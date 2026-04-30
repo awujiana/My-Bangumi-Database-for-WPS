@@ -480,3 +480,17 @@ function setBangumiToken() {
         alert("Token 已保存！");
     }
 }
+
+// ========== 显示同步面板 ==========
+function showBangumiPanel() {
+    let tsId = window.Application.PluginStorage.getItem("taskpane_id");
+    if (!tsId) {
+        let tskpane = window.Application.CreateTaskPane(GetUrlPath() + "/ui/taskpane.html");
+        let id = tskpane.ID;
+        window.Application.PluginStorage.setItem("taskpane_id", id);
+        tskpane.Visible = true;
+    } else {
+        let tskpane = window.Application.GetTaskPane(tsId);
+        tskpane.Visible = !tskpane.Visible;
+    }
+}

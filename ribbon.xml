@@ -3,11 +3,11 @@
         <tabs>
             <tab id="wpsAddinTab" label="Bangumi同步">
 				<group id="bangumiGroup" label="Bangumi">
-                    <button id="btnSyncBangumi" label="同步到Bangumi" onAction="OnAction" getEnabled="OnGetEnabled" getImage="GetBangumiImage" size="large"/>
+                    <button id="btnShowPanel" label="打开同步面板" onAction="OnAction" getImage="GetBangumiImage" size="large"/>
+                    <button id="btnSyncBangumi" label="快速同步" onAction="OnAction" getImage="GetBangumiImage" size="large"/>
                     <button id="btnSetToken" label="设置Token" onAction="OnAction" getImage="GetBangumiImage" size="large"/>
                     <button id="btnTestSync" label="测试同步" onAction="OnAction" getImage="GetBangumiImage" size="large"/>
-                    <button id="btnPreviewUrl" label="预览URL提取" onAction="OnAction" getImage="GetBangumiImage" size="large"/>
-                    <button id="btnPreviewJson" label="预览JSON" onAction="OnAction" getImage="GetBangumiImage" size="large"/>
+                    <button id="btnPreviewUrl" label="预览URL" onAction="OnAction" getImage="GetBangumiImage" size="large"/>
                     <button id="btnClearColors" label="清除标记" onAction="OnAction" getImage="GetBangumiImage" size="large"/>
 				</group>
             </tab>

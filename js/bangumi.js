@@ -139,24 +139,48 @@ function getColumnMap(ws, headerRow) {
         let colName = trim(String(ws.Cells(headerRow, i).Value()));
         if (colName === "") continue;
 
-        if (colName.toLowerCase().indexOf("bangumi") >= 0 || colName.toLowerCase().indexOf("bgm") >= 0 || colName.indexOf("URL") >= 0) {
+        // 精确匹配和模糊匹配
+        let lowerName = colName.toLowerCase();
+        
+        // Bangumi URL 列
+        if (lowerName.indexOf("bangumi") >= 0 || lowerName.indexOf("bgm") >= 0 || colName.indexOf("URL") >= 0 || colName === "Bangumi URL") {
             colMap.set("Bangumi_URL", i);
-        } else if (colName.indexOf("是否看完") >= 0 || colName.indexOf("观看状态") >= 0) {
+        }
+        // 观看状态 - 支持"是否看完"
+        else if (colName.indexOf("是否看完") >= 0 || colName.indexOf("观看状态") >= 0) {
             colMap.set("是否看完", i);
-        } else if (colName.indexOf("完播") >= 0 || colName.indexOf("看完时间") >= 0) {
+        }
+        // 完播相关 - 支持"看完时间"
+        else if (colName.indexOf("完播") >= 0 || colName.indexOf("看完时间") >= 0) {
             colMap.set("完播日", i);
-        } else if (colName.indexOf("打分") >= 0 || colName.indexOf("评分") >= 0) {
+        }
+        // 打分
+        else if (colName.indexOf("打分") >= 0 || colName.indexOf("评分") >= 0) {
             colMap.set("打分", i);
-        } else if (colName.indexOf("感言") >= 0 || colName.indexOf("剧透") >= 0 || colName.indexOf("评价") >= 0) {
+        }
+        // 评论/感言
+        else if (colName.indexOf("感言") >= 0 || colName.indexOf("剧透") >= 0 || colName.indexOf("评价") >= 0 || colName.indexOf("评论") >= 0) {
             colMap.set("剧透/感言", i);
-        } else if (colName.indexOf("标签") >= 0 || colName.indexOf("分级") >= 0) {
+        }
+        // 标签/分级 - 你的数据中是"标签/分级"
+        else if (colName.indexOf("标签") >= 0 || colName.indexOf("分级") >= 0) {
             colMap.set("标签/分级", i);
-        } else if (colName.indexOf("特点") >= 0 || colName.indexOf("印象") >= 0) {
+        }
+        // 特点/印象
+        else if (colName.indexOf("特点") >= 0 || colName.indexOf("印象") >= 0) {
             colMap.set("特点/印象", i);
-        } else if (colName.indexOf("集号") >= 0 || colName.indexOf("看到") >= 0) {
+        }
+        // 集号/看到
+        else if (colName.indexOf("集号") >= 0 || colName.indexOf("看到") >= 0) {
             colMap.set("集号", i);
-        } else if (colName.indexOf("集数") >= 0) {
+        }
+        // 集数
+        else if (colName.indexOf("集数") >= 0) {
             colMap.set("集数", i);
+        }
+        // 名称
+        else if (colName.indexOf("名称") >= 0 || colName.indexOf("标题") >= 0 || colName.indexOf("名") >= 0) {
+            colMap.set("名称", i);
         }
     }
     return colMap;
@@ -245,21 +269,33 @@ function mapWatchStatus(status, finishedDate) {
         return 1; // 默认想看
     }
 
-    switch (trim(status)) {
+    let s = trim(status);
+    switch (s) {
         case "是":
-            return 3;
+        case "看过":
+        case "完":
+            return 3; // 看过
         case "否":
-            return 1;
+        case "想看":
+        case "想看动画":
+            return 1; // 想看
         case "在追":
         case "在看":
-            return 2;
+        case "追":
+            return 2; // 在看
         case "搁置":
         case "暂停":
-            return 4;
+        case "停":
+            return 4; // 搁置
         case "抛弃":
         case "弃":
-            return 5;
+        case "弃番":
+            return 5; // 抛弃
         default:
+            // 再次尝试模糊匹配
+            if (s.indexOf("看") >= 0 && s.indexOf("追") < 0) return 3;
+            if (s.indexOf("追") >= 0) return 2;
+            if (s.indexOf("搁") >= 0 || s.indexOf("停") >= 0) return 4;
             return finishedDate !== "" ? 3 : 1;
     }
 }
@@ -291,8 +327,9 @@ function buildTags(ws, row, colMap) {
 function addTagsFromStr(tagSet, raw) {
     if (raw === "") return;
 
-    let seps = ["|", "、", "/", "\\", ",", ";", " ", "｜"];
-    let s = raw;
+    // 主要分隔符是 | ，同时支持其他常见分隔符
+    let seps = ["|", "、", "/", "\\", ",", ";", "｜", "，", "。"];
+    let s = String(raw);
 
     for (let sep of seps) {
         s = s.split(sep).join("|");
@@ -301,8 +338,12 @@ function addTagsFromStr(tagSet, raw) {
     let parts = s.split("|");
     for (let p of parts) {
         let tag = trim(p);
+        // 移除首尾空格和特殊字符
+        tag = tag.replace(/^\s+|\s+$/g, "");
+        // 标签不能含空格，用下划线替换
         tag = tag.split(" ").join("_");
-        if (tag !== "" && !tagSet.has(tag)) {
+        tag = tag.split("\t").join("_");
+        if (tag !== "" && !tagSet.has(tag) && tag.length > 0) {
             tagSet.add(tag);
         }
     }
@@ -478,5 +519,19 @@ function setBangumiToken() {
     if (newToken !== null && newToken.trim()) {
         window.Application.PluginStorage.setItem("bgm_token", newToken.trim());
         alert("Token 已保存！");
+    }
+}
+
+// ========== 显示同步面板 ==========
+function showBangumiPanel() {
+    let tsId = window.Application.PluginStorage.getItem("taskpane_id");
+    if (!tsId) {
+        let tskpane = window.Application.CreateTaskPane(GetUrlPath() + "/ui/taskpane.html");
+        let id = tskpane.ID;
+        window.Application.PluginStorage.setItem("taskpane_id", id);
+        tskpane.Visible = true;
+    } else {
+        let tskpane = window.Application.GetTaskPane(tsId);
+        tskpane.Visible = !tskpane.Visible;
     }
 }

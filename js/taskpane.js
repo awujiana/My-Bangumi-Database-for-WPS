@@ -1,62 +1,360 @@
-function onbuttonclick(idStr)
-{
-    if (typeof (window.Application.Enum) != "object") { // 如果没有内置枚举值
-        window.Application.Enum = WPS_Enum
+// ========== 面板初始化 ==========
+window.onload = () => {
+    // 检查枚举
+    if (typeof window.Application.Enum !== "object") {
+        window.Application.Enum = WPS_Enum;
     }
-    switch(idStr)
-    {
-        case "dockLeft":{
-                let tsId = window.Application.PluginStorage.getItem("taskpane_id")
-                if (tsId){
-                    let tskpane = window.Application.GetTaskPane(tsId)
-                    tskpane.DockPosition = window.Application.Enum.msoCTPDockPositionLeft
-                }
-                break
-            }
-        case "dockRight":{
-            let tsId = window.Application.PluginStorage.getItem("taskpane_id")
-                if (tsId){
-                    let tskpane = window.Application.GetTaskPane(tsId)
-                    tskpane.DockPosition = window.Application.Enum.msoCTPDockPositionRight
-                }
-                break
-        }
-        case "hideTaskPane":{
-            let tsId = window.Application.PluginStorage.getItem("taskpane_id")
-                if (tsId){
-                    let tskpane = window.Application.GetTaskPane(tsId)
-                    tskpane.Visible = false
-                }
-                break
-        }
-        case "addString":{
-            let curSheet = window.Application.ActiveSheet;
-            if (curSheet){
-                curSheet.Cells.Item(1, 1).Formula="Hello, wps加载项!" + curSheet.Cells.Item(1, 1).Formula
-            }
-            break;
-        }
-        case "getDocName":{
-            let doc = window.Application.ActiveWorkbook
-                let textValue = "";
-                if (!doc){
-                    textValue = textValue + "当前没有打开任何文档"
-                    return
-                }
-                textValue = textValue + doc.Name
-                document.getElementById("text_p").innerHTML = textValue
-                break
+
+    // 更新Token状态
+    updateTokenStatus();
+
+    // 加载工作表列表
+    refreshSheets();
+
+    // 刷新数据预览
+    setTimeout(() => refreshData(), 500);
+};
+
+// ========== Token 状态更新 ==========
+function updateTokenStatus() {
+    let token = window.Application.PluginStorage.getItem("bgm_token");
+    let statusEl = document.getElementById("tokenStatus");
+    if (statusEl) {
+        if (token) {
+            statusEl.textContent = "已设置 ✓";
+            statusEl.className = "set";
+        } else {
+            statusEl.textContent = "未设置 ✗";
+            statusEl.className = "";
         }
     }
 }
 
-window.onload = ()=>{
-    var xmlReq = WpsInvoke.CreateXHR();
-    var url = location.origin + "/.debugTemp/NotifyDemoUrl"
-    xmlReq.open("GET", url);
-    xmlReq.onload = function (res) {
-        var node = document.getElementById("DemoSpan");
-        window.document.getElementById("DemoSpan").innerHTML = res.target.responseText;
-    };
-    xmlReq.send();
+// ========== 刷新工作表列表 ==========
+function refreshSheets() {
+    let select = document.getElementById("sheetSelect");
+    if (!select) return;
+
+    select.innerHTML = '<option value="">-- 请选择 --</option>';
+
+    try {
+        let sheets = window.Application.ActiveWorkbook.Sheets;
+        for (let i = 1; i <= sheets.Count; i++) {
+            let option = document.createElement("option");
+            option.value = i;
+            option.textContent = sheets(i).Name;
+            select.appendChild(option);
+        }
+        // 默认选择活动工作表
+        let activeSheet = window.Application.ActiveSheet;
+        for (let i = 0; i < select.options.length; i++) {
+            if (select.options[i].textContent === activeSheet.Name) {
+                select.selectedIndex = i;
+                break;
+            }
+        }
+    } catch (e) {
+        console.error("获取工作表失败:", e);
+    }
+}
+
+// ========== 刷新数据预览 ==========
+function refreshData() {
+    setStatus("正在加载数据...", "loading");
+
+    let select = document.getElementById("sheetSelect");
+    let headerRowInput = document.getElementById("headerRow");
+    let startRowInput = document.getElementById("startRow");
+    let endRowInput = document.getElementById("endRow");
+    let previewBox = document.getElementById("previewBox");
+    let previewCount = document.getElementById("previewCount");
+
+    if (!select || !previewBox) return;
+
+    let sheetIndex = parseInt(select.value) || 1;
+    let headerRow = parseInt(headerRowInput?.value) || 1;
+    let startRow = parseInt(startRowInput?.value) || 2;
+    let endRow = parseInt(endRowInput?.value) || 0;
+
+    try {
+        let sheets = window.Application.ActiveWorkbook.Sheets;
+        let ws = sheets(sheetIndex);
+
+        if (!ws) {
+            setStatus("未找到工作表", "error");
+            return;
+        }
+
+        let lastRow = ws.Cells(ws.Rows.Count, 1).End(-4162).Row;
+        if (endRow === 0 || endRow > lastRow) {
+            if (endRowInput) endRowInput.value = lastRow;
+            endRow = lastRow;
+        }
+
+        // 获取列映射
+        let colMap = getColumnMap(ws, headerRow);
+
+        // 生成预览表格
+        let html = '<table><thead><tr>';
+        html += '<th>#</th><th>名称</th><th>URL→ID</th><th>状态</th><th>type</th><th>打分</th><th>标签</th>';
+        html += '</tr></thead><tbody>';
+
+        // 数据行
+        let previewRows = Math.min(15, endRow - startRow + 1);
+        let validCount = 0;
+        
+        for (let i = startRow; i < startRow + previewRows && i <= endRow; i++) {
+            let name = colMap.has("名称") ? trim(String(ws.Cells(i, colMap.get("名称")).Value())) : "";
+            let bgmUrl = colMap.has("Bangumi_URL") ? trim(String(ws.Cells(i, colMap.get("Bangumi_URL")).Value())) : "";
+            let status = colMap.has("是否看完") ? trim(String(ws.Cells(i, colMap.get("是否看完")).Value())) : "";
+            let rate = colMap.has("打分") ? trim(String(ws.Cells(i, colMap.get("打分")).Value())) : "";
+            let tagsRaw = colMap.has("标签/分级") ? trim(String(ws.Cells(i, colMap.get("标签/分级")).Value())) : "";
+            
+            let finishedDate = colMap.has("完播日") ? trim(String(ws.Cells(i, colMap.get("完播日")).Value())) : "";
+            
+            let sid = extractSubjectId(bgmUrl);
+            let hasUrl = sid !== "";
+            if (hasUrl) validCount++;
+
+            // 解析状态
+            let typeNum = mapWatchStatus(status, finishedDate);
+            let typeName = ["", "想看", "在看", "看过", "搁置", "抛弃"][typeNum] || "未知";
+
+            // 处理标签
+            let tagsDisplay = "";
+            if (tagsRaw) {
+                let tagSet = new Set();
+                addTagsFromStr(tagSet, tagsRaw);
+                let tags = Array.from(tagSet).slice(0, 5);
+                tagsDisplay = tags.join(", ");
+                if (tagSet.size > 5) tagsDisplay += "...";
+            }
+
+            let bgColor = hasUrl ? '#d5f5e3' : '#fadbd8';
+            
+            html += `<tr style="background:${bgColor}">`;
+            html += `<td>${i}</td>`;
+            html += `<td style="max-width:80px;overflow:hidden;text-overflow:ellipsis;">${name ? (name.length > 10 ? name.substring(0, 10) + '...' : name) : '-'}</td>`;
+            html += `<td>${sid || '❌'}</td>`;
+            html += `<td><span style="color:${statusColor(status)}">${status || '-'}</span></td>`;
+            html += `<td>${typeNum}</td>`;
+            html += `<td>${rate || '-'}</td>`;
+            html += `<td style="font-size:11px;max-width:100px;overflow:hidden;">${tagsDisplay || '-'}</td>`;
+            html += '</tr>';
+        }
+
+        html += '</tbody></table>';
+        html += `<p style="margin-top:10px;color:#7f8c8d;font-size:12px;">
+            显示 ${previewRows}/${endRow - startRow + 1} 行 | 
+            有效: <b style="color:#27ae60">${validCount}</b> | 
+            绿色=可同步 红色=跳过
+        </p>`;
+
+        previewBox.innerHTML = html;
+        if (previewCount) previewCount.textContent = `(${startRow}-${endRow}, 共${endRow - startRow + 1}行)`;
+
+        setStatus("就绪", "success");
+    } catch (e) {
+        console.error("刷新数据失败:", e);
+        previewBox.innerHTML = `<p class="hint">加载失败: ${e.message}</p>`;
+        setStatus("加载失败", "error");
+    }
+}
+
+// ========== 状态颜色 ==========
+function statusColor(status) {
+    switch (status) {
+        case "是": return "#27ae60";
+        case "在追": return "#3498db";
+        case "搁置": return "#f39c12";
+        case "否": return "#7f8c8d";
+        default: return "#2c3e50";
+    }
+}
+
+// ========== 详细预览同步内容 ==========
+function previewSyncContent() {
+    let select = document.getElementById("sheetSelect");
+    let headerRowInput = document.getElementById("headerRow");
+    let startRowInput = document.getElementById("startRow");
+    let endRowInput = document.getElementById("endRow");
+
+    let sheetIndex = parseInt(select?.value) || 1;
+    let headerRow = parseInt(headerRowInput?.value) || 1;
+    let startRow = parseInt(startRowInput?.value) || 2;
+    let endRow = parseInt(endRowInput?.value) || 0;
+
+    if (endRow === 0) {
+        let sheets = window.Application.ActiveWorkbook.Sheets;
+        let ws = sheets(sheetIndex);
+        endRow = ws.Cells(ws.Rows.Count, 1).End(-4162).Row;
+    }
+
+    try {
+        let sheets = window.Application.ActiveWorkbook.Sheets;
+        let ws = sheets(sheetIndex);
+        let colMap = getColumnMap(ws, headerRow);
+
+        let msg = "=== 同步内容预览 ===\n\n";
+        let previewCount = Math.min(5, endRow - startRow + 1);
+        let totalValid = 0;
+        let typeCount = {1:0, 2:0, 3:0, 4:0, 5:0};
+
+        for (let i = startRow; i <= startRow + previewCount - 1 && i <= endRow; i++) {
+            let bgmUrl = colMap.has("Bangumi_URL") ? trim(String(ws.Cells(i, colMap.get("Bangumi_URL")).Value())) : "";
+            let name = colMap.has("名称") ? trim(String(ws.Cells(i, colMap.get("名称")).Value())) : "";
+            let status = colMap.has("是否看完") ? trim(String(ws.Cells(i, colMap.get("是否看完")).Value())) : "";
+            let rate = colMap.has("打分") ? trim(String(ws.Cells(i, colMap.get("打分")).Value())) : "";
+            let tagsRaw = colMap.has("标签/分级") ? trim(String(ws.Cells(i, colMap.get("标签/分级")).Value())) : "";
+            let finishedDate = colMap.has("完播日") ? trim(String(ws.Cells(i, colMap.get("完播日")).Value())) : "";
+
+            let sid = extractSubjectId(bgmUrl);
+            if (sid) {
+                totalValid++;
+                let typeNum = mapWatchStatus(status, finishedDate);
+                typeCount[typeNum] = (typeCount[typeNum] || 0) + 1;
+            }
+
+            let typeNum = mapWatchStatus(status, finishedDate);
+            let typeName = ["", "想看", "在看", "看过", "搁置", "抛弃"][typeNum];
+            
+            // 处理标签
+            let tagSet = new Set();
+            addTagsFromStr(tagSet, tagsRaw);
+            let tags = Array.from(tagSet);
+
+            msg += `【行${i}】${name || '(无名称)'}\n`;
+            msg += `  URL: ${bgmUrl || '(空)'}\n`;
+            msg += `  subject_id: ${sid || '❌无法提取'}\n`;
+            msg += `  状态: "${status}" → type=${typeNum}(${typeName})\n`;
+            msg += `  完播日: ${finishedDate || '(空)'}\n`;
+            msg += `  评分: ${rate || '(空)'}\n`;
+            msg += `  标签: [${tags.join(', ') || '(空)'}]\n`;
+            
+            if (sid) {
+                msg += `  → 将发送: POST /v0/users/-/collections/${sid}\n`;
+                msg += `  → JSON: ${buildJsonPayload(ws, i, colMap, finishedDate)}\n`;
+            }
+            msg += "\n";
+        }
+
+        // 统计
+        msg += "=== 统计 ===\n";
+        msg += `总行数: ${endRow - startRow + 1}\n`;
+        msg += `有效URL: ${totalValid}\n`;
+        msg += `状态分布: 看过=${typeCount[3]} 在看=${typeCount[2]} 想看=${typeCount[1]} 搁置=${typeCount[4]}\n`;
+
+        alert(msg);
+    } catch (e) {
+        alert("预览失败: " + e.message);
+    }
+}
+
+// ========== 面板操作处理 ==========
+function onAction(action) {
+    switch (action) {
+        case "sync":
+            syncFromPanel();
+            break;
+        case "test":
+            testSingleUpdate();
+            break;
+        case "clear":
+            clearRowColors();
+            refreshData();
+            break;
+        case "setToken":
+            setBangumiToken();
+            updateTokenStatus();
+            break;
+    }
+}
+
+// ========== 从面板同步 ==========
+function syncFromPanel() {
+    let token = window.Application.PluginStorage.getItem("bgm_token");
+    if (!token) {
+        alert("请先设置 Bangumi Token！");
+        setBangumiToken();
+        updateTokenStatus();
+        return;
+    }
+
+    let select = document.getElementById("sheetSelect");
+    let startRowInput = document.getElementById("startRow");
+    let endRowInput = document.getElementById("endRow");
+
+    let sheetIndex = parseInt(select.value) || 1;
+    let startRow = parseInt(startRowInput?.value) || 2;
+    let endRow = parseInt(endRowInput?.value) || 0;
+
+    if (endRow === 0) {
+        let sheets = window.Application.ActiveWorkbook.Sheets;
+        let ws = sheets(sheetIndex);
+        endRow = ws.Cells(ws.Rows.Count, 1).End(-4162).Row;
+    }
+
+    setStatus("正在同步...", "loading");
+
+    let successCount = 0, failCount = 0, skipCount = 0;
+    let total = endRow - startRow + 1;
+
+    try {
+        let sheets = window.Application.ActiveWorkbook.Sheets;
+        let ws = sheets(sheetIndex);
+
+        for (let i = startRow; i <= endRow; i++) {
+            let bgmUrl = trim(ws.Cells(i, 1).Value());
+            let subjectId = extractSubjectId(bgmUrl);
+
+            if (subjectId === "") {
+                skipCount++;
+                ws.Cells(i, 1).Interior.Color = 0xFFFFCC;
+                continue;
+            }
+
+            // 获取完播日
+            let finishedDate = "";
+            // 构建请求体 - 简化版
+            let jsonBody = '{"type":3}';
+
+            let result = bgmRequestSync("POST", "/v0/users/-/collections/" + subjectId, jsonBody, token);
+            let statusCode = result.code;
+
+            if (statusCode === 204 || statusCode === 200) {
+                successCount++;
+                ws.Cells(i, 1).Interior.Color = 0xCCFFCC;
+            } else {
+                failCount++;
+                ws.Cells(i, 1).Interior.Color = 0xFFCCCC;
+                console.log("行 " + i + " 失败: " + result.message);
+            }
+
+            // 进度
+            if (i % 5 === 0) {
+                window.Application.StatusBar = `同步进度: ${i - startRow + 1}/${total}`;
+            }
+
+            // 延迟
+            sleep(REQUEST_DELAY);
+        }
+
+        window.Application.StatusBar = false;
+
+        setStatus(`完成! 成功:${successCount} 失败:${failCount} 跳过:${skipCount}`, "success");
+
+        alert(`同步完成！\n成功: ${successCount}\n失败: ${failCount}\n跳过: ${skipCount}`);
+    } catch (e) {
+        console.error("同步失败:", e);
+        setStatus("同步失败: " + e.message, "error");
+    }
+}
+
+// ========== 设置状态 ==========
+function setStatus(msg, type) {
+    let statusBox = document.getElementById("statusBox");
+    if (statusBox) {
+        statusBox.textContent = msg;
+        statusBox.className = "status " + (type || "");
+    }
 }

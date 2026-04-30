@@ -20,6 +20,9 @@ function OnAction(control) {
     const eleId = control.Id
     switch (eleId) {
         // ========== Bangumi 同步相关 ==========
+        case "btnShowPanel":
+            showBangumiPanel();
+            break;
         case "btnSyncBangumi":
             SyncToBangumi();
             break;
@@ -31,9 +34,6 @@ function OnAction(control) {
             break;
         case "btnPreviewUrl":
             previewSubjectIdExtraction();
-            break;
-        case "btnPreviewJson":
-            previewJsonPayload();
             break;
         case "btnClearColors":
             clearRowColors();
