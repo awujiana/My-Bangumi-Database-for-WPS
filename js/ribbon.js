@@ -67,15 +67,8 @@ function GetBangumiImage(control) {
     return "images/newFromTemp.svg"
 }
 
-// ========== 打开调试控制台 ==========
-function openDebugConsole() {
-    let debugUrl = "http://localhost:3889/";
-    try {
-        window.Application.OAAssist.ShellExecute(debugUrl);
-    } catch (e) {
-        window.open(debugUrl, "_blank");
-    }
-}
+
+
 
 
 
