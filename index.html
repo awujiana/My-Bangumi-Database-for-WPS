@@ -3,5 +3,31 @@
     <meta charset="utf-8">
     <script type="text/javascript" src="./main.js"></script>
     <script type="module" src="./js/functions.js"></script>
+    <script>
+        // 调试通知功能：向开发服务器发送请求
+        window.onload = function() {
+            try {
+                var xmlReq = WpsInvoke.CreateXHR();
+                var url = location.origin + "/.debugTemp/NotifyDemoUrl";
+                xmlReq.open("GET", url);
+                xmlReq.onload = function (res) {
+                    console.log("调试通知:", res.target.responseText);
+                    // 尝试在页面上显示（如果有 DemoSpan 元素）
+                    var node = document.getElementById("DemoSpan");
+                    if (node) {
+                        node.innerHTML = res.target.responseText;
+                    }
+                };
+                xmlReq.onerror = function () {
+                    console.log("调试服务器未连接（生产模式或服务器未启动）");
+                };
+                xmlReq.send();
+            } catch (e) {
+                console.log("调试通知功能不可用:", e.message);
+            }
+        };
+    </script>
+    <!-- 调试信息显示区域（可选）-->
+    <div id="DemoSpan" style="display:none;"></div>
 </html>
 <!--这个文件是wps加载项的入口文件，wps在启动时加载这个文件-->
