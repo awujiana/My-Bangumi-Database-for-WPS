@@ -47,12 +47,140 @@ window.onload = () => {
         sheetSelect.onchange = () => refreshData();
     }
 
+    // 对话框回车确认
+    let dialogInput = document.getElementById("dialogInput");
+    if (dialogInput) {
+        dialogInput.onkeypress = (e) => {
+            if (e.key === "Enter") {
+                closeDialog(true);
+            }
+        };
+    }
+
+    // 绑定所有链接点击事件（使用 WPS 方式打开）
+    document.addEventListener("click", (e) => {
+        if (e.target.tagName === "A") {
+            e.preventDefault();
+            let url = e.target.href;
+            if (url) {
+                try {
+                    window.Application.OAAssist.ShellExecute(url);
+                } catch (err) {
+                    window.open(url, "_blank");
+                }
+            }
+        }
+    });
+
+    // 右键菜单 - 显示/隐藏
+    let contextMenu = document.getElementById("contextMenu");
+    let contextTarget = null;
+
+    document.addEventListener("contextmenu", (e) => {
+        let target = e.target;
+        // 只在输入框上显示菜单
+        if (target.tagName === "INPUT" || target.tagName === "TEXTAREA") {
+            e.preventDefault();
+            contextTarget = target;
+            contextMenu.style.display = "block";
+            contextMenu.style.left = e.clientX + "px";
+            contextMenu.style.top = e.clientY + "px";
+        }
+    });
+
+    document.addEventListener("click", () => {
+        if (contextMenu) {
+            contextMenu.style.display = "none";
+        }
+    });
+
     // 加载工作表列表（延迟加载，等待 DOM 完全就绪）
     setTimeout(() => {
         refreshSheets();
         refreshData();
     }, 300);
 };
+
+// ========== 自定义对话框 ==========
+let dialogCallback = null;
+
+function showInputDialog(title, message, defaultValue, callback) {
+    let modal = document.getElementById("inputDialog");
+    let titleEl = document.getElementById("dialogTitle");
+    let messageEl = document.getElementById("dialogMessage");
+    let inputEl = document.getElementById("dialogInput");
+
+    if (!modal || !titleEl || !messageEl || !inputEl) {
+        alert(message + "\n\n" + defaultValue);
+        callback(defaultValue);
+        return;
+    }
+
+    titleEl.textContent = title;
+    messageEl.innerHTML = message.replace(/\n/g, "<br>");
+    inputEl.value = defaultValue;
+    dialogCallback = callback;
+
+    modal.style.display = "flex";
+    setTimeout(() => inputEl.focus(), 100);
+}
+
+function closeDialog(confirmed) {
+    let modal = document.getElementById("inputDialog");
+    let inputEl = document.getElementById("dialogInput");
+
+    modal.style.display = "none";
+
+    if (confirmed && dialogCallback) {
+        dialogCallback(inputEl.value);
+    }
+    dialogCallback = null;
+}
+
+// ========== 右键菜单操作 ==========
+function contextAction(action) {
+    if (!contextTarget) return;
+
+    let input = contextTarget;
+    let start = input.selectionStart;
+    let end = input.selectionEnd;
+    let text = input.value;
+
+    switch (action) {
+        case "cut":
+            if (start !== end) {
+                let selected = text.substring(start, end);
+                document.execCommand("copy");
+                input.value = text.substring(0, start) + text.substring(end);
+                input.selectionStart = input.selectionEnd = start;
+            }
+            break;
+        case "copy":
+            if (start !== end) {
+                let selected = text.substring(start, end);
+                navigator.clipboard.writeText(selected).catch(() => {
+                    // Fallback
+                    let textarea = document.createElement("textarea");
+                    textarea.value = selected;
+                    document.body.appendChild(textarea);
+                    textarea.select();
+                    document.execCommand("copy");
+                    document.body.removeChild(textarea);
+                });
+            }
+            break;
+        case "paste":
+            navigator.clipboard.readText().then((pastedText) => {
+                input.value = text.substring(0, start) + pastedText + text.substring(end);
+                input.selectionStart = input.selectionEnd = start + pastedText.length;
+            }).catch(() => {});
+            break;
+        case "selectAll":
+            input.selectionStart = 0;
+            input.selectionEnd = text.length;
+            break;
+    }
+}
 
 // ========== Token 状态更新 ==========
 function updateTokenStatus() {
@@ -351,58 +479,73 @@ function syncFromPanel() {
     let token = window.Application.PluginStorage.getItem("bgm_token");
     if (!token) {
         alert("请先设置 Bangumi Token！");
-        setBangumiToken();
-        updateTokenStatus();
+        showTokenDialog("");
         return;
     }
 
     let select = document.getElementById("sheetSelect");
+    let headerRowInput = document.getElementById("headerRow");
     let startRowInput = document.getElementById("startRow");
     let endRowInput = document.getElementById("endRow");
 
     let sheetIndex = parseInt(select.value) || 1;
+    let headerRow = parseInt(headerRowInput?.value) || 1;
     let startRow = parseInt(startRowInput?.value) || 2;
     let endRow = parseInt(endRowInput?.value) || 0;
-
-    if (endRow === 0) {
-        let sheets = window.Application.ActiveWorkbook.Sheets;
-        let ws = sheets(sheetIndex);
-        endRow = ws.Cells(ws.Rows.Count, 1).End(-4162).Row;
-    }
-
-    setStatus("正在同步...", "loading");
-
-    let successCount = 0, failCount = 0, skipCount = 0;
-    let total = endRow - startRow + 1;
 
     try {
         let sheets = window.Application.ActiveWorkbook.Sheets;
         let ws = sheets(sheetIndex);
 
+        if (endRow === 0) {
+            endRow = ws.Cells(ws.Rows.Count, 1).End(-4162).Row;
+        }
+
+        // 获取列映射
+        let colMap = getColumnMap(ws, headerRow);
+        if (!colMap.has("Bangumi_URL")) {
+            alert("未找到 Bangumi URL 列！");
+            return;
+        }
+
+        setStatus("正在同步...", "loading");
+
+        let successCount = 0, failCount = 0, skipCount = 0;
+        let total = endRow - startRow + 1;
+
         for (let i = startRow; i <= endRow; i++) {
-            let bgmUrl = trim(ws.Cells(i, 1).Value());
+            // 从正确的列获取 URL
+            let bgmUrl = trim(String(ws.Cells(i, colMap.get("Bangumi_URL")).Value()));
             let subjectId = extractSubjectId(bgmUrl);
 
             if (subjectId === "") {
                 skipCount++;
-                ws.Cells(i, 1).Interior.Color = 0xFFFFCC;
+                ws.Cells(i, colMap.get("Bangumi_URL")).Interior.Color = 0xFFFFCC;
                 continue;
             }
 
             // 获取完播日
             let finishedDate = "";
-            // 构建请求体 - 简化版
-            let jsonBody = '{"type":3}';
+            if (colMap.has("完播日")) {
+                finishedDate = trim(String(ws.Cells(i, colMap.get("完播日")).Value()));
+            }
+
+            // 构建完整请求体
+            let jsonBody = buildJsonPayload(ws, i, colMap, finishedDate);
+            if (jsonBody === "") {
+                skipCount++;
+                continue;
+            }
 
             let result = bgmRequestSync("POST", "/v0/users/-/collections/" + subjectId, jsonBody, token);
             let statusCode = result.code;
 
             if (statusCode === 204 || statusCode === 200) {
                 successCount++;
-                ws.Cells(i, 1).Interior.Color = 0xCCFFCC;
+                ws.Cells(i, colMap.get("Bangumi_URL")).Interior.Color = 0xCCFFCC;
             } else {
                 failCount++;
-                ws.Cells(i, 1).Interior.Color = 0xFFCCCC;
+                ws.Cells(i, colMap.get("Bangumi_URL")).Interior.Color = 0xFFCCCC;
                 console.log("行 " + i + " 失败: " + result.message);
             }
 
@@ -437,13 +580,18 @@ function setStatus(msg, type) {
 
 // ========== Token 设置对话框 ==========
 function showTokenDialog(currentToken) {
-    let token = prompt("请输入 Bangumi Access Token：\n\n获取方式：Bangumi → 设置 → API → 创建应用", currentToken || "");
-    if (token !== null && token.trim() !== "") {
-        window.Application.PluginStorage.setItem("bgm_token", token.trim());
-        updateTokenStatus();
-        // 设置后自动测试 Token
-        testTokenValidity(token.trim());
-    }
+    showInputDialog(
+        "设置 Bangumi Token",
+        "请输入 Bangumi Access Token<br><br>获取方式：从 <a href='https://next.bgm.tv/demo/access-token/create' target='_blank'>https://next.bgm.tv/demo/access-token/create</a> 创建",
+        currentToken || "",
+        (token) => {
+            if (token && token.trim() !== "") {
+                window.Application.PluginStorage.setItem("bgm_token", token.trim());
+                updateTokenStatus();
+                testTokenValidity(token.trim());
+            }
+        }
+    );
 }
 
 // ========== 测试 Token 有效性 ==========
@@ -472,8 +620,11 @@ function testTokenValidity(token) {
             alert("✓ Token 验证成功！\n\n用户: " + (userData.nickname || userData.username) + "\nID: " + userData.id);
             return true;
         } else if (xhr.status === 401) {
+            // 清除无效的 Token
+            window.Application.PluginStorage.setItem("bgm_token", "");
+            updateTokenStatus();
             setStatus("Token 无效", "error");
-            alert("✗ Token 验证失败！\n\n请检查 Token 是否正确，或重新获取新的 Token。");
+            alert("✗ Token 验证失败！\n\nToken 已清除，请重新获取正确的 Token。");
             return false;
         } else {
             setStatus("验证失败 (" + xhr.status + ")", "error");
@@ -490,12 +641,18 @@ function testTokenValidity(token) {
 // ========== 用户ID 设置对话框 ==========
 function showUserIdDialog() {
     let currentId = window.Application.PluginStorage.getItem("bgm_user_id") || "";
-    let userId = prompt("请输入 Bangumi 用户ID：\n\n获取方式：打开你的 Bangumi 主页，URL 中的数字/字母即为用户ID\n例如：https://bgm.tv/user/972358 → 用户ID: 972358", currentId);
-    if (userId !== null && userId.trim() !== "") {
-        window.Application.PluginStorage.setItem("bgm_user_id", userId.trim());
-        updateUserIdStatus();
-        alert("用户ID 设置成功！");
-    }
+    showInputDialog(
+        "设置 Bangumi 用户ID",
+        "请输入 Bangumi 用户ID<br><br>获取方式：打开你的 Bangumi 主页，URL 中的数字/字母即为用户ID<br>例如：https://bgm.tv/user/972358 → 用户ID: 972358",
+        currentId,
+        (userId) => {
+            if (userId && userId.trim() !== "") {
+                window.Application.PluginStorage.setItem("bgm_user_id", userId.trim());
+                updateUserIdStatus();
+                alert("用户ID 设置成功！");
+            }
+        }
+    );
 }
 
 // ========== 打开用户收藏页 ==========

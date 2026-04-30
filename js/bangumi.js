@@ -597,3 +597,5 @@ function showBangumiPanel() {
         tskpane.Visible = !tskpane.Visible;
     }
 }
+
+
