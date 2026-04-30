@@ -6,6 +6,12 @@
     <script>
         // 调试通知功能：向开发服务器发送请求
         window.onload = function() {
+            // 检查 WpsInvoke 是否可用
+            if (typeof WpsInvoke === "undefined") {
+                console.log("调试通知: WpsInvoke 不可用（生产模式）");
+                return;
+            }
+
             try {
                 var xmlReq = WpsInvoke.CreateXHR();
                 var url = location.origin + "/.debugTemp/NotifyDemoUrl";
