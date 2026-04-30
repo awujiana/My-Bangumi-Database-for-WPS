@@ -28,8 +28,8 @@
             <h3>Token 设置</h3>
             <div class="token-display">
                 <span id="tokenStatus">未设置</span>
-                <button class="btn small" id="setTokenBtn">设置/修改</button>
-                <button class="btn small primary" id="testTokenBtn">测试</button>
+                <button class="btn small" id="setTokenBtn" onclick="showTokenDialog(window.Application.PluginStorage.getItem('bgm_token') || '')">设置/修改</button>
+                <button class="btn small primary" id="testTokenBtn" onclick="testTokenValidity()">测试</button>
             </div>
             <p class="hint">Access Token 获取方式：Bangumi → 设置 → API → 创建应用</p>
         </div>
@@ -39,8 +39,8 @@
             <h3>收藏页访问</h3>
             <div class="token-display">
                 <span id="userIdStatus">未设置</span>
-                <button class="btn small" id="setUserIdBtn">设置用户ID</button>
-                <button class="btn small primary" id="openCollectionBtn">打开收藏页</button>
+                <button class="btn small" id="setUserIdBtn" onclick="showUserIdDialog()">设置用户ID</button>
+                <button class="btn small primary" id="openCollectionBtn" onclick="openUserCollection()">打开收藏页</button>
             </div>
             <p class="hint">用户ID：Bangumi主页URL中的数字/字母</p>
         </div>
