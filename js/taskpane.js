@@ -1,9 +1,34 @@
 // ========== 辅助函数：安全获取单元格 ==========
+function colNumToLetter(col) {
+    let letter = "";
+    while (col > 0) {
+        let mod = (col - 1) % 26;
+        letter = String.fromCharCode(65 + mod) + letter;
+        col = Math.floor((col - mod) / 26);
+    }
+    return letter;
+}
+
 function getCell(ws, row, col) {
     try {
-        return ws.Cells.Item(row, col);
-    } catch (e) {
+        // 优先使用 Range (WPS 兼容)
+        if (typeof ws.Range === 'function') {
+            let colLetter = colNumToLetter(col);
+            return ws.Range(colLetter + row);
+        }
+        // 回退：尝试 Cells 直接调用
+        if (typeof ws.Cells === 'function') {
+            return ws.Cells(row, col);
+        }
+        // 回退：尝试 Cells.Item
+        if (ws.Cells && typeof ws.Cells.Item === 'function') {
+            return ws.Cells.Item(row, col);
+        }
+        // 最后回退
         return ws.Cells(row, col);
+    } catch (e) {
+        console.error("getCell error:", e);
+        return null;
     }
 }
 
@@ -254,8 +279,6 @@ function refreshData() {
     setStatus("正在加载数据...", "loading");
 
     let select = document.getElementById("sheetSelect");
-    let headerRowInput = document.getElementById("headerRow");
-    let startRowInput = document.getElementById("startRow");
     let endRowInput = document.getElementById("endRow");
     let previewBox = document.getElementById("previewBox");
     let previewCount = document.getElementById("previewCount");
@@ -263,8 +286,6 @@ function refreshData() {
     if (!select || !previewBox) return;
 
     let sheetIndex = parseInt(select.value) || 1;
-    let headerRow = parseInt(headerRowInput?.value) || 1;
-    let startRow = parseInt(startRowInput?.value) || 2;
     let endRow = parseInt(endRowInput?.value) || 0;
 
     try {
@@ -276,6 +297,13 @@ function refreshData() {
             return;
         }
 
+        // 自动检测表头行
+        let headerRow = findHeaderRow(ws);
+        if (headerRow === 0) {
+            headerRow = 1; // 默认第1行
+        }
+        let startRow = headerRow + 1;
+
         let lastRow = getCell(ws, ws.Rows.Count, 1).End(-4162).Row;
         if (endRow === 0 || endRow > lastRow) {
             if (endRowInput) endRowInput.value = lastRow;
@@ -285,14 +313,15 @@ function refreshData() {
         // 获取列映射
         let colMap = getColumnMap(ws, headerRow);
 
-        // 生成预览表格
+        // 生成美化的预览表格
         let html = '<table><thead><tr>';
-        html += '<th>#</th><th>名称</th><th>URL→ID</th><th>状态</th><th>type</th><th>打分</th><th>标签</th>';
+        html += '<th>#</th><th>名称</th><th>ID</th><th>状态</th><th>类型</th><th>评分</th><th>标签</th>';
         html += '</tr></thead><tbody>';
 
         // 数据行
         let previewRows = Math.min(15, endRow - startRow + 1);
         let validCount = 0;
+        let typeStats = {1:0, 2:0, 3:0, 4:0, 5:0};
 
         for (let i = startRow; i < startRow + previewRows && i <= endRow; i++) {
             let name = colMap.has("名称") ? trim(String(getCell(ws, i, colMap.get("名称")).Value())) : "";
@@ -300,9 +329,8 @@ function refreshData() {
             let status = colMap.has("是否看完") ? trim(String(getCell(ws, i, colMap.get("是否看完")).Value())) : "";
             let rate = colMap.has("打分") ? trim(String(getCell(ws, i, colMap.get("打分")).Value())) : "";
             let tagsRaw = colMap.has("标签/分级") ? trim(String(getCell(ws, i, colMap.get("标签/分级")).Value())) : "";
-
             let finishedDate = colMap.has("完播日") ? trim(String(getCell(ws, i, colMap.get("完播日")).Value())) : "";
-            
+
             let sid = extractSubjectId(bgmUrl);
             let hasUrl = sid !== "";
             if (hasUrl) validCount++;
@@ -310,36 +338,47 @@ function refreshData() {
             // 解析状态
             let typeNum = mapWatchStatus(status, finishedDate);
             let typeName = ["", "想看", "在看", "看过", "搁置", "抛弃"][typeNum] || "未知";
+            typeStats[typeNum]++;
 
             // 处理标签
             let tagsDisplay = "";
             if (tagsRaw) {
                 let tagSet = new Set();
                 addTagsFromStr(tagSet, tagsRaw);
-                let tags = Array.from(tagSet).slice(0, 5);
-                tagsDisplay = tags.join(", ");
-                if (tagSet.size > 5) tagsDisplay += "...";
+                let tags = Array.from(tagSet).slice(0, 3);
+                tagsDisplay = tags.map(t => `<span class="tag-badge">${t}</span>`).join(' ');
+                if (tagSet.size > 3) tagsDisplay += `<span class="tag-badge" style="background:#95a5a6">+${tagSet.size - 3}</span>`;
             }
 
-            let bgColor = hasUrl ? '#d5f5e3' : '#fadbd8';
-            
-            html += `<tr style="background:${bgColor}">`;
-            html += `<td>${i}</td>`;
-            html += `<td style="max-width:80px;overflow:hidden;text-overflow:ellipsis;">${name ? (name.length > 10 ? name.substring(0, 10) + '...' : name) : '-'}</td>`;
-            html += `<td>${sid || '❌'}</td>`;
-            html += `<td><span style="color:${statusColor(status)}">${status || '-'}</span></td>`;
-            html += `<td>${typeNum}</td>`;
-            html += `<td>${rate || '-'}</td>`;
-            html += `<td style="font-size:11px;max-width:100px;overflow:hidden;">${tagsDisplay || '-'}</td>`;
+            html += `<tr class="${hasUrl ? 'valid' : 'invalid'}">`;
+            html += `<td class="row-num">${i}</td>`;
+            html += `<td class="name-cell" title="${name}">${name ? (name.length > 12 ? name.substring(0, 12) + '...' : name) : '-'}</td>`;
+            html += `<td class="sid-cell ${hasUrl ? 'has-url' : 'no-url'}">${sid || '❌无'}</td>`;
+            html += `<td class="status-cell"><span class="type-badge type-${typeNum}">${typeName}</span></td>`;
+            html += `<td class="type-cell">${typeNum}</td>`;
+            html += `<td class="rate-cell">${rate ? '⭐' + rate : '-'}</td>`;
+            html += `<td class="tags-cell">${tagsDisplay || '-'}</td>`;
             html += '</tr>';
         }
 
         html += '</tbody></table>';
-        html += `<p style="margin-top:10px;color:#7f8c8d;font-size:12px;">
-            显示 ${previewRows}/${endRow - startRow + 1} 行 | 
-            有效: <b style="color:#27ae60">${validCount}</b> | 
-            绿色=可同步 红色=跳过
-        </p>`;
+        html += `<div style="margin-top:14px;padding:12px;background:linear-gradient(135deg, #f8f9fa 0%, #ecf0f1 100%);border-radius:8px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
+                <span style="color:#7f8c8d;font-size:12px;">
+                    显示 <b>${previewRows}</b>/${endRow - startRow + 1} 行
+                </span>
+                <span style="display:flex;gap:12px;font-size:12px;">
+                    <span><span style="color:#27ae60">●</span> 可同步: <b>${validCount}</b></span>
+                    <span><span style="color:#e74c3c">●</span> 跳过: <b>${previewRows - validCount}</b></span>
+                </span>
+            </div>
+            <div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap;">
+                ${typeStats[3] > 0 ? `<span class="type-badge type-3">看过 ${typeStats[3]}</span>` : ''}
+                ${typeStats[2] > 0 ? `<span class="type-badge type-2">在看 ${typeStats[2]}</span>` : ''}
+                ${typeStats[1] > 0 ? `<span class="type-badge type-1">想看 ${typeStats[1]}</span>` : ''}
+                ${typeStats[4] > 0 ? `<span class="type-badge type-4">搁置 ${typeStats[4]}</span>` : ''}
+            </div>
+        </div>`;
 
         previewBox.innerHTML = html;
         if (previewCount) previewCount.textContent = `(${startRow}-${endRow}, 共${endRow - startRow + 1}行)`;
@@ -366,30 +405,32 @@ function statusColor(status) {
 // ========== 详细预览同步内容 ==========
 function previewSyncContent() {
     let select = document.getElementById("sheetSelect");
-    let headerRowInput = document.getElementById("headerRow");
-    let startRowInput = document.getElementById("startRow");
     let endRowInput = document.getElementById("endRow");
 
     let sheetIndex = parseInt(select?.value) || 1;
-    let headerRow = parseInt(headerRowInput?.value) || 1;
-    let startRow = parseInt(startRowInput?.value) || 2;
     let endRow = parseInt(endRowInput?.value) || 0;
-
-    if (endRow === 0) {
-        let sheets = window.Application.ActiveWorkbook.Sheets;
-        let ws = sheets.Item(sheetIndex);
-        endRow = getCell(ws, ws.Rows.Count, 1).End(-4162).Row;
-    }
 
     try {
         let sheets = window.Application.ActiveWorkbook.Sheets;
         let ws = sheets.Item(sheetIndex);
+
+        // 自动检测表头行
+        let headerRow = findHeaderRow(ws);
+        if (headerRow === 0) {
+            headerRow = 1;
+        }
+        let startRow = headerRow + 1;
+
+        if (endRow === 0) {
+            endRow = getCell(ws, ws.Rows.Count, 1).End(-4162).Row;
+        }
+
         let colMap = getColumnMap(ws, headerRow);
 
-        let msg = "=== 同步内容预览 ===\n\n";
         let previewCount = Math.min(5, endRow - startRow + 1);
         let totalValid = 0;
         let typeCount = {1:0, 2:0, 3:0, 4:0, 5:0};
+        let itemsHtml = '';
 
         for (let i = startRow; i <= startRow + previewCount - 1 && i <= endRow; i++) {
             let bgmUrl = colMap.has("Bangumi_URL") ? trim(String(getCell(ws, i, colMap.get("Bangumi_URL")).Value())) : "";
@@ -402,43 +443,110 @@ function previewSyncContent() {
             let sid = extractSubjectId(bgmUrl);
             if (sid) {
                 totalValid++;
-                let typeNum = mapWatchStatus(status, finishedDate);
-                typeCount[typeNum] = (typeCount[typeNum] || 0) + 1;
             }
 
             let typeNum = mapWatchStatus(status, finishedDate);
             let typeName = ["", "想看", "在看", "看过", "搁置", "抛弃"][typeNum];
-            
+
             // 处理标签
             let tagSet = new Set();
             addTagsFromStr(tagSet, tagsRaw);
             let tags = Array.from(tagSet);
+            let tagsHtml = tags.length > 0
+                ? `<div class="detail-value tags">${tags.map(t => `<span class="tag-badge">${t}</span>`).join('')}</div>`
+                : '<div class="detail-value">-</div>';
 
-            msg += `【行${i}】${name || '(无名称)'}\n`;
-            msg += `  URL: ${bgmUrl || '(空)'}\n`;
-            msg += `  subject_id: ${sid || '❌无法提取'}\n`;
-            msg += `  状态: "${status}" → type=${typeNum}(${typeName})\n`;
-            msg += `  完播日: ${finishedDate || '(空)'}\n`;
-            msg += `  评分: ${rate || '(空)'}\n`;
-            msg += `  标签: [${tags.join(', ') || '(空)'}]\n`;
-            
-            if (sid) {
-                msg += `  → 将发送: POST /v0/users/-/collections/${sid}\n`;
-                msg += `  → JSON: ${buildJsonPayload(ws, i, colMap, finishedDate)}\n`;
-            }
-            msg += "\n";
+            let jsonBody = buildJsonPayload(ws, i, colMap, finishedDate);
+            let urlDisplay = bgmUrl.length > 60 ? bgmUrl.substring(0, 60) + '...' : bgmUrl;
+
+            itemsHtml += `
+                <div class="detail-item">
+                    <div class="detail-item-header">
+                        <div class="detail-item-title">
+                            <span class="detail-item-row">行 ${i}</span>
+                            <span class="detail-item-name">${name || '(无名称)'}</span>
+                        </div>
+                        <span class="status-badge type-${typeNum}">${typeName}</span>
+                    </div>
+                    <div class="detail-item-body">
+                        <div class="detail-row">
+                            <span class="detail-label">Bangumi URL</span>
+                            <span class="detail-value url">${urlDisplay || '(空)'}</span>
+                        </div>
+                        <div class="detail-row">
+                            <span class="detail-label">Subject ID</span>
+                            <span class="detail-value sid ${sid ? 'valid' : ''}">${sid || '❌ 无法提取'}</span>
+                        </div>
+                        <div class="detail-row">
+                            <span class="detail-label">观看状态</span>
+                            <span class="detail-value">"${status || '-'}" → type=${typeNum}</span>
+                        </div>
+                        <div class="detail-row">
+                            <span class="detail-label">完播日</span>
+                            <span class="detail-value">${finishedDate || '(空)'}</span>
+                        </div>
+                        <div class="detail-row">
+                            <span class="detail-label">评分</span>
+                            <span class="detail-value" style="color:#f39c12;font-weight:600;">${rate ? '⭐ ' + rate : '(空)'}</span>
+                        </div>
+                        <div class="detail-row">
+                            <span class="detail-label">标签</span>
+                            ${tagsHtml}
+                        </div>
+                        ${sid ? `
+                        <div class="detail-row" style="flex-direction:column;gap:6px;">
+                            <span class="detail-label" style="min-width:auto;">将发送的请求</span>
+                            <div class="detail-value" style="color:#27ae60;font-weight:500;">
+                                POST /v0/users/-/collections/${sid}
+                            </div>
+                            <div class="detail-value json">${jsonBody}</div>
+                        </div>
+                        ` : ''}
+                    </div>
+                </div>
+            `;
+            typeCount[typeNum]++;
         }
 
-        // 统计
-        msg += "=== 统计 ===\n";
-        msg += `总行数: ${endRow - startRow + 1}\n`;
-        msg += `有效URL: ${totalValid}\n`;
-        msg += `状态分布: 看过=${typeCount[3]} 在看=${typeCount[2]} 想看=${typeCount[1]} 搁置=${typeCount[4]}\n`;
+        // 生成统计信息
+        let statsHtml = `
+            <div class="detail-stats">
+                <div class="stat-card">
+                    <div class="stat-value">${endRow - startRow + 1}</div>
+                    <div class="stat-label">总行数</div>
+                </div>
+                <div class="stat-card success">
+                    <div class="stat-value">${totalValid}</div>
+                    <div class="stat-label">有效URL</div>
+                </div>
+                <div class="stat-card info">
+                    <div class="stat-value">${previewCount}</div>
+                    <div class="stat-label">预览条数</div>
+                </div>
+            </div>
+            <div style="margin-bottom:14px;display:flex;gap:8px;flex-wrap:wrap;">
+                ${typeCount[3] > 0 ? `<span class="status-badge type-3">看过 ${typeCount[3]}</span>` : ''}
+                ${typeCount[2] > 0 ? `<span class="status-badge type-2">在看 ${typeCount[2]}</span>` : ''}
+                ${typeCount[1] > 0 ? `<span class="status-badge type-1">想看 ${typeCount[1]}</span>` : ''}
+                ${typeCount[4] > 0 ? `<span class="status-badge type-4">搁置 ${typeCount[4]}</span>` : ''}
+                ${typeCount[5] > 0 ? `<span class="status-badge type-5">抛弃 ${typeCount[5]}</span>` : ''}
+            </div>
+        `;
 
-        alert(msg);
+        // 显示模态框
+        let modalBody = document.getElementById("detailModalBody");
+        if (modalBody) {
+            modalBody.innerHTML = statsHtml + itemsHtml;
+            document.getElementById("detailModal").style.display = "flex";
+        }
     } catch (e) {
         alert("预览失败: " + e.message);
     }
+}
+
+// ========== 关闭详细预览模态框 ==========
+function closeDetailModal() {
+    document.getElementById("detailModal").style.display = "none";
 }
 
 // ========== 面板操作处理 ==========
@@ -478,13 +586,19 @@ function syncFromPanel() {
     let endRowInput = document.getElementById("endRow");
 
     let sheetIndex = parseInt(select.value) || 1;
-    let headerRow = parseInt(headerRowInput?.value) || 1;
     let startRow = parseInt(startRowInput?.value) || 2;
     let endRow = parseInt(endRowInput?.value) || 0;
 
     try {
         let sheets = window.Application.ActiveWorkbook.Sheets;
         let ws = sheets.Item(sheetIndex);
+
+        // 自动检测表头行
+        let headerRow = findHeaderRow(ws);
+        if (headerRow === 0) {
+            headerRow = parseInt(headerRowInput?.value) || 1;
+        }
+        startRow = headerRow + 1;
 
         if (endRow === 0) {
             endRow = getCell(ws, ws.Rows.Count, 1).End(-4162).Row;

@@ -262,8 +262,15 @@ function parseEpisodeNumber(epStr) {
 // ========== 映射观看状态 -> Bangumi type ==========
 // Bangumi type: 1=想看 2=在看 3=看过 4=搁置 5=抛弃
 function mapWatchStatus(status, finishedDate) {
+    // 处理 null、undefined、"null" 字符串
+    if (status === null || status === undefined || status === "null" || status === "NULL" || status === "Null") {
+        if (finishedDate !== "" && finishedDate !== null && finishedDate !== undefined) {
+            return 3; // 有完播日 = 看过
+        }
+        return 1; // 默认想看
+    }
     if (status === "") {
-        if (finishedDate !== "") {
+        if (finishedDate !== "" && finishedDate !== null && finishedDate !== undefined) {
             return 3; // 有完播日 = 看过
         }
         return 1; // 默认想看

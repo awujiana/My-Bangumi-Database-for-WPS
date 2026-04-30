@@ -71,25 +71,25 @@ function SyncToBangumi() {
         return;
     }
 
-    let lastRow = ws.Cells(ws.Rows.Count, 1).End(-4162).Row; // xlUp = -4162
+    let lastRow = getCell(ws, ws.Rows.Count, 1).End(-4162).Row; // xlUp = -4162
 
     let successCount = 0, failCount = 0, skipCount = 0;
 
     for (let i = headerRow + 1; i <= lastRow; i++) {
         // 从 Bangumi URL 提取 subject_id
-        let bgmUrl = trim(ws.Cells(i, colMap.get("Bangumi_URL")).Value());
+        let bgmUrl = trim(getCellValue(ws, i, colMap.get("Bangumi_URL")));
         let subjectId = extractSubjectId(bgmUrl);
 
         if (subjectId === "") {
             skipCount++;
-            ws.Cells(i, 1).Interior.Color = 0xFFFFCC; // 黄色=跳过
+            getCell(ws, i, 1).Interior.Color = 0xFFFFCC; // 黄色=跳过
             continue;
         }
 
         // 获取完播日
         let finishedDate = "";
         if (colMap.has("完播日")) {
-            finishedDate = trim(ws.Cells(i, colMap.get("完播日")).Value());
+            finishedDate = trim(getCellValue(ws, i, colMap.get("完播日")));
         }
 
         // 构建请求体
@@ -107,10 +107,10 @@ function SyncToBangumi() {
         // 处理结果
         if (statusCode === 204 || statusCode === 200) {
             successCount++;
-            ws.Cells(i, 1).Interior.Color = 0xCCFFCC; // 绿色=成功
+            getCell(ws, i, 1).Interior.Color = 0xCCFFCC; // 绿色=成功
         } else {
             failCount++;
-            ws.Cells(i, 1).Interior.Color = 0xFFCCCC; // 红色=失败
+            getCell(ws, i, 1).Interior.Color = 0xFFCCCC; // 红色=失败
             console.log("行 " + i + " 失败 (ID:" + subjectId + "): " + result.message);
         }
 
@@ -138,51 +138,134 @@ function extractSubjectId(url) {
 
 // ========== 查找表头行 ==========
 function findHeaderRow(ws) {
-    for (let i = 1; i <= 10; i++) {
-        for (let j = 1; j <= 10; j++) {
-            let cellVal = String(ws.Cells(i, j).Value());
-            if (cellVal.toLowerCase().indexOf("bangumi") >= 0 || cellVal.toLowerCase().indexOf("bgm") >= 0) {
-                return i;
+    // 已知列名列表，用于识别表头行
+    let knownHeaders = [
+        "序列号", "是否看完", "看完时间", "开播季度", "开播日期", "完播日",
+        "类别", "原作标签", "制作公司", "标签", "分级", "特点", "印象",
+        "打分", "评分", "集号", "看到", "集数", "系列", "季数",
+        "时长", "名称", "标题", "别名", "电影院", "影厅",
+        "电影票存根", "剧透", "感言", "评论", "Bangumi", "bgm",
+        "制片国家", "语言", "类型", "导演", "音乐", "人物设定",
+        "机械设定", "原作", "脚本", "分镜", "演出", "关联"
+    ];
+
+    // 扫描前 50 行
+    for (let i = 1; i <= 50; i++) {
+        let matchCount = 0;
+        let lastCol = 50; // 限制检查的列数
+        for (let j = 1; j <= lastCol; j++) {
+            let cellVal = String(getCellValue(ws, i, j)).toLowerCase();
+            for (let header of knownHeaders) {
+                if (cellVal.indexOf(header.toLowerCase()) >= 0) {
+                    matchCount++;
+                    break;
+                }
             }
+        }
+        // 如果一行有多个已知列名，则认为是表头行
+        if (matchCount >= 3) {
+            return i;
         }
     }
     return 0;
 }
 
+// ========== 安全获取单元格值 ==========
+function getCellValue(ws, row, col) {
+    try {
+        if (ws.Range) {
+            let colLetter = colNumToLetter(col);
+            return ws.Range(colLetter + row).Value();
+        }
+        if (ws.Cells) {
+            return ws.Cells(row, col).Value();
+        }
+    } catch (e) {}
+    return "";
+}
+
+// ========== 列号转字母 ==========
+function colNumToLetter(col) {
+    let letter = "";
+    while (col > 0) {
+        let mod = (col - 1) % 26;
+        letter = String.fromCharCode(65 + mod) + letter;
+        col = Math.floor((col - mod) / 26);
+    }
+    return letter;
+}
+
+// ========== 安全获取单元格对象 ==========
+function getCell(ws, row, col) {
+    try {
+        // 优先使用 Range (WPS 兼容)
+        if (typeof ws.Range === 'function') {
+            let colLetter = colNumToLetter(col);
+            return ws.Range(colLetter + row);
+        }
+        // 回退：尝试 Cells.Item
+        if (ws.Cells && typeof ws.Cells.Item === 'function') {
+            return ws.Cells.Item(row, col);
+        }
+        // 最后回退
+        return ws.Cells(row, col);
+    } catch (e) {
+        console.error("getCell error:", e);
+        return null;
+    }
+}
+
 // ========== 获取列名->列号映射 ==========
 function getColumnMap(ws, headerRow) {
     let colMap = new Map();
-    let lastCol = ws.Cells(headerRow, ws.Columns.Count).End(-4161).Column; // xlToLeft = -4161
+    let lastCol = 50; // 最多扫描50列
 
     for (let i = 1; i <= lastCol; i++) {
-        let colName = trim(String(ws.Cells(headerRow, i).Value()));
+        let colName = trim(String(getCellValue(ws, headerRow, i)));
         if (colName === "") continue;
 
         // 精确匹配和模糊匹配
         let lowerName = colName.toLowerCase();
-        
-        // Bangumi URL 列
-        if (lowerName.indexOf("bangumi") >= 0 || lowerName.indexOf("bgm") >= 0 || colName.indexOf("URL") >= 0 || colName === "Bangumi URL") {
+
+        // Bangumi URL 列（优先级最高）
+        if (lowerName.indexOf("bangumi") >= 0 || lowerName.indexOf("bgm") >= 0 ||
+            colName.indexOf("URL") >= 0 || lowerName.indexOf("subject") >= 0) {
             colMap.set("Bangumi_URL", i);
         }
-        // 观看状态 - 支持"是否看完"
-        else if (colName.indexOf("是否看完") >= 0 || colName.indexOf("观看状态") >= 0) {
+        // 观看状态
+        else if (colName.indexOf("是否看完") >= 0 || colName.indexOf("观看状态") >= 0 ||
+                 colName.indexOf("状态") >= 0) {
             colMap.set("是否看完", i);
         }
-        // 完播相关 - 支持"看完时间"
-        else if (colName.indexOf("完播") >= 0 || colName.indexOf("看完时间") >= 0) {
+        // 完播相关
+        else if (colName.indexOf("完播") >= 0 || colName.indexOf("看完时间") >= 0 ||
+                 colName.indexOf("看完日") >= 0) {
             colMap.set("完播日", i);
         }
+        // 开播日期
+        else if (colName.indexOf("开播日期") >= 0 || colName.indexOf("开播时间") >= 0 ||
+                 colName.indexOf("首播") >= 0) {
+            colMap.set("开播日期", i);
+        }
+        // 开播季度
+        else if (colName.indexOf("开播季度") >= 0 || colName.indexOf("季度") >= 0 ||
+                 colName.indexOf("年份") >= 0) {
+            colMap.set("开播季度", i);
+        }
         // 打分
-        else if (colName.indexOf("打分") >= 0 || colName.indexOf("评分") >= 0) {
+        else if (colName.indexOf("打分") >= 0 || colName.indexOf("评分") >= 0 ||
+                 colName.indexOf("分数") >= 0 || lowerName.indexOf("rate") >= 0) {
             colMap.set("打分", i);
         }
         // 评论/感言
-        else if (colName.indexOf("感言") >= 0 || colName.indexOf("剧透") >= 0 || colName.indexOf("评价") >= 0 || colName.indexOf("评论") >= 0) {
+        else if (colName.indexOf("感言") >= 0 || colName.indexOf("剧透") >= 0 ||
+                 colName.indexOf("评价") >= 0 || colName.indexOf("评论") >= 0 ||
+                 colName.indexOf("comment") >= 0) {
             colMap.set("剧透/感言", i);
         }
-        // 标签/分级 - 你的数据中是"标签/分级"
-        else if (colName.indexOf("标签") >= 0 || colName.indexOf("分级") >= 0) {
+        // 标签/分级
+        else if (colName.indexOf("标签") >= 0 || colName.indexOf("分级") >= 0 ||
+                 colName.indexOf("tag") >= 0) {
             colMap.set("标签/分级", i);
         }
         // 特点/印象
@@ -190,16 +273,62 @@ function getColumnMap(ws, headerRow) {
             colMap.set("特点/印象", i);
         }
         // 集号/看到
-        else if (colName.indexOf("集号") >= 0 || colName.indexOf("看到") >= 0) {
+        else if (colName.indexOf("集号") >= 0 || colName.indexOf("看到") >= 0 ||
+                 colName.indexOf("ep") >= 0) {
             colMap.set("集号", i);
         }
         // 集数
-        else if (colName.indexOf("集数") >= 0) {
+        else if (colName.indexOf("集数") >= 0 || colName.indexOf("总集") >= 0) {
             colMap.set("集数", i);
         }
-        // 名称
-        else if (colName.indexOf("名称") >= 0 || colName.indexOf("标题") >= 0 || colName.indexOf("名") >= 0) {
+        // 名称/标题
+        else if (colName.indexOf("名称") >= 0 || colName.indexOf("标题") >= 0 ||
+                 colName.indexOf("name") >= 0 || lowerName.indexOf("title") >= 0) {
             colMap.set("名称", i);
+        }
+        // 别名
+        else if (colName.indexOf("别名") >= 0 || colName.indexOf("原名") >= 0 ||
+                 lowerName.indexOf("alias") >= 0) {
+            colMap.set("别名", i);
+        }
+        // 类别
+        else if (colName.indexOf("类别") >= 0 || colName.indexOf("分类") >= 0 ||
+                 colName.indexOf("type") >= 0) {
+            colMap.set("类别", i);
+        }
+        // 原作标签
+        else if (colName.indexOf("原作") >= 0) {
+            colMap.set("原作标签", i);
+        }
+        // 制作公司
+        else if (colName.indexOf("制作公司") >= 0 || colName.indexOf("制作") >= 0 ||
+                 colName.indexOf("studio") >= 0) {
+            colMap.set("制作公司", i);
+        }
+        // 系列
+        else if (colName.indexOf("系列") >= 0) {
+            colMap.set("系列", i);
+        }
+        // 季数
+        else if (colName.indexOf("季数") >= 0 || colName.indexOf("第") >= 0 && colName.indexOf("季") >= 0) {
+            colMap.set("季数", i);
+        }
+        // 时长
+        else if (colName.indexOf("时长") >= 0 || colName.indexOf("分钟") >= 0) {
+            colMap.set("时长", i);
+        }
+        // 导演
+        else if (colName.indexOf("导演") >= 0 || lowerName.indexOf("director") >= 0) {
+            colMap.set("导演", i);
+        }
+        // 音乐
+        else if (colName.indexOf("音乐") >= 0 || lowerName.indexOf("music") >= 0) {
+            colMap.set("音乐", i);
+        }
+        // 序列号
+        else if (colName.indexOf("序列号") >= 0 || colName.indexOf("序号") >= 0 ||
+                 colName.indexOf("编号") >= 0) {
+            colMap.set("序列号", i);
         }
     }
     return colMap;
@@ -212,14 +341,14 @@ function buildJsonPayload(ws, row, colMap, finishedDate) {
     // --- type: 收藏类型 ---
     let watchStatus = "";
     if (colMap.has("是否看完")) {
-        watchStatus = trim(ws.Cells(row, colMap.get("是否看完")).Value());
+        watchStatus = trim(getCellValue(ws, row, colMap.get("是否看完")));
     }
     let bgmType = mapWatchStatus(watchStatus, finishedDate);
     parts.push('"type":' + bgmType);
 
     // --- rate: 评分 ---
     if (colMap.has("打分")) {
-        let rateVal = ws.Cells(row, colMap.get("打分")).Value();
+        let rateVal = getCellValue(ws, row, colMap.get("打分"));
         if (!isNaN(rateVal)) {
             let rate = Math.max(0, Math.min(10, parseInt(rateVal)));
             if (rate > 0) {
@@ -230,7 +359,7 @@ function buildJsonPayload(ws, row, colMap, finishedDate) {
 
     // --- comment: 评价/感言 ---
     if (colMap.has("剧透/感言")) {
-        let comment = trim(ws.Cells(row, colMap.get("剧透/感言")).Value());
+        let comment = trim(getCellValue(ws, row, colMap.get("剧透/感言")));
         if (comment !== "") {
             parts.push('"comment":"' + jsonEscape(comment) + '"');
         }
@@ -244,7 +373,7 @@ function buildJsonPayload(ws, row, colMap, finishedDate) {
 
     // --- ep_status: 章节进度 ---
     if (colMap.has("集号")) {
-        let epStatus = trim(ws.Cells(row, colMap.get("集号")).Value());
+        let epStatus = trim(getCellValue(ws, row, colMap.get("集号")));
         if (epStatus !== "") {
             let epNum = parseEpisodeNumber(epStatus);
             if (epNum > 0) {
@@ -281,8 +410,15 @@ function parseEpisodeNumber(epStr) {
 // ========== 映射观看状态 -> Bangumi type ==========
 // Bangumi type: 1=想看 2=在看 3=看过 4=搁置 5=抛弃
 function mapWatchStatus(status, finishedDate) {
+    // 处理 null、undefined、"null" 字符串
+    if (status === null || status === undefined || status === "null" || status === "NULL" || status === "Null") {
+        if (finishedDate !== "" && finishedDate !== null && finishedDate !== undefined) {
+            return 3; // 有完播日 = 看过
+        }
+        return 1; // 默认想看
+    }
     if (status === "") {
-        if (finishedDate !== "") {
+        if (finishedDate !== "" && finishedDate !== null && finishedDate !== undefined) {
             return 3; // 有完播日 = 看过
         }
         return 1; // 默认想看
@@ -324,12 +460,12 @@ function buildTags(ws, row, colMap) {
     let tagSet = new Set();
 
     if (colMap.has("标签/分级")) {
-        let raw = trim(ws.Cells(row, colMap.get("标签/分级")).Value());
+        let raw = trim(getCellValue(ws, row, colMap.get("标签/分级")));
         addTagsFromStr(tagSet, raw);
     }
 
     if (colMap.has("特点/印象")) {
-        let raw = trim(ws.Cells(row, colMap.get("特点/印象")).Value());
+        let raw = trim(getCellValue(ws, row, colMap.get("特点/印象")));
         addTagsFromStr(tagSet, raw);
     }
 
@@ -435,11 +571,11 @@ function clearRowColors() {
     let ws = app.ActiveSheet;
     if (!ws) return;
 
-    let lastRow = ws.Cells(ws.Rows.Count, 1).End(-4162).Row;
+    let lastRow = getCell(ws, ws.Rows.Count, 1).End(-4162).Row;
     if (lastRow < 2) return;
 
     for (let i = 2; i <= lastRow; i++) {
-        ws.Cells(i, 1).Interior.ColorIndex = -4142; // xlNone
+        getCell(ws, i, 1).Interior.ColorIndex = -4142; // xlNone
     }
     alert("已清除标记", 64);
 }
@@ -481,13 +617,13 @@ function previewSubjectIdExtraction() {
         return;
     }
 
-    let lastRow = ws.Cells(ws.Rows.Count, 1).End(-4162).Row;
+    let lastRow = getCell(ws, ws.Rows.Count, 1).End(-4162).Row;
     let previewRows = Math.min(10, lastRow - headerRow);
 
     let msg = "前" + previewRows + "行的 URL -> subject_id 提取结果：\n\n";
 
     for (let i = headerRow + 1; i <= headerRow + previewRows; i++) {
-        let url = trim(ws.Cells(i, colMap.get("Bangumi_URL")).Value());
+        let url = trim(getCellValue(ws, i, colMap.get("Bangumi_URL")));
         let sid = extractSubjectId(url);
         msg += "行" + i + ": " + (url.length > 50 ? url.substring(0, 50) + "..." : url) + " -> [" + sid + "]\n";
     }
@@ -513,13 +649,13 @@ function previewJsonPayload() {
     for (let i = headerRow + 1; i <= headerRow + previewRows; i++) {
         let url = "";
         if (colMap.has("Bangumi_URL")) {
-            url = trim(ws.Cells(i, colMap.get("Bangumi_URL")).Value());
+            url = trim(getCellValue(ws, i, colMap.get("Bangumi_URL")));
         }
         let sid = extractSubjectId(url);
 
         let finishedDate = "";
         if (colMap.has("完播日")) {
-            finishedDate = trim(ws.Cells(i, colMap.get("完播日")).Value());
+            finishedDate = trim(getCellValue(ws, i, colMap.get("完播日")));
         }
 
         let jsonBody = buildJsonPayload(ws, i, colMap, finishedDate);
