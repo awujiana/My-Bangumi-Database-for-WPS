@@ -150,36 +150,139 @@ function contextAction(action) {
         case "cut":
             if (start !== end) {
                 let selected = text.substring(start, end);
-                document.execCommand("copy");
-                input.value = text.substring(0, start) + text.substring(end);
-                input.selectionStart = input.selectionEnd = start;
+                // 使用临时textarea进行复制
+                let success = copyToClipboard(selected);
+                if (success) {
+                    input.value = text.substring(0, start) + text.substring(end);
+                    input.selectionStart = input.selectionEnd = start;
+                }
             }
             break;
         case "copy":
             if (start !== end) {
                 let selected = text.substring(start, end);
-                navigator.clipboard.writeText(selected).catch(() => {
-                    // Fallback
-                    let textarea = document.createElement("textarea");
-                    textarea.value = selected;
-                    document.body.appendChild(textarea);
-                    textarea.select();
-                    document.execCommand("copy");
-                    document.body.removeChild(textarea);
-                });
+                copyToClipboard(selected);
             }
             break;
         case "paste":
-            navigator.clipboard.readText().then((pastedText) => {
-                input.value = text.substring(0, start) + pastedText + text.substring(end);
-                input.selectionStart = input.selectionEnd = start + pastedText.length;
-            }).catch(() => {});
+            pasteText(input, start, end);
             break;
         case "selectAll":
             input.selectionStart = 0;
             input.selectionEnd = text.length;
             break;
     }
+}
+
+// 复制到剪贴板（兼容WPS环境）
+function copyToClipboard(text) {
+    // 只保留字母、数字和基本ASCII可显示字符
+    let cleanText = text.replace(/[^a-zA-Z0-9]/g, '').trim();
+
+    if (!cleanText) {
+        return false;
+    }
+
+    // 方法1：使用剪贴板API（需要用户手势触发）
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(cleanText).then(() => {
+            return true;
+        }).catch(() => {
+            // 降级到方法2
+            fallbackCopy(cleanText);
+        });
+        return true;
+    }
+
+    // 方法2：降级方案
+    return fallbackCopy(cleanText);
+}
+
+// 降级复制方案
+function fallbackCopy(text) {
+    try {
+        let textarea = document.createElement("textarea");
+        textarea.value = text;
+        textarea.style.position = "fixed";
+        textarea.style.left = "-9999px";
+        textarea.style.top = "0";
+        textarea.style.opacity = "0";
+        textarea.setAttribute("readonly", "");
+        document.body.appendChild(textarea);
+        textarea.focus();
+        textarea.select();
+
+        let success = document.execCommand("copy");
+        document.body.removeChild(textarea);
+        return success;
+    } catch (err) {
+        console.error("复制失败:", err);
+        return false;
+    }
+}
+
+// 粘贴纯文本到输入框（过滤非文字内容）
+async function pasteText(input, start, end) {
+    let text = input.value;
+    let pastedText = "";
+
+    // 方法1：优先使用Clipboard API
+    if (navigator.clipboard && navigator.clipboard.readText) {
+        try {
+            pastedText = await navigator.clipboard.readText();
+        } catch (err) {
+            // 方法2：降级使用 execCommand
+            try {
+                pastedText = await fallbackPaste();
+            } catch (e) {
+                console.error("粘贴失败:", err);
+                return;
+            }
+        }
+    } else {
+        // 方法2：降级使用 execCommand
+        pastedText = await fallbackPaste();
+    }
+
+    // 过滤非文字内容，只保留字母、数字和基本ASCII
+    let cleanText = pastedText.replace(/[^a-zA-Z0-9]/g, '').trim();
+
+    if (cleanText) {
+        input.value = text.substring(0, start) + cleanText + text.substring(end);
+        input.selectionStart = input.selectionEnd = start + cleanText.length;
+    }
+}
+
+// 降级粘贴方案
+function fallbackPaste() {
+    return new Promise((resolve, reject) => {
+        try {
+            let textarea = document.createElement("textarea");
+            textarea.style.position = "fixed";
+            textarea.style.left = "-9999px";
+            textarea.style.top = "0";
+            textarea.style.opacity = "0";
+            textarea.setAttribute("readonly", "");
+            document.body.appendChild(textarea);
+            textarea.focus();
+
+            let success = false;
+            try {
+                success = document.execCommand("paste");
+                if (success) {
+                    resolve(textarea.value);
+                } else {
+                    reject(new Error("粘贴命令失败"));
+                }
+            } catch (e) {
+                reject(e);
+            }
+
+            document.body.removeChild(textarea);
+        } catch (err) {
+            reject(err);
+        }
+    });
 }
 
 // ========== Token 状态更新 ==========
