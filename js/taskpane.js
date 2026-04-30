@@ -109,7 +109,7 @@ window.onload = () => {
     // 加载工作表列表（延迟加载，等待 DOM 完全就绪）
     setTimeout(() => {
         refreshSheets();
-        refreshData();
+        onSelectModeChange(); // 初始化模式切换 UI
     }, 300);
 
     // 调试通知功能：向开发服务器发送请求
@@ -274,19 +274,90 @@ function refreshSheets() {
     }
 }
 
+// ========== 根据序列号获取连续数据行 ==========
+function getSequentialRowsBySeqCol(ws, startRow, endRow, seqCol) {
+    let rows = [];
+    let expectedSeq = null;
+    
+    for (let i = startRow; i <= endRow; i++) {
+        let seqVal = trim(String(getCell(ws, i, seqCol).Value()));
+        let seqNum = parseInt(seqVal);
+        
+        if (seqVal !== "" && !isNaN(seqNum)) {
+            // 检查序列号是否连续（与上一行差值为1）
+            if (expectedSeq === null) {
+                // 第一行，直接添加
+                rows.push(i);
+                expectedSeq = seqNum + 1;
+            } else if (seqNum === expectedSeq) {
+                // 序列号连续，添加
+                rows.push(i);
+                expectedSeq = seqNum + 1;
+            } else if (seqNum > expectedSeq) {
+                // 序列号不连续（被筛选掉了一些行）
+                // 跳过这些被筛选的行，继续往后找
+                expectedSeq = seqNum + 1;
+                rows.push(i);
+            }
+            // seqNum < expectedSeq 的情况：序列号重复或倒退，忽略该行
+        }
+        // 空序列号：被筛选的行，忽略
+    }
+    
+    return rows;
+}
+
 // ========== 刷新数据预览 ==========
 function refreshData() {
+    // 检查必需函数是否已加载
+    if (typeof findHeaderRow === 'undefined' || typeof getColumnMap === 'undefined' || typeof getLastRow === 'undefined') {
+        console.log("等待脚本加载...");
+        setTimeout(refreshData, 500);
+        return;
+    }
+
     setStatus("正在加载数据...", "loading");
 
     let select = document.getElementById("sheetSelect");
     let endRowInput = document.getElementById("endRow");
+    let startRowInput = document.getElementById("startRow");
     let previewBox = document.getElementById("previewBox");
-    let previewCount = document.getElementById("previewCount");
+    let filterStatusEl = document.getElementById("filterStatus");
+    let selectMode = document.querySelector('input[name="selectMode"]:checked')?.value || 'auto';
+
+    // 先检测筛选状态并更新显示
+    try {
+        let filterInfo = getFilterStatus();
+        let hasFilter = filterInfo ? filterInfo.hasFilter : false;
+        let visibleCount = filterInfo ? filterInfo.visibleCount : 0;
+        let hiddenCount = filterInfo ? filterInfo.hiddenCount : 0;
+
+        if (filterInfo) {
+            if (filterStatusEl) {
+                if (hasFilter) {
+                    filterStatusEl.innerHTML = `⚠️ 已筛选：可见 <b style="color:#4ade80">${visibleCount}</b> 行，隐藏 <b style="color:#f87171">${hiddenCount}</b> 行`;
+                    filterStatusEl.className = 'has-filter';
+                } else if (selectMode === 'auto') {
+                    filterStatusEl.textContent = "✅ 无筛选：根据D列序列号识别连续数据行";
+                    filterStatusEl.className = 'no-filter';
+                } else {
+                    filterStatusEl.textContent = `手动模式`;
+                    filterStatusEl.className = '';
+                }
+            }
+        }
+    } catch (e) {
+        console.error("获取筛选状态失败:", e);
+        if (filterStatusEl) {
+            filterStatusEl.textContent = "⚠️ 无法获取筛选状态";
+            filterStatusEl.className = '';
+        }
+    }
 
     if (!select || !previewBox) return;
 
     let sheetIndex = parseInt(select.value) || 1;
-    let endRow = parseInt(endRowInput?.value) || 0;
+    let userEndRow = parseInt(endRowInput?.value) || 0;
 
     try {
         let sheets = window.Application.ActiveWorkbook.Sheets;
@@ -300,30 +371,60 @@ function refreshData() {
         // 自动检测表头行
         let headerRow = findHeaderRow(ws);
         if (headerRow === 0) {
-            headerRow = 1; // 默认第1行
+            headerRow = 1;
         }
-        let startRow = headerRow + 1;
-
-        let lastRow = getCell(ws, ws.Rows.Count, 1).End(-4162).Row;
-        if (endRow === 0 || endRow > lastRow) {
-            if (endRowInput) endRowInput.value = lastRow;
-            endRow = lastRow;
-        }
+        let dataStartRow = headerRow + 1;
 
         // 获取列映射
         let colMap = getColumnMap(ws, headerRow);
+        
+        // 获取最后一行
+        let lastRowCell = getCell(ws, ws.Rows.Count, 1);
+        let lastRow = lastRowCell.End(-4162).Row;
+        let actualEndRow = userEndRow > 0 ? Math.min(userEndRow, lastRow) : lastRow;
+        if (userEndRow === 0 && endRowInput) {
+            endRowInput.value = actualEndRow;
+        }
+
+        let visibleRows = [];
+        let totalRows = 0;
+        let firstVisibleRow = dataStartRow;
+        let lastVisibleRow = actualEndRow;
+        
+        // D列序列号（固定第4列）
+        let seqCol = 4;
+        
+        if (selectMode === 'auto') {
+            // 自动模式：根据序列号连续性识别有效数据行
+            visibleRows = getSequentialRowsBySeqCol(ws, dataStartRow, actualEndRow, seqCol);
+            totalRows = visibleRows.length;
+            firstVisibleRow = totalRows > 0 ? visibleRows[0] : dataStartRow;
+            lastVisibleRow = totalRows > 0 ? visibleRows[totalRows - 1] : dataStartRow;
+        } else {
+            // 手动模式：使用用户指定的范围
+            let manualStart = parseInt(startRowInput?.value) || dataStartRow;
+            let manualEnd = parseInt(endRowInput?.value) || lastRow;
+            for (let i = manualStart; i <= manualEnd; i++) {
+                visibleRows.push(i);
+            }
+            totalRows = visibleRows.length;
+            firstVisibleRow = manualStart;
+            lastVisibleRow = manualEnd;
+        }
 
         // 生成美化的预览表格
         let html = '<table><thead><tr>';
-        html += '<th>#</th><th>名称</th><th>ID</th><th>状态</th><th>类型</th><th>评分</th><th>标签</th>';
+        html += '<th>序号</th><th>名称</th><th>ID</th><th>状态</th><th>评分</th><th>标签</th>';
         html += '</tr></thead><tbody>';
 
-        // 数据行
-        let previewRows = Math.min(15, endRow - startRow + 1);
+        // 预览条数限制
+        let previewLimit = Math.min(15, totalRows);
         let validCount = 0;
         let typeStats = {1:0, 2:0, 3:0, 4:0, 5:0};
 
-        for (let i = startRow; i < startRow + previewRows && i <= endRow; i++) {
+        for (let idx = 0; idx < previewLimit; idx++) {
+            let i = visibleRows[idx];
+            let seqNum = trim(String(getCell(ws, i, seqCol).Value()));
             let name = colMap.has("名称") ? trim(String(getCell(ws, i, colMap.get("名称")).Value())) : "";
             let bgmUrl = colMap.has("Bangumi_URL") ? trim(String(getCell(ws, i, colMap.get("Bangumi_URL")).Value())) : "";
             let status = colMap.has("是否看完") ? trim(String(getCell(ws, i, colMap.get("是否看完")).Value())) : "";
@@ -347,29 +448,28 @@ function refreshData() {
                 addTagsFromStr(tagSet, tagsRaw);
                 let tags = Array.from(tagSet).slice(0, 3);
                 tagsDisplay = tags.map(t => `<span class="tag-badge">${t}</span>`).join(' ');
-                if (tagSet.size > 3) tagsDisplay += `<span class="tag-badge" style="background:#95a5a6">+${tagSet.size - 3}</span>`;
+                if (tagSet.size > 3) tagsDisplay += `<span class="tag-badge" style="background:#555">+${tagSet.size - 3}</span>`;
             }
 
             html += `<tr class="${hasUrl ? 'valid' : 'invalid'}">`;
-            html += `<td class="row-num">${i}</td>`;
+            html += `<td class="row-num">${seqNum}</td>`;
             html += `<td class="name-cell" title="${name}">${name ? (name.length > 12 ? name.substring(0, 12) + '...' : name) : '-'}</td>`;
-            html += `<td class="sid-cell ${hasUrl ? 'has-url' : 'no-url'}">${sid || '❌无'}</td>`;
+            html += `<td class="sid-cell ${hasUrl ? 'has-url' : 'no-url'}">${sid || '❌'}</td>`;
             html += `<td class="status-cell"><span class="type-badge type-${typeNum}">${typeName}</span></td>`;
-            html += `<td class="type-cell">${typeNum}</td>`;
             html += `<td class="rate-cell">${rate ? '⭐' + rate : '-'}</td>`;
             html += `<td class="tags-cell">${tagsDisplay || '-'}</td>`;
             html += '</tr>';
         }
 
         html += '</tbody></table>';
-        html += `<div style="margin-top:14px;padding:12px;background:linear-gradient(135deg, #f8f9fa 0%, #ecf0f1 100%);border-radius:8px;">
+        html += `<div style="margin-top:14px;padding:12px;background:#333;border-radius:8px;">
             <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
-                <span style="color:#7f8c8d;font-size:12px;">
-                    显示 <b>${previewRows}</b>/${endRow - startRow + 1} 行
+                <span style="color:#888;font-size:12px;">
+                    <b style="color:#4a9eff">${firstVisibleRow}</b> - <b style="color:#4a9eff">${lastVisibleRow}</b> 行，共 <b style="color:#fff">${totalRows}</b> 条
                 </span>
                 <span style="display:flex;gap:12px;font-size:12px;">
-                    <span><span style="color:#27ae60">●</span> 可同步: <b>${validCount}</b></span>
-                    <span><span style="color:#e74c3c">●</span> 跳过: <b>${previewRows - validCount}</b></span>
+                    <span><span style="color:#4ade80">●</span> 有效: <b>${validCount}</b></span>
+                    <span><span style="color:#f87171">●</span> 无URL: <b>${previewLimit - validCount}</b></span>
                 </span>
             </div>
             <div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap;">
@@ -381,14 +481,30 @@ function refreshData() {
         </div>`;
 
         previewBox.innerHTML = html;
-        if (previewCount) previewCount.textContent = `(${startRow}-${endRow}, 共${endRow - startRow + 1}行)`;
-
         setStatus("就绪", "success");
     } catch (e) {
         console.error("刷新数据失败:", e);
         previewBox.innerHTML = `<p class="hint">加载失败: ${e.message}</p>`;
         setStatus("加载失败", "error");
     }
+}
+
+// ========== 模式切换处理 ==========
+function onSelectModeChange() {
+    let selectMode = document.querySelector('input[name="selectMode"]:checked')?.value || 'auto';
+    let manualInputs = document.getElementById("manualRangeInputs");
+    let autoRangeInfo = document.getElementById("autoRangeInfo");
+    
+    if (selectMode === 'manual') {
+        manualInputs.style.display = 'block';
+        autoRangeInfo.style.display = 'none';
+    } else {
+        manualInputs.style.display = 'none';
+        autoRangeInfo.style.display = 'flex';
+    }
+    
+    // 刷新数据预览
+    refreshData();
 }
 
 // ========== 状态颜色 ==========
@@ -402,13 +518,27 @@ function statusColor(status) {
     }
 }
 
+// ========== 详细预览数据存储 ==========
+let detailPreviewData = {
+    allItems: [],
+    currentFilter: 'all'
+};
+
 // ========== 详细预览同步内容 ==========
 function previewSyncContent() {
+    // 检查必需函数是否已加载
+    if (typeof findHeaderRow === 'undefined' || typeof getColumnMap === 'undefined') {
+        setTimeout(previewSyncContent, 500);
+        return;
+    }
+
     let select = document.getElementById("sheetSelect");
     let endRowInput = document.getElementById("endRow");
+    let startRowInput = document.getElementById("startRow");
 
     let sheetIndex = parseInt(select?.value) || 1;
-    let endRow = parseInt(endRowInput?.value) || 0;
+    let userEndRow = parseInt(endRowInput?.value) || 0;
+    let selectMode = document.querySelector('input[name="selectMode"]:checked')?.value || 'auto';
 
     try {
         let sheets = window.Application.ActiveWorkbook.Sheets;
@@ -419,20 +549,47 @@ function previewSyncContent() {
         if (headerRow === 0) {
             headerRow = 1;
         }
-        let startRow = headerRow + 1;
+        let dataStartRow = headerRow + 1;
 
-        if (endRow === 0) {
-            endRow = getCell(ws, ws.Rows.Count, 1).End(-4162).Row;
-        }
+        // 获取最后一行
+        let lastRowCell = getCell(ws, ws.Rows.Count, 1);
+        let lastRow = lastRowCell.End(-4162).Row;
+        let actualEndRow = userEndRow > 0 ? Math.min(userEndRow, lastRow) : lastRow;
 
         let colMap = getColumnMap(ws, headerRow);
 
-        let previewCount = Math.min(5, endRow - startRow + 1);
-        let totalValid = 0;
-        let typeCount = {1:0, 2:0, 3:0, 4:0, 5:0};
-        let itemsHtml = '';
+        // D列序列号（固定第4列）
+        let seqCol = 4;
 
-        for (let i = startRow; i <= startRow + previewCount - 1 && i <= endRow; i++) {
+        // 确定要处理的行范围
+        let rowsToPreview = [];
+        
+        if (selectMode === 'auto') {
+            // 自动模式：根据D列序列号连续性识别有效数据行
+            rowsToPreview = getSequentialRowsBySeqCol(ws, dataStartRow, actualEndRow, seqCol);
+        } else {
+            // 手动模式：使用用户指定的范围
+            let manualStart = parseInt(startRowInput?.value) || dataStartRow;
+            let manualEnd = parseInt(endRowInput?.value) || lastRow;
+            for (let i = manualStart; i <= manualEnd; i++) {
+                rowsToPreview.push(i);
+            }
+        }
+
+        if (rowsToPreview.length === 0) {
+            alert("没有数据可预览！");
+            return;
+        }
+
+        // 预览条数限制
+        let previewLimit = Math.min(10, rowsToPreview.length);
+        let totalValid = 0;
+        let typeCount = {2:0, 3:0, 4:0, 5:0};
+        let itemsData = [];
+
+        for (let idx = 0; idx < previewLimit; idx++) {
+            let i = rowsToPreview[idx];
+            
             let bgmUrl = colMap.has("Bangumi_URL") ? trim(String(getCell(ws, i, colMap.get("Bangumi_URL")).Value())) : "";
             let name = colMap.has("名称") ? trim(String(getCell(ws, i, colMap.get("名称")).Value())) : "";
             let status = colMap.has("是否看完") ? trim(String(getCell(ws, i, colMap.get("是否看完")).Value())) : "";
@@ -446,6 +603,12 @@ function previewSyncContent() {
             }
 
             let typeNum = mapWatchStatus(status, finishedDate);
+
+            // type=0（空白/否/想看）不显示在预览中
+            if (typeNum === 0) {
+                continue;
+            }
+
             let typeName = ["", "想看", "在看", "看过", "搁置", "抛弃"][typeNum];
 
             // 处理标签
@@ -459,8 +622,8 @@ function previewSyncContent() {
             let jsonBody = buildJsonPayload(ws, i, colMap, finishedDate);
             let urlDisplay = bgmUrl.length > 60 ? bgmUrl.substring(0, 60) + '...' : bgmUrl;
 
-            itemsHtml += `
-                <div class="detail-item">
+            let itemHtml = `
+                <div class="detail-item" data-type="${typeNum}">
                     <div class="detail-item-header">
                         <div class="detail-item-title">
                             <span class="detail-item-row">行 ${i}</span>
@@ -479,11 +642,11 @@ function previewSyncContent() {
                         </div>
                         <div class="detail-row">
                             <span class="detail-label">观看状态</span>
-                            <span class="detail-value">"${status || '-'}" → type=${typeNum}</span>
+                            <span class="detail-value">${typeName} (type=${typeNum})</span>
                         </div>
                         <div class="detail-row">
                             <span class="detail-label">完播日</span>
-                            <span class="detail-value">${finishedDate || '(空)'}</span>
+                            <span class="detail-value">${(finishedDate === null || finishedDate === undefined || finishedDate === "" || finishedDate === "null") ? '(空白)' : finishedDate}</span>
                         </div>
                         <div class="detail-row">
                             <span class="detail-label">评分</span>
@@ -505,43 +668,107 @@ function previewSyncContent() {
                     </div>
                 </div>
             `;
+
+            itemsData.push({
+                html: itemHtml,
+                type: typeNum
+            });
+
             typeCount[typeNum]++;
         }
+
+        // 存储数据供过滤使用
+        detailPreviewData.allItems = itemsData;
+        detailPreviewData.currentFilter = 'all';
+
+        // 生成过滤按钮
+        let toolbarHtml = `
+            <button class="filter-btn all active" onclick="filterDetailItems('all')">全部 (${itemsData.length})</button>
+            ${typeCount[3] > 0 ? `<button class="filter-btn type-3" onclick="filterDetailItems(3)">看过 (${typeCount[3]})</button>` : ''}
+            ${typeCount[2] > 0 ? `<button class="filter-btn type-2" onclick="filterDetailItems(2)">在追 (${typeCount[2]})</button>` : ''}
+            ${typeCount[4] > 0 ? `<button class="filter-btn type-4" onclick="filterDetailItems(4)">搁置 (${typeCount[4]})</button>` : ''}
+            ${typeCount[5] > 0 ? `<button class="filter-btn type-5" onclick="filterDetailItems(5)">抛弃 (${typeCount[5]})</button>` : ''}
+        `;
 
         // 生成统计信息
         let statsHtml = `
             <div class="detail-stats">
                 <div class="stat-card">
-                    <div class="stat-value">${endRow - startRow + 1}</div>
+                    <div class="stat-value">${rowsToPreview.length}</div>
                     <div class="stat-label">总行数</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">${itemsData.length}</div>
+                    <div class="stat-label">待上传</div>
                 </div>
                 <div class="stat-card success">
                     <div class="stat-value">${totalValid}</div>
                     <div class="stat-label">有效URL</div>
                 </div>
-                <div class="stat-card info">
-                    <div class="stat-value">${previewCount}</div>
-                    <div class="stat-label">预览条数</div>
-                </div>
             </div>
             <div style="margin-bottom:14px;display:flex;gap:8px;flex-wrap:wrap;">
+                <span class="status-badge" style="background:#1a3a35;color:#4ade80;">D列序列号</span>
                 ${typeCount[3] > 0 ? `<span class="status-badge type-3">看过 ${typeCount[3]}</span>` : ''}
                 ${typeCount[2] > 0 ? `<span class="status-badge type-2">在看 ${typeCount[2]}</span>` : ''}
-                ${typeCount[1] > 0 ? `<span class="status-badge type-1">想看 ${typeCount[1]}</span>` : ''}
                 ${typeCount[4] > 0 ? `<span class="status-badge type-4">搁置 ${typeCount[4]}</span>` : ''}
                 ${typeCount[5] > 0 ? `<span class="status-badge type-5">抛弃 ${typeCount[5]}</span>` : ''}
             </div>
         `;
 
         // 显示模态框
+        let modalToolbar = document.getElementById("detailModalToolbar");
         let modalBody = document.getElementById("detailModalBody");
-        if (modalBody) {
-            modalBody.innerHTML = statsHtml + itemsHtml;
+        if (modalToolbar && modalBody) {
+            modalToolbar.innerHTML = toolbarHtml;
+            modalBody.innerHTML = statsHtml + itemsData.map(item => item.html).join('');
             document.getElementById("detailModal").style.display = "flex";
         }
     } catch (e) {
         alert("预览失败: " + e.message);
     }
+}
+
+// ========== 过滤详细预览项目 ==========
+function filterDetailItems(filterType) {
+    detailPreviewData.currentFilter = filterType;
+
+    // 更新按钮状态
+    let buttons = document.querySelectorAll('.filter-btn');
+    buttons.forEach(btn => {
+        btn.classList.remove('active');
+        if (filterType === 'all' && btn.classList.contains('all')) {
+            btn.classList.add('active');
+        } else if (btn.classList.contains('type-' + filterType)) {
+            btn.classList.add('active');
+        }
+    });
+
+    // 过滤并显示项目
+    let modalBody = document.getElementById("detailModalBody");
+    if (!modalBody) return;
+
+    // 过滤项目
+    let filteredItems = detailPreviewData.allItems;
+    if (filterType !== 'all') {
+        filteredItems = filteredItems.filter(item => item.type === parseInt(filterType));
+    }
+
+    // 更新统计显示
+    let totalCard = modalBody.querySelector('.stat-card:first-child .stat-value');
+    let previewCard = modalBody.querySelector('.stat-card:last-child .stat-value');
+    if (totalCard) totalCard.textContent = filteredItems.length;
+    if (previewCard) previewCard.textContent = filteredItems.length;
+
+    // 移除所有项目，重新添加过滤后的
+    let allItems = modalBody.querySelectorAll('.detail-item');
+    allItems.forEach(item => item.remove());
+
+    // 添加过滤后的项目
+    let tempDiv = document.createElement('div');
+    filteredItems.forEach(item => {
+        tempDiv.innerHTML = item.html;
+        modalBody.appendChild(tempDiv.firstElementChild);
+    });
 }
 
 // ========== 关闭详细预览模态框 ==========
@@ -573,6 +800,12 @@ function onAction(action) {
 
 // ========== 从面板同步 ==========
 function syncFromPanel() {
+    // 检查必需函数是否已加载
+    if (typeof findHeaderRow === 'undefined' || typeof getColumnMap === 'undefined' || typeof getLastRow === 'undefined') {
+        alert("正在加载脚本，请稍后重试...");
+        return;
+    }
+
     let token = window.Application.PluginStorage.getItem("bgm_token");
     if (!token) {
         alert("请先设置 Bangumi Token！");
@@ -582,9 +815,11 @@ function syncFromPanel() {
 
     let select = document.getElementById("sheetSelect");
     let endRowInput = document.getElementById("endRow");
+    let startRowInput = document.getElementById("startRow");
 
     let sheetIndex = parseInt(select.value) || 1;
-    let endRow = parseInt(endRowInput?.value) || 0;
+    let userEndRow = parseInt(endRowInput?.value) || 0;
+    let selectMode = document.querySelector('input[name="selectMode"]:checked')?.value || 'auto';
 
     try {
         let sheets = window.Application.ActiveWorkbook.Sheets;
@@ -595,11 +830,12 @@ function syncFromPanel() {
         if (headerRow === 0) {
             headerRow = 1;
         }
-        let startRow = headerRow + 1;
+        let dataStartRow = headerRow + 1;
 
-        if (endRow === 0) {
-            endRow = getCell(ws, ws.Rows.Count, 1).End(-4162).Row;
-        }
+        // 获取最后一行
+        let lastRowCell = getCell(ws, ws.Rows.Count, 1);
+        let lastRow = lastRowCell.End(-4162).Row;
+        let actualEndRow = userEndRow > 0 ? Math.min(userEndRow, lastRow) : lastRow;
 
         // 获取列映射
         let colMap = getColumnMap(ws, headerRow);
@@ -608,12 +844,45 @@ function syncFromPanel() {
             return;
         }
 
+        // D列序列号（固定第4列）
+        let seqCol = 4;
+
+        // 确定要处理的行范围
+        let rowsToProcess = [];
+        
+        if (selectMode === 'auto') {
+            // 自动模式：根据D列序列号连续性识别有效数据行
+            rowsToProcess = getSequentialRowsBySeqCol(ws, dataStartRow, actualEndRow, seqCol);
+        } else {
+            // 手动模式：使用用户指定的范围
+            let manualStart = parseInt(startRowInput?.value) || dataStartRow;
+            let manualEnd = parseInt(endRowInput?.value) || lastRow;
+            for (let i = manualStart; i <= manualEnd; i++) {
+                rowsToProcess.push(i);
+            }
+        }
+
+        if (rowsToProcess.length === 0) {
+            alert("没有需要同步的数据行！");
+            return;
+        }
+
+        let confirmMsg = `将同步 ${rowsToProcess.length} 行数据到 Bangumi\n\n`;
+        confirmMsg += "根据D列序列号识别有效数据行\n";
+        confirmMsg += "\n是否继续？";
+        
+        if (!confirm(confirmMsg)) {
+            return;
+        }
+
         setStatus("正在同步...", "loading");
 
         let successCount = 0, failCount = 0, skipCount = 0;
-        let total = endRow - startRow + 1;
+        let total = rowsToProcess.length;
 
-        for (let i = startRow; i <= endRow; i++) {
+        for (let idx = 0; idx < rowsToProcess.length; idx++) {
+            let i = rowsToProcess[idx];
+            
             // 从正确的列获取 URL
             let bgmUrl = trim(String(getCell(ws, i, colMap.get("Bangumi_URL")).Value()));
             let subjectId = extractSubjectId(bgmUrl);
@@ -650,8 +919,8 @@ function syncFromPanel() {
             }
 
             // 进度
-            if (i % 5 === 0) {
-                window.Application.StatusBar = `同步进度: ${i - startRow + 1}/${total}`;
+            if (idx % 5 === 0) {
+                window.Application.StatusBar = `同步进度: ${idx + 1}/${total}`;
             }
 
             // 延迟
@@ -663,6 +932,9 @@ function syncFromPanel() {
         setStatus(`完成! 成功:${successCount} 失败:${failCount} 跳过:${skipCount}`, "success");
 
         alert(`同步完成！\n成功: ${successCount}\n失败: ${failCount}\n跳过: ${skipCount}`);
+        
+        // 刷新预览
+        refreshData();
     } catch (e) {
         console.error("同步失败:", e);
         setStatus("同步失败: " + e.message, "error");

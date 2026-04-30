@@ -20,6 +20,46 @@ function getApp() {
     return null;
 }
 
+// ========== 可靠获取最后一行 ==========
+function getLastRow(ws) {
+    try {
+        // 方法1：使用 UsedRange（最可靠）
+        if (ws.UsedRange && ws.UsedRange.Rows) {
+            let usedLastRow = ws.UsedRange.Row + ws.UsedRange.Rows.Count - 1;
+            if (usedLastRow > 1) return usedLastRow;
+        }
+    } catch (e) {
+        // 忽略错误，尝试备选方案
+    }
+
+    // 方法2：从最大行向上查找有数据的行
+    try {
+        let maxRows = ws.Rows.Count;
+        // 尝试从不同列查找（优先 Bangumi URL 列，因为它是必填的）
+        for (let col = 1; col <= 10; col++) {
+            let cell = getCell(ws, maxRows, col);
+            if (cell && cell.Value !== null && cell.Value !== undefined && cell.Value !== "") {
+                let lastRow = cell.End(-4162).Row;
+                if (lastRow > 1) return lastRow;
+            }
+        }
+    } catch (e) {
+        // 忽略错误
+    }
+
+    // 方法3：使用 SpecialCells 查找最后一个单元格
+    try {
+        let lastCell = ws.Cells.Find("*", ws.Cells(1, 1), -4123, , 1, 2);
+        if (lastCell) {
+            return lastCell.Row;
+        }
+    } catch (e) {
+        // 忽略错误
+    }
+
+    return 100; // 默认返回100行作为安全值
+}
+
 // ========== 获取 Token ==========
 function getBgmtoken() {
     let app = getApp();
@@ -71,7 +111,7 @@ function SyncToBangumi() {
         return;
     }
 
-    let lastRow = getCell(ws, ws.Rows.Count, 1).End(-4162).Row; // xlUp = -4162
+    let lastRow = getLastRow(ws);
 
     let successCount = 0, failCount = 0, skipCount = 0;
 
@@ -336,14 +376,19 @@ function getColumnMap(ws, headerRow) {
 
 // ========== 构建 JSON 请求体 ==========
 function buildJsonPayload(ws, row, colMap, finishedDate) {
-    let parts = [];
-
     // --- type: 收藏类型 ---
     let watchStatus = "";
     if (colMap.has("是否看完")) {
         watchStatus = trim(getCellValue(ws, row, colMap.get("是否看完")));
     }
     let bgmType = mapWatchStatus(watchStatus, finishedDate);
+
+    // type=0 表示不需要上传（空白、否、想看等）
+    if (bgmType === 0) {
+        return "";
+    }
+
+    let parts = [];
     parts.push('"type":' + bgmType);
 
     // --- rate: 评分 ---
@@ -408,20 +453,16 @@ function parseEpisodeNumber(epStr) {
 }
 
 // ========== 映射观看状态 -> Bangumi type ==========
-// Bangumi type: 1=想看 2=在看 3=看过 4=搁置 5=抛弃
+// Bangumi type: 0=不上传 1=想看 2=在看 3=看过 4=搁置 5=抛弃
+// 只有在看(2)、看过(3)、搁置(4)、抛弃(5)才上传
+function isEmptyValue(val) {
+    return val === null || val === undefined || val === "" || val === "null" || val === "NULL" || val === "Null" || val === "undefined";
+}
+
 function mapWatchStatus(status, finishedDate) {
-    // 处理 null、undefined、"null" 字符串
-    if (status === null || status === undefined || status === "null" || status === "NULL" || status === "Null") {
-        if (finishedDate !== "" && finishedDate !== null && finishedDate !== undefined) {
-            return 3; // 有完播日 = 看过
-        }
-        return 1; // 默认想看
-    }
-    if (status === "") {
-        if (finishedDate !== "" && finishedDate !== null && finishedDate !== undefined) {
-            return 3; // 有完播日 = 看过
-        }
-        return 1; // 默认想看
+    // 处理空值（空白、null）
+    if (isEmptyValue(status)) {
+        return 0; // 不上传
     }
 
     let s = trim(status);
@@ -433,7 +474,7 @@ function mapWatchStatus(status, finishedDate) {
         case "否":
         case "想看":
         case "想看动画":
-            return 1; // 想看
+            return 0; // 不上传
         case "在追":
         case "在看":
         case "追":
@@ -447,11 +488,11 @@ function mapWatchStatus(status, finishedDate) {
         case "弃番":
             return 5; // 抛弃
         default:
-            // 再次尝试模糊匹配
-            if (s.indexOf("看") >= 0 && s.indexOf("追") < 0) return 3;
+            // 模糊匹配
             if (s.indexOf("追") >= 0) return 2;
             if (s.indexOf("搁") >= 0 || s.indexOf("停") >= 0) return 4;
-            return finishedDate !== "" ? 3 : 1;
+            if (s.indexOf("弃") >= 0) return 5;
+            return 0; // 其他情况不上传
     }
 }
 
@@ -571,7 +612,7 @@ function clearRowColors() {
     let ws = app.ActiveSheet;
     if (!ws) return;
 
-    let lastRow = getCell(ws, ws.Rows.Count, 1).End(-4162).Row;
+    let lastRow = getLastRow(ws);
     if (lastRow < 2) return;
 
     for (let i = 2; i <= lastRow; i++) {
@@ -617,7 +658,7 @@ function previewSubjectIdExtraction() {
         return;
     }
 
-    let lastRow = getCell(ws, ws.Rows.Count, 1).End(-4162).Row;
+    let lastRow = getLastRow(ws);
     let previewRows = Math.min(10, lastRow - headerRow);
 
     let msg = "前" + previewRows + "行的 URL -> subject_id 提取结果：\n\n";
@@ -797,6 +838,213 @@ function GetUrlPath() {
     }
     // Ribbon 上下文：返回默认路径
     return "";
+}
+
+// ========== 检测表头筛选状态 ==========
+function getFilterStatus() {
+    // 优先使用 window.Application（taskpane 环境中可用）
+    let app = window.Application || getApp();
+    if (!app) return null;
+    
+    let ws = app.ActiveSheet;
+    if (!ws) return null;
+    
+    let result = {
+        hasFilter: false,
+        filteredColumns: [],
+        hiddenRows: [],
+        visibleRows: []
+    };
+    
+    try {
+        let autoFilter = ws.AutoFilter;
+        if (autoFilter) {
+            result.hasFilter = autoFilter.FilterMode;
+            
+            // 获取各列筛选条件
+            let filters = autoFilter.Filters;
+            if (filters && filters.Count > 0) {
+                for (let i = 1; i <= filters.Count; i++) {
+                    try {
+                        let f = filters(i);
+                        if (f && f.On) {
+                            result.filteredColumns.push({
+                                column: i,
+                                criteria: f.Criteria1
+                            });
+                        }
+                    } catch (e) {}
+                }
+            }
+        }
+        
+        // 检测被隐藏的行
+        let lastRow = getLastRow(ws);
+        for (let i = 2; i <= lastRow; i++) {
+            try {
+                let rowHidden = ws.Rows(i).Hidden;
+                if (rowHidden) {
+                    result.hiddenRows.push(i);
+                } else {
+                    result.visibleRows.push(i);
+                }
+            } catch (e) {}
+        }
+    } catch (e) {
+        console.error("getFilterStatus error:", e);
+    }
+    
+    return result;
+}
+
+// ========== 获取筛选后的可见行 ==========
+function getVisibleRows() {
+    let status = getFilterStatus();
+    return status ? status.visibleRows : [];
+}
+
+// ========== 获取被筛选掉的行 ==========
+function getFilteredRows() {
+    let status = getFilterStatus();
+    return status ? status.hiddenRows : [];
+}
+
+// ========== 根据序列号获取连续数据行（支持筛选状态）==========
+/**
+ * 获取序列号连续的行
+ * 固定使用D列（第4列）作为序列号列
+ * 支持筛选模式：自动检测被隐藏的行并识别序列号跳跃
+ * @param {number} startRow - 起始行（默认从第2行开始）
+ * @returns {object} - 包含连续行信息和被筛选的行信息
+ */
+function getSequentialRowsBySeqCol(startRow) {
+    let app = getApp();
+    if (!app) return { validRows: [], filteredRows: [], totalFiltered: 0 };
+    
+    let ws = app.ActiveSheet;
+    if (!ws) return { validRows: [], filteredRows: [], totalFiltered: 0 };
+    
+    // 获取筛选状态
+    let filterStatus = getFilterStatus();
+    let visibleRows = filterStatus ? filterStatus.visibleRows : [];
+    let hiddenRows = filterStatus ? filterStatus.hiddenRows : [];
+    let isFiltered = filterStatus ? filterStatus.hasFilter : false;
+    
+    // 如果有筛选模式，只检查可见行
+    let checkRows = isFiltered ? visibleRows : [];
+    
+    // 结果对象
+    let result = {
+        validRows: [],        // 序列号连续的有效行
+        filteredRows: [],     // 被筛选掉的行（通过序列号跳跃检测）
+        totalFiltered: 0,     // 被筛选的总行数
+        hasFilter: isFiltered,
+        visibleCount: visibleRows.length,
+        hiddenCount: hiddenRows.length
+    };
+    
+    // 序列号列（D列=第4列）
+    let seqCol = 4;
+    
+    if (isFiltered) {
+        // ========== 筛选模式：只处理可见行 ==========
+        // 收集可见行的序列号
+        let visibleSeqMap = new Map(); // row -> seqNum
+        
+        for (let i = 0; i < checkRows.length; i++) {
+            let row = checkRows[i];
+            let cell = getCell(ws, row, seqCol);
+            if (!cell) continue;
+            
+            let seqValue = cell.Value();
+            if (seqValue === null || seqValue === undefined || seqValue === "") {
+                continue;
+            }
+            
+            let seqNum = parseInt(seqValue);
+            if (isNaN(seqNum)) continue;
+            
+            visibleSeqMap.set(row, seqNum);
+        }
+        
+        // 按行号排序
+        let sortedRows = Array.from(visibleSeqMap.keys()).sort(function(a, b) { return a - b; });
+        
+        if (sortedRows.length === 0) {
+            return result;
+        }
+        
+        // 第一个可见行
+        result.validRows.push(sortedRows[0]);
+        
+        // 遍历后续行，检测序列号连续性
+        for (let i = 1; i < sortedRows.length; i++) {
+            let prevRow = sortedRows[i - 1];
+            let prevSeq = visibleSeqMap.get(prevRow);
+            let currRow = sortedRows[i];
+            let currSeq = visibleSeqMap.get(currRow);
+            
+            let expectedSeq = prevSeq + 1;
+            
+            if (currSeq === expectedSeq) {
+                // 序列号连续，添加该行
+                result.validRows.push(currRow);
+            } else if (currSeq > expectedSeq) {
+                // 序列号跳跃，说明中间有被筛选的行
+                let gap = currSeq - expectedSeq;
+                result.totalFiltered += gap;
+                result.filteredRows.push({
+                    startSeq: expectedSeq,
+                    endSeq: currSeq - 1,
+                    count: gap,
+                    afterRow: currRow
+                });
+                result.validRows.push(currRow);
+            }
+            // currSeq < expectedSeq 的情况：忽略（可能是重复/倒退）
+        }
+        
+    } else {
+        // ========== 非筛选模式：扫描所有行 ==========
+        // 查找数据结束行
+        let lastRow = getLastRow(ws);
+        let start = startRow || 2;
+        
+        // 收集所有非空序列号行
+        let seqMap = new Map(); // row -> seqNum
+        
+        for (let row = start; row <= lastRow; row++) {
+            let cell = getCell(ws, row, seqCol);
+            if (!cell) continue;
+            
+            let seqValue = cell.Value();
+            if (seqValue === null || seqValue === undefined || seqValue === "") {
+                continue;
+            }
+            
+            let seqNum = parseInt(seqValue);
+            if (isNaN(seqNum)) continue;
+            
+            seqMap.set(row, seqNum);
+        }
+        
+        if (seqMap.size === 0) {
+            return result;
+        }
+        
+        // 按行号排序
+        let sortedRows = Array.from(seqMap.keys()).sort(function(a, b) { return a - b; });
+        
+        result.validRows = sortedRows;
+    }
+    
+    return result;
+}
+
+// ========== 简化版：只获取连续行 ==========
+function getSequentialRows(startRow) {
+    let result = getSequentialRowsBySeqCol(startRow);
+    return result.validRows;
 }
 
 

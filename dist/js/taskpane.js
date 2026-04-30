@@ -1,3 +1,37 @@
+// ========== 辅助函数：安全获取单元格 ==========
+function colNumToLetter(col) {
+    let letter = "";
+    while (col > 0) {
+        let mod = (col - 1) % 26;
+        letter = String.fromCharCode(65 + mod) + letter;
+        col = Math.floor((col - mod) / 26);
+    }
+    return letter;
+}
+
+function getCell(ws, row, col) {
+    try {
+        // 优先使用 Range (WPS 兼容)
+        if (typeof ws.Range === 'function') {
+            let colLetter = colNumToLetter(col);
+            return ws.Range(colLetter + row);
+        }
+        // 回退：尝试 Cells 直接调用
+        if (typeof ws.Cells === 'function') {
+            return ws.Cells(row, col);
+        }
+        // 回退：尝试 Cells.Item
+        if (ws.Cells && typeof ws.Cells.Item === 'function') {
+            return ws.Cells.Item(row, col);
+        }
+        // 最后回退
+        return ws.Cells(row, col);
+    } catch (e) {
+        console.error("getCell error:", e);
+        return null;
+    }
+}
+
 // ========== 面板初始化 ==========
 window.onload = () => {
     // 检查枚举
@@ -47,12 +81,102 @@ window.onload = () => {
         sheetSelect.onchange = () => refreshData();
     }
 
+    // 对话框回车确认
+    let dialogInput = document.getElementById("dialogInput");
+    if (dialogInput) {
+        dialogInput.onkeypress = (e) => {
+            if (e.key === "Enter") {
+                closeDialog(true);
+            }
+        };
+    }
+
+    // 绑定所有链接点击事件（使用 WPS 方式打开）
+    document.addEventListener("click", (e) => {
+        if (e.target.tagName === "A") {
+            e.preventDefault();
+            let url = e.target.href;
+            if (url) {
+                try {
+                    window.Application.OAAssist.ShellExecute(url);
+                } catch (err) {
+                    window.open(url, "_blank");
+                }
+            }
+        }
+    });
+
     // 加载工作表列表（延迟加载，等待 DOM 完全就绪）
     setTimeout(() => {
         refreshSheets();
         refreshData();
     }, 300);
+
+    // 调试通知功能：向开发服务器发送请求
+    if (typeof WpsInvoke !== "undefined") {
+        try {
+            var xmlReq = WpsInvoke.CreateXHR();
+            var url = location.origin + "/.debugTemp/NotifyDemoUrl";
+            xmlReq.open("GET", url);
+            xmlReq.onload = function (res) {
+                var node = document.getElementById("DemoSpan");
+                if (node) {
+                    node.innerHTML = res.target.responseText;
+                    // 显示调试区域
+                    var debugSection = document.getElementById("debugSection");
+                    if (debugSection) {
+                        debugSection.style.display = "block";
+                    }
+                }
+            };
+            xmlReq.onerror = function () {
+                var debugSection = document.getElementById("debugSection");
+                if (debugSection) {
+                    debugSection.style.display = "none";
+                }
+            };
+            xmlReq.send();
+        } catch (e) {
+            console.log("调试通知功能不可用:", e.message);
+        }
+    }
 };
+
+// ========== 自定义对话框 ==========
+let dialogCallback = null;
+
+function showInputDialog(title, message, defaultValue, callback) {
+    let modal = document.getElementById("inputDialog");
+    let titleEl = document.getElementById("dialogTitle");
+    let messageEl = document.getElementById("dialogMessage");
+    let inputEl = document.getElementById("dialogInput");
+
+    if (!modal || !titleEl || !messageEl || !inputEl) {
+        alert(message + "\n\n" + defaultValue);
+        callback(defaultValue);
+        return;
+    }
+
+    titleEl.textContent = title;
+    messageEl.innerHTML = message.replace(/\n/g, "<br>");
+    inputEl.value = defaultValue;
+    dialogCallback = callback;
+
+    modal.style.display = "flex";
+    setTimeout(() => inputEl.focus(), 100);
+}
+
+function closeDialog(confirmed) {
+    let modal = document.getElementById("inputDialog");
+    let inputEl = document.getElementById("dialogInput");
+
+    modal.style.display = "none";
+
+    if (confirmed && dialogCallback) {
+        dialogCallback(inputEl.value);
+    }
+    dialogCallback = null;
+}
 
 // ========== Token 状态更新 ==========
 function updateTokenStatus() {
@@ -96,23 +220,41 @@ function refreshSheets() {
     select.innerHTML = '<option value="">-- 请选择 --</option>';
 
     try {
+        // 检查 Application 对象
         let app = window.Application;
-        if (!app || !app.ActiveWorkbook) {
+        console.log("Application 对象:", app);
+
+        if (!app) {
+            console.error("Application 对象不存在");
+            select.innerHTML = '<option value="">-- WPS未就绪 --</option>';
+            return;
+        }
+
+        // 检查 ActiveWorkbook
+        let workbook = app.ActiveWorkbook;
+        console.log("ActiveWorkbook:", workbook);
+
+        if (!workbook) {
             console.log("没有打开的工作簿");
             select.innerHTML = '<option value="">-- 请先打开Excel --</option>';
             return;
         }
 
-        let sheets = app.ActiveWorkbook.Sheets;
+        let sheets = workbook.Sheets;
+        console.log("Sheets 对象:", sheets);
+
         if (!sheets || sheets.Count === 0) {
             console.log("工作簿中没有工作表");
+            select.innerHTML = '<option value="">-- 无工作表 --</option>';
             return;
         }
+
+        console.log("工作表数量:", sheets.Count);
 
         for (let i = 1; i <= sheets.Count; i++) {
             let option = document.createElement("option");
             option.value = i;
-            option.textContent = sheets(i).Name;
+            option.textContent = sheets.Item(i).Name;
             select.appendChild(option);
         }
 
@@ -144,11 +286,11 @@ function refreshData() {
     if (!select || !previewBox) return;
 
     let sheetIndex = parseInt(select.value) || 1;
-    let endRow = parseInt(endRowInput?.value) || 0;
+    let userEndRow = parseInt(endRowInput?.value) || 0;
 
     try {
         let sheets = window.Application.ActiveWorkbook.Sheets;
-        let ws = sheets(sheetIndex);
+        let ws = sheets.Item(sheetIndex);
 
         if (!ws) {
             setStatus("未找到工作表", "error");
@@ -162,33 +304,92 @@ function refreshData() {
         }
         let startRow = headerRow + 1;
 
-        let lastRow = ws.Cells(ws.Rows.Count, 1).End(-4162).Row;
-        if (endRow === 0 || endRow > lastRow) {
-            if (endRowInput) endRowInput.value = lastRow;
-            endRow = lastRow;
-        }
-
         // 获取列映射
         let colMap = getColumnMap(ws, headerRow);
+        
+        // 序列号列
+        let seqCol = colMap.has("序列号") ? colMap.get("序列号") : 0;
+        
+        // 获取可见行区域（处理筛选）
+        let lastRowCell = getCell(ws, ws.Rows.Count, 1);
+        let lastRow = lastRowCell.End(-4162).Row;
+        let actualEndRow = userEndRow > 0 ? Math.min(userEndRow, lastRow) : lastRow;
+        if (userEndRow === 0 && endRowInput) {
+            endRowInput.value = actualEndRow;
+        }
 
-        // 生成预览表格
+        // 构建行范围
+        let startCell = getCell(ws, startRow, 1);
+        let endCell = getCell(ws, actualEndRow, 1);
+        let rowRange = ws.Range(startCell, endCell);
+        
+        // 检查是否有筛选
+        let isFiltered = ws.AutoFilterMode && ws.AutoFilter.Filters.Count > 0;
+        let visibleRows = [];
+        let totalRows = 0;
+        let firstVisibleRow = 0;
+        let lastVisibleRow = 0;
+        
+        if (isFiltered) {
+            // 有筛选，只处理可见行
+            let visibleRange = rowRange.SpecialCells(12); // 12 = xlCellTypeVisible
+            if (visibleRange) {
+                let areas = visibleRange.Areas;
+                for (let a = 1; a <= areas.Count; a++) {
+                    let area = areas.Item(a);
+                    for (let r = 1; r <= area.Rows.Count; r++) {
+                        let rowNum = area.Rows.Item(r).Row;
+                        if (seqCol > 0) {
+                            let seqVal = trim(String(getCell(ws, rowNum, seqCol).Value()));
+                            if (seqVal !== "" && !isNaN(parseInt(seqVal))) {
+                                visibleRows.push(rowNum);
+                            }
+                        } else {
+                            visibleRows.push(rowNum);
+                        }
+                    }
+                }
+            }
+            totalRows = visibleRows.length;
+            firstVisibleRow = totalRows > 0 ? visibleRows[0] : startRow;
+            lastVisibleRow = totalRows > 0 ? visibleRows[totalRows - 1] : startRow;
+        } else {
+            // 无筛选，使用所有数据行
+            for (let i = startRow; i <= actualEndRow; i++) {
+                if (seqCol > 0) {
+                    let seqVal = trim(String(getCell(ws, i, seqCol).Value()));
+                    if (seqVal !== "" && !isNaN(parseInt(seqVal))) {
+                        visibleRows.push(i);
+                    }
+                } else {
+                    visibleRows.push(i);
+                }
+            }
+            totalRows = visibleRows.length;
+            firstVisibleRow = startRow;
+            lastVisibleRow = actualEndRow;
+        }
+
+        // 生成美化的预览表格
         let html = '<table><thead><tr>';
-        html += '<th>#</th><th>名称</th><th>URL→ID</th><th>状态</th><th>type</th><th>打分</th><th>标签</th>';
+        html += '<th>序号</th><th>名称</th><th>ID</th><th>状态</th><th>评分</th><th>标签</th>';
         html += '</tr></thead><tbody>';
 
-        // 数据行
-        let previewRows = Math.min(15, endRow - startRow + 1);
+        // 预览条数限制
+        let previewCount = Math.min(15, totalRows);
         let validCount = 0;
-        
-        for (let i = startRow; i < startRow + previewRows && i <= endRow; i++) {
-            let name = colMap.has("名称") ? trim(String(ws.Cells(i, colMap.get("名称")).Value())) : "";
-            let bgmUrl = colMap.has("Bangumi_URL") ? trim(String(ws.Cells(i, colMap.get("Bangumi_URL")).Value())) : "";
-            let status = colMap.has("是否看完") ? trim(String(ws.Cells(i, colMap.get("是否看完")).Value())) : "";
-            let rate = colMap.has("打分") ? trim(String(ws.Cells(i, colMap.get("打分")).Value())) : "";
-            let tagsRaw = colMap.has("标签/分级") ? trim(String(ws.Cells(i, colMap.get("标签/分级")).Value())) : "";
-            
-            let finishedDate = colMap.has("完播日") ? trim(String(ws.Cells(i, colMap.get("完播日")).Value())) : "";
-            
+        let typeStats = {1:0, 2:0, 3:0, 4:0, 5:0};
+
+        for (let idx = 0; idx < previewCount; idx++) {
+            let i = visibleRows[idx];
+            let seqNum = seqCol > 0 ? trim(String(getCell(ws, i, seqCol).Value())) : i;
+            let name = colMap.has("名称") ? trim(String(getCell(ws, i, colMap.get("名称")).Value())) : "";
+            let bgmUrl = colMap.has("Bangumi_URL") ? trim(String(getCell(ws, i, colMap.get("Bangumi_URL")).Value())) : "";
+            let status = colMap.has("是否看完") ? trim(String(getCell(ws, i, colMap.get("是否看完")).Value())) : "";
+            let rate = colMap.has("打分") ? trim(String(getCell(ws, i, colMap.get("打分")).Value())) : "";
+            let tagsRaw = colMap.has("标签/分级") ? trim(String(getCell(ws, i, colMap.get("标签/分级")).Value())) : "";
+            let finishedDate = colMap.has("完播日") ? trim(String(getCell(ws, i, colMap.get("完播日")).Value())) : "";
+
             let sid = extractSubjectId(bgmUrl);
             let hasUrl = sid !== "";
             if (hasUrl) validCount++;
@@ -196,40 +397,48 @@ function refreshData() {
             // 解析状态
             let typeNum = mapWatchStatus(status, finishedDate);
             let typeName = ["", "想看", "在看", "看过", "搁置", "抛弃"][typeNum] || "未知";
+            typeStats[typeNum]++;
 
             // 处理标签
             let tagsDisplay = "";
             if (tagsRaw) {
                 let tagSet = new Set();
                 addTagsFromStr(tagSet, tagsRaw);
-                let tags = Array.from(tagSet).slice(0, 5);
-                tagsDisplay = tags.join(", ");
-                if (tagSet.size > 5) tagsDisplay += "...";
+                let tags = Array.from(tagSet).slice(0, 3);
+                tagsDisplay = tags.map(t => `<span class="tag-badge">${t}</span>`).join(' ');
+                if (tagSet.size > 3) tagsDisplay += `<span class="tag-badge" style="background:#555">+${tagSet.size - 3}</span>`;
             }
 
-            let bgColor = hasUrl ? '#d5f5e3' : '#fadbd8';
-            
-            html += `<tr style="background:${bgColor}">`;
-            html += `<td>${i}</td>`;
-            html += `<td style="max-width:80px;overflow:hidden;text-overflow:ellipsis;">${name ? (name.length > 10 ? name.substring(0, 10) + '...' : name) : '-'}</td>`;
-            html += `<td>${sid || '❌'}</td>`;
-            html += `<td><span style="color:${statusColor(status)}">${status || '-'}</span></td>`;
-            html += `<td>${typeNum}</td>`;
-            html += `<td>${rate || '-'}</td>`;
-            html += `<td style="font-size:11px;max-width:100px;overflow:hidden;">${tagsDisplay || '-'}</td>`;
+            html += `<tr class="${hasUrl ? 'valid' : 'invalid'}">`;
+            html += `<td class="row-num">${seqNum}</td>`;
+            html += `<td class="name-cell" title="${name}">${name ? (name.length > 12 ? name.substring(0, 12) + '...' : name) : '-'}</td>`;
+            html += `<td class="sid-cell ${hasUrl ? 'has-url' : 'no-url'}">${sid || '❌'}</td>`;
+            html += `<td class="status-cell"><span class="type-badge type-${typeNum}">${typeName}</span></td>`;
+            html += `<td class="rate-cell">${rate ? '⭐' + rate : '-'}</td>`;
+            html += `<td class="tags-cell">${tagsDisplay || '-'}</td>`;
             html += '</tr>';
         }
 
         html += '</tbody></table>';
-        html += `<p style="margin-top:10px;color:#7f8c8d;font-size:12px;">
-            显示 ${previewRows}/${endRow - startRow + 1} 行 | 
-            有效: <b style="color:#27ae60">${validCount}</b> | 
-            绿色=可同步 红色=跳过
-        </p>`;
+        html += `<div style="margin-top:14px;padding:12px;background:#333;border-radius:8px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
+                <span style="color:#888;font-size:12px;">
+                    <b style="color:#4a9eff">${firstVisibleRow}</b> - <b style="color:#4a9eff">${lastVisibleRow}</b> 行，共 <b style="color:#fff">${totalRows}</b> 条
+                </span>
+                <span style="display:flex;gap:12px;font-size:12px;">
+                    <span><span style="color:#4ade80">●</span> 有效: <b>${validCount}</b></span>
+                    <span><span style="color:#f87171">●</span> 无URL: <b>${previewCount - validCount}</b></span>
+                </span>
+            </div>
+            <div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap;">
+                ${typeStats[3] > 0 ? `<span class="type-badge type-3">看过 ${typeStats[3]}</span>` : ''}
+                ${typeStats[2] > 0 ? `<span class="type-badge type-2">在看 ${typeStats[2]}</span>` : ''}
+                ${typeStats[1] > 0 ? `<span class="type-badge type-1">想看 ${typeStats[1]}</span>` : ''}
+                ${typeStats[4] > 0 ? `<span class="type-badge type-4">搁置 ${typeStats[4]}</span>` : ''}
+            </div>
+        </div>`;
 
         previewBox.innerHTML = html;
-        if (previewCount) previewCount.textContent = `(${startRow}-${endRow}, 共${endRow - startRow + 1}行)`;
-
         setStatus("就绪", "success");
     } catch (e) {
         console.error("刷新数据失败:", e);
@@ -252,79 +461,148 @@ function statusColor(status) {
 // ========== 详细预览同步内容 ==========
 function previewSyncContent() {
     let select = document.getElementById("sheetSelect");
-    let headerRowInput = document.getElementById("headerRow");
-    let startRowInput = document.getElementById("startRow");
     let endRowInput = document.getElementById("endRow");
 
     let sheetIndex = parseInt(select?.value) || 1;
-    let headerRow = parseInt(headerRowInput?.value) || 1;
-    let startRow = parseInt(startRowInput?.value) || 2;
     let endRow = parseInt(endRowInput?.value) || 0;
-
-    if (endRow === 0) {
-        let sheets = window.Application.ActiveWorkbook.Sheets;
-        let ws = sheets(sheetIndex);
-        endRow = ws.Cells(ws.Rows.Count, 1).End(-4162).Row;
-    }
 
     try {
         let sheets = window.Application.ActiveWorkbook.Sheets;
-        let ws = sheets(sheetIndex);
+        let ws = sheets.Item(sheetIndex);
+
+        // 自动检测表头行
+        let headerRow = findHeaderRow(ws);
+        if (headerRow === 0) {
+            headerRow = 1;
+        }
+        let startRow = headerRow + 1;
+
+        if (endRow === 0) {
+            endRow = getCell(ws, ws.Rows.Count, 1).End(-4162).Row;
+        }
+
         let colMap = getColumnMap(ws, headerRow);
 
-        let msg = "=== 同步内容预览 ===\n\n";
         let previewCount = Math.min(5, endRow - startRow + 1);
         let totalValid = 0;
         let typeCount = {1:0, 2:0, 3:0, 4:0, 5:0};
+        let itemsHtml = '';
 
         for (let i = startRow; i <= startRow + previewCount - 1 && i <= endRow; i++) {
-            let bgmUrl = colMap.has("Bangumi_URL") ? trim(String(ws.Cells(i, colMap.get("Bangumi_URL")).Value())) : "";
-            let name = colMap.has("名称") ? trim(String(ws.Cells(i, colMap.get("名称")).Value())) : "";
-            let status = colMap.has("是否看完") ? trim(String(ws.Cells(i, colMap.get("是否看完")).Value())) : "";
-            let rate = colMap.has("打分") ? trim(String(ws.Cells(i, colMap.get("打分")).Value())) : "";
-            let tagsRaw = colMap.has("标签/分级") ? trim(String(ws.Cells(i, colMap.get("标签/分级")).Value())) : "";
-            let finishedDate = colMap.has("完播日") ? trim(String(ws.Cells(i, colMap.get("完播日")).Value())) : "";
+            let bgmUrl = colMap.has("Bangumi_URL") ? trim(String(getCell(ws, i, colMap.get("Bangumi_URL")).Value())) : "";
+            let name = colMap.has("名称") ? trim(String(getCell(ws, i, colMap.get("名称")).Value())) : "";
+            let status = colMap.has("是否看完") ? trim(String(getCell(ws, i, colMap.get("是否看完")).Value())) : "";
+            let rate = colMap.has("打分") ? trim(String(getCell(ws, i, colMap.get("打分")).Value())) : "";
+            let tagsRaw = colMap.has("标签/分级") ? trim(String(getCell(ws, i, colMap.get("标签/分级")).Value())) : "";
+            let finishedDate = colMap.has("完播日") ? trim(String(getCell(ws, i, colMap.get("完播日")).Value())) : "";
 
             let sid = extractSubjectId(bgmUrl);
             if (sid) {
                 totalValid++;
-                let typeNum = mapWatchStatus(status, finishedDate);
-                typeCount[typeNum] = (typeCount[typeNum] || 0) + 1;
             }
 
             let typeNum = mapWatchStatus(status, finishedDate);
             let typeName = ["", "想看", "在看", "看过", "搁置", "抛弃"][typeNum];
-            
+
             // 处理标签
             let tagSet = new Set();
             addTagsFromStr(tagSet, tagsRaw);
             let tags = Array.from(tagSet);
+            let tagsHtml = tags.length > 0
+                ? `<div class="detail-value tags">${tags.map(t => `<span class="tag-badge">${t}</span>`).join('')}</div>`
+                : '<div class="detail-value">-</div>';
 
-            msg += `【行${i}】${name || '(无名称)'}\n`;
-            msg += `  URL: ${bgmUrl || '(空)'}\n`;
-            msg += `  subject_id: ${sid || '❌无法提取'}\n`;
-            msg += `  状态: "${status}" → type=${typeNum}(${typeName})\n`;
-            msg += `  完播日: ${finishedDate || '(空)'}\n`;
-            msg += `  评分: ${rate || '(空)'}\n`;
-            msg += `  标签: [${tags.join(', ') || '(空)'}]\n`;
-            
-            if (sid) {
-                msg += `  → 将发送: POST /v0/users/-/collections/${sid}\n`;
-                msg += `  → JSON: ${buildJsonPayload(ws, i, colMap, finishedDate)}\n`;
-            }
-            msg += "\n";
+            let jsonBody = buildJsonPayload(ws, i, colMap, finishedDate);
+            let urlDisplay = bgmUrl.length > 60 ? bgmUrl.substring(0, 60) + '...' : bgmUrl;
+
+            itemsHtml += `
+                <div class="detail-item">
+                    <div class="detail-item-header">
+                        <div class="detail-item-title">
+                            <span class="detail-item-row">行 ${i}</span>
+                            <span class="detail-item-name">${name || '(无名称)'}</span>
+                        </div>
+                        <span class="status-badge type-${typeNum}">${typeName}</span>
+                    </div>
+                    <div class="detail-item-body">
+                        <div class="detail-row">
+                            <span class="detail-label">Bangumi URL</span>
+                            <span class="detail-value url">${urlDisplay || '(空)'}</span>
+                        </div>
+                        <div class="detail-row">
+                            <span class="detail-label">Subject ID</span>
+                            <span class="detail-value sid ${sid ? 'valid' : ''}">${sid || '❌ 无法提取'}</span>
+                        </div>
+                        <div class="detail-row">
+                            <span class="detail-label">观看状态</span>
+                            <span class="detail-value">"${status || '-'}" → type=${typeNum}</span>
+                        </div>
+                        <div class="detail-row">
+                            <span class="detail-label">完播日</span>
+                            <span class="detail-value">${finishedDate || '(空)'}</span>
+                        </div>
+                        <div class="detail-row">
+                            <span class="detail-label">评分</span>
+                            <span class="detail-value" style="color:#f39c12;font-weight:600;">${rate ? '⭐ ' + rate : '(空)'}</span>
+                        </div>
+                        <div class="detail-row">
+                            <span class="detail-label">标签</span>
+                            ${tagsHtml}
+                        </div>
+                        ${sid ? `
+                        <div class="detail-row" style="flex-direction:column;gap:6px;">
+                            <span class="detail-label" style="min-width:auto;">将发送的请求</span>
+                            <div class="detail-value" style="color:#27ae60;font-weight:500;">
+                                POST /v0/users/-/collections/${sid}
+                            </div>
+                            <div class="detail-value json">${jsonBody}</div>
+                        </div>
+                        ` : ''}
+                    </div>
+                </div>
+            `;
+            typeCount[typeNum]++;
         }
 
-        // 统计
-        msg += "=== 统计 ===\n";
-        msg += `总行数: ${endRow - startRow + 1}\n`;
-        msg += `有效URL: ${totalValid}\n`;
-        msg += `状态分布: 看过=${typeCount[3]} 在看=${typeCount[2]} 想看=${typeCount[1]} 搁置=${typeCount[4]}\n`;
+        // 生成统计信息
+        let statsHtml = `
+            <div class="detail-stats">
+                <div class="stat-card">
+                    <div class="stat-value">${endRow - startRow + 1}</div>
+                    <div class="stat-label">总行数</div>
+                </div>
+                <div class="stat-card success">
+                    <div class="stat-value">${totalValid}</div>
+                    <div class="stat-label">有效URL</div>
+                </div>
+                <div class="stat-card info">
+                    <div class="stat-value">${previewCount}</div>
+                    <div class="stat-label">预览条数</div>
+                </div>
+            </div>
+            <div style="margin-bottom:14px;display:flex;gap:8px;flex-wrap:wrap;">
+                ${typeCount[3] > 0 ? `<span class="status-badge type-3">看过 ${typeCount[3]}</span>` : ''}
+                ${typeCount[2] > 0 ? `<span class="status-badge type-2">在看 ${typeCount[2]}</span>` : ''}
+                ${typeCount[1] > 0 ? `<span class="status-badge type-1">想看 ${typeCount[1]}</span>` : ''}
+                ${typeCount[4] > 0 ? `<span class="status-badge type-4">搁置 ${typeCount[4]}</span>` : ''}
+                ${typeCount[5] > 0 ? `<span class="status-badge type-5">抛弃 ${typeCount[5]}</span>` : ''}
+            </div>
+        `;
 
-        alert(msg);
+        // 显示模态框
+        let modalBody = document.getElementById("detailModalBody");
+        if (modalBody) {
+            modalBody.innerHTML = statsHtml + itemsHtml;
+            document.getElementById("detailModal").style.display = "flex";
+        }
     } catch (e) {
         alert("预览失败: " + e.message);
     }
+}
+
+// ========== 关闭详细预览模态框 ==========
+function closeDetailModal() {
+    document.getElementById("detailModal").style.display = "none";
 }
 
 // ========== 面板操作处理 ==========
@@ -354,58 +632,76 @@ function syncFromPanel() {
     let token = window.Application.PluginStorage.getItem("bgm_token");
     if (!token) {
         alert("请先设置 Bangumi Token！");
-        setBangumiToken();
-        updateTokenStatus();
+        showTokenDialog("");
         return;
     }
 
     let select = document.getElementById("sheetSelect");
-    let startRowInput = document.getElementById("startRow");
     let endRowInput = document.getElementById("endRow");
 
     let sheetIndex = parseInt(select.value) || 1;
-    let startRow = parseInt(startRowInput?.value) || 2;
     let endRow = parseInt(endRowInput?.value) || 0;
-
-    if (endRow === 0) {
-        let sheets = window.Application.ActiveWorkbook.Sheets;
-        let ws = sheets(sheetIndex);
-        endRow = ws.Cells(ws.Rows.Count, 1).End(-4162).Row;
-    }
-
-    setStatus("正在同步...", "loading");
-
-    let successCount = 0, failCount = 0, skipCount = 0;
-    let total = endRow - startRow + 1;
 
     try {
         let sheets = window.Application.ActiveWorkbook.Sheets;
-        let ws = sheets(sheetIndex);
+        let ws = sheets.Item(sheetIndex);
+
+        // 自动检测表头行
+        let headerRow = findHeaderRow(ws);
+        if (headerRow === 0) {
+            headerRow = 1;
+        }
+        let startRow = headerRow + 1;
+
+        if (endRow === 0) {
+            endRow = getCell(ws, ws.Rows.Count, 1).End(-4162).Row;
+        }
+
+        // 获取列映射
+        let colMap = getColumnMap(ws, headerRow);
+        if (!colMap.has("Bangumi_URL")) {
+            alert("未找到 Bangumi URL 列！");
+            return;
+        }
+
+        setStatus("正在同步...", "loading");
+
+        let successCount = 0, failCount = 0, skipCount = 0;
+        let total = endRow - startRow + 1;
 
         for (let i = startRow; i <= endRow; i++) {
-            let bgmUrl = trim(ws.Cells(i, 1).Value());
+            // 从正确的列获取 URL
+            let bgmUrl = trim(String(getCell(ws, i, colMap.get("Bangumi_URL")).Value()));
             let subjectId = extractSubjectId(bgmUrl);
 
             if (subjectId === "") {
                 skipCount++;
-                ws.Cells(i, 1).Interior.Color = 0xFFFFCC;
+                getCell(ws, i, colMap.get("Bangumi_URL")).Interior.Color = 0xFFFFCC;
                 continue;
             }
 
             // 获取完播日
             let finishedDate = "";
-            // 构建请求体 - 简化版
-            let jsonBody = '{"type":3}';
+            if (colMap.has("完播日")) {
+                finishedDate = trim(String(getCell(ws, i, colMap.get("完播日")).Value()));
+            }
+
+            // 构建完整请求体
+            let jsonBody = buildJsonPayload(ws, i, colMap, finishedDate);
+            if (jsonBody === "") {
+                skipCount++;
+                continue;
+            }
 
             let result = bgmRequestSync("POST", "/v0/users/-/collections/" + subjectId, jsonBody, token);
             let statusCode = result.code;
 
             if (statusCode === 204 || statusCode === 200) {
                 successCount++;
-                ws.Cells(i, 1).Interior.Color = 0xCCFFCC;
+                getCell(ws, i, colMap.get("Bangumi_URL")).Interior.Color = 0xCCFFCC;
             } else {
                 failCount++;
-                ws.Cells(i, 1).Interior.Color = 0xFFCCCC;
+                getCell(ws, i, colMap.get("Bangumi_URL")).Interior.Color = 0xFFCCCC;
                 console.log("行 " + i + " 失败: " + result.message);
             }
 
@@ -438,18 +734,9 @@ function setStatus(msg, type) {
     }
 }
 
-// ========== Token 设置对话框 ==========
-function showTokenDialog(currentToken) {
-    let token = prompt("请输入 Bangumi Access Token：\n\n获取方式：Bangumi → 设置 → API → 创建应用", currentToken || "");
-    if (token !== null && token.trim() !== "") {
-        window.Application.PluginStorage.setItem("bgm_token", token.trim());
-        updateTokenStatus();
-        // 设置后自动测试 Token
-        testTokenValidity(token.trim());
-    }
-}
 
-// ========== 测试 Token 有效性 ==========
+
+// ========== 测试 Token 有效性（taskpane版本，更新UI状态）==========
 function testTokenValidity(token) {
     if (!token) {
         let storedToken = window.Application.PluginStorage.getItem("bgm_token");
@@ -475,8 +762,10 @@ function testTokenValidity(token) {
             alert("✓ Token 验证成功！\n\n用户: " + (userData.nickname || userData.username) + "\nID: " + userData.id);
             return true;
         } else if (xhr.status === 401) {
+            window.Application.PluginStorage.setItem("bgm_token", "");
+            updateTokenStatus();
             setStatus("Token 无效", "error");
-            alert("✗ Token 验证失败！\n\n请检查 Token 是否正确，或重新获取新的 Token。");
+            alert("✗ Token 验证失败！\n\nToken 已清除，请重新获取正确的 Token。");
             return false;
         } else {
             setStatus("验证失败 (" + xhr.status + ")", "error");
@@ -490,17 +779,6 @@ function testTokenValidity(token) {
     }
 }
 
-// ========== 用户ID 设置对话框 ==========
-function showUserIdDialog() {
-    let currentId = window.Application.PluginStorage.getItem("bgm_user_id") || "";
-    let userId = prompt("请输入 Bangumi 用户ID：\n\n获取方式：打开你的 Bangumi 主页，URL 中的数字/字母即为用户ID\n例如：https://bgm.tv/user/972358 → 用户ID: 972358", currentId);
-    if (userId !== null && userId.trim() !== "") {
-        window.Application.PluginStorage.setItem("bgm_user_id", userId.trim());
-        updateUserIdStatus();
-        alert("用户ID 设置成功！");
-    }
-}
-
 // ========== 打开用户收藏页 ==========
 function openUserCollection() {
     let userId = window.Application.PluginStorage.getItem("bgm_user_id");
@@ -511,4 +789,37 @@ function openUserCollection() {
     }
     let url = "https://bgm.tv/anime/list/" + userId + "/wish";
     window.open(url, "_blank");
+}
+
+// ========== Token 设置对话框（TaskPane 版本，使用自定义 UI）==========
+function showTokenDialog(currentToken) {
+    showInputDialog(
+        "设置 Bangumi Token",
+        "请输入 Bangumi Access Token<br><br>获取方式：从 <a href='https://next.bgm.tv/demo/access-token/create' target='_blank'>https://next.bgm.tv/demo/access-token/create</a> 创建",
+        currentToken || "",
+        (token) => {
+            if (token && token.trim() !== "") {
+                window.Application.PluginStorage.setItem("bgm_token", token.trim());
+                updateTokenStatus();
+                testTokenValidity(token.trim());
+            }
+        }
+    );
+}
+
+// ========== 用户ID 设置对话框（TaskPane 版本，使用自定义 UI）==========
+function showUserIdDialog() {
+    let currentId = window.Application.PluginStorage.getItem("bgm_user_id") || "";
+    showInputDialog(
+        "设置 Bangumi 用户ID",
+        "请输入 Bangumi 用户ID<br><br>获取方式：打开你的 Bangumi 主页，URL 中的数字/字母即为用户ID<br>例如：https://bgm.tv/user/972358 → 用户ID: 972358",
+        currentId,
+        (userId) => {
+            if (userId && userId.trim() !== "") {
+                window.Application.PluginStorage.setItem("bgm_user_id", userId.trim());
+                updateUserIdStatus();
+                alert("用户ID 设置成功！");
+            }
+        }
+    );
 }

@@ -82,15 +82,40 @@
         <div class="section">
             <h3>数据选择</h3>
             <div class="form-group">
+                <label>选择模式：</label>
+                <div class="mode-selector">
+                    <label class="radio-label">
+                        <input type="radio" name="selectMode" value="auto" checked onchange="onSelectModeChange()">
+                        <span class="radio-text">🤖 自动模式</span>
+                        <span class="radio-desc">自动识别筛选后的可见数据</span>
+                    </label>
+                    <label class="radio-label">
+                        <input type="radio" name="selectMode" value="manual" onchange="onSelectModeChange()">
+                        <span class="radio-text">🎯 手动选择</span>
+                        <span class="radio-desc">手动指定起始和结束行号</span>
+                    </label>
+                </div>
+            </div>
+            <div class="form-group">
                 <label>选择工作表：</label>
                 <select id="sheetSelect" class="input">
                     <option value="">-- 请选择 --</option>
                 </select>
                 <button class="btn small" onclick="refreshSheets()">🔄 刷新</button>
             </div>
-            <div class="form-group">
-                <label>结束行号：</label>
-                <input type="number" id="endRow" class="input" value="0" min="0" placeholder="0=到最后一行">
+            <div id="manualRangeInputs" style="display:none;">
+                <div class="form-group">
+                    <label>起始行号：</label>
+                    <input type="number" id="startRow" class="input" value="2" min="2" placeholder="从第几行开始">
+                </div>
+                <div class="form-group">
+                    <label>结束行号：</label>
+                    <input type="number" id="endRow" class="input" value="0" min="0" placeholder="0=到最后一行">
+                </div>
+            </div>
+            <div id="autoRangeInfo" class="range-info">
+                <span class="info-icon">ℹ️</span>
+                <span id="filterStatus">正在检测筛选状态...</span>
             </div>
             <button class="btn" onclick="refreshData()">🔄 刷新数据</button>
         </div>
@@ -102,6 +127,7 @@
                 <h3>📋 详细预览</h3>
                 <button class="detail-close-btn" onclick="closeDetailModal()">×</button>
             </div>
+            <div class="detail-modal-toolbar" id="detailModalToolbar"></div>
             <div class="detail-modal-body" id="detailModalBody"></div>
         </div>
     </div>
@@ -111,7 +137,7 @@
         <h3>数据预览 <span id="previewCount"></span></h3>
         <div class="preview-wrapper">
             <div class="preview-box" id="previewBox">
-                <p class="hint">点击"刷新数据"加载预览</p>
+                <p class="hint">点击"刷新数据"加载预览（支持筛选后数据）</p>
             </div>
         </div>
         <button class="btn" id="previewBtn" onclick="previewSyncContent()">
@@ -515,6 +541,77 @@
         color: #ff6b6b;
         font-weight: bold;
     }
+    /* ========== 模式选择器样式 ========== */
+    .mode-selector {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        margin-bottom: 14px;
+    }
+    .radio-label {
+        display: flex;
+        align-items: flex-start;
+        gap: 10px;
+        padding: 12px 14px;
+        background: #333;
+        border-radius: 8px;
+        border: 2px solid #444;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+    .radio-label:hover {
+        border-color: #555;
+        background: #383838;
+    }
+    .radio-label:has(input:checked) {
+        border-color: #4a9eff;
+        background: linear-gradient(135deg, rgba(74, 158, 255, 0.1) 0%, rgba(74, 158, 255, 0.05) 100%);
+    }
+    .radio-label input[type="radio"] {
+        width: 18px;
+        height: 18px;
+        margin-top: 2px;
+        accent-color: #4a9eff;
+        cursor: pointer;
+    }
+    .radio-text {
+        font-weight: 600;
+        color: #e0e0e0;
+        font-size: 14px;
+    }
+    .radio-desc {
+        display: block;
+        font-size: 12px;
+        color: #888;
+        margin-top: 2px;
+    }
+    .range-info {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 10px 14px;
+        background: #2a3a2a;
+        border-radius: 8px;
+        border: 1px solid #3a4a3a;
+        margin-bottom: 14px;
+        font-size: 13px;
+    }
+    .range-info.filtered {
+        background: #2a3a4a;
+        border-color: #3a4a5a;
+    }
+    .info-icon {
+        font-size: 16px;
+    }
+    #filterStatus {
+        color: #e0e0e0;
+    }
+    #filterStatus.has-filter {
+        color: #fbbf24;
+    }
+    #filterStatus.no-filter {
+        color: #4ade80;
+    }
     .status {
         padding: 12px;
         background: #333;
@@ -634,6 +731,44 @@
         background: #4a9eff;
         border-radius: 3px;
     }
+    .detail-modal-toolbar {
+        padding: 12px 20px;
+        background: #333;
+        border-bottom: 1px solid #444;
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+    }
+    .filter-btn {
+        padding: 6px 14px;
+        border: 2px solid #444;
+        border-radius: 20px;
+        background: #2d2d2d;
+        color: #b0b0b0;
+        font-size: 12px;
+        cursor: pointer;
+        transition: all 0.2s;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+    }
+    .filter-btn:hover {
+        background: #3a3a3a;
+        border-color: #555;
+    }
+    .filter-btn.active {
+        background: #4a9eff;
+        border-color: #4a9eff;
+        color: white;
+    }
+    .filter-btn.all { border-color: #888; }
+    .filter-btn.all.active { background: #888; border-color: #888; }
+    .filter-btn.type-2 { border-color: #60a5fa; color: #60a5fa; }
+    .filter-btn.type-2.active { background: #60a5fa; border-color: #60a5fa; color: white; }
+    .filter-btn.type-3 { border-color: #fbbf24; color: #fbbf24; }
+    .filter-btn.type-3.active { background: #fbbf24; border-color: #fbbf24; color: white; }
+    .filter-btn.type-4 { border-color: #a78bfa; color: #a78bfa; }
+    .filter-btn.type-4.active { background: #a78bfa; border-color: #a78bfa; color: white; }
     /* ========== 详细预览卡片样式 ========== */
     .detail-stats {
         display: grid;
