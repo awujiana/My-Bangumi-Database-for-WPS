@@ -6,12 +6,6 @@
 <script type="text/javascript" src="../js/taskpane.js"></script>
 <script type="text/javascript" src="../.debugTemp/wpsjsrpcsdk.js"></script>
 <body>
-    <!-- 调试信息 -->
-    <div id="debugInfo" style="display:none; padding:10px; background:#f8f9fa; border-bottom:1px solid #ddd; font-size:12px;">
-        <b>调试地址：</b><a id="debugUrl" href="#" target="_blank"></a>
-        <span id="debugStatus" style="margin-left:10px;"></span>
-    </div>
-
     <!-- 自定义输入对话框 -->
     <div id="inputDialog" class="modal" style="display:none;">
         <div class="modal-content">
@@ -92,7 +86,7 @@
                 <select id="sheetSelect" class="input">
                     <option value="">-- 请选择 --</option>
                 </select>
-                <button class="btn small" onclick="refreshSheets()">🔄 刷新工作表</button>
+                <button class="btn small" onclick="refreshSheets()">🔄 刷新</button>
             </div>
             <div class="form-group">
                 <label>表头行号：</label>
@@ -157,6 +151,13 @@
                     <tr><td>集号 / 看到</td><td>如 1-12</td><td></td></tr>
                 </table>
             </div>
+        </div>
+
+        <!-- 调试通知 -->
+        <div class="section debug-section" id="debugSection" style="display:none;">
+            <h3>🔧 调试信息</h3>
+            <div id="DemoSpan" class="debug-content"></div>
+            <button class="btn small" onclick="testDebugConnection()">测试连接</button>
         </div>
 
         <!-- 状态 -->
@@ -383,6 +384,21 @@
     .status.loading {
         background: #fef9e7;
         color: #f39c12;
+    }
+    .debug-section {
+        background: #fff3cd;
+        border: 1px solid #ffc107;
+    }
+    .debug-section h3 {
+        color: #856404;
+        border-bottom-color: #ffc107;
+    }
+    .debug-content {
+        background: white;
+        padding: 10px;
+        border-radius: 4px;
+        margin-bottom: 10px;
+        font-size: 12px;
     }
 </style>
 </html>

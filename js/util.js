@@ -13,7 +13,7 @@ function GetUrlPath() {
  * @param {*} param 需要执行的脚本
  */
 function shellExecuteByOAAssist(param) {
-    if (wps != null) {
-        wps.OAAssist.ShellExecute(param)
+    if (window.Application != null) {
+        window.Application.OAAssist.ShellExecute(param)
     }
 }

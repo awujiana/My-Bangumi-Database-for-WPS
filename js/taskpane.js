@@ -1,59 +1,5 @@
-// ========== 获取调试信息 ==========
-function fetchDebugInfo() {
-    let debugInfo = document.getElementById("debugInfo");
-    let debugUrl = document.getElementById("debugUrl");
-    let debugStatus = document.getElementById("debugStatus");
-
-    try {
-        if (typeof WpsInvoke !== "undefined" && WpsInvoke.CreateXHR) {
-            let xmlReq = WpsInvoke.CreateXHR();
-            let url = location.origin + "/.debugTemp/NotifyDemoUrl";
-            xmlReq.open("GET", url);
-            xmlReq.onload = function (res) {
-                let responseText = res.target.responseText;
-                console.log("调试地址响应:", responseText);
-                if (responseText && responseText.trim() !== "") {
-                    debugInfo.style.display = "block";
-                    debugUrl.href = responseText;
-                    debugUrl.textContent = responseText;
-                    debugUrl.onclick = (e) => {
-                        e.preventDefault();
-                        try {
-                            window.Application.OAAssist.ShellExecute(responseText);
-                        } catch (err) {
-                            window.open(responseText, "_blank");
-                        }
-                    };
-                    debugStatus.textContent = "✓ 调试模式已激活";
-                    debugStatus.style.color = "#27ae60";
-                } else {
-                    debugStatus.textContent = "调试模式未激活";
-                    debugStatus.style.color = "#999";
-                }
-            };
-            xmlReq.onerror = function () {
-                console.log("获取调试地址失败");
-                debugStatus.textContent = "调试模式未激活";
-                debugStatus.style.color = "#999";
-            };
-            xmlReq.send();
-        } else {
-            console.log("WpsInvoke 不可用");
-            debugStatus.textContent = "WpsInvoke 不可用";
-            debugStatus.style.color = "#999";
-        }
-    } catch (e) {
-        console.error("获取调试信息失败:", e);
-        debugStatus.textContent = "获取调试信息失败";
-        debugStatus.style.color = "#e74c3c";
-    }
-}
-
 // ========== 面板初始化 ==========
 window.onload = () => {
-    // 获取调试信息
-    fetchDebugInfo();
-
     // 检查枚举
     if (typeof window.Application.Enum !== "object") {
         window.Application.Enum = WPS_Enum;
@@ -131,6 +77,33 @@ window.onload = () => {
         refreshSheets();
         refreshData();
     }, 300);
+
+    // 调试通知功能：向开发服务器发送请求
+    try {
+        var xmlReq = WpsInvoke.CreateXHR();
+        var url = location.origin + "/.debugTemp/NotifyDemoUrl";
+        xmlReq.open("GET", url);
+        xmlReq.onload = function (res) {
+            var node = document.getElementById("DemoSpan");
+            if (node) {
+                node.innerHTML = res.target.responseText;
+                // 显示调试区域
+                var debugSection = document.getElementById("debugSection");
+                if (debugSection) {
+                    debugSection.style.display = "block";
+                }
+            }
+        };
+        xmlReq.onerror = function () {
+            var debugSection = document.getElementById("debugSection");
+            if (debugSection) {
+                debugSection.style.display = "none";
+            }
+        };
+        xmlReq.send();
+    } catch (e) {
+        console.log("调试通知功能不可用:", e.message);
+    }
 };
 
 // ========== 自定义对话框 ==========
@@ -245,7 +218,7 @@ function refreshSheets() {
         for (let i = 1; i <= sheets.Count; i++) {
             let option = document.createElement("option");
             option.value = i;
-            option.textContent = sheets(i).Name;
+            option.textContent = sheets.Item(i).Name;
             select.appendChild(option);
         }
 
@@ -672,24 +645,28 @@ function openUserCollection() {
     window.open(url, "_blank");
 }
 
-window.onload = () => {
-    // 1. 创建 XMLHttpRequest 对象
-    var xmlReq = WpsInvoke.CreateXHR();
-    
-    // 2. 构造请求 URL：获取当前页面的 origin + 固定路径
-    // 例如：http://localhost:5173/.debugTemp/NotifyDemoUrl
-    var url = location.origin + "/.debugTemp/NotifyDemoUrl";
-    
-    // 3. 初始化 GET 请求
-    xmlReq.open("GET", url);
-    
-    // 4. 请求完成后的回调
-    xmlReq.onload = function (res) {
-        var node = document.getElementById("DemoSpan");
-        // 将服务器返回的内容显示到页面上
-        window.document.getElementById("DemoSpan").innerHTML = res.target.responseText;
-    };
-    
-    // 5. 发送请求
-    xmlReq.send();
+// ========== 测试调试连接 ==========
+function testDebugConnection() {
+    try {
+        var xmlReq = WpsInvoke.CreateXHR();
+        var url = location.origin + "/.debugTemp/Ping";
+        xmlReq.open("GET", url);
+
+        xmlReq.onload = function (res) {
+            try {
+                var data = JSON.parse(res.target.responseText);
+                alert("✓ 连接成功！\n\n状态: " + data.status + "\n时间: " + data.timestamp + "\n消息: " + data.message);
+            } catch (e) {
+                alert("✓ 连接成功！\n\n响应: " + res.target.responseText);
+            }
+        };
+
+        xmlReq.onerror = function () {
+            alert("✗ 连接失败！\n\n请确保开发服务器正在运行。");
+        };
+
+        xmlReq.send();
+    } catch (e) {
+        alert("测试失败: " + e.message);
+    }
 }
