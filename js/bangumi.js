@@ -218,16 +218,19 @@ function colNumToLetter(col) {
 function getCell(ws, row, col) {
     try {
         // 优先使用 Range (WPS 兼容)
-        if (typeof ws.Range === 'function') {
+        if (ws && typeof ws.Range === 'function') {
             let colLetter = colNumToLetter(col);
             return ws.Range(colLetter + row);
         }
         // 回退：尝试 Cells.Item
-        if (ws.Cells && typeof ws.Cells.Item === 'function') {
+        if (ws && ws.Cells && typeof ws.Cells.Item === 'function') {
             return ws.Cells.Item(row, col);
         }
         // 最后回退
-        return ws.Cells(row, col);
+        if (ws && ws.Cells) {
+            return ws.Cells(row, col);
+        }
+        return null;
     } catch (e) {
         console.error("getCell error:", e);
         return null;
@@ -1173,7 +1176,10 @@ function getSequentialRowsBySeqCol(startRow, endRow) {
             let cell = getCell(ws, row, seqCol);
             if (!cell) continue;
             
-            let seqValue = cell.Value();
+            let seqValue = null;
+            try {
+                seqValue = cell.Value2 || cell.Value();
+            } catch (e) {}
             if (seqValue === null || seqValue === undefined || seqValue === "") {
                 continue;
             }
@@ -1233,7 +1239,10 @@ function getSequentialRowsBySeqCol(startRow, endRow) {
             let cell = getCell(ws, row, seqCol);
             if (!cell) continue;
             
-            let seqValue = cell.Value();
+            let seqValue = null;
+            try {
+                seqValue = cell.Value2 || cell.Value();
+            } catch (e) {}
             if (seqValue === null || seqValue === undefined || seqValue === "") {
                 continue;
             }
@@ -1245,6 +1254,7 @@ function getSequentialRowsBySeqCol(startRow, endRow) {
         }
         
         if (seqMap.size === 0) {
+            console.log("getSequentialRowsBySeqCol - seqMap 为空, start:", start, "scanEndRow:", scanEndRow);
             return result;
         }
         
@@ -1252,6 +1262,7 @@ function getSequentialRowsBySeqCol(startRow, endRow) {
         let sortedRows = Array.from(seqMap.keys()).sort(function(a, b) { return a - b; });
         
         result.validRows = sortedRows;
+        console.log("getSequentialRowsBySeqCol - validRows:", sortedRows.length, "行");
     }
     
     return result;

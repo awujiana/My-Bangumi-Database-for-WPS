@@ -272,69 +272,6 @@ function refreshSheets() {
     }
 }
 
-// ========== 获取可见行（优化版：只遍历可见行）==========
-// @param {object} ws - 工作表对象
-// @param {number} startRow - 起始行
-// @param {number} endRow - 结束行
-// @param {number} seqCol - 序列号列（默认第4列）
-// @returns {Array} - 可见行号数组（只包含有有效序列号的行）
-function getSequentialRowsBySeqCol(ws, startRow, endRow, seqCol) {
-    let visibleRows = [];
-    
-    // 尝试使用 SpecialCells(12) 获取可见行（xlCellTypeVisible=12）
-    try {
-        let autoFilter = ws.AutoFilter;
-        if (autoFilter && autoFilter.FilterMode === true && autoFilter.Range) {
-            let filterRange = autoFilter.Range;
-            let filterStartRow = filterRange.Row + 1;
-            let filterEndRow = filterRange.Row + filterRange.Rows.Count - 1;
-            
-            // 使用较小值确保范围合理
-            let actualEndRow = Math.min(filterEndRow, endRow);
-            
-            // xlCellTypeVisible = 12，获取序列号列的可见单元格
-            let visibleCells = ws.Range(ws.Cells(filterStartRow, seqCol), ws.Cells(actualEndRow, seqCol)).SpecialCells(12);
-            if (visibleCells) {
-                let areas = visibleCells.Areas;
-                for (let a = 1; a <= areas.Count; a++) {
-                    let area = areas(a);
-                    for (let r = 1; r <= area.Rows.Count; r++) {
-                        let rowNum = area.Rows(r).Row;
-                        // 只计入有有效数字序列号的行
-                        if (rowNum >= filterStartRow && rowNum <= actualEndRow) {
-                            try {
-                                let cellVal = ws.Cells(rowNum, seqCol).Value();
-                                let seqNum = parseInt(cellVal);
-                                if (!isNaN(seqNum) && seqNum > 0) {
-                                    visibleRows.push(rowNum);
-                                }
-                            } catch (e) {}
-                        }
-                    }
-                }
-            }
-        }
-    } catch (e) {
-        console.log("SpecialCells 获取可见行失败:", e.message);
-    }
-    
-    // 如果没有获取到可见行，回退到遍历指定范围
-    if (visibleRows.length === 0) {
-        for (let i = startRow; i <= endRow; i++) {
-            // 只计入有有效序列号的行
-            try {
-                let cellVal = ws.Cells(i, seqCol).Value();
-                let seqNum = parseInt(cellVal);
-                if (!isNaN(seqNum) && seqNum > 0) {
-                    visibleRows.push(i);
-                }
-            } catch (e) {}
-        }
-    }
-    
-    return visibleRows;
-}
-
 // ========== 获取筛选状态（包装函数，调用 bangumi.js 中的 getFilterStatus）==========
 // @param {number} endRow - 用户指定的结束行号，0表示自动检测
 // @param {boolean} getColumnCounts - 是否获取各列的唯一值计数
@@ -469,7 +406,9 @@ function refreshData() {
         
         if (selectMode === 'auto') {
             // 自动模式：根据序列号连续性识别有效数据行
-            visibleRows = getSequentialRowsBySeqCol(ws, dataStartRow, actualEndRow, seqCol);
+            // getSequentialRowsBySeqCol(startRow, endRow) 只接受2个参数
+            let seqResult = getSequentialRowsBySeqCol(dataStartRow, actualEndRow);
+            visibleRows = seqResult.validRows || [];
             totalRows = visibleRows.length;
             firstVisibleRow = totalRows > 0 ? visibleRows[0] : dataStartRow;
             lastVisibleRow = totalRows > 0 ? visibleRows[totalRows - 1] : dataStartRow;
@@ -490,24 +429,39 @@ function refreshData() {
         html += '<th>序号</th><th>名称</th><th>ID</th><th>状态</th><th>评分</th><th>标签</th>';
         html += '</tr></thead><tbody>';
 
-        // 预览条数限制
-        let previewLimit = Math.min(15, totalRows);
-        let validCount = 0;
+        // 先过滤出有BGM链接的数据行
+        let validRows = [];
+        for (let idx = 0; idx < visibleRows.length; idx++) {
+            let i = visibleRows[idx];
+            let bgmUrlCell = colMap.has("Bangumi_URL") ? getCell(ws, i, colMap.get("Bangumi_URL")) : null;
+            let bgmUrl = bgmUrlCell ? trim(String(bgmUrlCell.Value() || "")) : "";
+            let sid = extractSubjectId(bgmUrl);
+            if (sid) {
+                validRows.push({ row: i, sid: sid });
+            }
+        }
+        
+        // 预览条数限制（基于有效数据）
+        let previewLimit = Math.min(15, validRows.length);
+        let validCount = validRows.length;
         let typeStats = {1:0, 2:0, 3:0, 4:0, 5:0};
 
         for (let idx = 0; idx < previewLimit; idx++) {
-            let i = visibleRows[idx];
-            let seqNum = trim(String(getCell(ws, i, seqCol).Value()));
-            let name = colMap.has("名称") ? trim(String(getCell(ws, i, colMap.get("名称")).Value())) : "";
-            let bgmUrl = colMap.has("Bangumi_URL") ? trim(String(getCell(ws, i, colMap.get("Bangumi_URL")).Value())) : "";
-            let status = colMap.has("是否看完") ? trim(String(getCell(ws, i, colMap.get("是否看完")).Value())) : "";
-            let rate = colMap.has("打分") ? trim(String(getCell(ws, i, colMap.get("打分")).Value())) : "";
-            let tagsRaw = colMap.has("标签/分级") ? trim(String(getCell(ws, i, colMap.get("标签/分级")).Value())) : "";
-            let finishedDate = colMap.has("完播日") ? trim(String(getCell(ws, i, colMap.get("完播日")).Value())) : "";
-
-            let sid = extractSubjectId(bgmUrl);
-            let hasUrl = sid !== "";
-            if (hasUrl) validCount++;
+            let i = validRows[idx].row;
+            let sid = validRows[idx].sid;
+            let seqCell = getCell(ws, i, seqCol);
+            let seqNum = seqCell ? trim(String(seqCell.Value() || "")) : String(i);
+            // 安全获取单元格值，添加null检查
+            let nameCell = colMap.has("名称") ? getCell(ws, i, colMap.get("名称")) : null;
+            let name = nameCell ? trim(String(nameCell.Value() || "")) : "";
+            let statusCell = colMap.has("是否看完") ? getCell(ws, i, colMap.get("是否看完")) : null;
+            let status = statusCell ? trim(String(statusCell.Value() || "")) : "";
+            let rateCell = colMap.has("打分") ? getCell(ws, i, colMap.get("打分")) : null;
+            let rate = rateCell ? trim(String(rateCell.Value() || "")) : "";
+            let tagsCell = colMap.has("标签/分级") ? getCell(ws, i, colMap.get("标签/分级")) : null;
+            let tagsRaw = tagsCell ? trim(String(tagsCell.Value() || "")) : "";
+            let finishedDateCell = colMap.has("完播日") ? getCell(ws, i, colMap.get("完播日")) : null;
+            let finishedDate = finishedDateCell ? trim(String(finishedDateCell.Value() || "")) : "";
 
             // 解析状态
             let typeNum = mapWatchStatus(status, finishedDate);
@@ -524,12 +478,12 @@ function refreshData() {
                 if (tagSet.size > 3) tagsDisplay += `<span class="tag-badge" style="background:#555">+${tagSet.size - 3}</span>`;
             }
 
-            html += `<tr class="${hasUrl ? 'valid' : 'invalid'}">`;
+            html += `<tr class="valid">`;
             html += `<td class="row-num">${seqNum}</td>`;
             html += `<td class="name-cell" title="${name}">${name ? (name.length > 12 ? name.substring(0, 12) + '...' : name) : '-'}</td>`;
-            html += `<td class="sid-cell ${hasUrl ? 'has-url' : 'no-url'}">${sid || '❌'}</td>`;
+            html += `<td class="sid-cell has-url">${sid}</td>`;
             html += `<td class="status-cell"><span class="type-badge type-${typeNum}">${typeName}</span></td>`;
-            html += `<td class="rate-cell">${rate ? '⭐' + rate : '-'}</td>`;
+            html += `<td class="rate-cell">${rate && rate !== 'true' && rate !== 'True' ? '⭐' + rate : '-'}</td>`;
             html += `<td class="tags-cell">${tagsDisplay || '-'}</td>`;
             html += '</tr>';
         }
@@ -538,11 +492,10 @@ function refreshData() {
         html += `<div style="margin-top:14px;padding:12px;background:#333;border-radius:8px;">
             <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
                 <span style="color:#888;font-size:12px;">
-                    <b style="color:#4a9eff">${firstVisibleRow}</b> - <b style="color:#4a9eff">${lastVisibleRow}</b> 行，共 <b style="color:#fff">${totalRows}</b> 条
+                    共 <b style="color:#4ade80">${validCount}</b> 条有BGM链接的数据
                 </span>
                 <span style="display:flex;gap:12px;font-size:12px;">
-                    <span><span style="color:#4ade80">●</span> 有效: <b>${validCount}</b></span>
-                    <span><span style="color:#f87171">●</span> 无URL: <b>${previewLimit - validCount}</b></span>
+                    <span><span style="color:#4ade80">●</span> 显示: <b>${previewLimit}</b> 条</span>
                 </span>
             </div>
             <div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap;">
@@ -631,19 +584,25 @@ function previewSyncContent() {
 
         let colMap = getColumnMap(ws, headerRow);
 
-        // D列序列号（固定第4列）
-        let seqCol = 4;
-
         // 确定要处理的行范围
         let rowsToPreview = [];
         
         if (selectMode === 'auto') {
             // 自动模式：根据D列序列号连续性识别有效数据行
-            rowsToPreview = getSequentialRowsBySeqCol(ws, dataStartRow, actualEndRow, seqCol);
+            // bangumi.js 的 getSequentialRowsBySeqCol 只接受2个参数
+            let seqResult = getSequentialRowsBySeqCol(dataStartRow, actualEndRow);
+            rowsToPreview = seqResult.validRows || [];
         } else {
             // 手动模式：使用用户指定的范围
             let manualStart = parseInt(startRowInput?.value) || dataStartRow;
             let manualEnd = parseInt(endRowInput?.value) || lastRow;
+            // 确保范围有效
+            if (isNaN(manualStart)) manualStart = dataStartRow;
+            if (isNaN(manualEnd)) manualEnd = lastRow;
+            if (manualStart > manualEnd) {
+                manualStart = dataStartRow;
+                manualEnd = lastRow;
+            }
             for (let i = manualStart; i <= manualEnd; i++) {
                 rowsToPreview.push(i);
             }
@@ -654,55 +613,89 @@ function previewSyncContent() {
             return;
         }
 
-        // 预览条数限制
-        let previewLimit = Math.min(10, rowsToPreview.length);
+        // 第一步：遍历所有行收集完整统计信息
         let totalValid = 0;
-        let typeCount = {2:0, 3:0, 4:0, 5:0};
-        let itemsData = [];
+        let totalWithType = 0;
+        let typeCount = {1:0, 2:0, 3:0, 4:0, 5:0};
+        let allValidRows = []; // 存储所有有BGM链接且type>0的行
 
-        for (let idx = 0; idx < previewLimit; idx++) {
+        for (let idx = 0; idx < rowsToPreview.length; idx++) {
             let i = rowsToPreview[idx];
             
-            let bgmUrl = colMap.has("Bangumi_URL") ? trim(String(getCell(ws, i, colMap.get("Bangumi_URL")).Value())) : "";
-            let name = colMap.has("名称") ? trim(String(getCell(ws, i, colMap.get("名称")).Value())) : "";
-            let status = colMap.has("是否看完") ? trim(String(getCell(ws, i, colMap.get("是否看完")).Value())) : "";
-            let rate = colMap.has("打分") ? trim(String(getCell(ws, i, colMap.get("打分")).Value())) : "";
-            let tagsRaw = colMap.has("标签/分级") ? trim(String(getCell(ws, i, colMap.get("标签/分级")).Value())) : "";
-            let finishedDate = colMap.has("完播日") ? trim(String(getCell(ws, i, colMap.get("完播日")).Value())) : "";
+            // 安全获取单元格值，添加null检查
+            let bgmUrlCell = colMap.has("Bangumi_URL") ? getCell(ws, i, colMap.get("Bangumi_URL")) : null;
+            let bgmUrl = bgmUrlCell ? trim(String(bgmUrlCell.Value() || "")) : "";
+            let nameCell = colMap.has("名称") ? getCell(ws, i, colMap.get("名称")) : null;
+            let name = nameCell ? trim(String(nameCell.Value() || "")) : "";
+            let statusCell = colMap.has("是否看完") ? getCell(ws, i, colMap.get("是否看完")) : null;
+            let status = statusCell ? trim(String(statusCell.Value() || "")) : "";
+            let rateCell = colMap.has("打分") ? getCell(ws, i, colMap.get("打分")) : null;
+            let rate = rateCell ? trim(String(rateCell.Value() || "")) : "";
+            let tagsCell = colMap.has("标签/分级") ? getCell(ws, i, colMap.get("标签/分级")) : null;
+            let tagsRaw = tagsCell ? trim(String(tagsCell.Value() || "")) : "";
+            let finishedDateCell = colMap.has("完播日") ? getCell(ws, i, colMap.get("完播日")) : null;
+            let finishedDate = finishedDateCell ? trim(String(finishedDateCell.Value() || "")) : "";
 
             let sid = extractSubjectId(bgmUrl);
             if (sid) {
                 totalValid++;
             }
 
+            // 忽略无BGM链接的数据
+            if (!sid) {
+                continue;
+            }
+
             let typeNum = mapWatchStatus(status, finishedDate);
 
-            // type=0（空白/否/想看）不显示在预览中
+            // type=0（空白/否/想看）不计入待上传
             if (typeNum === 0) {
                 continue;
             }
 
-            let typeName = ["", "想看", "在看", "看过", "搁置", "抛弃"][typeNum];
+            typeCount[typeNum]++;
+            totalWithType++;
+
+            // 存储完整行数据
+            allValidRows.push({
+                row: i,
+                name: name,
+                sid: sid,
+                bgmUrl: bgmUrl,
+                status: status,
+                rate: rate,
+                tagsRaw: tagsRaw,
+                finishedDate: finishedDate,
+                typeNum: typeNum
+            });
+        }
+
+        // 第二步：生成预览内容（显示所有条目）
+        let itemsData = [];
+
+        for (let idx = 0; idx < allValidRows.length; idx++) {
+            let rowData = allValidRows[idx];
+            let typeName = ["", "想看", "在看", "看过", "搁置", "抛弃"][rowData.typeNum];
 
             // 处理标签
             let tagSet = new Set();
-            addTagsFromStr(tagSet, tagsRaw);
+            addTagsFromStr(tagSet, rowData.tagsRaw);
             let tags = Array.from(tagSet);
             let tagsHtml = tags.length > 0
                 ? `<div class="detail-value tags">${tags.map(t => `<span class="tag-badge">${t}</span>`).join('')}</div>`
                 : '<div class="detail-value">-</div>';
 
-            let jsonBody = buildJsonPayload(ws, i, colMap, finishedDate);
-            let urlDisplay = bgmUrl.length > 60 ? bgmUrl.substring(0, 60) + '...' : bgmUrl;
+            let jsonBody = buildJsonPayload(ws, rowData.row, colMap, rowData.finishedDate);
+            let urlDisplay = rowData.bgmUrl.length > 60 ? rowData.bgmUrl.substring(0, 60) + '...' : rowData.bgmUrl;
 
             let itemHtml = `
-                <div class="detail-item" data-type="${typeNum}">
+                <div class="detail-item" data-type="${rowData.typeNum}">
                     <div class="detail-item-header">
                         <div class="detail-item-title">
-                            <span class="detail-item-row">行 ${i}</span>
-                            <span class="detail-item-name">${name || '(无名称)'}</span>
+                            <span class="detail-item-row">行 ${rowData.row}</span>
+                            <span class="detail-item-name">${rowData.name || '(无名称)'}</span>
                         </div>
-                        <span class="status-badge type-${typeNum}">${typeName}</span>
+                        <span class="status-badge type-${rowData.typeNum}">${typeName}</span>
                     </div>
                     <div class="detail-item-body">
                         <div class="detail-row">
@@ -711,29 +704,29 @@ function previewSyncContent() {
                         </div>
                         <div class="detail-row">
                             <span class="detail-label">Subject ID</span>
-                            <span class="detail-value sid ${sid ? 'valid' : ''}">${sid || '❌ 无法提取'}</span>
+                            <span class="detail-value sid ${rowData.sid ? 'valid' : ''}">${rowData.sid || '❌ 无法提取'}</span>
                         </div>
                         <div class="detail-row">
                             <span class="detail-label">观看状态</span>
-                            <span class="detail-value">${typeName} (type=${typeNum})</span>
+                            <span class="detail-value">${typeName} (type=${rowData.typeNum})</span>
                         </div>
                         <div class="detail-row">
                             <span class="detail-label">完播日</span>
-                            <span class="detail-value">${(finishedDate === null || finishedDate === undefined || finishedDate === "" || finishedDate === "null") ? '(空白)' : finishedDate}</span>
+                            <span class="detail-value">${(rowData.finishedDate === null || rowData.finishedDate === undefined || rowData.finishedDate === "" || rowData.finishedDate === "null") ? '(空白)' : rowData.finishedDate}</span>
                         </div>
                         <div class="detail-row">
                             <span class="detail-label">评分</span>
-                            <span class="detail-value" style="color:#f39c12;font-weight:600;">${rate ? '⭐ ' + rate : '(空)'}</span>
+                            <span class="detail-value" style="color:#f39c12;font-weight:600;">${rowData.rate && rowData.rate !== 'true' && rowData.rate !== 'True' ? '⭐ ' + rowData.rate : '(空)'}</span>
                         </div>
                         <div class="detail-row">
                             <span class="detail-label">标签</span>
                             ${tagsHtml}
                         </div>
-                        ${sid ? `
+                        ${rowData.sid ? `
                         <div class="detail-row" style="flex-direction:column;gap:6px;">
                             <span class="detail-label" style="min-width:auto;">将发送的请求</span>
                             <div class="detail-value" style="color:#27ae60;font-weight:500;">
-                                POST /v0/users/-/collections/${sid}
+                                POST /v0/users/-/collections/${rowData.sid}
                             </div>
                             <div class="detail-value json">${jsonBody}</div>
                         </div>
@@ -744,21 +737,23 @@ function previewSyncContent() {
 
             itemsData.push({
                 html: itemHtml,
-                type: typeNum
+                type: rowData.typeNum
             });
-
-            typeCount[typeNum]++;
         }
 
-        // 存储数据供过滤使用
+        // 存储数据供过滤使用（包含完整统计）
         detailPreviewData.allItems = itemsData;
+        detailPreviewData.totalWithType = totalWithType;
+        detailPreviewData.totalValid = totalValid;
+        detailPreviewData.typeCount = typeCount;
         detailPreviewData.currentFilter = 'all';
 
-        // 生成过滤按钮
+        // 生成过滤按钮（使用完整统计）
         let toolbarHtml = `
-            <button class="filter-btn all active" onclick="filterDetailItems('all')">全部 (${itemsData.length})</button>
+            <button class="filter-btn all active" onclick="filterDetailItems('all')">全部 (${totalWithType})</button>
             ${typeCount[3] > 0 ? `<button class="filter-btn type-3" onclick="filterDetailItems(3)">看过 (${typeCount[3]})</button>` : ''}
             ${typeCount[2] > 0 ? `<button class="filter-btn type-2" onclick="filterDetailItems(2)">在追 (${typeCount[2]})</button>` : ''}
+            ${typeCount[1] > 0 ? `<button class="filter-btn type-1" onclick="filterDetailItems(1)">想看 (${typeCount[1]})</button>` : ''}
             ${typeCount[4] > 0 ? `<button class="filter-btn type-4" onclick="filterDetailItems(4)">搁置 (${typeCount[4]})</button>` : ''}
             ${typeCount[5] > 0 ? `<button class="filter-btn type-5" onclick="filterDetailItems(5)">抛弃 (${typeCount[5]})</button>` : ''}
         `;
@@ -771,7 +766,7 @@ function previewSyncContent() {
                     <div class="stat-label">总行数</div>
                 </div>
                 <div class="stat-card">
-                    <div class="stat-value">${itemsData.length}</div>
+                    <div class="stat-value">${totalWithType}</div>
                     <div class="stat-label">待上传</div>
                 </div>
                 <div class="stat-card success">
@@ -783,6 +778,7 @@ function previewSyncContent() {
                 <span class="status-badge" style="background:#1a3a35;color:#4ade80;">D列序列号</span>
                 ${typeCount[3] > 0 ? `<span class="status-badge type-3">看过 ${typeCount[3]}</span>` : ''}
                 ${typeCount[2] > 0 ? `<span class="status-badge type-2">在看 ${typeCount[2]}</span>` : ''}
+                ${typeCount[1] > 0 ? `<span class="status-badge type-1">想看 ${typeCount[1]}</span>` : ''}
                 ${typeCount[4] > 0 ? `<span class="status-badge type-4">搁置 ${typeCount[4]}</span>` : ''}
                 ${typeCount[5] > 0 ? `<span class="status-badge type-5">抛弃 ${typeCount[5]}</span>` : ''}
             </div>
@@ -820,17 +816,23 @@ function filterDetailItems(filterType) {
     let modalBody = document.getElementById("detailModalBody");
     if (!modalBody) return;
 
-    // 过滤项目
+    // 获取完整统计信息
+    let totalWithType = detailPreviewData.totalWithType || 0;
+    let typeCount = detailPreviewData.typeCount || {1:0, 2:0, 3:0, 4:0, 5:0};
+
+    // 过滤项目（只过滤显示的项目，不改变总数）
     let filteredItems = detailPreviewData.allItems;
     if (filterType !== 'all') {
         filteredItems = filteredItems.filter(item => item.type === parseInt(filterType));
     }
 
-    // 更新统计显示
+    // 更新统计显示（使用完整统计而非过滤后的）
     let totalCard = modalBody.querySelector('.stat-card:first-child .stat-value');
-    let previewCard = modalBody.querySelector('.stat-card:last-child .stat-value');
-    if (totalCard) totalCard.textContent = filteredItems.length;
-    if (previewCard) previewCard.textContent = filteredItems.length;
+    let uploadCard = modalBody.querySelector('.stat-card:nth-child(2) .stat-value');
+    let validCard = modalBody.querySelector('.stat-card.success .stat-value');
+    if (totalCard) totalCard.textContent = detailPreviewData.allItems.length;
+    if (uploadCard) uploadCard.textContent = filterType === 'all' ? totalWithType : (typeCount[filterType] || 0);
+    if (validCard) validCard.textContent = detailPreviewData.totalValid || 0;
 
     // 移除所有项目，重新添加过滤后的
     let allItems = modalBody.querySelectorAll('.detail-item');
@@ -917,19 +919,24 @@ function syncFromPanel() {
             return;
         }
 
-        // D列序列号（固定第4列）
-        let seqCol = 4;
-
         // 确定要处理的行范围
         let rowsToProcess = [];
         
         if (selectMode === 'auto') {
             // 自动模式：根据D列序列号连续性识别有效数据行
-            rowsToProcess = getSequentialRowsBySeqCol(ws, dataStartRow, actualEndRow, seqCol);
+            let seqResult = getSequentialRowsBySeqCol(dataStartRow, actualEndRow);
+            rowsToProcess = seqResult.validRows || [];
         } else {
             // 手动模式：使用用户指定的范围
             let manualStart = parseInt(startRowInput?.value) || dataStartRow;
             let manualEnd = parseInt(endRowInput?.value) || lastRow;
+            // 确保范围有效
+            if (isNaN(manualStart)) manualStart = dataStartRow;
+            if (isNaN(manualEnd)) manualEnd = lastRow;
+            if (manualStart > manualEnd) {
+                manualStart = dataStartRow;
+                manualEnd = lastRow;
+            }
             for (let i = manualStart; i <= manualEnd; i++) {
                 rowsToProcess.push(i);
             }
@@ -956,20 +963,22 @@ function syncFromPanel() {
         for (let idx = 0; idx < rowsToProcess.length; idx++) {
             let i = rowsToProcess[idx];
             
-            // 从正确的列获取 URL
-            let bgmUrl = trim(String(getCell(ws, i, colMap.get("Bangumi_URL")).Value()));
+            // 安全获取 Bangumi URL
+            let bgmUrlCell = getCell(ws, i, colMap.get("Bangumi_URL"));
+            let bgmUrl = bgmUrlCell ? trim(String(bgmUrlCell.Value() || "")) : "";
             let subjectId = extractSubjectId(bgmUrl);
 
             if (subjectId === "") {
                 skipCount++;
-                getCell(ws, i, colMap.get("Bangumi_URL")).Interior.Color = 0xFFFFCC;
+                if (bgmUrlCell) bgmUrlCell.Interior.Color = 0xFFFFCC;
                 continue;
             }
 
             // 获取完播日
             let finishedDate = "";
             if (colMap.has("完播日")) {
-                finishedDate = trim(String(getCell(ws, i, colMap.get("完播日")).Value()));
+                let finishedDateCell = getCell(ws, i, colMap.get("完播日"));
+                finishedDate = finishedDateCell ? trim(String(finishedDateCell.Value() || "")) : "";
             }
 
             // 构建完整请求体
@@ -984,10 +993,10 @@ function syncFromPanel() {
 
             if (statusCode === 204 || statusCode === 200) {
                 successCount++;
-                getCell(ws, i, colMap.get("Bangumi_URL")).Interior.Color = 0xCCFFCC;
+                if (bgmUrlCell) bgmUrlCell.Interior.Color = 0xCCFFCC;
             } else {
                 failCount++;
-                getCell(ws, i, colMap.get("Bangumi_URL")).Interior.Color = 0xFFCCCC;
+                if (bgmUrlCell) bgmUrlCell.Interior.Color = 0xFFCCCC;
                 console.log("行 " + i + " 失败: " + result.message);
             }
 
