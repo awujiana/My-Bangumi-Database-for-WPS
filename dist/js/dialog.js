@@ -53,6 +53,8 @@ function onbuttonclick(idStr)
     
 }
 
+// 这些函数已移动到 taskpane.js 中
+
 window.onload = ()=>{
     var xmlReq = WpsInvoke.CreateXHR();
     var url = location.origin + "/.debugTemp/NotifyDemoUrl"

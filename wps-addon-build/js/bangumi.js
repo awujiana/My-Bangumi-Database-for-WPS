@@ -139,24 +139,48 @@ function getColumnMap(ws, headerRow) {
         let colName = trim(String(ws.Cells(headerRow, i).Value()));
         if (colName === "") continue;
 
-        if (colName.toLowerCase().indexOf("bangumi") >= 0 || colName.toLowerCase().indexOf("bgm") >= 0 || colName.indexOf("URL") >= 0) {
+        // 精确匹配和模糊匹配
+        let lowerName = colName.toLowerCase();
+        
+        // Bangumi URL 列
+        if (lowerName.indexOf("bangumi") >= 0 || lowerName.indexOf("bgm") >= 0 || colName.indexOf("URL") >= 0 || colName === "Bangumi URL") {
             colMap.set("Bangumi_URL", i);
-        } else if (colName.indexOf("是否看完") >= 0 || colName.indexOf("观看状态") >= 0) {
+        }
+        // 观看状态 - 支持"是否看完"
+        else if (colName.indexOf("是否看完") >= 0 || colName.indexOf("观看状态") >= 0) {
             colMap.set("是否看完", i);
-        } else if (colName.indexOf("完播") >= 0 || colName.indexOf("看完时间") >= 0) {
+        }
+        // 完播相关 - 支持"看完时间"
+        else if (colName.indexOf("完播") >= 0 || colName.indexOf("看完时间") >= 0) {
             colMap.set("完播日", i);
-        } else if (colName.indexOf("打分") >= 0 || colName.indexOf("评分") >= 0) {
+        }
+        // 打分
+        else if (colName.indexOf("打分") >= 0 || colName.indexOf("评分") >= 0) {
             colMap.set("打分", i);
-        } else if (colName.indexOf("感言") >= 0 || colName.indexOf("剧透") >= 0 || colName.indexOf("评价") >= 0) {
+        }
+        // 评论/感言
+        else if (colName.indexOf("感言") >= 0 || colName.indexOf("剧透") >= 0 || colName.indexOf("评价") >= 0 || colName.indexOf("评论") >= 0) {
             colMap.set("剧透/感言", i);
-        } else if (colName.indexOf("标签") >= 0 || colName.indexOf("分级") >= 0) {
+        }
+        // 标签/分级 - 你的数据中是"标签/分级"
+        else if (colName.indexOf("标签") >= 0 || colName.indexOf("分级") >= 0) {
             colMap.set("标签/分级", i);
-        } else if (colName.indexOf("特点") >= 0 || colName.indexOf("印象") >= 0) {
+        }
+        // 特点/印象
+        else if (colName.indexOf("特点") >= 0 || colName.indexOf("印象") >= 0) {
             colMap.set("特点/印象", i);
-        } else if (colName.indexOf("集号") >= 0 || colName.indexOf("看到") >= 0) {
+        }
+        // 集号/看到
+        else if (colName.indexOf("集号") >= 0 || colName.indexOf("看到") >= 0) {
             colMap.set("集号", i);
-        } else if (colName.indexOf("集数") >= 0) {
+        }
+        // 集数
+        else if (colName.indexOf("集数") >= 0) {
             colMap.set("集数", i);
+        }
+        // 名称
+        else if (colName.indexOf("名称") >= 0 || colName.indexOf("标题") >= 0 || colName.indexOf("名") >= 0) {
+            colMap.set("名称", i);
         }
     }
     return colMap;
@@ -245,21 +269,33 @@ function mapWatchStatus(status, finishedDate) {
         return 1; // 默认想看
     }
 
-    switch (trim(status)) {
+    let s = trim(status);
+    switch (s) {
         case "是":
-            return 3;
+        case "看过":
+        case "完":
+            return 3; // 看过
         case "否":
-            return 1;
+        case "想看":
+        case "想看动画":
+            return 1; // 想看
         case "在追":
         case "在看":
-            return 2;
+        case "追":
+            return 2; // 在看
         case "搁置":
         case "暂停":
-            return 4;
+        case "停":
+            return 4; // 搁置
         case "抛弃":
         case "弃":
-            return 5;
+        case "弃番":
+            return 5; // 抛弃
         default:
+            // 再次尝试模糊匹配
+            if (s.indexOf("看") >= 0 && s.indexOf("追") < 0) return 3;
+            if (s.indexOf("追") >= 0) return 2;
+            if (s.indexOf("搁") >= 0 || s.indexOf("停") >= 0) return 4;
             return finishedDate !== "" ? 3 : 1;
     }
 }
@@ -291,8 +327,9 @@ function buildTags(ws, row, colMap) {
 function addTagsFromStr(tagSet, raw) {
     if (raw === "") return;
 
-    let seps = ["|", "、", "/", "\\", ",", ";", " ", "｜"];
-    let s = raw;
+    // 主要分隔符是 | ，同时支持其他常见分隔符
+    let seps = ["|", "、", "/", "\\", ",", ";", "｜", "，", "。"];
+    let s = String(raw);
 
     for (let sep of seps) {
         s = s.split(sep).join("|");
@@ -301,8 +338,12 @@ function addTagsFromStr(tagSet, raw) {
     let parts = s.split("|");
     for (let p of parts) {
         let tag = trim(p);
+        // 移除首尾空格和特殊字符
+        tag = tag.replace(/^\s+|\s+$/g, "");
+        // 标签不能含空格，用下划线替换
         tag = tag.split(" ").join("_");
-        if (tag !== "" && !tagSet.has(tag)) {
+        tag = tag.split("\t").join("_");
+        if (tag !== "" && !tagSet.has(tag) && tag.length > 0) {
             tagSet.add(tag);
         }
     }
@@ -473,12 +514,184 @@ function trim(str) {
 
 // ========== 设置 Token ==========
 function setBangumiToken() {
-    let currentToken = window.Application.PluginStorage.getItem("bgm_token") || "";
-    let newToken = prompt("请输入 Bangumi Access Token:", currentToken);
-    if (newToken !== null && newToken.trim()) {
-        window.Application.PluginStorage.setItem("bgm_token", newToken.trim());
-        alert("Token 已保存！");
+    // 直接打开Bangumi创建Token页面
+    openBangumiTokenPage();
+}
+
+// ========== 打开Bangumi Token创建页面 ==========
+function openBangumiTokenPage() {
+    let tokenUrl = "https://next.bgm.tv/demo/access-token/create";
+    
+    try {
+        window.Application.OAAssist.ShellExecute(tokenUrl);
+    } catch (e) {
+        window.open(tokenUrl, "_blank");
     }
+}
+
+// ========== 显示Token输入对话框 ==========
+function showTokenDialog(currentToken) {
+    let overlay = document.createElement("div");
+    overlay.style.cssText = `
+        position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+        background: rgba(0,0,0,0.5); z-index: 1000;
+        display: flex; align-items: center; justify-content: center;
+    `;
+    
+    let dialog = document.createElement("div");
+    dialog.style.cssText = `
+        background: white; padding: 25px; border-radius: 10px;
+        width: 380px; box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+        font-family: -apple-system, BlinkMacSystemFont, "Microsoft YaHei", sans-serif;
+    `;
+    
+    dialog.innerHTML = `
+        <h3 style="margin:0 0 15px 0; color:#2c3e50;">设置 Bangumi Token</h3>
+        <p style="color:#7f8c8d; font-size:12px; margin-bottom:12px; line-height:1.6;">
+            1. 点击下方按钮打开Bangumi创建页面<br>
+            2. 创建应用后复制Access Token<br>
+            3. 粘贴到下方保存
+        </p>
+        <button id="openBgPage" style="width:100%; padding:12px; background:#3498db; 
+            color:white; border:none; border-radius:6px; cursor:pointer; font-size:14px; margin-bottom:15px;">
+            🌐 打开 Bangumi 创建 Token 页面
+        </button>
+        <textarea id="tokenInput" placeholder="粘贴 Access Token" 
+            style="width:100%; height:80px; padding:10px; border:1px solid #ddd; 
+            border-radius:6px; font-size:13px; resize:none; font-family:monospace;"
+        >${currentToken}</textarea>
+        <div style="display:flex; gap:10px; margin-top:15px;">
+            <button id="saveTokenBtn" style="flex:1; padding:10px; background:#27ae60; 
+                color:white; border:none; border-radius:6px; cursor:pointer; font-size:14px;">
+                ✓ 保存 Token
+            </button>
+            <button id="cancelTokenBtn" style="flex:1; padding:10px; background:#ecf0f1; 
+                color:#2c3e50; border:none; border-radius:6px; cursor:pointer; font-size:14px;">
+                取消
+            </button>
+        </div>
+    `;
+    
+    overlay.appendChild(dialog);
+    document.body.appendChild(overlay);
+    
+    // 打开Bangumi页面按钮
+    document.getElementById("openBgPage").onclick = () => {
+        window.Application.OAAssist.ShellExecute("https://next.bgm.tv/demo/access-token/create");
+    };
+    
+    // 保存按钮
+    document.getElementById("saveTokenBtn").onclick = () => {
+        let token = document.getElementById("tokenInput").value.trim();
+        if (token) {
+            window.Application.PluginStorage.setItem("bgm_token", token);
+            document.body.removeChild(overlay);
+            alert("Token 已保存！\n\n" + token.substring(0, 10) + "...");
+            if (typeof updateTokenStatus === "function") {
+                updateTokenStatus();
+            }
+        } else {
+            alert("请输入 Token！");
+        }
+    };
+    
+    // 取消按钮
+    document.getElementById("cancelTokenBtn").onclick = () => {
+        document.body.removeChild(overlay);
+    };
+    
+    // 点击外部关闭
+    overlay.onclick = (e) => {
+        if (e.target === overlay) {
+            document.body.removeChild(overlay);
+        }
+    };
+}
+
+// ========== 打开用户收藏页 ==========
+function openUserCollection() {
+    let userId = window.Application.PluginStorage.getItem("bgm_user_id");
+    if (!userId) {
+        // 如果没有设置用户ID，弹出设置对话框
+        showUserIdDialog();
+        return;
+    }
+    let url = "https://bgm.tv/anime/list/" + userId;
+    window.Application.OAAssist.ShellExecute(url);
+}
+
+// ========== 设置用户ID ==========
+function showUserIdDialog() {
+    let currentId = window.Application.PluginStorage.getItem("bgm_user_id") || "";
+    
+    let overlay = document.createElement("div");
+    overlay.style.cssText = `
+        position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+        background: rgba(0,0,0,0.5); z-index: 1000;
+        display: flex; align-items: center; justify-content: center;
+    `;
+    
+    let dialog = document.createElement("div");
+    dialog.style.cssText = `
+        background: white; padding: 25px; border-radius: 10px;
+        width: 380px; box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+        font-family: -apple-system, BlinkMacSystemFont, "Microsoft YaHei", sans-serif;
+    `;
+    
+    dialog.innerHTML = `
+        <h3 style="margin:0 0 15px 0; color:#2c3e50;">设置 Bangumi 用户ID</h3>
+        <p style="color:#7f8c8d; font-size:12px; margin-bottom:15px; line-height:1.6;">
+            用户ID是Bangumi个人主页URL中的数字/字母<br>
+            例如：https://bgm.tv/user/<span style="background:#eee;padding:2px 5px;">972358</span><br>
+            设置后将可以打开您的收藏页面
+        </p>
+        <input type="text" id="userIdInput" placeholder="输入用户ID，如 972358" 
+            style="width:100%; padding:12px; border:1px solid #ddd; 
+            border-radius:6px; font-size:14px; box-sizing:border-box;"
+            value="${currentId}">
+        <div style="display:flex; gap:10px; margin-top:15px;">
+            <button id="saveUserIdBtn" style="flex:1; padding:10px; background:#27ae60; 
+                color:white; border:none; border-radius:6px; cursor:pointer; font-size:14px;">
+                ✓ 保存并打开收藏页
+            </button>
+            <button id="cancelUserIdBtn" style="flex:1; padding:10px; background:#ecf0f1; 
+                color:#2c3e50; border:none; border-radius:6px; cursor:pointer; font-size:14px;">
+                取消
+            </button>
+        </div>
+    `;
+    
+    overlay.appendChild(dialog);
+    document.body.appendChild(overlay);
+    
+    // 保存并打开
+    document.getElementById("saveUserIdBtn").onclick = () => {
+        let userId = document.getElementById("userIdInput").value.trim();
+        if (userId) {
+            window.Application.PluginStorage.setItem("bgm_user_id", userId);
+            document.body.removeChild(overlay);
+            let url = "https://bgm.tv/anime/list/" + userId;
+            window.Application.OAAssist.ShellExecute(url);
+            if (typeof updateUserIdStatus === "function") {
+                updateUserIdStatus();
+            }
+        } else {
+            alert("请输入用户ID！");
+        }
+    };
+    
+    // 取消
+    document.getElementById("cancelUserIdBtn").onclick = () => {
+        document.body.removeChild(overlay);
+    };
+    
+    overlay.onclick = (e) => {
+        if (e.target === overlay) {
+            document.body.removeChild(overlay);
+        }
+    };
+    
+    setTimeout(() => document.getElementById("userIdInput").focus(), 100);
 }
 
 // ========== 显示同步面板 ==========

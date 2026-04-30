@@ -27,13 +27,13 @@ function OnAction(control) {
             SyncToBangumi();
             break;
         case "btnSetToken":
-            setBangumiToken();
+            showTokenDialog(window.Application.PluginStorage.getItem("bgm_token") || "");
             break;
-        case "btnTestSync":
-            testSingleUpdate();
+        case "btnSetUserId":
+            showUserIdDialog();
             break;
-        case "btnPreviewUrl":
-            previewSubjectIdExtraction();
+        case "btnOpenCollection":
+            openUserCollection();
             break;
         case "btnClearColors":
             clearRowColors();

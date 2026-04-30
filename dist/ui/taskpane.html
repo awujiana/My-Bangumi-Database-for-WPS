@@ -28,9 +28,21 @@
             <h3>Token 设置</h3>
             <div class="token-display">
                 <span id="tokenStatus">未设置</span>
-                <button class="btn small" onclick="onAction('setToken')">设置/修改</button>
+                <button class="btn small" id="setTokenBtn">设置/修改</button>
+                <button class="btn small primary" id="testTokenBtn">测试</button>
             </div>
             <p class="hint">Access Token 获取方式：Bangumi → 设置 → API → 创建应用</p>
+        </div>
+
+        <!-- 用户ID设置 -->
+        <div class="section">
+            <h3>收藏页访问</h3>
+            <div class="token-display">
+                <span id="userIdStatus">未设置</span>
+                <button class="btn small" id="setUserIdBtn">设置用户ID</button>
+                <button class="btn small primary" id="openCollectionBtn">打开收藏页</button>
+            </div>
+            <p class="hint">用户ID：Bangumi主页URL中的数字/字母</p>
         </div>
 
         <!-- 数据选择 -->
@@ -63,6 +75,7 @@
             <div class="preview-box" id="previewBox">
                 <p class="hint">点击"刷新数据"加载预览</p>
             </div>
+            <button class="btn" id="previewBtn">🔍 详细预览同步内容</button>
         </div>
 
         <!-- 使用引导 -->

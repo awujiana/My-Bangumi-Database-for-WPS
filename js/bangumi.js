@@ -514,12 +514,139 @@ function trim(str) {
 
 // ========== 设置 Token ==========
 function setBangumiToken() {
-    let currentToken = window.Application.PluginStorage.getItem("bgm_token") || "";
-    let newToken = prompt("请输入 Bangumi Access Token:", currentToken);
-    if (newToken !== null && newToken.trim()) {
-        window.Application.PluginStorage.setItem("bgm_token", newToken.trim());
-        alert("Token 已保存！");
+    // 直接打开Bangumi创建Token页面
+    openBangumiTokenPage();
+}
+
+// ========== 打开Bangumi Token创建页面 ==========
+function openBangumiTokenPage() {
+    let tokenUrl = "https://next.bgm.tv/demo/access-token/create";
+    
+    try {
+        window.Application.OAAssist.ShellExecute(tokenUrl);
+    } catch (e) {
+        window.open(tokenUrl, "_blank");
     }
+}
+
+// ========== 显示Token输入对话框（Ribbon 模式）==========
+function showTokenDialog(currentToken) {
+    let token = prompt("请输入 Bangumi Access Token：\n\n获取方式：Bangumi → 设置 → API → 创建应用", currentToken || "");
+    if (token !== null && token.trim() !== "") {
+        window.Application.PluginStorage.setItem("bgm_token", token.trim());
+        // 验证 Token
+        testTokenValidityForRibbon(token.trim());
+    }
+}
+
+// ========== Ribbon 模式测试 Token ==========
+function testTokenValidityForRibbon(token) {
+    if (!token) return;
+
+    let xhr = new XMLHttpRequest();
+    xhr.open("GET", "https://api.bgm.tv/v0/me", false);
+    xhr.setRequestHeader("Authorization", "Bearer " + token);
+    xhr.setRequestHeader("User-Agent", "BangumiWPS/1.0");
+
+    try {
+        xhr.send();
+        if (xhr.status === 200) {
+            let userData = JSON.parse(xhr.responseText);
+            alert("✓ Token 验证成功！\n\n用户: " + (userData.nickname || userData.username) + "\nID: " + userData.id);
+        } else if (xhr.status === 401) {
+            alert("✗ Token 验证失败！\n\n请检查 Token 是否正确，或重新获取新的 Token。");
+        } else {
+            alert("验证失败 (" + xhr.status + "): " + xhr.responseText);
+        }
+    } catch (err) {
+        alert("验证出错: " + err.message);
+    }
+}
+
+// ========== 打开用户收藏页 ==========
+function openUserCollection() {
+    let userId = window.Application.PluginStorage.getItem("bgm_user_id");
+    if (!userId) {
+        // 如果没有设置用户ID，弹出设置对话框
+        showUserIdDialog();
+        return;
+    }
+    let url = "https://bgm.tv/anime/list/" + userId;
+    window.Application.OAAssist.ShellExecute(url);
+}
+
+// ========== 设置用户ID ==========
+function showUserIdDialog() {
+    let currentId = window.Application.PluginStorage.getItem("bgm_user_id") || "";
+    
+    let overlay = document.createElement("div");
+    overlay.style.cssText = `
+        position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+        background: rgba(0,0,0,0.5); z-index: 1000;
+        display: flex; align-items: center; justify-content: center;
+    `;
+    
+    let dialog = document.createElement("div");
+    dialog.style.cssText = `
+        background: white; padding: 25px; border-radius: 10px;
+        width: 380px; box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+        font-family: -apple-system, BlinkMacSystemFont, "Microsoft YaHei", sans-serif;
+    `;
+    
+    dialog.innerHTML = `
+        <h3 style="margin:0 0 15px 0; color:#2c3e50;">设置 Bangumi 用户ID</h3>
+        <p style="color:#7f8c8d; font-size:12px; margin-bottom:15px; line-height:1.6;">
+            用户ID是Bangumi个人主页URL中的数字/字母<br>
+            例如：https://bgm.tv/user/<span style="background:#eee;padding:2px 5px;">972358</span><br>
+            设置后将可以打开您的收藏页面
+        </p>
+        <input type="text" id="userIdInput" placeholder="输入用户ID，如 972358" 
+            style="width:100%; padding:12px; border:1px solid #ddd; 
+            border-radius:6px; font-size:14px; box-sizing:border-box;"
+            value="${currentId}">
+        <div style="display:flex; gap:10px; margin-top:15px;">
+            <button id="saveUserIdBtn" style="flex:1; padding:10px; background:#27ae60; 
+                color:white; border:none; border-radius:6px; cursor:pointer; font-size:14px;">
+                ✓ 保存并打开收藏页
+            </button>
+            <button id="cancelUserIdBtn" style="flex:1; padding:10px; background:#ecf0f1; 
+                color:#2c3e50; border:none; border-radius:6px; cursor:pointer; font-size:14px;">
+                取消
+            </button>
+        </div>
+    `;
+    
+    overlay.appendChild(dialog);
+    document.body.appendChild(overlay);
+    
+    // 保存并打开
+    document.getElementById("saveUserIdBtn").onclick = () => {
+        let userId = document.getElementById("userIdInput").value.trim();
+        if (userId) {
+            window.Application.PluginStorage.setItem("bgm_user_id", userId);
+            document.body.removeChild(overlay);
+            let url = "https://bgm.tv/anime/list/" + userId;
+            window.Application.OAAssist.ShellExecute(url);
+            if (typeof updateUserIdStatus === "function") {
+                updateUserIdStatus();
+            }
+        } else {
+            alert("请输入用户ID！");
+        }
+    };
+    
+    // 取消
+    document.getElementById("cancelUserIdBtn").onclick = () => {
+        document.body.removeChild(overlay);
+    };
+    
+    overlay.onclick = (e) => {
+        if (e.target === overlay) {
+            document.body.removeChild(overlay);
+        }
+    };
+    
+    setTimeout(() => document.getElementById("userIdInput").focus(), 100);
 }
 
 // ========== 显示同步面板 ==========

@@ -8,11 +8,50 @@ window.onload = () => {
     // 更新Token状态
     updateTokenStatus();
 
-    // 加载工作表列表
-    refreshSheets();
+    // 更新用户ID状态
+    updateUserIdStatus();
 
-    // 刷新数据预览
-    setTimeout(() => refreshData(), 500);
+    // 绑定Token设置按钮
+    let setTokenBtn = document.getElementById("setTokenBtn");
+    if (setTokenBtn) {
+        setTokenBtn.onclick = () => showTokenDialog(window.Application.PluginStorage.getItem("bgm_token") || "");
+    }
+
+    // 绑定测试Token按钮
+    let testTokenBtn = document.getElementById("testTokenBtn");
+    if (testTokenBtn) {
+        testTokenBtn.onclick = () => testTokenValidity();
+    }
+
+    // 绑定用户ID设置按钮
+    let setUserIdBtn = document.getElementById("setUserIdBtn");
+    if (setUserIdBtn) {
+        setUserIdBtn.onclick = () => showUserIdDialog();
+    }
+
+    // 绑定打开收藏页按钮
+    let openCollectionBtn = document.getElementById("openCollectionBtn");
+    if (openCollectionBtn) {
+        openCollectionBtn.onclick = () => openUserCollection();
+    }
+
+    // 绑定预览按钮
+    let previewBtn = document.getElementById("previewBtn");
+    if (previewBtn) {
+        previewBtn.onclick = () => previewSyncContent();
+    }
+
+    // 绑定工作表选择事件
+    let sheetSelect = document.getElementById("sheetSelect");
+    if (sheetSelect) {
+        sheetSelect.onchange = () => refreshData();
+    }
+
+    // 加载工作表列表（延迟加载，等待 DOM 完全就绪）
+    setTimeout(() => {
+        refreshSheets();
+        refreshData();
+    }, 300);
 };
 
 // ========== Token 状态更新 ==========
@@ -30,31 +69,66 @@ function updateTokenStatus() {
     }
 }
 
+// ========== 用户ID 状态更新 ==========
+function updateUserIdStatus() {
+    let userId = window.Application.PluginStorage.getItem("bgm_user_id");
+    let statusEl = document.getElementById("userIdStatus");
+    if (statusEl) {
+        if (userId) {
+            statusEl.textContent = "ID: " + userId + " ✓";
+            statusEl.className = "set";
+        } else {
+            statusEl.textContent = "未设置 ✗";
+            statusEl.className = "";
+        }
+    }
+}
+
 // ========== 刷新工作表列表 ==========
 function refreshSheets() {
     let select = document.getElementById("sheetSelect");
-    if (!select) return;
+    if (!select) {
+        console.log("未找到 sheetSelect 元素，延迟重试...");
+        setTimeout(refreshSheets, 500);
+        return;
+    }
 
     select.innerHTML = '<option value="">-- 请选择 --</option>';
 
     try {
-        let sheets = window.Application.ActiveWorkbook.Sheets;
+        let app = window.Application;
+        if (!app || !app.ActiveWorkbook) {
+            console.log("没有打开的工作簿");
+            select.innerHTML = '<option value="">-- 请先打开Excel --</option>';
+            return;
+        }
+
+        let sheets = app.ActiveWorkbook.Sheets;
+        if (!sheets || sheets.Count === 0) {
+            console.log("工作簿中没有工作表");
+            return;
+        }
+
         for (let i = 1; i <= sheets.Count; i++) {
             let option = document.createElement("option");
             option.value = i;
             option.textContent = sheets(i).Name;
             select.appendChild(option);
         }
+
         // 默认选择活动工作表
-        let activeSheet = window.Application.ActiveSheet;
-        for (let i = 0; i < select.options.length; i++) {
-            if (select.options[i].textContent === activeSheet.Name) {
-                select.selectedIndex = i;
-                break;
+        let activeSheet = app.ActiveSheet;
+        if (activeSheet) {
+            for (let i = 0; i < select.options.length; i++) {
+                if (select.options[i].textContent === activeSheet.Name) {
+                    select.selectedIndex = i;
+                    break;
+                }
             }
         }
     } catch (e) {
         console.error("获取工作表失败:", e);
+        select.innerHTML = '<option value="">加载失败</option>';
     }
 }
 
@@ -264,8 +338,10 @@ function onAction(action) {
             refreshData();
             break;
         case "setToken":
-            setBangumiToken();
-            updateTokenStatus();
+            showTokenDialog(window.Application.PluginStorage.getItem("bgm_token") || "");
+            break;
+        case "preview":
+            previewSyncContent();
             break;
     }
 }
@@ -357,4 +433,79 @@ function setStatus(msg, type) {
         statusBox.textContent = msg;
         statusBox.className = "status " + (type || "");
     }
+}
+
+// ========== Token 设置对话框 ==========
+function showTokenDialog(currentToken) {
+    let token = prompt("请输入 Bangumi Access Token：\n\n获取方式：Bangumi → 设置 → API → 创建应用", currentToken || "");
+    if (token !== null && token.trim() !== "") {
+        window.Application.PluginStorage.setItem("bgm_token", token.trim());
+        updateTokenStatus();
+        // 设置后自动测试 Token
+        testTokenValidity(token.trim());
+    }
+}
+
+// ========== 测试 Token 有效性 ==========
+function testTokenValidity(token) {
+    if (!token) {
+        let storedToken = window.Application.PluginStorage.getItem("bgm_token");
+        if (!storedToken) {
+            alert("请先设置 Token！");
+            return false;
+        }
+        token = storedToken;
+    }
+
+    setStatus("正在验证 Token...", "loading");
+
+    let xhr = new XMLHttpRequest();
+    xhr.open("GET", "https://api.bgm.tv/v0/me", false);
+    xhr.setRequestHeader("Authorization", "Bearer " + token);
+    xhr.setRequestHeader("User-Agent", "BangumiWPS/1.0");
+
+    try {
+        xhr.send();
+        if (xhr.status === 200) {
+            let userData = JSON.parse(xhr.responseText);
+            setStatus("Token 有效！用户: " + (userData.nickname || userData.username), "success");
+            alert("✓ Token 验证成功！\n\n用户: " + (userData.nickname || userData.username) + "\nID: " + userData.id);
+            return true;
+        } else if (xhr.status === 401) {
+            setStatus("Token 无效", "error");
+            alert("✗ Token 验证失败！\n\n请检查 Token 是否正确，或重新获取新的 Token。");
+            return false;
+        } else {
+            setStatus("验证失败 (" + xhr.status + ")", "error");
+            alert("验证失败 (" + xhr.status + "): " + xhr.responseText);
+            return false;
+        }
+    } catch (err) {
+        setStatus("验证出错", "error");
+        alert("验证出错: " + err.message);
+        return false;
+    }
+}
+
+// ========== 用户ID 设置对话框 ==========
+function showUserIdDialog() {
+    let currentId = window.Application.PluginStorage.getItem("bgm_user_id") || "";
+    let userId = prompt("请输入 Bangumi 用户ID：\n\n获取方式：打开你的 Bangumi 主页，URL 中的数字/字母即为用户ID\n例如：https://bgm.tv/user/972358 → 用户ID: 972358", currentId);
+    if (userId !== null && userId.trim() !== "") {
+        window.Application.PluginStorage.setItem("bgm_user_id", userId.trim());
+        updateUserIdStatus();
+        alert("用户ID 设置成功！");
+    }
+}
+
+// ========== 打开用户收藏页 ==========
+function openUserCollection() {
+    let userId = window.Application.PluginStorage.getItem("bgm_user_id");
+    if (!userId) {
+        alert("请先设置用户ID！");
+        showUserIdDialog();
+        return;
+    }
+    let url = "https://bgm.tv/anime/list/" + userId + "/wish";
+    window.open(url, "_blank");
 }
