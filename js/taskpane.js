@@ -1,34 +1,32 @@
-// ========== 辅助函数：安全获取单元格 ==========
-function colNumToLetter(col) {
-    let letter = "";
-    while (col > 0) {
-        let mod = (col - 1) % 26;
-        letter = String.fromCharCode(65 + mod) + letter;
-        col = Math.floor((col - mod) / 26);
+// ========== 辅助函数：优先使用 bangumi.js 中的版本 ==========
+// 如果 bangumi.js 已加载，使用其版本；否则使用本地版本
+if (typeof colNumToLetter === 'undefined') {
+    function colNumToLetter(col) {
+        let letter = "";
+        while (col > 0) {
+            let mod = (col - 1) % 26;
+            letter = String.fromCharCode(65 + mod) + letter;
+            col = Math.floor((col - mod) / 26);
+        }
+        return letter;
     }
-    return letter;
 }
 
-function getCell(ws, row, col) {
-    try {
-        // 优先使用 Range (WPS 兼容)
-        if (typeof ws.Range === 'function') {
-            let colLetter = colNumToLetter(col);
-            return ws.Range(colLetter + row);
-        }
-        // 回退：尝试 Cells 直接调用
-        if (typeof ws.Cells === 'function') {
+if (typeof getCell === 'undefined') {
+    function getCell(ws, row, col) {
+        try {
+            if (typeof ws.Range === 'function') {
+                let colLetter = colNumToLetter(col);
+                return ws.Range(colLetter + row);
+            }
+            if (ws.Cells && typeof ws.Cells.Item === 'function') {
+                return ws.Cells.Item(row, col);
+            }
             return ws.Cells(row, col);
+        } catch (e) {
+            console.error("getCell error:", e);
+            return null;
         }
-        // 回退：尝试 Cells.Item
-        if (ws.Cells && typeof ws.Cells.Item === 'function') {
-            return ws.Cells.Item(row, col);
-        }
-        // 最后回退
-        return ws.Cells(row, col);
-    } catch (e) {
-        console.error("getCell error:", e);
-        return null;
     }
 }
 
@@ -274,37 +272,101 @@ function refreshSheets() {
     }
 }
 
-// ========== 根据序列号获取连续数据行 ==========
+// ========== 根据序列号获取连续数据行（优化版：只遍历可见行）==========
+// @param {object} ws - 工作表对象
+// @param {number} startRow - 起始行
+// @param {number} endRow - 结束行
+// @param {number} seqCol - 序列号列（默认第4列）
 function getSequentialRowsBySeqCol(ws, startRow, endRow, seqCol) {
     let rows = [];
     let expectedSeq = null;
     
-    for (let i = startRow; i <= endRow; i++) {
+    // 尝试使用 SpecialCells(12) 获取可见行（xlCellTypeVisible=12）
+    let visibleRows = null;
+    try {
+        let autoFilter = ws.AutoFilter;
+        if (autoFilter && autoFilter.FilterMode === true && autoFilter.Range) {
+            let filterRange = autoFilter.Range;
+            let filterStartRow = filterRange.Row + 1;
+            let filterEndRow = filterRange.Row + filterRange.Rows.Count - 1;
+            
+            // xlCellTypeVisible = 12，获取序列号列的可见单元格（从第2行开始，跳过表头）
+            let visibleCells = ws.Range(ws.Cells(filterStartRow, seqCol), ws.Cells(filterEndRow, seqCol)).SpecialCells(12);
+            if (visibleCells) {
+                visibleRows = [];
+                let areas = visibleCells.Areas;
+                for (let a = 1; a <= areas.Count; a++) {
+                    let area = areas(a);
+                    for (let r = 1; r <= area.Rows.Count; r++) {
+                        let rowNum = area.Rows(r).Row;
+                        // 确保行号在范围内
+                        if (rowNum >= filterStartRow && rowNum <= filterEndRow) {
+                            visibleRows.push(rowNum);
+                        }
+                    }
+                }
+            }
+        }
+    } catch (e) {
+        // SpecialCells 失败，使用逐行扫描
+        console.log("SpecialCells 获取可见行失败:", e.message);
+        visibleRows = null;
+    }
+    
+    // 确定要遍历的行范围
+    let rowsToCheck = visibleRows;
+    if (!rowsToCheck) {
+        // 回退：遍历指定范围
+        rowsToCheck = [];
+        for (let i = startRow; i <= endRow; i++) {
+            rowsToCheck.push(i);
+        }
+    }
+    
+    // 遍历可见行获取序列号
+    for (let i of rowsToCheck) {
         let seqVal = trim(String(getCell(ws, i, seqCol).Value()));
         let seqNum = parseInt(seqVal);
         
         if (seqVal !== "" && !isNaN(seqNum)) {
-            // 检查序列号是否连续（与上一行差值为1）
             if (expectedSeq === null) {
-                // 第一行，直接添加
                 rows.push(i);
                 expectedSeq = seqNum + 1;
             } else if (seqNum === expectedSeq) {
-                // 序列号连续，添加
                 rows.push(i);
                 expectedSeq = seqNum + 1;
             } else if (seqNum > expectedSeq) {
-                // 序列号不连续（被筛选掉了一些行）
-                // 跳过这些被筛选的行，继续往后找
                 expectedSeq = seqNum + 1;
                 rows.push(i);
             }
-            // seqNum < expectedSeq 的情况：序列号重复或倒退，忽略该行
         }
-        // 空序列号：被筛选的行，忽略
     }
     
     return rows;
+}
+
+// ========== 获取筛选状态（包装函数，调用 bangumi.js 中的 getFilterStatus）==========
+// @param {number} endRow - 用户指定的结束行号，0表示自动检测
+// @param {boolean} getColumnCounts - 是否获取各列的唯一值计数
+function getFilterStatusLocal(endRow, getColumnCounts) {
+    // 如果 bangumi.js 中的 getFilterStatus 可用，直接调用
+    if (typeof getFilterStatus === 'function') {
+        return getFilterStatus(endRow, getColumnCounts);
+    }
+    
+    // 否则返回空结果
+    console.log("getFilterStatus 不可用");
+    return {
+        hasFilter: false,
+        filteredColumns: [],
+        hiddenRows: [],
+        visibleRows: [],
+        filterDetails: "",
+        columnCounts: {},
+        totalRows: 0,
+        visibleCount: 0,
+        hiddenCount: 0
+    };
 }
 
 // ========== 刷新数据预览 ==========
@@ -325,17 +387,43 @@ function refreshData() {
     let filterStatusEl = document.getElementById("filterStatus");
     let selectMode = document.querySelector('input[name="selectMode"]:checked')?.value || 'auto';
 
+    if (!select || !previewBox) return;
+
+    let sheetIndex = parseInt(select.value) || 1;
+    let userEndRow = parseInt(endRowInput?.value) || 0;
+
+    // 先获取工作表对象（提前定义，供筛选状态使用）
+    let ws = null;
+    try {
+        let sheets = window.Application.ActiveWorkbook.Sheets;
+        ws = sheets.Item(sheetIndex);
+    } catch (e) {
+        console.error("获取工作表失败:", e);
+        setStatus("获取工作表失败", "error");
+        return;
+    }
+
     // 先检测筛选状态并更新显示
     try {
-        let filterInfo = getFilterStatus();
+        let filterInfo = getFilterStatusLocal(userEndRow, false);
         let hasFilter = filterInfo ? filterInfo.hasFilter : false;
         let visibleCount = filterInfo ? filterInfo.visibleCount : 0;
         let hiddenCount = filterInfo ? filterInfo.hiddenCount : 0;
+        let totalRows = filterInfo ? (filterInfo.totalRows || 0) : 0;
+        let filterDetails = filterInfo ? (filterInfo.filterDetails || "") : "";
 
         if (filterInfo) {
             if (filterStatusEl) {
                 if (hasFilter) {
-                    filterStatusEl.innerHTML = `⚠️ 已筛选：可见 <b style="color:#4ade80">${visibleCount}</b> 行，隐藏 <b style="color:#f87171">${hiddenCount}</b> 行`;
+                    let detailText = filterDetails ? `<br><span style="color:#888;font-size:11px">${filterDetails}</span>` : "";
+                    filterStatusEl.innerHTML = `
+                        <div>
+                            ⚠️ <b>已筛选</b>：总数据 <b style="color:#fbbf24">${totalRows}</b> 行 | 
+                            可见 <b style="color:#4ade80">${visibleCount}</b> 行 | 
+                            隐藏 <b style="color:#f87171">${hiddenCount}</b> 行
+                            ${detailText}
+                        </div>
+                    `;
                     filterStatusEl.className = 'has-filter';
                 } else if (selectMode === 'auto') {
                     filterStatusEl.textContent = "✅ 无筛选：根据D列序列号识别连续数据行";
@@ -354,15 +442,7 @@ function refreshData() {
         }
     }
 
-    if (!select || !previewBox) return;
-
-    let sheetIndex = parseInt(select.value) || 1;
-    let userEndRow = parseInt(endRowInput?.value) || 0;
-
     try {
-        let sheets = window.Application.ActiveWorkbook.Sheets;
-        let ws = sheets.Item(sheetIndex);
-
         if (!ws) {
             setStatus("未找到工作表", "error");
             return;
