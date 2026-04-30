@@ -7,13 +7,28 @@
 const BGM_API_BASE = "https://api.bgm.tv";
 const REQUEST_DELAY = 800;
 
+// ========== 统一获取 Application 对象 ==========
+function getApp() {
+    // 优先使用 window.Application
+    if (typeof window !== 'undefined' && window.Application) {
+        return window.Application;
+    }
+    // 回退到全局 Application
+    if (typeof Application !== 'undefined') {
+        return Application;
+    }
+    return null;
+}
+
 // ========== 获取 Token ==========
 function getBgmtoken() {
-    let token = window.Application.PluginStorage.getItem("bgm_token");
+    let app = getApp();
+    if (!app) return null;
+    let token = app.PluginStorage.getItem("bgm_token");
     if (!token) {
         token = prompt("请输入 Bangumi Access Token:", "");
         if (token && token.trim()) {
-            window.Application.PluginStorage.setItem("bgm_token", token.trim());
+            app.PluginStorage.setItem("bgm_token", token.trim());
         }
     }
     return token;
@@ -21,7 +36,11 @@ function getBgmtoken() {
 
 // ========== 主入口：批量同步 ==========
 function SyncToBangumi() {
-    let app = window.Application;
+    let app = getApp();
+    if (!app) {
+        alert("无法获取 WPS Application 对象！");
+        return;
+    }
     let ws = app.ActiveSheet;
     if (!ws) {
         alert("未找到活动工作表！");
@@ -411,7 +430,9 @@ function sleep(ms) {
 
 // ========== 清除行颜色标记 ==========
 function clearRowColors() {
-    let ws = window.Application.ActiveSheet;
+    let app = getApp();
+    if (!app) return;
+    let ws = app.ActiveSheet;
     if (!ws) return;
 
     let lastRow = ws.Cells(ws.Rows.Count, 1).End(-4162).Row;
@@ -446,7 +467,9 @@ function testSingleUpdate() {
 
 // ========== 预览 URL 提取结果 ==========
 function previewSubjectIdExtraction() {
-    let ws = window.Application.ActiveSheet;
+    let app = getApp();
+    if (!app) return;
+    let ws = app.ActiveSheet;
     if (!ws) return;
 
     let headerRow = findHeaderRow(ws);
@@ -474,7 +497,9 @@ function previewSubjectIdExtraction() {
 
 // ========== 预览 JSON 请求体 ==========
 function previewJsonPayload() {
-    let ws = window.Application.ActiveSheet;
+    let app = getApp();
+    if (!app) return;
+    let ws = app.ActiveSheet;
     if (!ws) return;
 
     let headerRow = findHeaderRow(ws);
@@ -521,9 +546,14 @@ function setBangumiToken() {
 // ========== 打开Bangumi Token创建页面 ==========
 function openBangumiTokenPage() {
     let tokenUrl = "https://next.bgm.tv/demo/access-token/create";
-    
+    let app = getApp();
+
     try {
-        window.Application.OAAssist.ShellExecute(tokenUrl);
+        if (app && app.OAAssist) {
+            app.OAAssist.ShellExecute(tokenUrl);
+        } else {
+            window.open(tokenUrl, "_blank");
+        }
     } catch (e) {
         window.open(tokenUrl, "_blank");
     }
@@ -531,9 +561,12 @@ function openBangumiTokenPage() {
 
 // ========== 显示Token输入对话框（Ribbon 模式）==========
 function showTokenDialog(currentToken) {
+    let app = getApp();
     let token = prompt("请输入 Bangumi Access Token：\n\n获取方式：Bangumi → 设置 → API → 创建应用", currentToken || "");
     if (token !== null && token.trim() !== "") {
-        window.Application.PluginStorage.setItem("bgm_token", token.trim());
+        if (app) {
+            app.PluginStorage.setItem("bgm_token", token.trim());
+        }
         // 验证 Token
         testTokenValidityForRibbon(token.trim());
     }
@@ -565,37 +598,69 @@ function testTokenValidityForRibbon(token) {
 
 // ========== 打开用户收藏页（Ribbon 模式）==========
 function openUserCollection() {
-    let userId = window.Application.PluginStorage.getItem("bgm_user_id");
+    let app = getApp();
+    let userId = app ? app.PluginStorage.getItem("bgm_user_id") : null;
     if (!userId) {
         showUserIdDialog();
         return;
     }
     let url = "https://bgm.tv/anime/list/" + userId;
-    window.Application.OAAssist.ShellExecute(url);
+    try {
+        if (app && app.OAAssist) {
+            app.OAAssist.ShellExecute(url);
+        } else {
+            window.open(url, "_blank");
+        }
+    } catch (e) {
+        window.open(url, "_blank");
+    }
 }
 
 // ========== 设置用户ID（Ribbon 模式）==========
 function showUserIdDialog() {
-    let currentId = window.Application.PluginStorage.getItem("bgm_user_id") || "";
+    let app = getApp();
+    let currentId = app ? app.PluginStorage.getItem("bgm_user_id") || "" : "";
     let userId = prompt("请输入 Bangumi 用户ID：\n\n获取方式：打开你的 Bangumi 主页，URL 中的数字/字母即为用户ID\n例如：https://bgm.tv/user/972358 → 用户ID: 972358", currentId);
     if (userId !== null && userId.trim() !== "") {
-        window.Application.PluginStorage.setItem("bgm_user_id", userId.trim());
+        if (app) {
+            app.PluginStorage.setItem("bgm_user_id", userId.trim());
+        }
         alert("用户ID 设置成功！");
     }
 }
 
 // ========== 显示同步面板 ==========
 function showBangumiPanel() {
-    let tsId = window.Application.PluginStorage.getItem("taskpane_id");
+    let app = getApp();
+    let tsId = app ? app.PluginStorage.getItem("taskpane_id") : null;
+
     if (!tsId) {
-        let tskpane = window.Application.CreateTaskPane(GetUrlPath() + "/ui/taskpane.html");
+        let tskpane = app.CreateTaskPane(GetUrlPath() + "/ui/taskpane.html");
         let id = tskpane.ID;
-        window.Application.PluginStorage.setItem("taskpane_id", id);
+        app.PluginStorage.setItem("taskpane_id", id);
         tskpane.Visible = true;
     } else {
-        let tskpane = window.Application.GetTaskPane(tsId);
+        let tskpane = app.GetTaskPane(tsId);
         tskpane.Visible = !tskpane.Visible;
     }
+}
+
+// ========== 获取 URL 路径（用于 taskpane）==========
+function GetUrlPath() {
+    let app = getApp();
+    // 优先使用 manifest 中的基础路径
+    let manifestPath = app ? app.PluginStorage.getItem("manifest_base_path") : null;
+    if (manifestPath) {
+        return manifestPath;
+    }
+    // 回退：使用当前页面路径
+    if (typeof window !== 'undefined' && window.location && window.location.href) {
+        let currentUrl = window.location.href;
+        let lastSlash = currentUrl.lastIndexOf("/");
+        return currentUrl.substring(0, lastSlash);
+    }
+    // Ribbon 上下文：返回默认路径
+    return "";
 }
 
 

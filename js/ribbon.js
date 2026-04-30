@@ -19,31 +19,34 @@ var WebNotifycount = 0;
 function OnAction(control) {
     console.log("OnAction called with:", control.Id);
     const eleId = control.Id
-    switch (eleId) {
-        // ========== Bangumi 同步相关 ==========
-        case "btnShowPanel":
-            showBangumiPanel();
-            break;
-        case "btnSyncBangumi":
-            SyncToBangumi();
-            break;
-        case "btnSetToken":
-            showTokenDialog(window.Application.PluginStorage.getItem("bgm_token"));
-            break;
-        case "btnSetUserId":
-            showUserIdDialog();
-            break;
-        case "btnOpenCollection":
-            openUserCollection();
-            break;
-        case "btnClearColors":
-            clearRowColors();
-            break;
-        case "btnOpenDebug":
-            openDebugConsole();
-            break;
-        default:
-            break
+    try {
+        switch (eleId) {
+            // ========== Bangumi 同步相关 ==========
+            case "btnShowPanel":
+                showBangumiPanel();
+                break;
+            case "btnSyncBangumi":
+                SyncToBangumi();
+                break;
+            case "btnSetToken":
+                showTokenDialog(window.Application.PluginStorage.getItem("bgm_token"));
+                break;
+            case "btnSetUserId":
+                showUserIdDialog();
+                break;
+            case "btnOpenCollection":
+                openUserCollection();
+                break;
+            case "btnClearColors":
+                clearRowColors();
+                break;
+
+            default:
+                break
+        }
+    } catch (e) {
+        console.error("OnAction error:", e);
+        alert("执行出错: " + e.message);
     }
     return true
 }

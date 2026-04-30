@@ -5,8 +5,18 @@ var WPS_Enum = {
 }
 
 function GetUrlPath() {
-    let e = document.location.toString()
-    return -1!=(e=decodeURI(e)).indexOf("/")&&(e=e.substring(0,e.lastIndexOf("/"))),e
+    // 优先使用 manifest 中的基础路径
+    let manifestPath = window.Application.PluginStorage.getItem("manifest_base_path");
+    if (manifestPath) {
+        return manifestPath;
+    }
+    // 回退：使用当前页面路径
+    if (typeof document !== 'undefined' && document.location && document.location.toString) {
+        let e = document.location.toString();
+        return -1 != (e = decodeURI(e)).indexOf("/") && (e = e.substring(0, e.lastIndexOf("/"))), e;
+    }
+    // Ribbon 上下文：返回默认路径
+    return "";
 }
 /**
  * 通过wps提供的接口执行一段脚本

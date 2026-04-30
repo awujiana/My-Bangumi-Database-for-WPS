@@ -1,3 +1,12 @@
+// ========== 辅助函数：安全获取单元格 ==========
+function getCell(ws, row, col) {
+    try {
+        return ws.Cells.Item(row, col);
+    } catch (e) {
+        return ws.Cells(row, col);
+    }
+}
+
 // ========== 面板初始化 ==========
 window.onload = () => {
     // 检查枚举
@@ -79,30 +88,32 @@ window.onload = () => {
     }, 300);
 
     // 调试通知功能：向开发服务器发送请求
-    try {
-        var xmlReq = WpsInvoke.CreateXHR();
-        var url = location.origin + "/.debugTemp/NotifyDemoUrl";
-        xmlReq.open("GET", url);
-        xmlReq.onload = function (res) {
-            var node = document.getElementById("DemoSpan");
-            if (node) {
-                node.innerHTML = res.target.responseText;
-                // 显示调试区域
+    if (typeof WpsInvoke !== "undefined") {
+        try {
+            var xmlReq = WpsInvoke.CreateXHR();
+            var url = location.origin + "/.debugTemp/NotifyDemoUrl";
+            xmlReq.open("GET", url);
+            xmlReq.onload = function (res) {
+                var node = document.getElementById("DemoSpan");
+                if (node) {
+                    node.innerHTML = res.target.responseText;
+                    // 显示调试区域
+                    var debugSection = document.getElementById("debugSection");
+                    if (debugSection) {
+                        debugSection.style.display = "block";
+                    }
+                }
+            };
+            xmlReq.onerror = function () {
                 var debugSection = document.getElementById("debugSection");
                 if (debugSection) {
-                    debugSection.style.display = "block";
+                    debugSection.style.display = "none";
                 }
-            }
-        };
-        xmlReq.onerror = function () {
-            var debugSection = document.getElementById("debugSection");
-            if (debugSection) {
-                debugSection.style.display = "none";
-            }
-        };
-        xmlReq.send();
-    } catch (e) {
-        console.log("调试通知功能不可用:", e.message);
+            };
+            xmlReq.send();
+        } catch (e) {
+            console.log("调试通知功能不可用:", e.message);
+        }
     }
 };
 
@@ -258,14 +269,14 @@ function refreshData() {
 
     try {
         let sheets = window.Application.ActiveWorkbook.Sheets;
-        let ws = sheets(sheetIndex);
+        let ws = sheets.Item(sheetIndex);
 
         if (!ws) {
             setStatus("未找到工作表", "error");
             return;
         }
 
-        let lastRow = ws.Cells(ws.Rows.Count, 1).End(-4162).Row;
+        let lastRow = getCell(ws, ws.Rows.Count, 1).End(-4162).Row;
         if (endRow === 0 || endRow > lastRow) {
             if (endRowInput) endRowInput.value = lastRow;
             endRow = lastRow;
@@ -282,15 +293,15 @@ function refreshData() {
         // 数据行
         let previewRows = Math.min(15, endRow - startRow + 1);
         let validCount = 0;
-        
+
         for (let i = startRow; i < startRow + previewRows && i <= endRow; i++) {
-            let name = colMap.has("名称") ? trim(String(ws.Cells(i, colMap.get("名称")).Value())) : "";
-            let bgmUrl = colMap.has("Bangumi_URL") ? trim(String(ws.Cells(i, colMap.get("Bangumi_URL")).Value())) : "";
-            let status = colMap.has("是否看完") ? trim(String(ws.Cells(i, colMap.get("是否看完")).Value())) : "";
-            let rate = colMap.has("打分") ? trim(String(ws.Cells(i, colMap.get("打分")).Value())) : "";
-            let tagsRaw = colMap.has("标签/分级") ? trim(String(ws.Cells(i, colMap.get("标签/分级")).Value())) : "";
-            
-            let finishedDate = colMap.has("完播日") ? trim(String(ws.Cells(i, colMap.get("完播日")).Value())) : "";
+            let name = colMap.has("名称") ? trim(String(getCell(ws, i, colMap.get("名称")).Value())) : "";
+            let bgmUrl = colMap.has("Bangumi_URL") ? trim(String(getCell(ws, i, colMap.get("Bangumi_URL")).Value())) : "";
+            let status = colMap.has("是否看完") ? trim(String(getCell(ws, i, colMap.get("是否看完")).Value())) : "";
+            let rate = colMap.has("打分") ? trim(String(getCell(ws, i, colMap.get("打分")).Value())) : "";
+            let tagsRaw = colMap.has("标签/分级") ? trim(String(getCell(ws, i, colMap.get("标签/分级")).Value())) : "";
+
+            let finishedDate = colMap.has("完播日") ? trim(String(getCell(ws, i, colMap.get("完播日")).Value())) : "";
             
             let sid = extractSubjectId(bgmUrl);
             let hasUrl = sid !== "";
@@ -366,13 +377,13 @@ function previewSyncContent() {
 
     if (endRow === 0) {
         let sheets = window.Application.ActiveWorkbook.Sheets;
-        let ws = sheets(sheetIndex);
-        endRow = ws.Cells(ws.Rows.Count, 1).End(-4162).Row;
+        let ws = sheets.Item(sheetIndex);
+        endRow = getCell(ws, ws.Rows.Count, 1).End(-4162).Row;
     }
 
     try {
         let sheets = window.Application.ActiveWorkbook.Sheets;
-        let ws = sheets(sheetIndex);
+        let ws = sheets.Item(sheetIndex);
         let colMap = getColumnMap(ws, headerRow);
 
         let msg = "=== 同步内容预览 ===\n\n";
@@ -381,12 +392,12 @@ function previewSyncContent() {
         let typeCount = {1:0, 2:0, 3:0, 4:0, 5:0};
 
         for (let i = startRow; i <= startRow + previewCount - 1 && i <= endRow; i++) {
-            let bgmUrl = colMap.has("Bangumi_URL") ? trim(String(ws.Cells(i, colMap.get("Bangumi_URL")).Value())) : "";
-            let name = colMap.has("名称") ? trim(String(ws.Cells(i, colMap.get("名称")).Value())) : "";
-            let status = colMap.has("是否看完") ? trim(String(ws.Cells(i, colMap.get("是否看完")).Value())) : "";
-            let rate = colMap.has("打分") ? trim(String(ws.Cells(i, colMap.get("打分")).Value())) : "";
-            let tagsRaw = colMap.has("标签/分级") ? trim(String(ws.Cells(i, colMap.get("标签/分级")).Value())) : "";
-            let finishedDate = colMap.has("完播日") ? trim(String(ws.Cells(i, colMap.get("完播日")).Value())) : "";
+            let bgmUrl = colMap.has("Bangumi_URL") ? trim(String(getCell(ws, i, colMap.get("Bangumi_URL")).Value())) : "";
+            let name = colMap.has("名称") ? trim(String(getCell(ws, i, colMap.get("名称")).Value())) : "";
+            let status = colMap.has("是否看完") ? trim(String(getCell(ws, i, colMap.get("是否看完")).Value())) : "";
+            let rate = colMap.has("打分") ? trim(String(getCell(ws, i, colMap.get("打分")).Value())) : "";
+            let tagsRaw = colMap.has("标签/分级") ? trim(String(getCell(ws, i, colMap.get("标签/分级")).Value())) : "";
+            let finishedDate = colMap.has("完播日") ? trim(String(getCell(ws, i, colMap.get("完播日")).Value())) : "";
 
             let sid = extractSubjectId(bgmUrl);
             if (sid) {
@@ -473,10 +484,10 @@ function syncFromPanel() {
 
     try {
         let sheets = window.Application.ActiveWorkbook.Sheets;
-        let ws = sheets(sheetIndex);
+        let ws = sheets.Item(sheetIndex);
 
         if (endRow === 0) {
-            endRow = ws.Cells(ws.Rows.Count, 1).End(-4162).Row;
+            endRow = getCell(ws, ws.Rows.Count, 1).End(-4162).Row;
         }
 
         // 获取列映射
@@ -493,19 +504,19 @@ function syncFromPanel() {
 
         for (let i = startRow; i <= endRow; i++) {
             // 从正确的列获取 URL
-            let bgmUrl = trim(String(ws.Cells(i, colMap.get("Bangumi_URL")).Value()));
+            let bgmUrl = trim(String(getCell(ws, i, colMap.get("Bangumi_URL")).Value()));
             let subjectId = extractSubjectId(bgmUrl);
 
             if (subjectId === "") {
                 skipCount++;
-                ws.Cells(i, colMap.get("Bangumi_URL")).Interior.Color = 0xFFFFCC;
+                getCell(ws, i, colMap.get("Bangumi_URL")).Interior.Color = 0xFFFFCC;
                 continue;
             }
 
             // 获取完播日
             let finishedDate = "";
             if (colMap.has("完播日")) {
-                finishedDate = trim(String(ws.Cells(i, colMap.get("完播日")).Value()));
+                finishedDate = trim(String(getCell(ws, i, colMap.get("完播日")).Value()));
             }
 
             // 构建完整请求体
@@ -520,10 +531,10 @@ function syncFromPanel() {
 
             if (statusCode === 204 || statusCode === 200) {
                 successCount++;
-                ws.Cells(i, colMap.get("Bangumi_URL")).Interior.Color = 0xCCFFCC;
+                getCell(ws, i, colMap.get("Bangumi_URL")).Interior.Color = 0xCCFFCC;
             } else {
                 failCount++;
-                ws.Cells(i, colMap.get("Bangumi_URL")).Interior.Color = 0xFFCCCC;
+                getCell(ws, i, colMap.get("Bangumi_URL")).Interior.Color = 0xFFCCCC;
                 console.log("行 " + i + " 失败: " + result.message);
             }
 
@@ -556,23 +567,9 @@ function setStatus(msg, type) {
     }
 }
 
-// ========== Token 设置对话框 ==========
-function showTokenDialog(currentToken) {
-    showInputDialog(
-        "设置 Bangumi Token",
-        "请输入 Bangumi Access Token<br><br>获取方式：从 <a href='https://next.bgm.tv/demo/access-token/create' target='_blank'>https://next.bgm.tv/demo/access-token/create</a> 创建",
-        currentToken || "",
-        (token) => {
-            if (token && token.trim() !== "") {
-                window.Application.PluginStorage.setItem("bgm_token", token.trim());
-                updateTokenStatus();
-                testTokenValidity(token.trim());
-            }
-        }
-    );
-}
 
-// ========== 测试 Token 有效性 ==========
+
+// ========== 测试 Token 有效性（taskpane版本，更新UI状态）==========
 function testTokenValidity(token) {
     if (!token) {
         let storedToken = window.Application.PluginStorage.getItem("bgm_token");
@@ -598,7 +595,6 @@ function testTokenValidity(token) {
             alert("✓ Token 验证成功！\n\n用户: " + (userData.nickname || userData.username) + "\nID: " + userData.id);
             return true;
         } else if (xhr.status === 401) {
-            // 清除无效的 Token
             window.Application.PluginStorage.setItem("bgm_token", "");
             updateTokenStatus();
             setStatus("Token 无效", "error");
@@ -616,7 +612,35 @@ function testTokenValidity(token) {
     }
 }
 
-// ========== 用户ID 设置对话框 ==========
+// ========== 打开用户收藏页 ==========
+function openUserCollection() {
+    let userId = window.Application.PluginStorage.getItem("bgm_user_id");
+    if (!userId) {
+        alert("请先设置用户ID！");
+        showUserIdDialog();
+        return;
+    }
+    let url = "https://bgm.tv/anime/list/" + userId + "/wish";
+    window.open(url, "_blank");
+}
+
+// ========== Token 设置对话框（TaskPane 版本，使用自定义 UI）==========
+function showTokenDialog(currentToken) {
+    showInputDialog(
+        "设置 Bangumi Token",
+        "请输入 Bangumi Access Token<br><br>获取方式：从 <a href='https://next.bgm.tv/demo/access-token/create' target='_blank'>https://next.bgm.tv/demo/access-token/create</a> 创建",
+        currentToken || "",
+        (token) => {
+            if (token && token.trim() !== "") {
+                window.Application.PluginStorage.setItem("bgm_token", token.trim());
+                updateTokenStatus();
+                testTokenValidity(token.trim());
+            }
+        }
+    );
+}
+
+// ========== 用户ID 设置对话框（TaskPane 版本，使用自定义 UI）==========
 function showUserIdDialog() {
     let currentId = window.Application.PluginStorage.getItem("bgm_user_id") || "";
     showInputDialog(
@@ -631,42 +655,4 @@ function showUserIdDialog() {
             }
         }
     );
-}
-
-// ========== 打开用户收藏页 ==========
-function openUserCollection() {
-    let userId = window.Application.PluginStorage.getItem("bgm_user_id");
-    if (!userId) {
-        alert("请先设置用户ID！");
-        showUserIdDialog();
-        return;
-    }
-    let url = "https://bgm.tv/anime/list/" + userId + "/wish";
-    window.open(url, "_blank");
-}
-
-// ========== 测试调试连接 ==========
-function testDebugConnection() {
-    try {
-        var xmlReq = WpsInvoke.CreateXHR();
-        var url = location.origin + "/.debugTemp/Ping";
-        xmlReq.open("GET", url);
-
-        xmlReq.onload = function (res) {
-            try {
-                var data = JSON.parse(res.target.responseText);
-                alert("✓ 连接成功！\n\n状态: " + data.status + "\n时间: " + data.timestamp + "\n消息: " + data.message);
-            } catch (e) {
-                alert("✓ 连接成功！\n\n响应: " + res.target.responseText);
-            }
-        };
-
-        xmlReq.onerror = function () {
-            alert("✗ 连接失败！\n\n请确保开发服务器正在运行。");
-        };
-
-        xmlReq.send();
-    } catch (e) {
-        alert("测试失败: " + e.message);
-    }
 }
