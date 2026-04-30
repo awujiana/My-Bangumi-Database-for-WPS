@@ -2,41 +2,335 @@
 <html>
 <head><meta charset="utf-8"></head>
 <script type="text/javascript" src="../js/util.js"></script>
+<script type="text/javascript" src="../js/bangumi.js"></script>
 <script type="text/javascript" src="../js/taskpane.js"></script>
 <script type="text/javascript" src="../.debugTemp/wpsjsrpcsdk.js"></script>
 <body>
     <div class="global">
-        <div class="divItem">
-            这是一个网页，按<span style="font-weight: bolder;">"F12"</span>可以打开调试器。
+        <!-- 标题 -->
+        <div class="header">
+            <h2>Bangumi 同步工具</h2>
+            <p class="subtitle">将 Excel 数据批量同步到 Bangumi 收藏</p>
         </div>
-        <div class="divItem">
-            这个示例展示了wps加载项的相关基础能力，与B/S业务系统的交互，请用浏览器打开：
-            <span style="font-weight: bolder;color: slateblue;cursor:pointer" id="DemoSpan" onclick="shellExecuteByOAAssist(this.innerHTML)"></span>
+
+        <!-- 快速操作 -->
+        <div class="section">
+            <h3>快速操作</h3>
+            <div class="btn-group">
+                <button class="btn primary" onclick="onAction('sync')">🚀 同步到 Bangumi</button>
+                <button class="btn" onclick="onAction('test')">🧪 测试同步</button>
+                <button class="btn warning" onclick="onAction('clear')">🗑️ 清除标记</button>
+            </div>
         </div>
-        <div class="divItem">开发文档: <span style="font-weight: bolder;color: slateblue;">https://open.wps.cn/docs/office</span></div>
-        <hr>
-        <div class="divItem">
-            <button style="margin:3px;" onclick="onbuttonclick('dockLeft')">停靠左边</button>
-            <button style="margin:3px;" onclick="onbuttonclick('dockRight')">停靠右边</button>
-            <button style="margin:3px;" onclick="onbuttonclick('hideTaskPane')">隐藏TaskPane</button>
-            <button style="margin:3px;" onclick="onbuttonclick('addString')">文档开头添加字符串</button>
-            <button style="margin:3px;" onclick="onbuttonclick('getDocName')">取文件名</button>
+
+        <!-- Token 设置 -->
+        <div class="section">
+            <h3>Token 设置</h3>
+            <div class="token-display">
+                <span id="tokenStatus">未设置</span>
+                <button class="btn small" onclick="onAction('setToken')">设置/修改</button>
+            </div>
+            <p class="hint">Access Token 获取方式：Bangumi → 设置 → API → 创建应用</p>
         </div>
-        <hr>
-        <div class="divItem">文档文件名为：<span id="text_p"></span></div>
+
+        <!-- 数据选择 -->
+        <div class="section">
+            <h3>数据选择</h3>
+            <div class="form-group">
+                <label>选择工作表：</label>
+                <select id="sheetSelect" class="input">
+                    <option value="">-- 请选择 --</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>表头行号：</label>
+                <input type="number" id="headerRow" class="input" value="1" min="1" max="10">
+            </div>
+            <div class="form-group">
+                <label>起始行号：</label>
+                <input type="number" id="startRow" class="input" value="2" min="2">
+            </div>
+            <div class="form-group">
+                <label>结束行号：</label>
+                <input type="number" id="endRow" class="input" value="0" min="0" placeholder="0=到最后一行">
+            </div>
+            <button class="btn" onclick="refreshData()">🔄 刷新数据</button>
+        </div>
+
+        <!-- 数据预览 -->
+        <div class="section">
+            <h3>数据预览 <span id="previewCount"></span></h3>
+            <div class="preview-box" id="previewBox">
+                <p class="hint">点击"刷新数据"加载预览</p>
+            </div>
+            <button class="btn" style="margin-top:10px" onclick="previewSyncContent()">🔍 详细预览同步内容</button>
+        </div>
+
+        <!-- 使用引导 -->
+        <div class="section">
+            <h3>📖 使用引导</h3>
+            <div class="guide">
+                <div class="step">
+                    <span class="step-num">1</span>
+                    <span>设置 Token（只需设置一次）</span>
+                </div>
+                <div class="step">
+                    <span class="step-num">2</span>
+                    <span>确保 Excel 包含必填列</span>
+                </div>
+                <div class="step">
+                    <span class="step-num">3</span>
+                    <span>选择工作表和行范围</span>
+                </div>
+                <div class="step">
+                    <span class="step-num">4</span>
+                    <span>点击"同步到 Bangumi"</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- 数据格式要求 -->
+        <div class="section">
+            <h3>📋 数据格式要求</h3>
+            <div class="format-table">
+                <table>
+                    <tr><th>列名（支持模糊匹配）</th><th>说明</th><th>必填</th></tr>
+                    <tr><td>Bangumi_URL / bgm</td><td>Bangumi 条目链接</td><td class="required">✅ 必填</td></tr>
+                    <tr><td>是否看完 / 观看状态</td><td>是/否/在追</td><td></td></tr>
+                    <tr><td>完播日 / 看完时间</td><td>如 2024-01-01</td><td></td></tr>
+                    <tr><td>打分 / 评分</td><td>1-10 分</td><td></td></tr>
+                    <tr><td>感言 / 评价 / 剧透</td><td>个人评论</td><td></td></tr>
+                    <tr><td>标签 / 分级</td><td>用 | 、 / 分隔</td><td></td></tr>
+                    <tr><td>特点 / 印象</td><td>用 | 、 / 分隔</td><td></td></tr>
+                    <tr><td>集号 / 看到</td><td>如 1-12</td><td></td></tr>
+                </table>
+            </div>
+        </div>
+
+        <!-- 状态 -->
+        <div class="section">
+            <div class="status" id="statusBox">就绪</div>
+        </div>
     </div>
 </body>
 
 <style>
-    .global{
-        font-size: 15px;
-        min-height: 95%;
+    * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
     }
-    .divItem{
-        margin-left: 5px;
-        margin-bottom: 18px;
+    body {
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Microsoft YaHei", sans-serif;
+        font-size: 14px;
+        background: #f5f7fa;
+        padding: 15px;
+    }
+    .global {
+        max-width: 400px;
+    }
+    .header {
+        text-align: center;
+        padding: 15px 0;
+        border-bottom: 2px solid #3498db;
+        margin-bottom: 15px;
+    }
+    .header h2 {
+        color: #2c3e50;
+        margin-bottom: 5px;
+    }
+    .subtitle {
+        color: #7f8c8d;
+        font-size: 12px;
+    }
+    .section {
+        background: white;
+        border-radius: 8px;
+        padding: 15px;
+        margin-bottom: 12px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    .section h3 {
+        color: #2c3e50;
         font-size: 15px;
-        word-wrap:break-word;
+        margin-bottom: 12px;
+        padding-bottom: 8px;
+        border-bottom: 1px solid #eee;
+    }
+    .btn-group {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+    }
+    .btn {
+        padding: 10px 16px;
+        border: none;
+        border-radius: 6px;
+        cursor: pointer;
+        font-size: 14px;
+        transition: all 0.2s;
+        background: #ecf0f1;
+        color: #2c3e50;
+    }
+    .btn:hover {
+        background: #dfe6e9;
+    }
+    .btn.primary {
+        background: #3498db;
+        color: white;
+    }
+    .btn.primary:hover {
+        background: #2980b9;
+    }
+    .btn.warning {
+        background: #e74c3c;
+        color: white;
+    }
+    .btn.warning:hover {
+        background: #c0392b;
+    }
+    .btn.small {
+        padding: 5px 10px;
+        font-size: 12px;
+    }
+    .token-display {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 10px;
+        background: #f8f9fa;
+        border-radius: 6px;
+    }
+    #tokenStatus {
+        font-weight: bold;
+        color: #e74c3c;
+    }
+    #tokenStatus.set {
+        color: #27ae60;
+    }
+    .hint {
+        color: #95a5a6;
+        font-size: 11px;
+        margin-top: 8px;
+    }
+    .form-group {
+        margin-bottom: 12px;
+    }
+    .form-group label {
+        display: block;
+        margin-bottom: 5px;
+        color: #34495e;
+        font-weight: 500;
+    }
+    .input {
+        width: 100%;
+        padding: 8px 12px;
+        border: 1px solid #ddd;
+        border-radius: 6px;
+        font-size: 14px;
+    }
+    .input:focus {
+        outline: none;
+        border-color: #3498db;
+    }
+    select.input {
+        cursor: pointer;
+    }
+    .preview-box {
+        background: #f8f9fa;
+        border-radius: 6px;
+        padding: 12px;
+        max-height: 200px;
+        overflow-y: auto;
+    }
+    .preview-box table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 12px;
+    }
+    .preview-box th, .preview-box td {
+        padding: 6px 8px;
+        text-align: left;
+        border-bottom: 1px solid #eee;
+    }
+    .preview-box th {
+        background: #3498db;
+        color: white;
+        position: sticky;
+        top: 0;
+    }
+    #previewCount {
+        font-size: 12px;
+        color: #7f8c8d;
+        font-weight: normal;
+    }
+    .guide {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+    }
+    .step {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 8px;
+        background: #f8f9fa;
+        border-radius: 6px;
+    }
+    .step-num {
+        width: 24px;
+        height: 24px;
+        background: #3498db;
+        color: white;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: bold;
+        font-size: 12px;
+    }
+    .format-table {
+        overflow-x: auto;
+    }
+    .format-table table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 12px;
+    }
+    .format-table th, .format-table td {
+        padding: 8px;
+        text-align: left;
+        border: 1px solid #ddd;
+    }
+    .format-table th {
+        background: #34495e;
+        color: white;
+    }
+    .format-table tr:nth-child(even) {
+        background: #f8f9fa;
+    }
+    .required {
+        color: #e74c3c;
+        font-weight: bold;
+    }
+    .status {
+        padding: 12px;
+        background: #ecf0f1;
+        border-radius: 6px;
+        text-align: center;
+        color: #7f8c8d;
+    }
+    .status.success {
+        background: #d5f5e3;
+        color: #27ae60;
+    }
+    .status.error {
+        background: #fadbd8;
+        color: #e74c3c;
+    }
+    .status.loading {
+        background: #fef9e7;
+        color: #f39c12;
     }
 </style>
 </html>
