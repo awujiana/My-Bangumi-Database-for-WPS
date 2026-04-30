@@ -581,12 +581,9 @@ function syncFromPanel() {
     }
 
     let select = document.getElementById("sheetSelect");
-    let headerRowInput = document.getElementById("headerRow");
-    let startRowInput = document.getElementById("startRow");
     let endRowInput = document.getElementById("endRow");
 
     let sheetIndex = parseInt(select.value) || 1;
-    let startRow = parseInt(startRowInput?.value) || 2;
     let endRow = parseInt(endRowInput?.value) || 0;
 
     try {
@@ -596,9 +593,9 @@ function syncFromPanel() {
         // 自动检测表头行
         let headerRow = findHeaderRow(ws);
         if (headerRow === 0) {
-            headerRow = parseInt(headerRowInput?.value) || 1;
+            headerRow = 1;
         }
-        startRow = headerRow + 1;
+        let startRow = headerRow + 1;
 
         if (endRow === 0) {
             endRow = getCell(ws, ws.Rows.Count, 1).End(-4162).Row;

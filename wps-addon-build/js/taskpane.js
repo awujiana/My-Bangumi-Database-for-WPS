@@ -137,8 +137,6 @@ function refreshData() {
     setStatus("正在加载数据...", "loading");
 
     let select = document.getElementById("sheetSelect");
-    let headerRowInput = document.getElementById("headerRow");
-    let startRowInput = document.getElementById("startRow");
     let endRowInput = document.getElementById("endRow");
     let previewBox = document.getElementById("previewBox");
     let previewCount = document.getElementById("previewCount");
@@ -146,8 +144,6 @@ function refreshData() {
     if (!select || !previewBox) return;
 
     let sheetIndex = parseInt(select.value) || 1;
-    let headerRow = parseInt(headerRowInput?.value) || 1;
-    let startRow = parseInt(startRowInput?.value) || 2;
     let endRow = parseInt(endRowInput?.value) || 0;
 
     try {
@@ -158,6 +154,13 @@ function refreshData() {
             setStatus("未找到工作表", "error");
             return;
         }
+
+        // 自动检测表头行
+        let headerRow = findHeaderRow(ws);
+        if (headerRow === 0) {
+            headerRow = 1;
+        }
+        let startRow = headerRow + 1;
 
         let lastRow = ws.Cells(ws.Rows.Count, 1).End(-4162).Row;
         if (endRow === 0 || endRow > lastRow) {
