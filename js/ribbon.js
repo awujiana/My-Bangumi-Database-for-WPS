@@ -1,4 +1,5 @@
 
+
 //这个函数在整个wps加载项中是第一个执行的
 function OnAddinLoad(ribbonUI){
     if (typeof (window.Application.ribbonUI) != "object"){
@@ -9,8 +10,8 @@ function OnAddinLoad(ribbonUI){
         window.Application.Enum = WPS_Enum
     }
 
-    window.Application.PluginStorage.setItem("EnableFlag", false) //往PluginStorage中设置一个标记，用于控制两个按钮的置灰
-    window.Application.PluginStorage.setItem("ApiEventFlag", false) //往PluginStorage中设置一个标记，用于控制ApiEvent的按钮label
+    window.Application.PluginStorage.setItem("EnableFlag", false)
+    window.Application.PluginStorage.setItem("ApiEventFlag", false)
     return true
 }
 
@@ -18,6 +19,26 @@ var WebNotifycount = 0;
 function OnAction(control) {
     const eleId = control.Id
     switch (eleId) {
+        // ========== Bangumi 同步相关 ==========
+        case "btnSyncBangumi":
+            SyncToBangumi();
+            break;
+        case "btnSetToken":
+            setBangumiToken();
+            break;
+        case "btnTestSync":
+            testSingleUpdate();
+            break;
+        case "btnPreviewUrl":
+            previewSubjectIdExtraction();
+            break;
+        case "btnPreviewJson":
+            previewJsonPayload();
+            break;
+        case "btnClearColors":
+            clearRowColors();
+            break;
+        // ========== 原有示例功能 ==========
         case "btnShowMsg":
             {
                 const doc = window.Application.ActiveWorkbook
@@ -33,11 +54,9 @@ function OnAction(control) {
                 let bFlag = window.Application.PluginStorage.getItem("EnableFlag")
                 window.Application.PluginStorage.setItem("EnableFlag", !bFlag)
                 
-                //通知wps刷新以下几个按饰的状态
                 window.Application.ribbonUI.InvalidateControl("btnIsEnbable")
                 window.Application.ribbonUI.InvalidateControl("btnShowDialog") 
                 window.Application.ribbonUI.InvalidateControl("btnShowTaskPane") 
-                //window.Application.ribbonUI.Invalidate(); 这行代码打开则是刷新所有的按钮状态
                 break
             }
         case "btnShowDialog":
@@ -97,6 +116,10 @@ function GetImage(control) {
         default:
             ;
     }
+    return "images/newFromTemp.svg"
+}
+
+function GetBangumiImage(control) {
     return "images/newFromTemp.svg"
 }
 
