@@ -272,17 +272,16 @@ function refreshSheets() {
     }
 }
 
-// ========== 根据序列号获取连续数据行（优化版：只遍历可见行）==========
+// ========== 获取可见行（优化版：只遍历可见行）==========
 // @param {object} ws - 工作表对象
 // @param {number} startRow - 起始行
 // @param {number} endRow - 结束行
 // @param {number} seqCol - 序列号列（默认第4列）
+// @returns {Array} - 可见行号数组（只包含有有效序列号的行）
 function getSequentialRowsBySeqCol(ws, startRow, endRow, seqCol) {
-    let rows = [];
-    let expectedSeq = null;
+    let visibleRows = [];
     
     // 尝试使用 SpecialCells(12) 获取可见行（xlCellTypeVisible=12）
-    let visibleRows = null;
     try {
         let autoFilter = ws.AutoFilter;
         if (autoFilter && autoFilter.FilterMode === true && autoFilter.Range) {
@@ -290,72 +289,66 @@ function getSequentialRowsBySeqCol(ws, startRow, endRow, seqCol) {
             let filterStartRow = filterRange.Row + 1;
             let filterEndRow = filterRange.Row + filterRange.Rows.Count - 1;
             
-            // xlCellTypeVisible = 12，获取序列号列的可见单元格（从第2行开始，跳过表头）
-            let visibleCells = ws.Range(ws.Cells(filterStartRow, seqCol), ws.Cells(filterEndRow, seqCol)).SpecialCells(12);
+            // 使用较小值确保范围合理
+            let actualEndRow = Math.min(filterEndRow, endRow);
+            
+            // xlCellTypeVisible = 12，获取序列号列的可见单元格
+            let visibleCells = ws.Range(ws.Cells(filterStartRow, seqCol), ws.Cells(actualEndRow, seqCol)).SpecialCells(12);
             if (visibleCells) {
-                visibleRows = [];
                 let areas = visibleCells.Areas;
                 for (let a = 1; a <= areas.Count; a++) {
                     let area = areas(a);
                     for (let r = 1; r <= area.Rows.Count; r++) {
                         let rowNum = area.Rows(r).Row;
-                        // 确保行号在范围内
-                        if (rowNum >= filterStartRow && rowNum <= filterEndRow) {
-                            visibleRows.push(rowNum);
+                        // 只计入有有效数字序列号的行
+                        if (rowNum >= filterStartRow && rowNum <= actualEndRow) {
+                            try {
+                                let cellVal = ws.Cells(rowNum, seqCol).Value();
+                                let seqNum = parseInt(cellVal);
+                                if (!isNaN(seqNum) && seqNum > 0) {
+                                    visibleRows.push(rowNum);
+                                }
+                            } catch (e) {}
                         }
                     }
                 }
             }
         }
     } catch (e) {
-        // SpecialCells 失败，使用逐行扫描
         console.log("SpecialCells 获取可见行失败:", e.message);
-        visibleRows = null;
     }
     
-    // 确定要遍历的行范围
-    let rowsToCheck = visibleRows;
-    if (!rowsToCheck) {
-        // 回退：遍历指定范围
-        rowsToCheck = [];
+    // 如果没有获取到可见行，回退到遍历指定范围
+    if (visibleRows.length === 0) {
         for (let i = startRow; i <= endRow; i++) {
-            rowsToCheck.push(i);
+            // 只计入有有效序列号的行
+            try {
+                let cellVal = ws.Cells(i, seqCol).Value();
+                let seqNum = parseInt(cellVal);
+                if (!isNaN(seqNum) && seqNum > 0) {
+                    visibleRows.push(i);
+                }
+            } catch (e) {}
         }
     }
     
-    // 遍历可见行获取序列号
-    for (let i of rowsToCheck) {
-        let seqVal = trim(String(getCell(ws, i, seqCol).Value()));
-        let seqNum = parseInt(seqVal);
-        
-        if (seqVal !== "" && !isNaN(seqNum)) {
-            if (expectedSeq === null) {
-                rows.push(i);
-                expectedSeq = seqNum + 1;
-            } else if (seqNum === expectedSeq) {
-                rows.push(i);
-                expectedSeq = seqNum + 1;
-            } else if (seqNum > expectedSeq) {
-                expectedSeq = seqNum + 1;
-                rows.push(i);
-            }
-        }
-    }
-    
-    return rows;
+    return visibleRows;
 }
 
 // ========== 获取筛选状态（包装函数，调用 bangumi.js 中的 getFilterStatus）==========
 // @param {number} endRow - 用户指定的结束行号，0表示自动检测
 // @param {boolean} getColumnCounts - 是否获取各列的唯一值计数
 function getFilterStatusLocal(endRow, getColumnCounts) {
+    console.log("getFilterStatusLocal 被调用, endRow:", endRow, "getColumnCounts:", getColumnCounts);
     // 如果 bangumi.js 中的 getFilterStatus 可用，直接调用
     if (typeof getFilterStatus === 'function') {
-        return getFilterStatus(endRow, getColumnCounts);
+        let result = getFilterStatus(endRow, getColumnCounts);
+        console.log("getFilterStatusLocal - getFilterStatus 返回:", JSON.stringify(result));
+        return result;
     }
     
     // 否则返回空结果
-    console.log("getFilterStatus 不可用");
+    console.log("getFilterStatusLocal - getFilterStatus 不可用!");
     return {
         hasFilter: false,
         filteredColumns: [],

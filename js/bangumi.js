@@ -825,10 +825,18 @@ function GetUrlPath() {
 function getFilterStatus(endRow, getColumnCounts) {
     // 优先使用 window.Application（taskpane 环境中可用）
     let app = window.Application || getApp();
-    if (!app) return null;
+    console.log("getFilterStatus - app:", !!app);
+    if (!app) {
+        console.log("getFilterStatus - app 为空，返回 null");
+        return null;
+    }
     
     let ws = app.ActiveSheet;
-    if (!ws) return null;
+    console.log("getFilterStatus - ws:", !!ws);
+    if (!ws) {
+        console.log("getFilterStatus - ws 为空，返回 null");
+        return null;
+    }
     
     let result = {
         hasFilter: false,
@@ -842,13 +850,17 @@ function getFilterStatus(endRow, getColumnCounts) {
         hiddenCount: 0
     };
     
+    const SEQ_COL = 4; // D列 - 序列号列
+    
     try {
         let autoFilter = ws.AutoFilter;
+        console.log("getFilterStatus - autoFilter:", !!autoFilter);
         let filterMode = false;
         let filterStartRow = 2; // 默认数据起始行（去除表头）
         
         if (autoFilter) {
             filterMode = autoFilter.FilterMode === true;
+            console.log("getFilterStatus - filterMode:", filterMode);
             result.hasFilter = filterMode;
             
             // 获取 AutoFilter 区域信息
@@ -912,40 +924,86 @@ function getFilterStatus(endRow, getColumnCounts) {
         try {
             if (filterMode && autoFilter && autoFilter.Range) {
                 let filterRange = autoFilter.Range;
+                // 使用实际数据范围，避免 AutoFilter 范围过大
+                let actualLastRow = getLastRow(ws);
                 let filterEndRow = filterRange.Row + filterRange.Rows.Count - 1;
+                // 取较小值，确保不超出实际数据范围
+                if (filterEndRow > actualLastRow) {
+                    filterEndRow = actualLastRow;
+                }
                 
                 // 获取 D 列可见单元格（第4列，序列号列）
                 try {
-                    const SEQ_COL = 4; // D列
-                    // xlCellTypeVisible = 12，获取可见单元格，从第2行开始（跳过表头"序列号"）
-                    let visibleCells = ws.Range(ws.Cells(filterStartRow, SEQ_COL), ws.Cells(filterEndRow, SEQ_COL)).SpecialCells(12);
+                    // xlCellTypeVisible = 12，获取可见单元格
+                    let filterRangeStr = "D" + filterStartRow + ":D" + filterEndRow;
+                    let visibleCells = ws.Range(filterRangeStr).SpecialCells(12);
                     
                     if (visibleCells) {
-                        let areas = visibleCells.Areas;
-                        for (let a = 1; a <= areas.Count; a++) {
-                            let area = areas(a);
-                            let rows = area.Rows;
-                            for (let r = 1; r <= rows.Count; r++) {
-                                let rowNum = rows(r).Row;
-                                // 确保行号在 filterStartRow 到 filterEndRow 之间
-                                if (rowNum >= filterStartRow && rowNum <= filterEndRow) {
-                                    result.visibleRows.push(rowNum);
+                        try {
+                            let areas = visibleCells.Areas;
+                            // 使用 Item() 方法访问 Areas（WPS 兼容）
+                            for (let a = 1; a <= areas.Count; a++) {
+                                let area = areas.Item(a);
+                                let rows = area.Rows;
+                                for (let r = 1; r <= rows.Count; r++) {
+                                    let rowNum = rows.Item(r).Row;
+                                    // 只计入 D 列有有效数字序列号的行
+                                    // 使用 Range 获取单元格值（WPS 兼容）
+                                    let cellAdd = "D" + rowNum;
+                                    let cell = ws.Range(cellAdd);
+                                    let cellVal = cell.Value2;
+                                    if (cellVal === null || cellVal === undefined || cellVal === "") {
+                                        cellVal = cell.Value();
+                                    }
+                                    let seqNum = parseInt(cellVal);
+                                    if (!isNaN(seqNum) && seqNum > 0) {
+                                        result.visibleRows.push(rowNum);
+                                    }
                                 }
                             }
+                        } catch (e) {
+                            console.error("遍历 Areas 失败:", e);
                         }
                     }
                 } catch (e) {
                     console.log("SpecialCells 获取 D 列可见行失败:", e.message);
                 }
                 
-                // 计算隐藏行 - 使用完整的 filterEndRow 范围
+                // 计算总数据行数（只统计有有效序列号的行）
+                let totalDataRows = 0;
+                for (let i = filterStartRow; i <= filterEndRow; i++) {
+                    try {
+                        // 使用 Range 获取单元格值（WPS 兼容）
+                        let cell = ws.Range("D" + i);
+                        let cellVal = cell.Value2;
+                        if (cellVal === null || cellVal === undefined || cellVal === "") {
+                            cellVal = cell.Value();
+                        }
+                        let seqNum = parseInt(cellVal);
+                        if (!isNaN(seqNum) && seqNum > 0) {
+                            totalDataRows++;
+                        }
+                    } catch (e) {}
+                }
+                result.totalRows = totalDataRows;
+                // 计算隐藏行 - 只统计有有效序列号但被隐藏的行
                 if (result.visibleRows.length > 0) {
                     let visibleSet = new Set(result.visibleRows);
-                    // 隐藏行范围 = filterStartRow 到 filterEndRow（完整筛选范围）
                     for (let i = filterStartRow; i <= filterEndRow; i++) {
-                        if (!visibleSet.has(i)) {
-                            result.hiddenRows.push(i);
-                        }
+                        try {
+                            // 使用 Range 获取单元格值（WPS 兼容）
+                            let cell = ws.Range("D" + i);
+                            let cellVal = cell.Value2;
+                            if (cellVal === null || cellVal === undefined || cellVal === "") {
+                                cellVal = cell.Value();
+                            }
+                            let seqNum = parseInt(cellVal);
+                            if (!isNaN(seqNum) && seqNum > 0) {
+                                if (!visibleSet.has(i)) {
+                                    result.hiddenRows.push(i);
+                                }
+                            }
+                        } catch (e) {}
                     }
                 }
             }
@@ -955,6 +1013,7 @@ function getFilterStatus(endRow, getColumnCounts) {
         
         // 回退到逐行扫描方式
         if (result.visibleRows.length === 0 && result.hiddenRows.length === 0) {
+            console.log("getFilterStatus - 进入回退逻辑, filterStartRow:", filterStartRow, "scanEndRow:", scanEndRow);
             for (let i = filterStartRow; i <= scanEndRow; i++) {
                 try {
                     let rowHidden = false;
@@ -988,7 +1047,12 @@ function getFilterStatus(endRow, getColumnCounts) {
             result.columnCounts = getColumnValueCounts(ws, scanEndRow);
         }
         
-        console.log("getFilterStatus 完成:", result.visibleCount, "可见,", result.hiddenCount, "隐藏");
+        console.log("getFilterStatus 完成:", {
+            hasFilter: result.hasFilter,
+            totalRows: result.totalRows,
+            visibleCount: result.visibleCount,
+            hiddenCount: result.hiddenCount
+        });
     } catch (e) {
         console.error("getFilterStatus error:", e);
     }
@@ -996,7 +1060,7 @@ function getFilterStatus(endRow, getColumnCounts) {
     return result;
 }
 
-// ========== 获取指定范围内各列的唯一值计数（用于模拟筛选下拉菜单）==========
+// ========== 获取指定范围内各列的唯一值计数（==========
 // @param {object} ws - 工作表对象
 // @param {number} endRow - 结束行号
 // @returns {object} - {colIndex: {value: count, ...}, ...}
