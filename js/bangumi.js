@@ -571,12 +571,18 @@ function bgmRequestSync(method, endpoint, body, token) {
     try {
         xhr.send(body);
         let statusCode = xhr.status;
-        // 200, 201, 202, 204 都视为成功
-        if (statusCode === 204 || statusCode === 200 || statusCode === 201 || statusCode === 202) {
+        let responseText = xhr.responseText;
+        
+        // 204 No Content 不返回 body
+        if (statusCode === 204) {
             return { code: statusCode, message: "OK" };
-        } else {
-            return { code: statusCode, message: xhr.responseText };
         }
+        // 其他成功状态码都返回响应内容
+        if (statusCode === 200 || statusCode === 201 || statusCode === 202) {
+            return { code: statusCode, message: responseText };
+        }
+        // 失败情况
+        return { code: statusCode, message: responseText || "Error" };
     } catch (err) {
         return { code: 0, message: "Error: " + err.message };
     }

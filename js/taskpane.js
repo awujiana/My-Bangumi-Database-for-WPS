@@ -56,7 +56,14 @@ window.onload = () => {
     // 绑定工作表选择事件
     let sheetSelect = document.getElementById("sheetSelect");
     if (sheetSelect) {
-        sheetSelect.onchange = () => refreshData();
+        sheetSelect.onchange = () => {
+            let selectedText = sheetSelect.options[sheetSelect.selectedIndex]?.textContent || "";
+            if (selectedText === "同步记录") {
+                refreshSyncRecordsPreview();
+            } else {
+                refreshData();
+            }
+        };
     }
 
     // 对话框回车确认
@@ -821,7 +828,7 @@ function uploadSingleRow(rowNum, btnElement) {
     if (btnElement) {
         btnElement.disabled = true;
         btnElement.classList.add('uploading');
-        btnElement.textContent = '验证中...';
+        btnElement.textContent = '上传中...';
     }
 
     try {
@@ -875,75 +882,43 @@ function uploadSingleRow(rowNum, btnElement) {
         let seqCell = getCell(ws, rowNum, seqCol);
 
         if (statusCode === 204 || statusCode === 200 || statusCode === 201 || statusCode === 202) {
-            // 上传成功，现在验证
+            // 上传成功：标记为绿色
+            if (seqCell && seqCell.Interior) {
+                seqCell.Interior.Color = 0x50D050;
+            }
+            
+            // 更新按钮显示
             if (btnElement) {
-                btnElement.textContent = '验证中...';
+                btnElement.classList.remove('uploading');
+                btnElement.classList.add('success');
+                btnElement.textContent = '✓ 已上传';
+                btnElement.disabled = false;
             }
 
-            // 调用 API 获取收藏信息验证
-            let verifyResult = verifyUpload(sid, jsonBody, token);
-            
-            if (verifyResult.success) {
-                // 验证成功：标记为绿色
-                if (seqCell && seqCell.Interior) {
-                    seqCell.Interior.Color = 0x50D050; // #92d050
-                }
-                
-                // 更新按钮显示
-                if (btnElement) {
-                    btnElement.classList.remove('uploading');
-                    btnElement.classList.add('success');
-                    btnElement.textContent = '✓ 已上传';
-                    btnElement.disabled = false;
-                }
-
-                // 更新详情项样式
-                let detailItem = btnElement?.closest('.detail-item');
-                if (detailItem) {
-                    detailItem.classList.remove('pending');
-                    detailItem.classList.add('uploaded');
-                }
-
-                // 添加同步记录
-                addSyncRecord({
-                    name: name || "(无名称)",
-                    url: bgmUrl,
-                    sid: sid,
-                    content: jsonBody,
-                    status: "成功",
-                    message: "行 " + rowNum,
-                    count: 1
-                });
-
-                // 更新统计信息
-                updateUploadStats();
-            } else {
-                // 验证失败：标记为橙色警告
-                if (seqCell && seqCell.Interior) {
-                    seqCell.Interior.Color = 0xFFA500; // 橙色警告
-                }
-                
-                if (btnElement) {
-                    btnElement.classList.remove('uploading');
-                    btnElement.classList.add('error');
-                    btnElement.textContent = '⚠ 异常';
-                    btnElement.disabled = false;
-                }
-                
-                // 添加验证失败的同步记录
-                addSyncRecord({
-                    name: name || "(无名称)",
-                    url: bgmUrl,
-                    sid: sid,
-                    content: jsonBody,
-                    status: "验证异常",
-                    message: verifyResult.message || "验证失败",
-                    count: 1
-                });
-                
-                alert(`上传到 Bangumi 成功，但验证失败：\n${verifyResult.message}\n\n请手动检查 https://bgm.tv/subject/${sid}`);
+            // 更新详情项样式
+            let detailItem = btnElement?.closest('.detail-item');
+            if (detailItem) {
+                detailItem.classList.remove('pending');
+                detailItem.classList.add('uploaded');
             }
+
+            // 添加同步记录
+            let recordAdded = addSyncRecord({
+                name: name || "(无名称)",
+                url: bgmUrl,
+                sid: sid,
+                content: jsonBody,
+                status: "成功",
+                message: "行 " + rowNum,
+                count: 1
+            });
             
+            if (!recordAdded) {
+                console.warn("同步记录添加失败，请检查控制台日志");
+            }
+
+            // 更新统计信息
+            updateUploadStats();
         } else {
             // 上传失败：标记为红色
             if (seqCell && seqCell.Interior) {
@@ -1004,80 +979,195 @@ function updateUploadStats() {
     }
 }
 
-// ========== 验证上传结果 ==========
-function verifyUpload(sid, sentJsonBody, token) {
-    try {
-        // 调用 BGM API 获取该条目的收藏信息
-        let verifyResult = bgmRequestSync("GET", "/v0/users/-/collections/" + sid, null, token);
-        
-        if (verifyResult.code !== 200) {
-            return { success: false, message: `验证请求失败 (${verifyResult.code})` };
-        }
+// ========== 从BGM同步收藏标记 ==========
+function syncCollectionFromBgm() {
+    let select = document.getElementById("sheetSelect");
+    let sheetIndex = parseInt(select?.value) || 1;
 
-        // 解析返回的收藏数据
-        let collection;
-        try {
-            collection = JSON.parse(verifyResult.message);
-        } catch (e) {
-            return { success: false, message: "无法解析收藏数据" };
-        }
+    // 让用户选择获取方式
+    let method = prompt(
+        "请选择获取收藏列表的方式：\n\n" +
+        "1. 网页抓取（推荐）- 通过抓取 bgm.tv 页面获取，需要用户ID\n" +
+        "2. API方式 - 通过 Bangumi API 获取，需要 Access Token\n\n" +
+        "输入数字选择（1 或 2）：",
+        "1"
+    );
 
-        // 解析发送的数据
-        let sentData;
-        try {
-            sentData = JSON.parse(sentJsonBody);
-        } catch (e) {
-            return { success: false, message: "无法解析发送的数据" };
-        }
+    if (!method) return;
 
-        // 验证关键字段
-        let typeMatch = collection.type === sentData.type;
-        let rateMatch = collection.rate === sentData.rate;
-
-        // 构建验证详情
-        let details = [];
-        details.push(`类型: ${getTypeName(collection.type)} ${typeMatch ? '✓' : '✗'}`);
-        details.push(`评分: ${collection.rate || '(无)'} ${rateMatch ? '✓' : '✗'}`);
-        
-        if (sentData.ep_status !== undefined) {
-            details.push(`进度: ${collection.ep_status}/${sentData.ep_status}`);
-        }
-
-        if (!typeMatch || !rateMatch) {
-            return { 
-                success: false, 
-                message: details.join('\n'),
-                details: details
-            };
-        }
-
-        return { 
-            success: true, 
-            message: '验证通过',
-            collection: collection
-        };
-
-    } catch (e) {
-        return { success: false, message: "验证出错: " + e.message };
+    if (method.trim() === "1") {
+        // 网页抓取方式
+        syncFromBgmByScraping(sheetIndex);
+    } else if (method.trim() === "2") {
+        // API方式
+        syncFromBgmByAPI(sheetIndex);
+    } else {
+        alert("无效的选择，请输入 1 或 2");
     }
 }
 
-// 获取收藏类型名称
-function getTypeName(type) {
-    let names = {1: '想看', 2: '在看', 3: '看过', 4: '搁置', 5: '抛弃', 6: '未看'};
-    return names[type] || '未知(' + type + ')';
-}
-
-// ========== 从BGM同步收藏标记 ==========
-function syncCollectionFromBgm() {
-    let token = window.Application.PluginStorage.getItem("bgm_token");
-    if (!token) {
-        alert("请先设置 Bangumi Token！");
+// ========== 网页抓取方式同步 ==========
+function syncFromBgmByScraping(sheetIndex) {
+    let userId = window.Application.PluginStorage.getItem("bgm_user_id");
+    if (!userId) {
+        alert("请先设置 Bangumi 用户ID！\n\n用户ID获取方式：\n打开你的 Bangumi 主页，URL 中的数字即为用户ID\n例如：https://bgm.tv/user/972358 → 用户ID: 972358");
+        showUserIdDialog();
         return;
     }
 
-    let select = document.getElementById("sheetSelect");
-    let sheetIndex = parseInt(select?.value) || 1;
+    // 让用户选择获取哪些类型的收藏
+    let typeChoice = prompt(
+        "请选择获取哪种收藏：\n\n" +
+        "1. 已看 (collect) - 已看完的番剧\n" +
+        "2. 想看 (wish) - 想看但还没看的\n" +
+        "3. 在看 (do) - 正在追的番剧\n" +
+        "4. 获取所有类型（推荐）\n\n" +
+        "输入数字选择（1、2、3 或 4）：",
+        "4"
+    );
+
+    if (!typeChoice) return;
+    typeChoice = typeChoice.trim();
+
+    // 确定要获取的类型
+    let typesToFetch = [];
+    if (typeChoice === "1") {
+        typesToFetch = [{ type: "collect", name: "已看" }];
+    } else if (typeChoice === "2") {
+        typesToFetch = [{ type: "wish", name: "想看" }];
+    } else if (typeChoice === "3") {
+        typesToFetch = [{ type: "do", name: "在看" }];
+    } else if (typeChoice === "4") {
+        typesToFetch = [
+            { type: "collect", name: "已看" },
+            { type: "wish", name: "想看" },
+            { type: "do", name: "在看" }
+        ];
+    } else {
+        alert("无效的选择，请输入 1、2、3 或 4");
+        return;
+    }
+
+    // 确认操作
+    if (typesToFetch.length === 1) {
+        if (!confirm(`将抓取你的「${typesToFetch[0].name}」收藏列表并标记到 D 列。\n\n是否继续？`)) {
+            return;
+        }
+    } else {
+        if (!confirm(`将抓取你的所有收藏列表（已看、想看、在看）并标记到 D 列。\n\n是否继续？`)) {
+            return;
+        }
+    }
+
+    setStatus("正在抓取收藏列表...", "loading");
+
+    try {
+        let sheets = window.Application.ActiveWorkbook.Sheets;
+        let ws = sheets.Item(sheetIndex);
+
+        // 获取表头行和列映射
+        let headerRow = findHeaderRow(ws);
+        if (headerRow === 0) headerRow = 1;
+
+        let colMap = getColumnMap(ws, headerRow);
+        if (!colMap.has("Bangumi_URL")) {
+            alert("未找到 Bangumi URL 列！");
+            setStatus("未找到 URL 列", "error");
+            return;
+        }
+
+        // 获取数据范围
+        let lastRowCell = getCell(ws, ws.Rows.Count, 1);
+        let lastRow = lastRowCell.End(-4162).Row;
+        let dataStartRow = headerRow + 1;
+        let seqCol = 4; // D列
+
+        // 获取所有类型的收藏
+        setStatus("正在抓取收藏列表（分页中）...", "loading");
+        let allCollections = {};
+
+        for (let i = 0; i < typesToFetch.length; i++) {
+            let typeInfo = typesToFetch[i];
+            setStatus(`正在抓取「${typeInfo.name}」列表（${i + 1}/${typesToFetch.length}）...`, "loading");
+            let collections = fetchAllUserCollectionsByScraping(userId, typeInfo.type);
+            allCollections[typeInfo.type] = collections;
+            console.log(`[同步] 获取到「${typeInfo.name}」收藏 ${collections.length} 条`);
+        }
+
+        // 合并所有收藏
+        let userCollections = [];
+        for (let type in allCollections) {
+            userCollections = userCollections.concat(allCollections[type]);
+        }
+
+        if (userCollections.length === 0) {
+            alert(`📭 未获取到任何收藏\n\n可能原因：\n1. 你还没有收藏任何动画\n2. 页面加载失败\n\n请检查用户ID是否正确：${userId}`);
+            setStatus("无收藏数据", "info");
+            return;
+        }
+
+        setStatus(`正在匹配 ${userCollections.length} 条收藏...`, "loading");
+
+        // 构建收藏映射：subject_id -> collection info
+        let collectionMap = new Map();
+        for (let i = 0; i < userCollections.length; i++) {
+            let item = userCollections[i];
+            collectionMap.set(item.sid, item);
+        }
+
+        // 颜色定义
+        let COLOR_PURPLE = 0x7030A0;     // #7030a0 - 从BGM同步
+
+        // 遍历 Excel 数据并标记
+        let matchedCount = 0;
+        let totalCount = 0;
+
+        for (let row = dataStartRow; row <= lastRow; row++) {
+            let bgmUrlCell = getCell(ws, row, colMap.get("Bangumi_URL"));
+            let bgmUrl = bgmUrlCell ? trim(String(bgmUrlCell.Value() || "")) : "";
+            let sid = extractSubjectId(bgmUrl);
+
+            if (sid && collectionMap.has(sid)) {
+                let seqCell = getCell(ws, row, seqCol);
+                if (seqCell && seqCell.Interior) {
+                    // 网页抓取方式：紫色
+                    seqCell.Interior.Color = COLOR_PURPLE;
+                }
+                matchedCount++;
+            }
+            totalCount++;
+
+            // 每100行更新一次状态
+            if (row % 100 === 0) {
+                setStatus(`已处理 ${row}/${lastRow} 行...`, "loading");
+            }
+        }
+
+        setStatus("就绪", "success");
+
+        // 构建类型统计
+        let typeStats = [];
+        for (let type in allCollections) {
+            typeStats.push(`「${typesToFetch.find(t => t.type === type)?.name || type}」${allCollections[type].length}条`);
+        }
+        let statsText = typeStats.join("、");
+
+        alert(`同步完成！\n\n共处理 ${totalCount} 行数据\n匹配到 ${matchedCount} 条收藏\n\n匹配详情：${statsText}\n\n🟣 紫色 - 从BGM同步（网页抓取）`);
+
+    } catch (e) {
+        alert("同步失败: " + e.message);
+        setStatus("同步失败", "error");
+    }
+}
+
+// ========== API方式同步（原有功能）==========
+function syncFromBgmByAPI(sheetIndex) {
+    let token = window.Application.PluginStorage.getItem("bgm_token");
+    if (!token) {
+        alert("请先设置 Bangumi Token！");
+        showTokenDialog("");
+        return;
+    }
 
     // 确认操作
     if (!confirm("将从 BGM API 获取你的收藏列表，并在 D 列标记已收藏的条目。\n\n是否继续？")) {
@@ -1111,9 +1201,23 @@ function syncCollectionFromBgm() {
         setStatus("正在获取收藏列表（分页中）...", "loading");
         let userCollections = fetchAllUserCollections(token);
 
-        if (userCollections.length === 0) {
-            alert("未能获取到收藏列表，请检查 Token 是否正确。");
+        // 检查是否有错误
+        if (fetchAllUserCollections.lastError) {
+            let err = fetchAllUserCollections.lastError;
+            if (err.type === "auth") {
+                alert("❌ Token 无效或已过期\n\n请重新设置 Token：\n1. 点击「设置/修改」按钮\n2. 输入新的 Access Token\n\n获取 Token: https://next.bgm.tv/demo/access-token/create");
+            } else if (err.type === "forbidden") {
+                alert("❌ 没有权限访问收藏列表\n\n请确保 Token 具有正确的权限。");
+            } else {
+                alert(`❌ 获取收藏列表失败\n\n错误: ${err.message}`);
+            }
             setStatus("获取收藏失败", "error");
+            return;
+        }
+
+        if (userCollections.length === 0) {
+            alert("📭 未获取到「${listName}」收藏\n\n可能原因：\n1. 你还没有${listName}任何动画\n2. 页面加载失败\n\n请检查用户ID是否正确：${userId}");
+            setStatus("无收藏数据", "info");
             return;
         }
 
@@ -1193,13 +1297,191 @@ function syncCollectionFromBgm() {
     }
 }
 
-// ========== 获取用户所有收藏（分页）==========
+// ========== 获取用户所有收藏（分页 - 网页抓取方式）==========
+// 参考 BangumiBatchImport.js 实现
+function fetchAllUserCollectionsByScraping(userId, listType) {
+    /**
+     * @param userId - Bangumi用户ID
+     * @param listType - 收藏类型: "collect"(已看), "wish"(想看), "do"(在看)
+     * @returns {Array} - 收藏条目数组
+     */
+    let allItems = [];
+    let currentPage = 1;
+    let hasNextPage = true;
+    const maxPages = 100; // 最多获取100页，防止无限循环
+    const baseUrl = `https://bgm.tv/anime/list/${userId}/${listType}`;
+    
+    // 统一的请求头（模拟浏览器）
+    const headers = {
+        "Content-Type": "text/html; charset=utf-8",
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+        "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8",
+    };
+
+    console.log(`[网页抓取] 开始获取收藏列表: ${baseUrl}`);
+
+    try {
+        while (hasNextPage && currentPage <= maxPages) {
+            console.log(`[网页抓取] 获取第 ${currentPage} 页...`);
+            
+            const pageUrl = currentPage === 1 ? baseUrl : `${baseUrl}?page=${currentPage}`;
+            
+            // 同步请求获取HTML
+            let xhr = new XMLHttpRequest();
+            xhr.open("GET", pageUrl, false); // 同步请求
+            for (let key in headers) {
+                xhr.setRequestHeader(key, headers[key]);
+            }
+            xhr.send();
+
+            console.log(`[网页抓取] 第 ${currentPage} 页 - 状态码: ${xhr.status}`);
+
+            if (xhr.status !== 200) {
+                console.log(`[网页抓取] 第 ${currentPage} 页请求失败: ${xhr.status}`);
+                break;
+            }
+
+            // 解析HTML
+            let doc = parseHTMLToDOM(xhr.responseText);
+            if (!doc) {
+                console.log(`[网页抓取] 第 ${currentPage} 页 HTML 解析失败`);
+                break;
+            }
+
+            // 解析当前页的条目
+            let pageItems = parseCollectionPageHTML(doc);
+            console.log(`[网页抓取] 第 ${currentPage} 页找到 ${pageItems.length} 个条目`);
+            
+            allItems.push(...pageItems);
+
+            // 检查是否有下一页
+            hasNextPage = hasNextPageLink(doc, currentPage);
+
+            if (hasNextPage) {
+                currentPage++;
+                // 延迟1秒，避免请求过快
+                sleep(1000);
+            } else {
+                console.log(`[网页抓取] 已获取所有页面，共 ${currentPage} 页，${allItems.length} 个条目`);
+                break;
+            }
+        }
+    } catch (e) {
+        console.error("[网页抓取] 获取收藏列表出错:", e);
+    }
+
+    return allItems;
+}
+
+// ========== HTML解析为DOM ==========
+function parseHTMLToDOM(html) {
+    if (!html) return null;
+    try {
+        let parser = new DOMParser();
+        return parser.parseFromString(html, "text/html");
+    } catch (e) {
+        console.error("HTML解析失败:", e);
+        return null;
+    }
+}
+
+// ========== 解析收藏页面HTML ==========
+function parseCollectionPageHTML(doc) {
+    let items = [];
+    try {
+        // Bangumi列表页的CSS选择器
+        let entries = doc.querySelectorAll('ul#browserItemList > li.item');
+        console.log(`[解析] 找到 ${entries.length} 个条目`);
+        
+        for (let entry of entries) {
+            try {
+                // 提取中文名
+                let titleLink = entry.querySelector('h3 > a.l');
+                let title_cn = titleLink ? titleLink.textContent.trim() : '';
+                
+                // 提取日文名
+                let titleJpElem = entry.querySelector('h3 > small.grey');
+                let title_jp = titleJpElem ? titleJpElem.textContent.trim() : '';
+                
+                // 提取详情页链接，获取 subject_id
+                let linkElem = titleLink || entry.querySelector('a.subjectCover');
+                let link = linkElem ? linkElem.getAttribute('href') || '' : '';
+                let sid = '';
+                
+                // 从链接中提取 subject_id
+                let sidMatch = link.match(/\/subject\/(\d+)/);
+                if (sidMatch) {
+                    sid = sidMatch[1];
+                }
+                
+                // 提取评分
+                let ratingElem = entry.querySelector('span.tip_j');
+                let rating = ratingElem ? ratingElem.textContent.trim() : '';
+                
+                // 提取基本信息（收藏日期、标签等）
+                let infoElem = entry.querySelector('p.info.tip');
+                let basic_info = infoElem ? infoElem.textContent.trim() : '';
+                
+                // 提取观看状态图标（如果有）
+                let statusElem = entry.querySelector('div.progress');
+                let progress = statusElem ? statusElem.textContent.trim() : '';
+                
+                if (sid) {
+                    items.push({
+                        sid: sid,
+                        title_cn: title_cn,
+                        title_jp: title_jp,
+                        link: 'https://bgm.tv/subject/' + sid,
+                        rating: rating,
+                        basic_info: basic_info,
+                        progress: progress
+                    });
+                }
+            } catch (e) {
+                // 忽略单个条目解析错误
+            }
+        }
+    } catch (e) {
+        console.error("[解析] 解析收藏页面失败:", e);
+    }
+    
+    return items;
+}
+
+// ========== 检查是否有下一页 ==========
+function hasNextPageLink(doc, currentPage) {
+    try {
+        // 检查分页区域
+        let pagination = doc.querySelector('div#multipage');
+        if (!pagination) {
+            return false;
+        }
+        
+        // 查找下一页链接
+        let nextLinks = pagination.querySelectorAll('a.p');
+        for (let link of nextLinks) {
+            let href = link.getAttribute('href') || '';
+            let pageMatch = href.match(/page=(\d+)/);
+            if (pageMatch && parseInt(pageMatch[1]) > currentPage) {
+                return true;
+            }
+        }
+    } catch (e) {
+        console.error("[分页] 检查下一页失败:", e);
+    }
+    
+    return false;
+}
+
+// ========== 获取用户所有收藏（分页 - API方式，原有）==========
 function fetchAllUserCollections(token) {
     let allCollections = [];
     let page = 1;
     let limit = 100;
     let maxPages = 50; // 最多获取5000条，防止无限循环
     let subjectType = 2; // 动画
+    let lastError = null;
 
     try {
         while (page <= maxPages) {
@@ -1212,7 +1494,27 @@ function fetchAllUserCollections(token) {
 
             xhr.send();
 
+            console.log(`获取收藏第 ${page} 页 - 状态码: ${xhr.status}`);
+            console.log(`响应内容: ${xhr.responseText.substring(0, 200)}...`);
+
+            if (xhr.status === 401) {
+                lastError = { type: "auth", message: "Token 无效或已过期，请重新设置 Token" };
+                break;
+            }
+
+            if (xhr.status === 403) {
+                lastError = { type: "forbidden", message: "没有权限访问收藏列表，请检查 Token 权限" };
+                break;
+            }
+
+            if (xhr.status === 404) {
+                // 404 可能表示用户没有任何该类型的收藏，不是错误
+                console.log("该类型收藏不存在或为空");
+                break;
+            }
+
             if (xhr.status !== 200) {
+                lastError = { type: "http", code: xhr.status, message: `HTTP 错误: ${xhr.status}` };
                 console.log(`获取收藏第 ${page} 页失败: ${xhr.status}`);
                 break;
             }
@@ -1221,11 +1523,19 @@ function fetchAllUserCollections(token) {
             try {
                 data = JSON.parse(xhr.responseText);
             } catch (e) {
+                lastError = { type: "parse", message: "响应数据格式错误" };
                 console.log("解析收藏数据失败");
                 break;
             }
 
-            if (!Array.isArray(data) || data.length === 0) {
+            if (!Array.isArray(data)) {
+                lastError = { type: "format", message: "响应数据不是数组格式" };
+                console.log("响应数据不是数组格式");
+                break;
+            }
+
+            if (data.length === 0) {
+                // 空数组，可能用户确实没有该类型收藏
                 break;
             }
 
@@ -1242,10 +1552,17 @@ function fetchAllUserCollections(token) {
             page++;
         }
     } catch (e) {
+        lastError = { type: "exception", message: e.message };
         console.error("获取收藏列表出错:", e);
     }
 
     console.log(`共获取 ${allCollections.length} 条收藏记录`);
+
+    // 保存错误信息供外部访问
+    if (lastError) {
+        fetchAllUserCollections.lastError = lastError;
+    }
+
     return allCollections;
 }
 
@@ -1451,18 +1768,9 @@ function syncFromPanel() {
             let statusCode = result.code;
 
             if (statusCode === 204 || statusCode === 200 || statusCode === 201 || statusCode === 202) {
-                // 验证上传结果：调用 BGM API 查看收藏状态
-                let verifyResult = verifyUpload(subjectId, jsonBody, token);
-                
-                if (verifyResult.success) {
-                    successCount++;
-                    if (bgmUrlCell) bgmUrlCell.Interior.Color = 0xCCFFCC; // 浅绿
-                } else {
-                    // API返回成功但验证失败，标记为警告色
-                    successCount++;
-                    if (bgmUrlCell) bgmUrlCell.Interior.Color = 0xFFA500; // 橙色警告
-                    console.log("行 " + i + " 验证警告: " + verifyResult.message);
-                }
+                // 上传成功
+                successCount++;
+                if (bgmUrlCell) bgmUrlCell.Interior.Color = 0xCCFFCC; // 浅绿
                 
                 // 添加同步记录
                 addSyncRecord({
@@ -1470,8 +1778,8 @@ function syncFromPanel() {
                     url: bgmUrl,
                     sid: subjectId,
                     content: jsonBody,
-                    status: verifyResult.success ? "成功" : "验证异常",
-                    message: verifyResult.message || "行 " + i,
+                    status: "成功",
+                    message: "行 " + i,
                     count: 1
                 });
             } else {
@@ -1584,8 +1892,16 @@ function openUserCollection() {
         showUserIdDialog();
         return;
     }
-    let url = "https://bgm.tv/anime/list/" + userId + "/wish";
-    window.open(url, "_blank");
+    let url = "https://bgm.tv/anime/list/" + userId + "/collect";
+    try {
+        if (window.Application && window.Application.OAAssist) {
+            window.Application.OAAssist.ShellExecute(url);
+        } else {
+            window.open(url, "_blank");
+        }
+    } catch (e) {
+        window.open(url, "_blank");
+    }
 }
 
 // ========== Token 设置对话框（TaskPane 版本，使用自定义 UI）==========

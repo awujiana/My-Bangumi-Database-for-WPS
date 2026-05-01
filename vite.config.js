@@ -26,7 +26,7 @@ export default defineConfig({
     },
     server: {
         host: '0.0.0.0',
-        port: 5173,
+        port: 3891,
         // 调试通知功能：/debugTemp/NotifyDemoUrl 路由
         setup(devServer) {
             devServer.middlewares.use('/.debugTemp/NotifyDemoUrl', (req, res) => {
