@@ -2,6 +2,7 @@
 <html>
 <head><meta charset="utf-8"></head>
 <script type="text/javascript" src="../js/util.js"></script>
+<script type="text/javascript" src="../js/syncRecord.js"></script>
 <script type="text/javascript" src="../js/bangumi.js"></script>
 <script type="text/javascript" src="../js/taskpane.js"></script>
 <script type="text/javascript" src="../.debugTemp/wpsjsrpcsdk.js"></script>
@@ -66,6 +67,14 @@
                 <button class="btn" onclick="onAction('test')">🧪 测试同步</button>
                 <button class="btn warning" onclick="onAction('clear')">🗑️ 清除标记</button>
             </div>
+            <div class="btn-group" style="margin-top:8px;">
+                <button class="btn success" onclick="syncCollectionFromBgm()">📥 从BGM同步收藏</button>
+                <button class="btn" onclick="onAction('preview')">👁️ 预览同步</button>
+            </div>
+            <p class="hint" style="margin-top:8px;">
+                📥 从BGM同步：获取你在Bangumi的收藏列表并标记到D列<br>
+                支持：collect(已看)、wish(想看)、do(在看)
+            </p>
         </div>
 
         <!-- Token 设置 -->
@@ -88,6 +97,24 @@
                 <button class="btn small primary" id="openCollectionBtn" onclick="openUserCollection()">打开收藏页</button>
             </div>
             <p class="hint">用户ID：Bangumi主页URL中的数字/字母</p>
+        </div>
+
+        <!-- 收藏列表类型选择 -->
+        <div class="section">
+            <h3>收藏列表类型</h3>
+            <div class="form-group">
+                <label>获取哪种收藏：</label>
+                <select id="listTypeSelect" class="input">
+                    <option value="collect">已看（collect）</option>
+                    <option value="wish">想看（wish）</option>
+                    <option value="do">在看（do）</option>
+                </select>
+            </div>
+            <p class="hint">
+                collect - 已看完的番剧<br>
+                wish - 想看但还没看的<br>
+                do - 正在追的番剧
+            </p>
         </div>
 
         <!-- 数据选择 -->
