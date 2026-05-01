@@ -10,9 +10,9 @@
     <div id="inputDialog" class="modal" style="display:none;">
         <div class="modal-content">
             <h3 id="dialogTitle">输入</h3>
-            <p id="dialogMessage" style="margin-bottom:15px;color:#555;"></p>
+            <p id="dialogMessage" style="margin-bottom:15px;"></p>
             <input type="text" id="dialogInput" class="input" style="width:100%;margin-bottom:15px;">
-            <div style="text-align:right;">
+            <div class="dialog-buttons">
                 <button class="btn" onclick="closeDialog(false)">取消</button>
                 <button class="btn primary" onclick="closeDialog(true)">确定</button>
             </div>
@@ -23,20 +23,32 @@
         position: fixed;
         top: 0; left: 0;
         width: 100%; height: 100%;
-        background: rgba(0,0,0,0.5);
+        background: rgba(0,0,0,0.7);
         z-index: 1000;
         display: flex;
         align-items: center;
         justify-content: center;
     }
     .modal-content {
-        background: white;
+        background: #2d2d2d;
         padding: 25px;
-        border-radius: 8px;
-        width: 350px;
-        box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+        border-radius: 12px;
+        width: 380px;
+        box-shadow: 0 8px 32px rgba(0,0,0,0.5);
     }
-    .modal-content h3 { margin: 0 0 10px 0; color: #2c3e50; }
+    .modal-content h3 { 
+        margin: 0 0 15px 0; 
+        color: #ffffff;
+        font-size: 18px;
+    }
+    #dialogMessage {
+        color: #b0b0b0;
+    }
+    .dialog-buttons {
+        display: flex;
+        justify-content: flex-end;
+        gap: 10px;
+    }
     </style>
 
     <div class="global">
@@ -143,6 +155,23 @@
         <button class="btn" id="previewBtn" onclick="previewSyncContent()">
             <span class="btn-icon">🔍</span> 详细预览同步内容
         </button>
+        <button class="btn" id="syncCollectionBtn" onclick="syncCollectionFromBgm()">
+            <span class="btn-icon">☁️</span> 从BGM同步收藏标记
+        </button>
+    </div>
+
+    <!-- 同步记录 -->
+    <div class="section">
+        <h3>📋 同步记录</h3>
+        <div class="btn-group">
+            <button class="btn" id="viewRecordsBtn" onclick="openSyncRecordSheet()">
+                <span class="btn-icon">📋</span> 查看同步记录
+            </button>
+            <button class="btn warning" id="clearRecordsBtn" onclick="clearSyncRecords()">
+                <span class="btn-icon">🗑️</span> 清除同步记录
+            </button>
+        </div>
+        <p class="hint">同步记录会保存在"同步记录"工作表中，包含：名称、URL、同步时间、同步次数、同步内容</p>
     </div>
 
         <!-- 使用引导 -->
@@ -807,6 +836,52 @@
     .detail-item:hover {
         box-shadow: 0 4px 15px rgba(0,0,0,0.3);
         transform: translateY(-2px);
+    }
+    .detail-item.uploaded {
+        border-left: 4px solid #92d050;
+    }
+    .detail-item.pending {
+        border-left: 4px solid #f59e0b;
+    }
+    .upload-single-btn {
+        padding: 6px 14px;
+        background: #3b82f6;
+        color: #fff;
+        border: none;
+        border-radius: 6px;
+        font-size: 12px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+    .upload-single-btn:hover {
+        background: #2563eb;
+        transform: scale(1.05);
+    }
+    .upload-single-btn:disabled {
+        background: #6b7280;
+        cursor: not-allowed;
+        transform: none;
+    }
+    .upload-single-btn.uploading {
+        background: #f59e0b;
+    }
+    .upload-single-btn.success {
+        background: #22c55e;
+    }
+    .upload-single-btn.error {
+        background: #ef4444;
+    }
+    .uploaded-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        padding: 4px 10px;
+        background: #22a84d;
+        color: #fff;
+        border-radius: 4px;
+        font-size: 11px;
+        font-weight: 600;
     }
     .detail-item-header {
         display: flex;
