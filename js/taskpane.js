@@ -57,8 +57,36 @@ window.onload = () => {
     let sheetSelect = document.getElementById("sheetSelect");
     if (sheetSelect) {
         sheetSelect.onchange = () => {
+            let selectedValue = sheetSelect.value;
             let selectedText = sheetSelect.options[sheetSelect.selectedIndex]?.textContent || "";
-            if (selectedText === "同步记录") {
+            
+            if (selectedValue && selectedText !== "-- 请选择 --") {
+                // 锁定选择的工作表
+                window.lockedSheetIndex = parseInt(selectedValue);
+                window.lockedSheetName = selectedText;
+                window.isSheetLocked = true;
+                
+                // 保存到缓存
+                window.Application.PluginStorage.setItem("bgm_sheet_index", selectedValue);
+                window.Application.PluginStorage.setItem("bgm_sheet_name", selectedText);
+                
+                // 更新锁定按钮状态
+                let lockBtn = document.getElementById("lockSheetBtn");
+                let lockStatus = document.getElementById("lockStatus");
+                if (lockBtn) {
+                    lockBtn.textContent = "🔓 解锁";
+                    lockBtn.classList.add("primary");
+                }
+                if (lockStatus) {
+                    lockStatus.style.display = "inline-flex";
+                lockStatus.textContent = "🔒 " + window.lockedSheetName;
+                lockStatus.className = "lock-status locked";
+            }
+            
+            console.log("已锁定工作表:", window.lockedSheetName, "索引:", window.lockedSheetIndex);
+        }
+        
+        if (selectedText === "同步记录") {
                 refreshSyncRecordsPreview();
             } else {
                 refreshData();
@@ -195,6 +223,54 @@ function updateUserIdStatus() {
     }
 }
 
+// ========== 锁定的数据工作表（全局变量，taskpane 和 bangumi 共享）==========
+window.lockedSheetIndex = null;
+window.lockedSheetName = null;
+window.isSheetLocked = false;
+
+// ========== 切换工作表锁定状态 ==========
+function toggleSheetLock() {
+    let select = document.getElementById("sheetSelect");
+    let lockBtn = document.getElementById("lockSheetBtn");
+    let lockStatus = document.getElementById("lockStatus");
+    
+    if (!select || !lockBtn || !lockStatus) return;
+    
+    if (!window.isSheetLocked) {
+        // 锁定
+        let selectedValue = select.value;
+        let selectedText = select.options[select.selectedIndex]?.textContent || "";
+        
+        if (!selectedValue || selectedText === "-- 请选择 --") {
+            alert("请先选择一个工作表！");
+            return;
+        }
+        
+        window.lockedSheetIndex = parseInt(selectedValue);
+        window.lockedSheetName = selectedText;
+        window.isSheetLocked = true;
+        
+        lockBtn.textContent = "🔓 解锁";
+        lockBtn.classList.add("primary");
+        lockStatus.style.display = "inline-flex";
+        lockStatus.textContent = "🔒 " + window.lockedSheetName;
+        lockStatus.className = "lock-status locked";
+        
+        console.log("已锁定工作表:", window.lockedSheetName, "索引:", window.lockedSheetIndex);
+    } else {
+        // 解锁
+        window.lockedSheetIndex = null;
+        window.lockedSheetName = null;
+        window.isSheetLocked = false;
+        
+        lockBtn.textContent = "🔒 锁定";
+        lockBtn.classList.remove("primary");
+        lockStatus.style.display = "none";
+        
+        console.log("已解锁工作表");
+    }
+}
+
 // ========== 刷新工作表列表 ==========
 function refreshSheets() {
     let select = document.getElementById("sheetSelect");
@@ -245,13 +321,46 @@ function refreshSheets() {
             select.appendChild(option);
         }
 
-        // 默认选择活动工作表
-        let activeSheet = app.ActiveSheet;
-        if (activeSheet) {
+        // 尝试从缓存恢复工作表选择
+        let cachedSheetIndex = window.Application.PluginStorage.getItem("bgm_sheet_index");
+        let cachedSheetName = window.Application.PluginStorage.getItem("bgm_sheet_name");
+        
+        if (cachedSheetIndex) {
+            // 先尝试按索引匹配
             for (let i = 0; i < select.options.length; i++) {
-                if (select.options[i].textContent === activeSheet.Name) {
+                if (select.options[i].value === cachedSheetIndex) {
                     select.selectedIndex = i;
+                    
+                    // 恢复全局变量
+                    window.lockedSheetIndex = parseInt(cachedSheetIndex);
+                    window.lockedSheetName = cachedSheetName || select.options[i].textContent;
+                    window.isSheetLocked = true;
+                    
+                    // 更新锁定按钮状态
+                    let lockBtn = document.getElementById("lockSheetBtn");
+                    let lockStatus = document.getElementById("lockStatus");
+                    if (lockBtn) {
+                        lockBtn.textContent = "🔓 解锁";
+                        lockBtn.classList.add("primary");
+                    }
+                    if (lockStatus) {
+                        lockStatus.style.display = "inline-flex";
+                        lockStatus.textContent = "🔒 " + window.lockedSheetName;
+                        lockStatus.className = "lock-status locked";
+                    }
+                    
                     break;
+                }
+            }
+        } else {
+            // 默认选择活动工作表
+            let activeSheet = app.ActiveSheet;
+            if (activeSheet) {
+                for (let i = 0; i < select.options.length; i++) {
+                    if (select.options[i].textContent === activeSheet.Name) {
+                        select.selectedIndex = i;
+                        break;
+                    }
                 }
             }
         }
@@ -288,6 +397,83 @@ function getFilterStatusLocal(endRow, getColumnCounts) {
     };
 }
 
+// ========== 预览同步记录 ==========
+function refreshSyncRecordsPreview() {
+    let previewBox = document.getElementById("previewBox");
+    if (!previewBox) return;
+    
+    let records = getAllSyncRecords();
+    
+    if (records.length === 0) {
+        previewBox.innerHTML = '<div style="padding:20px;text-align:center;color:#888;">暂无同步记录</div>';
+        return;
+    }
+    
+    let html = '<table><thead><tr>';
+    html += '<th>序号</th><th>时间</th><th>名称</th><th>SID</th><th>状态</th><th>备注</th><th>操作</th>';
+    html += '</tr></thead><tbody>';
+    
+    // 只显示前20条
+    let displayCount = Math.min(20, records.length);
+    for (let i = 0; i < displayCount; i++) {
+        let record = records[i];
+        let statusClass = record.status === "成功" ? "success" : "error";
+        let statusBadge = `<span class="status-badge ${statusClass}">${record.status || ""}</span>`;
+        
+        html += `<tr>
+            <td>${record.seq || ""}</td>
+            <td>${record.time || ""}</td>
+            <td><a href="#" onclick="event.preventDefault();openSyncDetail('${record.sid}');">${record.name || ""}</a></td>
+            <td>${record.sid || ""}</td>
+            <td>${statusBadge}</td>
+            <td style="max-width:150px;overflow:hidden;text-overflow:ellipsis;">${record.message || ""}</td>
+            <td><button class="btn-small" onclick="viewSyncRecordDetail('${record.sid}')">详情</button></td>
+        </tr>`;
+    }
+    
+    html += '</tbody></table>';
+    
+    if (records.length > displayCount) {
+        html += `<div style="padding:10px;text-align:center;color:#888;">共 ${records.length} 条记录，显示前 ${displayCount} 条</div>`;
+    }
+    
+    previewBox.innerHTML = html;
+}
+
+// ========== 查看同步记录详情 ==========
+function viewSyncRecordDetail(sid) {
+    let records = getAllSyncRecords();
+    let record = records.find(r => String(r.sid) === String(sid));
+    
+    if (!record) {
+        alert("未找到该同步记录");
+        return;
+    }
+    
+    let content = record.content || "";
+    let formattedContent = content;
+    try {
+        formattedContent = JSON.stringify(JSON.parse(content), null, 2);
+    } catch (e) {}
+    
+    let detail = `
+同步记录详情
+
+名称: ${record.name || ""}
+SID: ${record.sid || ""}
+URL: ${record.url || ""}
+时间: ${record.time || ""}
+状态: ${record.status || ""}
+同步次数: ${record.count || ""}
+备注: ${record.message || ""}
+
+同步内容:
+${formattedContent}
+    `;
+    
+    alert(detail);
+}
+
 // ========== 刷新数据预览 ==========
 function refreshData() {
     // 检查必需函数是否已加载
@@ -308,7 +494,8 @@ function refreshData() {
 
     if (!select || !previewBox) return;
 
-    let sheetIndex = parseInt(select.value) || 1;
+    // 优先使用锁定的工作表，否则使用选择器的值
+    let sheetIndex = window.lockedSheetIndex || parseInt(select.value) || 1;
     let userEndRow = parseInt(endRowInput?.value) || 0;
 
     // 先获取工作表对象（提前定义，供筛选状态使用）
@@ -454,7 +641,7 @@ function refreshData() {
 
             // 解析状态
             let typeNum = mapWatchStatus(status, finishedDate);
-            let typeName = ["", "想看", "在看", "看过", "搁置", "抛弃"][typeNum] || "未知";
+            let typeName = ["", "想看", "看过", "在看", "搁置", "抛弃"][typeNum] || "未知";
             typeStats[typeNum]++;
 
             // 处理标签
@@ -551,7 +738,8 @@ function previewSyncContent() {
     let endRowInput = document.getElementById("endRow");
     let startRowInput = document.getElementById("startRow");
 
-    let sheetIndex = parseInt(select?.value) || 1;
+    // 优先使用锁定的工作表，否则使用选择器的值
+    let sheetIndex = window.lockedSheetIndex || parseInt(select?.value) || 1;
     let userEndRow = parseInt(endRowInput?.value) || 0;
     let selectMode = document.querySelector('input[name="selectMode"]:checked')?.value || 'auto';
 
@@ -688,7 +876,7 @@ function previewSyncContent() {
 
         for (let idx = 0; idx < allValidRows.length; idx++) {
             let rowData = allValidRows[idx];
-            let typeName = ["", "想看", "在看", "看过", "搁置", "抛弃"][rowData.typeNum];
+            let typeName = ["", "想看", "看过", "在看", "搁置", "抛弃"][rowData.typeNum];
 
             // 处理标签
             let tagSet = new Set();
@@ -709,9 +897,10 @@ function previewSyncContent() {
                             <span class="detail-item-name">${rowData.name || '(无名称)'}</span>
                         </div>
                         ${rowData.isUploaded ? 
-                            '<span class="uploaded-badge">✓ 已上传</span>' : 
+                            `<button class="upload-single-btn reupload" onclick="uploadSingleRow(${rowData.row}, this)">重新上传</button>` : 
                             `<button class="upload-single-btn" onclick="uploadSingleRow(${rowData.row}, this)">上传</button>`
                         }
+                        ${rowData.isUploaded ? '<span class="uploaded-badge">✓ 已上传</span>' : ''}
                     </div>
                     <div class="detail-item-body">
                         <div class="detail-row">
@@ -833,7 +1022,9 @@ function uploadSingleRow(rowNum, btnElement) {
 
     try {
         let sheets = window.Application.ActiveWorkbook.Sheets;
-        let ws = sheets.Item(parseInt(document.getElementById("sheetSelect")?.value) || 1);
+        // 优先使用锁定的工作表，否则使用选择器的值
+        let sheetIndex = window.lockedSheetIndex || parseInt(document.getElementById("sheetSelect")?.value) || 1;
+        let ws = sheets.Item(sheetIndex);
 
         // 获取表头行和数据列映射
         let headerRow = findHeaderRow(ws);
@@ -867,7 +1058,7 @@ function uploadSingleRow(rowNum, btnElement) {
             finishedDate = finishedDateCell ? trim(String(finishedDateCell.Value() || "")) : "";
         }
 
-        // 构建请求体
+        // 构建请求体（不包含 ep_status，让用户在 Bangumi 网站上手动标记章节进度）
         let jsonBody = buildJsonPayload(ws, rowNum, colMap, finishedDate);
         if (jsonBody === "") {
             throw new Error("无法构建请求体");
@@ -887,19 +1078,31 @@ function uploadSingleRow(rowNum, btnElement) {
                 seqCell.Interior.Color = 0x50D050;
             }
             
-            // 更新按钮显示
+            // 更新按钮显示（保持为重新上传按钮样式）
             if (btnElement) {
                 btnElement.classList.remove('uploading');
-                btnElement.classList.add('success');
-                btnElement.textContent = '✓ 已上传';
+                btnElement.classList.add('reupload');
+                btnElement.textContent = '重新上传';
                 btnElement.disabled = false;
             }
 
-            // 更新详情项样式
+            // 更新详情项样式和显示已上传标记
             let detailItem = btnElement?.closest('.detail-item');
             if (detailItem) {
                 detailItem.classList.remove('pending');
                 detailItem.classList.add('uploaded');
+                
+                // 添加或更新已上传标记
+                let existingBadge = detailItem.querySelector('.uploaded-badge');
+                if (!existingBadge) {
+                    let header = detailItem.querySelector('.detail-item-header');
+                    if (header) {
+                        let badge = document.createElement('span');
+                        badge.className = 'uploaded-badge';
+                        badge.textContent = '✓ 已上传';
+                        header.appendChild(badge);
+                    }
+                }
             }
 
             // 添加同步记录
@@ -982,7 +1185,8 @@ function updateUploadStats() {
 // ========== 从BGM同步收藏标记 ==========
 function syncCollectionFromBgm() {
     let select = document.getElementById("sheetSelect");
-    let sheetIndex = parseInt(select?.value) || 1;
+    // 优先使用锁定的工作表，否则使用选择器的值
+    let sheetIndex = window.lockedSheetIndex || parseInt(select?.value) || 1;
 
     // 让用户选择获取方式
     let method = prompt(
@@ -1644,11 +1848,16 @@ function onAction(action) {
 
 // ========== 从面板同步 ==========
 function syncFromPanel() {
+    console.log("syncFromPanel 开始执行");
+    
     // 检查必需函数是否已加载
     if (typeof findHeaderRow === 'undefined' || typeof getColumnMap === 'undefined' || typeof getLastRow === 'undefined') {
+        console.error("syncFromPanel - 必需函数未加载");
         alert("正在加载脚本，请稍后重试...");
         return;
     }
+    
+    console.log("syncFromPanel - 必需函数已加载，开始同步...");
 
     let token = window.Application.PluginStorage.getItem("bgm_token");
     if (!token) {
@@ -1661,7 +1870,8 @@ function syncFromPanel() {
     let endRowInput = document.getElementById("endRow");
     let startRowInput = document.getElementById("startRow");
 
-    let sheetIndex = parseInt(select.value) || 1;
+    // 优先使用锁定的工作表，否则使用选择器的值
+    let sheetIndex = window.lockedSheetIndex || parseInt(select.value) || 1;
     let userEndRow = parseInt(endRowInput?.value) || 0;
     let selectMode = document.querySelector('input[name="selectMode"]:checked')?.value || 'auto';
 
@@ -1772,8 +1982,9 @@ function syncFromPanel() {
                 successCount++;
                 if (bgmUrlCell) bgmUrlCell.Interior.Color = 0xCCFFCC; // 浅绿
                 
+                console.log("syncFromPanel - 上传成功，行 " + i + "，添加同步记录...");
                 // 添加同步记录
-                addSyncRecord({
+                let recordResult = addSyncRecord({
                     name: name || "(无名称)",
                     url: bgmUrl,
                     sid: subjectId,
@@ -1782,13 +1993,15 @@ function syncFromPanel() {
                     message: "行 " + i,
                     count: 1
                 });
+                console.log("syncFromPanel - addSyncRecord 结果:", recordResult);
             } else {
                 failCount++;
                 if (bgmUrlCell) bgmUrlCell.Interior.Color = 0xFFCCCC;
-                console.log("行 " + i + " 失败: " + result.message);
+                console.log("syncFromPanel - 行 " + i + " 失败: " + result.message);
                 
+                console.log("syncFromPanel - 上传失败，行 " + i + "，添加失败记录...");
                 // 添加失败记录
-                addSyncRecord({
+                let recordResult = addSyncRecord({
                     name: name || "(无名称)",
                     url: bgmUrl,
                     sid: subjectId,
@@ -1797,6 +2010,7 @@ function syncFromPanel() {
                     message: result.message || "HTTP " + statusCode,
                     count: 1
                 });
+                console.log("syncFromPanel - addSyncRecord 结果:", recordResult);
             }
 
             // 进度
@@ -1935,4 +2149,192 @@ function showUserIdDialog() {
             }
         }
     );
+}
+
+// ========== 从 BGM 获取收藏并写入同步记录表 ==========
+function fetchBgCollectionRecords() {
+    let token = window.Application.PluginStorage.getItem("bgm_token");
+    if (!token) {
+        alert("请先设置 Bangumi Token！\n\n需要 Token 才能访问你的收藏列表。");
+        showTokenDialog("");
+        return;
+    }
+    
+    // 让用户选择获取范围
+    let choice = prompt(
+        "请选择获取范围：\n\n" +
+        "1. 获取所有类型（约500条）\n" +
+        "   包含：动画、书籍、音乐、游戏、真人剧\n" +
+        "2. 只获取动画\n" +
+        "3. 自定义条数\n\n" +
+        "输入数字选择（1、2 或 3）：",
+        "1"
+    );
+    
+    if (!choice) return;
+    choice = choice.trim();
+    
+    let includeAllTypes = true;
+    let maxItems = 500;
+    
+    if (choice === "2") {
+        includeAllTypes = false;
+        maxItems = 500;
+    } else if (choice === "3") {
+        let customCount = prompt("请输入要获取的条数（建议不超过 500）：", "500");
+        if (!customCount) return;
+        maxItems = parseInt(customCount) || 500;
+        if (maxItems < 1) maxItems = 1;
+        if (maxItems > 1000) maxItems = 1000;
+        
+        let typeChoice = prompt(
+            "请选择获取类型：\n\n" +
+            "1. 获取所有类型\n" +
+            "2. 只获取动画\n\n" +
+            "输入数字选择：",
+            "1"
+        );
+        if (!typeChoice) return;
+        includeAllTypes = typeChoice.trim() === "1";
+    } else if (choice !== "1") {
+        alert("无效的选择！");
+        return;
+    }
+    
+    let typeDesc = includeAllTypes ? "所有类型（动画、书籍、音乐、游戏、真人剧）" : "动画";
+    if (!confirm(`将从 Bangumi 获取你的收藏列表并写入"同步记录"表。\n\n类型：${typeDesc}\n最大条数：${maxItems}\n\n是否继续？`)) {
+        return;
+    }
+    
+    setStatus("正在获取收藏列表...", "loading");
+    
+    try {
+        // 调用 syncRecord.js 中的函数
+        let result = fetchAndRecordBgCollections(
+            token, 
+            includeAllTypes, 
+            maxItems,
+            (current, total, message) => {
+                setStatus(message, "loading");
+                if (window.Application) {
+                    window.Application.StatusBar = message;
+                }
+            }
+        );
+        
+        window.Application.StatusBar = false;
+        
+        if (result.success) {
+            setStatus(result.message, "success");
+            alert(`✓ ${result.message}\n\n请打开"同步记录"工作表查看。`);
+            
+            // 打开同步记录表
+            openSyncRecordSheet();
+        } else {
+            setStatus(result.message, "error");
+            alert(`✗ ${result.message}`);
+        }
+    } catch (e) {
+        window.Application.StatusBar = false;
+        setStatus("发生错误", "error");
+        alert("发生错误: " + e.message);
+    }
+}
+
+// ========== 标记已上传条目到工作表 D 列 ==========
+
+/**
+ * 从同步记录表标记已上传的条目到当前工作表 D 列
+ * @param {string} sheetType - 工作表类型："动画" 或 "书籍"
+ */
+function markUploadedItems(sheetType) {
+    let app = window.Application;
+    if (!app || !app.ActiveWorkbook) {
+        alert("无法获取工作簿");
+        return;
+    }
+    
+    let currentSheet = app.ActiveSheet;
+    if (!currentSheet) {
+        alert("未找到当前工作表");
+        return;
+    }
+    
+    let sheetName = currentSheet.Name;
+    
+    // 确认操作
+    let typeName = sheetType === "动画" ? "动画（剧集）" : "书籍（小说）";
+    if (!confirm(`将在当前工作表「${sheetName}」的 D 列标记已上传到 BGM 的${typeName}条目。\n\n注意：\n1. 会自动查找名称或 URL 匹配的条目\n2. 已标记的行会跳过\n3. 请确保同步记录表中已有相关条目\n\n是否继续？`)) {
+        return;
+    }
+    
+    setStatus("正在标记已上传条目...", "loading");
+    
+    try {
+        let result = markUploadedItemsInSheet(
+            sheetType,
+            (current, total, message) => {
+                setStatus(message, "loading");
+                if (app) {
+                    app.StatusBar = message;
+                }
+            }
+        );
+        
+        app.StatusBar = false;
+        
+        if (result.success) {
+            setStatus(result.message, "success");
+            alert(`✓ ${result.message}`);
+        } else {
+            setStatus(result.message, "error");
+            alert(`✗ ${result.message}`);
+        }
+    } catch (e) {
+        app.StatusBar = false;
+        setStatus("发生错误", "error");
+        alert("发生错误: " + e.message);
+    }
+}
+
+/**
+ * 清除当前工作表 D 列的同步状态标记
+ */
+function clearSheetMarks() {
+    let app = window.Application;
+    if (!app || !app.ActiveWorkbook) {
+        alert("无法获取工作簿");
+        return;
+    }
+    
+    let currentSheet = app.ActiveSheet;
+    if (!currentSheet) {
+        alert("未找到当前工作表");
+        return;
+    }
+    
+    let sheetName = currentSheet.Name;
+    
+    if (!confirm(`将清除当前工作表「${sheetName}」D 列的所有同步标记。\n\n是否继续？`)) {
+        return;
+    }
+    
+    try {
+        let lastRow = currentSheet.Range("A" + currentSheet.Rows.Count).End(-4162).Row;
+        let clearedCount = 0;
+        
+        for (let i = 2; i <= lastRow; i++) {
+            let cellD = currentSheet.Range("D" + i);
+            if (cellD.Value2 && String(cellD.Value2).includes("BGM已上传")) {
+                cellD.Value2 = "";
+                cellD.Interior.Color = 0xFFFFFF; // 白色
+                clearedCount++;
+            }
+        }
+        
+        alert(`✓ 已清除 ${clearedCount} 个标记`);
+        
+    } catch (e) {
+        alert("发生错误: " + e.message);
+    }
 }

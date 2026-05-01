@@ -141,6 +141,8 @@
                     <option value="">-- 请选择 --</option>
                 </select>
                 <button class="btn small" onclick="refreshSheets()">🔄 刷新</button>
+                <button class="btn small" id="lockSheetBtn" onclick="toggleSheetLock()">🔒 锁定</button>
+                <span id="lockStatus" class="lock-status" style="display:none;"></span>
             </div>
             <div id="manualRangeInputs" style="display:none;">
                 <div class="form-group">
@@ -187,19 +189,33 @@
         </button>
     </div>
 
-    <!-- 同步记录 -->
-    <div class="section">
-        <h3>📋 同步记录</h3>
-        <div class="btn-group">
-            <button class="btn" id="viewRecordsBtn" onclick="openSyncRecordSheet()">
-                <span class="btn-icon">📋</span> 查看同步记录
-            </button>
-            <button class="btn warning" id="clearRecordsBtn" onclick="clearSyncRecords()">
-                <span class="btn-icon">🗑️</span> 清除同步记录
-            </button>
+        <!-- 同步记录 -->
+        <div class="section">
+            <h3>📋 同步记录</h3>
+            <div class="btn-group">
+                <button class="btn" id="viewRecordsBtn" onclick="openSyncRecordSheet()">
+                    <span class="btn-icon">📋</span> 查看同步记录
+                </button>
+                <button class="btn success" id="fetchBgRecordsBtn" onclick="fetchBgCollectionRecords()">
+                    <span class="btn-icon">☁️</span> 从BGM同步收藏记录
+                </button>
+                <button class="btn warning" id="clearRecordsBtn" onclick="clearSyncRecords()">
+                    <span class="btn-icon">🗑️</span> 清除同步记录
+                </button>
+            </div>
+            <div class="btn-group" style="margin-top:8px;">
+                <button class="btn" id="markAnimeBtn" onclick="markUploadedItems('动画')">
+                    <span class="btn-icon">🎬</span> 标记动画（剧集）
+                </button>
+                <button class="btn" id="markBookBtn" onclick="markUploadedItems('书籍')">
+                    <span class="btn-icon">📚</span> 标记书籍（小说）
+                </button>
+                <button class="btn warning" id="clearMarkBtn" onclick="clearSheetMarks()">
+                    <span class="btn-icon">❌</span> 清除D列标记
+                </button>
+            </div>
+            <p class="hint">同步记录会保存在"同步记录"工作表中，包含：名称、URL、SID、类型、同步时间等</p>
         </div>
-        <p class="hint">同步记录会保存在"同步记录"工作表中，包含：名称、URL、同步时间、同步次数、同步内容</p>
-    </div>
 
         <!-- 使用引导 -->
         <div class="section">
@@ -689,6 +705,20 @@
         background: linear-gradient(135deg, #3a3510 0%, #4a4515 100%);
         color: #fbbf24;
     }
+    .lock-status {
+        padding: 6px 12px;
+        font-size: 12px;
+        border-radius: 8px;
+        font-weight: 600;
+    }
+    .lock-status.unlocked {
+        background: #3a3a3a;
+        color: #888;
+    }
+    .lock-status.locked {
+        background: linear-gradient(135deg, #4a9eff 0%, #3a8ee8 100%);
+        color: white;
+    }
     .debug-section {
         background: #3a3520;
         border: 1px solid #5a5520;
@@ -899,7 +929,14 @@
     .upload-single-btn.error {
         background: #ef4444;
     }
-    .uploaded-badge {
+    .upload-single-btn.reupload {
+        background: #f59e0b;
+        color: #fff;
+    }
+    .upload-single-btn.reupload:hover {
+        background: #d97706;
+    }
+    .uploaded-badge {"}
         display: inline-flex;
         align-items: center;
         gap: 4px;
@@ -917,6 +954,10 @@
         padding: 14px 16px;
         background: #3a3a3a;
         border-bottom: 1px solid #444;
+        gap: 10px;
+    }
+    .detail-item-header .upload-single-btn {
+        flex-shrink: 0;
     }
     .detail-item-title {
         display: flex;

@@ -24,6 +24,28 @@ function getApp() {
     return null;
 }
 
+// ========== 获取数据工作表（优先使用锁定的工作表）==========
+function getDataSheet() {
+    let app = getApp();
+    if (!app || !app.ActiveWorkbook) {
+        return null;
+    }
+    
+    let sheets = app.ActiveWorkbook.Sheets;
+    
+    // 优先使用锁定的工作表
+    if (typeof window.lockedSheetIndex !== 'undefined' && window.lockedSheetIndex !== null) {
+        let sheet = sheets.Item(window.lockedSheetIndex);
+        if (sheet) {
+            console.log("使用锁定的工作表:", window.lockedSheetIndex, sheet.Name);
+            return sheet;
+        }
+    }
+    
+    // 回退到 ActiveSheet
+    return app.ActiveSheet;
+}
+
 // ========== 获取D列最后一行 ==========
 function getLastRow(ws) {
     const xlUp = -4162;
@@ -60,9 +82,9 @@ function SyncToBangumi() {
         alert("无法获取 WPS Application 对象！");
         return;
     }
-    let ws = app.ActiveSheet;
+    let ws = getDataSheet();
     if (!ws) {
-        alert("未找到活动工作表！");
+        alert("未找到数据工作表！请在工作表选择器中选择一个工作表。");
         return;
     }
 
@@ -398,40 +420,9 @@ function buildJsonPayload(ws, row, colMap, finishedDate) {
         parts.push('"tags":[' + tags + ']');
     }
 
-    // --- ep_status: 章节进度 ---
-    if (colMap.has("集号")) {
-        let epStatus = trim(getCellValue(ws, row, colMap.get("集号")));
-        if (epStatus !== "") {
-            let epNum = parseEpisodeNumber(epStatus);
-            if (epNum > 0) {
-                parts.push('"ep_status":' + epNum);
-            }
-        }
-    }
+    // 注意：不包含 ep_status，让用户在 Bangumi 网站上手动标记章节进度
 
     return "{" + parts.join(",") + "}";
-}
-
-// ========== 解析集号（支持 "1-2" 格式，取最大值）==========
-function parseEpisodeNumber(epStr) {
-    epStr = trim(epStr);
-    if (epStr === "") return 0;
-
-    let maxVal = 0;
-    let parts = epStr.split(",");
-
-    for (let p of parts) {
-        p = trim(p);
-        let dashParts = p.split("-");
-        for (let d of dashParts) {
-            d = trim(d);
-            if (!isNaN(d)) {
-                let num = parseInt(d);
-                if (num > maxVal) maxVal = num;
-            }
-        }
-    }
-    return maxVal;
 }
 
 // ========== 映射观看状态 -> Bangumi type ==========
@@ -452,7 +443,7 @@ function mapWatchStatus(status, finishedDate) {
         case "是":
         case "看过":
         case "完":
-            return 3; // 看过
+            return 2; // 看过
         case "否":
         case "想看":
         case "想看动画":
@@ -460,7 +451,7 @@ function mapWatchStatus(status, finishedDate) {
         case "在追":
         case "在看":
         case "追":
-            return 2; // 在看
+            return 3; // 在看
         case "搁置":
         case "暂停":
         case "停":
@@ -471,7 +462,7 @@ function mapWatchStatus(status, finishedDate) {
             return 5; // 抛弃
         default:
             // 模糊匹配
-            if (s.indexOf("追") >= 0) return 2;
+            if (s.indexOf("追") >= 0) return 3;
             if (s.indexOf("搁") >= 0 || s.indexOf("停") >= 0) return 4;
             if (s.indexOf("弃") >= 0) return 5;
             return 0; // 其他情况不上传
@@ -598,7 +589,7 @@ function sleep(ms) {
 function clearRowColors() {
     let app = getApp();
     if (!app) return;
-    let ws = app.ActiveSheet;
+    let ws = getDataSheet();
     if (!ws) return;
 
     let lastRow = getLastRow(ws);
@@ -635,7 +626,7 @@ function testSingleUpdate() {
 function previewSubjectIdExtraction() {
     let app = getApp();
     if (!app) return;
-    let ws = app.ActiveSheet;
+    let ws = getDataSheet();
     if (!ws) return;
 
     let headerRow = findHeaderRow(ws);
@@ -665,7 +656,7 @@ function previewSubjectIdExtraction() {
 function previewJsonPayload() {
     let app = getApp();
     if (!app) return;
-    let ws = app.ActiveSheet;
+    let ws = getDataSheet();
     if (!ws) return;
 
     let headerRow = findHeaderRow(ws);
@@ -841,7 +832,7 @@ function getFilterStatus(endRow, getColumnCounts) {
         return null;
     }
     
-    let ws = app.ActiveSheet;
+    let ws = getDataSheet();
     console.log("getFilterStatus - ws:", !!ws);
     if (!ws) {
         console.log("getFilterStatus - ws 为空，返回 null");
@@ -1148,7 +1139,7 @@ function getSequentialRowsBySeqCol(startRow, endRow) {
     let app = getApp();
     if (!app) return { validRows: [], filteredRows: [], totalFiltered: 0 };
     
-    let ws = app.ActiveSheet;
+    let ws = getDataSheet();
     if (!ws) return { validRows: [], filteredRows: [], totalFiltered: 0 };
     
     // 获取筛选状态（使用指定的结束行）
