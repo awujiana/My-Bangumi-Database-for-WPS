@@ -269,19 +269,19 @@ function updateSyncRecord(sid, updates) {
         for (let row = 2; row <= lastRow; row++) {
             let recordSid = sheet.Range("E" + row).Value;
             if (recordSid === sid) {
-                // 更新同步次数
+                // 更新同步次数（G 列 = 第7列）
                 if (updates.count !== undefined) {
-                    let currentCount = parseInt(sheet.Range("F" + row).Value) || 0;
-                    sheet.Range("F" + row).Value = currentCount + updates.count;
+                    let currentCount = parseInt(sheet.Range("G" + row).Value) || 0;
+                    sheet.Range("G" + row).Value = currentCount + updates.count;
                 }
                 // 更新时间
                 if (updates.time) {
                     sheet.Range("B" + row).Value = updates.time;
                 }
-                // 更新状态
+                // 更新状态（I 列 = 第9列）
                 if (updates.status) {
-                    sheet.Range("H" + row).Value = updates.status;
-                    let statusCell = sheet.Range("H" + row);
+                    sheet.Range("I" + row).Value = updates.status;
+                    let statusCell = sheet.Range("I" + row);
                     if (statusCell && statusCell.Interior) {
                         if (updates.status === "成功") {
                             statusCell.Interior.Color = 0xCCFFCC;
@@ -290,11 +290,11 @@ function updateSyncRecord(sid, updates) {
                         }
                     }
                 }
-                // 更新备注
+                // 更新备注（J 列 = 第10列）
                 if (updates.message) {
-                    let currentMsg = sheet.Range("I" + row).Value || "";
+                    let currentMsg = sheet.Range("J" + row).Value || "";
                     let newMsg = currentMsg ? currentMsg + "; " + updates.message : updates.message;
-                    sheet.Range("I" + row).Value = newMsg;
+                    sheet.Range("J" + row).Value = newMsg;
                 }
                 return true;
             }
@@ -338,10 +338,11 @@ function getAllSyncRecords() {
                 name: sheet.Range("C" + row).Value,
                 url: url,
                 sid: sid,
-                count: sheet.Range("F" + row).Value,
-                content: sheet.Range("G" + row).Value,
-                status: sheet.Range("H" + row).Value,
-                message: sheet.Range("I" + row).Value,
+                type: sheet.Range("F" + row).Value,     // F=类型
+                count: sheet.Range("G" + row).Value,    // G=同步次数
+                content: sheet.Range("H" + row).Value,  // H=同步内容
+                status: sheet.Range("I" + row).Value,   // I=状态
+                message: sheet.Range("J" + row).Value,  // J=备注
                 row: row
             });
         }

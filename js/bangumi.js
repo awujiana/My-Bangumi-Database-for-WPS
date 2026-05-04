@@ -7,6 +7,17 @@
 const BGM_API_BASE = "https://api.bgm.tv";
 const REQUEST_DELAY = 800;
 
+// ========== 颜色常量 ==========
+const BGM_COLOR = {
+    SUCCESS: 0xCCFFCC,     // 上传成功 - 绿
+    FAIL: 0xFFCCCC,        // 上传失败 - 红
+    SKIP: 0xFFFFCC,        // 跳过 - 黄
+    BGM_SYNC: 0x7030A0,    // 从BGM同步标记 - 紫
+    LIGHT_GREEN: 0x92D050, // 已同步一次标记 - 浅绿
+    DARK_GREEN: 0x00B050,  // 已同步多次标记 - 深绿
+    WHITE: 0xFFFFFF        // 白色（清除标记）
+};
+
 // ========== 缓存区域 ==========
 // 缓存的总数据行数，用于优化扫描范围
 let _cachedTotalRows = 0;
@@ -132,7 +143,7 @@ function SyncToBangumi() {
 
         if (subjectId === "") {
             skipNoUrlCount++;
-            getCell(ws, i, 1).Interior.Color = 0xFFFFCC; // 黄色=跳过
+            getCell(ws, i, 1).Interior.Color = BGM_COLOR.SKIP;
             let skipInfo = `[跳过] 行${i}: ${name || "(无名称)"} - 缺少 Bangumi URL`;
             console.log("SyncToBangumi - " + skipInfo);
             logEntries.push(skipInfo);
@@ -198,9 +209,9 @@ function SyncToBangumi() {
         let statusCode = result.code;
 
         // 处理结果
-        if (statusCode === 204 || statusCode === 200) {
+        if (statusCode === 200 || statusCode === 201 || statusCode === 202 || statusCode === 204) {
             successCount++;
-            getCell(ws, i, 1).Interior.Color = 0xCCFFCC; // 绿色=成功
+            getCell(ws, i, 1).Interior.Color = BGM_COLOR.SUCCESS;
             let successInfo = `[成功] 行${i}: ${name || "(无名称)"} (SID=${subjectId}) - ${bodySummary}`;
             console.log("SyncToBangumi - " + successInfo);
             logEntries.push(successInfo);
@@ -220,7 +231,7 @@ function SyncToBangumi() {
             }
         } else {
             failCount++;
-            getCell(ws, i, 1).Interior.Color = 0xFFCCCC; // 红色=失败
+            getCell(ws, i, 1).Interior.Color = BGM_COLOR.FAIL;
             let errMsg = result.message || "HTTP " + statusCode;
             let failInfo = `[失败] 行${i}: ${name || "(无名称)"} (SID=${subjectId}) - 错误: ${errMsg} | 数据: ${bodySummary}`;
             console.log("SyncToBangumi - " + failInfo);
@@ -548,8 +559,9 @@ function buildJsonPayload(ws, row, colMap, finishedDate) {
 }
 
 // ========== 映射观看状态 -> Bangumi type ==========
-// Bangumi type: 0=不上传 1=想看 2=在看 3=看过 4=搁置 5=抛弃
-// 只有在看(2)、看过(3)、搁置(4)、抛弃(5)才上传
+// Bangumi type: 1=想看 2=在看 3=看过 4=搁置 5=抛弃
+// 0=不上传（空白、否、想看等）
+// 上传条件：看过(3) / 在看(2) / 搁置(4) / 抛弃(5)
 function isEmptyValue(val) {
     return val === null || val === undefined || val === "" || val === "null" || val === "NULL" || val === "Null" || val === "undefined";
 }
@@ -565,7 +577,7 @@ function mapWatchStatus(status, finishedDate) {
         case "是":
         case "看过":
         case "完":
-            return 2; // 看过
+            return 3; // 看过 (Bangumi API: 3=看过)
         case "否":
         case "想看":
         case "想看动画":
@@ -573,7 +585,7 @@ function mapWatchStatus(status, finishedDate) {
         case "在追":
         case "在看":
         case "追":
-            return 3; // 在看
+            return 2; // 在看 (Bangumi API: 2=在看)
         case "搁置":
         case "暂停":
         case "停":
@@ -584,7 +596,7 @@ function mapWatchStatus(status, finishedDate) {
             return 5; // 抛弃
         default:
             // 模糊匹配
-            if (s.indexOf("追") >= 0) return 3;
+            if (s.indexOf("追") >= 0) return 2; // 在看
             if (s.indexOf("搁") >= 0 || s.indexOf("停") >= 0) return 4;
             if (s.indexOf("弃") >= 0) return 5;
             return 0; // 其他情况不上传

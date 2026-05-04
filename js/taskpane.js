@@ -1,3 +1,14 @@
+// ========== 颜色常量（与 bangumi.js 保持一致）==========
+const BGM_COLOR = {
+    SUCCESS: 0xCCFFCC,     // 上传成功 - 绿
+    FAIL: 0xFFCCCC,        // 上传失败 - 红
+    SKIP: 0xFFFFCC,        // 跳过 - 黄
+    BGM_SYNC: 0x7030A0,    // 从BGM同步标记 - 紫
+    LIGHT_GREEN: 0x92D050, // 已同步一次标记 - 浅绿
+    DARK_GREEN: 0x00B050,  // 已同步多次标记 - 深绿
+    WHITE: 0xFFFFFF        // 白色（清除标记）
+};
+
 // ========== 面板初始化 ==========
 window.onload = () => {
     // 检查枚举
@@ -641,7 +652,7 @@ function refreshData() {
 
             // 解析状态
             let typeNum = mapWatchStatus(status, finishedDate);
-            let typeName = ["", "想看", "看过", "在看", "搁置", "抛弃"][typeNum] || "未知";
+            let typeName = ["", "想看", "在看", "看过", "搁置", "抛弃"][typeNum] || "未知";
             typeStats[typeNum]++;
 
             // 处理标签
@@ -818,14 +829,17 @@ function previewSyncContent() {
             let finishedDateCell = colMap.has("完播日") ? getCell(ws, i, colMap.get("完播日")) : null;
             let finishedDate = finishedDateCell ? trim(String(finishedDateCell.Value() || "")) : "";
 
-            // 检查D列单元格颜色（#92d050 = 绿色 = 已上传）
+            // 检查D列单元格颜色（绿色 = 已上传）
             let seqCell = getCell(ws, i, seqCol);
             let isUploaded = false;
             try {
                 if (seqCell && seqCell.Interior) {
                     let colorValue = seqCell.Interior.Color;
-                    // #92d050 = RGB(146, 208, 80) = 0x50D050 = 5251664
-                    if (colorValue === 0x50D050 || colorValue === 5251664 || colorValue === 14620880) {
+                    // 通过 BGM_COLOR 常量判断是否已上传（支持所有绿色变体）
+                    if (colorValue === BGM_COLOR.SUCCESS || 
+                        colorValue === BGM_COLOR.LIGHT_GREEN || 
+                        colorValue === BGM_COLOR.DARK_GREEN ||
+                        colorValue === 5292178) { // 0x50D092 = BGR格式的 #92D050
                         isUploaded = true;
                     }
                 }
@@ -876,7 +890,7 @@ function previewSyncContent() {
 
         for (let idx = 0; idx < allValidRows.length; idx++) {
             let rowData = allValidRows[idx];
-            let typeName = ["", "想看", "看过", "在看", "搁置", "抛弃"][rowData.typeNum];
+            let typeName = ["", "想看", "在看", "看过", "搁置", "抛弃"][rowData.typeNum];
 
             // 处理标签
             let tagSet = new Set();
@@ -1075,7 +1089,7 @@ function uploadSingleRow(rowNum, btnElement) {
         if (statusCode === 204 || statusCode === 200 || statusCode === 201 || statusCode === 202) {
             // 上传成功：标记为绿色
             if (seqCell && seqCell.Interior) {
-                seqCell.Interior.Color = 0x50D050;
+                seqCell.Interior.Color = BGM_COLOR.SUCCESS;
             }
             
             // 更新按钮显示（保持为重新上传按钮样式）
@@ -1125,7 +1139,7 @@ function uploadSingleRow(rowNum, btnElement) {
         } else {
             // 上传失败：标记为红色
             if (seqCell && seqCell.Interior) {
-                seqCell.Interior.Color = 0xFFCCCC;
+                seqCell.Interior.Color = BGM_COLOR.FAIL;
             }
             
             if (btnElement) {
@@ -1319,9 +1333,6 @@ function syncFromBgmByScraping(sheetIndex) {
             collectionMap.set(item.sid, item);
         }
 
-        // 颜色定义
-        let COLOR_PURPLE = 0x7030A0;     // #7030a0 - 从BGM同步
-
         // 遍历 Excel 数据并标记
         let matchedCount = 0;
         let totalCount = 0;
@@ -1335,7 +1346,7 @@ function syncFromBgmByScraping(sheetIndex) {
                 let seqCell = getCell(ws, row, seqCol);
                 if (seqCell && seqCell.Interior) {
                     // 网页抓取方式：紫色
-                    seqCell.Interior.Color = COLOR_PURPLE;
+                    seqCell.Interior.Color = BGM_COLOR.BGM_SYNC;
                 }
                 matchedCount++;
             }
@@ -1420,7 +1431,7 @@ function syncFromBgmByAPI(sheetIndex) {
         }
 
         if (userCollections.length === 0) {
-            alert("📭 未获取到「${listName}」收藏\n\n可能原因：\n1. 你还没有${listName}任何动画\n2. 页面加载失败\n\n请检查用户ID是否正确：${userId}");
+            alert("📭 未获取到收藏列表\n\n可能原因：\n1. 你还没有收藏任何动画\n2. Token 没有正确的访问权限\n\n请检查 Token 是否正确。");
             setStatus("无收藏数据", "info");
             return;
         }
@@ -1447,11 +1458,6 @@ function syncFromBgmByAPI(sheetIndex) {
             }
         }
 
-        // 颜色定义
-        let COLOR_PURPLE = 0x7030A0;     // #7030a0 - 从BGM同步
-        let COLOR_LIGHT_GREEN = 0x92D050; // #92d050 - 同步一次
-        let COLOR_DARK_GREEN = 0x00B050;  // #00b050 - 同步多次
-
         // 遍历 Excel 数据并标记
         let matchedCount = 0;
         let totalCount = 0;
@@ -1470,15 +1476,15 @@ function syncFromBgmByAPI(sheetIndex) {
                     
                     if (syncCount === 0) {
                         // 从BGM同步但还没有本地记录：紫色
-                        seqCell.Interior.Color = COLOR_PURPLE;
+                        seqCell.Interior.Color = BGM_COLOR.BGM_SYNC;
                         purpleCount++;
                     } else if (syncCount === 1) {
                         // 同步一次：浅绿色
-                        seqCell.Interior.Color = COLOR_LIGHT_GREEN;
+                        seqCell.Interior.Color = BGM_COLOR.LIGHT_GREEN;
                         lightGreenCount++;
                     } else {
                         // 同步多次：深绿色
-                        seqCell.Interior.Color = COLOR_DARK_GREEN;
+                        seqCell.Interior.Color = BGM_COLOR.DARK_GREEN;
                         darkGreenCount++;
                     }
                 }
@@ -2021,7 +2027,7 @@ function syncFromPanel() {
 
             if (subjectId === "") {
                 skipNoUrlCount++;
-                if (bgmUrlCell) bgmUrlCell.Interior.Color = 0xFFFFCC;
+                if (bgmUrlCell) bgmUrlCell.Interior.Color = BGM_COLOR.SKIP;
                 
                 // 记录跳过原因：无BGM链接
                 let skipReason = name ? `跳过行${i}「${name}」：缺少 Bangumi URL` : `跳过行${i}：缺少 Bangumi URL`;
@@ -2079,7 +2085,7 @@ function syncFromPanel() {
             if (statusCode === 204 || statusCode === 200 || statusCode === 201 || statusCode === 202) {
                 // 上传成功
                 successCount++;
-                if (bgmUrlCell) bgmUrlCell.Interior.Color = 0xCCFFCC; // 浅绿
+                if (bgmUrlCell) bgmUrlCell.Interior.Color = BGM_COLOR.SUCCESS;
                 
                 // 构建可读的上传内容描述
                 let parsedBody = parseJsonBodySummary(jsonBody);
@@ -2102,8 +2108,8 @@ function syncFromPanel() {
                 });
             } else {
                 failCount++;
-                if (bgmUrlCell) bgmUrlCell.Interior.Color = 0xFFCCCC;
-                
+                if (bgmUrlCell) bgmUrlCell.Interior.Color = BGM_COLOR.FAIL;
+
                 let failMsg = result.message || "HTTP " + statusCode;
                 let parsedBody = parseJsonBodySummary(jsonBody);
                 contentSummary = "上传内容：" + parsedBody;
@@ -2506,7 +2512,7 @@ function clearSheetMarks() {
             let cellD = currentSheet.Range("D" + i);
             if (cellD.Value2 && String(cellD.Value2).includes("BGM已上传")) {
                 cellD.Value2 = "";
-                cellD.Interior.Color = 0xFFFFFF; // 白色
+                cellD.Interior.Color = BGM_COLOR.WHITE;
                 clearedCount++;
             }
         }
