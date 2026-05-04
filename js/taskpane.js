@@ -1824,6 +1824,46 @@ function closeDetailModal() {
     document.getElementById("detailModal").style.display = "none";
 }
 
+// ========== 解析 JSON 请求体为可读摘要 ==========
+/**
+ * 将 bangumi 上传请求的 JSON 解析为可读的描述文本
+ * @param {string} jsonStr - JSON 字符串
+ * @returns {string} 可读的描述，如 "状态:看过 评分:8 标签:[动画] 评价:很好看"
+ */
+function parseJsonBodySummary(jsonStr) {
+    if (!jsonStr) return "(空)";
+    try {
+        let obj = JSON.parse(jsonStr);
+        let parts = [];
+        
+        // 收藏状态
+        let typeMap = {1:"想看", 2:"在看", 3:"看过", 4:"搁置", 5:"抛弃"};
+        if (obj.type !== undefined) {
+            parts.push("状态:" + (typeMap[obj.type] || obj.type));
+        }
+        
+        // 评分
+        if (obj.rate !== undefined && obj.rate > 0) {
+            parts.push("评分:" + obj.rate);
+        }
+        
+        // 标签
+        if (obj.tags && obj.tags.length > 0) {
+            parts.push("标签:[" + obj.tags.join(",") + "]");
+        }
+        
+        // 评论
+        if (obj.comment) {
+            let comment = obj.comment.length > 30 ? obj.comment.substring(0, 30) + "..." : obj.comment;
+            parts.push("评价:" + comment);
+        }
+        
+        return parts.length > 0 ? parts.join(" | ") : "(仅标记状态)";
+    } catch (e) {
+        return jsonStr;
+    }
+}
+
 // ========== 面板操作处理 ==========
 function onAction(action) {
     switch (action) {
@@ -1936,8 +1976,16 @@ function syncFromPanel() {
 
         setStatus("正在同步...", "loading");
 
-        let successCount = 0, failCount = 0, skipCount = 0;
+        let successCount = 0, failCount = 0, skipNoUrlCount = 0, skipNoTypeCount = 0;
         let total = rowsToProcess.length;
+
+        // 收集详细日志信息
+        let syncLog = {
+            success: [],
+            fail: [],
+            skipNoUrl: [],
+            skipNoType: []
+        };
 
         for (let idx = 0; idx < rowsToProcess.length; idx++) {
             let i = rowsToProcess[idx];
@@ -1954,9 +2002,43 @@ function syncFromPanel() {
                 name = nameCell ? trim(String(nameCell.Value() || "")) : "";
             }
 
+            // 获取观看状态
+            let watchStatus = "";
+            if (colMap.has("是否看完")) {
+                let statusCell = getCell(ws, i, colMap.get("是否看完"));
+                watchStatus = statusCell ? trim(String(statusCell.Value() || "")) : "";
+            }
+
+            // 获取评级
+            let rateVal = "";
+            if (colMap.has("打分")) {
+                let rateCell = getCell(ws, i, colMap.get("打分"));
+                rateVal = rateCell ? trim(String(rateCell.Value() || "")) : "";
+            }
+
+            // 构建 readable 内容摘要
+            let contentSummary = "";
+
             if (subjectId === "") {
-                skipCount++;
+                skipNoUrlCount++;
                 if (bgmUrlCell) bgmUrlCell.Interior.Color = 0xFFFFCC;
+                
+                // 记录跳过原因：无BGM链接
+                let skipReason = name ? `跳过行${i}「${name}」：缺少 Bangumi URL` : `跳过行${i}：缺少 Bangumi URL`;
+                console.log("syncFromPanel - " + skipReason);
+                syncLog.skipNoUrl.push({ row: i, name: name, reason: "缺少 Bangumi URL" });
+                
+                // 记录到同步记录表
+                addSyncRecord({
+                    name: name || "(无名称)",
+                    url: "",
+                    sid: "",
+                    type: "",
+                    content: "跳过原因：缺少 Bangumi URL",
+                    status: "跳过",
+                    message: "行" + i + " 无BGM链接",
+                    count: 1
+                });
                 continue;
             }
 
@@ -1970,7 +2052,24 @@ function syncFromPanel() {
             // 构建完整请求体
             let jsonBody = buildJsonPayload(ws, i, colMap, finishedDate);
             if (jsonBody === "") {
-                skipCount++;
+                skipNoTypeCount++;
+                
+                // 记录跳过原因：观看状态=不上传（空白/否/想看）
+                let skipReason = name ? `跳过行${i}「${name}」(SID=${subjectId})：观看状态「${watchStatus}」不上传` : `跳过行${i}(SID=${subjectId})：观看状态「${watchStatus}」不上传`;
+                console.log("syncFromPanel - " + skipReason);
+                syncLog.skipNoType.push({ row: i, name: name, sid: subjectId, status: watchStatus, reason: "观看状态不上传" });
+                
+                // 记录到同步记录表
+                addSyncRecord({
+                    name: name || "(无名称)",
+                    url: bgmUrl,
+                    sid: subjectId,
+                    type: "",
+                    content: "跳过原因：观看状态「" + watchStatus + "」不需要上传",
+                    status: "跳过",
+                    message: "行" + i + " 状态=不传",
+                    count: 1
+                });
                 continue;
             }
 
@@ -1982,40 +2081,52 @@ function syncFromPanel() {
                 successCount++;
                 if (bgmUrlCell) bgmUrlCell.Interior.Color = 0xCCFFCC; // 浅绿
                 
-                console.log("syncFromPanel - 上传成功，行 " + i + "，添加同步记录...");
+                // 构建可读的上传内容描述
+                let parsedBody = parseJsonBodySummary(jsonBody);
+                let uploadDesc = "上传内容：" + parsedBody;
+                contentSummary = uploadDesc + " | 完整JSON: " + jsonBody;
+                
+                console.log("syncFromPanel - 上传成功，行" + i + "「" + name + "」(SID=" + subjectId + ") " + uploadDesc);
+                syncLog.success.push({ row: i, name: name, sid: subjectId, body: jsonBody, summary: parsedBody });
+                
                 // 添加同步记录
-                let recordResult = addSyncRecord({
+                addSyncRecord({
                     name: name || "(无名称)",
                     url: bgmUrl,
                     sid: subjectId,
-                    content: jsonBody,
+                    type: "",
+                    content: contentSummary,
                     status: "成功",
-                    message: "行 " + i,
+                    message: "行" + i,
                     count: 1
                 });
-                console.log("syncFromPanel - addSyncRecord 结果:", recordResult);
             } else {
                 failCount++;
                 if (bgmUrlCell) bgmUrlCell.Interior.Color = 0xFFCCCC;
-                console.log("syncFromPanel - 行 " + i + " 失败: " + result.message);
                 
-                console.log("syncFromPanel - 上传失败，行 " + i + "，添加失败记录...");
+                let failMsg = result.message || "HTTP " + statusCode;
+                let parsedBody = parseJsonBodySummary(jsonBody);
+                contentSummary = "上传内容：" + parsedBody;
+                
+                console.log("syncFromPanel - 上传失败，行" + i + "「" + name + "」(SID=" + subjectId + ") 错误:" + failMsg + " 数据:" + jsonBody);
+                syncLog.fail.push({ row: i, name: name, sid: subjectId, body: jsonBody, summary: parsedBody, error: failMsg });
+                
                 // 添加失败记录
-                let recordResult = addSyncRecord({
+                addSyncRecord({
                     name: name || "(无名称)",
                     url: bgmUrl,
                     sid: subjectId,
-                    content: jsonBody,
+                    type: "",
+                    content: contentSummary + " | 完整JSON: " + jsonBody,
                     status: "失败",
-                    message: result.message || "HTTP " + statusCode,
+                    message: failMsg,
                     count: 1
                 });
-                console.log("syncFromPanel - addSyncRecord 结果:", recordResult);
             }
 
             // 进度
             if (idx % 5 === 0) {
-                window.Application.StatusBar = `同步进度: ${idx + 1}/${total}`;
+                window.Application.StatusBar = `同步进度: ${idx + 1}/${total} 成功:${successCount} 失败:${failCount} 跳过:${skipNoUrlCount + skipNoTypeCount}`;
             }
 
             // 延迟
@@ -2024,9 +2135,77 @@ function syncFromPanel() {
 
         window.Application.StatusBar = false;
 
-        setStatus(`完成! 成功:${successCount} 失败:${failCount} 跳过:${skipCount}`, "success");
+        let skipTotal = skipNoUrlCount + skipNoTypeCount;
+        setStatus(`完成! 成功:${successCount} 失败:${failCount} 跳过:${skipTotal}`, "success");
 
-        alert(`同步完成！\n成功: ${successCount}\n失败: ${failCount}\n跳过: ${skipCount}\n\n同步记录已保存到"同步记录"工作表`);
+        // 构建详细的同步报告
+        let report = `同步完成！\n`;
+        report += `━━━━━━━━━━━━━━━━━━\n`;
+        report += `✅ 成功上传: ${successCount} 条\n`;
+        report += `❌ 上传失败: ${failCount} 条\n`;
+        report += `⏭️ 跳过(无URL): ${skipNoUrlCount} 条\n`;
+        report += `⏭️ 跳过(不须上传): ${skipNoTypeCount} 条\n`;
+        report += `━━━━━━━━━━━━━━━━━━\n\n`;
+        
+        // 成功详情（最多显示10条）
+        if (successCount > 0) {
+            report += `✅ 已上传的条目：\n`;
+            let showSuccess = Math.min(syncLog.success.length, 10);
+            for (let s = 0; s < showSuccess; s++) {
+                let item = syncLog.success[s];
+                report += `  ${s+1}. ${item.name || "(无名称)"} [SID=${item.sid}]\n`;
+                report += `     ${item.summary}\n`;
+            }
+            if (syncLog.success.length > 10) {
+                report += `     ... 还有 ${syncLog.success.length - 10} 条\n`;
+            }
+            report += `\n`;
+        }
+
+        // 失败详情
+        if (failCount > 0) {
+            report += `❌ 失败的条目（需检查）：\n`;
+            for (let f = 0; f < syncLog.fail.length; f++) {
+                let item = syncLog.fail[f];
+                report += `  ${f+1}. ${item.name || "(无名称)"} [SID=${item.sid}]\n`;
+                report += `     错误: ${item.error}\n`;
+                report += `     数据: ${item.summary}\n`;
+            }
+            report += `\n`;
+        }
+
+        // 跳过详情（无URL）
+        if (skipNoUrlCount > 0) {
+            report += `⏭️ 跳过（无BGM链接）：\n`;
+            let showSkip = Math.min(syncLog.skipNoUrl.length, 5);
+            for (let s = 0; s < showSkip; s++) {
+                let item = syncLog.skipNoUrl[s];
+                report += `  ${s+1}. 行${item.row}：${item.name || "(无名称)"}\n`;
+            }
+            if (syncLog.skipNoUrl.length > 5) {
+                report += `     ... 还有 ${syncLog.skipNoUrl.length - 5} 条\n`;
+            }
+            report += `\n`;
+        }
+
+        // 跳过详情（不需上传）
+        if (skipNoTypeCount > 0) {
+            report += `⏭️ 跳过（不需上传）：\n`;
+            let showSkip = Math.min(syncLog.skipNoType.length, 5);
+            for (let s = 0; s < showSkip; s++) {
+                let item = syncLog.skipNoType[s];
+                report += `  ${s+1}. 行${item.row}：${item.name || "(无名称)"} [SID=${item.sid}]\n`;
+                report += `     状态: "${item.status}" → 不上传\n`;
+            }
+            if (syncLog.skipNoType.length > 5) {
+                report += `     ... 还有 ${syncLog.skipNoType.length - 5} 条\n`;
+            }
+            report += `\n`;
+        }
+
+        report += `📋 详细记录已保存到"同步记录"工作表`;
+        
+        alert(report);
         
         // 刷新预览
         refreshData();

@@ -114,16 +114,42 @@ function SyncToBangumi() {
 
     let lastRow = getLastRow(ws);
 
-    let successCount = 0, failCount = 0, skipCount = 0;
+    let successCount = 0, failCount = 0, skipNoUrlCount = 0, skipNoTypeCount = 0;
+    
+    // 记录详细日志
+    let logEntries = [];
 
     for (let i = headerRow + 1; i <= lastRow; i++) {
+        // 获取名称
+        let name = "";
+        if (colMap.has("名称")) {
+            name = trim(getCellValue(ws, i, colMap.get("名称")));
+        }
+
         // 从 Bangumi URL 提取 subject_id
         let bgmUrl = trim(getCellValue(ws, i, colMap.get("Bangumi_URL")));
         let subjectId = extractSubjectId(bgmUrl);
 
         if (subjectId === "") {
-            skipCount++;
+            skipNoUrlCount++;
             getCell(ws, i, 1).Interior.Color = 0xFFFFCC; // 黄色=跳过
+            let skipInfo = `[跳过] 行${i}: ${name || "(无名称)"} - 缺少 Bangumi URL`;
+            console.log("SyncToBangumi - " + skipInfo);
+            logEntries.push(skipInfo);
+            
+            // 写入同步记录表
+            if (typeof addSyncRecord === 'function') {
+                addSyncRecord({
+                    name: name || "(无名称)",
+                    url: bgmUrl,
+                    sid: "",
+                    type: "",
+                    content: "跳过原因：缺少 Bangumi URL",
+                    status: "跳过",
+                    message: "行" + i + " 无BGM链接",
+                    count: 1
+                });
+            }
             continue;
         }
 
@@ -133,13 +159,39 @@ function SyncToBangumi() {
             finishedDate = trim(getCellValue(ws, i, colMap.get("完播日")));
         }
 
+        // 获取观看状态
+        let watchStatus = "";
+        if (colMap.has("是否看完")) {
+            watchStatus = trim(getCellValue(ws, i, colMap.get("是否看完")));
+        }
+
         // 构建请求体
         let jsonBody = buildJsonPayload(ws, i, colMap, finishedDate);
 
         if (jsonBody === "") {
-            skipCount++;
+            skipNoTypeCount++;
+            let skipInfo = `[跳过] 行${i}: ${name || "(无名称)"} (SID=${subjectId}) - 观看状态「${watchStatus}」不上传`;
+            console.log("SyncToBangumi - " + skipInfo);
+            logEntries.push(skipInfo);
+            
+            // 写入同步记录表
+            if (typeof addSyncRecord === 'function') {
+                addSyncRecord({
+                    name: name || "(无名称)",
+                    url: bgmUrl,
+                    sid: subjectId,
+                    type: "",
+                    content: "跳过原因：观看状态「" + watchStatus + "」不需要上传",
+                    status: "跳过",
+                    message: "行" + i + " 状态=不传",
+                    count: 1
+                });
+            }
             continue;
         }
+
+        // 解析请求体摘要
+        let bodySummary = parseJsonBodySummarySync(jsonBody);
 
         // 发送请求
         let result = bgmRequest("POST", "/v0/users/-/collections/" + subjectId, jsonBody, token);
@@ -149,15 +201,51 @@ function SyncToBangumi() {
         if (statusCode === 204 || statusCode === 200) {
             successCount++;
             getCell(ws, i, 1).Interior.Color = 0xCCFFCC; // 绿色=成功
+            let successInfo = `[成功] 行${i}: ${name || "(无名称)"} (SID=${subjectId}) - ${bodySummary}`;
+            console.log("SyncToBangumi - " + successInfo);
+            logEntries.push(successInfo);
+            
+            // 写入同步记录表
+            if (typeof addSyncRecord === 'function') {
+                addSyncRecord({
+                    name: name || "(无名称)",
+                    url: bgmUrl,
+                    sid: subjectId,
+                    type: "",
+                    content: "上传内容：" + bodySummary + " | 完整JSON: " + jsonBody,
+                    status: "成功",
+                    message: "行" + i,
+                    count: 1
+                });
+            }
         } else {
             failCount++;
             getCell(ws, i, 1).Interior.Color = 0xFFCCCC; // 红色=失败
-            console.log("行 " + i + " 失败 (ID:" + subjectId + "): " + result.message);
+            let errMsg = result.message || "HTTP " + statusCode;
+            let failInfo = `[失败] 行${i}: ${name || "(无名称)"} (SID=${subjectId}) - 错误: ${errMsg} | 数据: ${bodySummary}`;
+            console.log("SyncToBangumi - " + failInfo);
+            logEntries.push(failInfo);
+            
+            // 写入同步记录表
+            if (typeof addSyncRecord === 'function') {
+                addSyncRecord({
+                    name: name || "(无名称)",
+                    url: bgmUrl,
+                    sid: subjectId,
+                    type: "",
+                    content: "上传内容：" + bodySummary + " | 完整JSON: " + jsonBody,
+                    status: "失败",
+                    message: errMsg,
+                    count: 1
+                });
+            }
         }
 
         // 进度提示
         if (i % 10 === 0) {
-            app.StatusBar = "处理进度: " + (i - headerRow) + "/" + (lastRow - headerRow);
+            app.StatusBar = "处理进度: " + (i - headerRow) + "/" + (lastRow - headerRow) + 
+                           " 成功:" + successCount + " 失败:" + failCount + 
+                           " 跳过:" + (skipNoUrlCount + skipNoTypeCount);
         }
 
         // 延迟避免限流
@@ -166,7 +254,41 @@ function SyncToBangumi() {
 
     app.StatusBar = false;
 
-    alert("同步完成！\n成功: " + successCount + "\n失败: " + failCount + "\n跳过(无BGM URL): " + skipCount);
+    let skipTotal = skipNoUrlCount + skipNoTypeCount;
+
+    // 构建详细的同步报告
+    let report = "同步完成！\n";
+    report += "━━━━━━━━━━━━━━━━━━\n";
+    report += "成功: " + successCount + " 条\n";
+    report += "失败: " + failCount + " 条\n";
+    report += "跳过(无URL): " + skipNoUrlCount + " 条\n";
+    report += "跳过(不须上传): " + skipNoTypeCount + " 条\n";
+    report += "━━━━━━━━━━━━━━━━━━\n\n";
+
+    // 显示详细日志（最多20条）
+    if (logEntries.length > 0) {
+        report += "详细日志：\n";
+        let showCount = Math.min(logEntries.length, 20);
+        for (let e = 0; e < showCount; e++) {
+            report += logEntries[e] + "\n";
+        }
+        if (logEntries.length > 20) {
+            report += "... 还有 " + (logEntries.length - 20) + " 条日志（查看控制台获取完整信息）\n";
+        }
+    }
+
+    report += "\n📋 同步记录已保存到「同步记录」工作表";
+
+    alert(report);
+
+    // 在控制台打印完整日志
+    console.log("=== SyncToBangumi 完整日志 ===");
+    console.log("成功:", successCount, "失败:", failCount, "跳过(无URL):", skipNoUrlCount, "跳过(不须上传):", skipNoTypeCount);
+    console.log("处理行数:", lastRow - headerRow);
+    for (let e = 0; e < logEntries.length; e++) {
+        console.log(logEntries[e]);
+    }
+    console.log("=== 日志结束 ===");
 }
 
 // ========== 从 Bangumi URL 提取 subject_id ==========
@@ -1266,10 +1388,32 @@ function getSequentialRowsBySeqCol(startRow, endRow) {
     return result;
 }
 
-// ========== 简化版：只获取连续行 ==========
-function getSequentialRows(startRow) {
-    let result = getSequentialRowsBySeqCol(startRow);
-    return result.validRows;
+
+
+// ========== 解析 JSON 请求体为可读摘要（Ribbon版）==========
+function parseJsonBodySummarySync(jsonStr) {
+    if (!jsonStr) return "(空)";
+    try {
+        let obj = JSON.parse(jsonStr);
+        let parts = [];
+        let typeMap = {1:"想看", 2:"在看", 3:"看过", 4:"搁置", 5:"抛弃"};
+        if (obj.type !== undefined) {
+            parts.push("状态:" + (typeMap[obj.type] || obj.type));
+        }
+        if (obj.rate !== undefined && obj.rate > 0) {
+            parts.push("评分:" + obj.rate);
+        }
+        if (obj.tags && obj.tags.length > 0) {
+            parts.push("标签:[" + obj.tags.join(",") + "]");
+        }
+        if (obj.comment) {
+            let comment = obj.comment.length > 30 ? obj.comment.substring(0, 30) + "..." : obj.comment;
+            parts.push("评价:" + comment);
+        }
+        return parts.length > 0 ? parts.join(" | ") : "(仅标记状态)";
+    } catch (e) {
+        return jsonStr;
+    }
 }
 
 
