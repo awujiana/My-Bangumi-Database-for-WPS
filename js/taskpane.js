@@ -1,14 +1,3 @@
-// ========== 颜色常量（与 bangumi.js 保持一致）==========
-const BGM_COLOR = {
-    SUCCESS: 0xCCFFCC,     // 上传成功 - 绿
-    FAIL: 0xFFCCCC,        // 上传失败 - 红
-    SKIP: 0xFFFFCC,        // 跳过 - 黄
-    BGM_SYNC: 0x7030A0,    // 从BGM同步标记 - 紫
-    LIGHT_GREEN: 0x92D050, // 已同步一次标记 - 浅绿
-    DARK_GREEN: 0x00B050,  // 已同步多次标记 - 深绿
-    WHITE: 0xFFFFFF        // 白色（清除标记）
-};
-
 // ========== 面板初始化 ==========
 window.onload = () => {
     // 检查枚举
@@ -694,6 +683,14 @@ function refreshData() {
         </div>`;
 
         previewBox.innerHTML = html;
+
+        // 更新预览计数
+        let previewCountEl = document.getElementById("previewCount");
+        if (previewCountEl) {
+            let cnt = validCount ? `(${validCount} 条)` : `(${totalRows} 行)`;
+            previewCountEl.textContent = cnt;
+        }
+
         setStatus("就绪", "success");
     } catch (e) {
         console.error("刷新数据失败:", e);
@@ -2218,6 +2215,24 @@ function syncFromPanel() {
     } catch (e) {
         console.error("同步失败:", e);
         setStatus("同步失败: " + e.message, "error");
+    }
+}
+
+// ========== 测试调试连接 ==========
+function testDebugConnection() {
+    setStatus("测试连接...", "loading");
+    try {
+        let xhr = new XMLHttpRequest();
+        xhr.open("GET", "/.debugTemp/Ping", false);
+        xhr.send();
+        if (xhr.status === 200) {
+            let data = JSON.parse(xhr.responseText);
+            setStatus("连接正常: " + data.message, "success");
+        } else {
+            setStatus("连接失败: HTTP " + xhr.status, "error");
+        }
+    } catch (e) {
+        setStatus("调试服务器未连接", "info");
     }
 }
 

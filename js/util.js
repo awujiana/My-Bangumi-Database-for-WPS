@@ -4,6 +4,13 @@ var WPS_Enum = {
     msoCTPDockPositionRight: 2
 }
 
+// ========== WPS Excel 方向常量 ==========
+const XL_UP = -4162;      // xlUp - 向上查找
+const XL_DOWN = -4121;    // xlDown - 向下查找
+const XL_TO_LEFT = -4159; // xlToLeft - 向左查找
+const XL_TO_RIGHT = -4161;// xlToRight - 向右查找
+const XL_NONE = -4142;    // xlNone - 无填充
+
 
 /**
  * 获取 Application 对象
@@ -108,6 +115,18 @@ function getSheetByIndex(sheetIndex) {
     if (!sheets || sheets.Count === 0) return null;
     return sheets.Item(sheetIndex);
 }
+
+// ========== 颜色常量（Excel 标记用）==========
+const BGM_COLOR = {
+    SUCCESS: 0xCCFFCC,     // 上传成功 - 绿
+    FAIL: 0xFFCCCC,        // 上传失败 - 红
+    SKIP: 0xFFFFCC,        // 跳过 - 黄
+    BGM_SYNC: 0x7030A0,    // 从BGM同步标记 - 紫
+    LIGHT_GREEN: 0x92D050, // 已同步一次标记 - 浅绿
+    DARK_GREEN: 0x00B050,  // 已同步多次标记 - 深绿
+    GRAY: 0xD3D3D3,        // 表头灰色
+    WHITE: 0xFFFFFF        // 白色（清除标记）
+};
 
 // ========== 辅助函数 ==========
 

@@ -7,33 +7,9 @@
 const BGM_API_BASE = "https://api.bgm.tv";
 const REQUEST_DELAY = 800;
 
-// ========== 颜色常量 ==========
-const BGM_COLOR = {
-    SUCCESS: 0xCCFFCC,     // 上传成功 - 绿
-    FAIL: 0xFFCCCC,        // 上传失败 - 红
-    SKIP: 0xFFFFCC,        // 跳过 - 黄
-    BGM_SYNC: 0x7030A0,    // 从BGM同步标记 - 紫
-    LIGHT_GREEN: 0x92D050, // 已同步一次标记 - 浅绿
-    DARK_GREEN: 0x00B050,  // 已同步多次标记 - 深绿
-    WHITE: 0xFFFFFF        // 白色（清除标记）
-};
-
 // ========== 缓存区域 ==========
 // 缓存的总数据行数，用于优化扫描范围
 let _cachedTotalRows = 0;
-
-// ========== 统一获取 Application 对象 ==========
-function getApp() {
-    // 优先使用 window.Application
-    if (typeof window !== 'undefined' && window.Application) {
-        return window.Application;
-    }
-    // 回退到全局 Application
-    if (typeof Application !== 'undefined') {
-        return Application;
-    }
-    return null;
-}
 
 // ========== 获取数据工作表（优先使用锁定的工作表）==========
 function getDataSheet() {
@@ -202,7 +178,7 @@ function SyncToBangumi() {
         }
 
         // 解析请求体摘要
-        let bodySummary = parseJsonBodySummarySync(jsonBody);
+        let bodySummary = parseJsonBodySummary(jsonBody);
 
         // 发送请求
         let result = bgmRequest("POST", "/v0/users/-/collections/" + subjectId, jsonBody, token);
@@ -342,54 +318,6 @@ function findHeaderRow(ws) {
         }
     }
     return 0;
-}
-
-// ========== 安全获取单元格值 ==========
-function getCellValue(ws, row, col) {
-    try {
-        if (ws.Range) {
-            let colLetter = colNumToLetter(col);
-            return ws.Range(colLetter + row).Value();
-        }
-        if (ws.Cells) {
-            return ws.Cells(row, col).Value();
-        }
-    } catch (e) {}
-    return "";
-}
-
-// ========== 列号转字母 ==========
-function colNumToLetter(col) {
-    let letter = "";
-    while (col > 0) {
-        let mod = (col - 1) % 26;
-        letter = String.fromCharCode(65 + mod) + letter;
-        col = Math.floor((col - mod) / 26);
-    }
-    return letter;
-}
-
-// ========== 安全获取单元格对象 ==========
-function getCell(ws, row, col) {
-    try {
-        // 优先使用 Range (WPS 兼容)
-        if (ws && typeof ws.Range === 'function') {
-            let colLetter = colNumToLetter(col);
-            return ws.Range(colLetter + row);
-        }
-        // 回退：尝试 Cells.Item
-        if (ws && ws.Cells && typeof ws.Cells.Item === 'function') {
-            return ws.Cells.Item(row, col);
-        }
-        // 最后回退
-        if (ws && ws.Cells) {
-            return ws.Cells(row, col);
-        }
-        return null;
-    } catch (e) {
-        console.error("getCell error:", e);
-        return null;
-    }
 }
 
 // ========== 获取列名->列号映射 ==========
@@ -713,12 +641,6 @@ function bgmRequestSync(method, endpoint, body, token) {
     }
 }
 
-// ========== Sleep ==========
-function sleep(ms) {
-    let end = Date.now() + ms;
-    while (Date.now() < end) {}
-}
-
 // ========== 清除行颜色标记 ==========
 function clearRowColors() {
     let app = getApp();
@@ -822,12 +744,6 @@ function previewJsonPayload() {
     alert(msg);
 }
 
-// ========== 辅助函数 ==========
-function trim(str) {
-    if (!str) return "";
-    return String(str).replace(/^\s+|\s+$/g, "");
-}
-
 // ========== 设置 Token ==========
 function setBangumiToken() {
     // 直接打开Bangumi创建Token页面
@@ -853,7 +769,7 @@ function openBangumiTokenPage() {
 // ========== 显示Token输入对话框（Ribbon 模式）==========
 function showTokenDialog(currentToken) {
     let app = getApp();
-    let token = prompt("请输入 Bangumi Access Token：\n\n获取方式：Bangumi → 设置 → API → 创建应用", currentToken || "");
+    let token = prompt("请输入 Bangumi Access Token：\n\n获取方式：Bangumi → 设置 → API → 创建应用\n\n已设置 Token: " + (currentToken ? "✅ 已设置（输入新值覆盖）" : "❌ 未设置"), "");
     if (token !== null && token.trim() !== "") {
         if (app) {
             app.PluginStorage.setItem("bgm_token", token.trim());
@@ -918,40 +834,6 @@ function showUserIdDialog() {
         }
         alert("用户ID 设置成功！");
     }
-}
-
-// ========== 显示同步面板 ==========
-function showBangumiPanel() {
-    let app = getApp();
-    let tsId = app ? app.PluginStorage.getItem("taskpane_id") : null;
-
-    if (!tsId) {
-        let tskpane = app.CreateTaskPane(GetUrlPath() + "/ui/taskpane.html");
-        let id = tskpane.ID;
-        app.PluginStorage.setItem("taskpane_id", id);
-        tskpane.Visible = true;
-    } else {
-        let tskpane = app.GetTaskPane(tsId);
-        tskpane.Visible = !tskpane.Visible;
-    }
-}
-
-// ========== 获取 URL 路径（用于 taskpane）==========
-function GetUrlPath() {
-    let app = getApp();
-    // 优先使用 manifest 中的基础路径
-    let manifestPath = app ? app.PluginStorage.getItem("manifest_base_path") : null;
-    if (manifestPath) {
-        return manifestPath;
-    }
-    // 回退：使用当前页面路径
-    if (typeof window !== 'undefined' && window.location && window.location.href) {
-        let currentUrl = window.location.href;
-        let lastSlash = currentUrl.lastIndexOf("/");
-        return currentUrl.substring(0, lastSlash);
-    }
-    // Ribbon 上下文：返回默认路径
-    return "";
 }
 
 // ========== 检测表头筛选状态（增强版）==========
@@ -1400,32 +1282,5 @@ function getSequentialRowsBySeqCol(startRow, endRow) {
     return result;
 }
 
-
-
-// ========== 解析 JSON 请求体为可读摘要（Ribbon版）==========
-function parseJsonBodySummarySync(jsonStr) {
-    if (!jsonStr) return "(空)";
-    try {
-        let obj = JSON.parse(jsonStr);
-        let parts = [];
-        let typeMap = {1:"想看", 2:"在看", 3:"看过", 4:"搁置", 5:"抛弃"};
-        if (obj.type !== undefined) {
-            parts.push("状态:" + (typeMap[obj.type] || obj.type));
-        }
-        if (obj.rate !== undefined && obj.rate > 0) {
-            parts.push("评分:" + obj.rate);
-        }
-        if (obj.tags && obj.tags.length > 0) {
-            parts.push("标签:[" + obj.tags.join(",") + "]");
-        }
-        if (obj.comment) {
-            let comment = obj.comment.length > 30 ? obj.comment.substring(0, 30) + "..." : obj.comment;
-            parts.push("评价:" + comment);
-        }
-        return parts.length > 0 ? parts.join(" | ") : "(仅标记状态)";
-    } catch (e) {
-        return jsonStr;
-    }
-}
 
 

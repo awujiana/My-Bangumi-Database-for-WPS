@@ -23,7 +23,7 @@ function setSyncRecordHeaders(sheet) {
                     cell.Font.Bold = true;
                 }
                 if (cell.Interior) {
-                    cell.Interior.Color = 0xD3D3D3;
+                    cell.Interior.Color = BGM_COLOR.GRAY;
                 }
                 console.log("设置成功:", cellAddr, "当前值:", cell.Value2);
             } else {
@@ -177,7 +177,7 @@ function addSyncRecord(options) {
             let sidValue = sidCell ? trim(String(sidCell.Value2 || "")) : "";
             if (sidValue === String(options.sid)) {
                 existingRow = i;
-                let countCell = sheet.Range("F" + i);
+                let countCell = sheet.Range("G" + i);
                 currentCount = countCell ? (parseInt(countCell.Value2) || 0) + 1 : 1;
                 break;
             }
@@ -224,11 +224,11 @@ function addSyncRecord(options) {
         let statusCell = sheet.Range("I" + newRow);
         if (statusCell && statusCell.Interior) {
             if (options.status === "成功") {
-                statusCell.Interior.Color = 0xCCFFCC;
+                statusCell.Interior.Color = BGM_COLOR.SUCCESS;
             } else if (options.status === "失败") {
-                statusCell.Interior.Color = 0xFFCCCC;
+                statusCell.Interior.Color = BGM_COLOR.FAIL;
             } else {
-                statusCell.Interior.Color = 0xFFFFCC;
+                statusCell.Interior.Color = BGM_COLOR.SKIP;
             }
         }
         
@@ -284,9 +284,9 @@ function updateSyncRecord(sid, updates) {
                     let statusCell = sheet.Range("I" + row);
                     if (statusCell && statusCell.Interior) {
                         if (updates.status === "成功") {
-                            statusCell.Interior.Color = 0xCCFFCC;
+                            statusCell.Interior.Color = BGM_COLOR.SUCCESS;
                         } else if (updates.status === "失败") {
-                            statusCell.Interior.Color = 0xFFCCCC;
+                            statusCell.Interior.Color = BGM_COLOR.FAIL;
                         }
                     }
                 }
@@ -811,7 +811,7 @@ function markUploadedItemsInSheet(sheetType, progressCallback) {
         let dHeaderCell = dataSheet.Range("D" + dataHeaderRow);
         if (!dHeaderCell.Value2 || dHeaderCell.Value2 === "") {
             dHeaderCell.Value2 = "同步状态";
-            dHeaderCell.Interior.Color = 0xD3D3D3;
+            dHeaderCell.Interior.Color = BGM_COLOR.GRAY;
         }
         
         // 标记已上传的条目
@@ -863,7 +863,7 @@ function markUploadedItemsInSheet(sheetType, progressCallback) {
             // 标记
             if (isMatched) {
                 dataSheet.Range("D" + row).Value2 = "✓ BGM已上传";
-                dataSheet.Range("D" + row).Interior.Color = 0xCCFFCC; // 绿色
+                dataSheet.Range("D" + row).Interior.Color = BGM_COLOR.SUCCESS;
                 markedCount++;
             }
             
