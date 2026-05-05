@@ -25,6 +25,20 @@ export const BGM_SUBJECT_TYPES = {
     5: "抛弃"
 };
 
+// 同步记录工作表列常量
+const SYNC_RECORD_COLUMNS = {
+    INDEX: 1,       // A列 - 序号
+    TIME: 2,        // B列 - 同步时间
+    NAME: 3,        // C列 - 名称
+    URL: 4,         // D列 - URL
+    SID: 5,         // E列 - SID
+    TYPE: 6,        // F列 - 条目类型
+    COUNT: 7,       // G列 - 次数
+    CONTENT: 8,     // H列 - 内容
+    STATUS: 9,      // I列 - 状态
+    COMMENT: 10     // J列 - 备注
+};
+
 // ========== 表头设置 ==========
 /**
  * 设置同步记录工作表的表头
@@ -32,12 +46,12 @@ export const BGM_SUBJECT_TYPES = {
 export function setSyncRecordHeaders(sheet) {
     let headers = ["序号", "同步时间", "名称", "URL", "SID", "条目类型", "次数", "内容", "状态", "备注"];
 
-    bgmLog(LOG_LEVELS.INFO, "setSyncRecordHeaders 开始 - 工作表: " + (sheet ? sheet.Name : "null"));
+    // 只在调试模式下记录工作表信息
+    bgmLog(LOG_LEVELS.DEBUG, "setSyncRecordHeaders 开始 - 工作表: " + (sheet ? sheet.Name : "null"));
 
     for (let i = 0; i < headers.length; i++) {
         let colLetter = colNumToLetter(i + 1);
         let cellAddr = colLetter + "1";
-        bgmLog(LOG_LEVELS.INFO, "设置表头 - 列: " + cellAddr + " 值: " + headers[i]);
 
         try {
             let cell = sheet.Range(cellAddr);
@@ -49,7 +63,6 @@ export function setSyncRecordHeaders(sheet) {
                 if (cell.Interior) {
                     cell.Interior.Color = BGM_COLOR.GRAY;
                 }
-                bgmLog(LOG_LEVELS.INFO, "设置成功: " + cellAddr + " 当前值: " + cell.Value2);
             }
         } catch (e) {
             bgmLog(LOG_LEVELS.ERROR, "设置表头失败 - 列: " + cellAddr + " 错误: " + e.message);
@@ -163,8 +176,8 @@ function _buildSyncRecordCache(sheet) {
 
         for (let row = 2; row <= lastRow; row++) {
             try {
-                let sid = sheet.Cells(row, 5).Value;
-                let index = sheet.Cells(row, 1).Value;
+                let sid = sheet.Cells(row, SYNC_RECORD_COLUMNS.SID).Value;
+                let index = sheet.Cells(row, SYNC_RECORD_COLUMNS.INDEX).Value;
 
                 if (sid) {
                     _syncRecordSidCache.set(String(sid), row);
@@ -173,15 +186,15 @@ function _buildSyncRecordCache(sheet) {
                 _syncRecordListCache.push({
                     row: row,
                     index: index,
-                    time: sheet.Cells(row, 2).Value,
-                    name: sheet.Cells(row, 3).Value,
-                    url: sheet.Cells(row, 4).Value,
+                    time: sheet.Cells(row, SYNC_RECORD_COLUMNS.TIME).Value,
+                    name: sheet.Cells(row, SYNC_RECORD_COLUMNS.NAME).Value,
+                    url: sheet.Cells(row, SYNC_RECORD_COLUMNS.URL).Value,
                     sid: sid,
-                    type: sheet.Cells(row, 6).Value,
-                    count: sheet.Cells(row, 7).Value,
-                    content: sheet.Cells(row, 8).Value,
-                    status: sheet.Cells(row, 9).Value,
-                    comment: sheet.Cells(row, 10).Value
+                    type: sheet.Cells(row, SYNC_RECORD_COLUMNS.TYPE).Value,
+                    count: sheet.Cells(row, SYNC_RECORD_COLUMNS.COUNT).Value,
+                    content: sheet.Cells(row, SYNC_RECORD_COLUMNS.CONTENT).Value,
+                    status: sheet.Cells(row, SYNC_RECORD_COLUMNS.STATUS).Value,
+                    comment: sheet.Cells(row, SYNC_RECORD_COLUMNS.COMMENT).Value
                 });
             } catch (e) {
                 bgmLog(LOG_LEVELS.WARN, "loadSyncRecords 读取第" + row + "行失败: " + e.message);
@@ -219,26 +232,26 @@ export function addSyncRecord(sheet, record) {
 
         if (existingRow) {
             targetRow = existingRow;
-            record.count = (parseInt(sheet.Cells(targetRow, 7).Value) || 0) + 1;
+            record.count = (parseInt(sheet.Cells(targetRow, SYNC_RECORD_COLUMNS.COUNT).Value) || 0) + 1;
         } else {
             let lastRowCell = sheet.Range("A" + sheet.Rows.Count).End(XL.UP);
             targetRow = lastRowCell.Row + 1;
         }
 
         // 写入数据
-        sheet.Cells(targetRow, 1).Value = existingRow ? sheet.Cells(targetRow, 1).Value : (targetRow - 1);
-        sheet.Cells(targetRow, 2).Value = formatCurrentTime();
-        sheet.Cells(targetRow, 3).Value = record.name || "";
-        sheet.Cells(targetRow, 4).Value = record.url || "";
-        sheet.Cells(targetRow, 5).Value = record.sid || "";
-        sheet.Cells(targetRow, 6).Value = record.type || "1";
-        sheet.Cells(targetRow, 7).Value = record.count || 1;
-        sheet.Cells(targetRow, 8).Value = record.content || "";
-        sheet.Cells(targetRow, 9).Value = record.status || "";
-        sheet.Cells(targetRow, 10).Value = record.comment || "";
+        sheet.Cells(targetRow, SYNC_RECORD_COLUMNS.INDEX).Value = existingRow ? sheet.Cells(targetRow, SYNC_RECORD_COLUMNS.INDEX).Value : (targetRow - 1);
+        sheet.Cells(targetRow, SYNC_RECORD_COLUMNS.TIME).Value = formatCurrentTime();
+        sheet.Cells(targetRow, SYNC_RECORD_COLUMNS.NAME).Value = record.name || "";
+        sheet.Cells(targetRow, SYNC_RECORD_COLUMNS.URL).Value = record.url || "";
+        sheet.Cells(targetRow, SYNC_RECORD_COLUMNS.SID).Value = record.sid || "";
+        sheet.Cells(targetRow, SYNC_RECORD_COLUMNS.TYPE).Value = record.type || "1";
+        sheet.Cells(targetRow, SYNC_RECORD_COLUMNS.COUNT).Value = record.count || 1;
+        sheet.Cells(targetRow, SYNC_RECORD_COLUMNS.CONTENT).Value = record.content || "";
+        sheet.Cells(targetRow, SYNC_RECORD_COLUMNS.STATUS).Value = record.status || "";
+        sheet.Cells(targetRow, SYNC_RECORD_COLUMNS.COMMENT).Value = record.comment || "";
 
         // 设置状态颜色
-        let statusCell = sheet.Cells(targetRow, 9);
+        let statusCell = sheet.Cells(targetRow, SYNC_RECORD_COLUMNS.STATUS);
         if (statusCell.Interior) {
             if (record.status && record.status.includes("成功")) {
                 statusCell.Interior.ColorIndex = 10;
@@ -340,8 +353,11 @@ export function openSyncRecordSheet() {
 
 /**
  * 获取并记录 Bangumi 收藏
+ * @param {string} _token - Token（预留参数）
+ * @param {string} _userId - 用户ID（预留参数）
+ * @param {Array} collections - 收藏数据
  */
-export function fetchAndRecordBgCollections(token, userId, collections) {
+export function fetchAndRecordBgCollections(_token, _userId, collections) {
     if (!collections || collections.length === 0) {
         bgmLog(LOG_LEVELS.WARN, "没有收藏数据需要记录");
         return;

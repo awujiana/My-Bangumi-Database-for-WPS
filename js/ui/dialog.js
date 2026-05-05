@@ -440,7 +440,7 @@ export function sendToTaskpane(data) {
     return BGM.postMessage(data);
 }
 
-export function showTokenDialog(currentToken) {
+export function showTokenDialog() {
     ensureDialogs();  // 确保对话框容器已创建
     showInput("设置 Bangumi Access Token", "请输入 Access Token", "", (value) => {
         if (value) {

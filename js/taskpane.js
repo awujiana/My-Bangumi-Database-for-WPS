@@ -4,12 +4,11 @@
  * @description 面板初始化、事件绑定、核心逻辑
  */
 
-import { WPS_Enum, LOG_LEVELS } from './util.js';
 import { BGM } from './util.js';
 import { getApp } from './util.js';
 import { initMessageListener, setSyncRunning, setStatus } from './ui/message.js';
 import { 
-    onAction, syncFromPanel, syncCollectionFromBgm,
+    onAction, syncCollectionFromBgm,
     markUploadedItems, clearSheetMarks
 } from './ui/handlers.js';
 import { 
@@ -168,7 +167,6 @@ function initPanel() {
     let sheetSelect = document.getElementById("sheetSelect");
     if (sheetSelect) {
         sheetSelect.addEventListener("change", () => {
-            let sheetIndex = parseInt(sheetSelect.value);
             BGM.sheet.lockedIndex = null;
             BGM.sheet.isLocked = false;
             updateLockButton();

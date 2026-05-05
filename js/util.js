@@ -385,7 +385,7 @@ BGM.showConfirm = function(title, message, onConfirm, onCancel) {
 (function() {
     try {
         const _origAlert = window.alert;
-        window.BGMAlert = window.BGMAlert || function(message, title) {
+        window.BGMAlert = window.BGMAlert || function(message) {
             // 优先使用自定义对话框，否则回退到原生 alert
             if (typeof _origAlert === 'function') {
                 _origAlert(message);

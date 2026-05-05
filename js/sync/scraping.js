@@ -2,13 +2,24 @@
 // 功能：从 Bangumi 获取收藏列表并标记到工作表
 // 依赖：bangumi.js, syncRecord.js, util.js
 
+// ========== 常量定义 ==========
+// 限制常量
+const SCRAPING_CONFIG = {
+    MAX_PAGES: 10,           // 网页抓取最大页数
+    API_MAX_PAGES: 50,        // API 获取最大页数
+    REQUEST_DELAY: 1000,     // 抓取请求延迟（毫秒）
+    PAGE_SIZE: 30,           // API 每页大小
+    MAX_RETRIES: 3,          // 最大重试次数
+    RETRY_DELAY: 2000        // 重试延迟（毫秒）
+};
+
 // ========== 抓取方式同步（保留旧方式）==========
 /**
  * 通过网页抓取方式同步收藏
  * @param {number} sheetIndex - 工作表索引
  */
 function syncFromBgmByScraping(sheetIndex) {
-    bgmLog(BGM.LOG_LEVELS.INFO, "syncFromBgmByScraping 开始");
+    bgmLog(BGM.LOG_LEVELS.DEBUG, "syncFromBgmByScraping 开始");
 
     let token = loadBgToken();
     if (!token) {
@@ -105,7 +116,7 @@ function fetchAllUserCollectionsByScraping(token, types, onSuccess, onError) {
 
     let allCollections = [];
     let currentPage = 1;
-    let maxPages = 10; // 限制最大页数
+    let maxPages = SCRAPING_CONFIG.MAX_PAGES;
 
     /**
      * 获取单页收藏
@@ -130,7 +141,7 @@ function fetchAllUserCollectionsByScraping(token, types, onSuccess, onError) {
                 // 检查是否有下一页
                 if (hasNextPageLink(xhr.responseText) && currentPage < maxPages) {
                     currentPage++;
-                    setTimeout(fetchPage, 1000); // 延迟避免限流
+                    setTimeout(fetchPage, SCRAPING_CONFIG.REQUEST_DELAY); // 使用配置的延迟
                 } else {
                     if (onSuccess) onSuccess(allCollections);
                 }
@@ -215,7 +226,7 @@ function fetchAllUserCollections(token, userId, onSuccess, onError) {
 
     let allCollections = [];
     let page = 1;
-    let maxPages = 50;
+    let maxPages = SCRAPING_CONFIG.API_MAX_PAGES;
 
     /**
      * 获取单页收藏
@@ -230,7 +241,8 @@ function fetchAllUserCollections(token, userId, onSuccess, onError) {
         setStatus("正在获取第 " + page + " 页...", "info");
 
         let xhr = new XMLHttpRequest();
-        let url = BGM_CONFIG.API_BASE + "/user/" + userId + "/collection?type=2&offset=" + ((page - 1) * 30) + "&limit=30";
+        let offset = (page - 1) * SCRAPING_CONFIG.PAGE_SIZE;
+        let url = BGM_CONFIG.API_BASE + "/user/" + userId + "/collection?type=2&offset=" + offset + "&limit=" + SCRAPING_CONFIG.PAGE_SIZE;
 
         xhr.open("GET", url, true);
         xhr.setRequestHeader("Authorization", "Bearer " + token);
@@ -270,7 +282,7 @@ function fetchAllUserCollections(token, userId, onSuccess, onError) {
                 if (onError) onError("用户不存在！");
             } else if (xhr.status === 429) {
                 bgmLog(BGM.LOG_LEVELS.WARN, "API 限流，等待后重试...");
-                setTimeout(fetchPage, 5000);
+                setTimeout(fetchPage, SCRAPING_CONFIG.RETRY_DELAY);
             } else {
                 if (onError) onError("获取失败，状态码：" + xhr.status);
             }
@@ -319,4 +331,78 @@ function _fetchRecordsScopeSelect(callback) {
  */
 function _runFetchBgRecords(token, userId) {
     fetchBgCollectionRecords(token, userId, null);
+}
+
+// ========== Promise 风格的 API（解决回调地狱）==========
+/**
+ * 通过 API 获取用户收藏（Promise 版本）
+ * @param {string} token - Token
+ * @param {string} userId - 用户ID
+ * @returns {Promise<Array>} 收藏列表
+ */
+function fetchAllUserCollectionsAsync(token, userId) {
+    return new Promise((resolve, reject) => {
+        fetchAllUserCollections(token, userId, resolve, reject);
+    });
+}
+
+/**
+ * 通过网页抓取获取用户收藏（Promise 版本）
+ * @param {string} token - Token
+ * @param {Array} types - 类型数组
+ * @returns {Promise<Array>} 收藏列表
+ */
+function fetchAllUserCollectionsByScrapingAsync(token, types) {
+    return new Promise((resolve, reject) => {
+        fetchAllUserCollectionsByScraping(token, types, resolve, reject);
+    });
+}
+
+/**
+ * HTTP 请求 Promise 封装
+ * @param {string} method - HTTP 方法
+ * @param {string} url - 请求 URL
+ * @param {object} options - 选项 { headers, body, token }
+ * @returns {Promise<{code: number, data: any}>}
+ */
+function httpRequestAsync(method, url, options = {}) {
+    return new Promise((resolve, reject) => {
+        const { headers = {}, body, token } = options;
+        
+        let xhr = new XMLHttpRequest();
+        xhr.open(method, url, true);
+        
+        // 设置默认 headers
+        xhr.setRequestHeader("Content-Type", "application/json");
+        if (token) {
+            xhr.setRequestHeader("Authorization", "Bearer " + token);
+        }
+        
+        // 设置自定义 headers
+        Object.entries(headers).forEach(([key, value]) => {
+            xhr.setRequestHeader(key, value);
+        });
+
+        xhr.onload = function() {
+            try {
+                let data = xhr.responseText ? JSON.parse(xhr.responseText) : null;
+                resolve({ code: xhr.status, data });
+            } catch (e) {
+                resolve({ code: xhr.status, data: xhr.responseText });
+            }
+        };
+
+        xhr.onerror = function() {
+            reject(new Error("网络请求失败"));
+        };
+
+        xhr.send(body ? JSON.stringify(body) : null);
+    });
+}
+
+// 导出 Promise 版本函数到全局（供外部使用）
+if (typeof window !== 'undefined') {
+    window.fetchAllUserCollectionsAsync = fetchAllUserCollectionsAsync;
+    window.fetchAllUserCollectionsByScrapingAsync = fetchAllUserCollectionsByScrapingAsync;
+    window.httpRequestAsync = httpRequestAsync;
 }

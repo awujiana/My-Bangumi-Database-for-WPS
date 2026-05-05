@@ -8,10 +8,22 @@ import { XL, BGM_CONFIG, LOG_LEVELS, BGM } from './util.js';
 import { getApp, bgmLog, getCell, getCellValue, sleep, loadBgToken, 
          _setBgmUserId, _getBgmUserId } from './util.js';
 import { showDialog, sendToTaskpane, showTokenDialog, showUserIdDialog } from './ui/dialog.js';
-import { safeExecute } from './core/unified.js';
 
-// 错误级别常量
-const { ERROR_LEVELS } = BGM;
+// ========== 常量定义 ==========
+// Excel 列常量
+const COLUMNS = {
+    SEQUENCE: 4,      // D列 - 序号
+    DEFAULT_START: 1   // 默认起始列
+};
+
+// 同步状态颜色常量
+const SYNC_STATUS_COLOR = {
+    SUCCESS: 10,       // 绿色 - 成功
+    FAILURE: 3,        // 红色 - 失败
+    WARNING: 6,         // 黄色 - 警告
+    INFO: 5,           // 蓝色 - 信息
+    SKIP: 16           // 灰色 - 跳过
+};
 
 // ========== 工具函数 ==========
 /**
@@ -69,10 +81,8 @@ export function getBgmtoken() {
  * 获取 D 列最后一行
  */
 export function getLastRow(ws) {
-    const SEQ_COL = 4;
-    
     try {
-        let cell = getCell(ws, ws.Rows.Count, SEQ_COL);
+        let cell = getCell(ws, ws.Rows.Count, COLUMNS.SEQUENCE);
         if (cell && cell.Value) {
             return cell.End(XL.UP).Row;
         }
@@ -190,7 +200,7 @@ function _doSyncBangumi(ws, colMap, token, lastRow, headerRow) {
                 if (colMap.syncStatus) {
                     let cell = getCell(ws, i, colMap.syncStatus);
                     cell.Value = "成功";
-                    cell.Interior.ColorIndex = 10;
+                    cell.Interior.ColorIndex = SYNC_STATUS_COLOR.SUCCESS;
                 }
 
                 if (syncRecordSheet && typeof addSyncRecord === 'function') {
@@ -210,7 +220,7 @@ function _doSyncBangumi(ws, colMap, token, lastRow, headerRow) {
                 if (colMap.syncStatus) {
                     let cell = getCell(ws, i, colMap.syncStatus);
                     cell.Value = "失败:" + result.code;
-                    cell.Interior.ColorIndex = 3;
+                    cell.Interior.ColorIndex = SYNC_STATUS_COLOR.FAILURE;
                 }
 
                 if (syncRecordSheet && typeof addSyncRecord === 'function') {
@@ -234,7 +244,7 @@ function _doSyncBangumi(ws, colMap, token, lastRow, headerRow) {
             if (colMap.syncStatus) {
                 let cell = getCell(ws, i, colMap.syncStatus);
                 cell.Value = "错误:" + err.message;
-                cell.Interior.ColorIndex = 3;
+                cell.Interior.ColorIndex = SYNC_STATUS_COLOR.FAILURE;
             }
         }
     }
@@ -469,10 +479,45 @@ export async function bgmRequest(method, endpoint, body, token) {
 
 /**
  * 同步发送 BGM API 请求（含 429 自动重试）
+ * @param {string} method - HTTP 方法 (GET, POST, PUT, DELETE)
+ * @param {string} endpoint - API 端点（必须是有效的路径）
+ * @param {string} body - 请求体（JSON 字符串）
+ * @param {string} token - 认证 Token
+ * @returns {object} { code: number, message: string }
  */
 export function bgmRequestSync(method, endpoint, body, token) {
     const { MAX_RETRIES, RETRY_DELAY_BASE } = BGM_CONFIG;
     let retries = 0;
+    
+    // 输入验证：防止注入攻击
+    // 1. 验证 HTTP 方法
+    const validMethods = ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'];
+    if (!validMethods.includes(method.toUpperCase())) {
+        bgmLog(LOG_LEVELS.ERROR, "bgmRequestSync: 无效的 HTTP 方法: " + method);
+        return { code: 0, message: "Invalid HTTP method" };
+    }
+    
+    // 2. 验证 endpoint：必须是有效的 API 路径，不允许绝对 URL 和协议
+    if (!endpoint || typeof endpoint !== 'string') {
+        bgmLog(LOG_LEVELS.ERROR, "bgmRequestSync: endpoint 无效");
+        return { code: 0, message: "Invalid endpoint" };
+    }
+    
+    // 防止路径遍历和注入
+    if (endpoint.includes('..') || endpoint.includes('//') || endpoint.startsWith('http')) {
+        bgmLog(LOG_LEVELS.ERROR, "bgmRequestSync: endpoint 包含非法字符: " + endpoint);
+        return { code: 0, message: "Invalid endpoint path" };
+    }
+    
+    // 3. 验证 body：必须是有效的 JSON 字符串
+    if (body && typeof body === 'string' && body.trim().startsWith('{')) {
+        try {
+            JSON.parse(body);
+        } catch (e) {
+            bgmLog(LOG_LEVELS.ERROR, "bgmRequestSync: 无效的 JSON body");
+            return { code: 0, message: "Invalid JSON body" };
+        }
+    }
     
     while (retries <= MAX_RETRIES) {
         let xhr = new XMLHttpRequest();
@@ -600,7 +645,7 @@ export function testSingleUpdate() {
 /**
  * 获取筛选状态
  */
-export function getFilterStatus(endRow, getColumnCounts) {
+export function getFilterStatus() {
     let app = getApp();
     if (!app || !app.ActiveWorkbook) {
         return { isFiltered: false, filterMode: "none" };
@@ -673,13 +718,12 @@ export function getSequentialRowsBySeqCol(startRow, endRow) {
         return { validRows: [], skippedRows: [] };
     }
 
-    let SEQ_COL = 4;
     let validRows = [];
     let skippedRows = [];
 
     for (let row = startRow; row <= endRow; row++) {
         try {
-            let cell = getCell(ws, row, SEQ_COL);
+            let cell = getCell(ws, row, COLUMNS.SEQUENCE);
             if (cell && cell.Value !== null && cell.Value !== "") {
                 validRows.push(row);
             } else {
