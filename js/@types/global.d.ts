@@ -75,3 +75,6 @@ declare interface Window {
 type DialogCallback = () => void;
 type InputCallback = (value: string) => void;
 type ConfirmCallback = (confirmed: boolean) => void;
+
+// WPS Office Application 全局变量声明
+declare const Application: unknown;

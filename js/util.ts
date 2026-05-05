@@ -1,0 +1,786 @@
+/**
+ * BGM 工具模块
+ * @module util
+ * @description 提供通用工具函数、常量定义、错误处理等核心功能
+ */
+
+import { WPS_ENUM, XL, BGM_CONFIG, BGM_COLOR, LOG_LEVELS, ERROR_LEVELS } from './core/constants.js';
+import { encryptToken, decryptToken, calcChecksum } from './core/crypto.js';
+
+// ========== 导出常量（向后兼容）==========
+export const WPS_Enum = WPS_ENUM;
+export { XL, BGM_CONFIG, BGM_COLOR, LOG_LEVELS, ERROR_LEVELS };
+
+// ========== 类型定义 ==========
+/** BGM 缓存数据结构 */
+interface BGMCache {
+    totalRows: number;
+    userId: string | null;
+    username: string | null;
+    sidCache: Map<string, string>;
+    listCache: unknown[];
+}
+
+/** BGM 工作表状态 */
+interface BGMSheet {
+    lockedIndex: number | null;
+    lockedName: string | null;
+    isLocked: boolean;
+}
+
+/** BGM 同步状态 */
+interface BGMSync {
+    isRunning: boolean;
+    lastSyncTime: string | null;
+}
+
+/** BGM 用户信息 */
+interface BGMUserInfo {
+    id: string;
+    username: string;
+}
+
+/** BGM 错误级别 */
+enum ErrorLevel {
+    SILENT = 0,
+    WARN = 1,
+    ERROR = 2,
+    THROW = 3
+}
+
+/** BGM 错误类 */
+class BgmError extends Error {
+    code: string;
+    details: Record<string, unknown>;
+    timestamp: string;
+
+    constructor(message: string, code: string = 'UNKNOWN', details: Record<string, unknown> = {}) {
+        super(message);
+        this.name = 'BgmError';
+        this.code = code;
+        this.details = details;
+        this.timestamp = new Date().toISOString();
+    }
+
+    override toString(): string {
+        return `[${this.code}] ${this.message}`;
+    }
+}
+
+/** 对话框选项 */
+interface DialogOptions {
+    onConfirm?: () => void;
+    onCancel?: () => void;
+    onOk?: (value: string) => void;
+    defaultValue?: string;
+}
+
+/** 错误处理选项 */
+interface ErrorOptions {
+    level?: ErrorLevel;
+    showDialog?: boolean;
+    context?: string;
+}
+
+// ========== BGM 全局命名空间 ==========
+export const BGM: {
+    cache: BGMCache;
+    sheet: BGMSheet;
+    sync: BGMSync;
+    LOG_LEVEL: number;
+    LOG_LEVELS: typeof LOG_LEVELS;
+    ERROR_LEVELS: typeof ERROR_LEVELS;
+    ErrorLevel: typeof ErrorLevel;
+    BgmError: typeof BgmError;
+    Dialog: {
+        alert: (title: string, message: string) => void;
+        confirm: (message: string, onConfirm?: () => void, onCancel?: () => void) => void;
+        error: (title: string, message: string) => void;
+        input: (title: string, prompt: string, defaultValue?: string, onOk?: (value: string) => void, onCancel?: () => void) => void;
+        show: (type: 'alert' | 'confirm' | 'error' | 'input', title: string, message: string, options?: DialogOptions) => void;
+    };
+    Message: {
+        send: (data: Record<string, unknown>, targetOrigin?: string) => boolean;
+        postMessage: (data: Record<string, unknown>, targetOrigin?: string) => boolean;
+    };
+    postMessage: (data: Record<string, unknown>, targetOrigin?: string) => boolean;
+    showDialog: (title: string, message: string) => void;
+    showConfirm: (title: string, message: string, onConfirm?: () => void, onCancel?: () => void) => void;
+    handleError: (error: unknown, options?: ErrorOptions) => BgmError;
+    safeExecute: <T>(fn: () => T, context?: string, options?: ErrorOptions) => T | BgmError;
+} = {
+    // 缓存数据
+    cache: {
+        totalRows: 0,
+        userId: null,
+        username: null,
+        sidCache: new Map(),
+        listCache: []
+    },
+    // 工作表状态
+    sheet: {
+        lockedIndex: null,
+        lockedName: null,
+        isLocked: false
+    },
+    // 同步状态
+    sync: {
+        isRunning: false,
+        lastSyncTime: null
+    },
+    // 日志级别（0=DEBUG, 1=INFO, 2=WARN, 3=ERROR）
+    LOG_LEVEL: LOG_LEVELS.INFO,
+
+    // 日志级别常量
+    LOG_LEVELS: LOG_LEVELS,
+
+    // 错误级别常量
+    ERROR_LEVELS: ERROR_LEVELS,
+
+    // 错误级别枚举
+    ErrorLevel: ErrorLevel,
+
+    // BGM 错误类
+    BgmError: BgmError,
+
+    // 统一对话框
+    Dialog: {
+        alert: function(title: string, message: string): void {
+            if (typeof window !== 'undefined' && (window as unknown as Record<string, unknown>).BGMDialog !== undefined) {
+                (window as unknown as Record<string, { alert: (t: string, m: string) => void }>).BGMDialog!.alert(title, message);
+            } else if (typeof window !== 'undefined' && typeof (window as unknown as Record<string, unknown>).BGMAlert === 'function') {
+                (window as unknown as Record<string, (m: string, t: string) => void>).BGMAlert!(message, title);
+            } else if (typeof window !== 'undefined') {
+                window.alert(message);
+            }
+        },
+        confirm: function(message: string, onConfirm?: () => void, onCancel?: () => void): void {
+            if (typeof window !== 'undefined' && (window as unknown as Record<string, unknown>).BGMDialog !== undefined) {
+                (window as unknown as Record<string, { confirm: (m: string, oc?: () => void, oc2?: () => void) => void }>).BGMDialog!.confirm(message, onConfirm, onCancel);
+            } else if (typeof window !== 'undefined' && typeof (window as unknown as Record<string, unknown>).BGMConfirm === 'function') {
+                (window as unknown as Record<string, (m: string, t: string, oc?: () => void, oc2?: () => void) => void>).BGMConfirm!(message, '确认', onConfirm, onCancel);
+            } else if (typeof window !== 'undefined') {
+                if (window.confirm(message)) {
+                    if (onConfirm) onConfirm();
+                } else {
+                    if (onCancel) onCancel();
+                }
+            }
+        },
+        error: function(title: string, message: string): void {
+            if (typeof window !== 'undefined' && (window as unknown as Record<string, unknown>).BGMDialog !== undefined) {
+                (window as unknown as Record<string, { error: (t: string, m: string) => void }>).BGMDialog!.error(title, message);
+            } else if (typeof window !== 'undefined' && typeof (window as unknown as Record<string, unknown>).BGMError === 'function') {
+                (window as unknown as Record<string, (m: string, t: string) => void>).BGMError!(message, title);
+            } else if (typeof window !== 'undefined') {
+                window.alert('[错误] ' + message);
+            }
+        },
+        input: function(title: string, prompt: string, defaultValue?: string, onOk?: (value: string) => void, onCancel?: () => void): void {
+            if (typeof window !== 'undefined' && (window as unknown as Record<string, unknown>).BGMDialog !== undefined) {
+                (window as unknown as Record<string, { input: (t: string, p: string, d: string, oc?: (v: string) => void, oc2?: () => void) => void }>).BGMDialog!.input(title, prompt, defaultValue || '', onOk, onCancel);
+            } else if (typeof window !== 'undefined' && typeof (window as unknown as Record<string, unknown>).BGMInput === 'function') {
+                (window as unknown as Record<string, (t: string, p: string, d: string, oc?: (v: string) => void, oc2?: () => void) => void>).BGMInput!(title, prompt, defaultValue || '', onOk, onCancel);
+            } else if (typeof window !== 'undefined') {
+                const result = window.prompt(prompt, defaultValue);
+                if (result !== null) {
+                    if (onOk) onOk(result);
+                } else {
+                    if (onCancel) onCancel();
+                }
+            }
+        },
+        show: function(type: 'alert' | 'confirm' | 'error' | 'input', title: string, message: string, options?: DialogOptions): void {
+            if (typeof window !== 'undefined' && (window as unknown as Record<string, unknown>).BGMDialog !== undefined) {
+                (window as unknown as Record<string, { show: (t: string, ti: string, m: string, o?: DialogOptions) => void }>).BGMDialog!.show(type, title, message, options);
+            } else {
+                switch (type) {
+                    case 'error':
+                        this.error(title, message);
+                        break;
+                    case 'confirm':
+                        this.confirm(message, options?.onConfirm, options?.onCancel);
+                        break;
+                    case 'input':
+                        this.input(title, message, options?.defaultValue, options?.onOk, options?.onCancel);
+                        break;
+                    default:
+                        this.alert(title, message);
+                }
+            }
+        }
+    },
+
+    // 统一消息通信
+    Message: {
+        send: function(data: Record<string, unknown>, targetOrigin?: string): boolean {
+            try {
+                if (typeof window !== 'undefined' && window.parent && window.parent !== window) {
+                    window.parent.postMessage(data, targetOrigin || "*");
+                    return true;
+                }
+            } catch (e) {
+                const err = e as Error;
+                if (typeof bgmLog === 'function') {
+                    bgmLog(LOG_LEVELS?.DEBUG || 0, "postMessage 不可用: " + err.message);
+                }
+            }
+            return false;
+        },
+        postMessage: function(data: Record<string, unknown>, targetOrigin?: string): boolean {
+            return this.send(data, targetOrigin);
+        }
+    },
+
+    // 向后兼容方法
+    postMessage: function(data: Record<string, unknown>, targetOrigin?: string): boolean {
+        return BGM.Message.send(data, targetOrigin);
+    },
+
+    showDialog: function(title: string, message: string): void {
+        if (BGM.Message.send({ type: "showDialog", title: title, message: message })) {
+            return;
+        }
+        BGM.Dialog.alert(title, message);
+    },
+
+    showConfirm: function(title: string, message: string, onConfirm?: () => void, onCancel?: () => void): void {
+        if (BGM.Message.send({ type: "showConfirm", title: title, message: message, onConfirm: true })) {
+            (window as unknown as Record<string, { confirm?: () => void; cancel?: () => void }>)._bgmConfirmCallback = { confirm: onConfirm, cancel: onCancel };
+            return;
+        }
+        BGM.Dialog.confirm(message, onConfirm, onCancel);
+    },
+
+    // 统一错误处理
+    handleError: function(error: unknown, options?: ErrorOptions): BgmError {
+        const opts: ErrorOptions = {
+            level: ErrorLevel.ERROR,
+            showDialog: false,
+            context: '',
+            ...options
+        };
+
+        let bgmError: BgmError;
+        if (error instanceof BgmError) {
+            bgmError = error;
+        } else if (error instanceof Error) {
+            bgmError = new BgmError(error.message, 'JS_ERROR', {
+                name: error.name,
+                stack: error.stack
+            });
+        } else {
+            bgmError = new BgmError(String(error), 'UNKNOWN');
+        }
+
+        if (opts.context) {
+            bgmError.details.context = opts.context;
+        }
+
+        switch (opts.level) {
+            case ErrorLevel.SILENT:
+                break;
+            case ErrorLevel.WARN:
+                bgmLog(LOG_LEVELS.WARN, bgmError.toString());
+                break;
+            case ErrorLevel.ERROR:
+                bgmLog(LOG_LEVELS.ERROR, bgmError.toString());
+                if (opts.showDialog) {
+                    BGM.showDialog('错误', bgmError.message);
+                }
+                break;
+            case ErrorLevel.THROW:
+                bgmLog(LOG_LEVELS.ERROR, bgmError.toString());
+                throw bgmError;
+        }
+
+        return bgmError;
+    },
+
+    // 安全执行函数
+    safeExecute: function<T>(fn: () => T, context?: string, options?: ErrorOptions): T | BgmError {
+        try {
+            return fn();
+        } catch (error) {
+            return BGM.handleError(error, { context, ...options } as ErrorOptions);
+        }
+    }
+};
+
+// ========== 日志函数 ==========
+/**
+ * 日志函数（支持日志级别控制）
+ * @param level - 日志级别 (0=DEBUG, 1=INFO, 2=WARN, 3=ERROR)
+ * @param message - 日志消息
+ */
+export function bgmLog(level: number, message: string): void {
+    if (level >= BGM.LOG_LEVEL) {
+        const prefix = ['[DEBUG]', '[INFO]', '[WARN]', '[ERROR]'][level] || '[INFO]';
+        console.log(prefix + ' ' + message);
+    }
+}
+
+// ========== Application 获取 ==========
+/**
+ * 获取 Application 对象
+ */
+export function getApp(): unknown {
+    if (typeof window !== 'undefined' && (window as unknown as Record<string, unknown>).Application) {
+        return (window as unknown as Record<string, unknown>).Application;
+    }
+    if (typeof Application !== 'undefined') {
+        return Application;
+    }
+    return null;
+}
+
+// ========== 单元格操作 ==========
+/**
+ * 列号转字母 (A, B, ..., Z, AA, AB, ...)
+ */
+export function colNumToLetter(col: number): string {
+    let letter = "";
+    while (col > 0) {
+        const mod = (col - 1) % 26;
+        letter = String.fromCharCode(65 + mod) + letter;
+        col = Math.floor((col - mod) / 26);
+    }
+    return letter;
+}
+
+/**
+ * 安全获取单元格对象
+ */
+export function getCell(ws: unknown, row: number, col: number): unknown {
+    try {
+        const wsObj = ws as { Range?: (addr: string) => unknown; Cells?: unknown };
+        if (wsObj && typeof wsObj.Range === 'function') {
+            const colLetter = colNumToLetter(col);
+            return wsObj.Range(colLetter + row);
+        }
+        const cellsObj = wsObj?.Cells as { Item?: (r: number, c: number) => unknown } | unknown;
+        if (typeof cellsObj === 'object' && cellsObj !== null) {
+            if (typeof (cellsObj as { Item: (r: number, c: number) => unknown }).Item === 'function') {
+                return (cellsObj as { Item: (r: number, c: number) => unknown }).Item(row, col);
+            }
+            // Cells(row, col) 形式
+            return (cellsObj as (r: number, c: number) => unknown)(row, col);
+        }
+        return null;
+    } catch (e) {
+        console.error("getCell error:", e);
+        return null;
+    }
+}
+
+/**
+ * 安全获取单元格值
+ */
+export function getCellValue(ws: unknown, row: number, col: number): string {
+    try {
+        const cell = getCell(ws, row, col);
+        if (cell && (cell as { Value?: () => unknown }).Value) {
+            const val = (cell as { Value: () => unknown }).Value();
+            return val !== null && val !== undefined ? String(val) : '';
+        }
+    } catch (e) {
+        const err = e as Error;
+        bgmLog(LOG_LEVELS.WARN, "getCellValue 失败: " + err.message);
+    }
+    return "";
+}
+
+/**
+ * 设置单元格值
+ */
+export function setCellValue(ws: unknown, row: number, col: number, value: unknown): boolean {
+    try {
+        const cell = getCell(ws, row, col);
+        if (!cell) {
+            console.error("setCellValue - 无法获取单元格:", row, col);
+            return false;
+        }
+        (cell as { Value: unknown }).Value = value;
+        return true;
+    } catch (e) {
+        console.error("setCellValue error (行:", row, "列:", col, "):", e);
+    }
+    return false;
+}
+
+/**
+ * 获取工作表对象
+ */
+export function getSheetByIndex(sheetIndex: number): unknown {
+    const app = getApp() as { ActiveWorkbook?: { Sheets?: { Count: number; Item: (i: number) => unknown } } };
+    if (!app?.ActiveWorkbook?.Sheets) return null;
+    const sheets = app.ActiveWorkbook.Sheets;
+    if (sheets.Count === 0) return null;
+    return sheets.Item(sheetIndex);
+}
+
+// ========== HTML 安全 ==========
+/**
+ * HTML 转义（防止 XSS）
+ */
+export function escapeHtml(text: string | null | undefined): string {
+    if (!text) return "";
+    const div = document.createElement("div");
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+// ========== Token 存储 ==========
+/**
+ * 存储 Token（加密）
+ */
+export function storeBgToken(token: string): boolean {
+    const app = getApp() as { PluginStorage?: { setItem: (key: string, value: string) => void } };
+    if (!app?.PluginStorage) return false;
+    app.PluginStorage.setItem("bgm_token", encryptToken(token));
+    return true;
+}
+
+/**
+ * 清除 Token
+ */
+export function clearBgToken(): boolean {
+    const app = getApp() as { PluginStorage?: { setItem: (key: string, value: string) => void } };
+    if (!app?.PluginStorage) return false;
+    app.PluginStorage.setItem("bgm_token", "");
+    return true;
+}
+
+/**
+ * 加载 Token（解密）
+ */
+export function loadBgToken(): string | null {
+    const app = getApp() as { PluginStorage?: { getItem: (key: string) => string | null } };
+    if (!app?.PluginStorage) return null;
+    const stored = app.PluginStorage.getItem("bgm_token");
+    if (!stored) return null;
+    const token = decryptToken(stored);
+    if (token) return token;
+    clearBgToken();
+    return null;
+}
+
+// ========== 用户信息 ==========
+/**
+ * 设置 BGM 用户 ID
+ */
+export function _setBgmUserId(id: string): void { 
+    BGM.cache.userId = id; 
+}
+
+/**
+ * 获取 BGM 用户 ID
+ */
+export function _getBgmUserId(): string | null { 
+    return BGM.cache.userId; 
+}
+
+/**
+ * 获取用户 API 路径
+ */
+export function _getUserApiPath(): string { 
+    return BGM.cache.userId ? String(BGM.cache.userId) : "-"; 
+}
+
+/**
+ * 获取 Bangumi 当前登录用户信息
+ */
+export function _fetchBgmUserInfo(callback?: (userInfo: BGMUserInfo | null) => void): void {
+    const token = loadBgToken();
+    if (!token) {
+        if (callback) callback(null);
+        return;
+    }
+    
+    const xhr = new XMLHttpRequest();
+    xhr.open("GET", BGM_CONFIG.API_BASE + "/me", true);
+    xhr.setRequestHeader("Authorization", "Bearer " + token);
+    
+    xhr.onload = function(): void {
+        if (xhr.status === 200) {
+            try {
+                const data = JSON.parse(xhr.responseText) as { id?: string | number; user_id?: string | number; username?: string; user_name?: string; name?: string };
+                const userId = String(data.id || data.user_id || '');
+                const username = String(data.username || data.user_name || data.name || '');
+                
+                BGM.cache.userId = userId;
+                BGM.cache.username = username;
+                bgmLog(LOG_LEVELS.DEBUG, "_fetchBgmUserInfo: userId=" + userId);
+                
+                if (callback) callback({ id: userId, username: username });
+            } catch {
+                if (callback) callback(null);
+            }
+        } else {
+            if (callback) callback(null);
+        }
+    };
+    
+    xhr.onerror = function(): void {
+        if (callback) callback(null);
+    };
+    
+    xhr.send();
+}
+
+// ========== 辅助函数 ==========
+/**
+ * 通过 WPS 提供的接口执行脚本
+ */
+export function shellExecuteByOAAssist(param: string): void {
+    const app = getApp() as { OAAssist?: { ShellExecute: (p: string) => void } };
+    if (app?.OAAssist) {
+        app.OAAssist.ShellExecute(param);
+    }
+}
+
+/**
+ * 获取 URL 路径
+ */
+export function GetUrlPath(): string {
+    const app = getApp() as { PluginStorage?: { getItem: (key: string) => string | null } };
+    const manifestPath = app?.PluginStorage?.getItem("manifest_base_path");
+    if (manifestPath) {
+        return manifestPath;
+    }
+    if (typeof window !== 'undefined' && window.location?.href) {
+        const currentUrl = window.location.href;
+        const lastSlash = currentUrl.lastIndexOf("/");
+        return currentUrl.substring(0, lastSlash);
+    }
+    return "";
+}
+
+/**
+ * 显示同步面板
+ */
+export function showBangumiPanel(): void {
+    const app = getApp() as {
+        PluginStorage?: { getItem: (k: string) => string | null; setItem: (k: string, v: string) => void };
+        CreateTaskPane?: (url: string) => { ID: string; Visible: boolean };
+        GetTaskPane?: (id: string) => { Visible: boolean };
+    };
+    if (!app) {
+        if (typeof window !== 'undefined' && typeof (window as unknown as Record<string, unknown>).BGMError === 'function') {
+            (window as unknown as Record<string, (m: string, t: string) => void>).BGMError("无法获取 WPS Application 对象！", "错误");
+        } else if (typeof window !== 'undefined') {
+            window.alert("无法获取 WPS Application 对象！");
+        }
+        return;
+    }
+    const tsId = app.PluginStorage?.getItem("taskpane_id");
+    if (!tsId) {
+        const tskpane = app.CreateTaskPane?.(GetUrlPath() + "/ui/taskpane.html");
+        if (tskpane) {
+            const id = tskpane.ID;
+            app.PluginStorage?.setItem("taskpane_id", id);
+            tskpane.Visible = true;
+        }
+    } else {
+        const tskpane = app.GetTaskPane?.(tsId);
+        if (tskpane) {
+            tskpane.Visible = !tskpane.Visible;
+        }
+    }
+}
+
+/**
+ * 字符串去除首尾空格
+ */
+export function trim(str: string | null | undefined): string {
+    if (!str) return "";
+    return String(str).replace(/^\s+|\s+$/g, "");
+}
+
+/**
+ * 显示输入提示框
+ */
+export function wpsPrompt(message: string, defaultValue?: string): Promise<string | null> {
+    return new Promise((resolve) => {
+        const app = getApp() as { InputBox?: (msg: string, title: string, defaultVal: string, type: number) => string | false };
+        if (app?.InputBox) {
+            try {
+                const result = app.InputBox(message, "Bangumi 设置", defaultValue || "", 2);
+                if (result === false || result === null || result === undefined) {
+                    resolve(null);
+                    return;
+                }
+                resolve(String(result));
+                return;
+            } catch (e) {
+                console.warn("WPS InputBox 不可用:", (e as Error).message);
+            }
+        }
+        if (typeof window !== 'undefined' && typeof (window as unknown as Record<string, unknown>).BGMInput === 'function') {
+            (window as unknown as Record<string, (t: string, m: string, d: string, oc: (v: string) => void, oc2: () => void) => void>).BGMInput!("输入", message, defaultValue || '', (value) => {
+                resolve(value);
+            }, () => {
+                resolve(null);
+            });
+        } else {
+            try {
+                const result = window.prompt(message, defaultValue);
+                resolve(result);
+            } catch (e) {
+                console.error("prompt 也不可用:", (e as Error).message);
+                resolve(null);
+            }
+        }
+    });
+}
+
+/**
+ * 显示 WPS 消息对话框
+ */
+export function wpsMsgBox(message: string, buttons?: number, icon?: number): Promise<number> {
+    return new Promise((resolve) => {
+        const app = getApp() as { MessageBox?: (msg: string, type: number) => number };
+        if (app?.MessageBox) {
+            try {
+                const result = app.MessageBox(message, (buttons || 0) + (icon || 64));
+                resolve(result);
+                return;
+            } catch (e) {
+                console.warn("WPS MessageBox 不可用:", (e as Error).message);
+            }
+        }
+        
+        if (buttons === 4) {
+            if (typeof window !== 'undefined' && typeof (window as unknown as Record<string, unknown>).BGMConfirm === 'function') {
+                (window as unknown as Record<string, (m: string, t: string, oc: () => void, oc2: () => void) => void>).BGMConfirm!(message, "确认", () => {
+                    resolve(6);
+                }, () => {
+                    resolve(7);
+                });
+            } else if (typeof window !== 'undefined') {
+                resolve(window.confirm(message) ? 6 : 7);
+            }
+        } else {
+            if (typeof window !== 'undefined' && typeof (window as unknown as Record<string, unknown>).BGMAlert === 'function') {
+                (window as unknown as Record<string, (m: string, t: string, oc?: () => void) => void>).BGMAlert!(message, "提示", () => {
+                    resolve(1);
+                });
+            } else if (typeof window !== 'undefined') {
+                window.alert(message);
+                resolve(1);
+            }
+        }
+    });
+}
+
+/**
+ * 延迟执行
+ */
+export function sleep(ms: number): void {
+    try {
+        const app = getApp() as { Wait?: (date: Date) => void; DoEvents?: () => void };
+        if (app?.Wait) {
+            const waitTime = new Date(Date.now() + ms);
+            app.Wait(waitTime);
+            return;
+        }
+    } catch (e) {
+        bgmLog(LOG_LEVELS.WARN, "sleep app.Wait 失败: " + (e as Error).message);
+    }
+    const end = Date.now() + ms;
+    while (Date.now() < end) {
+        try {
+            const app = getApp() as { DoEvents?: () => void };
+            if (app?.DoEvents) app.DoEvents();
+        } catch(e) {
+            if (typeof bgmLog === 'function') {
+                bgmLog(LOG_LEVELS?.DEBUG || 0, "sleep DoEvents 失败: " + (e as Error).message);
+            }
+            break;
+        }
+    }
+}
+
+/**
+ * 显示自定义提示对话框
+ */
+export function showAlertDialog(title: string, message: string): void {
+    if (typeof window !== 'undefined' && typeof (window as unknown as Record<string, unknown>).BGMAlert === 'function') {
+        (window as unknown as Record<string, (m: string, t: string) => void>).BGMAlert(message, title);
+    } else if (typeof window !== 'undefined') {
+        window.alert(message);
+    }
+}
+
+/**
+ * 关闭提示对话框
+ */
+export function closeAlertDialog(): void {
+    const modal = document.getElementById("alertDialog");
+    if (modal) {
+        modal.style.display = "none";
+    }
+}
+
+// ========== 统一日志前缀 ==========
+(function(): void {
+    const _origLog = console.log;
+    const _origWarn = console.warn;
+    const _origError = console.error;
+    console.log = function(...args: unknown[]): void {
+        const argsArray = Array.from(args);
+        if (argsArray.length > 0 && typeof argsArray[0] === 'string' && !argsArray[0].startsWith('[BGM]')) {
+            argsArray[0] = '[BGM] ' + argsArray[0];
+        }
+        _origLog.apply(console, argsArray as Parameters<typeof console.log>);
+    };
+    console.warn = function(...args: unknown[]): void {
+        const argsArray = Array.from(args);
+        if (argsArray.length > 0 && typeof argsArray[0] === 'string' && !argsArray[0].startsWith('[BGM]')) {
+            argsArray[0] = '[BGM] ' + argsArray[0];
+        }
+        _origWarn.apply(console, argsArray as Parameters<typeof console.warn>);
+    };
+    console.error = function(...args: unknown[]): void {
+        const argsArray = Array.from(args);
+        if (argsArray.length > 0 && typeof argsArray[0] === 'string' && !argsArray[0].startsWith('[BGM]')) {
+            argsArray[0] = '[BGM] ' + argsArray[0];
+        }
+        _origError.apply(console, argsArray as Parameters<typeof console.error>);
+    };
+})();
+
+// ========== 向后兼容别名（挂载到 window）==========
+if (typeof window !== 'undefined') {
+    const win = window as unknown as Record<string, unknown>;
+    win.WPS_Enum = WPS_ENUM;
+    win.XL = XL;
+    win.BGM_CONFIG = BGM_CONFIG;
+    win.BGM_COLOR = BGM_COLOR;
+    win.BGM = BGM;
+    win.bgmLog = bgmLog;
+    win.getApp = getApp;
+    win.colNumToLetter = colNumToLetter;
+    win.getCell = getCell;
+    win.getCellValue = getCellValue;
+    win.setCellValue = setCellValue;
+    win.getSheetByIndex = getSheetByIndex;
+    win.escapeHtml = escapeHtml;
+    win.storeBgToken = storeBgToken;
+    win.clearBgToken = clearBgToken;
+    win.loadBgToken = loadBgToken;
+    win._setBgmUserId = _setBgmUserId;
+    win._getBgmUserId = _getBgmUserId;
+    win._getUserApiPath = _getUserApiPath;
+    win._fetchBgmUserInfo = _fetchBgmUserInfo;
+    win.showAlertDialog = showAlertDialog;
+    win.closeAlertDialog = closeAlertDialog;
+    win.shellExecuteByOAAssist = shellExecuteByOAAssist;
+    win.GetUrlPath = GetUrlPath;
+    win.showBangumiPanel = showBangumiPanel;
+    win.trim = trim;
+    win.wpsPrompt = wpsPrompt;
+    win.wpsMsgBox = wpsMsgBox;
+    win.sleep = sleep;
+    win.calcChecksum = calcChecksum;
+}
