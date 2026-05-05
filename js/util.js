@@ -181,6 +181,34 @@ function clearBgToken() {
     return true;
 }
 
+// ========== 统一日志前缀 ==========
+(function() {
+    const _origLog = console.log;
+    const _origWarn = console.warn;
+    const _origError = console.error;
+    console.log = function() {
+        let args = Array.prototype.slice.call(arguments);
+        if (args.length > 0 && typeof args[0] === 'string' && !args[0].startsWith('[BGM]')) {
+            args[0] = '[BGM] ' + args[0];
+        }
+        _origLog.apply(console, args);
+    };
+    console.warn = function() {
+        let args = Array.prototype.slice.call(arguments);
+        if (args.length > 0 && typeof args[0] === 'string' && !args[0].startsWith('[BGM]')) {
+            args[0] = '[BGM] ' + args[0];
+        }
+        _origWarn.apply(console, args);
+    };
+    console.error = function() {
+        let args = Array.prototype.slice.call(arguments);
+        if (args.length > 0 && typeof args[0] === 'string' && !args[0].startsWith('[BGM]')) {
+            args[0] = '[BGM] ' + args[0];
+        }
+        _origError.apply(console, args);
+    };
+})();
+
 // ========== 辅助函数 ==========
 
 /**
