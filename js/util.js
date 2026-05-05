@@ -326,8 +326,60 @@ function trim(str) {
 }
 
 /**
- * Sleep 函数（优化版：优先使用 WPS Application.Wait 释放 CPU）
+ * 显示输入提示框（兼容 ribbon 和 taskpane 上下文）
+ * 优先使用 WPS Application.InputBox（ribbon 上下文）
+ * 回退使用浏览器 prompt（部分 WPS 版本支持）
+ * @param {string} message - 提示信息
+ * @param {string} defaultValue - 默认值
+ * @returns {string|null} - 输入值或 null（取消）
  */
+function wpsPrompt(message, defaultValue) {
+    let app = getApp();
+    // 尝试 WPS 原生 InputBox（ribbon 上下文）
+    if (app && typeof app.InputBox === 'function') {
+        try {
+            let result = app.InputBox(message, "Bangumi 设置", defaultValue || "", 2);
+            // InputBox 返回 false 表示取消
+            if (result === false || result === null || result === undefined) {
+                return null;
+            }
+            return String(result);
+        } catch (e) {
+            console.warn("WPS InputBox 不可用:", e.message);
+        }
+    }
+    // 回退浏览器 prompt
+    try {
+        return prompt(message, defaultValue);
+    } catch (e) {
+        console.error("prompt 也不可用:", e.message);
+        return null;
+    }
+}
+
+/**
+ * 显示 WPS 消息对话框（兼容上下文）
+ * @param {string} message - 提示信息
+ * @param {number} buttons - 按钮类型（0=OK, 1=OKCancel, 4=YesNo）
+ * @param {number} icon - 图标类型（16=Stop, 32=Question, 48=Exclamation, 64=Information）
+ * @returns {number} - 1=OK, 2=Cancel, 6=Yes, 7=No
+ */
+function wpsMsgBox(message, buttons, icon) {
+    let app = getApp();
+    if (app && typeof app.MessageBox === 'function') {
+        try {
+            return app.MessageBox(message, (buttons || 0) + (icon || 64));
+        } catch (e) {
+            console.warn("WPS MessageBox 不可用:", e.message);
+        }
+    }
+    // 回退浏览器 confirm/alert
+    if (buttons === 4) { // YesNo
+        return confirm(message) ? 6 : 7;
+    }
+    alert(message);
+    return 1;
+}
 function sleep(ms) {
     try {
         let app = getApp();

@@ -47,10 +47,17 @@ window.onload = () => {
         viewRecordsBtn.onclick = () => openSyncRecordSheet();
     }
 
-    // 绑定清除同步记录按钮
+    // 绑定清除同步记录按钮（使用自定义确认对话框）
     let clearRecordsBtn = document.getElementById("clearRecordsBtn");
     if (clearRecordsBtn) {
-        clearRecordsBtn.onclick = () => clearSyncRecords();
+        clearRecordsBtn.onclick = () => {
+            showConfirmDialog("确定要清除所有同步记录吗？\n\n此操作不可恢复，将删除同步记录表中的所有数据。", () => {
+                clearSyncRecords();
+                if (typeof refreshSyncRecordsPreview === 'function') {
+                    refreshSyncRecordsPreview();
+                }
+            });
+        };
     }
 
     // 绑定工作表选择事件
@@ -1508,25 +1515,33 @@ function _doAPISync(sheetIndex, token) {
             return;
         }
 
-        // 获取数据范围（使用 D 列序列号检测最后一行，与预览逻辑一致）
+        // 获取可见行（支持筛选模式）
         let seqCol = 4; // D列
         let dataStartRow = headerRow + 1;
         let lastRow = getLastRow(ws);
         let nameCol = colMap.has("名称") ? colMap.get("名称") : 0;
-        console.log("工作表演:", ws.Name, "表头行:", headerRow, "数据起始行:", dataStartRow, "最后行(DB):", lastRow);
         
-        // 确保至少扫描到合理的行数（兼容不同版本的 getLastRow 实现）
-        if (!lastRow || lastRow < dataStartRow) {
-            // 回退：直接从 D 列最后单元格向上查找
-            try {
-                let dLast = getCell(ws, ws.Rows.Count, seqCol);
-                if (dLast) {
-                    let dEnd = dLast.End(-4162);
-                    lastRow = dEnd.Row > dataStartRow ? dEnd.Row : 1000;
-                }
-            } catch (e2) {}
-            if (!lastRow || lastRow < dataStartRow) lastRow = 1000;
-            console.log("回退检测 lastRow:", lastRow);
+        // 检测筛选状态，仅处理可见行
+        let rowsToProcess = [];
+        let filterStatus = getFilterStatus(lastRow);
+        if (filterStatus && filterStatus.hasFilter && filterStatus.visibleRows.length > 0) {
+            rowsToProcess = filterStatus.visibleRows;
+            console.log(`检测到筛选，只处理 ${rowsToProcess.length} 行可见数据（共 ${filterStatus.totalRows} 行）`);
+        } else {
+            // 无筛选时使用序列号连续性检测
+            let seqResult = getSequentialRowsBySeqCol(dataStartRow, lastRow);
+            rowsToProcess = seqResult.validRows || [];
+            if (rowsToProcess.length === 0) {
+                // 回退：全量扫描
+                for (let r = dataStartRow; r <= lastRow; r++) rowsToProcess.push(r);
+            }
+            console.log(`工作表演: ${ws.Name}, 表头行: ${headerRow}, 可见行: ${rowsToProcess.length}`);
+        }
+        
+        if (rowsToProcess.length === 0) {
+            alert("没有需要处理的数据行！");
+            setStatus("无数据", "info");
+            return;
         }
 
         // 先验证 Token 有效性
@@ -1571,7 +1586,7 @@ function _doAPISync(sheetIndex, token) {
         let collectionMap = new Map();
         for (let i = 0; i < userCollections.length; i++) {
             let item = userCollections[i];
-            collectionMap.set(item.subject_id, item);
+            collectionMap.set(String(item.subject_id), item);
         }
 
         // 获取本地同步记录
@@ -1618,14 +1633,15 @@ function _doAPISync(sheetIndex, token) {
             syncCountMap.set(sid, (syncCountMap.get(sid) || 0) + 1);
         }
 
-        // 遍历 Excel 数据并标记 D 列
+        // 遍历可见行并标记 D 列
         setStatus(`正在匹配 ${userCollections.length} 条收藏...`, "loading");
         let matchedCount = 0;
         let totalCount = 0;
         let purpleCount = 0, lightGreenCount = 0, darkGreenCount = 0;
 
-        console.log(`开始扫描行: ${dataStartRow} → ${lastRow}, 共 ${lastRow - dataStartRow + 1} 行`);
-        for (let row = dataStartRow; row <= lastRow; row++) {
+        console.log(`开始扫描 ${rowsToProcess.length} 行可见数据`);
+        for (let idx = 0; idx < rowsToProcess.length; idx++) {
+            let row = rowsToProcess[idx];
             let bgmUrlCell = getCell(ws, row, colMap.get("Bangumi_URL"));
             let bgmUrl = bgmUrlCell ? trim(String(bgmUrlCell.Value() || "")) : "";
             let sid = extractSubjectId(bgmUrl);
@@ -1649,13 +1665,13 @@ function _doAPISync(sheetIndex, token) {
             }
             totalCount++;
 
-            if (row % 100 === 0) {
-                setStatus(`已处理 ${row}/${lastRow} 行...`, "loading");
+            if (idx % 100 === 0) {
+                setStatus(`已处理 ${idx + 1}/${rowsToProcess.length} 行...`, "loading");
             }
         }
 
         setStatus("就绪", "success");
-        alert(`同步完成！\n\n📋 已将 ${writtenToRecord} 条BGM收藏写入同步记录表\n🔍 扫描 ${totalCount} 行Excel数据\n🔗 匹配到 ${matchedCount} 条\n\nD 列颜色说明：\n🟣 紫色 - 本次从BGM同步\n🟢 浅绿色 - 已同步2次\n🌲 深绿色 - 已同步多次`);
+        alert(`同步完成！\n\n📋 已将 ${writtenToRecord} 条BGM收藏写入同步记录表\n🔍 扫描 ${totalCount} 行可见数据\n🔗 匹配到 ${matchedCount} 条\n\nD 列颜色说明：\n🟣 紫色 - 本次从BGM同步\n🟢 浅绿色 - 已同步2次\n🌲 深绿色 - 已同步多次`);
 
     } catch (e) {
         alert("同步失败: " + e.message);

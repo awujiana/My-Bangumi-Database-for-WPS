@@ -200,18 +200,13 @@ function addSyncRecord(options) {
         // 找到最后一行
         let lastRow = 1;
         try {
-            // 方法1：使用 End 向上查找
             let lastCell = sheet.Range("A" + sheet.Rows.Count);
             if (lastCell && lastCell.Value2) {
-                let endCell = lastCell.End(-4162); // xlUp
+                let endCell = lastCell.End(-4162);
                 lastRow = endCell.Row > 0 ? endCell.Row : 1;
             }
-            console.log("addSyncRecord - End方法 lastRow:", lastRow);
-        } catch (e) {
-            console.log("addSyncRecord - End方法失败:", e.message);
-        }
+        } catch (e) {}
         
-        // 方法2：如果 End 返回 1，尝试循环查找
         if (lastRow === 1) {
             try {
                 for (let i = 2; i <= 10000; i++) {
@@ -219,16 +214,16 @@ function addSyncRecord(options) {
                     if (!cell || !cell.Value2) break;
                     lastRow = i;
                 }
-                console.log("addSyncRecord - 循环方法 lastRow:", lastRow);
-            } catch (e) {
-                console.log("addSyncRecord - 循环方法失败:", e.message);
-            }
+            } catch (e) {}
         }
         
         console.log("addSyncRecord - 最终 lastRow:", lastRow);
         
-        // 检查是否已存在相同 SID 的记录（使用缓存加速查重）
-        let existingRow = _getRecordRowBySid(sheet, String(options.sid));
+        // 如果缓存无效，先重建
+        _buildSyncRecordCache(sheet);
+        
+        // 检查是否已存在相同 SID 的记录
+        let existingRow = _syncRecordSidCache.get(String(options.sid)) || 0;
         let currentCount = 1;
         if (existingRow > 0) {
             let countCell = sheet.Range("G" + existingRow);
@@ -253,7 +248,6 @@ function addSyncRecord(options) {
         // 写入数据（列顺序：序号、时间、名称、URL、SID、类型、同步次数、同步内容、状态、备注）
         console.log("addSyncRecord - 开始写入数据到行:", newRow);
         if (existingRow === 0) {
-            // 新增：设置序号
             sheet.Range("A" + newRow).Value = seqNum;
             console.log("addSyncRecord - 写入序号:", seqNum);
         }
@@ -261,16 +255,45 @@ function addSyncRecord(options) {
         sheet.Range("C" + newRow).Value = options.name || "";
         sheet.Range("D" + newRow).Value = options.url || "";
         sheet.Range("E" + newRow).Value = options.sid || "";
-        sheet.Range("F" + newRow).Value = options.type || ""; // 类型
+        sheet.Range("F" + newRow).Value = options.type || "";
         sheet.Range("G" + newRow).Value = currentCount;
         sheet.Range("H" + newRow).Value = options.content || "";
         sheet.Range("I" + newRow).Value = options.status || "成功";
         sheet.Range("J" + newRow).Value = options.message || "";
         console.log("addSyncRecord - 数据写入完成");
         
-        // 验证写入
-        let verifyCell = sheet.Range("E" + newRow);
-        console.log("addSyncRecord - 验证写入，E列值:", verifyCell ? verifyCell.Value2 : "null");
+        // 更新缓存（直接操作内存，避免从 sheet 重新读取）
+        if (existingRow === 0) {
+            _syncRecordListCache.push({
+                seq: seqNum,
+                time: timeStr,
+                name: options.name || "",
+                url: options.url || "",
+                sid: String(options.sid || ""),
+                type: options.type || "",
+                count: currentCount,
+                content: options.content || "",
+                status: options.status || "成功",
+                message: options.message || "",
+                row: newRow
+            });
+        } else {
+            // 更新缓存中的已有记录
+            for (let i = 0; i < _syncRecordListCache.length; i++) {
+                if (String(_syncRecordListCache[i].sid) === String(options.sid)) {
+                    _syncRecordListCache[i].time = timeStr;
+                    _syncRecordListCache[i].name = options.name || _syncRecordListCache[i].name;
+                    _syncRecordListCache[i].url = options.url || _syncRecordListCache[i].url;
+                    _syncRecordListCache[i].type = options.type || _syncRecordListCache[i].type;
+                    _syncRecordListCache[i].count = currentCount;
+                    _syncRecordListCache[i].content = options.content || _syncRecordListCache[i].content;
+                    _syncRecordListCache[i].status = options.status || _syncRecordListCache[i].status;
+                    _syncRecordListCache[i].message = options.message || _syncRecordListCache[i].message;
+                    break;
+                }
+            }
+        }
+        _syncRecordSidCache.set(String(options.sid), newRow);
         
         // 设置状态颜色（I 列）
         let statusCell = sheet.Range("I" + newRow);
@@ -284,13 +307,7 @@ function addSyncRecord(options) {
             }
         }
         
-        // 刷新工作表显示
-        sheet.Activate();
-        sheet.Calculate();
-        console.log("addSyncRecord - 工作表已刷新");
-        
-        // 写入后失效缓存
-        _invalidateSyncRecordCache();
+        console.log("addSyncRecord - 缓存已更新，总记录数:", _syncRecordListCache.length);
         
         let action = existingRow > 0 ? "更新" : "新增";
         console.log("addSyncRecord " + action + " - 行:", newRow, "状态:", options.status);
@@ -379,22 +396,11 @@ function getAllSyncRecords() {
 }
 
 /**
- * 清除同步记录
- * @param {boolean} confirmIt - 是否需要确认
+ * 清除同步记录（不含确认对话框，由调用方控制确认逻辑）
+ * taskpane 调用时通过自定义 showConfirmDialog 处理后调用此函数
+ * @returns {boolean} 是否清除成功
  */
-function clearSyncRecords(confirmIt) {
-    if (confirmIt !== false && typeof showConfirmDialog === 'function') {
-        // 使用自定义对话框（异步），但 clearSyncRecords 是同步函数
-        // 若自定义对话框不可用则回退原生 confirm
-        if (!confirm("确定要清除所有同步记录吗？")) {
-            return false;
-        }
-    } else if (confirmIt !== false) {
-        if (!confirm("确定要清除所有同步记录吗？")) {
-            return false;
-        }
-    }
-    
+function clearSyncRecords() {
     try {
         let sheet = getOrCreateSyncRecordSheet();
         if (!sheet) return false;
@@ -618,7 +624,7 @@ function fetchCollectionsByType(token, subjectType, maxItems) {
     try {
         while (allItems.length < maxItems) {
             let xhr = new XMLHttpRequest();
-            let url = `${BGM_API_BASE}/v0/users/-/collections?subject_type=${subjectType}&limit=${limit}&offset=${(page - 1) * limit}`;
+            let url = `${BGM_API_BASE}/v0/users/${_getUserApiPath()}/collections?subject_type=${subjectType}&limit=${limit}&offset=${(page - 1) * limit}`;
             
             xhr.open("GET", url, false);
             xhr.setRequestHeader("Authorization", "Bearer " + token);

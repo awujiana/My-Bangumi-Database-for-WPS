@@ -54,7 +54,7 @@ function getBgmtoken() {
     if (!app) return null;
     let token = loadBgToken();
     if (!token) {
-        token = prompt("请输入 Bangumi Access Token:", "");
+        token = wpsPrompt("请输入 Bangumi Access Token:", "");
         if (token && token.trim()) {
             storeBgToken(token.trim());
         }
@@ -688,7 +688,7 @@ function clearRowColors() {
 
 // ========== 测试单个条目 ==========
 function testSingleUpdate() {
-    let subjectId = prompt("输入 subject_id 测试:", "8");
+    let subjectId = wpsPrompt("输入 subject_id 测试:", "8");
     if (!subjectId || subjectId === "") return;
 
     let token = getBgmtoken();
@@ -798,7 +798,8 @@ function openBangumiTokenPage() {
 // ========== 显示Token输入对话框（Ribbon 模式）==========
 function showTokenDialog(currentToken) {
     let app = getApp();
-    let token = prompt("请输入 Bangumi Access Token：\n\n获取方式：Bangumi → 设置 → API → 创建应用\n\n已设置 Token: " + (currentToken ? "✅ 已设置（输入新值覆盖）" : "❌ 未设置"), "");
+    let message = "请输入 Bangumi Access Token：\n\n获取方式：Bangumi → 设置 → API → 创建应用\n\n已设置 Token: " + (currentToken ? "✅ 已设置（输入新值覆盖）" : "❌ 未设置");
+    let token = wpsPrompt(message, "");
     if (token !== null && token.trim() !== "") {
         if (app) {
             storeBgToken(token.trim());
@@ -855,7 +856,8 @@ function openUserCollection() {
 function showUserIdDialog() {
     let app = getApp();
     let currentId = app ? app.PluginStorage.getItem("bgm_user_id") || "" : "";
-    let userId = prompt("请输入 Bangumi 用户ID：\n\n获取方式：打开你的 Bangumi 主页，URL 中的数字/字母即为用户ID\n例如：https://bgm.tv/user/972358 → 用户ID: 972358", currentId);
+    let message = "请输入 Bangumi 用户ID：\n\n获取方式：打开你的 Bangumi 主页，URL 中的数字/字母即为用户ID\n例如：https://bgm.tv/user/972358 → 用户ID: 972358";
+    let userId = wpsPrompt(message, currentId);
     if (userId !== null && userId.trim() !== "") {
         if (app) {
             app.PluginStorage.setItem("bgm_user_id", userId.trim());
