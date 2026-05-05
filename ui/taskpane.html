@@ -28,36 +28,36 @@
     
     <!-- WPS JS RPC SDK（需要在模块之后加载）-->
     <script type="text/javascript" src="../.debugTemp/wpsjsrpcsdk.js"></script>
-    <!-- 自定义输入对话框 -->
-    <div id="inputDialog" class="modal" style="display:none;">
-        <div class="modal-content">
+    <!-- 内联对话框（仅作为 closeDialog/closeConfirmDialog/closeAlertDialog 的兼容目标，实际弹窗由 dialog.js 动态创建） -->
+    <div id="inputDialog" class="bgm-modal" style="display:none;">
+        <div class="bgm-modal-content bgm-input-content">
             <h3 id="dialogTitle">输入</h3>
             <p id="dialogMessage" style="margin-bottom:15px;"></p>
-            <input type="text" id="dialogInput" class="input" style="width:100%;margin-bottom:15px;">
-            <div class="dialog-buttons">
-                <button class="btn" onclick="closeDialog(false)">取消</button>
-                <button class="btn primary" onclick="closeDialog(true)">确定</button>
+            <input type="text" id="dialogInput" class="bgm-input-field" style="width:100%;margin-bottom:15px;">
+            <div class="bgm-dialog-footer">
+                <button class="bgm-btn bgm-btn-default" onclick="closeDialog(false)">取消</button>
+                <button class="bgm-btn bgm-btn-primary" onclick="closeDialog(true)">确定</button>
             </div>
         </div>
     </div>
     <!-- 自定义确认对话框 -->
-    <div id="confirmDialog" class="modal" style="display:none;">
-        <div class="modal-content confirm-modal-content">
+    <div id="confirmDialog" class="bgm-modal" style="display:none;">
+        <div class="bgm-modal-content bgm-confirm-content">
             <h3 id="confirmTitle">确认</h3>
-            <p id="confirmMessage" style="margin-bottom:20px;line-height:1.6;color:#ccc;"></p>
-            <div class="dialog-buttons" style="justify-content:center;gap:12px;">
-                <button class="btn confirm-btn confirm-no" id="confirmNoBtn" onclick="closeConfirmDialog(false)">取消</button>
-                <button class="btn confirm-btn confirm-yes" id="confirmYesBtn" onclick="closeConfirmDialog(true)">确定</button>
+            <p id="confirmMessage" style="margin-bottom:20px;line-height:1.6;color:#b0b0b0;"></p>
+            <div class="bgm-dialog-footer" style="justify-content:center;gap:12px;">
+                <button class="bgm-btn bgm-btn-default" onclick="closeConfirmDialog(false)">取消</button>
+                <button class="bgm-btn bgm-btn-primary" onclick="closeConfirmDialog(true)">确定</button>
             </div>
         </div>
     </div>
     <!-- 自定义提示对话框 -->
-    <div id="alertDialog" class="modal" style="display:none;">
-        <div class="modal-content confirm-modal-content">
+    <div id="alertDialog" class="bgm-modal" style="display:none;">
+        <div class="bgm-modal-content bgm-alert-content">
             <h3 id="alertTitle" style="margin:0 0 15px 0;color:#fff;font-size:18px;"></h3>
-            <p id="alertMessage" style="margin-bottom:20px;line-height:1.6;color:#ccc;white-space:pre-wrap;word-break:break-all;"></p>
-            <div class="dialog-buttons" style="justify-content:center;">
-                <button class="btn confirm-btn confirm-yes" onclick="closeAlertDialog()">确定</button>
+            <p id="alertMessage" style="margin-bottom:20px;line-height:1.6;color:#b0b0b0;white-space:pre-wrap;word-break:break-all;"></p>
+            <div class="bgm-dialog-footer" style="justify-content:center;">
+                <button class="bgm-btn bgm-btn-primary" onclick="closeAlertDialog()">确定</button>
             </div>
         </div>
     </div>
@@ -73,7 +73,7 @@
         <div class="section">
             <h3>快捷操作</h3>
             <div class="btn-group">
-                <button class="btn primary" onclick="onAction('sync')">🔄 同步到 Bangumi</button>
+                <button class="btn primary" id="syncBtn" onclick="onAction('sync')">🔄 同步到 Bangumi</button>
                 <button class="btn" onclick="onAction('test')">🧪 测试同步</button>
                 <button class="btn warning" onclick="onAction('clear')">🗑️ 清除标记</button>
             </div>
@@ -180,8 +180,12 @@
                     <h3>📋 详细预览</h3>
                     <button class="detail-close-btn" onclick="closeDetailModal()">×</button>
                 </div>
-                <div class="detail-modal-toolbar" id="detailModalToolbar"></div>
-                <div class="detail-modal-body" id="detailModalBody"></div>
+                <div class="detail-modal-toolbar" id="detailModalToolbar">
+                    <span id="detailCount" style="color:#aaa;"></span>
+                </div>
+                <div class="detail-modal-body" id="detailModalBody">
+                    <div id="detailList"></div>
+                </div>
             </div>
         </div>
 
