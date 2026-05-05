@@ -1,15 +1,158 @@
-// ========== 任务面板主模块 ==========
-// 功能：面板初始化、事件绑定、核心逻辑
-// 依赖：util.js, bangumi.js, syncRecord.js, ui/*.js, sync/*.js
+/**
+ * 任务面板主模块
+ * @module taskpane
+ * @description 面板初始化、事件绑定、核心逻辑
+ */
 
-// ========== 面板初始化 ==========
-window.onload = () => {
+import { WPS_Enum, LOG_LEVELS } from './util.js';
+import { BGM } from './util.js';
+import { getApp } from './util.js';
+import { initMessageListener, setSyncRunning, setStatus } from './ui/message.js';
+import { 
+    onAction, syncFromPanel, syncCollectionFromBgm,
+    markUploadedItems, clearSheetMarks
+} from './ui/handlers.js';
+import { 
+    updateTokenStatus, updateUserIdStatus, 
+    showAlertDialog, closeAlertDialog, closeInputDialog, closeConfirmDialog,
+    showToast, showTokenDialog, showUserIdDialog
+} from './ui/dialog.js';
+import { previewSyncContent, closeDetailModal, filterDetailItems } from './ui/preview.js';
+
+// ========== 工作表锁定功能 ==========
+let lockedSheetIndex = null;
+let lockedSheetName = null;
+
+/**
+ * 切换工作表锁定状态
+ */
+function toggleSheetLock() {
+    let select = document.getElementById("sheetSelect");
+    if (!select) return;
+
+    let sheetIndex = parseInt(select.value);
+
+    if (BGM.sheet.isLocked && BGM.sheet.lockedIndex === sheetIndex) {
+        BGM.sheet.lockedIndex = null;
+        BGM.sheet.lockedName = null;
+        BGM.sheet.isLocked = false;
+        showToast("已解锁工作表", "info");
+    } else {
+        let sheetName = select.options[select.selectedIndex]?.text || "";
+        BGM.sheet.lockedIndex = sheetIndex;
+        BGM.sheet.lockedName = sheetName;
+        BGM.sheet.isLocked = true;
+        showToast("已锁定工作表: " + sheetName, "info");
+    }
+    updateLockButton();
+    refreshData();
+}
+
+/**
+ * 更新锁定按钮状态
+ */
+function updateLockButton() {
+    let btn = document.getElementById("lockSheetBtn");
+    let status = document.getElementById("lockStatus");
+    
+    if (btn) {
+        if (BGM.sheet.isLocked) {
+            btn.textContent = "🔓 解锁";
+            btn.classList.add("locked");
+        } else {
+            btn.textContent = "🔒 锁定";
+            btn.classList.remove("locked");
+        }
+    }
+    
+    if (status) {
+        if (BGM.sheet.isLocked) {
+            status.style.display = "inline";
+            status.textContent = "已锁定: " + BGM.sheet.lockedName;
+        } else {
+            status.style.display = "none";
+        }
+    }
+}
+
+/**
+ * 刷新工作表列表
+ */
+function refreshSheets() {
+    let select = document.getElementById("sheetSelect");
+    if (!select) return;
+
+    let app = getApp();
+    if (!app || !app.ActiveWorkbook) {
+        console.warn("refreshSheets: 无法获取 ActiveWorkbook");
+        return;
+    }
+
+    let sheets = app.ActiveWorkbook.Worksheets;
+    select.innerHTML = '<option value="">-- 请选择 --</option>';
+
+    for (let i = 1; i <= sheets.Count; i++) {
+        let option = document.createElement("option");
+        option.value = i;
+        option.text = sheets.Item(i).Name;
+        
+        if (BGM.sheet.isLocked && BGM.sheet.lockedIndex === i) {
+            option.selected = true;
+        }
+        
+        select.appendChild(option);
+    }
+
+    updateLockButton();
+}
+
+/**
+ * 刷新数据预览
+ */
+function refreshData() {
+    // 实现数据刷新逻辑
+    let select = document.getElementById("sheetSelect");
+    let previewBox = document.getElementById("previewBox");
+    
+    if (previewBox) {
+        let sheetIndex = BGM.sheet.lockedIndex || parseInt(select?.value) || 1;
+        previewBox.innerHTML = `<p class="hint">已选择工作表索引: ${sheetIndex}，点击"刷新数据"加载预览</p>`;
+    }
+}
+
+/**
+ * 模式切换处理
+ */
+function onSelectModeChange() {
+    let manualInputs = document.getElementById("manualRangeInputs");
+    let autoInfo = document.getElementById("autoRangeInfo");
+    let modeRadios = document.querySelectorAll('input[name="selectMode"]');
+    
+    for (let radio of modeRadios) {
+        if (radio.checked) {
+            if (radio.value === "manual") {
+                manualInputs.style.display = "block";
+                autoInfo.style.display = "none";
+            } else {
+                manualInputs.style.display = "none";
+                autoInfo.style.display = "block";
+            }
+            break;
+        }
+    }
+}
+
+// ========== 初始化 ==========
+/**
+ * 面板初始化
+ */
+function initPanel() {
     // 检查枚举
     if (typeof window.Application.Enum !== "object") {
         window.Application.Enum = WPS_Enum;
     }
 
-    // 初始化消息监听（来自 ribbon 的消息）
+    // 初始化消息监听
     initMessageListener();
 
     // 初始化工作表列表
@@ -76,428 +219,87 @@ window.onload = () => {
             debugNotifyCount.textContent = "通知: " + (window.debugNotificationCount || 0);
         }, 1000);
     }
-};
-
-// ========== 工作表锁定功能 ==========
-let lockedSheetIndex = null;
-let lockedSheetName = null;
-
-/**
- * 切换工作表锁定状态
- */
-function toggleSheetLock() {
-    let select = document.getElementById("sheetSelect");
-    if (!select) return;
-
-    let sheetIndex = parseInt(select.value);
-
-    if (BGM.sheet.isLocked && BGM.sheet.lockedIndex === sheetIndex) {
-        // 解锁
-        BGM.sheet.lockedIndex = null;
-        BGM.sheet.lockedName = null;
-        BGM.sheet.isLocked = false;
-        showToast("已解锁工作表", "info");
-    } else {
-        // 锁定
-        let app = getApp();
-        if (app && app.ActiveWorkbook) {
-            let ws = app.ActiveWorkbook.Worksheets(sheetIndex);
-            if (ws) {
-                BGM.sheet.lockedIndex = sheetIndex;
-                BGM.sheet.lockedName = ws.Name;
-                BGM.sheet.isLocked = true;
-                showToast("已锁定工作表: " + ws.Name, "success");
-            }
-        }
-    }
-
-    updateLockButton();
-    refreshData();
 }
 
 /**
- * 更新锁定按钮状态
+ * 获取 BGM 收藏数据
  */
-function updateLockButton() {
-    let lockBtn = document.getElementById("lockSheetBtn");
-    if (!lockBtn) return;
-
-    if (BGM.sheet.isLocked) {
-        lockBtn.textContent = "🔓 解锁";
-        lockBtn.classList.add("locked");
-    } else {
-        lockBtn.textContent = "🔒 锁定";
-        lockBtn.classList.remove("locked");
-    }
-}
-
-// ========== 刷新工作表列表 ==========
-/**
- * 刷新工作表列表
- */
-function refreshSheets() {
-    let select = document.getElementById("sheetSelect");
-    if (!select) return;
-
-    let app = getApp();
-    if (!app) {
-        // 开发环境提示
-        select.innerHTML = '<option value="">-- 开发环境 --</option>';
-        return;
-    }
-    
-    if (typeof app.ActiveWorkbook === 'undefined') {
-        // 没有活动工作簿
-        select.innerHTML = '<option value="">-- 无活动工作簿 --</option>';
-        return;
-    }
-
-    let wb = app.ActiveWorkbook;
-    let sheets = wb.Worksheets;
-
-    // 保存当前值
-    let currentValue = select.value;
-
-    // 清空选项
-    select.innerHTML = "";
-
-    // 添加工作表选项
-    let sheetCount = typeof sheets.Count === 'number' ? sheets.Count : 0;
-    for (let i = 1; i <= sheetCount; i++) {
-        let ws = sheets.Item ? sheets.Item(i) : sheets(i);
-        if (ws && ws.Name) {
-            let option = document.createElement("option");
-            option.value = i;
-            option.textContent = ws.Name;
-            select.appendChild(option);
-        }
-    }
-
-    // 恢复锁定状态
-    if (BGM.sheet.isLocked && BGM.sheet.lockedIndex) {
-        select.value = BGM.sheet.lockedIndex;
-    } else if (currentValue && parseInt(currentValue) <= sheetCount) {
-        select.value = currentValue;
-    } else if (sheetCount > 0) {
-        select.value = 1;
-    }
-}
-
-// ========== 刷新数据预览 ==========
-/**
- * 刷新数据预览
- * @param {boolean} isAuto - 是否自动模式
- */
-function refreshData(isAuto) {
-    let dataPreview = document.getElementById("dataPreview");
-    let recordPreview = document.getElementById("recordPreview");
-    let select = document.getElementById("sheetSelect");
-
-    if (!dataPreview) return;
-
-    // 优先使用锁定的工作表
-    let sheetIndex = BGM.sheet.lockedIndex || parseInt(select?.value) || 1;
-
-    let app = getApp();
-    if (!app || !app.ActiveWorkbook) {
-        dataPreview.innerHTML = "<p class='hint'>无法获取工作簿</p>";
-        return;
-    }
-
-    let wb = app.ActiveWorkbook;
-    let ws = wb.Worksheets(sheetIndex);
-
-    if (!ws) {
-        dataPreview.innerHTML = "<p class='hint'>无法获取工作表</p>";
-        return;
-    }
-
-    // 检查函数是否加载
-    if (typeof findHeaderRow === 'undefined') {
-        dataPreview.innerHTML = "<p class='hint'>正在加载脚本...</p>";
-        setTimeout(refreshData, 500);
-        return;
-    }
-
-    // 查找表头
-    let headerRow = findHeaderRow(ws);
-    if (headerRow === 0) {
-        dataPreview.innerHTML = "<p class='hint'>未找到表头行</p>";
-        return;
-    }
-
-    // 获取列映射
-    let colMap = getColumnMap(ws, headerRow);
-    if (!colMap.subjectId && !colMap.url) {
-        dataPreview.innerHTML = "<p class='hint'>未找到【条目ID】或【Bangumi URL】列</p>";
-        return;
-    }
-
-    // 获取数据
-    let lastRow = getLastRow(ws);
-    let dataCount = lastRow - headerRow;
-
-    // 统计状态
-    let statusCounts = {};
-    if (colMap.status) {
-        statusCounts = getColumnValueCounts(ws, headerRow, colMap.status);
-    }
-
-    // 生成预览HTML
-    let html = "<p class='hint'>工作表: <strong>" + ws.Name + "</strong></p>";
-    html += "<p class='hint'>数据行数: <strong>" + dataCount + "</strong> 行</p>";
-    html += "<p class='hint'>表头行: <strong>" + headerRow + "</strong></p>";
-
-    if (Object.keys(statusCounts).length > 0) {
-        html += "<p class='hint'>状态统计:</p><ul class='status-list'>";
-        for (let [status, count] of Object.entries(statusCounts)) {
-            let color = statusColor(status);
-            html += "<li><span class='status-dot' style='background:" + color + "'></span> " + status + ": " + count + "</li>";
-        }
-        html += "</ul>";
-    }
-
-    dataPreview.innerHTML = html;
-
-    // 刷新同步记录预览
-    if (typeof refreshSyncRecordsPreview === 'function' && recordPreview) {
-        refreshSyncRecordsPreview();
-    }
-}
-
-/**
- * 模式切换处理
- */
-function onSelectModeChange() {
-    let autoSection = document.getElementById("autoSection");
-    let manualSection = document.getElementById("manualSection");
-    let selectMode = document.querySelector('input[name="selectMode"]:checked')?.value || 'auto';
-
-    if (selectMode === 'auto') {
-        if (autoSection) autoSection.style.display = 'block';
-        if (manualSection) manualSection.style.display = 'none';
-    } else {
-        if (autoSection) autoSection.style.display = 'none';
-        if (manualSection) manualSection.style.display = 'block';
-    }
-}
-
-/**
- * 状态颜色映射
- * @param {string} status - 状态文本
- * @returns {string} 颜色值
- */
-function statusColor(status) {
-    let s = (status || "").toLowerCase();
-    if (s.includes("成功") || s.includes("ok") || s.includes("200")) return "#4CAF50";
-    if (s.includes("失败") || s.includes("error") || s.includes("400") || s.includes("404")) return "#f44336";
-    if (s.includes("跳过") || s.includes("skip") || s.includes("ignore")) return "#FFC107";
-    if (s.includes("已收藏") && s.includes("3")) return "#2E7D32";
-    if (s.includes("已收藏") && s.includes("2")) return "#8BC34A";
-    if (s.includes("已收藏") || s.includes("collected") || s.includes("1")) return "#9C27B0";
-    return "#757575";
-}
-
-// ========== 同步记录预览 ==========
-/**
- * 刷新同步记录预览
- */
-function refreshSyncRecordsPreview() {
-    let container = document.getElementById("recordList");
-    if (!container) return;
-
-    if (typeof getAllSyncRecords !== 'function') {
-        container.innerHTML = "<p class='hint'>同步记录功能不可用</p>";
-        return;
-    }
-
-    let records = getAllSyncRecords();
-    if (!records || records.length === 0) {
-        container.innerHTML = "<p class='hint'>暂无同步记录</p>";
-        return;
-    }
-
-    // 显示最近10条
-    let recentRecords = records.slice(-10).reverse();
-    let html = "";
-
-    recentRecords.forEach((record, index) => {
-        let color = statusColor(record.status);
-        html += `
-            <div class="record-item" onclick="viewSyncRecordDetail(${records.length - 1 - index})">
-                <div class="record-header">
-                    <span class="record-name">${escapeHtml(record.name)}</span>
-                    <span class="record-status" style="color:${color}">${escapeHtml(record.status)}</span>
-                </div>
-                <div class="record-detail">
-                    <span>SID: ${record.sid || "-"}</span>
-                    <span>${record.time || ""}</span>
-                </div>
-            </div>
-        `;
-    });
-
-    container.innerHTML = html;
-}
-
-// ========== 单条上传功能 ==========
-/**
- * 上传单行
- * @param {number} row - 行号
- */
-function uploadSingleRow(row) {
-    if (typeof SyncToBangumi !== 'function') {
-        showAlertDialog("错误", "同步功能不可用");
-        return;
-    }
-
+function fetchBgCollectionRecords() {
     let token = loadBgToken();
     if (!token) {
         showAlertDialog("提示", "请先设置 Token！");
         return;
     }
 
-    // 显示进度
-    let progress = document.getElementById("uploadProgress");
-    if (progress) {
-        progress.style.display = "block";
-        progress.querySelector(".progress-bar").style.width = "50%";
-    }
-
-    // 调用同步逻辑
-    setTimeout(() => {
-        try {
-            // 这里应该调用单行同步逻辑
-            showToast("上传完成", "success");
-        } catch (e) {
-            showAlertDialog("上传失败", e.message);
-        }
-
-        if (progress) {
-            progress.style.display = "none";
-        }
-
-        // 更新统计
-        updateUploadStats();
-    }, 500);
-}
-
-/**
- * 更新上传统计
- */
-function updateUploadStats() {
-    let successEl = document.getElementById("uploadSuccess");
-    let failEl = document.getElementById("uploadFail");
-    let totalEl = document.getElementById("uploadTotal");
-
-    if (successEl) successEl.textContent = "成功: 0";
-    if (failEl) failEl.textContent = "失败: 0";
-    if (totalEl) totalEl.textContent = "总计: 0";
-}
-
-// ========== 调试功能 ==========
-/**
- * 测试调试连接
- */
-function testDebugConnection() {
-    bgmLog(BGM.LOG_LEVELS.INFO, "测试调试连接...");
-
-    let app = getApp();
-    if (app) {
-        showToast("WPS Application 连接正常", "success");
-        bgmLog(BGM.LOG_LEVELS.INFO, "WPS Application 连接正常");
-    } else {
-        showToast("无法连接 WPS Application", "error");
-        bgmLog(BGM.LOG_LEVELS.ERROR, "WPS Application 连接失败");
-    }
-}
-
-/**
- * Token 验证
- * @param {string} token - Token
- * @param {function} callback - 回调函数
- */
-function _verifyToken(token, callback) {
-    if (!token) {
-        callback(false, "Token 为空");
-        return;
-    }
-
-    let xhr = new XMLHttpRequest();
-    xhr.open("GET", BGM_CONFIG.API_BASE + "/me", true);
-    xhr.setRequestHeader("Authorization", "Bearer " + token);
-
-    xhr.onload = function() {
-        if (xhr.status === 200) {
-            try {
-                let data = JSON.parse(xhr.responseText);
-                callback(true, data);
-            } catch (e) {
-                callback(false, "响应解析失败");
-            }
-        } else {
-            callback(false, "Token 无效");
-        }
-    };
-
-    xhr.onerror = function() {
-        callback(false, "网络请求失败");
-    };
-
-    xhr.send();
-}
-
-/**
- * 测试 Token 有效性
- */
-function testTokenValidity() {
-    let token = loadBgToken();
-    if (!token) {
-        showAlertDialog("提示", "请先设置 Token！");
-        return;
-    }
-
-    setStatus("正在验证 Token...", "info");
-
-    _verifyToken(token, (isValid, data) => {
-        if (isValid) {
-            showAlertDialog("Token 有效", "用户: " + (data.username || data.user_name || "未知"));
-            setStatus("Token 有效", "success");
-        } else {
-            showAlertDialog("Token 无效", data);
-            setStatus("Token 无效", "error");
-        }
-    });
-}
-
-/**
- * 打开用户收藏页
- */
-function openUserCollection() {
     let userId = _getBgmUserId();
     if (!userId) {
         showAlertDialog("提示", "请先设置用户ID！");
+        showUserIdDialog();
         return;
     }
 
-    let app = getApp();
-    if (app && app.ActiveWindow) {
-        app.ActiveWindow.Activate();
-        // 打开 URL（需要 WPS 支持）
-        // app.followHyperlink("https://bgm.tv/" + userId + "/collect");
-    }
+    setSyncRunning(true);
+    setStatus("正在获取收藏记录...", "info");
 
-    showToast("请在浏览器中访问: https://bgm.tv/" + userId + "/collect", "info");
+    if (typeof fetchAllUserCollections === 'function') {
+        fetchAllUserCollections(token, userId, (collections) => {
+            if (collections && collections.length > 0) {
+                if (typeof fetchAndRecordBgCollections === 'function') {
+                    fetchAndRecordBgCollections(token, userId, collections);
+                }
+                showAlertDialog("完成", "已获取并记录 " + collections.length + " 条收藏");
+            } else {
+                showAlertDialog("提示", "未获取到收藏数据");
+            }
+            setSyncRunning(false);
+            setStatus("获取完成", "success");
+        }, (error) => {
+            showAlertDialog("获取失败", error);
+            setSyncRunning(false);
+            setStatus("获取失败", "error");
+        });
+    }
 }
 
 /**
- * HTML 转义
- * @param {string} text - 原始文本
- * @returns {string} 转义后的文本
+ * 清除同步记录
  */
-function escapeHtml(text) {
-    if (!text) return "";
-    let div = document.createElement("div");
-    div.textContent = text;
-    return div.innerHTML;
+function clearSyncRecords() {
+    if (typeof clearSyncRecords === 'function') {
+        clearSyncRecords(true);
+    }
 }
+
+// ========== 导出函数 ==========
+export {
+    initPanel,
+    refreshSheets,
+    refreshData,
+    toggleSheetLock,
+    onSelectModeChange,
+    fetchBgCollectionRecords,
+    clearSyncRecords
+};
+
+// ========== 挂载到 window（向后兼容）==========
+window.onload = initPanel;
+window.initPanel = initPanel;
+window.refreshSheets = refreshSheets;
+window.refreshData = refreshData;
+window.toggleSheetLock = toggleSheetLock;
+window.onSelectModeChange = onSelectModeChange;
+window.fetchBgCollectionRecords = fetchBgCollectionRecords;
+window.clearSyncRecords = clearSyncRecords;
+
+// 导出全局函数别名
+window.onAction = onAction;
+window.syncCollectionFromBgm = syncCollectionFromBgm;
+window.markUploadedItems = markUploadedItems;
+window.clearSheetMarks = clearSheetMarks;
+window.previewSyncContent = previewSyncContent;
+window.closeDetailModal = closeDetailModal;
+window.showAlertDialog = showAlertDialog;
+window.closeAlertDialog = closeAlertDialog;
+window.showToast = showToast;
+window.showTokenDialog = showTokenDialog;
+window.showUserIdDialog = showUserIdDialog;

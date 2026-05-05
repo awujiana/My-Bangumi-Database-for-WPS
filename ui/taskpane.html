@@ -5,24 +5,29 @@
     <!-- 外部样式 -->
     <link rel="stylesheet" href="../css/styles.css">
 </head>
-<!-- 核心依赖 -->
-<script type="text/javascript" src="../js/util.js"></script>
-<script type="text/javascript" src="../js/syncRecord.js"></script>
-<script type="text/javascript" src="../js/bangumi.js"></script>
-
-<!-- UI 模块 -->
-<script type="text/javascript" src="../js/ui/dialog.js"></script>
-<script type="text/javascript" src="../js/ui/message.js"></script>
-<script type="text/javascript" src="../js/ui/preview.js"></script>
-<script type="text/javascript" src="../js/ui/handlers.js"></script>
-
-<!-- 同步模块 -->
-<script type="text/javascript" src="../js/sync/scraping.js"></script>
-
-<!-- 主页面 -->
-<script type="text/javascript" src="../js/taskpane.js"></script>
-<script type="text/javascript" src="../.debugTemp/wpsjsrpcsdk.js"></script>
 <body>
+    <!-- ES6 模块加载（按依赖顺序）-->
+    <script type="module">
+        // 按依赖顺序导入模块
+        import '../js/core/constants.js';
+        import '../js/core/crypto.js';
+        import '../js/util.js';
+        import '../js/syncRecord.js';
+        import '../js/bangumi.js';
+        import '../js/ui/dialog.js';
+        import '../js/ui/message.js';
+        import '../js/ui/preview.js';
+        import '../js/ui/handlers.js';
+        import '../js/sync/scraping.js';
+        
+        // 导入主页面逻辑
+        import '../js/taskpane.js';
+        
+        console.log('[BGM] All modules loaded via ES6 imports');
+    </script>
+    
+    <!-- WPS JS RPC SDK（需要在模块之后加载）-->
+    <script type="text/javascript" src="../.debugTemp/wpsjsrpcsdk.js"></script>
     <!-- 自定义输入对话框 -->
     <div id="inputDialog" class="modal" style="display:none;">
         <div class="modal-content">

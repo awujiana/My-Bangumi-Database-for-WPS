@@ -1,89 +1,114 @@
+/**
+ * Ribbon 模块
+ * @module ribbon
+ * @description WPS Office 功能区按钮回调处理
+ */
 
+// 导入工具函数
+import { WPS_Enum } from './util.js';
+import { getApp, loadBgToken, showBangumiPanel } from './util.js';
 
+// ========== Ribbon 回调 ==========
 
-
-
-//这个函数在整个wps加载项中是第一个执行的
-function OnAddinLoad(ribbonUI){
-    if (typeof (window.Application.ribbonUI) != "object"){
-		window.Application.ribbonUI = ribbonUI
+/**
+ * 加载项初始化回调
+ * @param {object} ribbonUI - Ribbon UI 对象
+ */
+export function OnAddinLoad(ribbonUI) {
+    if (typeof (window.Application.ribbonUI) != "object") {
+        window.Application.ribbonUI = ribbonUI;
     }
     
-    if (typeof (window.Application.Enum) != "object") { // 如果没有内置枚举值
-        window.Application.Enum = WPS_Enum
+    if (typeof (window.Application.Enum) != "object") {
+        window.Application.Enum = WPS_Enum;
     }
 
-    window.Application.PluginStorage.setItem("EnableFlag", false)
-    window.Application.PluginStorage.setItem("ApiEventFlag", false)
-    return true
+    window.Application.PluginStorage.setItem("EnableFlag", false);
+    window.Application.PluginStorage.setItem("ApiEventFlag", false);
+    return true;
 }
 
-var WebNotifycount = 0;
-function OnAction(control) {
+/**
+ * Ribbon 按钮点击处理
+ * @param {object} control - 按钮控件
+ */
+export function OnAction(control) {
     console.log("OnAction called with:", control.Id);
-    const eleId = control.Id
+    const eleId = control.Id;
     try {
         switch (eleId) {
-            // ========== Bangumi 同步相关 ==========
             case "btnShowPanel":
                 showBangumiPanel();
                 break;
             case "btnSyncBangumi":
-                SyncToBangumi();
+                if (typeof SyncToBangumi === 'function') {
+                    SyncToBangumi();
+                }
                 break;
             case "btnSetToken":
-                showTokenDialog(loadBgToken());
+                if (typeof showTokenDialog === 'function') {
+                    showTokenDialog(loadBgToken());
+                }
                 break;
             case "btnSetUserId":
-                showUserIdDialog();
+                if (typeof showUserIdDialog === 'function') {
+                    showUserIdDialog();
+                }
                 break;
             case "btnOpenCollection":
-                openUserCollection();
+                if (typeof openUserCollection === 'function') {
+                    openUserCollection();
+                }
                 break;
             case "btnClearColors":
-                clearRowColors();
+                if (typeof clearRowColors === 'function') {
+                    clearRowColors();
+                }
                 break;
-
             default:
-                break
+                break;
         }
     } catch (e) {
         console.error("OnAction error:", e);
-        showDialogRibbon("执行出错", e.message);
+        if (typeof showDialogRibbon === 'function') {
+            showDialogRibbon("执行出错", e.message);
+        }
     }
-    return true
+    return true;
 }
 
-// ========== 向后兼容的别名（已迁移到 util.js 的 BGM 命名空间）==========
 /**
- * @deprecated 使用 BGM.showDialog() 替代
- * @param {string} title - 标题
- * @param {string} message - 消息内容
+ * 获取按钮图标
+ * @param {object} control - 按钮控件
  */
-function showDialogRibbon(title, message) {
-    BGM.showDialog(title, message);
-}
-
-function GetBangumiImage(control) {
-    const id = control.Id
+export function GetBangumiImage(control) {
+    const id = control.Id;
     switch (id) {
-        case "btnShowPanel":     return "images/panel.svg"
-        case "btnSyncBangumi":   return "images/sync.svg"
-        case "btnSetToken":      return "images/key.svg"
-        case "btnSetUserId":     return "images/user.svg"
-        case "btnOpenCollection": return "images/link.svg"
-        case "btnClearColors":   return "images/delete.svg"
-        default:                return "images/newFromTemp.svg"
+        case "btnShowPanel":     return "images/panel.svg";
+        case "btnSyncBangumi":   return "images/sync.svg";
+        case "btnSetToken":      return "images/key.svg";
+        case "btnSetUserId":     return "images/user.svg";
+        case "btnOpenCollection": return "images/link.svg";
+        case "btnClearColors":   return "images/delete.svg";
+        default:                return "images/newFromTemp.svg";
     }
 }
 
+// ========== 向后兼容别名 ==========
+// 保持全局函数可用性
+const WebNotifycount = 0;
 
+function showDialogRibbon(title, message) {
+    if (typeof BGM !== 'undefined' && BGM.showDialog) {
+        BGM.showDialog(title, message);
+    } else {
+        alert(message);
+    }
+}
 
-
-
-
-
-
-
-
-
+// 挂载到 window（向后兼容）
+window.OnAddinLoad = OnAddinLoad;
+window.OnAction = OnAction;
+window.GetBangumiImage = GetBangumiImage;
+window.showDialogRibbon = showDialogRibbon;
+window.WebNotifycount = WebNotifycount;

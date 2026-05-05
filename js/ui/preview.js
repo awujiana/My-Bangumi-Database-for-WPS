@@ -1,6 +1,13 @@
-// ========== UI 预览模块 ==========
-// 功能：数据预览、同步记录预览、详情模态框
-// 依赖：bangumi.js, syncRecord.js
+/**
+ * UI 预览模块
+ * @module ui/preview
+ * @description 数据预览、同步记录预览、详情模态框
+ */
+
+import { getApp, bgmLog, BGM, LOG_LEVELS } from '../util.js';
+import { getCellValue } from '../util.js';
+import { showAlertDialog } from '../dialog.js';
+import { escapeHtml } from '../util.js';
 
 // ========== 详细预览数据存储 ==========
 let detailPreviewData = [];
@@ -8,10 +15,8 @@ let detailPreviewData = [];
 // ========== 详细预览同步内容 ==========
 /**
  * 预览同步内容
- * @description 显示将要同步的数据预览，包括每条记录的详细信息
  */
-function previewSyncContent() {
-    // 检查必需函数是否已加载
+export function previewSyncContent() {
     if (typeof findHeaderRow === 'undefined' || typeof getColumnMap === 'undefined') {
         setTimeout(previewSyncContent, 500);
         return;
@@ -21,7 +26,6 @@ function previewSyncContent() {
     let endRowInput = document.getElementById("endRow");
     let startRowInput = document.getElementById("startRow");
 
-    // 优先使用锁定的工作表，否则使用选择器的值
     let sheetIndex = BGM.sheet.lockedIndex || parseInt(select?.value) || 1;
 
     let app = getApp();
@@ -37,67 +41,54 @@ function previewSyncContent() {
         return;
     }
 
-    // 获取起始和结束行
     let startRow = parseInt(startRowInput?.value) || 2;
     let userEndRow = parseInt(endRowInput?.value) || 0;
 
-    // 查找表头
     let headerRow = findHeaderRow(ws, startRow);
     if (headerRow === 0) {
         showAlertDialog("提示", "未找到表头行！");
         return;
     }
 
-    // 获取列映射
     let colMap = getColumnMap(ws, headerRow);
     if (!colMap.subjectId && !colMap.url) {
         showAlertDialog("提示", "未找到【条目ID】或【Bangumi URL】列！");
         return;
     }
 
-    // 获取结束行
     let lastRow = userEndRow > 0 ? userEndRow : getLastRow(ws);
     if (lastRow <= headerRow) {
         showAlertDialog("提示", "没有可预览的数据！");
         return;
     }
 
-    // 清空详情数据
     detailPreviewData = [];
-
-    // 显示详情模态框
     showDetailModal();
 
-    // 获取预览数据
     let rows = [];
     for (let i = headerRow + 1; i <= lastRow; i++) {
         try {
-            // 跳过空行
             let nameVal = getCellValue(ws, i, colMap.name);
             let sidVal = getCellValue(ws, i, colMap.subjectId);
             let urlVal = getCellValue(ws, i, colMap.url);
 
             if (!nameVal && !sidVal && !urlVal) continue;
 
-            // 提取 SID
             let sid = sidVal;
-            if (!sid && urlVal) {
+            if (!sid && urlVal && typeof extractSubjectId === 'function') {
                 sid = extractSubjectId(urlVal);
             }
 
-            // 获取当前状态
             let currentStatus = "";
             if (colMap.status) {
                 currentStatus = getCellValue(ws, i, colMap.status) || "";
             }
 
-            // 获取评分
             let rate = "";
             if (colMap.rate) {
                 rate = getCellValue(ws, i, colMap.rate) || "";
             }
 
-            // 获取标签
             let tags = "";
             if (colMap.tags) {
                 tags = getCellValue(ws, i, colMap.tags) || "";
@@ -111,11 +102,9 @@ function previewSyncContent() {
                 currentStatus: currentStatus,
                 rate: rate,
                 tags: tags,
-                // 预览构建的 JSON
                 previewPayload: buildPreviewPayload(ws, i, colMap)
             });
 
-            // 保存到详情数据
             detailPreviewData.push({
                 row: i,
                 name: nameVal,
@@ -123,19 +112,18 @@ function previewSyncContent() {
                 payload: buildPreviewPayload(ws, i, colMap)
             });
         } catch (e) {
-            bgmLog(BGM.LOG_LEVELS.WARN, "预览第 " + i + " 行出错: " + e.message);
+            bgmLog(LOG_LEVELS?.WARN || 2, "预览第 " + i + " 行出错: " + e.message);
         }
     }
 
-    // 渲染预览列表
     renderDetailList(rows);
     updateDetailCount(rows.length);
 }
 
 /**
- * 构建预览用的 payload（不实际调用 API）
+ * 构建预览用的 payload
  */
-function buildPreviewPayload(ws, row, colMap) {
+export function buildPreviewPayload(ws, row, colMap) {
     if (typeof buildJsonPayload === 'function') {
         return buildJsonPayload(ws, row, colMap);
     }
@@ -144,9 +132,8 @@ function buildPreviewPayload(ws, row, colMap) {
 
 /**
  * 过滤预览项目
- * @param {string} filterText - 过滤文本
  */
-function filterDetailItems(filterText) {
+export function filterDetailItems(filterText) {
     let items = document.querySelectorAll(".detail-item");
     filterText = filterText.toLowerCase();
 
@@ -158,9 +145,8 @@ function filterDetailItems(filterText) {
 
 /**
  * 更新详情计数
- * @param {number} count - 显示的数量
  */
-function updateDetailCount(count) {
+export function updateDetailCount(count) {
     let countEl = document.getElementById("detailCount");
     if (countEl) {
         countEl.textContent = "共 " + count + " 条";
@@ -170,7 +156,7 @@ function updateDetailCount(count) {
 /**
  * 显示详情模态框
  */
-function showDetailModal() {
+export function showDetailModal() {
     let modal = document.getElementById("detailModal");
     if (modal) {
         modal.style.display = "flex";
@@ -180,7 +166,7 @@ function showDetailModal() {
 /**
  * 关闭详情模态框
  */
-function closeDetailModal() {
+export function closeDetailModal() {
     let modal = document.getElementById("detailModal");
     if (modal) {
         modal.style.display = "none";
@@ -189,15 +175,14 @@ function closeDetailModal() {
 
 /**
  * 渲染详情列表
- * @param {Array} items - 数据项数组
  */
-function renderDetailList(items) {
+export function renderDetailList(items) {
     let container = document.getElementById("detailList");
     if (!container) return;
 
     container.innerHTML = "";
 
-    items.forEach((item, index) => {
+    items.forEach((item) => {
         let div = document.createElement("div");
         div.className = "detail-item";
         div.innerHTML = `
@@ -226,23 +211,9 @@ function renderDetailList(items) {
 }
 
 /**
- * HTML 转义
- * @param {string} text - 原始文本
- * @returns {string} 转义后的文本
- */
-function escapeHtml(text) {
-    if (!text) return "";
-    let div = document.createElement("div");
-    div.textContent = text;
-    return div.innerHTML;
-}
-
-// ========== 查看同步记录详情 ==========
-/**
  * 查看同步记录详情
- * @param {number} rowIndex - 行索引
  */
-function viewSyncRecordDetail(rowIndex) {
+export function viewSyncRecordDetail(rowIndex) {
     if (typeof getAllSyncRecords !== 'function') {
         showAlertDialog("提示", "同步记录功能不可用");
         return;
@@ -269,3 +240,14 @@ function viewSyncRecordDetail(rowIndex) {
 
     showAlertDialog("同步记录详情", detail);
 }
+
+// ========== 向后兼容（挂载到 window）==========
+window.previewSyncContent = previewSyncContent;
+window.buildPreviewPayload = buildPreviewPayload;
+window.filterDetailItems = filterDetailItems;
+window.updateDetailCount = updateDetailCount;
+window.showDetailModal = showDetailModal;
+window.closeDetailModal = closeDetailModal;
+window.renderDetailList = renderDetailList;
+window.viewSyncRecordDetail = viewSyncRecordDetail;
+window.detailPreviewData = detailPreviewData;

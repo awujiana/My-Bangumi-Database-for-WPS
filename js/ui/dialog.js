@@ -1,15 +1,17 @@
-// ========== UI 对话框模块 ==========
-// 功能：自定义对话框、确认对话框、Toast 通知
-// 依赖：无独立依赖
+/**
+ * UI 对话框模块
+ * @module ui/dialog
+ * @description 自定义对话框、确认对话框、Toast 通知
+ */
+
+import { loadBgToken } from '../util.js';
+import { BGM } from '../util.js';
 
 // ========== 输入对话框 ==========
 /**
  * 显示输入对话框
- * @param {string} title - 对话框标题
- * @param {string} placeholder - 输入框占位文本
- * @param {function} onSubmit - 提交回调
  */
-function showInputDialog(title, placeholder, onSubmit) {
+export function showInputDialog(title, placeholder, onSubmit) {
     let overlay = document.getElementById("inputOverlay");
     let titleEl = document.getElementById("inputTitle");
     let input = document.getElementById("inputField");
@@ -21,7 +23,6 @@ function showInputDialog(title, placeholder, onSubmit) {
     input.value = "";
     overlay.style.display = "flex";
 
-    // 绑定确认按钮
     let confirmBtn = document.getElementById("inputConfirmBtn");
     if (confirmBtn) {
         confirmBtn.onclick = () => {
@@ -37,7 +38,7 @@ function showInputDialog(title, placeholder, onSubmit) {
 /**
  * 关闭输入对话框
  */
-function closeInputDialog() {
+export function closeInputDialog() {
     let overlay = document.getElementById("inputOverlay");
     if (overlay) {
         overlay.style.display = "none";
@@ -47,15 +48,12 @@ function closeInputDialog() {
 // ========== 确认对话框 ==========
 /**
  * 显示确认对话框
- * @param {string} message - 确认消息
- * @param {function} onConfirm - 确认回调
  */
-function showConfirmDialog(message, onConfirm) {
+export function showConfirmDialog(message, onConfirm) {
     let overlay = document.getElementById("confirmOverlay");
     let messageEl = document.getElementById("confirmMessage");
 
     if (!overlay || !messageEl) {
-        // 兜底：使用原生 confirm
         if (confirm(message)) {
             if (onConfirm) onConfirm();
         }
@@ -65,7 +63,6 @@ function showConfirmDialog(message, onConfirm) {
     messageEl.textContent = message || "确定要执行此操作吗？";
     overlay.style.display = "flex";
 
-    // 绑定按钮
     let confirmBtn = document.getElementById("confirmBtn");
     let cancelBtn = document.getElementById("cancelBtn");
 
@@ -83,7 +80,7 @@ function showConfirmDialog(message, onConfirm) {
 /**
  * 关闭确认对话框
  */
-function closeConfirmDialog() {
+export function closeConfirmDialog() {
     let overlay = document.getElementById("confirmOverlay");
     if (overlay) {
         overlay.style.display = "none";
@@ -93,10 +90,8 @@ function closeConfirmDialog() {
 // ========== Toast 通知 ==========
 /**
  * 显示 Toast 通知
- * @param {string} message - 通知消息
- * @param {string} type - 类型 (success, error, info)
  */
-function showToast(message, type) {
+export function showToast(message, type) {
     let toast = document.getElementById("toast");
     if (!toast) return;
 
@@ -112,46 +107,63 @@ function showToast(message, type) {
 /**
  * 更新 Token 状态显示
  */
-function updateTokenStatus() {
+export function updateTokenStatus() {
     let tokenStatus = document.getElementById("tokenStatus");
     if (!tokenStatus) return;
 
     let token = loadBgToken();
     if (token && token.length > 10) {
-        tokenStatus.textContent = "已设置 (" + token.substring(0, 4) + "...)";
         tokenStatus.style.color = "#4CAF50";
+        tokenStatus.textContent = "已设置 (" + token.substring(0, 4) + "...)";
+        
+        if (typeof _fetchBgmUserInfo === 'function') {
+            _fetchBgmUserInfo(function(userInfo) {
+                if (userInfo && userInfo.username) {
+                    tokenStatus.textContent = "已设置: " + userInfo.username;
+                    if (typeof updateUserIdStatus === 'function') {
+                        updateUserIdStatus();
+                    }
+                }
+            });
+        }
     } else {
         tokenStatus.textContent = "未设置";
         tokenStatus.style.color = "#f44336";
+        BGM.cache.userId = null;
+        BGM.cache.username = null;
     }
 }
 
 /**
  * 更新用户ID状态显示
  */
-function updateUserIdStatus() {
+export function updateUserIdStatus() {
     let userIdStatus = document.getElementById("userIdStatus");
     if (!userIdStatus) return;
 
-    let userId = _getBgmUserId();
-    if (userId) {
-        userIdStatus.textContent = "已设置: " + userId;
-        userIdStatus.style.color = "#4CAF50";
-    } else {
-        userIdStatus.textContent = "未设置";
-        userIdStatus.style.color = "#f44336";
+    if (typeof _getBgmUserId === 'function') {
+        let userId = _getBgmUserId();
+        if (userId) {
+            let display = BGM.cache.username ? BGM.cache.username + " (" + userId + ")" : userId;
+            userIdStatus.textContent = "已设置: " + display;
+            userIdStatus.style.color = "#4CAF50";
+        } else {
+            userIdStatus.textContent = "未设置";
+            userIdStatus.style.color = "#f44336";
+        }
     }
 }
 
 // ========== Token 设置对话框 ==========
 /**
  * 显示 Token 设置对话框
- * @param {string} currentToken - 当前 Token
  */
-function showTokenDialog(currentToken) {
+export function showTokenDialog(currentToken) {
     showInputDialog("设置 Bangumi Access Token", "请输入 Access Token", (value) => {
         if (value) {
-            storeBgToken(value);
+            if (typeof storeBgToken === 'function') {
+                storeBgToken(value);
+            }
             updateTokenStatus();
             showToast("Token 已保存", "success");
             BGM.postMessage({ type: "tokenUpdated" });
@@ -162,15 +174,30 @@ function showTokenDialog(currentToken) {
 // ========== 用户ID 设置对话框 ==========
 /**
  * 显示用户ID设置对话框
- * @param {string} currentUserId - 当前用户ID
  */
-function showUserIdDialog() {
-    showInputDialog("设置 Bangumi 用户ID", "请输入用户ID（数字）", (value) => {
-        if (value) {
-            _setBgmUserId(value);
-            updateUserIdStatus();
-            showToast("用户ID 已保存", "success");
-            BGM.postMessage({ type: "userIdUpdated" });
+export function showUserIdDialog() {
+    if (typeof _getBgmUserId !== 'function') return;
+    
+    let currentId = _getBgmUserId() || "";
+    let userId = prompt("请输入 Bangumi 用户ID（数字）:", currentId);
+    
+    if (userId !== null && userId.trim() !== "") {
+        if (typeof _setBgmUserId === 'function') {
+            _setBgmUserId(userId.trim());
         }
-    });
+        updateUserIdStatus();
+        showToast("用户ID 已保存", "success");
+        BGM.postMessage({ type: "userIdUpdated" });
+    }
 }
+
+// ========== 向后兼容（挂载到 window）==========
+window.showInputDialog = showInputDialog;
+window.closeInputDialog = closeInputDialog;
+window.showConfirmDialog = showConfirmDialog;
+window.closeConfirmDialog = closeConfirmDialog;
+window.showToast = showToast;
+window.updateTokenStatus = updateTokenStatus;
+window.updateUserIdStatus = updateUserIdStatus;
+window.showTokenDialog = showTokenDialog;
+window.showUserIdDialog = showUserIdDialog;
