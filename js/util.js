@@ -244,9 +244,7 @@ function _getUserApiPath() { return _cachedBgmUserId ? String(_cachedBgmUserId) 
             let titleEl = document.getElementById("alertTitle");
             let msgEl = document.getElementById("alertMessage");
             if (titleEl && msgEl) {
-                // 如果是 "alert("text", 64)" 的 WPS 格式，忽略第二个参数
                 let text = typeof message === 'string' ? message : String(message);
-                // 根据消息长度和内容决定标题
                 if (text.length > 80 || text.indexOf('\n') >= 0) {
                     let firstLine = text.split('\n')[0];
                     titleEl.textContent = firstLine.length > 30 ? "提示" : firstLine;
@@ -256,7 +254,6 @@ function _getUserApiPath() { return _cachedBgmUserId ? String(_cachedBgmUserId) 
                     msgEl.textContent = text;
                 }
                 modal.style.display = "flex";
-                // 点击背景关闭
                 let bgHandler = function(e) { if (e.target === modal) { modal.style.display = "none"; modal.removeEventListener("click", bgHandler); } };
                 modal.addEventListener("click", bgHandler);
                 return;
@@ -265,6 +262,45 @@ function _getUserApiPath() { return _cachedBgmUserId ? String(_cachedBgmUserId) 
         _origAlert(message);
     };
 })();
+
+/**
+ * 显示自定义提示对话框（与确认对话框风格一致）
+ * @param {string} title - 标题
+ * @param {string} message - 提示内容
+ */
+function showAlertDialog(title, message) {
+    let modal = document.getElementById("alertDialog");
+    let titleEl = document.getElementById("alertTitle");
+    let msgEl = document.getElementById("alertMessage");
+    
+    if (modal && titleEl && msgEl) {
+        titleEl.textContent = title || "提示";
+        msgEl.textContent = message || "";
+        modal.style.display = "flex";
+        
+        // 点击背景关闭
+        let bgHandler = function(e) {
+            if (e.target === modal) {
+                closeAlertDialog();
+                modal.removeEventListener("click", bgHandler);
+            }
+        };
+        modal.addEventListener("click", bgHandler);
+    } else {
+        // 兜底
+        alert(message);
+    }
+}
+
+/**
+ * 关闭提示对话框
+ */
+function closeAlertDialog() {
+    let modal = document.getElementById("alertDialog");
+    if (modal) {
+        modal.style.display = "none";
+    }
+}
 
 // ========== 辅助函数 ==========
 

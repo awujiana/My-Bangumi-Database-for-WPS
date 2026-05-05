@@ -99,6 +99,12 @@ function SyncToBangumi() {
         return;
     }
 
+    // 确保同步记录表存在
+    if (typeof getOrCreateSyncRecordSheet === 'function' && !getOrCreateSyncRecordSheet()) {
+        showAlertDialog("创建失败", "创建同步记录表失败，请检查工作簿状态");
+        return;
+    }
+
     // 如果还没有缓存用户 ID，尝试通过 Token 获取
     if (!_cachedBgmUserId && typeof _getUserApiPath === 'function') {
         try {

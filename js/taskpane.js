@@ -1385,6 +1385,13 @@ function _doScrapingSync(sheetIndex, userId, typesToFetch) {
             return;
         }
 
+        // 确保同步记录表存在
+        if (!getOrCreateSyncRecordSheet()) {
+            showAlertDialog("创建失败", "创建同步记录表失败，请检查工作簿状态");
+            setStatus("创建同步记录表失败", "error");
+            return;
+        }
+
         // 获取数据范围
         let lastRowCell = getCell(ws, ws.Rows.Count, 1);
         let lastRow = lastRowCell.End(-4162).Row;
@@ -1515,6 +1522,13 @@ function _doAPISync(sheetIndex, token) {
     setStatus("正在获取收藏列表...", "loading");
 
     try {
+        // 确保同步记录表存在
+        if (!getOrCreateSyncRecordSheet()) {
+            showAlertDialog("创建失败", "创建同步记录表失败，请检查工作簿状态");
+            setStatus("创建同步记录表失败", "error");
+            return;
+        }
+        
         let app = window.Application;
         let sheets = app.ActiveWorkbook.Sheets;
         let ws = sheets.Item(sheetIndex);
@@ -2213,6 +2227,13 @@ function _runSyncRows(ws, colMap, rowsToProcess, headerRow) {
     setStatus("正在同步...", "loading");
 
     try {
+        // 确保同步记录表存在
+        if (!getOrCreateSyncRecordSheet()) {
+            showAlertDialog("创建失败", "创建同步记录表失败，请检查工作簿状态");
+            setStatus("创建同步记录表失败", "error");
+            return;
+        }
+        
         // 批量写入前激活同步记录表
         activateSyncRecordSheet();
         
