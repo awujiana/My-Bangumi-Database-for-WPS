@@ -273,23 +273,19 @@ function clearSyncRecords() {
 }
 
 /**
- * 标记已上传条目
+ * 标记已上传条目（默认动画sheet）
  */
-function markUploadedItems() {
-    if (typeof window.markUploadedItems === 'function') {
-        window.markUploadedItems('动画');
-    } else if (typeof markUploadedItems === 'function') {
+function markUploadedItemsDefault() {
+    if (typeof markUploadedItems === 'function') {
         markUploadedItems('动画');
     }
 }
 
 /**
- * 清除工作表标记
+ * 清除工作表标记（默认动画sheet）
  */
-function clearSheetMarks() {
-    if (typeof window.clearSheetMarks === 'function') {
-        window.clearSheetMarks();
-    } else if (typeof clearSheetMarks === 'function') {
+function clearSheetMarksDefault() {
+    if (typeof clearSheetMarks === 'function') {
         clearSheetMarks();
     }
 }
@@ -304,7 +300,9 @@ export {
     fetchBgCollectionRecords,
     clearSyncRecords,
     markUploadedItems,
-    clearSheetMarks
+    markUploadedItemsDefault,
+    clearSheetMarks,
+    clearSheetMarksDefault
 };
 
 // ========== 挂载到 window（向后兼容）==========
@@ -317,7 +315,9 @@ window.onSelectModeChange = onSelectModeChange;
 window.fetchBgCollectionRecords = fetchBgCollectionRecords;
 window.clearSyncRecords = clearSyncRecords;
 window.markUploadedItems = markUploadedItems;
+window.markUploadedItemsDefault = markUploadedItemsDefault;
 window.clearSheetMarks = clearSheetMarks;
+window.clearSheetMarksDefault = clearSheetMarksDefault;
 
 // 导出全局函数别名
 window.onAction = onAction;

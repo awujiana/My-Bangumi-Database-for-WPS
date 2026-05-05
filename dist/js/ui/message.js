@@ -5,7 +5,6 @@
  */
 
 import { BGM } from '../util.js';
-import { Message, Dialog } from '../core/unified.js';
 
 // ========== 消息监听 ==========
 /**
