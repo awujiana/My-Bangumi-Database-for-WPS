@@ -14,7 +14,7 @@ window.onload = () => {
     // 绑定Token设置按钮
     let setTokenBtn = document.getElementById("setTokenBtn");
     if (setTokenBtn) {
-        setTokenBtn.onclick = () => showTokenDialog(window.Application.PluginStorage.getItem("bgm_token") || "");
+        setTokenBtn.onclick = () => showTokenDialog(loadBgToken() || "");
     }
 
     // 绑定测试Token按钮
@@ -177,6 +177,24 @@ function showInputDialog(title, message, defaultValue, callback) {
 
     modal.style.display = "flex";
     setTimeout(() => inputEl.focus(), 100);
+    
+    // ESC 键关闭
+    let escHandler = (e) => {
+        if (e.key === "Escape") {
+            closeDialog(false);
+            document.removeEventListener("keydown", escHandler);
+        }
+    };
+    document.addEventListener("keydown", escHandler);
+    
+    // 点击背景关闭（点击模态框外部区域）
+    let bgHandler = (e) => {
+        if (e.target === modal) {
+            closeDialog(false);
+            modal.removeEventListener("click", bgHandler);
+        }
+    };
+    modal.addEventListener("click", bgHandler);
 }
 
 function closeDialog(confirmed) {
@@ -193,7 +211,7 @@ function closeDialog(confirmed) {
 
 // ========== Token 状态更新 ==========
 function updateTokenStatus() {
-    let token = window.Application.PluginStorage.getItem("bgm_token");
+    let token = loadBgToken();
     let statusEl = document.getElementById("tokenStatus");
     if (statusEl) {
         if (token) {
@@ -1018,7 +1036,7 @@ function previewSyncContent() {
 
 // ========== 单条上传功能 ==========
 function uploadSingleRow(rowNum, btnElement) {
-    let token = window.Application.PluginStorage.getItem("bgm_token");
+    let token = loadBgToken();
     if (!token) {
         alert("请先设置 Bangumi Token！");
         return;
@@ -1157,7 +1175,7 @@ function uploadSingleRow(rowNum, btnElement) {
                 count: 1
             });
             
-            alert(`上传失败 (${statusCode}): ${result.message || '未知错误'}`);
+            showToast(`上传失败: ${(result.message || '未知错误').substring(0, 60)}`, "error", 4000);
         }
 
     } catch (e) {
@@ -1167,7 +1185,7 @@ function uploadSingleRow(rowNum, btnElement) {
             btnElement.classList.add('error');
             btnElement.textContent = '✗ 错误';
         }
-        alert("上传出错: " + e.message);
+        showToast("上传出错: " + e.message.substring(0, 60), "error", 4000);
     }
 }
 
@@ -1374,7 +1392,7 @@ function syncFromBgmByScraping(sheetIndex) {
 
 // ========== API方式同步（原有功能）==========
 function syncFromBgmByAPI(sheetIndex) {
-    let token = window.Application.PluginStorage.getItem("bgm_token");
+    let token = loadBgToken();
     if (!token) {
         alert("请先设置 Bangumi Token！");
         showTokenDialog("");
@@ -1881,7 +1899,7 @@ function onAction(action) {
             refreshData();
             break;
         case "setToken":
-            showTokenDialog(window.Application.PluginStorage.getItem("bgm_token") || "");
+            showTokenDialog(loadBgToken() || "");
             break;
         case "preview":
             previewSyncContent();
@@ -1902,7 +1920,7 @@ function syncFromPanel() {
     
     console.log("syncFromPanel - 必需函数已加载，开始同步...");
 
-    let token = window.Application.PluginStorage.getItem("bgm_token");
+    let token = loadBgToken();
     if (!token) {
         alert("请先设置 Bangumi Token！");
         showTokenDialog("");
@@ -2218,6 +2236,35 @@ function syncFromPanel() {
     }
 }
 
+// ========== Toast 通知（非模态提示）==========
+let _toastTimer = null;
+
+function showToast(message, type, duration) {
+    if (_toastTimer) {
+        clearTimeout(_toastTimer);
+        _toastTimer = null;
+    }
+    let toast = document.getElementById("toastNotification");
+    if (!toast) {
+        toast = document.createElement("div");
+        toast.id = "toastNotification";
+        toast.style.cssText = "position:fixed;bottom:20px;left:50%;transform:translateX(-50%);z-index:2000;padding:10px 20px;border-radius:8px;font-size:13px;color:#fff;max-width:90%;text-align:center;box-shadow:0 4px 12px rgba(0,0,0,0.4);transition:opacity 0.3s;display:none;";
+        document.body.appendChild(toast);
+    }
+    
+    let bgColors = { success: "#22a84d", error: "#e74c3c", info: "#3498db", warning: "#f39c12" };
+    toast.style.background = bgColors[type] || "#555";
+    toast.textContent = message;
+    toast.style.display = "block";
+    toast.style.opacity = "1";
+    
+    _toastTimer = setTimeout(() => {
+        toast.style.opacity = "0";
+        setTimeout(() => { toast.style.display = "none"; }, 300);
+        _toastTimer = null;
+    }, duration || 3000);
+}
+
 // ========== 测试调试连接 ==========
 function testDebugConnection() {
     setStatus("测试连接...", "loading");
@@ -2250,7 +2297,7 @@ function setStatus(msg, type) {
 // ========== 测试 Token 有效性（taskpane版本，更新UI状态）==========
 function testTokenValidity(token) {
     if (!token) {
-        let storedToken = window.Application.PluginStorage.getItem("bgm_token");
+        let storedToken = loadBgToken();
         if (!storedToken) {
             alert("请先设置 Token！");
             return false;
@@ -2281,7 +2328,7 @@ function testTokenValidity(token) {
             alert("✓ Token 验证成功！\n\n用户: " + username + "\nID: " + userId + "\n\n用户信息已自动保存！");
             return true;
         } else if (xhr.status === 401) {
-            window.Application.PluginStorage.setItem("bgm_token", "");
+            clearBgToken();
             updateTokenStatus();
             setStatus("Token 无效", "error");
             alert("✗ Token 验证失败！\n\nToken 已清除，请重新获取正确的 Token。");
@@ -2326,7 +2373,7 @@ function showTokenDialog(currentToken) {
         currentToken || "",
         (token) => {
             if (token && token.trim() !== "") {
-                window.Application.PluginStorage.setItem("bgm_token", token.trim());
+                storeBgToken(token.trim());
                 updateTokenStatus();
                 testTokenValidity(token.trim());
             }
@@ -2353,7 +2400,7 @@ function showUserIdDialog() {
 
 // ========== 从 BGM 获取收藏并写入同步记录表 ==========
 function fetchBgCollectionRecords() {
-    let token = window.Application.PluginStorage.getItem("bgm_token");
+    let token = loadBgToken();
     if (!token) {
         alert("请先设置 Bangumi Token！\n\n需要 Token 才能访问你的收藏列表。");
         showTokenDialog("");

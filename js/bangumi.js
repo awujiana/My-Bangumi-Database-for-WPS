@@ -52,11 +52,11 @@ function getLastRow(ws) {
 function getBgmtoken() {
     let app = getApp();
     if (!app) return null;
-    let token = app.PluginStorage.getItem("bgm_token");
+    let token = loadBgToken();
     if (!token) {
         token = prompt("请输入 Bangumi Access Token:", "");
         if (token && token.trim()) {
-            app.PluginStorage.setItem("bgm_token", token.trim());
+            storeBgToken(token.trim());
         }
     }
     return token;
@@ -613,32 +613,49 @@ async function bgmRequest(method, endpoint, body, token) {
     });
 }
 
-// ========== 同步请求（兼容旧逻辑）==========
-function bgmRequestSync(method, endpoint, body, token) {
-    let xhr = new XMLHttpRequest();
-    xhr.open(method, BGM_API_BASE + endpoint, false);
-    xhr.setRequestHeader("Authorization", "Bearer " + token);
-    xhr.setRequestHeader("Content-Type", "application/json");
-    xhr.setRequestHeader("User-Agent", "BangumiWPS/1.0");
+// ========== 同步请求（兼容旧逻辑，含 429 自动重试）==========
+const MAX_RETRIES = 3;
+const RETRY_DELAY_BASE = 2000; // 首次重试等待 2 秒
 
-    try {
-        xhr.send(body);
-        let statusCode = xhr.status;
-        let responseText = xhr.responseText;
-        
-        // 204 No Content 不返回 body
-        if (statusCode === 204) {
-            return { code: statusCode, message: "OK" };
+function bgmRequestSync(method, endpoint, body, token) {
+    let retries = 0;
+    
+    while (retries <= MAX_RETRIES) {
+        let xhr = new XMLHttpRequest();
+        xhr.open(method, BGM_API_BASE + endpoint, false);
+        xhr.setRequestHeader("Authorization", "Bearer " + token);
+        xhr.setRequestHeader("Content-Type", "application/json");
+        xhr.setRequestHeader("User-Agent", "BangumiWPS/1.0");
+
+        try {
+            xhr.send(body);
+            let statusCode = xhr.status;
+            let responseText = xhr.responseText;
+            
+            // 204 No Content 不返回 body
+            if (statusCode === 204) {
+                return { code: statusCode, message: "OK" };
+            }
+            // 其他成功状态码都返回响应内容
+            if (statusCode === 200 || statusCode === 201 || statusCode === 202) {
+                return { code: statusCode, message: responseText };
+            }
+            // 429 Too Many Requests - 自动重试
+            if (statusCode === 429 && retries < MAX_RETRIES) {
+                retries++;
+                let retryAfter = RETRY_DELAY_BASE * Math.pow(2, retries - 1); // 指数退避
+                console.log(`API 限流(429)，第 ${retries}/${MAX_RETRIES} 次重试，等待 ${retryAfter}ms`);
+                sleep(retryAfter);
+                continue;
+            }
+            // 失败情况
+            return { code: statusCode, message: responseText || "Error" };
+        } catch (err) {
+            return { code: 0, message: "Error: " + err.message };
         }
-        // 其他成功状态码都返回响应内容
-        if (statusCode === 200 || statusCode === 201 || statusCode === 202) {
-            return { code: statusCode, message: responseText };
-        }
-        // 失败情况
-        return { code: statusCode, message: responseText || "Error" };
-    } catch (err) {
-        return { code: 0, message: "Error: " + err.message };
     }
+    
+    return { code: 429, message: `超过最大重试次数(${MAX_RETRIES}次)` };
 }
 
 // ========== 清除行颜色标记 ==========
@@ -772,7 +789,7 @@ function showTokenDialog(currentToken) {
     let token = prompt("请输入 Bangumi Access Token：\n\n获取方式：Bangumi → 设置 → API → 创建应用\n\n已设置 Token: " + (currentToken ? "✅ 已设置（输入新值覆盖）" : "❌ 未设置"), "");
     if (token !== null && token.trim() !== "") {
         if (app) {
-            app.PluginStorage.setItem("bgm_token", token.trim());
+            storeBgToken(token.trim());
         }
         // 验证 Token
         testTokenValidityForRibbon(token.trim());

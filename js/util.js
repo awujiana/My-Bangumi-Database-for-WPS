@@ -128,6 +128,59 @@ const BGM_COLOR = {
     WHITE: 0xFFFFFF        // 白色（清除标记）
 };
 
+// ========== Token 加密（简单 XOR + Base64 混淆，防明文窥探）==========
+const TOKEN_XOR_KEY = 0x5A;
+
+function encryptToken(token) {
+    if (!token) return "";
+    let result = "";
+    for (let i = 0; i < token.length; i++) {
+        let code = token.charCodeAt(i) ^ TOKEN_XOR_KEY;
+        result += String.fromCharCode(code);
+    }
+    return btoa(result); // Base64 编码
+}
+
+function decryptToken(encoded) {
+    if (!encoded) return "";
+    try {
+        let decoded = atob(encoded);
+        let result = "";
+        for (let i = 0; i < decoded.length; i++) {
+            let code = decoded.charCodeAt(i) ^ TOKEN_XOR_KEY;
+            result += String.fromCharCode(code);
+        }
+        return result;
+    } catch (e) {
+        return "";
+    }
+}
+
+// ========== Token 存储（读写均加密）==========
+function loadBgToken() {
+    let app = getApp();
+    if (!app) return null;
+    let encrypted = app.PluginStorage.getItem("bgm_token");
+    if (!encrypted) return null;
+    let token = decryptToken(encrypted);
+    return token || null;
+}
+
+function storeBgToken(token) {
+    let app = getApp();
+    if (!app) return false;
+    let encrypted = encryptToken(token);
+    app.PluginStorage.setItem("bgm_token", encrypted);
+    return true;
+}
+
+function clearBgToken() {
+    let app = getApp();
+    if (!app) return false;
+    app.PluginStorage.setItem("bgm_token", "");
+    return true;
+}
+
 // ========== 辅助函数 ==========
 
 /**
@@ -167,9 +220,24 @@ function trim(str) {
 }
 
 /**
- * Sleep 函数
+ * Sleep 函数（优化版：优先使用 WPS Application.Wait 释放 CPU）
  */
 function sleep(ms) {
+    try {
+        let app = getApp();
+        // WPS 原生 Wait 方法（非忙等待，释放 CPU）
+        if (app && typeof app.Wait !== 'undefined') {
+            let waitTime = new Date(Date.now() + ms);
+            app.Wait(waitTime);
+            return;
+        }
+    } catch (e) {}
+    // 回退忙等待
     let end = Date.now() + ms;
-    while (Date.now() < end) {}
+    while (Date.now() < end) {
+        try {
+            let app = getApp();
+            if (app && app.DoEvents) app.DoEvents();
+        } catch(e) {}
+    }
 }

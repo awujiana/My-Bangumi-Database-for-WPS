@@ -32,7 +32,7 @@ function OnAction(control) {
                 SyncToBangumi();
                 break;
             case "btnSetToken":
-                showTokenDialog(window.Application.PluginStorage.getItem("bgm_token"));
+                showTokenDialog(loadBgToken());
                 break;
             case "btnSetUserId":
                 showUserIdDialog();

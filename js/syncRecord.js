@@ -124,6 +124,64 @@ function getOrCreateSyncRecordSheet() {
     }
 }
 
+// ========== 同步记录缓存（优化重复读表）==========
+let _syncRecordSidCache = new Map();   // sid → row
+let _syncRecordListCache = [];         // 所有记录的缓存
+let _syncRecordCacheValid = false;     // 缓存是否有效
+
+function _invalidateSyncRecordCache() {
+    _syncRecordSidCache.clear();
+    _syncRecordListCache = [];
+    _syncRecordCacheValid = false;
+}
+
+function _buildSyncRecordCache(sheet) {
+    if (_syncRecordCacheValid) return;
+    _syncRecordSidCache.clear();
+    _syncRecordListCache = [];
+    
+    let lastRow = 1;
+    try {
+        let lastCell = sheet.Range("A" + sheet.Rows.Count);
+        if (lastCell && lastCell.Value2) {
+            let endCell = lastCell.End(-4162);
+            lastRow = endCell.Row > 0 ? endCell.Row : 1;
+        }
+    } catch (e) {}
+    
+    for (let row = 2; row <= lastRow; row++) {
+        try {
+            let sid = sheet.Range("E" + row).Value2 || "";
+            sid = String(sid).trim();
+            let url = sheet.Range("D" + row).Value2 || "";
+            url = String(url).trim();
+            if (!url && !sid) continue;
+            
+            _syncRecordSidCache.set(sid, row);
+            _syncRecordListCache.push({
+                seq: sheet.Range("A" + row).Value2,
+                time: sheet.Range("B" + row).Value2,
+                name: sheet.Range("C" + row).Value2,
+                url: url,
+                sid: sid,
+                type: sheet.Range("F" + row).Value2,
+                count: sheet.Range("G" + row).Value2,
+                content: sheet.Range("H" + row).Value2,
+                status: sheet.Range("I" + row).Value2,
+                message: sheet.Range("J" + row).Value2,
+                row: row
+            });
+        } catch (e) {}
+    }
+    _syncRecordCacheValid = true;
+}
+
+function _getRecordRowBySid(sheet, sid) {
+    if (!sid) return 0;
+    _buildSyncRecordCache(sheet);
+    return _syncRecordSidCache.get(sid) || 0;
+}
+
 /**
  * 添加同步记录
  * @param {object} options - 同步记录选项
@@ -169,18 +227,12 @@ function addSyncRecord(options) {
         
         console.log("addSyncRecord - 最终 lastRow:", lastRow);
         
-        // 检查是否已存在相同 SID 的记录
-        let existingRow = 0;
+        // 检查是否已存在相同 SID 的记录（使用缓存加速查重）
+        let existingRow = _getRecordRowBySid(sheet, String(options.sid));
         let currentCount = 1;
-        for (let i = 2; i <= lastRow; i++) {
-            let sidCell = sheet.Range("E" + i);
-            let sidValue = sidCell ? trim(String(sidCell.Value2 || "")) : "";
-            if (sidValue === String(options.sid)) {
-                existingRow = i;
-                let countCell = sheet.Range("G" + i);
-                currentCount = countCell ? (parseInt(countCell.Value2) || 0) + 1 : 1;
-                break;
-            }
+        if (existingRow > 0) {
+            let countCell = sheet.Range("G" + existingRow);
+            currentCount = countCell ? (parseInt(countCell.Value2) || 0) + 1 : 1;
         }
         
         let newRow = existingRow > 0 ? existingRow : lastRow + 1;
@@ -236,6 +288,9 @@ function addSyncRecord(options) {
         sheet.Activate();
         sheet.Calculate();
         console.log("addSyncRecord - 工作表已刷新");
+        
+        // 写入后失效缓存
+        _invalidateSyncRecordCache();
         
         let action = existingRow > 0 ? "更新" : "新增";
         console.log("addSyncRecord " + action + " - 行:", newRow, "状态:", options.status);
@@ -296,6 +351,7 @@ function updateSyncRecord(sid, updates) {
                     let newMsg = currentMsg ? currentMsg + "; " + updates.message : updates.message;
                     sheet.Range("J" + row).Value = newMsg;
                 }
+                _invalidateSyncRecordCache();
                 return true;
             }
         }
@@ -311,45 +367,15 @@ function updateSyncRecord(sid, updates) {
  * @returns {Array} 同步记录数组
  */
 function getAllSyncRecords() {
-    let records = [];
     try {
         let sheet = getOrCreateSyncRecordSheet();
-        if (!sheet) return records;
-        
-        let lastRow = 1;
-        try {
-            let lastCell = sheet.Range("A" + sheet.Rows.Count);
-            if (lastCell) {
-                let endCell = lastCell.End(-4162);
-                lastRow = endCell.Row > 0 ? endCell.Row : 1;
-            }
-        } catch (e) {}
-        
-        if (lastRow < 2) return records;
-        
-        for (let row = 2; row <= lastRow; row++) {
-            let url = sheet.Range("D" + row).Value;
-            let sid = sheet.Range("E" + row).Value;
-            if (!url && !sid) continue;
-            
-            records.push({
-                seq: sheet.Range("A" + row).Value,
-                time: sheet.Range("B" + row).Value,
-                name: sheet.Range("C" + row).Value,
-                url: url,
-                sid: sid,
-                type: sheet.Range("F" + row).Value,     // F=类型
-                count: sheet.Range("G" + row).Value,    // G=同步次数
-                content: sheet.Range("H" + row).Value,  // H=同步内容
-                status: sheet.Range("I" + row).Value,   // I=状态
-                message: sheet.Range("J" + row).Value,  // J=备注
-                row: row
-            });
-        }
+        if (!sheet) return [];
+        _buildSyncRecordCache(sheet);
+        return _syncRecordListCache.slice(); // 返回缓存的副本
     } catch (e) {
         console.error("getAllSyncRecords error:", e);
+        return [];
     }
-    return records;
 }
 
 /**
@@ -385,6 +411,7 @@ function clearSyncRecords(confirmIt) {
         let range = sheet.Range("A2:J" + lastRow);
         range.Delete();
         
+        _invalidateSyncRecordCache();
         alert("已清除 " + (lastRow - 1) + " 条同步记录");
         return true;
     } catch (e) {
