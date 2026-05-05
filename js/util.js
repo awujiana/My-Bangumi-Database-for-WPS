@@ -43,8 +43,28 @@ const BGM = {
         lastSyncTime: null
     },
     // 日志级别（0=DEBUG, 1=INFO, 2=WARN, 3=ERROR）
-    LOG_LEVEL: 1
+    LOG_LEVEL: 1,
+    
+    // 日志级别常量
+    LOG_LEVELS: {
+        DEBUG: 0,
+        INFO: 1,
+        WARN: 2,
+        ERROR: 3
+    }
 };
+
+/**
+ * 日志函数（支持日志级别控制）
+ * @param {number} level - 日志级别 (0=DEBUG, 1=INFO, 2=WARN, 3=ERROR)
+ * @param {string} message - 日志消息
+ */
+function bgmLog(level, message) {
+    if (level >= BGM.LOG_LEVEL) {
+        const prefix = ['[DEBUG]', '[INFO]', '[WARN]', '[ERROR]'][level] || '[INFO]';
+        console.log(prefix + ' ' + message);
+    }
+}
 
 
 /**
@@ -251,6 +271,58 @@ function loadBgToken() {
 // ========== 缓存 Bangumi 用户 ID（通过 /v0/me 获取），用于 API 路径 ==========
 function _setBgmUserId(id) { BGM.cache.userId = id; }
 function _getUserApiPath() { return BGM.cache.userId ? String(BGM.cache.userId) : "-"; }
+
+// ========== BGM 统一消息通信模块 ==========
+/**
+ * 统一的 postMessage 函数
+ * @param {object} data - 要发送的数据
+ * @param {string} [targetOrigin] - 目标源，默认 "*"
+ * @returns {boolean} 是否发送成功
+ */
+BGM.postMessage = function(data, targetOrigin) {
+    try {
+        if (window.parent && window.parent !== window) {
+            window.parent.postMessage(data, targetOrigin || "*");
+            return true;
+        }
+    } catch (e) {
+        console.log("[BGM] postMessage not available:", e.message);
+    }
+    return false;
+};
+
+/**
+ * 统一的对话框显示函数
+ * @param {string} title - 对话框标题
+ * @param {string} message - 对话框内容
+ */
+BGM.showDialog = function(title, message) {
+    if (BGM.postMessage({ type: "showDialog", title: title, message: message })) {
+        return;
+    }
+    alert(message);
+};
+
+/**
+ * 显示确认对话框
+ * @param {string} title - 对话框标题
+ * @param {string} message - 对话框内容
+ * @param {function} onConfirm - 确认回调
+ * @param {function} [onCancel] - 取消回调
+ */
+BGM.showConfirm = function(title, message, onConfirm, onCancel) {
+    if (BGM.postMessage({ type: "showConfirm", title: title, message: message, onConfirm: true })) {
+        // 通过 taskpane 处理
+        window._bgmConfirmCallback = { confirm: onConfirm, cancel: onCancel };
+        return;
+    }
+    // 兜底使用原生 confirm
+    if (confirm(message)) {
+        if (onConfirm) onConfirm();
+    } else {
+        if (onCancel) onCancel();
+    }
+};
 
 // ========== 自定义 Alert 对话框（替换原生 alert）==========
 // 全局覆写 alert，在 taskpane 环境中使用自定义模态框
@@ -469,3 +541,102 @@ function sleep(ms) {
         } catch(e) {}
     }
 }
+
+// ========== 统一错误处理模块 ==========
+/**
+ * 错误级别枚举
+ */
+BGM.ErrorLevel = {
+    SILENT: 0,    // 静默处理
+    WARN: 1,      // 警告
+    ERROR: 2,     // 错误
+    THROW: 3      // 抛出异常
+};
+
+/**
+ * 错误类
+ * @param {string} message - 错误消息
+ * @param {string} code - 错误代码
+ * @param {object} details - 详细信息
+ */
+BGM.BgmError = function(message, code, details) {
+    this.message = message;
+    this.code = code || 'UNKNOWN';
+    this.details = details || {};
+    this.timestamp = new Date().toISOString();
+};
+
+BGM.BgmError.prototype.toString = function() {
+    return `[${this.code}] ${this.message}`;
+};
+
+/**
+ * 统一错误处理函数
+ * @param {Error|BgmError|string} error - 错误对象或消息
+ * @param {object} options - 处理选项
+ * @param {number} options.level - 错误级别
+ * @param {boolean} options.showDialog - 是否显示对话框
+ * @param {string} options.context - 错误上下文
+ * @returns {BgmError} 处理后的错误对象
+ */
+BGM.handleError = function(error, options) {
+    const opts = Object.assign({
+        level: BGM.ErrorLevel.ERROR,
+        showDialog: false,
+        context: ''
+    }, options || {});
+
+    // 构建错误对象
+    let bgmError;
+    if (error instanceof BGM.BgmError) {
+        bgmError = error;
+    } else if (error instanceof Error) {
+        bgmError = new BGM.BgmError(error.message, 'JS_ERROR', {
+            name: error.name,
+            stack: error.stack
+        });
+    } else {
+        bgmError = new BGM.BgmError(String(error), 'UNKNOWN');
+    }
+
+    // 添加上下文
+    if (opts.context) {
+        bgmError.context = opts.context;
+    }
+
+    // 根据级别处理
+    switch (opts.level) {
+        case BGM.ErrorLevel.SILENT:
+            // 仅记录
+            break;
+        case BGM.ErrorLevel.WARN:
+            bgmLog(BGM.LOG_LEVELS.WARN, bgmError.toString());
+            break;
+        case BGM.ErrorLevel.ERROR:
+            bgmLog(BGM.LOG_LEVELS.ERROR, bgmError.toString());
+            if (opts.showDialog) {
+                BGM.showDialog('错误', bgmError.message);
+            }
+            break;
+        case BGM.ErrorLevel.THROW:
+            bgmLog(BGM.LOG_LEVELS.ERROR, bgmError.toString());
+            throw bgmError;
+    }
+
+    return bgmError;
+};
+
+/**
+ * 安全执行函数，捕获异常并统一处理
+ * @param {function} fn - 要执行的函数
+ * @param {string} context - 执行上下文
+ * @param {object} options - 处理选项
+ * @returns {*} 函数返回值或 undefined
+ */
+BGM.safeExecute = function(fn, context, options) {
+    try {
+        return fn();
+    } catch (error) {
+        return BGM.handleError(error, Object.assign({ context: context }, options));
+    }
+};

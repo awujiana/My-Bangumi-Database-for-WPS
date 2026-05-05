@@ -49,9 +49,19 @@ function OnAction(control) {
         }
     } catch (e) {
         console.error("OnAction error:", e);
-        alert("执行出错: " + e.message);
+        showDialogRibbon("执行出错", e.message);
     }
     return true
+}
+
+// ========== 向后兼容的别名（已迁移到 util.js 的 BGM 命名空间）==========
+/**
+ * @deprecated 使用 BGM.showDialog() 替代
+ * @param {string} title - 标题
+ * @param {string} message - 消息内容
+ */
+function showDialogRibbon(title, message) {
+    BGM.showDialog(title, message);
 }
 
 function GetBangumiImage(control) {
