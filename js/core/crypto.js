@@ -1,7 +1,8 @@
 /**
- * BGM 项目加密模块
+ * BGM Token 加密模块
  * @module crypto
- * @description Token 加密解密功能，使用 Web Crypto API AES-GCM
+ * @description Token 加密解密功能，使用 XOR 混淆 + 校验和
+ *              注意：这是简单的混淆，不是真正的加密，仅用于防止明文存储
  */
 
 import { TOKEN_CONFIG } from './constants.js';
@@ -46,7 +47,7 @@ export function calcChecksum(str) {
 }
 
 /**
- * 导入 AES 密钥
+ * 导入密钥（保留用于将来真正的加密实现）
  */
 async function importAesKey(keyBytes) {
     const keyData = new Uint8Array(keyBytes);
@@ -72,10 +73,10 @@ function fallbackXor(dataBytes, keys, iv) {
     return result;
 }
 
-// ========== Token 加密（Web Crypto API AES-GCM）==========
+// ========== Token 加密（XOR 混淆）==========
 
 /**
- * 异步加密 Token（使用 Web Crypto API）
+ * 异步加密 Token
  */
 export async function encryptTokenAsync(token) {
     if (!token) return "";
@@ -103,7 +104,7 @@ export async function encryptTokenAsync(token) {
 }
 
 /**
- * 异步解密 Token（使用 Web Crypto API）
+ * 异步解密 Token
  */
 export async function decryptTokenAsync(encoded) {
     if (!encoded) return null;

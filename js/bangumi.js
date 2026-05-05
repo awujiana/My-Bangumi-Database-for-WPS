@@ -8,6 +8,8 @@ import { XL, BGM_CONFIG, LOG_LEVELS, BGM } from './util.js';
 import { getApp, bgmLog, getCell, getCellValue, sleep, loadBgToken, 
          _setBgmUserId, _getBgmUserId } from './util.js';
 import { showDialog, sendToTaskpane, showTokenDialog, showUserIdDialog } from './ui/dialog.js';
+import { httpRequest } from './http.js';
+import { Result } from './types/result.js';
 
 // ========== 常量定义 ==========
 // Excel 列常量
@@ -25,6 +27,43 @@ const SYNC_STATUS_COLOR = {
     SKIP: 16           // 灰色 - 跳过
 };
 
+// 状态映射常量
+const WATCH_STATUS_MAP = {
+    "看过": 3, "看完": 3, "已看": 3, "completed": 3, "3": 3,
+    "在看": 2, "在看动画": 2, "watching": 2, "2": 2,
+    "想看": 1, "想看动画": 1, "wish": 1, "1": 1,
+    "搁置": 4, "on_hold": 4, "4": 4,
+    "抛弃": 5, "drop": 5, "dropped": 5, "5": 5
+};
+
+// 收藏类型文本映射
+const TYPE_TEXT_MAP = {1:"想看", 2:"在看", 3:"看过", 4:"搁置", 5:"抛弃"};
+
+// URL 解析正则
+const URL_PATTERNS = [
+    /bgm\.tv\/subject\/(\d+)/i,
+    /bangumi\.tv\/subject\/(\d+)/i,
+    /chii\.in\/subject\/(\d+)/i,
+    /(\d{6,})/
+];
+
+// 表头识别关键词
+const HEADER_KEYWORDS = ["条目id", "bangumi url", "url", "sid", "名称", "name", "状态", "status", "评分", "rate"];
+
+// 表头字段映射
+const FIELD_NAME_MAP = {
+    "名称": "name", "name": "name", "作品名": "name", "条目": "name", "标题": "name",
+    "条目id": "subjectId", "sid": "subjectId", "subject_id": "subjectId", "id": "subjectId",
+    "bangumi url": "url", "url": "url", "链接": "url", "地址": "url",
+    "状态": "type", "type": "type", "观看状态": "type", "收藏类型": "type",
+    "评分": "rate", "rate": "rate", "分数": "rate", "rating": "rate",
+    "标签": "tags", "tags": "tags", "tag": "tags",
+    "评价": "comment", "comment": "comment", "备注": "comment", "notes": "comment",
+    "看完日期": "finishedDate", "finished": "finishedDate", "日期": "finishedDate",
+    "章节状态": "epStatus", "ep_status": "epStatus", "集数": "epStatus",
+    "同步状态": "syncStatus", "sync_status": "syncStatus"
+};
+
 // ========== 工具函数 ==========
 /**
  * 解析 JSON 请求体为可读描述
@@ -34,8 +73,7 @@ export function parseJsonBodySummary(jsonStr) {
     try {
         let obj = JSON.parse(jsonStr);
         let parts = [];
-        let typeMap = {1:"想看", 2:"在看", 3:"看过", 4:"搁置", 5:"抛弃"};
-        if (obj.type !== undefined) parts.push("状态:" + (typeMap[obj.type] || obj.type));
+        if (obj.type !== undefined) parts.push("状态:" + (TYPE_TEXT_MAP[obj.type] || obj.type));
         if (obj.rate !== undefined && obj.rate > 0) parts.push("评分:" + obj.rate);
         if (obj.tags && obj.tags.length > 0) parts.push("标签:[" + obj.tags.join(",") + "]");
         if (obj.comment) {
@@ -258,27 +296,140 @@ function _doSyncBangumi(ws, colMap, token, lastRow, headerRow) {
     return { success: successCount, fail: failCount, skip: skipCount };
 }
 
+// ========== 异步批量同步（推荐使用）==========
+/**
+ * 异步批量同步 Excel 数据到 Bangumi
+ * @param {Function} onProgress - 进度回调 (current, total, message)
+ * @param {Function} onItemComplete - 单项完成回调 (row, success, result)
+ */
+export async function syncToBangumiAsync(ws, colMap, token, lastRow, headerRow, options = {}) {
+    const { onProgress, onItemComplete } = options;
+
+    BGM.sync.isRunning = true;
+    BGM.sync.lastSyncTime = null;
+
+    let syncRecordSheet = null;
+    if (typeof getOrCreateSyncRecordSheet === 'function') {
+        syncRecordSheet = getOrCreateSyncRecordSheet();
+    }
+
+    let successCount = 0;
+    let failCount = 0;
+    let skipCount = 0;
+    let totalCount = lastRow - headerRow;
+
+    for (let i = headerRow + 1; i <= lastRow; i++) {
+        // 进度回调
+        if (onProgress) {
+            onProgress(i - headerRow, totalCount, `正在处理第 ${i} 行...`);
+        }
+
+        try {
+            let sidVal = getCellValue(ws, i, colMap.subjectId);
+            let sid = sidVal;
+
+            if (!sid && colMap.url) {
+                let urlVal = getCellValue(ws, i, colMap.url);
+                sid = extractSubjectId(urlVal);
+            }
+
+            if (!sid) {
+                if (colMap.syncStatus) {
+                    getCell(ws, i, colMap.syncStatus).Value = "跳过(无SID)";
+                    getCell(ws, i, colMap.syncStatus).Interior.ColorIndex = XL.NONE;
+                }
+                skipCount++;
+                if (onItemComplete) onItemComplete(i, false, { code: 0, message: '无SID' });
+                continue;
+            }
+
+            let jsonBody = buildJsonPayload(ws, i, colMap);
+            const result = await httpRequest(`/subject/${sid}/update`, {
+                method: 'POST',
+                body: jsonBody,
+                token: token
+            });
+
+            const syncSuccess = result.isOk() && (result.data?.status === 204 || result.data?.status === 200 || result.data?.status === 201);
+
+            if (syncSuccess) {
+                successCount++;
+                if (colMap.syncStatus) {
+                    let cell = getCell(ws, i, colMap.syncStatus);
+                    cell.Value = "成功";
+                    cell.Interior.ColorIndex = SYNC_STATUS_COLOR.SUCCESS;
+                }
+                if (syncRecordSheet && typeof addSyncRecord === 'function') {
+                    addSyncRecord(syncRecordSheet, {
+                        name: getCellValue(ws, i, colMap.name) || "",
+                        url: colMap.url ? getCellValue(ws, i, colMap.url) : "",
+                        sid: sid,
+                        type: getCellValue(ws, i, colMap.type) || "1",
+                        count: 1,
+                        content: parseJsonBodySummary(jsonBody),
+                        status: "成功"
+                    });
+                }
+            } else {
+                failCount++;
+                const errorMsg = result.isFail() ? result.error.message : `HTTP ${result.data?.status}`;
+                if (colMap.syncStatus) {
+                    let cell = getCell(ws, i, colMap.syncStatus);
+                    cell.Value = "失败:" + errorMsg;
+                    cell.Interior.ColorIndex = SYNC_STATUS_COLOR.FAILURE;
+                }
+                if (syncRecordSheet && typeof addSyncRecord === 'function') {
+                    addSyncRecord(syncRecordSheet, {
+                        name: getCellValue(ws, i, colMap.name) || "",
+                        url: colMap.url ? getCellValue(ws, i, colMap.url) : "",
+                        sid: sid,
+                        type: getCellValue(ws, i, colMap.type) || "1",
+                        count: 1,
+                        content: parseJsonBodySummary(jsonBody),
+                        status: "失败:" + errorMsg
+                    });
+                }
+            }
+
+            if (onItemComplete) {
+                onItemComplete(i, syncSuccess, { code: result.data?.status, message: result.error?.message });
+            }
+
+            // 延迟避免限流
+            await new Promise(resolve => setTimeout(resolve, BGM_CONFIG.REQUEST_DELAY));
+
+        } catch (err) {
+            failCount++;
+            bgmLog(LOG_LEVELS.ERROR, "同步第 " + i + " 行出错: " + err.message);
+
+            if (colMap.syncStatus) {
+                let cell = getCell(ws, i, colMap.syncStatus);
+                cell.Value = "错误:" + err.message;
+                cell.Interior.ColorIndex = SYNC_STATUS_COLOR.FAILURE;
+            }
+
+            if (onItemComplete) {
+                onItemComplete(i, false, { code: 0, message: err.message });
+            }
+        }
+    }
+
+    BGM.sync.isRunning = false;
+    BGM.sync.lastSyncTime = new Date().toISOString();
+
+    return { success: successCount, fail: failCount, skip: skipCount };
+}
+
 // ========== URL 解析 ==========
 /**
  * 从 Bangumi URL 提取 subject_id
  */
 export function extractSubjectId(url) {
     if (!url) return null;
-    
-    let patterns = [
-        /bgm\.tv\/subject\/(\d+)/i,
-        /bangumi\.tv\/subject\/(\d+)/i,
-        /chii\.in\/subject\/(\d+)/i,
-        /(\d{6,})/
-    ];
-
-    for (let pattern of patterns) {
+    for (let pattern of URL_PATTERNS) {
         let match = url.match(pattern);
-        if (match) {
-            return match[1];
-        }
+        if (match) return match[1];
     }
-
     return null;
 }
 
@@ -289,8 +440,6 @@ export function extractSubjectId(url) {
 export function findHeaderRow(ws, startRow) {
     startRow = startRow || 1;
     
-    let keywords = ["条目id", "bangumi url", "url", "sid", "名称", "name", "状态", "status", "评分", "rate"];
-    
     for (let row = startRow; row <= Math.min(startRow + 5, 10); row++) {
         try {
             let cell = getCell(ws, row, 1);
@@ -298,7 +447,7 @@ export function findHeaderRow(ws, startRow) {
             
             let cellText = String(cell.Value).toLowerCase();
             
-            for (let keyword of keywords) {
+            for (let keyword of HEADER_KEYWORDS) {
                 if (cellText.includes(keyword)) {
                     return row;
                 }
@@ -329,19 +478,6 @@ export function getColumnMap(ws, headerRow) {
         syncStatus: null
     };
 
-    let fieldMap = {
-        "名称": "name", "name": "name", "作品名": "name", "条目": "name", "标题": "name",
-        "条目id": "subjectId", "条目id": "subjectId", "sid": "subjectId", "subject_id": "subjectId", "id": "subjectId",
-        "bangumi url": "url", "url": "url", "链接": "url", "地址": "url",
-        "状态": "type", "type": "type", "观看状态": "type", "收藏类型": "type",
-        "评分": "rate", "rate": "rate", "分数": "rate", "rating": "rate",
-        "标签": "tags", "tags": "tags", "tag": "tags",
-        "评价": "comment", "comment": "comment", "备注": "comment", "notes": "comment",
-        "看完日期": "finishedDate", "finished": "finishedDate", "日期": "finishedDate",
-        "章节状态": "epStatus", "ep_status": "epStatus", "集数": "epStatus",
-        "同步状态": "syncStatus", "sync_status": "syncStatus"
-    };
-
     try {
         // 使用 Range.End 代替 Cells 来获取最后一个有内容的列
         let lastCell = ws.Range(ws.Cells(headerRow, 1), ws.Cells(headerRow, ws.Columns.Count)).End(XL.TO_LEFT);
@@ -353,12 +489,12 @@ export function getColumnMap(ws, headerRow) {
             
             let normalized = String(cellValue).toLowerCase().trim();
             
-            if (fieldMap[normalized]) {
-                colMap[fieldMap[normalized]] = col;
+            if (FIELD_NAME_MAP[normalized]) {
+                colMap[FIELD_NAME_MAP[normalized]] = col;
                 continue;
             }
             
-            for (let [key, field] of Object.entries(fieldMap)) {
+            for (let [key, field] of Object.entries(FIELD_NAME_MAP)) {
                 if (normalized.includes(key) || key.includes(normalized)) {
                     if (!colMap[field]) {
                         colMap[field] = col;
@@ -436,18 +572,8 @@ export function isEmptyValue(val) {
  */
 export function mapWatchStatus(status) {
     if (!status) return null;
-    
     let s = String(status).toLowerCase().trim();
-    
-    let statusMap = {
-        "看过": 3, "看完": 3, "已看": 3, "completed": 3, "3": 3,
-        "在看": 2, "在看动画": 2, "watching": 2, "2": 2,
-        "想看": 1, "想看动画": 1, "wish": 1, "1": 1,
-        "搁置": 4, "on_hold": 4, "4": 4,
-        "抛弃": 5, "drop": 5, "dropped": 5, "5": 5
-    };
-
-    return statusMap[s] !== undefined ? statusMap[s] : null;
+    return WATCH_STATUS_MAP[s] !== undefined ? WATCH_STATUS_MAP[s] : null;
 }
 
 /**
