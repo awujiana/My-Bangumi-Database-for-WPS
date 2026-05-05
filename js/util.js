@@ -5,11 +5,46 @@ var WPS_Enum = {
 }
 
 // ========== WPS Excel 方向常量 ==========
-const XL_UP = -4162;      // xlUp - 向上查找
-const XL_DOWN = -4121;    // xlDown - 向下查找
-const XL_TO_LEFT = -4159; // xlToLeft - 向左查找
-const XL_TO_RIGHT = -4161;// xlToRight - 向右查找
-const XL_NONE = -4142;    // xlNone - 无填充
+const XL = {
+    UP: -4162,           // xlUp - 向上查找
+    DOWN: -4121,         // xlDown - 向下查找
+    TO_LEFT: -4159,      // xlToLeft - 向左查找
+    TO_RIGHT: -4161,     // xlToRight - 向右查找
+    NONE: -4142,         // xlNone - 无填充
+    CELL_TYPE_VISIBLE: 12 // xlCellTypeVisible - 可见单元格
+};
+
+// ========== BGM API 配置（统一定义，避免重复）==========
+const BGM_CONFIG = {
+    API_BASE: "https://api.bgm.tv",
+    REQUEST_DELAY: 800,
+    MAX_RETRIES: 3,
+    RETRY_DELAY_BASE: 2000
+};
+
+// ========== BGM 全局命名空间（封装全局变量）==========
+const BGM = {
+    // 缓存数据
+    cache: {
+        totalRows: 0,
+        userId: null,
+        sidCache: new Map(),
+        listCache: []
+    },
+    // 工作表状态
+    sheet: {
+        lockedIndex: null,
+        lockedName: null,
+        isLocked: false
+    },
+    // 同步状态
+    sync: {
+        isRunning: false,
+        lastSyncTime: null
+    },
+    // 日志级别（0=DEBUG, 1=INFO, 2=WARN, 3=ERROR）
+    LOG_LEVEL: 1
+};
 
 
 /**
@@ -214,9 +249,8 @@ function loadBgToken() {
 })();
 
 // ========== 缓存 Bangumi 用户 ID（通过 /v0/me 获取），用于 API 路径 ==========
-let _cachedBgmUserId = null;
-function _setBgmUserId(id) { _cachedBgmUserId = id; }
-function _getUserApiPath() { return _cachedBgmUserId ? String(_cachedBgmUserId) : "-"; }
+function _setBgmUserId(id) { BGM.cache.userId = id; }
+function _getUserApiPath() { return BGM.cache.userId ? String(BGM.cache.userId) : "-"; }
 
 // ========== 自定义 Alert 对话框（替换原生 alert）==========
 // 全局覆写 alert，在 taskpane 环境中使用自定义模态框

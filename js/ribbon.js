@@ -54,21 +54,6 @@ function OnAction(control) {
     return true
 }
 
-function GetImage(control) {
-    const eleId = control.Id
-    switch (eleId) {
-        case "btnShowMsg":
-            return "images/1.svg"
-        case "btnShowDialog":
-            return "images/2.svg"
-        case "btnShowTaskPane":
-            return "images/3.svg"
-        default:
-            ;
-    }
-    return "images/newFromTemp.svg"
-}
-
 function GetBangumiImage(control) {
     const id = control.Id
     switch (id) {

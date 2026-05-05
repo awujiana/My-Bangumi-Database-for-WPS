@@ -96,9 +96,9 @@ window.onload = () => {
             
             if (selectedValue && selectedText !== "-- 请选择 --") {
                 // 锁定选择的工作表
-                window.lockedSheetIndex = parseInt(selectedValue);
-                window.lockedSheetName = selectedText;
-                window.isSheetLocked = true;
+                BGM.sheet.lockedIndex = parseInt(selectedValue);
+                BGM.sheet.lockedName = selectedText;
+                BGM.sheet.isLocked = true;
                 
                 // 保存到缓存
                 window.Application.PluginStorage.setItem("bgm_sheet_index", selectedValue);
@@ -113,11 +113,11 @@ window.onload = () => {
                 }
                 if (lockStatus) {
                     lockStatus.style.display = "inline-flex";
-                lockStatus.textContent = "🔒 " + window.lockedSheetName;
+                lockStatus.textContent = "🔒 " + BGM.sheet.lockedName;
                 lockStatus.className = "lock-status locked";
             }
             
-            console.log("已锁定工作表:", window.lockedSheetName, "索引:", window.lockedSheetIndex);
+            console.log("已锁定工作表:", BGM.sheet.lockedName, "索引:", BGM.sheet.lockedIndex);
         }
         
         if (selectedText === "同步记录") {
@@ -2435,7 +2435,7 @@ function _runSyncRows(ws, colMap, rowsToProcess, headerRow) {
             }
 
             // 延迟
-            sleep(REQUEST_DELAY);
+            sleep(BGM_CONFIG.REQUEST_DELAY);
         }
 
         window.Application.StatusBar = false;

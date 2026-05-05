@@ -1,11 +1,13 @@
 /**
  * Bangumi API 同步模块
  * 功能：从 Excel 读取条目并批量同步到 Bangumi 收藏
+ * 
+ * 依赖: util.js (BGM_CONFIG, BGM命名空间, XL常量)
  */
 
-// ========== 配置区域 ==========
-const BGM_API_BASE = "https://api.bgm.tv";
-const REQUEST_DELAY = 800;
+// ========== 缓存区域 ==========
+// 缓存的总数据行数，用于优化扫描范围
+let _cachedTotalRows = 0;
 
 // ========== 向 taskpane 发送消息 ==========
 function sendToTaskpane(data) {
@@ -39,10 +41,6 @@ function parseJsonBodySummary(jsonStr) {
         return jsonStr;
     }
 }
-
-// ========== 缓存区域 ==========
-// 缓存的总数据行数，用于优化扫描范围
-let _cachedTotalRows = 0;
 
 // ========== 获取数据工作表（优先使用锁定的工作表）==========
 function getDataSheet() {
@@ -306,7 +304,7 @@ function SyncToBangumi() {
         }
 
         // 延迟避免限流
-        sleep(REQUEST_DELAY);
+        sleep(BGM_CONFIG.REQUEST_DELAY);
     }
 
     app.StatusBar = false;
@@ -510,6 +508,15 @@ function getColumnMap(ws, headerRow) {
 }
 
 // ========== 构建 JSON 请求体 ==========
+/**
+ * 构建 Bangumi API JSON 请求体
+ * 使用 JSON.stringify 确保安全性
+ * @param {object} ws - 工作表对象
+ * @param {number} row - 行号
+ * @param {Map} colMap - 列映射
+ * @param {string} finishedDate - 完播日期
+ * @returns {string} JSON字符串，空表示不需要上传
+ */
 function buildJsonPayload(ws, row, colMap, finishedDate) {
     // --- type: 收藏类型 ---
     let watchStatus = "";
@@ -523,8 +530,8 @@ function buildJsonPayload(ws, row, colMap, finishedDate) {
         return "";
     }
 
-    let parts = [];
-    parts.push('"type":' + bgmType);
+    // 使用对象构建，避免字符串拼接注入风险
+    let payload = { type: bgmType };
 
     // --- rate: 评分 ---
     if (colMap.has("打分")) {
@@ -532,7 +539,7 @@ function buildJsonPayload(ws, row, colMap, finishedDate) {
         if (!isNaN(rateVal)) {
             let rate = Math.max(0, Math.min(10, parseInt(rateVal)));
             if (rate > 0) {
-                parts.push('"rate":' + rate);
+                payload.rate = rate;
             }
         }
     }
@@ -541,19 +548,19 @@ function buildJsonPayload(ws, row, colMap, finishedDate) {
     if (colMap.has("剧透/感言")) {
         let comment = trim(getCellValue(ws, row, colMap.get("剧透/感言")));
         if (comment !== "") {
-            parts.push('"comment":"' + jsonEscape(comment) + '"');
+            payload.comment = comment;
         }
     }
 
     // --- tags: 标签 ---
-    let tags = buildTags(ws, row, colMap);
-    if (tags !== "") {
-        parts.push('"tags":[' + tags + ']');
+    let tags = buildTagsArray(ws, row, colMap);
+    if (tags.length > 0) {
+        payload.tags = tags;
     }
 
     // 注意：不包含 ep_status，让用户在 Bangumi 网站上手动标记章节进度
 
-    return "{" + parts.join(",") + "}";
+    return JSON.stringify(payload);
 }
 
 // ========== 映射观看状态 -> Bangumi type ==========
@@ -602,7 +609,14 @@ function mapWatchStatus(status, finishedDate) {
 }
 
 // ========== 构建标签数组 ==========
-function buildTags(ws, row, colMap) {
+/**
+ * 从工作表行构建标签数组
+ * @param {object} ws - 工作表对象
+ * @param {number} row - 行号
+ * @param {Map} colMap - 列映射
+ * @returns {Array} 标签数组
+ */
+function buildTagsArray(ws, row, colMap) {
     let tagSet = new Set();
 
     if (colMap.has("标签/分级")) {
@@ -615,13 +629,13 @@ function buildTags(ws, row, colMap) {
         addTagsFromStr(tagSet, raw);
     }
 
-    if (tagSet.size === 0) return "";
+    if (tagSet.size === 0) return [];
 
     let tags = [];
     for (let tag of tagSet) {
-        tags.push('"' + tag + '"');
+        tags.push(tag);
     }
-    return tags.join(",");
+    return tags;
 }
 
 // ========== 从字符串提取标签 ==========
@@ -664,7 +678,7 @@ function jsonEscape(s) {
 async function bgmRequest(method, endpoint, body, token) {
     return new Promise((resolve) => {
         let xhr = new XMLHttpRequest();
-        xhr.open(method, BGM_API_BASE + endpoint, false);
+        xhr.open(method, BGM_CONFIG.API_BASE + endpoint, false);
         xhr.setRequestHeader("Authorization", "Bearer " + token);
         xhr.setRequestHeader("Content-Type", "application/json");
 
@@ -691,7 +705,7 @@ function bgmRequestSync(method, endpoint, body, token) {
     
     while (retries <= MAX_RETRIES) {
         let xhr = new XMLHttpRequest();
-        xhr.open(method, BGM_API_BASE + endpoint, false);
+        xhr.open(method, BGM_CONFIG.API_BASE + endpoint, false);
         xhr.setRequestHeader("Authorization", "Bearer " + token);
         xhr.setRequestHeader("Content-Type", "application/json");
 

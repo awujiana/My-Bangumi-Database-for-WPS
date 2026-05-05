@@ -729,12 +729,10 @@ function fetchCollectionsByType(token, subjectType, maxItems) {
     let limit = 100;
     let lastError = null;
     
-    const BGM_API_BASE = "https://api.bgm.tv";
-    
     try {
         while (allItems.length < maxItems) {
             let xhr = new XMLHttpRequest();
-            let url = `${BGM_API_BASE}/v0/users/${_getUserApiPath()}/collections?subject_type=${subjectType}&limit=${limit}&offset=${(page - 1) * limit}`;
+            let url = `${BGM_CONFIG.API_BASE}/v0/users/${_getUserApiPath()}/collections?subject_type=${subjectType}&limit=${limit}&offset=${(page - 1) * limit}`;
             
             xhr.open("GET", url, false);
             xhr.setRequestHeader("Authorization", "Bearer " + token);
