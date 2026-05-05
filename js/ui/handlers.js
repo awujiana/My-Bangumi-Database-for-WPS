@@ -4,12 +4,13 @@
  * @description 面板操作处理、按钮绑定、事件处理
  */
 
-import { bgmLog, BGM } from '../util.js';
+import { bgmLog, BGM, LOG_LEVELS } from '../util.js';
 import { 
     showAlertDialog, showTokenDialog, showUserIdDialog, loadBgToken, 
     _getBgmUserId 
 } from '../util.js';
 import { setSyncRunning, setStatus } from './message.js';
+import { handleError } from '../core/unified.js';
 
 // ========== 面板操作处理 ==========
 /**
@@ -82,15 +83,15 @@ export function onAction(action) {
  * 从面板执行同步
  */
 export function syncFromPanel() {
-    bgmLog(LOG_LEVELS?.INFO || 1, "syncFromPanel 开始执行");
+    bgmLog(LOG_LEVELS.INFO, "syncFromPanel 开始执行");
     
     if (typeof findHeaderRow === 'undefined' || typeof getColumnMap === 'undefined' || typeof getLastRow === 'undefined') {
-        bgmLog(LOG_LEVELS?.ERROR || 3, "syncFromPanel - 必需函数未加载");
+        bgmLog(LOG_LEVELS.ERROR, "syncFromPanel - 必需函数未加载");
         showAlertDialog("提示", "正在加载脚本，请稍后重试...");
         return;
     }
     
-    bgmLog(LOG_LEVELS?.INFO || 1, "syncFromPanel - 必需函数已加载，开始同步...");
+    bgmLog(LOG_LEVELS.INFO, "syncFromPanel - 必需函数已加载，开始同步...");
 
     let token = loadBgToken();
     if (!token) {
@@ -105,7 +106,7 @@ export function syncFromPanel() {
             try {
                 syncSheet.Activate();
             } catch (e) {
-                bgmLog(LOG_LEVELS?.WARN || 2, "无法激活同步记录表: " + e.message);
+                bgmLog(LOG_LEVELS.WARN, "无法激活同步记录表: " + e.message);
             }
         }
     }
@@ -114,7 +115,7 @@ export function syncFromPanel() {
         try {
             SyncToBangumi();
         } catch (e) {
-            bgmLog(LOG_LEVELS?.ERROR || 3, "SyncToBangumi 出错: " + e.message);
+            bgmLog(LOG_LEVELS.ERROR, "SyncToBangumi 出错: " + e.message);
             showAlertDialog("执行出错", e.message);
         }
     }
@@ -149,7 +150,7 @@ export function syncCollectionFromBgm() {
         let select = document.getElementById("sheetSelect");
         let sheetIndex = BGM.sheet.lockedIndex || parseInt(select?.value) || 1;
         
-        bgmLog(LOG_LEVELS?.INFO || 1, "开始从BGM同步收藏标记，工作表索引: " + sheetIndex);
+        bgmLog(LOG_LEVELS.INFO, "开始从BGM同步收藏标记，工作表索引: " + sheetIndex);
 
         let token = loadBgToken();
         if (!token) {
@@ -159,8 +160,7 @@ export function syncCollectionFromBgm() {
 
         syncFromBgmByAPI(sheetIndex);
     } catch (e) {
-        console.error("syncCollectionFromBgm 出错:", e);
-        showAlertDialog("操作出错", e.message);
+        handleError(e, { context: 'syncCollectionFromBgm', showDialog: true });
     }
 }
 
@@ -168,7 +168,7 @@ export function syncCollectionFromBgm() {
  * 通过 API 方式同步收藏
  */
 export function syncFromBgmByAPI(sheetIndex) {
-    bgmLog(LOG_LEVELS?.INFO || 1, "syncFromBgmByAPI 开始");
+    bgmLog(LOG_LEVELS.INFO, "syncFromBgmByAPI 开始");
 
     let token = loadBgToken();
     if (!token) {

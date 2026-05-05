@@ -4,12 +4,12 @@
  * @description 提供通用工具函数、常量定义、错误处理等核心功能
  */
 
-import { WPS_ENUM, XL, BGM_CONFIG, BGM_COLOR, LOG_LEVELS } from './core/constants.js';
+import { WPS_ENUM, XL, BGM_CONFIG, BGM_COLOR, LOG_LEVELS, ERROR_LEVELS } from './core/constants.js';
 import { encryptToken, decryptToken, calcChecksum } from './core/crypto.js';
 
 // ========== 导出常量（向后兼容）==========
 export const WPS_Enum = WPS_ENUM;
-export { XL, BGM_CONFIG, BGM_COLOR, LOG_LEVELS };
+export { XL, BGM_CONFIG, BGM_COLOR, LOG_LEVELS, ERROR_LEVELS };
 
 // ========== BGM 全局命名空间 ==========
 export const BGM = {
@@ -36,7 +36,101 @@ export const BGM = {
     LOG_LEVEL: LOG_LEVELS.INFO,
     
     // 日志级别常量
-    LOG_LEVELS: LOG_LEVELS
+    LOG_LEVELS: LOG_LEVELS,
+
+    // 错误级别常量
+    ERROR_LEVELS: ERROR_LEVELS,
+
+    // 统一对话框
+    Dialog: {
+        alert: function(title, message) {
+            if (typeof window.BGMDialog !== 'undefined') {
+                window.BGMDialog.alert(title, message);
+            } else if (typeof window.BGMAlert === 'function') {
+                window.BGMAlert(message, title);
+            } else {
+                window.alert(message);
+            }
+        },
+        confirm: function(message, onConfirm, onCancel) {
+            if (typeof window.BGMDialog !== 'undefined') {
+                window.BGMDialog.confirm(message, onConfirm, onCancel);
+            } else if (typeof window.BGMConfirm === 'function') {
+                window.BGMConfirm(message, '确认', onConfirm, onCancel);
+            } else {
+                if (window.confirm(message)) {
+                    if (onConfirm) onConfirm();
+                } else {
+                    if (onCancel) onCancel();
+                }
+            }
+        },
+        error: function(title, message) {
+            if (typeof window.BGMDialog !== 'undefined') {
+                window.BGMDialog.error(title, message);
+            } else if (typeof window.BGMError === 'function') {
+                window.BGMError(message, title);
+            } else {
+                window.alert('[错误] ' + message);
+            }
+        },
+        input: function(title, prompt, defaultValue, onOk, onCancel) {
+            if (typeof window.BGMDialog !== 'undefined') {
+                window.BGMDialog.input(title, prompt, defaultValue, onOk, onCancel);
+            } else if (typeof window.BGMInput === 'function') {
+                window.BGMInput(title, prompt, defaultValue, onOk, onCancel);
+            } else {
+                const result = window.prompt(prompt, defaultValue);
+                if (result !== null) {
+                    if (onOk) onOk(result);
+                } else {
+                    if (onCancel) onCancel();
+                }
+            }
+        },
+        show: function(type, title, message, options) {
+            if (typeof window.BGMDialog !== 'undefined') {
+                window.BGMDialog.show(type, title, message, options);
+            } else {
+                // 降级处理
+                switch (type) {
+                    case 'error':
+                        this.error(title, message);
+                        break;
+                    case 'confirm':
+                        this.confirm(message, options?.onConfirm, options?.onCancel);
+                        break;
+                    case 'input':
+                        this.input(title, message, options?.defaultValue, options?.onOk, options?.onCancel);
+                        break;
+                    default:
+                        this.alert(title, message);
+                }
+            }
+        }
+    },
+
+    // 统一消息通信
+    Message: {
+        send: function(data, targetOrigin) {
+            try {
+                if (window.parent && window.parent !== window) {
+                    window.parent.postMessage(data, targetOrigin || "*");
+                    return true;
+                }
+            } catch (e) {
+                // 静默处理 postMessage 不可用的情况（如跨域限制）
+                // 仅在调试模式下记录
+                if (typeof bgmLog === 'function') {
+                    bgmLog(LOG_LEVELS?.DEBUG || 0, "postMessage 不可用: " + e.message);
+                }
+            }
+            return false;
+        },
+        postMessage: function(data, targetOrigin) {
+            return this.send(data, targetOrigin);
+        }
+    }
 };
 
 // ========== 日志函数 ==========
@@ -238,7 +332,8 @@ export function _fetchBgmUserInfo(callback) {
                 
                 BGM.cache.userId = userId;
                 BGM.cache.username = username;
-                bgmLog(LOG_LEVELS.INFO, "_fetchBgmUserInfo: " + username + " (" + userId + ")");
+                // 只在调试模式下记录用户信息（注意：不在生产环境日志中暴露敏感信息）
+                bgmLog(LOG_LEVELS.DEBUG, "_fetchBgmUserInfo: userId=" + userId);
                 
                 if (callback) callback({ id: userId, username: username });
             } catch (e) {
@@ -259,65 +354,47 @@ export function _fetchBgmUserInfo(callback) {
 // ========== 消息通信 ==========
 /**
  * 统一的 postMessage 函数
+ * @deprecated 使用 BGM.Message.send() 代替
  */
 BGM.postMessage = function(data, targetOrigin) {
-    try {
-        if (window.parent && window.parent !== window) {
-            window.parent.postMessage(data, targetOrigin || "*");
-            return true;
-        }
-    } catch (e) {
-        console.log("[BGM] postMessage not available:", e.message);
-    }
-    return false;
+    return BGM.Message.send(data, targetOrigin);
 };
 
 /**
  * 统一的对话框显示函数
+ * @deprecated 使用 BGM.Dialog.alert() 代替
  */
 BGM.showDialog = function(title, message) {
-    if (BGM.postMessage({ type: "showDialog", title: title, message: message })) {
+    if (BGM.Message.send({ type: "showDialog", title: title, message: message })) {
         return;
     }
-    // 使用自定义对话框
-    if (typeof window.BGMAlert === 'function') {
-        window.BGMAlert(message, title);
-    } else {
-        window.alert(message);
-    }
+    BGM.Dialog.alert(title, message);
 };
 
 /**
  * 显示确认对话框
+ * @deprecated 使用 BGM.Dialog.confirm() 代替
  */
 BGM.showConfirm = function(title, message, onConfirm, onCancel) {
-    if (BGM.postMessage({ type: "showConfirm", title: title, message: message, onConfirm: true })) {
+    if (BGM.Message.send({ type: "showConfirm", title: title, message: message, onConfirm: true })) {
         window._bgmConfirmCallback = { confirm: onConfirm, cancel: onCancel };
         return;
     }
-    // 使用自定义确认对话框
-    if (typeof window.BGMConfirm === 'function') {
-        window.BGMConfirm(message, title, onConfirm, onCancel);
-    } else {
-        if (window.confirm(message)) {
-            if (onConfirm) onConfirm();
-        } else {
-            if (onCancel) onCancel();
-        }
-    }
+    BGM.Dialog.confirm(message, onConfirm, onCancel);
 };
-
-// ========== 自定义对话框替换原生 alert ==========
 (function() {
-    const _origAlert = window.alert;
-    window.alert = function(message) {
-        // 使用自定义对话框
-        if (typeof window.BGMAlert === 'function') {
-            window.BGMAlert(message, '提示');
-            return;
-        }
-        _origAlert(message);
-    };
+    try {
+        const _origAlert = window.alert;
+        window.BGMAlert = window.BGMAlert || function(message, title) {
+            // 优先使用自定义对话框，否则回退到原生 alert
+            if (typeof _origAlert === 'function') {
+                _origAlert(message);
+            }
+        };
+    } catch (e) {
+        // 某些环境禁止覆盖 window.alert，忽略即可
+        console.warn('[BGM] Cannot override window.alert:', e.message);
+    }
 })();
 
 /**
@@ -501,7 +578,12 @@ export function sleep(ms) {
             let app = getApp();
             if (app && app.DoEvents) app.DoEvents();
         } catch(e) {
-            // 静默处理
+            // 静默处理 DoEvents 不可用的情况
+            // 仅在调试模式下记录
+            if (typeof bgmLog === 'function') {
+                bgmLog(LOG_LEVELS?.DEBUG || 0, "sleep DoEvents 失败: " + e.message);
+            }
+            break; // 退出循环，避免无限等待
         }
     }
 }

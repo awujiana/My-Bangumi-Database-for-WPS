@@ -5,17 +5,13 @@
  */
 
 import { XL, BGM_CONFIG, LOG_LEVELS, BGM } from './util.js';
-import { getApp, bgmLog, getCell, getCellValue, sleep, loadBgToken, storeBgToken, 
-         _setBgmUserId, _getBgmUserId, wpsPrompt } from './util.js';
+import { getApp, bgmLog, getCell, getCellValue, sleep, loadBgToken, 
+         _setBgmUserId, _getBgmUserId } from './util.js';
+import { showDialog, sendToTaskpane, showTokenDialog, showUserIdDialog } from './ui/dialog.js';
+import { safeExecute } from './core/unified.js';
 
-// ========== 向后兼容别名 ==========
-export function sendToTaskpane(data) {
-    return BGM.postMessage(data);
-}
-
-export function showDialog(title, message) {
-    BGM.showDialog(title, message);
-}
+// 错误级别常量
+const { ERROR_LEVELS } = BGM;
 
 // ========== 工具函数 ==========
 /**
@@ -287,7 +283,7 @@ export function findHeaderRow(ws, startRow) {
     
     for (let row = startRow; row <= Math.min(startRow + 5, 10); row++) {
         try {
-            let cell = ws.Cells(row, 1);
+            let cell = getCell(ws, row, 1);
             if (!cell || !cell.Value) continue;
             
             let cellText = String(cell.Value).toLowerCase();
@@ -337,7 +333,9 @@ export function getColumnMap(ws, headerRow) {
     };
 
     try {
-        let lastCol = ws.Cells(headerRow, ws.Columns.Count).End(XL.TO_LEFT).Column;
+        // 使用 Range.End 代替 Cells 来获取最后一个有内容的列
+        let lastCell = ws.Range(ws.Cells(headerRow, 1), ws.Cells(headerRow, ws.Columns.Count)).End(XL.TO_LEFT);
+        let lastCol = lastCell.Column;
         
         for (let col = 1; col <= lastCol; col++) {
             let cellValue = getCellValue(ws, headerRow, col);
@@ -695,24 +693,6 @@ export function getSequentialRowsBySeqCol(startRow, endRow) {
     return { validRows: validRows, skippedRows: skippedRows };
 }
 
-// ========== Ribbon 模式函数 ==========
-/**
- * 显示 Token 输入对话框（Ribbon 模式）
- */
-export function showTokenDialogRibbon(currentToken) {
-    let app = getApp();
-    let message = "请输入 Bangumi Access Token：\n\n获取方式：Bangumi → 设置 → API → 创建应用\n\n已设置 Token: " + (currentToken ? "✅ 已设置（输入新值覆盖）" : "❌ 未设置");
-    
-    let token = wpsPrompt(message, "");
-    if (token !== null && token.trim() !== "") {
-        if (app) {
-            storeBgToken(token.trim());
-        }
-        sendToTaskpane({ type: "tokenUpdated" });
-        testTokenValidityForRibbon(token.trim());
-    }
-}
-
 /**
  * Ribbon 模式测试 Token
  */
@@ -768,20 +748,6 @@ export function openUserCollection() {
     window.open("https://bgm.tv/" + userId + "/collect", "_blank");
 }
 
-/**
- * 显示用户ID设置对话框
- */
-export function showUserIdDialog() {
-    let currentId = _getBgmUserId() || "";
-    let message = "请输入 Bangumi 用户ID：\n\n获取方式：访问你的 Bangumi 主页，URL 中的数字即为用户ID\n\n当前用户ID: " + (currentId || "(未设置)");
-    
-    let userId = wpsPrompt(message, currentId);
-    if (userId !== null && userId.trim() !== "") {
-        _setBgmUserId(userId.trim());
-        showDialog("设置成功", "用户ID 已设置为: " + userId.trim());
-    }
-}
-
 // ========== 向后兼容（挂载到 window）==========
 window.SyncToBangumi = SyncToBangumi;
 window.getDataSheet = getDataSheet;
@@ -793,6 +759,11 @@ window.buildJsonPayload = buildJsonPayload;
 window.extractSubjectId = extractSubjectId;
 window.clearRowColors = clearRowColors;
 window.openUserCollection = openUserCollection;
-window.showTokenDialogRibbon = showTokenDialogRibbon;
+window.openBangumiTokenPage = openBangumiTokenPage;
+window.showTokenDialog = showTokenDialog;
 window.showUserIdDialog = showUserIdDialog;
-window.showTokenDialog = showTokenDialogRibbon; // 别名
+window.testTokenValidityForRibbon = testTokenValidityForRibbon;
+window.bgmiRequestSync = bgmRequestSync;
+window.bgmiRequest = bgmRequest;
+window.sendToTaskpane = sendToTaskpane;
+window.showDialog = showDialog;

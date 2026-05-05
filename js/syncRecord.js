@@ -5,7 +5,7 @@
  */
 
 import { XL, BGM_CONFIG, BGM_COLOR, LOG_LEVELS, BGM } from './util.js';
-import { getApp, bgmLog, colNumToLetter } from './util.js';
+import { getApp, bgmLog, colNumToLetter, getCell } from './util.js';
 
 // ========== 向后兼容别名 ==========
 export function sendToTaskpaneSR(data) {
@@ -451,7 +451,8 @@ export function markUploadedItemsInSheet(sheetIndex, collections) {
         let lastRow = ws.Range("A" + ws.Rows.Count).End(XL.UP).Row;
 
         for (let col = 1; col <= lastCol; col++) {
-            let header = String(ws.Cells(headerRow, col).Value || "").toLowerCase();
+            let cell = getCell(ws, headerRow, col);
+            let header = String(cell && cell.Value ? cell.Value : "").toLowerCase();
             if (header.includes("条目id") || header === "sid" || header === "id") {
                 sidCol = col;
             }
@@ -465,9 +466,10 @@ export function markUploadedItemsInSheet(sheetIndex, collections) {
         let markedCount = 0;
         for (let row = headerRow + 1; row <= lastRow; row++) {
             try {
-                let sid = String(ws.Cells(row, sidCol).Value || "").trim();
+                let sidCell = getCell(ws, row, sidCol);
+                let sid = String(sidCell && sidCell.Value ? sidCell.Value : "").trim();
                 if (sidSet.has(sid)) {
-                    let cell = ws.Cells(row, 4);
+                    let cell = getCell(ws, row, 4);
                     if (cell) {
                         cell.Value = "已收藏";
                         cell.Interior.ColorIndex = 40;
@@ -501,7 +503,7 @@ export function clearSheetMarksInSheet(sheetIndex) {
         
         for (let row = 2; row <= lastRow; row++) {
             try {
-                let cell = ws.Cells(row, 4);
+                let cell = getCell(ws, row, 4);
                 if (cell) {
                     cell.Value = "";
                     if (cell.Interior) {

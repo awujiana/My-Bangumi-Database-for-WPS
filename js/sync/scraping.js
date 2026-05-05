@@ -109,6 +109,7 @@ function fetchAllUserCollectionsByScraping(token, types, onSuccess, onError) {
 
     /**
      * 获取单页收藏
+     * 注意：网页抓取方式存在跨域限制，建议使用官方 API (fetchAllUserCollections)
      */
     function fetchPage() {
         setStatus("正在获取第 " + currentPage + " 页...", "info");
@@ -117,8 +118,9 @@ function fetchAllUserCollectionsByScraping(token, types, onSuccess, onError) {
         let url = "https://bgm.tv/" + userId + "?tab=collect";
 
         xhr.open("GET", url, true);
-        xhr.setRequestHeader("Cookie", "chii_secerv_token=" + token);
-        xhr.withCredentials = true;
+        // 使用 Authorization Header 代替 Cookie，避免 CORS 问题
+        xhr.setRequestHeader("Authorization", "Bearer " + token);
+        xhr.setRequestHeader("Content-Type", "application/json; charset=utf-8");
 
         xhr.onload = function() {
             if (xhr.status === 200) {
@@ -208,7 +210,8 @@ function hasNextPageLink(html) {
  * @param {function} onError - 失败回调
  */
 function fetchAllUserCollections(token, userId, onSuccess, onError) {
-    bgmLog(BGM.LOG_LEVELS.INFO, "fetchAllUserCollections 开始, userId: " + userId);
+    // 只在调试模式下记录（不在生产环境日志中暴露敏感信息）
+    bgmLog(BGM.LOG_LEVELS.DEBUG, "fetchAllUserCollections 开始, userId=" + userId);
 
     let allCollections = [];
     let page = 1;

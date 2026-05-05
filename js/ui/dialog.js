@@ -8,14 +8,25 @@ import { loadBgToken } from '../util.js';
 import { BGM } from '../util.js';
 
 // ========== 全局对话框容器 ==========
-(function() {
-    // 页面加载完成后创建对话框容器
+// 在 WPS/Office 环境中，document.readyState 可能不是标准值
+// 所以使用 setTimeout 确保对话框在 DOM 准备好后创建
+let dialogInitialized = false;
+
+function ensureDialogs() {
+    if (dialogInitialized) return;
+    dialogInitialized = true;
+    createDialogs();
+}
+
+// 尝试在脚本加载时创建对话框
+if (typeof document !== 'undefined') {
     if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', createDialogs);
+        document.addEventListener('DOMContentLoaded', ensureDialogs);
     } else {
-        createDialogs();
+        // 使用 setTimeout 确保 DOM 操作在下一个事件循环中执行
+        setTimeout(ensureDialogs, 0);
     }
-})();
+}
 
 function createDialogs() {
     // 避免重复创建
@@ -276,6 +287,7 @@ export function showSuccess(message, title, onOk) {
  * 显示 Input 输入对话框
  */
 export function showInput(title, prompt, defaultValue, onOk, onCancel) {
+    ensureDialogs();  // 确保对话框容器已创建
     const dialog = document.getElementById('bgmInputDialog');
     if (!dialog) {
         const result = window.prompt(prompt, defaultValue);
@@ -406,7 +418,30 @@ export function updateUserIdStatus() {
 /**
  * 显示 Token 设置对话框
  */
+
+/**
+ * 显示消息对话框（自定义模态框）
+ */
+export function showDialog(title, message) {
+    const dialog = document.getElementById('bgmAlertDialog');
+    if (!dialog) {
+        window.alert(message);
+        return;
+    }
+    document.getElementById('bgmAlertTitle').textContent = title || '提示';
+    document.getElementById('bgmAlertMessage').textContent = message;
+    dialog.style.display = 'flex';
+}
+
+/**
+ * 发送消息到任务窗格
+ */
+export function sendToTaskpane(data) {
+    return BGM.postMessage(data);
+}
+
 export function showTokenDialog(currentToken) {
+    ensureDialogs();  // 确保对话框容器已创建
     showInput("设置 Bangumi Access Token", "请输入 Access Token", "", (value) => {
         if (value) {
             if (typeof storeBgToken === 'function') {
@@ -423,6 +458,7 @@ export function showTokenDialog(currentToken) {
  * 显示用户ID设置对话框
  */
 export function showUserIdDialog() {
+    ensureDialogs();  // 确保对话框容器已创建
     if (typeof _getBgmUserId !== 'function') return;
     
     let currentId = _getBgmUserId() || "";

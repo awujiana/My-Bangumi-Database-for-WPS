@@ -7,6 +7,8 @@
 // 导入工具函数
 import { WPS_Enum } from './util.js';
 import { getApp, loadBgToken, showBangumiPanel } from './util.js';
+import { SyncToBangumi, openUserCollection, clearRowColors, testTokenValidityForRibbon } from './bangumi.js';
+import { showTokenDialog, showUserIdDialog } from './ui/dialog.js';
 
 // ========== Ribbon 回调 ==========
 
@@ -50,6 +52,11 @@ export function OnAction(control) {
                     showTokenDialog(loadBgToken());
                 }
                 break;
+            case "btnTestToken":
+                if (typeof testTokenValidityForRibbon === 'function') {
+                    testTokenValidityForRibbon(loadBgToken());
+                }
+                break;
             case "btnSetUserId":
                 if (typeof showUserIdDialog === 'function') {
                     showUserIdDialog();
@@ -87,6 +94,7 @@ export function GetBangumiImage(control) {
         case "btnShowPanel":     return "images/panel.svg";
         case "btnSyncBangumi":   return "images/sync.svg";
         case "btnSetToken":      return "images/key.svg";
+        case "btnTestToken":     return "images/key.svg";  // 使用 key 图标
         case "btnSetUserId":     return "images/user.svg";
         case "btnOpenCollection": return "images/link.svg";
         case "btnClearColors":   return "images/delete.svg";

@@ -20,8 +20,10 @@ import {
 import { previewSyncContent, closeDetailModal, filterDetailItems } from './ui/preview.js';
 
 // ========== 工作表锁定功能 ==========
-let lockedSheetIndex = null;
-let lockedSheetName = null;
+// 注意：工作表锁定状态已迁移到 BGM.sheet 命名空间
+// - BGM.sheet.lockedIndex: 锁定的工作表索引
+// - BGM.sheet.lockedName: 锁定的工作表名称
+// - BGM.sheet.isLocked: 是否已锁定
 
 /**
  * 切换工作表锁定状态
@@ -265,8 +267,32 @@ function fetchBgCollectionRecords() {
  * 清除同步记录
  */
 function clearSyncRecords() {
-    if (typeof clearSyncRecords === 'function') {
+    if (typeof window.clearSyncRecords === 'function') {
+        window.clearSyncRecords(true);
+    } else if (typeof clearSyncRecords === 'function') {
         clearSyncRecords(true);
+    }
+}
+
+/**
+ * 标记已上传条目
+ */
+function markUploadedItems() {
+    if (typeof window.markUploadedItems === 'function') {
+        window.markUploadedItems('动画');
+    } else if (typeof markUploadedItems === 'function') {
+        markUploadedItems('动画');
+    }
+}
+
+/**
+ * 清除工作表标记
+ */
+function clearSheetMarks() {
+    if (typeof window.clearSheetMarks === 'function') {
+        window.clearSheetMarks();
+    } else if (typeof clearSheetMarks === 'function') {
+        clearSheetMarks();
     }
 }
 
@@ -278,7 +304,9 @@ export {
     toggleSheetLock,
     onSelectModeChange,
     fetchBgCollectionRecords,
-    clearSyncRecords
+    clearSyncRecords,
+    markUploadedItems,
+    clearSheetMarks
 };
 
 // ========== 挂载到 window（向后兼容）==========
@@ -290,6 +318,8 @@ window.toggleSheetLock = toggleSheetLock;
 window.onSelectModeChange = onSelectModeChange;
 window.fetchBgCollectionRecords = fetchBgCollectionRecords;
 window.clearSyncRecords = clearSyncRecords;
+window.markUploadedItems = markUploadedItems;
+window.clearSheetMarks = clearSheetMarks;
 
 // 导出全局函数别名
 window.onAction = onAction;

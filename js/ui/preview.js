@@ -112,7 +112,7 @@ export function previewSyncContent() {
                 payload: buildPreviewPayload(ws, i, colMap)
             });
         } catch (e) {
-            bgmLog(LOG_LEVELS?.WARN || 2, "预览第 " + i + " 行出错: " + e.message);
+            bgmLog(LOG_LEVELS.WARN, "预览第 " + i + " 行出错: " + e.message);
         }
     }
 
