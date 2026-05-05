@@ -1508,12 +1508,26 @@ function _doAPISync(sheetIndex, token) {
             return;
         }
 
-        // 获取数据范围
-        let lastRowCell = getCell(ws, ws.Rows.Count, 1);
-        let lastRow = lastRowCell.End(-4162).Row;
-        let dataStartRow = headerRow + 1;
+        // 获取数据范围（使用 D 列序列号检测最后一行，与预览逻辑一致）
         let seqCol = 4; // D列
+        let dataStartRow = headerRow + 1;
+        let lastRow = getLastRow(ws);
         let nameCol = colMap.has("名称") ? colMap.get("名称") : 0;
+        console.log("工作表演:", ws.Name, "表头行:", headerRow, "数据起始行:", dataStartRow, "最后行(DB):", lastRow);
+        
+        // 确保至少扫描到合理的行数（兼容不同版本的 getLastRow 实现）
+        if (!lastRow || lastRow < dataStartRow) {
+            // 回退：直接从 D 列最后单元格向上查找
+            try {
+                let dLast = getCell(ws, ws.Rows.Count, seqCol);
+                if (dLast) {
+                    let dEnd = dLast.End(-4162);
+                    lastRow = dEnd.Row > dataStartRow ? dEnd.Row : 1000;
+                }
+            } catch (e2) {}
+            if (!lastRow || lastRow < dataStartRow) lastRow = 1000;
+            console.log("回退检测 lastRow:", lastRow);
+        }
 
         // 先验证 Token 有效性
         setStatus("正在验证 Token...", "loading");
@@ -1573,11 +1587,44 @@ function _doAPISync(sheetIndex, token) {
             }
         }
 
-        // 遍历 Excel 数据并标记 + 写入同步记录
+        // 先写入所有收藏到同步记录表（无论是否匹配Excel行）
+        setStatus(`正在写入 ${userCollections.length} 条收藏到同步记录表...`, "loading");
+        let writtenToRecord = 0;
+        for (let ci = 0; ci < userCollections.length; ci++) {
+            let item = userCollections[ci];
+            let sid = item.subject_id;
+            let url = "https://bgm.tv/subject/" + sid;
+            let name = item.subject?.name_cn || item.subject?.name || "(无名称)";
+            addSyncRecord({
+                name: name,
+                url: url,
+                sid: String(sid),
+                type: "动画",
+                content: "从BGM API同步收藏",
+                status: "成功",
+                message: "BGM收藏同步",
+                count: 1
+            });
+            writtenToRecord++;
+        }
+        console.log(`已将 ${writtenToRecord} 条收藏写入同步记录表`);
+
+        // 重新获取同步记录计数（因为刚才写入了新记录）
+        syncRecords = getAllSyncRecords();
+        syncCountMap = new Map();
+        for (let i = 0; i < syncRecords.length; i++) {
+            let record = syncRecords[i];
+            let sid = String(record.sid);
+            syncCountMap.set(sid, (syncCountMap.get(sid) || 0) + 1);
+        }
+
+        // 遍历 Excel 数据并标记 D 列
+        setStatus(`正在匹配 ${userCollections.length} 条收藏...`, "loading");
         let matchedCount = 0;
         let totalCount = 0;
         let purpleCount = 0, lightGreenCount = 0, darkGreenCount = 0;
 
+        console.log(`开始扫描行: ${dataStartRow} → ${lastRow}, 共 ${lastRow - dataStartRow + 1} 行`);
         for (let row = dataStartRow; row <= lastRow; row++) {
             let bgmUrlCell = getCell(ws, row, colMap.get("Bangumi_URL"));
             let bgmUrl = bgmUrlCell ? trim(String(bgmUrlCell.Value() || "")) : "";
@@ -1586,13 +1633,11 @@ function _doAPISync(sheetIndex, token) {
             if (sid && collectionMap.has(sid)) {
                 let seqCell = getCell(ws, row, seqCol);
                 if (seqCell && seqCell.Interior) {
-                    // 检查本地同步次数
                     let syncCount = syncCountMap.get(sid) || 0;
-                    
-                    if (syncCount === 0) {
+                    if (syncCount === 1) {
                         seqCell.Interior.Color = BGM_COLOR.BGM_SYNC;
                         purpleCount++;
-                    } else if (syncCount === 1) {
+                    } else if (syncCount === 2) {
                         seqCell.Interior.Color = BGM_COLOR.LIGHT_GREEN;
                         lightGreenCount++;
                     } else {
@@ -1601,36 +1646,16 @@ function _doAPISync(sheetIndex, token) {
                     }
                 }
                 matchedCount++;
-
-                // 获取名称
-                let name = "";
-                if (nameCol > 0) {
-                    let nameCell = getCell(ws, row, nameCol);
-                    name = nameCell ? trim(String(nameCell.Value() || "")) : "";
-                }
-
-                // 写入同步记录表
-                addSyncRecord({
-                    name: name || "(无名称)",
-                    url: bgmUrl,
-                    sid: sid,
-                    type: "动画",
-                    content: "从BGM API同步",
-                    status: "成功",
-                    message: "行" + row + " API匹配",
-                    count: 1
-                });
             }
             totalCount++;
 
-            // 每100行更新一次状态
             if (row % 100 === 0) {
                 setStatus(`已处理 ${row}/${lastRow} 行...`, "loading");
             }
         }
 
         setStatus("就绪", "success");
-        alert(`同步完成！\n\n共处理 ${totalCount} 行数据\n匹配到 ${matchedCount} 条已收藏条目\n\nD 列颜色说明：\n🟣 紫色 - 从BGM同步（未本地同步）\n🟢 浅绿色 - 已同步1次\n🌲 深绿色 - 已同步多次\n📋 ${matchedCount} 条同步记录已写入同步记录表`);
+        alert(`同步完成！\n\n📋 已将 ${writtenToRecord} 条BGM收藏写入同步记录表\n🔍 扫描 ${totalCount} 行Excel数据\n🔗 匹配到 ${matchedCount} 条\n\nD 列颜色说明：\n🟣 紫色 - 本次从BGM同步\n🟢 浅绿色 - 已同步2次\n🌲 深绿色 - 已同步多次`);
 
     } catch (e) {
         alert("同步失败: " + e.message);
@@ -1862,33 +1887,30 @@ function fetchAllUserCollections(token) {
                 break;
             }
 
-            let data;
+            let raw;
             try {
-                data = JSON.parse(xhr.responseText);
+                raw = JSON.parse(xhr.responseText);
             } catch (e) {
                 lastError = { type: "parse", message: "响应数据格式错误" };
                 console.log("解析收藏数据失败");
                 break;
             }
 
-            if (!Array.isArray(data)) {
-                lastError = { type: "format", message: "响应数据不是数组格式" };
-                console.log("响应数据不是数组格式");
-                break;
-            }
-
-            if (data.length === 0) {
-                // 空数组，可能用户确实没有该类型收藏
+            // API 返回格式: { data: [...], total: N, limit: 100, offset: 0 }
+            let items = Array.isArray(raw) ? raw : (raw.data || []);
+            
+            if (!Array.isArray(items) || items.length === 0) {
+                // 空数据，可能用户确实没有该类型收藏
                 break;
             }
 
             // 添加到结果集
-            for (let i = 0; i < data.length; i++) {
-                allCollections.push(data[i]);
+            for (let i = 0; i < items.length; i++) {
+                allCollections.push(items[i]);
             }
 
             // 如果返回数据少于 limit，说明已经是最后一页
-            if (data.length < limit) {
+            if (items.length < limit) {
                 break;
             }
 
@@ -2109,12 +2131,28 @@ function syncFromPanel() {
         confirmMsg += "根据D列序列号识别有效数据行\n";
         confirmMsg += "\n是否继续？";
         
-        if (!confirm(confirmMsg)) {
-            return;
-        }
+        // 使用自定义确认对话框
+        showConfirmDialog(confirmMsg, () => {
+            _runSyncRows(ws, colMap, rowsToProcess, headerRow);
+        });
+        return;
+    } catch (e) {
+        console.error("同步失败:", e);
+        setStatus("同步失败: " + e.message, "error");
+    }
+}
 
-        setStatus("正在同步...", "loading");
+// ========== 执行同步行数据 ==========
+function _runSyncRows(ws, colMap, rowsToProcess, headerRow) {
+    let token = loadBgToken();
+    if (!token) {
+        alert("请先设置 Bangumi Token！");
+        return;
+    }
+    
+    setStatus("正在同步...", "loading");
 
+    try {
         let successCount = 0, failCount = 0, skipNoUrlCount = 0, skipNoTypeCount = 0;
         let total = rowsToProcess.length;
 
@@ -2655,12 +2693,15 @@ function markUploadedItems(sheetType) {
     
     let sheetName = currentSheet.Name;
     
-    // 确认操作
+    // 确认操作（使用自定义对话框）
     let typeName = sheetType === "动画" ? "动画（剧集）" : "书籍（小说）";
-    if (!confirm(`将在当前工作表「${sheetName}」的 D 列标记已上传到 BGM 的${typeName}条目。\n\n注意：\n1. 会自动查找名称或 URL 匹配的条目\n2. 已标记的行会跳过\n3. 请确保同步记录表中已有相关条目\n\n是否继续？`)) {
-        return;
-    }
-    
+    showConfirmDialog(`将在当前工作表「${sheetName}」的 D 列标记已上传到 BGM 的${typeName}条目。\n\n注意：\n1. 会自动查找名称或 URL 匹配的条目\n2. 已标记的行会跳过\n3. 请确保同步记录表中已有相关条目\n\n是否继续？`, () => {
+        _doMarkUploaded(sheetType, app);
+    });
+}
+
+// ========== 执行标记已上传条目 ==========
+function _doMarkUploaded(sheetType, app) {
     setStatus("正在标记已上传条目...", "loading");
     
     try {
@@ -2708,16 +2749,19 @@ function clearSheetMarks() {
     
     let sheetName = currentSheet.Name;
     
-    if (!confirm(`将清除当前工作表「${sheetName}」D 列的所有同步标记。\n\n是否继续？`)) {
-        return;
-    }
-    
+    showConfirmDialog(`将清除当前工作表「${sheetName}」D 列的所有同步标记。\n\n是否继续？`, () => {
+        _doClearSheetMarks(currentSheet);
+    });
+}
+
+// ========== 执行清除 D 列标记 ==========
+function _doClearSheetMarks(ws) {
     try {
-        let lastRow = currentSheet.Range("A" + currentSheet.Rows.Count).End(-4162).Row;
+        let lastRow = ws.Range("A" + ws.Rows.Count).End(-4162).Row;
         let clearedCount = 0;
         
         for (let i = 2; i <= lastRow; i++) {
-            let cellD = currentSheet.Range("D" + i);
+            let cellD = ws.Range("D" + i);
             if (cellD.Value2 && String(cellD.Value2).includes("BGM已上传")) {
                 cellD.Value2 = "";
                 cellD.Interior.Color = BGM_COLOR.WHITE;

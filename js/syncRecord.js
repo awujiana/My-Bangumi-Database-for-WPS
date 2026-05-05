@@ -383,7 +383,13 @@ function getAllSyncRecords() {
  * @param {boolean} confirmIt - 是否需要确认
  */
 function clearSyncRecords(confirmIt) {
-    if (confirmIt !== false) {
+    if (confirmIt !== false && typeof showConfirmDialog === 'function') {
+        // 使用自定义对话框（异步），但 clearSyncRecords 是同步函数
+        // 若自定义对话框不可用则回退原生 confirm
+        if (!confirm("确定要清除所有同步记录吗？")) {
+            return false;
+        }
+    } else if (confirmIt !== false) {
         if (!confirm("确定要清除所有同步记录吗？")) {
             return false;
         }

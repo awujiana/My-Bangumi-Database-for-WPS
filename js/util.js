@@ -218,6 +218,54 @@ let _cachedBgmUserId = null;
 function _setBgmUserId(id) { _cachedBgmUserId = id; }
 function _getUserApiPath() { return _cachedBgmUserId ? String(_cachedBgmUserId) : "-"; }
 
+// ========== 自定义 Alert 对话框（替换原生 alert）==========
+// 全局覆写 alert，在 taskpane 环境中使用自定义模态框
+(function() {
+    const _origAlert = window.alert;
+    window.alert = function(message) {
+        try {
+            let modal = document.getElementById("alertDialog");
+            if (!modal) {
+                // 动态创建 Alert 模态框
+                modal = document.createElement("div");
+                modal.id = "alertDialog";
+                modal.className = "modal";
+                modal.style.display = "none";
+                modal.innerHTML = `
+                    <div class="modal-content confirm-modal-content" style="max-width:420px;text-align:center;padding:30px 25px;">
+                        <h3 id="alertTitle" style="margin:0 0 15px 0;color:#fff;font-size:18px;"></h3>
+                        <p id="alertMessage" style="margin-bottom:20px;line-height:1.6;color:#ccc;white-space:pre-wrap;word-break:break-all;"></p>
+                        <div class="dialog-buttons" style="justify-content:center;">
+                            <button class="btn confirm-btn confirm-yes" onclick="document.getElementById('alertDialog').style.display='none'">确定</button>
+                        </div>
+                    </div>`;
+                document.body.appendChild(modal);
+            }
+            let titleEl = document.getElementById("alertTitle");
+            let msgEl = document.getElementById("alertMessage");
+            if (titleEl && msgEl) {
+                // 如果是 "alert("text", 64)" 的 WPS 格式，忽略第二个参数
+                let text = typeof message === 'string' ? message : String(message);
+                // 根据消息长度和内容决定标题
+                if (text.length > 80 || text.indexOf('\n') >= 0) {
+                    let firstLine = text.split('\n')[0];
+                    titleEl.textContent = firstLine.length > 30 ? "提示" : firstLine;
+                    msgEl.textContent = text;
+                } else {
+                    titleEl.textContent = "提示";
+                    msgEl.textContent = text;
+                }
+                modal.style.display = "flex";
+                // 点击背景关闭
+                let bgHandler = function(e) { if (e.target === modal) { modal.style.display = "none"; modal.removeEventListener("click", bgHandler); } };
+                modal.addEventListener("click", bgHandler);
+                return;
+            }
+        } catch(e) {}
+        _origAlert(message);
+    };
+})();
+
 // ========== 辅助函数 ==========
 
 /**
