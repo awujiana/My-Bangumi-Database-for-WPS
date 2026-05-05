@@ -597,7 +597,6 @@ async function bgmRequest(method, endpoint, body, token) {
         xhr.open(method, BGM_API_BASE + endpoint, false);
         xhr.setRequestHeader("Authorization", "Bearer " + token);
         xhr.setRequestHeader("Content-Type", "application/json");
-        xhr.setRequestHeader("User-Agent", "BangumiWPS/1.0");
 
         try {
             xhr.send(body);
@@ -625,7 +624,6 @@ function bgmRequestSync(method, endpoint, body, token) {
         xhr.open(method, BGM_API_BASE + endpoint, false);
         xhr.setRequestHeader("Authorization", "Bearer " + token);
         xhr.setRequestHeader("Content-Type", "application/json");
-        xhr.setRequestHeader("User-Agent", "BangumiWPS/1.0");
 
         try {
             xhr.send(body);
@@ -803,7 +801,6 @@ function testTokenValidityForRibbon(token) {
     let xhr = new XMLHttpRequest();
     xhr.open("GET", "https://api.bgm.tv/v0/me", false);
     xhr.setRequestHeader("Authorization", "Bearer " + token);
-    xhr.setRequestHeader("User-Agent", "BangumiWPS/1.0");
 
     try {
         xhr.send();

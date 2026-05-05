@@ -152,18 +152,24 @@ function decryptToken(encoded) {
         }
         return result;
     } catch (e) {
-        return "";
+        return null; // 解码失败，可能是旧版明文 Token
     }
 }
 
-// ========== Token 存储（读写均加密）==========
+// ========== Token 存储（读写均加密，兼容旧版本明文 Token）==========
 function loadBgToken() {
     let app = getApp();
     if (!app) return null;
-    let encrypted = app.PluginStorage.getItem("bgm_token");
-    if (!encrypted) return null;
-    let token = decryptToken(encrypted);
-    return token || null;
+    let stored = app.PluginStorage.getItem("bgm_token");
+    if (!stored) return null;
+    
+    // 尝试解密
+    let token = decryptToken(stored);
+    if (token) return token; // 解密成功，返回 Token
+    
+    // 解密失败 → 旧版明文 Token，自动升级为加密存储
+    storeBgToken(stored); // 加密写入
+    return stored;         // 返回原文
 }
 
 function storeBgToken(token) {
@@ -237,6 +243,27 @@ function GetUrlPath() {
         return currentUrl.substring(0, lastSlash);
     }
     return "";
+}
+
+/**
+ * 显示同步面板（由 ribbon.js 的 btnShowPanel 调用）
+ */
+function showBangumiPanel() {
+    let app = getApp();
+    if (!app) {
+        alert("无法获取 WPS Application 对象！");
+        return;
+    }
+    let tsId = app.PluginStorage.getItem("taskpane_id");
+    if (!tsId) {
+        let tskpane = app.CreateTaskPane(GetUrlPath() + "/ui/taskpane.html");
+        let id = tskpane.ID;
+        app.PluginStorage.setItem("taskpane_id", id);
+        tskpane.Visible = true;
+    } else {
+        let tskpane = app.GetTaskPane(tsId);
+        tskpane.Visible = !tskpane.Visible;
+    }
 }
 
 /**

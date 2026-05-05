@@ -616,7 +616,6 @@ function fetchCollectionsByType(token, subjectType, maxItems) {
             
             xhr.open("GET", url, false);
             xhr.setRequestHeader("Authorization", "Bearer " + token);
-            xhr.setRequestHeader("User-Agent", "BangumiWPS/1.0");
             xhr.send();
             
             console.log(`fetchCollectionsByType - type=${subjectType}, page=${page}, status=${xhr.status}`);

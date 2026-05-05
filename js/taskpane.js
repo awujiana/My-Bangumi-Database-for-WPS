@@ -209,6 +209,60 @@ function closeDialog(confirmed) {
     dialogCallback = null;
 }
 
+// ========== 自定义确认对话框（替换原生 confirm）==========
+let _confirmCallback = null;
+
+function showConfirmDialog(message, onYes, onCancel) {
+    let modal = document.getElementById("confirmDialog");
+    let titleEl = document.getElementById("confirmTitle");
+    let msgEl = document.getElementById("confirmMessage");
+
+    if (!modal || !msgEl) {
+        // 兜底：用原生 confirm
+        if (confirm(message)) {
+            if (onYes) onYes();
+        } else {
+            if (onCancel) onCancel();
+        }
+        return;
+    }
+    titleEl.textContent = "确认";
+    msgEl.innerHTML = message.replace(/\n/g, "<br>");
+    _confirmCallback = { onYes, onCancel };
+    modal.style.display = "flex";
+
+    // ESC 键关闭
+    let escHandler = (e) => {
+        if (e.key === "Escape") {
+            closeConfirmDialog(false);
+            document.removeEventListener("keydown", escHandler);
+        }
+    };
+    document.addEventListener("keydown", escHandler);
+
+    // 点击背景关闭
+    let bgHandler = (e) => {
+        if (e.target === modal) {
+            closeConfirmDialog(false);
+            modal.removeEventListener("click", bgHandler);
+        }
+    };
+    modal.addEventListener("click", bgHandler);
+}
+
+function closeConfirmDialog(confirmed) {
+    let modal = document.getElementById("confirmDialog");
+    modal.style.display = "none";
+    if (_confirmCallback) {
+        if (confirmed && _confirmCallback.onYes) {
+            _confirmCallback.onYes();
+        } else if (!confirmed && _confirmCallback.onCancel) {
+            _confirmCallback.onCancel();
+        }
+    }
+    _confirmCallback = null;
+}
+
 // ========== Token 状态更新 ==========
 function updateTokenStatus() {
     let token = loadBgToken();
@@ -1213,29 +1267,19 @@ function updateUploadStats() {
 
 // ========== 从BGM同步收藏标记 ==========
 function syncCollectionFromBgm() {
-    let select = document.getElementById("sheetSelect");
-    // 优先使用锁定的工作表，否则使用选择器的值
-    let sheetIndex = window.lockedSheetIndex || parseInt(select?.value) || 1;
+    try {
+        console.log("syncCollectionFromBgm 被调用");
+        
+        let select = document.getElementById("sheetSelect");
+        let sheetIndex = window.lockedSheetIndex || parseInt(select?.value) || 1;
+        console.log("sheetIndex:", sheetIndex);
 
-    // 让用户选择获取方式
-    let method = prompt(
-        "请选择获取收藏列表的方式：\n\n" +
-        "1. 网页抓取（推荐）- 通过抓取 bgm.tv 页面获取，需要用户ID\n" +
-        "2. API方式 - 通过 Bangumi API 获取，需要 Access Token\n\n" +
-        "输入数字选择（1 或 2）：",
-        "1"
-    );
-
-    if (!method) return;
-
-    if (method.trim() === "1") {
-        // 网页抓取方式
-        syncFromBgmByScraping(sheetIndex);
-    } else if (method.trim() === "2") {
-        // API方式
+        // 注意：WPS 任务窗格中无法跨域访问 bgm.tv 页面（CORS 限制）
+        // 网页抓取方式不可用，自动使用 API 方式
         syncFromBgmByAPI(sheetIndex);
-    } else {
-        alert("无效的选择，请输入 1 或 2");
+    } catch (e) {
+        console.error("syncCollectionFromBgm 出错:", e);
+        alert("操作出错: " + e.message);
     }
 }
 
@@ -1248,54 +1292,70 @@ function syncFromBgmByScraping(sheetIndex) {
         return;
     }
 
-    // 让用户选择获取哪些类型的收藏
-    let typeChoice = prompt(
-        "请选择获取哪种收藏：\n\n" +
-        "1. 已看 (collect) - 已看完的番剧\n" +
-        "2. 想看 (wish) - 想看但还没看的\n" +
-        "3. 在看 (do) - 正在追的番剧\n" +
-        "4. 获取所有类型（推荐）\n\n" +
-        "输入数字选择（1、2、3 或 4）：",
-        "4"
-    );
+    // 让用户选择获取哪些类型的收藏（使用自定义对话框）
+    _scrapingTypeSelect(sheetIndex, userId);
+}
 
-    if (!typeChoice) return;
-    typeChoice = typeChoice.trim();
-
-    // 确定要获取的类型
-    let typesToFetch = [];
-    if (typeChoice === "1") {
-        typesToFetch = [{ type: "collect", name: "已看" }];
-    } else if (typeChoice === "2") {
-        typesToFetch = [{ type: "wish", name: "想看" }];
-    } else if (typeChoice === "3") {
-        typesToFetch = [{ type: "do", name: "在看" }];
-    } else if (typeChoice === "4") {
-        typesToFetch = [
-            { type: "collect", name: "已看" },
-            { type: "wish", name: "想看" },
-            { type: "do", name: "在看" }
-        ];
+// ========== 网页抓取：递归选择收藏类型 ==========
+function _scrapingTypeSelect(sheetIndex, userId, typesToFetch) {
+    if (!typesToFetch) {
+        // 第一步：选择是否获取全部
+        showConfirmDialog("是否获取所有类型的收藏？\n\n点击「确定」→ 获取全部（已看 + 想看 + 在看）\n点击「取消」→ 选择具体类型",
+            () => {
+                // 确定：获取全部
+                let types = [
+                    { type: "collect", name: "已看" },
+                    { type: "wish", name: "想看" },
+                    { type: "do", name: "在看" }
+                ];
+                _scrapingConfirmThenRun(sheetIndex, userId, types);
+            },
+            () => {
+                // 取消：选择具体类型
+                _scrapingTypeSelect(sheetIndex, userId, []);
+            }
+        );
+    } else if (typesToFetch.length === 0) {
+        // 第二步：选择是否获取"已看"
+        showConfirmDialog("获取「已看 (collect)」收藏？\n\n「确定」→ 已看\n「取消」→ 继续选择",
+            () => {
+                _scrapingConfirmThenRun(sheetIndex, userId, [{ type: "collect", name: "已看" }]);
+            },
+            () => {
+                _scrapingTypeSelect(sheetIndex, userId, ["skipCollect"]);
+            }
+        );
     } else {
-        alert("无效的选择，请输入 1、2、3 或 4");
-        return;
+        // 第三步：选择"想看"还是"在看"
+        showConfirmDialog("获取「想看 (wish)」收藏？\n\n「确定」→ 想看\n「取消」→ 在看",
+            () => {
+                _scrapingConfirmThenRun(sheetIndex, userId, [{ type: "wish", name: "想看" }]);
+            },
+            () => {
+                _scrapingConfirmThenRun(sheetIndex, userId, [{ type: "do", name: "在看" }]);
+            }
+        );
     }
+}
 
-    // 确认操作
-    if (typesToFetch.length === 1) {
-        if (!confirm(`将抓取你的「${typesToFetch[0].name}」收藏列表并标记到 D 列。\n\n是否继续？`)) {
-            return;
-        }
-    } else {
-        if (!confirm(`将抓取你的所有收藏列表（已看、想看、在看）并标记到 D 列。\n\n是否继续？`)) {
-            return;
-        }
-    }
+// ========== 网页抓取：确认后执行 ==========
+function _scrapingConfirmThenRun(sheetIndex, userId, typesToFetch) {
+    let confirmMsg = typesToFetch.length === 1
+        ? `将抓取你的「${typesToFetch[0].name}」收藏列表并标记到 D 列，同时写入同步记录表。\n\n是否继续？`
+        : `将抓取你的所有收藏列表（已看、想看、在看）并标记到 D 列，同时写入同步记录表。\n\n是否继续？`;
 
+    showConfirmDialog(confirmMsg, () => {
+        _doScrapingSync(sheetIndex, userId, typesToFetch);
+    });
+}
+
+// ========== 执行网页抓取同步（确认后执行）==========
+function _doScrapingSync(sheetIndex, userId, typesToFetch) {
     setStatus("正在抓取收藏列表...", "loading");
 
     try {
-        let sheets = window.Application.ActiveWorkbook.Sheets;
+        let app = window.Application;
+        let sheets = app.ActiveWorkbook.Sheets;
         let ws = sheets.Item(sheetIndex);
 
         // 获取表头行和列映射
@@ -1348,9 +1408,13 @@ function syncFromBgmByScraping(sheetIndex) {
             collectionMap.set(item.sid, item);
         }
 
-        // 遍历 Excel 数据并标记
+        // 获取名称列索引
+        let nameCol = colMap.has("名称") ? colMap.get("名称") : 0;
+
+        // 遍历 Excel 数据并标记 + 写入同步记录
         let matchedCount = 0;
         let totalCount = 0;
+        let timeStr = formatCurrentTime();
 
         for (let row = dataStartRow; row <= lastRow; row++) {
             let bgmUrlCell = getCell(ws, row, colMap.get("Bangumi_URL"));
@@ -1364,6 +1428,25 @@ function syncFromBgmByScraping(sheetIndex) {
                     seqCell.Interior.Color = BGM_COLOR.BGM_SYNC;
                 }
                 matchedCount++;
+
+                // 获取名称
+                let name = "";
+                if (nameCol > 0) {
+                    let nameCell = getCell(ws, row, nameCol);
+                    name = nameCell ? trim(String(nameCell.Value() || "")) : "";
+                }
+
+                // 写入同步记录表
+                addSyncRecord({
+                    name: name || "(无名称)",
+                    url: bgmUrl,
+                    sid: sid,
+                    type: "动画",
+                    content: "从BGM网页抓取同步",
+                    status: "成功",
+                    message: "行" + row + " 网页抓取匹配",
+                    count: 1
+                });
             }
             totalCount++;
 
@@ -1382,7 +1465,7 @@ function syncFromBgmByScraping(sheetIndex) {
         }
         let statsText = typeStats.join("、");
 
-        alert(`同步完成！\n\n共处理 ${totalCount} 行数据\n匹配到 ${matchedCount} 条收藏\n\n匹配详情：${statsText}\n\n🟣 紫色 - 从BGM同步（网页抓取）`);
+        alert(`同步完成！\n\n共处理 ${totalCount} 行数据\n匹配到 ${matchedCount} 条收藏\n\n匹配详情：${statsText}\n\n🟣 紫色 - 从BGM同步（网页抓取）\n📋 ${matchedCount} 条同步记录已写入同步记录表`);
 
     } catch (e) {
         alert("同步失败: " + e.message);
@@ -1390,7 +1473,7 @@ function syncFromBgmByScraping(sheetIndex) {
     }
 }
 
-// ========== API方式同步（原有功能）==========
+// ========== API方式同步 ==========
 function syncFromBgmByAPI(sheetIndex) {
     let token = loadBgToken();
     if (!token) {
@@ -1399,15 +1482,19 @@ function syncFromBgmByAPI(sheetIndex) {
         return;
     }
 
-    // 确认操作
-    if (!confirm("将从 BGM API 获取你的收藏列表，并在 D 列标记已收藏的条目。\n\n是否继续？")) {
-        return;
-    }
+    // 确认操作（使用自定义对话框）
+    showConfirmDialog("将从 BGM API 获取你的收藏列表，并在 D 列标记已收藏的条目，同时写入同步记录表。\n\n是否继续？", () => {
+        _doAPISync(sheetIndex, token);
+    });
+}
 
+// ========== 执行 API 同步（确认后执行）==========
+function _doAPISync(sheetIndex, token) {
     setStatus("正在获取收藏列表...", "loading");
 
     try {
-        let sheets = window.Application.ActiveWorkbook.Sheets;
+        let app = window.Application;
+        let sheets = app.ActiveWorkbook.Sheets;
         let ws = sheets.Item(sheetIndex);
 
         // 获取表头行和列映射
@@ -1426,6 +1513,7 @@ function syncFromBgmByAPI(sheetIndex) {
         let lastRow = lastRowCell.End(-4162).Row;
         let dataStartRow = headerRow + 1;
         let seqCol = 4; // D列
+        let nameCol = colMap.has("名称") ? colMap.get("名称") : 0;
 
         // 获取用户收藏列表
         setStatus("正在获取收藏列表（分页中）...", "loading");
@@ -1473,7 +1561,7 @@ function syncFromBgmByAPI(sheetIndex) {
             }
         }
 
-        // 遍历 Excel 数据并标记
+        // 遍历 Excel 数据并标记 + 写入同步记录
         let matchedCount = 0;
         let totalCount = 0;
         let purpleCount = 0, lightGreenCount = 0, darkGreenCount = 0;
@@ -1490,20 +1578,36 @@ function syncFromBgmByAPI(sheetIndex) {
                     let syncCount = syncCountMap.get(sid) || 0;
                     
                     if (syncCount === 0) {
-                        // 从BGM同步但还没有本地记录：紫色
                         seqCell.Interior.Color = BGM_COLOR.BGM_SYNC;
                         purpleCount++;
                     } else if (syncCount === 1) {
-                        // 同步一次：浅绿色
                         seqCell.Interior.Color = BGM_COLOR.LIGHT_GREEN;
                         lightGreenCount++;
                     } else {
-                        // 同步多次：深绿色
                         seqCell.Interior.Color = BGM_COLOR.DARK_GREEN;
                         darkGreenCount++;
                     }
                 }
                 matchedCount++;
+
+                // 获取名称
+                let name = "";
+                if (nameCol > 0) {
+                    let nameCell = getCell(ws, row, nameCol);
+                    name = nameCell ? trim(String(nameCell.Value() || "")) : "";
+                }
+
+                // 写入同步记录表
+                addSyncRecord({
+                    name: name || "(无名称)",
+                    url: bgmUrl,
+                    sid: sid,
+                    type: "动画",
+                    content: "从BGM API同步",
+                    status: "成功",
+                    message: "行" + row + " API匹配",
+                    count: 1
+                });
             }
             totalCount++;
 
@@ -1514,7 +1618,7 @@ function syncFromBgmByAPI(sheetIndex) {
         }
 
         setStatus("就绪", "success");
-        alert(`同步完成！\n\n共处理 ${totalCount} 行数据\n匹配到 ${matchedCount} 条已收藏条目\n\nD 列颜色说明：\n🟣 紫色 - 从BGM同步（未本地同步）\n🟢 浅绿色 - 已同步1次\n🌲 深绿色 - 已同步多次`);
+        alert(`同步完成！\n\n共处理 ${totalCount} 行数据\n匹配到 ${matchedCount} 条已收藏条目\n\nD 列颜色说明：\n🟣 紫色 - 从BGM同步（未本地同步）\n🟢 浅绿色 - 已同步1次\n🌲 深绿色 - 已同步多次\n📋 ${matchedCount} 条同步记录已写入同步记录表`);
 
     } catch (e) {
         alert("同步失败: " + e.message);
@@ -1539,7 +1643,6 @@ function fetchAllUserCollectionsByScraping(userId, listType) {
     // 统一的请求头（模拟浏览器）
     const headers = {
         "Content-Type": "text/html; charset=utf-8",
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
         "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
         "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8",
     };
@@ -1713,14 +1816,13 @@ function fetchAllUserCollections(token) {
             // 获取当前页数据
             let xhr = new XMLHttpRequest();
             let url = `https://api.bgm.tv/v0/users/-/collections?subject_type=${subjectType}&limit=${limit}&offset=${(page - 1) * limit}`;
-            xhr.open("GET", url, false); // 同步请求
+            xhr.open("GET", url, false);
             xhr.setRequestHeader("Authorization", "Bearer " + token);
-            xhr.setRequestHeader("User-Agent", "BangumiWPS/1.0");
 
             xhr.send();
 
+            let responseText = xhr.responseText || "";
             console.log(`获取收藏第 ${page} 页 - 状态码: ${xhr.status}`);
-            console.log(`响应内容: ${xhr.responseText.substring(0, 200)}...`);
 
             if (xhr.status === 401) {
                 lastError = { type: "auth", message: "Token 无效或已过期，请重新设置 Token" };
@@ -1733,8 +1835,12 @@ function fetchAllUserCollections(token) {
             }
 
             if (xhr.status === 404) {
-                // 404 可能表示用户没有任何该类型的收藏，不是错误
-                console.log("该类型收藏不存在或为空");
+                // 404 可能表示用户不存在（Token无效）或没有该类型的收藏
+                if (responseText.indexOf("user doesn't exist") >= 0) {
+                    lastError = { type: "auth", message: "Token 无效或已过期，用户不存在" };
+                } else {
+                    console.log("该类型收藏不存在或为空");
+                }
                 break;
             }
 
@@ -2310,7 +2416,6 @@ function testTokenValidity(token) {
     let xhr = new XMLHttpRequest();
     xhr.open("GET", "https://api.bgm.tv/v0/me", false);
     xhr.setRequestHeader("Authorization", "Bearer " + token);
-    xhr.setRequestHeader("User-Agent", "BangumiWPS/1.0");
 
     try {
         xhr.send();
@@ -2407,85 +2512,92 @@ function fetchBgCollectionRecords() {
         return;
     }
     
-    // 让用户选择获取范围
-    let choice = prompt(
+    // 让用户选择获取范围（使用自定义对话框）
+    _fetchRecordsScopeSelect(token);
+}
+
+// ========== 从BGM同步收藏记录：选择范围 ==========
+function _fetchRecordsScopeSelect(token) {
+    showConfirmDialog(
         "请选择获取范围：\n\n" +
-        "1. 获取所有类型（约500条）\n" +
-        "   包含：动画、书籍、音乐、游戏、真人剧\n" +
-        "2. 只获取动画\n" +
-        "3. 自定义条数\n\n" +
-        "输入数字选择（1、2 或 3）：",
-        "1"
-    );
-    
-    if (!choice) return;
-    choice = choice.trim();
-    
-    let includeAllTypes = true;
-    let maxItems = 500;
-    
-    if (choice === "2") {
-        includeAllTypes = false;
-        maxItems = 500;
-    } else if (choice === "3") {
-        let customCount = prompt("请输入要获取的条数（建议不超过 500）：", "500");
-        if (!customCount) return;
-        maxItems = parseInt(customCount) || 500;
-        if (maxItems < 1) maxItems = 1;
-        if (maxItems > 1000) maxItems = 1000;
-        
-        let typeChoice = prompt(
-            "请选择获取类型：\n\n" +
-            "1. 获取所有类型\n" +
-            "2. 只获取动画\n\n" +
-            "输入数字选择：",
-            "1"
-        );
-        if (!typeChoice) return;
-        includeAllTypes = typeChoice.trim() === "1";
-    } else if (choice !== "1") {
-        alert("无效的选择！");
-        return;
-    }
-    
-    let typeDesc = includeAllTypes ? "所有类型（动画、书籍、音乐、游戏、真人剧）" : "动画";
-    if (!confirm(`将从 Bangumi 获取你的收藏列表并写入"同步记录"表。\n\n类型：${typeDesc}\n最大条数：${maxItems}\n\n是否继续？`)) {
-        return;
-    }
-    
-    setStatus("正在获取收藏列表...", "loading");
-    
-    try {
-        // 调用 syncRecord.js 中的函数
-        let result = fetchAndRecordBgCollections(
-            token, 
-            includeAllTypes, 
-            maxItems,
-            (current, total, message) => {
-                setStatus(message, "loading");
-                if (window.Application) {
-                    window.Application.StatusBar = message;
+        "点击「确定」→ 获取所有类型（约500条）\n" +
+        "      包含：动画、书籍、音乐、游戏、真人剧\n" +
+        "点击「取消」→ 自定义（仅动画或自定义条数）",
+        () => {
+            // 确定：获取所有类型
+            _runFetchBgRecords(token, true, 500);
+        },
+        () => {
+            // 取消：进入自定义
+            showConfirmDialog(
+                "获取范围：\n\n" +
+                "点击「确定」→ 仅获取动画\n" +
+                "点击「取消」→ 自定义条数",
+                () => {
+                    _runFetchBgRecords(token, false, 500);
+                },
+                () => {
+                    // 自定义条数
+                    showInputDialog(
+                        "自定义条数",
+                        "请输入要获取的条数（建议不超过 500）：",
+                        "500",
+                        (count) => {
+                            if (!count) return;
+                            let maxItems = parseInt(count) || 500;
+                            if (maxItems < 1) maxItems = 1;
+                            if (maxItems > 1000) maxItems = 1000;
+                            // 选择类型
+                            showConfirmDialog(
+                                "获取类型：\n\n" +
+                                "点击「确定」→ 仅动画\n" +
+                                "点击「取消」→ 所有类型",
+                                () => { _runFetchBgRecords(token, false, maxItems); },
+                                () => { _runFetchBgRecords(token, true, maxItems); }
+                            );
+                        }
+                    );
                 }
-            }
-        );
-        
-        window.Application.StatusBar = false;
-        
-        if (result.success) {
-            setStatus(result.message, "success");
-            alert(`✓ ${result.message}\n\n请打开"同步记录"工作表查看。`);
-            
-            // 打开同步记录表
-            openSyncRecordSheet();
-        } else {
-            setStatus(result.message, "error");
-            alert(`✗ ${result.message}`);
+            );
         }
-    } catch (e) {
-        window.Application.StatusBar = false;
-        setStatus("发生错误", "error");
-        alert("发生错误: " + e.message);
-    }
+    );
+}
+
+// ========== 执行从 BGM 获取收藏并写入同步记录表 ==========
+function _runFetchBgRecords(token, includeAllTypes, maxItems) {
+    let typeDesc = includeAllTypes ? "所有类型（动画、书籍、音乐、游戏、真人剧）" : "动画";
+    showConfirmDialog(`将从 Bangumi 获取你的收藏列表并写入"同步记录"表。\n\n类型：${typeDesc}\n最大条数：${maxItems}\n\n是否继续？`, () => {
+        setStatus("正在获取收藏列表...", "loading");
+        
+        try {
+            let result = fetchAndRecordBgCollections(
+                token, 
+                includeAllTypes, 
+                maxItems,
+                (current, total, message) => {
+                    setStatus(message, "loading");
+                    if (window.Application) {
+                        window.Application.StatusBar = message;
+                    }
+                }
+            );
+            
+            window.Application.StatusBar = false;
+            
+            if (result.success) {
+                setStatus(result.message, "success");
+                alert(`✓ ${result.message}\n\n请打开"同步记录"工作表查看。`);
+                openSyncRecordSheet();
+            } else {
+                setStatus(result.message, "error");
+                alert(`✗ ${result.message}`);
+            }
+        } catch (e) {
+            window.Application.StatusBar = false;
+            setStatus("发生错误", "error");
+            alert("发生错误: " + e.message);
+        }
+    });
 }
 
 // ========== 标记已上传条目到工作表 D 列 ==========
