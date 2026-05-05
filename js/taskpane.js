@@ -1148,6 +1148,13 @@ function uploadSingleRow(rowNum, btnElement) {
             finishedDate = finishedDateCell ? trim(String(finishedDateCell.Value() || "")) : "";
         }
 
+        // 获取条目类型
+        let itemType = "";
+        if (colMap.has("类别")) {
+            let typeCell = getCell(ws, rowNum, colMap.get("类别"));
+            itemType = typeCell ? trim(String(typeCell.Value() || "")) : "";
+        }
+
         // 构建请求体（不包含 ep_status，让用户在 Bangumi 网站上手动标记章节进度）
         let jsonBody = buildJsonPayload(ws, rowNum, colMap, finishedDate);
         if (jsonBody === "") {
@@ -1200,6 +1207,7 @@ function uploadSingleRow(rowNum, btnElement) {
                 name: name || "(无名称)",
                 url: bgmUrl,
                 sid: sid,
+                type: itemType,
                 content: jsonBody,
                 status: "成功",
                 message: "行 " + rowNum,
@@ -1230,6 +1238,7 @@ function uploadSingleRow(rowNum, btnElement) {
                 name: name || "(无名称)",
                 url: bgmUrl,
                 sid: sid,
+                type: itemType,
                 content: jsonBody,
                 status: "失败",
                 message: result.message || "HTTP " + statusCode,
@@ -1422,6 +1431,9 @@ function _doScrapingSync(sheetIndex, userId, typesToFetch) {
         let matchedCount = 0;
         let totalCount = 0;
         let timeStr = formatCurrentTime();
+        
+        // 批量写入前激活同步记录表
+        activateSyncRecordSheet();
 
         for (let row = dataStartRow; row <= lastRow; row++) {
             let bgmUrlCell = getCell(ws, row, colMap.get("Bangumi_URL"));
@@ -1449,9 +1461,9 @@ function _doScrapingSync(sheetIndex, userId, typesToFetch) {
                     url: bgmUrl,
                     sid: sid,
                     type: "动画",
-                    content: "从BGM网页抓取同步",
+                    content: "标记同步：网页抓取匹配",
                     status: "成功",
-                    message: "行" + row + " 网页抓取匹配",
+                    message: "行" + row,
                     count: 1
                 });
             }
@@ -1471,6 +1483,9 @@ function _doScrapingSync(sheetIndex, userId, typesToFetch) {
             typeStats.push(`「${typesToFetch.find(t => t.type === type)?.name || type}」${allCollections[type].length}条`);
         }
         let statsText = typeStats.join("、");
+
+        // 完成批量写入后刷新
+        finalizeSyncRecordBatch();
 
         alert(`同步完成！\n\n共处理 ${totalCount} 行数据\n匹配到 ${matchedCount} 条收藏\n\n匹配详情：${statsText}\n\n🟣 紫色 - 从BGM同步（网页抓取）\n📋 ${matchedCount} 条同步记录已写入同步记录表`);
 
@@ -1605,22 +1620,44 @@ function _doAPISync(sheetIndex, token) {
         // 先写入所有收藏到同步记录表（无论是否匹配Excel行）
         setStatus(`正在写入 ${userCollections.length} 条收藏到同步记录表...`, "loading");
         let writtenToRecord = 0;
+        // 保存当前活动工作表
+        let prevActiveSheet = null;
+        try { prevActiveSheet = app.ActiveSheet; } catch (e) {}
+        
+        // 批量写入前激活同步记录表（WPS 需要激活才能写入新行）
+        activateSyncRecordSheet();
+        
+        // 类型名称映射
+        let typeNames = (typeof BGM_SUBJECT_TYPES !== 'undefined') ? BGM_SUBJECT_TYPES : {
+            1: "书籍", 2: "动画", 3: "音乐", 4: "游戏", 6: "真人剧"
+        };
+        
         for (let ci = 0; ci < userCollections.length; ci++) {
             let item = userCollections[ci];
             let sid = item.subject_id;
             let url = "https://bgm.tv/subject/" + sid;
             let name = item.subject?.name_cn || item.subject?.name || "(无名称)";
+            let typeId = item.subject_type || 2;
+            let typeName = typeNames[typeId] || "未知";
             addSyncRecord({
                 name: name,
                 url: url,
                 sid: String(sid),
-                type: "动画",
-                content: "从BGM API同步收藏",
+                type: typeName,
+                content: "标记同步：" + typeName + "收藏",
                 status: "成功",
-                message: "BGM收藏同步",
+                message: typeName + "收藏同步",
                 count: 1
             });
             writtenToRecord++;
+        }
+        
+        // 完成批量写入后刷新
+        finalizeSyncRecordBatch();
+        
+        // 恢复原始活动工作表
+        if (prevActiveSheet) {
+            try { prevActiveSheet.Activate(); } catch (e) {}
         }
         console.log(`已将 ${writtenToRecord} 条收藏写入同步记录表`);
 
@@ -1855,91 +1892,98 @@ function hasNextPageLink(doc, currentPage) {
     return false;
 }
 
-// ========== 获取用户所有收藏（分页 - API方式）==========
+// ========== 获取用户所有收藏（分页 - API方式，支持所有类型）==========
 function fetchAllUserCollections(token) {
     let allCollections = [];
-    let page = 1;
-    let limit = 100;
     let maxPages = 50;
-    let subjectType = 2; // 动画
+    let limit = 100;
     let lastError = null;
-    let userPath = _getUserApiPath(); // 使用缓存的用户 ID 而非 "-" 占位符
-
+    let userPath = _getUserApiPath();
+    
+    // 要获取的所有类型：书籍、动画、音乐、游戏、真人剧
+    let subjectTypes = [1, 2, 3, 4, 6];
+    
     try {
-        while (page <= maxPages) {
-            let xhr = new XMLHttpRequest();
-            let url = `https://api.bgm.tv/v0/users/${userPath}/collections?subject_type=${subjectType}&limit=${limit}&offset=${(page - 1) * limit}`;
-            xhr.open("GET", url, false);
-            xhr.setRequestHeader("Authorization", "Bearer " + token);
-
-            xhr.send();
-
-            let responseText = xhr.responseText || "";
-            console.log(`获取收藏第 ${page} 页 - 状态码: ${xhr.status}`);
-
-            if (xhr.status === 401) {
-                lastError = { type: "auth", message: "Token 无效或已过期，请重新设置 Token" };
-                break;
-            }
-
-            if (xhr.status === 403) {
-                lastError = { type: "forbidden", message: "没有权限访问收藏列表，请检查 Token 权限" };
-                break;
-            }
-
-            if (xhr.status === 404) {
-                // 404 可能表示用户不存在（Token无效）或没有该类型的收藏
-                if (responseText.indexOf("user doesn't exist") >= 0) {
-                    lastError = { type: "auth", message: "Token 无效或已过期，用户不存在" };
-                } else {
-                    console.log("该类型收藏不存在或为空");
-                }
-                break;
-            }
-
-            if (xhr.status !== 200) {
-                lastError = { type: "http", code: xhr.status, message: `HTTP 错误: ${xhr.status}` };
-                console.log(`获取收藏第 ${page} 页失败: ${xhr.status}`);
-                break;
-            }
-
-            let raw;
-            try {
-                raw = JSON.parse(xhr.responseText);
-            } catch (e) {
-                lastError = { type: "parse", message: "响应数据格式错误" };
-                console.log("解析收藏数据失败");
-                break;
-            }
-
-            // API 返回格式: { data: [...], total: N, limit: 100, offset: 0 }
-            let items = Array.isArray(raw) ? raw : (raw.data || []);
+        for (let typeIdx = 0; typeIdx < subjectTypes.length; typeIdx++) {
+            let subjectType = subjectTypes[typeIdx];
+            let typeName = (typeof BGM_SUBJECT_TYPES !== 'undefined') ? 
+                (BGM_SUBJECT_TYPES[subjectType] || "未知") : String(subjectType);
+            let page = 1;
             
-            if (!Array.isArray(items) || items.length === 0) {
-                // 空数据，可能用户确实没有该类型收藏
-                break;
-            }
+            console.log(`开始获取「${typeName}」类型收藏 (type=${subjectType})`);
+            
+            while (page <= maxPages) {
+                let xhr = new XMLHttpRequest();
+                let url = `https://api.bgm.tv/v0/users/${userPath}/collections?subject_type=${subjectType}&limit=${limit}&offset=${(page - 1) * limit}`;
+                xhr.open("GET", url, false);
+                xhr.setRequestHeader("Authorization", "Bearer " + token);
 
-            // 添加到结果集
-            for (let i = 0; i < items.length; i++) {
-                allCollections.push(items[i]);
-            }
+                xhr.send();
 
-            // 如果返回数据少于 limit，说明已经是最后一页
-            if (items.length < limit) {
-                break;
-            }
+                console.log(`获取「${typeName}」第 ${page} 页 - 状态码: ${xhr.status}`);
 
-            page++;
+                if (xhr.status === 401) {
+                    lastError = { type: "auth", message: "Token 无效或已过期，请重新设置 Token" };
+                    break;
+                }
+
+                if (xhr.status === 403) {
+                    lastError = { type: "forbidden", message: "没有权限访问收藏列表，请检查 Token 权限" };
+                    break;
+                }
+
+                if (xhr.status === 404) {
+                    // 404 = 该类型无收藏
+                    console.log(`「${typeName}」类型收藏不存在或为空`);
+                    break;
+                }
+
+                if (xhr.status !== 200) {
+                    lastError = { type: "http", code: xhr.status, message: `HTTP 错误: ${xhr.status}` };
+                    console.log(`获取「${typeName}」第 ${page} 页失败: ${xhr.status}`);
+                    break;
+                }
+
+                let raw;
+                try {
+                    raw = JSON.parse(xhr.responseText);
+                } catch (e) {
+                    lastError = { type: "parse", message: "响应数据格式错误" };
+                    console.log("解析收藏数据失败");
+                    break;
+                }
+
+                let items = Array.isArray(raw) ? raw : (raw.data || []);
+
+                if (!Array.isArray(items) || items.length === 0) {
+                    break;
+                }
+
+                for (let i = 0; i < items.length; i++) {
+                    allCollections.push(items[i]);
+                }
+
+                if (items.length < limit) {
+                    break;
+                }
+
+                page++;
+            }
+            
+            if (lastError) break;
+            
+            // 类型间延迟
+            sleep(500);
         }
     } catch (e) {
-        lastError = { type: "exception", message: e.message };
+        if (!lastError) {
+            lastError = { type: "exception", message: e.message };
+        }
         console.error("获取收藏列表出错:", e);
     }
 
     console.log(`共获取 ${allCollections.length} 条收藏记录`);
 
-    // 保存错误信息供外部访问
     if (lastError) {
         fetchAllUserCollections.lastError = lastError;
     }
@@ -2169,6 +2213,9 @@ function _runSyncRows(ws, colMap, rowsToProcess, headerRow) {
     setStatus("正在同步...", "loading");
 
     try {
+        // 批量写入前激活同步记录表
+        activateSyncRecordSheet();
+        
         let successCount = 0, failCount = 0, skipNoUrlCount = 0, skipNoTypeCount = 0;
         let total = rowsToProcess.length;
 
@@ -2202,6 +2249,13 @@ function _runSyncRows(ws, colMap, rowsToProcess, headerRow) {
                 watchStatus = statusCell ? trim(String(statusCell.Value() || "")) : "";
             }
 
+            // 获取条目类型（类别列）
+            let itemType = "";
+            if (colMap.has("类别")) {
+                let typeCell = getCell(ws, i, colMap.get("类别"));
+                itemType = typeCell ? trim(String(typeCell.Value() || "")) : "";
+            }
+
             // 获取评级
             let rateVal = "";
             if (colMap.has("打分")) {
@@ -2226,7 +2280,7 @@ function _runSyncRows(ws, colMap, rowsToProcess, headerRow) {
                     name: name || "(无名称)",
                     url: "",
                     sid: "",
-                    type: "",
+                    type: itemType,
                     content: "跳过原因：缺少 Bangumi URL",
                     status: "跳过",
                     message: "行" + i + " 无BGM链接",
@@ -2257,7 +2311,7 @@ function _runSyncRows(ws, colMap, rowsToProcess, headerRow) {
                     name: name || "(无名称)",
                     url: bgmUrl,
                     sid: subjectId,
-                    type: "",
+                    type: itemType,
                     content: "跳过原因：观看状态「" + watchStatus + "」不需要上传",
                     status: "跳过",
                     message: "行" + i + " 状态=不传",
@@ -2287,8 +2341,8 @@ function _runSyncRows(ws, colMap, rowsToProcess, headerRow) {
                     name: name || "(无名称)",
                     url: bgmUrl,
                     sid: subjectId,
-                    type: "",
-                    content: contentSummary,
+                    type: itemType,
+                    content: "上传同步：" + contentSummary,
                     status: "成功",
                     message: "行" + i,
                     count: 1
@@ -2309,8 +2363,8 @@ function _runSyncRows(ws, colMap, rowsToProcess, headerRow) {
                     name: name || "(无名称)",
                     url: bgmUrl,
                     sid: subjectId,
-                    type: "",
-                    content: contentSummary + " | 完整JSON: " + jsonBody,
+                    type: itemType,
+                    content: "上传同步：" + contentSummary + " | 完整JSON: " + jsonBody,
                     status: "失败",
                     message: failMsg,
                     count: 1
@@ -2397,6 +2451,9 @@ function _runSyncRows(ws, colMap, rowsToProcess, headerRow) {
         }
 
         report += `📋 详细记录已保存到"同步记录"工作表`;
+        
+        // 完成批量写入后刷新
+        finalizeSyncRecordBatch();
         
         alert(report);
         

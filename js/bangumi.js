@@ -144,7 +144,7 @@ function SyncToBangumi() {
                     name: name || "(无名称)",
                     url: bgmUrl,
                     sid: "",
-                    type: "",
+                    type: itemType,
                     content: "跳过原因：缺少 Bangumi URL",
                     status: "跳过",
                     message: "行" + i + " 无BGM链接",
@@ -166,6 +166,12 @@ function SyncToBangumi() {
             watchStatus = trim(getCellValue(ws, i, colMap.get("是否看完")));
         }
 
+        // 获取条目类型
+        let itemType = "";
+        if (colMap.has("类别")) {
+            itemType = trim(getCellValue(ws, i, colMap.get("类别")));
+        }
+
         // 构建请求体
         let jsonBody = buildJsonPayload(ws, i, colMap, finishedDate);
 
@@ -181,7 +187,7 @@ function SyncToBangumi() {
                     name: name || "(无名称)",
                     url: bgmUrl,
                     sid: subjectId,
-                    type: "",
+                    type: itemType,
                     content: "跳过原因：观看状态「" + watchStatus + "」不需要上传",
                     status: "跳过",
                     message: "行" + i + " 状态=不传",
@@ -212,8 +218,8 @@ function SyncToBangumi() {
                     name: name || "(无名称)",
                     url: bgmUrl,
                     sid: subjectId,
-                    type: "",
-                    content: "上传内容：" + bodySummary + " | 完整JSON: " + jsonBody,
+                    type: itemType,
+                    content: "上传同步：" + bodySummary,
                     status: "成功",
                     message: "行" + i,
                     count: 1
@@ -233,8 +239,8 @@ function SyncToBangumi() {
                     name: name || "(无名称)",
                     url: bgmUrl,
                     sid: subjectId,
-                    type: "",
-                    content: "上传内容：" + bodySummary + " | 完整JSON: " + jsonBody,
+                    type: itemType,
+                    content: "上传同步：" + bodySummary,
                     status: "失败",
                     message: errMsg,
                     count: 1

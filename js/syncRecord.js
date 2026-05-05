@@ -5,8 +5,8 @@
  * @param {object} sheet - 工作表对象
  */
 function setSyncRecordHeaders(sheet) {
-    // 更新表头：增加"类型"列
-    let headers = ["序号", "同步时间", "名称", "URL", "SID", "类型", "同步次数", "同步内容", "状态", "备注"];
+    // 更新表头
+    let headers = ["序号", "同步时间", "名称", "URL", "SID", "条目类型", "次数", "内容", "状态", "备注"];
     
     console.log("setSyncRecordHeaders 开始 - 工作表:", sheet ? sheet.Name : "null");
     
@@ -245,22 +245,78 @@ function addSyncRecord(options) {
                       String(now.getMinutes()).padStart(2, '0') + ":" + 
                       String(now.getSeconds()).padStart(2, '0');
         
-        // 写入数据（列顺序：序号、时间、名称、URL、SID、类型、同步次数、同步内容、状态、备注）
+        // ---- 写入数据到工作表 ----
+        // 使用与 setSyncRecordHeaders 相同的方式：sheet.Range().Value2
+        // WPS 要求对超出已用区域的行写入时，调用方需确保 sheet 已激活
         console.log("addSyncRecord - 开始写入数据到行:", newRow);
-        if (existingRow === 0) {
-            sheet.Range("A" + newRow).Value = seqNum;
-            console.log("addSyncRecord - 写入序号:", seqNum);
+        let writeSuccess = false;
+        try {
+            if (existingRow === 0) {
+                let cellA = sheet.Range("A" + newRow);
+                if (cellA) cellA.Value2 = seqNum;
+            }
+            let cellB = sheet.Range("B" + newRow);
+            if (cellB) cellB.Value2 = timeStr;
+            let cellC = sheet.Range("C" + newRow);
+            if (cellC) cellC.Value2 = options.name || "";
+            let cellD = sheet.Range("D" + newRow);
+            if (cellD) cellD.Value2 = options.url || "";
+            let cellE = sheet.Range("E" + newRow);
+            if (cellE) cellE.Value2 = options.sid || "";
+            let cellF = sheet.Range("F" + newRow);
+            if (cellF) cellF.Value2 = options.type || "";
+            let cellG = sheet.Range("G" + newRow);
+            if (cellG) cellG.Value2 = currentCount;
+            let cellH = sheet.Range("H" + newRow);
+            if (cellH) cellH.Value2 = options.content || "";
+            let cellI = sheet.Range("I" + newRow);
+            if (cellI) cellI.Value2 = options.status || "成功";
+            let cellJ = sheet.Range("J" + newRow);
+            if (cellJ) cellJ.Value2 = options.message || "";
+            
+            // 验证写入：读回 A 列值确认
+            let verifyA = sheet.Range("A" + newRow);
+            let verifyVal = verifyA ? verifyA.Value2 : null;
+            writeSuccess = (verifyVal !== null && verifyVal !== undefined && verifyVal !== "");
+            console.log("addSyncRecord - 数据写入完成, 验证:", verifyVal, "成功:", writeSuccess);
+        } catch (writeErr) {
+            console.error("addSyncRecord - 写入失败:", writeErr);
         }
-        sheet.Range("B" + newRow).Value = timeStr;
-        sheet.Range("C" + newRow).Value = options.name || "";
-        sheet.Range("D" + newRow).Value = options.url || "";
-        sheet.Range("E" + newRow).Value = options.sid || "";
-        sheet.Range("F" + newRow).Value = options.type || "";
-        sheet.Range("G" + newRow).Value = currentCount;
-        sheet.Range("H" + newRow).Value = options.content || "";
-        sheet.Range("I" + newRow).Value = options.status || "成功";
-        sheet.Range("J" + newRow).Value = options.message || "";
-        console.log("addSyncRecord - 数据写入完成");
+        
+        // 写入失败时尝试激活后重写
+        if (!writeSuccess) {
+            console.log("addSyncRecord - 首次写入验证失败，尝试激活后重新写入");
+            try {
+                sheet.Activate();
+                if (existingRow === 0) {
+                    let cellA = sheet.Range("A" + newRow);
+                    if (cellA) cellA.Value2 = seqNum;
+                }
+                let cellB = sheet.Range("B" + newRow);
+                if (cellB) cellB.Value2 = timeStr;
+                let cellC = sheet.Range("C" + newRow);
+                if (cellC) cellC.Value2 = options.name || "";
+                let cellD = sheet.Range("D" + newRow);
+                if (cellD) cellD.Value2 = options.url || "";
+                let cellE = sheet.Range("E" + newRow);
+                if (cellE) cellE.Value2 = options.sid || "";
+                let cellF = sheet.Range("F" + newRow);
+                if (cellF) cellF.Value2 = options.type || "";
+                let cellG = sheet.Range("G" + newRow);
+                if (cellG) cellG.Value2 = currentCount;
+                let cellH = sheet.Range("H" + newRow);
+                if (cellH) cellH.Value2 = options.content || "";
+                let cellI = sheet.Range("I" + newRow);
+                if (cellI) cellI.Value2 = options.status || "成功";
+                let cellJ = sheet.Range("J" + newRow);
+                if (cellJ) cellJ.Value2 = options.message || "";
+                let verifyA2 = sheet.Range("A" + newRow);
+                writeSuccess = verifyA2 && (verifyA2.Value2 !== null && verifyA2.Value2 !== undefined && verifyA2.Value2 !== "");
+                console.log("addSyncRecord - 重写后验证:", verifyA2 ? verifyA2.Value2 : "null", "成功:", writeSuccess);
+            } catch (retryErr) {
+                console.error("addSyncRecord - 重写也失败:", retryErr);
+            }
+        }
         
         // 更新缓存（直接操作内存，避免从 sheet 重新读取）
         if (existingRow === 0) {
@@ -405,6 +461,9 @@ function clearSyncRecords() {
         let sheet = getOrCreateSyncRecordSheet();
         if (!sheet) return false;
         
+        // 激活此工作表后再删除（WPS COM 要求激活才能操作已用区域）
+        try { sheet.Activate(); } catch (e) {}
+        
         let lastRow = 1;
         try {
             let lastCell = sheet.Range("A" + sheet.Rows.Count);
@@ -431,6 +490,31 @@ function clearSyncRecords() {
         alert("清除同步记录失败: " + e.message);
         return false;
     }
+}
+
+/**
+ * 激活同步记录工作表（批量写入前调用，确保写入生效）
+ * @returns {object|null} 同步记录工作表对象
+ */
+function activateSyncRecordSheet() {
+    let sheet = getOrCreateSyncRecordSheet();
+    if (!sheet) return null;
+    try { sheet.Activate(); } catch (e) {}
+    return sheet;
+}
+
+/**
+ * 完成批量写入后刷新同步记录工作表
+ */
+function finalizeSyncRecordBatch() {
+    try {
+        let sheet = getOrCreateSyncRecordSheet();
+        if (sheet) {
+            try { sheet.Calculate(); } catch (e) {}
+            // 标记缓存有效
+            _syncRecordCacheValid = true;
+        }
+    } catch (e) {}
 }
 
 /**
@@ -577,7 +661,7 @@ function fetchAndRecordBgCollections(token, includeAllTypes, maxItems, progressC
                 url: url,
                 sid: String(item.subject_id),
                 type: item.subject_type_name,
-                content: contentSummary,
+                content: "标记同步：" + item.subject_type_name + "收藏",
                 status: "成功",
                 message: "从BGM同步",
                 count: 1
