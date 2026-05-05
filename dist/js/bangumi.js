@@ -8,7 +8,7 @@ import { XL, BGM_CONFIG, LOG_LEVELS, BGM } from './util.js';
 import { getApp, bgmLog, getCell, getCellValue, sleep, loadBgToken, 
          _setBgmUserId, _getBgmUserId } from './util.js';
 import { showDialog, sendToTaskpane, showTokenDialog, showUserIdDialog } from './ui/dialog.js';
-import { httpRequest, SyncProgressCallback } from './http.js';
+import { httpRequest } from './http.js';
 import { Result } from './types/result.js';
 
 // ========== 常量定义 ==========

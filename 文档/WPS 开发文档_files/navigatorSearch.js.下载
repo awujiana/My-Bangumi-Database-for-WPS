@@ -1,0 +1,247 @@
+/*
+@ 用于导航栏页面负责搜索功能的脚本
+*/
+//==============================================
+var searchObjInfo = []
+var searchMemInfo = []
+var searchEssayInfo = []
+var searchEnumInfo = []
+var resultMax = 80
+
+/*
+@ 侧边栏页面加载事件响应，获取json查找数据
+*/
+function OnLoad() {
+    // 获取 searchObjInfo 、searchMemberInfo 、searchEssayInfo searchEnumInfo和四个个查询文件
+    GetSearchJsonData("searchObjInfo", (data)=>{
+        searchObjInfo = data
+        GetSearchJsonData("searchMemberInfo", (data)=>{
+            searchMemInfo = data
+            GetSearchJsonData("searchEssayInfo", (data)=>{
+                searchEssayInfo = data
+                GetSearchJsonData("searchEnumInfo", (data)=>{
+                    searchEnumInfo = data
+                    let displayElem = document.getElementById("search_input");
+                    displayElem.style.display = 'block';
+                })
+            })
+        })
+    })
+}
+
+/*
+@ 从服务器获取查询列表
+*/
+function GetSearchJsonData(fileName, callback) {
+    var xhr = new XMLHttpRequest();
+    var url = `./navjson/search/${fileName}.json`;
+    xhr.open("GET", url, true);
+    xhr.onreadystatechange = function() {
+        if (this.readyState == 4 && this.status == 200) {
+            var data = JSON.parse(xhr.responseText);
+            callback(data);
+        }
+    }
+    xhr.send()
+}
+
+function OnSearch(value) {
+    let resultList = []
+    let resultCount = 0
+    if(value == undefined || value === "") {
+        return;
+    }
+    value = value.toLowerCase().trim();
+    // 先匹配对象
+    let objCount = searchObjInfo.length;
+    for (let idx = 0; idx < objCount; idx ++) {
+        let navpath = searchObjInfo[idx];
+        let objName = navpath.substring(navpath.lastIndexOf("/") + 1)
+        if (objName.toLowerCase().indexOf(value) >= 0) {
+            resultList.push({
+                title : navpath.replace(/\//g,">>") + " 对象",
+                value : 'apiObjectTemplate.htm?page=topics/' + navpath + '/' + objName + '.htm#jsObject_' + objName,
+                type : "apidir"
+            })
+            resultCount++
+        }
+        if (resultCount >= resultMax) {
+            break;
+        }
+    }
+
+    // 匹配成员
+    if (resultCount < resultMax) {
+        let memCount = searchMemInfo.length
+        for (let idx = 0; idx < memCount; idx ++) {
+            let navpath = searchMemInfo[idx];
+            let objMemName = navpath.substring(navpath.lastIndexOf("/") + 1, navpath.lastIndexOf(" "));
+
+            let objName = objMemName.split(".")[0];//对象名
+            if (objMemName.toLowerCase().indexOf(value) >= 0) {
+                let parentNavPath = navpath.substring(0, navpath.lastIndexOf("/"))
+                resultList.push({
+                    title : navpath.replace(/\//g,">>"),
+                    value : 'apiObjectTemplate.htm?page=topics/' + parentNavPath + '/' + objName + '/' + objName + '.htm#' + objMemName,
+                    type : "apisubdir"
+                })
+                resultCount++
+                if (resultCount >= resultMax) {
+                    break;
+                }
+            }
+        }
+    }
+    
+    // 匹配文章列表
+    if (resultCount < resultMax) { 
+        let EssayCount = searchEssayInfo.length;
+        for (let idx = 0; idx < EssayCount; idx ++) {
+            let essayInfo = searchEssayInfo[idx];
+            let essayName = essayInfo.substring(essayInfo.lastIndexOf("/") + 1);
+            if(essayName.toLowerCase().indexOf(value) >= 0) {
+                resultList.push({
+                    title : essayInfo.replace(/\//g,">>").replace(/枚举.html/,"枚举"),
+                    value : 'topics/' + essayInfo,
+                    type : essayInfo.indexOf("枚举") > -1 ? "enum" : "essay",
+                });
+                resultCount++
+                if (resultCount >= resultMax) {
+                    break;
+                }
+            }
+        }
+    }
+    
+    // 匹配枚举值
+    if (resultCount < resultMax) { 
+        let EssayCount = searchEnumInfo.length;
+        for (let idx = 0; idx < EssayCount; idx ++) {
+            let essayInfo = searchEnumInfo[idx];
+
+            let endIndex = essayInfo.lastIndexOf("/");
+            let enumValue = essayInfo.substring(endIndex + 1);
+            let navPath = essayInfo.substring(0,endIndex);
+
+            if(enumValue.toLowerCase().indexOf(value) >= 0) {
+                resultList.push({
+                    title : essayInfo.replace(/\//g,">>"),
+                    value : 'topics/' + navPath + '.html',
+                    type : "enumValue"
+                });
+                resultCount++
+                if (resultCount >= resultMax) {
+                    break;
+                }
+            }
+        }
+    }
+
+    AddList(resultList);
+}
+
+/*
+@ 查找结果下拉列表显示
+*/
+function AddList(option) {
+    var displayElem = document.getElementById("search_ul_root");
+    if (option.length == 0) {
+        displayElem.style.display = 'none';
+        return;
+    }
+
+    displayElem.style.display = 'block';
+    var listElem = document.getElementById("search_ul");
+    listElem.innerHTML = "";
+    option.map(function(item, index) {
+        var itemElem = document.createElement("li");
+        itemElem.innerHTML = '<a href="' + item.value + '" target="content" onclick="OnListBlur(this)" type="' + item.type + '">' + item.title + '</a>';
+        listElem.append(itemElem);
+        return;
+    })
+    displayElem.scrollLeft = displayElem.offsetWidth;
+}
+
+/*
+@ 隐藏查找结果列表
+*/
+function OnListBlur(ele) {
+    //隐搜索列表
+    var displayElem = document.getElementById("search_ul_root");
+    displayElem.style.display = 'none';
+
+    if(ele == undefined) {
+        return;
+    }
+    // 展开左边导航栏
+    let navPath = ele.innerHTML; //导航路径
+    let dirNameList = undefined; // 各级目录名
+    let type = ele.type;
+    if(type === "apidir") {
+        dirNameList = navPath.substring(0,navPath.lastIndexOf(" 对象")).split("&gt;&gt;");
+        dirNameList[dirNameList.length - 1] = dirNameList[dirNameList.length - 1] + '/';//如果最后一级打开的是目录，加上/
+    }else if(type === "apisubdir") {
+        dirNameList = navPath.split("&gt;&gt;");
+        let len = dirNameList.length;
+        let objMemName = dirNameList[len - 1];
+        let objName = objMemName.split(".")[0];
+        if(objMemName.indexOf("方法") > -1) {
+            dirNameList.splice(len - 1, 0, objName, "方法");
+        }else {
+            dirNameList.splice(len - 1, 0, objName, "属性");
+        }
+    }else if(type === "essay") {
+        dirNameList = navPath.replace(/.html/,"").split("&gt;&gt;");
+    }else if(type === "enum") {
+        dirNameList = navPath.split("&gt;&gt;");
+    }else if(type === "enumValue") {
+        dirNameList = navPath.replace(/ 枚举.*/," 枚举").split("&gt;&gt;");
+    }
+    preNavPath  = "";
+    openNavBar(dirNameList,0);
+}
+
+//上一级目录
+let preNavPath = "";
+//当上一级目录加载完成后，在回调下一级目录
+function openNavBar(navNames,index) {
+    // 如果是在后一级目录，则不加 /
+    let navpath = index < navNames.length -1 ? preNavPath + navNames[index] + '/' : preNavPath + navNames[index];
+    preNavPath = navpath;
+    let node = document.querySelector('div[navpath="' + navpath + '"]');
+    if(node == undefined) {
+        return;
+    }
+    //移动到节点
+    document.body.scrollTop = node.offsetTop - 100;
+    if(index < navNames.length - 1) {
+        //检查是否已经展开
+        if(!isFoldExpand(node)) {
+            LinkClick(node.children[0].children[0],true,function() {
+                openNavBar(navNames,index + 1);
+            });
+        } else{
+            openNavBar(navNames,index + 1);
+        }
+    }else{
+        if(isItemDir(node.fileType) && !isFoldExpand(node) ) {
+            LinkClick(node.children[0].children[0],true);
+        }else{
+            if (curSelect) {
+                curSelect.style.color = "#000000"
+                curSelect.parentElement.style.backgroundColor = "#FFFFFF"
+            }
+            node.children[0].children[0].style.color = "#409EFF";
+            node.children[0].children[0].parentElement.style.backgroundColor = "#E9F1FE"
+
+            curSelect =  node.children[0].children[0];
+        }
+    }
+}
+
+/*
+@ 异步隐藏查找结果列表
+*/
+function OnHideList() {
+    setTimeout(OnListBlur, 200);
+}

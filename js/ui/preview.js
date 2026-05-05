@@ -6,7 +6,7 @@
 
 import { getApp, bgmLog, BGM, LOG_LEVELS } from '../util.js';
 import { getCellValue } from '../util.js';
-import { showAlertDialog } from '../dialog.js';
+import { showAlertDialog } from './dialog.js';
 import { escapeHtml } from '../util.js';
 
 // ========== 详细预览数据存储 ==========

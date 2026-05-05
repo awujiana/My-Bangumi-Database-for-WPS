@@ -232,3 +232,86 @@ window.syncFromBgmByAPI = syncFromBgmByAPI;
 window.markUploadedItems = markUploadedItems;
 window.clearSheetMarks = clearSheetMarks;
 window.testSingleUpdateFromPanel = testSingleUpdateFromPanel;
+window.testTokenValidity = testTokenValidity;
+
+// ========== 事件监听器（替代内联 onclick）==========
+function setupButtonListeners() {
+    // 查找所有带 data-action 属性的按钮
+    const buttons = document.querySelectorAll('[data-action]');
+    buttons.forEach(button => {
+        // 移除旧的事件监听器（防止重复绑定）
+        button.removeEventListener('click', handleActionClick);
+        // 添加新的事件监听器
+        button.addEventListener('click', handleActionClick);
+    });
+}
+
+function handleActionClick(event) {
+    const button = event.currentTarget;
+    const action = button.dataset.action;
+    
+    if (!action) return;
+    
+    bgmLog(LOG_LEVELS.DEBUG, 'Button action: ' + action);
+
+    switch (action) {
+        case 'showTokenDialog':
+            if (typeof showTokenDialog === 'function') {
+                showTokenDialog(loadBgToken() || "");
+            }
+            break;
+        case 'testToken':
+            if (typeof testTokenValidity === 'function') {
+                testTokenValidity();
+            }
+            break;
+        case 'showUserIdDialog':
+            if (typeof showUserIdDialog === 'function') {
+                showUserIdDialog();
+            }
+            break;
+        case 'openUserCollection':
+            if (typeof openUserCollection === 'function') {
+                openUserCollection();
+            }
+            break;
+        case 'sync':
+            syncFromPanel();
+            break;
+        case 'test':
+            if (typeof testSingleUpdate === 'function') {
+                testSingleUpdate();
+            }
+            break;
+        case 'clear':
+            if (typeof showConfirmDialog === 'function') {
+                showConfirmDialog("确定要清除所有标记吗？", () => {
+                    if (typeof clearRowColors === 'function') {
+                        clearRowColors();
+                    }
+                });
+            }
+            break;
+        case 'preview':
+            if (typeof previewSyncContent === 'function') {
+                previewSyncContent();
+            }
+            break;
+        default:
+            bgmLog(LOG_LEVELS.WARN, 'Unknown action: ' + action);
+    }
+}
+
+// 等待 DOM 加载完成后设置事件监听器
+function initEventListeners() {
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', () => {
+            setTimeout(setupButtonListeners, 0);
+        });
+    } else {
+        setTimeout(setupButtonListeners, 0);
+    }
+}
+
+// 初始化
+initEventListeners();

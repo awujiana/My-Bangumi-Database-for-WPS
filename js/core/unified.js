@@ -13,7 +13,7 @@ import {
 export { XL, BGM_CONFIG, LOG_LEVELS, BGM_COLOR, ERROR_LEVELS };
 
 // ========== 导出 BGM 命名空间 ==========
-export { BGM } from './util.js';
+export { BGM } from '../util.js';
 
 // ========== 统一对话框 API ==========
 /**

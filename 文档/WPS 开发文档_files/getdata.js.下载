@@ -1,0 +1,140 @@
+const objTemp = "apiObjectTemplate.htm"
+const objTempLen = objTemp.length
+
+function IEVersion() {
+    var userAgent = navigator.userAgent; //取得浏览器的userAgent字符串  
+    var isIE = userAgent.indexOf("compatible") > -1 && userAgent.indexOf("MSIE") > -1; //判断是否IE<11浏览器  
+    var isEdge = userAgent.indexOf("Edge") > -1 && !isIE; //判断是否IE的Edge浏览器  
+    var isIE11 = userAgent.indexOf('Trident') > -1 && userAgent.indexOf("rv:11.0") > -1;
+    if (isIE) {
+        var reIE = new RegExp("MSIE (\\d+\\.\\d+);");
+        reIE.test(userAgent);
+        var fIEVersion = parseFloat(RegExp["$1"]);
+        if (fIEVersion == 7) {
+            return 7;
+        } else if (fIEVersion == 8) {
+            return 8;
+        } else if (fIEVersion == 9) {
+            return 9;
+        } else if (fIEVersion == 10) {
+            return 10;
+        } else {
+            return 6; //IE版本<=7
+        }
+    } else if (isEdge) {
+        return 20; //edge
+    } else if (isIE11) {
+        return 11; //IE11  
+    } else {
+        return 30; //不是ie浏览器
+    }
+}
+
+function getHttpObj() {
+    var httpobj = null;
+    if (IEVersion() < 10) {
+        try {
+            httpobj = new XDomainRequest();
+        } catch (e1) {
+            httpobj = new createXHR();
+        }
+    } else {
+        httpobj = new createXHR();
+    }
+    return httpobj;
+}
+
+//兼容IE低版本的创建xmlhttprequest对象的方法
+function createXHR() {
+    if (typeof XMLHttpRequest != 'undefined') { //兼容高版本浏览器
+        return new XMLHttpRequest();
+    } else if (typeof ActiveXObject != 'undefined') { //IE6 采用 ActiveXObject， 兼容IE6
+        var versions = [ //由于MSXML库有3个版本，因此都要考虑
+            'MSXML2.XMLHttp.6.0',
+            'MSXML2.XMLHttp.3.0',
+            'MSXML2.XMLHttp'
+        ];
+
+        for (var i = 0; i < versions.length; i++) {
+            try {
+                return new ActiveXObject(versions[i]);
+            } catch (e) {
+                //跳过
+            }
+        }
+    } else {
+        throw new Error('您的浏览器不支持XHR对象');
+    }
+}
+
+/*
+@ 返回?page=后面的内容，当然也不要锚点
+*/
+function GetJSName(href) {
+    let startPage = href.indexOf("?page=");
+    let endPage = href.lastIndexOf("#");
+    let url;
+    if (endPage !== -1) {
+        url = href.substring(startPage + 6, endPage);
+    } else {
+        url = href.substring(startPage);
+    }
+
+    let servIp = href.substring(0, startPage - objTempLen)
+    let relPath = url.substring(0, url.lastIndexOf("/"))
+    return `${servIp}${relPath}/objDetail.json`
+}
+
+/*
+@ 从页面服务器获取当前要显示对象的数据，不通过后端
+*/
+function GetData(url, cbGetData) {
+    var xmlReq = getHttpObj();
+    xmlReq.open('GET', url);
+    xmlReq.onload = function(res) {
+        cbGetData({
+            status: 0,
+            response: IEVersion() < 10 ? xmlReq.responseText : res.target.response
+        });
+    }
+    xmlReq.ontimeout = xmlReq.onerror = function(res) {
+        xmlReq.bTimeout = true;
+        cbGetData({ status: 1, response: res })
+    }
+    if (IEVersion() < 10) {
+        xmlReq.onreadystatechange = function() {
+            if (xmlReq.readyState != 4)
+                return;
+            if (xmlReq.bTimeout) {
+                return;
+            }
+            if (xmlReq.status === 200)
+                xmlReq.onload();
+            else
+                xmlReq.onerror();
+        }
+    }
+    xmlReq.timeout = 5000;
+    xmlReq.send()
+}
+
+var lastObjectData
+var lastUrl
+
+function GetJSData(href, cbInitData) {
+    var url = GetJSName(href)
+    if (lastUrl == url) {
+        cbInitData(lastObjectData)
+        return
+    }
+    lastObjectData = undefined
+    lastUrl = undefined
+    GetData(url, function(res) {
+        if (res.status == 0) {
+            lastUrl = url
+            lastObjectData = JSON.parse(res.response)
+            cbInitData(lastObjectData)
+        } else
+            alert(res.response)
+    })
+}

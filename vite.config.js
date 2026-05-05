@@ -13,6 +13,7 @@ export default defineConfig({
         copyFile({ src: 'ui', dest: 'ui', }),
         copyFile({ src: 'main.js', dest: 'main.js', }),
         copyFile({ src: 'ribbon.xml', dest: 'ribbon.xml', }),
+        copyFile({ src: 'node_modules/wpsjs-rpc-sdk-new/wpsjsrpcsdk.js', dest: 'wpsjsrpcsdk.js', }),
         functionsScanner({
             inputJsPath: 'js/functions.js',
             outputJsonPath: 'functions.json',
