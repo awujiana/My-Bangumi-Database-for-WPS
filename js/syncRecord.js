@@ -859,7 +859,8 @@ function markUploadedItemsInSheet(sheetType, progressCallback) {
             // 过滤类型
             let typeMatch = false;
             if (sheetType === "动画" || sheetType === "剧集") {
-                typeMatch = (type === "动画");
+                // 剧集包括所有影视类型：动画、真人剧（电视剧/电影）等
+                typeMatch = (type === "动画" || type === "真人剧");
             } else if (sheetType === "书籍" || sheetType === "小说") {
                 typeMatch = (type === "书籍");
             } else {

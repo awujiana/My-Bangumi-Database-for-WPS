@@ -2109,8 +2109,10 @@ function onAction(action) {
             testSingleUpdate();
             break;
         case "clear":
-            clearRowColors();
-            refreshData();
+            showConfirmDialog("将清除工作表中 A 列的所有同步颜色标记。\n\n注意：此操作仅清除颜色标记，不会影响数据内容。\n\n是否继续？", () => {
+                clearRowColors();
+                refreshData();
+            });
             break;
         case "setToken":
             showTokenDialog(loadBgToken() || "");
