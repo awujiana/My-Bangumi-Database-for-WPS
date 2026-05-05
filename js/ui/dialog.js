@@ -1,15 +1,13 @@
 /**
- * UI 对话框模块
- * @module ui/dialog
+ * UI 对话框模�? * @module ui/dialog
  * @description 自定义对话框、确认对话框、Toast 通知
  */
 
 import { loadBgToken } from '../util.js';
 import { BGM } from '../util.js';
 
-// ========== 全局对话框容器 ==========
-// 在 WPS/Office 环境中，document.readyState 可能不是标准值
-// 所以使用 setTimeout 确保对话框在 DOM 准备好后创建
+// ========== 全局对话框容�?==========
+// �?WPS/Office 环境中，document.readyState 可能不是标准�?// 所以使�?setTimeout 确保对话框在 DOM 准备好后创建
 let dialogInitialized = false;
 
 function ensureDialogs() {
@@ -18,8 +16,7 @@ function ensureDialogs() {
     createDialogs();
 }
 
-// 尝试在脚本加载时创建对话框
-if (typeof document !== 'undefined') {
+// 尝试在脚本加载时创建对话�?if (typeof document !== 'undefined') {
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', ensureDialogs);
     } else {
@@ -35,7 +32,7 @@ function createDialogs() {
     const container = document.createElement('div');
     container.id = 'bgmDialogContainer';
     container.innerHTML = `
-        <!-- Alert 对话框 -->
+        <!-- Alert 对话�?-->
         <div id="bgmAlertDialog" class="bgm-modal" style="display:none;">
             <div class="bgm-modal-content bgm-alert-content">
                 <div class="bgm-dialog-header">
@@ -51,7 +48,7 @@ function createDialogs() {
             </div>
         </div>
         
-        <!-- Confirm 对话框 -->
+        <!-- Confirm 对话�?-->
         <div id="bgmConfirmDialog" class="bgm-modal" style="display:none;">
             <div class="bgm-modal-content bgm-confirm-content">
                 <div class="bgm-dialog-header">
@@ -68,7 +65,7 @@ function createDialogs() {
             </div>
         </div>
         
-        <!-- Error 对话框 -->
+        <!-- Error 对话�?-->
         <div id="bgmErrorDialog" class="bgm-modal" style="display:none;">
             <div class="bgm-modal-content bgm-error-content">
                 <div class="bgm-dialog-header">
@@ -84,7 +81,7 @@ function createDialogs() {
             </div>
         </div>
         
-        <!-- Warning 对话框 -->
+        <!-- Warning 对话�?-->
         <div id="bgmWarningDialog" class="bgm-modal" style="display:none;">
             <div class="bgm-modal-content bgm-warning-content">
                 <div class="bgm-dialog-header">
@@ -100,7 +97,7 @@ function createDialogs() {
             </div>
         </div>
         
-        <!-- Success 对话框 -->
+        <!-- Success 对话�?-->
         <div id="bgmSuccessDialog" class="bgm-modal" style="display:none;">
             <div class="bgm-modal-content bgm-success-content">
                 <div class="bgm-dialog-header">
@@ -116,7 +113,7 @@ function createDialogs() {
             </div>
         </div>
         
-        <!-- Input 对话框 -->
+        <!-- Input 对话�?-->
         <div id="bgmInputDialog" class="bgm-modal" style="display:none;">
             <div class="bgm-modal-content bgm-input-content">
                 <div class="bgm-dialog-header">
@@ -189,19 +186,17 @@ function bindDialogEvents() {
         if (window._bgmDialogCallback?.onCancel) window._bgmDialogCallback.onCancel();
     });
     
-    // 回车键确认 Input 对话框
-    document.getElementById('bgmInputField')?.addEventListener('keypress', (e) => {
+    // 回车键确�?Input 对话�?    document.getElementById('bgmInputField')?.addEventListener('keypress', (e) => {
         if (e.key === 'Enter') {
             document.getElementById('bgmInputOk')?.click();
         }
     });
 }
 
-// ========== 对话框显示函数 ==========
+// ========== 对话框显示函�?==========
 
 /**
- * 显示 Alert 对话框
- */
+ * 显示 Alert 对话�? */
 export function showAlert(message, title, onOk) {
     const dialog = document.getElementById('bgmAlertDialog');
     if (!dialog) {
@@ -216,8 +211,7 @@ export function showAlert(message, title, onOk) {
 }
 
 /**
- * 显示 Confirm 对话框
- */
+ * 显示 Confirm 对话�? */
 export function showConfirm(message, title, onOk, onCancel) {
     const dialog = document.getElementById('bgmConfirmDialog');
     if (!dialog) {
@@ -236,8 +230,7 @@ export function showConfirm(message, title, onOk, onCancel) {
 }
 
 /**
- * 显示 Error 对话框
- */
+ * 显示 Error 对话�? */
 export function showError(message, title, onOk) {
     const dialog = document.getElementById('bgmErrorDialog');
     if (!dialog) {
@@ -252,8 +245,7 @@ export function showError(message, title, onOk) {
 }
 
 /**
- * 显示 Warning 对话框
- */
+ * 显示 Warning 对话�? */
 export function showWarning(message, title, onOk) {
     const dialog = document.getElementById('bgmWarningDialog');
     if (!dialog) {
@@ -268,8 +260,7 @@ export function showWarning(message, title, onOk) {
 }
 
 /**
- * 显示 Success 对话框
- */
+ * 显示 Success 对话�? */
 export function showSuccess(message, title, onOk) {
     const dialog = document.getElementById('bgmSuccessDialog');
     if (!dialog) {
@@ -284,8 +275,7 @@ export function showSuccess(message, title, onOk) {
 }
 
 /**
- * 显示 Input 输入对话框
- */
+ * 显示 Input 输入对话�? */
 export function showInput(title, prompt, defaultValue, onOk, onCancel) {
     ensureDialogs();  // 确保对话框容器已创建
     const dialog = document.getElementById('bgmInputDialog');
@@ -309,18 +299,16 @@ export function showInput(title, prompt, defaultValue, onOk, onCancel) {
     inputField.focus();
 }
 
-// ========== 旧的对话框函数（保持兼容）==========
+// ========== 旧的对话框函数（保持兼容�?=========
 
 /**
- * 显示输入对话框
- */
+ * 显示输入对话�? */
 export function showInputDialog(title, placeholder, onSubmit) {
     showInput(title, placeholder, '', onSubmit);
 }
 
 /**
- * 关闭输入对话框
- */
+ * 关闭输入对话�? */
 export function closeInputDialog() {
     const dialog = document.getElementById('bgmInputDialog');
     if (dialog) {
@@ -336,8 +324,7 @@ export function showConfirmDialog(message, onConfirm) {
 }
 
 /**
- * 关闭确认对话框
- */
+ * 关闭确认对话�? */
 export function closeConfirmDialog() {
     const dialog = document.getElementById('bgmConfirmDialog');
     if (dialog) {
@@ -364,10 +351,9 @@ export function showToast(message, type) {
     }, 3000);
 }
 
-// ========== Token 状态更新 ==========
+// ========== Token 状态更�?==========
 /**
- * 更新 Token 状态显示
- */
+ * 更新 Token 状态显�? */
 export function updateTokenStatus() {
     let tokenStatus = document.getElementById("tokenStatus");
     if (!tokenStatus) return;
@@ -375,12 +361,12 @@ export function updateTokenStatus() {
     let token = loadBgToken();
     if (token && token.length > 10) {
         tokenStatus.style.color = "#4CAF50";
-        tokenStatus.textContent = "已设置 (" + token.substring(0, 4) + "...)";
+        tokenStatus.textContent = "已设�?(" + token.substring(0, 4) + "...)";
         
         if (typeof _fetchBgmUserInfo === 'function') {
             _fetchBgmUserInfo(function(userInfo) {
                 if (userInfo && userInfo.username) {
-                    tokenStatus.textContent = "已设置: " + userInfo.username;
+                    tokenStatus.textContent = "已设�? " + userInfo.username;
                     if (typeof updateUserIdStatus === 'function') {
                         updateUserIdStatus();
                     }
@@ -388,7 +374,7 @@ export function updateTokenStatus() {
             });
         }
     } else {
-        tokenStatus.textContent = "未设置";
+        tokenStatus.textContent = "未设�?;
         tokenStatus.style.color = "#f44336";
         BGM.cache.userId = null;
         BGM.cache.username = null;
@@ -396,8 +382,7 @@ export function updateTokenStatus() {
 }
 
 /**
- * 更新用户ID状态显示
- */
+ * 更新用户ID状态显�? */
 export function updateUserIdStatus() {
     let userIdStatus = document.getElementById("userIdStatus");
     if (!userIdStatus) return;
@@ -406,22 +391,20 @@ export function updateUserIdStatus() {
         let userId = _getBgmUserId();
         if (userId) {
             let display = BGM.cache.username ? BGM.cache.username + " (" + userId + ")" : userId;
-            userIdStatus.textContent = "已设置: " + display;
+            userIdStatus.textContent = "已设�? " + display;
             userIdStatus.style.color = "#4CAF50";
         } else {
-            userIdStatus.textContent = "未设置";
+            userIdStatus.textContent = "未设�?;
             userIdStatus.style.color = "#f44336";
         }
     }
 }
 
 /**
- * 显示 Token 设置对话框
- */
+ * 显示 Token 设置对话�? */
 
 /**
- * 显示消息对话框（自定义模态框）
- */
+ * 显示消息对话框（自定义模态框�? */
 export function showDialog(title, message) {
     const dialog = document.getElementById('bgmAlertDialog');
     if (!dialog) {
@@ -442,21 +425,20 @@ export function sendToTaskpane(data) {
 
 export function showTokenDialog() {
     ensureDialogs();  // 确保对话框容器已创建
-    showInput("设置 Bangumi Access Token", "请输入 Access Token", "", (value) => {
+    showInput("设置 Bangumi Access Token", "请输�?Access Token", "", (value) => {
         if (value) {
             if (typeof storeBgToken === 'function') {
                 storeBgToken(value);
             }
             updateTokenStatus();
-            showToast("Token 已保存", "success");
+            showToast("Token 已保�?, "success");
             BGM.postMessage({ type: "tokenUpdated" });
         }
     });
 }
 
 /**
- * 显示用户ID设置对话框
- */
+ * 显示用户ID设置对话�? */
 export function showUserIdDialog() {
     ensureDialogs();  // 确保对话框容器已创建
     if (typeof _getBgmUserId !== 'function') return;
@@ -468,13 +450,13 @@ export function showUserIdDialog() {
                 _setBgmUserId(value.trim());
             }
             updateUserIdStatus();
-            showToast("用户ID 已保存", "success");
+            showToast("用户ID 已保�?, "success");
             BGM.postMessage({ type: "userIdUpdated" });
         }
     });
 }
 
-// ========== 向后兼容（挂载到 window）==========
+// ========== 向后兼容（挂载到 window�?=========
 window.showInputDialog = showInputDialog;
 window.closeInputDialog = closeInputDialog;
 window.showConfirmDialog = showConfirmDialog;
@@ -483,10 +465,11 @@ window.showToast = showToast;
 window.updateTokenStatus = updateTokenStatus;
 window.updateUserIdStatus = updateUserIdStatus;
 window.showTokenDialog = showTokenDialog;
+window.showAlertDialog = showAlert;
+window.alert = showAlert;
 window.showUserIdDialog = showUserIdDialog;
 
-// 新增通用对话框函数
-window.BGMAlert = showAlert;
+// 新增通用对话框函�?window.BGMAlert = showAlert;
 window.BGMConfirm = showConfirm;
 window.BGMError = showError;
 window.BGMWarning = showWarning;

@@ -6,7 +6,7 @@
 
 import { getApp, bgmLog, BGM, LOG_LEVELS } from '../util.js';
 import { getCellValue } from '../util.js';
-import { showAlertDialog } from './dialog.js';
+import { showAlert } from './dialog.js';
 import { escapeHtml } from '../util.js';
 
 // ========== 详细预览数据存储 ==========
@@ -30,14 +30,14 @@ export function previewSyncContent() {
 
     let app = getApp();
     if (!app || !app.ActiveWorkbook) {
-        showAlertDialog("错误", "无法获取 WPS Application 对象！");
+        showAlert("错误", "无法获取 WPS Application 对象�?);
         return;
     }
 
     let wb = app.ActiveWorkbook;
     let ws = wb.Worksheets(sheetIndex);
     if (!ws) {
-        showAlertDialog("错误", "无法获取工作表！");
+        showAlert("错误", "无法获取工作表！");
         return;
     }
 
@@ -46,19 +46,19 @@ export function previewSyncContent() {
 
     let headerRow = findHeaderRow(ws, startRow);
     if (headerRow === 0) {
-        showAlertDialog("提示", "未找到表头行！");
+        showAlert("提示", "未找到表头行�?);
         return;
     }
 
     let colMap = getColumnMap(ws, headerRow);
     if (!colMap.subjectId && !colMap.url) {
-        showAlertDialog("提示", "未找到【条目ID】或【Bangumi URL】列！");
+        showAlert("提示", "未找到【条目ID】或【Bangumi URL】列�?);
         return;
     }
 
     let lastRow = userEndRow > 0 ? userEndRow : getLastRow(ws);
     if (lastRow <= headerRow) {
-        showAlertDialog("提示", "没有可预览的数据！");
+        showAlert("提示", "没有可预览的数据�?);
         return;
     }
 
@@ -96,7 +96,7 @@ export function previewSyncContent() {
 
             rows.push({
                 row: i,
-                name: nameVal || "(无名称)",
+                name: nameVal || "(无名�?",
                 sid: sid,
                 url: urlVal,
                 currentStatus: currentStatus,
@@ -112,7 +112,7 @@ export function previewSyncContent() {
                 payload: buildPreviewPayload(ws, i, colMap)
             });
         } catch (e) {
-            bgmLog(LOG_LEVELS.WARN, "预览第 " + i + " 行出错: " + e.message);
+            bgmLog(LOG_LEVELS.WARN, "预览�?" + i + " 行出�? " + e.message);
         }
     }
 
@@ -149,7 +149,7 @@ export function filterDetailItems(filterText) {
 export function updateDetailCount(count) {
     let countEl = document.getElementById("detailCount");
     if (countEl) {
-        countEl.textContent = "共 " + count + " 条";
+        countEl.textContent = "�?" + count + " �?;
     }
 }
 
@@ -187,7 +187,7 @@ export function renderDetailList(items) {
         div.className = "detail-item";
         div.innerHTML = `
             <div class="detail-row">
-                <span class="detail-label">行 ${item.row}</span>
+                <span class="detail-label">�?${item.row}</span>
                 <span class="detail-name">${escapeHtml(item.name)}</span>
             </div>
             <div class="detail-row">
@@ -195,12 +195,12 @@ export function renderDetailList(items) {
                 <span class="detail-sid">${item.sid || "(无法提取)"}</span>
             </div>
             <div class="detail-row">
-                <span class="detail-label">当前状态:</span>
-                <span class="detail-status">${item.currentStatus || "(无)"}</span>
+                <span class="detail-label">当前状�?</span>
+                <span class="detail-status">${item.currentStatus || "(�?"}</span>
             </div>
             <div class="detail-row">
                 <span class="detail-label">评分:</span>
-                <span class="detail-rate">${item.rate || "(无)"}</span>
+                <span class="detail-rate">${item.rate || "(�?"}</span>
             </div>
             <div class="detail-preview">
                 <pre>${escapeHtml(item.previewPayload)}</pre>
@@ -215,7 +215,7 @@ export function renderDetailList(items) {
  */
 export function viewSyncRecordDetail(rowIndex) {
     if (typeof getAllSyncRecords !== 'function') {
-        showAlertDialog("提示", "同步记录功能不可用");
+        showAlert("提示", "同步记录功能不可�?);
         return;
     }
 
@@ -234,14 +234,14 @@ export function viewSyncRecordDetail(rowIndex) {
         条目类型: ${record.type}
         同步次数: ${record.count}
         内容: ${record.content}
-        状态: ${record.status}
+        状�? ${record.status}
         备注: ${record.comment}
     `;
 
-    showAlertDialog("同步记录详情", detail);
+    showAlert("同步记录详情", detail);
 }
 
-// ========== 向后兼容（挂载到 window）==========
+// ========== 向后兼容（挂载到 window�?=========
 window.previewSyncContent = previewSyncContent;
 window.buildPreviewPayload = buildPreviewPayload;
 window.filterDetailItems = filterDetailItems;

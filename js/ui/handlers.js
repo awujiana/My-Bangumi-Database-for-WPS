@@ -1,14 +1,10 @@
 /**
  * UI 事件处理模块
  * @module ui/handlers
- * @description 面板操作处理、按钮绑定、事件处理
- */
+ * @description 面板操作处理、按钮绑定、事件处�? */
 
-import { bgmLog, BGM, LOG_LEVELS } from '../util.js';
-import { 
-    showAlertDialog, showTokenDialog, showUserIdDialog, loadBgToken, 
-    _getBgmUserId 
-} from '../util.js';
+import { bgmLog, BGM, LOG_LEVELS, loadBgToken, _getBgmUserId } from '../util.js';
+import { showAlertDialog, showTokenDialog, showUserIdDialog } from './dialog.js';
 import { setSyncRunning, setStatus } from './message.js';
 import { handleError } from '../core/unified.js';
 
@@ -28,7 +24,7 @@ export function onAction(action) {
             break;
         case "clear":
             if (typeof showConfirmDialog === 'function') {
-                showConfirmDialog("确定要清除所有标记吗？", () => {
+                showConfirmDialog("确定要清除所有标记吗�?, () => {
                     if (typeof clearRowColors === 'function') {
                         clearRowColors();
                     }
@@ -55,7 +51,7 @@ export function onAction(action) {
             break;
         case "showClearConfirm":
             if (typeof showConfirmDialog === 'function') {
-                showConfirmDialog("确定要清除所有标记吗？", () => {
+                showConfirmDialog("确定要清除所有标记吗�?, () => {
                     if (typeof clearRowColors === 'function') {
                         clearRowColors();
                     }
@@ -78,24 +74,23 @@ export function onAction(action) {
     }
 }
 
-// ========== 从面板同步 ==========
+// ========== 从面板同�?==========
 /**
- * 从面板执行同步
- */
+ * 从面板执行同�? */
 export function syncFromPanel() {
-    bgmLog(LOG_LEVELS.INFO, "syncFromPanel 开始执行");
+    bgmLog(LOG_LEVELS.INFO, "syncFromPanel 开始执�?);
     
     if (typeof findHeaderRow === 'undefined' || typeof getColumnMap === 'undefined' || typeof getLastRow === 'undefined') {
-        bgmLog(LOG_LEVELS.ERROR, "syncFromPanel - 必需函数未加载");
+        bgmLog(LOG_LEVELS.ERROR, "syncFromPanel - 必需函数未加�?);
         showAlertDialog("提示", "正在加载脚本，请稍后重试...");
         return;
     }
     
-    bgmLog(LOG_LEVELS.INFO, "syncFromPanel - 必需函数已加载，开始同步...");
+    bgmLog(LOG_LEVELS.INFO, "syncFromPanel - 必需函数已加载，开始同�?..");
 
     let token = loadBgToken();
     if (!token) {
-        showAlertDialog("提示", "请先设置 Bangumi Token！");
+        showAlertDialog("提示", "请先设置 Bangumi Token�?);
         showTokenDialog("");
         return;
     }
@@ -132,7 +127,7 @@ export function testSingleUpdateFromPanel() {
     
     let token = loadBgToken();
     if (!token) {
-        showAlertDialog("提示", "请先设置 Bangumi Token！");
+        showAlertDialog("提示", "请先设置 Bangumi Token�?);
         return;
     }
     
@@ -154,7 +149,7 @@ export function syncCollectionFromBgm() {
 
         let token = loadBgToken();
         if (!token) {
-            showAlertDialog("提示", "请先设置 Bangumi Token！");
+            showAlertDialog("提示", "请先设置 Bangumi Token�?);
             return;
         }
 
@@ -168,17 +163,17 @@ export function syncCollectionFromBgm() {
  * 通过 API 方式同步收藏
  */
 export function syncFromBgmByAPI(sheetIndex) {
-    bgmLog(LOG_LEVELS.INFO, "syncFromBgmByAPI 开始");
+    bgmLog(LOG_LEVELS.INFO, "syncFromBgmByAPI 开�?);
 
     let token = loadBgToken();
     if (!token) {
-        showAlertDialog("提示", "请先设置 Token！");
+        showAlertDialog("提示", "请先设置 Token�?);
         return;
     }
 
     let userId = _getBgmUserId();
     if (!userId) {
-        showAlertDialog("提示", "请先设置用户ID！");
+        showAlertDialog("提示", "请先设置用户ID�?);
         showUserIdDialog();
         return;
     }
@@ -194,7 +189,7 @@ export function syncFromBgmByAPI(sheetIndex) {
                 }
                 markUploadedItems(sheetIndex, collections);
             } else {
-                showAlertDialog("提示", "未获取到收藏数据，请检查 Token 和用户ID！");
+                showAlertDialog("提示", "未获取到收藏数据，请检�?Token 和用户ID�?);
             }
             setSyncRunning(false);
             setStatus("同步完成", "success");
@@ -216,15 +211,14 @@ export function markUploadedItems(sheetIndex, collections) {
 }
 
 /**
- * 清除工作表标记
- */
+ * 清除工作表标�? */
 export function clearSheetMarks(sheetIndex) {
     if (typeof clearSheetMarksInSheet === 'function') {
         clearSheetMarksInSheet(sheetIndex);
     }
 }
 
-// ========== 向后兼容（挂载到 window）==========
+// ========== 向后兼容（挂载到 window�?=========
 window.onAction = onAction;
 window.syncFromPanel = syncFromPanel;
 window.syncCollectionFromBgm = syncCollectionFromBgm;
@@ -234,15 +228,13 @@ window.clearSheetMarks = clearSheetMarks;
 window.testSingleUpdateFromPanel = testSingleUpdateFromPanel;
 window.testTokenValidity = testTokenValidity;
 
-// ========== 事件监听器（替代内联 onclick）==========
+// ========== 事件监听器（替代内联 onclick�?=========
 function setupButtonListeners() {
     // 查找所有带 data-action 属性的按钮
     const buttons = document.querySelectorAll('[data-action]');
     buttons.forEach(button => {
-        // 移除旧的事件监听器（防止重复绑定）
-        button.removeEventListener('click', handleActionClick);
-        // 添加新的事件监听器
-        button.addEventListener('click', handleActionClick);
+        // 移除旧的事件监听器（防止重复绑定�?        button.removeEventListener('click', handleActionClick);
+        // 添加新的事件监听�?        button.addEventListener('click', handleActionClick);
     });
 }
 
@@ -285,7 +277,7 @@ function handleActionClick(event) {
             break;
         case 'clear':
             if (typeof showConfirmDialog === 'function') {
-                showConfirmDialog("确定要清除所有标记吗？", () => {
+                showConfirmDialog("确定要清除所有标记吗�?, () => {
                     if (typeof clearRowColors === 'function') {
                         clearRowColors();
                     }
@@ -313,5 +305,4 @@ function initEventListeners() {
     }
 }
 
-// 初始化
-initEventListeners();
+// 初始�?initEventListeners();
