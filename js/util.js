@@ -279,7 +279,12 @@ BGM.showDialog = function(title, message) {
     if (BGM.postMessage({ type: "showDialog", title: title, message: message })) {
         return;
     }
-    alert(message);
+    // 使用自定义对话框
+    if (typeof window.BGMAlert === 'function') {
+        window.BGMAlert(message, title);
+    } else {
+        window.alert(message);
+    }
 };
 
 /**
@@ -290,53 +295,26 @@ BGM.showConfirm = function(title, message, onConfirm, onCancel) {
         window._bgmConfirmCallback = { confirm: onConfirm, cancel: onCancel };
         return;
     }
-    if (confirm(message)) {
-        if (onConfirm) onConfirm();
+    // 使用自定义确认对话框
+    if (typeof window.BGMConfirm === 'function') {
+        window.BGMConfirm(message, title, onConfirm, onCancel);
     } else {
-        if (onCancel) onCancel();
+        if (window.confirm(message)) {
+            if (onConfirm) onConfirm();
+        } else {
+            if (onCancel) onCancel();
+        }
     }
 };
 
-// ========== 自定义 Alert ==========
+// ========== 自定义对话框替换原生 alert ==========
 (function() {
     const _origAlert = window.alert;
     window.alert = function(message) {
-        try {
-            let modal = document.getElementById("alertDialog");
-            if (!modal) {
-                modal = document.createElement("div");
-                modal.id = "alertDialog";
-                modal.className = "modal";
-                modal.style.display = "none";
-                modal.innerHTML = `
-                    <div class="modal-content confirm-modal-content" style="max-width:420px;text-align:center;padding:30px 25px;">
-                        <h3 id="alertTitle" style="margin:0 0 15px 0;color:#fff;font-size:18px;"></h3>
-                        <p id="alertMessage" style="margin-bottom:20px;line-height:1.6;color:#ccc;white-space:pre-wrap;word-break:break-all;"></p>
-                        <div class="dialog-buttons" style="justify-content:center;">
-                            <button class="btn confirm-btn confirm-yes" onclick="document.getElementById('alertDialog').style.display='none'">确定</button>
-                        </div>
-                    </div>`;
-                document.body.appendChild(modal);
-            }
-            let titleEl = document.getElementById("alertTitle");
-            let msgEl = document.getElementById("alertMessage");
-            if (titleEl && msgEl) {
-                let text = typeof message === 'string' ? message : String(message);
-                if (text.length > 80 || text.indexOf('\n') >= 0) {
-                    let firstLine = text.split('\n')[0];
-                    titleEl.textContent = firstLine.length > 30 ? "提示" : firstLine;
-                    msgEl.textContent = text;
-                } else {
-                    titleEl.textContent = "提示";
-                    msgEl.textContent = text;
-                }
-                modal.style.display = "flex";
-                let bgHandler = function(e) { if (e.target === modal) { modal.style.display = "none"; modal.removeEventListener("click", bgHandler); } };
-                modal.addEventListener("click", bgHandler);
-                return;
-            }
-        } catch(e) {
-            bgmLog(LOG_LEVELS.WARN, "showAlert DOM 操作失败: " + e.message);
+        // 使用自定义对话框
+        if (typeof window.BGMAlert === 'function') {
+            window.BGMAlert(message, '提示');
+            return;
         }
         _origAlert(message);
     };
@@ -346,24 +324,10 @@ BGM.showConfirm = function(title, message, onConfirm, onCancel) {
  * 显示自定义提示对话框
  */
 export function showAlertDialog(title, message) {
-    let modal = document.getElementById("alertDialog");
-    let titleEl = document.getElementById("alertTitle");
-    let msgEl = document.getElementById("alertMessage");
-    
-    if (modal && titleEl && msgEl) {
-        titleEl.textContent = title || "提示";
-        msgEl.textContent = message || "";
-        modal.style.display = "flex";
-        
-        let bgHandler = function(e) {
-            if (e.target === modal) {
-                closeAlertDialog();
-                modal.removeEventListener("click", bgHandler);
-            }
-        };
-        modal.addEventListener("click", bgHandler);
+    if (typeof window.BGMAlert === 'function') {
+        window.BGMAlert(message, title);
     } else {
-        alert(message);
+        window.alert(message);
     }
 }
 
@@ -411,7 +375,11 @@ export function GetUrlPath() {
 export function showBangumiPanel() {
     let app = getApp();
     if (!app) {
-        alert("无法获取 WPS Application 对象！");
+        if (typeof window.BGMError === 'function') {
+            window.BGMError("无法获取 WPS Application 对象！", "错误");
+        } else {
+            window.alert("无法获取 WPS Application 对象！");
+        }
         return;
     }
     let tsId = app.PluginStorage.getItem("taskpane_id");
@@ -438,43 +406,79 @@ export function trim(str) {
  * 显示输入提示框
  */
 export function wpsPrompt(message, defaultValue) {
-    let app = getApp();
-    if (app && typeof app.InputBox === 'function') {
-        try {
-            let result = app.InputBox(message, "Bangumi 设置", defaultValue || "", 2);
-            if (result === false || result === null || result === undefined) {
-                return null;
+    return new Promise((resolve) => {
+        let app = getApp();
+        if (app && typeof app.InputBox === 'function') {
+            try {
+                let result = app.InputBox(message, "Bangumi 设置", defaultValue || "", 2);
+                if (result === false || result === null || result === undefined) {
+                    resolve(null);
+                    return;
+                }
+                resolve(String(result));
+                return;
+            } catch (e) {
+                console.warn("WPS InputBox 不可用:", e.message);
             }
-            return String(result);
-        } catch (e) {
-            console.warn("WPS InputBox 不可用:", e.message);
         }
-    }
-    try {
-        return prompt(message, defaultValue);
-    } catch (e) {
-        console.error("prompt 也不可用:", e.message);
-        return null;
-    }
+        // 使用自定义输入对话框
+        if (typeof window.BGMInput === 'function') {
+            window.BGMInput("输入", message, defaultValue, (value) => {
+                resolve(value);
+            }, () => {
+                resolve(null);
+            });
+        } else {
+            try {
+                let result = window.prompt(message, defaultValue);
+                resolve(result);
+            } catch (e) {
+                console.error("prompt 也不可用:", e.message);
+                resolve(null);
+            }
+        }
+    });
 }
 
 /**
  * 显示 WPS 消息对话框
  */
 export function wpsMsgBox(message, buttons, icon) {
-    let app = getApp();
-    if (app && typeof app.MessageBox === 'function') {
-        try {
-            return app.MessageBox(message, (buttons || 0) + (icon || 64));
-        } catch (e) {
-            console.warn("WPS MessageBox 不可用:", e.message);
+    return new Promise((resolve) => {
+        let app = getApp();
+        if (app && typeof app.MessageBox === 'function') {
+            try {
+                let result = app.MessageBox(message, (buttons || 0) + (icon || 64));
+                resolve(result);
+                return;
+            } catch (e) {
+                console.warn("WPS MessageBox 不可用:", e.message);
+            }
         }
-    }
-    if (buttons === 4) {
-        return confirm(message) ? 6 : 7;
-    }
-    alert(message);
-    return 1;
+        
+        if (buttons === 4) {
+            // 确认对话框
+            if (typeof window.BGMConfirm === 'function') {
+                window.BGMConfirm(message, "确认", () => {
+                    resolve(6); // IDOK
+                }, () => {
+                    resolve(7); // IDCANCEL
+                });
+            } else {
+                resolve(window.confirm(message) ? 6 : 7);
+            }
+        } else {
+            // 普通提示
+            if (typeof window.BGMAlert === 'function') {
+                window.BGMAlert(message, "提示", () => {
+                    resolve(1);
+                });
+            } else {
+                window.alert(message);
+                resolve(1);
+            }
+        }
+    });
 }
 
 /**

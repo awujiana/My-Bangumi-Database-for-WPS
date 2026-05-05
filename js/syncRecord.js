@@ -277,11 +277,31 @@ export function getAllSyncRecords() {
  */
 export function clearSyncRecords(confirmPrompt) {
     if (confirmPrompt !== false) {
+        // 使用自定义确认对话框
+        if (typeof window.BGMConfirm === 'function') {
+            window.BGMConfirm(
+                "确定要清除所有同步记录吗？此操作不可撤销。",
+                "确认清除",
+                () => {
+                    _doClearSyncRecords();
+                }
+            );
+            return;
+        }
+        // 备用原生确认
         if (!confirm("确定要清除所有同步记录吗？此操作不可撤销。")) {
             return;
         }
+        _doClearSyncRecords();
+    } else {
+        _doClearSyncRecords();
     }
+}
 
+/**
+ * 执行清除同步记录的内部函数
+ */
+function _doClearSyncRecords() {
     let sheet = getOrCreateSyncRecordSheet();
     if (!sheet) return;
 

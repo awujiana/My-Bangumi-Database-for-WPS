@@ -822,3 +822,241 @@ select.input {
     border-radius: 50%;
     animation: spin 0.8s linear infinite;
 }
+
+/* ========== BGM 自定义对话框系统 ========== */
+#bgmDialogContainer {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 10000;
+    pointer-events: none;
+}
+
+/* 对话框基础样式 */
+.bgm-modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.75);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10001;
+    pointer-events: auto;
+}
+
+.bgm-modal-content {
+    background: #2d2d2d;
+    border-radius: 14px;
+    padding: 24px;
+    min-width: 340px;
+    max-width: 480px;
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5);
+    animation: bgmDialogIn 0.25s ease;
+}
+
+@keyframes bgmDialogIn {
+    from {
+        opacity: 0;
+        transform: scale(0.9) translateY(-20px);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1) translateY(0);
+    }
+}
+
+.bgm-dialog-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 16px;
+}
+
+.bgm-dialog-icon {
+    font-size: 24px;
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.bgm-icon-info {
+    background: linear-gradient(135deg, #4a9eff 0%, #3a8ee8 100%);
+    color: white;
+}
+
+.bgm-icon-question {
+    background: linear-gradient(135deg, #ffc107 0%, #e0a800 100%);
+    color: #333;
+}
+
+.bgm-icon-error {
+    background: linear-gradient(135deg, #ff6b6b 0%, #ee5a5a 100%);
+    color: white;
+}
+
+.bgm-icon-warning {
+    background: linear-gradient(135deg, #ff9800 0%, #f57c00 100%);
+    color: white;
+}
+
+.bgm-icon-success {
+    background: linear-gradient(135deg, #4ade80 0%, #3ace70 100%);
+    color: white;
+}
+
+.bgm-dialog-title {
+    font-size: 18px;
+    font-weight: 600;
+    color: #ffffff;
+}
+
+.bgm-dialog-body {
+    margin-bottom: 20px;
+}
+
+.bgm-dialog-message {
+    font-size: 14px;
+    line-height: 1.6;
+    color: #b0b0b0;
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+
+.bgm-dialog-footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+}
+
+/* 按钮样式 */
+.bgm-btn {
+    padding: 10px 24px;
+    border: none;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+    min-width: 80px;
+}
+
+.bgm-btn-primary {
+    background: linear-gradient(135deg, #4a9eff 0%, #3a8ee8 100%);
+    color: white;
+}
+
+.bgm-btn-primary:hover {
+    background: linear-gradient(135deg, #3a8ee8 0%, #2a7ed8 100%);
+    transform: translateY(-1px);
+}
+
+.bgm-btn-default {
+    background: #3a3a3a;
+    color: #e0e0e0;
+}
+
+.bgm-btn-default:hover {
+    background: #4a4a4a;
+}
+
+.bgm-btn-danger {
+    background: linear-gradient(135deg, #ff6b6b 0%, #ee5a5a 100%);
+    color: white;
+}
+
+.bgm-btn-danger:hover {
+    background: linear-gradient(135deg, #ee5a5a 0%, #de4a4a 100%);
+}
+
+.bgm-btn-warning {
+    background: linear-gradient(135deg, #ff9800 0%, #f57c00 100%);
+    color: white;
+}
+
+.bgm-btn-warning:hover {
+    background: linear-gradient(135deg, #f57c00 0%, #e65100 100%);
+}
+
+.bgm-btn-success {
+    background: linear-gradient(135deg, #4ade80 0%, #3ace70 100%);
+    color: white;
+}
+
+.bgm-btn-success:hover {
+    background: linear-gradient(135deg, #3ace70 0%, #2abe60 100%);
+}
+
+/* 输入对话框 */
+.bgm-input-content {
+    max-width: 420px;
+}
+
+.bgm-input-field {
+    width: 100%;
+    padding: 12px 14px;
+    border: 2px solid #444;
+    border-radius: 8px;
+    font-size: 14px;
+    background: #333;
+    color: #e0e0e0;
+    margin-top: 12px;
+    transition: all 0.2s;
+}
+
+.bgm-input-field:focus {
+    outline: none;
+    border-color: #4a9eff;
+    box-shadow: 0 0 0 3px rgba(74, 158, 255, 0.2);
+}
+
+/* Toast 通知 */
+.bgm-toast {
+    position: fixed;
+    top: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    padding: 14px 28px;
+    border-radius: 10px;
+    font-size: 14px;
+    font-weight: 500;
+    z-index: 10002;
+    background: #333;
+    color: #fff;
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4);
+    opacity: 0;
+    transition: opacity 0.3s, transform 0.3s;
+    pointer-events: none;
+}
+
+.bgm-toast.bgm-toast-show {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+}
+
+.bgm-toast-success {
+    background: linear-gradient(135deg, #4ade80 0%, #3ace70 100%);
+    color: white;
+}
+
+.bgm-toast-error {
+    background: linear-gradient(135deg, #ff6b6b 0%, #ee5a5a 100%);
+    color: white;
+}
+
+.bgm-toast-warning {
+    background: linear-gradient(135deg, #ffc107 0%, #e0a800 100%);
+    color: #333;
+}
+
+.bgm-toast-info {
+    background: linear-gradient(135deg, #4a9eff 0%, #3a8ee8 100%);
+    color: white;
+}

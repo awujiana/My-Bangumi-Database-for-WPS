@@ -130,10 +130,26 @@ export function SyncToBangumi() {
     let dataCount = lastRow - headerRow;
     let confirmMsg = "即将同步第 " + (headerRow + 1) + " 到 " + lastRow + " 行，共 " + dataCount + " 条数据。\n\n是否继续？";
     
+    // 使用自定义确认对话框
+    if (typeof window.BGMConfirm === 'function') {
+        window.BGMConfirm(confirmMsg, "确认同步", () => {
+            _doSyncBangumi(ws, colMap, token, lastRow, headerRow);
+        });
+        return;
+    }
+    
+    // 备用原生确认
     if (!confirm(confirmMsg)) {
         return;
     }
+    
+    _doSyncBangumi(ws, colMap, token, lastRow, headerRow);
+}
 
+/**
+ * 执行 Bangumi 同步（内部函数）
+ */
+function _doSyncBangumi(ws, colMap, token, lastRow, headerRow) {
     BGM.sync.isRunning = true;
     BGM.sync.lastSyncTime = null;
 

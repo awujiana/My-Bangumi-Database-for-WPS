@@ -101,8 +101,10 @@ const WebNotifycount = 0;
 function showDialogRibbon(title, message) {
     if (typeof BGM !== 'undefined' && BGM.showDialog) {
         BGM.showDialog(title, message);
+    } else if (typeof window.BGMAlert === 'function') {
+        window.BGMAlert(message, title);
     } else {
-        alert(message);
+        window.alert(message);
     }
 }
 
