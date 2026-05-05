@@ -128,55 +128,41 @@ const BGM_COLOR = {
     WHITE: 0xFFFFFF        // 白色（清除标记）
 };
 
-// ========== Token 加密（简单 XOR + Base64 混淆，防明文窥探）==========
+// ========== Token 加密（新版：btoa("BGM:" + XOR(token))）==========
 const TOKEN_XOR_KEY = 0x5A;
+const TOKEN_PREFIX = "BGM:";
 
 function encryptToken(token) {
     if (!token) return "";
-    let result = "";
+    let xorResult = "";
     for (let i = 0; i < token.length; i++) {
         let code = token.charCodeAt(i) ^ TOKEN_XOR_KEY;
-        result += String.fromCharCode(code);
+        xorResult += String.fromCharCode(code);
     }
-    return btoa(result); // Base64 编码
+    return btoa(TOKEN_PREFIX + xorResult);
 }
 
 function decryptToken(encoded) {
-    if (!encoded) return "";
+    if (!encoded) return null;
     try {
         let decoded = atob(encoded);
+        if (!decoded.startsWith(TOKEN_PREFIX)) return null;
+        let xorResult = decoded.substring(TOKEN_PREFIX.length);
         let result = "";
-        for (let i = 0; i < decoded.length; i++) {
-            let code = decoded.charCodeAt(i) ^ TOKEN_XOR_KEY;
+        for (let i = 0; i < xorResult.length; i++) {
+            let code = xorResult.charCodeAt(i) ^ TOKEN_XOR_KEY;
             result += String.fromCharCode(code);
         }
         return result;
     } catch (e) {
-        return null; // 解码失败，可能是旧版明文 Token
+        return null;
     }
-}
-
-// ========== Token 存储（读写均加密，兼容旧版本明文 Token）==========
-function loadBgToken() {
-    let app = getApp();
-    if (!app) return null;
-    let stored = app.PluginStorage.getItem("bgm_token");
-    if (!stored) return null;
-    
-    // 尝试解密
-    let token = decryptToken(stored);
-    if (token) return token; // 解密成功，返回 Token
-    
-    // 解密失败 → 旧版明文 Token，自动升级为加密存储
-    storeBgToken(stored); // 加密写入
-    return stored;         // 返回原文
 }
 
 function storeBgToken(token) {
     let app = getApp();
     if (!app) return false;
-    let encrypted = encryptToken(token);
-    app.PluginStorage.setItem("bgm_token", encrypted);
+    app.PluginStorage.setItem("bgm_token", encryptToken(token));
     return true;
 }
 
@@ -185,6 +171,18 @@ function clearBgToken() {
     if (!app) return false;
     app.PluginStorage.setItem("bgm_token", "");
     return true;
+}
+
+function loadBgToken() {
+    let app = getApp();
+    if (!app) return null;
+    let stored = app.PluginStorage.getItem("bgm_token");
+    if (!stored) return null;
+    let token = decryptToken(stored);
+    if (token) return token;
+    // 非加密格式 → 删除无效数据
+    clearBgToken();
+    return null;
 }
 
 // ========== 统一日志前缀 ==========
@@ -214,6 +212,11 @@ function clearBgToken() {
         _origError.apply(console, args);
     };
 })();
+
+// ========== 缓存 Bangumi 用户 ID（通过 /v0/me 获取），用于 API 路径 ==========
+let _cachedBgmUserId = null;
+function _setBgmUserId(id) { _cachedBgmUserId = id; }
+function _getUserApiPath() { return _cachedBgmUserId ? String(_cachedBgmUserId) : "-"; }
 
 // ========== 辅助函数 ==========
 

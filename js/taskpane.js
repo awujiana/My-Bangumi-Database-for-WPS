@@ -1014,7 +1014,7 @@ function previewSyncContent() {
                         <div class="detail-row" style="flex-direction:column;gap:6px;">
                             <span class="detail-label" style="min-width:auto;">将发送的请求</span>
                             <div class="detail-value" style="color:#27ae60;font-weight:500;">
-                                POST /v0/users/-/collections/${rowData.sid}
+                                POST /v0/users/{userId}/collections/${rowData.sid}
                             </div>
                             <div class="detail-value json">${jsonBody}</div>
                         </div>
@@ -1148,7 +1148,7 @@ function uploadSingleRow(rowNum, btnElement) {
         }
 
         // 发送上传请求
-        let result = bgmRequestSync("POST", "/v0/users/-/collections/" + sid, jsonBody, token);
+        let result = bgmRequestSync("POST", "/v0/users/" + _getUserApiPath() + "/collections/" + sid, jsonBody, token);
         let statusCode = result.code;
 
         // 获取D列单元格标记颜色
@@ -1515,6 +1515,18 @@ function _doAPISync(sheetIndex, token) {
         let seqCol = 4; // D列
         let nameCol = colMap.has("名称") ? colMap.get("名称") : 0;
 
+        // 先验证 Token 有效性
+        setStatus("正在验证 Token...", "loading");
+        let verifyResult = _verifyToken(token);
+        if (!verifyResult.valid) {
+            alert("❌ " + verifyResult.message + "\n\n请重新设置 Token：\n1. 点击「设置/修改」按钮\n2. 输入新的 Access Token\n\n获取 Token: https://next.bgm.tv/demo/access-token/create");
+            setStatus("Token 无效", "error");
+            return;
+        }
+        console.log("Token 验证通过，用户:", verifyResult.username, "ID:", verifyResult.userId);
+        // 缓存用户 ID，后续 API 调用使用真实 ID 而非 "-" 占位符
+        _setBgmUserId(verifyResult.userId);
+
         // 获取用户收藏列表
         setStatus("正在获取收藏列表（分页中）...", "loading");
         let userCollections = fetchAllUserCollections(token);
@@ -1802,20 +1814,20 @@ function hasNextPageLink(doc, currentPage) {
     return false;
 }
 
-// ========== 获取用户所有收藏（分页 - API方式，原有）==========
+// ========== 获取用户所有收藏（分页 - API方式）==========
 function fetchAllUserCollections(token) {
     let allCollections = [];
     let page = 1;
     let limit = 100;
-    let maxPages = 50; // 最多获取5000条，防止无限循环
+    let maxPages = 50;
     let subjectType = 2; // 动画
     let lastError = null;
+    let userPath = _getUserApiPath(); // 使用缓存的用户 ID 而非 "-" 占位符
 
     try {
         while (page <= maxPages) {
-            // 获取当前页数据
             let xhr = new XMLHttpRequest();
-            let url = `https://api.bgm.tv/v0/users/-/collections?subject_type=${subjectType}&limit=${limit}&offset=${(page - 1) * limit}`;
+            let url = `https://api.bgm.tv/v0/users/${userPath}/collections?subject_type=${subjectType}&limit=${limit}&offset=${(page - 1) * limit}`;
             xhr.open("GET", url, false);
             xhr.setRequestHeader("Authorization", "Bearer " + token);
 
@@ -2200,7 +2212,7 @@ function syncFromPanel() {
                 continue;
             }
 
-            let result = bgmRequestSync("POST", "/v0/users/-/collections/" + subjectId, jsonBody, token);
+            let result = bgmRequestSync("POST", "/v0/users/" + _getUserApiPath() + "/collections/" + subjectId, jsonBody, token);
             let statusCode = result.code;
 
             if (statusCode === 204 || statusCode === 200 || statusCode === 201 || statusCode === 202) {
@@ -2399,6 +2411,28 @@ function setStatus(msg, type) {
 }
 
 
+
+// ========== 验证 Token（返回 {valid, username, message}）==========
+function _verifyToken(token) {
+    if (!token) return { valid: false, message: "Token 为空" };
+    try {
+        let xhr = new XMLHttpRequest();
+        xhr.open("GET", "https://api.bgm.tv/v0/me", false);
+        xhr.setRequestHeader("Authorization", "Bearer " + token);
+        xhr.send();
+
+        if (xhr.status === 200) {
+            let data = JSON.parse(xhr.responseText);
+            return { valid: true, userId: data.id, username: data.nickname || data.username || "未知", message: "Token 有效" };
+        }
+        if (xhr.status === 401) {
+            return { valid: false, message: "Token 无效或已过期（HTTP 401）" };
+        }
+        return { valid: false, message: `Token 验证失败（HTTP ${xhr.status}）` };
+    } catch (e) {
+        return { valid: false, message: "Token 验证请求失败: " + e.message };
+    }
+}
 
 // ========== 测试 Token 有效性（taskpane版本，更新UI状态）==========
 function testTokenValidity(token) {

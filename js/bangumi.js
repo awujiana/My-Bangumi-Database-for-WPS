@@ -99,6 +99,20 @@ function SyncToBangumi() {
         return;
     }
 
+    // 如果还没有缓存用户 ID，尝试通过 Token 获取
+    if (!_cachedBgmUserId && typeof _getUserApiPath === 'function') {
+        try {
+            let xhr = new XMLHttpRequest();
+            xhr.open("GET", "https://api.bgm.tv/v0/me", false);
+            xhr.setRequestHeader("Authorization", "Bearer " + token);
+            xhr.send();
+            if (xhr.status === 200) {
+                let data = JSON.parse(xhr.responseText);
+                if (data.id) _setBgmUserId(data.id);
+            }
+        } catch (e) {}
+    }
+
     let lastRow = getLastRow(ws);
 
     let successCount = 0, failCount = 0, skipNoUrlCount = 0, skipNoTypeCount = 0;
@@ -181,7 +195,7 @@ function SyncToBangumi() {
         let bodySummary = parseJsonBodySummary(jsonBody);
 
         // 发送请求
-        let result = bgmRequest("POST", "/v0/users/-/collections/" + subjectId, jsonBody, token);
+        let result = bgmRequest("POST", "/v0/users/" + _getUserApiPath() + "/collections/" + subjectId, jsonBody, token);
         let statusCode = result.code;
 
         // 处理结果
@@ -684,7 +698,7 @@ function testSingleUpdate() {
     }
 
     let jsonBody = '{"type":3,"rate":8,"comment":"WPS加载项测试","tags":["动画"]}';
-    let result = bgmRequestSync("POST", "/v0/users/-/collections/" + subjectId, jsonBody, token);
+    let result = bgmRequestSync("POST", "/v0/users/" + _getUserApiPath() + "/collections/" + subjectId, jsonBody, token);
 
     if (result.code === 204 || result.code === 200) {
         alert("测试成功！subject_id: " + subjectId);
