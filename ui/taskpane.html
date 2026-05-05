@@ -1,282 +1,281 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html>
 <head>
     <meta charset="utf-8">
-    <!-- 澶栭儴鏍峰紡 -->
+    <!-- 外部样式 -->
     <link rel="stylesheet" href="../css/styles.css">
 </head>
-<!-- 鏍稿績渚濊禆 -->
+<!-- 核心依赖 -->
 <script type="text/javascript" src="../js/util.js"></script>
 <script type="text/javascript" src="../js/syncRecord.js"></script>
 <script type="text/javascript" src="../js/bangumi.js"></script>
 
-<!-- UI 妯″潡 -->
+<!-- UI 模块 -->
 <script type="text/javascript" src="../js/ui/dialog.js"></script>
 <script type="text/javascript" src="../js/ui/message.js"></script>
 <script type="text/javascript" src="../js/ui/preview.js"></script>
 <script type="text/javascript" src="../js/ui/handlers.js"></script>
 
-<!-- 鍚屾妯″潡 -->
+<!-- 同步模块 -->
 <script type="text/javascript" src="../js/sync/scraping.js"></script>
 
-<!-- 涓婚潰鏉?-->
+<!-- 主页面 -->
 <script type="text/javascript" src="../js/taskpane.js"></script>
 <script type="text/javascript" src="../.debugTemp/wpsjsrpcsdk.js"></script>
 <body>
-    <!-- 鑷畾涔夎緭鍏ュ璇濇 -->
+    <!-- 自定义输入对话框 -->
     <div id="inputDialog" class="modal" style="display:none;">
         <div class="modal-content">
-            <h3 id="dialogTitle">杈撳叆</h3>
+            <h3 id="dialogTitle">输入</h3>
             <p id="dialogMessage" style="margin-bottom:15px;"></p>
             <input type="text" id="dialogInput" class="input" style="width:100%;margin-bottom:15px;">
             <div class="dialog-buttons">
-                <button class="btn" onclick="closeDialog(false)">鍙栨秷</button>
-                <button class="btn primary" onclick="closeDialog(true)">纭畾</button>
+                <button class="btn" onclick="closeDialog(false)">取消</button>
+                <button class="btn primary" onclick="closeDialog(true)">确定</button>
             </div>
         </div>
     </div>
-    <!-- 鑷畾涔夌‘璁ゅ璇濇 -->
+    <!-- 自定义确认对话框 -->
     <div id="confirmDialog" class="modal" style="display:none;">
         <div class="modal-content confirm-modal-content">
-            <h3 id="confirmTitle">纭</h3>
+            <h3 id="confirmTitle">确认</h3>
             <p id="confirmMessage" style="margin-bottom:20px;line-height:1.6;color:#ccc;"></p>
             <div class="dialog-buttons" style="justify-content:center;gap:12px;">
-                <button class="btn confirm-btn confirm-no" id="confirmNoBtn" onclick="closeConfirmDialog(false)">鍙栨秷</button>
-                <button class="btn confirm-btn confirm-yes" id="confirmYesBtn" onclick="closeConfirmDialog(true)">纭畾</button>
+                <button class="btn confirm-btn confirm-no" id="confirmNoBtn" onclick="closeConfirmDialog(false)">取消</button>
+                <button class="btn confirm-btn confirm-yes" id="confirmYesBtn" onclick="closeConfirmDialog(true)">确定</button>
             </div>
         </div>
     </div>
-    <!-- 鑷畾涔夋彁绀哄璇濇 -->
+    <!-- 自定义提示对话框 -->
     <div id="alertDialog" class="modal" style="display:none;">
         <div class="modal-content confirm-modal-content">
             <h3 id="alertTitle" style="margin:0 0 15px 0;color:#fff;font-size:18px;"></h3>
             <p id="alertMessage" style="margin-bottom:20px;line-height:1.6;color:#ccc;white-space:pre-wrap;word-break:break-all;"></p>
             <div class="dialog-buttons" style="justify-content:center;">
-                <button class="btn confirm-btn confirm-yes" onclick="closeAlertDialog()">纭畾</button>
+                <button class="btn confirm-btn confirm-yes" onclick="closeAlertDialog()">确定</button>
             </div>
         </div>
     </div>
 
     <div class="global">
-        <!-- 鏍囬 -->
+        <!-- 标题 -->
         <div class="header">
-            <h2>Bangumi 鍚屾宸ュ叿</h2>
-            <p class="subtitle">灏?Excel 鏁版嵁鎵归噺鍚屾鍒?Bangumi 鏀惰棌</p>
+            <h2>Bangumi 同步工具</h2>
+            <p class="subtitle">将 Excel 数据批量同步到 Bangumi 收藏</p>
         </div>
 
-        <!-- 蹇€熸搷浣?-->
+        <!-- 快捷操作 -->
         <div class="section">
-            <h3>蹇€熸搷浣?/h3>
+            <h3>快捷操作</h3>
             <div class="btn-group">
-                <button class="btn primary" onclick="onAction('sync')">馃殌 鍚屾鍒?Bangumi</button>
-                <button class="btn" onclick="onAction('test')">馃И 娴嬭瘯鍚屾</button>
-                <button class="btn warning" onclick="onAction('clear')">馃棏锔?娓呴櫎鏍囪</button>
+                <button class="btn primary" onclick="onAction('sync')">🔄 同步到 Bangumi</button>
+                <button class="btn" onclick="onAction('test')">🧪 测试同步</button>
+                <button class="btn warning" onclick="onAction('clear')">🗑️ 清除标记</button>
             </div>
             <div class="btn-group" style="margin-top:8px;">
-                <button class="btn success" onclick="syncCollectionFromBgm()">馃摜 浠嶣GM鍚屾鏀惰棌</button>
-                <button class="btn" onclick="onAction('preview')">馃憗锔?棰勮鍚屾</button>
+                <button class="btn success" onclick="syncCollectionFromBgm()">⬇️ 从BGM同步收藏</button>
+                <button class="btn" onclick="onAction('preview')">👁️ 预览同步</button>
             </div>
             <p class="hint" style="margin-top:8px;">
-                馃摜 浠嶣GM鍚屾锛氳幏鍙栦綘鍦˙angumi鐨勬敹钘忓垪琛ㄥ苟鏍囪鍒癉鍒?br>
-                鏀寔锛歝ollect(宸茬湅)銆亀ish(鎯崇湅)銆乨o(鍦ㄧ湅)
+                ⬇️ 从BGM同步：获取你在Bangumi的收藏列表并标记到Excel<br>
+                支持：collect(已看)、wish(想看)、do(在看)
             </p>
         </div>
 
-        <!-- Token 璁剧疆 -->
+        <!-- Token 设置 -->
         <div class="section">
-            <h3>Token 璁剧疆</h3>
+            <h3>Token 设置</h3>
             <div class="token-display">
-                <span id="tokenStatus">鏈缃?/span>
-                <button class="btn small" id="setTokenBtn" onclick="showTokenDialog(window.Application.PluginStorage.getItem('bgm_token'))">璁剧疆/淇敼</button>
-                <button class="btn small primary" id="testTokenBtn" onclick="testTokenValidity()">娴嬭瘯</button>
+                <span id="tokenStatus">未设置</span>
+                <button class="btn small" id="setTokenBtn" onclick="showTokenDialog(window.Application.PluginStorage.getItem('bgm_token'))">设置/修改</button>
+                <button class="btn small primary" id="testTokenBtn" onclick="testTokenValidity()">测试</button>
             </div>
-            <p class="hint">Access Token 鑾峰彇鏂瑰紡锛?a href="https://next.bgm.tv/demo/access-token/create" target="_blank">鐐瑰嚮鍒涘缓</a></p>
+            <p class="hint">Access Token 获取方式：<a href="https://next.bgm.tv/demo/access-token/create" target="_blank">点击创建</a></p>
         </div>
 
-        <!-- 鐢ㄦ埛ID璁剧疆 -->
+        <!-- 用户ID设置 -->
         <div class="section">
-            <h3>鏀惰棌椤佃闂?/h3>
+            <h3>收藏页面访问</h3>
             <div class="token-display">
-                <span id="userIdStatus">鏈缃?/span>
-                <button class="btn small" id="setUserIdBtn" onclick="showUserIdDialog()">璁剧疆鐢ㄦ埛ID</button>
-                <button class="btn small primary" id="openCollectionBtn" onclick="openUserCollection()">鎵撳紑鏀惰棌椤?/button>
+                <span id="userIdStatus">未设置</span>
+                <button class="btn small" id="setUserIdBtn" onclick="showUserIdDialog()">设置用户ID</button>
+                <button class="btn small primary" id="openCollectionBtn" onclick="openUserCollection()">打开收藏页</button>
             </div>
-            <p class="hint">鐢ㄦ埛ID锛欱angumi涓婚〉URL涓殑鏁板瓧/瀛楁瘝</p>
+            <p class="hint">用户ID：Bangumi主页URL中的数字/字母</p>
         </div>
 
-        <!-- 鏀惰棌鍒楄〃绫诲瀷閫夋嫨 -->
+        <!-- 收藏列表类型选择 -->
         <div class="section">
-            <h3>鏀惰棌鍒楄〃绫诲瀷</h3>
+            <h3>收藏列表类型</h3>
             <div class="form-group">
-                <label>鑾峰彇鍝鏀惰棌锛?/label>
+                <label>获取哪种收藏：</label>
                 <select id="listTypeSelect" class="input">
-                    <option value="collect">宸茬湅锛坈ollect锛?/option>
-                    <option value="wish">鎯崇湅锛坵ish锛?/option>
-                    <option value="do">鍦ㄧ湅锛坉o锛?/option>
+                    <option value="collect">已看（Collect）</option>
+                    <option value="wish">想看（Wish）</option>
+                    <option value="do">在看（Do）</option>
                 </select>
             </div>
             <p class="hint">
-                collect - 宸茬湅瀹岀殑鐣墽<br>
-                wish - 鎯崇湅浣嗚繕娌＄湅鐨?br>
-                do - 姝ｅ湪杩界殑鐣墽
+                collect - 已看完的番剧<br>
+                wish - 想看还没看的<br>
+                do - 正在追的番剧
             </p>
         </div>
 
-        <!-- 鏁版嵁閫夋嫨 -->
+        <!-- 数据选择 -->
         <div class="section">
-            <h3>鏁版嵁閫夋嫨</h3>
+            <h3>数据选择</h3>
             <div class="form-group">
-                <label>閫夋嫨妯″紡锛?/label>
+                <label>选择模式：</label>
                 <div class="mode-selector">
                     <label class="radio-label">
                         <input type="radio" name="selectMode" value="auto" checked onchange="onSelectModeChange()">
-                        <span class="radio-text">馃 鑷姩妯″紡</span>
-                        <span class="radio-desc">鑷姩璇嗗埆绛涢€夊悗鐨勫彲瑙佹暟鎹?/span>
+                        <span class="radio-text">🤖 自动模式</span>
+                        <span class="radio-desc">自动识别筛选后的可见数据</span>
                     </label>
                     <label class="radio-label">
                         <input type="radio" name="selectMode" value="manual" onchange="onSelectModeChange()">
-                        <span class="radio-text">馃幆 鎵嬪姩閫夋嫨</span>
-                        <span class="radio-desc">鎵嬪姩鎸囧畾璧峰鍜岀粨鏉熻鍙?/span>
+                        <span class="radio-text">✋ 手动选择</span>
+                        <span class="radio-desc">手动指定起始和结束行号</span>
                     </label>
                 </div>
             </div>
             <div class="form-group">
-                <label>閫夋嫨宸ヤ綔琛細</label>
+                <label>选择工作表：</label>
                 <div class="sheet-select-row">
                     <select id="sheetSelect" class="input" style="flex:1;">
-                        <option value="">-- 璇烽€夋嫨 --</option>
+                        <option value="">-- 请选择 --</option>
                     </select>
-                    <button class="btn small" onclick="refreshSheets()">馃攧 鍒锋柊</button>
-                    <button class="btn small" id="lockSheetBtn" onclick="toggleSheetLock()">馃敀 閿佸畾</button>
+                    <button class="btn small" onclick="refreshSheets()">🔄 刷新</button>
+                    <button class="btn small" id="lockSheetBtn" onclick="toggleSheetLock()">🔒 锁定</button>
                     <span id="lockStatus" class="lock-status" style="display:none;"></span>
                 </div>
             </div>
             <div id="manualRangeInputs" style="display:none;">
                 <div class="form-group">
-                    <label>璧峰琛屽彿锛?/label>
-                    <input type="number" id="startRow" class="input" value="2" min="2" placeholder="浠庣鍑犺寮€濮?>
+                    <label>起始行号：</label>
+                    <input type="number" id="startRow" class="input" value="2" min="2" placeholder="从第几行开始">
                 </div>
                 <div class="form-group">
-                    <label>缁撴潫琛屽彿锛?/label>
-                    <input type="number" id="endRow" class="input" value="0" min="0" placeholder="0=鍒版渶鍚庝竴琛?>
+                    <label>结束行号：</label>
+                    <input type="number" id="endRow" class="input" value="0" min="0" placeholder="0=到最后一行">
                 </div>
             </div>
             <div id="autoRangeInfo" class="range-info">
-                <span class="info-icon">鈩癸笍</span>
-                <span id="filterStatus">姝ｅ湪妫€娴嬬瓫閫夌姸鎬?..</span>
+                <span class="info-icon">ℹ️</span>
+                <span id="filterStatus">正在检测筛选状态...</span>
             </div>
-            <button class="btn" onclick="refreshData()">馃攧 鍒锋柊鏁版嵁</button>
+            <button class="btn" onclick="refreshData()">🔄 刷新数据</button>
         </div>
 
-        <!-- 璇︾粏棰勮妯℃€佹 -->
-    <div id="detailModal" class="detail-modal" style="display:none;">
-        <div class="detail-modal-content">
-            <div class="detail-modal-header">
-                <h3>馃搵 璇︾粏棰勮</h3>
-                <button class="detail-close-btn" onclick="closeDetailModal()">脳</button>
-            </div>
-            <div class="detail-modal-toolbar" id="detailModalToolbar"></div>
-            <div class="detail-modal-body" id="detailModalBody"></div>
-        </div>
-    </div>
-
-    <!-- 鏁版嵁棰勮 -->
-    <div class="section">
-        <h3>鏁版嵁棰勮 <span id="previewCount"></span></h3>
-        <div class="preview-wrapper">
-            <div class="preview-box" id="previewBox">
-                <p class="hint">鐐瑰嚮"鍒锋柊鏁版嵁"鍔犺浇棰勮锛堟敮鎸佺瓫閫夊悗鏁版嵁锛?/p>
+        <!-- 详细预览模态框 -->
+        <div id="detailModal" class="detail-modal" style="display:none;">
+            <div class="detail-modal-content">
+                <div class="detail-modal-header">
+                    <h3>📋 详细预览</h3>
+                    <button class="detail-close-btn" onclick="closeDetailModal()">×</button>
+                </div>
+                <div class="detail-modal-toolbar" id="detailModalToolbar"></div>
+                <div class="detail-modal-body" id="detailModalBody"></div>
             </div>
         </div>
-        <button class="btn" id="previewBtn" onclick="previewSyncContent()">
-            <span class="btn-icon">馃攳</span> 璇︾粏棰勮鍚屾鍐呭
-        </button>
-        <button class="btn" id="syncCollectionBtn" onclick="syncCollectionFromBgm()">
-            <span class="btn-icon">鈽侊笍</span> 浠嶣GM鍚屾鏀惰棌鏍囪
-        </button>
-    </div>
 
-        <!-- 鍚屾璁板綍 -->
+        <!-- 数据预览 -->
         <div class="section">
-            <h3>馃搵 鍚屾璁板綍</h3>
+            <h3>数据预览 <span id="previewCount"></span></h3>
+            <div class="preview-wrapper">
+                <div class="preview-box" id="previewBox">
+                    <p class="hint">点击"刷新数据"加载预览（支持筛选后数据）</p>
+                </div>
+            </div>
+            <button class="btn" id="previewBtn" onclick="previewSyncContent()">
+                <span class="btn-icon">🔍</span> 详细预览同步内容
+            </button>
+            <button class="btn" id="syncCollectionBtn" onclick="syncCollectionFromBgm()">
+                <span class="btn-icon">⬇️</span> 从BGM同步收藏标记
+            </button>
+        </div>
+
+        <!-- 同步记录 -->
+        <div class="section">
+            <h3>📊 同步记录</h3>
             <div class="btn-group">
                 <button class="btn" id="viewRecordsBtn" onclick="openSyncRecordSheet()">
-                    <span class="btn-icon">馃搵</span> 鏌ョ湅鍚屾璁板綍
+                    <span class="btn-icon">📋</span> 查看同步记录
                 </button>
                 <button class="btn success" id="fetchBgRecordsBtn" onclick="fetchBgCollectionRecords()">
-                    <span class="btn-icon">鈽侊笍</span> 浠嶣GM鍚屾鏀惰棌璁板綍
+                    <span class="btn-icon">⬇️</span> 从BGM同步收藏记录
                 </button>
                 <button class="btn warning" id="clearRecordsBtn" onclick="clearSyncRecords()">
-                    <span class="btn-icon">馃棏锔?/span> 娓呴櫎鍚屾璁板綍
+                    <span class="btn-icon">🗑️</span> 清除同步记录
                 </button>
             </div>
             <div class="btn-group" style="margin-top:8px;">
-                <button class="btn" id="markAnimeBtn" onclick="markUploadedItems('鍔ㄧ敾')">
-                    <span class="btn-icon">馃幀</span> 鏍囪鍔ㄧ敾锛堝墽闆嗭級
+                <button class="btn" id="markAnimeBtn" onclick="markUploadedItems('动画')">
+                    <span class="btn-icon">📺</span> 标记动画（番剧）
                 </button>
-                <button class="btn" id="markBookBtn" onclick="markUploadedItems('涔︾睄')">
-                    <span class="btn-icon">馃摎</span> 鏍囪涔︾睄锛堝皬璇达級
+                <button class="btn" id="markBookBtn" onclick="markUploadedItems('书籍')">
+                    <span class="btn-icon">📚</span> 标记书籍（小说）
                 </button>
                 <button class="btn warning" id="clearMarkBtn" onclick="clearSheetMarks()">
-                    <span class="btn-icon">鉂?/span> 娓呴櫎D鍒楁爣璁?                </button>
+                    <span class="btn-icon">❌</span> 清除D列标记
+                </button>
             </div>
-            <p class="hint">鍚屾璁板綍浼氫繚瀛樺湪"鍚屾璁板綍"宸ヤ綔琛ㄤ腑锛屽寘鍚細鍚嶇О銆乁RL銆丼ID銆佺被鍨嬨€佸悓姝ユ椂闂寸瓑</p>
+            <p class="hint">同步记录会保存在"同步记录"工作表中，包含：名称、URL、SID、类型、同步时间等</p>
         </div>
 
-        <!-- 浣跨敤寮曞 -->
+        <!-- 使用引导 -->
         <div class="section">
-            <h3>馃摉 浣跨敤寮曞</h3>
+            <h3>📖 使用引导</h3>
             <div class="guide">
                 <div class="step">
                     <span class="step-num">1</span>
-                    <span>璁剧疆 Token锛堝彧闇€璁剧疆涓€娆★級</span>
+                    <span>设置 Token（只需设置一次）</span>
                 </div>
                 <div class="step">
                     <span class="step-num">2</span>
-                    <span>纭繚 Excel 鍖呭惈蹇呭～鍒?/span>
+                    <span>确保 Excel 包含必填列</span>
                 </div>
                 <div class="step">
                     <span class="step-num">3</span>
-                    <span>閫夋嫨宸ヤ綔琛ㄥ拰琛岃寖鍥?/span>
+                    <span>选择工作表和行范围</span>
                 </div>
                 <div class="step">
                     <span class="step-num">4</span>
-                    <span>鐐瑰嚮"鍚屾鍒?Bangumi"</span>
+                    <span>点击"同步到 Bangumi"</span>
                 </div>
             </div>
         </div>
 
-        <!-- 鏁版嵁鏍煎紡瑕佹眰 -->
+        <!-- 数据格式要求 -->
         <div class="section">
-            <h3>馃搵 鏁版嵁鏍煎紡瑕佹眰</h3>
+            <h3>📋 数据格式要求</h3>
             <div class="format-table">
                 <table>
-                    <tr><th>鍒楀悕锛堟敮鎸佹ā绯婂尮閰嶏級</th><th>璇存槑</th><th>蹇呭～</th></tr>
-                    <tr><td>Bangumi_URL / bgm</td><td>Bangumi 鏉＄洰閾炬帴</td><td class="required">鉁?蹇呭～</td></tr>
-                    <tr><td>鏄惁鐪嬪畬 / 瑙傜湅鐘舵€?/td><td>鏄?鍚?鍦ㄨ拷</td><td></td></tr>
-                    <tr><td>瀹屾挱鏃?/ 鐪嬪畬鏃堕棿</td><td>濡?2024-01-01</td><td></td></tr>
-                    <tr><td>鎵撳垎 / 璇勫垎</td><td>1-10 鍒?/td><td></td></tr>
-                    <tr><td>鎰熻█ / 璇勪环 / 鍓ч€?/td><td>涓汉璇勮</td><td></td></tr>
-                    <tr><td>鏍囩 / 鍒嗙骇</td><td>鐢?| 銆?/ 鍒嗛殧</td><td></td></tr>
-                    <tr><td>鐗圭偣 / 鍗拌薄</td><td>鐢?| 銆?/ 鍒嗛殧</td><td></td></tr>
-                    <tr><td>闆嗗彿 / 鐪嬪埌</td><td>濡?1-12</td><td></td></tr>
+                    <tr><th>列名（支持模糊匹配）</th><th>说明</th><th>必填</th></tr>
+                    <tr><td>Bangumi_URL / bgm</td><td>Bangumi 条目链接</td><td class="required">✅ 必填</td></tr>
+                    <tr><td>是否看完 / 观看状态</td><td>是/否/在看</td><td></td></tr>
+                    <tr><td>完播时间 / 看完时间</td><td>如 2024-01-01</td><td></td></tr>
+                    <tr><td>打分 / 评分</td><td>1-10 分</td><td></td></tr>
+                    <tr><td>感想 / 评价 / 简评</td><td>个人评论</td><td></td></tr>
+                    <tr><td>标签 / 分类</td><td>用 | 、/ 分隔</td><td></td></tr>
+                    <tr><td>特典 / 印象</td><td>用 | 、/ 分隔</td><td></td></tr>
+                    <tr><td>集数 / 看到</td><td>如 1-12</td><td></td></tr>
                 </table>
             </div>
         </div>
 
-        <!-- 璋冭瘯閫氱煡 -->
+        <!-- 调试通知 -->
         <div class="section debug-section" id="debugSection" style="display:none;">
-            <h3>馃敡 璋冭瘯淇℃伅</h3>
+            <h3>🐛 调试信息</h3>
             <div id="DemoSpan" class="debug-content"></div>
-            <button class="btn small" onclick="testDebugConnection()">娴嬭瘯杩炴帴</button>
+            <button class="btn small" onclick="testDebugConnection()">测试连接</button>
         </div>
 
-        <!-- 鐘舵€?-->
+        <!-- 状态 -->
         <div class="section">
-            <div class="status" id="statusBox">宸插氨缁?/div>
+            <div class="status" id="statusBox">就绪</div>
         </div>
     </div>
 </body>
-
-
 </html>
