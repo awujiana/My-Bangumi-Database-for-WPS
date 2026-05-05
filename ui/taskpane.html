@@ -158,12 +158,14 @@
             </div>
             <div class="form-group">
                 <label>选择工作表：</label>
-                <select id="sheetSelect" class="input">
-                    <option value="">-- 请选择 --</option>
-                </select>
-                <button class="btn small" onclick="refreshSheets()">🔄 刷新</button>
-                <button class="btn small" id="lockSheetBtn" onclick="toggleSheetLock()">🔒 锁定</button>
-                <span id="lockStatus" class="lock-status" style="display:none;"></span>
+                <div class="sheet-select-row">
+                    <select id="sheetSelect" class="input" style="flex:1;">
+                        <option value="">-- 请选择 --</option>
+                    </select>
+                    <button class="btn small" onclick="refreshSheets()">🔄 刷新</button>
+                    <button class="btn small" id="lockSheetBtn" onclick="toggleSheetLock()">🔒 锁定</button>
+                    <span id="lockStatus" class="lock-status" style="display:none;"></span>
+                </div>
             </div>
             <div id="manualRangeInputs" style="display:none;">
                 <div class="form-group">
@@ -288,7 +290,7 @@
 
         <!-- 状态 -->
         <div class="section">
-            <div class="status" id="statusBox">就绪</div>
+            <div class="status" id="statusBox">已就绪</div>
         </div>
     </div>
 </body>
@@ -429,6 +431,14 @@
         font-weight: 500;
         font-size: 13px;
     }
+    .sheet-select-row {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+    .sheet-select-row select {
+        min-width: 0;
+    }
     .input {
         width: 100%;
         padding: 10px 14px;
@@ -456,6 +466,8 @@
         padding: 3px;
         margin-bottom: 12px;
         border: 1px solid #444;
+        max-width: 100%;
+        overflow-x: auto;
     }
     .preview-box {
         background: #2a2a2a;
@@ -463,7 +475,7 @@
         padding: 0;
         max-height: 280px;
         overflow-y: auto;
-        overflow-x: auto;
+        overflow-x: visible;
     }
     .preview-box::-webkit-scrollbar {
         width: 6px;
@@ -560,9 +572,6 @@
     }
     .preview-box .tags-cell {
         font-size: 11px;
-        max-width: 110px;
-        overflow: hidden;
-        text-overflow: ellipsis;
         white-space: nowrap;
         color: #7f8c8d;
     }
