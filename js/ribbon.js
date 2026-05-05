@@ -70,7 +70,16 @@ function GetImage(control) {
 }
 
 function GetBangumiImage(control) {
-    return "images/newFromTemp.svg"
+    const id = control.Id
+    switch (id) {
+        case "btnShowPanel":     return "images/panel.svg"
+        case "btnSyncBangumi":   return "images/sync.svg"
+        case "btnSetToken":      return "images/key.svg"
+        case "btnSetUserId":     return "images/user.svg"
+        case "btnOpenCollection": return "images/link.svg"
+        case "btnClearColors":   return "images/delete.svg"
+        default:                return "images/newFromTemp.svg"
+    }
 }
 
 

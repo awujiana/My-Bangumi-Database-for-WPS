@@ -1,5 +1,8 @@
 
 
+
+
+
 //这个函数在整个wps加载项中是第一个执行的
 function OnAddinLoad(ribbonUI){
     if (typeof (window.Application.ribbonUI) != "object"){
@@ -19,31 +22,34 @@ var WebNotifycount = 0;
 function OnAction(control) {
     console.log("OnAction called with:", control.Id);
     const eleId = control.Id
-    switch (eleId) {
-        // ========== Bangumi 同步相关 ==========
-        case "btnShowPanel":
-            showBangumiPanel();
-            break;
-        case "btnSyncBangumi":
-            SyncToBangumi();
-            break;
-        case "btnSetToken":
-            showTokenDialog(window.Application.PluginStorage.getItem("bgm_token"));
-            break;
-        case "btnSetUserId":
-            showUserIdDialog();
-            break;
-        case "btnOpenCollection":
-            openUserCollection();
-            break;
-        case "btnClearColors":
-            clearRowColors();
-            break;
-        case "btnOpenDebug":
-            openDebugConsole();
-            break;
-        default:
-            break
+    try {
+        switch (eleId) {
+            // ========== Bangumi 同步相关 ==========
+            case "btnShowPanel":
+                showBangumiPanel();
+                break;
+            case "btnSyncBangumi":
+                SyncToBangumi();
+                break;
+            case "btnSetToken":
+                showTokenDialog(loadBgToken());
+                break;
+            case "btnSetUserId":
+                showUserIdDialog();
+                break;
+            case "btnOpenCollection":
+                openUserCollection();
+                break;
+            case "btnClearColors":
+                clearRowColors();
+                break;
+
+            default:
+                break
+        }
+    } catch (e) {
+        console.error("OnAction error:", e);
+        alert("执行出错: " + e.message);
     }
     return true
 }
@@ -64,18 +70,24 @@ function GetImage(control) {
 }
 
 function GetBangumiImage(control) {
-    return "images/newFromTemp.svg"
-}
-
-// ========== 打开调试控制台 ==========
-function openDebugConsole() {
-    let debugUrl = "http://localhost:3889/";
-    try {
-        window.Application.OAAssist.ShellExecute(debugUrl);
-    } catch (e) {
-        window.open(debugUrl, "_blank");
+    const id = control.Id
+    switch (id) {
+        case "btnShowPanel":     return "images/panel.svg"
+        case "btnSyncBangumi":   return "images/sync.svg"
+        case "btnSetToken":      return "images/key.svg"
+        case "btnSetUserId":     return "images/user.svg"
+        case "btnOpenCollection": return "images/link.svg"
+        case "btnClearColors":   return "images/delete.svg"
+        default:                return "images/newFromTemp.svg"
     }
 }
+
+
+
+
+
+
+
 
 
 
