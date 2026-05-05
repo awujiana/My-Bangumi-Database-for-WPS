@@ -1,16 +1,17 @@
 /**
- * UI äº‹ä»¶å¤„ç†æ¨¡å—
+ * UI ÊÂ¼þ´¦ÀíÄ£¿é
  * @module ui/handlers
- * @description é¢æ¿æ“ä½œå¤„ç†ã€æŒ‰é’®ç»‘å®šã€äº‹ä»¶å¤„ç? */
+ * @description Ãæ°å²Ù×÷´¦Àí¡¢°´Å¥°ó¶¨¡¢ÊÂ¼þ´¦Àí
+ */
 
 import { bgmLog, BGM, LOG_LEVELS, loadBgToken, _getBgmUserId } from '../util.js';
 import { showAlertDialog, showTokenDialog, showUserIdDialog } from './dialog.js';
 import { setSyncRunning, setStatus } from './message.js';
 import { handleError } from '../core/unified.js';
 
-// ========== é¢æ¿æ“ä½œå¤„ç† ==========
+// ========== Ãæ°å²Ù×÷´¦Àí ==========
 /**
- * å¤„ç†é¢æ¿æ“ä½œ
+ * ´¦ÀíÃæ°å²Ù×÷
  */
 export function onAction(action) {
     switch (action) {
@@ -24,7 +25,7 @@ export function onAction(action) {
             break;
         case "clear":
             if (typeof showConfirmDialog === 'function') {
-                showConfirmDialog("ç¡®å®šè¦æ¸…é™¤æ‰€æœ‰æ ‡è®°å—ï¼?, () => {
+                showConfirmDialog("È·¶¨ÒªÇå³ýËùÓÐ±ê¼ÇÂð£¿", () => {
                     if (typeof clearRowColors === 'function') {
                         clearRowColors();
                     }
@@ -51,7 +52,7 @@ export function onAction(action) {
             break;
         case "showClearConfirm":
             if (typeof showConfirmDialog === 'function') {
-                showConfirmDialog("ç¡®å®šè¦æ¸…é™¤æ‰€æœ‰æ ‡è®°å—ï¼?, () => {
+                showConfirmDialog("È·¶¨ÒªÇå³ýËùÓÐ±ê¼ÇÂð£¿", () => {
                     if (typeof clearRowColors === 'function') {
                         clearRowColors();
                     }
@@ -74,23 +75,24 @@ export function onAction(action) {
     }
 }
 
-// ========== ä»Žé¢æ¿åŒæ­?==========
+// ========== ´ÓÃæ°åÍ¬²½ ==========
 /**
- * ä»Žé¢æ¿æ‰§è¡ŒåŒæ­? */
+ * ´ÓÃæ°åÖ´ÐÐÍ¬²½
+ */
 export function syncFromPanel() {
-    bgmLog(LOG_LEVELS.INFO, "syncFromPanel å¼€å§‹æ‰§è¡?);
+    bgmLog(LOG_LEVELS.INFO, "syncFromPanel ¿ªÊ¼Ö´ÐÐ");
     
     if (typeof findHeaderRow === 'undefined' || typeof getColumnMap === 'undefined' || typeof getLastRow === 'undefined') {
-        bgmLog(LOG_LEVELS.ERROR, "syncFromPanel - å¿…éœ€å‡½æ•°æœªåŠ è½?);
-        showAlertDialog("æç¤º", "æ­£åœ¨åŠ è½½è„šæœ¬ï¼Œè¯·ç¨åŽé‡è¯•...");
+        bgmLog(LOG_LEVELS.ERROR, "syncFromPanel - ±ØÐèº¯ÊýÎ´¼ÓÔØ");
+        showAlertDialog("ÌáÊ¾", "ÕýÔÚ¼ÓÔØ½Å±¾£¬ÇëÉÔºóÖØÊÔ...");
         return;
     }
     
-    bgmLog(LOG_LEVELS.INFO, "syncFromPanel - å¿…éœ€å‡½æ•°å·²åŠ è½½ï¼Œå¼€å§‹åŒæ­?..");
+    bgmLog(LOG_LEVELS.INFO, "syncFromPanel - ±ØÐèº¯ÊýÒÑ¼ÓÔØ£¬¿ªÊ¼Í¬²½...");
 
     let token = loadBgToken();
     if (!token) {
-        showAlertDialog("æç¤º", "è¯·å…ˆè®¾ç½® Bangumi Tokenï¼?);
+        showAlertDialog("ÌáÊ¾", "ÇëÏÈÉèÖÃ Bangumi Token£¡");
         showTokenDialog("");
         return;
     }
@@ -101,7 +103,7 @@ export function syncFromPanel() {
             try {
                 syncSheet.Activate();
             } catch (e) {
-                bgmLog(LOG_LEVELS.WARN, "æ— æ³•æ¿€æ´»åŒæ­¥è®°å½•è¡¨: " + e.message);
+                bgmLog(LOG_LEVELS.WARN, "ÎÞ·¨¼¤»îÍ¬²½¼ÇÂ¼±í: " + e.message);
             }
         }
     }
@@ -110,14 +112,14 @@ export function syncFromPanel() {
         try {
             SyncToBangumi();
         } catch (e) {
-            bgmLog(LOG_LEVELS.ERROR, "SyncToBangumi å‡ºé”™: " + e.message);
-            showAlertDialog("æ‰§è¡Œå‡ºé”™", e.message);
+            bgmLog(LOG_LEVELS.ERROR, "SyncToBangumi ³ö´í: " + e.message);
+            showAlertDialog("Ö´ÐÐ³ö´í", e.message);
         }
     }
 }
 
 /**
- * æµ‹è¯•å•ä¸ªæ¡ç›®æ›´æ–°
+ * ²âÊÔµ¥¸öÌõÄ¿¸üÐÂ
  */
 export function testSingleUpdateFromPanel() {
     if (typeof findHeaderRow === 'undefined') {
@@ -127,7 +129,7 @@ export function testSingleUpdateFromPanel() {
     
     let token = loadBgToken();
     if (!token) {
-        showAlertDialog("æç¤º", "è¯·å…ˆè®¾ç½® Bangumi Tokenï¼?);
+        showAlertDialog("ÌáÊ¾", "ÇëÏÈÉèÖÃ Bangumi Token£¡");
         return;
     }
     
@@ -136,20 +138,20 @@ export function testSingleUpdateFromPanel() {
     }
 }
 
-// ========== ä»ŽBGMåŒæ­¥æ”¶è—æ ‡è®° ==========
+// ========== ´ÓBGMÍ¬²½ÊÕ²Ø±ê¼Ç ==========
 /**
- * ä»ŽBGMåŒæ­¥æ”¶è—æ ‡è®°
+ * ´ÓBGMÍ¬²½ÊÕ²Ø±ê¼Ç
  */
 export function syncCollectionFromBgm() {
     try {
         let select = document.getElementById("sheetSelect");
         let sheetIndex = BGM.sheet.lockedIndex || parseInt(select?.value) || 1;
         
-        bgmLog(LOG_LEVELS.INFO, "å¼€å§‹ä»ŽBGMåŒæ­¥æ”¶è—æ ‡è®°ï¼Œå·¥ä½œè¡¨ç´¢å¼•: " + sheetIndex);
+        bgmLog(LOG_LEVELS.INFO, "¿ªÊ¼´ÓBGMÍ¬²½ÊÕ²Ø±ê¼Ç£¬¹¤×÷±íË÷Òý: " + sheetIndex);
 
         let token = loadBgToken();
         if (!token) {
-            showAlertDialog("æç¤º", "è¯·å…ˆè®¾ç½® Bangumi Tokenï¼?);
+            showAlertDialog("ÌáÊ¾", "ÇëÏÈÉèÖÃ Bangumi Token£¡");
             return;
         }
 
@@ -160,26 +162,26 @@ export function syncCollectionFromBgm() {
 }
 
 /**
- * é€šè¿‡ API æ–¹å¼åŒæ­¥æ”¶è—
+ * Í¨¹ý API ·½Ê½Í¬²½ÊÕ²Ø
  */
 export function syncFromBgmByAPI(sheetIndex) {
-    bgmLog(LOG_LEVELS.INFO, "syncFromBgmByAPI å¼€å§?);
+    bgmLog(LOG_LEVELS.INFO, "syncFromBgmByAPI ¿ªÊ¼");
 
     let token = loadBgToken();
     if (!token) {
-        showAlertDialog("æç¤º", "è¯·å…ˆè®¾ç½® Tokenï¼?);
+        showAlertDialog("ÌáÊ¾", "ÇëÏÈÉèÖÃ Token£¡");
         return;
     }
 
     let userId = _getBgmUserId();
     if (!userId) {
-        showAlertDialog("æç¤º", "è¯·å…ˆè®¾ç½®ç”¨æˆ·IDï¼?);
+        showAlertDialog("ÌáÊ¾", "ÇëÏÈÉèÖÃÓÃ»§ID£¡");
         showUserIdDialog();
         return;
     }
 
     setSyncRunning(true);
-    setStatus("æ­£åœ¨èŽ·å–æ”¶è—åˆ—è¡¨...", "info");
+    setStatus("ÕýÔÚ»ñÈ¡ÊÕ²ØÁÐ±í...", "info");
 
     if (typeof fetchAllUserCollections === 'function') {
         fetchAllUserCollections(token, userId, (collections) => {
@@ -189,36 +191,109 @@ export function syncFromBgmByAPI(sheetIndex) {
                 }
                 markUploadedItems(sheetIndex, collections);
             } else {
-                showAlertDialog("æç¤º", "æœªèŽ·å–åˆ°æ”¶è—æ•°æ®ï¼Œè¯·æ£€æŸ?Token å’Œç”¨æˆ·IDï¼?);
+                showAlertDialog("ÌáÊ¾", "Î´»ñÈ¡µ½ÊÕ²ØÊý¾Ý£¬Çë¼ì²é Token ºÍÓÃ»§ID£¡");
             }
             setSyncRunning(false);
-            setStatus("åŒæ­¥å®Œæˆ", "success");
+            setStatus("Í¬²½Íê³É", "success");
         }, (error) => {
-            showAlertDialog("èŽ·å–æ”¶è—å¤±è´¥", error);
+            showAlertDialog("»ñÈ¡ÊÕ²ØÊ§°Ü", error);
             setSyncRunning(false);
-            setStatus("åŒæ­¥å¤±è´¥", "error");
+            setStatus("Í¬²½Ê§°Ü", "error");
         });
     }
 }
 
 /**
- * æ ‡è®°å·²ä¸Šä¼ çš„æ¡ç›®åˆ°å·¥ä½œè¡¨
+ * ±ê¼ÇÒÑÉÏ´«ÌõÄ¿µ½¹¤×÷±í
+ * Ö§³ÖÁ½ÖÖµ÷ÓÃ·½Ê½£º
+ *   markUploadedItems(sheetIndex, collections) - Ö±½Ó´«Ë÷ÒýºÍÊý¾Ý
+ *   markUploadedItems(sheetName) - ´«¹¤×÷±íÃû³Æ£¬×Ô¶¯»ñÈ¡ÊÕ²ØÊý¾Ýºó±ê¼Ç
  */
-export function markUploadedItems(sheetIndex, collections) {
+export function markUploadedItems(sheetIndexOrName, collections) {
+    // Èç¹ûÖ»´«ÁËÒ»¸ö×Ö·û´®²ÎÊý£¬ÊÓÎª¹¤×÷±íÃû³Æ
+    if (typeof sheetIndexOrName === 'string' && collections === undefined) {
+        let sheetName = sheetIndexOrName;
+        let token = loadBgToken();
+        if (!token) {
+            if (typeof showAlertDialog === 'function') {
+                showAlertDialog("ÌáÊ¾", "ÇëÏÈÉèÖÃ Token£¡");
+            }
+            return;
+        }
+        let userId = _getBgmUserId();
+        if (!userId) {
+            if (typeof showAlertDialog === 'function') {
+                showAlertDialog("ÌáÊ¾", "ÇëÏÈÉèÖÃÓÃ»§ID£¡");
+            }
+            return;
+        }
+        // ²éÕÒ¹¤×÷±íË÷Òý
+        let getApp = (typeof window.getApp === 'function') ? window.getApp : null;
+        let app = getApp ? getApp() : null;
+        let targetIndex = null;
+        if (app && app.ActiveWorkbook) {
+            let sheets = app.ActiveWorkbook.Worksheets;
+            for (let i = 1; i <= sheets.Count; i++) {
+                if (sheets.Item(i).Name === sheetName) {
+                    targetIndex = i;
+                    break;
+                }
+            }
+        }
+        if (targetIndex === null) {
+            if (typeof showAlertDialog === 'function') {
+                showAlertDialog("ÌáÊ¾", 'Î´ÕÒµ½¹¤×÷±í: ' + sheetName);
+            }
+            return;
+        }
+        // »ñÈ¡ÊÕ²ØÊý¾Ýºó±ê¼Ç
+        if (typeof fetchAllUserCollections === 'function') {
+            fetchAllUserCollections(token, userId, (cols) => {
+                if (cols && cols.length > 0) {
+                    if (typeof markUploadedItemsInSheet === 'function') {
+                        markUploadedItemsInSheet(targetIndex, cols);
+                        if (typeof showToast === 'function') {
+                            showToast('ÒÑ±ê¼Ç ' + cols.length + ' ÌõÊÕ²Øµ½ ' + sheetName, 'success');
+                        }
+                    }
+                }
+            });
+        }
+        return;
+    }
+    // Õý³£µ÷ÓÃ£ºsheetIndex, collections
     if (typeof markUploadedItemsInSheet === 'function') {
-        markUploadedItemsInSheet(sheetIndex, collections);
+        markUploadedItemsInSheet(sheetIndexOrName, collections);
     }
 }
 
 /**
- * æ¸…é™¤å·¥ä½œè¡¨æ ‡è®? */
-export function clearSheetMarks(sheetIndex) {
-    if (typeof clearSheetMarksInSheet === 'function') {
-        clearSheetMarksInSheet(sheetIndex);
+ * Çå³ý¹¤×÷±í±ê¼Ç
+ * Ö§³Ö°´Ãû³Æ»ò°´Ë÷ÒýÇå³ý
+ */
+export function clearSheetMarks(sheetIndexOrName) {
+    if (typeof clearSheetMarksInSheet !== 'function') return;
+
+    // Èç¹û´«µÄÊÇ×Ö·û´®£¬°´Ãû³Æ²éÕÒ¹¤×÷±íË÷Òý
+    if (typeof sheetIndexOrName === 'string') {
+        let getApp = (typeof window.getApp === 'function') ? window.getApp : null;
+        let app = getApp ? getApp() : null;
+        if (app && app.ActiveWorkbook) {
+            let sheets = app.ActiveWorkbook.Worksheets;
+            for (let i = 1; i <= sheets.Count; i++) {
+                if (sheets.Item(i).Name === sheetIndexOrName) {
+                    clearSheetMarksInSheet(i);
+                    return;
+                }
+            }
+        }
+        return;
     }
+    // Êý×ÖË÷Òý£¬Ö±½Óµ÷ÓÃ
+    clearSheetMarksInSheet(sheetIndexOrName);
 }
 
-// ========== å‘åŽå…¼å®¹ï¼ˆæŒ‚è½½åˆ° windowï¼?=========
+// ========== Ïòºó¼æÈÝ£¨¹ÒÔØµ½ window£©==========
 window.onAction = onAction;
 window.syncFromPanel = syncFromPanel;
 window.syncCollectionFromBgm = syncCollectionFromBgm;
@@ -226,15 +301,16 @@ window.syncFromBgmByAPI = syncFromBgmByAPI;
 window.markUploadedItems = markUploadedItems;
 window.clearSheetMarks = clearSheetMarks;
 window.testSingleUpdateFromPanel = testSingleUpdateFromPanel;
-window.testTokenValidity = testTokenValidity;
 
-// ========== äº‹ä»¶ç›‘å¬å™¨ï¼ˆæ›¿ä»£å†…è” onclickï¼?=========
+// ========== ÊÂ¼þ¼àÌýÆ÷£¨Ìæ´úÄÚÁª onclick£©==========
 function setupButtonListeners() {
-    // æŸ¥æ‰¾æ‰€æœ‰å¸¦ data-action å±žæ€§çš„æŒ‰é’®
+    // ²éÕÒËùÓÐ´ø data-action ÊôÐÔµÄ°´Å¥
     const buttons = document.querySelectorAll('[data-action]');
     buttons.forEach(button => {
-        // ç§»é™¤æ—§çš„äº‹ä»¶ç›‘å¬å™¨ï¼ˆé˜²æ­¢é‡å¤ç»‘å®šï¼?        button.removeEventListener('click', handleActionClick);
-        // æ·»åŠ æ–°çš„äº‹ä»¶ç›‘å¬å™?        button.addEventListener('click', handleActionClick);
+        // ÒÆ³ý¾ÉµÄÊÂ¼þ¼àÌýÆ÷£¨·ÀÖ¹ÖØ¸´°ó¶¨£©
+        button.removeEventListener('click', handleActionClick);
+        // Ìí¼ÓÐÂµÄÊÂ¼þ¼àÌýÆ÷
+        button.addEventListener('click', handleActionClick);
     });
 }
 
@@ -277,7 +353,7 @@ function handleActionClick(event) {
             break;
         case 'clear':
             if (typeof showConfirmDialog === 'function') {
-                showConfirmDialog("ç¡®å®šè¦æ¸…é™¤æ‰€æœ‰æ ‡è®°å—ï¼?, () => {
+                showConfirmDialog("È·¶¨ÒªÇå³ýËùÓÐ±ê¼ÇÂð£¿", () => {
                     if (typeof clearRowColors === 'function') {
                         clearRowColors();
                     }
@@ -294,7 +370,7 @@ function handleActionClick(event) {
     }
 }
 
-// ç­‰å¾… DOM åŠ è½½å®ŒæˆåŽè®¾ç½®äº‹ä»¶ç›‘å¬å™¨
+// µÈ´ý DOM ¼ÓÔØÍê³ÉºóÉèÖÃÊÂ¼þ¼àÌýÆ÷
 function initEventListeners() {
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', () => {
@@ -305,4 +381,5 @@ function initEventListeners() {
     }
 }
 
-// åˆå§‹åŒ?initEventListeners();
+// ³õÊ¼»¯
+initEventListeners();

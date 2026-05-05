@@ -53,7 +53,7 @@ export function initMessageListener() {
  * 设置状态显示
  */
 export function setStatus(message, type) {
-    let statusEl = document.getElementById("statusDisplay");
+    let statusEl = document.getElementById("statusBox") || document.getElementById("statusDisplay");
     if (!statusEl) return;
 
     statusEl.textContent = message;

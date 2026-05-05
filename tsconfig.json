@@ -1,10 +1,10 @@
 {
   "compilerOptions": {
-    /* 项目配置 */
-    "target": "ES2020",
+    /* ???? */
+    "target": "ES2024",
     "module": "ESNext",
     "moduleResolution": "bundler",
-    "lib": ["ES2020", "DOM", "DOM.Iterable"],
+    "lib": ["ES2024", "DOM", "DOM.Iterable"],
     "strict": true,
     "noImplicitAny": true,
     "strictNullChecks": true,
@@ -17,18 +17,18 @@
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
     
-    /* 输出配置 */
+    /* ???? */
     "declaration": true,
     "declarationMap": true,
     "sourceMap": true,
     "outDir": "./dist",
     
-    /* 模块解析 */
+    /* ???? */
     "resolveJsonModule": true,
     "isolatedModules": true,
     "allowSyntheticDefaultImports": true,
     
-    /* 类型检查 */
+    /* ???? */
     "typeRoots": ["./node_modules/@types", "./js/@types", "./js/types"],
     "types": []
   },

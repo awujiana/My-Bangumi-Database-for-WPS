@@ -178,8 +178,11 @@ function httpRequestAsync(method, url, options = {}) {
     });
 }
 
-// 导出 Promise 版本函数到全局
+// 导出函数到全局（供其他模块通过 window 访问）
 if (typeof window !== 'undefined') {
+    window.fetchAllUserCollections = fetchAllUserCollections;
     window.fetchAllUserCollectionsAsync = fetchAllUserCollectionsAsync;
     window.httpRequestAsync = httpRequestAsync;
+    window._fetchRecordsScopeSelect = _fetchRecordsScopeSelect;
+    window._runFetchBgRecords = _runFetchBgRecords;
 }

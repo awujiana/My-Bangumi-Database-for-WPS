@@ -16,7 +16,8 @@ import {
     showAlertDialog, closeAlertDialog, closeInputDialog, closeConfirmDialog,
     showToast, showTokenDialog, showUserIdDialog
 } from './ui/dialog.js';
-import { previewSyncContent, closeDetailModal, filterDetailItems } from './ui/preview.js';
+import { previewSyncContent, closeDetailModal } from './ui/preview.js';
+import { clearSyncRecords as _clearSyncRecords } from './syncRecord.js';
 
 // ========== 工作表锁定功能 ==========
 // 注意：工作表锁定状态已迁移到 BGM.sheet 命名空间
@@ -25,7 +26,7 @@ import { previewSyncContent, closeDetailModal, filterDetailItems } from './ui/pr
 // - BGM.sheet.isLocked: 是否已锁定
 
 /**
- * 切换工作表锁定状态
+ * 切换工作表锁定状态，并缓存到 PluginStorage
  */
 function toggleSheetLock() {
     let select = document.getElementById("sheetSelect");
@@ -37,16 +38,51 @@ function toggleSheetLock() {
         BGM.sheet.lockedIndex = null;
         BGM.sheet.lockedName = null;
         BGM.sheet.isLocked = false;
+        saveLockedSheet(null);  // 清除缓存
         showToast("已解锁工作表", "info");
     } else {
         let sheetName = select.options[select.selectedIndex]?.text || "";
         BGM.sheet.lockedIndex = sheetIndex;
         BGM.sheet.lockedName = sheetName;
         BGM.sheet.isLocked = true;
+        saveLockedSheet({ index: sheetIndex, name: sheetName });  // 写入缓存
         showToast("已锁定工作表: " + sheetName, "info");
     }
     updateLockButton();
     refreshData();
+}
+
+/**
+ * 保存锁定的工作表到 PluginStorage
+ */
+function saveLockedSheet(info) {
+    let app = getApp();
+    if (app?.PluginStorage) {
+        app.PluginStorage.setItem("bgm_locked_sheet", info ? JSON.stringify(info) : "");
+    }
+}
+
+/**
+ * 从 PluginStorage 恢复锁定的工作表
+ */
+function restoreLockedSheet() {
+    let app = getApp();
+    if (app?.PluginStorage) {
+        let raw = app.PluginStorage.getItem("bgm_locked_sheet");
+        if (raw) {
+            try {
+                let info = JSON.parse(raw);
+                BGM.sheet.lockedIndex = info.index || null;
+                BGM.sheet.lockedName = info.name || null;
+                BGM.sheet.isLocked = !!(info.index && info.name);
+                return true;
+            } catch (e) {
+                // 缓存数据损坏，清除
+                saveLockedSheet(null);
+            }
+        }
+    }
+    return false;
 }
 
 /**
@@ -156,6 +192,9 @@ function initPanel() {
     // 初始化消息监听
     initMessageListener();
 
+    // 恢复锁定的工作表缓存
+    restoreLockedSheet();
+
     // 初始化工作表列表
     refreshSheets();
 
@@ -168,41 +207,28 @@ function initPanel() {
     if (sheetSelect) {
         sheetSelect.addEventListener("change", () => {
             BGM.sheet.lockedIndex = null;
+            BGM.sheet.lockedName = null;
             BGM.sheet.isLocked = false;
+            saveLockedSheet(null);  // 手动切换工作表时清除锁定缓存
             updateLockButton();
             refreshData();
         });
     }
 
-    // 绑定刷新按钮
-    let refreshBtn = document.getElementById("refreshBtn");
-    if (refreshBtn) {
-        refreshBtn.addEventListener("click", () => {
-            refreshSheets();
-            refreshData();
-        });
-    }
-
+    // 绑定刷新数据按钮（通过 onclick 机制已处理）
+    // refreshBtn 已在 HTML 中通过 onclick 绑定，无需重复绑定
+    
     // 绑定模式切换
     let modeRadios = document.querySelectorAll('input[name="selectMode"]');
     modeRadios.forEach(radio => {
         radio.addEventListener("change", onSelectModeChange);
     });
 
-    // 绑定预览过滤
-    let filterInput = document.getElementById("detailFilter");
-    if (filterInput) {
-        filterInput.addEventListener("input", (e) => {
-            filterDetailItems(e.target.value);
-        });
-    }
-
-    // 绑定关闭详情模态框
-    let closeBtn = document.getElementById("closeDetailModal");
-    if (closeBtn) {
-        closeBtn.addEventListener("click", closeDetailModal);
-    }
-
+    // 绑定预览过滤（HTML中无detailFilter元素，跳过）
+    
+    // 绑定关闭详情模态框（通过 onclick 机制已处理）
+    // closeDetailModal 已在 HTML 中通过 onclick 绑定，无需重复绑定
+    
     // 绑定键盘事件
     document.addEventListener("keydown", (e) => {
         if (e.key === "Escape") {
@@ -212,13 +238,7 @@ function initPanel() {
         }
     });
 
-    // 调试：显示通知计数
-    let debugNotifyCount = document.getElementById("debugNotifyCount");
-    if (debugNotifyCount) {
-        setInterval(() => {
-            debugNotifyCount.textContent = "通知: " + (window.debugNotificationCount || 0);
-        }, 1000);
-    }
+    // 调试：显示通知计数（HTML中无debugNotifyCount元素，跳过）
 }
 
 /**
@@ -263,31 +283,53 @@ function fetchBgCollectionRecords() {
 
 /**
  * 清除同步记录
+ * 实际实现在 syncRecord.js 中，这里作为转发入口
  */
 function clearSyncRecords() {
-    if (typeof window.clearSyncRecords === 'function') {
-        window.clearSyncRecords(true);
-    } else if (typeof clearSyncRecords === 'function') {
-        clearSyncRecords(true);
+    if (typeof _clearSyncRecords === 'function') {
+        _clearSyncRecords();
+    } else {
+        showAlertDialog("提示", "清除同步记录功能未加载");
     }
 }
 
 /**
- * 标记已上传条目（默认动画sheet）
+ * 获取当前用户选择的工作表名称
+ * 优先返回锁定的工作表名，其次返回下拉框选中的工作表名
+ */
+function getSelectedSheetName() {
+    if (BGM.sheet.isLocked && BGM.sheet.lockedName) {
+        return BGM.sheet.lockedName;
+    }
+    let select = document.getElementById('sheetSelect');
+    if (select && select.selectedIndex > 0) {
+        return select.options[select.selectedIndex].text;
+    }
+    return null;
+}
+
+/**
+ * 标记已上传条目（当前选择的工作表）
  */
 function markUploadedItemsDefault() {
-    if (typeof markUploadedItems === 'function') {
-        markUploadedItems('动画');
+    let sheetName = getSelectedSheetName();
+    if (!sheetName) {
+        showAlertDialog('提示', '请先选择工作表！');
+        return;
     }
+    markUploadedItems(sheetName);
 }
 
 /**
- * 清除工作表标记（默认动画sheet）
+ * 清除工作表标记（当前选择的工作表）
  */
 function clearSheetMarksDefault() {
-    if (typeof clearSheetMarks === 'function') {
-        clearSheetMarks();
+    let sheetName = getSelectedSheetName();
+    if (!sheetName) {
+        showAlertDialog('提示', '请先选择工作表！');
+        return;
     }
+    clearSheetMarks(sheetName);
 }
 
 // ========== 导出函数 ==========
@@ -314,9 +356,7 @@ window.toggleSheetLock = toggleSheetLock;
 window.onSelectModeChange = onSelectModeChange;
 window.fetchBgCollectionRecords = fetchBgCollectionRecords;
 window.clearSyncRecords = clearSyncRecords;
-window.markUploadedItems = markUploadedItems;
 window.markUploadedItemsDefault = markUploadedItemsDefault;
-window.clearSheetMarks = clearSheetMarks;
 window.clearSheetMarksDefault = clearSheetMarksDefault;
 
 // 导出全局函数别名

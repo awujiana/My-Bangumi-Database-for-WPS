@@ -1,13 +1,15 @@
 /**
- * UI 瀵硅瘽妗嗘ā鍧? * @module ui/dialog
- * @description 鑷畾涔夊璇濇銆佺‘璁ゅ璇濇銆乀oast 閫氱煡
+ * UI 对话框模块
+ * @module ui/dialog
+ * @description 自定义对话框、确认对话框、Toast 通知
  */
 
 import { loadBgToken } from '../util.js';
 import { BGM } from '../util.js';
 
-// ========== 鍏ㄥ眬瀵硅瘽妗嗗鍣?==========
-// 鍦?WPS/Office 鐜涓紝document.readyState 鍙兘涓嶆槸鏍囧噯鍊?// 鎵�浠ヤ娇鐢?setTimeout 纭繚瀵硅瘽妗嗗湪 DOM 鍑嗗濂藉悗鍒涘缓
+// ========== 全局对话框容器 ==========
+// 在 WPS/Office 环境中，document.readyState 可能不是标准值
+// 所以使用 setTimeout 确保对话框在 DOM 准备好后创建
 let dialogInitialized = false;
 
 function ensureDialogs() {
@@ -16,138 +18,139 @@ function ensureDialogs() {
     createDialogs();
 }
 
-// 灏濊瘯鍦ㄨ剼鏈姞杞芥椂鍒涘缓瀵硅瘽妗?if (typeof document !== 'undefined') {
+// 尝试在脚本加载时创建对话框
+if (typeof document !== 'undefined') {
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', ensureDialogs);
     } else {
-        // 浣跨敤 setTimeout 纭繚 DOM 鎿嶄綔鍦ㄤ笅涓�涓簨浠跺惊鐜腑鎵ц
+        // 使用 setTimeout 确保 DOM 操作在下一个事件循环中执行
         setTimeout(ensureDialogs, 0);
     }
 }
 
 function createDialogs() {
-    // 閬垮厤閲嶅鍒涘缓
+    // 避免重复创建
     if (document.getElementById('bgmDialogContainer')) return;
     
     const container = document.createElement('div');
     container.id = 'bgmDialogContainer';
     container.innerHTML = `
-        <!-- Alert 瀵硅瘽妗?-->
+        <!-- Alert 对话框 -->
         <div id="bgmAlertDialog" class="bgm-modal" style="display:none;">
             <div class="bgm-modal-content bgm-alert-content">
                 <div class="bgm-dialog-header">
                     <span class="bgm-dialog-icon bgm-icon-info">&#9432;</span>
-                    <span id="bgmAlertTitle" class="bgm-dialog-title">鎻愮ず</span>
+                    <span id="bgmAlertTitle" class="bgm-dialog-title">提示</span>
                 </div>
                 <div class="bgm-dialog-body">
                     <p id="bgmAlertMessage" class="bgm-dialog-message"></p>
                 </div>
                 <div class="bgm-dialog-footer">
-                    <button id="bgmAlertOk" class="bgm-btn bgm-btn-primary">纭畾</button>
+                    <button id="bgmAlertOk" class="bgm-btn bgm-btn-primary">确定</button>
                 </div>
             </div>
         </div>
         
-        <!-- Confirm 瀵硅瘽妗?-->
+        <!-- Confirm 对话框 -->
         <div id="bgmConfirmDialog" class="bgm-modal" style="display:none;">
             <div class="bgm-modal-content bgm-confirm-content">
                 <div class="bgm-dialog-header">
                     <span class="bgm-dialog-icon bgm-icon-question">&#63;</span>
-                    <span id="bgmConfirmTitle" class="bgm-dialog-title">纭</span>
+                    <span id="bgmConfirmTitle" class="bgm-dialog-title">确认</span>
                 </div>
                 <div class="bgm-dialog-body">
                     <p id="bgmConfirmMessage" class="bgm-dialog-message"></p>
                 </div>
                 <div class="bgm-dialog-footer">
-                    <button id="bgmConfirmCancel" class="bgm-btn bgm-btn-default">鍙栨秷</button>
-                    <button id="bgmConfirmOk" class="bgm-btn bgm-btn-primary">纭畾</button>
+                    <button id="bgmConfirmCancel" class="bgm-btn bgm-btn-default">取消</button>
+                    <button id="bgmConfirmOk" class="bgm-btn bgm-btn-primary">确定</button>
                 </div>
             </div>
         </div>
         
-        <!-- Error 瀵硅瘽妗?-->
+        <!-- Error 对话框 -->
         <div id="bgmErrorDialog" class="bgm-modal" style="display:none;">
             <div class="bgm-modal-content bgm-error-content">
                 <div class="bgm-dialog-header">
                     <span class="bgm-dialog-icon bgm-icon-error">&#10006;</span>
-                    <span id="bgmErrorTitle" class="bgm-dialog-title">閿欒</span>
+                    <span id="bgmErrorTitle" class="bgm-dialog-title">错误</span>
                 </div>
                 <div class="bgm-dialog-body">
                     <p id="bgmErrorMessage" class="bgm-dialog-message"></p>
                 </div>
                 <div class="bgm-dialog-footer">
-                    <button id="bgmErrorOk" class="bgm-btn bgm-btn-danger">纭畾</button>
+                    <button id="bgmErrorOk" class="bgm-btn bgm-btn-danger">确定</button>
                 </div>
             </div>
         </div>
         
-        <!-- Warning 瀵硅瘽妗?-->
+        <!-- Warning 对话框 -->
         <div id="bgmWarningDialog" class="bgm-modal" style="display:none;">
             <div class="bgm-modal-content bgm-warning-content">
                 <div class="bgm-dialog-header">
                     <span class="bgm-dialog-icon bgm-icon-warning">&#9888;</span>
-                    <span id="bgmWarningTitle" class="bgm-dialog-title">璀﹀憡</span>
+                    <span id="bgmWarningTitle" class="bgm-dialog-title">警告</span>
                 </div>
                 <div class="bgm-dialog-body">
                     <p id="bgmWarningMessage" class="bgm-dialog-message"></p>
                 </div>
                 <div class="bgm-dialog-footer">
-                    <button id="bgmWarningOk" class="bgm-btn bgm-btn-warning">纭畾</button>
+                    <button id="bgmWarningOk" class="bgm-btn bgm-btn-warning">确定</button>
                 </div>
             </div>
         </div>
         
-        <!-- Success 瀵硅瘽妗?-->
+        <!-- Success 对话框 -->
         <div id="bgmSuccessDialog" class="bgm-modal" style="display:none;">
             <div class="bgm-modal-content bgm-success-content">
                 <div class="bgm-dialog-header">
                     <span class="bgm-dialog-icon bgm-icon-success">&#10004;</span>
-                    <span id="bgmSuccessTitle" class="bgm-dialog-title">鎴愬姛</span>
+                    <span id="bgmSuccessTitle" class="bgm-dialog-title">成功</span>
                 </div>
                 <div class="bgm-dialog-body">
                     <p id="bgmSuccessMessage" class="bgm-dialog-message"></p>
                 </div>
                 <div class="bgm-dialog-footer">
-                    <button id="bgmSuccessOk" class="bgm-btn bgm-btn-success">纭畾</button>
+                    <button id="bgmSuccessOk" class="bgm-btn bgm-btn-success">确定</button>
                 </div>
             </div>
         </div>
         
-        <!-- Input 瀵硅瘽妗?-->
+        <!-- Input 对话框 -->
         <div id="bgmInputDialog" class="bgm-modal" style="display:none;">
             <div class="bgm-modal-content bgm-input-content">
                 <div class="bgm-dialog-header">
                     <span class="bgm-dialog-icon bgm-icon-info">&#9432;</span>
-                    <span id="bgmInputTitle" class="bgm-dialog-title">杈撳叆</span>
+                    <span id="bgmInputTitle" class="bgm-dialog-title">输入</span>
                 </div>
                 <div class="bgm-dialog-body">
                     <p id="bgmInputPrompt" class="bgm-dialog-message"></p>
                     <input type="text" id="bgmInputField" class="bgm-input-field" placeholder="">
                 </div>
                 <div class="bgm-dialog-footer">
-                    <button id="bgmInputCancel" class="bgm-btn bgm-btn-default">鍙栨秷</button>
-                    <button id="bgmInputOk" class="bgm-btn bgm-btn-primary">纭畾</button>
+                    <button id="bgmInputCancel" class="bgm-btn bgm-btn-default">取消</button>
+                    <button id="bgmInputOk" class="bgm-btn bgm-btn-primary">确定</button>
                 </div>
             </div>
         </div>
         
-        <!-- Toast 閫氱煡 -->
+        <!-- Toast 通知 -->
         <div id="bgmToast" class="bgm-toast"></div>
     `;
     document.body.appendChild(container);
     
-    // 缁戝畾浜嬩欢
+    // 绑定事件
     bindDialogEvents();
 }
 
 function bindDialogEvents() {
-    // Alert 纭畾鎸夐挳
+    // Alert 确定按钮
     document.getElementById('bgmAlertOk')?.addEventListener('click', () => {
         document.getElementById('bgmAlertDialog').style.display = 'none';
         if (window._bgmDialogCallback?.onOk) window._bgmDialogCallback.onOk();
     });
     
-    // Confirm 鎸夐挳
+    // Confirm 按钮
     document.getElementById('bgmConfirmOk')?.addEventListener('click', () => {
         document.getElementById('bgmConfirmDialog').style.display = 'none';
         if (window._bgmDialogCallback?.onOk) window._bgmDialogCallback.onOk();
@@ -157,25 +160,25 @@ function bindDialogEvents() {
         if (window._bgmDialogCallback?.onCancel) window._bgmDialogCallback.onCancel();
     });
     
-    // Error 纭畾鎸夐挳
+    // Error 确定按钮
     document.getElementById('bgmErrorOk')?.addEventListener('click', () => {
         document.getElementById('bgmErrorDialog').style.display = 'none';
         if (window._bgmDialogCallback?.onOk) window._bgmDialogCallback.onOk();
     });
     
-    // Warning 纭畾鎸夐挳
+    // Warning 确定按钮
     document.getElementById('bgmWarningOk')?.addEventListener('click', () => {
         document.getElementById('bgmWarningDialog').style.display = 'none';
         if (window._bgmDialogCallback?.onOk) window._bgmDialogCallback.onOk();
     });
     
-    // Success 纭畾鎸夐挳
+    // Success 确定按钮
     document.getElementById('bgmSuccessOk')?.addEventListener('click', () => {
         document.getElementById('bgmSuccessDialog').style.display = 'none';
         if (window._bgmDialogCallback?.onOk) window._bgmDialogCallback.onOk();
     });
     
-    // Input 鎸夐挳
+    // Input 按钮
     document.getElementById('bgmInputOk')?.addEventListener('click', () => {
         const value = document.getElementById('bgmInputField')?.value?.trim();
         document.getElementById('bgmInputDialog').style.display = 'none';
@@ -186,17 +189,19 @@ function bindDialogEvents() {
         if (window._bgmDialogCallback?.onCancel) window._bgmDialogCallback.onCancel();
     });
     
-    // 鍥炶溅閿‘璁?Input 瀵硅瘽妗?    document.getElementById('bgmInputField')?.addEventListener('keypress', (e) => {
+    // 回车确认 Input 对话框
+    document.getElementById('bgmInputField')?.addEventListener('keypress', (e) => {
         if (e.key === 'Enter') {
             document.getElementById('bgmInputOk')?.click();
         }
     });
 }
 
-// ========== 瀵硅瘽妗嗘樉绀哄嚱鏁?==========
+// ========== 对话框显示函数 ==========
 
 /**
- * 鏄剧ず Alert 瀵硅瘽妗? */
+ * 显示 Alert 对话框
+ */
 export function showAlert(message, title, onOk) {
     const dialog = document.getElementById('bgmAlertDialog');
     if (!dialog) {
@@ -204,14 +209,15 @@ export function showAlert(message, title, onOk) {
         return;
     }
     
-    document.getElementById('bgmAlertTitle').textContent = title || '鎻愮ず';
+    document.getElementById('bgmAlertTitle').textContent = title || '提示';
     document.getElementById('bgmAlertMessage').textContent = message;
     window._bgmDialogCallback = { onOk };
     dialog.style.display = 'flex';
 }
 
 /**
- * 鏄剧ず Confirm 瀵硅瘽妗? */
+ * 显示 Confirm 对话框
+ */
 export function showConfirm(message, title, onOk, onCancel) {
     const dialog = document.getElementById('bgmConfirmDialog');
     if (!dialog) {
@@ -223,61 +229,65 @@ export function showConfirm(message, title, onOk, onCancel) {
         return;
     }
     
-    document.getElementById('bgmConfirmTitle').textContent = title || '纭';
+    document.getElementById('bgmConfirmTitle').textContent = title || '确认';
     document.getElementById('bgmConfirmMessage').textContent = message;
     window._bgmDialogCallback = { onOk, onCancel };
     dialog.style.display = 'flex';
 }
 
 /**
- * 鏄剧ず Error 瀵硅瘽妗? */
+ * 显示 Error 对话框
+ */
 export function showError(message, title, onOk) {
     const dialog = document.getElementById('bgmErrorDialog');
     if (!dialog) {
-        window.alert('[閿欒] ' + message);
+        window.alert('[错误] ' + message);
         return;
     }
     
-    document.getElementById('bgmErrorTitle').textContent = title || '閿欒';
+    document.getElementById('bgmErrorTitle').textContent = title || '错误';
     document.getElementById('bgmErrorMessage').textContent = message;
     window._bgmDialogCallback = { onOk };
     dialog.style.display = 'flex';
 }
 
 /**
- * 鏄剧ず Warning 瀵硅瘽妗? */
+ * 显示 Warning 对话框
+ */
 export function showWarning(message, title, onOk) {
     const dialog = document.getElementById('bgmWarningDialog');
     if (!dialog) {
-        window.alert('[璀﹀憡] ' + message);
+        window.alert('[警告] ' + message);
         return;
     }
     
-    document.getElementById('bgmWarningTitle').textContent = title || '璀﹀憡';
+    document.getElementById('bgmWarningTitle').textContent = title || '警告';
     document.getElementById('bgmWarningMessage').textContent = message;
     window._bgmDialogCallback = { onOk };
     dialog.style.display = 'flex';
 }
 
 /**
- * 鏄剧ず Success 瀵硅瘽妗? */
+ * 显示 Success 对话框
+ */
 export function showSuccess(message, title, onOk) {
     const dialog = document.getElementById('bgmSuccessDialog');
     if (!dialog) {
-        window.alert('[鎴愬姛] ' + message);
+        window.alert('[成功] ' + message);
         return;
     }
     
-    document.getElementById('bgmSuccessTitle').textContent = title || '鎴愬姛';
+    document.getElementById('bgmSuccessTitle').textContent = title || '成功';
     document.getElementById('bgmSuccessMessage').textContent = message;
     window._bgmDialogCallback = { onOk };
     dialog.style.display = 'flex';
 }
 
 /**
- * 鏄剧ず Input 杈撳叆瀵硅瘽妗? */
+ * 显示 Input 输入对话框
+ */
 export function showInput(title, prompt, defaultValue, onOk, onCancel) {
-    ensureDialogs();  // 纭繚瀵硅瘽妗嗗鍣ㄥ凡鍒涘缓
+    ensureDialogs();  // 确保对话框容器已创建
     const dialog = document.getElementById('bgmInputDialog');
     if (!dialog) {
         const result = window.prompt(prompt, defaultValue);
@@ -289,7 +299,7 @@ export function showInput(title, prompt, defaultValue, onOk, onCancel) {
         return;
     }
     
-    document.getElementById('bgmInputTitle').textContent = title || '杈撳叆';
+    document.getElementById('bgmInputTitle').textContent = title || '输入';
     document.getElementById('bgmInputPrompt').textContent = prompt || '';
     const inputField = document.getElementById('bgmInputField');
     inputField.value = defaultValue || '';
@@ -299,16 +309,18 @@ export function showInput(title, prompt, defaultValue, onOk, onCancel) {
     inputField.focus();
 }
 
-// ========== 鏃х殑瀵硅瘽妗嗗嚱鏁帮紙淇濇寔鍏煎锛?=========
+// ========== 旧的对话框函数（保持兼容）==========
 
 /**
- * 鏄剧ず杈撳叆瀵硅瘽妗? */
+ * 显示输入对话框
+ */
 export function showInputDialog(title, placeholder, onSubmit) {
     showInput(title, placeholder, '', onSubmit);
 }
 
 /**
- * 鍏抽棴杈撳叆瀵硅瘽妗? */
+ * 关闭输入对话框
+ */
 export function closeInputDialog() {
     const dialog = document.getElementById('bgmInputDialog');
     if (dialog) {
@@ -317,14 +329,15 @@ export function closeInputDialog() {
 }
 
 /**
- * 鏄剧ず纭瀵硅瘽妗嗭紙鍏煎鏃ф帴鍙ｏ級
+ * 显示确认对话框（兼容旧接口）
  */
 export function showConfirmDialog(message, onConfirm) {
-    showConfirm(message, '纭', onConfirm);
+    showConfirm(message, '确认', onConfirm);
 }
 
 /**
- * 鍏抽棴纭瀵硅瘽妗? */
+ * 关闭确认对话框
+ */
 export function closeConfirmDialog() {
     const dialog = document.getElementById('bgmConfirmDialog');
     if (dialog) {
@@ -332,9 +345,9 @@ export function closeConfirmDialog() {
     }
 }
 
-// ========== Toast 閫氱煡 ==========
+// ========== Toast 通知 ==========
 /**
- * 鏄剧ず Toast 閫氱煡
+ * 显示 Toast 通知
  */
 export function showToast(message, type) {
     const toast = document.getElementById('bgmToast');
@@ -351,9 +364,10 @@ export function showToast(message, type) {
     }, 3000);
 }
 
-// ========== Token 鐘舵�佹洿鏂?==========
+// ========== Token 状态更新 ==========
 /**
- * 鏇存柊 Token 鐘舵�佹樉绀? */
+ * 更新 Token 状态显示
+ */
 export function updateTokenStatus() {
     let tokenStatus = document.getElementById("tokenStatus");
     if (!tokenStatus) return;
@@ -361,12 +375,12 @@ export function updateTokenStatus() {
     let token = loadBgToken();
     if (token && token.length > 10) {
         tokenStatus.style.color = "#4CAF50";
-        tokenStatus.textContent = "宸茶缃?(" + token.substring(0, 4) + "...)";
+        tokenStatus.textContent = "已设置 (" + token.substring(0, 4) + "...)";
         
         if (typeof _fetchBgmUserInfo === 'function') {
             _fetchBgmUserInfo(function(userInfo) {
                 if (userInfo && userInfo.username) {
-                    tokenStatus.textContent = "宸茶缃? " + userInfo.username;
+                    tokenStatus.textContent = "已设置: " + userInfo.username;
                     if (typeof updateUserIdStatus === 'function') {
                         updateUserIdStatus();
                     }
@@ -374,7 +388,7 @@ export function updateTokenStatus() {
             });
         }
     } else {
-        tokenStatus.textContent = "鏈缃?;
+        tokenStatus.textContent = "未设置";
         tokenStatus.style.color = "#f44336";
         BGM.cache.userId = null;
         BGM.cache.username = null;
@@ -382,7 +396,8 @@ export function updateTokenStatus() {
 }
 
 /**
- * 鏇存柊鐢ㄦ埛ID鐘舵�佹樉绀? */
+ * 更新用户ID状态显示
+ */
 export function updateUserIdStatus() {
     let userIdStatus = document.getElementById("userIdStatus");
     if (!userIdStatus) return;
@@ -391,72 +406,75 @@ export function updateUserIdStatus() {
         let userId = _getBgmUserId();
         if (userId) {
             let display = BGM.cache.username ? BGM.cache.username + " (" + userId + ")" : userId;
-            userIdStatus.textContent = "宸茶缃? " + display;
+            userIdStatus.textContent = "已设置: " + display;
             userIdStatus.style.color = "#4CAF50";
         } else {
-            userIdStatus.textContent = "鏈缃?;
+            userIdStatus.textContent = "未设置";
             userIdStatus.style.color = "#f44336";
         }
     }
 }
 
 /**
- * 鏄剧ず Token 璁剧疆瀵硅瘽妗? */
+ * 显示 Token 设置对话框
+ */
 
 /**
- * 鏄剧ず娑堟伅瀵硅瘽妗嗭紙鑷畾涔夋ā鎬佹锛? */
+ * 显示消息对话框（自定义模态框）
+ */
 export function showDialog(title, message) {
     const dialog = document.getElementById('bgmAlertDialog');
     if (!dialog) {
         window.alert(message);
         return;
     }
-    document.getElementById('bgmAlertTitle').textContent = title || '鎻愮ず';
+    document.getElementById('bgmAlertTitle').textContent = title || '提示';
     document.getElementById('bgmAlertMessage').textContent = message;
     dialog.style.display = 'flex';
 }
 
 /**
- * 鍙戦�佹秷鎭埌浠诲姟绐楁牸
+ * 发送消息到任务窗格
  */
 export function sendToTaskpane(data) {
     return BGM.postMessage(data);
 }
 
 export function showTokenDialog() {
-    ensureDialogs();  // 纭繚瀵硅瘽妗嗗鍣ㄥ凡鍒涘缓
-    showInput("璁剧疆 Bangumi Access Token", "璇疯緭鍏?Access Token", "", (value) => {
+    ensureDialogs();  // 确保对话框容器已创建
+    showInput("设置 Bangumi Access Token", "请输入 Access Token", "", (value) => {
         if (value) {
             if (typeof storeBgToken === 'function') {
                 storeBgToken(value);
             }
             updateTokenStatus();
-            showToast("Token 宸蹭繚瀛?, "success");
+            showToast("Token 已保存", "success");
             BGM.postMessage({ type: "tokenUpdated" });
         }
     });
 }
 
 /**
- * 鏄剧ず鐢ㄦ埛ID璁剧疆瀵硅瘽妗? */
+ * 显示用户ID设置对话框
+ */
 export function showUserIdDialog() {
-    ensureDialogs();  // 纭繚瀵硅瘽妗嗗鍣ㄥ凡鍒涘缓
+    ensureDialogs();  // 确保对话框容器已创建
     if (typeof _getBgmUserId !== 'function') return;
     
     let currentId = _getBgmUserId() || "";
-    showInput("璁剧疆 Bangumi 鐢ㄦ埛ID", "璇疯緭鍏ョ敤鎴稩D锛堟暟瀛楋級", currentId, (value) => {
+    showInput("设置 Bangumi 用户ID", "请输入用户ID（数字）", currentId, (value) => {
         if (value && value.trim() !== "") {
             if (typeof _setBgmUserId === 'function') {
                 _setBgmUserId(value.trim());
             }
             updateUserIdStatus();
-            showToast("鐢ㄦ埛ID 宸蹭繚瀛?, "success");
+            showToast("用户ID 已保存", "success");
             BGM.postMessage({ type: "userIdUpdated" });
         }
     });
 }
 
-// ========== 鍚戝悗鍏煎锛堟寕杞藉埌 window锛?=========
+// ========== 向后兼容（挂载到 window）==========
 window.showInputDialog = showInputDialog;
 window.closeInputDialog = closeInputDialog;
 window.showConfirmDialog = showConfirmDialog;
@@ -469,9 +487,100 @@ window.showAlertDialog = showAlert;
 window.alert = showAlert;
 window.showUserIdDialog = showUserIdDialog;
 
-// 鏂板閫氱敤瀵硅瘽妗嗗嚱鏁?window.BGMAlert = showAlert;
+// 新增通用对话框函数
+window.BGMAlert = showAlert;
 window.BGMConfirm = showConfirm;
 window.BGMError = showError;
 window.BGMWarning = showWarning;
 window.BGMSuccess = showSuccess;
 window.BGMInput = showInput;
+
+// ========== 兼容 HTML 内联对话框 ==========
+
+/**
+ * 关闭所有对话框（通用）- 兼容 HTML onclick
+ */
+export function closeDialog(result) {
+    var dialogs = ['inputDialog', 'confirmDialog', 'alertDialog'];
+    for (var i = 0; i < dialogs.length; i++) {
+        var d = document.getElementById(dialogs[i]);
+        if (d) { d.style.display = 'none'; }
+    }
+    if (window._dialogCallback) {
+        window._dialogCallback(result);
+        window._dialogCallback = null;
+    }
+}
+
+/**
+ * 关闭提示对话框
+ */
+export function closeAlertDialog() {
+    const dialog = document.getElementById('bgmAlertDialog');
+    if (dialog) dialog.style.display = 'none';
+    const oldDialog = document.getElementById('alertDialog');
+    if (oldDialog) oldDialog.style.display = 'none';
+}
+
+/**
+ * 测试调试连接
+ */
+export function testDebugConnection() {
+    if (typeof window.Application !== 'undefined') {
+        if (typeof showToast === 'function') { showToast('调试连接正常', 'success'); }
+    } else {
+        if (typeof showToast === 'function') { showToast('调试连接失败', 'error'); }
+    }
+}
+
+/**
+ * 打开用户收藏页面
+ */
+export function openUserCollection() {
+    if (typeof _getBgmUserId !== 'function') { return; }
+    var userId = _getBgmUserId();
+    if (!userId) {
+        if (typeof showAlert === 'function') { showAlert('提示', '请先设置用户ID'); }
+        return;
+    }
+    window.open('https://bgm.tv/user/' + userId + '/collection', '_blank');
+}
+
+/**
+ * 测试 Token 有效性
+ */
+export function testTokenValidity() {
+    if (typeof loadBgToken !== 'function') { return; }
+    var token = loadBgToken();
+    if (!token) {
+        if (typeof showAlert === 'function') { showAlert('提示', '请先设置 Token'); }
+        return;
+    }
+    var xhr = new XMLHttpRequest();
+    xhr.open('GET', 'https://api.bgm.tv/v0/me', true);
+    xhr.setRequestHeader('Authorization', 'Bearer ' + token);
+    xhr.onload = function() {
+        if (xhr.status === 200) {
+            try {
+                var data = JSON.parse(xhr.responseText);
+                var username = data.username || data.nickname || '未知用户';
+                if (typeof showSuccess === 'function') { showSuccess('Token 有效', '用户: ' + username); }
+            } catch (e) {
+                if (typeof showError === 'function') { showError('解析失败', '无法解析响应数据'); }
+            }
+        } else if (xhr.status === 401) {
+            if (typeof showError === 'function') { showError('Token 无效', 'Access Token 已过期或无效'); }
+        }
+    };
+    xhr.onerror = function() {
+        if (typeof showError === 'function') { showError('网络错误', '无法连接到 Bangumi API'); }
+    };
+    xhr.send();
+}
+
+// 挂载新增函数到 window
+window.closeDialog = closeDialog;
+window.closeAlertDialog = closeAlertDialog;
+window.testDebugConnection = testDebugConnection;
+window.openUserCollection = openUserCollection;
+window.testTokenValidity = testTokenValidity;
