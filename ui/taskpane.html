@@ -19,6 +19,17 @@
             </div>
         </div>
     </div>
+    <!-- 自定义确认对话框 -->
+    <div id="confirmDialog" class="modal" style="display:none;">
+        <div class="modal-content confirm-modal-content">
+            <h3 id="confirmTitle">确认</h3>
+            <p id="confirmMessage" style="margin-bottom:20px;line-height:1.6;color:#ccc;"></p>
+            <div class="dialog-buttons" style="justify-content:center;gap:12px;">
+                <button class="btn confirm-btn confirm-no" id="confirmNoBtn" onclick="closeConfirmDialog(false)">取消</button>
+                <button class="btn confirm-btn confirm-yes" id="confirmYesBtn" onclick="closeConfirmDialog(true)">确定</button>
+            </div>
+        </div>
+    </div>
     <style>
     .modal {
         position: fixed;
@@ -935,6 +946,39 @@
     }
     .upload-single-btn.reupload:hover {
         background: #d97706;
+    }
+    .confirm-modal-content {
+        max-width: 420px;
+        text-align: center;
+        padding: 30px 25px;
+    }
+    .confirm-btn {
+        min-width: 100px;
+        padding: 10px 24px;
+        font-size: 14px;
+        border-radius: 8px;
+        border: none;
+        cursor: pointer;
+        font-weight: 600;
+        transition: all 0.2s;
+    }
+    .confirm-yes {
+        background: linear-gradient(135deg, #22a84d, #1a8a3e);
+        color: #fff;
+        box-shadow: 0 2px 8px rgba(34, 168, 77, 0.3);
+    }
+    .confirm-yes:hover {
+        background: linear-gradient(135deg, #1a8a3e, #157a35);
+        transform: translateY(-1px);
+        box-shadow: 0 4px 12px rgba(34, 168, 77, 0.4);
+    }
+    .confirm-no {
+        background: #444;
+        color: #ccc;
+    }
+    .confirm-no:hover {
+        background: #555;
+        color: #fff;
     }
     .uploaded-badge {
         display: inline-flex;
