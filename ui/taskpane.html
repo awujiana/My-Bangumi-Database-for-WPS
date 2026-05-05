@@ -1,1139 +1,282 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html>
-<head><meta charset="utf-8"></head>
-<!-- 核心依赖 -->
+<head>
+    <meta charset="utf-8">
+    <!-- 澶栭儴鏍峰紡 -->
+    <link rel="stylesheet" href="../css/styles.css">
+</head>
+<!-- 鏍稿績渚濊禆 -->
 <script type="text/javascript" src="../js/util.js"></script>
 <script type="text/javascript" src="../js/syncRecord.js"></script>
 <script type="text/javascript" src="../js/bangumi.js"></script>
 
-<!-- UI 模块 -->
+<!-- UI 妯″潡 -->
 <script type="text/javascript" src="../js/ui/dialog.js"></script>
 <script type="text/javascript" src="../js/ui/message.js"></script>
 <script type="text/javascript" src="../js/ui/preview.js"></script>
 <script type="text/javascript" src="../js/ui/handlers.js"></script>
 
-<!-- 同步模块 -->
+<!-- 鍚屾妯″潡 -->
 <script type="text/javascript" src="../js/sync/scraping.js"></script>
 
-<!-- 主面板 -->
+<!-- 涓婚潰鏉?-->
 <script type="text/javascript" src="../js/taskpane.js"></script>
 <script type="text/javascript" src="../.debugTemp/wpsjsrpcsdk.js"></script>
 <body>
-    <!-- 自定义输入对话框 -->
+    <!-- 鑷畾涔夎緭鍏ュ璇濇 -->
     <div id="inputDialog" class="modal" style="display:none;">
         <div class="modal-content">
-            <h3 id="dialogTitle">输入</h3>
+            <h3 id="dialogTitle">杈撳叆</h3>
             <p id="dialogMessage" style="margin-bottom:15px;"></p>
             <input type="text" id="dialogInput" class="input" style="width:100%;margin-bottom:15px;">
             <div class="dialog-buttons">
-                <button class="btn" onclick="closeDialog(false)">取消</button>
-                <button class="btn primary" onclick="closeDialog(true)">确定</button>
+                <button class="btn" onclick="closeDialog(false)">鍙栨秷</button>
+                <button class="btn primary" onclick="closeDialog(true)">纭畾</button>
             </div>
         </div>
     </div>
-    <!-- 自定义确认对话框 -->
+    <!-- 鑷畾涔夌‘璁ゅ璇濇 -->
     <div id="confirmDialog" class="modal" style="display:none;">
         <div class="modal-content confirm-modal-content">
-            <h3 id="confirmTitle">确认</h3>
+            <h3 id="confirmTitle">纭</h3>
             <p id="confirmMessage" style="margin-bottom:20px;line-height:1.6;color:#ccc;"></p>
             <div class="dialog-buttons" style="justify-content:center;gap:12px;">
-                <button class="btn confirm-btn confirm-no" id="confirmNoBtn" onclick="closeConfirmDialog(false)">取消</button>
-                <button class="btn confirm-btn confirm-yes" id="confirmYesBtn" onclick="closeConfirmDialog(true)">确定</button>
+                <button class="btn confirm-btn confirm-no" id="confirmNoBtn" onclick="closeConfirmDialog(false)">鍙栨秷</button>
+                <button class="btn confirm-btn confirm-yes" id="confirmYesBtn" onclick="closeConfirmDialog(true)">纭畾</button>
             </div>
         </div>
     </div>
-    <!-- 自定义提示对话框 -->
+    <!-- 鑷畾涔夋彁绀哄璇濇 -->
     <div id="alertDialog" class="modal" style="display:none;">
         <div class="modal-content confirm-modal-content">
             <h3 id="alertTitle" style="margin:0 0 15px 0;color:#fff;font-size:18px;"></h3>
             <p id="alertMessage" style="margin-bottom:20px;line-height:1.6;color:#ccc;white-space:pre-wrap;word-break:break-all;"></p>
             <div class="dialog-buttons" style="justify-content:center;">
-                <button class="btn confirm-btn confirm-yes" onclick="closeAlertDialog()">确定</button>
+                <button class="btn confirm-btn confirm-yes" onclick="closeAlertDialog()">纭畾</button>
             </div>
         </div>
     </div>
-    <style>
-    .modal {
-        position: fixed;
-        top: 0; left: 0;
-        width: 100%; height: 100%;
-        background: rgba(0,0,0,0.7);
-        z-index: 1000;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-    }
-    .modal-content {
-        background: #2d2d2d;
-        padding: 25px;
-        border-radius: 12px;
-        width: 380px;
-        box-shadow: 0 8px 32px rgba(0,0,0,0.5);
-    }
-    .modal-content h3 { 
-        margin: 0 0 15px 0; 
-        color: #ffffff;
-        font-size: 18px;
-    }
-    #dialogMessage {
-        color: #b0b0b0;
-    }
-    .dialog-buttons {
-        display: flex;
-        justify-content: flex-end;
-        gap: 10px;
-    }
-    </style>
 
     <div class="global">
-        <!-- 标题 -->
+        <!-- 鏍囬 -->
         <div class="header">
-            <h2>Bangumi 同步工具</h2>
-            <p class="subtitle">将 Excel 数据批量同步到 Bangumi 收藏</p>
+            <h2>Bangumi 鍚屾宸ュ叿</h2>
+            <p class="subtitle">灏?Excel 鏁版嵁鎵归噺鍚屾鍒?Bangumi 鏀惰棌</p>
         </div>
 
-        <!-- 快速操作 -->
+        <!-- 蹇€熸搷浣?-->
         <div class="section">
-            <h3>快速操作</h3>
+            <h3>蹇€熸搷浣?/h3>
             <div class="btn-group">
-                <button class="btn primary" onclick="onAction('sync')">🚀 同步到 Bangumi</button>
-                <button class="btn" onclick="onAction('test')">🧪 测试同步</button>
-                <button class="btn warning" onclick="onAction('clear')">🗑️ 清除标记</button>
+                <button class="btn primary" onclick="onAction('sync')">馃殌 鍚屾鍒?Bangumi</button>
+                <button class="btn" onclick="onAction('test')">馃И 娴嬭瘯鍚屾</button>
+                <button class="btn warning" onclick="onAction('clear')">馃棏锔?娓呴櫎鏍囪</button>
             </div>
             <div class="btn-group" style="margin-top:8px;">
-                <button class="btn success" onclick="syncCollectionFromBgm()">📥 从BGM同步收藏</button>
-                <button class="btn" onclick="onAction('preview')">👁️ 预览同步</button>
+                <button class="btn success" onclick="syncCollectionFromBgm()">馃摜 浠嶣GM鍚屾鏀惰棌</button>
+                <button class="btn" onclick="onAction('preview')">馃憗锔?棰勮鍚屾</button>
             </div>
             <p class="hint" style="margin-top:8px;">
-                📥 从BGM同步：获取你在Bangumi的收藏列表并标记到D列<br>
-                支持：collect(已看)、wish(想看)、do(在看)
+                馃摜 浠嶣GM鍚屾锛氳幏鍙栦綘鍦˙angumi鐨勬敹钘忓垪琛ㄥ苟鏍囪鍒癉鍒?br>
+                鏀寔锛歝ollect(宸茬湅)銆亀ish(鎯崇湅)銆乨o(鍦ㄧ湅)
             </p>
         </div>
 
-        <!-- Token 设置 -->
+        <!-- Token 璁剧疆 -->
         <div class="section">
-            <h3>Token 设置</h3>
+            <h3>Token 璁剧疆</h3>
             <div class="token-display">
-                <span id="tokenStatus">未设置</span>
-                <button class="btn small" id="setTokenBtn" onclick="showTokenDialog(window.Application.PluginStorage.getItem('bgm_token'))">设置/修改</button>
-                <button class="btn small primary" id="testTokenBtn" onclick="testTokenValidity()">测试</button>
+                <span id="tokenStatus">鏈缃?/span>
+                <button class="btn small" id="setTokenBtn" onclick="showTokenDialog(window.Application.PluginStorage.getItem('bgm_token'))">璁剧疆/淇敼</button>
+                <button class="btn small primary" id="testTokenBtn" onclick="testTokenValidity()">娴嬭瘯</button>
             </div>
-            <p class="hint">Access Token 获取方式：<a href="https://next.bgm.tv/demo/access-token/create" target="_blank">点击创建</a></p>
+            <p class="hint">Access Token 鑾峰彇鏂瑰紡锛?a href="https://next.bgm.tv/demo/access-token/create" target="_blank">鐐瑰嚮鍒涘缓</a></p>
         </div>
 
-        <!-- 用户ID设置 -->
+        <!-- 鐢ㄦ埛ID璁剧疆 -->
         <div class="section">
-            <h3>收藏页访问</h3>
+            <h3>鏀惰棌椤佃闂?/h3>
             <div class="token-display">
-                <span id="userIdStatus">未设置</span>
-                <button class="btn small" id="setUserIdBtn" onclick="showUserIdDialog()">设置用户ID</button>
-                <button class="btn small primary" id="openCollectionBtn" onclick="openUserCollection()">打开收藏页</button>
+                <span id="userIdStatus">鏈缃?/span>
+                <button class="btn small" id="setUserIdBtn" onclick="showUserIdDialog()">璁剧疆鐢ㄦ埛ID</button>
+                <button class="btn small primary" id="openCollectionBtn" onclick="openUserCollection()">鎵撳紑鏀惰棌椤?/button>
             </div>
-            <p class="hint">用户ID：Bangumi主页URL中的数字/字母</p>
+            <p class="hint">鐢ㄦ埛ID锛欱angumi涓婚〉URL涓殑鏁板瓧/瀛楁瘝</p>
         </div>
 
-        <!-- 收藏列表类型选择 -->
+        <!-- 鏀惰棌鍒楄〃绫诲瀷閫夋嫨 -->
         <div class="section">
-            <h3>收藏列表类型</h3>
+            <h3>鏀惰棌鍒楄〃绫诲瀷</h3>
             <div class="form-group">
-                <label>获取哪种收藏：</label>
+                <label>鑾峰彇鍝鏀惰棌锛?/label>
                 <select id="listTypeSelect" class="input">
-                    <option value="collect">已看（collect）</option>
-                    <option value="wish">想看（wish）</option>
-                    <option value="do">在看（do）</option>
+                    <option value="collect">宸茬湅锛坈ollect锛?/option>
+                    <option value="wish">鎯崇湅锛坵ish锛?/option>
+                    <option value="do">鍦ㄧ湅锛坉o锛?/option>
                 </select>
             </div>
             <p class="hint">
-                collect - 已看完的番剧<br>
-                wish - 想看但还没看的<br>
-                do - 正在追的番剧
+                collect - 宸茬湅瀹岀殑鐣墽<br>
+                wish - 鎯崇湅浣嗚繕娌＄湅鐨?br>
+                do - 姝ｅ湪杩界殑鐣墽
             </p>
         </div>
 
-        <!-- 数据选择 -->
+        <!-- 鏁版嵁閫夋嫨 -->
         <div class="section">
-            <h3>数据选择</h3>
+            <h3>鏁版嵁閫夋嫨</h3>
             <div class="form-group">
-                <label>选择模式：</label>
+                <label>閫夋嫨妯″紡锛?/label>
                 <div class="mode-selector">
                     <label class="radio-label">
                         <input type="radio" name="selectMode" value="auto" checked onchange="onSelectModeChange()">
-                        <span class="radio-text">🤖 自动模式</span>
-                        <span class="radio-desc">自动识别筛选后的可见数据</span>
+                        <span class="radio-text">馃 鑷姩妯″紡</span>
+                        <span class="radio-desc">鑷姩璇嗗埆绛涢€夊悗鐨勫彲瑙佹暟鎹?/span>
                     </label>
                     <label class="radio-label">
                         <input type="radio" name="selectMode" value="manual" onchange="onSelectModeChange()">
-                        <span class="radio-text">🎯 手动选择</span>
-                        <span class="radio-desc">手动指定起始和结束行号</span>
+                        <span class="radio-text">馃幆 鎵嬪姩閫夋嫨</span>
+                        <span class="radio-desc">鎵嬪姩鎸囧畾璧峰鍜岀粨鏉熻鍙?/span>
                     </label>
                 </div>
             </div>
             <div class="form-group">
-                <label>选择工作表：</label>
+                <label>閫夋嫨宸ヤ綔琛細</label>
                 <div class="sheet-select-row">
                     <select id="sheetSelect" class="input" style="flex:1;">
-                        <option value="">-- 请选择 --</option>
+                        <option value="">-- 璇烽€夋嫨 --</option>
                     </select>
-                    <button class="btn small" onclick="refreshSheets()">🔄 刷新</button>
-                    <button class="btn small" id="lockSheetBtn" onclick="toggleSheetLock()">🔒 锁定</button>
+                    <button class="btn small" onclick="refreshSheets()">馃攧 鍒锋柊</button>
+                    <button class="btn small" id="lockSheetBtn" onclick="toggleSheetLock()">馃敀 閿佸畾</button>
                     <span id="lockStatus" class="lock-status" style="display:none;"></span>
                 </div>
             </div>
             <div id="manualRangeInputs" style="display:none;">
                 <div class="form-group">
-                    <label>起始行号：</label>
-                    <input type="number" id="startRow" class="input" value="2" min="2" placeholder="从第几行开始">
+                    <label>璧峰琛屽彿锛?/label>
+                    <input type="number" id="startRow" class="input" value="2" min="2" placeholder="浠庣鍑犺寮€濮?>
                 </div>
                 <div class="form-group">
-                    <label>结束行号：</label>
-                    <input type="number" id="endRow" class="input" value="0" min="0" placeholder="0=到最后一行">
+                    <label>缁撴潫琛屽彿锛?/label>
+                    <input type="number" id="endRow" class="input" value="0" min="0" placeholder="0=鍒版渶鍚庝竴琛?>
                 </div>
             </div>
             <div id="autoRangeInfo" class="range-info">
-                <span class="info-icon">ℹ️</span>
-                <span id="filterStatus">正在检测筛选状态...</span>
+                <span class="info-icon">鈩癸笍</span>
+                <span id="filterStatus">姝ｅ湪妫€娴嬬瓫閫夌姸鎬?..</span>
             </div>
-            <button class="btn" onclick="refreshData()">🔄 刷新数据</button>
+            <button class="btn" onclick="refreshData()">馃攧 鍒锋柊鏁版嵁</button>
         </div>
 
-        <!-- 详细预览模态框 -->
+        <!-- 璇︾粏棰勮妯℃€佹 -->
     <div id="detailModal" class="detail-modal" style="display:none;">
         <div class="detail-modal-content">
             <div class="detail-modal-header">
-                <h3>📋 详细预览</h3>
-                <button class="detail-close-btn" onclick="closeDetailModal()">×</button>
+                <h3>馃搵 璇︾粏棰勮</h3>
+                <button class="detail-close-btn" onclick="closeDetailModal()">脳</button>
             </div>
             <div class="detail-modal-toolbar" id="detailModalToolbar"></div>
             <div class="detail-modal-body" id="detailModalBody"></div>
         </div>
     </div>
 
-    <!-- 数据预览 -->
+    <!-- 鏁版嵁棰勮 -->
     <div class="section">
-        <h3>数据预览 <span id="previewCount"></span></h3>
+        <h3>鏁版嵁棰勮 <span id="previewCount"></span></h3>
         <div class="preview-wrapper">
             <div class="preview-box" id="previewBox">
-                <p class="hint">点击"刷新数据"加载预览（支持筛选后数据）</p>
+                <p class="hint">鐐瑰嚮"鍒锋柊鏁版嵁"鍔犺浇棰勮锛堟敮鎸佺瓫閫夊悗鏁版嵁锛?/p>
             </div>
         </div>
         <button class="btn" id="previewBtn" onclick="previewSyncContent()">
-            <span class="btn-icon">🔍</span> 详细预览同步内容
+            <span class="btn-icon">馃攳</span> 璇︾粏棰勮鍚屾鍐呭
         </button>
         <button class="btn" id="syncCollectionBtn" onclick="syncCollectionFromBgm()">
-            <span class="btn-icon">☁️</span> 从BGM同步收藏标记
+            <span class="btn-icon">鈽侊笍</span> 浠嶣GM鍚屾鏀惰棌鏍囪
         </button>
     </div>
 
-        <!-- 同步记录 -->
+        <!-- 鍚屾璁板綍 -->
         <div class="section">
-            <h3>📋 同步记录</h3>
+            <h3>馃搵 鍚屾璁板綍</h3>
             <div class="btn-group">
                 <button class="btn" id="viewRecordsBtn" onclick="openSyncRecordSheet()">
-                    <span class="btn-icon">📋</span> 查看同步记录
+                    <span class="btn-icon">馃搵</span> 鏌ョ湅鍚屾璁板綍
                 </button>
                 <button class="btn success" id="fetchBgRecordsBtn" onclick="fetchBgCollectionRecords()">
-                    <span class="btn-icon">☁️</span> 从BGM同步收藏记录
+                    <span class="btn-icon">鈽侊笍</span> 浠嶣GM鍚屾鏀惰棌璁板綍
                 </button>
                 <button class="btn warning" id="clearRecordsBtn" onclick="clearSyncRecords()">
-                    <span class="btn-icon">🗑️</span> 清除同步记录
+                    <span class="btn-icon">馃棏锔?/span> 娓呴櫎鍚屾璁板綍
                 </button>
             </div>
             <div class="btn-group" style="margin-top:8px;">
-                <button class="btn" id="markAnimeBtn" onclick="markUploadedItems('动画')">
-                    <span class="btn-icon">🎬</span> 标记动画（剧集）
+                <button class="btn" id="markAnimeBtn" onclick="markUploadedItems('鍔ㄧ敾')">
+                    <span class="btn-icon">馃幀</span> 鏍囪鍔ㄧ敾锛堝墽闆嗭級
                 </button>
-                <button class="btn" id="markBookBtn" onclick="markUploadedItems('书籍')">
-                    <span class="btn-icon">📚</span> 标记书籍（小说）
+                <button class="btn" id="markBookBtn" onclick="markUploadedItems('涔︾睄')">
+                    <span class="btn-icon">馃摎</span> 鏍囪涔︾睄锛堝皬璇达級
                 </button>
                 <button class="btn warning" id="clearMarkBtn" onclick="clearSheetMarks()">
-                    <span class="btn-icon">❌</span> 清除D列标记
-                </button>
+                    <span class="btn-icon">鉂?/span> 娓呴櫎D鍒楁爣璁?                </button>
             </div>
-            <p class="hint">同步记录会保存在"同步记录"工作表中，包含：名称、URL、SID、类型、同步时间等</p>
+            <p class="hint">鍚屾璁板綍浼氫繚瀛樺湪"鍚屾璁板綍"宸ヤ綔琛ㄤ腑锛屽寘鍚細鍚嶇О銆乁RL銆丼ID銆佺被鍨嬨€佸悓姝ユ椂闂寸瓑</p>
         </div>
 
-        <!-- 使用引导 -->
+        <!-- 浣跨敤寮曞 -->
         <div class="section">
-            <h3>📖 使用引导</h3>
+            <h3>馃摉 浣跨敤寮曞</h3>
             <div class="guide">
                 <div class="step">
                     <span class="step-num">1</span>
-                    <span>设置 Token（只需设置一次）</span>
+                    <span>璁剧疆 Token锛堝彧闇€璁剧疆涓€娆★級</span>
                 </div>
                 <div class="step">
                     <span class="step-num">2</span>
-                    <span>确保 Excel 包含必填列</span>
+                    <span>纭繚 Excel 鍖呭惈蹇呭～鍒?/span>
                 </div>
                 <div class="step">
                     <span class="step-num">3</span>
-                    <span>选择工作表和行范围</span>
+                    <span>閫夋嫨宸ヤ綔琛ㄥ拰琛岃寖鍥?/span>
                 </div>
                 <div class="step">
                     <span class="step-num">4</span>
-                    <span>点击"同步到 Bangumi"</span>
+                    <span>鐐瑰嚮"鍚屾鍒?Bangumi"</span>
                 </div>
             </div>
         </div>
 
-        <!-- 数据格式要求 -->
+        <!-- 鏁版嵁鏍煎紡瑕佹眰 -->
         <div class="section">
-            <h3>📋 数据格式要求</h3>
+            <h3>馃搵 鏁版嵁鏍煎紡瑕佹眰</h3>
             <div class="format-table">
                 <table>
-                    <tr><th>列名（支持模糊匹配）</th><th>说明</th><th>必填</th></tr>
-                    <tr><td>Bangumi_URL / bgm</td><td>Bangumi 条目链接</td><td class="required">✅ 必填</td></tr>
-                    <tr><td>是否看完 / 观看状态</td><td>是/否/在追</td><td></td></tr>
-                    <tr><td>完播日 / 看完时间</td><td>如 2024-01-01</td><td></td></tr>
-                    <tr><td>打分 / 评分</td><td>1-10 分</td><td></td></tr>
-                    <tr><td>感言 / 评价 / 剧透</td><td>个人评论</td><td></td></tr>
-                    <tr><td>标签 / 分级</td><td>用 | 、 / 分隔</td><td></td></tr>
-                    <tr><td>特点 / 印象</td><td>用 | 、 / 分隔</td><td></td></tr>
-                    <tr><td>集号 / 看到</td><td>如 1-12</td><td></td></tr>
+                    <tr><th>鍒楀悕锛堟敮鎸佹ā绯婂尮閰嶏級</th><th>璇存槑</th><th>蹇呭～</th></tr>
+                    <tr><td>Bangumi_URL / bgm</td><td>Bangumi 鏉＄洰閾炬帴</td><td class="required">鉁?蹇呭～</td></tr>
+                    <tr><td>鏄惁鐪嬪畬 / 瑙傜湅鐘舵€?/td><td>鏄?鍚?鍦ㄨ拷</td><td></td></tr>
+                    <tr><td>瀹屾挱鏃?/ 鐪嬪畬鏃堕棿</td><td>濡?2024-01-01</td><td></td></tr>
+                    <tr><td>鎵撳垎 / 璇勫垎</td><td>1-10 鍒?/td><td></td></tr>
+                    <tr><td>鎰熻█ / 璇勪环 / 鍓ч€?/td><td>涓汉璇勮</td><td></td></tr>
+                    <tr><td>鏍囩 / 鍒嗙骇</td><td>鐢?| 銆?/ 鍒嗛殧</td><td></td></tr>
+                    <tr><td>鐗圭偣 / 鍗拌薄</td><td>鐢?| 銆?/ 鍒嗛殧</td><td></td></tr>
+                    <tr><td>闆嗗彿 / 鐪嬪埌</td><td>濡?1-12</td><td></td></tr>
                 </table>
             </div>
         </div>
 
-        <!-- 调试通知 -->
+        <!-- 璋冭瘯閫氱煡 -->
         <div class="section debug-section" id="debugSection" style="display:none;">
-            <h3>🔧 调试信息</h3>
+            <h3>馃敡 璋冭瘯淇℃伅</h3>
             <div id="DemoSpan" class="debug-content"></div>
-            <button class="btn small" onclick="testDebugConnection()">测试连接</button>
+            <button class="btn small" onclick="testDebugConnection()">娴嬭瘯杩炴帴</button>
         </div>
 
-        <!-- 状态 -->
+        <!-- 鐘舵€?-->
         <div class="section">
-            <div class="status" id="statusBox">已就绪</div>
+            <div class="status" id="statusBox">宸插氨缁?/div>
         </div>
     </div>
 </body>
 
-<style>
-    * {
-        margin: 0;
-        padding: 0;
-        box-sizing: border-box;
-    }
-    body {
-        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Microsoft YaHei", sans-serif;
-        font-size: 14px;
-        background: #242424;
-        min-height: 100vh;
-        padding: 15px;
-        color: #e0e0e0;
-    }
-    .global {
-        max-width: 480px;
-        margin: 0 auto;
-    }
-    .header {
-        text-align: center;
-        padding: 20px 15px;
-        background: #2d2d2d;
-        border-radius: 12px;
-        margin-bottom: 15px;
-        box-shadow: 0 4px 15px rgba(0,0,0,0.3);
-    }
-    .header h2 {
-        color: #ffffff;
-        margin-bottom: 5px;
-        font-size: 22px;
-    }
-    .subtitle {
-        color: #888;
-        font-size: 13px;
-    }
-    .section {
-        background: #2d2d2d;
-        border-radius: 12px;
-        padding: 18px;
-        margin-bottom: 12px;
-        box-shadow: 0 4px 15px rgba(0,0,0,0.2);
-        transition: transform 0.2s;
-    }
-    .section:hover {
-        transform: translateY(-2px);
-    }
-    .section h3 {
-        color: #ffffff;
-        font-size: 15px;
-        margin-bottom: 14px;
-        padding-bottom: 10px;
-        border-bottom: 2px solid #4a9eff;
-        display: flex;
-        align-items: center;
-        gap: 8px;
-    }
-    .btn-group {
-        display: flex;
-        flex-direction: column;
-        gap: 8px;
-    }
-    .btn {
-        padding: 12px 18px;
-        border: none;
-        border-radius: 8px;
-        cursor: pointer;
-        font-size: 14px;
-        transition: all 0.3s;
-        background: #3a3a3a;
-        color: #e0e0e0;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        gap: 8px;
-    }
-    .btn:hover {
-        background: #4a4a4a;
-        transform: translateY(-1px);
-    }
-    .btn-icon {
-        font-size: 16px;
-    }
-    .btn.primary {
-        background: linear-gradient(135deg, #4a9eff 0%, #3a8ee8 100%);
-        color: white;
-        box-shadow: 0 4px 10px rgba(74, 158, 255, 0.3);
-    }
-    .btn.primary:hover {
-        background: linear-gradient(135deg, #3a8ee8 0%, #2a7ed8 100%);
-        box-shadow: 0 6px 15px rgba(74, 158, 255, 0.4);
-    }
-    .btn.warning {
-        background: linear-gradient(135deg, #ff6b6b 0%, #ee5a5a 100%);
-        color: white;
-        box-shadow: 0 4px 10px rgba(255, 107, 107, 0.3);
-    }
-    .btn.warning:hover {
-        background: linear-gradient(135deg, #ee5a5a 0%, #de4a4a 100%);
-        box-shadow: 0 6px 15px rgba(255, 107, 107, 0.4);
-    }
-    .btn.small {
-        padding: 6px 12px;
-        font-size: 12px;
-    }
-    .token-display {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        padding: 12px 15px;
-        background: #3a3a3a;
-        border-radius: 8px;
-        border: 1px solid #444;
-    }
-    #tokenStatus {
-        font-weight: bold;
-        color: #ff6b6b;
-        font-size: 14px;
-    }
-    #tokenStatus.set {
-        color: #4ade80;
-    }
-    .hint {
-        color: #888;
-        font-size: 12px;
-        margin-top: 10px;
-    }
-    .form-group {
-        margin-bottom: 14px;
-    }
-    .form-group label {
-        display: block;
-        margin-bottom: 6px;
-        color: #b0b0b0;
-        font-weight: 500;
-        font-size: 13px;
-    }
-    .sheet-select-row {
-        display: flex;
-        align-items: center;
-        gap: 8px;
-    }
-    .sheet-select-row select {
-        min-width: 0;
-    }
-    .input {
-        width: 100%;
-        padding: 10px 14px;
-        border: 2px solid #444;
-        border-radius: 8px;
-        font-size: 14px;
-        transition: all 0.3s;
-        background: #333;
-        color: #e0e0e0;
-    }
-    .input:focus {
-        outline: none;
-        border-color: #4a9eff;
-        box-shadow: 0 0 0 3px rgba(74, 158, 255, 0.2);
-    }
-    select.input {
-        cursor: pointer;
-        background: #333;
-        color: #e0e0e0;
-    }
-    /* ========== 美化的数据预览区域 ========== */
-    .preview-wrapper {
-        background: #333;
-        border-radius: 10px;
-        padding: 3px;
-        margin-bottom: 12px;
-        border: 1px solid #444;
-        max-width: 100%;
-        overflow-x: auto;
-    }
-    .preview-box {
-        background: #2a2a2a;
-        border-radius: 8px;
-        padding: 0;
-        max-height: 280px;
-        overflow-y: auto;
-        overflow-x: visible;
-    }
-    .preview-box::-webkit-scrollbar {
-        width: 6px;
-    }
-    .preview-box::-webkit-scrollbar-track {
-        background: #333;
-        border-radius: 3px;
-    }
-    .preview-box::-webkit-scrollbar-thumb {
-        background: #4a9eff;
-        border-radius: 3px;
-    }
-    .preview-box table {
-        width: max-content;
-        min-width: 100%;
-        border-collapse: collapse;
-        font-size: 12px;
-    }
-    .preview-box th {
-        background: linear-gradient(135deg, #4a9eff 0%, #3a8ee8 100%);
-        color: white;
-        padding: 10px 8px;
-        text-align: left;
-        font-weight: 600;
-        position: sticky;
-        top: 0;
-        z-index: 10;
-        white-space: nowrap;
-    }
-    .preview-box th:first-child {
-        border-radius: 8px 0 0 0;
-    }
-    .preview-box th:last-child {
-        border-radius: 0 8px 0 0;
-    }
-    .preview-box td {
-        padding: 10px 8px;
-        border-bottom: 1px solid #3a3a3a;
-        vertical-align: middle;
-        color: #e0e0e0;
-    }
-    .preview-box tr {
-        transition: all 0.2s;
-    }
-    .preview-box tr:hover {
-        background: #383838;
-    }
-    .preview-box tr:last-child td {
-        border-bottom: none;
-    }
-    .preview-box tr.valid {
-        background: linear-gradient(90deg, rgba(74, 222, 128, 0.1) 0%, transparent 100%);
-    }
-    .preview-box tr.invalid {
-        background: linear-gradient(90deg, rgba(255, 107, 107, 0.1) 0%, transparent 100%);
-    }
-    .preview-box .row-num {
-        font-weight: 600;
-        color: #888;
-        min-width: 35px;
-    }
-    .preview-box .name-cell {
-        max-width: 90px;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
-        font-weight: 500;
-        color: #e0e0e0;
-    }
-    .preview-box .sid-cell {
-        font-family: 'Monaco', 'Menlo', monospace;
-        font-size: 11px;
-        color: #4a9eff;
-        font-weight: 600;
-    }
-    .preview-box .status-cell {
-        min-width: 50px;
-    }
-    .preview-box .type-badge {
-        display: inline-block;
-        padding: 2px 8px;
-        border-radius: 10px;
-        font-size: 11px;
-        font-weight: 600;
-    }
-    .preview-box .type-1 { background: #1a3a35; color: #4ade80; }
-    .preview-box .type-2 { background: #1a2a3a; color: #60a5fa; }
-    .preview-box .type-3 { background: #3a3520; color: #fbbf24; }
-    .preview-box .type-4 { background: #352a3a; color: #a78bfa; }
-    .preview-box .type-5 { background: #3a1a1a; color: #f87171; }
-    .preview-box .rate-cell {
-        color: #f39c12;
-        font-weight: 600;
-    }
-    .preview-box .tags-cell {
-        font-size: 11px;
-        white-space: nowrap;
-        color: #7f8c8d;
-    }
-    .preview-box .no-url {
-        color: #e74c3c;
-    }
-    .preview-box .has-url {
-        color: #27ae60;
-    }
-    #previewCount {
-        font-size: 12px;
-        color: #888;
-        font-weight: normal;
-    }
-    .guide {
-        display: flex;
-        flex-direction: column;
-        gap: 10px;
-    }
-    .step {
-        display: flex;
-        align-items: center;
-        gap: 12px;
-        padding: 12px;
-        background: #333;
-        border-radius: 8px;
-        border-left: 3px solid #4a9eff;
-    }
-    .step-num {
-        width: 28px;
-        height: 28px;
-        background: linear-gradient(135deg, #4a9eff 0%, #3a8ee8 100%);
-        color: white;
-        border-radius: 50%;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-weight: bold;
-        font-size: 13px;
-        box-shadow: 0 2px 6px rgba(74, 158, 255, 0.3);
-    }
-    .format-table {
-        overflow-x: auto;
-    }
-    .format-table table {
-        width: 100%;
-        border-collapse: collapse;
-        font-size: 12px;
-        border-radius: 8px;
-        overflow: hidden;
-    }
-    .format-table th, .format-table td {
-        padding: 10px 8px;
-        text-align: left;
-        border: none;
-        border-bottom: 1px solid #444;
-        color: #e0e0e0;
-    }
-    .format-table th {
-        background: linear-gradient(135deg, #4a9eff 0%, #3a8ee8 100%);
-        color: white;
-    }
-    .format-table tr:nth-child(even) {
-        background: #333;
-    }
-    .format-table tr:hover {
-        background: #3a3a3a;
-    }
-    .required {
-        color: #ff6b6b;
-        font-weight: bold;
-    }
-    /* ========== 模式选择器样式 ========== */
-    .mode-selector {
-        display: flex;
-        flex-direction: column;
-        gap: 8px;
-        margin-bottom: 14px;
-    }
-    .radio-label {
-        display: flex;
-        align-items: flex-start;
-        gap: 10px;
-        padding: 12px 14px;
-        background: #333;
-        border-radius: 8px;
-        border: 2px solid #444;
-        cursor: pointer;
-        transition: all 0.2s;
-    }
-    .radio-label:hover {
-        border-color: #555;
-        background: #383838;
-    }
-    .radio-label:has(input:checked) {
-        border-color: #4a9eff;
-        background: linear-gradient(135deg, rgba(74, 158, 255, 0.1) 0%, rgba(74, 158, 255, 0.05) 100%);
-    }
-    .radio-label input[type="radio"] {
-        width: 18px;
-        height: 18px;
-        margin-top: 2px;
-        accent-color: #4a9eff;
-        cursor: pointer;
-    }
-    .radio-text {
-        font-weight: 600;
-        color: #e0e0e0;
-        font-size: 14px;
-    }
-    .radio-desc {
-        display: block;
-        font-size: 12px;
-        color: #888;
-        margin-top: 2px;
-    }
-    .range-info {
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        padding: 10px 14px;
-        background: #2a3a2a;
-        border-radius: 8px;
-        border: 1px solid #3a4a3a;
-        margin-bottom: 14px;
-        font-size: 13px;
-    }
-    .range-info.filtered {
-        background: #2a3a4a;
-        border-color: #3a4a5a;
-    }
-    .info-icon {
-        font-size: 16px;
-    }
-    #filterStatus {
-        color: #e0e0e0;
-    }
-    #filterStatus.has-filter {
-        color: #fbbf24;
-    }
-    #filterStatus.no-filter {
-        color: #4ade80;
-    }
-    .status {
-        padding: 12px;
-        background: #333;
-        border-radius: 8px;
-        text-align: center;
-        color: #888;
-        font-weight: 500;
-    }
-    .status.success {
-        background: linear-gradient(135deg, #1a3a25 0%, #2a4a35 100%);
-        color: #4ade80;
-    }
-    .status.error {
-        background: linear-gradient(135deg, #3a1a1a 0%, #4a2a2a 100%);
-        color: #f87171;
-    }
-    .status.loading {
-        background: linear-gradient(135deg, #3a3510 0%, #4a4515 100%);
-        color: #fbbf24;
-    }
-    .lock-status {
-        padding: 6px 12px;
-        font-size: 12px;
-        border-radius: 8px;
-        font-weight: 600;
-    }
-    .lock-status.unlocked {
-        background: #3a3a3a;
-        color: #888;
-    }
-    .lock-status.locked {
-        background: linear-gradient(135deg, #4a9eff 0%, #3a8ee8 100%);
-        color: white;
-    }
-    .debug-section {
-        background: #3a3520;
-        border: 1px solid #5a5520;
-    }
-    .debug-section h3 {
-        color: #fbbf24;
-        border-bottom-color: #5a5520;
-    }
-    .debug-content {
-        background: #2a2a2a;
-        padding: 10px;
-        border-radius: 4px;
-        margin-bottom: 10px;
-        font-size: 12px;
-        color: #e0e0e0;
-    }
-    /* ========== 详细预览模态框样式 ========== */
-    .detail-modal {
-        position: fixed;
-        top: 0; left: 0;
-        width: 100%; height: 100%;
-        background: rgba(0,0,0,0.7);
-        z-index: 1000;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        backdrop-filter: blur(3px);
-    }
-    .detail-modal-content {
-        background: #2d2d2d;
-        border-radius: 16px;
-        width: 95%;
-        max-width: 550px;
-        max-height: 85vh;
-        display: flex;
-        flex-direction: column;
-        box-shadow: 0 20px 60px rgba(0,0,0,0.5);
-        animation: modalSlideIn 0.3s ease;
-    }
-    @keyframes modalSlideIn {
-        from {
-            opacity: 0;
-            transform: translateY(-30px);
-        }
-        to {
-            opacity: 1;
-            transform: translateY(0);
-        }
-    }
-    .detail-modal-header {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        padding: 18px 20px;
-        background: linear-gradient(135deg, #4a9eff 0%, #3a8ee8 100%);
-        border-radius: 16px 16px 0 0;
-    }
-    .detail-modal-header h3 {
-        color: white;
-        margin: 0;
-        padding: 0;
-        border: none;
-        font-size: 18px;
-    }
-    .detail-close-btn {
-        width: 32px;
-        height: 32px;
-        border: none;
-        background: rgba(255,255,255,0.2);
-        color: white;
-        border-radius: 50%;
-        font-size: 20px;
-        cursor: pointer;
-        transition: all 0.2s;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-    }
-    .detail-close-btn:hover {
-        background: rgba(255,255,255,0.3);
-        transform: rotate(90deg);
-    }
-    .detail-modal-body {
-        padding: 20px;
-        overflow-y: auto;
-        flex: 1;
-        color: #e0e0e0;
-    }
-    .detail-modal-body::-webkit-scrollbar {
-        width: 6px;
-    }
-    .detail-modal-body::-webkit-scrollbar-track {
-        background: #333;
-        border-radius: 3px;
-    }
-    .detail-modal-body::-webkit-scrollbar-thumb {
-        background: #4a9eff;
-        border-radius: 3px;
-    }
-    .detail-modal-toolbar {
-        padding: 12px 20px;
-        background: #333;
-        border-bottom: 1px solid #444;
-        display: flex;
-        gap: 8px;
-        flex-wrap: wrap;
-    }
-    .filter-btn {
-        padding: 6px 14px;
-        border: 2px solid #444;
-        border-radius: 20px;
-        background: #2d2d2d;
-        color: #b0b0b0;
-        font-size: 12px;
-        cursor: pointer;
-        transition: all 0.2s;
-        display: flex;
-        align-items: center;
-        gap: 6px;
-    }
-    .filter-btn:hover {
-        background: #3a3a3a;
-        border-color: #555;
-    }
-    .filter-btn.active {
-        background: #4a9eff;
-        border-color: #4a9eff;
-        color: white;
-    }
-    .filter-btn.all { border-color: #888; }
-    .filter-btn.all.active { background: #888; border-color: #888; }
-    .filter-btn.type-2 { border-color: #60a5fa; color: #60a5fa; }
-    .filter-btn.type-2.active { background: #60a5fa; border-color: #60a5fa; color: white; }
-    .filter-btn.type-3 { border-color: #fbbf24; color: #fbbf24; }
-    .filter-btn.type-3.active { background: #fbbf24; border-color: #fbbf24; color: white; }
-    .filter-btn.type-4 { border-color: #a78bfa; color: #a78bfa; }
-    .filter-btn.type-4.active { background: #a78bfa; border-color: #a78bfa; color: white; }
-    /* ========== 详细预览卡片样式 ========== */
-    .detail-stats {
-        display: grid;
-        grid-template-columns: repeat(3, 1fr);
-        gap: 10px;
-        margin-bottom: 18px;
-    }
-    .stat-card {
-        background: #3a3a3a;
-        padding: 12px;
-        border-radius: 10px;
-        text-align: center;
-        border: 1px solid #444;
-    }
-    .stat-card .stat-value {
-        font-size: 22px;
-        font-weight: 700;
-        color: #ffffff;
-    }
-    .stat-card .stat-label {
-        font-size: 11px;
-        color: #888;
-        margin-top: 4px;
-    }
-    .stat-card.success .stat-value { color: #4ade80; }
-    .stat-card.info .stat-value { color: #60a5fa; }
-    .detail-item {
-        background: #333;
-        border: 1px solid #444;
-        border-radius: 12px;
-        margin-bottom: 14px;
-        overflow: hidden;
-        transition: all 0.2s;
-    }
-    .detail-item:hover {
-        box-shadow: 0 4px 15px rgba(0,0,0,0.3);
-        transform: translateY(-2px);
-    }
-    .detail-item.uploaded {
-        border-left: 4px solid #92d050;
-    }
-    .detail-item.pending {
-        border-left: 4px solid #f59e0b;
-    }
-    .upload-single-btn {
-        padding: 6px 14px;
-        background: #3b82f6;
-        color: #fff;
-        border: none;
-        border-radius: 6px;
-        font-size: 12px;
-        font-weight: 600;
-        cursor: pointer;
-        transition: all 0.2s;
-    }
-    .upload-single-btn:hover {
-        background: #2563eb;
-        transform: scale(1.05);
-    }
-    .upload-single-btn:disabled {
-        background: #6b7280;
-        cursor: not-allowed;
-        transform: none;
-    }
-    .upload-single-btn.uploading {
-        background: #f59e0b;
-    }
-    .upload-single-btn.success {
-        background: #22c55e;
-    }
-    .upload-single-btn.error {
-        background: #ef4444;
-    }
-    .upload-single-btn.reupload {
-        background: #f59e0b;
-        color: #fff;
-    }
-    .upload-single-btn.reupload:hover {
-        background: #d97706;
-    }
-    .confirm-modal-content {
-        max-width: 420px;
-        text-align: center;
-        padding: 30px 25px;
-    }
-    .confirm-btn {
-        min-width: 100px;
-        padding: 10px 24px;
-        font-size: 14px;
-        border-radius: 8px;
-        border: none;
-        cursor: pointer;
-        font-weight: 600;
-        transition: all 0.2s;
-    }
-    .confirm-yes {
-        background: linear-gradient(135deg, #22a84d, #1a8a3e);
-        color: #fff;
-        box-shadow: 0 2px 8px rgba(34, 168, 77, 0.3);
-    }
-    .confirm-yes:hover {
-        background: linear-gradient(135deg, #1a8a3e, #157a35);
-        transform: translateY(-1px);
-        box-shadow: 0 4px 12px rgba(34, 168, 77, 0.4);
-    }
-    .confirm-no {
-        background: #444;
-        color: #ccc;
-    }
-    .confirm-no:hover {
-        background: #555;
-        color: #fff;
-    }
-    .uploaded-badge {
-        display: inline-flex;
-        align-items: center;
-        gap: 4px;
-        padding: 4px 10px;
-        background: #22a84d;
-        color: #fff;
-        border-radius: 4px;
-        font-size: 11px;
-        font-weight: 600;
-    }
-    .detail-item-header {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        padding: 14px 16px;
-        background: #3a3a3a;
-        border-bottom: 1px solid #444;
-        gap: 10px;
-    }
-    .detail-item-header .upload-single-btn {
-        flex-shrink: 0;
-    }
-    .detail-item-title {
-        display: flex;
-        align-items: center;
-        gap: 10px;
-    }
-    .detail-item-row {
-        font-weight: 600;
-        color: #e0e0e0;
-        font-size: 14px;
-    }
-    .detail-item-name {
-        font-size: 15px;
-        font-weight: 700;
-        color: #ffffff;
-    }
-    .detail-item-body {
-        padding: 14px 16px;
-    }
-    .detail-row {
-        display: flex;
-        margin-bottom: 10px;
-        align-items: flex-start;
-    }
-    .detail-row:last-child {
-        margin-bottom: 0;
-    }
-    .detail-label {
-        min-width: 70px;
-        color: #888;
-        font-size: 12px;
-        font-weight: 500;
-    }
-    .detail-value {
-        flex: 1;
-        color: #e0e0e0;
-        font-size: 13px;
-        word-break: break-all;
-    }
-    .detail-value.url {
-        font-family: 'Monaco', 'Menlo', monospace;
-        font-size: 11px;
-        color: #60a5fa;
-        background: #2a2a3a;
-        padding: 4px 8px;
-        border-radius: 4px;
-        word-break: break-all;
-    }
-    .detail-value.sid {
-        font-weight: 700;
-        color: #f87171;
-    }
-    .detail-value.sid.valid {
-        color: #4ade80;
-    }
-    .detail-value.json {
-        font-family: 'Monaco', 'Menlo', monospace;
-        font-size: 11px;
-        background: #2a2a2a;
-        padding: 10px;
-        border-radius: 6px;
-        white-space: pre-wrap;
-        word-break: break-all;
-        color: #a5f3fc;
-        border: 1px solid #444;
-    }
-    .detail-value.tags {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 6px;
-    }
-    .tag-badge {
-        background: linear-gradient(135deg, #4a9eff 0%, #3a8ee8 100%);
-        color: white;
-        padding: 3px 10px;
-        border-radius: 12px;
-        font-size: 11px;
-        font-weight: 500;
-    }
-    .status-badge {
-        display: inline-block;
-        padding: 4px 12px;
-        border-radius: 15px;
-        font-size: 12px;
-        font-weight: 600;
-    }
-    .status-badge.type-1 { background: #1a3a35; color: #4ade80; }
-    .status-badge.type-2 { background: #1a2a3a; color: #60a5fa; }
-    .status-badge.type-3 { background: #3a3520; color: #fbbf24; }
-    .status-badge.type-4 { background: #352a3a; color: #a78bfa; }
-    .status-badge.type-5 { background: #3a1a1a; color: #f87171; }
-    .detail-footer {
-        padding: 12px 16px;
-        background: #1a3a25;
-        border-top: 1px solid #2a4a35;
-        color: #4ade80;
-    }
-    .detail-footer .send-info {
-        font-size: 12px;
-        color: #1e8449;
-        font-weight: 500;
-    }
-</style>
+
 </html>

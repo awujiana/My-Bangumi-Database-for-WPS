@@ -183,33 +183,143 @@ const BGM_COLOR = {
     WHITE: 0xFFFFFF        // 白色（清除标记）
 };
 
-// ========== Token 加密（新版：btoa("BGM:" + XOR(token))）==========
-const TOKEN_XOR_KEY = 0x5A;
-const TOKEN_PREFIX = "BGM:";
+// ========== Token 加密（增强版：时间戳 + 多重 XOR + Base64）==========
+/**
+ * Token 加密方案说明：
+ * 1. 使用多重 XOR 混淆，增加破解难度
+ * 2. 添加时间戳，防止 Token 被永久存储后滥用
+ * 3. 添加校验和，检测数据损坏
+ * 4. Base64 编码存储
+ */
 
-function encryptToken(token) {
-    if (!token) return "";
-    let xorResult = "";
-    for (let i = 0; i < token.length; i++) {
-        let code = token.charCodeAt(i) ^ TOKEN_XOR_KEY;
-        xorResult += String.fromCharCode(code);
+const TOKEN_CONFIG = {
+    // 多重 XOR 密钥（不同位置的字符使用不同密钥）
+    KEYS: [0x5A, 0xA5, 0x7F, 0xF2],
+    // Token 前缀（用于验证解密结果）
+    PREFIX: "BGM1:",
+    // Token 有效期（毫秒），0 表示永久
+    EXPIRY_MS: 0, // 建议生产环境设置，如 30 * 24 * 60 * 60 * 1000 (30天)
+    // 校验字符数
+    CHECKSUM_LEN: 4
+};
+
+/**
+ * 计算简单校验和
+ * @param {string} str - 输入字符串
+ * @returns {number} 校验和
+ */
+function calcChecksum(str) {
+    let sum = 0;
+    for (let i = 0; i < str.length; i++) {
+        sum = ((sum << 5) - sum + str.charCodeAt(i)) & 0xFFFFFFFF;
     }
-    return btoa(TOKEN_PREFIX + xorResult);
+    return Math.abs(sum) % 10000;
 }
 
+/**
+ * 多重 XOR 加密
+ * @param {string} text - 原文
+ * @param {number[]} keys - 密钥数组
+ * @returns {string} 加密后文本
+ */
+function multiXor(text, keys) {
+    let result = "";
+    for (let i = 0; i < text.length; i++) {
+        let key = keys[i % keys.length];
+        result += String.fromCharCode(text.charCodeAt(i) ^ key);
+    }
+    return result;
+}
+
+/**
+ * 加密 Token
+ * @param {string} token - 原始 Token
+ * @returns {string} 加密后的 Token
+ */
+function encryptToken(token) {
+    if (!token) return "";
+    
+    try {
+        // 添加前缀
+        let data = TOKEN_CONFIG.PREFIX + token;
+        
+        // 添加时间戳（如果配置了有效期）
+        if (TOKEN_CONFIG.EXPIRY_MS > 0) {
+            const expiry = Date.now() + TOKEN_CONFIG.EXPIRY_MS;
+            data += ":" + expiry.toString(36);
+        }
+        
+        // 添加校验和
+        const checksum = calcChecksum(token);
+        data += ":" + checksum.toString().padStart(TOKEN_CONFIG.CHECKSUM_LEN, '0');
+        
+        // 多重 XOR 加密
+        let encrypted = multiXor(data, TOKEN_CONFIG.KEYS);
+        
+        // Base64 编码
+        return btoa(encrypted);
+    } catch (e) {
+        bgmLog(BGM.LOG_LEVELS.ERROR, "Token encryption failed: " + e.message);
+        return "";
+    }
+}
+
+/**
+ * 解密 Token
+ * @param {string} encoded - 加密后的 Token
+ * @returns {string|null} 原始 Token 或 null
+ */
 function decryptToken(encoded) {
     if (!encoded) return null;
+    
     try {
+        // Base64 解码
         let decoded = atob(encoded);
-        if (!decoded.startsWith(TOKEN_PREFIX)) return null;
-        let xorResult = decoded.substring(TOKEN_PREFIX.length);
-        let result = "";
-        for (let i = 0; i < xorResult.length; i++) {
-            let code = xorResult.charCodeAt(i) ^ TOKEN_XOR_KEY;
-            result += String.fromCharCode(code);
+        
+        // XOR 解密
+        let decrypted = multiXor(decoded, TOKEN_CONFIG.KEYS);
+        
+        // 验证前缀
+        if (!decrypted.startsWith(TOKEN_CONFIG.PREFIX)) {
+            bgmLog(BGM.LOG_LEVELS.WARN, "Invalid token prefix");
+            return null;
         }
-        return result;
+        
+        // 移除前缀
+        let data = decrypted.substring(TOKEN_CONFIG.PREFIX.length);
+        
+        // 提取各部分
+        let parts = data.split(':');
+        
+        // 解析 Token、过期时间、校验和
+        let token, expiry, storedChecksum;
+        
+        if (TOKEN_CONFIG.EXPIRY_MS > 0 && parts.length >= 3) {
+            token = parts[0];
+            expiry = parseInt(parts[1], 36);
+            storedChecksum = parts[2];
+        } else {
+            token = parts[0];
+            storedChecksum = parts[1];
+            expiry = null;
+        }
+        
+        // 验证校验和
+        const calcSum = calcChecksum(token);
+        if (storedChecksum !== calcSum.toString().padStart(TOKEN_CONFIG.CHECKSUM_LEN, '0')) {
+            bgmLog(BGM.LOG_LEVELS.WARN, "Token checksum mismatch");
+            return null;
+        }
+        
+        // 验证过期时间
+        if (expiry && Date.now() > expiry) {
+            bgmLog(BGM.LOG_LEVELS.WARN, "Token expired");
+            return null;
+        }
+        
+        return token;
     } catch (e) {
+        bgmLog(BGM.LOG_LEVELS.ERROR, "Token decryption failed: " + e.message);
         return null;
     }
 }
