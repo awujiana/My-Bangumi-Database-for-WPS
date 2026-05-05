@@ -7,6 +7,39 @@
 const BGM_API_BASE = "https://api.bgm.tv";
 const REQUEST_DELAY = 800;
 
+// ========== 向 taskpane 发送消息 ==========
+function sendToTaskpane(data) {
+    try {
+        if (window.parent && window.parent !== window) {
+            window.parent.postMessage(data, "*");
+            return true;
+        }
+    } catch (e) {
+        console.log("postMessage not available:", e.message);
+    }
+    return false;
+}
+
+// ========== 工具函数：解析 JSON 请求体为可读描述 ==========
+function parseJsonBodySummary(jsonStr) {
+    if (!jsonStr) return "(空)";
+    try {
+        let obj = JSON.parse(jsonStr);
+        let parts = [];
+        let typeMap = {1:"想看", 2:"在看", 3:"看过", 4:"搁置", 5:"抛弃"};
+        if (obj.type !== undefined) parts.push("状态:" + (typeMap[obj.type] || obj.type));
+        if (obj.rate !== undefined && obj.rate > 0) parts.push("评分:" + obj.rate);
+        if (obj.tags && obj.tags.length > 0) parts.push("标签:[" + obj.tags.join(",") + "]");
+        if (obj.comment) {
+            let comment = obj.comment.length > 30 ? obj.comment.substring(0, 30) + "..." : obj.comment;
+            parts.push("评价:" + comment);
+        }
+        return parts.length > 0 ? parts.join(" | ") : "(仅标记状态)";
+    } catch (e) {
+        return jsonStr;
+    }
+}
+
 // ========== 缓存区域 ==========
 // 缓存的总数据行数，用于优化扫描范围
 let _cachedTotalRows = 0;
@@ -82,6 +115,14 @@ function SyncToBangumi() {
         return;
     }
 
+    // 激活同步记录表（方便查看同步过程）
+    if (typeof getOrCreateSyncRecordSheet === 'function') {
+        let syncSheet = getOrCreateSyncRecordSheet();
+        if (syncSheet) {
+            syncSheet.Activate();
+        }
+    }
+
     // 找表头行
     let headerRow = findHeaderRow(ws);
     if (headerRow === 0) {
@@ -137,13 +178,20 @@ function SyncToBangumi() {
         let bgmUrl = trim(getCellValue(ws, i, colMap.get("Bangumi_URL")));
         let subjectId = extractSubjectId(bgmUrl);
 
+        // 获取条目类型（在需要使用前先获取）
+        let itemType = "";
+        if (colMap.has("类别")) {
+            itemType = trim(getCellValue(ws, i, colMap.get("类别")));
+        }
+
         if (subjectId === "") {
             skipNoUrlCount++;
-            getCell(ws, i, 1).Interior.Color = BGM_COLOR.SKIP;
+            let firstCell = getCell(ws, i, 1);
+            if (firstCell && firstCell.Interior) firstCell.Interior.Color = BGM_COLOR.SKIP;
             let skipInfo = `[跳过] 行${i}: ${name || "(无名称)"} - 缺少 Bangumi URL`;
             console.log("SyncToBangumi - " + skipInfo);
             logEntries.push(skipInfo);
-            
+
             // 写入同步记录表
             if (typeof addSyncRecord === 'function') {
                 addSyncRecord({
@@ -170,12 +218,6 @@ function SyncToBangumi() {
         let watchStatus = "";
         if (colMap.has("是否看完")) {
             watchStatus = trim(getCellValue(ws, i, colMap.get("是否看完")));
-        }
-
-        // 获取条目类型
-        let itemType = "";
-        if (colMap.has("类别")) {
-            itemType = trim(getCellValue(ws, i, colMap.get("类别")));
         }
 
         // 构建请求体
@@ -213,7 +255,8 @@ function SyncToBangumi() {
         // 处理结果
         if (statusCode === 200 || statusCode === 201 || statusCode === 202 || statusCode === 204) {
             successCount++;
-            getCell(ws, i, 1).Interior.Color = BGM_COLOR.SUCCESS;
+            let successCell = getCell(ws, i, 1);
+            if (successCell && successCell.Interior) successCell.Interior.Color = BGM_COLOR.SUCCESS;
             let successInfo = `[成功] 行${i}: ${name || "(无名称)"} (SID=${subjectId}) - ${bodySummary}`;
             console.log("SyncToBangumi - " + successInfo);
             logEntries.push(successInfo);
@@ -233,7 +276,8 @@ function SyncToBangumi() {
             }
         } else {
             failCount++;
-            getCell(ws, i, 1).Interior.Color = BGM_COLOR.FAIL;
+            let failCell = getCell(ws, i, 1);
+            if (failCell && failCell.Interior) failCell.Interior.Color = BGM_COLOR.FAIL;
             let errMsg = result.message || "HTTP " + statusCode;
             let failInfo = `[失败] 行${i}: ${name || "(无名称)"} (SID=${subjectId}) - 错误: ${errMsg} | 数据: ${bodySummary}`;
             console.log("SyncToBangumi - " + failInfo);
@@ -693,7 +737,8 @@ function clearRowColors() {
     if (lastRow < 2) return;
 
     for (let i = 2; i <= lastRow; i++) {
-        getCell(ws, i, 1).Interior.ColorIndex = -4142; // xlNone
+        let cell = getCell(ws, i, 1);
+        if (cell && cell.Interior) cell.Interior.ColorIndex = -4142; // xlNone
     }
     alert("已清除标记", 64);
 }
@@ -816,6 +861,8 @@ function showTokenDialog(currentToken) {
         if (app) {
             storeBgToken(token.trim());
         }
+        // 通知 taskpane 更新状态
+        sendToTaskpane({ type: "tokenUpdated" });
         // 验证 Token
         testTokenValidityForRibbon(token.trim());
     }
@@ -874,6 +921,8 @@ function showUserIdDialog() {
         if (app) {
             app.PluginStorage.setItem("bgm_user_id", userId.trim());
         }
+        // 通知 taskpane 更新状态
+        sendToTaskpane({ type: "userIdUpdated" });
         alert("用户ID 设置成功！");
     }
 }

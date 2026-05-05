@@ -7,14 +7,14 @@
 function setSyncRecordHeaders(sheet) {
     // 更新表头
     let headers = ["序号", "同步时间", "名称", "URL", "SID", "条目类型", "次数", "内容", "状态", "备注"];
-    
+
     console.log("setSyncRecordHeaders 开始 - 工作表:", sheet ? sheet.Name : "null");
-    
+
     for (let i = 0; i < headers.length; i++) {
         let colLetter = colNumToLetter(i + 1);
         let cellAddr = colLetter + "1";
         console.log("设置表头 - 列:", cellAddr, "值:", headers[i]);
-        
+
         try {
             let cell = sheet.Range(cellAddr);
             if (cell) {
@@ -33,7 +33,33 @@ function setSyncRecordHeaders(sheet) {
             console.error("设置表头失败 - 列:", cellAddr, "错误:", e);
         }
     }
-    
+
+    // 设置第二行为颜色标记说明
+    try {
+        // I列 - 状态列颜色说明
+        let noteCell = sheet.Range("I2");
+        if (noteCell) {
+            noteCell.Value2 = "状态颜色：绿=成功 | 红=失败 | 黄=跳过 | 紫=已收藏(1次) | 浅绿=已收藏(2次) | 深绿=已收藏(3次+)";
+            if (noteCell.Font) {
+                noteCell.Font.Size = 9;
+                noteCell.Font.Color = 0x404040;
+            }
+            if (noteCell.Interior) noteCell.Interior.Color = -4142; // 无填充
+        }
+
+        // 冻结首行
+        try {
+            if (sheet && sheet.Application && sheet.Application.ActiveWindow) {
+                sheet.Range("A2").Select();
+                sheet.Application.ActiveWindow.FreezePanes = true;
+            }
+        } catch (e) {
+            console.log("冻结首行失败:", e.message);
+        }
+    } catch (e) {
+        console.log("设置说明行失败:", e.message);
+    }
+
     console.log("setSyncRecordHeaders 完成");
 }
 

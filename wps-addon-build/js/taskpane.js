@@ -5,6 +5,33 @@ window.onload = () => {
         window.Application.Enum = WPS_Enum;
     }
 
+    // 监听来自 ribbon 的消息，显示自定义对话框
+    window.addEventListener("message", (event) => {
+        const data = event.data;
+        if (!data || !data.type) return;
+
+        switch (data.type) {
+            case "showTokenDialog":
+                showTokenDialog(loadBgToken() || "");
+                break;
+            case "showUserIdDialog":
+                showUserIdDialog();
+                break;
+            case "showClearConfirm":
+                showConfirmDialog("确定要清除所有标记吗？", () => {
+                    clearRowColors();
+                    refreshData();
+                });
+                break;
+            case "tokenUpdated":
+                updateTokenStatus();
+                break;
+            case "userIdUpdated":
+                updateUserIdStatus();
+                break;
+        }
+    });
+
     // 更新Token状态
     updateTokenStatus();
 
@@ -2109,8 +2136,10 @@ function onAction(action) {
             testSingleUpdate();
             break;
         case "clear":
-            clearRowColors();
-            refreshData();
+            showConfirmDialog("将清除工作表中 A 列的所有同步颜色标记。\n\n注意：此操作仅清除颜色标记，不会影响数据内容。\n\n是否继续？", () => {
+                clearRowColors();
+                refreshData();
+            });
             break;
         case "setToken":
             showTokenDialog(loadBgToken() || "");
@@ -2139,6 +2168,14 @@ function syncFromPanel() {
         alert("请先设置 Bangumi Token！");
         showTokenDialog("");
         return;
+    }
+
+    // 激活同步记录表（方便查看同步过程）
+    if (typeof getOrCreateSyncRecordSheet === 'function') {
+        let syncSheet = getOrCreateSyncRecordSheet();
+        if (syncSheet) {
+            syncSheet.Activate();
+        }
     }
 
     let select = document.getElementById("sheetSelect");
@@ -2596,17 +2633,17 @@ function testTokenValidity(token) {
             updateUserIdStatus();
             
             setStatus("Token 有效！用户: " + username, "success");
-            alert("✓ Token 验证成功！\n\n用户: " + username + "\nID: " + userId + "\n\n用户信息已自动保存！");
+            showAlertDialog("验证成功", "用户: " + username + "\nID: " + userId + "\n\n用户信息已自动保存！");
             return true;
         } else if (xhr.status === 401) {
             clearBgToken();
             updateTokenStatus();
             setStatus("Token 无效", "error");
-            alert("✗ Token 验证失败！\n\nToken 已清除，请重新获取正确的 Token。");
+            showAlertDialog("验证失败", "Token 已清除，请重新获取正确的 Token。");
             return false;
         } else {
             setStatus("验证失败 (" + xhr.status + ")", "error");
-            alert("验证失败 (" + xhr.status + "): " + xhr.responseText);
+            showAlertDialog("验证失败", "错误代码: " + xhr.status + "\n" + xhr.responseText);
             return false;
         }
     } catch (err) {
@@ -2663,7 +2700,7 @@ function showUserIdDialog() {
             if (userId && userId.trim() !== "") {
                 window.Application.PluginStorage.setItem("bgm_user_id", userId.trim());
                 updateUserIdStatus();
-                alert("用户ID 设置成功！");
+                showAlertDialog("设置成功", "用户ID 已保存！");
             }
         }
     );
