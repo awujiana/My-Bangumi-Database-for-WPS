@@ -140,7 +140,15 @@ function refreshSheets() {
     if (!select) return;
 
     let app = getApp();
-    if (!app || !app.ActiveWorkbook) {
+    if (!app) {
+        // 开发环境提示
+        select.innerHTML = '<option value="">-- 开发环境 --</option>';
+        return;
+    }
+    
+    if (typeof app.ActiveWorkbook === 'undefined') {
+        // 没有活动工作簿
+        select.innerHTML = '<option value="">-- 无活动工作簿 --</option>';
         return;
     }
 
@@ -154,20 +162,23 @@ function refreshSheets() {
     select.innerHTML = "";
 
     // 添加工作表选项
-    for (let i = 1; i <= sheets.Count; i++) {
-        let ws = sheets(i);
-        let option = document.createElement("option");
-        option.value = i;
-        option.textContent = ws.Name;
-        select.appendChild(option);
+    let sheetCount = typeof sheets.Count === 'number' ? sheets.Count : 0;
+    for (let i = 1; i <= sheetCount; i++) {
+        let ws = sheets.Item ? sheets.Item(i) : sheets(i);
+        if (ws && ws.Name) {
+            let option = document.createElement("option");
+            option.value = i;
+            option.textContent = ws.Name;
+            select.appendChild(option);
+        }
     }
 
     // 恢复锁定状态
     if (BGM.sheet.isLocked && BGM.sheet.lockedIndex) {
         select.value = BGM.sheet.lockedIndex;
-    } else if (currentValue && parseInt(currentValue) <= sheets.Count) {
+    } else if (currentValue && parseInt(currentValue) <= sheetCount) {
         select.value = currentValue;
-    } else {
+    } else if (sheetCount > 0) {
         select.value = 1;
     }
 }

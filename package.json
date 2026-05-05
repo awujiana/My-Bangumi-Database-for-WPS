@@ -14,5 +14,8 @@
 		"et-jsapi-declare": "latest",
 		"vite": "^5.3.1",
 		"wpsjs": "latest"
+	},
+	"dependencies": {
+		"iconv-lite": "^0.7.2"
 	}
 }
