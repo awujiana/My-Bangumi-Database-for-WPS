@@ -186,7 +186,5 @@ export async function fetchAllUserCollections(token, userId) {
 // ========== 挂载到 window（向后兼容） ==========
 if (typeof window !== 'undefined') {
     window.verifyToken = verifyToken;
-    window._verifyToken = _verifyToken;
     window.fetchAllUserCollections = fetchAllUserCollections;
-   
 }

@@ -27,7 +27,7 @@ function base64ToBytes(base64) {
 }
 
 /**
- * 计算校验和（与之前逻辑一致）
+ * 计算校验和
  */
 function calcChecksum(str) {
     let sum = 0;

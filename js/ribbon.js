@@ -7,7 +7,8 @@
 // 导入工具函数
 import { WPS_Enum } from './util.js';
 import { getApp, loadBgToken, showBangumiPanel } from './util.js';
-import { SyncToBangumi, openUserCollection, clearRowColors, testTokenValidityForRibbon } from './bangumi.js';
+import { SyncToBangumi, clearRowColors, testTokenValidityForRibbon } from './sync/exceltobangumi.js';
+import { openUserCollection } from './ui/handlers.js';
 import { showTokenDialog, showUserIdDialog } from './ui/handlers.js';
 
 // ========== Ribbon 回调 ==========

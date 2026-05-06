@@ -21,8 +21,8 @@ const MODULES = [
     { src: 'js/ui/message.js', type: 'module' },
     { src: 'js/ui/preview.js', type: 'module' },
     // 业务模块
-    { src: 'js/syncRecord.js', type: 'module' },
-    { src: 'js/bangumi.js', type: 'module' },
+    { src: 'js/sync/syncRecord.js', type: 'module' },
+    { src: 'js/sync/exceltobangumi.js', type: 'module' },
     { src: 'js/ribbon.js', type: 'module' },
     { src: 'js/ui/handlers.js', type: 'module' },
     { src: 'js/sync/scraping.js', type: 'module' },

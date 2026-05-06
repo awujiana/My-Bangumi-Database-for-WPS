@@ -6,12 +6,12 @@
 
 import { BGM, PANEL_CONFIG, WPS_Enum } from './util.js';
 import { getApp, bgmLog, LOG_LEVELS, escapeHtml, readCell, colNumToLetter } from './util.js';
+import { HEADER_KEYWORDS, IMPORTANT_COLS } from './sync/exceltobangumi.js';
 import { initMessageListener } from './ui/message.js';
 import { markUploadedItems, clearSheetMarks,updateTokenStatus, updateUserIdStatus,showTokenDialog, showUserIdDialog} from './ui/handlers.js';
 import { showAlert, closeAlertDialog, closeInputDialog, closeConfirmDialog,showToast} from './ui/dialog.js';
 import { previewSyncContent, closeDetailModal } from './ui/preview.js';
-import { clearSyncRecords as _clearSyncRecords } from './syncRecord.js';
-import {   HEADER_KEYWORDS, IMPORTANT_COLS} from './bangumi.js';
+import { clearSyncRecords as _clearSyncRecords } from './sync/syncRecord.js';
 
 
 

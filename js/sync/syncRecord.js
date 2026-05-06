@@ -1,11 +1,11 @@
 /**
- * 同步记录模块（优化版）
- * @module syncRecord
+ * 同步记录模块
+ * @module sync/syncRecord
  * @description 管理同步记录工作表，记录同步历史
  */
 
-import { XL, BGM_COLOR, LOG_LEVELS, BGM, BGM_SUBJECT_TYPES, SYNC_STATUS } from './util.js';
-import { getApp, bgmLog, colNumToLetter, getCell } from './util.js';
+import { XL, BGM_COLOR, LOG_LEVELS, BGM, BGM_SUBJECT_TYPES, SYNC_STATUS } from '../util.js';
+import { getApp, bgmLog, colNumToLetter, getCell } from '../util.js';
 
 // ========== 向后兼容别名 ==========
 export function sendToTaskpaneSR(data) {
