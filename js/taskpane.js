@@ -29,7 +29,7 @@ import { clearSyncRecords as _clearSyncRecords,
 import {
     findHeaderRow, getColumnMap, getLastRow, extractSubjectId,
     mapWatchStatus, buildJsonPayload, getSequentialRowsBySeqCol,
-    getFilterStatus, clearRowColors, BGM_COLOR, bgmRequestSync
+    getFilterStatus, clearRowColors, bgmRequestSync
 } from './bangumi.js';
 
 // ========== 工作表锁定功能 ==========
@@ -688,6 +688,9 @@ function initPanel() {
             closeConfirmDialog();
         }
     });
+
+    // 通知 HTML 模块已就绪，启用按钮
+    document.dispatchEvent(new CustomEvent('bgm:modulesReady'));
 
     bgmLog(LOG_LEVELS.INFO, "initPanel \u5B8C\u6210");
 }

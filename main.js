@@ -24,6 +24,8 @@ const MODULES = [
     { src: 'js/ribbon.js', type: 'module' },
     { src: 'js/ui/handlers.js', type: 'module' },
     { src: 'js/sync/scraping.js', type: 'module' },
+    // 面板模块（挂载 window 函数供 HTML onclick 调用）
+    { src: 'js/taskpane.js', type: 'module' },
     // 系统模块
     { src: 'js/systemdemo.js', type: 'script' }
 ];

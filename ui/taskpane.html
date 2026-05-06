@@ -43,16 +43,27 @@
             }
             console.warn('[BGM] 模块未加载，跳过调用: ' + fn);
         };
-        // 模块加载完成后启用按钮
+        // 监听模块加载完成事件（由 taskpane.js 触发）
+        document.addEventListener('bgm:modulesReady', function() {
+            window._modulesReady = true;
+            document.querySelectorAll('button[onclick], button[data-action]').forEach(function(btn) {
+                btn.disabled = false;
+            });
+            console.log('[BGM] 模块加载完成，按钮已启用');
+        });
+        // 兜底：轮询检查（防止事件未触发）
         var _checkCount = 0;
         var _checkInterval = setInterval(function() {
             _checkCount++;
             if (typeof window.refreshData === 'function' && typeof window.onAction === 'function') {
                 clearInterval(_checkInterval);
-                window._modulesReady = true;
-                document.querySelectorAll('button[onclick], button[data-action]').forEach(function(btn) {
-                    btn.disabled = false;
-                });
+                if (!window._modulesReady) {
+                    window._modulesReady = true;
+                    document.querySelectorAll('button[onclick], button[data-action]').forEach(function(btn) {
+                        btn.disabled = false;
+                    });
+                    console.log('[BGM] 轮询检测模块已就绪');
+                }
             }
             if (_checkCount > 200) { // 10秒超时
                 clearInterval(_checkInterval);
