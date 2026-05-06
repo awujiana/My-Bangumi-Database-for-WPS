@@ -3,11 +3,11 @@
  * @module util
  * @description 提供通用工具函数、常量定义、错误处理等核心功能
  */
-import { WPS_ENUM, XL, BGM_CONFIG, BGM_COLOR, LOG_LEVELS, ERROR_LEVELS } from './core/constants.js';
+import { WPS_ENUM, XL, BGM_CONFIG, BGM_COLOR, LOG_LEVELS, ERROR_LEVELS, PANEL_CONFIG, BGM_SUBJECT_TYPES, SYNC_STATUS } from './core/constants.js';
 import { encryptToken, decryptToken, calcChecksum } from './core/crypto.js';
 // ========== 导出常量（向后兼容）==========
 export const WPS_Enum = WPS_ENUM;
-export { XL, BGM_CONFIG, BGM_COLOR, LOG_LEVELS, ERROR_LEVELS };
+export { XL, BGM_CONFIG, BGM_COLOR, LOG_LEVELS, ERROR_LEVELS, PANEL_CONFIG, BGM_SUBJECT_TYPES, SYNC_STATUS };
 /** BGM 错误级别 */
 var ErrorLevel;
 (function (ErrorLevel) {
@@ -17,7 +17,7 @@ var ErrorLevel;
     ErrorLevel[ErrorLevel["THROW"] = 3] = "THROW";
 })(ErrorLevel || (ErrorLevel = {}));
 /** BGM 错误类 */
-class BgmError extends Error {
+export class BgmError extends Error {
     constructor(message, code = 'UNKNOWN', details = {}) {
         super(message);
         this.name = 'BgmError';

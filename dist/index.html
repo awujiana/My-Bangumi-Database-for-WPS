@@ -3,12 +3,13 @@
 <head>
     <meta charset="utf-8">
     <title>BGM Excel 加载项</title>
-  <script type="module" crossorigin src="./assets/index-2fDTB91t.js"></script>
 </head>
-<body>
+<body>
+    <script type="module" src="./main.js"></script>
+    <script type="module" src="./js/functions.js"></script>
     <script>
         // ========== WPS Ribbon 回调早期占位（模块加载前即需可用）==========
-        // WPS 会在模块加载前就调用 OnAddinLoad/OnAction，因此必须提前占位
+        // WPS 会在模块加载前就调用 OnAddinLoad/OnAction/GetBangumiImage，因此必须提前占位
         var _ribbonReady = false;
         var _pendingActions = [];
 
@@ -32,14 +33,25 @@
             return true;
         };
 
+        window.GetBangumiImage = function(control) {
+            // 如果模块已就绪，使用真实实现
+            if (_ribbonReady && typeof window._GetBangumiImageReal === 'function') {
+                return window._GetBangumiImageReal(control);
+            }
+            // 返回默认图标（避免 WPS 报错）
+            return 'images/newFromTemp.svg';
+        };
+
         // 模块就绪后由 ribbon.js 调用此函数完成初始化
-        window._bgmRibbonReady = function(realOnAddinLoad, realOnAction) {
+        window._bgmRibbonReady = function(realOnAddinLoad, realOnAction, realGetBangumiImage) {
             window._OnAddinLoadReal = realOnAddinLoad;
             window._OnActionReal = realOnAction;
+            window._GetBangumiImageReal = realGetBangumiImage;
 
             // 用真实实现替换占位
             window.OnAddinLoad = realOnAddinLoad;
             window.OnAction = realOnAction;
+            window.GetBangumiImage = realGetBangumiImage;
 
             // 如果之前 OnAddinLoad 已被调用，用真实实现重新执行
             if (window.__ribbonUI && realOnAddinLoad) {

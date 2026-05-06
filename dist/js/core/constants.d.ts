@@ -54,6 +54,29 @@ export interface ErrorLevels {
     THROW: 3;
 }
 
+export interface PanelConfig {
+    MAX_SCAN_COLUMNS: number;
+    MAX_SCAN_ROWS: number;
+    PREVIEW_LIMIT: number;
+    MAX_FILTER_SCAN_ROWS: number;
+    FILTER_FALLBACK_LIMIT: number;
+}
+
+export interface BGMSubjectTypes {
+    1: string;
+    2: string;
+    3: string;
+    4: string;
+    6: string;
+}
+
+export interface SyncStatus {
+    SUCCESS: string;
+    FAIL: string;
+    SKIP: string;
+    COLLECTED: string;
+}
+
 declare const WPS_ENUM: WPSEnum;
 declare const XL: XLConstants;
 declare const BGM_CONFIG: BGMConfig;
@@ -61,6 +84,8 @@ declare const BGM_COLOR: BGMColors;
 declare const TOKEN_CONFIG: TokenConfig;
 declare const LOG_LEVELS: LogLevels;
 declare const ERROR_LEVELS: ErrorLevels;
+declare const PANEL_CONFIG: PanelConfig;
+declare const BGM_SUBJECT_TYPES: BGMSubjectTypes;
+declare const SYNC_STATUS: SyncStatus;
 
-export { WPS_ENUM, XL, BGM_CONFIG, BGM_COLOR, TOKEN_CONFIG, LOG_LEVELS, ERROR_LEVELS };
-export { BGM_API_CONFIG, BGM_COLORS, TOKEN_CFG };
+export { WPS_ENUM, XL, BGM_CONFIG, BGM_COLOR, TOKEN_CONFIG, LOG_LEVELS, ERROR_LEVELS, PANEL_CONFIG, BGM_SUBJECT_TYPES, SYNC_STATUS };
