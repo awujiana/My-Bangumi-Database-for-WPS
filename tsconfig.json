@@ -18,8 +18,8 @@
     "declaration": false,  // 设为 false，由 tsconfig.build.json 控制
     "declarationMap": false,
     "sourceMap": true,
-    "outDir": "./dist",
-    "rootDir": "./js",  // 指定源代码根目录
+    "outDir": "./dist-ts",
+    "rootDir": "./js",  // 指定TS源代码根目录
     "baseUrl": ".",
     "paths": {
       "@/*": ["./js/*"]
