@@ -32,14 +32,14 @@
     </script>
     <script>
         // 模块加载前禁用所有按钮，防止点击报错
-        document.querySelectorAll('button[onclick]').forEach(function(btn) {
+        document.querySelectorAll('button[onclick], button[data-action]').forEach(function(btn) {
             btn.disabled = true;
         });
         // 模块加载完成后启用按钮
         var _checkInterval = setInterval(function() {
             if (typeof window.onAction === 'function') {
                 clearInterval(_checkInterval);
-                document.querySelectorAll('button[onclick]').forEach(function(btn) {
+                document.querySelectorAll('button[onclick], button[data-action]').forEach(function(btn) {
                     btn.disabled = false;
                 });
             }
