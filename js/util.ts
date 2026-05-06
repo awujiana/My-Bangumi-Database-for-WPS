@@ -4,72 +4,10 @@
  * @description 提供通用工具函数、常量定义、错误处理等核心功能
  */
 
-import { WPS_ENUM, XL, BGM_CONFIG, BGM_COLOR, LOG_LEVELS, ERROR_LEVELS, PANEL_CONFIG, BGM_SUBJECT_TYPES, SYNC_STATUS } from './core/constants.js';
-import { encryptToken, decryptToken, calcChecksum } from './core/crypto.js';
-import { BgmError } from './types/result.js';
-
+import { BgmError, ErrorLevel, type BGMCache, type BGMSheet, type BGMSync, type BGMUserInfo, type DialogOptions, type ErrorOptions } from './types/index.js';
 // 重新导出 ErrorLevel 和 BgmError（向后兼容）
-export { BgmError };
-
-// ========== 导出常量（向后兼容）==========
-export const WPS_Enum = WPS_ENUM;
-export { XL, BGM_CONFIG, BGM_COLOR, LOG_LEVELS, ERROR_LEVELS, PANEL_CONFIG, BGM_SUBJECT_TYPES, SYNC_STATUS };
-
-// ========== 错误级别枚举 ==========
-export const ErrorLevel = {
-    SILENT: 0,
-    WARN: 1,
-    ERROR: 2,
-    THROW: 3
-} as const;
-export type ErrorLevel = typeof ErrorLevel[keyof typeof ErrorLevel];
-
-// ========== 类型定义 ==========
-/** BGM 缓存数据结构 */
-interface BGMCache {
-    totalRows: number;
-    userId: string | null;
-    username: string | null;
-    sidCache: Map<string, string>;
-    listCache: unknown[];
-}
-
-/** BGM 工作表状态 */
-interface BGMSheet {
-    lockedIndex: number | null;
-    lockedName: string | null;
-    isLocked: boolean;
-}
-
-/** BGM 同步状态 */
-interface BGMSync {
-    isRunning: boolean;
-    lastSyncTime: string | null;
-}
-
-/** BGM 用户信息 */
-interface BGMUserInfo {
-    id: string;
-    username: string;
-}
 
 
-
-
-/** 对话框选项 */
-interface DialogOptions {
-    onConfirm?: () => void;
-    onCancel?: () => void;
-    onOk?: (value: string) => void;
-    defaultValue?: string;
-}
-
-/** 错误处理选项 */
-interface ErrorOptions {
-    level?: ErrorLevel;
-    showDialog?: boolean;
-    context?: string;
-}
 
 // ========== BGM 全局命名空间 ==========
 export const BGM: {

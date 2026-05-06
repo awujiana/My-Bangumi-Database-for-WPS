@@ -4,9 +4,8 @@
  * @description 支持异步请求、进度回调、自动重试、限流处理
  */
 
-import { BGM_CONFIG } from './core/constants.js';
-import { Result, BgmError, toSyncResult } from './types/result.js';
-import { bgmLog, LOG_LEVELS } from './util.js';
+import { Result, BgmError, toSyncResult, type SyncResult } from './types/index.js';
+
 
 // ========== 类型定义 ==========
 export type HttpMethod = 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH';
