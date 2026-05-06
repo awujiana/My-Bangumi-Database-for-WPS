@@ -1,3 +1,4 @@
+// vite.config.js
 import { fileURLToPath } from 'node:url'
 import { defineConfig } from 'vite'
 import { functionsScanner } from "wpsjs/vite_plugins"
@@ -25,11 +26,21 @@ export default defineConfig({
           transform: (contents) => contents.toString().replace(/ui\/taskpane\.html/g, 'taskpane.html')
         },
         { src: 'images/**/*', dest: 'images' },
-        { src: 'ui/**/*', dest: 'ui' },
+        { src: 'ui/**/*.html', dest: 'ui' },
         { src: 'main.js', dest: '.' },
         { src: 'node_modules/wpsjs-rpc-sdk-new/wpsjsrpcsdk.js', dest: '.' },
-        // 如果需要，可以复制生成的声明文件
-        { src: 'types/**/*', dest: 'types' }
+        // 单独处理 taskpane.html，确保路径正确
+        { 
+          src: 'ui/taskpane.html', 
+          dest: '.',
+          rename: 'taskpane.html',
+          transform: (contents) => {
+            let html = contents.toString();
+            // 确保路径正确
+            html = html.replace('src="./wpsjsrpcsdk.js"', 'src="./wpsjsrpcsdk.js"');
+            return html;
+          }
+        }
       ],
       silent: false
     })
@@ -37,37 +48,16 @@ export default defineConfig({
   resolve: {
     alias: {
       '@': fileURLToPath(new URL('./js', import.meta.url))
-    },
-    extensions: ['.js', '.ts', '.jsx', '.tsx', '.json']
-  },
-  // TypeScript 配置
-  esbuild: {
-    tsconfigRaw: {
-      compilerOptions: {
-        baseUrl: ".",
-        paths: {
-          "@/*": ["./js/*"]
-        },
-        typeRoots: [
-          "./node_modules/@types",
-          "./types",
-          "./js/@types",
-          "./js/types"
-        ]
-      }
     }
   },
   server: {
     host: '0.0.0.0',
-    port: 3889,
-    cors: true,
-    strictPort: true
+    port: 3889
   },
   build: {
     outDir: 'dist',
     emptyOutDir: true,
     sourcemap: false,
-    target: 'es2020',
     rollupOptions: {
       input: {
         main: 'index.html',
