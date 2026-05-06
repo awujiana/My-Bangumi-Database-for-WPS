@@ -1129,3 +1129,284 @@ select.input {
     white-space: nowrap;
     max-width: 200px;
 }
+
+/* ========== 富预览 - 统计卡片 ========== */
+.detail-stats {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+    margin-bottom: 16px;
+}
+
+.stat-card {
+    background: #333;
+    padding: 14px 12px;
+    border-radius: 10px;
+    text-align: center;
+    border-left: 3px solid #4a9eff;
+}
+
+.stat-card .stat-value {
+    font-size: 26px;
+    font-weight: 700;
+    color: #4a9eff;
+    line-height: 1.2;
+}
+
+.stat-card .stat-label {
+    font-size: 12px;
+    color: #888;
+    margin-top: 4px;
+}
+
+/* ========== 富预览 - 类型状态标签 ========== */
+.status-badges {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    margin-bottom: 14px;
+}
+
+.status-badge {
+    display: inline-block;
+    padding: 4px 10px;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: 600;
+    background: #333;
+    color: #aaa;
+    border: 1px solid #444;
+}
+
+.status-badge.type-1 { background: rgba(74,158,255,0.15); color: #4a9eff; border-color: rgba(74,158,255,0.3); }
+.status-badge.type-2 { background: rgba(74,222,128,0.12); color: #4ade80; border-color: rgba(74,222,128,0.25); }
+.status-badge.type-3 { background: rgba(168,85,247,0.15); color: #a855f7; border-color: rgba(168,85,247,0.3); }
+.status-badge.type-4 { background: rgba(255,193,7,0.15); color: #ffc107; border-color: rgba(255,193,7,0.3); }
+.status-badge.type-5 { background: rgba(255,107,107,0.15); color: #ff6b6b; border-color: rgba(255,107,107,0.3); }
+
+/* ========== 富预览 - 过滤按钮 ========== */
+.filter-btn {
+    padding: 6px 14px;
+    border: 1px solid #444;
+    border-radius: 16px;
+    background: transparent;
+    color: #aaa;
+    font-size: 12px;
+    cursor: pointer;
+    transition: all 0.2s;
+    white-space: nowrap;
+}
+
+.filter-btn:hover {
+    background: #3a3a3a;
+    color: #e0e0e0;
+}
+
+.filter-btn.active {
+    background: #4a9eff;
+    color: #fff;
+    border-color: #4a9eff;
+}
+
+.filter-btn.type-1.active { background: #4a9eff; border-color: #4a9eff; }
+.filter-btn.type-2.active { background: #4ade80; color: #1a1a1a; border-color: #4ade80; }
+.filter-btn.type-3.active { background: #a855f7; border-color: #a855f7; }
+.filter-btn.type-4.active { background: #ffc107; color: #1a1a1a; border-color: #ffc107; }
+.filter-btn.type-5.active { background: #ff6b6b; border-color: #ff6b6b; }
+
+/* ========== 富预览 - 详情条目 ========== */
+.detail-item {
+    background: #2a2a2a;
+    border: 1px solid #3a3a3a;
+    border-radius: 10px;
+    margin-bottom: 10px;
+    overflow: hidden;
+    transition: border-color 0.2s;
+}
+
+.detail-item:hover {
+    border-color: #555;
+}
+
+.detail-item.uploaded {
+    border-left: 3px solid #4ade80;
+}
+
+.detail-item.pending {
+    border-left: 3px solid #ffc107;
+}
+
+.detail-item-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 14px;
+    background: rgba(255,255,255,0.03);
+    border-bottom: 1px solid #333;
+    gap: 8px;
+}
+
+.detail-item-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+    flex: 1;
+}
+
+.detail-item-row {
+    display: inline-block;
+    padding: 2px 7px;
+    border-radius: 4px;
+    background: rgba(74,158,255,0.15);
+    color: #4a9eff;
+    font-size: 11px;
+    font-weight: 600;
+    flex-shrink: 0;
+}
+
+.detail-item-name {
+    font-weight: 600;
+    color: #e8e8e8;
+    font-size: 14px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* ========== 富预览 - 单条上传按钮 ========== */
+.upload-single-btn {
+    padding: 5px 14px;
+    border: none;
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    background: linear-gradient(135deg, #4a9eff, #3a8ee8);
+    color: #fff;
+    flex-shrink: 0;
+}
+
+.upload-single-btn:hover {
+    background: linear-gradient(135deg, #3a8ee8, #2a7ed8);
+    transform: translateY(-1px);
+}
+
+.upload-single-btn.reupload {
+    background: linear-gradient(135deg, #ff9800, #f57c00);
+}
+
+.upload-single-btn.reupload:hover {
+    background: linear-gradient(135deg, #f57c00, #e65100);
+}
+
+.upload-single-btn.uploading {
+    opacity: 0.6;
+    pointer-events: none;
+}
+
+.upload-single-btn.error {
+    background: linear-gradient(135deg, #ff6b6b, #ee5a5a);
+}
+
+.uploaded-badge {
+    display: inline-block;
+    padding: 3px 10px;
+    border-radius: 10px;
+    font-size: 11px;
+    font-weight: 600;
+    background: rgba(74,222,128,0.15);
+    color: #4ade80;
+    flex-shrink: 0;
+}
+
+/* ========== 富预览 - 详情内容行 ========== */
+.detail-item-body {
+    padding: 12px 14px;
+}
+
+.detail-row {
+    display: flex;
+    align-items: flex-start;
+    padding: 6px 0;
+    border-bottom: 1px solid rgba(255,255,255,0.04);
+    gap: 10px;
+}
+
+.detail-row:last-child {
+    border-bottom: none;
+}
+
+.detail-label {
+    display: inline-block;
+    min-width: 90px;
+    font-size: 12px;
+    color: #888;
+    font-weight: 600;
+    flex-shrink: 0;
+    padding-top: 1px;
+}
+
+.detail-value {
+    font-size: 13px;
+    color: #ddd;
+    word-break: break-all;
+    line-height: 1.5;
+}
+
+.detail-value.url {
+    color: #4a9eff;
+    font-size: 12px;
+}
+
+.detail-value.sid {
+    color: #ffc107;
+    font-weight: 600;
+}
+
+.detail-value.json {
+    background: #1a1a1a;
+    padding: 8px 10px;
+    border-radius: 6px;
+    font-family: 'Consolas', 'Monaco', monospace;
+    font-size: 11px;
+    color: #4ade80;
+    white-space: pre-wrap;
+    word-break: break-all;
+    border: 1px solid #333;
+    margin-top: 4px;
+    line-height: 1.4;
+}
+
+/* ========== 富预览 - 标签 ========== */
+.detail-value.tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+}
+
+.tag-badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 8px;
+    font-size: 11px;
+    background: rgba(74,158,255,0.1);
+    color: #4a9eff;
+    border: 1px solid rgba(74,158,255,0.2);
+}
+
+/* ========== 详细预览滚动条 ========== */
+.detail-modal-body::-webkit-scrollbar {
+    width: 6px;
+}
+
+.detail-modal-body::-webkit-scrollbar-track {
+    background: #333;
+    border-radius: 3px;
+}
+
+.detail-modal-body::-webkit-scrollbar-thumb {
+    background: #4a9eff;
+    border-radius: 3px;
+}
