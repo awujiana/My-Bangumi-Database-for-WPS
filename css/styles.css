@@ -536,6 +536,8 @@ select.input {
 
 #filterStatus {
     color: #ccc;
+    white-space: pre-line;
+    line-height: 1.5;
 }
 
 /* ========== Toast 提示 ========== */
