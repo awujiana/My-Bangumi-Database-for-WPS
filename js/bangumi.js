@@ -580,4 +580,3 @@ window.buildPreviewPayload = buildPreviewPayload;
 window.updateDetailCount = updateDetailCount;
 window.detailPreviewData = detailPreviewData;   // 保持引用兼容
 
-// 注意：如 util 中缺少 BGM_COLOR.UPLOADED_ALT，请添加常量 5292178
