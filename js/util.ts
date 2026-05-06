@@ -1,6 +1,6 @@
 import { WPS_ENUM, XL, BGM_CONFIG, BGM_COLOR, LOG_LEVELS, ERROR_LEVELS, PANEL_CONFIG, BGM_SUBJECT_TYPES, SYNC_STATUS } from './core/constants.js';
 import { encryptToken, decryptToken, calcChecksum } from './core/crypto.js';
-import { BgmError, ErrorLevel, type BGMCache, type BGMSheet, type BGMSync, type BGMUserInfo, type DialogOptions, type ErrorOptions } from './types/index.js';
+import { BgmError, ErrorLevel, type BGMCache, type BGMSheet, type BGMSync, type BGMUserInfo, type DialogOptions, type ErrorOptions,isWpsApp, type WpsApplication} from './types/index.js';
 
 // 重新导出（向后兼容）
 export { BgmError, ErrorLevel };
@@ -246,16 +246,21 @@ export function bgmLog(level: number, message: string): void {
         console.log(prefix + ' ' + message);
     }
 }
+
+
 // ========== Application 获取 ==========
 /**
- * 获取 Application 对象
+ * 获取 Application 对象（使用类型守卫）
  */
-export function getApp(): unknown {
-    if (typeof window !== 'undefined' && (window as any).Application) {
-        return (window as any).Application;
+export function getApp(): WpsApplication | null {
+    if (typeof window !== 'undefined') {
+        const winApp = (window as any).Application;
+        if (isWpsApp(winApp)) return winApp;
     }
-    if (typeof Application !== 'undefined') {
-        return Application;
+    // 使用 window.Application 替代裸 Application
+    if (typeof window !== 'undefined') {
+        const globalApp = (window as any).Application;
+        if (isWpsApp(globalApp)) return globalApp;
     }
     return null;
 }
