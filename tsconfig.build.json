@@ -4,7 +4,7 @@
     "outDir": "./dist-ts",  // 将编译输出放到单独的目录
     "declaration": true,
     "declarationMap": true,
-    "declarationDir": "./dist-ts/@types",  // 声明文件放在 dist-ts/@types
+    "declarationDir": "./generated-types",  // 声明文件放在./generated-types"目录
     "sourceMap": false,
     "noEmitOnError": true,
     "ignoreDeprecations": "6.0"

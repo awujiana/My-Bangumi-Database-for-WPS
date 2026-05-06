@@ -26,20 +26,12 @@ export default defineConfig({
           transform: (contents) => contents.toString().replace(/ui\/taskpane\.html/g, 'taskpane.html')
         },
         { src: 'images/**/*', dest: 'images' },
-        { src: 'ui/**/*.html', dest: 'ui' },
+        { src: 'ui/**/*', dest: 'ui' },
         { src: 'main.js', dest: '.' },
-        { src: 'node_modules/wpsjs-rpc-sdk-new/wpsjsrpcsdk.js', dest: '.' },
-        // 单独处理 taskpane.html，确保路径正确
         { 
-          src: 'ui/taskpane.html', 
+          src: 'node_modules/wpsjs-rpc-sdk-new/wpsjsrpcsdk.js', 
           dest: '.',
-          rename: 'taskpane.html',
-          transform: (contents) => {
-            let html = contents.toString();
-            // 确保路径正确
-            html = html.replace('src="./wpsjsrpcsdk.js"', 'src="./wpsjsrpcsdk.js"');
-            return html;
-          }
+          rename: 'wpsjsrpcsdk.js'  // 确保重命名为正确的名字
         }
       ],
       silent: false
@@ -75,7 +67,9 @@ export default defineConfig({
           }
           return 'assets/[name].[hash][extname]';
         }
-      }
+      },
+      // 将 WPS SDK 设为外部依赖，不进行打包
+      external: ['wpsjsrpcsdk.js']
     }
   }
 })

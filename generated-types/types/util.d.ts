@@ -1,63 +1,9 @@
-/**
- * BGM 工具模块
- * @module util
- * @description 提供通用工具函数、常量定义、错误处理等核心功能
- */
-import { XL, BGM_CONFIG, BGM_COLOR, LOG_LEVELS, ERROR_LEVELS } from './core/constants.js';
-export declare const WPS_Enum: import("./core/constants.js").WPSEnum;
-export { XL, BGM_CONFIG, BGM_COLOR, LOG_LEVELS, ERROR_LEVELS };
-/** BGM 缓存数据结构 */
-interface BGMCache {
-    totalRows: number;
-    userId: string | null;
-    username: string | null;
-    sidCache: Map<string, string>;
-    listCache: unknown[];
-}
-/** BGM 工作表状态 */
-interface BGMSheet {
-    lockedIndex: number | null;
-    lockedName: string | null;
-    isLocked: boolean;
-}
-/** BGM 同步状态 */
-interface BGMSync {
-    isRunning: boolean;
-    lastSyncTime: string | null;
-}
-/** BGM 用户信息 */
-interface BGMUserInfo {
-    id: string;
-    username: string;
-}
-/** BGM 错误级别 */
-declare enum ErrorLevel {
-    SILENT = 0,
-    WARN = 1,
-    ERROR = 2,
-    THROW = 3
-}
-/** BGM 错误类 */
-declare class BgmError extends Error {
-    code: string;
-    details: Record<string, unknown>;
-    timestamp: string;
-    constructor(message: string, code?: string, details?: Record<string, unknown>);
-    toString(): string;
-}
-/** 对话框选项 */
-interface DialogOptions {
-    onConfirm?: () => void;
-    onCancel?: () => void;
-    onOk?: (value: string) => void;
-    defaultValue?: string;
-}
-/** 错误处理选项 */
-interface ErrorOptions {
-    level?: ErrorLevel;
-    showDialog?: boolean;
-    context?: string;
-}
+import { XL, BGM_CONFIG, BGM_COLOR, LOG_LEVELS, ERROR_LEVELS, PANEL_CONFIG, BGM_SUBJECT_TYPES, SYNC_STATUS } from '../core/constants.js';
+import { BgmError, ErrorLevel, type BGMCache, type BGMSheet, type BGMSync, type BGMUserInfo, type DialogOptions, type ErrorOptions, type WpsApplication } from './index.js';
+export { BgmError, ErrorLevel };
+export type { BGMCache, BGMSheet, BGMSync, BGMUserInfo, DialogOptions, ErrorOptions };
+export declare const WPS_Enum: import("../core/constants.js").WPSEnum;
+export { XL, BGM_CONFIG, BGM_COLOR, LOG_LEVELS, ERROR_LEVELS, PANEL_CONFIG, BGM_SUBJECT_TYPES, SYNC_STATUS };
 export declare const BGM: {
     cache: BGMCache;
     sheet: BGMSheet;
@@ -91,9 +37,9 @@ export declare const BGM: {
  */
 export declare function bgmLog(level: number, message: string): void;
 /**
- * 获取 Application 对象
+ * 获取 Application 对象（使用类型守卫）
  */
-export declare function getApp(): unknown;
+export declare function getApp(): WpsApplication | null;
 /**
  * 列号转字母 (A, B, ..., Z, AA, AB, ...)
  */
@@ -106,6 +52,10 @@ export declare function getCell(ws: unknown, row: number, col: number): unknown;
  * 安全获取单元格值
  */
 export declare function getCellValue(ws: unknown, row: number, col: number): string;
+/**
+ * 读取单元格文本（handle WPS Value/Value2/Text 等多种属性）
+ */
+export declare function readCell(ws: unknown, row: number, col: number): string;
 /**
  * 设置单元格值
  */
@@ -143,9 +93,13 @@ export declare function _getBgmUserId(): string | null;
  */
 export declare function _getUserApiPath(): string;
 /**
- * 获取 Bangumi 当前登录用户信息（返回 Promise）
+ * 获取 Bangumi 当前登录用户信息
  */
-export declare function fetchBgmUserInfo(): Promise<{ id: string; username: string } | null>;
+export declare function _fetchBgmUserInfo(callback?: (userInfo: BGMUserInfo | null) => void): void;
+/**
+ * 获取 Bangumi 用户信息（Promise 版本，供 handlers.js 等模块使用）
+ */
+export declare function fetchBgmUserInfo(): Promise<BGMUserInfo | null>;
 /**
  * 通过 WPS 提供的接口执行脚本
  */
@@ -182,3 +136,4 @@ export declare function showAlertDialog(title: string, message: string): void;
  * 关闭提示对话框
  */
 export declare function closeAlertDialog(): void;
+//# sourceMappingURL=util.d.ts.map

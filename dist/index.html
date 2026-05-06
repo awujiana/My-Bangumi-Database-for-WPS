@@ -3,7 +3,8 @@
 <head>
     <meta charset="utf-8">
     <title>BGM Excel 加载项</title>
-  <script type="module" crossorigin src="./assets/index-2fDTB91t.js"></script>
+  <script type="module" crossorigin src="./assets/main.js"></script>
+  <link rel="modulepreload" crossorigin href="./assets/modulepreload-polyfill.B5Qt9EMX.js">
 </head>
 <body>
     <script>
@@ -91,6 +92,31 @@
                 console.log("调试通知功能不可用:", e.message);
             }
         };
+          // 新增：Ribbon 真实函数就绪超时检测
+            var _ribbonReadyTimeout = setTimeout(function() {
+                if (!_ribbonReady) {
+                    console.warn('[BGM] Ribbon 模块未在 15 秒内就绪，使用降级模式');
+                    // 降级：OnAction 直接显示提示
+                    window.OnAction = function(control) {
+                        if (typeof BGM !== 'undefined' && BGM.showDialog) {
+                            BGM.showDialog('提示', '功能正在加载中，请稍后再试');
+                        }
+                        return true;
+                    };
+                    // 清除待处理的 action 队列
+                    _pendingActions = [];
+                }
+            }, 15000);
+        
+            // 在 _bgmRibbonReady 中清除定时器
+            var _originalBgRibbonReady = window._bgmRibbonReady;
+            window._bgmRibbonReady = function(realOnAddinLoad, realOnAction,        realGetBangumiImage) {
+                clearTimeout(_ribbonReadyTimeout);
+                _originalBgRibbonReady(realOnAddinLoad, realOnAction, realGetBangumiImage);
+            };
+
+
+
     </script>
     <!-- 调试信息显示区域（可选）-->
     <div id="DemoSpan" style="display:none;"></div>

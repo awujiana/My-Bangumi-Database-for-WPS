@@ -2,34 +2,13 @@
 <html>
 <head>
     <meta charset="utf-8">
-    <!-- 外部样式 -->
-    <link rel="stylesheet" href="../css/styles.css">
+    <!-- 外部样式 -->
+  <script type="module" crossorigin src="../assets/taskpane.DUxInC3n.js"></script>
+  <link rel="modulepreload" crossorigin href="../assets/modulepreload-polyfill.B5Qt9EMX.js">
+  <link rel="stylesheet" crossorigin href="../assets/taskpane.nacFAT5P.css">
 </head>
 <body>
-    <!-- ES6 模块加载（按依赖顺序）-->
-    <script type="module">
-        // 按依赖顺序导入模块（确保副作用按顺序执行）
-        import '../js/core/constants.js';
-        import '../js/core/crypto.js';
-        import '../js/util.js';
-        import '../js/sync/syncRecord.js';
-        import '../js/sync/exceltobangumi.js';
-        import '../js/ui/dialog.js';
-        import '../js/ui/message.js';
-        import '../js/ui/preview.js';
-        import '../js/ui/handlers.js';
-        import '../js/sync/scraping.js';
-
-        // 导入主页面逻辑（taskpane.js 会将函数挂载到 window）
-        import '../js/taskpane.js';
-
-        // 确认挂载完成
-        if (typeof window.initPanel === 'function') {
-            console.log('[BGM] All modules loaded, window functions ready');
-        } else {
-            console.error('[BGM] Modules loaded but window.initPanel not found');
-        }
-    </script>
+    <!-- ES6 模块加载（按依赖顺序）-->
     <script>
         // 模块加载前禁用所有按钮，防止点击报错
         document.querySelectorAll('button[onclick], button[data-action]').forEach(function(btn) {
@@ -74,7 +53,7 @@
     </script>
     
     <!-- WPS JS RPC SDK（需要在模块之后加载）-->
-    <script type="text/javascript" src="../.debugTemp/wpsjsrpcsdk.js"></script>
+    <script src="../wpsjsrpcsdk.js"></script>
     <!-- 内联对话框（仅作为 closeDialog/closeConfirmDialog/closeAlertDialog 的兼容目标，实际弹窗由 dialog.js 动态创建） -->
     <div id="inputDialog" class="bgm-modal" style="display:none;">
         <div class="bgm-modal-content bgm-input-content">

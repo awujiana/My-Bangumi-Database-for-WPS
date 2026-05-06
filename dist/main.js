@@ -1,57 +1,37 @@
 /**
- * BGM 主入口模块
+ * BGM 主入口模块（修复版）
  * @module main
- * @description 动态加载所有模块脚本
  */
-
 'use strict';
 
-// ========== 模块依赖顺序 ==========
 const MODULES = [
-    // 核心模块
-    { src: 'js/core/constants.js', type: 'module' },
-    { src: 'js/core/crypto.js', type: 'module' },
-    // 工具模块
-    { src: 'js/util.js', type: 'module' },
+    { src: 'js/core/constants.js', type: 'module', critical: true },
+    { src: 'js/core/crypto.js', type: 'module', critical: true },
+    { src: 'js/util.js', type: 'module', critical: true },
     { src: 'js/http.js', type: 'module' },
-    // 核心扩展模块（handlers.js 依赖 unified.js）
     { src: 'js/core/unified.js', type: 'module' },
-    // UI 模块（dialog 先于业务模块，避免重复挂载 window）
     { src: 'js/ui/dialog.js', type: 'module' },
     { src: 'js/ui/message.js', type: 'module' },
     { src: 'js/ui/preview.js', type: 'module' },
-    // 业务模块
     { src: 'js/sync/syncRecord.js', type: 'module' },
     { src: 'js/sync/exceltobangumi.js', type: 'module' },
-    { src: 'js/ribbon.js', type: 'module' },
-    { src: 'js/ui/handlers.js', type: 'module' },
+    { src: 'js/ribbon.js', type: 'module', critical: true },
+    { src: 'js/ui/handlers.js', type: 'module', critical: true },
     { src: 'js/sync/scraping.js', type: 'module' },
-    // 面板模块（挂载 window 函数供 HTML onclick 调用）
-    { src: 'js/taskpane.js', type: 'module' },
-    // 系统模块
-    { src: 'js/systemdemo.js', type: 'script' }
+    { src: 'js/taskpane.js', type: 'module', critical: true }
+    // systemdemo.js 已移除（脚手架模板，与业务无关）
 ];
 
-/**
- * 加载脚本（支持 module 和 classic 两种模式）
- * @param {string} src - 脚本路径
- * @param {string} type - 脚本类型 ('module' 或 'script')
- * @returns {Promise} - 加载完成 Promise
- */
 function loadScript(src, type) {
-    return new Promise(function(resolve, reject) {
-        var script = document.createElement('script');
+    return new Promise((resolve, reject) => {
+        const script = document.createElement('script');
         script.src = src;
-        
-        if (type === 'module') {
-            script.type = 'module';
-        }
-        
-        script.onload = function() {
+        if (type === 'module') script.type = 'module';
+        script.onload = () => {
             console.log('[BGM] Loaded: ' + src);
             resolve();
         };
-        script.onerror = function(e) {
+        script.onerror = (e) => {
             console.error('[BGM] Failed to load: ' + src, e);
             reject(new Error('Failed to load script: ' + src));
         };
@@ -59,64 +39,30 @@ function loadScript(src, type) {
     });
 }
 
-/**
- * 加载 ES module 脚本
- * @param {string} src - 模块路径
- * @returns {Promise} - 加载完成 Promise
- */
-async function loadModule(src) {
-    try {
-        await loadScript(src, 'module');
-        console.log('[BGM] Imported: ' + src);
-    } catch (e) {
-        console.error('[BGM] Failed to import: ' + src, e);
-        throw e;
-    }
-}
-
-/**
- * 按顺序加载所有模块
- */
 async function loadAllModules() {
     console.log('[BGM] Starting module loading...');
-    
     for (const mod of MODULES) {
         try {
-            if (mod.type === 'module') {
-                // 优先尝试 ES6 import（需要服务器支持 CORS）
-                await loadModule(mod.src);
-            } else {
-                // 普通脚本直接加载
-                await loadScript(mod.src, 'script');
-            }
+            await loadScript(mod.src, mod.type);
         } catch (e) {
             console.error('[BGM] Module loading failed:', e);
-            // 继续加载下一个模块
+            if (mod.critical) {
+                document.body.innerHTML = `<div style="color:red;padding:20px;font-size:16px;">
+                    <h3>核心模块加载失败</h3>
+                    <p>模块: ${mod.src}</p>
+                    <p>${e.message}</p>
+                    <p>请检查网络或文件完整性，然后重新加载。</p>
+                </div>`;
+                return;
+            }
+            // 非关键模块加载失败继续执行
         }
     }
-    
     console.log('[BGM] Module loading complete');
-    
-    // 通知加载完成
-    if (typeof window.BGM !== 'undefined') {
-        window.BGM.onModulesLoaded && window.BGM.onModulesLoaded();
-    }
 }
 
-/**
- * 初始化
- */
-function init() {
-    if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', loadAllModules);
-    } else {
-        // DOM 已就绪
-        loadAllModules();
-    }
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', loadAllModules);
+} else {
+    loadAllModules();
 }
-
-// 启动
-init();
-
-// ========== 导出（用于外部访问）==========
-export { loadAllModules, loadModule, loadScript };
