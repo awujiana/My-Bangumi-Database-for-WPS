@@ -14,6 +14,8 @@ const MODULES = [
     // 工具模块
     { src: 'js/util.js', type: 'module' },
     { src: 'js/http.js', type: 'module' },
+    // 核心扩展模块（handlers.js 依赖 unified.js）
+    { src: 'js/core/unified.js', type: 'module' },
     // UI 模块（dialog 先于业务模块，避免重复挂载 window）
     { src: 'js/ui/dialog.js', type: 'module' },
     { src: 'js/ui/message.js', type: 'module' },
@@ -58,18 +60,17 @@ function loadScript(src, type) {
 }
 
 /**
- * 使用 ES6 动态 import 加载模块
+ * 加载 ES module 脚本
  * @param {string} src - 模块路径
  * @returns {Promise} - 加载完成 Promise
  */
 async function loadModule(src) {
     try {
-        await import(/* @mangle */'./' + src);
+        await loadScript(src, 'module');
         console.log('[BGM] Imported: ' + src);
     } catch (e) {
         console.error('[BGM] Failed to import: ' + src, e);
-        // 回退到传统脚本加载
-        await loadScript(src, 'script');
+        throw e;
     }
 }
 

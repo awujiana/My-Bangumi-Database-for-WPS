@@ -9,7 +9,7 @@ import { BGM_COLOR } from '../util.js';
 import { showAlert, showConfirm, showError, showSuccess, showInput, showConfirmDialog, showToast } from './dialog.js';
 import { setSyncRunning, setStatus } from './message.js';
 import { handleError } from '../core/unified.js';
-import { _verifyToken, fetchAllUserCollectionsSync } from '../sync/scraping.js';
+import { verifyToken, fetchAllUserCollections } from '../sync/scraping.js';
 
 // ========== 中文文本常量（Unicode 转义，避免 WPS WebView 编码问题）==========
 const _T = {
@@ -396,7 +396,7 @@ function _doAPISync(sheetIndex, token) {
 
         // 验证 Token
         setStatus("\u6B63\u5728\u9A8C\u8BC1 Token...", "info");
-        let verifyResult = _verifyToken(token);
+        let verifyResult = verifyToken(token);
         if (!verifyResult.valid) {
             showAlert("\u274C " + verifyResult.message);
             setStatus("Token \u65E0\u6548", "error");
@@ -406,10 +406,10 @@ function _doAPISync(sheetIndex, token) {
 
         // 获取收藏列表（同步版，所有类型）
         setStatus("\u6B63\u5728\u83B7\u53D6\u6536\u85CF\u5217\u8868...", "info");
-        let userCollections = fetchAllUserCollectionsSync(token);
+        let userCollections = fetchAllUserCollections(token);
 
-        if (fetchAllUserCollectionsSync.lastError) {
-            let err = fetchAllUserCollectionsSync.lastError;
+        if (fetchAllUserCollections.lastError) {
+            let err = fetchAllUserCollections.lastError;
             showAlert("\u274C " + (err.message || "\u83B7\u53D6\u6536\u85CF\u5217\u8868\u5931\u8D25"));
             setStatus("\u83B7\u53D6\u6536\u85CF\u5931\u8D25", "error");
             return;
@@ -614,8 +614,8 @@ function _runFetchBgRecords(token, includeAllTypes, maxItems) {
     showConfirmDialog(`\u5C06\u4ECE Bangumi \u83B7\u53D6\u4F60\u7684\u6536\u85CF\u5217\u8868\u5E76\u5199\u5165"\u540C\u6B65\u8BB0\u5F55"\u8868\u3002\n\n\u7C7B\u578B\uFF1A${typeDesc}\n\u6700\u5927\u6761\u6570\uFF1A${maxItems}\n\n\u662F\u5426\u7EE7\u7EED\uFF1F`, () => {
         setStatus("\u6B63\u5728\u83B7\u53D6\u6536\u85CF\u5217\u8868...", "info");
         try {
-            let result = fetchAllUserCollectionsSync(token);
-            let err = fetchAllUserCollectionsSync.lastError;
+            let result = fetchAllUserCollections(token);
+            let err = fetchAllUserCollections.lastError;
             if (err) {
                 setStatus(err.message || "\u83B7\u53D6\u5931\u8D25", "error");
                 showAlert("\u274C " + (err.message || "\u83B7\u53D6\u6536\u85CF\u5931\u8D25"));
