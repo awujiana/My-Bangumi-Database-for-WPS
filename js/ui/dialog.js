@@ -26,111 +26,90 @@ function createDialogs() {
     
     const container = document.createElement('div');
     container.id = 'bgmDialogContainer';
-    container.innerHTML = `
-        <!-- Alert 对话框 -->
-        <div id="bgmAlertDialog" class="bgm-modal" style="display:none;">
-            <div class="bgm-modal-content bgm-alert-content">
-                <div class="bgm-dialog-header">
-                    <span class="bgm-dialog-icon bgm-icon-info">&#9432;</span>
-                    <span id="bgmAlertTitle" class="bgm-dialog-title">提示</span>
-                </div>
-                <div class="bgm-dialog-body">
-                    <p id="bgmAlertMessage" class="bgm-dialog-message"></p>
-                </div>
-                <div class="bgm-dialog-footer">
-                    <button id="bgmAlertOk" class="bgm-btn bgm-btn-primary">确定</button>
-                </div>
-            </div>
-        </div>
-        
-        <!-- Confirm 对话框 -->
-        <div id="bgmConfirmDialog" class="bgm-modal" style="display:none;">
-            <div class="bgm-modal-content bgm-confirm-content">
-                <div class="bgm-dialog-header">
-                    <span class="bgm-dialog-icon bgm-icon-question">&#63;</span>
-                    <span id="bgmConfirmTitle" class="bgm-dialog-title">确认</span>
-                </div>
-                <div class="bgm-dialog-body">
-                    <p id="bgmConfirmMessage" class="bgm-dialog-message"></p>
-                </div>
-                <div class="bgm-dialog-footer">
-                    <button id="bgmConfirmCancel" class="bgm-btn bgm-btn-default">取消</button>
-                    <button id="bgmConfirmOk" class="bgm-btn bgm-btn-primary">确定</button>
-                </div>
-            </div>
-        </div>
-        
-        <!-- Error 对话框 -->
-        <div id="bgmErrorDialog" class="bgm-modal" style="display:none;">
-            <div class="bgm-modal-content bgm-error-content">
-                <div class="bgm-dialog-header">
-                    <span class="bgm-dialog-icon bgm-icon-error">&#10006;</span>
-                    <span id="bgmErrorTitle" class="bgm-dialog-title">错误</span>
-                </div>
-                <div class="bgm-dialog-body">
-                    <p id="bgmErrorMessage" class="bgm-dialog-message"></p>
-                </div>
-                <div class="bgm-dialog-footer">
-                    <button id="bgmErrorOk" class="bgm-btn bgm-btn-danger">确定</button>
-                </div>
-            </div>
-        </div>
-        
-        <!-- Warning 对话框 -->
-        <div id="bgmWarningDialog" class="bgm-modal" style="display:none;">
-            <div class="bgm-modal-content bgm-warning-content">
-                <div class="bgm-dialog-header">
-                    <span class="bgm-dialog-icon bgm-icon-warning">&#9888;</span>
-                    <span id="bgmWarningTitle" class="bgm-dialog-title">警告</span>
-                </div>
-                <div class="bgm-dialog-body">
-                    <p id="bgmWarningMessage" class="bgm-dialog-message"></p>
-                </div>
-                <div class="bgm-dialog-footer">
-                    <button id="bgmWarningOk" class="bgm-btn bgm-btn-warning">确定</button>
-                </div>
-            </div>
-        </div>
-        
-        <!-- Success 对话框 -->
-        <div id="bgmSuccessDialog" class="bgm-modal" style="display:none;">
-            <div class="bgm-modal-content bgm-success-content">
-                <div class="bgm-dialog-header">
-                    <span class="bgm-dialog-icon bgm-icon-success">&#10004;</span>
-                    <span id="bgmSuccessTitle" class="bgm-dialog-title">成功</span>
-                </div>
-                <div class="bgm-dialog-body">
-                    <p id="bgmSuccessMessage" class="bgm-dialog-message"></p>
-                </div>
-                <div class="bgm-dialog-footer">
-                    <button id="bgmSuccessOk" class="bgm-btn bgm-btn-success">确定</button>
-                </div>
-            </div>
-        </div>
-        
-        <!-- Input 对话框 -->
-        <div id="bgmInputDialog" class="bgm-modal" style="display:none;">
-            <div class="bgm-modal-content bgm-input-content">
-                <div class="bgm-dialog-header">
-                    <span class="bgm-dialog-icon bgm-icon-info">&#9432;</span>
-                    <span id="bgmInputTitle" class="bgm-dialog-title">输入</span>
-                </div>
-                <div class="bgm-dialog-body">
-                    <p id="bgmInputPrompt" class="bgm-dialog-message"></p>
-                    <input type="text" id="bgmInputField" class="bgm-input-field" placeholder="">
-                </div>
-                <div class="bgm-dialog-footer">
-                    <button id="bgmInputCancel" class="bgm-btn bgm-btn-default">取消</button>
-                    <button id="bgmInputOk" class="bgm-btn bgm-btn-primary">确定</button>
-                </div>
-            </div>
-        </div>
-        
-        <!-- Toast 通知 -->
-        <div id="bgmToast" class="bgm-toast"></div>
-    `;
     document.body.appendChild(container);
-    
+
+    // 通过 DOM API 创建对话框（避免 WPS WebView innerHTML 编码问题）
+    function makeDialog(id, modalClass, iconClass, iconChar, titleId, titleText, bodyId, footerId, buttons) {
+        const modal = document.createElement('div');
+        modal.id = id;
+        modal.className = 'bgm-modal';
+        modal.style.display = 'none';
+        const content = document.createElement('div');
+        content.className = 'bgm-modal-content ' + modalClass;
+        const header = document.createElement('div');
+        header.className = 'bgm-dialog-header';
+        const icon = document.createElement('span');
+        icon.className = 'bgm-dialog-icon ' + iconClass;
+        icon.innerHTML = iconChar;
+        const title = document.createElement('span');
+        title.id = titleId;
+        title.className = 'bgm-dialog-title';
+        title.textContent = titleText;
+        header.appendChild(icon);
+        header.appendChild(title);
+        content.appendChild(header);
+        const body = document.createElement('div');
+        body.className = 'bgm-dialog-body';
+        const msg = document.createElement('p');
+        msg.id = bodyId;
+        msg.className = 'bgm-dialog-message';
+        body.appendChild(msg);
+        content.appendChild(body);
+        const footer = document.createElement('div');
+        footer.className = 'bgm-dialog-footer';
+        footer.id = footerId;
+        buttons.forEach(function(btn) {
+            const b = document.createElement('button');
+            b.id = btn.id;
+            b.className = 'bgm-btn ' + btn.cls;
+            b.textContent = btn.text;
+            footer.appendChild(b);
+        });
+        content.appendChild(footer);
+        modal.appendChild(content);
+        return modal;
+    }
+
+    // Alert
+    container.appendChild(makeDialog('bgmAlertDialog', 'bgm-alert-content', 'bgm-icon-info', '&#9432;', 'bgmAlertTitle', '\u63D0\u793A', 'bgmAlertMessage', null, [
+        { id: 'bgmAlertOk', cls: 'bgm-btn-primary', text: '\u786E\u5B9A' }
+    ]));
+    // Confirm
+    container.appendChild(makeDialog('bgmConfirmDialog', 'bgm-confirm-content', 'bgm-icon-question', '&#63;', 'bgmConfirmTitle', '\u786E\u8BA4', 'bgmConfirmMessage', null, [
+        { id: 'bgmConfirmCancel', cls: 'bgm-btn-default', text: '\u53D6\u6D88' },
+        { id: 'bgmConfirmOk', cls: 'bgm-btn-primary', text: '\u786E\u5B9A' }
+    ]));
+    // Error
+    container.appendChild(makeDialog('bgmErrorDialog', 'bgm-error-content', 'bgm-icon-error', '&#10006;', 'bgmErrorTitle', '\u9519\u8BEF', 'bgmErrorMessage', null, [
+        { id: 'bgmErrorOk', cls: 'bgm-btn-danger', text: '\u786E\u5B9A' }
+    ]));
+    // Warning
+    container.appendChild(makeDialog('bgmWarningDialog', 'bgm-warning-content', 'bgm-icon-warning', '&#9888;', 'bgmWarningTitle', '\u8B66\u544A', 'bgmWarningMessage', null, [
+        { id: 'bgmWarningOk', cls: 'bgm-btn-warning', text: '\u786E\u5B9A' }
+    ]));
+    // Success
+    container.appendChild(makeDialog('bgmSuccessDialog', 'bgm-success-content', 'bgm-icon-success', '&#10004;', 'bgmSuccessTitle', '\u6210\u529F', 'bgmSuccessMessage', null, [
+        { id: 'bgmSuccessOk', cls: 'bgm-btn-success', text: '\u786E\u5B9A' }
+    ]));
+    // Input
+    container.appendChild(makeDialog('bgmInputDialog', 'bgm-input-content', 'bgm-icon-info', '&#9432;', 'bgmInputTitle', '\u8F93\u5165', 'bgmInputPrompt', null, [
+        { id: 'bgmInputCancel', cls: 'bgm-btn-default', text: '\u53D6\u6D88' },
+        { id: 'bgmInputOk', cls: 'bgm-btn-primary', text: '\u786E\u5B9A' }
+    ]));
+    // 为 Input 对话框添加输入框
+    const inputBody = document.querySelector('#bgmInputDialog .bgm-dialog-body');
+    const inputField = document.createElement('input');
+    inputField.type = 'text';
+    inputField.id = 'bgmInputField';
+    inputField.className = 'bgm-input-field';
+    inputField.placeholder = '';
+    inputBody.appendChild(inputField);
+    // Toast
+    const toast = document.createElement('div');
+    toast.id = 'bgmToast';
+    toast.className = 'bgm-toast';
+    container.appendChild(toast);
+
     bindDialogEvents();
 }
 
