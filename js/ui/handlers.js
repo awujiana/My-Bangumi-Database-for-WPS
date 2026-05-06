@@ -9,6 +9,46 @@ import { showAlert, showConfirm, showError, showSuccess, showInput, showConfirmD
 import { setSyncRunning, setStatus } from './message.js';
 import { handleError } from '../core/unified.js';
 
+// ========== 中文文本常量（Unicode 转义，避免 WPS WebView 编码问题）==========
+const _T = {
+    setBgmToken: '\u8BBE\u7F6E Bangumi Access Token',
+    inputToken: '\u8BF7\u8F93\u5165 Access Token',
+    tokenSaved: 'Token \u5DF2\u4FDD\u5B58',
+    setBgmUserId: '\u8BBE\u7F6E Bangumi \u7528\u6237ID',
+    inputUserId: '\u8BF7\u8F93\u5165\u7528\u6237ID\uFF08\u6570\u5B57\uFF09',
+    userIdSaved: '\u7528\u6237ID \u5DF2\u4FDD\u5B58',
+    set: '\u5DF2\u8BBE\u7F6E',
+    notSet: '\u672A\u8BBE\u7F6E',
+    pleaseSetUserIdFirst: '\u8BF7\u5148\u8BBE\u7F6E\u7528\u6237ID',
+    pleaseSetTokenFirst: '\u8BF7\u5148\u8BBE\u7F6E Token',
+    tokenValid: 'Token \u6709\u6548',
+    user: '\u7528\u6237: ',
+    unknownUser: '\u672A\u77E5\u7528\u6237',
+    parseFailed: '\u89E3\u6790\u5931\u8D25',
+    cannotParseResponse: '\u65E0\u6CD5\u89E3\u6790\u54CD\u5E94\u6570\u636E',
+    tokenInvalid: 'Token \u65E0\u6548',
+    tokenExpired: 'Access Token \u5DF2\u8FC7\u671F\u6216\u65E0\u6548',
+    networkError: '\u7F51\u7EDC\u9519\u8BEF',
+    cannotConnectBgm: '\u65E0\u6CD5\u8FDE\u63A5\u5230 Bangumi API',
+    debugConnOk: '\u8C03\u8BD5\u8FDE\u63A5\u6B63\u5E38',
+    debugConnFail: '\u8C03\u8BD5\u8FDE\u63A5\u5931\u8D25',
+    confirmClearMarks: '\u786E\u5B9A\u8981\u6E05\u9664\u6240\u6709\u6807\u8BB0\u5417\uFF1F',
+    loadingWait: '\u6B63\u5728\u52A0\u8F7D\u811A\u672C\uFF0C\u8BF7\u7A0D\u540E\u91CD\u8BD5...',
+    pleaseSetBgmToken: '\u8BF7\u5148\u8BBE\u7F6E Bangumi Token\uFF01',
+    cannotActivateSyncSheet: '\u65E0\u6CD5\u6FC0\u6D3B\u540C\u6B65\u8BB0\u5F55\u8868: ',
+    syncToBgmError: 'SyncToBangumi \u51FA\u9519: ',
+    execError: '\u6267\u884C\u51FA\u9519',
+    syncBgmMarksStart: '\u5F00\u59CB\u4ECEBGM\u540C\u6B65\u6536\u85CF\u6807\u8BB0\uFF0C\u5DE5\u4F5C\u8868\u7D22\u5F15: ',
+    fetchingCollections: '\u6B63\u5728\u83B7\u53D6\u6536\u85CF\u5217\u8868...',
+    noCollectionData: '\u672A\u83B7\u53D6\u5230\u6536\u85CF\u6570\u636E\uFF0C\u8BF7\u68C0\u67E5 Token \u548C\u7528\u6237ID\uFF01',
+    syncComplete: '\u540C\u6B65\u5B8C\u6210',
+    fetchCollectionFailed: '\u83B7\u53D6\u6536\u85CF\u5931\u8D25',
+    syncFailed: '\u540C\u6B65\u5931\u8D25',
+    sheetNotFound: '\u672A\u627E\u5230\u5DE5\u4F5C\u8868: ',
+    marksToSheet: '\u5DF2\u6807\u8BB0 ',
+    marksToSheetSuffix: ' \u6761\u6536\u85CF\u5230 ',
+};
+
 // ========== 业务对话框函数 ==========
 
 /**
@@ -16,11 +56,11 @@ import { handleError } from '../core/unified.js';
  */
 export function showTokenDialog(currentToken) {
     let defaultVal = currentToken || loadBgToken() || "";
-    showInput("设置 Bangumi Access Token", "请输入 Access Token", defaultVal, (value) => {
+    showInput(_T.setBgmToken, _T.inputToken, defaultVal, (value) => {
         if (value) {
             storeBgToken(value);
             updateTokenStatus();
-            showToast("Token 已保存", "success");
+            showToast(_T.tokenSaved, "success");
             BGM.postMessage({ type: "tokenUpdated" });
         }
     });
@@ -31,11 +71,11 @@ export function showTokenDialog(currentToken) {
  */
 export function showUserIdDialog() {
     let currentId = _getBgmUserId() || "";
-    showInput("设置 Bangumi 用户ID", "请输入用户ID（数字）", currentId, (value) => {
+    showInput(_T.setBgmUserId, _T.inputUserId, currentId, (value) => {
         if (value && value.trim() !== "") {
             _setBgmUserId(value.trim());
             updateUserIdStatus();
-            showToast("用户ID 已保存", "success");
+            showToast(_T.userIdSaved, "success");
             BGM.postMessage({ type: "userIdUpdated" });
         }
     });
@@ -51,18 +91,18 @@ export function updateTokenStatus() {
     let token = loadBgToken();
     if (token && token.length > 10) {
         tokenStatus.style.color = "#4CAF50";
-        tokenStatus.textContent = "已设置 (" + token.substring(0, 4) + "...)";
+        tokenStatus.textContent = _T.set + " (" + token.substring(0, 4) + "...)";
         
         if (typeof _fetchBgmUserInfo === 'function') {
             _fetchBgmUserInfo(function(userInfo) {
                 if (userInfo && userInfo.username) {
-                    tokenStatus.textContent = "已设置: " + userInfo.username;
+                    tokenStatus.textContent = _T.set + ": " + userInfo.username;
                     updateUserIdStatus();
                 }
             });
         }
     } else {
-        tokenStatus.textContent = "未设置";
+        tokenStatus.textContent = _T.notSet;
         tokenStatus.style.color = "#f44336";
         BGM.cache.userId = null;
         BGM.cache.username = null;
@@ -79,10 +119,10 @@ export function updateUserIdStatus() {
     let userId = _getBgmUserId();
     if (userId) {
         let display = BGM.cache.username ? BGM.cache.username + " (" + userId + ")" : userId;
-        userIdStatus.textContent = "已设置: " + display;
+        userIdStatus.textContent = _T.set + ": " + display;
         userIdStatus.style.color = "#4CAF50";
     } else {
-        userIdStatus.textContent = "未设置";
+        userIdStatus.textContent = _T.notSet;
         userIdStatus.style.color = "#f44336";
     }
 }
@@ -93,7 +133,7 @@ export function updateUserIdStatus() {
 export function openUserCollection() {
     var userId = _getBgmUserId();
     if (!userId) {
-        showAlert("请先设置用户ID");
+        showAlert(_T.pleaseSetUserIdFirst);
         return;
     }
     window.open('https://bgm.tv/user/' + userId + '/collection', '_blank');
@@ -105,7 +145,7 @@ export function openUserCollection() {
 export function testTokenValidity() {
     var token = loadBgToken();
     if (!token) {
-        showAlert("请先设置 Token");
+        showAlert(_T.pleaseSetTokenFirst);
         return;
     }
     var xhr = new XMLHttpRequest();
@@ -115,17 +155,17 @@ export function testTokenValidity() {
         if (xhr.status === 200) {
             try {
                 var data = JSON.parse(xhr.responseText);
-                var username = data.username || data.nickname || '未知用户';
-                showSuccess('Token 有效', '用户: ' + username);
+                var username = data.username || data.nickname || _T.unknownUser;
+                showSuccess(_T.tokenValid, _T.user + username);
             } catch (e) {
-                showError("解析失败", "无法解析响应数据");
+                showError(_T.parseFailed, _T.cannotParseResponse);
             }
         } else if (xhr.status === 401) {
-            showError("Token 无效", "Access Token 已过期或无效");
+            showError(_T.tokenInvalid, _T.tokenExpired);
         }
     };
     xhr.onerror = function() {
-        showError("网络错误", "无法连接到 Bangumi API");
+        showError(_T.networkError, _T.cannotConnectBgm);
     };
     xhr.send();
 }
@@ -135,9 +175,9 @@ export function testTokenValidity() {
  */
 export function testDebugConnection() {
     if (typeof window.Application !== 'undefined') {
-        showToast('调试连接正常', 'success');
+        showToast(_T.debugConnOk, 'success');
     } else {
-        showToast('调试连接失败', 'error');
+        showToast(_T.debugConnFail, 'error');
     }
 }
 
@@ -157,7 +197,7 @@ export function onAction(action) {
             }
             break;
         case "clear":
-            showConfirmDialog("确定要清除所有标记吗？", () => {
+            showConfirmDialog(_T.confirmClearMarks, () => {
                 if (typeof clearRowColors === 'function') {
                     clearRowColors();
                 }
@@ -178,7 +218,7 @@ export function onAction(action) {
             showUserIdDialog();
             break;
         case "showClearConfirm":
-            showConfirmDialog("确定要清除所有标记吗？", () => {
+            showConfirmDialog(_T.confirmClearMarks, () => {
                 if (typeof clearRowColors === 'function') {
                     clearRowColors();
                 }
@@ -202,19 +242,19 @@ export function onAction(action) {
  * 从面板执行同步
  */
 export function syncFromPanel() {
-    bgmLog(LOG_LEVELS.INFO, "syncFromPanel 开始执行");
+    bgmLog(LOG_LEVELS.INFO, "syncFromPanel " + '\u5F00\u59CB\u6267\u884C');
     
     if (typeof findHeaderRow === 'undefined' || typeof getColumnMap === 'undefined' || typeof getLastRow === 'undefined') {
-        bgmLog(LOG_LEVELS.ERROR, "syncFromPanel - 必需函数未加载");
-        showAlert("正在加载脚本，请稍后重试...");
+        bgmLog(LOG_LEVELS.ERROR, "syncFromPanel - " + '\u5FC5\u9700\u51FD\u6570\u672A\u52A0\u8F7D');
+        showAlert(_T.loadingWait);
         return;
     }
     
-    bgmLog(LOG_LEVELS.INFO, "syncFromPanel - 必需函数已加载，开始同步...");
+    bgmLog(LOG_LEVELS.INFO, "syncFromPanel - " + '\u5FC5\u9700\u51FD\u6570\u5DF2\u52A0\u8F7D\uFF0C\u5F00\u59CB\u540C\u6B65...');
 
     let token = loadBgToken();
     if (!token) {
-        showAlert("请先设置 Bangumi Token！");
+        showAlert(_T.pleaseSetBgmToken);
         return;
     }
 
@@ -224,7 +264,7 @@ export function syncFromPanel() {
             try {
                 syncSheet.Activate();
             } catch (e) {
-                bgmLog(LOG_LEVELS.WARN, "无法激活同步记录表: " + e.message);
+                bgmLog(LOG_LEVELS.WARN, _T.cannotActivateSyncSheet + e.message);
             }
         }
     }
@@ -233,8 +273,8 @@ export function syncFromPanel() {
         try {
             SyncToBangumi();
         } catch (e) {
-            bgmLog(LOG_LEVELS.ERROR, "SyncToBangumi 出错: " + e.message);
-            showAlert(e.message, "执行出错");
+            bgmLog(LOG_LEVELS.ERROR, _T.syncToBgmError + e.message);
+            showAlert(e.message, _T.execError);
         }
     }
 }
@@ -250,7 +290,7 @@ export function testSingleUpdateFromPanel() {
     
     let token = loadBgToken();
     if (!token) {
-        showAlert("请先设置 Bangumi Token！");
+        showAlert(_T.pleaseSetBgmToken);
         return;
     }
     
@@ -269,11 +309,11 @@ export function syncCollectionFromBgm() {
         let select = document.getElementById("sheetSelect");
         let sheetIndex = BGM.sheet.lockedIndex || parseInt(select?.value) || 1;
         
-        bgmLog(LOG_LEVELS.INFO, "开始从BGM同步收藏标记，工作表索引: " + sheetIndex);
+        bgmLog(LOG_LEVELS.INFO, _T.syncBgmMarksStart + sheetIndex);
 
-        let token = loadBgToken();
-        if (!token) {
-            showAlert("请先设置 Bangumi Token！");
+    let token = loadBgToken();
+    if (!token) {
+        showAlert(_T.pleaseSetBgmToken);
             return;
         }
 
@@ -291,19 +331,19 @@ export function syncFromBgmByAPI(sheetIndex) {
 
     let token = loadBgToken();
     if (!token) {
-        showAlert("请先设置 Token！");
+        showAlert(_T.pleaseSetTokenFirst);
         return;
     }
 
     let userId = _getBgmUserId();
     if (!userId) {
-        showAlert("请先设置用户ID！");
+        showAlert(_T.pleaseSetUserIdFirst + '\uFF01');
         showUserIdDialog();
         return;
     }
 
     setSyncRunning(true);
-    setStatus("正在获取收藏列表...", "info");
+    setStatus(_T.fetchingCollections, "info");
 
     if (typeof fetchAllUserCollections === 'function') {
         fetchAllUserCollections(token, userId, (collections) => {
@@ -313,14 +353,14 @@ export function syncFromBgmByAPI(sheetIndex) {
                 }
                 markUploadedItems(sheetIndex, collections);
             } else {
-                showAlert("未获取到收藏数据，请检查 Token 和用户ID！");
+                showAlert(_T.noCollectionData);
             }
             setSyncRunning(false);
-            setStatus("同步完成", "success");
+            setStatus(_T.syncComplete, "success");
         }, (error) => {
-            showAlert(error, "获取收藏失败");
+            showAlert(error, _T.fetchCollectionFailed);
             setSyncRunning(false);
-            setStatus("同步失败", "error");
+            setStatus(_T.syncFailed, "error");
         });
     }
 }
@@ -336,12 +376,12 @@ export function markUploadedItems(sheetIndexOrName, collections) {
         let sheetName = sheetIndexOrName;
         let token = loadBgToken();
         if (!token) {
-            showAlert("请先设置 Token！");
+            showAlert(_T.pleaseSetTokenFirst);
             return;
         }
         let userId = _getBgmUserId();
         if (!userId) {
-            showAlert("请先设置用户ID！");
+            showAlert(_T.pleaseSetUserIdFirst + '\uFF01');
             return;
         }
         let getApp = (typeof window.getApp === 'function') ? window.getApp : null;
@@ -357,7 +397,7 @@ export function markUploadedItems(sheetIndexOrName, collections) {
             }
         }
         if (targetIndex === null) {
-            showAlert('未找到工作表: ' + sheetName);
+            showAlert(_T.sheetNotFound + sheetName);
             return;
         }
         if (typeof fetchAllUserCollections === 'function') {
@@ -365,7 +405,7 @@ export function markUploadedItems(sheetIndexOrName, collections) {
                 if (cols && cols.length > 0) {
                     if (typeof markUploadedItemsInSheet === 'function') {
                         markUploadedItemsInSheet(targetIndex, cols);
-                        showToast('已标记 ' + cols.length + ' 条收藏到 ' + sheetName, 'success');
+                        showToast(_T.marksToSheet + cols.length + _T.marksToSheetSuffix + sheetName, 'success');
                     }
                 }
             });
@@ -455,7 +495,7 @@ function handleActionClick(event) {
             }
             break;
         case 'clear':
-            showConfirmDialog("确定要清除所有标记吗？", () => {
+            showConfirmDialog(_T.confirmClearMarks, () => {
                 if (typeof clearRowColors === 'function') {
                     clearRowColors();
                 }

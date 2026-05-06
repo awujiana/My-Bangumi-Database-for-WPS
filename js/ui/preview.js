@@ -1,7 +1,7 @@
 /**
- * UI 预览模块
+ * UI \u9884\u89C8\u6A21\u5757
  * @module ui/preview
- * @description 数据预览、同步记录预览、详情模态框
+ * @description \u6570\u636E\u9884\u89C8\u3001\u540C\u6B65\u8BB0\u5F55\u9884\u89C8\u3001\u8BE6\u60C5\u6A21\u6001\u6846
  */
 
 import { getApp, bgmLog, BGM, LOG_LEVELS } from '../util.js';
@@ -9,12 +9,46 @@ import { getCellValue } from '../util.js';
 import { showAlert } from './dialog.js';
 import { escapeHtml } from '../util.js';
 
-// ========== 详细预览数据存储 ==========
+// ========== \u4E2D\u6587\u6587\u672C\u5E38\u91CF ==========
+const _T = {
+    error: '\u9519\u8BEF',
+    cannotGetApp: '\u65E0\u6CD5\u83B7\u53D6 WPS Application \u5BF9\u8C61\uFF01',
+    cannotGetSheet: '\u65E0\u6CD5\u83B7\u53D6\u5DE5\u4F5C\u8868\uFF01',
+    hint: '\u63D0\u793A',
+    noHeaderRow: '\u672A\u627E\u5230\u8868\u5934\u884C\uFF01',
+    noSubjectIdOrUrl: '\u672A\u627E\u5230\u3010\u6761\u76EEID\u3011\u6216\u3010Bangumi URL\u3011\u5217\uFF01',
+    noPreviewData: '\u6CA1\u6709\u53EF\u9884\u89C8\u7684\u6570\u636E\uFF01',
+    noName: '(\u65E0\u540D)',
+    cannotExtract: '(\u65E0\u6CD5\u63D0\u53D6)',
+    noData: '(\u65E0)',
+    previewRowErr: '\u9884\u89C8\u7B2C',
+    rowErr: '\u884C\u51FA\u9519: ',
+    countPrefix: '\u5171',
+    countSuffix: ' \u6761',
+    syncRecordNotAvailable: '\u540C\u6B65\u8BB0\u5F55\u529F\u80FD\u4E0D\u53EF\u7528\uFF01',
+    syncRecordDetail: '\u540C\u6B65\u8BB0\u5F55\u8BE6\u60C5',
+    labelRow: '\u884C:',
+    labelSid: 'SID:',
+    labelCurrentStatus: '\u5F53\u524D\u72B6\u6001:',
+    labelRate: '\u8BC4\u5206:',
+    fieldIndex: '\u5E8F\u53F7: ',
+    fieldTime: '\u540C\u6B65\u65F6\u95F4: ',
+    fieldName: '\u540D\u79F0: ',
+    fieldUrl: 'URL: ',
+    fieldSid: 'SID: ',
+    fieldType: '\u6761\u76EE\u7C7B\u578B: ',
+    fieldCount: '\u540C\u6B65\u6B21\u6570: ',
+    fieldContent: '\u5185\u5BB9: ',
+    fieldStatus: '\u72B6\u6001: ',
+    fieldComment: '\u5907\u6CE8: ',
+};
+
+// ========== \u8BE6\u7EC6\u9884\u89C8\u6570\u636E\u5B58\u50A8 ==========
 let detailPreviewData = [];
 
-// ========== 详细预览同步内容 ==========
+// ========== \u8BE6\u7EC6\u9884\u89C8\u540C\u6B65\u5185\u5BB9 ==========
 /**
- * 预览同步内容
+ * \u9884\u89C8\u540C\u6B65\u5185\u5BB9
  */
 export function previewSyncContent() {
     if (typeof findHeaderRow === 'undefined' || typeof getColumnMap === 'undefined') {
@@ -30,14 +64,14 @@ export function previewSyncContent() {
 
     let app = getApp();
     if (!app || !app.ActiveWorkbook) {
-        showAlert("错误", "无法获取 WPS Application 对象！");
+        showAlert(_T.error, _T.cannotGetApp);
         return;
     }
 
     let wb = app.ActiveWorkbook;
-    let ws = wb.Worksheets(sheetIndex);
+    let ws = wb.Worksheets.Item(sheetIndex);
     if (!ws) {
-        showAlert("错误", "无法获取工作表！");
+        showAlert(_T.error, _T.cannotGetSheet);
         return;
     }
 
@@ -46,19 +80,19 @@ export function previewSyncContent() {
 
     let headerRow = findHeaderRow(ws, startRow);
     if (headerRow === 0) {
-        showAlert("提示", "未找到表头行！");
+        showAlert(_T.hint, _T.noHeaderRow);
         return;
     }
 
     let colMap = getColumnMap(ws, headerRow);
     if (!colMap.subjectId && !colMap.url) {
-        showAlert("提示", "未找到【条目ID】或【Bangumi URL】列！");
+        showAlert(_T.hint, _T.noSubjectIdOrUrl);
         return;
     }
 
     let lastRow = userEndRow > 0 ? userEndRow : getLastRow(ws);
     if (lastRow <= headerRow) {
-        showAlert("提示", "没有可预览的数据！");
+        showAlert(_T.hint, _T.noPreviewData);
         return;
     }
 
@@ -96,7 +130,7 @@ export function previewSyncContent() {
 
             rows.push({
                 row: i,
-                name: nameVal || "(无名)",
+                name: nameVal || _T.noName,
                 sid: sid,
                 url: urlVal,
                 currentStatus: currentStatus,
@@ -112,7 +146,7 @@ export function previewSyncContent() {
                 payload: buildPreviewPayload(ws, i, colMap)
             });
         } catch (e) {
-            bgmLog(LOG_LEVELS.WARN, "预览第" + i + "行出错: " + e.message);
+            bgmLog(LOG_LEVELS.WARN, _T.previewRowErr + i + _T.rowErr + e.message);
         }
     }
 
@@ -121,7 +155,7 @@ export function previewSyncContent() {
 }
 
 /**
- * 构建预览用的 payload
+ * \u6784\u5EFA\u9884\u89C8\u7528\u7684 payload
  */
 export function buildPreviewPayload(ws, row, colMap) {
     if (typeof buildJsonPayload === 'function') {
@@ -131,7 +165,7 @@ export function buildPreviewPayload(ws, row, colMap) {
 }
 
 /**
- * 过滤预览项目
+ * \u8FC7\u6EE4\u9884\u89C8\u9879\u76EE
  */
 export function filterDetailItems(filterText) {
     let items = document.querySelectorAll(".detail-item");
@@ -144,17 +178,17 @@ export function filterDetailItems(filterText) {
 }
 
 /**
- * 更新详情计数
+ * \u66F4\u65B0\u8BE6\u60C5\u8BA1\u6570
  */
 export function updateDetailCount(count) {
     let countEl = document.getElementById("detailCount");
     if (countEl) {
-        countEl.textContent = "共" + count + " 条";
+        countEl.textContent = _T.countPrefix + count + _T.countSuffix;
     }
 }
 
 /**
- * 显示详情模态框
+ * \u663E\u793A\u8BE6\u60C5\u6A21\u6001\u6846
  */
 export function showDetailModal() {
     let modal = document.getElementById("detailModal");
@@ -164,7 +198,7 @@ export function showDetailModal() {
 }
 
 /**
- * 关闭详情模态框
+ * \u5173\u95ED\u8BE6\u60C5\u6A21\u6001\u6846
  */
 export function closeDetailModal() {
     let modal = document.getElementById("detailModal");
@@ -174,7 +208,7 @@ export function closeDetailModal() {
 }
 
 /**
- * 渲染详情列表
+ * \u6E32\u67D3\u8BE6\u60C5\u5217\u8868
  */
 export function renderDetailList(items) {
     let container = document.getElementById("detailList");
@@ -187,20 +221,20 @@ export function renderDetailList(items) {
         div.className = "detail-item";
         div.innerHTML = `
             <div class="detail-row">
-                <span class="detail-label">行:${item.row}</span>
+                <span class="detail-label">${_T.labelRow}${item.row}</span>
                 <span class="detail-name">${escapeHtml(item.name)}</span>
             </div>
             <div class="detail-row">
-                <span class="detail-label">SID:</span>
-                <span class="detail-sid">${item.sid || "(无法提取)"}</span>
+                <span class="detail-label">${_T.labelSid}</span>
+                <span class="detail-sid">${item.sid || _T.cannotExtract}</span>
             </div>
             <div class="detail-row">
-                <span class="detail-label">当前状态:</span>
-                <span class="detail-status">${item.currentStatus || "(无)"}</span>
+                <span class="detail-label">${_T.labelCurrentStatus}</span>
+                <span class="detail-status">${item.currentStatus || _T.noData}</span>
             </div>
             <div class="detail-row">
-                <span class="detail-label">评分:</span>
-                <span class="detail-rate">${item.rate || "(无)"}</span>
+                <span class="detail-label">${_T.labelRate}</span>
+                <span class="detail-rate">${item.rate || _T.noData}</span>
             </div>
             <div class="detail-preview">
                 <pre>${escapeHtml(item.previewPayload)}</pre>
@@ -211,11 +245,11 @@ export function renderDetailList(items) {
 }
 
 /**
- * 查看同步记录详情
+ * \u67E5\u770B\u540C\u6B65\u8BB0\u5F55\u8BE6\u60C5
  */
 export function viewSyncRecordDetail(rowIndex) {
     if (typeof getAllSyncRecords !== 'function') {
-        showAlert("提示", "同步记录功能不可用！");
+        showAlert(_T.hint, _T.syncRecordNotAvailable);
         return;
     }
 
@@ -225,23 +259,23 @@ export function viewSyncRecordDetail(rowIndex) {
     }
 
     let record = records[rowIndex];
-    let detail = `
-        序号: ${record.index}
-        同步时间: ${record.time}
-        名称: ${record.name}
-        URL: ${record.url}
-        SID: ${record.sid}
-        条目类型: ${record.type}
-        同步次数: ${record.count}
-        内容: ${record.content}
-        状态: ${record.status}
-        备注: ${record.comment}
-    `;
+    let detail = [
+        _T.fieldIndex + record.index,
+        _T.fieldTime + record.time,
+        _T.fieldName + record.name,
+        _T.fieldUrl + record.url,
+        _T.fieldSid + record.sid,
+        _T.fieldType + record.type,
+        _T.fieldCount + record.count,
+        _T.fieldContent + record.content,
+        _T.fieldStatus + record.status,
+        _T.fieldComment + record.comment
+    ].join('\n');
 
-    showAlert("同步记录详情", detail);
+    showAlert(_T.syncRecordDetail, detail);
 }
 
-// ========== 向后兼容（挂载到 window）==========
+// ========== \u5411\u540E\u517C\u5BB9\uFF08\u6302\u8F7D\u5230 window\uFF09==========
 window.previewSyncContent = previewSyncContent;
 window.buildPreviewPayload = buildPreviewPayload;
 window.filterDetailItems = filterDetailItems;

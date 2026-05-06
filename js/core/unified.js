@@ -38,9 +38,9 @@ const Dialog = {
      */
     confirm: function(message, onConfirm, onCancel) {
         if (typeof window.BGMConfirm === 'function') {
-            window.BGMConfirm(message, '确认', onConfirm, onCancel);
+            window.BGMConfirm(message, '\u786E\u8BA4', onConfirm, onCancel);
         } else if (typeof window.showConfirm === 'function') {
-            window.showConfirm(message, '确认', onConfirm, onCancel);
+            window.showConfirm(message, '\u786E\u8BA4', onConfirm, onCancel);
         } else {
             if (window.confirm(message)) {
                 if (onConfirm) onConfirm();
@@ -57,7 +57,7 @@ const Dialog = {
         if (typeof window.BGMError === 'function') {
             window.BGMError(message, title);
         } else {
-            window.alert('[错误] ' + message);
+            window.alert('[\u9519\u8BEF] ' + message);
         }
     },
 
@@ -68,7 +68,7 @@ const Dialog = {
         if (typeof window.BGMSuccess === 'function') {
             window.BGMSuccess(message, title);
         } else {
-            window.alert('[成功] ' + message);
+            window.alert('[\u6210\u529F] ' + message);
         }
     },
 
@@ -79,7 +79,7 @@ const Dialog = {
         if (typeof window.BGMWarning === 'function') {
             window.BGMWarning(message, title);
         } else {
-            window.alert('[警告] ' + message);
+            window.alert('[\u8B66\u544A] ' + message);
         }
     },
 
@@ -108,19 +108,19 @@ const Dialog = {
         switch (type) {
             case 'alert':
             case 'info':
-                return this.alert(title || '提示', message);
+                return this.alert(title || '\u63D0\u793A', message);
             case 'error':
-                return this.error(title || '错误', message);
+                return this.error(title || '\u9519\u8BEF', message);
             case 'success':
-                return this.success(title || '成功', message);
+                return this.success(title || '\u6210\u529F', message);
             case 'warning':
-                return this.warning(title || '警告', message);
+                return this.warning(title || '\u8B66\u544A', message);
             case 'confirm':
                 return this.confirm(message, options?.onConfirm, options?.onCancel);
             case 'input':
-                return this.input(title || '输入', message, options?.defaultValue, options?.onOk, options?.onCancel);
+                return this.input(title || '\u8F93\u5165', message, options?.defaultValue, options?.onOk, options?.onCancel);
             default:
-                return this.alert(title || '提示', message);
+                return this.alert(title || '\u63D0\u793A', message);
         }
     }
 };
@@ -157,7 +157,7 @@ const Message = {
             // 静默处理 postMessage 不可用的情况（如跨域限制）
             // 仅在调试模式下记录，避免日志泄露
             if (typeof bgmLog === 'function') {
-                bgmLog(LOG_LEVELS?.DEBUG || 0, "postMessage 不可用: " + e.message);
+                bgmLog(LOG_LEVELS?.DEBUG || 0, "postMessage \u4E0D\u53EF\u7528: " + e.message);
             }
         }
         return false;
@@ -267,7 +267,7 @@ export function handleError(error, options) {
 
     // 显示对话框
     if (opts.showDialog) {
-        Dialog.error('错误', bgmError.message);
+        Dialog.error('\u9519\u8BEF', bgmError.message);
     }
 
     // 抛出异常

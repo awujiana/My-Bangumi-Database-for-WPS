@@ -78,7 +78,7 @@ export const BGM = {
                 window.BGMDialog.confirm(message, onConfirm, onCancel);
             }
             else if (typeof window !== 'undefined' && typeof window.BGMConfirm === 'function') {
-                window.BGMConfirm(message, '确认', onConfirm, onCancel);
+                window.BGMConfirm(message, '\u786E\u8BA4', onConfirm, onCancel);
             }
             else if (typeof window !== 'undefined') {
                 if (window.confirm(message)) {
@@ -99,7 +99,7 @@ export const BGM = {
                 window.BGMError(message, title);
             }
             else if (typeof window !== 'undefined') {
-                window.alert('[错误] ' + message);
+                window.alert('[\u9519\u8BEF] ' + message);
             }
         },
         input: function (title, prompt, defaultValue, onOk, onCancel) {
@@ -154,7 +154,7 @@ export const BGM = {
             catch (e) {
                 const err = e;
                 if (typeof bgmLog === 'function') {
-                    bgmLog(LOG_LEVELS?.DEBUG || 0, "postMessage 不可用: " + err.message);
+                    bgmLog(LOG_LEVELS?.DEBUG || 0, "postMessage \u4E0D\u53EF\u7528: " + err.message);
                 }
             }
             return false;
@@ -213,7 +213,7 @@ export const BGM = {
             case ErrorLevel.ERROR:
                 bgmLog(LOG_LEVELS.ERROR, bgmError.toString());
                 if (opts.showDialog) {
-                    BGM.showDialog('错误', bgmError.message);
+                    BGM.showDialog('\u9519\u8BEF', bgmError.message);
                 }
                 break;
             case ErrorLevel.THROW:
@@ -308,7 +308,7 @@ export function getCellValue(ws, row, col) {
     }
     catch (e) {
         const err = e;
-        bgmLog(LOG_LEVELS.WARN, "getCellValue 失败: " + err.message);
+        bgmLog(LOG_LEVELS.WARN, "getCellValue \u5931\u8D25: " + err.message);
     }
     return "";
 }
@@ -319,14 +319,14 @@ export function setCellValue(ws, row, col, value) {
     try {
         const cell = getCell(ws, row, col);
         if (!cell) {
-            console.error("setCellValue - 无法获取单元格:", row, col);
+            console.error("setCellValue - \u65E0\u6CD5\u83B7\u53D6\u5355\u5143\u683C:", row, col);
             return false;
         }
         cell.Value = value;
         return true;
     }
     catch (e) {
-        console.error("setCellValue error (行:", row, "列:", col, "):", e);
+        console.error("setCellValue error (\u884C:", row, "\u5217:", col, "):", e);
     }
     return false;
 }
@@ -483,10 +483,10 @@ export function showBangumiPanel() {
     const app = getApp();
     if (!app) {
         if (typeof window !== 'undefined' && typeof window.BGMError === 'function') {
-            window.BGMError("无法获取 WPS Application 对象！", "错误");
+            window.BGMError("\u65E0\u6CD5\u83B7\u53D6 WPS Application \u5BF9\u8C61！", "\u9519\u8BEF");
         }
         else if (typeof window !== 'undefined') {
-            window.alert("无法获取 WPS Application 对象！");
+            window.alert("\u65E0\u6CD5\u83B7\u53D6 WPS Application \u5BF9\u8C61！");
         }
         return;
     }
@@ -522,7 +522,7 @@ export function wpsPrompt(message, defaultValue) {
         const app = getApp();
         if (app?.InputBox) {
             try {
-                const result = app.InputBox(message, "Bangumi 设置", defaultValue || "", 2);
+                const result = app.InputBox(message, "Bangumi \u8BBE\u7F6E", defaultValue || "", 2);
                 if (result === false || result === null || result === undefined) {
                     resolve(null);
                     return;
@@ -531,11 +531,11 @@ export function wpsPrompt(message, defaultValue) {
                 return;
             }
             catch (e) {
-                console.warn("WPS InputBox 不可用:", e.message);
+                console.warn("WPS InputBox \u4E0D\u53EF\u7528:", e.message);
             }
         }
         if (typeof window !== 'undefined' && typeof window.BGMInput === 'function') {
-            window.BGMInput("输入", message, defaultValue || '', (value) => {
+            window.BGMInput("\u8F93\u5165", message, defaultValue || '', (value) => {
                 resolve(value);
             }, () => {
                 resolve(null);
@@ -547,7 +547,7 @@ export function wpsPrompt(message, defaultValue) {
                 resolve(result);
             }
             catch (e) {
-                console.error("prompt 也不可用:", e.message);
+                console.error("prompt \u4E5F\u4E0D\u53EF\u7528:", e.message);
                 resolve(null);
             }
         }
@@ -566,12 +566,12 @@ export function wpsMsgBox(message, buttons, icon) {
                 return;
             }
             catch (e) {
-                console.warn("WPS MessageBox 不可用:", e.message);
+                console.warn("WPS MessageBox \u4E0D\u53EF\u7528:", e.message);
             }
         }
         if (buttons === 4) {
             if (typeof window !== 'undefined' && typeof window.BGMConfirm === 'function') {
-                window.BGMConfirm(message, "确认", () => {
+                window.BGMConfirm(message, "\u786E\u8BA4", () => {
                     resolve(6);
                 }, () => {
                     resolve(7);
@@ -583,7 +583,7 @@ export function wpsMsgBox(message, buttons, icon) {
         }
         else {
             if (typeof window !== 'undefined' && typeof window.BGMAlert === 'function') {
-                window.BGMAlert(message, "提示", () => {
+                window.BGMAlert(message, "\u63D0\u793A", () => {
                     resolve(1);
                 });
             }
@@ -607,7 +607,7 @@ export function sleep(ms) {
         }
     }
     catch (e) {
-        bgmLog(LOG_LEVELS.WARN, "sleep app.Wait 失败: " + e.message);
+        bgmLog(LOG_LEVELS.WARN, "sleep app.Wait \u5931\u8D25: " + e.message);
     }
     const end = Date.now() + ms;
     while (Date.now() < end) {
@@ -618,7 +618,7 @@ export function sleep(ms) {
         }
         catch (e) {
             if (typeof bgmLog === 'function') {
-                bgmLog(LOG_LEVELS?.DEBUG || 0, "sleep DoEvents 失败: " + e.message);
+                bgmLog(LOG_LEVELS?.DEBUG || 0, "sleep DoEvents \u5931\u8D25: " + e.message);
             }
             break;
         }

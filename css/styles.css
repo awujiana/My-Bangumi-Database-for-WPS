@@ -1060,3 +1060,72 @@ select.input {
     background: linear-gradient(135deg, #4a9eff 0%, #3a8ee8 100%);
     color: white;
 }
+
+/* \u9884\u89C8\u8868\u683C */
+.preview-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+    margin-bottom: 8px;
+}
+
+.preview-table tr {
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.preview-table tr:hover {
+    background: rgba(255, 255, 255, 0.03);
+}
+
+.preview-header-row {
+    background: rgba(74, 158, 255, 0.1);
+}
+
+.preview-header-row:hover {
+    background: rgba(74, 158, 255, 0.15);
+}
+
+.preview-row-num {
+    color: #666;
+    padding: 3px 6px;
+    text-align: center;
+    font-size: 11px;
+    white-space: nowrap;
+    border-right: 1px solid rgba(255, 255, 255, 0.06);
+    min-width: 28px;
+}
+
+.preview-header-row .preview-row-num {
+    color: #4a9eff;
+    font-weight: bold;
+}
+
+.preview-name {
+    font-weight: 500;
+    color: #ddd;
+}
+
+.preview-header {
+    color: #4a9eff;
+    font-weight: 600;
+    font-size: 11px;
+}
+
+.preview-important-header {
+    color: #ff9f43;
+    font-weight: 700;
+}
+
+.preview-important {
+    color: #f0e6d3;
+    font-weight: 500;
+    background: rgba(255, 159, 67, 0.06);
+}
+
+.preview-table td {
+    padding: 3px 8px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 200px;
+}

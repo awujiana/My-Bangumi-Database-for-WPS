@@ -31,15 +31,15 @@ const SYNC_STATUS_COLOR = {
 
 // 状态映射常量
 const WATCH_STATUS_MAP = {
-    "看过": 3, "看完": 3, "已看": 3, "completed": 3, "3": 3,
-    "在看": 2, "在看动画": 2, "watching": 2, "2": 2,
-    "想看": 1, "想看动画": 1, "wish": 1, "1": 1,
-    "搁置": 4, "on_hold": 4, "4": 4,
-    "抛弃": 5, "drop": 5, "dropped": 5, "5": 5
+    "\u770B\u8FC7": 3, "\u770B\u5B8C": 3, "\u5DF2\u770B": 3, "completed": 3, "3": 3,
+    "\u5728\u770B": 2, "\u5728\u770B\u52A8\u753B": 2, "watching": 2, "2": 2,
+    "\u60F3\u770B": 1, "\u60F3\u770B\u52A8\u753B": 1, "wish": 1, "1": 1,
+    "\u6401\u7F6E": 4, "on_hold": 4, "4": 4,
+    "\u629B\u5F03": 5, "drop": 5, "dropped": 5, "5": 5
 };
 
 // 收藏类型文本映射
-const TYPE_TEXT_MAP = {1:"想看", 2:"在看", 3:"看过", 4:"搁置", 5:"抛弃"};
+const TYPE_TEXT_MAP = {1:"\u60F3\u770B", 2:"\u5728\u770B", 3:"\u770B\u8FC7", 4:"\u6401\u7F6E", 5:"\u629B\u5F03"};
 
 // URL 解析正则
 const URL_PATTERNS = [
@@ -50,20 +50,20 @@ const URL_PATTERNS = [
 ];
 
 // 表头识别关键词
-const HEADER_KEYWORDS = ["条目id", "bangumi url", "url", "sid", "名称", "name", "状态", "status", "评分", "rate"];
+const HEADER_KEYWORDS = ["\u6761\u76EEid", "bangumi url", "url", "sid", "\u540D\u79F0", "name", "\u72B6\u6001", "status", "\u8BC4\u5206", "rate"];
 
 // 表头字段映射
 const FIELD_NAME_MAP = {
-    "名称": "name", "name": "name", "作品名": "name", "条目": "name", "标题": "name",
-    "条目id": "subjectId", "sid": "subjectId", "subject_id": "subjectId", "id": "subjectId",
-    "bangumi url": "url", "url": "url", "链接": "url", "地址": "url",
-    "状态": "type", "type": "type", "观看状态": "type", "收藏类型": "type",
-    "评分": "rate", "rate": "rate", "分数": "rate", "rating": "rate",
-    "标签": "tags", "tags": "tags", "tag": "tags",
-    "评价": "comment", "comment": "comment", "备注": "comment", "notes": "comment",
-    "看完日期": "finishedDate", "finished": "finishedDate", "日期": "finishedDate",
-    "章节状态": "epStatus", "ep_status": "epStatus", "集数": "epStatus",
-    "同步状态": "syncStatus", "sync_status": "syncStatus"
+    "\u540D\u79F0": "name", "name": "name", "\u4F5C\u54C1\u540D": "name", "\u6761\u76EE": "name", "\u6807\u9898": "name",
+    "\u6761\u76EEid": "subjectId", "sid": "subjectId", "subject_id": "subjectId", "id": "subjectId",
+    "bangumi url": "url", "url": "url", "\u94FE\u63A5": "url", "\u5730\u5740": "url",
+    "\u72B6\u6001": "type", "type": "type", "\u89C2\u770B\u72B6\u6001": "type", "\u6536\u85CF\u7C7B\u578B": "type",
+    "\u8BC4\u5206": "rate", "rate": "rate", "\u5206\u6570": "rate", "rating": "rate",
+    "\u6807\u7B7E": "tags", "tags": "tags", "tag": "tags",
+    "\u8BC4\u4EF7": "comment", "comment": "comment", "\u5907\u6CE8": "comment", "notes": "comment",
+    "\u770B\u5B8C\u65E5\u671F": "finishedDate", "finished": "finishedDate", "\u65E5\u671F": "finishedDate",
+    "\u7AE0\u8282\u72B6\u6001": "epStatus", "ep_status": "epStatus", "\u96C6\u6570": "epStatus",
+    "\u540C\u6B65\u72B6\u6001": "syncStatus", "sync_status": "syncStatus"
 };
 
 // ========== 工具函数 ==========
@@ -71,18 +71,18 @@ const FIELD_NAME_MAP = {
  * 解析 JSON 请求体为可读描述
  */
 export function parseJsonBodySummary(jsonStr) {
-    if (!jsonStr) return "(空)";
+    if (!jsonStr) return "(\u7A7A)";
     try {
         let obj = JSON.parse(jsonStr);
         let parts = [];
-        if (obj.type !== undefined) parts.push("状态:" + (TYPE_TEXT_MAP[obj.type] || obj.type));
-        if (obj.rate !== undefined && obj.rate > 0) parts.push("评分:" + obj.rate);
-        if (obj.tags && obj.tags.length > 0) parts.push("标签:[" + obj.tags.join(",") + "]");
+        if (obj.type !== undefined) parts.push("\u72B6\u6001:" + (TYPE_TEXT_MAP[obj.type] || obj.type));
+        if (obj.rate !== undefined && obj.rate > 0) parts.push("\u8BC4\u5206:" + obj.rate);
+        if (obj.tags && obj.tags.length > 0) parts.push("\u6807\u7B7E:[" + obj.tags.join(",") + "]");
         if (obj.comment) {
             let comment = obj.comment.length > 30 ? obj.comment.substring(0, 30) + "..." : obj.comment;
-            parts.push("评价:" + comment);
+            parts.push("\u8BC4\u4EF7:" + comment);
         }
-        return parts.length > 0 ? parts.join(" | ") : "(仅标记状态)";
+        return parts.length > 0 ? parts.join(" | ") : "(\u4EC5\u6807\u8BB0\u72B6\u6001)";
     } catch (e) {
         return jsonStr;
     }
@@ -100,9 +100,9 @@ export function getDataSheet() {
 
     if (BGM.sheet.isLocked && BGM.sheet.lockedIndex) {
         try {
-            return app.ActiveWorkbook.Worksheets(BGM.sheet.lockedIndex);
+            return app.ActiveWorkbook.Worksheets.Item(BGM.sheet.lockedIndex);
         } catch (e) {
-            bgmLog(LOG_LEVELS.WARN, "getDataSheet 锁定工作表失败: " + e.message);
+            bgmLog(LOG_LEVELS.WARN, "getDataSheet \u9501\u5B9A\u5DE5\u4F5C\u8868\u5931\u8D25: " + e.message);
         }
     }
 
@@ -127,7 +127,7 @@ export function getLastRow(ws) {
             return cell.End(XL.UP).Row;
         }
     } catch (e) {
-        bgmLog(LOG_LEVELS.WARN, "getLastRow 失败: " + e.message);
+        bgmLog(LOG_LEVELS.WARN, "getLastRow \u5931\u8D25: " + e.message);
     }
     
     return 1000;
@@ -140,45 +140,45 @@ export function getLastRow(ws) {
 export function SyncToBangumi() {
     let app = getApp();
     if (!app) {
-        showDialog("错误", "无法获取 WPS Application 对象！");
+        showDialog("\u9519\u8BEF", "\u65E0\u6CD5\u83B7\u53D6 WPS Application \u5BF9\u8C61！");
         return;
     }
     let ws = getDataSheet();
     if (!ws) {
-        showDialog("提示", "未找到数据工作表！请在工作表选择器中选择一个工作表。");
+        showDialog("\u63D0\u793A", "\u672A\u627E\u5230\u6570\u636E\u5DE5\u4F5C\u8868！\u8BF7\u5728\u5DE5\u4F5C\u8868\u9009\u62E9\u5668\u4E2D\u9009\u62E9\u4E00\u4E2A\u5DE5\u4F5C\u8868。");
         return;
     }
 
     let token = getBgmtoken();
     if (!token) {
-        showDialog("提示", "未设置 Bangumi Token，无法同步！");
+        showDialog("\u63D0\u793A", "\u672A\u8BBE\u7F6E Bangumi Token，\u65E0\u6CD5\u540C\u6B65！");
         return;
     }
 
     let headerRow = findHeaderRow(ws);
     if (headerRow === 0) {
-        showDialog("提示", "未找到表头行！请确保工作表第一行包含列名。");
+        showDialog("\u63D0\u793A", "\u672A\u627E\u5230\u8868\u5934\u884C！\u8BF7\u786E\u4FDD\u5DE5\u4F5C\u8868\u7B2C\u4E00\u884C\u5305\u542B\u5217\u540D。");
         return;
     }
 
     let colMap = getColumnMap(ws, headerRow);
     if (!colMap.subjectId && !colMap.url) {
-        showDialog("提示", "未找到【条目ID】或【Bangumi URL】列！请检查表头名称。");
+        showDialog("\u63D0\u793A", "\u672A\u627E\u5230【\u6761\u76EEID】\u6216【Bangumi URL】\u5217！\u8BF7\u68C0\u67E5\u8868\u5934\u540D\u79F0。");
         return;
     }
 
     let lastRow = getLastRow(ws);
     if (lastRow <= headerRow) {
-        showDialog("提示", "没有可同步的数据！");
+        showDialog("\u63D0\u793A", "\u6CA1\u6709\u53EF\u540C\u6B65\u7684\u6570\u636E！");
         return;
     }
 
     let dataCount = lastRow - headerRow;
-    let confirmMsg = "即将同步第 " + (headerRow + 1) + " 到 " + lastRow + " 行，共 " + dataCount + " 条数据。\n\n是否继续？";
+    let confirmMsg = "\u5373\u5C06\u540C\u6B65\u7B2C " + (headerRow + 1) + " \u5230 " + lastRow + " \u884C，\u5171 " + dataCount + " \u6761\u6570\u636E。\n\n\u662F\u5426\u7EE7\u7EED？";
     
     // 使用自定义确认对话框
     if (typeof window.BGMConfirm === 'function') {
-        window.BGMConfirm(confirmMsg, "确认同步", () => {
+        window.BGMConfirm(confirmMsg, "\u786E\u8BA4\u540C\u6B65", () => {
             _doSyncBangumi(ws, colMap, token, lastRow, headerRow);
         });
         return;
@@ -210,7 +210,7 @@ function _doSyncBangumi(ws, colMap, token, lastRow, headerRow) {
     let skipCount = 0;
     let totalCount = lastRow - headerRow;
 
-    showDialog("同步进度", "开始同步...\n已处理: 0 / " + totalCount);
+    showDialog("\u540C\u6B65\u8FDB\u5EA6", "\u5F00\u59CB\u540C\u6B65...\n\u5DF2\u5904\u7406: 0 / " + totalCount);
 
     for (let i = headerRow + 1; i <= lastRow; i++) {
         try {
@@ -224,7 +224,7 @@ function _doSyncBangumi(ws, colMap, token, lastRow, headerRow) {
 
             if (!sid) {
                 if (colMap.syncStatus) {
-                    getCell(ws, i, colMap.syncStatus).Value = "跳过(无SID)";
+                    getCell(ws, i, colMap.syncStatus).Value = "\u8DF3\u8FC7(\u65E0SID)";
                     getCell(ws, i, colMap.syncStatus).Interior.ColorIndex = XL.NONE;
                 }
                 skipCount++;
@@ -239,7 +239,7 @@ function _doSyncBangumi(ws, colMap, token, lastRow, headerRow) {
                 
                 if (colMap.syncStatus) {
                     let cell = getCell(ws, i, colMap.syncStatus);
-                    cell.Value = "成功";
+                    cell.Value = "\u6210\u529F";
                     cell.Interior.ColorIndex = SYNC_STATUS_COLOR.SUCCESS;
                 }
 
@@ -251,7 +251,7 @@ function _doSyncBangumi(ws, colMap, token, lastRow, headerRow) {
                         type: getCellValue(ws, i, colMap.type) || "1",
                         count: 1,
                         content: parseJsonBodySummary(jsonBody),
-                        status: "成功"
+                        status: "\u6210\u529F"
                     });
                 }
             } else {
@@ -259,7 +259,7 @@ function _doSyncBangumi(ws, colMap, token, lastRow, headerRow) {
                 
                 if (colMap.syncStatus) {
                     let cell = getCell(ws, i, colMap.syncStatus);
-                    cell.Value = "失败:" + result.code;
+                    cell.Value = "\u5931\u8D25:" + result.code;
                     cell.Interior.ColorIndex = SYNC_STATUS_COLOR.FAILURE;
                 }
 
@@ -271,7 +271,7 @@ function _doSyncBangumi(ws, colMap, token, lastRow, headerRow) {
                         type: getCellValue(ws, i, colMap.type) || "1",
                         count: 1,
                         content: parseJsonBodySummary(jsonBody),
-                        status: "失败:" + result.code
+                        status: "\u5931\u8D25:" + result.code
                     });
                 }
             }
@@ -279,11 +279,11 @@ function _doSyncBangumi(ws, colMap, token, lastRow, headerRow) {
             sleep(BGM_CONFIG.REQUEST_DELAY);
         } catch (err) {
             failCount++;
-            bgmLog(LOG_LEVELS.ERROR, "同步第 " + i + " 行出错: " + err.message);
+            bgmLog(LOG_LEVELS.ERROR, "\u540C\u6B65\u7B2C " + i + " \u884C\u51FA\u9519: " + err.message);
             
             if (colMap.syncStatus) {
                 let cell = getCell(ws, i, colMap.syncStatus);
-                cell.Value = "错误:" + err.message;
+                cell.Value = "\u9519\u8BEF:" + err.message;
                 cell.Interior.ColorIndex = SYNC_STATUS_COLOR.FAILURE;
             }
         }
@@ -292,8 +292,8 @@ function _doSyncBangumi(ws, colMap, token, lastRow, headerRow) {
     BGM.sync.isRunning = false;
     BGM.sync.lastSyncTime = new Date().toISOString();
 
-    let summary = "同步完成！\n\n成功: " + successCount + "\n失败: " + failCount + "\n跳过: " + skipCount + "\n总计: " + totalCount;
-    showDialog("同步完成", summary);
+    let summary = "\u540C\u6B65\u5B8C\u6210！\n\n\u6210\u529F: " + successCount + "\n\u5931\u8D25: " + failCount + "\n\u8DF3\u8FC7: " + skipCount + "\n\u603B\u8BA1: " + totalCount;
+    showDialog("\u540C\u6B65\u5B8C\u6210", summary);
     
     return { success: successCount, fail: failCount, skip: skipCount };
 }
@@ -323,7 +323,7 @@ export async function syncToBangumiAsync(ws, colMap, token, lastRow, headerRow, 
     for (let i = headerRow + 1; i <= lastRow; i++) {
         // 进度回调
         if (onProgress) {
-            onProgress(i - headerRow, totalCount, `正在处理第 ${i} 行...`);
+            onProgress(i - headerRow, totalCount, `\u6B63\u5728\u5904\u7406\u7B2C ${i} \u884C...`);
         }
 
         try {
@@ -337,11 +337,11 @@ export async function syncToBangumiAsync(ws, colMap, token, lastRow, headerRow, 
 
             if (!sid) {
                 if (colMap.syncStatus) {
-                    getCell(ws, i, colMap.syncStatus).Value = "跳过(无SID)";
+                    getCell(ws, i, colMap.syncStatus).Value = "\u8DF3\u8FC7(\u65E0SID)";
                     getCell(ws, i, colMap.syncStatus).Interior.ColorIndex = XL.NONE;
                 }
                 skipCount++;
-                if (onItemComplete) onItemComplete(i, false, { code: 0, message: '无SID' });
+                if (onItemComplete) onItemComplete(i, false, { code: 0, message: '\u65E0SID' });
                 continue;
             }
 
@@ -358,7 +358,7 @@ export async function syncToBangumiAsync(ws, colMap, token, lastRow, headerRow, 
                 successCount++;
                 if (colMap.syncStatus) {
                     let cell = getCell(ws, i, colMap.syncStatus);
-                    cell.Value = "成功";
+                    cell.Value = "\u6210\u529F";
                     cell.Interior.ColorIndex = SYNC_STATUS_COLOR.SUCCESS;
                 }
                 if (syncRecordSheet && typeof addSyncRecord === 'function') {
@@ -369,7 +369,7 @@ export async function syncToBangumiAsync(ws, colMap, token, lastRow, headerRow, 
                         type: getCellValue(ws, i, colMap.type) || "1",
                         count: 1,
                         content: parseJsonBodySummary(jsonBody),
-                        status: "成功"
+                        status: "\u6210\u529F"
                     });
                 }
             } else {
@@ -377,7 +377,7 @@ export async function syncToBangumiAsync(ws, colMap, token, lastRow, headerRow, 
                 const errorMsg = result.isFail() ? result.error.message : `HTTP ${result.data?.status}`;
                 if (colMap.syncStatus) {
                     let cell = getCell(ws, i, colMap.syncStatus);
-                    cell.Value = "失败:" + errorMsg;
+                    cell.Value = "\u5931\u8D25:" + errorMsg;
                     cell.Interior.ColorIndex = SYNC_STATUS_COLOR.FAILURE;
                 }
                 if (syncRecordSheet && typeof addSyncRecord === 'function') {
@@ -388,7 +388,7 @@ export async function syncToBangumiAsync(ws, colMap, token, lastRow, headerRow, 
                         type: getCellValue(ws, i, colMap.type) || "1",
                         count: 1,
                         content: parseJsonBodySummary(jsonBody),
-                        status: "失败:" + errorMsg
+                        status: "\u5931\u8D25:" + errorMsg
                     });
                 }
             }
@@ -402,11 +402,11 @@ export async function syncToBangumiAsync(ws, colMap, token, lastRow, headerRow, 
 
         } catch (err) {
             failCount++;
-            bgmLog(LOG_LEVELS.ERROR, "同步第 " + i + " 行出错: " + err.message);
+            bgmLog(LOG_LEVELS.ERROR, "\u540C\u6B65\u7B2C " + i + " \u884C\u51FA\u9519: " + err.message);
 
             if (colMap.syncStatus) {
                 let cell = getCell(ws, i, colMap.syncStatus);
-                cell.Value = "错误:" + err.message;
+                cell.Value = "\u9519\u8BEF:" + err.message;
                 cell.Interior.ColorIndex = SYNC_STATUS_COLOR.FAILURE;
             }
 
@@ -455,7 +455,7 @@ export function findHeaderRow(ws, startRow) {
                 }
             }
         } catch (e) {
-            bgmLog(LOG_LEVELS.WARN, "findHeaderRow 行扫描失败: " + e.message);
+            bgmLog(LOG_LEVELS.WARN, "findHeaderRow \u884C\u626B\u63CF\u5931\u8D25: " + e.message);
         }
     }
     
@@ -505,7 +505,7 @@ export function getColumnMap(ws, headerRow) {
             }
         }
     } catch (e) {
-        bgmLog(LOG_LEVELS.ERROR, "获取列映射失败: " + e.message);
+        bgmLog(LOG_LEVELS.ERROR, "\u83B7\u53D6\u5217\u6620\u5C04\u5931\u8D25: " + e.message);
     }
 
     return colMap;
@@ -621,19 +621,19 @@ export function bgmRequestSync(method, endpoint, body, token) {
     // 1. 验证 HTTP 方法
     const validMethods = ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'];
     if (!validMethods.includes(method.toUpperCase())) {
-        bgmLog(LOG_LEVELS.ERROR, "bgmRequestSync: 无效的 HTTP 方法: " + method);
+        bgmLog(LOG_LEVELS.ERROR, "bgmRequestSync: \u65E0\u6548\u7684 HTTP \u65B9\u6CD5: " + method);
         return { code: 0, message: "Invalid HTTP method" };
     }
     
     // 2. 验证 endpoint：必须是有效的 API 路径，不允许绝对 URL 和协议
     if (!endpoint || typeof endpoint !== 'string') {
-        bgmLog(LOG_LEVELS.ERROR, "bgmRequestSync: endpoint 无效");
+        bgmLog(LOG_LEVELS.ERROR, "bgmRequestSync: endpoint \u65E0\u6548");
         return { code: 0, message: "Invalid endpoint" };
     }
     
     // 防止路径遍历和注入
     if (endpoint.includes('..') || endpoint.includes('//') || endpoint.startsWith('http')) {
-        bgmLog(LOG_LEVELS.ERROR, "bgmRequestSync: endpoint 包含非法字符: " + endpoint);
+        bgmLog(LOG_LEVELS.ERROR, "bgmRequestSync: endpoint \u5305\u542B\u975E\u6CD5\u5B57\u7B26: " + endpoint);
         return { code: 0, message: "Invalid endpoint path" };
     }
     
@@ -642,7 +642,7 @@ export function bgmRequestSync(method, endpoint, body, token) {
         try {
             JSON.parse(body);
         } catch (e) {
-            bgmLog(LOG_LEVELS.ERROR, "bgmRequestSync: 无效的 JSON body");
+            bgmLog(LOG_LEVELS.ERROR, "bgmRequestSync: \u65E0\u6548\u7684 JSON body");
             return { code: 0, message: "Invalid JSON body" };
         }
     }
@@ -667,7 +667,7 @@ export function bgmRequestSync(method, endpoint, body, token) {
             if (statusCode === 429 && retries < MAX_RETRIES) {
                 retries++;
                 let retryDelay = RETRY_DELAY_BASE * Math.pow(2, retries - 1);
-                bgmLog(LOG_LEVELS.WARN, `API 限流(429)，第 ${retries}/${MAX_RETRIES} 次重试，等待 ${retryDelay}ms`);
+                bgmLog(LOG_LEVELS.WARN, `API \u9650\u6D41(429)，\u7B2C ${retries}/${MAX_RETRIES} \u6B21\u91CD\u8BD5，\u7B49\u5F85 ${retryDelay}ms`);
                 sleep(retryDelay);
                 continue;
             }
@@ -677,7 +677,7 @@ export function bgmRequestSync(method, endpoint, body, token) {
         }
     }
     
-    return { code: 429, message: `超过最大重试次数(${MAX_RETRIES}次)` };
+    return { code: 429, message: `\u8D85\u8FC7\u6700\u5927\u91CD\u8BD5\u6B21\u6570(${MAX_RETRIES}\u6B21)` };
 }
 
 // ========== 清除行颜色标记 ==========
@@ -693,7 +693,7 @@ export function clearRowColors() {
     let colMap = getColumnMap(ws, headerRow);
 
     if (!colMap.syncStatus) {
-        showDialog("提示", "未找到【同步状态】列");
+        showDialog("\u63D0\u793A", "\u672A\u627E\u5230【\u540C\u6B65\u72B6\u6001】\u5217");
         return;
     }
 
@@ -707,11 +707,11 @@ export function clearRowColors() {
                 }
             }
         } catch (e) {
-            bgmLog(LOG_LEVELS.WARN, "clearRowColors 清除第" + i + "行失败: " + e.message);
+            bgmLog(LOG_LEVELS.WARN, "clearRowColors \u6E05\u9664\u7B2C" + i + "\u884C\u5931\u8D25: " + e.message);
         }
     }
 
-    showDialog("完成", "已清除所有颜色标记");
+    showDialog("\u5B8C\u6210", "\u5DF2\u6E05\u9664\u6240\u6709\u989C\u8272\u6807\u8BB0");
 }
 
 // ========== 测试单个条目 ==========
@@ -721,19 +721,19 @@ export function clearRowColors() {
 export function testSingleUpdate() {
     let ws = getDataSheet();
     if (!ws) {
-        showDialog("错误", "未找到数据工作表！");
+        showDialog("\u9519\u8BEF", "\u672A\u627E\u5230\u6570\u636E\u5DE5\u4F5C\u8868！");
         return;
     }
 
     let token = getBgmtoken();
     if (!token) {
-        showDialog("提示", "请先设置 Token！");
+        showDialog("\u63D0\u793A", "\u8BF7\u5148\u8BBE\u7F6E Token！");
         return;
     }
 
     let app = getApp();
     if (!app || !app.ActiveCell) {
-        showDialog("提示", "请先选中一个单元格");
+        showDialog("\u63D0\u793A", "\u8BF7\u5148\u9009\u4E2D\u4E00\u4E2A\u5355\u5143\u683C");
         return;
     }
 
@@ -742,7 +742,7 @@ export function testSingleUpdate() {
     let colMap = getColumnMap(ws, headerRow);
 
     if (!colMap.subjectId && !colMap.url) {
-        showDialog("提示", "未找到【条目ID】或【Bangumi URL】列");
+        showDialog("\u63D0\u793A", "\u672A\u627E\u5230【\u6761\u76EEID】\u6216【Bangumi URL】\u5217");
         return;
     }
 
@@ -755,7 +755,7 @@ export function testSingleUpdate() {
     }
 
     if (!sid) {
-        showDialog("提示", "当前行没有条目ID或URL");
+        showDialog("\u63D0\u793A", "\u5F53\u524D\u884C\u6CA1\u6709\u6761\u76EEID\u6216URL");
         return;
     }
 
@@ -763,9 +763,9 @@ export function testSingleUpdate() {
     let result = bgmRequestSync("POST", "/subject/" + sid + "/update", jsonBody, token);
 
     if (result.code === 204 || result.code === 200 || result.code === 201) {
-        showDialog("测试成功", "条目 " + sid + " 更新成功！\n\n请求体: " + parseJsonBodySummary(jsonBody));
+        showDialog("\u6D4B\u8BD5\u6210\u529F", "\u6761\u76EE " + sid + " \u66F4\u65B0\u6210\u529F！\n\n\u8BF7\u6C42\u4F53: " + parseJsonBodySummary(jsonBody));
     } else {
-        showDialog("测试失败", "条目 " + sid + " 更新失败！\n\n状态码: " + result.code + "\n响应: " + result.message);
+        showDialog("\u6D4B\u8BD5\u5931\u8D25", "\u6761\u76EE " + sid + " \u66F4\u65B0\u5931\u8D25！\n\n\u72B6\u6001\u7801: " + result.code + "\n\u54CD\u5E94: " + result.message);
     }
 }
 
@@ -803,7 +803,7 @@ export function getFilterStatus() {
             }
         }
     } catch (e) {
-        bgmLog(LOG_LEVELS.WARN, "检查筛选状态失败: " + e.message);
+        bgmLog(LOG_LEVELS.WARN, "\u68C0\u67E5\u7B5B\u9009\u72B6\u6001\u5931\u8D25: " + e.message);
     }
 
     return { isFiltered: false, filterMode: "none" };
@@ -821,7 +821,7 @@ export function getColumnValueCounts(ws, headerRow, col) {
         
         for (let row = headerRow + 1; row <= lastRow; row++) {
             let value = getCellValue(ws, row, col);
-            if (!value) value = "(空)";
+            if (!value) value = "(\u7A7A)";
             
             if (counts[value]) {
                 counts[value]++;
@@ -830,7 +830,7 @@ export function getColumnValueCounts(ws, headerRow, col) {
             }
         }
     } catch (e) {
-        bgmLog(LOG_LEVELS.ERROR, "获取列值统计失败: " + e.message);
+        bgmLog(LOG_LEVELS.ERROR, "\u83B7\u53D6\u5217\u503C\u7EDF\u8BA1\u5931\u8D25: " + e.message);
     }
     
     return counts;
@@ -877,14 +877,14 @@ export function testTokenValidityForRibbon(token) {
 
     xhr.onload = function() {
         if (xhr.status === 200) {
-            showDialog("Token 有效", "Token 验证通过！");
+            showDialog("Token \u6709\u6548", "Token \u9A8C\u8BC1\u901A\u8FC7！");
         } else {
-            showDialog("Token 无效", "Token 验证失败，请检查是否正确。");
+            showDialog("Token \u65E0\u6548", "Token \u9A8C\u8BC1\u5931\u8D25，\u8BF7\u68C0\u67E5\u662F\u5426\u6B63\u786E。");
         }
     };
 
     xhr.onerror = function() {
-        showDialog("网络错误", "无法连接到 Bangumi API，请检查网络。");
+        showDialog("\u7F51\u7EDC\u9519\u8BEF", "\u65E0\u6CD5\u8FDE\u63A5\u5230 Bangumi API，\u8BF7\u68C0\u67E5\u7F51\u7EDC。");
     };
 
     xhr.send();
@@ -914,7 +914,7 @@ export function openBangumiTokenPage() {
 export function openUserCollection() {
     let userId = _getBgmUserId();
     if (!userId) {
-        showDialog("提示", "请先设置用户ID！");
+        showDialog("\u63D0\u793A", "\u8BF7\u5148\u8BBE\u7F6E\u7528\u6237ID！");
         return;
     }
     window.open("https://bgm.tv/user/" + userId + "/collection", "_blank");

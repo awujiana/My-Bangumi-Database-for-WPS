@@ -18,7 +18,7 @@ export function initMessageListener() {
         switch (data.type) {
             case "showDialog":
                 if (typeof showDialog === 'function') {
-                    showDialog(data.title || "提示", data.message || "");
+                    showDialog(data.title || "\u63D0\u793A", data.message || "");
                 }
                 break;
             case "showConfirm":
@@ -70,7 +70,7 @@ export function setSyncRunning(isRunning) {
     let syncBtn = document.getElementById("syncBtn");
     if (syncBtn) {
         syncBtn.disabled = isRunning;
-        syncBtn.textContent = isRunning ? "同步中..." : "🚀 同步到 Bangumi";
+        syncBtn.textContent = isRunning ? "\u540C\u6B65\u4E2D..." : "🚀 \u540C\u6B65\u5230 Bangumi";
     }
 }
 

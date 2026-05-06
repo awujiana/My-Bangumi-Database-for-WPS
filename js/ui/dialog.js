@@ -175,7 +175,7 @@ export function showAlert(message, title, onOk) {
         return;
     }
     
-    document.getElementById('bgmAlertTitle').textContent = title || '提示';
+    document.getElementById('bgmAlertTitle').textContent = title || '\u63D0\u793A';
     document.getElementById('bgmAlertMessage').textContent = message;
     window._bgmDialogCallback = { onOk };
     dialog.style.display = 'flex';
@@ -199,7 +199,7 @@ export function showConfirm(message, title, onOk, onCancel) {
         return;
     }
     
-    document.getElementById('bgmConfirmTitle').textContent = title || '确认';
+    document.getElementById('bgmConfirmTitle').textContent = title || '\u786E\u8BA4';
     document.getElementById('bgmConfirmMessage').textContent = message;
     window._bgmDialogCallback = { onOk, onCancel };
     dialog.style.display = 'flex';
@@ -211,11 +211,11 @@ export function showConfirm(message, title, onOk, onCancel) {
 export function showError(message, title, onOk) {
     const dialog = document.getElementById('bgmErrorDialog');
     if (!dialog) {
-        window.alert('[错误] ' + message);
+        window.alert('[\u9519\u8BEF] ' + message);
         return;
     }
     
-    document.getElementById('bgmErrorTitle').textContent = title || '错误';
+    document.getElementById('bgmErrorTitle').textContent = title || '\u9519\u8BEF';
     document.getElementById('bgmErrorMessage').textContent = message;
     window._bgmDialogCallback = { onOk };
     dialog.style.display = 'flex';
@@ -227,11 +227,11 @@ export function showError(message, title, onOk) {
 export function showWarning(message, title, onOk) {
     const dialog = document.getElementById('bgmWarningDialog');
     if (!dialog) {
-        window.alert('[警告] ' + message);
+        window.alert('[\u8B66\u544A] ' + message);
         return;
     }
     
-    document.getElementById('bgmWarningTitle').textContent = title || '警告';
+    document.getElementById('bgmWarningTitle').textContent = title || '\u8B66\u544A';
     document.getElementById('bgmWarningMessage').textContent = message;
     window._bgmDialogCallback = { onOk };
     dialog.style.display = 'flex';
@@ -243,11 +243,11 @@ export function showWarning(message, title, onOk) {
 export function showSuccess(message, title, onOk) {
     const dialog = document.getElementById('bgmSuccessDialog');
     if (!dialog) {
-        window.alert('[成功] ' + message);
+        window.alert('[\u6210\u529F] ' + message);
         return;
     }
     
-    document.getElementById('bgmSuccessTitle').textContent = title || '成功';
+    document.getElementById('bgmSuccessTitle').textContent = title || '\u6210\u529F';
     document.getElementById('bgmSuccessMessage').textContent = message;
     window._bgmDialogCallback = { onOk };
     dialog.style.display = 'flex';
@@ -274,7 +274,7 @@ export function showInput(title, prompt, defaultValue, onOk, onCancel) {
         return;
     }
     
-    document.getElementById('bgmInputTitle').textContent = title || '输入';
+    document.getElementById('bgmInputTitle').textContent = title || '\u8F93\u5165';
     document.getElementById('bgmInputPrompt').textContent = prompt || '';
     const inputField = document.getElementById('bgmInputField');
     inputField.value = defaultValue || '';
@@ -299,7 +299,7 @@ export function closeInputDialog() {
 
 /** 显示确认对话框（旧接口） */
 export function showConfirmDialog(message, onConfirm) {
-    showConfirm(message, '确认', onConfirm);
+    showConfirm(message, '\u786E\u8BA4', onConfirm);
 }
 
 /** 关闭确认对话框 */

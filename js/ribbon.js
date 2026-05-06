@@ -78,7 +78,7 @@ export function OnAction(control) {
     } catch (e) {
         console.error("OnAction error:", e);
         if (typeof showDialogRibbon === 'function') {
-            showDialogRibbon("执行出错", e.message);
+            showDialogRibbon("\u6267\u884C\u51FA\u9519", e.message);
         }
     }
     return true;

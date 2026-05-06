@@ -22,7 +22,7 @@ const SCRAPING_CONFIG = {
  * @param {function} onError - 失败回调
  */
 function fetchAllUserCollections(token, userId, onSuccess, onError) {
-    bgmLog(BGM.LOG_LEVELS.DEBUG, "fetchAllUserCollections 开始, userId=" + userId);
+    bgmLog(BGM.LOG_LEVELS.DEBUG, "fetchAllUserCollections \u5F00\u59CB, userId=" + userId);
 
     let allCollections = [];
     let page = 1;
@@ -30,12 +30,12 @@ function fetchAllUserCollections(token, userId, onSuccess, onError) {
 
     function fetchPage() {
         if (page > maxPages) {
-            bgmLog(BGM.LOG_LEVELS.WARN, "达到最大页数限制，停止获取");
+            bgmLog(BGM.LOG_LEVELS.WARN, "\u8FBE\u5230\u6700\u5927\u9875\u6570\u9650\u5236，\u505C\u6B62\u83B7\u53D6");
             if (onSuccess) onSuccess(allCollections);
             return;
         }
 
-        setStatus("正在获取第 " + page + " 页...", "info");
+        setStatus("\u6B63\u5728\u83B7\u53D6\u7B2C " + page + " \u9875...", "info");
 
         let xhr = new XMLHttpRequest();
         let offset = (page - 1) * SCRAPING_CONFIG.PAGE_SIZE;
@@ -65,27 +65,27 @@ function fetchAllUserCollections(token, userId, onSuccess, onError) {
                         page++;
                         setTimeout(fetchPage, BGM_CONFIG.REQUEST_DELAY);
                     } else {
-                        bgmLog(BGM.LOG_LEVELS.INFO, "获取完成，共 " + allCollections.length + " 条");
+                        bgmLog(BGM.LOG_LEVELS.INFO, "\u83B7\u53D6\u5B8C\u6210，\u5171 " + allCollections.length + " \u6761");
                         if (onSuccess) onSuccess(allCollections);
                     }
                 } catch (e) {
-                    bgmLog(BGM.LOG_LEVELS.ERROR, "解析收藏数据失败: " + e.message);
-                    if (onError) onError("解析数据失败: " + e.message);
+                    bgmLog(BGM.LOG_LEVELS.ERROR, "\u89E3\u6790\u6536\u85CF\u6570\u636E\u5931\u8D25: " + e.message);
+                    if (onError) onError("\u89E3\u6790\u6570\u636E\u5931\u8D25: " + e.message);
                 }
             } else if (xhr.status === 401) {
-                if (onError) onError("Token 无效或已过期！");
+                if (onError) onError("Token \u65E0\u6548\u6216\u5DF2\u8FC7\u671F！");
             } else if (xhr.status === 404) {
-                if (onError) onError("用户不存在！");
+                if (onError) onError("\u7528\u6237\u4E0D\u5B58\u5728！");
             } else if (xhr.status === 429) {
-                bgmLog(BGM.LOG_LEVELS.WARN, "API 限流，等待后重试...");
+                bgmLog(BGM.LOG_LEVELS.WARN, "API \u9650\u6D41，\u7B49\u5F85\u540E\u91CD\u8BD5...");
                 setTimeout(fetchPage, SCRAPING_CONFIG.RETRY_DELAY);
             } else {
-                if (onError) onError("获取失败，状态码：" + xhr.status);
+                if (onError) onError("\u83B7\u53D6\u5931\u8D25，\u72B6\u6001\u7801：" + xhr.status);
             }
         };
 
         xhr.onerror = function() {
-            if (onError) onError("网络请求失败！");
+            if (onError) onError("\u7F51\u7EDC\u8BF7\u6C42\u5931\u8D25！");
         };
 
         xhr.send();
@@ -174,7 +174,7 @@ function httpRequestAsync(method, url, options = {}) {
         };
 
         xhr.onerror = function() {
-            reject(new Error("网络请求失败"));
+            reject(new Error("\u7F51\u7EDC\u8BF7\u6C42\u5931\u8D25"));
         };
 
         xhr.send(body ? JSON.stringify(body) : null);

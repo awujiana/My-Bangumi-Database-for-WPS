@@ -18,11 +18,11 @@ export function showDialogSR(title, message) {
 
 // ========== 常量定义 ==========
 export const BGM_SUBJECT_TYPES = {
-    1: "想看",
-    2: "在看",
-    3: "已看",
-    4: "搁置",
-    5: "抛弃"
+    1: "\u60F3\u770B",
+    2: "\u5728\u770B",
+    3: "\u5DF2\u770B",
+    4: "\u6401\u7F6E",
+    5: "\u629B\u5F03"
 };
 
 // 同步记录工作表列常量
@@ -44,10 +44,10 @@ const SYNC_RECORD_COLUMNS = {
  * 设置同步记录工作表的表头
  */
 export function setSyncRecordHeaders(sheet) {
-    let headers = ["序号", "同步时间", "名称", "URL", "SID", "条目类型", "次数", "内容", "状态", "备注"];
+    let headers = ["\u5E8F\u53F7", "\u540C\u6B65\u65F6\u95F4", "\u540D\u79F0", "URL", "SID", "\u6761\u76EE\u7C7B\u578B", "\u6B21\u6570", "\u5185\u5BB9", "\u72B6\u6001", "\u5907\u6CE8"];
 
     // 只在调试模式下记录工作表信息
-    bgmLog(LOG_LEVELS.DEBUG, "setSyncRecordHeaders 开始 - 工作表: " + (sheet ? sheet.Name : "null"));
+    bgmLog(LOG_LEVELS.DEBUG, "setSyncRecordHeaders \u5F00\u59CB - \u5DE5\u4F5C\u8868: " + (sheet ? sheet.Name : "null"));
 
     for (let i = 0; i < headers.length; i++) {
         let colLetter = colNumToLetter(i + 1);
@@ -65,7 +65,7 @@ export function setSyncRecordHeaders(sheet) {
                 }
             }
         } catch (e) {
-            bgmLog(LOG_LEVELS.ERROR, "设置表头失败 - 列: " + cellAddr + " 错误: " + e.message);
+            bgmLog(LOG_LEVELS.ERROR, "\u8BBE\u7F6E\u8868\u5934\u5931\u8D25 - \u5217: " + cellAddr + " \u9519\u8BEF: " + e.message);
         }
     }
 
@@ -73,7 +73,7 @@ export function setSyncRecordHeaders(sheet) {
     try {
         let noteCell = sheet.Range("I2");
         if (noteCell) {
-            noteCell.Value2 = "状态颜色：绿=成功 | 红=失败 | 黄=跳过 | 紫=已收藏(1次) | 浅绿=已收藏(2次) | 深绿=已收藏(3次+)";
+            noteCell.Value2 = "\u72B6\u6001\u989C\u8272：\u7EFF=\u6210\u529F | \u7EA2=\u5931\u8D25 | \u9EC4=\u8DF3\u8FC7 | \u7D2B=\u5DF2\u6536\u85CF(1\u6B21) | \u6D45\u7EFF=\u5DF2\u6536\u85CF(2\u6B21) | \u6DF1\u7EFF=\u5DF2\u6536\u85CF(3\u6B21+)";
             if (noteCell.Font) {
                 noteCell.Font.Size = 9;
                 noteCell.Font.Color = 0x404040;
@@ -88,13 +88,13 @@ export function setSyncRecordHeaders(sheet) {
                 sheet.Application.ActiveWindow.FreezePanes = true;
             }
         } catch (e) {
-            bgmLog(LOG_LEVELS.WARN, "冻结首行失败: " + e.message);
+            bgmLog(LOG_LEVELS.WARN, "\u51BB\u7ED3\u9996\u884C\u5931\u8D25: " + e.message);
         }
     } catch (e) {
-        bgmLog(LOG_LEVELS.WARN, "设置说明行失败: " + e.message);
+        bgmLog(LOG_LEVELS.WARN, "\u8BBE\u7F6E\u8BF4\u660E\u884C\u5931\u8D25: " + e.message);
     }
 
-    bgmLog(LOG_LEVELS.INFO, "setSyncRecordHeaders 完成");
+    bgmLog(LOG_LEVELS.INFO, "setSyncRecordHeaders \u5B8C\u6210");
 }
 
 /**
@@ -103,7 +103,7 @@ export function setSyncRecordHeaders(sheet) {
 export function checkHeaderExists(sheet) {
     try {
         let firstCell = sheet.Range("A1");
-        return firstCell && firstCell.Value === "序号";
+        return firstCell && firstCell.Value === "\u5E8F\u53F7";
     } catch (e) {
         return false;
     }
@@ -116,19 +116,19 @@ export function checkHeaderExists(sheet) {
 export function getOrCreateSyncRecordSheet() {
     let app = getApp();
     if (!app || !app.ActiveWorkbook) {
-        bgmLog(LOG_LEVELS.ERROR, "getOrCreateSyncRecordSheet - 无法获取 ActiveWorkbook");
+        bgmLog(LOG_LEVELS.ERROR, "getOrCreateSyncRecordSheet - \u65E0\u6CD5\u83B7\u53D6 ActiveWorkbook");
         return null;
     }
 
     let wb = app.ActiveWorkbook;
-    let sheetName = "同步记录";
+    let sheetName = "\u540C\u6B65\u8BB0\u5F55";
 
     // 查找是否已存在
     try {
         for (let i = 1; i <= wb.Worksheets.Count; i++) {
-            if (wb.Worksheets(i).Name === sheetName) {
-                bgmLog(LOG_LEVELS.INFO, "找到现有同步记录工作表");
-                let sheet = wb.Worksheets(sheetName);
+            if (wb.Worksheets.Item(i).Name === sheetName) {
+                bgmLog(LOG_LEVELS.INFO, "\u627E\u5230\u73B0\u6709\u540C\u6B65\u8BB0\u5F55\u5DE5\u4F5C\u8868");
+                let sheet = wb.Worksheets.Item(sheetName);
                 
                 if (!checkHeaderExists(sheet)) {
                     setSyncRecordHeaders(sheet);
@@ -138,19 +138,19 @@ export function getOrCreateSyncRecordSheet() {
             }
         }
     } catch (e) {
-        bgmLog(LOG_LEVELS.ERROR, "查找工作表失败: " + e.message);
+        bgmLog(LOG_LEVELS.ERROR, "\u67E5\u627E\u5DE5\u4F5C\u8868\u5931\u8D25: " + e.message);
     }
 
     // 创建新工作表
-    bgmLog(LOG_LEVELS.INFO, "创建新的同步记录工作表");
+    bgmLog(LOG_LEVELS.INFO, "\u521B\u5EFA\u65B0\u7684\u540C\u6B65\u8BB0\u5F55\u5DE5\u4F5C\u8868");
     try {
         let newSheet = wb.Worksheets.Add();
         newSheet.Name = sheetName;
         setSyncRecordHeaders(newSheet);
-        bgmLog(LOG_LEVELS.INFO, "新工作表已创建: " + sheetName);
+        bgmLog(LOG_LEVELS.INFO, "\u65B0\u5DE5\u4F5C\u8868\u5DF2\u521B\u5EFA: " + sheetName);
         return newSheet;
     } catch (e) {
-        bgmLog(LOG_LEVELS.ERROR, "创建工作表失败: " + e.message);
+        bgmLog(LOG_LEVELS.ERROR, "\u521B\u5EFA\u5DE5\u4F5C\u8868\u5931\u8D25: " + e.message);
         return null;
     }
 }
@@ -197,13 +197,13 @@ function _buildSyncRecordCache(sheet) {
                     comment: sheet.Cells(row, SYNC_RECORD_COLUMNS.COMMENT).Value
                 });
             } catch (e) {
-                bgmLog(LOG_LEVELS.WARN, "loadSyncRecords 读取第" + row + "行失败: " + e.message);
+                bgmLog(LOG_LEVELS.WARN, "loadSyncRecords \u8BFB\u53D6\u7B2C" + row + "\u884C\u5931\u8D25: " + e.message);
             }
         }
 
         _syncRecordCacheValid = true;
     } catch (e) {
-        bgmLog(LOG_LEVELS.ERROR, "构建缓存失败: " + e.message);
+        bgmLog(LOG_LEVELS.ERROR, "\u6784\u5EFA\u7F13\u5B58\u5931\u8D25: " + e.message);
     }
 }
 
@@ -253,11 +253,11 @@ export function addSyncRecord(sheet, record) {
         // 设置状态颜色
         let statusCell = sheet.Cells(targetRow, SYNC_RECORD_COLUMNS.STATUS);
         if (statusCell.Interior) {
-            if (record.status && record.status.includes("成功")) {
+            if (record.status && record.status.includes("\u6210\u529F")) {
                 statusCell.Interior.ColorIndex = 10;
-            } else if (record.status && record.status.includes("失败")) {
+            } else if (record.status && record.status.includes("\u5931\u8D25")) {
                 statusCell.Interior.ColorIndex = 3;
-            } else if (record.status && record.status.includes("跳过")) {
+            } else if (record.status && record.status.includes("\u8DF3\u8FC7")) {
                 statusCell.Interior.ColorIndex = 6;
             }
         }
@@ -265,7 +265,7 @@ export function addSyncRecord(sheet, record) {
         _invalidateSyncRecordCache();
         return true;
     } catch (e) {
-        bgmLog(LOG_LEVELS.ERROR, "添加同步记录失败: " + e.message);
+        bgmLog(LOG_LEVELS.ERROR, "\u6DFB\u52A0\u540C\u6B65\u8BB0\u5F55\u5931\u8D25: " + e.message);
         return false;
     }
 }
@@ -293,8 +293,8 @@ export function clearSyncRecords(confirmPrompt) {
         // 使用自定义确认对话框
         if (typeof window.BGMConfirm === 'function') {
             window.BGMConfirm(
-                "确定要清除所有同步记录吗？此操作不可撤销。",
-                "确认清除",
+                "\u786E\u5B9A\u8981\u6E05\u9664\u6240\u6709\u540C\u6B65\u8BB0\u5F55\u5417？\u6B64\u64CD\u4F5C\u4E0D\u53EF\u64A4\u9500。",
+                "\u786E\u8BA4\u6E05\u9664",
                 () => {
                     _doClearSyncRecords();
                 }
@@ -302,7 +302,7 @@ export function clearSyncRecords(confirmPrompt) {
             return;
         }
         // 备用原生确认
-        if (!confirm("确定要清除所有同步记录吗？此操作不可撤销。")) {
+        if (!confirm("\u786E\u5B9A\u8981\u6E05\u9664\u6240\u6709\u540C\u6B65\u8BB0\u5F55\u5417？\u6B64\u64CD\u4F5C\u4E0D\u53EF\u64A4\u9500。")) {
             return;
         }
         _doClearSyncRecords();
@@ -326,11 +326,11 @@ function _doClearSyncRecords() {
             sheet.Range("A2:A" + lastRow).EntireRow.Delete();
         }
 
-        sheet.Range("A1").Value = "序号";
+        sheet.Range("A1").Value = "\u5E8F\u53F7";
         _invalidateSyncRecordCache();
-        bgmLog(LOG_LEVELS.INFO, "同步记录已清除");
+        bgmLog(LOG_LEVELS.INFO, "\u540C\u6B65\u8BB0\u5F55\u5DF2\u6E05\u9664");
     } catch (e) {
-        bgmLog(LOG_LEVELS.ERROR, "清除同步记录失败: " + e.message);
+        bgmLog(LOG_LEVELS.ERROR, "\u6E05\u9664\u540C\u6B65\u8BB0\u5F55\u5931\u8D25: " + e.message);
     }
 }
 
@@ -346,7 +346,7 @@ export function openSyncRecordSheet() {
             sheet.Range("A2").Select();
             sheet.Application.ActiveWindow.FreezePanes = true;
         } catch (e) {
-            bgmLog(LOG_LEVELS.ERROR, "打开同步记录表失败: " + e.message);
+            bgmLog(LOG_LEVELS.ERROR, "\u6253\u5F00\u540C\u6B65\u8BB0\u5F55\u8868\u5931\u8D25: " + e.message);
         }
     }
 }
@@ -359,14 +359,14 @@ export function openSyncRecordSheet() {
  */
 export function fetchAndRecordBgCollections(_token, _userId, collections) {
     if (!collections || collections.length === 0) {
-        bgmLog(LOG_LEVELS.WARN, "没有收藏数据需要记录");
+        bgmLog(LOG_LEVELS.WARN, "\u6CA1\u6709\u6536\u85CF\u6570\u636E\u9700\u8981\u8BB0\u5F55");
         return;
     }
 
     let sheet = getOrCreateSyncRecordSheet();
     if (!sheet) return;
 
-    bgmLog(LOG_LEVELS.INFO, "开始记录 " + collections.length + " 条收藏");
+    bgmLog(LOG_LEVELS.INFO, "\u5F00\u59CB\u8BB0\u5F55 " + collections.length + " \u6761\u6536\u85CF");
 
     let recordCount = 0;
     collections.forEach(item => {
@@ -376,8 +376,8 @@ export function fetchAndRecordBgCollections(_token, _userId, collections) {
             sid: String(item.sid),
             type: String(item.type || 3),
             count: 1,
-            content: item.comment || (item.rate ? "评分: " + item.rate : ""),
-            status: "已收藏"
+            content: item.comment || (item.rate ? "\u8BC4\u5206: " + item.rate : ""),
+            status: "\u5DF2\u6536\u85CF"
         };
 
         if (addSyncRecord(sheet, record)) {
@@ -385,7 +385,7 @@ export function fetchAndRecordBgCollections(_token, _userId, collections) {
         }
     });
 
-    bgmLog(LOG_LEVELS.INFO, "记录完成，共添加 " + recordCount + " 条");
+    bgmLog(LOG_LEVELS.INFO, "\u8BB0\u5F55\u5B8C\u6210，\u5171\u6DFB\u52A0 " + recordCount + " \u6761");
 }
 
 /**
@@ -405,17 +405,17 @@ export function fetchCollectionsByType(token, userId, type, callback) {
                 let data = JSON.parse(xhr.responseText);
                 if (callback) callback(data.data || []);
             } catch (e) {
-                bgmLog(LOG_LEVELS.ERROR, "解析收藏数据失败: " + e.message);
+                bgmLog(LOG_LEVELS.ERROR, "\u89E3\u6790\u6536\u85CF\u6570\u636E\u5931\u8D25: " + e.message);
                 if (callback) callback([]);
             }
         } else {
-            bgmLog(LOG_LEVELS.ERROR, "获取收藏失败，状态码: " + xhr.status);
+            bgmLog(LOG_LEVELS.ERROR, "\u83B7\u53D6\u6536\u85CF\u5931\u8D25，\u72B6\u6001\u7801: " + xhr.status);
             if (callback) callback([]);
         }
     };
 
     xhr.onerror = function() {
-        bgmLog(LOG_LEVELS.ERROR, "网络请求失败");
+        bgmLog(LOG_LEVELS.ERROR, "\u7F51\u7EDC\u8BF7\u6C42\u5931\u8D25");
         if (callback) callback([]);
     };
 
@@ -442,13 +442,13 @@ export function formatCurrentTime() {
 export function markUploadedItemsInSheet(sheetIndex, collections) {
     let app = getApp();
     if (!app || !app.ActiveWorkbook) {
-        bgmLog(LOG_LEVELS.ERROR, "无法获取 ActiveWorkbook");
+        bgmLog(LOG_LEVELS.ERROR, "\u65E0\u6CD5\u83B7\u53D6 ActiveWorkbook");
         return;
     }
 
-    let ws = app.ActiveWorkbook.Worksheets(sheetIndex);
+    let ws = app.ActiveWorkbook.Worksheets.Item(sheetIndex);
     if (!ws) {
-        bgmLog(LOG_LEVELS.ERROR, "无法获取工作表");
+        bgmLog(LOG_LEVELS.ERROR, "\u65E0\u6CD5\u83B7\u53D6\u5DE5\u4F5C\u8868");
         return;
     }
 
@@ -457,7 +457,7 @@ export function markUploadedItemsInSheet(sheetIndex, collections) {
         sidSet.add(String(item.sid));
     });
 
-    bgmLog(LOG_LEVELS.INFO, "开始标记 " + sidSet.size + " 个条目");
+    bgmLog(LOG_LEVELS.INFO, "\u5F00\u59CB\u6807\u8BB0 " + sidSet.size + " \u4E2A\u6761\u76EE");
 
     let headerRow = 1;
     let sidCol = 0;
@@ -469,13 +469,13 @@ export function markUploadedItemsInSheet(sheetIndex, collections) {
         for (let col = 1; col <= lastCol; col++) {
             let cell = getCell(ws, headerRow, col);
             let header = String(cell && cell.Value ? cell.Value : "").toLowerCase();
-            if (header.includes("条目id") || header === "sid" || header === "id") {
+            if (header.includes("\u6761\u76EEid") || header === "sid" || header === "id") {
                 sidCol = col;
             }
         }
 
         if (sidCol === 0) {
-            bgmLog(LOG_LEVELS.WARN, "未找到条目 ID 列");
+            bgmLog(LOG_LEVELS.WARN, "\u672A\u627E\u5230\u6761\u76EE ID \u5217");
             return;
         }
 
@@ -487,20 +487,20 @@ export function markUploadedItemsInSheet(sheetIndex, collections) {
                 if (sidSet.has(sid)) {
                     let cell = getCell(ws, row, 4);
                     if (cell) {
-                        cell.Value = "已收藏";
+                        cell.Value = "\u5DF2\u6536\u85CF";
                         cell.Interior.ColorIndex = 40;
                         markedCount++;
                     }
                 }
             } catch (e) {
-                bgmLog(LOG_LEVELS.WARN, "markCollectedItems 标记第" + row + "行失败: " + e.message);
+                bgmLog(LOG_LEVELS.WARN, "markCollectedItems \u6807\u8BB0\u7B2C" + row + "\u884C\u5931\u8D25: " + e.message);
             }
         }
 
-        bgmLog(LOG_LEVELS.INFO, "标记完成，共标记 " + markedCount + " 个条目");
-        BGM.showDialog("标记完成", "已在 D 列标记 " + markedCount + " 个已收藏条目");
+        bgmLog(LOG_LEVELS.INFO, "\u6807\u8BB0\u5B8C\u6210，\u5171\u6807\u8BB0 " + markedCount + " \u4E2A\u6761\u76EE");
+        BGM.showDialog("\u6807\u8BB0\u5B8C\u6210", "\u5DF2\u5728 D \u5217\u6807\u8BB0 " + markedCount + " \u4E2A\u5DF2\u6536\u85CF\u6761\u76EE");
     } catch (e) {
-        bgmLog(LOG_LEVELS.ERROR, "标记条目失败: " + e.message);
+        bgmLog(LOG_LEVELS.ERROR, "\u6807\u8BB0\u6761\u76EE\u5931\u8D25: " + e.message);
     }
 }
 
@@ -511,7 +511,7 @@ export function clearSheetMarksInSheet(sheetIndex) {
     let app = getApp();
     if (!app || !app.ActiveWorkbook) return;
 
-    let ws = app.ActiveWorkbook.Worksheets(sheetIndex);
+    let ws = app.ActiveWorkbook.Worksheets.Item(sheetIndex);
     if (!ws) return;
 
     try {
@@ -527,13 +527,13 @@ export function clearSheetMarksInSheet(sheetIndex) {
                     }
                 }
             } catch (e) {
-                bgmLog(LOG_LEVELS.WARN, "clearAllMarks 清除第" + row + "行失败: " + e.message);
+                bgmLog(LOG_LEVELS.WARN, "clearAllMarks \u6E05\u9664\u7B2C" + row + "\u884C\u5931\u8D25: " + e.message);
             }
         }
 
-        BGM.showDialog("完成", "已清除所有标记");
+        BGM.showDialog("\u5B8C\u6210", "\u5DF2\u6E05\u9664\u6240\u6709\u6807\u8BB0");
     } catch (e) {
-        bgmLog(LOG_LEVELS.ERROR, "清除标记失败: " + e.message);
+        bgmLog(LOG_LEVELS.ERROR, "\u6E05\u9664\u6807\u8BB0\u5931\u8D25: " + e.message);
     }
 }
 
