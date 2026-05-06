@@ -120,3 +120,8 @@ window.OnAddinLoad = OnAddinLoad;
 window.OnAction = OnAction;
 window.GetBangumiImage = GetBangumiImage;
 window.showDialogRibbon = showDialogRibbon;
+
+// 通知 index.html 中的早期占位：真实实现已就绪
+if (typeof window._bgmRibbonReady === 'function') {
+    window._bgmRibbonReady(OnAddinLoad, OnAction);
+}

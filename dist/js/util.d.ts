@@ -143,9 +143,9 @@ export declare function _getBgmUserId(): string | null;
  */
 export declare function _getUserApiPath(): string;
 /**
- * 获取 Bangumi 当前登录用户信息
+ * 获取 Bangumi 当前登录用户信息（返回 Promise）
  */
-export declare function _fetchBgmUserInfo(callback?: (userInfo: BGMUserInfo | null) => void): void;
+export declare function fetchBgmUserInfo(): Promise<{ id: string; username: string } | null>;
 /**
  * 通过 WPS 提供的接口执行脚本
  */

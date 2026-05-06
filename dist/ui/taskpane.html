@@ -12,8 +12,8 @@
         import '../js/core/constants.js';
         import '../js/core/crypto.js';
         import '../js/util.js';
-        import '../js/syncRecord.js';
-        import '../js/bangumi.js';
+        import '../js/sync/syncRecord.js';
+        import '../js/sync/exceltobangumi.js';
         import '../js/ui/dialog.js';
         import '../js/ui/message.js';
         import '../js/ui/preview.js';
@@ -45,6 +45,7 @@
         };
         // 监听模块加载完成事件（由 taskpane.js 触发）
         document.addEventListener('bgm:modulesReady', function() {
+            clearInterval(_checkInterval);
             window._modulesReady = true;
             document.querySelectorAll('button[onclick], button[data-action]').forEach(function(btn) {
                 btn.disabled = false;

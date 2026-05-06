@@ -711,8 +711,8 @@ function onSelectModeChange() {
 function initPanel() {
     bgmLog(LOG_LEVELS.INFO, "initPanel 开始");
 
-    // 检查枚举
-    if (typeof window.Application.Enum !== "object") {
+    // 检查枚举（兼容 WPS 环境可能未就绪的情况）
+    if (typeof window.Application !== "undefined" && typeof window.Application.Enum !== "object") {
         window.Application.Enum = WPS_Enum;
         bgmLog(LOG_LEVELS.DEBUG, "initPanel: 已设置 WPS_Enum");
     }
@@ -882,10 +882,20 @@ export {
 
 // ========== 挂载到 window（向后兼容）==========
 // 修复：当脚本在 load 事件后执行时仍能初始化
+function safeInitPanel() {
+    try {
+        initPanel();
+    } catch (e) {
+        console.error('[BGM] initPanel 执行失败:', e);
+        // 即使初始化失败，也通知模块已加载（函数已挂载到 window）
+        document.dispatchEvent(new CustomEvent('bgm:modulesReady'));
+    }
+}
+
 if (document.readyState === 'complete') {
-    initPanel();
+    safeInitPanel();
 } else {
-    window.addEventListener('load', initPanel);
+    window.addEventListener('load', safeInitPanel);
 }
 
 window.initPanel = initPanel;

@@ -1,12 +1,28 @@
 /**
- * UI 对话框模块（纯 UI 组件，无业务依赖）
+ * UI 对话框模块（优化版）
  * @module ui/dialog
  * @description 自定义对话框、确认对话框、Toast 通知
  */
 
-// ========== 全局对话框容器 ==========
-let dialogInitialized = false;
+// ========== 常量与配置 ==========
+const DIALOG_TYPES = {
+    alert:    { id: 'bgmAlertDialog',    titleId: 'bgmAlertTitle',    msgId: 'bgmAlertMessage',    buttons: [{ id: 'bgmAlertOk',    cls: 'bgm-btn-primary', text: '确定', event: 'ok' }] },
+    confirm:  { id: 'bgmConfirmDialog',  titleId: 'bgmConfirmTitle',  msgId: 'bgmConfirmMessage',  buttons: [{ id: 'bgmConfirmOk',   cls: 'bgm-btn-primary', text: '确定', event: 'ok' }, { id: 'bgmConfirmCancel', cls: 'bgm-btn-default', text: '取消', event: 'cancel' }] },
+    error:    { id: 'bgmErrorDialog',    titleId: 'bgmErrorTitle',    msgId: 'bgmErrorMessage',    buttons: [{ id: 'bgmErrorOk',    cls: 'bgm-btn-danger',  text: '确定', event: 'ok' }] },
+    warning:  { id: 'bgmWarningDialog',  titleId: 'bgmWarningTitle',  msgId: 'bgmWarningMessage',  buttons: [{ id: 'bgmWarningOk',  cls: 'bgm-btn-warning', text: '确定', event: 'ok' }] },
+    success:  { id: 'bgmSuccessDialog',  titleId: 'bgmSuccessTitle',  msgId: 'bgmSuccessMessage',  buttons: [{ id: 'bgmSuccessOk',  cls: 'bgm-btn-success', text: '确定', event: 'ok' }] },
+    input:    { id: 'bgmInputDialog',    titleId: 'bgmInputTitle',    msgId: 'bgmInputPrompt',     buttons: [{ id: 'bgmInputOk',     cls: 'bgm-btn-primary', text: '确定', event: 'ok' }, { id: 'bgmInputCancel', cls: 'bgm-btn-default', text: '取消', event: 'cancel' }] }
+};
 
+// ========== 模块内部状态 ==========
+let dialogInitialized = false;
+let _dialogCallback = null;        // 当前激活对话框的回调函数
+let _toastTimer = null;           // Toast 定时器 ID
+
+// 缓存 DOM 引用（初始化后填充）
+const dom = {};
+
+// ========== 初始化 ==========
 function ensureDialogs() {
     if (dialogInitialized) return;
     dialogInitialized = true;
@@ -23,336 +39,284 @@ if (typeof document !== 'undefined') {
 
 function createDialogs() {
     if (document.getElementById('bgmDialogContainer')) return;
-    
+
     const container = document.createElement('div');
     container.id = 'bgmDialogContainer';
     document.body.appendChild(container);
 
-    // 通过 DOM API 创建对话框（避免 WPS WebView innerHTML 编码问题）
-    function makeDialog(id, modalClass, iconClass, iconChar, titleId, titleText, bodyId, footerId, buttons) {
+    // 通用对话框创建函数
+    function createDialogElement(type, iconClass, iconChar, defaultTitle) {
+        const cfg = DIALOG_TYPES[type];
         const modal = document.createElement('div');
-        modal.id = id;
+        modal.id = cfg.id;
         modal.className = 'bgm-modal';
         modal.style.display = 'none';
+
         const content = document.createElement('div');
-        content.className = 'bgm-modal-content ' + modalClass;
+        content.className = 'bgm-modal-content ' + type;
+
+        // Header
         const header = document.createElement('div');
         header.className = 'bgm-dialog-header';
         const icon = document.createElement('span');
         icon.className = 'bgm-dialog-icon ' + iconClass;
         icon.innerHTML = iconChar;
         const title = document.createElement('span');
-        title.id = titleId;
+        title.id = cfg.titleId;
         title.className = 'bgm-dialog-title';
-        title.textContent = titleText;
+        title.textContent = defaultTitle;
         header.appendChild(icon);
         header.appendChild(title);
         content.appendChild(header);
+
+        // Body
         const body = document.createElement('div');
         body.className = 'bgm-dialog-body';
         const msg = document.createElement('p');
-        msg.id = bodyId;
+        msg.id = cfg.msgId;
         msg.className = 'bgm-dialog-message';
         body.appendChild(msg);
         content.appendChild(body);
+
+        // Footer
         const footer = document.createElement('div');
         footer.className = 'bgm-dialog-footer';
-        footer.id = footerId;
-        buttons.forEach(function(btn) {
-            const b = document.createElement('button');
-            b.id = btn.id;
-            b.className = 'bgm-btn ' + btn.cls;
-            b.textContent = btn.text;
-            footer.appendChild(b);
+        cfg.buttons.forEach(btn => {
+            const button = document.createElement('button');
+            button.id = btn.id;
+            button.className = 'bgm-btn ' + btn.cls;
+            button.textContent = btn.text;
+            button.dataset.event = btn.event;   // 标记事件类型
+            footer.appendChild(button);
         });
         content.appendChild(footer);
         modal.appendChild(content);
         return modal;
     }
 
-    // Alert
-    container.appendChild(makeDialog('bgmAlertDialog', 'bgm-alert-content', 'bgm-icon-info', '&#9432;', 'bgmAlertTitle', '\u63D0\u793A', 'bgmAlertMessage', null, [
-        { id: 'bgmAlertOk', cls: 'bgm-btn-primary', text: '\u786E\u5B9A' }
-    ]));
-    // Confirm
-    container.appendChild(makeDialog('bgmConfirmDialog', 'bgm-confirm-content', 'bgm-icon-question', '&#63;', 'bgmConfirmTitle', '\u786E\u8BA4', 'bgmConfirmMessage', null, [
-        { id: 'bgmConfirmCancel', cls: 'bgm-btn-default', text: '\u53D6\u6D88' },
-        { id: 'bgmConfirmOk', cls: 'bgm-btn-primary', text: '\u786E\u5B9A' }
-    ]));
-    // Error
-    container.appendChild(makeDialog('bgmErrorDialog', 'bgm-error-content', 'bgm-icon-error', '&#10006;', 'bgmErrorTitle', '\u9519\u8BEF', 'bgmErrorMessage', null, [
-        { id: 'bgmErrorOk', cls: 'bgm-btn-danger', text: '\u786E\u5B9A' }
-    ]));
-    // Warning
-    container.appendChild(makeDialog('bgmWarningDialog', 'bgm-warning-content', 'bgm-icon-warning', '&#9888;', 'bgmWarningTitle', '\u8B66\u544A', 'bgmWarningMessage', null, [
-        { id: 'bgmWarningOk', cls: 'bgm-btn-warning', text: '\u786E\u5B9A' }
-    ]));
-    // Success
-    container.appendChild(makeDialog('bgmSuccessDialog', 'bgm-success-content', 'bgm-icon-success', '&#10004;', 'bgmSuccessTitle', '\u6210\u529F', 'bgmSuccessMessage', null, [
-        { id: 'bgmSuccessOk', cls: 'bgm-btn-success', text: '\u786E\u5B9A' }
-    ]));
-    // Input
-    container.appendChild(makeDialog('bgmInputDialog', 'bgm-input-content', 'bgm-icon-info', '&#9432;', 'bgmInputTitle', '\u8F93\u5165', 'bgmInputPrompt', null, [
-        { id: 'bgmInputCancel', cls: 'bgm-btn-default', text: '\u53D6\u6D88' },
-        { id: 'bgmInputOk', cls: 'bgm-btn-primary', text: '\u786E\u5B9A' }
-    ]));
+    // 创建各种对话框
+    container.appendChild(createDialogElement('alert', 'bgm-icon-info', '&#9432;', '提示'));
+    container.appendChild(createDialogElement('confirm', 'bgm-icon-question', '&#63;', '确认'));
+    container.appendChild(createDialogElement('error', 'bgm-icon-error', '&#10006;', '错误'));
+    container.appendChild(createDialogElement('warning', 'bgm-icon-warning', '&#9888;', '警告'));
+    container.appendChild(createDialogElement('success', 'bgm-icon-success', '&#10004;', '成功'));
+    container.appendChild(createDialogElement('input', 'bgm-icon-info', '&#9432;', '输入'));
+
     // 为 Input 对话框添加输入框
     const inputBody = document.querySelector('#bgmInputDialog .bgm-dialog-body');
     const inputField = document.createElement('input');
     inputField.type = 'text';
     inputField.id = 'bgmInputField';
     inputField.className = 'bgm-input-field';
-    inputField.placeholder = '';
     inputBody.appendChild(inputField);
-    // Toast
+
+    // Toast 容器
     const toast = document.createElement('div');
     toast.id = 'bgmToast';
     toast.className = 'bgm-toast';
     container.appendChild(toast);
 
-    bindDialogEvents();
+    // 绑定事件并缓存 DOM
+    bindAllEvents();
 }
 
-function bindDialogEvents() {
-    document.getElementById('bgmAlertOk')?.addEventListener('click', () => {
-        document.getElementById('bgmAlertDialog').style.display = 'none';
-        if (window._bgmDialogCallback?.onOk) window._bgmDialogCallback.onOk();
+function bindAllEvents() {
+    // 缓存对话框元素
+    for (const type in DIALOG_TYPES) {
+        const cfg = DIALOG_TYPES[type];
+        dom[cfg.id] = document.getElementById(cfg.id);
+        dom[cfg.titleId] = document.getElementById(cfg.titleId);
+        dom[cfg.msgId] = document.getElementById(cfg.msgId);
+        cfg.buttons.forEach(btn => {
+            dom[btn.id] = document.getElementById(btn.id);
+        });
+    }
+    // Toast
+    dom.bgmToast = document.getElementById('bgmToast');
+    dom.bgmInputField = document.getElementById('bgmInputField');
+
+    // 通用事件处理：使用事件委托，放在 bgmDialogContainer 上
+    const container = document.getElementById('bgmDialogContainer');
+    container.addEventListener('click', (e) => {
+        const btn = e.target.closest('button');
+        if (!btn) return;
+        const eventType = btn.dataset.event;
+        if (!eventType) return;
+
+        const modal = btn.closest('.bgm-modal');
+        if (!modal) return;
+
+        // 关闭对话框
+        modal.style.display = 'none';
+
+        // 获取当前回调并调用
+        if (_dialogCallback) {
+            if (eventType === 'ok' && _dialogCallback.onOk) {
+                if (modal.id === 'bgmInputDialog') {
+                    const inputValue = dom.bgmInputField ? dom.bgmInputField.value.trim() : '';
+                    _dialogCallback.onOk(inputValue);
+                } else {
+                    _dialogCallback.onOk();
+                }
+            } else if (eventType === 'cancel' && _dialogCallback.onCancel) {
+                _dialogCallback.onCancel();
+            }
+            // 执行后清理回调
+            _dialogCallback = null;
+        }
     });
-    
-    document.getElementById('bgmConfirmOk')?.addEventListener('click', () => {
-        document.getElementById('bgmConfirmDialog').style.display = 'none';
-        if (window._bgmDialogCallback?.onOk) window._bgmDialogCallback.onOk();
-    });
-    document.getElementById('bgmConfirmCancel')?.addEventListener('click', () => {
-        document.getElementById('bgmConfirmDialog').style.display = 'none';
-        if (window._bgmDialogCallback?.onCancel) window._bgmDialogCallback.onCancel();
-    });
-    
-    document.getElementById('bgmErrorOk')?.addEventListener('click', () => {
-        document.getElementById('bgmErrorDialog').style.display = 'none';
-        if (window._bgmDialogCallback?.onOk) window._bgmDialogCallback.onOk();
-    });
-    
-    document.getElementById('bgmWarningOk')?.addEventListener('click', () => {
-        document.getElementById('bgmWarningDialog').style.display = 'none';
-        if (window._bgmDialogCallback?.onOk) window._bgmDialogCallback.onOk();
-    });
-    
-    document.getElementById('bgmSuccessOk')?.addEventListener('click', () => {
-        document.getElementById('bgmSuccessDialog').style.display = 'none';
-        if (window._bgmDialogCallback?.onOk) window._bgmDialogCallback.onOk();
-    });
-    
-    document.getElementById('bgmInputOk')?.addEventListener('click', () => {
-        const value = document.getElementById('bgmInputField')?.value?.trim();
-        document.getElementById('bgmInputDialog').style.display = 'none';
-        if (window._bgmDialogCallback?.onOk) window._bgmDialogCallback.onOk(value);
-    });
-    document.getElementById('bgmInputCancel')?.addEventListener('click', () => {
-        document.getElementById('bgmInputDialog').style.display = 'none';
-        if (window._bgmDialogCallback?.onCancel) window._bgmDialogCallback.onCancel();
-    });
-    
-    document.getElementById('bgmInputField')?.addEventListener('keypress', (e) => {
+
+    // Input 框 Enter 键支持
+    dom.bgmInputField?.addEventListener('keypress', (e) => {
         if (e.key === 'Enter') {
-            document.getElementById('bgmInputOk')?.click();
+            dom.bgmInputOk?.click();
         }
     });
 }
 
-// ========== 对话框显示函数 ==========
-
 /**
- * 显示 Alert 对话框
- * @param {string} message - 提示内容
- * @param {string} [title] - 标题
- * @param {Function} [onOk] - 确定回调
+ * 通用对话框显示函数（内部使用）
+ * @param {string} type - 对话框类型
+ * @param {object} opts - { message, title, onOk, onCancel, defaultValue }
  */
+function _showDialog(type, opts = {}) {
+    const cfg = DIALOG_TYPES[type];
+    const dialog = dom[cfg.id];
+    if (!dialog) {
+        // 回退到原生弹窗
+        if (type === 'confirm') {
+            if (window.confirm(opts.message)) {
+                opts.onOk && opts.onOk();
+            } else {
+                opts.onCancel && opts.onCancel();
+            }
+        } else if (type === 'input') {
+            const result = window.prompt(opts.prompt || '', opts.defaultValue || '');
+            if (result !== null) {
+                opts.onOk && opts.onOk(result);
+            } else {
+                opts.onCancel && opts.onCancel();
+            }
+        } else {
+            window.alert(opts.message);
+            opts.onOk && opts.onOk();
+        }
+        return;
+    }
+
+    // 设置标题与消息
+    dom[cfg.titleId].textContent = opts.title || '';
+    dom[cfg.msgId].textContent = opts.message || '';
+
+    // 如果是输入框，设置默认值
+    if (type === 'input') {
+        dom.bgmInputField.value = opts.defaultValue || '';
+        dom.bgmInputField.focus();
+    }
+
+    // 存储回调
+    _dialogCallback = { onOk: opts.onOk, onCancel: opts.onCancel };
+
+    dialog.style.display = 'flex';
+}
+
+// ========== 公开 API ==========
+
+/** Alert 对话框 */
 export function showAlert(message, title, onOk) {
-    const dialog = document.getElementById('bgmAlertDialog');
-    if (!dialog) {
-        window.alert(message);
-        return;
-    }
-    
-    document.getElementById('bgmAlertTitle').textContent = title || '\u63D0\u793A';
-    document.getElementById('bgmAlertMessage').textContent = message;
-    window._bgmDialogCallback = { onOk };
-    dialog.style.display = 'flex';
+    _showDialog('alert', { message, title: title || '提示', onOk });
 }
 
-/**
- * 显示 Confirm 确认对话框
- * @param {string} message - 确认内容
- * @param {string} [title] - 标题
- * @param {Function} [onOk] - 确定回调
- * @param {Function} [onCancel] - 取消回调
- */
+/** Confirm 确认对话框 */
 export function showConfirm(message, title, onOk, onCancel) {
-    const dialog = document.getElementById('bgmConfirmDialog');
-    if (!dialog) {
-        if (window.confirm(message)) {
-            if (onOk) onOk();
-        } else {
-            if (onCancel) onCancel();
-        }
-        return;
-    }
-    
-    document.getElementById('bgmConfirmTitle').textContent = title || '\u786E\u8BA4';
-    document.getElementById('bgmConfirmMessage').textContent = message;
-    window._bgmDialogCallback = { onOk, onCancel };
-    dialog.style.display = 'flex';
+    _showDialog('confirm', { message, title: title || '确认', onOk, onCancel });
 }
 
-/**
- * 显示 Error 错误对话框
- */
+/** Error 错误对话框 */
 export function showError(message, title, onOk) {
-    const dialog = document.getElementById('bgmErrorDialog');
-    if (!dialog) {
-        window.alert('[\u9519\u8BEF] ' + message);
-        return;
-    }
-    
-    document.getElementById('bgmErrorTitle').textContent = title || '\u9519\u8BEF';
-    document.getElementById('bgmErrorMessage').textContent = message;
-    window._bgmDialogCallback = { onOk };
-    dialog.style.display = 'flex';
+    _showDialog('error', { message, title: title || '错误', onOk });
 }
 
-/**
- * 显示 Warning 警告对话框
- */
+/** Warning 警告对话框 */
 export function showWarning(message, title, onOk) {
-    const dialog = document.getElementById('bgmWarningDialog');
-    if (!dialog) {
-        window.alert('[\u8B66\u544A] ' + message);
-        return;
-    }
-    
-    document.getElementById('bgmWarningTitle').textContent = title || '\u8B66\u544A';
-    document.getElementById('bgmWarningMessage').textContent = message;
-    window._bgmDialogCallback = { onOk };
-    dialog.style.display = 'flex';
+    _showDialog('warning', { message, title: title || '警告', onOk });
 }
 
-/**
- * 显示 Success 成功对话框
- */
+/** Success 成功对话框 */
 export function showSuccess(message, title, onOk) {
-    const dialog = document.getElementById('bgmSuccessDialog');
-    if (!dialog) {
-        window.alert('[\u6210\u529F] ' + message);
-        return;
-    }
-    
-    document.getElementById('bgmSuccessTitle').textContent = title || '\u6210\u529F';
-    document.getElementById('bgmSuccessMessage').textContent = message;
-    window._bgmDialogCallback = { onOk };
-    dialog.style.display = 'flex';
+    _showDialog('success', { message, title: title || '成功', onOk });
 }
 
-/**
- * 显示 Input 输入对话框
- * @param {string} title - 标题
- * @param {string} prompt - 提示文本
- * @param {string} defaultValue - 默认值
- * @param {Function} onOk - 确定回调（参数为输入值）
- * @param {Function} [onCancel] - 取消回调
- */
+/** Input 输入对话框 */
 export function showInput(title, prompt, defaultValue, onOk, onCancel) {
-    ensureDialogs();
-    const dialog = document.getElementById('bgmInputDialog');
-    if (!dialog) {
-        const result = window.prompt(prompt, defaultValue);
-        if (result !== null) {
-            if (onOk) onOk(result);
-        } else {
-            if (onCancel) onCancel();
-        }
-        return;
-    }
-    
-    document.getElementById('bgmInputTitle').textContent = title || '\u8F93\u5165';
-    document.getElementById('bgmInputPrompt').textContent = prompt || '';
-    const inputField = document.getElementById('bgmInputField');
-    inputField.value = defaultValue || '';
-    inputField.placeholder = '';
-    window._bgmDialogCallback = { onOk, onCancel };
-    dialog.style.display = 'flex';
-    inputField.focus();
+    _showDialog('input', { title, message: prompt, onOk, onCancel, defaultValue });
 }
 
-// ========== 兼容快捷函数 ==========
+// ========== 快捷兼容函数 ==========
 
-/** 显示输入对话框（旧接口） */
 export function showInputDialog(title, placeholder, onSubmit) {
     showInput(title, placeholder, '', onSubmit);
 }
 
-/** 关闭输入对话框 */
 export function closeInputDialog() {
-    const dialog = document.getElementById('bgmInputDialog');
+    const dialog = dom.bgmInputDialog;
     if (dialog) dialog.style.display = 'none';
 }
 
-/** 显示确认对话框（旧接口） */
 export function showConfirmDialog(message, onConfirm) {
-    showConfirm(message, '\u786E\u8BA4', onConfirm);
+    showConfirm(message, '确认', onConfirm);
 }
 
-/** 关闭确认对话框 */
 export function closeConfirmDialog() {
-    const dialog = document.getElementById('bgmConfirmDialog');
+    const dialog = dom.bgmConfirmDialog;
     if (dialog) dialog.style.display = 'none';
 }
 
-/** 关闭所有对话框（兼容 HTML onclick） */
+/** 关闭所有对话框（兼容旧接口） */
 export function closeDialog(result) {
-    var dialogs = ['inputDialog', 'confirmDialog', 'alertDialog'];
-    for (var i = 0; i < dialogs.length; i++) {
-        var d = document.getElementById(dialogs[i]);
-        if (d) { d.style.display = 'none'; }
+    // 关闭所有模态框并调用可能遗留的回调
+    for (const id in dom) {
+        if (id.startsWith('bgm') && dom[id]?.classList?.contains('bgm-modal')) {
+            dom[id].style.display = 'none';
+        }
     }
+    // 调用旧式回调（如果存在）
     if (window._dialogCallback) {
         window._dialogCallback(result);
         window._dialogCallback = null;
     }
 }
 
-/** 关闭提示对话框 */
 export function closeAlertDialog() {
-    const dialog = document.getElementById('bgmAlertDialog');
+    const dialog = dom.bgmAlertDialog;
     if (dialog) dialog.style.display = 'none';
-    const oldDialog = document.getElementById('alertDialog');
-    if (oldDialog) oldDialog.style.display = 'none';
 }
 
-/** 通用对话框（兼容旧接口） */
 export function showDialog(title, message) {
     showAlert(message, title);
 }
 
 // ========== Toast 通知 ==========
 
-/**
- * 显示 Toast 通知
- * @param {string} message - 通知内容
- * @param {string} [type] - 类型：success/error/warning/info
- */
 export function showToast(message, type) {
-    const toast = document.getElementById('bgmToast');
+    const toast = dom.bgmToast;
     if (!toast) return;
-    
+
+    // 清除之前的定时器（避免叠加）
+    if (_toastTimer) {
+        clearTimeout(_toastTimer);
+        _toastTimer = null;
+    }
+
     toast.textContent = message;
     toast.className = 'bgm-toast bgm-toast-show';
     if (type) {
         toast.classList.add('bgm-toast-' + type);
     }
-    
-    setTimeout(() => {
+
+    _toastTimer = setTimeout(() => {
         toast.className = 'bgm-toast';
+        _toastTimer = null;
     }, 3000);
 }
 
@@ -371,4 +335,4 @@ window.BGMError = showError;
 window.BGMWarning = showWarning;
 window.BGMSuccess = showSuccess;
 window.BGMInput = showInput;
-try { window.alert = showAlert; } catch(e) { /* alert 是只读属性，忽略 */ }
+try { window.alert = showAlert; } catch(e) { /* alert 只读属性 */ }

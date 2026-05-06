@@ -1,37 +1,19 @@
-/**
+﻿/**
  * 任务面板主模块
  * @module taskpane
  * @description 面板初始化、事件绑定、核心逻辑
  */
 
-import { BGM, BGM_CONFIG } from './util.js';
-import { getApp, bgmLog, LOG_LEVELS, escapeHtml,
-    loadBgToken, storeBgToken, clearBgToken,
-    sleep, getCell, getCellValue, trim,
-    _getUserApiPath, _setBgmUserId
-} from './util.js';
-import { initMessageListener, setSyncRunning, setStatus } from './ui/message.js';
-import { 
-    markUploadedItems, clearSheetMarks,
-    updateTokenStatus, updateUserIdStatus,
-    showTokenDialog, showUserIdDialog
-} from './ui/handlers.js';
-import { 
-    showAlert, closeAlertDialog, closeInputDialog, closeConfirmDialog,
-    showToast,
-    showInputDialog, showConfirmDialog
-} from './ui/dialog.js';
-import { previewSyncContent, closeDetailModal, filterDetailItems } from './ui/preview.js';
-import { clearSyncRecords as _clearSyncRecords,
-    getOrCreateSyncRecordSheet, getAllSyncRecords, addSyncRecord,
-    openSyncRecordSheet, BGM_SUBJECT_TYPES, formatCurrentTime,
-    updateSyncRecord, activateSyncRecordSheet, finalizeSyncRecordBatch
-} from './syncRecord.js';
-import {
-    findHeaderRow, getColumnMap, getLastRow, extractSubjectId,
-    mapWatchStatus, buildJsonPayload, getSequentialRowsBySeqCol,
-    getFilterStatus, clearRowColors, bgmRequestSync
-} from './bangumi.js';
+import { BGM, PANEL_CONFIG, WPS_Enum } from './util.js';
+import { getApp, bgmLog, LOG_LEVELS, escapeHtml, readCell, colNumToLetter } from './util.js';
+import { HEADER_KEYWORDS, IMPORTANT_COLS } from './sync/exceltobangumi.js';
+import { initMessageListener } from './ui/message.js';
+import { markUploadedItems, clearSheetMarks,updateTokenStatus, updateUserIdStatus,showTokenDialog, showUserIdDialog} from './ui/handlers.js';
+import { showAlert, closeAlertDialog, closeInputDialog, closeConfirmDialog,showToast} from './ui/dialog.js';
+import { previewSyncContent, closeDetailModal } from './ui/preview.js';
+import { clearSyncRecords as _clearSyncRecords } from './sync/syncRecord.js';
+
+
 
 // ========== 工作表锁定功能 ==========
 // 注意：工作表锁定状态已迁移到 BGM.sheet 命名空间
@@ -46,21 +28,26 @@ function toggleSheetLock() {
     let select = document.getElementById("sheetSelect");
     if (!select) return;
 
-    let sheetIndex = parseInt(select.value);
+    const sheetIndex = parseInt(select.value, 10);
+    // 修复：防止 NaN 索引
+    if (isNaN(sheetIndex) || sheetIndex <= 0) {
+        showToast("请先选择一个有效的工作表", "warn");
+        return;
+    }
 
     if (BGM.sheet.isLocked && BGM.sheet.lockedIndex === sheetIndex) {
         BGM.sheet.lockedIndex = null;
         BGM.sheet.lockedName = null;
         BGM.sheet.isLocked = false;
         saveLockedSheet(null);  // 清除缓存
-        showToast("\u5DF2\u89E3\u9501\u5DE5\u4F5C\u8868", "info");
+        showToast("已解锁工作表", "info");
     } else {
         let sheetName = select.options[select.selectedIndex]?.text || "";
         BGM.sheet.lockedIndex = sheetIndex;
         BGM.sheet.lockedName = sheetName;
         BGM.sheet.isLocked = true;
         saveLockedSheet({ index: sheetIndex, name: sheetName });  // 写入缓存
-        showToast("\u5DF2\u9501\u5B9A\u5DE5\u4F5C\u8868: " + sheetName, "info");
+        showToast("已锁定工作表: " + sheetName, "info");
     }
     updateLockButton();
     refreshData();
@@ -86,9 +73,10 @@ function restoreLockedSheet() {
         if (raw) {
             try {
                 let info = JSON.parse(raw);
-                BGM.sheet.lockedIndex = info.index || null;
+                // 修复：index 可能为 0（避免被 || 误判为 falsy）
+                BGM.sheet.lockedIndex = (info.index != null) ? info.index : null;
                 BGM.sheet.lockedName = info.name || null;
-                BGM.sheet.isLocked = !!(info.index && info.name);
+                BGM.sheet.isLocked = !!(info.index != null && info.name);
                 return true;
             } catch (e) {
                 // 缓存数据损坏，清除
@@ -108,10 +96,10 @@ function updateLockButton() {
     
     if (btn) {
         if (BGM.sheet.isLocked) {
-            btn.textContent = "🔓 \u89E3\u9501";
+            btn.textContent = "🔓 解锁";
             btn.classList.add("locked");
         } else {
-            btn.textContent = "🔒 \u9501\u5B9A";
+            btn.textContent = "🔒 锁定";
             btn.classList.remove("locked");
         }
     }
@@ -119,7 +107,7 @@ function updateLockButton() {
     if (status) {
         if (BGM.sheet.isLocked) {
             status.style.display = "inline";
-            status.textContent = "\u5DF2\u9501\u5B9A: " + BGM.sheet.lockedName;
+            status.textContent = "已锁定: " + BGM.sheet.lockedName;
         } else {
             status.style.display = "none";
         }
@@ -135,12 +123,12 @@ function refreshSheets() {
 
     let app = getApp();
     if (!app || !app.ActiveWorkbook) {
-        console.warn("refreshSheets: \u65E0\u6CD5\u83B7\u53D6 ActiveWorkbook");
+        console.warn("refreshSheets: 无法获取 ActiveWorkbook");
         return;
     }
 
     let sheets = app.ActiveWorkbook.Worksheets;
-    select.innerHTML = '<option value="">-- \u8BF7\u9009\u62E9 --</option>';
+    select.innerHTML = '<option value="">-- 请选择 --</option>';
 
     for (let i = 1; i <= sheets.Count; i++) {
         let option = document.createElement("option");
@@ -158,450 +146,542 @@ function refreshSheets() {
 }
 
 /**
- * 更新筛选状态显示
+ * 临时激活工作表，返回恢复函数（或 false 表示未需激活）
+ * @param {object} ws - 要激活的工作表
+ * @returns {Function|boolean} 恢复函数或 false
  */
-function updateFilterStatus() {
-    let filterStatusEl = document.getElementById("filterStatus");
-    if (!filterStatusEl) return;
-
-    let app = getApp();
-    if (!app || !app.ActiveWorkbook) {
-        filterStatusEl.textContent = "\u672A\u8FDE\u63A5\u5230 Excel\uFF08\u8C03\u8BD5\u6A21\u5F0F\u4E0B\u4E0D\u53EF\u7528\uFF09";
-        bgmLog(LOG_LEVELS.WARN, "updateFilterStatus: Application \u4E0D\u53EF\u7528");
-        return;
-    }
-
-    let ws = app.ActiveWorkbook.ActiveSheet;
-    if (!ws) {
-        filterStatusEl.textContent = "\u672A\u627E\u5230\u5DE5\u4F5C\u8868";
-        bgmLog(LOG_LEVELS.WARN, "updateFilterStatus: ActiveSheet \u4E3A\u7A7A");
-        return;
-    }
-
+function activateSheetIfNeeded(ws) {
+    const app = getApp();
+    if (!app) return false;
     try {
-        if (ws.AutoFilterMode) {
-            let filters = ws.AutoFilter.Filters;
-            if (filters && typeof filters.Count !== 'undefined') {
-                let activeCount = 0;
-                for (let i = 1; i <= filters.Count; i++) {
-                    try {
-                        let f = filters.Item(i);
-                        if (f && f.On) activeCount++;
-                    } catch (_) { /* \u8DF3\u8FC7\u65E0\u6548\u7B5B\u9009 */ }
+        const active = app.ActiveWorkbook.ActiveSheet;
+        const activeName = active.Name || "";
+        if (activeName !== ws.Name) {
+            ws.Activate();
+            return function restore() {
+                try { active.Activate(); } catch (_) {}
+            };
+        }
+    } catch (e) {
+        bgmLog(LOG_LEVELS.WARN, "activateSheetIfNeeded 失败: " + e.message);
+    }
+    return false;
+}
+
+
+
+/**
+ * 扫描工作表，找出最佳表头行、实际数据起始行、列宽等元信息
+ * @param {object} ws - 工作表对象
+ * @param {object} [opts] - 可选配置
+ * @param {Set|null} [opts.visibleRowSet] - 筛选模式下的可见行集合
+ * @param {boolean} [opts.isFiltered=false] - 是否启用了筛选
+ * @returns {{
+ *   headerRow: number,
+ *   headerNames: string[],
+ *   isImportant: boolean[],
+ *   dataStartRow: number,
+ *   lastCol: number,
+ *   firstDataCol: number,
+ *   previewColStart: Math.max(0, Math.min(previewColStart - 1, headerNames.length)),
+ *   previewColEnd: number,
+ *   headerMatchCount: number
+ * }}
+ */
+function detectHeaderAndColumns(ws, opts = {}) {
+    const { visibleRowSet = null, isFiltered = false } = opts;
+
+    // 判断某行是否可见
+    function isRowVisible(r, headerRow) {
+        if (r === headerRow) return true;
+        return !isFiltered || (visibleRowSet && visibleRowSet.has(r));
+    }
+
+    // 1. 扫描前 MAX_SCAN_ROWS 行，找出所有候选表头行
+    const candidates = [];
+    for (let r = 1; r <= PANEL_CONFIG.MAX_SCAN_ROWS; r++) {
+        if (!isFiltered || !visibleRowSet || visibleRowSet.has(r)) {
+            let matchCount = 0;
+            let colCount = 0;
+            for (let c = 1; c <= PANEL_CONFIG.MAX_SCAN_COLUMNS; c++) {
+                const v = readCell(ws, r, c).trim();
+                if (v) {
+                    colCount++;
+                    const cv = v.toLowerCase();
+                    if (HEADER_KEYWORDS.some(kw => cv === kw || cv.includes(kw))) {
+                        matchCount++;
+                    }
                 }
-                if (activeCount > 0) {
-                    filterStatusEl.textContent = "\u2714 \u7B5B\u9009\u5DF2\u5F00\u542F\uFF08" + activeCount + " \u5217\uFF09\uFF0C\u5C06\u540C\u6B65\u7B5B\u9009\u540E\u7684\u53EF\u89C1\u6570\u636E";
-                    bgmLog(LOG_LEVELS.INFO, "updateFilterStatus: \u7B5B\u9009\u5DF2\u5F00\u542F, activeColumns=" + activeCount);
-                } else {
-                    filterStatusEl.textContent = "\u7B5B\u9009\u5DF2\u5F00\u542F\u4F46\u65E0\u6D3B\u52A8\u7B5B\u9009\uFF0C\u540C\u6B65\u5168\u90E8\u6570\u636E";
-                    bgmLog(LOG_LEVELS.INFO, "updateFilterStatus: AutoFilter \u5DF2\u5F00\u542F\u4F46\u65E0\u6D3B\u52A8\u7B5B\u9009");
-                }
-                return;
+            }
+            if (matchCount >= 3) {
+                candidates.push({ row: r, matchCount, colCount });
             }
         }
-        filterStatusEl.textContent = "\u672A\u5F00\u542F\u7B5B\u9009\uFF0C\u540C\u6B65\u5168\u90E8\u6570\u636E";
-        bgmLog(LOG_LEVELS.INFO, "updateFilterStatus: \u672A\u5F00\u542F\u7B5B\u9009");
+    }
+
+    if (candidates.length === 0) {
+        return {
+            headerRow: 0,
+            headerNames: [],
+            isImportant: [],
+            dataStartRow: 0,
+            lastCol: 0,
+            firstDataCol: 0,
+            previewColStart: 0,
+            previewColEnd: 0,
+            headerMatchCount: 0
+        };
+    }
+
+    // 选列数最多、行号最小的作为表头
+    candidates.sort((a, b) => b.colCount - a.colCount || a.row - b.row);
+    const headerRow = candidates[0].row;
+    const headerMatchCount = candidates[0].matchCount;
+
+    // 2. 读取表头名称
+    const headerNames = [];
+    const headerIsImportant = [];
+    for (let c = 1; c <= PANEL_CONFIG.MAX_SCAN_COLUMNS; c++) {
+        const v = readCell(ws, headerRow, c).trim();
+        headerNames.push(v);
+        headerIsImportant.push(IMPORTANT_COLS[v.toLowerCase()] || false);
+    }
+
+    // 3. 检测多行表头（下一行是否填充了当前表头的空列）
+    let dataStartRow = headerRow + 1;
+    // 修复：使用配置常量替代硬编码 100
+    const secondHeaderRowLimit = Math.min(headerRow + 1, PANEL_CONFIG.MAX_SCAN_ROWS);
+    if (headerRow + 1 <= secondHeaderRowLimit) {
+        let filled = 0, total = 0;
+        for (let c = 1; c <= PANEL_CONFIG.MAX_SCAN_COLUMNS; c++) {
+            const nv = readCell(ws, headerRow + 1, c).trim();
+            if (nv) {
+                total++;
+                if (!headerNames[c - 1]) filled++;
+            }
+        }
+        if (filled >= 3 && total >= 3) {
+            dataStartRow = headerRow + 2;
+            for (let c = 1; c <= PANEL_CONFIG.MAX_SCAN_COLUMNS; c++) {
+                if (!headerNames[c - 1]) {
+                    const nv = readCell(ws, headerRow + 1, c).trim();
+                    if (nv) {
+                        headerNames[c - 1] = nv;
+                        headerIsImportant[c - 1] = IMPORTANT_COLS[nv.toLowerCase()] || false;
+                    }
+                }
+            }
+        }
+    }
+
+    // 4. 计算实际使用的列范围（数据列）
+    let firstDataCol = -1;
+    let lastDataCol = 0;
+    let samples = 0;
+    for (let dr = dataStartRow; dr <= dataStartRow + 20 && samples < 5; dr++) {
+        if (!isRowVisible(dr, headerRow)) continue;
+        samples++;
+        for (let c = 1; c <= PANEL_CONFIG.MAX_SCAN_COLUMNS; c++) {
+            const v = readCell(ws, dr, c).trim();
+            if (v) {
+                if (firstDataCol < 0) firstDataCol = c;
+                if (c > lastDataCol) lastDataCol = c;
+            }
+        }
+    }
+    if (firstDataCol < 0) firstDataCol = 1;
+
+    // 表头结束列
+    let headerLastCol = 0;
+    for (let c = 1; c <= PANEL_CONFIG.MAX_SCAN_COLUMNS; c++) {
+        if (headerNames[c - 1]) headerLastCol = c;
+    }
+
+    const actualLastCol = Math.max(lastDataCol, headerLastCol);
+
+    // 预览显示的列范围：从第一个数据列左扩找到最左非空表头，但不能超过表头范围
+    let previewColStart = Math.max(1, firstDataCol - 5);
+    for (let c = previewColStart; c <= firstDataCol; c++) {
+        if (headerNames[c - 1]) {
+            previewColStart = c;
+            break;
+        }
+    }
+    // 预览结束列为表头最大列，若实际数据超出表头范围则以表头为准
+    const previewColEnd = actualLastCol > headerLastCol ? headerLastCol : actualLastCol;
+
+    return {
+        headerRow,
+        headerNames,
+        isImportant: headerIsImportant,
+        dataStartRow,
+        lastCol: actualLastCol,
+        firstDataCol,
+        previewColStart: previewColStart - 1, // 转为 0 基索引供 slice 使用
+        previewColEnd,
+        headerMatchCount
+    };
+}
+
+/**
+ * 自动检测包含数据表头的工作表并选中
+ * 扫描所有工作表，找表头匹配度最高的，自动选中、锁定、预览
+ * @returns {{ sheetIndex: number, sheetName: string, headerRow: number, matchCount: number }|null}
+ */
+function autoDetectSheet() {
+    const app = getApp();
+    if (!app || !app.ActiveWorkbook) {
+        bgmLog(LOG_LEVELS.WARN, "autoDetectSheet: Application 不可用");
+        return null;
+    }
+
+    const sheets = app.ActiveWorkbook.Worksheets;
+    let bestMatch = null;
+
+    for (let si = 1; si <= sheets.Count; si++) {
+        let needRestore = null; // 存储恢复函数
+        try {
+            const ws = sheets.Item(si);
+            if (!ws) continue;
+            const sheetName = ws.Name || "";
+
+            if (/^(同步记录|SyncRecord|模糊|搜索|SEARCH)/i.test(sheetName)) continue;
+
+            needRestore = activateSheetIfNeeded(ws);
+            const meta = detectHeaderAndColumns(ws);
+
+            if (meta.headerRow > 0) {
+                // 验证表头下方至少有 2 行有效数据
+                let dataRowCount = 0;
+                for (let dr = meta.dataStartRow; dr <= meta.dataStartRow + 10; dr++) {
+                    let hasAny = false;
+                    for (let c = 1; c <= meta.lastCol; c++) {
+                        if (readCell(ws, dr, c).trim()) { hasAny = true; break; }
+                    }
+                    if (hasAny) dataRowCount++;
+                }
+                if (dataRowCount >= 2) {
+                    // 优先选择列数更多的表，列数相同时选匹配关键词更多的
+                    if (!bestMatch ||
+                        meta.lastCol > bestMatch.colCount ||
+                        (meta.lastCol === bestMatch.colCount && meta.headerMatchCount > bestMatch.matchCount)) {
+                        bestMatch = {
+                            sheetIndex: si,
+                            sheetName: sheetName,
+                            headerRow: meta.headerRow,
+                            matchCount: meta.headerMatchCount,   // 使用实际匹配数
+                            colCount: meta.lastCol
+                        };
+                    }
+                }
+            }
+        } catch (e) {
+            bgmLog(LOG_LEVELS.WARN, `autoDetectSheet: 扫描工作表 ${si} 出错: ${e.message}`);
+        } finally {
+            // 修复：正确调用返回的恢复函数（而不是不存在的 restoreActiveSheet）
+            if (typeof needRestore === 'function') {
+                needRestore();
+            }
+        }
+    }
+
+    if (bestMatch) {
+        bgmLog(LOG_LEVELS.INFO, `autoDetectSheet: 找到最佳匹配 ${bestMatch.sheetName} (index=${bestMatch.sheetIndex}, headerRow=${bestMatch.headerRow}, match=${bestMatch.matchCount})`);
+    } else {
+        bgmLog(LOG_LEVELS.INFO, "autoDetectSheet: 未找到包含数据表头的工作表");
+    }
+    return bestMatch;
+}
+
+/**
+ * 更新筛选状态显示（增强版：显示筛选列名、条件、可见/隐藏行数）
+ */
+function updateFilterStatus(targetWs) {
+    const el = document.getElementById("filterStatus");
+    if (!el) return;
+
+    const app = getApp();
+    const ws = targetWs || (app?.ActiveWorkbook?.ActiveSheet);
+    if (!ws) {
+        el.textContent = "未连接到工作表";
+        return;
+    }
+
+    let autoFilterMode = false;
+    try { autoFilterMode = !!ws.AutoFilterMode; } catch (_) {}
+    try { if (!autoFilterMode && ws.AutoFilter) autoFilterMode = !!ws.AutoFilter.Mode; } catch (_) {}
+
+    if (!autoFilterMode) {
+        el.textContent = "未开启筛选，同步全部数据";
+        el.removeAttribute("title");
+        return;
+    }
+
+    // 筛选已开启
+    try {
+        const autoFilter = ws.AutoFilter;
+        if (!autoFilter) {
+            el.textContent = "筛选已开启但无活动筛选";
+            return;
+        }
+        const filters = autoFilter.Filters;
+        if (!filters || typeof filters.Count === 'undefined' || filters.Count === 0) {
+            el.textContent = "筛选已开启但无活动筛选，同步全部数据";
+            return;
+        }
+
+        const activeCols = [];
+        for (let i = 1; i <= filters.Count; i++) {
+            try {
+                const f = filters.Item ? filters.Item(i) : filters(i);
+                if (f && f.On) {
+                    // 获取列标题
+                    let colName = "";
+                    try {
+                        const headerCell = ws.Range(colNumToLetter(i) + "1");
+                        if (headerCell) {
+                            colName = String(headerCell.Value2 || "").substring(0, 12);
+                        }
+                    } catch (_) {}
+                    // 获取筛选条件文本
+                    let criteria = f.Criteria1 || "";
+                    if (f.Criteria2) {
+                        const op = f.Operator;
+                        criteria += op === 1 ? " 且 " + f.Criteria2 : op === 2 ? " 或 " + f.Criteria2 : " / " + f.Criteria2;
+                    }
+                    activeCols.push(colName ? `${colName}(${criteria})` : `列${i}`);
+                }
+            } catch (_) {}
+        }
+
+        if (activeCols.length > 0) {
+            const text = `✔ 筛选已开启（${activeCols.length} 列），将同步筛选后的可见数据\n${activeCols.join("、")}`;
+            el.textContent = text;
+            el.setAttribute("title", text);
+        } else {
+            el.textContent = "筛选已开启但无活动筛选，同步全部数据";
+            el.removeAttribute("title");
+        }
     } catch (e) {
-        filterStatusEl.textContent = "\u68C0\u6D4B\u7B5B\u9009\u72B6\u6001\u5931\u8D25: " + e.message;
-        bgmLog(LOG_LEVELS.ERROR, "updateFilterStatus \u51FA\u9519: " + e.message);
+        el.textContent = "检测筛选状态失败: " + e.message;
+        bgmLog(LOG_LEVELS.ERROR, "updateFilterStatus error: " + e.message);
     }
 }
 
 /**
- * \u5237\u65B0\u6570\u636E\u9884\u89C8
- * - \u68C0\u6D4B\u5DE5\u4F5C\u8868\u662F\u5426\u5305\u542B\u6709\u6548\u6570\u636E
- * - \u5982\u679C\u627E\u5230\u6570\u636E\u4E14\u672A\u9501\u5B9A\uFF0C\u81EA\u52A8\u9501\u5B9A\u5F53\u524D\u5DE5\u4F5C\u8868
- * - \u663E\u793A\u524D\u51E0\u884C\u6570\u636E\u4F5C\u4E3A\u9884\u89C8
+ * 检测工作表的筛选状态，返回 { isFiltered, visibleRowSet }
+ */
+function detectFilterState(ws) {
+    let isFiltered = false;
+    let visibleRowSet = null;
+    let filterStartRow = 1;
+
+    try {
+        // 判断是否开启了筛选
+        let autoFilterMode = !!ws.AutoFilterMode;
+        if (!autoFilterMode && ws.AutoFilter) autoFilterMode = !!ws.AutoFilter.Mode;
+        if (!autoFilterMode) return { isFiltered: false, visibleRowSet: null };
+
+        isFiltered = true;
+
+        // 获取筛选范围起始行（如果存在）
+        try {
+            const filterRange = ws.AutoFilter.Range;
+            if (filterRange) filterStartRow = filterRange.Row;
+        } catch (_) { /* 使用默认值 1 */ }
+
+        // 方法1：SpecialCells 快速获取可见行（大范围）
+        try {
+            const lastRow = Math.min(ws.Rows.Count, PANEL_CONFIG.MAX_FILTER_SCAN_ROWS);
+            const rangeStr = `${colNumToLetter(1)}${filterStartRow}:${colNumToLetter(1)}${lastRow}`;
+            const visibleCells = ws.Range(rangeStr).SpecialCells(12);
+            if (visibleCells) {
+                visibleRowSet = new Set();
+                for (let a = 1; a <= visibleCells.Areas.Count; a++) {
+                    const area = visibleCells.Areas.Item(a);
+                    for (let r = 1; r <= area.Rows.Count; r++) {
+                        visibleRowSet.add(area.Rows.Item(r).Row);
+                    }
+                }
+                if (visibleRowSet.size < 3) visibleRowSet = null; // 不可信
+            }
+        } catch (_) {
+            // SpecialCells 不可用或出错，降级到逐行检查
+        }
+
+        // 方法2：逐行检查 Hidden 属性（回退，小范围避免卡顿）
+        if (!visibleRowSet) {
+            visibleRowSet = new Set();
+            const lastRow = Math.min(ws.Rows.Count, PANEL_CONFIG.FILTER_FALLBACK_LIMIT);
+            for (let r = filterStartRow; r <= lastRow; r++) {
+                try {
+                    if (!ws.Rows(r).Hidden) visibleRowSet.add(r);
+                } catch (_) { visibleRowSet.add(r); }
+            }
+        }
+    } catch (e) {
+        bgmLog(LOG_LEVELS.ERROR, "detectFilterState error: " + e.message);
+    }
+    return { isFiltered, visibleRowSet };
+}
+
+/**
+ * 渲染预览表格 HTML
+ * @param {Array} rows - 预览行数据
+ * @param {number} sheetIndex
+ * @param {string} sheetName
+ * @param {number} headerRow
+ * @returns {string}
+ */
+function renderPreviewTable(rows, sheetIndex, sheetName, headerRow) {
+    let html = '<table class="preview-table"><tbody>';
+    rows.forEach(item => {
+        const rowClass = item.isHeader ? 'preview-header-row' : '';
+        html += `<tr class="${rowClass}">`;
+        html += `<td class="preview-row-num">${item.isHeader ? 'H' : item.row}</td>`;
+        if (item.aligned) {
+            const lastNonEmpty = item.cols.map((v, i) => v ? i : -1).filter(i => i >= 0).pop() || -1;
+            const colLimit = lastNonEmpty + 1;
+            for (let i = 0; i < colLimit; i++) {
+                const text = item.cols[i] || '';
+                let cls = '';
+                if (item.isHeader) {
+                    cls = 'preview-header';
+                    if (item.isImportant && item.isImportant[i]) cls += ' preview-important-header';
+                }
+                html += `<td class="${cls}">${escapeHtml(String(text))}</td>`;
+            }
+        }
+        html += '</tr>';
+    });
+    html += '</tbody></table>';
+    html += `<p class="hint">已选择工作表索引: ${sheetIndex} (${escapeHtml(sheetName)})`;
+    if (headerRow) html += ` | 表头行: ${headerRow}`;
+    html += '</p>';
+    return html;
+}
+
+/**
+ * 刷新数据预览
  */
 function refreshData() {
-    bgmLog(LOG_LEVELS.INFO, "refreshData \u5F00\u59CB\u6267\u884C");
-    let select = document.getElementById("sheetSelect");
-    let previewBox = document.getElementById("previewBox");
-
-    let sheetIndex = BGM.sheet.lockedIndex || parseInt(select?.value) || 0;
+    bgmLog(LOG_LEVELS.INFO, "refreshData 开始执行");
+    const select = document.getElementById("sheetSelect");
+    const previewBox = document.getElementById("previewBox");
+    const sheetIndex = BGM.sheet.lockedIndex || parseInt(select?.value) || 0;
 
     if (!sheetIndex) {
-        if (previewBox) {
-            previewBox.innerHTML = '<p class="hint">\u8BF7\u5148\u9009\u62E9\u5DE5\u4F5C\u8868</p>';
-        }
+        if (previewBox) previewBox.innerHTML = '<p class="hint">请先选择工作表</p>';
         updateFilterStatus();
-        bgmLog(LOG_LEVELS.INFO, "refreshData: \u672A\u9009\u62E9\u5DE5\u4F5C\u8868");
+        bgmLog(LOG_LEVELS.INFO, "refreshData: 未选择工作表");
         return;
     }
 
-    let app = getApp();
+    const app = getApp();
     if (!app || !app.ActiveWorkbook) {
-        if (previewBox) {
-            previewBox.innerHTML = '<p class="hint">\u672A\u8FDE\u63A5\u5230 Excel</p>';
-        }
-        bgmLog(LOG_LEVELS.WARN, "refreshData: Application \u4E0D\u53EF\u7528");
+        if (previewBox) previewBox.innerHTML = '<p class="hint">未连接到 Excel</p>';
         updateFilterStatus();
         return;
     }
 
-    let wb = app.ActiveWorkbook;
     let ws;
     try {
-        ws = wb.Worksheets.Item(sheetIndex);
+        ws = app.ActiveWorkbook.Worksheets.Item(sheetIndex);
     } catch (e) {
-        if (previewBox) {
-            previewBox.innerHTML = '<p class="hint">\u65E0\u6CD5\u83B7\u53D6\u5DE5\u4F5C\u8868: ' + sheetIndex + '</p>';
-        }
-        bgmLog(LOG_LEVELS.WARN, "refreshData: \u83B7\u53D6\u5DE5\u4F5C\u8868\u5931\u8D25: " + e.message);
+        if (previewBox) previewBox.innerHTML = `<p class="hint">无法获取工作表: ${sheetIndex}</p>`;
         updateFilterStatus();
         return;
     }
 
-    let sheetName = "";
-    try { sheetName = ws.Name; } catch (_) {}
+    const sheetName = ws.Name || "";
 
-    // \u5C1D\u8BD5\u8BFB\u53D6\u524D\u51E0\u884C\u6570\u636E\u4F5C\u4E3A\u9884\u89C8
-    let previewRows = [];
+   // 临时激活非活动表
+    const needRestore = activateSheetIfNeeded(ws);
+    try{
+   // 筛选状态
+    const { isFiltered, visibleRowSet } = detectFilterState(ws);
+
+    // 获取表头及列信息
+    const meta = detectHeaderAndColumns(ws, { visibleRowSet, isFiltered });
+
+    // 构建预览行
+    const previewRows = [];
     let hasData = false;
-    let PREVIEW_LIMIT = 8;
-    let foundHeaderRow = 0;
 
-    // \u8BFB\u53D6\u5355\u5143\u683C\u503C\uFF08WPS COM \u517C\u5BB9\uFF09
-    function readCell(ws, row, col) {
-        try {
-            let v = ws.Cells(row, col).Value;
-            if (typeof v === 'function') v = v();
-            if (v !== null && v !== undefined && v !== '') return String(v);
-        } catch (_) {}
-        try {
-            let cell = ws.Cells.Item(row, col);
-            if (cell) {
-                let v = cell.Value;
-                if (typeof v === 'function') v = v();
-                if (v !== null && v !== undefined && v !== '') return String(v);
-            }
-        } catch (_) {}
-        try {
-            let colLetter = String.fromCharCode(64 + col);
-            let cell2 = ws.Range(colLetter + row);
-            if (cell2) {
-                let v = cell2.Value;
-                if (typeof v === 'function') v = v();
-                if (v !== null && v !== undefined && v !== '') return String(v);
-            }
-        } catch (_) {}
-        // 备用4: 通过 UsedRange 读取（解决非活动表读取失败问题）
-        try {
-            let usedRange = ws.UsedRange;
-            if (usedRange) {
-                let rIdx = row - usedRange.Row;
-                let cIdx = col - usedRange.Column;
-                if (rIdx >= 0 && rIdx < usedRange.Rows.Count && cIdx >= 0 && cIdx < usedRange.Columns.Count) {
-                    let cell = usedRange.Cells.Item(rIdx + 1, cIdx + 1);
-                    if (cell) {
-                        let v = cell.Value;
-                        if (typeof v === 'function') v = v();
-                        if (v !== null && v !== undefined && v !== '') return String(v);
-                    }
+    if (meta.headerRow > 0) {
+        // 表头行
+        previewRows.push({
+            row: -1,
+            cols: meta.headerNames.slice(meta.previewColStart, meta.previewColEnd),
+            isHeader: true,
+            aligned: true,
+            isImportant: meta.isImportant.slice(meta.previewColStart, meta.previewColEnd)
+        });
+
+        // 数据行
+        const displayColCount = meta.previewColEnd - meta.previewColStart;
+        for (let dr = meta.dataStartRow; dr <= meta.dataStartRow + PANEL_CONFIG.PREVIEW_LIMIT + 20 && dr <= 1000; dr++) {
+            if (!isFiltered || !visibleRowSet || visibleRowSet.has(dr)) {
+                let hasAny = false;
+                const rowCols = [];
+                for (let ci = 0; ci < displayColCount; ci++) {
+                    const v = readCell(ws, dr, meta.previewColStart + ci + 1).trim();
+                    if (v) hasAny = true;
+                    rowCols.push(v);
                 }
-            }
-        } catch (_) {}
-        return "";
-    }
-    // \u5B9A\u4E49\u8868\u5934\u5173\u952E\u8BCD\uFF08\u8986\u76D6\u7528\u6237\u5B9E\u9645\u8868\u5934 + bangumi.js \u5173\u952E\u8BCD\uFF09
-    let scanKeywords = [
-        "\u5e8f\u5217\u53f7", "\u662f\u5426\u770b\u5b8c", "\u770b\u5b8c\u65f6\u95f4", "\u5f00\u64ad\u5b63\u5ea6",
-        "\u540d\u79f0", "\u522b\u540d", "\u6253\u5206", "\u96c6\u53f7", "\u96c6\u6570",
-        "\u5267\u900f/\u611f\u8a00", "\u611f\u8a00", "\u5907\u6ce8", "\u8bc4\u4ef7",
-        "bangumi url", "url", "\u5236\u7247\u56fd\u5bb6", "\u8bed\u8a00", "\u7c7b\u578b",
-        "\u5bfc\u6f14", "\u97f3\u4e50", "\u539f\u4f5c", "\u6807\u7b7e",
-        "\u6761\u76eeid", "sid", "\u72b6\u6001", "status", "rate",
-        "\u756a\u5267", "\u52a8\u753b", "\u4e66", "\u540d\u5b57", "\u94fe\u63a5",
-        "\u89c2\u770b\u72b6\u6001", "\u6536\u85cf\u7c7b\u578b", "\u7ae0\u8282\u72b6\u6001", "\u540c\u6b65\u72b6\u6001",
-        "\u5b8c\u64ad\u65e5", "\u7279\u70b9", "\u5370\u8c61", "\u5173\u8054\u7684\u52a8\u6f2b"
-    ];
-
-    // \u5B9A\u4E49\u5173\u952E\u5217\uFF08\u9884\u89C8\u65F6\u9AD8\u4EAE\u663E\u793A\uFF09
-    let importantCols = {
-        "\u540d\u79f0": true, "\u662f\u5426\u770b\u5b8c": true, "bangumi url": true,
-        "url": true, "\u6253\u5206": true, "\u96c6\u6570": true, "\u611f\u8a00": true,
-        "\u5267\u900f/\u611f\u8a00": true, "\u7c7b\u578b": true, "\u72b6\u6001": true,
-        "status": true, "rate": true, "\u522b\u540d": true
-    };
-
-    // 诊断：测试 readCell 是否能读取数据，非活动表时临时激活
-    let originalActiveSheet = null;
-    let needRestore = false;
-    try {
-        let testVal = readCell(ws, 1, 1);
-        bgmLog(LOG_LEVELS.INFO, "refreshData: ws.Name=" + sheetName + ", readCell(1,1)='" + testVal + "'");
-        if (!testVal) {
-            try {
-                let activeWs = app.ActiveWorkbook.ActiveSheet;
-                let activeName = "";
-                try { activeName = activeWs.Name; } catch (_) {}
-                originalActiveSheet = activeWs;
-                bgmLog(LOG_LEVELS.INFO, "refreshData: 非活动表读取失败，临时激活 " + sheetName + " (current=" + activeName + ")");
-                try { ws.Activate(); } catch (_) {}
-                needRestore = true;
-                testVal = readCell(ws, 1, 1);
-                bgmLog(LOG_LEVELS.INFO, "refreshData: 激活后 readCell(1,1)='" + testVal + "'");
-            } catch (e2) {
-                bgmLog(LOG_LEVELS.WARN, "refreshData: 激活失败: " + e2.message);
-            }
-        }
-    } catch (_) {}
-
-    // 检测筛选状态，获取可见行集合（用于跳过隐藏行）
-    let visibleRowSet = null;
-    let isFiltered = false;
-    try {
-        // 兼容 WPS：使用 AutoFilterMode 属性检测（与 updateFilterStatus 一致）
-        let autoFilterMode = false;
-        try { autoFilterMode = !!ws.AutoFilterMode; } catch (_) {}
-        try { if (!autoFilterMode && ws.AutoFilter) autoFilterMode = !!ws.AutoFilter.Mode; } catch (_) {}
-        
-        bgmLog(LOG_LEVELS.INFO, "refreshData: AutoFilterMode=" + autoFilterMode);
-        
-        if (autoFilterMode) {
-            isFiltered = true;
-            let filterStartRow = 1;
-            let autoFilter = null;
-            try {
-                autoFilter = ws.AutoFilter;
-                if (autoFilter && autoFilter.Range) filterStartRow = autoFilter.Range.Row;
-            } catch (_) {}
-            
-            // 检测实际最后行
-            let lastRow = 200;
-            try { lastRow = ws.Cells(ws.Rows.Count, 1).End(-4162).Row; } catch (_) {}
-            if (lastRow < 10) lastRow = 200;
-            let scanEndRow = Math.min(filterStartRow + lastRow + 20, 5000);
-            
-            visibleRowSet = new Set();
-            
-            // 方法1：SpecialCells(12) = xlCellTypeVisible
-            try {
-                let filterRangeStr = "A" + filterStartRow + ":A" + scanEndRow;
-                let visibleCells = ws.Range(filterRangeStr).SpecialCells(12);
-                if (visibleCells) {
-                    let areas = visibleCells.Areas;
-                    for (let a = 1; a <= areas.Count; a++) {
-                        let area = areas.Item(a);
-                        for (let r = 1; r <= area.Rows.Count; r++) {
-                            visibleRowSet.add(area.Rows.Item(r).Row);
-                        }
-                    }
-                }
-                bgmLog(LOG_LEVELS.INFO, "refreshData: SpecialCells 找到可见行=" + visibleRowSet.size);
-            } catch (e) {
-                bgmLog(LOG_LEVELS.WARN, "refreshData: SpecialCells 失败: " + e.message);
-            }
-            
-            // 方法2：逐行检查 Hidden 属性
-            if (visibleRowSet.size === 0) {
-                let visibleCount = 0, hiddenCount = 0;
-                for (let r = filterStartRow; r <= scanEndRow; r++) {
-                    try {
-                        let hidden = false;
-                        try { hidden = ws.Rows(r).Hidden; } catch (_) {}
-                        try { if (!hidden) hidden = ws.Rows.Item(r).Hidden; } catch (_) {}
-                        if (hidden === true) {
-                            hiddenCount++;
-                        } else {
-                            visibleRowSet.add(r);
-                            visibleCount++;
-                        }
-                    } catch (_) {
-                        visibleRowSet.add(r);
-                        visibleCount++;
-                    }
-                }
-                bgmLog(LOG_LEVELS.INFO, "refreshData: Hidden逐行扫描 visible=" + visibleCount + " hidden=" + hiddenCount);
-            }
-            
-            bgmLog(LOG_LEVELS.INFO, "refreshData: 筛选已开启, 可见行数=" + visibleRowSet.size + ", scanRange=" + filterStartRow + "-" + scanEndRow);
-        }
-    } catch (e) {
-        bgmLog(LOG_LEVELS.ERROR, "refreshData: 筛选检测异常: " + e.message);
-    }
-
-    function isRowVisible(r) {
-        return !isFiltered || (visibleRowSet && visibleRowSet.has(r));
-    }
-
-    try {
-        // 扫描前 50 行找表头（筛选模式下只扫描可见行）
-        let rowsToScan = [];
-        if (isFiltered && visibleRowSet) {
-            for (let r = 1; r <= 50; r++) {
-                if (visibleRowSet.has(r)) rowsToScan.push(r);
-            }
-        } else {
-            for (let r = 1; r <= 50; r++) rowsToScan.push(r);
-        }
-
-        for (let ri = 0; ri < rowsToScan.length; ri++) {
-            let r = rowsToScan[ri];
-            let matchCount = 0;
-            let matchedCol = 0;
-            for (let c = 1; c <= 35; c++) {
-                let cellVal = readCell(ws, r, c).trim().toLowerCase();
-                if (!cellVal) continue;
-                if (scanKeywords.some(kw => cellVal === kw || cellVal.includes(kw))) {
-                    matchCount++;
-                    matchedCol = c;
-                    if (matchCount >= 3) break; // 匹配到 3 个关键词就确认是表头行
-                }
-            }
-            if (matchCount >= 3) {
-                foundHeaderRow = r;
-                bgmLog(LOG_LEVELS.INFO, "refreshData: 找到表头 行" + r + ", 匹配" + matchCount + "个关键词");
-                break;
-            }
-        }
-
-        // 调试：如果未找到，输出前几个可见行的内容
-        if (!foundHeaderRow) {
-            let diagRows = [];
-            let diagLimit = 0;
-            for (let r = 1; r <= 50 && diagLimit < 5; r++) {
-                if (!isRowVisible(r)) continue;
-                diagLimit++;
-                let vals = [];
-                for (let c = 1; c <= 35; c++) {
-                    let v = readCell(ws, r, c).trim();
-                    if (v) vals.push("C" + c + "='" + v + "'");
-                }
-                diagRows.push("R" + r + ": {" + vals.join(", ") + "}");
-            }
-            bgmLog(LOG_LEVELS.WARN, "refreshData: 未找到表头, 可见行内容: " + diagRows.join(" | "));
-        }
-
-        if (foundHeaderRow > 0) {
-            // 读取表头行，记录各列名称和重要性
-            let headerNames = [];
-            let headerIsImportant = [];
-            for (let c = 1; c <= 35; c++) {
-                let v = readCell(ws, foundHeaderRow, c).trim();
-                headerNames.push(v);
-                headerIsImportant.push(importantCols[v.toLowerCase()] || false);
-            }
-
-            // 添加表头行到预览
-            let headerCols = [];
-            for (let c = 0; c < headerNames.length; c++) {
-                if (headerNames[c]) headerCols.push({ text: headerNames[c], important: headerIsImportant[c] });
-            }
-            if (headerCols.length > 0) {
-                previewRows.push({ row: -1, cols: headerCols, isHeader: true });
-            }
-
-            // 读取数据行（只读取有表头的列，跳过隐藏行）
-            let dataColCount = 0;
-            for (let c = 0; c < headerNames.length; c++) {
-                if (headerNames[c]) dataColCount = c + 1;
-            }
-
-            for (let dr = foundHeaderRow + 1; dr <= foundHeaderRow + PREVIEW_LIMIT + 20 && dr <= 1000; dr++) {
-                if (!isRowVisible(dr)) continue;
-                let rowCols = [];
-                let hasAnyContent = false;
-                for (let c = 0; c < dataColCount; c++) {
-                    let v = readCell(ws, dr, c + 1).trim();
-                    if (v) {
-                        rowCols.push({ text: v, important: headerIsImportant[c] });
-                        hasAnyContent = true;
-                    }
-                }
-                if (hasAnyContent) {
-                    previewRows.push({ row: dr, cols: rowCols, isHeader: false });
+                if (hasAny) {
+                    previewRows.push({ row: dr, cols: rowCols, isHeader: false, aligned: true });
                     hasData = true;
-                    if (previewRows.filter(p => !p.isHeader).length >= PREVIEW_LIMIT) break;
-                }
-            }
-        } else {
-            // 完全找不到表头，显示前几个可见行原始内容
-            let fallbackLimit = 0;
-            for (let r = 1; r <= 100 && fallbackLimit < 5; r++) {
-                if (!isRowVisible(r)) continue;
-                fallbackLimit++;
-                let rowCols = [];
-                let hasAnyContent = false;
-                for (let c = 1; c <= 35; c++) {
-                    let v = readCell(ws, r, c).trim();
-                    if (v) {
-                        rowCols.push({ text: v, important: false });
-                        hasAnyContent = true;
-                    }
-                }
-                if (hasAnyContent) {
-                    previewRows.push({ row: r, cols: rowCols, isHeader: false });
-                    hasData = true;
+                    if (previewRows.filter(p => !p.isHeader).length >= PANEL_CONFIG.PREVIEW_LIMIT) break;
                 }
             }
         }
-        } catch (e) {
-        bgmLog(LOG_LEVELS.ERROR, "refreshData \u8BFB\u53D6\u9884\u89C8\u6570\u636E\u51FA\u9519: " + e.message);
+    } else {
+        // 无表头时回退到前几行
+        let count = 0;
+        for (let r = 1; r <= 100 && count < 5; r++) {
+            if (isFiltered && visibleRowSet && !visibleRowSet.has(r)) continue;
+            const cols = [];
+            let any = false;
+            for (let c = 1; c <= PANEL_CONFIG.MAX_SCAN_COLUMNS; c++) {
+                const v = readCell(ws, r, c).trim();
+                if (v) {
+                    cols.push({ text: v, important: false });
+                    any = true;
+                }
+            }
+            if (any) {
+                // 修复：添加 aligned: true，否则预览不显示列内容
+                previewRows.push({ row: r, cols: cols, isHeader: false, aligned: true });
+                hasData = true;
+                count++;
+            }
+        }
     }
 
-    // \u81EA\u52A8\u9501\u5B9A\u903B\u8F91\uFF1A\u5982\u679C\u627E\u5230\u6570\u636E\u4E14\u672A\u9501\u5B9A\uFF0C\u81EA\u52A8\u9501\u5B9A
+    // 自动锁定逻辑
     if (hasData && !BGM.sheet.isLocked) {
         BGM.sheet.lockedIndex = sheetIndex;
         BGM.sheet.lockedName = sheetName;
         BGM.sheet.isLocked = true;
         saveLockedSheet({ index: sheetIndex, name: sheetName });
         updateLockButton();
-        // \u540C\u6B65\u4E0B\u62C9\u6846\u9009\u4E2D\u72B6\u6001
-        if (select) {
-            select.value = sheetIndex;
-        }
-        showToast("\u5DF2\u81EA\u52A8\u9501\u5B9A\u5DE5\u4F5C\u8868: " + sheetName, "info");
-        bgmLog(LOG_LEVELS.INFO, "refreshData: \u5DF2\u81EA\u52A8\u9501\u5B9A " + sheetName + " (index=" + sheetIndex + ")");
+        if (select) select.value = sheetIndex;
+        showToast("已自动锁定工作表: " + sheetName, "info");
     }
 
-    // \u6E32\u67D3\u9884\u89C8
+    // 渲染
     if (previewBox) {
-        if (previewRows.length > 0) {
-            let html = '<table class="preview-table"><tbody>';
-            previewRows.forEach(item => {
-                let rowClass = item.isHeader ? 'preview-header-row' : '';
-                html += '<tr class="' + rowClass + '">';
-                html += '<td class="preview-row-num">' + (item.isHeader ? 'H' : item.row) + '</td>';
-                item.cols.forEach((col) => {
-                    let text = col.text || col;
-                    let important = col.important || false;
-                    let cls = '';
-                    if (item.isHeader) {
-                        cls = 'preview-header';
-                        if (important) cls += ' preview-important-header';
-                    } else if (important) {
-                        cls = 'preview-important';
-                    }
-                    html += '<td class="' + cls + '">' + (typeof text === 'string' ? text : escapeHtml(String(text))) + '</td>';
-                });
-                html += '</tr>';
-            });
-            html += '</tbody></table>';
-            html += '<p class="hint">\u5DF2\u9009\u62E9\u5DE5\u4F5C\u8868\u7D22\u5F15: ' + sheetIndex;
-            if (sheetName) html += ' (' + escapeHtml(sheetName) + ')';
-            if (foundHeaderRow) html += ' | \u8868\u5934\u884C: ' + foundHeaderRow;
-            html += '</p>';
-            previewBox.innerHTML = html;
-        } else {
-            previewBox.innerHTML = '<p class="hint">\u5DF2\u9009\u62E9\u5DE5\u4F5C\u8868\u7D22\u5F15: ' + sheetIndex;
-            if (sheetName) previewBox.innerHTML += ' (' + escapeHtml(sheetName) + ')';
-            previewBox.innerHTML += '<br>\u672A\u68C0\u6D4B\u5230\u6570\u636E\uFF0C\u8BF7\u786E\u4FDD\u8868\u5934\u5305\u542B\u201C\u540D\u79F0\u201D\u7B49\u5173\u952E\u8BCD</p>';
-        }
+        previewBox.innerHTML = previewRows.length > 0
+            ? renderPreviewTable(previewRows, sheetIndex, sheetName, meta.headerRow)
+            : `<p class="hint">已选择工作表索引: ${sheetIndex} (${escapeHtml(sheetName)})<br>未检测到数据</p>`;
     }
-
-    // 恢复原活动表（如果临时激活了其他表）
-    if (needRestore && originalActiveSheet) {
-        try {
-            originalActiveSheet.Activate();
-            bgmLog(LOG_LEVELS.INFO, "refreshData: 已恢复活动表");
-        } catch (_) {}
+    updateFilterStatus(ws);
+    bgmLog(LOG_LEVELS.INFO, `refreshData 完成, hasData=${hasData}, rows=${previewRows.length}`);
+    } finally {
+    if (needRestore) needRestore();   // needRestore 现在是恢复函数
     }
-
-    updateFilterStatus();
-    bgmLog(LOG_LEVELS.INFO, "refreshData \u6267\u884C\u5B8C\u6210, hasData=" + hasData + ", previewRows=" + previewRows.length);
 }
-
 /**
  * 模式切换处理
  */
@@ -613,11 +693,11 @@ function onSelectModeChange() {
     for (let radio of modeRadios) {
         if (radio.checked) {
             if (radio.value === "manual") {
-                manualInputs.style.display = "block";
-                autoInfo.style.display = "none";
+                if (manualInputs) manualInputs.style.display = "block";
+                if (autoInfo) autoInfo.style.display = "none";
             } else {
-                manualInputs.style.display = "none";
-                autoInfo.style.display = "block";
+                if (manualInputs) manualInputs.style.display = "none";
+                if (autoInfo) autoInfo.style.display = "block";
             }
             break;
         }
@@ -629,30 +709,54 @@ function onSelectModeChange() {
  * 面板初始化
  */
 function initPanel() {
-    bgmLog(LOG_LEVELS.INFO, "initPanel \u5F00\u59CB");
+    bgmLog(LOG_LEVELS.INFO, "initPanel 开始");
 
-    // 检查枚举
-    if (typeof window.Application.Enum !== "object") {
+    // 检查枚举（兼容 WPS 环境可能未就绪的情况）
+    if (typeof window.Application !== "undefined" && typeof window.Application.Enum !== "object") {
         window.Application.Enum = WPS_Enum;
-        bgmLog(LOG_LEVELS.DEBUG, "initPanel: \u5DF2\u8BBE\u7F6E WPS_Enum");
+        bgmLog(LOG_LEVELS.DEBUG, "initPanel: 已设置 WPS_Enum");
     }
 
     // 初始化消息监听
     initMessageListener();
-    bgmLog(LOG_LEVELS.DEBUG, "initPanel: \u6D88\u606F\u76D1\u542C\u5DF2\u521D\u59CB\u5316");
+    bgmLog(LOG_LEVELS.DEBUG, "initPanel: 消息监听已初始化");
 
     // 恢复锁定的工作表缓存
     let restored = restoreLockedSheet();
-    bgmLog(LOG_LEVELS.DEBUG, "initPanel: \u5DE5\u4F5C\u8868\u9501\u5B9A\u6062\u590D=" + restored);
+    bgmLog(LOG_LEVELS.DEBUG, "initPanel: 工作表锁定恢复=" + restored);
 
-    // 初始化工作表列表
+    // 初始化工作表列表（会自动选中锁定的工作表）
     refreshSheets();
-    bgmLog(LOG_LEVELS.DEBUG, "initPanel: \u5DE5\u4F5C\u8868\u5217\u8868\u5DF2\u5237\u65B0");
+    bgmLog(LOG_LEVELS.DEBUG, "initPanel: 工作表列表已刷新");
+
+    // 每次启动都重新自动检测最佳工作表（避免旧锁定缓存指向无效表）
+    let detected = autoDetectSheet();
+    if (detected) {
+        let select = document.getElementById("sheetSelect");
+        if (select) {
+            select.value = detected.sheetIndex;
+        }
+        BGM.sheet.lockedIndex = detected.sheetIndex;
+        BGM.sheet.lockedName = detected.sheetName;
+        BGM.sheet.isLocked = true;
+        saveLockedSheet({ index: detected.sheetIndex, name: detected.sheetName });
+        updateLockButton();
+        bgmLog(LOG_LEVELS.INFO, "initPanel: 自动识别到数据表 " + detected.sheetName +
+            " (匹配" + detected.matchCount + "个关键词，表头第" + detected.headerRow + "行, " + detected.colCount + "列)");
+        refreshData();
+    } else {
+        // 未检测到有效数据表，尝试使用恢复的锁定表
+        if (restored && BGM.sheet.isLocked) {
+            let select = document.getElementById("sheetSelect");
+            if (select) select.value = BGM.sheet.lockedIndex;
+            refreshData();
+        }
+    }
 
     // 更新状态显示
     updateTokenStatus();
     updateUserIdStatus();
-    bgmLog(LOG_LEVELS.DEBUG, "initPanel: Token/\u7528\u6237ID \u72B6\u6001\u5DF2\u66F4\u65B0");
+    bgmLog(LOG_LEVELS.DEBUG, "initPanel: Token/用户ID 状态已更新");
 
     // 绑定工作表选择事件
     let sheetSelect = document.getElementById("sheetSelect");
@@ -693,7 +797,7 @@ function initPanel() {
     // 通知 HTML 模块已就绪，启用按钮
     document.dispatchEvent(new CustomEvent('bgm:modulesReady'));
 
-    bgmLog(LOG_LEVELS.INFO, "initPanel \u5B8C\u6210");
+    bgmLog(LOG_LEVELS.INFO, "initPanel 完成");
 }
 
 /**
@@ -704,7 +808,7 @@ function fetchBgCollectionRecords() {
         // 委托给 handlers.js 的增强版（会触发完整交互流程）
         window.syncCollectionFromBgm();
     } else {
-        showAlert("\u8BF7\u5148\u8BBE\u7F6E Token\uFF01");
+        showAlert("请先设置 Token！");
     }
 }
 
@@ -716,7 +820,7 @@ function clearSyncRecords() {
     if (typeof _clearSyncRecords === 'function') {
         _clearSyncRecords();
     } else {
-        showAlert("\u6E05\u9664\u540C\u6B65\u8BB0\u5F55\u529F\u80FD\u672A\u52A0\u8F7D");
+        showAlert("清除同步记录功能未加载");
     }
 }
 
@@ -741,7 +845,7 @@ function getSelectedSheetName() {
 function markUploadedItemsDefault() {
     let sheetName = getSelectedSheetName();
     if (!sheetName) {
-        showAlert('\u8BF7\u5148\u9009\u62E9\u5DE5\u4F5C\u8868！');
+        showAlert('请先选择工作表！');
         return;
     }
     markUploadedItems(sheetName);
@@ -753,7 +857,7 @@ function markUploadedItemsDefault() {
 function clearSheetMarksDefault() {
     let sheetName = getSelectedSheetName();
     if (!sheetName) {
-        showAlert('\u8BF7\u5148\u9009\u62E9\u5DE5\u4F5C\u8868！');
+        showAlert('请先选择工作表！');
         return;
     }
     clearSheetMarks(sheetName);
@@ -771,11 +875,29 @@ export {
     markUploadedItems,
     markUploadedItemsDefault,
     clearSheetMarks,
-    clearSheetMarksDefault
+    clearSheetMarksDefault,
+    autoDetectSheet,
+    updateFilterStatus
 };
 
 // ========== 挂载到 window（向后兼容）==========
-window.onload = initPanel;
+// 修复：当脚本在 load 事件后执行时仍能初始化
+function safeInitPanel() {
+    try {
+        initPanel();
+    } catch (e) {
+        console.error('[BGM] initPanel 执行失败:', e);
+        // 即使初始化失败，也通知模块已加载（函数已挂载到 window）
+        document.dispatchEvent(new CustomEvent('bgm:modulesReady'));
+    }
+}
+
+if (document.readyState === 'complete') {
+    safeInitPanel();
+} else {
+    window.addEventListener('load', safeInitPanel);
+}
+
 window.initPanel = initPanel;
 window.refreshSheets = refreshSheets;
 window.refreshData = refreshData;

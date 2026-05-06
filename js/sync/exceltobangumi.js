@@ -4,15 +4,15 @@
  * @description 从 Excel 读取条目并批量同步到 Bangumi 收藏
  */
 
-import { XL, BGM_CONFIG, BGM_COLOR, LOG_LEVELS, BGM } from './util.js';
+import { XL, BGM_CONFIG, BGM_COLOR, LOG_LEVELS, BGM } from '../util.js';
 import { getApp, bgmLog, getCell, getCellValue, sleep, loadBgToken,
          _setBgmUserId, _getBgmUserId, _getUserApiPath, trim,
-         colNumToLetter, storeBgToken, readCell } from './util.js';
-import { showDialog } from './ui/dialog.js';
-import { sendToTaskpane } from './core/unified.js';
-import { showTokenDialog, showUserIdDialog } from './ui/handlers.js';
-import { httpRequest } from './http.js';
-import { Result } from './types/result.js';
+         colNumToLetter, storeBgToken, readCell } from '../util.js';
+import { showDialog } from '../ui/dialog.js';
+import { sendToTaskpane } from '../core/unified.js';
+import { showTokenDialog, showUserIdDialog } from '../ui/handlers.js';
+import { httpRequest } from '../http.js';
+import { Result } from '../types/result.js';
 
 // ========== 常量定义 ==========
 const COLUMNS = {

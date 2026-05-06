@@ -3,15 +3,21 @@
  * @module util
  * @description 提供通用工具函数、常量定义、错误处理等核心功能
  */
-import { WPS_ENUM, XL, BGM_CONFIG, BGM_COLOR, LOG_LEVELS, ERROR_LEVELS, PANEL_CONFIG, BGM_SUBJECT_TYPES, SYNC_STATUS } from './core/constants.js';
+import { WPS_ENUM, XL, BGM_CONFIG, BGM_COLOR, LOG_LEVELS, ERROR_LEVELS } from './core/constants.js';
 import { encryptToken, decryptToken, calcChecksum } from './core/crypto.js';
 // ========== 导出常量（向后兼容）==========
 export const WPS_Enum = WPS_ENUM;
-export { XL, BGM_CONFIG, BGM_COLOR, LOG_LEVELS, ERROR_LEVELS, PANEL_CONFIG, BGM_SUBJECT_TYPES, SYNC_STATUS };
-
-
+export { XL, BGM_CONFIG, BGM_COLOR, LOG_LEVELS, ERROR_LEVELS };
+/** BGM 错误级别 */
+var ErrorLevel;
+(function (ErrorLevel) {
+    ErrorLevel[ErrorLevel["SILENT"] = 0] = "SILENT";
+    ErrorLevel[ErrorLevel["WARN"] = 1] = "WARN";
+    ErrorLevel[ErrorLevel["ERROR"] = 2] = "ERROR";
+    ErrorLevel[ErrorLevel["THROW"] = 3] = "THROW";
+})(ErrorLevel || (ErrorLevel = {}));
 /** BGM 错误类 */
-export class BgmError extends Error {
+class BgmError extends Error {
     constructor(message, code = 'UNKNOWN', details = {}) {
         super(message);
         this.name = 'BgmError';
@@ -23,72 +29,8 @@ export class BgmError extends Error {
         return `[${this.code}] ${this.message}`;
     }
 }
-
-
-
-
-
-
-
-
-// 对话框适配器（自动检测环境）
-const DialogAdapter = (() => {
-  const w = (typeof window !== 'undefined') ? window : null;
-  if (w?.BGMDialog) {
-    return {
-      alert: (title, msg) => w.BGMDialog.alert(title, msg),
-      confirm: (msg, onConfirm, onCancel) => w.BGMDialog.confirm(msg, onConfirm, onCancel),
-      error: (title, msg) => w.BGMDialog.error(title, msg),
-      input: (title, prompt, defaultValue, onOk, onCancel) =>
-        w.BGMDialog.input(title, prompt, defaultValue ?? '', onOk, onCancel),
-      show: (type, title, msg, options) => w.BGMDialog.show(type, title, msg, options)
-    };
-  }
-  if (w?.BGMAlert) {
-    return {
-      alert: (title, msg) => w.BGMAlert(msg, title),
-      confirm: (msg, onConfirm, onCancel) => w.BGMConfirm(msg, '\u786E\u8BA4', onConfirm, onCancel),
-      error: (title, msg) => w.BGMError(msg, title),
-      input: (title, prompt, defaultValue, onOk, onCancel) =>
-        w.BGMInput(title, prompt, defaultValue ?? '', onOk, onCancel),
-      show: (type, title, msg, options) => {
-        switch (type) {
-          case 'error': w.BGMError(msg, title); break;
-          case 'confirm': w.BGMConfirm(msg, '\u786E\u8BA4', options?.onConfirm, options?.onCancel); break;
-          case 'input': w.BGMInput(title, msg, options?.defaultValue, options?.onOk, options?.onCancel); break;
-          default: w.BGMAlert(msg, title);
-        }
-      }
-    };
-  }
-  // 回退到原生
-  return {
-    alert: (title, msg) => w?.alert?.(msg),
-    confirm: (msg, onConfirm, onCancel) => {
-      if (w?.confirm?.(msg)) { onConfirm?.(); } else { onCancel?.(); }
-    },
-    error: (title, msg) => w?.alert?.('[\u9519\u8BEF] ' + msg),
-    input: (title, prompt, defaultValue, onOk, onCancel) => {
-      const result = w?.prompt?.(prompt, defaultValue);
-      if (result !== null) { onOk?.(result); } else { onCancel?.(); }
-    },
-    show: (type, title, msg, options) => {
-      switch (type) {
-        case 'error': this.error(title, msg); break;
-        case 'confirm': this.confirm(msg, options?.onConfirm, options?.onCancel); break;
-        case 'input': this.input(title, msg, options?.defaultValue, options?.onOk, options?.onCancel); break;
-        default: this.alert(title, msg);
-      }
-    }
-  };
-})();
-
-
-
 // ========== BGM 全局命名空间 ==========
 export const BGM = {
-    // 在 BGM 对象定义内添加：
-    PANEL_CONFIG: PANEL_CONFIG,
     // 缓存数据
     cache: {
         totalRows: 0,
@@ -115,30 +57,104 @@ export const BGM = {
     // 错误级别常量
     ERROR_LEVELS: ERROR_LEVELS,
     // 错误级别枚举
-    ErrorLevel: ERROR_LEVELS,
+    ErrorLevel: ErrorLevel,
     // BGM 错误类
     BgmError: BgmError,
     // 统一对话框
-    Dialog: DialogAdapter,
+    Dialog: {
+        alert: function (title, message) {
+            if (typeof window !== 'undefined' && window.BGMDialog !== undefined) {
+                window.BGMDialog.alert(title, message);
+            }
+            else if (typeof window !== 'undefined' && typeof window.BGMAlert === 'function') {
+                window.BGMAlert(message, title);
+            }
+            else if (typeof window !== 'undefined') {
+                window.alert(message);
+            }
+        },
+        confirm: function (message, onConfirm, onCancel) {
+            if (typeof window !== 'undefined' && window.BGMDialog !== undefined) {
+                window.BGMDialog.confirm(message, onConfirm, onCancel);
+            }
+            else if (typeof window !== 'undefined' && typeof window.BGMConfirm === 'function') {
+                window.BGMConfirm(message, '确认', onConfirm, onCancel);
+            }
+            else if (typeof window !== 'undefined') {
+                if (window.confirm(message)) {
+                    if (onConfirm)
+                        onConfirm();
+                }
+                else {
+                    if (onCancel)
+                        onCancel();
+                }
+            }
+        },
+        error: function (title, message) {
+            if (typeof window !== 'undefined' && window.BGMDialog !== undefined) {
+                window.BGMDialog.error(title, message);
+            }
+            else if (typeof window !== 'undefined' && typeof window.BGMError === 'function') {
+                window.BGMError(message, title);
+            }
+            else if (typeof window !== 'undefined') {
+                window.alert('[错误] ' + message);
+            }
+        },
+        input: function (title, prompt, defaultValue, onOk, onCancel) {
+            if (typeof window !== 'undefined' && window.BGMDialog !== undefined) {
+                window.BGMDialog.input(title, prompt, defaultValue || '', onOk, onCancel);
+            }
+            else if (typeof window !== 'undefined' && typeof window.BGMInput === 'function') {
+                window.BGMInput(title, prompt, defaultValue || '', onOk, onCancel);
+            }
+            else if (typeof window !== 'undefined') {
+                const result = window.prompt(prompt, defaultValue);
+                if (result !== null) {
+                    if (onOk)
+                        onOk(result);
+                }
+                else {
+                    if (onCancel)
+                        onCancel();
+                }
+            }
+        },
+        show: function (type, title, message, options) {
+            if (typeof window !== 'undefined' && window.BGMDialog !== undefined) {
+                window.BGMDialog.show(type, title, message, options);
+            }
+            else {
+                switch (type) {
+                    case 'error':
+                        this.error(title, message);
+                        break;
+                    case 'confirm':
+                        this.confirm(message, options?.onConfirm, options?.onCancel);
+                        break;
+                    case 'input':
+                        this.input(title, message, options?.defaultValue, options?.onOk, options?.onCancel);
+                        break;
+                    default:
+                        this.alert(title, message);
+                }
+            }
+        }
+    },
     // 统一消息通信
     Message: {
         send: function (data, targetOrigin) {
             try {
                 if (typeof window !== 'undefined' && window.parent && window.parent !== window) {
-                    const origin = targetOrigin || (typeof window !== 'undefined' ? window.location.origin : '*');
-                        if (!targetOrigin && origin === '*') {
-                                if (typeof bgmLog === 'function') {
-                                  bgmLog(LOG_LEVELS?.WARN ?? 2, 'postMessage 使用通配符 *，存在安全风险');
-                                }
-                        }
-                        window.parent.postMessage(data, origin);
+                    window.parent.postMessage(data, targetOrigin || "*");
                     return true;
                 }
             }
             catch (e) {
                 const err = e;
                 if (typeof bgmLog === 'function') {
-                    bgmLog(LOG_LEVELS?.DEBUG || 0, "postMessage \u4E0D\u53EF\u7528: " + err.message);
+                    bgmLog(LOG_LEVELS?.DEBUG || 0, "postMessage 不可用: " + err.message);
                 }
             }
             return false;
@@ -197,7 +213,7 @@ export const BGM = {
             case ErrorLevel.ERROR:
                 bgmLog(LOG_LEVELS.ERROR, bgmError.toString());
                 if (opts.showDialog) {
-                    BGM.showDialog('\u9519\u8BEF', bgmError.message);
+                    BGM.showDialog('错误', bgmError.message);
                 }
                 break;
             case ErrorLevel.THROW:
@@ -280,7 +296,7 @@ export function getCell(ws, row, col) {
     }
 }
 /**
- * 安全获取单元格值（基础版，1种读取方式）
+ * 安全获取单元格值
  */
 export function getCellValue(ws, row, col) {
     try {
@@ -292,130 +308,9 @@ export function getCellValue(ws, row, col) {
     }
     catch (e) {
         const err = e;
-        bgmLog(LOG_LEVELS.WARN, "getCellValue \u5931\u8D25: " + err.message);
+        bgmLog(LOG_LEVELS.WARN, "getCellValue 失败: " + err.message);
     }
     return "";
-}
-// 缓存最佳读取器，首次调用时自动探测
-let bestReader = null;
-
-function detectBestReader(ws) {
-  const colLetter = colNumToLetter(1);
-  const cellRef = colLetter + '1';
-
-  // 按性能排序的候选读取方式
-  const candidates = [
-    {
-      name: 'Range.Value2',
-      test: () => ws.Range?.(cellRef)?.Value2,
-      read: (r, c) => {
-        const v = ws.Range(colNumToLetter(c) + r)?.Value2;
-        return v != null && v !== '' ? String(v) : '';
-      }
-    },
-    {
-      name: 'Range.Value',
-      test: () => {
-        const cell = ws.Range?.(cellRef);
-        let v = cell?.Value;
-        if (typeof v === 'function') v = v();
-        return v;
-      },
-      read: (r, c) => {
-        const cell = ws.Range(colNumToLetter(c) + r);
-        let v = cell?.Value;
-        if (typeof v === 'function') v = v();
-        return v != null && v !== '' ? String(v) : '';
-      }
-    },
-    {
-      name: 'Cells.Value2',
-      test: () => ws.Cells?.(1, 1)?.Value2,
-      read: (r, c) => {
-        const v = ws.Cells(r, c)?.Value2;
-        return v != null && v !== '' ? String(v) : '';
-      }
-    },
-    {
-      name: 'Cells.Item.Value',
-      test: () => {
-        const cell = ws.Cells?.Item?.(1, 1);
-        let v = cell?.Value;
-        if (typeof v === 'function') v = v();
-        return v;
-      },
-      read: (r, c) => {
-        const cell = ws.Cells.Item(r, c);
-        let v = cell?.Value;
-        if (typeof v === 'function') v = v();
-        return v != null && v !== '' ? String(v) : '';
-      }
-    },
-    {
-      name: 'Cells.Value',
-      test: () => {
-        let v = ws.Cells?.(1, 1)?.Value;
-        if (typeof v === 'function') v = v();
-        return v;
-      },
-      read: (r, c) => {
-        let v = ws.Cells(r, c)?.Value;
-        if (typeof v === 'function') v = v();
-        return v != null && v !== '' ? String(v) : '';
-      }
-    }
-  ];
-
-  for (const candidate of candidates) {
-    try {
-      candidate.test();
-      return (rIdx, colIdx) => {
-        try {
-          return candidate.read(rIdx, colIdx);
-        } catch {
-          return '';
-        }
-      };
-    } catch {
-      continue;
-    }
-  }
-
-  // 完全回退
-  return (rIdx, colIdx) => {
-    const cl = colNumToLetter(colIdx);
-    try { const v = ws.Range(cl + rIdx)?.Value2; if (v != null && v !== '') return String(v); } catch {}
-    try {
-      const cell = ws.Range(cl + rIdx);
-      let v = cell?.Value; if (typeof v === 'function') v = v();
-      if (v != null && v !== '') return String(v);
-    } catch {}
-    try { const v = ws.Cells(rIdx, colIdx)?.Value2; if (v != null && v !== '') return String(v); } catch {}
-    try {
-      const cell = ws.Cells.Item(rIdx, colIdx);
-      let v = cell?.Value; if (typeof v === 'function') v = v();
-      if (v != null && v !== '') return String(v);
-    } catch {}
-    try {
-      let v = ws.Cells(rIdx, colIdx)?.Value;
-      if (typeof v === 'function') v = v();
-      if (v != null && v !== '') return String(v);
-    } catch {}
-    return '';
-  };
-}
-
-
-
-
-/**
- * WPS COM 兼容读取单元格值（自动选择最快方式）
- */
-export function readCell(ws, row, col) {
-  if (!bestReader) {
-    bestReader = detectBestReader(ws);
-  }
-  return bestReader(ws, row, col);
 }
 /**
  * 设置单元格值
@@ -424,14 +319,14 @@ export function setCellValue(ws, row, col, value) {
     try {
         const cell = getCell(ws, row, col);
         if (!cell) {
-            console.error("setCellValue - \u65E0\u6CD5\u83B7\u53D6\u5355\u5143\u683C:", row, col);
+            console.error("setCellValue - 无法获取单元格:", row, col);
             return false;
         }
         cell.Value = value;
         return true;
     }
     catch (e) {
-        console.error("setCellValue error (\u884C:", row, "\u5217:", col, "):", e);
+        console.error("setCellValue error (行:", row, "列:", col, "):", e);
     }
     return false;
 }
@@ -515,41 +410,46 @@ export function _getUserApiPath() {
     return BGM.cache.userId ? String(BGM.cache.userId) : "-";
 }
 /**
- * 获取 Bangumi 当前登录用户信息（返回 Promise）
+ * 获取 Bangumi 当前登录用户信息
  */
-export function fetchBgmUserInfo() {
-  return new Promise((resolve) => {
+export function _fetchBgmUserInfo(callback) {
     const token = loadBgToken();
-    if (!token) return resolve(null);
-
+    if (!token) {
+        if (callback)
+            callback(null);
+        return;
+    }
     const xhr = new XMLHttpRequest();
-    xhr.open('GET', BGM_CONFIG.API_BASE + '/me', true);
-    xhr.setRequestHeader('Authorization', 'Bearer ' + token);
-
-    xhr.onload = () => {
-      if (xhr.status === 200) {
-        try {
-          const data = JSON.parse(xhr.responseText);
-          const userId = String(data.id || data.user_id || '');
-          const username = String(data.username || data.user_name || data.name || '');
-          BGM.cache.userId = userId;
-          BGM.cache.username = username;
-          bgmLog(LOG_LEVELS.DEBUG, `fetchBgmUserInfo: userId=${userId}`);
-          resolve({ id: userId, username });
-        } catch {
-          resolve(null);
+    xhr.open("GET", BGM_CONFIG.API_BASE + "/me", true);
+    xhr.setRequestHeader("Authorization", "Bearer " + token);
+    xhr.onload = function () {
+        if (xhr.status === 200) {
+            try {
+                const data = JSON.parse(xhr.responseText);
+                const userId = String(data.id || data.user_id || '');
+                const username = String(data.username || data.user_name || data.name || '');
+                BGM.cache.userId = userId;
+                BGM.cache.username = username;
+                bgmLog(LOG_LEVELS.DEBUG, "_fetchBgmUserInfo: userId=" + userId);
+                if (callback)
+                    callback({ id: userId, username: username });
+            }
+            catch {
+                if (callback)
+                    callback(null);
+            }
         }
-      } else {
-        resolve(null);
-      }
+        else {
+            if (callback)
+                callback(null);
+        }
     };
-
-    xhr.onerror = () => resolve(null);
+    xhr.onerror = function () {
+        if (callback)
+            callback(null);
+    };
     xhr.send();
-  });
 }
-
-
 // ========== 辅助函数 ==========
 /**
  * 通过 WPS 提供的接口执行脚本
@@ -583,10 +483,10 @@ export function showBangumiPanel() {
     const app = getApp();
     if (!app) {
         if (typeof window !== 'undefined' && typeof window.BGMError === 'function') {
-            window.BGMError("\u65E0\u6CD5\u83B7\u53D6 WPS Application \u5BF9\u8C61！", "\u9519\u8BEF");
+            window.BGMError("无法获取 WPS Application 对象！", "错误");
         }
         else if (typeof window !== 'undefined') {
-            window.alert("\u65E0\u6CD5\u83B7\u53D6 WPS Application \u5BF9\u8C61！");
+            window.alert("无法获取 WPS Application 对象！");
         }
         return;
     }
@@ -622,7 +522,7 @@ export function wpsPrompt(message, defaultValue) {
         const app = getApp();
         if (app?.InputBox) {
             try {
-                const result = app.InputBox(message, "Bangumi \u8BBE\u7F6E", defaultValue || "", 2);
+                const result = app.InputBox(message, "Bangumi 设置", defaultValue || "", 2);
                 if (result === false || result === null || result === undefined) {
                     resolve(null);
                     return;
@@ -631,11 +531,11 @@ export function wpsPrompt(message, defaultValue) {
                 return;
             }
             catch (e) {
-                console.warn("WPS InputBox \u4E0D\u53EF\u7528:", e.message);
+                console.warn("WPS InputBox 不可用:", e.message);
             }
         }
         if (typeof window !== 'undefined' && typeof window.BGMInput === 'function') {
-            window.BGMInput("\u8F93\u5165", message, defaultValue || '', (value) => {
+            window.BGMInput("输入", message, defaultValue || '', (value) => {
                 resolve(value);
             }, () => {
                 resolve(null);
@@ -647,7 +547,7 @@ export function wpsPrompt(message, defaultValue) {
                 resolve(result);
             }
             catch (e) {
-                console.error("prompt \u4E5F\u4E0D\u53EF\u7528:", e.message);
+                console.error("prompt 也不可用:", e.message);
                 resolve(null);
             }
         }
@@ -666,12 +566,12 @@ export function wpsMsgBox(message, buttons, icon) {
                 return;
             }
             catch (e) {
-                console.warn("WPS MessageBox \u4E0D\u53EF\u7528:", e.message);
+                console.warn("WPS MessageBox 不可用:", e.message);
             }
         }
         if (buttons === 4) {
             if (typeof window !== 'undefined' && typeof window.BGMConfirm === 'function') {
-                window.BGMConfirm(message, "\u786E\u8BA4", () => {
+                window.BGMConfirm(message, "确认", () => {
                     resolve(6);
                 }, () => {
                     resolve(7);
@@ -683,7 +583,7 @@ export function wpsMsgBox(message, buttons, icon) {
         }
         else {
             if (typeof window !== 'undefined' && typeof window.BGMAlert === 'function') {
-                window.BGMAlert(message, "\u63D0\u793A", () => {
+                window.BGMAlert(message, "提示", () => {
                     resolve(1);
                 });
             }
@@ -694,22 +594,35 @@ export function wpsMsgBox(message, buttons, icon) {
         }
     });
 }
-
 /**
- * 异步延迟（不阻塞 UI）
+ * 延迟执行
  */
-export async function sleep(ms) {
-  const app = getApp();
-  if (app?.Wait) {
+export function sleep(ms) {
     try {
-      const waitUntil = new Date(Date.now() + ms);
-      app.Wait(waitUntil);
-      return;
-    } catch {
-      // 回退到 setTimeout
+        const app = getApp();
+        if (app?.Wait) {
+            const waitTime = new Date(Date.now() + ms);
+            app.Wait(waitTime);
+            return;
+        }
     }
-  }
-  return new Promise(resolve => setTimeout(resolve, ms));
+    catch (e) {
+        bgmLog(LOG_LEVELS.WARN, "sleep app.Wait 失败: " + e.message);
+    }
+    const end = Date.now() + ms;
+    while (Date.now() < end) {
+        try {
+            const app = getApp();
+            if (app?.DoEvents)
+                app.DoEvents();
+        }
+        catch (e) {
+            if (typeof bgmLog === 'function') {
+                bgmLog(LOG_LEVELS?.DEBUG || 0, "sleep DoEvents 失败: " + e.message);
+            }
+            break;
+        }
+    }
 }
 /**
  * 显示自定义提示对话框
@@ -771,7 +684,6 @@ if (typeof window !== 'undefined') {
     win.colNumToLetter = colNumToLetter;
     win.getCell = getCell;
     win.getCellValue = getCellValue;
-    win.readCell = readCell;
     win.setCellValue = setCellValue;
     win.getSheetByIndex = getSheetByIndex;
     win.escapeHtml = escapeHtml;
@@ -781,7 +693,7 @@ if (typeof window !== 'undefined') {
     win._setBgmUserId = _setBgmUserId;
     win._getBgmUserId = _getBgmUserId;
     win._getUserApiPath = _getUserApiPath;
-    win.fetchBgmUserInfo = fetchBgmUserInfo;
+    win._fetchBgmUserInfo = _fetchBgmUserInfo;
     win.showAlertDialog = showAlertDialog;
     win.closeAlertDialog = closeAlertDialog;
     win.shellExecuteByOAAssist = shellExecuteByOAAssist;
