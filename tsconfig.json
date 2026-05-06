@@ -18,13 +18,18 @@
     "declaration": true,
     "declarationMap": true,
     "sourceMap": true,
-    "outDir": "./dist",
+    "outDir": "./dist-types",  // 改为不同的目录，避免与 Vite 输出冲突
+    "rootDir": "./js",  // 指定源代码根目录
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["./js/*"]
+    },
     "resolveJsonModule": true,
     "isolatedModules": true,
     "allowSyntheticDefaultImports": true,
-    "typeRoots": ["./node_modules/@types", "./js/@types", "./js/types"],
+    "typeRoots": ["./node_modules/@types", "./js/@types"],
     "types": []
   },
-  "include": ["js/**/*"],
-  "exclude": ["node_modules", "dist", "**/*.spec.ts"]
+  "include": ["js/**/*", "vite-env.d.ts"],
+  "exclude": ["node_modules", "dist", "dist-types", "**/*.spec.ts"]
 }
