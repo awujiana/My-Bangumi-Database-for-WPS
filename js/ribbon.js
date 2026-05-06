@@ -8,7 +8,7 @@
 import { WPS_Enum } from './util.js';
 import { getApp, loadBgToken, showBangumiPanel } from './util.js';
 import { SyncToBangumi, openUserCollection, clearRowColors, testTokenValidityForRibbon } from './bangumi.js';
-import { showTokenDialog, showUserIdDialog } from './ui/dialog.js';
+import { showTokenDialog, showUserIdDialog } from './ui/handlers.js';
 
 // ========== Ribbon 回调 ==========
 

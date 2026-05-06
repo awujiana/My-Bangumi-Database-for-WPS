@@ -1,15 +1,148 @@
 /**
  * UI 事件处理模块
  * @module ui/handlers
- * @description 面板操作处理、按钮绑定、事件处理
+ * @description 面板操作处理、按钮绑定、业务对话框
  */
 
-import { bgmLog, BGM, LOG_LEVELS, loadBgToken, _getBgmUserId } from '../util.js';
-import { showAlert, showTokenDialog, showUserIdDialog } from './dialog.js';
+import { bgmLog, BGM, LOG_LEVELS, loadBgToken, storeBgToken, _getBgmUserId, _setBgmUserId } from '../util.js';
+import { showAlert, showConfirm, showError, showSuccess, showInput, showConfirmDialog, showToast } from './dialog.js';
 import { setSyncRunning, setStatus } from './message.js';
 import { handleError } from '../core/unified.js';
 
+// ========== 业务对话框函数 ==========
+
+/**
+ * 显示 Token 设置对话框
+ */
+export function showTokenDialog(currentToken) {
+    let defaultVal = currentToken || loadBgToken() || "";
+    showInput("设置 Bangumi Access Token", "请输入 Access Token", defaultVal, (value) => {
+        if (value) {
+            storeBgToken(value);
+            updateTokenStatus();
+            showToast("Token 已保存", "success");
+            BGM.postMessage({ type: "tokenUpdated" });
+        }
+    });
+}
+
+/**
+ * 显示用户ID设置对话框
+ */
+export function showUserIdDialog() {
+    let currentId = _getBgmUserId() || "";
+    showInput("设置 Bangumi 用户ID", "请输入用户ID（数字）", currentId, (value) => {
+        if (value && value.trim() !== "") {
+            _setBgmUserId(value.trim());
+            updateUserIdStatus();
+            showToast("用户ID 已保存", "success");
+            BGM.postMessage({ type: "userIdUpdated" });
+        }
+    });
+}
+
+/**
+ * 更新 Token 状态显示
+ */
+export function updateTokenStatus() {
+    let tokenStatus = document.getElementById("tokenStatus");
+    if (!tokenStatus) return;
+    
+    let token = loadBgToken();
+    if (token && token.length > 10) {
+        tokenStatus.style.color = "#4CAF50";
+        tokenStatus.textContent = "已设置 (" + token.substring(0, 4) + "...)";
+        
+        if (typeof _fetchBgmUserInfo === 'function') {
+            _fetchBgmUserInfo(function(userInfo) {
+                if (userInfo && userInfo.username) {
+                    tokenStatus.textContent = "已设置: " + userInfo.username;
+                    updateUserIdStatus();
+                }
+            });
+        }
+    } else {
+        tokenStatus.textContent = "未设置";
+        tokenStatus.style.color = "#f44336";
+        BGM.cache.userId = null;
+        BGM.cache.username = null;
+    }
+}
+
+/**
+ * 更新用户ID状态显示
+ */
+export function updateUserIdStatus() {
+    let userIdStatus = document.getElementById("userIdStatus");
+    if (!userIdStatus) return;
+    
+    let userId = _getBgmUserId();
+    if (userId) {
+        let display = BGM.cache.username ? BGM.cache.username + " (" + userId + ")" : userId;
+        userIdStatus.textContent = "已设置: " + display;
+        userIdStatus.style.color = "#4CAF50";
+    } else {
+        userIdStatus.textContent = "未设置";
+        userIdStatus.style.color = "#f44336";
+    }
+}
+
+/**
+ * 打开用户收藏页面
+ */
+export function openUserCollection() {
+    var userId = _getBgmUserId();
+    if (!userId) {
+        showAlert("请先设置用户ID");
+        return;
+    }
+    window.open('https://bgm.tv/user/' + userId + '/collection', '_blank');
+}
+
+/**
+ * 测试 Token 有效性
+ */
+export function testTokenValidity() {
+    var token = loadBgToken();
+    if (!token) {
+        showAlert("请先设置 Token");
+        return;
+    }
+    var xhr = new XMLHttpRequest();
+    xhr.open('GET', 'https://api.bgm.tv/v0/me', true);
+    xhr.setRequestHeader('Authorization', 'Bearer ' + token);
+    xhr.onload = function() {
+        if (xhr.status === 200) {
+            try {
+                var data = JSON.parse(xhr.responseText);
+                var username = data.username || data.nickname || '未知用户';
+                showSuccess('Token 有效', '用户: ' + username);
+            } catch (e) {
+                showError("解析失败", "无法解析响应数据");
+            }
+        } else if (xhr.status === 401) {
+            showError("Token 无效", "Access Token 已过期或无效");
+        }
+    };
+    xhr.onerror = function() {
+        showError("网络错误", "无法连接到 Bangumi API");
+    };
+    xhr.send();
+}
+
+/**
+ * 测试调试连接
+ */
+export function testDebugConnection() {
+    if (typeof window.Application !== 'undefined') {
+        showToast('调试连接正常', 'success');
+    } else {
+        showToast('调试连接失败', 'error');
+    }
+}
+
 // ========== 面板操作处理 ==========
+
 /**
  * 处理面板操作
  */
@@ -24,21 +157,17 @@ export function onAction(action) {
             }
             break;
         case "clear":
-            if (typeof showConfirmDialog === 'function') {
-                showConfirmDialog("确定要清除所有标记吗？", () => {
-                    if (typeof clearRowColors === 'function') {
-                        clearRowColors();
-                    }
-                    if (typeof refreshData === 'function') {
-                        refreshData();
-                    }
-                });
-            }
+            showConfirmDialog("确定要清除所有标记吗？", () => {
+                if (typeof clearRowColors === 'function') {
+                    clearRowColors();
+                }
+                if (typeof refreshData === 'function') {
+                    refreshData();
+                }
+            });
             break;
         case "setToken":
-            if (typeof showTokenDialog === 'function') {
-                showTokenDialog(loadBgToken() || "");
-            }
+            showTokenDialog(loadBgToken() || "");
             break;
         case "preview":
             if (typeof previewSyncContent === 'function') {
@@ -46,36 +175,29 @@ export function onAction(action) {
             }
             break;
         case "showUserIdDialog":
-            if (typeof showUserIdDialog === 'function') {
-                showUserIdDialog();
-            }
+            showUserIdDialog();
             break;
         case "showClearConfirm":
-            if (typeof showConfirmDialog === 'function') {
-                showConfirmDialog("确定要清除所有标记吗？", () => {
-                    if (typeof clearRowColors === 'function') {
-                        clearRowColors();
-                    }
-                    if (typeof refreshData === 'function') {
-                        refreshData();
-                    }
-                });
-            }
+            showConfirmDialog("确定要清除所有标记吗？", () => {
+                if (typeof clearRowColors === 'function') {
+                    clearRowColors();
+                }
+                if (typeof refreshData === 'function') {
+                    refreshData();
+                }
+            });
             break;
         case "tokenUpdated":
-            if (typeof updateTokenStatus === 'function') {
-                updateTokenStatus();
-            }
+            updateTokenStatus();
             break;
         case "userIdUpdated":
-            if (typeof updateUserIdStatus === 'function') {
-                updateUserIdStatus();
-            }
+            updateUserIdStatus();
             break;
     }
 }
 
 // ========== 从面板同步 ==========
+
 /**
  * 从面板执行同步
  */
@@ -138,6 +260,7 @@ export function testSingleUpdateFromPanel() {
 }
 
 // ========== 从BGM同步收藏标记 ==========
+
 /**
  * 从BGM同步收藏标记
  */
@@ -209,7 +332,6 @@ export function syncFromBgmByAPI(sheetIndex) {
  *   markUploadedItems(sheetName) - 传工作表名称，自动获取收藏数据后标记
  */
 export function markUploadedItems(sheetIndexOrName, collections) {
-    // 如果只传了一个字符串参数，视为工作表名称
     if (typeof sheetIndexOrName === 'string' && collections === undefined) {
         let sheetName = sheetIndexOrName;
         let token = loadBgToken();
@@ -222,7 +344,6 @@ export function markUploadedItems(sheetIndexOrName, collections) {
             showAlert("请先设置用户ID！");
             return;
         }
-        // 查找工作表索引
         let getApp = (typeof window.getApp === 'function') ? window.getApp : null;
         let app = getApp ? getApp() : null;
         let targetIndex = null;
@@ -239,22 +360,18 @@ export function markUploadedItems(sheetIndexOrName, collections) {
             showAlert('未找到工作表: ' + sheetName);
             return;
         }
-        // 获取收藏数据后标记
         if (typeof fetchAllUserCollections === 'function') {
             fetchAllUserCollections(token, userId, (cols) => {
                 if (cols && cols.length > 0) {
                     if (typeof markUploadedItemsInSheet === 'function') {
                         markUploadedItemsInSheet(targetIndex, cols);
-                        if (typeof showToast === 'function') {
-                            showToast('已标记 ' + cols.length + ' 条收藏到 ' + sheetName, 'success');
-                        }
+                        showToast('已标记 ' + cols.length + ' 条收藏到 ' + sheetName, 'success');
                     }
                 }
             });
         }
         return;
     }
-    // 正常调用：sheetIndex, collections
     if (typeof markUploadedItemsInSheet === 'function') {
         markUploadedItemsInSheet(sheetIndexOrName, collections);
     }
@@ -262,12 +379,10 @@ export function markUploadedItems(sheetIndexOrName, collections) {
 
 /**
  * 清除工作表标记
- * 支持按名称或按索引清除
  */
 export function clearSheetMarks(sheetIndexOrName) {
     if (typeof clearSheetMarksInSheet !== 'function') return;
 
-    // 如果传的是字符串，按名称查找工作表索引
     if (typeof sheetIndexOrName === 'string') {
         let getApp = (typeof window.getApp === 'function') ? window.getApp : null;
         let app = getApp ? getApp() : null;
@@ -282,7 +397,6 @@ export function clearSheetMarks(sheetIndexOrName) {
         }
         return;
     }
-    // 数字索引，直接调用
     clearSheetMarksInSheet(sheetIndexOrName);
 }
 
@@ -294,15 +408,19 @@ window.syncFromBgmByAPI = syncFromBgmByAPI;
 window.markUploadedItems = markUploadedItems;
 window.clearSheetMarks = clearSheetMarks;
 window.testSingleUpdateFromPanel = testSingleUpdateFromPanel;
+window.showTokenDialog = showTokenDialog;
+window.showUserIdDialog = showUserIdDialog;
+window.updateTokenStatus = updateTokenStatus;
+window.updateUserIdStatus = updateUserIdStatus;
+window.openUserCollection = openUserCollection;
+window.testTokenValidity = testTokenValidity;
+window.testDebugConnection = testDebugConnection;
 
 // ========== 事件监听器（替代内联 onclick）==========
 function setupButtonListeners() {
-    // 查找所有带 data-action 属性的按钮
     const buttons = document.querySelectorAll('[data-action]');
     buttons.forEach(button => {
-        // 移除旧的事件监听器（防止重复绑定）
         button.removeEventListener('click', handleActionClick);
-        // 添加新的事件监听器
         button.addEventListener('click', handleActionClick);
     });
 }
@@ -317,24 +435,16 @@ function handleActionClick(event) {
 
     switch (action) {
         case 'showTokenDialog':
-            if (typeof showTokenDialog === 'function') {
-                showTokenDialog(loadBgToken() || "");
-            }
+            showTokenDialog(loadBgToken() || "");
             break;
         case 'testToken':
-            if (typeof testTokenValidity === 'function') {
-                testTokenValidity();
-            }
+            testTokenValidity();
             break;
         case 'showUserIdDialog':
-            if (typeof showUserIdDialog === 'function') {
-                showUserIdDialog();
-            }
+            showUserIdDialog();
             break;
         case 'openUserCollection':
-            if (typeof openUserCollection === 'function') {
-                openUserCollection();
-            }
+            openUserCollection();
             break;
         case 'sync':
             syncFromPanel();
@@ -345,13 +455,11 @@ function handleActionClick(event) {
             }
             break;
         case 'clear':
-            if (typeof showConfirmDialog === 'function') {
-                showConfirmDialog("确定要清除所有标记吗？", () => {
-                    if (typeof clearRowColors === 'function') {
-                        clearRowColors();
-                    }
-                });
-            }
+            showConfirmDialog("确定要清除所有标记吗？", () => {
+                if (typeof clearRowColors === 'function') {
+                    clearRowColors();
+                }
+            });
             break;
         case 'preview':
             if (typeof previewSyncContent === 'function') {
@@ -363,7 +471,6 @@ function handleActionClick(event) {
     }
 }
 
-// 等待 DOM 加载完成后设置事件监听器
 function initEventListeners() {
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', () => {
@@ -374,5 +481,4 @@ function initEventListeners() {
     }
 }
 
-// 初始化
 initEventListeners();

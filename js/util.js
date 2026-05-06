@@ -17,7 +17,7 @@ var ErrorLevel;
     ErrorLevel[ErrorLevel["THROW"] = 3] = "THROW";
 })(ErrorLevel || (ErrorLevel = {}));
 /** BGM 错误类（统一定义，unified.js 不再重复定义）*/
-class BgmError extends Error {
+export class BgmError extends Error {
     constructor(message, code = 'UNKNOWN', details = {}) {
         super(message);
         this.name = 'BgmError';

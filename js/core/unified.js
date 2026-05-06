@@ -216,7 +216,8 @@ export const sendToTaskpane = Message.send.bind(Message);
 /**
  * 错误类（统一定义在 util.js 中，此处重新导出）
  */
-export { BgmError } from '../util.js';
+import { BgmError } from '../util.js';
+export { BgmError };
 
 /**
  * 统一错误处理函数

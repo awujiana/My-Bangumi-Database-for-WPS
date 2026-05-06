@@ -8,12 +8,13 @@ import { BGM } from './util.js';
 import { getApp } from './util.js';
 import { initMessageListener, setSyncRunning, setStatus } from './ui/message.js';
 import { 
-    markUploadedItems, clearSheetMarks
+    markUploadedItems, clearSheetMarks,
+    updateTokenStatus, updateUserIdStatus,
+    showTokenDialog, showUserIdDialog
 } from './ui/handlers.js';
 import { 
-    updateTokenStatus, updateUserIdStatus, 
     showAlert, closeAlertDialog, closeInputDialog, closeConfirmDialog,
-    showToast, showTokenDialog, showUserIdDialog
+    showToast
 } from './ui/dialog.js';
 import { previewSyncContent, closeDetailModal } from './ui/preview.js';
 import { clearSyncRecords as _clearSyncRecords } from './syncRecord.js';
