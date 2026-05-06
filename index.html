@@ -8,6 +8,53 @@
     <script type="module" src="./main.js"></script>
     <script type="module" src="./js/functions.js"></script>
     <script>
+        // ========== WPS Ribbon 回调早期占位（模块加载前即需可用）==========
+        // WPS 会在模块加载前就调用 OnAddinLoad/OnAction，因此必须提前占位
+        var _ribbonReady = false;
+        var _pendingActions = [];
+
+        window.OnAddinLoad = function(ribbonUI) {
+            console.log('[BGM] OnAddinLoad 早期调用');
+            // 缓存 ribbonUI 供后续使用
+            if (ribbonUI) {
+                window.__ribbonUI = ribbonUI;
+            }
+            return true;
+        };
+
+        window.OnAction = function(control) {
+            console.log('[BGM] OnAction 早期调用:', control && control.Id);
+            // 如果模块已就绪，直接转发
+            if (_ribbonReady && typeof window._OnActionReal === 'function') {
+                return window._OnActionReal(control);
+            }
+            // 否则暂存，等模块加载后重放
+            _pendingActions.push(control);
+            return true;
+        };
+
+        // 模块就绪后由 ribbon.js 调用此函数完成初始化
+        window._bgmRibbonReady = function(realOnAddinLoad, realOnAction) {
+            window._OnAddinLoadReal = realOnAddinLoad;
+            window._OnActionReal = realOnAction;
+
+            // 用真实实现替换占位
+            window.OnAddinLoad = realOnAddinLoad;
+            window.OnAction = realOnAction;
+
+            // 如果之前 OnAddinLoad 已被调用，用真实实现重新执行
+            if (window.__ribbonUI && realOnAddinLoad) {
+                try { realOnAddinLoad(window.__ribbonUI); } catch(e) { console.error(e); }
+            }
+
+            // 重放暂存的 OnAction 调用
+            var actions = _pendingActions;
+            _pendingActions = [];
+            _ribbonReady = true;
+            actions.forEach(function(ctrl) {
+                try { realOnAction(ctrl); } catch(e) { console.error(e); }
+            });
+        };
         // 调试通知功能：向开发服务器发送请求
         window.onload = function() {
             if (typeof WpsInvoke === "undefined") {
