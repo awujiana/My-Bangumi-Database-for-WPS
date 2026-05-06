@@ -1,12 +1,14 @@
-/**
- * BGM 工具模块
- * @module util
- * @description 提供通用工具函数、常量定义、错误处理等核心功能
- */
-
+import { WPS_ENUM, XL, BGM_CONFIG, BGM_COLOR, LOG_LEVELS, ERROR_LEVELS, PANEL_CONFIG, BGM_SUBJECT_TYPES, SYNC_STATUS } from './core/constants.js';
+import { encryptToken, decryptToken, calcChecksum } from './core/crypto.js';
 import { BgmError, ErrorLevel, type BGMCache, type BGMSheet, type BGMSync, type BGMUserInfo, type DialogOptions, type ErrorOptions } from './types/index.js';
-// 重新导出 ErrorLevel 和 BgmError（向后兼容）
 
+// 重新导出（向后兼容）
+export { BgmError, ErrorLevel };
+export type { BGMCache, BGMSheet, BGMSync, BGMUserInfo, DialogOptions, ErrorOptions };
+
+// ========== 导出常量（向后兼容）==========
+export const WPS_Enum = WPS_ENUM;
+export { XL, BGM_CONFIG, BGM_COLOR, LOG_LEVELS, ERROR_LEVELS, PANEL_CONFIG, BGM_SUBJECT_TYPES, SYNC_STATUS };
 
 
 // ========== BGM 全局命名空间 ==========
@@ -222,16 +224,15 @@ export const BGM: {
         return bgmError;
     },
 
-    // 安全执行函数
-    safeExecute: function<T>(fn: () => T, context?:     
-    string, options?: ErrorOptions): T | BgmError {
-            try {
-                return fn();
-            } catch (error) {
-                return BGM.handleError(error, { context, ...    options } as ErrorOptions);
-            }
+      // 安全执行函数
+    safeExecute: function<T>(fn: () => T, context?: string, options?: ErrorOptions): T | BgmError {
+        try {
+            return fn();
+        } catch (error) {
+            return BGM.handleError(error, { context, ...options } as ErrorOptions);
         }
-    };
+    }
+}
 
 // ========== 日志函数 ==========
 /**

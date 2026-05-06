@@ -4,8 +4,9 @@
  * @description 支持异步请求、进度回调、自动重试、限流处理
  */
 
+import { BGM_CONFIG, LOG_LEVELS } from './core/constants.js';
+import { bgmLog } from './util.js';
 import { Result, BgmError, toSyncResult, type SyncResult } from './types/index.js';
-
 
 // ========== 类型定义 ==========
 export type HttpMethod = 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH';
@@ -46,9 +47,9 @@ function sleep(ms: number): Promise<void> {
 }
 
 /**
- * 从 XMLHttpRequest 响应描述错误信息
+ * 根据 HTTP 状态码返回中文错误描述
  */
-function getErrorMessage(status: number, responseText: string): string {
+function getErrorMessage(status: number): string {
     const statusMessages: Record<number, string> = {
         400: '请求参数错误',
         401: 'Token 无效或已过期',
@@ -93,7 +94,9 @@ export async function httpRequest<T = unknown>(
         validateEndpoint(endpoint);
         validateMethod(method);
     } catch (error) {
-        return Result.fail(error instanceof BgmError ? error : new BgmError(String(error), 'VALIDATION_ERROR'));
+        return Result.fail(
+            error instanceof BgmError ? error : new BgmError(String(error), 'VALIDATION_ERROR')
+        );
     }
 
     const validMethod = validateMethod(method);
@@ -127,11 +130,11 @@ export async function httpRequest<T = unknown>(
             }
 
             // 其他错误: 返回失败 Result
-            const errorMessage = getErrorMessage(response.status, '');
-            const details = {
-                status: response.status,
-                xhr: response.xhr ? { status: response.xhr.status } : undefined
-            };
+            const errorMessage = getErrorMessage(response.status);
+            const details: Record<string, unknown> = { status: response.status };
+            if (response.xhr) {
+                details.xhrStatus = response.xhr.status;
+            }
             return Result.fail(new BgmError(errorMessage, 'HTTP_ERROR', details));
 
         } catch (error) {
@@ -190,7 +193,6 @@ function executeXhrRequest<T>(
                 try {
                     data = JSON.parse(xhr.responseText);
                 } catch {
-                    // 非 JSON 响应，保存原始文本
                     data = xhr.responseText as unknown as T;
                 }
             }
@@ -226,26 +228,37 @@ function executeXhrRequest<T>(
 
 // ========== 便捷方法 ==========
 
-/** GET 请求 */
+/**
+ * GET 请求
+ * @example httpGet<UserInfo>('/v0/me', token)
+ */
 export const httpGet = <T = unknown>(endpoint: string, token?: string) =>
     httpRequest<T>(endpoint, { method: 'GET', token });
 
-/** POST 请求 */
+/**
+ * POST 请求
+ * @example httpPost('/v0/users/123/collections', jsonBody, token)
+ */
 export const httpPost = <T = unknown>(endpoint: string, body: string, token?: string) =>
     httpRequest<T>(endpoint, { method: 'POST', body, token });
 
-/** PUT 请求 */
+/**
+ * PUT 请求
+ */
 export const httpPut = <T = unknown>(endpoint: string, body: string, token?: string) =>
     httpRequest<T>(endpoint, { method: 'PUT', body, token });
 
-/** DELETE 请求 */
+/**
+ * DELETE 请求
+ */
 export const httpDelete = <T = unknown>(endpoint: string, token?: string) =>
     httpRequest<T>(endpoint, { method: 'DELETE', token });
 
-// ========== 同步版本（向后兼容）==========
+// ========== 同步版本（向后兼容） ==========
 
 /**
  * 同步 HTTP 请求（仅用于 WPS COM 环境，不建议在新代码中使用）
+ * @deprecated 使用 httpRequest 异步版本替代
  */
 export function httpRequestSync(
     method: string,
@@ -253,7 +266,7 @@ export function httpRequestSync(
     body: string | null,
     token: string,
     options: { retries?: number } = {}
-): { code: number; message: string } {
+): SyncResult {
     // 输入验证
     try {
         validateEndpoint(endpoint);
@@ -295,14 +308,13 @@ export function httpRequestSync(
                 const delayMs = BGM_CONFIG.RETRY_DELAY_BASE * Math.pow(2, retriesCount - 1);
                 bgmLog(LOG_LEVELS.WARN, `同步请求限流(429)，第 ${retriesCount} 次重试，等待 ${delayMs}ms`);
 
-                // 同步延迟
                 const end = Date.now() + delayMs;
                 while (Date.now() < end) { /* busy wait */ }
                 continue;
             }
 
             // 其他错误
-            const errorMessage = getErrorMessage(xhr.status, xhr.responseText);
+            const errorMessage = getErrorMessage(xhr.status);
             return {
                 code: xhr.status,
                 message: errorMessage + (xhr.responseText ? `: ${xhr.responseText}` : '')

@@ -81,29 +81,11 @@ BGM/
 
 ---
 
-## 4. 🟡 类型系统问题
-
-### 4.1 类型声明分散重复
-
-`BGMUserInfo` 在 **3 个文件** 中独立定义：
-- `js/util.ts:35`
-- `js/types/index.ts:118`
-- `js/@types/bangumi.d.ts`（间接）
-
-`BGMCache`、`BGMSheet`、`BGMSync` 在 `util.ts` 和 `types/index.ts` 各定义一次。
-
-**修复**: 统一在 `types/` 中定义，其他文件 `import type` 引用。
 
 ### 4.2 构建不生成 `.d.ts`
 
 `tsconfig.build.json` 未设置 `declaration: true`，构建产物缺少类型声明文件。实际使用的 `dist/js/util.d.ts` 等是手动维护的，可能与源码不一致。
 
-### 4.3 `window` 全局类型不完整
-
-`js/types/index.ts` 的 `BgmWindow` 接口缺少约 **20 个** 运行时挂载的函数声明：
-- `readCell`, `_bgmRibbonReady`, `OnAddinLoad`, `OnAction`
-- `GetBangumiImage`, `safeCall`, `_modulesReady`
-- `refreshData`, `onAction`, `toggleSheetLock`
 
 ### 4.4 `unknown` 类型过度使用与不安全转换
 

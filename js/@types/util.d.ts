@@ -1,83 +1,59 @@
-/**
- * 工具函数类型定义
- */
-
-/**
- * WPS Excel 枚举值
- */
-export interface WPSEnum {
-  UP: number;
-  DOWN: number;
-  LEFT: number;
-  RIGHT: number;
-}
-
-/**
- * Excel 常量
- */
-export interface XLConstants {
-  UP: number;
-  DOWN: number;
-  LEFT: number;
-  RIGHT: number;
-  NONE: number;
-}
-
-/**
- * BGM 颜色常量
- */
-export interface BGMColor {
-  GRAY: number;
-  WHITE: number;
-  BLACK: number;
-  RED: number;
-  GREEN: number;
-  BLUE: number;
-  YELLOW: number;
-  ORANGE: number;
-  PURPLE: number;
-}
-
-/**
- * 消息数据
- */
-export interface MessageData {
-  type: string;
-  [key: string]: unknown;
-}
-
-/**
- * Token 加密接口
- */
-export interface TokenCrypto {
-  encrypt: (token: string) => Promise<string>;
-  decrypt: (encrypted: string) => Promise<string>;
-}
-
-/**
- * 工具函数接口
- */
-export interface UtilFunctions {
-  // Excel 操作
-  getApp: () => unknown;
-  getCell: (ws: unknown, row: number, col: number) => unknown;
-  getCellValue: (ws: unknown, row: number, col: number) => string | null;
-  setCellValue: (ws: unknown, row: number, col: number, value: unknown) => void;
-  
-  // Token 管理
-  loadBgToken: () => string | null;
-  storeBgToken: (token: string) => void;
-  clearBgToken: () => void;
-  
-  // 用户 ID
-  _getBgmUserId: () => string | null;
-  _setBgmUserId: (id: string) => void;
-  
-  // 工具
-  sleep: (ms: number) => void;
-  bgmLog: (level: number, message: string) => void;
-  colNumToLetter: (col: number) => string;
-  
-  // HTML 转义
-  escapeHtml: (text: string) => string;
-}
+import { XL, BGM_CONFIG, BGM_COLOR, LOG_LEVELS, ERROR_LEVELS, PANEL_CONFIG, BGM_SUBJECT_TYPES, SYNC_STATUS } from '../core/constants.js';
+import { BgmError, ErrorLevel, type BGMCache, type BGMSheet, type BGMSync, type BGMUserInfo, type DialogOptions, type ErrorOptions } from '../types/index.js';
+export { BgmError, ErrorLevel };
+export type { BGMCache, BGMSheet, BGMSync, BGMUserInfo, DialogOptions, ErrorOptions };
+export declare const WPS_Enum: import("../core/constants.js").WPSEnum;
+export { XL, BGM_CONFIG, BGM_COLOR, LOG_LEVELS, ERROR_LEVELS, PANEL_CONFIG, BGM_SUBJECT_TYPES, SYNC_STATUS };
+export declare const BGM: {
+    cache: BGMCache;
+    sheet: BGMSheet;
+    sync: BGMSync;
+    LOG_LEVEL: number;
+    LOG_LEVELS: typeof LOG_LEVELS;
+    ERROR_LEVELS: typeof ERROR_LEVELS;
+    ErrorLevel: typeof ErrorLevel;
+    BgmError: typeof BgmError;
+    Dialog: {
+        alert: (title: string, message: string) => void;
+        confirm: (message: string, onConfirm?: () => void, onCancel?: () => void) => void;
+        error: (title: string, message: string) => void;
+        input: (title: string, prompt: string, defaultValue?: string, onOk?: (value: string) => void, onCancel?: () => void) => void;
+        show: (type: 'alert' | 'confirm' | 'error' | 'input', title: string, message: string, options?: DialogOptions) => void;
+    };
+    Message: {
+        send: (data: Record<string, unknown>, targetOrigin?: string) => boolean;
+        postMessage: (data: Record<string, unknown>, targetOrigin?: string) => boolean;
+    };
+    postMessage: (data: Record<string, unknown>, targetOrigin?: string) => boolean;
+    showDialog: (title: string, message: string) => void;
+    showConfirm: (title: string, message: string, onConfirm?: () => void, onCancel?: () => void) => void;
+    handleError: (error: unknown, options?: ErrorOptions) => BgmError;
+    safeExecute: <T>(fn: () => T, context?: string, options?: ErrorOptions) => T | BgmError;
+};
+export declare function bgmLog(level: number, message: string): void;
+export declare function getApp(): unknown;
+export declare function colNumToLetter(col: number): string;
+export declare function getCell(ws: unknown, row: number, col: number): unknown;
+export declare function getCellValue(ws: unknown, row: number, col: number): string;
+export declare function readCell(ws: unknown, row: number, col: number): string;
+export declare function setCellValue(ws: unknown, row: number, col: number, value: unknown): boolean;
+export declare function getSheetByIndex(sheetIndex: number): unknown;
+export declare function escapeHtml(text: string | null | undefined): string;
+export declare function storeBgToken(token: string): boolean;
+export declare function clearBgToken(): boolean;
+export declare function loadBgToken(): string | null;
+export declare function _setBgmUserId(id: string): void;
+export declare function _getBgmUserId(): string | null;
+export declare function _getUserApiPath(): string;
+export declare function _fetchBgmUserInfo(callback?: (userInfo: BGMUserInfo | null) => void): void;
+export declare function fetchBgmUserInfo(): Promise<BGMUserInfo | null>;
+export declare function shellExecuteByOAAssist(param: string): void;
+export declare function GetUrlPath(): string;
+export declare function showBangumiPanel(): void;
+export declare function trim(str: string | null | undefined): string;
+export declare function wpsPrompt(message: string, defaultValue?: string): Promise<string | null>;
+export declare function wpsMsgBox(message: string, buttons?: number, icon?: number): Promise<number>;
+export declare function sleep(ms: number): void;
+export declare function showAlertDialog(title: string, message: string): void;
+export declare function closeAlertDialog(): void;
+//# sourceMappingURL=util.d.ts.map

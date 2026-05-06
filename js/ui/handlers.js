@@ -10,6 +10,9 @@ import { showAlert, showConfirm, showError, showSuccess, showInput, showConfirmD
 import { setSyncRunning, setStatus } from './message.js';
 import { handleError } from '../core/unified.js';
 import { verifyToken, fetchAllUserCollections } from '../sync/scraping.js';
+import { SyncToBangumi } from '../sync/exceltobangumi.js';
+import { BgmError, ErrorLevel,  BGMUserInfo,  ErrorOptions } from './types/index.js';
+
 
 // ========== 中文文本常量（Unicode 转义，避免 WPS WebView 编码问题）==========
 const _T = {

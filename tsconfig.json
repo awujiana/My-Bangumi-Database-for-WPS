@@ -20,7 +20,6 @@
     "sourceMap": true,
     "outDir": "./dist-types",  // 改为不同的目录，避免与 Vite 输出冲突
     "rootDir": "./js",  // 指定源代码根目录
-    "baseUrl": ".",
     "paths": {
       "@/*": ["./js/*"]
     },

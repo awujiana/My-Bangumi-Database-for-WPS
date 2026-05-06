@@ -1,36 +1,14 @@
 /**
  * BGM 结果类型
  * @module types/result
- * @description 统一的操作结果类型和错误处理，避免错误处理不一致
+ * @description 统一的操作结果类型和错误处理
  */
 
-// ========== 错误级别枚举 ==========
-export const ErrorLevel = {
-    SILENT: 0,
-    WARN: 1,
-    ERROR: 2,
-    THROW: 3
-} as const;
-export type ErrorLevel = typeof ErrorLevel[keyof typeof ErrorLevel];
-
-// ========== 统一的 BGM 错误类 ==========
-/**
- * BGM 统一错误类
- * @extends Error
- */
 export class BgmError extends Error {
-    /** 错误代码（如 'NETWORK_ERROR', 'API_ERROR' 等） */
     code: string;
-    /** 额外错误详情 */
     details: Record<string, any>;
-    /** 错误发生时间 */
     timestamp: string;
 
-    /**
-     * @param message - 错误消息
-     * @param code - 错误代码，默认 'UNKNOWN'
-     * @param details - 额外详情
-     */
     constructor(message: string, code: string = 'UNKNOWN', details: Record<string, any> = {}) {
         super(message);
         this.name = 'BgmError';
@@ -44,9 +22,8 @@ export class BgmError extends Error {
     }
 }
 
-// ========== 向后兼容类型别名 ==========
-/** @deprecated 使用 BgmError 替代 */
 export type BgmResultError = BgmError;
+
 
 // ========== Result 类型 ==========
 /**

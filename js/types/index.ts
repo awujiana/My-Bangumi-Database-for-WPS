@@ -84,7 +84,7 @@ export interface ErrorOptions {
 }
 
 // ========== WPS 窗口扩展接口 ==========
-export interface BgmWindow extends Window {
+export interface BgmWindow {
     // 应用对象
     Application?: unknown;
     WPS_Enum?: unknown;
@@ -160,4 +160,97 @@ export interface BgmWindow extends Window {
 
     // Ribbon UI
     __ribbonUI?: unknown;
+
+
+     /** 安全调用函数（index.html 中使用） */
+    safeCall?: (funcName: string, ...args: unknown[]) => unknown;
+
+    /** 模块就绪标志 */
+    _modulesReady?: boolean;
+
+    /** 面板操作分发 */
+    onAction?: (action: string) => void;
+
+    /** 更新筛选状态 */
+    updateFilterStatus?: (ws?: unknown) => void;
+
+    /** 模式切换处理 */
+    onSelectModeChange?: () => void;
+
+    /** 标记已上传条目（默认工作表） */
+    markUploadedItemsDefault?: () => void;
+
+    /** 清除工作表标记（默认工作表） */
+    clearSheetMarksDefault?: () => void;
+
+    /** 预览同步内容 */
+    filterDetailItems?: (filterType: string) => void;
+
+    /** 上传单行 */
+    uploadSingleRow?: (rowNum: number, btnElement?: HTMLElement) => void;
+
+    /** 更新上传统计 */
+    updateUploadStats?: () => void;
+
+    /** 显示/关闭详情模态框 */
+    showDetailModal?: () => void;
+    closeDetailModal?: () => void;
+
+    /** 查看同步记录详情 */
+    viewSyncRecordDetail?: (sid: string) => void;
+
+    /** 构建预览请求体（兼容旧接口） */
+    buildPreviewPayload?: (ws: unknown, row: number, colMap: Map<string, number>) => string;
+
+    /** 更新详情计数 */
+    updateDetailCount?: (count: number) => void;
+
+    /** 详情预览数据 */
+    detailPreviewData?: {
+        allItems: unknown[];
+        currentFilter: string;
+        totalWithType: number;
+        totalValid: number;
+        totalUploaded: number;
+    };
+
+    /** 打开同步记录工作表 */
+    openSyncRecordSheet?: () => void;
+
+    /** 获取所有同步记录 */
+    getAllSyncRecords?: () => unknown[];
+
+    /** 添加同步记录 */
+    addSyncRecord?: (sheetOrOptions: unknown, record?: unknown) => boolean;
+
+    /** 获取或创建同步记录表 */
+    getOrCreateSyncRecordSheet?: () => unknown;
+
+    /** 获取顺序行（按序列号） */
+    getSequentialRowsBySeqCol?: (startRow: number, endRow: number) => { validRows: number[] };
+
+
 }
+
+export type {
+    WpsApplication,
+    WpsWorkbook,
+    WpsWorksheets,
+    WpsSheets,
+    WpsWorksheet,
+    WpsRows,
+    WpsRow,
+    WpsColumns,
+    WpsRange,
+    WpsAutoFilter,
+    WpsFilters,
+    WpsFilter,
+    WpsInterior,
+    WpsFont,
+    WpsAreas,
+    WpsPluginStorage,
+    WpsOAAssist,
+    WpsTaskPane,
+} from './wps.js';
+
+export { isWpsApp, isWpsWorksheet, isWpsRange } from './wps.js';

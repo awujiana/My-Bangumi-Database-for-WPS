@@ -1,4 +1,4 @@
-import { Result, SyncResult } from './types/result.js';
+import { Result, toSyncResult, type SyncResult } from '../types/index.js';
 export type HttpMethod = 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH';
 export type SyncProgressCallback = (current: number, total: number, message: string) => void;
 export declare function httpRequest<T = unknown>(endpoint: string, options?: {
@@ -31,4 +31,5 @@ export declare const httpDelete: <T = unknown>(endpoint: string, token?: string)
 export declare function httpRequestSync(method: string, endpoint: string, body: string | null, token: string, options?: {
     retries?: number;
 }): SyncResult;
-export { toSyncResult } from './types/result.js';
+export { toSyncResult };
+//# sourceMappingURL=http.d.ts.map
