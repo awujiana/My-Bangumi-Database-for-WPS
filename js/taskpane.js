@@ -24,7 +24,8 @@ import {
 import { previewSyncContent, closeDetailModal, filterDetailItems } from './ui/preview.js';
 import { clearSyncRecords as _clearSyncRecords,
     getOrCreateSyncRecordSheet, getAllSyncRecords, addSyncRecord,
-    openSyncRecordSheet, BGM_SUBJECT_TYPES, formatCurrentTime
+    openSyncRecordSheet, BGM_SUBJECT_TYPES, formatCurrentTime,
+    updateSyncRecord, activateSyncRecordSheet, finalizeSyncRecordBatch
 } from './syncRecord.js';
 import {
     findHeaderRow, getColumnMap, getLastRow, extractSubjectId,

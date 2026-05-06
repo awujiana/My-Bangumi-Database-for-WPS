@@ -303,7 +303,7 @@ export function previewSyncContent() {
     let modalBody = document.getElementById("detailModalBody");
     if (modalToolbar && modalBody) {
         modalToolbar.innerHTML = toolbarHtml;
-        modalBody.innerHTML = statsHtml + itemsData.map(item => item.html).join('');
+        modalBody.innerHTML = statsHtml + '<div id="detailItemsContainer">' + itemsData.map(item => item.html).join('') + '</div>';
         document.getElementById("detailModal").style.display = "flex";
     }
 }
@@ -475,33 +475,46 @@ export function filterDetailItems(filterType) {
         }
     });
 
-    let modalBody = document.getElementById("detailModalBody");
-    if (!modalBody) return;
+    // 隐藏/显示条目
+    let container = document.getElementById("detailItemsContainer");
+    if (!container) return;
 
-    let totalWithType = detailPreviewData.totalWithType || 0;
-    let typeCount = detailPreviewData.typeCount || { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
-
-    let filteredItems = detailPreviewData.allItems;
-    if (filterType !== 'all') {
-        filteredItems = filteredItems.filter(item => item.type === parseInt(filterType));
-    }
-
-    let totalCard = modalBody.querySelector('.stat-card:first-child .stat-value');
-    let uploadCard = modalBody.querySelector('.stat-card:nth-child(2) .stat-value');
-    let validCard = modalBody.querySelector('.stat-card.success .stat-value');
-    if (totalCard) totalCard.textContent = detailPreviewData.allItems.length;
-    if (uploadCard) uploadCard.textContent = filterType === 'all' ? totalWithType : (typeCount[filterType] || 0);
-    if (validCard) validCard.textContent = detailPreviewData.totalValid || 0;
-
-    // 移除并重新添加
-    let allItems = modalBody.querySelectorAll('.detail-item');
-    allItems.forEach(item => item.remove());
-
-    let tempDiv = document.createElement('div');
-    filteredItems.forEach(item => {
-        tempDiv.innerHTML = item.html;
-        modalBody.appendChild(tempDiv.firstElementChild);
+    let items = container.querySelectorAll('.detail-item');
+    let visibleCount = 0;
+    items.forEach(item => {
+        if (filterType === 'all') {
+            item.style.display = '';
+            visibleCount++;
+        } else {
+            let match = item.getAttribute('data-type') === String(filterType);
+            item.style.display = match ? '' : 'none';
+            if (match) visibleCount++;
+        }
     });
+
+    // 更新统计卡片
+    let typeCount = detailPreviewData.typeCount || { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
+    let uploadedCount = detailPreviewData.uploadedCount || { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
+    let modalBody = document.getElementById("detailModalBody");
+
+    let totalCard = modalBody?.querySelector('.stat-card:first-child .stat-value');
+    let pendingCard = modalBody?.querySelector('.stat-card:nth-child(2) .stat-value');
+    let uploadedCard = modalBody?.querySelector('.stat-card:nth-child(3) .stat-value');
+
+    if (totalCard) totalCard.textContent = visibleCount;
+
+    if (filterType === 'all') {
+        let totalWithType = detailPreviewData.totalWithType || 0;
+        let totalUploaded = detailPreviewData.totalUploaded || 0;
+        if (pendingCard) pendingCard.textContent = totalWithType - totalUploaded;
+        if (uploadedCard) uploadedCard.textContent = totalUploaded;
+    } else {
+        let typeNum = parseInt(filterType);
+        let typeTotal = typeCount[typeNum] || 0;
+        let typeUploaded = uploadedCount[typeNum] || 0;
+        if (pendingCard) pendingCard.textContent = typeTotal - typeUploaded;
+        if (uploadedCard) uploadedCard.textContent = typeUploaded;
+    }
 }
 
 // ========== 显示/关闭详情模态框 ==========
