@@ -4,8 +4,12 @@
  * @description 面板初始化、事件绑定、核心逻辑
  */
 
-import { BGM } from './util.js';
-import { getApp, bgmLog, LOG_LEVELS, escapeHtml } from './util.js';
+import { BGM, BGM_CONFIG } from './util.js';
+import { getApp, bgmLog, LOG_LEVELS, escapeHtml,
+    loadBgToken, storeBgToken, clearBgToken,
+    sleep, getCell, getCellValue, trim,
+    _getUserApiPath, _setBgmUserId
+} from './util.js';
 import { initMessageListener, setSyncRunning, setStatus } from './ui/message.js';
 import { 
     markUploadedItems, clearSheetMarks,
@@ -14,10 +18,19 @@ import {
 } from './ui/handlers.js';
 import { 
     showAlert, closeAlertDialog, closeInputDialog, closeConfirmDialog,
-    showToast
+    showToast,
+    showInputDialog, showConfirmDialog
 } from './ui/dialog.js';
-import { previewSyncContent, closeDetailModal } from './ui/preview.js';
-import { clearSyncRecords as _clearSyncRecords } from './syncRecord.js';
+import { previewSyncContent, closeDetailModal, filterDetailItems } from './ui/preview.js';
+import { clearSyncRecords as _clearSyncRecords,
+    getOrCreateSyncRecordSheet, getAllSyncRecords, addSyncRecord,
+    openSyncRecordSheet, BGM_SUBJECT_TYPES, formatCurrentTime
+} from './syncRecord.js';
+import {
+    findHeaderRow, getColumnMap, getLastRow, extractSubjectId,
+    mapWatchStatus, buildJsonPayload, getSequentialRowsBySeqCol,
+    getFilterStatus, clearRowColors, BGM_COLOR, bgmRequestSync
+} from './bangumi.js';
 
 // ========== 工作表锁定功能 ==========
 // 注意：工作表锁定状态已迁移到 BGM.sheet 命名空间
@@ -250,13 +263,11 @@ function refreshData() {
     // \u8BFB\u53D6\u5355\u5143\u683C\u503C\uFF08WPS COM \u517C\u5BB9\uFF09
     function readCell(ws, row, col) {
         try {
-            // \u4F18\u5148 ws.Cells(row, col).Value \u2014\u2014 \u4E0E syncRecord.js \u4E00\u81F4
             let v = ws.Cells(row, col).Value;
             if (typeof v === 'function') v = v();
             if (v !== null && v !== undefined && v !== '') return String(v);
         } catch (_) {}
         try {
-            // \u5907\u7528: ws.Cells.Item(row, col)
             let cell = ws.Cells.Item(row, col);
             if (cell) {
                 let v = cell.Value;
@@ -265,7 +276,6 @@ function refreshData() {
             }
         } catch (_) {}
         try {
-            // \u5907\u7528: ws.Range
             let colLetter = String.fromCharCode(64 + col);
             let cell2 = ws.Range(colLetter + row);
             if (cell2) {
@@ -274,9 +284,24 @@ function refreshData() {
                 if (v !== null && v !== undefined && v !== '') return String(v);
             }
         } catch (_) {}
+        // 备用4: 通过 UsedRange 读取（解决非活动表读取失败问题）
+        try {
+            let usedRange = ws.UsedRange;
+            if (usedRange) {
+                let rIdx = row - usedRange.Row;
+                let cIdx = col - usedRange.Column;
+                if (rIdx >= 0 && rIdx < usedRange.Rows.Count && cIdx >= 0 && cIdx < usedRange.Columns.Count) {
+                    let cell = usedRange.Cells.Item(rIdx + 1, cIdx + 1);
+                    if (cell) {
+                        let v = cell.Value;
+                        if (typeof v === 'function') v = v();
+                        if (v !== null && v !== undefined && v !== '') return String(v);
+                    }
+                }
+            }
+        } catch (_) {}
         return "";
     }
-
     // \u5B9A\u4E49\u8868\u5934\u5173\u952E\u8BCD\uFF08\u8986\u76D6\u7528\u6237\u5B9E\u9645\u8868\u5934 + bangumi.js \u5173\u952E\u8BCD\uFF09
     let scanKeywords = [
         "\u5e8f\u5217\u53f7", "\u662f\u5426\u770b\u5b8c", "\u770b\u5b8c\u65f6\u95f4", "\u5f00\u64ad\u5b63\u5ea6",
@@ -298,9 +323,120 @@ function refreshData() {
         "status": true, "rate": true, "\u522b\u540d": true
     };
 
+    // 诊断：测试 readCell 是否能读取数据，非活动表时临时激活
+    let originalActiveSheet = null;
+    let needRestore = false;
     try {
-        // \u626B\u63CF\u524D 20 \u884C x 35 \u5217\u627E\u8868\u5934
-        for (let r = 1; r <= 20; r++) {
+        let testVal = readCell(ws, 1, 1);
+        bgmLog(LOG_LEVELS.INFO, "refreshData: ws.Name=" + sheetName + ", readCell(1,1)='" + testVal + "'");
+        if (!testVal) {
+            try {
+                let activeWs = app.ActiveWorkbook.ActiveSheet;
+                let activeName = "";
+                try { activeName = activeWs.Name; } catch (_) {}
+                originalActiveSheet = activeWs;
+                bgmLog(LOG_LEVELS.INFO, "refreshData: 非活动表读取失败，临时激活 " + sheetName + " (current=" + activeName + ")");
+                try { ws.Activate(); } catch (_) {}
+                needRestore = true;
+                testVal = readCell(ws, 1, 1);
+                bgmLog(LOG_LEVELS.INFO, "refreshData: 激活后 readCell(1,1)='" + testVal + "'");
+            } catch (e2) {
+                bgmLog(LOG_LEVELS.WARN, "refreshData: 激活失败: " + e2.message);
+            }
+        }
+    } catch (_) {}
+
+    // 检测筛选状态，获取可见行集合（用于跳过隐藏行）
+    let visibleRowSet = null;
+    let isFiltered = false;
+    try {
+        // 兼容 WPS：使用 AutoFilterMode 属性检测（与 updateFilterStatus 一致）
+        let autoFilterMode = false;
+        try { autoFilterMode = !!ws.AutoFilterMode; } catch (_) {}
+        try { if (!autoFilterMode && ws.AutoFilter) autoFilterMode = !!ws.AutoFilter.Mode; } catch (_) {}
+        
+        bgmLog(LOG_LEVELS.INFO, "refreshData: AutoFilterMode=" + autoFilterMode);
+        
+        if (autoFilterMode) {
+            isFiltered = true;
+            let filterStartRow = 1;
+            let autoFilter = null;
+            try {
+                autoFilter = ws.AutoFilter;
+                if (autoFilter && autoFilter.Range) filterStartRow = autoFilter.Range.Row;
+            } catch (_) {}
+            
+            // 检测实际最后行
+            let lastRow = 200;
+            try { lastRow = ws.Cells(ws.Rows.Count, 1).End(-4162).Row; } catch (_) {}
+            if (lastRow < 10) lastRow = 200;
+            let scanEndRow = Math.min(filterStartRow + lastRow + 20, 5000);
+            
+            visibleRowSet = new Set();
+            
+            // 方法1：SpecialCells(12) = xlCellTypeVisible
+            try {
+                let filterRangeStr = "A" + filterStartRow + ":A" + scanEndRow;
+                let visibleCells = ws.Range(filterRangeStr).SpecialCells(12);
+                if (visibleCells) {
+                    let areas = visibleCells.Areas;
+                    for (let a = 1; a <= areas.Count; a++) {
+                        let area = areas.Item(a);
+                        for (let r = 1; r <= area.Rows.Count; r++) {
+                            visibleRowSet.add(area.Rows.Item(r).Row);
+                        }
+                    }
+                }
+                bgmLog(LOG_LEVELS.INFO, "refreshData: SpecialCells 找到可见行=" + visibleRowSet.size);
+            } catch (e) {
+                bgmLog(LOG_LEVELS.WARN, "refreshData: SpecialCells 失败: " + e.message);
+            }
+            
+            // 方法2：逐行检查 Hidden 属性
+            if (visibleRowSet.size === 0) {
+                let visibleCount = 0, hiddenCount = 0;
+                for (let r = filterStartRow; r <= scanEndRow; r++) {
+                    try {
+                        let hidden = false;
+                        try { hidden = ws.Rows(r).Hidden; } catch (_) {}
+                        try { if (!hidden) hidden = ws.Rows.Item(r).Hidden; } catch (_) {}
+                        if (hidden === true) {
+                            hiddenCount++;
+                        } else {
+                            visibleRowSet.add(r);
+                            visibleCount++;
+                        }
+                    } catch (_) {
+                        visibleRowSet.add(r);
+                        visibleCount++;
+                    }
+                }
+                bgmLog(LOG_LEVELS.INFO, "refreshData: Hidden逐行扫描 visible=" + visibleCount + " hidden=" + hiddenCount);
+            }
+            
+            bgmLog(LOG_LEVELS.INFO, "refreshData: 筛选已开启, 可见行数=" + visibleRowSet.size + ", scanRange=" + filterStartRow + "-" + scanEndRow);
+        }
+    } catch (e) {
+        bgmLog(LOG_LEVELS.ERROR, "refreshData: 筛选检测异常: " + e.message);
+    }
+
+    function isRowVisible(r) {
+        return !isFiltered || (visibleRowSet && visibleRowSet.has(r));
+    }
+
+    try {
+        // 扫描前 50 行找表头（筛选模式下只扫描可见行）
+        let rowsToScan = [];
+        if (isFiltered && visibleRowSet) {
+            for (let r = 1; r <= 50; r++) {
+                if (visibleRowSet.has(r)) rowsToScan.push(r);
+            }
+        } else {
+            for (let r = 1; r <= 50; r++) rowsToScan.push(r);
+        }
+
+        for (let ri = 0; ri < rowsToScan.length; ri++) {
+            let r = rowsToScan[ri];
             let matchCount = 0;
             let matchedCol = 0;
             for (let c = 1; c <= 35; c++) {
@@ -309,20 +445,23 @@ function refreshData() {
                 if (scanKeywords.some(kw => cellVal === kw || cellVal.includes(kw))) {
                     matchCount++;
                     matchedCol = c;
-                    if (matchCount >= 3) break; // \u5339\u914D\u5230 3 \u4E2A\u5173\u952E\u8BCD\u5C31\u786E\u8BA4\u662F\u8868\u5934\u884C
+                    if (matchCount >= 3) break; // 匹配到 3 个关键词就确认是表头行
                 }
             }
             if (matchCount >= 3) {
                 foundHeaderRow = r;
-                bgmLog(LOG_LEVELS.INFO, "refreshData: \u627E\u5230\u8868\u5934 \u884C" + r + ", \u5339\u914D" + matchCount + "\u4E2A\u5173\u952E\u8BCD");
+                bgmLog(LOG_LEVELS.INFO, "refreshData: 找到表头 行" + r + ", 匹配" + matchCount + "个关键词");
                 break;
             }
         }
 
-        // \u8C03\u8BD5\uFF1A\u5982\u679C\u672A\u627E\u5230\uFF0C\u8F93\u51FA\u524D5\u884C\u6240\u6709\u5217\u7684\u503C
+        // 调试：如果未找到，输出前几个可见行的内容
         if (!foundHeaderRow) {
             let diagRows = [];
-            for (let r = 1; r <= 5; r++) {
+            let diagLimit = 0;
+            for (let r = 1; r <= 50 && diagLimit < 5; r++) {
+                if (!isRowVisible(r)) continue;
+                diagLimit++;
                 let vals = [];
                 for (let c = 1; c <= 35; c++) {
                     let v = readCell(ws, r, c).trim();
@@ -330,11 +469,11 @@ function refreshData() {
                 }
                 diagRows.push("R" + r + ": {" + vals.join(", ") + "}");
             }
-            bgmLog(LOG_LEVELS.WARN, "refreshData: \u672A\u627E\u5230\u8868\u5934, \u524D5\u884C\u5185\u5BB9: " + diagRows.join(" | "));
+            bgmLog(LOG_LEVELS.WARN, "refreshData: 未找到表头, 可见行内容: " + diagRows.join(" | "));
         }
 
         if (foundHeaderRow > 0) {
-            // \u8BFB\u53D6\u8868\u5934\u884C\uFF0C\u8BB0\u5F55\u5404\u5217\u540D\u79F0\u548C\u91CD\u8981\u6027
+            // 读取表头行，记录各列名称和重要性
             let headerNames = [];
             let headerIsImportant = [];
             for (let c = 1; c <= 35; c++) {
@@ -343,7 +482,7 @@ function refreshData() {
                 headerIsImportant.push(importantCols[v.toLowerCase()] || false);
             }
 
-            // \u6DFB\u52A0\u8868\u5934\u884C\u5230\u9884\u89C8
+            // 添加表头行到预览
             let headerCols = [];
             for (let c = 0; c < headerNames.length; c++) {
                 if (headerNames[c]) headerCols.push({ text: headerNames[c], important: headerIsImportant[c] });
@@ -352,13 +491,14 @@ function refreshData() {
                 previewRows.push({ row: -1, cols: headerCols, isHeader: true });
             }
 
-            // \u8BFB\u53D6\u6570\u636E\u884C\uFF08\u53EA\u8BFB\u53D6\u6709\u8868\u5934\u7684\u5217\uFF09
+            // 读取数据行（只读取有表头的列，跳过隐藏行）
             let dataColCount = 0;
             for (let c = 0; c < headerNames.length; c++) {
                 if (headerNames[c]) dataColCount = c + 1;
             }
 
             for (let dr = foundHeaderRow + 1; dr <= foundHeaderRow + PREVIEW_LIMIT + 20 && dr <= 1000; dr++) {
+                if (!isRowVisible(dr)) continue;
                 let rowCols = [];
                 let hasAnyContent = false;
                 for (let c = 0; c < dataColCount; c++) {
@@ -375,8 +515,11 @@ function refreshData() {
                 }
             }
         } else {
-            // \u5B8C\u5168\u627E\u4E0D\u5230\u8868\u5934\uFF0C\u663E\u793A\u524D\u51E0\u884C\u539F\u59CB\u5185\u5BB9
-            for (let r = 1; r <= 5 && r <= 100; r++) {
+            // 完全找不到表头，显示前几个可见行原始内容
+            let fallbackLimit = 0;
+            for (let r = 1; r <= 100 && fallbackLimit < 5; r++) {
+                if (!isRowVisible(r)) continue;
+                fallbackLimit++;
                 let rowCols = [];
                 let hasAnyContent = false;
                 for (let c = 1; c <= 35; c++) {
@@ -392,7 +535,7 @@ function refreshData() {
                 }
             }
         }
-    } catch (e) {
+        } catch (e) {
         bgmLog(LOG_LEVELS.ERROR, "refreshData \u8BFB\u53D6\u9884\u89C8\u6570\u636E\u51FA\u9519: " + e.message);
     }
 
@@ -444,6 +587,14 @@ function refreshData() {
             if (sheetName) previewBox.innerHTML += ' (' + escapeHtml(sheetName) + ')';
             previewBox.innerHTML += '<br>\u672A\u68C0\u6D4B\u5230\u6570\u636E\uFF0C\u8BF7\u786E\u4FDD\u8868\u5934\u5305\u542B\u201C\u540D\u79F0\u201D\u7B49\u5173\u952E\u8BCD</p>';
         }
+    }
+
+    // 恢复原活动表（如果临时激活了其他表）
+    if (needRestore && originalActiveSheet) {
+        try {
+            originalActiveSheet.Activate();
+            bgmLog(LOG_LEVELS.INFO, "refreshData: 已恢复活动表");
+        } catch (_) {}
     }
 
     updateFilterStatus();
