@@ -16,7 +16,7 @@ var ErrorLevel;
     ErrorLevel[ErrorLevel["ERROR"] = 2] = "ERROR";
     ErrorLevel[ErrorLevel["THROW"] = 3] = "THROW";
 })(ErrorLevel || (ErrorLevel = {}));
-/** BGM 错误类 */
+/** BGM 错误类（统一定义，unified.js 不再重复定义）*/
 class BgmError extends Error {
     constructor(message, code = 'UNKNOWN', details = {}) {
         super(message);
@@ -27,6 +27,15 @@ class BgmError extends Error {
     }
     toString() {
         return `[${this.code}] ${this.message}`;
+    }
+    toJSON() {
+        return {
+            name: this.name,
+            message: this.message,
+            code: this.code,
+            details: this.details,
+            timestamp: this.timestamp
+        };
     }
 }
 // ========== BGM 全局命名空间 ==========

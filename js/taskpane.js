@@ -8,12 +8,11 @@ import { BGM } from './util.js';
 import { getApp } from './util.js';
 import { initMessageListener, setSyncRunning, setStatus } from './ui/message.js';
 import { 
-    onAction, syncCollectionFromBgm,
     markUploadedItems, clearSheetMarks
 } from './ui/handlers.js';
 import { 
     updateTokenStatus, updateUserIdStatus, 
-    showAlertDialog, closeAlertDialog, closeInputDialog, closeConfirmDialog,
+    showAlert, closeAlertDialog, closeInputDialog, closeConfirmDialog,
     showToast, showTokenDialog, showUserIdDialog
 } from './ui/dialog.js';
 import { previewSyncContent, closeDetailModal } from './ui/preview.js';
@@ -247,13 +246,13 @@ function initPanel() {
 function fetchBgCollectionRecords() {
     let token = loadBgToken();
     if (!token) {
-        showAlertDialog("提示", "请先设置 Token！");
+        showAlert("请先设置 Token！");
         return;
     }
 
     let userId = _getBgmUserId();
     if (!userId) {
-        showAlertDialog("提示", "请先设置用户ID！");
+        showAlert("请先设置用户ID！");
         showUserIdDialog();
         return;
     }
@@ -267,14 +266,14 @@ function fetchBgCollectionRecords() {
                 if (typeof fetchAndRecordBgCollections === 'function') {
                     fetchAndRecordBgCollections(token, userId, collections);
                 }
-                showAlertDialog("完成", "已获取并记录 " + collections.length + " 条收藏");
+                showAlert("已获取并记录 " + collections.length + " 条收藏", "完成");
             } else {
-                showAlertDialog("提示", "未获取到收藏数据");
+                showAlert("未获取到收藏数据");
             }
             setSyncRunning(false);
             setStatus("获取完成", "success");
         }, (error) => {
-            showAlertDialog("获取失败", error);
+            showAlert(error, "获取失败");
             setSyncRunning(false);
             setStatus("获取失败", "error");
         });
@@ -289,7 +288,7 @@ function clearSyncRecords() {
     if (typeof _clearSyncRecords === 'function') {
         _clearSyncRecords();
     } else {
-        showAlertDialog("提示", "清除同步记录功能未加载");
+        showAlert("清除同步记录功能未加载");
     }
 }
 
@@ -314,7 +313,7 @@ function getSelectedSheetName() {
 function markUploadedItemsDefault() {
     let sheetName = getSelectedSheetName();
     if (!sheetName) {
-        showAlertDialog('提示', '请先选择工作表！');
+        showAlert('请先选择工作表！');
         return;
     }
     markUploadedItems(sheetName);
@@ -326,7 +325,7 @@ function markUploadedItemsDefault() {
 function clearSheetMarksDefault() {
     let sheetName = getSelectedSheetName();
     if (!sheetName) {
-        showAlertDialog('提示', '请先选择工作表！');
+        showAlert('请先选择工作表！');
         return;
     }
     clearSheetMarks(sheetName);
@@ -359,14 +358,10 @@ window.clearSyncRecords = clearSyncRecords;
 window.markUploadedItemsDefault = markUploadedItemsDefault;
 window.clearSheetMarksDefault = clearSheetMarksDefault;
 
-// 导出全局函数别名
-window.onAction = onAction;
-window.syncCollectionFromBgm = syncCollectionFromBgm;
-window.markUploadedItems = markUploadedItems;
-window.clearSheetMarks = clearSheetMarks;
+// 导出全局函数别名（仅挂载 handlers.js/dialog.js 未覆盖的函数）
 window.previewSyncContent = previewSyncContent;
 window.closeDetailModal = closeDetailModal;
-window.showAlertDialog = showAlertDialog;
+window.showAlertDialog = showAlert;  // 兼容别名
 window.closeAlertDialog = closeAlertDialog;
 window.showToast = showToast;
 window.showTokenDialog = showTokenDialog;

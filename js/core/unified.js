@@ -23,11 +23,11 @@ const Dialog = {
     /**
      * 显示提示对话框
      */
-    alert: function(title, message) {
-        if (typeof window.BGMAlert === 'function') {
-            window.BGMAlert(message, title);
-        } else if (typeof window.showAlert === 'function') {
+    alert: function(message, title) {
+        if (typeof window.showAlert === 'function') {
             window.showAlert(message, title);
+        } else if (typeof window.BGMAlert === 'function') {
+            window.BGMAlert(message, title);
         } else {
             window.alert(message);
         }
@@ -214,31 +214,9 @@ export const sendToTaskpane = Message.send.bind(Message);
 
 // ========== 统一错误处理 API ==========
 /**
- * 错误类
+ * 错误类（统一定义在 util.js 中，此处重新导出）
  */
-export class BgmError extends Error {
-    constructor(message, code, details) {
-        super(message);
-        this.name = 'BgmError';
-        this.code = code || 'UNKNOWN';
-        this.details = details || {};
-        this.timestamp = new Date().toISOString();
-    }
-
-    toString() {
-        return `[${this.code}] ${this.message}`;
-    }
-
-    toJSON() {
-        return {
-            name: this.name,
-            message: this.message,
-            code: this.code,
-            details: this.details,
-            timestamp: this.timestamp
-        };
-    }
-}
+export { BgmError } from '../util.js';
 
 /**
  * 统一错误处理函数

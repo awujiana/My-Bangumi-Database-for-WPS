@@ -97,9 +97,9 @@ export interface FilterStatus {
 }
 
 /**
- * 同步结果
+ * 同步统计结果
  */
-export interface SyncResult {
+export interface SyncStats {
   success: number;
   fail: number;
   skip: number;

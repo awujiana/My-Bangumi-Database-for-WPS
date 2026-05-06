@@ -75,10 +75,10 @@ export interface BGMNamespace {
   
   // 错误级别
   ERROR_LEVELS: {
-    MINOR: number;
-    MODERATE: number;
-    SERIOUS: number;
-    FATAL: number;
+    SILENT: number;
+    WARN: number;
+    ERROR: number;
+    THROW: number;
   };
   
   // 方法

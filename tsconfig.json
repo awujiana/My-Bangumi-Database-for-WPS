@@ -1,6 +1,6 @@
 {
   "compilerOptions": {
-    /* ???? */
+    /* 语言环境 */
     "target": "ES2024",
     "module": "ESNext",
     "moduleResolution": "bundler",
@@ -17,18 +17,18 @@
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
     
-    /* ???? */
+    /* 输出相关 */
     "declaration": true,
     "declarationMap": true,
     "sourceMap": true,
     "outDir": "./dist",
     
-    /* ???? */
+    /* 类型相关 */
     "resolveJsonModule": true,
     "isolatedModules": true,
     "allowSyntheticDefaultImports": true,
     
-    /* ???? */
+    /* 编译选项 */
     "typeRoots": ["./node_modules/@types", "./js/@types", "./js/types"],
     "types": []
   },

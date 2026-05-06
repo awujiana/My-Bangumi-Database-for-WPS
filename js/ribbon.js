@@ -103,8 +103,6 @@ export function GetBangumiImage(control) {
 }
 
 // ========== 向后兼容别名 ==========
-// 保持全局函数可用性
-const WebNotifycount = 0;
 
 function showDialogRibbon(title, message) {
     if (typeof BGM !== 'undefined' && BGM.showDialog) {
@@ -121,4 +119,3 @@ window.OnAddinLoad = OnAddinLoad;
 window.OnAction = OnAction;
 window.GetBangumiImage = GetBangumiImage;
 window.showDialogRibbon = showDialogRibbon;
-window.WebNotifycount = WebNotifycount;

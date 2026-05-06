@@ -440,9 +440,10 @@ export function sendToTaskpane(data) {
     return BGM.postMessage(data);
 }
 
-export function showTokenDialog() {
+export function showTokenDialog(currentToken) {
     ensureDialogs();  // 确保对话框容器已创建
-    showInput("设置 Bangumi Access Token", "请输入 Access Token", "", (value) => {
+    let defaultVal = currentToken || "";
+    showInput("设置 Bangumi Access Token", "请输入 Access Token", defaultVal, (value) => {
         if (value) {
             if (typeof storeBgToken === 'function') {
                 storeBgToken(value);
@@ -484,7 +485,7 @@ window.updateTokenStatus = updateTokenStatus;
 window.updateUserIdStatus = updateUserIdStatus;
 window.showTokenDialog = showTokenDialog;
 window.showAlertDialog = showAlert;
-window.alert = showAlert;
+try { window.alert = showAlert; } catch(e) { /* alert 是只读属性，忽略 */ }
 window.showUserIdDialog = showUserIdDialog;
 
 // 新增通用对话框函数

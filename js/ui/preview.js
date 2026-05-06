@@ -1,7 +1,7 @@
 /**
- * UI é¢„è§ˆæ¨¡å—
+ * UI Ô¤ÀÀÄ£¿é
  * @module ui/preview
- * @description æ•°æ®é¢„è§ˆã€åŒæ­¥è®°å½•é¢„è§ˆã€è¯¦æƒ…æ¨¡æ€æ¡†
+ * @description Êý¾ÝÔ¤ÀÀ¡¢Í¬²½¼ÇÂ¼Ô¤ÀÀ¡¢ÏêÇéÄ£Ì¬¿ò
  */
 
 import { getApp, bgmLog, BGM, LOG_LEVELS } from '../util.js';
@@ -9,12 +9,12 @@ import { getCellValue } from '../util.js';
 import { showAlert } from './dialog.js';
 import { escapeHtml } from '../util.js';
 
-// ========== è¯¦ç»†é¢„è§ˆæ•°æ®å­˜å‚¨ ==========
+// ========== ÏêÏ¸Ô¤ÀÀÊý¾Ý´æ´¢ ==========
 let detailPreviewData = [];
 
-// ========== è¯¦ç»†é¢„è§ˆåŒæ­¥å†…å®¹ ==========
+// ========== ÏêÏ¸Ô¤ÀÀÍ¬²½ÄÚÈÝ ==========
 /**
- * é¢„è§ˆåŒæ­¥å†…å®¹
+ * Ô¤ÀÀÍ¬²½ÄÚÈÝ
  */
 export function previewSyncContent() {
     if (typeof findHeaderRow === 'undefined' || typeof getColumnMap === 'undefined') {
@@ -30,14 +30,14 @@ export function previewSyncContent() {
 
     let app = getApp();
     if (!app || !app.ActiveWorkbook) {
-        showAlert("é”™è¯¯", "æ— æ³•èŽ·å– WPS Application å¯¹è±¡ï¼?);
+        showAlert("´íÎó", "ÎÞ·¨»ñÈ¡ WPS Application ¶ÔÏó£¡");
         return;
     }
 
     let wb = app.ActiveWorkbook;
     let ws = wb.Worksheets(sheetIndex);
     if (!ws) {
-        showAlert("é”™è¯¯", "æ— æ³•èŽ·å–å·¥ä½œè¡¨ï¼");
+        showAlert("´íÎó", "ÎÞ·¨»ñÈ¡¹¤×÷±í£¡");
         return;
     }
 
@@ -46,19 +46,19 @@ export function previewSyncContent() {
 
     let headerRow = findHeaderRow(ws, startRow);
     if (headerRow === 0) {
-        showAlert("æç¤º", "æœªæ‰¾åˆ°è¡¨å¤´è¡Œï¼?);
+        showAlert("ÌáÊ¾", "Î´ÕÒµ½±íÍ·ÐÐ£¡");
         return;
     }
 
     let colMap = getColumnMap(ws, headerRow);
     if (!colMap.subjectId && !colMap.url) {
-        showAlert("æç¤º", "æœªæ‰¾åˆ°ã€æ¡ç›®IDã€‘æˆ–ã€Bangumi URLã€‘åˆ—ï¼?);
+        showAlert("ÌáÊ¾", "Î´ÕÒµ½¡¾ÌõÄ¿ID¡¿»ò¡¾Bangumi URL¡¿ÁÐ£¡");
         return;
     }
 
     let lastRow = userEndRow > 0 ? userEndRow : getLastRow(ws);
     if (lastRow <= headerRow) {
-        showAlert("æç¤º", "æ²¡æœ‰å¯é¢„è§ˆçš„æ•°æ®ï¼?);
+        showAlert("ÌáÊ¾", "Ã»ÓÐ¿ÉÔ¤ÀÀµÄÊý¾Ý£¡");
         return;
     }
 
@@ -96,7 +96,7 @@ export function previewSyncContent() {
 
             rows.push({
                 row: i,
-                name: nameVal || "(æ— åç§?",
+                name: nameVal || "(ÎÞÃû)",
                 sid: sid,
                 url: urlVal,
                 currentStatus: currentStatus,
@@ -112,7 +112,7 @@ export function previewSyncContent() {
                 payload: buildPreviewPayload(ws, i, colMap)
             });
         } catch (e) {
-            bgmLog(LOG_LEVELS.WARN, "é¢„è§ˆç¬?" + i + " è¡Œå‡ºé”? " + e.message);
+            bgmLog(LOG_LEVELS.WARN, "Ô¤ÀÀµÚ" + i + "ÐÐ³ö´í: " + e.message);
         }
     }
 
@@ -121,7 +121,7 @@ export function previewSyncContent() {
 }
 
 /**
- * æž„å»ºé¢„è§ˆç”¨çš„ payload
+ * ¹¹½¨Ô¤ÀÀÓÃµÄ payload
  */
 export function buildPreviewPayload(ws, row, colMap) {
     if (typeof buildJsonPayload === 'function') {
@@ -131,7 +131,7 @@ export function buildPreviewPayload(ws, row, colMap) {
 }
 
 /**
- * è¿‡æ»¤é¢„è§ˆé¡¹ç›®
+ * ¹ýÂËÔ¤ÀÀÏîÄ¿
  */
 export function filterDetailItems(filterText) {
     let items = document.querySelectorAll(".detail-item");
@@ -144,17 +144,17 @@ export function filterDetailItems(filterText) {
 }
 
 /**
- * æ›´æ–°è¯¦æƒ…è®¡æ•°
+ * ¸üÐÂÏêÇé¼ÆÊý
  */
 export function updateDetailCount(count) {
     let countEl = document.getElementById("detailCount");
     if (countEl) {
-        countEl.textContent = "å…?" + count + " æ?;
+        countEl.textContent = "¹²" + count + " Ìõ";
     }
 }
 
 /**
- * æ˜¾ç¤ºè¯¦æƒ…æ¨¡æ€æ¡†
+ * ÏÔÊ¾ÏêÇéÄ£Ì¬¿ò
  */
 export function showDetailModal() {
     let modal = document.getElementById("detailModal");
@@ -164,7 +164,7 @@ export function showDetailModal() {
 }
 
 /**
- * å…³é—­è¯¦æƒ…æ¨¡æ€æ¡†
+ * ¹Ø±ÕÏêÇéÄ£Ì¬¿ò
  */
 export function closeDetailModal() {
     let modal = document.getElementById("detailModal");
@@ -174,7 +174,7 @@ export function closeDetailModal() {
 }
 
 /**
- * æ¸²æŸ“è¯¦æƒ…åˆ—è¡¨
+ * äÖÈ¾ÏêÇéÁÐ±í
  */
 export function renderDetailList(items) {
     let container = document.getElementById("detailList");
@@ -187,20 +187,20 @@ export function renderDetailList(items) {
         div.className = "detail-item";
         div.innerHTML = `
             <div class="detail-row">
-                <span class="detail-label">è¡?${item.row}</span>
+                <span class="detail-label">ÐÐ:${item.row}</span>
                 <span class="detail-name">${escapeHtml(item.name)}</span>
             </div>
             <div class="detail-row">
                 <span class="detail-label">SID:</span>
-                <span class="detail-sid">${item.sid || "(æ— æ³•æå–)"}</span>
+                <span class="detail-sid">${item.sid || "(ÎÞ·¨ÌáÈ¡)"}</span>
             </div>
             <div class="detail-row">
-                <span class="detail-label">å½“å‰çŠ¶æ€?</span>
-                <span class="detail-status">${item.currentStatus || "(æ—?"}</span>
+                <span class="detail-label">µ±Ç°×´Ì¬:</span>
+                <span class="detail-status">${item.currentStatus || "(ÎÞ)"}</span>
             </div>
             <div class="detail-row">
-                <span class="detail-label">è¯„åˆ†:</span>
-                <span class="detail-rate">${item.rate || "(æ—?"}</span>
+                <span class="detail-label">ÆÀ·Ö:</span>
+                <span class="detail-rate">${item.rate || "(ÎÞ)"}</span>
             </div>
             <div class="detail-preview">
                 <pre>${escapeHtml(item.previewPayload)}</pre>
@@ -211,11 +211,11 @@ export function renderDetailList(items) {
 }
 
 /**
- * æŸ¥çœ‹åŒæ­¥è®°å½•è¯¦æƒ…
+ * ²é¿´Í¬²½¼ÇÂ¼ÏêÇé
  */
 export function viewSyncRecordDetail(rowIndex) {
     if (typeof getAllSyncRecords !== 'function') {
-        showAlert("æç¤º", "åŒæ­¥è®°å½•åŠŸèƒ½ä¸å¯ç”?);
+        showAlert("ÌáÊ¾", "Í¬²½¼ÇÂ¼¹¦ÄÜ²»¿ÉÓÃ£¡");
         return;
     }
 
@@ -226,22 +226,22 @@ export function viewSyncRecordDetail(rowIndex) {
 
     let record = records[rowIndex];
     let detail = `
-        åºå·: ${record.index}
-        åŒæ­¥æ—¶é—´: ${record.time}
-        åç§°: ${record.name}
+        ÐòºÅ: ${record.index}
+        Í¬²½Ê±¼ä: ${record.time}
+        Ãû³Æ: ${record.name}
         URL: ${record.url}
         SID: ${record.sid}
-        æ¡ç›®ç±»åž‹: ${record.type}
-        åŒæ­¥æ¬¡æ•°: ${record.count}
-        å†…å®¹: ${record.content}
-        çŠ¶æ€? ${record.status}
-        å¤‡æ³¨: ${record.comment}
+        ÌõÄ¿ÀàÐÍ: ${record.type}
+        Í¬²½´ÎÊý: ${record.count}
+        ÄÚÈÝ: ${record.content}
+        ×´Ì¬: ${record.status}
+        ±¸×¢: ${record.comment}
     `;
 
-    showAlert("åŒæ­¥è®°å½•è¯¦æƒ…", detail);
+    showAlert("Í¬²½¼ÇÂ¼ÏêÇé", detail);
 }
 
-// ========== å‘åŽå…¼å®¹ï¼ˆæŒ‚è½½åˆ° windowï¼?=========
+// ========== Ïòºó¼æÈÝ£¨¹ÒÔØµ½ window£©==========
 window.previewSyncContent = previewSyncContent;
 window.buildPreviewPayload = buildPreviewPayload;
 window.filterDetailItems = filterDetailItems;

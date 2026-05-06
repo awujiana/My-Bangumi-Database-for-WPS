@@ -5,7 +5,7 @@
  */
 
 import { bgmLog, BGM, LOG_LEVELS, loadBgToken, _getBgmUserId } from '../util.js';
-import { showAlertDialog, showTokenDialog, showUserIdDialog } from './dialog.js';
+import { showAlert, showTokenDialog, showUserIdDialog } from './dialog.js';
 import { setSyncRunning, setStatus } from './message.js';
 import { handleError } from '../core/unified.js';
 
@@ -84,7 +84,7 @@ export function syncFromPanel() {
     
     if (typeof findHeaderRow === 'undefined' || typeof getColumnMap === 'undefined' || typeof getLastRow === 'undefined') {
         bgmLog(LOG_LEVELS.ERROR, "syncFromPanel - 必需函数未加载");
-        showAlertDialog("提示", "正在加载脚本，请稍后重试...");
+        showAlert("正在加载脚本，请稍后重试...");
         return;
     }
     
@@ -92,8 +92,7 @@ export function syncFromPanel() {
 
     let token = loadBgToken();
     if (!token) {
-        showAlertDialog("提示", "请先设置 Bangumi Token！");
-        showTokenDialog("");
+        showAlert("请先设置 Bangumi Token！");
         return;
     }
 
@@ -113,7 +112,7 @@ export function syncFromPanel() {
             SyncToBangumi();
         } catch (e) {
             bgmLog(LOG_LEVELS.ERROR, "SyncToBangumi 出错: " + e.message);
-            showAlertDialog("执行出错", e.message);
+            showAlert(e.message, "执行出错");
         }
     }
 }
@@ -129,7 +128,7 @@ export function testSingleUpdateFromPanel() {
     
     let token = loadBgToken();
     if (!token) {
-        showAlertDialog("提示", "请先设置 Bangumi Token！");
+        showAlert("请先设置 Bangumi Token！");
         return;
     }
     
@@ -151,7 +150,7 @@ export function syncCollectionFromBgm() {
 
         let token = loadBgToken();
         if (!token) {
-            showAlertDialog("提示", "请先设置 Bangumi Token！");
+            showAlert("请先设置 Bangumi Token！");
             return;
         }
 
@@ -169,13 +168,13 @@ export function syncFromBgmByAPI(sheetIndex) {
 
     let token = loadBgToken();
     if (!token) {
-        showAlertDialog("提示", "请先设置 Token！");
+        showAlert("请先设置 Token！");
         return;
     }
 
     let userId = _getBgmUserId();
     if (!userId) {
-        showAlertDialog("提示", "请先设置用户ID！");
+        showAlert("请先设置用户ID！");
         showUserIdDialog();
         return;
     }
@@ -191,12 +190,12 @@ export function syncFromBgmByAPI(sheetIndex) {
                 }
                 markUploadedItems(sheetIndex, collections);
             } else {
-                showAlertDialog("提示", "未获取到收藏数据，请检查 Token 和用户ID！");
+                showAlert("未获取到收藏数据，请检查 Token 和用户ID！");
             }
             setSyncRunning(false);
             setStatus("同步完成", "success");
         }, (error) => {
-            showAlertDialog("获取收藏失败", error);
+            showAlert(error, "获取收藏失败");
             setSyncRunning(false);
             setStatus("同步失败", "error");
         });
@@ -215,16 +214,12 @@ export function markUploadedItems(sheetIndexOrName, collections) {
         let sheetName = sheetIndexOrName;
         let token = loadBgToken();
         if (!token) {
-            if (typeof showAlertDialog === 'function') {
-                showAlertDialog("提示", "请先设置 Token！");
-            }
+            showAlert("请先设置 Token！");
             return;
         }
         let userId = _getBgmUserId();
         if (!userId) {
-            if (typeof showAlertDialog === 'function') {
-                showAlertDialog("提示", "请先设置用户ID！");
-            }
+            showAlert("请先设置用户ID！");
             return;
         }
         // 查找工作表索引
@@ -241,9 +236,7 @@ export function markUploadedItems(sheetIndexOrName, collections) {
             }
         }
         if (targetIndex === null) {
-            if (typeof showAlertDialog === 'function') {
-                showAlertDialog("提示", '未找到工作表: ' + sheetName);
-            }
+            showAlert('未找到工作表: ' + sheetName);
             return;
         }
         // 获取收藏数据后标记

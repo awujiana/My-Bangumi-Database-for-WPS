@@ -6,18 +6,13 @@
 		"dev": "npm run build:ts && vite --port 3889",
 		"build": "npm run build:ts && vite build",
 		"build:ts": "tsc --project tsconfig.build.json",
-		"preview": "vite preview",
-		"lint": "eslint . --ext .vue,.js,.jsx,.cjs,.mjs --fix --ignore-path .gitignore",
-		"format": "prettier --write src/"
+		"preview": "vite preview"
 	},
-	"description": "wps加载项示例, 执行npm install后，提供代码联想功能",
+	"description": "Bangumi Excel 同步加载项",
 	"devDependencies": {
 		"et-jsapi-declare": "latest",
 		"typescript": "^6.0.3",
 		"vite": "^5.3.1",
 		"wpsjs": "latest"
-	},
-	"dependencies": {
-		"iconv-lite": "^0.7.2"
 	}
 }

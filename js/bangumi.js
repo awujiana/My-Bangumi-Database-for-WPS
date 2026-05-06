@@ -915,7 +915,7 @@ export function openUserCollection() {
         showDialog("提示", "请先设置用户ID！");
         return;
     }
-    window.open("https://bgm.tv/" + userId + "/collect", "_blank");
+    window.open("https://bgm.tv/user/" + userId + "/collection", "_blank");
 }
 
 // ========== 向后兼容（挂载到 window）==========
@@ -930,10 +930,8 @@ window.extractSubjectId = extractSubjectId;
 window.clearRowColors = clearRowColors;
 window.openUserCollection = openUserCollection;
 window.openBangumiTokenPage = openBangumiTokenPage;
-window.showTokenDialog = showTokenDialog;
-window.showUserIdDialog = showUserIdDialog;
 window.testTokenValidityForRibbon = testTokenValidityForRibbon;
-window.bgmiRequestSync = bgmRequestSync;
-window.bgmiRequest = bgmRequest;
-window.sendToTaskpane = sendToTaskpane;
-window.showDialog = showDialog;
+window.bgmRequestSync = bgmRequestSync;
+window.bgmRequest = bgmRequest;
+// 以下函数已在 dialog.js 中挂载，不再重复
+// window.showTokenDialog, window.showUserIdDialog, window.sendToTaskpane, window.showDialog

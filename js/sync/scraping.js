@@ -1,6 +1,9 @@
 // ========== 同步收藏模块 ==========
 // 功能：从 Bangumi API 获取收藏列表并标记到工作表
-// 依赖：bangumi.js, syncRecord.js, util.js
+// 依赖：util.js
+
+import { bgmLog, BGM, LOG_LEVELS, BGM_CONFIG } from '../util.js';
+import { setStatus } from '../ui/message.js';
 
 // ========== 常量定义 ==========
 const SCRAPING_CONFIG = {
@@ -178,11 +181,8 @@ function httpRequestAsync(method, url, options = {}) {
     });
 }
 
-// 导出函数到全局（供其他模块通过 window 访问）
+// 导出函数到全局
 if (typeof window !== 'undefined') {
     window.fetchAllUserCollections = fetchAllUserCollections;
     window.fetchAllUserCollectionsAsync = fetchAllUserCollectionsAsync;
-    window.httpRequestAsync = httpRequestAsync;
-    window._fetchRecordsScopeSelect = _fetchRecordsScopeSelect;
-    window._runFetchBgRecords = _runFetchBgRecords;
 }

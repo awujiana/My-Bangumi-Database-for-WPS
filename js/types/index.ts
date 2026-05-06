@@ -161,7 +161,7 @@ interface ColumnMap {
     syncStatus: number | null;
 }
 
-interface SyncResult {
+interface SyncStats {
     success: number;
     fail: number;
     skip: number;

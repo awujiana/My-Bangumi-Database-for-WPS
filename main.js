@@ -13,10 +13,18 @@ const MODULES = [
     { src: 'js/core/crypto.js', type: 'module' },
     // 工具模块
     { src: 'js/util.js', type: 'module' },
+    { src: 'js/http.js', type: 'module' },
+    // UI 模块（dialog 先于业务模块，避免重复挂载 window）
+    { src: 'js/ui/dialog.js', type: 'module' },
+    { src: 'js/ui/message.js', type: 'module' },
+    { src: 'js/ui/preview.js', type: 'module' },
     // 业务模块
     { src: 'js/syncRecord.js', type: 'module' },
     { src: 'js/bangumi.js', type: 'module' },
     { src: 'js/ribbon.js', type: 'module' },
+    { src: 'js/ui/handlers.js', type: 'module' },
+    { src: 'js/sync/scraping.js', type: 'module' },
+    // 系统模块
     { src: 'js/systemdemo.js', type: 'script' }
 ];
 

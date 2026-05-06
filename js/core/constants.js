@@ -70,9 +70,3 @@ export const ERROR_LEVELS = {
     ERROR: 2,     // 错误
     THROW: 3      // 抛出异常
 };
-
-// ========== 兼容性别名（向后兼容）==========
-// 这些别名用于兼容旧代码，待完全迁移后可移除
-export const BGM_API_CONFIG = BGM_CONFIG;
-export const BGM_COLORS = BGM_COLOR;
-export const TOKEN_CFG = TOKEN_CONFIG;
