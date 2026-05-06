@@ -27,7 +27,9 @@ export default defineConfig({
         { src: 'images/**/*', dest: 'images' },
         { src: 'ui/**/*', dest: 'ui' },
         { src: 'main.js', dest: '.' },
-        { src: 'node_modules/wpsjs-rpc-sdk-new/wpsjsrpcsdk.js', dest: '.' }
+        { src: 'node_modules/wpsjs-rpc-sdk-new/wpsjsrpcsdk.js', dest: '.' },
+        // 如果需要，可以复制生成的声明文件
+        { src: 'types/**/*', dest: 'types' }
       ],
       silent: false
     })
@@ -37,6 +39,23 @@ export default defineConfig({
       '@': fileURLToPath(new URL('./js', import.meta.url))
     },
     extensions: ['.js', '.ts', '.jsx', '.tsx', '.json']
+  },
+  // TypeScript 配置
+  esbuild: {
+    tsconfigRaw: {
+      compilerOptions: {
+        baseUrl: ".",
+        paths: {
+          "@/*": ["./js/*"]
+        },
+        typeRoots: [
+          "./node_modules/@types",
+          "./types",
+          "./js/@types",
+          "./js/types"
+        ]
+      }
+    }
   },
   server: {
     host: '0.0.0.0',
@@ -49,27 +68,13 @@ export default defineConfig({
     emptyOutDir: true,
     sourcemap: false,
     target: 'es2020',
-    minify: 'terser',
-    terserOptions: {
-      compress: {
-        drop_console: true,
-        drop_debugger: true
-      }
-    },
     rollupOptions: {
       input: {
         main: 'index.html',
         taskpane: 'ui/taskpane.html'
       },
       output: {
-        // 分离第三方库
-        manualChunks: (id) => {
-          if (id.includes('node_modules')) {
-            return 'vendor';
-          }
-        },
         entryFileNames: (chunkInfo) => {
-          // 主入口文件保持原名
           if (chunkInfo.name === 'main') return 'assets/[name].js';
           return 'assets/[name].[hash].js';
         },

@@ -15,20 +15,34 @@
     "esModuleInterop": true,
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
-    "declaration": true,
-    "declarationMap": true,
+    "declaration": false,  // 设为 false，由 tsconfig.build.json 控制
+    "declarationMap": false,
     "sourceMap": true,
-    "outDir": "./dist-types",  // 改为不同的目录，避免与 Vite 输出冲突
+    "outDir": "./dist",
     "rootDir": "./js",  // 指定源代码根目录
+    "baseUrl": ".",
     "paths": {
       "@/*": ["./js/*"]
     },
     "resolveJsonModule": true,
     "isolatedModules": true,
     "allowSyntheticDefaultImports": true,
-    "typeRoots": ["./node_modules/@types", "./js/@types"],
-    "types": []
+    "typeRoots": [
+      "./node_modules/@types",  // 1. npm 安装的类型定义
+      "./types",                // 2. 生成的类型定义 (.d.ts 和 .d.ts.map)
+      "./js/@types",           // 3. 手写的类型定义
+      "./js/types"             // 4. 其他类型定义
+    ],
+    "types": [],
+    "ignoreDeprecations": "6.0"
   },
-  "include": ["js/**/*", "vite-env.d.ts"],
-  "exclude": ["node_modules", "dist", "dist-types", "**/*.spec.ts"]
+  "include": [
+    "js/**/*",
+    "types/**/*"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist",
+    "**/*.spec.ts"
+  ]
 }
