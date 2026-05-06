@@ -391,6 +391,27 @@ export function getCellValue(ws: unknown, row: number, col: number): string {
 }
 
 /**
+ * 读取单元格文本（handle WPS Value/Value2/Text 等多种属性）
+ */
+export function readCell(ws: unknown, row: number, col: number): string {
+    try {
+        const cell = getCell(ws, row, col);
+        if (!cell) return "";
+        const c = cell as Record<string, unknown>;
+        // 尝试多种取值方式
+        if (typeof c.Text === 'function') return String(c.Text());
+        if (c.Text !== undefined && c.Text !== null) return String(c.Text);
+        if (typeof c.Value2 === 'function') return String(c.Value2());
+        if (c.Value2 !== undefined && c.Value2 !== null) return String(c.Value2);
+        if (typeof c.Value === 'function') return String(c.Value());
+        if (c.Value !== undefined && c.Value !== null) return String(c.Value);
+        return "";
+    } catch {
+        return "";
+    }
+}
+
+/**
  * 设置单元格值
  */
 export function setCellValue(ws: unknown, row: number, col: number, value: unknown): boolean {
@@ -526,6 +547,17 @@ export function _fetchBgmUserInfo(callback?: (userInfo: BGMUserInfo | null) => v
     };
     
     xhr.send();
+}
+
+/**
+ * 获取 Bangumi 用户信息（Promise 版本，供 handlers.js 等模块使用）
+ */
+export function fetchBgmUserInfo(): Promise<BGMUserInfo | null> {
+    return new Promise((resolve) => {
+        _fetchBgmUserInfo((userInfo) => {
+            resolve(userInfo);
+        });
+    });
 }
 
 // ========== 辅助函数 ==========
@@ -764,6 +796,7 @@ if (typeof window !== 'undefined') {
     win.getCell = getCell;
     win.getCellValue = getCellValue;
     win.setCellValue = setCellValue;
+    win.readCell = readCell;
     win.getSheetByIndex = getSheetByIndex;
     win.escapeHtml = escapeHtml;
     win.storeBgToken = storeBgToken;
@@ -773,6 +806,7 @@ if (typeof window !== 'undefined') {
     win._getBgmUserId = _getBgmUserId;
     win._getUserApiPath = _getUserApiPath;
     win._fetchBgmUserInfo = _fetchBgmUserInfo;
+    win.fetchBgmUserInfo = fetchBgmUserInfo;
     win.showAlertDialog = showAlertDialog;
     win.closeAlertDialog = closeAlertDialog;
     win.shellExecuteByOAAssist = shellExecuteByOAAssist;
