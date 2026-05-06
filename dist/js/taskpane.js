@@ -696,42 +696,14 @@ function initPanel() {
 }
 
 /**
- * 获取 BGM 收藏数据
+ * 获取 BGM 收藏数据（委托给 handlers.js 增强版）
  */
 function fetchBgCollectionRecords() {
-    let token = loadBgToken();
-    if (!token) {
-        showAlert("\u8BF7\u5148\u8BBE\u7F6E Token！");
-        return;
-    }
-
-    let userId = _getBgmUserId();
-    if (!userId) {
-        showAlert("\u8BF7\u5148\u8BBE\u7F6E\u7528\u6237ID！");
-        showUserIdDialog();
-        return;
-    }
-
-    setSyncRunning(true);
-    setStatus("\u6B63\u5728\u83B7\u53D6\u6536\u85CF\u8BB0\u5F55...", "info");
-
-    if (typeof fetchAllUserCollections === 'function') {
-        fetchAllUserCollections(token, userId, (collections) => {
-            if (collections && collections.length > 0) {
-                if (typeof fetchAndRecordBgCollections === 'function') {
-                    fetchAndRecordBgCollections(token, userId, collections);
-                }
-                showAlert("\u5DF2\u83B7\u53D6\u5E76\u8BB0\u5F55 " + collections.length + " \u6761\u6536\u85CF", "\u5B8C\u6210");
-            } else {
-                showAlert("\u672A\u83B7\u53D6\u5230\u6536\u85CF\u6570\u636E");
-            }
-            setSyncRunning(false);
-            setStatus("\u83B7\u53D6\u5B8C\u6210", "success");
-        }, (error) => {
-            showAlert(error, "\u83B7\u53D6\u5931\u8D25");
-            setSyncRunning(false);
-            setStatus("\u83B7\u53D6\u5931\u8D25", "error");
-        });
+    if (typeof window.syncCollectionFromBgm === 'function') {
+        // 委托给 handlers.js 的增强版（会触发完整交互流程）
+        window.syncCollectionFromBgm();
+    } else {
+        showAlert("\u8BF7\u5148\u8BBE\u7F6E Token\uFF01");
     }
 }
 
