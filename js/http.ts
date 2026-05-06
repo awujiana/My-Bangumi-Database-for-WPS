@@ -2,7 +2,7 @@
  * BGM HTTP 请求模块 - 支持异步和进度回调
  */
 import { BGM_CONFIG } from './core/constants.js';
-import { Result, BgmResultError, SyncResult } from './types/result.js';
+import { Result, BgmError, SyncResult } from './types/result.js';
 import { bgmLog, LOG_LEVELS } from './util.js';
 
 export type HttpMethod = 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH';
@@ -12,13 +12,13 @@ const VALID_METHODS: HttpMethod[] = ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'];
 
 function validateMethod(method: string): HttpMethod {
     const upper = method.toUpperCase() as HttpMethod;
-    if (!VALID_METHODS.includes(upper)) throw new BgmResultError(0, `无效的 HTTP 方法: ${method}`);
+    if (!VALID_METHODS.includes(upper)) throw new BgmError(0, `无效的 HTTP 方法: ${method}`);
     return upper;
 }
 
 function validateEndpoint(endpoint: string): void {
-    if (!endpoint || typeof endpoint !== 'string') throw new BgmResultError(0, 'endpoint 无效');
-    if (endpoint.includes('..') || endpoint.startsWith('http')) throw new BgmResultError(0, 'endpoint 包含非法字符');
+    if (!endpoint || typeof endpoint !== 'string') throw new BgmError(0, 'endpoint 无效');
+    if (endpoint.includes('..') || endpoint.startsWith('http')) throw new BgmError(0, 'endpoint 包含非法字符');
 }
 
 function sleep(ms: number): Promise<void> {
@@ -58,16 +58,16 @@ export async function httpRequest<T = unknown>(
                 continue;
             }
 
-            return Result.fail(BgmResultError.fromXhr(response.xhr));
+            return Result.fail(BgmError.fromXhr(response.xhr));
         } catch (error) {
             if (attempt < retries) {
                 attempt++;
                 continue;
             }
-            return Result.fail(BgmResultError.fromError(error));
+            return Result.fail(BgmError.fromError(error));
         }
     }
-    return Result.fail(new BgmResultError(0, '超过最大重试次数'));
+    return Result.fail(new BgmError(0, '超过最大重试次数'));
 }
 
 function fetchWithProgress<T>(url: string, options: {

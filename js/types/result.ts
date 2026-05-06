@@ -1,9 +1,54 @@
 /**
  * BGM 结果类型
  * @module types/result
- * @description 统一的操作结果类型，避免错误处理不一致
+ * @description 统一的操作结果类型和错误处理，避免错误处理不一致
  */
 
+// ========== 错误级别枚举 ==========
+export const ErrorLevel = {
+    SILENT: 0,
+    WARN: 1,
+    ERROR: 2,
+    THROW: 3
+} as const;
+export type ErrorLevel = typeof ErrorLevel[keyof typeof ErrorLevel];
+
+// ========== 统一的 BGM 错误类 ==========
+/**
+ * BGM 统一错误类
+ * @extends Error
+ */
+export class BgmError extends Error {
+    /** 错误代码（如 'NETWORK_ERROR', 'API_ERROR' 等） */
+    code: string;
+    /** 额外错误详情 */
+    details: Record<string, any>;
+    /** 错误发生时间 */
+    timestamp: string;
+
+    /**
+     * @param message - 错误消息
+     * @param code - 错误代码，默认 'UNKNOWN'
+     * @param details - 额外详情
+     */
+    constructor(message: string, code: string = 'UNKNOWN', details: Record<string, any> = {}) {
+        super(message);
+        this.name = 'BgmError';
+        this.code = code;
+        this.details = details;
+        this.timestamp = new Date().toISOString();
+    }
+
+    toString(): string {
+        return `[${this.code}] ${this.message}`;
+    }
+}
+
+// ========== 向后兼容类型别名 ==========
+/** @deprecated 使用 BgmError 替代 */
+export type BgmResultError = BgmError;
+
+// ========== Result 类型 ==========
 /**
  * 操作结果基类
  */
@@ -30,7 +75,7 @@ export class Result<T> {
         if (code >= 200 && code < 300) {
             return Result.ok(data ?? null as T);
         }
-        return Result.fail(new BgmResultError(code, 'API Error'));
+        return Result.fail(new BgmError('API Error', String(code)));
     }
 
     isOk(): boolean {
@@ -59,7 +104,7 @@ export class Result<T> {
         return Result.fail(this.error!);
     }
 
-    mapErr(fn: (error: BgmResultError) => BgmResultError): Result<T> {
+    mapErr(fn: (error: BgmError) => BgmError): Result<T> {
         if (!this.success) {
             return Result.fail(fn(this.error!));
         }
@@ -67,57 +112,7 @@ export class Result<T> {
     }
 }
 
-/**
- * BGM 错误类
- */
-export class BgmResultError {
-    readonly code: number;
-    readonly message: string;
-    readonly details?: Record<string, unknown>;
-
-    constructor(code: number, message: string, details?: Record<string, unknown>) {
-        this.code = code;
-        this.message = message;
-        this.details = details;
-    }
-
-    toString(): string {
-        return `[${this.code}] ${this.message}`;
-    }
-
-    static fromXhr(xhr: XMLHttpRequest): BgmResultError {
-        if (xhr.status === 0) {
-            return new BgmResultError(0, '网络错误或请求被阻止');
-        }
-        if (xhr.status === 429) {
-            return new BgmResultError(429, '请求过于频繁，请稍后重试');
-        }
-        if (xhr.status === 401) {
-            return new BgmResultError(401, 'Token 无效或已过期');
-        }
-        if (xhr.status === 403) {
-            return new BgmResultError(403, '没有权限执行此操作');
-        }
-        if (xhr.status === 404) {
-            return new BgmResultError(404, '请求的资源不存在');
-        }
-        if (xhr.status >= 500) {
-            return new BgmResultError(xhr.status, '服务器错误，请稍后重试');
-        }
-        return new BgmResultError(xhr.status, `请求失败: ${xhr.statusText}`);
-    }
-
-    static fromError(error: unknown): BgmResultError {
-        if (error instanceof Error) {
-            return new BgmResultError(0, error.message);
-        }
-        return new BgmResultError(0, String(error));
-    }
-}
-
-/**
- * 同步结果（保持向后兼容）
- */
+// ========== 向后兼容接口 ==========
 export interface SyncResult {
     code: number;
     message: string;
@@ -128,5 +123,8 @@ export function toSyncResult<T>(result: Result<T>): SyncResult {
     if (result.success) {
         return { code: 200, message: 'OK', data: result.data };
     }
-    return { code: result.error?.code ?? 0, message: result.error?.message ?? 'Unknown error' };
+    return {
+        code: result.error?.code ? parseInt(result.error.code) || 0 : 0,
+        message: result.error?.message ?? 'Unknown error'
+    };
 }

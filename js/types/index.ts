@@ -171,5 +171,5 @@ interface SyncStats {
 export type {
     ExcelApplication, ExcelWorkbook, ExcelWorksheet, ExcelCell, ExcelWorksheets,
     BgmWindow, BGMConfig, BGMColor, LOG_LEVELS, ERROR_LEVELS,
-    BGMUserInfo, BGMCache, BGMSheet, BGMSync, ColumnMap, SyncResult
+    BGMUserInfo, BGMCache, BGMSheet, BGMSync, ColumnMap, SyncStats,
 };

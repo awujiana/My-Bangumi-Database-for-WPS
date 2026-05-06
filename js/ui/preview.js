@@ -247,7 +247,8 @@ export function previewSyncContent() {
         if (manualStart > manualEnd) { manualStart = dataStartRow; manualEnd = lastRow; }
         for (let i = manualStart; i <= manualEnd; i++) rowsToPreview.push(i);
     }
-
+    bgmLog(LOG_LEVELS.INFO, `dataStartRow=${dataStartRow}, actualEndRow=${actualEndRow}, lastRow=${lastRow}`);
+    bgmLog(LOG_LEVELS.INFO, `rowsToPreview.length=${rowsToPreview.length}`);
     if (rowsToPreview.length === 0) {
         showAlert('没有数据可预览！');
         return;

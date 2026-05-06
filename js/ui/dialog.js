@@ -1,28 +1,28 @@
 /**
- * UI ¶Ô»°¿òÄ£¿é£¨ÓÅ»¯°æ£©
+ * UI å¯¹è¯æ¡†æ¨¡å—ï¼ˆä¼˜åŒ–ç‰ˆï¼‰
  * @module ui/dialog
- * @description ×Ô¶¨Òå¶Ô»°¿ò¡¢È·ÈÏ¶Ô»°¿ò¡¢Toast Í¨Öª
+ * @description è‡ªå®šä¹‰å¯¹è¯æ¡†ã€ç¡®è®¤å¯¹è¯æ¡†ã€Toast é€šçŸ¥
  */
 
-// ========== ³£Á¿ÓëÅäÖÃ ==========
+// ========== å¸¸é‡ä¸é…ç½® ==========
 const DIALOG_TYPES = {
-    alert:    { id: 'bgmAlertDialog',    titleId: 'bgmAlertTitle',    msgId: 'bgmAlertMessage',    buttons: [{ id: 'bgmAlertOk',    cls: 'bgm-btn-primary', text: 'È·¶¨', event: 'ok' }] },
-    confirm:  { id: 'bgmConfirmDialog',  titleId: 'bgmConfirmTitle',  msgId: 'bgmConfirmMessage',  buttons: [{ id: 'bgmConfirmOk',   cls: 'bgm-btn-primary', text: 'È·¶¨', event: 'ok' }, { id: 'bgmConfirmCancel', cls: 'bgm-btn-default', text: 'È¡Ïû', event: 'cancel' }] },
-    error:    { id: 'bgmErrorDialog',    titleId: 'bgmErrorTitle',    msgId: 'bgmErrorMessage',    buttons: [{ id: 'bgmErrorOk',    cls: 'bgm-btn-danger',  text: 'È·¶¨', event: 'ok' }] },
-    warning:  { id: 'bgmWarningDialog',  titleId: 'bgmWarningTitle',  msgId: 'bgmWarningMessage',  buttons: [{ id: 'bgmWarningOk',  cls: 'bgm-btn-warning', text: 'È·¶¨', event: 'ok' }] },
-    success:  { id: 'bgmSuccessDialog',  titleId: 'bgmSuccessTitle',  msgId: 'bgmSuccessMessage',  buttons: [{ id: 'bgmSuccessOk',  cls: 'bgm-btn-success', text: 'È·¶¨', event: 'ok' }] },
-    input:    { id: 'bgmInputDialog',    titleId: 'bgmInputTitle',    msgId: 'bgmInputPrompt',     buttons: [{ id: 'bgmInputOk',     cls: 'bgm-btn-primary', text: 'È·¶¨', event: 'ok' }, { id: 'bgmInputCancel', cls: 'bgm-btn-default', text: 'È¡Ïû', event: 'cancel' }] }
+    alert:    { id: 'bgmAlertDialog',    titleId: 'bgmAlertTitle',    msgId: 'bgmAlertMessage',    buttons: [{ id: 'bgmAlertOk',    cls: 'bgm-btn-primary', text: 'ç¡®å®š', event: 'ok' }] },
+    confirm:  { id: 'bgmConfirmDialog',  titleId: 'bgmConfirmTitle',  msgId: 'bgmConfirmMessage',  buttons: [{ id: 'bgmConfirmOk',   cls: 'bgm-btn-primary', text: 'ç¡®å®š', event: 'ok' }, { id: 'bgmConfirmCancel', cls: 'bgm-btn-default', text: 'å–æ¶ˆ', event: 'cancel' }] },
+    error:    { id: 'bgmErrorDialog',    titleId: 'bgmErrorTitle',    msgId: 'bgmErrorMessage',    buttons: [{ id: 'bgmErrorOk',    cls: 'bgm-btn-danger',  text: 'ç¡®å®š', event: 'ok' }] },
+    warning:  { id: 'bgmWarningDialog',  titleId: 'bgmWarningTitle',  msgId: 'bgmWarningMessage',  buttons: [{ id: 'bgmWarningOk',  cls: 'bgm-btn-warning', text: 'ç¡®å®š', event: 'ok' }] },
+    success:  { id: 'bgmSuccessDialog',  titleId: 'bgmSuccessTitle',  msgId: 'bgmSuccessMessage',  buttons: [{ id: 'bgmSuccessOk',  cls: 'bgm-btn-success', text: 'ç¡®å®š', event: 'ok' }] },
+    input:    { id: 'bgmInputDialog',    titleId: 'bgmInputTitle',    msgId: 'bgmInputPrompt',     buttons: [{ id: 'bgmInputOk',     cls: 'bgm-btn-primary', text: 'ç¡®å®š', event: 'ok' }, { id: 'bgmInputCancel', cls: 'bgm-btn-default', text: 'å–æ¶ˆ', event: 'cancel' }] }
 };
 
-// ========== Ä£¿éÄÚ²¿×´Ì¬ ==========
+// ========== æ¨¡å—å†…éƒ¨çŠ¶æ€ ==========
 let dialogInitialized = false;
-let _dialogCallback = null;        // µ±Ç°¼¤»î¶Ô»°¿òµÄ»Øµ÷º¯Êı
-let _toastTimer = null;           // Toast ¶¨Ê±Æ÷ ID
+let _dialogCallback = null;        // å½“å‰æ¿€æ´»å¯¹è¯æ¡†çš„å›è°ƒå‡½æ•°
+let _toastTimer = null;           // Toast å®šæ—¶å™¨ ID
 
-// »º´æ DOM ÒıÓÃ£¨³õÊ¼»¯ºóÌî³ä£©
+// ç¼“å­˜ DOM å¼•ç”¨ï¼ˆåˆå§‹åŒ–åå¡«å……ï¼‰
 const dom = {};
 
-// ========== ³õÊ¼»¯ ==========
+// ========== åˆå§‹åŒ– ==========
 function ensureDialogs() {
     if (dialogInitialized) return;
     dialogInitialized = true;
@@ -44,7 +44,7 @@ function createDialogs() {
     container.id = 'bgmDialogContainer';
     document.body.appendChild(container);
 
-    // Í¨ÓÃ¶Ô»°¿ò´´½¨º¯Êı
+    // é€šç”¨å¯¹è¯æ¡†åˆ›å»ºå‡½æ•°
     function createDialogElement(type, iconClass, iconChar, defaultTitle) {
         const cfg = DIALOG_TYPES[type];
         const modal = document.createElement('div');
@@ -86,7 +86,7 @@ function createDialogs() {
             button.id = btn.id;
             button.className = 'bgm-btn ' + btn.cls;
             button.textContent = btn.text;
-            button.dataset.event = btn.event;   // ±ê¼ÇÊÂ¼şÀàĞÍ
+            button.dataset.event = btn.event;   // æ ‡è®°äº‹ä»¶ç±»å‹
             footer.appendChild(button);
         });
         content.appendChild(footer);
@@ -94,15 +94,15 @@ function createDialogs() {
         return modal;
     }
 
-    // ´´½¨¸÷ÖÖ¶Ô»°¿ò
-    container.appendChild(createDialogElement('alert', 'bgm-icon-info', '&#9432;', 'ÌáÊ¾'));
-    container.appendChild(createDialogElement('confirm', 'bgm-icon-question', '&#63;', 'È·ÈÏ'));
-    container.appendChild(createDialogElement('error', 'bgm-icon-error', '&#10006;', '´íÎó'));
-    container.appendChild(createDialogElement('warning', 'bgm-icon-warning', '&#9888;', '¾¯¸æ'));
-    container.appendChild(createDialogElement('success', 'bgm-icon-success', '&#10004;', '³É¹¦'));
-    container.appendChild(createDialogElement('input', 'bgm-icon-info', '&#9432;', 'ÊäÈë'));
+    // åˆ›å»ºå„ç§å¯¹è¯æ¡†
+    container.appendChild(createDialogElement('alert', 'bgm-icon-info', '&#9432;', 'æç¤º'));
+    container.appendChild(createDialogElement('confirm', 'bgm-icon-question', '&#63;', 'ç¡®è®¤'));
+    container.appendChild(createDialogElement('error', 'bgm-icon-error', '&#10006;', 'é”™è¯¯'));
+    container.appendChild(createDialogElement('warning', 'bgm-icon-warning', '&#9888;', 'è­¦å‘Š'));
+    container.appendChild(createDialogElement('success', 'bgm-icon-success', '&#10004;', 'æˆåŠŸ'));
+    container.appendChild(createDialogElement('input', 'bgm-icon-info', '&#9432;', 'è¾“å…¥'));
 
-    // Îª Input ¶Ô»°¿òÌí¼ÓÊäÈë¿ò
+    // ä¸º Input å¯¹è¯æ¡†æ·»åŠ è¾“å…¥æ¡†
     const inputBody = document.querySelector('#bgmInputDialog .bgm-dialog-body');
     const inputField = document.createElement('input');
     inputField.type = 'text';
@@ -110,18 +110,18 @@ function createDialogs() {
     inputField.className = 'bgm-input-field';
     inputBody.appendChild(inputField);
 
-    // Toast ÈİÆ÷
+    // Toast å®¹å™¨
     const toast = document.createElement('div');
     toast.id = 'bgmToast';
     toast.className = 'bgm-toast';
     container.appendChild(toast);
 
-    // °ó¶¨ÊÂ¼ş²¢»º´æ DOM
+    // ç»‘å®šäº‹ä»¶å¹¶ç¼“å­˜ DOM
     bindAllEvents();
 }
 
 function bindAllEvents() {
-    // »º´æ¶Ô»°¿òÔªËØ
+    // ç¼“å­˜å¯¹è¯æ¡†å…ƒç´ 
     for (const type in DIALOG_TYPES) {
         const cfg = DIALOG_TYPES[type];
         dom[cfg.id] = document.getElementById(cfg.id);
@@ -135,7 +135,7 @@ function bindAllEvents() {
     dom.bgmToast = document.getElementById('bgmToast');
     dom.bgmInputField = document.getElementById('bgmInputField');
 
-    // Í¨ÓÃÊÂ¼ş´¦Àí£ºÊ¹ÓÃÊÂ¼şÎ¯ÍĞ£¬·ÅÔÚ bgmDialogContainer ÉÏ
+    // é€šç”¨äº‹ä»¶å¤„ç†ï¼šä½¿ç”¨äº‹ä»¶å§”æ‰˜ï¼Œæ”¾åœ¨ bgmDialogContainer ä¸Š
     const container = document.getElementById('bgmDialogContainer');
     container.addEventListener('click', (e) => {
         const btn = e.target.closest('button');
@@ -146,10 +146,10 @@ function bindAllEvents() {
         const modal = btn.closest('.bgm-modal');
         if (!modal) return;
 
-        // ¹Ø±Õ¶Ô»°¿ò
+        // å…³é—­å¯¹è¯æ¡†
         modal.style.display = 'none';
 
-        // »ñÈ¡µ±Ç°»Øµ÷²¢µ÷ÓÃ
+        // è·å–å½“å‰å›è°ƒå¹¶è°ƒç”¨
         if (_dialogCallback) {
             if (eventType === 'ok' && _dialogCallback.onOk) {
                 if (modal.id === 'bgmInputDialog') {
@@ -161,12 +161,12 @@ function bindAllEvents() {
             } else if (eventType === 'cancel' && _dialogCallback.onCancel) {
                 _dialogCallback.onCancel();
             }
-            // Ö´ĞĞºóÇåÀí»Øµ÷
+            // æ‰§è¡Œåæ¸…ç†å›è°ƒ
             _dialogCallback = null;
         }
     });
 
-    // Input ¿ò Enter ¼üÖ§³Ö
+    // Input æ¡† Enter é”®æ”¯æŒ
     dom.bgmInputField?.addEventListener('keypress', (e) => {
         if (e.key === 'Enter') {
             dom.bgmInputOk?.click();
@@ -175,15 +175,15 @@ function bindAllEvents() {
 }
 
 /**
- * Í¨ÓÃ¶Ô»°¿òÏÔÊ¾º¯Êı£¨ÄÚ²¿Ê¹ÓÃ£©
- * @param {string} type - ¶Ô»°¿òÀàĞÍ
+ * é€šç”¨å¯¹è¯æ¡†æ˜¾ç¤ºå‡½æ•°ï¼ˆå†…éƒ¨ä½¿ç”¨ï¼‰
+ * @param {string} type - å¯¹è¯æ¡†ç±»å‹
  * @param {object} opts - { message, title, onOk, onCancel, defaultValue }
  */
 function _showDialog(type, opts = {}) {
     const cfg = DIALOG_TYPES[type];
     const dialog = dom[cfg.id];
     if (!dialog) {
-        // »ØÍËµ½Ô­Éúµ¯´°
+        // å›é€€åˆ°åŸç”Ÿå¼¹çª—
         if (type === 'confirm') {
             if (window.confirm(opts.message)) {
                 opts.onOk && opts.onOk();
@@ -204,55 +204,55 @@ function _showDialog(type, opts = {}) {
         return;
     }
 
-    // ÉèÖÃ±êÌâÓëÏûÏ¢
+    // è®¾ç½®æ ‡é¢˜ä¸æ¶ˆæ¯
     dom[cfg.titleId].textContent = opts.title || '';
     dom[cfg.msgId].textContent = opts.message || '';
 
-    // Èç¹ûÊÇÊäÈë¿ò£¬ÉèÖÃÄ¬ÈÏÖµ
+    // å¦‚æœæ˜¯è¾“å…¥æ¡†ï¼Œè®¾ç½®é»˜è®¤å€¼
     if (type === 'input') {
         dom.bgmInputField.value = opts.defaultValue || '';
         dom.bgmInputField.focus();
     }
 
-    // ´æ´¢»Øµ÷
+    // å­˜å‚¨å›è°ƒ
     _dialogCallback = { onOk: opts.onOk, onCancel: opts.onCancel };
 
     dialog.style.display = 'flex';
 }
 
-// ========== ¹«¿ª API ==========
+// ========== å…¬å¼€ API ==========
 
-/** Alert ¶Ô»°¿ò */
+/** Alert å¯¹è¯æ¡† */
 export function showAlert(message, title, onOk) {
-    _showDialog('alert', { message, title: title || 'ÌáÊ¾', onOk });
+    _showDialog('alert', { message, title: title || 'æç¤º', onOk });
 }
 
-/** Confirm È·ÈÏ¶Ô»°¿ò */
+/** Confirm ç¡®è®¤å¯¹è¯æ¡† */
 export function showConfirm(message, title, onOk, onCancel) {
-    _showDialog('confirm', { message, title: title || 'È·ÈÏ', onOk, onCancel });
+    _showDialog('confirm', { message, title: title || 'ç¡®è®¤', onOk, onCancel });
 }
 
-/** Error ´íÎó¶Ô»°¿ò */
+/** Error é”™è¯¯å¯¹è¯æ¡† */
 export function showError(message, title, onOk) {
-    _showDialog('error', { message, title: title || '´íÎó', onOk });
+    _showDialog('error', { message, title: title || 'é”™è¯¯', onOk });
 }
 
-/** Warning ¾¯¸æ¶Ô»°¿ò */
+/** Warning è­¦å‘Šå¯¹è¯æ¡† */
 export function showWarning(message, title, onOk) {
-    _showDialog('warning', { message, title: title || '¾¯¸æ', onOk });
+    _showDialog('warning', { message, title: title || 'è­¦å‘Š', onOk });
 }
 
-/** Success ³É¹¦¶Ô»°¿ò */
+/** Success æˆåŠŸå¯¹è¯æ¡† */
 export function showSuccess(message, title, onOk) {
-    _showDialog('success', { message, title: title || '³É¹¦', onOk });
+    _showDialog('success', { message, title: title || 'æˆåŠŸ', onOk });
 }
 
-/** Input ÊäÈë¶Ô»°¿ò */
+/** Input è¾“å…¥å¯¹è¯æ¡† */
 export function showInput(title, prompt, defaultValue, onOk, onCancel) {
     _showDialog('input', { title, message: prompt, onOk, onCancel, defaultValue });
 }
 
-// ========== ¿ì½İ¼æÈİº¯Êı ==========
+// ========== å¿«æ·å…¼å®¹å‡½æ•° ==========
 
 export function showInputDialog(title, placeholder, onSubmit) {
     showInput(title, placeholder, '', onSubmit);
@@ -264,7 +264,7 @@ export function closeInputDialog() {
 }
 
 export function showConfirmDialog(message, onConfirm) {
-    showConfirm(message, 'È·ÈÏ', onConfirm);
+    showConfirm(message, 'ç¡®è®¤', onConfirm);
 }
 
 export function closeConfirmDialog() {
@@ -272,15 +272,15 @@ export function closeConfirmDialog() {
     if (dialog) dialog.style.display = 'none';
 }
 
-/** ¹Ø±ÕËùÓĞ¶Ô»°¿ò£¨¼æÈİ¾É½Ó¿Ú£© */
+/** å…³é—­æ‰€æœ‰å¯¹è¯æ¡†ï¼ˆå…¼å®¹æ—§æ¥å£ï¼‰ */
 export function closeDialog(result) {
-    // ¹Ø±ÕËùÓĞÄ£Ì¬¿ò²¢µ÷ÓÃ¿ÉÄÜÒÅÁôµÄ»Øµ÷
+    // å…³é—­æ‰€æœ‰æ¨¡æ€æ¡†å¹¶è°ƒç”¨å¯èƒ½é—ç•™çš„å›è°ƒ
     for (const id in dom) {
         if (id.startsWith('bgm') && dom[id]?.classList?.contains('bgm-modal')) {
             dom[id].style.display = 'none';
         }
     }
-    // µ÷ÓÃ¾ÉÊ½»Øµ÷£¨Èç¹û´æÔÚ£©
+    // è°ƒç”¨æ—§å¼å›è°ƒï¼ˆå¦‚æœå­˜åœ¨ï¼‰
     if (window._dialogCallback) {
         window._dialogCallback(result);
         window._dialogCallback = null;
@@ -296,13 +296,13 @@ export function showDialog(title, message) {
     showAlert(message, title);
 }
 
-// ========== Toast Í¨Öª ==========
+// ========== Toast é€šçŸ¥ ==========
 
 export function showToast(message, type) {
     const toast = dom.bgmToast;
     if (!toast) return;
 
-    // Çå³ıÖ®Ç°µÄ¶¨Ê±Æ÷£¨±ÜÃâµş¼Ó£©
+    // æ¸…é™¤ä¹‹å‰çš„å®šæ—¶å™¨ï¼ˆé¿å…å åŠ ï¼‰
     if (_toastTimer) {
         clearTimeout(_toastTimer);
         _toastTimer = null;
@@ -320,7 +320,7 @@ export function showToast(message, type) {
     }, 3000);
 }
 
-// ========== ¹ÒÔØµ½ window£¨Ïòºó¼æÈİ£©==========
+// ========== æŒ‚è½½åˆ° windowï¼ˆå‘åå…¼å®¹ï¼‰==========
 window.showInputDialog = showInputDialog;
 window.closeInputDialog = closeInputDialog;
 window.showConfirmDialog = showConfirmDialog;
@@ -335,4 +335,4 @@ window.BGMError = showError;
 window.BGMWarning = showWarning;
 window.BGMSuccess = showSuccess;
 window.BGMInput = showInput;
-try { window.alert = showAlert; } catch(e) { /* alert Ö»¶ÁÊôĞÔ */ }
+try { window.alert = showAlert; } catch(e) { /* alert åªè¯»å±æ€§ */ }

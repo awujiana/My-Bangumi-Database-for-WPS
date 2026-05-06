@@ -6,10 +6,23 @@
 
 import { WPS_ENUM, XL, BGM_CONFIG, BGM_COLOR, LOG_LEVELS, ERROR_LEVELS, PANEL_CONFIG, BGM_SUBJECT_TYPES, SYNC_STATUS } from './core/constants.js';
 import { encryptToken, decryptToken, calcChecksum } from './core/crypto.js';
+import { BgmError } from './types/result.js';
+
+// 重新导出 ErrorLevel 和 BgmError（向后兼容）
+export { BgmError };
 
 // ========== 导出常量（向后兼容）==========
 export const WPS_Enum = WPS_ENUM;
 export { XL, BGM_CONFIG, BGM_COLOR, LOG_LEVELS, ERROR_LEVELS, PANEL_CONFIG, BGM_SUBJECT_TYPES, SYNC_STATUS };
+
+// ========== 错误级别枚举 ==========
+export const ErrorLevel = {
+    SILENT: 0,
+    WARN: 1,
+    ERROR: 2,
+    THROW: 3
+} as const;
+export type ErrorLevel = typeof ErrorLevel[keyof typeof ErrorLevel];
 
 // ========== 类型定义 ==========
 /** BGM 缓存数据结构 */
@@ -40,32 +53,8 @@ interface BGMUserInfo {
     username: string;
 }
 
-/** BGM 错误级别 */
-enum ErrorLevel {
-    SILENT = 0,
-    WARN = 1,
-    ERROR = 2,
-    THROW = 3
-}
 
-/** BGM 错误类 */
-export class BgmError extends Error {
-    code: string;
-    details: Record<string, unknown>;
-    timestamp: string;
 
-    constructor(message: string, code: string = 'UNKNOWN', details: Record<string, unknown> = {}) {
-        super(message);
-        this.name = 'BgmError';
-        this.code = code;
-        this.details = details;
-        this.timestamp = new Date().toISOString();
-    }
-
-    override toString(): string {
-        return `[${this.code}] ${this.message}`;
-    }
-}
 
 /** 对话框选项 */
 interface DialogOptions {
@@ -210,8 +199,7 @@ export const BGM: {
             }
         }
     },
-
-    // 统一消息通信
+ // 统一消息通信
     Message: {
         send: function(data: Record<string, unknown>, targetOrigin?: string): boolean {
             try {
@@ -231,8 +219,7 @@ export const BGM: {
             return this.send(data, targetOrigin);
         }
     },
-
-    // 向后兼容方法
+      // 向后兼容方法
     postMessage: function(data: Record<string, unknown>, targetOrigin?: string): boolean {
         return BGM.Message.send(data, targetOrigin);
     },
@@ -246,13 +233,13 @@ export const BGM: {
 
     showConfirm: function(title: string, message: string, onConfirm?: () => void, onCancel?: () => void): void {
         if (BGM.Message.send({ type: "showConfirm", title: title, message: message, onConfirm: true })) {
-            (window as unknown as Record<string, { confirm?: () => void; cancel?: () => void }>)._bgmConfirmCallback = { confirm: onConfirm, cancel: onCancel };
+            (window as any)._bgmConfirmCallback = { confirm: onConfirm, cancel: onCancel };
             return;
         }
         BGM.Dialog.confirm(message, onConfirm, onCancel);
     },
 
-    // 统一错误处理
+     // 统一错误处理
     handleError: function(error: unknown, options?: ErrorOptions): BgmError {
         const opts: ErrorOptions = {
             level: ErrorLevel.ERROR,
@@ -298,14 +285,15 @@ export const BGM: {
     },
 
     // 安全执行函数
-    safeExecute: function<T>(fn: () => T, context?: string, options?: ErrorOptions): T | BgmError {
-        try {
-            return fn();
-        } catch (error) {
-            return BGM.handleError(error, { context, ...options } as ErrorOptions);
+    safeExecute: function<T>(fn: () => T, context?:     
+    string, options?: ErrorOptions): T | BgmError {
+            try {
+                return fn();
+            } catch (error) {
+                return BGM.handleError(error, { context, ...    options } as ErrorOptions);
+            }
         }
-    }
-};
+    };
 
 // ========== 日志函数 ==========
 /**
@@ -319,14 +307,13 @@ export function bgmLog(level: number, message: string): void {
         console.log(prefix + ' ' + message);
     }
 }
-
 // ========== Application 获取 ==========
 /**
  * 获取 Application 对象
  */
 export function getApp(): unknown {
-    if (typeof window !== 'undefined' && (window as unknown as Record<string, unknown>).Application) {
-        return (window as unknown as Record<string, unknown>).Application;
+    if (typeof window !== 'undefined' && (window as any).Application) {
+        return (window as any).Application;
     }
     if (typeof Application !== 'undefined') {
         return Application;
@@ -353,18 +340,17 @@ export function colNumToLetter(col: number): string {
  */
 export function getCell(ws: unknown, row: number, col: number): unknown {
     try {
-        const wsObj = ws as { Range?: (addr: string) => unknown; Cells?: unknown };
+        const wsObj = ws as any;
         if (wsObj && typeof wsObj.Range === 'function') {
             const colLetter = colNumToLetter(col);
             return wsObj.Range(colLetter + row);
         }
-        const cellsObj = wsObj?.Cells as { Item?: (r: number, c: number) => unknown } | unknown;
+        const cellsObj = wsObj?.Cells;
         if (typeof cellsObj === 'object' && cellsObj !== null) {
-            if (typeof (cellsObj as { Item: (r: number, c: number) => unknown }).Item === 'function') {
-                return (cellsObj as { Item: (r: number, c: number) => unknown }).Item(row, col);
+            if (typeof cellsObj.Item === 'function') {
+                return cellsObj.Item(row, col);
             }
-            // Cells(row, col) 形式
-            return (cellsObj as (r: number, c: number) => unknown)(row, col);
+            return cellsObj(row, col);
         }
         return null;
     } catch (e) {
@@ -378,14 +364,13 @@ export function getCell(ws: unknown, row: number, col: number): unknown {
  */
 export function getCellValue(ws: unknown, row: number, col: number): string {
     try {
-        const cell = getCell(ws, row, col);
-        if (cell && (cell as { Value?: () => unknown }).Value) {
-            const val = (cell as { Value: () => unknown }).Value();
+        const cell = getCell(ws, row, col) as any;
+        if (cell?.Value != null) {
+            const val = typeof cell.Value === 'function' ? cell.Value() : cell.Value;
             return val !== null && val !== undefined ? String(val) : '';
         }
     } catch (e) {
-        const err = e as Error;
-        bgmLog(LOG_LEVELS.WARN, "getCellValue 失败: " + err.message);
+        bgmLog(LOG_LEVELS.WARN, "getCellValue 失败: " + (e as Error).message);
     }
     return "";
 }
@@ -395,16 +380,14 @@ export function getCellValue(ws: unknown, row: number, col: number): string {
  */
 export function readCell(ws: unknown, row: number, col: number): string {
     try {
-        const cell = getCell(ws, row, col);
+        const cell = getCell(ws, row, col) as any;
         if (!cell) return "";
-        const c = cell as Record<string, unknown>;
-        // 尝试多种取值方式
-        if (typeof c.Text === 'function') return String(c.Text());
-        if (c.Text !== undefined && c.Text !== null) return String(c.Text);
-        if (typeof c.Value2 === 'function') return String(c.Value2());
-        if (c.Value2 !== undefined && c.Value2 !== null) return String(c.Value2);
-        if (typeof c.Value === 'function') return String(c.Value());
-        if (c.Value !== undefined && c.Value !== null) return String(c.Value);
+        if (typeof cell.Text === 'function') return String(cell.Text());
+        if (cell.Text != null) return String(cell.Text);
+        if (typeof cell.Value2 === 'function') return String(cell.Value2());
+        if (cell.Value2 != null) return String(cell.Value2);
+        if (typeof cell.Value === 'function') return String(cell.Value());
+        if (cell.Value != null) return String(cell.Value);
         return "";
     } catch {
         return "";
@@ -416,19 +399,18 @@ export function readCell(ws: unknown, row: number, col: number): string {
  */
 export function setCellValue(ws: unknown, row: number, col: number, value: unknown): boolean {
     try {
-        const cell = getCell(ws, row, col);
+        const cell = getCell(ws, row, col) as any;
         if (!cell) {
             console.error("setCellValue - 无法获取单元格:", row, col);
             return false;
         }
-        (cell as { Value: unknown }).Value = value;
+        cell.Value = value;
         return true;
     } catch (e) {
-        console.error("setCellValue error (行:", row, "列:", col, "):", e);
+        console.error("setCellValue error:", e);
     }
     return false;
 }
-
 /**
  * 获取工作表对象
  */
@@ -782,9 +764,9 @@ export function closeAlertDialog(): void {
     };
 })();
 
-// ========== 向后兼容别名（挂载到 window）==========
+// ========== 向后兼容别名 ==========
 if (typeof window !== 'undefined') {
-    const win = window as unknown as Record<string, unknown>;
+    const win = window as any;
     win.WPS_Enum = WPS_ENUM;
     win.XL = XL;
     win.BGM_CONFIG = BGM_CONFIG;
