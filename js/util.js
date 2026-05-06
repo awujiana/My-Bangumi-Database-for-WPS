@@ -3,11 +3,11 @@
  * @module util
  * @description 提供通用工具函数、常量定义、错误处理等核心功能
  */
-import { WPS_ENUM, XL, BGM_CONFIG, BGM_COLOR, LOG_LEVELS, ERROR_LEVELS } from './core/constants.js';
+import { WPS_ENUM, XL, BGM_CONFIG, BGM_COLOR, LOG_LEVELS, ERROR_LEVELS, PANEL_CONFIG, BGM_SUBJECT_TYPES, SYNC_STATUS } from './core/constants.js';
 import { encryptToken, decryptToken, calcChecksum } from './core/crypto.js';
 // ========== 导出常量（向后兼容）==========
 export const WPS_Enum = WPS_ENUM;
-export { XL, BGM_CONFIG, BGM_COLOR, LOG_LEVELS, ERROR_LEVELS };
+export { XL, BGM_CONFIG, BGM_COLOR, LOG_LEVELS, ERROR_LEVELS, PANEL_CONFIG, BGM_SUBJECT_TYPES, SYNC_STATUS };
 
 
 /** BGM 错误类 */
@@ -23,19 +23,6 @@ export class BgmError extends Error {
         return `[${this.code}] ${this.message}`;
     }
 }
-// ========== 任务面板配置常量 ==========
-export const PANEL_CONFIG = {
-  /** 表头/数据扫描的最大列数 */
-  MAX_SCAN_COLUMNS: 60,
-  /** 表头检测的最大扫描行数 */
-  MAX_SCAN_ROWS: 10,
-  /** 预览显示的数据行数上限 */
-  PREVIEW_LIMIT: 8,
-  /** 筛选检测最大行数（SpecialCells 可用时） */
-  MAX_FILTER_SCAN_ROWS: 5000,
-  /** 回退方式（逐行 Hidden 检查）的最大行数 */
-  FILTER_FALLBACK_LIMIT: 200,
-};
 
 
 

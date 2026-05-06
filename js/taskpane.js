@@ -29,20 +29,25 @@ function toggleSheetLock() {
     if (!select) return;
 
     const sheetIndex = parseInt(select.value, 10);
+    // 修复：防止 NaN 索引
+    if (isNaN(sheetIndex) || sheetIndex <= 0) {
+        showToast("请先选择一个有效的工作表", "warn");
+        return;
+    }
 
     if (BGM.sheet.isLocked && BGM.sheet.lockedIndex === sheetIndex) {
         BGM.sheet.lockedIndex = null;
         BGM.sheet.lockedName = null;
         BGM.sheet.isLocked = false;
         saveLockedSheet(null);  // 清除缓存
-        showToast("\u5DF2\u89E3\u9501\u5DE5\u4F5C\u8868", "info");
+        showToast("已解锁工作表", "info");
     } else {
         let sheetName = select.options[select.selectedIndex]?.text || "";
         BGM.sheet.lockedIndex = sheetIndex;
         BGM.sheet.lockedName = sheetName;
         BGM.sheet.isLocked = true;
         saveLockedSheet({ index: sheetIndex, name: sheetName });  // 写入缓存
-        showToast("\u5DF2\u9501\u5B9A\u5DE5\u4F5C\u8868: " + sheetName, "info");
+        showToast("已锁定工作表: " + sheetName, "info");
     }
     updateLockButton();
     refreshData();
@@ -68,9 +73,10 @@ function restoreLockedSheet() {
         if (raw) {
             try {
                 let info = JSON.parse(raw);
-                BGM.sheet.lockedIndex = info.index || null;
+                // 修复：index 可能为 0（避免被 || 误判为 falsy）
+                BGM.sheet.lockedIndex = (info.index != null) ? info.index : null;
                 BGM.sheet.lockedName = info.name || null;
-                BGM.sheet.isLocked = !!(info.index && info.name);
+                BGM.sheet.isLocked = !!(info.index != null && info.name);
                 return true;
             } catch (e) {
                 // 缓存数据损坏，清除
@@ -90,10 +96,10 @@ function updateLockButton() {
     
     if (btn) {
         if (BGM.sheet.isLocked) {
-            btn.textContent = "🔓 \u89E3\u9501";
+            btn.textContent = "🔓 解锁";
             btn.classList.add("locked");
         } else {
-            btn.textContent = "🔒 \u9501\u5B9A";
+            btn.textContent = "🔒 锁定";
             btn.classList.remove("locked");
         }
     }
@@ -101,7 +107,7 @@ function updateLockButton() {
     if (status) {
         if (BGM.sheet.isLocked) {
             status.style.display = "inline";
-            status.textContent = "\u5DF2\u9501\u5B9A: " + BGM.sheet.lockedName;
+            status.textContent = "已锁定: " + BGM.sheet.lockedName;
         } else {
             status.style.display = "none";
         }
@@ -117,12 +123,12 @@ function refreshSheets() {
 
     let app = getApp();
     if (!app || !app.ActiveWorkbook) {
-        console.warn("refreshSheets: \u65E0\u6CD5\u83B7\u53D6 ActiveWorkbook");
+        console.warn("refreshSheets: 无法获取 ActiveWorkbook");
         return;
     }
 
     let sheets = app.ActiveWorkbook.Worksheets;
-    select.innerHTML = '<option value="">-- \u8BF7\u9009\u62E9 --</option>';
+    select.innerHTML = '<option value="">-- 请选择 --</option>';
 
     for (let i = 1; i <= sheets.Count; i++) {
         let option = document.createElement("option");
@@ -243,7 +249,9 @@ function detectHeaderAndColumns(ws, opts = {}) {
 
     // 3. 检测多行表头（下一行是否填充了当前表头的空列）
     let dataStartRow = headerRow + 1;
-    if (headerRow + 1 <= 100) {
+    // 修复：使用配置常量替代硬编码 100
+    const secondHeaderRowLimit = Math.min(headerRow + 1, PANEL_CONFIG.MAX_SCAN_ROWS);
+    if (headerRow + 1 <= secondHeaderRowLimit) {
         let filled = 0, total = 0;
         for (let c = 1; c <= PANEL_CONFIG.MAX_SCAN_COLUMNS; c++) {
             const nv = readCell(ws, headerRow + 1, c).trim();
@@ -331,7 +339,7 @@ function autoDetectSheet() {
     let bestMatch = null;
 
     for (let si = 1; si <= sheets.Count; si++) {
-        let needRestore = false;
+        let needRestore = null; // 存储恢复函数
         try {
             const ws = sheets.Item(si);
             if (!ws) continue;
@@ -370,7 +378,10 @@ function autoDetectSheet() {
         } catch (e) {
             bgmLog(LOG_LEVELS.WARN, `autoDetectSheet: 扫描工作表 ${si} 出错: ${e.message}`);
         } finally {
-            if (needRestore) needRestore();   // 确保恢复
+            // 修复：正确调用返回的恢复函数（而不是不存在的 restoreActiveSheet）
+            if (typeof needRestore === 'function') {
+                needRestore();
+            }
         }
     }
 
@@ -640,7 +651,8 @@ function refreshData() {
                 }
             }
             if (any) {
-                previewRows.push({ row: r, cols: cols, isHeader: false });
+                // 修复：添加 aligned: true，否则预览不显示列内容
+                previewRows.push({ row: r, cols: cols, isHeader: false, aligned: true });
                 hasData = true;
                 count++;
             }
@@ -697,25 +709,25 @@ function onSelectModeChange() {
  * 面板初始化
  */
 function initPanel() {
-    bgmLog(LOG_LEVELS.INFO, "initPanel \u5F00\u59CB");
+    bgmLog(LOG_LEVELS.INFO, "initPanel 开始");
 
     // 检查枚举
     if (typeof window.Application.Enum !== "object") {
         window.Application.Enum = WPS_Enum;
-        bgmLog(LOG_LEVELS.DEBUG, "initPanel: \u5DF2\u8BBE\u7F6E WPS_Enum");
+        bgmLog(LOG_LEVELS.DEBUG, "initPanel: 已设置 WPS_Enum");
     }
 
     // 初始化消息监听
     initMessageListener();
-    bgmLog(LOG_LEVELS.DEBUG, "initPanel: \u6D88\u606F\u76D1\u542C\u5DF2\u521D\u59CB\u5316");
+    bgmLog(LOG_LEVELS.DEBUG, "initPanel: 消息监听已初始化");
 
     // 恢复锁定的工作表缓存
     let restored = restoreLockedSheet();
-    bgmLog(LOG_LEVELS.DEBUG, "initPanel: \u5DE5\u4F5C\u8868\u9501\u5B9A\u6062\u590D=" + restored);
+    bgmLog(LOG_LEVELS.DEBUG, "initPanel: 工作表锁定恢复=" + restored);
 
     // 初始化工作表列表（会自动选中锁定的工作表）
     refreshSheets();
-    bgmLog(LOG_LEVELS.DEBUG, "initPanel: \u5DE5\u4F5C\u8868\u5217\u8868\u5DF2\u5237\u65B0");
+    bgmLog(LOG_LEVELS.DEBUG, "initPanel: 工作表列表已刷新");
 
     // 每次启动都重新自动检测最佳工作表（避免旧锁定缓存指向无效表）
     let detected = autoDetectSheet();
@@ -729,8 +741,8 @@ function initPanel() {
         BGM.sheet.isLocked = true;
         saveLockedSheet({ index: detected.sheetIndex, name: detected.sheetName });
         updateLockButton();
-        bgmLog(LOG_LEVELS.INFO, "initPanel: \u81EA\u52A8\u8BC6\u522B\u5230\u6570\u636E\u8868 " + detected.sheetName +
-            " (\u5339\u914D" + detected.matchCount + "\u4E2A\u5173\u952E\u8BCD\uFF0C\u8868\u5934\u7B2C" + detected.headerRow + "\u884C, " + detected.colCount + "\u5217)");
+        bgmLog(LOG_LEVELS.INFO, "initPanel: 自动识别到数据表 " + detected.sheetName +
+            " (匹配" + detected.matchCount + "个关键词，表头第" + detected.headerRow + "行, " + detected.colCount + "列)");
         refreshData();
     } else {
         // 未检测到有效数据表，尝试使用恢复的锁定表
@@ -744,7 +756,7 @@ function initPanel() {
     // 更新状态显示
     updateTokenStatus();
     updateUserIdStatus();
-    bgmLog(LOG_LEVELS.DEBUG, "initPanel: Token/\u7528\u6237ID \u72B6\u6001\u5DF2\u66F4\u65B0");
+    bgmLog(LOG_LEVELS.DEBUG, "initPanel: Token/用户ID 状态已更新");
 
     // 绑定工作表选择事件
     let sheetSelect = document.getElementById("sheetSelect");
@@ -785,7 +797,7 @@ function initPanel() {
     // 通知 HTML 模块已就绪，启用按钮
     document.dispatchEvent(new CustomEvent('bgm:modulesReady'));
 
-    bgmLog(LOG_LEVELS.INFO, "initPanel \u5B8C\u6210");
+    bgmLog(LOG_LEVELS.INFO, "initPanel 完成");
 }
 
 /**
@@ -796,7 +808,7 @@ function fetchBgCollectionRecords() {
         // 委托给 handlers.js 的增强版（会触发完整交互流程）
         window.syncCollectionFromBgm();
     } else {
-        showAlert("\u8BF7\u5148\u8BBE\u7F6E Token\uFF01");
+        showAlert("请先设置 Token！");
     }
 }
 
@@ -808,7 +820,7 @@ function clearSyncRecords() {
     if (typeof _clearSyncRecords === 'function') {
         _clearSyncRecords();
     } else {
-        showAlert("\u6E05\u9664\u540C\u6B65\u8BB0\u5F55\u529F\u80FD\u672A\u52A0\u8F7D");
+        showAlert("清除同步记录功能未加载");
     }
 }
 
@@ -833,7 +845,7 @@ function getSelectedSheetName() {
 function markUploadedItemsDefault() {
     let sheetName = getSelectedSheetName();
     if (!sheetName) {
-        showAlert('\u8BF7\u5148\u9009\u62E9\u5DE5\u4F5C\u8868！');
+        showAlert('请先选择工作表！');
         return;
     }
     markUploadedItems(sheetName);
@@ -845,7 +857,7 @@ function markUploadedItemsDefault() {
 function clearSheetMarksDefault() {
     let sheetName = getSelectedSheetName();
     if (!sheetName) {
-        showAlert('\u8BF7\u5148\u9009\u62E9\u5DE5\u4F5C\u8868！');
+        showAlert('请先选择工作表！');
         return;
     }
     clearSheetMarks(sheetName);
@@ -869,7 +881,13 @@ export {
 };
 
 // ========== 挂载到 window（向后兼容）==========
-window.addEventListener('load', initPanel);
+// 修复：当脚本在 load 事件后执行时仍能初始化
+if (document.readyState === 'complete') {
+    initPanel();
+} else {
+    window.addEventListener('load', initPanel);
+}
+
 window.initPanel = initPanel;
 window.refreshSheets = refreshSheets;
 window.refreshData = refreshData;

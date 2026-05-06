@@ -6,11 +6,12 @@
  */
 
 import { 
-    XL, BGM_CONFIG, LOG_LEVELS, BGM_COLOR, ERROR_LEVELS 
+    XL, BGM_CONFIG, LOG_LEVELS, BGM_COLOR, ERROR_LEVELS, 
+    PANEL_CONFIG, BGM_SUBJECT_TYPES, SYNC_STATUS
 } from './constants.js';
 
 // ========== 导出常量（确保全局可用）==========
-export { XL, BGM_CONFIG, LOG_LEVELS, BGM_COLOR, ERROR_LEVELS };
+export { XL, BGM_CONFIG, LOG_LEVELS, BGM_COLOR, ERROR_LEVELS, PANEL_CONFIG, BGM_SUBJECT_TYPES, SYNC_STATUS };
 
 // ========== 导出 BGM 命名空间 ==========
 export { BGM } from '../util.js';

@@ -38,7 +38,8 @@ export const BGM_COLOR = {
     LIGHT_GREEN: 0x92D050, // 已同步一次标记 - 浅绿
     DARK_GREEN: 0x00B050,  // 已同步多次标记 - 深绿
     GRAY: 0xD3D3D3,        // 表头灰色
-    WHITE: 0xFFFFFF        // 白色（清除标记）
+    WHITE: 0xFFFFFF ,       // 白色（清除标记）
+    GREEN: 0x50C092       // 浅绿色
 };
 
 // ========== Token 加密配置 ==========
@@ -69,4 +70,35 @@ export const ERROR_LEVELS = {
     WARN: 1,      // 警告
     ERROR: 2,     // 错误
     THROW: 3      // 抛出异常
+};
+
+// ========== 任务面板配置 ==========
+export const PANEL_CONFIG = {
+  /** 表头/数据扫描的最大列数 */
+  MAX_SCAN_COLUMNS: 60,
+  /** 表头检测的最大扫描行数 */
+  MAX_SCAN_ROWS: 10,
+  /** 预览显示的数据行数上限 */
+  PREVIEW_LIMIT: 8,
+  /** 筛选检测最大行数（SpecialCells 可用时） */
+  MAX_FILTER_SCAN_ROWS: 5000,
+  /** 回退方式（逐行 Hidden 检查）的最大行数 */
+  FILTER_FALLBACK_LIMIT: 200,
+};
+
+// ========== BGM 条目类型 ==========
+export const BGM_SUBJECT_TYPES = {
+    1: "书籍",
+    2: "动画",
+    3: "音乐",
+    4: "游戏",
+    6: "真人剧"
+};
+
+// ========== 同步记录状态 ==========
+export const SYNC_STATUS = {
+    SUCCESS: "成功",
+    FAIL: "失败",
+    SKIP: "跳过",
+    COLLECTED: "已收藏"
 };
