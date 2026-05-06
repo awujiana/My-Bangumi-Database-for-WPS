@@ -4,7 +4,7 @@
  * @description 面板操作处理、按钮绑定、业务对话框
  */
 
-import { bgmLog, BGM, LOG_LEVELS, loadBgToken, storeBgToken, clearBgToken, _getBgmUserId, _setBgmUserId, getApp, getCell, trim } from '../util.js';
+import { bgmLog, BGM, LOG_LEVELS, loadBgToken, storeBgToken, clearBgToken, _getBgmUserId, _setBgmUserId, getApp, getCell, trim, fetchBgmUserInfo } from '../util.js';
 import { BGM_COLOR } from '../util.js';
 import { showAlert, showConfirm, showError, showSuccess, showInput, showConfirmDialog, showToast } from './dialog.js';
 import { setSyncRunning, setStatus } from './message.js';
@@ -95,8 +95,8 @@ export function updateTokenStatus() {
         tokenStatus.style.color = "#4CAF50";
         tokenStatus.textContent = _T.set + " (" + token.substring(0, 4) + "...)";
         
-        if (typeof _fetchBgmUserInfo === 'function') {
-            _fetchBgmUserInfo(function(userInfo) {
+        if (typeof fetchBgmUserInfo === 'function') {
+            fetchBgmUserInfo().then(function(userInfo) {
                 if (userInfo && userInfo.username) {
                     tokenStatus.textContent = _T.set + ": " + userInfo.username;
                     updateUserIdStatus();

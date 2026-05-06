@@ -85,7 +85,7 @@ interface BgmWindow {
     loadBgToken?: () => string | null;
     _setBgmUserId?: (id: string) => void;
     _getBgmUserId?: () => string | null;
-    _fetchBgmUserInfo?: (callback?: (userInfo: BGMUserInfo | null) => void) => void;
+    fetchBgmUserInfo?: () => Promise<{ id: string; username: string } | null>;
     showBangumiPanel?: () => void;
     sleep?: (ms: number) => void;
     wpsPrompt?: (message: string, defaultValue?: string) => Promise<string | null>;

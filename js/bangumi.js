@@ -7,7 +7,7 @@
 import { XL, BGM_CONFIG, BGM_COLOR, LOG_LEVELS, BGM } from './util.js';
 import { getApp, bgmLog, getCell, getCellValue, sleep, loadBgToken,
          _setBgmUserId, _getBgmUserId, _getUserApiPath, trim,
-         colNumToLetter, storeBgToken } from './util.js';
+         colNumToLetter, storeBgToken, readCell } from './util.js';
 import { showDialog } from './ui/dialog.js';
 import { sendToTaskpane } from './core/unified.js';
 import { showTokenDialog, showUserIdDialog } from './ui/handlers.js';
@@ -52,7 +52,7 @@ const URL_PATTERNS = [
 ];
 
 // 表头识别关键词（覆盖用户实际表头 + bangumi.js 关键词）
-const HEADER_KEYWORDS = [
+export const HEADER_KEYWORDS = [
     "\u5e8f\u5217\u53f7", "\u662f\u5426\u770b\u5b8c", "\u770b\u5b8c\u65f6\u95f4", "\u5f00\u64ad\u5b63\u5ea6",
     "\u5f00\u64ad\u65e5\u671f", "\u5b8c\u64ad\u65e5", "\u7c7b\u522b", "\u539f\u4f5c\u6807\u7b7e", "\u5236\u4f5c\u516c\u53f8",
     "\u6807\u7b7e/\u5206\u7ea7", "\u7279\u70b9/\u5370\u8c61", "\u6253\u5206", "\u96c6\u53f7", "\u96c6\u6570",
@@ -64,6 +64,14 @@ const HEADER_KEYWORDS = [
     "\u89c2\u770b\u72b6\u6001", "\u6536\u85cf\u7c7b\u578b", "\u7ae0\u8282\u72b6\u6001", "\u540c\u6b65\u72b6\u6001",
     "\u5173\u8054\u7684\u52a8\u6f2b", "\u7cfb\u5217", "\u5b63\u6570", "\u65f6\u957f"
 ];
+
+// 预览时高亮显示的关键列
+export const IMPORTANT_COLS = {
+    "\u540d\u79f0": true, "\u662f\u5426\u770b\u5b8c": true, "bangumi url": true,
+    "url": true, "\u6253\u5206": true, "\u96c6\u6570": true, "\u611f\u8a00": true,
+    "\u5267\u900f/\u611f\u8a00": true, "\u7c7b\u578b": true, "\u72b6\u6001": true,
+    "status": true, "rate": true, "\u522b\u540d": true
+};
 
 // 表头字段映射
 const FIELD_NAME_MAP = {
@@ -596,8 +604,8 @@ export function SyncToBangumi() {
     }
 
     // 如果还没有缓存用户 ID，尝试通过 Token 获取
-    if (!BGM.cache.userId && typeof _fetchBgmUserInfo === 'function') {
-        _fetchBgmUserInfo(null);
+    if (!BGM.cache.userId && typeof fetchBgmUserInfo === 'function') {
+        fetchBgmUserInfo();
     }
 
     let lastRow = getLastRow(ws);
