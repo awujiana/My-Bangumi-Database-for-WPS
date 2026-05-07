@@ -1,56 +1,25 @@
 /**
- * 面板初始化
+ * 任务面板主模块（TypeScript 版）
+ * @module taskpane
+ * @description 面板初始化、事件绑定、核心逻辑
  */
-export function initPanel(): void;
-/**
- * 刷新工作表列表
- */
-export function refreshSheets(): void;
-/**
- * 刷新数据预览
- */
-export function refreshData(): void;
-/**
- * 切换工作表锁定状态，并缓存到 PluginStorage
- */
-export function toggleSheetLock(): void;
-/**
- * 模式切换处理
- */
-export function onSelectModeChange(): void;
-/**
- * 获取 BGM 收藏数据（委托给 handlers.js 增强版）
- */
-export function fetchBgCollectionRecords(): void;
-/**
- * 清除同步记录
- * 实际实现在 syncRecord.js 中，这里作为转发入口
- */
-export function clearSyncRecords(): void;
-import { markUploadedItems } from './ui/handlers.js';
-/**
- * 标记已上传条目（当前选择的工作表）
- */
-export function markUploadedItemsDefault(): void;
-import { clearSheetMarks } from './ui/handlers.js';
-/**
- * 清除工作表标记（当前选择的工作表）
- */
-export function clearSheetMarksDefault(): void;
-/**
- * 自动检测包含数据表头的工作表并选中
- * 扫描所有工作表，找表头匹配度最高的，自动选中、锁定、预览
- * @returns {{ sheetIndex: number, sheetName: string, headerRow: number, matchCount: number }|null}
- */
-export function autoDetectSheet(): {
+import { markUploadedItems, clearSheetMarks } from '../generated-types/ui/handlers.js';
+declare function toggleSheetLock(): void;
+declare function refreshSheets(): void;
+declare function autoDetectSheet(): {
     sheetIndex: number;
     sheetName: string;
     headerRow: number;
     matchCount: number;
+    colCount: number;
 } | null;
-/**
- * 更新筛选状态显示（增强版：显示筛选列名、条件、可见/隐藏行数）
- */
-export function updateFilterStatus(targetWs: any): void;
-export { markUploadedItems, clearSheetMarks };
+declare function updateFilterStatus(targetWs?: any): void;
+declare function refreshData(): void;
+declare function onSelectModeChange(): void;
+declare function initPanel(): void;
+declare function fetchBgCollectionRecords(): void;
+declare function clearSyncRecords(): void;
+declare function markUploadedItemsDefault(): void;
+declare function clearSheetMarksDefault(): void;
+export { initPanel, refreshSheets, refreshData, toggleSheetLock, onSelectModeChange, fetchBgCollectionRecords, clearSyncRecords, markUploadedItems, markUploadedItemsDefault, clearSheetMarks, clearSheetMarksDefault, autoDetectSheet, updateFilterStatus };
 //# sourceMappingURL=taskpane.d.ts.map

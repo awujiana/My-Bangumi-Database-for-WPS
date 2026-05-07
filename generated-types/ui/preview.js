@@ -3,10 +3,10 @@
  * @module ui/detail-preview
  * @description 数据预览、同步记录预览、详情模态框、单条上传
  */
-import { getApp, bgmLog, BGM, LOG_LEVELS, BGM_COLOR } from '../../generated-types/types/util.js';
-import { getCell, trim, _getUserApiPath } from '../../generated-types/types/util.js';
+import { getApp, bgmLog, BGM, LOG_LEVELS, BGM_COLOR } from '../../generated-types/tools/util.js';
+import { getCell, trim, _getUserApiPath } from '../../generated-types/tools/util.js';
 import { showAlert, showToast } from './dialog.js';
-import { escapeHtml } from '../util.js';
+import { escapeHtml } from '../../generated-types/tools/util.js';
 // ========== 依赖函数可用性检测（运行时可能由其他模块挂载到 window） ==========
 const hasFunc = {
     findHeaderRow: () => typeof window.findHeaderRow === 'function',

@@ -3,7 +3,7 @@
  * @module ui/message
  * @description 消息监听、消息处理、状态设置
  */
-import { BGM } from '../../generated-types/types/util.js';
+import { BGM } from '../../generated-types/tools/util.js';
 // ========== 消息监听 ==========
 export function initMessageListener() {
     window.addEventListener('message', (event) => {

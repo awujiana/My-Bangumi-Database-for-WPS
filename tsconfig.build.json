@@ -6,12 +6,16 @@
     "declarationMap": true,
     "declarationDir": "./generated-types",
     "sourceMap": false,
-    "noEmitOnError": false,           // 1️⃣ 改为 false，否则一个错就全部不生成
-    "allowJs": true,                  // 2️⃣ 新增，允许 TS 导入 JS 文件
+    "noEmitOnError": false,
+    "noImplicitAny": true,
+    "strictNullChecks": true,
+    "strictFunctionTypes": true,
+    "noImplicitReturns": true,
+
     "ignoreDeprecations": "6.0"
   },
   "include": [
-    "ts/**/*.ts"                      // ts/**/*.ts 已包含所有子目录
+    "ts/**/*.ts"
   ],
   "exclude": [
     "node_modules",

@@ -1,5 +1,5 @@
 import { WPS_ENUM, XL, BGM_CONFIG, BGM_COLOR, LOG_LEVELS, ERROR_LEVELS, PANEL_CONFIG, BGM_SUBJECT_TYPES, SYNC_STATUS } from '../core/constants.js';
-import { encryptToken, decryptToken, calcChecksum } from '../core/crypto.js';
+import { encryptToken, decryptToken, calcChecksum } from '../../generated-types/core/crypto.js';
 import { BgmError, ErrorLevel, type BGMCache, type BGMSheet, type BGMSync, type BGMUserInfo, type DialogOptions, type ErrorOptions,isWpsApp, type WpsApplication} from './index.js';
 
 // 重新导出（向后兼容）

@@ -4,8 +4,8 @@
     "module": "ESNext",
     "moduleResolution": "bundler",
     "lib": ["ES2022", "DOM", "DOM.Iterable"],
-   // 1️⃣ 关闭严格模式（TS 文件导入 JS 文件时会大量报错）
-    "strict": false,
+   
+    "strict": true,
     "noImplicitAny": true,
     "strictNullChecks": true,
     "strictFunctionTypes": true,
@@ -28,8 +28,7 @@
     "resolveJsonModule": true,
     "isolatedModules": true,
     "allowSyntheticDefaultImports": true,
-     // 2️⃣ 允许 TS 文件导入 JS 文件
-    "allowJs": true,
+     
     "typeRoots": [
       "./node_modules/@types",  // 1. npm 安装的类型定义
       "./generated-types",             // 2. 生成的类型定义 (.d.ts 和 .d.ts.map)

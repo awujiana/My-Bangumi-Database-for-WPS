@@ -43,16 +43,7 @@ interface FilterStatus {
     hiddenRows: number[];
 }
 
-interface SyncRecord {
-    sid: string;
-    name?: string;
-    url?: string;
-    time?: string;
-    status?: string;
-    count?: number;
-    message?: string;
-    content?: string;
-}
+
 
 interface BangumiCollectionItem {
     subject_id: string;
