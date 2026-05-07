@@ -3,7 +3,7 @@
  * @module http
  * @description 支持异步请求、进度回调、自动重试、限流处理
  */
-import { BGM_CONFIG, LOG_LEVELS } from '../../js/core/constants.js';
+import { BGM_CONFIG, LOG_LEVELS } from '../core/constants.js';
 import { bgmLog } from './util.js';
 import { Result, BgmError, toSyncResult } from './index.js';
 const VALID_METHODS = ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'];

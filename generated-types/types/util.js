@@ -1,5 +1,5 @@
 import { WPS_ENUM, XL, BGM_CONFIG, BGM_COLOR, LOG_LEVELS, ERROR_LEVELS, PANEL_CONFIG, BGM_SUBJECT_TYPES, SYNC_STATUS } from '../core/constants.js';
-import { encryptToken, decryptToken, calcChecksum } from '../../js/core/crypto.js';
+import { encryptToken, decryptToken, calcChecksum } from '../core/crypto.js';
 import { BgmError, ErrorLevel, isWpsApp } from './index.js';
 // 重新导出（向后兼容）
 export { BgmError, ErrorLevel };
@@ -108,6 +108,7 @@ export const BGM = {
                         this.error(title, message);
                         break;
                     case 'confirm':
+                        // 传递 message 而非 onConfirm
                         this.confirm(message, options?.onConfirm, options?.onCancel);
                         break;
                     case 'input':

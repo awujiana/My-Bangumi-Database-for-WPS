@@ -5,7 +5,7 @@
  */
 
 import { bgmLog, LOG_LEVELS } from '../../generated-types/types/util.js';
-import  {  TokenVerifyResult, BgmError, ApiResonance,BangumiUserData ,} from '../../generated-types/types/index.js';
+import  {  TokenVerifyResult, BgmError, ApiResponse,BangumiUserData ,} from '../../generated-types/types/index.js';
 
 
 // ========== 配置 ==========

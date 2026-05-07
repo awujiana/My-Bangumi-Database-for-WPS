@@ -43,14 +43,18 @@ interface SyncResult {
 }
 
 interface CollectionItem {
+  seq?: number | string;
+  time?: string;
   name?: string;
   url?: string;
   sid?: string;
-  type?: string;
+  type?: string | number;
+  count?: number;
   content?: string;
   status?: string;
   message?: string;
-  count?: number;
+  comment?: string;  // 修复：添加 comment 属性
+  row?: number;
 }
 
 interface SyncOptions {
@@ -486,7 +490,16 @@ export function SyncToBangumi(): SyncResult | undefined {
       logEntries.push(info);
       if (typeof (window as any).addSyncRecord === 'function' && typeof (window as any).getOrCreateSyncRecordSheet === 'function') {
         let syncSheet = (window as any).getOrCreateSyncRecordSheet();
-        if (syncSheet) (window as any).addSyncRecord(syncSheet, { name: name || "(无名称)", url: bgmUrl, sid: "", type: itemType, content: "跳过原因：缺少 Bangumi URL", status: "跳过", comment: "行" + i + " 无BGM链接", count: 1 });
+        if (syncSheet) (window as any).addSyncRecord(syncSheet, { 
+          name: name || "(无名称)", 
+          url: bgmUrl, 
+          sid: "", 
+          type: itemType, 
+          content: "跳过原因：缺少 Bangumi URL", 
+          status: "跳过", 
+          comment: "行" + i + " 无BGM链接", 
+          count: 1 
+        });
       }
       sleep(BGM_CONFIG.REQUEST_DELAY);
       continue;
@@ -502,7 +515,16 @@ export function SyncToBangumi(): SyncResult | undefined {
       logEntries.push(info);
       if (typeof (window as any).addSyncRecord === 'function' && typeof (window as any).getOrCreateSyncRecordSheet === 'function') {
         let syncSheet = (window as any).getOrCreateSyncRecordSheet();
-        if (syncSheet) (window as any).addSyncRecord(syncSheet, { name: name || "(无名称)", url: bgmUrl, sid: subjectId, type: itemType, content: "跳过原因：观看状态「" + watchStatus + "」不需要上传", status: "跳过", comment: "行" + i + " 状态=不传", count: 1 });
+        if (syncSheet) (window as any).addSyncRecord(syncSheet, { 
+          name: name || "(无名称)", 
+          url: bgmUrl, 
+          sid: subjectId, 
+          type: itemType, 
+          content: "跳过原因：观看状态「" + watchStatus + "」不需要上传", 
+          status: "跳过", 
+          comment: "行" + i + " 状态=不传", 
+          count: 1 
+        });
       }
       continue;
     }
@@ -516,7 +538,16 @@ export function SyncToBangumi(): SyncResult | undefined {
       if (colorCell?.Interior) colorCell.Interior.Color = success ? BGM_COLOR.SUCCESS : BGM_COLOR.FAIL;
     } catch(e){}
 
-    let recordData: CollectionItem = { name: name || "(无名称)", url: bgmUrl, sid: subjectId, type: itemType, content: bodySummary, status: success ? "成功" : "失败", message: success ? `行 ${i}` : (result.message || `HTTP ${result.code}`), count: 1 };
+    let recordData: CollectionItem = { 
+      name: name || "(无名称)", 
+      url: bgmUrl, 
+      sid: subjectId, 
+      type: itemType, 
+      content: bodySummary, 
+      status: success ? "成功" : "失败", 
+      message: success ? `行 ${i}` : (result.message || `HTTP ${result.code}`), 
+      count: 1 
+    };
     let logEntry = `${success ? '成功' : '失败'}] 行${i}: ${name || '(无名称)'} (SID=${subjectId}) - ${bodySummary}${!success ? ' 错误:' + (result.message || result.code) : ''}`;
     logEntries.push(logEntry);
 

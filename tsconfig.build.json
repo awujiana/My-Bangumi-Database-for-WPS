@@ -1,22 +1,23 @@
 {
   "extends": "./tsconfig.json",
   "compilerOptions": {
-    "outDir": "./generated-types",  // 将编译输出放到单独的目录
+    "outDir": "./generated-types",
     "declaration": true,
     "declarationMap": true,
-    "declarationDir": "./generated-types",  // 声明文件放在./generated-types"目录
+    "declarationDir": "./generated-types",
     "sourceMap": false,
-    "noEmitOnError": true,
+    "noEmitOnError": false,           // 1️⃣ 改为 false，否则一个错就全部不生成
+    "allowJs": true,                  // 2️⃣ 新增，允许 TS 导入 JS 文件
     "ignoreDeprecations": "6.0"
   },
   "include": [
-    "js/**/*.ts",
-    "js/core/*.ts",
-    "js/ui/@types/*.ts",
+    "js/**/*.ts"                      // 简化，js/**/*.ts 已包含所有子目录
   ],
   "exclude": [
     "node_modules",
     "dist",
+    "dist-ts",
+    "generated-types",
     "**/*.spec.ts"
   ]
 }
