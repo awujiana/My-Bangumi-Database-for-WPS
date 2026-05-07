@@ -15,7 +15,7 @@
     "ignoreDeprecations": "6.0"
   },
   "include": [
-    "ts/**/*.ts"
+    "ts/*"
   ],
   "exclude": [
     "node_modules",
