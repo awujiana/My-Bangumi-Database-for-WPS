@@ -5,13 +5,13 @@
 'use strict';
 
 const MODULES = [
-    { src: 'dist-ts/core/constants.js', type: 'module', critical: true },
-    { src: 'dist-ts/core/crypto.js', type: 'module', critical: true },
-    { src: 'dist-ts/tools/index.js', type: 'module', critical: true },     // 先加载类型/枚举
-    { src: 'dist-ts/core/result.js', type: 'module', critical: true },     // BgmError + Result
-    { src: 'dist-ts/tools/wps.js', type: 'module', critical: true },        // isWpsApp 等
-    { src: 'dist-ts/tools/util.js', type: 'module', critical: true },
-    { src: 'dist-ts/tools/http.js', type: 'module' },
+    { src: 'generated-types/core/constants.js', type: 'module', critical: true },
+    { src: 'generated-types/core/crypto.js', type: 'module', critical: true },
+    { src: 'generated-types/tools/index.js', type: 'module', critical: true },     // 先加载类型/枚举
+    { src: 'generated-types/core/result.js', type: 'module', critical: true },     // BgmError + Result
+    { src: 'generated-types/tools/wps.js', type: 'module', critical: true },        // isWpsApp 等
+    { src: 'generated-types/tools/util.js', type: 'module', critical: true },
+    { src: '/tools/http.js', type: 'module' },
     { src: 'dist-ts/ui/dialog.js', type: 'module' },
     { src: 'dist-ts/ui/message.js', type: 'module' },
     { src: 'dist-ts/ui/preview.js', type: 'module' },
