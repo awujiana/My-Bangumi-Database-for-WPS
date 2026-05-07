@@ -14,7 +14,7 @@ import { setStatus } from './message.js';
 
 
 // ========== 业务函数导入 ==========
-import { verifyToken, fetchAllUserCollections } from '../sync/scaping.js';
+import { verifyToken, fetchAllUserCollections } from '../sync/scraping.js';
 import {
     findHeaderRow, getColumnMap, getLastRow, extractSubjectId,
     getFilterStatus, getSequentialRowsBySeqCol, SyncToBangumi,

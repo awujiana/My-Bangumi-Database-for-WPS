@@ -562,6 +562,8 @@ function refreshData(): void {
             updateLockButton();
             if (select) select.value = String(sheetIndex);
             showToast('已自动锁定工作表: ' + sheetName, 'info');
+            const meta = detectHeaderAndColumns(ws, { visibleRowSet, isFiltered });
+            bgmLog(LOG_LEVELS.INFO, `headerRow=${meta.headerRow}, dataStartRow=${meta.dataStartRow}, lastCol=${meta.lastCol}, previewColStart=${meta.previewColStart},  previewColEnd=${meta.previewColEnd}`);
         }
 
         if (previewBox) {
