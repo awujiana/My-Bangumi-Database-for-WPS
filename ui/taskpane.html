@@ -9,23 +9,23 @@
     <!-- ES6 模块加载（按依赖顺序）-->
     <script type="module">
         // 按依赖顺序导入模块（确保副作用按顺序执行）
-        import '../js/core/constants.js';
-        import '../js/core/crypto.js';
-        import '../js/tools/index.js';
-        import '../js/tools/result.js';
-        import '../js/tools/wps.js';
-        import '../js/tools/util.js';
-        import '../js/tools/http.js';
-        import '../js/ui/dialog.js';
-        import '../js/ui/message.js';
-        import '../js/ui/preview.js';
-        import '../js/sync/syncRecord.js';
-        import '../js/sync/scraping.js';
-        import '../js/sync/exceltobangumi.js';
-        import '../js/ui/handlers.js';
+        import '../ts/core/constants.js';
+        import '../ts/core/crypto.js';
+        import '../ts/tools/index.js';
+        import '../ts/tools/result.js';
+        import '../ts/tools/wps.js';
+        import '../ts/tools/util.js';
+        import '../ts/tools/http.js';
+        import '../ts/ui/dialog.js';
+        import '../ts/ui/message.js';
+        import '../ts/ui/preview.js';
+        import '../ts/sync/syncRecord.js';
+        import '../ts/sync/scraping.js';
+        import '../ts/sync/exceltobangumi.js';
+        import '../ts/ui/handlers.js';
     
         // 导入主页面逻辑（taskpane.js 会将函数挂载到 window）
-        import '../js/taskpane.js';
+        import '../ts/taskpane.js';
 
         // 确认挂载完成
         if (typeof window.initPanel === 'function') {
