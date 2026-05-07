@@ -11,7 +11,7 @@ import { getApp, bgmLog, getCell, getCellValue, sleep, loadBgToken,
 import { showDialog } from '../ui/dialog.js';
 import { sendToTaskpane } from '../core/unified.js';
 import { showTokenDialog, showUserIdDialog } from '../ui/handlers.js';
-import { httpRequest } from '../http.js';
+import { httpRequest } from '../../generated-types/types/http.js';
 import { Result } from '../types/result.js';
 
 // 定义接口类型
@@ -53,7 +53,7 @@ interface CollectionItem {
   content?: string;
   status?: string;
   message?: string;
-  comment?: string;  // 修复：添加 comment 属性
+  comment?: string;
   row?: number;
 }
 
@@ -63,6 +63,23 @@ interface SyncOptions {
 }
 
 interface ColumnMap extends Map<string, number> {}
+
+// 定义 Excel Range 接口
+interface ExcelRange {
+  Value2?: any;
+  Interior?: {
+    Color?: number;
+    ColorIndex?: number;
+  };
+  Font?: {
+    Bold?: boolean;
+    Size?: number;
+    Color?: number;
+  };
+  Row?: number;
+  Column?: number;
+  [key: string]: any;
+}
 
 // ========== 常量定义 ==========
 const COLUMNS = {
@@ -383,9 +400,11 @@ export function buildJsonPayload(ws: any, row: number, colMap: ColumnMap, finish
 
   if (colMap.has("打分")) {
     let rateVal = getCellValue(ws, row, colMap.get("打分")!);
-    if (!isNaN(rateVal)) {
-      let rate = Math.max(0, Math.min(10, parseInt(rateVal)));
-      if (rate > 0) parts.push('"rate":' + rate);
+    // 修复：将 rateVal 转换为字符串，然后解析为整数
+    let rateNum = parseInt(String(rateVal), 10);
+    if (!isNaN(rateNum)) {
+      let rate = Math.max(0, Math.min(10, rateNum));
+      if (rate >= 0) parts.push('"rate":' + rate);
     }
   }
 
@@ -485,7 +504,10 @@ export function SyncToBangumi(): SyncResult | undefined {
 
     if (!subjectId) {
       skipNoUrlCount++;
-      try { let cell = getCell(ws, i, 1); if (cell?.Interior) cell.Interior.Color = BGM_COLOR.SKIP; } catch(e){}
+      try { 
+        let cell = getCell(ws, i, 1) as ExcelRange; 
+        if (cell?.Interior) cell.Interior.Color = BGM_COLOR.SKIP; 
+      } catch(e){}
       let info = `跳过] 行${i}: ${name || "(无名称)"} - 缺少 Bangumi URL`;
       logEntries.push(info);
       if (typeof (window as any).addSyncRecord === 'function' && typeof (window as any).getOrCreateSyncRecordSheet === 'function') {
@@ -534,7 +556,7 @@ export function SyncToBangumi(): SyncResult | undefined {
     let success = [200, 201, 202, 204].includes(result.code);
 
     try {
-      let colorCell = getCell(ws, i, 1);
+      let colorCell = getCell(ws, i, 1) as ExcelRange;
       if (colorCell?.Interior) colorCell.Interior.Color = success ? BGM_COLOR.SUCCESS : BGM_COLOR.FAIL;
     } catch(e){}
 
@@ -655,10 +677,16 @@ export async function syncToBangumiAsync(ws: any, colMap: ColumnMap, token: stri
 
       if (syncSuccess) {
         successCount++;
-        try { const cell = getCell(ws, i, 1); if (cell?.Interior) cell.Interior.Color = BGM_COLOR.SUCCESS; } catch(_){}
+        try { 
+          const cell = getCell(ws, i, 1) as ExcelRange; 
+          if (cell?.Interior) cell.Interior.Color = BGM_COLOR.SUCCESS; 
+        } catch(_){}
       } else {
         failCount++;
-        try { const cell = getCell(ws, i, 1); if (cell?.Interior) cell.Interior.Color = BGM_COLOR.FAIL; } catch(_){}
+        try { 
+          const cell = getCell(ws, i, 1) as ExcelRange; 
+          if (cell?.Interior) cell.Interior.Color = BGM_COLOR.FAIL; 
+        } catch(_){}
       }
 
       if (syncRecordSheet && typeof (window as any).addSyncRecord === 'function') {
@@ -867,7 +895,10 @@ export function clearRowColors(): void {
   if (!ws) return;
   let lastRow = getLastRow(ws);
   for (let i = 2; i <= lastRow; i++) {
-    try { let cell = getCell(ws, i, 1); if (cell?.Interior) cell.Interior.ColorIndex = -4142; } catch(e){}
+    try { 
+      let cell = getCell(ws, i, 1) as ExcelRange; 
+      if (cell?.Interior) cell.Interior.ColorIndex = -4142; 
+    } catch(e){}
   }
   showDialog("完成", "已清除所有颜色标记");
 }

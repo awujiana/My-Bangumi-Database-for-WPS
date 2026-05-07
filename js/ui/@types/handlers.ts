@@ -9,9 +9,9 @@ import { bgmLog, BGM, LOG_LEVELS, loadBgToken, storeBgToken, clearBgToken, _getB
 import { BgmError, ErrorLevel, type BGMUserInfo, type ErrorOptions } from '../../../generated-types/types/index.js';
 import { BGM_COLOR } from '../../core/constants.js';
 import { showAlert, showConfirm, showError, showSuccess, showInput, showConfirmDialog, showToast } from './dialog.js';
-import { setSyncRunning, setStatus } from './message.js';
-import { handleError } from '../core/unified.js';
-import { verifyToken, fetchAllUserCollections } from '../sync/scraping.js';
+import { setSyncRunning, setStatus } from '../message.js';
+import { handleError } from '../../core/unified.js';
+import { verifyToken, fetchAllUserCollections } from '../../sync/scraping.js';
 
 // 声明外部全局函数
 declare const findHeaderRow: ((ws: unknown, startRow?: number) => number) | undefined;

@@ -3,11 +3,11 @@
  * @module bangumi
  * @description 从 Excel 读取条目并批量同步到 Bangumi 收藏
  */
-import { XL, BGM_CONFIG, BGM_COLOR, LOG_LEVELS, BGM } from '../util.js';
-import { getApp, bgmLog, getCell, getCellValue, sleep, loadBgToken, _getBgmUserId, _getUserApiPath, trim, colNumToLetter } from '../util.js';
+import { XL, BGM_CONFIG, BGM_COLOR, LOG_LEVELS, BGM } from '../../generated-types/types/util.js';
+import { getApp, bgmLog, getCell, getCellValue, sleep, loadBgToken, _getBgmUserId, _getUserApiPath, trim, colNumToLetter } from '../../generated-types/types/util.js';
 import { showDialog } from '../ui/dialog.js';
 import { showUserIdDialog } from '../ui/handlers.js';
-import { httpRequest } from '../http.js';
+import { httpRequest } from '../../generated-types/types/http.js';
 // ========== 常量定义 ==========
 const COLUMNS = {
     SEQUENCE: 4, // D列 - 序号
@@ -323,9 +323,11 @@ export function buildJsonPayload(ws, row, colMap, finishedDate) {
     parts.push('"type":' + bgmType);
     if (colMap.has("打分")) {
         let rateVal = getCellValue(ws, row, colMap.get("打分"));
-        if (!isNaN(rateVal)) {
-            let rate = Math.max(0, Math.min(10, parseInt(rateVal)));
-            if (rate > 0)
+        // 修复：将 rateVal 转换为字符串，然后解析为整数
+        let rateNum = parseInt(String(rateVal), 10);
+        if (!isNaN(rateNum)) {
+            let rate = Math.max(0, Math.min(10, rateNum));
+            if (rate >= 0)
                 parts.push('"rate":' + rate);
         }
     }

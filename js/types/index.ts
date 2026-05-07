@@ -82,6 +82,28 @@ export interface BangumiUserData {
 
 
 
+export interface SyncRecord {
+  seq?: number | string;
+  time?: string;
+  name?: string;
+  url?: string;
+  sid?: string;
+  type?: string | number;
+  count?: number;
+  content?: string;
+  status?: string;
+  message?: string;
+  comment?: string;  
+  row?: number;
+}
+
+export interface UpdateRecordParams {
+  sid?: string;
+  time?: string;
+  status?: string;
+  message?: string;
+  count?: number;
+}
 
 
 

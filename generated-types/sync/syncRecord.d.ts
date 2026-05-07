@@ -3,26 +3,7 @@
  * @module sync/syncRecord
  * @description 管理同步记录工作表，记录同步历史
  */
-interface SyncRecord {
-    seq?: number | string;
-    time?: string;
-    name?: string;
-    url?: string;
-    sid?: string;
-    type?: string | number;
-    count?: number;
-    content?: string;
-    status?: string;
-    message?: string;
-    row?: number;
-}
-interface UpdateRecordParams {
-    sid?: string;
-    time?: string;
-    status?: string;
-    message?: string;
-    count?: number;
-}
+import { SyncRecord, UpdateRecordParams } from '../../generated-types/types/index.js';
 export declare function sendToTaskpaneSR(data: any): any;
 export declare function showDialogSR(title: string, message: string): void;
 export declare function setSyncRecordHeaders(sheet: any): void;
@@ -44,5 +25,4 @@ export declare function openSyncRecordSheet(): void;
 export declare function formatCurrentTime(): string;
 export declare function fetchAndRecordBgCollections(_token: string, _userId: string, collections: any[]): void;
 export declare function clearSheetMarksInSheet(sheetIndex: number): void;
-export {};
 //# sourceMappingURL=syncRecord.d.ts.map

@@ -6,9 +6,9 @@
 import { bgmLog, BGM, LOG_LEVELS, loadBgToken, storeBgToken, _getBgmUserId, _setBgmUserId, getApp, getCell, trim, fetchBgmUserInfo } from '../../../generated-types/types/util.js';
 import { BGM_COLOR } from '../../core/constants.js';
 import { showAlert, showError, showSuccess, showInput, showConfirmDialog, showToast } from './dialog.js';
-import { setStatus } from './message.js';
-import { handleError } from '../core/unified.js';
-import { verifyToken, fetchAllUserCollections } from '../sync/scraping.js';
+import { setStatus } from '../message.js';
+import { handleError } from '../../core/unified.js';
+import { verifyToken, fetchAllUserCollections } from '../../sync/scraping.js';
 // ========== 中文文本常量 ==========
 const _T = {
     setBgmToken: '\u8BBE\u7F6E Bangumi Access Token',

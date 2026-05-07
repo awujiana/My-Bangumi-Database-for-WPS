@@ -6,29 +6,8 @@
 
 import { XL, BGM_COLOR, LOG_LEVELS, BGM, BGM_SUBJECT_TYPES, SYNC_STATUS } from '../../generated-types/types/util.js';
 import { getApp, bgmLog, colNumToLetter, getCell } from '../../generated-types/types/util.js';
+import { SyncRecord, UpdateRecordParams } from '../../generated-types/types/index.js';
 
-// 定义接口类型
-interface SyncRecord {
-  seq?: number | string;
-  time?: string;
-  name?: string;
-  url?: string;
-  sid?: string;
-  type?: string | number;
-  count?: number;
-  content?: string;
-  status?: string;
-  message?: string;
-  row?: number;
-}
-
-interface UpdateRecordParams {
-  sid?: string;
-  time?: string;
-  status?: string;
-  message?: string;
-  count?: number;
-}
 
 // ========== 向后兼容别名 ==========
 export function sendToTaskpaneSR(data: any): any {
