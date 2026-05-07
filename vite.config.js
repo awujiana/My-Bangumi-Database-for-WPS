@@ -1,14 +1,12 @@
 // vite.config.js
 import { fileURLToPath } from 'node:url'
 import { defineConfig } from 'vite'
-import { functionsScanner } from "wpsjs/vite_plugins"
 import { viteStaticCopy } from 'vite-plugin-static-copy'
 
 export default defineConfig({
   base: './',
   root: '.',
   plugins: [
-   
     viteStaticCopy({
       targets: [
         { src: 'manifest.xml', dest: '.' },
@@ -20,22 +18,13 @@ export default defineConfig({
       ]
     })
   ],
-  resolve: {
-    alias: {
-      '@': fileURLToPath(new URL('./js', import.meta.url))
-    }
-  },
-  server: {
-    host: '0.0.0.0',
-    port: 3889
-  },
   build: {
     outDir: 'dist',
     emptyOutDir: true,
     rollupOptions: {
       input: {
-        main: 'index.html',
-        taskpane: 'ui/taskpane.html'
+        main: 'index.html'
+        // 移除 taskpane.html 入口，它由 viteStaticCopy 直接复制
       },
       output: {
         entryFileNames: 'assets/[name].[hash].js',
