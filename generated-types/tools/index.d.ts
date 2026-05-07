@@ -4,11 +4,11 @@
  * @description 所有项目的全局类型、接口、类、枚举的统一导出入口
  *              其他模块只需 `import { ... } from './types/index.js'`
  */
-export { BgmError } from './result.js';
-export type { BgmResultError } from './result.js';
-export { Result } from './result.js';
-export type { SyncResult } from './result.js';
-export { toSyncResult } from './result.js';
+export { BgmError } from '../core/result.js';
+export type { BgmResultError } from '../core/result.js';
+export { Result } from '../core/result.js';
+export type { SyncResult } from '../core/result.js';
+export { toSyncResult } from '../core/result.js';
 export declare const ErrorLevel: {
     readonly SILENT: 0;
     readonly WARN: 1;

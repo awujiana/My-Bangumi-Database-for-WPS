@@ -3,7 +3,7 @@
  * @module ui/message
  * @description 消息监听、消息处理、状态设置
  */
-import { BGM } from '../../generated-types/tools/util.js';
+import { BGM } from '../tools/util.js';
 // ========== 消息监听 ==========
 export function initMessageListener() {
     window.addEventListener('message', (event) => {
@@ -60,7 +60,3 @@ export function setSyncRunning(isRunning) {
         syncBtn.textContent = isRunning ? '\u540C\u6B65\u4E2D...' : '\u{1F680} \u540C\u6B65\u5230 Bangumi';
     }
 }
-// ========== 向后兼容 ==========
-window.initMessageListener = initMessageListener;
-window.setStatus = setStatus;
-window.setSyncRunning = setSyncRunning;

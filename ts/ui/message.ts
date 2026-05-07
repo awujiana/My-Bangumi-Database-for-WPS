@@ -4,7 +4,7 @@
  * @description 消息监听、消息处理、状态设置
  */
 
-import { BGM } from '../../generated-types/tools/util.js';
+import { BGM } from '../tools/util.js';
 
 // ========== 类型定义 ==========
 interface MessageEventData {
@@ -74,7 +74,3 @@ export function setSyncRunning(isRunning: boolean): void {
     }
 }
 
-// ========== 向后兼容 ==========
-(window as any).initMessageListener = initMessageListener;
-(window as any).setStatus = setStatus;
-(window as any).setSyncRunning = setSyncRunning;

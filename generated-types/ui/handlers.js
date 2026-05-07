@@ -3,19 +3,17 @@
  * @module ui/handlers
  * @description 面板操作处理、按钮绑定、业务对话框
  */
+// ========== 工具与类型导入 ==========
 import { bgmLog, BGM, LOG_LEVELS, loadBgToken, storeBgToken, _getBgmUserId, _setBgmUserId, getApp, getCell, trim, fetchBgmUserInfo } from '../tools/util.js';
+import { BgmError } from '../tools/index.js';
 import { BGM_COLOR } from '../core/constants.js';
 import { showAlert, showError, showSuccess, showInput, showConfirmDialog, showToast } from './dialog.js';
 import { setStatus } from './message.js';
-import { handleError } from '../core/unified.js';
+// ========== 业务函数导入 ==========
 import { verifyToken, fetchAllUserCollections } from '../sync/scraping.js';
-// 从 exceltobangumi 导入
 import { findHeaderRow, getColumnMap, getLastRow, extractSubjectId, getFilterStatus, getSequentialRowsBySeqCol, SyncToBangumi, clearRowColors } from '../sync/exceltobangumi.js';
-// 从 syncRecord 导入
-import { getOrCreateSyncRecordSheet, getAllSyncRecords, addSyncRecord, clearSheetMarksInSheet } from '../sync/syncRecord.js';
-// 从 preview 导入
-import { previewSyncContent } from '../../../generated-types/ui/preview.js';
-// 从 taskpane 导入
+import { getOrCreateSyncRecordSheet, getAllSyncRecords, addSyncRecord, clearSheetMarksInSheet, markUploadedItemsInSheet } from '../sync/syncRecord.js';
+import { previewSyncContent } from './preview.js';
 import { refreshData } from '../taskpane.js';
 // ========== 中文文本常量 ==========
 const _T = {
@@ -272,7 +270,7 @@ export async function syncCollectionFromBgm() {
         await syncFromBgmByAPI(sheetIndex);
     }
     catch (e) {
-        handleError(e, { context: 'syncCollectionFromBgm', showDialog: true });
+        BgmError(e, { context: 'syncCollectionFromBgm', showDialog: true });
     }
 }
 export async function syncFromBgmByAPI(sheetIndex) {

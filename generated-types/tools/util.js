@@ -1,5 +1,5 @@
 import { WPS_ENUM, XL, BGM_CONFIG, BGM_COLOR, LOG_LEVELS, ERROR_LEVELS, PANEL_CONFIG, BGM_SUBJECT_TYPES, SYNC_STATUS } from '../core/constants.js';
-import { encryptToken, decryptToken, calcChecksum } from '../../generated-types/core/crypto.js';
+import { encryptToken, decryptToken } from '../core/cypto.js';
 import { BgmError, ErrorLevel, isWpsApp } from './index.js';
 // 重新导出（向后兼容）
 export { BgmError, ErrorLevel };
@@ -688,39 +688,3 @@ export function closeAlertDialog() {
         _origError.apply(console, argsArray);
     };
 })();
-// ========== 向后兼容别名 ==========
-if (typeof window !== 'undefined') {
-    const win = window;
-    win.WPS_Enum = WPS_ENUM;
-    win.XL = XL;
-    win.BGM_CONFIG = BGM_CONFIG;
-    win.BGM_COLOR = BGM_COLOR;
-    win.BGM = BGM;
-    win.bgmLog = bgmLog;
-    win.getApp = getApp;
-    win.colNumToLetter = colNumToLetter;
-    win.getCell = getCell;
-    win.getCellValue = getCellValue;
-    win.setCellValue = setCellValue;
-    win.readCell = readCell;
-    win.getSheetByIndex = getSheetByIndex;
-    win.escapeHtml = escapeHtml;
-    win.storeBgToken = storeBgToken;
-    win.clearBgToken = clearBgToken;
-    win.loadBgToken = loadBgToken;
-    win._setBgmUserId = _setBgmUserId;
-    win._getBgmUserId = _getBgmUserId;
-    win._getUserApiPath = _getUserApiPath;
-    win._fetchBgmUserInfo = _fetchBgmUserInfo;
-    win.fetchBgmUserInfo = fetchBgmUserInfo;
-    win.showAlertDialog = showAlertDialog;
-    win.closeAlertDialog = closeAlertDialog;
-    win.shellExecuteByOAAssist = shellExecuteByOAAssist;
-    win.GetUrlPath = GetUrlPath;
-    win.showBangumiPanel = showBangumiPanel;
-    win.trim = trim;
-    win.wpsPrompt = wpsPrompt;
-    win.wpsMsgBox = wpsMsgBox;
-    win.sleep = sleep;
-    win.calcChecksum = calcChecksum;
-}

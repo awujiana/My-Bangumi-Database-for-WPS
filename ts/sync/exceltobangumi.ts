@@ -12,7 +12,7 @@ import { showDialog } from '../ui/dialog.js';
 import { sendToTaskpane } from '../core/unified.js';
 import { showTokenDialog, showUserIdDialog } from '../ui/handlers.js';
 import { httpRequest } from '../tools/http.js';
-import { Result } from '../tools/result.js';
+import { Result } from '../core/result.js';
 
 // 定义接口类型
 interface FilterStatus {

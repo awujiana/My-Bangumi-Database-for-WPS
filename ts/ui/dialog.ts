@@ -324,25 +324,3 @@ export function showToast(message: string, type?: string): void {
         _toastTimer = null;
     }, 3000);
 }
-
-// ========== 挂载到 window（向后兼容）==========
-(window as any).showInputDialog = showInputDialog;
-(window as any).closeInputDialog = closeInputDialog;
-(window as any).showConfirmDialog = showConfirmDialog;
-(window as any).closeConfirmDialog = closeConfirmDialog;
-(window as any).closeDialog = closeDialog;
-(window as any).closeAlertDialog = closeAlertDialog;
-(window as any).showAlertDialog = showAlert;
-(window as any).showAlert = showAlert;
-(window as any).BGMAlert = showAlert;
-(window as any).BGMConfirm = showConfirm;
-(window as any).BGMError = showError;
-(window as any).BGMWarning = showWarning;
-(window as any).BGMSuccess = showSuccess;
-(window as any).BGMInput = showInput;
-
-try {
-    (window as any).alert = showAlert;
-} catch (e) {
-    /* alert 是只读属性 */
-}

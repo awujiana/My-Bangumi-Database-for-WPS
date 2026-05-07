@@ -134,8 +134,3 @@ export async function fetchAllUserCollections(token, userId) {
     bgmLog(LOG_LEVELS.INFO, `共获取 ${allCollections.length} 条收藏记录`);
     return allCollections;
 }
-// ========== 向后兼容 ==========
-if (typeof window !== 'undefined') {
-    window.verifyToken = verifyToken;
-    window.fetchAllUserCollections = fetchAllUserCollections;
-}

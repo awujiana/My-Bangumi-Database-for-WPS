@@ -3,10 +3,10 @@
  * @module ui/detail-preview
  * @description 数据预览、同步记录预览、详情模态框、单条上传
  */
-import { getApp, bgmLog, BGM, LOG_LEVELS, BGM_COLOR } from '../../generated-types/tools/util.js';
-import { getCell, trim, _getUserApiPath } from '../../generated-types/tools/util.js';
+import { getApp, bgmLog, BGM, LOG_LEVELS, BGM_COLOR } from '../tools/util.js';
+import { getCell, trim, _getUserApiPath } from '../tools/util.js';
 import { showAlert, showToast } from './dialog.js';
-import { escapeHtml } from '../../generated-types/tools/util.js';
+import { escapeHtml } from '../tools/util.js';
 // ========== 依赖函数可用性检测（运行时可能由其他模块挂载到 window） ==========
 const hasFunc = {
     findHeaderRow: () => typeof window.findHeaderRow === 'function',
@@ -46,7 +46,8 @@ function isUploadedByColor(seqCell) {
     return (color === BGM_COLOR.SUCCESS ||
         color === BGM_COLOR.LIGHT_GREEN ||
         color === BGM_COLOR.DARK_GREEN ||
-        color === BGM_COLOR.UPLOADED_ALT // 替换魔术数字 5292178
+        color === BGM_COLOR.GREEN ||
+    // 替换魔术数字 5292178
     );
 }
 /**
@@ -537,17 +538,4 @@ export function updateDetailCount(count) {
     const countEl = document.getElementById("detailCount");
     if (countEl)
         countEl.textContent = count + ' 条';
-}
-// ========== 挂载到 window ==========
-if (typeof window !== 'undefined') {
-    window.previewSyncContent = previewSyncContent;
-    window.uploadSingleRow = uploadSingleRow;
-    window.updateUploadStats = updateUploadStats;
-    window.filterDetailItems = filterDetailItems;
-    window.showDetailModal = showDetailModal;
-    window.closeDetailModal = closeDetailModal;
-    window.viewSyncRecordDetail = viewSyncRecordDetail;
-    window.buildPreviewPayload = buildPreviewPayload;
-    window.updateDetailCount = updateDetailCount;
-    window.detailPreviewData = detailPreviewData; // 保持引用兼容
 }

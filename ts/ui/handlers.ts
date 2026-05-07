@@ -4,37 +4,30 @@
  * @description 面板操作处理、按钮绑定、业务对话框
  */
 
-import { bgmLog, BGM, LOG_LEVELS, loadBgToken, storeBgToken, clearBgToken, _getBgmUserId, _setBgmUserId, getApp, getCell, trim, fetchBgmUserInfo } from '../tools/util.js';
-
-import { BgmError, ErrorLevel, type BGMUserInfo, type ErrorOptions } from '../tools/index.js';
+// ========== 工具与类型导入 ==========
+import { bgmLog, BGM, LOG_LEVELS, loadBgToken, storeBgToken, _getBgmUserId, _setBgmUserId, getApp, getCell, trim, fetchBgmUserInfo } from '../tools/util.js';
+import { BgmError, ErrorLevel, type BGMUserInfo, type ErrorOptions, type SyncRecord } from '../tools/index.js';
 import { BGM_COLOR } from '../core/constants.js';
 import { showAlert, showConfirm, showError, showSuccess, showInput, showConfirmDialog, showToast } from './dialog.js';
-import { setSyncRunning, setStatus } from './message.js';
-import { handleError } from '../core/unified.js';
+import { setStatus } from './message.js';
+
+
+// ========== 业务函数导入 ==========
 import { verifyToken, fetchAllUserCollections } from '../sync/scraping.js';
-
-// 从源模块导入类型和函数
-import { BgmError, ErrorLevel } from '../tools/result.js';
-import type { BGMUserInfo, ErrorOptions, FilterStatus, SyncRecord, BangumiCollectionItem } from '../tools/index.js';
-
-// 从 exceltobangumi 导入
 import {
     findHeaderRow, getColumnMap, getLastRow, extractSubjectId,
     getFilterStatus, getSequentialRowsBySeqCol, SyncToBangumi,
     clearRowColors
 } from '../sync/exceltobangumi.js';
-
-// 从 syncRecord 导入
 import {
     getOrCreateSyncRecordSheet, getAllSyncRecords, addSyncRecord,
-    openSyncRecordSheet, clearSheetMarksInSheet
+    openSyncRecordSheet, clearSheetMarksInSheet, markUploadedItemsInSheet
 } from '../sync/syncRecord.js';
-
-// 从 preview 导入
-import { previewSyncContent } from '../../../generated-types/ui/preview.js';
-
-// 从 taskpane 导入
+import { previewSyncContent } from './preview.js';
 import { refreshData } from '../taskpane.js';
+
+
+
 
 // 类型定义
 interface FilterStatus {
@@ -322,7 +315,7 @@ export async function syncCollectionFromBgm(): Promise<void> {
 
         await syncFromBgmByAPI(sheetIndex);
     } catch (e) {
-        handleError(e, { context: 'syncCollectionFromBgm', showDialog: true });
+        BgmError(e, { context: 'syncCollectionFromBgm', showDialog: true });
     }
 }
 

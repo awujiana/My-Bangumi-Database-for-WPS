@@ -4,11 +4,11 @@
  * @description 数据预览、同步记录预览、详情模态框、单条上传
  */
 
-import { getApp, bgmLog, BGM, LOG_LEVELS, BGM_COLOR } from '../../generated-types/tools/util.js';
-import { getCellValue, getCell, trim, _getUserApiPath } from '../../generated-types/tools/util.js';
+import { getApp, bgmLog, BGM, LOG_LEVELS, BGM_COLOR } from '../tools/util.js';
+import { getCellValue, getCell, trim, _getUserApiPath } from '../tools/util.js';
 import { showAlert, showToast } from './dialog.js';
-import { escapeHtml } from '../../generated-types/tools/util.js';
-import type { WpsRange } from '../../generated-types/tools/wps.js';
+import { escapeHtml } from '../tools/util.js';
+import type { WpsRange } from '../tools/wps.js';
 // 定义接口类型
 interface DetailItem {
   row: number;
@@ -100,7 +100,7 @@ function isUploadedByColor(seqCell: WpsRange | null): boolean {
     color === BGM_COLOR.SUCCESS ||
     color === BGM_COLOR.LIGHT_GREEN ||
     color === BGM_COLOR.DARK_GREEN ||
-    color === BGM_COLOR.UPLOADED_ALT   // 替换魔术数字 5292178
+    color === BGM_COLOR.GREEN  ||  // 替换魔术数字 5292178
   );
 }
 
@@ -620,16 +620,3 @@ export function updateDetailCount(count: number): void {
   if (countEl) countEl.textContent = count + ' 条';
 }
 
-// ========== 挂载到 window ==========
-if (typeof window !== 'undefined') {
-  (window as any).previewSyncContent = previewSyncContent;
-  (window as any).uploadSingleRow = uploadSingleRow;
-  (window as any).updateUploadStats = updateUploadStats;
-  (window as any).filterDetailItems = filterDetailItems;
-  (window as any).showDetailModal = showDetailModal;
-  (window as any).closeDetailModal = closeDetailModal;
-  (window as any).viewSyncRecordDetail = viewSyncRecordDetail;
-  (window as any).buildPreviewPayload = buildPreviewPayload;
-  (window as any).updateDetailCount = updateDetailCount;
-  (window as any).detailPreviewData = detailPreviewData;   // 保持引用兼容
-}
