@@ -1,5 +1,5 @@
 /**
- * BGM 主入口模块（修复版）
+ * BGM 主入口模块
  * @module main
  */
 'use strict';
@@ -7,19 +7,20 @@
 const MODULES = [
     { src: 'js/core/constants.js', type: 'module', critical: true },
     { src: 'js/core/crypto.js', type: 'module', critical: true },
-    { src: 'js/util.js', type: 'module', critical: true },
-    { src: 'js/http.js', type: 'module' },
-    { src: 'js/core/unified.js', type: 'module' },
+    { src: 'js/tools/index.js', type: 'module', critical: true },     // 先加载类型/枚举
+    { src: 'js/tools/result.js', type: 'module', critical: true },     // BgmError + Result
+    { src: 'js/tools/wps.js', type: 'module', critical: true },        // isWpsApp 等
+    { src: 'js/tools/util.js', type: 'module', critical: true },
+    { src: 'js/tools/http.js', type: 'module' },
     { src: 'js/ui/dialog.js', type: 'module' },
     { src: 'js/ui/message.js', type: 'module' },
     { src: 'js/ui/preview.js', type: 'module' },
     { src: 'js/sync/syncRecord.js', type: 'module' },
+    { src: 'js/sync/scraping.js', type: 'module' },                    // 移到 exceltobangumi 之前
     { src: 'js/sync/exceltobangumi.js', type: 'module' },
     { src: 'js/ribbon.js', type: 'module', critical: true },
     { src: 'js/ui/handlers.js', type: 'module', critical: true },
-    { src: 'js/sync/scraping.js', type: 'module' },
     { src: 'js/taskpane.js', type: 'module', critical: true }
-    // systemdemo.js 已移除（脚手架模板，与业务无关）
 ];
 
 function loadScript(src, type) {
