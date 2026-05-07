@@ -3,9 +3,8 @@
  * @module sync/syncRecord
  * @description 管理同步记录工作表，记录同步历史
  */
-
-import { XL, BGM_COLOR, LOG_LEVELS, BGM, BGM_SUBJECT_TYPES, SYNC_STATUS } from '../tools/util.js';
-import { getApp, bgmLog, colNumToLetter, getCell } from '../tools/util.js';
+import {LOG_LEVELS,BGM_COLOR,BGM_SUBJECT_TYPES, SYNC_STATUS,XL} from '../core/constants.js';
+import { getApp, bgmLog, colNumToLetter, getCell, BGM,   } from '../tools/util.js';
 import { SyncRecord, UpdateRecordParams } from '../tools/index.js';
 
 
@@ -464,7 +463,7 @@ export function clearSheetMarksInSheet(sheetIndex: number): void {
   try {
     const lastRow = ws.Range("A" + ws.Rows.Count).End(-4162).Row;
     for (let row = 2; row <= lastRow; row++) {
-      const cell = getCell(ws, row, 4);
+      const cell = getCell(ws, row, 4) as any;
       if (cell) {
         cell.Value = "";
         if (cell.Interior) cell.Interior.ColorIndex = XL.NONE;

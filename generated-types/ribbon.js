@@ -4,8 +4,8 @@
  * @description WPS Office 功能区按钮回调处理
  */
 // 导入工具函数
-import { WPS_Enum } from '../generated-types/tools/util.js';
-import { loadBgToken, showBangumiPanel } from '../generated-types/tools/util.js';
+import { WPS_ENUM } from './core/constants.js';
+import { loadBgToken, showBangumiPanel } from './tools/util.js';
 import { SyncToBangumi, clearRowColors, testTokenValidityForRibbon } from './sync/exceltobangumi.js';
 import { openUserCollection } from './ui/handlers.js';
 import { showTokenDialog, showUserIdDialog } from './ui/handlers.js';
@@ -19,7 +19,7 @@ export function OnAddinLoad(ribbonUI) {
         window.Application.ribbonUI = ribbonUI;
     }
     if (typeof window.Application.Enum !== "object") {
-        window.Application.Enum = WPS_Enum;
+        window.Application.Enum = WPS_ENUM;
     }
     window.Application.PluginStorage.setItem("EnableFlag", false);
     window.Application.PluginStorage.setItem("ApiEventFlag", false);

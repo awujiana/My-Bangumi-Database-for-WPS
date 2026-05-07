@@ -31,7 +31,6 @@ export declare const BGM_COLOR: {
     DARK_GREEN: number;
     GRAY: number;
     WHITE: number;
-    GREEN: number;
 };
 export declare const TOKEN_CONFIG: {
     KEY_BYTES: number[];

@@ -1,12 +1,10 @@
 /**
  * 同步收藏模块（TypeScript 版）
  * @module sync/scraping
- * @description 从 Bangumi API 获取收藏列表、Token 验证
  */
 
-import { bgmLog, LOG_LEVELS } from '../tools/util.js';
-import  {  TokenVerifyResult, BgmError, ApiResponse,BangumiUserData ,} from '../tools/index.js';
-
+import {  LOG_LEVELS } from '../core/constants.js';
+import { BGM ,bgmLog} from '../tools/util.js';
 
 // ========== 配置 ==========
 const CONFIG = {
@@ -18,23 +16,18 @@ const CONFIG = {
     REQUEST_DELAY: 500
 } as const;
 
-// 所有要抓取的条目类型
 const SUBJECT_TYPES: number[] = [1, 2, 3, 4, 6];
 const TYPE_LABELS: Record<number, string> = {
-    1: '书籍',
-    2: '动画',
-    3: '音乐',
-    4: '游戏',
-    6: '真人剧'
+    1: '书籍', 2: '动画', 3: '音乐', 4: '游戏', 6: '真人剧'
 };
 
-// ========== 内部工具函数 ==========
+// ========== 内部工具 ==========
 
 function delay(ms: number): Promise<void> {
     return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-async function apiRequest(path: string, token: string): Promise<ApiResponse> {
+async function apiRequest(path: string, token: string): Promise<{ status: number; data: unknown }> {
     const url = CONFIG.API_BASE + path;
     let retries = 0;
 
@@ -51,11 +44,7 @@ async function apiRequest(path: string, token: string): Promise<ApiResponse> {
         }
 
         let data: unknown = null;
-        try {
-            data = await response.json();
-        } catch (_) {
-            // 无 JSON 响应时 data 保持 null
-        }
+        try { data = await response.json(); } catch (_) {}
 
         return { status: response.status, data };
     }
@@ -63,16 +52,16 @@ async function apiRequest(path: string, token: string): Promise<ApiResponse> {
     throw new Error(`请求失败：连续 ${retries} 次 429 限流`);
 }
 
-// ========== Token 验证（异步） ==========
+// ========== Token 验证 ==========
 
-export async function verifyToken(token: string): Promise<TokenVerifyResult> {
+export async function verifyToken(token: string): Promise<{ valid: boolean; userId: string; username: string; message: string }> {
     if (!token) return { valid: false, userId: '', username: '', message: 'Token 为空' };
 
     try {
         const { status, data } = await apiRequest('/v0/me', token);
 
         if (status === 200) {
-            const userData = data as BangumiUserData;
+            const userData = data as { id?: string; nickname?: string; username?: string };
             return {
                 valid: true,
                 userId: String(userData.id || ''),
@@ -85,18 +74,18 @@ export async function verifyToken(token: string): Promise<TokenVerifyResult> {
         }
         return { valid: false, userId: '', username: '', message: `Token 验证失败（HTTP ${status}）` };
     } catch (e) {
-        const err = e as Error;
-        return { valid: false, userId: '', username: '', message: 'Token 验证请求失败: ' + err.message };
+        BGM.handleError(e, { context: 'verifyToken' });
+        return { valid: false, userId: '', username: '', message: 'Token 验证请求失败: ' + (e as Error).message };
     }
 }
 
-// ========== 收藏列表获取（异步，全类型） ==========
+// ========== 收藏列表获取 ==========
 
 export async function fetchAllUserCollections(token: string, userId?: string): Promise<unknown[]> {
-    // 自动获取用户 ID
     if (!userId) {
         const authResult = await verifyToken(token);
         if (!authResult.valid) {
+            BGM.handleError(new Error('Token 无效，无法获取用户 ID'), { context: 'fetchAllUserCollections', showDialog: true });
             throw new Error('Token 无效，无法获取用户 ID');
         }
         userId = authResult.userId;
@@ -119,35 +108,19 @@ export async function fetchAllUserCollections(token: string, userId?: string): P
                 const path = `/v0/users/${userId}/collections?subject_type=${type}&limit=${CONFIG.LIMIT}&offset=${offset}`;
                 const { status, data } = await apiRequest(path, token);
 
-                if (status === 401) {
-                    throw new Error('Token 无效或已过期');
-                }
-                if (status === 403) {
-                    throw new Error('没有权限访问收藏列表，请检查 Token 权限');
-                }
-                if (status === 404) {
-                    bgmLog(LOG_LEVELS.DEBUG, `「${typeName}」类型收藏不存在或为空`);
-                    break;
-                }
-                if (status !== 200) {
-                    throw new Error(`HTTP 错误: ${status}`);
-                }
+                if (status === 401) throw new Error('Token 无效或已过期');
+                if (status === 403) throw new Error('没有权限访问收藏列表');
+                if (status === 404) break;
+                if (status !== 200) throw new Error(`HTTP 错误: ${status}`);
 
                 const items = Array.isArray(data) ? data : (data as { data?: unknown[] }).data || [];
-                if (!Array.isArray(items) || items.length === 0) {
-                    hasMore = false;
-                    break;
-                }
+                if (!items.length) { hasMore = false; break; }
 
                 allCollections.push(...items);
                 page++;
-
-                if (items.length < CONFIG.LIMIT) {
-                    hasMore = false;
-                }
+                if (items.length < CONFIG.LIMIT) hasMore = false;
             } catch (e) {
-                const err = e as Error;
-                bgmLog(LOG_LEVELS.ERROR, `获取「${typeName}」第 ${page} 页失败: ${err.message}`);
+                BGM.handleError(e, { context: `fetchAllUserCollections: ${typeName} 第${page}页`, showDialog: true });
                 throw e;
             }
         }
@@ -161,3 +134,8 @@ export async function fetchAllUserCollections(token: string, userId?: string): P
     return allCollections;
 }
 
+// ========== 向后兼容 ==========
+if (typeof window !== 'undefined') {
+    (window as any).verifyToken = verifyToken;
+    (window as any).fetchAllUserCollections = fetchAllUserCollections;
+}

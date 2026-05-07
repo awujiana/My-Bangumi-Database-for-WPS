@@ -1,8 +1,3 @@
-/**
- * 详细预览页面
- * @module ui/detail-preview
- * @description 数据预览、同步记录预览、详情模态框、单条上传
- */
 interface ColumnMap extends Map<string, number> {
 }
 export declare function previewSyncContent(): void;

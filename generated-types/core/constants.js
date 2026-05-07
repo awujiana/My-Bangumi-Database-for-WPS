@@ -35,7 +35,6 @@ export const BGM_COLOR = {
     DARK_GREEN: 0x00B050, // 已同步多次标记 - 深绿
     GRAY: 0xD3D3D3, // 表头灰色
     WHITE: 0xFFFFFF, // 白色（清除标记）
-    GREEN: 0x50C092 // 浅绿色
 };
 // ========== Token 加密配置 ==========
 export const TOKEN_CONFIG = {

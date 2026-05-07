@@ -6,7 +6,7 @@
  */
 
 // ========== 从 result.ts 重导出 ==========
-export { BgmError } from '../core/result.js';
+
 export type { BgmResultError } from '../core/result.js';
 export { Result } from '../core/result.js';
 export type { SyncResult } from '../core/result.js';

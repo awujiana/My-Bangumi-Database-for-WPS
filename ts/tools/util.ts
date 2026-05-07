@@ -1,14 +1,7 @@
 import { WPS_ENUM, XL, BGM_CONFIG, BGM_COLOR, LOG_LEVELS, ERROR_LEVELS, PANEL_CONFIG, BGM_SUBJECT_TYPES, SYNC_STATUS } from '../core/constants.js';
-import { encryptToken, decryptToken, calcChecksum } from '../core/cypto.js';
-import { BgmError, ErrorLevel, type BGMCache, type BGMSheet, type BGMSync, type BGMUserInfo, type DialogOptions, type ErrorOptions,isWpsApp, type WpsApplication} from './index.js';
-
-// 重新导出（向后兼容）
-export { BgmError, ErrorLevel };
-export type { BGMCache, BGMSheet, BGMSync, BGMUserInfo, DialogOptions, ErrorOptions };
-
-// ========== 导出常量（向后兼容）==========
-export const WPS_Enum = WPS_ENUM;
-export { XL, BGM_CONFIG, BGM_COLOR, LOG_LEVELS, ERROR_LEVELS, PANEL_CONFIG, BGM_SUBJECT_TYPES, SYNC_STATUS };
+import { encryptToken, decryptToken, calcChecksum } from '../core/crypto.js'
+import {  ErrorLevel, type BGMCache, type BGMSheet, type BGMSync, type BGMUserInfo, type DialogOptions, type ErrorOptions,isWpsApp, type WpsApplication} from './index.js';
+import { BgmError } from '../core/result.js';
 
 
 // ========== BGM 全局命名空间 ==========

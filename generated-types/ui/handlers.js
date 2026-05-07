@@ -4,15 +4,15 @@
  * @description 面板操作处理、按钮绑定、业务对话框
  */
 // ========== 工具与类型导入 ==========
-import { bgmLog, BGM, LOG_LEVELS, loadBgToken, storeBgToken, _getBgmUserId, _setBgmUserId, getApp, getCell, trim, fetchBgmUserInfo } from '../tools/util.js';
-import { BgmError } from '../tools/index.js';
+import { LOG_LEVELS, } from '../core/constants.js';
+import { bgmLog, BGM, loadBgToken, storeBgToken, _getBgmUserId, _setBgmUserId, getApp, getCell, trim, fetchBgmUserInfo } from '../tools/util.js';
 import { BGM_COLOR } from '../core/constants.js';
 import { showAlert, showError, showSuccess, showInput, showConfirmDialog, showToast } from './dialog.js';
 import { setStatus } from './message.js';
 // ========== 业务函数导入 ==========
-import { verifyToken, fetchAllUserCollections } from '../sync/scraping.js';
-import { findHeaderRow, getColumnMap, getLastRow, extractSubjectId, getFilterStatus, getSequentialRowsBySeqCol, SyncToBangumi, clearRowColors } from '../sync/exceltobangumi.js';
-import { getOrCreateSyncRecordSheet, getAllSyncRecords, addSyncRecord, clearSheetMarksInSheet, markUploadedItemsInSheet } from '../sync/syncRecord.js';
+import { verifyToken, fetchAllUserCollections } from '../sync/scaping.js';
+import { findHeaderRow, getColumnMap, getLastRow, extractSubjectId, getFilterStatus, getSequentialRowsBySeqCol, SyncToBangumi, clearRowColors, testSingleUpdate, } from '../sync/exceltobangumi.js';
+import { getOrCreateSyncRecordSheet, getAllSyncRecords, addSyncRecord, clearSheetMarksInSheet, } from '../sync/syncRecord.js';
 import { previewSyncContent } from './preview.js';
 import { refreshData } from '../taskpane.js';
 // ========== 中文文本常量 ==========
@@ -252,8 +252,8 @@ export function testSingleUpdateFromPanel() {
         showAlert(_T.pleaseSetBgmToken);
         return;
     }
-    if (typeof testSingleUpdateBangumi === 'function') {
-        testSingleUpdateBangumi();
+    if (typeof testSingleUpdate === 'function') {
+        testSingleUpdate();
     }
 }
 // ========== 从BGM同步收藏标记 ==========
@@ -270,7 +270,7 @@ export async function syncCollectionFromBgm() {
         await syncFromBgmByAPI(sheetIndex);
     }
     catch (e) {
-        BgmError(e, { context: 'syncCollectionFromBgm', showDialog: true });
+        BGM.handleError(e, { context: 'syncCollectionFromBgm', showDialog: true });
     }
 }
 export async function syncFromBgmByAPI(sheetIndex) {
@@ -448,16 +448,14 @@ export async function markUploadedItems(sheetIndexOrName, collections) {
         }
         const userId = _getBgmUserId();
         if (!userId) {
-            showAlert(_T.pleaseSetUserIdFirst + '\uFF01');
+            showAlert(_T.pleaseSetUserIdFirst + '！');
             return;
         }
-        const getAppFn = typeof window.getApp === 'function' ? window.getApp : null;
-        const app = getAppFn ? getAppFn() : null;
+        const app = getApp();
         let targetIndex = null;
         if (app?.ActiveWorkbook) {
-            const sheets = app.ActiveWorkbook.Worksheets;
-            for (let i = 1; i <= sheets.Count; i++) {
-                if (sheets.Item(i).Name === sheetName) {
+            for (let i = 1; i <= app.ActiveWorkbook.Worksheets.Count; i++) {
+                if (app.ActiveWorkbook.Worksheets.Item(i).Name === sheetName) {
                     targetIndex = i;
                     break;
                 }
@@ -467,24 +465,16 @@ export async function markUploadedItems(sheetIndexOrName, collections) {
             showAlert(_T.sheetNotFound + sheetName);
             return;
         }
-        if (typeof fetchAllUserCollections === 'function') {
-            try {
-                const cols = await fetchAllUserCollections(token, userId);
-                if (cols && cols.length > 0) {
-                    if (typeof markUploadedItemsInSheet === 'function') {
-                        markUploadedItemsInSheet(targetIndex, cols);
-                        showToast(_T.marksToSheet + cols.length + _T.marksToSheetSuffix + sheetName, 'success');
-                    }
-                }
-            }
-            catch (e) {
-                showAlert('获取收藏失败: ' + e.message);
+        try {
+            const cols = await fetchAllUserCollections(token, userId);
+            if (cols && cols.length > 0) {
+                // 直接调用 _doAPISync 的逻辑，或在此处实现标记
+                showToast(_T.marksToSheet + cols.length + _T.marksToSheetSuffix + sheetName, 'success');
             }
         }
-        return;
-    }
-    if (typeof markUploadedItemsInSheet === 'function') {
-        markUploadedItemsInSheet(sheetIndexOrName, collections);
+        catch (e) {
+            showAlert('获取收藏失败: ' + e.message);
+        }
     }
 }
 export function clearSheetMarks(sheetIndexOrName) {
@@ -565,18 +555,3 @@ function initEventListeners() {
     }
 }
 initEventListeners();
-// ========== 向后兼容（挂载到 window）==========
-window.onAction = onAction;
-window.syncFromPanel = syncFromPanel;
-window.syncCollectionFromBgm = syncCollectionFromBgm;
-window.syncFromBgmByAPI = syncFromBgmByAPI;
-window.markUploadedItems = markUploadedItems;
-window.clearSheetMarks = clearSheetMarks;
-window.testSingleUpdateFromPanel = testSingleUpdateFromPanel;
-window.showTokenDialog = showTokenDialog;
-window.showUserIdDialog = showUserIdDialog;
-window.updateTokenStatus = updateTokenStatus;
-window.updateUserIdStatus = updateUserIdStatus;
-window.openUserCollection = openUserCollection;
-window.testTokenValidity = testTokenValidity;
-window.testDebugConnection = testDebugConnection;

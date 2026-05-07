@@ -3,7 +3,8 @@
  * @module ui/detail-preview
  * @description 数据预览、同步记录预览、详情模态框、单条上传
  */
-import { getApp, bgmLog, BGM, LOG_LEVELS, BGM_COLOR } from '../tools/util.js';
+import { LOG_LEVELS, BGM_COLOR } from '../core/constants.js';
+import { getApp, bgmLog, BGM } from '../tools/util.js';
 import { getCell, trim, _getUserApiPath } from '../tools/util.js';
 import { showAlert, showToast } from './dialog.js';
 import { escapeHtml } from '../tools/util.js';
@@ -45,10 +46,7 @@ function isUploadedByColor(seqCell) {
     const color = seqCell.Interior.Color;
     return (color === BGM_COLOR.SUCCESS ||
         color === BGM_COLOR.LIGHT_GREEN ||
-        color === BGM_COLOR.DARK_GREEN ||
-        color === BGM_COLOR.GREEN ||
-    // 替换魔术数字 5292178
-    );
+        color === BGM_COLOR.DARK_GREEN);
 }
 /**
  * 从工作表读取单行所需全部数据（用于预览和上传）

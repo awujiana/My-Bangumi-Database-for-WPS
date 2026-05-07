@@ -3,7 +3,7 @@
  * @module taskpane
  * @description 面板初始化、事件绑定、核心逻辑
  */
-import { markUploadedItems, clearSheetMarks } from '../generated-types/ui/handlers.js';
+import { markUploadedItems, clearSheetMarks } from './ui/handlers.js';
 declare function toggleSheetLock(): void;
 declare function refreshSheets(): void;
 declare function autoDetectSheet(): {

@@ -5,12 +5,13 @@
  */
 import { BGM_CONFIG, LOG_LEVELS } from '../core/constants.js';
 import { bgmLog } from './util.js';
-import { Result, BgmError, toSyncResult } from './index.js';
+import { Result, toSyncResult } from './index.js';
 const VALID_METHODS = ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'];
 // ========== 内部工具函数 ==========
 /**
  * 验证并标准化 HTTP 方法
  */
+import { BgmError } from '../core/result.js';
 function validateMethod(method) {
     const upper = method.toUpperCase();
     if (!VALID_METHODS.includes(upper)) {
@@ -64,27 +65,22 @@ export async function httpRequest(endpoint, options = {}) {
         validateMethod(method);
     }
     catch (error) {
-        return Result.fail(error instanceof BgmError ? error : new BgmError(String(error), 'VALIDATION_ERROR'));
+        const err = error instanceof BgmError ? error : new BgmError(String(error), 'VALIDATION_ERROR');
+        return Result.fail(err);
     }
     const validMethod = validateMethod(method);
     let attempt = 0;
     while (attempt <= retries) {
         try {
             const response = await executeXhrRequest(BGM_CONFIG.API_BASE + endpoint, {
-                method: validMethod,
-                body,
-                token,
-                timeout,
-                onProgress
+                method: validMethod, body, token, timeout, onProgress
             });
-            // 成功: 2xx
             if (response.status === 204) {
                 return Result.ok({ status: 204, data: null });
             }
             if (response.status >= 200 && response.status < 300) {
                 return Result.ok(response);
             }
-            // 限流: 429 自动重试
             if (response.status === 429 && attempt < retries) {
                 attempt++;
                 const delayMs = BGM_CONFIG.RETRY_DELAY_BASE * Math.pow(2, attempt - 1);
@@ -92,16 +88,10 @@ export async function httpRequest(endpoint, options = {}) {
                 await sleep(delayMs);
                 continue;
             }
-            // 其他错误: 返回失败 Result
             const errorMessage = getErrorMessage(response.status);
-            const details = { status: response.status };
-            if (response.xhr) {
-                details.xhrStatus = response.xhr.status;
-            }
-            return Result.fail(new BgmError(errorMessage, 'HTTP_ERROR', details));
+            return Result.fail(new BgmError(errorMessage, 'HTTP_ERROR', { status: response.status }));
         }
         catch (error) {
-            // 网络错误/超时: 判断是否重试
             if (attempt < retries) {
                 attempt++;
                 const delayMs = BGM_CONFIG.RETRY_DELAY_BASE * Math.pow(2, attempt - 1);
@@ -109,16 +99,11 @@ export async function httpRequest(endpoint, options = {}) {
                 await sleep(delayMs);
                 continue;
             }
-            // 重试用尽: 返回失败
             const errMsg = error instanceof Error ? error.message : String(error);
             return Result.fail(new BgmError(errMsg, 'NETWORK_ERROR'));
         }
     }
-    // 超过最大重试次数
-    return Result.fail(new BgmError('超过最大重试次数', 'MAX_RETRIES_EXCEEDED', {
-        retries,
-        endpoint
-    }));
+    return Result.fail(new BgmError('超过最大重试次数', 'MAX_RETRIES_EXCEEDED', { retries, endpoint }));
 }
 /**
  * 执行单次 XHR 请求并返回响应

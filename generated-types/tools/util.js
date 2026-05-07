@@ -1,11 +1,7 @@
-import { WPS_ENUM, XL, BGM_CONFIG, BGM_COLOR, LOG_LEVELS, ERROR_LEVELS, PANEL_CONFIG, BGM_SUBJECT_TYPES, SYNC_STATUS } from '../core/constants.js';
-import { encryptToken, decryptToken } from '../core/cypto.js';
-import { BgmError, ErrorLevel, isWpsApp } from './index.js';
-// 重新导出（向后兼容）
-export { BgmError, ErrorLevel };
-// ========== 导出常量（向后兼容）==========
-export const WPS_Enum = WPS_ENUM;
-export { XL, BGM_CONFIG, BGM_COLOR, LOG_LEVELS, ERROR_LEVELS, PANEL_CONFIG, BGM_SUBJECT_TYPES, SYNC_STATUS };
+import { BGM_CONFIG, LOG_LEVELS, ERROR_LEVELS } from '../core/constants.js';
+import { encryptToken, decryptToken } from '../core/crypto.js';
+import { ErrorLevel, isWpsApp } from './index.js';
+import { BgmError } from '../core/result.js';
 // ========== BGM 全局命名空间 ==========
 export const BGM = {
     // 缓存数据

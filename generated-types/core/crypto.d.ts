@@ -38,4 +38,4 @@ export declare function encryptTokenAsync(token: string): Promise<string>;
  * 异步解密 Token（AES-GCM）
  */
 export declare function decryptTokenAsync(encoded: string): Promise<string | null>;
-//# sourceMappingURL=cypto.d.ts.map
+//# sourceMappingURL=crypto.d.ts.map

@@ -4,12 +4,12 @@
  * @description 从 Excel 读取条目并批量同步到 Bangumi 收藏
  */
 
-import { XL, BGM_CONFIG, BGM_COLOR, LOG_LEVELS, BGM } from '../tools/util.js';
+import { XL, BGM_CONFIG, BGM_COLOR, LOG_LEVELS } from '../core/constants.js';
 import { getApp, bgmLog, getCell, getCellValue, sleep, loadBgToken,
          _setBgmUserId, _getBgmUserId, _getUserApiPath, trim,
-         colNumToLetter, storeBgToken, readCell } from '../tools/util.js';
+         colNumToLetter, storeBgToken, readCell ,BGM} from '../tools/util.js';
 import { showDialog } from '../ui/dialog.js';
-import { sendToTaskpane } from '../core/unified.js';
+
 import { showTokenDialog, showUserIdDialog } from '../ui/handlers.js';
 import { httpRequest } from '../tools/http.js';
 import { Result } from '../core/result.js';
@@ -203,8 +203,8 @@ export function getBgmtoken(): string | null {
 
 export function getLastRow(ws: any): number {
   try {
-    let cell = getCell(ws, ws.Rows.Count, COLUMNS.SEQUENCE);
-    if (cell && cell.Value2) {
+    const cell = getCell(ws, ws.Rows.Count, COLUMNS.SEQUENCE) as any;
+    if (cell?.Value2) {
       return cell.End(XL.UP).Row;
     }
   } catch (e) {}
@@ -653,16 +653,16 @@ export async function syncToBangumiAsync(ws: any, colMap: ColumnMap, token: stri
         ? httpRequest(`/subject/${sid}/update`, { method: 'POST', body: jsonBody, token })
         : Promise.resolve(bgmRequestSync('POST', `/v0/users/${_getUserApiPath()}/collections/${sid}`, jsonBody, token))
       );
-
       let syncSuccess = false, statusCode = 0, errMsg = '';
-      if (typeof result?.isOk === 'function') {
-        syncSuccess = (result as any).isOk();
-        statusCode = (result as any).data?.status;
-        errMsg = (result as any).error?.message || '';
+          
+      if (result instanceof Result) {
+          syncSuccess = result.isOk();
+          statusCode = (result.data as any)?.status || 0;
+          errMsg = result.error?.message || '';
       } else {
-        statusCode = (result as any)?.code || 0;
-        syncSuccess = [200, 201, 202, 204].includes(statusCode);
-        errMsg = (result as any)?.message || '';
+          statusCode = result.code || 0;
+          syncSuccess = [200, 201, 202, 204].includes(statusCode);
+          errMsg = result.message || '';
       }
 
       const bodySummary = parseJsonBodySummary(jsonBody);

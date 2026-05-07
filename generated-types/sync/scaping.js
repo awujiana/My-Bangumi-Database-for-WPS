@@ -1,9 +1,9 @@
 /**
  * 同步收藏模块（TypeScript 版）
  * @module sync/scraping
- * @description 从 Bangumi API 获取收藏列表、Token 验证
  */
-import { bgmLog, LOG_LEVELS } from '../tools/util.js';
+import { LOG_LEVELS } from '../core/constants.js';
+import { BGM, bgmLog } from '../tools/util.js';
 // ========== 配置 ==========
 const CONFIG = {
     API_BASE: 'https://api.bgm.tv/v0',
@@ -13,16 +13,11 @@ const CONFIG = {
     RETRY_MAX: 3,
     REQUEST_DELAY: 500
 };
-// 所有要抓取的条目类型
 const SUBJECT_TYPES = [1, 2, 3, 4, 6];
 const TYPE_LABELS = {
-    1: '书籍',
-    2: '动画',
-    3: '音乐',
-    4: '游戏',
-    6: '真人剧'
+    1: '书籍', 2: '动画', 3: '音乐', 4: '游戏', 6: '真人剧'
 };
-// ========== 内部工具函数 ==========
+// ========== 内部工具 ==========
 function delay(ms) {
     return new Promise(resolve => setTimeout(resolve, ms));
 }
@@ -43,14 +38,12 @@ async function apiRequest(path, token) {
         try {
             data = await response.json();
         }
-        catch (_) {
-            // 无 JSON 响应时 data 保持 null
-        }
+        catch (_) { }
         return { status: response.status, data };
     }
     throw new Error(`请求失败：连续 ${retries} 次 429 限流`);
 }
-// ========== Token 验证（异步） ==========
+// ========== Token 验证 ==========
 export async function verifyToken(token) {
     if (!token)
         return { valid: false, userId: '', username: '', message: 'Token 为空' };
@@ -71,16 +64,16 @@ export async function verifyToken(token) {
         return { valid: false, userId: '', username: '', message: `Token 验证失败（HTTP ${status}）` };
     }
     catch (e) {
-        const err = e;
-        return { valid: false, userId: '', username: '', message: 'Token 验证请求失败: ' + err.message };
+        BGM.handleError(e, { context: 'verifyToken' });
+        return { valid: false, userId: '', username: '', message: 'Token 验证请求失败: ' + e.message };
     }
 }
-// ========== 收藏列表获取（异步，全类型） ==========
+// ========== 收藏列表获取 ==========
 export async function fetchAllUserCollections(token, userId) {
-    // 自动获取用户 ID
     if (!userId) {
         const authResult = await verifyToken(token);
         if (!authResult.valid) {
+            BGM.handleError(new Error('Token 无效，无法获取用户 ID'), { context: 'fetchAllUserCollections', showDialog: true });
             throw new Error('Token 无效，无法获取用户 ID');
         }
         userId = authResult.userId;
@@ -97,33 +90,26 @@ export async function fetchAllUserCollections(token, userId) {
                 const offset = (page - 1) * CONFIG.LIMIT;
                 const path = `/v0/users/${userId}/collections?subject_type=${type}&limit=${CONFIG.LIMIT}&offset=${offset}`;
                 const { status, data } = await apiRequest(path, token);
-                if (status === 401) {
+                if (status === 401)
                     throw new Error('Token 无效或已过期');
-                }
-                if (status === 403) {
-                    throw new Error('没有权限访问收藏列表，请检查 Token 权限');
-                }
-                if (status === 404) {
-                    bgmLog(LOG_LEVELS.DEBUG, `「${typeName}」类型收藏不存在或为空`);
+                if (status === 403)
+                    throw new Error('没有权限访问收藏列表');
+                if (status === 404)
                     break;
-                }
-                if (status !== 200) {
+                if (status !== 200)
                     throw new Error(`HTTP 错误: ${status}`);
-                }
                 const items = Array.isArray(data) ? data : data.data || [];
-                if (!Array.isArray(items) || items.length === 0) {
+                if (!items.length) {
                     hasMore = false;
                     break;
                 }
                 allCollections.push(...items);
                 page++;
-                if (items.length < CONFIG.LIMIT) {
+                if (items.length < CONFIG.LIMIT)
                     hasMore = false;
-                }
             }
             catch (e) {
-                const err = e;
-                bgmLog(LOG_LEVELS.ERROR, `获取「${typeName}」第 ${page} 页失败: ${err.message}`);
+                BGM.handleError(e, { context: `fetchAllUserCollections: ${typeName} 第${page}页`, showDialog: true });
                 throw e;
             }
         }
@@ -133,4 +119,9 @@ export async function fetchAllUserCollections(token, userId) {
     }
     bgmLog(LOG_LEVELS.INFO, `共获取 ${allCollections.length} 条收藏记录`);
     return allCollections;
+}
+// ========== 向后兼容 ==========
+if (typeof window !== 'undefined') {
+    window.verifyToken = verifyToken;
+    window.fetchAllUserCollections = fetchAllUserCollections;
 }

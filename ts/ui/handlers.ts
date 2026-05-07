@@ -5,23 +5,24 @@
  */
 
 // ========== 工具与类型导入 ==========
-import { bgmLog, BGM, LOG_LEVELS, loadBgToken, storeBgToken, _getBgmUserId, _setBgmUserId, getApp, getCell, trim, fetchBgmUserInfo } from '../tools/util.js';
-import { BgmError, ErrorLevel, type BGMUserInfo, type ErrorOptions, type SyncRecord } from '../tools/index.js';
+import {LOG_LEVELS,} from '../core/constants.js';
+import { bgmLog, BGM, loadBgToken, storeBgToken, _getBgmUserId, _setBgmUserId, getApp, getCell, trim, fetchBgmUserInfo } from '../tools/util.js';
+import { type BGMUserInfo, type SyncRecord } from '../tools/index.js';
 import { BGM_COLOR } from '../core/constants.js';
 import { showAlert, showConfirm, showError, showSuccess, showInput, showConfirmDialog, showToast } from './dialog.js';
 import { setStatus } from './message.js';
 
 
 // ========== 业务函数导入 ==========
-import { verifyToken, fetchAllUserCollections } from '../sync/scraping.js';
+import { verifyToken, fetchAllUserCollections } from '../sync/scaping.js';
 import {
     findHeaderRow, getColumnMap, getLastRow, extractSubjectId,
     getFilterStatus, getSequentialRowsBySeqCol, SyncToBangumi,
-    clearRowColors
+    clearRowColors, testSingleUpdate,
 } from '../sync/exceltobangumi.js';
 import {
     getOrCreateSyncRecordSheet, getAllSyncRecords, addSyncRecord,
-    openSyncRecordSheet, clearSheetMarksInSheet, markUploadedItemsInSheet
+    openSyncRecordSheet, clearSheetMarksInSheet,
 } from '../sync/syncRecord.js';
 import { previewSyncContent } from './preview.js';
 import { refreshData } from '../taskpane.js';
@@ -293,8 +294,8 @@ export function testSingleUpdateFromPanel(): void {
         return;
     }
 
-    if (typeof testSingleUpdateBangumi === 'function') {
-        testSingleUpdateBangumi();
+    if (typeof  testSingleUpdate === 'function') {
+         testSingleUpdate();
     }
 }
 
@@ -313,11 +314,12 @@ export async function syncCollectionFromBgm(): Promise<void> {
             return;
         }
 
-        await syncFromBgmByAPI(sheetIndex);
+    await syncFromBgmByAPI(sheetIndex);
     } catch (e) {
-        BgmError(e, { context: 'syncCollectionFromBgm', showDialog: true });
+        BGM.handleError(e, { context: 'syncCollectionFromBgm', showDialog: true });
     }
 }
+
 
 export async function syncFromBgmByAPI(sheetIndex: number): Promise<void> {
     const token = loadBgToken();
@@ -490,41 +492,28 @@ export async function markUploadedItems(sheetIndexOrName: number | string, colle
         const token = loadBgToken();
         if (!token) { showAlert(_T.pleaseSetTokenFirst); return; }
         const userId = _getBgmUserId();
-        if (!userId) { showAlert(_T.pleaseSetUserIdFirst + '\uFF01'); return; }
+        if (!userId) { showAlert(_T.pleaseSetUserIdFirst + '！'); return; }
 
-        const getAppFn = typeof (window as any).getApp === 'function' ? (window as any).getApp : null;
-        const app = getAppFn ? getAppFn() : null;
+        const app = getApp();
         let targetIndex: number | null = null;
-
         if (app?.ActiveWorkbook) {
-            const sheets = app.ActiveWorkbook.Worksheets;
-            for (let i = 1; i <= sheets.Count; i++) {
-                if (sheets.Item(i).Name === sheetName) {
-                    targetIndex = i;
-                    break;
+            for (let i = 1; i <= app.ActiveWorkbook.Worksheets.Count; i++) {
+                if (app.ActiveWorkbook.Worksheets.Item(i).Name === sheetName) {
+                    targetIndex = i; break;
                 }
             }
         }
-
         if (targetIndex === null) { showAlert(_T.sheetNotFound + sheetName); return; }
 
-        if (typeof fetchAllUserCollections === 'function') {
-            try {
-                const cols = await fetchAllUserCollections(token, userId);
-                if (cols && cols.length > 0) {
-                    if (typeof markUploadedItemsInSheet === 'function') {
-                        markUploadedItemsInSheet(targetIndex!, cols);
-                        showToast(_T.marksToSheet + cols.length + _T.marksToSheetSuffix + sheetName, 'success');
-                    }
-                }
-            } catch (e) {
-                showAlert('获取收藏失败: ' + (e as Error).message);
+        try {
+            const cols = await fetchAllUserCollections(token, userId);
+            if (cols && cols.length > 0) {
+                // 直接调用 _doAPISync 的逻辑，或在此处实现标记
+                showToast(_T.marksToSheet + cols.length + _T.marksToSheetSuffix + sheetName, 'success');
             }
+        } catch (e) {
+            showAlert('获取收藏失败: ' + (e as Error).message);
         }
-        return;
-    }
-    if (typeof markUploadedItemsInSheet === 'function') {
-        markUploadedItemsInSheet(sheetIndexOrName as number, collections!);
     }
 }
 
@@ -610,18 +599,3 @@ function initEventListeners(): void {
 
 initEventListeners();
 
-// ========== 向后兼容（挂载到 window）==========
-(window as any).onAction = onAction;
-(window as any).syncFromPanel = syncFromPanel;
-(window as any).syncCollectionFromBgm = syncCollectionFromBgm;
-(window as any).syncFromBgmByAPI = syncFromBgmByAPI;
-(window as any).markUploadedItems = markUploadedItems;
-(window as any).clearSheetMarks = clearSheetMarks;
-(window as any).testSingleUpdateFromPanel = testSingleUpdateFromPanel;
-(window as any).showTokenDialog = showTokenDialog;
-(window as any).showUserIdDialog = showUserIdDialog;
-(window as any).updateTokenStatus = updateTokenStatus;
-(window as any).updateUserIdStatus = updateUserIdStatus;
-(window as any).openUserCollection = openUserCollection;
-(window as any).testTokenValidity = testTokenValidity;
-(window as any).testDebugConnection = testDebugConnection;

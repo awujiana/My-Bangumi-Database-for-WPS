@@ -4,8 +4,6 @@
  * @description 所有项目的全局类型、接口、类、枚举的统一导出入口
  *              其他模块只需 `import { ... } from './types/index.js'`
  */
-// ========== 从 result.ts 重导出 ==========
-export { BgmError } from '../core/result.js';
 export { Result } from '../core/result.js';
 export { toSyncResult } from '../core/result.js';
 // ========== 错误级别枚举 ==========

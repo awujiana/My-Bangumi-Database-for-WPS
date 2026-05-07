@@ -4,14 +4,14 @@
  * @description 面板初始化、事件绑定、核心逻辑
  */
 
-import { BGM, PANEL_CONFIG, WPS_Enum } from '../generated-types/tools/util.js';
-import { getApp, bgmLog, LOG_LEVELS, escapeHtml, readCell, colNumToLetter } from '../generated-types/tools/util.js';
-import { HEADER_KEYWORDS, IMPORTANT_COLS } from '../generated-types/sync/exceltobangumi.js';
+import {  PANEL_CONFIG, WPS_ENUM , LOG_LEVELS   } from './core/constants.js';
+import { getApp, bgmLog, BGM, escapeHtml, readCell, colNumToLetter } from './tools/util.js';
+import { HEADER_KEYWORDS, IMPORTANT_COLS } from './sync/exceltobangumi.js';
 import { initMessageListener } from './ui/message.js';
-import { markUploadedItems, clearSheetMarks, updateTokenStatus, updateUserIdStatus, showTokenDialog, showUserIdDialog } from '../generated-types/ui/handlers.js';
-import { showAlert, closeAlertDialog, closeInputDialog, closeConfirmDialog, showToast } from '../generated-types/ui/dialog.js';
-import { previewSyncContent, closeDetailModal } from '../generated-types/ui/preview.js';
-import { clearSyncRecords as _clearSyncRecords } from '../generated-types/sync/syncRecord.js';
+import { markUploadedItems, clearSheetMarks, updateTokenStatus, updateUserIdStatus, showTokenDialog, showUserIdDialog } from './ui/handlers.js';
+import { showAlert, closeAlertDialog, closeInputDialog, closeConfirmDialog, showToast } from './ui/dialog.js';
+import { previewSyncContent, closeDetailModal } from './ui/preview.js';
+import { clearSyncRecords as _clearSyncRecords } from './sync/syncRecord.js';
 
 // ========== 类型定义 ==========
 interface LockedSheetInfo {
@@ -601,7 +601,7 @@ function initPanel(): void {
     bgmLog(LOG_LEVELS.INFO, 'initPanel 开始');
 
     if (typeof (window as any).Application !== 'undefined' && typeof (window as any).Application.Enum !== 'object') {
-        (window as any).Application.Enum = WPS_Enum;
+        (window as any).Application.Enum = WPS_ENUM;
     }
 
     initMessageListener();

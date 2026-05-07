@@ -3,11 +3,12 @@
  * @module bangumi
  * @description 从 Excel 读取条目并批量同步到 Bangumi 收藏
  */
-import { XL, BGM_CONFIG, BGM_COLOR, LOG_LEVELS, BGM } from '../tools/util.js';
-import { getApp, bgmLog, getCell, getCellValue, sleep, loadBgToken, _getBgmUserId, _getUserApiPath, trim, colNumToLetter } from '../tools/util.js';
+import { XL, BGM_CONFIG, BGM_COLOR, LOG_LEVELS } from '../core/constants.js';
+import { getApp, bgmLog, getCell, getCellValue, sleep, loadBgToken, _getBgmUserId, _getUserApiPath, trim, colNumToLetter, BGM } from '../tools/util.js';
 import { showDialog } from '../ui/dialog.js';
 import { showUserIdDialog } from '../ui/handlers.js';
 import { httpRequest } from '../tools/http.js';
+import { Result } from '../core/result.js';
 // ========== 常量定义 ==========
 const COLUMNS = {
     SEQUENCE: 4, // D列 - 序号
@@ -122,8 +123,8 @@ export function getBgmtoken() {
 }
 export function getLastRow(ws) {
     try {
-        let cell = getCell(ws, ws.Rows.Count, COLUMNS.SEQUENCE);
-        if (cell && cell.Value2) {
+        const cell = getCell(ws, ws.Rows.Count, COLUMNS.SEQUENCE);
+        if (cell?.Value2) {
             return cell.End(XL.UP).Row;
         }
     }
@@ -596,15 +597,15 @@ export async function syncToBangumiAsync(ws, colMap, token, lastRow, headerRow, 
                 ? httpRequest(`/subject/${sid}/update`, { method: 'POST', body: jsonBody, token })
                 : Promise.resolve(bgmRequestSync('POST', `/v0/users/${_getUserApiPath()}/collections/${sid}`, jsonBody, token)));
             let syncSuccess = false, statusCode = 0, errMsg = '';
-            if (typeof result?.isOk === 'function') {
+            if (result instanceof Result) {
                 syncSuccess = result.isOk();
-                statusCode = result.data?.status;
+                statusCode = result.data?.status || 0;
                 errMsg = result.error?.message || '';
             }
             else {
-                statusCode = result?.code || 0;
+                statusCode = result.code || 0;
                 syncSuccess = [200, 201, 202, 204].includes(statusCode);
-                errMsg = result?.message || '';
+                errMsg = result.message || '';
             }
             const bodySummary = parseJsonBodySummary(jsonBody);
             const recordData = {

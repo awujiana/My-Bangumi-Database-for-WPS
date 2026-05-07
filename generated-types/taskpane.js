@@ -3,14 +3,14 @@
  * @module taskpane
  * @description 面板初始化、事件绑定、核心逻辑
  */
-import { BGM, PANEL_CONFIG, WPS_Enum } from '../generated-types/tools/util.js';
-import { getApp, bgmLog, LOG_LEVELS, escapeHtml, readCell, colNumToLetter } from '../generated-types/tools/util.js';
-import { HEADER_KEYWORDS, IMPORTANT_COLS } from '../generated-types/sync/exceltobangumi.js';
+import { PANEL_CONFIG, WPS_ENUM, LOG_LEVELS } from './core/constants.js';
+import { getApp, bgmLog, BGM, escapeHtml, readCell, colNumToLetter } from './tools/util.js';
+import { HEADER_KEYWORDS, IMPORTANT_COLS } from './sync/exceltobangumi.js';
 import { initMessageListener } from './ui/message.js';
-import { markUploadedItems, clearSheetMarks, updateTokenStatus, updateUserIdStatus, showTokenDialog, showUserIdDialog } from '../generated-types/ui/handlers.js';
-import { showAlert, closeAlertDialog, closeInputDialog, closeConfirmDialog, showToast } from '../generated-types/ui/dialog.js';
-import { previewSyncContent, closeDetailModal } from '../generated-types/ui/preview.js';
-import { clearSyncRecords as _clearSyncRecords } from '../generated-types/sync/syncRecord.js';
+import { markUploadedItems, clearSheetMarks, updateTokenStatus, updateUserIdStatus, showTokenDialog, showUserIdDialog } from './ui/handlers.js';
+import { showAlert, closeAlertDialog, closeInputDialog, closeConfirmDialog, showToast } from './ui/dialog.js';
+import { previewSyncContent, closeDetailModal } from './ui/preview.js';
+import { clearSyncRecords as _clearSyncRecords } from './sync/syncRecord.js';
 // ========== 工作表锁定功能 ==========
 function toggleSheetLock() {
     const select = document.getElementById('sheetSelect');
@@ -586,7 +586,7 @@ function onSelectModeChange() {
 function initPanel() {
     bgmLog(LOG_LEVELS.INFO, 'initPanel 开始');
     if (typeof window.Application !== 'undefined' && typeof window.Application.Enum !== 'object') {
-        window.Application.Enum = WPS_Enum;
+        window.Application.Enum = WPS_ENUM;
     }
     initMessageListener();
     const restored = restoreLockedSheet();

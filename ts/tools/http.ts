@@ -5,8 +5,8 @@
  */
 
 import { BGM_CONFIG, LOG_LEVELS } from '../core/constants.js';
-import { bgmLog } from './util.js';
-import { Result, BgmError, toSyncResult, type SyncResult } from './index.js';
+import { bgmLog,BGM } from './util.js';
+import { Result, toSyncResult, type SyncResult } from './index.js';
 
 // ========== 类型定义 ==========
 export type HttpMethod = 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH';
@@ -19,6 +19,7 @@ const VALID_METHODS: HttpMethod[] = ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'];
 /**
  * 验证并标准化 HTTP 方法
  */
+import { BgmError } from '../core/result.js';
 function validateMethod(method: string): HttpMethod {
     const upper = method.toUpperCase() as HttpMethod;
     if (!VALID_METHODS.includes(upper)) {
@@ -30,6 +31,7 @@ function validateMethod(method: string): HttpMethod {
 /**
  * 验证 endpoint 安全性（防止路径遍历）
  */
+
 function validateEndpoint(endpoint: string): void {
     if (!endpoint || typeof endpoint !== 'string') {
         throw new BgmError('endpoint 无效', 'INVALID_ENDPOINT');
@@ -38,6 +40,7 @@ function validateEndpoint(endpoint: string): void {
         throw new BgmError('endpoint 包含非法字符', 'INVALID_ENDPOINT');
     }
 }
+
 
 /**
  * 异步延迟
@@ -94,9 +97,8 @@ export async function httpRequest<T = unknown>(
         validateEndpoint(endpoint);
         validateMethod(method);
     } catch (error) {
-        return Result.fail(
-            error instanceof BgmError ? error : new BgmError(String(error), 'VALIDATION_ERROR')
-        );
+        const err = error instanceof BgmError ? error : new BgmError(String(error), 'VALIDATION_ERROR');
+        return Result.fail(err);
     }
 
     const validMethod = validateMethod(method);
@@ -105,14 +107,9 @@ export async function httpRequest<T = unknown>(
     while (attempt <= retries) {
         try {
             const response = await executeXhrRequest<T>(BGM_CONFIG.API_BASE + endpoint, {
-                method: validMethod,
-                body,
-                token,
-                timeout,
-                onProgress
+                method: validMethod, body, token, timeout, onProgress
             });
 
-            // 成功: 2xx
             if (response.status === 204) {
                 return Result.ok({ status: 204, data: null });
             }
@@ -120,7 +117,6 @@ export async function httpRequest<T = unknown>(
                 return Result.ok(response);
             }
 
-            // 限流: 429 自动重试
             if (response.status === 429 && attempt < retries) {
                 attempt++;
                 const delayMs = BGM_CONFIG.RETRY_DELAY_BASE * Math.pow(2, attempt - 1);
@@ -129,16 +125,10 @@ export async function httpRequest<T = unknown>(
                 continue;
             }
 
-            // 其他错误: 返回失败 Result
             const errorMessage = getErrorMessage(response.status);
-            const details: Record<string, unknown> = { status: response.status };
-            if (response.xhr) {
-                details.xhrStatus = response.xhr.status;
-            }
-            return Result.fail(new BgmError(errorMessage, 'HTTP_ERROR', details));
+            return Result.fail(new BgmError(errorMessage, 'HTTP_ERROR', { status: response.status }));
 
         } catch (error) {
-            // 网络错误/超时: 判断是否重试
             if (attempt < retries) {
                 attempt++;
                 const delayMs = BGM_CONFIG.RETRY_DELAY_BASE * Math.pow(2, attempt - 1);
@@ -147,19 +137,13 @@ export async function httpRequest<T = unknown>(
                 continue;
             }
 
-            // 重试用尽: 返回失败
             const errMsg = error instanceof Error ? error.message : String(error);
             return Result.fail(new BgmError(errMsg, 'NETWORK_ERROR'));
         }
     }
 
-    // 超过最大重试次数
-    return Result.fail(new BgmError('超过最大重试次数', 'MAX_RETRIES_EXCEEDED', {
-        retries,
-        endpoint
-    }));
+    return Result.fail(new BgmError('超过最大重试次数', 'MAX_RETRIES_EXCEEDED', { retries, endpoint }));
 }
-
 /**
  * 执行单次 XHR 请求并返回响应
  */

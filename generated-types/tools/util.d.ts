@@ -1,9 +1,6 @@
-import { XL, BGM_CONFIG, BGM_COLOR, LOG_LEVELS, ERROR_LEVELS, PANEL_CONFIG, BGM_SUBJECT_TYPES, SYNC_STATUS } from '../core/constants.js';
-import { BgmError, ErrorLevel, type BGMCache, type BGMSheet, type BGMSync, type BGMUserInfo, type DialogOptions, type ErrorOptions, type WpsApplication } from './index.js';
-export { BgmError, ErrorLevel };
-export type { BGMCache, BGMSheet, BGMSync, BGMUserInfo, DialogOptions, ErrorOptions };
-export declare const WPS_Enum: import("../core/constants.js").WPSEnum;
-export { XL, BGM_CONFIG, BGM_COLOR, LOG_LEVELS, ERROR_LEVELS, PANEL_CONFIG, BGM_SUBJECT_TYPES, SYNC_STATUS };
+import { LOG_LEVELS, ERROR_LEVELS } from '../core/constants.js';
+import { ErrorLevel, type BGMCache, type BGMSheet, type BGMSync, type BGMUserInfo, type DialogOptions, type ErrorOptions, type WpsApplication } from './index.js';
+import { BgmError } from '../core/result.js';
 export declare const BGM: {
     cache: BGMCache;
     sheet: BGMSheet;
