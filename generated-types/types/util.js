@@ -1,6 +1,6 @@
 import { WPS_ENUM, XL, BGM_CONFIG, BGM_COLOR, LOG_LEVELS, ERROR_LEVELS, PANEL_CONFIG, BGM_SUBJECT_TYPES, SYNC_STATUS } from '../core/constants.js';
 import { encryptToken, decryptToken, calcChecksum } from '../core/crypto.js';
-import { BgmError, ErrorLevel, isWpsApp } from './index.js';
+import { BgmError, ErrorLevel, isWpsApp } from '../../ts/tools/index.js';
 // 重新导出（向后兼容）
 export { BgmError, ErrorLevel };
 // ========== 导出常量（向后兼容）==========

@@ -4,15 +4,15 @@
  * @description 从 Excel 读取条目并批量同步到 Bangumi 收藏
  */
 
-import { XL, BGM_CONFIG, BGM_COLOR, LOG_LEVELS, BGM } from '../util.js';
+import { XL, BGM_CONFIG, BGM_COLOR, LOG_LEVELS, BGM } from '../tools/util.js';
 import { getApp, bgmLog, getCell, getCellValue, sleep, loadBgToken,
          _setBgmUserId, _getBgmUserId, _getUserApiPath, trim,
-         colNumToLetter, storeBgToken, readCell } from '../util.js';
+         colNumToLetter, storeBgToken, readCell } from '../tools/util.js';
 import { showDialog } from '../ui/dialog.js';
 import { sendToTaskpane } from '../core/unified.js';
 import { showTokenDialog, showUserIdDialog } from '../ui/handlers.js';
-import { httpRequest } from '../../generated-types/types/http.js';
-import { Result } from '../types/result.js';
+import { httpRequest } from '../tools/http.js';
+import { Result } from '../tools/result.js';
 
 // 定义接口类型
 interface FilterStatus {
@@ -494,7 +494,7 @@ export function SyncToBangumi(): SyncResult | undefined {
   let successCount = 0, failCount = 0, skipNoUrlCount = 0, skipNoTypeCount = 0;
   let logEntries: string[] = [];
   BGM.sync.isRunning = true;
-  BGM.sync.lastSyncTime = null;
+  BGM.sync.lastSyncTime = null;  // 这里赋值 null 是允许的，因为类型是 string 
 
   for (let i = headerRow + 1; i <= lastRow; i++) {
     let name = colMap.has("名称") ? trim(getCellValue(ws, i, colMap.get("名称")!)) : "";
@@ -591,7 +591,8 @@ export function SyncToBangumi(): SyncResult | undefined {
   }
 
   BGM.sync.isRunning = false;
-  BGM.sync.lastSyncTime = new Date().toISOString();
+  // 修复：确保这里赋值的是字符串，不是数字
+  BGM.sync.lastSyncTime = new Date().toISOString();  // 这返回的是字符串
   if (app.StatusBar !== undefined) app.StatusBar = false;
 
   let skipTotal = skipNoUrlCount + skipNoTypeCount;
@@ -608,13 +609,14 @@ export function SyncToBangumi(): SyncResult | undefined {
   return { success: successCount, fail: failCount, skip: skipTotal };
 }
 
-// ========== 异步批量同步（已修复） ==========
+
+// ========== 异步批量同步 ==========
 export async function syncToBangumiAsync(ws: any, colMap: ColumnMap, token: string, lastRow: number, headerRow: number, options: SyncOptions = {}): Promise<SyncResult> {
   const { onProgress, onItemComplete } = options;
   if (!ws || !colMap || !token || !lastRow || !headerRow) throw new Error('缺少必要的同步参数');
 
   BGM.sync.isRunning = true;
-  BGM.sync.lastSyncTime = null;
+  BGM.sync.lastSyncTime = null;  // 这里赋值 null
 
   let syncRecordSheet = null;
   if (typeof (window as any).getOrCreateSyncRecordSheet === 'function') {
@@ -703,10 +705,10 @@ export async function syncToBangumiAsync(ws: any, colMap: ColumnMap, token: stri
   }
 
   BGM.sync.isRunning = false;
-  BGM.sync.lastSyncTime = new Date().toISOString();
+  // 修复：确保这里赋值的是字符串，不是数字
+  BGM.sync.lastSyncTime = new Date().toISOString();  // 这返回的是字符串
   return { success: successCount, fail: failCount, skip: skipCount };
 }
-
 // ========== 筛选相关 ==========
 export function getFilterStatus(endRow?: number, getColumnCounts?: boolean): FilterStatus | null {
   let app = getApp();

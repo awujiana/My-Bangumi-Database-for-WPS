@@ -1,11 +1,15 @@
 /**
- * UI 对话框模块（优化版）
+ * UI 对话框模块（TypeScript 版）
  * @module ui/dialog
  * @description 自定义对话框、确认对话框、Toast 通知
  */
+// 从统一入口导入类型
+import type { DialogButton, DialogConfig, DialogCallback, DialogOptions } from '../tools/index.js';
+// ========== 类型定义 ==========
+
 
 // ========== 常量与配置 ==========
-const DIALOG_TYPES = {
+const DIALOG_TYPES: Record<string, DialogConfig> = {
     alert:    { id: 'bgmAlertDialog',    titleId: 'bgmAlertTitle',    msgId: 'bgmAlertMessage',    buttons: [{ id: 'bgmAlertOk',    cls: 'bgm-btn-primary', text: '确定', event: 'ok' }] },
     confirm:  { id: 'bgmConfirmDialog',  titleId: 'bgmConfirmTitle',  msgId: 'bgmConfirmMessage',  buttons: [{ id: 'bgmConfirmOk',   cls: 'bgm-btn-primary', text: '确定', event: 'ok' }, { id: 'bgmConfirmCancel', cls: 'bgm-btn-default', text: '取消', event: 'cancel' }] },
     error:    { id: 'bgmErrorDialog',    titleId: 'bgmErrorTitle',    msgId: 'bgmErrorMessage',    buttons: [{ id: 'bgmErrorOk',    cls: 'bgm-btn-danger',  text: '确定', event: 'ok' }] },
@@ -15,15 +19,15 @@ const DIALOG_TYPES = {
 };
 
 // ========== 模块内部状态 ==========
-let dialogInitialized = false;
-let _dialogCallback = null;        // 当前激活对话框的回调函数
-let _toastTimer = null;           // Toast 定时器 ID
+let dialogInitialized: boolean = false;
+let _dialogCallback: DialogCallback | null = null;
+let _toastTimer: number | null = null;
 
 // 缓存 DOM 引用（初始化后填充）
-const dom = {};
+const dom: Record<string, HTMLElement | null> = {};
 
 // ========== 初始化 ==========
-function ensureDialogs() {
+function ensureDialogs(): void {
     if (dialogInitialized) return;
     dialogInitialized = true;
     createDialogs();
@@ -37,7 +41,7 @@ if (typeof document !== 'undefined') {
     }
 }
 
-function createDialogs() {
+function createDialogs(): void {
     if (document.getElementById('bgmDialogContainer')) return;
 
     const container = document.createElement('div');
@@ -45,7 +49,7 @@ function createDialogs() {
     document.body.appendChild(container);
 
     // 通用对话框创建函数
-    function createDialogElement(type, iconClass, iconChar, defaultTitle) {
+    function createDialogElement(type: string, iconClass: string, iconChar: string, defaultTitle: string): HTMLElement {
         const cfg = DIALOG_TYPES[type];
         const modal = document.createElement('div');
         modal.id = cfg.id;
@@ -81,12 +85,12 @@ function createDialogs() {
         // Footer
         const footer = document.createElement('div');
         footer.className = 'bgm-dialog-footer';
-        cfg.buttons.forEach(btn => {
+        cfg.buttons.forEach((btn: DialogButton) => {
             const button = document.createElement('button');
             button.id = btn.id;
             button.className = 'bgm-btn ' + btn.cls;
             button.textContent = btn.text;
-            button.dataset.event = btn.event;   // 标记事件类型
+            button.dataset.event = btn.event;
             footer.appendChild(button);
         });
         content.appendChild(footer);
@@ -104,11 +108,13 @@ function createDialogs() {
 
     // 为 Input 对话框添加输入框
     const inputBody = document.querySelector('#bgmInputDialog .bgm-dialog-body');
-    const inputField = document.createElement('input');
-    inputField.type = 'text';
-    inputField.id = 'bgmInputField';
-    inputField.className = 'bgm-input-field';
-    inputBody.appendChild(inputField);
+    if (inputBody) {
+        const inputField = document.createElement('input');
+        inputField.type = 'text';
+        inputField.id = 'bgmInputField';
+        inputField.className = 'bgm-input-field';
+        inputBody.appendChild(inputField);
+    }
 
     // Toast 容器
     const toast = document.createElement('div');
@@ -120,14 +126,14 @@ function createDialogs() {
     bindAllEvents();
 }
 
-function bindAllEvents() {
+function bindAllEvents(): void {
     // 缓存对话框元素
     for (const type in DIALOG_TYPES) {
         const cfg = DIALOG_TYPES[type];
         dom[cfg.id] = document.getElementById(cfg.id);
         dom[cfg.titleId] = document.getElementById(cfg.titleId);
         dom[cfg.msgId] = document.getElementById(cfg.msgId);
-        cfg.buttons.forEach(btn => {
+        cfg.buttons.forEach((btn: DialogButton) => {
             dom[btn.id] = document.getElementById(btn.id);
         });
     }
@@ -135,15 +141,19 @@ function bindAllEvents() {
     dom.bgmToast = document.getElementById('bgmToast');
     dom.bgmInputField = document.getElementById('bgmInputField');
 
-    // 通用事件处理：使用事件委托，放在 bgmDialogContainer 上
+    // 通用事件处理
     const container = document.getElementById('bgmDialogContainer');
-    container.addEventListener('click', (e) => {
-        const btn = e.target.closest('button');
+    if (!container) return;
+
+    container.addEventListener('click', (e: Event) => {
+        const target = e.target as HTMLElement;
+        const btn = target.closest('button');
         if (!btn) return;
-        const eventType = btn.dataset.event;
+
+        const eventType = (btn as HTMLButtonElement).dataset.event;
         if (!eventType) return;
 
-        const modal = btn.closest('.bgm-modal');
+        const modal = btn.closest('.bgm-modal') as HTMLElement;
         if (!modal) return;
 
         // 关闭对话框
@@ -153,7 +163,7 @@ function bindAllEvents() {
         if (_dialogCallback) {
             if (eventType === 'ok' && _dialogCallback.onOk) {
                 if (modal.id === 'bgmInputDialog') {
-                    const inputValue = dom.bgmInputField ? dom.bgmInputField.value.trim() : '';
+                    const inputValue = dom.bgmInputField ? (dom.bgmInputField as HTMLInputElement).value.trim() : '';
                     _dialogCallback.onOk(inputValue);
                 } else {
                     _dialogCallback.onOk();
@@ -161,13 +171,12 @@ function bindAllEvents() {
             } else if (eventType === 'cancel' && _dialogCallback.onCancel) {
                 _dialogCallback.onCancel();
             }
-            // 执行后清理回调
             _dialogCallback = null;
         }
     });
 
     // Input 框 Enter 键支持
-    dom.bgmInputField?.addEventListener('keypress', (e) => {
+    dom.bgmInputField?.addEventListener('keypress', (e: KeyboardEvent) => {
         if (e.key === 'Enter') {
             dom.bgmInputOk?.click();
         }
@@ -175,135 +184,131 @@ function bindAllEvents() {
 }
 
 /**
- * 通用对话框显示函数（内部使用）
- * @param {string} type - 对话框类型
- * @param {object} opts - { message, title, onOk, onCancel, defaultValue }
+ * 通用对话框显示函数
  */
-function _showDialog(type, opts = {}) {
+function _showDialog(type: string, opts: DialogOptions = {}): void {
     const cfg = DIALOG_TYPES[type];
     const dialog = dom[cfg.id];
     if (!dialog) {
         // 回退到原生弹窗
         if (type === 'confirm') {
-            if (window.confirm(opts.message)) {
-                opts.onOk && opts.onOk();
+            if (window.confirm(opts.message || '')) {
+                // confirm 对话框使用 onConfirm
+                opts.onConfirm?.();
             } else {
-                opts.onCancel && opts.onCancel();
+                opts.onCancel?.();
             }
         } else if (type === 'input') {
-            const result = window.prompt(opts.prompt || '', opts.defaultValue || '');
+            const promptText = opts.prompt || opts.message || '';
+            const result = window.prompt(promptText, opts.defaultValue || '');
             if (result !== null) {
-                opts.onOk && opts.onOk(result);
+                // input 对话框使用 onOk，传入输入值
+                opts.onOk?.(result);
             } else {
-                opts.onCancel && opts.onCancel();
+                opts.onCancel?.();
             }
         } else {
+            // alert 对话框
             window.alert(opts.message);
-            opts.onOk && opts.onOk();
+            opts.onConfirm?.();
         }
         return;
     }
 
     // 设置标题与消息
-    dom[cfg.titleId].textContent = opts.title || '';
-    dom[cfg.msgId].textContent = opts.message || '';
+    const titleEl = dom[cfg.titleId];
+    const msgEl = dom[cfg.msgId];
+    if (titleEl) titleEl.textContent = opts.title || '';
+    if (msgEl) msgEl.textContent = opts.prompt || opts.message || '';
 
     // 如果是输入框，设置默认值
-    if (type === 'input') {
-        dom.bgmInputField.value = opts.defaultValue || '';
+    if (type === 'input' && dom.bgmInputField) {
+        (dom.bgmInputField as HTMLInputElement).value = opts.defaultValue || '';
         dom.bgmInputField.focus();
     }
 
-    // 存储回调
+    // 存储回调（统一使用 onOk 和 onCancel）
     _dialogCallback = { onOk: opts.onOk, onCancel: opts.onCancel };
 
     dialog.style.display = 'flex';
 }
-
 // ========== 公开 API ==========
 
-/** Alert 对话框 */
-export function showAlert(message, title, onOk) {
+export function showAlert(message: string, title?: string, onOk?: () => void): void {
     _showDialog('alert', { message, title: title || '提示', onOk });
 }
 
-/** Confirm 确认对话框 */
-export function showConfirm(message, title, onOk, onCancel) {
+export function showConfirm(message: string, title?: string, onOk?: () => void, onCancel?: () => void): void {
     _showDialog('confirm', { message, title: title || '确认', onOk, onCancel });
 }
 
-/** Error 错误对话框 */
-export function showError(message, title, onOk) {
+export function showError(message: string, title?: string, onOk?: () => void): void {
     _showDialog('error', { message, title: title || '错误', onOk });
 }
 
-/** Warning 警告对话框 */
-export function showWarning(message, title, onOk) {
+export function showWarning(message: string, title?: string, onOk?: () => void): void {
     _showDialog('warning', { message, title: title || '警告', onOk });
 }
 
-/** Success 成功对话框 */
-export function showSuccess(message, title, onOk) {
+export function showSuccess(message: string, title?: string, onOk?: () => void): void {
     _showDialog('success', { message, title: title || '成功', onOk });
 }
 
-/** Input 输入对话框 */
-export function showInput(title, prompt, defaultValue, onOk, onCancel) {
+export function showInput(title: string, prompt: string, defaultValue?: string, onOk?: (value?: string) => void, onCancel?: () => void): void {
     _showDialog('input', { title, message: prompt, onOk, onCancel, defaultValue });
 }
 
 // ========== 快捷兼容函数 ==========
 
-export function showInputDialog(title, placeholder, onSubmit) {
-    showInput(title, placeholder, '', onSubmit);
+export function showInputDialog(title: string, placeholder: string, onSubmit: (value: string) => void): void {
+    showInput(title, placeholder, '', (value?: string) => {
+        if (onSubmit && value !== undefined) onSubmit(value);
+    });
 }
 
-export function closeInputDialog() {
+export function closeInputDialog(): void {
     const dialog = dom.bgmInputDialog;
     if (dialog) dialog.style.display = 'none';
 }
 
-export function showConfirmDialog(message, onConfirm) {
+export function showConfirmDialog(message: string, onConfirm: () => void): void {
     showConfirm(message, '确认', onConfirm);
 }
 
-export function closeConfirmDialog() {
+export function closeConfirmDialog(): void {
     const dialog = dom.bgmConfirmDialog;
     if (dialog) dialog.style.display = 'none';
 }
 
-/** 关闭所有对话框（兼容旧接口） */
-export function closeDialog(result) {
-    // 关闭所有模态框并调用可能遗留的回调
+export function closeDialog(result?: unknown): void {
     for (const id in dom) {
-        if (id.startsWith('bgm') && dom[id]?.classList?.contains('bgm-modal')) {
-            dom[id].style.display = 'none';
+        const el = dom[id];
+        if (id.startsWith('bgm') && el?.classList?.contains('bgm-modal')) {
+            el.style.display = 'none';
         }
     }
-    // 调用旧式回调（如果存在）
-    if (window._dialogCallback) {
-        window._dialogCallback(result);
-        window._dialogCallback = null;
+    if ((window as any)._dialogCallback) {
+        (window as any)._dialogCallback(result);
+        (window as any)._dialogCallback = null;
     }
 }
 
-export function closeAlertDialog() {
+export function closeAlertDialog(): void {
     const dialog = dom.bgmAlertDialog;
     if (dialog) dialog.style.display = 'none';
 }
 
-export function showDialog(title, message) {
+export function showDialog(title: string, message: string): void {
     showAlert(message, title);
 }
 
 // ========== Toast 通知 ==========
 
-export function showToast(message, type) {
+export function showToast(message: string, type?: string): void {
     const toast = dom.bgmToast;
     if (!toast) return;
 
-    // 清除之前的定时器（避免叠加）
-    if (_toastTimer) {
+    if (_toastTimer !== null) {
         clearTimeout(_toastTimer);
         _toastTimer = null;
     }
@@ -314,25 +319,30 @@ export function showToast(message, type) {
         toast.classList.add('bgm-toast-' + type);
     }
 
-    _toastTimer = setTimeout(() => {
+    _toastTimer = window.setTimeout(() => {
         toast.className = 'bgm-toast';
         _toastTimer = null;
     }, 3000);
 }
 
 // ========== 挂载到 window（向后兼容）==========
-window.showInputDialog = showInputDialog;
-window.closeInputDialog = closeInputDialog;
-window.showConfirmDialog = showConfirmDialog;
-window.closeConfirmDialog = closeConfirmDialog;
-window.closeDialog = closeDialog;
-window.closeAlertDialog = closeAlertDialog;
-window.showAlertDialog = showAlert;
-window.showAlert = showAlert;
-window.BGMAlert = showAlert;
-window.BGMConfirm = showConfirm;
-window.BGMError = showError;
-window.BGMWarning = showWarning;
-window.BGMSuccess = showSuccess;
-window.BGMInput = showInput;
-try { window.alert = showAlert; } catch(e) { /* alert 只读属性 */ }
+(window as any).showInputDialog = showInputDialog;
+(window as any).closeInputDialog = closeInputDialog;
+(window as any).showConfirmDialog = showConfirmDialog;
+(window as any).closeConfirmDialog = closeConfirmDialog;
+(window as any).closeDialog = closeDialog;
+(window as any).closeAlertDialog = closeAlertDialog;
+(window as any).showAlertDialog = showAlert;
+(window as any).showAlert = showAlert;
+(window as any).BGMAlert = showAlert;
+(window as any).BGMConfirm = showConfirm;
+(window as any).BGMError = showError;
+(window as any).BGMWarning = showWarning;
+(window as any).BGMSuccess = showSuccess;
+(window as any).BGMInput = showInput;
+
+try {
+    (window as any).alert = showAlert;
+} catch (e) {
+    /* alert 是只读属性 */
+}

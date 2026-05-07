@@ -20,10 +20,10 @@
     "declarationMap": false,
     "sourceMap": true,
     "outDir": "./dist-ts",
-    "rootDir": "./js",  // 指定TS源代码根目录
+    "rootDir": "ts",  // 指定TS源代码根目录
     "baseUrl": ".",
     "paths": {
-      "@/*": ["./js/*"]
+      "@/*": ["ts/*"]
     },
     "resolveJsonModule": true,
     "isolatedModules": true,
@@ -33,15 +33,13 @@
     "typeRoots": [
       "./node_modules/@types",  // 1. npm 安装的类型定义
       "./generated-types",             // 2. 生成的类型定义 (.d.ts 和 .d.ts.map)
-      "js/types",           // 3. 手写的类型定义
-      "./js/types"             // 4. 其他类型定义
-  
+      "ts/tools",           // 3. 手写的类型定义
     ],
     "types": [],
     "ignoreDeprecations": "6.0"
   },
   "include": [
-    "js/**/*",
+    "ts/**/*",
   ],
   "exclude": [
     "node_modules",

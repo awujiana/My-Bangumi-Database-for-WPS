@@ -12,7 +12,7 @@ import { showDialog } from '../ui/dialog.js';
 import { sendToTaskpane } from '../core/unified.js';
 import { showTokenDialog, showUserIdDialog } from '../ui/handlers.js';
 import { httpRequest } from '../http.js';
-import { Result } from '../types/result.js';
+import { Result } from '../tools/result.js';
 
 // ========== 常量定义 ==========
 const COLUMNS = {

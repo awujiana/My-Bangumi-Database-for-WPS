@@ -11,7 +11,7 @@
     "ignoreDeprecations": "6.0"
   },
   "include": [
-    "js/**/*.ts"                      // 简化，js/**/*.ts 已包含所有子目录
+    "ts/**/*.ts"                      // ts/**/*.ts 已包含所有子目录
   ],
   "exclude": [
     "node_modules",

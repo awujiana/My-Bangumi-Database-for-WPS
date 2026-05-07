@@ -4,8 +4,8 @@
  * @description 支持异步请求、进度回调、自动重试、限流处理
  */
 import { BGM_CONFIG, LOG_LEVELS } from '../core/constants.js';
-import { bgmLog } from './util.js';
-import { Result, BgmError, toSyncResult } from './index.js';
+import { bgmLog } from '../../ts/tools/util.js';
+import { Result, BgmError, toSyncResult } from '../../ts/tools/index.js';
 const VALID_METHODS = ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'];
 // ========== 内部工具函数 ==========
 /**

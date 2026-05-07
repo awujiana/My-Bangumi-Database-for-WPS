@@ -1,6 +1,6 @@
 import { WPS_ENUM, XL, BGM_CONFIG, BGM_COLOR, LOG_LEVELS, ERROR_LEVELS, PANEL_CONFIG, BGM_SUBJECT_TYPES, SYNC_STATUS } from './core/constants.js';
 import { encryptToken, decryptToken, calcChecksum } from './core/crypto.js';
-import { BgmError, ErrorLevel } from './types/index.js';
+import { BgmError, ErrorLevel } from './tools/index.js';
 export { BgmError, ErrorLevel };
 export const WPS_Enum = WPS_ENUM;
 export { XL, BGM_CONFIG, BGM_COLOR, LOG_LEVELS, ERROR_LEVELS, PANEL_CONFIG, BGM_SUBJECT_TYPES, SYNC_STATUS };
@@ -19,7 +19,7 @@ export const BGM = {
     },
     sync: {
         isRunning: false,
-        lastSyncTime: null
+        lastSyncTime: null,
     },
     LOG_LEVEL: LOG_LEVELS.INFO,
     LOG_LEVELS: LOG_LEVELS,

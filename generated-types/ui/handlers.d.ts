@@ -1,61 +1,20 @@
 /**
- * ��ʾ Token ���öԻ���
+ * UI 事件处理模块（TypeScript 版）
+ * @module ui/handlers
+ * @description 面板操作处理、按钮绑定、业务对话框
  */
-export function showTokenDialog(currentToken: any): void;
-/**
- * ��ʾ�û�ID���öԻ���
- */
-export function showUserIdDialog(): void;
-/**
- * ���� Token ״̬��ʾ
- */
-export function updateTokenStatus(): void;
-/**
- * �����û�ID״̬��ʾ
- */
-export function updateUserIdStatus(): void;
-/**
- * ���û��ղ�ҳ��
- */
-export function openUserCollection(): void;
-/**
- * ���� Token ��Ч��
- */
-export function testTokenValidity(): void;
-/**
- * ���Ե�������
- */
-export function testDebugConnection(): void;
-/**
- * ����������
- */
-export function onAction(action: any): void;
-/**
- * �����ִ��ͬ��
- */
-export function syncFromPanel(): void;
-/**
- * ���Ե�����Ŀ����
- */
-export function testSingleUpdateFromPanel(): void;
-/**
- * ��BGMͬ���ղر��
- */
-export function syncCollectionFromBgm(): void;
-/**
- * ͨ�� API ��ʽͬ���ղأ������棩
- * ���� Token ��֤����ȡ�������͡�����д��ͬ����¼���༶��ɫ���
- */
-export function syncFromBgmByAPI(sheetIndex: any): void;
-/**
- * ������ϴ���Ŀ��������
- * ֧�����ֵ��÷�ʽ��
- *   markUploadedItems(sheetIndex, collections) - ֱ�Ӵ�����������
- *   markUploadedItems(sheetName) - �����������ƣ��Զ���ȡ�ղ����ݺ���
- */
-export function markUploadedItems(sheetIndexOrName: any, collections: any): void;
-/**
- * ������������
- */
-export function clearSheetMarks(sheetIndexOrName: any): void;
+export declare function showTokenDialog(currentToken?: string): void;
+export declare function showUserIdDialog(): void;
+export declare function updateTokenStatus(): void;
+export declare function updateUserIdStatus(): void;
+export declare function openUserCollection(): void;
+export declare function testTokenValidity(): void;
+export declare function testDebugConnection(): void;
+export declare function onAction(action: string): void;
+export declare function syncFromPanel(): void;
+export declare function testSingleUpdateFromPanel(): void;
+export declare function syncCollectionFromBgm(): Promise<void>;
+export declare function syncFromBgmByAPI(sheetIndex: number): Promise<void>;
+export declare function markUploadedItems(sheetIndexOrName: number | string, collections?: unknown[]): Promise<void>;
+export declare function clearSheetMarks(sheetIndexOrName: number | string): void;
 //# sourceMappingURL=handlers.d.ts.map

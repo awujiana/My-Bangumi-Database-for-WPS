@@ -3,7 +3,7 @@
  * @module sync/syncRecord
  * @description 管理同步记录工作表，记录同步历史
  */
-import { SyncRecord, UpdateRecordParams } from '../../generated-types/types/index.js';
+import { SyncRecord, UpdateRecordParams } from '../tools/index.js';
 export declare function sendToTaskpaneSR(data: any): any;
 export declare function showDialogSR(title: string, message: string): void;
 export declare function setSyncRecordHeaders(sheet: any): void;

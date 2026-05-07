@@ -4,8 +4,8 @@
  * @description 从 Bangumi API 获取收藏列表、Token 验证
  */
 
-import { bgmLog, LOG_LEVELS } from '../../generated-types/types/util.js';
-import  {  TokenVerifyResult, BgmError, ApiResponse,BangumiUserData ,} from '../../generated-types/types/index.js';
+import { bgmLog, LOG_LEVELS } from '../tools/util.js';
+import  {  TokenVerifyResult, BgmError, ApiResponse,BangumiUserData ,} from '../tools/index.js';
 
 
 // ========== 配置 ==========

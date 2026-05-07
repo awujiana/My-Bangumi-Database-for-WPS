@@ -65,8 +65,8 @@ export namespace BGM {
     export function handleError(error: any, options: any): BgmError;
     export function safeExecute(fn: any, context: any, options: any): any;
 }
-import { BgmError } from './types/index.js';
-import { ErrorLevel } from './types/index.js';
+import { BgmError } from './tools/index.js';
+import { ErrorLevel } from './tools/index.js';
 import { XL } from './core/constants.js';
 import { BGM_CONFIG } from './core/constants.js';
 import { BGM_COLOR } from './core/constants.js';

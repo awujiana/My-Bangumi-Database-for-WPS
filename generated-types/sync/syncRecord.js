@@ -3,8 +3,8 @@
  * @module sync/syncRecord
  * @description 管理同步记录工作表，记录同步历史
  */
-import { XL, BGM_COLOR, LOG_LEVELS, BGM, BGM_SUBJECT_TYPES, SYNC_STATUS } from '../../generated-types/types/util.js';
-import { getApp, bgmLog, colNumToLetter, getCell } from '../../generated-types/types/util.js';
+import { XL, BGM_COLOR, LOG_LEVELS, BGM, BGM_SUBJECT_TYPES, SYNC_STATUS } from '../tools/util.js';
+import { getApp, bgmLog, colNumToLetter, getCell } from '../tools/util.js';
 // ========== 向后兼容别名 ==========
 export function sendToTaskpaneSR(data) {
     return BGM.postMessage(data);

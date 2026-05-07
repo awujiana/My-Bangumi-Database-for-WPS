@@ -1,10 +1,14 @@
-import { WPS_ENUM, XL, BGM_CONFIG, BGM_COLOR, LOG_LEVELS, ERROR_LEVELS, PANEL_CONFIG, BGM_SUBJECT_TYPES, SYNC_STATUS } from './core/constants.js';
-import { encryptToken, decryptToken, calcChecksum } from './core/crypto.js';
-import { BgmError, ErrorLevel } from './types/index.js';
+import { WPS_ENUM, XL, BGM_CONFIG, BGM_COLOR, LOG_LEVELS, ERROR_LEVELS, PANEL_CONFIG, BGM_SUBJECT_TYPES, SYNC_STATUS } from '../core/constants.js';
+import { encryptToken, decryptToken, calcChecksum } from '../core/crypto.js';
+import { BgmError, ErrorLevel, isWpsApp } from './index.js';
+// 重新导出（向后兼容）
 export { BgmError, ErrorLevel };
+// ========== 导出常量（向后兼容）==========
 export const WPS_Enum = WPS_ENUM;
 export { XL, BGM_CONFIG, BGM_COLOR, LOG_LEVELS, ERROR_LEVELS, PANEL_CONFIG, BGM_SUBJECT_TYPES, SYNC_STATUS };
+// ========== BGM 全局命名空间 ==========
 export const BGM = {
+    // 缓存数据
     cache: {
         totalRows: 0,
         userId: null,
@@ -12,20 +16,28 @@ export const BGM = {
         sidCache: new Map(),
         listCache: []
     },
+    // 工作表状态
     sheet: {
         lockedIndex: null,
         lockedName: null,
         isLocked: false
     },
+    // 同步状态
     sync: {
         isRunning: false,
-        lastSyncTime: null
+        lastSyncTime: new Date().toISOString(),
     },
+    // 日志级别（0=DEBUG, 1=INFO, 2=WARN, 3=ERROR）
     LOG_LEVEL: LOG_LEVELS.INFO,
+    // 日志级别常量
     LOG_LEVELS: LOG_LEVELS,
+    // 错误级别常量
     ERROR_LEVELS: ERROR_LEVELS,
+    // 错误级别枚举
     ErrorLevel: ErrorLevel,
+    // BGM 错误类
     BgmError: BgmError,
+    // 统一对话框
     Dialog: {
         alert: function (title, message) {
             if (typeof window !== 'undefined' && window.BGMDialog !== undefined) {
@@ -96,6 +108,7 @@ export const BGM = {
                         this.error(title, message);
                         break;
                     case 'confirm':
+                        // 传递 message 而非 onConfirm
                         this.confirm(message, options?.onConfirm, options?.onCancel);
                         break;
                     case 'input':
@@ -107,6 +120,7 @@ export const BGM = {
             }
         }
     },
+    // 统一消息通信
     Message: {
         send: function (data, targetOrigin) {
             try {
@@ -127,6 +141,7 @@ export const BGM = {
             return this.send(data, targetOrigin);
         }
     },
+    // 向后兼容方法
     postMessage: function (data, targetOrigin) {
         return BGM.Message.send(data, targetOrigin);
     },
@@ -143,6 +158,7 @@ export const BGM = {
         }
         BGM.Dialog.confirm(message, onConfirm, onCancel);
     },
+    // 统一错误处理
     handleError: function (error, options) {
         const opts = {
             level: ErrorLevel.ERROR,
@@ -184,6 +200,7 @@ export const BGM = {
         }
         return bgmError;
     },
+    // 安全执行函数
     safeExecute: function (fn, context, options) {
         try {
             return fn();
@@ -193,21 +210,40 @@ export const BGM = {
         }
     }
 };
+// ========== 日志函数 ==========
+/**
+ * 日志函数（支持日志级别控制）
+ * @param level - 日志级别 (0=DEBUG, 1=INFO, 2=WARN, 3=ERROR)
+ * @param message - 日志消息
+ */
 export function bgmLog(level, message) {
     if (level >= BGM.LOG_LEVEL) {
         const prefix = ['[DEBUG]', '[INFO]', '[WARN]', '[ERROR]'][level] || '[INFO]';
         console.log(prefix + ' ' + message);
     }
 }
+// ========== Application 获取 ==========
+/**
+ * 获取 Application 对象（使用类型守卫）
+ */
 export function getApp() {
-    if (typeof window !== 'undefined' && window.Application) {
-        return window.Application;
+    if (typeof window !== 'undefined') {
+        const winApp = window.Application;
+        if (isWpsApp(winApp))
+            return winApp;
     }
-    if (typeof Application !== 'undefined') {
-        return Application;
+    // 使用 window.Application 替代裸 Application
+    if (typeof window !== 'undefined') {
+        const globalApp = window.Application;
+        if (isWpsApp(globalApp))
+            return globalApp;
     }
     return null;
 }
+// ========== 单元格操作 ==========
+/**
+ * 列号转字母 (A, B, ..., Z, AA, AB, ...)
+ */
 export function colNumToLetter(col) {
     let letter = "";
     while (col > 0) {
@@ -217,6 +253,9 @@ export function colNumToLetter(col) {
     }
     return letter;
 }
+/**
+ * 安全获取单元格对象
+ */
 export function getCell(ws, row, col) {
     try {
         const wsObj = ws;
@@ -238,6 +277,9 @@ export function getCell(ws, row, col) {
         return null;
     }
 }
+/**
+ * 安全获取单元格值
+ */
 export function getCellValue(ws, row, col) {
     try {
         const cell = getCell(ws, row, col);
@@ -251,6 +293,9 @@ export function getCellValue(ws, row, col) {
     }
     return "";
 }
+/**
+ * 读取单元格文本（handle WPS Value/Value2/Text 等多种属性）
+ */
 export function readCell(ws, row, col) {
     try {
         const cell = getCell(ws, row, col);
@@ -274,6 +319,9 @@ export function readCell(ws, row, col) {
         return "";
     }
 }
+/**
+ * 设置单元格值
+ */
 export function setCellValue(ws, row, col, value) {
     try {
         const cell = getCell(ws, row, col);
@@ -289,6 +337,9 @@ export function setCellValue(ws, row, col, value) {
     }
     return false;
 }
+/**
+ * 获取工作表对象
+ */
 export function getSheetByIndex(sheetIndex) {
     const app = getApp();
     if (!app?.ActiveWorkbook?.Sheets)
@@ -298,6 +349,10 @@ export function getSheetByIndex(sheetIndex) {
         return null;
     return sheets.Item(sheetIndex);
 }
+// ========== HTML 安全 ==========
+/**
+ * HTML 转义（防止 XSS）
+ */
 export function escapeHtml(text) {
     if (!text)
         return "";
@@ -305,6 +360,10 @@ export function escapeHtml(text) {
     div.textContent = text;
     return div.innerHTML;
 }
+// ========== Token 存储 ==========
+/**
+ * 存储 Token（加密）
+ */
 export function storeBgToken(token) {
     const app = getApp();
     if (!app?.PluginStorage)
@@ -312,6 +371,9 @@ export function storeBgToken(token) {
     app.PluginStorage.setItem("bgm_token", encryptToken(token));
     return true;
 }
+/**
+ * 清除 Token
+ */
 export function clearBgToken() {
     const app = getApp();
     if (!app?.PluginStorage)
@@ -319,6 +381,9 @@ export function clearBgToken() {
     app.PluginStorage.setItem("bgm_token", "");
     return true;
 }
+/**
+ * 加载 Token（解密）
+ */
 export function loadBgToken() {
     const app = getApp();
     if (!app?.PluginStorage)
@@ -332,15 +397,28 @@ export function loadBgToken() {
     clearBgToken();
     return null;
 }
+// ========== 用户信息 ==========
+/**
+ * 设置 BGM 用户 ID
+ */
 export function _setBgmUserId(id) {
     BGM.cache.userId = id;
 }
+/**
+ * 获取 BGM 用户 ID
+ */
 export function _getBgmUserId() {
     return BGM.cache.userId;
 }
+/**
+ * 获取用户 API 路径
+ */
 export function _getUserApiPath() {
     return BGM.cache.userId ? String(BGM.cache.userId) : "-";
 }
+/**
+ * 获取 Bangumi 当前登录用户信息
+ */
 export function _fetchBgmUserInfo(callback) {
     const token = loadBgToken();
     if (!token) {
@@ -379,6 +457,9 @@ export function _fetchBgmUserInfo(callback) {
     };
     xhr.send();
 }
+/**
+ * 获取 Bangumi 用户信息（Promise 版本，供 handlers.js 等模块使用）
+ */
 export function fetchBgmUserInfo() {
     return new Promise((resolve) => {
         _fetchBgmUserInfo((userInfo) => {
@@ -386,12 +467,19 @@ export function fetchBgmUserInfo() {
         });
     });
 }
+// ========== 辅助函数 ==========
+/**
+ * 通过 WPS 提供的接口执行脚本
+ */
 export function shellExecuteByOAAssist(param) {
     const app = getApp();
     if (app?.OAAssist) {
         app.OAAssist.ShellExecute(param);
     }
 }
+/**
+ * 获取 URL 路径
+ */
 export function GetUrlPath() {
     const app = getApp();
     const manifestPath = app?.PluginStorage?.getItem("manifest_base_path");
@@ -405,6 +493,9 @@ export function GetUrlPath() {
     }
     return "";
 }
+/**
+ * 显示同步面板
+ */
 export function showBangumiPanel() {
     const app = getApp();
     if (!app) {
@@ -432,11 +523,17 @@ export function showBangumiPanel() {
         }
     }
 }
+/**
+ * 字符串去除首尾空格
+ */
 export function trim(str) {
     if (!str)
         return "";
     return String(str).replace(/^\s+|\s+$/g, "");
 }
+/**
+ * 显示输入提示框
+ */
 export function wpsPrompt(message, defaultValue) {
     return new Promise((resolve) => {
         const app = getApp();
@@ -473,6 +570,9 @@ export function wpsPrompt(message, defaultValue) {
         }
     });
 }
+/**
+ * 显示 WPS 消息对话框
+ */
 export function wpsMsgBox(message, buttons, icon) {
     return new Promise((resolve) => {
         const app = getApp();
@@ -511,6 +611,9 @@ export function wpsMsgBox(message, buttons, icon) {
         }
     });
 }
+/**
+ * 延迟执行
+ */
 export function sleep(ms) {
     try {
         const app = getApp();
@@ -538,6 +641,9 @@ export function sleep(ms) {
         }
     }
 }
+/**
+ * 显示自定义提示对话框
+ */
 export function showAlertDialog(title, message) {
     if (typeof window !== 'undefined' && typeof window.BGMAlert === 'function') {
         window.BGMAlert(message, title);
@@ -546,12 +652,16 @@ export function showAlertDialog(title, message) {
         window.alert(message);
     }
 }
+/**
+ * 关闭提示对话框
+ */
 export function closeAlertDialog() {
     const modal = document.getElementById("alertDialog");
     if (modal) {
         modal.style.display = "none";
     }
 }
+// ========== 统一日志前缀 ==========
 (function () {
     const _origLog = console.log;
     const _origWarn = console.warn;
@@ -578,6 +688,7 @@ export function closeAlertDialog() {
         _origError.apply(console, argsArray);
     };
 })();
+// ========== 向后兼容别名 ==========
 if (typeof window !== 'undefined') {
     const win = window;
     win.WPS_Enum = WPS_ENUM;

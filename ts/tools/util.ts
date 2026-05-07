@@ -55,7 +55,8 @@ export const BGM: {
     // 同步状态
     sync: {
         isRunning: false,
-        lastSyncTime: null
+        lastSyncTime:  new Date().toISOString(),
+   
     },
     // 日志级别（0=DEBUG, 1=INFO, 2=WARN, 3=ERROR）
     LOG_LEVEL: LOG_LEVELS.INFO,

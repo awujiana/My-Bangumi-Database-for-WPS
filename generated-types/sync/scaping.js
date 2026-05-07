@@ -3,7 +3,7 @@
  * @module sync/scraping
  * @description 从 Bangumi API 获取收藏列表、Token 验证
  */
-import { bgmLog, LOG_LEVELS } from '../../generated-types/types/util.js';
+import { bgmLog, LOG_LEVELS } from '../tools/util.js';
 // ========== 配置 ==========
 const CONFIG = {
     API_BASE: 'https://api.bgm.tv/v0',

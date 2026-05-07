@@ -4,34 +4,37 @@
  * @description 面板操作处理、按钮绑定、业务对话框
  */
 
-import { bgmLog, BGM, LOG_LEVELS, loadBgToken, storeBgToken, clearBgToken, _getBgmUserId, _setBgmUserId, getApp, getCell, trim, fetchBgmUserInfo } from '../../../generated-types/types/util.js';
+import { bgmLog, BGM, LOG_LEVELS, loadBgToken, storeBgToken, clearBgToken, _getBgmUserId, _setBgmUserId, getApp, getCell, trim, fetchBgmUserInfo } from '../tools/util.js';
 
-import { BgmError, ErrorLevel, type BGMUserInfo, type ErrorOptions } from '../../../generated-types/types/index.js';
-import { BGM_COLOR } from '../../core/constants.js';
+import { BgmError, ErrorLevel, type BGMUserInfo, type ErrorOptions } from '../tools/index.js';
+import { BGM_COLOR } from '../core/constants.js';
 import { showAlert, showConfirm, showError, showSuccess, showInput, showConfirmDialog, showToast } from './dialog.js';
-import { setSyncRunning, setStatus } from '../message.js';
-import { handleError } from '../../core/unified.js';
-import { verifyToken, fetchAllUserCollections } from '../../sync/scraping.js';
+import { setSyncRunning, setStatus } from './message.js';
+import { handleError } from '../core/unified.js';
+import { verifyToken, fetchAllUserCollections } from '../sync/scraping.js';
 
-// 声明外部全局函数
-declare const findHeaderRow: ((ws: unknown, startRow?: number) => number) | undefined;
-declare const getColumnMap: ((ws: unknown, headerRow: number) => Map<string, number>) | undefined;
-declare const getLastRow: ((ws: unknown) => number) | undefined;
-declare const getFilterStatus: ((endRow: number) => FilterStatus | null) | undefined;
-declare const getSequentialRowsBySeqCol: ((startRow: number, endRow: number) => { validRows: number[] }) | undefined;
-declare const extractSubjectId: ((url: string) => string) | undefined;
-declare const getOrCreateSyncRecordSheet: (() => unknown) | undefined;
-declare const getAllSyncRecords: (() => SyncRecord[]) | undefined;
-declare const addSyncRecord: ((options: Record<string, unknown>) => boolean) | undefined;
-declare const openSyncRecordSheet: (() => void) | undefined;
-declare const SyncToBangumi: (() => void) | undefined;
-declare const testSingleUpdate: (() => void) | undefined;
-declare const testSingleUpdateBangumi: (() => void) | undefined;
-declare const clearRowColors: (() => void) | undefined;
-declare const refreshData: (() => void) | undefined;
-declare const previewSyncContent: (() => void) | undefined;
-declare const markUploadedItemsInSheet: ((index: number, collections: unknown[]) => void) | undefined;
-declare const clearSheetMarksInSheet: ((index: number) => void) | undefined;
+// 从源模块导入类型和函数
+import { BgmError, ErrorLevel } from '../tools/result.js';
+import type { BGMUserInfo, ErrorOptions, FilterStatus, SyncRecord, BangumiCollectionItem } from '../tools/index.js';
+
+// 从 exceltobangumi 导入
+import {
+    findHeaderRow, getColumnMap, getLastRow, extractSubjectId,
+    getFilterStatus, getSequentialRowsBySeqCol, SyncToBangumi,
+    clearRowColors
+} from '../sync/exceltobangumi.js';
+
+// 从 syncRecord 导入
+import {
+    getOrCreateSyncRecordSheet, getAllSyncRecords, addSyncRecord,
+    openSyncRecordSheet, clearSheetMarksInSheet
+} from '../sync/syncRecord.js';
+
+// 从 preview 导入
+import { previewSyncContent } from '../../../generated-types/ui/preview.js';
+
+// 从 taskpane 导入
+import { refreshData } from '../taskpane.js';
 
 // 类型定义
 interface FilterStatus {
@@ -313,7 +316,7 @@ export function testSingleUpdateFromPanel(): void {
 
 // ========== 从BGM同步收藏标记 ==========
 
-export function syncCollectionFromBgm(): void {
+export async function syncCollectionFromBgm(): Promise<void> {
     try {
         const select = document.getElementById('sheetSelect') as HTMLSelectElement | null;
         const sheetIndex = BGM.sheet.lockedIndex || parseInt(select?.value || '') || 1;
@@ -326,13 +329,13 @@ export function syncCollectionFromBgm(): void {
             return;
         }
 
-        syncFromBgmByAPI(sheetIndex);
+        await syncFromBgmByAPI(sheetIndex);
     } catch (e) {
         handleError(e, { context: 'syncCollectionFromBgm', showDialog: true });
     }
 }
 
-export function syncFromBgmByAPI(sheetIndex: number): void {
+export async function syncFromBgmByAPI(sheetIndex: number): Promise<void> {
     const token = loadBgToken();
     if (!token) {
         showAlert(_T.pleaseSetBgmToken);
@@ -342,11 +345,12 @@ export function syncFromBgmByAPI(sheetIndex: number): void {
 
     showConfirmDialog(
         '\u5C06\u4ECE BGM API \u83B7\u53D6\u4F60\u7684\u6536\u85CF\u5217\u8868\uFF0C\u5E76\u5728 D \u5217\u6807\u8BB0\u5DF2\u6536\u85CF\u7684\u6761\u76EE\uFF0C\u540C\u65F6\u5199\u5165\u540C\u6B65\u8BB0\u5F55\u8868\u3002\n\n\u662F\u5426\u7EE7\u7EED\uFF1F',
-        () => { _doAPISync(sheetIndex, token); }
+        async () => { await _doAPISync(sheetIndex, token); }
     );
 }
 
-function _doAPISync(sheetIndex: number, token: string): void {
+
+async function _doAPISync(sheetIndex: number, token: string): Promise<void> {
     setStatus('\u6B63\u5728\u83B7\u53D6\u6536\u85CF\u5217\u8868...', 'info');
 
     try {
@@ -394,17 +398,16 @@ function _doAPISync(sheetIndex: number, token: string): void {
 
         // 验证 Token
         setStatus('\u6B63\u5728\u9A8C\u8BC1 Token...', 'info');
-        const verifyResult = verifyToken(token);
+            const verifyResult = await verifyToken(token);
         if (!verifyResult.valid) {
             showAlert('\u274C ' + verifyResult.message);
             setStatus('Token \u65E0\u6548', 'error');
             return;
         }
         _setBgmUserId(verifyResult.userId);
-
         // 获取收藏列表
         setStatus('\u6B63\u5728\u83B7\u53D6\u6536\u85CF\u5217\u8868...', 'info');
-        const userCollections = fetchAllUserCollections(token) as BangumiCollectionItem[];
+        const userCollections = await fetchAllUserCollections(token) as BangumiCollectionItem[];
 
         if ((fetchAllUserCollections as any).lastError) {
             const err = (fetchAllUserCollections as any).lastError;
@@ -497,7 +500,7 @@ function _doAPISync(sheetIndex: number, token: string): void {
     }
 }
 
-export function markUploadedItems(sheetIndexOrName: number | string, collections?: unknown[]): void {
+export async function markUploadedItems(sheetIndexOrName: number | string, collections?: unknown[]): Promise<void> {
     if (typeof sheetIndexOrName === 'string' && collections === undefined) {
         const sheetName = sheetIndexOrName;
         const token = loadBgToken();
@@ -522,14 +525,17 @@ export function markUploadedItems(sheetIndexOrName: number | string, collections
         if (targetIndex === null) { showAlert(_T.sheetNotFound + sheetName); return; }
 
         if (typeof fetchAllUserCollections === 'function') {
-            fetchAllUserCollections(token, userId as string, (cols: unknown[]) => {
+            try {
+                const cols = await fetchAllUserCollections(token, userId);
                 if (cols && cols.length > 0) {
                     if (typeof markUploadedItemsInSheet === 'function') {
                         markUploadedItemsInSheet(targetIndex!, cols);
                         showToast(_T.marksToSheet + cols.length + _T.marksToSheetSuffix + sheetName, 'success');
                     }
                 }
-            });
+            } catch (e) {
+                showAlert('获取收藏失败: ' + (e as Error).message);
+            }
         }
         return;
     }
