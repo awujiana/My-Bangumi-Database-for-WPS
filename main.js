@@ -9,7 +9,6 @@ const MODULES = [
     { src: 'js/core/crypto.js', type: 'module', critical: true },
     { src: 'js/util.js', type: 'module', critical: true },
     { src: 'js/http.js', type: 'module' },
-    { src: 'js/core/unified.js', type: 'module' },
     { src: 'js/ui/dialog.js', type: 'module' },
     { src: 'js/ui/message.js', type: 'module' },
     { src: 'js/ui/preview.js', type: 'module' },
@@ -19,7 +18,7 @@ const MODULES = [
     { src: 'js/ui/handlers.js', type: 'module', critical: true },
     { src: 'js/sync/scraping.js', type: 'module' },
     { src: 'js/taskpane.js', type: 'module', critical: true }
-    // systemdemo.js 已移除（脚手架模板，与业务无关）
+    
 ];
 
 function loadScript(src, type) {
