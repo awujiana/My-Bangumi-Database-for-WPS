@@ -4,14 +4,17 @@
  * @description 面板操作处理、按钮绑定、业务对话框
  */
 
-import { bgmLog, BGM, LOG_LEVELS, loadBgToken, storeBgToken, clearBgToken, _getBgmUserId, _setBgmUserId, getApp, getCell, trim, fetchBgmUserInfo } from '../util.js';
-import { BGM_COLOR } from '../util.js';
+import { bgmLog, BGM, LOG_LEVELS, loadBgToken, storeBgToken, clearBgToken, _getBgmUserId, _setBgmUserId, getApp, getCell, trim, fetchBgmUserInfo } from '../generated-types/types/util.js';
+
+// 从类型统一入口导入
+import { BgmError, ErrorLevel,  BGMUserInfo,  ErrorOptions } from '../types/index.js';
+
+import { BGM_COLOR } from '../core/constants.js';
 import { showAlert, showConfirm, showError, showSuccess, showInput, showConfirmDialog, showToast } from './dialog.js';
 import { setSyncRunning, setStatus } from './message.js';
 import { handleError } from '../core/unified.js';
 import { verifyToken, fetchAllUserCollections } from '../sync/scraping.js';
-import { SyncToBangumi } from '../sync/exceltobangumi.js';
-import { BgmError, ErrorLevel,  BGMUserInfo,  ErrorOptions } from '../types/index.js';
+import { getOrCreateSyncRecordSheet, getAllSyncRecords, addSyncRecord } from '../sync/record.js';
 
 
 // ========== 中文文本常量（Unicode 转义，避免 WPS WebView 编码问题）==========

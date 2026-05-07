@@ -120,14 +120,15 @@ export const BGM: {
             }
         },
         show: function(type: 'alert' | 'confirm' | 'error' | 'input', title: string, message: string, options?: DialogOptions): void {
-            if (typeof window !== 'undefined' && (window as unknown as Record<string, unknown>).BGMDialog !== undefined) {
-                (window as unknown as Record<string, { show: (t: string, ti: string, m: string, o?: DialogOptions) => void }>).BGMDialog!.show(type, title, message, options);
+            if (typeof window !== 'undefined' && (window as any).BGMDialog !== undefined) {
+                (window as any).BGMDialog.show(type, title, message, options);
             } else {
                 switch (type) {
                     case 'error':
                         this.error(title, message);
                         break;
                     case 'confirm':
+                        // 传递 message 而非 onConfirm
                         this.confirm(message, options?.onConfirm, options?.onCancel);
                         break;
                     case 'input':
@@ -137,7 +138,7 @@ export const BGM: {
                         this.alert(title, message);
                 }
             }
-        }
+}
     },
  // 统一消息通信
     Message: {

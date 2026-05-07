@@ -61,17 +61,75 @@ export interface BGMUserInfo {
     username: string;
 }
 
+export interface TokenVerifyResult {
+    valid: boolean;
+    userId: string;
+    username: string;
+    message: string;
+}
+
+export interface ApiResponse {
+    status: number;
+    data: any;
+}
+
+export interface BangumiUserData {
+    id?: string | number;
+    nickname?: string;
+    username?: string;
+}
+
+
+
+
+
+
+
+
 // ========== 对话框选项 ==========
 export interface DialogOptions {
-    /** 确认回调 */
-    onConfirm?: () => void;
+    title?: string;
+    message?: string;
+    prompt?: string;       // 输入框的提示文本（与 message 等效）
+    /** 输入确认回调（参数为用户输入的值） */
+    onOk?: (value?: string) => void;
     /** 取消回调 */
     onCancel?: () => void;
-    /** 输入确认回调（参数为用户输入的值） */
-    onOk?: (value: string) => void;
+    // 确认回调（无输入参数，适用于确认对话框） */
+    onConfirm?: () => void;      
     /** 默认值 */
     defaultValue?: string;
 }
+
+
+export interface DialogButton {
+    id: string;
+    cls: string;
+    text: string;
+    event: string;
+}
+
+export interface DialogConfig {
+    id: string;
+    titleId: string;
+    msgId: string;
+    buttons: DialogButton[];
+}
+
+export interface DialogCallback {
+    onOk?: (value?: string) => void;  // value 改为可选
+    onCancel?: () => void;
+}
+
+
+
+
+
+
+
+
+
+
 
 // ========== 错误处理选项 ==========
 export interface ErrorOptions {
