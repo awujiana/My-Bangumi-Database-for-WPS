@@ -5,22 +5,22 @@
 'use strict';
 
 const MODULES = [
-    { src: 'js/core/constants.js', type: 'module', critical: true },
-    { src: 'js/core/crypto.js', type: 'module', critical: true },
-    { src: 'js/tools/index.js', type: 'module', critical: true },     // 先加载类型/枚举
-    { src: 'js/tools/result.js', type: 'module', critical: true },     // BgmError + Result
-    { src: 'js/tools/wps.js', type: 'module', critical: true },        // isWpsApp 等
-    { src: 'js/tools/util.js', type: 'module', critical: true },
-    { src: 'js/tools/http.js', type: 'module' },
-    { src: 'js/ui/dialog.js', type: 'module' },
-    { src: 'js/ui/message.js', type: 'module' },
-    { src: 'js/ui/preview.js', type: 'module' },
-    { src: 'js/sync/syncRecord.js', type: 'module' },
-    { src: 'js/sync/scraping.js', type: 'module' },                    // 移到 exceltobangumi 之前
-    { src: 'js/sync/exceltobangumi.js', type: 'module' },
-    { src: 'js/ribbon.js', type: 'module', critical: true },
-    { src: 'js/ui/handlers.js', type: 'module', critical: true },
-    { src: 'js/taskpane.js', type: 'module', critical: true }
+    { src: 'ts/core/constants.js', type: 'module', critical: true },
+    { src: 'ts/core/crypto.js', type: 'module', critical: true },
+    { src: 'ts/tools/index.js', type: 'module', critical: true },     // 先加载类型/枚举
+    { src: 'ts/tools/result.js', type: 'module', critical: true },     // BgmError + Result
+    { src: 'ts/tools/wps.js', type: 'module', critical: true },        // isWpsApp 等
+    { src: 'ts/tools/util.js', type: 'module', critical: true },
+    { src: 'ts/tools/http.js', type: 'module' },
+    { src: 'ts/ui/dialog.js', type: 'module' },
+    { src: 'ts/ui/message.js', type: 'module' },
+    { src: 'ts/ui/preview.js', type: 'module' },
+    { src: 'ts/sync/syncRecord.js', type: 'module' },
+    { src: 'ts/sync/scraping.js', type: 'module' },                    // 移到 exceltobangumi 之前
+    { src: 'ts/sync/exceltobangumi.js', type: 'module' },
+    { src: 'ts/ribbon.js', type: 'module', critical: true },
+    { src: 'ts/ui/handlers.js', type: 'module', critical: true },
+    { src: 'ts/taskpane.js', type: 'module', critical: true }
 ];
 
 function loadScript(src, type) {

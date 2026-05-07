@@ -18,14 +18,18 @@ export default defineConfig({
       ]
     })
   ],
+  server: {
+    host: '0.0.0.0',
+    port: 3889,
+    fs: {
+      allow: ['.']  // 允许访问项目根目录
+    }
+  },
   build: {
     outDir: 'dist',
     emptyOutDir: true,
     rollupOptions: {
-      input: {
-        main: 'index.html'
-        // 移除 taskpane.html 入口，它由 viteStaticCopy 直接复制
-      },
+      input: { main: 'index.html' },
       output: {
         entryFileNames: 'assets/[name].[hash].js',
         chunkFileNames: 'assets/[name].[hash].js',
