@@ -4,11 +4,11 @@
  * @description 数据预览、同步记录预览、详情模态框、单条上传
  */
 
-import { getApp, bgmLog, BGM, LOG_LEVELS, BGM_COLOR } from '../../generated-types/types/util.js';
-import { getCellValue, getCell, trim, _getUserApiPath } from '../../generated-types/types/util.js';
+import { getApp, bgmLog, BGM, LOG_LEVELS, BGM_COLOR } from '../../generated-types/tools/util.js';
+import { getCellValue, getCell, trim, _getUserApiPath } from '../../generated-types/tools/util.js';
 import { showAlert, showToast } from './dialog.js';
-import { escapeHtml } from '../util.js';
-import type { WpsRange } from '../../generated-types/types/wps.js';
+import { escapeHtml } from '../../generated-types/tools/util.js';
+import type { WpsRange } from '../../generated-types/tools/wps.js';
 // 定义接口类型
 interface DetailItem {
   row: number;
