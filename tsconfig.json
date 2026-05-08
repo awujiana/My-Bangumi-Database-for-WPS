@@ -26,7 +26,7 @@
     "declarationMap": false,                   // 不生成声明文件的 source map
     "sourceMap": true,                         // 生成 .js.map 方便调试
     "outDir": "./dist-ts",                     // TS 编译输出目录
-    "rootDir": ".",                            // 源文件根目录（项目根）【关键】
+    "rootDir": "ts/",                            // 源文件根目录（项目根）【关键】
 
     // ========== 路径别名 ==========
     "baseUrl": ".",                            // 基础路径
