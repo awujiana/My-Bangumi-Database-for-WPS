@@ -24,14 +24,38 @@ export function OnAddinLoad(ribbonUI: any): boolean {
 }
 
 export function OnAction(control: { Id: string }): boolean {
-    switch (control.Id) {
-        case 'btnShowPanel':      showBangumiPanel(); break;
-        case 'btnSyncBangumi':    SyncToBangumi?.(); break;
-        case 'btnSetToken':       showTokenDialog(loadBgToken() || '');break;
-        case 'btnTestToken':      const token = loadBgToken();if (token) testTokenValidityForRibbon(token);break;
-        case 'btnSetUserId':      showUserIdDialog(); break;
-        case 'btnOpenCollection': openUserCollection(); break;
-        case 'btnClearColors':    clearRowColors?.(); break;
+    console.log('[BGM] OnAction:', control.Id);
+    try {
+        switch (control.Id) {
+            case 'btnShowPanel':
+                showBangumiPanel();
+                break;
+            case 'btnSyncBangumi':
+                SyncToBangumi?.();
+                break;
+            case 'btnSetToken':
+                showTokenDialog(loadBgToken() || '');
+                break;
+            case 'btnTestToken': {
+                const token = loadBgToken();
+                if (token) testTokenValidityForRibbon(token);
+                else console.warn('[BGM] 没有 Token，无法测试');
+                break;
+            }
+            case 'btnSetUserId':
+                showUserIdDialog();
+                break;
+            case 'btnOpenCollection':
+                openUserCollection();
+                break;
+            case 'btnClearColors':
+                clearRowColors?.();
+                break;
+            default:
+                console.warn('[BGM] 未知按钮:', control.Id);
+        }
+    } catch (e) {
+        console.error('[BGM] OnAction error:', e);
     }
     return true;
 }
@@ -39,7 +63,7 @@ export function OnAction(control: { Id: string }): boolean {
 export function GetBangumiImage(control: { Id: string }): string {
     const icons: Record<string, string> = {
         btnShowPanel: 'images/panel.svg',
-        btnSyncBangumi: 'images/sync.svg',
+        btnSyncBangumi:'images/sync.svg',
         btnSetToken: 'images/token.svg',
         btnTestToken: 'images/key.svg',
         btnSetUserId: 'images/user.svg',
