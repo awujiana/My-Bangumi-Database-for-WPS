@@ -134,8 +134,3 @@ export async function fetchAllUserCollections(token: string, userId?: string): P
     return allCollections;
 }
 
-// ========== 向后兼容 ==========
-if (typeof window !== 'undefined') {
-    (window as any).verifyToken = verifyToken;
-    (window as any).fetchAllUserCollections = fetchAllUserCollections;
-}

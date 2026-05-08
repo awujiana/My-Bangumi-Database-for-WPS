@@ -6,7 +6,7 @@
 
 import { BGM_CONFIG, LOG_LEVELS } from '../core/constants.js';
 import { bgmLog,BGM } from './util.js';
-import { Result, toSyncResult, type SyncResult } from './index.js';
+import { Result, toSyncResult, type SyncResult } from '../core/result.js';
 
 // ========== 类型定义 ==========
 export type HttpMethod = 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH';
@@ -312,5 +312,3 @@ export function httpRequestSync(
     return { code: 429, message: `超过最大重试次数 (${maxRetries} 次)` };
 }
 
-// ========== 导出 ==========
-export { toSyncResult };

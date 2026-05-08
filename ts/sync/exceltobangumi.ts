@@ -1004,28 +1004,3 @@ export function buildTagsArray(tagsStr: string): string[] {
   return Array.from(tagSet).slice(0, 5);
 }
 
-// ========== 向后兼容挂载 ==========
-if (typeof window !== 'undefined') {
-  (window as any).SyncToBangumi = SyncToBangumi;
-  (window as any).getDataSheet = getDataSheet;
-  (window as any).getBgmtoken = getBgmtoken;
-  (window as any).getLastRow = getLastRow;
-  (window as any).findHeaderRow = findHeaderRow;
-  (window as any).getColumnMap = getColumnMap;
-  (window as any).buildJsonPayload = buildJsonPayload;
-  (window as any).extractSubjectId = extractSubjectId;
-  (window as any).clearRowColors = clearRowColors;
-  (window as any).openUserCollection = openUserCollection;
-  (window as any).openBangumiTokenPage = openBangumiTokenPage;
-  (window as any).testTokenValidityForRibbon = testTokenValidityForRibbon;
-  (window as any).bgmRequestSync = bgmRequestSync;
-  (window as any).bgmRequest = bgmRequest;
-  (window as any).previewSubjectIdExtraction = previewSubjectIdExtraction;
-  (window as any).previewJsonPayload = previewJsonPayload;
-  (window as any).getFilterStatus = getFilterStatus;
-  (window as any).getColumnValueCounts = getColumnValueCounts;
-  (window as any).getSequentialRowsBySeqCol = getSequentialRowsBySeqCol;
-  (window as any).mapWatchStatus = mapWatchStatus;
-  (window as any).addTagsFromStr = addTagsFromStr;
-  (window as any).buildTags = buildTags;
-}

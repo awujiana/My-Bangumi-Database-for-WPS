@@ -5,12 +5,6 @@
  *              其他模块只需 `import { ... } from './types/index.js'`
  */
 
-// ========== 从 result.ts 重导出 ==========
-
-export type { BgmResultError } from '../core/result.js';
-export { Result } from '../core/result.js';
-export type { SyncResult } from '../core/result.js';
-export { toSyncResult } from '../core/result.js';
 
 // ========== 错误级别枚举 ==========
 export const ErrorLevel = {

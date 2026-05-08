@@ -476,20 +476,3 @@ export function clearSheetMarksInSheet(sheetIndex: number): void {
   }
 }
 
-// ========== 向后兼容挂载 ==========
-if (typeof window !== 'undefined') {
-  (window as any).setSyncRecordHeaders = setSyncRecordHeaders;
-  (window as any).checkHeaderExists = checkHeaderExists;
-  (window as any).getOrCreateSyncRecordSheet = getOrCreateSyncRecordSheet;
-  (window as any).addSyncRecord = addSyncRecord;
-  (window as any).updateSyncRecord = updateSyncRecord;
-  (window as any).getAllSyncRecords = getAllSyncRecords;
-  (window as any).clearSyncRecords = clearSyncRecords;
-  (window as any).openSyncRecordSheet = openSyncRecordSheet;
-  (window as any).activateSyncRecordSheet = activateSyncRecordSheet;
-  (window as any).finalizeSyncRecordBatch = finalizeSyncRecordBatch;
-  (window as any).fetchAndRecordBgCollections = fetchAndRecordBgCollections;
-  (window as any).formatCurrentTime = formatCurrentTime;
-  (window as any).clearSheetMarksInSheet = clearSheetMarksInSheet;
-  (window as any).BGM_SUBJECT_TYPES = BGM_SUBJECT_TYPES;
-}
