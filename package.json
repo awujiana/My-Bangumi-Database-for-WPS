@@ -6,12 +6,13 @@
 		"dev": "vite --port 3889",
 		"build": "vite build",
 		"build:ts": "tsc --project tsconfig.build.json",
-		"debug": "npm run build:ts && wpsjs debug",
+		"debug": "npm run build:ts && concurrently \"tsc --project tsconfig.build.json --watch\" \"wpsjs debug\"",
 		"lint": "eslint . --ext .vue,.js,.jsx,.cjs,.mjs --fix --ignore-path .gitignore",
 		"format": "prettier --write src/"
 	},
 	"description": "WPS Excel 加载项 - 追番助手",
 	"devDependencies": {
+		"concurrently": "^9.2.1",
 		"et-jsapi-declare": "latest",
 		"typescript": "^6.0.3",
 		"vite": "^6.0.0",

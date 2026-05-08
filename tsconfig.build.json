@@ -9,7 +9,7 @@
     "declarationMap": true,                    // 生成声明文件的 source map
     "sourceMap": false,                        // 不生成 .js.map（构建产物体积更小）
     "noEmitOnError": false,                    // 即使有错也生成文件（方便调试）
-    "allowJs": true                            // 允许 TS 导入 JS【关键】
+    "allowJs": false,                            // 允许 TS 导入 JS【关键】
   },
   // ========== 包含的源文件 ==========
   "include": ["ts/"],                          // 编译 ts/ 目录下所有文件

@@ -33,13 +33,12 @@
     "resolveJsonModule": true,                 // 允许导入 .json 文件
     "isolatedModules": true,                   // 每个文件独立编译（安全）
     "allowSyntheticDefaultImports": true,      // 允许默认导入无 default 的模块
-    "allowJs": true,                           // 允许 TS 文件导入 JS 文件【关键】
+    "allowJs": false,                           // 允许 TS 文件导入 JS 文件【关键】
 
     // ========== 类型查找路径 ==========
     "typeRoots": [
       "./node_modules/@types",                 // npm 安装的类型包
-      "./generated-types",                     // 上次编译生成的 .d.ts
-      "ts/tools"                               // 手写的类型定义
+      "./dist-ts/ts",                     // 上次编译生成的 .d.ts
     ],
     "types": [],                               // 不自动包含任何 @types 包
     "ignoreDeprecations": "6.0"                // 忽略 6.0 版本的废弃警告
@@ -51,7 +50,7 @@
     "node_modules",                            // 依赖包
     "dist",                                    // Vite 构建产物
     "dist-ts",                                 // 自己的编译产物
-    "generated-types",                         // 声明文件输出
+                                               // 声明文件输出
     "**/*.spec.ts"                             // 测试文件
   ]
 }

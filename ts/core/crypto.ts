@@ -11,9 +11,7 @@ interface TokenConfig {
   FALLBACK_KEYS: number[];
   KEY_BYTES: number[];
 }
-
-// 假设从常量文件导入
-declare const TOKEN_CONFIG: TokenConfig;
+import { TOKEN_CONFIG } from '../core/constants.js';
 
 // ========== 内部工具 ==========
 
