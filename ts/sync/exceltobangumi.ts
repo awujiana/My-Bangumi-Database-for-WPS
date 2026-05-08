@@ -10,9 +10,9 @@ import { getApp, bgmLog, getCell, getCellValue, sleep, loadBgToken,
          colNumToLetter, storeBgToken, readCell ,BGM} from '../tools/util.js';
 import { showDialog } from '../ui/dialog.js';
 
-import { showTokenDialog, showUserIdDialog } from '../ui/handlers.js';
+import { showUserIdDialog } from '../ui/handlers.js';
 import { httpRequest } from '../tools/http.js';
-import { Result } from '../core/result.js';
+import { Result,BatchSyncResult } from '../core/result.js';
 
 // 定义接口类型
 interface FilterStatus {
@@ -36,11 +36,6 @@ interface SequentialRowsResult {
   hiddenCount: number;
 }
 
-interface SyncResult {
-  success: number;
-  fail: number;
-  skip: number;
-}
 
 interface CollectionItem {
   seq?: number | string;
@@ -468,7 +463,7 @@ export async function bgmRequest(method: string, endpoint: string, body: any, to
 }
 
 // ========== 主入口：批量同步 ==========
-export function SyncToBangumi(): SyncResult | undefined {
+export function SyncToBangumi(): BatchSyncResult | undefined {
   let app = getApp();
   if (!app) { showDialog("错误", "无法获取 WPS Application 对象！"); return; }
   let ws = getDataSheet();
@@ -611,7 +606,7 @@ export function SyncToBangumi(): SyncResult | undefined {
 
 
 // ========== 异步批量同步 ==========
-export async function syncToBangumiAsync(ws: any, colMap: ColumnMap, token: string, lastRow: number, headerRow: number, options: SyncOptions = {}): Promise<SyncResult> {
+export async function syncToBangumiAsync(ws: any, colMap: ColumnMap, token: string, lastRow: number, headerRow: number, options: SyncOptions = {}): Promise<BatchSyncResult> {
   const { onProgress, onItemComplete } = options;
   if (!ws || !colMap || !token || !lastRow || !headerRow) throw new Error('缺少必要的同步参数');
 
@@ -965,7 +960,15 @@ export function previewJsonPayload(): void {
   showDialog("预览请求体", msg);
 }
 
-export function setBangumiToken(): void { openBangumiTokenPage(); }
+export function setBangumiToken(): void {
+    openBangumiTokenPage();
+    // 打开 Token 页面后定时检查是否已保存（用户可能已复制粘贴）
+    setTimeout(() => {
+        const token = loadBgToken();
+        if (token) testTokenValidityForRibbon(token);
+    }, 2000);
+}
+
 
 export function openBangumiTokenPage(): void {
   let tokenUrl = "https://next.bgm.tv/demo/access-token/create";

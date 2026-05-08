@@ -6,7 +6,7 @@
 
 import { BGM_CONFIG, LOG_LEVELS } from '../core/constants.js';
 import { bgmLog,BGM } from './util.js';
-import { Result, toSyncResult, type SyncResult } from '../core/result.js';
+import { Result } from '../core/result.js';
 
 // ========== 类型定义 ==========
 export type HttpMethod = 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH';
@@ -237,78 +237,4 @@ export const httpPut = <T = unknown>(endpoint: string, body: string, token?: str
  */
 export const httpDelete = <T = unknown>(endpoint: string, token?: string) =>
     httpRequest<T>(endpoint, { method: 'DELETE', token });
-
-// ========== 同步版本（向后兼容） ==========
-
-/**
- * 同步 HTTP 请求（仅用于 WPS COM 环境，不建议在新代码中使用）
- * @deprecated 使用 httpRequest 异步版本替代
- */
-export function httpRequestSync(
-    method: string,
-    endpoint: string,
-    body: string | null,
-    token: string,
-    options: { retries?: number } = {}
-): SyncResult {
-    // 输入验证
-    try {
-        validateEndpoint(endpoint);
-        validateMethod(method);
-    } catch (error) {
-        return {
-            code: 0,
-            message: error instanceof Error ? error.message : String(error)
-        };
-    }
-
-    const validMethod = validateMethod(method);
-    let retriesCount = 0;
-    const maxRetries = options.retries ?? BGM_CONFIG.MAX_RETRIES;
-
-    while (retriesCount <= maxRetries) {
-        const xhr = new XMLHttpRequest();
-        xhr.open(validMethod, BGM_CONFIG.API_BASE + endpoint, false); // false = 同步模式
-        xhr.setRequestHeader('Authorization', `Bearer ${token}`);
-
-        if (body) {
-            xhr.setRequestHeader('Content-Type', 'application/json');
-        }
-
-        try {
-            xhr.send(body);
-
-            // 成功: 2xx
-            if (xhr.status === 204) {
-                return { code: 204, message: 'OK' };
-            }
-            if (xhr.status >= 200 && xhr.status < 300) {
-                return { code: xhr.status, message: xhr.responseText };
-            }
-
-            // 限流: 429 同步等待重试
-            if (xhr.status === 429 && retriesCount < maxRetries) {
-                retriesCount++;
-                const delayMs = BGM_CONFIG.RETRY_DELAY_BASE * Math.pow(2, retriesCount - 1);
-                bgmLog(LOG_LEVELS.WARN, `同步请求限流(429)，第 ${retriesCount} 次重试，等待 ${delayMs}ms`);
-
-                const end = Date.now() + delayMs;
-                while (Date.now() < end) { /* busy wait */ }
-                continue;
-            }
-
-            // 其他错误
-            const errorMessage = getErrorMessage(xhr.status);
-            return {
-                code: xhr.status,
-                message: errorMessage + (xhr.responseText ? `: ${xhr.responseText}` : '')
-            };
-        } catch (err) {
-            const errorMsg = err instanceof Error ? err.message : String(err);
-            return { code: 0, message: `请求异常: ${errorMsg}` };
-        }
-    }
-
-    return { code: 429, message: `超过最大重试次数 (${maxRetries} 次)` };
-}
 

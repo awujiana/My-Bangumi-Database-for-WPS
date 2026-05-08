@@ -7,7 +7,6 @@
 		"build": "vite build",
 		"build:ts": "tsc --project tsconfig.build.json",
 		"debug": "npm run build:ts && wpsjs debug",
-		"preview": "vite preview",
 		"lint": "eslint . --ext .vue,.js,.jsx,.cjs,.mjs --fix --ignore-path .gitignore",
 		"format": "prettier --write src/"
 	},

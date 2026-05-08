@@ -40,11 +40,11 @@ export function GetBangumiImage(control: { Id: string }): string {
     const icons: Record<string, string> = {
         btnShowPanel: 'images/panel.svg',
         btnSyncBangumi: 'images/sync.svg',
-        btnSetToken: 'images/key.svg',
+        btnSetToken: 'images/token.svg',
         btnTestToken: 'images/key.svg',
         btnSetUserId: 'images/user.svg',
         btnOpenCollection: 'images/link.svg',
-        btnClearColors: 'images/delete.svg',
+        btnClearColors: 'images/cleartags.svg',
     };
     return icons[control.Id] || 'images/newFromTemp.svg';
 }
