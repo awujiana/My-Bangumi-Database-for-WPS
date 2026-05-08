@@ -698,6 +698,7 @@ export {
     autoDetectSheet, updateFilterStatus
 };
 
+
 // ========== 挂载到 window ==========
 function safeInitPanel(): void {
     try { initPanel(); }
@@ -707,11 +708,15 @@ function safeInitPanel(): void {
     }
 }
 
-if (document.readyState === 'complete') {
-    safeInitPanel();
-} else {
-    window.addEventListener('load', safeInitPanel);
+// 只在 taskpane.html 中自动初始化，避免 main.js 加载时重复执行
+if (window.location.pathname.includes('taskpane.html')) {
+    if (document.readyState === 'complete') {
+        safeInitPanel();
+    } else {
+        window.addEventListener('load', safeInitPanel);
+    }
 }
+
 
 (window as any).initPanel = initPanel;
 (window as any).refreshSheets = refreshSheets;

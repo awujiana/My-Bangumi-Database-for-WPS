@@ -4,162 +4,50 @@
  * @description WPS Office 功能区按钮回调处理
  */
 
-// 导入工具函数
 import { WPS_ENUM } from './core/constants.js';
-import { getApp, loadBgToken, showBangumiPanel } from './tools/util.js';
+import { loadBgToken, showBangumiPanel } from './tools/util.js';
 import { SyncToBangumi, clearRowColors, testTokenValidityForRibbon } from './sync/exceltobangumi.js';
-import { openUserCollection } from './ui/handlers.js';
-import { showTokenDialog, showUserIdDialog } from './ui/handlers.js';
-
-// 定义接口类型
-interface RibbonControl {
-  Id: string;
-  [key: string]: any;
-}
-
-interface RibbonUI {
-  [key: string]: any;
-}
-
-interface ApplicationWindow {
-  Application: {
-    ribbonUI?: RibbonUI;
-    Enum?: any;
-    PluginStorage: {
-      setItem: (key: string, value: any) => void;
-    };
-  };
-  BGM?: {
-    showDialog?: (title: string, message: string) => void;
-  };
-  BGMAlert?: (message: string, title?: string) => void;
-  _bgmRibbonReady?: (onAddinLoad: Function, onAction: Function, getBangumiImage: Function) => void;
-  [key: string]: any;
-}
-
-declare const window: ApplicationWindow;
+import { openUserCollection, showTokenDialog, showUserIdDialog } from './ui/handlers.js';
 
 // ========== Ribbon 回调 ==========
 
-/**
- * 加载项初始化回调
- * @param ribbonUI - Ribbon UI 对象
- */
-export function OnAddinLoad(ribbonUI: RibbonUI): boolean {
-  if (typeof window.Application.ribbonUI !== "object") {
-    window.Application.ribbonUI = ribbonUI;
-  }
-  
-  if (typeof window.Application.Enum !== "object") {
-    window.Application.Enum = WPS_ENUM;
-  }
-
-  window.Application.PluginStorage.setItem("EnableFlag", false);
-  window.Application.PluginStorage.setItem("ApiEventFlag", false);
-  return true;
-}
-
-/**
- * Ribbon 按钮点击处理
- * @param control - 按钮控件
- */
-export function OnAction(control: RibbonControl): boolean {
-  console.log("OnAction called with:", control.Id);
-  const eleId = control.Id;
-  try {
-    switch (eleId) {
-      case "btnShowPanel":
-        showBangumiPanel();
-        break;
-      case "btnSyncBangumi":
-        if (typeof SyncToBangumi === 'function') {
-          SyncToBangumi();
-        }
-        break;
-      case "btnSetToken":
-        if (typeof showTokenDialog === 'function') {
-          const token = loadBgToken();
-          if (token) {
-            showTokenDialog(token);
-          } else {
-            showTokenDialog('');
-          }
-        }
-        break;
-      case "btnTestToken":
-        if (typeof testTokenValidityForRibbon === 'function') {
-          const token = loadBgToken();
-          if (token) {
-            testTokenValidityForRibbon(token);
-          }
-        }
-        break;
-      case "btnSetUserId":
-        if (typeof showUserIdDialog === 'function') {
-          showUserIdDialog();
-        }
-        break;
-      case "btnOpenCollection":
-        if (typeof openUserCollection === 'function') {
-          openUserCollection();
-        }
-        break;
-      case "btnClearColors":
-        if (typeof clearRowColors === 'function') {
-          clearRowColors();
-        }
-        break;
-      default:
-        break;
+export function OnAddinLoad(ribbonUI: any): boolean {
+    if (typeof (window as any).Application.ribbonUI !== 'object') {
+        (window as any).Application.ribbonUI = ribbonUI;
     }
-  } catch (e: any) {
-    console.error("OnAction error:", e);
-    if (typeof showDialogRibbon === 'function') {
-      showDialogRibbon("执行出错", e.message);
+    if (typeof (window as any).Application.Enum !== 'object') {
+        (window as any).Application.Enum = WPS_ENUM;
     }
-  }
-  return true;
+    (window as any).Application.PluginStorage.setItem('EnableFlag', false);
+    (window as any).Application.PluginStorage.setItem('ApiEventFlag', false);
+    return true;
 }
 
-/**
- * 获取按钮图标
- * @param control - 按钮控件
- */
-export function GetBangumiImage(control: RibbonControl): string {
-  const id = control.Id;
-  switch (id) {
-    case "btnShowPanel":     return "images/panel.svg";
-    case "btnSyncBangumi":   return "images/sync.svg";
-    case "btnSetToken":      return "images/key.svg";
-    case "btnTestToken":     return "images/key.svg";  // 使用 key 图标
-    case "btnSetUserId":     return "images/user.svg";
-    case "btnOpenCollection": return "images/link.svg";
-    case "btnClearColors":   return "images/delete.svg";
-    default:                return "images/newFromTemp.svg";
-  }
+export function OnAction(control: { Id: string }): boolean {
+    switch (control.Id) {
+        case 'btnShowPanel':      showBangumiPanel(); break;
+        case 'btnSyncBangumi':    SyncToBangumi?.(); break;
+        case 'btnSetToken':       showTokenDialog(loadBgToken() || '');break;
+        case 'btnTestToken':      const token = loadBgToken();if (token) testTokenValidityForRibbon(token);break;
+        case 'btnSetUserId':      showUserIdDialog(); break;
+        case 'btnOpenCollection': openUserCollection(); break;
+        case 'btnClearColors':    clearRowColors?.(); break;
+    }
+    return true;
 }
 
-// ========== 向后兼容别名 ==========
-
-function showDialogRibbon(title: string, message: string): void {
-  if (typeof window.BGM !== 'undefined' && window.BGM?.showDialog) {
-    window.BGM.showDialog(title, message);
-  } else if (typeof window.BGMAlert === 'function') {
-    window.BGMAlert(message, title);
-  } else {
-    window.alert(message);
-  }
+export function GetBangumiImage(control: { Id: string }): string {
+    const icons: Record<string, string> = {
+        btnShowPanel: 'images/panel.svg',
+        btnSyncBangumi: 'images/sync.svg',
+        btnSetToken: 'images/key.svg',
+        btnTestToken: 'images/key.svg',
+        btnSetUserId: 'images/user.svg',
+        btnOpenCollection: 'images/link.svg',
+        btnClearColors: 'images/delete.svg',
+    };
+    return icons[control.Id] || 'images/newFromTemp.svg';
 }
 
-// 挂载到 window（向后兼容）
-if (typeof window !== 'undefined') {
-  window.OnAddinLoad = OnAddinLoad;
-  window.OnAction = OnAction;
-  window.GetBangumiImage = GetBangumiImage;
-  window.showDialogRibbon = showDialogRibbon;
-
-  // 通知 index.html 中的早期占位：真实实现已就绪
-  if (typeof window._bgmRibbonReady === 'function') {
-    window._bgmRibbonReady(OnAddinLoad, OnAction, GetBangumiImage);
-  }
-}
+// 通知 index.html 早期占位：真实实现已就绪
+(window as any)._bgmRibbonReady?.(OnAddinLoad, OnAction, GetBangumiImage);
