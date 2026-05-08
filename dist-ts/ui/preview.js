@@ -3,10 +3,7 @@
  * @module ui/detail-preview
  * @description 数据预览、同步记录预览、详情模态框、单条上传
  */
-import { BGM_COLOR } from '../core/constants.js';
-import { showAlert, showToast } from './dialog.js';
-import { escapeHtml } from '../tools/util.js';
-import { getApp, BGM, readCell, trim, _getUserApiPath, wpsMsgBox, getCell } from '../tools/util.js';
+import { getApp, BGM, readCell, trim, _getUserApiPath, wpsMsgBox, getCell, escapeHtml, showAlert, showToast, BGM_COLOR } from '../index.js';
 // ========== 辅助函数 ==========
 /** 安全弹出提示（优先自定义，否则回退原生） */
 function safeAlert(message, title) {

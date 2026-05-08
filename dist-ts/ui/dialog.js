@@ -1,4 +1,8 @@
-// ========== 类型定义 ==========
+/**
+ * UI 对话框模块（TypeScript 版）
+ * @module ui/dialog
+ * @description 自定义对话框、确认对话框、Toast 通知
+ */
 // ========== 常量与配置 ==========
 const DIALOG_TYPES = {
     alert: { id: 'bgmAlertDialog', titleId: 'bgmAlertTitle', msgId: 'bgmAlertMessage', buttons: [{ id: 'bgmAlertOk', cls: 'bgm-btn-primary', text: '确定', event: 'ok' }] },

@@ -3,14 +3,12 @@
  * @module ui/detail-preview
  * @description 数据预览、同步记录预览、详情模态框、单条上传
  */
-import { LOG_LEVELS, BGM_COLOR } from '../core/constants.js';
-import { showAlert, showToast } from './dialog.js';
-import { escapeHtml } from '../tools/util.js';
-import type { WpsRange } from '../tools/wps.js';
-import { getApp, bgmLog, BGM, readCell, trim, _getUserApiPath, wpsMsgBox, getCell } from '../tools/util.js';
+
+import { getApp, bgmLog, BGM, readCell, trim, _getUserApiPath, wpsMsgBox, getCell, WpsRange,escapeHtml, showAlert, showToast,LOG_LEVELS, BGM_COLOR ,SyncRecord } from '../index.js';
+
 
 // ========== 类型定义 ==========
-interface DetailItem {
+export interface DetailItem {
   row: number;
   name: string;
   bgmUrl: string;
@@ -24,12 +22,12 @@ interface DetailItem {
   urlCell: WpsRange | null;
 }
 
-interface PreviewItem {
+export interface PreviewItem {
   html: string;
   type: number;
 }
 
-interface DetailPreviewData {
+export interface DetailPreviewData {
   allItems: PreviewItem[];
   currentFilter: string;
   totalWithType: number;
@@ -41,17 +39,8 @@ interface DetailPreviewData {
 
 type ColumnMap = Map<string, number>;
 
-interface SyncRecord {
-  name?: string;
-  url?: string;
-  sid?: string;
-  type?: string;
-  content?: string;
-  status?: string;
-  message?: string;
-  count?: number;
-  time?: string;
-}
+
+
 
 // ========== 辅助函数 ==========
 

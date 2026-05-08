@@ -11,7 +11,7 @@ import { getApp, bgmLog, getCell, getCellValue, sleep, loadBgToken,
 import { showDialog } from '../ui/dialog.js';
 
 import { showUserIdDialog } from '../ui/handlers.js';
-import { httpRequest } from '../tools/http.js';
+import { httpRequest } from '../index.js';
 import { Result,BatchSyncResult } from '../core/result.js';
 
 // 定义接口类型

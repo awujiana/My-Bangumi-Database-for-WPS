@@ -4,11 +4,9 @@
  * @description 支持异步请求、进度回调、自动重试、限流处理
  */
 
-import { BGM_CONFIG, LOG_LEVELS } from '../core/constants.js';
-import { bgmLog,BGM } from './util.js';
-import { Result } from '../core/result.js';
 
-// ========== 类型定义 ==========
+import { Result, BgmError, BGM_CONFIG, LOG_LEVELS, bgmLog, BGM } from '../index.js';
+
 export type HttpMethod = 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH';
 export type SyncProgressCallback = (current: number, total: number, message: string) => void;
 
@@ -19,7 +17,6 @@ const VALID_METHODS: HttpMethod[] = ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'];
 /**
  * 验证并标准化 HTTP 方法
  */
-import { BgmError } from '../core/result.js';
 function validateMethod(method: string): HttpMethod {
     const upper = method.toUpperCase() as HttpMethod;
     if (!VALID_METHODS.includes(upper)) {

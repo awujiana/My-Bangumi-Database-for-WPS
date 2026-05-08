@@ -3,17 +3,7 @@
  * @module sync/syncRecord
  * @description 管理同步记录工作表，记录同步历史
  */
-import { LOG_LEVELS, BGM_COLOR, SYNC_STATUS, XL } from '../core/constants.js';
-import { getApp, bgmLog, colNumToLetter, getCell, BGM, } from '../tools/util.js';
-// ========== 向后兼容别名 ==========
-export function sendToTaskpaneSR(data) {
-    return BGM.postMessage(data);
-}
-export function showDialogSR(title, message) {
-    BGM.showDialog(title, message);
-}
-// ========== 常量定义 ==========
-// 已从 util.js 导入
+import { getApp, bgmLog, colNumToLetter, getCell, BGM, LOG_LEVELS, BGM_COLOR, SYNC_STATUS, XL } from '../index.js';
 // ========== 表头设置 ==========
 export function setSyncRecordHeaders(sheet) {
     const headers = ["序号", "同步时间", "名称", "URL", "SID", "条目类型", "次数", "内容", "状态", "备注"];

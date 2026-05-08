@@ -1,6 +1,29 @@
-import { SyncRecord, UpdateRecordParams } from '../tools/index.js';
-export declare function sendToTaskpaneSR(data: any): any;
-export declare function showDialogSR(title: string, message: string): void;
+/**
+ * 同步记录模块
+ * @module sync/syncRecord
+ * @description 管理同步记录工作表，记录同步历史
+ */
+export interface UpdateRecordParams {
+    sid?: string;
+    time?: string;
+    status?: string;
+    message?: string;
+    count?: number;
+}
+export interface SyncRecord {
+    seq?: number | string;
+    time?: string;
+    name?: string;
+    url?: string;
+    sid?: string;
+    type?: string | number;
+    count?: number;
+    content?: string;
+    status?: string;
+    message?: string;
+    comment?: string;
+    row?: number;
+}
 export declare function setSyncRecordHeaders(sheet: any): void;
 export declare function checkHeaderExists(sheet: any): boolean;
 /**

@@ -3,11 +3,11 @@
  * @module sync/scraping
  */
 
-import {  LOG_LEVELS } from '../core/constants.js';
-import { BGM ,bgmLog} from '../tools/util.js';
+import { BGM ,bgmLog ,LOG_LEVELS, } from '../index.js';
 
-// ========== 配置 ==========
-const CONFIG = {
+
+// ========== 局部常量配置 ==========
+ const CONFIG = {
     API_BASE: 'https://api.bgm.tv/v0',
     MAX_PAGES: 50,
     LIMIT: 100,
@@ -20,6 +20,25 @@ const SUBJECT_TYPES: number[] = [1, 2, 3, 4, 6];
 const TYPE_LABELS: Record<number, string> = {
     1: '书籍', 2: '动画', 3: '音乐', 4: '游戏', 6: '真人剧'
 };
+
+// ========== 导出接口定义 ==========
+export interface TokenVerifyResult {
+    valid: boolean;
+    userId: string;
+    username: string;
+    message: string;
+}
+
+export interface ApiResponse {
+    status: number;
+    data: any;
+}
+
+export interface BangumiUserData {
+    id?: string | number;
+    nickname?: string;
+    username?: string;
+}
 
 // ========== 内部工具 ==========
 
@@ -51,6 +70,9 @@ async function apiRequest(path: string, token: string): Promise<{ status: number
 
     throw new Error(`请求失败：连续 ${retries} 次 429 限流`);
 }
+
+
+
 
 // ========== Token 验证 ==========
 

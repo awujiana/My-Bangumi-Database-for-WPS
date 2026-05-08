@@ -70,4 +70,19 @@ export declare const SYNC_STATUS: {
     SKIP: string;
     COLLECTED: string;
 };
+export declare const ErrorLevel: {
+    readonly SILENT: 0;
+    readonly WARN: 1;
+    readonly ERROR: 2;
+    readonly THROW: 3;
+};
+export type ErrorLevel = typeof ErrorLevel[keyof typeof ErrorLevel];
+export interface ErrorOptions {
+    /** 错误级别（0=SILENT, 1=WARN, 2=ERROR, 3=THROW） */
+    level?: ErrorLevel;
+    /** 是否显示错误对话框 */
+    showDialog?: boolean;
+    /** 错误上下文描述 */
+    context?: string;
+}
 //# sourceMappingURL=constants.d.ts.map

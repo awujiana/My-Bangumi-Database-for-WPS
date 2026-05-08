@@ -7,7 +7,7 @@ import { XL, BGM_CONFIG, BGM_COLOR, LOG_LEVELS } from '../core/constants.js';
 import { getApp, bgmLog, getCell, getCellValue, sleep, loadBgToken, _getBgmUserId, _getUserApiPath, trim, colNumToLetter, BGM } from '../tools/util.js';
 import { showDialog } from '../ui/dialog.js';
 import { showUserIdDialog } from '../ui/handlers.js';
-import { httpRequest } from '../tools/http.js';
+import { httpRequest } from '../index.js';
 import { Result } from '../core/result.js';
 // ========== 常量定义 ==========
 const COLUMNS = {

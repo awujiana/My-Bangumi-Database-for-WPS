@@ -2,9 +2,8 @@
  * 同步收藏模块（TypeScript 版）
  * @module sync/scraping
  */
-import { LOG_LEVELS } from '../core/constants.js';
-import { BGM, bgmLog } from '../tools/util.js';
-// ========== 配置 ==========
+import { BGM, bgmLog, LOG_LEVELS, } from '../index.js';
+// ========== 局部常量配置 ==========
 const CONFIG = {
     API_BASE: 'https://api.bgm.tv/v0',
     MAX_PAGES: 50,

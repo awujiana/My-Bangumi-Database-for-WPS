@@ -3,22 +3,33 @@
  * @module sync/syncRecord
  * @description 管理同步记录工作表，记录同步历史
  */
-import {LOG_LEVELS,BGM_COLOR,BGM_SUBJECT_TYPES, SYNC_STATUS,XL} from '../core/constants.js';
-import { getApp, bgmLog, colNumToLetter, getCell, BGM,   } from '../tools/util.js';
-import { SyncRecord, UpdateRecordParams } from '../tools/index.js';
+
+import { getApp, bgmLog, colNumToLetter, getCell, BGM ,LOG_LEVELS,BGM_COLOR,BGM_SUBJECT_TYPES, SYNC_STATUS,XL} from '../index.js';
 
 
-// ========== 向后兼容别名 ==========
-export function sendToTaskpaneSR(data: any): any {
-  return BGM.postMessage(data);
+
+export interface UpdateRecordParams {
+  sid?: string;
+  time?: string;
+  status?: string;
+  message?: string;
+  count?: number;
+}
+export interface SyncRecord {
+    seq?: number | string;
+    time?: string;
+    name?: string;
+    url?: string;
+    sid?: string;
+    type?: string | number;
+    count?: number;
+    content?: string;
+    status?: string;
+    message?: string;
+    comment?: string;  // 兼容某些调用
+    row?: number;
 }
 
-export function showDialogSR(title: string, message: string): void {
-  BGM.showDialog(title, message);
-}
-
-// ========== 常量定义 ==========
-// 已从 util.js 导入
 
 // ========== 表头设置 ==========
 export function setSyncRecordHeaders(sheet: any): void {
@@ -475,4 +486,5 @@ export function clearSheetMarksInSheet(sheetIndex: number): void {
     bgmLog(LOG_LEVELS.ERROR, "清除标记失败: " + e.message);
   }
 }
+
 

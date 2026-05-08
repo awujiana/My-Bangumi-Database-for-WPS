@@ -1,7 +1,4 @@
-import { BGM_CONFIG, LOG_LEVELS, ERROR_LEVELS } from '../core/constants.js';
-import { encryptToken, decryptToken } from '../core/crypto.js';
-import { ErrorLevel, isWpsApp } from './index.js';
-import { BgmError } from '../core/result.js';
+import { BGM_CONFIG, LOG_LEVELS, ERROR_LEVELS, ErrorLevel, isWpsApp, BgmError, encryptToken, decryptToken } from '../index.js';
 // ========== BGM 全局命名空间 ==========
 export const BGM = {
     // 缓存数据

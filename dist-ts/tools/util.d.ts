@@ -1,6 +1,4 @@
-import { LOG_LEVELS, ERROR_LEVELS } from '../core/constants.js';
-import { ErrorLevel, type BGMCache, type BGMSheet, type BGMSync, type BGMUserInfo, type DialogOptions, type ErrorOptions, type WpsApplication } from './index.js';
-import { BgmError } from '../core/result.js';
+import { LOG_LEVELS, ERROR_LEVELS, ErrorLevel, type DialogOptions, type ErrorOptions, type WpsApplication, BgmError } from '../index.js';
 export declare const BGM: {
     cache: BGMCache;
     sheet: BGMSheet;
@@ -133,4 +131,36 @@ export declare function showAlertDialog(title: string, message: string): void;
  * 关闭提示对话框
  */
 export declare function closeAlertDialog(): void;
+export interface BGMCache {
+    /** WPS 文档总行数缓存 */
+    totalRows: number;
+    /** 当前用户 ID */
+    userId: string | null;
+    /** 当前用户名 */
+    username: string | null;
+    /** Subject ID 缓存（sid → 行号） */
+    sidCache: Map<string, string>;
+    /** 列表缓存（通用数据） */
+    listCache: unknown[];
+}
+export interface BGMSheet {
+    /** 锁定的工作表索引 */
+    lockedIndex: number | null;
+    /** 锁定的工作表名称 */
+    lockedName: string | null;
+    /** 是否已锁定 */
+    isLocked: boolean;
+}
+export interface BGMSync {
+    /** 是否正在同步 */
+    isRunning: boolean;
+    /** 上次同步时间（ISO 格式） */
+    lastSyncTime: string | null;
+}
+export interface BGMUserInfo {
+    /** 用户 ID */
+    id: string;
+    /** 用户名 */
+    username: string;
+}
 //# sourceMappingURL=util.d.ts.map

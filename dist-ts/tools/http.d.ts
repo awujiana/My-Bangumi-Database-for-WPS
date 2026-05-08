@@ -3,7 +3,7 @@
  * @module http
  * @description 支持异步请求、进度回调、自动重试、限流处理
  */
-import { Result } from '../core/result.js';
+import { Result } from '../index.js';
 export type HttpMethod = 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH';
 export type SyncProgressCallback = (current: number, total: number, message: string) => void;
 /**

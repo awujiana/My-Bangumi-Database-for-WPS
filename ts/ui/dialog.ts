@@ -3,9 +3,46 @@
  * @module ui/dialog
  * @description 自定义对话框、确认对话框、Toast 通知
  */
-// 从统一入口导入类型
-import type { DialogButton, DialogConfig, DialogCallback, DialogOptions } from '../tools/index.js';
+
 // ========== 类型定义 ==========
+
+
+// ========== 对话框选项 ==========
+export interface DialogOptions {
+    title?: string;
+    message?: string;
+    prompt?: string;       // 输入框的提示文本（与 message 等效）
+    /** 输入确认回调（参数为用户输入的值） */
+    onOk?: (value?: string) => void;
+    /** 取消回调 */
+    onCancel?: () => void;
+    // 确认回调（无输入参数，适用于确认对话框） */
+    onConfirm?: () => void;      
+    /** 默认值 */
+    defaultValue?: string;
+}
+
+
+export interface DialogButton {
+    id: string;
+    cls: string;
+    text: string;
+    event: string;
+}
+
+export interface DialogConfig {
+    id: string;
+    titleId: string;
+    msgId: string;
+    buttons: DialogButton[];
+}
+
+export interface DialogCallback {
+    onOk?: (value?: string) => void;  // value 改为可选
+    onCancel?: () => void;
+}
+
+
 
 
 // ========== 常量与配置 ==========
@@ -324,3 +361,5 @@ export function showToast(message: string, type?: string): void {
         _toastTimer = null;
     }, 3000);
 }
+
+

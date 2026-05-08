@@ -4,28 +4,13 @@
  * @description 面板操作处理、按钮绑定、业务对话框
  */
 
-// ========== 工具与类型导入 ==========
-import {LOG_LEVELS,} from '../core/constants.js';
-import { bgmLog, BGM, loadBgToken, storeBgToken, _getBgmUserId, _setBgmUserId, getApp, getCell, trim, fetchBgmUserInfo } from '../tools/util.js';
-import { type BGMUserInfo, type SyncRecord } from '../tools/index.js';
-import { BGM_COLOR } from '../core/constants.js';
-import { showAlert, showConfirm, showError, showSuccess, showInput, showConfirmDialog, showToast } from './dialog.js';
-import { setStatus } from './message.js';
 
-
-// ========== 业务函数导入 ==========
-import { verifyToken, fetchAllUserCollections } from '../sync/scraping.js';
-import {
-    findHeaderRow, getColumnMap, getLastRow, extractSubjectId,
+import { type BGMUserInfo, type SyncRecord,LOG_LEVELS, bgmLog, BGM, loadBgToken, storeBgToken, _getBgmUserId, _setBgmUserId, getApp, getCell, trim, fetchBgmUserInfo,BGM_COLOR,showAlert, showConfirm, showError, showSuccess, showInput, showConfirmDialog, showToast,setStatus,verifyToken, fetchAllUserCollections, findHeaderRow, getColumnMap, getLastRow, extractSubjectId,
     getFilterStatus, getSequentialRowsBySeqCol, SyncToBangumi,
-    clearRowColors, testSingleUpdate,
-} from '../sync/exceltobangumi.js';
-import {
-    getOrCreateSyncRecordSheet, getAllSyncRecords, addSyncRecord,
-    openSyncRecordSheet, clearSheetMarksInSheet,
-} from '../sync/syncRecord.js';
-import { previewSyncContent } from './preview.js';
-import { refreshData } from '../taskpane.js';
+    clearRowColors, testSingleUpdate, getOrCreateSyncRecordSheet, getAllSyncRecords, addSyncRecord,
+    openSyncRecordSheet, clearSheetMarksInSheet,previewSyncContent,refreshData } from '../index.js';
+
+
 
 
 

@@ -101,3 +101,24 @@ export const SYNC_STATUS = {
   SKIP: "跳过",
   COLLECTED: "已收藏"
 };
+
+
+// ========== 错误级别枚举 ==========
+export const ErrorLevel = {
+    SILENT: 0,
+    WARN: 1,
+    ERROR: 2,
+    THROW: 3
+} as const;
+export type ErrorLevel = typeof ErrorLevel[keyof typeof ErrorLevel];
+
+
+// ========== 错误处理选项 ==========
+export interface ErrorOptions {
+    /** 错误级别（0=SILENT, 1=WARN, 2=ERROR, 3=THROW） */
+    level?: ErrorLevel;
+    /** 是否显示错误对话框 */
+    showDialog?: boolean;
+    /** 错误上下文描述 */
+    context?: string;
+}

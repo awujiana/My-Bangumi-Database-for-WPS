@@ -91,3 +91,10 @@ export const SYNC_STATUS = {
     SKIP: "跳过",
     COLLECTED: "已收藏"
 };
+// ========== 错误级别枚举 ==========
+export const ErrorLevel = {
+    SILENT: 0,
+    WARN: 1,
+    ERROR: 2,
+    THROW: 3
+};

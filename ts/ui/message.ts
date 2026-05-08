@@ -4,7 +4,7 @@
  * @description 消息监听、消息处理、状态设置
  */
 
-import { BGM } from '../tools/util.js';
+import { BGM } from '../index.js';
 
 // ========== 类型定义 ==========
 interface MessageEventData {
