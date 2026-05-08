@@ -1,11 +1,20 @@
 /**
- * 详细预览页面
+ * 详细预览页面（模块化版）
  * @module ui/detail-preview
  * @description 数据预览、同步记录预览、详情模态框、单条上传
  */
 
-import { getApp, bgmLog, BGM, readCell, trim, _getUserApiPath, wpsMsgBox, getCell, WpsRange,escapeHtml, showAlert, showToast,LOG_LEVELS, BGM_COLOR ,SyncRecord } from '../index.js';
+import {
+  getApp, bgmLog, BGM, readCell, trim, _getUserApiPath,
+  wpsMsgBox, getCell, escapeHtml, showAlert, showToast,
+  LOG_LEVELS, BGM_COLOR, type SyncRecord, findHeaderRow, getColumnMap, getSequentialRowsBySeqCol,
+  extractSubjectId, mapWatchStatus, buildJsonPayload,
+  bgmRequestSync, addSyncRecord, addTagsFromStr,WpsRange 
+} from '../index.js';
 
+
+import { getAllSyncRecords } from '../sync/syncRecord.js';
+import { loadBgToken } from '../tools/util.js';
 
 // ========== 类型定义 ==========
 export interface DetailItem {
@@ -39,12 +48,8 @@ export interface DetailPreviewData {
 
 type ColumnMap = Map<string, number>;
 
-
-
-
 // ========== 辅助函数 ==========
 
-/** 安全弹出提示（优先自定义，否则回退原生） */
 function safeAlert(message: string, title?: string): void {
   if (document.getElementById('bgmDialogContainer')) {
     showAlert(message, title);
@@ -53,14 +58,12 @@ function safeAlert(message: string, title?: string): void {
   }
 }
 
-/** 判断单元格颜色是否为已上传 */
 function isUploadedByColor(seqCell: WpsRange | null): boolean {
   if (!seqCell?.Interior) return false;
   const c = seqCell.Interior.Color;
   return c === BGM_COLOR.SUCCESS || c === BGM_COLOR.LIGHT_GREEN || c === BGM_COLOR.DARK_GREEN;
 }
 
-/** 从工作表读取单行数据 */
 function getRowData(
   ws: any,
   rowNum: number,
@@ -87,7 +90,6 @@ function getRowData(
       const col = colMap.get(mapKey)!;
       const value = trim(readCell(ws, rowNum, col));
       if (mapKey === 'Bangumi_URL') {
-        // getCell 返回 unknown | null，显式断言为 WpsRange | null
         data.urlCell = getCell(ws, rowNum, col) as WpsRange | null;
       }
       return value;
@@ -102,12 +104,11 @@ function getRowData(
   data.tagsRaw = readCol('标签/分级');
   data.finishedDate = readCol('完播日');
 
-  const win = window as any;
-  if (data.bgmUrl && win.extractSubjectId) {
-    data.sid = win.extractSubjectId(data.bgmUrl);
+  if (data.bgmUrl) {
+    data.sid = extractSubjectId(data.bgmUrl);
   }
-  if (data.sid && win.mapWatchStatus) {
-    data.typeNum = win.mapWatchStatus(data.status, data.finishedDate);
+  if (data.sid) {
+    data.typeNum = mapWatchStatus(data.status);
   }
 
   const seqCell = getCell(ws, rowNum, seqCol) as WpsRange | null;
@@ -115,27 +116,22 @@ function getRowData(
   return data;
 }
 
-/** 生成单条预览 HTML */
 function renderDetailItemHtml(rowData: DetailItem, colMap: ColumnMap, ws: any): string {
   const typeNames: Record<number, string> = { 0: '', 1: '想看', 2: '在看', 3: '看过', 4: '搁置', 5: '抛弃' };
   const typeName = typeNames[rowData.typeNum] || '未知';
 
   const tagSet = new Set<string>();
-  if ((window as any).addTagsFromStr) {
-    (window as any).addTagsFromStr(tagSet, rowData.tagsRaw);
-  }
+  addTagsFromStr(tagSet, rowData.tagsRaw);
   const tags = Array.from(tagSet);
-  const tagsHtml =
-    tags.length > 0
-      ? `<div class="detail-value tags">${tags.map((t) => `<span class="tag-badge">${escapeHtml(t)}</span>`).join('')}</div>`
-      : '<div class="detail-value">-</div>';
+  const tagsHtml = tags.length > 0
+    ? `<div class="detail-value tags">${tags.map(t => `<span class="tag-badge">${escapeHtml(t)}</span>`).join('')}</div>`
+    : '<div class="detail-value">-</div>';
 
   let jsonBody = '';
-  if (rowData.sid && (window as any).buildJsonPayload) {
-    jsonBody = (window as any).buildJsonPayload(ws, rowData.row, colMap, rowData.finishedDate);
+  if (rowData.sid) {
+    jsonBody = buildJsonPayload(ws, rowData.row, colMap, rowData.finishedDate);
   }
-  const urlDisplay =
-    rowData.bgmUrl.length > 60 ? rowData.bgmUrl.substring(0, 60) + '...' : rowData.bgmUrl;
+  const urlDisplay = rowData.bgmUrl.length > 60 ? rowData.bgmUrl.substring(0, 60) + '...' : rowData.bgmUrl;
 
   return `
     <div class="detail-item ${rowData.isUploaded ? 'uploaded' : 'pending'}" data-type="${rowData.typeNum}" data-row="${rowData.row}" data-sid="${rowData.sid}">
@@ -204,12 +200,6 @@ let detailPreviewData: DetailPreviewData = {
 
 export function previewSyncContent(): void {
   console.log('[preview] 开始执行 previewSyncContent');
-  const win = window as any;
-  if (!win.findHeaderRow || !win.getColumnMap) {
-    console.warn('[preview] 依赖函数未就绪，延迟重试');
-    setTimeout(previewSyncContent, 500);
-    return;
-  }
 
   const select = document.getElementById('sheetSelect') as HTMLSelectElement;
   const endRowInput = document.getElementById('endRow') as HTMLInputElement;
@@ -232,11 +222,10 @@ export function previewSyncContent(): void {
     return;
   }
 
-  const headerRow = win.findHeaderRow(ws) || 1;
+  const headerRow = findHeaderRow(ws) || 1;
   const dataStartRow = headerRow + 1;
-  const colMap = win.getColumnMap(ws, headerRow);
+  const colMap = getColumnMap(ws, headerRow);
 
-  // 获取最后一行
   let lastRow = 1;
   try {
     const lastCell = getCell(ws, ws.Rows.Count, 4) as WpsRange | null;
@@ -244,17 +233,15 @@ export function previewSyncContent(): void {
       lastRow = lastCell.End(-4162).Row;
     }
   } catch (e) {
-    lastRow = 500; // 安全回退
+    lastRow = 500;
   }
 
   const actualEndRow = userEndRow > 0 ? Math.min(userEndRow, lastRow) : lastRow;
   let rowsToPreview: number[] = [];
 
   if (selectMode === 'auto') {
-    if (win.getSequentialRowsBySeqCol) {
-      const seqResult = win.getSequentialRowsBySeqCol(dataStartRow, actualEndRow);
-      rowsToPreview = seqResult?.validRows || [];
-    }
+    const seqResult = getSequentialRowsBySeqCol(dataStartRow, actualEndRow);
+    rowsToPreview = seqResult?.validRows || [];
     if (rowsToPreview.length === 0) {
       for (let i = dataStartRow; i <= actualEndRow; i++) rowsToPreview.push(i);
     }
@@ -273,7 +260,6 @@ export function previewSyncContent(): void {
     return;
   }
 
-  // 重置统计
   detailPreviewData = {
     allItems: [],
     currentFilter: 'all',
@@ -298,7 +284,7 @@ export function previewSyncContent(): void {
     allValidRows.push(rowData);
   }
 
-  const itemsData: PreviewItem[] = allValidRows.map((rowData) => ({
+  const itemsData: PreviewItem[] = allValidRows.map(rowData => ({
     html: renderDetailItemHtml(rowData, colMap, ws),
     type: rowData.typeNum,
   }));
@@ -379,10 +365,9 @@ function createTypeBadges(): string {
   return badges;
 }
 
-// ========== 单条上传（保持不变，只需消除类型错误） ==========
+// ========== 单条上传 ==========
 export function uploadSingleRow(rowNum: number, btnElement?: HTMLButtonElement): void {
-  const loadBgToken = (window as any).loadBgToken;
-  const token = loadBgToken ? loadBgToken() : '';
+  const token = loadBgToken();
   if (!token) {
     safeAlert('请先设置 Bangumi Token！');
     return;
@@ -402,23 +387,18 @@ export function uploadSingleRow(rowNum: number, btnElement?: HTMLButtonElement):
     const sheetIndex = BGM.sheet.lockedIndex || parseInt(select?.value, 10) || 1;
     const ws = app.ActiveWorkbook.Worksheets.Item(sheetIndex);
 
-    const win = window as any;
-    const headerRow = win.findHeaderRow ? (win.findHeaderRow(ws) || 1) : 1;
-    const colMap: ColumnMap = win.getColumnMap ? win.getColumnMap(ws, headerRow) : new Map();
+    const headerRow = findHeaderRow(ws) || 1;
+    const colMap: ColumnMap = getColumnMap(ws, headerRow);
     if (!colMap.has('Bangumi_URL')) throw new Error('未找到 Bangumi URL 列');
 
     const rowData = getRowData(ws, rowNum, colMap, headerRow, 4);
     if (!rowData.sid) throw new Error('无法提取 Subject ID');
 
-    if (!win.buildJsonPayload) throw new Error('缺少 buildJsonPayload 函数');
-    const jsonBody = win.buildJsonPayload(ws, rowNum, colMap, rowData.finishedDate);
+    const jsonBody = buildJsonPayload(ws, rowNum, colMap, rowData.finishedDate);
     if (!jsonBody) throw new Error('无法构建请求体');
 
-    let result: { code: number; message: string } | null = null;
-    if (win.bgmRequestSync) {
-      result = win.bgmRequestSync('POST', `/v0/users/${_getUserApiPath()}/collections/${rowData.sid}`, jsonBody, token);
-    }
-    const statusCode = result ? result.code : 0;
+    const result = bgmRequestSync('POST', `/v0/users/${_getUserApiPath()}/collections/${rowData.sid}`, jsonBody, token);
+    const statusCode = result?.code || 0;
     const seqCell = getCell(ws, rowNum, 4) as WpsRange | null;
 
     if ([200, 201, 202, 204].includes(statusCode)) {
@@ -446,18 +426,16 @@ export function uploadSingleRow(rowNum: number, btnElement?: HTMLButtonElement):
         }
       }
 
-      if (win.addSyncRecord) {
-        win.addSyncRecord({
-          name: rowData.name || '(无名称)',
-          url: rowData.bgmUrl,
-          sid: rowData.sid,
-          type: '',
-          content: jsonBody,
-          status: '成功',
-          message: '行 ' + rowNum,
-          count: 1,
-        });
-      }
+      addSyncRecord({
+        name: rowData.name || '(无名称)',
+        url: rowData.bgmUrl,
+        sid: rowData.sid,
+        type: '',
+        content: jsonBody,
+        status: '成功',
+        message: '行 ' + rowNum,
+        count: 1,
+      });
 
       updateUploadStats();
     } else {
@@ -470,18 +448,16 @@ export function uploadSingleRow(rowNum: number, btnElement?: HTMLButtonElement):
         btnElement.disabled = false;
       }
 
-      if (win.addSyncRecord) {
-        win.addSyncRecord({
-          name: rowData.name || '(无名称)',
-          url: rowData.bgmUrl,
-          sid: rowData.sid,
-          type: '',
-          content: jsonBody,
-          status: '失败',
-          message: result?.message || 'HTTP ' + statusCode,
-          count: 1,
-        });
-      }
+      addSyncRecord({
+        name: rowData.name || '(无名称)',
+        url: rowData.bgmUrl,
+        sid: rowData.sid,
+        type: '',
+        content: jsonBody,
+        status: '失败',
+        message: result?.message || 'HTTP ' + statusCode,
+        count: 1,
+      });
       showToast('上传失败: ' + ((result?.message || '未知错误').substring(0, 60)), 'error');
     }
   } catch (e: any) {
@@ -495,6 +471,7 @@ export function uploadSingleRow(rowNum: number, btnElement?: HTMLButtonElement):
   }
 }
 
+// ========== 模态框控制 ==========
 export function updateUploadStats(): void {
   const modalBody = document.getElementById('detailModalBody');
   if (!modalBody) return;
@@ -552,12 +529,12 @@ export function closeDetailModal(): void {
 }
 
 export function viewSyncRecordDetail(sid: string): void {
-  if (!(window as any).getAllSyncRecords) {
+  if (typeof getAllSyncRecords !== 'function') {
     safeAlert('同步记录功能不可用！');
     return;
   }
-  const records = (window as any).getAllSyncRecords() as SyncRecord[];
-  const record = records.find((r) => String(r.sid) === String(sid));
+  const records = getAllSyncRecords();
+  const record = records.find((r: SyncRecord) => String(r.sid) === String(sid));
   if (!record) {
     safeAlert('未找到该同步记录');
     return;
@@ -566,4 +543,15 @@ export function viewSyncRecordDetail(sid: string): void {
   try { content = JSON.stringify(JSON.parse(content), null, 2); } catch (e) {}
   const detail = `同步记录详情\n\n名称: ${record.name || ""}\nSID: ${record.sid || ""}\nURL: ${record.url || ""}\n时间: ${record.time || ""}\n状态: ${record.status || ""}\n同步次数: ${record.count || ""}\n备注: ${record.message || ""}\n\n同步内容:\n${content}`;
   safeAlert(detail, '同步记录详情');
+}
+
+// ========== 挂载到 window（仅用于 HTML onclick 调用）==========
+if (typeof window !== 'undefined') {
+  (window as any).uploadSingleRow = uploadSingleRow;
+  (window as any).previewSyncContent = previewSyncContent;
+  (window as any).filterDetailItems = filterDetailItems;
+  (window as any).updateUploadStats = updateUploadStats;
+  (window as any).showDetailModal = showDetailModal;
+  (window as any).closeDetailModal = closeDetailModal;
+  (window as any).viewSyncRecordDetail = viewSyncRecordDetail;
 }

@@ -105,7 +105,7 @@ SyncToBangumi,
 // 清除所有行颜色标记
 clearRowColors, 
 // 测试单个条目更新
-testSingleUpdate, } from './sync/exceltobangumi.js';
+testSingleUpdate, mapWatchStatus, buildJsonPayload, bgmRequestSync, bgmRequest, setBangumiToken, openBangumiTokenPage, testTokenValidityForRibbon, openUserCollection, buildTagsArray, addTagsFromStr, } from './sync/exceltobangumi.js';
 // ============================================================================
 // 10. 同步收藏抓取（来自 sync/scraping.js）
 // ============================================================================

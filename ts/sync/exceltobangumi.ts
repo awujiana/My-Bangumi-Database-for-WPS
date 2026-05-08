@@ -347,7 +347,7 @@ export function mapWatchStatus(status: any): number {
   return 0;
 }
 
-function addTagsFromStr(tagSet: Set<string>, raw: any): void {
+export function addTagsFromStr(tagSet: Set<string>, raw: any): void {
   if (raw === "") return;
   let seps = ["|", "、", "/", "\\", ",", ";", "｜", "，", "。"];
   let s = String(raw);

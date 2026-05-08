@@ -20,7 +20,7 @@ export { type DialogButton, type DialogConfig, type DialogCallback, type DialogO
 export { setStatus, } from './ui/message.js';
 export { showUserIdDialog, } from './ui/handlers.js';
 export { getOrCreateSyncRecordSheet, getAllSyncRecords, addSyncRecord, openSyncRecordSheet, clearSheetMarksInSheet, type SyncRecord, type UpdateRecordParams, } from './sync/syncRecord.js';
-export { findHeaderRow, getColumnMap, getLastRow, extractSubjectId, getFilterStatus, getSequentialRowsBySeqCol, SyncToBangumi, clearRowColors, testSingleUpdate, } from './sync/exceltobangumi.js';
+export { findHeaderRow, getColumnMap, getLastRow, extractSubjectId, getFilterStatus, getSequentialRowsBySeqCol, SyncToBangumi, clearRowColors, testSingleUpdate, mapWatchStatus, buildJsonPayload, bgmRequestSync, bgmRequest, setBangumiToken, openBangumiTokenPage, testTokenValidityForRibbon, openUserCollection, buildTagsArray, addTagsFromStr, } from './sync/exceltobangumi.js';
 export { verifyToken, fetchAllUserCollections, type BangumiUserData, type TokenVerifyResult, type ApiResponse, } from './sync/scraping.js';
 export { bgmLog, getApp, colNumToLetter, getCell, getCellValue, readCell, setCellValue, getSheetByIndex, escapeHtml, storeBgToken, clearBgToken, loadBgToken, _getBgmUserId, _setBgmUserId, fetchBgmUserInfo, trim, BGM, _getUserApiPath, wpsMsgBox } from './tools/util.js';
 export type { BGMCache, BGMSheet, BGMSync, BGMUserInfo, } from './tools/util.js';

@@ -1,5 +1,5 @@
 /**
- * 详细预览页面
+ * 详细预览页面（模块化版）
  * @module ui/detail-preview
  * @description 数据预览、同步记录预览、详情模态框、单条上传
  */

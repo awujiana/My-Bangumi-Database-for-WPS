@@ -146,6 +146,16 @@ export {
     clearRowColors,
     // 测试单个条目更新
     testSingleUpdate,
+    mapWatchStatus,
+    buildJsonPayload,
+    bgmRequestSync,
+    bgmRequest,
+    setBangumiToken,
+    openBangumiTokenPage,
+    testTokenValidityForRibbon,
+    openUserCollection,
+    buildTagsArray,
+    addTagsFromStr,
 } from './sync/exceltobangumi.js';
 
 // ============================================================================

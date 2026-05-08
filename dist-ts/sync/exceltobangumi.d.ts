@@ -58,6 +58,7 @@ export declare function extractSubjectId(url: string): string;
 export declare function findHeaderRow(ws: any, startRow?: number): number;
 export declare function getColumnMap(ws: any, headerRow: number): ColumnMap;
 export declare function mapWatchStatus(status: any): number;
+export declare function addTagsFromStr(tagSet: Set<string>, raw: any): void;
 export declare function buildJsonPayload(ws: any, row: number, colMap: ColumnMap, finishedDate: any): string;
 export declare function bgmRequestSync(method: string, endpoint: string, body: any, token: string): {
     code: number;
