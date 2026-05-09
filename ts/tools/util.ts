@@ -23,7 +23,7 @@ export const BGM: {
         postMessage: (data: Record<string, unknown>, targetOrigin?: string) => boolean;
     };
     postMessage: (data: Record<string, unknown>, targetOrigin?: string) => boolean;
-    showDialog: (title: string, message: string) => void;
+    showAlert: (title: string, message: string) => void;
     showConfirm: (title: string, message: string, onConfirm?: () => void, onCancel?: () => void) => void;
     handleError: (error: unknown, options?: ErrorOptions) => BgmError;
     safeExecute: <T>(fn: () => T, context?: string, options?: ErrorOptions) => T | BgmError;
@@ -156,8 +156,8 @@ export const BGM: {
         return BGM.Message.send(data, targetOrigin);
     },
 
-    showDialog: function(title: string, message: string): void {
-        if (BGM.Message.send({ type: "showDialog", title: title, message: message })) {
+    showAlert: function(title: string, message: string): void {
+        if (BGM.Message.send({ type: "showAlert", title: title, message: message })) {
             return;
         }
         BGM.Dialog.alert(title, message);
@@ -175,7 +175,7 @@ export const BGM: {
     handleError: function(error: unknown, options?: ErrorOptions): BgmError {
         const opts: ErrorOptions = {
             level: ErrorLevel.ERROR,
-            showDialog: false,
+            showAlert: false,
             context: '',
             ...options
         };
@@ -204,8 +204,8 @@ export const BGM: {
                 break;
             case ErrorLevel.ERROR:
                 bgmLog(LOG_LEVELS.ERROR, bgmError.toString());
-                if (opts.showDialog) {
-                    BGM.showDialog('错误', bgmError.message);
+                if (opts.showAlert) {
+                    BGM.showAlert('错误', bgmError.message);
                 }
                 break;
             case ErrorLevel.THROW:

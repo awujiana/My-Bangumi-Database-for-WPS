@@ -1,0 +1,44 @@
+#virtualScrollContainer {
+    border: 1px solid var(--border-color, #444);
+    background: var(--bg-secondary, #1e1e1e);
+    margin-top: 10px;
+}
+
+#virtualScrollContent {
+    will-change: transform; /* 优化滚动性能 */
+}
+
+.detail-item {
+    min-height: 170px;
+    box-sizing: border-box;
+    padding: 10px;
+    border-bottom: 1px solid var(--border-color, #333);
+}
+
+/* 筛选按钮激活状态 */
+.filter-btn.active {
+    background: #27ae60;
+    color: white;
+}
+
+/* 统计卡片样式 */
+.detail-stats {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 14px;
+}
+.stat-card {
+    flex: 1;
+    background: var(--bg-card, #2a2a2a);
+    border-radius: 8px;
+    padding: 12px;
+    text-align: center;
+}
+.stat-value {
+    font-size: 24px;
+    font-weight: bold;
+}
+.stat-label {
+    color: #aaa;
+    font-size: 12px;
+}

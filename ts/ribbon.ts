@@ -4,10 +4,7 @@
  * @description WPS Office 功能区按钮回调处理
  */
 
-import { WPS_ENUM } from './core/constants.js';
-import { loadBgToken, storeBgToken, _setBgmUserId, showBangumiPanel } from './tools/util.js';
-import { SyncToBangumi, clearRowColors, testTokenValidityForRibbon } from './sync/exceltobangumi.js';
-import { openUserCollection } from './ui/handlers.js';
+import {findHeaderRow, getColumnMap, getLastRow, openUserCollection,SyncToBangumiAsync, clearRowColors, testTokenValidityForRibbon,loadBgToken, storeBgToken, _setBgmUserId,showBangumiPanel,  WPS_ENUM,getDataSheet,BGM } from './index.js';
 
 // ========== Ribbon 回调 ==========
 
@@ -50,9 +47,50 @@ export function OnAction(control: { Id: string }): boolean {
                 showBangumiPanel();
                 break;
             case 'btnSyncBangumi':
-                SyncToBangumi?.();
-                break;
-     case 'btnSetToken': {
+                    (async () => {
+                        const app = (window as any).Application;
+                        if (!app?.ActiveWorkbook) {
+                            app?.MessageBox?.('请先打开一个 Excel 工作簿', 0, 64);
+                            return;
+                        }
+                        const ws = getDataSheet();
+                        if (!ws) {
+                            app?.MessageBox?.('未找到数据工作表，请先锁定一个工作表', 0, 64);
+                            return;
+                        }
+                        const token = loadBgToken();
+                        if (!token) {
+                            app?.MessageBox?.('请先设置 Bangumi Token', 0, 48);
+                            return;
+                        }
+                        const headerRow = findHeaderRow(ws);
+                        const lastRow = getLastRow(ws);
+                        const colMap = getColumnMap(ws, headerRow);
+                        if (!colMap.has("Bangumi_URL")) {
+                            app?.MessageBox?.('未找到 Bangumi URL 列', 0, 48);
+                            return;
+                        }
+                    
+                        try {
+                            const result = await SyncToBangumiAsync(ws, colMap, token, lastRow, headerRow, {
+                                onProgress: (current, total, message) => {
+                                    if (app.StatusBar !== undefined) {
+                                        app.StatusBar = `[${current}/${total}] ${message}`;
+                                    }
+                                }
+                            });
+                            app.StatusBar = false;
+                            app?.MessageBox?.(
+                                `同步完成！\n成功: ${result.success} 条\n失败: ${result.fail} 条\n跳过: ${result.skip}              条`,
+                                0, 64
+                            );
+                        } catch (err: any) {
+                            app.StatusBar = false;
+                            BGM.handleError(err, { context: 'Ribbon同步', showAlert: true });
+                        }
+                    })();
+            break;
+            case 'btnSetToken': {
                   const currentToken = loadBgToken() || '';
                   const app = (window as any).Application;
                   if (app?.InputBox) {

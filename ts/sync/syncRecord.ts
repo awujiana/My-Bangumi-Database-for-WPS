@@ -480,7 +480,7 @@ export function clearSheetMarksInSheet(sheetIndex: number): void {
         if (cell.Interior) cell.Interior.ColorIndex = XL.NONE;
       }
     }
-    BGM?.showDialog?.("完成", "已清除所有标记");
+    BGM?.showAlert?.("完成", "已清除所有标记");
     bgmLog(LOG_LEVELS.INFO, "清除标记完成");
   } catch (e: any) {
     bgmLog(LOG_LEVELS.ERROR, "清除标记失败: " + e.message);

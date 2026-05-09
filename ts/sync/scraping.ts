@@ -96,7 +96,7 @@ export async function verifyToken(token: string): Promise<{ valid: boolean; user
         }
         return { valid: false, userId: '', username: '', message: `Token 验证失败（HTTP ${status}）` };
     } catch (e) {
-        BGM.handleError(e, { context: 'verifyToken' });
+        BGM.handleError(e, { context: 'verifyToken', showAlert: true });
         return { valid: false, userId: '', username: '', message: 'Token 验证请求失败: ' + (e as Error).message };
     }
 }
@@ -107,7 +107,7 @@ export async function fetchAllUserCollections(token: string, userId?: string): P
     if (!userId) {
         const authResult = await verifyToken(token);
         if (!authResult.valid) {
-            BGM.handleError(new Error('Token 无效，无法获取用户 ID'), { context: 'fetchAllUserCollections', showDialog: true });
+            BGM.handleError(new Error('Token 无效，无法获取用户 ID'), { context: 'fetchAllUserCollections', showAlert: true });
             throw new Error('Token 无效，无法获取用户 ID');
         }
         userId = authResult.userId;
@@ -142,7 +142,7 @@ export async function fetchAllUserCollections(token: string, userId?: string): P
                 page++;
                 if (items.length < CONFIG.LIMIT) hasMore = false;
             } catch (e) {
-                BGM.handleError(e, { context: `fetchAllUserCollections: ${typeName} 第${page}页`, showDialog: true });
+            BGM.handleError(e, { context: `fetchAllUserCollections: ${typeName} 第${page}页`, showAlert: true });
                 throw e;
             }
         }

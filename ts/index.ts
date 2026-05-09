@@ -41,6 +41,8 @@ export {
     BgmError,
     // 操作结果类型（成功/失败）
     Result,
+    
+    type BatchSyncResult,
 } from './core/result.js';
 
 // ============================================================================
@@ -76,7 +78,6 @@ export {
     showError,           // 错误
     showSuccess,         // 成功
     showInput,           // 输入
-    showConfirmDialog,   // 确认对话框（兼容旧接口）
     showToast,           // Toast 通知
 } from './ui/dialog.js';
 
@@ -140,8 +141,8 @@ export {
     getFilterStatus,
     // 根据 D 列序列号获取连续行
     getSequentialRowsBySeqCol,
-    // 同步到 Bangumi（入口）
-    SyncToBangumi,
+    // 异步同步到 Bangumi
+    SyncToBangumiAsync,
     // 清除所有行颜色标记
     clearRowColors,
     // 测试单个条目更新
@@ -156,6 +157,7 @@ export {
     openUserCollection,
     buildTagsArray,
     addTagsFromStr,
+    getDataSheet,
 } from './sync/exceltobangumi.js';
 
 // ============================================================================
@@ -212,7 +214,11 @@ export {
     trim,
     // BGM 全局命名空间（包含 Dialog, Message, handleError 等）
     BGM,
-    _getUserApiPath, wpsMsgBox
+    _getUserApiPath, 
+    wpsMsgBox,
+    showBangumiPanel,
+   
+    sleep,
 } from './tools/util.js';
 
 // BGM 状态接口（用于描述 BGM 对象的类型）
@@ -225,6 +231,7 @@ export type {
     BGMSync,
     // 用户信息
     BGMUserInfo,
+    
 } from './tools/util.js';
 
 // ============================================================================

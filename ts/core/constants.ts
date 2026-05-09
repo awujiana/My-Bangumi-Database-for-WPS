@@ -118,7 +118,7 @@ export interface ErrorOptions {
     /** 错误级别（0=SILENT, 1=WARN, 2=ERROR, 3=THROW） */
     level?: ErrorLevel;
     /** 是否显示错误对话框 */
-    showDialog?: boolean;
+    showAlert?: boolean;
     /** 错误上下文描述 */
     context?: string;
 }

@@ -3,7 +3,8 @@
  * @module ui/detail-preview
  * @description 数据预览、同步记录预览、详情模态框、单条上传
  */
-
+const ITEM_HEIGHT = 180;   // 每个条目的高度（根据实际样式调整）
+const CONTAINER_HEIGHT = 600;
 import {
   getApp, bgmLog, BGM, readCell, trim, _getUserApiPath,
   wpsMsgBox, getCell, escapeHtml, showAlert, showToast,
@@ -293,8 +294,27 @@ export function previewSyncContent(): void {
   const modalToolbar = document.getElementById('detailModalToolbar');
   const modalBody = document.getElementById('detailModalBody');
   if (modalToolbar && modalBody) {
+
     modalToolbar.innerHTML = buildFilterToolbar();
-    modalBody.innerHTML = buildStatsHtml(rowsToPreview.length) + '<div id="detailItemsContainer">' + itemsData.map(item => item.html).join('') + '</div>';
+    const statsHtml = buildStatsHtml(rowsToPreview.length);  
+       // 创建虚拟滚动容器
+      const containerHtml = `
+        <div id="virtualScrollContainer" style="height:${CONTAINER_HEIGHT}px;overflow-y:auto;border:1px solid #ccc;">
+          <div id="virtualScrollInner" style="position:relative; height:${itemsData.length * ITEM_HEIGHT}px;">
+            <div id="virtualScrollContent" style="position:absolute;top:0;left:0;right:0;"></div>
+          </div>
+        </div>`;
+
+      modalBody.innerHTML = statsHtml + containerHtml;
+
+      // 初始渲染第一屏
+      renderVisibleItems(itemsData);
+
+      // 绑定滚动事件
+      const scrollContainer = document.getElementById('virtualScrollContainer');
+      if (scrollContainer) {
+          scrollContainer.addEventListener('scroll', () => renderVisibleItems(itemsData));
+      }
     const modal = document.getElementById('detailModal') as HTMLElement;
     if (modal) {
       modal.style.display = 'flex';
@@ -308,7 +328,29 @@ export function previewSyncContent(): void {
     safeAlert('预览界面缺失，请联系开发者');
   }
 }
+let virtualScrollStart = 0;
+let virtualScrollEnd = 0;
 
+function renderVisibleItems(items: PreviewItem[]) {
+    const container = document.getElementById('virtualScrollContainer');
+    const content = document.getElementById('virtualScrollContent');
+    if (!container || !content) return;
+
+    const scrollTop = container.scrollTop;
+    const startIndex = Math.floor(scrollTop / ITEM_HEIGHT);
+    const endIndex = Math.min(
+        startIndex + Math.ceil(CONTAINER_HEIGHT / ITEM_HEIGHT) + 5,
+        items.length
+    );
+
+    if (startIndex === virtualScrollStart && endIndex === virtualScrollEnd) return;
+    virtualScrollStart = startIndex;
+    virtualScrollEnd = endIndex;
+
+    const visibleItems = items.slice(startIndex, endIndex);
+    content.style.top = (startIndex * ITEM_HEIGHT) + 'px';
+    content.innerHTML = visibleItems.map(item => item.html).join('');
+}
 // ========== UI 辅助函数 ==========
 function buildFilterToolbar(): string {
   const d = detailPreviewData;
@@ -484,38 +526,52 @@ export function updateUploadStats(): void {
 }
 
 export function filterDetailItems(filterType: string | number): void {
-  detailPreviewData.currentFilter = String(filterType);
-  document.querySelectorAll('.filter-btn').forEach((btn) => {
-    btn.classList.remove('active');
-    if (filterType === 'all' && btn.classList.contains('all')) btn.classList.add('active');
-    else if (btn.classList.contains('type-' + filterType)) btn.classList.add('active');
-  });
+    detailPreviewData.currentFilter = String(filterType);
+    const allItems = detailPreviewData.allItems;
+    const filteredItems = filterType === 'all' 
+        ? allItems 
+        : allItems.filter(item => item.type === parseInt(filterType as string));
 
-  const container = document.getElementById('detailItemsContainer');
-  if (!container) return;
+    // 重新渲染虚拟滚动
+    const scrollContainer = document.getElementById('virtualScrollContainer');
+    const scrollInner = document.getElementById('virtualScrollInner');
+    const scrollContent = document.getElementById('virtualScrollContent');
+    if (!scrollContainer || !scrollInner || !scrollContent) return;
 
-  let visibleCount = 0;
-  container.querySelectorAll('.detail-item').forEach((item) => {
-    const match = filterType === 'all' || item.getAttribute('data-type') === String(filterType);
-    (item as HTMLElement).style.display = match ? '' : 'none';
-    if (match) visibleCount++;
-  });
+    // 更新总高度
+    scrollInner.style.height = `${filteredItems.length * ITEM_HEIGHT}px`;
+    // 重置滚动位置
+    scrollContainer.scrollTop = 0;
+    // 重置虚拟状态
+    virtualScrollStart = 0;
+    virtualScrollEnd = 0;
+    // 重新渲染
+    renderVisibleItems(filteredItems);
 
-  const modalBody = document.getElementById('detailModalBody');
-  const statCards = modalBody?.querySelectorAll('.stat-card .stat-value');
-  if (!statCards || statCards.length < 3) return;
+    // 更新统计卡片（可选）
+    const statCards = document.querySelectorAll('.stat-card .stat-value');
+    if (statCards.length >= 3) {
+        const d = detailPreviewData;
+        if (filterType === 'all') {
+            statCards[0].textContent = String(d.totalWithType);
+            statCards[1].textContent = String(d.totalWithType - d.totalUploaded);
+            statCards[2].textContent = String(d.totalUploaded);
+        } else {
+            const typeNum = parseInt(filterType as string);
+            const typeTotal = d.typeCount[typeNum] || 0;
+            const typeUploaded = d.uploadedCount[typeNum] || 0;
+            statCards[0].textContent = String(typeTotal);
+            statCards[1].textContent = String(typeTotal - typeUploaded);
+            statCards[2].textContent = String(typeUploaded);
+        }
+    }
 
-  const d = detailPreviewData;
-  if (filterType === 'all') {
-    statCards[0].textContent = String(d.totalWithType);
-    statCards[1].textContent = String(d.totalWithType - d.totalUploaded);
-    statCards[2].textContent = String(d.totalUploaded);
-  } else {
-    const typeNum = parseInt(String(filterType), 10);
-    statCards[0].textContent = String(visibleCount);
-    statCards[1].textContent = String((d.typeCount[typeNum] || 0) - (d.uploadedCount[typeNum] || 0));
-    statCards[2].textContent = String(d.uploadedCount[typeNum] || 0);
-  }
+    // 更新按钮状态
+    document.querySelectorAll('.filter-btn').forEach(btn => {
+        btn.classList.remove('active');
+        if (filterType === 'all' && btn.classList.contains('all')) btn.classList.add('active');
+        else if (btn.classList.contains('type-' + filterType)) btn.classList.add('active');
+    });
 }
 
 export function showDetailModal(): void {
