@@ -4,6 +4,7 @@
     <meta charset="utf-8">
     <!-- 外部样式 -->
     <link rel="stylesheet" href="../css/styles.css">
+    <link rel="stylesheet" href="../css/preview.css">
 </head>
 <body>
     <!-- ES6 模块加载（按依赖顺序）-->
@@ -306,7 +307,15 @@
                 </div>
             </div>
         </div>
-
+        <!-- 同步进度条 -->
+            <div id="syncProgress" style="display:none; margin: 10px 0; padding: 8px; background: #2a2a2a; border-radius: 4px;">
+                <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
+                    <span id="progressText" style="color: #aaa;">准备中...</span>
+                </div>
+                <div style="background: #444; border-radius: 4px; height: 20px; overflow: hidden;">
+                    <div id="progressBar" style="width: 0%; height: 100%; background: #27ae60; text-align: center; line-height: 20px; color: white; font-size: 12px;            transition: width 0.3s;"></div>
+                </div>
+            </div>
         <!-- 数据格式要求 -->
         <div class="section">
             <h3>📋 数据格式要求</h3>
