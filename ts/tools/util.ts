@@ -548,82 +548,6 @@ export function trim(str: string | null | undefined): string {
 }
 
 /**
- * 显示输入提示框
- */
-export function wpsPrompt(message: string, defaultValue?: string): Promise<string | null> {
-    return new Promise((resolve) => {
-        const app = getApp() as { InputBox?: (msg: string, title: string, defaultVal: string, type: number) => string | false };
-        if (app?.InputBox) {
-            try {
-                const result = app.InputBox(message, "Bangumi 设置", defaultValue || "", 2);
-                if (result === false || result === null || result === undefined) {
-                    resolve(null);
-                    return;
-                }
-                resolve(String(result));
-                return;
-            } catch (e) {
-                console.warn("WPS InputBox 不可用:", (e as Error).message);
-            }
-        }
-        if (typeof window !== 'undefined' && typeof (window as unknown as Record<string, unknown>).BGMInput === 'function') {
-            (window as unknown as Record<string, (t: string, m: string, d: string, oc: (v: string) => void, oc2: () => void) => void>).BGMInput!("输入", message, defaultValue || '', (value) => {
-                resolve(value);
-            }, () => {
-                resolve(null);
-            });
-        } else {
-            try {
-                const result = window.prompt(message, defaultValue);
-                resolve(result);
-            } catch (e) {
-                console.error("prompt 也不可用:", (e as Error).message);
-                resolve(null);
-            }
-        }
-    });
-}
-
-/**
- * 显示 WPS 消息对话框
- */
-export function wpsMsgBox(message: string, buttons?: number, icon?: number): Promise<number> {
-    return new Promise((resolve) => {
-        const app = getApp() as { MessageBox?: (msg: string, type: number) => number };
-        if (app?.MessageBox) {
-            try {
-                const result = app.MessageBox(message, (buttons || 0) + (icon || 64));
-                resolve(result);
-                return;
-            } catch (e) {
-                console.warn("WPS MessageBox 不可用:", (e as Error).message);
-            }
-        }
-        
-        if (buttons === 4) {
-            if (typeof window !== 'undefined' && typeof (window as unknown as Record<string, unknown>).BGMConfirm === 'function') {
-                (window as unknown as Record<string, (m: string, t: string, oc: () => void, oc2: () => void) => void>).BGMConfirm!(message, "确认", () => {
-                    resolve(6);
-                }, () => {
-                    resolve(7);
-                });
-            } else if (typeof window !== 'undefined') {
-                resolve(window.confirm(message) ? 6 : 7);
-            }
-        } else {
-            if (typeof window !== 'undefined' && typeof (window as unknown as Record<string, unknown>).BGMAlert === 'function') {
-                (window as unknown as Record<string, (m: string, t: string, oc?: () => void) => void>).BGMAlert!(message, "提示", () => {
-                    resolve(1);
-                });
-            } else if (typeof window !== 'undefined') {
-                window.alert(message);
-                resolve(1);
-            }
-        }
-    });
-}
-
-/**
  * 延迟执行
  */
 export function sleep(ms: number): void {
@@ -651,28 +575,7 @@ export function sleep(ms: number): void {
     }
 }
 
-/**
- * 显示自定义提示对话框
- */
-export function showAlertDialog(title: string, message: string): void {
-    if (typeof window !== 'undefined' && typeof (window as unknown as Record<string, unknown>).BGMAlert === 'function') {
-        (window as unknown as Record<string, (m: string, t: string) => void>).BGMAlert(message, title);
-    } else if (typeof window !== 'undefined') {
-        window.alert(message);
-    }
-}
-
-/**
- * 关闭提示对话框
- */
-export function closeAlertDialog(): void {
-    const modal = document.getElementById("alertDialog");
-    if (modal) {
-        modal.style.display = "none";
-    }
-}
-
-// ========== 统一日志前缀 ==========
+// ===== 统一日志前缀 ==========
 (function(): void {
     const _origLog = console.log;
     const _origWarn = console.warn;

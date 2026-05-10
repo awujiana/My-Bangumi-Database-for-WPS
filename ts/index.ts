@@ -99,6 +99,9 @@ export {
 export {
     // 设置状态栏消息
     setStatus,
+    initMessageListener,
+    // 设置同步运行状态（是否正在同步）
+     setSyncRunning,
 } from './ui/message.js';
 
 // ============================================================================
@@ -107,6 +110,13 @@ export {
 export {
     // 显示用户 ID 设置对话框
     showUserIdDialog,
+    markUploadedItems, 
+    clearSheetMarks, 
+    updateTokenStatus, 
+    updateUserIdStatus, 
+    showTokenDialog,
+    testDebugConnection
+    
 } from './ui/handlers.js';
 
 // ============================================================================
@@ -158,6 +168,7 @@ export {
     buildTagsArray,
     addTagsFromStr,
     getDataSheet,
+    HEADER_KEYWORDS, IMPORTANT_COLS
 } from './sync/exceltobangumi.js';
 
 // ============================================================================
@@ -215,7 +226,7 @@ export {
     // BGM 全局命名空间（包含 Dialog, Message, handleError 等）
     BGM,
     _getUserApiPath, 
-    wpsMsgBox,
+   
     showBangumiPanel,
    
     sleep,
@@ -237,11 +248,18 @@ export type {
 // ============================================================================
 // 12. 页面逻辑（来自 taskpane.js）
 // ============================================================================
-export {
-    // 刷新数据预览
-    refreshData,
-} from './taskpane.js';
 
+export {
+    refreshSheets, 
+    toggleSheetLock, 
+     // 刷新数据预览
+    refreshData,
+    fetchBgCollectionRecords, 
+    clearSyncRecords,
+    markUploadedItemsDefault,
+     clearSheetMarksDefault,
+     
+} from './taskpane.js';
 // ============================================================================
 // 13. 预览模块（类型部分）
 // ============================================================================
@@ -256,8 +274,9 @@ export type {
 
 // 预览函数
 export {
-    // 显示预览内容（已挂载 window）
+    // 显示预览内容
     previewSyncContent,
+    closeDetailModal,
 } from './ui/preview.js';
 
 // ============================================================================
@@ -270,6 +289,7 @@ export {
     isWpsWorksheet,
     // 判断对象是否为 WPS Range
     isWpsRange,
+     wpsMsgBox,
 } from './tools/wps.js';
 
 export type {

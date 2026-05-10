@@ -3,7 +3,7 @@
  * @module types/wps
  * @description 定义 WPS COM 对象的核心接口，避免 unknown 强制转换
  */
-
+import {  getApp,   } from '../index.js';
 // ========== WPS Application ==========
 export interface WpsApplication {
     ActiveWorkbook?: WpsWorkbook;
@@ -191,150 +191,111 @@ export function isWpsRange(value: unknown): value is WpsRange {
 }
 
 // ========== WPS 窗口扩展接口 ==========
+
 export interface BgmWindow {
-    // 应用对象
+    // WPS 核心对象（由 WPS 注入）
     Application?: unknown;
     WPS_Enum?: unknown;
     XL?: unknown;
 
-    // BGM 全局对象
+    // BGM 全局状态对象（由 util.ts 挂载）
     BGM?: unknown;
     BGM_CONFIG?: unknown;
     BGM_COLOR?: unknown;
 
-    // 核心函数
-    bgmLog?: (level: number, msg: string) => void;
-    getApp?: () => unknown;
-    loadBgToken?: () => string | null;
-    storeBgToken?: (token: string) => boolean;
-    clearBgToken?: () => boolean;
-
-    // 单元格操作
-    getCell?: (ws: unknown, row: number, col: number) => unknown;
-    getCellValue?: (ws: unknown, row: number, col: number) => string;
-    setCellValue?: (ws: unknown, row: number, col: number, value: unknown) => boolean;
-    readCell?: (ws: unknown, row: number, col: number) => string;
-    colNumToLetter?: (col: number) => string;
-
-    // 对话框
-    showAlert?: (message: string, title?: string, onOk?: () => void) => void;
-    showConfirm?: (message: string, title?: string, onOk?: () => void, onCancel?: () => void) => void;
-    showError?: (message: string, title?: string, onOk?: () => void) => void;
-    showWarning?: (message: string, title?: string, onOk?: () => void) => void;
-    showSuccess?: (message: string, title?: string, onOk?: () => void) => void;
-    showInput?: (title: string, prompt: string, defaultValue?: string, onOk?: (v: string) => void, onCancel?: () => void) => void;
-    showToast?: (message: string, type?: string) => void;
-    showDialog?: (title: string, message: string) => void;
-    BGMAlert?: (message: string, title?: string) => void;
-    BGMConfirm?: (message: string, title: string, onOk?: () => void, onCancel?: () => void) => void;
-    BGMError?: (message: string, title?: string) => void;
-    BGMWarning?: (message: string, title?: string) => void;
-    BGMSuccess?: (message: string, title?: string) => void;
-    BGMInput?: (title: string, prompt: string, defaultValue: string, onOk?: (v: string) => void, onCancel?: () => void) => void;
-
-    // Ribbon 回调
+    // Ribbon 回调（WPS 要求全局函数）
     OnAddinLoad?: (ribbonUI: unknown) => boolean;
     OnAction?: (control: { Id: string }) => boolean;
     GetBangumiImage?: (control: { Id: string }) => string;
+
+    // Ribbon 早期占位机制（index.html 使用）
     _bgmRibbonReady?: (a: unknown, b: unknown, c: unknown) => void;
     _OnAddinLoadReal?: (ribbonUI: unknown) => boolean;
     _OnActionReal?: (control: { Id: string }) => boolean;
     _GetBangumiImageReal?: (control: { Id: string }) => string;
-
-    // 同步相关
-    SyncToBangumi?: () => void;
-    previewSyncContent?: () => void;
-    fetchBgCollectionRecords?: () => void;
-    clearSyncRecords?: () => void;
-    markUploadedItems?: (sheetIndexOrName: unknown) => void;
-    clearSheetMarks?: (sheetIndexOrName: unknown) => void;
-
-    // 工作表操作
-    refreshSheets?: () => void;
-    refreshData?: () => void;
-    toggleSheetLock?: () => void;
-    findHeaderRow?: (ws: unknown, startRow?: number) => number;
-    getColumnMap?: (ws: unknown, headerRow: number) => Map<string, number>;
-    getLastRow?: (ws: unknown) => number;
-    extractSubjectId?: (url: string) => string;
-    mapWatchStatus?: (status: string) => number;
-    buildJsonPayload?: (ws: unknown, row: number, colMap: Map<string, number>, finishedDate: string) => string;
-
-    // 回调存储
-    _bgmDialogCallback?: { onOk?: (v?: string) => void; onCancel?: () => void } | null;
-    _bgmConfirmCallback?: { confirm?: () => void; cancel?: () => void } | null;
-    _dialogCallback?: ((result?: unknown) => void) | null;
-
-    // Ribbon UI
     __ribbonUI?: unknown;
 
-
-     /** 安全调用函数（index.html 中使用） */
-    safeCall?: (funcName: string, ...args: unknown[]) => unknown;
-
-    /** 模块就绪标志 */
+    // 模块加载状态（taskpane.html 使用）
     _modulesReady?: boolean;
-
-    /** 面板操作分发 */
-    onAction?: (action: string) => void;
-
-    /** 更新筛选状态 */
-    updateFilterStatus?: (ws?: unknown) => void;
-
-    /** 模式切换处理 */
-    onSelectModeChange?: () => void;
-
-    /** 标记已上传条目（默认工作表） */
-    markUploadedItemsDefault?: () => void;
-
-    /** 清除工作表标记（默认工作表） */
-    clearSheetMarksDefault?: () => void;
-
-    /** 预览同步内容 */
-    filterDetailItems?: (filterType: string) => void;
-
-    /** 上传单行 */
-    uploadSingleRow?: (rowNum: number, btnElement?: HTMLElement) => void;
-
-    /** 更新上传统计 */
-    updateUploadStats?: () => void;
-
-    /** 显示/关闭详情模态框 */
-    showDetailModal?: () => void;
-    closeDetailModal?: () => void;
-
-    /** 查看同步记录详情 */
-    viewSyncRecordDetail?: (sid: string) => void;
-
-    /** 构建预览请求体（兼容旧接口） */
-    buildPreviewPayload?: (ws: unknown, row: number, colMap: Map<string, number>) => string;
-
-    /** 更新详情计数 */
-    updateDetailCount?: (count: number) => void;
-
-    /** 详情预览数据 */
-    detailPreviewData?: {
-        allItems: unknown[];
-        currentFilter: string;
-        totalWithType: number;
-        totalValid: number;
-        totalUploaded: number;
-    };
-
-    /** 打开同步记录工作表 */
-    openSyncRecordSheet?: () => void;
-
-    /** 获取所有同步记录 */
-    getAllSyncRecords?: () => unknown[];
-
-    /** 添加同步记录 */
-    addSyncRecord?: (sheetOrOptions: unknown, record?: unknown) => boolean;
-
-    /** 获取或创建同步记录表 */
-    getOrCreateSyncRecordSheet?: () => unknown;
-
-    /** 获取顺序行（按序列号） */
-    getSequentialRowsBySeqCol?: (startRow: number, endRow: number) => { validRows: number[] };
+ 
+    // 消息通信回调（跨窗口通信临时保留）
+    _bgmDialogCallback?: { onOk?: (v?: string) => void; onCancel?: () => void } | null;
+    _bgmConfirmCallback?: { confirm?: () => void; cancel?: () => void } | null;
+}
 
 
+/**
+ * 显示输入提示框
+ */
+export function wpsPrompt(message: string, defaultValue?: string): Promise<string | null> {
+    return new Promise((resolve) => {
+        const app = getApp() as { InputBox?: (msg: string, title: string, defaultVal: string, type: number) => string | false };
+        if (app?.InputBox) {
+            try {
+                const result = app.InputBox(message, "Bangumi 设置", defaultValue || "", 2);
+                if (result === false || result === null || result === undefined) {
+                    resolve(null);
+                    return;
+                }
+                resolve(String(result));
+                return;
+            } catch (e) {
+                console.warn("WPS InputBox 不可用:", (e as Error).message);
+            }
+        }
+        if (typeof window !== 'undefined' && typeof (window as unknown as Record<string, unknown>).BGMInput === 'function') {
+            (window as unknown as Record<string, (t: string, m: string, d: string, oc: (v: string) => void, oc2: () => void) => void>).BGMInput!("输入", message, defaultValue || '', (value) => {
+                resolve(value);
+            }, () => {
+                resolve(null);
+            });
+        } else {
+            try {
+                const result = window.prompt(message, defaultValue);
+                resolve(result);
+            } catch (e) {
+                console.error("prompt 也不可用:", (e as Error).message);
+                resolve(null);
+            }
+        }
+    });
+}
+
+/**
+ * 显示 WPS 消息对话框
+ */
+export function wpsMsgBox(message: string, buttons?: number, icon?: number): Promise<number> {
+    return new Promise((resolve) => {
+        const app = getApp() as { MessageBox?: (msg: string, type: number) => number };
+        if (app?.MessageBox) {
+            try {
+                const result = app.MessageBox(message, (buttons || 0) + (icon || 64));
+                resolve(result);
+                return;
+            } catch (e) {
+                console.warn("WPS MessageBox 不可用:", (e as Error).message);
+            }
+        }
+        
+        if (buttons === 4) {
+            if (typeof window !== 'undefined' && typeof (window as unknown as Record<string, unknown>).BGMConfirm === 'function') {
+                (window as unknown as Record<string, (m: string, t: string, oc: () => void, oc2: () => void) => void>).BGMConfirm!(message, "确认", () => {
+                    resolve(6);
+                }, () => {
+                    resolve(7);
+                });
+            } else if (typeof window !== 'undefined') {
+                resolve(window.confirm(message) ? 6 : 7);
+            }
+        } else {
+            if (typeof window !== 'undefined' && typeof (window as unknown as Record<string, unknown>).BGMAlert === 'function') {
+                (window as unknown as Record<string, (m: string, t: string, oc?: () => void) => void>).BGMAlert!(message, "提示", () => {
+                    resolve(1);
+                });
+            } else if (typeof window !== 'undefined') {
+                window.alert(message);
+                resolve(1);
+            }
+        }
+    });
 }

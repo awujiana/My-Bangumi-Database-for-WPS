@@ -14,7 +14,9 @@ import {
     getSequentialRowsBySeqCol, SyncToBangumiAsync, clearRowColors,
     testSingleUpdate, getOrCreateSyncRecordSheet, getAllSyncRecords,
     addSyncRecord, openSyncRecordSheet, clearSheetMarksInSheet,
-    previewSyncContent, refreshData
+    previewSyncContent, refreshData,refreshSheets,toggleSheetLock, fetchBgCollectionRecords,clearSyncRecords,
+
+    closeDetailModal, 
 } from '../index.js';
 
 // 本地类型定义
@@ -239,35 +241,41 @@ export async function syncFromPanel(): Promise<void> {
         }
     }
 
-    const app = getApp();
-    if (!app?.ActiveWorkbook) {
-        showAlert('无法获取 Application 对象！');
-        return;
-    }
+      const app = getApp();
+    if (!app?.ActiveWorkbook) { showAlert('无法获取 Application 对象！'); return; }
     const ws = getDataSheet();
-    if (!ws) {
-        showAlert('未找到数据工作表，请先锁定工作表。');
-        return;
-    }
+    if (!ws) { showAlert('未找到数据工作表'); return; }
 
     const headerRow = findHeaderRow(ws);
     const lastRow = getLastRow(ws);
-    const colMap = getColumnMap(ws, headerRow);
-    if (!colMap.has("Bangumi_URL")) {
-        showAlert('未找到 "Bangumi URL" 列！');
+    const rowCount = lastRow - headerRow;
+    if (rowCount <= 0) {
+        showAlert('没有可同步的数据行');
         return;
     }
 
+    // 同步前确认
+    const confirmed = await new Promise<boolean>(resolve => {
+        showConfirm(`即将同步 ${rowCount} 行数据到 Bangumi，是否继续？`, '确认', 
+            () => resolve(true), 
+            () => resolve(false)
+        );
+    });
+    if (!confirmed) return;
+
+    // 获取列映射
+    const colMap = getColumnMap(ws, headerRow);
+    if (!colMap.has("Bangumi_URL")) { showAlert('未找到 Bangumi URL 列'); return; }
+
     try {
         const result = await SyncToBangumiAsync(ws, colMap, token, lastRow, headerRow, {
-            onProgress: (current: number, total: number, message: string) => {
+            onProgress: (current, total, message) => {
                 updateProgressBar(current, total, message);
                 if (app.StatusBar !== undefined) {
                     app.StatusBar = `[${current}/${total}] ${message}`;
                 }
             }
         });
-
         resetProgressBar();
         if (app.StatusBar !== undefined) app.StatusBar = false;
         showAlert(`同步完成！成功 ${result.success} 条，失败 ${result.fail} 条，跳过 ${result.skip} 条`);
@@ -470,21 +478,42 @@ function setupButtonListeners(): void {
 }
 
 function handleActionClick(event: Event): void {
-    const action = (event.currentTarget as HTMLElement).dataset.action;
+    const target = event.currentTarget as HTMLElement;
+    const action = target.dataset.action;
     if (!action) return;
+
+    // 解析参数（data-args 传递 JSON 数组）
+    let args: string[] = [];
+    if (target.dataset.args) {
+        try { args = JSON.parse(target.dataset.args); } catch { /* ignore */ }
+    }
+
     switch (action) {
+        case 'sync': syncFromPanel(); break;
+        case 'test': if (typeof testSingleUpdate === 'function') testSingleUpdate(); break;
+        case 'clear': showConfirm(_T.confirmClearMarks, '确认', () => {
+            if (typeof clearRowColors === 'function') clearRowColors();
+            if (typeof refreshData === 'function') refreshData();
+        }); break;
+        case 'preview': if (typeof previewSyncContent === 'function') previewSyncContent(); break;
+        case 'setToken': showTokenDialog(loadBgToken() || ''); break;
         case 'showTokenDialog': showTokenDialog(loadBgToken() || ''); break;
         case 'testToken': testTokenValidity(); break;
         case 'showUserIdDialog': showUserIdDialog(); break;
         case 'openUserCollection': openUserCollection(); break;
-        case 'sync': syncFromPanel(); break;
-        case 'test': if (typeof testSingleUpdate === 'function') testSingleUpdate(); break;
-        case 'clear':
-            showConfirm(_T.confirmClearMarks, '确认', () => {
-                if (typeof clearRowColors === 'function') clearRowColors();
-            });
-            break;
-        case 'preview': if (typeof previewSyncContent === 'function') previewSyncContent(); break;
+        case 'syncCollectionFromBgm': syncCollectionFromBgm(); break;
+        case 'refreshSheets': refreshSheets(); break;
+        case 'refreshData': refreshData(); break;
+        case 'toggleSheetLock': toggleSheetLock(); break;
+        case 'fetchBgCollectionRecords': fetchBgCollectionRecords(); break;
+        case 'clearSyncRecords': clearSyncRecords(); break;
+        case 'markUploadedItems': markUploadedItems(args[0]); break;
+        case 'clearSheetMarks': clearSheetMarks(args[0]); break;
+        case 'openSyncRecordSheet': openSyncRecordSheet(); break;
+        case 'testDebugConnection': testDebugConnection(); break;
+        case 'closeDetailModal': closeDetailModal(); break;
+        case 'showToast': showToast(args[0], args[1]); break;
+        case 'showAlert': showAlert(args[0], args[1]); break;
         default: bgmLog(LOG_LEVELS.WARN, 'Unknown action: ' + action);
     }
 }
@@ -495,19 +524,3 @@ if (document.readyState === 'loading') {
     setTimeout(setupButtonListeners, 0);
 }
 
-// ========== 向后兼容挂载 ==========
-const w = window as any;
-w.onAction = onAction;
-w.syncFromPanel = syncFromPanel;
-w.syncCollectionFromBgm = syncCollectionFromBgm;
-w.syncFromBgmByAPI = syncFromBgmByAPI;
-w.markUploadedItems = markUploadedItems;
-w.clearSheetMarks = clearSheetMarks;
-w.testSingleUpdateFromPanel = testSingleUpdateFromPanel;
-w.showTokenDialog = showTokenDialog;
-w.showUserIdDialog = showUserIdDialog;
-w.updateTokenStatus = updateTokenStatus;
-w.updateUserIdStatus = updateUserIdStatus;
-w.openUserCollection = openUserCollection;
-w.testTokenValidity = testTokenValidity;
-w.testDebugConnection = testDebugConnection;

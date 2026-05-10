@@ -231,105 +231,59 @@ export function findHeaderRow(ws: any, startRow?: number): number {
   }
   return 0;
 }
+// 在文件顶部或函数外定义匹配规则数组（按优先级顺序）
+const COLUMN_RULES: [RegExp, string][] = [
+    [/bangumi.*url|bgm.*url|subject.*url|url.*bgm/i, "Bangumi_URL"],
+    [/是否看完|观看状态/, "是否看完"],
+    [/完播日|完播时间|看完时间/, "完播日"],
+    [/开播日期|开播时间|首播/, "开播日期"],
+    [/开播季度|季度|年份/, "开播季度"],
+    [/打分|评分|分数|\brate\b/i, "打分"],
+    [/感言|剧透|评价|评论|\bcomment\b/i, "剧透/感言"],
+    [/标签|分级|\btag\b/i, "标签/分级"],
+    [/特点|印象/, "特点/印象"],
+    [/集号|看到|ep/i, "集号"],
+    [/集数|总集/, "集数"],
+    [/名称|标题|\bname\b|\btitle\b/i, "名称"],
+    [/别名|原名|alias/i, "别名"],
+    [/类别|分类|\btype\b/i, "类别"],
+    [/原作标签|原作/, "原作标签"],
+    [/制作公司|studio/i, "制作公司"],
+    [/系列/, "系列"],
+    [/季数/, "季数"],
+    [/时长|分钟/, "时长"],
+    [/导演|director/i, "导演"],
+    [/音乐|music/i, "音乐"],
+    [/序列号|序号|编号/, "序列号"],
+    [/制片国家/, "制片国家"],
+    [/语言/, "语言"]
+];
 
-export function getColumnMap(ws: any, headerRow: number): ColumnMap {
-  let colMap: ColumnMap = new Map();
-  let lastCol = 50;
+/**
+ * 获取列名到列号的映射（优化版：使用正则规则数组，时间复杂度 O(N*M) 但 M 较小）
+ * @param ws 工作表对象
+ * @param headerRow 表头行号
+ * @returns Map<string, number> 列映射
+ */
+export function getColumnMap(ws: any, headerRow: number): Map<string, number> {
+    const colMap = new Map<string, number>();
+    const lastCol = 50;
 
-  for (let i = 1; i <= lastCol; i++) {
-    let colName = trim(String(getCellValue(ws, headerRow, i)));
-    if (colName === "") continue;
+    for (let i = 1; i <= lastCol; i++) {
+        const colName = trim(String(getCellValue(ws, headerRow, i)));
+        if (!colName) continue;
 
-    let lowerName = colName.toLowerCase();
-
-    if (lowerName.indexOf("bangumi") >= 0 || lowerName.indexOf("bgm") >= 0 ||
-        colName.indexOf("URL") >= 0 || lowerName.indexOf("subject") >= 0) {
-      colMap.set("Bangumi_URL", i);
+        // 遍历规则，找到第一个匹配的规则则跳出
+        for (const [pattern, key] of COLUMN_RULES) {
+            if (pattern.test(colName)) {
+                colMap.set(key, i);
+                break;  // 一个重要列名只匹配一个规则
+            }
+        }
     }
-    else if (colName.indexOf("是否看完") >= 0 || colName.indexOf("观看状态") >= 0 ||
-             colName.indexOf("状态") >= 0) {
-      colMap.set("是否看完", i);
-    }
-    else if (colName.indexOf("完播") >= 0 || colName.indexOf("看完时间") >= 0) {
-      colMap.set("完播日", i);
-    }
-    else if (colName.indexOf("开播日期") >= 0 || colName.indexOf("开播时间") >= 0 ||
-             colName.indexOf("首播") >= 0) {
-      colMap.set("开播日期", i);
-    }
-    else if (colName.indexOf("开播季度") >= 0 || colName.indexOf("季度") >= 0 ||
-             colName.indexOf("年份") >= 0) {
-      colMap.set("开播季度", i);
-    }
-    else if (colName.indexOf("打分") >= 0 || colName.indexOf("评分") >= 0 ||
-             colName.indexOf("分数") >= 0 || lowerName.indexOf("rate") >= 0) {
-      colMap.set("打分", i);
-    }
-    else if (colName.indexOf("感言") >= 0 || colName.indexOf("剧透") >= 0 ||
-             colName.indexOf("评价") >= 0 || colName.indexOf("评论") >= 0 ||
-             colName.indexOf("comment") >= 0) {
-      colMap.set("剧透/感言", i);
-    }
-    else if (colName.indexOf("标签") >= 0 || colName.indexOf("分级") >= 0 ||
-             colName.indexOf("tag") >= 0) {
-      colMap.set("标签/分级", i);
-    }
-    else if (colName.indexOf("特点") >= 0 || colName.indexOf("印象") >= 0) {
-      colMap.set("特点/印象", i);
-    }
-    else if (colName.indexOf("集号") >= 0 || colName.indexOf("看到") >= 0 ||
-             colName.indexOf("ep") >= 0) {
-      colMap.set("集号", i);
-    }
-    else if (colName.indexOf("集数") >= 0 || colName.indexOf("总集") >= 0) {
-      colMap.set("集数", i);
-    }
-    else if (colName.indexOf("名称") >= 0 || colName.indexOf("标题") >= 0 ||
-             colName.indexOf("name") >= 0 || lowerName.indexOf("title") >= 0) {
-      colMap.set("名称", i);
-    }
-    else if (colName.indexOf("别名") >= 0 || colName.indexOf("原名") >= 0 ||
-             lowerName.indexOf("alias") >= 0) {
-      colMap.set("别名", i);
-    }
-    else if (colName.indexOf("类别") >= 0 || colName.indexOf("分类") >= 0 ||
-             colName.indexOf("type") >= 0) {
-      colMap.set("类别", i);
-    }
-    else if (colName.indexOf("原作标签") >= 0 || colName.indexOf("原作") >= 0) {
-      colMap.set("原作标签", i);
-    }
-    else if (colName.indexOf("制作公司") >= 0 || lowerName.indexOf("studio") >= 0) {
-      colMap.set("制作公司", i);
-    }
-    else if (colName.indexOf("系列") >= 0) {
-      colMap.set("系列", i);
-    }
-    else if (colName.indexOf("季数") >= 0 || (colName.indexOf("第") >= 0 && colName.indexOf("季") >= 0)) {
-      colMap.set("季数", i);
-    }
-    else if (colName.indexOf("时长") >= 0 || colName.indexOf("分钟") >= 0) {
-      colMap.set("时长", i);
-    }
-    else if (colName.indexOf("导演") >= 0 || lowerName.indexOf("director") >= 0) {
-      colMap.set("导演", i);
-    }
-    else if (colName.indexOf("音乐") >= 0 || lowerName.indexOf("music") >= 0) {
-      colMap.set("音乐", i);
-    }
-    else if (colName.indexOf("序列号") >= 0 || colName.indexOf("序号") >= 0 ||
-             colName.indexOf("编号") >= 0) {
-      colMap.set("序列号", i);
-    }
-    else if (colName.indexOf("制片国家") >= 0) {
-      colMap.set("制片国家", i);
-    }
-    else if (colName.indexOf("语言") >= 0) {
-      colMap.set("语言", i);
-    }
-  }
-  return colMap;
+    return colMap;
 }
+
 
 export function mapWatchStatus(status: any): number {
   if (isEmptyValue(status)) return 0;
@@ -378,37 +332,44 @@ function buildTags(ws: any, row: number, colMap: ColumnMap): string {
 }
 
 export function buildJsonPayload(ws: any, row: number, colMap: ColumnMap, finishedDate: any): string {
-  let watchStatus = "";
-  if (colMap.has("是否看完")) {
-    watchStatus = trim(getCellValue(ws, row, colMap.get("是否看完")!));
-  }
-  let bgmType = mapWatchStatus(watchStatus);
-  if (bgmType === 0) return "";
-
-  let parts: string[] = [];
-  parts.push('"type":' + bgmType);
-
-  if (colMap.has("打分")) {
-    let rateVal = getCellValue(ws, row, colMap.get("打分")!);
-    // 修复：将 rateVal 转换为字符串，然后解析为整数
-    let rateNum = parseInt(String(rateVal), 10);
-    if (!isNaN(rateNum)) {
-      let rate = Math.max(0, Math.min(10, rateNum));
-      if (rate >= 0) parts.push('"rate":' + rate);
+    let watchStatus = "";
+    if (colMap.has("是否看完")) {
+        watchStatus = trim(getCellValue(ws, row, colMap.get("是否看完")!));
     }
-  }
+    let bgmType = mapWatchStatus(watchStatus);
+    if (bgmType === 0) return "";
 
-  if (colMap.has("剧透/感言")) {
-    let comment = trim(getCellValue(ws, row, colMap.get("剧透/感言")!));
-    if (comment !== "") {
-      parts.push('"comment":"' + jsonEscape(comment) + '"');
+    let parts: string[] = [];
+    parts.push('"type":' + bgmType);
+
+    if (colMap.has("打分")) {
+        let rateVal = getCellValue(ws, row, colMap.get("打分")!);
+        let rateNum = parseInt(String(rateVal), 10);
+        if (!isNaN(rateNum)) {
+            let rate = Math.max(0, Math.min(10, rateNum));
+            if (rate >= 0) parts.push('"rate":' + rate);
+        }
     }
-  }
 
-  let tags = buildTags(ws, row, colMap);
-  if (tags !== "") parts.push('"tags":[' + tags + ']');
+    if (colMap.has("剧透/感言")) {
+        let comment = trim(getCellValue(ws, row, colMap.get("剧透/感言")!));
+        if (comment !== "") {
+            parts.push('"comment":"' + jsonEscape(comment) + '"');
+        }
+    }
 
-  return "{" + parts.join(",") + "}";
+    let tags = buildTags(ws, row, colMap);
+    if (tags !== "") parts.push('"tags":[' + tags + ']');
+
+    // 新增：支持私密收藏
+    if (colMap.has("私密收藏")) {
+        const privateVal = trim(getCellValue(ws, row, colMap.get("私密收藏")!)).toLowerCase();
+        if (privateVal === "是" || privateVal === "1" || privateVal === "true") {
+            parts.push('"private":true');
+        }
+    }
+
+    return "{" + parts.join(",") + "}";
 }
 
 export function bgmRequestSync(method: string, endpoint: string, body: any, token: string): { code: number; message: string } {

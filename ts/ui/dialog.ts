@@ -262,3 +262,4 @@ export function showToast(message: string, type?: string): void {
         _toastTimer = null;
     }, 3000);
 }
+

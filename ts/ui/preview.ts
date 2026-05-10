@@ -601,13 +601,3 @@ export function viewSyncRecordDetail(sid: string): void {
   safeAlert(detail, '同步记录详情');
 }
 
-// ========== 挂载到 window（仅用于 HTML onclick 调用）==========
-if (typeof window !== 'undefined') {
-  (window as any).uploadSingleRow = uploadSingleRow;
-  (window as any).previewSyncContent = previewSyncContent;
-  (window as any).filterDetailItems = filterDetailItems;
-  (window as any).updateUploadStats = updateUploadStats;
-  (window as any).showDetailModal = showDetailModal;
-  (window as any).closeDetailModal = closeDetailModal;
-  (window as any).viewSyncRecordDetail = viewSyncRecordDetail;
-}

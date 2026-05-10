@@ -76,14 +76,38 @@ async function apiRequest(path: string, token: string): Promise<{ status: number
 
 // ========== Token 验证 ==========
 
-export async function verifyToken(token: string): Promise<{ valid: boolean; userId: string; username: string; message: string }> {
+/**
+ * 异步验证 Token 有效性（增强版：检测过期）
+ * @param {string} token - Access Token
+ * @returns {Promise<TokenVerifyResult>}
+ */
+export async function verifyToken(token: string): Promise<TokenVerifyResult> {
     if (!token) return { valid: false, userId: '', username: '', message: 'Token 为空' };
 
     try {
         const { status, data } = await apiRequest('/v0/me', token);
 
         if (status === 200) {
-            const userData = data as { id?: string; nickname?: string; username?: string };
+            const userData = data as {
+                id?: string | number;
+                nickname?: string;
+                username?: string;
+                expires_at?: string | number;   // 可能为 Unix 时间戳
+            };
+
+            // 检查令牌过期时间（如果提供）
+            if (userData.expires_at) {
+                const expiresTimestamp = Number(userData.expires_at) * 1000; // 转为毫秒
+                if (!isNaN(expiresTimestamp) && Date.now() > expiresTimestamp) {
+                    return {
+                        valid: false,
+                        userId: String(userData.id || ''),
+                        username: userData.nickname || userData.username || '未知',
+                        message: 'Token 已过期，请重新获取'
+                    };
+                }
+            }
+
             return {
                 valid: true,
                 userId: String(userData.id || ''),
@@ -91,13 +115,14 @@ export async function verifyToken(token: string): Promise<{ valid: boolean; user
                 message: 'Token 有效'
             };
         }
+
         if (status === 401) {
             return { valid: false, userId: '', username: '', message: 'Token 无效或已过期（HTTP 401）' };
         }
         return { valid: false, userId: '', username: '', message: `Token 验证失败（HTTP ${status}）` };
     } catch (e) {
-        BGM.handleError(e, { context: 'verifyToken', showAlert: true });
-        return { valid: false, userId: '', username: '', message: 'Token 验证请求失败: ' + (e as Error).message };
+        const err = e as Error;
+        return { valid: false, userId: '', username: '', message: 'Token 验证请求失败: ' + err.message };
     }
 }
 
