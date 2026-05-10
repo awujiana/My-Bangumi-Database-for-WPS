@@ -18,7 +18,7 @@ import {
 
     closeDetailModal, 
 } from '../index.js';
-
+import{BGM_EVENTS, eventBus} from '../tools/events.js';
 // 本地类型定义
 interface FilterStatus {
     hasFilter: boolean;
@@ -523,3 +523,16 @@ if (document.readyState === 'loading') {
     setTimeout(setupButtonListeners, 0);
 }
 
+// 监听状态更新事件
+eventBus.on(BGM_EVENTS.TOKEN_UPDATED, () => {
+    updateTokenStatus();
+});
+
+eventBus.on(BGM_EVENTS.USER_ID_UPDATED, () => {
+    updateUserIdStatus();
+});
+
+// 同步进度事件（全局进度条）
+eventBus.on(BGM_EVENTS.SYNC_PROGRESS, (data: { current: number; total: number; message: string }) => {
+    updateProgressBar(data.current, data.total, data.message);
+});

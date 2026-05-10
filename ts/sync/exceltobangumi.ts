@@ -512,12 +512,17 @@ export function buildJsonPayload(
             }
         }
 
-        // 是否私有（默认为false）
-        payload.private = 0;
+        // 私密收藏（仅当明确标记为“是”或“1”时才添加）
+        if (colMap.has('私密收藏')) {
+            const privateVal = trim(readCell(ws, rowNum, colMap.get('私密收藏')!)).toLowerCase();
+            if (privateVal === '是' || privateVal === '1' || privateVal === 'true') {
+                payload.private = true;
+            }
+        }
 
         return JSON.stringify(payload);
     } catch (e) {
-         BGM.handleError(e, { level: BGM.ErrorLevel.ERROR, context: 'buildJsonPayload' });
+        BGM.handleError(e, { level: BGM.ErrorLevel.ERROR, context: 'buildJsonPayload' });
         return '{}';
     }
 }
@@ -722,7 +727,8 @@ export async function SyncToBangumiAsync(
     for (let idx = 0; idx < rowsToProcess.length; idx++) {
         const rowNum = rowsToProcess[idx];
         reportProgress(idx + 1, `处理行 ${rowNum}...`);
-
+        //同时发送全局进度事件（让其他模块也能收到）
+        BGM.setSyncProgress(idx + 1, total, `处理行 ${rowNum}...`);
         try {
             const bgmUrl = getField(rowNum, 'Bangumi_URL');
             if (!bgmUrl) { result.skip++; reportProgress(idx + 1, `行 ${rowNum}：跳过（无URL）`); continue; }
@@ -777,11 +783,13 @@ export async function SyncToBangumiAsync(
         } catch (e: any) {
             result.fail++;
             reportProgress(idx + 1, `行 ${rowNum}：✗ 异常 (${e.message})`);
+            BGM.setSyncError(e);
             BGM.handleError(e, { level: BGM.ErrorLevel.ERROR, context: 'SyncToBangumiAsync' });
         }
     }
 
     reportProgress(total, '同步完成');
+    BGM.setSyncComplete(result);
     bgmLog(LOG_LEVELS.INFO, `SyncToBangumi 完成: 成功=${result.success}, 失败=${result.fail}, 跳过=${result.skip}`);
     return result;
 }
@@ -889,5 +897,4 @@ export function testSingleUpdate(): void {
     }
 }
 
-// 重新导出类型
-export type { BGMCache, BGMSync };
+
