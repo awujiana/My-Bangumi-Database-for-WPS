@@ -31,6 +31,16 @@ export {
     BGM_SUBJECT_TYPES,
     // 同步状态常量
     SYNC_STATUS,
+    COLUMN_RULES,
+    HEADER_KEYWORDS, 
+    IMPORTANT_COLS,
+    TYPE_TEXT_MAP,
+    FIELD_NAME_MAP,
+    URL_PATTERNS,
+    TOKEN_CONFIG,
+    WATCH_STATUS_MAP,
+    COLUMNS,
+
 } from './core/constants.js';
 
 // ============================================================================
@@ -142,8 +152,7 @@ export {
 export {
     // 查找表头行
     findHeaderRow,
-    // 获取列映射
-    getColumnMap,
+   
     // 获取最后一行
     getLastRow,
     // 提取 Subject ID
@@ -169,7 +178,7 @@ export {
     buildTagsArray,
     addTagsFromStr,
     getDataSheet,
-    HEADER_KEYWORDS, IMPORTANT_COLS
+ 
 } from './sync/exceltobangumi.js';
 
 // ============================================================================
@@ -231,6 +240,11 @@ export {
     showBangumiPanel,
    
     sleep,
+    delay,
+    readRangeValues,
+     // 获取列映射
+    getColumnMap,
+
 } from './tools/util.js';
 
 // BGM 状态接口（用于描述 BGM 对象的类型）

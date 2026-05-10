@@ -7,7 +7,9 @@
 
 import {  showUserIdDialog,httpRequest, showAlert,Result,BatchSyncResult,getApp, bgmLog, getCell, getCellValue, sleep, loadBgToken,
          _setBgmUserId, _getBgmUserId, _getUserApiPath, trim,
-         colNumToLetter, storeBgToken, readCell ,BGM ,XL, BGM_CONFIG, BGM_COLOR, LOG_LEVELS} from '../index.js';
+         colNumToLetter, storeBgToken, readCell ,BGM ,XL, BGM_CONFIG, BGM_COLOR, LOG_LEVELS, delay, readRangeValues,COLUMN_RULES, TYPE_TEXT_MAP,COLUMNS,WATCH_STATUS_MAP,HEADER_KEYWORDS,URL_PATTERNS,
+    getColumnMap,} from '../index.js';
+
 
 // 定义接口类型
 interface FilterStatus {
@@ -71,70 +73,6 @@ interface ExcelRange {
   [key: string]: any;
 }
 
-// ========== 常量定义 ==========
-const COLUMNS = {
-  SEQUENCE: 4,      // D列 - 序号
-  DEFAULT_START: 1
-};
-
-const WATCH_STATUS_MAP: { [key: string]: number } = {
-  "看过": 3, "看完": 3, "已看": 3, "完": 3, "completed": 3, "3": 3,
-  "在看": 2, "在看动画": 2, "在追": 2, "追": 2, "watching": 2, "2": 2,
-  "想看": 0, "想看动画": 0, "否": 0, "wish": 0, "1": 0,
-  "搁置": 4, "暂停": 4, "停": 4, "on_hold": 4, "4": 4,
-  "抛弃": 5, "弃": 5, "弃番": 5, "drop": 5, "dropped": 5, "5": 5
-};
-
-const TYPE_TEXT_MAP: { [key: number]: string } = {1: "想看", 2: "在看", 3: "看过", 4: "搁置", 5: "抛弃"};
-
-const URL_PATTERNS = [
-  /bgm\.tv\/subject\/(\d+)/i,
-  /bangumi\.tv\/subject\/(\d+)/i,
-  /chii\.in\/subject\/(\d+)/i,
-  /(\d{6,})/
-];
-
-export const HEADER_KEYWORDS = [
-  "序列号", "是否看完", "看完时间", "开播季度",
-  "开播日期", "完播日", "类别", "原作标签", "制作公司",
-  "标签/分级", "特点/印象", "打分", "集号", "集数",
-  "名称", "别名", "剧透/感言", "感言", "备注", "评价",
-  "bangumi url", "url", "制片国家", "语言", "类型",
-  "导演", "音乐", "原作", "标签",
-  "条目id", "sid", "状态", "status", "rate",
-  "番剧", "动画", "书", "名字", "链接",
-  "观看状态", "收藏类型", "章节状态", "同步状态",
-  "关联的动漫", "系列", "季数", "时长"
-];
-
-export const IMPORTANT_COLS: { [key: string]: boolean } = {
-  "名称": true, "是否看完": true, "bangumi url": true,
-  "url": true, "打分": true, "集数": true, "感言": true,
-  "剧透/感言": true, "类型": true, "状态": true,
-  "status": true, "rate": true, "别名": true
-};
-
-const FIELD_NAME_MAP: { [key: string]: string } = {
-  "名称": "name", "name": "name", "作品名": "name", "条目": "name", "标题": "name",
-  "条目id": "subjectId", "sid": "subjectId", "subject_id": "subjectId", "id": "subjectId",
-  "bangumi url": "url", "url": "url", "链接": "url", "地址": "url",
-  "状态": "type", "type": "type", "观看状态": "type", "收藏类型": "type",
-  "是否看完": "watchStatus",
-  "评分": "rate", "rate": "rate", "分数": "rate", "rating": "rate", "打分": "rate",
-  "标签": "tags", "tags": "tags", "tag": "tags", "标签/分级": "tags",
-  "评价": "comment", "comment": "comment", "备注": "comment", "notes": "comment",
-  "剧透/感言": "comment", "感言": "comment",
-  "完播日": "finishedDate", "完播日期": "finishedDate", "看完时间": "finishedDate",
-  "finished": "finishedDate", "日期": "finishedDate",
-  "章节状态": "epStatus", "ep_status": "epStatus", "集数": "epStatus",
-  "同步状态": "syncStatus", "sync_status": "syncStatus",
-  "开播季度": "startSeason", "开播日期": "startDate",
-  "别名": "alias", "类别": "category", "制作公司": "studio",
-  "原作标签": "originalTag", "特点/印象": "impression",
-  "集号": "epNum", "系列": "series", "季数": "season",
-  "时长": "duration", "导演": "director", "音乐": "music",
-  "制片国家": "country", "序列号": "sequence"
-};
 
 let _cachedTotalRows = 0;
 
@@ -231,58 +169,7 @@ export function findHeaderRow(ws: any, startRow?: number): number {
   }
   return 0;
 }
-// 在文件顶部或函数外定义匹配规则数组（按优先级顺序）
-const COLUMN_RULES: [RegExp, string][] = [
-    [/bangumi.*url|bgm.*url|subject.*url|url.*bgm/i, "Bangumi_URL"],
-    [/是否看完|观看状态/, "是否看完"],
-    [/完播日|完播时间|看完时间/, "完播日"],
-    [/开播日期|开播时间|首播/, "开播日期"],
-    [/开播季度|季度|年份/, "开播季度"],
-    [/打分|评分|分数|\brate\b/i, "打分"],
-    [/感言|剧透|评价|评论|\bcomment\b/i, "剧透/感言"],
-    [/标签|分级|\btag\b/i, "标签/分级"],
-    [/特点|印象/, "特点/印象"],
-    [/集号|看到|ep/i, "集号"],
-    [/集数|总集/, "集数"],
-    [/名称|标题|\bname\b|\btitle\b/i, "名称"],
-    [/别名|原名|alias/i, "别名"],
-    [/类别|分类|\btype\b/i, "类别"],
-    [/原作标签|原作/, "原作标签"],
-    [/制作公司|studio/i, "制作公司"],
-    [/系列/, "系列"],
-    [/季数/, "季数"],
-    [/时长|分钟/, "时长"],
-    [/导演|director/i, "导演"],
-    [/音乐|music/i, "音乐"],
-    [/序列号|序号|编号/, "序列号"],
-    [/制片国家/, "制片国家"],
-    [/语言/, "语言"]
-];
 
-/**
- * 获取列名到列号的映射（优化版：使用正则规则数组，时间复杂度 O(N*M) 但 M 较小）
- * @param ws 工作表对象
- * @param headerRow 表头行号
- * @returns Map<string, number> 列映射
- */
-export function getColumnMap(ws: any, headerRow: number): Map<string, number> {
-    const colMap = new Map<string, number>();
-    const lastCol = 50;
-
-    for (let i = 1; i <= lastCol; i++) {
-        const colName = trim(String(getCellValue(ws, headerRow, i)));
-        if (!colName) continue;
-
-        // 遍历规则，找到第一个匹配的规则则跳出
-        for (const [pattern, key] of COLUMN_RULES) {
-            if (pattern.test(colName)) {
-                colMap.set(key, i);
-                break;  // 一个重要列名只匹配一个规则
-            }
-        }
-    }
-    return colMap;
-}
 
 
 export function mapWatchStatus(status: any): number {
@@ -331,76 +218,77 @@ function buildTags(ws: any, row: number, colMap: ColumnMap): string {
   return tags.join(",");
 }
 
-export function buildJsonPayload(ws: any, row: number, colMap: ColumnMap, finishedDate: any): string {
-    let watchStatus = "";
-    if (colMap.has("是否看完")) {
-        watchStatus = trim(getCellValue(ws, row, colMap.get("是否看完")!));
-    }
-    let bgmType = mapWatchStatus(watchStatus);
-    if (bgmType === 0) return "";
 
+export function buildJsonPayload(ws: any, row: number, colMap: ColumnMap, finishedDate: any): string {
+  let watchStatus = "";
+  if (colMap.has("是否看完")) {
+    watchStatus = trim(getCellValue(ws, row, colMap.get("是否看完")!));
+  }
+  let bgmType = mapWatchStatus(watchStatus);
+    if (bgmType === 0) return "";
+    
     let parts: string[] = [];
     parts.push('"type":' + bgmType);
-
+    
     if (colMap.has("打分")) {
-        let rateVal = getCellValue(ws, row, colMap.get("打分")!);
-        let rateNum = parseInt(String(rateVal), 10);
-        if (!isNaN(rateNum)) {
-            let rate = Math.max(0, Math.min(10, rateNum));
-            if (rate >= 0) parts.push('"rate":' + rate);
-        }
+      let rateVal = getCellValue(ws, row, colMap.get("打分")!);
+      let rateNum = parseInt(String(rateVal), 10);
+      if (!isNaN(rateNum)) {
+        let rate = Math.max(0, Math.min(10, rateNum));
+        if (rate >= 0) parts.push('"rate":' + rate);
+      }
     }
-
+    
     if (colMap.has("剧透/感言")) {
-        let comment = trim(getCellValue(ws, row, colMap.get("剧透/感言")!));
+      let comment = trim(getCellValue(ws, row, colMap.get("剧透/感言")!));
         if (comment !== "") {
-            parts.push('"comment":"' + jsonEscape(comment) + '"');
+          parts.push('"comment":"' + jsonEscape(comment) + '"');
         }
-    }
-
-    let tags = buildTags(ws, row, colMap);
-    if (tags !== "") parts.push('"tags":[' + tags + ']');
-
-    // 新增：支持私密收藏
-    if (colMap.has("私密收藏")) {
+      }
+      
+      let tags = buildTags(ws, row, colMap);
+      if (tags !== "") parts.push('"tags":[' + tags + ']');
+      
+      // 新增：支持私密收藏
+      if (colMap.has("私密收藏")) {
         const privateVal = trim(getCellValue(ws, row, colMap.get("私密收藏")!)).toLowerCase();
         if (privateVal === "是" || privateVal === "1" || privateVal === "true") {
-            parts.push('"private":true');
+          parts.push('"private":true');
         }
+      }
+      
+      return "{" + parts.join(",") + "}";
     }
-
-    return "{" + parts.join(",") + "}";
-}
-
-export function bgmRequestSync(method: string, endpoint: string, body: any, token: string): { code: number; message: string } {
-  const { MAX_RETRIES, RETRY_DELAY_BASE } = BGM_CONFIG;
-  let retries = 0;
-
-  const validMethods = ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'];
-  if (!validMethods.includes(method.toUpperCase())) {
-    return { code: 0, message: "Invalid HTTP method" };
-  }
-  if (!endpoint || typeof endpoint !== 'string') {
-    return { code: 0, message: "Invalid endpoint" };
-  }
-  if (endpoint.includes('..') || endpoint.includes('//') || endpoint.startsWith('http')) {
-    return { code: 0, message: "Invalid endpoint path" };
-  }
-  if (body && typeof body === 'string' && body.trim().startsWith('{')) {
-    try { JSON.parse(body); } catch (e) { return { code: 0, message: "Invalid JSON body" }; }
-  }
-
-  while (retries <= MAX_RETRIES) {
-    let xhr = new XMLHttpRequest();
-    xhr.open(method, BGM_CONFIG.API_BASE + endpoint, false);
-    xhr.setRequestHeader("Authorization", "Bearer " + token);
-    xhr.setRequestHeader("Content-Type", "application/json");
-    try {
-      xhr.send(body);
-      let statusCode = xhr.status;
-      if (statusCode === 204) return { code: statusCode, message: "OK" };
-      if (statusCode === 200 || statusCode === 201 || statusCode === 202) return { code: statusCode, message: xhr.responseText };
-      if (statusCode === 429 && retries < MAX_RETRIES) {
+    
+    export function bgmRequestSync(method: string, endpoint: string, body: any, token: string): { code: number; message: string } {
+      const { MAX_RETRIES, RETRY_DELAY_BASE } = BGM_CONFIG;
+      let retries = 0;
+      
+      const validMethods = ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'];
+      if (!validMethods.includes(method.toUpperCase())) {
+        return { code: 0, message: "Invalid HTTP method" };
+      }
+      if (!endpoint || typeof endpoint !== 'string') {
+        return { code: 0, message: "Invalid endpoint" };
+      }
+      if (endpoint.includes('..') || endpoint.includes('//') || endpoint.startsWith('http')) {
+        return { code: 0, message: "Invalid endpoint path" };
+      }
+      if (body && typeof body === 'string' && body.trim().startsWith('{')) {
+        try { JSON.parse(body); } catch (e) { return { code: 0, message: "Invalid JSON body" }; }
+      }
+      
+      while (retries <= MAX_RETRIES) {
+        let xhr = new XMLHttpRequest();
+        xhr.open(method, BGM_CONFIG.API_BASE + endpoint, false);
+        xhr.setRequestHeader("Authorization", "Bearer " + token);
+        xhr.setRequestHeader("Content-Type", "application/json");
+        try {
+          xhr.send(body);
+          let statusCode = xhr.status;
+          if (statusCode === 204) return { code: statusCode, message: "OK" };
+          if (statusCode === 200 || statusCode === 201 || statusCode === 202) return { code: statusCode, message: xhr.responseText };
+          if (statusCode === 429 && retries < MAX_RETRIES) {
         retries++;
         let retryDelay = RETRY_DELAY_BASE * Math.pow(2, retries - 1);
         sleep(retryDelay);
@@ -419,103 +307,194 @@ export async function bgmRequest(method: string, endpoint: string, body: any, to
 }
 
 
-// ========== 异步批量同步 ==========
-export async function SyncToBangumiAsync(ws: any, colMap: ColumnMap, token: string, lastRow: number, headerRow: number, options: SyncOptions = {}): Promise<BatchSyncResult> {
-    const { onProgress, onItemComplete } = options;  // 先解构出回调
+
+
+
+
+// 异步同步函数 SyncToBangumiAsync
+export async function SyncToBangumiAsync(
+    ws: any,
+    colMap: ColumnMap,
+    token: string,
+    lastRow: number,
+    headerRow: number,
+    options: SyncOptions = {}
+): Promise<BatchSyncResult> {
+    const { onProgress, onItemComplete } = options;
     if (!ws || !colMap || !token || !lastRow || !headerRow) throw new Error('缺少必要的同步参数');
 
     BGM.sync.isRunning = true;
     BGM.sync.lastSyncTime = null;
 
+    // 获取同步记录工作表
     let syncRecordSheet = null;
     if (typeof (window as any).getOrCreateSyncRecordSheet === 'function') {
         syncRecordSheet = (window as any).getOrCreateSyncRecordSheet();
     }
 
-  let successCount = 0, failCount = 0, skipCount = 0;
-  const totalCount = lastRow - headerRow;
-
-  const getCellStr = (row: number, key: string): string => {
-    if (!colMap.has(key)) return '';
-    return trim(getCellValue(ws, row, colMap.get(key)!));
-  };
-
-  for (let i = headerRow + 1; i <= lastRow; i++) {
-    const currentIndex = i - headerRow;
-    if (onProgress) onProgress(currentIndex, totalCount, `正在处理第 ${i} 行...`);
+    // ========== 1. 筛选状态检测与可见行获取 ==========
+    let visibleRows: number[] = [];
+    let isFiltered = false;
     try {
-      const bgmUrl = getCellStr(i, 'Bangumi_URL');
-      const name = getCellStr(i, '名称');
-      const itemType = getCellStr(i, '类别');
-      const finishedDate = getCellStr(i, '完播日');
+        const autoFilter = ws.AutoFilter;
+        if (autoFilter && (autoFilter.FilterMode === true || ws.AutoFilterMode === true)) {
+            isFiltered = true;
+            // 通过 SpecialCells 或回退获取可见行
+            const filterRange = autoFilter.Range;
+            const filterStartRow = filterRange ? filterRange.Row + 1 : headerRow + 1;
+            try {
+                const lastCell = getCell(ws, lastRow, 4) as any;
+                const actualLastRow = lastCell?.End ? lastCell.End(-4162).Row : lastRow;
+                const rangeStr = `${colNumToLetter(4)}${filterStartRow}:${colNumToLetter(4)}${actualLastRow}`;
+                const visibleCells = ws.Range(rangeStr).SpecialCells(12);
+                if (visibleCells) {
+                    for (let a = 1; a <= visibleCells.Areas.Count; a++) {
+                        const area = visibleCells.Areas.Item(a);
+                        for (let r = 1; r <= area.Rows.Count; r++) {
+                            visibleRows.push(area.Rows.Item(r).Row);
+                        }
+                    }
+                }
+            } catch (e) {
+                // 回退到逐行检查
+                const checkEnd = Math.min(lastRow, headerRow + 5000);
+                for (let r = filterStartRow; r <= checkEnd; r++) {
+                    try {
+                        if (!ws.Rows(r).Hidden) visibleRows.push(r);
+                    } catch (e2) { visibleRows.push(r); }
+                }
+            }
+        }
+    } catch (e) { /* 忽略筛选检测错误 */ }
 
-      if (!bgmUrl) { skipCount++; onItemComplete?.(i, false, { code: 0, message: '无 Bangumi URL' }); continue; }
-      const sid = extractSubjectId(bgmUrl);
-      if (!sid) { skipCount++; onItemComplete?.(i, false, { code: 0, message: '无 SID' }); continue; }
-
-      const jsonBody = buildJsonPayload(ws, i, colMap, finishedDate);
-      if (!jsonBody) { skipCount++; onItemComplete?.(i, false, { code: 0, message: '状态不上传' }); continue; }
-
-      // 请求（优先 httpRequest，否则 bgmRequestSync）
-      const result = await (typeof httpRequest === 'function'
-        ? httpRequest(`/subject/${sid}/update`, { method: 'POST', body: jsonBody, token })
-        : Promise.resolve(bgmRequestSync('POST', `/v0/users/${_getUserApiPath()}/collections/${sid}`, jsonBody, token))
-      );
-      let syncSuccess = false, statusCode = 0, errMsg = '';
-          
-      if (result instanceof Result) {
-          syncSuccess = result.isOk();
-          statusCode = (result.data as any)?.status || 0;
-          errMsg = result.error?.message || '';
-      } else {
-          statusCode = result.code || 0;
-          syncSuccess = [200, 201, 202, 204].includes(statusCode);
-          errMsg = result.message || '';
-      }
-
-      const bodySummary = parseJsonBodySummary(jsonBody);
-      const recordData: CollectionItem = {
-        name: name || '(无名称)',
-        url: bgmUrl,
-        sid,
-        type: itemType,
-        content: bodySummary,
-        status: syncSuccess ? '成功' : '失败',
-        message: syncSuccess ? `行 ${i}` : (errMsg || `HTTP ${statusCode}`),
-        count: 1
-      };
-
-      if (syncSuccess) {
-        successCount++;
-        try { 
-          const cell = getCell(ws, i, 1) as ExcelRange; 
-          if (cell?.Interior) cell.Interior.Color = BGM_COLOR.SUCCESS; 
-        } catch(_){}
-      } else {
-        failCount++;
-        try { 
-          const cell = getCell(ws, i, 1) as ExcelRange; 
-          if (cell?.Interior) cell.Interior.Color = BGM_COLOR.FAIL; 
-        } catch(_){}
-      }
-
-      if (syncRecordSheet && typeof (window as any).addSyncRecord === 'function') {
-        (window as any).addSyncRecord(syncRecordSheet, recordData);
-      }
-      onItemComplete?.(i, syncSuccess, { code: statusCode, message: errMsg });
-
-      await new Promise(resolve => setTimeout(resolve, BGM_CONFIG.REQUEST_DELAY));
-    } catch (err: any) {
-      failCount++;
-      bgmLog(LOG_LEVELS.ERROR, `同步第 ${i} 行出错: ${err.message}`);
-      onItemComplete?.(i, false, { code: 0, message: err.message });
+    // 如果没有筛选，所有行都可见
+    if (!isFiltered || visibleRows.length === 0) {
+        for (let r = headerRow + 1; r <= lastRow; r++) visibleRows.push(r);
     }
-  }
 
-  BGM.sync.isRunning = false;
-  // 修复：确保这里赋值的是字符串，不是数字
-  BGM.sync.lastSyncTime = new Date().toISOString();  // 这返回的是字符串
-  return { success: successCount, fail: failCount, skip: skipCount };
+    // ========== 2. 批量读取数据缓存 ==========
+    const neededKeys = ['Bangumi_URL', '名称', '是否看完', '打分', '标签/分级', '完播日', '类别', '剧透/感言', '集号'];
+    let maxCol = 1;
+    for (const key of neededKeys) {
+        if (colMap.has(key)) maxCol = Math.max(maxCol, colMap.get(key)!);
+    }
+    const totalDataRows = lastRow - headerRow;
+    const allData = readRangeValues(ws, headerRow + 1, lastRow, 1, maxCol);
+
+    // 辅助取值函数：从缓存中取，若缓存失效则回退到逐单元格读取
+    const getField = (row: number, key: string): string => {
+        if (allData && Array.isArray(allData)) {
+            const col = colMap.get(key);
+            if (!col) return '';
+            const rowIdx = row - headerRow - 1;
+            if (rowIdx >= 0 && rowIdx < allData.length) {
+                const rowData = allData[rowIdx];
+                if (Array.isArray(rowData) && col - 1 < rowData.length) {
+                    return trim(rowData[col - 1]);
+                }
+            }
+        }
+        // 回退
+        return colMap.has(key) ? trim(getCellValue(ws, row, colMap.get(key)!)) : '';
+    };
+
+    // ========== 3. 统计变量 ==========
+    let successCount = 0, failCount = 0, skipCount = 0;
+    const totalCount = visibleRows.length;
+    let lastRequestTime = 0;
+    const MIN_INTERVAL = 200; // 毫秒
+
+    // ========== 4. 遍历可见行 ==========
+    for (let idx = 0; idx < visibleRows.length; idx++) {
+        const row = visibleRows[idx];
+        const currentIndex = idx + 1;
+        if (onProgress) onProgress(currentIndex, totalCount, `正在处理第 ${row} 行...`);
+
+        try {
+            const bgmUrl = getField(row, 'Bangumi_URL');
+            const name = getField(row, '名称');
+            const itemType = getField(row, '类别');
+            const finishedDate = getField(row, '完播日');
+
+            if (!bgmUrl) {
+                skipCount++;
+                onItemComplete?.(row, false, { code: 0, message: '无 Bangumi URL' });
+                continue;
+            }
+            const sid = extractSubjectId(bgmUrl);
+            if (!sid) {
+                skipCount++;
+                onItemComplete?.(row, false, { code: 0, message: '无 SID' });
+                continue;
+            }
+
+            const jsonBody = buildJsonPayload(ws, row, colMap, finishedDate);
+            if (!jsonBody) {
+                skipCount++;
+                onItemComplete?.(row, false, { code: 0, message: '状态不上传' });
+                continue;
+            }
+
+            // 动态请求间隔
+            const now = Date.now();
+            const elapsed = now - lastRequestTime;
+            if (elapsed < MIN_INTERVAL) {
+                await delay(MIN_INTERVAL - elapsed);
+            }
+
+            // 发送请求
+            const result = await (typeof httpRequest === 'function'
+                ? httpRequest(`/subject/${sid}/update`, { method: 'POST', body: jsonBody, token })
+                : Promise.resolve(bgmRequestSync('POST', `/v0/users/${_getUserApiPath()}/collections/${sid}`, jsonBody, token))
+            );
+            lastRequestTime = Date.now();
+
+            let syncSuccess = false, statusCode = 0, errMsg = '';
+            if (result instanceof Result) {
+                syncSuccess = result.isOk();
+                statusCode = (result.data as any)?.status || 0;
+                errMsg = result.error?.message || '';
+            } else {
+                statusCode = result.code || 0;
+                syncSuccess = [200, 201, 202, 204].includes(statusCode);
+                errMsg = result.message || '';
+            }
+
+            const bodySummary = parseJsonBodySummary(jsonBody);
+            const recordData: CollectionItem = {
+                name: name || '(无名称)',
+                url: bgmUrl,
+                sid,
+                type: itemType,
+                content: bodySummary,
+                status: syncSuccess ? '成功' : '失败',
+                message: syncSuccess ? `行 ${row}` : (errMsg || `HTTP ${statusCode}`),
+                count: 1
+            };
+
+            if (syncSuccess) {
+                successCount++;
+                try { const cell = getCell(ws, row, 1) as ExcelRange; if (cell?.Interior) cell.Interior.Color = BGM_COLOR.SUCCESS; } catch(_){}
+            } else {
+                failCount++;
+                try { const cell = getCell(ws, row, 1) as ExcelRange; if (cell?.Interior) cell.Interior.Color = BGM_COLOR.FAIL; } catch(_){}
+            }
+
+            if (syncRecordSheet && typeof (window as any).addSyncRecord === 'function') {
+                (window as any).addSyncRecord(syncRecordSheet, recordData);
+            }
+            onItemComplete?.(row, syncSuccess, { code: statusCode, message: errMsg });
+
+        } catch (err: any) {
+            failCount++;
+            bgmLog(LOG_LEVELS.ERROR, `同步第 ${row} 行出错: ${err.message}`);
+            onItemComplete?.(row, false, { code: 0, message: err.message });
+        }
+    }
+
+    BGM.sync.isRunning = false;
+    BGM.sync.lastSyncTime = new Date().toISOString();
+    return { success: successCount, fail: failCount, skip: skipCount };
 }
 // ========== 筛选相关 ==========
 export function getFilterStatus(endRow?: number, getColumnCounts?: boolean): FilterStatus | null {
@@ -819,4 +798,7 @@ export function buildTagsArray(tagsStr: string): string[] {
   addTagsFromStr(tagSet, tagsStr);
   return Array.from(tagSet).slice(0, 5);
 }
+
+
+
 

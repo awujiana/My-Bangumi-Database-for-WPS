@@ -1,5 +1,5 @@
 
-import {  WPS_ENUM, XL, BGM_CONFIG, BGM_COLOR, LOG_LEVELS, ERROR_LEVELS, PANEL_CONFIG, BGM_SUBJECT_TYPES, SYNC_STATUS,ErrorLevel, type DialogOptions, type ErrorOptions,isWpsApp, type WpsApplication,BgmError,encryptToken, decryptToken, calcChecksum} from '../index.js';
+import {  WPS_ENUM, XL, BGM_CONFIG, BGM_COLOR, LOG_LEVELS, ERROR_LEVELS, PANEL_CONFIG, BGM_SUBJECT_TYPES, SYNC_STATUS,ErrorLevel, type DialogOptions, type ErrorOptions,isWpsApp, type WpsApplication,BgmError,encryptToken, decryptToken, calcChecksum,COLUMN_RULES} from '../index.js';
 
 // ========== BGM 全局命名空间 ==========
 export const BGM: {
@@ -602,6 +602,83 @@ export function sleep(ms: number): void {
         _origError.apply(console, argsArray as Parameters<typeof console.error>);
     };
 })();
+
+
+
+
+/**
+ * 异步延迟指定的毫秒数
+ * @param ms 毫秒
+ * @returns Promise
+ */
+export function delay(ms: number): Promise<void> {
+    return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+/**
+ * 批量读取工作表中指定范围的所有值，返回字符串二维数组 [行][列]
+ * 如果读取失败则返回空数组，调用方应处理空数组情况
+ * @param ws 工作表对象
+ * @param startRow 起始行
+ * @param endRow 结束行
+ * @param startCol 起始列
+ * @param endCol 结束列
+ * @returns 字符串二维数组
+ */
+export function readRangeValues(
+    ws: any,
+    startRow: number,
+    endRow: number,
+    startCol: number,
+    endCol: number
+): string[][] {
+    try {
+        const range = ws.Range(ws.Cells(startRow, startCol), ws.Cells(endRow, endCol));
+        const raw = range?.Value2;
+        if (!raw) return [];
+        // 处理单个值的情况
+        if (!Array.isArray(raw)) {
+            return [[raw == null ? '' : String(raw)]];
+        }
+        const result: string[][] = [];
+        for (const row of raw) {
+            if (!Array.isArray(row)) {
+                result.push([row == null ? '' : String(row)]);
+            } else {
+                result.push(row.map((cell: any) => (cell == null ? '' : String(cell))));
+            }
+        }
+        return result;
+    } catch (e) {
+        return [];
+    }
+}
+/**
+ * 获取列名到列号的映射（优化版：使用正则规则数组，时间复杂度 O(N*M) 但 M 较小）
+ * @param ws 工作表对象
+ * @param headerRow 表头行号
+ * @returns Map<string, number> 列映射
+ */
+export function getColumnMap(ws: any, headerRow: number): Map<string, number> {
+    const colMap = new Map<string, number>();
+    const lastCol = 50;
+
+    for (let i = 1; i <= lastCol; i++) {
+        const colName = trim(String(getCellValue(ws, headerRow, i)));
+        if (!colName) continue;
+
+        // 遍历规则，找到第一个匹配的规则则跳出
+        for (const [pattern, key] of COLUMN_RULES) {
+            if (pattern.test(colName)) {
+                colMap.set(key, i);
+                break;  // 一个重要列名只匹配一个规则
+            }
+        }
+    }
+    return colMap;
+}
+
+
 
 
 // ========== BGM 缓存数据结构 ==========

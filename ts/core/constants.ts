@@ -5,6 +5,30 @@
  *              所有其他模块应从此模块导入常量，而非自行定义
  */
 
+
+
+// ========== 错误级别枚举 ==========
+export const ErrorLevel = {
+    SILENT: 0,
+    WARN: 1,
+    ERROR: 2,
+    THROW: 3
+} as const;
+export type ErrorLevel = typeof ErrorLevel[keyof typeof ErrorLevel];
+
+
+// ========== 错误处理选项 ==========
+export interface ErrorOptions {
+    /** 错误级别（0=SILENT, 1=WARN, 2=ERROR, 3=THROW） */
+    level?: ErrorLevel;
+    /** 是否显示错误对话框 */
+    showAlert?: boolean;
+    /** 错误上下文描述 */
+    context?: string;
+}
+
+
+
 // ========== WPS Office 枚举 ==========
 export const WPS_ENUM = {
   msoCTPDockPositionLeft: 0,
@@ -102,23 +126,97 @@ export const SYNC_STATUS = {
   COLLECTED: "已收藏"
 };
 
+// 定义匹配规则数组（按优先级顺序）
+export const COLUMN_RULES: [RegExp, string][] = [
+    [/bangumi.*url|bgm.*url|subject.*url|url.*bgm/i, "Bangumi_URL"],
+    [/是否看完|观看状态/, "是否看完"],
+    [/完播日|完播时间|看完时间/, "完播日"],
+    [/开播日期|开播时间|首播/, "开播日期"],
+    [/开播季度|季度|年份/, "开播季度"],
+    [/打分|评分|分数|\brate\b/i, "打分"],
+    [/感言|剧透|评价|评论|\bcomment\b/i, "剧透/感言"],
+    [/标签|分级|\btag\b/i, "标签/分级"],
+    [/特点|印象/, "特点/印象"],
+    [/集号|看到|ep/i, "集号"],
+    [/集数|总集/, "集数"],
+    [/名称|标题|\bname\b|\btitle\b/i, "名称"],
+    [/别名|原名|alias/i, "别名"],
+    [/类别|分类|\btype\b/i, "类别"],
+    [/原作标签|原作/, "原作标签"],
+    [/制作公司|studio/i, "制作公司"],
+    [/系列/, "系列"],
+    [/季数/, "季数"],
+    [/时长|分钟/, "时长"],
+    [/导演|director/i, "导演"],
+    [/音乐|music/i, "音乐"],
+    [/序列号|序号|编号/, "序列号"],
+    [/制片国家/, "制片国家"],
+    [/语言/, "语言"]
+];
 
-// ========== 错误级别枚举 ==========
-export const ErrorLevel = {
-    SILENT: 0,
-    WARN: 1,
-    ERROR: 2,
-    THROW: 3
-} as const;
-export type ErrorLevel = typeof ErrorLevel[keyof typeof ErrorLevel];
 
 
-// ========== 错误处理选项 ==========
-export interface ErrorOptions {
-    /** 错误级别（0=SILENT, 1=WARN, 2=ERROR, 3=THROW） */
-    level?: ErrorLevel;
-    /** 是否显示错误对话框 */
-    showAlert?: boolean;
-    /** 错误上下文描述 */
-    context?: string;
-}
+// ========== 常量定义 ==========
+export const COLUMNS = {
+  SEQUENCE: 4,      // D列 - 序号
+  DEFAULT_START: 1
+};
+
+export const WATCH_STATUS_MAP: { [key: string]: number } = {
+  "看过": 3, "看完": 3, "已看": 3, "完": 3, "completed": 3, "3": 3,
+  "在看": 2, "在看动画": 2, "在追": 2, "追": 2, "watching": 2, "2": 2,
+  "想看": 0, "想看动画": 0, "否": 0, "wish": 0, "1": 0,
+  "搁置": 4, "暂停": 4, "停": 4, "on_hold": 4, "4": 4,
+  "抛弃": 5, "弃": 5, "弃番": 5, "drop": 5, "dropped": 5, "5": 5
+};
+
+export const TYPE_TEXT_MAP: { [key: number]: string } = {1: "想看", 2: "在看", 3: "看过", 4: "搁置", 5: "抛弃"};
+
+export const URL_PATTERNS = [
+  /bgm\.tv\/subject\/(\d+)/i,
+  /bangumi\.tv\/subject\/(\d+)/i,
+  /chii\.in\/subject\/(\d+)/i,
+  /(\d{6,})/
+];
+
+export const HEADER_KEYWORDS = [
+  "序列号", "是否看完", "看完时间", "开播季度",
+  "开播日期", "完播日", "类别", "原作标签", "制作公司",
+  "标签/分级", "特点/印象", "打分", "集号", "集数",
+  "名称", "别名", "剧透/感言", "感言", "备注", "评价",
+  "bangumi url", "url", "制片国家", "语言", "类型",
+  "导演", "音乐", "原作", "标签",
+  "条目id", "sid", "状态", "status", "rate",
+  "番剧", "动画", "书", "名字", "链接",
+  "观看状态", "收藏类型", "章节状态", "同步状态",
+  "关联的动漫", "系列", "季数", "时长"
+];
+
+export const IMPORTANT_COLS: { [key: string]: boolean } = {
+  "名称": true, "是否看完": true, "bangumi url": true,
+  "url": true, "打分": true, "集数": true, "感言": true,
+  "剧透/感言": true, "类型": true, "状态": true,
+  "status": true, "rate": true, "别名": true
+};
+
+export const FIELD_NAME_MAP: { [key: string]: string } = {
+  "名称": "name", "name": "name", "作品名": "name", "条目": "name", "标题": "name",
+  "条目id": "subjectId", "sid": "subjectId", "subject_id": "subjectId", "id": "subjectId",
+  "bangumi url": "url", "url": "url", "链接": "url", "地址": "url",
+  "状态": "type", "type": "type", "观看状态": "type", "收藏类型": "type",
+  "是否看完": "watchStatus",
+  "评分": "rate", "rate": "rate", "分数": "rate", "rating": "rate", "打分": "rate",
+  "标签": "tags", "tags": "tags", "tag": "tags", "标签/分级": "tags",
+  "评价": "comment", "comment": "comment", "备注": "comment", "notes": "comment",
+  "剧透/感言": "comment", "感言": "comment",
+  "完播日": "finishedDate", "完播日期": "finishedDate", "看完时间": "finishedDate",
+  "finished": "finishedDate", "日期": "finishedDate",
+  "章节状态": "epStatus", "ep_status": "epStatus", "集数": "epStatus",
+  "同步状态": "syncStatus", "sync_status": "syncStatus",
+  "开播季度": "startSeason", "开播日期": "startDate",
+  "别名": "alias", "类别": "category", "制作公司": "studio",
+  "原作标签": "originalTag", "特点/印象": "impression",
+  "集号": "epNum", "系列": "series", "季数": "season",
+  "时长": "duration", "导演": "director", "音乐": "music",
+  "制片国家": "country", "序列号": "sequence"
+};

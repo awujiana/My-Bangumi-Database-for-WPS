@@ -5,13 +5,8 @@
  *              注意：这是简单的混淆，不是真正的加密，仅用于防止明文存储
  */
 
-// 假设 TOKEN_CONFIG 接口
-interface TokenConfig {
-  VERSION: string;
-  FALLBACK_KEYS: number[];
-  KEY_BYTES: number[];
-}
-import { TOKEN_CONFIG } from '../core/constants.js';
+
+import { TOKEN_CONFIG } from '../index.js';
 
 // ========== 内部工具 ==========
 
