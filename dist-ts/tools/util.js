@@ -138,8 +138,8 @@ export const BGM = {
     postMessage: function (data, targetOrigin) {
         return BGM.Message.send(data, targetOrigin);
     },
-    showDialog: function (title, message) {
-        if (BGM.Message.send({ type: "showDialog", title: title, message: message })) {
+    showAlert: function (title, message) {
+        if (BGM.Message.send({ type: "showAlert", title: title, message: message })) {
             return;
         }
         BGM.Dialog.alert(title, message);
@@ -155,7 +155,7 @@ export const BGM = {
     handleError: function (error, options) {
         const opts = {
             level: ErrorLevel.ERROR,
-            showDialog: false,
+            showAlert: false,
             context: '',
             ...options
         };
@@ -183,8 +183,8 @@ export const BGM = {
                 break;
             case ErrorLevel.ERROR:
                 bgmLog(LOG_LEVELS.ERROR, bgmError.toString());
-                if (opts.showDialog) {
-                    BGM.showDialog('错误', bgmError.message);
+                if (opts.showAlert) {
+                    BGM.showAlert('错误', bgmError.message);
                 }
                 break;
             case ErrorLevel.THROW:
@@ -525,86 +525,6 @@ export function trim(str) {
     return String(str).replace(/^\s+|\s+$/g, "");
 }
 /**
- * 显示输入提示框
- */
-export function wpsPrompt(message, defaultValue) {
-    return new Promise((resolve) => {
-        const app = getApp();
-        if (app?.InputBox) {
-            try {
-                const result = app.InputBox(message, "Bangumi 设置", defaultValue || "", 2);
-                if (result === false || result === null || result === undefined) {
-                    resolve(null);
-                    return;
-                }
-                resolve(String(result));
-                return;
-            }
-            catch (e) {
-                console.warn("WPS InputBox 不可用:", e.message);
-            }
-        }
-        if (typeof window !== 'undefined' && typeof window.BGMInput === 'function') {
-            window.BGMInput("输入", message, defaultValue || '', (value) => {
-                resolve(value);
-            }, () => {
-                resolve(null);
-            });
-        }
-        else {
-            try {
-                const result = window.prompt(message, defaultValue);
-                resolve(result);
-            }
-            catch (e) {
-                console.error("prompt 也不可用:", e.message);
-                resolve(null);
-            }
-        }
-    });
-}
-/**
- * 显示 WPS 消息对话框
- */
-export function wpsMsgBox(message, buttons, icon) {
-    return new Promise((resolve) => {
-        const app = getApp();
-        if (app?.MessageBox) {
-            try {
-                const result = app.MessageBox(message, (buttons || 0) + (icon || 64));
-                resolve(result);
-                return;
-            }
-            catch (e) {
-                console.warn("WPS MessageBox 不可用:", e.message);
-            }
-        }
-        if (buttons === 4) {
-            if (typeof window !== 'undefined' && typeof window.BGMConfirm === 'function') {
-                window.BGMConfirm(message, "确认", () => {
-                    resolve(6);
-                }, () => {
-                    resolve(7);
-                });
-            }
-            else if (typeof window !== 'undefined') {
-                resolve(window.confirm(message) ? 6 : 7);
-            }
-        }
-        else {
-            if (typeof window !== 'undefined' && typeof window.BGMAlert === 'function') {
-                window.BGMAlert(message, "提示", () => {
-                    resolve(1);
-                });
-            }
-            else if (typeof window !== 'undefined') {
-                window.alert(message);
-                resolve(1);
-            }
-        }
-    });
-}
-/**
  * 延迟执行
  */
 export function sleep(ms) {
@@ -634,27 +554,7 @@ export function sleep(ms) {
         }
     }
 }
-/**
- * 显示自定义提示对话框
- */
-export function showAlertDialog(title, message) {
-    if (typeof window !== 'undefined' && typeof window.BGMAlert === 'function') {
-        window.BGMAlert(message, title);
-    }
-    else if (typeof window !== 'undefined') {
-        window.alert(message);
-    }
-}
-/**
- * 关闭提示对话框
- */
-export function closeAlertDialog() {
-    const modal = document.getElementById("alertDialog");
-    if (modal) {
-        modal.style.display = "none";
-    }
-}
-// ========== 统一日志前缀 ==========
+// ===== 统一日志前缀 ==========
 (function () {
     const _origLog = console.log;
     const _origWarn = console.warn;

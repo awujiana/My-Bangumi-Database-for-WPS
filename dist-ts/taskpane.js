@@ -3,14 +3,7 @@
  * @module taskpane
  * @description 面板初始化、事件绑定、核心逻辑
  */
-import { PANEL_CONFIG, WPS_ENUM, LOG_LEVELS } from './core/constants.js';
-import { getApp, bgmLog, BGM, escapeHtml, readCell, colNumToLetter } from './tools/util.js';
-import { HEADER_KEYWORDS, IMPORTANT_COLS } from './sync/exceltobangumi.js';
-import { initMessageListener } from './ui/message.js';
-import { markUploadedItems, clearSheetMarks, updateTokenStatus, updateUserIdStatus, showTokenDialog, showUserIdDialog } from './ui/handlers.js';
-import { showAlert, closeAlertDialog, closeInputDialog, closeConfirmDialog, showToast } from './ui/dialog.js';
-import { previewSyncContent, closeDetailModal } from './ui/preview.js';
-import { clearSyncRecords as _clearSyncRecords } from './sync/syncRecord.js';
+import { PANEL_CONFIG, WPS_ENUM, LOG_LEVELS, getApp, bgmLog, BGM, escapeHtml, readCell, colNumToLetter, HEADER_KEYWORDS, IMPORTANT_COLS, initMessageListener, markUploadedItems, clearSheetMarks, updateTokenStatus, updateUserIdStatus, showAlert, showToast, closeDetailModal, clearSyncRecords as _clearSyncRecords } from './index.js';
 // ========== 工作表锁定功能 ==========
 function toggleSheetLock() {
     const select = document.getElementById('sheetSelect');
@@ -627,11 +620,10 @@ function initPanel() {
     document.querySelectorAll('input[name="selectMode"]').forEach(radio => {
         radio.addEventListener('change', onSelectModeChange);
     });
+    // 按 Escape 键只关闭详情模态框，其它弹窗由各自的关闭按钮控制
     document.addEventListener('keydown', (e) => {
         if (e.key === 'Escape') {
             closeDetailModal();
-            closeInputDialog();
-            closeConfirmDialog();
         }
     });
     document.dispatchEvent(new CustomEvent('bgm:modulesReady'));
@@ -676,7 +668,7 @@ function clearSheetMarksDefault() {
     clearSheetMarks(sheetName);
 }
 // ========== 导出 ==========
-export { initPanel, refreshSheets, refreshData, toggleSheetLock, onSelectModeChange, fetchBgCollectionRecords, clearSyncRecords, markUploadedItems, markUploadedItemsDefault, clearSheetMarks, clearSheetMarksDefault, autoDetectSheet, updateFilterStatus };
+export { initPanel, refreshSheets, refreshData, toggleSheetLock, onSelectModeChange, fetchBgCollectionRecords, clearSyncRecords, markUploadedItems, markUploadedItemsDefault, clearSheetMarksDefault, autoDetectSheet, updateFilterStatus };
 // ========== 挂载到 window ==========
 function safeInitPanel() {
     try {
@@ -696,19 +688,3 @@ if (window.location.pathname.includes('taskpane.html')) {
         window.addEventListener('load', safeInitPanel);
     }
 }
-window.initPanel = initPanel;
-window.refreshSheets = refreshSheets;
-window.refreshData = refreshData;
-window.toggleSheetLock = toggleSheetLock;
-window.onSelectModeChange = onSelectModeChange;
-window.fetchBgCollectionRecords = fetchBgCollectionRecords;
-window.clearSyncRecords = clearSyncRecords;
-window.markUploadedItemsDefault = markUploadedItemsDefault;
-window.clearSheetMarksDefault = clearSheetMarksDefault;
-window.previewSyncContent = previewSyncContent;
-window.closeDetailModal = closeDetailModal;
-window.showAlertDialog = showAlert;
-window.closeAlertDialog = closeAlertDialog;
-window.showToast = showToast;
-window.showTokenDialog = showTokenDialog;
-window.showUserIdDialog = showUserIdDialog;

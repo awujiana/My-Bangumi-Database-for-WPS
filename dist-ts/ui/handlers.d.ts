@@ -1,5 +1,5 @@
 /**
- * UI 事件处理模块（TypeScript 版）
+ * UI 事件处理模块
  * @module ui/handlers
  * @description 面板操作处理、按钮绑定、业务对话框
  */
@@ -11,7 +11,7 @@ export declare function openUserCollection(): void;
 export declare function testTokenValidity(): void;
 export declare function testDebugConnection(): void;
 export declare function onAction(action: string): void;
-export declare function syncFromPanel(): void;
+export declare function syncFromPanel(): Promise<void>;
 export declare function testSingleUpdateFromPanel(): void;
 export declare function syncCollectionFromBgm(): Promise<void>;
 export declare function syncFromBgmByAPI(sheetIndex: number): Promise<void>;

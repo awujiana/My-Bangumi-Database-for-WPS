@@ -3,12 +3,7 @@
  * @module bangumi
  * @description 从 Excel 读取条目并批量同步到 Bangumi 收藏
  */
-import { XL, BGM_CONFIG, BGM_COLOR, LOG_LEVELS } from '../core/constants.js';
-import { getApp, bgmLog, getCell, getCellValue, sleep, loadBgToken, _getBgmUserId, _getUserApiPath, trim, colNumToLetter, BGM } from '../tools/util.js';
-import { showDialog } from '../ui/dialog.js';
-import { showUserIdDialog } from '../ui/handlers.js';
-import { httpRequest } from '../index.js';
-import { Result } from '../core/result.js';
+import { showUserIdDialog, httpRequest, showAlert, Result, getApp, bgmLog, getCell, getCellValue, sleep, loadBgToken, _getBgmUserId, _getUserApiPath, trim, colNumToLetter, BGM, XL, BGM_CONFIG, BGM_COLOR, LOG_LEVELS } from '../index.js';
 // ========== 常量定义 ==========
 const COLUMNS = {
     SEQUENCE: 4, // D列 - 序号
@@ -166,98 +161,52 @@ export function findHeaderRow(ws, startRow) {
     }
     return 0;
 }
+// 在文件顶部或函数外定义匹配规则数组（按优先级顺序）
+const COLUMN_RULES = [
+    [/bangumi.*url|bgm.*url|subject.*url|url.*bgm/i, "Bangumi_URL"],
+    [/是否看完|观看状态/, "是否看完"],
+    [/完播日|完播时间|看完时间/, "完播日"],
+    [/开播日期|开播时间|首播/, "开播日期"],
+    [/开播季度|季度|年份/, "开播季度"],
+    [/打分|评分|分数|\brate\b/i, "打分"],
+    [/感言|剧透|评价|评论|\bcomment\b/i, "剧透/感言"],
+    [/标签|分级|\btag\b/i, "标签/分级"],
+    [/特点|印象/, "特点/印象"],
+    [/集号|看到|ep/i, "集号"],
+    [/集数|总集/, "集数"],
+    [/名称|标题|\bname\b|\btitle\b/i, "名称"],
+    [/别名|原名|alias/i, "别名"],
+    [/类别|分类|\btype\b/i, "类别"],
+    [/原作标签|原作/, "原作标签"],
+    [/制作公司|studio/i, "制作公司"],
+    [/系列/, "系列"],
+    [/季数/, "季数"],
+    [/时长|分钟/, "时长"],
+    [/导演|director/i, "导演"],
+    [/音乐|music/i, "音乐"],
+    [/序列号|序号|编号/, "序列号"],
+    [/制片国家/, "制片国家"],
+    [/语言/, "语言"]
+];
+/**
+ * 获取列名到列号的映射（优化版：使用正则规则数组，时间复杂度 O(N*M) 但 M 较小）
+ * @param ws 工作表对象
+ * @param headerRow 表头行号
+ * @returns Map<string, number> 列映射
+ */
 export function getColumnMap(ws, headerRow) {
-    let colMap = new Map();
-    let lastCol = 50;
+    const colMap = new Map();
+    const lastCol = 50;
     for (let i = 1; i <= lastCol; i++) {
-        let colName = trim(String(getCellValue(ws, headerRow, i)));
-        if (colName === "")
+        const colName = trim(String(getCellValue(ws, headerRow, i)));
+        if (!colName)
             continue;
-        let lowerName = colName.toLowerCase();
-        if (lowerName.indexOf("bangumi") >= 0 || lowerName.indexOf("bgm") >= 0 ||
-            colName.indexOf("URL") >= 0 || lowerName.indexOf("subject") >= 0) {
-            colMap.set("Bangumi_URL", i);
-        }
-        else if (colName.indexOf("是否看完") >= 0 || colName.indexOf("观看状态") >= 0 ||
-            colName.indexOf("状态") >= 0) {
-            colMap.set("是否看完", i);
-        }
-        else if (colName.indexOf("完播") >= 0 || colName.indexOf("看完时间") >= 0) {
-            colMap.set("完播日", i);
-        }
-        else if (colName.indexOf("开播日期") >= 0 || colName.indexOf("开播时间") >= 0 ||
-            colName.indexOf("首播") >= 0) {
-            colMap.set("开播日期", i);
-        }
-        else if (colName.indexOf("开播季度") >= 0 || colName.indexOf("季度") >= 0 ||
-            colName.indexOf("年份") >= 0) {
-            colMap.set("开播季度", i);
-        }
-        else if (colName.indexOf("打分") >= 0 || colName.indexOf("评分") >= 0 ||
-            colName.indexOf("分数") >= 0 || lowerName.indexOf("rate") >= 0) {
-            colMap.set("打分", i);
-        }
-        else if (colName.indexOf("感言") >= 0 || colName.indexOf("剧透") >= 0 ||
-            colName.indexOf("评价") >= 0 || colName.indexOf("评论") >= 0 ||
-            colName.indexOf("comment") >= 0) {
-            colMap.set("剧透/感言", i);
-        }
-        else if (colName.indexOf("标签") >= 0 || colName.indexOf("分级") >= 0 ||
-            colName.indexOf("tag") >= 0) {
-            colMap.set("标签/分级", i);
-        }
-        else if (colName.indexOf("特点") >= 0 || colName.indexOf("印象") >= 0) {
-            colMap.set("特点/印象", i);
-        }
-        else if (colName.indexOf("集号") >= 0 || colName.indexOf("看到") >= 0 ||
-            colName.indexOf("ep") >= 0) {
-            colMap.set("集号", i);
-        }
-        else if (colName.indexOf("集数") >= 0 || colName.indexOf("总集") >= 0) {
-            colMap.set("集数", i);
-        }
-        else if (colName.indexOf("名称") >= 0 || colName.indexOf("标题") >= 0 ||
-            colName.indexOf("name") >= 0 || lowerName.indexOf("title") >= 0) {
-            colMap.set("名称", i);
-        }
-        else if (colName.indexOf("别名") >= 0 || colName.indexOf("原名") >= 0 ||
-            lowerName.indexOf("alias") >= 0) {
-            colMap.set("别名", i);
-        }
-        else if (colName.indexOf("类别") >= 0 || colName.indexOf("分类") >= 0 ||
-            colName.indexOf("type") >= 0) {
-            colMap.set("类别", i);
-        }
-        else if (colName.indexOf("原作标签") >= 0 || colName.indexOf("原作") >= 0) {
-            colMap.set("原作标签", i);
-        }
-        else if (colName.indexOf("制作公司") >= 0 || lowerName.indexOf("studio") >= 0) {
-            colMap.set("制作公司", i);
-        }
-        else if (colName.indexOf("系列") >= 0) {
-            colMap.set("系列", i);
-        }
-        else if (colName.indexOf("季数") >= 0 || (colName.indexOf("第") >= 0 && colName.indexOf("季") >= 0)) {
-            colMap.set("季数", i);
-        }
-        else if (colName.indexOf("时长") >= 0 || colName.indexOf("分钟") >= 0) {
-            colMap.set("时长", i);
-        }
-        else if (colName.indexOf("导演") >= 0 || lowerName.indexOf("director") >= 0) {
-            colMap.set("导演", i);
-        }
-        else if (colName.indexOf("音乐") >= 0 || lowerName.indexOf("music") >= 0) {
-            colMap.set("音乐", i);
-        }
-        else if (colName.indexOf("序列号") >= 0 || colName.indexOf("序号") >= 0 ||
-            colName.indexOf("编号") >= 0) {
-            colMap.set("序列号", i);
-        }
-        else if (colName.indexOf("制片国家") >= 0) {
-            colMap.set("制片国家", i);
-        }
-        else if (colName.indexOf("语言") >= 0) {
-            colMap.set("语言", i);
+        // 遍历规则，找到第一个匹配的规则则跳出
+        for (const [pattern, key] of COLUMN_RULES) {
+            if (pattern.test(colName)) {
+                colMap.set(key, i);
+                break; // 一个重要列名只匹配一个规则
+            }
         }
     }
     return colMap;
@@ -324,7 +273,6 @@ export function buildJsonPayload(ws, row, colMap, finishedDate) {
     parts.push('"type":' + bgmType);
     if (colMap.has("打分")) {
         let rateVal = getCellValue(ws, row, colMap.get("打分"));
-        // 修复：将 rateVal 转换为字符串，然后解析为整数
         let rateNum = parseInt(String(rateVal), 10);
         if (!isNaN(rateNum)) {
             let rate = Math.max(0, Math.min(10, rateNum));
@@ -341,6 +289,13 @@ export function buildJsonPayload(ws, row, colMap, finishedDate) {
     let tags = buildTags(ws, row, colMap);
     if (tags !== "")
         parts.push('"tags":[' + tags + ']');
+    // 新增：支持私密收藏
+    if (colMap.has("私密收藏")) {
+        const privateVal = trim(getCellValue(ws, row, colMap.get("私密收藏"))).toLowerCase();
+        if (privateVal === "是" || privateVal === "1" || privateVal === "true") {
+            parts.push('"private":true');
+        }
+    }
     return "{" + parts.join(",") + "}";
 }
 export function bgmRequestSync(method, endpoint, body, token) {
@@ -393,168 +348,13 @@ export function bgmRequestSync(method, endpoint, body, token) {
 export async function bgmRequest(method, endpoint, body, token) {
     return bgmRequestSync(method, endpoint, body, token);
 }
-// ========== 主入口：批量同步 ==========
-export function SyncToBangumi() {
-    let app = getApp();
-    if (!app) {
-        showDialog("错误", "无法获取 WPS Application 对象！");
-        return;
-    }
-    let ws = getDataSheet();
-    if (!ws) {
-        showDialog("提示", "未找到数据工作表！请在工作表选择器中选择一个工作表。");
-        return;
-    }
-    let token = getBgmtoken();
-    if (!token) {
-        showDialog("提示", "未设置 Bangumi Token，无法同步！");
-        return;
-    }
-    let headerRow = findHeaderRow(ws);
-    if (headerRow === 0) {
-        showDialog("提示", "未找到表头行！请确保工作表第一行包含列名。");
-        return;
-    }
-    let colMap = getColumnMap(ws, headerRow);
-    if (!colMap || !colMap.has("Bangumi_URL")) {
-        showDialog("提示", "未找到 \"Bangumi URL\" 列，无法获取 subject_id！");
-        return;
-    }
-    if (typeof window.getOrCreateSyncRecordSheet === 'function' && !window.getOrCreateSyncRecordSheet()) {
-        showDialog("创建失败", "创建同步记录表失败，请检查工作簿状态");
-        return;
-    }
-    if (!BGM.cache.userId && typeof window.fetchBgmUserInfo === 'function')
-        window.fetchBgmUserInfo();
-    let lastRow = getLastRow(ws);
-    if (typeof window.getOrCreateSyncRecordSheet === 'function') {
-        let syncSheet = window.getOrCreateSyncRecordSheet();
-        if (syncSheet)
-            syncSheet.Activate();
-    }
-    let successCount = 0, failCount = 0, skipNoUrlCount = 0, skipNoTypeCount = 0;
-    let logEntries = [];
-    BGM.sync.isRunning = true;
-    BGM.sync.lastSyncTime = null; // 这里赋值 null 是允许的，因为类型是 string 
-    for (let i = headerRow + 1; i <= lastRow; i++) {
-        let name = colMap.has("名称") ? trim(getCellValue(ws, i, colMap.get("名称"))) : "";
-        let bgmUrl = trim(getCellValue(ws, i, colMap.get("Bangumi_URL")));
-        let subjectId = extractSubjectId(bgmUrl);
-        let itemType = colMap.has("类别") ? trim(getCellValue(ws, i, colMap.get("类别"))) : "";
-        if (!subjectId) {
-            skipNoUrlCount++;
-            try {
-                let cell = getCell(ws, i, 1);
-                if (cell?.Interior)
-                    cell.Interior.Color = BGM_COLOR.SKIP;
-            }
-            catch (e) { }
-            let info = `跳过] 行${i}: ${name || "(无名称)"} - 缺少 Bangumi URL`;
-            logEntries.push(info);
-            if (typeof window.addSyncRecord === 'function' && typeof window.getOrCreateSyncRecordSheet === 'function') {
-                let syncSheet = window.getOrCreateSyncRecordSheet();
-                if (syncSheet)
-                    window.addSyncRecord(syncSheet, {
-                        name: name || "(无名称)",
-                        url: bgmUrl,
-                        sid: "",
-                        type: itemType,
-                        content: "跳过原因：缺少 Bangumi URL",
-                        status: "跳过",
-                        comment: "行" + i + " 无BGM链接",
-                        count: 1
-                    });
-            }
-            sleep(BGM_CONFIG.REQUEST_DELAY);
-            continue;
-        }
-        let finishedDate = colMap.has("完播日") ? trim(getCellValue(ws, i, colMap.get("完播日"))) : "";
-        let watchStatus = colMap.has("是否看完") ? trim(getCellValue(ws, i, colMap.get("是否看完"))) : "";
-        let jsonBody = buildJsonPayload(ws, i, colMap, finishedDate);
-        if (!jsonBody) {
-            skipNoTypeCount++;
-            let info = `跳过] 行${i}: ${name || "(无名称)"} (SID=${subjectId}) - 观看状态「${watchStatus}」不上传`;
-            logEntries.push(info);
-            if (typeof window.addSyncRecord === 'function' && typeof window.getOrCreateSyncRecordSheet === 'function') {
-                let syncSheet = window.getOrCreateSyncRecordSheet();
-                if (syncSheet)
-                    window.addSyncRecord(syncSheet, {
-                        name: name || "(无名称)",
-                        url: bgmUrl,
-                        sid: subjectId,
-                        type: itemType,
-                        content: "跳过原因：观看状态「" + watchStatus + "」不需要上传",
-                        status: "跳过",
-                        comment: "行" + i + " 状态=不传",
-                        count: 1
-                    });
-            }
-            continue;
-        }
-        let bodySummary = parseJsonBodySummary(jsonBody);
-        let result = bgmRequestSync("POST", `/v0/users/${_getUserApiPath()}/collections/${subjectId}`, jsonBody, token);
-        let success = [200, 201, 202, 204].includes(result.code);
-        try {
-            let colorCell = getCell(ws, i, 1);
-            if (colorCell?.Interior)
-                colorCell.Interior.Color = success ? BGM_COLOR.SUCCESS : BGM_COLOR.FAIL;
-        }
-        catch (e) { }
-        let recordData = {
-            name: name || "(无名称)",
-            url: bgmUrl,
-            sid: subjectId,
-            type: itemType,
-            content: bodySummary,
-            status: success ? "成功" : "失败",
-            message: success ? `行 ${i}` : (result.message || `HTTP ${result.code}`),
-            count: 1
-        };
-        let logEntry = `${success ? '成功' : '失败'}] 行${i}: ${name || '(无名称)'} (SID=${subjectId}) - ${bodySummary}${!success ? ' 错误:' + (result.message || result.code) : ''}`;
-        logEntries.push(logEntry);
-        if (success) {
-            successCount++;
-        }
-        else {
-            failCount++;
-        }
-        if (typeof window.addSyncRecord === 'function' && typeof window.getOrCreateSyncRecordSheet === 'function') {
-            let syncSheet = window.getOrCreateSyncRecordSheet();
-            if (syncSheet)
-                window.addSyncRecord(syncSheet, recordData);
-        }
-        if (i % 10 === 0 && app.StatusBar !== undefined) {
-            app.StatusBar = `处理进度: ${i - headerRow}/${lastRow - headerRow} 成功:${successCount} 失败:${failCount} 跳过:${skipNoUrlCount + skipNoTypeCount}`;
-        }
-        sleep(BGM_CONFIG.REQUEST_DELAY);
-    }
-    BGM.sync.isRunning = false;
-    // 修复：确保这里赋值的是字符串，不是数字
-    BGM.sync.lastSyncTime = new Date().toISOString(); // 这返回的是字符串
-    if (app.StatusBar !== undefined)
-        app.StatusBar = false;
-    let skipTotal = skipNoUrlCount + skipNoTypeCount;
-    let report = `同步完成！\n──────────────────\n成功: ${successCount} 条\n失败: ${failCount} 条\n跳过(无URL): ${skipNoUrlCount} 条\n跳过(不须上传): ${skipNoTypeCount} 条\n──────────────────\n\n`;
-    if (logEntries.length > 0) {
-        report += "详细日志：\n";
-        let showCount = Math.min(logEntries.length, 20);
-        for (let e = 0; e < showCount; e++)
-            report += logEntries[e] + "\n";
-        if (logEntries.length > 20)
-            report += `... 还有 ${logEntries.length - 20} 条日志\n`;
-    }
-    report += "\n同步记录已保存到「同步记录」工作表";
-    showDialog("同步完成", report);
-    bgmLog(LOG_LEVELS.INFO, `SyncToBangumi 完成: 成功=${successCount} 失败=${failCount} 跳过=${skipTotal} 总计=${lastRow - headerRow}`);
-    return { success: successCount, fail: failCount, skip: skipTotal };
-}
 // ========== 异步批量同步 ==========
-export async function syncToBangumiAsync(ws, colMap, token, lastRow, headerRow, options = {}) {
-    const { onProgress, onItemComplete } = options;
+export async function SyncToBangumiAsync(ws, colMap, token, lastRow, headerRow, options = {}) {
+    const { onProgress, onItemComplete } = options; // 先解构出回调
     if (!ws || !colMap || !token || !lastRow || !headerRow)
         throw new Error('缺少必要的同步参数');
     BGM.sync.isRunning = true;
-    BGM.sync.lastSyncTime = null; // 这里赋值 null
+    BGM.sync.lastSyncTime = null;
     let syncRecordSheet = null;
     if (typeof window.getOrCreateSyncRecordSheet === 'function') {
         syncRecordSheet = window.getOrCreateSyncRecordSheet();
@@ -865,49 +665,49 @@ export function clearRowColors() {
         }
         catch (e) { }
     }
-    showDialog("完成", "已清除所有颜色标记");
+    showAlert("完成", "已清除所有颜色标记");
 }
 export function testSingleUpdate() {
     let ws = getDataSheet();
     if (!ws) {
-        showDialog("错误", "未找到数据工作表！");
+        showAlert("错误", "未找到数据工作表！");
         return;
     }
     let token = getBgmtoken();
     if (!token) {
-        showDialog("提示", "请先设置 Token！");
+        showAlert("提示", "请先设置 Token！");
         return;
     }
     let app = getApp();
     if (!app?.ActiveCell) {
-        showDialog("提示", "请先选中一个单元格");
+        showAlert("提示", "请先选中一个单元格");
         return;
     }
     let row = app.ActiveCell.Row;
     let headerRow = findHeaderRow(ws);
     let colMap = getColumnMap(ws, headerRow);
     if (!colMap.has("Bangumi_URL")) {
-        showDialog("提示", "未找到 Bangumi URL 列");
+        showAlert("提示", "未找到 Bangumi URL 列");
         return;
     }
     let bgmUrl = trim(getCellValue(ws, row, colMap.get("Bangumi_URL")));
     let sid = extractSubjectId(bgmUrl);
     if (!sid) {
-        showDialog("提示", "当前行没有 Bangumi URL");
+        showAlert("提示", "当前行没有 Bangumi URL");
         return;
     }
     let finishedDate = colMap.has("完播日") ? trim(getCellValue(ws, row, colMap.get("完播日"))) : "";
     let jsonBody = buildJsonPayload(ws, row, colMap, finishedDate);
     if (!jsonBody) {
-        showDialog("提示", "当前行观看状态不上传");
+        showAlert("提示", "当前行观看状态不上传");
         return;
     }
     let result = bgmRequestSync("POST", `/v0/users/${_getUserApiPath()}/collections/${sid}`, jsonBody, token);
     if (result.code === 204 || result.code === 200 || result.code === 201) {
-        showDialog("测试成功", `条目 ${sid} 更新成功！\n\n请求体: ${parseJsonBodySummary(jsonBody)}`);
+        showAlert("测试成功", `条目 ${sid} 更新成功！\n\n请求体: ${parseJsonBodySummary(jsonBody)}`);
     }
     else {
-        showDialog("测试失败", `条目 ${sid} 更新失败！\n\n状态码: ${result.code}\n响应: ${result.message}`);
+        showAlert("测试失败", `条目 ${sid} 更新失败！\n\n状态码: ${result.code}\n响应: ${result.message}`);
     }
 }
 export function previewSubjectIdExtraction() {
@@ -919,7 +719,7 @@ export function previewSubjectIdExtraction() {
         return;
     let colMap = getColumnMap(ws, headerRow);
     if (!colMap.has("Bangumi_URL")) {
-        showDialog("提示", "未找到 Bangumi URL 列");
+        showAlert("提示", "未找到 Bangumi URL 列");
         return;
     }
     let lastRow = getLastRow(ws);
@@ -929,7 +729,7 @@ export function previewSubjectIdExtraction() {
         let url = trim(getCellValue(ws, i, colMap.get("Bangumi_URL")));
         msg += `行${i}: ${url.length > 50 ? url.substring(0, 50) + '...' : url} -> [${extractSubjectId(url)}]\n`;
     }
-    showDialog("预览 URL 提取", msg);
+    showAlert("预览 URL 提取", msg);
 }
 export function previewJsonPayload() {
     let ws = getDataSheet();
@@ -948,7 +748,7 @@ export function previewJsonPayload() {
         let jsonBody = buildJsonPayload(ws, i, colMap, finishedDate);
         msg += `行${i} [ID:${sid}]\n${jsonBody || "(空)"}\n\n`;
     }
-    showDialog("预览请求体", msg);
+    showAlert("预览请求体", msg);
 }
 export function setBangumiToken() {
     openBangumiTokenPage();
@@ -982,17 +782,17 @@ export function testTokenValidityForRibbon(token) {
         xhr.send();
         if (xhr.status === 200) {
             let userData = JSON.parse(xhr.responseText);
-            showDialog("Token 有效", `Token 验证成功！\n\n用户: ${userData.nickname || userData.username}\nID: ${userData.id}`);
+            showAlert("Token 有效", `Token 验证成功！\n\n用户: ${userData.nickname || userData.username}\nID: ${userData.id}`);
         }
         else if (xhr.status === 401) {
-            showDialog("Token 无效", "Token 验证失败！请检查 Token 是否正确。");
+            showAlert("Token 无效", "Token 验证失败！请检查 Token 是否正确。");
         }
         else {
-            showDialog("验证失败", `验证失败 (${xhr.status}): ${xhr.responseText}`);
+            showAlert("验证失败", `验证失败 (${xhr.status}): ${xhr.responseText}`);
         }
     }
     catch (err) {
-        showDialog("验证出错", `验证出错: ${err.message}`);
+        showAlert("验证出错", `验证出错: ${err.message}`);
     }
 }
 export function openUserCollection() {

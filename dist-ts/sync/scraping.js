@@ -43,6 +43,11 @@ async function apiRequest(path, token) {
     throw new Error(`请求失败：连续 ${retries} 次 429 限流`);
 }
 // ========== Token 验证 ==========
+/**
+ * 异步验证 Token 有效性（增强版：检测过期）
+ * @param {string} token - Access Token
+ * @returns {Promise<TokenVerifyResult>}
+ */
 export async function verifyToken(token) {
     if (!token)
         return { valid: false, userId: '', username: '', message: 'Token 为空' };
@@ -50,6 +55,18 @@ export async function verifyToken(token) {
         const { status, data } = await apiRequest('/v0/me', token);
         if (status === 200) {
             const userData = data;
+            // 检查令牌过期时间（如果提供）
+            if (userData.expires_at) {
+                const expiresTimestamp = Number(userData.expires_at) * 1000; // 转为毫秒
+                if (!isNaN(expiresTimestamp) && Date.now() > expiresTimestamp) {
+                    return {
+                        valid: false,
+                        userId: String(userData.id || ''),
+                        username: userData.nickname || userData.username || '未知',
+                        message: 'Token 已过期，请重新获取'
+                    };
+                }
+            }
             return {
                 valid: true,
                 userId: String(userData.id || ''),
@@ -63,8 +80,8 @@ export async function verifyToken(token) {
         return { valid: false, userId: '', username: '', message: `Token 验证失败（HTTP ${status}）` };
     }
     catch (e) {
-        BGM.handleError(e, { context: 'verifyToken' });
-        return { valid: false, userId: '', username: '', message: 'Token 验证请求失败: ' + e.message };
+        const err = e;
+        return { valid: false, userId: '', username: '', message: 'Token 验证请求失败: ' + err.message };
     }
 }
 // ========== 收藏列表获取 ==========
@@ -72,7 +89,7 @@ export async function fetchAllUserCollections(token, userId) {
     if (!userId) {
         const authResult = await verifyToken(token);
         if (!authResult.valid) {
-            BGM.handleError(new Error('Token 无效，无法获取用户 ID'), { context: 'fetchAllUserCollections', showDialog: true });
+            BGM.handleError(new Error('Token 无效，无法获取用户 ID'), { context: 'fetchAllUserCollections', showAlert: true });
             throw new Error('Token 无效，无法获取用户 ID');
         }
         userId = authResult.userId;
@@ -108,7 +125,7 @@ export async function fetchAllUserCollections(token, userId) {
                     hasMore = false;
             }
             catch (e) {
-                BGM.handleError(e, { context: `fetchAllUserCollections: ${typeName} 第${page}页`, showDialog: true });
+                BGM.handleError(e, { context: `fetchAllUserCollections: ${typeName} 第${page}页`, showAlert: true });
                 throw e;
             }
         }

@@ -3,7 +3,7 @@
  * @module bangumi
  * @description 从 Excel 读取条目并批量同步到 Bangumi 收藏
  */
-import { BatchSyncResult } from '../core/result.js';
+import { BatchSyncResult } from '../index.js';
 interface FilterStatus {
     hasFilter: boolean;
     filteredColumns: Array<{
@@ -56,7 +56,13 @@ export declare function getBgmtoken(): string | null;
 export declare function getLastRow(ws: any): number;
 export declare function extractSubjectId(url: string): string;
 export declare function findHeaderRow(ws: any, startRow?: number): number;
-export declare function getColumnMap(ws: any, headerRow: number): ColumnMap;
+/**
+ * 获取列名到列号的映射（优化版：使用正则规则数组，时间复杂度 O(N*M) 但 M 较小）
+ * @param ws 工作表对象
+ * @param headerRow 表头行号
+ * @returns Map<string, number> 列映射
+ */
+export declare function getColumnMap(ws: any, headerRow: number): Map<string, number>;
 export declare function mapWatchStatus(status: any): number;
 export declare function addTagsFromStr(tagSet: Set<string>, raw: any): void;
 export declare function buildJsonPayload(ws: any, row: number, colMap: ColumnMap, finishedDate: any): string;
@@ -68,8 +74,7 @@ export declare function bgmRequest(method: string, endpoint: string, body: any, 
     code: number;
     message: string;
 }>;
-export declare function SyncToBangumi(): BatchSyncResult | undefined;
-export declare function syncToBangumiAsync(ws: any, colMap: ColumnMap, token: string, lastRow: number, headerRow: number, options?: SyncOptions): Promise<BatchSyncResult>;
+export declare function SyncToBangumiAsync(ws: any, colMap: ColumnMap, token: string, lastRow: number, headerRow: number, options?: SyncOptions): Promise<BatchSyncResult>;
 export declare function getFilterStatus(endRow?: number, getColumnCounts?: boolean): FilterStatus | null;
 export declare function getColumnValueCounts(ws: any, endRow: number): {
     [key: number]: {

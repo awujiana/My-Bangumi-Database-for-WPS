@@ -61,7 +61,6 @@ showConfirm, // 确认
 showError, // 错误
 showSuccess, // 成功
 showInput, // 输入
-showConfirmDialog, // 确认对话框（兼容旧接口）
 showToast, // Toast 通知
  } from './ui/dialog.js';
 // ============================================================================
@@ -69,13 +68,15 @@ showToast, // Toast 通知
 // ============================================================================
 export { 
 // 设置状态栏消息
-setStatus, } from './ui/message.js';
+setStatus, initMessageListener, 
+// 设置同步运行状态（是否正在同步）
+setSyncRunning, } from './ui/message.js';
 // ============================================================================
 // 7. UI 事件处理（来自 ui/handlers.js）
 // ============================================================================
 export { 
 // 显示用户 ID 设置对话框
-showUserIdDialog, } from './ui/handlers.js';
+showUserIdDialog, markUploadedItems, clearSheetMarks, updateTokenStatus, updateUserIdStatus, showTokenDialog, testDebugConnection } from './ui/handlers.js';
 // ============================================================================
 // 8. 同步记录工作表（来自 sync/syncRecord.js）
 // ============================================================================
@@ -100,12 +101,12 @@ extractSubjectId,
 getFilterStatus, 
 // 根据 D 列序列号获取连续行
 getSequentialRowsBySeqCol, 
-// 同步到 Bangumi（入口）
-SyncToBangumi, 
+// 异步同步到 Bangumi
+SyncToBangumiAsync, 
 // 清除所有行颜色标记
 clearRowColors, 
 // 测试单个条目更新
-testSingleUpdate, mapWatchStatus, buildJsonPayload, bgmRequestSync, bgmRequest, setBangumiToken, openBangumiTokenPage, testTokenValidityForRibbon, openUserCollection, buildTagsArray, addTagsFromStr, } from './sync/exceltobangumi.js';
+testSingleUpdate, mapWatchStatus, buildJsonPayload, bgmRequestSync, bgmRequest, setBangumiToken, openBangumiTokenPage, testTokenValidityForRibbon, openUserCollection, buildTagsArray, addTagsFromStr, getDataSheet, HEADER_KEYWORDS, IMPORTANT_COLS } from './sync/exceltobangumi.js';
 // ============================================================================
 // 10. 同步收藏抓取（来自 sync/scraping.js）
 // ============================================================================
@@ -151,17 +152,17 @@ fetchBgmUserInfo,
 // 去除首尾空格
 trim, 
 // BGM 全局命名空间（包含 Dialog, Message, handleError 等）
-BGM, _getUserApiPath, wpsMsgBox } from './tools/util.js';
+BGM, _getUserApiPath, showBangumiPanel, sleep, } from './tools/util.js';
 // ============================================================================
 // 12. 页面逻辑（来自 taskpane.js）
 // ============================================================================
-export { 
+export { refreshSheets, toggleSheetLock, 
 // 刷新数据预览
-refreshData, } from './taskpane.js';
+refreshData, fetchBgCollectionRecords, clearSyncRecords, markUploadedItemsDefault, clearSheetMarksDefault, } from './taskpane.js';
 // 预览函数
 export { 
-// 显示预览内容（已挂载 window）
-previewSyncContent, } from './ui/preview.js';
+// 显示预览内容
+previewSyncContent, closeDetailModal, } from './ui/preview.js';
 // ============================================================================
 // 14. WPS 操作接口（类型守卫与类型定义）
 // ============================================================================
@@ -171,4 +172,4 @@ isWpsApp,
 // 判断对象是否为 WPS 工作表
 isWpsWorksheet, 
 // 判断对象是否为 WPS Range
-isWpsRange, } from './tools/wps.js';
+isWpsRange, wpsMsgBox, } from './tools/wps.js';

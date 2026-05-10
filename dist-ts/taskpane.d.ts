@@ -3,7 +3,7 @@
  * @module taskpane
  * @description 面板初始化、事件绑定、核心逻辑
  */
-import { markUploadedItems, clearSheetMarks } from './ui/handlers.js';
+import { markUploadedItems } from './index.js';
 declare function toggleSheetLock(): void;
 declare function refreshSheets(): void;
 declare function autoDetectSheet(): {
@@ -21,5 +21,5 @@ declare function fetchBgCollectionRecords(): void;
 declare function clearSyncRecords(): void;
 declare function markUploadedItemsDefault(): void;
 declare function clearSheetMarksDefault(): void;
-export { initPanel, refreshSheets, refreshData, toggleSheetLock, onSelectModeChange, fetchBgCollectionRecords, clearSyncRecords, markUploadedItems, markUploadedItemsDefault, clearSheetMarks, clearSheetMarksDefault, autoDetectSheet, updateFilterStatus };
+export { initPanel, refreshSheets, refreshData, toggleSheetLock, onSelectModeChange, fetchBgCollectionRecords, clearSyncRecords, markUploadedItems, markUploadedItemsDefault, clearSheetMarksDefault, autoDetectSheet, updateFilterStatus };
 //# sourceMappingURL=taskpane.d.ts.map

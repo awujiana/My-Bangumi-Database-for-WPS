@@ -1,10 +1,10 @@
 /**
- * UI 事件处理模块（TypeScript 版）
+ * UI 事件处理模块
  * @module ui/handlers
  * @description 面板操作处理、按钮绑定、业务对话框
  */
-import { LOG_LEVELS, bgmLog, BGM, loadBgToken, storeBgToken, _getBgmUserId, _setBgmUserId, getApp, getCell, trim, fetchBgmUserInfo, BGM_COLOR, showAlert, showError, showSuccess, showInput, showConfirmDialog, showToast, setStatus, verifyToken, fetchAllUserCollections, findHeaderRow, getColumnMap, getLastRow, extractSubjectId, getFilterStatus, getSequentialRowsBySeqCol, SyncToBangumi, clearRowColors, testSingleUpdate, getOrCreateSyncRecordSheet, getAllSyncRecords, addSyncRecord, clearSheetMarksInSheet, previewSyncContent, refreshData } from '../index.js';
-// ========== 中文文本常量 ==========
+import { LOG_LEVELS, bgmLog, BGM, loadBgToken, storeBgToken, _getBgmUserId, _setBgmUserId, getApp, getCell, trim, fetchBgmUserInfo, BGM_COLOR, showAlert, showConfirm, showError, showSuccess, showInput, showToast, setStatus, verifyToken, fetchAllUserCollections, findHeaderRow, getColumnMap, getLastRow, extractSubjectId, getDataSheet, getFilterStatus, SyncToBangumiAsync, clearRowColors, testSingleUpdate, getOrCreateSyncRecordSheet, getAllSyncRecords, addSyncRecord, openSyncRecordSheet, clearSheetMarksInSheet, previewSyncContent, refreshData, refreshSheets, toggleSheetLock, fetchBgCollectionRecords, clearSyncRecords, closeDetailModal, } from '../index.js';
+// ========== 中文常量 ==========
 const _T = {
     setBgmToken: '\u8BBE\u7F6E Bangumi Access Token',
     inputToken: '\u8BF7\u8F93\u5165 Access Token',
@@ -31,10 +31,9 @@ const _T = {
     loadingWait: '\u6B63\u5728\u52A0\u8F7D\u811A\u672C\uFF0C\u8BF7\u7A0D\u540E\u91CD\u8BD5...',
     pleaseSetBgmToken: '\u8BF7\u5148\u8BBE\u7F6E Bangumi Token\uFF01',
     cannotActivateSyncSheet: '\u65E0\u6CD5\u6FC0\u6D3B\u540C\u6B65\u8BB0\u5F55\u8868: ',
-    syncToBgmError: 'SyncToBangumi \u51FA\u9519: ',
+    syncToBgmError: 'SyncToBangumiAsync \u51FA\u9519: ',
     execError: '\u6267\u884C\u51FA\u9519',
     syncBgmMarksStart: '\u5F00\u59CB\u4ECEBGM\u540C\u6B65\u6536\u85CF\u6807\u8BB0\uFF0C\u5DE5\u4F5C\u8868\u7D22\u5F15: ',
-    fetchingCollections: '\u6B63\u5728\u83B7\u53D6\u6536\u85CF\u5217\u8868...',
     noCollectionData: '\u672A\u83B7\u53D6\u5230\u6536\u85CF\u6570\u636E\uFF0C\u8BF7\u68C0\u67E5 Token \u548C\u7528\u6237ID\uFF01',
     syncComplete: '\u540C\u6B65\u5B8C\u6210',
     fetchCollectionFailed: '\u83B7\u53D6\u6536\u85CF\u5931\u8D25',
@@ -43,7 +42,7 @@ const _T = {
     marksToSheet: '\u5DF2\u6807\u8BB0 ',
     marksToSheetSuffix: ' \u6761\u6536\u85CF\u5230 ',
 };
-// ========== 业务对话框函数 ==========
+// ========== 业务对话框 ==========
 export function showTokenDialog(currentToken) {
     const defaultVal = currentToken || loadBgToken() || '';
     showInput(_T.setBgmToken, _T.inputToken, defaultVal, (value) => {
@@ -74,14 +73,12 @@ export function updateTokenStatus() {
     if (token && token.length > 10) {
         tokenStatus.style.color = '#4CAF50';
         tokenStatus.textContent = _T.set + ' (' + token.substring(0, 4) + '...)';
-        if (typeof fetchBgmUserInfo === 'function') {
-            fetchBgmUserInfo().then((userInfo) => {
-                if (userInfo?.username) {
-                    tokenStatus.textContent = _T.set + ': ' + userInfo.username;
-                    updateUserIdStatus();
-                }
-            });
-        }
+        fetchBgmUserInfo().then((userInfo) => {
+            if (userInfo?.username) {
+                tokenStatus.textContent = _T.set + ': ' + userInfo.username;
+                updateUserIdStatus();
+            }
+        });
     }
     else {
         tokenStatus.textContent = _T.notSet;
@@ -137,9 +134,7 @@ export function testTokenValidity() {
             showError(_T.tokenInvalid, _T.tokenExpired);
         }
     };
-    xhr.onerror = () => {
-        showError(_T.networkError, _T.cannotConnectBgm);
-    };
+    xhr.onerror = () => showError(_T.networkError, _T.cannotConnectBgm);
     xhr.send();
 }
 export function testDebugConnection() {
@@ -150,19 +145,18 @@ export function testDebugConnection() {
         showToast(_T.debugConnFail, 'error');
     }
 }
-// ========== 面板操作处理 ==========
+// ========== 面板操作分发 ==========
 export function onAction(action) {
     switch (action) {
         case 'sync':
             syncFromPanel();
             break;
         case 'test':
-            if (typeof testSingleUpdate === 'function') {
+            if (typeof testSingleUpdate === 'function')
                 testSingleUpdate();
-            }
             break;
         case 'clear':
-            showConfirmDialog(_T.confirmClearMarks, () => {
+            showConfirm(_T.confirmClearMarks, '确认', () => {
                 if (typeof clearRowColors === 'function')
                     clearRowColors();
                 if (typeof refreshData === 'function')
@@ -180,7 +174,7 @@ export function onAction(action) {
             showUserIdDialog();
             break;
         case 'showClearConfirm':
-            showConfirmDialog(_T.confirmClearMarks, () => {
+            showConfirm(_T.confirmClearMarks, '确认', () => {
                 if (typeof clearRowColors === 'function')
                     clearRowColors();
                 if (typeof refreshData === 'function')
@@ -195,15 +189,13 @@ export function onAction(action) {
             break;
     }
 }
-// ========== 从面板同步 ==========
-export function syncFromPanel() {
+// ========== 从面板同步（异步，带进度条） ==========
+export async function syncFromPanel() {
     bgmLog(LOG_LEVELS.INFO, 'syncFromPanel 开始执行');
-    if (typeof findHeaderRow === 'undefined' || typeof getColumnMap === 'undefined' || typeof getLastRow === 'undefined') {
-        bgmLog(LOG_LEVELS.ERROR, 'syncFromPanel - 必需函数未加载');
+    if (typeof findHeaderRow !== 'function' || typeof getColumnMap !== 'function' || typeof getLastRow !== 'function') {
         showAlert(_T.loadingWait);
         return;
     }
-    bgmLog(LOG_LEVELS.INFO, 'syncFromPanel - 必需函数已加载，开始同步...');
     const token = loadBgToken();
     if (!token) {
         showAlert(_T.pleaseSetBgmToken);
@@ -215,24 +207,89 @@ export function syncFromPanel() {
             try {
                 syncSheet.Activate();
             }
-            catch (e) {
-                bgmLog(LOG_LEVELS.WARN, _T.cannotActivateSyncSheet + e.message);
-            }
+            catch (e) { /* 忽略 */ }
         }
     }
-    if (typeof SyncToBangumi === 'function') {
-        try {
-            SyncToBangumi();
-        }
-        catch (e) {
-            const err = e;
-            bgmLog(LOG_LEVELS.ERROR, _T.syncToBgmError + err.message);
-            showAlert(err.message, _T.execError);
-        }
+    const app = getApp();
+    if (!app?.ActiveWorkbook) {
+        showAlert('无法获取 Application 对象！');
+        return;
+    }
+    const ws = getDataSheet();
+    if (!ws) {
+        showAlert('未找到数据工作表');
+        return;
+    }
+    const headerRow = findHeaderRow(ws);
+    const lastRow = getLastRow(ws);
+    const rowCount = lastRow - headerRow;
+    if (rowCount <= 0) {
+        showAlert('没有可同步的数据行');
+        return;
+    }
+    // 同步前确认
+    const confirmed = await new Promise(resolve => {
+        showConfirm(`即将同步 ${rowCount} 行数据到 Bangumi，是否继续？`, '确认', () => resolve(true), () => resolve(false));
+    });
+    if (!confirmed)
+        return;
+    // 获取列映射
+    const colMap = getColumnMap(ws, headerRow);
+    if (!colMap.has("Bangumi_URL")) {
+        showAlert('未找到 Bangumi URL 列');
+        return;
+    }
+    try {
+        const result = await SyncToBangumiAsync(ws, colMap, token, lastRow, headerRow, {
+            onProgress: (current, total, message) => {
+                updateProgressBar(current, total, message);
+                if (app.StatusBar !== undefined) {
+                    app.StatusBar = `[${current}/${total}] ${message}`;
+                }
+            }
+        });
+        resetProgressBar();
+        if (app.StatusBar !== undefined)
+            app.StatusBar = false;
+        showAlert(`同步完成！成功 ${result.success} 条，失败 ${result.fail} 条，跳过 ${result.skip} 条`);
+    }
+    catch (err) {
+        resetProgressBar();
+        if (app.StatusBar !== undefined)
+            app.StatusBar = false;
+        BGM.handleError(err, { context: 'syncFromPanel', showAlert: true });
     }
 }
+// 进度条辅助函数
+function updateProgressBar(current, total, message) {
+    const container = document.getElementById('syncProgress');
+    const bar = document.getElementById('progressBar');
+    const text = document.getElementById('progressText');
+    if (container)
+        container.style.display = 'block';
+    if (bar) {
+        const percent = Math.round((current / total) * 100);
+        bar.style.width = percent + '%';
+        bar.textContent = percent + '%';
+    }
+    if (text)
+        text.textContent = message;
+}
+function resetProgressBar() {
+    const container = document.getElementById('syncProgress');
+    const bar = document.getElementById('progressBar');
+    if (container)
+        container.style.display = 'none';
+    if (bar) {
+        bar.style.width = '0%';
+        bar.textContent = '';
+    }
+    const text = document.getElementById('progressText');
+    if (text)
+        text.textContent = '';
+}
 export function testSingleUpdateFromPanel() {
-    if (typeof findHeaderRow === 'undefined') {
+    if (typeof findHeaderRow !== 'function') {
         setTimeout(testSingleUpdateFromPanel, 500);
         return;
     }
@@ -241,25 +298,24 @@ export function testSingleUpdateFromPanel() {
         showAlert(_T.pleaseSetBgmToken);
         return;
     }
-    if (typeof testSingleUpdate === 'function') {
+    if (typeof testSingleUpdate === 'function')
         testSingleUpdate();
-    }
 }
 // ========== 从BGM同步收藏标记 ==========
 export async function syncCollectionFromBgm() {
+    const select = document.getElementById('sheetSelect');
+    const sheetIndex = BGM.sheet.lockedIndex || parseInt(select?.value || '') || 1;
+    bgmLog(LOG_LEVELS.INFO, _T.syncBgmMarksStart + sheetIndex);
+    const token = loadBgToken();
+    if (!token) {
+        showAlert(_T.pleaseSetBgmToken);
+        return;
+    }
     try {
-        const select = document.getElementById('sheetSelect');
-        const sheetIndex = BGM.sheet.lockedIndex || parseInt(select?.value || '') || 1;
-        bgmLog(LOG_LEVELS.INFO, _T.syncBgmMarksStart + sheetIndex);
-        const token = loadBgToken();
-        if (!token) {
-            showAlert(_T.pleaseSetBgmToken);
-            return;
-        }
         await syncFromBgmByAPI(sheetIndex);
     }
     catch (e) {
-        BGM.handleError(e, { context: 'syncCollectionFromBgm', showDialog: true });
+        BGM.handleError(e, { context: 'syncCollectionFromBgm', showAlert: true });
     }
 }
 export async function syncFromBgmByAPI(sheetIndex) {
@@ -269,161 +325,94 @@ export async function syncFromBgmByAPI(sheetIndex) {
         showTokenDialog('');
         return;
     }
-    showConfirmDialog('\u5C06\u4ECE BGM API \u83B7\u53D6\u4F60\u7684\u6536\u85CF\u5217\u8868\uFF0C\u5E76\u5728 D \u5217\u6807\u8BB0\u5DF2\u6536\u85CF\u7684\u6761\u76EE\uFF0C\u540C\u65F6\u5199\u5165\u540C\u6B65\u8BB0\u5F55\u8868\u3002\n\n\u662F\u5426\u7EE7\u7EED\uFF1F', async () => { await _doAPISync(sheetIndex, token); });
+    showConfirm('将 从 BGM API 获取你的收藏列表，并在 D 列标记已收藏的条目，同时写入同步记录表。\n\n是否继续？', '确认', async () => { await _doAPISync(sheetIndex, token); });
 }
 async function _doAPISync(sheetIndex, token) {
-    setStatus('\u6B63\u5728\u83B7\u53D6\u6536\u85CF\u5217\u8868...', 'info');
+    setStatus('正在获取收藏列表...', 'info');
     try {
         if (typeof getOrCreateSyncRecordSheet === 'function') {
             const syncSheet = getOrCreateSyncRecordSheet();
             if (!syncSheet) {
-                showAlert('\u521B\u5EFA\u540C\u6B65\u8BB0\u5F55\u8868\u5931\u8D25');
-                setStatus('\u521B\u5EFA\u540C\u6B65\u8BB0\u5F55\u8868\u5931\u8D25', 'error');
+                showAlert('创建同步记录表失败');
                 return;
             }
         }
         const app = getApp();
         if (!app?.ActiveWorkbook) {
-            showAlert('\u65E0\u6CD5\u83B7\u53D6 Application');
+            showAlert('无法获取 Application');
             return;
         }
         const ws = app.ActiveWorkbook.Worksheets.Item(sheetIndex);
-        let headerRow = typeof findHeaderRow === 'function' ? findHeaderRow(ws) : 0;
-        if (headerRow === 0)
-            headerRow = 1;
+        const headerRow = typeof findHeaderRow === 'function' ? findHeaderRow(ws) : 1;
         const colMap = typeof getColumnMap === 'function' ? getColumnMap(ws, headerRow) : new Map();
         if (!colMap.has('Bangumi_URL')) {
-            showAlert('\u672A\u627E\u5230 Bangumi URL \u5217\uFF01');
+            showAlert('未找到 Bangumi URL 列！');
             return;
         }
-        const seqCol = 4;
-        const dataStartRow = headerRow + 1;
         const lastRow = typeof getLastRow === 'function' ? getLastRow(ws) : 200;
         let rowsToProcess = [];
         if (typeof getFilterStatus === 'function') {
             const filterStatus = getFilterStatus(lastRow);
-            if (filterStatus?.hasFilter && filterStatus.visibleRows.length > 0) {
-                rowsToProcess = filterStatus.visibleRows;
-            }
-            else if (typeof getSequentialRowsBySeqCol === 'function') {
-                const seqResult = getSequentialRowsBySeqCol(dataStartRow, lastRow);
-                rowsToProcess = seqResult.validRows || [];
-                if (rowsToProcess.length === 0) {
-                    for (let r = dataStartRow; r <= lastRow; r++)
-                        rowsToProcess.push(r);
-                }
-            }
-            else {
-                for (let r = dataStartRow; r <= lastRow; r++)
-                    rowsToProcess.push(r);
-            }
+            rowsToProcess = filterStatus?.visibleRows ?? [];
         }
-        else {
-            for (let r = dataStartRow; r <= lastRow; r++)
+        if (rowsToProcess.length === 0) {
+            for (let r = headerRow + 1; r <= lastRow; r++)
                 rowsToProcess.push(r);
         }
         if (rowsToProcess.length === 0) {
-            showAlert('\u6CA1\u6709\u9700\u8981\u5904\u7406\u7684\u6570\u636E\u884C\uFF01');
+            showAlert('没有需要处理的数据行！');
             return;
         }
-        // 验证 Token
-        setStatus('\u6B63\u5728\u9A8C\u8BC1 Token...', 'info');
+        setStatus('正在验证 Token...', 'info');
         const verifyResult = await verifyToken(token);
         if (!verifyResult.valid) {
-            showAlert('\u274C ' + verifyResult.message);
-            setStatus('Token \u65E0\u6548', 'error');
+            showAlert('✘ ' + verifyResult.message);
             return;
         }
         _setBgmUserId(verifyResult.userId);
-        // 获取收藏列表
-        setStatus('\u6B63\u5728\u83B7\u53D6\u6536\u85CF\u5217\u8868...', 'info');
+        setStatus('正在获取收藏列表...', 'info');
         const userCollections = await fetchAllUserCollections(token);
-        if (fetchAllUserCollections.lastError) {
-            const err = fetchAllUserCollections.lastError;
-            showAlert('\u274C ' + (err.message || '\u83B7\u53D6\u6536\u85CF\u5217\u8868\u5931\u8D25'));
-            setStatus('\u83B7\u53D6\u6536\u85CF\u5931\u8D25', 'error');
-            return;
-        }
-        if (userCollections.length === 0) {
-            showAlert(_T.noCollectionData);
-            setStatus('\u65E0\u6536\u85CF\u6570\u636E', 'info');
-            return;
-        }
-        setStatus(`\u6B63\u5728\u5339\u914D ${userCollections.length} \u6761\u6536\u85CF...`, 'info');
         const collectionMap = new Map();
-        for (let i = 0; i < userCollections.length; i++) {
-            collectionMap.set(String(userCollections[i].subject_id), userCollections[i]);
-        }
+        userCollections.forEach(c => collectionMap.set(String(c.subject_id), c));
         let syncRecords = typeof getAllSyncRecords === 'function' ? getAllSyncRecords() : [];
         const syncCountMap = new Map();
-        for (let i = 0; i < syncRecords.length; i++) {
-            syncCountMap.set(String(syncRecords[i].sid), (syncCountMap.get(String(syncRecords[i].sid)) || 0) + 1);
-        }
-        setStatus(`\u6B63\u5728\u5199\u5165 ${userCollections.length} \u6761\u6536\u85CF\u5230\u540C\u6B65\u8BB0\u5F55\u8868...`, 'info');
-        let writtenToRecord = 0;
-        let prevActiveSheet = null;
-        try {
-            prevActiveSheet = app.ActiveSheet;
-        }
-        catch (e) { }
-        const BGM_SUBJECT_TYPES = window.BGM_SUBJECT_TYPES || { 1: '\u4E66\u7C4D', 2: '\u52A8\u753B', 3: '\u97F3\u4E50', 4: '\u6E38\u620F', 6: '\u771F\u4EBA\u5267' };
-        for (let ci = 0; ci < userCollections.length; ci++) {
-            const item = userCollections[ci];
-            const sid = item.subject_id;
-            const url = 'https://bgm.tv/subject/' + sid;
-            const name = item.subject?.name_cn || item.subject?.name || '(\u65E0\u540D\u79F0)';
-            const typeId = item.subject_type || 2;
-            const typeName = BGM_SUBJECT_TYPES[typeId] || '\u672A\u77E5';
+        syncRecords.forEach(r => syncCountMap.set(String(r.sid || ''), (syncCountMap.get(String(r.sid || '')) || 0) + 1));
+        const BGM_SUBJECT_TYPES = window.BGM_SUBJECT_TYPES || { 1: '书籍', 2: '动画', 3: '音乐', 4: '游戏', 6: '真人剧' };
+        for (const item of userCollections) {
             if (typeof addSyncRecord === 'function') {
                 addSyncRecord({
-                    name, url, sid: String(sid), type: typeName,
-                    content: '\u6807\u8BB0\u540C\u6B65\uFF1A' + typeName + '\u6536\u85CF',
-                    status: '\u6210\u529F', message: typeName + '\u6536\u85CF\u540C\u6B65', count: 1
+                    name: item.subject?.name_cn || item.subject?.name || '(无名称)',
+                    url: 'https://bgm.tv/subject/' + item.subject_id,
+                    sid: String(item.subject_id),
+                    type: BGM_SUBJECT_TYPES[item.subject_type || 2],
+                    content: '标记同步',
+                    status: '成功',
+                    count: 1
                 });
             }
-            writtenToRecord++;
-        }
-        if (prevActiveSheet) {
-            try {
-                prevActiveSheet.Activate();
-            }
-            catch (e) { }
         }
         syncRecords = typeof getAllSyncRecords === 'function' ? getAllSyncRecords() : [];
         syncCountMap.clear();
-        for (let i = 0; i < syncRecords.length; i++) {
-            syncCountMap.set(String(syncRecords[i].sid), (syncCountMap.get(String(syncRecords[i].sid)) || 0) + 1);
-        }
+        syncRecords.forEach(r => syncCountMap.set(String(r.sid || ''), (syncCountMap.get(String(r.sid || '')) || 0) + 1));
         let matchedCount = 0;
-        let totalCount = 0;
-        for (let idx = 0; idx < rowsToProcess.length; idx++) {
-            const row = rowsToProcess[idx];
+        for (const row of rowsToProcess) {
             const bgmUrlCell = colMap.has('Bangumi_URL') ? getCell(ws, row, colMap.get('Bangumi_URL')) : null;
             const bgmUrl = bgmUrlCell ? trim(String(bgmUrlCell.Value() || '')) : '';
             const sid = typeof extractSubjectId === 'function' ? extractSubjectId(bgmUrl) : '';
             if (sid && collectionMap.has(sid)) {
-                const seqCell = getCell(ws, row, seqCol);
+                const seqCell = getCell(ws, row, 4);
                 if (seqCell && seqCell.Interior) {
                     const syncCount = syncCountMap.get(sid) || 0;
-                    if (syncCount === 1)
-                        seqCell.Interior.Color = BGM_COLOR.BGM_SYNC;
-                    else if (syncCount === 2)
-                        seqCell.Interior.Color = BGM_COLOR.LIGHT_GREEN;
-                    else
-                        seqCell.Interior.Color = BGM_COLOR.DARK_GREEN;
+                    seqCell.Interior.Color = syncCount === 1 ? BGM_COLOR.BGM_SYNC :
+                        syncCount === 2 ? BGM_COLOR.LIGHT_GREEN : BGM_COLOR.DARK_GREEN;
                 }
                 matchedCount++;
             }
-            totalCount++;
-            if (idx % 100 === 0)
-                setStatus(`\u5DF2\u5904\u7406 ${idx + 1}/${rowsToProcess.length} \u884C...`, 'info');
         }
-        setStatus(_T.syncComplete, 'success');
-        showAlert(`\u540C\u6B65\u5B8C\u6210\uFF01\n\n\u5DF2\u5C06 ${writtenToRecord} \u6761BGM\u6536\u85CF\u5199\u5165\u540C\u6B65\u8BB0\u5F55\u8868\n\u626B\u63CF ${totalCount} \u884C\u53EF\u89C1\u6570\u636E\n\u5339\u914D\u5230 ${matchedCount} \u6761\n\nD \u5217\u989C\u8272\u8BF4\u660E\uFF1A\n\u{1F7E3} \u7D2B\u8272 - \u672C\u6B21\u4ECEBGM\u540C\u6B65\n\u{1F7E2} \u6D45\u7EFF\u8272 - \u5DF2\u540C\u6B652\u6B21\n\u{1F332} \u6DF1\u7EFF\u8272 - \u5DF2\u540C\u6B65\u591A\u6B21`, _T.syncComplete);
+        showAlert(`同步完成！\n\n已匹配 ${matchedCount} 条`, _T.syncComplete);
     }
     catch (e) {
-        const err = e;
-        showAlert('\u540C\u6B65\u5931\u8D25: ' + err.message, _T.syncFailed);
+        showAlert(_T.syncFailed + e.message, _T.syncFailed);
         setStatus(_T.syncFailed, 'error');
     }
 }
@@ -454,52 +443,75 @@ export async function markUploadedItems(sheetIndexOrName, collections) {
             showAlert(_T.sheetNotFound + sheetName);
             return;
         }
-        try {
-            const cols = await fetchAllUserCollections(token, userId);
-            if (cols && cols.length > 0) {
-                // 直接调用 _doAPISync 的逻辑，或在此处实现标记
-                showToast(_T.marksToSheet + cols.length + _T.marksToSheetSuffix + sheetName, 'success');
-            }
+        const cols = await fetchAllUserCollections(token, userId);
+        if (cols?.length) {
+            showToast(_T.marksToSheet + cols.length + _T.marksToSheetSuffix + sheetName, 'success');
         }
-        catch (e) {
-            showAlert('获取收藏失败: ' + e.message);
-        }
+        return;
     }
+    // 无操作
 }
 export function clearSheetMarks(sheetIndexOrName) {
     if (typeof clearSheetMarksInSheet !== 'function')
         return;
     if (typeof sheetIndexOrName === 'string') {
-        const getAppFn = typeof window.getApp === 'function' ? window.getApp : null;
-        const app = getAppFn ? getAppFn() : null;
+        const app = getApp();
         if (app?.ActiveWorkbook) {
-            const sheets = app.ActiveWorkbook.Worksheets;
-            for (let i = 1; i <= sheets.Count; i++) {
-                if (sheets.Item(i).Name === sheetIndexOrName) {
+            for (let i = 1; i <= app.ActiveWorkbook.Worksheets.Count; i++) {
+                if (app.ActiveWorkbook.Worksheets.Item(i).Name === sheetIndexOrName) {
                     clearSheetMarksInSheet(i);
                     return;
                 }
             }
         }
-        return;
     }
-    clearSheetMarksInSheet(sheetIndexOrName);
+    else {
+        clearSheetMarksInSheet(sheetIndexOrName);
+    }
 }
-// ========== 事件监听器 ==========
+// ========== 事件监听 ==========
 function setupButtonListeners() {
-    const buttons = document.querySelectorAll('[data-action]');
-    buttons.forEach(button => {
+    document.querySelectorAll('[data-action]').forEach(button => {
         button.removeEventListener('click', handleActionClick);
         button.addEventListener('click', handleActionClick);
     });
 }
 function handleActionClick(event) {
-    const button = event.currentTarget;
-    const action = button.dataset.action;
+    const target = event.currentTarget;
+    const action = target.dataset.action;
     if (!action)
         return;
-    bgmLog(LOG_LEVELS.DEBUG, 'Button action: ' + action);
+    // 解析参数（data-args 传递 JSON 数组）
+    let args = [];
+    if (target.dataset.args) {
+        try {
+            args = JSON.parse(target.dataset.args);
+        }
+        catch { /* ignore */ }
+    }
     switch (action) {
+        case 'sync':
+            syncFromPanel();
+            break;
+        case 'test':
+            if (typeof testSingleUpdate === 'function')
+                testSingleUpdate();
+            break;
+        case 'clear':
+            showConfirm(_T.confirmClearMarks, '确认', () => {
+                if (typeof clearRowColors === 'function')
+                    clearRowColors();
+                if (typeof refreshData === 'function')
+                    refreshData();
+            });
+            break;
+        case 'preview':
+            if (typeof previewSyncContent === 'function')
+                previewSyncContent();
+            break;
+        case 'setToken':
+            showTokenDialog(loadBgToken() || '');
+            break;
         case 'showTokenDialog':
             showTokenDialog(loadBgToken() || '');
             break;
@@ -512,35 +524,51 @@ function handleActionClick(event) {
         case 'openUserCollection':
             openUserCollection();
             break;
-        case 'sync':
-            syncFromPanel();
+        case 'syncCollectionFromBgm':
+            syncCollectionFromBgm();
             break;
-        case 'test':
-            if (typeof testSingleUpdate === 'function')
-                testSingleUpdate();
+        case 'refreshSheets':
+            refreshSheets();
             break;
-        case 'clear':
-            showConfirmDialog(_T.confirmClearMarks, () => {
-                if (typeof clearRowColors === 'function')
-                    clearRowColors();
-            });
+        case 'refreshData':
+            refreshData();
             break;
-        case 'preview':
-            if (typeof previewSyncContent === 'function')
-                previewSyncContent();
+        case 'toggleSheetLock':
+            toggleSheetLock();
             break;
-        default:
-            bgmLog(LOG_LEVELS.WARN, 'Unknown action: ' + action);
+        case 'fetchBgCollectionRecords':
+            fetchBgCollectionRecords();
+            break;
+        case 'clearSyncRecords':
+            clearSyncRecords();
+            break;
+        case 'markUploadedItems':
+            markUploadedItems(args[0]);
+            break;
+        case 'clearSheetMarks':
+            clearSheetMarks(args[0]);
+            break;
+        case 'openSyncRecordSheet':
+            openSyncRecordSheet();
+            break;
+        case 'testDebugConnection':
+            testDebugConnection();
+            break;
+        case 'closeDetailModal':
+            closeDetailModal();
+            break;
+        case 'showToast':
+            showToast(args[0], args[1]);
+            break;
+        case 'showAlert':
+            showAlert(args[0], args[1]);
+            break;
+        default: bgmLog(LOG_LEVELS.WARN, 'Unknown action: ' + action);
     }
 }
-function initEventListeners() {
-    if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', () => {
-            setTimeout(setupButtonListeners, 0);
-        });
-    }
-    else {
-        setTimeout(setupButtonListeners, 0);
-    }
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', () => setTimeout(setupButtonListeners, 0));
 }
-initEventListeners();
+else {
+    setTimeout(setupButtonListeners, 0);
+}

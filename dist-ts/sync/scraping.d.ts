@@ -17,11 +17,11 @@ export interface BangumiUserData {
     nickname?: string;
     username?: string;
 }
-export declare function verifyToken(token: string): Promise<{
-    valid: boolean;
-    userId: string;
-    username: string;
-    message: string;
-}>;
+/**
+ * 异步验证 Token 有效性（增强版：检测过期）
+ * @param {string} token - Access Token
+ * @returns {Promise<TokenVerifyResult>}
+ */
+export declare function verifyToken(token: string): Promise<TokenVerifyResult>;
 export declare function fetchAllUserCollections(token: string, userId?: string): Promise<unknown[]>;
 //# sourceMappingURL=scraping.d.ts.map

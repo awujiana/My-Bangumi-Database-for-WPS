@@ -20,7 +20,7 @@ export declare const BGM: {
         postMessage: (data: Record<string, unknown>, targetOrigin?: string) => boolean;
     };
     postMessage: (data: Record<string, unknown>, targetOrigin?: string) => boolean;
-    showDialog: (title: string, message: string) => void;
+    showAlert: (title: string, message: string) => void;
     showConfirm: (title: string, message: string, onConfirm?: () => void, onCancel?: () => void) => void;
     handleError: (error: unknown, options?: ErrorOptions) => BgmError;
     safeExecute: <T>(fn: () => T, context?: string, options?: ErrorOptions) => T | BgmError;
@@ -112,25 +112,9 @@ export declare function showBangumiPanel(): void;
  */
 export declare function trim(str: string | null | undefined): string;
 /**
- * 显示输入提示框
- */
-export declare function wpsPrompt(message: string, defaultValue?: string): Promise<string | null>;
-/**
- * 显示 WPS 消息对话框
- */
-export declare function wpsMsgBox(message: string, buttons?: number, icon?: number): Promise<number>;
-/**
  * 延迟执行
  */
 export declare function sleep(ms: number): void;
-/**
- * 显示自定义提示对话框
- */
-export declare function showAlertDialog(title: string, message: string): void;
-/**
- * 关闭提示对话框
- */
-export declare function closeAlertDialog(): void;
 export interface BGMCache {
     /** WPS 文档总行数缓存 */
     totalRows: number;
