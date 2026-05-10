@@ -3,7 +3,7 @@
  * @module taskpane
  * @description 面板初始化、事件绑定、核心逻辑
  */
-import { PANEL_CONFIG, WPS_ENUM, LOG_LEVELS, getApp, bgmLog, BGM, escapeHtml, readCell, colNumToLetter, HEADER_KEYWORDS, IMPORTANT_COLS, initMessageListener, markUploadedItems, clearSheetMarks, updateTokenStatus, updateUserIdStatus, showAlert, showToast, closeDetailModal, clearSyncRecords as _clearSyncRecords } from './index.js';
+import { PANEL_CONFIG, WPS_ENUM, LOG_LEVELS, getApp, bgmLog, BGM, escapeHtml, readCell, colNumToLetter, HEADER_KEYWORDS, IMPORTANT_COLS, initMessageListener, markUploadedItems, updateTokenStatus, updateUserIdStatus, showToast, closeDetailModal, } from './index.js';
 // ========== 工作表锁定功能 ==========
 function toggleSheetLock() {
     const select = document.getElementById('sheetSelect');
@@ -539,8 +539,6 @@ function refreshData() {
             if (select)
                 select.value = String(sheetIndex);
             showToast('已自动锁定工作表: ' + sheetName, 'info');
-            const meta = detectHeaderAndColumns(ws, { visibleRowSet, isFiltered });
-            bgmLog(LOG_LEVELS.INFO, `headerRow=${meta.headerRow}, dataStartRow=${meta.dataStartRow}, lastCol=${meta.lastCol}, previewColStart=${meta.previewColStart},  previewColEnd=${meta.previewColEnd}`);
         }
         if (previewBox) {
             previewBox.innerHTML = previewRows.length > 0
@@ -629,46 +627,8 @@ function initPanel() {
     document.dispatchEvent(new CustomEvent('bgm:modulesReady'));
     bgmLog(LOG_LEVELS.INFO, 'initPanel 完成');
 }
-function fetchBgCollectionRecords() {
-    if (typeof window.syncCollectionFromBgm === 'function') {
-        window.syncCollectionFromBgm();
-    }
-    else {
-        showAlert('请先设置 Token！');
-    }
-}
-function clearSyncRecords() {
-    if (typeof _clearSyncRecords === 'function')
-        _clearSyncRecords();
-    else
-        showAlert('清除同步记录功能未加载');
-}
-function getSelectedSheetName() {
-    if (BGM.sheet.isLocked && BGM.sheet.lockedName)
-        return BGM.sheet.lockedName;
-    const select = document.getElementById('sheetSelect');
-    if (select && select.selectedIndex > 0)
-        return select.options[select.selectedIndex].text;
-    return null;
-}
-function markUploadedItemsDefault() {
-    const sheetName = getSelectedSheetName();
-    if (!sheetName) {
-        showAlert('请先选择工作表！');
-        return;
-    }
-    markUploadedItems(sheetName);
-}
-function clearSheetMarksDefault() {
-    const sheetName = getSelectedSheetName();
-    if (!sheetName) {
-        showAlert('请先选择工作表！');
-        return;
-    }
-    clearSheetMarks(sheetName);
-}
 // ========== 导出 ==========
-export { initPanel, refreshSheets, refreshData, toggleSheetLock, onSelectModeChange, fetchBgCollectionRecords, clearSyncRecords, markUploadedItems, markUploadedItemsDefault, clearSheetMarksDefault, autoDetectSheet, updateFilterStatus };
+export { initPanel, refreshSheets, refreshData, toggleSheetLock, onSelectModeChange, markUploadedItems, autoDetectSheet, updateFilterStatus };
 // ========== 挂载到 window ==========
 function safeInitPanel() {
     try {

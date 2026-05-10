@@ -115,8 +115,8 @@ export {
     updateTokenStatus, 
     updateUserIdStatus, 
     showTokenDialog,
-    testDebugConnection
-    
+    testDebugConnection,
+    syncCollectionFromBgm
 } from './ui/handlers.js';
 
 // ============================================================================
@@ -132,6 +132,7 @@ export {
     clearSheetMarksInSheet,
    type SyncRecord,
     type UpdateRecordParams,
+    clearSyncRecords,
 } from './sync/syncRecord.js';
 
 
@@ -254,10 +255,7 @@ export {
     toggleSheetLock, 
      // 刷新数据预览
     refreshData,
-    fetchBgCollectionRecords, 
-    clearSyncRecords,
-    markUploadedItemsDefault,
-     clearSheetMarksDefault,
+
      
 } from './taskpane.js';
 // ============================================================================

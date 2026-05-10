@@ -17,9 +17,5 @@ declare function updateFilterStatus(targetWs?: any): void;
 declare function refreshData(): void;
 declare function onSelectModeChange(): void;
 declare function initPanel(): void;
-declare function fetchBgCollectionRecords(): void;
-declare function clearSyncRecords(): void;
-declare function markUploadedItemsDefault(): void;
-declare function clearSheetMarksDefault(): void;
-export { initPanel, refreshSheets, refreshData, toggleSheetLock, onSelectModeChange, fetchBgCollectionRecords, clearSyncRecords, markUploadedItems, markUploadedItemsDefault, clearSheetMarksDefault, autoDetectSheet, updateFilterStatus };
+export { initPanel, refreshSheets, refreshData, toggleSheetLock, onSelectModeChange, markUploadedItems, autoDetectSheet, updateFilterStatus };
 //# sourceMappingURL=taskpane.d.ts.map

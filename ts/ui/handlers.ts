@@ -14,7 +14,7 @@ import {
     getSequentialRowsBySeqCol, SyncToBangumiAsync, clearRowColors,
     testSingleUpdate, getOrCreateSyncRecordSheet, getAllSyncRecords,
     addSyncRecord, openSyncRecordSheet, clearSheetMarksInSheet,
-    previewSyncContent, refreshData,refreshSheets,toggleSheetLock, fetchBgCollectionRecords,clearSyncRecords,
+    previewSyncContent, refreshData,refreshSheets,toggleSheetLock ,clearSyncRecords,
 
     closeDetailModal, 
 } from '../index.js';
@@ -505,7 +505,6 @@ function handleActionClick(event: Event): void {
         case 'refreshSheets': refreshSheets(); break;
         case 'refreshData': refreshData(); break;
         case 'toggleSheetLock': toggleSheetLock(); break;
-        case 'fetchBgCollectionRecords': fetchBgCollectionRecords(); break;
         case 'clearSyncRecords': clearSyncRecords(); break;
         case 'markUploadedItems': markUploadedItems(args[0]); break;
         case 'clearSheetMarks': clearSheetMarks(args[0]); break;

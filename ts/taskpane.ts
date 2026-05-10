@@ -6,7 +6,7 @@
 
 
 import { PANEL_CONFIG, WPS_ENUM , LOG_LEVELS ,getApp, bgmLog, BGM, escapeHtml, readCell, colNumToLetter,HEADER_KEYWORDS, IMPORTANT_COLS  ,initMessageListener,  markUploadedItems, clearSheetMarks, updateTokenStatus, updateUserIdStatus, showTokenDialog, showUserIdDialog ,
-     showAlert, showToast ,closeDetailModal,clearSyncRecords as _clearSyncRecords 
+     showAlert, showToast ,closeDetailModal,
 }from './index.js';
 // ========== 类型定义 ==========
 interface LockedSheetInfo {
@@ -548,18 +548,15 @@ function refreshData(): void {
                 }
             }
         }
-
-        if (hasData && !BGM.sheet.isLocked) {
-            BGM.sheet.lockedIndex = sheetIndex;
-            BGM.sheet.lockedName = sheetName;
-            BGM.sheet.isLocked = true;
-            saveLockedSheet({ index: sheetIndex, name: sheetName });
-            updateLockButton();
-            if (select) select.value = String(sheetIndex);
-            showToast('已自动锁定工作表: ' + sheetName, 'info');
-            const meta = detectHeaderAndColumns(ws, { visibleRowSet, isFiltered });
-            bgmLog(LOG_LEVELS.INFO, `headerRow=${meta.headerRow}, dataStartRow=${meta.dataStartRow}, lastCol=${meta.lastCol}, previewColStart=${meta.previewColStart},  previewColEnd=${meta.previewColEnd}`);
-        }
+            if (hasData && !BGM.sheet.isLocked) {
+                BGM.sheet.lockedIndex = sheetIndex;
+                BGM.sheet.lockedName = sheetName;
+                BGM.sheet.isLocked = true;
+                saveLockedSheet({ index: sheetIndex, name: sheetName });
+                updateLockButton();
+                if (select) select.value = String(sheetIndex);
+                showToast('已自动锁定工作表: ' + sheetName, 'info');
+            }
 
         if (previewBox) {
             previewBox.innerHTML = previewRows.length > 0
@@ -650,44 +647,15 @@ function initPanel(): void {
     document.dispatchEvent(new CustomEvent('bgm:modulesReady'));
     bgmLog(LOG_LEVELS.INFO, 'initPanel 完成');
 }
-function fetchBgCollectionRecords(): void {
-    if (typeof (window as any).syncCollectionFromBgm === 'function') {
-        (window as any).syncCollectionFromBgm();
-    } else {
-        showAlert('请先设置 Token！');
-    }
-}
 
-function clearSyncRecords(): void {
-    if (typeof _clearSyncRecords === 'function') _clearSyncRecords();
-    else showAlert('清除同步记录功能未加载');
-}
 
-function getSelectedSheetName(): string | null {
-    if (BGM.sheet.isLocked && BGM.sheet.lockedName) return BGM.sheet.lockedName;
-    const select = document.getElementById('sheetSelect') as HTMLSelectElement | null;
-    if (select && select.selectedIndex > 0) return select.options[select.selectedIndex].text;
-    return null;
-}
 
-function markUploadedItemsDefault(): void {
-    const sheetName = getSelectedSheetName();
-    if (!sheetName) { showAlert('请先选择工作表！'); return; }
-    markUploadedItems(sheetName);
-}
-
-function clearSheetMarksDefault(): void {
-    const sheetName = getSelectedSheetName();
-    if (!sheetName) { showAlert('请先选择工作表！'); return; }
-    clearSheetMarks(sheetName);
-}
 
 // ========== 导出 ==========
 export {
     initPanel, refreshSheets, refreshData, toggleSheetLock,
-    onSelectModeChange, fetchBgCollectionRecords, clearSyncRecords,
-    markUploadedItems, markUploadedItemsDefault,
-    clearSheetMarksDefault,
+    onSelectModeChange, 
+    markUploadedItems, 
     autoDetectSheet, updateFilterStatus
 };
 
