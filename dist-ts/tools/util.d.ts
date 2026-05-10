@@ -76,15 +76,19 @@ export declare function clearBgToken(): boolean;
  */
 export declare function loadBgToken(): string | null;
 /**
- * 设置 BGM 用户 ID
+ * 设置 Bangumi 用户 ID（存储到全局缓存）
+ * @param id - 用户 ID 字符串，不能为空
  */
 export declare function _setBgmUserId(id: string): void;
 /**
- * 获取 BGM 用户 ID
+ * 获取 Bangumi 用户 ID（从全局缓存读取）
+ * @returns 用户 ID 字符串；若未设置则返回 null
  */
 export declare function _getBgmUserId(): string | null;
 /**
- * 获取用户 API 路径
+ * 获取 Bangumi API 用户路径（格式：/-/userId）
+ * 用于拼接用户收藏请求的 URL
+ * @returns 用户路径字符串，如 "/-/123456"；若 userId 未设置则返回 "/-/0"
  */
 export declare function _getUserApiPath(): string;
 /**
@@ -115,6 +119,49 @@ export declare function trim(str: string | null | undefined): string;
  * 延迟执行
  */
 export declare function sleep(ms: number): void;
+/**
+ * 异步延迟指定的毫秒数
+ * @param ms 毫秒
+ * @returns Promise
+ */
+export declare function delay(ms: number): Promise<void>;
+/**
+ * 批量读取工作表中指定范围的所有值，返回字符串二维数组 [行][列]
+ * 如果读取失败则返回空数组，调用方应处理空数组情况
+ * @param ws 工作表对象
+ * @param startRow 起始行
+ * @param endRow 结束行
+ * @param startCol 起始列
+ * @param endCol 结束列
+ * @returns 字符串二维数组
+ */
+export declare function readRangeValues(ws: any, startRow: number, endRow: number, startCol: number, endCol: number): string[][];
+/**
+ * 获取或设置缓存
+ * @param key 缓存键
+ * @param factory 当缓存不存在时执行的工厂函数
+ * @returns 缓存的值
+ */
+export declare function cacheGet<T>(key: string, factory: () => T): T;
+export declare function findHeaderRow(ws: any, startRow?: number): number;
+/**
+ * 获取列名到列号的映射（优化版：使用正则规则数组，时间复杂度 O(N*M) 但 M 较小）
+ * @param ws 工作表对象
+ * @param headerRow 表头行号
+ * @returns Map<string, number> 列映射
+ */
+/**
+ * 获取列名到列号的映射（优化版：正则规则数组 + 缓存）
+ * @param ws 工作表对象
+ * @param headerRow 表头行号
+ * @returns Map<string, number> 列名 -> 列号
+ */
+export declare function getColumnMap(ws: any, headerRow: number): Map<string, number>;
+/** 清除指定工作表的所有缓存 */
+export declare function clearSheetCache(ws: any): void;
+export declare function getLastRow(ws: any): number;
+export declare function isEmptyValue(val: any): boolean;
+export declare function getDataSheet(): any;
 export interface BGMCache {
     /** WPS 文档总行数缓存 */
     totalRows: number;

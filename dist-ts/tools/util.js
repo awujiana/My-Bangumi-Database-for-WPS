@@ -1,4 +1,4 @@
-import { BGM_CONFIG, LOG_LEVELS, ERROR_LEVELS, ErrorLevel, isWpsApp, BgmError, encryptToken, decryptToken } from '../index.js';
+import { XL, BGM_CONFIG, LOG_LEVELS, ERROR_LEVELS, PANEL_CONFIG, ErrorLevel, isWpsApp, BgmError, encryptToken, decryptToken, COLUMN_RULES, COLUMNS, HEADER_KEYWORDS } from '../index.js';
 // ========== BGM 全局命名空间 ==========
 export const BGM = {
     // 缓存数据
@@ -266,7 +266,7 @@ export function getCell(ws, row, col) {
         return null;
     }
     catch (e) {
-        console.error("getCell error:", e);
+        BGM.handleError(e, { level: ErrorLevel.WARN, context: 'getCell' });
         return null;
     }
 }
@@ -282,7 +282,7 @@ export function getCellValue(ws, row, col) {
         }
     }
     catch (e) {
-        bgmLog(LOG_LEVELS.WARN, "getCellValue 失败: " + e.message);
+        BGM.handleError(e, { level: ErrorLevel.WARN, context: 'getCellValue' });
     }
     return "";
 }
@@ -390,24 +390,37 @@ export function loadBgToken() {
     clearBgToken();
     return null;
 }
-// ========== 用户信息 ==========
 /**
- * 设置 BGM 用户 ID
+ * 设置 Bangumi 用户 ID（存储到全局缓存）
+ * @param id - 用户 ID 字符串，不能为空
  */
 export function _setBgmUserId(id) {
-    BGM.cache.userId = id;
+    if (!id || id.trim() === '') {
+        bgmLog(LOG_LEVELS.WARN, '_setBgmUserId: 忽略空的用户 ID');
+        return;
+    }
+    BGM.cache.userId = id.trim();
+    bgmLog(LOG_LEVELS.DEBUG, `_setBgmUserId: 已设置 userId = ${id}`);
 }
 /**
- * 获取 BGM 用户 ID
+ * 获取 Bangumi 用户 ID（从全局缓存读取）
+ * @returns 用户 ID 字符串；若未设置则返回 null
  */
 export function _getBgmUserId() {
     return BGM.cache.userId;
 }
 /**
- * 获取用户 API 路径
+ * 获取 Bangumi API 用户路径（格式：/-/userId）
+ * 用于拼接用户收藏请求的 URL
+ * @returns 用户路径字符串，如 "/-/123456"；若 userId 未设置则返回 "/-/0"
  */
 export function _getUserApiPath() {
-    return BGM.cache.userId ? String(BGM.cache.userId) : "-";
+    const userId = _getBgmUserId();
+    if (!userId) {
+        bgmLog(LOG_LEVELS.WARN, '_getUserApiPath: userId 未设置，使用默认路径 /-/0');
+        return '/-/0';
+    }
+    return `/-/${userId}`;
 }
 /**
  * 获取 Bangumi 当前登录用户信息
@@ -440,11 +453,16 @@ export function _fetchBgmUserInfo(callback) {
             }
         }
         else {
+            // 非 200 时记录错误（401 为预期状态，不记录）
+            if (xhr.status !== 401) {
+                BGM.handleError(new Error(`获取用户信息失败，HTTP ${xhr.status}`), { level: ErrorLevel.WARN, context: '_fetchBgmUserInfo' });
+            }
             if (callback)
                 callback(null);
         }
     };
     xhr.onerror = function () {
+        BGM.handleError(new Error('获取用户信息网络错误'), { level: ErrorLevel.WARN, context: '_fetchBgmUserInfo' });
         if (callback)
             callback(null);
     };
@@ -581,3 +599,164 @@ export function sleep(ms) {
         _origError.apply(console, argsArray);
     };
 })();
+/**
+ * 异步延迟指定的毫秒数
+ * @param ms 毫秒
+ * @returns Promise
+ */
+export function delay(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+}
+/**
+ * 批量读取工作表中指定范围的所有值，返回字符串二维数组 [行][列]
+ * 如果读取失败则返回空数组，调用方应处理空数组情况
+ * @param ws 工作表对象
+ * @param startRow 起始行
+ * @param endRow 结束行
+ * @param startCol 起始列
+ * @param endCol 结束列
+ * @returns 字符串二维数组
+ */
+export function readRangeValues(ws, startRow, endRow, startCol, endCol) {
+    try {
+        const range = ws.Range(ws.Cells(startRow, startCol), ws.Cells(endRow, endCol));
+        const raw = range?.Value2;
+        if (!raw)
+            return [];
+        // 处理单个值的情况
+        if (!Array.isArray(raw)) {
+            return [[raw == null ? '' : String(raw)]];
+        }
+        const result = [];
+        for (const row of raw) {
+            if (!Array.isArray(row)) {
+                result.push([row == null ? '' : String(row)]);
+            }
+            else {
+                result.push(row.map((cell) => (cell == null ? '' : String(cell))));
+            }
+        }
+        return result;
+    }
+    catch (e) {
+        return [];
+    }
+}
+// 缓存相关（放在文件顶部，导入之后）
+const sheetCache = new Map();
+/**
+ * 获取或设置缓存
+ * @param key 缓存键
+ * @param factory 当缓存不存在时执行的工厂函数
+ * @returns 缓存的值
+ */
+export function cacheGet(key, factory) {
+    if (sheetCache.has(key)) {
+        return sheetCache.get(key);
+    }
+    const value = factory();
+    sheetCache.set(key, value);
+    return value;
+}
+export function findHeaderRow(ws, startRow) {
+    const sheetName = ws?.Name || '';
+    const cacheKey = `${sheetName}:headerRow:${startRow || 1}`;
+    return cacheGet(cacheKey, () => {
+        let sRow = startRow || 1;
+        for (let row = sRow; row <= PANEL_CONFIG.MAX_SCAN_ROWS; row++) {
+            let matchCount = 0;
+            for (let col = 1; col <= PANEL_CONFIG.MAX_SCAN_COLUMNS; col++) {
+                try {
+                    let cellVal = String(getCellValue(ws, row, col)).toLowerCase();
+                    if (!cellVal)
+                        continue;
+                    for (let header of HEADER_KEYWORDS) {
+                        if (cellVal.indexOf(header.toLowerCase()) >= 0) {
+                            matchCount++;
+                            break;
+                        }
+                    }
+                    if (matchCount >= 3)
+                        break;
+                }
+                catch (e) { }
+            }
+            if (matchCount >= 3)
+                return row;
+        }
+        return 0;
+    });
+}
+/**
+ * 获取列名到列号的映射（优化版：使用正则规则数组，时间复杂度 O(N*M) 但 M 较小）
+ * @param ws 工作表对象
+ * @param headerRow 表头行号
+ * @returns Map<string, number> 列映射
+ */
+/**
+ * 获取列名到列号的映射（优化版：正则规则数组 + 缓存）
+ * @param ws 工作表对象
+ * @param headerRow 表头行号
+ * @returns Map<string, number> 列名 -> 列号
+ */
+export function getColumnMap(ws, headerRow) {
+    const sheetName = ws?.Name || '';
+    const cacheKey = `${sheetName}:columnMap:${headerRow}`;
+    return cacheGet(cacheKey, () => {
+        const colMap = new Map();
+        const lastCol = 50;
+        for (let i = 1; i <= lastCol; i++) {
+            const colName = trim(String(getCellValue(ws, headerRow, i)));
+            if (!colName)
+                continue;
+            for (const [pattern, key] of COLUMN_RULES) {
+                if (pattern.test(colName)) {
+                    colMap.set(key, i);
+                    break; // 每个列名只匹配第一个规则
+                }
+            }
+        }
+        return colMap;
+    });
+}
+/** 清除指定工作表的所有缓存 */
+export function clearSheetCache(ws) {
+    const prefix = ws?.Name || '';
+    for (const key of sheetCache.keys()) {
+        if (key.startsWith(prefix))
+            sheetCache.delete(key);
+    }
+}
+export function getLastRow(ws) {
+    const sheetName = ws?.Name || '';
+    const cacheKey = `${sheetName}:lastRow`;
+    return cacheGet(cacheKey, () => {
+        try {
+            const cell = getCell(ws, ws.Rows.Count, COLUMNS.SEQUENCE);
+            if (cell?.Value2) {
+                return cell.End(XL.UP).Row;
+            }
+        }
+        catch (e) { }
+        return 1000; // 回退值
+    });
+}
+export function isEmptyValue(val) {
+    return val === null || val === undefined || val === "" ||
+        val === "null" || val === "NULL" || val === "Null" || val === "undefined";
+}
+// ========== 获取数据工作表 ==========
+export function getDataSheet() {
+    let app = getApp();
+    if (!app || !app.ActiveWorkbook)
+        return null;
+    if (BGM.sheet.isLocked && BGM.sheet.lockedIndex) {
+        try {
+            return app.ActiveWorkbook.Worksheets.Item(BGM.sheet.lockedIndex);
+        }
+        catch (e) {
+            bgmLog(LOG_LEVELS.WARN, "getDataSheet 锁定工作表失败: " + e.message);
+        }
+    }
+    return app.ActiveWorkbook.ActiveSheet;
+}

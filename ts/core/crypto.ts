@@ -1,198 +1,317 @@
 /**
- * BGM Token 加密模块（优化版）
- * @module crypto
- * @description Token 加密解密功能，使用 XOR 混淆 + 校验和
- *              注意：这是简单的混淆，不是真正的加密，仅用于防止明文存储
+ * @fileoverview Token加密解密模块
+ * @module core/crypto
+ * @description 提供Bangumi API Token的安全加密存储功能。
+ *              支持XOR加密（同步）和AES-GCM加密（异步）两种模式，
+ *              以及Token完整性校验。
+ *
+ * @author BGM Development Team
+ * @version 1.0.0
  */
 
+import { TOKEN_CONFIG } from './constants.js';
 
-import { TOKEN_CONFIG } from '../index.js';
-
-// ========== 内部工具 ==========
-
-function stringToBytes(str: string): Uint8Array {
-  return new TextEncoder().encode(str);
-}
-
-function bytesToBase64(bytes: Uint8Array): string {
-  return btoa(String.fromCharCode(...bytes));
-}
-
-function base64ToBytes(base64: string): Uint8Array {
-  const binary = atob(base64);
-  const bytes = new Uint8Array(binary.length);
-  for (let i = 0; i < binary.length; i++) {
-    bytes[i] = binary.charCodeAt(i);
-  }
-  return bytes;
+/**
+ * 将字符串转换为UTF-8字节数组
+ *
+ * @function strToBytes
+ * @param {string} str - 输入字符串
+ * @returns {Uint8Array} UTF-8编码的字节数组
+ *
+ * @example
+ * const bytes = strToBytes('hello');
+ * console.log(bytes); // Uint8Array([104, 101, 108, 108, 111])
+ */
+ function strToBytes(str: string): Uint8Array {
+    // .slice() 确保返回的 Uint8Array 的 buffer 是 ArrayBuffer，而不是 SharedArrayBuffer
+    return new TextEncoder().encode(str).slice();
 }
 
 /**
- * 计算校验和
+ * 将UTF-8字节数组转换回字符串
+ *
+ * @function bytesToStr
+ * @param {Uint8Array} bytes - UTF-8编码的字节数组
+ * @returns {string} 解码后的字符串
+ *
+ * @example
+ * const bytes = new Uint8Array([104, 101, 108, 108, 111]);
+ * const str = bytesToStr(bytes);
+ * console.log(str); // 'hello'
  */
-export function calcChecksum(str: string): number {
-  let sum = 0;
-  for (let i = 0; i < str.length; i++) {
-    sum = ((sum << 5) - sum + str.charCodeAt(i)) & 0xFFFFFFFF;
-  }
-  return Math.abs(sum) % 10000;
+function bytesToStr(bytes: Uint8Array): string {
+    return new TextDecoder().decode(bytes);
 }
 
 /**
- * 从解密字符串中提取 Token（版本校验 + 校验和检查）
- * @param decryptedStr - 解密后的原始字符串
- * @returns 提取的 token，校验失败返回 null
+ * 计算字符串的校验和
+ * 用于验证Token数据的完整性
+ *
+ * @function calcChecksum
+ * @param {string} input - 输入字符串
+ * @returns {number} 0-255之间的校验和值
+ *
+ * @example
+ * const checksum = calcChecksum('mytoken123');
+ * console.log(checksum); // 某个0-255的数字
  */
-export function extractToken(decryptedStr: string): string | null {
-  const version = TOKEN_CONFIG.VERSION;
-  if (!decryptedStr.startsWith(version)) {
-    return null;
-  }
-  const data = decryptedStr.substring(version.length);
-  const colonIdx = data.indexOf(':');
-  if (colonIdx === -1) return null;
-  const storedChecksum = data.substring(0, colonIdx);
-  const token = data.substring(colonIdx + 1);
-
-  const calculated = calcChecksum(token).toString().padStart(4, '0');
-  return storedChecksum === calculated ? token : null;
+export function calcChecksum(input: string): number {
+    let sum = 0;
+    for (let i = 0; i < input.length; i++) {
+        sum = ((sum << 5) - sum + input.charCodeAt(i)) & 0xFF;
+    }
+    return Math.abs(sum) % 256;
 }
 
 /**
- * 构建要加密的数据串（版本 + 校验和 + token）
+ * 构建Token Payload
+ * 在Token前后添加版本前缀和校验和，生成完整的加密前数据
+ *
+ * @function buildPayload
+ * @param {string} token - 原始Token字符串
+ * @returns {string} 格式化的Payload字符串
+ *
+ * @description
+ * Payload格式：{版本}:{校验和}:{Token}
+ * 例如：1:123:mytoken123
+ *
+ * @example
+ * const payload = buildPayload('mytoken123');
+ * console.log(payload); // '1:123:mytoken123'
  */
 export function buildPayload(token: string): string {
-  const version = TOKEN_CONFIG.VERSION;
-  const checksum = calcChecksum(token).toString().padStart(4, '0');
-  return version + checksum + ':' + token;
+    const checksum = calcChecksum(token);
+    return `${TOKEN_CONFIG.VERSION}:${checksum}:${token}`;
 }
-
-// ========== 遗留 XOR 加密 ==========
-
-interface XorEncryptResult {
-  iv: Uint8Array;
-  encrypted: Uint8Array;
-}
-
-function xorEncrypt(dataBytes: Uint8Array): XorEncryptResult {
-  const keys = TOKEN_CONFIG.FALLBACK_KEYS;
-  const iv = new Uint8Array(8);
-  crypto.getRandomValues(iv);
-  const encrypted: number[] = [];
-  for (let i = 0; i < dataBytes.length; i++) {
-    encrypted.push(dataBytes[i] ^ keys[i % keys.length] ^ iv[i % iv.length]);
-  }
-  return { iv, encrypted: new Uint8Array(encrypted) };
-}
-
-function xorDecrypt(encryptedBytes: Uint8Array, ivBytes: Uint8Array): string {
-  const keys = TOKEN_CONFIG.FALLBACK_KEYS;
-  const decrypted: number[] = [];
-  for (let i = 0; i < encryptedBytes.length; i++) {
-    decrypted.push(encryptedBytes[i] ^ keys[i % keys.length] ^ ivBytes[i % ivBytes.length]);
-  }
-  return new TextDecoder().decode(new Uint8Array(decrypted));
-}
-
-// ========== 公开 API：同步加密/解密（XOR，始终可用） ==========
 
 /**
- * 同步加密 Token
- * @param token
- * @returns 加密字符串（格式：1:iv.base64.encrypted.base64）
+ * 从解密后的字符串中提取Token
+ * 同时验证版本号和校验和的完整性
+ *
+ * @function extractToken
+ * @param {string} encrypted - 解密后的字符串
+ * @returns {string | null} 提取的Token，如果验证失败则返回null
+ *
+ * @example
+ * const token = extractToken('1:123:mytoken123');
+ * if (token) {
+ *     console.log('Token有效:', token);
+ * } else {
+ *     console.log('Token无效');
+ * }
+ */
+export function extractToken(encrypted: string): string | null {
+    try {
+        const parts = encrypted.split(':');
+        if (parts.length < 3) {
+            console.warn('[crypto] Payload格式无效');
+            return null;
+        }
+
+        const [version, checksumStr, ...tokenParts] = parts;
+        const token = tokenParts.join(':');
+        const checksum = parseInt(checksumStr, 10);
+
+        if (version !== TOKEN_CONFIG.VERSION) {
+            console.warn(`[crypto] Token版本不匹配: ${version}`);
+            return null;
+        }
+
+        const expectedChecksum = calcChecksum(token);
+        if (checksum !== expectedChecksum) {
+            console.warn('[crypto] Token校验和不匹配，可能已被篡改');
+            return null;
+        }
+
+        return token;
+    } catch (e) {
+        console.error('[crypto] 提取Token失败:', e);
+        return null;
+    }
+}
+
+/**
+ * XOR加密Token
+ * 使用简单的XOR运算对Token进行混淆
+ *
+ * @function encryptToken
+ * @param {string} token - 原始Token字符串
+ * @returns {string} Base64编码的加密字符串
+ *
+ * @description
+ * 加密格式：{版本}.{IV}.{加密数据}
+ * - 版本：1（表示使用XOR加密）
+ * - IV：初始向量（Base64编码）
+ * - 加密数据：XOR加密后的数据（Base64编码）
+ *
+ * @example
+ * const encrypted = encryptToken('my-secret-token');
+ * console.log(encrypted); // '1.abc123.xyz789'
  */
 export function encryptToken(token: string): string {
-  if (!token) return '';
-  try {
     const payload = buildPayload(token);
-    const payloadBytes = stringToBytes(payload);
-    const { iv, encrypted } = xorEncrypt(payloadBytes);
-    return '1:' + bytesToBase64(iv) + '.' + bytesToBase64(encrypted);
-  } catch (e: any) {
-    console.error('Token encryption failed:', e);
-    return '';
-  }
+    const payloadBytes = strToBytes(payload);
+    const keyBytes = strToBytes(TOKEN_CONFIG.XOR_KEY);
+
+    // 生成随机IV
+    const iv = new Uint8Array(16);
+    crypto.getRandomValues(iv);
+
+    // XOR加密
+    const encrypted = new Uint8Array(payloadBytes.length);
+    for (let i = 0; i < payloadBytes.length; i++) {
+        encrypted[i] = payloadBytes[i] ^ keyBytes[i % keyBytes.length] ^ iv[i % iv.length];
+    }
+
+    // 返回格式：版本.IV.Base64(加密数据)
+    const ivBase64 = btoa(String.fromCharCode(...iv));
+    const encryptedBase64 = btoa(String.fromCharCode(...encrypted));
+
+    return `${TOKEN_CONFIG.VERSION}.${ivBase64}.${encryptedBase64}`;
 }
 
 /**
- * 同步解密 Token
- * @param encoded
- * @returns
+ * 解密XOR加密的Token
+ *
+ * @function decryptToken
+ * @param {string} encrypted - encryptToken生成的加密字符串
+ * @returns {string | null} 解密后的Token，失败返回null
+ *
+ * @example
+ * const encrypted = encryptToken('my-secret-token');
+ * const decrypted = decryptToken(encrypted);
+ * console.log(decrypted); // 'my-secret-token'
  */
-export function decryptToken(encoded: string): string | null {
-  if (!encoded) return null;
-  try {
-    // 移除版本前缀（'1:' 或 '2:' 等）
-    const prefixEnd = encoded.indexOf(':');
-    if (prefixEnd === -1) return null;
-    const dataPart = encoded.substring(prefixEnd + 1);
-    const parts = dataPart.split('.');
-    if (parts.length !== 2) return null;
+export function decryptToken(encrypted: string): string | null {
+    try {
+        const parts = encrypted.split('.');
+        if (parts.length < 3) {
+            console.warn('[crypto] 加密字符串格式无效');
+            return null;
+        }
 
-    const iv = base64ToBytes(parts[0]);
-    const encrypted = base64ToBytes(parts[1]);
-    const decrypted = xorDecrypt(encrypted, iv);
-    return extractToken(decrypted);
-  } catch (e: any) {
-    console.error('Token decryption failed:', e);
-    return null;
-  }
-}
+        const [version, ivBase64, encryptedBase64] = parts;
 
-// ========== 异步 Web Crypto 加密/解密（可选，提供更强保护） ==========
+        if (version !== TOKEN_CONFIG.VERSION) {
+            console.warn(`[crypto] 加密版本不匹配: ${version}`);
+            return null;
+        }
 
-async function importAesKey(): Promise<CryptoKey> {
-  const keyData = new Uint8Array(TOKEN_CONFIG.KEY_BYTES);
-  return await crypto.subtle.importKey(
-    'raw',
-    keyData,
-    { name: 'AES-GCM' },
-    false,
-    ['encrypt', 'decrypt']
-  );
+        // 解码Base64
+        const iv = Uint8Array.from(atob(ivBase64), c => c.charCodeAt(0));
+        const encryptedData = Uint8Array.from(atob(encryptedBase64), c => c.charCodeAt(0));
+
+        // XOR解密
+        const keyBytes = strToBytes(TOKEN_CONFIG.XOR_KEY);
+        const decrypted = new Uint8Array(encryptedData.length);
+        for (let i = 0; i < encryptedData.length; i++) {
+            decrypted[i] = encryptedData[i] ^ keyBytes[i % keyBytes.length] ^ iv[i % iv.length];
+        }
+
+        const payload = bytesToStr(decrypted);
+        return extractToken(payload);
+    } catch (e) {
+        console.error('[crypto] 解密Token失败:', e);
+        return null;
+    }
 }
 
 /**
- * 异步加密 Token（使用 AES-GCM）
+ * 使用AES-GCM异步加密Token（更安全的加密方式）
+ *
+ * @async
+ * @function encryptTokenAsync
+ * @param {string} token - 原始Token字符串
+ * @returns {Promise<string>} Base64编码的加密字符串
+ *
+ * @description
+ * AES-GCM是AEAD加密模式，同时提供加密和完整性验证。
+ * 比XOR加密更安全，推荐在支持Web Crypto API的环境使用。
+ *
+ * @example
+ * const encrypted = await encryptTokenAsync('my-secret-token');
+ * console.log(encrypted); // '2.abc123.xyz789'
  */
 export async function encryptTokenAsync(token: string): Promise<string> {
-  if (!token) return '';
-  try {
     const payload = buildPayload(token);
-    const payloadBytes = stringToBytes(payload);
+    const payloadBytes = strToBytes(payload);
+
     const iv = crypto.getRandomValues(new Uint8Array(12));
-    const key = await importAesKey();
-    const encrypted = await crypto.subtle.encrypt(
-      { name: 'AES-GCM', iv: iv.slice().buffer as ArrayBuffer },
-      key,
-      payloadBytes.slice().buffer as ArrayBuffer
+
+    const keyMaterial = await crypto.subtle.importKey(
+        'raw',
+        strToBytes(TOKEN_CONFIG.XOR_KEY.padEnd(32, '0').slice(0, 32)),
+        { name: 'AES-GCM' },
+        false,
+        ['encrypt']
     );
-    return bytesToBase64(new Uint8Array(iv)) + '.' + bytesToBase64(new Uint8Array(encrypted));
-  } catch (e: any) {
-    console.error('Async token encryption failed:', e);
-    return '';
-  }
+
+    const encryptedBuffer = await crypto.subtle.encrypt(
+        { name: 'AES-GCM', iv: iv.slice().buffer as ArrayBuffer },
+        keyMaterial,
+        payloadBytes.slice().buffer as ArrayBuffer
+    );
+
+    const encrypted = new Uint8Array(encryptedBuffer);
+    const ivBase64 = btoa(String.fromCharCode(...iv));
+    const encryptedBase64 = btoa(String.fromCharCode(...encrypted));
+
+    return `2.${ivBase64}.${encryptedBase64}`;
 }
 /**
- * 异步解密 Token（AES-GCM）
+ * 异步解密AES-GCM加密的Token
+ *
+ * @async
+ * @function decryptTokenAsync
+ * @param {string} encrypted - encryptTokenAsync生成的加密字符串
+ * @returns {Promise<string | null>} 解密后的Token，失败返回null
+ *
+ * @example
+ * const encrypted = await encryptTokenAsync('my-secret-token');
+ * const decrypted = await decryptTokenAsync(encrypted);
+ * console.log(decrypted); // 'my-secret-token'
  */
-export async function decryptTokenAsync(encoded: string): Promise<string | null> {
-  if (!encoded) return null;
-  try {
-    const parts = encoded.split('.');
-    if (parts.length !== 2) return null;
-    const iv = base64ToBytes(parts[0]);
-    const encrypted = base64ToBytes(parts[1]);
-    const key = await importAesKey();
-    const decrypted = await crypto.subtle.decrypt(
-      { name: 'AES-GCM', iv: iv.slice().buffer as ArrayBuffer },
-      key,
-      encrypted.slice().buffer as ArrayBuffer
-    );
-    const decryptedStr = new TextDecoder().decode(decrypted);
-    return extractToken(decryptedStr);
-  } catch (e: any) {
-    console.error('Async token decryption failed:', e);
-    return null;
-  }
+export async function decryptTokenAsync(encrypted: string): Promise<string | null> {
+    try {
+        const parts = encrypted.split('.');
+        if (parts.length < 3) {
+            console.warn('[crypto] 加密字符串格式无效');
+            return null;
+        }
+
+        const [version, ivBase64, encryptedBase64] = parts;
+
+        if (version !== '2') {
+            console.warn(`[crypto] 不支持此加密版本: ${version}`);
+            return null;
+        }
+
+        // 解码Base64
+        const iv = Uint8Array.from(atob(ivBase64), c => c.charCodeAt(0));
+        const encryptedData = Uint8Array.from(atob(encryptedBase64), c => c.charCodeAt(0));
+
+        // 导入密钥
+        const keyMaterial = await crypto.subtle.importKey(
+            'raw',
+            strToBytes(TOKEN_CONFIG.XOR_KEY.padEnd(32, '0').slice(0, 32)),
+            { name: 'AES-GCM' },
+            false,
+            ['decrypt']
+        );
+
+        // AES-GCM解密
+        const decryptedBuffer = await crypto.subtle.decrypt(
+            { name: 'AES-GCM', iv },
+            keyMaterial,
+            encryptedData
+        );
+
+        const decrypted = new Uint8Array(decryptedBuffer);
+        const payload = bytesToStr(decrypted);
+
+        return extractToken(payload);
+    } catch (e) {
+        console.error('[crypto] 解密Token失败:', e);
+        return null;
+    }
 }

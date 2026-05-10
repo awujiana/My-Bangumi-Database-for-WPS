@@ -33,6 +33,7 @@ export interface WpsWorkbook {
 export interface WpsWorksheets {
     Count: number;
     Item(index: number): WpsWorksheet;
+    Move(Before?: any, After?: any): void;
 }
 
 export interface WpsSheets {

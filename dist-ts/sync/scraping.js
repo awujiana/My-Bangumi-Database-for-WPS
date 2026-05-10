@@ -1,138 +1,222 @@
 /**
- * 同步收藏模块（TypeScript 版）
+ * @fileoverview Bangumi数据拉取模块
  * @module sync/scraping
+ * @description 从Bangumi API获取用户收藏数据并同步到Excel的工作逻辑。
+ *              支持Token验证、收藏列表获取等功能。
+ *
+ * @author BGM Development Team
+ * @version 1.0.0
  */
-import { BGM, bgmLog, LOG_LEVELS, } from '../index.js';
-// ========== 局部常量配置 ==========
-const CONFIG = {
-    API_BASE: 'https://api.bgm.tv/v0',
-    MAX_PAGES: 50,
-    LIMIT: 100,
-    RETRY_DELAY: 2000,
-    RETRY_MAX: 3,
-    REQUEST_DELAY: 500
-};
-const SUBJECT_TYPES = [1, 2, 3, 4, 6];
-const TYPE_LABELS = {
-    1: '书籍', 2: '动画', 3: '音乐', 4: '游戏', 6: '真人剧'
-};
-// ========== 内部工具 ==========
-function delay(ms) {
-    return new Promise(resolve => setTimeout(resolve, ms));
-}
-async function apiRequest(path, token) {
-    const url = CONFIG.API_BASE + path;
-    let retries = 0;
-    while (retries <= CONFIG.RETRY_MAX) {
-        const response = await fetch(url, {
-            headers: { 'Authorization': `Bearer ${token}` }
-        });
-        if (response.status === 429) {
-            retries++;
-            bgmLog(LOG_LEVELS.WARN, `遇到限流 (429)，${CONFIG.RETRY_DELAY / 1000}s 后重试 (${retries}/${CONFIG.RETRY_MAX})`);
-            await delay(CONFIG.RETRY_DELAY);
-            continue;
-        }
-        let data = null;
-        try {
-            data = await response.json();
-        }
-        catch (_) { }
-        return { status: response.status, data };
-    }
-    throw new Error(`请求失败：连续 ${retries} 次 429 限流`);
-}
-// ========== Token 验证 ==========
+import { BGM_CONFIG, LOG_LEVELS, bgmLog } from '../index.js';
 /**
- * 异步验证 Token 有效性（增强版：检测过期）
- * @param {string} token - Access Token
- * @returns {Promise<TokenVerifyResult>}
+ * 验证Bangumi API Token的有效性
+ *
+ * @async
+ * @function verifyToken
+ * @param {string} token - 待验证的API Token
+ * @returns {Promise<TokenVerifyResult>} 验证结果
+ *
+ * @description
+ * 通过调用 /v0/me 接口验证Token是否有效。
+ * 如果Token有效，会自动更新缓存中的用户信息。
+ *
+ * @example
+ * const result = await verifyToken('your-token-here');
+ * if (result.valid) {
+ *     console.log(`欢迎，${result.username}！`);
+ * }
  */
 export async function verifyToken(token) {
-    if (!token)
-        return { valid: false, userId: '', username: '', message: 'Token 为空' };
+    const result = {
+        valid: false,
+        userId: '', // 确保始终为字符串
+        username: '', // 确保始终为字符串
+        message: ''
+    };
+    if (!token) {
+        result.message = 'Token 不能为空';
+        return result;
+    }
     try {
-        const { status, data } = await apiRequest('/v0/me', token);
-        if (status === 200) {
-            const userData = data;
-            // 检查令牌过期时间（如果提供）
-            if (userData.expires_at) {
-                const expiresTimestamp = Number(userData.expires_at) * 1000; // 转为毫秒
-                if (!isNaN(expiresTimestamp) && Date.now() > expiresTimestamp) {
-                    return {
-                        valid: false,
-                        userId: String(userData.id || ''),
-                        username: userData.nickname || userData.username || '未知',
-                        message: 'Token 已过期，请重新获取'
-                    };
+        const xhr = new XMLHttpRequest();
+        const response = await new Promise((resolve, reject) => {
+            xhr.open('GET', `${BGM_CONFIG.API_BASE}/v0/me`, true);
+            xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+            xhr.setRequestHeader('Content-Type', 'application/json');
+            xhr.onload = () => {
+                try {
+                    resolve({
+                        status: xhr.status,
+                        data: xhr.responseText ? JSON.parse(xhr.responseText) : null
+                    });
                 }
-            }
-            return {
-                valid: true,
-                userId: String(userData.id || ''),
-                username: userData.nickname || userData.username || '未知',
-                message: 'Token 有效'
+                catch (e) {
+                    reject(new Error('解析响应失败'));
+                }
             };
+            xhr.onerror = () => reject(new Error('网络错误'));
+            xhr.send();
+        });
+        if (response.status === 200) {
+            result.valid = true;
+            result.message = 'Token 有效';
+            if (response.data) {
+                result.userId = String(response.data.id || '');
+                result.username = response.data.username || response.data.nickname || '';
+            }
         }
-        if (status === 401) {
-            return { valid: false, userId: '', username: '', message: 'Token 无效或已过期（HTTP 401）' };
+        else if (response.status === 401) {
+            result.message = 'Token 无效或已过期';
         }
-        return { valid: false, userId: '', username: '', message: `Token 验证失败（HTTP ${status}）` };
+        else {
+            result.message = `验证失败 (HTTP ${response.status})`;
+        }
     }
     catch (e) {
-        const err = e;
-        return { valid: false, userId: '', username: '', message: 'Token 验证请求失败: ' + err.message };
+        result.message = e.message || '验证过程出错';
+        bgmLog(LOG_LEVELS.ERROR, 'verifyToken error: ' + (e.message || e));
     }
+    return result;
 }
-// ========== 收藏列表获取 ==========
-export async function fetchAllUserCollections(token, userId) {
+/**
+ * 获取用户的收藏列表
+ *
+ * @async
+ * @function fetchAllUserCollections
+ * @param {string} token - API Token
+ * @param {string} [userId] - 用户ID（可选，不提供则从Token自动获取）
+ * @param {Object} [options] - 可选参数
+ * @param {number} [options.limit=30] - 每页数量
+ * @param {number} [options.maxTotal=1000] - 最大获取数量
+ * @param {Function} [options.onProgress] - 进度回调
+ * @returns {Promise<any[]>} 收藏列表
+ *
+ * @description
+ * 从Bangumi API获取用户的收藏列表，支持自动分页。
+ * 默认最多获取1000条记录，每页30条。
+ *
+ * @example
+ * const collections = await fetchAllUserCollections(token, '123456', {
+ *     onProgress: (page, total) => console.log(`获取第${page}页，共${total}页`)
+ * });
+ * console.log(`共获取 ${collections.length} 条收藏`);
+ */
+export async function fetchAllUserCollections(token, userId, options) {
+    const limit = options?.limit || 30;
+    const maxTotal = options?.maxTotal || 1000;
+    // 如果没有提供userId，先验证Token获取用户信息
     if (!userId) {
-        const authResult = await verifyToken(token);
-        if (!authResult.valid) {
-            BGM.handleError(new Error('Token 无效，无法获取用户 ID'), { context: 'fetchAllUserCollections', showAlert: true });
-            throw new Error('Token 无效，无法获取用户 ID');
+        const verifyResult = await verifyToken(token);
+        if (!verifyResult.valid) {
+            bgmLog(LOG_LEVELS.ERROR, 'fetchAllUserCollections: Token无效');
+            return [];
         }
-        userId = authResult.userId;
+        userId = verifyResult.userId;
+    }
+    if (!userId) {
+        bgmLog(LOG_LEVELS.ERROR, 'fetchAllUserCollections: 无法获取用户ID');
+        return [];
     }
     const allCollections = [];
-    bgmLog(LOG_LEVELS.INFO, `开始获取用户 ${userId} 的全部收藏`);
-    for (const type of SUBJECT_TYPES) {
-        const typeName = TYPE_LABELS[type] || '未知';
-        let page = 1;
-        let hasMore = true;
-        bgmLog(LOG_LEVELS.INFO, `获取「${typeName}」类型收藏 (type=${type})`);
-        while (page <= CONFIG.MAX_PAGES && hasMore) {
-            try {
-                const offset = (page - 1) * CONFIG.LIMIT;
-                const path = `/v0/users/${userId}/collections?subject_type=${type}&limit=${CONFIG.LIMIT}&offset=${offset}`;
-                const { status, data } = await apiRequest(path, token);
-                if (status === 401)
-                    throw new Error('Token 无效或已过期');
-                if (status === 403)
-                    throw new Error('没有权限访问收藏列表');
-                if (status === 404)
-                    break;
-                if (status !== 200)
-                    throw new Error(`HTTP 错误: ${status}`);
-                const items = Array.isArray(data) ? data : data.data || [];
-                if (!items.length) {
-                    hasMore = false;
+    let offset = 0;
+    let total = 0;
+    let page = 0;
+    bgmLog(LOG_LEVELS.INFO, `开始获取用户 ${userId} 的收藏列表`);
+    while (offset < maxTotal) {
+        page++;
+        try {
+            const url = `${BGM_CONFIG.API_BASE}/v0/users/${userId}/collections?limit=${limit}&offset=${offset}`;
+            const response = await fetch(url, {
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                }
+            });
+            if (!response.ok) {
+                if (response.status === 429) {
+                    // 限流，等待后重试
+                    bgmLog(LOG_LEVELS.WARN, 'API限流，等待重试...');
+                    await new Promise(resolve => setTimeout(resolve, BGM_CONFIG.REQUEST_DELAY * 2));
+                    continue;
+                }
+                throw new Error(`HTTP ${response.status}`);
+            }
+            const data = await response.json();
+            // 首次请求获取总数
+            if (total === 0 && data.total) {
+                total = Math.min(data.total, maxTotal);
+                bgmLog(LOG_LEVELS.INFO, `收藏总数: ${total}`);
+            }
+            // 添加到结果集
+            if (data.data && Array.isArray(data.data)) {
+                allCollections.push(...data.data);
+                offset += data.data.length;
+                // 进度回调
+                if (options?.onProgress) {
+                    options.onProgress(page, Math.ceil(total / limit));
+                }
+                // 如果没有更多数据，退出循环
+                if (data.data.length < limit || offset >= total) {
                     break;
                 }
-                allCollections.push(...items);
-                page++;
-                if (items.length < CONFIG.LIMIT)
-                    hasMore = false;
             }
-            catch (e) {
-                BGM.handleError(e, { context: `fetchAllUserCollections: ${typeName} 第${page}页`, showAlert: true });
-                throw e;
+            else {
+                break;
             }
+            // 请求间隔（防止限流）
+            await new Promise(resolve => setTimeout(resolve, BGM_CONFIG.REQUEST_DELAY));
         }
-        if (type !== SUBJECT_TYPES[SUBJECT_TYPES.length - 1]) {
-            await delay(CONFIG.REQUEST_DELAY);
+        catch (e) {
+            bgmLog(LOG_LEVELS.ERROR, 'fetchSubjectCollection error: ' + (e.message || String(e)));
+            break;
         }
     }
-    bgmLog(LOG_LEVELS.INFO, `共获取 ${allCollections.length} 条收藏记录`);
+    bgmLog(LOG_LEVELS.INFO, `获取收藏完成，共 ${allCollections.length} 条`);
     return allCollections;
+}
+/**
+ * 获取单个条目的收藏状态
+ *
+ * @async
+ * @function fetchSubjectCollection
+ * @param {string} token - API Token
+ * @param {string} subjectId - 条目ID
+ * @returns {Promise<ApiResponse>} API响应
+ *
+ * @description
+ * 获取当前用户对特定条目的收藏状态
+ *
+ * @example
+ * const result = await fetchSubjectCollection(token, '123456');
+ * if (result.data) {
+ *     console.log(`当前状态: ${result.data.type}`);
+ * }
+ */
+export async function fetchSubjectCollection(token, subjectId) {
+    const result = {
+        data: null,
+        status: 0,
+        message: ''
+    };
+    try {
+        const response = await fetch(`${BGM_CONFIG.API_BASE}/v0/users/-/collections/${subjectId}`, {
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            }
+        });
+        result.status = response.status;
+        if (response.ok) {
+            result.data = await response.json();
+            result.message = 'success';
+        }
+        else {
+            result.message = `HTTP ${response.status}`;
+        }
+    }
+    catch (e) {
+        result.message = e.message || '请求失败';
+        bgmLog(LOG_LEVELS.ERROR, 'fetchSubjectCollection error: ' + (e.message || String(e)));
+    }
+    return result;
 }

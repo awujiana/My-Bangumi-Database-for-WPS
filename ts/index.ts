@@ -229,7 +229,7 @@ export {
     // BGM 全局命名空间（包含 Dialog, Message, handleError 等）
     BGM,
     _getUserApiPath, 
-   
+   _fetchBgmUserInfo,
     showBangumiPanel,
    
     sleep,
@@ -245,6 +245,8 @@ export {
     getDataSheet,
       // 查找表头行
     findHeaderRow,
+    shellExecuteByOAAssist,
+    GetUrlPath,
 
 } from './tools/util.js';
 

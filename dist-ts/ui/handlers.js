@@ -369,7 +369,7 @@ async function _doAPISync(sheetIndex, token) {
             showAlert('✘ ' + verifyResult.message);
             return;
         }
-        _setBgmUserId(verifyResult.userId);
+        _setBgmUserId(verifyResult.userId || '');
         setStatus('正在获取收藏列表...', 'info');
         const userCollections = await fetchAllUserCollections(token);
         const collectionMap = new Map();

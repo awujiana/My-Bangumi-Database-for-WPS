@@ -405,26 +405,39 @@ export function loadBgToken(): string | null {
     return null;
 }
 
-// ========== 用户信息 ==========
 /**
- * 设置 BGM 用户 ID
+ * 设置 Bangumi 用户 ID（存储到全局缓存）
+ * @param id - 用户 ID 字符串，不能为空
  */
-export function _setBgmUserId(id: string): void { 
-    BGM.cache.userId = id; 
+export function _setBgmUserId(id: string): void {
+    if (!id || id.trim() === '') {
+        bgmLog(LOG_LEVELS.WARN, '_setBgmUserId: 忽略空的用户 ID');
+        return;
+    }
+    BGM.cache.userId = id.trim();
+    bgmLog(LOG_LEVELS.DEBUG, `_setBgmUserId: 已设置 userId = ${id}`);
 }
 
 /**
- * 获取 BGM 用户 ID
+ * 获取 Bangumi 用户 ID（从全局缓存读取）
+ * @returns 用户 ID 字符串；若未设置则返回 null
  */
-export function _getBgmUserId(): string | null { 
-    return BGM.cache.userId; 
+export function _getBgmUserId(): string | null {
+    return BGM.cache.userId;
 }
 
 /**
- * 获取用户 API 路径
+ * 获取 Bangumi API 用户路径（格式：/-/userId）
+ * 用于拼接用户收藏请求的 URL
+ * @returns 用户路径字符串，如 "/-/123456"；若 userId 未设置则返回 "/-/0"
  */
-export function _getUserApiPath(): string { 
-    return BGM.cache.userId ? String(BGM.cache.userId) : "-"; 
+export function _getUserApiPath(): string {
+    const userId = _getBgmUserId();
+    if (!userId) {
+        bgmLog(LOG_LEVELS.WARN, '_getUserApiPath: userId 未设置，使用默认路径 /-/0');
+        return '/-/0';
+    }
+    return `/-/${userId}`;
 }
 
 /**

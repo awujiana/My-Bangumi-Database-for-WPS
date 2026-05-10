@@ -5,7 +5,7 @@
  *              其他模块只需 `import { ... } from '../types/index.js'`
  *              即可获取所有核心功能与类型，降低模块间耦合。
  */
-export { ErrorLevel, type ErrorOptions, WPS_ENUM, XL, BGM_CONFIG, BGM_COLOR, LOG_LEVELS, ERROR_LEVELS, PANEL_CONFIG, BGM_SUBJECT_TYPES, SYNC_STATUS, } from './core/constants.js';
+export { ErrorLevel, type ErrorOptions, WPS_ENUM, XL, BGM_CONFIG, BGM_COLOR, LOG_LEVELS, ERROR_LEVELS, PANEL_CONFIG, BGM_SUBJECT_TYPES, SYNC_STATUS, COLUMN_RULES, HEADER_KEYWORDS, IMPORTANT_COLS, TYPE_TEXT_MAP, FIELD_NAME_MAP, URL_PATTERNS, TOKEN_CONFIG, WATCH_STATUS_MAP, COLUMNS, } from './core/constants.js';
 export { BgmError, Result, type BatchSyncResult, } from './core/result.js';
 export { calcChecksum, extractToken, encryptToken, decryptToken, } from './core/crypto.js';
 export { httpRequest, type HttpMethod, } from './tools/http.js';
@@ -19,9 +19,9 @@ export { type DialogButton, type DialogConfig, type DialogCallback, type DialogO
 export { setStatus, initMessageListener, setSyncRunning, } from './ui/message.js';
 export { showUserIdDialog, markUploadedItems, clearSheetMarks, updateTokenStatus, updateUserIdStatus, showTokenDialog, testDebugConnection, syncCollectionFromBgm } from './ui/handlers.js';
 export { getOrCreateSyncRecordSheet, getAllSyncRecords, addSyncRecord, openSyncRecordSheet, clearSheetMarksInSheet, type SyncRecord, type UpdateRecordParams, clearSyncRecords, } from './sync/syncRecord.js';
-export { findHeaderRow, getColumnMap, getLastRow, extractSubjectId, getFilterStatus, getSequentialRowsBySeqCol, SyncToBangumiAsync, clearRowColors, testSingleUpdate, mapWatchStatus, buildJsonPayload, bgmRequestSync, bgmRequest, setBangumiToken, openBangumiTokenPage, testTokenValidityForRibbon, openUserCollection, buildTagsArray, addTagsFromStr, getDataSheet, HEADER_KEYWORDS, IMPORTANT_COLS } from './sync/exceltobangumi.js';
+export { extractSubjectId, getFilterStatus, getSequentialRowsBySeqCol, SyncToBangumiAsync, clearRowColors, testSingleUpdate, mapWatchStatus, buildJsonPayload, bgmRequestSync, setBangumiToken, openBangumiTokenPage, testTokenValidityForRibbon, openUserCollection, buildTagsArray, addTagsFromStr, } from './sync/exceltobangumi.js';
 export { verifyToken, fetchAllUserCollections, type BangumiUserData, type TokenVerifyResult, type ApiResponse, } from './sync/scraping.js';
-export { bgmLog, getApp, colNumToLetter, getCell, getCellValue, readCell, setCellValue, getSheetByIndex, escapeHtml, storeBgToken, clearBgToken, loadBgToken, _getBgmUserId, _setBgmUserId, fetchBgmUserInfo, trim, BGM, _getUserApiPath, showBangumiPanel, sleep, } from './tools/util.js';
+export { bgmLog, getApp, colNumToLetter, getCell, getCellValue, readCell, setCellValue, getSheetByIndex, escapeHtml, storeBgToken, clearBgToken, loadBgToken, _getBgmUserId, _setBgmUserId, fetchBgmUserInfo, trim, BGM, _getUserApiPath, _fetchBgmUserInfo, showBangumiPanel, sleep, delay, readRangeValues, getColumnMap, cacheGet, clearSheetCache, getLastRow, isEmptyValue, getDataSheet, findHeaderRow, shellExecuteByOAAssist, GetUrlPath, } from './tools/util.js';
 export type { BGMCache, BGMSheet, BGMSync, BGMUserInfo, } from './tools/util.js';
 export { refreshSheets, toggleSheetLock, refreshData, } from './taskpane.js';
 export type { DetailItem, PreviewItem, DetailPreviewData, } from './ui/preview.js';

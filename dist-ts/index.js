@@ -26,7 +26,7 @@ PANEL_CONFIG,
 // Bangumi 条目类型映射
 BGM_SUBJECT_TYPES, 
 // 同步状态常量
-SYNC_STATUS, } from './core/constants.js';
+SYNC_STATUS, COLUMN_RULES, HEADER_KEYWORDS, IMPORTANT_COLS, TYPE_TEXT_MAP, FIELD_NAME_MAP, URL_PATTERNS, TOKEN_CONFIG, WATCH_STATUS_MAP, COLUMNS, } from './core/constants.js';
 // ============================================================================
 // 2. 错误处理与结果类型（来自 core/result.js）
 // ============================================================================
@@ -89,12 +89,6 @@ clearSheetMarksInSheet, clearSyncRecords, } from './sync/syncRecord.js';
 // 9. 同步引擎（来自 sync/exceltobangumi.js）
 // ============================================================================
 export { 
-// 查找表头行
-findHeaderRow, 
-// 获取列映射
-getColumnMap, 
-// 获取最后一行
-getLastRow, 
 // 提取 Subject ID
 extractSubjectId, 
 // 获取筛选状态
@@ -106,7 +100,7 @@ SyncToBangumiAsync,
 // 清除所有行颜色标记
 clearRowColors, 
 // 测试单个条目更新
-testSingleUpdate, mapWatchStatus, buildJsonPayload, bgmRequestSync, bgmRequest, setBangumiToken, openBangumiTokenPage, testTokenValidityForRibbon, openUserCollection, buildTagsArray, addTagsFromStr, getDataSheet, HEADER_KEYWORDS, IMPORTANT_COLS } from './sync/exceltobangumi.js';
+testSingleUpdate, mapWatchStatus, buildJsonPayload, bgmRequestSync, setBangumiToken, openBangumiTokenPage, testTokenValidityForRibbon, openUserCollection, buildTagsArray, addTagsFromStr, } from './sync/exceltobangumi.js';
 // ============================================================================
 // 10. 同步收藏抓取（来自 sync/scraping.js）
 // ============================================================================
@@ -152,7 +146,13 @@ fetchBgmUserInfo,
 // 去除首尾空格
 trim, 
 // BGM 全局命名空间（包含 Dialog, Message, handleError 等）
-BGM, _getUserApiPath, showBangumiPanel, sleep, } from './tools/util.js';
+BGM, _getUserApiPath, _fetchBgmUserInfo, showBangumiPanel, sleep, delay, readRangeValues, 
+// 获取列映射（固定表头名称到列号的映射）
+getColumnMap, cacheGet, clearSheetCache, 
+// 获取最后一行
+getLastRow, isEmptyValue, getDataSheet, 
+// 查找表头行
+findHeaderRow, shellExecuteByOAAssist, GetUrlPath, } from './tools/util.js';
 // ============================================================================
 // 12. 页面逻辑（来自 taskpane.js）
 // ============================================================================

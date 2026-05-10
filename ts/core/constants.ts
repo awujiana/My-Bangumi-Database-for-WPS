@@ -1,132 +1,233 @@
 /**
- * BGM 项目常量定义
- * @module constants
- * @description 统一定义所有常量，避免分散定义导致的不一致
- *              所有其他模块应从此模块导入常量，而非自行定义
+ * @fileoverview 全局常量定义模块
+ * @module core/constants
+ * @description 存储项目中使用的所有全局常量、枚举、配置值和映射表。
+ *              包括WPS Office枚举、Excel方向常量、Bangumi API配置、
+ *              颜色常量、面板配置、表头关键字、字段映射等。
+ *
+ * @author BGM Development Team
+ * @version 1.0.0
  */
 
-
-
-// ========== 错误级别枚举 ==========
+/**
+ * 错误级别枚举
+ * 用于控制错误处理的行为和输出级别
+ *
+ * @enum {number}
+ * @property {number} SILENT - 静默处理，不输出任何信息
+ * @property {number} WARN - 输出警告信息
+ * @property {number} ERROR - 输出错误信息
+ * @property {number} THROW - 抛出异常
+ */
 export const ErrorLevel = {
     SILENT: 0,
     WARN: 1,
     ERROR: 2,
     THROW: 3
 } as const;
-export type ErrorLevel = typeof ErrorLevel[keyof typeof ErrorLevel];
 
-
-// ========== 错误处理选项 ==========
+/**
+ * 错误处理选项接口
+ * 用于配置handleError函数的行为
+ *
+ * @interface ErrorOptions
+ * @property {number} [level=ErrorLevel.ERROR] - 错误级别
+ * @property {string} [context] - 错误上下文描述
+ * @property {boolean} [showAlert=false] - 是否显示警告对话框
+ * @property {boolean} [throwOnCritical=true] - 严重错误是否抛出
+ */
 export interface ErrorOptions {
-    /** 错误级别（0=SILENT, 1=WARN, 2=ERROR, 3=THROW） */
-    level?: ErrorLevel;
-    /** 是否显示错误对话框 */
-    showAlert?: boolean;
-    /** 错误上下文描述 */
+    level?: number;
     context?: string;
+    showAlert?: boolean;
+    throwOnCritical?: boolean;
 }
 
-
-
-// ========== WPS Office 枚举 ==========
+/**
+ * WPS Office 枚举值集合
+ * 用于WPS加载项开发和COM对象操作
+ *
+ * @constant
+ * @type {Object}
+ */
 export const WPS_ENUM = {
-  msoCTPDockPositionLeft: 0,
-  msoCTPDockPositionRight: 2
+    /** 任务窗格停靠位置：左侧 */
+    msoCTPDockPositionLeft: 0,
+    /** 任务窗格停靠位置：右侧 */
+    msoCTPDockPositionRight: 2
 };
 
-// ========== Excel 方向常量 ==========
+/**
+ * Excel 方向常量
+ * 用于Range对象的导航和定位操作
+ *
+ * @constant
+ * @type {Object}
+ */
 export const XL = {
-  UP: -4162,           // xlUp - 向上查找
-  DOWN: -4121,         // xlDown - 向下查找
-  TO_LEFT: -4159,      // xlToLeft - 向左查找
-  TO_RIGHT: -4161,     // xlToRight - 向右查找
-  NONE: -4142,         // xlNone - 无填充
-  CELL_TYPE_VISIBLE: 12 // xlCellTypeVisible - 可见单元格
+    /** 向上定位 (xlUp) */
+    UP: -4162,
+    /** 向下定位 (xlDown) */
+    DOWN: -4121,
+    /** 向左定位 (xlToLeft) */
+    TO_LEFT: -4159,
+    /** 向右定位 (xlToRight) */
+    TO_RIGHT: -4161,
+    /** 无特殊填充 (xlNone) */
+    NONE: -4142,
+    /** 可见单元格类型 (xlCellTypeVisible) */
+    CELL_TYPE_VISIBLE: 12
 };
 
-// ========== BGM API 配置 ==========
+/**
+ * Bangumi API 配置
+ * 定义与Bangumi API通信的相关参数
+ *
+ * @constant
+ * @type {Object}
+ */
 export const BGM_CONFIG = {
-  API_BASE: "https://api.bgm.tv",
-  REQUEST_DELAY: 800,
-  MAX_RETRIES: 3,
-  RETRY_DELAY_BASE: 2000
+    /** Bangumi API 基础URL */
+    API_BASE: "https://api.bgm.tv",
+    /** 请求间隔时间（毫秒），用于防止API限流 */
+    REQUEST_DELAY: 800,
+    /** 失败后最大重试次数 */
+    MAX_RETRIES: 3,
+    /** 重试等待基础时间（毫秒），采用指数退避策略 */
+    RETRY_DELAY_BASE: 2000
 };
 
-// ========== Excel 颜色常量 ==========
+/**
+ * 错误级别映射
+ * 将HTTP状态码映射到错误级别
+ *
+ * @constant
+ * @type {Record<number, number>}
+ */
+export const ERROR_LEVELS: Record<number, number> = {
+    400: ErrorLevel.ERROR,
+    401: ErrorLevel.ERROR,
+    403: ErrorLevel.ERROR,
+    404: ErrorLevel.WARN,
+    429: ErrorLevel.ERROR,
+    500: ErrorLevel.ERROR,
+    502: ErrorLevel.ERROR,
+    503: ErrorLevel.ERROR
+};
+
+/**
+ * Excel 单元格颜色常量
+ * 用于标记同步结果的可视化显示
+ *
+ * @constant
+ * @type {Object}
+ */
 export const BGM_COLOR = {
-  SUCCESS: 0xCCFFCC,     // 上传成功 - 绿
-  FAIL: 0xFFCCCC,        // 上传失败 - 红
-  SKIP: 0xFFFFCC,        // 跳过 - 黄
-  BGM_SYNC: 0x7030A0,    // 从BGM同步标记 - 紫
-  LIGHT_GREEN: 0x92D050, // 已同步一次标记 - 浅绿
-  DARK_GREEN: 0x00B050,  // 已同步多次标记 - 深绿
-  GRAY: 0xD3D3D3,        // 表头灰色
-  WHITE: 0xFFFFFF,       // 白色（清除标记）
+    /** 浅绿色 - 同步成功 */
+    SUCCESS: 0xCCFFCC,
+    /** 浅红色 - 同步失败 */
+    FAIL: 0xFFCCCC,
+    /** 浅黄色 - 跳过 */
+    SKIP: 0xFFFFCC,
+    /** 紫色 - 从Bangumi同步（已收藏1次） */
+    BGM_SYNC: 0x7030A0,
+    /** 浅绿色 - 已同步2次 */
+    LIGHT_GREEN: 0x92D050,
+    /** 深绿色 - 已同步3次及以上 */
+    DARK_GREEN: 0x00B050,
+    /** 灰色 - 表头背景 */
+    GRAY: 0xD3D3D3,
+    /** 白色 - 清除标记 */
+    WHITE: 0xFFFFFF
 };
 
-// ========== Token 加密配置 ==========
-export const TOKEN_CONFIG = {
-  // AES 密钥（32字节 = 256位）
-  KEY_BYTES: [
-    0x42, 0x47, 0x4D, 0x5F, 0x54, 0x4F, 0x4B, 0x45,
-    0x4E, 0x5F, 0x53, 0x45, 0x43, 0x55, 0x52, 0x45,
-    0x5F, 0x4B, 0x45, 0x59, 0x5F, 0x32, 0x30, 0x32,
-    0x34, 0x5F, 0x41, 0x45, 0x53, 0x5F, 0x32, 0x35
-  ],
-  VERSION: "BGM2:",
-  // 备用 XOR 密钥（当 Web Crypto 不可用时使用）
-  FALLBACK_KEYS: [0x5A, 0xA5, 0x7F, 0xF2, 0x3C, 0xC3, 0x1E, 0xE1]
-};
-
-// ========== 日志级别 ==========
+/**
+ * 日志级别常量
+ * 用于bgmLog函数控制日志输出
+ *
+ * @constant
+ * @type {Object}
+ */
 export const LOG_LEVELS = {
-  DEBUG: 0,
-  INFO: 1,
-  WARN: 2,
-  ERROR: 3
+    /** 调试级别 - 详细信息，通常用于开发调试 */
+    DEBUG: 0,
+    /** 信息级别 - 一般操作信息 */
+    INFO: 1,
+    /** 警告级别 - 潜在问题提示 */
+    WARN: 2,
+    /** 错误级别 - 错误信息 */
+    ERROR: 3
 };
 
-// ========== 错误级别 ==========
-export const ERROR_LEVELS = {
-  SILENT: 0,    // 静默处理
-  WARN: 1,      // 警告
-  ERROR: 2,     // 错误
-  THROW: 3      // 抛出异常
-};
-
-// ========== 任务面板配置 ==========
+/**
+ * 任务面板配置
+ * 定义面板扫描和显示的相关参数
+ *
+ * @constant
+ * @type {Object}
+ */
 export const PANEL_CONFIG = {
-  /** 表头/数据扫描的最大列数 */
-  MAX_SCAN_COLUMNS: 60,
-  /** 表头检测的最大扫描行数 */
-  MAX_SCAN_ROWS: 10,
-  /** 预览显示的数据行数上限 */
-  PREVIEW_LIMIT: 8,
-  /** 筛选检测最大行数（SpecialCells 可用时） */
-  MAX_FILTER_SCAN_ROWS: 5000,
-  /** 回退方式（逐行 Hidden 检查）的最大行数 */
-  FILTER_FALLBACK_LIMIT: 200,
+    /** 表头检测的最大列数 */
+    MAX_SCAN_COLUMNS: 60,
+    /** 表头检测的最大行数 */
+    MAX_SCAN_ROWS: 10,
+    /** 预览显示的数据行数上限 */
+    PREVIEW_LIMIT: 8,
+    /** 筛选检测最大行数 */
+    MAX_FILTER_SCAN_ROWS: 5000,
+    /** 回退检测的最大行数 */
+    FILTER_FALLBACK_LIMIT: 200
 };
 
-// ========== BGM 条目类型 ==========
-export const BGM_SUBJECT_TYPES: { [key: number]: string } = {
-  1: "书籍",
-  2: "动画",
-  3: "音乐",
-  4: "游戏",
-  6: "真人剧"
+/**
+ * Bangumi 条目类型映射
+ * 将数字类型映射为可读文本
+ *
+ * @constant
+ * @type {Record<number, string>}
+ */
+export const BGM_SUBJECT_TYPES: Record<number, string> = {
+    /** 书籍 */
+    1: '书籍',
+    /** 动画 */
+    2: '动画',
+    /** 音乐 */
+    3: '音乐',
+    /** 游戏 */
+    4: '游戏',
+    /** 真人剧 */
+    6: '真人剧'
 };
 
-// ========== 同步记录状态 ==========
+/**
+ * 同步状态常量
+ * 用于标识同步操作的结果状态
+ *
+ * @constant
+ * @type {Object}
+ */
 export const SYNC_STATUS = {
-  SUCCESS: "成功",
-  FAIL: "失败",
-  SKIP: "跳过",
-  COLLECTED: "已收藏"
+    /** 成功 */
+    SUCCESS: '成功',
+    /** 失败 */
+    FAIL: '失败',
+    /** 跳过 */
+    SKIP: '跳过',
+    /** 已收藏 */
+    COLLECTED: '已收藏',
+    /** 无需更新 */
+    NO_UPDATE: '无需更新'
 };
 
-// 定义匹配规则数组（按优先级顺序）
+/**
+ * 列规则配置
+ * 定义各列的数据验证和转换规则
+ *
+ * @constant
+ * @type {Array<Object>}
+ */
+
+// ✅ COLUMN_RULES 必须是数组（元素为 [正则, 映射名] 元组）
 export const COLUMN_RULES: [RegExp, string][] = [
     [/bangumi.*url|bgm.*url|subject.*url|url.*bgm/i, "Bangumi_URL"],
     [/是否看完|观看状态/, "是否看完"],
@@ -153,70 +254,153 @@ export const COLUMN_RULES: [RegExp, string][] = [
     [/制片国家/, "制片国家"],
     [/语言/, "语言"]
 ];
+/**
+ * 列索引常量
+ * 定义标准列对应的索引位置
+ *
+ * @constant
+ * @type {Object}
+ */
 
-
-
-// ========== 常量定义 ==========
 export const COLUMNS = {
-  SEQUENCE: 4,      // D列 - 序号
-  DEFAULT_START: 1
+  /** 序列号列 */
+    SEQUENCE: 4,      // D列 - 序号
+    DEFAULT_START: 1,
+    // 如果需要 NAME, URL, STATUS 也可以保留
+     /** 名称列 */
+    NAME: 1,
+     /** URL列 */
+    URL: 2,
+      /** 状态列 */
+    STATUS: 3
 };
 
-export const WATCH_STATUS_MAP: { [key: string]: number } = {
-  "看过": 3, "看完": 3, "已看": 3, "完": 3, "completed": 3, "3": 3,
-  "在看": 2, "在看动画": 2, "在追": 2, "追": 2, "watching": 2, "2": 2,
-  "想看": 0, "想看动画": 0, "否": 0, "wish": 0, "1": 0,
-  "搁置": 4, "暂停": 4, "停": 4, "on_hold": 4, "4": 4,
-  "抛弃": 5, "弃": 5, "弃番": 5, "drop": 5, "dropped": 5, "5": 5
-};
-
-export const TYPE_TEXT_MAP: { [key: number]: string } = {1: "想看", 2: "在看", 3: "看过", 4: "搁置", 5: "抛弃"};
-
-export const URL_PATTERNS = [
-  /bgm\.tv\/subject\/(\d+)/i,
-  /bangumi\.tv\/subject\/(\d+)/i,
-  /chii\.in\/subject\/(\d+)/i,
-  /(\d{6,})/
-];
-
+/**
+ * 表头关键字列表
+ * 用于自动识别Excel表格中的表头行
+ *
+ * @constant
+ * @type {string[]}
+ */
 export const HEADER_KEYWORDS = [
-  "序列号", "是否看完", "看完时间", "开播季度",
-  "开播日期", "完播日", "类别", "原作标签", "制作公司",
-  "标签/分级", "特点/印象", "打分", "集号", "集数",
-  "名称", "别名", "剧透/感言", "感言", "备注", "评价",
-  "bangumi url", "url", "制片国家", "语言", "类型",
-  "导演", "音乐", "原作", "标签",
-  "条目id", "sid", "状态", "status", "rate",
-  "番剧", "动画", "书", "名字", "链接",
-  "观看状态", "收藏类型", "章节状态", "同步状态",
-  "关联的动漫", "系列", "季数", "时长"
+    "序列号", "是否看完", "看完时间", "开播季度",
+    "开播日期", "完播日", "类别", "原作标签", "制作公司",
+    "标签/分级", "特点/印象", "打分", "集号", "集数",
+    "名称", "别名", "剧透/感言", "感言", "备注", "评价",
+    "bangumi url", "url", "制片国家", "语言", "类型",
+    "导演", "音乐", "原作", "标签",
+    "条目id", "sid", "状态", "status", "rate",
+    "番剧", "动画", "书", "名字", "链接",
+    "观看状态", "收藏类型", "章节状态", "同步状态",
+    "关联的动漫", "系列", "季数", "时长"
 ];
 
-export const IMPORTANT_COLS: { [key: string]: boolean } = {
-  "名称": true, "是否看完": true, "bangumi url": true,
-  "url": true, "打分": true, "集数": true, "感言": true,
-  "剧透/感言": true, "类型": true, "状态": true,
-  "status": true, "rate": true, "别名": true
+/**
+ * 重要列配置
+ * 标记哪些列属于重要列，在预览时会高亮显示
+ *
+ * @constant
+ * @type {Record<string, boolean>}
+ */
+export const IMPORTANT_COLS: Record<string, boolean> = {
+    "名称": true,
+    "bangumi url": true,
+    "条目id": true,
+    "sid": true,
+    "url": true,
+    "状态": true,
+    "观看状态": true,
+    "收藏类型": true,
+    "是否看完": true,
+    "打分": true,
+    "标签": true,
+    "标签/分级": true,
+    "感言": true,
+    "剧透/感言": true,
+    "评价": true
 };
 
-export const FIELD_NAME_MAP: { [key: string]: string } = {
-  "名称": "name", "name": "name", "作品名": "name", "条目": "name", "标题": "name",
-  "条目id": "subjectId", "sid": "subjectId", "subject_id": "subjectId", "id": "subjectId",
-  "bangumi url": "url", "url": "url", "链接": "url", "地址": "url",
-  "状态": "type", "type": "type", "观看状态": "type", "收藏类型": "type",
-  "是否看完": "watchStatus",
-  "评分": "rate", "rate": "rate", "分数": "rate", "rating": "rate", "打分": "rate",
-  "标签": "tags", "tags": "tags", "tag": "tags", "标签/分级": "tags",
-  "评价": "comment", "comment": "comment", "备注": "comment", "notes": "comment",
-  "剧透/感言": "comment", "感言": "comment",
-  "完播日": "finishedDate", "完播日期": "finishedDate", "看完时间": "finishedDate",
-  "finished": "finishedDate", "日期": "finishedDate",
-  "章节状态": "epStatus", "ep_status": "epStatus", "集数": "epStatus",
-  "同步状态": "syncStatus", "sync_status": "syncStatus",
-  "开播季度": "startSeason", "开播日期": "startDate",
-  "别名": "alias", "类别": "category", "制作公司": "studio",
-  "原作标签": "originalTag", "特点/印象": "impression",
-  "集号": "epNum", "系列": "series", "季数": "season",
-  "时长": "duration", "导演": "director", "音乐": "music",
-  "制片国家": "country", "序列号": "sequence"
+/**
+ * 观看状态文本到数值的映射表
+ * 用于将用户友好的状态文本转换为Bangumi API所需数值
+ *
+ * @constant
+ * @type {Record<string, number>}
+ */
+export const TYPE_TEXT_MAP: Record<string, number> = {
+    "看过": 3, "看完": 3, "已看": 3, "完": 3, "completed": 3,
+    "在看": 2, "在看动画": 2, "在追": 2, "追": 2, "watching": 2,
+    "想看": 0, "想看动画": 0, "否": 0, "wish": 0,
+    "搁置": 4, "暂停": 4, "on_hold": 4,
+    "抛弃": 5, "弃": 5, "弃番": 5, "drop": 5, "dropped": 5,
+    "1": 0, "2": 2, "3": 3, "4": 4, "5": 5,
+    "true": 3, "false": 0
 };
+
+/**
+ * 字段名称映射表
+ * 将各种可能的列名映射到标准字段名
+ *
+ * @constant
+ * @type {Record<string, string>}
+ */
+export const FIELD_NAME_MAP: Record<string, string> = {
+    "名称": "name", "name": "name", "作品名": "name",
+    "条目id": "subjectId", "sid": "subjectId", "id": "subjectId",
+    "bangumi url": "url", "url": "url", "链接": "url",
+    "状态": "type", "type": "type", "观看状态": "type", "收藏类型": "type",
+    "是否看完": "watchStatus", "watchStatus": "watchStatus",
+    "打分": "rate", "rate": "rate", "评分": "rate",
+    "标签": "tags", "tags": "tags", "标签/分级": "tags",
+    "评价": "comment", "comment": "comment", "感言": "comment", "剧透/感言": "comment",
+    "完播日": "finishedDate", "完播日期": "finishedDate", "看完时间": "finishedDate",
+    "开播日期": "airDate", "开播时间": "airDate",
+    "别名": "alias", "alias": "alias",
+    "季数": "season", "season": "season",
+    "集数": "episode", "episode": "episode", "集号": "episode",
+    "时长": "duration",
+    "类型": "subjectType", "subjectType": "subjectType",
+    "番剧": "subjectType", "动画": "subjectType",
+    "备注": "notes", "notes": "notes"
+};
+
+/**
+ * URL匹配模式
+ * 用于从各种格式的URL中提取Bangumi Subject ID
+ *
+ * @constant
+ * @type {RegExp[]}
+ */
+export const URL_PATTERNS = [
+    /bgm\.tv\/subject\/(\d+)/i,
+    /bangumi\.tv\/subject\/(\d+)/i,
+    /chii\.in\/subject\/(\d+)/i
+];
+
+/**
+ * Token加密配置
+ * 定义Token加密和解密的相关参数
+ *
+ * @constant
+ * @type {Object}
+ */
+export const TOKEN_CONFIG = {
+    /** Token版本标识 */
+    VERSION: "1",
+    /** XOR加密密钥 */
+    XOR_KEY: "bgmtoken_secret_key_2024"
+};
+
+/**
+ * 观看状态文本到数值的反向映射（用于快速精确匹配）
+ * 键：常见状态文本（小写），值：Bangumi 状态码 (1-5)
+ */
+export const WATCH_STATUS_MAP: Record<string, number> = {
+    "看过": 3, "看完": 3, "已看": 3, "完": 3, "completed": 3, "3": 3,
+    "在看": 2, "看动画": 2, "在追": 2, "追": 2, "watching": 2, "2": 2,
+    "想看": 0, "想看动画": 0, "否": 0, "wish": 0, "1": 0,
+    "搁置": 4, "暂停": 4, "停": 4, "on_hold": 4, "4": 4,
+    "抛弃": 5, "弃": 5, "弃番": 5, "drop": 5, "dropped": 5, "5": 5
+};
+
+
