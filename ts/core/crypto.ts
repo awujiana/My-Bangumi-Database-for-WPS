@@ -240,7 +240,7 @@ export async function encryptTokenAsync(token: string): Promise<string> {
 
     const keyMaterial = await crypto.subtle.importKey(
         'raw',
-        strToBytes(TOKEN_CONFIG.XOR_KEY.padEnd(32, '0').slice(0, 32)),
+        strToBytes(TOKEN_CONFIG.XOR_KEY.padEnd(32, '0').slice(0, 32)).slice().buffer as ArrayBuffer,
         { name: 'AES-GCM' },
         false,
         ['encrypt']
@@ -293,19 +293,18 @@ export async function decryptTokenAsync(encrypted: string): Promise<string | nul
         // 导入密钥
         const keyMaterial = await crypto.subtle.importKey(
             'raw',
-            strToBytes(TOKEN_CONFIG.XOR_KEY.padEnd(32, '0').slice(0, 32)),
+             strToBytes(TOKEN_CONFIG.XOR_KEY.padEnd(32, '0').slice(0, 32)).slice().buffer as ArrayBuffer,
             { name: 'AES-GCM' },
             false,
             ['decrypt']
         );
 
         // AES-GCM解密
-        const decryptedBuffer = await crypto.subtle.decrypt(
-            { name: 'AES-GCM', iv },
+       const decryptedBuffer = await crypto.subtle.decrypt(
+            { name: 'AES-GCM', iv: iv.slice().buffer as ArrayBuffer },
             keyMaterial,
-            encryptedData
+            encryptedData.slice().buffer as ArrayBuffer
         );
-
         const decrypted = new Uint8Array(decryptedBuffer);
         const payload = bytesToStr(decrypted);
 

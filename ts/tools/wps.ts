@@ -20,6 +20,7 @@ export interface WpsApplication {
     GetTaskPane?: (id: string) => WpsTaskPane;
     Enum?: Record<string, number>;
     ribbonUI?: unknown;
+    Selection?: any;  
 }
 
 // ========== WPS 工作簿 ==========
@@ -33,7 +34,7 @@ export interface WpsWorkbook {
 export interface WpsWorksheets {
     Count: number;
     Item(index: number): WpsWorksheet;
-    Move(Before?: any, After?: any): void;
+    
 }
 
 export interface WpsSheets {
@@ -53,6 +54,7 @@ export interface WpsWorksheet {
     Calculate(): void;
     Range(address: string): WpsRange;
     Cells(row: number, col: number): WpsRange;
+    Move(Before?: any, After?: any): void;
 }
 
 // ========== WPS 行/列 ==========
@@ -113,6 +115,7 @@ export interface WpsRange {
     // 区域属性
     Areas?: WpsAreas;
 
+    
     // 方法
     End(direction: number): WpsRange;
     Select(): void;

@@ -38,7 +38,6 @@ import {
     colNumToLetter,
     getCellValue,
     cacheGet,
-    cacheSet,
     escapeHtml,
     loadBgToken,
     storeBgToken,
@@ -48,7 +47,9 @@ import {
     wpsMsgBox,
     _getUserApiPath,
     isEmptyValue,
-    IMPORTANT_COLS
+    IMPORTANT_COLS,
+    readRangeValues,
+    delay
 } from '../index.js';
 
 import { getOrCreateSyncRecordSheet, addSyncRecord } from './syncRecord.js';
@@ -346,7 +347,6 @@ export function getFilterStatus(lastRow?: number): { hasFilter: boolean; visible
 
         result.hasFilter = true;
 
-        // 使用SpecialCells获取可见单元格
         const maxRow = lastRow || Math.min(ws.Rows.Count, PANEL_CONFIG.MAX_FILTER_SCAN_ROWS);
         const visibleSet = new Set<number>();
 
@@ -354,7 +354,8 @@ export function getFilterStatus(lastRow?: number): { hasFilter: boolean; visible
             const range = ws.Range(`A1:A${maxRow}`);
             const visibleCells = range.SpecialCells(12); // xlCellTypeVisible
 
-            if (visibleCells) {
+            // 关键修复：确保 Areas 存在后再遍历
+            if (visibleCells?.Areas) {
                 for (let a = 1; a <= visibleCells.Areas.Count; a++) {
                     const area = visibleCells.Areas.Item(a);
                     for (let r = 1; r <= area.Rows.Count; r++) {
@@ -387,7 +388,7 @@ export function getFilterStatus(lastRow?: number): { hasFilter: boolean; visible
             }
         }
     } catch (e) {
-        bgmLog(LOG_LEVELS.ERROR, 'getFilterStatus error:', e);
+        BGM.handleError(e, { level: BGM.ErrorLevel.ERROR, context: 'getFilterStatus' });
     }
 
     return result;
@@ -433,7 +434,7 @@ export function getSequentialRowsBySeqCol(startRow: number, endRow: number): { v
             } catch (_) {}
         }
     } catch (e) {
-        bgmLog(LOG_LEVELS.ERROR, 'getSequentialRowsBySeqCol error:', e);
+         BGM.handleError(e, { level: BGM.ErrorLevel.ERROR, context: 'getSequentialRowsBySeqCol' });
     }
 
     return result;
@@ -516,7 +517,7 @@ export function buildJsonPayload(
 
         return JSON.stringify(payload);
     } catch (e) {
-        bgmLog(LOG_LEVELS.ERROR, 'buildJsonPayload error:', e);
+         BGM.handleError(e, { level: BGM.ErrorLevel.ERROR, context: 'buildJsonPayload' });
         return '{}';
     }
 }
@@ -582,7 +583,7 @@ export function bgmRequestSync(
  * @param {string} token - Token字符串
  * @returns {boolean} 是否保存成功
  */
-export function setBangumiToken(token: string): boolean {
+export function  setBangumiToken(token: string): boolean {
     if (!token) return false;
 
     try {
@@ -590,15 +591,12 @@ export function setBangumiToken(token: string): boolean {
         bgmLog(LOG_LEVELS.INFO, 'Token已保存');
         return true;
     } catch (e) {
-        bgmLog(LOG_LEVELS.ERROR, 'Token保存失败:', e);
+         BGM.handleError(e, { level: BGM.ErrorLevel.ERROR, context: 'setBangumiToken' });
         return false;
     }
 }
-
 /**
- * 清除所有行的颜色标记
- *
- * @function clearRowColors
+ * 清除当前活动工作表的 D 列颜色标记（与 clearSheetMarksInSheet 相同，但作用于活动工作表）清除所有行的颜色标记
  */
 export function clearRowColors(): void {
     try {
@@ -608,23 +606,19 @@ export function clearRowColors(): void {
         const ws = app.ActiveWorkbook.ActiveSheet;
         if (!ws) return;
 
-        const lastRow = ws.UsedRange?.Rows.Count || 1000;
-
-        // 清除D列的颜色
+        const lastRow = getLastRow(ws);
         for (let r = 1; r <= lastRow; r++) {
             try {
-                const cell = ws.Cells(r, 4);
-                if (cell?.Interior) {
-                    cell.Interior.ColorIndex = -4142; // xlColorIndexNone
-                }
+                const cell = ws.Cells(r, 4) as WpsRange | null;
+                if (cell?.Interior) cell.Interior.ColorIndex = -4142;
             } catch (_) {}
         }
-
         bgmLog(LOG_LEVELS.INFO, '已清除所有颜色标记');
     } catch (e) {
-        bgmLog(LOG_LEVELS.ERROR, 'clearRowColors error:', e);
+        BGM.handleError(e, { level: BGM.ErrorLevel.ERROR, context: 'clearRowColors' });
     }
 }
+
 
 /**
  * 异步同步到Bangumi（主同步函数）
@@ -648,6 +642,21 @@ export function clearRowColors(): void {
  * 5. 标记同步结果（颜色）
  * 6. 记录同步历史
  */
+/**
+ * 异步批量同步 Excel 数据到 Bangumi
+ * - 支持筛选状态下仅处理可见行
+ * - 批量读取单元格数据，提高性能
+ * - 动态请求间隔，避免限制的同时提升速度
+ * - 统一错误处理，带详细日志
+ *
+ * @param ws 工作表对象
+ * @param colMap 列名到列号的映射 Map
+ * @param token Bangumi API 访问令牌
+ * @param lastRow 数据区域最后一行
+ * @param headerRow 表头行号
+ * @param options 可选项（onProgress, onItemComplete 回调）
+ * @returns 同步结果统计 { success, fail, skip }
+ */
 export async function SyncToBangumiAsync(
     ws: any,
     colMap: Map<string, number>,
@@ -659,153 +668,149 @@ export async function SyncToBangumiAsync(
     const result = { success: 0, fail: 0, skip: 0 };
     const startRow = headerRow + 1;
 
-    // 获取筛选状态
+    // ========== 1. 获取可见行（筛选状态） ==========
     const filterStatus = getFilterStatus(lastRow);
     let rowsToProcess: number[] = [];
-
     if (filterStatus.hasFilter && filterStatus.visibleRows.length > 0) {
-        // 筛选模式：只处理可见行
         rowsToProcess = filterStatus.visibleRows.filter(r => r >= startRow);
         bgmLog(LOG_LEVELS.INFO, `筛选模式：处理 ${rowsToProcess.length} 个可见行`);
     } else {
-        // 全部模式：处理所有数据行
-        for (let r = startRow; r <= lastRow; r++) {
-            rowsToProcess.push(r);
-        }
+        for (let r = startRow; r <= lastRow; r++) rowsToProcess.push(r);
     }
-
     const total = rowsToProcess.length;
-    const userId = _getUserApiPath();
 
-    // 进度回调
-    const reportProgress = (current: number, message: string) => {
-        if (options?.onProgress) {
-            options.onProgress(current, total, message);
+    // ========== 2. 批量读取数据缓存（性能关键） ==========
+    const neededKeys = ['Bangumi_URL', '名称', '是否看完', '打分', '标签/分级', '完播日', '类别', '剧透/感言', '集号'];
+    let maxCol = 1;
+    for (const key of neededKeys) {
+        if (colMap.has(key)) maxCol = Math.max(maxCol, colMap.get(key)!);
+    }
+    const allData = readRangeValues(ws, startRow, lastRow, 1, maxCol);
+
+    /** 从缓存数组中获取字段值，失败时回退到逐单元格读取 */
+    const getField = (row: number, key: string): string => {
+        if (allData && Array.isArray(allData)) {
+            const col = colMap.get(key);
+            if (!col) return '';
+            const rowIdx = row - startRow;
+            if (rowIdx >= 0 && rowIdx < allData.length) {
+                const rowData = allData[rowIdx];
+                if (Array.isArray(rowData) && col - 1 < rowData.length) {
+                    return trim(rowData[col - 1]);
+                }
+            }
         }
+        // 回退到原始读取
+        return colMap.has(key) ? trim(getCellValue(ws, row, colMap.get(key)!)) : '';
     };
 
-    // 创建同步记录工作表
-    try {
-        getOrCreateSyncRecordSheet();
-    } catch (e) {
-        bgmLog(LOG_LEVELS.WARN, '无法创建同步记录表:', e);
+    // ========== 3. 进度与错误处理 ==========
+    const reportProgress = (current: number, message: string) => {
+        if (options?.onProgress) options.onProgress(current, total, message);
+    };
+
+    // 尝试创建同步记录表（忽略失败）
+    try { getOrCreateSyncRecordSheet(); } catch (e) {
+        BGM.handleError(e, { level: BGM.ErrorLevel.WARN, context: 'SyncToBangumiAsync:createSheet' });
     }
 
-    // 逐行处理
-    for (let i = 0; i < rowsToProcess.length; i++) {
-        const rowNum = rowsToProcess[i];
-        reportProgress(i + 1, `处理行 ${rowNum}...`);
+    const userIdPath = _getUserApiPath();
+    let lastRequestTime = 0;
+    const MIN_INTERVAL = 200; // 最小间隔 200ms
+
+    // ========== 4. 逐行处理 ==========
+    for (let idx = 0; idx < rowsToProcess.length; idx++) {
+        const rowNum = rowsToProcess[idx];
+        reportProgress(idx + 1, `处理行 ${rowNum}...`);
 
         try {
-            // 获取Bangumi URL列
-            if (!colMap.has('Bangumi_URL')) {
-                result.skip++;
-                continue;
-            }
+            const bgmUrl = getField(rowNum, 'Bangumi_URL');
+            if (!bgmUrl) { result.skip++; reportProgress(idx + 1, `行 ${rowNum}：跳过（无URL）`); continue; }
 
-            const urlCol = colMap.get('Bangumi_URL')!;
-            const bgmUrl = trim(readCell(ws, rowNum, urlCol) || '');
-
-            if (!bgmUrl) {
-                result.skip++;
-                reportProgress(i + 1, `行 ${rowNum}：跳过（无URL）`);
-                continue;
-            }
-
-            // 提取Subject ID
             const sid = extractSubjectId(bgmUrl);
-            if (!sid) {
-                result.skip++;
-                reportProgress(i + 1, `行 ${rowNum}：跳过（无有效SID）`);
-                continue;
-            }
+            if (!sid) { result.skip++; reportProgress(idx + 1, `行 ${rowNum}：跳过（无有效SID）`); continue; }
 
-            // 获取完播日期
-            let finishedDate = '';
-            if (colMap.has('完播日')) {
-                finishedDate = trim(readCell(ws, rowNum, colMap.get('完播日')!) || '');
-            }
-
-            // 构建请求体
+            const finishedDate = getField(rowNum, '完播日');
             const jsonBody = buildJsonPayload(ws, rowNum, colMap, finishedDate);
+            const name = getField(rowNum, '名称');
 
-            // 获取名称（用于记录）
-            let name = '';
-            if (colMap.has('名称')) {
-                name = trim(readCell(ws, rowNum, colMap.get('名称')!) || '');
+            // 动态请求间隔（取代固定延迟）
+            const now = Date.now();
+            const elapsed = now - lastRequestTime;
+            if (elapsed < MIN_INTERVAL) {
+                await delay(MIN_INTERVAL - elapsed);
             }
 
-            // 获取当前观看状态
-            let watchStatus = '';
-            if (colMap.has('是否看完')) {
-                watchStatus = trim(readCell(ws, rowNum, colMap.get('是否看完')!) || '');
+            const apiResult = bgmRequestSync('POST', `/v0/users${userIdPath}/collections/${sid}`, jsonBody, token);
+            lastRequestTime = Date.now();
+
+            const seqCell = getCell(ws, rowNum, 4) as WpsRange | null;  // 类型断言
+            const success = apiResult.code >= 200 && apiResult.code < 300;
+
+            // 标记颜色
+            if (seqCell?.Interior) {
+                seqCell.Interior.Color = success ? BGM_COLOR.SUCCESS : BGM_COLOR.FAIL;
             }
 
-            // 发送同步请求
-            const apiResult = bgmRequestSync('POST', `/v0/users${userId}/collections/${sid}`, jsonBody, token);
-            const seqCell = getCell(ws, rowNum, 4);
-
-            if (apiResult.code >= 200 && apiResult.code < 300) {
-                // 成功
-                result.success++;
-
-                // 标记颜色
-                if (seqCell?.Interior) {
-                    seqCell.Interior.Color = BGM_COLOR.SUCCESS;
-                }
-
-                // 添加同步记录
+            // 记录同步日志
+            if (typeof addSyncRecord === 'function') {
                 addSyncRecord({
                     name: name || `SID:${sid}`,
                     url: bgmUrl,
                     sid: sid,
                     type: '',
                     content: jsonBody,
-                    status: SYNC_STATUS.SUCCESS,
-                    message: apiResult.message,
-                    count: 1
-                });
-
-                reportProgress(i + 1, `行 ${rowNum}：✓ 成功`);
-            } else {
-                // 失败
-                result.fail++;
-
-                // 标记颜色
-                if (seqCell?.Interior) {
-                    seqCell.Interior.Color = BGM_COLOR.FAIL;
-                }
-
-                // 添加同步记录
-                addSyncRecord({
-                    name: name || `SID:${sid}`,
-                    url: bgmUrl,
-                    sid: sid,
-                    type: '',
-                    content: jsonBody,
-                    status: SYNC_STATUS.FAIL,
+                    status: success ? SYNC_STATUS.SUCCESS : SYNC_STATUS.FAIL,
                     message: apiResult.message || `HTTP ${apiResult.code}`,
                     count: 1
                 });
-
-                reportProgress(i + 1, `行 ${rowNum}：✗ 失败 (${apiResult.message})`);
             }
 
-            // 请求间隔（防止限流）
-            await new Promise(resolve => setTimeout(resolve, BGM_CONFIG.REQUEST_DELAY));
+            if (success) {
+                result.success++;
+                reportProgress(idx + 1, `行 ${rowNum}：✓ 成功`);
+            } else {
+                result.fail++;
+                reportProgress(idx + 1, `行 ${rowNum}：✗ 失败 (${apiResult.message || apiResult.code})`);
+            }
 
         } catch (e: any) {
             result.fail++;
-            reportProgress(i + 1, `行 ${rowNum}：✗ 异常 (${e.message})`);
-            bgmLog(LOG_LEVELS.ERROR, `Sync row ${rowNum} error:`, e);
+            reportProgress(idx + 1, `行 ${rowNum}：✗ 异常 (${e.message})`);
+            BGM.handleError(e, { level: BGM.ErrorLevel.ERROR, context: 'SyncToBangumiAsync' });
         }
     }
 
     reportProgress(total, '同步完成');
-    bgmLog(LOG_LEVELS.INFO, `SyncToBangumi完成: 成功=${result.success}, 失败=${result.fail}, 跳过=${result.skip}`);
-
+    bgmLog(LOG_LEVELS.INFO, `SyncToBangumi 完成: 成功=${result.success}, 失败=${result.fail}, 跳过=${result.skip}`);
     return result;
 }
+
+/**
+ * 清除指定工作表的 D 列颜色标记
+ * @param sheetIndex 工作表索引
+ */
+export function clearSheetMarksInSheet(sheetIndex: number): void {
+    try {
+        const app = getApp();
+        if (!app?.ActiveWorkbook) return;
+
+        const ws = app.ActiveWorkbook.Worksheets.Item(sheetIndex);
+        if (!ws) return;
+
+        const lastRow = getLastRow(ws);  // 精确获取最后数据行
+        for (let r = 1; r <= lastRow; r++) {
+            try {
+                const cell = ws.Cells(r, 4) as WpsRange | null;
+                if (cell?.Interior) cell.Interior.ColorIndex = -4142;
+            } catch (_) {}
+        }
+        bgmLog(LOG_LEVELS.INFO, `已清除工作表 ${sheetIndex} 的颜色标记`);
+    } catch (e) {
+        BGM.handleError(e, { level: BGM.ErrorLevel.ERROR, context: 'clearSheetMarksInSheet' });
+    }
+}
+
 
 /**
  * 测试单个条目更新

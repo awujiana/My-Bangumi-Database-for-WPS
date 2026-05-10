@@ -216,7 +216,7 @@ export async function encryptTokenAsync(token) {
     const payload = buildPayload(token);
     const payloadBytes = strToBytes(payload);
     const iv = crypto.getRandomValues(new Uint8Array(12));
-    const keyMaterial = await crypto.subtle.importKey('raw', strToBytes(TOKEN_CONFIG.XOR_KEY.padEnd(32, '0').slice(0, 32)), { name: 'AES-GCM' }, false, ['encrypt']);
+    const keyMaterial = await crypto.subtle.importKey('raw', strToBytes(TOKEN_CONFIG.XOR_KEY.padEnd(32, '0').slice(0, 32)).slice().buffer, { name: 'AES-GCM' }, false, ['encrypt']);
     const encryptedBuffer = await crypto.subtle.encrypt({ name: 'AES-GCM', iv: iv.slice().buffer }, keyMaterial, payloadBytes.slice().buffer);
     const encrypted = new Uint8Array(encryptedBuffer);
     const ivBase64 = btoa(String.fromCharCode(...iv));
@@ -252,9 +252,9 @@ export async function decryptTokenAsync(encrypted) {
         const iv = Uint8Array.from(atob(ivBase64), c => c.charCodeAt(0));
         const encryptedData = Uint8Array.from(atob(encryptedBase64), c => c.charCodeAt(0));
         // 导入密钥
-        const keyMaterial = await crypto.subtle.importKey('raw', strToBytes(TOKEN_CONFIG.XOR_KEY.padEnd(32, '0').slice(0, 32)), { name: 'AES-GCM' }, false, ['decrypt']);
+        const keyMaterial = await crypto.subtle.importKey('raw', strToBytes(TOKEN_CONFIG.XOR_KEY.padEnd(32, '0').slice(0, 32)).slice().buffer, { name: 'AES-GCM' }, false, ['decrypt']);
         // AES-GCM解密
-        const decryptedBuffer = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, keyMaterial, encryptedData);
+        const decryptedBuffer = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: iv.slice().buffer }, keyMaterial, encryptedData.slice().buffer);
         const decrypted = new Uint8Array(decryptedBuffer);
         const payload = bytesToStr(decrypted);
         return extractToken(payload);

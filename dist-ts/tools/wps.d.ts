@@ -13,6 +13,7 @@ export interface WpsApplication {
     GetTaskPane?: (id: string) => WpsTaskPane;
     Enum?: Record<string, number>;
     ribbonUI?: unknown;
+    Selection?: any;
 }
 export interface WpsWorkbook {
     Worksheets: WpsWorksheets;
@@ -22,7 +23,6 @@ export interface WpsWorkbook {
 export interface WpsWorksheets {
     Count: number;
     Item(index: number): WpsWorksheet;
-    Move(Before?: any, After?: any): void;
 }
 export interface WpsSheets {
     Count: number;
@@ -39,6 +39,7 @@ export interface WpsWorksheet {
     Calculate(): void;
     Range(address: string): WpsRange;
     Cells(row: number, col: number): WpsRange;
+    Move(Before?: any, After?: any): void;
 }
 export interface WpsRows {
     Count: number;

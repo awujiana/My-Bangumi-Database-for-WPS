@@ -180,9 +180,7 @@ export declare function bgmRequestSync(method: string, endpoint: string, jsonBod
  */
 export declare function setBangumiToken(token: string): boolean;
 /**
- * 清除所有行的颜色标记
- *
- * @function clearRowColors
+ * 清除当前活动工作表的 D 列颜色标记（与 clearSheetMarksInSheet 相同，但作用于活动工作表）清除所有行的颜色标记
  */
 export declare function clearRowColors(): void;
 /**
@@ -207,11 +205,31 @@ export declare function clearRowColors(): void;
  * 5. 标记同步结果（颜色）
  * 6. 记录同步历史
  */
+/**
+ * 异步批量同步 Excel 数据到 Bangumi
+ * - 支持筛选状态下仅处理可见行
+ * - 批量读取单元格数据，提高性能
+ * - 动态请求间隔，避免限制的同时提升速度
+ * - 统一错误处理，带详细日志
+ *
+ * @param ws 工作表对象
+ * @param colMap 列名到列号的映射 Map
+ * @param token Bangumi API 访问令牌
+ * @param lastRow 数据区域最后一行
+ * @param headerRow 表头行号
+ * @param options 可选项（onProgress, onItemComplete 回调）
+ * @returns 同步结果统计 { success, fail, skip }
+ */
 export declare function SyncToBangumiAsync(ws: any, colMap: Map<string, number>, token: string, lastRow: number, headerRow: number, options?: SyncOptions): Promise<{
     success: number;
     fail: number;
     skip: number;
 }>;
+/**
+ * 清除指定工作表的 D 列颜色标记
+ * @param sheetIndex 工作表索引
+ */
+export declare function clearSheetMarksInSheet(sheetIndex: number): void;
 /**
  * 测试单个条目更新
  *

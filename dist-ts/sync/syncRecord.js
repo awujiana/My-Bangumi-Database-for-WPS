@@ -7,7 +7,7 @@
  * @author BGM Development Team
  * @version 1.0.0
  */
-import { LOG_LEVELS, SYNC_STATUS, BGM_COLOR, bgmLog, getApp, trim, BGM } from '../index.js';
+import { LOG_LEVELS, SYNC_STATUS, BGM_COLOR, bgmLog, getApp, trim, BGM, getLastRow } from '../index.js';
 /**
  * 同步记录工作表名称
  *
@@ -151,7 +151,7 @@ function buildCache(sheet) {
         bgmLog(LOG_LEVELS.DEBUG, `已构建缓存，共 ${_syncRecordListCache.length} 条记录`);
     }
     catch (e) {
-        bgmLog(LOG_LEVELS.ERROR, 'buildCache error:', e);
+        BGM.handleError(e, { level: BGM.ErrorLevel.ERROR, context: 'buildCache' });
     }
 }
 /**
@@ -246,7 +246,7 @@ export function addSyncRecord(params) {
         return true;
     }
     catch (e) {
-        bgmLog(LOG_LEVELS.ERROR, 'addSyncRecord error:', e);
+        BGM.handleError(e, { level: BGM.ErrorLevel.ERROR, context: 'addSyncRecord' });
         return false;
     }
 }
@@ -269,7 +269,7 @@ export function getAllSyncRecords() {
         return [..._syncRecordListCache];
     }
     catch (e) {
-        bgmLog(LOG_LEVELS.ERROR, 'getAllSyncRecords error:', e);
+        BGM.handleError(e, { level: BGM.ErrorLevel.ERROR, context: 'getAllSyncRecords' });
         return [];
     }
 }
@@ -295,7 +295,7 @@ export function clearSyncRecords() {
         return true;
     }
     catch (e) {
-        bgmLog(LOG_LEVELS.ERROR, 'clearSyncRecords error:', e);
+        BGM.handleError(e, { level: BGM.ErrorLevel.ERROR, context: 'clearSyncRecords' });
         return false;
     }
 }
@@ -321,28 +321,22 @@ export function openSyncRecordSheet() {
  * @param {number} sheetIndex - 工作表索引
  */
 export function clearSheetMarksInSheet(sheetIndex) {
-    try {
-        const app = getApp();
-        if (!app?.ActiveWorkbook)
-            return;
-        const ws = app.ActiveWorkbook.Worksheets.Item(sheetIndex);
-        if (!ws)
-            return;
-        const lastRow = ws.UsedRange?.Rows.Count || 1000;
-        // 清除D列的颜色
-        for (let r = 1; r <= lastRow; r++) {
-            try {
-                const cell = ws.Cells(r, 4);
-                if (cell?.Interior) {
-                    cell.Interior.ColorIndex = -4142; // xlColorIndexNone
-                }
+    const app = getApp();
+    if (!app?.ActiveWorkbook)
+        return;
+    const ws = app.ActiveWorkbook.Worksheets.Item(sheetIndex);
+    if (!ws)
+        return;
+    // 使用精确的最后数据行（D列向上查找）
+    const lastRow = getLastRow(ws);
+    for (let r = 1; r <= lastRow; r++) {
+        try {
+            const cell = ws.Cells(r, 4);
+            if (cell?.Interior) {
+                cell.Interior.ColorIndex = -4142;
             }
-            catch (_) { }
         }
-        bgmLog(LOG_LEVELS.INFO, `已清除工作表 ${sheetIndex} 的颜色标记`);
+        catch (_) { }
     }
-    catch (e) {
-        BGM.handleError(e, { level: BGM.ErrorLevel.ERROR, context: 'clearSheetMarksInSheet' });
-    }
+    bgmLog(LOG_LEVELS.INFO, `已清除工作表 ${sheetIndex} 的颜色标记`);
 }
-;
