@@ -4,7 +4,12 @@
  * @description WPS Office 功能区按钮回调处理
  */
 
-import {findHeaderRow, getColumnMap, getLastRow, openUserCollection,SyncToBangumiAsync, clearRowColors, testTokenValidityForRibbon,loadBgToken, storeBgToken, _setBgmUserId,showBangumiPanel,  WPS_ENUM,getDataSheet,BGM } from './index.js';
+import {
+    WPS_ENUM, loadBgToken, storeBgToken, showBangumiPanel,
+    findHeaderRow, getColumnMap, getLastRow, getDataSheet,
+    SyncToBangumiAsync, clearRowColors, testTokenValidityForRibbon,
+    openUserCollection, BGM
+} from './index.js';
 
 // ========== Ribbon 回调 ==========
 
@@ -19,25 +24,6 @@ export function OnAddinLoad(ribbonUI: any): boolean {
     (window as any).Application.PluginStorage.setItem('ApiEventFlag', false);
     return true;
 }
-
-/**
- * 通知任务窗格面板刷新状态
- */
-function notifyTaskpane(method: string): void {
-    const app = (window as any).Application;
-    const taskPaneId = app?.PluginStorage?.getItem('taskpane_id');
-    if (taskPaneId) {
-        try {
-            const taskPane = app.GetTaskPane(taskPaneId);
-            if (taskPane?.Visible && taskPane?.WebBrowser?.ExecScript) {
-                taskPane.WebBrowser.ExecScript(`if(typeof ${method}==='function')${method}()`);
-            }
-        } catch (e) {
-            // 面板未打开或不支持，忽略
-        }
-    }
-}
-
 
 export function OnAction(control: { Id: string }): boolean {
     console.log('[BGM] OnAction:', control.Id);
@@ -75,9 +61,9 @@ export function OnAction(control: { Id: string }): boolean {
                     // 同步前确认
                     const confirmResult = app?.MessageBox?.(
                         `即将同步 ${rowCount} 行数据到 Bangumi，是否继续？`,
-                        4 + 32  // 4 = Yes/No, 32 = Question icon
+                        4 + 32
                     );
-                    if (confirmResult !== 6) return; // 6 = Yes
+                    if (confirmResult !== 6) return;
 
                     const colMap = getColumnMap(ws, headerRow);
                     if (!colMap.has("Bangumi_URL")) {
@@ -112,10 +98,11 @@ export function OnAction(control: { Id: string }): boolean {
                     if (newToken && newToken !== false && typeof newToken === 'string') {
                         const saved = storeBgToken(newToken);
                         if (saved) {
+                            // 使用新的状态变更方法通知面板更新
+                            BGM.notifyTokenUpdated();
                             if (typeof testTokenValidityForRibbon === 'function') {
                                 testTokenValidityForRibbon(newToken);
                             }
-                            notifyTaskpane('updateTokenStatus');
                             alert('Token 已保存，已自动验证');
                         } else {
                             alert('Token 保存失败，请检查插件存储权限');
@@ -130,7 +117,8 @@ export function OnAction(control: { Id: string }): boolean {
                 const token = loadBgToken();
                 if (token) {
                     testTokenValidityForRibbon(token);
-                    setTimeout(() => notifyTaskpane('updateTokenStatus'), 500);
+                    // 验证完成后更新面板状态
+                    setTimeout(() => BGM.notifyTokenUpdated(), 500);
                 } else {
                     alert('请先设置 Token！');
                 }
@@ -141,9 +129,9 @@ export function OnAction(control: { Id: string }): boolean {
                 if (app?.InputBox) {
                     const userId = app.InputBox('请输入用户 ID（数字）', '设置用户 ID', '', 2);
                     if (userId && userId !== false) {
-                        _setBgmUserId(String(userId).trim());
+                        // 使用新的状态变更方法，内部自动持久化并通知面板
+                        BGM.setUserId(String(userId).trim());
                         alert('用户 ID 已保存');
-                        notifyTaskpane('updateUserIdStatus');
                     }
                 } else {
                     console.warn('无法使用 WPS InputBox，设置用户 ID 功能不可用');

@@ -230,6 +230,7 @@ export {
     BGM,
     _getUserApiPath, 
    _fetchBgmUserInfo,
+
     showBangumiPanel,
    
     sleep,
@@ -250,18 +251,48 @@ export {
 
 } from './tools/util.js';
 
+// ========== BGM 缓存数据结构 ==========
+export interface BGMCache {
+    /** WPS 文档总行数缓存 */
+    totalRows: number;
+    /** 当前用户 ID */
+    userId: string | null;
+    /** 当前用户名 */
+    username: string | null;
+    /** Subject ID 缓存（sid → 行号） */
+    sidCache: Map<string, string>;
+    /** 列表缓存（通用数据） */
+    listCache: unknown[];
+}
+
 // BGM 状态接口（用于描述 BGM 对象的类型）
-export type {
-    // 缓存数据结构（totalRows, userId 等）
-    BGMCache,
-    // 工作表锁定状态
-    BGMSheet,
-    // 同步运行状态
-    BGMSync,
-    // 用户信息
-    BGMUserInfo,
-    
-} from './tools/util.js';
+// ========== BGM 工作表状态 ==========
+export interface BGMSheet {
+    /** 锁定的工作表索引 */
+    lockedIndex: number | null;
+    /** 锁定的工作表名称 */
+    lockedName: string | null;
+    /** 是否已锁定 */
+    isLocked: boolean;
+}
+
+// ========== BGM 同步状态 ==========
+export interface BGMSync {
+    /** 是否正在同步 */
+    isRunning: boolean;
+    /** 上次同步时间（ISO 格式） */
+    lastSyncTime: string | null;
+}
+
+// ========== BGM 用户信息 ==========
+export interface BGMUserInfo {
+    /** 用户 ID */
+    id: string;
+    /** 用户名 */
+    username: string;
+}
+
+
 
 // ============================================================================
 // 12. 页面逻辑（来自 taskpane.js）
@@ -330,3 +361,5 @@ export type {
     WpsOAAssist,
     WpsTaskPane,
 } from './tools/wps.js';
+
+

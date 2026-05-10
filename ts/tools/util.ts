@@ -1,9 +1,10 @@
 
-import {  WPS_ENUM, XL, BGM_CONFIG, BGM_COLOR, LOG_LEVELS, ERROR_LEVELS, PANEL_CONFIG, BGM_SUBJECT_TYPES, SYNC_STATUS,ErrorLevel, type DialogOptions, type ErrorOptions,isWpsApp, type WpsApplication,BgmError,encryptToken, decryptToken, calcChecksum,COLUMN_RULES,COLUMNS,HEADER_KEYWORDS} from '../index.js';
+import {  WPS_ENUM, XL, BGM_CONFIG, BGM_COLOR, LOG_LEVELS, ERROR_LEVELS, PANEL_CONFIG, BGM_SUBJECT_TYPES, SYNC_STATUS,ErrorLevel, type DialogOptions, type ErrorOptions,isWpsApp, type WpsApplication,BgmError,encryptToken, decryptToken, calcChecksum,COLUMN_RULES,COLUMNS,HEADER_KEYWORDS,BGMCache,BGMSheet,BGMSync,BGMUserInfo } from '../index.js';
 
+import { BGM_EVENTS ,eventBus } from '../tools/events.js';  
 // ========== BGM 全局命名空间 ==========
 export const BGM: {
-    cache: BGMCache;
+  cache: BGMCache;
     sheet: BGMSheet;
     sync: BGMSync;
     LOG_LEVEL: number;
@@ -20,13 +21,19 @@ export const BGM: {
     };
     Message: {
         send: (data: Record<string, unknown>, targetOrigin?: string) => boolean;
-        postMessage: (data: Record<string, unknown>, targetOrigin?: string) => boolean;
     };
-    postMessage: (data: Record<string, unknown>, targetOrigin?: string) => boolean;
     showAlert: (title: string, message: string) => void;
     showConfirm: (title: string, message: string, onConfirm?: () => void, onCancel?: () => void) => void;
     handleError: (error: unknown, options?: ErrorOptions) => BgmError;
     safeExecute: <T>(fn: () => T, context?: string, options?: ErrorOptions) => T | BgmError;
+
+    setUserId: (id: string | null) => void;
+    setUsername: (name: string | null) => void;
+    notifyTokenUpdated: () => void;
+    setSyncProgress: (current: number, total: number, message: string) => void;
+    setSyncComplete: (results?: { success: number; fail: number; skip: number }) => void;
+    setSyncError: (error: unknown) => void;
+
 } = {
     // 缓存数据
     cache: {
@@ -136,25 +143,19 @@ export const BGM: {
         send: function(data: Record<string, unknown>, targetOrigin?: string): boolean {
             try {
                 if (typeof window !== 'undefined' && window.parent && window.parent !== window) {
-                    window.parent.postMessage(data, targetOrigin || "*");
+                    window.parent.postMessage(data, targetOrigin || '*');
                     return true;
                 }
             } catch (e) {
                 const err = e as Error;
                 if (typeof bgmLog === 'function') {
-                    bgmLog(LOG_LEVELS?.DEBUG || 0, "postMessage 不可用: " + err.message);
+                    bgmLog(LOG_LEVELS?.DEBUG || 0, 'postMessage 不可用: ' + err.message);
                 }
             }
             return false;
-        },
-        postMessage: function(data: Record<string, unknown>, targetOrigin?: string): boolean {
-            return this.send(data, targetOrigin);
         }
     },
-      // 向后兼容方法
-    postMessage: function(data: Record<string, unknown>, targetOrigin?: string): boolean {
-        return BGM.Message.send(data, targetOrigin);
-    },
+    
 
     showAlert: function(title: string, message: string): void {
         if (BGM.Message.send({ type: "showAlert", title: title, message: message })) {
@@ -223,6 +224,26 @@ export const BGM: {
         } catch (error) {
             return BGM.handleError(error, { context, ...options } as ErrorOptions);
         }
+    },
+    setUserId(id: string | null) {
+        this.cache.userId = id;
+        eventBus.emit(BGM_EVENTS.USER_ID_UPDATED);
+    },
+    setUsername(name: string | null) {
+        this.cache.username = name;
+        eventBus.emit(BGM_EVENTS.USER_NAME_UPDATED);
+    },
+    notifyTokenUpdated() {
+        eventBus.emit(BGM_EVENTS.TOKEN_UPDATED);
+    },
+    setSyncProgress(current, total, message) {
+        eventBus.emit(BGM_EVENTS.SYNC_PROGRESS, { current, total, message });
+    },
+    setSyncComplete(results?) {
+        eventBus.emit(BGM_EVENTS.SYNC_COMPLETED, results);
+    },
+    setSyncError(error) {
+        eventBus.emit(BGM_EVENTS.SYNC_ERROR, error);
     }
 }
 
@@ -795,42 +816,3 @@ export function getDataSheet(): any {
   return app.ActiveWorkbook.ActiveSheet;
 }
 
-// ========== BGM 缓存数据结构 ==========
-export interface BGMCache {
-    /** WPS 文档总行数缓存 */
-    totalRows: number;
-    /** 当前用户 ID */
-    userId: string | null;
-    /** 当前用户名 */
-    username: string | null;
-    /** Subject ID 缓存（sid → 行号） */
-    sidCache: Map<string, string>;
-    /** 列表缓存（通用数据） */
-    listCache: unknown[];
-}
-
-// ========== BGM 工作表状态 ==========
-export interface BGMSheet {
-    /** 锁定的工作表索引 */
-    lockedIndex: number | null;
-    /** 锁定的工作表名称 */
-    lockedName: string | null;
-    /** 是否已锁定 */
-    isLocked: boolean;
-}
-
-// ========== BGM 同步状态 ==========
-export interface BGMSync {
-    /** 是否正在同步 */
-    isRunning: boolean;
-    /** 上次同步时间（ISO 格式） */
-    lastSyncTime: string | null;
-}
-
-// ========== BGM 用户信息 ==========
-export interface BGMUserInfo {
-    /** 用户 ID */
-    id: string;
-    /** 用户名 */
-    username: string;
-}

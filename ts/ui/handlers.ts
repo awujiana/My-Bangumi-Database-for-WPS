@@ -83,7 +83,7 @@ export function showTokenDialog(currentToken?: string): void {
             storeBgToken(value);
             updateTokenStatus();
             showToast(_T.tokenSaved, 'success');
-            BGM.postMessage({ type: 'tokenUpdated' });
+           BGM.Message.send({ type: 'tokenUpdated' });
         }
     });
 }
@@ -95,7 +95,7 @@ export function showUserIdDialog(): void {
             _setBgmUserId(value.trim());
             updateUserIdStatus();
             showToast(_T.userIdSaved, 'success');
-            BGM.postMessage({ type: 'userIdUpdated' });
+            BGM.Message.send({ type: 'userIdUpdated' });
         }
     });
 }
