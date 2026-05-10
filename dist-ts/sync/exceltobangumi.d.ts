@@ -235,16 +235,5 @@ export declare function clearSheetMarksInSheet(sheetIndex: number): void;
  * @function testSingleUpdate
  */
 export declare function testSingleUpdate(): void;
-/**
- * 获取同步预览统计（不实际发送请求）
- * @returns { total: number; valid: number; willSync: number; willSkip: number; alreadyUploaded: number }
- */
-export declare function getSyncPreviewtoRibbon(ws: any, colMap: Map<string, number>, lastRow: number, headerRow: number): {
-    total: number;
-    valid: number;
-    willSync: number;
-    willSkip: number;
-    alreadyUploaded: number;
-};
 export {};
 //# sourceMappingURL=exceltobangumi.d.ts.map
