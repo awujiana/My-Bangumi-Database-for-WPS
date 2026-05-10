@@ -1,5 +1,5 @@
 
-import {  WPS_ENUM, XL, BGM_CONFIG, BGM_COLOR, LOG_LEVELS, ERROR_LEVELS, PANEL_CONFIG, BGM_SUBJECT_TYPES, SYNC_STATUS,ErrorLevel, type DialogOptions, type ErrorOptions,isWpsApp, type WpsApplication,BgmError,encryptToken, decryptToken, calcChecksum,COLUMN_RULES} from '../index.js';
+import {  WPS_ENUM, XL, BGM_CONFIG, BGM_COLOR, LOG_LEVELS, ERROR_LEVELS, PANEL_CONFIG, BGM_SUBJECT_TYPES, SYNC_STATUS,ErrorLevel, type DialogOptions, type ErrorOptions,isWpsApp, type WpsApplication,BgmError,encryptToken, decryptToken, calcChecksum,COLUMN_RULES,COLUMNS,HEADER_KEYWORDS} from '../index.js';
 
 // ========== BGM 全局命名空间 ==========
 export const BGM: {
@@ -290,7 +290,7 @@ export function getCell(ws: unknown, row: number, col: number): unknown {
         }
         return null;
     } catch (e) {
-        console.error("getCell error:", e);
+        BGM.handleError(e, { level: ErrorLevel.WARN, context: 'getCell' });
         return null;
     }
 }
@@ -306,10 +306,11 @@ export function getCellValue(ws: unknown, row: number, col: number): string {
             return val !== null && val !== undefined ? String(val) : '';
         }
     } catch (e) {
-        bgmLog(LOG_LEVELS.WARN, "getCellValue 失败: " + (e as Error).message);
+        BGM.handleError(e, { level: ErrorLevel.WARN, context: 'getCellValue' });
     }
     return "";
 }
+
 
 /**
  * 读取单元格文本（handle WPS Value/Value2/Text 等多种属性）
@@ -456,17 +457,27 @@ export function _fetchBgmUserInfo(callback?: (userInfo: BGMUserInfo | null) => v
                 if (callback) callback(null);
             }
         } else {
+            // 非 200 时记录错误（401 为预期状态，不记录）
+            if (xhr.status !== 401) {
+                BGM.handleError(
+                    new Error(`获取用户信息失败，HTTP ${xhr.status}`),
+                    { level: ErrorLevel.WARN, context: '_fetchBgmUserInfo' }
+                );
+            }
             if (callback) callback(null);
         }
     };
     
     xhr.onerror = function(): void {
+        BGM.handleError(
+            new Error('获取用户信息网络错误'),
+            { level: ErrorLevel.WARN, context: '_fetchBgmUserInfo' }
+        );
         if (callback) callback(null);
     };
     
     xhr.send();
 }
-
 /**
  * 获取 Bangumi 用户信息（Promise 版本，供 handlers.js 等模块使用）
  */
@@ -653,33 +664,123 @@ export function readRangeValues(
         return [];
     }
 }
+// 缓存相关（放在文件顶部，导入之后）
+const sheetCache = new Map<string, any>();
+
+/**
+ * 获取或设置缓存
+ * @param key 缓存键
+ * @param factory 当缓存不存在时执行的工厂函数
+ * @returns 缓存的值
+ */
+export function cacheGet<T>(key: string, factory: () => T): T {
+    if (sheetCache.has(key)) {
+        return sheetCache.get(key) as T;
+    }
+    const value = factory();
+    sheetCache.set(key, value);
+    return value;
+}
+export function findHeaderRow(ws: any, startRow?: number): number {
+    const sheetName = ws?.Name || '';
+    const cacheKey = `${sheetName}:headerRow:${startRow || 1}`;
+    return cacheGet(cacheKey, () => {
+        let sRow = startRow || 1;
+        for (let row = sRow; row <= PANEL_CONFIG.MAX_SCAN_ROWS; row++) {
+            let matchCount = 0;
+            for (let col = 1; col <= PANEL_CONFIG.MAX_SCAN_COLUMNS; col++) {
+                try {
+                    let cellVal = String(getCellValue(ws, row, col)).toLowerCase();
+                    if (!cellVal) continue;
+                    for (let header of HEADER_KEYWORDS) {
+                        if (cellVal.indexOf(header.toLowerCase()) >= 0) {
+                            matchCount++;
+                            break;
+                        }
+                    }
+                    if (matchCount >= 3) break;
+                } catch (e) {}
+            }
+            if (matchCount >= 3) return row;
+        }
+        return 0;
+    });
+}
+
 /**
  * 获取列名到列号的映射（优化版：使用正则规则数组，时间复杂度 O(N*M) 但 M 较小）
  * @param ws 工作表对象
  * @param headerRow 表头行号
  * @returns Map<string, number> 列映射
  */
+/**
+ * 获取列名到列号的映射（优化版：正则规则数组 + 缓存）
+ * @param ws 工作表对象
+ * @param headerRow 表头行号
+ * @returns Map<string, number> 列名 -> 列号
+ */
 export function getColumnMap(ws: any, headerRow: number): Map<string, number> {
-    const colMap = new Map<string, number>();
-    const lastCol = 50;
-
-    for (let i = 1; i <= lastCol; i++) {
-        const colName = trim(String(getCellValue(ws, headerRow, i)));
-        if (!colName) continue;
-
-        // 遍历规则，找到第一个匹配的规则则跳出
-        for (const [pattern, key] of COLUMN_RULES) {
-            if (pattern.test(colName)) {
-                colMap.set(key, i);
-                break;  // 一个重要列名只匹配一个规则
+    const sheetName = ws?.Name || '';
+    const cacheKey = `${sheetName}:columnMap:${headerRow}`;
+    return cacheGet(cacheKey, () => {
+        const colMap = new Map<string, number>();
+        const lastCol = 50;
+        for (let i = 1; i <= lastCol; i++) {
+            const colName = trim(String(getCellValue(ws, headerRow, i)));
+            if (!colName) continue;
+            for (const [pattern, key] of COLUMN_RULES) {
+                if (pattern.test(colName)) {
+                    colMap.set(key, i);
+                    break;  // 每个列名只匹配第一个规则
+                }
             }
         }
+        return colMap;
+    });
+}
+/** 清除指定工作表的所有缓存 */
+export function clearSheetCache(ws: any) {
+    const prefix = ws?.Name || '';
+    for (const key of sheetCache.keys()) {
+        if (key.startsWith(prefix)) sheetCache.delete(key);
     }
-    return colMap;
+}
+
+export function getLastRow(ws: any): number {
+    const sheetName = ws?.Name || '';
+    const cacheKey = `${sheetName}:lastRow`;
+    return cacheGet(cacheKey, () => {
+        try {
+            const cell = getCell(ws, ws.Rows.Count, COLUMNS.SEQUENCE) as any;
+            if (cell?.Value2) {
+                return cell.End(XL.UP).Row;
+            }
+        } catch (e) {}
+        return 1000; // 回退值
+    });
 }
 
 
+export function isEmptyValue(val: any): boolean {
+  return val === null || val === undefined || val === "" ||
+         val === "null" || val === "NULL" || val === "Null" || val === "undefined";
+}
 
+// ========== 获取数据工作表 ==========
+export function getDataSheet(): any {
+  let app = getApp();
+  if (!app || !app.ActiveWorkbook) return null;
+
+  if (BGM.sheet.isLocked && BGM.sheet.lockedIndex) {
+    try {
+      return app.ActiveWorkbook.Worksheets.Item(BGM.sheet.lockedIndex);
+    } catch (e: any) {
+      bgmLog(LOG_LEVELS.WARN, "getDataSheet 锁定工作表失败: " + e.message);
+    }
+  }
+
+  return app.ActiveWorkbook.ActiveSheet;
+}
 
 // ========== BGM 缓存数据结构 ==========
 export interface BGMCache {

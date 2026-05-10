@@ -7,9 +7,7 @@
 
 import {  showUserIdDialog,httpRequest, showAlert,Result,BatchSyncResult,getApp, bgmLog, getCell, getCellValue, sleep, loadBgToken,
          _setBgmUserId, _getBgmUserId, _getUserApiPath, trim,
-         colNumToLetter, storeBgToken, readCell ,BGM ,XL, BGM_CONFIG, BGM_COLOR, LOG_LEVELS, delay, readRangeValues,COLUMN_RULES, TYPE_TEXT_MAP,COLUMNS,WATCH_STATUS_MAP,HEADER_KEYWORDS,URL_PATTERNS,
-    getColumnMap,} from '../index.js';
-
+         colNumToLetter, storeBgToken, readCell ,BGM ,XL, BGM_CONFIG, BGM_COLOR, LOG_LEVELS, delay, readRangeValues,COLUMN_RULES, TYPE_TEXT_MAP,COLUMNS,WATCH_STATUS_MAP,HEADER_KEYWORDS,URL_PATTERNS,PANEL_CONFIG,getLastRow,cacheGet,clearSheetCache,getColumnMap,isEmptyValue,getDataSheet,findHeaderRow,WpsRange,ErrorLevel,BgmError} from '../index.js';
 
 // 定义接口类型
 interface FilterStatus {
@@ -32,8 +30,6 @@ interface SequentialRowsResult {
   visibleCount: number;
   hiddenCount: number;
 }
-
-
 interface CollectionItem {
   seq?: number | string;
   time?: string;
@@ -48,35 +44,20 @@ interface CollectionItem {
   comment?: string;
   row?: number;
 }
-
 interface SyncOptions {
   onProgress?: (current: number, total: number, message: string) => void;
   onItemComplete?: (row: number, success: boolean, result: { code: number; message: string }) => void;
 }
-
 interface ColumnMap extends Map<string, number> {}
-
-// 定义 Excel Range 接口
-interface ExcelRange {
-  Value2?: any;
-  Interior?: {
-    Color?: number;
-    ColorIndex?: number;
-  };
-  Font?: {
-    Bold?: boolean;
-    Size?: number;
-    Color?: number;
-  };
-  Row?: number;
-  Column?: number;
-  [key: string]: any;
-}
 
 
 let _cachedTotalRows = 0;
 
 // ========== 工具函数 ==========
+
+
+
+
 export function parseJsonBodySummary(jsonStr: string): string {
   if (!jsonStr) return "(空)";
   try {
@@ -95,10 +76,6 @@ export function parseJsonBodySummary(jsonStr: string): string {
   }
 }
 
-export function isEmptyValue(val: any): boolean {
-  return val === null || val === undefined || val === "" ||
-         val === "null" || val === "NULL" || val === "Null" || val === "undefined";
-}
 
 function jsonEscape(s: string): string {
   s = s.split("\\").join("\\\\");
@@ -109,35 +86,7 @@ function jsonEscape(s: string): string {
   return s;
 }
 
-// ========== 获取数据工作表 ==========
-export function getDataSheet(): any {
-  let app = getApp();
-  if (!app || !app.ActiveWorkbook) return null;
 
-  if (BGM.sheet.isLocked && BGM.sheet.lockedIndex) {
-    try {
-      return app.ActiveWorkbook.Worksheets.Item(BGM.sheet.lockedIndex);
-    } catch (e: any) {
-      bgmLog(LOG_LEVELS.WARN, "getDataSheet 锁定工作表失败: " + e.message);
-    }
-  }
-
-  return app.ActiveWorkbook.ActiveSheet;
-}
-
-export function getBgmtoken(): string | null {
-  return loadBgToken();
-}
-
-export function getLastRow(ws: any): number {
-  try {
-    const cell = getCell(ws, ws.Rows.Count, COLUMNS.SEQUENCE) as any;
-    if (cell?.Value2) {
-      return cell.End(XL.UP).Row;
-    }
-  } catch (e) {}
-  return 1000;
-}
 
 export function extractSubjectId(url: string): string {
   if (!url) return "";
@@ -146,28 +95,6 @@ export function extractSubjectId(url: string): string {
     if (match) return match[1];
   }
   return "";
-}
-
-export function findHeaderRow(ws: any, startRow?: number): number {
-  startRow = startRow || 1;
-  for (let row = startRow; row <= 50; row++) {
-    let matchCount = 0;
-    for (let col = 1; col <= 50; col++) {
-      try {
-        let cellVal = String(getCellValue(ws, row, col)).toLowerCase();
-        if (!cellVal) continue;
-        for (let header of HEADER_KEYWORDS) {
-          if (cellVal.indexOf(header.toLowerCase()) >= 0) {
-            matchCount++;
-            break;
-          }
-        }
-        if (matchCount >= 3) break;
-      } catch (e) {}
-    }
-    if (matchCount >= 3) return row;
-  }
-  return 0;
 }
 
 
@@ -284,26 +211,23 @@ export function buildJsonPayload(ws: any, row: number, colMap: ColumnMap, finish
         xhr.setRequestHeader("Authorization", "Bearer " + token);
         xhr.setRequestHeader("Content-Type", "application/json");
         try {
-          xhr.send(body);
-          let statusCode = xhr.status;
-          if (statusCode === 204) return { code: statusCode, message: "OK" };
-          if (statusCode === 200 || statusCode === 201 || statusCode === 202) return { code: statusCode, message: xhr.responseText };
-          if (statusCode === 429 && retries < MAX_RETRIES) {
-        retries++;
-        let retryDelay = RETRY_DELAY_BASE * Math.pow(2, retries - 1);
-        sleep(retryDelay);
-        continue;
-      }
-      return { code: statusCode, message: xhr.responseText || "Error" };
-    } catch (err: any) {
-      return { code: 0, message: "Error: " + err.message };
+            xhr.send(body);
+            let statusCode = xhr.status;
+            if (statusCode === 204) return { code: statusCode, message: "OK" };
+            if (statusCode === 200 || statusCode === 201 || statusCode === 202) return { code: statusCode, message: xhr.responseText };
+            if (statusCode === 429 && retries < MAX_RETRIES) {
+                retries++;
+                let retryDelay = RETRY_DELAY_BASE * Math.pow(2, retries - 1);
+                sleep(retryDelay);
+                continue;
+            }
+            return { code: statusCode, message: xhr.responseText || "Error" };
+        } catch (err: any) {
+            BGM.handleError(err, { level: ErrorLevel.WARN, context: 'bgmRequestSync' });
+            return { code: 0, message: "Error: " + err.message };
+        }
     }
-  }
-  return { code: 429, message: `超过最大重试次数(${MAX_RETRIES}次)` };
-}
-
-export async function bgmRequest(method: string, endpoint: string, body: any, token: string): Promise<{ code: number; message: string }> {
-  return bgmRequestSync(method, endpoint, body, token);
+    return { code: 429, message: `超过最大重试次数(${MAX_RETRIES}次)` };
 }
 
 
@@ -311,7 +235,20 @@ export async function bgmRequest(method: string, endpoint: string, body: any, to
 
 
 
-// 异步同步函数 SyncToBangumiAsync
+
+// 异步同步函数：批量处理可见行，支持进度回调和单项完成回调
+/**
+ * 批量处理可见行，支持进度回调和单项完成回调。
+ * @param ws 工作表对象
+ * @param colMap 列名到列号的映射
+ * @param token Bangumi API 访问令牌
+ * @param lastRow 数据结束行号
+ * @param headerRow 表头行号
+ * @param options 同步选项，包含 onProgress / onItemComplete 回调
+ * @returns 同步结果统计 { success, fail, skip }
+ */
+
+
 export async function SyncToBangumiAsync(
     ws: any,
     colMap: ColumnMap,
@@ -326,7 +263,7 @@ export async function SyncToBangumiAsync(
     BGM.sync.isRunning = true;
     BGM.sync.lastSyncTime = null;
 
-    // 获取同步记录工作表
+    // 获取同步记录工作表（如果可用）
     let syncRecordSheet = null;
     if (typeof (window as any).getOrCreateSyncRecordSheet === 'function') {
         syncRecordSheet = (window as any).getOrCreateSyncRecordSheet();
@@ -339,7 +276,6 @@ export async function SyncToBangumiAsync(
         const autoFilter = ws.AutoFilter;
         if (autoFilter && (autoFilter.FilterMode === true || ws.AutoFilterMode === true)) {
             isFiltered = true;
-            // 通过 SpecialCells 或回退获取可见行
             const filterRange = autoFilter.Range;
             const filterStartRow = filterRange ? filterRange.Row + 1 : headerRow + 1;
             try {
@@ -356,7 +292,7 @@ export async function SyncToBangumiAsync(
                     }
                 }
             } catch (e) {
-                // 回退到逐行检查
+                // 回退：逐行检查隐藏状态
                 const checkEnd = Math.min(lastRow, headerRow + 5000);
                 for (let r = filterStartRow; r <= checkEnd; r++) {
                     try {
@@ -367,7 +303,7 @@ export async function SyncToBangumiAsync(
         }
     } catch (e) { /* 忽略筛选检测错误 */ }
 
-    // 如果没有筛选，所有行都可见
+    // 如果没有筛选或未获取到可见行，则所有行都视为可见
     if (!isFiltered || visibleRows.length === 0) {
         for (let r = headerRow + 1; r <= lastRow; r++) visibleRows.push(r);
     }
@@ -378,10 +314,9 @@ export async function SyncToBangumiAsync(
     for (const key of neededKeys) {
         if (colMap.has(key)) maxCol = Math.max(maxCol, colMap.get(key)!);
     }
-    const totalDataRows = lastRow - headerRow;
     const allData = readRangeValues(ws, headerRow + 1, lastRow, 1, maxCol);
 
-    // 辅助取值函数：从缓存中取，若缓存失效则回退到逐单元格读取
+    // 辅助取值函数：优先使用批量缓存，失败则回退到逐单元格读取
     const getField = (row: number, key: string): string => {
         if (allData && Array.isArray(allData)) {
             const col = colMap.get(key);
@@ -394,7 +329,7 @@ export async function SyncToBangumiAsync(
                 }
             }
         }
-        // 回退
+        // 回退到原始读取方式
         return colMap.has(key) ? trim(getCellValue(ws, row, colMap.get(key)!)) : '';
     };
 
@@ -402,13 +337,35 @@ export async function SyncToBangumiAsync(
     let successCount = 0, failCount = 0, skipCount = 0;
     const totalCount = visibleRows.length;
     let lastRequestTime = 0;
-    const MIN_INTERVAL = 200; // 毫秒
+    const MIN_INTERVAL = 200; // 最小请求间隔（毫秒）
 
-    // ========== 4. 遍历可见行 ==========
+    // ========== 4. 错误记录辅助函数 ==========
+    const logApiError = (row: number, sid: string, statusCode: number, errMsg: string, requestBody: string) => {
+        const error = new BgmError(
+            `行 ${row} 同步失败: HTTP ${statusCode}, ${errMsg}`,
+            'API_ERROR',
+            { row, sid, statusCode, response: errMsg, requestBody: requestBody.substring(0, 200) }
+        );
+        BGM.handleError(error, { level: ErrorLevel.WARN, context: 'SyncToBangumi-API' });
+    };
+
+    const logNetworkError = (row: number, sid: string, err: Error, requestBody: string, showAlert: boolean) => {
+        const error = new BgmError(
+            `行 ${row} 网络异常: ${err.message}`,
+            'NETWORK_ERROR',
+            { row, sid: sid || 'unknown', requestBody: requestBody?.substring(0, 200) || '' }
+        );
+        BGM.handleError(error, { level: ErrorLevel.ERROR, context: 'SyncToBangumi-Network', showAlert });
+    };
+
+    // ========== 5. 遍历可见行 ==========
     for (let idx = 0; idx < visibleRows.length; idx++) {
         const row = visibleRows[idx];
         const currentIndex = idx + 1;
         if (onProgress) onProgress(currentIndex, totalCount, `正在处理第 ${row} 行...`);
+
+        let sid = '';
+        let jsonBody = '';
 
         try {
             const bgmUrl = getField(row, 'Bangumi_URL');
@@ -421,14 +378,14 @@ export async function SyncToBangumiAsync(
                 onItemComplete?.(row, false, { code: 0, message: '无 Bangumi URL' });
                 continue;
             }
-            const sid = extractSubjectId(bgmUrl);
+            sid = extractSubjectId(bgmUrl);
             if (!sid) {
                 skipCount++;
                 onItemComplete?.(row, false, { code: 0, message: '无 SID' });
                 continue;
             }
 
-            const jsonBody = buildJsonPayload(ws, row, colMap, finishedDate);
+            jsonBody = buildJsonPayload(ws, row, colMap, finishedDate);
             if (!jsonBody) {
                 skipCount++;
                 onItemComplete?.(row, false, { code: 0, message: '状态不上传' });
@@ -443,7 +400,7 @@ export async function SyncToBangumiAsync(
             }
 
             // 发送请求
-            const result = await (typeof httpRequest === 'function'
+            let result = await (typeof httpRequest === 'function'
                 ? httpRequest(`/subject/${sid}/update`, { method: 'POST', body: jsonBody, token })
                 : Promise.resolve(bgmRequestSync('POST', `/v0/users/${_getUserApiPath()}/collections/${sid}`, jsonBody, token))
             );
@@ -460,6 +417,11 @@ export async function SyncToBangumiAsync(
                 errMsg = result.message || '';
             }
 
+            // 如果失败，记录详细错误信息
+            if (!syncSuccess) {
+                logApiError(row, sid, statusCode, errMsg, jsonBody);
+            }
+
             const bodySummary = parseJsonBodySummary(jsonBody);
             const recordData: CollectionItem = {
                 name: name || '(无名称)',
@@ -474,10 +436,16 @@ export async function SyncToBangumiAsync(
 
             if (syncSuccess) {
                 successCount++;
-                try { const cell = getCell(ws, row, 1) as ExcelRange; if (cell?.Interior) cell.Interior.Color = BGM_COLOR.SUCCESS; } catch(_){}
+                try {
+                    const cell = getCell(ws, row, 1) as WpsRange;
+                    if (cell?.Interior) cell.Interior.Color = BGM_COLOR.SUCCESS;
+                } catch (_) {}
             } else {
                 failCount++;
-                try { const cell = getCell(ws, row, 1) as ExcelRange; if (cell?.Interior) cell.Interior.Color = BGM_COLOR.FAIL; } catch(_){}
+                try {
+                    const cell = getCell(ws, row, 1) as WpsRange;
+                    if (cell?.Interior) cell.Interior.Color = BGM_COLOR.FAIL;
+                } catch (_) {}
             }
 
             if (syncRecordSheet && typeof (window as any).addSyncRecord === 'function') {
@@ -486,9 +454,56 @@ export async function SyncToBangumiAsync(
             onItemComplete?.(row, syncSuccess, { code: statusCode, message: errMsg });
 
         } catch (err: any) {
-            failCount++;
-            bgmLog(LOG_LEVELS.ERROR, `同步第 ${row} 行出错: ${err.message}`);
-            onItemComplete?.(row, false, { code: 0, message: err.message });
+            // 先记录网络异常（不弹窗）
+            logNetworkError(row, sid, err, jsonBody, false);
+
+            // 尝试对网络错误重试一次
+            let retried = false;
+            if (err.message?.includes('网络') || err.message?.includes('超时') || err.message?.includes('fetch')) {
+                try {
+                    const retryResult = await (typeof httpRequest === 'function'
+                        ? httpRequest(`/subject/${sid}/update`, { method: 'POST', body: jsonBody, token })
+                        : Promise.resolve(bgmRequestSync('POST', `/v0/users/${_getUserApiPath()}/collections/${sid}`, jsonBody, token))
+                    );
+                    let retrySuccess = false;
+                    if (retryResult instanceof Result) {
+                        retrySuccess = retryResult.isOk();
+                    } else {
+                        retrySuccess = [200, 201, 202, 204].includes(retryResult.code);
+                    }
+                    if (retrySuccess) {
+                        successCount++;
+                        try {
+                            const cell = getCell(ws, row, 1) as WpsRange;
+                            if (cell?.Interior) cell.Interior.Color = BGM_COLOR.SUCCESS;
+                        } catch (_) {}
+                        if (syncRecordSheet && typeof (window as any).addSyncRecord === 'function') {
+                            (window as any).addSyncRecord(syncRecordSheet, {
+                                name: getField(row, '名称') || '(无名称)',
+                                url: getField(row, 'Bangumi_URL') || '',
+                                sid,
+                                type: getField(row, '类别') || '',
+                                content: parseJsonBodySummary(jsonBody),
+                                status: '成功',
+                                message: `行 ${row} (重试成功)`,
+                                count: 1
+                            });
+                        }
+                        retried = true;
+                        onItemComplete?.(row, true, { code: 200, message: '重试成功' });
+                    }
+                } catch (retryErr: any) {
+                    // 重试也失败，记录最终错误并弹窗
+                    logNetworkError(row, sid, retryErr, jsonBody, true);
+                }
+            }
+
+            if (!retried) {
+                failCount++;
+                // 最终失败，弹窗提示
+                logNetworkError(row, sid, err, jsonBody, true);
+                onItemComplete?.(row, false, { code: 0, message: err.message });
+            }
         }
     }
 
@@ -685,7 +700,7 @@ export function clearRowColors(): void {
   let lastRow = getLastRow(ws);
   for (let i = 2; i <= lastRow; i++) {
     try { 
-      let cell = getCell(ws, i, 1) as ExcelRange; 
+      let cell = getCell(ws, i, 1) as WpsRange; 
       if (cell?.Interior) cell.Interior.ColorIndex = -4142; 
     } catch(e){}
   }
@@ -695,7 +710,7 @@ export function clearRowColors(): void {
 export function testSingleUpdate(): void {
   let ws = getDataSheet();
 if (!ws) { showAlert("错误", "未找到数据工作表！"); return; }
-  let token = getBgmtoken();
+  let token = loadBgToken();
   if (!token) { showAlert("提示", "请先设置 Token！"); return; }
   let app = getApp();
   if (!app?.ActiveCell) { showAlert("提示", "请先选中一个单元格"); return; }

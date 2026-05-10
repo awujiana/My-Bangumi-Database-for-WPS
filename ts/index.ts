@@ -40,7 +40,6 @@ export {
     TOKEN_CONFIG,
     WATCH_STATUS_MAP,
     COLUMNS,
-
 } from './core/constants.js';
 
 // ============================================================================
@@ -150,11 +149,7 @@ export {
 // 9. 同步引擎（来自 sync/exceltobangumi.js）
 // ============================================================================
 export {
-    // 查找表头行
-    findHeaderRow,
-   
-    // 获取最后一行
-    getLastRow,
+  
     // 提取 Subject ID
     extractSubjectId,
     // 获取筛选状态
@@ -177,7 +172,6 @@ export {
     openUserCollection,
     buildTagsArray,
     addTagsFromStr,
-    getDataSheet,
  
 } from './sync/exceltobangumi.js';
 
@@ -242,8 +236,16 @@ export {
     sleep,
     delay,
     readRangeValues,
-     // 获取列映射
+     // 获取列映射（固定表头名称到列号的映射）
     getColumnMap,
+    cacheGet,
+    clearSheetCache,
+      // 获取最后一行
+    getLastRow,
+    isEmptyValue,
+    getDataSheet,
+      // 查找表头行
+    findHeaderRow,
 
 } from './tools/util.js';
 
