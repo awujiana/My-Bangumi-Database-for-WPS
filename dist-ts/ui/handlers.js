@@ -4,6 +4,7 @@
  * @description 面板操作处理、按钮绑定、业务对话框
  */
 import { LOG_LEVELS, bgmLog, BGM, loadBgToken, storeBgToken, _getBgmUserId, _setBgmUserId, getApp, getCell, trim, fetchBgmUserInfo, BGM_COLOR, showAlert, showConfirm, showError, showSuccess, showInput, showToast, setStatus, verifyToken, fetchAllUserCollections, findHeaderRow, getColumnMap, getLastRow, extractSubjectId, getDataSheet, getFilterStatus, SyncToBangumiAsync, clearRowColors, testSingleUpdate, getOrCreateSyncRecordSheet, getAllSyncRecords, addSyncRecord, openSyncRecordSheet, clearSheetMarksInSheet, previewSyncContent, refreshData, refreshSheets, toggleSheetLock, clearSyncRecords, closeDetailModal, } from '../index.js';
+import { BGM_EVENTS, eventBus } from '../tools/events.js';
 // ========== 中文常量 ==========
 const _T = {
     setBgmToken: '\u8BBE\u7F6E Bangumi Access Token',
@@ -50,7 +51,7 @@ export function showTokenDialog(currentToken) {
             storeBgToken(value);
             updateTokenStatus();
             showToast(_T.tokenSaved, 'success');
-            BGM.postMessage({ type: 'tokenUpdated' });
+            BGM.Message.send({ type: 'tokenUpdated' });
         }
     });
 }
@@ -61,7 +62,7 @@ export function showUserIdDialog() {
             _setBgmUserId(value.trim());
             updateUserIdStatus();
             showToast(_T.userIdSaved, 'success');
-            BGM.postMessage({ type: 'userIdUpdated' });
+            BGM.Message.send({ type: 'userIdUpdated' });
         }
     });
 }
@@ -569,3 +570,14 @@ if (document.readyState === 'loading') {
 else {
     setTimeout(setupButtonListeners, 0);
 }
+// 监听状态更新事件
+eventBus.on(BGM_EVENTS.TOKEN_UPDATED, () => {
+    updateTokenStatus();
+});
+eventBus.on(BGM_EVENTS.USER_ID_UPDATED, () => {
+    updateUserIdStatus();
+});
+// 同步进度事件（全局进度条）
+eventBus.on(BGM_EVENTS.SYNC_PROGRESS, (data) => {
+    updateProgressBar(data.current, data.total, data.message);
+});

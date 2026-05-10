@@ -176,3 +176,13 @@ export const EVENTS = {
     USERID_UPDATED: 'userid:updated',
     PANEL_READY: 'panel:ready'
 };
+export const BGM_EVENTS = {
+    TOKEN_UPDATED: 'state:tokenUpdated',
+    USER_ID_UPDATED: 'state:userIdUpdated',
+    USER_NAME_UPDATED: 'state:userNameUpdated',
+    SYNC_PROGRESS: 'sync:progress',
+    SYNC_COMPLETED: 'sync:completed',
+    SYNC_ERROR: 'sync:error',
+    SHEET_LOCKED: 'sheet:locked',
+    SHEET_UNLOCKED: 'sheet:unlocked',
+};

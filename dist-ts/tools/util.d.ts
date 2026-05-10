@@ -1,4 +1,4 @@
-import { LOG_LEVELS, ERROR_LEVELS, ErrorLevel, type DialogOptions, type ErrorOptions, type WpsApplication, BgmError } from '../index.js';
+import { LOG_LEVELS, ERROR_LEVELS, ErrorLevel, type DialogOptions, type ErrorOptions, type WpsApplication, BgmError, BGMCache, BGMSheet, BGMSync, BGMUserInfo } from '../index.js';
 export declare const BGM: {
     cache: BGMCache;
     sheet: BGMSheet;
@@ -17,13 +17,21 @@ export declare const BGM: {
     };
     Message: {
         send: (data: Record<string, unknown>, targetOrigin?: string) => boolean;
-        postMessage: (data: Record<string, unknown>, targetOrigin?: string) => boolean;
     };
-    postMessage: (data: Record<string, unknown>, targetOrigin?: string) => boolean;
     showAlert: (title: string, message: string) => void;
     showConfirm: (title: string, message: string, onConfirm?: () => void, onCancel?: () => void) => void;
     handleError: (error: unknown, options?: ErrorOptions) => BgmError;
     safeExecute: <T>(fn: () => T, context?: string, options?: ErrorOptions) => T | BgmError;
+    setUserId: (id: string | null) => void;
+    setUsername: (name: string | null) => void;
+    notifyTokenUpdated: () => void;
+    setSyncProgress: (current: number, total: number, message: string) => void;
+    setSyncComplete: (results?: {
+        success: number;
+        fail: number;
+        skip: number;
+    }) => void;
+    setSyncError: (error: unknown) => void;
 };
 /**
  * 日志函数（支持日志级别控制）
@@ -162,36 +170,4 @@ export declare function clearSheetCache(ws: any): void;
 export declare function getLastRow(ws: any): number;
 export declare function isEmptyValue(val: any): boolean;
 export declare function getDataSheet(): any;
-export interface BGMCache {
-    /** WPS 文档总行数缓存 */
-    totalRows: number;
-    /** 当前用户 ID */
-    userId: string | null;
-    /** 当前用户名 */
-    username: string | null;
-    /** Subject ID 缓存（sid → 行号） */
-    sidCache: Map<string, string>;
-    /** 列表缓存（通用数据） */
-    listCache: unknown[];
-}
-export interface BGMSheet {
-    /** 锁定的工作表索引 */
-    lockedIndex: number | null;
-    /** 锁定的工作表名称 */
-    lockedName: string | null;
-    /** 是否已锁定 */
-    isLocked: boolean;
-}
-export interface BGMSync {
-    /** 是否正在同步 */
-    isRunning: boolean;
-    /** 上次同步时间（ISO 格式） */
-    lastSyncTime: string | null;
-}
-export interface BGMUserInfo {
-    /** 用户 ID */
-    id: string;
-    /** 用户名 */
-    username: string;
-}
 //# sourceMappingURL=util.d.ts.map

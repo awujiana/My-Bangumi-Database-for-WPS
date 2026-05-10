@@ -412,8 +412,13 @@ export function buildJsonPayload(ws, rowNum, colMap, finishedDate) {
                 }
             }
         }
-        // 是否私有（默认为false）
-        payload.private = 0;
+        // 私密收藏（仅当明确标记为“是”或“1”时才添加）
+        if (colMap.has('私密收藏')) {
+            const privateVal = trim(readCell(ws, rowNum, colMap.get('私密收藏'))).toLowerCase();
+            if (privateVal === '是' || privateVal === '1' || privateVal === 'true') {
+                payload.private = true;
+            }
+        }
         return JSON.stringify(payload);
     }
     catch (e) {
@@ -611,6 +616,8 @@ export async function SyncToBangumiAsync(ws, colMap, token, lastRow, headerRow, 
     for (let idx = 0; idx < rowsToProcess.length; idx++) {
         const rowNum = rowsToProcess[idx];
         reportProgress(idx + 1, `处理行 ${rowNum}...`);
+        //同时发送全局进度事件（让其他模块也能收到）
+        BGM.setSyncProgress(idx + 1, total, `处理行 ${rowNum}...`);
         try {
             const bgmUrl = getField(rowNum, 'Bangumi_URL');
             if (!bgmUrl) {
@@ -666,10 +673,12 @@ export async function SyncToBangumiAsync(ws, colMap, token, lastRow, headerRow, 
         catch (e) {
             result.fail++;
             reportProgress(idx + 1, `行 ${rowNum}：✗ 异常 (${e.message})`);
+            BGM.setSyncError(e);
             BGM.handleError(e, { level: BGM.ErrorLevel.ERROR, context: 'SyncToBangumiAsync' });
         }
     }
     reportProgress(total, '同步完成');
+    BGM.setSyncComplete(result);
     bgmLog(LOG_LEVELS.INFO, `SyncToBangumi 完成: 成功=${result.success}, 失败=${result.fail}, 跳过=${result.skip}`);
     return result;
 }
@@ -766,4 +775,78 @@ export function testSingleUpdate() {
     catch (e) {
         wpsMsgBox(`测试异常: ${e.message}`, 0, 16);
     }
+}
+/**
+ * 获取同步预览统计（不实际发送请求）
+ * @returns { total: number; valid: number; willSync: number; willSkip: number; alreadyUploaded: number }
+ */
+export function getSyncPreviewtoRibbon(ws, colMap, lastRow, headerRow) {
+    const startRow = headerRow + 1;
+    let total = 0, valid = 0, willSync = 0, willSkip = 0, alreadyUploaded = 0;
+    // 批量读取（与同步函数相同的列范围）
+    const neededKeys = ['Bangumi_URL', '名称', '是否看完'];
+    let maxCol = 1;
+    for (const key of neededKeys) {
+        if (colMap.has(key))
+            maxCol = Math.max(maxCol, colMap.get(key));
+    }
+    const allData = readRangeValues(ws, startRow, lastRow, 1, maxCol);
+    // 获取可见行（与同步函数相同）
+    const filterStatus = getFilterStatus(lastRow);
+    let rowsToProcess = [];
+    if (filterStatus.hasFilter && filterStatus.visibleRows.length > 0) {
+        rowsToProcess = filterStatus.visibleRows.filter(r => r >= startRow);
+    }
+    else {
+        for (let r = startRow; r <= lastRow; r++)
+            rowsToProcess.push(r);
+    }
+    for (const rowNum of rowsToProcess) {
+        total++;
+        const bgmUrl = (() => {
+            if (allData) {
+                const col = colMap.get('Bangumi_URL');
+                if (col) {
+                    const rowIdx = rowNum - startRow;
+                    if (rowIdx >= 0 && rowIdx < allData.length) {
+                        const rowData = allData[rowIdx];
+                        if (Array.isArray(rowData) && col - 1 < rowData.length) {
+                            return trim(rowData[col - 1]);
+                        }
+                    }
+                }
+            }
+            return colMap.has('Bangumi_URL') ? trim(getCellValue(ws, rowNum, colMap.get('Bangumi_URL'))) : '';
+        })();
+        if (!bgmUrl || !extractSubjectId(bgmUrl)) {
+            continue; // 无效行不计入 valid
+        }
+        valid++;
+        // 检查是否已上传（D 列颜色）
+        const seqCell = getCell(ws, rowNum, 4);
+        const isUploaded = seqCell?.Interior && (seqCell.Interior.Color === BGM_COLOR.SUCCESS ||
+            seqCell.Interior.Color === BGM_COLOR.LIGHT_GREEN ||
+            seqCell.Interior.Color === BGM_COLOR.DARK_GREEN);
+        if (isUploaded) {
+            alreadyUploaded++;
+            continue; // 已上传不再计入待同步或跳过
+        }
+        // 判断观看状态
+        const watchStatus = (() => {
+            const key = '是否看完';
+            if (colMap.has(key)) {
+                const col = colMap.get(key);
+                return trim(readCell(ws, rowNum, col));
+            }
+            return '';
+        })();
+        const type = mapWatchStatus(watchStatus);
+        if (type === 0) {
+            willSkip++;
+        }
+        else {
+            willSync++;
+        }
+    }
+    return { total, valid, willSync, willSkip, alreadyUploaded };
 }

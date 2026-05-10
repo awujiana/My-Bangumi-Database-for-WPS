@@ -10,6 +10,7 @@ import {
     SyncToBangumiAsync, clearRowColors, testTokenValidityForRibbon,
     openUserCollection, BGM
 } from './index.js';
+import { getSyncPreviewtoRibbon } from './sync/exceltobangumi.js';
 
 // ========== Ribbon 回调 ==========
 
@@ -32,64 +33,67 @@ export function OnAction(control: { Id: string }): boolean {
             case 'btnShowPanel':
                 showBangumiPanel();
                 break;
-            case 'btnSyncBangumi':
-                (async () => {
-                    const app = (window as any).Application;
-                    if (!app?.ActiveWorkbook) {
-                        app?.MessageBox?.('请先打开一个 Excel 工作簿', 0, 64);
-                        return;
-                    }
-                    const ws = getDataSheet();
-                    if (!ws) {
-                        app?.MessageBox?.('未找到数据工作表，请先锁定一个工作表', 0, 64);
-                        return;
-                    }
-                    const token = loadBgToken();
-                    if (!token) {
-                        app?.MessageBox?.('请先设置 Bangumi Token', 0, 48);
-                        return;
-                    }
-                    const headerRow = findHeaderRow(ws) || 1;
-                    const lastRow = getLastRow(ws);
-                    const rowCount = lastRow - headerRow;
-
-                    if (rowCount <= 0) {
-                        app?.MessageBox?.('没有可同步的数据行', 0, 48);
-                        return;
-                    }
-
-                    // 同步前确认
-                    const confirmResult = app?.MessageBox?.(
-                        `即将同步 ${rowCount} 行数据到 Bangumi，是否继续？`,
-                        4 + 32
-                    );
-                    if (confirmResult !== 6) return;
-
-                    const colMap = getColumnMap(ws, headerRow);
-                    if (!colMap.has("Bangumi_URL")) {
-                        app?.MessageBox?.('未找到 Bangumi URL 列', 0, 48);
-                        return;
-                    }
-
-                    try {
-                        const result = await SyncToBangumiAsync(ws, colMap, token, lastRow, headerRow, {
-                            onProgress: (current, total, message) => {
-                                if (app.StatusBar !== undefined) {
-                                    app.StatusBar = `[${current}/${total}] ${message}`;
-                                }
-                            }
-                        });
-                        app.StatusBar = false;
-                        app?.MessageBox?.(
-                            `同步完成！\n成功: ${result.success} 条\n失败: ${result.fail} 条\n跳过: ${result.skip} 条`,
-                            0, 64
-                        );
-                    } catch (err: any) {
-                        app.StatusBar = false;
-                        BGM.handleError(err, { context: 'Ribbon同步', showAlert: true });
-                    }
-                })();
+            case 'btnSyncBangumi': {
+            const app = (window as any).Application;
+            if (!app?.ActiveWorkbook) {
+                app?.MessageBox?.('请先打开一个 Excel 工作簿', 0, 64);
                 break;
+            }
+            const ws = getDataSheet();
+            if (!ws) {
+                app?.MessageBox?.('未找到数据工作表，请先锁定一个工作表', 0, 64);
+                break;
+            }
+            const token = loadBgToken();
+            if (!token) {
+                app?.MessageBox?.('请先设置 Bangumi Token', 0, 48);
+                break;
+            }
+            const headerRow = findHeaderRow(ws) || 1;
+            const lastRow = getLastRow(ws);
+            const colMap = getColumnMap(ws, headerRow);
+            if (!colMap.has("Bangumi_URL")) {
+                app?.MessageBox?.('未找到 Bangumi URL 列', 0, 48);
+                break;
+            }
+        
+            // ---------- 新增：获取预览统计 ----------
+            const preview = getSyncPreviewtoRibbon(ws, colMap, lastRow, headerRow);
+            const previewMsg =
+                `数据预览：\n` +
+                `总行数：${preview.total}\n` +
+                `有效条目：${preview.valid}\n` +
+                `已上传（跳过）：${preview.alreadyUploaded}\n` +
+                `待同步：${preview.willSync}\n` +
+                `不上传（状态跳过）：${preview.willSkip}\n` +
+                `无效（无SID）：${preview.total - preview.valid}\n\n` +
+                `是否继续同步？`;
+        
+            const confirmResult = app?.MessageBox?.(previewMsg, 4 + 32); // Yes/No + 问号图标
+            if (confirmResult !== 6) break; // 6 = Yes
+        
+            // 执行实际同步（异步）
+            (async () => {
+                try {
+                    const result = await SyncToBangumiAsync(ws, colMap, token, lastRow, headerRow, {
+                        onProgress: (current, total, message) => {
+                            if (app.StatusBar !== undefined) {
+                                app.StatusBar = `[${current}/${total}] ${message}`;
+                            }
+                        }
+                    });
+                    app.StatusBar = false;
+                    app?.MessageBox?.(
+                        `同步完成！\n成功: ${result.success} 条\n失败: ${result.fail} 条\n跳过: ${result.skip} 条`,
+                        0, 64
+                    );
+                } catch (err: any) {
+                    app.StatusBar = false;
+                    BGM.handleError(err, { context: 'Ribbon同步', showAlert: true });
+                }
+            })();
+            break;
+            }          
             case 'btnSetToken': {
                 const currentToken = loadBgToken() || '';
                 const app = (window as any).Application;

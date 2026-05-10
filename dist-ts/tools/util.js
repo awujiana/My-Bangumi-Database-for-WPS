@@ -1,4 +1,5 @@
 import { XL, BGM_CONFIG, LOG_LEVELS, ERROR_LEVELS, PANEL_CONFIG, ErrorLevel, isWpsApp, BgmError, encryptToken, decryptToken, COLUMN_RULES, COLUMNS, HEADER_KEYWORDS } from '../index.js';
+import { BGM_EVENTS, eventBus } from '../tools/events.js';
 // ========== BGM 全局命名空间 ==========
 export const BGM = {
     // 缓存数据
@@ -118,25 +119,18 @@ export const BGM = {
         send: function (data, targetOrigin) {
             try {
                 if (typeof window !== 'undefined' && window.parent && window.parent !== window) {
-                    window.parent.postMessage(data, targetOrigin || "*");
+                    window.parent.postMessage(data, targetOrigin || '*');
                     return true;
                 }
             }
             catch (e) {
                 const err = e;
                 if (typeof bgmLog === 'function') {
-                    bgmLog(LOG_LEVELS?.DEBUG || 0, "postMessage 不可用: " + err.message);
+                    bgmLog(LOG_LEVELS?.DEBUG || 0, 'postMessage 不可用: ' + err.message);
                 }
             }
             return false;
-        },
-        postMessage: function (data, targetOrigin) {
-            return this.send(data, targetOrigin);
         }
-    },
-    // 向后兼容方法
-    postMessage: function (data, targetOrigin) {
-        return BGM.Message.send(data, targetOrigin);
     },
     showAlert: function (title, message) {
         if (BGM.Message.send({ type: "showAlert", title: title, message: message })) {
@@ -201,6 +195,26 @@ export const BGM = {
         catch (error) {
             return BGM.handleError(error, { context, ...options });
         }
+    },
+    setUserId(id) {
+        this.cache.userId = id;
+        eventBus.emit(BGM_EVENTS.USER_ID_UPDATED);
+    },
+    setUsername(name) {
+        this.cache.username = name;
+        eventBus.emit(BGM_EVENTS.USER_NAME_UPDATED);
+    },
+    notifyTokenUpdated() {
+        eventBus.emit(BGM_EVENTS.TOKEN_UPDATED);
+    },
+    setSyncProgress(current, total, message) {
+        eventBus.emit(BGM_EVENTS.SYNC_PROGRESS, { current, total, message });
+    },
+    setSyncComplete(results) {
+        eventBus.emit(BGM_EVENTS.SYNC_COMPLETED, results);
+    },
+    setSyncError(error) {
+        eventBus.emit(BGM_EVENTS.SYNC_ERROR, error);
     }
 };
 // ========== 日志函数 ==========

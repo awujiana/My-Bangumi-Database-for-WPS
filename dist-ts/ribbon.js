@@ -3,7 +3,8 @@
  * @module ribbon
  * @description WPS Office 功能区按钮回调处理
  */
-import { findHeaderRow, getColumnMap, getLastRow, openUserCollection, SyncToBangumiAsync, clearRowColors, testTokenValidityForRibbon, loadBgToken, storeBgToken, _setBgmUserId, showBangumiPanel, WPS_ENUM, getDataSheet, BGM } from './index.js';
+import { WPS_ENUM, loadBgToken, storeBgToken, showBangumiPanel, findHeaderRow, getColumnMap, getLastRow, getDataSheet, SyncToBangumiAsync, clearRowColors, testTokenValidityForRibbon, openUserCollection, BGM } from './index.js';
+import { getSyncPreviewtoRibbon } from './sync/exceltobangumi.js';
 // ========== Ribbon 回调 ==========
 export function OnAddinLoad(ribbonUI) {
     if (typeof window.Application.ribbonUI !== 'object') {
@@ -16,24 +17,6 @@ export function OnAddinLoad(ribbonUI) {
     window.Application.PluginStorage.setItem('ApiEventFlag', false);
     return true;
 }
-/**
- * 通知任务窗格面板刷新状态
- */
-function notifyTaskpane(method) {
-    const app = window.Application;
-    const taskPaneId = app?.PluginStorage?.getItem('taskpane_id');
-    if (taskPaneId) {
-        try {
-            const taskPane = app.GetTaskPane(taskPaneId);
-            if (taskPane?.Visible && taskPane?.WebBrowser?.ExecScript) {
-                taskPane.WebBrowser.ExecScript(`if(typeof ${method}==='function')${method}()`);
-            }
-        }
-        catch (e) {
-            // 面板未打开或不支持，忽略
-        }
-    }
-}
 export function OnAction(control) {
     console.log('[BGM] OnAction:', control.Id);
     try {
@@ -41,40 +24,44 @@ export function OnAction(control) {
             case 'btnShowPanel':
                 showBangumiPanel();
                 break;
-            case 'btnSyncBangumi':
+            case 'btnSyncBangumi': {
+                const app = window.Application;
+                if (!app?.ActiveWorkbook) {
+                    app?.MessageBox?.('请先打开一个 Excel 工作簿', 0, 64);
+                    break;
+                }
+                const ws = getDataSheet();
+                if (!ws) {
+                    app?.MessageBox?.('未找到数据工作表，请先锁定一个工作表', 0, 64);
+                    break;
+                }
+                const token = loadBgToken();
+                if (!token) {
+                    app?.MessageBox?.('请先设置 Bangumi Token', 0, 48);
+                    break;
+                }
+                const headerRow = findHeaderRow(ws) || 1;
+                const lastRow = getLastRow(ws);
+                const colMap = getColumnMap(ws, headerRow);
+                if (!colMap.has("Bangumi_URL")) {
+                    app?.MessageBox?.('未找到 Bangumi URL 列', 0, 48);
+                    break;
+                }
+                // ---------- 新增：获取预览统计 ----------
+                const preview = getSyncPreviewtoRibbon(ws, colMap, lastRow, headerRow);
+                const previewMsg = `数据预览：\n` +
+                    `总行数：${preview.total}\n` +
+                    `有效条目：${preview.valid}\n` +
+                    `已上传（跳过）：${preview.alreadyUploaded}\n` +
+                    `待同步：${preview.willSync}\n` +
+                    `不上传（状态跳过）：${preview.willSkip}\n` +
+                    `无效（无SID）：${preview.total - preview.valid}\n\n` +
+                    `是否继续同步？`;
+                const confirmResult = app?.MessageBox?.(previewMsg, 4 + 32); // Yes/No + 问号图标
+                if (confirmResult !== 6)
+                    break; // 6 = Yes
+                // 执行实际同步（异步）
                 (async () => {
-                    const app = window.Application;
-                    if (!app?.ActiveWorkbook) {
-                        app?.MessageBox?.('请先打开一个 Excel 工作簿', 0, 64);
-                        return;
-                    }
-                    const ws = getDataSheet();
-                    if (!ws) {
-                        app?.MessageBox?.('未找到数据工作表，请先锁定一个工作表', 0, 64);
-                        return;
-                    }
-                    const token = loadBgToken();
-                    if (!token) {
-                        app?.MessageBox?.('请先设置 Bangumi Token', 0, 48);
-                        return;
-                    }
-                    const headerRow = findHeaderRow(ws) || 1;
-                    const lastRow = getLastRow(ws);
-                    const rowCount = lastRow - headerRow;
-                    if (rowCount <= 0) {
-                        app?.MessageBox?.('没有可同步的数据行', 0, 48);
-                        return;
-                    }
-                    // 同步前确认
-                    const confirmResult = app?.MessageBox?.(`即将同步 ${rowCount} 行数据到 Bangumi，是否继续？`, 4 + 32 // 4 = Yes/No, 32 = Question icon
-                    );
-                    if (confirmResult !== 6)
-                        return; // 6 = Yes
-                    const colMap = getColumnMap(ws, headerRow);
-                    if (!colMap.has("Bangumi_URL")) {
-                        app?.MessageBox?.('未找到 Bangumi URL 列', 0, 48);
-                        return;
-                    }
                     try {
                         const result = await SyncToBangumiAsync(ws, colMap, token, lastRow, headerRow, {
                             onProgress: (current, total, message) => {
@@ -92,6 +79,7 @@ export function OnAction(control) {
                     }
                 })();
                 break;
+            }
             case 'btnSetToken': {
                 const currentToken = loadBgToken() || '';
                 const app = window.Application;
@@ -100,10 +88,11 @@ export function OnAction(control) {
                     if (newToken && newToken !== false && typeof newToken === 'string') {
                         const saved = storeBgToken(newToken);
                         if (saved) {
+                            // 使用新的状态变更方法通知面板更新
+                            BGM.notifyTokenUpdated();
                             if (typeof testTokenValidityForRibbon === 'function') {
                                 testTokenValidityForRibbon(newToken);
                             }
-                            notifyTaskpane('updateTokenStatus');
                             alert('Token 已保存，已自动验证');
                         }
                         else {
@@ -120,7 +109,8 @@ export function OnAction(control) {
                 const token = loadBgToken();
                 if (token) {
                     testTokenValidityForRibbon(token);
-                    setTimeout(() => notifyTaskpane('updateTokenStatus'), 500);
+                    // 验证完成后更新面板状态
+                    setTimeout(() => BGM.notifyTokenUpdated(), 500);
                 }
                 else {
                     alert('请先设置 Token！');
@@ -132,9 +122,9 @@ export function OnAction(control) {
                 if (app?.InputBox) {
                     const userId = app.InputBox('请输入用户 ID（数字）', '设置用户 ID', '', 2);
                     if (userId && userId !== false) {
-                        _setBgmUserId(String(userId).trim());
+                        // 使用新的状态变更方法，内部自动持久化并通知面板
+                        BGM.setUserId(String(userId).trim());
                         alert('用户 ID 已保存');
-                        notifyTaskpane('updateUserIdStatus');
                     }
                 }
                 else {

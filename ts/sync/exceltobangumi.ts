@@ -898,3 +898,87 @@ export function testSingleUpdate(): void {
 }
 
 
+/**
+ * 获取同步预览统计（不实际发送请求）
+ * @returns { total: number; valid: number; willSync: number; willSkip: number; alreadyUploaded: number }
+ */
+export function getSyncPreviewtoRibbon(
+    ws: any,
+    colMap: Map<string, number>,
+    lastRow: number,
+    headerRow: number
+): { total: number; valid: number; willSync: number; willSkip: number; alreadyUploaded: number } {
+    const startRow = headerRow + 1;
+    let total = 0, valid = 0, willSync = 0, willSkip = 0, alreadyUploaded = 0;
+
+    // 批量读取（与同步函数相同的列范围）
+    const neededKeys = ['Bangumi_URL', '名称', '是否看完'];
+    let maxCol = 1;
+    for (const key of neededKeys) {
+        if (colMap.has(key)) maxCol = Math.max(maxCol, colMap.get(key)!);
+    }
+    const allData = readRangeValues(ws, startRow, lastRow, 1, maxCol);
+
+    // 获取可见行（与同步函数相同）
+    const filterStatus = getFilterStatus(lastRow);
+    let rowsToProcess: number[] = [];
+    if (filterStatus.hasFilter && filterStatus.visibleRows.length > 0) {
+        rowsToProcess = filterStatus.visibleRows.filter(r => r >= startRow);
+    } else {
+        for (let r = startRow; r <= lastRow; r++) rowsToProcess.push(r);
+    }
+
+    for (const rowNum of rowsToProcess) {
+        total++;
+        const bgmUrl = (() => {
+            if (allData) {
+                const col = colMap.get('Bangumi_URL');
+                if (col) {
+                    const rowIdx = rowNum - startRow;
+                    if (rowIdx >= 0 && rowIdx < allData.length) {
+                        const rowData = allData[rowIdx];
+                        if (Array.isArray(rowData) && col - 1 < rowData.length) {
+                            return trim(rowData[col - 1]);
+                        }
+                    }
+                }
+            }
+            return colMap.has('Bangumi_URL') ? trim(getCellValue(ws, rowNum, colMap.get('Bangumi_URL')!)) : '';
+        })();
+
+        if (!bgmUrl || !extractSubjectId(bgmUrl)) {
+            continue;  // 无效行不计入 valid
+        }
+        valid++;
+
+        // 检查是否已上传（D 列颜色）
+        const seqCell = getCell(ws, rowNum, 4) as WpsRange | null;
+        const isUploaded = seqCell?.Interior && (
+            seqCell.Interior.Color === BGM_COLOR.SUCCESS ||
+            seqCell.Interior.Color === BGM_COLOR.LIGHT_GREEN ||
+            seqCell.Interior.Color === BGM_COLOR.DARK_GREEN
+        );
+        if (isUploaded) {
+            alreadyUploaded++;
+            continue;  // 已上传不再计入待同步或跳过
+        }
+
+        // 判断观看状态
+        const watchStatus = (() => {
+            const key = '是否看完';
+            if (colMap.has(key)) {
+                const col = colMap.get(key)!;
+                return trim(readCell(ws, rowNum, col));
+            }
+            return '';
+        })();
+        const type = mapWatchStatus(watchStatus);
+        if (type === 0) {
+            willSkip++;
+        } else {
+            willSync++;
+        }
+    }
+
+    return { total, valid, willSync, willSkip, alreadyUploaded };
+}

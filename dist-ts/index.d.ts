@@ -22,7 +22,38 @@ export { getOrCreateSyncRecordSheet, getAllSyncRecords, addSyncRecord, openSyncR
 export { extractSubjectId, getFilterStatus, getSequentialRowsBySeqCol, SyncToBangumiAsync, clearRowColors, testSingleUpdate, mapWatchStatus, buildJsonPayload, bgmRequestSync, setBangumiToken, openBangumiTokenPage, testTokenValidityForRibbon, openUserCollection, buildTagsArray, addTagsFromStr, } from './sync/exceltobangumi.js';
 export { verifyToken, fetchAllUserCollections, type BangumiUserData, type TokenVerifyResult, type ApiResponse, } from './sync/scraping.js';
 export { bgmLog, getApp, colNumToLetter, getCell, getCellValue, readCell, setCellValue, getSheetByIndex, escapeHtml, storeBgToken, clearBgToken, loadBgToken, _getBgmUserId, _setBgmUserId, fetchBgmUserInfo, trim, BGM, _getUserApiPath, _fetchBgmUserInfo, showBangumiPanel, sleep, delay, readRangeValues, getColumnMap, cacheGet, clearSheetCache, getLastRow, isEmptyValue, getDataSheet, findHeaderRow, shellExecuteByOAAssist, GetUrlPath, } from './tools/util.js';
-export type { BGMCache, BGMSheet, BGMSync, BGMUserInfo, } from './tools/util.js';
+export interface BGMCache {
+    /** WPS 文档总行数缓存 */
+    totalRows: number;
+    /** 当前用户 ID */
+    userId: string | null;
+    /** 当前用户名 */
+    username: string | null;
+    /** Subject ID 缓存（sid → 行号） */
+    sidCache: Map<string, string>;
+    /** 列表缓存（通用数据） */
+    listCache: unknown[];
+}
+export interface BGMSheet {
+    /** 锁定的工作表索引 */
+    lockedIndex: number | null;
+    /** 锁定的工作表名称 */
+    lockedName: string | null;
+    /** 是否已锁定 */
+    isLocked: boolean;
+}
+export interface BGMSync {
+    /** 是否正在同步 */
+    isRunning: boolean;
+    /** 上次同步时间（ISO 格式） */
+    lastSyncTime: string | null;
+}
+export interface BGMUserInfo {
+    /** 用户 ID */
+    id: string;
+    /** 用户名 */
+    username: string;
+}
 export { refreshSheets, toggleSheetLock, refreshData, } from './taskpane.js';
 export type { DetailItem, PreviewItem, DetailPreviewData, } from './ui/preview.js';
 export { previewSyncContent, closeDetailModal, } from './ui/preview.js';

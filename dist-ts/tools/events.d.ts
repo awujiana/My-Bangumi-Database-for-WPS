@@ -135,4 +135,14 @@ export declare const EVENTS: {
     readonly USERID_UPDATED: "userid:updated";
     readonly PANEL_READY: "panel:ready";
 };
+export declare const BGM_EVENTS: {
+    readonly TOKEN_UPDATED: "state:tokenUpdated";
+    readonly USER_ID_UPDATED: "state:userIdUpdated";
+    readonly USER_NAME_UPDATED: "state:userNameUpdated";
+    readonly SYNC_PROGRESS: "sync:progress";
+    readonly SYNC_COMPLETED: "sync:completed";
+    readonly SYNC_ERROR: "sync:error";
+    readonly SHEET_LOCKED: "sheet:locked";
+    readonly SHEET_UNLOCKED: "sheet:unlocked";
+};
 //# sourceMappingURL=events.d.ts.map
