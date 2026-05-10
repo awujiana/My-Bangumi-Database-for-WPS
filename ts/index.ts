@@ -165,7 +165,6 @@ export {
     mapWatchStatus,
     buildJsonPayload,
     bgmRequestSync,
-    bgmRequest,
     setBangumiToken,
     openBangumiTokenPage,
     testTokenValidityForRibbon,
