@@ -473,6 +473,13 @@ function refreshData(): void {
         updateFilterStatus();
         return;
     }
+     // ✅ 增加判空，防止 Item 返回 null/undefined
+    if (!ws) {
+        if (previewBox) previewBox.innerHTML = `<p class="hint">工作表 ${sheetIndex} 不存在或无法访问</p>`;
+        updateFilterStatus();
+        return;
+    }
+
 
     const sheetName = ws.Name || '';
     // 清除该工作表所有缓存，确保获取到最新数据

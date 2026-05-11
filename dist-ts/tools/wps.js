@@ -3,28 +3,19 @@
  * @module types/wps
  * @description 定义 WPS COM 对象的核心接口，避免 unknown 强制转换
  */
-import { getApp, } from '../index.js';
+import { getApp } from '../index.js';
 // ========== 类型守卫函数 ==========
-/**
- * 检查对象是否为有效的 WPS Application
- */
 export function isWpsApp(value) {
     return (typeof value === 'object' &&
         value !== null &&
         'ActiveWorkbook' in value);
 }
-/**
- * 检查对象是否为有效的 WPS 工作表
- */
 export function isWpsWorksheet(value) {
     return (typeof value === 'object' &&
         value !== null &&
         'Name' in value &&
         'Range' in value);
 }
-/**
- * 检查对象是否为有效的 WPS Range
- */
 export function isWpsRange(value) {
     return (typeof value === 'object' &&
         value !== null &&
@@ -32,9 +23,7 @@ export function isWpsRange(value) {
             'Value' in value ||
             'Value2' in value));
 }
-/**
- * 显示输入提示框
- */
+// ========== 工具函数 ==========
 export function wpsPrompt(message, defaultValue) {
     return new Promise((resolve) => {
         const app = getApp();
@@ -71,9 +60,6 @@ export function wpsPrompt(message, defaultValue) {
         }
     });
 }
-/**
- * 显示 WPS 消息对话框
- */
 export function wpsMsgBox(message, buttons, icon) {
     return new Promise((resolve) => {
         const app = getApp();
@@ -111,4 +97,39 @@ export function wpsMsgBox(message, buttons, icon) {
             }
         }
     });
+}
+/**
+ * 安全获取指定行的 Range 对象（推荐使用）
+ * @param ws  当前工作表
+ * @param row 1‑based 行号
+ * @returns   该行对应的 WpsRange
+ */
+export function getRowRange(ws, row) {
+    if (!ws || typeof ws.Range !== 'function') {
+        throw new Error('Invalid worksheet object');
+    }
+    if (!Number.isFinite(row) || row < 1) {
+        throw new Error(`Row index must be a positive integer, got ${row}`);
+    }
+    return ws.Range(`${row}:${row}`);
+}
+/**
+ * 带后备的安全行 Range 获取（当 Range 构造异常时尝试使用 Rows.Item）
+ * @param ws  当前工作表
+ * @param row 1‑based 行号
+ * @returns   该行对应的 WpsRange
+ */
+export function getRowRangeSafe(ws, row) {
+    try {
+        return getRowRange(ws, row);
+    }
+    catch {
+        try {
+            const item = ws.Rows.Item(row);
+            return item;
+        }
+        catch {
+            throw new Error(`Failed to access row ${row}`);
+        }
+    }
 }

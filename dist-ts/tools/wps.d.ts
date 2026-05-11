@@ -35,6 +35,9 @@ export interface WpsWorksheet {
     Columns: WpsColumns;
     AutoFilter?: WpsAutoFilter;
     AutoFilterMode?: boolean;
+    /** 已用区域 */
+    UsedRange?: WpsRange;
+    /** 保护状态 */
     Activate(): void;
     Calculate(): void;
     Range(address: string): WpsRange;
@@ -44,17 +47,15 @@ export interface WpsWorksheet {
 export interface WpsRows {
     /** 行数 */
     Count: number;
-    /** 行项 */
+    /** 获取指定行（1‑based） */
     Item(index: number): WpsRow;
-    /** 行项索引 */
-    (index: number): WpsRow;
 }
 export interface WpsRow {
     /** 行号 */
     Row: number;
     /** 是否隐藏 */
     Hidden: boolean;
-    /** 行高（隐藏行通常为0） */
+    /** 行高（隐藏行通常为 0） */
     RowHeight?: number;
 }
 export interface WpsColumns {
@@ -118,17 +119,8 @@ export interface WpsTaskPane {
     ID: string;
     Visible: boolean;
 }
-/**
- * 检查对象是否为有效的 WPS Application
- */
 export declare function isWpsApp(value: unknown): value is WpsApplication;
-/**
- * 检查对象是否为有效的 WPS 工作表
- */
 export declare function isWpsWorksheet(value: unknown): value is WpsWorksheet;
-/**
- * 检查对象是否为有效的 WPS Range
- */
 export declare function isWpsRange(value: unknown): value is WpsRange;
 export interface BgmWindow {
     Application?: unknown;
@@ -163,12 +155,20 @@ export interface BgmWindow {
         cancel?: () => void;
     } | null;
 }
-/**
- * 显示输入提示框
- */
 export declare function wpsPrompt(message: string, defaultValue?: string): Promise<string | null>;
-/**
- * 显示 WPS 消息对话框
- */
 export declare function wpsMsgBox(message: string, buttons?: number, icon?: number): Promise<number>;
+/**
+ * 安全获取指定行的 Range 对象（推荐使用）
+ * @param ws  当前工作表
+ * @param row 1‑based 行号
+ * @returns   该行对应的 WpsRange
+ */
+export declare function getRowRange(ws: WpsWorksheet, row: number): WpsRange;
+/**
+ * 带后备的安全行 Range 获取（当 Range 构造异常时尝试使用 Rows.Item）
+ * @param ws  当前工作表
+ * @param row 1‑based 行号
+ * @returns   该行对应的 WpsRange
+ */
+export declare function getRowRangeSafe(ws: WpsWorksheet, row: number): WpsRange;
 //# sourceMappingURL=wps.d.ts.map

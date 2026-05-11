@@ -1,5 +1,5 @@
 
-import {  WPS_ENUM, XL, BGM_CONFIG, BGM_COLOR, LOG_LEVELS, ERROR_LEVELS, PANEL_CONFIG, BGM_SUBJECT_TYPES, SYNC_STATUS,ErrorLevel, type DialogOptions, type ErrorOptions,isWpsApp, type WpsApplication,BgmError,encryptToken, decryptToken, calcChecksum,COLUMN_RULES,COLUMNS,HEADER_KEYWORDS,BGMCache,BGMSheet,BGMSync,BGMUserInfo } from '../index.js';
+import {  WPS_ENUM, XL, BGM_CONFIG, BGM_COLOR, LOG_LEVELS, ERROR_LEVELS, PANEL_CONFIG, BGM_SUBJECT_TYPES, SYNC_STATUS,ErrorLevel, type DialogOptions, type ErrorOptions,isWpsApp, type WpsApplication,BgmError,encryptToken, decryptToken, calcChecksum,COLUMN_RULES,COLUMNS,HEADER_KEYWORDS,BGMCache,BGMSheet,BGMSync,BGMUserInfo,WpsWorksheet } from '../index.js';
 
 import { BGM_EVENTS ,eventBus } from '../tools/events.js';  
 // ========== BGM 全局命名空间 ==========
@@ -780,56 +780,112 @@ export function clearSheetCache(ws: any) {
     }
 }
 
-/**
- * 获取工作表中 D 列（序号列）的最后非空行号
- * @param ws 工作表对象
- * @param forceRefresh 是否强制刷新缓存，默认 false
- * @returns 最后数据行号
- */
-export function getLastRow(ws: any, forceRefresh: boolean = false): number {
-    const sheetName = ws?.Name || '';
-    const cacheKey = `${sheetName}:lastRow`;
 
-    // 强制刷新时，清除该工作表的所有缓存
+/**
+ * 在表头行中查找第一个匹配「序列号 / Bangumi URL / 名称 / 别名」的列索引
+ * @param ws           工作表
+ * @param headerRow 表头行号
+ * @returns 列索引（1‑based），若未找到返回 undefined
+ */
+function findAnchorColumn(ws: WpsWorksheet, headerRow: number): number | undefined {
+    const keywords = [
+        // 序列号
+        '序号', '编号', '序列号', '整理序号', 'id', 'no', 'number',
+        // Bangumi URL
+        'bangumi', 'url', '链接', '地址', 'bgm',
+        // 名称
+        '名称', '标题', '作品名', 'title', 'name',
+        // 别名
+        '别名', '又名', 'alias', 'othername'
+    ];
+    const maxCols = 50;
+
+    for (let c = 1; c <= maxCols; c++) {
+        const val = ws.Cells(headerRow, c).Value2;
+        if (val == null) continue;
+        const text = String(val).trim().toLowerCase();
+        if (keywords.some(kw => text === kw || text.includes(kw))) {
+            return c;
+        }
+    }
+    return undefined;
+}
+/**
+ * 获取工作表的最后有效数据行
+ * @param ws            工作表对象（WpsWorksheet）
+ * @param forceRefresh  是否强制刷新（跳过缓存）
+ * @param headerRow     可选：表头行号。若提供，则自动检测“序号/ID”列并用该列定位最后行；
+ *                      若未找到或未提供，回退到原有逻辑（D列 → A列 → UsedRange）。
+ * @returns 最后数据行号（1‑based），至少返回 1
+ */
+export function getLastRow(ws: WpsWorksheet | null | undefined,forceRefresh: boolean = false,headerRow?: number): number {
+    if (!ws) {
+        bgmLog(LOG_LEVELS.WARN, 'getLastRow: 工作表对象无效，返回默认值 50000');
+        return 50000;
+    }
+
+    const sheetName = ws.Name || '';
+    // 缓存 key 带上 headerRow 的哈希，避免不同表头结果互相覆盖
+    const cacheKey = `${sheetName}:lastRow${headerRow ? `:hr${headerRow}` : ''}`;
+
     if (forceRefresh) {
         clearSheetCache(ws);
-        bgmLog(LOG_LEVELS.DEBUG, `缓存已清除，重新计算最后行`);
+        bgmLog(LOG_LEVELS.DEBUG, '缓存已清除，重新计算最后行');
     }
 
     const cached = cacheGet<number>(cacheKey, () => {
-        bgmLog(LOG_LEVELS.DEBUG, `正在计算工作表 "${sheetName}" 的最后数据行...`);
+        bgmLog(LOG_LEVELS.DEBUG,
+            `正在计算工作表 "${sheetName}" 的最后数据行（${headerRow ? '根据表头自动选择列' : '多列回退'}）...`
+        );
 
-        // 1. 优先使用 D 列（序号列）向上定位
-        try {
-            const cell = getCell(ws, ws.Rows.Count, 4) as any; // D列
-            if (cell?.Value2 != null) {
-                const endCell = cell.End(-4162); // xlUp
-                if (endCell && endCell.Row > 0) {
-                    bgmLog(LOG_LEVELS.DEBUG, `D列向上定位成功，最后行: ${endCell.Row}`);
-                    return endCell.Row;
+        // 1. 如果提供了表头行，尝试自动选择 ID/序号列
+        if (headerRow != null && headerRow >= 1) {
+            const col = findAnchorColumn(ws, headerRow);
+            if (col) {
+                try {
+                    const cell = ws.Cells(ws.Rows.Count, col);
+                    const endCell = cell.End(-4162); // xlUp
+                    if (endCell && endCell.Row > 0) {
+                        bgmLog(LOG_LEVELS.DEBUG,
+                            `根据表头找到 ID/序号列 ${col}，最后行: ${endCell.Row}`
+                        );
+                        return endCell.Row;
+                    }
+                } catch (e) {
+                    bgmLog(LOG_LEVELS.WARN,
+                        `根据表头列 ${col} 定位失败: ${(e as Error).message}，回退到原有逻辑`
+                    );
                 }
+            }
+        }
+
+        // 2. 原有逻辑：优先 D 列（序号列）
+        try {
+            const cell = ws.Cells(ws.Rows.Count, 4);
+            const endCell = cell.End(-4162);
+            if (endCell && endCell.Row > 0) {
+                bgmLog(LOG_LEVELS.DEBUG, `D列向上定位成功，最后行: ${endCell.Row}`);
+                return endCell.Row;
             }
         } catch (e) {
             bgmLog(LOG_LEVELS.WARN, `D列定位失败: ${(e as Error).message}`);
         }
 
-        // 2. 尝试 A 列
+        // 3. 尝试 A 列
         try {
-            const cellA = getCell(ws, ws.Rows.Count, 1) as any;
-            if (cellA?.Value2 != null) {
-                const endCellA = cellA.End(-4162);
-                if (endCellA && endCellA.Row > 0) {
-                    bgmLog(LOG_LEVELS.DEBUG, `A列向上定位成功，最后行: ${endCellA.Row}`);
-                    return endCellA.Row;
-                }
+            const cell = ws.Cells(ws.Rows.Count, 1);
+            const endCell = cell.End(-4162);
+            if (endCell && endCell.Row > 0) {
+                bgmLog(LOG_LEVELS.DEBUG, `A列向上定位成功，最后行: ${endCell.Row}`);
+                return endCell.Row;
             }
         } catch (e) {
             bgmLog(LOG_LEVELS.WARN, `A列定位失败: ${(e as Error).message}`);
         }
 
-        // 3. 使用 UsedRange 估算
+        // 4. 使用 UsedRange 估算
         try {
-            const usedRange = (ws as any).UsedRange;
+            const usedRange = ws.UsedRange;
             if (usedRange) {
                 const last = usedRange.Row + usedRange.Rows.Count - 1;
                 if (last > 0) {
@@ -841,13 +897,14 @@ export function getLastRow(ws: any, forceRefresh: boolean = false): number {
             bgmLog(LOG_LEVELS.WARN, `UsedRange 失败: ${(e as Error).message}`);
         }
 
-        // 4. 无法确定，返回一个较大的值并警告
-        bgmLog(LOG_LEVELS.WARN, `无法获取工作表 "${sheetName}" 的最后行，使用默认值 50000`);
+        // 5. 最终默认值
+        bgmLog(LOG_LEVELS.WARN, `无法确定工作表 "${sheetName}" 的最后行，使用默认值 50000`);
         return 50000;
     });
 
-    // 输出最终结果（无论缓存还是新算）
-    bgmLog(LOG_LEVELS.DEBUG, `工作表 "${sheetName}" 最后数据行: ${cached} ${sheetCache.has(cacheKey) ? '(来自缓存)' : '(首次计算)'}`);
+    bgmLog(LOG_LEVELS.DEBUG,
+        `工作表 "${sheetName}" 最后数据行: ${cached}${sheetCache.has(cacheKey) ? ' (来自缓存)' : ' (首次计算)'}`
+    );
     return cached;
 }
 

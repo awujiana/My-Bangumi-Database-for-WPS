@@ -3,7 +3,8 @@
  * @module types/wps
  * @description 定义 WPS COM 对象的核心接口，避免 unknown 强制转换
  */
-import {  getApp,   } from '../index.js';
+import { getApp } from '../index.js';
+
 // ========== WPS Application ==========
 export interface WpsApplication {
     ActiveWorkbook?: WpsWorkbook;
@@ -20,7 +21,7 @@ export interface WpsApplication {
     GetTaskPane?: (id: string) => WpsTaskPane;
     Enum?: Record<string, number>;
     ribbonUI?: unknown;
-    Selection?: any;  
+    Selection?: any;
 }
 
 // ========== WPS 工作簿 ==========
@@ -34,7 +35,6 @@ export interface WpsWorkbook {
 export interface WpsWorksheets {
     Count: number;
     Item(index: number): WpsWorksheet;
-    
 }
 
 export interface WpsSheets {
@@ -50,6 +50,9 @@ export interface WpsWorksheet {
     Columns: WpsColumns;
     AutoFilter?: WpsAutoFilter;
     AutoFilterMode?: boolean;
+    /** 已用区域 */
+    UsedRange?: WpsRange;    
+        /** 保护状态 */
     Activate(): void;
     Calculate(): void;
     Range(address: string): WpsRange;
@@ -61,10 +64,9 @@ export interface WpsWorksheet {
 export interface WpsRows {
     /** 行数 */
     Count: number;
-    /** 行项 */
+    /** 获取指定行（1‑based） */
     Item(index: number): WpsRow;
-    /** 行项索引 */
-    (index: number): WpsRow;
+    // 不再提供可调用签名 (index: number): WpsRow，运行时不支持
 }
 
 export interface WpsRow {
@@ -72,8 +74,8 @@ export interface WpsRow {
     Row: number;
     /** 是否隐藏 */
     Hidden: boolean;
-    /** 行高（隐藏行通常为0） */
-    RowHeight?: number;  
+    /** 行高（隐藏行通常为 0） */
+    RowHeight?: number;
 }
 
 export interface WpsColumns {
@@ -109,7 +111,7 @@ export interface WpsRange {
     Rows: WpsRows;
     Columns: WpsColumns;
 
-    // 值属性（WPS 中是属性，不是方法）
+    // 值属性
     Value?: unknown;
     Value2?: unknown;
     Text?: string;
@@ -122,13 +124,13 @@ export interface WpsRange {
     // 区域属性
     Areas?: WpsAreas;
 
-    
     // 方法
     End(direction: number): WpsRange;
     Select(): void;
     Delete(): void;
     SpecialCells(type: number): WpsRange;
 }
+
 // ========== WPS 区域集合 ==========
 export interface WpsAreas {
     Count: number;
@@ -165,9 +167,6 @@ export interface WpsTaskPane {
 
 // ========== 类型守卫函数 ==========
 
-/**
- * 检查对象是否为有效的 WPS Application
- */
 export function isWpsApp(value: unknown): value is WpsApplication {
     return (
         typeof value === 'object' &&
@@ -176,9 +175,6 @@ export function isWpsApp(value: unknown): value is WpsApplication {
     );
 }
 
-/**
- * 检查对象是否为有效的 WPS 工作表
- */
 export function isWpsWorksheet(value: unknown): value is WpsWorksheet {
     return (
         typeof value === 'object' &&
@@ -188,9 +184,6 @@ export function isWpsWorksheet(value: unknown): value is WpsWorksheet {
     );
 }
 
-/**
- * 检查对象是否为有效的 WPS Range
- */
 export function isWpsRange(value: unknown): value is WpsRange {
     return (
         typeof value === 'object' &&
@@ -204,40 +197,32 @@ export function isWpsRange(value: unknown): value is WpsRange {
 // ========== WPS 窗口扩展接口 ==========
 
 export interface BgmWindow {
-    // WPS 核心对象（由 WPS 注入）
     Application?: unknown;
     WPS_Enum?: unknown;
     XL?: unknown;
 
-    // BGM 全局状态对象（由 util.ts 挂载）
     BGM?: unknown;
     BGM_CONFIG?: unknown;
     BGM_COLOR?: unknown;
 
-    // Ribbon 回调（WPS 要求全局函数）
     OnAddinLoad?: (ribbonUI: unknown) => boolean;
     OnAction?: (control: { Id: string }) => boolean;
     GetBangumiImage?: (control: { Id: string }) => string;
 
-    // Ribbon 早期占位机制（index.html 使用）
     _bgmRibbonReady?: (a: unknown, b: unknown, c: unknown) => void;
     _OnAddinLoadReal?: (ribbonUI: unknown) => boolean;
     _OnActionReal?: (control: { Id: string }) => boolean;
     _GetBangumiImageReal?: (control: { Id: string }) => string;
     __ribbonUI?: unknown;
 
-    // 模块加载状态（taskpane.html 使用）
     _modulesReady?: boolean;
- 
-    // 消息通信回调（跨窗口通信临时保留）
+
     _bgmDialogCallback?: { onOk?: (v?: string) => void; onCancel?: () => void } | null;
     _bgmConfirmCallback?: { confirm?: () => void; cancel?: () => void } | null;
 }
 
+// ========== 工具函数 ==========
 
-/**
- * 显示输入提示框
- */
 export function wpsPrompt(message: string, defaultValue?: string): Promise<string | null> {
     return new Promise((resolve) => {
         const app = getApp() as { InputBox?: (msg: string, title: string, defaultVal: string, type: number) => string | false };
@@ -272,9 +257,6 @@ export function wpsPrompt(message: string, defaultValue?: string): Promise<strin
     });
 }
 
-/**
- * 显示 WPS 消息对话框
- */
 export function wpsMsgBox(message: string, buttons?: number, icon?: number): Promise<number> {
     return new Promise((resolve) => {
         const app = getApp() as { MessageBox?: (msg: string, type: number) => number };
@@ -287,7 +269,7 @@ export function wpsMsgBox(message: string, buttons?: number, icon?: number): Pro
                 console.warn("WPS MessageBox 不可用:", (e as Error).message);
             }
         }
-        
+
         if (buttons === 4) {
             if (typeof window !== 'undefined' && typeof (window as unknown as Record<string, unknown>).BGMConfirm === 'function') {
                 (window as unknown as Record<string, (m: string, t: string, oc: () => void, oc2: () => void) => void>).BGMConfirm!(message, "确认", () => {
@@ -309,4 +291,39 @@ export function wpsMsgBox(message: string, buttons?: number, icon?: number): Pro
             }
         }
     });
+}
+
+/**
+ * 安全获取指定行的 Range 对象（推荐使用）
+ * @param ws  当前工作表
+ * @param row 1‑based 行号
+ * @returns   该行对应的 WpsRange
+ */
+export function getRowRange(ws: WpsWorksheet, row: number): WpsRange {
+    if (!ws || typeof ws.Range !== 'function') {
+        throw new Error('Invalid worksheet object');
+    }
+    if (!Number.isFinite(row) || row < 1) {
+        throw new Error(`Row index must be a positive integer, got ${row}`);
+    }
+    return ws.Range(`${row}:${row}`);
+}
+
+/**
+ * 带后备的安全行 Range 获取（当 Range 构造异常时尝试使用 Rows.Item）
+ * @param ws  当前工作表
+ * @param row 1‑based 行号
+ * @returns   该行对应的 WpsRange
+ */
+export function getRowRangeSafe(ws: WpsWorksheet, row: number): WpsRange {
+    try {
+        return getRowRange(ws, row);
+    } catch {
+        try {
+            const item = ws.Rows.Item(row);
+            return item as unknown as WpsRange;
+        } catch {
+            throw new Error(`Failed to access row ${row}`);
+        }
+    }
 }
