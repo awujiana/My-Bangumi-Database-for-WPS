@@ -135,7 +135,7 @@ function renderDetailItemHtml(rowData: DetailItem, colMap: ColumnMap, ws: any): 
   const urlDisplay = rowData.bgmUrl.length > 60 ? rowData.bgmUrl.substring(0, 60) + '...' : rowData.bgmUrl;
 
   return `
-    <div class="detail-item ${rowData.isUploaded ? 'uploaded' : 'pending'}" data-type="${rowData.typeNum}" data-row="${rowData.row}" data-sid="${rowData.sid}">
+    <div class="detail-item ${rowData.isUploaded ? 'uploaded' : 'pending'}" data-type="${rowData.typeNum}" data-row="${rowData.row}" data-sid="${rowData.sid}" data-status="${escapeHtml(rowData.status)}">
       <div class="detail-item-header">
         <div class="detail-item-title">
           <span class="detail-item-row">行 ${rowData.row}</span>
@@ -183,6 +183,14 @@ function renderDetailItemHtml(rowData: DetailItem, colMap: ColumnMap, ws: any): 
         ` : ''}
       </div>
     </div>
+    <div class="detail-item ${rowData.isUploaded ? 'uploaded' : 'pending'}" 
+         data-type="${rowData.typeNum}" 
+         data-row="${rowData.row}" 
+         data-sid="${rowData.sid}"
+         data-status="${escapeHtml(rowData.status)}">
+      ...
+    </div>    
+
   `;
 }
 
@@ -204,13 +212,13 @@ export function previewSyncContent(): void {
 
     const dp = BGM.dataPreview;
     if (!dp || !dp.ws) {
+        bgmLog(LOG_LEVELS.WARN, '[preview] BGM.dataPreview 不可用');
         showToast('请先在预览面板中加载数据', 'warn');
         return;
     }
 
     const { ws, visibleRows, headerRow, dataStartRow } = dp;
 
-    // 过滤出真正的数据行（排除表头，且行号 ≥ dataStartRow）
     const dataRows = visibleRows.filter(r => r !== headerRow && r >= dataStartRow);
     bgmLog(LOG_LEVELS.INFO, `[preview] 过滤后得到 ${dataRows.length} 条数据行`);
 
@@ -219,25 +227,23 @@ export function previewSyncContent(): void {
         return;
     }
 
-    // 获取列映射
     const colMap = getColumnMap(ws, headerRow);
     if (!colMap || colMap.size === 0) {
         showToast('无法读取列映射', 'error');
         return;
     }
 
-    // 生成详情卡片HTML
+    // 生成卡片列表 HTML（包含 data-status 属性）
     let html = '<div class="detail-list">';
     for (let i = 0; i < dataRows.length; i++) {
         const rowNum = dataRows[i];
         try {
             const rowData = getRowData(ws, rowNum, colMap, headerRow, 4);
-            // 跳过无 Bangumi URL 的行
             if (!rowData.bgmUrl || !rowData.sid) {
                 bgmLog(LOG_LEVELS.DEBUG, `[preview] 跳过行 ${rowNum} (无 Bangumi URL)`);
                 continue;
             }
-            html += renderDetailItemHtml(rowData, colMap, ws);
+            html += renderDetailItemHtml(rowData, colMap, ws);  // 这里会包含 data-status
         } catch (e) {
             html += `<div class="detail-item error">行 ${rowNum} 处理出错: ${escapeHtml((e as Error).message)}</div>`;
         }
@@ -259,7 +265,67 @@ export function previewSyncContent(): void {
 
     body.innerHTML = html;
     modal.style.display = 'block';
-    bgmLog(LOG_LEVELS.INFO, '[preview] 模态框已显示');
+
+    // ---------- 动态创建状态下拉筛选器 ----------
+    const header = modal.querySelector('.modal-header');
+    if (!header) return;
+
+    // 收集所有卡片的状态
+    const statusSet = new Set<string>();
+    body.querySelectorAll<HTMLElement>('.detail-item').forEach(item => {
+        const s = item.dataset.status;
+        if (s) statusSet.add(s);
+    });
+    // 统计每个状态的出现次数
+    const statusCountMap = new Map<string, number>();
+    body.querySelectorAll<HTMLElement>('.detail-item').forEach(item => {
+        const s = item.dataset.status;
+        if (s) statusCountMap.set(s, (statusCountMap.get(s) || 0) + 1);
+    });
+    // 定义优先级顺序并生成选项
+    const priorityStatus = ['想看', '在看', '看过', '搁置', '抛弃'];
+    const sortedStatus = [
+        ...priorityStatus.filter(s => statusSet.has(s)),
+        ...Array.from(statusSet).filter(s => !priorityStatus.includes(s)).sort()
+    ];
+    // 创建下拉框
+    const select = document.createElement('select');
+    select.id = 'statusFilterSelect';
+    select.className = 'status-filter-select';
+
+    // 生成选项：全部 + 各状态（含计数）
+    select.innerHTML = `<option value="all">全部 (${dataRows.length})</option>` +
+        sortedStatus.map(s => {
+            const count = statusCountMap.get(s);
+            return `<option value="${escapeHtml(s)}">${escapeHtml(s)} (${count})</option>`;
+        }).join('');
+      
+    // 插入到标题栏
+    const syncBtn = document.getElementById('syncAllBtn');
+    if (syncBtn) {
+        syncBtn.insertAdjacentElement('afterend', select);
+    } else {
+        header.appendChild(select);
+    }
+
+    // 绑定筛选事件
+    select.addEventListener('change', () => {
+        const filter = select.value;
+        const items = body.querySelectorAll<HTMLElement>('.detail-item');
+        items.forEach(item => {
+            if (filter === 'all' || item.dataset.status === filter) {
+                item.style.display = '';
+            } else {
+                item.style.display = 'none';
+            }
+        });
+    });
+
+    // 默认展示全部
+    select.value = 'all';
+    select.dispatchEvent(new Event('change'));
+
+    bgmLog(LOG_LEVELS.INFO, '[preview] 模态框已显示（含筛选器）');
 }
 let virtualScrollStart = 0;
 let virtualScrollEnd = 0;
@@ -481,7 +547,7 @@ export function filterDetailItems(filterType: string | number): void {
     // 重新渲染
     renderVisibleItems(filteredItems);
 
-    // 更新统计卡片（可选）
+    // 更新统计卡片
     const statCards = document.querySelectorAll('.stat-card .stat-value');
     if (statCards.length >= 3) {
         const d = detailPreviewData;
