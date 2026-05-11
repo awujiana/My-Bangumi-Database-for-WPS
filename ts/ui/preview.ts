@@ -208,8 +208,9 @@ export function previewSyncContent(): void {
         return;
     }
 
-    const { ws, visibleRows, headerRow, dataStartRow, previewColStart, previewColEnd, columnCount, headerNames } = dp;
+    const { ws, visibleRows, headerRow, dataStartRow } = dp;
 
+    // 过滤出真正的数据行（排除表头，且行号 ≥ dataStartRow）
     const dataRows = visibleRows.filter(r => r !== headerRow && r >= dataStartRow);
     bgmLog(LOG_LEVELS.INFO, `[preview] 过滤后得到 ${dataRows.length} 条数据行`);
 
@@ -218,33 +219,47 @@ export function previewSyncContent(): void {
         return;
     }
 
-    // 生成表格 HTML（与之前相同）
-    let html = `<table class="preview-table"><thead><tr><th>#</th>`;
-    for (let i = 0; i < columnCount; i++) {
-        html += `<th>${escapeHtml(headerNames[i] || '')}</th>`;
+    // 获取列映射
+    const colMap = getColumnMap(ws, headerRow);
+    if (!colMap || colMap.size === 0) {
+        showToast('无法读取列映射', 'error');
+        return;
     }
-    html += `</tr></thead><tbody>`;
 
+    // 生成详情卡片HTML
+    let html = '<div class="detail-list">';
     for (let i = 0; i < dataRows.length; i++) {
-        const row = dataRows[i];
-        html += `<tr><td class="preview-row-num">${row}</td>`;
-        for (let c = previewColStart; c <= previewColEnd; c++) {
-            html += `<td>${escapeHtml(readCell(ws, row, c))}</td>`;
+        const rowNum = dataRows[i];
+        try {
+            const rowData = getRowData(ws, rowNum, colMap, headerRow, 4);
+            // 跳过无 Bangumi URL 的行
+            if (!rowData.bgmUrl || !rowData.sid) {
+                bgmLog(LOG_LEVELS.DEBUG, `[preview] 跳过行 ${rowNum} (无 Bangumi URL)`);
+                continue;
+            }
+            html += renderDetailItemHtml(rowData, colMap, ws);
+        } catch (e) {
+            html += `<div class="detail-item error">行 ${rowNum} 处理出错: ${escapeHtml((e as Error).message)}</div>`;
         }
-        html += `</tr>`;
     }
-    html += `</tbody></table>`;
+    html += '</div>';
 
-    // 直接使用页面已有的模态框
+    // 显示到模态框
     const modal = document.getElementById('syncPreviewModal');
-    const body = modal?.querySelector('.modal-body');
-    if (modal && body) {
-        body.innerHTML = html;
-        modal.style.display = 'block';
-        bgmLog(LOG_LEVELS.INFO, '[preview] 模态框已显示');
-    } else {
-        bgmLog(LOG_LEVELS.ERROR, '[preview] syncPreviewModal 或 .modal-body 不存在');
+    if (!modal) {
+        bgmLog(LOG_LEVELS.ERROR, '[preview] 未找到 syncPreviewModal 元素');
+        return;
     }
+
+    const body = modal.querySelector('.modal-body');
+    if (!body) {
+        bgmLog(LOG_LEVELS.ERROR, '[preview] 未找到 .modal-body 元素');
+        return;
+    }
+
+    body.innerHTML = html;
+    modal.style.display = 'block';
+    bgmLog(LOG_LEVELS.INFO, '[preview] 模态框已显示');
 }
 let virtualScrollStart = 0;
 let virtualScrollEnd = 0;
@@ -518,4 +533,5 @@ export function viewSyncRecordDetail(sid: string): void {
   const detail = `同步记录详情\n\n名称: ${record.name || ""}\nSID: ${record.sid || ""}\nURL: ${record.url || ""}\n时间: ${record.time || ""}\n状态: ${record.status || ""}\n同步次数: ${record.count || ""}\n备注: ${record.message || ""}\n\n同步内容:\n${content}`;
   safeAlert(detail, '同步记录详情');
 }
+
 

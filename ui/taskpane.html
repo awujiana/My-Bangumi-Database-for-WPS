@@ -234,19 +234,19 @@
                 <div id="progressBar" style="width: 0%; height: 100%; background: #27ae60; text-align: center; line-height: 20px; color: white; font-size: 12px; transition: width 0.3s;"></div>
             </div>
         </div>
-                    <!-- 同步预览模态框 -->
-<div id="syncPreviewModal" class="modal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.  5);           z-index:10000; overflow:auto;">
-  <div class="modal-content" style="background:var(--bg-color, #fff); margin: 20px auto; width: 95%; max-width: 1400px; border-radius: 8px; box-shadow: 0           4px 20px rgba(0,0,0,0.3);">
-                <div class="modal-header" style="padding:10px 20px; border-bottom:1px solid #ddd; display:flex; justify-content:space-between; align-items:center;">
-                  <h3 style="margin:0;">同步预览数据</h3>
-                  <button id="closeSyncPreview" style="background:none; border:none; font-size:24px; cursor:pointer;">&times;</button>
-                </div>
-                <div class="modal-body" style="padding:20px; max-height:70vh; overflow:auto;">
-                  <!-- 表格会插入这里 -->
-                  <p>加载中...</p>
-                </div>
+                            <!-- 同步预览模态框 -->
+       <div id="syncPreviewModal" class="modal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5);        z-index:10000; overflow:auto;">
+  <div class="modal-content" style="background:#fff; margin:20px auto; width:95%; max-width:1400px; border-radius:12px; box-shadow:0 12px 40px rgba(0,0,0,      0.25);">
+    <div class="modal-header" style="padding:16px 24px; border-bottom:1px solid #e2e8f0; display:flex; justify-content:space-between; align-items:center;       background:linear-gradient(135deg, #4a6cf7, #6b8aff); color:white;">
+              <h3 style="margin:0; font-size:18px; font-weight:600;">同步预览数据</h3>
+              <div style="display:flex; align-items:center; column-gap:12px;">
+                <button id="syncAllBtn" class="modal-action-btn">全部同步</button>
+        <button id="closeSyncPreview" style="background:rgba(255,255,255,0.2); border:none; color:white; font-size:24px; width:32px; height:32px;       border-radius:50%; display:flex; align-items:center; justify-content:center; cursor:pointer;">&times;</button>
               </div>
             </div>
+            <div class="modal-body" style="padding:20px 24px; max-height:70vh; overflow:auto;"></div>
+          </div>
+        </div>
         <div class="section">
             <h3>📖 使用引导</h3>
             <div class="guide">

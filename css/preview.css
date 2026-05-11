@@ -150,3 +150,32 @@
 .btn-danger:hover {
     background: #c53030;
 }
+
+/* 模态框标题栏中的操作按钮通用样式 */
+.modal-action-btn {
+    padding: 6px 18px;
+    border: none;
+    border-radius: 6px;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background 0.2s, transform 0.1s;
+    background: rgba(255,255,255,0.2);
+    color: white;
+    backdrop-filter: blur(4px);
+}
+
+.modal-action-btn:hover {
+    background: rgba(255,255,255,0.35);
+    transform: translateY(-1px);
+}
+
+.modal-action-btn:active {
+    transform: translateY(0);
+}
+
+.modal-action-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    transform: none;
+}

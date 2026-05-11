@@ -146,39 +146,47 @@ export function previewSyncContent() {
         showToast('请先在预览面板中加载数据', 'warn');
         return;
     }
-    const { ws, visibleRows, headerRow, dataStartRow, previewColStart, previewColEnd, columnCount, headerNames } = dp;
+    const { ws, visibleRows, headerRow, dataStartRow } = dp;
+    // 过滤出真正的数据行（排除表头，且行号 ≥ dataStartRow）
     const dataRows = visibleRows.filter(r => r !== headerRow && r >= dataStartRow);
     bgmLog(LOG_LEVELS.INFO, `[preview] 过滤后得到 ${dataRows.length} 条数据行`);
     if (dataRows.length === 0) {
         showToast('没有可预览的数据行', 'info');
         return;
     }
-    // 生成表格 HTML（与之前相同）
-    let html = `<table class="preview-table"><thead><tr><th>#</th>`;
-    for (let i = 0; i < columnCount; i++) {
-        html += `<th>${escapeHtml(headerNames[i] || '')}</th>`;
+    // 获取列映射
+    const colMap = getColumnMap(ws, headerRow);
+    if (!colMap || colMap.size === 0) {
+        showToast('无法读取列映射', 'error');
+        return;
     }
-    html += `</tr></thead><tbody>`;
+    // 生成详情卡片HTML
+    let html = '<div class="detail-list">';
     for (let i = 0; i < dataRows.length; i++) {
-        const row = dataRows[i];
-        html += `<tr><td class="preview-row-num">${row}</td>`;
-        for (let c = previewColStart; c <= previewColEnd; c++) {
-            html += `<td>${escapeHtml(readCell(ws, row, c))}</td>`;
+        const rowNum = dataRows[i];
+        try {
+            const rowData = getRowData(ws, rowNum, colMap, headerRow, 4); // 假设序号列是第4列
+            html += renderDetailItemHtml(rowData, colMap, ws);
         }
-        html += `</tr>`;
+        catch (e) {
+            html += `<div class="detail-item error">行 ${rowNum} 处理出错: ${escapeHtml(e.message)}</div>`;
+        }
     }
-    html += `</tbody></table>`;
-    // 直接使用页面已有的模态框
+    html += '</div>';
+    // 显示到模态框
     const modal = document.getElementById('syncPreviewModal');
-    const body = modal?.querySelector('.modal-body');
-    if (modal && body) {
-        body.innerHTML = html;
-        modal.style.display = 'block';
-        bgmLog(LOG_LEVELS.INFO, '[preview] 模态框已显示');
+    if (!modal) {
+        bgmLog(LOG_LEVELS.ERROR, '[preview] 未找到 syncPreviewModal 元素');
+        return;
     }
-    else {
-        bgmLog(LOG_LEVELS.ERROR, '[preview] syncPreviewModal 或 .modal-body 不存在');
+    const body = modal.querySelector('.modal-body');
+    if (!body) {
+        bgmLog(LOG_LEVELS.ERROR, '[preview] 未找到 .modal-body 元素');
+        return;
     }
+    body.innerHTML = html;
+    modal.style.display = 'block';
+    bgmLog(LOG_LEVELS.INFO, '[preview] 模态框已显示');
 }
 let virtualScrollStart = 0;
 let virtualScrollEnd = 0;
