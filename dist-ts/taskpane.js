@@ -127,11 +127,13 @@ function activateSheetIfNeeded(ws) {
 // ========== 表头检测 ==========
 function detectHeaderAndColumns(ws, opts = {}) {
     const { visibleRowSet = null, isFiltered = false } = opts;
+    // 判断某行是否可见
     function isRowVisible(r, headerRow) {
         if (r === headerRow)
             return true;
         return !isFiltered || (visibleRowSet !== null && visibleRowSet.has(r));
     }
+    // 1. 扫描前 MAX_SCAN_ROWS 行，找出所有候选表头行
     const candidates = [];
     for (let r = 1; r <= PANEL_CONFIG.MAX_SCAN_ROWS; r++) {
         if (!isFiltered || !visibleRowSet || visibleRowSet.has(r)) {
@@ -158,9 +160,11 @@ function detectHeaderAndColumns(ws, opts = {}) {
             lastCol: 0, firstDataCol: 0, previewColStart: 0, previewColEnd: 0, headerMatchCount: 0
         };
     }
+    // 选列数最多、行号最小的作为表头
     candidates.sort((a, b) => b.colCount - a.colCount || a.row - b.row);
     const headerRow = candidates[0].row;
     const headerMatchCount = candidates[0].matchCount;
+    // 2. 读取表头名称
     const headerNames = [];
     const headerIsImportant = [];
     for (let c = 1; c <= PANEL_CONFIG.MAX_SCAN_COLUMNS; c++) {
@@ -168,6 +172,7 @@ function detectHeaderAndColumns(ws, opts = {}) {
         headerNames.push(v);
         headerIsImportant.push(IMPORTANT_COLS[v.toLowerCase()] || false);
     }
+    // 3. 检测多行表头（下一行是否填充了当前表头的空列）
     let dataStartRow = headerRow + 1;
     const secondHeaderRowLimit = Math.min(headerRow + 1, PANEL_CONFIG.MAX_SCAN_ROWS);
     if (headerRow + 1 <= secondHeaderRowLimit) {
@@ -193,6 +198,7 @@ function detectHeaderAndColumns(ws, opts = {}) {
             }
         }
     }
+    // 4. 计算实际使用的列范围（数据列）
     let firstDataCol = -1;
     let lastDataCol = 0;
     let samples = 0;
@@ -201,7 +207,8 @@ function detectHeaderAndColumns(ws, opts = {}) {
             continue;
         samples++;
         for (let c = 1; c <= PANEL_CONFIG.MAX_SCAN_COLUMNS; c++) {
-            if (readCell(ws, dr, c).trim()) {
+            const v = readCell(ws, dr, c).trim();
+            if (v) {
                 if (firstDataCol < 0)
                     firstDataCol = c;
                 if (c > lastDataCol)
@@ -211,12 +218,14 @@ function detectHeaderAndColumns(ws, opts = {}) {
     }
     if (firstDataCol < 0)
         firstDataCol = 1;
+    // 表头结束列
     let headerLastCol = 0;
     for (let c = 1; c <= PANEL_CONFIG.MAX_SCAN_COLUMNS; c++) {
         if (headerNames[c - 1])
             headerLastCol = c;
     }
     const actualLastCol = Math.max(lastDataCol, headerLastCol);
+    // 预览显示的列范围：从第一个数据列左扩找到最左非空表头，但不能超过表头范围
     let previewColStart = Math.max(1, firstDataCol - 5);
     for (let c = previewColStart; c <= firstDataCol; c++) {
         if (headerNames[c - 1]) {
@@ -224,11 +233,18 @@ function detectHeaderAndColumns(ws, opts = {}) {
             break;
         }
     }
+    // 预览结束列为表头最大列，若实际数据超出表头范围则以表头为准
     const previewColEnd = actualLastCol > headerLastCol ? headerLastCol : actualLastCol;
     return {
-        headerRow, headerNames, isImportant: headerIsImportant, dataStartRow,
-        lastCol: actualLastCol, firstDataCol,
-        previewColStart: previewColStart - 1, previewColEnd, headerMatchCount
+        headerRow,
+        headerNames: headerNames.slice(previewColStart - 1, previewColEnd), // 根据范围截取列名
+        isImportant: headerIsImportant.slice(previewColStart - 1, previewColEnd), // 对应的重要标记
+        dataStartRow,
+        lastCol: actualLastCol,
+        firstDataCol,
+        previewColStart: 0, // 切片后数组索引从0开始，不再需要偏移
+        previewColEnd: previewColEnd - previewColStart + 1, // 实际列数
+        headerMatchCount
     };
 }
 function autoDetectSheet() {
@@ -624,6 +640,32 @@ function initPanel() {
             closeDetailModal();
         }
     });
+    // 自动检测筛选变化并刷新预览（每2秒检查一次）
+    let lastFilterHash = '';
+    setInterval(() => {
+        if (!BGM.sheet.isLocked)
+            return; // 只有锁定了工作表才自动刷新
+        const app = getApp();
+        if (!app?.ActiveWorkbook)
+            return;
+        const ws = BGM.sheet.lockedIndex
+            ? app.ActiveWorkbook.Worksheets.Item(BGM.sheet.lockedIndex)
+            : app.ActiveWorkbook.ActiveSheet;
+        if (!ws)
+            return;
+        // 获取当前筛选状态的“快照”
+        const filterState = detectFilterState(ws);
+        const currentHash = JSON.stringify({
+            filtered: filterState.isFiltered,
+            visibleCount: filterState.visibleRowSet?.size ?? -1
+        });
+        // 如果筛选状态变化，自动刷新预览
+        if (currentHash !== lastFilterHash) {
+            lastFilterHash = currentHash;
+            updateFilterStatus(ws); // 更新筛选状态文字
+            refreshData(); // 刷新预览表格
+        }
+    }, 2000);
     document.dispatchEvent(new CustomEvent('bgm:modulesReady'));
     bgmLog(LOG_LEVELS.INFO, 'initPanel 完成');
 }
