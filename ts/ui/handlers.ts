@@ -15,7 +15,6 @@ import {
     testSingleUpdate, getOrCreateSyncRecordSheet, getAllSyncRecords,
     addSyncRecord, openSyncRecordSheet, clearSheetMarksInSheet,
     previewSyncContent, refreshData,refreshSheets,toggleSheetLock ,clearSyncRecords,
-    
     closeDetailModal, 
 } from '../index.js';5
 import{BGM_EVENTS, eventBus} from '../tools/events.js';
@@ -237,7 +236,7 @@ export async function syncFromPanel(): Promise<void> {
         return;
     }
 
-    // 确保同步记录工作表存在
+    // 确保同步记录工作表存在并激活
     if (typeof getOrCreateSyncRecordSheet === 'function') {
         const syncSheet = getOrCreateSyncRecordSheet();
         if (syncSheet) {
@@ -255,13 +254,12 @@ export async function syncFromPanel(): Promise<void> {
     const colMap = getColumnMap(ws, headerRow);
     if (!colMap.has("Bangumi_URL")) { showAlert('未找到 "Bangumi URL" 列！'); return; }
 
-    // ========== 新增：获取预览统计 ==========
+    // ========== 获取同步预览统计 ==========
     const preview = getSyncPreview(ws, colMap, lastRow, headerRow);
 
-    // 读取用户选择的策略
-    const strategySelect = document.getElementById('conflictStrategy') as HTMLSelectElement;
-    const conflictStrategy = strategySelect?.value || 'skip'; // 默认跳过
-
+    // ========== 冲突检测与策略 ==========
+    const conflictSelect = document.getElementById('conflictStrategy') as HTMLSelectElement;
+    const conflictStrategy = conflictSelect?.value || 'skip'; // 默认跳过冲突
     let conflictSids: Set<string> | undefined = undefined;
     let conflictMsg = '';
     try {
@@ -271,39 +269,37 @@ export async function syncFromPanel(): Promise<void> {
                 conflictSids = new Set(conflicts.map(c => c.sid));
                 conflictMsg = `检测到 ${conflictCount} 条冲突，已选择【跳过冲突】。\n\n`;
             } else {
-                // excel 覆盖：不设置跳过集合，正常同步
                 conflictMsg = `检测到 ${conflictCount} 条冲突，将使用【Excel数据覆盖】。\n\n`;
             }
         }
-    } catch (_) {}
+    } catch (_) {
+        // 检测失败不影响同步
+    }
 
-                            // 构建确认消息（加入策略提示）
-                            const msg = `数据预览：
-                                总行数：${preview.total}
-                                有效条目：${preview.valid}
-                                已上传（跳过）：${preview.alreadyUploaded}
-                                待同步：${preview.willSync}
-                                不上传（状态跳过）：${preview.willSkip}
-                                无效（无SID）：${preview.total - preview.valid}
-                                ${conflictMsg}是否继续同步？`;
+    // ========== 增量同步开关 ==========
+    const incremental = (document.getElementById('chkIncremental') as HTMLInputElement)?.checked ?? false;
 
-    // 显示确认对话框（使用自定义的 showConfirm，支持异步等待）
+    // ========== 确认对话框 ==========
+    const msg = `数据预览：
+总行数：${preview.total}
+有效条目：${preview.valid}
+已上传（跳过）：${preview.alreadyUploaded}
+待同步：${preview.willSync}
+不上传（状态跳过）：${preview.willSkip}
+无效（无SID）：${preview.total - preview.valid}
+${conflictMsg}是否继续同步？`;
+
     const confirmed = await new Promise<boolean>(resolve => {
-        showConfirm(msg, '同步确认',
-            () => resolve(true),
-            () => resolve(false)
-        );
+        showConfirm(msg, '同步确认', () => resolve(true), () => resolve(false));
     });
-
     if (!confirmed) return;
 
-    // ========== 执行同步，并传入冲突跳过集合 ==========
+    // ========== 执行同步 ==========
     try {
-        const incremental = (document.getElementById('chkIncremental') as HTMLInputElement)?.checked ?? false;
         const result = await SyncToBangumiAsync(ws, colMap, token, lastRow, headerRow, {
             skipSids: conflictSids,
-            incremental,  
-            onProgress: (current, total, message) => {
+            incremental,
+            onProgress: (current: number, total: number, message: string) => {
                 updateProgressBar(current, total, message);
                 if (app.StatusBar !== undefined) {
                     app.StatusBar = `[${current}/${total}] ${message}`;
@@ -516,38 +512,49 @@ function handleActionClick(event: Event): void {
     const action = target.dataset.action;
     if (!action) return;
 
-    // 解析参数（data-args 传递 JSON 数组）
+    // 解析可能的参数（如：<button data-action="markUploadedItems" data-args='["动画"]'>）
     let args: string[] = [];
     if (target.dataset.args) {
         try { args = JSON.parse(target.dataset.args); } catch { /* ignore */ }
     }
 
     switch (action) {
-        case 'sync': syncFromPanel(); break;
-        case 'test': if (typeof testSingleUpdate === 'function') testSingleUpdate(); break;
-        case 'clear': showConfirm(_T.confirmClearMarks, '确认', () => {
-            if (typeof clearRowColors === 'function') clearRowColors();
-            if (typeof refreshData === 'function') refreshData();
-        }); break;
-        case 'preview': if (typeof previewSyncContent === 'function') previewSyncContent(); break;
-        case 'setToken': showTokenDialog(loadBgToken() || ''); break;
-        case 'showTokenDialog': showTokenDialog(loadBgToken() || ''); break;
-        case 'testToken': testTokenValidity(); break;
-        case 'showUserIdDialog': showUserIdDialog(); break;
-        case 'openUserCollection': openUserCollection(); break;
+        // 核心操作
+        case 'sync':                syncFromPanel(); break;
+        case 'test':                if (typeof testSingleUpdate === 'function') testSingleUpdate(); break;
+        case 'clear':               showConfirm(_T.confirmClearMarks, '确认', () => {
+                                        if (typeof clearRowColors === 'function') clearRowColors();
+                                        if (typeof refreshData === 'function') refreshData();
+                                    }); break;
+        case 'preview':             // 统一名称，支持旧写法
+        case 'previewSyncContent':  // 新写法
+                                    if (typeof previewSyncContent === 'function') previewSyncContent(); break;
+        case 'setToken':            showTokenDialog(loadBgToken() || ''); break;
+
+        // 快捷按钮
+        case 'showTokenDialog':     showTokenDialog(loadBgToken() || ''); break;
+        case 'testToken':           testTokenValidity(); break;
+        case 'showUserIdDialog':    showUserIdDialog(); break;
+        case 'openUserCollection':  openUserCollection(); break;
         case 'syncCollectionFromBgm': syncCollectionFromBgm(); break;
-        case 'refreshSheets': refreshSheets(); break;
-        case 'refreshData': refreshData(); break;
-        case 'toggleSheetLock': toggleSheetLock(); break;
-        case 'clearSyncRecords': clearSyncRecords(); break;
-        case 'markUploadedItems': markUploadedItems(args[0]); break;
-        case 'clearSheetMarks': clearSheetMarks(args[0]); break;
+        case 'refreshSheets':       refreshSheets(); break;
+        case 'refreshData':         refreshData(); break;
+        case 'toggleSheetLock':     toggleSheetLock(); break;
+        case 'clearSyncRecords':    clearSyncRecords(); break;
+        case 'markUploadedItems':   markUploadedItems(args[0]); break;
+        case 'clearSheetMarks':     clearSheetMarks(args[0]); break;
         case 'openSyncRecordSheet': openSyncRecordSheet(); break;
         case 'testDebugConnection': testDebugConnection(); break;
-        case 'closeDetailModal': closeDetailModal(); break;
-        case 'showToast': showToast(args[0], args[1]); break;
-        case 'showAlert': showAlert(args[0], args[1]); break;
-        default: bgmLog(LOG_LEVELS.WARN, 'Unknown action: ' + action);
+
+        // 模态框操作
+        case 'closeDetailModal':    closeDetailModal(); break;
+
+        // 弹窗快捷调用（参数形式）
+        case 'showToast':           showToast(args[0], args[1]); break;
+        case 'showAlert':           showAlert(args[0], args[1]); break;
+
+        default:
+            bgmLog(LOG_LEVELS.WARN, 'Unknown action: ' + action);
     }
 }
 

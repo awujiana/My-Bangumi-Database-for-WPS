@@ -2,14 +2,12 @@
 <html>
 <head>
     <meta charset="utf-8">
-    <!-- 外部样式 -->
     <link rel="stylesheet" href="../css/styles.css">
     <link rel="stylesheet" href="../css/preview.css">
 </head>
 <body>
-    <!-- ES6 模块加载（按依赖顺序）-->
+    <!-- ES6 模块加载 -->
     <script type="module">
-        // 按依赖顺序导入模块（确保副作用按顺序执行）
         import '../dist-ts/core/constants.js';
         import '../dist-ts/core/crypto.js';
         import '../dist-ts/tools/events.js';
@@ -24,112 +22,91 @@
         import '../dist-ts/sync/syncRecord.js';
         import '../dist-ts/sync/scraping.js';
         import '../dist-ts/sync/exceltobangumi.js';
-        import '../dist-ts/ui//handlers.js';
-
-        // 导入主页面逻辑（taskpane.js 会将函数挂载到 window）
+        import '../dist-ts/ui/handlers.js';
         import '../dist-ts/taskpane.js';
 
-        // 确认挂载完成
         if (typeof window.initPanel === 'function') {
             console.log('[BGM] All modules loaded, window functions ready');
         } else {
             console.error('[BGM] Modules loaded but window.initPanel not found');
         }
     </script>
+    
     <script>
-        // 模块加载前禁用所有按钮，防止点击报错
+        // 模块加载前禁用所有按钮
         document.querySelectorAll('button[onclick], button[data-action]').forEach(function(btn) {
             btn.disabled = true;
-            });
-        // 全局安全调用：模块未加载时阻止 data-action= 报错
-        window._modulesReady = false;
-        window.safeCall = function(fn, args) {
-            if (window._modulesReady && typeof window[fn] === 'function') {
-                return window[fn].apply(null, args || []);
-            }
-            console.warn('[BGM] 模块未加载，跳过调用: ' + fn);
-        };
-        // 监听模块加载完成事件（由 taskpane.js 触发）
+        });
+        // 模块就绪后启用按钮
         document.addEventListener('bgm:modulesReady', function() {
-            clearInterval(_checkInterval);
-            window._modulesReady = true;
-            document.querySelectorAll('button[data-action=], button[data-action]').forEach(function(btn) {
+            document.querySelectorAll('button[data-action]').forEach(function(btn) {
                 btn.disabled = false;
             });
             console.log('[BGM] 模块加载完成，按钮已启用');
         });
-        // 兜底：轮询检查（防止事件未触发）
+        // 轮询检测超时处理（10秒后若按钮仍禁用则提示）
         var _checkCount = 0;
         var _checkInterval = setInterval(function() {
             _checkCount++;
             if (typeof window.refreshData === 'function' && typeof window.onAction === 'function') {
                 clearInterval(_checkInterval);
-                if (!window._modulesReady) {
-                    window._modulesReady = true;
-                    document.querySelectorAll('button[data-action=], button[data-action]').forEach(function(btn) {
-                        btn.disabled = false;
-                    });
-                    console.log('[BGM] 轮询检测模块已就绪');
-                }
+                document.querySelectorAll('button[data-action]').forEach(function(btn) {
+                    btn.disabled = false;
+                });
+                console.log('[BGM] 轮询检测模块已就绪');
             }
-            if (_checkCount > 200) { // 10秒超时
+            if (_checkCount > 200) {
                 clearInterval(_checkInterval);
                 console.error('[BGM] 模块加载超时，部分功能可能不可用');
             }
         }, 50);
     </script>
     
-    <!-- WPS JS RPC SDK（需要在模块之后加载）-->
     <script src="../wpsjsrpcsdk.js"></script>
 
     <div class="global">
-        <!-- 标题 -->
         <div class="header">
             <h2>Bangumi 同步工具</h2>
             <p class="subtitle">将 Excel 数据批量同步到 Bangumi 收藏</p>
         </div>
 
-       <!-- 快捷操作 -->
-            <div class="section">
-                <h3>快捷操作</h3>
-                <div class="btn-group">
-                    <button class="btn primary" id="syncBtn" data-action="sync">🔄 同步到 Bangumi</button>
-                    <button class="btn" data-action="test">🧪 测试同步</button>
-                    <button class="btn warning" data-action="clear">🗑️ 清除标记</button>
-                </div>
-                <div class="btn-group" style="margin-top:8px;">
-                    <button class="btn success" data-action="syncCollectionFromBgm">⬇️ 从BGM同步收藏</button>
-                    <button class="btn" data-action="preview">👁️ 预览同步</button>
-                </div>
-                <p class="hint" style="margin-top:8px;">
-                    ⬇️ 从BGM同步：获取你在Bangumi的收藏列表并标记到Excel<br>
-                    支持：collect(已看)、wish(想看)、do(在看)
-                </p>
+        <div class="section">
+            <h3>快捷操作</h3>
+            <div class="btn-group">
+                <button class="btn primary" id="syncBtn" data-action="sync">🔄 同步到 Bangumi</button>
+                <button class="btn" data-action="test">🧪 测试同步</button>
+                <button class="btn warning" data-action="clear">🗑️ 清除标记</button>
             </div>
+            <div class="btn-group" style="margin-top:8px;">
+                <button class="btn success" data-action="syncCollectionFromBgm">⬇️ 从BGM同步收藏</button>
+                <button class="btn" data-action="previewSyncContent">👁️ 预览同步</button>
+            </div>
+            <p class="hint" style="margin-top:8px;">
+                ⬇️ 从BGM同步：获取你在Bangumi的收藏列表并标记到Excel<br>
+                支持：collect(已看)、wish(想看)、do(在看)
+            </p>
+        </div>
 
-        <!-- Token 设置 -->
         <div class="section">
             <h3>Token 设置</h3>
             <div class="token-display">
                 <span id="tokenStatus">未设置</span>
-                <button class="btn small" id="setTokenBtn" data-action="showTokenDialog">设置/修改</button>
-                <button class="btn small primary" id="testTokenBtn" data-action="testToken">测试</button>
+                <button class="btn small" data-action="showTokenDialog">设置/修改</button>
+                <button class="btn small primary" data-action="testToken">测试</button>
             </div>
             <p class="hint">Access Token 获取方式：<a href="https://next.bgm.tv/demo/access-token/create" target="_blank">点击创建</a></p>
         </div>
 
-        <!-- 用户ID设置 -->
         <div class="section">
             <h3>收藏页面访问</h3>
             <div class="token-display">
                 <span id="userIdStatus">未设置</span>
-                <button class="btn small" id="setUserIdBtn" data-action="showUserIdDialog">设置用户ID</button>
-                <button class="btn small primary" id="openCollectionBtn" data-action="openUserCollection">打开收藏页</button>
+                <button class="btn small" data-action="showUserIdDialog">设置用户ID</button>
+                <button class="btn small primary" data-action="openUserCollection">打开收藏页</button>
             </div>
             <p class="hint">用户ID：Bangumi主页URL中的数字/字母</p>
         </div>
 
-        <!-- 收藏列表类型选择 -->
         <div class="section">
             <h3>收藏列表类型</h3>
             <div class="form-group">
@@ -140,14 +117,9 @@
                     <option value="do">在看（Do）</option>
                 </select>
             </div>
-            <p class="hint">
-                collect - 已看完的番剧<br>
-                wish - 想看还没看的<br>
-                do - 正在追的番剧
-            </p>
+            <p class="hint">collect - 已看完的番剧<br>wish - 想看还没看的<br>do - 正在追的番剧</p>
         </div>
 
-        <!-- 数据选择 -->
         <div class="section">
             <h3>数据选择</h3>
             <div class="form-group">
@@ -209,7 +181,6 @@
             </div>
         </div>
 
-        <!-- 数据预览 -->
         <div class="section">
             <h3>数据预览 <span id="previewCount"></span></h3>
             <div class="preview-wrapper">
@@ -224,7 +195,7 @@
                 <span class="btn-icon">⬇️</span> 从BGM同步收藏标记
             </button>
         </div>
-        <!-- 冲突处理策略选择（放在同步按钮组之前或之后均可） -->
+
         <div class="section">
             <h3>冲突处理策略</h3>
             <div class="form-group">
@@ -234,73 +205,61 @@
                 </select>
             </div>
             <p class="hint">当Excel条目与Bangumi收藏状态不一致时，自动按所选策略处理。</p>
+            <div class="form-group">
+                <label>
+                    <input type="checkbox" id="chkIncremental">
+                    仅同步变更（增量同步）
+                </label>
+            </div>
         </div>
-        <div class="form-group">
-            <label>
-                <input type="checkbox" id="chkIncremental">
-                仅同步变更（增量同步）
-            </label>
-        </div>
-        <!-- 同步记录 -->
+
         <div class="section">
             <h3>📊 同步记录</h3>
             <div class="btn-group">
-                <button class="btn" id="viewRecordsBtn" data-action="openSyncRecordSheet">
+                <button class="btn" data-action="openSyncRecordSheet">
                     <span class="btn-icon">📋</span> 查看同步记录
                 </button>
-                <button class="btn success" id="fetchBgRecordsBtn" data-action="fetchBgCollectionRecords">
+                <button class="btn success" data-action="syncCollectionFromBgm">
                     <span class="btn-icon">⬇️</span> 从BGM同步收藏记录
                 </button>
-                <button class="btn warning" id="clearRecordsBtn" data-action="clearSyncRecords">
+                <button class="btn warning" data-action="clearSyncRecords">
                     <span class="btn-icon">🗑️</span> 清除同步记录
                 </button>
             </div>
             <div class="btn-group" style="margin-top:8px;">
-                <button class="btn" data-action="markUploadedItems" data-args='["动画"]'>📺 标记动画（番剧）</button>
+                <button class="btn" data-action="markUploadedItems" data-args='["动画"]'>
                     <span class="btn-icon">📺</span> 标记动画（番剧）
                 </button>
-                <button class="btn" id="markBookBtn" data-action="markUploadedItems" data-args='["书籍"]'>
+                <button class="btn" data-action="markUploadedItems" data-args='["书籍"]'>
                     <span class="btn-icon">📚</span> 标记书籍（小说）
                 </button>
-                <button class="btn warning" id="clearMarkBtn" data-action="clearSheetMarks">
+                <button class="btn warning" data-action="clearSheetMarks">
                     <span class="btn-icon">❌</span> 清除D列标记
                 </button>
             </div>
             <p class="hint">同步记录会保存在"同步记录"工作表中，包含：名称、URL、SID、类型、同步时间等</p>
         </div>
 
-        <!-- 使用引导 -->
+        <!-- 同步进度条 -->
+        <div id="syncProgress" style="display:none; margin: 10px 0; padding: 8px; background: #2a2a2a; border-radius: 4px;">
+            <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
+                <span id="progressText" style="color: #aaa;">准备中...</span>
+            </div>
+            <div style="background: #444; border-radius: 4px; height: 20px; overflow: hidden;">
+                <div id="progressBar" style="width: 0%; height: 100%; background: #27ae60; text-align: center; line-height: 20px; color: white; font-size: 12px; transition: width 0.3s;"></div>
+            </div>
+        </div>
+
         <div class="section">
             <h3>📖 使用引导</h3>
             <div class="guide">
-                <div class="step">
-                    <span class="step-num">1</span>
-                    <span>设置 Token（只需设置一次）</span>
-                </div>
-                <div class="step">
-                    <span class="step-num">2</span>
-                    <span>确保 Excel 包含必填列</span>
-                </div>
-                <div class="step">
-                    <span class="step-num">3</span>
-                    <span>选择工作表和行范围</span>
-                </div>
-                <div class="step">
-                    <span class="step-num">4</span>
-                    <span>点击"同步到 Bangumi"</span>
-                </div>
+                <div class="step"><span class="step-num">1</span><span>设置 Token（只需设置一次）</span></div>
+                <div class="step"><span class="step-num">2</span><span>确保 Excel 包含必填列</span></div>
+                <div class="step"><span class="step-num">3</span><span>选择工作表和行范围</span></div>
+                <div class="step"><span class="step-num">4</span><span>点击"同步到 Bangumi"</span></div>
             </div>
         </div>
-        <!-- 同步进度条 -->
-            <div id="syncProgress" style="display:none; margin: 10px 0; padding: 8px; background: #2a2a2a; border-radius: 4px;">
-                <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
-                    <span id="progressText" style="color: #aaa;">准备中...</span>
-                </div>
-                <div style="background: #444; border-radius: 4px; height: 20px; overflow: hidden;">
-                    <div id="progressBar" style="width: 0%; height: 100%; background: #27ae60; text-align: center; line-height: 20px; color: white; font-size: 12px;            transition: width 0.3s;"></div>
-                </div>
-            </div>
-        <!-- 数据格式要求 -->
+
         <div class="section">
             <h3>📋 数据格式要求</h3>
             <div class="format-table">
@@ -318,14 +277,12 @@
             </div>
         </div>
 
-        <!-- 调试通知 -->
         <div class="section debug-section" id="debugSection" style="display:none;">
             <h3>🐛 调试信息</h3>
             <div id="DemoSpan" class="debug-content"></div>
             <button class="btn small" data-action="testDebugConnection">测试连接</button>
         </div>
 
-        <!-- 状态 -->
         <div class="section">
             <div class="status" id="statusBox">就绪</div>
         </div>

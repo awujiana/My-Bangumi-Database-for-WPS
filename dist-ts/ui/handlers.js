@@ -205,7 +205,7 @@ export async function syncFromPanel() {
         showAlert(_T.pleaseSetBgmToken);
         return;
     }
-    // 确保同步记录工作表存在
+    // 确保同步记录工作表存在并激活
     if (typeof getOrCreateSyncRecordSheet === 'function') {
         const syncSheet = getOrCreateSyncRecordSheet();
         if (syncSheet) {
@@ -232,11 +232,11 @@ export async function syncFromPanel() {
         showAlert('未找到 "Bangumi URL" 列！');
         return;
     }
-    // ========== 新增：获取预览统计 ==========
+    // ========== 获取同步预览统计 ==========
     const preview = getSyncPreview(ws, colMap, lastRow, headerRow);
-    // 读取用户选择的策略
-    const strategySelect = document.getElementById('conflictStrategy');
-    const conflictStrategy = strategySelect?.value || 'skip'; // 默认跳过
+    // ========== 冲突检测与策略 ==========
+    const conflictSelect = document.getElementById('conflictStrategy');
+    const conflictStrategy = conflictSelect?.value || 'skip'; // 默认跳过冲突
     let conflictSids = undefined;
     let conflictMsg = '';
     try {
@@ -247,30 +247,31 @@ export async function syncFromPanel() {
                 conflictMsg = `检测到 ${conflictCount} 条冲突，已选择【跳过冲突】。\n\n`;
             }
             else {
-                // excel 覆盖：不设置跳过集合，正常同步
                 conflictMsg = `检测到 ${conflictCount} 条冲突，将使用【Excel数据覆盖】。\n\n`;
             }
         }
     }
-    catch (_) { }
-    // 构建确认消息（加入策略提示）
+    catch (_) {
+        // 检测失败不影响同步
+    }
+    // ========== 增量同步开关 ==========
+    const incremental = document.getElementById('chkIncremental')?.checked ?? false;
+    // ========== 确认对话框 ==========
     const msg = `数据预览：
-                                总行数：${preview.total}
-                                有效条目：${preview.valid}
-                                已上传（跳过）：${preview.alreadyUploaded}
-                                待同步：${preview.willSync}
-                                不上传（状态跳过）：${preview.willSkip}
-                                无效（无SID）：${preview.total - preview.valid}
-                                ${conflictMsg}是否继续同步？`;
-    // 显示确认对话框（使用自定义的 showConfirm，支持异步等待）
+总行数：${preview.total}
+有效条目：${preview.valid}
+已上传（跳过）：${preview.alreadyUploaded}
+待同步：${preview.willSync}
+不上传（状态跳过）：${preview.willSkip}
+无效（无SID）：${preview.total - preview.valid}
+${conflictMsg}是否继续同步？`;
     const confirmed = await new Promise(resolve => {
         showConfirm(msg, '同步确认', () => resolve(true), () => resolve(false));
     });
     if (!confirmed)
         return;
-    // ========== 执行同步，并传入冲突跳过集合 ==========
+    // ========== 执行同步 ==========
     try {
-        const incremental = document.getElementById('chkIncremental')?.checked ?? false;
         const result = await SyncToBangumiAsync(ws, colMap, token, lastRow, headerRow, {
             skipSids: conflictSids,
             incremental,
@@ -514,7 +515,7 @@ function handleActionClick(event) {
     const action = target.dataset.action;
     if (!action)
         return;
-    // 解析参数（data-args 传递 JSON 数组）
+    // 解析可能的参数（如：<button data-action="markUploadedItems" data-args='["动画"]'>）
     let args = [];
     if (target.dataset.args) {
         try {
@@ -523,6 +524,7 @@ function handleActionClick(event) {
         catch { /* ignore */ }
     }
     switch (action) {
+        // 核心操作
         case 'sync':
             syncFromPanel();
             break;
@@ -538,13 +540,15 @@ function handleActionClick(event) {
                     refreshData();
             });
             break;
-        case 'preview':
+        case 'preview': // 统一名称，支持旧写法
+        case 'previewSyncContent': // 新写法
             if (typeof previewSyncContent === 'function')
                 previewSyncContent();
             break;
         case 'setToken':
             showTokenDialog(loadBgToken() || '');
             break;
+        // 快捷按钮
         case 'showTokenDialog':
             showTokenDialog(loadBgToken() || '');
             break;
@@ -584,16 +588,19 @@ function handleActionClick(event) {
         case 'testDebugConnection':
             testDebugConnection();
             break;
+        // 模态框操作
         case 'closeDetailModal':
             closeDetailModal();
             break;
+        // 弹窗快捷调用（参数形式）
         case 'showToast':
             showToast(args[0], args[1]);
             break;
         case 'showAlert':
             showAlert(args[0], args[1]);
             break;
-        default: bgmLog(LOG_LEVELS.WARN, 'Unknown action: ' + action);
+        default:
+            bgmLog(LOG_LEVELS.WARN, 'Unknown action: ' + action);
     }
 }
 if (document.readyState === 'loading') {
