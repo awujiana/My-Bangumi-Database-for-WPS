@@ -5,7 +5,7 @@
 				<group id="bangumiGroup" label="Bangumi">
                     <button id="btnShowPanel" label="打开同步面板" onAction="OnAction" getImage="GetBangumiImage" size="large"/>
                     <button id="btnSyncBangumi" label="全面同步" onAction="OnAction" getImage="GetBangumiImage" size="large"/>
-                     <!-- 新增复选框：跳过冲突 -->
+                    <checkBox id="chkIncrementalSync" label="仅同步变更" getPressed="GetIncrementalSyncPressed" onAction="OnIncrementalSyncChange" />
                     <checkBox id="chkSkipConflicts" label="跳过冲突" getPressed="GetSkipConflictsPressed" onAction="OnSkipConflictsChange" />
                     <button id="btnSetToken" label="设置Token" onAction="OnAction" getImage="GetBangumiImage" size="large"/>
                     <button id="btnTestToken" label="测试Token" onAction="OnAction" getImage="GetBangumiImage" size="large"/>
