@@ -12,7 +12,7 @@ import {
     HEADER_KEYWORDS,
     FIELD_NAME_MAP,
     URL_PATTERNS,
-    TYPE_TEXT_MAP,
+    WATCH_STATUS_MAP,
     PANEL_CONFIG,
     BGM_CONFIG,
     BGM_COLOR,
@@ -78,41 +78,8 @@ interface SyncOptions {
     skipSids?: Set<string>;                  // 冲突跳过
     incremental?: boolean;                   // 增量同步开关
 }
-/**
- * 表头关键字集合（用于快速查找）
- *
- * @constant
- * @type {Set<string>}
- */
-const headerKeywordSet = new Set(HEADER_KEYWORDS.map(k => k.toLowerCase()));
 
-/**
- * 重要列集合（用于快速查找）
- *
- * @constant
- * @type {Set<string>}
- */
-const importantColSet = new Set(Object.keys(IMPORTANT_COLS || {}).map(k => k.toLowerCase()));
 
-/**
- * 观看状态文本映射（用于快速查找）
- *
- * @constant
- * @type {Map<string, number>}
- */
-const watchStatusMap = new Map(Object.entries(TYPE_TEXT_MAP));
-
-/**
- * 获取BgmWindow上缓存的函数引用
- * 用于在面板函数就绪前延迟执行
- *
- * @function getPanelFunction
- * @param {string} name - 函数名
- * @returns {Function | undefined} 函数引用
- */
-function getPanelFunction(name: string): Function | undefined {
-    return (window as any)[name];
-}
 
 
 /**
@@ -251,12 +218,12 @@ export function mapWatchStatus(status: string): number {
     const normalized = trim(status).toLowerCase();
 
     // 直接查找
-    if (watchStatusMap.has(normalized)) {
-        return watchStatusMap.get(normalized)!;
+    if (WATCH_STATUS_MAP[normalized] !== undefined) {
+        return WATCH_STATUS_MAP[normalized];
     }
 
     // 模糊匹配
-    for (const [key, value] of watchStatusMap.entries()) {
+    for (const [key, value] of Object.entries(WATCH_STATUS_MAP)) {
         if (normalized.includes(key) || key.includes(normalized)) {
             return value;
         }
@@ -291,18 +258,16 @@ export function mapWatchStatus(status: string): number {
  * addTagsFromStr(tags, '治愈,日常,萌系');
  * // tags = {'治愈', '日常', '萌系'}
  */
-export function addTagsFromStr(tagSet: Set<string>, tagsRaw: string): void {
-    if (!tagsRaw) return;
-
-    const separators = /[,，、；;\s\n]+/;
-    const parts = tagsRaw.split(separators);
-
-    for (const part of parts) {
-        const trimmed = trim(part);
-        if (trimmed) {
-            tagSet.add(trimmed);
+export function addTagsFromStr(tagSet: Set<string>, raw: string) {
+    if (!raw) return;
+    // 按 | 或 , 或 ; 分割，并过滤掉纯符号和空白
+    const parts = raw.split(/[|,;，；]/);
+    parts.forEach(part => {
+        const tag = part.trim();
+        if (tag && !['|', ',', ';', '，', '；'].includes(tag)) {
+            tagSet.add(tag);
         }
-    }
+    });
 }
 
 /**

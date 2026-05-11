@@ -7,40 +7,8 @@
  * @author BGM Development Team
  * @version 1.0.0
  */
-import { HEADER_KEYWORDS, URL_PATTERNS, TYPE_TEXT_MAP, BGM_CONFIG, BGM_COLOR, LOG_LEVELS, SYNC_STATUS, bgmLog, getApp, readCell, getCell, trim, getColumnMap, getLastRow, findHeaderRow, getCellValue, loadBgToken, storeBgToken, _getBgmUserId, _setBgmUserId, BGM, wpsMsgBox, _getUserApiPath, IMPORTANT_COLS, readRangeValues, delay, calcFingerprint, getAllSyncRecords, isWpsWorksheet } from '../index.js';
+import { URL_PATTERNS, WATCH_STATUS_MAP, BGM_CONFIG, BGM_COLOR, LOG_LEVELS, SYNC_STATUS, bgmLog, getApp, readCell, getCell, trim, getColumnMap, getLastRow, findHeaderRow, getCellValue, loadBgToken, storeBgToken, _getBgmUserId, _setBgmUserId, BGM, wpsMsgBox, _getUserApiPath, readRangeValues, delay, calcFingerprint, getAllSyncRecords, isWpsWorksheet } from '../index.js';
 import { getOrCreateSyncRecordSheet, addSyncRecord } from './syncRecord.js';
-/**
- * 表头关键字集合（用于快速查找）
- *
- * @constant
- * @type {Set<string>}
- */
-const headerKeywordSet = new Set(HEADER_KEYWORDS.map(k => k.toLowerCase()));
-/**
- * 重要列集合（用于快速查找）
- *
- * @constant
- * @type {Set<string>}
- */
-const importantColSet = new Set(Object.keys(IMPORTANT_COLS || {}).map(k => k.toLowerCase()));
-/**
- * 观看状态文本映射（用于快速查找）
- *
- * @constant
- * @type {Map<string, number>}
- */
-const watchStatusMap = new Map(Object.entries(TYPE_TEXT_MAP));
-/**
- * 获取BgmWindow上缓存的函数引用
- * 用于在面板函数就绪前延迟执行
- *
- * @function getPanelFunction
- * @param {string} name - 函数名
- * @returns {Function | undefined} 函数引用
- */
-function getPanelFunction(name) {
-    return window[name];
-}
 /**
  * 打开Bangumi Token申请页面
  *
@@ -168,11 +136,11 @@ export function mapWatchStatus(status) {
         return 0;
     const normalized = trim(status).toLowerCase();
     // 直接查找
-    if (watchStatusMap.has(normalized)) {
-        return watchStatusMap.get(normalized);
+    if (WATCH_STATUS_MAP[normalized] !== undefined) {
+        return WATCH_STATUS_MAP[normalized];
     }
     // 模糊匹配
-    for (const [key, value] of watchStatusMap.entries()) {
+    for (const [key, value] of Object.entries(WATCH_STATUS_MAP)) {
         if (normalized.includes(key) || key.includes(normalized)) {
             return value;
         }
@@ -205,17 +173,17 @@ export function mapWatchStatus(status) {
  * addTagsFromStr(tags, '治愈,日常,萌系');
  * // tags = {'治愈', '日常', '萌系'}
  */
-export function addTagsFromStr(tagSet, tagsRaw) {
-    if (!tagsRaw)
+export function addTagsFromStr(tagSet, raw) {
+    if (!raw)
         return;
-    const separators = /[,，、；;\s\n]+/;
-    const parts = tagsRaw.split(separators);
-    for (const part of parts) {
-        const trimmed = trim(part);
-        if (trimmed) {
-            tagSet.add(trimmed);
+    // 按 | 或 , 或 ; 分割，并过滤掉纯符号和空白
+    const parts = raw.split(/[|,;，；]/);
+    parts.forEach(part => {
+        const tag = part.trim();
+        if (tag && !['|', ',', ';', '，', '；'].includes(tag)) {
+            tagSet.add(tag);
         }
-    }
+    });
 }
 /**
  * 构建标签数组

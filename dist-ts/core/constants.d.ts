@@ -230,14 +230,6 @@ export declare const HEADER_KEYWORDS: string[];
  */
 export declare const IMPORTANT_COLS: Record<string, boolean>;
 /**
- * 观看状态文本到数值的映射表
- * 用于将用户友好的状态文本转换为Bangumi API所需数值
- *
- * @constant
- * @type {Record<string, number>}
- */
-export declare const TYPE_TEXT_MAP: Record<string, number>;
-/**
  * 字段名称映射表
  * 将各种可能的列名映射到标准字段名
  *
@@ -269,6 +261,13 @@ export declare const TOKEN_CONFIG: {
 /**
  * 观看状态文本到数值的反向映射（用于快速精确匹配）
  * 键：常见状态文本（小写），值：Bangumi 状态码 (1-5)
+ */
+/**
+ * 观看状态文本到数值的映射表
+ * 用于将用户友好的状态文本转换为Bangumi API所需数值
+ *
+ * @constant
+ * @type {Record<string, number>}
  */
 export declare const WATCH_STATUS_MAP: Record<string, number>;
 /**

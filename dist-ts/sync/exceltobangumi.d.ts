@@ -95,7 +95,7 @@ export declare function mapWatchStatus(status: string): number;
  * addTagsFromStr(tags, '治愈,日常,萌系');
  * // tags = {'治愈', '日常', '萌系'}
  */
-export declare function addTagsFromStr(tagSet: Set<string>, tagsRaw: string): void;
+export declare function addTagsFromStr(tagSet: Set<string>, raw: string): void;
 /**
  * 构建标签数组
  *

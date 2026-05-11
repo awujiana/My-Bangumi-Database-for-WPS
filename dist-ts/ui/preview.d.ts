@@ -1,3 +1,8 @@
+/**
+ * 详细预览页面（模块化版）
+ * @module ui/detail-preview
+ * @description 数据预览、同步记录预览、详情模态框、单条上传
+ */
 import { WpsRange } from '../index.js';
 export interface DetailItem {
     row: number;
@@ -27,8 +32,6 @@ export interface DetailPreviewData {
 }
 export declare function previewSyncContent(): void;
 export declare function uploadSingleRow(rowNum: number, btnElement?: HTMLButtonElement): void;
-export declare function updateUploadStats(): void;
-export declare function filterDetailItems(filterType: string | number): void;
 export declare function showDetailModal(): void;
 export declare function closeDetailModal(): void;
 export declare function viewSyncRecordDetail(sid: string): void;

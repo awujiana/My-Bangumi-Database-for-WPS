@@ -3,14 +3,13 @@
  * @module ui/detail-preview
  * @description 数据预览、同步记录预览、详情模态框、单条上传
  */
-const ITEM_HEIGHT = 180;   // 每个条目的高度（根据实际样式调整）
-const CONTAINER_HEIGHT = 600;
+
 import {
   getApp, bgmLog, BGM, readCell, trim, _getUserApiPath,
   wpsMsgBox, getCell, escapeHtml, showAlert, showToast,
   LOG_LEVELS, BGM_COLOR, type SyncRecord, findHeaderRow, getColumnMap, getSequentialRowsBySeqCol,
   extractSubjectId, mapWatchStatus, buildJsonPayload,
-  bgmRequestSync, addSyncRecord, addTagsFromStr,WpsRange 
+  bgmRequestSync, addSyncRecord, addTagsFromStr,WpsRange ,WATCH_STATUS_MAP 
 } from '../index.js';
 
 
@@ -38,7 +37,8 @@ export interface PreviewItem {
 }
 
 export interface DetailPreviewData {
-  allItems: PreviewItem[];
+  //  所有条目（包含无效和已上传）
+   allItems: PreviewItem[];
   currentFilter: string;
   totalWithType: number;
   totalValid: number;
@@ -205,20 +205,42 @@ let detailPreviewData: DetailPreviewData = {
   uploadedCount: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 },
 };
 
+// 从映射表中提取标准中文状态列表（过滤数字和英文）
+const VALID_STATUSES = Object.keys(WATCH_STATUS_MAP)
+    .filter(key => /^[\u4e00-\u9fa5]+$/.test(key)) // 只保留纯中文
+    .filter((key, idx, arr) => arr.indexOf(key) === idx); // 去重
+
+/**
+ * 将非标准状态文本标准化（如 "是" → "看过"）
+ */
+function normalizeStatus(rawStatus: string): string {
+    const trimmed = rawStatus.trim();
+    if (!trimmed) return '';
+    // 如果在映射表中找到（包括中文和英文），则转换为对应的状态码，
+    // 然后再映射回中文名称。也可以直接基于文本映射。
+    const code = WATCH_STATUS_MAP[trimmed.toLowerCase()];
+    if (code !== undefined) {
+        // 根据状态码返回标准中文名称
+        const reverseMap: Record<number, string> = { 0: '想看', 2: '在看', 3: '看过', 4: '搁置', 5: '抛弃' };
+        return reverseMap[code] || trimmed;
+    }
+    return trimmed; // 未识别的保持原样
+}
 // ========== 公有函数 ==========
+
+
+
 
 export function previewSyncContent(): void {
     bgmLog(LOG_LEVELS.INFO, '[preview] 开始执行 previewSyncContent');
 
     const dp = BGM.dataPreview;
     if (!dp || !dp.ws) {
-        bgmLog(LOG_LEVELS.WARN, '[preview] BGM.dataPreview 不可用');
         showToast('请先在预览面板中加载数据', 'warn');
         return;
     }
 
     const { ws, visibleRows, headerRow, dataStartRow } = dp;
-
     const dataRows = visibleRows.filter(r => r !== headerRow && r >= dataStartRow);
     bgmLog(LOG_LEVELS.INFO, `[preview] 过滤后得到 ${dataRows.length} 条数据行`);
 
@@ -233,74 +255,103 @@ export function previewSyncContent(): void {
         return;
     }
 
-    // 生成卡片列表 HTML（包含 data-status 属性）
-    let html = '<div class="detail-list">';
+    // 重置统计
+    detailPreviewData = {
+        allItems: [],
+        currentFilter: 'all',
+        totalWithType: 0,
+        totalValid: 0,
+        totalUploaded: 0,
+        typeCount: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 },
+        uploadedCount: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 },
+    };
+
+    let cardsHtml = '<div class="detail-list">';
+    let actualCardCount = 0;
+
     for (let i = 0; i < dataRows.length; i++) {
         const rowNum = dataRows[i];
         try {
             const rowData = getRowData(ws, rowNum, colMap, headerRow, 4);
+
+            // 过滤无效行
             if (!rowData.bgmUrl || !rowData.sid) {
                 bgmLog(LOG_LEVELS.DEBUG, `[preview] 跳过行 ${rowNum} (无 Bangumi URL)`);
                 continue;
             }
-            html += renderDetailItemHtml(rowData, colMap, ws);  // 这里会包含 data-status
+            // 可选：过滤全空（名称、状态、标签全空）
+            if (!rowData.name && !rowData.status && !rowData.tagsRaw) {
+                bgmLog(LOG_LEVELS.DEBUG, `[preview] 跳过行 ${rowNum} (空卡片)`);
+                continue;
+            }
+
+            actualCardCount++;
+
+            // 标准化观看状态（用于 data-status 属性）
+            const normalizedStatus = normalizeStatus(rowData.status);
+            // 将标准化后的状态放回 rowData，便于后续统计和卡片渲染
+            rowData.status = normalizedStatus;
+
+            // 更新统计数据（仅当状态码在 1-5 范围内）
+            if (rowData.typeNum >= 1 && rowData.typeNum <= 5) {
+                detailPreviewData.totalWithType++;
+                detailPreviewData.typeCount[rowData.typeNum] =
+                    (detailPreviewData.typeCount[rowData.typeNum] || 0) + 1;
+                if (rowData.isUploaded) {
+                    detailPreviewData.totalUploaded++;
+                    detailPreviewData.uploadedCount[rowData.typeNum] =
+                        (detailPreviewData.uploadedCount[rowData.typeNum] || 0) + 1;
+                }
+            }
+
+            // 生成卡片 HTML
+            cardsHtml += renderDetailItemHtml(rowData, colMap, ws);
         } catch (e) {
-            html += `<div class="detail-item error">行 ${rowNum} 处理出错: ${escapeHtml((e as Error).message)}</div>`;
+            cardsHtml += `<div class="detail-item error">行 ${rowNum} 处理出错: ${escapeHtml((e as Error).message)}</div>`;
         }
     }
-    html += '</div>';
+    cardsHtml += '</div>';
 
-    // 显示到模态框
+    // 生成统计卡片（使用 actualCardCount）
+    const statsHtml = buildStatsHtml(actualCardCount);
+
+    // 插入模态框
     const modal = document.getElementById('syncPreviewModal');
-    if (!modal) {
-        bgmLog(LOG_LEVELS.ERROR, '[preview] 未找到 syncPreviewModal 元素');
-        return;
-    }
-
+    if (!modal) return;
     const body = modal.querySelector('.modal-body');
-    if (!body) {
-        bgmLog(LOG_LEVELS.ERROR, '[preview] 未找到 .modal-body 元素');
-        return;
-    }
-
-    body.innerHTML = html;
+    if (!body) return;
+    body.innerHTML = statsHtml + cardsHtml;
     modal.style.display = 'block';
 
-    // ---------- 动态创建状态下拉筛选器 ----------
+    // ----- 状态下拉筛选器 -----
     const header = modal.querySelector('.modal-header');
     if (!header) return;
 
-    // 收集所有卡片的状态
-    const statusSet = new Set<string>();
+    const oldSelect = document.getElementById('statusFilterSelect');
+    if (oldSelect) oldSelect.remove();
+
+    // 收集卡片中出现的标准状态及其计数
+    const statusMap = new Map<string, number>();
     body.querySelectorAll<HTMLElement>('.detail-item').forEach(item => {
         const s = item.dataset.status;
-        if (s) statusSet.add(s);
+        if (s && VALID_STATUSES.includes(s)) {   // 只统计有效标准状态
+            statusMap.set(s, (statusMap.get(s) || 0) + 1);
+        }
     });
-    // 统计每个状态的出现次数
-    const statusCountMap = new Map<string, number>();
-    body.querySelectorAll<HTMLElement>('.detail-item').forEach(item => {
-        const s = item.dataset.status;
-        if (s) statusCountMap.set(s, (statusCountMap.get(s) || 0) + 1);
-    });
-    // 定义优先级顺序并生成选项
+
+    // 按预定义顺序排序
     const priorityStatus = ['想看', '在看', '看过', '搁置', '抛弃'];
     const sortedStatus = [
-        ...priorityStatus.filter(s => statusSet.has(s)),
-        ...Array.from(statusSet).filter(s => !priorityStatus.includes(s)).sort()
+        ...priorityStatus.filter(s => statusMap.has(s)),
+        ...Array.from(statusMap.keys()).filter(s => !priorityStatus.includes(s)).sort()
     ];
-    // 创建下拉框
+
     const select = document.createElement('select');
     select.id = 'statusFilterSelect';
     select.className = 'status-filter-select';
+    select.innerHTML = `<option value="all">全部 (${actualCardCount})</option>` +
+        sortedStatus.map(s => `<option value="${escapeHtml(s)}">${escapeHtml(s)} (${statusMap.get(s)})</option>`).join('');
 
-    // 生成选项：全部 + 各状态（含计数）
-    select.innerHTML = `<option value="all">全部 (${dataRows.length})</option>` +
-        sortedStatus.map(s => {
-            const count = statusCountMap.get(s);
-            return `<option value="${escapeHtml(s)}">${escapeHtml(s)} (${count})</option>`;
-        }).join('');
-      
-    // 插入到标题栏
     const syncBtn = document.getElementById('syncAllBtn');
     if (syncBtn) {
         syncBtn.insertAdjacentElement('afterend', select);
@@ -308,102 +359,44 @@ export function previewSyncContent(): void {
         header.appendChild(select);
     }
 
-    // 绑定筛选事件
     select.addEventListener('change', () => {
         const filter = select.value;
-        const items = body.querySelectorAll<HTMLElement>('.detail-item');
-        items.forEach(item => {
-            if (filter === 'all' || item.dataset.status === filter) {
-                item.style.display = '';
-            } else {
-                item.style.display = 'none';
-            }
+        body.querySelectorAll<HTMLElement>('.detail-item').forEach(item => {
+            item.style.display = (filter === 'all' || item.dataset.status === filter) ? '' : 'none';
         });
     });
 
-    // 默认展示全部
     select.value = 'all';
     select.dispatchEvent(new Event('change'));
 
-    bgmLog(LOG_LEVELS.INFO, '[preview] 模态框已显示（含筛选器）');
+    bgmLog(LOG_LEVELS.INFO, `[preview] 模态框已显示（${actualCardCount} 条卡片，下拉全部）`);
 }
-let virtualScrollStart = 0;
-let virtualScrollEnd = 0;
 
-function renderVisibleItems(items: PreviewItem[]) {
-    const container = document.getElementById('virtualScrollContainer');
-    const content = document.getElementById('virtualScrollContent');
-    if (!container || !content) return;
-
-    const scrollTop = container.scrollTop;
-    const startIndex = Math.floor(scrollTop / ITEM_HEIGHT);
-    const endIndex = Math.min(
-        startIndex + Math.ceil(CONTAINER_HEIGHT / ITEM_HEIGHT) + 5,
-        items.length
-    );
-
-    if (startIndex === virtualScrollStart && endIndex === virtualScrollEnd) return;
-    virtualScrollStart = startIndex;
-    virtualScrollEnd = endIndex;
-
-    const visibleItems = items.slice(startIndex, endIndex);
-    content.style.top = (startIndex * ITEM_HEIGHT) + 'px';
-    content.innerHTML = visibleItems.map(item => item.html).join('');
-}
 // ========== UI 辅助函数 ==========
-function buildFilterToolbar(): string {
-  const d = detailPreviewData;
-  let html = `<button class="filter-btn all active" onclick="window.filterDetailItems('all')">全部 (${d.totalWithType})</button>`;
-  const addBtn = (type: number, label: string) => {
-    if (d.typeCount[type] > 0) {
-      html += `<button class="filter-btn type-${type}" onclick="window.filterDetailItems(${type})">${label} (${d.typeCount[type]})</button>`;
-    }
-  };
-  addBtn(3, '看过');
-  addBtn(2, '在追');
-  addBtn(1, '想看');
-  addBtn(4, '搁置');
-  addBtn(5, '抛弃');
-  return html;
-}
 
+// 生成统计卡片HTML
 function buildStatsHtml(totalRows: number): string {
   const d = detailPreviewData;
   const pending = d.totalWithType - d.totalUploaded;
+
   return `
     <div class="detail-stats">
-      <div class="stat-card">
-        <div class="stat-value">${totalRows}</div>
-        <div class="stat-label">总行数</div>
+      <div class="stat-cards stat-cards-centered">
+        <div class="stat-card">
+          <div class="stat-value">${totalRows}</div>
+          <div class="stat-label">总行数</div>
+        </div>
+        <div class="stat-card stat-card-pending">
+          <div class="stat-value" style="color:#f59e0b;">${pending}</div>
+          <div class="stat-label">待上传</div>
+        </div>
+        <div class="stat-card stat-card-uploaded">
+          <div class="stat-value" style="color:#22c55e;">${d.totalUploaded}</div>
+          <div class="stat-label">已上传</div>
+        </div>
       </div>
-      <div class="stat-card" style="border-left:3px solid #f59e0b;">
-        <div class="stat-value" style="color:#f59e0b;">${pending}</div>
-        <div class="stat-label">待上传</div>
-      </div>
-      <div class="stat-card success" style="border-left:3px solid #22c55e;">
-        <div class="stat-value" style="color:#22c55e;">${d.totalUploaded}</div>
-        <div class="stat-label">已上传</div>
-      </div>
-    </div>
-    <div style="margin-bottom:14px;display:flex;gap:8px;flex-wrap:wrap;">
-      <span class="status-badge" style="background:#1a3a35;color:#4ade80;">D列序列号</span>
-      ${createTypeBadges()}
     </div>
   `;
-}
-
-function createTypeBadges(): string {
-  const d = detailPreviewData;
-  const labels: Record<number, string> = { 3: '看过', 2: '在看', 1: '想看', 4: '搁置', 5: '抛弃' };
-  let badges = '';
-  for (const type in labels) {
-    const count = d.typeCount[parseInt(type, 10)] || 0;
-    if (count > 0) {
-      const uploaded = d.uploadedCount[parseInt(type, 10)] || 0;
-      badges += `<span class="status-badge type-${type}">${labels[parseInt(type, 10)]} ${count}${uploaded > 0 ? ' ✓' + uploaded : ''}</span>`;
-    }
-  }
-  return badges;
 }
 
 // ========== 单条上传 ==========
@@ -478,7 +471,6 @@ export function uploadSingleRow(rowNum: number, btnElement?: HTMLButtonElement):
         count: 1,
       });
 
-      updateUploadStats();
     } else {
       if (seqCell?.Interior) seqCell.Interior.Color = BGM_COLOR.FAIL;
 
@@ -512,66 +504,9 @@ export function uploadSingleRow(rowNum: number, btnElement?: HTMLButtonElement):
   }
 }
 
-// ========== 模态框控制 ==========
-export function updateUploadStats(): void {
-  const modalBody = document.getElementById('detailModalBody');
-  if (!modalBody) return;
-  const d = detailPreviewData;
-  const cards = modalBody.querySelectorAll('.stat-card .stat-value');
-  if (cards.length >= 3) {
-    cards[1].textContent = String(d.totalWithType - d.totalUploaded);
-    cards[2].textContent = String(d.totalUploaded);
-  }
-}
 
-export function filterDetailItems(filterType: string | number): void {
-    detailPreviewData.currentFilter = String(filterType);
-    const allItems = detailPreviewData.allItems;
-    const filteredItems = filterType === 'all' 
-        ? allItems 
-        : allItems.filter(item => item.type === parseInt(filterType as string));
 
-    // 重新渲染虚拟滚动
-    const scrollContainer = document.getElementById('virtualScrollContainer');
-    const scrollInner = document.getElementById('virtualScrollInner');
-    const scrollContent = document.getElementById('virtualScrollContent');
-    if (!scrollContainer || !scrollInner || !scrollContent) return;
 
-    // 更新总高度
-    scrollInner.style.height = `${filteredItems.length * ITEM_HEIGHT}px`;
-    // 重置滚动位置
-    scrollContainer.scrollTop = 0;
-    // 重置虚拟状态
-    virtualScrollStart = 0;
-    virtualScrollEnd = 0;
-    // 重新渲染
-    renderVisibleItems(filteredItems);
-
-    // 更新统计卡片
-    const statCards = document.querySelectorAll('.stat-card .stat-value');
-    if (statCards.length >= 3) {
-        const d = detailPreviewData;
-        if (filterType === 'all') {
-            statCards[0].textContent = String(d.totalWithType);
-            statCards[1].textContent = String(d.totalWithType - d.totalUploaded);
-            statCards[2].textContent = String(d.totalUploaded);
-        } else {
-            const typeNum = parseInt(filterType as string);
-            const typeTotal = d.typeCount[typeNum] || 0;
-            const typeUploaded = d.uploadedCount[typeNum] || 0;
-            statCards[0].textContent = String(typeTotal);
-            statCards[1].textContent = String(typeTotal - typeUploaded);
-            statCards[2].textContent = String(typeUploaded);
-        }
-    }
-
-    // 更新按钮状态
-    document.querySelectorAll('.filter-btn').forEach(btn => {
-        btn.classList.remove('active');
-        if (filterType === 'all' && btn.classList.contains('all')) btn.classList.add('active');
-        else if (btn.classList.contains('type-' + filterType)) btn.classList.add('active');
-    });
-}
 
 export function showDetailModal(): void {
   const modal = document.getElementById('detailModal');
