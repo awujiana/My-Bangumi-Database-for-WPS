@@ -21,7 +21,7 @@ export { showUserIdDialog, markUploadedItems, clearSheetMarks, updateTokenStatus
 export { getOrCreateSyncRecordSheet, getAllSyncRecords, addSyncRecord, openSyncRecordSheet, clearSheetMarksInSheet, type SyncRecord, type UpdateRecordParams, clearSyncRecords, } from './sync/syncRecord.js';
 export { extractSubjectId, getFilterStatus, getSequentialRowsBySeqCol, SyncToBangumiAsync, clearRowColors, testSingleUpdate, mapWatchStatus, buildJsonPayload, bgmRequestSync, setBangumiToken, openBangumiTokenPage, testTokenValidityForRibbon, openUserCollection, buildTagsArray, addTagsFromStr, } from './sync/exceltobangumi.js';
 export { verifyToken, fetchAllUserCollections, type BangumiUserData, type TokenVerifyResult, type ApiResponse, } from './sync/scraping.js';
-export { bgmLog, getApp, colNumToLetter, getCell, getCellValue, readCell, setCellValue, getSheetByIndex, escapeHtml, storeBgToken, clearBgToken, loadBgToken, _getBgmUserId, _setBgmUserId, fetchBgmUserInfo, trim, BGM, _getUserApiPath, _fetchBgmUserInfo, showBangumiPanel, sleep, delay, readRangeValues, getColumnMap, cacheGet, clearSheetCache, getLastRow, isEmptyValue, getDataSheet, findHeaderRow, shellExecuteByOAAssist, GetUrlPath, } from './tools/util.js';
+export { bgmLog, getApp, colNumToLetter, getCell, getCellValue, readCell, setCellValue, getSheetByIndex, escapeHtml, storeBgToken, clearBgToken, loadBgToken, _getBgmUserId, _setBgmUserId, fetchBgmUserInfo, trim, BGM, _getUserApiPath, _fetchBgmUserInfo, showBangumiPanel, sleep, delay, readRangeValues, getColumnMap, cacheGet, clearSheetCache, getLastRow, isEmptyValue, getDataSheet, findHeaderRow, shellExecuteByOAAssist, GetUrlPath, calcFingerprint } from './tools/util.js';
 export interface BGMCache {
     /** WPS 文档总行数缓存 */
     totalRows: number;

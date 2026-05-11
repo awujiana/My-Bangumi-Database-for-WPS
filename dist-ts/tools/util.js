@@ -1,4 +1,4 @@
-import { XL, BGM_CONFIG, LOG_LEVELS, ERROR_LEVELS, PANEL_CONFIG, ErrorLevel, isWpsApp, BgmError, encryptToken, decryptToken, COLUMN_RULES, COLUMNS, HEADER_KEYWORDS } from '../index.js';
+import { XL, BGM_CONFIG, LOG_LEVELS, ERROR_LEVELS, PANEL_CONFIG, ErrorLevel, isWpsApp, BgmError, encryptToken, decryptToken, calcChecksum, COLUMN_RULES, COLUMNS, HEADER_KEYWORDS } from '../index.js';
 import { BGM_EVENTS, eventBus } from '../tools/events.js';
 // ========== BGM 全局命名空间 ==========
 export const BGM = {
@@ -773,4 +773,14 @@ export function getDataSheet() {
         }
     }
     return app.ActiveWorkbook.ActiveSheet;
+}
+/**
+ * 计算 Excel 行数据的指纹（用于增量同步比较）
+ * @param fields 关键字段值数组，如 [name, type, rate, tags, comment]
+ * @returns 指纹字符串
+ */
+export function calcFingerprint(fields) {
+    const raw = fields.join('|');
+    // 复用已有的 calcChecksum 生成简短校验和，或直接返回原始字符串前 50 字符
+    return calcChecksum(raw).toString(16).padStart(4, '0');
 }

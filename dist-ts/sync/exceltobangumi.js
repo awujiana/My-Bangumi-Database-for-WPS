@@ -7,7 +7,7 @@
  * @author BGM Development Team
  * @version 1.0.0
  */
-import { HEADER_KEYWORDS, URL_PATTERNS, TYPE_TEXT_MAP, PANEL_CONFIG, BGM_CONFIG, BGM_COLOR, LOG_LEVELS, SYNC_STATUS, bgmLog, getApp, readCell, getCell, trim, getColumnMap, getLastRow, findHeaderRow, getCellValue, loadBgToken, storeBgToken, _getBgmUserId, _setBgmUserId, BGM, wpsMsgBox, _getUserApiPath, IMPORTANT_COLS, readRangeValues, delay } from '../index.js';
+import { HEADER_KEYWORDS, URL_PATTERNS, TYPE_TEXT_MAP, PANEL_CONFIG, BGM_CONFIG, BGM_COLOR, LOG_LEVELS, SYNC_STATUS, bgmLog, getApp, readCell, getCell, trim, getColumnMap, getLastRow, findHeaderRow, getCellValue, loadBgToken, storeBgToken, _getBgmUserId, _setBgmUserId, BGM, wpsMsgBox, _getUserApiPath, IMPORTANT_COLS, readRangeValues, delay, calcFingerprint, getAllSyncRecords } from '../index.js';
 import { getOrCreateSyncRecordSheet, addSyncRecord } from './syncRecord.js';
 /**
  * 表头关键字集合（用于快速查找）
@@ -547,21 +547,6 @@ export function clearRowColors() {
  * - 支持筛选状态下仅处理可见行
  * - 批量读取单元格数据，提高性能
  * - 动态请求间隔，避免限制的同时提升速度
- * - 统一错误处理，带详细日志
- *
- * @param ws 工作表对象
- * @param colMap 列名到列号的映射 Map
- * @param token Bangumi API 访问令牌
- * @param lastRow 数据区域最后一行
- * @param headerRow 表头行号
- * @param options 可选项（onProgress, onItemComplete 回调）
- * @returns 同步结果统计 { success, fail, skip }
- */
-/**
- * 异步批量同步 Excel 数据到 Bangumi
- * - 支持筛选状态下仅处理可见行
- * - 批量读取单元格数据，提高性能
- * - 动态请求间隔，避免限制的同时提升速度
  * - 支持跳过冲突条目（通过 skipSids 集合）
  * - 跳过已上传条目（D列颜色）
  * - 统一错误处理，带详细日志
@@ -572,6 +557,23 @@ export function clearRowColors() {
  * @param lastRow 数据区域最后一行
  * @param headerRow 表头行号
  * @param options 可选项（onProgress, onItemComplete, skipSids 回调）
+ * @returns 同步结果统计 { success, fail, skip }
+ */
+/**
+ * 异步批量同步 Excel 数据到 Bangumi（优化版）
+ * - 支持筛选状态下仅处理可见行
+ * - 批量读取单元格数据，提高性能
+ * - 动态请求间隔，避免限制的同时提升速度
+ * - 支持跳过冲突条目（通过 skipSids 集合）
+ * - 支持增量同步：根据历史指纹自动跳过无变化条目，并在成功后更新指纹
+ * - 统一错误处理，带详细日志
+ *
+ * @param ws 工作表对象
+ * @param colMap 列名到列号的映射 Map
+ * @param token Bangumi API 访问令牌
+ * @param lastRow 数据区域最后一行
+ * @param headerRow 表头行号
+ * @param options 可选项（onProgress, onItemComplete, skipSids, incremental 回调）
  * @returns 同步结果统计 { success, fail, skip }
  */
 export async function SyncToBangumiAsync(ws, colMap, token, lastRow, headerRow, options) {
@@ -611,10 +613,22 @@ export async function SyncToBangumiAsync(ws, colMap, token, lastRow, headerRow, 
                 }
             }
         }
-        // 回退到原始读取
         return colMap.has(key) ? trim(getCellValue(ws, row, colMap.get(key))) : '';
     };
-    // ========== 3. 进度与错误处理 ==========
+    // ========== 3. 增量同步：构建历史指纹映射 ==========
+    let fingerprintMap;
+    if (options?.incremental) {
+        const allRecords = typeof getAllSyncRecords === 'function' ? getAllSyncRecords() : [];
+        fingerprintMap = new Map();
+        // 保留每个 SID 最新记录的指纹
+        for (const r of allRecords) {
+            if (r.sid && r.fingerprint) {
+                fingerprintMap.set(r.sid, r.fingerprint);
+            }
+        }
+        bgmLog(LOG_LEVELS.INFO, `增量同步模式：已加载 ${fingerprintMap.size} 条历史指纹`);
+    }
+    // ========== 4. 进度与错误处理 ==========
     const reportProgress = (current, message) => {
         if (options?.onProgress)
             options.onProgress(current, total, message);
@@ -629,13 +643,11 @@ export async function SyncToBangumiAsync(ws, colMap, token, lastRow, headerRow, 
     const userIdPath = _getUserApiPath();
     let lastRequestTime = 0;
     const MIN_INTERVAL = 200; // 最小间隔 200ms
-    // 冲突跳过集合
     const skipSids = options?.skipSids;
-    // ========== 4. 逐行处理 ==========
+    // ========== 5. 遍历可见行 ==========
     for (let idx = 0; idx < rowsToProcess.length; idx++) {
         const rowNum = rowsToProcess[idx];
         reportProgress(idx + 1, `处理行 ${rowNum}...`);
-        // 同时发送全局进度事件（让其他模块也能收到）
         BGM.setSyncProgress(idx + 1, total, `处理行 ${rowNum}...`);
         try {
             const bgmUrl = getField(rowNum, 'Bangumi_URL');
@@ -650,26 +662,48 @@ export async function SyncToBangumiAsync(ws, colMap, token, lastRow, headerRow, 
                 reportProgress(idx + 1, `行 ${rowNum}：跳过（无有效SID）`);
                 continue;
             }
-            // 检查冲突跳过
+            // 冲突跳过
             if (skipSids && skipSids.has(sid)) {
                 result.skip++;
                 reportProgress(idx + 1, `行 ${rowNum}：跳过（冲突保护）`);
                 continue;
             }
-            // 检查是否已上传（D列颜色）
-            const seqCell = getCell(ws, rowNum, 4);
-            const isUploaded = seqCell?.Interior && (seqCell.Interior.Color === BGM_COLOR.SUCCESS ||
-                seqCell.Interior.Color === BGM_COLOR.LIGHT_GREEN ||
-                seqCell.Interior.Color === BGM_COLOR.DARK_GREEN);
-            if (isUploaded) {
-                result.skip++;
-                reportProgress(idx + 1, `行 ${rowNum}：跳过（已上传）`);
-                continue;
+            // 增量同步指纹检查
+            let currentFingerprint;
+            if (fingerprintMap) {
+                // 计算当前指纹
+                currentFingerprint = calcFingerprint([
+                    getField(rowNum, '名称'),
+                    mapWatchStatus(getField(rowNum, '是否看完')).toString(),
+                    getField(rowNum, '打分'),
+                    getField(rowNum, '标签/分级'),
+                    getField(rowNum, '剧透/感言'),
+                    getField(rowNum, '集数'),
+                    getField(rowNum, '集号')
+                ]);
+                // 如果指纹与历史一致，跳过（无变化）
+                if (fingerprintMap.get(sid) === currentFingerprint) {
+                    result.skip++;
+                    reportProgress(idx + 1, `行 ${rowNum}：跳过（无变更）`);
+                    continue;
+                }
+            }
+            // 非增量模式下才检查已上传颜色（增量模式下即使已上传，如果指纹变了也要重新同步）
+            if (!fingerprintMap) {
+                const seqCell = getCell(ws, rowNum, 4);
+                const isUploaded = seqCell?.Interior && (seqCell.Interior.Color === BGM_COLOR.SUCCESS ||
+                    seqCell.Interior.Color === BGM_COLOR.LIGHT_GREEN ||
+                    seqCell.Interior.Color === BGM_COLOR.DARK_GREEN);
+                if (isUploaded) {
+                    result.skip++;
+                    reportProgress(idx + 1, `行 ${rowNum}：跳过（已上传）`);
+                    continue;
+                }
             }
             const finishedDate = getField(rowNum, '完播日');
             const jsonBody = buildJsonPayload(ws, rowNum, colMap, finishedDate);
             const name = getField(rowNum, '名称');
-            // 动态请求间隔（取代固定延迟）
+            // 动态请求间隔
             const now = Date.now();
             const elapsed = now - lastRequestTime;
             if (elapsed < MIN_INTERVAL) {
@@ -679,10 +713,11 @@ export async function SyncToBangumiAsync(ws, colMap, token, lastRow, headerRow, 
             lastRequestTime = Date.now();
             const success = apiResult.code >= 200 && apiResult.code < 300;
             // 标记颜色
+            const seqCell = getCell(ws, rowNum, 4);
             if (seqCell?.Interior) {
                 seqCell.Interior.Color = success ? BGM_COLOR.SUCCESS : BGM_COLOR.FAIL;
             }
-            // 记录同步日志
+            // 记录同步日志，成功时写入指纹
             if (typeof addSyncRecord === 'function') {
                 addSyncRecord({
                     name: name || `SID:${sid}`,
@@ -692,7 +727,8 @@ export async function SyncToBangumiAsync(ws, colMap, token, lastRow, headerRow, 
                     content: jsonBody,
                     status: success ? SYNC_STATUS.SUCCESS : SYNC_STATUS.FAIL,
                     message: apiResult.message || `HTTP ${apiResult.code}`,
-                    count: 1
+                    count: 1,
+                    fingerprint: success ? currentFingerprint : undefined
                 });
             }
             if (success) {

@@ -146,13 +146,39 @@ fetchBgmUserInfo,
 // 去除首尾空格
 trim, 
 // BGM 全局命名空间（包含 Dialog, Message, handleError 等）
-BGM, _getUserApiPath, _fetchBgmUserInfo, showBangumiPanel, sleep, delay, readRangeValues, 
+BGM, 
+// 获取用户 API 路径（用于 API 调用）
+_getUserApiPath, 
+// 获取 Bangumi 当前登录用户信息
+_fetchBgmUserInfo, 
+// 显示主面板
+showBangumiPanel, 
+// 等待指定毫秒数
+sleep, 
+// 延迟执行（用于模拟异步操作）
+delay, 
+// 读取指定范围的单元格值
+readRangeValues, 
 // 获取列映射（固定表头名称到列号的映射）
-getColumnMap, cacheGet, clearSheetCache, 
+getColumnMap, 
+// 获取最后一行（包含数据的最后一行）
+cacheGet, 
+// 清除工作表缓存
+clearSheetCache, 
 // 获取最后一行
-getLastRow, isEmptyValue, getDataSheet, 
+getLastRow, 
+// 检查单元格是否为空（兼容多种取值方式）
+isEmptyValue, 
+// 获取数据工作表
+getDataSheet, 
 // 查找表头行
-findHeaderRow, shellExecuteByOAAssist, GetUrlPath, } from './tools/util.js';
+findHeaderRow, 
+// 根据表头关键字获取列映射
+shellExecuteByOAAssist, 
+// 获取 URL 路径（用于 API 调用）
+GetUrlPath, 
+// 计算数据指纹（用于缓存）
+calcFingerprint } from './tools/util.js';
 // ============================================================================
 // 12. 页面逻辑（来自 taskpane.js）
 // ============================================================================

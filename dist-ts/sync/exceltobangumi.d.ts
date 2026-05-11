@@ -19,6 +19,7 @@ interface SyncOptions {
         message: string;
     }) => void;
     skipSids?: Set<string>;
+    incremental?: boolean;
 }
 /**
  * 打开Bangumi Token申请页面
@@ -206,21 +207,6 @@ export declare function clearRowColors(): void;
  * - 支持筛选状态下仅处理可见行
  * - 批量读取单元格数据，提高性能
  * - 动态请求间隔，避免限制的同时提升速度
- * - 统一错误处理，带详细日志
- *
- * @param ws 工作表对象
- * @param colMap 列名到列号的映射 Map
- * @param token Bangumi API 访问令牌
- * @param lastRow 数据区域最后一行
- * @param headerRow 表头行号
- * @param options 可选项（onProgress, onItemComplete 回调）
- * @returns 同步结果统计 { success, fail, skip }
- */
-/**
- * 异步批量同步 Excel 数据到 Bangumi
- * - 支持筛选状态下仅处理可见行
- * - 批量读取单元格数据，提高性能
- * - 动态请求间隔，避免限制的同时提升速度
  * - 支持跳过冲突条目（通过 skipSids 集合）
  * - 跳过已上传条目（D列颜色）
  * - 统一错误处理，带详细日志
@@ -231,6 +217,23 @@ export declare function clearRowColors(): void;
  * @param lastRow 数据区域最后一行
  * @param headerRow 表头行号
  * @param options 可选项（onProgress, onItemComplete, skipSids 回调）
+ * @returns 同步结果统计 { success, fail, skip }
+ */
+/**
+ * 异步批量同步 Excel 数据到 Bangumi（优化版）
+ * - 支持筛选状态下仅处理可见行
+ * - 批量读取单元格数据，提高性能
+ * - 动态请求间隔，避免限制的同时提升速度
+ * - 支持跳过冲突条目（通过 skipSids 集合）
+ * - 支持增量同步：根据历史指纹自动跳过无变化条目，并在成功后更新指纹
+ * - 统一错误处理，带详细日志
+ *
+ * @param ws 工作表对象
+ * @param colMap 列名到列号的映射 Map
+ * @param token Bangumi API 访问令牌
+ * @param lastRow 数据区域最后一行
+ * @param headerRow 表头行号
+ * @param options 可选项（onProgress, onItemComplete, skipSids, incremental 回调）
  * @returns 同步结果统计 { success, fail, skip }
  */
 export declare function SyncToBangumiAsync(ws: any, colMap: Map<string, number>, token: string, lastRow: number, headerRow: number, options?: SyncOptions): Promise<{

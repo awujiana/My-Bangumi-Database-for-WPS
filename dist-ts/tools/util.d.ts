@@ -170,4 +170,10 @@ export declare function clearSheetCache(ws: any): void;
 export declare function getLastRow(ws: any): number;
 export declare function isEmptyValue(val: any): boolean;
 export declare function getDataSheet(): any;
+/**
+ * 计算 Excel 行数据的指纹（用于增量同步比较）
+ * @param fields 关键字段值数组，如 [name, type, rate, tags, comment]
+ * @returns 指纹字符串
+ */
+export declare function calcFingerprint(fields: string[]): string;
 //# sourceMappingURL=util.d.ts.map

@@ -7,7 +7,7 @@
  * @author BGM Development Team
  * @version 1.0.0
  */
-import { LOG_LEVELS, SYNC_STATUS, BGM_COLOR, bgmLog, getApp, trim, BGM, getLastRow } from '../index.js';
+import { LOG_LEVELS, SYNC_STATUS, BGM_COLOR, bgmLog, getApp, BGM, getLastRow } from '../index.js';
 /**
  * 同步记录工作表名称
  *
@@ -23,7 +23,7 @@ const SYNC_RECORD_SHEET_NAME = '同步记录';
  */
 const SYNC_RECORD_COLUMNS = [
     '序号', '同步时间', '名称', 'URL', 'SID', '条目类型',
-    '次数', '内容', '状态', '备注'
+    '次数', '内容', '状态', '备注', '数据指纹'
 ];
 /**
  * 内存缓存：SID到行号的映射
@@ -40,7 +40,7 @@ let _syncRecordListCache = [];
 /**
  * 缓存有效标志
  *
- * @type {boolean}
+ * @type {boolean}buildCache
  */
 let _syncRecordCacheValid = false;
 /**
@@ -51,7 +51,7 @@ let _syncRecordCacheValid = false;
  *
  * @description
  * 如果「同步记录」工作表不存在，则创建一个新的。
- * 工作表包含10列：序号、时间、名称、URL、SID、类型、次数、内容、状态、备注
+ * 工作表包含11列：序号、时间、名称、URL、SID、类型、次数、内容、状态、备注、数据指纹
  */
 /**
  * 获取或创建同步记录工作表
@@ -125,34 +125,35 @@ function buildCache(sheet) {
     if (_syncRecordCacheValid)
         return;
     _syncRecordSidCache.clear();
-    _syncRecordListCache = [];
-    try {
-        const lastRow = sheet.UsedRange?.Rows.Count || 1;
-        for (let r = 2; r <= lastRow; r++) {
-            const sid = trim(String(sheet.Cells(r, 5).Value2 || ''));
-            const record = {
-                id: r,
-                time: trim(String(sheet.Cells(r, 2).Value2 || '')),
-                name: trim(String(sheet.Cells(r, 3).Value2 || '')),
-                url: trim(String(sheet.Cells(r, 4).Value2 || '')),
+    _syncRecordListCache.length = 0;
+    const lastRow = getLastRow(sheet);
+    for (let row = 2; row <= lastRow; row++) {
+        try {
+            const sid = String(sheet.Range("E" + row).Value2 || "").trim();
+            const url = String(sheet.Range("D" + row).Value2 || "").trim();
+            if (!url && !sid)
+                continue;
+            _syncRecordSidCache.set(sid, row);
+            _syncRecordListCache.push({
+                seq: sheet.Range("A" + row).Value2,
+                time: sheet.Range("B" + row).Value2,
+                name: sheet.Range("C" + row).Value2,
+                url: url,
                 sid: sid,
-                type: trim(String(sheet.Cells(r, 6).Value2 || '')),
-                count: parseInt(String(sheet.Cells(r, 7).Value2 || '0'), 10) || 0,
-                content: trim(String(sheet.Cells(r, 8).Value2 || '')),
-                status: trim(String(sheet.Cells(r, 9).Value2 || '')),
-                message: trim(String(sheet.Cells(r, 10).Value2 || ''))
-            };
-            _syncRecordListCache.push(record);
-            if (sid) {
-                _syncRecordSidCache.set(sid, r);
-            }
+                type: sheet.Range("F" + row).Value2,
+                count: parseInt(sheet.Range("G" + row).Value2) || 1,
+                content: sheet.Range("H" + row).Value2,
+                status: sheet.Range("I" + row).Value2 || SYNC_STATUS.SUCCESS,
+                message: sheet.Range("J" + row).Value2,
+                fingerprint: String(sheet.Range("K" + row).Value2 || ""), // 读取指纹
+                row: row
+            });
         }
-        _syncRecordCacheValid = true;
-        bgmLog(LOG_LEVELS.DEBUG, `已构建缓存，共 ${_syncRecordListCache.length} 条记录`);
+        catch (e) {
+            // 忽略单行读取错误
+        }
     }
-    catch (e) {
-        BGM.handleError(e, { level: BGM.ErrorLevel.ERROR, context: 'buildCache' });
-    }
+    _syncRecordCacheValid = true;
 }
 /**
  * 添加同步记录
@@ -164,6 +165,13 @@ function buildCache(sheet) {
  * @description
  * 如果该SID已有记录，则更新现有记录并增加计数。
  * 否则添加新记录。
+ */
+/**
+ * 添加同步记录（支持写入数据指纹）
+ *
+ * @function addSyncRecord
+ * @param {UpdateRecordParams} params - 记录参数
+ * @returns {boolean} 是否添加成功
  */
 export function addSyncRecord(params) {
     try {
@@ -185,7 +193,11 @@ export function addSyncRecord(params) {
                 sheet.Cells(existingRow, 9).Value2 = params.status;
             if (params.message)
                 sheet.Cells(existingRow, 10).Value2 = params.message;
-            // 根据同步次数设置颜色
+            // 写入指纹（K列）
+            if (params.fingerprint !== undefined) {
+                sheet.Cells(existingRow, 11).Value2 = params.fingerprint;
+            }
+            // 根据同步次数设置颜色（已有逻辑保持不变）
             const seqCell = sheet.Cells(existingRow, 1);
             if (seqCell?.Interior) {
                 if (newCount === 1) {
@@ -197,6 +209,11 @@ export function addSyncRecord(params) {
                 else {
                     seqCell.Interior.Color = BGM_COLOR.DARK_GREEN;
                 }
+            }
+            // 更新缓存中的指纹信息
+            const cacheItem = _syncRecordListCache.find(item => item.sid === sid);
+            if (cacheItem && params.fingerprint !== undefined) {
+                cacheItem.fingerprint = params.fingerprint;
             }
             bgmLog(LOG_LEVELS.DEBUG, `更新同步记录: SID=${sid}, 次数=${newCount}`);
         }
@@ -214,7 +231,11 @@ export function addSyncRecord(params) {
             sheet.Cells(newRow, 8).Value2 = params.content || '';
             sheet.Cells(newRow, 9).Value2 = params.status || SYNC_STATUS.SUCCESS;
             sheet.Cells(newRow, 10).Value2 = params.message || '';
-            // 设置颜色标记
+            // 写入指纹（K列）
+            if (params.fingerprint !== undefined) {
+                sheet.Cells(newRow, 11).Value2 = params.fingerprint;
+            }
+            // 设置颜色标记（已有逻辑）
             const seqCell = sheet.Cells(newRow, 1);
             if (seqCell?.Interior) {
                 if (params.status === SYNC_STATUS.SUCCESS) {
@@ -229,7 +250,7 @@ export function addSyncRecord(params) {
             }
             // 更新缓存
             _syncRecordSidCache.set(sid, newRow);
-            _syncRecordListCache.push({
+            const newRecord = {
                 id: newRow,
                 time: now,
                 name: params.name,
@@ -238,9 +259,11 @@ export function addSyncRecord(params) {
                 type: params.type,
                 count: params.count || 1,
                 content: params.content,
-                status: params.status,
-                message: params.message
-            });
+                status: params.status || SYNC_STATUS.SUCCESS,
+                message: params.message || '',
+                fingerprint: params.fingerprint // 记录指纹
+            };
+            _syncRecordListCache.push(newRecord);
             bgmLog(LOG_LEVELS.DEBUG, `添加同步记录: SID=${sid}, 行=${newRow}`);
         }
         return true;

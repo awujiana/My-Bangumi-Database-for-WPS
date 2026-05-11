@@ -13,6 +13,8 @@
  * @interface SyncRecord
  */
 export interface SyncRecord {
+    /** 序号（用于缓存构建） */
+    seq?: number | string;
     /** 记录ID */
     id?: number;
     /** 同步时间 */
@@ -33,6 +35,10 @@ export interface SyncRecord {
     status?: string;
     /** 备注/错误信息 */
     message?: string;
+    /** 数据指纹 */
+    fingerprint?: string;
+    /** 行号（用于缓存构建）更新现有记录时用 */
+    row?: number;
 }
 /**
  * 更新记录参数接口
@@ -56,6 +62,10 @@ export interface UpdateRecordParams {
     message?: string;
     /** 同步次数 */
     count?: number;
+    /** 数据指纹 */
+    fingerprint?: string;
+    /** 行号（用于缓存构建）更新现有记录时用 */
+    row?: number;
 }
 /**
  * 获取或创建同步记录工作表
@@ -65,7 +75,7 @@ export interface UpdateRecordParams {
  *
  * @description
  * 如果「同步记录」工作表不存在，则创建一个新的。
- * 工作表包含10列：序号、时间、名称、URL、SID、类型、次数、内容、状态、备注
+ * 工作表包含11列：序号、时间、名称、URL、SID、类型、次数、内容、状态、备注、数据指纹
  */
 /**
  * 获取或创建同步记录工作表
@@ -84,6 +94,13 @@ export declare function getOrCreateSyncRecordSheet(): any;
  * @description
  * 如果该SID已有记录，则更新现有记录并增加计数。
  * 否则添加新记录。
+ */
+/**
+ * 添加同步记录（支持写入数据指纹）
+ *
+ * @function addSyncRecord
+ * @param {UpdateRecordParams} params - 记录参数
+ * @returns {boolean} 是否添加成功
  */
 export declare function addSyncRecord(params: UpdateRecordParams): boolean;
 /**

@@ -816,3 +816,13 @@ export function getDataSheet(): any {
   return app.ActiveWorkbook.ActiveSheet;
 }
 
+/**
+ * 计算 Excel 行数据的指纹（用于增量同步比较）
+ * @param fields 关键字段值数组，如 [name, type, rate, tags, comment]
+ * @returns 指纹字符串
+ */
+export function calcFingerprint(fields: string[]): string {
+    const raw = fields.join('|');
+    // 复用已有的 calcChecksum 生成简短校验和，或直接返回原始字符串前 50 字符
+    return calcChecksum(raw).toString(16).padStart(4, '0'); 
+}
