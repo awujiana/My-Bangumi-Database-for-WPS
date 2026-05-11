@@ -224,7 +224,17 @@
                 <span class="btn-icon">⬇️</span> 从BGM同步收藏标记
             </button>
         </div>
-
+        <!-- 冲突处理策略选择（放在同步按钮组之前或之后均可） -->
+        <div class="section">
+            <h3>冲突处理策略</h3>
+            <div class="form-group">
+                <select id="conflictStrategy" class="input">
+                    <option value="skip" selected>跳过冲突（保留Bangumi数据）</option>
+                    <option value="excel">Excel覆盖（用Excel数据覆盖）</option>
+                </select>
+            </div>
+            <p class="hint">当Excel条目与Bangumi收藏状态不一致时，自动按所选策略处理。</p>
+        </div>
         <!-- 同步记录 -->
         <div class="section">
             <h3>📊 同步记录</h3>

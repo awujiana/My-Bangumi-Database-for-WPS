@@ -7,6 +7,32 @@
 import { WPS_ENUM, showBangumiPanel } from './index.js';
 import * as RibbonService from './services/ribbonService.js';
 
+
+
+
+/**
+ * 获取“跳过冲突”复选框的初始按下状态
+ * 从 PluginStorage 读取上次保存的设置，默认未选中
+ */
+export function GetSkipConflictsPressed(control: any): boolean {
+    const app = (window as any).Application;
+    if (app?.PluginStorage) {
+        const saved = app.PluginStorage.getItem('bgm_skip_conflicts');
+        return saved === 'true';
+    }
+    return false;
+}
+
+/**
+ * 当“跳过冲突”复选框被点击时，保存状态
+ */
+export function OnSkipConflictsChange(control: any) {
+    const app = (window as any).Application;
+    if (app?.PluginStorage) {
+        app.PluginStorage.setItem('bgm_skip_conflicts', control.Pressed ? 'true' : 'false');
+    }
+}
+
 // ========== Ribbon 回调 ==========
 
 export function OnAddinLoad(ribbonUI: any): boolean {
