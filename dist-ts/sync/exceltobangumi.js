@@ -7,7 +7,7 @@
  * @author BGM Development Team
  * @version 1.0.0
  */
-import { HEADER_KEYWORDS, URL_PATTERNS, TYPE_TEXT_MAP, BGM_CONFIG, BGM_COLOR, LOG_LEVELS, SYNC_STATUS, bgmLog, getApp, readCell, getCell, trim, getColumnMap, getLastRow, findHeaderRow, getCellValue, loadBgToken, storeBgToken, _getBgmUserId, _setBgmUserId, BGM, wpsMsgBox, _getUserApiPath, IMPORTANT_COLS, readRangeValues, delay, calcFingerprint, getAllSyncRecords, isWpsWorksheet } from '../index.js';
+import { HEADER_KEYWORDS, URL_PATTERNS, TYPE_TEXT_MAP, BGM_CONFIG, BGM_COLOR, LOG_LEVELS, SYNC_STATUS, bgmLog, getApp, readCell, getCell, trim, getColumnMap, getLastRow, findHeaderRow, colNumToLetter, getCellValue, loadBgToken, storeBgToken, _getBgmUserId, _setBgmUserId, BGM, wpsMsgBox, _getUserApiPath, IMPORTANT_COLS, readRangeValues, delay, calcFingerprint, getAllSyncRecords, isWpsWorksheet } from '../index.js';
 import { getOrCreateSyncRecordSheet, addSyncRecord } from './syncRecord.js';
 /**
  * 表头关键字集合（用于快速查找）
@@ -242,7 +242,12 @@ export function buildTagsArray(tagsRaw) {
  * @description
  * 检测工作表是否启用了筛选，并返回可见行和隐藏行的行号数组
  */
-export function getFilterStatus(lastRow) {
+/**
+ * 获取筛选状态（可见行列表）
+ * @param lastRow  可选扫描上限，默认取工作表最大行数
+ * @returns hasFilter, visibleRows（不含表头和全空行）, hiddenRows
+ */
+export function getFilterStatus(lastRow, headerRow) {
     const result = {
         hasFilter: false,
         visibleRows: [],
@@ -255,7 +260,7 @@ export function getFilterStatus(lastRow) {
         const ws = app.ActiveWorkbook.ActiveSheet;
         if (!isWpsWorksheet(ws))
             return result;
-        // 检查是否启用了自动筛选
+        // 1. 检查是否启用了筛选
         let autoFilterMode = false;
         try {
             autoFilterMode = !!ws.AutoFilterMode;
@@ -264,68 +269,110 @@ export function getFilterStatus(lastRow) {
         if (!autoFilterMode)
             return result;
         result.hasFilter = true;
-        // 1. 优先使用 AutoFilter.Range（最精确）
+        // 2. 获取自动筛选区域
         let filterRange = null;
         try {
             if (ws.AutoFilter?.Range) {
                 filterRange = ws.AutoFilter.Range;
             }
         }
-        catch {
-            // 个别版本可能抛异常，忽略
-        }
-        let visibleCells = null;
-        // 2. 获取可见单元格集合
+        catch { }
+        // 3. 确定扫描范围
+        let scanRange;
         if (filterRange) {
-            visibleCells = filterRange.SpecialCells(12);
-            bgmLog(LOG_LEVELS.INFO, '使用 AutoFilter.Range.SpecialCells 获取可见单元格');
+            scanRange = filterRange;
+            bgmLog(LOG_LEVELS.INFO, '使用 AutoFilter.Range 做 SpecialCells');
         }
         else {
-            // 回退方案：用 End(xlUp) 获取有数据的最后行，构造范围
+            // 回退：用 A 列最后非空行
             const maxRow = lastRow && lastRow > 0 ? lastRow : ws.Rows.Count;
+            let lastUsedRow = maxRow;
             try {
-                const lastUsedRow = getLastRow(ws, true);
-                const scanEnd = Math.min(lastUsedRow, maxRow); // 取较小值
-                const rng = ws.Range(`A1:A${scanEnd}`);
-                visibleCells = rng.SpecialCells(12);
-                bgmLog(LOG_LEVELS.INFO, `使用 End(xlUp) 范围 A1:A${scanEnd} 做 SpecialCells`);
+                const bottomCell = ws.Range(`A${maxRow}`);
+                const endCell = bottomCell.End(-4162);
+                if (endCell && endCell.Row > 0)
+                    lastUsedRow = endCell.Row;
             }
-            catch {
-                // 仍失败则回退整列（但这正是造成多行误判的根源，所以放在最后）
-                visibleCells = ws.Range(`A1:A${maxRow}`).SpecialCells(12);
-                bgmLog(LOG_LEVELS.INFO, '回退到整列 SpecialCells (可能包含空白行)');
-            }
+            catch { }
+            scanRange = ws.Range(`A1:A${lastUsedRow}`);
+            bgmLog(LOG_LEVELS.INFO, `无 AutoFilter.Range，使用回退范围 A1:A${lastUsedRow}`);
         }
-        // 3. 提取所有可见行号（去重）
+        // 4. 获取可见单元格
+        let visibleCells = null;
+        try {
+            visibleCells = scanRange.SpecialCells(12);
+        }
+        catch (e) {
+            bgmLog(LOG_LEVELS.WARN, `SpecialCells 失败: ${e.message}`);
+        }
+        // 5. 提取所有可见行号（去重）
         const rawRows = new Set();
-        if (visibleCells?.Areas) {
-            const areas = visibleCells.Areas;
-            for (let a = 1; a <= areas.Count; a++) {
-                const area = areas.Item(a);
-                const areaRows = area.Rows;
-                for (let r = 1; r <= areaRows.Count; r++) {
-                    const rowObj = areaRows.Item(r);
-                    rawRows.add(rowObj.Row);
+        if (visibleCells) {
+            const areas = [];
+            try {
+                if (visibleCells.Areas) {
+                    for (let a = 1; a <= visibleCells.Areas.Count; a++) {
+                        areas.push(visibleCells.Areas.Item(a));
+                    }
+                }
+                else {
+                    areas.push(visibleCells);
                 }
             }
-        }
-        // 4. 确定表头行（筛选区域的第一行，或默认第1行）
-        const headerRow = filterRange ? filterRange.Row : 1;
-        // 5. 过滤空白行和表头行
-        for (const r of rawRows) {
-            if (r === headerRow)
-                continue; // 跳过表头
-            // 快速非空检测（取前两列）避免误加空白行
-            const valA = ws.Range(`A${r}`).Value2;
-            const valB = ws.Range(`B${r}`).Value2;
-            const isEmpty = (valA === null || valA === undefined || valA === '') &&
-                (valB === null || valB === undefined || valB === '');
-            if (!isEmpty) {
-                result.visibleRows.push(r);
+            catch {
+                areas.push(visibleCells);
             }
+            for (const area of areas) {
+                const rows = area.Rows;
+                for (let r = 1; r <= rows.Count; r++) {
+                    rawRows.add(rows.Item(r).Row);
+                }
+            }
+            bgmLog(LOG_LEVELS.INFO, `SpecialCells 收集到 ${rawRows.size} 个原始行号`);
+            // ---- 新增：输出每个可见行及其前 3 列数据 ----
+            const rowList = Array.from(rawRows).sort((a, b) => a - b);
+            const previewCount = Math.min(rowList.length, 15); // 最多输出 15 行，避免日志过长
+            for (let i = 0; i < previewCount; i++) {
+                const r = rowList[i];
+                const vals = [];
+                for (let c = 1; c <= 3; c++) {
+                    try {
+                        const cell = ws.Range(`${colNumToLetter(c)}${r}`);
+                        let val;
+                        try {
+                            val = typeof cell.Value2 === 'function' ? cell.Value2() : cell.Value2;
+                        }
+                        catch {
+                            try {
+                                val = typeof cell.Value === 'function' ? cell.Value() : cell.Value;
+                            }
+                            catch {
+                                val = '';
+                            }
+                        }
+                        vals.push((val ?? '').toString());
+                    }
+                    catch {
+                        vals.push('?');
+                    }
+                }
+                bgmLog(LOG_LEVELS.INFO, `  行 ${r}: ${vals.join(' | ')}`);
+            }
+            if (rowList.length > previewCount) {
+                bgmLog(LOG_LEVELS.INFO, `  ... 剩余 ${rowList.length - previewCount} 行省略`);
+            }
+        }
+        // 6. 生成最终可见行列表（排除表头行）
+        for (const r of rawRows) {
+            if (headerRow != null && r === headerRow)
+                continue;
+            result.visibleRows.push(r);
         }
         result.visibleRows.sort((a, b) => a - b);
         bgmLog(LOG_LEVELS.INFO, `有效可见数据行: ${result.visibleRows.length} 行`);
+        if (result.visibleRows.length > 0) {
+            bgmLog(LOG_LEVELS.INFO, `可见行前10: ${result.visibleRows.slice(0, 10).join(',')}`);
+        }
     }
     catch (e) {
         BGM.handleError(e, { level: BGM.ErrorLevel.ERROR, context: 'getFilterStatus' });
@@ -359,9 +406,20 @@ export function getSequentialRowsBySeqCol(startRow, endRow) {
         for (let r = startRow; r <= endRow; r++) {
             try {
                 const cell = ws.Range(`D${r}`);
-                const value = cell?.Value2;
-                if (value !== null && value !== undefined && value !== '') {
-                    const seqNum = String(value).trim();
+                let val;
+                try {
+                    val = typeof cell.Value2 === 'function' ? cell.Value2() : cell.Value2;
+                }
+                catch {
+                    try {
+                        val = typeof cell.Value === 'function' ? cell.Value() : cell.Value;
+                    }
+                    catch {
+                        val = '';
+                    }
+                }
+                if (val !== null && val !== undefined && val !== '') {
+                    const seqNum = String(val).trim();
                     if (/^\d+$/.test(seqNum)) {
                         result.validRows.push(r);
                         result.seqMap.set(seqNum, r);

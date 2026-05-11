@@ -260,70 +260,82 @@ export function colNumToLetter(col) {
     }
     return letter;
 }
-/**
- * 安全获取单元格对象
- */
 export function getCell(ws, row, col) {
     try {
-        const wsObj = ws;
-        if (wsObj && typeof wsObj.Range === 'function') {
-            const colLetter = colNumToLetter(col);
-            return wsObj.Range(colLetter + row);
-        }
-        const cellsObj = wsObj?.Cells;
-        if (typeof cellsObj === 'object' && cellsObj !== null) {
-            if (typeof cellsObj.Item === 'function') {
-                return cellsObj.Item(row, col);
-            }
-            return cellsObj(row, col);
-        }
-        return null;
+        const sheet = ws;
+        if (!sheet || typeof sheet.Range !== 'function')
+            return null;
+        return sheet.Range(colNumToLetter(col) + row);
     }
-    catch (e) {
-        BGM.handleError(e, { level: ErrorLevel.WARN, context: 'getCell' });
+    catch {
         return null;
     }
 }
-/**
- * 安全获取单元格值
- */
 export function getCellValue(ws, row, col) {
     try {
-        const cell = getCell(ws, row, col);
-        if (cell?.Value != null) {
-            const val = typeof cell.Value === 'function' ? cell.Value() : cell.Value;
-            return val !== null && val !== undefined ? String(val) : '';
+        // 类型守卫：确保 ws 有 Range 方法
+        const sheet = ws;
+        if (!sheet || typeof sheet.Range !== 'function')
+            return '';
+        const addr = colNumToLetter(col) + row; // 例如 "A1"
+        const cell = sheet.Range(addr);
+        if (!cell)
+            return '';
+        // 兼容 WPS 中 Value/Value2 可能是属性也可能是方法
+        let raw;
+        try {
+            // 优先 Value2（原始值，无格式）
+            raw = typeof cell.Value2 === 'function' ? cell.Value2() : cell.Value2;
         }
+        catch { }
+        if (raw === undefined || raw === null) {
+            try {
+                raw = typeof cell.Value === 'function' ? cell.Value() : cell.Value;
+            }
+            catch { }
+        }
+        return raw != null ? String(raw) : '';
     }
     catch (e) {
-        BGM.handleError(e, { level: ErrorLevel.WARN, context: 'getCellValue' });
+        // 可根据你的错误处理习惯决定是否记录日志
+        return '';
     }
-    return "";
 }
 /**
- * 读取单元格文本（handle WPS Value/Value2/Text 等多种属性）
+ * 读取单元格文本，基于 ws.Range 安全访问
+ *
  */
 export function readCell(ws, row, col) {
     try {
-        const cell = getCell(ws, row, col);
+        // 类型守卫：确保 ws 是有效的 Worksheet 对象且有 Range 方法
+        const sheet = ws;
+        if (!sheet || typeof sheet.Range !== 'function')
+            return '';
+        // 构造地址，如 "A1"
+        const address = colNumToLetter(col) + row;
+        const cell = sheet.Range(address);
         if (!cell)
-            return "";
-        if (typeof cell.Text === 'function')
-            return String(cell.Text());
-        if (cell.Text != null)
-            return String(cell.Text);
-        if (typeof cell.Value2 === 'function')
-            return String(cell.Value2());
-        if (cell.Value2 != null)
-            return String(cell.Value2);
-        if (typeof cell.Value === 'function')
-            return String(cell.Value());
-        if (cell.Value != null)
-            return String(cell.Value);
-        return "";
+            return '';
+        // 优先读取 Value2，它是原始值，不带格式
+        // WPS 中 Value2/Value 可能是属性，也可能是方法（个别版本），做兼容
+        let val = undefined;
+        try {
+            val = cell.Value2;
+        }
+        catch { }
+        if (val === undefined || val === null) {
+            try {
+                val = cell.Value;
+            }
+            catch { }
+        }
+        // 转换为字符串
+        if (val === null || val === undefined)
+            return '';
+        return String(val);
     }
     catch {
-        return "";
+        return '';
     }
 }
 /**

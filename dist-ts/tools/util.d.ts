@@ -47,16 +47,11 @@ export declare function getApp(): WpsApplication | null;
  * 列号转字母 (A, B, ..., Z, AA, AB, ...)
  */
 export declare function colNumToLetter(col: number): string;
-/**
- * 安全获取单元格对象
- */
-export declare function getCell(ws: unknown, row: number, col: number): unknown;
-/**
- * 安全获取单元格值
- */
+export declare function getCell(ws: unknown, row: number, col: number): any | null;
 export declare function getCellValue(ws: unknown, row: number, col: number): string;
 /**
- * 读取单元格文本（handle WPS Value/Value2/Text 等多种属性）
+ * 读取单元格文本，基于 ws.Range 安全访问
+ *
  */
 export declare function readCell(ws: unknown, row: number, col: number): string;
 /**

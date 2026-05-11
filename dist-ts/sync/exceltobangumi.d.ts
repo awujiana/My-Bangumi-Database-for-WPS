@@ -117,7 +117,12 @@ export declare function buildTagsArray(tagsRaw: string): string[];
  * @description
  * 检测工作表是否启用了筛选，并返回可见行和隐藏行的行号数组
  */
-export declare function getFilterStatus(lastRow?: number): {
+/**
+ * 获取筛选状态（可见行列表）
+ * @param lastRow  可选扫描上限，默认取工作表最大行数
+ * @returns hasFilter, visibleRows（不含表头和全空行）, hiddenRows
+ */
+export declare function getFilterStatus(lastRow?: number, headerRow?: number): {
     hasFilter: boolean;
     visibleRows: number[];
     hiddenRows: number[];
