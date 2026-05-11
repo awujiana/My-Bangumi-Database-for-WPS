@@ -271,4 +271,18 @@ export declare const TOKEN_CONFIG: {
  * 键：常见状态文本（小写），值：Bangumi 状态码 (1-5)
  */
 export declare const WATCH_STATUS_MAP: Record<string, number>;
+/**
+ * 同步记录工作表名称
+ *
+ * @constant
+ * @type {string}
+ */
+export declare const SYNC_RECORD_SHEET_NAME = "\u540C\u6B65\u8BB0\u5F55";
+/**
+ * 同步记录列配置
+ *
+ * @constant
+ * @type {string[]}
+ */
+export declare const SYNC_RECORD_COLUMNS: string[];
 //# sourceMappingURL=constants.d.ts.map

@@ -405,3 +405,22 @@ export const WATCH_STATUS_MAP: Record<string, number> = {
 };
 
 
+
+/**
+ * 同步记录工作表名称
+ *
+ * @constant
+ * @type {string}
+ */
+export const SYNC_RECORD_SHEET_NAME = '同步记录';
+
+/**
+ * 同步记录列配置
+ *
+ * @constant
+ * @type {string[]}
+ */
+export const SYNC_RECORD_COLUMNS = [
+    '序号', '同步时间', '名称', 'URL', 'SID', '条目类型',
+    '次数', '内容', '状态', '备注', '数据指纹'
+];

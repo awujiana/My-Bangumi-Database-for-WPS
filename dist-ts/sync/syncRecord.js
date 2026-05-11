@@ -7,24 +7,7 @@
  * @author BGM Development Team
  * @version 1.0.0
  */
-import { LOG_LEVELS, SYNC_STATUS, BGM_COLOR, bgmLog, getApp, BGM, getLastRow } from '../index.js';
-/**
- * 同步记录工作表名称
- *
- * @constant
- * @type {string}
- */
-const SYNC_RECORD_SHEET_NAME = '同步记录';
-/**
- * 同步记录列配置
- *
- * @constant
- * @type {string[]}
- */
-const SYNC_RECORD_COLUMNS = [
-    '序号', '同步时间', '名称', 'URL', 'SID', '条目类型',
-    '次数', '内容', '状态', '备注', '数据指纹'
-];
+import { LOG_LEVELS, SYNC_STATUS, BGM_COLOR, bgmLog, getApp, BGM, getLastRow, SYNC_RECORD_COLUMNS, SYNC_RECORD_SHEET_NAME } from '../index.js';
 /**
  * 内存缓存：SID到行号的映射
  *

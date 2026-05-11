@@ -40,6 +40,8 @@ export {
     TOKEN_CONFIG,
     WATCH_STATUS_MAP,
     COLUMNS,
+    SYNC_RECORD_SHEET_NAME,
+    SYNC_RECORD_COLUMNS
 } from './core/constants.js';
 
 // ============================================================================

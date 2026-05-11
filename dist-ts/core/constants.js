@@ -365,3 +365,20 @@ export const WATCH_STATUS_MAP = {
     "搁置": 4, "暂停": 4, "停": 4, "on_hold": 4, "4": 4,
     "抛弃": 5, "弃": 5, "弃番": 5, "drop": 5, "dropped": 5, "5": 5
 };
+/**
+ * 同步记录工作表名称
+ *
+ * @constant
+ * @type {string}
+ */
+export const SYNC_RECORD_SHEET_NAME = '同步记录';
+/**
+ * 同步记录列配置
+ *
+ * @constant
+ * @type {string[]}
+ */
+export const SYNC_RECORD_COLUMNS = [
+    '序号', '同步时间', '名称', 'URL', 'SID', '条目类型',
+    '次数', '内容', '状态', '备注', '数据指纹'
+];
