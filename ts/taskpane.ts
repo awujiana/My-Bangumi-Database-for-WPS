@@ -707,13 +707,17 @@ function initPanel(): void {
         radio.addEventListener('change', onSelectModeChange);
     });
 
+    // 在 initPanel 中添加
+    document.getElementById('closeSyncPreview')?.addEventListener('click', () => {
+        const modal = document.getElementById('syncPreviewModal');
+        if (modal) modal.style.display = 'none';
+    });
     // 按 Escape 键关闭详情模态框
     document.addEventListener('keydown', (e: KeyboardEvent) => {
         if (e.key === 'Escape') {
             closeDetailModal();
         }
     });
-
     // 通知模块就绪
     document.dispatchEvent(new CustomEvent('bgm:modulesReady'));
     bgmLog(LOG_LEVELS.INFO, 'initPanel 完成');

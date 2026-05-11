@@ -656,6 +656,12 @@ function initPanel() {
     document.querySelectorAll('input[name="selectMode"]').forEach(radio => {
         radio.addEventListener('change', onSelectModeChange);
     });
+    // 在 initPanel 中添加
+    document.getElementById('closeSyncPreview')?.addEventListener('click', () => {
+        const modal = document.getElementById('syncPreviewModal');
+        if (modal)
+            modal.style.display = 'none';
+    });
     // 按 Escape 键关闭详情模态框
     document.addEventListener('keydown', (e) => {
         if (e.key === 'Escape') {

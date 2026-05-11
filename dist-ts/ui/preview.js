@@ -5,7 +5,7 @@
  */
 const ITEM_HEIGHT = 180; // 每个条目的高度（根据实际样式调整）
 const CONTAINER_HEIGHT = 600;
-import { getApp, BGM, readCell, trim, _getUserApiPath, wpsMsgBox, getCell, escapeHtml, showAlert, showToast, BGM_COLOR, findHeaderRow, getColumnMap, extractSubjectId, mapWatchStatus, buildJsonPayload, bgmRequestSync, addSyncRecord, addTagsFromStr } from '../index.js';
+import { getApp, bgmLog, BGM, readCell, trim, _getUserApiPath, wpsMsgBox, getCell, escapeHtml, showAlert, showToast, LOG_LEVELS, BGM_COLOR, findHeaderRow, getColumnMap, extractSubjectId, mapWatchStatus, buildJsonPayload, bgmRequestSync, addSyncRecord, addTagsFromStr } from '../index.js';
 import { getAllSyncRecords } from '../sync/syncRecord.js';
 import { loadBgToken } from '../tools/util.js';
 // ========== 辅助函数 ==========
@@ -140,43 +140,44 @@ let detailPreviewData = {
 };
 // ========== 公有函数 ==========
 export function previewSyncContent() {
+    bgmLog(LOG_LEVELS.INFO, '[preview] 开始执行 previewSyncContent');
     const dp = BGM.dataPreview;
     if (!dp || !dp.ws) {
         showToast('请先在预览面板中加载数据', 'warn');
         return;
     }
     const { ws, visibleRows, headerRow, dataStartRow, previewColStart, previewColEnd, columnCount, headerNames } = dp;
-    // 过滤出真正的数据行（排除表头，且行号 ≥ dataStartRow）
     const dataRows = visibleRows.filter(r => r !== headerRow && r >= dataStartRow);
+    bgmLog(LOG_LEVELS.INFO, `[preview] 过滤后得到 ${dataRows.length} 条数据行`);
     if (dataRows.length === 0) {
         showToast('没有可预览的数据行', 'info');
         return;
     }
-    // 生成表格 HTML
-    let html = '<table class="preview-table"><thead><tr>';
-    html += '<th>#</th>'; // 行号列
+    // 生成表格 HTML（与之前相同）
+    let html = `<table class="preview-table"><thead><tr><th>#</th>`;
     for (let i = 0; i < columnCount; i++) {
         html += `<th>${escapeHtml(headerNames[i] || '')}</th>`;
     }
-    html += '</tr></thead><tbody>';
+    html += `</tr></thead><tbody>`;
     for (let i = 0; i < dataRows.length; i++) {
         const row = dataRows[i];
-        html += '<tr>';
-        html += `<td class="preview-row-num">${row}</td>`;
+        html += `<tr><td class="preview-row-num">${row}</td>`;
         for (let c = previewColStart; c <= previewColEnd; c++) {
-            const val = readCell(ws, row, c);
-            html += `<td>${escapeHtml(val)}</td>`;
+            html += `<td>${escapeHtml(readCell(ws, row, c))}</td>`;
         }
-        html += '</tr>';
+        html += `</tr>`;
     }
-    html += '</tbody></table>';
-    // 显示到模态框（假设你的模态框 id 为 syncPreviewModal）
+    html += `</tbody></table>`;
+    // 直接使用页面已有的模态框
     const modal = document.getElementById('syncPreviewModal');
-    if (modal) {
-        const body = modal.querySelector('.modal-body');
-        if (body)
-            body.innerHTML = html;
+    const body = modal?.querySelector('.modal-body');
+    if (modal && body) {
+        body.innerHTML = html;
         modal.style.display = 'block';
+        bgmLog(LOG_LEVELS.INFO, '[preview] 模态框已显示');
+    }
+    else {
+        bgmLog(LOG_LEVELS.ERROR, '[preview] syncPreviewModal 或 .modal-body 不存在');
     }
 }
 let virtualScrollStart = 0;

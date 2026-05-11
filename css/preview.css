@@ -1,44 +1,152 @@
-#virtualScrollContainer {
-    border: 1px solid var(--border-color, #444);
-    background: var(--bg-secondary, #1e1e1e);
-    margin-top: 10px;
+/* ========== 同步预览模态框 ========== */
+#syncPreviewModal {
+    font-family: "Microsoft YaHei", "苹方", sans-serif;
 }
 
-#virtualScrollContent {
-    will-change: transform; /* 优化滚动性能 */
+#syncPreviewModal .modal-content {
+    background: #fff;
+    border-radius: 12px;
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.25);
+    overflow: hidden;
 }
 
-.detail-item {
-    min-height: 170px;
-    box-sizing: border-box;
-    padding: 10px;
-    border-bottom: 1px solid var(--border-color, #333);
+#syncPreviewModal .modal-header {
+    background: linear-gradient(135deg, #4a6cf7, #6b8aff);
+    color: white;
+    padding: 16px 24px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: none;
 }
 
-/* 筛选按钮激活状态 */
-.filter-btn.active {
-    background: #27ae60;
+#syncPreviewModal .modal-header h3 {
+    margin: 0;
+    font-size: 18px;
+    font-weight: 600;
+}
+
+#closeSyncPreview {
+    background: rgba(255,255,255,0.2);
+    border: none;
+    color: white;
+    font-size: 24px;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+#closeSyncPreview:hover {
+    background: rgba(255,255,255,0.4);
+}
+
+#syncPreviewModal .modal-body {
+    padding: 20px 24px;
+    max-height: 70vh;
+    overflow: auto;
+}
+
+/* ========== 预览表格（用于面板和模态框） ========== */
+.preview-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+    background: #fff;
+}
+
+.preview-table th,
+.preview-table td {
+    padding: 8px 10px;
+    border: 1px solid #e2e8f0;
+    text-align: left;
+    white-space: nowrap;
+}
+
+.preview-table thead tr {
+    background: #f7f9fc;
+    position: sticky;
+    top: 0;
+    z-index: 2;
+}
+
+.preview-table th {
+    font-weight: 600;
+    color: #2d3748;
+    border-bottom: 2px solid #cbd5e0;
+}
+
+.preview-table .preview-row-num {
+    width: 40px;
+    text-align: center;
+    color: #718096;
+    font-weight: 500;
+    background: #f7fafc;
+}
+
+.preview-table .preview-header-row td {
+    background: #edf2f7;
+    font-weight: 600;
+    color: #1a202c;
+}
+
+.preview-table .preview-important-header {
+    background: #fffbeb !important;
+    color: #975a16 !important;
+    border-bottom: 2px solid #ecc94b;
+}
+
+/* 行悬停效果 */
+.preview-table tbody tr:hover td {
+    background: #eef2ff;
+    transition: background 0.15s;
+}
+
+/* 滚动条美化 */
+#syncPreviewModal .modal-body::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+#syncPreviewModal .modal-body::-webkit-scrollbar-thumb {
+    background: #cbd5e0;
+    border-radius: 4px;
+}
+#syncPreviewModal .modal-body::-webkit-scrollbar-track {
+    background: #f1f5f9;
+}
+.action-btn {
+    padding: 6px 16px;
+    border: none;
+    border-radius: 6px;
+    font-size: 13px;
+    cursor: pointer;
+    transition: background 0.2s, box-shadow 0.2s;
+    margin-right: 6px;
+}
+
+.btn-primary {
+    background: #4a6cf7;
     color: white;
 }
+.btn-primary:hover {
+    background: #3451b2;
+}
 
-/* 统计卡片样式 */
-.detail-stats {
-    display: flex;
-    gap: 12px;
-    margin-bottom: 14px;
+.btn-success {
+    background: #48bb78;
+    color: white;
 }
-.stat-card {
-    flex: 1;
-    background: var(--bg-card, #2a2a2a);
-    border-radius: 8px;
-    padding: 12px;
-    text-align: center;
+.btn-success:hover {
+    background: #38a169;
 }
-.stat-value {
-    font-size: 24px;
-    font-weight: bold;
+
+.btn-danger {
+    background: #e53e3e;
+    color: white;
 }
-.stat-label {
-    color: #aaa;
-    font-size: 12px;
+.btn-danger:hover {
+    background: #c53030;
 }

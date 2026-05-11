@@ -234,7 +234,19 @@
                 <div id="progressBar" style="width: 0%; height: 100%; background: #27ae60; text-align: center; line-height: 20px; color: white; font-size: 12px; transition: width 0.3s;"></div>
             </div>
         </div>
-
+                    <!-- 同步预览模态框 -->
+<div id="syncPreviewModal" class="modal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.  5);           z-index:10000; overflow:auto;">
+  <div class="modal-content" style="background:var(--bg-color, #fff); margin: 20px auto; width: 95%; max-width: 1400px; border-radius: 8px; box-shadow: 0           4px 20px rgba(0,0,0,0.3);">
+                <div class="modal-header" style="padding:10px 20px; border-bottom:1px solid #ddd; display:flex; justify-content:space-between; align-items:center;">
+                  <h3 style="margin:0;">同步预览数据</h3>
+                  <button id="closeSyncPreview" style="background:none; border:none; font-size:24px; cursor:pointer;">&times;</button>
+                </div>
+                <div class="modal-body" style="padding:20px; max-height:70vh; overflow:auto;">
+                  <!-- 表格会插入这里 -->
+                  <p>加载中...</p>
+                </div>
+              </div>
+            </div>
         <div class="section">
             <h3>📖 使用引导</h3>
             <div class="guide">
