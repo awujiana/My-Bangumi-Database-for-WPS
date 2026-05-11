@@ -6,7 +6,7 @@
 
 
 import { PANEL_CONFIG, WPS_ENUM , LOG_LEVELS ,getApp, bgmLog, BGM, escapeHtml, readCell, colNumToLetter,HEADER_KEYWORDS, IMPORTANT_COLS  ,initMessageListener,  markUploadedItems, clearSheetMarks, updateTokenStatus, updateUserIdStatus, showTokenDialog, showUserIdDialog ,
-     showAlert, showToast ,closeDetailModal,getFilterStatus,    getLastRow
+     showAlert, showToast ,closeDetailModal,getFilterStatus,    getLastRow,clearSheetCache
 }from './index.js';
 // ========== 类型定义 ==========
 interface LockedSheetInfo {
@@ -475,17 +475,30 @@ function refreshData(): void {
     }
 
     const sheetName = ws.Name || '';
+    // 清除该工作表所有缓存，确保获取到最新数据
+    if (typeof clearSheetCache === 'function') {
+        clearSheetCache(ws);
+    }
     const needRestore = activateSheetIfNeeded(ws);
     try {
-        // 获取最后数据行
-        const lastRow = getLastRow(ws);
-       // ===== 使用统一的筛选状态检测（与预览一致）=====
-        const filterStatus = getFilterStatus(lastRow); // 会返回 { hasFilter, visibleRows, hiddenRows }
-        const isFiltered = filterStatus ? filterStatus.hasFilter : false;
-        const visibleRowSet = isFiltered ? new Set<number>(filterStatus.visibleRows) : null;
+        // 获取最后数据行（强制刷新，不使用缓存）
+        const lastRow = getLastRow(ws, true);
+        bgmLog(LOG_LEVELS.INFO, `工作表最后数据行: ${lastRow}`);
 
-        bgmLog(LOG_LEVELS.INFO, `筛选状态: isFiltered=${isFiltered}, visibleRowSet.size=${visibleRowSet ? visibleRowSet.size : 'null'}, 可见行: ${visibleRowSet ? Array.from(visibleRowSet).slice(0, 10).join(',') : 'none'}`);
+        // 使用统一的筛选状态检测
+        const filterStatus = getFilterStatus(lastRow);
+        const isFiltered = filterStatus ? filterStatus.hasFilter : false;
+        const visibleRows = filterStatus?.visibleRows || [];
+        const visibleRowSet = isFiltered ? new Set<number>(visibleRows) : null;
+
+        // 记录筛选状态详情
+        bgmLog(LOG_LEVELS.INFO, `筛选状态: isFiltered=${isFiltered}, 可见行数=${visibleRows.length}`);
+        if (isFiltered && visibleRows.length > 0) {
+            bgmLog(LOG_LEVELS.INFO, `可见行列表(前10): ${visibleRows.slice(0, 10).join(',')}`);
+        }
+
         const meta = detectHeaderAndColumns(ws, { visibleRowSet, isFiltered });
+        bgmLog(LOG_LEVELS.INFO, `表头检测: headerRow=${meta.headerRow}, dataStartRow=${meta.dataStartRow}, 列数=${meta.previewColEnd - meta.previewColStart}`);
 
         const previewRows: PreviewRow[] = [];
         let hasData = false;
@@ -499,12 +512,10 @@ function refreshData(): void {
             });
 
             const displayColCount = meta.previewColEnd - meta.previewColStart;
-            for (let dr = meta.dataStartRow; dr <= meta.dataStartRow + PANEL_CONFIG.PREVIEW_LIMIT + 20 && dr <= 1000; dr++) {
-                let shouldInclude = !isFiltered;
-                if (isFiltered) {
-                    shouldInclude = visibleRowSet !== null && visibleRowSet.has(dr);
-                }
-                if (shouldInclude) {
+            // 扫描范围：从数据起始行开始，最多预览 PANEL_CONFIG.PREVIEW_LIMIT + 20 行，且不超过工作表最后行
+            const scanEnd = Math.min(lastRow, meta.dataStartRow + PANEL_CONFIG.PREVIEW_LIMIT + 20);
+            for (let dr = meta.dataStartRow; dr <= scanEnd; dr++) {
+                if (!isFiltered || !visibleRowSet || visibleRowSet.has(dr)) {
                     let hasAny = false;
                     const rowCols: string[] = [];
                     for (let ci = 0; ci < displayColCount; ci++) {
@@ -520,36 +531,35 @@ function refreshData(): void {
                 }
             }
         } else {
+            // 无表头时的回退逻辑
             let count = 0;
-            for (let r = 1; r <= 100 && count < 5; r++) {
-                let shouldInclude = !isFiltered;
-                if (isFiltered) {
-                    shouldInclude = visibleRowSet !== null && visibleRowSet.has(r);
+            for (let r = 1; r <= Math.min(lastRow, 100) && count < 5; r++) {
+                if (isFiltered && visibleRowSet && !visibleRowSet.has(r)) continue;
+                const cols: { text: string; important: boolean }[] = [];
+                let any = false;
+                for (let c = 1; c <= PANEL_CONFIG.MAX_SCAN_COLUMNS; c++) {
+                    const v = readCell(ws, r, c).trim();
+                    if (v) { cols.push({ text: v, important: false }); any = true; }
                 }
-                if (shouldInclude) {
-                    const cols: { text: string; important: boolean }[] = [];
-                    let any = false;
-                    for (let c = 1; c <= PANEL_CONFIG.MAX_SCAN_COLUMNS; c++) {
-                        const v = readCell(ws, r, c).trim();
-                        if (v) { cols.push({ text: v, important: false }); any = true; }
-                    }
-                    if (any) {
-                        previewRows.push({ row: r, cols, isHeader: false, aligned: true });
-                        hasData = true;
-                        count++;
-                    }
+                if (any) {
+                    previewRows.push({ row: r, cols, isHeader: false, aligned: true });
+                    hasData = true;
+                    count++;
                 }
             }
         }
-            if (hasData && !BGM.sheet.isLocked) {
-                BGM.sheet.lockedIndex = sheetIndex;
-                BGM.sheet.lockedName = sheetName;
-                BGM.sheet.isLocked = true;
-                saveLockedSheet({ index: sheetIndex, name: sheetName });
-                updateLockButton();
-                if (select) select.value = String(sheetIndex);
-                showToast('已自动锁定工作表: ' + sheetName, 'info');
-            }
+
+        bgmLog(LOG_LEVELS.INFO, `生成预览行数: ${previewRows.length}, 其中数据行: ${previewRows.filter(p => !p.isHeader).length}`);
+
+        if (hasData && !BGM.sheet.isLocked) {
+            BGM.sheet.lockedIndex = sheetIndex;
+            BGM.sheet.lockedName = sheetName;
+            BGM.sheet.isLocked = true;
+            saveLockedSheet({ index: sheetIndex, name: sheetName });
+            updateLockButton();
+            if (select) select.value = String(sheetIndex);
+            showToast('已自动锁定工作表: ' + sheetName, 'info');
+        }
 
         if (previewBox) {
             previewBox.innerHTML = previewRows.length > 0

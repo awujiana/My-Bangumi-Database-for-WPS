@@ -780,19 +780,77 @@ export function clearSheetCache(ws: any) {
     }
 }
 
-export function getLastRow(ws: any): number {
+/**
+ * 获取工作表中 D 列（序号列）的最后非空行号
+ * @param ws 工作表对象
+ * @param forceRefresh 是否强制刷新缓存，默认 false
+ * @returns 最后数据行号
+ */
+export function getLastRow(ws: any, forceRefresh: boolean = false): number {
     const sheetName = ws?.Name || '';
     const cacheKey = `${sheetName}:lastRow`;
-    return cacheGet(cacheKey, () => {
+
+    // 强制刷新时，清除该工作表的所有缓存
+    if (forceRefresh) {
+        clearSheetCache(ws);
+        bgmLog(LOG_LEVELS.DEBUG, `缓存已清除，重新计算最后行`);
+    }
+
+    const cached = cacheGet<number>(cacheKey, () => {
+        bgmLog(LOG_LEVELS.DEBUG, `正在计算工作表 "${sheetName}" 的最后数据行...`);
+
+        // 1. 优先使用 D 列（序号列）向上定位
         try {
-            const cell = getCell(ws, ws.Rows.Count, COLUMNS.SEQUENCE) as any;
-            if (cell?.Value2) {
-                return cell.End(XL.UP).Row;
+            const cell = getCell(ws, ws.Rows.Count, 4) as any; // D列
+            if (cell?.Value2 != null) {
+                const endCell = cell.End(-4162); // xlUp
+                if (endCell && endCell.Row > 0) {
+                    bgmLog(LOG_LEVELS.DEBUG, `D列向上定位成功，最后行: ${endCell.Row}`);
+                    return endCell.Row;
+                }
             }
-        } catch (e) {}
-        return 1000; // 回退值
+        } catch (e) {
+            bgmLog(LOG_LEVELS.WARN, `D列定位失败: ${(e as Error).message}`);
+        }
+
+        // 2. 尝试 A 列
+        try {
+            const cellA = getCell(ws, ws.Rows.Count, 1) as any;
+            if (cellA?.Value2 != null) {
+                const endCellA = cellA.End(-4162);
+                if (endCellA && endCellA.Row > 0) {
+                    bgmLog(LOG_LEVELS.DEBUG, `A列向上定位成功，最后行: ${endCellA.Row}`);
+                    return endCellA.Row;
+                }
+            }
+        } catch (e) {
+            bgmLog(LOG_LEVELS.WARN, `A列定位失败: ${(e as Error).message}`);
+        }
+
+        // 3. 使用 UsedRange 估算
+        try {
+            const usedRange = (ws as any).UsedRange;
+            if (usedRange) {
+                const last = usedRange.Row + usedRange.Rows.Count - 1;
+                if (last > 0) {
+                    bgmLog(LOG_LEVELS.DEBUG, `UsedRange 估算最后行: ${last}`);
+                    return last;
+                }
+            }
+        } catch (e) {
+            bgmLog(LOG_LEVELS.WARN, `UsedRange 失败: ${(e as Error).message}`);
+        }
+
+        // 4. 无法确定，返回一个较大的值并警告
+        bgmLog(LOG_LEVELS.WARN, `无法获取工作表 "${sheetName}" 的最后行，使用默认值 50000`);
+        return 50000;
     });
+
+    // 输出最终结果（无论缓存还是新算）
+    bgmLog(LOG_LEVELS.DEBUG, `工作表 "${sheetName}" 最后数据行: ${cached} ${sheetCache.has(cacheKey) ? '(来自缓存)' : '(首次计算)'}`);
+    return cached;
 }
+
 
 
 export function isEmptyValue(val: any): boolean {

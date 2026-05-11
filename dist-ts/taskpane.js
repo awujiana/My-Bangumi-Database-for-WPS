@@ -443,12 +443,19 @@ function refreshData() {
     try {
         // 获取最后数据行
         const lastRow = getLastRow(ws);
-        // ===== 使用统一的筛选状态检测（与预览一致）=====
-        const filterStatus = getFilterStatus(lastRow); // 会返回 { hasFilter, visibleRows, hiddenRows }
+        bgmLog(LOG_LEVELS.INFO, `工作表最后数据行: ${lastRow}`);
+        // 使用统一的筛选状态检测
+        const filterStatus = getFilterStatus(lastRow);
         const isFiltered = filterStatus ? filterStatus.hasFilter : false;
-        const visibleRowSet = isFiltered ? new Set(filterStatus.visibleRows) : null;
-        bgmLog(LOG_LEVELS.INFO, `筛选状态: isFiltered=${isFiltered}, visibleRowSet.size=${visibleRowSet ? visibleRowSet.size : 'null'}, 可见行: ${visibleRowSet ? Array.from(visibleRowSet).slice(0, 10).join(',') : 'none'}`);
+        const visibleRows = filterStatus?.visibleRows || [];
+        const visibleRowSet = isFiltered ? new Set(visibleRows) : null;
+        // 记录筛选状态详情
+        bgmLog(LOG_LEVELS.INFO, `筛选状态: isFiltered=${isFiltered}, 可见行数=${visibleRows.length}`);
+        if (isFiltered && visibleRows.length > 0) {
+            bgmLog(LOG_LEVELS.INFO, `可见行列表(前10): ${visibleRows.slice(0, 10).join(',')}`);
+        }
         const meta = detectHeaderAndColumns(ws, { visibleRowSet, isFiltered });
+        bgmLog(LOG_LEVELS.INFO, `表头检测: headerRow=${meta.headerRow}, dataStartRow=${meta.dataStartRow}, 列数=${meta.previewColEnd - meta.previewColStart}`);
         const previewRows = [];
         let hasData = false;
         if (meta.headerRow > 0) {
@@ -460,11 +467,7 @@ function refreshData() {
             });
             const displayColCount = meta.previewColEnd - meta.previewColStart;
             for (let dr = meta.dataStartRow; dr <= meta.dataStartRow + PANEL_CONFIG.PREVIEW_LIMIT + 20 && dr <= 1000; dr++) {
-                let shouldInclude = !isFiltered;
-                if (isFiltered) {
-                    shouldInclude = visibleRowSet !== null && visibleRowSet.has(dr);
-                }
-                if (shouldInclude) {
+                if (!isFiltered || !visibleRowSet || visibleRowSet.has(dr)) {
                     let hasAny = false;
                     const rowCols = [];
                     for (let ci = 0; ci < displayColCount; ci++) {
@@ -485,28 +488,25 @@ function refreshData() {
         else {
             let count = 0;
             for (let r = 1; r <= 100 && count < 5; r++) {
-                let shouldInclude = !isFiltered;
-                if (isFiltered) {
-                    shouldInclude = visibleRowSet !== null && visibleRowSet.has(r);
+                if (isFiltered && visibleRowSet && !visibleRowSet.has(r))
+                    continue;
+                const cols = [];
+                let any = false;
+                for (let c = 1; c <= PANEL_CONFIG.MAX_SCAN_COLUMNS; c++) {
+                    const v = readCell(ws, r, c).trim();
+                    if (v) {
+                        cols.push({ text: v, important: false });
+                        any = true;
+                    }
                 }
-                if (shouldInclude) {
-                    const cols = [];
-                    let any = false;
-                    for (let c = 1; c <= PANEL_CONFIG.MAX_SCAN_COLUMNS; c++) {
-                        const v = readCell(ws, r, c).trim();
-                        if (v) {
-                            cols.push({ text: v, important: false });
-                            any = true;
-                        }
-                    }
-                    if (any) {
-                        previewRows.push({ row: r, cols, isHeader: false, aligned: true });
-                        hasData = true;
-                        count++;
-                    }
+                if (any) {
+                    previewRows.push({ row: r, cols, isHeader: false, aligned: true });
+                    hasData = true;
+                    count++;
                 }
             }
         }
+        bgmLog(LOG_LEVELS.INFO, `生成预览行数: ${previewRows.length}, 其中数据行: ${previewRows.filter(p => !p.isHeader).length}`);
         if (hasData && !BGM.sheet.isLocked) {
             BGM.sheet.lockedIndex = sheetIndex;
             BGM.sheet.lockedName = sheetName;
