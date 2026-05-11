@@ -98,3 +98,8 @@ export function GetBangumiImage(control) {
 }
 // 通知 index.html 早期占位：真实实现已就绪
 window._bgmRibbonReady?.(OnAddinLoad, OnAction, GetBangumiImage);
+// 挂载 Ribbon 复选框回调到全局（WPS Ribbon XML 只能调用 window 上的函数）
+window.GetIncrementalSyncPressed = GetIncrementalSyncPressed;
+window.GetSkipConflictsPressed = GetSkipConflictsPressed;
+window.OnIncrementalSyncChange = OnIncrementalSyncChange;
+window.OnSkipConflictsChange = OnSkipConflictsChange;

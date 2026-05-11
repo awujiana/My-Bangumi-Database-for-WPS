@@ -7,9 +7,9 @@
 const MODULES = [
     { src: 'dist-ts/core/constants.js', type: 'module', critical: true },
     { src: 'dist-ts/core/crypto.js', type: 'module', critical: true },
+    { src: 'dist-ts/tools/events.js', type: 'module', critical: true }, 
     { src: 'dist-ts/index.js', type: 'module', critical: true },     // 先加载类型/枚举
     { src: 'dist-ts/core/result.js', type: 'module', critical: true },     // BgmError + Result
-    { src: 'dist-ts/tools/events.ts.js', type: 'module', critical: true }, 
     { src: 'dist-ts/tools/wps.js', type: 'module', critical: true },        // isWpsApp 等
     { src: 'dist-ts/tools/util.js', type: 'module', critical: true },
     { src: 'dist-ts/tools/http.js', type: 'module' },
