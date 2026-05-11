@@ -784,7 +784,6 @@ export function getLastRow(ws, forceRefresh = false, headerRow) {
         return 50000;
     }
     const sheetName = ws.Name || '';
-    // 缓存 key 带上 headerRow 的哈希，避免不同表头结果互相覆盖
     const cacheKey = `${sheetName}:lastRow${headerRow ? `:hr${headerRow}` : ''}`;
     if (forceRefresh) {
         clearSheetCache(ws);
@@ -792,30 +791,32 @@ export function getLastRow(ws, forceRefresh = false, headerRow) {
     }
     const cached = cacheGet(cacheKey, () => {
         bgmLog(LOG_LEVELS.DEBUG, `正在计算工作表 "${sheetName}" 的最后数据行（${headerRow ? '根据表头自动选择列' : '多列回退'}）...`);
-        // 1. 如果提供了表头行，尝试自动选择 ID/序号列
+        // 1. 如果提供了表头行，尝试自动选择锚定列
         if (headerRow != null && headerRow >= 1) {
             const col = findAnchorColumn(ws, headerRow);
             if (col) {
                 try {
-                    const cell = ws.Range(`D${ws.Rows.Count}`);
+                    // ✅ 修复点：使用 col 拼地址，而不是硬编码 D
+                    const colLetter = colNumToLetter(col);
+                    const cell = ws.Range(`${colLetter}${ws.Rows.Count}`);
                     const endCell = cell.End(-4162);
                     if (endCell && endCell.Row > 0) {
-                        bgmLog(LOG_LEVELS.DEBUG, `根据表头找到锚列 ${col}，最后行: ${endCell.Row}`);
+                        bgmLog(LOG_LEVELS.DEBUG, `根据表头找到锚定列 ${col}(${colLetter})，最后行: ${endCell.Row}`);
                         return endCell.Row;
                     }
                 }
                 catch (e) {
-                    bgmLog(LOG_LEVELS.WARN, `根据表头列 ${col} 定位失败: ${e.message}，回退到原有逻辑`);
+                    bgmLog(LOG_LEVELS.WARN, `锚定列 ${col} 定位失败: ${e.message}，回退到原有逻辑`);
                 }
             }
         }
-        // 2. 原有逻辑：优先 D 列（序号列）
+        // 2. 优先 D 列（常见序号列）
         try {
-            const cellA = ws.Range(`A${ws.Rows.Count}`);
-            const endCellA = cellA.End(-4162);
-            if (endCellA && endCellA.Row > 0) {
-                bgmLog(LOG_LEVELS.DEBUG, `A列向上定位成功，最后行: ${endCellA.Row}`);
-                return endCellA.Row;
+            const cell = ws.Range(`D${ws.Rows.Count}`);
+            const endCell = cell.End(-4162);
+            if (endCell && endCell.Row > 0) {
+                bgmLog(LOG_LEVELS.DEBUG, `D列向上定位成功，最后行: ${endCell.Row}`);
+                return endCell.Row;
             }
         }
         catch (e) {
@@ -823,17 +824,17 @@ export function getLastRow(ws, forceRefresh = false, headerRow) {
         }
         // 3. 尝试 A 列
         try {
-            const cellA = ws.Range(`A${ws.Rows.Count}`);
-            const endCellA = cellA.End(-4162);
-            if (endCellA && endCellA.Row > 0) {
-                bgmLog(LOG_LEVELS.DEBUG, `A列向上定位成功，最后行: ${endCellA.Row}`);
-                return endCellA.Row;
+            const cell = ws.Range(`A${ws.Rows.Count}`);
+            const endCell = cell.End(-4162);
+            if (endCell && endCell.Row > 0) {
+                bgmLog(LOG_LEVELS.DEBUG, `A列向上定位成功，最后行: ${endCell.Row}`);
+                return endCell.Row;
             }
         }
         catch (e) {
             bgmLog(LOG_LEVELS.WARN, `A列定位失败: ${e.message}`);
         }
-        // 4. 使用 UsedRange 估算
+        // 4. UsedRange 兜底
         try {
             const usedRange = ws.UsedRange;
             if (usedRange) {

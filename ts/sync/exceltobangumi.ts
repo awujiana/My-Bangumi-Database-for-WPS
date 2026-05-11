@@ -331,6 +331,11 @@ export function buildTagsArray(tagsRaw: string): string[] {
  * @description
  * 检测工作表是否启用了筛选，并返回可见行和隐藏行的行号数组
  */
+/**
+ * 获取筛选状态（可见行列表）
+ * @param lastRow  可选扫描上限，默认取工作表最大行数
+ * @returns hasFilter, visibleRows（不含表头和全空行）, hiddenRows
+ */
 export function getFilterStatus(lastRow?: number): {
     hasFilter: boolean;
     visibleRows: number[];
@@ -349,65 +354,93 @@ export function getFilterStatus(lastRow?: number): {
         const ws = app.ActiveWorkbook.ActiveSheet;
         if (!isWpsWorksheet(ws)) return result;
 
-        // 检查是否启用了自动筛选
+        // 1. 检查是否启用了自动筛选
         let autoFilterMode = false;
         try { autoFilterMode = !!ws.AutoFilterMode; } catch { }
         if (!autoFilterMode) return result;
         result.hasFilter = true;
 
-        // 1. 优先使用 AutoFilter.Range（最精确）
+        // 2. 获取自动筛选区域
         let filterRange: WpsRange | null = null;
         try {
             if (ws.AutoFilter?.Range) {
                 filterRange = ws.AutoFilter.Range;
             }
         } catch {
-            // 个别版本可能抛异常，忽略
+            bgmLog(LOG_LEVELS.WARN, '获取 AutoFilter.Range 失败');
         }
 
-        let visibleCells: WpsRange | null = null;
-
-        // 2. 获取可见单元格集合
+        // 3. 确定用于 SpecialCells 的范围
+        let scanRange: WpsRange;
         if (filterRange) {
-            visibleCells = filterRange.SpecialCells(12) as WpsRange;
-            bgmLog(LOG_LEVELS.INFO, '使用 AutoFilter.Range.SpecialCells 获取可见单元格');
+            scanRange = filterRange;
+            bgmLog(LOG_LEVELS.INFO, '使用 AutoFilter.Range 做 SpecialCells');
         } else {
-            // 回退方案：用 End(xlUp) 获取有数据的最后行，构造范围
-            const maxRow = lastRow && lastRow > 0 ? lastRow : ws.Rows.Count;
+            // 回退：使用 End(xlUp) 确定有数据的最后一行
+            const maxRow = ws.Rows.Count;
+            let lastUsedRow = maxRow;
             try {
-                const lastUsedRow = getLastRow(ws, true);
-                const scanEnd = Math.min(lastUsedRow, maxRow);   // 取较小值
-                const rng = ws.Range(`A1:A${scanEnd}`);
-                visibleCells = rng.SpecialCells(12) as WpsRange;
-                bgmLog(LOG_LEVELS.INFO, `使用 End(xlUp) 范围 A1:A${scanEnd} 做 SpecialCells`);
+                // 先试 A 列
+                const bottomCell = ws.Range(`A${maxRow}`);
+                const endCell = bottomCell.End(-4162); // xlUp
+                if (endCell && endCell.Row > 0) {
+                    lastUsedRow = endCell.Row;
+                }
             } catch {
-                // 仍失败则回退整列（但这正是造成多行误判的根源，所以放在最后）
-                visibleCells = ws.Range(`A1:A${maxRow}`).SpecialCells(12) as WpsRange;
-                bgmLog(LOG_LEVELS.INFO, '回退到整列 SpecialCells (可能包含空白行)');
+                // 若失败则使用 UsedRange
+                try {
+                    const ur = ws.UsedRange;
+                    if (ur) {
+                        lastUsedRow = ur.Row + ur.Rows.Count - 1;
+                    }
+                } catch {}
             }
+            scanRange = ws.Range(`A1:A${lastUsedRow}`);
+            bgmLog(LOG_LEVELS.INFO, `无 AutoFilter.Range，使用回退范围 A1:A${lastUsedRow}`);
         }
 
-        // 3. 提取所有可见行号（去重）
+        // 4. 获取可见单元格（SpecialCells xlCellTypeVisible = 12）
+        let visibleCells: WpsRange | null = null;
+        try {
+            visibleCells = scanRange.SpecialCells(12) as WpsRange;
+        } catch (e) {
+            bgmLog(LOG_LEVELS.WARN, `SpecialCells 执行失败: ${(e as Error).message}`);
+        }
+
+        // 5. 提取所有可见行号（去重）
         const rawRows = new Set<number>();
-        if (visibleCells?.Areas) {
-            const areas: WpsAreas = visibleCells.Areas;
-            for (let a = 1; a <= areas.Count; a++) {
-                const area = areas.Item(a);
-                const areaRows = area.Rows;
-                for (let r = 1; r <= areaRows.Count; r++) {
-                    const rowObj = areaRows.Item(r);
-                    rawRows.add(rowObj.Row);
+        if (visibleCells) {
+            const areas: WpsRange[] = [];
+            // 兼容无 Areas 情况
+            try {
+                if (visibleCells.Areas) {
+                    for (let a = 1; a <= visibleCells.Areas.Count; a++) {
+                        areas.push(visibleCells.Areas.Item(a));
+                    }
+                } else {
+                    areas.push(visibleCells);
+                }
+            } catch {
+                areas.push(visibleCells);
+            }
+
+            for (const area of areas) {
+                const rows = area.Rows;
+                for (let r = 1; r <= rows.Count; r++) {
+                    rawRows.add(rows.Item(r).Row);
                 }
             }
+            bgmLog(LOG_LEVELS.INFO, `SpecialCells 收集到 ${rawRows.size} 个原始行号`);
         }
 
-        // 4. 确定表头行（筛选区域的第一行，或默认第1行）
+        // 6. 确定表头行
         const headerRow = filterRange ? filterRange.Row : 1;
+        // 如果表头行也在原始集合中，可以在后续过滤中排除
 
-        // 5. 过滤空白行和表头行
+        // 7. 过滤空白行和表头行
         for (const r of rawRows) {
-            if (r === headerRow) continue; // 跳过表头
-            // 快速非空检测（取前两列）避免误加空白行
+            if (r === headerRow) continue;                     // 排除表头
+            // 快速非空检测（取前两列）
             const valA = ws.Range(`A${r}`).Value2;
             const valB = ws.Range(`B${r}`).Value2;
             const isEmpty = (valA === null || valA === undefined || valA === '') &&
@@ -419,6 +452,9 @@ export function getFilterStatus(lastRow?: number): {
         result.visibleRows.sort((a, b) => a - b);
 
         bgmLog(LOG_LEVELS.INFO, `有效可见数据行: ${result.visibleRows.length} 行`);
+        if (result.visibleRows.length > 0) {
+            bgmLog(LOG_LEVELS.INFO, `可见行前10: ${result.visibleRows.slice(0, 10).join(',')}`);
+        }
 
     } catch (e) {
         BGM.handleError(e, { level: BGM.ErrorLevel.ERROR, context: 'getFilterStatus' });
