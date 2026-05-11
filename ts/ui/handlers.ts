@@ -15,10 +15,13 @@ import {
     testSingleUpdate, getOrCreateSyncRecordSheet, getAllSyncRecords,
     addSyncRecord, openSyncRecordSheet, clearSheetMarksInSheet,
     previewSyncContent, refreshData,refreshSheets,toggleSheetLock ,clearSyncRecords,
-
+    
     closeDetailModal, 
-} from '../index.js';
+} from '../index.js';5
 import{BGM_EVENTS, eventBus} from '../tools/events.js';
+
+//  
+import { getSyncPreview, detectConflicts } from '../services/ribbonService.js';
 // 本地类型定义
 interface FilterStatus {
     hasFilter: boolean;
@@ -219,9 +222,6 @@ export function onAction(action: string): void {
 }
 
 // ========== 从面板同步（异步，带进度条） ==========
-
-// 在文件顶部添加导入
-import { getSyncPreview, detectConflicts } from '../services/ribbonService.js';
 
 export async function syncFromPanel(): Promise<void> {
     bgmLog(LOG_LEVELS.INFO, 'syncFromPanel 开始执行');

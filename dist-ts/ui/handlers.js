@@ -4,7 +4,10 @@
  * @description 面板操作处理、按钮绑定、业务对话框
  */
 import { LOG_LEVELS, bgmLog, BGM, loadBgToken, storeBgToken, _getBgmUserId, _setBgmUserId, getApp, getCell, trim, fetchBgmUserInfo, BGM_COLOR, showAlert, showConfirm, showError, showSuccess, showInput, showToast, setStatus, verifyToken, fetchAllUserCollections, findHeaderRow, getColumnMap, getLastRow, extractSubjectId, getDataSheet, getFilterStatus, SyncToBangumiAsync, clearRowColors, testSingleUpdate, getOrCreateSyncRecordSheet, getAllSyncRecords, addSyncRecord, openSyncRecordSheet, clearSheetMarksInSheet, previewSyncContent, refreshData, refreshSheets, toggleSheetLock, clearSyncRecords, closeDetailModal, } from '../index.js';
+5;
 import { BGM_EVENTS, eventBus } from '../tools/events.js';
+//  
+import { getSyncPreview, detectConflicts } from '../services/ribbonService.js';
 // ========== 中文常量 ==========
 const _T = {
     setBgmToken: '\u8BBE\u7F6E Bangumi Access Token',
@@ -191,8 +194,6 @@ export function onAction(action) {
     }
 }
 // ========== 从面板同步（异步，带进度条） ==========
-// 在文件顶部添加导入
-import { getSyncPreview, detectConflicts } from '../services/ribbonService.js';
 export async function syncFromPanel() {
     bgmLog(LOG_LEVELS.INFO, 'syncFromPanel 开始执行');
     if (typeof findHeaderRow !== 'function' || typeof getColumnMap !== 'function' || typeof getLastRow !== 'function') {
