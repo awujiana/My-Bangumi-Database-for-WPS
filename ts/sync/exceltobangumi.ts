@@ -346,58 +346,50 @@ export function getFilterStatus(lastRow?: number): { hasFilter: boolean; visible
         // 检查是否启用筛选
         let autoFilterMode = false;
         try { autoFilterMode = !!ws.AutoFilterMode; } catch (_) {}
-
         if (!autoFilterMode) return result;
 
         result.hasFilter = true;
 
-        const maxRow = lastRow || Math.min(ws.Rows.Count, PANEL_CONFIG.MAX_FILTER_SCAN_ROWS);
+        // 扫描上限：使用传入的准确 lastRow，避免漏扫
+        const maxRow = lastRow && lastRow > 0 ? lastRow : ws.Rows.Count;
+        bgmLog(LOG_LEVELS.INFO, `getFilterStatus: 开始扫描，上限 ${maxRow} 行`);
+
         const visibleSet = new Set<number>();
+        let hiddenCount = 0;
+        let errorCount = 0;
 
-        try {
-            const range = ws.Range(`A1:A${maxRow}`);
-            const visibleCells = range.SpecialCells(12); // xlCellTypeVisible
-
-            // 关键修复：确保 Areas 存在后再遍历
-            if (visibleCells?.Areas) {
-                for (let a = 1; a <= visibleCells.Areas.Count; a++) {
-                    const area = visibleCells.Areas.Item(a);
-                    for (let r = 1; r <= area.Rows.Count; r++) {
-                        visibleSet.add(area.Rows.Item(r).Row);
-                    }
+        // 逐行检测行高（唯一可靠方式）
+        for (let r = 1; r <= maxRow; r++) {
+            try {
+                const rowObj = ws.Rows(r);
+                if (!rowObj) {
+                    errorCount++;
+                    continue;
                 }
-            }
-        } catch (_) {}
-
-        // 回退：逐行检查
-        if (visibleSet.size < 3) {
-            visibleSet.clear();
-            for (let r = 1; r <= maxRow; r++) {
-                try {
-                    if (!ws.Rows(r).Hidden) {
-                        visibleSet.add(r);
-                    }
-                } catch (_) {
+                // 隐藏行的行高通常为 0
+                if (typeof rowObj.RowHeight !== 'undefined' && rowObj.RowHeight > 0) {
                     visibleSet.add(r);
+                } else {
+                    hiddenCount++;
                 }
+            } catch (_) {
+                errorCount++;
+            }
+
+            if (r % 10000 === 0) {
+                bgmLog(LOG_LEVELS.DEBUG, `行高检测进度: ${r}/${maxRow}, 可见 ${visibleSet.size}`);
             }
         }
 
         result.visibleRows = Array.from(visibleSet).sort((a, b) => a - b);
+        bgmLog(LOG_LEVELS.INFO, `行高检测完成: 可见 ${visibleSet.size} 行, 隐藏 ${hiddenCount} 行, 错误 ${errorCount}`);
 
-        // 计算隐藏行
-        for (let r = 1; r <= maxRow; r++) {
-            if (!visibleSet.has(r)) {
-                result.hiddenRows.push(r);
-            }
-        }
     } catch (e) {
         BGM.handleError(e, { level: BGM.ErrorLevel.ERROR, context: 'getFilterStatus' });
     }
 
     return result;
 }
-
 /**
  * 根据D列序列号获取连续的有效行
  *

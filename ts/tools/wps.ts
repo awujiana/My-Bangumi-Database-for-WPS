@@ -59,14 +59,21 @@ export interface WpsWorksheet {
 
 // ========== WPS 行/列 ==========
 export interface WpsRows {
+    /** 行数 */
     Count: number;
+    /** 行项 */
     Item(index: number): WpsRow;
+    /** 行项索引 */
     (index: number): WpsRow;
 }
 
 export interface WpsRow {
+    /** 行号 */
     Row: number;
+    /** 是否隐藏 */
     Hidden: boolean;
+    /** 行高（隐藏行通常为0） */
+    RowHeight?: number;  
 }
 
 export interface WpsColumns {

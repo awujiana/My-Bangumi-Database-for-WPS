@@ -167,7 +167,13 @@ export declare function findHeaderRow(ws: any, startRow?: number): number;
 export declare function getColumnMap(ws: any, headerRow: number): Map<string, number>;
 /** 清除指定工作表的所有缓存 */
 export declare function clearSheetCache(ws: any): void;
-export declare function getLastRow(ws: any): number;
+/**
+ * 获取工作表中 D 列（序号列）的最后非空行号
+ * @param ws 工作表对象
+ * @param forceRefresh 是否强制刷新缓存，默认 false
+ * @returns 最后数据行号
+ */
+export declare function getLastRow(ws: any, forceRefresh?: boolean): number;
 export declare function isEmptyValue(val: any): boolean;
 export declare function getDataSheet(): any;
 /**

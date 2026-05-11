@@ -3,7 +3,7 @@
  * @module taskpane
  * @description 面板初始化、事件绑定、核心逻辑
  */
-import { PANEL_CONFIG, WPS_ENUM, LOG_LEVELS, getApp, bgmLog, BGM, escapeHtml, readCell, colNumToLetter, HEADER_KEYWORDS, IMPORTANT_COLS, initMessageListener, markUploadedItems, updateTokenStatus, updateUserIdStatus, showToast, closeDetailModal, getFilterStatus, getLastRow } from './index.js';
+import { PANEL_CONFIG, WPS_ENUM, LOG_LEVELS, getApp, bgmLog, BGM, escapeHtml, readCell, colNumToLetter, HEADER_KEYWORDS, IMPORTANT_COLS, initMessageListener, markUploadedItems, updateTokenStatus, updateUserIdStatus, showToast, closeDetailModal, getFilterStatus, getLastRow, clearSheetCache } from './index.js';
 // ========== 工作表锁定功能 ==========
 function toggleSheetLock() {
     const select = document.getElementById('sheetSelect');
@@ -439,10 +439,14 @@ function refreshData() {
         return;
     }
     const sheetName = ws.Name || '';
+    // 清除该工作表所有缓存，确保获取到最新数据
+    if (typeof clearSheetCache === 'function') {
+        clearSheetCache(ws);
+    }
     const needRestore = activateSheetIfNeeded(ws);
     try {
-        // 获取最后数据行
-        const lastRow = getLastRow(ws);
+        // 获取最后数据行（强制刷新，不使用缓存）
+        const lastRow = getLastRow(ws, true);
         bgmLog(LOG_LEVELS.INFO, `工作表最后数据行: ${lastRow}`);
         // 使用统一的筛选状态检测
         const filterStatus = getFilterStatus(lastRow);
@@ -466,7 +470,9 @@ function refreshData() {
                 isImportant: meta.isImportant.slice(meta.previewColStart, meta.previewColEnd)
             });
             const displayColCount = meta.previewColEnd - meta.previewColStart;
-            for (let dr = meta.dataStartRow; dr <= meta.dataStartRow + PANEL_CONFIG.PREVIEW_LIMIT + 20 && dr <= 1000; dr++) {
+            // 扫描范围：从数据起始行开始，最多预览 PANEL_CONFIG.PREVIEW_LIMIT + 20 行，且不超过工作表最后行
+            const scanEnd = Math.min(lastRow, meta.dataStartRow + PANEL_CONFIG.PREVIEW_LIMIT + 20);
+            for (let dr = meta.dataStartRow; dr <= scanEnd; dr++) {
                 if (!isFiltered || !visibleRowSet || visibleRowSet.has(dr)) {
                     let hasAny = false;
                     const rowCols = [];
@@ -486,8 +492,9 @@ function refreshData() {
             }
         }
         else {
+            // 无表头时的回退逻辑
             let count = 0;
-            for (let r = 1; r <= 100 && count < 5; r++) {
+            for (let r = 1; r <= Math.min(lastRow, 100) && count < 5; r++) {
                 if (isFiltered && visibleRowSet && !visibleRowSet.has(r))
                     continue;
                 const cols = [];
