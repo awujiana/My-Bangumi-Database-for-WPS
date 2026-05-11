@@ -12,7 +12,7 @@
         // 按依赖顺序导入模块（确保副作用按顺序执行）
         import '../dist-ts/core/constants.js';
         import '../dist-ts/core/crypto.js';
-        import '../dist-ts/tools/events.ts.js';
+        import '../dist-ts/tools/events.js';
         import '../dist-ts/index.js';
         import '../dist-ts/core/result.js';
         import '../dist-ts/tools/wps.js';
@@ -38,9 +38,9 @@
     </script>
     <script>
         // 模块加载前禁用所有按钮，防止点击报错
-        document.querySelectorAll('button[data-action=], button[data-action]').forEach(function(btn) {
+        document.querySelectorAll('button[onclick], button[data-action]').forEach(function(btn) {
             btn.disabled = true;
-        });
+            });
         // 全局安全调用：模块未加载时阻止 data-action= 报错
         window._modulesReady = false;
         window.safeCall = function(fn, args) {
