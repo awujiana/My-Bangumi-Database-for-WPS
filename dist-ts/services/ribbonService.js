@@ -177,13 +177,18 @@ export async function syncWithConfirmation() {
     }
     // 1. 预览统计
     const preview = getSyncPreview(ws, colMap, lastRow, headerRow);
-    // 2. 读取 Ribbon 复选框状态（存储在 PluginStorage）
+    // 2. 读取 Ribbon 复选框状态（冲突策略 + 增量同步）
     let conflictStrategy = 'excel';
+    let incremental = false;
     try {
         if (app?.PluginStorage) {
             const skipConflicts = app.PluginStorage.getItem('bgm_skip_conflicts');
             if (skipConflicts === 'true') {
                 conflictStrategy = 'skip';
+            }
+            const incr = app.PluginStorage.getItem('bgm_incremental_sync');
+            if (incr === 'true') {
+                incremental = true;
             }
         }
     }
@@ -205,7 +210,6 @@ export async function syncWithConfirmation() {
     }
     catch (e) {
         BGM.handleError(e, { level: BGM.ErrorLevel.WARN, context: 'syncWithConfirmation:conflictDetection' });
-        // 冲突检测失败不影响主流程
     }
     // 4. 确认弹窗
     const msg = `数据预览：
@@ -216,13 +220,14 @@ export async function syncWithConfirmation() {
 不上传（状态跳过）：${preview.willSkip}
 无效（无SID）：${preview.total - preview.valid}
 ${conflictInfo}是否继续同步？`;
-    const confirmResult = app?.MessageBox?.(msg, 4 + 32); // Yes/No + 问号图标
+    const confirmResult = app?.MessageBox?.(msg, 4 + 32);
     if (confirmResult !== 6)
         return;
-    // 5. 执行同步，传入冲突跳过集合
+    // 5. 执行同步（传入跳过冲突集合和增量同步开关）
     try {
         const result = await SyncToBangumiAsync(ws, colMap, token, lastRow, headerRow, {
             skipSids,
+            incremental,
             onProgress: (current, total, message) => {
                 if (app.StatusBar !== undefined)
                     app.StatusBar = `[${current}/${total}] ${message}`;

@@ -299,8 +299,10 @@ export async function syncFromPanel(): Promise<void> {
 
     // ========== 执行同步，并传入冲突跳过集合 ==========
     try {
+        const incremental = (document.getElementById('chkIncremental') as HTMLInputElement)?.checked ?? false;
         const result = await SyncToBangumiAsync(ws, colMap, token, lastRow, headerRow, {
             skipSids: conflictSids,
+            incremental,  
             onProgress: (current, total, message) => {
                 updateProgressBar(current, total, message);
                 if (app.StatusBar !== undefined) {

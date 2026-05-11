@@ -32,7 +32,18 @@ export function OnSkipConflictsChange(control: any) {
         app.PluginStorage.setItem('bgm_skip_conflicts', control.Pressed ? 'true' : 'false');
     }
 }
+export function GetIncrementalSyncPressed(control: any): boolean {
+    const app = (window as any).Application;
+    if (app?.PluginStorage) {
+        return app.PluginStorage.getItem('bgm_incremental_sync') === 'true';
+    }
+    return false;
+}
 
+export function OnIncrementalSyncChange(control: any) {
+    const app = (window as any).Application;
+    app?.PluginStorage?.setItem('bgm_incremental_sync', control.Pressed ? 'true' : 'false');
+}
 // ========== Ribbon 回调 ==========
 
 export function OnAddinLoad(ribbonUI: any): boolean {

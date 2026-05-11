@@ -12,6 +12,8 @@ export declare function GetSkipConflictsPressed(control: any): boolean;
  * 当“跳过冲突”复选框被点击时，保存状态
  */
 export declare function OnSkipConflictsChange(control: any): void;
+export declare function GetIncrementalSyncPressed(control: any): boolean;
+export declare function OnIncrementalSyncChange(control: any): void;
 export declare function OnAddinLoad(ribbonUI: any): boolean;
 export declare function OnAction(control: {
     Id: string;
