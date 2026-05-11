@@ -6,7 +6,7 @@
 
 
 import { PANEL_CONFIG, WPS_ENUM , LOG_LEVELS ,getApp, bgmLog, BGM, escapeHtml, readCell, colNumToLetter,HEADER_KEYWORDS, IMPORTANT_COLS  ,initMessageListener,  markUploadedItems, clearSheetMarks, updateTokenStatus, updateUserIdStatus, showTokenDialog, showUserIdDialog ,
-     showAlert, showToast ,closeDetailModal,
+     showAlert, showToast ,closeDetailModal,getFilterStatus,    getLastRow
 }from './index.js';
 // ========== 类型定义 ==========
 interface LockedSheetInfo {
@@ -415,52 +415,6 @@ function updateFilterStatus(targetWs?: any): void {
     }
 }
 
-function detectFilterState(ws: any): FilterState {
-    let isFiltered = false;
-    let visibleRowSet: Set<number> | null = null;
-    let filterStartRow = 1;
-
-    try {
-        let autoFilterMode = !!ws.AutoFilterMode;
-        if (!autoFilterMode && ws.AutoFilter) autoFilterMode = !!ws.AutoFilter.Mode;
-        if (!autoFilterMode) return { isFiltered: false, visibleRowSet: null };
-
-        isFiltered = true;
-
-        try {
-            const filterRange = ws.AutoFilter.Range;
-            if (filterRange) filterStartRow = filterRange.Row;
-        } catch (_) {}
-
-        try {
-            const lastRow = Math.min(ws.Rows.Count, PANEL_CONFIG.MAX_FILTER_SCAN_ROWS);
-            const rangeStr = `${colNumToLetter(1)}${filterStartRow}:${colNumToLetter(1)}${lastRow}`;
-            const visibleCells = ws.Range(rangeStr).SpecialCells(12);
-            if (visibleCells) {
-                visibleRowSet = new Set<number>();
-                for (let a = 1; a <= visibleCells.Areas.Count; a++) {
-                    const area = visibleCells.Areas.Item(a);
-                    for (let r = 1; r <= area.Rows.Count; r++) {
-                        visibleRowSet.add(area.Rows.Item(r).Row);
-                    }
-                }
-                if (visibleRowSet.size < 3) visibleRowSet = null;
-            }
-        } catch (_) {}
-
-        if (!visibleRowSet) {
-            visibleRowSet = new Set<number>();
-            const lastRow = Math.min(ws.Rows.Count, PANEL_CONFIG.FILTER_FALLBACK_LIMIT);
-            for (let r = filterStartRow; r <= lastRow; r++) {
-                try { if (!ws.Rows(r).Hidden) visibleRowSet.add(r); }
-                catch (_) { visibleRowSet.add(r); }
-            }
-        }
-    } catch (e) {
-        bgmLog(LOG_LEVELS.ERROR, 'detectFilterState error: ' + (e as Error).message);
-    }
-    return { isFiltered, visibleRowSet };
-}
 
 // ========== 预览渲染 ==========
 
@@ -523,7 +477,14 @@ function refreshData(): void {
     const sheetName = ws.Name || '';
     const needRestore = activateSheetIfNeeded(ws);
     try {
-        const { isFiltered, visibleRowSet } = detectFilterState(ws);
+        // 获取最后数据行
+        const lastRow = getLastRow(ws);
+       // ===== 使用统一的筛选状态检测（与预览一致）=====
+        const filterStatus = getFilterStatus(lastRow); // 会返回 { hasFilter, visibleRows, hiddenRows }
+        const isFiltered = filterStatus ? filterStatus.hasFilter : false;
+        const visibleRowSet = isFiltered ? new Set<number>(filterStatus.visibleRows) : null;
+
+        bgmLog(LOG_LEVELS.INFO, `筛选状态: isFiltered=${isFiltered}, visibleRowSet.size=${visibleRowSet ? visibleRowSet.size : 'null'}, 可见行: ${visibleRowSet ? Array.from(visibleRowSet).slice(0, 10).join(',') : 'none'}`);
         const meta = detectHeaderAndColumns(ws, { visibleRowSet, isFiltered });
 
         const previewRows: PreviewRow[] = [];
@@ -539,7 +500,11 @@ function refreshData(): void {
 
             const displayColCount = meta.previewColEnd - meta.previewColStart;
             for (let dr = meta.dataStartRow; dr <= meta.dataStartRow + PANEL_CONFIG.PREVIEW_LIMIT + 20 && dr <= 1000; dr++) {
-                if (!isFiltered || !visibleRowSet || visibleRowSet.has(dr)) {
+                let shouldInclude = !isFiltered;
+                if (isFiltered) {
+                    shouldInclude = visibleRowSet !== null && visibleRowSet.has(dr);
+                }
+                if (shouldInclude) {
                     let hasAny = false;
                     const rowCols: string[] = [];
                     for (let ci = 0; ci < displayColCount; ci++) {
@@ -557,17 +522,22 @@ function refreshData(): void {
         } else {
             let count = 0;
             for (let r = 1; r <= 100 && count < 5; r++) {
-                if (isFiltered && visibleRowSet && !visibleRowSet.has(r)) continue;
-                const cols: { text: string; important: boolean }[] = [];
-                let any = false;
-                for (let c = 1; c <= PANEL_CONFIG.MAX_SCAN_COLUMNS; c++) {
-                    const v = readCell(ws, r, c).trim();
-                    if (v) { cols.push({ text: v, important: false }); any = true; }
+                let shouldInclude = !isFiltered;
+                if (isFiltered) {
+                    shouldInclude = visibleRowSet !== null && visibleRowSet.has(r);
                 }
-                if (any) {
-                    previewRows.push({ row: r, cols, isHeader: false, aligned: true });
-                    hasData = true;
-                    count++;
+                if (shouldInclude) {
+                    const cols: { text: string; important: boolean }[] = [];
+                    let any = false;
+                    for (let c = 1; c <= PANEL_CONFIG.MAX_SCAN_COLUMNS; c++) {
+                        const v = readCell(ws, r, c).trim();
+                        if (v) { cols.push({ text: v, important: false }); any = true; }
+                    }
+                    if (any) {
+                        previewRows.push({ row: r, cols, isHeader: false, aligned: true });
+                        hasData = true;
+                        count++;
+                    }
                 }
             }
         }
@@ -617,14 +587,19 @@ function onSelectModeChange(): void {
 function initPanel(): void {
     bgmLog(LOG_LEVELS.INFO, 'initPanel 开始');
 
+    // 初始化 WPS 枚举（如果未设置）
     if (typeof (window as any).Application !== 'undefined' && typeof (window as any).Application.Enum !== 'object') {
         (window as any).Application.Enum = WPS_ENUM;
     }
 
+    // 初始化消息监听（用于与其他任务窗格通信）
     initMessageListener();
+
+    // 恢复上次锁定的工作表
     const restored = restoreLockedSheet();
     refreshSheets();
 
+    // 自动检测最佳工作表并锁定
     const detected = autoDetectSheet();
     if (detected) {
         const select = document.getElementById('sheetSelect') as HTMLSelectElement | null;
@@ -634,16 +609,18 @@ function initPanel(): void {
         BGM.sheet.isLocked = true;
         saveLockedSheet({ index: detected.sheetIndex, name: detected.sheetName });
         updateLockButton();
-        refreshData();
+        refreshData();  // 立即刷新一次预览
     } else if (restored && BGM.sheet.isLocked) {
         const select = document.getElementById('sheetSelect') as HTMLSelectElement | null;
         if (select) select.value = String(BGM.sheet.lockedIndex);
         refreshData();
     }
 
+    // 更新 Token 和用户 ID 状态显示
     updateTokenStatus();
     updateUserIdStatus();
 
+    // 工作表选择器变更事件
     const sheetSelect = document.getElementById('sheetSelect');
     if (sheetSelect) {
         sheetSelect.addEventListener('change', () => {
@@ -652,45 +629,23 @@ function initPanel(): void {
             BGM.sheet.isLocked = false;
             saveLockedSheet(null);
             updateLockButton();
-            refreshData();
+            refreshData();  // 切换工作表时刷新预览
         });
     }
 
+    // 模式切换（自动/手动）
     document.querySelectorAll<HTMLInputElement>('input[name="selectMode"]').forEach(radio => {
         radio.addEventListener('change', onSelectModeChange);
     });
 
-    // 按 Escape 键只关闭详情模态框，其它弹窗由各自的关闭按钮控制
+    // 按 Escape 键关闭详情模态框
     document.addEventListener('keydown', (e: KeyboardEvent) => {
         if (e.key === 'Escape') {
             closeDetailModal();
         }
     });
-    // 自动检测筛选变化并刷新预览（每2秒检查一次）
-    let lastFilterHash = '';
-    setInterval(() => {
-        if (!BGM.sheet.isLocked) return; // 只有锁定了工作表才自动刷新
-        const app = getApp();
-        if (!app?.ActiveWorkbook) return;
-        const ws = BGM.sheet.lockedIndex 
-            ? app.ActiveWorkbook.Worksheets.Item(BGM.sheet.lockedIndex) 
-            : app.ActiveWorkbook.ActiveSheet;
-        if (!ws) return;
 
-        // 获取当前筛选状态的“快照”
-        const filterState = detectFilterState(ws);
-        const currentHash = JSON.stringify({
-            filtered: filterState.isFiltered,
-            visibleCount: filterState.visibleRowSet?.size ?? -1
-        });
-
-        // 如果筛选状态变化，自动刷新预览
-        if (currentHash !== lastFilterHash) {
-            lastFilterHash = currentHash;
-            updateFilterStatus(ws); // 更新筛选状态文字
-            refreshData();           // 刷新预览表格
-        }
-    }, 2000);
+    // 通知模块就绪
     document.dispatchEvent(new CustomEvent('bgm:modulesReady'));
     bgmLog(LOG_LEVELS.INFO, 'initPanel 完成');
 }
