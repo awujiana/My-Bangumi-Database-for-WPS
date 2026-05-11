@@ -71,7 +71,7 @@ export function getOrCreateSyncRecordSheet() {
         syncSheet.Name = SYNC_RECORD_SHEET_NAME;
         // 设置表头
         for (let i = 0; i < SYNC_RECORD_COLUMNS.length; i++) {
-            const cell = syncSheet.Cells(1, i + 1);
+            const cell = syncSheet.Range(`A${1}`);
             cell.Value2 = SYNC_RECORD_COLUMNS[i];
             if (cell.Interior) {
                 cell.Interior.Color = BGM_COLOR.GRAY;
@@ -219,7 +219,7 @@ export function addSyncRecord(params) {
                 sheet.Cells(newRow, 11).Value2 = params.fingerprint;
             }
             // 设置颜色标记（已有逻辑）
-            const seqCell = sheet.Cells(newRow, 1);
+            const seqCell = sheet.Range(`A${newRow}`);
             if (seqCell?.Interior) {
                 if (params.status === SYNC_STATUS.SUCCESS) {
                     seqCell.Interior.Color = BGM_COLOR.BGM_SYNC;
@@ -337,7 +337,7 @@ export function clearSheetMarksInSheet(sheetIndex) {
     const lastRow = getLastRow(ws);
     for (let r = 1; r <= lastRow; r++) {
         try {
-            const cell = ws.Cells(r, 4);
+            const cell = ws.Range(`D${r}`);
             if (cell?.Interior) {
                 cell.Interior.ColorIndex = -4142;
             }

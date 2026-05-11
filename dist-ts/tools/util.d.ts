@@ -1,4 +1,4 @@
-import { LOG_LEVELS, ERROR_LEVELS, ErrorLevel, type DialogOptions, type ErrorOptions, type WpsApplication, BgmError, BGMCache, BGMSheet, BGMSync, BGMUserInfo } from '../index.js';
+import { LOG_LEVELS, ERROR_LEVELS, ErrorLevel, type DialogOptions, type ErrorOptions, type WpsApplication, BgmError, BGMCache, BGMSheet, BGMSync, BGMUserInfo, WpsWorksheet } from '../index.js';
 export declare const BGM: {
     cache: BGMCache;
     sheet: BGMSheet;
@@ -168,12 +168,14 @@ export declare function getColumnMap(ws: any, headerRow: number): Map<string, nu
 /** 清除指定工作表的所有缓存 */
 export declare function clearSheetCache(ws: any): void;
 /**
- * 获取工作表中 D 列（序号列）的最后非空行号
- * @param ws 工作表对象
- * @param forceRefresh 是否强制刷新缓存，默认 false
- * @returns 最后数据行号
+ * 获取工作表的最后有效数据行
+ * @param ws            工作表对象（WpsWorksheet）
+ * @param forceRefresh  是否强制刷新（跳过缓存）
+ * @param headerRow     可选：表头行号。若提供，则自动检测“序号/ID”列并用该列定位最后行；
+ *                      若未找到或未提供，回退到原有逻辑（D列 → A列 → UsedRange）。
+ * @returns 最后数据行号（1‑based），至少返回 1
  */
-export declare function getLastRow(ws: any, forceRefresh?: boolean): number;
+export declare function getLastRow(ws: WpsWorksheet | null | undefined, forceRefresh?: boolean, headerRow?: number): number;
 export declare function isEmptyValue(val: any): boolean;
 export declare function getDataSheet(): any;
 /**

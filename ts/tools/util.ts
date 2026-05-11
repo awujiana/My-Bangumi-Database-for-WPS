@@ -678,7 +678,7 @@ export function readRangeValues(
     endCol: number
 ): string[][] {
     try {
-        const range = ws.Range(ws.Cells(startRow, startCol), ws.Cells(endRow, endCol));
+        const range = ws.Range(`${colNumToLetter(startCol)}${startRow}:${colNumToLetter(endCol)}${endRow}`);
         const raw = range?.Value2;
         if (!raw) return [];
         // 处理单个值的情况
@@ -801,7 +801,7 @@ function findAnchorColumn(ws: WpsWorksheet, headerRow: number): number | undefin
     const maxCols = 50;
 
     for (let c = 1; c <= maxCols; c++) {
-        const val = ws.Cells(headerRow, c).Value2;
+        const val = ws.Range(`${colNumToLetter(c)}${headerRow}`).Value2;
         if (val == null) continue;
         const text = String(val).trim().toLowerCase();
         if (keywords.some(kw => text === kw || text.includes(kw))) {
@@ -843,11 +843,11 @@ export function getLastRow(ws: WpsWorksheet | null | undefined,forceRefresh: boo
             const col = findAnchorColumn(ws, headerRow);
             if (col) {
                 try {
-                    const cell = ws.Cells(ws.Rows.Count, col);
-                    const endCell = cell.End(-4162); // xlUp
+                    const cell = ws.Range(`D${ws.Rows.Count}`);
+                    const endCell = cell.End(-4162);
                     if (endCell && endCell.Row > 0) {
                         bgmLog(LOG_LEVELS.DEBUG,
-                            `根据表头找到 ID/序号列 ${col}，最后行: ${endCell.Row}`
+                            `根据表头找到锚列 ${col}，最后行: ${endCell.Row}`
                         );
                         return endCell.Row;
                     }
@@ -861,11 +861,11 @@ export function getLastRow(ws: WpsWorksheet | null | undefined,forceRefresh: boo
 
         // 2. 原有逻辑：优先 D 列（序号列）
         try {
-            const cell = ws.Cells(ws.Rows.Count, 4);
-            const endCell = cell.End(-4162);
-            if (endCell && endCell.Row > 0) {
-                bgmLog(LOG_LEVELS.DEBUG, `D列向上定位成功，最后行: ${endCell.Row}`);
-                return endCell.Row;
+            const cellA = ws.Range(`A${ws.Rows.Count}`);
+            const endCellA = cellA.End(-4162);
+            if (endCellA && endCellA.Row > 0) {
+                bgmLog(LOG_LEVELS.DEBUG, `A列向上定位成功，最后行: ${endCellA.Row}`);
+                return endCellA.Row;    
             }
         } catch (e) {
             bgmLog(LOG_LEVELS.WARN, `D列定位失败: ${(e as Error).message}`);
@@ -873,11 +873,11 @@ export function getLastRow(ws: WpsWorksheet | null | undefined,forceRefresh: boo
 
         // 3. 尝试 A 列
         try {
-            const cell = ws.Cells(ws.Rows.Count, 1);
-            const endCell = cell.End(-4162);
-            if (endCell && endCell.Row > 0) {
-                bgmLog(LOG_LEVELS.DEBUG, `A列向上定位成功，最后行: ${endCell.Row}`);
-                return endCell.Row;
+            const cellA = ws.Range(`A${ws.Rows.Count}`);
+            const endCellA = cellA.End(-4162);
+            if (endCellA && endCellA.Row > 0) {
+                bgmLog(LOG_LEVELS.DEBUG, `A列向上定位成功，最后行: ${endCellA.Row}`);
+                return endCellA.Row;
             }
         } catch (e) {
             bgmLog(LOG_LEVELS.WARN, `A列定位失败: ${(e as Error).message}`);

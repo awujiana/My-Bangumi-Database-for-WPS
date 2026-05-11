@@ -56,7 +56,6 @@ export interface WpsWorksheet {
     Activate(): void;
     Calculate(): void;
     Range(address: string): WpsRange;
-    Cells(row: number, col: number): WpsRange;
     Move(Before?: any, After?: any): void;
 }
 

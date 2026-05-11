@@ -284,7 +284,7 @@ export function getFilterStatus(lastRow) {
             // 回退方案：用 End(xlUp) 获取有数据的最后行，构造范围
             const maxRow = lastRow && lastRow > 0 ? lastRow : ws.Rows.Count;
             try {
-                const lastUsedRow = getLastUsedRow(ws);
+                const lastUsedRow = getLastRow(ws, true);
                 const scanEnd = Math.min(lastUsedRow, maxRow); // 取较小值
                 const rng = ws.Range(`A1:A${scanEnd}`);
                 visibleCells = rng.SpecialCells(12);
@@ -316,8 +316,8 @@ export function getFilterStatus(lastRow) {
             if (r === headerRow)
                 continue; // 跳过表头
             // 快速非空检测（取前两列）避免误加空白行
-            const valA = ws.Cells(r, 1).Value2;
-            const valB = ws.Cells(r, 2).Value2;
+            const valA = ws.Range(`A${r}`).Value2;
+            const valB = ws.Range(`B${r}`).Value2;
             const isEmpty = (valA === null || valA === undefined || valA === '') &&
                 (valB === null || valB === undefined || valB === '');
             if (!isEmpty) {
@@ -331,12 +331,6 @@ export function getFilterStatus(lastRow) {
         BGM.handleError(e, { level: BGM.ErrorLevel.ERROR, context: 'getFilterStatus' });
     }
     return result;
-}
-// 辅助函数
-function getLastUsedRow(ws) {
-    const maxRow = ws.Rows.Count;
-    const lastCell = ws.Cells(maxRow, 1).End(-4162); // -4162 = xlUp
-    return lastCell.Row;
 }
 /**
  * 根据D列序列号获取连续的有效行
@@ -364,7 +358,7 @@ export function getSequentialRowsBySeqCol(startRow, endRow) {
             return result;
         for (let r = startRow; r <= endRow; r++) {
             try {
-                const cell = ws.Cells(r, 4); // D列
+                const cell = ws.Range(`D${r}`);
                 const value = cell?.Value2;
                 if (value !== null && value !== undefined && value !== '') {
                     const seqNum = String(value).trim();
@@ -539,7 +533,7 @@ export function clearRowColors() {
         const lastRow = getLastRow(ws);
         for (let r = 1; r <= lastRow; r++) {
             try {
-                const cell = ws.Cells(r, 4);
+                const cell = ws.Range(`D${r}`);
                 if (cell?.Interior)
                     cell.Interior.ColorIndex = -4142;
             }
@@ -798,7 +792,7 @@ export function clearSheetMarksInSheet(sheetIndex) {
         const lastRow = getLastRow(ws); // 精确获取最后数据行
         for (let r = 1; r <= lastRow; r++) {
             try {
-                const cell = ws.Cells(r, 4);
+                const cell = ws.Range(`D${r}`);
                 if (cell?.Interior)
                     cell.Interior.ColorIndex = -4142;
             }

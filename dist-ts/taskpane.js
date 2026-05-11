@@ -255,43 +255,68 @@ function autoDetectSheet() {
     }
     const sheets = app.ActiveWorkbook.Worksheets;
     let bestMatch = null;
+    bgmLog(LOG_LEVELS.INFO, `autoDetectSheet: 开始扫描 ${sheets.Count} 个工作表...`);
     for (let si = 1; si <= sheets.Count; si++) {
         let needRestore = false;
         try {
             const ws = sheets.Item(si);
-            if (!ws)
+            if (!ws) {
+                bgmLog(LOG_LEVELS.WARN, `autoDetectSheet: 工作表索引 ${si} 为 null，已跳过`);
                 continue;
+            }
             const sheetName = ws.Name || '';
-            if (/^(同步记录|SyncRecord|模糊|搜索|SEARCH)/i.test(sheetName))
+            // 跳过特定系统表（例如同步记录等）
+            if (/^(同步记录|SyncRecord|模糊|搜索|SEARCH)/i.test(sheetName)) {
+                bgmLog(LOG_LEVELS.DEBUG, `autoDetectSheet: 跳过系统工作表 "${sheetName}"`);
                 continue;
+            }
+            bgmLog(LOG_LEVELS.DEBUG, `autoDetectSheet: 正在分析工作表 "${sheetName}"`);
             needRestore = activateSheetIfNeeded(ws);
             const meta = detectHeaderAndColumns(ws);
-            if (meta.headerRow > 0) {
-                let dataRowCount = 0;
-                for (let dr = meta.dataStartRow; dr <= meta.dataStartRow + 10; dr++) {
-                    let hasAny = false;
-                    for (let c = 1; c <= meta.lastCol; c++) {
-                        if (readCell(ws, dr, c).trim()) {
-                            hasAny = true;
-                            break;
-                        }
-                    }
-                    if (hasAny)
-                        dataRowCount++;
-                }
-                if (dataRowCount >= 2) {
-                    if (!bestMatch || meta.lastCol > bestMatch.colCount ||
-                        (meta.lastCol === bestMatch.colCount && meta.headerMatchCount > bestMatch.matchCount)) {
-                        bestMatch = {
-                            sheetIndex: si, sheetName: sheetName,
-                            headerRow: meta.headerRow, matchCount: meta.headerMatchCount, colCount: meta.lastCol
-                        };
+            if (meta.headerRow === 0) {
+                bgmLog(LOG_LEVELS.DEBUG, `  => 工作表 "${sheetName}" 未检测到有效表头 (headerRow=0), 已跳过`);
+                continue;
+            }
+            // 检查表头下方是否有足够的数据行
+            let dataRowCount = 0;
+            let firstDataRow = -1;
+            for (let dr = meta.dataStartRow; dr <= meta.dataStartRow + 10; dr++) {
+                let hasAny = false;
+                for (let c = 1; c <= meta.lastCol; c++) {
+                    if (readCell(ws, dr, c).trim()) {
+                        hasAny = true;
+                        break;
                     }
                 }
+                if (hasAny) {
+                    dataRowCount++;
+                    if (firstDataRow < 0)
+                        firstDataRow = dr;
+                }
+            }
+            bgmLog(LOG_LEVELS.DEBUG, `  => 工作表 "${sheetName}" 表头行 ${meta.headerRow}, 匹配关键词数 ${meta.headerMatchCount}, ` +
+                `数据列数 ${meta.lastCol}, 前10行含数据行数 ${dataRowCount}`);
+            if (dataRowCount < 2) {
+                bgmLog(LOG_LEVELS.DEBUG, `  => 数据行不足 (${dataRowCount} 行)，不视为有效数据表`);
+                continue;
+            }
+            // 判断是否更优
+            const isBetter = !bestMatch ||
+                meta.lastCol > bestMatch.colCount ||
+                (meta.lastCol === bestMatch.colCount && meta.headerMatchCount > bestMatch.matchCount);
+            bgmLog(LOG_LEVELS.DEBUG, `  => 是否为当前最优: ${isBetter ? '是' : '否'} (现有最优: ${bestMatch ? `${bestMatch.sheetName}(列${bestMatch.colCount})` : '无'})`);
+            if (isBetter) {
+                bestMatch = {
+                    sheetIndex: si,
+                    sheetName: sheetName,
+                    headerRow: meta.headerRow,
+                    matchCount: meta.headerMatchCount,
+                    colCount: meta.lastCol
+                };
             }
         }
         catch (e) {
-            bgmLog(LOG_LEVELS.WARN, `autoDetectSheet: 扫描工作表 ${si} 出错: ${e.message}`);
+            bgmLog(LOG_LEVELS.WARN, `autoDetectSheet: 扫描工作表 ${si} 时出错: ${e.message}`);
         }
         finally {
             if (typeof needRestore === 'function')
@@ -299,10 +324,10 @@ function autoDetectSheet() {
         }
     }
     if (bestMatch) {
-        bgmLog(LOG_LEVELS.INFO, `autoDetectSheet: 找到最佳匹配 ${bestMatch.sheetName}`);
+        bgmLog(LOG_LEVELS.INFO, `autoDetectSheet: 最终选中工作表 "${bestMatch.sheetName}" (列${bestMatch.colCount}, 行${bestMatch.headerRow})`);
     }
     else {
-        bgmLog(LOG_LEVELS.INFO, 'autoDetectSheet: 未找到包含数据表头的工作表');
+        bgmLog(LOG_LEVELS.WARN, 'autoDetectSheet: 未在任何工作表中找到有效数据表头');
     }
     return bestMatch;
 }

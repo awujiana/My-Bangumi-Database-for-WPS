@@ -408,8 +408,8 @@ export function getFilterStatus(lastRow?: number): {
         for (const r of rawRows) {
             if (r === headerRow) continue; // 跳过表头
             // 快速非空检测（取前两列）避免误加空白行
-            const valA = ws.Cells(r, 1).Value2;
-            const valB = ws.Cells(r, 2).Value2;
+            const valA = ws.Range(`A${r}`).Value2;
+            const valB = ws.Range(`B${r}`).Value2;
             const isEmpty = (valA === null || valA === undefined || valA === '') &&
                             (valB === null || valB === undefined || valB === '');
             if (!isEmpty) {
@@ -455,7 +455,7 @@ export function getSequentialRowsBySeqCol(startRow: number, endRow: number): { v
 
         for (let r = startRow; r <= endRow; r++) {
             try {
-                const cell = ws.Cells(r, 4); // D列
+                const cell = ws.Range(`D${r}`);
                 const value = cell?.Value2;
 
                 if (value !== null && value !== undefined && value !== '') {
@@ -648,7 +648,7 @@ export function clearRowColors(): void {
         const lastRow = getLastRow(ws);
         for (let r = 1; r <= lastRow; r++) {
             try {
-                const cell = ws.Cells(r, 4) as WpsRange | null;
+                const cell = ws.Range(`D${r}`) as WpsRange | null;
                 if (cell?.Interior) cell.Interior.ColorIndex = -4142;
             } catch (_) {}
         }
@@ -920,7 +920,7 @@ export function clearSheetMarksInSheet(sheetIndex: number): void {
         const lastRow = getLastRow(ws);  // 精确获取最后数据行
         for (let r = 1; r <= lastRow; r++) {
             try {
-                const cell = ws.Cells(r, 4) as WpsRange | null;
+                const cell = ws.Range(`D${r}`) as WpsRange | null;
                 if (cell?.Interior) cell.Interior.ColorIndex = -4142;
             } catch (_) {}
         }
