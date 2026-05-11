@@ -33,34 +33,19 @@
     </script>
     
     <script>
-        // 模块加载前禁用所有按钮
-        document.querySelectorAll('button[onclick], button[data-action]').forEach(function(btn) {
-            btn.disabled = true;
+    // 模块加载前禁用所有按钮
+    document.querySelectorAll('button[data-action]').forEach(function(btn) {
+        btn.disabled = true;
+    });
+
+    // 模块就绪后启用按钮（由 taskpane.ts 触发自定义事件）
+    document.addEventListener('bgm:modulesReady', function() {
+        document.querySelectorAll('button[data-action]').forEach(function(btn) {
+            btn.disabled = false;
         });
-        // 模块就绪后启用按钮
-        document.addEventListener('bgm:modulesReady', function() {
-            document.querySelectorAll('button[data-action]').forEach(function(btn) {
-                btn.disabled = false;
-            });
-            console.log('[BGM] 模块加载完成，按钮已启用');
-        });
-        // 轮询检测超时处理（10秒后若按钮仍禁用则提示）
-        var _checkCount = 0;
-        var _checkInterval = setInterval(function() {
-            _checkCount++;
-            if (typeof window.refreshData === 'function' && typeof window.onAction === 'function') {
-                clearInterval(_checkInterval);
-                document.querySelectorAll('button[data-action]').forEach(function(btn) {
-                    btn.disabled = false;
-                });
-                console.log('[BGM] 轮询检测模块已就绪');
-            }
-            if (_checkCount > 200) {
-                clearInterval(_checkInterval);
-                console.error('[BGM] 模块加载超时，部分功能可能不可用');
-            }
-        }, 50);
-    </script>
+        console.log('[BGM] 模块加载完成，按钮已启用');
+    });
+</script>
     
     <script src="../wpsjsrpcsdk.js"></script>
 
