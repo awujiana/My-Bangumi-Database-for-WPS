@@ -191,6 +191,8 @@ export function onAction(action) {
     }
 }
 // ========== 从面板同步（异步，带进度条） ==========
+// 在文件顶部添加导入
+import { getSyncPreview, detectConflicts } from '../services/ribbonService.js';
 export async function syncFromPanel() {
     bgmLog(LOG_LEVELS.INFO, 'syncFromPanel 开始执行');
     if (typeof findHeaderRow !== 'function' || typeof getColumnMap !== 'function' || typeof getLastRow !== 'function') {
@@ -202,6 +204,7 @@ export async function syncFromPanel() {
         showAlert(_T.pleaseSetBgmToken);
         return;
     }
+    // 确保同步记录工作表存在
     if (typeof getOrCreateSyncRecordSheet === 'function') {
         const syncSheet = getOrCreateSyncRecordSheet();
         if (syncSheet) {
@@ -218,30 +221,56 @@ export async function syncFromPanel() {
     }
     const ws = getDataSheet();
     if (!ws) {
-        showAlert('未找到数据工作表');
+        showAlert('未找到数据工作表，请先锁定工作表。');
         return;
     }
     const headerRow = findHeaderRow(ws);
     const lastRow = getLastRow(ws);
-    const rowCount = lastRow - headerRow;
-    if (rowCount <= 0) {
-        showAlert('没有可同步的数据行');
+    const colMap = getColumnMap(ws, headerRow);
+    if (!colMap.has("Bangumi_URL")) {
+        showAlert('未找到 "Bangumi URL" 列！');
         return;
     }
-    // 同步前确认
+    // ========== 新增：获取预览统计 ==========
+    const preview = getSyncPreview(ws, colMap, lastRow, headerRow);
+    // 读取用户选择的策略
+    const strategySelect = document.getElementById('conflictStrategy');
+    const conflictStrategy = strategySelect?.value || 'skip'; // 默认跳过
+    let conflictSids = undefined;
+    let conflictMsg = '';
+    try {
+        const { conflicts, conflictCount } = await detectConflicts(ws, colMap, lastRow, headerRow, token);
+        if (conflictCount > 0) {
+            if (conflictStrategy === 'skip') {
+                conflictSids = new Set(conflicts.map(c => c.sid));
+                conflictMsg = `检测到 ${conflictCount} 条冲突，已选择【跳过冲突】。\n\n`;
+            }
+            else {
+                // excel 覆盖：不设置跳过集合，正常同步
+                conflictMsg = `检测到 ${conflictCount} 条冲突，将使用【Excel数据覆盖】。\n\n`;
+            }
+        }
+    }
+    catch (_) { }
+    // 构建确认消息（加入策略提示）
+    const msg = `数据预览：
+                                总行数：${preview.total}
+                                有效条目：${preview.valid}
+                                已上传（跳过）：${preview.alreadyUploaded}
+                                待同步：${preview.willSync}
+                                不上传（状态跳过）：${preview.willSkip}
+                                无效（无SID）：${preview.total - preview.valid}
+                                ${conflictMsg}是否继续同步？`;
+    // 显示确认对话框（使用自定义的 showConfirm，支持异步等待）
     const confirmed = await new Promise(resolve => {
-        showConfirm(`即将同步 ${rowCount} 行数据到 Bangumi，是否继续？`, '确认', () => resolve(true), () => resolve(false));
+        showConfirm(msg, '同步确认', () => resolve(true), () => resolve(false));
     });
     if (!confirmed)
         return;
-    // 获取列映射
-    const colMap = getColumnMap(ws, headerRow);
-    if (!colMap.has("Bangumi_URL")) {
-        showAlert('未找到 Bangumi URL 列');
-        return;
-    }
+    // ========== 执行同步，并传入冲突跳过集合 ==========
     try {
         const result = await SyncToBangumiAsync(ws, colMap, token, lastRow, headerRow, {
+            skipSids: conflictSids,
             onProgress: (current, total, message) => {
                 updateProgressBar(current, total, message);
                 if (app.StatusBar !== undefined) {

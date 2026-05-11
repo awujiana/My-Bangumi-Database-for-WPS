@@ -156,7 +156,7 @@ export async function detectConflicts(ws, colMap, lastRow, headerRow, token) {
  * Ribbon 专用的完整同步流程：预览 → 冲突检测 → 确认 → 执行
  * @param conflictResolution 冲突处理策略，默认 'excel'（覆盖）
  */
-export async function syncWithConfirmation(conflictResolution = 'excel') {
+export async function syncWithConfirmation() {
     const app = window.Application;
     const ws = getDataSheet();
     if (!ws) {
@@ -177,18 +177,37 @@ export async function syncWithConfirmation(conflictResolution = 'excel') {
     }
     // 1. 预览统计
     const preview = getSyncPreview(ws, colMap, lastRow, headerRow);
-    // 2. 冲突检测
-    let conflictInfo = '';
+    // 2. 读取 Ribbon 复选框状态（存储在 PluginStorage）
+    let conflictStrategy = 'excel';
     try {
-        const { conflictCount } = await detectConflicts(ws, colMap, lastRow, headerRow, token);
-        if (conflictCount > 0) {
-            conflictInfo = `检测到 ${conflictCount} 条冲突，当前策略：${conflictResolution === 'excel' ? 'Excel覆盖' : '跳过冲突'}\n\n`;
+        if (app?.PluginStorage) {
+            const skipConflicts = app.PluginStorage.getItem('bgm_skip_conflicts');
+            if (skipConflicts === 'true') {
+                conflictStrategy = 'skip';
+            }
         }
     }
-    catch (_) {
+    catch (_) { }
+    // 3. 冲突检测
+    let conflictInfo = '';
+    let skipSids = undefined;
+    try {
+        const { conflicts, conflictCount } = await detectConflicts(ws, colMap, lastRow, headerRow, token);
+        if (conflictCount > 0) {
+            if (conflictStrategy === 'skip') {
+                skipSids = new Set(conflicts.map(c => c.sid));
+                conflictInfo = `检测到 ${conflictCount} 条冲突，已选择【跳过冲突】。\n\n`;
+            }
+            else {
+                conflictInfo = `检测到 ${conflictCount} 条冲突，将使用【Excel数据覆盖】。\n\n`;
+            }
+        }
+    }
+    catch (e) {
+        BGM.handleError(e, { level: BGM.ErrorLevel.WARN, context: 'syncWithConfirmation:conflictDetection' });
         // 冲突检测失败不影响主流程
     }
-    // 3. 确认弹窗
+    // 4. 确认弹窗
     const msg = `数据预览：
 总行数：${preview.total}
 有效条目：${preview.valid}
@@ -200,9 +219,10 @@ ${conflictInfo}是否继续同步？`;
     const confirmResult = app?.MessageBox?.(msg, 4 + 32); // Yes/No + 问号图标
     if (confirmResult !== 6)
         return;
-    // 4. 执行同步（目前先使用默认策略，SyncToBangumiAsync 后续可扩展支持 conflictResolution）
+    // 5. 执行同步，传入冲突跳过集合
     try {
         const result = await SyncToBangumiAsync(ws, colMap, token, lastRow, headerRow, {
+            skipSids,
             onProgress: (current, total, message) => {
                 if (app.StatusBar !== undefined)
                     app.StatusBar = `[${current}/${total}] ${message}`;

@@ -32,7 +32,7 @@ export declare function detectConflicts(ws: any, colMap: Map<string, number>, la
  * Ribbon 专用的完整同步流程：预览 → 冲突检测 → 确认 → 执行
  * @param conflictResolution 冲突处理策略，默认 'excel'（覆盖）
  */
-export declare function syncWithConfirmation(conflictResolution?: 'excel' | 'skip'): Promise<void>;
+export declare function syncWithConfirmation(): Promise<void>;
 /** 设置 Token（Ribbon 版本） */
 export declare function setTokenForRibbon(): Promise<boolean>;
 /** 测试 Token（Ribbon 版本） */

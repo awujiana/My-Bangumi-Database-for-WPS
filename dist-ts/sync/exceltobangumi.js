@@ -557,6 +557,23 @@ export function clearRowColors() {
  * @param options 可选项（onProgress, onItemComplete 回调）
  * @returns 同步结果统计 { success, fail, skip }
  */
+/**
+ * 异步批量同步 Excel 数据到 Bangumi
+ * - 支持筛选状态下仅处理可见行
+ * - 批量读取单元格数据，提高性能
+ * - 动态请求间隔，避免限制的同时提升速度
+ * - 支持跳过冲突条目（通过 skipSids 集合）
+ * - 跳过已上传条目（D列颜色）
+ * - 统一错误处理，带详细日志
+ *
+ * @param ws 工作表对象
+ * @param colMap 列名到列号的映射 Map
+ * @param token Bangumi API 访问令牌
+ * @param lastRow 数据区域最后一行
+ * @param headerRow 表头行号
+ * @param options 可选项（onProgress, onItemComplete, skipSids 回调）
+ * @returns 同步结果统计 { success, fail, skip }
+ */
 export async function SyncToBangumiAsync(ws, colMap, token, lastRow, headerRow, options) {
     const result = { success: 0, fail: 0, skip: 0 };
     const startRow = headerRow + 1;
@@ -612,11 +629,13 @@ export async function SyncToBangumiAsync(ws, colMap, token, lastRow, headerRow, 
     const userIdPath = _getUserApiPath();
     let lastRequestTime = 0;
     const MIN_INTERVAL = 200; // 最小间隔 200ms
+    // 冲突跳过集合
+    const skipSids = options?.skipSids;
     // ========== 4. 逐行处理 ==========
     for (let idx = 0; idx < rowsToProcess.length; idx++) {
         const rowNum = rowsToProcess[idx];
         reportProgress(idx + 1, `处理行 ${rowNum}...`);
-        //同时发送全局进度事件（让其他模块也能收到）
+        // 同时发送全局进度事件（让其他模块也能收到）
         BGM.setSyncProgress(idx + 1, total, `处理行 ${rowNum}...`);
         try {
             const bgmUrl = getField(rowNum, 'Bangumi_URL');
@@ -631,6 +650,22 @@ export async function SyncToBangumiAsync(ws, colMap, token, lastRow, headerRow, 
                 reportProgress(idx + 1, `行 ${rowNum}：跳过（无有效SID）`);
                 continue;
             }
+            // 检查冲突跳过
+            if (skipSids && skipSids.has(sid)) {
+                result.skip++;
+                reportProgress(idx + 1, `行 ${rowNum}：跳过（冲突保护）`);
+                continue;
+            }
+            // 检查是否已上传（D列颜色）
+            const seqCell = getCell(ws, rowNum, 4);
+            const isUploaded = seqCell?.Interior && (seqCell.Interior.Color === BGM_COLOR.SUCCESS ||
+                seqCell.Interior.Color === BGM_COLOR.LIGHT_GREEN ||
+                seqCell.Interior.Color === BGM_COLOR.DARK_GREEN);
+            if (isUploaded) {
+                result.skip++;
+                reportProgress(idx + 1, `行 ${rowNum}：跳过（已上传）`);
+                continue;
+            }
             const finishedDate = getField(rowNum, '完播日');
             const jsonBody = buildJsonPayload(ws, rowNum, colMap, finishedDate);
             const name = getField(rowNum, '名称');
@@ -642,7 +677,6 @@ export async function SyncToBangumiAsync(ws, colMap, token, lastRow, headerRow, 
             }
             const apiResult = bgmRequestSync('POST', `/v0/users${userIdPath}/collections/${sid}`, jsonBody, token);
             lastRequestTime = Date.now();
-            const seqCell = getCell(ws, rowNum, 4); // 类型断言
             const success = apiResult.code >= 200 && apiResult.code < 300;
             // 标记颜色
             if (seqCell?.Interior) {
