@@ -492,6 +492,18 @@ function refreshData() {
             bgmLog(LOG_LEVELS.INFO, `可见行列表(前10): ${visibleRows.slice(0, 10).join(',')}`);
         }
         const meta = detectHeaderAndColumns(ws, { visibleRowSet, isFiltered });
+        // ✅ 保存供 previewSyncContent 使用
+        BGM.dataPreview = {
+            ws, // 工作表引用
+            visibleRows: filterStatus.visibleRows, // 筛选后可见行（含表头）
+            headerRow: meta.headerRow,
+            dataStartRow: meta.dataStartRow,
+            previewColStart: meta.previewColStartAbsolute, // 实际起始列号
+            previewColEnd: meta.previewColStartAbsolute + (meta.previewColEnd - meta.previewColStart) - 1,
+            columnCount: meta.previewColEnd - meta.previewColStart,
+            headerNames: meta.headerNames.slice(meta.previewColStart, meta.previewColEnd),
+            isImportant: meta.isImportant.slice(meta.previewColStart, meta.previewColEnd),
+        };
         bgmLog(LOG_LEVELS.INFO, `表头检测: headerRow=${meta.headerRow}, dataStartRow=${meta.dataStartRow}, 列数=${meta.previewColEnd - meta.previewColStart}`);
         const previewRows = [];
         let hasData = false;

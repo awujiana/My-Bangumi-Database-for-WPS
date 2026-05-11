@@ -273,31 +273,37 @@ export function getCell(ws, row, col) {
 }
 export function getCellValue(ws, row, col) {
     try {
-        // 类型守卫：确保 ws 有 Range 方法
         const sheet = ws;
         if (!sheet || typeof sheet.Range !== 'function')
             return '';
-        const addr = colNumToLetter(col) + row; // 例如 "A1"
+        const addr = colNumToLetter(col) + row;
         const cell = sheet.Range(addr);
         if (!cell)
             return '';
-        // 兼容 WPS 中 Value/Value2 可能是属性也可能是方法
         let raw;
         try {
-            // 优先 Value2（原始值，无格式）
-            raw = typeof cell.Value2 === 'function' ? cell.Value2() : cell.Value2;
+            raw = cell.Value2;
+            if (typeof raw === 'function')
+                raw = raw();
         }
         catch { }
         if (raw === undefined || raw === null) {
             try {
-                raw = typeof cell.Value === 'function' ? cell.Value() : cell.Value;
+                raw = cell.Value;
+                if (typeof raw === 'function')
+                    raw = raw();
+            }
+            catch { }
+        }
+        if (raw === undefined || raw === null) {
+            try {
+                raw = typeof cell.Text === 'function' ? cell.Text() : cell.Text;
             }
             catch { }
         }
         return raw != null ? String(raw) : '';
     }
     catch (e) {
-        // 可根据你的错误处理习惯决定是否记录日志
         return '';
     }
 }
@@ -307,32 +313,35 @@ export function getCellValue(ws, row, col) {
  */
 export function readCell(ws, row, col) {
     try {
-        // 类型守卫：确保 ws 是有效的 Worksheet 对象且有 Range 方法
         const sheet = ws;
         if (!sheet || typeof sheet.Range !== 'function')
             return '';
-        // 构造地址，如 "A1"
         const address = colNumToLetter(col) + row;
         const cell = sheet.Range(address);
         if (!cell)
             return '';
-        // 优先读取 Value2，它是原始值，不带格式
-        // WPS 中 Value2/Value 可能是属性，也可能是方法（个别版本），做兼容
-        let val = undefined;
-        try {
-            val = cell.Value2;
-        }
-        catch { }
-        if (val === undefined || val === null) {
-            try {
-                val = cell.Value;
+        let raw = undefined;
+        // ---- 安全取值，兼容 Value2 / Value 为函数的情况 ----
+        // 优先取 Value2
+        if ('Value2' in cell) {
+            raw = cell.Value2;
+            if (typeof raw === 'function') {
+                raw = raw(); // ← 关键：调用函数拿到真实值
             }
-            catch { }
         }
-        // 转换为字符串
-        if (val === null || val === undefined)
-            return '';
-        return String(val);
+        // 若 Value2 无效，尝试 Value
+        if ((raw === undefined || raw === null) && 'Value' in cell) {
+            raw = cell.Value;
+            if (typeof raw === 'function') {
+                raw = raw();
+            }
+        }
+        // 最后尝试 Text（可能是函数）
+        if ((raw === undefined || raw === null) && 'Text' in cell) {
+            const txt = cell.Text;
+            raw = typeof txt === 'function' ? txt() : txt;
+        }
+        return raw != null ? String(raw) : '';
     }
     catch {
         return '';

@@ -5,7 +5,7 @@
  */
 const ITEM_HEIGHT = 180; // 每个条目的高度（根据实际样式调整）
 const CONTAINER_HEIGHT = 600;
-import { getApp, BGM, readCell, trim, _getUserApiPath, wpsMsgBox, getCell, escapeHtml, showAlert, showToast, BGM_COLOR, findHeaderRow, getColumnMap, getSequentialRowsBySeqCol, extractSubjectId, mapWatchStatus, buildJsonPayload, bgmRequestSync, addSyncRecord, addTagsFromStr } from '../index.js';
+import { getApp, BGM, readCell, trim, _getUserApiPath, wpsMsgBox, getCell, escapeHtml, showAlert, showToast, BGM_COLOR, findHeaderRow, getColumnMap, extractSubjectId, mapWatchStatus, buildJsonPayload, bgmRequestSync, addSyncRecord, addTagsFromStr } from '../index.js';
 import { getAllSyncRecords } from '../sync/syncRecord.js';
 import { loadBgToken } from '../tools/util.js';
 // ========== 辅助函数 ==========
@@ -140,129 +140,43 @@ let detailPreviewData = {
 };
 // ========== 公有函数 ==========
 export function previewSyncContent() {
-    console.log('[preview] 开始执行 previewSyncContent');
-    const select = document.getElementById('sheetSelect');
-    const endRowInput = document.getElementById('endRow');
-    const startRowInput = document.getElementById('startRow');
-    const sheetIndex = BGM.sheet.lockedIndex || parseInt(select?.value, 10) || 1;
-    const userEndRow = parseInt(endRowInput?.value, 10) || 0;
-    const selectMode = document.querySelector('input[name="selectMode"]:checked')?.value || 'auto';
-    const app = getApp();
-    if (!app?.ActiveWorkbook) {
-        safeAlert('无法获取 WPS Application 对象！');
+    const dp = BGM.dataPreview;
+    if (!dp || !dp.ws) {
+        showToast('请先在预览面板中加载数据', 'warn');
         return;
     }
-    let ws;
-    try {
-        ws = app.ActiveWorkbook.Worksheets.Item(sheetIndex);
-    }
-    catch (e) {
-        safeAlert('无法获取工作表！');
+    const { ws, visibleRows, headerRow, dataStartRow, previewColStart, previewColEnd, columnCount, headerNames } = dp;
+    // 过滤出真正的数据行（排除表头，且行号 ≥ dataStartRow）
+    const dataRows = visibleRows.filter(r => r !== headerRow && r >= dataStartRow);
+    if (dataRows.length === 0) {
+        showToast('没有可预览的数据行', 'info');
         return;
     }
-    const headerRow = findHeaderRow(ws) || 1;
-    const dataStartRow = headerRow + 1;
-    const colMap = getColumnMap(ws, headerRow);
-    let lastRow = 1;
-    try {
-        const lastCell = getCell(ws, ws.Rows.Count, 4);
-        if (lastCell?.End) {
-            lastRow = lastCell.End(-4162).Row;
-        }
+    // 生成表格 HTML
+    let html = '<table class="preview-table"><thead><tr>';
+    html += '<th>#</th>'; // 行号列
+    for (let i = 0; i < columnCount; i++) {
+        html += `<th>${escapeHtml(headerNames[i] || '')}</th>`;
     }
-    catch (e) {
-        lastRow = 500;
-    }
-    const actualEndRow = userEndRow > 0 ? Math.min(userEndRow, lastRow) : lastRow;
-    let rowsToPreview = [];
-    if (selectMode === 'auto') {
-        const seqResult = getSequentialRowsBySeqCol(dataStartRow, actualEndRow);
-        rowsToPreview = seqResult?.validRows || [];
-        if (rowsToPreview.length === 0) {
-            for (let i = dataStartRow; i <= actualEndRow; i++)
-                rowsToPreview.push(i);
+    html += '</tr></thead><tbody>';
+    for (let i = 0; i < dataRows.length; i++) {
+        const row = dataRows[i];
+        html += '<tr>';
+        html += `<td class="preview-row-num">${row}</td>`;
+        for (let c = previewColStart; c <= previewColEnd; c++) {
+            const val = readCell(ws, row, c);
+            html += `<td>${escapeHtml(val)}</td>`;
         }
+        html += '</tr>';
     }
-    else {
-        let manualStart = parseInt(startRowInput?.value, 10) || dataStartRow;
-        let manualEnd = parseInt(endRowInput?.value, 10) || lastRow;
-        if (isNaN(manualStart))
-            manualStart = dataStartRow;
-        if (isNaN(manualEnd))
-            manualEnd = lastRow;
-        if (manualStart > manualEnd) {
-            manualStart = dataStartRow;
-            manualEnd = lastRow;
-        }
-        for (let i = manualStart; i <= manualEnd; i++)
-            rowsToPreview.push(i);
-    }
-    console.log('[preview] 待预览行数:', rowsToPreview.length);
-    if (rowsToPreview.length === 0) {
-        safeAlert('没有数据可预览！');
-        return;
-    }
-    detailPreviewData = {
-        allItems: [],
-        currentFilter: 'all',
-        totalWithType: 0,
-        totalValid: 0,
-        totalUploaded: 0,
-        typeCount: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 },
-        uploadedCount: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 },
-    };
-    const allValidRows = [];
-    for (const rowNum of rowsToPreview) {
-        const rowData = getRowData(ws, rowNum, colMap, headerRow, 4);
-        if (!rowData.sid || rowData.typeNum === 0)
-            continue;
-        detailPreviewData.totalValid++;
-        detailPreviewData.typeCount[rowData.typeNum]++;
-        detailPreviewData.totalWithType++;
-        if (rowData.isUploaded) {
-            detailPreviewData.totalUploaded++;
-            detailPreviewData.uploadedCount[rowData.typeNum]++;
-        }
-        allValidRows.push(rowData);
-    }
-    const itemsData = allValidRows.map(rowData => ({
-        html: renderDetailItemHtml(rowData, colMap, ws),
-        type: rowData.typeNum,
-    }));
-    detailPreviewData.allItems = itemsData;
-    const modalToolbar = document.getElementById('detailModalToolbar');
-    const modalBody = document.getElementById('detailModalBody');
-    if (modalToolbar && modalBody) {
-        modalToolbar.innerHTML = buildFilterToolbar();
-        const statsHtml = buildStatsHtml(rowsToPreview.length);
-        // 创建虚拟滚动容器
-        const containerHtml = `
-        <div id="virtualScrollContainer" style="height:${CONTAINER_HEIGHT}px;overflow-y:auto;border:1px solid #ccc;">
-          <div id="virtualScrollInner" style="position:relative; height:${itemsData.length * ITEM_HEIGHT}px;">
-            <div id="virtualScrollContent" style="position:absolute;top:0;left:0;right:0;"></div>
-          </div>
-        </div>`;
-        modalBody.innerHTML = statsHtml + containerHtml;
-        // 初始渲染第一屏
-        renderVisibleItems(itemsData);
-        // 绑定滚动事件
-        const scrollContainer = document.getElementById('virtualScrollContainer');
-        if (scrollContainer) {
-            scrollContainer.addEventListener('scroll', () => renderVisibleItems(itemsData));
-        }
-        const modal = document.getElementById('detailModal');
-        if (modal) {
-            modal.style.display = 'flex';
-            console.log('[preview] 模态框已显示');
-        }
-        else {
-            console.error('[preview] 找不到 detailModal 元素');
-            safeAlert('预览界面缺失，请联系开发者');
-        }
-    }
-    else {
-        console.error('[preview] 找不到 detailModalToolbar 或 detailModalBody');
-        safeAlert('预览界面缺失，请联系开发者');
+    html += '</tbody></table>';
+    // 显示到模态框（假设你的模态框 id 为 syncPreviewModal）
+    const modal = document.getElementById('syncPreviewModal');
+    if (modal) {
+        const body = modal.querySelector('.modal-body');
+        if (body)
+            body.innerHTML = html;
+        modal.style.display = 'block';
     }
 }
 let virtualScrollStart = 0;

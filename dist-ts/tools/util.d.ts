@@ -8,6 +8,17 @@ export declare const BGM: {
     ERROR_LEVELS: typeof ERROR_LEVELS;
     ErrorLevel: typeof ErrorLevel;
     BgmError: typeof BgmError;
+    dataPreview?: {
+        ws: any;
+        visibleRows: number[];
+        headerRow: number;
+        dataStartRow: number;
+        previewColStart: number;
+        previewColEnd: number;
+        columnCount: number;
+        headerNames: string[];
+        isImportant: boolean[];
+    };
     Dialog: {
         alert: (title: string, message: string) => void;
         confirm: (message: string, onConfirm?: () => void, onCancel?: () => void) => void;

@@ -7,7 +7,7 @@
  * @author BGM Development Team
  * @version 1.0.0
  */
-import { HEADER_KEYWORDS, URL_PATTERNS, TYPE_TEXT_MAP, BGM_CONFIG, BGM_COLOR, LOG_LEVELS, SYNC_STATUS, bgmLog, getApp, readCell, getCell, trim, getColumnMap, getLastRow, findHeaderRow, colNumToLetter, getCellValue, loadBgToken, storeBgToken, _getBgmUserId, _setBgmUserId, BGM, wpsMsgBox, _getUserApiPath, IMPORTANT_COLS, readRangeValues, delay, calcFingerprint, getAllSyncRecords, isWpsWorksheet } from '../index.js';
+import { HEADER_KEYWORDS, URL_PATTERNS, TYPE_TEXT_MAP, BGM_CONFIG, BGM_COLOR, LOG_LEVELS, SYNC_STATUS, bgmLog, getApp, readCell, getCell, trim, getColumnMap, getLastRow, findHeaderRow, getCellValue, loadBgToken, storeBgToken, _getBgmUserId, _setBgmUserId, BGM, wpsMsgBox, _getUserApiPath, IMPORTANT_COLS, readRangeValues, delay, calcFingerprint, getAllSyncRecords, isWpsWorksheet } from '../index.js';
 import { getOrCreateSyncRecordSheet, addSyncRecord } from './syncRecord.js';
 /**
  * 表头关键字集合（用于快速查找）
@@ -329,32 +329,14 @@ export function getFilterStatus(lastRow, headerRow) {
                 }
             }
             bgmLog(LOG_LEVELS.INFO, `SpecialCells 收集到 ${rawRows.size} 个原始行号`);
-            // ---- 新增：输出每个可见行及其前 3 列数据 ----
+            // 在 getFilterStatus 中输出每个可见行及其前10 列数据
             const rowList = Array.from(rawRows).sort((a, b) => a - b);
-            const previewCount = Math.min(rowList.length, 15); // 最多输出 15 行，避免日志过长
+            const previewCount = Math.min(rowList.length, 15);
             for (let i = 0; i < previewCount; i++) {
                 const r = rowList[i];
                 const vals = [];
-                for (let c = 1; c <= 3; c++) {
-                    try {
-                        const cell = ws.Range(`${colNumToLetter(c)}${r}`);
-                        let val;
-                        try {
-                            val = typeof cell.Value2 === 'function' ? cell.Value2() : cell.Value2;
-                        }
-                        catch {
-                            try {
-                                val = typeof cell.Value === 'function' ? cell.Value() : cell.Value;
-                            }
-                            catch {
-                                val = '';
-                            }
-                        }
-                        vals.push((val ?? '').toString());
-                    }
-                    catch {
-                        vals.push('?');
-                    }
+                for (let c = 1; c <= 10; c++) {
+                    vals.push(readCell(ws, r, c)); // 直接复用统一函数
                 }
                 bgmLog(LOG_LEVELS.INFO, `  行 ${r}: ${vals.join(' | ')}`);
             }
