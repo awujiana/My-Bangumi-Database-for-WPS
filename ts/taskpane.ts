@@ -27,8 +27,9 @@ interface HeaderMeta {
     dataStartRow: number;
     lastCol: number;
     firstDataCol: number;
-    previewColStart: number;
-    previewColEnd: number;
+    previewColStart: number;        // 切片后的数组起始索引（0）
+    previewColEnd: number;          // 切片后的列数
+    previewColStartAbsolute: number; // 新增：预览第一列的实际列号（1‑based）
     headerMatchCount: number;
 }
 
@@ -207,7 +208,7 @@ function detectHeaderAndColumns(ws: any, opts: { visibleRowSet?: Set<number> | n
     if (candidates.length === 0) {
         return {
             headerRow: 0, headerNames: [], isImportant: [], dataStartRow: 0,
-            lastCol: 0, firstDataCol: 0, previewColStart: 0, previewColEnd: 0, headerMatchCount: 0
+           lastCol: 0, firstDataCol: 0, previewColStart: 0, previewColEnd: 0, previewColStartAbsolute: 0, headerMatchCount: 0
         };
     }
 
@@ -288,15 +289,16 @@ function detectHeaderAndColumns(ws: any, opts: { visibleRowSet?: Set<number> | n
     const previewColEnd = actualLastCol > headerLastCol ? headerLastCol : actualLastCol;
 
     return {
-        headerRow,
-        headerNames: headerNames.slice(previewColStart - 1, previewColEnd),   // 根据范围截取列名
-        isImportant: headerIsImportant.slice(previewColStart - 1, previewColEnd), // 对应的重要标记
-        dataStartRow,
-        lastCol: actualLastCol,
-        firstDataCol,
-        previewColStart: 0,          // 切片后数组索引从0开始，不再需要偏移
-        previewColEnd: previewColEnd - previewColStart + 1,  // 实际列数
-        headerMatchCount
+         headerRow,
+         headerNames: headerNames.slice(previewColStart - 1, previewColEnd),
+         isImportant: headerIsImportant.slice(previewColStart - 1, previewColEnd),
+         dataStartRow,
+         lastCol: actualLastCol,
+         firstDataCol,
+         previewColStart: 0,                             // 保留，但不用于数据读取
+         previewColEnd: previewColEnd - previewColStart + 1,
+         previewColStartAbsolute: previewColStart,   // 新增，实际列号
+         headerMatchCount
     };
 }
 
@@ -544,34 +546,38 @@ function refreshData(): void {
         const previewRows: PreviewRow[] = [];
         let hasData = false;
 
-        if (meta.headerRow > 0) {
-            previewRows.push({
-                row: -1,
-                cols: meta.headerNames.slice(meta.previewColStart, meta.previewColEnd),
-                isHeader: true, aligned: true,
-                isImportant: meta.isImportant.slice(meta.previewColStart, meta.previewColEnd)
-            });
-
-            const displayColCount = meta.previewColEnd - meta.previewColStart;
-            // 扫描范围：从数据起始行开始，最多预览 PANEL_CONFIG.PREVIEW_LIMIT + 20 行，且不超过工作表最后行
-            const scanEnd = Math.min(lastRow, meta.dataStartRow + PANEL_CONFIG.PREVIEW_LIMIT + 20);
-            for (let dr = meta.dataStartRow; dr <= scanEnd; dr++) {
-                if (!isFiltered || !visibleRowSet || visibleRowSet.has(dr)) {
-                    let hasAny = false;
+            if (meta.headerRow > 0) {
+                previewRows.push({
+                    row: -1,
+                    cols: meta.headerNames.slice(meta.previewColStart, meta.previewColEnd),
+                    isHeader: true,
+                    aligned: true,
+                    isImportant: meta.isImportant.slice(meta.previewColStart, meta.previewColEnd),
+                });
+            
+                const displayColCount = meta.previewColEnd - meta.previewColStart;
+                // 使用 visibleRows 过滤，而不是遍历整个范围
+                const dataRows = (filterStatus?.visibleRows || [])
+                    .filter(r => r !== meta.headerRow && r >= meta.dataStartRow);
+                const maxPreview = Math.min(dataRows.length, PANEL_CONFIG.PREVIEW_LIMIT);
+            
+                for (let i = 0; i < maxPreview; i++) {
+                    const dr = dataRows[i];
                     const rowCols: string[] = [];
+                    let hasAny = false;
                     for (let ci = 0; ci < displayColCount; ci++) {
-                        const v = readCell(ws, dr, meta.previewColStart + ci + 1).trim();
+                        // ✅ 使用实际列号
+                        const col = meta.previewColStartAbsolute + ci;
+                        const v = readCell(ws, dr, col).trim();
                         if (v) hasAny = true;
                         rowCols.push(v);
                     }
                     if (hasAny) {
                         previewRows.push({ row: dr, cols: rowCols, isHeader: false, aligned: true });
                         hasData = true;
-                        if (previewRows.filter(p => !p.isHeader).length >= PANEL_CONFIG.PREVIEW_LIMIT) break;
                     }
                 }
-            }
-        } else {
+            }else {
             // 无表头时的回退逻辑
             let count = 0;
             for (let r = 1; r <= Math.min(lastRow, 100) && count < 5; r++) {
