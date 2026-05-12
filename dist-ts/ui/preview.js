@@ -236,6 +236,7 @@ export function previewSyncContent() {
             cardsHtml += renderDetailItemHtml(rowData, colMap, ws);
         }
         catch (e) {
+            BGM.handleError(e, { showAlert: false, level: BGM.ErrorLevel.WARN, context: 'previewSyncContent' });
             cardsHtml += `<div class="detail-item error">行 ${rowNum} 处理出错: ${escapeHtml(e.message)}</div>`;
         }
     }
@@ -417,10 +418,12 @@ export function uploadSingleRow(rowNum, btnElement) {
                 message: result?.message || 'HTTP ' + statusCode,
                 count: 1,
             });
+            BGM.handleError(new Error('上传失败: ' + (result?.message || '未知错误')), { showAlert: false, level: BGM.ErrorLevel.WARN, context: 'UploadSingleRow' });
             showToast('上传失败: ' + ((result?.message || '未知错误').substring(0, 60)), 'error');
         }
     }
     catch (e) {
+        BGM.handleError(e, { showAlert: true, level: BGM.ErrorLevel.ERROR, context: 'UploadSingleRow' });
         if (btnElement) {
             btnElement.disabled = false;
             btnElement.classList.remove('uploading');
@@ -428,6 +431,7 @@ export function uploadSingleRow(rowNum, btnElement) {
             btnElement.textContent = '✗ 错误';
         }
         showToast('上传出错: ' + e.message.substring(0, 60), 'error');
+        BGM.handleError(e, { showAlert: true, level: BGM.ErrorLevel.ERROR, context: 'UploadSingleRow' });
     }
 }
 export function showDetailModal() {
@@ -455,7 +459,9 @@ export function viewSyncRecordDetail(sid) {
     try {
         content = JSON.stringify(JSON.parse(content), null, 2);
     }
-    catch (e) { }
+    catch (e) {
+        BGM.handleError(e, { showAlert: false, level: BGM.ErrorLevel.WARN, context: 'ViewSyncRecordDetail' });
+    }
     const detail = `同步记录详情\n\n名称: ${record.name || ""}\nSID: ${record.sid || ""}\nURL: ${record.url || ""}\n时间: ${record.time || ""}\n状态: ${record.status || ""}\n同步次数: ${record.count || ""}\n备注: ${record.message || ""}\n\n同步内容:\n${content}`;
     safeAlert(detail, '同步记录详情');
 }

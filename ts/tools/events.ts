@@ -7,7 +7,7 @@
  * @author BGM Development Team
  * @version 1.0.0
  */
-
+import { BGM } from '../index.js';
 /**
  * 事件处理器类型
  *
@@ -116,8 +116,12 @@ export class EventBus {
         for (const entry of entriesCopy) {
             try {
                 entry.handler(data);
-            } catch (e) {
-                console.error(`[EventBus] Error in event handler for '${event}':`, e);
+            } catch (e: any) {
+                BGM.handleError(e, { context: 'emit', showAlert: false });
+            }
+
+            // 如果是单次订阅，处理后移除
+            if (entry.once) {                
             }
 
             // 如果是单次订阅，处理后移除

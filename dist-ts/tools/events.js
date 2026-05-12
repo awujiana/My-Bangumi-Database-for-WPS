@@ -7,6 +7,7 @@
  * @author BGM Development Team
  * @version 1.0.0
  */
+import { BGM } from '../index.js';
 /**
  * 事件总线类
  * 实现发布-订阅模式，支持多个订阅者订阅同一事件
@@ -91,7 +92,10 @@ export class EventBus {
                 entry.handler(data);
             }
             catch (e) {
-                console.error(`[EventBus] Error in event handler for '${event}':`, e);
+                BGM.handleError(e, { context: 'emit', showAlert: false });
+            }
+            // 如果是单次订阅，处理后移除
+            if (entry.once) {
             }
             // 如果是单次订阅，处理后移除
             if (entry.once) {

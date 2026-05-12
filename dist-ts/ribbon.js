@@ -3,7 +3,7 @@
  * @module ribbon
  * @description WPS Office 功能区按钮回调处理
  */
-import { WPS_ENUM, showBangumiPanel } from './index.js';
+import { WPS_ENUM, showBangumiPanel, BGM } from './index.js';
 import * as RibbonService from './services/ribbonService.js';
 /**
  * 获取“跳过冲突”复选框的初始按下状态
@@ -79,8 +79,7 @@ export function OnAction(control) {
         }
     }
     catch (e) {
-        console.error('[BGM] OnAction error:', e);
-        alert('操作失败: ' + e.message);
+        BGM.handleError(e, { showAlert: true, level: BGM.ErrorLevel.ERROR, context: 'Ribbon OnAction' });
     }
     return true;
 }

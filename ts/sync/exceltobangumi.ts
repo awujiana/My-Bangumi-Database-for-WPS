@@ -116,7 +116,8 @@ export function testTokenValidityForRibbon(token?: string): void {
                 const userId = data.id || '未知ID';
                 alert(`✓ Token有效！\n\n用户名: ${username}\n用户ID: ${userId}`);
                 _setBgmUserId(String(userId));
-            } catch (e) {
+            } catch (e: any) {
+                BGM.handleError(e, { context: 'testTokenValidityForRibbon', showAlert: false });
                 alert('✗ Token有效，但解析响应失败');
             }
         } else if (xhr.status === 401) {
@@ -326,7 +327,9 @@ export function getFilterStatus(
 
         // 1. 检查是否启用了筛选
         let autoFilterMode = false;
-        try { autoFilterMode = !!ws.AutoFilterMode; } catch { }
+        try { autoFilterMode = !!ws.AutoFilterMode; } catch (e: any) {
+            BGM.handleError(e, { context: 'getFilterStatus', showAlert: false });
+        }
         if (!autoFilterMode) return result;
         result.hasFilter = true;
 
@@ -336,7 +339,9 @@ export function getFilterStatus(
             if (ws.AutoFilter?.Range) {
                 filterRange = ws.AutoFilter.Range;
             }
-        } catch { }
+        } catch (e: any) {
+            BGM.handleError(e, { context: 'getFilterStatus', showAlert: false });
+        }
 
         // 3. 确定扫描范围
         let scanRange: WpsRange;
@@ -351,7 +356,9 @@ export function getFilterStatus(
                 const bottomCell = ws.Range(`A${maxRow}`);
                 const endCell = bottomCell.End(-4162);
                 if (endCell && endCell.Row > 0) lastUsedRow = endCell.Row;
-            } catch { }
+            } catch (e: any) {
+                BGM.handleError(e, { context: 'getFilterStatus', showAlert: false });
+            }
             scanRange = ws.Range(`A1:A${lastUsedRow}`);
             bgmLog(LOG_LEVELS.INFO, `无 AutoFilter.Range，使用回退范围 A1:A${lastUsedRow}`);
         }
@@ -360,8 +367,8 @@ export function getFilterStatus(
         let visibleCells: WpsRange | null = null;
         try {
             visibleCells = scanRange.SpecialCells(12) as WpsRange;
-        } catch (e) {
-            bgmLog(LOG_LEVELS.WARN, `SpecialCells 失败: ${(e as Error).message}`);
+        } catch (e: any) {
+            BGM.handleError(e, { context: 'getFilterStatus', showAlert: false });
         }
 
         // 5. 提取所有可见行号（去重）
@@ -376,7 +383,8 @@ export function getFilterStatus(
                 } else {
                     areas.push(visibleCells);
                 }
-            } catch {
+            } catch (e: any) {
+                BGM.handleError(e, { context: 'getFilterStatus', showAlert: false });
                 areas.push(visibleCells);
             }
 
@@ -415,8 +423,8 @@ export function getFilterStatus(
             bgmLog(LOG_LEVELS.INFO, `可见行前10: ${result.visibleRows.slice(0, 10).join(',')}`);
         }
 
-    } catch (e) {
-        BGM.handleError(e, { level: BGM.ErrorLevel.ERROR, context: 'getFilterStatus' });
+    } catch (e: any) {
+        BGM.handleError(e, { context: 'getFilterStatus', showAlert: false });   
     }
 
     return result;
@@ -454,10 +462,12 @@ export function getSequentialRowsBySeqCol(startRow: number, endRow: number): { v
                 let val: any;
                 try {
                     val = typeof cell.Value2 === 'function' ? cell.Value2() : cell.Value2;
-                } catch {
+                } catch (e: any) {
+                    BGM.handleError(e, { context: 'getSequentialRowsBySeqCol', showAlert: false });
                     try {
                         val = typeof cell.Value === 'function' ? cell.Value() : cell.Value;
-                    } catch {
+                    } catch (e: any) {
+                        BGM.handleError(e, { context: 'getSequentialRowsBySeqCol', showAlert: false });
                         val = '';
                     }
                 }
@@ -468,10 +478,12 @@ export function getSequentialRowsBySeqCol(startRow: number, endRow: number): { v
                         result.seqMap.set(seqNum, r);
                     }
                 }
-            } catch (_) {}
+            } catch (e: any) {
+                BGM.handleError(e, { context: 'getSequentialRowsBySeqCol', showAlert: false });
+            }
         }
-    } catch (e) {
-         BGM.handleError(e, { level: BGM.ErrorLevel.ERROR, context: 'getSequentialRowsBySeqCol' });
+    } catch (e: any) {
+         BGM.handleError(e, { context: 'getSequentialRowsBySeqCol', showAlert: false });
     }
 
     return result;
@@ -558,8 +570,8 @@ export function buildJsonPayload(
         }
 
         return JSON.stringify(payload);
-    } catch (e) {
-        BGM.handleError(e, { level: BGM.ErrorLevel.ERROR, context: 'buildJsonPayload' });
+    } catch (e: any) {
+        BGM.handleError(e, { context: 'buildJsonPayload', showAlert: false });
         return '{}';
     }
 }
@@ -598,7 +610,9 @@ export function bgmRequestSync(
                 try {
                     const data = JSON.parse(xhr.responseText);
                     result.message = data.msg || data.message || 'success';
-                } catch (_) {}
+                } catch (e: any) {
+                    BGM.handleError(e, { context: 'bgmRequestSync', showAlert: false });
+                }
             }
         } else if (xhr.status === 429) {
             result.message = 'Rate limited, please slow down';
@@ -606,11 +620,13 @@ export function bgmRequestSync(
             try {
                 const errData = JSON.parse(xhr.responseText);
                 result.message = errData.error || errData.description || `HTTP ${xhr.status}`;
-            } catch (_) {
+            } catch (e: any) {
+                BGM.handleError(e, { context: 'bgmRequestSync', showAlert: false });
                 result.message = xhr.statusText || `HTTP ${xhr.status}`;
             }
         }
     } catch (e: any) {
+        BGM.handleError(e, { context: 'bgmRequestSync', showAlert: false });
         result.code = 0;
         result.message = e.message || 'Network error';
     }
@@ -632,8 +648,8 @@ export function  setBangumiToken(token: string): boolean {
         storeBgToken(token);
         bgmLog(LOG_LEVELS.INFO, 'Token已保存');
         return true;
-    } catch (e) {
-         BGM.handleError(e, { level: BGM.ErrorLevel.ERROR, context: 'setBangumiToken' });
+    } catch (e: any) {
+        BGM.handleError(e, { context: 'setBangumiToken', showAlert: false });
         return false;
     }
 }
@@ -653,11 +669,13 @@ export function clearRowColors(): void {
             try {
                 const cell = ws.Range(`D${r}`) as WpsRange | null;
                 if (cell?.Interior) cell.Interior.ColorIndex = -4142;
-            } catch (_) {}
+            } catch (e: any) {
+                BGM.handleError(e, { context: 'clearRowColors', showAlert: false });
+            }
         }
         bgmLog(LOG_LEVELS.INFO, '已清除所有颜色标记');
-    } catch (e) {
-        BGM.handleError(e, { level: BGM.ErrorLevel.ERROR, context: 'clearRowColors' });
+    } catch (e: any) {
+        BGM.handleError(e, { context: 'clearRowColors', showAlert: false });
     }
 }
 
@@ -784,7 +802,7 @@ export async function SyncToBangumiAsync(
     };
 
     // 尝试创建同步记录表（忽略失败）
-    try { getOrCreateSyncRecordSheet(); } catch (e) {
+    try { getOrCreateSyncRecordSheet(); } catch (e: any ) {
         BGM.handleError(e, { level: BGM.ErrorLevel.WARN, context: 'SyncToBangumiAsync:createSheet' });
     }
 
@@ -925,11 +943,13 @@ export function clearSheetMarksInSheet(sheetIndex: number): void {
             try {
                 const cell = ws.Range(`D${r}`) as WpsRange | null;
                 if (cell?.Interior) cell.Interior.ColorIndex = -4142;
-            } catch (_) {}
+            } catch (e: any) {
+                BGM.handleError(e, { context: 'clearSheetMarksInSheet', showAlert: false });
+            }
         }
         bgmLog(LOG_LEVELS.INFO, `已清除工作表 ${sheetIndex} 的颜色标记`);
-    } catch (e) {
-        BGM.handleError(e, { level: BGM.ErrorLevel.ERROR, context: 'clearSheetMarksInSheet' });
+    } catch (e: any) {
+        BGM.handleError(e, { context: 'clearSheetMarksInSheet', showAlert: false });
     }
 }
 
@@ -960,7 +980,10 @@ export function testSingleUpdate(): void {
             if (activeCell?.Row) {
                 targetRow = activeCell.Row;
             }
-        } catch (_) {}
+        } catch (e: any) {
+            BGM.handleError(e, { context: 'testSingleUpdate', showAlert: false });
+            return;
+        }
 
         // 查找URL列
         const headerRow = findHeaderRow(ws) || 1;
@@ -1007,6 +1030,7 @@ export function testSingleUpdate(): void {
         }
 
     } catch (e: any) {
+        BGM.handleError(e, { context: 'testSingleUpdate', showAlert: false });
         wpsMsgBox(`测试异常: ${e.message}`, 0, 16);
     }
 }

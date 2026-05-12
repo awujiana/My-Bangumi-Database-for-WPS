@@ -93,9 +93,11 @@ export async function httpRequest<T = unknown>(
     try {
         validateEndpoint(endpoint);
         validateMethod(method);
-    } catch (error) {
+    } catch (error: any) {
+        BGM.handleError(error, { context: 'httpRequest', showAlert: false });
         const err = error instanceof BgmError ? error : new BgmError(String(error), 'VALIDATION_ERROR');
         return Result.fail(err);
+
     }
 
     const validMethod = validateMethod(method);
@@ -125,7 +127,8 @@ export async function httpRequest<T = unknown>(
             const errorMessage = getErrorMessage(response.status);
             return Result.fail(new BgmError(errorMessage, 'HTTP_ERROR', { status: response.status }));
 
-        } catch (error) {
+        } catch (error: any) {
+            BGM.handleError(error, { context: 'httpRequest', showAlert: false });
             if (attempt < retries) {
                 attempt++;
                 const delayMs = BGM_CONFIG.RETRY_DELAY_BASE * Math.pow(2, attempt - 1);
@@ -173,7 +176,8 @@ function executeXhrRequest<T>(
             if (xhr.responseText && xhr.responseText.length > 0) {
                 try {
                     data = JSON.parse(xhr.responseText);
-                } catch {
+                } catch (error: any) {
+                    BGM.handleError(error, { context: 'executeXhrRequest', showAlert: false });
                     data = xhr.responseText as unknown as T;
                 }
             }
@@ -201,8 +205,9 @@ function executeXhrRequest<T>(
         // 发送请求
         try {
             xhr.send(options.body);
-        } catch (error) {
-            reject(new Error(`发送请求失败: ${(error as Error).message}`));
+        } catch (error: any) {
+            BGM.handleError(error, { context: 'executeXhrRequest', showAlert: false });
+            reject(new Error(`发送请求失败: ${error.message}`));
         }
     });
 }

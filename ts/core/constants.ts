@@ -24,7 +24,8 @@ export const ErrorLevel = {
     SILENT: 0,
     WARN: 1,
     ERROR: 2,
-    THROW: 3
+    THROW: 3,
+    DEBUG: 4
 } as const;
 
 /**

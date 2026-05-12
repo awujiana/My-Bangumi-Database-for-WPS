@@ -9,8 +9,8 @@
  * @version 1.0.0
  */
 
-import { TOKEN_CONFIG } from './constants.js';
-
+import { TOKEN_CONFIG, } from './constants.js';
+import  { BGM } from '../index.js';
 /**
  * 将字符串转换为UTF-8字节数组
  *
@@ -124,8 +124,8 @@ export function extractToken(encrypted: string): string | null {
         }
 
         return token;
-    } catch (e) {
-        console.error('[crypto] 提取Token失败:', e);
+    } catch (e: any) {
+        BGM.handleError(e, { context: 'extractToken', showAlert: false });
         return null;
     }
 }
@@ -210,8 +210,8 @@ export function decryptToken(encrypted: string): string | null {
 
         const payload = bytesToStr(decrypted);
         return extractToken(payload);
-    } catch (e) {
-        console.error('[crypto] 解密Token失败:', e);
+    } catch (e: any) {
+        BGM.handleError(e, { context: 'decryptToken', showAlert: false });
         return null;
     }
 }
@@ -309,8 +309,8 @@ export async function decryptTokenAsync(encrypted: string): Promise<string | nul
         const payload = bytesToStr(decrypted);
 
         return extractToken(payload);
-    } catch (e) {
-        console.error('[crypto] 解密Token失败:', e);
+    } catch (e: any) {
+        BGM.handleError(e, { context: 'decryptTokenAsync', showAlert: false });
         return null;
     }
 }

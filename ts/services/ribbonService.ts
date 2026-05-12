@@ -133,8 +133,8 @@ export async function detectConflicts(
             });
         }
         bgmCollectionReady = true;
-    } catch (e) {
-        BGM.handleError(e, { level: BGM.ErrorLevel.WARN, context: 'detectConflicts' });
+    } catch (e: any) {
+        BGM.handleError(e, { context: 'detectConflicts', showAlert: false });
         // 获取失败时，返回空冲突信息
         return { conflicts, conflictCount, bgmCollectionReady };
     }
@@ -216,7 +216,9 @@ export async function syncWithConfirmation() {
                 incremental = true;
             }
         }
-    } catch (_) {}
+    } catch (e: any) {
+        BGM.handleError(e, { context: 'syncWithConfirmation:readRibbonOptions', showAlert: false });
+    }
 
     // 3. 冲突检测
     let conflictInfo = '';
@@ -231,19 +233,19 @@ export async function syncWithConfirmation() {
                 conflictInfo = `检测到 ${conflictCount} 条冲突，将使用【Excel数据覆盖】。\n\n`;
             }
         }
-    } catch (e) {
-        BGM.handleError(e, { level: BGM.ErrorLevel.WARN, context: 'syncWithConfirmation:conflictDetection' });
+    } catch (e: any) {
+        BGM.handleError(e, { context: 'syncWithConfirmation:conflictDetection', showAlert: false });
     }
 
     // 4. 确认弹窗
     const msg = `数据预览：
-总行数：${preview.total}
-有效条目：${preview.valid}
-已上传（跳过）：${preview.alreadyUploaded}
-待同步：${preview.willSync}
-不上传（状态跳过）：${preview.willSkip}
-无效（无SID）：${preview.total - preview.valid}
-${conflictInfo}是否继续同步？`;
+        总行数：${preview.total}
+        有效条目：${preview.valid}
+        已上传（跳过）：${preview.alreadyUploaded}
+        待同步：${preview.willSync}
+        不上传（状态跳过）：${preview.willSkip}
+        无效（无SID）：${preview.total - preview.valid}
+        ${conflictInfo}是否继续同步？`;
 
     const confirmResult = app?.MessageBox?.(msg, 4 + 32);
     if (confirmResult !== 6) return;

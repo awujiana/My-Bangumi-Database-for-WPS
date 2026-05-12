@@ -132,6 +132,7 @@ export function testTokenValidity() {
             }
             catch (e) {
                 showError(_T.parseFailed, _T.cannotParseResponse);
+                BGM.handleError(e, { showAlert: false, level: BGM.ErrorLevel.WARN, context: 'testTokenValidity' });
             }
         }
         else if (xhr.status === 401) {
@@ -217,7 +218,9 @@ export async function syncFromPanel() {
             try {
                 syncSheet.Activate();
             }
-            catch (e) { /* 忽略 */ }
+            catch (e) {
+                BGM.handleError(e, { showAlert: false, level: BGM.ErrorLevel.WARN, context: 'syncFromPanel' });
+            }
         }
     }
     const app = getApp();
@@ -256,20 +259,21 @@ export async function syncFromPanel() {
             }
         }
     }
-    catch (_) {
+    catch (e) {
+        BGM.handleError(e, { showAlert: false, level: BGM.ErrorLevel.WARN, context: 'syncFromPanel' });
         // 检测失败不影响同步
     }
     // ========== 增量同步开关 ==========
     const incremental = document.getElementById('chkIncremental')?.checked ?? false;
     // ========== 确认对话框 ==========
     const msg = `数据预览：
-总行数：${preview.total}
-有效条目：${preview.valid}
-已上传（跳过）：${preview.alreadyUploaded}
-待同步：${preview.willSync}
-不上传（状态跳过）：${preview.willSkip}
-无效（无SID）：${preview.total - preview.valid}
-${conflictMsg}是否继续同步？`;
+            总行数：${preview.total}
+            有效条目：${preview.valid}
+            已上传（跳过）：${preview.alreadyUploaded}
+            待同步：${preview.willSync}
+            不上传（状态跳过）：${preview.willSkip}
+            无效（无SID）：${preview.total - preview.valid}
+            ${conflictMsg}是否继续同步？`;
     const confirmed = await new Promise(resolve => {
         showConfirm(msg, (confirmed) => resolve(confirmed));
     });
@@ -455,6 +459,7 @@ async function _doAPISync(sheetIndex, token) {
         showAlert(`同步完成！\n\n已匹配 ${matchedCount} 条`, _T.syncComplete);
     }
     catch (e) {
+        BGM.handleError(e, { showAlert: false, level: BGM.ErrorLevel.WARN, context: '_doAPISync' });
         showAlert(_T.syncFailed + e.message, _T.syncFailed);
         setStatus(_T.syncFailed, 'error');
     }
@@ -530,7 +535,9 @@ function handleActionClick(event) {
         try {
             args = JSON.parse(target.dataset.args);
         }
-        catch { /* ignore */ }
+        catch (e) {
+            BGM.handleError(e, { showAlert: false, level: BGM.ErrorLevel.WARN, context: 'handleActionClick' });
+        }
     }
     switch (action) {
         // 核心操作

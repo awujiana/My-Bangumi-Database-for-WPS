@@ -4,7 +4,7 @@
  * @description WPS Office 功能区按钮回调处理
  */
 
-import { WPS_ENUM, showBangumiPanel } from './index.js';
+import { WPS_ENUM, showBangumiPanel,BGM } from './index.js';
 import * as RibbonService from './services/ribbonService.js';
 
 
@@ -87,8 +87,7 @@ export function OnAction(control: { Id: string }): boolean {
                 console.warn('[BGM] 未知按钮:', control.Id);
         }
     } catch (e: any) {
-        console.error('[BGM] OnAction error:', e);
-        alert('操作失败: ' + e.message);
+        BGM.handleError(e, { showAlert: true, level: BGM.ErrorLevel.ERROR, context: 'Ribbon OnAction' });
     }
     return true;
 }

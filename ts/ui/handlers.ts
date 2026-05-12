@@ -161,8 +161,9 @@ export function testTokenValidity(): void {
                 const data = JSON.parse(xhr.responseText);
                 const username = data.username || data.nickname || _T.unknownUser;
                 showSuccess(_T.tokenValid, _T.user + username);
-            } catch (e) {
+            } catch (e: any) {
                 showError(_T.parseFailed, _T.cannotParseResponse);
+                BGM.handleError(e, { showAlert: false, level: BGM.ErrorLevel.WARN, context: 'testTokenValidity' });
             }
         } else if (xhr.status === 401) {
             showError(_T.tokenInvalid, _T.tokenExpired);
@@ -245,7 +246,9 @@ export async function syncFromPanel(): Promise<void> {
     if (typeof getOrCreateSyncRecordSheet === 'function') {
         const syncSheet = getOrCreateSyncRecordSheet();
         if (syncSheet) {
-            try { (syncSheet as any).Activate(); } catch (e) { /* 忽略 */ }
+            try { (syncSheet as any).Activate(); } catch (e: any) {
+                BGM.handleError(e, { showAlert: false, level: BGM.ErrorLevel.WARN, context: 'syncFromPanel' });
+            }
         }
     }
 
@@ -277,7 +280,8 @@ export async function syncFromPanel(): Promise<void> {
                 conflictMsg = `检测到 ${conflictCount} 条冲突，将使用【Excel数据覆盖】。\n\n`;
             }
         }
-    } catch (_) {
+    } catch (e: any) {
+        BGM.handleError(e, { showAlert: false, level: BGM.ErrorLevel.WARN, context: 'syncFromPanel' });
         // 检测失败不影响同步
     }
 
@@ -286,13 +290,13 @@ export async function syncFromPanel(): Promise<void> {
 
     // ========== 确认对话框 ==========
     const msg = `数据预览：
-总行数：${preview.total}
-有效条目：${preview.valid}
-已上传（跳过）：${preview.alreadyUploaded}
-待同步：${preview.willSync}
-不上传（状态跳过）：${preview.willSkip}
-无效（无SID）：${preview.total - preview.valid}
-${conflictMsg}是否继续同步？`;
+            总行数：${preview.total}
+            有效条目：${preview.valid}
+            已上传（跳过）：${preview.alreadyUploaded}
+            待同步：${preview.willSync}
+            不上传（状态跳过）：${preview.willSkip}
+            无效（无SID）：${preview.total - preview.valid}
+            ${conflictMsg}是否继续同步？`;
 
     const confirmed = await new Promise<boolean>(resolve => {
         showConfirm(msg, (confirmed) => resolve(confirmed));
@@ -364,7 +368,7 @@ export async function syncCollectionFromBgm(): Promise<void> {
     if (!token) { showAlert(_T.pleaseSetBgmToken); return; }
     try {
         await syncFromBgmByAPI(sheetIndex);
-    } catch (e) {
+    } catch (e: any) {
         BGM.handleError(e, { context: 'syncCollectionFromBgm', showAlert: true });
     }
 }
@@ -461,7 +465,8 @@ async function _doAPISync(sheetIndex: number, token: string): Promise<void> {
             }
         }
         showAlert(`同步完成！\n\n已匹配 ${matchedCount} 条`, _T.syncComplete);
-    } catch (e) {
+    } catch (e: any) {
+        BGM.handleError(e, { showAlert: false, level: BGM.ErrorLevel.WARN, context: '_doAPISync' });
         showAlert(_T.syncFailed + (e as Error).message, _T.syncFailed);
         setStatus(_T.syncFailed, 'error');
     }
@@ -523,7 +528,9 @@ function handleActionClick(event: Event): void {
     // 解析可能的参数（如：<button data-action="markUploadedItems" data-args='["动画"]'>）
     let args: string[] = [];
     if (target.dataset.args) {
-        try { args = JSON.parse(target.dataset.args); } catch { /* ignore */ }
+        try { args = JSON.parse(target.dataset.args); } catch (e: any) {
+            BGM.handleError(e, { showAlert: false, level: BGM.ErrorLevel.WARN, context: 'handleActionClick' });
+        }
     }
 
     switch (action) {

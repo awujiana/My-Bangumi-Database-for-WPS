@@ -32,8 +32,9 @@ export function getOrCreateSyncRecordSheet() {
             }
         }
     }
-    catch (e) { /* 忽略 */ }
-    // 不存在则创建
+    catch (e) {
+        BGM.handleError(e, { context: 'getOrCreateSyncRecordSheet', showAlert: false });
+    }
     if (!syncSheet) {
         syncSheet = wb.Sheets.Add();
         syncSheet.Name = SYNC_RECORD_SHEET_NAME;
@@ -50,7 +51,9 @@ export function getOrCreateSyncRecordSheet() {
         try {
             syncSheet.Move(null, wb.Sheets.Item(wb.Sheets.Count));
         }
-        catch (moveError) { /* 忽略 */ }
+        catch (moveError) {
+            BGM.handleError(moveError, { context: 'getOrCreateSyncRecordSheet', showAlert: false });
+        }
         bgmLog(LOG_LEVELS.INFO, '已创建同步记录工作表');
     }
     invalidateCache();
@@ -88,7 +91,9 @@ function buildCache(sheet) {
                 row: row
             });
         }
-        catch (e) { /* 忽略单行错误 */ }
+        catch (e) {
+            BGM.handleError(e, { context: 'buildCache', showAlert: false });
+        }
     }
     _syncRecordCacheValid = true;
 }
@@ -178,7 +183,7 @@ export function addSyncRecord(params) {
         return true;
     }
     catch (e) {
-        BGM.handleError(e, { level: BGM.ErrorLevel.ERROR, context: 'addSyncRecord' });
+        BGM.handleError(e, { context: 'addSyncRecord', showAlert: false });
         return false;
     }
 }
@@ -190,7 +195,7 @@ export function getAllSyncRecords() {
         return [..._syncRecordListCache];
     }
     catch (e) {
-        BGM.handleError(e, { level: BGM.ErrorLevel.ERROR, context: 'getAllSyncRecords' });
+        BGM.handleError(e, { context: 'getAllSyncRecords', showAlert: false });
         return [];
     }
 }
@@ -210,7 +215,7 @@ export function clearSyncRecords() {
         return true;
     }
     catch (e) {
-        BGM.handleError(e, { level: BGM.ErrorLevel.ERROR, context: 'clearSyncRecords' });
+        BGM.handleError(e, { context: 'clearSyncRecords', showAlert: false });
         return false;
     }
 }
@@ -221,7 +226,7 @@ export function openSyncRecordSheet() {
         bgmLog(LOG_LEVELS.INFO, '已切换到同步记录工作表');
     }
     catch (e) {
-        BGM.handleError(e, { level: BGM.ErrorLevel.ERROR, context: 'openSyncRecordSheet' });
+        BGM.handleError(e, { context: 'openSyncRecordSheet', showAlert: false });
     }
 }
 export function clearSheetMarksInSheet(sheetIndex) {
@@ -239,7 +244,9 @@ export function clearSheetMarksInSheet(sheetIndex) {
                 cell.Interior.Color = 0xFFFFFF; // 重置为白色（而非 ColorIndex）
             }
         }
-        catch (_) { }
+        catch (e) {
+            BGM.handleError(e, { context: 'clearSheetMarksInSheet', showAlert: false });
+        }
     }
     bgmLog(LOG_LEVELS.INFO, `已清除工作表 ${sheetIndex} 的颜色标记`);
 }

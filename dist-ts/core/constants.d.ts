@@ -23,6 +23,7 @@ export declare const ErrorLevel: {
     readonly WARN: 1;
     readonly ERROR: 2;
     readonly THROW: 3;
+    readonly DEBUG: 4;
 };
 /**
  * 错误处理选项接口

@@ -3,7 +3,7 @@
  * @module http
  * @description 支持异步请求、进度回调、自动重试、限流处理
  */
-import { Result, BgmError, BGM_CONFIG, LOG_LEVELS, bgmLog } from '../index.js';
+import { Result, BgmError, BGM_CONFIG, LOG_LEVELS, bgmLog, BGM } from '../index.js';
 const VALID_METHODS = ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'];
 // ========== 内部工具函数 ==========
 /**
@@ -62,6 +62,7 @@ export async function httpRequest(endpoint, options = {}) {
         validateMethod(method);
     }
     catch (error) {
+        BGM.handleError(error, { context: 'httpRequest', showAlert: false });
         const err = error instanceof BgmError ? error : new BgmError(String(error), 'VALIDATION_ERROR');
         return Result.fail(err);
     }
@@ -89,6 +90,7 @@ export async function httpRequest(endpoint, options = {}) {
             return Result.fail(new BgmError(errorMessage, 'HTTP_ERROR', { status: response.status }));
         }
         catch (error) {
+            BGM.handleError(error, { context: 'httpRequest', showAlert: false });
             if (attempt < retries) {
                 attempt++;
                 const delayMs = BGM_CONFIG.RETRY_DELAY_BASE * Math.pow(2, attempt - 1);
@@ -124,7 +126,8 @@ function executeXhrRequest(url, options) {
                 try {
                     data = JSON.parse(xhr.responseText);
                 }
-                catch {
+                catch (error) {
+                    BGM.handleError(error, { context: 'executeXhrRequest', showAlert: false });
                     data = xhr.responseText;
                 }
             }
@@ -150,6 +153,7 @@ function executeXhrRequest(url, options) {
             xhr.send(options.body);
         }
         catch (error) {
+            BGM.handleError(error, { context: 'executeXhrRequest', showAlert: false });
             reject(new Error(`发送请求失败: ${error.message}`));
         }
     });

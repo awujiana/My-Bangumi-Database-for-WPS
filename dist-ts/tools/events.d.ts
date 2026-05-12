@@ -1,13 +1,4 @@
 /**
- * @fileoverview 事件总线模块
- * @module tools/events
- * @description 实现模块间的发布-订阅事件系统，提供松耦合的组件通信方式。
- *              支持事件的订阅、退订、单次订阅和发布。
- *
- * @author BGM Development Team
- * @version 1.0.0
- */
-/**
  * 事件处理器类型
  *
  * @callback EventHandler

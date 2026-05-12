@@ -223,7 +223,7 @@ export class Result {
      * try {
      *     const user = result.unwrap();
      *     console.log(user.name);
-     * } catch (e) {
+     * } catch (e: any) {
      *     console.error('获取用户失败:', e.message);
      * }
      */

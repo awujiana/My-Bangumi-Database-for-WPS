@@ -94,7 +94,8 @@ function restoreLockedSheet(): boolean {
                 BGM.sheet.lockedName = info.name || null;
                 BGM.sheet.isLocked = !!(info.index != null && info.name);
                 return true;
-            } catch (e) {
+            } catch (e: any) {
+                BGM.handleError(e, { showAlert: false, level: BGM.ErrorLevel.WARN, context: 'restoreLockedSheet' });
                 saveLockedSheet(null);
             }
         }
@@ -166,11 +167,13 @@ function activateSheetIfNeeded(ws: WpsWorksheet): (() => void) | false {
         if (activeName !== (ws.Name || '')) {
             ws.Activate();
             return function restore() {
-                try { active.Activate(); } catch (_) {}
+                try { active.Activate(); } catch (e: any) {
+                    BGM.handleError(e, { showAlert: false, level: BGM.ErrorLevel.WARN, context: 'activateSheetIfNeeded' });
+                }
             };
         }
-    } catch (e) {
-        bgmLog(LOG_LEVELS.WARN, 'activateSheetIfNeeded 失败: ' + (e as Error).message);
+    } catch (e: any) {
+        BGM.handleError(e, { showAlert: false, level: BGM.ErrorLevel.WARN, context: 'activateSheetIfNeeded' });
     }
     return false;
 }
@@ -357,11 +360,11 @@ function autoDetectSheet(): { sheetIndex: number; sheetName: string; headerRow: 
                 }
             }
 
-            bgmLog(LOG_LEVELS.DEBUG, `  => 工作表 "${sheetName}" 表头行 ${meta.headerRow}, 匹配关键词数 ${meta.headerMatchCount}, ` +
-                `数据列数 ${meta.lastCol}, 前10行含数据行数 ${dataRowCount}`);
+            BGM.handleError(new Error(`  => 工作表 "${sheetName}" 表头行 ${meta.headerRow}, 匹配关键词数 ${meta.headerMatchCount}, ` +
+                `数据列数 ${meta.lastCol}, 前10行含数据行数 ${dataRowCount}`), { showAlert: false, level: BGM.ErrorLevel.DEBUG, context: 'autoDetectSheet' });
 
             if (dataRowCount < 2) {
-                bgmLog(LOG_LEVELS.DEBUG, `  => 数据行不足 (${dataRowCount} 行)，不视为有效数据表`);
+                BGM.handleError(new Error(`  => 数据行不足 (${dataRowCount} 行)，不视为有效数据表`), { showAlert: false, level: BGM.ErrorLevel.DEBUG, context: 'autoDetectSheet' });
                 continue;
             }
 
@@ -370,7 +373,7 @@ function autoDetectSheet(): { sheetIndex: number; sheetName: string; headerRow: 
                 meta.lastCol > bestMatch.colCount ||
                 (meta.lastCol === bestMatch.colCount && meta.headerMatchCount > bestMatch.matchCount);
 
-            bgmLog(LOG_LEVELS.DEBUG, `  => 是否为当前最优: ${isBetter ? '是' : '否'} (现有最优: ${bestMatch ? `${bestMatch.sheetName}(列${bestMatch.colCount})` : '无'})`);
+            BGM.handleError(new Error(`  => 是否为当前最优: ${isBetter ? '是' : '否'} (现有最优: ${bestMatch ? `${bestMatch.sheetName}(列${bestMatch.colCount})` : '无'})`), { showAlert: false, level: BGM.ErrorLevel.DEBUG, context: 'autoDetectSheet' });
 
             if (isBetter) {
                 bestMatch = {
@@ -381,8 +384,8 @@ function autoDetectSheet(): { sheetIndex: number; sheetName: string; headerRow: 
                     colCount: meta.lastCol
                 };
             }
-        } catch (e) {
-            bgmLog(LOG_LEVELS.WARN, `autoDetectSheet: 扫描工作表 ${si} 时出错: ${(e as Error).message}`);
+        } catch (e: any) {
+            BGM.handleError(e, { showAlert: false, level: BGM.ErrorLevel.WARN, context: 'autoDetectSheet' });
         } finally {
             if (typeof needRestore === 'function') needRestore();
         }
@@ -412,8 +415,12 @@ const ws: WpsWorksheet = sheet;
 if (!ws) { el.textContent = '未连接到工作表'; return; }
 
     let autoFilterMode = false;
-    try { autoFilterMode = !!ws.AutoFilterMode; } catch (_) {}
-    try { if (!autoFilterMode && ws.AutoFilter) autoFilterMode = !!ws.AutoFilter.Mode; } catch (_) {}
+    try { autoFilterMode = !!ws.AutoFilterMode; } catch (e: any) {
+        BGM.handleError(e, { showAlert: false, level: BGM.ErrorLevel.WARN, context: 'updateFilterStatus' });
+    }
+    try { if (!autoFilterMode && ws.AutoFilter) autoFilterMode = !!ws.AutoFilter.Mode; } catch (e: any) {
+        BGM.handleError(e, { showAlert: false, level: BGM.ErrorLevel.WARN, context: 'updateFilterStatus' });
+    }
 
     if (!autoFilterMode) {
         el.textContent = '未开启筛选，同步全部数据';
@@ -436,7 +443,9 @@ if (!ws) { el.textContent = '未连接到工作表'; return; }
                     try {
                         const headerCell = ws.Range(colNumToLetter(i) + '1');
                         if (headerCell) colName = String(headerCell.Value2 || '').substring(0, 12);
-                    } catch (_) {}
+                    } catch (e: any) {
+                        BGM.handleError(e, { showAlert: false, level: BGM.ErrorLevel.WARN, context: 'updateFilterStatus' });
+                    }
                     let criteria = f.Criteria1 || '';
                     if (f.Criteria2) {
                         const op = f.Operator;
@@ -444,7 +453,9 @@ if (!ws) { el.textContent = '未连接到工作表'; return; }
                     }
                     activeCols.push(colName ? `${colName}(${criteria})` : `列${i}`);
                 }
-            } catch (_) {}
+            } catch (e: any) {
+                BGM.handleError(e, { showAlert: false, level: BGM.ErrorLevel.WARN, context: 'updateFilterStatus' });
+            }
         }
 
         if (activeCols.length > 0) {
@@ -455,8 +466,9 @@ if (!ws) { el.textContent = '未连接到工作表'; return; }
             el.textContent = '筛选已开启但无活动筛选，同步全部数据';
             el.removeAttribute('title');
         }
-    } catch (e) {
+    } catch (e: any) {
         el.textContent = '检测筛选状态失败: ' + (e as Error).message;
+        BGM.handleError(e, { showAlert: false, level: BGM.ErrorLevel.WARN, context: 'updateFilterStatus' });
     }
 }
 
@@ -513,14 +525,17 @@ function refreshData(): void {
 
     let ws: WpsWorksheet | null | undefined = null;
     try { ws = app.ActiveWorkbook.Worksheets.Item(sheetIndex); }
-    catch (e) {
+    catch (e: any) {
         if (previewBox) previewBox.innerHTML = `<p class="hint">无法获取工作表: ${sheetIndex}</p>`;
+        BGM.handleError(e, { showAlert: false, level: BGM.ErrorLevel.WARN, context: 'refreshData' });
         updateFilterStatus();
         return;
     }
      // ✅ 增加判空，防止 Item 返回 null/undefined
     if (!ws || typeof ws.Activate !== 'function') {
         if (previewBox) previewBox.innerHTML = `<p class="hint">无法访问工作表 ${sheetIndex}</p>`;
+        BGM.handleError(new Error(`无法访问工作表 ${sheetIndex}`), { showAlert: false, level: BGM.ErrorLevel.WARN, context: 'refreshData' });
+        updateFilterStatus();
         return;
     }
 
@@ -746,8 +761,8 @@ export {
 // ========== 挂载到 window ==========
 function safeInitPanel(): void {
     try { initPanel(); }
-    catch (e) {
-        console.error('[BGM] initPanel 执行失败:', e);
+    catch (e: any) {
+        BGM.handleError(e, { showAlert: false, level: BGM.ErrorLevel.WARN, context: 'initPanel' });
         document.dispatchEvent(new CustomEvent('bgm:modulesReady'));
     }
 }
