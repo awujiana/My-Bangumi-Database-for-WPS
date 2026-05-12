@@ -59,6 +59,13 @@ export declare function getApp(): WpsApplication | null;
  */
 export declare function colNumToLetter(col: number): string;
 export declare function getCell(ws: WpsWorksheet | null | undefined, row: number, col: number): WpsRange | null;
+/**
+ * 获取单元格的值
+ * @param ws - 工作表对象，可能为 null 或 undefined
+ * @param row - 行号
+ * @param col - 列号
+ * @returns 单元格的字符串值；如果工作表无效或单元格不存在，则返回空字符串
+ */
 export declare function getCellValue(ws: WpsWorksheet | null | undefined, row: number, col: number): string;
 /**
  * 读取单元格文本，兼容多种取值方式，且不依赖 Cells 方法

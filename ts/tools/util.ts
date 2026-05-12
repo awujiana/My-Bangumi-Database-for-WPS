@@ -396,65 +396,52 @@ export function getCell(
                     return ws.Range(address);
                 }
 
+// 内部辅助函数，不导出
 /**
- * 安全获取单元格值（字符串形式）
- * @param ws  WPS 工作表
- * @param row 行号 (1‑based)
- * @param col 列号 (1‑based)
- * @returns   单元格值的字符串形式，若无法获取则返回空字符串
+ * 安全地获取对象属性值，处理属性值为函数的情况
+ * @param cell - 要获取属性的对象
+ * @param prop - 属性名称
+ * @returns 属性的值；如果属性不存在或访问失败，则返回 undefined
  */
+function tryGetProperty(cell: any, prop: string): any {
+    if (!(prop in cell)) return undefined;
+    try {
+        const val = cell[prop];
+        if (typeof val === 'function') {
+            try { return val(); } catch { return val; }
+        }
+        if (val && typeof val === 'object' && typeof val.toString === 'function') {
+            const str = val.toString();
+            if (str.includes('function') || str.includes('[native code]')) {
+                try { return val(); } catch { return val; }
+            }
+        }
+        return val;
+    } catch {
+        return undefined;
+    }
+}
+//内部辅助函数，不导出
 /**
- * 安全获取单元格值，兼容 WPS COM 对象的特殊行为
- * @param cell COM 单元格对象
- * @returns 单元格值或空字符串
+ * 获取单元格的原始值，按优先级尝试 Value2、Value 和 Text 属性
+ * @param cell - 单元格对象
+ * @returns 单元格的原始值；如果单元格无效或没有值，则返回 null
  */
 function getCellRawValue(cell: any): any {
     if (!cell) return null;
-    try {
-        // WPS COM 特殊处理：Value2/Value 可能返回函数引用而非直接值
-        if ('Value2' in cell) {
-            try {
-                const val = cell.Value2;
-                // 如果返回值是函数（通过 toString 判断），则调用它
-                if (val && typeof val.toString === 'function') {
-                    const str = val.toString();
-                    if (str.indexOf('function') >= 0 || str.indexOf('[native code]') >= 0) {
-                        try { return val(); } catch { return val; }
-                    }
-                }
-                // 常规情况：直接返回（可能是值或已经是解包的值）
-                if (typeof val !== 'function') return val;
-                try { return val(); } catch { return val; }
-            } catch { }
-        }
-        // 回退到 Value 属性
-        if ('Value' in cell) {
-            try {
-                const val = cell.Value;
-                if (val && typeof val.toString === 'function') {
-                    const str = val.toString();
-                    if (str.indexOf('function') >= 0 || str.indexOf('[native code]') >= 0) {
-                        try { return val(); } catch { return val; }
-                    }
-                }
-                if (typeof val !== 'function') return val;
-                try { return val(); } catch { return val; }
-            } catch { }
-        }
-        // 最后尝试 Text
-        if ('Text' in cell) {
-            try {
-                const txt = cell.Text;
-                if (typeof txt === 'function') return txt();
-                return txt;
-            } catch { }
-        }
-        return null;
-    } catch {
-        return null;
-    }
+    return tryGetProperty(cell, 'Value2') ??
+           tryGetProperty(cell, 'Value') ??
+           tryGetProperty(cell, 'Text') ??
+           null;
 }
 
+/**
+ * 获取单元格的值
+ * @param ws - 工作表对象，可能为 null 或 undefined
+ * @param row - 行号
+ * @param col - 列号
+ * @returns 单元格的字符串值；如果工作表无效或单元格不存在，则返回空字符串
+ */
 export function getCellValue(
     ws: WpsWorksheet | null | undefined,
     row: number,
