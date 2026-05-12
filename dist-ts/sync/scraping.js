@@ -5,9 +5,36 @@
  *              支持Token验证、收藏列表获取等功能。
  *
  * @author BGM Development Team
- * @version 1.0.0
+ * @version 1.1.0 (优化版)
  */
 import { BGM_CONFIG, LOG_LEVELS, bgmLog } from '../index.js';
+/**
+ * 提取响应消息
+ */
+function extractResponseMessage(data) {
+    return data?.msg || data?.message || data?.error || 'success';
+}
+/**
+ * 执行HTTP请求的通用Promise封装
+ */
+function requestPromise(xhr) {
+    const startTime = Date.now();
+    return new Promise((resolve, reject) => {
+        xhr.onload = () => {
+            const duration = Date.now() - startTime;
+            bgmLog(LOG_LEVELS.INFO, `[scraping] HTTP ${xhr.status} (${xhr.statusText}), 耗时: ${duration}ms`);
+            try {
+                const responseData = xhr.responseText ? JSON.parse(xhr.responseText) : null;
+                resolve({ status: xhr.status, data: responseData, responseText: xhr.responseText });
+            }
+            catch {
+                reject(new Error('解析响应失败'));
+            }
+        };
+        xhr.onerror = () => reject(new Error('网络错误'));
+        xhr.ontimeout = () => reject(new Error('请求超时'));
+    });
+}
 /**
  * 验证Bangumi API Token的有效性
  *
@@ -19,67 +46,21 @@ import { BGM_CONFIG, LOG_LEVELS, bgmLog } from '../index.js';
  * @description
  * 通过调用 /v0/me 接口验证Token是否有效。
  * 如果Token有效，会自动更新缓存中的用户信息。
- *
- * @example
- * const result = await verifyToken('your-token-here');
- * if (result.valid) {
- *     console.log(`欢迎，${result.username}！`);
- * }
  */
 export async function verifyToken(token) {
-    const result = {
-        valid: false,
-        userId: '', // 确保始终为字符串
-        username: '', // 确保始终为字符串
-        message: ''
-    };
+    const result = { valid: false, message: '' };
     if (!token) {
         result.message = 'Token 不能为空';
         return result;
     }
     try {
-        const xhr = new XMLHttpRequest();
         const apiUrl = `${BGM_CONFIG.API_BASE}/v0/me`;
-        const startTime = Date.now();
-        bgmLog(LOG_LEVELS.INFO, `[scraping/verifyToken] ========== 开始验证 Token ==========`);
-        bgmLog(LOG_LEVELS.INFO, `[scraping/verifyToken] API 路由: ${apiUrl}`);
-        bgmLog(LOG_LEVELS.INFO, `[scraping/verifyToken] 请求方法: GET`);
-        bgmLog(LOG_LEVELS.DEBUG, `[scraping/verifyToken] 请求头: Authorization: Bearer ${token.substring(0, 8)}...`);
-        const response = await new Promise((resolve, reject) => {
-            xhr.open('GET', apiUrl, true);
-            xhr.setRequestHeader('Authorization', `Bearer ${token}`);
-            xhr.setRequestHeader('Content-Type', 'application/json');
-            xhr.onload = () => {
-                const duration = Date.now() - startTime;
-                bgmLog(LOG_LEVELS.INFO, `[scraping/verifyToken] ========== 请求完成 ==========`);
-                bgmLog(LOG_LEVELS.INFO, `[scraping/verifyToken] HTTP 状态码: ${xhr.status} (${xhr.statusText})`);
-                bgmLog(LOG_LEVELS.INFO, `[scraping/verifyToken] 请求耗时: ${duration}ms`);
-                try {
-                    const responseData = xhr.responseText ? JSON.parse(xhr.responseText) : null;
-                    bgmLog(LOG_LEVELS.DEBUG, `[scraping/verifyToken] 响应数据: ${JSON.stringify(responseData).length > 300 ? JSON.stringify(responseData).substring(0, 300) + '...' : JSON.stringify(responseData)}`);
-                    resolve({
-                        status: xhr.status,
-                        data: responseData
-                    });
-                }
-                catch (e) {
-                    bgmLog(LOG_LEVELS.ERROR, `[scraping/verifyToken] 解析响应失败: ${e}`);
-                    reject(new Error('解析响应失败'));
-                }
-            };
-            xhr.onerror = () => {
-                const duration = Date.now() - startTime;
-                bgmLog(LOG_LEVELS.ERROR, `[scraping/verifyToken] 网络错误，耗时: ${duration}ms`);
-                reject(new Error('网络错误'));
-            };
-            xhr.ontimeout = () => {
-                const duration = Date.now() - startTime;
-                bgmLog(LOG_LEVELS.WARN, `[scraping/verifyToken] 请求超时，耗时: ${duration}ms`);
-                reject(new Error('请求超时'));
-            };
-            bgmLog(LOG_LEVELS.DEBUG, `[scraping/verifyToken] 正在发送请求...`);
-            xhr.send();
-        });
+        bgmLog(LOG_LEVELS.INFO, `[scraping/verifyToken] 验证 Token: ${apiUrl}`);
+        const xhr = new XMLHttpRequest();
+        xhr.open('GET', apiUrl, true);
+        xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+        xhr.setRequestHeader('Content-Type', 'application/json');
+        const response = await requestPromise(xhr);
         if (response.status === 200) {
             result.valid = true;
             result.message = 'Token 有效';
@@ -95,12 +76,12 @@ export async function verifyToken(token) {
         }
         else {
             result.message = `验证失败 (HTTP ${response.status})`;
-            bgmLog(LOG_LEVELS.ERROR, `[scraping/verifyToken] 验证失败，HTTP 状态码: ${response.status}`);
+            bgmLog(LOG_LEVELS.ERROR, `[scraping/verifyToken] 验证失败，HTTP ${response.status}`);
         }
     }
     catch (e) {
         result.message = e.message || '验证过程出错';
-        bgmLog(LOG_LEVELS.ERROR, '[scraping/verifyToken] error: ' + (e.message || e));
+        bgmLog(LOG_LEVELS.ERROR, `[scraping/verifyToken] error: ${result.message}`);
     }
     return result;
 }
@@ -115,41 +96,28 @@ export async function verifyToken(token) {
  * @param {number} [options.limit=30] - 每页数量
  * @param {number} [options.maxTotal=1000] - 最大获取数量
  * @param {Function} [options.onProgress] - 进度回调
- * @returns {Promise<any[]>} 收藏列表
- *
- * @description
- * 从Bangumi API获取用户的收藏列表，支持自动分页。
- * 默认最多获取1000条记录，每页30条。
- *
- * @example
- * const collections = await fetchAllUserCollections(token, '123456', {
- *     onProgress: (page, total) => console.log(`获取第${page}页，共${total}页`)
- * });
- * console.log(`共获取 ${collections.length} 条收藏`);
+ * @returns {Promise<CollectionItem[]>} 收藏列表
  */
 export async function fetchAllUserCollections(token, userId, options) {
     const limit = options?.limit || 30;
     const maxTotal = options?.maxTotal || 1000;
-    // 如果没有提供userId，先验证Token获取用户信息
     if (!userId) {
         const verifyResult = await verifyToken(token);
         if (!verifyResult.valid) {
-            bgmLog(LOG_LEVELS.ERROR, 'fetchAllUserCollections: Token无效');
+            bgmLog(LOG_LEVELS.ERROR, '[fetchAllUserCollections] Token无效');
             return [];
         }
         userId = verifyResult.userId;
     }
     if (!userId) {
-        bgmLog(LOG_LEVELS.ERROR, 'fetchAllUserCollections: 无法获取用户ID');
+        bgmLog(LOG_LEVELS.ERROR, '[fetchAllUserCollections] 无法获取用户ID');
         return [];
     }
     const allCollections = [];
     let offset = 0;
     let total = 0;
-    let page = 0;
-    bgmLog(LOG_LEVELS.INFO, `开始获取用户 ${userId} 的收藏列表`);
+    bgmLog(LOG_LEVELS.INFO, `[fetchAllUserCollections] 开始获取用户 ${userId} 的收藏列表`);
     while (offset < maxTotal) {
-        page++;
         try {
             const url = `${BGM_CONFIG.API_BASE}/v0/users/${userId}/collections?limit=${limit}&offset=${offset}`;
             const response = await fetch(url, {
@@ -160,28 +128,23 @@ export async function fetchAllUserCollections(token, userId, options) {
             });
             if (!response.ok) {
                 if (response.status === 429) {
-                    // 限流，等待后重试
-                    bgmLog(LOG_LEVELS.WARN, 'API限流，等待重试...');
+                    bgmLog(LOG_LEVELS.WARN, '[fetchAllUserCollections] API限流，等待重试...');
                     await new Promise(resolve => setTimeout(resolve, BGM_CONFIG.REQUEST_DELAY * 2));
                     continue;
                 }
                 throw new Error(`HTTP ${response.status}`);
             }
             const data = await response.json();
-            // 首次请求获取总数
             if (total === 0 && data.total) {
                 total = Math.min(data.total, maxTotal);
-                bgmLog(LOG_LEVELS.INFO, `收藏总数: ${total}`);
+                bgmLog(LOG_LEVELS.INFO, `[fetchAllUserCollections] 收藏总数: ${total}`);
             }
-            // 添加到结果集
             if (data.data && Array.isArray(data.data)) {
                 allCollections.push(...data.data);
                 offset += data.data.length;
-                // 进度回调
                 if (options?.onProgress) {
-                    options.onProgress(page, Math.ceil(total / limit));
+                    options.onProgress(Math.ceil(offset / limit), Math.ceil(total / limit));
                 }
-                // 如果没有更多数据，退出循环
                 if (data.data.length < limit || offset >= total) {
                     break;
                 }
@@ -189,15 +152,14 @@ export async function fetchAllUserCollections(token, userId, options) {
             else {
                 break;
             }
-            // 请求间隔（防止限流）
             await new Promise(resolve => setTimeout(resolve, BGM_CONFIG.REQUEST_DELAY));
         }
         catch (e) {
-            bgmLog(LOG_LEVELS.ERROR, 'fetchSubjectCollection error: ' + (e.message || String(e)));
+            bgmLog(LOG_LEVELS.ERROR, `[fetchAllUserCollections] 请求失败: ${e.message}`);
             break;
         }
     }
-    bgmLog(LOG_LEVELS.INFO, `获取收藏完成，共 ${allCollections.length} 条`);
+    bgmLog(LOG_LEVELS.INFO, `[fetchAllUserCollections] 获取完成，共 ${allCollections.length} 条`);
     return allCollections;
 }
 /**
@@ -208,24 +170,12 @@ export async function fetchAllUserCollections(token, userId, options) {
  * @param {string} token - API Token
  * @param {string} subjectId - 条目ID
  * @returns {Promise<ApiResponse>} API响应
- *
- * @description
- * 获取当前用户对特定条目的收藏状态
- *
- * @example
- * const result = await fetchSubjectCollection(token, '123456');
- * if (result.data) {
- *     console.log(`当前状态: ${result.data.type}`);
- * }
  */
 export async function fetchSubjectCollection(token, subjectId) {
-    const result = {
-        data: null,
-        status: 0,
-        message: ''
-    };
+    const result = { data: null, status: 0, message: '' };
     try {
-        const response = await fetch(`${BGM_CONFIG.API_BASE}/v0/users/-/collections/${subjectId}`, {
+        const url = `${BGM_CONFIG.API_BASE}/v0/users/-/collections/${subjectId}`;
+        const response = await fetch(url, {
             headers: {
                 'Authorization': `Bearer ${token}`,
                 'Content-Type': 'application/json'
@@ -242,7 +192,7 @@ export async function fetchSubjectCollection(token, subjectId) {
     }
     catch (e) {
         result.message = e.message || '请求失败';
-        bgmLog(LOG_LEVELS.ERROR, 'fetchSubjectCollection error: ' + (e.message || String(e)));
+        bgmLog(LOG_LEVELS.ERROR, `[fetchSubjectCollection] 请求失败: ${result.message}`);
     }
     return result;
 }

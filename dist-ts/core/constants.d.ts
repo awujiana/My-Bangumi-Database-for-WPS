@@ -296,4 +296,30 @@ export declare const SYNC_RECORD_SHEET_NAME = "\u540C\u6B65\u8BB0\u5F55";
  * @type {string[]}
  */
 export declare const SYNC_RECORD_COLUMNS: string[];
+/**
+ * 同步记录表列索引常量 (1-based，便于维护)
+ *
+ * @constant
+ * @type {Object}
+ */
+export declare const SYNC_RECORD_COL: {
+    readonly SEQ: 1;
+    readonly TIME: 2;
+    readonly NAME: 3;
+    readonly URL: 4;
+    readonly SID: 5;
+    readonly TYPE: 6;
+    readonly COUNT: 7;
+    readonly CONTENT: 8;
+    readonly STATUS: 9;
+    readonly MESSAGE: 10;
+    readonly FINGERPRINT: 11;
+};
+/**
+ * 同步记录类型颜色映射表
+ *
+ * @constant
+ * @type {Record<string, number>}
+ */
+export declare const SYNC_RECORD_TYPE_COLOR: Record<string, number>;
 //# sourceMappingURL=constants.d.ts.map

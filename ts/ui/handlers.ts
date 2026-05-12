@@ -694,18 +694,32 @@ export async function markUploadedItems(sheetIndexOrName: number | string, colle
 }
 
 export function clearSheetMarks(sheetIndexOrName: number | string): void {
-    if (typeof clearSheetMarksInSheet !== 'function') return;
+    if (typeof clearSheetMarksInSheet !== 'function') {
+        bgmLog(LOG_LEVELS.ERROR, '[clearSheetMarks] clearSheetMarksInSheet 函数不可用');
+        return;
+    }
+    const app = getApp();
+    if (!app?.ActiveWorkbook) {
+        bgmLog(LOG_LEVELS.ERROR, '[clearSheetMarks] 无法获取活动工作簿');
+        return;
+    }
     if (typeof sheetIndexOrName === 'string') {
-        const app = getApp();
-        if (app?.ActiveWorkbook) {
-            for (let i = 1; i <= app.ActiveWorkbook.Worksheets.Count; i++) {
-                if (app.ActiveWorkbook.Worksheets.Item(i).Name === sheetIndexOrName) {
-                    clearSheetMarksInSheet(i);
-                    return;
-                }
+        bgmLog(LOG_LEVELS.INFO, `[clearSheetMarks] 查找工作表名称: "${sheetIndexOrName}"`);
+        for (let i = 1; i <= app.ActiveWorkbook.Worksheets.Count; i++) {
+            const ws = app.ActiveWorkbook.Worksheets.Item(i);
+            const wsName = ws?.Name || `Sheet${i}`;
+            bgmLog(LOG_LEVELS.DEBUG, `[clearSheetMarks] 检查工作表 ${i}: "${wsName}"`);
+            if (ws && ws.Name === sheetIndexOrName) {
+                bgmLog(LOG_LEVELS.INFO, `[clearSheetMarks] 找到匹配的工作表: "${wsName}" (索引: ${i})`);
+                clearSheetMarksInSheet(i);
+                return;
             }
         }
+        bgmLog(LOG_LEVELS.WARN, `[clearSheetMarks] 未找到工作表: "${sheetIndexOrName}"`);
     } else {
+        const ws = app.ActiveWorkbook.Worksheets.Item(sheetIndexOrName);
+        const wsName = ws?.Name || `Sheet${sheetIndexOrName}`;
+        bgmLog(LOG_LEVELS.INFO, `[clearSheetMarks] 使用工作表索引: ${sheetIndexOrName} (名称: "${wsName}")`);
         clearSheetMarksInSheet(sheetIndexOrName);
     }
 }

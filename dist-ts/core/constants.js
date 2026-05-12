@@ -390,3 +390,35 @@ export const SYNC_RECORD_COLUMNS = [
     '序号', '同步时间', '名称', 'URL', 'SID', '条目类型',
     '次数', '内容', '状态', '备注', '数据指纹'
 ];
+/**
+ * 同步记录表列索引常量 (1-based，便于维护)
+ *
+ * @constant
+ * @type {Object}
+ */
+export const SYNC_RECORD_COL = {
+    SEQ: 1,
+    TIME: 2,
+    NAME: 3,
+    URL: 4,
+    SID: 5,
+    TYPE: 6,
+    COUNT: 7,
+    CONTENT: 8,
+    STATUS: 9,
+    MESSAGE: 10,
+    FINGERPRINT: 11
+};
+/**
+ * 同步记录类型颜色映射表
+ *
+ * @constant
+ * @type {Record<string, number>}
+ */
+export const SYNC_RECORD_TYPE_COLOR = {
+    '想看': BGM_COLOR.WISH,
+    '在看': BGM_COLOR.WATCHING,
+    '看过': BGM_COLOR.SUCCESS,
+    '搁置': BGM_COLOR.SKIP,
+    '抛弃': BGM_COLOR.FAIL
+};
