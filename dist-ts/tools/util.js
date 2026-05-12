@@ -316,34 +316,99 @@ export function getCell(ws, row, col) {
  * @param col 列号 (1‑based)
  * @returns   单元格值的字符串形式，若无法获取则返回空字符串
  */
+/**
+ * 安全获取单元格值，兼容 WPS COM 对象的特殊行为
+ * @param cell COM 单元格对象
+ * @returns 单元格值或空字符串
+ */
+function getCellRawValue(cell) {
+    if (!cell)
+        return null;
+    try {
+        // WPS COM 特殊处理：Value2/Value 可能返回函数引用而非直接值
+        if ('Value2' in cell) {
+            try {
+                const val = cell.Value2;
+                // 如果返回值是函数（通过 toString 判断），则调用它
+                if (val && typeof val.toString === 'function') {
+                    const str = val.toString();
+                    if (str.indexOf('function') >= 0 || str.indexOf('[native code]') >= 0) {
+                        try {
+                            return val();
+                        }
+                        catch {
+                            return val;
+                        }
+                    }
+                }
+                // 常规情况：直接返回（可能是值或已经是解包的值）
+                if (typeof val !== 'function')
+                    return val;
+                try {
+                    return val();
+                }
+                catch {
+                    return val;
+                }
+            }
+            catch { }
+        }
+        // 回退到 Value 属性
+        if ('Value' in cell) {
+            try {
+                const val = cell.Value;
+                if (val && typeof val.toString === 'function') {
+                    const str = val.toString();
+                    if (str.indexOf('function') >= 0 || str.indexOf('[native code]') >= 0) {
+                        try {
+                            return val();
+                        }
+                        catch {
+                            return val;
+                        }
+                    }
+                }
+                if (typeof val !== 'function')
+                    return val;
+                try {
+                    return val();
+                }
+                catch {
+                    return val;
+                }
+            }
+            catch { }
+        }
+        // 最后尝试 Text
+        if ('Text' in cell) {
+            try {
+                const txt = cell.Text;
+                if (typeof txt === 'function')
+                    return txt();
+                return txt;
+            }
+            catch { }
+        }
+        return null;
+    }
+    catch {
+        return null;
+    }
+}
 export function getCellValue(ws, row, col) {
     if (!ws)
         return '';
-    const cell = getCell(ws, row, col);
-    if (!cell)
-        return '';
-    let raw;
     try {
-        raw = cell.Value2;
-        if (typeof raw === 'function')
-            raw = raw();
+        const address = colNumToLetter(col) + row;
+        const cell = ws.Range(address);
+        if (!cell)
+            return '';
+        const raw = getCellRawValue(cell);
+        return raw != null ? String(raw) : '';
     }
-    catch { }
-    if (raw === undefined || raw === null) {
-        try {
-            raw = cell.Value;
-            if (typeof raw === 'function')
-                raw = raw();
-        }
-        catch { }
+    catch {
+        return '';
     }
-    if (raw === undefined || raw === null) {
-        try {
-            raw = typeof cell.Text === 'function' ? cell.Text() : cell.Text;
-        }
-        catch { }
-    }
-    return raw != null ? String(raw) : '';
 }
 /**
  * 读取单元格文本，兼容多种取值方式，且不依赖 Cells 方法
@@ -360,30 +425,7 @@ export function readCell(ws, row, col) {
         const cell = ws.Range(address);
         if (!cell)
             return '';
-        let raw = undefined;
-        try {
-            if ('Value2' in cell) {
-                raw = cell.Value2;
-                if (typeof raw === 'function')
-                    raw = raw();
-            }
-        }
-        catch { }
-        if ((raw === undefined || raw === null) && 'Value' in cell) {
-            try {
-                raw = cell.Value;
-                if (typeof raw === 'function')
-                    raw = raw();
-            }
-            catch { }
-        }
-        if ((raw === undefined || raw === null) && 'Text' in cell) {
-            try {
-                const txt = cell.Text;
-                raw = typeof txt === 'function' ? txt() : txt;
-            }
-            catch { }
-        }
+        const raw = getCellRawValue(cell);
         return raw != null ? String(raw) : '';
     }
     catch {
