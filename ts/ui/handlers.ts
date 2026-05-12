@@ -703,6 +703,34 @@ export function clearSheetMarks(sheetIndexOrName: number | string): void {
         bgmLog(LOG_LEVELS.ERROR, '[clearSheetMarks] 无法获取活动工作簿');
         return;
     }
+
+    // 处理 "当前" 工作表
+    if (sheetIndexOrName === '当前') {
+        const ws = app.ActiveWorkbook.ActiveSheet;
+        if (ws) {
+            // 遍历查找当前工作表的索引
+            let sheetIndex = -1;
+            for (let i = 1; i <= app.ActiveWorkbook.Worksheets.Count; i++) {
+                const currentWs = app.ActiveWorkbook.Worksheets.Item(i);
+                if (currentWs.Name === ws.Name) {
+                    sheetIndex = i;
+                    break;
+                }
+            }
+            if (sheetIndex > 0) {
+                bgmLog(LOG_LEVELS.INFO, `[clearSheetMarks] 使用当前活动工作表: "${ws.Name}" (索引: ${sheetIndex})`);
+                clearSheetMarksInSheet(sheetIndex);
+                return;
+            } else {
+                bgmLog(LOG_LEVELS.ERROR, `[clearSheetMarks] 无法找到当前工作表 "${ws.Name}" 的索引`);
+                return;
+            }
+        } else {
+            bgmLog(LOG_LEVELS.ERROR, '[clearSheetMarks] 无法获取当前活动工作表');
+            return;
+        }
+    }
+
     if (typeof sheetIndexOrName === 'string') {
         bgmLog(LOG_LEVELS.INFO, `[clearSheetMarks] 查找工作表名称: "${sheetIndexOrName}"`);
         for (let i = 1; i <= app.ActiveWorkbook.Worksheets.Count; i++) {
