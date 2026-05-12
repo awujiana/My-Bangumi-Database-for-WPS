@@ -6,7 +6,7 @@
 
 
 import { PANEL_CONFIG, WPS_ENUM , LOG_LEVELS ,getApp, bgmLog, BGM, escapeHtml, readCell, colNumToLetter,HEADER_KEYWORDS, IMPORTANT_COLS  ,initMessageListener,  markUploadedItems, clearSheetMarks, updateTokenStatus, updateUserIdStatus, showTokenDialog, showUserIdDialog ,
-     showAlert, showToast ,closeDetailModal,getFilterStatus,    getLastRow,clearSheetCache
+     showAlert, showToast ,closeDetailModal,getFilterStatus,    getLastRow,clearSheetCache,WpsWorksheet
 }from './index.js';
 // ========== 类型定义 ==========
 interface LockedSheetInfo {
@@ -154,13 +154,16 @@ function refreshSheets(): void {
     updateLockButton();
 }
 
-function activateSheetIfNeeded(ws: any): (() => void) | false {
+function activateSheetIfNeeded(ws: WpsWorksheet): (() => void) | false {
     const app = getApp();
-    if (!app) return false;
+    if (!app?.ActiveWorkbook) return false;  // 确保工作簿存在
+
     try {
-        const active = app.ActiveWorkbook!.ActiveSheet;
+        const active = app.ActiveWorkbook.ActiveSheet;
+        if (!active || !ws) return false;     // ✅ 防止 undefined
+
         const activeName = active.Name || '';
-        if (activeName !== ws.Name) {
+        if (activeName !== (ws.Name || '')) {
             ws.Activate();
             return function restore() {
                 try { active.Activate(); } catch (_) {}
@@ -174,7 +177,7 @@ function activateSheetIfNeeded(ws: any): (() => void) | false {
 
 // ========== 表头检测 ==========
 
-function detectHeaderAndColumns(ws: any, opts: { visibleRowSet?: Set<number> | null; isFiltered?: boolean } = {}): HeaderMeta {
+function detectHeaderAndColumns(ws: WpsWorksheet, opts: { visibleRowSet?: Set<number> | null; isFiltered?: boolean } = {}): HeaderMeta {
     const { visibleRowSet = null, isFiltered = false } = opts;
 
     // 判断某行是否可见
@@ -317,9 +320,9 @@ function autoDetectSheet(): { sheetIndex: number; sheetName: string; headerRow: 
     for (let si = 1; si <= sheets.Count; si++) {
         let needRestore: (() => void) | false = false;
         try {
-            const ws = sheets.Item(si);
-            if (!ws) {
-                bgmLog(LOG_LEVELS.WARN, `autoDetectSheet: 工作表索引 ${si} 为 null，已跳过`);
+            const ws : WpsWorksheet = sheets.Item(si);
+            if (!ws || typeof ws.Activate !== 'function') {
+                bgmLog(LOG_LEVELS.WARN, `autoDetectSheet: 工作表索引 ${si} 为 null 或无法访问，已跳过`);
                 continue;
             }
 
@@ -331,7 +334,7 @@ function autoDetectSheet(): { sheetIndex: number; sheetName: string; headerRow: 
             }
 
             bgmLog(LOG_LEVELS.DEBUG, `autoDetectSheet: 正在分析工作表 "${sheetName}"`);
-
+                
             needRestore = activateSheetIfNeeded(ws);
             const meta = detectHeaderAndColumns(ws);
 
@@ -394,13 +397,19 @@ function autoDetectSheet(): { sheetIndex: number; sheetName: string; headerRow: 
 }
 // ========== 筛选状态 ==========
 
-function updateFilterStatus(targetWs?: any): void {
+function updateFilterStatus(targetWs?: WpsWorksheet): void {
     const el = document.getElementById('filterStatus');
     if (!el) return;
 
     const app = getApp();
-    const ws = targetWs || app?.ActiveWorkbook?.ActiveSheet;
-    if (!ws) { el.textContent = '未连接到工作表'; return; }
+    const sheet = targetWs || app?.ActiveWorkbook?.ActiveSheet;
+        if (!sheet) {
+            // 处理：显示提示、返回等
+            return;
+        }
+// 现在 sheet 被收窄为 WpsWorksheet
+const ws: WpsWorksheet = sheet;
+if (!ws) { el.textContent = '未连接到工作表'; return; }
 
     let autoFilterMode = false;
     try { autoFilterMode = !!ws.AutoFilterMode; } catch (_) {}
@@ -502,7 +511,7 @@ function refreshData(): void {
         return;
     }
 
-    let ws: any;
+    let ws: WpsWorksheet | null | undefined = null;
     try { ws = app.ActiveWorkbook.Worksheets.Item(sheetIndex); }
     catch (e) {
         if (previewBox) previewBox.innerHTML = `<p class="hint">无法获取工作表: ${sheetIndex}</p>`;
@@ -510,9 +519,8 @@ function refreshData(): void {
         return;
     }
      // ✅ 增加判空，防止 Item 返回 null/undefined
-    if (!ws) {
-        if (previewBox) previewBox.innerHTML = `<p class="hint">工作表 ${sheetIndex} 不存在或无法访问</p>`;
-        updateFilterStatus();
+    if (!ws || typeof ws.Activate !== 'function') {
+        if (previewBox) previewBox.innerHTML = `<p class="hint">无法访问工作表 ${sheetIndex}</p>`;
         return;
     }
 

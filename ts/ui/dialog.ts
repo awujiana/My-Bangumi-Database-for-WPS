@@ -223,8 +223,23 @@ export function showAlert(message: string, title?: string, onOk?: () => void): v
     _showDialog('alert', { message, title: title || '提示', onOk });
 }
 
-export function showConfirm(message: string, title?: string, onOk?: () => void, onCancel?: () => void): void {
-    _showDialog('confirm', { message, title: title || '确认', onOk, onCancel });
+/*
+ * 显示确认对话框（新签名）
+ * @param message  提示内容
+ * @param callback 回调函数，参数 confirmed 为 true 表示用户点击了确定
+ * @param title    可选标题
+ */
+export function showConfirm(
+    message: string,
+    callback: (confirmed: boolean) => void,
+    title?: string
+): void {
+    _showDialog('confirm', {
+        message,
+        title: title || '确认',
+        onOk: () => callback(true),
+        onCancel: () => callback(false),
+    });
 }
 
 export function showError(message: string, title?: string, onOk?: () => void): void {

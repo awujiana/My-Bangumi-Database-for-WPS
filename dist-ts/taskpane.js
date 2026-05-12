@@ -104,12 +104,14 @@ function refreshSheets() {
 }
 function activateSheetIfNeeded(ws) {
     const app = getApp();
-    if (!app)
-        return false;
+    if (!app?.ActiveWorkbook)
+        return false; // 确保工作簿存在
     try {
         const active = app.ActiveWorkbook.ActiveSheet;
+        if (!active || !ws)
+            return false; // ✅ 防止 undefined
         const activeName = active.Name || '';
-        if (activeName !== ws.Name) {
+        if (activeName !== (ws.Name || '')) {
             ws.Activate();
             return function restore() {
                 try {
@@ -261,8 +263,8 @@ function autoDetectSheet() {
         let needRestore = false;
         try {
             const ws = sheets.Item(si);
-            if (!ws) {
-                bgmLog(LOG_LEVELS.WARN, `autoDetectSheet: 工作表索引 ${si} 为 null，已跳过`);
+            if (!ws || typeof ws.Activate !== 'function') {
+                bgmLog(LOG_LEVELS.WARN, `autoDetectSheet: 工作表索引 ${si} 为 null 或无法访问，已跳过`);
                 continue;
             }
             const sheetName = ws.Name || '';
@@ -465,10 +467,9 @@ function refreshData() {
         return;
     }
     // ✅ 增加判空，防止 Item 返回 null/undefined
-    if (!ws) {
+    if (!ws || typeof ws.Activate !== 'function') {
         if (previewBox)
-            previewBox.innerHTML = `<p class="hint">工作表 ${sheetIndex} 不存在或无法访问</p>`;
-        updateFilterStatus();
+            previewBox.innerHTML = `<p class="hint">无法访问工作表 ${sheetIndex}</p>`;
         return;
     }
     const sheetName = ws.Name || '';

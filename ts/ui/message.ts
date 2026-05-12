@@ -4,7 +4,7 @@
  * @description 消息监听、消息处理、状态设置
  */
 
-import { BGM } from '../index.js';
+import { BGM,showAlert,showConfirm ,updateTokenStatus,refreshSheets,refreshData} from '../index.js';
 
 // ========== 类型定义 ==========
 interface MessageEventData {
@@ -19,35 +19,23 @@ export function initMessageListener(): void {
     window.addEventListener('message', (event: MessageEvent<MessageEventData>) => {
         const data = event.data;
         if (!data?.type) return;
-
         switch (data.type) {
-            case 'showDialog':
-                if (typeof (window as any).showDialog === 'function') {
-                    (window as any).showDialog(data.title || '\u63D0\u793A', data.message || '');
-                }
+            case 'showAlert':
+                showAlert(data.message || '', data.title);
                 break;
             case 'showConfirm':
-                if (typeof (window as any).showConfirmDialog === 'function') {
-                    (window as any).showConfirmDialog(data.message || '', () => {
-                        const callback = (window as any)._bgmConfirmCallback;
-                        if (callback?.confirm) callback.confirm();
-                    });
-                }
+                showConfirm(data.message || '', (confirmed) => {
+                    if (confirmed) BGM.sync.startSync();
+                });
                 break;
             case 'updateToken':
-                if (typeof (window as any).updateTokenStatus === 'function') {
-                    (window as any).updateTokenStatus();
-                }
+                updateTokenStatus();
                 break;
             case 'refreshSheets':
-                if (typeof (window as any).refreshSheets === 'function') {
-                    (window as any).refreshSheets();
-                }
+                refreshSheets();
                 break;
             case 'refreshData':
-                if (typeof (window as any).refreshData === 'function') {
-                    (window as any).refreshData();
-                }
+                refreshData();
                 break;
         }
     });

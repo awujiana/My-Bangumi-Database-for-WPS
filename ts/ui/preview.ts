@@ -8,7 +8,7 @@ import {
   getApp, bgmLog, BGM, readCell, trim, _getUserApiPath,
   wpsMsgBox, getCell, escapeHtml, showAlert, showToast,
   LOG_LEVELS, BGM_COLOR, type SyncRecord, findHeaderRow, getColumnMap, getSequentialRowsBySeqCol,
-  extractSubjectId, mapWatchStatus, buildJsonPayload,
+  extractSubjectId, mapWatchStatus, buildJsonPayload,WpsWorksheet,
   bgmRequestSync, addSyncRecord, addTagsFromStr,WpsRange ,WATCH_STATUS_MAP 
 } from '../index.js';
 
@@ -66,7 +66,7 @@ function isUploadedByColor(seqCell: WpsRange | null): boolean {
 }
 
 function getRowData(
-  ws: any,
+  ws: WpsWorksheet | null | undefined,
   rowNum: number,
   colMap: ColumnMap,
   headerRow: number,
@@ -117,23 +117,38 @@ function getRowData(
   return data;
 }
 
-function renderDetailItemHtml(rowData: DetailItem, colMap: ColumnMap, ws: any): string {
+
+
+/**
+ * 渲染详情项的HTML内容
+ * @param rowData - 详情项数据对象，包含名称、类型、标签等信息
+ * @param colMap - 列映射关系，用于构建JSON载荷
+ * @param ws - 工作表对象，用于构建JSON载荷
+ * @returns 返回渲染后的详情项HTML字符串
+ */
+function renderDetailItemHtml(rowData: DetailItem, colMap: ColumnMap, ws: WpsWorksheet | null | undefined): string {
+  // 定义观看状态类型映射
   const typeNames: Record<number, string> = { 0: '', 1: '想看', 2: '在看', 3: '看过', 4: '搁置', 5: '抛弃' };
   const typeName = typeNames[rowData.typeNum] || '未知';
 
+  // 解析标签数据
   const tagSet = new Set<string>();
   addTagsFromStr(tagSet, rowData.tagsRaw);
   const tags = Array.from(tagSet);
+  // 生成标签HTML
   const tagsHtml = tags.length > 0
     ? `<div class="detail-value tags">${tags.map(t => `<span class="tag-badge">${escapeHtml(t)}</span>`).join('')}</div>`
     : '<div class="detail-value">-</div>';
 
+  // 构建JSON请求载荷
   let jsonBody = '';
   if (rowData.sid) {
     jsonBody = buildJsonPayload(ws, rowData.row, colMap, rowData.finishedDate);
   }
+  // 截断显示URL，避免过长影响UI
   const urlDisplay = rowData.bgmUrl.length > 60 ? rowData.bgmUrl.substring(0, 60) + '...' : rowData.bgmUrl;
 
+  // 返回完整的HTML模板字符串
   return `
     <div class="detail-item ${rowData.isUploaded ? 'uploaded' : 'pending'}" data-type="${rowData.typeNum}" data-row="${rowData.row}" data-sid="${rowData.sid}" data-status="${escapeHtml(rowData.status)}">
       <div class="detail-item-header">
@@ -141,10 +156,9 @@ function renderDetailItemHtml(rowData: DetailItem, colMap: ColumnMap, ws: any): 
           <span class="detail-item-row">行 ${rowData.row}</span>
           <span class="detail-item-name">${escapeHtml(rowData.name) || '(无名称)'}</span>
         </div>
-        ${rowData.isUploaded
-      ? `<button class="upload-single-btn reupload" onclick="window.uploadSingleRow(${rowData.row}, this)">重新上传</button>`
-      : `<button class="upload-single-btn" onclick="window.uploadSingleRow(${rowData.row}, this)">上传</button>`
-    }
+        <button class="upload-single-btn ${rowData.isUploaded ? 'reupload' : ''}" data-row="${rowData.row}">
+          ${rowData.isUploaded ? '重新上传' : '上传'}
+        </button>
         ${rowData.isUploaded ? '<span class="uploaded-badge">✓ 已上传</span>' : ''}
       </div>
       <div class="detail-item-body">
@@ -183,16 +197,10 @@ function renderDetailItemHtml(rowData: DetailItem, colMap: ColumnMap, ws: any): 
         ` : ''}
       </div>
     </div>
-    <div class="detail-item ${rowData.isUploaded ? 'uploaded' : 'pending'}" 
-         data-type="${rowData.typeNum}" 
-         data-row="${rowData.row}" 
-         data-sid="${rowData.sid}"
-         data-status="${escapeHtml(rowData.status)}">
-      ...
-    </div>    
-
   `;
 }
+ 
+        
 
 // ========== 状态存储 ==========
 let detailPreviewData: DetailPreviewData = {
@@ -319,7 +327,20 @@ export function previewSyncContent(): void {
     const modal = document.getElementById('syncPreviewModal');
     if (!modal) return;
     const body = modal.querySelector('.modal-body');
-    if (!body) return;
+    if (!body) {return;}
+    else {
+       body.addEventListener('click', (e) => {
+           const target = e.target as HTMLElement;
+           const btn = target.closest('.upload-single-btn');
+           // 确保 btn 是 HTMLElement 且包含 dataset
+           if (!(btn instanceof HTMLElement)) return;
+       
+           const rowNum = parseInt(btn.dataset.row || '', 10);
+           if (isNaN(rowNum)) return;
+       
+           uploadSingleRow(rowNum, btn as HTMLButtonElement);
+       });
+   }
     body.innerHTML = statsHtml + cardsHtml;
     modal.style.display = 'block';
 

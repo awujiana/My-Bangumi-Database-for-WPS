@@ -45,17 +45,15 @@ export interface WpsSheets {
 
 // ========== WPS 工作表 ==========
 export interface WpsWorksheet {
-    Name: string;
+   Name: string;
     Rows: WpsRows;
     Columns: WpsColumns;
     AutoFilter?: WpsAutoFilter;
     AutoFilterMode?: boolean;
-    /** 已用区域 */
-    UsedRange?: WpsRange;    
-        /** 保护状态 */
+    UsedRange?: WpsRange;
     Activate(): void;
     Calculate(): void;
-    Range(address: string): WpsRange;
+    Range(address: string): WpsRange; 
     Move(Before?: any, After?: any): void;
 }
 
@@ -110,11 +108,11 @@ export interface WpsRange {
     Rows: WpsRows;
     Columns: WpsColumns;
 
-    // 值属性
-    Value?: unknown;
-    Value2?: unknown;
-    Text?: string;
-    Formula?: string;
+     // 值属性（WPS 中可能是属性也可能是函数，全部声明为 any）
+    Value?: any;
+    Value2?: any;
+    Text?: any;          // ← 关键补充，消除“never”错误
+    Formula?: any;
 
     // 格式属性
     Interior?: WpsInterior;

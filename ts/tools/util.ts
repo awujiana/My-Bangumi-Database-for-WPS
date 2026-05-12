@@ -1,5 +1,5 @@
 
-import {  WPS_ENUM, XL, BGM_CONFIG, BGM_COLOR, LOG_LEVELS, ERROR_LEVELS, PANEL_CONFIG, BGM_SUBJECT_TYPES, SYNC_STATUS,ErrorLevel, type DialogOptions, type ErrorOptions,isWpsApp, type WpsApplication,BgmError,encryptToken, decryptToken, calcChecksum,COLUMN_RULES,COLUMNS,HEADER_KEYWORDS,BGMCache,BGMSheet,BGMSync,BGMUserInfo,WpsWorksheet } from '../index.js';
+import {  WPS_ENUM, XL, BGM_CONFIG, BGM_COLOR, LOG_LEVELS, ERROR_LEVELS, PANEL_CONFIG, BGM_SUBJECT_TYPES, SYNC_STATUS,ErrorLevel, type DialogOptions, type ErrorOptions,isWpsApp, type WpsApplication,BgmError,encryptToken, decryptToken, calcChecksum,COLUMN_RULES,COLUMNS,HEADER_KEYWORDS,BGMCache,BGMSheet,BGMSync,BGMUserInfo,WpsWorksheet ,WpsRange,syncAllRows} from '../index.js';
 
 import { BGM_EVENTS ,eventBus } from '../tools/events.js';  
 // ========== BGM 全局命名空间 ==========
@@ -13,7 +13,7 @@ export const BGM: {
     ErrorLevel: typeof ErrorLevel;
     BgmError: typeof BgmError;
     dataPreview?: {
-        ws: any;
+        ws: WpsWorksheet | null | undefined;
         visibleRows: number[];
         headerRow: number;
         dataStartRow: number;
@@ -64,7 +64,35 @@ export const BGM: {
     sync: {
         isRunning: false,
         lastSyncTime:  new Date().toISOString(),
-   
+        startSync() {
+        // 防重复
+        if (this.isRunning) {
+            BGM.Dialog.alert('同步正在进行中，请稍后');
+            return;
+        }
+
+        // 检查数据预览是否已加载
+        if (!BGM.dataPreview?.ws) {
+            BGM.Dialog.alert('请先在预览面板中加载数据', '提示');
+            return;
+        }
+
+        this.isRunning = true;
+        bgmLog(LOG_LEVELS.INFO, '开始执行同步...');
+
+        // 调用 preview 模块中的批量同步函数，该函数会自行检查 Token 和逐行上传
+        syncAllRows()
+            .then(() => {
+                this.isRunning = false;
+                bgmLog(LOG_LEVELS.INFO, '同步完成');
+            })
+            .catch((err: unknown) => {
+                this.isRunning = false;
+                BGM.handleError(err, { showAlert: true });   // 自动带上函数名和错误详情
+            });
+    }
+
+
     },
     // 日志级别（0=DEBUG, 1=INFO, 2=WARN, 3=ERROR）
     LOG_LEVEL: LOG_LEVELS.INFO,
@@ -191,7 +219,10 @@ export const BGM: {
             context: '',
             ...options
         };
-
+             // ✅ 自动获取调用函数名（如果 context 未手动指定）
+        if (!opts.context) {
+            opts.context = getCallerFunctionName();
+        }
         let bgmError: BgmError;
         if (error instanceof BgmError) {
             bgmError = error;
@@ -258,17 +289,49 @@ export const BGM: {
     }
 }
 
+
 // ========== 日志函数 ==========
 /**
  * 日志函数（支持日志级别控制）
  * @param level - 日志级别 (0=DEBUG, 1=INFO, 2=WARN, 3=ERROR)
  * @param message - 日志消息
  */
-export function bgmLog(level: number, message: string): void {
+
+export function bgmLog(level: number, message: string | null | undefined): void {
     if (level >= BGM.LOG_LEVEL) {
-        const prefix = ['[DEBUG]', '[INFO]', '[WARN]', '[ERROR]'][level] || '[INFO]';
-        console.log(prefix + ' ' + message);
+        const prefixes: string[] = ['[DEBUG]', '[INFO]', '[WARN]', '[ERROR]'];
+        const prefix = prefixes[level] ?? '[INFO]';
+        console.log(prefix + ' ' + (message ?? ''));
     }
+}
+/**
+ * 从调用栈中提取第一个非内部函数的名称
+ * @param skipAdditional 额外跳过的帧数（备用，通常无需传）
+ */
+function getCallerFunctionName(skipAdditional = 0): string {
+    const e = new Error();
+    const stack = e.stack || '';
+    const lines = stack.split('\n');
+    // 需要跳过的内部函数名列表
+    const internalFuncs = [
+        'getCallerFunctionName',
+        'handleError',
+        'safeExecute',
+        'BGM.handleError',
+        'BGM.safeExecute',
+    ];
+
+    for (let i = 2; i < lines.length; i++) {
+        const line = lines[i].trim();
+        const match = /at\s+([^\s(]+)/.exec(line);
+        if (match) {
+            const name = match[1];
+            if (!internalFuncs.includes(name)) {
+                return name;
+            }
+        }
+    }
+    return 'unknown';
 }
 
 
@@ -303,93 +366,92 @@ export function colNumToLetter(col: number): string {
     return letter;
 }
 
-export function getCell(ws: unknown, row: number, col: number): any | null {
-    try {
-        const sheet = ws as { Range?: (addr: string) => any } | null;
-        if (!sheet || typeof sheet.Range !== 'function') return null;
-        return sheet.Range(colNumToLetter(col) + row);
-    } catch {
-        return null;
-    }
-}
-export function getCellValue(ws: unknown, row: number, col: number): string {
-    try {
-        const sheet = ws as { Range?: (addr: string) => any } | null;
-        if (!sheet || typeof sheet.Range !== 'function') return '';
+export function getCell(
+                    ws: WpsWorksheet | null | undefined,
+                    row: number,
+                    col: number
+                ): WpsRange | null {
+                    if (!ws) return null;
+                    const address = colNumToLetter(col) + row;
+                    return ws.Range(address);
+                }
 
-        const addr = colNumToLetter(col) + row;
-        const cell = sheet.Range(addr);
-        if (!cell) return '';
-
-        let raw: any;
-        try {
-            raw = cell.Value2;
-            if (typeof raw === 'function') raw = raw();
-        } catch {}
-        if (raw === undefined || raw === null) {
-            try {
-                raw = cell.Value;
-                if (typeof raw === 'function') raw = raw();
-            } catch {}
-        }
-        if (raw === undefined || raw === null) {
-            try {
-                raw = typeof cell.Text === 'function' ? cell.Text() : cell.Text;
-            } catch {}
-        }
-
-        return raw != null ? String(raw) : '';
-    } catch (e) {
-        return '';
-    }
-}
 /**
- * 读取单元格文本，基于 ws.Range 安全访问
- * 
+ * 安全获取单元格值（字符串形式）
+ * @param ws  WPS 工作表
+ * @param row 行号 (1‑based)
+ * @param col 列号 (1‑based)
+ * @returns   单元格值的字符串形式，若无法获取则返回空字符串
  */
-export function readCell(ws: unknown, row: number, col: number): string {
-    try {
-        const sheet = ws as { Range?: (addr: string) => any } | null;
-        if (!sheet || typeof sheet.Range !== 'function') return '';
+export function getCellValue(
+                        ws: WpsWorksheet | null | undefined,
+                        row: number,
+                        col: number
+                    ): string {
+                        if (!ws) return '';
+                        const cell = getCell(ws, row, col);
+                        if (!cell) return '';
+                    
+                        let raw: any;
+                        try {
+                            raw = cell.Value2;
+                            if (typeof raw === 'function') raw = raw();
+                        } catch {}
+                        if (raw === undefined || raw === null) {
+                            try {
+                                raw = cell.Value;
+                                if (typeof raw === 'function') raw = raw();
+                            } catch {}
+                        }
+                        if (raw === undefined || raw === null) {
+                            try {
+                                raw = typeof cell.Text === 'function' ? cell.Text() : cell.Text;
+                            } catch {}
+                        }
+                        return raw != null ? String(raw) : '';
+                }
 
-        const address = colNumToLetter(col) + row;
-        const cell = sheet.Range(address);
-        if (!cell) return '';
+/**
+ * 读取单元格文本，兼容多种取值方式，且不依赖 Cells 方法
+ * @param ws  WPS 工作表
+ * @param row 行号 (1‑based)
+ * @param col 列号 (1‑based)
+ * @returns   单元格文本，若无法读取则返回空字符串
+ */
+export function readCell(
+                    ws: WpsWorksheet | null | undefined,
+                    row: number,
+                    col: number
+                ): string {
+    if (!ws) return '';
+    const address = colNumToLetter(col) + row;
+    const cell = ws.Range(address);
+    if (!cell) return '';
 
-        let raw: any = undefined;
+    let raw: any = undefined;
 
-        // ---- 安全取值，兼容 Value2 / Value 为函数的情况 ----
-        // 优先取 Value2
-        if ('Value2' in cell) {
-            raw = cell.Value2;
-            if (typeof raw === 'function') {
-                raw = raw();          // ← 关键：调用函数拿到真实值
-            }
-        }
-
-        // 若 Value2 无效，尝试 Value
-        if ((raw === undefined || raw === null) && 'Value' in cell) {
-            raw = cell.Value;
-            if (typeof raw === 'function') {
-                raw = raw();
-            }
-        }
-
-        // 最后尝试 Text（可能是函数）
-        if ((raw === undefined || raw === null) && 'Text' in cell) {
-            const txt = cell.Text;
-            raw = typeof txt === 'function' ? txt() : txt;
-        }
-
-        return raw != null ? String(raw) : '';
-    } catch {
-        return '';
+    if ('Value2' in cell) {
+        raw = cell.Value2;
+        if (typeof raw === 'function') raw = raw();
     }
+
+    if ((raw === undefined || raw === null) && 'Value' in cell) {
+        raw = cell.Value;
+        if (typeof raw === 'function') raw = raw();
+    }
+
+    if ((raw === undefined || raw === null) && 'Text' in cell) {
+        const txt = cell.Text;
+        raw = typeof txt === 'function' ? txt() : txt;
+    }
+
+    return raw != null ? String(raw) : '';
 }
+
 /**
  * 设置单元格值
  */
-export function setCellValue(ws: unknown, row: number, col: number, value: unknown): boolean {
+export function setCellValue(ws: WpsWorksheet | null | undefined, row: number, col: number, value: unknown): boolean {
     try {
         const cell = getCell(ws, row, col) as any;
         if (!cell) {
@@ -954,7 +1016,7 @@ export function isEmptyValue(val: any): boolean {
 }
 
 // ========== 获取数据工作表 ==========
-export function getDataSheet(): any {
+export function getDataSheet(): WpsWorksheet | null | undefined {
   let app = getApp();
   if (!app || !app.ActiveWorkbook) return null;
 
@@ -978,4 +1040,12 @@ export function calcFingerprint(fields: string[]): string {
     const raw = fields.join('|');
     // 复用已有的 calcChecksum 生成简短校验和，或直接返回原始字符串前 50 字符
     return calcChecksum(raw).toString(16).padStart(4, '0'); 
+}
+
+export function safeActivate(ws: WpsWorksheet | null | undefined): void {
+    if (ws && typeof ws.Activate === 'function') {
+        ws.Activate();
+    } else {
+        bgmLog(LOG_LEVELS.WARN, 'safeActivate: 无法激活工作表');
+    }
 }
