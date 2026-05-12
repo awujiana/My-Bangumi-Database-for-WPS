@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html>
 <head>
     <meta charset="utf-8">
@@ -59,7 +59,8 @@
             <h3>快捷操作</h3>
             <div class="btn-group">
                 <button class="btn primary" id="syncBtn" data-action="sync">🔄 同步到 Bangumi</button>
-                <button class="btn" data-action="test">🧪 测试同步</button>
+                <button class="btn danger" id="stopBtn" data-action="requestStopSync" style="display:none;">⏹️ 停止同步</button>
+                <button class="btn" data-action="test">🧪 单条测试同步</button>
                 <button class="btn warning" data-action="clear">🗑️ 清除标记</button>
             </div>
             <div class="btn-group" style="margin-top:8px;">

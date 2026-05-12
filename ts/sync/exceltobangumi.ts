@@ -263,17 +263,15 @@ export function extractSubjectId(input: string): string {
 }
 
 /**
- * 将观看状态文本转换为Bangumi API数值
- *
  * @function mapWatchStatus
  * @param {string} status - 观看状态文本
- * @returns {number} API数值：0=想看, 2=在看, 3=看过, 4=搁置, 5=抛弃
+ * @returns {number} API数值：1=想看, 2=在看, 3=看过, 4=搁置, 5=抛弃
  *
  * @description
  * 支持的状态文本映射：
  * - 看过/看完/已看/完/completed → 3
  * - 在看/在看动画/在追/追/watching → 2
- * - 想看/想看动画/否/wish → 0
+ * - 想看/想看动画/否/wish → 1
  * - 搁置/暂停/on_hold → 4
  * - 抛弃/弃/弃番/drop/dropped → 5
  *
@@ -282,7 +280,7 @@ export function extractSubjectId(input: string): string {
  * mapWatchStatus('在看'); // 返回 2
  */
 export function mapWatchStatus(status: string): number {
-    if (!status) return 0;
+    if (!status) return 1;
 
     const normalized = trim(status).toLowerCase();
 
@@ -598,10 +596,10 @@ export function buildJsonPayload(
                 }
             }
         }
-        // 如果没有找到有效的状态，默认设置为"想看"(0)
+        // 如果没有找到有效的状态，默认设置为"想看"(1)
         if (!statusFound) {
-            payload.type = 0;
-            bgmLog(LOG_LEVELS.WARN, `[buildJsonPayload] 未找到有效的观看状态，默认设置为"想看"(0)`);
+            payload.type = 1;
+            bgmLog(LOG_LEVELS.WARN, `[buildJsonPayload] 未找到有效的观看状态，默认设置为"想看"(1)`);
         }
 
         // 评分
@@ -866,17 +864,29 @@ async function batchSyncRequests(
     token: string,
     userIdPath: string,
     concurrency: number = 5
-): Promise<{ success: SyncTask[]; fail: SyncTask[] }> {
+): Promise<{ success: SyncTask[]; fail: SyncTask[]; stopped: boolean }> {
     const success: SyncTask[] = [];
     const fail: SyncTask[] = [];
     const MIN_INTERVAL = 100; // 最小间隔 100ms
     let lastRequestTime = 0;
+    let stopped = false;
 
     // 使用队列控制并发
     const queue = [...tasks];
     const executing: Promise<void>[] = [];
 
     while (queue.length > 0 || executing.length > 0) {
+        // 检查是否应该停止
+        if (BGM.sync.checkShouldStop()) {
+            bgmLog(LOG_LEVELS.INFO, '[batchSyncRequests] 检测到停止请求，正在停止...');
+            stopped = true;
+            // 等待正在执行的任务完成
+            if (executing.length > 0) {
+                await Promise.all(executing);
+            }
+            break;
+        }
+
         // 填充执行队列到并发数
         while (executing.length < concurrency && queue.length > 0) {
             const task = queue.shift()!;
@@ -923,7 +933,7 @@ async function batchSyncRequests(
         }
     }
 
-    return { success, fail };
+    return { success, fail, stopped };
 }
 
 export async function SyncToBangumiAsync(
@@ -933,8 +943,8 @@ export async function SyncToBangumiAsync(
     lastRow: number,
     headerRow: number,
     options?: SyncOptions
-): Promise<{ success: number; fail: number; skip: number }> {
-    const result = { success: 0, fail: 0, skip: 0 };
+): Promise<{ success: number; fail: number; skip: number; stopped: boolean }> {
+    const result = { success: 0, fail: 0, skip: 0, stopped: false };
     const startRow = headerRow + 1;
     const startTime = Date.now();
 
@@ -1013,6 +1023,13 @@ export async function SyncToBangumiAsync(
                 continue;
             }
 
+            // 检查观看状态是否为空
+            const watchStatusField = getField(rowNum, '是否看完') || getField(rowNum, '状态') || getField(rowNum, '观看状态');
+            if (!watchStatusField) {
+                result.skip++;
+                continue;
+            }
+
             // 增量同步指纹检查
             let currentFingerprint: string | undefined;
             if (fingerprintMap) {
@@ -1080,7 +1097,7 @@ export async function SyncToBangumiAsync(
     }
 
     bgmLog(LOG_LEVELS.INFO, '[SyncToBangumiAsync] 步骤5: 开始批量同步请求');
-    const { success: successTasks, fail: failTasks } = await batchSyncRequests(
+    const { success: successTasks, fail: failTasks, stopped } = await batchSyncRequests(
         syncTasks,
         token,
         userIdPath,
@@ -1139,10 +1156,22 @@ export async function SyncToBangumiAsync(
         result.fail++;
     }
 
+    // 处理未执行的任务（如果停止了）
+    if (stopped) {
+        result.stopped = true;
+        const executedCount = successTasks.length + failTasks.length;
+        const remainingTasks = syncTasks.slice(executedCount);
+        for (const task of remainingTasks) {
+            result.skip++;
+            bgmLog(LOG_LEVELS.DEBUG, `[SyncToBangumiAsync] 任务被跳过（停止）: SID=${task.sid}`);
+        }
+        bgmLog(LOG_LEVELS.INFO, `[SyncToBangumiAsync] 同步已停止，${remainingTasks.length} 条任务被跳过`);
+    }
+
     const totalTime = Date.now() - startTime;
-    reportProgress(syncTasks.length, '同步完成');
+    reportProgress(syncTasks.length, stopped ? '同步已停止' : '同步完成');
     BGM.setSyncComplete(result);
-    bgmLog(LOG_LEVELS.INFO, `[SyncToBangumiAsync] 同步完成: 成功=${result.success}, 失败=${result.fail}, 跳过=${result.skip}, 总耗时=${totalTime}ms`);
+    bgmLog(LOG_LEVELS.INFO, `[SyncToBangumiAsync] 同步完成: 成功=${result.success}, 失败=${result.fail}, 跳过=${result.skip}, 已停止=${result.stopped}, 总耗时=${totalTime}ms`);
     return result;
 }
 /**

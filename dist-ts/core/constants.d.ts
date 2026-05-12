@@ -269,6 +269,13 @@ export declare const TOKEN_CONFIG: {
  *
  * @constant
  * @type {Record<string, number>}
+ * @description
+ * BGM API v0 状态码：
+ * - 1: wish (想看)
+ * - 2: collect (在看)
+ * - 3: do (看过)
+ * - 4: on_hold (搁置)
+ * - 5: dropped (抛弃)
  */
 export declare const WATCH_STATUS_MAP: Record<string, number>;
 /**

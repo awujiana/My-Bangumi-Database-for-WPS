@@ -389,14 +389,21 @@ export const TOKEN_CONFIG = {
  *
  * @constant
  * @type {Record<string, number>}
+ * @description
+ * BGM API v0 状态码：
+ * - 1: wish (想看)
+ * - 2: collect (在看)
+ * - 3: do (看过)
+ * - 4: on_hold (搁置)
+ * - 5: dropped (抛弃)
  */
 export const WATCH_STATUS_MAP: Record<string, number> = {
-    // 看过 (3)
-    "看过": 3, "看完": 3, "已看": 3, "完": 3, "completed": 3, "3": 3, "是": 3, "true": 3,
+    // 想看 (1)
+    "想看": 1, "想看动画": 1, "否": 1, "wish": 1, "1": 1, "false": 1,
     // 在看 (2)
     "在看": 2, "看动画": 2, "在看动画": 2, "在追": 2, "追": 2, "watching": 2, "2": 2,
-    // 想看 (0)
-    "想看": 0, "想看动画": 0, "否": 0, "wish": 0, "1": 0, "false": 0,
+    // 看过 (3)
+    "看过": 3, "看完": 3, "已看": 3, "完": 3, "completed": 3, "3": 3, "是": 3, "true": 3,
     // 搁置 (4)
     "搁置": 4, "暂停": 4, "停": 4, "on_hold": 4, "4": 4,
     // 抛弃 (5)

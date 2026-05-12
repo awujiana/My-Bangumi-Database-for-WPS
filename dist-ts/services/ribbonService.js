@@ -68,6 +68,10 @@ export function getSyncPreview(ws, colMap, lastRow, headerRow) {
             }
             return '';
         })();
+        // 空状态不计入待同步，跳过该条目
+        if (!watchStatus) {
+            continue;
+        }
         const type = mapWatchStatus(watchStatus);
         if (type === 0) {
             willSkip++;

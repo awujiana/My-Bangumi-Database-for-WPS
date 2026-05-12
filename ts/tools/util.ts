@@ -64,32 +64,63 @@ export const BGM: {
     // 同步状态
     sync: {
         isRunning: false,
-        lastSyncTime:  new Date().toISOString(),            
+        shouldStop: false,
+        lastSyncTime: new Date().toISOString(),
+        
         startSync() {
-                // 防重复
-                if (this.isRunning) {
-                    BGM.Dialog.alert('同步正在进行中，请稍后', '提示');
-                    return;
+            // 防重复
+            if (this.isRunning) {
+                BGM.Dialog.alert('同步正在进行中，请稍后', '提示');
+                return;
+            }
+            // 重置停止标志
+            this.resetStopFlag();
+            
+            // 显示确认对话框，避免误操作
+            BGM.Dialog.confirm('确定要开始全面同步吗？', (confirmed: boolean) => {
+                if (!confirmed) return;
+                this.isRunning = true;
+                bgmLog(LOG_LEVELS.INFO, '开始执行同步...');
+
+                syncAllRows()
+                    .then(() => {
+                        this.isRunning = false;
+                        // 如果是因为停止而结束，显示提示
+                        if (this.shouldStop) {
+                            BGM.Dialog.alert('同步已停止', '提示');
+                            this.resetStopFlag();
+                        }
+                    })
+                    .catch((err: unknown) => {
+                        this.isRunning = false;
+                        this.resetStopFlag();
+                        BGM.handleError(err, { showAlert: true });
+                    });
+            });
+        },
+        
+        requestStop() {
+            if (!this.isRunning) {
+                BGM.Dialog.alert('当前没有正在进行的同步', '提示');
+                return;
+            }
+            
+            BGM.Dialog.confirm('确定要停止同步吗？已同步的数据不会回滚。', (confirmed: boolean) => {
+                if (confirmed) {
+                    this.shouldStop = true;
+                    bgmLog(LOG_LEVELS.INFO, '用户请求停止同步');
+                    BGM.Dialog.alert('正在停止同步，请稍候...', '提示');
                 }
-                // 显示确认对话框，避免误操作
-                // 检查数据预览是否已加载
-        BGM.Dialog.confirm('确定要开始全面同步吗？', (confirmed: boolean) => {
-            if (!confirmed) return;
-            this.isRunning = true;
-            bgmLog(LOG_LEVELS.INFO, '开始执行同步...');
-
-            syncAllRows()
-                .then(() => {
-                    this.isRunning = false;
-                })
-                .catch((err: unknown) => {
-                    this.isRunning = false;
-                    BGM.handleError(err, { showAlert: true });
-                });
-        });
-}
-
-
+            }, '确认停止');
+        },
+        
+        checkShouldStop(): boolean {
+            return this.shouldStop;
+        },
+        
+        resetStopFlag() {
+            this.shouldStop = false;
+        }
     },
     // 日志级别（0=DEBUG, 1=INFO, 2=WARN, 3=ERROR）
     LOG_LEVEL: LOG_LEVELS.INFO,
@@ -571,17 +602,14 @@ export function _getBgmUserId(): string | null {
 }
 
 /**
- * 获取 Bangumi API 用户路径（格式：/userId）
+ * 获取 Bangumi API 用户路径（格式：/-）
  * 用于拼接用户收藏请求的 URL
- * @returns 用户路径字符串，如 "/123456"；若 userId 未设置则返回 "/0"
+ * @returns 用户路径字符串 "/-"，代表当前认证用户
+ * @description BGM API v0 使用 "-" 代表当前认证用户，而不是具体的用户ID
  */
 export function _getUserApiPath(): string {
-    const userId = _getBgmUserId();
-    if (!userId) {
-        bgmLog(LOG_LEVELS.WARN, '_getUserApiPath: userId 未设置，使用默认路径 /0');
-        return '/0';
-    }
-    return `/${userId}`;
+    // BGM API v0 使用 "-" 代表当前认证用户
+    return '/-';
 }
 
 /**

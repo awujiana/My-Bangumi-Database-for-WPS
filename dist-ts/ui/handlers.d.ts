@@ -12,6 +12,8 @@ export declare function testTokenValidity(): void;
 export declare function testDebugConnection(): void;
 export declare function onAction(action: string): void;
 export declare function syncFromPanel(): Promise<void>;
+export declare function showStopButton(): void;
+export declare function hideStopButton(): void;
 export declare function testSingleUpdateFromPanel(): void;
 export declare function syncCollectionFromBgm(): Promise<void>;
 export declare function syncFromBgmByAPI(sheetIndex: number): Promise<void>;

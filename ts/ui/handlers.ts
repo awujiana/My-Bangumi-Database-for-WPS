@@ -291,6 +291,10 @@ export function onAction(action: string): void {
         case 'userIdUpdated':
             updateUserIdStatus();
             break;
+        case 'requestStopSync':
+            bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 用户请求停止同步');
+            BGM.sync.requestStop();
+            break;
     }
 }
 
@@ -435,6 +439,7 @@ export async function syncFromPanel(): Promise<void> {
 
     // 10. 执行同步
     bgmLog(LOG_LEVELS.INFO, '[syncFromPanel] 步骤10: 开始执行同步');
+    showStopButton(); // 显示停止按钮
     try {
         bgmLog(LOG_LEVELS.DEBUG, '[syncFromPanel] 调用 SyncToBangumiAsync...');
         const result = await SyncToBangumiAsync(ws, colMap, token, lastRow, headerRow, {
@@ -449,11 +454,20 @@ export async function syncFromPanel(): Promise<void> {
             }
         });
         resetProgressBar();
+        hideStopButton(); // 隐藏停止按钮
         if (app.StatusBar !== undefined) app.StatusBar = false;
-        bgmLog(LOG_LEVELS.INFO, `[syncFromPanel] 同步完成！成功: ${result.success}, 失败: ${result.fail}, 跳过: ${result.skip}`);
-        showAlert(`同步完成！成功 ${result.success} 条，失败 ${result.fail} 条，跳过 ${result.skip} 条`);
+        
+        // 检查是否被用户停止
+        if (result.stopped) {
+            bgmLog(LOG_LEVELS.INFO, `[syncFromPanel] 同步已被用户停止！成功: ${result.success}, 失败: ${result.fail}, 跳过: ${result.skip}`);
+            showAlert(`同步已停止！成功 ${result.success} 条，失败 ${result.fail} 条，跳过 ${result.skip} 条\n\n注意：已同步的数据不会回滚。`);
+        } else {
+            bgmLog(LOG_LEVELS.INFO, `[syncFromPanel] 同步完成！成功: ${result.success}, 失败: ${result.fail}, 跳过: ${result.skip}`);
+            showAlert(`同步完成！成功 ${result.success} 条，失败 ${result.fail} 条，跳过 ${result.skip} 条`);
+        }
     } catch (err: any) {
         resetProgressBar();
+        hideStopButton(); // 隐藏停止按钮
         if (app.StatusBar !== undefined) app.StatusBar = false;
         bgmLog(LOG_LEVELS.ERROR, `[syncFromPanel] 同步失败: ${err.message}`);
         BGM.handleError(err, { context: 'syncFromPanel', showAlert: true });
@@ -483,6 +497,23 @@ function resetProgressBar(): void {
     if (bar) { bar.style.width = '0%'; bar.textContent = ''; }
     const text = document.getElementById('progressText');
     if (text) text.textContent = '';
+}
+
+// 显示/隐藏停止按钮
+export function showStopButton(): void {
+    const syncBtn = document.getElementById('syncBtn');
+    const stopBtn = document.getElementById('stopBtn');
+    if (syncBtn) syncBtn.style.display = 'none';
+    if (stopBtn) stopBtn.style.display = 'inline-block';
+    bgmLog(LOG_LEVELS.DEBUG, '[handlers] 停止按钮已显示，同步按钮已隐藏');
+}
+
+export function hideStopButton(): void {
+    const syncBtn = document.getElementById('syncBtn');
+    const stopBtn = document.getElementById('stopBtn');
+    if (syncBtn) syncBtn.style.display = 'inline-block';
+    if (stopBtn) stopBtn.style.display = 'none';
+    bgmLog(LOG_LEVELS.DEBUG, '[handlers] 停止按钮已隐藏，同步按钮已显示');
 }
 
 export function testSingleUpdateFromPanel(): void {

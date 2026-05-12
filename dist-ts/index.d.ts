@@ -45,6 +45,8 @@ export interface BGMSheet {
 export interface BGMSync {
     /** 是否正在同步 */
     isRunning: boolean;
+    /** 是否请求停止同步 */
+    shouldStop: boolean;
     /** 上次同步时间（ISO 格式） */
     lastSyncTime: string | null;
     /**
@@ -54,6 +56,21 @@ export interface BGMSync {
     * - 调用 preview.ts 中的 syncAllRows() 执行批量上传
     */
     startSync: () => void;
+    /**
+     * 请求停止同步
+     * - 设置 shouldStop 标志
+     * - 显示确认对话框
+     */
+    requestStop: () => void;
+    /**
+     * 检查是否应该停止同步
+     * @returns 是否应该停止
+     */
+    checkShouldStop: () => boolean;
+    /**
+     * 重置停止标志
+     */
+    resetStopFlag: () => void;
 }
 export interface BGMUserInfo {
     /** 用户 ID */

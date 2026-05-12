@@ -60,17 +60,15 @@ export declare function openUserCollection(): void;
  */
 export declare function extractSubjectId(input: string): string;
 /**
- * 将观看状态文本转换为Bangumi API数值
- *
  * @function mapWatchStatus
  * @param {string} status - 观看状态文本
- * @returns {number} API数值：0=想看, 2=在看, 3=看过, 4=搁置, 5=抛弃
+ * @returns {number} API数值：1=想看, 2=在看, 3=看过, 4=搁置, 5=抛弃
  *
  * @description
  * 支持的状态文本映射：
  * - 看过/看完/已看/完/completed → 3
  * - 在看/在看动画/在追/追/watching → 2
- * - 想看/想看动画/否/wish → 0
+ * - 想看/想看动画/否/wish → 1
  * - 搁置/暂停/on_hold → 4
  * - 抛弃/弃/弃番/drop/dropped → 5
  *
@@ -189,6 +187,7 @@ export declare function SyncToBangumiAsync(ws: any, colMap: Map<string, number>,
     success: number;
     fail: number;
     skip: number;
+    stopped: boolean;
 }>;
 /**
  * 清除指定工作表的 D 列颜色标记
