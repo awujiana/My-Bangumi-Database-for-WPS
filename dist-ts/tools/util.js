@@ -349,21 +349,20 @@ function tryGetProperty(cell, prop) {
         const val = cell[prop];
         if (typeof val === 'function') {
             try {
-                return val();
+                const result = val();
+                if (typeof result === 'function' && result.toString().includes('[native code]')) {
+                    return undefined;
+                }
+                return result;
             }
             catch {
-                return val;
+                return undefined;
             }
         }
         if (val && typeof val === 'object' && typeof val.toString === 'function') {
             const str = val.toString();
             if (str.includes('function') || str.includes('[native code]')) {
-                try {
-                    return val();
-                }
-                catch {
-                    return val;
-                }
+                return undefined;
             }
         }
         return val;
@@ -381,10 +380,16 @@ function tryGetProperty(cell, prop) {
 function getCellRawValue(cell) {
     if (!cell)
         return null;
-    return tryGetProperty(cell, 'Value2') ??
-        tryGetProperty(cell, 'Value') ??
-        tryGetProperty(cell, 'Text') ??
-        null;
+    const val2 = tryGetProperty(cell, 'Value2');
+    if (val2 !== undefined && val2 !== null)
+        return val2;
+    const val = tryGetProperty(cell, 'Value');
+    if (val !== undefined && val !== null)
+        return val;
+    const text = tryGetProperty(cell, 'Text');
+    if (text !== undefined && text !== null)
+        return text;
+    return null;
 }
 /**
  * 获取单元格的值
@@ -747,23 +752,58 @@ export function delay(ms) {
  * @param endCol 结束列
  * @returns 字符串二维数组
  */
+function isNativeCode(val) {
+    if (typeof val === 'function') {
+        const str = val.toString();
+        return str.includes('[native code]') || str.includes('function Value()');
+    }
+    if (val && typeof val === 'object' && typeof val.toString === 'function') {
+        const str = val.toString();
+        return str.includes('[native code]') || str.includes('function Value()');
+    }
+    return false;
+}
+function safeCellValue(cell) {
+    if (cell == null)
+        return '';
+    if (isNativeCode(cell))
+        return '';
+    if (typeof cell === 'function') {
+        try {
+            const result = cell();
+            if (isNativeCode(result))
+                return '';
+            return result == null ? '' : String(result);
+        }
+        catch {
+            return '';
+        }
+    }
+    if (typeof cell === 'object' && cell.toString) {
+        const str = cell.toString();
+        if (isNativeCode(str) || isNativeCode(cell))
+            return '';
+        return str;
+    }
+    return String(cell);
+}
 export function readRangeValues(ws, startRow, endRow, startCol, endCol) {
     try {
         const range = ws.Range(`${colNumToLetter(startCol)}${startRow}:${colNumToLetter(endCol)}${endRow}`);
-        const raw = range?.Value2;
+        const raw = tryGetProperty(range, 'Value2');
         if (!raw)
             return [];
         // 处理单个值的情况
         if (!Array.isArray(raw)) {
-            return [[raw == null ? '' : String(raw)]];
+            return [[safeCellValue(raw)]];
         }
         const result = [];
         for (const row of raw) {
             if (!Array.isArray(row)) {
-                result.push([row == null ? '' : String(row)]);
+                result.push([safeCellValue(row)]);
             }
             else {
-                result.push(row.map((cell) => (cell == null ? '' : String(cell))));
+                result.push(row.map((cell) => safeCellValue(cell)));
             }
         }
         return result;

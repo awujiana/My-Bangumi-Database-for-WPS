@@ -157,16 +157,6 @@ export declare function sleep(ms: number): void;
  * @returns Promise
  */
 export declare function delay(ms: number): Promise<void>;
-/**
- * 批量读取工作表中指定范围的所有值，返回字符串二维数组 [行][列]
- * 如果读取失败则返回空数组，调用方应处理空数组情况
- * @param ws 工作表对象
- * @param startRow 起始行
- * @param endRow 结束行
- * @param startCol 起始列
- * @param endCol 结束列
- * @returns 字符串二维数组
- */
 export declare function readRangeValues(ws: any, startRow: number, endRow: number, startCol: number, endCol: number): string[][];
 /**
  * 获取或设置缓存
