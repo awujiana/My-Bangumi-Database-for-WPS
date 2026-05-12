@@ -55,7 +55,7 @@ function createFieldGetter(allData, colMap, startRow, ws) {
  */
 function isCellMarkedSuccess(ws, row, colMap) {
     try {
-        const seqCol = colMap.get('序列号') || 9;
+        const seqCol = colMap.get('序列号') || 4;
         const cell = getCell(ws, row, seqCol);
         if (!cell?.Interior)
             return false;
@@ -72,7 +72,7 @@ function isCellMarkedSuccess(ws, row, colMap) {
  * 标记单元格同步结果颜色
  */
 function markCellColor(ws, row, status, colMap) {
-    const seqCol = colMap.get('序列号') || 9;
+    const seqCol = colMap.get('序列号') || 4;
     const cell = getCell(ws, row, seqCol);
     if (cell?.Interior) {
         cell.Interior.Color = status === 'success' ? BGM_COLOR.SUCCESS : BGM_COLOR.FAIL;

@@ -874,9 +874,14 @@ export function getColumnMap(ws, headerRow) {
     const cacheKey = `${sheetName}:columnMap:${headerRow}`;
     return cacheGet(cacheKey, () => {
         const colMap = new Map();
+        let firstNonEmptyCol;
         const lastCol = 50;
         for (let i = 1; i <= lastCol; i++) {
             const colName = trim(String(getCellValue(ws, headerRow, i)));
+            // 记录第一个非空列作为序列号列
+            if (!firstNonEmptyCol && colName) {
+                firstNonEmptyCol = i;
+            }
             if (!colName)
                 continue;
             for (const [pattern, key] of COLUMN_RULES) {
@@ -885,6 +890,10 @@ export function getColumnMap(ws, headerRow) {
                     break; // 每个列名只匹配第一个规则
                 }
             }
+        }
+        // 如果没有通过规则匹配到序列号列，使用第一个非空列
+        if (!colMap.has('序列号') && firstNonEmptyCol) {
+            colMap.set('序列号', firstNonEmptyCol);
         }
         return colMap;
     });

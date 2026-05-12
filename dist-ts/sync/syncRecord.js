@@ -141,7 +141,7 @@ function buildCache(sheet) {
  * 设置同步记录的颜色标记
  */
 function setSyncRecordColors(sheet, row, status, count) {
-    // 序号列（A列）
+    // 序号列（默认A列）
     const seqCell = sheet.Range(`${colNumToLetter(COL.SEQ)}${row}`);
     if (seqCell?.Interior) {
         if (status === SYNC_STATUS.FAIL) {

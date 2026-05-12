@@ -112,9 +112,9 @@ function createFieldGetter(
 /**
  * 检查单元格是否已标记为成功（颜色判断）
  */
-function isCellMarkedSuccess(ws: any, row: number, colMap: Map<string, number>): boolean {
+function isCellMarkedSuccess(ws: WpsWorksheet | null | undefined, row: number, colMap: Map<string, number>): boolean {
     try {
-        const seqCol = colMap.get('序列号') || 9;
+        const seqCol = colMap.get('序列号') || 4;
         const cell = getCell(ws, row, seqCol) as WpsRange | null;
         if (!cell?.Interior) return false;
         const color = cell.Interior.Color;
@@ -129,8 +129,8 @@ function isCellMarkedSuccess(ws: any, row: number, colMap: Map<string, number>):
 /**
  * 标记单元格同步结果颜色
  */
-function markCellColor(ws: any, row: number, status: 'success' | 'fail', colMap: Map<string, number>): void {
-    const seqCol = colMap.get('序列号') || 9;
+function markCellColor(ws: WpsWorksheet | null | undefined, row: number, status: 'success' | 'fail', colMap: Map<string, number>): void {
+    const seqCol = colMap.get('序列号') || 4;
     const cell = getCell(ws, row, seqCol) as WpsRange | null;
     if (cell?.Interior) {
         cell.Interior.Color = status === 'success' ? BGM_COLOR.SUCCESS : BGM_COLOR.FAIL;

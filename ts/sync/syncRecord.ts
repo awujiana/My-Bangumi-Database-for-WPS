@@ -12,7 +12,7 @@ import {
     BGM_CONFIG, LOG_LEVELS, SYNC_STATUS, BGM_COLOR, bgmLog, getApp,setCellValue,
     trim, isEmptyValue, BGM, getLastRow, colNumToLetter,
     SYNC_RECORD_COLUMNS, SYNC_RECORD_SHEET_NAME,
-    getCellValue
+    getCellValue,WpsWorksheet 
 } from '../index.js';
 
 export interface SyncRecord {
@@ -196,8 +196,8 @@ function buildCache(sheet: any): void {
 /**
  * 设置同步记录的颜色标记
  */
-function setSyncRecordColors(sheet: any, row: number, status: string, count: number): void {
-    // 序号列（A列）
+function setSyncRecordColors(sheet: WpsWorksheet , row: number, status: string, count: number): void {
+    // 序号列（默认A列）
     const seqCell = sheet.Range(`${colNumToLetter(COL.SEQ)}${row}`);
     if (seqCell?.Interior) {
         if (status === SYNC_STATUS.FAIL) {
