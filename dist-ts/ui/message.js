@@ -3,7 +3,7 @@
  * @module ui/message
  * @description 消息监听、消息处理、状态设置
  */
-import { BGM } from '../index.js';
+import { BGM, showAlert, showConfirm, updateTokenStatus, refreshSheets, refreshData } from '../index.js';
 // ========== 消息监听 ==========
 export function initMessageListener() {
     window.addEventListener('message', (event) => {
@@ -11,34 +11,23 @@ export function initMessageListener() {
         if (!data?.type)
             return;
         switch (data.type) {
-            case 'showDialog':
-                if (typeof window.showDialog === 'function') {
-                    window.showDialog(data.title || '\u63D0\u793A', data.message || '');
-                }
+            case 'showAlert':
+                showAlert(data.message || '', data.title);
                 break;
             case 'showConfirm':
-                if (typeof window.showConfirmDialog === 'function') {
-                    window.showConfirmDialog(data.message || '', () => {
-                        const callback = window._bgmConfirmCallback;
-                        if (callback?.confirm)
-                            callback.confirm();
-                    });
-                }
+                showConfirm(data.message || '', (confirmed) => {
+                    if (confirmed)
+                        BGM.sync.startSync();
+                });
                 break;
             case 'updateToken':
-                if (typeof window.updateTokenStatus === 'function') {
-                    window.updateTokenStatus();
-                }
+                updateTokenStatus();
                 break;
             case 'refreshSheets':
-                if (typeof window.refreshSheets === 'function') {
-                    window.refreshSheets();
-                }
+                refreshSheets();
                 break;
             case 'refreshData':
-                if (typeof window.refreshData === 'function') {
-                    window.refreshData();
-                }
+                refreshData();
                 break;
         }
     });

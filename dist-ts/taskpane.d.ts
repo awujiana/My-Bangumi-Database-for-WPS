@@ -3,7 +3,7 @@
  * @module taskpane
  * @description 面板初始化、事件绑定、核心逻辑
  */
-import { markUploadedItems } from './index.js';
+import { markUploadedItems, WpsWorksheet } from './index.js';
 declare function toggleSheetLock(): void;
 declare function refreshSheets(): void;
 declare function autoDetectSheet(): {
@@ -13,7 +13,7 @@ declare function autoDetectSheet(): {
     matchCount: number;
     colCount: number;
 } | null;
-declare function updateFilterStatus(targetWs?: any): void;
+declare function updateFilterStatus(targetWs?: WpsWorksheet): void;
 declare function refreshData(): void;
 declare function onSelectModeChange(): void;
 declare function initPanel(): void;

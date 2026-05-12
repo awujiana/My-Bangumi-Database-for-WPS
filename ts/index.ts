@@ -294,6 +294,14 @@ export interface BGMSync {
     isRunning: boolean;
     /** 上次同步时间（ISO 格式） */
     lastSyncTime: string | null;
+     /**
+     * 启动同步流程（由“全面同步”按钮触发）
+     * - 防重复：如果 isRunning === true 则提示并返回
+     * - 检查 BGM.dataPreview 是否已加载
+     * - 调用 preview.ts 中的 syncAllRows() 执行批量上传
+     */
+    startSync: () => void;
+  
 }
 
 // ========== BGM 用户信息 ==========
@@ -335,6 +343,9 @@ export {
     // 显示预览内容
     previewSyncContent,
     closeDetailModal,
+    syncAllRows,
+
+    
 } from './ui/preview.js';
 
 // ============================================================================

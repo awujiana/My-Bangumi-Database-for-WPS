@@ -35,9 +35,7 @@ export interface WpsWorksheet {
     Columns: WpsColumns;
     AutoFilter?: WpsAutoFilter;
     AutoFilterMode?: boolean;
-    /** 已用区域 */
     UsedRange?: WpsRange;
-    /** 保护状态 */
     Activate(): void;
     Calculate(): void;
     Range(address: string): WpsRange;
@@ -82,10 +80,10 @@ export interface WpsRange {
     Column: number;
     Rows: WpsRows;
     Columns: WpsColumns;
-    Value?: unknown;
-    Value2?: unknown;
-    Text?: string;
-    Formula?: string;
+    Value?: any;
+    Value2?: any;
+    Text?: any;
+    Formula?: any;
     Interior?: WpsInterior;
     Font?: WpsFont;
     Areas?: WpsAreas;

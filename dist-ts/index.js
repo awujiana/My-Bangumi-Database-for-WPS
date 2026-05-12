@@ -188,7 +188,7 @@ refreshData, } from './taskpane.js';
 // 预览函数
 export { 
 // 显示预览内容
-previewSyncContent, closeDetailModal, } from './ui/preview.js';
+previewSyncContent, closeDetailModal, syncAllRows, } from './ui/preview.js';
 // ============================================================================
 // 14. WPS 操作接口（类型守卫与类型定义）
 // ============================================================================

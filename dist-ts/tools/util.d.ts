@@ -1,4 +1,4 @@
-import { LOG_LEVELS, ERROR_LEVELS, ErrorLevel, type DialogOptions, type ErrorOptions, type WpsApplication, BgmError, BGMCache, BGMSheet, BGMSync, BGMUserInfo, WpsWorksheet } from '../index.js';
+import { LOG_LEVELS, ERROR_LEVELS, ErrorLevel, type DialogOptions, type ErrorOptions, type WpsApplication, BgmError, BGMCache, BGMSheet, type BGMSync, BGMUserInfo, WpsWorksheet, WpsRange } from '../index.js';
 export declare const BGM: {
     cache: BGMCache;
     sheet: BGMSheet;
@@ -9,7 +9,7 @@ export declare const BGM: {
     ErrorLevel: typeof ErrorLevel;
     BgmError: typeof BgmError;
     dataPreview?: {
-        ws: any;
+        ws: WpsWorksheet | null | undefined;
         visibleRows: number[];
         headerRow: number;
         dataStartRow: number;
@@ -49,7 +49,7 @@ export declare const BGM: {
  * @param level - 日志级别 (0=DEBUG, 1=INFO, 2=WARN, 3=ERROR)
  * @param message - 日志消息
  */
-export declare function bgmLog(level: number, message: string): void;
+export declare function bgmLog(level: number, message: string | null | undefined): void;
 /**
  * 获取 Application 对象（使用类型守卫）
  */
@@ -58,17 +58,27 @@ export declare function getApp(): WpsApplication | null;
  * 列号转字母 (A, B, ..., Z, AA, AB, ...)
  */
 export declare function colNumToLetter(col: number): string;
-export declare function getCell(ws: unknown, row: number, col: number): any | null;
-export declare function getCellValue(ws: unknown, row: number, col: number): string;
+export declare function getCell(ws: WpsWorksheet | null | undefined, row: number, col: number): WpsRange | null;
 /**
- * 读取单元格文本，基于 ws.Range 安全访问
- *
+ * 安全获取单元格值（字符串形式）
+ * @param ws  WPS 工作表
+ * @param row 行号 (1‑based)
+ * @param col 列号 (1‑based)
+ * @returns   单元格值的字符串形式，若无法获取则返回空字符串
  */
-export declare function readCell(ws: unknown, row: number, col: number): string;
+export declare function getCellValue(ws: WpsWorksheet | null | undefined, row: number, col: number): string;
+/**
+ * 读取单元格文本，兼容多种取值方式，且不依赖 Cells 方法
+ * @param ws  WPS 工作表
+ * @param row 行号 (1‑based)
+ * @param col 列号 (1‑based)
+ * @returns   单元格文本，若无法读取则返回空字符串
+ */
+export declare function readCell(ws: WpsWorksheet | null | undefined, row: number, col: number): string;
 /**
  * 设置单元格值
  */
-export declare function setCellValue(ws: unknown, row: number, col: number, value: unknown): boolean;
+export declare function setCellValue(ws: WpsWorksheet | null | undefined, row: number, col: number, value: unknown): boolean;
 /**
  * 获取工作表对象
  */
@@ -183,11 +193,12 @@ export declare function clearSheetCache(ws: any): void;
  */
 export declare function getLastRow(ws: WpsWorksheet | null | undefined, forceRefresh?: boolean, headerRow?: number): number;
 export declare function isEmptyValue(val: any): boolean;
-export declare function getDataSheet(): any;
+export declare function getDataSheet(): WpsWorksheet | null | undefined;
 /**
  * 计算 Excel 行数据的指纹（用于增量同步比较）
  * @param fields 关键字段值数组，如 [name, type, rate, tags, comment]
  * @returns 指纹字符串
  */
 export declare function calcFingerprint(fields: string[]): string;
+export declare function safeActivate(ws: WpsWorksheet | null | undefined): void;
 //# sourceMappingURL=util.d.ts.map

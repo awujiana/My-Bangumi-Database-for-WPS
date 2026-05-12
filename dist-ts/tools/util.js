@@ -1,4 +1,4 @@
-import { BGM_CONFIG, LOG_LEVELS, ERROR_LEVELS, PANEL_CONFIG, ErrorLevel, isWpsApp, BgmError, encryptToken, decryptToken, calcChecksum, COLUMN_RULES, HEADER_KEYWORDS } from '../index.js';
+import { BGM_CONFIG, LOG_LEVELS, ERROR_LEVELS, PANEL_CONFIG, ErrorLevel, isWpsApp, BgmError, encryptToken, decryptToken, calcChecksum, COLUMN_RULES, HEADER_KEYWORDS, syncAllRows } from '../index.js';
 import { BGM_EVENTS, eventBus } from '../tools/events.js';
 // ========== BGM 全局命名空间 ==========
 export const BGM = {
@@ -20,6 +20,30 @@ export const BGM = {
     sync: {
         isRunning: false,
         lastSyncTime: new Date().toISOString(),
+        startSync() {
+            // 防重复
+            if (this.isRunning) {
+                BGM.Dialog.alert('同步正在进行中，请稍后,不要重复点击', '提示');
+                return;
+            }
+            // 检查数据预览是否已加载
+            if (!BGM.dataPreview?.ws) {
+                BGM.Dialog.alert('请先在预览面板中加载数据', '提示');
+                return;
+            }
+            this.isRunning = true;
+            bgmLog(LOG_LEVELS.INFO, '开始执行同步...');
+            // 调用 preview 模块中的批量同步函数，该函数会自行检查 Token 和逐行上传
+            syncAllRows()
+                .then(() => {
+                this.isRunning = false;
+                bgmLog(LOG_LEVELS.INFO, '同步完成');
+            })
+                .catch((err) => {
+                this.isRunning = false;
+                BGM.handleError(err, { showAlert: true }); // 自动带上函数名和错误详情
+            });
+        }
     },
     // 日志级别（0=DEBUG, 1=INFO, 2=WARN, 3=ERROR）
     LOG_LEVEL: LOG_LEVELS.INFO,
@@ -153,6 +177,10 @@ export const BGM = {
             context: '',
             ...options
         };
+        // ✅ 自动获取调用函数名（如果 context 未手动指定）
+        if (!opts.context) {
+            opts.context = getCallerFunctionName();
+        }
         let bgmError;
         if (error instanceof BgmError) {
             bgmError = error;
@@ -207,12 +235,15 @@ export const BGM = {
     notifyTokenUpdated() {
         eventBus.emit(BGM_EVENTS.TOKEN_UPDATED);
     },
+    // 同步进度更新
     setSyncProgress(current, total, message) {
         eventBus.emit(BGM_EVENTS.SYNC_PROGRESS, { current, total, message });
     },
+    // 同步完成，结果可选（成功/失败/跳过数量）
     setSyncComplete(results) {
         eventBus.emit(BGM_EVENTS.SYNC_COMPLETED, results);
     },
+    // 同步错误更新
     setSyncError(error) {
         eventBus.emit(BGM_EVENTS.SYNC_ERROR, error);
     }
@@ -225,9 +256,38 @@ export const BGM = {
  */
 export function bgmLog(level, message) {
     if (level >= BGM.LOG_LEVEL) {
-        const prefix = ['[DEBUG]', '[INFO]', '[WARN]', '[ERROR]'][level] || '[INFO]';
-        console.log(prefix + ' ' + message);
+        const prefixes = ['[DEBUG]', '[INFO]', '[WARN]', '[ERROR]'];
+        const prefix = prefixes[level] ?? '[INFO]';
+        console.log(prefix + ' ' + (message ?? ''));
     }
+}
+/**
+ * 从调用栈中提取第一个非内部函数的名称
+ * @param skipAdditional 额外跳过的帧数（备用，通常无需传）
+ */
+function getCallerFunctionName(skipAdditional = 0) {
+    const e = new Error();
+    const stack = e.stack || '';
+    const lines = stack.split('\n');
+    // 需要跳过的内部函数名列表
+    const internalFuncs = [
+        'getCallerFunctionName',
+        'handleError',
+        'safeExecute',
+        'BGM.handleError',
+        'BGM.safeExecute',
+    ];
+    for (let i = 2; i < lines.length; i++) {
+        const line = lines[i].trim();
+        const match = /at\s+([^\s(]+)/.exec(line);
+        if (match) {
+            const name = match[1];
+            if (!internalFuncs.includes(name)) {
+                return name;
+            }
+        }
+    }
+    return 'unknown';
 }
 // ========== Application 获取 ==========
 /**
@@ -261,91 +321,77 @@ export function colNumToLetter(col) {
     return letter;
 }
 export function getCell(ws, row, col) {
-    try {
-        const sheet = ws;
-        if (!sheet || typeof sheet.Range !== 'function')
-            return null;
-        return sheet.Range(colNumToLetter(col) + row);
-    }
-    catch {
+    if (!ws)
         return null;
-    }
+    const address = colNumToLetter(col) + row;
+    return ws.Range(address);
 }
+/**
+ * 安全获取单元格值（字符串形式）
+ * @param ws  WPS 工作表
+ * @param row 行号 (1‑based)
+ * @param col 列号 (1‑based)
+ * @returns   单元格值的字符串形式，若无法获取则返回空字符串
+ */
 export function getCellValue(ws, row, col) {
+    if (!ws)
+        return '';
+    const cell = getCell(ws, row, col);
+    if (!cell)
+        return '';
+    let raw;
     try {
-        const sheet = ws;
-        if (!sheet || typeof sheet.Range !== 'function')
-            return '';
-        const addr = colNumToLetter(col) + row;
-        const cell = sheet.Range(addr);
-        if (!cell)
-            return '';
-        let raw;
+        raw = cell.Value2;
+        if (typeof raw === 'function')
+            raw = raw();
+    }
+    catch { }
+    if (raw === undefined || raw === null) {
         try {
-            raw = cell.Value2;
+            raw = cell.Value;
             if (typeof raw === 'function')
                 raw = raw();
         }
         catch { }
-        if (raw === undefined || raw === null) {
-            try {
-                raw = cell.Value;
-                if (typeof raw === 'function')
-                    raw = raw();
-            }
-            catch { }
-        }
-        if (raw === undefined || raw === null) {
-            try {
-                raw = typeof cell.Text === 'function' ? cell.Text() : cell.Text;
-            }
-            catch { }
-        }
-        return raw != null ? String(raw) : '';
     }
-    catch (e) {
-        return '';
+    if (raw === undefined || raw === null) {
+        try {
+            raw = typeof cell.Text === 'function' ? cell.Text() : cell.Text;
+        }
+        catch { }
     }
+    return raw != null ? String(raw) : '';
 }
 /**
- * 读取单元格文本，基于 ws.Range 安全访问
- *
+ * 读取单元格文本，兼容多种取值方式，且不依赖 Cells 方法
+ * @param ws  WPS 工作表
+ * @param row 行号 (1‑based)
+ * @param col 列号 (1‑based)
+ * @returns   单元格文本，若无法读取则返回空字符串
  */
 export function readCell(ws, row, col) {
-    try {
-        const sheet = ws;
-        if (!sheet || typeof sheet.Range !== 'function')
-            return '';
-        const address = colNumToLetter(col) + row;
-        const cell = sheet.Range(address);
-        if (!cell)
-            return '';
-        let raw = undefined;
-        // ---- 安全取值，兼容 Value2 / Value 为函数的情况 ----
-        // 优先取 Value2
-        if ('Value2' in cell) {
-            raw = cell.Value2;
-            if (typeof raw === 'function') {
-                raw = raw(); // ← 关键：调用函数拿到真实值
-            }
-        }
-        // 若 Value2 无效，尝试 Value
-        if ((raw === undefined || raw === null) && 'Value' in cell) {
-            raw = cell.Value;
-            if (typeof raw === 'function') {
-                raw = raw();
-            }
-        }
-        // 最后尝试 Text（可能是函数）
-        if ((raw === undefined || raw === null) && 'Text' in cell) {
-            const txt = cell.Text;
-            raw = typeof txt === 'function' ? txt() : txt;
-        }
-        return raw != null ? String(raw) : '';
-    }
-    catch {
+    if (!ws)
         return '';
+    const address = colNumToLetter(col) + row;
+    const cell = ws.Range(address);
+    if (!cell)
+        return '';
+    let raw = undefined;
+    if ('Value2' in cell) {
+        raw = cell.Value2;
+        if (typeof raw === 'function')
+            raw = raw();
     }
+    if ((raw === undefined || raw === null) && 'Value' in cell) {
+        raw = cell.Value;
+        if (typeof raw === 'function')
+            raw = raw();
+    }
+    if ((raw === undefined || raw === null) && 'Text' in cell) {
+        const txt = cell.Text;
+        raw = typeof txt === 'function' ? txt() : txt;
+    }
+    return raw != null ? String(raw) : '';
 }
 /**
  * 设置单元格值
@@ -904,4 +950,12 @@ export function calcFingerprint(fields) {
     const raw = fields.join('|');
     // 复用已有的 calcChecksum 生成简短校验和，或直接返回原始字符串前 50 字符
     return calcChecksum(raw).toString(16).padStart(4, '0');
+}
+export function safeActivate(ws) {
+    if (ws && typeof ws.Activate === 'function') {
+        ws.Activate();
+    }
+    else {
+        bgmLog(LOG_LEVELS.WARN, 'safeActivate: 无法激活工作表');
+    }
 }

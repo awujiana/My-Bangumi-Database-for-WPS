@@ -1,5 +1,5 @@
 
-import {  WPS_ENUM, XL, BGM_CONFIG, BGM_COLOR, LOG_LEVELS, ERROR_LEVELS, PANEL_CONFIG, BGM_SUBJECT_TYPES, SYNC_STATUS,ErrorLevel, type DialogOptions, type ErrorOptions,isWpsApp, type WpsApplication,BgmError,encryptToken, decryptToken, calcChecksum,COLUMN_RULES,COLUMNS,HEADER_KEYWORDS,BGMCache,BGMSheet,BGMSync,BGMUserInfo,WpsWorksheet ,WpsRange,syncAllRows} from '../index.js';
+import {  WPS_ENUM, XL, BGM_CONFIG, BGM_COLOR, LOG_LEVELS, ERROR_LEVELS, PANEL_CONFIG, BGM_SUBJECT_TYPES, SYNC_STATUS,ErrorLevel, type DialogOptions, type ErrorOptions,isWpsApp, type WpsApplication,BgmError,encryptToken, decryptToken, calcChecksum,COLUMN_RULES,COLUMNS,HEADER_KEYWORDS,BGMCache,BGMSheet,type BGMSync,BGMUserInfo,WpsWorksheet ,WpsRange,syncAllRows } from '../index.js';
 
 import { BGM_EVENTS ,eventBus } from '../tools/events.js';  
 // ========== BGM 全局命名空间 ==========
@@ -67,7 +67,7 @@ export const BGM: {
         startSync() {
         // 防重复
         if (this.isRunning) {
-            BGM.Dialog.alert('同步正在进行中，请稍后');
+            BGM.Dialog.alert('同步正在进行中，请稍后,不要重复点击', '提示');
             return;
         }
 
@@ -278,13 +278,16 @@ export const BGM: {
     notifyTokenUpdated() {
         eventBus.emit(BGM_EVENTS.TOKEN_UPDATED);
     },
-    setSyncProgress(current, total, message) {
+    // 同步进度更新
+    setSyncProgress(current: number, total: number, message: string) {
         eventBus.emit(BGM_EVENTS.SYNC_PROGRESS, { current, total, message });
     },
-    setSyncComplete(results?) {
+    // 同步完成，结果可选（成功/失败/跳过数量）
+    setSyncComplete(results?: unknown) {
         eventBus.emit(BGM_EVENTS.SYNC_COMPLETED, results);
     },
-    setSyncError(error) {
+    // 同步错误更新
+    setSyncError(error: unknown) {
         eventBus.emit(BGM_EVENTS.SYNC_ERROR, error);
     }
 }

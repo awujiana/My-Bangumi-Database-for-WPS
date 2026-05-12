@@ -459,3 +459,106 @@ export function viewSyncRecordDetail(sid) {
     const detail = `同步记录详情\n\n名称: ${record.name || ""}\nSID: ${record.sid || ""}\nURL: ${record.url || ""}\n时间: ${record.time || ""}\n状态: ${record.status || ""}\n同步次数: ${record.count || ""}\n备注: ${record.message || ""}\n\n同步内容:\n${content}`;
     safeAlert(detail, '同步记录详情');
 }
+/**
+ * 一键同步所有可见数据行（由 BGM.sync.startSync 调用）
+ * - 依赖 BGM.dataPreview 中的预览数据
+ * - 跳过无 Bangumi URL 或无法提取 Subject ID 的行
+ * - 调用 bgmRequestSync 执行单条同步
+ * - 标记成功/失败颜色，更新同步记录
+ * - 通过事件总线通知进度
+ * @returns 同步结果统计 { success: number; fail: number; skip: number }
+ */
+export async function syncAllRows() {
+    const dp = BGM.dataPreview;
+    if (!dp?.ws) {
+        showToast('请先在预览面板中加载数据', 'warn');
+        return { success: 0, fail: 0, skip: 0 };
+    }
+    const token = loadBgToken();
+    if (!token) {
+        safeAlert('请先设置 Bangumi Token！');
+        return { success: 0, fail: 0, skip: 0 };
+    }
+    const { ws, visibleRows, headerRow, dataStartRow } = dp;
+    const dataRows = visibleRows.filter(r => r !== headerRow && r >= dataStartRow);
+    if (dataRows.length === 0) {
+        showToast('没有可同步的数据行', 'info');
+        return { success: 0, fail: 0, skip: 0 };
+    }
+    const colMap = getColumnMap(ws, headerRow);
+    if (!colMap || colMap.size === 0) {
+        showToast('无法读取列映射', 'error');
+        return { success: 0, fail: 0, skip: 0 };
+    }
+    let successCount = 0;
+    let failCount = 0;
+    let skipCount = 0;
+    const total = dataRows.length;
+    bgmLog(LOG_LEVELS.INFO, `开始批量同步，共 ${total} 行`);
+    for (let i = 0; i < dataRows.length; i++) {
+        const rowNum = dataRows[i];
+        try {
+            const rowData = getRowData(ws, rowNum, colMap, headerRow, 4);
+            // 跳过没有有效 URL 和 sid 的行
+            if (!rowData.bgmUrl || !rowData.sid) {
+                skipCount++;
+                bgmLog(LOG_LEVELS.DEBUG, `跳过行 ${rowNum} (无 Bangumi URL 或 sid)`);
+                continue;
+            }
+            const jsonBody = buildJsonPayload(ws, rowNum, colMap, rowData.finishedDate);
+            if (!jsonBody) {
+                failCount++;
+                bgmLog(LOG_LEVELS.WARN, `行 ${rowNum} 无法构建请求体`);
+                continue;
+            }
+            // 发送 API 请求
+            const result = bgmRequestSync('POST', `/v0/users/${_getUserApiPath()}/collections/${rowData.sid}`, jsonBody, token);
+            const statusCode = result?.code || 0;
+            const seqCell = getCell(ws, rowNum, 4);
+            if ([200, 201, 202, 204].includes(statusCode)) {
+                // 成功：标记绿色
+                if (seqCell?.Interior)
+                    seqCell.Interior.Color = BGM_COLOR.SUCCESS;
+                successCount++;
+                addSyncRecord({
+                    name: rowData.name || '(无名称)',
+                    url: rowData.bgmUrl,
+                    sid: rowData.sid,
+                    content: jsonBody,
+                    status: '成功',
+                    message: `行 ${rowNum}`,
+                    count: 1,
+                });
+            }
+            else {
+                // 失败：标记红色
+                if (seqCell?.Interior)
+                    seqCell.Interior.Color = BGM_COLOR.FAIL;
+                failCount++;
+                addSyncRecord({
+                    name: rowData.name || '(无名称)',
+                    url: rowData.bgmUrl,
+                    sid: rowData.sid,
+                    content: jsonBody,
+                    status: '失败',
+                    message: result?.message || `HTTP ${statusCode}`,
+                    count: 1,
+                });
+            }
+        }
+        catch (e) {
+            failCount++;
+            BGM.handleError(e, { level: BGM.ErrorLevel.ERROR, context: `syncAllRows:行${rowNum}` });
+            // 确保失败时也标记颜色
+            const seqCell = getCell(ws, rowNum, 4);
+            if (seqCell?.Interior)
+                seqCell.Interior.Color = BGM_COLOR.FAIL;
+        }
+        // 更新进度
+        BGM.setSyncProgress(i + 1, total, `同步中 ${i + 1}/${total}`);
+    }
+    const stats = { success: successCount, fail: failCount, skip: skipCount };
+    BGM.setSyncComplete(stats);
+    bgmLog(LOG_LEVELS.INFO, `批量同步完成：成功 ${successCount}，失败 ${failCount}，跳过 ${skipCount}`);
+    return stats;
+}

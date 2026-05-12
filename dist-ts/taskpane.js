@@ -340,7 +340,13 @@ function updateFilterStatus(targetWs) {
     if (!el)
         return;
     const app = getApp();
-    const ws = targetWs || app?.ActiveWorkbook?.ActiveSheet;
+    const sheet = targetWs || app?.ActiveWorkbook?.ActiveSheet;
+    if (!sheet) {
+        // 处理：显示提示、返回等
+        return;
+    }
+    // 现在 sheet 被收窄为 WpsWorksheet
+    const ws = sheet;
     if (!ws) {
         el.textContent = '未连接到工作表';
         return;
@@ -456,7 +462,7 @@ function refreshData() {
         updateFilterStatus();
         return;
     }
-    let ws;
+    let ws = null;
     try {
         ws = app.ActiveWorkbook.Worksheets.Item(sheetIndex);
     }

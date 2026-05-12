@@ -191,11 +191,14 @@ export function onAction(action: string): void {
             if (typeof testSingleUpdate === 'function') testSingleUpdate();
             break;
         case 'clear':
-            showConfirm(_T.confirmClearMarks, '确认', () => {
-                if (typeof clearRowColors === 'function') clearRowColors();
-                if (typeof refreshData === 'function') refreshData();
-            });
-            break;
+           case 'clear':
+                     showConfirm(_T.confirmClearMarks, (confirmed) => {
+                         if (confirmed) {
+                             if (typeof clearRowColors === 'function') clearRowColors();
+                             if (typeof refreshData === 'function') refreshData();
+                         }
+                     });
+                    break;
         case 'setToken':
             showTokenDialog(loadBgToken() || '');
             break;
@@ -206,9 +209,11 @@ export function onAction(action: string): void {
             showUserIdDialog();
             break;
         case 'showClearConfirm':
-            showConfirm(_T.confirmClearMarks, '确认', () => {
-                if (typeof clearRowColors === 'function') clearRowColors();
-                if (typeof refreshData === 'function') refreshData();
+            showConfirm(_T.confirmClearMarks, (confirmed) => {
+                if (confirmed) {
+                    if (typeof clearRowColors === 'function') clearRowColors();
+                    if (typeof refreshData === 'function') refreshData();
+                }
             });
             break;
         case 'tokenUpdated':
@@ -290,7 +295,7 @@ export async function syncFromPanel(): Promise<void> {
 ${conflictMsg}是否继续同步？`;
 
     const confirmed = await new Promise<boolean>(resolve => {
-        showConfirm(msg, '同步确认', () => resolve(true), () => resolve(false));
+        showConfirm(msg, (confirmed) => resolve(confirmed));
     });
     if (!confirmed) return;
 
@@ -369,8 +374,11 @@ export async function syncFromBgmByAPI(sheetIndex: number): Promise<void> {
     if (!token) { showAlert(_T.pleaseSetBgmToken); showTokenDialog(''); return; }
     showConfirm(
         '将 从 BGM API 获取你的收藏列表，并在 D 列标记已收藏的条目，同时写入同步记录表。\n\n是否继续？',
-        '确认',
-        async () => { await _doAPISync(sheetIndex, token); }
+        async (confirmed) => {
+            if (confirmed) {
+                await _doAPISync(sheetIndex, token);
+            }
+        }
     );
 }
 
@@ -522,11 +530,12 @@ function handleActionClick(event: Event): void {
         // 核心操作
         case 'sync':                syncFromPanel(); break;
         case 'test':                if (typeof testSingleUpdate === 'function') testSingleUpdate(); break;
-        case 'clear':               showConfirm(_T.confirmClearMarks, '确认', () => {
-                                        if (typeof clearRowColors === 'function') clearRowColors();
-                                        if (typeof refreshData === 'function') refreshData();
+        case 'clear':               showConfirm(_T.confirmClearMarks, (confirmed) => {
+                                        if (confirmed) {
+                                            if (typeof clearRowColors === 'function') clearRowColors();
+                                            if (typeof refreshData === 'function') refreshData();
+                                        }
                                     }); break;
-        case 'preview':             // 统一名称，支持旧写法
         case 'previewSyncContent':  // 新写法
                                     if (typeof previewSyncContent === 'function') previewSyncContent(); break;
         case 'setToken':            showTokenDialog(loadBgToken() || ''); break;

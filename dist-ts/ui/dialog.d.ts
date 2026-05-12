@@ -29,7 +29,7 @@ export interface DialogCallback {
     onCancel?: () => void;
 }
 export declare function showAlert(message: string, title?: string, onOk?: () => void): void;
-export declare function showConfirm(message: string, title?: string, onOk?: () => void, onCancel?: () => void): void;
+export declare function showConfirm(message: string, callback: (confirmed: boolean) => void, title?: string): void;
 export declare function showError(message: string, title?: string, onOk?: () => void): void;
 export declare function showWarning(message: string, title?: string, onOk?: () => void): void;
 export declare function showSuccess(message: string, title?: string, onOk?: () => void): void;
