@@ -105,8 +105,9 @@ export function testTokenValidityForRibbon(token?: string): void {
     }
 
     const xhr = new XMLHttpRequest();
-    xhr.open('GET', 'https://api.bgm.tv/v0/me', true);
+    xhr.open('GET', `${BGM_CONFIG.API_BASE}/v0/me`, true);
     xhr.setRequestHeader('Authorization', 'Bearer ' + testToken);
+    xhr.setRequestHeader('Content-Type', 'application/json');
 
     xhr.onload = () => {
         if (xhr.status === 200) {

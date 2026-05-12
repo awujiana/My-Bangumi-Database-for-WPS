@@ -513,14 +513,25 @@ export function loadBgToken() {
 /**
  * 设置 Bangumi 用户 ID（存储到全局缓存）
  * @param id - 用户 ID 字符串，不能为空
+ *
+ *
+ *
+ *  1.验证输入的用户ID是否为空
+    2.将用户ID存储到全局缓存 BGM.cache.userId 中
+    3.同时使用插件存储功能将用户ID持久化保存
+    4.触发用户ID更新事件通知其他模块
  */
 export function _setBgmUserId(id) {
-    if (!id || id.trim() === '') {
-        bgmLog(LOG_LEVELS.WARN, '_setBgmUserId: 忽略空的用户 ID');
+    if (!id || id.trim() === '')
         return;
+    const userId = id.trim();
+    BGM.cache.userId = userId;
+    // 持久化存储
+    const app = getApp();
+    if (app?.PluginStorage) {
+        app.PluginStorage.setItem('bgm_user_id', userId);
     }
-    BGM.cache.userId = id.trim();
-    bgmLog(LOG_LEVELS.DEBUG, `_setBgmUserId: 已设置 userId = ${id}`);
+    eventBus.emit(BGM_EVENTS.USER_ID_UPDATED);
 }
 /**
  * 获取 Bangumi 用户 ID（从全局缓存读取）

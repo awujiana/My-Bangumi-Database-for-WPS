@@ -136,6 +136,7 @@ export function testTokenValidity() {
     const xhr = new XMLHttpRequest();
     xhr.open('GET', 'https://api.bgm.tv/v0/me', true);
     xhr.setRequestHeader('Authorization', 'Bearer ' + token);
+    xhr.setRequestHeader('Content-Type', 'application/json');
     xhr.onload = () => {
         if (xhr.status === 200) {
             try {

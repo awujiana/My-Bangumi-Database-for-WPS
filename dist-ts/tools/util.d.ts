@@ -95,6 +95,13 @@ export declare function loadBgToken(): string | null;
 /**
  * 设置 Bangumi 用户 ID（存储到全局缓存）
  * @param id - 用户 ID 字符串，不能为空
+ *
+ *
+ *
+ *  1.验证输入的用户ID是否为空
+    2.将用户ID存储到全局缓存 BGM.cache.userId 中
+    3.同时使用插件存储功能将用户ID持久化保存
+    4.触发用户ID更新事件通知其他模块
  */
 export declare function _setBgmUserId(id: string): void;
 /**
