@@ -676,29 +676,25 @@ export function clearRowColors() {
 async function batchSyncRequests(tasks, token, userIdPath, concurrency = 5) {
     const success = [];
     const fail = [];
-    const MIN_INTERVAL = 100; // 最小间隔 100ms
+    const MIN_INTERVAL = 100;
     let lastRequestTime = 0;
     let stopped = false;
-    // 使用队列控制并发
     const queue = [...tasks];
     const executing = [];
     while (queue.length > 0 || executing.length > 0) {
-        // 检查是否应该停止
         if (BGM.sync.checkShouldStop()) {
             bgmLog(LOG_LEVELS.INFO, '[batchSyncRequests] 检测到停止请求，正在停止...');
             stopped = true;
-            // 等待正在执行的任务完成
             if (executing.length > 0) {
-                await Promise.all(executing);
+                await Promise.all(executing.map(e => e.promise));
             }
             break;
         }
-        // 填充执行队列到并发数
         while (executing.length < concurrency && queue.length > 0) {
             const task = queue.shift();
-            const promise = (async () => {
+            const entry = { promise: null, task, done: false };
+            entry.promise = (async () => {
                 try {
-                    // 动态请求间隔控制
                     const now = Date.now();
                     const elapsed = now - lastRequestTime;
                     if (elapsed < MIN_INTERVAL) {
@@ -708,25 +704,27 @@ async function batchSyncRequests(tasks, token, userIdPath, concurrency = 5) {
                     lastRequestTime = Date.now();
                     if (apiResult.code >= 200 && apiResult.code < 300) {
                         success.push(task);
+                        bgmLog(LOG_LEVELS.DEBUG, `[batchSyncRequests] SID ${task.sid} 同步成功，HTTP ${apiResult.code}`);
                     }
                     else {
                         fail.push(task);
+                        bgmLog(LOG_LEVELS.WARN, `[batchSyncRequests] SID ${task.sid} 同步失败，HTTP ${apiResult.code}，消息: ${apiResult.message}`);
                     }
                 }
                 catch (e) {
                     fail.push(task);
+                    bgmLog(LOG_LEVELS.ERROR, `[batchSyncRequests] SID ${task.sid} 同步异常: ${e.message}`);
+                }
+                finally {
+                    entry.done = true;
                 }
             })();
-            executing.push(promise);
+            executing.push(entry);
         }
-        // 等待至少一个任务完成
         if (executing.length > 0) {
-            await Promise.race(executing);
-            // 清理已完成的任务
+            await Promise.race(executing.map(e => e.promise));
             for (let i = executing.length - 1; i >= 0; i--) {
-                const promise = executing[i];
-                // 检查是否已完成（通过检查 success/fail 列表）
-                if (success.length + fail.length > 0) {
+                if (executing[i].done) {
                     executing.splice(i, 1);
                 }
             }
@@ -819,12 +817,19 @@ export async function SyncToBangumiAsync(ws, colMap, token, lastRow, headerRow, 
                 result.skip++;
                 continue;
             }
+            // 获取观看状态类型
+            const watchType = mapWatchStatus(watchStatusField);
+            if (watchType === 0) {
+                result.skip++;
+                bgmLog(LOG_LEVELS.WARN, `[SyncToBangumiAsync] 行 ${rowNum} 状态无效: "${watchStatusField}"`);
+                continue;
+            }
             // 增量同步指纹检查
             let currentFingerprint;
             if (fingerprintMap) {
                 currentFingerprint = calcFingerprint([
                     getField(rowNum, '名称'),
-                    mapWatchStatus(getField(rowNum, '是否看完') || getField(rowNum, '状态') || getField(rowNum, '观看状态')).toString(),
+                    watchType.toString(),
                     getField(rowNum, '打分'),
                     getField(rowNum, '标签/分级'),
                     getField(rowNum, '剧透/感言'),
@@ -858,7 +863,8 @@ export async function SyncToBangumiAsync(ws, colMap, token, lastRow, headerRow, 
                 name,
                 jsonBody,
                 fingerprint: currentFingerprint,
-                isUploaded
+                isUploaded,
+                type: watchType
             });
         }
         catch (e) {
@@ -884,6 +890,8 @@ export async function SyncToBangumiAsync(ws, colMap, token, lastRow, headerRow, 
     );
     // ========== 6. 批量更新 UI 和记录 ==========
     bgmLog(LOG_LEVELS.INFO, '[SyncToBangumiAsync] 步骤6: 批量更新 UI 和记录');
+    // 观看状态类型名称映射
+    const typeNames = { 1: '想看', 2: '在看', 3: '看过', 4: '搁置', 5: '抛弃' };
     // 批量更新成功项
     for (const task of successTasks) {
         // 标记颜色
@@ -897,7 +905,7 @@ export async function SyncToBangumiAsync(ws, colMap, token, lastRow, headerRow, 
                 name: task.name || `SID:${task.sid}`,
                 url: task.bgmUrl,
                 sid: task.sid,
-                type: '',
+                type: typeNames[task.type] || `类型${task.type}`,
                 content: task.jsonBody,
                 status: SYNC_STATUS.SUCCESS,
                 message: '批量同步成功',
@@ -918,7 +926,7 @@ export async function SyncToBangumiAsync(ws, colMap, token, lastRow, headerRow, 
                 name: task.name || `SID:${task.sid}`,
                 url: task.bgmUrl,
                 sid: task.sid,
-                type: '',
+                type: typeNames[task.type] || `类型${task.type}`,
                 content: task.jsonBody,
                 status: SYNC_STATUS.FAIL,
                 message: '批量同步失败',
