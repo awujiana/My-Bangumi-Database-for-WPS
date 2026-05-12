@@ -270,7 +270,7 @@ export const COLUMN_RULES: [RegExp, string][] = [
 
 export const COLUMNS = {
   /** 序列号列 */
-    SEQUENCE: 4,      // D列 - 序号
+    SEQUENCE: 9,      // I列 - 序号
     DEFAULT_START: 1,
     // 如果需要 NAME, URL, STATUS 也可以保留
      /** 名称列 */

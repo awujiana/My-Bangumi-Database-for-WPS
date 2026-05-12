@@ -21,7 +21,7 @@ function isUploadedByColor(seqCell) {
     const c = seqCell.Interior.Color;
     return c === BGM_COLOR.SUCCESS || c === BGM_COLOR.LIGHT_GREEN || c === BGM_COLOR.DARK_GREEN;
 }
-function getRowData(ws, rowNum, colMap, headerRow, seqCol = 4) {
+function getRowData(ws, rowNum, colMap, headerRow, seqCol = 9) {
     const data = {
         row: rowNum,
         name: '',
@@ -58,7 +58,9 @@ function getRowData(ws, rowNum, colMap, headerRow, seqCol = 4) {
     if (data.sid) {
         data.typeNum = mapWatchStatus(data.status);
     }
-    const seqCell = getCell(ws, rowNum, seqCol);
+    // 从列映射中读取序列号列，如果没有则使用默认值
+    const actualSeqCol = colMap.get('序列号') || seqCol;
+    const seqCell = getCell(ws, rowNum, actualSeqCol);
     data.isUploaded = isUploadedByColor(seqCell);
     return data;
 }
@@ -205,7 +207,7 @@ export function previewSyncContent() {
     for (let i = 0; i < dataRows.length; i++) {
         const rowNum = dataRows[i];
         try {
-            const rowData = getRowData(ws, rowNum, colMap, headerRow, 4);
+            const rowData = getRowData(ws, rowNum, colMap, headerRow, 9);
             // 过滤无效行
             if (!rowData.bgmUrl || !rowData.sid) {
                 bgmLog(LOG_LEVELS.DEBUG, `[preview] 跳过行 ${rowNum} (无 Bangumi URL)`);
@@ -356,7 +358,7 @@ export function uploadSingleRow(rowNum, btnElement) {
         const colMap = getColumnMap(ws, headerRow);
         if (!colMap.has('Bangumi_URL'))
             throw new Error('未找到 Bangumi URL 列');
-        const rowData = getRowData(ws, rowNum, colMap, headerRow, 4);
+        const rowData = getRowData(ws, rowNum, colMap, headerRow, 9);
         if (!rowData.sid)
             throw new Error('无法提取 Subject ID');
         const jsonBody = buildJsonPayload(ws, rowNum, colMap, rowData.finishedDate);
@@ -364,7 +366,9 @@ export function uploadSingleRow(rowNum, btnElement) {
             throw new Error('无法构建请求体');
         const result = bgmRequestSync('POST', `/v0/users/${_getUserApiPath()}/collections/${rowData.sid}`, jsonBody, token);
         const statusCode = result?.code || 0;
-        const seqCell = getCell(ws, rowNum, 4);
+        // 从列映射中读取序列号列
+        const actualSeqCol = colMap.get('序列号') || 9;
+        const seqCell = getCell(ws, rowNum, actualSeqCol);
         if ([200, 201, 202, 204].includes(statusCode)) {
             if (seqCell?.Interior)
                 seqCell.Interior.Color = BGM_COLOR.SUCCESS;

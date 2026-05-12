@@ -70,7 +70,7 @@ function getRowData(
   rowNum: number,
   colMap: ColumnMap,
   headerRow: number,
-  seqCol = 4
+  seqCol = 9
 ): DetailItem {
   const data: DetailItem = {
     row: rowNum,
@@ -112,7 +112,9 @@ function getRowData(
     data.typeNum = mapWatchStatus(data.status);
   }
 
-  const seqCell = getCell(ws, rowNum, seqCol) as WpsRange | null;
+  // 从列映射中读取序列号列，如果没有则使用默认值
+  const actualSeqCol = colMap.get('序列号') || seqCol;
+  const seqCell = getCell(ws, rowNum, actualSeqCol) as WpsRange | null;
   data.isUploaded = isUploadedByColor(seqCell);
   return data;
 }
@@ -280,7 +282,7 @@ export function previewSyncContent(): void {
     for (let i = 0; i < dataRows.length; i++) {
         const rowNum = dataRows[i];
         try {
-            const rowData = getRowData(ws, rowNum, colMap, headerRow, 4);
+            const rowData = getRowData(ws, rowNum, colMap, headerRow, 9);
 
             // 过滤无效行
             if (!rowData.bgmUrl || !rowData.sid) {
@@ -447,7 +449,7 @@ export function uploadSingleRow(rowNum: number, btnElement?: HTMLButtonElement):
     const colMap: ColumnMap = getColumnMap(ws, headerRow);
     if (!colMap.has('Bangumi_URL')) throw new Error('未找到 Bangumi URL 列');
 
-    const rowData = getRowData(ws, rowNum, colMap, headerRow, 4);
+    const rowData = getRowData(ws, rowNum, colMap, headerRow, 9);
     if (!rowData.sid) throw new Error('无法提取 Subject ID');
 
     const jsonBody = buildJsonPayload(ws, rowNum, colMap, rowData.finishedDate);
@@ -455,7 +457,9 @@ export function uploadSingleRow(rowNum: number, btnElement?: HTMLButtonElement):
 
     const result = bgmRequestSync('POST', `/v0/users/${_getUserApiPath()}/collections/${rowData.sid}`, jsonBody, token);
     const statusCode = result?.code || 0;
-    const seqCell = getCell(ws, rowNum, 4) as WpsRange | null;
+    // 从列映射中读取序列号列
+    const actualSeqCol = colMap.get('序列号') || 9;
+    const seqCell = getCell(ws, rowNum, actualSeqCol) as WpsRange | null;
 
     if ([200, 201, 202, 204].includes(statusCode)) {
       if (seqCell?.Interior) seqCell.Interior.Color = BGM_COLOR.SUCCESS;

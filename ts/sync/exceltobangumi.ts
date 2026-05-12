@@ -112,9 +112,10 @@ function createFieldGetter(
 /**
  * 检查单元格是否已标记为成功（颜色判断）
  */
-function isCellMarkedSuccess(ws: any, row: number): boolean {
+function isCellMarkedSuccess(ws: any, row: number, colMap: Map<string, number>): boolean {
     try {
-        const cell = getCell(ws, row, 4) as WpsRange | null;
+        const seqCol = colMap.get('序列号') || 9;
+        const cell = getCell(ws, row, seqCol) as WpsRange | null;
         if (!cell?.Interior) return false;
         const color = cell.Interior.Color;
         return color === BGM_COLOR.SUCCESS ||
@@ -128,8 +129,9 @@ function isCellMarkedSuccess(ws: any, row: number): boolean {
 /**
  * 标记单元格同步结果颜色
  */
-function markCellColor(ws: any, row: number, status: 'success' | 'fail'): void {
-    const cell = getCell(ws, row, 4) as WpsRange | null;
+function markCellColor(ws: any, row: number, status: 'success' | 'fail', colMap: Map<string, number>): void {
+    const seqCol = colMap.get('序列号') || 9;
+    const cell = getCell(ws, row, seqCol) as WpsRange | null;
     if (cell?.Interior) {
         cell.Interior.Color = status === 'success' ? BGM_COLOR.SUCCESS : BGM_COLOR.FAIL;
     }
@@ -668,7 +670,7 @@ export async function SyncToBangumiAsync(
         }
 
         // 非增量模式下检查颜色标记
-        if (!fingerprintMap && isCellMarkedSuccess(ws, rowNum)) {
+        if (!fingerprintMap && isCellMarkedSuccess(ws, rowNum, colMap)) {
             result.skip++;
             continue;
         }
@@ -695,7 +697,7 @@ export async function SyncToBangumiAsync(
 
     // 6. 更新 UI 和记录
     for (const task of successTasks) {
-        markCellColor(ws, task.rowNum, 'success');
+        markCellColor(ws, task.rowNum, 'success', colMap);
         addSyncRecord({
             name: task.name || `SID:${task.sid}`,
             url: task.bgmUrl,
@@ -711,7 +713,7 @@ export async function SyncToBangumiAsync(
     }
 
     for (const task of failTasks) {
-        markCellColor(ws, task.rowNum, 'fail');
+        markCellColor(ws, task.rowNum, 'fail', colMap);
         addSyncRecord({
             name: task.name || `SID:${task.sid}`,
             url: task.bgmUrl,

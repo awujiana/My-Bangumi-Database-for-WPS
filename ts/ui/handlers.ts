@@ -653,7 +653,8 @@ async function _doAPISync(sheetIndex: number, token: string): Promise<void> {
             const bgmUrl = bgmUrlCell ? trim(String((bgmUrlCell as any).Value() || '')) : '';
             const sid = typeof extractSubjectId === 'function' ? extractSubjectId(bgmUrl) : '';
             if (sid && collectionMap.has(sid)) {
-                const seqCell = getCell(ws, row, 4);
+                const seqCol = colMap.get('序列号') || 9;
+                const seqCell = getCell(ws, row, seqCol);
                 if (seqCell && (seqCell as any).Interior) {
                     const syncCount = syncCountMap.get(sid) || 0;
                     (seqCell as any).Interior.Color = syncCount === 1 ? BGM_COLOR.BGM_SYNC :

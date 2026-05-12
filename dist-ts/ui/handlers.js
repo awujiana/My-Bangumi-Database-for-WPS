@@ -606,7 +606,8 @@ async function _doAPISync(sheetIndex, token) {
             const bgmUrl = bgmUrlCell ? trim(String(bgmUrlCell.Value() || '')) : '';
             const sid = typeof extractSubjectId === 'function' ? extractSubjectId(bgmUrl) : '';
             if (sid && collectionMap.has(sid)) {
-                const seqCell = getCell(ws, row, 4);
+                const seqCol = colMap.get('序列号') || 9;
+                const seqCell = getCell(ws, row, seqCol);
                 if (seqCell && seqCell.Interior) {
                     const syncCount = syncCountMap.get(sid) || 0;
                     seqCell.Interior.Color = syncCount === 1 ? BGM_COLOR.BGM_SYNC :

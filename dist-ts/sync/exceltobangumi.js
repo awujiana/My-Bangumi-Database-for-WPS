@@ -53,9 +53,10 @@ function createFieldGetter(allData, colMap, startRow, ws) {
 /**
  * 检查单元格是否已标记为成功（颜色判断）
  */
-function isCellMarkedSuccess(ws, row) {
+function isCellMarkedSuccess(ws, row, colMap) {
     try {
-        const cell = getCell(ws, row, 4);
+        const seqCol = colMap.get('序列号') || 9;
+        const cell = getCell(ws, row, seqCol);
         if (!cell?.Interior)
             return false;
         const color = cell.Interior.Color;
@@ -70,8 +71,9 @@ function isCellMarkedSuccess(ws, row) {
 /**
  * 标记单元格同步结果颜色
  */
-function markCellColor(ws, row, status) {
-    const cell = getCell(ws, row, 4);
+function markCellColor(ws, row, status, colMap) {
+    const seqCol = colMap.get('序列号') || 9;
+    const cell = getCell(ws, row, seqCol);
     if (cell?.Interior) {
         cell.Interior.Color = status === 'success' ? BGM_COLOR.SUCCESS : BGM_COLOR.FAIL;
     }
@@ -579,7 +581,7 @@ export async function SyncToBangumiAsync(ws, colMap, token, lastRow, headerRow, 
             }
         }
         // 非增量模式下检查颜色标记
-        if (!fingerprintMap && isCellMarkedSuccess(ws, rowNum)) {
+        if (!fingerprintMap && isCellMarkedSuccess(ws, rowNum, colMap)) {
             result.skip++;
             continue;
         }
@@ -601,7 +603,7 @@ export async function SyncToBangumiAsync(ws, colMap, token, lastRow, headerRow, 
     const { success: successTasks, fail: failTasks, stopped } = await batchSyncRequests(syncTasks, token, userIdPath, DEFAULT_CONCURRENCY);
     // 6. 更新 UI 和记录
     for (const task of successTasks) {
-        markCellColor(ws, task.rowNum, 'success');
+        markCellColor(ws, task.rowNum, 'success', colMap);
         addSyncRecord({
             name: task.name || `SID:${task.sid}`,
             url: task.bgmUrl,
@@ -616,7 +618,7 @@ export async function SyncToBangumiAsync(ws, colMap, token, lastRow, headerRow, 
         result.success++;
     }
     for (const task of failTasks) {
-        markCellColor(ws, task.rowNum, 'fail');
+        markCellColor(ws, task.rowNum, 'fail', colMap);
         addSyncRecord({
             name: task.name || `SID:${task.sid}`,
             url: task.bgmUrl,

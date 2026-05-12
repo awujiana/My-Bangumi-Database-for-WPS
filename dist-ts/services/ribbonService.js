@@ -55,8 +55,9 @@ export function getSyncPreview(ws, colMap, lastRow, headerRow, options) {
             continue; // 无效行不计入 valid
         }
         valid++;
-        // 检查是否已上传（D 列颜色）
-        const seqCell = getCell(ws, rowNum, 4);
+        // 检查是否已上传（序列号列颜色）
+        const seqCol = colMap.get('序列号') || 9;
+        const seqCell = getCell(ws, rowNum, seqCol);
         const isUploaded = seqCell?.Interior && (seqCell.Interior.Color === BGM_COLOR.SUCCESS ||
             seqCell.Interior.Color === BGM_COLOR.LIGHT_GREEN ||
             seqCell.Interior.Color === BGM_COLOR.DARK_GREEN);
