@@ -621,11 +621,21 @@ export async function syncAllRows(): Promise<{ success: number; fail: number; sk
         bgmErr.message = '冲突检测失败，已跳过此步骤。原始错误: ' + bgmErr.message;
     }
 
-    // ---------- 3. 执行同步 ----------
+    // ---------- 3. 读取增量同步设置 ----------
+    const app = (window as any).Application;
+    let incremental = false;
+    try {
+        incremental = app?.PluginStorage?.getItem('bgm_incremental_sync') === 'true';
+    } catch (e: any) {
+        bgmLog(LOG_LEVELS.WARN, `[syncAllRows] 读取增量同步设置失败: ${e.message}`);
+    }
+    bgmLog(LOG_LEVELS.INFO, `[syncAllRows] 增量同步: ${incremental ? '开启' : '关闭'}`);
+
+    // ---------- 4. 执行同步 ----------
     try {
         const result = await SyncToBangumiAsync(ws, colMap, token, lastRow, headerRow, {
             skipSids: conflictSids,        // 跳过冲突的 sid 集合
-            incremental: false,            // 全量同步，可根据需要改为从 BGM 状态读取
+            incremental,                  // 从 Ribbon 设置读取
             onProgress: (current, total, message) => {
                 BGM.setSyncProgress(current, total, message);
             },

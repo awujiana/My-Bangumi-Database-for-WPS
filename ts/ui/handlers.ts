@@ -950,8 +950,35 @@ function initializeListeners(): void {
     setTimeout(() => {
         setupMessageListener();
         setupEventListeners();
+        initIncrementalSyncFromRibbon();
         bgmLog(LOG_LEVELS.DEBUG, '[handlers] 所有监听器初始化完成');
     }, 100);
+}
+
+// 从 Ribbon 读取增量同步状态并初始化 checkbox
+function initIncrementalSyncFromRibbon(): void {
+    const app = (window as any).Application;
+    const chkIncremental = document.getElementById('chkIncremental') as HTMLInputElement;
+    if (!chkIncremental) return;
+
+    try {
+        const isIncremental = app?.PluginStorage?.getItem('bgm_incremental_sync') === 'true';
+        chkIncremental.checked = isIncremental;
+        bgmLog(LOG_LEVELS.DEBUG, `[handlers] 从 Ribbon 读取增量同步状态: ${isIncremental ? '开启' : '关闭'}`);
+    } catch (e: any) {
+        bgmLog(LOG_LEVELS.WARN, `[handlers] 读取增量同步状态失败: ${e.message}`);
+    }
+
+    // 监听 checkbox 变化，同步到 PluginStorage
+    chkIncremental.addEventListener('change', () => {
+        const checked = chkIncremental.checked;
+        try {
+            app?.PluginStorage?.setItem('bgm_incremental_sync', checked ? 'true' : 'false');
+            bgmLog(LOG_LEVELS.DEBUG, `[handlers] 增量同步状态已同步到 Ribbon: ${checked ? '开启' : '关闭'}`);
+        } catch (e: any) {
+            bgmLog(LOG_LEVELS.WARN, `[handlers] 同步增量同步状态失败: ${e.message}`);
+        }
+    });
 }
 
 // 监听模块初始化完成事件
