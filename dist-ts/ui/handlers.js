@@ -76,13 +76,26 @@ export function updateTokenStatus() {
     const token = loadBgToken();
     if (token && token.length > 10) {
         tokenStatus.style.color = '#4CAF50';
-        tokenStatus.textContent = _T.set + ' (' + token.substring(0, 4) + '...)';
-        fetchBgmUserInfo().then((userInfo) => {
-            if (userInfo?.username) {
-                tokenStatus.textContent = _T.set + ': ' + userInfo.username;
-                updateUserIdStatus();
-            }
-        });
+        // 如果已经有用户名缓存，直接显示
+        if (BGM.cache.username) {
+            tokenStatus.textContent = _T.set + ': ' + BGM.cache.username;
+        }
+        else {
+            tokenStatus.textContent = _T.set + ' (' + token.substring(0, 4) + '...)';
+            // 尝试获取用户信息（但不阻塞 UI 更新）
+            // 注意：这里可能会因为 CORS 失败，但不影响 Token 状态显示
+            fetchBgmUserInfo()
+                .then((userInfo) => {
+                if (userInfo?.username) {
+                    tokenStatus.textContent = _T.set + ': ' + userInfo.username;
+                    updateUserIdStatus();
+                }
+            })
+                .catch(() => {
+                // CORS 错误或其他错误，静默处理
+                bgmLog(LOG_LEVELS.DEBUG, '获取用户名失败（CORS或网络错误）');
+            });
+        }
     }
     else {
         tokenStatus.textContent = _T.notSet;
@@ -626,11 +639,51 @@ if (document.readyState === 'loading') {
 else {
     setTimeout(setupButtonListeners, 0);
 }
-// 监听状态更新事件
+// ========== 消息监听（用于接收来自 Ribbon 的通知）==========
+if (typeof window !== 'undefined') {
+    window.addEventListener('message', (event) => {
+        const data = event.data;
+        if (!data || typeof data !== 'object')
+            return;
+        bgmLog(LOG_LEVELS.DEBUG, '[handlers] 收到消息: ' + JSON.stringify(data));
+        switch (data.type) {
+            case 'BGM:tokenUpdated':
+                bgmLog(LOG_LEVELS.INFO, '[handlers] 收到 Token 更新通知');
+                updateTokenStatus();
+                updateUserIdStatus();
+                break;
+            case 'BGM:userIdUpdated':
+                updateUserIdStatus();
+                break;
+            case 'BGM:userInfoUpdated':
+                updateUserIdStatus();
+                break;
+            case 'tokenUpdated':
+            case 'userIdUpdated':
+                // 兼容旧格式
+                if (data.type === 'tokenUpdated') {
+                    updateTokenStatus();
+                }
+                else if (data.type === 'userIdUpdated') {
+                    updateUserIdStatus();
+                }
+                break;
+        }
+    });
+    bgmLog(LOG_LEVELS.DEBUG, '[handlers] 消息监听器已注册');
+}
+// ========== 事件监听（用于接收事件总线通知）==========
 eventBus.on(BGM_EVENTS.TOKEN_UPDATED, () => {
+    bgmLog(LOG_LEVELS.DEBUG, '[handlers] 收到 TOKEN_UPDATED 事件');
     updateTokenStatus();
+    updateUserIdStatus();
 });
 eventBus.on(BGM_EVENTS.USER_ID_UPDATED, () => {
+    bgmLog(LOG_LEVELS.DEBUG, '[handlers] 收到 USER_ID_UPDATED 事件');
+    updateUserIdStatus();
+});
+eventBus.on(BGM_EVENTS.USER_NAME_UPDATED, () => {
+    bgmLog(LOG_LEVELS.DEBUG, '[handlers] 收到 USER_NAME_UPDATED 事件');
     updateUserIdStatus();
 });
 // 同步进度事件（全局进度条）

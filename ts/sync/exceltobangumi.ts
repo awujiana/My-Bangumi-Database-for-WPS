@@ -115,7 +115,14 @@ export function testTokenValidityForRibbon(token?: string): void {
                 const username = data.username || data.nickname || '未知用户';
                 const userId = data.id || '未知ID';
                 alert(`✓ Token有效！\n\n用户名: ${username}\n用户ID: ${userId}`);
+                
+                // 保存用户信息到全局缓存
                 _setBgmUserId(String(userId));
+                BGM.cache.username = username;
+                
+                // 通知面板用户信息已更新
+                notifyUserInfoUpdated(username, String(userId));
+                
             } catch (e: any) {
                 BGM.handleError(e, { context: 'testTokenValidityForRibbon', showAlert: false });
                 alert('✗ Token有效，但解析响应失败');
@@ -132,6 +139,31 @@ export function testTokenValidityForRibbon(token?: string): void {
     };
 
     xhr.send();
+}
+
+/**
+ * 通知面板用户信息已更新
+ */
+function notifyUserInfoUpdated(username: string, userId: string): void {
+    try {
+        // 触发事件总线
+        BGM.setUserId(userId);
+        BGM.setUsername(username);
+        
+        // 尝试通知 taskpane
+        if (typeof window !== 'undefined' && window.parent) {
+            window.parent.postMessage({
+                type: 'BGM:userInfoUpdated',
+                username: username,
+                userId: userId,
+                timestamp: Date.now()
+            }, '*');
+        }
+        
+        bgmLog(LOG_LEVELS.DEBUG, `notifyUserInfoUpdated: 用户名=${username}, ID=${userId}`);
+    } catch (e) {
+        bgmLog(LOG_LEVELS.WARN, '通知用户信息更新失败: ' + (e as Error).message);
+    }
 }
 
 /**

@@ -279,7 +279,12 @@ export async function setTokenForRibbon() {
     if (newToken && newToken !== false && typeof newToken === 'string') {
         const saved = storeBgToken(newToken);
         if (saved) {
+            bgmLog(LOG_LEVELS.INFO, 'Token 已保存，通知面板更新...');
             BGM.notifyTokenUpdated();
+            
+            // 通知面板刷新状态
+            notifyPanelTokenUpdated();
+            
             if (typeof testTokenValidityForRibbon === 'function') {
                 testTokenValidityForRibbon(newToken);
             }
@@ -289,6 +294,29 @@ export async function setTokenForRibbon() {
         }
     }
     return false;
+}
+
+/**
+ * 通知面板 Token 已更新
+ * 通过 postMessage 跨域通信
+ */
+function notifyPanelTokenUpdated(): void {
+    try {
+        // 尝试通知 taskpane.html
+        if (typeof window !== 'undefined' && window.parent) {
+            window.parent.postMessage({
+                type: 'BGM:tokenUpdated',
+                timestamp: Date.now()
+            }, '*');
+        }
+        
+        // 触发事件总线（供面板内的事件监听器使用）
+        BGM.notifyTokenUpdated();
+        
+        bgmLog(LOG_LEVELS.DEBUG, '已发送 Token 更新通知');
+    } catch (e) {
+        BGM.handleError(new Error('通知面板失败',e as Error), { showAlert: false });
+    }
 }
 
 /** 测试 Token（Ribbon 版本） */
