@@ -591,85 +591,145 @@ function handleActionClick(event) {
             BGM.handleError(e, { showAlert: false, level: BGM.ErrorLevel.WARN, context: 'handleActionClick' });
         }
     }
+    bgmLog(LOG_LEVELS.INFO, `[handleActionClick] ========== 按钮点击事件 ==========`);
+    bgmLog(LOG_LEVELS.INFO, `[handleActionClick] 操作类型: ${action}`);
+    if (args.length > 0) {
+        bgmLog(LOG_LEVELS.DEBUG, `[handleActionClick] 参数: ${JSON.stringify(args)}`);
+    }
+    const startTime = Date.now();
     switch (action) {
         // 核心操作
         case 'sync':
+            bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 开始执行同步操作');
             syncFromPanel();
+            bgmLog(LOG_LEVELS.INFO, `[handleActionClick] 同步操作已触发，耗时: ${Date.now() - startTime}ms`);
             break;
         case 'test':
-            if (typeof testSingleUpdate === 'function')
+            bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 开始执行单条测试更新');
+            if (typeof testSingleUpdate === 'function') {
                 testSingleUpdate();
+                bgmLog(LOG_LEVELS.INFO, `[handleActionClick] 单条测试更新已触发，耗时: ${Date.now() - startTime}ms`);
+            }
+            else {
+                bgmLog(LOG_LEVELS.WARN, '[handleActionClick] testSingleUpdate 函数未定义');
+            }
             break;
         case 'clear':
+            bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 开始执行清除标记');
             showConfirm(_T.confirmClearMarks, (confirmed) => {
                 if (confirmed) {
+                    bgmLog(LOG_LEVELS.DEBUG, '[handleActionClick] 用户确认清除标记');
                     if (typeof clearRowColors === 'function')
                         clearRowColors();
                     if (typeof refreshData === 'function')
                         refreshData();
+                    bgmLog(LOG_LEVELS.INFO, `[handleActionClick] 清除标记完成，耗时: ${Date.now() - startTime}ms`);
+                }
+                else {
+                    bgmLog(LOG_LEVELS.DEBUG, '[handleActionClick] 用户取消清除标记');
                 }
             });
             break;
-        case 'previewSyncContent': // 新写法
-            if (typeof previewSyncContent === 'function')
+        case 'previewSyncContent':
+            bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 开始执行预览同步内容');
+            if (typeof previewSyncContent === 'function') {
                 previewSyncContent();
+                bgmLog(LOG_LEVELS.INFO, `[handleActionClick] 预览同步内容已触发，耗时: ${Date.now() - startTime}ms`);
+            }
+            else {
+                bgmLog(LOG_LEVELS.WARN, '[handleActionClick] previewSyncContent 函数未定义');
+            }
             break;
         case 'setToken':
+            bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 打开 Token 设置对话框');
             showTokenDialog(loadBgToken() || '');
+            bgmLog(LOG_LEVELS.INFO, `[handleActionClick] Token 设置对话框已打开，耗时: ${Date.now() - startTime}ms`);
             break;
         // 快捷按钮
         case 'showTokenDialog':
+            bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 显示 Token 设置对话框');
             showTokenDialog(loadBgToken() || '');
+            bgmLog(LOG_LEVELS.INFO, `[handleActionClick] Token 设置对话框已显示，耗时: ${Date.now() - startTime}ms`);
             break;
         case 'testToken':
+            bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 开始测试 Token 有效性');
             testTokenValidity();
+            bgmLog(LOG_LEVELS.INFO, `[handleActionClick] Token 测试已触发，耗时: ${Date.now() - startTime}ms`);
             break;
         case 'showUserIdDialog':
+            bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 显示用户ID设置对话框');
             showUserIdDialog();
+            bgmLog(LOG_LEVELS.INFO, `[handleActionClick] 用户ID设置对话框已显示，耗时: ${Date.now() - startTime}ms`);
             break;
         case 'openUserCollection':
+            bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 尝试打开收藏页面');
             openUserCollection();
+            bgmLog(LOG_LEVELS.INFO, `[handleActionClick] 收藏页面打开操作已触发，耗时: ${Date.now() - startTime}ms`);
             break;
         case 'syncCollectionFromBgm':
+            bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 开始从 BGM 同步收藏');
             syncCollectionFromBgm();
+            bgmLog(LOG_LEVELS.INFO, `[handleActionClick] 收藏同步已触发，耗时: ${Date.now() - startTime}ms`);
             break;
         case 'refreshSheets':
+            bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 开始刷新工作表');
             refreshSheets();
+            bgmLog(LOG_LEVELS.INFO, `[handleActionClick] 工作表刷新已触发，耗时: ${Date.now() - startTime}ms`);
             break;
         case 'refreshData':
+            bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 开始刷新数据');
             refreshData();
+            bgmLog(LOG_LEVELS.INFO, `[handleActionClick] 数据刷新已触发，耗时: ${Date.now() - startTime}ms`);
             break;
         case 'toggleSheetLock':
+            bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 切换工作表锁定状态');
             toggleSheetLock();
+            bgmLog(LOG_LEVELS.INFO, `[handleActionClick] 工作表锁定状态已切换，耗时: ${Date.now() - startTime}ms`);
             break;
         case 'clearSyncRecords':
+            bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 开始清除同步记录');
             clearSyncRecords();
+            bgmLog(LOG_LEVELS.INFO, `[handleActionClick] 同步记录清除已触发，耗时: ${Date.now() - startTime}ms`);
             break;
         case 'markUploadedItems':
+            bgmLog(LOG_LEVELS.INFO, `[handleActionClick] 标记已上传项目，类型: ${args[0] || '全部'}`);
             markUploadedItems(args[0]);
+            bgmLog(LOG_LEVELS.INFO, `[handleActionClick] 已上传项目标记完成，耗时: ${Date.now() - startTime}ms`);
             break;
         case 'clearSheetMarks':
+            bgmLog(LOG_LEVELS.INFO, `[handleActionClick] 清除工作表标记，工作表: ${args[0] || '当前'}`);
             clearSheetMarks(args[0]);
+            bgmLog(LOG_LEVELS.INFO, `[handleActionClick] 工作表标记清除完成，耗时: ${Date.now() - startTime}ms`);
             break;
         case 'openSyncRecordSheet':
+            bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 打开同步记录工作表');
             openSyncRecordSheet();
+            bgmLog(LOG_LEVELS.INFO, `[handleActionClick] 同步记录工作表已打开，耗时: ${Date.now() - startTime}ms`);
             break;
         case 'testDebugConnection':
+            bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 测试调试连接');
             testDebugConnection();
+            bgmLog(LOG_LEVELS.INFO, `[handleActionClick] 调试连接测试已完成，耗时: ${Date.now() - startTime}ms`);
             break;
         // 模态框操作
         case 'closeDetailModal':
+            bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 关闭详情模态框');
             closeDetailModal();
+            bgmLog(LOG_LEVELS.INFO, `[handleActionClick] 详情模态框已关闭，耗时: ${Date.now() - startTime}ms`);
             break;
         // 弹窗快捷调用（参数形式）
         case 'showToast':
+            bgmLog(LOG_LEVELS.INFO, `[handleActionClick] 显示 Toast 消息: ${args[0] || ''}`);
             showToast(args[0], args[1]);
+            bgmLog(LOG_LEVELS.INFO, `[handleActionClick] Toast 已显示，耗时: ${Date.now() - startTime}ms`);
             break;
         case 'showAlert':
+            bgmLog(LOG_LEVELS.INFO, `[handleActionClick] 显示警告框: ${args[0] || ''}`);
             showAlert(args[0], args[1]);
+            bgmLog(LOG_LEVELS.INFO, `[handleActionClick] 警告框已显示，耗时: ${Date.now() - startTime}ms`);
             break;
         default:
-            bgmLog(LOG_LEVELS.WARN, 'Unknown action: ' + action);
+            bgmLog(LOG_LEVELS.WARN, `[handleActionClick] 未知操作类型: ${action}`);
     }
 }
 if (document.readyState === 'loading') {
