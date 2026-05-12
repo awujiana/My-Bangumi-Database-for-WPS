@@ -185,62 +185,6 @@ export declare function setBangumiToken(token: string): boolean;
  * 清除当前活动工作表的 D 列颜色标记（与 clearSheetMarksInSheet 相同，但作用于活动工作表）清除所有行的颜色标记
  */
 export declare function clearRowColors(): void;
-/**
- * 异步同步到Bangumi（主同步函数）
- *
- * @async
- * @function SyncToBangumiAsync
- * @param {any} ws - 工作表对象
- * @param {Map<string, number>} colMap - 列映射
- * @param {string} token - API Token
- * @param {number} lastRow - 最后一行行号
- * @param {number} headerRow - 表头行行号
- * @param {SyncOptions} [options] - 同步选项
- * @returns {Promise<{ success: number; fail: number; skip: number }>} 同步结果统计
- *
- * @description
- * 这是主要的同步入口函数。它会：
- * 1. 获取筛选状态（如果是筛选状态则只同步可见行）
- * 2. 遍历每一行数据
- * 3. 提取Subject ID和同步信息
- * 4. 调用Bangumi API进行同步
- * 5. 标记同步结果（颜色）
- * 6. 记录同步历史
- */
-/**
- * 异步批量同步 Excel 数据到 Bangumi
- * - 支持筛选状态下仅处理可见行
- * - 批量读取单元格数据，提高性能
- * - 动态请求间隔，避免限制的同时提升速度
- * - 支持跳过冲突条目（通过 skipSids 集合）
- * - 跳过已上传条目（D列颜色）
- * - 统一错误处理，带详细日志
- *
- * @param ws 工作表对象
- * @param colMap 列名到列号的映射 Map
- * @param token Bangumi API 访问令牌
- * @param lastRow 数据区域最后一行
- * @param headerRow 表头行号
- * @param options 可选项（onProgress, onItemComplete, skipSids 回调）
- * @returns 同步结果统计 { success, fail, skip }
- */
-/**
- * 异步批量同步 Excel 数据到 Bangumi（优化版）
- * - 支持筛选状态下仅处理可见行
- * - 批量读取单元格数据，提高性能
- * - 动态请求间隔，避免限制的同时提升速度
- * - 支持跳过冲突条目（通过 skipSids 集合）
- * - 支持增量同步：根据历史指纹自动跳过无变化条目，并在成功后更新指纹
- * - 统一错误处理，带详细日志
- *
- * @param ws 工作表对象
- * @param colMap 列名到列号的映射 Map
- * @param token Bangumi API 访问令牌
- * @param lastRow 数据区域最后一行
- * @param headerRow 表头行号
- * @param options 可选项（onProgress, onItemComplete, skipSids, incremental 回调）
- * @returns 同步结果统计 { success, fail, skip }
- */
 export declare function SyncToBangumiAsync(ws: any, colMap: Map<string, number>, token: string, lastRow: number, headerRow: number, options?: SyncOptions): Promise<{
     success: number;
     fail: number;

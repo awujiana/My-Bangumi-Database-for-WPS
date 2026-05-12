@@ -540,14 +540,17 @@ export function _getBgmUserId() {
     return BGM.cache.userId;
 }
 /**
- * 获取 Bangumi API 用户路径（格式：/-）
+ * 获取 Bangumi API 用户路径（格式：/userId）
  * 用于拼接用户收藏请求的 URL
- * @returns 用户路径字符串 "/-"，代表当前认证用户
- * @description BGM API v0 使用 "-" 代表当前认证用户，而不是具体的用户ID
+ * @returns 用户路径字符串，如 "/123456"；若 userId 未设置则返回 "/0"
  */
 export function _getUserApiPath() {
-    // BGM API v0 使用 "-" 代表当前认证用户
-    return '/-';
+    const userId = _getBgmUserId();
+    if (!userId) {
+        bgmLog(LOG_LEVELS.WARN, '_getUserApiPath: userId 未设置，使用默认路径 /0');
+        return '/0';
+    }
+    return `/${userId}`;
 }
 /**
  * 获取 Bangumi 当前登录用户信息
