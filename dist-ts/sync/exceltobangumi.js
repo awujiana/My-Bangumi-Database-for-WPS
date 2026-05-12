@@ -469,12 +469,27 @@ export function getSequentialRowsBySeqCol(startRow, endRow) {
 export function buildJsonPayload(ws, rowNum, colMap, finishedDate) {
     try {
         const payload = {};
-        // 观看状态
-        if (colMap.has('是否看完')) {
-            const statusVal = trim(readCell(ws, rowNum, colMap.get('是否看完')));
-            if (statusVal) {
-                payload.type = mapWatchStatus(statusVal);
+        // 观看状态 - 支持多种列名
+        const statusKeys = ['是否看完', '状态', '观看状态', '收藏类型', 'type'];
+        let statusFound = false;
+        for (const key of statusKeys) {
+            if (colMap.has(key)) {
+                const statusVal = trim(readCell(ws, rowNum, colMap.get(key)));
+                if (statusVal) {
+                    const mappedStatus = mapWatchStatus(statusVal);
+                    if (mappedStatus !== undefined) {
+                        payload.type = mappedStatus;
+                        statusFound = true;
+                        bgmLog(LOG_LEVELS.DEBUG, `[buildJsonPayload] 从列 "${key}" 读取状态: "${statusVal}" -> ${mappedStatus}`);
+                        break;
+                    }
+                }
             }
+        }
+        // 如果没有找到有效的状态，默认设置为"想看"(0)
+        if (!statusFound) {
+            payload.type = 0;
+            bgmLog(LOG_LEVELS.WARN, `[buildJsonPayload] 未找到有效的观看状态，默认设置为"想看"(0)`);
         }
         // 评分
         if (colMap.has('打分')) {
