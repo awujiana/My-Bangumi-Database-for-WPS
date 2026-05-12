@@ -39,27 +39,51 @@ export async function verifyToken(token) {
     }
     try {
         const xhr = new XMLHttpRequest();
+        const apiUrl = `${BGM_CONFIG.API_BASE}/v0/me`;
+        const startTime = Date.now();
+        bgmLog(LOG_LEVELS.INFO, `[scraping/verifyToken] ========== 开始验证 Token ==========`);
+        bgmLog(LOG_LEVELS.INFO, `[scraping/verifyToken] API 路由: ${apiUrl}`);
+        bgmLog(LOG_LEVELS.INFO, `[scraping/verifyToken] 请求方法: GET`);
+        bgmLog(LOG_LEVELS.DEBUG, `[scraping/verifyToken] 请求头: Authorization: Bearer ${token.substring(0, 8)}...`);
         const response = await new Promise((resolve, reject) => {
-            xhr.open('GET', `${BGM_CONFIG.API_BASE}/v0/me`, true);
+            xhr.open('GET', apiUrl, true);
             xhr.setRequestHeader('Authorization', `Bearer ${token}`);
             xhr.setRequestHeader('Content-Type', 'application/json');
             xhr.onload = () => {
+                const duration = Date.now() - startTime;
+                bgmLog(LOG_LEVELS.INFO, `[scraping/verifyToken] ========== 请求完成 ==========`);
+                bgmLog(LOG_LEVELS.INFO, `[scraping/verifyToken] HTTP 状态码: ${xhr.status} (${xhr.statusText})`);
+                bgmLog(LOG_LEVELS.INFO, `[scraping/verifyToken] 请求耗时: ${duration}ms`);
                 try {
+                    const responseData = xhr.responseText ? JSON.parse(xhr.responseText) : null;
+                    bgmLog(LOG_LEVELS.DEBUG, `[scraping/verifyToken] 响应数据: ${JSON.stringify(responseData).length > 300 ? JSON.stringify(responseData).substring(0, 300) + '...' : JSON.stringify(responseData)}`);
                     resolve({
                         status: xhr.status,
-                        data: xhr.responseText ? JSON.parse(xhr.responseText) : null
+                        data: responseData
                     });
                 }
                 catch (e) {
+                    bgmLog(LOG_LEVELS.ERROR, `[scraping/verifyToken] 解析响应失败: ${e}`);
                     reject(new Error('解析响应失败'));
                 }
             };
-            xhr.onerror = () => reject(new Error('网络错误'));
+            xhr.onerror = () => {
+                const duration = Date.now() - startTime;
+                bgmLog(LOG_LEVELS.ERROR, `[scraping/verifyToken] 网络错误，耗时: ${duration}ms`);
+                reject(new Error('网络错误'));
+            };
+            xhr.ontimeout = () => {
+                const duration = Date.now() - startTime;
+                bgmLog(LOG_LEVELS.WARN, `[scraping/verifyToken] 请求超时，耗时: ${duration}ms`);
+                reject(new Error('请求超时'));
+            };
+            bgmLog(LOG_LEVELS.DEBUG, `[scraping/verifyToken] 正在发送请求...`);
             xhr.send();
         });
         if (response.status === 200) {
             result.valid = true;
             result.message = 'Token 有效';
+            bgmLog(LOG_LEVELS.INFO, `[scraping/verifyToken] Token 验证成功，用户ID: ${response.data?.id || '未知'}`);
             if (response.data) {
                 result.userId = String(response.data.id || '');
                 result.username = response.data.username || response.data.nickname || '';
@@ -67,14 +91,16 @@ export async function verifyToken(token) {
         }
         else if (response.status === 401) {
             result.message = 'Token 无效或已过期';
+            bgmLog(LOG_LEVELS.WARN, `[scraping/verifyToken] Token 无效或已过期`);
         }
         else {
             result.message = `验证失败 (HTTP ${response.status})`;
+            bgmLog(LOG_LEVELS.ERROR, `[scraping/verifyToken] 验证失败，HTTP 状态码: ${response.status}`);
         }
     }
     catch (e) {
         result.message = e.message || '验证过程出错';
-        bgmLog(LOG_LEVELS.ERROR, 'verifyToken error: ' + (e.message || e));
+        bgmLog(LOG_LEVELS.ERROR, '[scraping/verifyToken] error: ' + (e.message || e));
     }
     return result;
 }

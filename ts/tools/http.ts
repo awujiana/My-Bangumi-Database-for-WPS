@@ -158,6 +158,20 @@ function executeXhrRequest<T>(
     }
 ): Promise<{ status: number; xhr: XMLHttpRequest; data: T | null }> {
     return new Promise((resolve, reject) => {
+        const startTime = Date.now();
+        
+        bgmLog(LOG_LEVELS.INFO, `[HTTP] ========== 开始请求 ==========`);
+        bgmLog(LOG_LEVELS.INFO, `[HTTP] URL: ${url}`);
+        bgmLog(LOG_LEVELS.INFO, `[HTTP] 方法: ${options.method}`);
+        bgmLog(LOG_LEVELS.INFO, `[HTTP] 超时: ${options.timeout}ms`);
+        
+        if (options.token) {
+            bgmLog(LOG_LEVELS.DEBUG, `[HTTP] 请求头: Authorization: Bearer ${options.token.substring(0, 8)}...`);
+        }
+        if (options.body) {
+            bgmLog(LOG_LEVELS.DEBUG, `[HTTP] 请求体: ${options.body.length > 200 ? options.body.substring(0, 200) + '...' : options.body}`);
+        }
+        
         const xhr = new XMLHttpRequest();
         xhr.open(options.method, url, true);
         xhr.timeout = options.timeout;
@@ -168,28 +182,53 @@ function executeXhrRequest<T>(
         }
         if (options.body) {
             xhr.setRequestHeader('Content-Type', 'application/json');
+            bgmLog(LOG_LEVELS.DEBUG, `[HTTP] 请求头: Content-Type: application/json`);
         }
 
         // 响应处理
         xhr.onload = () => {
+            const duration = Date.now() - startTime;
+            
+            bgmLog(LOG_LEVELS.INFO, `[HTTP] ========== 请求完成 ==========`);
+            bgmLog(LOG_LEVELS.INFO, `[HTTP] URL: ${url}`);
+            bgmLog(LOG_LEVELS.INFO, `[HTTP] HTTP 状态码: ${xhr.status} (${xhr.statusText})`);
+            bgmLog(LOG_LEVELS.INFO, `[HTTP] 请求耗时: ${duration}ms`);
+            
+            if (xhr.getAllResponseHeaders()) {
+                bgmLog(LOG_LEVELS.DEBUG, `[HTTP] 响应头: ${xhr.getAllResponseHeaders()}`);
+            }
+            
             let data: T | null = null;
             if (xhr.responseText && xhr.responseText.length > 0) {
                 try {
                     data = JSON.parse(xhr.responseText);
+                    bgmLog(LOG_LEVELS.DEBUG, `[HTTP] 响应数据: ${JSON.stringify(data).length > 500 ? JSON.stringify(data).substring(0, 500) + '...' : JSON.stringify(data)}`);
                 } catch (error: any) {
                     BGM.handleError(error, { context: 'executeXhrRequest', showAlert: false });
+                    bgmLog(LOG_LEVELS.WARN, `[HTTP] 解析响应失败，返回原始文本: ${xhr.responseText.length > 200 ? xhr.responseText.substring(0, 200) + '...' : xhr.responseText}`);
                     data = xhr.responseText as unknown as T;
                 }
             }
+            
+            if (xhr.status >= 200 && xhr.status < 300) {
+                bgmLog(LOG_LEVELS.INFO, `[HTTP] 请求成功`);
+            } else {
+                bgmLog(LOG_LEVELS.WARN, `[HTTP] 请求失败，状态码: ${xhr.status}`);
+            }
+            
             resolve({ status: xhr.status, xhr, data });
         };
 
         // 错误处理
         xhr.onerror = () => {
+            const duration = Date.now() - startTime;
+            bgmLog(LOG_LEVELS.ERROR, `[HTTP] 请求发生网络错误，URL: ${url}，耗时: ${duration}ms`);
             reject(new Error(`网络请求失败: ${url}`));
         };
 
         xhr.ontimeout = () => {
+            const duration = Date.now() - startTime;
+            bgmLog(LOG_LEVELS.WARN, `[HTTP] 请求超时，URL: ${url}，耗时: ${duration}ms`);
             reject(new Error(`请求超时 (${options.timeout}ms): ${url}`));
         };
 
@@ -198,15 +237,19 @@ function executeXhrRequest<T>(
             xhr.upload.onprogress = (e) => {
                 if (e.lengthComputable) {
                     options.onProgress!(e.loaded, e.total);
+                    const progress = Math.round((e.loaded / e.total) * 100);
+                    bgmLog(LOG_LEVELS.DEBUG, `[HTTP] 上传进度: ${progress}% (${e.loaded}/${e.total})`);
                 }
             };
         }
 
         // 发送请求
         try {
+            bgmLog(LOG_LEVELS.DEBUG, `[HTTP] 正在发送请求...`);
             xhr.send(options.body);
         } catch (error: any) {
             BGM.handleError(error, { context: 'executeXhrRequest', showAlert: false });
+            bgmLog(LOG_LEVELS.ERROR, `[HTTP] 发送请求失败: ${error.message}`);
             reject(new Error(`发送请求失败: ${error.message}`));
         }
     });

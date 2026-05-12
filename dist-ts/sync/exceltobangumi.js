@@ -29,41 +29,64 @@ export function testTokenValidityForRibbon(token) {
         alert('请先设置 Token！');
         return;
     }
+    const apiUrl = `${BGM_CONFIG.API_BASE}/v0/me`;
+    const startTime = Date.now();
+    bgmLog(LOG_LEVELS.INFO, `[exceltobangumi/testTokenValidityForRibbon] ========== 开始测试 Token ==========`);
+    bgmLog(LOG_LEVELS.INFO, `[exceltobangumi/testTokenValidityForRibbon] API 路由: ${apiUrl}`);
+    bgmLog(LOG_LEVELS.INFO, `[exceltobangumi/testTokenValidityForRibbon] 请求方法: GET`);
+    bgmLog(LOG_LEVELS.DEBUG, `[exceltobangumi/testTokenValidityForRibbon] 请求头: Authorization: Bearer ${testToken.substring(0, 8)}...`);
+    bgmLog(LOG_LEVELS.DEBUG, `[exceltobangumi/testTokenValidityForRibbon] 请求头: Content-Type: application/json`);
     const xhr = new XMLHttpRequest();
-    xhr.open('GET', `${BGM_CONFIG.API_BASE}/v0/me`, true);
+    xhr.open('GET', apiUrl, true);
     xhr.setRequestHeader('Authorization', 'Bearer ' + testToken);
     xhr.setRequestHeader('Content-Type', 'application/json');
     xhr.onload = () => {
+        const duration = Date.now() - startTime;
+        bgmLog(LOG_LEVELS.INFO, `[exceltobangumi/testTokenValidityForRibbon] ========== 请求完成 ==========`);
+        bgmLog(LOG_LEVELS.INFO, `[exceltobangumi/testTokenValidityForRibbon] HTTP 状态码: ${xhr.status} (${xhr.statusText})`);
+        bgmLog(LOG_LEVELS.INFO, `[exceltobangumi/testTokenValidityForRibbon] 请求耗时: ${duration}ms`);
+        if (xhr.getAllResponseHeaders()) {
+            bgmLog(LOG_LEVELS.DEBUG, `[exceltobangumi/testTokenValidityForRibbon] 响应头: ${xhr.getAllResponseHeaders()}`);
+        }
         if (xhr.status === 200) {
             try {
                 const data = JSON.parse(xhr.responseText);
-                bgmLog(LOG_LEVELS.DEBUG, '[BGM API /me] 响应数据: ' + JSON.stringify(data));
-                // BGM API v0 /me 端点返回的用户名字段是 'nickname'
-                // username 是用户ID，nickname 是显示名称
+                bgmLog(LOG_LEVELS.DEBUG, `[exceltobangumi/testTokenValidityForRibbon] 响应数据: ${JSON.stringify(data).length > 300 ? JSON.stringify(data).substring(0, 300) + '...' : JSON.stringify(data)}`);
                 const nickname = data.nickname || data.username || '未知用户';
                 const userId = String(data.id || '未知ID');
+                bgmLog(LOG_LEVELS.INFO, `[exceltobangumi/testTokenValidityForRibbon] Token 验证成功！用户名: ${nickname}, 用户ID: ${userId}`);
                 alert(`✓ Token有效！\n\n用户名: ${nickname}\n用户ID: ${userId}`);
-                // 保存用户信息到全局缓存
                 _setBgmUserId(userId);
                 BGM.cache.username = nickname;
-                // 通知面板用户信息已更新
                 notifyUserInfoUpdated(nickname, userId);
             }
             catch (e) {
+                bgmLog(LOG_LEVELS.ERROR, `[exceltobangumi/testTokenValidityForRibbon] 解析响应失败: ${e.message}`);
                 BGM.handleError(e, { context: 'testTokenValidityForRibbon', showAlert: false });
                 alert('✗ Token有效，但解析响应失败');
             }
         }
         else if (xhr.status === 401) {
+            bgmLog(LOG_LEVELS.WARN, `[exceltobangumi/testTokenValidityForRibbon] Token 无效或已过期`);
             alert('✗ Token无效或已过期，请重新获取');
         }
         else {
+            bgmLog(LOG_LEVELS.ERROR, `[exceltobangumi/testTokenValidityForRibbon] Token验证失败，HTTP 状态码: ${xhr.status}`);
+            bgmLog(LOG_LEVELS.DEBUG, `[exceltobangumi/testTokenValidityForRibbon] 响应内容: ${xhr.responseText}`);
             alert(`✗ Token验证失败 (HTTP ${xhr.status})`);
         }
     };
     xhr.onerror = () => {
+        const duration = Date.now() - startTime;
+        bgmLog(LOG_LEVELS.ERROR, `[exceltobangumi/testTokenValidityForRibbon] 网络错误，耗时: ${duration}ms`);
         alert('✗ 网络错误，无法验证Token');
     };
+    xhr.ontimeout = () => {
+        const duration = Date.now() - startTime;
+        bgmLog(LOG_LEVELS.WARN, `[exceltobangumi/testTokenValidityForRibbon] 请求超时，耗时: ${duration}ms`);
+        alert('✗ 请求超时');
+    };
+    bgmLog(LOG_LEVELS.DEBUG, `[exceltobangumi/testTokenValidityForRibbon] 正在发送请求...`);
     xhr.send();
 }
 /**
