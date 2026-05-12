@@ -378,17 +378,35 @@ export async function syncFromPanel(): Promise<void> {
         return; 
     }
 
-    // 6. 获取同步预览统计
-    bgmLog(LOG_LEVELS.DEBUG, '[syncFromPanel] 步骤6: 获取同步预览统计');
-    const preview = getSyncPreview(ws, colMap, lastRow, headerRow);
-    bgmLog(LOG_LEVELS.INFO, `[syncFromPanel] 数据预览 - 总行数: ${preview.total}, 有效: ${preview.valid}, 已上传: ${preview.alreadyUploaded}, 待同步: ${preview.willSync}, 跳过: ${preview.willSkip}`);
+    // 6. 增量同步开关（提前读取）
+    bgmLog(LOG_LEVELS.DEBUG, '[syncFromPanel] 步骤6: 检查增量同步设置');
+    const incremental = (document.getElementById('chkIncremental') as HTMLInputElement)?.checked ?? false;
+    bgmLog(LOG_LEVELS.INFO, `[syncFromPanel] 增量同步: ${incremental ? '开启' : '关闭'}`);
 
-    // 7. 冲突检测与策略
-    bgmLog(LOG_LEVELS.DEBUG, '[syncFromPanel] 步骤7: 冲突检测');
+    // 构建增量同步的指纹映射
+    let fingerprintMap: Map<string, string> | undefined;
+    if (incremental) {
+        const allRecords = getAllSyncRecords ? getAllSyncRecords() : [];
+        fingerprintMap = new Map();
+        for (const r of allRecords) {
+            if (r.sid && r.fingerprint) {
+                fingerprintMap.set(r.sid, r.fingerprint);
+            }
+        }
+        bgmLog(LOG_LEVELS.INFO, `[syncFromPanel] 增量同步模式：已加载 ${fingerprintMap.size} 条历史指纹`);
+    }
+
+    // 7. 获取同步预览统计（传入增量同步选项）
+    bgmLog(LOG_LEVELS.DEBUG, '[syncFromPanel] 步骤7: 获取同步预览统计');
+    const preview = getSyncPreview(ws, colMap, lastRow, headerRow, { incremental, fingerprintMap });
+    bgmLog(LOG_LEVELS.INFO, `[syncFromPanel] 数据预览 - 总行数: ${preview.total}, 有效: ${preview.valid}, 已上传: ${preview.alreadyUploaded}, 待同步: ${preview.willSync}, 跳过: ${preview.willSkip}, 无URL: ${preview.noUrl}, 空状态: ${preview.emptyStatus}, 增量跳过: ${preview.incrementalSkipped}`);
+
+    // 8. 冲突检测与策略
+    bgmLog(LOG_LEVELS.DEBUG, '[syncFromPanel] 步骤8: 冲突检测');
     const conflictSelect = document.getElementById('conflictStrategy') as HTMLSelectElement;
     const conflictStrategy = conflictSelect?.value || 'skip';
     bgmLog(LOG_LEVELS.DEBUG, `[syncFromPanel] 冲突策略: ${conflictStrategy}`);
-    
+
     let conflictSids: Set<string> | undefined = undefined;
     let conflictMsg = '';
     try {
@@ -412,11 +430,6 @@ export async function syncFromPanel(): Promise<void> {
         BGM.handleError(e, { showAlert: false, level: BGM.ErrorLevel.WARN, context: 'syncFromPanel' });
     }
 
-    // 8. 增量同步开关
-    bgmLog(LOG_LEVELS.DEBUG, '[syncFromPanel] 步骤8: 检查增量同步设置');
-    const incremental = (document.getElementById('chkIncremental') as HTMLInputElement)?.checked ?? false;
-    bgmLog(LOG_LEVELS.INFO, `[syncFromPanel] 增量同步: ${incremental ? '开启' : '关闭'}`);
-
     // 9. 确认对话框
     bgmLog(LOG_LEVELS.DEBUG, '[syncFromPanel] 步骤9: 显示确认对话框');
     const msg = `数据预览：
@@ -425,8 +438,9 @@ export async function syncFromPanel(): Promise<void> {
             已上传（跳过）：${preview.alreadyUploaded}
             待同步：${preview.willSync}
             不上传（状态跳过）：${preview.willSkip}
-            无效（无SID）：${preview.total - preview.valid}
-            ${conflictMsg}是否继续同步？`;
+            无URL：${preview.noUrl}
+            空状态：${preview.emptyStatus}
+            ${incremental ? `增量跳过：${preview.incrementalSkipped}\n` : ''}${conflictMsg}是否继续同步？`;
 
     const confirmed = await new Promise<boolean>(resolve => {
         showConfirm(msg, (confirmed) => resolve(confirmed));
@@ -870,6 +884,12 @@ function handleActionClick(event: Event): void {
             bgmLog(LOG_LEVELS.INFO, `[handleActionClick] 显示警告框: ${args[0] || ''}`);
             showAlert(args[0], args[1]);
             bgmLog(LOG_LEVELS.INFO, `[handleActionClick] 警告框已显示，耗时: ${Date.now() - startTime}ms`);
+            break;
+
+        case 'requestStopSync':
+            bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 用户请求停止同步');
+            BGM.sync.requestStop();
+            bgmLog(LOG_LEVELS.INFO, `[handleActionClick] 停止同步请求已发送，耗时: ${Date.now() - startTime}ms`);
             break;
 
         default:

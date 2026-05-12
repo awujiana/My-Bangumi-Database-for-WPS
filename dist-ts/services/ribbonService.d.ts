@@ -4,14 +4,21 @@
  * @param colMap 列映射
  * @param lastRow 数据最后一行
  * @param headerRow 表头行
- * @returns 统计信息 { total, valid, willSync, willSkip, alreadyUploaded }
+ * @param options 可选参数 { incremental: boolean }
+ * @returns 统计信息 { total, valid, willSync, willSkip, alreadyUploaded, noUrl, emptyStatus }
  */
-export declare function getSyncPreview(ws: any, colMap: Map<string, number>, lastRow: number, headerRow: number): {
+export declare function getSyncPreview(ws: any, colMap: Map<string, number>, lastRow: number, headerRow: number, options?: {
+    incremental?: boolean;
+    fingerprintMap?: Map<string, string>;
+}): {
     total: number;
     valid: number;
     willSync: number;
     willSkip: number;
     alreadyUploaded: number;
+    noUrl: number;
+    emptyStatus: number;
+    incrementalSkipped: number;
 };
 /**
  * 异步检测 Excel 与 Bangumi 收藏之间的冲突

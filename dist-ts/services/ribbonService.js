@@ -1,18 +1,21 @@
 // ts/services/ribbonService.ts
-import { bgmLog, BGM, wpsMsgBox, loadBgToken, storeBgToken, getDataSheet, findHeaderRow, getLastRow, getColumnMap, extractSubjectId, mapWatchStatus, readCell, getCellValue, readRangeValues, getFilterStatus, BGM_COLOR, LOG_LEVELS, SyncToBangumiAsync, openUserCollection, clearRowColors, testTokenValidityForRibbon, fetchAllUserCollections, getCell, trim } from '../index.js';
+import { bgmLog, BGM, wpsMsgBox, loadBgToken, storeBgToken, getDataSheet, findHeaderRow, getLastRow, getColumnMap, extractSubjectId, mapWatchStatus, readCell, getCellValue, readRangeValues, getFilterStatus, BGM_COLOR, LOG_LEVELS, SyncToBangumiAsync, openUserCollection, clearRowColors, testTokenValidityForRibbon, fetchAllUserCollections, getCell, trim, calcFingerprint } from '../index.js';
 /**
  * 获取同步预览统计（不发送请求，仅扫描 Excel）
  * @param ws 工作表对象
  * @param colMap 列映射
  * @param lastRow 数据最后一行
  * @param headerRow 表头行
- * @returns 统计信息 { total, valid, willSync, willSkip, alreadyUploaded }
+ * @param options 可选参数 { incremental: boolean }
+ * @returns 统计信息 { total, valid, willSync, willSkip, alreadyUploaded, noUrl, emptyStatus }
  */
-export function getSyncPreview(ws, colMap, lastRow, headerRow) {
+export function getSyncPreview(ws, colMap, lastRow, headerRow, options) {
     const startRow = headerRow + 1;
-    let total = 0, valid = 0, willSync = 0, willSkip = 0, alreadyUploaded = 0;
+    let total = 0, valid = 0, willSync = 0, willSkip = 0, alreadyUploaded = 0, noUrl = 0, emptyStatus = 0, incrementalSkipped = 0;
+    const isIncremental = options?.incremental;
+    const fingerprintMap = options?.fingerprintMap;
     // 批量读取（与同步函数相同的列范围）
-    const neededKeys = ['Bangumi_URL', '名称', '是否看完'];
+    const neededKeys = ['Bangumi_URL', '名称', '是否看完', '打分', '标签/分级', '剧透/感言', '集数', '集号'];
     let maxCol = 1;
     for (const key of neededKeys) {
         if (colMap.has(key))
@@ -29,24 +32,26 @@ export function getSyncPreview(ws, colMap, lastRow, headerRow) {
         for (let r = startRow; r <= lastRow; r++)
             rowsToProcess.push(r);
     }
-    for (const rowNum of rowsToProcess) {
-        total++;
-        const bgmUrl = (() => {
-            if (allData) {
-                const col = colMap.get('Bangumi_URL');
-                if (col) {
-                    const rowIdx = rowNum - startRow;
-                    if (rowIdx >= 0 && rowIdx < allData.length) {
-                        const rowData = allData[rowIdx];
-                        if (Array.isArray(rowData) && col - 1 < rowData.length) {
-                            return trim(rowData[col - 1]);
-                        }
-                    }
+    const getField = (rowNum, key) => {
+        if (allData) {
+            const col = colMap.get(key);
+            if (!col)
+                return '';
+            const rowIdx = rowNum - startRow;
+            if (rowIdx >= 0 && rowIdx < allData.length) {
+                const rowData = allData[rowIdx];
+                if (Array.isArray(rowData) && col - 1 < rowData.length) {
+                    return trim(rowData[col - 1]);
                 }
             }
-            return colMap.has('Bangumi_URL') ? trim(getCellValue(ws, rowNum, colMap.get('Bangumi_URL'))) : '';
-        })();
+        }
+        return colMap.has(key) ? trim(getCellValue(ws, rowNum, colMap.get(key))) : '';
+    };
+    for (const rowNum of rowsToProcess) {
+        total++;
+        const bgmUrl = getField(rowNum, 'Bangumi_URL');
         if (!bgmUrl || !extractSubjectId(bgmUrl)) {
+            noUrl++;
             continue; // 无效行不计入 valid
         }
         valid++;
@@ -57,19 +62,34 @@ export function getSyncPreview(ws, colMap, lastRow, headerRow) {
             seqCell.Interior.Color === BGM_COLOR.DARK_GREEN);
         if (isUploaded) {
             alreadyUploaded++;
-            continue; // 已上传不再计入待同步或跳过
+            if (isIncremental) {
+                // 增量模式：已上传且指纹匹配则跳过
+                const sid = extractSubjectId(bgmUrl);
+                if (sid && fingerprintMap) {
+                    const currentFingerprint = calcFingerprint([
+                        getField(rowNum, '名称'),
+                        mapWatchStatus(getField(rowNum, '是否看完') || getField(rowNum, '状态') || getField(rowNum, '观看状态')).toString(),
+                        getField(rowNum, '打分'),
+                        getField(rowNum, '标签/分级'),
+                        getField(rowNum, '剧透/感言'),
+                        getField(rowNum, '集数'),
+                        getField(rowNum, '集号')
+                    ]);
+                    if (fingerprintMap.get(sid) === currentFingerprint) {
+                        incrementalSkipped++;
+                        continue;
+                    }
+                }
+            }
+            else {
+                continue; // 非增量模式：已上传跳过
+            }
         }
         // 判断观看状态
-        const watchStatus = (() => {
-            const key = '是否看完';
-            if (colMap.has(key)) {
-                const col = colMap.get(key);
-                return trim(readCell(ws, rowNum, col));
-            }
-            return '';
-        })();
+        const watchStatus = getField(rowNum, '是否看完') || getField(rowNum, '状态') || getField(rowNum, '观看状态');
         // 空状态不计入待同步，跳过该条目
         if (!watchStatus) {
+            emptyStatus++;
             continue;
         }
         const type = mapWatchStatus(watchStatus);
@@ -77,10 +97,29 @@ export function getSyncPreview(ws, colMap, lastRow, headerRow) {
             willSkip++;
         }
         else {
+            // 增量模式：检查指纹是否匹配
+            if (isIncremental && fingerprintMap) {
+                const sid = extractSubjectId(bgmUrl);
+                if (sid) {
+                    const currentFingerprint = calcFingerprint([
+                        getField(rowNum, '名称'),
+                        type.toString(),
+                        getField(rowNum, '打分'),
+                        getField(rowNum, '标签/分级'),
+                        getField(rowNum, '剧透/感言'),
+                        getField(rowNum, '集数'),
+                        getField(rowNum, '集号')
+                    ]);
+                    if (fingerprintMap.get(sid) === currentFingerprint) {
+                        incrementalSkipped++;
+                        continue;
+                    }
+                }
+            }
             willSync++;
         }
     }
-    return { total, valid, willSync, willSkip, alreadyUploaded };
+    return { total, valid, willSync, willSkip, alreadyUploaded, noUrl, emptyStatus, incrementalSkipped };
 }
 /**
  * 异步检测 Excel 与 Bangumi 收藏之间的冲突

@@ -306,6 +306,8 @@ export function mapWatchStatus(status: string): number {
         return num;
     }
 
+    // 无法识别的状态，记录警告日志
+    bgmLog(LOG_LEVELS.WARN, `[mapWatchStatus] 无法识别的状态值: "${status}"，返回 0（无效）`);
     return 0;
 }
 
@@ -582,16 +584,20 @@ export function buildJsonPayload(
         // 观看状态 - 支持多种列名
         const statusKeys = ['是否看完', '状态', '观看状态', '收藏类型', 'type'];
         let statusFound = false;
+        let rawStatusValue = '';
         for (const key of statusKeys) {
             if (colMap.has(key)) {
                 const statusVal = trim(readCell(ws, rowNum, colMap.get(key)!));
                 if (statusVal) {
+                    rawStatusValue = statusVal;
                     const mappedStatus = mapWatchStatus(statusVal);
-                    if (mappedStatus !== undefined) {
+                    if (mappedStatus !== undefined && mappedStatus > 0) {
                         payload.type = mappedStatus;
                         statusFound = true;
                         bgmLog(LOG_LEVELS.DEBUG, `[buildJsonPayload] 从列 "${key}" 读取状态: "${statusVal}" -> ${mappedStatus}`);
                         break;
+                    } else {
+                        bgmLog(LOG_LEVELS.WARN, `[buildJsonPayload] 从列 "${key}" 读取状态: "${statusVal}" -> ${mappedStatus} (无效)`);
                     }
                 }
             }
@@ -599,7 +605,7 @@ export function buildJsonPayload(
         // 如果没有找到有效的状态，默认设置为"想看"(1)
         if (!statusFound) {
             payload.type = 1;
-            bgmLog(LOG_LEVELS.WARN, `[buildJsonPayload] 未找到有效的观看状态，默认设置为"想看"(1)`);
+            bgmLog(LOG_LEVELS.WARN, `[buildJsonPayload] 未找到有效的观看状态，默认设置为"想看"(1)，原始值: "${rawStatusValue}"`);
         }
 
         // 评分
