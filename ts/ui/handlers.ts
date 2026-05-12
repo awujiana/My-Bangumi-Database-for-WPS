@@ -167,38 +167,77 @@ export function testTokenValidity(): void {
         showAlert(_T.pleaseSetTokenFirst);
         return;
     }
+    
+    const apiUrl = 'https://api.bgm.tv/v0/me';
+    const requestStartTime = Date.now();
+    
+    bgmLog(LOG_LEVELS.INFO, `[testTokenValidity] ========== 开始测试 Token ==========`);
+    bgmLog(LOG_LEVELS.INFO, `[testTokenValidity] API 路由: ${apiUrl}`);
+    bgmLog(LOG_LEVELS.INFO, `[testTokenValidity] 请求方法: GET`);
+    bgmLog(LOG_LEVELS.DEBUG, `[testTokenValidity] 请求头: Authorization: Bearer ${token.substring(0, 8)}...`);
+    bgmLog(LOG_LEVELS.DEBUG, `[testTokenValidity] 请求头: Content-Type: application/json`);
+    
     const xhr = new XMLHttpRequest();
-    xhr.open('GET', 'https://api.bgm.tv/v0/me', true);
+    xhr.open('GET', apiUrl, true);
     xhr.setRequestHeader('Authorization', 'Bearer ' + token);
     xhr.setRequestHeader('Content-Type', 'application/json');
+    
     xhr.onload = () => {
+        const requestEndTime = Date.now();
+        const duration = requestEndTime - requestStartTime;
+        
+        bgmLog(LOG_LEVELS.INFO, `[testTokenValidity] ========== 请求完成 ==========`);
+        bgmLog(LOG_LEVELS.INFO, `[testTokenValidity] HTTP 状态码: ${xhr.status} (${xhr.statusText})`);
+        bgmLog(LOG_LEVELS.INFO, `[testTokenValidity] 请求耗时: ${duration}ms`);
+        
+        if (xhr.getAllResponseHeaders()) {
+            bgmLog(LOG_LEVELS.DEBUG, `[testTokenValidity] 响应头: ${xhr.getAllResponseHeaders()}`);
+        }
+        
         if (xhr.status === 200) {
             try {
                 const data = JSON.parse(xhr.responseText);
                 bgmLog(LOG_LEVELS.DEBUG, '[testTokenValidity] 响应数据: ' + JSON.stringify(data));
                 
-                // BGM API v0 /me 端点返回的用户名字段是 'nickname'
                 const nickname = data.nickname || data.username || _T.unknownUser;
                 const userId = String(data.id || '');
                 
+                bgmLog(LOG_LEVELS.INFO, `[testTokenValidity] Token 验证成功！用户名: ${nickname}, 用户ID: ${userId}`);
                 showSuccess(_T.tokenValid, _T.user + nickname);
                 
-                // 保存用户信息
                 _setBgmUserId(userId);
                 BGM.cache.username = nickname;
                 BGM.setUsername(nickname);
                 
             } catch (e: any) {
+                bgmLog(LOG_LEVELS.ERROR, `[testTokenValidity] 解析响应失败: ${e.message}`);
                 showError(_T.parseFailed, _T.cannotParseResponse);
                 BGM.handleError(e, { showAlert: false, level: BGM.ErrorLevel.WARN, context: 'testTokenValidity' });
             }
         } else if (xhr.status === 401) {
+            bgmLog(LOG_LEVELS.WARN, '[testTokenValidity] Token 无效或已过期');
             showError(_T.tokenInvalid, _T.tokenExpired);
         } else {
+            bgmLog(LOG_LEVELS.ERROR, `[testTokenValidity] Token 验证失败，HTTP 状态码: ${xhr.status}`);
+            bgmLog(LOG_LEVELS.DEBUG, `[testTokenValidity] 响应内容: ${xhr.responseText}`);
             showError('错误', `Token验证失败 (HTTP ${xhr.status})`);
         }
     };
-    xhr.onerror = () => showError(_T.networkError, _T.cannotConnectBgm);
+    
+    xhr.onerror = () => {
+        const requestEndTime = Date.now();
+        const duration = requestEndTime - requestStartTime;
+        
+        bgmLog(LOG_LEVELS.ERROR, `[testTokenValidity] 请求发生网络错误，耗时: ${duration}ms`);
+        bgmLog(LOG_LEVELS.DEBUG, `[testTokenValidity] XHR 状态: ${xhr.readyState}`);
+        showError(_T.networkError, _T.cannotConnectBgm);
+    };
+    
+    xhr.ontimeout = () => {
+        bgmLog(LOG_LEVELS.WARN, '[testTokenValidity] 请求超时');
+    };
+    
+    bgmLog(LOG_LEVELS.DEBUG, `[testTokenValidity] 正在发送请求...`);
     xhr.send();
 }
 
