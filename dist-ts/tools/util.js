@@ -355,26 +355,40 @@ export function getCellValue(ws, row, col) {
 export function readCell(ws, row, col) {
     if (!ws)
         return '';
-    const address = colNumToLetter(col) + row;
-    const cell = ws.Range(address);
-    if (!cell)
+    try {
+        const address = colNumToLetter(col) + row;
+        const cell = ws.Range(address);
+        if (!cell)
+            return '';
+        let raw = undefined;
+        try {
+            if ('Value2' in cell) {
+                raw = cell.Value2;
+                if (typeof raw === 'function')
+                    raw = raw();
+            }
+        }
+        catch { }
+        if ((raw === undefined || raw === null) && 'Value' in cell) {
+            try {
+                raw = cell.Value;
+                if (typeof raw === 'function')
+                    raw = raw();
+            }
+            catch { }
+        }
+        if ((raw === undefined || raw === null) && 'Text' in cell) {
+            try {
+                const txt = cell.Text;
+                raw = typeof txt === 'function' ? txt() : txt;
+            }
+            catch { }
+        }
+        return raw != null ? String(raw) : '';
+    }
+    catch {
         return '';
-    let raw = undefined;
-    if ('Value2' in cell) {
-        raw = cell.Value2;
-        if (typeof raw === 'function')
-            raw = raw();
     }
-    if ((raw === undefined || raw === null) && 'Value' in cell) {
-        raw = cell.Value;
-        if (typeof raw === 'function')
-            raw = raw();
-    }
-    if ((raw === undefined || raw === null) && 'Text' in cell) {
-        const txt = cell.Text;
-        raw = typeof txt === 'function' ? txt() : txt;
-    }
-    return raw != null ? String(raw) : '';
 }
 /**
  * 设置单元格值

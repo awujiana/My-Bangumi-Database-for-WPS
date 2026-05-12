@@ -145,13 +145,20 @@ function detectHeaderAndColumns(ws, opts = {}) {
             let matchCount = 0;
             let colCount = 0;
             for (let c = 1; c <= PANEL_CONFIG.MAX_SCAN_COLUMNS; c++) {
-                const v = readCell(ws, r, c).trim();
-                if (v) {
-                    colCount++;
-                    const cv = v.toLowerCase();
-                    if (HEADER_KEYWORDS.some(kw => cv === kw || cv.includes(kw))) {
-                        matchCount++;
+                try {
+                    const v = readCell(ws, r, c).trim();
+                    if (v) {
+                        colCount++;
+                        const cv = v.toLowerCase();
+                        if (HEADER_KEYWORDS.some(kw => cv === kw || cv.includes(kw))) {
+                            matchCount++;
+                        }
                     }
+                }
+                catch (cellError) {
+                    BGM.handleError(cellError, { showAlert: false, level: BGM.ErrorLevel.WARN, context: 'detectHeaderAndColumns' });
+                    // 单个单元格读取失败，不影响该行其他列
+                    continue;
                 }
             }
             if (matchCount >= 3) {
@@ -256,7 +263,7 @@ function detectHeaderAndColumns(ws, opts = {}) {
 function autoDetectSheet() {
     const app = getApp();
     if (!app?.ActiveWorkbook) {
-        bgmLog(LOG_LEVELS.WARN, 'autoDetectSheet: Application 不可用');
+        BGM.handleError(new Error('Application 不可用'), { showAlert: false, level: BGM.ErrorLevel.WARN, context: 'autoDetectSheet' });
         return null;
     }
     const sheets = app.ActiveWorkbook.Worksheets;
@@ -267,13 +274,13 @@ function autoDetectSheet() {
         try {
             const ws = sheets.Item(si);
             if (!ws || typeof ws.Activate !== 'function') {
-                bgmLog(LOG_LEVELS.WARN, `autoDetectSheet: 工作表索引 ${si} 为 null 或无法访问，已跳过`);
+                BGM.handleError(new Error(`autoDetectSheet: 工作表索引 ${si} 为 null 或无法访问，已跳过`), { showAlert: false, level: BGM.ErrorLevel.WARN, context: 'autoDetectSheet' });
                 continue;
             }
             const sheetName = ws.Name || '';
             // 跳过特定系统表（例如同步记录等）
             if (/^(同步记录|SyncRecord|模糊|搜索|SEARCH)/i.test(sheetName)) {
-                bgmLog(LOG_LEVELS.DEBUG, `autoDetectSheet: 跳过系统工作表 "${sheetName}"`);
+                BGM.handleError(new Error(`autoDetectSheet: 跳过系统工作表 "${sheetName}"`), { showAlert: false, level: BGM.ErrorLevel.DEBUG, context: 'autoDetectSheet' });
                 continue;
             }
             bgmLog(LOG_LEVELS.DEBUG, `autoDetectSheet: 正在分析工作表 "${sheetName}"`);
@@ -330,10 +337,10 @@ function autoDetectSheet() {
         }
     }
     if (bestMatch) {
-        bgmLog(LOG_LEVELS.INFO, `autoDetectSheet: 最终选中工作表 "${bestMatch.sheetName}" (列${bestMatch.colCount}, 行${bestMatch.headerRow})`);
+        BGM.handleError(new Error(`autoDetectSheet: 最终选中工作表 "${bestMatch.sheetName}" (列${bestMatch.colCount}, 行${bestMatch.headerRow})`));
     }
     else {
-        bgmLog(LOG_LEVELS.WARN, 'autoDetectSheet: 未在任何工作表中找到有效数据表头');
+        BGM.handleError(new Error('autoDetectSheet: 未在任何工作表中找到有效数据表头'));
     }
     return bestMatch;
 }

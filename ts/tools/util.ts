@@ -407,33 +407,42 @@ export function getCellValue(
  * @returns   单元格文本，若无法读取则返回空字符串
  */
 export function readCell(
-                    ws: WpsWorksheet | null | undefined,
-                    row: number,
-                    col: number
-                ): string {
+    ws: WpsWorksheet | null | undefined,
+    row: number,
+    col: number
+): string {
     if (!ws) return '';
-    const address = colNumToLetter(col) + row;
-    const cell = ws.Range(address);
-    if (!cell) return '';
+    try {
+        const address = colNumToLetter(col) + row;
+        const cell = ws.Range(address);
+        if (!cell) return '';
 
-    let raw: any = undefined;
+        let raw: any = undefined;
+        try {
+            if ('Value2' in cell) {
+                raw = cell.Value2;
+                if (typeof raw === 'function') raw = raw();
+            }
+        } catch {}
 
-    if ('Value2' in cell) {
-        raw = cell.Value2;
-        if (typeof raw === 'function') raw = raw();
+        if ((raw === undefined || raw === null) && 'Value' in cell) {
+            try {
+                raw = cell.Value;
+                if (typeof raw === 'function') raw = raw();
+            } catch {}
+        }
+
+        if ((raw === undefined || raw === null) && 'Text' in cell) {
+            try {
+                const txt = cell.Text;
+                raw = typeof txt === 'function' ? txt() : txt;
+            } catch {}
+        }
+
+        return raw != null ? String(raw) : '';
+    } catch {
+        return '';
     }
-
-    if ((raw === undefined || raw === null) && 'Value' in cell) {
-        raw = cell.Value;
-        if (typeof raw === 'function') raw = raw();
-    }
-
-    if ((raw === undefined || raw === null) && 'Text' in cell) {
-        const txt = cell.Text;
-        raw = typeof txt === 'function' ? txt() : txt;
-    }
-
-    return raw != null ? String(raw) : '';
 }
 
 /**
