@@ -139,6 +139,56 @@ function buildCache(sheet: any): void {
     _syncRecordCacheValid = true;
 }
 
+/**
+ * 设置同步记录的颜色标记
+ * @param sheet 工作表对象
+ * @param row 行号
+ * @param status 同步状态 (SUCCESS/FAIL/SKIP)
+ * @param count 同步次数
+ */
+function setSyncRecordColors(sheet: any, row: number, status: string, count: number): void {
+    // 序号列（A列）- 根据同步次数设置颜色
+    const seqCell = sheet.Range(`A${row}`);
+    if (seqCell?.Interior) {
+        if (status === SYNC_STATUS.FAIL) {
+            seqCell.Interior.Color = BGM_COLOR.FAIL;
+        } else if (status === SYNC_STATUS.SKIP) {
+            seqCell.Interior.Color = BGM_COLOR.SKIP;
+        } else {
+            // 根据同步次数设置颜色
+            if (count === 1) seqCell.Interior.Color = BGM_COLOR.BGM_SYNC;
+            else if (count === 2) seqCell.Interior.Color = BGM_COLOR.LIGHT_GREEN;
+            else seqCell.Interior.Color = BGM_COLOR.DARK_GREEN;
+        }
+    }
+
+    // 状态列（I列）- 根据状态设置颜色
+    const statusCell = sheet.Range(`I${row}`);
+    if (statusCell?.Interior) {
+        if (status === SYNC_STATUS.FAIL) {
+            statusCell.Interior.Color = BGM_COLOR.FAIL;
+        } else if (status === SYNC_STATUS.SKIP) {
+            statusCell.Interior.Color = BGM_COLOR.SKIP;
+        } else {
+            statusCell.Interior.Color = BGM_COLOR.SUCCESS;
+        }
+    }
+
+    // 类型列（F列）- 根据类型设置颜色
+    const typeCell = sheet.Range(`F${row}`);
+    if (typeCell?.Interior) {
+        const typeName = String(typeCell.Value2 || '');
+        const typeColorMap: Record<string, number> = {
+            '想看': BGM_COLOR.WISH,     // 粉色
+            '在看': BGM_COLOR.WATCHING, // 蓝色
+            '看过': BGM_COLOR.SUCCESS,  // 浅绿色
+            '搁置': BGM_COLOR.SKIP,     // 浅黄色
+            '抛弃': BGM_COLOR.FAIL      // 浅红色
+        };
+        typeCell.Interior.Color = typeColorMap[typeName] || BGM_COLOR.GRAY;
+    }
+}
+
 export function addSyncRecord(params: UpdateRecordParams): boolean {
     try {
         const sheet = getOrCreateSyncRecordSheet();
@@ -152,19 +202,15 @@ export function addSyncRecord(params: UpdateRecordParams): boolean {
             const existingRow = _syncRecordSidCache.get(sid)!;
             const existingCount = parseInt(String(sheet.Range(`G${existingRow}`).Value2 || '0'), 10) || 0;
             const newCount = existingCount + (params.count || 1);
+            const finalStatus = params.status || SYNC_STATUS.SUCCESS;
 
             sheet.Range(`G${existingRow}`).Value2 = newCount;
             if (params.status) sheet.Range(`I${existingRow}`).Value2 = params.status;
             if (params.message) sheet.Range(`J${existingRow}`).Value2 = params.message;
             if (params.fingerprint !== undefined) sheet.Range(`K${existingRow}`).Value2 = params.fingerprint;
 
-            // 设置颜色
-            const seqCell = sheet.Range(`A${existingRow}`);
-            if (seqCell?.Interior) {
-                if (newCount === 1) seqCell.Interior.Color = BGM_COLOR.BGM_SYNC;
-                else if (newCount === 2) seqCell.Interior.Color = BGM_COLOR.LIGHT_GREEN;
-                else seqCell.Interior.Color = BGM_COLOR.DARK_GREEN;
-            }
+            // 设置颜色标记
+            setSyncRecordColors(sheet, existingRow, finalStatus, newCount);
 
             // 更新缓存
             const cacheItem = _syncRecordListCache.find(item => item.sid === sid);
@@ -176,15 +222,17 @@ export function addSyncRecord(params: UpdateRecordParams): boolean {
             }
         } else {
             // 新增记录
-            // 正确计算最后行号（避免 UsedRange 错误）
             let newRow = 1;
             const usedRange = sheet.UsedRange;
             if (usedRange) {
                 const lastUsedRow = usedRange.Row + usedRange.Rows.Count - 1;
                 newRow = lastUsedRow + 1;
             } else {
-                newRow = sheet.Rows.Count > 1 ? 2 : 1; // 至少从第2行开始
+                newRow = sheet.Rows.Count > 1 ? 2 : 1;
             }
+
+            const finalStatus = params.status || SYNC_STATUS.SUCCESS;
+            const finalCount = params.count || 1;
 
             sheet.Range(`A${newRow}`).Value2 = newRow - 1;
             sheet.Range(`B${newRow}`).Value2 = now;
@@ -192,25 +240,20 @@ export function addSyncRecord(params: UpdateRecordParams): boolean {
             sheet.Range(`D${newRow}`).Value2 = params.url || '';
             sheet.Range(`E${newRow}`).Value2 = sid;
             sheet.Range(`F${newRow}`).Value2 = params.type || '';
-            sheet.Range(`G${newRow}`).Value2 = params.count || 1;
+            sheet.Range(`G${newRow}`).Value2 = finalCount;
             sheet.Range(`H${newRow}`).Value2 = params.content || '';
-            sheet.Range(`I${newRow}`).Value2 = params.status || SYNC_STATUS.SUCCESS;
+            sheet.Range(`I${newRow}`).Value2 = finalStatus;
             sheet.Range(`J${newRow}`).Value2 = params.message || '';
             if (params.fingerprint !== undefined) sheet.Range(`K${newRow}`).Value2 = params.fingerprint;
 
-            // 设置颜色
-            const seqCell = sheet.Range(`A${newRow}`);
-            if (seqCell?.Interior) {
-                if (params.status === SYNC_STATUS.SUCCESS) seqCell.Interior.Color = BGM_COLOR.BGM_SYNC;
-                else if (params.status === SYNC_STATUS.FAIL) seqCell.Interior.Color = BGM_COLOR.FAIL;
-                else seqCell.Interior.Color = BGM_COLOR.SKIP;
-            }
+            // 设置颜色标记
+            setSyncRecordColors(sheet, newRow, finalStatus, finalCount);
 
             _syncRecordSidCache.set(sid, newRow);
             _syncRecordListCache.push({
                 id: newRow, time: now, name: params.name, url: params.url,
-                sid: sid, type: params.type, count: params.count || 1,
-                content: params.content, status: params.status || SYNC_STATUS.SUCCESS,
+                sid: sid, type: params.type, count: finalCount,
+                content: params.content, status: finalStatus,
                 message: params.message || '', fingerprint: params.fingerprint
             });
         }

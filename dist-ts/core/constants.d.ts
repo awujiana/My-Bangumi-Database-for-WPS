@@ -124,6 +124,10 @@ export declare const BGM_COLOR: {
     GRAY: number;
     /** 白色 - 清除标记 */
     WHITE: number;
+    /** 粉色 - 想看状态 */
+    WISH: number;
+    /** 蓝色 - 在看状态 */
+    WATCHING: number;
 };
 /**
  * 日志级别常量

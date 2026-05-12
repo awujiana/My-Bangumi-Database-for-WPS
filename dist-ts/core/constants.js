@@ -116,7 +116,11 @@ export const BGM_COLOR = {
     /** 灰色 - 表头背景 */
     GRAY: 0xD3D3D3,
     /** 白色 - 清除标记 */
-    WHITE: 0xFFFFFF
+    WHITE: 0xFFFFFF,
+    /** 粉色 - 想看状态 */
+    WISH: 0xFFCCE5,
+    /** 蓝色 - 在看状态 */
+    WATCHING: 0xCCE5FF
 };
 /**
  * 日志级别常量
