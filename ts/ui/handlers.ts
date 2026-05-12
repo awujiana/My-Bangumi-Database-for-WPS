@@ -297,66 +297,124 @@ export function onAction(action: string): void {
 // ========== 从面板同步（异步，带进度条） ==========
 
 export async function syncFromPanel(): Promise<void> {
-    bgmLog(LOG_LEVELS.INFO, 'syncFromPanel 开始执行');
+    const startTime = Date.now();
+    bgmLog(LOG_LEVELS.INFO, '[syncFromPanel] ========== 开始执行同步操作 ==========');
 
+    // 1. 检查必要函数是否加载
+    bgmLog(LOG_LEVELS.DEBUG, '[syncFromPanel] 步骤1: 检查必要函数是否加载');
     if (typeof findHeaderRow !== 'function' || typeof getColumnMap !== 'function' || typeof getLastRow !== 'function') {
+        bgmLog(LOG_LEVELS.WARN, '[syncFromPanel] 必要函数未加载完成');
         showAlert(_T.loadingWait);
+        bgmLog(LOG_LEVELS.INFO, `[syncFromPanel] 同步操作终止（函数未加载），耗时: ${Date.now() - startTime}ms`);
         return;
     }
 
+    // 2. 检查 Token
+    bgmLog(LOG_LEVELS.DEBUG, '[syncFromPanel] 步骤2: 检查 Token');
     const token = loadBgToken();
     if (!token) {
+        bgmLog(LOG_LEVELS.WARN, '[syncFromPanel] Token 未设置');
         showAlert(_T.pleaseSetBgmToken);
+        bgmLog(LOG_LEVELS.INFO, `[syncFromPanel] 同步操作终止（Token未设置），耗时: ${Date.now() - startTime}ms`);
         return;
     }
+    bgmLog(LOG_LEVELS.DEBUG, `[syncFromPanel] Token 已设置（长度: ${token.length}）`);
 
-    // 确保同步记录工作表存在并激活
+    // 3. 确保同步记录工作表存在并激活
+    bgmLog(LOG_LEVELS.DEBUG, '[syncFromPanel] 步骤3: 确保同步记录工作表存在');
     if (typeof getOrCreateSyncRecordSheet === 'function') {
         const syncSheet = getOrCreateSyncRecordSheet();
         if (syncSheet) {
-            try { (syncSheet as any).Activate(); } catch (e: any) {
+            bgmLog(LOG_LEVELS.DEBUG, '[syncFromPanel] 同步记录工作表已创建/获取');
+            try { 
+                (syncSheet as any).Activate(); 
+                bgmLog(LOG_LEVELS.DEBUG, '[syncFromPanel] 同步记录工作表已激活');
+            } catch (e: any) {
+                bgmLog(LOG_LEVELS.WARN, `[syncFromPanel] 激活同步记录工作表失败: ${e.message}`);
                 BGM.handleError(e, { showAlert: false, level: BGM.ErrorLevel.WARN, context: 'syncFromPanel' });
             }
         }
     }
 
+    // 4. 获取应用和工作表对象
+    bgmLog(LOG_LEVELS.DEBUG, '[syncFromPanel] 步骤4: 获取应用和工作表对象');
     const app = getApp();
-    if (!app?.ActiveWorkbook) { showAlert('无法获取 Application 对象！'); return; }
+    if (!app?.ActiveWorkbook) { 
+        bgmLog(LOG_LEVELS.ERROR, '[syncFromPanel] 无法获取 Application 对象');
+        showAlert('无法获取 Application 对象！'); 
+        bgmLog(LOG_LEVELS.INFO, `[syncFromPanel] 同步操作终止（无法获取Application），耗时: ${Date.now() - startTime}ms`);
+        return; 
+    }
+    bgmLog(LOG_LEVELS.DEBUG, '[syncFromPanel] Application 对象获取成功');
+
     const ws = getDataSheet();
-    if (!ws) { showAlert('未找到数据工作表，请先锁定工作表。'); return; }
+    if (!ws) { 
+        bgmLog(LOG_LEVELS.WARN, '[syncFromPanel] 未找到数据工作表');
+        showAlert('未找到数据工作表，请先锁定工作表。'); 
+        bgmLog(LOG_LEVELS.INFO, `[syncFromPanel] 同步操作终止（未找到数据工作表），耗时: ${Date.now() - startTime}ms`);
+        return; 
+    }
+    bgmLog(LOG_LEVELS.DEBUG, '[syncFromPanel] 数据工作表获取成功');
 
+    // 5. 解析表头和列映射
+    bgmLog(LOG_LEVELS.DEBUG, '[syncFromPanel] 步骤5: 解析表头和列映射');
     const headerRow = findHeaderRow(ws);
+    bgmLog(LOG_LEVELS.DEBUG, `[syncFromPanel] 表头行: ${headerRow}`);
+    
     const lastRow = getLastRow(ws);
+    bgmLog(LOG_LEVELS.DEBUG, `[syncFromPanel] 最后一行: ${lastRow}`);
+    
     const colMap = getColumnMap(ws, headerRow);
-    if (!colMap.has("Bangumi_URL")) { showAlert('未找到 "Bangumi URL" 列！'); return; }
+    bgmLog(LOG_LEVELS.DEBUG, `[syncFromPanel] 列映射完成，共 ${colMap.size} 列`);
+    
+    if (!colMap.has("Bangumi_URL")) { 
+        bgmLog(LOG_LEVELS.WARN, '[syncFromPanel] 未找到 Bangumi_URL 列');
+        showAlert('未找到 "Bangumi URL" 列！'); 
+        bgmLog(LOG_LEVELS.INFO, `[syncFromPanel] 同步操作终止（缺少Bangumi_URL列），耗时: ${Date.now() - startTime}ms`);
+        return; 
+    }
 
-    // ========== 获取同步预览统计 ==========
+    // 6. 获取同步预览统计
+    bgmLog(LOG_LEVELS.DEBUG, '[syncFromPanel] 步骤6: 获取同步预览统计');
     const preview = getSyncPreview(ws, colMap, lastRow, headerRow);
+    bgmLog(LOG_LEVELS.INFO, `[syncFromPanel] 数据预览 - 总行数: ${preview.total}, 有效: ${preview.valid}, 已上传: ${preview.alreadyUploaded}, 待同步: ${preview.willSync}, 跳过: ${preview.willSkip}`);
 
-    // ========== 冲突检测与策略 ==========
+    // 7. 冲突检测与策略
+    bgmLog(LOG_LEVELS.DEBUG, '[syncFromPanel] 步骤7: 冲突检测');
     const conflictSelect = document.getElementById('conflictStrategy') as HTMLSelectElement;
-    const conflictStrategy = conflictSelect?.value || 'skip'; // 默认跳过冲突
+    const conflictStrategy = conflictSelect?.value || 'skip';
+    bgmLog(LOG_LEVELS.DEBUG, `[syncFromPanel] 冲突策略: ${conflictStrategy}`);
+    
     let conflictSids: Set<string> | undefined = undefined;
     let conflictMsg = '';
     try {
+        bgmLog(LOG_LEVELS.DEBUG, '[syncFromPanel] 开始检测冲突...');
         const { conflicts, conflictCount } = await detectConflicts(ws, colMap, lastRow, headerRow, token);
         if (conflictCount > 0) {
+            bgmLog(LOG_LEVELS.WARN, `[syncFromPanel] 检测到 ${conflictCount} 条冲突`);
             if (conflictStrategy === 'skip') {
                 conflictSids = new Set(conflicts.map(c => c.sid));
                 conflictMsg = `检测到 ${conflictCount} 条冲突，已选择【跳过冲突】。\n\n`;
+                bgmLog(LOG_LEVELS.INFO, `[syncFromPanel] 冲突处理策略: 跳过 ${conflictCount} 条冲突条目`);
             } else {
                 conflictMsg = `检测到 ${conflictCount} 条冲突，将使用【Excel数据覆盖】。\n\n`;
+                bgmLog(LOG_LEVELS.INFO, `[syncFromPanel] 冲突处理策略: 使用Excel数据覆盖 ${conflictCount} 条冲突`);
             }
+        } else {
+            bgmLog(LOG_LEVELS.DEBUG, '[syncFromPanel] 未检测到冲突');
         }
     } catch (e: any) {
+        bgmLog(LOG_LEVELS.WARN, `[syncFromPanel] 冲突检测失败: ${e.message}`);
         BGM.handleError(e, { showAlert: false, level: BGM.ErrorLevel.WARN, context: 'syncFromPanel' });
-        // 检测失败不影响同步
     }
 
-    // ========== 增量同步开关 ==========
+    // 8. 增量同步开关
+    bgmLog(LOG_LEVELS.DEBUG, '[syncFromPanel] 步骤8: 检查增量同步设置');
     const incremental = (document.getElementById('chkIncremental') as HTMLInputElement)?.checked ?? false;
+    bgmLog(LOG_LEVELS.INFO, `[syncFromPanel] 增量同步: ${incremental ? '开启' : '关闭'}`);
 
-    // ========== 确认对话框 ==========
+    // 9. 确认对话框
+    bgmLog(LOG_LEVELS.DEBUG, '[syncFromPanel] 步骤9: 显示确认对话框');
     const msg = `数据预览：
             总行数：${preview.total}
             有效条目：${preview.valid}
@@ -369,10 +427,16 @@ export async function syncFromPanel(): Promise<void> {
     const confirmed = await new Promise<boolean>(resolve => {
         showConfirm(msg, (confirmed) => resolve(confirmed));
     });
-    if (!confirmed) return;
+    if (!confirmed) {
+        bgmLog(LOG_LEVELS.INFO, '[syncFromPanel] 用户取消同步');
+        bgmLog(LOG_LEVELS.INFO, `[syncFromPanel] 同步操作终止（用户取消），耗时: ${Date.now() - startTime}ms`);
+        return;
+    }
 
-    // ========== 执行同步 ==========
+    // 10. 执行同步
+    bgmLog(LOG_LEVELS.INFO, '[syncFromPanel] 步骤10: 开始执行同步');
     try {
+        bgmLog(LOG_LEVELS.DEBUG, '[syncFromPanel] 调用 SyncToBangumiAsync...');
         const result = await SyncToBangumiAsync(ws, colMap, token, lastRow, headerRow, {
             skipSids: conflictSids,
             incremental,
@@ -381,16 +445,21 @@ export async function syncFromPanel(): Promise<void> {
                 if (app.StatusBar !== undefined) {
                     app.StatusBar = `[${current}/${total}] ${message}`;
                 }
+                bgmLog(LOG_LEVELS.DEBUG, `[syncFromPanel] 同步进度: ${current}/${total} - ${message}`);
             }
         });
         resetProgressBar();
         if (app.StatusBar !== undefined) app.StatusBar = false;
+        bgmLog(LOG_LEVELS.INFO, `[syncFromPanel] 同步完成！成功: ${result.success}, 失败: ${result.fail}, 跳过: ${result.skip}`);
         showAlert(`同步完成！成功 ${result.success} 条，失败 ${result.fail} 条，跳过 ${result.skip} 条`);
     } catch (err: any) {
         resetProgressBar();
         if (app.StatusBar !== undefined) app.StatusBar = false;
+        bgmLog(LOG_LEVELS.ERROR, `[syncFromPanel] 同步失败: ${err.message}`);
         BGM.handleError(err, { context: 'syncFromPanel', showAlert: true });
     }
+    
+    bgmLog(LOG_LEVELS.INFO, `[syncFromPanel] ========== 同步操作结束，总耗时: ${Date.now() - startTime}ms ==========`);
 }
 
 // 进度条辅助函数
@@ -429,16 +498,32 @@ export function testSingleUpdateFromPanel(): void {
 // ========== 从BGM同步收藏标记 ==========
 
 export async function syncCollectionFromBgm(): Promise<void> {
+    const startTime = Date.now();
+    bgmLog(LOG_LEVELS.INFO, '[syncCollectionFromBgm] ========== 开始从 BGM 同步收藏标记 ==========');
+    
     const select = document.getElementById('sheetSelect') as HTMLSelectElement | null;
     const sheetIndex = BGM.sheet.lockedIndex || parseInt(select?.value || '') || 1;
-    bgmLog(LOG_LEVELS.INFO, _T.syncBgmMarksStart + sheetIndex);
+    bgmLog(LOG_LEVELS.INFO, `[syncCollectionFromBgm] 目标工作表索引: ${sheetIndex}`);
+    
     const token = loadBgToken();
-    if (!token) { showAlert(_T.pleaseSetBgmToken); return; }
+    if (!token) { 
+        bgmLog(LOG_LEVELS.WARN, '[syncCollectionFromBgm] Token 未设置');
+        showAlert(_T.pleaseSetBgmToken); 
+        bgmLog(LOG_LEVELS.INFO, `[syncCollectionFromBgm] 操作终止（Token未设置），耗时: ${Date.now() - startTime}ms`);
+        return; 
+    }
+    bgmLog(LOG_LEVELS.DEBUG, `[syncCollectionFromBgm] Token 已设置（长度: ${token.length}）`);
+    
     try {
+        bgmLog(LOG_LEVELS.DEBUG, '[syncCollectionFromBgm] 调用 syncFromBgmByAPI...');
         await syncFromBgmByAPI(sheetIndex);
+        bgmLog(LOG_LEVELS.INFO, `[syncCollectionFromBgm] 同步完成，耗时: ${Date.now() - startTime}ms`);
     } catch (e: any) {
+        bgmLog(LOG_LEVELS.ERROR, `[syncCollectionFromBgm] 同步失败: ${e.message}`);
         BGM.handleError(e, { context: 'syncCollectionFromBgm', showAlert: true });
     }
+    
+    bgmLog(LOG_LEVELS.INFO, `[syncCollectionFromBgm] ========== 操作结束，总耗时: ${Date.now() - startTime}ms ==========`);
 }
 
 export async function syncFromBgmByAPI(sheetIndex: number): Promise<void> {
