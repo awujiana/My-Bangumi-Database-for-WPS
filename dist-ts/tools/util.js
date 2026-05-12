@@ -563,31 +563,34 @@ export function _fetchBgmUserInfo(callback) {
             callback(null);
         return;
     }
+    const apiUrl = BGM_CONFIG.API_BASE + "/v0/me";
+    bgmLog(LOG_LEVELS.DEBUG, `[_fetchBgmUserInfo] API 路由: ${apiUrl}`);
     const xhr = new XMLHttpRequest();
-    xhr.open("GET", BGM_CONFIG.API_BASE + "/me", true);
+    xhr.open("GET", apiUrl, true);
     xhr.setRequestHeader("Authorization", "Bearer " + token);
+    xhr.setRequestHeader("Content-Type", "application/json");
     xhr.onload = function () {
         if (xhr.status === 200) {
             try {
                 const data = JSON.parse(xhr.responseText);
                 const userId = String(data.id || data.user_id || '');
-                const username = String(data.username || data.user_name || data.name || '');
+                // BGM API v0 返回的用户名字段是 nickname，username 是用户ID
+                const username = String(data.nickname || data.username || data.user_name || data.name || '');
                 BGM.cache.userId = userId;
                 BGM.cache.username = username;
-                bgmLog(LOG_LEVELS.DEBUG, "_fetchBgmUserInfo: userId=" + userId);
+                _setBgmUserId(userId); // 确保用户ID被持久化保存
+                bgmLog(LOG_LEVELS.INFO, `[_fetchBgmUserInfo] 获取用户信息成功: userId=${userId}, username=${username}`);
                 if (callback)
                     callback({ id: userId, username: username });
             }
-            catch {
+            catch (e) {
+                bgmLog(LOG_LEVELS.ERROR, `[_fetchBgmUserInfo] 解析响应失败: ${e.message}`);
                 if (callback)
                     callback(null);
             }
         }
         else {
-            // 非 200 时记录错误（401 为预期状态，不记录）
-            if (xhr.status !== 401) {
-                BGM.handleError(new Error(`获取用户信息失败，HTTP ${xhr.status}`), { level: ErrorLevel.WARN, context: '_fetchBgmUserInfo' });
-            }
+            bgmLog(LOG_LEVELS.WARN, `[_fetchBgmUserInfo] 获取用户信息失败，HTTP 状态码: ${xhr.status}`);
             if (callback)
                 callback(null);
         }
