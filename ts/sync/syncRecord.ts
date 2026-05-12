@@ -11,8 +11,8 @@
 import {
     BGM_CONFIG, LOG_LEVELS, SYNC_STATUS, BGM_COLOR, bgmLog, getApp,
     trim, isEmptyValue, BGM, getLastRow, colNumToLetter,
-    SYNC_RECORD_COLUMNS, SYNC_RECORD_SHEET_NAME,
-    getCellValue, setCellValue, readCell      // 复用公共函数
+    SYNC_RECORD_COLUMNS, SYNC_RECORD_SHEET_NAME, SYNC_RECORD_COL, SYNC_RECORD_TYPE_COLOR,
+    getCellValue, setCellValue, readCell
 } from '../index.js';
 
 export interface SyncRecord {
@@ -44,29 +44,10 @@ export interface UpdateRecordParams {
     row?: number;
 }
 
-// ========== 列索引常量 (1-based，便于维护) ==========
-const COL = {
-    SEQ: 1,
-    TIME: 2,
-    NAME: 3,
-    URL: 4,
-    SID: 5,
-    TYPE: 6,
-    COUNT: 7,
-    CONTENT: 8,
-    STATUS: 9,
-    MESSAGE: 10,
-    FINGERPRINT: 11
-} as const;
-
-// 类型颜色映射表 (提取为常量)
-const TYPE_COLOR_MAP: Record<string, number> = {
-    '想看': BGM_COLOR.WISH,
-    '在看': BGM_COLOR.WATCHING,
-    '看过': BGM_COLOR.SUCCESS,
-    '搁置': BGM_COLOR.SKIP,
-    '抛弃': BGM_COLOR.FAIL
-};
+// ========== 内存缓存 ==========
+let _syncRecordSidCache = new Map<string, number>();
+let _syncRecordListCache: SyncRecord[] = [];
+let _syncRecordCacheValid = false;
 
 /**
  * 根据同步次数获取颜色
@@ -87,11 +68,6 @@ function getStatusColor(status: string): number {
         default: return BGM_COLOR.SUCCESS;
     }
 }
-
-// ========== 内存缓存 ==========
-let _syncRecordSidCache = new Map<string, number>();     // sid -> 行号 (空 sid 不被缓存)
-let _syncRecordListCache: SyncRecord[] = [];
-let _syncRecordCacheValid = false;
 
 /**
  * 获取或创建同步记录工作表
@@ -154,28 +130,26 @@ function buildCache(sheet: any): void {
     _syncRecordSidCache.clear();
     _syncRecordListCache.length = 0;
 
-    // 使用精确的最后数据行（避免扫描整张表）
     const lastRow = getLastRow(sheet);
     for (let row = 2; row <= lastRow; row++) {
         try {
-            // 改用公共函数 getCellValue 读取
-            const sid = getCellValue(sheet, row, COL.SID).trim();
-            const url = getCellValue(sheet, row, COL.URL).trim();
+            const sid = getCellValue(sheet, row, SYNC_RECORD_COL.SID).trim();
+            const url = getCellValue(sheet, row, SYNC_RECORD_COL.URL).trim();
             if (!url && !sid) continue;
 
             _syncRecordSidCache.set(sid, row);
             _syncRecordListCache.push({
-                seq: getCellValue(sheet, row, COL.SEQ),
-                time: getCellValue(sheet, row, COL.TIME),
-                name: getCellValue(sheet, row, COL.NAME),
+                seq: getCellValue(sheet, row, SYNC_RECORD_COL.SEQ),
+                time: getCellValue(sheet, row, SYNC_RECORD_COL.TIME),
+                name: getCellValue(sheet, row, SYNC_RECORD_COL.NAME),
                 url: url,
                 sid: sid,
-                type: getCellValue(sheet, row, COL.TYPE),
-                count: parseInt(getCellValue(sheet, row, COL.COUNT)) || 1,
-                content: getCellValue(sheet, row, COL.CONTENT),
-                status: getCellValue(sheet, row, COL.STATUS) || SYNC_STATUS.SUCCESS,
-                message: getCellValue(sheet, row, COL.MESSAGE),
-                fingerprint: getCellValue(sheet, row, COL.FINGERPRINT),
+                type: getCellValue(sheet, row, SYNC_RECORD_COL.TYPE),
+                count: parseInt(getCellValue(sheet, row, SYNC_RECORD_COL.COUNT)) || 1,
+                content: getCellValue(sheet, row, SYNC_RECORD_COL.CONTENT),
+                status: getCellValue(sheet, row, SYNC_RECORD_COL.STATUS) || SYNC_STATUS.SUCCESS,
+                message: getCellValue(sheet, row, SYNC_RECORD_COL.MESSAGE),
+                fingerprint: getCellValue(sheet, row, SYNC_RECORD_COL.FINGERPRINT),
                 row: row
             });
         } catch (e: any) {
@@ -199,18 +173,18 @@ function setSyncRecordColors(sheet: any, row: number, status: string, count: num
     };
 
     // 序号列（A列）- 根据同步次数或状态设置颜色
-    setColor(COL.SEQ, status === SYNC_STATUS.FAIL ? BGM_COLOR.FAIL
+    setColor(SYNC_RECORD_COL.SEQ, status === SYNC_STATUS.FAIL ? BGM_COLOR.FAIL
                 : status === SYNC_STATUS.SKIP ? BGM_COLOR.SKIP
                 : getCountColor(count));
 
     // 状态列（I列）- 根据状态设置颜色
-    setColor(COL.STATUS, getStatusColor(status));
+    setColor(SYNC_RECORD_COL.STATUS, getStatusColor(status));
 
     // 类型列（F列）- 根据类型设置颜色
-    const typeCell = sheet.Range(`${colNumToLetter(COL.TYPE)}${row}`);
+    const typeCell = sheet.Range(`${colNumToLetter(SYNC_RECORD_COL.TYPE)}${row}`);
     if (typeCell?.Interior) {
-        const typeName = String(getCellValue(sheet, row, COL.TYPE) || '');
-        typeCell.Interior.Color = TYPE_COLOR_MAP[typeName] || BGM_COLOR.GRAY;
+        const typeName = String(getCellValue(sheet, row, SYNC_RECORD_COL.TYPE) || '');
+        typeCell.Interior.Color = SYNC_RECORD_TYPE_COLOR[typeName] || BGM_COLOR.GRAY;
     }
 }
 
@@ -223,21 +197,18 @@ export function addSyncRecord(params: UpdateRecordParams): boolean {
         const now = new Date().toLocaleString('zh-CN');
 
         if (sid && _syncRecordSidCache.has(sid)) {
-            // 更新现有记录
             const existingRow = _syncRecordSidCache.get(sid)!;
-            const existingCount = parseInt(getCellValue(sheet, existingRow, COL.COUNT)) || 0;
+            const existingCount = parseInt(getCellValue(sheet, existingRow, SYNC_RECORD_COL.COUNT)) || 0;
             const newCount = existingCount + (params.count || 1);
             const finalStatus = params.status || SYNC_STATUS.SUCCESS;
 
-            setCellValue(sheet, existingRow, COL.COUNT, newCount);
-            if (params.status) setCellValue(sheet, existingRow, COL.STATUS, params.status);
-            if (params.message) setCellValue(sheet, existingRow, COL.MESSAGE, params.message);
-            if (params.fingerprint !== undefined) setCellValue(sheet, existingRow, COL.FINGERPRINT, params.fingerprint);
+            setCellValue(sheet, existingRow, SYNC_RECORD_COL.COUNT, newCount);
+            if (params.status) setCellValue(sheet, existingRow, SYNC_RECORD_COL.STATUS, params.status);
+            if (params.message) setCellValue(sheet, existingRow, SYNC_RECORD_COL.MESSAGE, params.message);
+            if (params.fingerprint !== undefined) setCellValue(sheet, existingRow, SYNC_RECORD_COL.FINGERPRINT, params.fingerprint);
 
-            // 设置颜色标记
             setSyncRecordColors(sheet, existingRow, finalStatus, newCount);
 
-            // 更新缓存
             const cacheItem = _syncRecordListCache.find(item => item.sid === sid);
             if (cacheItem) {
                 cacheItem.count = newCount;
@@ -246,7 +217,6 @@ export function addSyncRecord(params: UpdateRecordParams): boolean {
                 if (params.fingerprint !== undefined) cacheItem.fingerprint = params.fingerprint;
             }
         } else {
-            // 新增记录
             let newRow = 1;
             const usedRange = sheet.UsedRange;
             if (usedRange) {
@@ -259,19 +229,18 @@ export function addSyncRecord(params: UpdateRecordParams): boolean {
             const finalStatus = params.status || SYNC_STATUS.SUCCESS;
             const finalCount = params.count || 1;
 
-            setCellValue(sheet, newRow, COL.SEQ, newRow - 1);
-            setCellValue(sheet, newRow, COL.TIME, now);
-            setCellValue(sheet, newRow, COL.NAME, params.name || '');
-            setCellValue(sheet, newRow, COL.URL, params.url || '');
-            setCellValue(sheet, newRow, COL.SID, sid);
-            setCellValue(sheet, newRow, COL.TYPE, params.type || '');
-            setCellValue(sheet, newRow, COL.COUNT, finalCount);
-            setCellValue(sheet, newRow, COL.CONTENT, params.content || '');
-            setCellValue(sheet, newRow, COL.STATUS, finalStatus);
-            setCellValue(sheet, newRow, COL.MESSAGE, params.message || '');
-            if (params.fingerprint !== undefined) setCellValue(sheet, newRow, COL.FINGERPRINT, params.fingerprint);
+            setCellValue(sheet, newRow, SYNC_RECORD_COL.SEQ, newRow - 1);
+            setCellValue(sheet, newRow, SYNC_RECORD_COL.TIME, now);
+            setCellValue(sheet, newRow, SYNC_RECORD_COL.NAME, params.name || '');
+            setCellValue(sheet, newRow, SYNC_RECORD_COL.URL, params.url || '');
+            setCellValue(sheet, newRow, SYNC_RECORD_COL.SID, sid);
+            setCellValue(sheet, newRow, SYNC_RECORD_COL.TYPE, params.type || '');
+            setCellValue(sheet, newRow, SYNC_RECORD_COL.COUNT, finalCount);
+            setCellValue(sheet, newRow, SYNC_RECORD_COL.CONTENT, params.content || '');
+            setCellValue(sheet, newRow, SYNC_RECORD_COL.STATUS, finalStatus);
+            setCellValue(sheet, newRow, SYNC_RECORD_COL.MESSAGE, params.message || '');
+            if (params.fingerprint !== undefined) setCellValue(sheet, newRow, SYNC_RECORD_COL.FINGERPRINT, params.fingerprint);
 
-            // 设置颜色标记
             setSyncRecordColors(sheet, newRow, finalStatus, finalCount);
 
             _syncRecordSidCache.set(sid, newRow);

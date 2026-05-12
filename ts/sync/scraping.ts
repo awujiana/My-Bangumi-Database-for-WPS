@@ -59,6 +59,13 @@ export interface CollectionItem {
     ep_status?: number;
     vol_status?: number;
     updated_at?: string;
+    subject_type?: number;
+    subject?: {
+        id: number;
+        name: string;
+        name_cn?: string;
+        type?: number;
+    };
 }
 
 /**

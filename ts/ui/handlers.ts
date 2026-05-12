@@ -29,7 +29,7 @@ interface FilterStatus {
 }
 
 interface BangumiCollectionItem {
-    subject_id: string;
+    subject_id: number;
     subject_type?: number;
     subject?: {
         name_cn?: string;
@@ -618,7 +618,7 @@ async function _doAPISync(sheetIndex: number, token: string): Promise<void> {
         _setBgmUserId(verifyResult.userId || '');
 
         setStatus('正在获取收藏列表...', 'info');
-        const userCollections = await fetchAllUserCollections(token) as BangumiCollectionItem[];
+        const userCollections = await fetchAllUserCollections(token) ;
 
         const collectionMap = new Map<string, BangumiCollectionItem>();
         userCollections.forEach(c => collectionMap.set(String(c.subject_id), c));

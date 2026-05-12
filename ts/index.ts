@@ -40,7 +40,9 @@ export {
     WATCH_STATUS_MAP,
     COLUMNS,
     SYNC_RECORD_SHEET_NAME,
-    SYNC_RECORD_COLUMNS
+    SYNC_RECORD_COLUMNS,
+    SYNC_RECORD_COL, 
+    SYNC_RECORD_TYPE_COLOR,
 } from './core/constants.js';
 
 // ============================================================================
