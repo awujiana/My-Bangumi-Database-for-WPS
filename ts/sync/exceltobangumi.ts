@@ -75,23 +75,30 @@ const TYPE_NAMES: Record<number, string> = {
 const DEFAULT_CONCURRENCY = 5;
 /** 请求最小间隔（毫秒） */
 const MIN_REQUEST_INTERVAL = 100;
+/** 序列号列默认索引 */
+const DEFAULT_SEQ_COL = 4;
 
 // ========== 辅助函数 (优化点：拆分复用) ==========
 
+
+
 /**
- * 获取单元格字符串值 (兼容已有工具函数)
+ * 获取序列号列索引（支持 colMap 或默认列号）
  */
-function getCellString(ws: any, row: number, col: number): string {
-    return getCellValue(ws, row, col);
+function getSeqColIndex(colMap: Map<string, number> | undefined): number {
+    return colMap?.get('序列号') || DEFAULT_SEQ_COL;
 }
 
 /**
  * 检查单元格是否已标记为同步成功（颜色判断）
- * 优化点：提取重复逻辑
+ * @param ws 工作表
+ * @param row 行号
+ * @param seqCol 序列号列索引（可选，默认4）
  */
-function isCellMarkedSuccess(ws: any, row: number): boolean {
+function isCellMarkedSuccess(ws: any, row: number, seqCol?: number): boolean {
     try {
-        const cell = getCell(ws, row, 4) as WpsRange | null;
+        const col = seqCol || DEFAULT_SEQ_COL;
+        const cell = getCell(ws, row, col) as WpsRange | null;
         if (!cell?.Interior) return false;
         const color = cell.Interior.Color;
         return color === BGM_COLOR.SUCCESS ||
@@ -104,11 +111,56 @@ function isCellMarkedSuccess(ws: any, row: number): boolean {
 
 /**
  * 标记单元格同步结果颜色
+ * @param ws 工作表
+ * @param row 行号
+ * @param isSuccess 是否成功
+ * @param seqCol 序列号列索引（可选，默认4）
  */
-function markSyncResultColor(ws: any, row: number, isSuccess: boolean): void {
-    const cell = getCell(ws, row, 4) as WpsRange | null;
+function markSyncResultColor(ws: any, row: number, isSuccess: boolean, seqCol?: number): void {
+    const col = seqCol || DEFAULT_SEQ_COL;
+    const cell = getCell(ws, row, col) as WpsRange | null;
     if (cell?.Interior) {
         cell.Interior.Color = isSuccess ? BGM_COLOR.SUCCESS : BGM_COLOR.FAIL;
+    }
+}
+
+/**
+ * 清除行颜色标记
+ */
+function clearRowColor(ws: any, row: number, seqCol: number): void {
+    try {
+        const cell = getCell(ws, row, seqCol) as WpsRange | null;
+        if (cell?.Interior) cell.Interior.ColorIndex = -4142;
+    } catch (e: any) {
+        BGM.handleError(e, { context: 'clearRowColor', showAlert: false });
+    }
+}
+
+/**
+ * 批量清除工作表颜色标记
+ */
+function clearSheetColors(ws: any, lastRow: number, seqCol: number): void {
+    for (let r = 1; r <= lastRow; r++) {
+        clearRowColor(ws, r, seqCol);
+    }
+}
+
+/**
+ * 提取HTTP请求结果消息
+ */
+function extractResponseMessage(data: any): string {
+    return data?.msg || data?.message || data?.error || data?.description || 'success';
+}
+
+/**
+ * 处理请求错误响应
+ */
+function parseErrorResponse(xhr: XMLHttpRequest): string {
+    try {
+        const errData = JSON.parse(xhr.responseText);
+        return errData.error || errData.description || `HTTP ${xhr.status}`;
+    } catch {
+        return xhr.statusText || `HTTP ${xhr.status}`;
     }
 }
 
@@ -549,18 +601,23 @@ export function getFilterStatus(
 }
 
 /**
- * 根据D列序列号获取连续的有效行
+ * 根据序列号列获取连续的有效行
  *
  * @function getSequentialRowsBySeqCol
  * @param {number} startRow - 起始行
  * @param {number} endRow - 结束行
+ * @param {Map<string, number>} [colMap] - 列映射（可选）
  * @returns {{ validRows: number[]; seqMap: Map<string, number> }} 有效行和序列号映射
  *
  * @description
- * 扫描D列（序列号列），找出有序列号的数据行。
+ * 扫描序列号列，找出有序列号的数据行。
  * 序列号格式应为数字，用于标记同步进度。
  */
-export function getSequentialRowsBySeqCol(startRow: number, endRow: number): { validRows: number[]; seqMap: Map<string, number> } {
+export function getSequentialRowsBySeqCol(
+    startRow: number,
+    endRow: number,
+    colMap?: Map<string, number>
+): { validRows: number[]; seqMap: Map<string, number> } {
     const result = {
         validRows: [] as number[],
         seqMap: new Map<string, number>()
@@ -573,9 +630,10 @@ export function getSequentialRowsBySeqCol(startRow: number, endRow: number): { v
         const ws = app.ActiveWorkbook.ActiveSheet;
         if (!ws) return result;
 
+        const seqCol = getSeqColIndex(colMap);
         for (let r = startRow; r <= endRow; r++) {
             try {
-                const val = readCell(ws, r, 4);   // 复用统一的 readCell 函数
+                const val = readCell(ws, r, seqCol);
                 if (val !== null && val !== undefined && val !== '') {
                     const seqNum = String(val).trim();
                     if (/^\d+$/.test(seqNum)) {
@@ -736,19 +794,19 @@ export function bgmRequestSync(
         xhr.send(jsonBody);
 
         const duration = Date.now() - startTime;
+        result.code = xhr.status;
+        result.message = xhr.status >= 200 && xhr.status < 300 ? 'success' : parseErrorResponse(xhr);
+
         bgmLog(LOG_LEVELS.INFO, `[bgmRequestSync] ========== 请求完成 ==========`);
         bgmLog(LOG_LEVELS.INFO, `[bgmRequestSync] HTTP 状态码: ${xhr.status} (${xhr.statusText})`);
         bgmLog(LOG_LEVELS.INFO, `[bgmRequestSync] 请求耗时: ${duration}ms`);
 
-        result.code = xhr.status;
-
         if (xhr.status >= 200 && xhr.status < 300) {
-            result.message = 'success';
             bgmLog(LOG_LEVELS.INFO, `[bgmRequestSync] 请求成功`);
             if (xhr.responseText) {
                 try {
                     const data = JSON.parse(xhr.responseText);
-                    result.message = data.msg || data.message || 'success';
+                    result.message = extractResponseMessage(data);
                     bgmLog(LOG_LEVELS.DEBUG, `[bgmRequestSync] 响应数据: ${JSON.stringify(data).length > 300 ? JSON.stringify(data).substring(0, 300) + '...' : JSON.stringify(data)}`);
                 } catch (e: any) {
                     BGM.handleError(e, { context: 'bgmRequestSync', showAlert: false });
@@ -800,9 +858,10 @@ export function setBangumiToken(token: string): boolean {
 }
 
 /**
- * 清除当前活动工作表的 D 列颜色标记（与 clearSheetMarksInSheet 相同，但作用于活动工作表）清除所有行的颜色标记
+ * 清除当前活动工作表的序列号列颜色标记
+ * @param colMap 列映射（可选，用于确定序列号列）
  */
-export function clearRowColors(): void {
+export function clearRowColors(colMap?: Map<string, number>): void {
     try {
         const app = getApp();
         if (!app?.ActiveWorkbook) return;
@@ -811,14 +870,8 @@ export function clearRowColors(): void {
         if (!ws) return;
 
         const lastRow = getLastRow(ws);
-        for (let r = 1; r <= lastRow; r++) {
-            try {
-                const cell = ws.Range(`D${r}`) as WpsRange | null;
-                if (cell?.Interior) cell.Interior.ColorIndex = -4142;
-            } catch (e: any) {
-                BGM.handleError(e, { context: 'clearRowColors', showAlert: false });
-            }
-        }
+        const seqCol = getSeqColIndex(colMap);
+        clearSheetColors(ws, lastRow, seqCol);
         bgmLog(LOG_LEVELS.INFO, '已清除所有颜色标记');
     } catch (e: any) {
         BGM.handleError(e, { context: 'clearRowColors', showAlert: false });
@@ -968,6 +1021,7 @@ export async function SyncToBangumiAsync(
     const result = { success: 0, fail: 0, skip: 0, stopped: false };
     const startRow = headerRow + 1;
     const startTime = Date.now();
+    const seqCol = getSeqColIndex(colMap);
 
     bgmLog(LOG_LEVELS.INFO, '[SyncToBangumiAsync] ========== 开始批量同步 ==========');
 
@@ -1056,7 +1110,7 @@ export async function SyncToBangumiAsync(
             }
 
             // 检查已上传颜色（非增量模式）
-            if (!fingerprintMap && isCellMarkedSuccess(ws, rowNum)) {
+            if (!fingerprintMap && isCellMarkedSuccess(ws, rowNum, seqCol)) {
                 result.skip++;
                 continue;
             }
@@ -1107,7 +1161,7 @@ export async function SyncToBangumiAsync(
     // 批量更新成功项
     for (const task of successTasks) {
         // 标记颜色
-        markSyncResultColor(ws, task.rowNum, true);
+        markSyncResultColor(ws, task.rowNum, true, seqCol);
 
         // 记录同步日志
         addSyncRecord({
@@ -1127,7 +1181,7 @@ export async function SyncToBangumiAsync(
 
     // 批量更新失败项
     for (const task of failTasks) {
-        markSyncResultColor(ws, task.rowNum, false);
+        markSyncResultColor(ws, task.rowNum, false, seqCol);
 
         addSyncRecord({
             name: task.name || `SID:${task.sid}`,
@@ -1163,10 +1217,11 @@ export async function SyncToBangumiAsync(
 }
 
 /**
- * 清除指定工作表的 D 列颜色标记
+ * 清除指定工作表的序列号列颜色标记
  * @param sheetIndex 工作表索引
+ * @param colMap 列映射（可选，用于确定序列号列）
  */
-export function clearSheetMarksInSheet(sheetIndex: number): void {
+export function clearSheetMarksInSheet(sheetIndex: number, colMap?: Map<string, number>): void {
     try {
         const app = getApp();
         if (!app?.ActiveWorkbook) return;
@@ -1174,15 +1229,9 @@ export function clearSheetMarksInSheet(sheetIndex: number): void {
         const ws = app.ActiveWorkbook.Worksheets.Item(sheetIndex);
         if (!ws) return;
 
-        const lastRow = getLastRow(ws);  // 精确获取最后数据行
-        for (let r = 1; r <= lastRow; r++) {
-            try {
-                const cell = ws.Range(`D${r}`) as WpsRange | null;
-                if (cell?.Interior) cell.Interior.ColorIndex = -4142;
-            } catch (e: any) {
-                BGM.handleError(e, { context: 'clearSheetMarksInSheet', showAlert: false });
-            }
-        }
+        const lastRow = getLastRow(ws);
+        const seqCol = getSeqColIndex(colMap);
+        clearSheetColors(ws, lastRow, seqCol);
         bgmLog(LOG_LEVELS.INFO, `已清除工作表 ${sheetIndex} 的颜色标记`);
     } catch (e: any) {
         BGM.handleError(e, { context: 'clearSheetMarksInSheet', showAlert: false });

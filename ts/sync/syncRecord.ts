@@ -68,6 +68,26 @@ const TYPE_COLOR_MAP: Record<string, number> = {
     '抛弃': BGM_COLOR.FAIL
 };
 
+/**
+ * 根据同步次数获取颜色
+ */
+function getCountColor(count: number): number {
+    if (count === 1) return BGM_COLOR.BGM_SYNC;
+    if (count === 2) return BGM_COLOR.LIGHT_GREEN;
+    return BGM_COLOR.DARK_GREEN;
+}
+
+/**
+ * 根据状态获取颜色
+ */
+function getStatusColor(status: string): number {
+    switch (status) {
+        case SYNC_STATUS.FAIL: return BGM_COLOR.FAIL;
+        case SYNC_STATUS.SKIP: return BGM_COLOR.SKIP;
+        default: return BGM_COLOR.SUCCESS;
+    }
+}
+
 // ========== 内存缓存 ==========
 let _syncRecordSidCache = new Map<string, number>();     // sid -> 行号 (空 sid 不被缓存)
 let _syncRecordListCache: SyncRecord[] = [];
@@ -173,37 +193,23 @@ function buildCache(sheet: any): void {
  * @param count 同步次数
  */
 function setSyncRecordColors(sheet: any, row: number, status: string, count: number): void {
-    // 序号列（A列）- 根据同步次数设置颜色
-    const seqCell = sheet.Range(`${colNumToLetter(COL.SEQ)}${row}`);
-    if (seqCell?.Interior) {
-        if (status === SYNC_STATUS.FAIL) {
-            seqCell.Interior.Color = BGM_COLOR.FAIL;
-        } else if (status === SYNC_STATUS.SKIP) {
-            seqCell.Interior.Color = BGM_COLOR.SKIP;
-        } else {
-            // 根据同步次数设置颜色
-            if (count === 1) seqCell.Interior.Color = BGM_COLOR.BGM_SYNC;
-            else if (count === 2) seqCell.Interior.Color = BGM_COLOR.LIGHT_GREEN;
-            else seqCell.Interior.Color = BGM_COLOR.DARK_GREEN;
-        }
-    }
+    const setColor = (colIdx: number, color: number): void => {
+        const cell = sheet.Range(`${colNumToLetter(colIdx)}${row}`);
+        if (cell?.Interior) cell.Interior.Color = color;
+    };
+
+    // 序号列（A列）- 根据同步次数或状态设置颜色
+    setColor(COL.SEQ, status === SYNC_STATUS.FAIL ? BGM_COLOR.FAIL
+                : status === SYNC_STATUS.SKIP ? BGM_COLOR.SKIP
+                : getCountColor(count));
 
     // 状态列（I列）- 根据状态设置颜色
-    const statusCell = sheet.Range(`${colNumToLetter(COL.STATUS)}${row}`);
-    if (statusCell?.Interior) {
-        if (status === SYNC_STATUS.FAIL) {
-            statusCell.Interior.Color = BGM_COLOR.FAIL;
-        } else if (status === SYNC_STATUS.SKIP) {
-            statusCell.Interior.Color = BGM_COLOR.SKIP;
-        } else {
-            statusCell.Interior.Color = BGM_COLOR.SUCCESS;
-        }
-    }
+    setColor(COL.STATUS, getStatusColor(status));
 
     // 类型列（F列）- 根据类型设置颜色
     const typeCell = sheet.Range(`${colNumToLetter(COL.TYPE)}${row}`);
     if (typeCell?.Interior) {
-        const typeName = String(typeCell.Value2 || '');
+        const typeName = String(getCellValue(sheet, row, COL.TYPE) || '');
         typeCell.Interior.Color = TYPE_COLOR_MAP[typeName] || BGM_COLOR.GRAY;
     }
 }

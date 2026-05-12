@@ -5,22 +5,24 @@
 'use strict';
 
 const MODULES = [
-    { src: 'dist-ts/ts/core/constants.js', type: 'module', critical: true },
-    { src: 'dist-ts/ts/core/crypto.js', type: 'module', critical: true },
-    { src: 'dist-ts/ts/tools/index.js', type: 'module', critical: true },     // 先加载类型/枚举
-    { src: 'dist-ts/ts/core/result.js', type: 'module', critical: true },     // BgmError + Result
-    { src: 'dist-ts/ts/tools/wps.js', type: 'module', critical: true },        // isWpsApp 等
-    { src: 'dist-ts/ts/tools/util.js', type: 'module', critical: true },
-    { src: 'dist-ts/ts/tools/http.js', type: 'module' },
-    { src: 'dist-ts/ts/ui/dialog.js', type: 'module' },
-    { src: 'dist-ts/ts/ui/message.js', type: 'module' },
-    { src: 'dist-ts/ts/ui/preview.js', type: 'module' },
-    { src: 'dist-ts/ts/sync/syncRecord.js', type: 'module' },
-    { src: 'dist-ts/ts/sync/scraping.js', type: 'module' },                    // 移到 exceltobangumi 之前
-    { src: 'dist-ts/ts/sync/exceltobangumi.js', type: 'module' },
-    { src: 'dist-ts/ts/ribbon.js', type: 'module', critical: true },
-    { src: 'dist-ts/ts/ui/handlers.js', type: 'module', critical: true },
-    { src: 'dist-ts/ts/taskpane.js', type: 'module', critical: true }
+    { src: 'dist-ts/index.js', type: 'module', critical: true },     // 先加载类型/枚举
+    { src: 'dist-ts/tools/util.js', type: 'module', critical: true },
+    { src: 'dist-ts/core/result.js', type: 'module', critical: true },     // BgmError + Result
+    { src: 'dist-ts/core/constants.js', type: 'module', critical: true },
+    { src: 'dist-ts/core/crypto.js', type: 'module', critical: true },
+    { src: 'dist-ts/tools/events.js', type: 'module', critical: true }, 
+    { src: 'dist-ts/tools/wps.js', type: 'module', critical: true },        // isWpsApp 等
+    { src: 'dist-ts/tools/http.js', type: 'module' },
+    { src: 'dist-ts/ui/dialog.js', type: 'module' },
+    { src: 'dist-ts/ui/message.js', type: 'module' },
+    { src: 'dist-ts/ui/preview.js', type: 'module' },
+    { src: 'dist-ts/sync/syncRecord.js', type: 'module' },
+    { src: 'dist-ts/sync/scraping.js', type: 'module' },                 
+    { src: 'dist-ts/sync/exceltobangumi.js', type: 'module' },
+    {src:'dist-ts/services/ribbonService.js', type:'module'},
+    { src: 'dist-ts/ribbon.js', type: 'module', critical: true },
+    { src: 'dist-ts/ui/handlers.js', type: 'module', critical: true },
+    { src: 'dist-ts/taskpane.js', type: 'module', critical: true }
 ];
 
 function loadScript(src, type) {
