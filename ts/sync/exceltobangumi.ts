@@ -112,16 +112,20 @@ export function testTokenValidityForRibbon(token?: string): void {
         if (xhr.status === 200) {
             try {
                 const data = JSON.parse(xhr.responseText);
-                const username = data.username || data.nickname || '未知用户';
-                const userId = data.id || '未知ID';
-                alert(`✓ Token有效！\n\n用户名: ${username}\n用户ID: ${userId}`);
+                bgmLog(LOG_LEVELS.DEBUG, '[BGM API /me] 响应数据: ' + JSON.stringify(data));
+                
+                // BGM API v0 /me 端点返回的用户名字段是 'nickname'
+                // username 是用户ID，nickname 是显示名称
+                const nickname = data.nickname || data.username || '未知用户';
+                const userId = String(data.id || '未知ID');
+                alert(`✓ Token有效！\n\n用户名: ${nickname}\n用户ID: ${userId}`);
                 
                 // 保存用户信息到全局缓存
-                _setBgmUserId(String(userId));
-                BGM.cache.username = username;
+                _setBgmUserId(userId);
+                BGM.cache.username = nickname;
                 
                 // 通知面板用户信息已更新
-                notifyUserInfoUpdated(username, String(userId));
+                notifyUserInfoUpdated(nickname, userId);
                 
             } catch (e: any) {
                 BGM.handleError(e, { context: 'testTokenValidityForRibbon', showAlert: false });

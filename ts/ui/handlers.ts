@@ -174,14 +174,27 @@ export function testTokenValidity(): void {
         if (xhr.status === 200) {
             try {
                 const data = JSON.parse(xhr.responseText);
-                const username = data.username || data.nickname || _T.unknownUser;
-                showSuccess(_T.tokenValid, _T.user + username);
+                bgmLog(LOG_LEVELS.DEBUG, '[testTokenValidity] 响应数据: ' + JSON.stringify(data));
+                
+                // BGM API v0 /me 端点返回的用户名字段是 'nickname'
+                const nickname = data.nickname || data.username || _T.unknownUser;
+                const userId = String(data.id || '');
+                
+                showSuccess(_T.tokenValid, _T.user + nickname);
+                
+                // 保存用户信息
+                _setBgmUserId(userId);
+                BGM.cache.username = nickname;
+                BGM.setUsername(nickname);
+                
             } catch (e: any) {
                 showError(_T.parseFailed, _T.cannotParseResponse);
                 BGM.handleError(e, { showAlert: false, level: BGM.ErrorLevel.WARN, context: 'testTokenValidity' });
             }
         } else if (xhr.status === 401) {
             showError(_T.tokenInvalid, _T.tokenExpired);
+        } else {
+            showError('错误', `Token验证失败 (HTTP ${xhr.status})`);
         }
     };
     xhr.onerror = () => showError(_T.networkError, _T.cannotConnectBgm);

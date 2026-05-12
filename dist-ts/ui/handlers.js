@@ -140,8 +140,15 @@ export function testTokenValidity() {
         if (xhr.status === 200) {
             try {
                 const data = JSON.parse(xhr.responseText);
-                const username = data.username || data.nickname || _T.unknownUser;
-                showSuccess(_T.tokenValid, _T.user + username);
+                bgmLog(LOG_LEVELS.DEBUG, '[testTokenValidity] 响应数据: ' + JSON.stringify(data));
+                // BGM API v0 /me 端点返回的用户名字段是 'nickname'
+                const nickname = data.nickname || data.username || _T.unknownUser;
+                const userId = String(data.id || '');
+                showSuccess(_T.tokenValid, _T.user + nickname);
+                // 保存用户信息
+                _setBgmUserId(userId);
+                BGM.cache.username = nickname;
+                BGM.setUsername(nickname);
             }
             catch (e) {
                 showError(_T.parseFailed, _T.cannotParseResponse);
@@ -150,6 +157,9 @@ export function testTokenValidity() {
         }
         else if (xhr.status === 401) {
             showError(_T.tokenInvalid, _T.tokenExpired);
+        }
+        else {
+            showError('错误', `Token验证失败 (HTTP ${xhr.status})`);
         }
     };
     xhr.onerror = () => showError(_T.networkError, _T.cannotConnectBgm);
@@ -640,53 +650,75 @@ else {
     setTimeout(setupButtonListeners, 0);
 }
 // ========== 消息监听（用于接收来自 Ribbon 的通知）==========
-if (typeof window !== 'undefined') {
-    window.addEventListener('message', (event) => {
-        const data = event.data;
-        if (!data || typeof data !== 'object')
-            return;
-        bgmLog(LOG_LEVELS.DEBUG, '[handlers] 收到消息: ' + JSON.stringify(data));
-        switch (data.type) {
-            case 'BGM:tokenUpdated':
-                bgmLog(LOG_LEVELS.INFO, '[handlers] 收到 Token 更新通知');
-                updateTokenStatus();
-                updateUserIdStatus();
-                break;
-            case 'BGM:userIdUpdated':
-                updateUserIdStatus();
-                break;
-            case 'BGM:userInfoUpdated':
-                updateUserIdStatus();
-                break;
-            case 'tokenUpdated':
-            case 'userIdUpdated':
-                // 兼容旧格式
-                if (data.type === 'tokenUpdated') {
+function setupMessageListener() {
+    if (typeof window !== 'undefined') {
+        window.addEventListener('message', (event) => {
+            const data = event.data;
+            if (!data || typeof data !== 'object')
+                return;
+            bgmLog(LOG_LEVELS.DEBUG, '[handlers] 收到消息: ' + JSON.stringify(data));
+            switch (data.type) {
+                case 'BGM:tokenUpdated':
+                    bgmLog(LOG_LEVELS.INFO, '[handlers] 收到 Token 更新通知');
                     updateTokenStatus();
-                }
-                else if (data.type === 'userIdUpdated') {
                     updateUserIdStatus();
-                }
-                break;
-        }
-    });
-    bgmLog(LOG_LEVELS.DEBUG, '[handlers] 消息监听器已注册');
+                    break;
+                case 'BGM:userIdUpdated':
+                    updateUserIdStatus();
+                    break;
+                case 'BGM:userInfoUpdated':
+                    updateUserIdStatus();
+                    break;
+                case 'tokenUpdated':
+                case 'userIdUpdated':
+                    // 兼容旧格式
+                    if (data.type === 'tokenUpdated') {
+                        updateTokenStatus();
+                    }
+                    else if (data.type === 'userIdUpdated') {
+                        updateUserIdStatus();
+                    }
+                    break;
+            }
+        });
+        bgmLog(LOG_LEVELS.DEBUG, '[handlers] 消息监听器已注册');
+    }
 }
 // ========== 事件监听（用于接收事件总线通知）==========
-eventBus.on(BGM_EVENTS.TOKEN_UPDATED, () => {
-    bgmLog(LOG_LEVELS.DEBUG, '[handlers] 收到 TOKEN_UPDATED 事件');
-    updateTokenStatus();
-    updateUserIdStatus();
-});
-eventBus.on(BGM_EVENTS.USER_ID_UPDATED, () => {
-    bgmLog(LOG_LEVELS.DEBUG, '[handlers] 收到 USER_ID_UPDATED 事件');
-    updateUserIdStatus();
-});
-eventBus.on(BGM_EVENTS.USER_NAME_UPDATED, () => {
-    bgmLog(LOG_LEVELS.DEBUG, '[handlers] 收到 USER_NAME_UPDATED 事件');
-    updateUserIdStatus();
-});
-// 同步进度事件（全局进度条）
-eventBus.on(BGM_EVENTS.SYNC_PROGRESS, (data) => {
-    updateProgressBar(data.current, data.total, data.message);
-});
+function setupEventListeners() {
+    eventBus.on(BGM_EVENTS.TOKEN_UPDATED, () => {
+        bgmLog(LOG_LEVELS.DEBUG, '[handlers] 收到 TOKEN_UPDATED 事件');
+        updateTokenStatus();
+        updateUserIdStatus();
+    });
+    eventBus.on(BGM_EVENTS.USER_ID_UPDATED, () => {
+        bgmLog(LOG_LEVELS.DEBUG, '[handlers] 收到 USER_ID_UPDATED 事件');
+        updateUserIdStatus();
+    });
+    eventBus.on(BGM_EVENTS.USER_NAME_UPDATED, () => {
+        bgmLog(LOG_LEVELS.DEBUG, '[handlers] 收到 USER_NAME_UPDATED 事件');
+        updateUserIdStatus();
+    });
+    // 同步进度事件（全局进度条）
+    eventBus.on(BGM_EVENTS.SYNC_PROGRESS, (data) => {
+        updateProgressBar(data.current, data.total, data.message);
+    });
+}
+// 确保在 DOM 加载完成且模块初始化后执行
+function initializeListeners() {
+    // 延迟执行，确保 BGM 等对象已初始化
+    setTimeout(() => {
+        setupMessageListener();
+        setupEventListeners();
+        bgmLog(LOG_LEVELS.DEBUG, '[handlers] 所有监听器初始化完成');
+    }, 100);
+}
+// 监听模块初始化完成事件
+if (typeof document !== 'undefined') {
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initializeListeners);
+    }
+    else {
+        initializeListeners();
+    }
+}
