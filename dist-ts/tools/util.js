@@ -1,4 +1,5 @@
 import { BGM_CONFIG, LOG_LEVELS, ERROR_LEVELS, PANEL_CONFIG, ErrorLevel, isWpsApp, BgmError, encryptToken, decryptToken, calcChecksum, COLUMN_RULES, HEADER_KEYWORDS, syncAllRows, showConfirm } from '../index.js';
+import { showAlert as customShowAlert, showError as customShowError, showInput as customShowInput } from '../ui/dialog.js';
 import { BGM_EVENTS, eventBus } from '../tools/events.js';
 // ========== BGM 全局命名空间 ==========
 export const BGM = {
@@ -63,8 +64,9 @@ export const BGM = {
             else if (typeof window !== 'undefined' && typeof window.BGMAlert === 'function') {
                 window.BGMAlert(message, title);
             }
-            else if (typeof window !== 'undefined') {
-                window.alert(message);
+            else {
+                // 使用自定义对话框
+                customShowAlert(message, title);
             }
         },
         confirm: function (message, callback, title) {
@@ -77,8 +79,9 @@ export const BGM = {
             else if (typeof window !== 'undefined' && typeof window.BGMError === 'function') {
                 window.BGMError(message, title);
             }
-            else if (typeof window !== 'undefined') {
-                window.alert('[错误] ' + message);
+            else {
+                // 使用自定义对话框
+                customShowError(message, title);
             }
         },
         input: function (title, prompt, defaultValue, onOk, onCancel) {
@@ -88,16 +91,12 @@ export const BGM = {
             else if (typeof window !== 'undefined' && typeof window.BGMInput === 'function') {
                 window.BGMInput(title, prompt, defaultValue || '', onOk, onCancel);
             }
-            else if (typeof window !== 'undefined') {
-                const result = window.prompt(prompt, defaultValue);
-                if (result !== null) {
-                    if (onOk)
-                        onOk(result);
-                }
-                else {
-                    if (onCancel)
-                        onCancel();
-                }
+            else {
+                // 使用自定义对话框
+                customShowInput(title, prompt, defaultValue, (value) => {
+                    if (onOk && value !== undefined)
+                        onOk(value);
+                }, onCancel);
             }
         },
         show: function (type, title, message, options) {
@@ -647,8 +646,9 @@ export function showBangumiPanel() {
         if (typeof window !== 'undefined' && typeof window.BGMError === 'function') {
             window.BGMError("无法获取 WPS Application 对象！", "错误");
         }
-        else if (typeof window !== 'undefined') {
-            window.alert("无法获取 WPS Application 对象！");
+        else {
+            // 使用自定义错误对话框
+            customShowError("无法获取 WPS Application 对象！", "错误");
         }
         return;
     }

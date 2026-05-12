@@ -1,5 +1,6 @@
 
 import {  WPS_ENUM, XL, BGM_CONFIG, BGM_COLOR, LOG_LEVELS, ERROR_LEVELS, PANEL_CONFIG, BGM_SUBJECT_TYPES, SYNC_STATUS,ErrorLevel, type DialogOptions, type ErrorOptions,isWpsApp, type WpsApplication,BgmError,encryptToken, decryptToken, calcChecksum,COLUMN_RULES,COLUMNS,HEADER_KEYWORDS,BGMCache,BGMSheet,type BGMSync,BGMUserInfo,WpsWorksheet ,WpsRange,syncAllRows ,showConfirm} from '../index.js';
+import { showAlert as customShowAlert, showError as customShowError, showInput as customShowInput } from '../ui/dialog.js';
 
 import { BGM_EVENTS ,eventBus } from '../tools/events.js';  
 // ========== BGM 全局命名空间 ==========
@@ -112,8 +113,9 @@ export const BGM: {
                 (window as any).BGMDialog.alert(title, message);
             } else if (typeof window !== 'undefined' && typeof (window as any).BGMAlert === 'function') {
                 (window as any).BGMAlert(message, title);
-            } else if (typeof window !== 'undefined') {
-                window.alert(message);
+            } else {
+                // 使用自定义对话框
+                customShowAlert(message, title);
             }
         },
         confirm: function(message: string, callback: (confirmed: boolean) => void, title?: string): void {
@@ -124,8 +126,9 @@ export const BGM: {
                 (window as any).BGMDialog.error(title, message);
             } else if (typeof window !== 'undefined' && typeof (window as any).BGMError === 'function') {
                 (window as any).BGMError(message, title);
-            } else if (typeof window !== 'undefined') {
-                window.alert('[错误] ' + message);
+            } else {
+                // 使用自定义对话框
+                customShowError(message, title);
             }
         },
         input: function(title: string, prompt: string, defaultValue?: string, onOk?: (value: string) => void, onCancel?: () => void): void {
@@ -133,13 +136,11 @@ export const BGM: {
                 (window as any).BGMDialog.input(title, prompt, defaultValue || '', onOk, onCancel);
             } else if (typeof window !== 'undefined' && typeof (window as any).BGMInput === 'function') {
                 (window as any).BGMInput(title, prompt, defaultValue || '', onOk, onCancel);
-            } else if (typeof window !== 'undefined') {
-                const result = window.prompt(prompt, defaultValue);
-                if (result !== null) {
-                    if (onOk) onOk(result);
-                } else {
-                    if (onCancel) onCancel();
-                }
+            } else {
+                // 使用自定义对话框
+                customShowInput(title, prompt, defaultValue, (value) => {
+                    if (onOk && value !== undefined) onOk(value);
+                }, onCancel);
             }
         },
        show: function(type: 'alert' | 'confirm' | 'error' | 'input', title: string, message: string, options?: DialogOptions): void {
@@ -686,8 +687,9 @@ export function showBangumiPanel(): void {
     if (!app) {
         if (typeof window !== 'undefined' && typeof (window as unknown as Record<string, unknown>).BGMError === 'function') {
             (window as unknown as Record<string, (m: string, t: string) => void>).BGMError("无法获取 WPS Application 对象！", "错误");
-        } else if (typeof window !== 'undefined') {
-            window.alert("无法获取 WPS Application 对象！");
+        } else {
+            // 使用自定义错误对话框
+            customShowError("无法获取 WPS Application 对象！", "错误");
         }
         return;
     }

@@ -4,6 +4,7 @@
  * @description 定义 WPS COM 对象的核心接口，避免 unknown 强制转换
  */
 import { getApp } from '../index.js';
+import { showAlert as customShowAlert, showConfirm as customShowConfirm, showInput as customShowInput } from '../ui/dialog.js';
 
 // ========== WPS Application ==========
 export interface WpsApplication {
@@ -243,13 +244,12 @@ export function wpsPrompt(message: string, defaultValue?: string): Promise<strin
                 resolve(null);
             });
         } else {
-            try {
-                const result = window.prompt(message, defaultValue);
-                resolve(result);
-            } catch (e) {
-                console.error("prompt 也不可用:", (e as Error).message);
+            // 使用自定义输入对话框
+            customShowInput("输入", message, defaultValue, (value) => {
+                resolve(value || null);
+            }, () => {
                 resolve(null);
-            }
+            });
         }
     });
 }
@@ -274,17 +274,22 @@ export function wpsMsgBox(message: string, buttons?: number, icon?: number): Pro
                 }, () => {
                     resolve(7);
                 });
-            } else if (typeof window !== 'undefined') {
-                resolve(window.confirm(message) ? 6 : 7);
+            } else {
+                // 使用自定义确认对话框
+                customShowConfirm(message, (confirmed) => {
+                    resolve(confirmed ? 6 : 7);
+                }, "确认");
             }
         } else {
             if (typeof window !== 'undefined' && typeof (window as unknown as Record<string, unknown>).BGMAlert === 'function') {
                 (window as unknown as Record<string, (m: string, t: string, oc?: () => void) => void>).BGMAlert!(message, "提示", () => {
                     resolve(1);
                 });
-            } else if (typeof window !== 'undefined') {
-                window.alert(message);
-                resolve(1);
+            } else {
+                // 使用自定义警告对话框
+                customShowAlert(message, "提示", () => {
+                    resolve(1);
+                });
             }
         }
     });

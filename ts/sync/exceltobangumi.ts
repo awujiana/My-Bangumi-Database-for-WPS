@@ -57,6 +57,7 @@ import {
 } from '../index.js';
 
 import { getOrCreateSyncRecordSheet, addSyncRecord } from './syncRecord.js';
+import { showAlert, showSuccess, showError } from '../ui/dialog.js';
 
 /**
  * 同步进度回调接口
@@ -100,7 +101,7 @@ export function openBangumiTokenPage(): void {
 export function testTokenValidityForRibbon(token?: string): void {
     const testToken = token || loadBgToken();
     if (!testToken) {
-        alert('请先设置 Token！');
+        showAlert('请先设置 Token！', '提示');
         return;
     }
 
@@ -138,7 +139,7 @@ export function testTokenValidityForRibbon(token?: string): void {
                 const userId = String(data.id || '未知ID');
                 
                 bgmLog(LOG_LEVELS.INFO, `[exceltobangumi/testTokenValidityForRibbon] Token 验证成功！用户名: ${nickname}, 用户ID: ${userId}`);
-                alert(`✓ Token有效！\n\n用户名: ${nickname}\n用户ID: ${userId}`);
+                showSuccess(`Token有效！\n\n用户名: ${nickname}\n用户ID: ${userId}`, '验证成功');
                 
                 _setBgmUserId(userId);
                 BGM.cache.username = nickname;
@@ -148,28 +149,28 @@ export function testTokenValidityForRibbon(token?: string): void {
             } catch (e: any) {
                 bgmLog(LOG_LEVELS.ERROR, `[exceltobangumi/testTokenValidityForRibbon] 解析响应失败: ${e.message}`);
                 BGM.handleError(e, { context: 'testTokenValidityForRibbon', showAlert: false });
-                alert('✗ Token有效，但解析响应失败');
+                showError('Token有效，但解析响应失败', '错误');
             }
         } else if (xhr.status === 401) {
             bgmLog(LOG_LEVELS.WARN, `[exceltobangumi/testTokenValidityForRibbon] Token 无效或已过期`);
-            alert('✗ Token无效或已过期，请重新获取');
+            showError('Token无效或已过期，请重新获取', '验证失败');
         } else {
             bgmLog(LOG_LEVELS.ERROR, `[exceltobangumi/testTokenValidityForRibbon] Token验证失败，HTTP 状态码: ${xhr.status}`);
             bgmLog(LOG_LEVELS.DEBUG, `[exceltobangumi/testTokenValidityForRibbon] 响应内容: ${xhr.responseText}`);
-            alert(`✗ Token验证失败 (HTTP ${xhr.status})`);
+            showError(`Token验证失败 (HTTP ${xhr.status})`, '错误');
         }
     };
 
     xhr.onerror = () => {
         const duration = Date.now() - startTime;
         bgmLog(LOG_LEVELS.ERROR, `[exceltobangumi/testTokenValidityForRibbon] 网络错误，耗时: ${duration}ms`);
-        alert('✗ 网络错误，无法验证Token');
+        showError('网络错误，无法验证Token', '错误');
     };
     
     xhr.ontimeout = () => {
         const duration = Date.now() - startTime;
         bgmLog(LOG_LEVELS.WARN, `[exceltobangumi/testTokenValidityForRibbon] 请求超时，耗时: ${duration}ms`);
-        alert('✗ 请求超时');
+        showError('请求超时', '错误');
     };
     
     bgmLog(LOG_LEVELS.DEBUG, `[exceltobangumi/testTokenValidityForRibbon] 正在发送请求...`);
