@@ -538,19 +538,33 @@ export function buildJsonPayload(ws, rowNum, colMap, finishedDate) {
  */
 export function bgmRequestSync(method, endpoint, jsonBody, token) {
     const result = { code: 0, message: '' };
+    const startTime = Date.now();
+    const fullUrl = `${BGM_CONFIG.API_BASE}${endpoint}`;
+    bgmLog(LOG_LEVELS.INFO, `[bgmRequestSync] ========== 开始同步请求 ==========`);
+    bgmLog(LOG_LEVELS.INFO, `[bgmRequestSync] URL: ${fullUrl}`);
+    bgmLog(LOG_LEVELS.INFO, `[bgmRequestSync] 方法: ${method.toUpperCase()}`);
+    bgmLog(LOG_LEVELS.DEBUG, `[bgmRequestSync] 请求头: Authorization: Bearer ${token.substring(0, 8)}...`);
+    bgmLog(LOG_LEVELS.DEBUG, `[bgmRequestSync] 请求体: ${jsonBody.length > 200 ? jsonBody.substring(0, 200) + '...' : jsonBody}`);
     try {
         const xhr = new XMLHttpRequest();
-        xhr.open(method.toUpperCase(), `${BGM_CONFIG.API_BASE}${endpoint}`, false);
+        xhr.open(method.toUpperCase(), fullUrl, false);
         xhr.setRequestHeader('Authorization', `Bearer ${token}`);
         xhr.setRequestHeader('Content-Type', 'application/json');
+        bgmLog(LOG_LEVELS.DEBUG, `[bgmRequestSync] 正在发送请求...`);
         xhr.send(jsonBody);
+        const duration = Date.now() - startTime;
+        bgmLog(LOG_LEVELS.INFO, `[bgmRequestSync] ========== 请求完成 ==========`);
+        bgmLog(LOG_LEVELS.INFO, `[bgmRequestSync] HTTP 状态码: ${xhr.status} (${xhr.statusText})`);
+        bgmLog(LOG_LEVELS.INFO, `[bgmRequestSync] 请求耗时: ${duration}ms`);
         result.code = xhr.status;
         if (xhr.status >= 200 && xhr.status < 300) {
             result.message = 'success';
+            bgmLog(LOG_LEVELS.INFO, `[bgmRequestSync] 请求成功`);
             if (xhr.responseText) {
                 try {
                     const data = JSON.parse(xhr.responseText);
                     result.message = data.msg || data.message || 'success';
+                    bgmLog(LOG_LEVELS.DEBUG, `[bgmRequestSync] 响应数据: ${JSON.stringify(data).length > 300 ? JSON.stringify(data).substring(0, 300) + '...' : JSON.stringify(data)}`);
                 }
                 catch (e) {
                     BGM.handleError(e, { context: 'bgmRequestSync', showAlert: false });
@@ -559,15 +573,19 @@ export function bgmRequestSync(method, endpoint, jsonBody, token) {
         }
         else if (xhr.status === 429) {
             result.message = 'Rate limited, please slow down';
+            bgmLog(LOG_LEVELS.WARN, `[bgmRequestSync] 请求被限流 (429)`);
         }
         else {
+            bgmLog(LOG_LEVELS.WARN, `[bgmRequestSync] 请求失败，状态码: ${xhr.status}`);
             try {
                 const errData = JSON.parse(xhr.responseText);
                 result.message = errData.error || errData.description || `HTTP ${xhr.status}`;
+                bgmLog(LOG_LEVELS.DEBUG, `[bgmRequestSync] 错误响应: ${JSON.stringify(errData)}`);
             }
             catch (e) {
                 BGM.handleError(e, { context: 'bgmRequestSync', showAlert: false });
                 result.message = xhr.statusText || `HTTP ${xhr.status}`;
+                bgmLog(LOG_LEVELS.DEBUG, `[bgmRequestSync] 响应内容: ${xhr.responseText}`);
             }
         }
     }
@@ -575,6 +593,7 @@ export function bgmRequestSync(method, endpoint, jsonBody, token) {
         BGM.handleError(e, { context: 'bgmRequestSync', showAlert: false });
         result.code = 0;
         result.message = e.message || 'Network error';
+        bgmLog(LOG_LEVELS.ERROR, `[bgmRequestSync] 网络错误: ${e.message}`);
     }
     return result;
 }
@@ -893,17 +912,22 @@ export function clearSheetMarksInSheet(sheetIndex) {
  * @function testSingleUpdate
  */
 export function testSingleUpdate() {
+    const startTime = Date.now();
+    bgmLog(LOG_LEVELS.INFO, '[testSingleUpdate] ========== 开始单条测试更新 ==========');
     try {
         const app = getApp();
         if (!app?.ActiveWorkbook) {
+            bgmLog(LOG_LEVELS.ERROR, '[testSingleUpdate] 无法获取 Application');
             wpsMsgBox('无法获取 Application', 0, 48);
             return;
         }
         const ws = app.ActiveWorkbook.ActiveSheet;
         if (!ws) {
+            bgmLog(LOG_LEVELS.ERROR, '[testSingleUpdate] 无法获取工作表');
             wpsMsgBox('无法获取工作表', 0, 48);
             return;
         }
+        bgmLog(LOG_LEVELS.DEBUG, '[testSingleUpdate] 工作表获取成功');
         // 获取当前单元格或默认第2行
         let targetRow = 2;
         try {
@@ -911,6 +935,7 @@ export function testSingleUpdate() {
             if (activeCell?.Row) {
                 targetRow = activeCell.Row;
             }
+            bgmLog(LOG_LEVELS.DEBUG, `[testSingleUpdate] 目标行: ${targetRow}`);
         }
         catch (e) {
             BGM.handleError(e, { context: 'testSingleUpdate', showAlert: false });
@@ -918,43 +943,62 @@ export function testSingleUpdate() {
         }
         // 查找URL列
         const headerRow = findHeaderRow(ws) || 1;
+        bgmLog(LOG_LEVELS.DEBUG, `[testSingleUpdate] 表头行: ${headerRow}`);
         const colMap = getColumnMap(ws, headerRow);
+        bgmLog(LOG_LEVELS.DEBUG, `[testSingleUpdate] 列映射完成，共 ${colMap.size} 列`);
         if (!colMap.has('Bangumi_URL')) {
+            bgmLog(LOG_LEVELS.WARN, '[testSingleUpdate] 未找到 Bangumi_URL 列');
             wpsMsgBox('未找到 Bangumi URL 列', 0, 48);
             return;
         }
         const urlCol = colMap.get('Bangumi_URL');
         const bgmUrl = trim(readCell(ws, targetRow, urlCol) || '');
+        bgmLog(LOG_LEVELS.DEBUG, `[testSingleUpdate] Bangumi URL: ${bgmUrl}`);
         if (!bgmUrl) {
+            bgmLog(LOG_LEVELS.WARN, `[testSingleUpdate] 第 ${targetRow} 行URL为空`);
             wpsMsgBox(`第 ${targetRow} 行URL为空`, 0, 48);
             return;
         }
         const sid = extractSubjectId(bgmUrl);
         if (!sid) {
+            bgmLog(LOG_LEVELS.WARN, `[testSingleUpdate] 无法从URL提取 Subject ID: ${bgmUrl}`);
             wpsMsgBox('无法从URL提取 Subject ID', 0, 48);
             return;
         }
+        bgmLog(LOG_LEVELS.INFO, `[testSingleUpdate] 提取到 Subject ID: ${sid}`);
         const token = loadBgToken();
         if (!token) {
+            bgmLog(LOG_LEVELS.WARN, '[testSingleUpdate] Token 未设置');
             wpsMsgBox('请先设置 Token', 0, 48);
             return;
         }
+        bgmLog(LOG_LEVELS.DEBUG, `[testSingleUpdate] Token 已设置（长度: ${token.length}）`);
         // 构建测试请求体
         const finishedDate = colMap.has('完播日')
             ? trim(readCell(ws, targetRow, colMap.get('完播日')) || '')
             : '';
         const jsonBody = buildJsonPayload(ws, targetRow, colMap, finishedDate);
+        bgmLog(LOG_LEVELS.DEBUG, `[testSingleUpdate] 请求体构建完成: ${jsonBody.length > 200 ? jsonBody.substring(0, 200) + '...' : jsonBody}`);
+        // 获取用户路径
+        const userPath = _getUserApiPath();
+        bgmLog(LOG_LEVELS.INFO, `[testSingleUpdate] 用户路径: ${userPath}`);
         // 发送请求
-        const result = bgmRequestSync('POST', `/v0/users${_getUserApiPath()}/collections/${sid}`, jsonBody, token);
+        const endpoint = `/v0/users${userPath}/collections/${sid}`;
+        bgmLog(LOG_LEVELS.INFO, `[testSingleUpdate] 完整端点: ${endpoint}`);
+        const result = bgmRequestSync('POST', endpoint, jsonBody, token);
         if (result.code >= 200 && result.code < 300) {
+            bgmLog(LOG_LEVELS.INFO, `[testSingleUpdate] 测试成功！SID: ${sid}, HTTP: ${result.code}`);
             wpsMsgBox(`✓ 测试成功！\n\nSID: ${sid}\nHTTP: ${result.code}\n消息: ${result.message}`, 0, 64);
         }
         else {
+            bgmLog(LOG_LEVELS.WARN, `[testSingleUpdate] 测试失败！SID: ${sid}, HTTP: ${result.code}, 消息: ${result.message}`);
             wpsMsgBox(`✗ 测试失败\n\nSID: ${sid}\nHTTP: ${result.code}\n消息: ${result.message}`, 0, 16);
         }
     }
     catch (e) {
         BGM.handleError(e, { context: 'testSingleUpdate', showAlert: false });
+        bgmLog(LOG_LEVELS.ERROR, `[testSingleUpdate] 测试异常: ${e.message}`);
         wpsMsgBox(`测试异常: ${e.message}`, 0, 16);
     }
+    bgmLog(LOG_LEVELS.INFO, `[testSingleUpdate] ========== 测试结束，总耗时: ${Date.now() - startTime}ms ==========`);
 }
