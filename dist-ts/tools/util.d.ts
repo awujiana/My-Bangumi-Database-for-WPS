@@ -110,9 +110,9 @@ export declare function _setBgmUserId(id: string): void;
  */
 export declare function _getBgmUserId(): string | null;
 /**
- * 获取 Bangumi API 用户路径（格式：/-/userId）
+ * 获取 Bangumi API 用户路径（格式：/userId）
  * 用于拼接用户收藏请求的 URL
- * @returns 用户路径字符串，如 "/-/123456"；若 userId 未设置则返回 "/-/0"
+ * @returns 用户路径字符串，如 "/123456"；若 userId 未设置则返回 "/0"
  */
 export declare function _getUserApiPath(): string;
 /**
