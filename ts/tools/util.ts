@@ -1,5 +1,5 @@
 
-import {  WPS_ENUM, XL, BGM_CONFIG, BGM_COLOR, LOG_LEVELS, ERROR_LEVELS, PANEL_CONFIG, BGM_SUBJECT_TYPES, SYNC_STATUS,ErrorLevel, type DialogOptions, type ErrorOptions,isWpsApp, type WpsApplication,BgmError,encryptToken, decryptToken, calcChecksum,COLUMN_RULES,COLUMNS,HEADER_KEYWORDS,BGMCache,BGMSheet,type BGMSync,BGMUserInfo,WpsWorksheet ,WpsRange,syncAllRows } from '../index.js';
+import {  WPS_ENUM, XL, BGM_CONFIG, BGM_COLOR, LOG_LEVELS, ERROR_LEVELS, PANEL_CONFIG, BGM_SUBJECT_TYPES, SYNC_STATUS,ErrorLevel, type DialogOptions, type ErrorOptions,isWpsApp, type WpsApplication,BgmError,encryptToken, decryptToken, calcChecksum,COLUMN_RULES,COLUMNS,HEADER_KEYWORDS,BGMCache,BGMSheet,type BGMSync,BGMUserInfo,WpsWorksheet ,WpsRange,syncAllRows ,showConfirm} from '../index.js';
 
 import { BGM_EVENTS ,eventBus } from '../tools/events.js';  
 // ========== BGM 全局命名空间 ==========
@@ -23,9 +23,9 @@ export const BGM: {
         headerNames: string[];
         isImportant: boolean[];
     };
-    Dialog: {
+     Dialog: {
         alert: (title: string, message: string) => void;
-        confirm: (message: string, onConfirm?: () => void, onCancel?: () => void) => void;
+        confirm: (message: string, callback: (confirmed: boolean) => void, title?: string) => void;
         error: (title: string, message: string) => void;
         input: (title: string, prompt: string, defaultValue?: string, onOk?: (value: string) => void, onCancel?: () => void) => void;
         show: (type: 'alert' | 'confirm' | 'error' | 'input', title: string, message: string, options?: DialogOptions) => void;
@@ -63,34 +63,30 @@ export const BGM: {
     // 同步状态
     sync: {
         isRunning: false,
-        lastSyncTime:  new Date().toISOString(),
+        lastSyncTime:  new Date().toISOString(),            
         startSync() {
-        // 防重复
-        if (this.isRunning) {
-            BGM.Dialog.alert('同步正在进行中，请稍后,不要重复点击', '提示');
-            return;
-        }
+                // 防重复
+                if (this.isRunning) {
+                    BGM.Dialog.alert('同步正在进行中，请稍后', '提示');
+                    return;
+                }
+                // 显示确认对话框，避免误操作
+                // 检查数据预览是否已加载
+        BGM.Dialog.confirm('确定要开始全面同步吗？', (confirmed: boolean) => {
+            if (!confirmed) return;
+            this.isRunning = true;
+            bgmLog(LOG_LEVELS.INFO, '开始执行同步...');
 
-        // 检查数据预览是否已加载
-        if (!BGM.dataPreview?.ws) {
-            BGM.Dialog.alert('请先在预览面板中加载数据', '提示');
-            return;
-        }
-
-        this.isRunning = true;
-        bgmLog(LOG_LEVELS.INFO, '开始执行同步...');
-
-        // 调用 preview 模块中的批量同步函数，该函数会自行检查 Token 和逐行上传
-        syncAllRows()
-            .then(() => {
-                this.isRunning = false;
-                bgmLog(LOG_LEVELS.INFO, '同步完成');
-            })
-            .catch((err: unknown) => {
-                this.isRunning = false;
-                BGM.handleError(err, { showAlert: true });   // 自动带上函数名和错误详情
-            });
-    }
+            syncAllRows()
+                .then(() => {
+                    this.isRunning = false;
+                })
+                .catch((err: unknown) => {
+                    this.isRunning = false;
+                    BGM.handleError(err, { showAlert: true });
+                });
+        });
+}
 
 
     },
@@ -109,44 +105,34 @@ export const BGM: {
     // BGM 错误类
     BgmError: BgmError,
 
-    // 统一对话框
+        // 统一对话框
     Dialog: {
         alert: function(title: string, message: string): void {
-            if (typeof window !== 'undefined' && (window as unknown as Record<string, unknown>).BGMDialog !== undefined) {
-                (window as unknown as Record<string, { alert: (t: string, m: string) => void }>).BGMDialog!.alert(title, message);
-            } else if (typeof window !== 'undefined' && typeof (window as unknown as Record<string, unknown>).BGMAlert === 'function') {
-                (window as unknown as Record<string, (m: string, t: string) => void>).BGMAlert!(message, title);
+            if (typeof window !== 'undefined' && (window as any).BGMDialog !== undefined) {
+                (window as any).BGMDialog.alert(title, message);
+            } else if (typeof window !== 'undefined' && typeof (window as any).BGMAlert === 'function') {
+                (window as any).BGMAlert(message, title);
             } else if (typeof window !== 'undefined') {
                 window.alert(message);
             }
         },
-        confirm: function(message: string, onConfirm?: () => void, onCancel?: () => void): void {
-            if (typeof window !== 'undefined' && (window as unknown as Record<string, unknown>).BGMDialog !== undefined) {
-                (window as unknown as Record<string, { confirm: (m: string, oc?: () => void, oc2?: () => void) => void }>).BGMDialog!.confirm(message, onConfirm, onCancel);
-            } else if (typeof window !== 'undefined' && typeof (window as unknown as Record<string, unknown>).BGMConfirm === 'function') {
-                (window as unknown as Record<string, (m: string, t: string, oc?: () => void, oc2?: () => void) => void>).BGMConfirm!(message, '确认', onConfirm, onCancel);
-            } else if (typeof window !== 'undefined') {
-                if (window.confirm(message)) {
-                    if (onConfirm) onConfirm();
-                } else {
-                    if (onCancel) onCancel();
-                }
-            }
+        confirm: function(message: string, callback: (confirmed: boolean) => void, title?: string): void {
+            showConfirm(message, callback, title);
         },
         error: function(title: string, message: string): void {
-            if (typeof window !== 'undefined' && (window as unknown as Record<string, unknown>).BGMDialog !== undefined) {
-                (window as unknown as Record<string, { error: (t: string, m: string) => void }>).BGMDialog!.error(title, message);
-            } else if (typeof window !== 'undefined' && typeof (window as unknown as Record<string, unknown>).BGMError === 'function') {
-                (window as unknown as Record<string, (m: string, t: string) => void>).BGMError!(message, title);
+            if (typeof window !== 'undefined' && (window as any).BGMDialog !== undefined) {
+                (window as any).BGMDialog.error(title, message);
+            } else if (typeof window !== 'undefined' && typeof (window as any).BGMError === 'function') {
+                (window as any).BGMError(message, title);
             } else if (typeof window !== 'undefined') {
                 window.alert('[错误] ' + message);
             }
         },
         input: function(title: string, prompt: string, defaultValue?: string, onOk?: (value: string) => void, onCancel?: () => void): void {
-            if (typeof window !== 'undefined' && (window as unknown as Record<string, unknown>).BGMDialog !== undefined) {
-                (window as unknown as Record<string, { input: (t: string, p: string, d: string, oc?: (v: string) => void, oc2?: () => void) => void }>).BGMDialog!.input(title, prompt, defaultValue || '', onOk, onCancel);
-            } else if (typeof window !== 'undefined' && typeof (window as unknown as Record<string, unknown>).BGMInput === 'function') {
-                (window as unknown as Record<string, (t: string, p: string, d: string, oc?: (v: string) => void, oc2?: () => void) => void>).BGMInput!(title, prompt, defaultValue || '', onOk, onCancel);
+            if (typeof window !== 'undefined' && (window as any).BGMDialog !== undefined) {
+                (window as any).BGMDialog.input(title, prompt, defaultValue || '', onOk, onCancel);
+            } else if (typeof window !== 'undefined' && typeof (window as any).BGMInput === 'function') {
+                (window as any).BGMInput(title, prompt, defaultValue || '', onOk, onCancel);
             } else if (typeof window !== 'undefined') {
                 const result = window.prompt(prompt, defaultValue);
                 if (result !== null) {
@@ -156,7 +142,7 @@ export const BGM: {
                 }
             }
         },
-        show: function(type: 'alert' | 'confirm' | 'error' | 'input', title: string, message: string, options?: DialogOptions): void {
+       show: function(type: 'alert' | 'confirm' | 'error' | 'input', title: string, message: string, options?: DialogOptions): void {
             if (typeof window !== 'undefined' && (window as any).BGMDialog !== undefined) {
                 (window as any).BGMDialog.show(type, title, message, options);
             } else {
@@ -164,18 +150,14 @@ export const BGM: {
                     case 'error':
                         this.error(title, message);
                         break;
-                    case 'confirm':
-                        // 传递 message 而非 onConfirm
-                        this.confirm(message, options?.onConfirm, options?.onCancel);
-                        break;
                     case 'input':
                         this.input(title, message, options?.defaultValue, options?.onOk, options?.onCancel);
                         break;
-                    default:
+                    default: // 包括 'alert' 和已移除的 'confirm'
                         this.alert(title, message);
                 }
             }
-}
+        }
     },
  // 统一消息通信
     Message: {
@@ -195,21 +177,24 @@ export const BGM: {
         }
     },
     
-
+    
     showAlert: function(title: string, message: string): void {
         if (BGM.Message.send({ type: "showAlert", title: title, message: message })) {
             return;
         }
         BGM.Dialog.alert(title, message);
     },
-
+    
     showConfirm: function(title: string, message: string, onConfirm?: () => void, onCancel?: () => void): void {
-        if (BGM.Message.send({ type: "showConfirm", title: title, message: message, onConfirm: true })) {
-            (window as any)._bgmConfirmCallback = { confirm: onConfirm, cancel: onCancel };
-            return;
-        }
-        BGM.Dialog.confirm(message, onConfirm, onCancel);
+           BGM.Dialog.confirm(message, (confirmed: boolean) => {
+               if (confirmed) {
+                   onConfirm?.();
+               } else {
+                   onCancel?.();
+               }
+           }, title);
     },
+ 
 
      // 统一错误处理
     handleError: function(error: unknown, options?: ErrorOptions): BgmError {
@@ -290,8 +275,8 @@ export const BGM: {
     setSyncError(error: unknown) {
         eventBus.emit(BGM_EVENTS.SYNC_ERROR, error);
     }
-}
 
+};
 
 // ========== 日志函数 ==========
 /**

@@ -386,3 +386,6 @@ export type {
 } from './tools/wps.js';
 
 
+
+
+export { detectConflicts, getSyncPreview }from'./services/ribbonService.js';

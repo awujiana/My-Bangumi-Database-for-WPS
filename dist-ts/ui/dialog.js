@@ -150,7 +150,7 @@ function _showDialog(type, opts = {}) {
     if (!dialog) {
         if (type === 'confirm') {
             if (window.confirm(opts.message || ''))
-                opts.onConfirm?.();
+                opts.onOk?.();
             else
                 opts.onCancel?.();
         }
@@ -163,7 +163,7 @@ function _showDialog(type, opts = {}) {
         }
         else {
             window.alert(opts.message);
-            opts.onConfirm?.();
+            opts.onOk?.();
         }
         return;
     }

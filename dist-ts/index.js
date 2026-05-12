@@ -199,3 +199,4 @@ isWpsApp,
 isWpsWorksheet, 
 // 判断对象是否为 WPS Range
 isWpsRange, wpsMsgBox, } from './tools/wps.js';
+export { detectConflicts, getSyncPreview } from './services/ribbonService.js';

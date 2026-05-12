@@ -9,7 +9,6 @@ export interface DialogOptions {
     prompt?: string;
     onOk?: (value?: string) => void;
     onCancel?: () => void;
-    onConfirm?: () => void;
     defaultValue?: string;
 }
 export interface DialogButton {

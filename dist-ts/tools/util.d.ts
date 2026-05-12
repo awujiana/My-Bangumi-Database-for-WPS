@@ -21,7 +21,7 @@ export declare const BGM: {
     };
     Dialog: {
         alert: (title: string, message: string) => void;
-        confirm: (message: string, onConfirm?: () => void, onCancel?: () => void) => void;
+        confirm: (message: string, callback: (confirmed: boolean) => void, title?: string) => void;
         error: (title: string, message: string) => void;
         input: (title: string, prompt: string, defaultValue?: string, onOk?: (value: string) => void, onCancel?: () => void) => void;
         show: (type: 'alert' | 'confirm' | 'error' | 'input', title: string, message: string, options?: DialogOptions) => void;

@@ -66,4 +66,5 @@ export type { DetailItem, PreviewItem, DetailPreviewData, } from './ui/preview.j
 export { previewSyncContent, closeDetailModal, syncAllRows, } from './ui/preview.js';
 export { isWpsApp, isWpsWorksheet, isWpsRange, wpsMsgBox, } from './tools/wps.js';
 export type { BgmWindow, WpsApplication, WpsWorkbook, WpsWorksheets, WpsSheets, WpsWorksheet, WpsRows, WpsRow, WpsColumns, WpsRange, WpsAutoFilter, WpsFilters, WpsFilter, WpsInterior, WpsFont, WpsAreas, WpsPluginStorage, WpsOAAssist, WpsTaskPane, } from './tools/wps.js';
+export { detectConflicts, getSyncPreview } from './services/ribbonService.js';
 //# sourceMappingURL=index.d.ts.map

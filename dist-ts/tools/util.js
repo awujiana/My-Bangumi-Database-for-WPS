@@ -1,4 +1,4 @@
-import { BGM_CONFIG, LOG_LEVELS, ERROR_LEVELS, PANEL_CONFIG, ErrorLevel, isWpsApp, BgmError, encryptToken, decryptToken, calcChecksum, COLUMN_RULES, HEADER_KEYWORDS, syncAllRows } from '../index.js';
+import { BGM_CONFIG, LOG_LEVELS, ERROR_LEVELS, PANEL_CONFIG, ErrorLevel, isWpsApp, BgmError, encryptToken, decryptToken, calcChecksum, COLUMN_RULES, HEADER_KEYWORDS, syncAllRows, showConfirm } from '../index.js';
 import { BGM_EVENTS, eventBus } from '../tools/events.js';
 // ========== BGM 全局命名空间 ==========
 export const BGM = {
@@ -23,25 +23,24 @@ export const BGM = {
         startSync() {
             // 防重复
             if (this.isRunning) {
-                BGM.Dialog.alert('同步正在进行中，请稍后,不要重复点击', '提示');
+                BGM.Dialog.alert('同步正在进行中，请稍后', '提示');
                 return;
             }
+            // 显示确认对话框，避免误操作
             // 检查数据预览是否已加载
-            if (!BGM.dataPreview?.ws) {
-                BGM.Dialog.alert('请先在预览面板中加载数据', '提示');
-                return;
-            }
-            this.isRunning = true;
-            bgmLog(LOG_LEVELS.INFO, '开始执行同步...');
-            // 调用 preview 模块中的批量同步函数，该函数会自行检查 Token 和逐行上传
-            syncAllRows()
-                .then(() => {
-                this.isRunning = false;
-                bgmLog(LOG_LEVELS.INFO, '同步完成');
-            })
-                .catch((err) => {
-                this.isRunning = false;
-                BGM.handleError(err, { showAlert: true }); // 自动带上函数名和错误详情
+            BGM.Dialog.confirm('确定要开始全面同步吗？', (confirmed) => {
+                if (!confirmed)
+                    return;
+                this.isRunning = true;
+                bgmLog(LOG_LEVELS.INFO, '开始执行同步...');
+                syncAllRows()
+                    .then(() => {
+                    this.isRunning = false;
+                })
+                    .catch((err) => {
+                    this.isRunning = false;
+                    BGM.handleError(err, { showAlert: true });
+                });
             });
         }
     },
@@ -68,23 +67,8 @@ export const BGM = {
                 window.alert(message);
             }
         },
-        confirm: function (message, onConfirm, onCancel) {
-            if (typeof window !== 'undefined' && window.BGMDialog !== undefined) {
-                window.BGMDialog.confirm(message, onConfirm, onCancel);
-            }
-            else if (typeof window !== 'undefined' && typeof window.BGMConfirm === 'function') {
-                window.BGMConfirm(message, '确认', onConfirm, onCancel);
-            }
-            else if (typeof window !== 'undefined') {
-                if (window.confirm(message)) {
-                    if (onConfirm)
-                        onConfirm();
-                }
-                else {
-                    if (onCancel)
-                        onCancel();
-                }
-            }
+        confirm: function (message, callback, title) {
+            showConfirm(message, callback, title);
         },
         error: function (title, message) {
             if (typeof window !== 'undefined' && window.BGMDialog !== undefined) {
@@ -125,14 +109,10 @@ export const BGM = {
                     case 'error':
                         this.error(title, message);
                         break;
-                    case 'confirm':
-                        // 传递 message 而非 onConfirm
-                        this.confirm(message, options?.onConfirm, options?.onCancel);
-                        break;
                     case 'input':
                         this.input(title, message, options?.defaultValue, options?.onOk, options?.onCancel);
                         break;
-                    default:
+                    default: // 包括 'alert' 和已移除的 'confirm'
                         this.alert(title, message);
                 }
             }
@@ -163,11 +143,14 @@ export const BGM = {
         BGM.Dialog.alert(title, message);
     },
     showConfirm: function (title, message, onConfirm, onCancel) {
-        if (BGM.Message.send({ type: "showConfirm", title: title, message: message, onConfirm: true })) {
-            window._bgmConfirmCallback = { confirm: onConfirm, cancel: onCancel };
-            return;
-        }
-        BGM.Dialog.confirm(message, onConfirm, onCancel);
+        BGM.Dialog.confirm(message, (confirmed) => {
+            if (confirmed) {
+                onConfirm?.();
+            }
+            else {
+                onCancel?.();
+            }
+        }, title);
     },
     // 统一错误处理
     handleError: function (error, options) {

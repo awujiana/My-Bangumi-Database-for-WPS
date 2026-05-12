@@ -11,7 +11,6 @@ export interface DialogOptions {
     prompt?: string;
     onOk?: (value?: string) => void;
     onCancel?: () => void;
-    onConfirm?: () => void;
     defaultValue?: string;
 }
 
@@ -191,7 +190,7 @@ function _showDialog(type: string, opts: DialogOptions = {}): void {
     const dialog = dom[cfg.id];
     if (!dialog) {
         if (type === 'confirm') {
-            if (window.confirm(opts.message || '')) opts.onConfirm?.();
+            if (window.confirm(opts.message || '')) opts.onOk?.();
             else opts.onCancel?.();
         } else if (type === 'input') {
             const result = window.prompt(opts.prompt || opts.message || '', opts.defaultValue || '');
@@ -199,7 +198,7 @@ function _showDialog(type: string, opts: DialogOptions = {}): void {
             else opts.onCancel?.();
         } else {
             window.alert(opts.message);
-            opts.onConfirm?.();
+            opts.onOk?.();
         }
         return;
     }

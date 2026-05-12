@@ -7,9 +7,9 @@
 import {
   getApp, bgmLog, BGM, readCell, trim, _getUserApiPath,
   wpsMsgBox, getCell, escapeHtml, showAlert, showToast,
-  LOG_LEVELS, BGM_COLOR, type SyncRecord, findHeaderRow, getColumnMap, getSequentialRowsBySeqCol,
+  LOG_LEVELS, BGM_COLOR, type SyncRecord, findHeaderRow, getColumnMap, getSyncPreview,detectConflicts,
   extractSubjectId, mapWatchStatus, buildJsonPayload,WpsWorksheet,
-  bgmRequestSync, addSyncRecord, addTagsFromStr,WpsRange ,WATCH_STATUS_MAP 
+  bgmRequestSync, addSyncRecord, addTagsFromStr,WpsRange ,WATCH_STATUS_MAP ,SyncToBangumiAsync
 } from '../index.js';
 
 
@@ -559,14 +559,13 @@ export function viewSyncRecordDetail(sid: string): void {
 
 
 
-/**
+/*
  * 一键同步所有可见数据行（由 BGM.sync.startSync 调用）
  * - 依赖 BGM.dataPreview 中的预览数据
- * - 跳过无 Bangumi URL 或无法提取 Subject ID 的行
- * - 调用 bgmRequestSync 执行单条同步
- * - 标记成功/失败颜色，更新同步记录
+ * - 使用 getSyncPreview 和 detectConflicts 进行统计和冲突检测
+ * - 调用 SyncToBangumiAsync 执行批量同步
  * - 通过事件总线通知进度
- * @returns 同步结果统计 { success: number; fail: number; skip: number }
+ * @returns 同步结果统计 { success, fail, skip }
  */
 export async function syncAllRows(): Promise<{ success: number; fail: number; skip: number }> {
     const dp = BGM.dataPreview;
@@ -583,7 +582,6 @@ export async function syncAllRows(): Promise<{ success: number; fail: number; sk
 
     const { ws, visibleRows, headerRow, dataStartRow } = dp;
     const dataRows = visibleRows.filter(r => r !== headerRow && r >= dataStartRow);
-
     if (dataRows.length === 0) {
         showToast('没有可同步的数据行', 'info');
         return { success: 0, fail: 0, skip: 0 };
@@ -595,83 +593,46 @@ export async function syncAllRows(): Promise<{ success: number; fail: number; sk
         return { success: 0, fail: 0, skip: 0 };
     }
 
-    let successCount = 0;
-    let failCount = 0;
-    let skipCount = 0;
-    const total = dataRows.length;
+    const lastRow = Math.max(...dataRows); // 使用可见行最大行号作为数据范围
 
-    bgmLog(LOG_LEVELS.INFO, `开始批量同步，共 ${total} 行`);
+    // ---------- 1. 同步预览统计 ----------
+    const preview = getSyncPreview(ws, colMap, lastRow, headerRow);
 
-    for (let i = 0; i < dataRows.length; i++) {
-        const rowNum = dataRows[i];
-        try {
-            const rowData = getRowData(ws, rowNum, colMap, headerRow, 4);
-
-            // 跳过没有有效 URL 和 sid 的行
-            if (!rowData.bgmUrl || !rowData.sid) {
-                skipCount++;
-                bgmLog(LOG_LEVELS.DEBUG, `跳过行 ${rowNum} (无 Bangumi URL 或 sid)`);
-                continue;
-            }
-
-            const jsonBody = buildJsonPayload(ws, rowNum, colMap, rowData.finishedDate);
-            if (!jsonBody) {
-                failCount++;
-                bgmLog(LOG_LEVELS.WARN, `行 ${rowNum} 无法构建请求体`);
-                continue;
-            }
-
-            // 发送 API 请求
-            const result = bgmRequestSync(
-                'POST',
-                `/v0/users/${_getUserApiPath()}/collections/${rowData.sid}`,
-                jsonBody,
-                token
-            );
-            const statusCode = result?.code || 0;
-            const seqCell = getCell(ws, rowNum, 4) as WpsRange | null;
-
-            if ([200, 201, 202, 204].includes(statusCode)) {
-                // 成功：标记绿色
-                if (seqCell?.Interior) seqCell.Interior.Color = BGM_COLOR.SUCCESS;
-                successCount++;
-                addSyncRecord({
-                    name: rowData.name || '(无名称)',
-                    url: rowData.bgmUrl,
-                    sid: rowData.sid,
-                    content: jsonBody,
-                    status: '成功',
-                    message: `行 ${rowNum}`,
-                    count: 1,
-                });
-            } else {
-                // 失败：标记红色
-                if (seqCell?.Interior) seqCell.Interior.Color = BGM_COLOR.FAIL;
-                failCount++;
-                addSyncRecord({
-                    name: rowData.name || '(无名称)',
-                    url: rowData.bgmUrl,
-                    sid: rowData.sid,
-                    content: jsonBody,
-                    status: '失败',
-                    message: result?.message || `HTTP ${statusCode}`,
-                    count: 1,
-                });
-            }
-        } catch (e) {
-            failCount++;
-            BGM.handleError(e, { level: BGM.ErrorLevel.ERROR, context: `syncAllRows:行${rowNum}` });
-            // 确保失败时也标记颜色
-            const seqCell = getCell(ws, rowNum, 4) as WpsRange | null;
-            if (seqCell?.Interior) seqCell.Interior.Color = BGM_COLOR.FAIL;
+    // ---------- 2. 冲突检测（可选，默认以 Excel 覆盖） ----------
+    let conflictSids: Set<string> | undefined = undefined;
+    let conflictInfo = '';
+    try {
+        const { conflicts, conflictCount } = await detectConflicts(ws, colMap, lastRow, headerRow, token);
+        if (conflictCount > 0) {
+            // 使用 Ribbon 的统一策略：默认以 Excel 覆盖，所以只需记录，不跳过
+            conflictInfo = `检测到 ${conflictCount} 条冲突，将以 Excel 数据覆盖。`;
+            bgmLog(LOG_LEVELS.WARN, conflictInfo);
+            // 如需跳过，可启用下行代码（需传入 skipSids 给 SyncToBangumiAsync）
+            // conflictSids = new Set(conflicts.map(c => c.sid));
         }
-
-        // 更新进度
-        BGM.setSyncProgress(i + 1, total, `同步中 ${i + 1}/${total}`);
+    } catch (e) {
+        const bgmErr = BGM.handleError(e, { showAlert: false });
+        bgmErr.message = '冲突检测失败，已跳过此步骤。原始错误: ' + bgmErr.message;
     }
 
-    const stats = { success: successCount, fail: failCount, skip: skipCount };
-    BGM.setSyncComplete(stats);
-    bgmLog(LOG_LEVELS.INFO, `批量同步完成：成功 ${successCount}，失败 ${failCount}，跳过 ${skipCount}`);
-    return stats;
+    // ---------- 3. 执行同步 ----------
+    try {
+        const result = await SyncToBangumiAsync(ws, colMap, token, lastRow, headerRow, {
+            skipSids: conflictSids,        // 跳过冲突的 sid 集合
+            incremental: false,            // 全量同步，可根据需要改为从 BGM 状态读取
+            onProgress: (current, total, message) => {
+                BGM.setSyncProgress(current, total, message);
+            },
+            onItemComplete: (row, success, _result) => {
+                // 这里可以不做额外处理，因为颜色标记由内部完成
+            }
+        });
+
+        BGM.setSyncComplete(result);
+        showToast(`同步完成：成功 ${result.success}，失败 ${result.fail}，跳过 ${result.skip}`, 'success');
+        return result;
+    } catch (err: any) {
+        BGM.handleError(err, { showAlert: true });
+        return { success: 0, fail: 0, skip: 0 };
+    }
 }
