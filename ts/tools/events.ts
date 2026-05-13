@@ -7,7 +7,7 @@
  * @author BGM Development Team
  * @version 1.0.0
  */
-import { BGM } from '../index.js';
+import { BGM, bgmLog, LOG_LEVELS } from '../index.js';
 /**
  * 事件处理器类型
  *
@@ -91,7 +91,7 @@ export class EventBus {
             try {
                 entry.handler(data);
             } catch (error) {
-                console.error(`Error handling event "${eventName}":`, error);
+                BGM.handleError(error, { level: BGM.ErrorLevel.ERROR, context: `EventBus:${eventName}` });
             }
             if (entry.once) {
                 this.off(eventName, entry.handler);

@@ -4,7 +4,7 @@
  * @description WPS Office 功能区按钮回调处理
  */
 
-import { WPS_ENUM, showBangumiPanel,BGM, getIncrementalSync, getSkipConflicts, setIncrementalSync, setSkipConflicts,listenToRibbonConfigUpdates } from './index.js';
+import { WPS_ENUM, showBangumiPanel,BGM, getIncrementalSync, getSkipConflicts, setIncrementalSync, setSkipConflicts,listenToRibbonConfigUpdates, bgmLog, LOG_LEVELS } from './index.js';
 import * as RibbonService from './services/ribbonService.js';
 
 // 在 Ribbon 启动时（例如 OnAddinLoad 中或文件顶部立即执行）
@@ -34,7 +34,7 @@ initRibbonMessageListener();
  */
 export function GetSkipConflictsPressed(control: any): boolean {
     const result = getSkipConflicts();
-    console.log(`[Ribbon] GetSkipConflictsPressed: ${result}`);
+    bgmLog(LOG_LEVELS.DEBUG, `[Ribbon] GetSkipConflictsPressed: ${result}`);
     return result;
 }
 
@@ -43,7 +43,7 @@ export function GetSkipConflictsPressed(control: any): boolean {
  */
 export function OnSkipConflictsChange(control: any): boolean {
     const newValue = control.Pressed;
-    console.log(`[Ribbon] OnSkipConflictsChange: control.Pressed = ${newValue}`);
+    bgmLog(LOG_LEVELS.DEBUG, `[Ribbon] OnSkipConflictsChange: control.Pressed = ${newValue}`);
     
     // 如果 control.Pressed 是 undefined，则切换当前状态
     let finalValue: boolean;
@@ -51,12 +51,12 @@ export function OnSkipConflictsChange(control: any): boolean {
         finalValue = newValue;
     } else {
         finalValue = !getSkipConflicts();
-        console.log(`[Ribbon] control.Pressed 不可用，切换状态为: ${finalValue}`);
+        bgmLog(LOG_LEVELS.DEBUG, `[Ribbon] control.Pressed 不可用，切换状态为: ${finalValue}`);
     }
     
     // 保存到 PluginStorage
     setSkipConflicts(finalValue);
-    console.log(`[Ribbon] 跳过冲突状态已保存到 PluginStorage: ${finalValue}`);
+    bgmLog(LOG_LEVELS.INFO, `[Ribbon] 跳过冲突状态已保存到 PluginStorage: ${finalValue}`);
     
     // ========== 新增：通知侧边栏配置已更新 ==========
     try {
@@ -68,12 +68,12 @@ export function OnSkipConflictsChange(control: any): boolean {
                     value: finalValue ? 'true' : 'false'
                 }
             }, '*');
-            console.log(`[Ribbon] 已通知侧边栏冲突策略更新: ${finalValue ? '跳过' : '覆盖'}`);
+            bgmLog(LOG_LEVELS.DEBUG, `[Ribbon] 已通知侧边栏冲突策略更新: ${finalValue ? '跳过' : '覆盖'}`);
         } else {
-            console.warn('[Ribbon] 无法发送 postMessage，window.parent 不可用');
+            bgmLog(LOG_LEVELS.WARN, '[Ribbon] 无法发送 postMessage，window.parent 不可用');
         }
     } catch (err) {
-        console.error('[Ribbon] 通知侧边栏失败:', err);
+        BGM.handleError(err, { level: BGM.ErrorLevel.WARN, context: 'Ribbon OnSkipConflictsChange' });
     }
     
     return true; // 必须返回 boolean
@@ -85,7 +85,7 @@ export function OnSkipConflictsChange(control: any): boolean {
  */
 export function GetIncrementalSyncPressed(control: any): boolean {
     const result = getIncrementalSync();
-    console.log(`[Ribbon] GetIncrementalSyncPressed: ${result}`);
+    bgmLog(LOG_LEVELS.DEBUG, `[Ribbon] GetIncrementalSyncPressed: ${result}`);
     return result;
 }
 
@@ -99,8 +99,10 @@ export function OnIncrementalSyncChange(control: any): boolean {
         finalValue = newValue;
     } else {
         finalValue = !getIncrementalSync();
+        bgmLog(LOG_LEVELS.DEBUG, `[Ribbon] control.Pressed 不可用，切换状态为: ${finalValue}`);
     }
     setIncrementalSync(finalValue);
+    bgmLog(LOG_LEVELS.INFO, `[Ribbon] 增量同步状态已保存到 PluginStorage: ${finalValue}`);
 
     // 新增：通知侧边栏
     try {
@@ -109,10 +111,10 @@ export function OnIncrementalSyncChange(control: any): boolean {
                 type: 'BGM:configUpdated',
                 data: { key: 'bgm_incremental_sync', value: finalValue ? 'true' : 'false' }
             }, '*');
-            console.log(`[Ribbon] 已通知侧边栏增量同步更新: ${finalValue ? '开启' : '关闭'}`);
+            bgmLog(LOG_LEVELS.DEBUG, `[Ribbon] 已通知侧边栏增量同步更新: ${finalValue ? '开启' : '关闭'}`);
         }
     } catch (err) {
-        console.error('[Ribbon] 通知侧边栏失败:', err);
+        BGM.handleError(err, { level: BGM.ErrorLevel.WARN, context: 'Ribbon OnIncrementalSyncChange' });
     }
     return true;
 }
@@ -140,7 +142,7 @@ export function OnAddinLoad(ribbonUI: any): boolean {
  */
 
 export function OnAction(control: { Id: string }): boolean {
-    console.log('[BGM] OnAction:', control.Id);
+    bgmLog(LOG_LEVELS.INFO, `[BGM] OnAction: ${control.Id}`);
     try {
         switch (control.Id) {
             case 'btnShowPanel':
@@ -162,7 +164,7 @@ export function OnAction(control: { Id: string }): boolean {
                             RibbonService.openCollectionForRibbon();
                             break;
                             default:
-                                console.warn('[BGM] 未知按钮:', control.Id);
+                                bgmLog(LOG_LEVELS.WARN, `[BGM] 未知按钮: ${control.Id}`);
                             }
                         } catch (e: any) {
                             BGM.handleError(e, { showAlert: true, level: BGM.ErrorLevel.ERROR, context: 'Ribbon OnAction' });

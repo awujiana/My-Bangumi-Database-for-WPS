@@ -499,13 +499,13 @@ export function setCellValue(ws: WpsWorksheet | null | undefined, row: number, c
     try {
         const cell = getCell(ws, row, col) as any;
         if (!cell) {
-            console.error("setCellValue - 无法获取单元格:", row, col);
+            bgmLog(LOG_LEVELS.ERROR, `setCellValue - 无法获取单元格: (${row}, ${col})`);
             return false;
         }
         cell.Value = value;
         return true;
     } catch (e) {
-        console.error("setCellValue error:", e);
+        BGM.handleError(e, { level: BGM.ErrorLevel.ERROR, context: 'setCellValue' });
     }
     return false;
 }

@@ -442,14 +442,14 @@ export function setCellValue(ws, row, col, value) {
     try {
         const cell = getCell(ws, row, col);
         if (!cell) {
-            console.error("setCellValue - 无法获取单元格:", row, col);
+            bgmLog(LOG_LEVELS.ERROR, `setCellValue - 无法获取单元格: (${row}, ${col})`);
             return false;
         }
         cell.Value = value;
         return true;
     }
     catch (e) {
-        console.error("setCellValue error:", e);
+        BGM.handleError(e, { level: BGM.ErrorLevel.ERROR, context: 'setCellValue' });
     }
     return false;
 }

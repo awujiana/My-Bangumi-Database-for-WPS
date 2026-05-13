@@ -3,7 +3,7 @@
  * @module types/wps
  * @description 定义 WPS COM 对象的核心接口，避免 unknown 强制转换
  */
-import { getApp } from '../index.js';
+import { getApp, bgmLog, LOG_LEVELS } from '../index.js';
 import { showAlert as customShowAlert, showConfirm as customShowConfirm, showInput as customShowInput } from '../ui/dialog.js';
 // ========== 类型守卫函数 ==========
 export function isWpsApp(value) {
@@ -39,7 +39,7 @@ export function wpsPrompt(message, defaultValue) {
                 return;
             }
             catch (e) {
-                console.warn("WPS InputBox 不可用:", e.message);
+                bgmLog(LOG_LEVELS.WARN, `WPS InputBox 不可用: ${e.message}`);
             }
         }
         if (typeof window !== 'undefined' && typeof window.BGMInput === 'function') {
@@ -69,7 +69,7 @@ export function wpsMsgBox(message, buttons, icon) {
                 return;
             }
             catch (e) {
-                console.warn("WPS MessageBox 不可用:", e.message);
+                bgmLog(LOG_LEVELS.WARN, `WPS MessageBox 不可用: ${e.message}`);
             }
         }
         if (buttons === 4) {

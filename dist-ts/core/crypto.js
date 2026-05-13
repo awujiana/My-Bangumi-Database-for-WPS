@@ -9,7 +9,7 @@
  * @version 1.0.0
  */
 import { TOKEN_CONFIG, } from './constants.js';
-import { BGM } from '../index.js';
+import { BGM, bgmLog, LOG_LEVELS } from '../index.js';
 /**
  * 将字符串转换为UTF-8字节数组
  *
@@ -99,19 +99,19 @@ export function extractToken(encrypted) {
     try {
         const parts = encrypted.split(':');
         if (parts.length < 3) {
-            console.warn('[crypto] Payload格式无效');
+            bgmLog(LOG_LEVELS.WARN, '[crypto] Payload格式无效');
             return null;
         }
         const [version, checksumStr, ...tokenParts] = parts;
         const token = tokenParts.join(':');
         const checksum = parseInt(checksumStr, 10);
         if (version !== TOKEN_CONFIG.VERSION) {
-            console.warn(`[crypto] Token版本不匹配: ${version}`);
+            bgmLog(LOG_LEVELS.WARN, `[crypto] Token版本不匹配: ${version}`);
             return null;
         }
         const expectedChecksum = calcChecksum(token);
         if (checksum !== expectedChecksum) {
-            console.warn('[crypto] Token校验和不匹配，可能已被篡改');
+            bgmLog(LOG_LEVELS.WARN, '[crypto] Token校验和不匹配，可能已被篡改');
             return null;
         }
         return token;
@@ -172,12 +172,12 @@ export function decryptToken(encrypted) {
     try {
         const parts = encrypted.split('.');
         if (parts.length < 3) {
-            console.warn('[crypto] 加密字符串格式无效');
+            bgmLog(LOG_LEVELS.WARN, '[crypto] 加密字符串格式无效');
             return null;
         }
         const [version, ivBase64, encryptedBase64] = parts;
         if (version !== TOKEN_CONFIG.VERSION) {
-            console.warn(`[crypto] 加密版本不匹配: ${version}`);
+            bgmLog(LOG_LEVELS.WARN, `[crypto] 加密版本不匹配: ${version}`);
             return null;
         }
         // 解码Base64
@@ -241,12 +241,12 @@ export async function decryptTokenAsync(encrypted) {
     try {
         const parts = encrypted.split('.');
         if (parts.length < 3) {
-            console.warn('[crypto] 加密字符串格式无效');
+            bgmLog(LOG_LEVELS.WARN, '[crypto] 加密字符串格式无效');
             return null;
         }
         const [version, ivBase64, encryptedBase64] = parts;
         if (version !== '2') {
-            console.warn(`[crypto] 不支持此加密版本: ${version}`);
+            bgmLog(LOG_LEVELS.WARN, `[crypto] 不支持此加密版本: ${version}`);
             return null;
         }
         // 解码Base64

@@ -1,4 +1,14 @@
 /**
+ * @fileoverview 事件总线模块
+ * @module tools/events
+ * @description 实现模块间的发布-订阅事件系统，提供松耦合的组件通信方式。
+ *              支持事件的订阅、退订、单次订阅和发布。
+ *
+ * @author BGM Development Team
+ * @version 1.0.0
+ */
+import { BGM } from '../index.js';
+/**
  * 事件总线类
  * @class
  */
@@ -62,7 +72,7 @@ export class EventBus {
                 entry.handler(data);
             }
             catch (error) {
-                console.error(`Error handling event "${eventName}":`, error);
+                BGM.handleError(error, { level: BGM.ErrorLevel.ERROR, context: `EventBus:${eventName}` });
             }
             if (entry.once) {
                 this.off(eventName, entry.handler);

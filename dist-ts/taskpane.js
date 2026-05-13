@@ -87,7 +87,7 @@ function refreshSheets() {
         return;
     const app = getApp();
     if (!app?.ActiveWorkbook) {
-        console.warn('refreshSheets: 无法获取 ActiveWorkbook');
+        bgmLog(LOG_LEVELS.WARN, 'refreshSheets: 无法获取 ActiveWorkbook');
         return;
     }
     const sheets = app.ActiveWorkbook.Worksheets;
