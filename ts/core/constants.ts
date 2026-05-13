@@ -19,12 +19,14 @@
  * @property {number} WARN - 输出警告信息
  * @property {number} ERROR - 输出错误信息
  * @property {number} THROW - 抛出异常
+ * @property {number} INFO - 输出信息级日志
  */
 export const ErrorLevel = {
     SILENT: 0,
     WARN: 1,
     ERROR: 2,
     THROW: 3,
+    INFO: 4,
 } as const;
 
 /**

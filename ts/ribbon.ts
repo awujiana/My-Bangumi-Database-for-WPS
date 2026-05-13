@@ -34,7 +34,7 @@ initRibbonMessageListener();
  */
 export function GetSkipConflictsPressed(control: any): boolean {
     const result = getSkipConflicts();
-    bgmLog(LOG_LEVELS.DEBUG, `[Ribbon] GetSkipConflictsPressed: ${result}`);
+    bgmLog(LOG_LEVELS.INFO, `[Ribbon] GetSkipConflictsPressed: ${result}`);
     return result;
 }
 
@@ -43,7 +43,7 @@ export function GetSkipConflictsPressed(control: any): boolean {
  */
 export function OnSkipConflictsChange(control: any): boolean {
     const newValue = control.Pressed;
-    bgmLog(LOG_LEVELS.DEBUG, `[Ribbon] OnSkipConflictsChange: control.Pressed = ${newValue}`);
+    bgmLog(LOG_LEVELS.INFO, `[Ribbon] OnSkipConflictsChange: control.Pressed = ${newValue}`);
     
     // 如果 control.Pressed 是 undefined，则切换当前状态
     let finalValue: boolean;
@@ -51,7 +51,7 @@ export function OnSkipConflictsChange(control: any): boolean {
         finalValue = newValue;
     } else {
         finalValue = !getSkipConflicts();
-        bgmLog(LOG_LEVELS.DEBUG, `[Ribbon] control.Pressed 不可用，切换状态为: ${finalValue}`);
+        bgmLog(LOG_LEVELS.INFO, `[Ribbon] control.Pressed 不可用，切换状态为: ${finalValue}`);
     }
     
     // 保存到 PluginStorage
@@ -68,7 +68,7 @@ export function OnSkipConflictsChange(control: any): boolean {
                     value: finalValue ? 'true' : 'false'
                 }
             }, '*');
-            bgmLog(LOG_LEVELS.DEBUG, `[Ribbon] 已通知侧边栏冲突策略更新: ${finalValue ? '跳过' : '覆盖'}`);
+            bgmLog(LOG_LEVELS.INFO, `[Ribbon] 已通知侧边栏冲突策略更新: ${finalValue ? '跳过' : '覆盖'}`);
         } else {
             bgmLog(LOG_LEVELS.WARN, '[Ribbon] 无法发送 postMessage，window.parent 不可用');
         }
@@ -85,7 +85,7 @@ export function OnSkipConflictsChange(control: any): boolean {
  */
 export function GetIncrementalSyncPressed(control: any): boolean {
     const result = getIncrementalSync();
-    bgmLog(LOG_LEVELS.DEBUG, `[Ribbon] GetIncrementalSyncPressed: ${result}`);
+    bgmLog(LOG_LEVELS.INFO, `[Ribbon] GetIncrementalSyncPressed: ${result}`);
     return result;
 }
 
@@ -99,7 +99,7 @@ export function OnIncrementalSyncChange(control: any): boolean {
         finalValue = newValue;
     } else {
         finalValue = !getIncrementalSync();
-        bgmLog(LOG_LEVELS.DEBUG, `[Ribbon] control.Pressed 不可用，切换状态为: ${finalValue}`);
+        bgmLog(LOG_LEVELS.INFO, `[Ribbon] control.Pressed 不可用，切换状态为: ${finalValue}`);
     }
     setIncrementalSync(finalValue);
     bgmLog(LOG_LEVELS.INFO, `[Ribbon] 增量同步状态已保存到 PluginStorage: ${finalValue}`);
@@ -111,7 +111,7 @@ export function OnIncrementalSyncChange(control: any): boolean {
                 type: 'BGM:configUpdated',
                 data: { key: 'bgm_incremental_sync', value: finalValue ? 'true' : 'false' }
             }, '*');
-            bgmLog(LOG_LEVELS.DEBUG, `[Ribbon] 已通知侧边栏增量同步更新: ${finalValue ? '开启' : '关闭'}`);
+            bgmLog(LOG_LEVELS.INFO, `[Ribbon] 已通知侧边栏增量同步更新: ${finalValue ? '开启' : '关闭'}`);
         }
     } catch (err) {
         BGM.handleError(err, { level: BGM.ErrorLevel.WARN, context: 'Ribbon OnIncrementalSyncChange' });

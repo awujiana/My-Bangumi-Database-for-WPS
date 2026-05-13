@@ -166,10 +166,10 @@ function executeXhrRequest<T>(
         bgmLog(LOG_LEVELS.INFO, `[HTTP] 超时: ${options.timeout}ms`);
         
         if (options.token) {
-            bgmLog(LOG_LEVELS.DEBUG, `[HTTP] 请求头: Authorization: Bearer ${options.token.substring(0, 8)}...`);
+            bgmLog(LOG_LEVELS.INFO, `[HTTP] 请求头: Authorization: Bearer ${options.token.substring(0, 8)}...`);
         }
         if (options.body) {
-            bgmLog(LOG_LEVELS.DEBUG, `[HTTP] 请求体: ${options.body.length > 200 ? options.body.substring(0, 200) + '...' : options.body}`);
+            bgmLog(LOG_LEVELS.INFO, `[HTTP] 请求体: ${options.body.length > 200 ? options.body.substring(0, 200) + '...' : options.body}`);
         }
         
         const xhr = new XMLHttpRequest();
@@ -182,7 +182,7 @@ function executeXhrRequest<T>(
         }
         if (options.body) {
             xhr.setRequestHeader('Content-Type', 'application/json');
-            bgmLog(LOG_LEVELS.DEBUG, `[HTTP] 请求头: Content-Type: application/json`);
+            bgmLog(LOG_LEVELS.INFO, `[HTTP] 请求头: Content-Type: application/json`);
         }
 
         // 响应处理
@@ -195,14 +195,14 @@ function executeXhrRequest<T>(
             bgmLog(LOG_LEVELS.INFO, `[HTTP] 请求耗时: ${duration}ms`);
             
             if (xhr.getAllResponseHeaders()) {
-                bgmLog(LOG_LEVELS.DEBUG, `[HTTP] 响应头: ${xhr.getAllResponseHeaders()}`);
+                bgmLog(LOG_LEVELS.INFO, `[HTTP] 响应头: ${xhr.getAllResponseHeaders()}`);
             }
             
             let data: T | null = null;
             if (xhr.responseText && xhr.responseText.length > 0) {
                 try {
                     data = JSON.parse(xhr.responseText);
-                    bgmLog(LOG_LEVELS.DEBUG, `[HTTP] 响应数据: ${JSON.stringify(data).length > 500 ? JSON.stringify(data).substring(0, 500) + '...' : JSON.stringify(data)}`);
+                    bgmLog(LOG_LEVELS.INFO, `[HTTP] 响应数据: ${JSON.stringify(data).length > 500 ? JSON.stringify(data).substring(0, 500) + '...' : JSON.stringify(data)}`);
                 } catch (error: any) {
                     BGM.handleError(error, { context: 'executeXhrRequest', showAlert: false });
                     bgmLog(LOG_LEVELS.WARN, `[HTTP] 解析响应失败，返回原始文本: ${xhr.responseText.length > 200 ? xhr.responseText.substring(0, 200) + '...' : xhr.responseText}`);
@@ -238,14 +238,14 @@ function executeXhrRequest<T>(
                 if (e.lengthComputable) {
                     options.onProgress!(e.loaded, e.total);
                     const progress = Math.round((e.loaded / e.total) * 100);
-                    bgmLog(LOG_LEVELS.DEBUG, `[HTTP] 上传进度: ${progress}% (${e.loaded}/${e.total})`);
+                    bgmLog(LOG_LEVELS.INFO, `[HTTP] 上传进度: ${progress}% (${e.loaded}/${e.total})`);
                 }
             };
         }
 
         // 发送请求
         try {
-            bgmLog(LOG_LEVELS.DEBUG, `[HTTP] 正在发送请求...`);
+            bgmLog(LOG_LEVELS.INFO, `[HTTP] 正在发送请求...`);
             xhr.send(options.body);
         } catch (error: any) {
             BGM.handleError(error, { context: 'executeXhrRequest', showAlert: false });

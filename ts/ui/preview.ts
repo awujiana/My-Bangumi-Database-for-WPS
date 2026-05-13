@@ -286,12 +286,12 @@ export function previewSyncContent(): void {
 
             // 过滤无效行
             if (!rowData.bgmUrl || !rowData.sid) {
-                bgmLog(LOG_LEVELS.DEBUG, `[preview] 跳过行 ${rowNum} (无 Bangumi URL)`);
+                bgmLog(LOG_LEVELS.INFO, `[preview] 跳过行 ${rowNum} (无 Bangumi URL)`);
                 continue;
             }
             // 可选：过滤全空（名称、状态、标签全空）
             if (!rowData.name && !rowData.status && !rowData.tagsRaw) {
-                bgmLog(LOG_LEVELS.DEBUG, `[preview] 跳过行 ${rowNum} (空卡片)`);
+                bgmLog(LOG_LEVELS.INFO, `[preview] 跳过行 ${rowNum} (空卡片)`);
                 continue;
             }
 

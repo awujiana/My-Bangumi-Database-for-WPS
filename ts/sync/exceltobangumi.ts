@@ -755,7 +755,7 @@ export function bgmRequestSync(
     bgmLog(LOG_LEVELS.INFO, `[bgmRequestSync] URL: ${fullUrl}`);
     bgmLog(LOG_LEVELS.INFO, `[bgmRequestSync] 方法: ${method.toUpperCase()}`);
     bgmLog(LOG_LEVELS.INFO, `[bgmRequestSync] 请求头: Authorization: Bearer ${token.substring(0, 8)}...`);
-    bgmLog(LOG_LEVELS.INFO, `[bgmRequestSync] 请求体: ${jsonBody.length > 500 ? jsonBody.substring(0, 500) + '...' : jsonBody}`);
+    bgmLog(LOG_LEVELS.INFO, `[bgmRequestSync] 请求体: ${jsonBody}`);
 
     try {
         const xhr = new XMLHttpRequest();

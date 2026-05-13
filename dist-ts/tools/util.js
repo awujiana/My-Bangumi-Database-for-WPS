@@ -156,7 +156,7 @@ export const BGM = {
             catch (e) {
                 const err = e;
                 if (typeof bgmLog === 'function') {
-                    bgmLog(LOG_LEVELS?.DEBUG || 0, 'postMessage 不可用: ' + err.message);
+                    bgmLog(LOG_LEVELS.INFO || 0, 'postMessage 不可用: ' + err.message);
                 }
             }
             return false;
@@ -564,7 +564,7 @@ export function _fetchBgmUserInfo(callback) {
         return;
     }
     const apiUrl = BGM_CONFIG.API_BASE + "/v0/me";
-    bgmLog(LOG_LEVELS.DEBUG, `[_fetchBgmUserInfo] API 路由: ${apiUrl}`);
+    bgmLog(LOG_LEVELS.INFO, `[_fetchBgmUserInfo] API 路由: ${apiUrl}`);
     const xhr = new XMLHttpRequest();
     xhr.open("GET", apiUrl, true);
     xhr.setRequestHeader("Authorization", "Bearer " + token);
@@ -701,7 +701,7 @@ export function sleep(ms) {
         }
         catch (e) {
             if (typeof bgmLog === 'function') {
-                bgmLog(LOG_LEVELS?.DEBUG || 0, "sleep DoEvents 失败: " + e.message);
+                bgmLog(LOG_LEVELS.INFO, "sleep DoEvents 失败: " + e.message);
             }
             break;
         }
@@ -952,10 +952,10 @@ export function getLastRow(ws, forceRefresh = false, headerRow) {
     const cacheKey = `${sheetName}:lastRow${headerRow ? `:hr${headerRow}` : ''}`;
     if (forceRefresh) {
         clearSheetCache(ws);
-        bgmLog(LOG_LEVELS.DEBUG, '缓存已清除，重新计算最后行');
+        bgmLog(LOG_LEVELS.INFO, '缓存已清除，重新计算最后行');
     }
     const cached = cacheGet(cacheKey, () => {
-        bgmLog(LOG_LEVELS.DEBUG, `正在计算工作表 "${sheetName}" 的最后数据行（${headerRow ? '根据表头自动选择列' : '多列回退'}）...`);
+        bgmLog(LOG_LEVELS.INFO, `正在计算工作表 "${sheetName}" 的最后数据行（${headerRow ? '根据表头自动选择列' : '多列回退'}）...`);
         // 1. 如果提供了表头行，尝试自动选择锚定列
         if (headerRow != null && headerRow >= 1) {
             const col = findAnchorColumn(ws, headerRow);
@@ -966,7 +966,7 @@ export function getLastRow(ws, forceRefresh = false, headerRow) {
                     const cell = ws.Range(`${colLetter}${ws.Rows.Count}`);
                     const endCell = cell.End(-4162);
                     if (endCell && endCell.Row > 0) {
-                        bgmLog(LOG_LEVELS.DEBUG, `根据表头找到锚定列 ${col}(${colLetter})，最后行: ${endCell.Row}`);
+                        bgmLog(LOG_LEVELS.INFO, `根据表头找到锚定列 ${col}(${colLetter})，最后行: ${endCell.Row}`);
                         return endCell.Row;
                     }
                 }
@@ -980,7 +980,7 @@ export function getLastRow(ws, forceRefresh = false, headerRow) {
             const cell = ws.Range(`D${ws.Rows.Count}`);
             const endCell = cell.End(-4162);
             if (endCell && endCell.Row > 0) {
-                bgmLog(LOG_LEVELS.DEBUG, `D列向上定位成功，最后行: ${endCell.Row}`);
+                bgmLog(LOG_LEVELS.INFO, `D列向上定位成功，最后行: ${endCell.Row}`);
                 return endCell.Row;
             }
         }
@@ -992,7 +992,7 @@ export function getLastRow(ws, forceRefresh = false, headerRow) {
             const cell = ws.Range(`A${ws.Rows.Count}`);
             const endCell = cell.End(-4162);
             if (endCell && endCell.Row > 0) {
-                bgmLog(LOG_LEVELS.DEBUG, `A列向上定位成功，最后行: ${endCell.Row}`);
+                bgmLog(LOG_LEVELS.INFO, `A列向上定位成功，最后行: ${endCell.Row}`);
                 return endCell.Row;
             }
         }
@@ -1005,7 +1005,7 @@ export function getLastRow(ws, forceRefresh = false, headerRow) {
             if (usedRange) {
                 const last = usedRange.Row + usedRange.Rows.Count - 1;
                 if (last > 0) {
-                    bgmLog(LOG_LEVELS.DEBUG, `UsedRange 估算最后行: ${last}`);
+                    bgmLog(LOG_LEVELS.INFO, `UsedRange 估算最后行: ${last}`);
                     return last;
                 }
             }
@@ -1017,7 +1017,7 @@ export function getLastRow(ws, forceRefresh = false, headerRow) {
         bgmLog(LOG_LEVELS.WARN, `无法确定工作表 "${sheetName}" 的最后行，使用默认值 50000`);
         return 50000;
     });
-    bgmLog(LOG_LEVELS.DEBUG, `工作表 "${sheetName}" 最后数据行: ${cached}${sheetCache.has(cacheKey) ? ' (来自缓存)' : ' (首次计算)'}`);
+    bgmLog(LOG_LEVELS.INFO, `工作表 "${sheetName}" 最后数据行: ${cached}${sheetCache.has(cacheKey) ? ' (来自缓存)' : ' (首次计算)'}`);
     return cached;
 }
 export function isEmptyValue(val) {

@@ -17,13 +17,14 @@
  * @property {number} WARN - 输出警告信息
  * @property {number} ERROR - 输出错误信息
  * @property {number} THROW - 抛出异常
+ * @property {number} INFO - 输出信息级日志
  */
 export declare const ErrorLevel: {
     readonly SILENT: 0;
     readonly WARN: 1;
     readonly ERROR: 2;
     readonly THROW: 3;
-    readonly DEBUG: 4;
+    readonly INFO: 4;
 };
 /**
  * 错误处理选项接口
@@ -137,8 +138,6 @@ export declare const BGM_COLOR: {
  * @type {Object}
  */
 export declare const LOG_LEVELS: {
-    /** 调试级别 - 详细信息，通常用于开发调试 */
-    DEBUG: number;
     /** 信息级别 - 一般操作信息 */
     INFO: number;
     /** 警告级别 - 潜在问题提示 */

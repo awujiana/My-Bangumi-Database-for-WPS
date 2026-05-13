@@ -93,7 +93,7 @@ export function updateTokenStatus() {
             })
                 .catch(() => {
                 // CORS 错误或其他错误，静默处理
-                bgmLog(LOG_LEVELS.DEBUG, '获取用户名失败（CORS或网络错误）');
+                bgmLog(LOG_LEVELS.INFO, '获取用户名失败（CORS或网络错误）');
             });
         }
     }
@@ -123,7 +123,7 @@ export function openUserCollection() {
     const startTime = Date.now();
     bgmLog(LOG_LEVELS.INFO, '[openUserCollection] ========== 打开用户收藏页面 ==========');
     const userId = _getBgmUserId();
-    bgmLog(LOG_LEVELS.DEBUG, `[openUserCollection] 获取用户ID: ${userId || '(未设置)'}`);
+    bgmLog(LOG_LEVELS.INFO, `[openUserCollection] 获取用户ID: ${userId || '(未设置)'}`);
     if (!userId) {
         bgmLog(LOG_LEVELS.ERROR, '[openUserCollection] 用户ID未设置，无法打开收藏页面');
         showAlert(_T.pleaseSetUserIdFirst);
@@ -146,8 +146,8 @@ export function testTokenValidity() {
     bgmLog(LOG_LEVELS.INFO, `[testTokenValidity] ========== 开始测试 Token ==========`);
     bgmLog(LOG_LEVELS.INFO, `[testTokenValidity] API 路由: ${apiUrl}`);
     bgmLog(LOG_LEVELS.INFO, `[testTokenValidity] 请求方法: GET`);
-    bgmLog(LOG_LEVELS.DEBUG, `[testTokenValidity] 请求头: Authorization: Bearer ${token.substring(0, 8)}...`);
-    bgmLog(LOG_LEVELS.DEBUG, `[testTokenValidity] 请求头: Content-Type: application/json`);
+    bgmLog(LOG_LEVELS.INFO, `[testTokenValidity] 请求头: Authorization: Bearer ${token.substring(0, 8)}...`);
+    bgmLog(LOG_LEVELS.INFO, `[testTokenValidity] 请求头: Content-Type: application/json`);
     const xhr = new XMLHttpRequest();
     xhr.open('GET', apiUrl, true);
     xhr.setRequestHeader('Authorization', 'Bearer ' + token);
@@ -159,12 +159,12 @@ export function testTokenValidity() {
         bgmLog(LOG_LEVELS.INFO, `[testTokenValidity] HTTP 状态码: ${xhr.status} (${xhr.statusText})`);
         bgmLog(LOG_LEVELS.INFO, `[testTokenValidity] 请求耗时: ${duration}ms`);
         if (xhr.getAllResponseHeaders()) {
-            bgmLog(LOG_LEVELS.DEBUG, `[testTokenValidity] 响应头: ${xhr.getAllResponseHeaders()}`);
+            bgmLog(LOG_LEVELS.INFO, `[testTokenValidity] 响应头: ${xhr.getAllResponseHeaders()}`);
         }
         if (xhr.status === 200) {
             try {
                 const data = JSON.parse(xhr.responseText);
-                bgmLog(LOG_LEVELS.DEBUG, '[testTokenValidity] 响应数据: ' + JSON.stringify(data));
+                bgmLog(LOG_LEVELS.INFO, '[testTokenValidity] 响应数据: ' + JSON.stringify(data));
                 const nickname = data.nickname || data.username || _T.unknownUser;
                 const userId = String(data.id || '');
                 bgmLog(LOG_LEVELS.INFO, `[testTokenValidity] Token 验证成功！用户名: ${nickname}, 用户ID: ${userId}`);
@@ -185,7 +185,7 @@ export function testTokenValidity() {
         }
         else {
             bgmLog(LOG_LEVELS.ERROR, `[testTokenValidity] Token 验证失败，HTTP 状态码: ${xhr.status}`);
-            bgmLog(LOG_LEVELS.DEBUG, `[testTokenValidity] 响应内容: ${xhr.responseText}`);
+            bgmLog(LOG_LEVELS.INFO, `[testTokenValidity] 响应内容: ${xhr.responseText}`);
             showError('错误', `Token验证失败 (HTTP ${xhr.status})`);
         }
     };
@@ -193,13 +193,13 @@ export function testTokenValidity() {
         const requestEndTime = Date.now();
         const duration = requestEndTime - requestStartTime;
         bgmLog(LOG_LEVELS.ERROR, `[testTokenValidity] 请求发生网络错误，耗时: ${duration}ms`);
-        bgmLog(LOG_LEVELS.DEBUG, `[testTokenValidity] XHR 状态: ${xhr.readyState}`);
+        bgmLog(LOG_LEVELS.INFO, `[testTokenValidity] XHR 状态: ${xhr.readyState}`);
         showError(_T.networkError, _T.cannotConnectBgm);
     };
     xhr.ontimeout = () => {
         bgmLog(LOG_LEVELS.WARN, '[testTokenValidity] 请求超时');
     };
-    bgmLog(LOG_LEVELS.DEBUG, `[testTokenValidity] 正在发送请求...`);
+    bgmLog(LOG_LEVELS.INFO, `[testTokenValidity] 正在发送请求...`);
     xhr.send();
 }
 export function testDebugConnection() {
@@ -263,7 +263,7 @@ export async function syncFromPanel() {
     const startTime = Date.now();
     bgmLog(LOG_LEVELS.INFO, '[syncFromPanel] ========== 开始执行同步操作 ==========');
     // 1. 检查必要函数是否加载
-    bgmLog(LOG_LEVELS.DEBUG, '[syncFromPanel] 步骤1: 检查必要函数是否加载');
+    bgmLog(LOG_LEVELS.INFO, '[syncFromPanel] 步骤1: 检查必要函数是否加载');
     if (typeof findHeaderRow !== 'function' || typeof getColumnMap !== 'function' || typeof getLastRow !== 'function') {
         bgmLog(LOG_LEVELS.WARN, '[syncFromPanel] 必要函数未加载完成');
         showAlert(_T.loadingWait);
@@ -271,7 +271,7 @@ export async function syncFromPanel() {
         return;
     }
     // 2. 检查 Token
-    bgmLog(LOG_LEVELS.DEBUG, '[syncFromPanel] 步骤2: 检查 Token');
+    bgmLog(LOG_LEVELS.INFO, '[syncFromPanel] 步骤2: 检查 Token');
     const token = loadBgToken();
     if (!token) {
         bgmLog(LOG_LEVELS.WARN, '[syncFromPanel] Token 未设置');
@@ -279,16 +279,16 @@ export async function syncFromPanel() {
         bgmLog(LOG_LEVELS.INFO, `[syncFromPanel] 同步操作终止（Token未设置），耗时: ${Date.now() - startTime}ms`);
         return;
     }
-    bgmLog(LOG_LEVELS.DEBUG, `[syncFromPanel] Token 已设置（长度: ${token.length}）`);
+    bgmLog(LOG_LEVELS.INFO, `[syncFromPanel] Token 已设置（长度: ${token.length}）`);
     // 3. 确保同步记录工作表存在并激活
-    bgmLog(LOG_LEVELS.DEBUG, '[syncFromPanel] 步骤3: 确保同步记录工作表存在');
+    bgmLog(LOG_LEVELS.INFO, '[syncFromPanel] 步骤3: 确保同步记录工作表存在');
     if (typeof getOrCreateSyncRecordSheet === 'function') {
         const syncSheet = getOrCreateSyncRecordSheet();
         if (syncSheet) {
-            bgmLog(LOG_LEVELS.DEBUG, '[syncFromPanel] 同步记录工作表已创建/获取');
+            bgmLog(LOG_LEVELS.INFO, '[syncFromPanel] 同步记录工作表已创建/获取');
             try {
                 syncSheet.Activate();
-                bgmLog(LOG_LEVELS.DEBUG, '[syncFromPanel] 同步记录工作表已激活');
+                bgmLog(LOG_LEVELS.INFO, '[syncFromPanel] 同步记录工作表已激活');
             }
             catch (e) {
                 bgmLog(LOG_LEVELS.WARN, `[syncFromPanel] 激活同步记录工作表失败: ${e.message}`);
@@ -297,7 +297,7 @@ export async function syncFromPanel() {
         }
     }
     // 4. 获取应用和工作表对象
-    bgmLog(LOG_LEVELS.DEBUG, '[syncFromPanel] 步骤4: 获取应用和工作表对象');
+    bgmLog(LOG_LEVELS.INFO, '[syncFromPanel] 步骤4: 获取应用和工作表对象');
     const app = getApp();
     if (!app?.ActiveWorkbook) {
         bgmLog(LOG_LEVELS.ERROR, '[syncFromPanel] 无法获取 Application 对象');
@@ -305,7 +305,7 @@ export async function syncFromPanel() {
         bgmLog(LOG_LEVELS.INFO, `[syncFromPanel] 同步操作终止（无法获取Application），耗时: ${Date.now() - startTime}ms`);
         return;
     }
-    bgmLog(LOG_LEVELS.DEBUG, '[syncFromPanel] Application 对象获取成功');
+    bgmLog(LOG_LEVELS.INFO, '[syncFromPanel] Application 对象获取成功');
     const ws = getDataSheet();
     if (!ws) {
         bgmLog(LOG_LEVELS.WARN, '[syncFromPanel] 未找到数据工作表');
@@ -313,15 +313,15 @@ export async function syncFromPanel() {
         bgmLog(LOG_LEVELS.INFO, `[syncFromPanel] 同步操作终止（未找到数据工作表），耗时: ${Date.now() - startTime}ms`);
         return;
     }
-    bgmLog(LOG_LEVELS.DEBUG, '[syncFromPanel] 数据工作表获取成功');
+    bgmLog(LOG_LEVELS.INFO, '[syncFromPanel] 数据工作表获取成功');
     // 5. 解析表头和列映射
-    bgmLog(LOG_LEVELS.DEBUG, '[syncFromPanel] 步骤5: 解析表头和列映射');
+    bgmLog(LOG_LEVELS.INFO, '[syncFromPanel] 步骤5: 解析表头和列映射');
     const headerRow = findHeaderRow(ws);
-    bgmLog(LOG_LEVELS.DEBUG, `[syncFromPanel] 表头行: ${headerRow}`);
+    bgmLog(LOG_LEVELS.INFO, `[syncFromPanel] 表头行: ${headerRow}`);
     const lastRow = getLastRow(ws);
-    bgmLog(LOG_LEVELS.DEBUG, `[syncFromPanel] 最后一行: ${lastRow}`);
+    bgmLog(LOG_LEVELS.INFO, `[syncFromPanel] 最后一行: ${lastRow}`);
     const colMap = getColumnMap(ws, headerRow);
-    bgmLog(LOG_LEVELS.DEBUG, `[syncFromPanel] 列映射完成，共 ${colMap.size} 列`);
+    bgmLog(LOG_LEVELS.INFO, `[syncFromPanel] 列映射完成，共 ${colMap.size} 列`);
     if (!colMap.has("Bangumi_URL")) {
         bgmLog(LOG_LEVELS.WARN, '[syncFromPanel] 未找到 Bangumi_URL 列');
         showAlert('未找到 "Bangumi URL" 列！');
@@ -329,7 +329,7 @@ export async function syncFromPanel() {
         return;
     }
     // 6. 增量同步开关（提前读取）
-    bgmLog(LOG_LEVELS.DEBUG, '[syncFromPanel] 步骤6: 检查增量同步设置');
+    bgmLog(LOG_LEVELS.INFO, '[syncFromPanel] 步骤6: 检查增量同步设置');
     const incremental = document.getElementById('chkIncremental')?.checked ?? false;
     bgmLog(LOG_LEVELS.INFO, `[syncFromPanel] 增量同步: ${incremental ? '开启' : '关闭'}`);
     // 构建增量同步的指纹映射
@@ -345,18 +345,18 @@ export async function syncFromPanel() {
         bgmLog(LOG_LEVELS.INFO, `[syncFromPanel] 增量同步模式：已加载 ${fingerprintMap.size} 条历史指纹`);
     }
     // 7. 获取同步预览统计（传入增量同步选项）
-    bgmLog(LOG_LEVELS.DEBUG, '[syncFromPanel] 步骤7: 获取同步预览统计');
+    bgmLog(LOG_LEVELS.INFO, '[syncFromPanel] 步骤7: 获取同步预览统计');
     const preview = getSyncPreview(ws, colMap, lastRow, headerRow, { incremental, fingerprintMap });
     bgmLog(LOG_LEVELS.INFO, `[syncFromPanel] 数据预览 - 总行数: ${preview.total}, 有效: ${preview.valid}, 已上传: ${preview.alreadyUploaded}, 待同步: ${preview.willSync}, 跳过: ${preview.willSkip}, 无URL: ${preview.noUrl}, 空状态: ${preview.emptyStatus}, 增量跳过: ${preview.incrementalSkipped}`);
     // 8. 冲突检测与策略
-    bgmLog(LOG_LEVELS.DEBUG, '[syncFromPanel] 步骤8: 冲突检测');
+    bgmLog(LOG_LEVELS.INFO, '[syncFromPanel] 步骤8: 冲突检测');
     const conflictSelect = document.getElementById('conflictStrategy');
     const conflictStrategy = conflictSelect?.value || 'skip';
-    bgmLog(LOG_LEVELS.DEBUG, `[syncFromPanel] 冲突策略: ${conflictStrategy}`);
+    bgmLog(LOG_LEVELS.INFO, `[syncFromPanel] 冲突策略: ${conflictStrategy}`);
     let conflictSids = undefined;
     let conflictMsg = '';
     try {
-        bgmLog(LOG_LEVELS.DEBUG, '[syncFromPanel] 开始检测冲突...');
+        bgmLog(LOG_LEVELS.INFO, '[syncFromPanel] 开始检测冲突...');
         const { conflicts, conflictCount } = await detectConflicts(ws, colMap, lastRow, headerRow, token);
         if (conflictCount > 0) {
             bgmLog(LOG_LEVELS.WARN, `[syncFromPanel] 检测到 ${conflictCount} 条冲突`);
@@ -371,7 +371,7 @@ export async function syncFromPanel() {
             }
         }
         else {
-            bgmLog(LOG_LEVELS.DEBUG, '[syncFromPanel] 未检测到冲突');
+            bgmLog(LOG_LEVELS.INFO, '[syncFromPanel] 未检测到冲突');
         }
     }
     catch (e) {
@@ -379,7 +379,7 @@ export async function syncFromPanel() {
         BGM.handleError(e, { showAlert: false, level: BGM.ErrorLevel.WARN, context: 'syncFromPanel' });
     }
     // 9. 确认对话框
-    bgmLog(LOG_LEVELS.DEBUG, '[syncFromPanel] 步骤9: 显示确认对话框');
+    bgmLog(LOG_LEVELS.INFO, '[syncFromPanel] 步骤9: 显示确认对话框');
     const msg = `数据预览：
             总行数：${preview.total}
             有效条目：${preview.valid}
@@ -401,7 +401,7 @@ export async function syncFromPanel() {
     bgmLog(LOG_LEVELS.INFO, '[syncFromPanel] 步骤10: 开始执行同步');
     showStopButton(); // 显示停止按钮
     try {
-        bgmLog(LOG_LEVELS.DEBUG, '[syncFromPanel] 调用 SyncToBangumiAsync...');
+        bgmLog(LOG_LEVELS.INFO, '[syncFromPanel] 调用 SyncToBangumiAsync...');
         const result = await SyncToBangumiAsync(ws, colMap, token, lastRow, headerRow, {
             skipSids: conflictSids,
             incremental,
@@ -410,7 +410,7 @@ export async function syncFromPanel() {
                 if (app.StatusBar !== undefined) {
                     app.StatusBar = `[${current}/${total}] ${message}`;
                 }
-                bgmLog(LOG_LEVELS.DEBUG, `[syncFromPanel] 同步进度: ${current}/${total} - ${message}`);
+                bgmLog(LOG_LEVELS.INFO, `[syncFromPanel] 同步进度: ${current}/${total} - ${message}`);
             }
         });
         resetProgressBar();
@@ -473,7 +473,7 @@ export function showStopButton() {
         syncBtn.style.display = 'none';
     if (stopBtn)
         stopBtn.style.display = 'inline-block';
-    bgmLog(LOG_LEVELS.DEBUG, '[handlers] 停止按钮已显示，同步按钮已隐藏');
+    bgmLog(LOG_LEVELS.INFO, '[handlers] 停止按钮已显示，同步按钮已隐藏');
 }
 export function hideStopButton() {
     const syncBtn = document.getElementById('syncBtn');
@@ -482,7 +482,7 @@ export function hideStopButton() {
         syncBtn.style.display = 'inline-block';
     if (stopBtn)
         stopBtn.style.display = 'none';
-    bgmLog(LOG_LEVELS.DEBUG, '[handlers] 停止按钮已隐藏，同步按钮已显示');
+    bgmLog(LOG_LEVELS.INFO, '[handlers] 停止按钮已隐藏，同步按钮已显示');
 }
 export function testSingleUpdateFromPanel() {
     if (typeof findHeaderRow !== 'function') {
@@ -511,9 +511,9 @@ export async function syncCollectionFromBgm() {
         bgmLog(LOG_LEVELS.INFO, `[syncCollectionFromBgm] 操作终止（Token未设置），耗时: ${Date.now() - startTime}ms`);
         return;
     }
-    bgmLog(LOG_LEVELS.DEBUG, `[syncCollectionFromBgm] Token 已设置（长度: ${token.length}）`);
+    bgmLog(LOG_LEVELS.INFO, `[syncCollectionFromBgm] Token 已设置（长度: ${token.length}）`);
     try {
-        bgmLog(LOG_LEVELS.DEBUG, '[syncCollectionFromBgm] 调用 syncFromBgmByAPI...');
+        bgmLog(LOG_LEVELS.INFO, '[syncCollectionFromBgm] 调用 syncFromBgmByAPI...');
         await syncFromBgmByAPI(sheetIndex);
         bgmLog(LOG_LEVELS.INFO, `[syncCollectionFromBgm] 同步完成，耗时: ${Date.now() - startTime}ms`);
     }
@@ -687,7 +687,7 @@ function handleActionClick(event) {
     bgmLog(LOG_LEVELS.INFO, `[handleActionClick] ========== 按钮点击事件 ==========`);
     bgmLog(LOG_LEVELS.INFO, `[handleActionClick] 操作类型: ${action}`);
     if (args.length > 0) {
-        bgmLog(LOG_LEVELS.DEBUG, `[handleActionClick] 参数: ${JSON.stringify(args)}`);
+        bgmLog(LOG_LEVELS.INFO, `[handleActionClick] 参数: ${JSON.stringify(args)}`);
     }
     const startTime = Date.now();
     switch (action) {
@@ -711,13 +711,13 @@ function handleActionClick(event) {
             bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 开始刷新数据');
             showConfirm(_T.confirmClearMarks, (confirmed) => {
                 if (confirmed) {
-                    bgmLog(LOG_LEVELS.DEBUG, '[handleActionClick] 用户确认刷新数据');
+                    bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 用户确认刷新数据');
                     if (typeof refreshData === 'function')
                         refreshData();
                     bgmLog(LOG_LEVELS.INFO, `[handleActionClick] 刷新数据完成，耗时: ${Date.now() - startTime}ms`);
                 }
                 else {
-                    bgmLog(LOG_LEVELS.DEBUG, '[handleActionClick] 用户取消刷新数据');
+                    bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 用户取消刷新数据');
                 }
             });
             break;
@@ -836,7 +836,7 @@ function setupMessageListener() {
             const data = event.data;
             if (!data || typeof data !== 'object')
                 return;
-            bgmLog(LOG_LEVELS.DEBUG, '[handlers] 收到消息: ' + JSON.stringify(data));
+            bgmLog(LOG_LEVELS.INFO, '[handlers] 收到消息: ' + JSON.stringify(data));
             switch (data.type) {
                 case 'BGM:tokenUpdated':
                     bgmLog(LOG_LEVELS.INFO, '[handlers] 收到 Token 更新通知');
@@ -848,7 +848,7 @@ function setupMessageListener() {
                     if (data.userId) {
                         BGM.cache.userId = data.userId;
                         _setBgmUserId(data.userId);
-                        bgmLog(LOG_LEVELS.DEBUG, `[handlers] 已更新 BGM.cache.userId: ${BGM.cache.userId}`);
+                        bgmLog(LOG_LEVELS.INFO, `[handlers] 已更新 BGM.cache.userId: ${BGM.cache.userId}`);
                     }
                     updateUserIdStatus();
                     break;
@@ -856,12 +856,12 @@ function setupMessageListener() {
                     bgmLog(LOG_LEVELS.INFO, `[handlers] 收到用户信息更新通知: 用户名=${data.username}, 用户ID=${data.userId}`);
                     if (data.username) {
                         BGM.cache.username = data.username;
-                        bgmLog(LOG_LEVELS.DEBUG, `[handlers] 已更新 BGM.cache.username: ${BGM.cache.username}`);
+                        bgmLog(LOG_LEVELS.INFO, `[handlers] 已更新 BGM.cache.username: ${BGM.cache.username}`);
                     }
                     if (data.userId) {
                         BGM.cache.userId = data.userId;
                         _setBgmUserId(data.userId);
-                        bgmLog(LOG_LEVELS.DEBUG, `[handlers] 已更新 BGM.cache.userId 和用户ID配置: ${BGM.cache.userId}`);
+                        bgmLog(LOG_LEVELS.INFO, `[handlers] 已更新 BGM.cache.userId 和用户ID配置: ${BGM.cache.userId}`);
                     }
                     updateUserIdStatus();
                     break;
@@ -890,22 +890,22 @@ function setupMessageListener() {
                     break;
             }
         });
-        bgmLog(LOG_LEVELS.DEBUG, '[handlers] 消息监听器已注册');
+        bgmLog(LOG_LEVELS.INFO, '[handlers] 消息监听器已注册');
     }
 }
 // ========== 事件监听（用于接收事件总线通知）==========
 function setupEventListeners() {
     eventBus.on(BGM_EVENTS.TOKEN_UPDATED, () => {
-        bgmLog(LOG_LEVELS.DEBUG, '[handlers] 收到 TOKEN_UPDATED 事件');
+        bgmLog(LOG_LEVELS.INFO, '[handlers] 收到 TOKEN_UPDATED 事件');
         updateTokenStatus();
         updateUserIdStatus();
     });
     eventBus.on(BGM_EVENTS.USER_ID_UPDATED, () => {
-        bgmLog(LOG_LEVELS.DEBUG, '[handlers] 收到 USER_ID_UPDATED 事件');
+        bgmLog(LOG_LEVELS.INFO, '[handlers] 收到 USER_ID_UPDATED 事件');
         updateUserIdStatus();
     });
     eventBus.on(BGM_EVENTS.USER_NAME_UPDATED, () => {
-        bgmLog(LOG_LEVELS.DEBUG, '[handlers] 收到 USER_NAME_UPDATED 事件');
+        bgmLog(LOG_LEVELS.INFO, '[handlers] 收到 USER_NAME_UPDATED 事件');
         updateUserIdStatus();
     });
     // 配置更新事件（用于同步增量同步和跳过冲突状态）
@@ -931,8 +931,8 @@ function setupEventListeners() {
 function tryUpdateIncrementalCheckbox(checked, attempts = 0) {
     let chkIncremental = document.getElementById('chkIncremental');
     if (chkIncremental) {
-        bgmLog(LOG_LEVELS.DEBUG, `[handlers] 找到 chkIncremental 元素`);
-        bgmLog(LOG_LEVELS.DEBUG, `[handlers] 当前状态: ${chkIncremental.checked ? '开启' : '关闭'}`);
+        bgmLog(LOG_LEVELS.INFO, `[handlers] 找到 chkIncremental 元素`);
+        bgmLog(LOG_LEVELS.INFO, `[handlers] 当前状态: ${chkIncremental.checked ? '开启' : '关闭'}`);
         chkIncremental.checked = checked;
         bgmLog(LOG_LEVELS.INFO, `[handlers] 增量同步复选框已更新: ${checked ? '开启' : '关闭'}`);
     }
@@ -949,8 +949,8 @@ function tryUpdateSkipConflictsUI(skipConflicts, attempts = 0) {
     bgmLog(LOG_LEVELS.INFO, `[handlers] 目标状态: ${skipConflicts ? '跳过冲突' : 'Excel覆盖'}`);
     let conflictStrategySelect = document.getElementById('conflictStrategy');
     if (conflictStrategySelect) {
-        bgmLog(LOG_LEVELS.DEBUG, `[handlers] 找到 conflictStrategy select 元素`);
-        bgmLog(LOG_LEVELS.DEBUG, `[handlers] 当前值: ${conflictStrategySelect.value}`);
+        bgmLog(LOG_LEVELS.INFO, `[handlers] 找到 conflictStrategy select 元素`);
+        bgmLog(LOG_LEVELS.INFO, `[handlers] 当前值: ${conflictStrategySelect.value}`);
         conflictStrategySelect.value = skipConflicts ? 'skip' : 'excel';
         bgmLog(LOG_LEVELS.INFO, `[handlers] 冲突策略 select 已更新: ${conflictStrategySelect.value}`);
         return;
@@ -968,14 +968,14 @@ function tryUpdateSkipConflictsUI(skipConflicts, attempts = 0) {
     if (skipRadio && overwriteRadio) {
         skipRadio.checked = skipConflicts;
         overwriteRadio.checked = !skipConflicts;
-        bgmLog(LOG_LEVELS.DEBUG, `[handlers] 冲突策略 radio 已更新`);
+        bgmLog(LOG_LEVELS.INFO, `[handlers] 冲突策略 radio 已更新`);
         return;
     }
     // 备用：如果是 checkbox
     const chkSkipConflicts = document.getElementById('chkSkipConflicts');
     if (chkSkipConflicts) {
         chkSkipConflicts.checked = skipConflicts;
-        bgmLog(LOG_LEVELS.DEBUG, `[handlers] 跳过冲突复选框已更新`);
+        bgmLog(LOG_LEVELS.INFO, `[handlers] 跳过冲突复选框已更新`);
     }
 }
 // 确保在 DOM 加载完成且模块初始化后执行
@@ -985,7 +985,7 @@ function initializeListeners() {
         setupMessageListener();
         setupEventListeners();
         initIncrementalSyncFromRibbon();
-        bgmLog(LOG_LEVELS.DEBUG, '[handlers] 所有监听器初始化完成');
+        bgmLog(LOG_LEVELS.INFO, '[handlers] 所有监听器初始化完成');
     }, 100);
 }
 // 从配置读取增量同步状态并初始化 checkbox
@@ -996,7 +996,7 @@ function initIncrementalSyncFromRibbon() {
     try {
         const isIncremental = getIncrementalSync();
         chkIncremental.checked = isIncremental;
-        bgmLog(LOG_LEVELS.DEBUG, `[handlers] 从配置读取增量同步状态: ${isIncremental ? '开启' : '关闭'}`);
+        bgmLog(LOG_LEVELS.INFO, `[handlers] 从配置读取增量同步状态: ${isIncremental ? '开启' : '关闭'}`);
     }
     catch (e) {
         bgmLog(LOG_LEVELS.WARN, `[handlers] 读取增量同步状态失败: ${e.message}`);
@@ -1027,7 +1027,7 @@ function initSkipConflictsFromRibbon() {
     try {
         const skipConflicts = getSkipConflicts();
         tryUpdateSkipConflictsUI(skipConflicts);
-        bgmLog(LOG_LEVELS.DEBUG, `[handlers] 从配置读取跳过冲突状态: ${skipConflicts ? '跳过冲突' : 'Excel覆盖'}`);
+        bgmLog(LOG_LEVELS.INFO, `[handlers] 从配置读取跳过冲突状态: ${skipConflicts ? '跳过冲突' : 'Excel覆盖'}`);
     }
     catch (e) {
         BGM.handleError(e, { showAlert: false, level: BGM.ErrorLevel.WARN, context: 'initSkipConflictsFromRibbon' });
@@ -1049,7 +1049,7 @@ function initSkipConflictsFromRibbon() {
                 bgmLog(LOG_LEVELS.WARN, `[handlers] 冲突策略同步失败`);
             }
         });
-        bgmLog(LOG_LEVELS.DEBUG, `[handlers] 已注册冲突策略 select 变化监听器`);
+        bgmLog(LOG_LEVELS.INFO, `[handlers] 已注册冲突策略 select 变化监听器`);
         return;
     }
     // 备用：查找并监听 radio 按钮
@@ -1059,13 +1059,13 @@ function initSkipConflictsFromRibbon() {
         skipRadio.addEventListener('change', () => {
             if (skipRadio.checked) {
                 setSkipConflicts(true);
-                bgmLog(LOG_LEVELS.DEBUG, `[handlers] 冲突策略已更新: 跳过冲突`);
+                bgmLog(LOG_LEVELS.INFO, `[handlers] 冲突策略已更新: 跳过冲突`);
             }
         });
         overwriteRadio.addEventListener('change', () => {
             if (overwriteRadio.checked) {
                 setSkipConflicts(false);
-                bgmLog(LOG_LEVELS.DEBUG, `[handlers] 冲突策略已更新: Excel覆盖`);
+                bgmLog(LOG_LEVELS.INFO, `[handlers] 冲突策略已更新: Excel覆盖`);
             }
         });
         return;
@@ -1077,7 +1077,7 @@ function initSkipConflictsFromRibbon() {
             const checked = chkSkipConflicts.checked;
             try {
                 setSkipConflicts(checked);
-                bgmLog(LOG_LEVELS.DEBUG, `[handlers] 跳过冲突状态已更新: ${checked ? '跳过冲突' : 'Excel覆盖'}`);
+                bgmLog(LOG_LEVELS.INFO, `[handlers] 跳过冲突状态已更新: ${checked ? '跳过冲突' : 'Excel覆盖'}`);
             }
             catch (e) {
                 bgmLog(LOG_LEVELS.WARN, `[handlers] 更新跳过冲突状态失败: ${e.message}`);

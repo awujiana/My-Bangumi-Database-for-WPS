@@ -72,19 +72,19 @@ export function setConfig(key: string, value: string, notifyRibbon: boolean = tr
     
     if (oldValue !== value) {
         bgmLog(LOG_LEVELS.INFO, `[config] 配置已更新: ${key}`);
-        bgmLog(LOG_LEVELS.DEBUG, `[config]   旧值: ${oldValue || '(空)'}`);
-        bgmLog(LOG_LEVELS.DEBUG, `[config]   新值: ${value}`);
+        bgmLog(LOG_LEVELS.INFO, `[config]   旧值: ${oldValue || '(空)'}`);
+        bgmLog(LOG_LEVELS.INFO, `[config]   新值: ${value}`);
     } else {
-        bgmLog(LOG_LEVELS.DEBUG, `[config] 配置值未变化: ${key} = ${value}`);
+        bgmLog(LOG_LEVELS.INFO, `[config] 配置值未变化: ${key} = ${value}`);
     }
 
     // 触发内部事件
-    bgmLog(LOG_LEVELS.DEBUG, `[config] 触发内部事件: ${BGM_EVENTS.CONFIG_UPDATED}`);
+    bgmLog(LOG_LEVELS.INFO, `[config] 触发内部事件: ${BGM_EVENTS.CONFIG_UPDATED}`);
     eventBus.emit(BGM_EVENTS.CONFIG_UPDATED, { key, value });
 
     // 通知 Ribbon
     if (notifyRibbon) {
-        bgmLog(LOG_LEVELS.DEBUG, `[config] 准备向 Ribbon 发送通知`);
+        bgmLog(LOG_LEVELS.INFO, `[config] 准备向 Ribbon 发送通知`);
         sendConfigUpdateToRibbon(key, value);
     }
 
@@ -105,7 +105,7 @@ export function getConfig(key: string, defaultValue: string = ''): string {
 
     const value = storage.getItem(key);
     const result = value !== null ? value : defaultValue;
-    bgmLog(LOG_LEVELS.DEBUG, `[config] 获取配置: ${key} = ${result}`);
+    bgmLog(LOG_LEVELS.INFO, `[config] 获取配置: ${key} = ${result}`);
     return result;
 }
 
@@ -125,11 +125,11 @@ export function removeConfig(key: string): boolean {
     bgmLog(LOG_LEVELS.INFO, `[config] 配置已删除: ${key} (原值: ${oldValue || '(空)'})`);
 
     // 触发内部事件
-    bgmLog(LOG_LEVELS.DEBUG, `[config] 触发内部事件: ${BGM_EVENTS.CONFIG_UPDATED}`);
+    bgmLog(LOG_LEVELS.INFO, `[config] 触发内部事件: ${BGM_EVENTS.CONFIG_UPDATED}`);
     eventBus.emit(BGM_EVENTS.CONFIG_UPDATED, { key, value: '' });
 
     // 通知 Ribbon
-    bgmLog(LOG_LEVELS.DEBUG, `[config] 准备向 Ribbon 发送删除通知`);
+    bgmLog(LOG_LEVELS.INFO, `[config] 准备向 Ribbon 发送删除通知`);
     sendConfigUpdateToRibbon(key, '');
 
     return true;
@@ -146,10 +146,10 @@ export function sendConfigUpdateToRibbon(key: string, value: string): void {
             type: CONFIG_MESSAGE_TYPES.CONFIG_UPDATED,
             data: { key, value }
         };
-        bgmLog(LOG_LEVELS.DEBUG, `[config] postMessage 发送中...`);
-        bgmLog(LOG_LEVELS.DEBUG, `[config]   目标: window.parent`);
-        bgmLog(LOG_LEVELS.DEBUG, `[config]   消息类型: ${message.type}`);
-        bgmLog(LOG_LEVELS.DEBUG, `[config]   数据: ${JSON.stringify(message.data)}`);
+        bgmLog(LOG_LEVELS.INFO, `[config] postMessage 发送中...`);
+        bgmLog(LOG_LEVELS.INFO, `[config]   目标: window.parent`);
+        bgmLog(LOG_LEVELS.INFO, `[config]   消息类型: ${message.type}`);
+        bgmLog(LOG_LEVELS.INFO, `[config]   数据: ${JSON.stringify(message.data)}`);
         
         window.parent.postMessage(message, '*');
         
@@ -169,9 +169,9 @@ export function sendSyncProgressToRibbon(progress: SyncProgressData): void {
             type: CONFIG_MESSAGE_TYPES.SYNC_PROGRESS,
             data: progress
         };
-        bgmLog(LOG_LEVELS.DEBUG, `[config] postMessage 发送同步进度...`);
-        bgmLog(LOG_LEVELS.DEBUG, `[config]   进度: ${progress.current}/${progress.total}`);
-        bgmLog(LOG_LEVELS.DEBUG, `[config]   消息: ${progress.message || '(无)'}`);
+        bgmLog(LOG_LEVELS.INFO, `[config] postMessage 发送同步进度...`);
+        bgmLog(LOG_LEVELS.INFO, `[config]   进度: ${progress.current}/${progress.total}`);
+        bgmLog(LOG_LEVELS.INFO, `[config]   消息: ${progress.message || '(无)'}`);
         
         window.parent.postMessage(message, '*');
         
@@ -187,7 +187,7 @@ export function sendSyncProgressToRibbon(progress: SyncProgressData): void {
  */
 export function listenToRibbonConfigUpdates(callback: (data: ConfigUpdateData) => void): void {
     const handler = (event: MessageEvent) => {
-        bgmLog(LOG_LEVELS.DEBUG, `[config] 收到 postMessage: ${event.data?.type || '(未知类型)'}`);
+        bgmLog(LOG_LEVELS.INFO, `[config] 收到 postMessage: ${event.data?.type || '(未知类型)'}`);
         
         if (event.data?.type === CONFIG_MESSAGE_TYPES.CONFIG_UPDATED) {
             const data = event.data.data as ConfigUpdateData;
@@ -197,7 +197,7 @@ export function listenToRibbonConfigUpdates(callback: (data: ConfigUpdateData) =
             
             callback(data);
         } else if (event.data?.type === CONFIG_MESSAGE_TYPES.SYNC_PROGRESS) {
-            bgmLog(LOG_LEVELS.DEBUG, `[config] 收到同步进度通知: ${event.data.data?.current}/${event.data.data?.total}`);
+            bgmLog(LOG_LEVELS.INFO, `[config] 收到同步进度通知: ${event.data.data?.current}/${event.data.data?.total}`);
         }
     };
 
@@ -218,7 +218,7 @@ export function setIncrementalSync(enabled: boolean): boolean {
  */
 export function getIncrementalSync(): boolean {
     const result = getConfig(CONFIG_KEYS.INCREMENTAL_SYNC) === 'true';
-    bgmLog(LOG_LEVELS.DEBUG, `[config] 获取增量同步状态: ${result ? '开启' : '关闭'}`);
+    bgmLog(LOG_LEVELS.INFO, `[config] 获取增量同步状态: ${result ? '开启' : '关闭'}`);
     return result;
 }
 
@@ -235,6 +235,6 @@ export function setSkipConflicts(enabled: boolean): boolean {
  */
 export function getSkipConflicts(): boolean {
     const result = getConfig(CONFIG_KEYS.SKIP_CONFLICTS) === 'true';
-    bgmLog(LOG_LEVELS.DEBUG, `[config] 获取跳过冲突状态: ${result ? '开启' : '关闭'}`);
+    bgmLog(LOG_LEVELS.INFO, `[config] 获取跳过冲突状态: ${result ? '开启' : '关闭'}`);
     return result;
 }

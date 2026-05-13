@@ -17,13 +17,14 @@
  * @property {number} WARN - 输出警告信息
  * @property {number} ERROR - 输出错误信息
  * @property {number} THROW - 抛出异常
+ * @property {number} INFO - 输出信息级日志
  */
 export const ErrorLevel = {
     SILENT: 0,
     WARN: 1,
     ERROR: 2,
     THROW: 3,
-    DEBUG: 4
+    INFO: 4,
 };
 /**
  * WPS Office 枚举值集合
@@ -130,8 +131,6 @@ export const BGM_COLOR = {
  * @type {Object}
  */
 export const LOG_LEVELS = {
-    /** 调试级别 - 详细信息，通常用于开发调试 */
-    DEBUG: 0,
     /** 信息级别 - 一般操作信息 */
     INFO: 1,
     /** 警告级别 - 潜在问题提示 */
