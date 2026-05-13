@@ -765,6 +765,8 @@ export {
 
 
 // ========== 挂载到 window ==========
+(window as any).initPanel = initPanel;
+
 function safeInitPanel(): void {
     try { initPanel(); }
     catch (e: any) {

@@ -704,6 +704,7 @@ function initPanel() {
 // ========== 导出 ==========
 export { initPanel, refreshSheets, refreshData, toggleSheetLock, onSelectModeChange, markUploadedItems, autoDetectSheet, updateFilterStatus };
 // ========== 挂载到 window ==========
+window.initPanel = initPanel;
 function safeInitPanel() {
     try {
         initPanel();
