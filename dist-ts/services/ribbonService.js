@@ -1,5 +1,5 @@
 // ts/services/ribbonService.ts
-import { bgmLog, BGM, wpsMsgBox, loadBgToken, storeBgToken, getDataSheet, findHeaderRow, getLastRow, getColumnMap, extractSubjectId, mapWatchStatus, readCell, getCellValue, readRangeValues, getFilterStatus, BGM_COLOR, LOG_LEVELS, SyncToBangumiAsync, openUserCollection, testTokenValidityForRibbon, fetchAllUserCollections, getCell, trim, calcFingerprint } from '../index.js';
+import { bgmLog, BGM, wpsMsgBox, loadBgToken, storeBgToken, getDataSheet, findHeaderRow, getLastRow, getColumnMap, extractSubjectId, mapWatchStatus, readCell, getCellValue, readRangeValues, getFilterStatus, BGM_COLOR, LOG_LEVELS, SyncToBangumiAsync, _getBgmUserId, testTokenValidityForRibbon, fetchAllUserCollections, getCell, trim, calcFingerprint } from '../index.js';
 /**
  * 获取同步预览统计（不发送请求，仅扫描 Excel）
  * @param ws 工作表对象
@@ -351,10 +351,24 @@ export function setUserIdForRibbon() {
         app?.MessageBox?.('用户 ID 已保存', 0, 64);
     }
 }
-/** 打开收藏页面 */
+/** 打开收藏页面（Ribbon 版本） */
 export function openCollectionForRibbon() {
+    const startTime = Date.now();
     bgmLog(LOG_LEVELS.INFO, '[openCollectionForRibbon] ========== Ribbon 打开收藏页面 ==========');
-    bgmLog(LOG_LEVELS.INFO, '[openCollectionForRibbon] 调用 openUserCollection(true)');
-    openUserCollection(true);
-    bgmLog(LOG_LEVELS.INFO, '[openCollectionForRibbon] openUserCollection() 执行完成');
+    const app = window.Application;
+    if (!app) {
+        bgmLog(LOG_LEVELS.ERROR, '[openCollectionForRibbon] 无法获取 Application 对象');
+        return;
+    }
+    const userId = _getBgmUserId();
+    bgmLog(LOG_LEVELS.DEBUG, `[openCollectionForRibbon] 获取用户ID: ${userId || '(未设置)'}`);
+    if (!userId) {
+        bgmLog(LOG_LEVELS.ERROR, '[openCollectionForRibbon] 用户ID未设置');
+        app.MessageBox?.('请先设置用户ID！', 0, 48);
+        return;
+    }
+    const collectionUrl = `https://bgm.tv/user/${userId}/collection`;
+    bgmLog(LOG_LEVELS.INFO, `[openCollectionForRibbon] 打开收藏页面: ${collectionUrl}`);
+    window.open(collectionUrl, '_blank');
+    bgmLog(LOG_LEVELS.INFO, `[openCollectionForRibbon] 完成，耗时: ${Date.now() - startTime}ms`);
 }

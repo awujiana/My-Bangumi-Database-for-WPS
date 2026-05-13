@@ -13,9 +13,10 @@ import {
     getLastRow, extractSubjectId, getDataSheet, getFilterStatus,
     getSequentialRowsBySeqCol, SyncToBangumiAsync,
     testSingleUpdate, getOrCreateSyncRecordSheet, getAllSyncRecords,
-    addSyncRecord, openSyncRecordSheet,
+    addSyncRecord, openSyncRecordSheet,wpsMsgBox,
     previewSyncContent, refreshData,refreshSheets,toggleSheetLock ,clearSyncRecords,
-    closeDetailModal, 
+    closeDetailModal,
+    getIncrementalSync, setIncrementalSync,
 } from '../index.js';5
 import{BGM_EVENTS, eventBus} from '../tools/events.js';
 
@@ -152,7 +153,7 @@ export function updateUserIdStatus(): void {
     }
 }
 
-export function openUserCollection(isRibbon: boolean = false): void {
+export function openUserCollection(): void {
     const startTime = Date.now();
     bgmLog(LOG_LEVELS.INFO, '[openUserCollection] ========== 打开用户收藏页面 ==========');
 
@@ -161,21 +162,14 @@ export function openUserCollection(isRibbon: boolean = false): void {
 
     if (!userId) {
         bgmLog(LOG_LEVELS.ERROR, '[openUserCollection] 用户ID未设置，无法打开收藏页面');
-        if (isRibbon) {
-            const app = getApp();
-            app?.MessageBox?.('请先设置用户ID！' , 48);
-        } else {
             showAlert(_T.pleaseSetUserIdFirst);
-        }
         return;
     }
 
     const collectionUrl = `https://bgm.tv/user/${userId}/collection`;
     bgmLog(LOG_LEVELS.INFO, `[openUserCollection] 生成收藏页面URL: ${collectionUrl}`);
-
     bgmLog(LOG_LEVELS.INFO, `[openUserCollection] 正在打开收藏页面...`);
     window.open(collectionUrl, '_blank');
-
     bgmLog(LOG_LEVELS.INFO, `[openUserCollection] 收藏页面已在新标签页打开，耗时: ${Date.now() - startTime}ms`);
 }
 
@@ -970,28 +964,27 @@ function initializeListeners(): void {
     }, 100);
 }
 
-// 从 Ribbon 读取增量同步状态并初始化 checkbox
+// 从配置读取增量同步状态并初始化 checkbox
 function initIncrementalSyncFromRibbon(): void {
-    const app = (window as any).Application;
     const chkIncremental = document.getElementById('chkIncremental') as HTMLInputElement;
     if (!chkIncremental) return;
 
     try {
-        const isIncremental = app?.PluginStorage?.getItem('bgm_incremental_sync') === 'true';
+        const isIncremental = getIncrementalSync();
         chkIncremental.checked = isIncremental;
-        bgmLog(LOG_LEVELS.DEBUG, `[handlers] 从 Ribbon 读取增量同步状态: ${isIncremental ? '开启' : '关闭'}`);
+        bgmLog(LOG_LEVELS.DEBUG, `[handlers] 从配置读取增量同步状态: ${isIncremental ? '开启' : '关闭'}`);
     } catch (e: any) {
         bgmLog(LOG_LEVELS.WARN, `[handlers] 读取增量同步状态失败: ${e.message}`);
     }
 
-    // 监听 checkbox 变化，同步到 PluginStorage
+    // 监听 checkbox 变化，同步到配置
     chkIncremental.addEventListener('change', () => {
         const checked = chkIncremental.checked;
         try {
-            app?.PluginStorage?.setItem('bgm_incremental_sync', checked ? 'true' : 'false');
-            bgmLog(LOG_LEVELS.DEBUG, `[handlers] 增量同步状态已同步到 Ribbon: ${checked ? '开启' : '关闭'}`);
+            setIncrementalSync(checked);
+            bgmLog(LOG_LEVELS.DEBUG, `[handlers] 增量同步状态已更新: ${checked ? '开启' : '关闭'}`);
         } catch (e: any) {
-            bgmLog(LOG_LEVELS.WARN, `[handlers] 同步增量同步状态失败: ${e.message}`);
+            bgmLog(LOG_LEVELS.WARN, `[handlers] 更新增量同步状态失败: ${e.message}`);
         }
     });
 }

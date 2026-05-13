@@ -3,7 +3,7 @@
  * @module ui/handlers
  * @description 面板操作处理、按钮绑定、业务对话框
  */
-import { LOG_LEVELS, bgmLog, BGM, loadBgToken, storeBgToken, _getBgmUserId, _setBgmUserId, getApp, getCell, trim, fetchBgmUserInfo, BGM_COLOR, showAlert, showConfirm, showError, showSuccess, showInput, showToast, setStatus, verifyToken, fetchAllUserCollections, findHeaderRow, getColumnMap, getLastRow, extractSubjectId, getDataSheet, getFilterStatus, SyncToBangumiAsync, testSingleUpdate, getOrCreateSyncRecordSheet, getAllSyncRecords, addSyncRecord, openSyncRecordSheet, previewSyncContent, refreshData, refreshSheets, toggleSheetLock, clearSyncRecords, closeDetailModal, } from '../index.js';
+import { LOG_LEVELS, bgmLog, BGM, loadBgToken, storeBgToken, _getBgmUserId, _setBgmUserId, getApp, getCell, trim, fetchBgmUserInfo, BGM_COLOR, showAlert, showConfirm, showError, showSuccess, showInput, showToast, setStatus, verifyToken, fetchAllUserCollections, findHeaderRow, getColumnMap, getLastRow, extractSubjectId, getDataSheet, getFilterStatus, SyncToBangumiAsync, testSingleUpdate, getOrCreateSyncRecordSheet, getAllSyncRecords, addSyncRecord, openSyncRecordSheet, previewSyncContent, refreshData, refreshSheets, toggleSheetLock, clearSyncRecords, closeDetailModal, getIncrementalSync, setIncrementalSync, } from '../index.js';
 5;
 import { BGM_EVENTS, eventBus } from '../tools/events.js';
 //  
@@ -119,20 +119,14 @@ export function updateUserIdStatus() {
         userIdStatus.style.color = '#f44336';
     }
 }
-export function openUserCollection(isRibbon = false) {
+export function openUserCollection() {
     const startTime = Date.now();
     bgmLog(LOG_LEVELS.INFO, '[openUserCollection] ========== 打开用户收藏页面 ==========');
     const userId = _getBgmUserId();
     bgmLog(LOG_LEVELS.DEBUG, `[openUserCollection] 获取用户ID: ${userId || '(未设置)'}`);
     if (!userId) {
         bgmLog(LOG_LEVELS.ERROR, '[openUserCollection] 用户ID未设置，无法打开收藏页面');
-        if (isRibbon) {
-            const app = getApp();
-            app?.MessageBox?.('请先设置用户ID！', 48);
-        }
-        else {
-            showAlert(_T.pleaseSetUserIdFirst);
-        }
+        showAlert(_T.pleaseSetUserIdFirst);
         return;
     }
     const collectionUrl = `https://bgm.tv/user/${userId}/collection`;
@@ -900,29 +894,28 @@ function initializeListeners() {
         bgmLog(LOG_LEVELS.DEBUG, '[handlers] 所有监听器初始化完成');
     }, 100);
 }
-// 从 Ribbon 读取增量同步状态并初始化 checkbox
+// 从配置读取增量同步状态并初始化 checkbox
 function initIncrementalSyncFromRibbon() {
-    const app = window.Application;
     const chkIncremental = document.getElementById('chkIncremental');
     if (!chkIncremental)
         return;
     try {
-        const isIncremental = app?.PluginStorage?.getItem('bgm_incremental_sync') === 'true';
+        const isIncremental = getIncrementalSync();
         chkIncremental.checked = isIncremental;
-        bgmLog(LOG_LEVELS.DEBUG, `[handlers] 从 Ribbon 读取增量同步状态: ${isIncremental ? '开启' : '关闭'}`);
+        bgmLog(LOG_LEVELS.DEBUG, `[handlers] 从配置读取增量同步状态: ${isIncremental ? '开启' : '关闭'}`);
     }
     catch (e) {
         bgmLog(LOG_LEVELS.WARN, `[handlers] 读取增量同步状态失败: ${e.message}`);
     }
-    // 监听 checkbox 变化，同步到 PluginStorage
+    // 监听 checkbox 变化，同步到配置
     chkIncremental.addEventListener('change', () => {
         const checked = chkIncremental.checked;
         try {
-            app?.PluginStorage?.setItem('bgm_incremental_sync', checked ? 'true' : 'false');
-            bgmLog(LOG_LEVELS.DEBUG, `[handlers] 增量同步状态已同步到 Ribbon: ${checked ? '开启' : '关闭'}`);
+            setIncrementalSync(checked);
+            bgmLog(LOG_LEVELS.DEBUG, `[handlers] 增量同步状态已更新: ${checked ? '开启' : '关闭'}`);
         }
         catch (e) {
-            bgmLog(LOG_LEVELS.WARN, `[handlers] 同步增量同步状态失败: ${e.message}`);
+            bgmLog(LOG_LEVELS.WARN, `[handlers] 更新增量同步状态失败: ${e.message}`);
         }
     });
 }

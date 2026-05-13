@@ -46,6 +46,6 @@ export declare function setTokenForRibbon(): Promise<boolean>;
 export declare function testTokenForRibbon(): void;
 /** 设置用户 ID（Ribbon 版本） */
 export declare function setUserIdForRibbon(): void;
-/** 打开收藏页面 */
+/** 打开收藏页面（Ribbon 版本） */
 export declare function openCollectionForRibbon(): void;
 //# sourceMappingURL=ribbonService.d.ts.map

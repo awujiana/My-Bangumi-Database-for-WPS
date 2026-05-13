@@ -7,122 +7,63 @@
 export type EventHandler = (data?: any) => void;
 /**
  * 事件总线类
- * 实现发布-订阅模式，支持多个订阅者订阅同一事件
- *
- * @class EventBus
- *
- * @example
- * // 订阅事件
- * const unsubscribe = eventBus.on('sync:complete', (data) => {
- *     console.log('同步完成:', data);
- * });
- *
- * // 发布事件
- * eventBus.emit('sync:complete', { success: 10, fail: 2 });
- *
- * // 退订
- * unsubscribe();
+ * @class
  */
 export declare class EventBus {
-    /**
-     * 事件存储
-     * @private
-     * @type {Map<string, EventEntry[]>}
-     */
     private events;
+    constructor();
     /**
      * 订阅事件
-     *
-     * @method on
-     * @param {string} event - 事件名称
+     * @param {string} eventName - 事件名称
      * @param {EventHandler} handler - 事件处理器
-     * @returns {() => void} 退订函数
-     *
-     * @example
-     * const unsubscribe = eventBus.on('user:login', (user) => {
-     *     console.log('用户登录:', user);
-     * });
+     * @param {boolean} [once=false] - 是否只触发一次
      */
-    on(event: string, handler: EventHandler): () => void;
+    on(eventName: string, handler: EventHandler, once?: boolean): void;
+    /**
+     * 订阅事件（只触发一次）
+     * @param {string} eventName - 事件名称
+     * @param {EventHandler} handler - 事件处理器
+     */
+    once(eventName: string, handler: EventHandler): void;
     /**
      * 退订事件
-     *
-     * @method off
-     * @param {string} event - 事件名称
-     * @param {EventHandler} handler - 要移除的事件处理器
+     * @param {string} eventName - 事件名称
+     * @param {EventHandler} [handler] - 事件处理器（不传则移除所有）
      */
-    off(event: string, handler: EventHandler): void;
+    off(eventName: string, handler?: EventHandler): void;
     /**
      * 发布事件
-     *
-     * @method emit
-     * @param {string} event - 事件名称
+     * @param {string} eventName - 事件名称
      * @param {any} [data] - 事件数据
-     *
-     * @example
-     * eventBus.emit('sync:progress', { current: 5, total: 10 });
      */
-    emit(event: string, data?: any): void;
+    emit(eventName: string, data?: any): void;
     /**
-     * 单次订阅
-     * 事件触发一次后自动退订
-     *
-     * @method once
-     * @param {string} event - 事件名称
-     * @param {EventHandler} handler - 事件处理器
-     * @returns {() => void} 退订函数
-     *
-     * @example
-     * eventBus.once('app:ready', () => {
-     *     console.log('应用已就绪');
-     * });
+     * 检查是否有指定事件的订阅者
+     * @param {string} eventName - 事件名称
+     * @returns {boolean}
      */
-    once(event: string, handler: EventHandler): () => void;
+    has(eventName: string): boolean;
     /**
-     * 清除所有事件订阅
-     *
-     * @method clear
+     * 获取指定事件的订阅者数量
+     * @param {string} eventName - 事件名称
+     * @returns {number}
+     */
+    listenerCount(eventName: string): number;
+    /**
+     * 清空所有事件
      */
     clear(): void;
-    /**
-     * 清除特定事件的所有订阅
-     *
-     * @method clearEvent
-     * @param {string} event - 事件名称
-     */
-    clearEvent(event: string): void;
-    /**
-     * 获取事件订阅数量
-     *
-     * @method listenerCount
-     * @param {string} event - 事件名称
-     * @returns {number} 订阅数量
-     */
-    listenerCount(event: string): number;
 }
-/**
- * 全局事件总线实例
- *
- * @constant
- * @type {EventBus}
- *
- * @description
- * 预定义事件列表：
- * - sync:start - 开始同步
- * - sync:progress - 同步进度更新
- * - sync:complete - 同步完成
- * - sync:error - 同步出错
- * - token:updated - Token更新
- * - userid:updated - UserID更新
- * - panel:ready - 面板就绪
- */
-export declare const eventBus: EventBus;
-export declare const EVENTS: {
+export declare const BANGUMI_EVENTS: {
+    readonly LOGIN_SUCCESS: "login:success";
+    readonly LOGIN_FAILED: "login:failed";
+    readonly LOGOUT: "logout";
     readonly SYNC_START: "sync:start";
+    readonly SYNC_END: "sync:end";
     readonly SYNC_PROGRESS: "sync:progress";
-    readonly SYNC_COMPLETE: "sync:complete";
     readonly SYNC_ERROR: "sync:error";
-    readonly TOKEN_UPDATED: "token:updated";
+    readonly COLLECTION_UPDATED: "collection:updated";
+    readonly SETTINGS_CHANGED: "settings:changed";
     readonly USERID_UPDATED: "userid:updated";
     readonly PANEL_READY: "panel:ready";
 };
@@ -135,5 +76,7 @@ export declare const BGM_EVENTS: {
     readonly SYNC_ERROR: "sync:error";
     readonly SHEET_LOCKED: "sheet:locked";
     readonly SHEET_UNLOCKED: "sheet:unlocked";
+    readonly CONFIG_UPDATED: "config:updated";
 };
+export declare const eventBus: EventBus;
 //# sourceMappingURL=events.d.ts.map

@@ -176,6 +176,22 @@ GetUrlPath,
 // 计算数据指纹（用于缓存）
 calcFingerprint } from './tools/util.js';
 // ============================================================================
+// 12. 配置管理模块（来自 tools/config.js）
+// ============================================================================
+export { 
+// 配置键名常量
+CONFIG_KEYS, 
+// 消息类型常量
+CONFIG_MESSAGE_TYPES, 
+// 配置操作函数
+setConfig, getConfig, removeConfig, 
+// 增量同步配置
+setIncrementalSync, getIncrementalSync, 
+// 跳过冲突配置
+setSkipConflicts, getSkipConflicts, 
+// 通知函数
+sendConfigUpdateToRibbon, sendSyncProgressToRibbon, listenToRibbonConfigUpdates, } from './tools/config.js';
+// ============================================================================
 // 12. 页面逻辑（来自 taskpane.js）
 // ============================================================================
 export { refreshSheets, toggleSheetLock, 

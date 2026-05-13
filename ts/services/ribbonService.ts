@@ -4,7 +4,7 @@ import {
     getDataSheet, findHeaderRow, getLastRow, getColumnMap,
     extractSubjectId, mapWatchStatus, readCell, getCellValue,
     readRangeValues, getFilterStatus, BGM_COLOR, LOG_LEVELS,
-    SyncToBangumiAsync, openUserCollection,
+    SyncToBangumiAsync, openUserCollection,_getBgmUserId,
     testTokenValidityForRibbon, fetchAllUserCollections,
     type WpsRange, getCell, trim, getAllSyncRecords, calcFingerprint
 } from '../index.js';
@@ -386,10 +386,28 @@ export function setUserIdForRibbon() {
     }
 }
 
-/** 打开收藏页面 */
-export function openCollectionForRibbon() {
+/** 打开收藏页面（Ribbon 版本） */
+export function openCollectionForRibbon(): void {
+    const startTime = Date.now();
     bgmLog(LOG_LEVELS.INFO, '[openCollectionForRibbon] ========== Ribbon 打开收藏页面 ==========');
-    bgmLog(LOG_LEVELS.INFO, '[openCollectionForRibbon] 调用 openUserCollection(true)');
-    openUserCollection(true);
-    bgmLog(LOG_LEVELS.INFO, '[openCollectionForRibbon] openUserCollection() 执行完成');
+    
+    const app = (window as any).Application;
+    if (!app) {
+        bgmLog(LOG_LEVELS.ERROR, '[openCollectionForRibbon] 无法获取 Application 对象');
+        return;
+    }
+
+    const userId = _getBgmUserId();
+    bgmLog(LOG_LEVELS.DEBUG, `[openCollectionForRibbon] 获取用户ID: ${userId || '(未设置)'}`);
+    
+    if (!userId) {
+        bgmLog(LOG_LEVELS.ERROR, '[openCollectionForRibbon] 用户ID未设置');
+        app.MessageBox?.('请先设置用户ID！', 0, 48);
+        return;
+    }
+    
+    const collectionUrl = `https://bgm.tv/user/${userId}/collection`;
+    bgmLog(LOG_LEVELS.INFO, `[openCollectionForRibbon] 打开收藏页面: ${collectionUrl}`);
+    window.open(collectionUrl, '_blank');
+    bgmLog(LOG_LEVELS.INFO, `[openCollectionForRibbon] 完成，耗时: ${Date.now() - startTime}ms`);
 }

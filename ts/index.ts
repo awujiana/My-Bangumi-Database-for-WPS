@@ -260,6 +260,30 @@ export {
     calcFingerprint
 } from './tools/util.js';
 
+// ============================================================================
+// 12. 配置管理模块（来自 tools/config.js）
+// ============================================================================
+export {
+    // 配置键名常量
+    CONFIG_KEYS,
+    // 消息类型常量
+    CONFIG_MESSAGE_TYPES,
+    // 配置操作函数
+    setConfig,
+    getConfig,
+    removeConfig,
+    // 增量同步配置
+    setIncrementalSync,
+    getIncrementalSync,
+    // 跳过冲突配置
+    setSkipConflicts,
+    getSkipConflicts,
+    // 通知函数
+    sendConfigUpdateToRibbon,
+    sendSyncProgressToRibbon,
+    listenToRibbonConfigUpdates,
+} from './tools/config.js';
+
 // ========== BGM 缓存数据结构 ==========
 export interface BGMCache {
     /** WPS 文档总行数缓存 */

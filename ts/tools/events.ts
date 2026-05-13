@@ -18,200 +18,126 @@ export type EventHandler = (data?: any) => void;
 
 /**
  * 事件条目接口
- *
- * @interface EventEntry
  */
 interface EventEntry {
-    /** 事件处理器 */
     handler: EventHandler;
-    /** 是否为单次订阅 */
-    once: boolean;
+    once?: boolean;
 }
 
 /**
  * 事件总线类
- * 实现发布-订阅模式，支持多个订阅者订阅同一事件
- *
- * @class EventBus
- *
- * @example
- * // 订阅事件
- * const unsubscribe = eventBus.on('sync:complete', (data) => {
- *     console.log('同步完成:', data);
- * });
- *
- * // 发布事件
- * eventBus.emit('sync:complete', { success: 10, fail: 2 });
- *
- * // 退订
- * unsubscribe();
+ * @class
  */
 export class EventBus {
-    /**
-     * 事件存储
-     * @private
-     * @type {Map<string, EventEntry[]>}
-     */
-    private events: Map<string, EventEntry[]> = new Map();
+    private events: Map<string, EventEntry[]>;
+
+    constructor() {
+        this.events = new Map();
+    }
 
     /**
      * 订阅事件
-     *
-     * @method on
-     * @param {string} event - 事件名称
+     * @param {string} eventName - 事件名称
      * @param {EventHandler} handler - 事件处理器
-     * @returns {() => void} 退订函数
-     *
-     * @example
-     * const unsubscribe = eventBus.on('user:login', (user) => {
-     *     console.log('用户登录:', user);
-     * });
+     * @param {boolean} [once=false] - 是否只触发一次
      */
-    on(event: string, handler: EventHandler): () => void {
-        if (!this.events.has(event)) {
-            this.events.set(event, []);
+    on(eventName: string, handler: EventHandler, once: boolean = false): void {
+        if (!this.events.has(eventName)) {
+            this.events.set(eventName, []);
         }
+        this.events.get(eventName)!.push({ handler, once });
+    }
 
-        const entry: EventEntry = { handler, once: false };
-        this.events.get(event)!.push(entry);
-
-        // 返回退订函数
-        return () => this.off(event, handler);
+    /**
+     * 订阅事件（只触发一次）
+     * @param {string} eventName - 事件名称
+     * @param {EventHandler} handler - 事件处理器
+     */
+    once(eventName: string, handler: EventHandler): void {
+        this.on(eventName, handler, true);
     }
 
     /**
      * 退订事件
-     *
-     * @method off
-     * @param {string} event - 事件名称
-     * @param {EventHandler} handler - 要移除的事件处理器
+     * @param {string} eventName - 事件名称
+     * @param {EventHandler} [handler] - 事件处理器（不传则移除所有）
      */
-    off(event: string, handler: EventHandler): void {
-        const entries = this.events.get(event);
-        if (!entries) return;
+    off(eventName: string, handler?: EventHandler): void {
+        const handlers = this.events.get(eventName);
+        if (!handlers) return;
 
-        const index = entries.findIndex(e => e.handler === handler);
-        if (index !== -1) {
-            entries.splice(index, 1);
+        if (handler) {
+            const index = handlers.findIndex(h => h.handler === handler);
+            if (index !== -1) {
+                handlers.splice(index, 1);
+            }
+        } else {
+            this.events.delete(eventName);
         }
     }
 
     /**
      * 发布事件
-     *
-     * @method emit
-     * @param {string} event - 事件名称
+     * @param {string} eventName - 事件名称
      * @param {any} [data] - 事件数据
-     *
-     * @example
-     * eventBus.emit('sync:progress', { current: 5, total: 10 });
      */
-    emit(event: string, data?: any): void {
-        const entries = this.events.get(event);
-        if (!entries) return;
+    emit(eventName: string, data?: any): void {
+        const handlers = this.events.get(eventName);
+        if (!handlers || handlers.length === 0) return;
 
-        // 复制一份，防止订阅/退订影响当前执行
-        const entriesCopy = [...entries];
-
-        for (const entry of entriesCopy) {
+        // 创建副本以防止在处理过程中被修改
+        const handlersCopy = [...handlers];
+        for (const entry of handlersCopy) {
             try {
                 entry.handler(data);
-            } catch (e: any) {
-                BGM.handleError(e, { context: 'emit', showAlert: false });
+            } catch (error) {
+                console.error(`Error handling event "${eventName}":`, error);
             }
-
-            // 如果是单次订阅，处理后移除
-            if (entry.once) {                
-            }
-
-            // 如果是单次订阅，处理后移除
             if (entry.once) {
-                this.off(event, entry.handler);
+                this.off(eventName, entry.handler);
             }
         }
     }
 
     /**
-     * 单次订阅
-     * 事件触发一次后自动退订
-     *
-     * @method once
-     * @param {string} event - 事件名称
-     * @param {EventHandler} handler - 事件处理器
-     * @returns {() => void} 退订函数
-     *
-     * @example
-     * eventBus.once('app:ready', () => {
-     *     console.log('应用已就绪');
-     * });
+     * 检查是否有指定事件的订阅者
+     * @param {string} eventName - 事件名称
+     * @returns {boolean}
      */
-    once(event: string, handler: EventHandler): () => void {
-        if (!this.events.has(event)) {
-            this.events.set(event, []);
-        }
-
-        const entry: EventEntry = { handler, once: true };
-        this.events.get(event)!.push(entry);
-
-        return () => this.off(event, handler);
+    has(eventName: string): boolean {
+        const handlers = this.events.get(eventName);
+        return !!(handlers && handlers.length > 0);
     }
 
     /**
-     * 清除所有事件订阅
-     *
-     * @method clear
+     * 获取指定事件的订阅者数量
+     * @param {string} eventName - 事件名称
+     * @returns {number}
+     */
+    listenerCount(eventName: string): number {
+        const handlers = this.events.get(eventName);
+        return handlers?.length || 0;
+    }
+
+    /**
+     * 清空所有事件
      */
     clear(): void {
         this.events.clear();
     }
-
-    /**
-     * 清除特定事件的所有订阅
-     *
-     * @method clearEvent
-     * @param {string} event - 事件名称
-     */
-    clearEvent(event: string): void {
-        this.events.delete(event);
-    }
-
-    /**
-     * 获取事件订阅数量
-     *
-     * @method listenerCount
-     * @param {string} event - 事件名称
-     * @returns {number} 订阅数量
-     */
-    listenerCount(event: string): number {
-        return this.events.get(event)?.length || 0;
-    }
 }
 
-/**
- * 全局事件总线实例
- *
- * @constant
- * @type {EventBus}
- *
- * @description
- * 预定义事件列表：
- * - sync:start - 开始同步
- * - sync:progress - 同步进度更新
- * - sync:complete - 同步完成
- * - sync:error - 同步出错
- * - token:updated - Token更新
- * - userid:updated - UserID更新
- * - panel:ready - 面板就绪
- */
-export const eventBus = new EventBus();
-
-// 预定义事件常量
-export const EVENTS = {
+// 事件名称常量定义
+export const BANGUMI_EVENTS = {
+    LOGIN_SUCCESS: 'login:success',
+    LOGIN_FAILED: 'login:failed',
+    LOGOUT: 'logout',
     SYNC_START: 'sync:start',
+    SYNC_END: 'sync:end',
     SYNC_PROGRESS: 'sync:progress',
-    SYNC_COMPLETE: 'sync:complete',
     SYNC_ERROR: 'sync:error',
-    TOKEN_UPDATED: 'token:updated',
+    COLLECTION_UPDATED: 'collection:updated',
+    SETTINGS_CHANGED: 'settings:changed',
     USERID_UPDATED: 'userid:updated',
     PANEL_READY: 'panel:ready'
 } as const;
@@ -224,4 +150,8 @@ export const BGM_EVENTS = {
     SYNC_ERROR:      'sync:error',
     SHEET_LOCKED:    'sheet:locked',
     SHEET_UNLOCKED:  'sheet:unlocked',
+    CONFIG_UPDATED:  'config:updated',
 } as const;
+
+// 创建全局事件总线实例
+export const eventBus = new EventBus();
