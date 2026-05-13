@@ -119,14 +119,20 @@ export function updateUserIdStatus() {
         userIdStatus.style.color = '#f44336';
     }
 }
-export function openUserCollection() {
+export function openUserCollection(isRibbon = false) {
     const startTime = Date.now();
     bgmLog(LOG_LEVELS.INFO, '[openUserCollection] ========== 打开用户收藏页面 ==========');
     const userId = _getBgmUserId();
     bgmLog(LOG_LEVELS.DEBUG, `[openUserCollection] 获取用户ID: ${userId || '(未设置)'}`);
     if (!userId) {
         bgmLog(LOG_LEVELS.ERROR, '[openUserCollection] 用户ID未设置，无法打开收藏页面');
-        showAlert(_T.pleaseSetUserIdFirst);
+        if (isRibbon) {
+            const app = getApp();
+            app?.MessageBox?.('请先设置用户ID！', 48);
+        }
+        else {
+            showAlert(_T.pleaseSetUserIdFirst);
+        }
         return;
     }
     const collectionUrl = `https://bgm.tv/user/${userId}/collection`;

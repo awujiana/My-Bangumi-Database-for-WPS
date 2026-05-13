@@ -152,7 +152,7 @@ export function updateUserIdStatus(): void {
     }
 }
 
-export function openUserCollection(): void {
+export function openUserCollection(isRibbon: boolean = false): void {
     const startTime = Date.now();
     bgmLog(LOG_LEVELS.INFO, '[openUserCollection] ========== 打开用户收藏页面 ==========');
 
@@ -161,7 +161,12 @@ export function openUserCollection(): void {
 
     if (!userId) {
         bgmLog(LOG_LEVELS.ERROR, '[openUserCollection] 用户ID未设置，无法打开收藏页面');
-        showAlert(_T.pleaseSetUserIdFirst);
+        if (isRibbon) {
+            const app = getApp();
+            app?.MessageBox?.('请先设置用户ID！' , 48);
+        } else {
+            showAlert(_T.pleaseSetUserIdFirst);
+        }
         return;
     }
 

@@ -7,7 +7,7 @@ export declare function showTokenDialog(currentToken?: string): void;
 export declare function showUserIdDialog(): void;
 export declare function updateTokenStatus(): void;
 export declare function updateUserIdStatus(): void;
-export declare function openUserCollection(): void;
+export declare function openUserCollection(isRibbon?: boolean): void;
 export declare function testTokenValidity(): void;
 export declare function testDebugConnection(): void;
 export declare function onAction(action: string): void;

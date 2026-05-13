@@ -388,5 +388,8 @@ export function setUserIdForRibbon() {
 
 /** 打开收藏页面 */
 export function openCollectionForRibbon() {
-    openUserCollection();
+    bgmLog(LOG_LEVELS.INFO, '[openCollectionForRibbon] ========== Ribbon 打开收藏页面 ==========');
+    bgmLog(LOG_LEVELS.INFO, '[openCollectionForRibbon] 调用 openUserCollection(true)');
+    openUserCollection(true);
+    bgmLog(LOG_LEVELS.INFO, '[openCollectionForRibbon] openUserCollection() 执行完成');
 }
