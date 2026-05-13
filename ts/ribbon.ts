@@ -4,10 +4,19 @@
  * @description WPS Office 功能区按钮回调处理
  */
 
-import { WPS_ENUM, showBangumiPanel,BGM, getIncrementalSync, getSkipConflicts, setIncrementalSync, setSkipConflicts } from './index.js';
+import { WPS_ENUM, showBangumiPanel,BGM, getIncrementalSync, getSkipConflicts, setIncrementalSync, setSkipConflicts,listenToRibbonConfigUpdates } from './index.js';
 import * as RibbonService from './services/ribbonService.js';
 
-
+// 启动时接收来自侧边栏的配置更新
+listenToRibbonConfigUpdates((data) => {
+    console.log(`[Ribbon] 配置更新: ${data.key} = ${data.value}`);
+    // 如果 Ribbon 有 UI 控件，可刷新状态，例如复选框的 Pressed 状态
+    const ribbonUI = (window as any).Application?.ribbonUI;
+    if (ribbonUI) {
+        ribbonUI.InvalidateControl('chkIncrementalSync');  // 使按钮刷新
+        ribbonUI.InvalidateControl('chkSkipConflicts');
+    }
+});
 /**
  * 获取"跳过冲突"复选框的初始按下状态
  * 从配置读取上次保存的设置，默认未选中

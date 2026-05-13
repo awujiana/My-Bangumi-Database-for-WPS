@@ -20,7 +20,7 @@ const MODULES = [
     { src: 'dist-ts/sync/syncRecord.js', type: 'module' },
     { src: 'dist-ts/sync/scraping.js', type: 'module' },                 
     { src: 'dist-ts/sync/exceltobangumi.js', type: 'module' },
-    {src:'dist-ts/services/ribbonService.js', type:'module'},
+    { src:'dist-ts/services/ribbonService.js', type:'module'},
     { src: 'dist-ts/ribbon.js', type: 'module', critical: true },
     { src: 'dist-ts/ui/handlers.js', type: 'module', critical: true },
     { src: 'dist-ts/taskpane.js', type: 'module', critical: true }

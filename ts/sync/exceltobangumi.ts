@@ -968,6 +968,12 @@ export async function SyncToBangumiAsync(
     const seqCol = getSeqColIndex(colMap);
 
     bgmLog(LOG_LEVELS.INFO, '[SyncToBangumiAsync] ========== 开始批量同步 ==========');
+    bgmLog(LOG_LEVELS.INFO, `[SyncToBangumiAsync] 配置参数：`);
+    bgmLog(LOG_LEVELS.INFO, `[SyncToBangumiAsync]   - 增量同步模式: ${options?.incremental ? '开启' : '关闭'}`);
+    bgmLog(LOG_LEVELS.INFO, `[SyncToBangumiAsync]   - 跳过冲突数量: ${options?.skipSids?.size || 0}`);
+    bgmLog(LOG_LEVELS.INFO, `[SyncToBangumiAsync]   - 表头行: ${headerRow}`);
+    bgmLog(LOG_LEVELS.INFO, `[SyncToBangumiAsync]   - 最后一行: ${lastRow}`);
+    bgmLog(LOG_LEVELS.INFO, `[SyncToBangumiAsync]   - 序列号列: ${seqCol} (列${colNumToLetter(seqCol)})`);
 
     // ========== 1. 获取可见行（筛选状态） ==========
     const filterStatus = getFilterStatus(lastRow, headerRow);
@@ -987,6 +993,7 @@ export async function SyncToBangumiAsync(
     // ========== 3. 增量同步：构建历史指纹映射 ==========
     let fingerprintMap: Map<string, string> | undefined;
     if (options?.incremental) {
+        bgmLog(LOG_LEVELS.DEBUG, '[SyncToBangumiAsync] 正在加载历史同步记录...');
         const allRecords = getAllSyncRecords();
         fingerprintMap = new Map();
         for (const r of allRecords) {
@@ -1015,6 +1022,8 @@ export async function SyncToBangumiAsync(
 
             // 冲突跳过
             if (skipSids && skipSids.has(sid)) {
+                const name = getField(rowNum, '名称');
+                bgmLog(LOG_LEVELS.INFO, `[SyncToBangumiAsync] 行 ${rowNum} - ${name || '未命名'} (SID: ${sid}) 跳过：存在冲突`);
                 result.skip++;
                 continue;
             }
@@ -1022,6 +1031,8 @@ export async function SyncToBangumiAsync(
             // 检查观看状态是否为空
             const watchStatusField = getField(rowNum, '是否看完') || getField(rowNum, '状态') || getField(rowNum, '观看状态');
             if (!watchStatusField) {
+                const name = getField(rowNum, '名称');
+                bgmLog(LOG_LEVELS.WARN, `[SyncToBangumiAsync] 行 ${rowNum} - ${name || '未命名'} 跳过：观看状态为空`);
                 result.skip++;
                 continue;
             }
@@ -1029,14 +1040,16 @@ export async function SyncToBangumiAsync(
             // 获取观看状态类型
             const watchType = mapWatchStatus(watchStatusField);
             if (watchType === 0) {
+                const name = getField(rowNum, '名称');
+                bgmLog(LOG_LEVELS.WARN, `[SyncToBangumiAsync] 行 ${rowNum} - ${name || '未命名'} 跳过：状态无效 "${watchStatusField}"`);
                 result.skip++;
-                bgmLog(LOG_LEVELS.WARN, `[SyncToBangumiAsync] 行 ${rowNum} 状态无效: "${watchStatusField}"`);
                 continue;
             }
 
             // 增量同步指纹检查
             let currentFingerprint: string | undefined;
             if (fingerprintMap) {
+                const name = getField(rowNum, '名称');
                 currentFingerprint = calcFingerprint([
                     getField(rowNum, '名称'),
                     watchType.toString(),
@@ -1047,14 +1060,26 @@ export async function SyncToBangumiAsync(
                     getField(rowNum, '集号')
                 ]);
 
-                if (fingerprintMap.get(sid) === currentFingerprint) {
+                const storedFingerprint = fingerprintMap.get(sid);
+                if (storedFingerprint === currentFingerprint) {
+                    bgmLog(LOG_LEVELS.DEBUG, `[SyncToBangumiAsync] 行 ${rowNum} - ${name || '未命名'} (SID: ${sid}) 跳过：增量同步检测无变化`);
+                    bgmLog(LOG_LEVELS.DEBUG, `[SyncToBangumiAsync]   当前指纹: ${currentFingerprint}`);
+                    bgmLog(LOG_LEVELS.DEBUG, `[SyncToBangumiAsync]   历史指纹: ${storedFingerprint}`);
                     result.skip++;
                     continue;
+                } else {
+                    bgmLog(LOG_LEVELS.DEBUG, `[SyncToBangumiAsync] 行 ${rowNum} - ${name || '未命名'} (SID: ${sid}) 增量同步检测有变化，加入同步队列`);
+                    if (storedFingerprint) {
+                        bgmLog(LOG_LEVELS.DEBUG, `[SyncToBangumiAsync]   当前指纹: ${currentFingerprint}`);
+                        bgmLog(LOG_LEVELS.DEBUG, `[SyncToBangumiAsync]   历史指纹: ${storedFingerprint}`);
+                    }
                 }
             }
 
             // 检查已上传颜色（非增量模式）
             if (!fingerprintMap && isCellMarkedSuccess(ws, rowNum, seqCol)) {
+                const name = getField(rowNum, '名称');
+                bgmLog(LOG_LEVELS.INFO, `[SyncToBangumiAsync] 行 ${rowNum} - ${name || '未命名'} 跳过：已标记为上传成功`);
                 result.skip++;
                 continue;
             }
