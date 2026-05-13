@@ -669,40 +669,35 @@ export function clearSheetMarks(sheetIndexOrName) {
         bgmLog(LOG_LEVELS.ERROR, '[clearSheetMarks] 无法获取活动工作簿');
         return;
     }
-    // 处理 "当前" 工作表
-    if (sheetIndexOrName === '当前') {
-        const ws = app.ActiveWorkbook.ActiveSheet;
-        if (ws) {
-            // 遍历查找当前工作表的索引
-            let sheetIndex = -1;
-            for (let i = 1; i <= app.ActiveWorkbook.Worksheets.Count; i++) {
-                const currentWs = app.ActiveWorkbook.Worksheets.Item(i);
-                if (currentWs.Name === ws.Name) {
-                    sheetIndex = i;
-                    break;
-                }
-            }
-            if (sheetIndex > 0) {
-                bgmLog(LOG_LEVELS.INFO, `[clearSheetMarks] 使用当前活动工作表: "${ws.Name}" (索引: ${sheetIndex})`);
-                clearSheetMarksInSheet(sheetIndex);
-                return;
-            }
-            else {
-                bgmLog(LOG_LEVELS.ERROR, `[clearSheetMarks] 无法找到当前工作表 "${ws.Name}" 的索引`);
-                return;
-            }
-        }
-        else {
+    // 1. 如果没有提供参数，默认清除当前活动工作表
+    if (sheetIndexOrName === undefined || sheetIndexOrName === null || sheetIndexOrName === '') {
+        const activeSheet = app.ActiveWorkbook.ActiveSheet;
+        if (!activeSheet) {
             bgmLog(LOG_LEVELS.ERROR, '[clearSheetMarks] 无法获取当前活动工作表');
             return;
         }
+        // 查找当前活动工作表的索引
+        let activeIndex = -1;
+        for (let i = 1; i <= app.ActiveWorkbook.Worksheets.Count; i++) {
+            if (app.ActiveWorkbook.Worksheets.Item(i).Name === activeSheet.Name) {
+                activeIndex = i;
+                break;
+            }
+        }
+        if (activeIndex === -1) {
+            bgmLog(LOG_LEVELS.ERROR, '[clearSheetMarks] 无法确定当前活动工作表的索引');
+            return;
+        }
+        bgmLog(LOG_LEVELS.INFO, `[clearSheetMarks] 默认清除当前活动工作表: "${activeSheet.Name}" (索引: ${activeIndex})`);
+        clearSheetMarksInSheet(activeIndex);
+        return;
     }
+    // 2. 处理传入的工作表名称（字符串）
     if (typeof sheetIndexOrName === 'string') {
         bgmLog(LOG_LEVELS.INFO, `[clearSheetMarks] 查找工作表名称: "${sheetIndexOrName}"`);
         for (let i = 1; i <= app.ActiveWorkbook.Worksheets.Count; i++) {
             const ws = app.ActiveWorkbook.Worksheets.Item(i);
             const wsName = ws?.Name || `Sheet${i}`;
-            bgmLog(LOG_LEVELS.DEBUG, `[clearSheetMarks] 检查工作表 ${i}: "${wsName}"`);
             if (ws && ws.Name === sheetIndexOrName) {
                 bgmLog(LOG_LEVELS.INFO, `[clearSheetMarks] 找到匹配的工作表: "${wsName}" (索引: ${i})`);
                 clearSheetMarksInSheet(i);
@@ -710,13 +705,18 @@ export function clearSheetMarks(sheetIndexOrName) {
             }
         }
         bgmLog(LOG_LEVELS.WARN, `[clearSheetMarks] 未找到工作表: "${sheetIndexOrName}"`);
+        return;
     }
-    else {
-        const ws = app.ActiveWorkbook.Worksheets.Item(sheetIndexOrName);
-        const wsName = ws?.Name || `Sheet${sheetIndexOrName}`;
-        bgmLog(LOG_LEVELS.INFO, `[clearSheetMarks] 使用工作表索引: ${sheetIndexOrName} (名称: "${wsName}")`);
-        clearSheetMarksInSheet(sheetIndexOrName);
+    // 3. 处理传入的数字索引
+    const idx = Number(sheetIndexOrName);
+    if (isNaN(idx)) {
+        bgmLog(LOG_LEVELS.WARN, `[clearSheetMarks] 无效的工作表索引: ${sheetIndexOrName}`);
+        return;
     }
+    const ws = app.ActiveWorkbook.Worksheets.Item(idx);
+    const wsName = ws?.Name || `Sheet${idx}`;
+    bgmLog(LOG_LEVELS.INFO, `[clearSheetMarks] 使用工作表索引: ${idx} (名称: "${wsName}")`);
+    clearSheetMarksInSheet(idx);
 }
 // ========== 事件监听 ==========
 function setupButtonListeners() {
@@ -846,8 +846,10 @@ function handleActionClick(event) {
             bgmLog(LOG_LEVELS.INFO, `[handleActionClick] 已上传项目标记完成，耗时: ${Date.now() - startTime}ms`);
             break;
         case 'clearSheetMarks':
-            bgmLog(LOG_LEVELS.INFO, `[handleActionClick] 清除工作表标记，工作表: ${args[0] || '当前'}`);
             clearSheetMarks(args[0]);
+            const sheetTarget = args[0] || '';
+            bgmLog(LOG_LEVELS.INFO, `[handleActionClick] 清除工作表标记，默认为当前工作表,工作表: ${sheetTarget}`);
+            clearSheetMarks(sheetTarget);
             bgmLog(LOG_LEVELS.INFO, `[handleActionClick] 工作表标记清除完成，耗时: ${Date.now() - startTime}ms`);
             break;
         case 'openSyncRecordSheet':

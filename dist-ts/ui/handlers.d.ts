@@ -18,5 +18,5 @@ export declare function testSingleUpdateFromPanel(): void;
 export declare function syncCollectionFromBgm(): Promise<void>;
 export declare function syncFromBgmByAPI(sheetIndex: number): Promise<void>;
 export declare function markUploadedItems(sheetIndexOrName: number | string, collections?: unknown[]): Promise<void>;
-export declare function clearSheetMarks(sheetIndexOrName: number | string): void;
+export declare function clearSheetMarks(sheetIndexOrName?: number | string): void;
 //# sourceMappingURL=handlers.d.ts.map
