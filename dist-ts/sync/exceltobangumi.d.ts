@@ -46,9 +46,9 @@ export declare function extractSubjectId(input: string): string;
  *
  * @description
  * 支持的状态文本映射：
- * - 看过/看完/已看/完/completed → 3
- * - 在看/在看动画/在追/追/watching → 2
  * - 想看/想看动画/否/wish → 1
+ * - 在看/在看动画/在追/追/watching → 2
+ * - 看过/看完/已看/完/completed → 3
  * - 搁置/暂停/on_hold → 4
  * - 抛弃/弃/弃番/drop/dropped → 5
  *

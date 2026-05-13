@@ -274,9 +274,9 @@ export function extractSubjectId(input) {
  *
  * @description
  * 支持的状态文本映射：
- * - 看过/看完/已看/完/completed → 3
- * - 在看/在看动画/在追/追/watching → 2
  * - 想看/想看动画/否/wish → 1
+ * - 在看/在看动画/在追/追/watching → 2
+ * - 看过/看完/已看/完/completed → 3
  * - 搁置/暂停/on_hold → 4
  * - 抛弃/弃/弃番/drop/dropped → 5
  *
@@ -569,10 +569,9 @@ export function buildJsonPayload(ws, rowNum, colMap, finishedDate) {
                 }
             }
         }
-        // 如果没有找到有效的状态，默认设置为"想看"(1)
         if (!statusFound) {
-            payload.type = 1;
-            bgmLog(LOG_LEVELS.WARN, `[buildJsonPayload] 未找到有效的观看状态，默认设置为"想看"(1)，原始值: "${rawStatusValue}"`);
+            bgmLog(LOG_LEVELS.ERROR, `[buildJsonPayload] 未找到有效的观看状态，返回空对象，原始值: "${rawStatusValue}"`);
+            return '{}'; // 失败标记
         }
         // 评分
         if (colMap.has('打分')) {
@@ -642,7 +641,7 @@ export function bgmRequestSync(method, endpoint, jsonBody, token) {
     bgmLog(LOG_LEVELS.INFO, `[bgmRequestSync] URL: ${fullUrl}`);
     bgmLog(LOG_LEVELS.INFO, `[bgmRequestSync] 方法: ${method.toUpperCase()}`);
     bgmLog(LOG_LEVELS.DEBUG, `[bgmRequestSync] 请求头: Authorization: Bearer ${token.substring(0, 8)}...`);
-    bgmLog(LOG_LEVELS.DEBUG, `[bgmRequestSync] 请求体: ${jsonBody.length > 200 ? jsonBody.substring(0, 200) + '...' : jsonBody}`);
+    bgmLog(LOG_LEVELS.INFO, `[bgmRequestSync] 请求体: ${jsonBody.length > 500 ? jsonBody.substring(0, 500) + '...' : jsonBody}`);
     try {
         const xhr = new XMLHttpRequest();
         xhr.open(method.toUpperCase(), fullUrl, false);
@@ -1055,7 +1054,7 @@ export function testSingleUpdate() {
             ? trim(readCell(ws, targetRow, colMap.get('完播日')) || '')
             : '';
         const jsonBody = buildJsonPayload(ws, targetRow, colMap, finishedDate);
-        bgmLog(LOG_LEVELS.DEBUG, `[testSingleUpdate] 请求体构建完成: ${jsonBody.length > 200 ? jsonBody.substring(0, 200) + '...' : jsonBody}`);
+        bgmLog(LOG_LEVELS.INFO, `[testSingleUpdate] 请求体构建完成: ${jsonBody.length > 500 ? jsonBody.substring(0, 500) + '...' : jsonBody}`);
         // 获取用户路径
         const userPath = _getUserApiPath();
         bgmLog(LOG_LEVELS.INFO, `[testSingleUpdate] 用户路径: ${userPath}`);

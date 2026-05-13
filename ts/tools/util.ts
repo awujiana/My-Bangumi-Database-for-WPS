@@ -202,7 +202,7 @@ export const BGM: {
             } catch (e) {
                 const err = e as Error;
                 if (typeof bgmLog === 'function') {
-                    bgmLog(LOG_LEVELS?.DEBUG || 0, 'postMessage 不可用: ' + err.message);
+                    bgmLog(LOG_LEVELS.INFO|| 0, 'postMessage 不可用: ' + err.message);
                 }
             }
             return false;
@@ -619,7 +619,7 @@ export function _fetchBgmUserInfo(callback?: (userInfo: BGMUserInfo | null) => v
     }
     
     const apiUrl = BGM_CONFIG.API_BASE + "/v0/me";
-    bgmLog(LOG_LEVELS.DEBUG, `[_fetchBgmUserInfo] API 路由: ${apiUrl}`);
+    bgmLog(LOG_LEVELS.INFO, `[_fetchBgmUserInfo] API 路由: ${apiUrl}`);
     
     const xhr = new XMLHttpRequest();
     xhr.open("GET", apiUrl, true);
@@ -762,7 +762,7 @@ export function sleep(ms: number): void {
             if (app?.DoEvents) app.DoEvents();
         } catch(e) {
             if (typeof bgmLog === 'function') {
-                bgmLog(LOG_LEVELS?.DEBUG || 0, "sleep DoEvents 失败: " + (e as Error).message);
+                bgmLog(LOG_LEVELS.INFO, "sleep DoEvents 失败: " + (e as Error).message);
             }
             break;
         }
@@ -1024,11 +1024,11 @@ export function getLastRow(
 
     if (forceRefresh) {
         clearSheetCache(ws);
-        bgmLog(LOG_LEVELS.DEBUG, '缓存已清除，重新计算最后行');
+        bgmLog(LOG_LEVELS.INFO, '缓存已清除，重新计算最后行');
     }
 
     const cached = cacheGet<number>(cacheKey, () => {
-        bgmLog(LOG_LEVELS.DEBUG,
+        bgmLog(LOG_LEVELS.INFO,
             `正在计算工作表 "${sheetName}" 的最后数据行（${headerRow ? '根据表头自动选择列' : '多列回退'}）...`
         );
 
@@ -1042,7 +1042,7 @@ export function getLastRow(
                     const cell = ws.Range(`${colLetter}${ws.Rows.Count}`);
                     const endCell = cell.End(-4162);
                     if (endCell && endCell.Row > 0) {
-                        bgmLog(LOG_LEVELS.DEBUG,
+                        bgmLog(LOG_LEVELS.INFO,
                             `根据表头找到锚定列 ${col}(${colLetter})，最后行: ${endCell.Row}`
                         );
                         return endCell.Row;
@@ -1060,7 +1060,7 @@ export function getLastRow(
             const cell = ws.Range(`D${ws.Rows.Count}`);
             const endCell = cell.End(-4162);
             if (endCell && endCell.Row > 0) {
-                bgmLog(LOG_LEVELS.DEBUG, `D列向上定位成功，最后行: ${endCell.Row}`);
+                bgmLog(LOG_LEVELS.INFO, `D列向上定位成功，最后行: ${endCell.Row}`);
                 return endCell.Row;
             }
         } catch (e) {
@@ -1072,7 +1072,7 @@ export function getLastRow(
             const cell = ws.Range(`A${ws.Rows.Count}`);
             const endCell = cell.End(-4162);
             if (endCell && endCell.Row > 0) {
-                bgmLog(LOG_LEVELS.DEBUG, `A列向上定位成功，最后行: ${endCell.Row}`);
+                bgmLog(LOG_LEVELS.INFO, `A列向上定位成功，最后行: ${endCell.Row}`);
                 return endCell.Row;
             }
         } catch (e) {
@@ -1085,7 +1085,7 @@ export function getLastRow(
             if (usedRange) {
                 const last = usedRange.Row + usedRange.Rows.Count - 1;
                 if (last > 0) {
-                    bgmLog(LOG_LEVELS.DEBUG, `UsedRange 估算最后行: ${last}`);
+                    bgmLog(LOG_LEVELS.INFO, `UsedRange 估算最后行: ${last}`);
                     return last;
                 }
             }
@@ -1098,7 +1098,7 @@ export function getLastRow(
         return 50000;
     });
 
-    bgmLog(LOG_LEVELS.DEBUG,
+    bgmLog(LOG_LEVELS.INFO,
         `工作表 "${sheetName}" 最后数据行: ${cached}${sheetCache.has(cacheKey) ? ' (来自缓存)' : ' (首次计算)'}`
     );
     return cached;

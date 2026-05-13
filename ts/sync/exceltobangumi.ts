@@ -203,8 +203,8 @@ export function testTokenValidityForRibbon(token?: string): void {
     bgmLog(LOG_LEVELS.INFO, `[exceltobangumi/testTokenValidityForRibbon] ========== 开始测试 Token ==========`);
     bgmLog(LOG_LEVELS.INFO, `[exceltobangumi/testTokenValidityForRibbon] API 路由: ${apiUrl}`);
     bgmLog(LOG_LEVELS.INFO, `[exceltobangumi/testTokenValidityForRibbon] 请求方法: GET`);
-    bgmLog(LOG_LEVELS.DEBUG, `[exceltobangumi/testTokenValidityForRibbon] 请求头: Authorization: Bearer ${testToken.substring(0, 8)}...`);
-    bgmLog(LOG_LEVELS.DEBUG, `[exceltobangumi/testTokenValidityForRibbon] 请求头: Content-Type: application/json`);
+    bgmLog(LOG_LEVELS.INFO, `[exceltobangumi/testTokenValidityForRibbon] 请求头: Authorization: Bearer ${testToken.substring(0, 8)}...`);
+    bgmLog(LOG_LEVELS.INFO, `[exceltobangumi/testTokenValidityForRibbon] 请求头: Content-Type: application/json`);
 
     const xhr = new XMLHttpRequest();
     xhr.open('GET', apiUrl, true);
@@ -219,13 +219,13 @@ export function testTokenValidityForRibbon(token?: string): void {
         bgmLog(LOG_LEVELS.INFO, `[exceltobangumi/testTokenValidityForRibbon] 请求耗时: ${duration}ms`);
         
         if (xhr.getAllResponseHeaders()) {
-            bgmLog(LOG_LEVELS.DEBUG, `[exceltobangumi/testTokenValidityForRibbon] 响应头: ${xhr.getAllResponseHeaders()}`);
+            bgmLog(LOG_LEVELS.INFO, `[exceltobangumi/testTokenValidityForRibbon] 响应头: ${xhr.getAllResponseHeaders()}`);
         }
         
         if (xhr.status === 200) {
             try {
                 const data = JSON.parse(xhr.responseText);
-                bgmLog(LOG_LEVELS.DEBUG, `[exceltobangumi/testTokenValidityForRibbon] 响应数据: ${JSON.stringify(data).length > 300 ? JSON.stringify(data).substring(0, 300) + '...' : JSON.stringify(data)}`);
+                bgmLog(LOG_LEVELS.INFO, `[exceltobangumi/testTokenValidityForRibbon] 响应数据: ${JSON.stringify(data).length > 300 ? JSON.stringify(data).substring(0, 300) + '...' : JSON.stringify(data)}`);
                 
                 const nickname = data.nickname || data.username || '未知用户';
                 const userId = String(data.id || '未知ID');
@@ -248,7 +248,7 @@ export function testTokenValidityForRibbon(token?: string): void {
             showError('Token无效或已过期，请重新获取', '验证失败');
         } else {
             bgmLog(LOG_LEVELS.ERROR, `[exceltobangumi/testTokenValidityForRibbon] Token验证失败，HTTP 状态码: ${xhr.status}`);
-            bgmLog(LOG_LEVELS.DEBUG, `[exceltobangumi/testTokenValidityForRibbon] 响应内容: ${xhr.responseText}`);
+            bgmLog(LOG_LEVELS.INFO, `[exceltobangumi/testTokenValidityForRibbon] 响应内容: ${xhr.responseText}`);
             showError(`Token验证失败 (HTTP ${xhr.status})`, '错误');
         }
     };
@@ -265,7 +265,7 @@ export function testTokenValidityForRibbon(token?: string): void {
         showError('请求超时', '错误');
     };
     
-    bgmLog(LOG_LEVELS.DEBUG, `[exceltobangumi/testTokenValidityForRibbon] 正在发送请求...`);
+    bgmLog(LOG_LEVELS.INFO, `[exceltobangumi/testTokenValidityForRibbon] 正在发送请求...`);
     xhr.send();
 }
 
@@ -281,11 +281,11 @@ function notifyUserInfoUpdated(username: string, userId: string): void {
         // 触发事件总线
         BGM.setUserId(userId);
         BGM.setUsername(username);
-        bgmLog(LOG_LEVELS.DEBUG, `[notifyUserInfoUpdated] BGM.cache 已更新`);
+        bgmLog(LOG_LEVELS.INFO, `[notifyUserInfoUpdated] BGM.cache 已更新`);
         
         // 尝试通知 taskpane
         if (typeof window !== 'undefined' && window.parent) {
-            bgmLog(LOG_LEVELS.DEBUG, `[notifyUserInfoUpdated] 准备发送 postMessage 到 window.parent`);
+            bgmLog(LOG_LEVELS.INFO, `[notifyUserInfoUpdated] 准备发送 postMessage 到 window.parent`);
             window.parent.postMessage({
                 type: 'BGM:userInfoUpdated',
                 username: username,
@@ -297,7 +297,7 @@ function notifyUserInfoUpdated(username: string, userId: string): void {
             bgmLog(LOG_LEVELS.WARN, `[notifyUserInfoUpdated] window.parent 不可用，无法发送通知`);
         }
         
-        bgmLog(LOG_LEVELS.DEBUG, `[notifyUserInfoUpdated] 通知完成`);
+        bgmLog(LOG_LEVELS.INFO, `[notifyUserInfoUpdated] 通知完成`);
     } catch (e) {
         bgmLog(LOG_LEVELS.WARN, '通知用户信息更新失败: ' + (e as Error).message);
     }
@@ -356,9 +356,9 @@ export function extractSubjectId(input: string): string {
  *
  * @description
  * 支持的状态文本映射：
- * - 看过/看完/已看/完/completed → 3
- * - 在看/在看动画/在追/追/watching → 2
  * - 想看/想看动画/否/wish → 1
+ * - 在看/在看动画/在追/追/watching → 2
+ * - 看过/看完/已看/完/completed → 3
  * - 搁置/暂停/on_hold → 4
  * - 抛弃/弃/弃番/drop/dropped → 5
  *
@@ -663,7 +663,7 @@ export function buildJsonPayload(
                     if (mappedStatus !== undefined && mappedStatus > 0) {
                         payload.type = mappedStatus;
                         statusFound = true;
-                        bgmLog(LOG_LEVELS.DEBUG, `[buildJsonPayload] 从列 "${key}" 读取状态: "${statusVal}" -> ${mappedStatus}`);
+                        bgmLog(LOG_LEVELS.INFO, `[buildJsonPayload] 从列 "${key}" 读取状态: "${statusVal}" -> ${mappedStatus}`);
                         break;
                     } else {
                         bgmLog(LOG_LEVELS.WARN, `[buildJsonPayload] 从列 "${key}" 读取状态: "${statusVal}" -> ${mappedStatus} (无效)`);
@@ -671,10 +671,9 @@ export function buildJsonPayload(
                 }
             }
         }
-        // 如果没有找到有效的状态，默认设置为"想看"(1)
-        if (!statusFound) {
-            payload.type = 1;
-            bgmLog(LOG_LEVELS.WARN, `[buildJsonPayload] 未找到有效的观看状态，默认设置为"想看"(1)，原始值: "${rawStatusValue}"`);
+          if (!statusFound) {
+            bgmLog(LOG_LEVELS.ERROR, `[buildJsonPayload] 未找到有效的观看状态，返回空对象，原始值: "${rawStatusValue}"`);
+            return '{}';   // 失败标记
         }
 
         // 评分
@@ -755,8 +754,8 @@ export function bgmRequestSync(
     bgmLog(LOG_LEVELS.INFO, `[bgmRequestSync] ========== 开始同步请求 ==========`);
     bgmLog(LOG_LEVELS.INFO, `[bgmRequestSync] URL: ${fullUrl}`);
     bgmLog(LOG_LEVELS.INFO, `[bgmRequestSync] 方法: ${method.toUpperCase()}`);
-    bgmLog(LOG_LEVELS.DEBUG, `[bgmRequestSync] 请求头: Authorization: Bearer ${token.substring(0, 8)}...`);
-    bgmLog(LOG_LEVELS.DEBUG, `[bgmRequestSync] 请求体: ${jsonBody.length > 200 ? jsonBody.substring(0, 200) + '...' : jsonBody}`);
+    bgmLog(LOG_LEVELS.INFO, `[bgmRequestSync] 请求头: Authorization: Bearer ${token.substring(0, 8)}...`);
+    bgmLog(LOG_LEVELS.INFO, `[bgmRequestSync] 请求体: ${jsonBody.length > 500 ? jsonBody.substring(0, 500) + '...' : jsonBody}`);
 
     try {
         const xhr = new XMLHttpRequest();
@@ -764,7 +763,7 @@ export function bgmRequestSync(
         xhr.setRequestHeader('Authorization', `Bearer ${token}`);
         xhr.setRequestHeader('Content-Type', 'application/json');
 
-        bgmLog(LOG_LEVELS.DEBUG, `[bgmRequestSync] 正在发送请求...`);
+        bgmLog(LOG_LEVELS.INFO, `[bgmRequestSync] 正在发送请求...`);
         xhr.send(jsonBody);
 
         const duration = Date.now() - startTime;
@@ -781,7 +780,7 @@ export function bgmRequestSync(
                 try {
                     const data = JSON.parse(xhr.responseText);
                     result.message = extractResponseMessage(data);
-                    bgmLog(LOG_LEVELS.DEBUG, `[bgmRequestSync] 响应数据: ${JSON.stringify(data).length > 300 ? JSON.stringify(data).substring(0, 300) + '...' : JSON.stringify(data)}`);
+                    bgmLog(LOG_LEVELS.INFO, `[bgmRequestSync] 响应数据: ${JSON.stringify(data).length > 300 ? JSON.stringify(data).substring(0, 300) + '...' : JSON.stringify(data)}`);
                 } catch (e: any) {
                     BGM.handleError(e, { context: 'bgmRequestSync', showAlert: false });
                 }
@@ -794,11 +793,11 @@ export function bgmRequestSync(
             try {
                 const errData = JSON.parse(xhr.responseText);
                 result.message = errData.error || errData.description || `HTTP ${xhr.status}`;
-                bgmLog(LOG_LEVELS.DEBUG, `[bgmRequestSync] 错误响应: ${JSON.stringify(errData)}`);
+                bgmLog(LOG_LEVELS.INFO, `[bgmRequestSync] 错误响应: ${JSON.stringify(errData)}`);
             } catch (e: any) {
                 BGM.handleError(e, { context: 'bgmRequestSync', showAlert: false });
                 result.message = xhr.statusText || `HTTP ${xhr.status}`;
-                bgmLog(LOG_LEVELS.DEBUG, `[bgmRequestSync] 响应内容: ${xhr.responseText}`);
+                bgmLog(LOG_LEVELS.INFO, `[bgmRequestSync] 响应内容: ${xhr.responseText}`);
             }
         }
     } catch (e: any) {
@@ -901,7 +900,7 @@ async function batchSyncRequests(
 
                     if (apiResult.code >= 200 && apiResult.code < 300) {
                         success.push(task);
-                        bgmLog(LOG_LEVELS.DEBUG, `[batchSyncRequests] SID ${task.sid} 同步成功，HTTP ${apiResult.code}`);
+                        bgmLog(LOG_LEVELS.INFO, `[batchSyncRequests] SID ${task.sid} 同步成功，HTTP ${apiResult.code}`);
                     } else {
                         fail.push(task);
                         bgmLog(LOG_LEVELS.WARN, `[batchSyncRequests] SID ${task.sid} 同步失败，HTTP ${apiResult.code}，消息: ${apiResult.message}`);
@@ -1002,7 +1001,7 @@ export async function SyncToBangumiAsync(
     // ========== 3. 增量同步：构建历史指纹映射 ==========
     let fingerprintMap: Map<string, string> | undefined;
     if (options?.incremental) {
-        bgmLog(LOG_LEVELS.DEBUG, '[SyncToBangumiAsync] 正在加载历史同步记录...');
+        bgmLog(LOG_LEVELS.INFO, '[SyncToBangumiAsync] 正在加载历史同步记录...');
         const allRecords = getAllSyncRecords();
         fingerprintMap = new Map();
         for (const r of allRecords) {
@@ -1071,16 +1070,16 @@ export async function SyncToBangumiAsync(
 
                 const storedFingerprint = fingerprintMap.get(sid);
                 if (storedFingerprint === currentFingerprint) {
-                    bgmLog(LOG_LEVELS.DEBUG, `[SyncToBangumiAsync] 行 ${rowNum} - ${name || '未命名'} (SID: ${sid}) 跳过：增量同步检测无变化`);
-                    bgmLog(LOG_LEVELS.DEBUG, `[SyncToBangumiAsync]   当前指纹: ${currentFingerprint}`);
-                    bgmLog(LOG_LEVELS.DEBUG, `[SyncToBangumiAsync]   历史指纹: ${storedFingerprint}`);
+                    bgmLog(LOG_LEVELS.INFO, `[SyncToBangumiAsync] 行 ${rowNum} - ${name || '未命名'} (SID: ${sid}) 跳过：增量同步检测无变化`);
+                    bgmLog(LOG_LEVELS.INFO, `[SyncToBangumiAsync]   当前指纹: ${currentFingerprint}`);
+                    bgmLog(LOG_LEVELS.INFO, `[SyncToBangumiAsync]   历史指纹: ${storedFingerprint}`);
                     result.skip++;
                     continue;
                 } else {
-                    bgmLog(LOG_LEVELS.DEBUG, `[SyncToBangumiAsync] 行 ${rowNum} - ${name || '未命名'} (SID: ${sid}) 增量同步检测有变化，加入同步队列`);
+                    bgmLog(LOG_LEVELS.INFO, `[SyncToBangumiAsync] 行 ${rowNum} - ${name || '未命名'} (SID: ${sid}) 增量同步检测有变化，加入同步队列`);
                     if (storedFingerprint) {
-                        bgmLog(LOG_LEVELS.DEBUG, `[SyncToBangumiAsync]   当前指纹: ${currentFingerprint}`);
-                        bgmLog(LOG_LEVELS.DEBUG, `[SyncToBangumiAsync]   历史指纹: ${storedFingerprint}`);
+                        bgmLog(LOG_LEVELS.INFO, `[SyncToBangumiAsync]   当前指纹: ${currentFingerprint}`);
+                        bgmLog(LOG_LEVELS.INFO, `[SyncToBangumiAsync]   历史指纹: ${storedFingerprint}`);
                     }
                 }
             }
@@ -1182,7 +1181,7 @@ export async function SyncToBangumiAsync(
         const remainingTasks = syncTasks.slice(executedCount);
         for (const task of remainingTasks) {
             result.skip++;
-            bgmLog(LOG_LEVELS.DEBUG, `[SyncToBangumiAsync] 任务被跳过（停止）: SID=${task.sid}`);
+            bgmLog(LOG_LEVELS.INFO, `[SyncToBangumiAsync] 任务被跳过（停止）: SID=${task.sid}`);
         }
         bgmLog(LOG_LEVELS.INFO, `[SyncToBangumiAsync] 同步已停止，${remainingTasks.length} 条任务被跳过`);
     }
@@ -1217,7 +1216,7 @@ export function testSingleUpdate(): void {
             wpsMsgBox('无法获取工作表', 0, 48);
             return;
         }
-        bgmLog(LOG_LEVELS.DEBUG, '[testSingleUpdate] 工作表获取成功');
+        bgmLog(LOG_LEVELS.INFO, '[testSingleUpdate] 工作表获取成功');
 
         // 获取当前单元格或默认第2行
         let targetRow = 2;
@@ -1226,7 +1225,7 @@ export function testSingleUpdate(): void {
             if (activeCell?.Row) {
                 targetRow = activeCell.Row;
             }
-            bgmLog(LOG_LEVELS.DEBUG, `[testSingleUpdate] 目标行: ${targetRow}`);
+            bgmLog(LOG_LEVELS.INFO, `[testSingleUpdate] 目标行: ${targetRow}`);
         } catch (e: any) {
             BGM.handleError(e, { context: 'testSingleUpdate', showAlert: false });
             return;
@@ -1234,10 +1233,10 @@ export function testSingleUpdate(): void {
 
         // 查找URL列
         const headerRow = findHeaderRow(ws) || 1;
-        bgmLog(LOG_LEVELS.DEBUG, `[testSingleUpdate] 表头行: ${headerRow}`);
+        bgmLog(LOG_LEVELS.INFO, `[testSingleUpdate] 表头行: ${headerRow}`);
         
         const colMap = getColumnMap(ws, headerRow);
-        bgmLog(LOG_LEVELS.DEBUG, `[testSingleUpdate] 列映射完成，共 ${colMap.size} 列`);
+        bgmLog(LOG_LEVELS.INFO, `[testSingleUpdate] 列映射完成，共 ${colMap.size} 列`);
 
         if (!colMap.has('Bangumi_URL')) {
             bgmLog(LOG_LEVELS.WARN, '[testSingleUpdate] 未找到 Bangumi_URL 列');
@@ -1247,7 +1246,7 @@ export function testSingleUpdate(): void {
 
         const urlCol = colMap.get('Bangumi_URL')!;
         const bgmUrl = trim(readCell(ws, targetRow, urlCol) || '');
-        bgmLog(LOG_LEVELS.DEBUG, `[testSingleUpdate] Bangumi URL: ${bgmUrl}`);
+        bgmLog(LOG_LEVELS.INFO, `[testSingleUpdate] Bangumi URL: ${bgmUrl}`);
 
         if (!bgmUrl) {
             bgmLog(LOG_LEVELS.WARN, `[testSingleUpdate] 第 ${targetRow} 行URL为空`);
@@ -1269,14 +1268,14 @@ export function testSingleUpdate(): void {
             wpsMsgBox('请先设置 Token', 0, 48);
             return;
         }
-        bgmLog(LOG_LEVELS.DEBUG, `[testSingleUpdate] Token 已设置（长度: ${token.length}）`);
+        bgmLog(LOG_LEVELS.INFO, `[testSingleUpdate] Token 已设置（长度: ${token.length}）`);
 
         // 构建测试请求体
         const finishedDate = colMap.has('完播日')
             ? trim(readCell(ws, targetRow, colMap.get('完播日')!) || '')
             : '';
         const jsonBody = buildJsonPayload(ws, targetRow, colMap, finishedDate);
-        bgmLog(LOG_LEVELS.DEBUG, `[testSingleUpdate] 请求体构建完成: ${jsonBody.length > 200 ? jsonBody.substring(0, 200) + '...' : jsonBody}`);
+        bgmLog(LOG_LEVELS.INFO, `[testSingleUpdate] 请求体构建完成: ${jsonBody.length > 500 ? jsonBody.substring(0, 500) + '...' : jsonBody}`);
 
         // 获取用户路径
         const userPath = _getUserApiPath();

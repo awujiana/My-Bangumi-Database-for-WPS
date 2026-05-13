@@ -25,7 +25,6 @@ export const ErrorLevel = {
     WARN: 1,
     ERROR: 2,
     THROW: 3,
-    DEBUG: 4
 } as const;
 
 /**
@@ -155,8 +154,6 @@ export const BGM_COLOR = {
  * @type {Object}
  */
 export const LOG_LEVELS = {
-    /** 调试级别 - 详细信息，通常用于开发调试 */
-    DEBUG: 0,
     /** 信息级别 - 一般操作信息 */
     INFO: 1,
     /** 警告级别 - 潜在问题提示 */
@@ -404,10 +401,10 @@ export const TOKEN_CONFIG = {
 export const WATCH_STATUS_MAP: Record<string, number> = {
     // 想看 (1)
     "想看": 1, "想看动画": 1, "否": 1, "wish": 1, "1": 1, "false": 1,
-    // 在看 (2)
-    "在看": 2, "看动画": 2, "在看动画": 2, "在追": 2, "追": 2, "watching": 2, "2": 2,
-    // 看过 (3)
-    "看过": 3, "看完": 3, "已看": 3, "完": 3, "completed": 3, "3": 3, "是": 3, "true": 3,
+    // 看过 (2)
+    "看过": 2, "看完": 2, "已看": 2, "完": 2, "completed": 2, "2": 2, "是": 2, "true": 2,
+    // 在看 (3)
+    "在看": 3, "看动画": 3, "在看动画": 3, "在追": 3, "追": 3, "watching": 3, "3": 3,
     // 搁置 (4)
     "搁置": 4, "暂停": 4, "停": 4, "on_hold": 4, "4": 4,
     // 抛弃 (5)

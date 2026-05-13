@@ -360,7 +360,7 @@ function notifyPanelTokenUpdated(): void {
         // 触发事件总线（供面板内的事件监听器使用）
         BGM.notifyTokenUpdated();
         
-        bgmLog(LOG_LEVELS.DEBUG, '已发送 Token 更新通知');
+        bgmLog(LOG_LEVELS.INFO, '已发送 Token 更新通知');
     } catch (e) {
         BGM.handleError(new Error('通知面板失败',e as Error), { showAlert: false });
     }
@@ -393,7 +393,7 @@ export function setUserIdForRibbon() {
                 userId: userIdStr,
                 timestamp: Date.now()
             }, '*');
-            bgmLog(LOG_LEVELS.DEBUG, `[setUserIdForRibbon] 已发送 postMessage 通知侧边栏`);
+            bgmLog(LOG_LEVELS.INFO, `[setUserIdForRibbon] 已发送 postMessage 通知侧边栏`);
         }
         
         app?.MessageBox?.('用户 ID 已保存', 0, 64);
@@ -412,7 +412,7 @@ export function openCollectionForRibbon(): void {
     }
 
     const userId = _getBgmUserId();
-    bgmLog(LOG_LEVELS.DEBUG, `[openCollectionForRibbon] 获取用户ID: ${userId || '(未设置)'}`);
+    bgmLog(LOG_LEVELS.INFO, `[openCollectionForRibbon] 获取用户ID: ${userId || '(未设置)'}`);
     
     if (!userId) {
         bgmLog(LOG_LEVELS.ERROR, '[openCollectionForRibbon] 用户ID未设置');
