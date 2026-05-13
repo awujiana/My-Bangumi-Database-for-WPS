@@ -9,6 +9,7 @@ import {
     type WpsRange, getCell, trim, getAllSyncRecords, calcFingerprint
 } from '../index.js';
 
+
 /**
  * 获取同步预览统计（不发送请求，仅扫描 Excel）
  * @param ws 工作表对象

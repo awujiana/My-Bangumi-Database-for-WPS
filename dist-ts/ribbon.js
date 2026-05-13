@@ -3,25 +3,28 @@
  * @module ribbon
  * @description WPS Office 功能区按钮回调处理
  */
-import { WPS_ENUM, showBangumiPanel, BGM, getIncrementalSync, getSkipConflicts, setIncrementalSync, setSkipConflicts, listenToRibbonConfigUpdates } from './index.js';
+import { WPS_ENUM, showBangumiPanel, BGM, getIncrementalSync, getSkipConflicts, setIncrementalSync, setSkipConflicts } from './index.js';
 import * as RibbonService from './services/ribbonService.js';
-// 启动时接收来自侧边栏的配置更新
-listenToRibbonConfigUpdates((data) => {
-    console.log(`[Ribbon] ========== 收到配置更新通知 ==========`);
-    console.log(`[Ribbon] 配置键: ${data.key}`);
-    console.log(`[Ribbon] 新值: ${data.value}`);
-    console.log(`[Ribbon] 尝试刷新 Ribbon UI...`);
-    const ribbonUI = window.Application?.ribbonUI;
-    if (ribbonUI) {
-        console.log(`[Ribbon] ribbonUI 可用，刷新控件状态`);
-        ribbonUI.InvalidateControl('chkIncrementalSync');
-        ribbonUI.InvalidateControl('chkSkipConflicts');
-        console.log(`[Ribbon] 控件状态已刷新`);
-    }
-    else {
-        console.warn(`[Ribbon] ribbonUI 不可用，无法刷新控件状态`);
-    }
-});
+// 在 Ribbon 启动时（例如 OnAddinLoad 中或文件顶部立即执行）
+// 【正确】监听侧边栏发来的配置更新，刷新 Ribbon UI
+function initRibbonMessageListener() {
+    if (typeof window === 'undefined')
+        return;
+    window.addEventListener('message', (event) => {
+        const data = event.data;
+        if (data?.type === 'BGM:configUpdated') {
+            const key = data.data?.key;
+            if (key === 'bgm_skip_conflicts' || key === 'bgm_incremental_sync') {
+                const ribbonUI = window.Application?.ribbonUI;
+                if (ribbonUI) {
+                    const controlId = key === 'bgm_skip_conflicts' ? 'chkSkipConflicts' : 'chkIncrementalSync';
+                    ribbonUI.InvalidateControl(controlId);
+                }
+            }
+        }
+    });
+}
+initRibbonMessageListener();
 /**
  * 获取"跳过冲突"复选框的初始按下状态
  * 从配置读取上次保存的设置，默认未选中
@@ -46,9 +49,29 @@ export function OnSkipConflictsChange(control) {
         finalValue = !getSkipConflicts();
         console.log(`[Ribbon] control.Pressed 不可用，切换状态为: ${finalValue}`);
     }
+    // 保存到 PluginStorage
     setSkipConflicts(finalValue);
     console.log(`[Ribbon] 跳过冲突状态已保存到 PluginStorage: ${finalValue}`);
-    return true;
+    // ========== 新增：通知侧边栏配置已更新 ==========
+    try {
+        if (typeof window !== 'undefined' && window.parent) {
+            window.parent.postMessage({
+                type: 'BGM:configUpdated',
+                data: {
+                    key: 'bgm_skip_conflicts',
+                    value: finalValue ? 'true' : 'false'
+                }
+            }, '*');
+            console.log(`[Ribbon] 已通知侧边栏冲突策略更新: ${finalValue ? '跳过' : '覆盖'}`);
+        }
+        else {
+            console.warn('[Ribbon] 无法发送 postMessage，window.parent 不可用');
+        }
+    }
+    catch (err) {
+        console.error('[Ribbon] 通知侧边栏失败:', err);
+    }
+    return true; // 必须返回 boolean
 }
 /**
  * 获取增量同步复选框的初始按下状态
@@ -64,18 +87,27 @@ export function GetIncrementalSyncPressed(control) {
  */
 export function OnIncrementalSyncChange(control) {
     const newValue = control.Pressed;
-    console.log(`[Ribbon] OnIncrementalSyncChange: control.Pressed = ${newValue}`);
-    // 如果 control.Pressed 是 undefined，则切换当前状态
     let finalValue;
     if (typeof newValue === 'boolean') {
         finalValue = newValue;
     }
     else {
         finalValue = !getIncrementalSync();
-        console.log(`[Ribbon] control.Pressed 不可用，切换状态为: ${finalValue}`);
     }
     setIncrementalSync(finalValue);
-    console.log(`[Ribbon] 增量同步状态已保存到 PluginStorage: ${finalValue}`);
+    // 新增：通知侧边栏
+    try {
+        if (typeof window !== 'undefined' && window.parent) {
+            window.parent.postMessage({
+                type: 'BGM:configUpdated',
+                data: { key: 'bgm_incremental_sync', value: finalValue ? 'true' : 'false' }
+            }, '*');
+            console.log(`[Ribbon] 已通知侧边栏增量同步更新: ${finalValue ? '开启' : '关闭'}`);
+        }
+    }
+    catch (err) {
+        console.error('[Ribbon] 通知侧边栏失败:', err);
+    }
     return true;
 }
 // ========== Ribbon 回调 ==========
