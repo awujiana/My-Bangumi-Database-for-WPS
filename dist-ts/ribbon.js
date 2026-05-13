@@ -71,9 +71,6 @@ export function OnAction(control) {
             case 'btnOpenCollection':
                 RibbonService.openCollectionForRibbon();
                 break;
-            case 'btnClearColors':
-                RibbonService.clearColorsForRibbon();
-                break;
             default:
                 console.warn('[BGM] 未知按钮:', control.Id);
         }

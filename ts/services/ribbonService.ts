@@ -4,7 +4,7 @@ import {
     getDataSheet, findHeaderRow, getLastRow, getColumnMap,
     extractSubjectId, mapWatchStatus, readCell, getCellValue,
     readRangeValues, getFilterStatus, BGM_COLOR, LOG_LEVELS,
-    SyncToBangumiAsync, openUserCollection, clearRowColors,
+    SyncToBangumiAsync, openUserCollection,
     testTokenValidityForRibbon, fetchAllUserCollections,
     type WpsRange, getCell, trim, getAllSyncRecords, calcFingerprint
 } from '../index.js';
@@ -389,9 +389,4 @@ export function setUserIdForRibbon() {
 /** 打开收藏页面 */
 export function openCollectionForRibbon() {
     openUserCollection();
-}
-
-/** 清除颜色标记 */
-export function clearColorsForRibbon() {
-    clearRowColors?.();
 }

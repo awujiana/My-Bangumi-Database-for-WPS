@@ -158,11 +158,6 @@ export declare function bgmRequestSync(method: string, endpoint: string, jsonBod
  */
 export declare function setBangumiToken(token: string): boolean;
 /**
- * 清除当前活动工作表的序列号列颜色标记
- * @param colMap 列映射（可选，用于确定序列号列）
- */
-export declare function clearRowColors(colMap?: Map<string, number>): void;
-/**
  * 异步同步到Bangumi（主同步函数）
  *
  * @async
@@ -206,12 +201,6 @@ export declare function SyncToBangumiAsync(ws: any, colMap: Map<string, number>,
     skip: number;
     stopped: boolean;
 }>;
-/**
- * 清除指定工作表的序列号列颜色标记
- * @param sheetIndex 工作表索引
- * @param colMap 列映射（可选，用于确定序列号列）
- */
-export declare function clearSheetMarksInSheet(sheetIndex: number, colMap?: Map<string, number>): void;
 /**
  * 测试单个条目更新
  *

@@ -1,5 +1,5 @@
 // ts/services/ribbonService.ts
-import { bgmLog, BGM, wpsMsgBox, loadBgToken, storeBgToken, getDataSheet, findHeaderRow, getLastRow, getColumnMap, extractSubjectId, mapWatchStatus, readCell, getCellValue, readRangeValues, getFilterStatus, BGM_COLOR, LOG_LEVELS, SyncToBangumiAsync, openUserCollection, clearRowColors, testTokenValidityForRibbon, fetchAllUserCollections, getCell, trim, calcFingerprint } from '../index.js';
+import { bgmLog, BGM, wpsMsgBox, loadBgToken, storeBgToken, getDataSheet, findHeaderRow, getLastRow, getColumnMap, extractSubjectId, mapWatchStatus, readCell, getCellValue, readRangeValues, getFilterStatus, BGM_COLOR, LOG_LEVELS, SyncToBangumiAsync, openUserCollection, testTokenValidityForRibbon, fetchAllUserCollections, getCell, trim, calcFingerprint } from '../index.js';
 /**
  * 获取同步预览统计（不发送请求，仅扫描 Excel）
  * @param ws 工作表对象
@@ -354,8 +354,4 @@ export function setUserIdForRibbon() {
 /** 打开收藏页面 */
 export function openCollectionForRibbon() {
     openUserCollection();
-}
-/** 清除颜色标记 */
-export function clearColorsForRibbon() {
-    clearRowColors?.();
 }

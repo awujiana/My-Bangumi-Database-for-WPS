@@ -7,7 +7,7 @@
  * @author BGM Development Team
  * @version 1.1.0 (优化版，保留原注释和日志)
  */
-import { URL_PATTERNS, WATCH_STATUS_MAP, BGM_CONFIG, BGM_COLOR, LOG_LEVELS, SYNC_STATUS, bgmLog, getApp, readCell, getCell, trim, getColumnMap, getLastRow, findHeaderRow, colNumToLetter, getCellValue, loadBgToken, storeBgToken, _getBgmUserId, _setBgmUserId, BGM, wpsMsgBox, _getUserApiPath, readRangeValues, delay, calcFingerprint, getAllSyncRecords, isWpsWorksheet } from '../index.js';
+import { URL_PATTERNS, WATCH_STATUS_MAP, BGM_CONFIG, BGM_COLOR, LOG_LEVELS, SYNC_STATUS, bgmLog, getApp, readCell, getCell, trim, getColumnMap, findHeaderRow, getCellValue, loadBgToken, storeBgToken, _getBgmUserId, _setBgmUserId, BGM, wpsMsgBox, _getUserApiPath, readRangeValues, delay, calcFingerprint, getAllSyncRecords, isWpsWorksheet } from '../index.js';
 import { getOrCreateSyncRecordSheet, addSyncRecord } from './syncRecord.js';
 import { showAlert, showSuccess, showError } from '../ui/dialog.js';
 // ========== 常量定义 (优化点：集中管理) ==========
@@ -66,27 +66,6 @@ function markSyncResultColor(ws, row, isSuccess, seqCol) {
     const cell = getCell(ws, row, col);
     if (cell?.Interior) {
         cell.Interior.Color = isSuccess ? BGM_COLOR.SUCCESS : BGM_COLOR.FAIL;
-    }
-}
-/**
- * 清除行颜色标记
- */
-function clearRowColor(ws, row, seqCol) {
-    try {
-        const cell = getCell(ws, row, seqCol);
-        if (cell?.Interior)
-            cell.Interior.ColorIndex = -4142;
-    }
-    catch (e) {
-        BGM.handleError(e, { context: 'clearRowColor', showAlert: false });
-    }
-}
-/**
- * 批量清除工作表颜色标记
- */
-function clearSheetColors(ws, lastRow, seqCol) {
-    for (let r = 1; r <= lastRow; r++) {
-        clearRowColor(ws, r, seqCol);
     }
 }
 /**
@@ -741,42 +720,6 @@ export function setBangumiToken(token) {
     }
 }
 /**
- * 清除当前活动工作表的序列号列颜色标记
- * @param colMap 列映射（可选，用于确定序列号列）
- */
-export function clearRowColors(colMap) {
-    try {
-        const app = getApp();
-        if (!app?.ActiveWorkbook) {
-            bgmLog(LOG_LEVELS.ERROR, '[clearRowColors] 无法获取活动工作簿');
-            return;
-        }
-        const ws = app.ActiveWorkbook.ActiveSheet;
-        if (!ws) {
-            bgmLog(LOG_LEVELS.ERROR, '[clearRowColors] 无法获取活动工作表');
-            return;
-        }
-        const sheetName = ws.Name;
-        bgmLog(LOG_LEVELS.INFO, `[clearRowColors] 开始清除工作表 "${sheetName}" 的颜色标记`);
-        const lastRow = getLastRow(ws);
-        bgmLog(LOG_LEVELS.DEBUG, `[clearRowColors] 工作表 "${sheetName}" 的最后一行: ${lastRow}`);
-        const detectedColMap = colMap;
-        const seqCol = getSeqColIndex(detectedColMap);
-        const seqColLetter = colNumToLetter(seqCol);
-        bgmLog(LOG_LEVELS.INFO, `[clearRowColors] 工作表 "${sheetName}" 序列号列: ${seqColLetter} (列号: ${seqCol})`);
-        if (lastRow <= 1) {
-            bgmLog(LOG_LEVELS.INFO, `[clearRowColors] 工作表 "${sheetName}" 没有数据，无需清除`);
-            return;
-        }
-        clearSheetColors(ws, lastRow, seqCol);
-        bgmLog(LOG_LEVELS.INFO, `[clearRowColors] 已清除工作表 "${sheetName}" 的颜色标记 (清除行数: ${lastRow - 1})`);
-    }
-    catch (e) {
-        bgmLog(LOG_LEVELS.ERROR, `[clearRowColors] 清除颜色标记失败: ${e.message || e}`);
-        BGM.handleError(e, { context: 'clearRowColors', showAlert: false });
-    }
-}
-/**
  * 批量执行同步请求（并发控制）
  * 优化点：提取独立函数，保留所有原有日志
  * @param tasks 同步任务列表
@@ -1017,43 +960,6 @@ export async function SyncToBangumiAsync(ws, colMap, token, lastRow, headerRow, 
     BGM.setSyncComplete(result);
     bgmLog(LOG_LEVELS.INFO, `[SyncToBangumiAsync] 同步完成: 成功=${result.success}, 失败=${result.fail}, 跳过=${result.skip}, 已停止=${result.stopped}, 总耗时=${totalTime}ms`);
     return result;
-}
-/**
- * 清除指定工作表的序列号列颜色标记
- * @param sheetIndex 工作表索引
- * @param colMap 列映射（可选，用于确定序列号列）
- */
-export function clearSheetMarksInSheet(sheetIndex, colMap) {
-    try {
-        const app = getApp();
-        if (!app?.ActiveWorkbook) {
-            bgmLog(LOG_LEVELS.ERROR, '[clearSheetMarksInSheet] 无法获取活动工作簿');
-            return;
-        }
-        const ws = app.ActiveWorkbook.Worksheets.Item(sheetIndex);
-        if (!ws) {
-            bgmLog(LOG_LEVELS.ERROR, `[clearSheetMarksInSheet] 工作表索引 ${sheetIndex} 不存在`);
-            return;
-        }
-        const sheetName = ws.Name;
-        bgmLog(LOG_LEVELS.INFO, `[clearSheetMarksInSheet] 开始清除工作表 "${sheetName}" (索引: ${sheetIndex}) 的颜色标记`);
-        const lastRow = getLastRow(ws);
-        bgmLog(LOG_LEVELS.DEBUG, `[clearSheetMarksInSheet] 工作表 "${sheetName}" 的最后一行: ${lastRow}`);
-        const detectedColMap = colMap;
-        const seqCol = getSeqColIndex(detectedColMap);
-        const seqColLetter = colNumToLetter(seqCol);
-        bgmLog(LOG_LEVELS.INFO, `[clearSheetMarksInSheet] 工作表 "${sheetName}" 序列号列: ${seqColLetter} (列号: ${seqCol})`);
-        if (lastRow <= 1) {
-            bgmLog(LOG_LEVELS.INFO, `[clearSheetMarksInSheet] 工作表 "${sheetName}" 没有数据，无需清除`);
-            return;
-        }
-        clearSheetColors(ws, lastRow, seqCol);
-        bgmLog(LOG_LEVELS.INFO, `[clearSheetMarksInSheet] 已清除工作表 "${sheetName}" 的颜色标记 (清除行数: ${lastRow - 1})`);
-    }
-    catch (e) {
-        bgmLog(LOG_LEVELS.ERROR, `[clearSheetMarksInSheet] 清除颜色标记失败: ${e.message || e}`);
-        BGM.handleError(e, { context: 'clearSheetMarksInSheet', showAlert: false });
-    }
 }
 /**
  * 测试单个条目更新

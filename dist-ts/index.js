@@ -76,15 +76,13 @@ setSyncRunning, } from './ui/message.js';
 // ============================================================================
 export { 
 // 显示用户 ID 设置对话框
-showUserIdDialog, markUploadedItems, clearSheetMarks, updateTokenStatus, updateUserIdStatus, showTokenDialog, testDebugConnection, syncCollectionFromBgm } from './ui/handlers.js';
+showUserIdDialog, markUploadedItems, updateTokenStatus, updateUserIdStatus, showTokenDialog, testDebugConnection, syncCollectionFromBgm } from './ui/handlers.js';
 // ============================================================================
 // 8. 同步记录工作表（来自 sync/syncRecord.js）
 // ============================================================================
 export { 
 // 导入同步记录模块的函数
-getOrCreateSyncRecordSheet, getAllSyncRecords, addSyncRecord, openSyncRecordSheet, 
-// 清除 D 列颜色标记（COM 版本）
-clearSheetMarksInSheet, clearSyncRecords, } from './sync/syncRecord.js';
+getOrCreateSyncRecordSheet, getAllSyncRecords, addSyncRecord, openSyncRecordSheet, clearSyncRecords, } from './sync/syncRecord.js';
 // ============================================================================
 // 9. 同步引擎（来自 sync/exceltobangumi.js）
 // ============================================================================
@@ -97,8 +95,6 @@ getFilterStatus,
 getSequentialRowsBySeqCol, 
 // 异步同步到 Bangumi
 SyncToBangumiAsync, 
-// 清除所有行颜色标记
-clearRowColors, 
 // 测试单个条目更新
 testSingleUpdate, mapWatchStatus, buildJsonPayload, bgmRequestSync, setBangumiToken, openBangumiTokenPage, testTokenValidityForRibbon, openUserCollection, buildTagsArray, addTagsFromStr, } from './sync/exceltobangumi.js';
 // ============================================================================

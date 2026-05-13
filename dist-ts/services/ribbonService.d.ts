@@ -48,6 +48,4 @@ export declare function testTokenForRibbon(): void;
 export declare function setUserIdForRibbon(): void;
 /** 打开收藏页面 */
 export declare function openCollectionForRibbon(): void;
-/** 清除颜色标记 */
-export declare function clearColorsForRibbon(): void;
 //# sourceMappingURL=ribbonService.d.ts.map

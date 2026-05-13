@@ -3,7 +3,7 @@
  * @module ui/handlers
  * @description 面板操作处理、按钮绑定、业务对话框
  */
-import { LOG_LEVELS, bgmLog, BGM, loadBgToken, storeBgToken, _getBgmUserId, _setBgmUserId, getApp, getCell, trim, fetchBgmUserInfo, BGM_COLOR, showAlert, showConfirm, showError, showSuccess, showInput, showToast, setStatus, verifyToken, fetchAllUserCollections, findHeaderRow, getColumnMap, getLastRow, extractSubjectId, getDataSheet, getFilterStatus, SyncToBangumiAsync, clearRowColors, testSingleUpdate, getOrCreateSyncRecordSheet, getAllSyncRecords, addSyncRecord, openSyncRecordSheet, clearSheetMarksInSheet, previewSyncContent, refreshData, refreshSheets, toggleSheetLock, clearSyncRecords, closeDetailModal, } from '../index.js';
+import { LOG_LEVELS, bgmLog, BGM, loadBgToken, storeBgToken, _getBgmUserId, _setBgmUserId, getApp, getCell, trim, fetchBgmUserInfo, BGM_COLOR, showAlert, showConfirm, showError, showSuccess, showInput, showToast, setStatus, verifyToken, fetchAllUserCollections, findHeaderRow, getColumnMap, getLastRow, extractSubjectId, getDataSheet, getFilterStatus, SyncToBangumiAsync, testSingleUpdate, getOrCreateSyncRecordSheet, getAllSyncRecords, addSyncRecord, openSyncRecordSheet, previewSyncContent, refreshData, refreshSheets, toggleSheetLock, clearSyncRecords, closeDetailModal, } from '../index.js';
 5;
 import { BGM_EVENTS, eventBus } from '../tools/events.js';
 //  
@@ -213,11 +213,8 @@ export function onAction(action) {
                 testSingleUpdate();
             break;
         case 'clear':
-        case 'clear':
             showConfirm(_T.confirmClearMarks, (confirmed) => {
                 if (confirmed) {
-                    if (typeof clearRowColors === 'function')
-                        clearRowColors();
                     if (typeof refreshData === 'function')
                         refreshData();
                 }
@@ -236,8 +233,6 @@ export function onAction(action) {
         case 'showClearConfirm':
             showConfirm(_T.confirmClearMarks, (confirmed) => {
                 if (confirmed) {
-                    if (typeof clearRowColors === 'function')
-                        clearRowColors();
                     if (typeof refreshData === 'function')
                         refreshData();
                 }
@@ -659,65 +654,6 @@ export async function markUploadedItems(sheetIndexOrName, collections) {
     }
     // 无操作
 }
-export function clearSheetMarks(sheetIndexOrName) {
-    if (typeof clearSheetMarksInSheet !== 'function') {
-        bgmLog(LOG_LEVELS.ERROR, '[clearSheetMarks] clearSheetMarksInSheet 函数不可用');
-        return;
-    }
-    const app = getApp();
-    if (!app?.ActiveWorkbook) {
-        bgmLog(LOG_LEVELS.ERROR, '[clearSheetMarks] 无法获取活动工作簿');
-        return;
-    }
-    // 1. 如果没有提供参数，默认清除当前活动工作表
-    if (sheetIndexOrName === undefined || sheetIndexOrName === null || sheetIndexOrName === '') {
-        const activeSheet = app.ActiveWorkbook.ActiveSheet;
-        if (!activeSheet) {
-            bgmLog(LOG_LEVELS.ERROR, '[clearSheetMarks] 无法获取当前活动工作表');
-            return;
-        }
-        // 查找当前活动工作表的索引
-        let activeIndex = -1;
-        for (let i = 1; i <= app.ActiveWorkbook.Worksheets.Count; i++) {
-            if (app.ActiveWorkbook.Worksheets.Item(i).Name === activeSheet.Name) {
-                activeIndex = i;
-                break;
-            }
-        }
-        if (activeIndex === -1) {
-            bgmLog(LOG_LEVELS.ERROR, '[clearSheetMarks] 无法确定当前活动工作表的索引');
-            return;
-        }
-        bgmLog(LOG_LEVELS.INFO, `[clearSheetMarks] 默认清除当前活动工作表: "${activeSheet.Name}" (索引: ${activeIndex})`);
-        clearSheetMarksInSheet(activeIndex);
-        return;
-    }
-    // 2. 处理传入的工作表名称（字符串）
-    if (typeof sheetIndexOrName === 'string') {
-        bgmLog(LOG_LEVELS.INFO, `[clearSheetMarks] 查找工作表名称: "${sheetIndexOrName}"`);
-        for (let i = 1; i <= app.ActiveWorkbook.Worksheets.Count; i++) {
-            const ws = app.ActiveWorkbook.Worksheets.Item(i);
-            const wsName = ws?.Name || `Sheet${i}`;
-            if (ws && ws.Name === sheetIndexOrName) {
-                bgmLog(LOG_LEVELS.INFO, `[clearSheetMarks] 找到匹配的工作表: "${wsName}" (索引: ${i})`);
-                clearSheetMarksInSheet(i);
-                return;
-            }
-        }
-        bgmLog(LOG_LEVELS.WARN, `[clearSheetMarks] 未找到工作表: "${sheetIndexOrName}"`);
-        return;
-    }
-    // 3. 处理传入的数字索引
-    const idx = Number(sheetIndexOrName);
-    if (isNaN(idx)) {
-        bgmLog(LOG_LEVELS.WARN, `[clearSheetMarks] 无效的工作表索引: ${sheetIndexOrName}`);
-        return;
-    }
-    const ws = app.ActiveWorkbook.Worksheets.Item(idx);
-    const wsName = ws?.Name || `Sheet${idx}`;
-    bgmLog(LOG_LEVELS.INFO, `[clearSheetMarks] 使用工作表索引: ${idx} (名称: "${wsName}")`);
-    clearSheetMarksInSheet(idx);
-}
 // ========== 事件监听 ==========
 function setupButtonListeners() {
     document.querySelectorAll('[data-action]').forEach(button => {
@@ -764,18 +700,16 @@ function handleActionClick(event) {
             }
             break;
         case 'clear':
-            bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 开始执行清除标记');
+            bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 开始刷新数据');
             showConfirm(_T.confirmClearMarks, (confirmed) => {
                 if (confirmed) {
-                    bgmLog(LOG_LEVELS.DEBUG, '[handleActionClick] 用户确认清除标记');
-                    if (typeof clearRowColors === 'function')
-                        clearRowColors();
+                    bgmLog(LOG_LEVELS.DEBUG, '[handleActionClick] 用户确认刷新数据');
                     if (typeof refreshData === 'function')
                         refreshData();
-                    bgmLog(LOG_LEVELS.INFO, `[handleActionClick] 清除标记完成，耗时: ${Date.now() - startTime}ms`);
+                    bgmLog(LOG_LEVELS.INFO, `[handleActionClick] 刷新数据完成，耗时: ${Date.now() - startTime}ms`);
                 }
                 else {
-                    bgmLog(LOG_LEVELS.DEBUG, '[handleActionClick] 用户取消清除标记');
+                    bgmLog(LOG_LEVELS.DEBUG, '[handleActionClick] 用户取消刷新数据');
                 }
             });
             break;
@@ -844,13 +778,6 @@ function handleActionClick(event) {
             bgmLog(LOG_LEVELS.INFO, `[handleActionClick] 标记已上传项目，类型: ${args[0] || '全部'}`);
             markUploadedItems(args[0]);
             bgmLog(LOG_LEVELS.INFO, `[handleActionClick] 已上传项目标记完成，耗时: ${Date.now() - startTime}ms`);
-            break;
-        case 'clearSheetMarks':
-            clearSheetMarks(args[0]);
-            const sheetTarget = args[0] || '';
-            bgmLog(LOG_LEVELS.INFO, `[handleActionClick] 清除工作表标记，默认为当前工作表,工作表: ${sheetTarget}`);
-            clearSheetMarks(sheetTarget);
-            bgmLog(LOG_LEVELS.INFO, `[handleActionClick] 工作表标记清除完成，耗时: ${Date.now() - startTime}ms`);
             break;
         case 'openSyncRecordSheet':
             bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 打开同步记录工作表');
