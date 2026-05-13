@@ -931,18 +931,29 @@ function setupMessageListener(): void {
                     updateUserIdStatus();
                     break;
                 case 'BGM:configUpdated':
-                    bgmLog(LOG_LEVELS.INFO, `[handlers] 收到配置更新通知: key=${data.data?.key}, value=${data.data?.value}`);
-                    if (data.data?.key === 'bgm_incremental_sync') {
-                        const chkIncremental = document.getElementById('chkIncremental') as HTMLInputElement;
-                        if (chkIncremental) {
-                            const isChecked = data.data.value === 'true';
-                            chkIncremental.checked = isChecked;
-                            bgmLog(LOG_LEVELS.DEBUG, `[handlers] 增量同步复选框已更新: ${isChecked ? '开启' : '关闭'}`);
-                        }
-                    } else if (data.data?.key === 'bgm_skip_conflicts') {
-                        updateSkipConflictsUI(data.data.value === 'true');
-                    }
-                    break;
+            bgmLog(LOG_LEVELS.INFO, `[handlers] ========== 收到 BGM:configUpdated 消息 ==========`);
+            bgmLog(LOG_LEVELS.INFO, `[handlers] 配置键: ${data.data?.key}`);
+            bgmLog(LOG_LEVELS.INFO, `[handlers] 配置值: ${data.data?.value}`);
+            
+            if (data.data?.key === 'bgm_incremental_sync') {
+                bgmLog(LOG_LEVELS.INFO, `[handlers] 处理增量同步配置更新`);
+                const chkIncremental = document.getElementById('chkIncremental') as HTMLInputElement;
+                if (chkIncremental) {
+                    bgmLog(LOG_LEVELS.DEBUG, `[handlers] 找到 chkIncremental 元素`);
+                    bgmLog(LOG_LEVELS.DEBUG, `[handlers] 当前状态: ${chkIncremental.checked ? '开启' : '关闭'}`);
+                    
+                    const isChecked = data.data.value === 'true';
+                    chkIncremental.checked = isChecked;
+                    
+                    bgmLog(LOG_LEVELS.INFO, `[handlers] 增量同步复选框已更新: ${isChecked ? '开启' : '关闭'}`);
+                } else {
+                    bgmLog(LOG_LEVELS.WARN, `[handlers] 未找到 chkIncremental 元素`);
+                }
+            } else if (data.data?.key === 'bgm_skip_conflicts') {
+                bgmLog(LOG_LEVELS.INFO, `[handlers] 处理跳过冲突配置更新`);
+                updateSkipConflictsUI(data.data.value === 'true');
+            }
+            break;
                 case 'tokenUpdated':
                 case 'userIdUpdated':
                     // 兼容旧格式
@@ -983,11 +994,18 @@ function setupEventListeners(): void {
         
         if (data.key === 'bgm_incremental_sync') {
             // 更新增量同步复选框
+            bgmLog(LOG_LEVELS.INFO, `[handlers] ========== 更新增量同步复选框 ==========`);
             const chkIncremental = document.getElementById('chkIncremental') as HTMLInputElement;
             if (chkIncremental) {
+                bgmLog(LOG_LEVELS.DEBUG, `[handlers] 找到 chkIncremental 元素`);
+                bgmLog(LOG_LEVELS.DEBUG, `[handlers] 当前状态: ${chkIncremental.checked ? '开启' : '关闭'}`);
+                
                 const isChecked = data.value === 'true';
                 chkIncremental.checked = isChecked;
-                bgmLog(LOG_LEVELS.DEBUG, `[handlers] 增量同步复选框已更新: ${isChecked ? '开启' : '关闭'}`);
+                
+                bgmLog(LOG_LEVELS.INFO, `[handlers] 增量同步复选框已更新: ${isChecked ? '开启' : '关闭'}`);
+            } else {
+                bgmLog(LOG_LEVELS.WARN, `[handlers] 未找到 chkIncremental 元素`);
             }
         } else if (data.key === 'bgm_skip_conflicts') {
             // 更新跳过冲突选项
@@ -1003,17 +1021,24 @@ function setupEventListeners(): void {
 
 // 更新跳过冲突 UI 状态
 function updateSkipConflictsUI(skipConflicts: boolean): void {
-    bgmLog(LOG_LEVELS.DEBUG, `[handlers] 更新跳过冲突 UI: ${skipConflicts ? '跳过冲突' : 'Excel覆盖'}`);
+    bgmLog(LOG_LEVELS.INFO, `[handlers] ========== 更新跳过冲突 UI ==========`);
+    bgmLog(LOG_LEVELS.INFO, `[handlers] 目标状态: ${skipConflicts ? '跳过冲突' : 'Excel覆盖'}`);
     
     // 查找 select 元素（侧边栏使用的是 select 下拉框）
     const conflictStrategySelect = document.getElementById('conflictStrategy') as HTMLSelectElement;
     
     if (conflictStrategySelect) {
         // 如果是 select 下拉框
+        bgmLog(LOG_LEVELS.DEBUG, `[handlers] 找到 conflictStrategy select 元素`);
+        bgmLog(LOG_LEVELS.DEBUG, `[handlers] 当前值: ${conflictStrategySelect.value}`);
+        
         conflictStrategySelect.value = skipConflicts ? 'skip' : 'excel';
-        bgmLog(LOG_LEVELS.DEBUG, `[handlers] 冲突策略 select 已更新: ${conflictStrategySelect.value}`);
+        
+        bgmLog(LOG_LEVELS.INFO, `[handlers] 冲突策略 select 已更新: ${conflictStrategySelect.value}`);
         return;
     }
+    
+    bgmLog(LOG_LEVELS.WARN, `[handlers] 未找到 conflictStrategy select 元素`);
     
     // 备用：查找 radio 按钮
     const skipRadio = document.querySelector('input[name="conflictStrategy"][value="skip"]') as HTMLInputElement;
