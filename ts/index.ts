@@ -123,7 +123,6 @@ export {
     // 显示用户 ID 设置对话框
     showUserIdDialog,
     markUploadedItems, 
-    clearSheetMarks, 
     updateTokenStatus, 
     updateUserIdStatus, 
     showTokenDialog,
@@ -140,8 +139,6 @@ export {
     getAllSyncRecords,
     addSyncRecord,
     openSyncRecordSheet,
-    // 清除 D 列颜色标记（COM 版本）
-    clearSheetMarksInSheet,
    type SyncRecord,
     type UpdateRecordParams,
     clearSyncRecords,
@@ -161,8 +158,6 @@ export {
     getSequentialRowsBySeqCol,
     // 异步同步到 Bangumi
     SyncToBangumiAsync,
-    // 清除所有行颜色标记
-    clearRowColors,
     // 测试单个条目更新
     testSingleUpdate,
     mapWatchStatus,

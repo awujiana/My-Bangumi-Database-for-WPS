@@ -125,27 +125,6 @@ function markSyncResultColor(ws: any, row: number, isSuccess: boolean, seqCol?: 
 }
 
 /**
- * 清除行颜色标记
- */
-function clearRowColor(ws: any, row: number, seqCol: number): void {
-    try {
-        const cell = getCell(ws, row, seqCol) as WpsRange | null;
-        if (cell?.Interior) cell.Interior.ColorIndex = -4142;
-    } catch (e: any) {
-        BGM.handleError(e, { context: 'clearRowColor', showAlert: false });
-    }
-}
-
-/**
- * 批量清除工作表颜色标记
- */
-function clearSheetColors(ws: any, lastRow: number, seqCol: number): void {
-    for (let r = 1; r <= lastRow; r++) {
-        clearRowColor(ws, r, seqCol);
-    }
-}
-
-/**
  * 提取HTTP请求结果消息
  */
 function extractResponseMessage(data: any): string {
@@ -857,49 +836,7 @@ export function setBangumiToken(token: string): boolean {
     }
 }
 
-/**
- * 清除当前活动工作表的序列号列颜色标记
- * @param colMap 列映射（可选，用于确定序列号列）
- */
-export function clearRowColors(colMap?: Map<string, number>): void {
-    try {
-        const app = getApp();
-        if (!app?.ActiveWorkbook) {
-            bgmLog(LOG_LEVELS.ERROR, '[clearRowColors] 无法获取活动工作簿');
-            return;
-        }
 
-        const ws = app.ActiveWorkbook.ActiveSheet;
-        if (!ws) {
-            bgmLog(LOG_LEVELS.ERROR, '[clearRowColors] 无法获取活动工作表');
-            return;
-        }
-
-        const sheetName = ws.Name;
-        bgmLog(LOG_LEVELS.INFO, `[clearRowColors] 开始清除工作表 "${sheetName}" 的颜色标记`);
-
-        const lastRow = getLastRow(ws);
-        bgmLog(LOG_LEVELS.DEBUG, `[clearRowColors] 工作表 "${sheetName}" 的最后一行: ${lastRow}`);
-
-        const detectedColMap = colMap ;
-        const seqCol = getSeqColIndex(detectedColMap);
-        const seqColLetter = colNumToLetter(seqCol);
-        bgmLog(LOG_LEVELS.INFO, `[clearRowColors] 工作表 "${sheetName}" 序列号列: ${seqColLetter} (列号: ${seqCol})`);
-
-        if (lastRow <= 1) {
-            bgmLog(LOG_LEVELS.INFO, `[clearRowColors] 工作表 "${sheetName}" 没有数据，无需清除`);
-            return;
-        }
-
-        clearSheetColors(ws, lastRow, seqCol);
-        bgmLog(LOG_LEVELS.INFO, `[clearRowColors] 已清除工作表 "${sheetName}" 的颜色标记 (清除行数: ${lastRow - 1})`);
-    } catch (e: any) {
-        bgmLog(LOG_LEVELS.ERROR, `[clearRowColors] 清除颜色标记失败: ${e.message || e}`);
-        BGM.handleError(e, { context: 'clearRowColors', showAlert: false });
-    }
-}
-
-// ========== 批量同步核心函数（优化点：拆分逻辑，但保留所有日志） ==========
 
 /**
  * 同步任务项接口
@@ -1235,49 +1172,6 @@ export async function SyncToBangumiAsync(
     BGM.setSyncComplete(result);
     bgmLog(LOG_LEVELS.INFO, `[SyncToBangumiAsync] 同步完成: 成功=${result.success}, 失败=${result.fail}, 跳过=${result.skip}, 已停止=${result.stopped}, 总耗时=${totalTime}ms`);
     return result;
-}
-
-/**
- * 清除指定工作表的序列号列颜色标记
- * @param sheetIndex 工作表索引
- * @param colMap 列映射（可选，用于确定序列号列）
- */
-export function clearSheetMarksInSheet(sheetIndex: number, colMap?: Map<string, number>): void {
-    try {
-        const app = getApp();
-        if (!app?.ActiveWorkbook) {
-            bgmLog(LOG_LEVELS.ERROR, '[clearSheetMarksInSheet] 无法获取活动工作簿');
-            return;
-        }
-
-        const ws = app.ActiveWorkbook.Worksheets.Item(sheetIndex);
-        if (!ws) {
-            bgmLog(LOG_LEVELS.ERROR, `[clearSheetMarksInSheet] 工作表索引 ${sheetIndex} 不存在`);
-            return;
-        }
-
-        const sheetName = ws.Name;
-        bgmLog(LOG_LEVELS.INFO, `[clearSheetMarksInSheet] 开始清除工作表 "${sheetName}" (索引: ${sheetIndex}) 的颜色标记`);
-
-        const lastRow = getLastRow(ws);
-        bgmLog(LOG_LEVELS.DEBUG, `[clearSheetMarksInSheet] 工作表 "${sheetName}" 的最后一行: ${lastRow}`);
-
-        const detectedColMap = colMap ;
-        const seqCol = getSeqColIndex(detectedColMap);
-        const seqColLetter = colNumToLetter(seqCol);
-        bgmLog(LOG_LEVELS.INFO, `[clearSheetMarksInSheet] 工作表 "${sheetName}" 序列号列: ${seqColLetter} (列号: ${seqCol})`);
-
-        if (lastRow <= 1) {
-            bgmLog(LOG_LEVELS.INFO, `[clearSheetMarksInSheet] 工作表 "${sheetName}" 没有数据，无需清除`);
-            return;
-        }
-
-        clearSheetColors(ws, lastRow, seqCol);
-        bgmLog(LOG_LEVELS.INFO, `[clearSheetMarksInSheet] 已清除工作表 "${sheetName}" 的颜色标记 (清除行数: ${lastRow - 1})`);
-    } catch (e: any) {
-        bgmLog(LOG_LEVELS.ERROR, `[clearSheetMarksInSheet] 清除颜色标记失败: ${e.message || e}`);
-        BGM.handleError(e, { context: 'clearSheetMarksInSheet', showAlert: false });
-    }
 }
 
 /**
