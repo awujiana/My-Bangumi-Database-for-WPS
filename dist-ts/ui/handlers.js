@@ -934,23 +934,28 @@ function setupEventListeners() {
 // 更新跳过冲突 UI 状态
 function updateSkipConflictsUI(skipConflicts) {
     bgmLog(LOG_LEVELS.DEBUG, `[handlers] 更新跳过冲突 UI: ${skipConflicts ? '跳过冲突' : 'Excel覆盖'}`);
-    // 查找跳过冲突的 radio 或 checkbox 并更新
-    // 先尝试查找 radio 按钮
+    // 查找 select 元素（侧边栏使用的是 select 下拉框）
+    const conflictStrategySelect = document.getElementById('conflictStrategy');
+    if (conflictStrategySelect) {
+        // 如果是 select 下拉框
+        conflictStrategySelect.value = skipConflicts ? 'skip' : 'excel';
+        bgmLog(LOG_LEVELS.DEBUG, `[handlers] 冲突策略 select 已更新: ${conflictStrategySelect.value}`);
+        return;
+    }
+    // 备用：查找 radio 按钮
     const skipRadio = document.querySelector('input[name="conflictStrategy"][value="skip"]');
     const overwriteRadio = document.querySelector('input[name="conflictStrategy"][value="overwrite"]');
     if (skipRadio && overwriteRadio) {
-        // 如果是 radio 按钮
         skipRadio.checked = skipConflicts;
         overwriteRadio.checked = !skipConflicts;
         bgmLog(LOG_LEVELS.DEBUG, `[handlers] 冲突策略 radio 已更新`);
+        return;
     }
-    else {
-        // 如果是 checkbox
-        const chkSkipConflicts = document.getElementById('chkSkipConflicts');
-        if (chkSkipConflicts) {
-            chkSkipConflicts.checked = skipConflicts;
-            bgmLog(LOG_LEVELS.DEBUG, `[handlers] 跳过冲突复选框已更新`);
-        }
+    // 备用：如果是 checkbox
+    const chkSkipConflicts = document.getElementById('chkSkipConflicts');
+    if (chkSkipConflicts) {
+        chkSkipConflicts.checked = skipConflicts;
+        bgmLog(LOG_LEVELS.DEBUG, `[handlers] 跳过冲突复选框已更新`);
     }
 }
 // 确保在 DOM 加载完成且模块初始化后执行
@@ -979,9 +984,16 @@ function initIncrementalSyncFromRibbon() {
     // 监听 checkbox 变化，同步到配置
     chkIncremental.addEventListener('change', () => {
         const checked = chkIncremental.checked;
+        bgmLog(LOG_LEVELS.INFO, `[handlers] ========== 增量同步状态变更 ==========`);
+        bgmLog(LOG_LEVELS.INFO, `[handlers] 新状态: ${checked ? '开启' : '关闭'}`);
         try {
-            setIncrementalSync(checked);
-            bgmLog(LOG_LEVELS.DEBUG, `[handlers] 增量同步状态已更新: ${checked ? '开启' : '关闭'}`);
+            const result = setIncrementalSync(checked);
+            if (result) {
+                bgmLog(LOG_LEVELS.INFO, `[handlers] 增量同步状态已成功同步到配置和 Ribbon`);
+            }
+            else {
+                bgmLog(LOG_LEVELS.WARN, `[handlers] 增量同步状态同步失败`);
+            }
         }
         catch (e) {
             bgmLog(LOG_LEVELS.WARN, `[handlers] 更新增量同步状态失败: ${e.message}`);
@@ -1000,8 +1012,27 @@ function initSkipConflictsFromRibbon() {
     catch (e) {
         bgmLog(LOG_LEVELS.WARN, `[handlers] 读取跳过冲突状态失败: ${e.message}`);
     }
-    // 监听冲突策略 radio 或 checkbox 的变化
-    // 先尝试查找 radio 按钮
+    // 监听冲突策略 select 的变化（侧边栏使用的是 select 下拉框）
+    const conflictStrategySelect = document.getElementById('conflictStrategy');
+    if (conflictStrategySelect) {
+        conflictStrategySelect.addEventListener('change', () => {
+            const selectedValue = conflictStrategySelect.value;
+            const isSkip = selectedValue === 'skip';
+            bgmLog(LOG_LEVELS.INFO, `[handlers] ========== 冲突策略变更 ==========`);
+            bgmLog(LOG_LEVELS.INFO, `[handlers] 当前值: ${selectedValue}`);
+            bgmLog(LOG_LEVELS.INFO, `[handlers] 策略类型: ${isSkip ? '跳过冲突（保留Bangumi数据）' : 'Excel覆盖（用Excel数据覆盖）'}`);
+            const result = setSkipConflicts(isSkip);
+            if (result) {
+                bgmLog(LOG_LEVELS.INFO, `[handlers] 冲突策略已成功同步到配置和 Ribbon`);
+            }
+            else {
+                bgmLog(LOG_LEVELS.WARN, `[handlers] 冲突策略同步失败`);
+            }
+        });
+        bgmLog(LOG_LEVELS.DEBUG, `[handlers] 已注册冲突策略 select 变化监听器`);
+        return;
+    }
+    // 备用：查找并监听 radio 按钮
     const skipRadio = document.querySelector('input[name="conflictStrategy"][value="skip"]');
     const overwriteRadio = document.querySelector('input[name="conflictStrategy"][value="overwrite"]');
     if (skipRadio && overwriteRadio) {
@@ -1017,22 +1048,21 @@ function initSkipConflictsFromRibbon() {
                 bgmLog(LOG_LEVELS.DEBUG, `[handlers] 冲突策略已更新: Excel覆盖`);
             }
         });
+        return;
     }
-    else {
-        // 如果是 checkbox
-        const chkSkipConflicts = document.getElementById('chkSkipConflicts');
-        if (chkSkipConflicts) {
-            chkSkipConflicts.addEventListener('change', () => {
-                const checked = chkSkipConflicts.checked;
-                try {
-                    setSkipConflicts(checked);
-                    bgmLog(LOG_LEVELS.DEBUG, `[handlers] 跳过冲突状态已更新: ${checked ? '跳过冲突' : 'Excel覆盖'}`);
-                }
-                catch (e) {
-                    bgmLog(LOG_LEVELS.WARN, `[handlers] 更新跳过冲突状态失败: ${e.message}`);
-                }
-            });
-        }
+    // 备用：如果是 checkbox
+    const chkSkipConflicts = document.getElementById('chkSkipConflicts');
+    if (chkSkipConflicts) {
+        chkSkipConflicts.addEventListener('change', () => {
+            const checked = chkSkipConflicts.checked;
+            try {
+                setSkipConflicts(checked);
+                bgmLog(LOG_LEVELS.DEBUG, `[handlers] 跳过冲突状态已更新: ${checked ? '跳过冲突' : 'Excel覆盖'}`);
+            }
+            catch (e) {
+                bgmLog(LOG_LEVELS.WARN, `[handlers] 更新跳过冲突状态失败: ${e.message}`);
+            }
+        });
     }
 }
 // 监听模块初始化完成事件
