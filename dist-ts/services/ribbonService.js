@@ -347,7 +347,18 @@ export function setUserIdForRibbon() {
     const app = window.Application;
     const userId = app?.InputBox?.('请输入用户 ID（数字）', '设置用户 ID', '', 2);
     if (userId && userId !== false) {
-        BGM.setUserId(String(userId).trim());
+        const userIdStr = String(userId).trim();
+        BGM.setUserId(userIdStr);
+        bgmLog(LOG_LEVELS.INFO, `[setUserIdForRibbon] 用户ID已设置: ${userIdStr}`);
+        // 发送 postMessage 通知侧边栏
+        if (typeof window !== 'undefined' && window.parent) {
+            window.parent.postMessage({
+                type: 'BGM:userIdUpdated',
+                userId: userIdStr,
+                timestamp: Date.now()
+            }, '*');
+            bgmLog(LOG_LEVELS.DEBUG, `[setUserIdForRibbon] 已发送 postMessage 通知侧边栏`);
+        }
         app?.MessageBox?.('用户 ID 已保存', 0, 64);
     }
 }

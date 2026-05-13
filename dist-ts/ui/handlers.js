@@ -844,6 +844,12 @@ function setupMessageListener() {
                     updateUserIdStatus();
                     break;
                 case 'BGM:userIdUpdated':
+                    bgmLog(LOG_LEVELS.INFO, `[handlers] 收到用户ID更新通知: ${data.userId}`);
+                    if (data.userId) {
+                        BGM.cache.userId = data.userId;
+                        _setBgmUserId(data.userId);
+                        bgmLog(LOG_LEVELS.DEBUG, `[handlers] 已更新 BGM.cache.userId: ${BGM.cache.userId}`);
+                    }
                     updateUserIdStatus();
                     break;
                 case 'BGM:userInfoUpdated':
