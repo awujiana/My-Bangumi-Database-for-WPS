@@ -198,19 +198,28 @@ export function testTokenValidityForRibbon(token) {
  */
 function notifyUserInfoUpdated(username, userId) {
     try {
+        bgmLog(LOG_LEVELS.INFO, `[notifyUserInfoUpdated] 开始通知用户信息更新:`);
+        bgmLog(LOG_LEVELS.INFO, `[notifyUserInfoUpdated]   用户名: ${username}`);
+        bgmLog(LOG_LEVELS.INFO, `[notifyUserInfoUpdated]   用户ID: ${userId}`);
         // 触发事件总线
         BGM.setUserId(userId);
         BGM.setUsername(username);
+        bgmLog(LOG_LEVELS.DEBUG, `[notifyUserInfoUpdated] BGM.cache 已更新`);
         // 尝试通知 taskpane
         if (typeof window !== 'undefined' && window.parent) {
+            bgmLog(LOG_LEVELS.DEBUG, `[notifyUserInfoUpdated] 准备发送 postMessage 到 window.parent`);
             window.parent.postMessage({
                 type: 'BGM:userInfoUpdated',
                 username: username,
                 userId: userId,
                 timestamp: Date.now()
             }, '*');
+            bgmLog(LOG_LEVELS.INFO, `[notifyUserInfoUpdated] postMessage 已发送: BGM:userInfoUpdated`);
         }
-        bgmLog(LOG_LEVELS.DEBUG, `notifyUserInfoUpdated: 用户名=${username}, ID=${userId}`);
+        else {
+            bgmLog(LOG_LEVELS.WARN, `[notifyUserInfoUpdated] window.parent 不可用，无法发送通知`);
+        }
+        bgmLog(LOG_LEVELS.DEBUG, `[notifyUserInfoUpdated] 通知完成`);
     }
     catch (e) {
         bgmLog(LOG_LEVELS.WARN, '通知用户信息更新失败: ' + e.message);

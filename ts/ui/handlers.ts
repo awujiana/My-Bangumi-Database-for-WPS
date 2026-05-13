@@ -911,6 +911,16 @@ function setupMessageListener(): void {
                     updateUserIdStatus();
                     break;
                 case 'BGM:userInfoUpdated':
+                    bgmLog(LOG_LEVELS.INFO, `[handlers] 收到用户信息更新通知: 用户名=${data.username}, 用户ID=${data.userId}`);
+                    if (data.username) {
+                        BGM.cache.username = data.username;
+                        bgmLog(LOG_LEVELS.DEBUG, `[handlers] 已更新 BGM.cache.username: ${BGM.cache.username}`);
+                    }
+                    if (data.userId) {
+                        BGM.cache.userId = data.userId;
+                        _setBgmUserId(data.userId);
+                        bgmLog(LOG_LEVELS.DEBUG, `[handlers] 已更新 BGM.cache.userId 和用户ID配置: ${BGM.cache.userId}`);
+                    }
                     updateUserIdStatus();
                     break;
                 case 'tokenUpdated':
