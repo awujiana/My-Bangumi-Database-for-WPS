@@ -6,6 +6,7 @@
 
 const MODULES = [
     { src: 'dist-ts/index.js', type: 'module', critical: true },     // 先加载类型/枚举
+    { src: 'dist-ts/tools/config.js', type: 'module', critical: true },
     { src: 'dist-ts/tools/util.js', type: 'module', critical: true },
     { src: 'dist-ts/core/result.js', type: 'module', critical: true },     // BgmError + Result
     { src: 'dist-ts/core/constants.js', type: 'module', critical: true },
