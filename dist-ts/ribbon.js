@@ -3,7 +3,7 @@
  * @module ribbon
  * @description WPS Office 功能区按钮回调处理
  */
-import { WPS_ENUM, showBangumiPanel, getIncrementalSync, getSkipConflicts, setIncrementalSync, setSkipConflicts } from './index.js';
+import { WPS_ENUM, showBangumiPanel, BGM, getIncrementalSync, getSkipConflicts, setIncrementalSync, setSkipConflicts } from './index.js';
 import * as RibbonService from './services/ribbonService.js';
 /**
  * 获取"跳过冲突"复选框的初始按下状态
@@ -17,6 +17,7 @@ export function GetSkipConflictsPressed(control) {
  */
 export function OnSkipConflictsChange(control) {
     setSkipConflicts(control.Pressed);
+    return true; // 必须返回 boolean
 }
 /**
  * 获取增量同步复选框的初始按下状态
@@ -30,48 +31,7 @@ export function GetIncrementalSyncPressed(control) {
  */
 export function OnIncrementalSyncChange(control) {
     setIncrementalSync(control.Pressed);
-}
-/**
- * 统一的 Ribbon 按钮点击处理函数
- * 根据按钮 ID 分发到具体的处理函数
- */
-export function OnAction(control) {
-    const buttonId = control?.Id || control?.id;
-    console.log(`[BGM] Ribbon 按钮点击: ${buttonId}`);
-    try {
-        switch (buttonId) {
-            case 'btnShowPanel':
-                showBangumiPanel();
-                break;
-            case 'btnSyncBangumi':
-                RibbonService.syncWithConfirmation();
-                break;
-            case 'btnSetToken':
-                RibbonService.setUserIdForRibbon();
-                break;
-            case 'btnTestToken':
-                RibbonService.testTokenForRibbon();
-                break;
-            case 'btnSetUserId':
-                RibbonService.setUserIdForRibbon();
-                break;
-            case 'btnOpenCollection':
-                RibbonService.openCollectionForRibbon();
-                break;
-            default:
-                console.warn(`[BGM] 未知的 Ribbon 按钮 ID: ${buttonId}`);
-                break;
-        }
-    }
-    catch (error) {
-        console.error(`[BGM] 处理 Ribbon 按钮 ${buttonId} 时出错:`, error);
-    }
-}
-/**
- * 获取按钮图标（占位函数，实际图标由 CSS 或图片提供）
- */
-export function GetBangumiImage(control) {
-    return '';
+    return true; // 必须返回 boolean，否则 WPS 警告
 }
 // ========== Ribbon 回调 ==========
 export function OnAddinLoad(ribbonUI) {
@@ -85,15 +45,60 @@ export function OnAddinLoad(ribbonUI) {
     window.Application.PluginStorage.setItem('ApiEventFlag', false);
     return true;
 }
-// ========== 全局函数挂载 ==========
-// 将 Ribbon 回调函数挂载到全局作用域，使其可以被 ribbon.xml 引用
-if (typeof window !== 'undefined') {
-    window.GetSkipConflictsPressed = GetSkipConflictsPressed;
-    window.OnSkipConflictsChange = OnSkipConflictsChange;
-    window.GetIncrementalSyncPressed = GetIncrementalSyncPressed;
-    window.OnIncrementalSyncChange = OnIncrementalSyncChange;
-    window.OnAddinLoad = OnAddinLoad;
-    window.OnAction = OnAction;
-    window.GetBangumiImage = GetBangumiImage;
-    console.log('[BGM] Ribbon 回调函数已挂载到全局作用域');
+/**
+ * 统一的 Ribbon 按钮点击处理函数
+ * 根据按钮 ID 分发到具体的处理函数
+ */
+export function OnAction(control) {
+    console.log('[BGM] OnAction:', control.Id);
+    try {
+        switch (control.Id) {
+            case 'btnShowPanel':
+                showBangumiPanel();
+                break;
+            case 'btnSyncBangumi':
+                RibbonService.syncWithConfirmation();
+                break;
+            case 'btnSetToken':
+                RibbonService.setTokenForRibbon();
+                break;
+            case 'btnTestToken':
+                RibbonService.testTokenForRibbon();
+                break;
+            case 'btnSetUserId':
+                RibbonService.setUserIdForRibbon();
+                break;
+            case 'btnOpenCollection':
+                RibbonService.openCollectionForRibbon();
+                break;
+            default:
+                console.warn('[BGM] 未知按钮:', control.Id);
+        }
+    }
+    catch (e) {
+        BGM.handleError(e, { showAlert: true, level: BGM.ErrorLevel.ERROR, context: 'Ribbon OnAction' });
+    }
+    return true;
 }
+/**
+* 获取按钮图标（占位函数，实际图标由 CSS 或图片提供）
+*/
+export function GetBangumiImage(control) {
+    const icons = {
+        btnShowPanel: 'images/panel.svg',
+        btnSyncBangumi: 'images/sync.svg',
+        btnSetToken: 'images/token.svg',
+        btnTestToken: 'images/key.svg',
+        btnSetUserId: 'images/user.svg',
+        btnOpenCollection: 'images/link.svg',
+        btnClearColors: 'images/cleartags.svg',
+    };
+    return icons[control.Id] || 'images/newFromTemp.svg';
+}
+// 通知 index.html 早期占位：真实实现已就绪
+window._bgmRibbonReady?.(OnAddinLoad, OnAction, GetBangumiImage);
+// 挂载 Ribbon 复选框回调到全局（WPS Ribbon XML 只能调用 window 上的函数）
+window.GetIncrementalSyncPressed = GetIncrementalSyncPressed;
+window.GetSkipConflictsPressed = GetSkipConflictsPressed;
+window.OnIncrementalSyncChange = OnIncrementalSyncChange;
+window.OnSkipConflictsChange = OnSkipConflictsChange;
