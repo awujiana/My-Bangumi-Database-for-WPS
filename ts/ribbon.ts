@@ -40,10 +40,19 @@ export function GetSkipConflictsPressed(control: any): boolean {
  */
 export function OnSkipConflictsChange(control: any): boolean {
     const newValue = control.Pressed;
-    console.log(`[Ribbon] OnSkipConflictsChange: ${newValue}`);
+    console.log(`[Ribbon] OnSkipConflictsChange: control.Pressed = ${newValue}`);
     
-    setSkipConflicts(newValue);
-    console.log(`[Ribbon] 跳过冲突状态已保存到 PluginStorage`);
+    // 如果 control.Pressed 是 undefined，则切换当前状态
+    let finalValue;
+    if (typeof newValue === 'boolean') {
+        finalValue = newValue;
+    } else {
+        finalValue = !getSkipConflicts();
+        console.log(`[Ribbon] control.Pressed 不可用，切换状态为: ${finalValue}`);
+    }
+    
+    setSkipConflicts(finalValue);
+    console.log(`[Ribbon] 跳过冲突状态已保存到 PluginStorage: ${finalValue}`);
     
     return true;
 }
@@ -63,10 +72,19 @@ export function GetIncrementalSyncPressed(control: any): boolean {
  */
 export function OnIncrementalSyncChange(control: any): boolean {
     const newValue = control.Pressed;
-    console.log(`[Ribbon] OnIncrementalSyncChange: ${newValue}`);
+    console.log(`[Ribbon] OnIncrementalSyncChange: control.Pressed = ${newValue}`);
     
-    setIncrementalSync(newValue);
-    console.log(`[Ribbon] 增量同步状态已保存到 PluginStorage`);
+    // 如果 control.Pressed 是 undefined，则切换当前状态
+    let finalValue;
+    if (typeof newValue === 'boolean') {
+        finalValue = newValue;
+    } else {
+        finalValue = !getIncrementalSync();
+        console.log(`[Ribbon] control.Pressed 不可用，切换状态为: ${finalValue}`);
+    }
+    
+    setIncrementalSync(finalValue);
+    console.log(`[Ribbon] 增量同步状态已保存到 PluginStorage: ${finalValue}`);
     
     return true;
 }

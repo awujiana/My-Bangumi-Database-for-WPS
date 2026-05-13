@@ -3,7 +3,7 @@
  * @module ui/handlers
  * @description 面板操作处理、按钮绑定、业务对话框
  */
-import { LOG_LEVELS, bgmLog, BGM, loadBgToken, storeBgToken, _getBgmUserId, _setBgmUserId, getApp, getCell, trim, fetchBgmUserInfo, BGM_COLOR, showAlert, showConfirm, showError, showSuccess, showInput, showToast, setStatus, verifyToken, fetchAllUserCollections, findHeaderRow, getColumnMap, getLastRow, extractSubjectId, getDataSheet, getFilterStatus, SyncToBangumiAsync, testSingleUpdate, getOrCreateSyncRecordSheet, getAllSyncRecords, addSyncRecord, openSyncRecordSheet, previewSyncContent, refreshData, refreshSheets, toggleSheetLock, clearSyncRecords, closeDetailModal, getIncrementalSync, setIncrementalSync, } from '../index.js';
+import { LOG_LEVELS, bgmLog, BGM, loadBgToken, storeBgToken, _getBgmUserId, _setBgmUserId, getApp, getCell, trim, fetchBgmUserInfo, BGM_COLOR, showAlert, showConfirm, showError, showSuccess, showInput, showToast, setStatus, verifyToken, fetchAllUserCollections, findHeaderRow, getColumnMap, getLastRow, extractSubjectId, getDataSheet, getFilterStatus, SyncToBangumiAsync, testSingleUpdate, getOrCreateSyncRecordSheet, getAllSyncRecords, addSyncRecord, openSyncRecordSheet, previewSyncContent, refreshData, refreshSheets, toggleSheetLock, clearSyncRecords, closeDetailModal, getIncrementalSync, setIncrementalSync, getSkipConflicts, setSkipConflicts, } from '../index.js';
 5;
 import { BGM_EVENTS, eventBus } from '../tools/events.js';
 //  
@@ -865,6 +865,20 @@ function setupMessageListener() {
                     }
                     updateUserIdStatus();
                     break;
+                case 'BGM:configUpdated':
+                    bgmLog(LOG_LEVELS.INFO, `[handlers] 收到配置更新通知: key=${data.data?.key}, value=${data.data?.value}`);
+                    if (data.data?.key === 'bgm_incremental_sync') {
+                        const chkIncremental = document.getElementById('chkIncremental');
+                        if (chkIncremental) {
+                            const isChecked = data.data.value === 'true';
+                            chkIncremental.checked = isChecked;
+                            bgmLog(LOG_LEVELS.DEBUG, `[handlers] 增量同步复选框已更新: ${isChecked ? '开启' : '关闭'}`);
+                        }
+                    }
+                    else if (data.data?.key === 'bgm_skip_conflicts') {
+                        updateSkipConflictsUI(data.data.value === 'true');
+                    }
+                    break;
                 case 'tokenUpdated':
                 case 'userIdUpdated':
                     // 兼容旧格式
@@ -895,10 +909,49 @@ function setupEventListeners() {
         bgmLog(LOG_LEVELS.DEBUG, '[handlers] 收到 USER_NAME_UPDATED 事件');
         updateUserIdStatus();
     });
+    // 配置更新事件（用于同步增量同步和跳过冲突状态）
+    eventBus.on(BGM_EVENTS.CONFIG_UPDATED, (data) => {
+        bgmLog(LOG_LEVELS.INFO, `[handlers] 收到 CONFIG_UPDATED 事件: key=${data.key}, value=${data.value}`);
+        if (data.key === 'bgm_incremental_sync') {
+            // 更新增量同步复选框
+            const chkIncremental = document.getElementById('chkIncremental');
+            if (chkIncremental) {
+                const isChecked = data.value === 'true';
+                chkIncremental.checked = isChecked;
+                bgmLog(LOG_LEVELS.DEBUG, `[handlers] 增量同步复选框已更新: ${isChecked ? '开启' : '关闭'}`);
+            }
+        }
+        else if (data.key === 'bgm_skip_conflicts') {
+            // 更新跳过冲突选项
+            updateSkipConflictsUI(data.value === 'true');
+        }
+    });
     // 同步进度事件（全局进度条）
     eventBus.on(BGM_EVENTS.SYNC_PROGRESS, (data) => {
         updateProgressBar(data.current, data.total, data.message);
     });
+}
+// 更新跳过冲突 UI 状态
+function updateSkipConflictsUI(skipConflicts) {
+    bgmLog(LOG_LEVELS.DEBUG, `[handlers] 更新跳过冲突 UI: ${skipConflicts ? '跳过冲突' : 'Excel覆盖'}`);
+    // 查找跳过冲突的 radio 或 checkbox 并更新
+    // 先尝试查找 radio 按钮
+    const skipRadio = document.querySelector('input[name="conflictStrategy"][value="skip"]');
+    const overwriteRadio = document.querySelector('input[name="conflictStrategy"][value="overwrite"]');
+    if (skipRadio && overwriteRadio) {
+        // 如果是 radio 按钮
+        skipRadio.checked = skipConflicts;
+        overwriteRadio.checked = !skipConflicts;
+        bgmLog(LOG_LEVELS.DEBUG, `[handlers] 冲突策略 radio 已更新`);
+    }
+    else {
+        // 如果是 checkbox
+        const chkSkipConflicts = document.getElementById('chkSkipConflicts');
+        if (chkSkipConflicts) {
+            chkSkipConflicts.checked = skipConflicts;
+            bgmLog(LOG_LEVELS.DEBUG, `[handlers] 跳过冲突复选框已更新`);
+        }
+    }
 }
 // 确保在 DOM 加载完成且模块初始化后执行
 function initializeListeners() {
@@ -934,6 +987,53 @@ function initIncrementalSyncFromRibbon() {
             bgmLog(LOG_LEVELS.WARN, `[handlers] 更新增量同步状态失败: ${e.message}`);
         }
     });
+    // 同时初始化跳过冲突选项
+    initSkipConflictsFromRibbon();
+}
+// 从配置读取跳过冲突状态并初始化 UI
+function initSkipConflictsFromRibbon() {
+    try {
+        const skipConflicts = getSkipConflicts();
+        updateSkipConflictsUI(skipConflicts);
+        bgmLog(LOG_LEVELS.DEBUG, `[handlers] 从配置读取跳过冲突状态: ${skipConflicts ? '跳过冲突' : 'Excel覆盖'}`);
+    }
+    catch (e) {
+        bgmLog(LOG_LEVELS.WARN, `[handlers] 读取跳过冲突状态失败: ${e.message}`);
+    }
+    // 监听冲突策略 radio 或 checkbox 的变化
+    // 先尝试查找 radio 按钮
+    const skipRadio = document.querySelector('input[name="conflictStrategy"][value="skip"]');
+    const overwriteRadio = document.querySelector('input[name="conflictStrategy"][value="overwrite"]');
+    if (skipRadio && overwriteRadio) {
+        skipRadio.addEventListener('change', () => {
+            if (skipRadio.checked) {
+                setSkipConflicts(true);
+                bgmLog(LOG_LEVELS.DEBUG, `[handlers] 冲突策略已更新: 跳过冲突`);
+            }
+        });
+        overwriteRadio.addEventListener('change', () => {
+            if (overwriteRadio.checked) {
+                setSkipConflicts(false);
+                bgmLog(LOG_LEVELS.DEBUG, `[handlers] 冲突策略已更新: Excel覆盖`);
+            }
+        });
+    }
+    else {
+        // 如果是 checkbox
+        const chkSkipConflicts = document.getElementById('chkSkipConflicts');
+        if (chkSkipConflicts) {
+            chkSkipConflicts.addEventListener('change', () => {
+                const checked = chkSkipConflicts.checked;
+                try {
+                    setSkipConflicts(checked);
+                    bgmLog(LOG_LEVELS.DEBUG, `[handlers] 跳过冲突状态已更新: ${checked ? '跳过冲突' : 'Excel覆盖'}`);
+                }
+                catch (e) {
+                    bgmLog(LOG_LEVELS.WARN, `[handlers] 更新跳过冲突状态失败: ${e.message}`);
+                }
+            });
+        }
+    }
 }
 // 监听模块初始化完成事件
 if (typeof document !== 'undefined') {
