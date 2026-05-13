@@ -295,20 +295,6 @@ function notifyUserInfoUpdated(username: string, userId: string): void {
 }
 
 /**
- * 打开用户收藏页面
- *
- * @function openUserCollection
- */
-export function openUserCollection(): void {
-    const userId = _getBgmUserId();
-    if (!userId) {
-        wpsMsgBox('请先设置用户ID！', 0, 48);
-        return;
-    }
-    window.open('https://bgm.tv/user/' + userId + '/collection', '_blank');
-}
-
-/**
  * 从URL或文本中提取Bangumi Subject ID
  *
  * @function extractSubjectId

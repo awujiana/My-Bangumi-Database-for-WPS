@@ -76,7 +76,7 @@ setSyncRunning, } from './ui/message.js';
 // ============================================================================
 export { 
 // 显示用户 ID 设置对话框
-showUserIdDialog, markUploadedItems, updateTokenStatus, updateUserIdStatus, showTokenDialog, testDebugConnection, syncCollectionFromBgm } from './ui/handlers.js';
+showUserIdDialog, markUploadedItems, updateTokenStatus, updateUserIdStatus, showTokenDialog, testDebugConnection, syncCollectionFromBgm, openUserCollection } from './ui/handlers.js';
 // ============================================================================
 // 8. 同步记录工作表（来自 sync/syncRecord.js）
 // ============================================================================
@@ -96,7 +96,7 @@ getSequentialRowsBySeqCol,
 // 异步同步到 Bangumi
 SyncToBangumiAsync, 
 // 测试单个条目更新
-testSingleUpdate, mapWatchStatus, buildJsonPayload, bgmRequestSync, setBangumiToken, openBangumiTokenPage, testTokenValidityForRibbon, openUserCollection, buildTagsArray, addTagsFromStr, } from './sync/exceltobangumi.js';
+testSingleUpdate, mapWatchStatus, buildJsonPayload, bgmRequestSync, setBangumiToken, openBangumiTokenPage, testTokenValidityForRibbon, buildTagsArray, addTagsFromStr, } from './sync/exceltobangumi.js';
 // ============================================================================
 // 10. 同步收藏抓取（来自 sync/scraping.js）
 // ============================================================================

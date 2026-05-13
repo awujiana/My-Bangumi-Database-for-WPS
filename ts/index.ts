@@ -127,7 +127,8 @@ export {
     updateUserIdStatus, 
     showTokenDialog,
     testDebugConnection,
-    syncCollectionFromBgm
+    syncCollectionFromBgm,
+    openUserCollection
 } from './ui/handlers.js';
 
 // ============================================================================
@@ -166,7 +167,6 @@ export {
     setBangumiToken,
     openBangumiTokenPage,
     testTokenValidityForRibbon,
-    openUserCollection,
     buildTagsArray,
     addTagsFromStr,
  

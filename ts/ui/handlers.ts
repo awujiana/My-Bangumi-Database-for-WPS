@@ -153,12 +153,25 @@ export function updateUserIdStatus(): void {
 }
 
 export function openUserCollection(): void {
+    const startTime = Date.now();
+    bgmLog(LOG_LEVELS.INFO, '[openUserCollection] ========== 打开用户收藏页面 ==========');
+
     const userId = _getBgmUserId();
+    bgmLog(LOG_LEVELS.DEBUG, `[openUserCollection] 获取用户ID: ${userId || '(未设置)'}`);
+
     if (!userId) {
+        bgmLog(LOG_LEVELS.ERROR, '[openUserCollection] 用户ID未设置，无法打开收藏页面');
         showAlert(_T.pleaseSetUserIdFirst);
         return;
     }
-    window.open('https://bgm.tv/user/' + userId + '/collection', '_blank');
+
+    const collectionUrl = `https://bgm.tv/user/${userId}/collection`;
+    bgmLog(LOG_LEVELS.INFO, `[openUserCollection] 生成收藏页面URL: ${collectionUrl}`);
+
+    bgmLog(LOG_LEVELS.INFO, `[openUserCollection] 正在打开收藏页面...`);
+    window.open(collectionUrl, '_blank');
+
+    bgmLog(LOG_LEVELS.INFO, `[openUserCollection] 收藏页面已在新标签页打开，耗时: ${Date.now() - startTime}ms`);
 }
 
 export function testTokenValidity(): void {

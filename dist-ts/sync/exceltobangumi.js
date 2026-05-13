@@ -7,7 +7,7 @@
  * @author BGM Development Team
  * @version 1.1.0 (优化版，保留原注释和日志)
  */
-import { URL_PATTERNS, WATCH_STATUS_MAP, BGM_CONFIG, BGM_COLOR, LOG_LEVELS, SYNC_STATUS, bgmLog, getApp, readCell, getCell, trim, getColumnMap, findHeaderRow, getCellValue, loadBgToken, storeBgToken, _getBgmUserId, _setBgmUserId, BGM, wpsMsgBox, _getUserApiPath, readRangeValues, delay, calcFingerprint, getAllSyncRecords, isWpsWorksheet } from '../index.js';
+import { URL_PATTERNS, WATCH_STATUS_MAP, BGM_CONFIG, BGM_COLOR, LOG_LEVELS, SYNC_STATUS, bgmLog, getApp, readCell, getCell, trim, getColumnMap, findHeaderRow, getCellValue, loadBgToken, storeBgToken, _setBgmUserId, BGM, wpsMsgBox, _getUserApiPath, readRangeValues, delay, calcFingerprint, getAllSyncRecords, isWpsWorksheet } from '../index.js';
 import { getOrCreateSyncRecordSheet, addSyncRecord } from './syncRecord.js';
 import { showAlert, showSuccess, showError } from '../ui/dialog.js';
 // ========== 常量定义 (优化点：集中管理) ==========
@@ -215,19 +215,6 @@ function notifyUserInfoUpdated(username, userId) {
     catch (e) {
         bgmLog(LOG_LEVELS.WARN, '通知用户信息更新失败: ' + e.message);
     }
-}
-/**
- * 打开用户收藏页面
- *
- * @function openUserCollection
- */
-export function openUserCollection() {
-    const userId = _getBgmUserId();
-    if (!userId) {
-        wpsMsgBox('请先设置用户ID！', 0, 48);
-        return;
-    }
-    window.open('https://bgm.tv/user/' + userId + '/collection', '_blank');
 }
 /**
  * 从URL或文本中提取Bangumi Subject ID

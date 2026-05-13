@@ -21,12 +21,6 @@ export declare function openBangumiTokenPage(): void;
  */
 export declare function testTokenValidityForRibbon(token?: string): void;
 /**
- * 打开用户收藏页面
- *
- * @function openUserCollection
- */
-export declare function openUserCollection(): void;
-/**
  * 从URL或文本中提取Bangumi Subject ID
  *
  * @function extractSubjectId
