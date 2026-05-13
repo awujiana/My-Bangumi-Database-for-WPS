@@ -26,7 +26,11 @@ export const CONFIG_MESSAGE_TYPES = {
  */
 function getStorage() {
     const app = getApp();
-    return app?.PluginStorage;
+    const storage = app?.PluginStorage;
+    if (!storage) {
+        bgmLog(LOG_LEVELS.WARN, '[config] PluginStorage 不可用');
+    }
+    return storage;
 }
 /**
  * 设置配置值
@@ -40,12 +44,22 @@ export function setConfig(key, value, notifyRibbon = true) {
         bgmLog(LOG_LEVELS.ERROR, `[config] 无法获取 PluginStorage，无法设置配置 ${key}`);
         return false;
     }
+    const oldValue = storage.getItem(key);
     storage.setItem(key, value);
-    bgmLog(LOG_LEVELS.DEBUG, `[config] 配置已更新: ${key} = ${value}`);
+    if (oldValue !== value) {
+        bgmLog(LOG_LEVELS.INFO, `[config] 配置已更新: ${key}`);
+        bgmLog(LOG_LEVELS.DEBUG, `[config]   旧值: ${oldValue || '(空)'}`);
+        bgmLog(LOG_LEVELS.DEBUG, `[config]   新值: ${value}`);
+    }
+    else {
+        bgmLog(LOG_LEVELS.DEBUG, `[config] 配置值未变化: ${key} = ${value}`);
+    }
     // 触发内部事件
+    bgmLog(LOG_LEVELS.DEBUG, `[config] 触发内部事件: ${BGM_EVENTS.CONFIG_UPDATED}`);
     eventBus.emit(BGM_EVENTS.CONFIG_UPDATED, { key, value });
     // 通知 Ribbon
     if (notifyRibbon) {
+        bgmLog(LOG_LEVELS.DEBUG, `[config] 准备向 Ribbon 发送通知`);
         sendConfigUpdateToRibbon(key, value);
     }
     return true;
@@ -62,7 +76,9 @@ export function getConfig(key, defaultValue = '') {
         return defaultValue;
     }
     const value = storage.getItem(key);
-    return value !== null ? value : defaultValue;
+    const result = value !== null ? value : defaultValue;
+    bgmLog(LOG_LEVELS.DEBUG, `[config] 获取配置: ${key} = ${result}`);
+    return result;
 }
 /**
  * 删除配置值
@@ -74,11 +90,14 @@ export function removeConfig(key) {
         bgmLog(LOG_LEVELS.ERROR, `[config] 无法获取 PluginStorage，无法删除配置 ${key}`);
         return false;
     }
+    const oldValue = storage.getItem(key);
     storage.removeItem(key);
-    bgmLog(LOG_LEVELS.DEBUG, `[config] 配置已删除: ${key}`);
+    bgmLog(LOG_LEVELS.INFO, `[config] 配置已删除: ${key} (原值: ${oldValue || '(空)'})`);
     // 触发内部事件
+    bgmLog(LOG_LEVELS.DEBUG, `[config] 触发内部事件: ${BGM_EVENTS.CONFIG_UPDATED}`);
     eventBus.emit(BGM_EVENTS.CONFIG_UPDATED, { key, value: '' });
     // 通知 Ribbon
+    bgmLog(LOG_LEVELS.DEBUG, `[config] 准备向 Ribbon 发送删除通知`);
     sendConfigUpdateToRibbon(key, '');
     return true;
 }
@@ -93,8 +112,12 @@ export function sendConfigUpdateToRibbon(key, value) {
             type: CONFIG_MESSAGE_TYPES.CONFIG_UPDATED,
             data: { key, value }
         };
+        bgmLog(LOG_LEVELS.DEBUG, `[config] postMessage 发送中...`);
+        bgmLog(LOG_LEVELS.DEBUG, `[config]   目标: window.parent`);
+        bgmLog(LOG_LEVELS.DEBUG, `[config]   消息类型: ${message.type}`);
+        bgmLog(LOG_LEVELS.DEBUG, `[config]   数据: ${JSON.stringify(message.data)}`);
         window.parent.postMessage(message, '*');
-        bgmLog(LOG_LEVELS.DEBUG, `[config] 已向 Ribbon 发送配置更新通知: ${key} = ${value}`);
+        bgmLog(LOG_LEVELS.INFO, `[config] 已向 Ribbon 发送配置更新通知: ${key} = ${value}`);
     }
     catch (error) {
         bgmLog(LOG_LEVELS.ERROR, `[config] 发送配置更新通知失败: ${error}`);
@@ -110,8 +133,11 @@ export function sendSyncProgressToRibbon(progress) {
             type: CONFIG_MESSAGE_TYPES.SYNC_PROGRESS,
             data: progress
         };
+        bgmLog(LOG_LEVELS.DEBUG, `[config] postMessage 发送同步进度...`);
+        bgmLog(LOG_LEVELS.DEBUG, `[config]   进度: ${progress.current}/${progress.total}`);
+        bgmLog(LOG_LEVELS.DEBUG, `[config]   消息: ${progress.message || '(无)'}`);
         window.parent.postMessage(message, '*');
-        bgmLog(LOG_LEVELS.DEBUG, `[config] 已向 Ribbon 发送同步进度: ${progress.current}/${progress.total}`);
+        bgmLog(LOG_LEVELS.INFO, `[config] 已向 Ribbon 发送同步进度: ${progress.current}/${progress.total}`);
     }
     catch (error) {
         bgmLog(LOG_LEVELS.ERROR, `[config] 发送同步进度失败: ${error}`);
@@ -123,10 +149,16 @@ export function sendSyncProgressToRibbon(progress) {
  */
 export function listenToRibbonConfigUpdates(callback) {
     const handler = (event) => {
+        bgmLog(LOG_LEVELS.DEBUG, `[config] 收到 postMessage: ${event.data?.type || '(未知类型)'}`);
         if (event.data?.type === CONFIG_MESSAGE_TYPES.CONFIG_UPDATED) {
             const data = event.data.data;
-            bgmLog(LOG_LEVELS.DEBUG, `[config] 收到 Ribbon 配置更新通知: ${data.key} = ${data.value}`);
+            bgmLog(LOG_LEVELS.INFO, `[config] 收到 Ribbon 配置更新通知:`);
+            bgmLog(LOG_LEVELS.INFO, `[config]   配置键: ${data.key}`);
+            bgmLog(LOG_LEVELS.INFO, `[config]   新值: ${data.value}`);
             callback(data);
+        }
+        else if (event.data?.type === CONFIG_MESSAGE_TYPES.SYNC_PROGRESS) {
+            bgmLog(LOG_LEVELS.DEBUG, `[config] 收到同步进度通知: ${event.data.data?.current}/${event.data.data?.total}`);
         }
     };
     window.addEventListener('message', handler);
@@ -136,23 +168,29 @@ export function listenToRibbonConfigUpdates(callback) {
  * 设置增量同步开关
  */
 export function setIncrementalSync(enabled) {
+    bgmLog(LOG_LEVELS.INFO, `[config] 设置增量同步: ${enabled ? '开启' : '关闭'}`);
     return setConfig(CONFIG_KEYS.INCREMENTAL_SYNC, enabled ? 'true' : 'false');
 }
 /**
  * 获取增量同步开关状态
  */
 export function getIncrementalSync() {
-    return getConfig(CONFIG_KEYS.INCREMENTAL_SYNC) === 'true';
+    const result = getConfig(CONFIG_KEYS.INCREMENTAL_SYNC) === 'true';
+    bgmLog(LOG_LEVELS.DEBUG, `[config] 获取增量同步状态: ${result ? '开启' : '关闭'}`);
+    return result;
 }
 /**
  * 设置跳过冲突开关
  */
 export function setSkipConflicts(enabled) {
+    bgmLog(LOG_LEVELS.INFO, `[config] 设置跳过冲突: ${enabled ? '开启' : '关闭'}`);
     return setConfig(CONFIG_KEYS.SKIP_CONFLICTS, enabled ? 'true' : 'false');
 }
 /**
  * 获取跳过冲突开关状态
  */
 export function getSkipConflicts() {
-    return getConfig(CONFIG_KEYS.SKIP_CONFLICTS) === 'true';
+    const result = getConfig(CONFIG_KEYS.SKIP_CONFLICTS) === 'true';
+    bgmLog(LOG_LEVELS.DEBUG, `[config] 获取跳过冲突状态: ${result ? '开启' : '关闭'}`);
+    return result;
 }
