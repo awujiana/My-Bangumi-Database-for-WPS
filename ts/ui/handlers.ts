@@ -334,24 +334,8 @@ export async function syncFromPanel(): Promise<void> {
     }
     bgmLog(LOG_LEVELS.INFO, `[syncFromPanel] Token 已设置（长度: ${token.length}）`);
 
-    // 3. 确保同步记录工作表存在并激活
-    bgmLog(LOG_LEVELS.INFO, '[syncFromPanel] 步骤3: 确保同步记录工作表存在');
-    if (typeof getOrCreateSyncRecordSheet === 'function') {
-        const syncSheet = getOrCreateSyncRecordSheet();
-        if (syncSheet) {
-            bgmLog(LOG_LEVELS.INFO, '[syncFromPanel] 同步记录工作表已创建/获取');
-            try { 
-                (syncSheet as any).Activate(); 
-                bgmLog(LOG_LEVELS.INFO, '[syncFromPanel] 同步记录工作表已激活');
-            } catch (e: any) {
-                bgmLog(LOG_LEVELS.WARN, `[syncFromPanel] 激活同步记录工作表失败: ${e.message}`);
-                BGM.handleError(e, { showAlert: false, level: BGM.ErrorLevel.WARN, context: 'syncFromPanel' });
-            }
-        }
-    }
-
-    // 4. 获取应用和工作表对象
-    bgmLog(LOG_LEVELS.INFO, '[syncFromPanel] 步骤4: 获取应用和工作表对象');
+    // 3. 获取应用和工作表对象
+    bgmLog(LOG_LEVELS.INFO, '[syncFromPanel] 步骤3: 获取应用和工作表对象');
     const app = getApp();
     if (!app?.ActiveWorkbook) { 
         bgmLog(LOG_LEVELS.ERROR, '[syncFromPanel] 无法获取 Application 对象');
@@ -361,6 +345,28 @@ export async function syncFromPanel(): Promise<void> {
     }
     bgmLog(LOG_LEVELS.INFO, '[syncFromPanel] Application 对象获取成功');
 
+    // 3.1 记住用户当前活动的工作表
+    let originalActiveSheet: any = null;
+    try {
+        originalActiveSheet = app.ActiveWorkbook.ActiveSheet;
+        if (originalActiveSheet) {
+            bgmLog(LOG_LEVELS.INFO, `[syncFromPanel] 记住用户当前工作表: ${originalActiveSheet.Name}`);
+        }
+    } catch (e: any) {
+        bgmLog(LOG_LEVELS.WARN, `[syncFromPanel] 获取当前工作表失败: ${e.message}`);
+    }
+
+    // 3.2 确保同步记录工作表存在（不激活）
+    let syncSheet: any = null;
+    bgmLog(LOG_LEVELS.INFO, '[syncFromPanel] 步骤3.2: 确保同步记录工作表存在');
+    if (typeof getOrCreateSyncRecordSheet === 'function') {
+        syncSheet = getOrCreateSyncRecordSheet();
+        if (syncSheet) {
+            bgmLog(LOG_LEVELS.INFO, '[syncFromPanel] 同步记录工作表已创建/获取（暂不激活）');
+        }
+    }
+
+    // 4. 获取数据工作表并激活（确保筛选检测正确）
     const ws = getDataSheet();
     if (!ws) { 
         bgmLog(LOG_LEVELS.WARN, '[syncFromPanel] 未找到数据工作表');
@@ -372,7 +378,7 @@ export async function syncFromPanel(): Promise<void> {
 
     try {
         (ws as any).Activate();
-        bgmLog(LOG_LEVELS.INFO, `[syncFromPanel] 已激活数据工作表: ${ws.Name}`);
+        bgmLog(LOG_LEVELS.INFO, `[syncFromPanel] 已激活数据工作表: ${ws.Name}（用于筛选检测）`);
     } catch (e: any) {
         bgmLog(LOG_LEVELS.WARN, `[syncFromPanel] 激活数据工作表失败: ${e.message}`);
     }
@@ -457,19 +463,39 @@ export async function syncFromPanel(): Promise<void> {
             不上传（状态跳过）：${preview.willSkip}
             无URL：${preview.noUrl}
             空状态：${preview.emptyStatus}
-            ${incremental ? `增量跳过：${preview.incrementalSkipped}\n` : ''}${conflictMsg}是否继续同步？`;
+            ${incremental ? `增量跳过：${preview.incrementalSkipped}\n` : ''}${conflictMsg}是否继续同步？\n\n同步开始后将切换到同步记录工作表查看进度。`;
 
     const confirmed = await new Promise<boolean>(resolve => {
         showConfirm(msg, (confirmed) => resolve(confirmed));
     });
     if (!confirmed) {
         bgmLog(LOG_LEVELS.INFO, '[syncFromPanel] 用户取消同步');
+        // 恢复用户之前的工作表
+        if (originalActiveSheet) {
+            try {
+                originalActiveSheet.Activate();
+                bgmLog(LOG_LEVELS.INFO, `[syncFromPanel] 已恢复用户之前的工作表: ${originalActiveSheet.Name}`);
+            } catch (e: any) {
+                bgmLog(LOG_LEVELS.WARN, `[syncFromPanel] 恢复工作表失败: ${e.message}`);
+            }
+        }
         bgmLog(LOG_LEVELS.INFO, `[syncFromPanel] 同步操作终止（用户取消），耗时: ${Date.now() - startTime}ms`);
         return;
     }
 
-    // 10. 执行同步
-    bgmLog(LOG_LEVELS.INFO, '[syncFromPanel] 步骤10: 开始执行同步');
+    // 10. 切换到同步记录工作表，让用户看到实时写入
+    bgmLog(LOG_LEVELS.INFO, '[syncFromPanel] 步骤10: 切换到同步记录工作表');
+    if (syncSheet) {
+        try {
+            (syncSheet as any).Activate();
+            bgmLog(LOG_LEVELS.INFO, `[syncFromPanel] 已激活同步记录工作表: ${syncSheet.Name}`);
+        } catch (e: any) {
+            bgmLog(LOG_LEVELS.WARN, `[syncFromPanel] 激活同步记录工作表失败: ${e.message}`);
+        }
+    }
+
+    // 11. 执行同步
+    bgmLog(LOG_LEVELS.INFO, '[syncFromPanel] 步骤11: 开始执行同步');
     showStopButton(); // 显示停止按钮
     try {
         bgmLog(LOG_LEVELS.INFO, '[syncFromPanel] 调用 SyncToBangumiAsync...');
@@ -502,6 +528,16 @@ export async function syncFromPanel(): Promise<void> {
         if (app.StatusBar !== undefined) app.StatusBar = false;
         bgmLog(LOG_LEVELS.ERROR, `[syncFromPanel] 同步失败: ${err.message}`);
         BGM.handleError(err, { context: 'syncFromPanel', showAlert: true });
+    } finally {
+        // 无论成功失败，最后都尝试恢复用户之前的工作表
+        if (originalActiveSheet) {
+            try {
+                originalActiveSheet.Activate();
+                bgmLog(LOG_LEVELS.INFO, `[syncFromPanel] 已恢复用户之前的工作表: ${originalActiveSheet.Name}`);
+            } catch (e: any) {
+                bgmLog(LOG_LEVELS.WARN, `[syncFromPanel] 恢复工作表失败: ${e.message}`);
+            }
+        }
     }
     
     bgmLog(LOG_LEVELS.INFO, `[syncFromPanel] ========== 同步操作结束，总耗时: ${Date.now() - startTime}ms ==========`);
