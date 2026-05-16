@@ -47,7 +47,7 @@ export function getSyncPreview(
     bgmLog(LOG_LEVELS.INFO, `[getSyncPreview] 批量读取数据: ${allData?.length || 0} 行`);
     
     // 获取可见行（与同步函数相同）
-    const filterStatus = getFilterStatus(lastRow, headerRow);
+    const filterStatus = getFilterStatus(ws, lastRow, headerRow);
     bgmLog(LOG_LEVELS.INFO, `[getSyncPreview] 筛选检测结果: hasFilter=${filterStatus.hasFilter}, visibleRows=${filterStatus.visibleRows.length}`);
     
     let rowsToProcess: number[] = [];
@@ -208,7 +208,7 @@ export async function detectConflicts(
     }
 
     // 2. 遍历 Excel 可见行，比对差异
-    const filterStatus = getFilterStatus(lastRow, headerRow);
+    const filterStatus = getFilterStatus(ws, lastRow, headerRow);
     bgmLog(LOG_LEVELS.INFO, `[detectConflicts] 筛选检测结果: hasFilter=${filterStatus.hasFilter}, visibleRows=${filterStatus.visibleRows.length}`);
     
     let rowsToProcess: number[] = [];

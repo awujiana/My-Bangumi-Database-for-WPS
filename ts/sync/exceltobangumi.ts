@@ -443,12 +443,14 @@ export function buildTagsArray(tagsRaw: string): string[] {
 }
 
 /**
- * 获取筛选状态（可见行列表）
- * @param lastRow  可选扫描上限，默认取工作表最大行数
+ * 获取筛选状态（可见行）
+ * @param wsOrLastRow 工作表对象或最后行号（兼容旧用法）
+ * @param lastRow 最后行号（当 wsOrLastRow 为工作表时）
  * @param headerRow 表头行号，用于排除
  * @returns hasFilter, visibleRows（不含表头和全空行）, hiddenRows
  */
 export function getFilterStatus(
+    wsOrLastRow?: WpsWorksheet | number,
     lastRow?: number,
     headerRow?: number
 ): {
@@ -466,15 +468,32 @@ export function getFilterStatus(
         const app = getApp() as WpsApplication | null;
         if (!app?.ActiveWorkbook) return result;
 
-        const ws = app.ActiveWorkbook.ActiveSheet;
+        let ws: WpsWorksheet | null = null;
+        let effectiveLastRow: number | undefined;
+        let effectiveHeaderRow: number | undefined;
+
+        if (typeof wsOrLastRow === 'number') {
+            effectiveLastRow = wsOrLastRow;
+            effectiveHeaderRow = lastRow;
+            ws = app.ActiveWorkbook.ActiveSheet;
+            bgmLog(LOG_LEVELS.INFO, `getFilterStatus: 使用 ActiveSheet（兼容模式）`);
+        } else if (wsOrLastRow) {
+            ws = wsOrLastRow;
+            effectiveLastRow = lastRow;
+            effectiveHeaderRow = headerRow;
+            bgmLog(LOG_LEVELS.INFO, `getFilterStatus: 使用传入的工作表: ${ws.Name}`);
+        } else {
+            ws = app.ActiveWorkbook.ActiveSheet;
+            bgmLog(LOG_LEVELS.INFO, `getFilterStatus: 使用 ActiveSheet（无参数）`);
+        }
+
         if (!isWpsWorksheet(ws)) return result;
 
-        // 1. 检查是否启用了筛选
         let autoFilterMode = false;
         try { autoFilterMode = !!ws.AutoFilterMode; } catch (e: any) {
             BGM.handleError(e, { context: 'getFilterStatus', showAlert: false });
         }
-        bgmLog(LOG_LEVELS.INFO, `getFilterStatus: AutoFilterMode=${autoFilterMode}, ws.AutoFilterMode=${ws.AutoFilterMode}`);
+        bgmLog(LOG_LEVELS.INFO, `getFilterStatus: AutoFilterMode=${autoFilterMode}, ws.AutoFilterMode=${ws.AutoFilterMode}, ws.Name=${ws.Name}`);
         
         if (!autoFilterMode) return result;
         result.hasFilter = true;
@@ -499,8 +518,7 @@ export function getFilterStatus(
             scanRange = filterRange;
             bgmLog(LOG_LEVELS.INFO, '使用 AutoFilter.Range 做 SpecialCells');
         } else {
-            // 回退：用 A 列最后非空行
-            const maxRow = lastRow && lastRow > 0 ? lastRow : ws.Rows.Count;
+            const maxRow = effectiveLastRow && effectiveLastRow > 0 ? effectiveLastRow : ws.Rows.Count;
             let lastUsedRow = maxRow;
             try {
                 const bottomCell = ws.Range(`A${maxRow}`);
@@ -563,7 +581,7 @@ export function getFilterStatus(
 
         // 6. 生成最终可见行列表（排除表头行）
         for (const r of rawRows) {
-            if (headerRow != null && r === headerRow) continue;
+            if (effectiveHeaderRow != null && r === effectiveHeaderRow) continue;
             result.visibleRows.push(r);
         }
         result.visibleRows.sort((a, b) => a - b);
@@ -990,7 +1008,7 @@ export async function SyncToBangumiAsync(
     bgmLog(LOG_LEVELS.INFO, `[SyncToBangumiAsync]   - 序列号列: ${seqCol} (列${colNumToLetter(seqCol)})`);
 
     // ========== 1. 获取可见行（筛选状态） ==========
-    const filterStatus = getFilterStatus(lastRow, headerRow);
+    const filterStatus = getFilterStatus(ws, lastRow, headerRow);
     let rowsToProcess: number[] = [];
     if (filterStatus.hasFilter && filterStatus.visibleRows.length > 0) {
         rowsToProcess = filterStatus.visibleRows.filter(r => r >= startRow);

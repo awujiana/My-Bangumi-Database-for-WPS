@@ -370,6 +370,13 @@ export async function syncFromPanel(): Promise<void> {
     }
     bgmLog(LOG_LEVELS.INFO, '[syncFromPanel] 数据工作表获取成功');
 
+    try {
+        (ws as any).Activate();
+        bgmLog(LOG_LEVELS.INFO, `[syncFromPanel] 已激活数据工作表: ${ws.Name}`);
+    } catch (e: any) {
+        bgmLog(LOG_LEVELS.WARN, `[syncFromPanel] 激活数据工作表失败: ${e.message}`);
+    }
+
     // 5. 解析表头和列映射
     bgmLog(LOG_LEVELS.INFO, '[syncFromPanel] 步骤5: 解析表头和列映射');
     const headerRow = findHeaderRow(ws);
@@ -613,7 +620,7 @@ async function _doAPISync(sheetIndex: number, token: string): Promise<void> {
         const lastRow = typeof getLastRow === 'function' ? getLastRow(ws) : 200;
         let rowsToProcess: number[] = [];
         if (typeof getFilterStatus === 'function') {
-            const filterStatus = getFilterStatus(lastRow);
+            const filterStatus = getFilterStatus(ws, lastRow, headerRow);
             rowsToProcess = filterStatus?.visibleRows ?? [];
         }
         if (rowsToProcess.length === 0) {
