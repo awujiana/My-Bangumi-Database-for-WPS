@@ -142,15 +142,38 @@ export function updateTokenStatus(): void {
 
 export function updateUserIdStatus(): void {
     const userIdStatus = document.getElementById('userIdStatus');
-    if (!userIdStatus) return;
+    bgmLog(LOG_LEVELS.INFO, `[updateUserIdStatus] userIdStatus 元素: ${userIdStatus ? '存在' : '不存在'}`);
+    
+    if (!userIdStatus) {
+        // 如果元素不存在，可能是 taskpane 页面还未完全加载，延迟重试
+        setTimeout(() => {
+            const retryElement = document.getElementById('userIdStatus');
+            if (retryElement) {
+                bgmLog(LOG_LEVELS.INFO, `[updateUserIdStatus] 重试成功，找到元素`);
+                doUpdateUserIdStatus(retryElement);
+            } else {
+                bgmLog(LOG_LEVELS.WARN, `[updateUserIdStatus] 重试后仍找不到 userIdStatus 元素`);
+            }
+        }, 500);
+        return;
+    }
+    
+    doUpdateUserIdStatus(userIdStatus);
+}
+
+function doUpdateUserIdStatus(userIdStatus: HTMLElement): void {
     const userId = _getBgmUserId();
+    bgmLog(LOG_LEVELS.INFO, `[updateUserIdStatus] 当前 userId: ${userId}, username: ${BGM.cache.username}`);
+    
     if (userId) {
         const display = BGM.cache.username ? BGM.cache.username + ' (' + userId + ')' : userId;
         userIdStatus.textContent = _T.set + ': ' + display;
         userIdStatus.style.color = '#4CAF50';
+        bgmLog(LOG_LEVELS.INFO, `[updateUserIdStatus] UI 已更新为: ${_T.set}: ${display}`);
     } else {
         userIdStatus.textContent = _T.notSet;
         userIdStatus.style.color = '#f44336';
+        bgmLog(LOG_LEVELS.INFO, `[updateUserIdStatus] UI 已更新为: ${_T.notSet}`);
     }
 }
 
