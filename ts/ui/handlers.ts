@@ -639,14 +639,26 @@ export async function syncFromBgmByAPI(sheetIndex: number): Promise<void> {
 
 async function _doAPISync(sheetIndex: number, token: string): Promise<void> {
     setStatus('正在获取收藏列表...', 'info');
+    
+    // 记住原始活动工作表
+    const app = getApp();
+    if (!app?.ActiveWorkbook) { showAlert('无法获取 Application'); return; }
+    let originalActiveSheet: any = null;
     try {
-        if (typeof getOrCreateSyncRecordSheet === 'function') {
-            const syncSheet = getOrCreateSyncRecordSheet();
-            if (!syncSheet) { showAlert('创建同步记录表失败'); return; }
-        }
-
-        const app = getApp();
-        if (!app?.ActiveWorkbook) { showAlert('无法获取 Application'); return; }
+        originalActiveSheet = app.ActiveWorkbook.ActiveSheet;
+        bgmLog(LOG_LEVELS.INFO, `[_doAPISync] 记住原始工作表: ${originalActiveSheet?.Name}`);
+    } catch (e: any) {
+        bgmLog(LOG_LEVELS.WARN, `[_doAPISync] 获取原始工作表失败: ${e.message}`);
+    }
+    
+    // 获取同步记录工作表
+    let syncSheet: any = null;
+    if (typeof getOrCreateSyncRecordSheet === 'function') {
+        syncSheet = getOrCreateSyncRecordSheet();
+        if (!syncSheet) { showAlert('创建同步记录表失败'); return; }
+    }
+    
+    try {
         const ws = app.ActiveWorkbook.Worksheets.Item(sheetIndex);
 
         const headerRow = typeof findHeaderRow === 'function' ? findHeaderRow(ws) : 1;
@@ -675,6 +687,16 @@ async function _doAPISync(sheetIndex: number, token: string): Promise<void> {
 
         const collectionMap = new Map<string, BangumiCollectionItem>();
         userCollections.forEach(c => collectionMap.set(String(c.subject_id), c));
+
+        // 切换到同步记录工作表，让用户能看到实时写入
+        if (syncSheet) {
+            try {
+                (syncSheet as any).Activate();
+                bgmLog(LOG_LEVELS.INFO, `[_doAPISync] 已激活同步记录工作表: ${syncSheet.Name}`);
+            } catch (e: any) {
+                bgmLog(LOG_LEVELS.WARN, `[_doAPISync] 激活同步记录工作表失败: ${e.message}`);
+            }
+        }
 
         let syncRecords: SyncRecord[] = typeof getAllSyncRecords === 'function' ? getAllSyncRecords() : [];
         const syncCountMap = new Map<string, number>();
@@ -716,11 +738,31 @@ async function _doAPISync(sheetIndex: number, token: string): Promise<void> {
                 matchedCount++;
             }
         }
+        
+        // 恢复原始工作表
+        if (originalActiveSheet) {
+            try {
+                originalActiveSheet.Activate();
+                bgmLog(LOG_LEVELS.INFO, `[_doAPISync] 已恢复原始工作表: ${originalActiveSheet.Name}`);
+            } catch (e: any) {
+                bgmLog(LOG_LEVELS.WARN, `[_doAPISync] 恢复原始工作表失败: ${e.message}`);
+            }
+        }
+        
         showAlert(`同步完成！\n\n已匹配 ${matchedCount} 条`, _T.syncComplete);
     } catch (e: any) {
         BGM.handleError(e, { showAlert: false, level: BGM.ErrorLevel.WARN, context: '_doAPISync' });
         showAlert(_T.syncFailed + (e as Error).message, _T.syncFailed);
         setStatus(_T.syncFailed, 'error');
+    } finally {
+        // 确保即使发生异常也尝试恢复原始工作表
+        if (originalActiveSheet) {
+            try {
+                originalActiveSheet.Activate();
+            } catch (e: any) {
+                // 静默处理恢复失败
+            }
+        }
     }
 }
 

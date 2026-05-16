@@ -202,19 +202,31 @@ export function addSyncRecord(params: UpdateRecordParams): boolean {
             const newCount = existingCount + (params.count || 1);
             const finalStatus = params.status || SYNC_STATUS.SUCCESS;
 
+            // 更新时间戳
+            setCellValue(sheet, existingRow, SYNC_RECORD_COL.TIME, now);
             setCellValue(sheet, existingRow, SYNC_RECORD_COL.COUNT, newCount);
             if (params.status) setCellValue(sheet, existingRow, SYNC_RECORD_COL.STATUS, params.status);
             if (params.message) setCellValue(sheet, existingRow, SYNC_RECORD_COL.MESSAGE, params.message);
             if (params.fingerprint !== undefined) setCellValue(sheet, existingRow, SYNC_RECORD_COL.FINGERPRINT, params.fingerprint);
+            if (params.name) setCellValue(sheet, existingRow, SYNC_RECORD_COL.NAME, params.name);
+            if (params.url) setCellValue(sheet, existingRow, SYNC_RECORD_COL.URL, params.url);
+            if (params.type) setCellValue(sheet, existingRow, SYNC_RECORD_COL.TYPE, params.type);
+            if (params.content) setCellValue(sheet, existingRow, SYNC_RECORD_COL.CONTENT, params.content);
 
             setSyncRecordColors(sheet, existingRow, finalStatus, newCount);
 
+            // 更新缓存
             const cacheItem = _syncRecordListCache.find(item => item.sid === sid);
             if (cacheItem) {
+                cacheItem.time = now;
                 cacheItem.count = newCount;
                 if (params.status) cacheItem.status = params.status;
                 if (params.message) cacheItem.message = params.message;
                 if (params.fingerprint !== undefined) cacheItem.fingerprint = params.fingerprint;
+                if (params.name) cacheItem.name = params.name;
+                if (params.url) cacheItem.url = params.url;
+                if (params.type) cacheItem.type = params.type;
+                if (params.content) cacheItem.content = params.content;
             }
         } else {
             let newRow = 1;
