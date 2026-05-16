@@ -30,22 +30,31 @@ export function getSyncPreview(
     let total = 0, valid = 0, willSync = 0, willSkip = 0, alreadyUploaded = 0, noUrl = 0, emptyStatus = 0, incrementalSkipped = 0;
     const isIncremental = options?.incremental;
     const fingerprintMap = options?.fingerprintMap;
-
+    
+    bgmLog(LOG_LEVELS.INFO, `[getSyncPreview] ========== 数据预览统计开始 ==========`);
+    bgmLog(LOG_LEVELS.INFO, `[getSyncPreview] 起始行: ${startRow}, 最后行: ${lastRow}, 总行数: ${lastRow - startRow + 1}`);
+    bgmLog(LOG_LEVELS.INFO, `[getSyncPreview] 增量同步: ${isIncremental ? '开启' : '关闭'}`);
+    
     // 批量读取（与同步函数相同的列范围）
     const neededKeys = ['Bangumi_URL', '名称', '是否看完', '打分', '标签/分级', '剧透/感言', '集数', '集号'];
     let maxCol = 1;
     for (const key of neededKeys) {
         if (colMap.has(key)) maxCol = Math.max(maxCol, colMap.get(key)!);
     }
+    bgmLog(LOG_LEVELS.INFO, `[getSyncPreview] 最大列号: ${maxCol}`);
+    
     const allData = readRangeValues(ws, startRow, lastRow, 1, maxCol);
-
+    bgmLog(LOG_LEVELS.INFO, `[getSyncPreview] 批量读取数据: ${allData?.length || 0} 行`);
+    
     // 获取可见行（与同步函数相同）
     const filterStatus = getFilterStatus(lastRow);
     let rowsToProcess: number[] = [];
     if (filterStatus.hasFilter && filterStatus.visibleRows.length > 0) {
         rowsToProcess = filterStatus.visibleRows.filter(r => r >= startRow);
+        bgmLog(LOG_LEVELS.INFO, `[getSyncPreview] 筛选模式: ${rowsToProcess.length} 行可见`);
     } else {
         for (let r = startRow; r <= lastRow; r++) rowsToProcess.push(r);
+        bgmLog(LOG_LEVELS.INFO, `[getSyncPreview] 全量模式: ${rowsToProcess.length} 行`);
     }
 
     const getField = (rowNum: number, key: string): string => {
