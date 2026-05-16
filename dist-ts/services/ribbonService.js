@@ -28,7 +28,8 @@ export function getSyncPreview(ws, colMap, lastRow, headerRow, options) {
     const allData = readRangeValues(ws, startRow, lastRow, 1, maxCol);
     bgmLog(LOG_LEVELS.INFO, `[getSyncPreview] 批量读取数据: ${allData?.length || 0} 行`);
     // 获取可见行（与同步函数相同）
-    const filterStatus = getFilterStatus(lastRow);
+    const filterStatus = getFilterStatus(lastRow, headerRow);
+    bgmLog(LOG_LEVELS.INFO, `[getSyncPreview] 筛选检测结果: hasFilter=${filterStatus.hasFilter}, visibleRows=${filterStatus.visibleRows.length}`);
     let rowsToProcess = [];
     if (filterStatus.hasFilter && filterStatus.visibleRows.length > 0) {
         rowsToProcess = filterStatus.visibleRows.filter(r => r >= startRow);
@@ -127,6 +128,15 @@ export function getSyncPreview(ws, colMap, lastRow, headerRow, options) {
             willSync++;
         }
     }
+    bgmLog(LOG_LEVELS.INFO, `[getSyncPreview] ========== 数据预览统计结果 ==========`);
+    bgmLog(LOG_LEVELS.INFO, `[getSyncPreview] 总行数: ${total}`);
+    bgmLog(LOG_LEVELS.INFO, `[getSyncPreview] 有效行数: ${valid}`);
+    bgmLog(LOG_LEVELS.INFO, `[getSyncPreview] 待同步行数: ${willSync}`);
+    bgmLog(LOG_LEVELS.INFO, `[getSyncPreview] 跳过期数: ${willSkip}`);
+    bgmLog(LOG_LEVELS.INFO, `[getSyncPreview] 已上传行数: ${alreadyUploaded}`);
+    bgmLog(LOG_LEVELS.INFO, `[getSyncPreview] 无URL行数: ${noUrl}`);
+    bgmLog(LOG_LEVELS.INFO, `[getSyncPreview] 空状态行数: ${emptyStatus}`);
+    bgmLog(LOG_LEVELS.INFO, `[getSyncPreview] 增量跳过行数: ${incrementalSkipped}`);
     return { total, valid, willSync, willSkip, alreadyUploaded, noUrl, emptyStatus, incrementalSkipped };
 }
 /**
@@ -160,14 +170,17 @@ export async function detectConflicts(ws, colMap, lastRow, headerRow, token) {
         return { conflicts, conflictCount, bgmCollectionReady };
     }
     // 2. 遍历 Excel 可见行，比对差异
-    const filterStatus = getFilterStatus(lastRow);
+    const filterStatus = getFilterStatus(lastRow, headerRow);
+    bgmLog(LOG_LEVELS.INFO, `[detectConflicts] 筛选检测结果: hasFilter=${filterStatus.hasFilter}, visibleRows=${filterStatus.visibleRows.length}`);
     let rowsToProcess = [];
     if (filterStatus.hasFilter && filterStatus.visibleRows.length > 0) {
         rowsToProcess = filterStatus.visibleRows.filter(r => r >= startRow);
+        bgmLog(LOG_LEVELS.INFO, `[detectConflicts] 筛选模式: ${rowsToProcess.length} 行可见`);
     }
     else {
         for (let r = startRow; r <= lastRow; r++)
             rowsToProcess.push(r);
+        bgmLog(LOG_LEVELS.INFO, `[detectConflicts] 全量模式: ${rowsToProcess.length} 行`);
     }
     const getField = (row, key) => {
         if (colMap.has(key))
