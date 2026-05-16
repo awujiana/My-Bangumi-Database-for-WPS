@@ -474,6 +474,8 @@ export function getFilterStatus(
         try { autoFilterMode = !!ws.AutoFilterMode; } catch (e: any) {
             BGM.handleError(e, { context: 'getFilterStatus', showAlert: false });
         }
+        bgmLog(LOG_LEVELS.INFO, `getFilterStatus: AutoFilterMode=${autoFilterMode}, ws.AutoFilterMode=${ws.AutoFilterMode}`);
+        
         if (!autoFilterMode) return result;
         result.hasFilter = true;
 
@@ -482,9 +484,13 @@ export function getFilterStatus(
         try {
             if (ws.AutoFilter?.Range) {
                 filterRange = ws.AutoFilter.Range;
+                bgmLog(LOG_LEVELS.INFO, `getFilterStatus: 获取到 AutoFilter.Range`);
+            } else {
+                bgmLog(LOG_LEVELS.INFO, `getFilterStatus: ws.AutoFilter?.Range 为空或不存在`);
             }
         } catch (e: any) {
             BGM.handleError(e, { context: 'getFilterStatus', showAlert: false });
+            bgmLog(LOG_LEVELS.WARN, `getFilterStatus: 获取 AutoFilter.Range 失败: ${e.message}`);
         }
 
         // 3. 确定扫描范围

@@ -1029,15 +1029,20 @@ export function getDataSheet() {
     let app = getApp();
     if (!app || !app.ActiveWorkbook)
         return null;
+    bgmLog(LOG_LEVELS.INFO, `getDataSheet: isLocked=${BGM.sheet.isLocked}, lockedIndex=${BGM.sheet.lockedIndex}`);
     if (BGM.sheet.isLocked && BGM.sheet.lockedIndex) {
         try {
-            return app.ActiveWorkbook.Worksheets.Item(BGM.sheet.lockedIndex);
+            const ws = app.ActiveWorkbook.Worksheets.Item(BGM.sheet.lockedIndex);
+            bgmLog(LOG_LEVELS.INFO, `getDataSheet: 返回锁定的工作表: ${ws.Name}`);
+            return ws;
         }
         catch (e) {
             bgmLog(LOG_LEVELS.WARN, "getDataSheet 锁定工作表失败: " + e.message);
         }
     }
-    return app.ActiveWorkbook.ActiveSheet;
+    const ws = app.ActiveWorkbook.ActiveSheet;
+    bgmLog(LOG_LEVELS.INFO, `getDataSheet: 返回当前活动工作表: ${ws.Name}`);
+    return ws;
 }
 /**
  * 计算 Excel 行数据的指纹（用于增量同步比较）
