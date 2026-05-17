@@ -106,17 +106,36 @@ export function updateTokenStatus() {
 }
 export function updateUserIdStatus() {
     const userIdStatus = document.getElementById('userIdStatus');
-    if (!userIdStatus)
+    bgmLog(LOG_LEVELS.INFO, `[updateUserIdStatus] userIdStatus 元素: ${userIdStatus ? '存在' : '不存在'}`);
+    if (!userIdStatus) {
+        // 如果元素不存在，可能是 taskpane 页面还未完全加载，延迟重试
+        setTimeout(() => {
+            const retryElement = document.getElementById('userIdStatus');
+            if (retryElement) {
+                bgmLog(LOG_LEVELS.INFO, `[updateUserIdStatus] 重试成功，找到元素`);
+                doUpdateUserIdStatus(retryElement);
+            }
+            else {
+                bgmLog(LOG_LEVELS.WARN, `[updateUserIdStatus] 重试后仍找不到 userIdStatus 元素`);
+            }
+        }, 500);
         return;
+    }
+    doUpdateUserIdStatus(userIdStatus);
+}
+function doUpdateUserIdStatus(userIdStatus) {
     const userId = _getBgmUserId();
+    bgmLog(LOG_LEVELS.INFO, `[updateUserIdStatus] 当前 userId: ${userId}, username: ${BGM.cache.username}`);
     if (userId) {
         const display = BGM.cache.username ? BGM.cache.username + ' (' + userId + ')' : userId;
         userIdStatus.textContent = _T.set + ': ' + display;
         userIdStatus.style.color = '#4CAF50';
+        bgmLog(LOG_LEVELS.INFO, `[updateUserIdStatus] UI 已更新为: ${_T.set}: ${display}`);
     }
     else {
         userIdStatus.textContent = _T.notSet;
         userIdStatus.style.color = '#f44336';
+        bgmLog(LOG_LEVELS.INFO, `[updateUserIdStatus] UI 已更新为: ${_T.notSet}`);
     }
 }
 export function openUserCollection() {
@@ -280,24 +299,8 @@ export async function syncFromPanel() {
         return;
     }
     bgmLog(LOG_LEVELS.INFO, `[syncFromPanel] Token 已设置（长度: ${token.length}）`);
-    // 3. 确保同步记录工作表存在并激活
-    bgmLog(LOG_LEVELS.INFO, '[syncFromPanel] 步骤3: 确保同步记录工作表存在');
-    if (typeof getOrCreateSyncRecordSheet === 'function') {
-        const syncSheet = getOrCreateSyncRecordSheet();
-        if (syncSheet) {
-            bgmLog(LOG_LEVELS.INFO, '[syncFromPanel] 同步记录工作表已创建/获取');
-            try {
-                syncSheet.Activate();
-                bgmLog(LOG_LEVELS.INFO, '[syncFromPanel] 同步记录工作表已激活');
-            }
-            catch (e) {
-                bgmLog(LOG_LEVELS.WARN, `[syncFromPanel] 激活同步记录工作表失败: ${e.message}`);
-                BGM.handleError(e, { showAlert: false, level: BGM.ErrorLevel.WARN, context: 'syncFromPanel' });
-            }
-        }
-    }
-    // 4. 获取应用和工作表对象
-    bgmLog(LOG_LEVELS.INFO, '[syncFromPanel] 步骤4: 获取应用和工作表对象');
+    // 3. 获取应用和工作表对象
+    bgmLog(LOG_LEVELS.INFO, '[syncFromPanel] 步骤3: 获取应用和工作表对象');
     const app = getApp();
     if (!app?.ActiveWorkbook) {
         bgmLog(LOG_LEVELS.ERROR, '[syncFromPanel] 无法获取 Application 对象');
@@ -306,6 +309,27 @@ export async function syncFromPanel() {
         return;
     }
     bgmLog(LOG_LEVELS.INFO, '[syncFromPanel] Application 对象获取成功');
+    // 3.1 记住用户当前活动的工作表
+    let originalActiveSheet = null;
+    try {
+        originalActiveSheet = app.ActiveWorkbook.ActiveSheet;
+        if (originalActiveSheet) {
+            bgmLog(LOG_LEVELS.INFO, `[syncFromPanel] 记住用户当前工作表: ${originalActiveSheet.Name}`);
+        }
+    }
+    catch (e) {
+        bgmLog(LOG_LEVELS.WARN, `[syncFromPanel] 获取当前工作表失败: ${e.message}`);
+    }
+    // 3.2 确保同步记录工作表存在（不激活）
+    let syncSheet = null;
+    bgmLog(LOG_LEVELS.INFO, '[syncFromPanel] 步骤3.2: 确保同步记录工作表存在');
+    if (typeof getOrCreateSyncRecordSheet === 'function') {
+        syncSheet = getOrCreateSyncRecordSheet();
+        if (syncSheet) {
+            bgmLog(LOG_LEVELS.INFO, '[syncFromPanel] 同步记录工作表已创建/获取（暂不激活）');
+        }
+    }
+    // 4. 获取数据工作表并激活（确保筛选检测正确）
     const ws = getDataSheet();
     if (!ws) {
         bgmLog(LOG_LEVELS.WARN, '[syncFromPanel] 未找到数据工作表');
@@ -314,6 +338,13 @@ export async function syncFromPanel() {
         return;
     }
     bgmLog(LOG_LEVELS.INFO, '[syncFromPanel] 数据工作表获取成功');
+    try {
+        ws.Activate();
+        bgmLog(LOG_LEVELS.INFO, `[syncFromPanel] 已激活数据工作表: ${ws.Name}（用于筛选检测）`);
+    }
+    catch (e) {
+        bgmLog(LOG_LEVELS.WARN, `[syncFromPanel] 激活数据工作表失败: ${e.message}`);
+    }
     // 5. 解析表头和列映射
     bgmLog(LOG_LEVELS.INFO, '[syncFromPanel] 步骤5: 解析表头和列映射');
     const headerRow = findHeaderRow(ws);
@@ -388,17 +419,38 @@ export async function syncFromPanel() {
             不上传（状态跳过）：${preview.willSkip}
             无URL：${preview.noUrl}
             空状态：${preview.emptyStatus}
-            ${incremental ? `增量跳过：${preview.incrementalSkipped}\n` : ''}${conflictMsg}是否继续同步？`;
+            ${incremental ? `增量跳过：${preview.incrementalSkipped}\n` : ''}${conflictMsg}是否继续同步？\n\n同步开始后将切换到同步记录工作表查看进度。`;
     const confirmed = await new Promise(resolve => {
         showConfirm(msg, (confirmed) => resolve(confirmed));
     });
     if (!confirmed) {
         bgmLog(LOG_LEVELS.INFO, '[syncFromPanel] 用户取消同步');
+        // 恢复用户之前的工作表
+        if (originalActiveSheet) {
+            try {
+                originalActiveSheet.Activate();
+                bgmLog(LOG_LEVELS.INFO, `[syncFromPanel] 已恢复用户之前的工作表: ${originalActiveSheet.Name}`);
+            }
+            catch (e) {
+                bgmLog(LOG_LEVELS.WARN, `[syncFromPanel] 恢复工作表失败: ${e.message}`);
+            }
+        }
         bgmLog(LOG_LEVELS.INFO, `[syncFromPanel] 同步操作终止（用户取消），耗时: ${Date.now() - startTime}ms`);
         return;
     }
-    // 10. 执行同步
-    bgmLog(LOG_LEVELS.INFO, '[syncFromPanel] 步骤10: 开始执行同步');
+    // 10. 切换到同步记录工作表，让用户看到实时写入
+    bgmLog(LOG_LEVELS.INFO, '[syncFromPanel] 步骤10: 切换到同步记录工作表');
+    if (syncSheet) {
+        try {
+            syncSheet.Activate();
+            bgmLog(LOG_LEVELS.INFO, `[syncFromPanel] 已激活同步记录工作表: ${syncSheet.Name}`);
+        }
+        catch (e) {
+            bgmLog(LOG_LEVELS.WARN, `[syncFromPanel] 激活同步记录工作表失败: ${e.message}`);
+        }
+    }
+    // 11. 执行同步
+    bgmLog(LOG_LEVELS.INFO, '[syncFromPanel] 步骤11: 开始执行同步');
     showStopButton(); // 显示停止按钮
     try {
         bgmLog(LOG_LEVELS.INFO, '[syncFromPanel] 调用 SyncToBangumiAsync...');
@@ -434,6 +486,18 @@ export async function syncFromPanel() {
             app.StatusBar = false;
         bgmLog(LOG_LEVELS.ERROR, `[syncFromPanel] 同步失败: ${err.message}`);
         BGM.handleError(err, { context: 'syncFromPanel', showAlert: true });
+    }
+    finally {
+        // 无论成功失败，最后都尝试恢复用户之前的工作表
+        if (originalActiveSheet) {
+            try {
+                originalActiveSheet.Activate();
+                bgmLog(LOG_LEVELS.INFO, `[syncFromPanel] 已恢复用户之前的工作表: ${originalActiveSheet.Name}`);
+            }
+            catch (e) {
+                bgmLog(LOG_LEVELS.WARN, `[syncFromPanel] 恢复工作表失败: ${e.message}`);
+            }
+        }
     }
     bgmLog(LOG_LEVELS.INFO, `[syncFromPanel] ========== 同步操作结束，总耗时: ${Date.now() - startTime}ms ==========`);
 }
@@ -538,19 +602,30 @@ export async function syncFromBgmByAPI(sheetIndex) {
 }
 async function _doAPISync(sheetIndex, token) {
     setStatus('正在获取收藏列表...', 'info');
+    // 记住原始活动工作表
+    const app = getApp();
+    if (!app?.ActiveWorkbook) {
+        showAlert('无法获取 Application');
+        return;
+    }
+    let originalActiveSheet = null;
     try {
-        if (typeof getOrCreateSyncRecordSheet === 'function') {
-            const syncSheet = getOrCreateSyncRecordSheet();
-            if (!syncSheet) {
-                showAlert('创建同步记录表失败');
-                return;
-            }
-        }
-        const app = getApp();
-        if (!app?.ActiveWorkbook) {
-            showAlert('无法获取 Application');
+        originalActiveSheet = app.ActiveWorkbook.ActiveSheet;
+        bgmLog(LOG_LEVELS.INFO, `[_doAPISync] 记住原始工作表: ${originalActiveSheet?.Name}`);
+    }
+    catch (e) {
+        bgmLog(LOG_LEVELS.WARN, `[_doAPISync] 获取原始工作表失败: ${e.message}`);
+    }
+    // 获取同步记录工作表
+    let syncSheet = null;
+    if (typeof getOrCreateSyncRecordSheet === 'function') {
+        syncSheet = getOrCreateSyncRecordSheet();
+        if (!syncSheet) {
+            showAlert('创建同步记录表失败');
             return;
         }
+    }
+    try {
         const ws = app.ActiveWorkbook.Worksheets.Item(sheetIndex);
         const headerRow = typeof findHeaderRow === 'function' ? findHeaderRow(ws) : 1;
         const colMap = typeof getColumnMap === 'function' ? getColumnMap(ws, headerRow) : new Map();
@@ -561,7 +636,7 @@ async function _doAPISync(sheetIndex, token) {
         const lastRow = typeof getLastRow === 'function' ? getLastRow(ws) : 200;
         let rowsToProcess = [];
         if (typeof getFilterStatus === 'function') {
-            const filterStatus = getFilterStatus(lastRow);
+            const filterStatus = getFilterStatus(ws, lastRow, headerRow);
             rowsToProcess = filterStatus?.visibleRows ?? [];
         }
         if (rowsToProcess.length === 0) {
@@ -583,6 +658,16 @@ async function _doAPISync(sheetIndex, token) {
         const userCollections = await fetchAllUserCollections(token);
         const collectionMap = new Map();
         userCollections.forEach(c => collectionMap.set(String(c.subject_id), c));
+        // 切换到同步记录工作表，让用户能看到实时写入
+        if (syncSheet) {
+            try {
+                syncSheet.Activate();
+                bgmLog(LOG_LEVELS.INFO, `[_doAPISync] 已激活同步记录工作表: ${syncSheet.Name}`);
+            }
+            catch (e) {
+                bgmLog(LOG_LEVELS.WARN, `[_doAPISync] 激活同步记录工作表失败: ${e.message}`);
+            }
+        }
         let syncRecords = typeof getAllSyncRecords === 'function' ? getAllSyncRecords() : [];
         const syncCountMap = new Map();
         syncRecords.forEach(r => syncCountMap.set(String(r.sid || ''), (syncCountMap.get(String(r.sid || '')) || 0) + 1));
@@ -619,12 +704,33 @@ async function _doAPISync(sheetIndex, token) {
                 matchedCount++;
             }
         }
+        // 恢复原始工作表
+        if (originalActiveSheet) {
+            try {
+                originalActiveSheet.Activate();
+                bgmLog(LOG_LEVELS.INFO, `[_doAPISync] 已恢复原始工作表: ${originalActiveSheet.Name}`);
+            }
+            catch (e) {
+                bgmLog(LOG_LEVELS.WARN, `[_doAPISync] 恢复原始工作表失败: ${e.message}`);
+            }
+        }
         showAlert(`同步完成！\n\n已匹配 ${matchedCount} 条`, _T.syncComplete);
     }
     catch (e) {
         BGM.handleError(e, { showAlert: false, level: BGM.ErrorLevel.WARN, context: '_doAPISync' });
         showAlert(_T.syncFailed + e.message, _T.syncFailed);
         setStatus(_T.syncFailed, 'error');
+    }
+    finally {
+        // 确保即使发生异常也尝试恢复原始工作表
+        if (originalActiveSheet) {
+            try {
+                originalActiveSheet.Activate();
+            }
+            catch (e) {
+                // 静默处理恢复失败
+            }
+        }
     }
 }
 export async function markUploadedItems(sheetIndexOrName, collections) {

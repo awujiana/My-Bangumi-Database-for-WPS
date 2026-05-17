@@ -28,7 +28,7 @@ export function getSyncPreview(ws, colMap, lastRow, headerRow, options) {
     const allData = readRangeValues(ws, startRow, lastRow, 1, maxCol);
     bgmLog(LOG_LEVELS.INFO, `[getSyncPreview] 批量读取数据: ${allData?.length || 0} 行`);
     // 获取可见行（与同步函数相同）
-    const filterStatus = getFilterStatus(lastRow, headerRow);
+    const filterStatus = getFilterStatus(ws, lastRow, headerRow);
     bgmLog(LOG_LEVELS.INFO, `[getSyncPreview] 筛选检测结果: hasFilter=${filterStatus.hasFilter}, visibleRows=${filterStatus.visibleRows.length}`);
     let rowsToProcess = [];
     if (filterStatus.hasFilter && filterStatus.visibleRows.length > 0) {
@@ -170,7 +170,7 @@ export async function detectConflicts(ws, colMap, lastRow, headerRow, token) {
         return { conflicts, conflictCount, bgmCollectionReady };
     }
     // 2. 遍历 Excel 可见行，比对差异
-    const filterStatus = getFilterStatus(lastRow, headerRow);
+    const filterStatus = getFilterStatus(ws, lastRow, headerRow);
     bgmLog(LOG_LEVELS.INFO, `[detectConflicts] 筛选检测结果: hasFilter=${filterStatus.hasFilter}, visibleRows=${filterStatus.visibleRows.length}`);
     let rowsToProcess = [];
     if (filterStatus.hasFilter && filterStatus.visibleRows.length > 0) {

@@ -7,6 +7,7 @@
  * @author BGM Development Team
  * @version 1.1.0 (优化版，保留原注释和日志)
  */
+import { WpsWorksheet } from '../index.js';
 /**
  * 打开Bangumi Token申请页面
  *
@@ -86,12 +87,13 @@ export declare function addTagsFromStr(tagSet: Set<string>, raw: string): void;
  */
 export declare function buildTagsArray(tagsRaw: string): string[];
 /**
- * 获取筛选状态（可见行列表）
- * @param lastRow  可选扫描上限，默认取工作表最大行数
+ * 获取筛选状态（可见行）
+ * @param wsOrLastRow 工作表对象或最后行号（兼容旧用法）
+ * @param lastRow 最后行号（当 wsOrLastRow 为工作表时）
  * @param headerRow 表头行号，用于排除
  * @returns hasFilter, visibleRows（不含表头和全空行）, hiddenRows
  */
-export declare function getFilterStatus(lastRow?: number, headerRow?: number): {
+export declare function getFilterStatus(wsOrLastRow?: WpsWorksheet | number, lastRow?: number, headerRow?: number): {
     hasFilter: boolean;
     visibleRows: number[];
     hiddenRows: number[];

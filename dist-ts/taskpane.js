@@ -511,7 +511,7 @@ function refreshData() {
         const lastRow = getLastRow(ws, true);
         bgmLog(LOG_LEVELS.INFO, `工作表最后数据行: ${lastRow}`);
         // 使用统一的筛选状态检测
-        const filterStatus = getFilterStatus(lastRow);
+        const filterStatus = getFilterStatus(ws, lastRow);
         const isFiltered = filterStatus ? filterStatus.hasFilter : false;
         const visibleRows = filterStatus?.visibleRows || [];
         const visibleRowSet = isFiltered ? new Set(visibleRows) : null;

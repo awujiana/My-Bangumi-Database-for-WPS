@@ -4,13 +4,15 @@
  * @description 消息监听、消息处理、状态设置
  */
 
-import { BGM,showAlert,showConfirm ,updateTokenStatus,refreshSheets,refreshData} from '../index.js';
+import { BGM,showAlert,showConfirm ,updateTokenStatus,updateUserIdStatus,refreshSheets,refreshData, bgmLog, LOG_LEVELS} from '../index.js';
 
 // ========== 类型定义 ==========
 interface MessageEventData {
     type: string;
     title?: string;
     message?: string;
+    username?: string;
+    userId?: string;
 }
 
 // ========== 消息监听 ==========
@@ -19,6 +21,9 @@ export function initMessageListener(): void {
     window.addEventListener('message', (event: MessageEvent<MessageEventData>) => {
         const data = event.data;
         if (!data?.type) return;
+        
+        bgmLog(LOG_LEVELS.INFO, `[message] 收到消息: ${data.type}`);
+        
         switch (data.type) {
             case 'showAlert':
                 showAlert(data.message || '', data.title);
@@ -36,6 +41,10 @@ export function initMessageListener(): void {
                 break;
             case 'refreshData':
                 refreshData();
+                break;
+            case 'BGM:userInfoUpdated':
+                bgmLog(LOG_LEVELS.INFO, `[message] 收到用户信息更新: username=${data.username}, userId=${data.userId}`);
+                updateUserIdStatus();
                 break;
         }
     });
