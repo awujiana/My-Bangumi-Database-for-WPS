@@ -112,10 +112,19 @@ export declare function loadBgToken(): string | null;
  */
 export declare function _setBgmUserId(id: string): void;
 /**
- * 获取 Bangumi 用户 ID（从全局缓存读取）
+ * 获取 Bangumi 用户 ID（优先从内存缓存读取，回退到 PluginStorage）
  * @returns 用户 ID 字符串；若未设置则返回 null
  */
 export declare function _getBgmUserId(): string | null;
+/**
+ * 设置 Bangumi 用户名（持久化到 PluginStorage）
+ */
+export declare function _setBgmUsername(name: string): void;
+/**
+ * 获取 Bangumi 用户名（优先从内存缓存读取，回退到 PluginStorage）
+ * @returns 用户名；若未设置则返回 null
+ */
+export declare function _getBgmUsername(): string | null;
 /**
  * 获取 Bangumi API 用户路径（格式：/-）
  * 用于拼接用户收藏请求的 URL

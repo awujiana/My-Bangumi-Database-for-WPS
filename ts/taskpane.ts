@@ -6,7 +6,7 @@
 
 
 import { PANEL_CONFIG, WPS_ENUM , LOG_LEVELS ,getApp, bgmLog, BGM, escapeHtml, readCell, colNumToLetter,HEADER_KEYWORDS, IMPORTANT_COLS  ,initMessageListener,  markUploadedItems,  updateTokenStatus, updateUserIdStatus, showTokenDialog, showUserIdDialog ,
-     showAlert, showToast ,closeDetailModal,getFilterStatus,    getLastRow,clearSheetCache,WpsWorksheet
+     showAlert, showToast ,closeDetailModal,getFilterStatus,    getLastRow,clearSheetCache,WpsWorksheet, _getBgmUserId, _getBgmUsername, _setBgmUserId, _setBgmUsername
 }from './index.js';
 // ========== 类型定义 ==========
 interface LockedSheetInfo {
@@ -682,6 +682,36 @@ function onSelectModeChange(): void {
 
 // ========== 初始化 ==========
 
+/**
+ * 从 PluginStorage 恢复用户信息到内存缓存
+ * Ribbon 设置的用户信息通过 PluginStorage 在 Ribbon 和 Taskpane 之间共享
+ */
+function restoreUserInfoFromStorage(): void {
+    try {
+        const app = getApp();
+        if (!app?.PluginStorage) {
+            bgmLog(LOG_LEVELS.INFO, '[restoreUserInfoFromStorage] PluginStorage 不可用');
+            return;
+        }
+        const storedUserId = app.PluginStorage.getItem('bgm_user_id');
+        const storedUsername = app.PluginStorage.getItem('bgm_username');
+        
+        if (storedUserId) {
+            BGM.cache.userId = storedUserId;
+            bgmLog(LOG_LEVELS.INFO, `[restoreUserInfoFromStorage] 恢复 userId: ${storedUserId}`);
+        }
+        if (storedUsername) {
+            BGM.cache.username = storedUsername;
+            bgmLog(LOG_LEVELS.INFO, `[restoreUserInfoFromStorage] 恢复 username: ${storedUsername}`);
+        }
+        if (storedUserId || storedUsername) {
+            updateUserIdStatus();
+        }
+    } catch (e: any) {
+        bgmLog(LOG_LEVELS.WARN, `[restoreUserInfoFromStorage] 恢复失败: ${e.message}`);
+    }
+}
+
 function initPanel(): void {
     bgmLog(LOG_LEVELS.INFO, 'initPanel 开始');
 
@@ -692,6 +722,9 @@ function initPanel(): void {
 
     // 初始化消息监听（用于与其他任务窗格通信）
     initMessageListener();
+
+    // 从 PluginStorage 恢复用户信息（Ribbon 设置后 Taskpane 读取）
+    restoreUserInfoFromStorage();
 
     // 恢复上次锁定的工作表
     const restored = restoreLockedSheet();

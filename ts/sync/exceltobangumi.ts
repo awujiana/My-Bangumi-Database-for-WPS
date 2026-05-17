@@ -43,6 +43,7 @@ import {
     storeBgToken,
     _getBgmUserId,
     _setBgmUserId,
+    _setBgmUsername,
     BGM,
     wpsMsgBox,
     _getUserApiPath,
@@ -233,9 +234,6 @@ export function testTokenValidityForRibbon(token?: string): void {
                 bgmLog(LOG_LEVELS.INFO, `[exceltobangumi/testTokenValidityForRibbon] Token 验证成功！用户名: ${nickname}, 用户ID: ${userId}`);
                 showSuccess(`Token有效！\n\n用户名: ${nickname}\n用户ID: ${userId}`, '验证成功');
                 
-                _setBgmUserId(userId);
-                BGM.cache.username = nickname;
-                
                 notifyUserInfoUpdated(nickname, userId);
                 
             } catch (e: any) {
@@ -278,25 +276,13 @@ function notifyUserInfoUpdated(username: string, userId: string): void {
         bgmLog(LOG_LEVELS.INFO, `[notifyUserInfoUpdated]   用户名: ${username}`);
         bgmLog(LOG_LEVELS.INFO, `[notifyUserInfoUpdated]   用户ID: ${userId}`);
         
-        // 触发事件总线
-        BGM.setUserId(userId);
-        BGM.setUsername(username);
-        bgmLog(LOG_LEVELS.INFO, `[notifyUserInfoUpdated] BGM.cache 已更新`);
+        // 更新内存缓存 + 持久化到 PluginStorage
+        _setBgmUserId(userId);
+        _setBgmUsername(username);
+        BGM.cache.username = username;
+        BGM.cache.userId = userId;
         
-        // 尝试通知 taskpane
-        if (typeof window !== 'undefined' && window.parent) {
-            bgmLog(LOG_LEVELS.INFO, `[notifyUserInfoUpdated] 准备发送 postMessage 到 window.parent`);
-            window.parent.postMessage({
-                type: 'BGM:userInfoUpdated',
-                username: username,
-                userId: userId,
-                timestamp: Date.now()
-            }, '*');
-            bgmLog(LOG_LEVELS.INFO, `[notifyUserInfoUpdated] postMessage 已发送: BGM:userInfoUpdated`);
-        } else {
-            bgmLog(LOG_LEVELS.WARN, `[notifyUserInfoUpdated] window.parent 不可用，无法发送通知`);
-        }
-        
+        bgmLog(LOG_LEVELS.INFO, `[notifyUserInfoUpdated] 用户信息已持久化到 PluginStorage`);
         bgmLog(LOG_LEVELS.INFO, `[notifyUserInfoUpdated] 通知完成`);
     } catch (e) {
         bgmLog(LOG_LEVELS.WARN, '通知用户信息更新失败: ' + (e as Error).message);

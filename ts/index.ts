@@ -220,6 +220,10 @@ export {
     _getBgmUserId,
     // 设置用户 ID
     _setBgmUserId,
+    // 获取用户名
+    _getBgmUsername,
+    // 设置用户名
+    _setBgmUsername,
     // Promise 版本获取用户信息
     fetchBgmUserInfo,
     // 去除首尾空格

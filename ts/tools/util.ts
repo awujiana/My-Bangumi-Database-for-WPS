@@ -285,12 +285,20 @@ export const BGM: {
         }
     },
     setUserId(id: string | null) {
-        this.cache.userId = id;
-        eventBus.emit(BGM_EVENTS.USER_ID_UPDATED);
+        if (id) {
+            _setBgmUserId(id);
+        } else {
+            this.cache.userId = null;
+            eventBus.emit(BGM_EVENTS.USER_ID_UPDATED);
+        }
     },
     setUsername(name: string | null) {
-        this.cache.username = name;
-        eventBus.emit(BGM_EVENTS.USER_NAME_UPDATED);
+        if (name) {
+            _setBgmUsername(name);
+        } else {
+            this.cache.username = null;
+            eventBus.emit(BGM_EVENTS.USER_NAME_UPDATED);
+        }
     },
     notifyTokenUpdated() {
         eventBus.emit(BGM_EVENTS.TOKEN_UPDATED);
@@ -590,11 +598,56 @@ export function _setBgmUserId(id: string): void {
 }
 
 /**
- * 获取 Bangumi 用户 ID（从全局缓存读取）
+ * 获取 Bangumi 用户 ID（优先从内存缓存读取，回退到 PluginStorage）
  * @returns 用户 ID 字符串；若未设置则返回 null
  */
 export function _getBgmUserId(): string | null {
-    return BGM.cache.userId;
+    if (BGM.cache.userId) return BGM.cache.userId;
+    // 回退到 PluginStorage（Ribbon 设置后 Taskpane 可从持久化存储读取）
+    try {
+        const app = getApp();
+        if (app?.PluginStorage) {
+            const stored = app.PluginStorage.getItem('bgm_user_id');
+            if (stored) {
+                BGM.cache.userId = stored;
+                return stored;
+            }
+        }
+    } catch (e) { /* 忽略 PluginStorage 读取错误 */ }
+    return null;
+}
+
+/**
+ * 设置 Bangumi 用户名（持久化到 PluginStorage）
+ */
+export function _setBgmUsername(name: string): void {
+    if (!name || name.trim() === '') return;
+    const username = name.trim();
+    BGM.cache.username = username;
+    const app = getApp();
+    if (app?.PluginStorage) {
+        app.PluginStorage.setItem('bgm_username', username);
+    }
+    eventBus.emit(BGM_EVENTS.USER_NAME_UPDATED);
+}
+
+/**
+ * 获取 Bangumi 用户名（优先从内存缓存读取，回退到 PluginStorage）
+ * @returns 用户名；若未设置则返回 null
+ */
+export function _getBgmUsername(): string | null {
+    if (BGM.cache.username) return BGM.cache.username;
+    try {
+        const app = getApp();
+        if (app?.PluginStorage) {
+            const stored = app.PluginStorage.getItem('bgm_username');
+            if (stored) {
+                BGM.cache.username = stored;
+                return stored;
+            }
+        }
+    } catch (e) { /* 忽略 */ }
+    return null;
 }
 
 /**
@@ -634,9 +687,8 @@ export function _fetchBgmUserInfo(callback?: (userInfo: BGMUserInfo | null) => v
                 // BGM API v0 返回的用户名字段是 nickname，username 是用户ID
                 const username = String(data.nickname || data.username || data.user_name || data.name || '');
                 
-                BGM.cache.userId = userId;
-                BGM.cache.username = username;
-                _setBgmUserId(userId);  // 确保用户ID被持久化保存
+                _setBgmUserId(userId);
+                _setBgmUsername(username);
                 bgmLog(LOG_LEVELS.INFO, `[_fetchBgmUserInfo] 获取用户信息成功: userId=${userId}, username=${username}`);
                 
                 if (callback) callback({ id: userId, username: username });

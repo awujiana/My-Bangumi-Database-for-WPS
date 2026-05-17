@@ -3,7 +3,7 @@
  * @module ui/handlers
  * @description 面板操作处理、按钮绑定、业务对话框
  */
-import { LOG_LEVELS, bgmLog, BGM, loadBgToken, storeBgToken, _getBgmUserId, _setBgmUserId, getApp, getCell, trim, fetchBgmUserInfo, BGM_COLOR, showAlert, showConfirm, showError, showSuccess, showInput, showToast, setStatus, verifyToken, fetchAllUserCollections, findHeaderRow, getColumnMap, getLastRow, extractSubjectId, getDataSheet, getFilterStatus, SyncToBangumiAsync, testSingleUpdate, getOrCreateSyncRecordSheet, getAllSyncRecords, addSyncRecord, openSyncRecordSheet, previewSyncContent, refreshData, refreshSheets, toggleSheetLock, clearSyncRecords, closeDetailModal, getIncrementalSync, setIncrementalSync, getSkipConflicts, setSkipConflicts, } from '../index.js';
+import { LOG_LEVELS, bgmLog, BGM, loadBgToken, storeBgToken, _getBgmUserId, _setBgmUserId, _getBgmUsername, _setBgmUsername, getApp, getCell, trim, fetchBgmUserInfo, BGM_COLOR, showAlert, showConfirm, showError, showSuccess, showInput, showToast, setStatus, verifyToken, fetchAllUserCollections, findHeaderRow, getColumnMap, getLastRow, extractSubjectId, getDataSheet, getFilterStatus, SyncToBangumiAsync, testSingleUpdate, getOrCreateSyncRecordSheet, getAllSyncRecords, addSyncRecord, openSyncRecordSheet, previewSyncContent, refreshData, refreshSheets, toggleSheetLock, clearSyncRecords, closeDetailModal, getIncrementalSync, setIncrementalSync, getSkipConflicts, setSkipConflicts, } from '../index.js';
 5;
 import { BGM_EVENTS, eventBus } from '../tools/events.js';
 //  
@@ -116,9 +116,10 @@ export function updateUserIdStatus() {
 }
 function doUpdateUserIdStatus(userIdStatus) {
     const userId = _getBgmUserId();
-    bgmLog(LOG_LEVELS.INFO, `[updateUserIdStatus] 当前 userId: ${userId}, username: ${BGM.cache.username}`);
+    const username = _getBgmUsername();
+    bgmLog(LOG_LEVELS.INFO, `[updateUserIdStatus] 当前 userId: ${userId}, username: ${username}`);
     if (userId) {
-        const display = BGM.cache.username ? BGM.cache.username + ' (' + userId + ')' : userId;
+        const display = username ? username + ' (' + userId + ')' : userId;
         userIdStatus.textContent = _T.set + ': ' + display;
         userIdStatus.style.color = '#4CAF50';
         bgmLog(LOG_LEVELS.INFO, `[updateUserIdStatus] UI 已更新为: ${_T.set}: ${display}`);
@@ -180,8 +181,7 @@ export function testTokenValidity() {
                 bgmLog(LOG_LEVELS.INFO, `[testTokenValidity] Token 验证成功！用户名: ${nickname}, 用户ID: ${userId}`);
                 showSuccess(_T.tokenValid, _T.user + nickname);
                 _setBgmUserId(userId);
-                BGM.cache.username = nickname;
-                BGM.setUsername(nickname);
+                _setBgmUsername(nickname);
             }
             catch (e) {
                 bgmLog(LOG_LEVELS.ERROR, `[testTokenValidity] 解析响应失败: ${e.message}`);
@@ -953,6 +953,7 @@ function setupMessageListener() {
                     bgmLog(LOG_LEVELS.INFO, `[handlers] 收到用户信息更新通知: 用户名=${data.username}, 用户ID=${data.userId}`);
                     if (data.username) {
                         BGM.cache.username = data.username;
+                        _setBgmUsername(data.username);
                         bgmLog(LOG_LEVELS.INFO, `[handlers] 已更新 BGM.cache.username: ${BGM.cache.username}`);
                     }
                     if (data.userId) {
