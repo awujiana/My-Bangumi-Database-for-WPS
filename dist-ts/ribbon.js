@@ -52,25 +52,6 @@ export function OnSkipConflictsChange(control) {
     // 保存到 PluginStorage
     setSkipConflicts(finalValue);
     bgmLog(LOG_LEVELS.INFO, `[Ribbon] 跳过冲突状态已保存到 PluginStorage: ${finalValue}`);
-    // ========== 新增：通知侧边栏配置已更新 ==========
-    try {
-        if (typeof window !== 'undefined' && window.parent) {
-            window.parent.postMessage({
-                type: 'BGM:configUpdated',
-                data: {
-                    key: 'bgm_skip_conflicts',
-                    value: finalValue ? 'true' : 'false'
-                }
-            }, '*');
-            bgmLog(LOG_LEVELS.INFO, `[Ribbon] 已通知侧边栏冲突策略更新: ${finalValue ? '跳过' : '覆盖'}`);
-        }
-        else {
-            bgmLog(LOG_LEVELS.WARN, '[Ribbon] 无法发送 postMessage，window.parent 不可用');
-        }
-    }
-    catch (err) {
-        BGM.handleError(err, { level: BGM.ErrorLevel.WARN, context: 'Ribbon OnSkipConflictsChange' });
-    }
     return true; // 必须返回 boolean
 }
 /**
@@ -97,19 +78,6 @@ export function OnIncrementalSyncChange(control) {
     }
     setIncrementalSync(finalValue);
     bgmLog(LOG_LEVELS.INFO, `[Ribbon] 增量同步状态已保存到 PluginStorage: ${finalValue}`);
-    // 新增：通知侧边栏
-    try {
-        if (typeof window !== 'undefined' && window.parent) {
-            window.parent.postMessage({
-                type: 'BGM:configUpdated',
-                data: { key: 'bgm_incremental_sync', value: finalValue ? 'true' : 'false' }
-            }, '*');
-            bgmLog(LOG_LEVELS.INFO, `[Ribbon] 已通知侧边栏增量同步更新: ${finalValue ? '开启' : '关闭'}`);
-        }
-    }
-    catch (err) {
-        BGM.handleError(err, { level: BGM.ErrorLevel.WARN, context: 'Ribbon OnIncrementalSyncChange' });
-    }
     return true;
 }
 // ========== Ribbon 回调 ==========

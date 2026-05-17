@@ -926,6 +926,9 @@ if (document.readyState === 'loading') {
 else {
     setTimeout(setupButtonListeners, 0);
 }
+function isTaskpaneContext() {
+    return typeof window !== 'undefined' && window.location.pathname.includes('taskpane.html');
+}
 // ========== 消息监听（用于接收来自 Ribbon 的通知）==========
 function setupMessageListener() {
     if (typeof window !== 'undefined') {
@@ -1008,14 +1011,14 @@ function setupEventListeners() {
     });
     // 配置更新事件（用于同步增量同步和跳过冲突状态）
     eventBus.on(BGM_EVENTS.CONFIG_UPDATED, (data) => {
+        if (!isTaskpaneContext())
+            return;
         bgmLog(LOG_LEVELS.INFO, `[handlers] 收到 CONFIG_UPDATED 事件: key=${data.key}, value=${data.value}`);
         if (data.key === 'bgm_incremental_sync') {
-            // 更新增量同步复选框 - 带重试机制
             bgmLog(LOG_LEVELS.INFO, `[handlers] ========== 更新增量同步复选框 ==========`);
             tryUpdateIncrementalCheckbox(data.value === 'true');
         }
         else if (data.key === 'bgm_skip_conflicts') {
-            // 更新跳过冲突选项 - 带重试机制
             bgmLog(LOG_LEVELS.INFO, `[handlers] ========== 更新跳过冲突 UI ==========`);
             tryUpdateSkipConflictsUI(data.value === 'true');
         }
@@ -1027,6 +1030,8 @@ function setupEventListeners() {
 }
 // 尝试更新增量同步复选框（带重试机制）
 function tryUpdateIncrementalCheckbox(checked, attempts = 0) {
+    if (!isTaskpaneContext())
+        return;
     let chkIncremental = document.getElementById('chkIncremental');
     if (chkIncremental) {
         bgmLog(LOG_LEVELS.INFO, `[handlers] 找到 chkIncremental 元素`);
@@ -1034,16 +1039,18 @@ function tryUpdateIncrementalCheckbox(checked, attempts = 0) {
         chkIncremental.checked = checked;
         bgmLog(LOG_LEVELS.INFO, `[handlers] 增量同步复选框已更新: ${checked ? '开启' : '关闭'}`);
     }
-    else if (attempts < 5) { // 最多重试5次
-        bgmLog(LOG_LEVELS.WARN, `[handlers] 未找到 chkIncremental 元素，延迟重试 (${attempts + 1}/5)...`);
+    else if (attempts < 3) { // 最多重试3次
+        bgmLog(LOG_LEVELS.WARN, `[handlers] 未找到 chkIncremental 元素，延迟重试 (${attempts + 1}/3)...`);
         setTimeout(() => tryUpdateIncrementalCheckbox(checked, attempts + 1), 100);
     }
     else {
-        bgmLog(LOG_LEVELS.ERROR, `[handlers] 重试5次后仍未找到 chkIncremental 元素，放弃更新`);
+        bgmLog(LOG_LEVELS.ERROR, `[handlers] 重试3次后仍未找到 chkIncremental 元素，放弃更新`);
     }
 }
 // 尝试更新跳过冲突 UI（带重试机制）
 function tryUpdateSkipConflictsUI(skipConflicts, attempts = 0) {
+    if (!isTaskpaneContext())
+        return;
     bgmLog(LOG_LEVELS.INFO, `[handlers] 目标状态: ${skipConflicts ? '跳过冲突' : 'Excel覆盖'}`);
     let conflictStrategySelect = document.getElementById('conflictStrategy');
     if (conflictStrategySelect) {
@@ -1053,12 +1060,12 @@ function tryUpdateSkipConflictsUI(skipConflicts, attempts = 0) {
         bgmLog(LOG_LEVELS.INFO, `[handlers] 冲突策略 select 已更新: ${conflictStrategySelect.value}`);
         return;
     }
-    else if (attempts < 5) { // 最多重试5次
-        bgmLog(LOG_LEVELS.WARN, `[handlers] 未找到 conflictStrategy select 元素，延迟重试 (${attempts + 1}/5)...`);
+    else if (attempts < 3) { // 最多重试3次
+        bgmLog(LOG_LEVELS.WARN, `[handlers] 未找到 conflictStrategy select 元素，延迟重试 (${attempts + 1}/3)...`);
         setTimeout(() => tryUpdateSkipConflictsUI(skipConflicts, attempts + 1), 100);
         return;
     }
-    bgmLog(LOG_LEVELS.ERROR, `[handlers] 重试5次后仍未找到 conflictStrategy select 元素，尝试查找其他控件`);
+    bgmLog(LOG_LEVELS.ERROR, `[handlers] 重试3次后仍未找到 conflictStrategy select 元素，尝试查找其他控件`);
     // 如果找不到，尝试查找其他类型的控件
     // 备用：查找 radio 按钮
     const skipRadio = document.querySelector('input[name="conflictStrategy"][value="skip"]');
@@ -1088,6 +1095,8 @@ function initializeListeners() {
 }
 // 从配置读取增量同步状态并初始化 checkbox
 function initIncrementalSyncFromRibbon() {
+    if (!isTaskpaneContext())
+        return;
     const chkIncremental = document.getElementById('chkIncremental');
     if (!chkIncremental)
         return;
@@ -1122,6 +1131,8 @@ function initIncrementalSyncFromRibbon() {
 }
 // 从配置读取跳过冲突状态并初始化 UI
 function initSkipConflictsFromRibbon() {
+    if (!isTaskpaneContext())
+        return;
     try {
         const skipConflicts = getSkipConflicts();
         tryUpdateSkipConflictsUI(skipConflicts);
