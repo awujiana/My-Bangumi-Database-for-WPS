@@ -3,7 +3,7 @@
  * @module taskpane
  * @description 面板初始化、事件绑定、核心逻辑
  */
-import { PANEL_CONFIG, WPS_ENUM, LOG_LEVELS, getApp, bgmLog, BGM, escapeHtml, readCell, colNumToLetter, HEADER_KEYWORDS, IMPORTANT_COLS, initMessageListener, markUploadedItems, updateTokenStatus, updateUserIdStatus, showToast, closeDetailModal, getFilterStatus, getLastRow, clearSheetCache, _getBgmUserId, _getBgmUsername } from './index.js';
+import { PANEL_CONFIG, WPS_ENUM, LOG_LEVELS, getApp, bgmLog, BGM, escapeHtml, readCell, colNumToLetter, HEADER_KEYWORDS, IMPORTANT_COLS, initMessageListener, markUploadedItems, updateTokenStatus, updateUserIdStatus, loadBgToken, showToast, closeDetailModal, getFilterStatus, getLastRow, clearSheetCache, _getBgmUserId, _getBgmUsername } from './index.js';
 // ========== 工作表锁定功能 ==========
 function toggleSheetLock() {
     const select = document.getElementById('sheetSelect');
@@ -666,18 +666,22 @@ function restoreUserInfoFromStorage() {
     }
 }
 /**
- * 定时轮询 PluginStorage 检查用户信息变更
+ * 定时轮询 PluginStorage 检查用户信息和 Token 变更
  * 由于 WPS 中 Ribbon 和 Taskpane 是独立 iframe，postMessage 无法跨上下文通信，
- * 因此 Taskpane 需要定期从 PluginStorage 读取最新用户信息并更新 UI。
+ * 因此 Taskpane 需要定期从 PluginStorage 读取最新数据并更新 UI。
  */
 function startUserInfoPolling() {
     let lastUserId = BGM.cache.userId || null;
     let lastUsername = BGM.cache.username || null;
+    let lastToken = loadBgToken();
     setInterval(() => {
         try {
             const currentUserId = _getBgmUserId();
             const currentUsername = _getBgmUsername();
-            if (currentUserId !== lastUserId || currentUsername !== lastUsername) {
+            const currentToken = loadBgToken();
+            const userInfoChanged = currentUserId !== lastUserId || currentUsername !== lastUsername;
+            const tokenChanged = currentToken !== lastToken;
+            if (userInfoChanged) {
                 bgmLog(LOG_LEVELS.INFO, `[startUserInfoPolling] 检测到用户信息变更: userId=${currentUserId || '(无)'}, username=${currentUsername || '(无)'}`);
                 lastUserId = currentUserId;
                 lastUsername = currentUsername;
@@ -685,6 +689,16 @@ function startUserInfoPolling() {
                     BGM.cache.userId = currentUserId;
                 if (currentUsername)
                     BGM.cache.username = currentUsername;
+                updateUserIdStatus();
+            }
+            if (tokenChanged) {
+                bgmLog(LOG_LEVELS.INFO, `[startUserInfoPolling] 检测到 Token 变更: ${currentToken ? '已设置' : '已清除'}`);
+                lastToken = currentToken;
+                if (!currentToken) {
+                    BGM.cache.userId = null;
+                    BGM.cache.username = null;
+                }
+                updateTokenStatus();
                 updateUserIdStatus();
             }
         }
