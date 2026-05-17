@@ -18,6 +18,8 @@ interface MessageEventData {
 // ========== 消息监听 ==========
 
 export function initMessageListener(): void {
+    bgmLog(LOG_LEVELS.INFO, `[message] initMessageListener 开始执行`);
+    
     window.addEventListener('message', (event: MessageEvent<MessageEventData>) => {
         const data = event.data;
         if (!data?.type) return;
@@ -48,6 +50,8 @@ export function initMessageListener(): void {
                 break;
         }
     });
+    
+    bgmLog(LOG_LEVELS.INFO, `[message] initMessageListener 执行完成，监听器已注册`);
 }
 
 // ========== 状态显示 ==========

@@ -144,17 +144,19 @@ export function updateUserIdStatus(): void {
     const userIdStatus = document.getElementById('userIdStatus');
     bgmLog(LOG_LEVELS.INFO, `[updateUserIdStatus] userIdStatus 元素: ${userIdStatus ? '存在' : '不存在'}`);
     
+    // 如果元素不存在，直接发送消息到 taskpane 页面处理，不要延迟重试
     if (!userIdStatus) {
-        // 如果元素不存在，可能是 taskpane 页面还未完全加载，延迟重试
-        setTimeout(() => {
-            const retryElement = document.getElementById('userIdStatus');
-            if (retryElement) {
-                bgmLog(LOG_LEVELS.INFO, `[updateUserIdStatus] 重试成功，找到元素`);
-                doUpdateUserIdStatus(retryElement);
-            } else {
-                bgmLog(LOG_LEVELS.WARN, `[updateUserIdStatus] 重试后仍找不到 userIdStatus 元素`);
-            }
-        }, 500);
+        bgmLog(LOG_LEVELS.INFO, `[updateUserIdStatus] 元素不存在，通过 postMessage 通知 taskpane`);
+        // 通知 taskpane 页面更新 UI
+        if (typeof window !== 'undefined' && window.parent) {
+            window.parent.postMessage({
+                type: 'BGM:userInfoUpdated',
+                username: BGM.cache.username,
+                userId: _getBgmUserId(),
+                timestamp: Date.now()
+            }, '*');
+            bgmLog(LOG_LEVELS.INFO, `[updateUserIdStatus] 已发送 postMessage 到 taskpane`);
+        }
         return;
     }
     

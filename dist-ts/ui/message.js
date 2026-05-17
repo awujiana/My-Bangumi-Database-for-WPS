@@ -3,13 +3,15 @@
  * @module ui/message
  * @description 消息监听、消息处理、状态设置
  */
-import { BGM, showAlert, showConfirm, updateTokenStatus, refreshSheets, refreshData } from '../index.js';
+import { BGM, showAlert, showConfirm, updateTokenStatus, updateUserIdStatus, refreshSheets, refreshData, bgmLog, LOG_LEVELS } from '../index.js';
 // ========== 消息监听 ==========
 export function initMessageListener() {
+    bgmLog(LOG_LEVELS.INFO, `[message] initMessageListener 开始执行`);
     window.addEventListener('message', (event) => {
         const data = event.data;
         if (!data?.type)
             return;
+        bgmLog(LOG_LEVELS.INFO, `[message] 收到消息: ${data.type}`);
         switch (data.type) {
             case 'showAlert':
                 showAlert(data.message || '', data.title);
@@ -29,8 +31,13 @@ export function initMessageListener() {
             case 'refreshData':
                 refreshData();
                 break;
+            case 'BGM:userInfoUpdated':
+                bgmLog(LOG_LEVELS.INFO, `[message] 收到用户信息更新: username=${data.username}, userId=${data.userId}`);
+                updateUserIdStatus();
+                break;
         }
     });
+    bgmLog(LOG_LEVELS.INFO, `[message] initMessageListener 执行完成，监听器已注册`);
 }
 // ========== 状态显示 ==========
 export function setStatus(message, type) {
