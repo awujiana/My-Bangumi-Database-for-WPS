@@ -728,7 +728,7 @@ function startUserInfoPolling() {
         catch (e) {
             // 静默处理轮询错误
         }
-    }, 2000); // 每5秒轮询一次
+    }, 2000); // 每2秒轮询一次
 }
 function initPanel() {
     bgmLog(LOG_LEVELS.INFO, 'initPanel 开始');

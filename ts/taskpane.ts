@@ -780,7 +780,7 @@ function startUserInfoPolling(): void {
         } catch (e: any) {
             // 静默处理轮询错误
         }
-    }, 2000); // 每5秒轮询一次
+    }, 2000); // 每2秒轮询一次
 }
 
 function initPanel(): void {
