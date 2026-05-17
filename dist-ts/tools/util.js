@@ -455,7 +455,7 @@ export function setCellValue(ws, row, col, value) {
             bgmLog(LOG_LEVELS.ERROR, `setCellValue - 无法获取单元格: (${row}, ${col})`);
             return false;
         }
-        cell.Value = value;
+        cell.Value2 = value;
         return true;
     }
     catch (e) {

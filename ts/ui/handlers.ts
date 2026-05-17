@@ -681,14 +681,8 @@ async function _doAPISync(sheetIndex: number, token: string): Promise<void> {
         if (!colMap.has('Bangumi_URL')) { showAlert('未找到 Bangumi URL 列！'); return; }
 
         const lastRow = typeof getLastRow === 'function' ? getLastRow(ws) : 200;
-        let rowsToProcess: number[] = [];
-        if (typeof getFilterStatus === 'function') {
-            const filterStatus = getFilterStatus(ws, lastRow, headerRow);
-            rowsToProcess = filterStatus?.visibleRows ?? [];
-        }
-        if (rowsToProcess.length === 0) {
-            for (let r = headerRow + 1; r <= lastRow; r++) rowsToProcess.push(r);
-        }
+        const rowsToProcess: number[] = [];
+        for (let r = headerRow + 1; r <= lastRow; r++) rowsToProcess.push(r);
 
         if (rowsToProcess.length === 0) { showAlert('没有需要处理的数据行！'); return; }
 
@@ -753,7 +747,16 @@ async function _doAPISync(sheetIndex: number, token: string): Promise<void> {
                 matchedCount++;
             }
         }
-        
+
+        // 输出同步统计
+        const totalCollections = userCollections.length;
+        bgmLog(LOG_LEVELS.INFO, `[_doAPISync] ========== 同步统计 ==========`);
+        bgmLog(LOG_LEVELS.INFO, `[_doAPISync] BGM 收藏总数: ${totalCollections}`);
+        bgmLog(LOG_LEVELS.INFO, `[_doAPISync] 数据表总行数: ${rowsToProcess.length}`);
+        bgmLog(LOG_LEVELS.INFO, `[_doAPISync] 匹配标记数: ${matchedCount}`);
+        bgmLog(LOG_LEVELS.INFO, `[_doAPISync] 同步记录条数: ${syncRecords.length}`);
+        bgmLog(LOG_LEVELS.INFO, `[_doAPISync] ================================`);
+
         // 恢复原始工作表
         if (originalActiveSheet) {
             try {

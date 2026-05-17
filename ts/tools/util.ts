@@ -510,7 +510,7 @@ export function setCellValue(ws: WpsWorksheet | null | undefined, row: number, c
             bgmLog(LOG_LEVELS.ERROR, `setCellValue - 无法获取单元格: (${row}, ${col})`);
             return false;
         }
-        cell.Value = value;
+        cell.Value2 = value;
         return true;
     } catch (e) {
         BGM.handleError(e, { level: BGM.ErrorLevel.ERROR, context: 'setCellValue' });

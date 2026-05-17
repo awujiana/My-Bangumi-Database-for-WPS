@@ -3,7 +3,7 @@
  * @module ui/handlers
  * @description 面板操作处理、按钮绑定、业务对话框
  */
-import { LOG_LEVELS, bgmLog, BGM, loadBgToken, storeBgToken, clearBgToken, _getBgmUserId, _setBgmUserId, _getBgmUsername, _setBgmUsername, getApp, getCell, trim, fetchBgmUserInfo, BGM_COLOR, showAlert, showConfirm, showError, showSuccess, showInput, showToast, setStatus, verifyToken, fetchAllUserCollections, findHeaderRow, getColumnMap, getLastRow, extractSubjectId, getDataSheet, getFilterStatus, SyncToBangumiAsync, testSingleUpdate, getOrCreateSyncRecordSheet, getAllSyncRecords, addSyncRecord, openSyncRecordSheet, previewSyncContent, refreshData, refreshSheets, toggleSheetLock, clearSyncRecords, closeDetailModal, getIncrementalSync, setIncrementalSync, getSkipConflicts, setSkipConflicts, } from '../index.js';
+import { LOG_LEVELS, bgmLog, BGM, loadBgToken, storeBgToken, clearBgToken, _getBgmUserId, _setBgmUserId, _getBgmUsername, _setBgmUsername, getApp, getCell, trim, fetchBgmUserInfo, BGM_COLOR, showAlert, showConfirm, showError, showSuccess, showInput, showToast, setStatus, verifyToken, fetchAllUserCollections, findHeaderRow, getColumnMap, getLastRow, extractSubjectId, getDataSheet, SyncToBangumiAsync, testSingleUpdate, getOrCreateSyncRecordSheet, getAllSyncRecords, addSyncRecord, openSyncRecordSheet, previewSyncContent, refreshData, refreshSheets, toggleSheetLock, clearSyncRecords, closeDetailModal, getIncrementalSync, setIncrementalSync, getSkipConflicts, setSkipConflicts, } from '../index.js';
 5;
 import { BGM_EVENTS, eventBus } from '../tools/events.js';
 //  
@@ -625,15 +625,9 @@ async function _doAPISync(sheetIndex, token) {
             return;
         }
         const lastRow = typeof getLastRow === 'function' ? getLastRow(ws) : 200;
-        let rowsToProcess = [];
-        if (typeof getFilterStatus === 'function') {
-            const filterStatus = getFilterStatus(ws, lastRow, headerRow);
-            rowsToProcess = filterStatus?.visibleRows ?? [];
-        }
-        if (rowsToProcess.length === 0) {
-            for (let r = headerRow + 1; r <= lastRow; r++)
-                rowsToProcess.push(r);
-        }
+        const rowsToProcess = [];
+        for (let r = headerRow + 1; r <= lastRow; r++)
+            rowsToProcess.push(r);
         if (rowsToProcess.length === 0) {
             showAlert('没有需要处理的数据行！');
             return;
@@ -695,6 +689,14 @@ async function _doAPISync(sheetIndex, token) {
                 matchedCount++;
             }
         }
+        // 输出同步统计
+        const totalCollections = userCollections.length;
+        bgmLog(LOG_LEVELS.INFO, `[_doAPISync] ========== 同步统计 ==========`);
+        bgmLog(LOG_LEVELS.INFO, `[_doAPISync] BGM 收藏总数: ${totalCollections}`);
+        bgmLog(LOG_LEVELS.INFO, `[_doAPISync] 数据表总行数: ${rowsToProcess.length}`);
+        bgmLog(LOG_LEVELS.INFO, `[_doAPISync] 匹配标记数: ${matchedCount}`);
+        bgmLog(LOG_LEVELS.INFO, `[_doAPISync] 同步记录条数: ${syncRecords.length}`);
+        bgmLog(LOG_LEVELS.INFO, `[_doAPISync] ================================`);
         // 恢复原始工作表
         if (originalActiveSheet) {
             try {
