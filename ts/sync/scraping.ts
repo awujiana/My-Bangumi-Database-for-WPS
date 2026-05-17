@@ -101,6 +101,7 @@ function requestPromise(xhr: XMLHttpRequest): Promise<{ status: number; data: an
         };
         xhr.onerror = () => reject(new Error('网络错误'));
         xhr.ontimeout = () => reject(new Error('请求超时'));
+        xhr.send();
     });
 }
 
