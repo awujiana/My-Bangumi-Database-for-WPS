@@ -830,6 +830,20 @@ export {
 // ========== 挂载到 window ==========
 (window as any).initPanel = initPanel;
 
+/**
+ * 全局函数：供 Ribbon 通过 GetTaskPane 直接调用，
+ * 从 PluginStorage 刷新所有 UI 状态（用户信息、配置等）
+ * 如果 GetTaskPane 不可用，轮询也请购底机制。）
+ */
+(window as any).refreshTaskpaneUI = function (): void {
+    try {
+        restoreUserInfoFromStorage();
+        bgmLog(LOG_LEVELS.INFO, '[refreshTaskpaneUI] UI 已刷新');
+    } catch (e: any) {
+        bgmLog(LOG_LEVELS.WARN, '[refreshTaskpaneUI] 刷新失败: ' + e.message);
+    }
+};
+
 function safeInitPanel(): void {
     try { initPanel(); }
     catch (e: any) {

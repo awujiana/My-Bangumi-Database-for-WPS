@@ -4,7 +4,7 @@
  * @description WPS Office 功能区按钮回调处理
  */
 
-import { WPS_ENUM, showBangumiPanel,BGM, getIncrementalSync, getSkipConflicts, setIncrementalSync, setSkipConflicts,listenToRibbonConfigUpdates, bgmLog, LOG_LEVELS } from './index.js';
+import { WPS_ENUM, showBangumiPanel, BGM, getIncrementalSync, getSkipConflicts, setIncrementalSync, setSkipConflicts, bgmLog, LOG_LEVELS, getApp } from './index.js';
 import * as RibbonService from './services/ribbonService.js';
 
 // 在 Ribbon 启动时（例如 OnAddinLoad 中或文件顶部立即执行）

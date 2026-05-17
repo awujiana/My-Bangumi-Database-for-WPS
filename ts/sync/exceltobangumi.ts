@@ -284,6 +284,23 @@ function notifyUserInfoUpdated(username: string, userId: string): void {
         
         bgmLog(LOG_LEVELS.INFO, `[notifyUserInfoUpdated] 用户信息已持久化到 PluginStorage`);
         
+        // 尝试通过 GetTaskPane 直接通知 Taskpane 刷新 UI
+        // 如果 GetTaskPane.contentWindow 不可用（不同 WPS 版本或安全限制），
+        // Taskpane 的轮询机制会在 1-2 秒内检测到变更
+        try {
+            const app = getApp();
+            const tsId = (app as any)?.PluginStorage?.getItem('taskpane_id');
+            if (tsId) {
+                const pane = (app as any)?.GetTaskPane?.(tsId);
+                if (pane?.contentWindow?.refreshTaskpaneUI) {
+                    pane.contentWindow.refreshTaskpaneUI();
+                    bgmLog(LOG_LEVELS.INFO, `[notifyUserInfoUpdated] 已通过 GetTaskPane 通知 Taskpane 刷新`);
+                }
+            }
+        } catch (e: any) {
+            bgmLog(LOG_LEVELS.WARN, `[notifyUserInfoUpdated] GetTaskPane 通知失败（轮询兜底）: ${e.message}`);
+        }
+        
         bgmLog(LOG_LEVELS.INFO, `[notifyUserInfoUpdated] 通知完成`);
     } catch (e) {
         bgmLog(LOG_LEVELS.WARN, '通知用户信息更新失败: ' + (e as Error).message);

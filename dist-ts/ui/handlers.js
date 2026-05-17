@@ -929,7 +929,7 @@ else {
 function isTaskpaneContext() {
     return typeof window !== 'undefined' && window.location.pathname.includes('taskpane.html');
 }
-// ========== 消息监听（用于接收来自 Ribbon 的通知）==========
+// ========== 消息监听 ==========
 function setupMessageListener() {
     if (typeof window !== 'undefined') {
         window.addEventListener('message', (event) => {
@@ -965,19 +965,6 @@ function setupMessageListener() {
                         bgmLog(LOG_LEVELS.INFO, `[handlers] 已更新 BGM.cache.userId 和用户ID配置: ${BGM.cache.userId}`);
                     }
                     updateUserIdStatus();
-                    break;
-                case 'BGM:configUpdated':
-                    bgmLog(LOG_LEVELS.INFO, `[handlers] ========== 收到 BGM:configUpdated 消息 ==========`);
-                    bgmLog(LOG_LEVELS.INFO, `[handlers] 配置键: ${data.data?.key}`);
-                    bgmLog(LOG_LEVELS.INFO, `[handlers] 配置值: ${data.data?.value}`);
-                    if (data.data?.key === 'bgm_incremental_sync') {
-                        bgmLog(LOG_LEVELS.INFO, `[handlers] 处理增量同步配置更新`);
-                        tryUpdateIncrementalCheckbox(data.data.value === 'true');
-                    }
-                    else if (data.data?.key === 'bgm_skip_conflicts') {
-                        bgmLog(LOG_LEVELS.INFO, `[handlers] 处理跳过冲突配置更新`);
-                        tryUpdateSkipConflictsUI(data.data.value === 'true');
-                    }
                     break;
                 case 'tokenUpdated':
                 case 'userIdUpdated':

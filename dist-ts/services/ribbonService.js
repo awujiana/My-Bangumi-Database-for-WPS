@@ -336,13 +336,6 @@ export async function setTokenForRibbon() {
  */
 function notifyPanelTokenUpdated() {
     try {
-        // 尝试通知 taskpane.html
-        if (typeof window !== 'undefined' && window.parent) {
-            window.parent.postMessage({
-                type: 'BGM:tokenUpdated',
-                timestamp: Date.now()
-            }, '*');
-        }
         // 触发事件总线（供面板内的事件监听器使用）
         BGM.notifyTokenUpdated();
         bgmLog(LOG_LEVELS.INFO, '已发送 Token 更新通知');
@@ -370,15 +363,6 @@ export function setUserIdForRibbon() {
         const userIdStr = String(userId).trim();
         BGM.setUserId(userIdStr);
         bgmLog(LOG_LEVELS.INFO, `[setUserIdForRibbon] 用户ID已设置: ${userIdStr}`);
-        // 发送 postMessage 通知侧边栏
-        if (typeof window !== 'undefined' && window.parent) {
-            window.parent.postMessage({
-                type: 'BGM:userIdUpdated',
-                userId: userIdStr,
-                timestamp: Date.now()
-            }, '*');
-            bgmLog(LOG_LEVELS.INFO, `[setUserIdForRibbon] 已发送 postMessage 通知侧边栏`);
-        }
         app?.MessageBox?.('用户 ID 已保存', 0, 64);
     }
 }
