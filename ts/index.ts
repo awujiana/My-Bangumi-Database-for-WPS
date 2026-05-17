@@ -270,8 +270,6 @@ export {
 export {
     // 配置键名常量
     CONFIG_KEYS,
-    // 消息类型常量
-    CONFIG_MESSAGE_TYPES,
     // 配置操作函数
     setConfig,
     getConfig,
@@ -282,10 +280,6 @@ export {
     // 跳过冲突配置
     setSkipConflicts,
     getSkipConflicts,
-    // 通知函数
-    sendConfigUpdateToRibbon,
-    sendSyncProgressToRibbon,
-    listenToRibbonConfigUpdates,
 } from './tools/config.js';
 
 // ========== BGM 缓存数据结构 ==========

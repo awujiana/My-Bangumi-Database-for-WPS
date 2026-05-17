@@ -50,7 +50,7 @@ export function initMessageListener(): void {
                 break;
         }
     });
-    
+
     bgmLog(LOG_LEVELS.INFO, `[message] initMessageListener 执行完成，监听器已注册`);
 }
 

@@ -283,6 +283,7 @@ function notifyUserInfoUpdated(username: string, userId: string): void {
         BGM.cache.userId = userId;
         
         bgmLog(LOG_LEVELS.INFO, `[notifyUserInfoUpdated] 用户信息已持久化到 PluginStorage`);
+        
         bgmLog(LOG_LEVELS.INFO, `[notifyUserInfoUpdated] 通知完成`);
     } catch (e) {
         bgmLog(LOG_LEVELS.WARN, '通知用户信息更新失败: ' + (e as Error).message);

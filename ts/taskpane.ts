@@ -712,6 +712,34 @@ function restoreUserInfoFromStorage(): void {
     }
 }
 
+/**
+ * 定时轮询 PluginStorage 检查用户信息变更
+ * 由于 WPS 中 Ribbon 和 Taskpane 是独立 iframe，postMessage 无法跨上下文通信，
+ * 因此 Taskpane 需要定期从 PluginStorage 读取最新用户信息并更新 UI。
+ */
+function startUserInfoPolling(): void {
+    let lastUserId = BGM.cache.userId || null;
+    let lastUsername = BGM.cache.username || null;
+    
+    setInterval(() => {
+        try {
+            const currentUserId = _getBgmUserId();
+            const currentUsername = _getBgmUsername();
+            
+            if (currentUserId !== lastUserId || currentUsername !== lastUsername) {
+                bgmLog(LOG_LEVELS.INFO, `[startUserInfoPolling] 检测到用户信息变更: userId=${currentUserId || '(无)'}, username=${currentUsername || '(无)'}`);
+                lastUserId = currentUserId;
+                lastUsername = currentUsername;
+                if (currentUserId) BGM.cache.userId = currentUserId;
+                if (currentUsername) BGM.cache.username = currentUsername;
+                updateUserIdStatus();
+            }
+        } catch (e: any) {
+            // 静默处理轮询错误
+        }
+    }, 2000); // 每2秒轮询一次
+}
+
 function initPanel(): void {
     bgmLog(LOG_LEVELS.INFO, 'initPanel 开始');
 
@@ -725,6 +753,8 @@ function initPanel(): void {
 
     // 从 PluginStorage 恢复用户信息（Ribbon 设置后 Taskpane 读取）
     restoreUserInfoFromStorage();
+    // 定时轮询 PluginStorage，确保在 Ribbon 设置 Token 后 Taskpane 能自动更新 UI
+    startUserInfoPolling();
 
     // 恢复上次锁定的工作表
     const restored = restoreLockedSheet();
