@@ -6,7 +6,7 @@
 
 import {
     type BGMUserInfo, type SyncRecord, LOG_LEVELS, bgmLog, BGM,
-    loadBgToken, storeBgToken, _getBgmUserId, _setBgmUserId, _getBgmUsername, _setBgmUsername, getApp,
+    loadBgToken, storeBgToken, clearBgToken, _getBgmUserId, _setBgmUserId, _getBgmUsername, _setBgmUsername, getApp,
     getCell, trim, fetchBgmUserInfo, BGM_COLOR, showAlert, showConfirm,
     showError, showSuccess, showInput, showToast, setStatus,
     verifyToken, fetchAllUserCollections, findHeaderRow, getColumnMap,
@@ -886,6 +886,27 @@ function handleActionClick(event: Event): void {
             bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 显示 Token 设置对话框');
             showTokenDialog(loadBgToken() || '');
             bgmLog(LOG_LEVELS.INFO, `[handleActionClick] Token 设置对话框已显示，耗时: ${Date.now() - startTime}ms`);
+            break;
+            
+        case 'clearToken':
+            bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 清除 Token 设置');
+            try {
+                clearBgToken();
+                BGM.cache.userId = null;
+                BGM.cache.username = null;
+                const app = getApp();
+                if (app?.PluginStorage) {
+                    app.PluginStorage.setItem('bgm_user_id', '');
+                    app.PluginStorage.setItem('bgm_username', '');
+                }
+                updateTokenStatus();
+                updateUserIdStatus();
+                showToast('Token 已清除', 'info');
+                bgmLog(LOG_LEVELS.INFO, '[handleActionClick] Token 已清除');
+            } catch (e: any) {
+                BGM.handleError(e, { showAlert: true, level: BGM.ErrorLevel.WARN, context: 'clearToken' });
+            }
+            bgmLog(LOG_LEVELS.INFO, `[handleActionClick] 清除 Token 操作完成，耗时: ${Date.now() - startTime}ms`);
             break;
             
         case 'testToken':
