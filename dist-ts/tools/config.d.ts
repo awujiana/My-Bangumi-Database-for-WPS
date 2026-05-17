@@ -21,8 +21,9 @@ export declare function setConfig(key: string, value: string): boolean;
  * 获取配置值
  * @param key - 配置键名
  * @param defaultValue - 默认值
+ * @param silent - 静默模式，不打印日志（用于轮询等高频读取）
  */
-export declare function getConfig(key: string, defaultValue?: string): string;
+export declare function getConfig(key: string, defaultValue?: string, silent?: boolean): string;
 /**
  * 删除配置值
  * @param key - 配置键名
@@ -34,14 +35,16 @@ export declare function removeConfig(key: string): boolean;
 export declare function setIncrementalSync(enabled: boolean): boolean;
 /**
  * 获取增量同步开关状态
+ * @param silent - 静默模式，不打印日志
  */
-export declare function getIncrementalSync(): boolean;
+export declare function getIncrementalSync(silent?: boolean): boolean;
 /**
  * 设置跳过冲突开关
  */
 export declare function setSkipConflicts(enabled: boolean): boolean;
 /**
  * 获取跳过冲突开关状态
+ * @param silent - 静默模式，不打印日志
  */
-export declare function getSkipConflicts(): boolean;
+export declare function getSkipConflicts(silent?: boolean): boolean;
 //# sourceMappingURL=config.d.ts.map

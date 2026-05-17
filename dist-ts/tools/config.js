@@ -55,16 +55,19 @@ export function setConfig(key, value) {
  * 获取配置值
  * @param key - 配置键名
  * @param defaultValue - 默认值
+ * @param silent - 静默模式，不打印日志（用于轮询等高频读取）
  */
-export function getConfig(key, defaultValue = '') {
+export function getConfig(key, defaultValue = '', silent = false) {
     const storage = getStorage();
     if (!storage) {
-        bgmLog(LOG_LEVELS.WARN, `[config] 无法获取 PluginStorage，使用默认值: ${key} = ${defaultValue}`);
+        if (!silent)
+            bgmLog(LOG_LEVELS.WARN, `[config] 无法获取 PluginStorage，使用默认值: ${key} = ${defaultValue}`);
         return defaultValue;
     }
     const value = storage.getItem(key);
     const result = value !== null ? value : defaultValue;
-    bgmLog(LOG_LEVELS.INFO, `[config] 获取配置: ${key} = ${result}`);
+    if (!silent)
+        bgmLog(LOG_LEVELS.INFO, `[config] 获取配置: ${key} = ${result}`);
     return result;
 }
 /**
@@ -94,10 +97,12 @@ export function setIncrementalSync(enabled) {
 }
 /**
  * 获取增量同步开关状态
+ * @param silent - 静默模式，不打印日志
  */
-export function getIncrementalSync() {
-    const result = getConfig(CONFIG_KEYS.INCREMENTAL_SYNC) === 'true';
-    bgmLog(LOG_LEVELS.INFO, `[config] 获取增量同步状态: ${result ? '开启' : '关闭'}`);
+export function getIncrementalSync(silent = false) {
+    const result = getConfig(CONFIG_KEYS.INCREMENTAL_SYNC, '', silent) === 'true';
+    if (!silent)
+        bgmLog(LOG_LEVELS.INFO, `[config] 获取增量同步状态: ${result ? '开启' : '关闭'}`);
     return result;
 }
 /**
@@ -109,9 +114,11 @@ export function setSkipConflicts(enabled) {
 }
 /**
  * 获取跳过冲突开关状态
+ * @param silent - 静默模式，不打印日志
  */
-export function getSkipConflicts() {
-    const result = getConfig(CONFIG_KEYS.SKIP_CONFLICTS) === 'true';
-    bgmLog(LOG_LEVELS.INFO, `[config] 获取跳过冲突状态: ${result ? '开启' : '关闭'}`);
+export function getSkipConflicts(silent = false) {
+    const result = getConfig(CONFIG_KEYS.SKIP_CONFLICTS, '', silent) === 'true';
+    if (!silent)
+        bgmLog(LOG_LEVELS.INFO, `[config] 获取跳过冲突状态: ${result ? '开启' : '关闭'}`);
     return result;
 }

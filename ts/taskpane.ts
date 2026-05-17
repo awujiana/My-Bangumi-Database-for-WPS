@@ -6,7 +6,8 @@
 
 
 import { PANEL_CONFIG, WPS_ENUM , LOG_LEVELS ,getApp, bgmLog, BGM, escapeHtml, readCell, colNumToLetter,HEADER_KEYWORDS, IMPORTANT_COLS  ,initMessageListener,  markUploadedItems,  updateTokenStatus, updateUserIdStatus, loadBgToken, showTokenDialog, showUserIdDialog ,
-     showAlert, showToast ,closeDetailModal,getFilterStatus,    getLastRow,clearSheetCache,WpsWorksheet, _getBgmUserId, _getBgmUsername, _setBgmUserId, _setBgmUsername
+     showAlert, showToast ,closeDetailModal,getFilterStatus,    getLastRow,clearSheetCache,WpsWorksheet, _getBgmUserId, _getBgmUsername, _setBgmUserId, _setBgmUsername,
+     getIncrementalSync, getSkipConflicts
 }from './index.js';
 // ========== 类型定义 ==========
 interface LockedSheetInfo {
@@ -721,6 +722,8 @@ function startUserInfoPolling(): void {
     let lastUserId = BGM.cache.userId || null;
     let lastUsername = BGM.cache.username || null;
     let lastToken = loadBgToken();
+    let lastIncrementalSync: boolean | null = null;
+    let lastSkipConflicts: boolean | null = null;
     
     setInterval(() => {
         try {
@@ -750,10 +753,34 @@ function startUserInfoPolling(): void {
                 updateTokenStatus();
                 updateUserIdStatus();
             }
+            
+            // 同步 Ribbon 的配置变更到 Taskpane UI（增量同步 + 跳过冲突，静默读取避免日志刷屏）
+            const currentIncrementalSync = getIncrementalSync(true);
+            const currentSkipConflicts = getSkipConflicts(true);
+            
+            if (currentIncrementalSync !== lastIncrementalSync) {
+                bgmLog(LOG_LEVELS.INFO, `[startUserInfoPolling] 检测到增量同步配置变更: ${currentIncrementalSync ? '开启' : '关闭'}`);
+                lastIncrementalSync = currentIncrementalSync;
+                const chkIncremental = document.getElementById('chkIncremental') as HTMLInputElement;
+                if (chkIncremental) {
+                    chkIncremental.checked = currentIncrementalSync;
+                    bgmLog(LOG_LEVELS.INFO, `[startUserInfoPolling] 增量同步复选框已同步: ${currentIncrementalSync ? '开启' : '关闭'}`);
+                }
+            }
+            
+            if (currentSkipConflicts !== lastSkipConflicts) {
+                bgmLog(LOG_LEVELS.INFO, `[startUserInfoPolling] 检测到跳过冲突配置变更: ${currentSkipConflicts ? '跳过' : 'Excel覆盖'}`);
+                lastSkipConflicts = currentSkipConflicts;
+                const conflictStrategySelect = document.getElementById('conflictStrategy') as HTMLSelectElement;
+                if (conflictStrategySelect) {
+                    conflictStrategySelect.value = currentSkipConflicts ? 'skip' : 'excel';
+                    bgmLog(LOG_LEVELS.INFO, `[startUserInfoPolling] 冲突策略 select 已同步: ${conflictStrategySelect.value}`);
+                }
+            }
         } catch (e: any) {
             // 静默处理轮询错误
         }
-    }, 2000); // 每2秒轮询一次
+    }, 2000); // 每5秒轮询一次
 }
 
 function initPanel(): void {
