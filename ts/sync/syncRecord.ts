@@ -28,6 +28,7 @@ export interface SyncRecord {
     status?: string;
     message?: string;
     fingerprint?: string;
+    collType?: string;
     row?: number;
 }
 
@@ -41,6 +42,7 @@ export interface UpdateRecordParams {
     message?: string;
     count?: number;
     fingerprint?: string;
+    collType?: string;
     row?: number;
 }
 
@@ -97,7 +99,7 @@ export function getOrCreateSyncRecordSheet(): any {
         syncSheet = wb.Sheets.Add();
         syncSheet.Name = SYNC_RECORD_SHEET_NAME;
 
-        // 写入表头（修复：循环内正确创建每个单元格）
+        // 写入表头
         for (let i = 0; i < SYNC_RECORD_COLUMNS.length; i++) {
             const colLetter = colNumToLetter(i + 1);
             const cell = syncSheet.Range(`${colLetter}1`);
@@ -115,6 +117,22 @@ export function getOrCreateSyncRecordSheet(): any {
         }
 
         bgmLog(LOG_LEVELS.INFO, '已创建同步记录工作表');
+    } else {
+        // 已有工作表，检查并补齐表头（修复历史遗留的表头错位问题）
+        const existingCols = SYNC_RECORD_COLUMNS.length;
+        for (let i = 0; i < existingCols; i++) {
+            const colLetter = colNumToLetter(i + 1);
+            const cell = syncSheet.Range(`${colLetter}1`);
+            const currentHeader = String(cell.Value2 ?? '').trim();
+            const expectedHeader = SYNC_RECORD_COLUMNS[i];
+            if (currentHeader !== expectedHeader) {
+                cell.Value2 = expectedHeader;
+                if (cell.Interior) {
+                    cell.Interior.Color = BGM_COLOR.GRAY;
+                }
+                bgmLog(LOG_LEVELS.INFO, `修复表头: ${colLetter}1 从 "${currentHeader}" → "${expectedHeader}"`);
+            }
+        }
     }
 
     invalidateCache();
@@ -150,6 +168,7 @@ function buildCache(sheet: any): void {
                 status: getCellValue(sheet, row, SYNC_RECORD_COL.STATUS) || SYNC_STATUS.SUCCESS,
                 message: getCellValue(sheet, row, SYNC_RECORD_COL.MESSAGE),
                 fingerprint: getCellValue(sheet, row, SYNC_RECORD_COL.FINGERPRINT),
+                collType: getCellValue(sheet, row, SYNC_RECORD_COL.COLL_TYPE),
                 row: row
             });
         } catch (e: any) {
@@ -212,6 +231,7 @@ export function addSyncRecord(params: UpdateRecordParams): boolean {
             if (params.url) setCellValue(sheet, existingRow, SYNC_RECORD_COL.URL, params.url);
             if (params.type) setCellValue(sheet, existingRow, SYNC_RECORD_COL.TYPE, params.type);
             if (params.content) setCellValue(sheet, existingRow, SYNC_RECORD_COL.CONTENT, params.content);
+            if (params.collType) setCellValue(sheet, existingRow, SYNC_RECORD_COL.COLL_TYPE, params.collType);
 
             setSyncRecordColors(sheet, existingRow, finalStatus, newCount);
 
@@ -227,6 +247,7 @@ export function addSyncRecord(params: UpdateRecordParams): boolean {
                 if (params.url) cacheItem.url = params.url;
                 if (params.type) cacheItem.type = params.type;
                 if (params.content) cacheItem.content = params.content;
+                if (params.collType) cacheItem.collType = params.collType;
             }
         } else {
             let newRow = 1;
@@ -252,6 +273,7 @@ export function addSyncRecord(params: UpdateRecordParams): boolean {
             setCellValue(sheet, newRow, SYNC_RECORD_COL.STATUS, finalStatus);
             setCellValue(sheet, newRow, SYNC_RECORD_COL.MESSAGE, params.message || '');
             if (params.fingerprint !== undefined) setCellValue(sheet, newRow, SYNC_RECORD_COL.FINGERPRINT, params.fingerprint);
+            if (params.collType) setCellValue(sheet, newRow, SYNC_RECORD_COL.COLL_TYPE, params.collType);
 
             setSyncRecordColors(sheet, newRow, finalStatus, finalCount);
 
@@ -260,7 +282,8 @@ export function addSyncRecord(params: UpdateRecordParams): boolean {
                 id: newRow, time: now, name: params.name, url: params.url,
                 sid: sid, type: params.type, count: finalCount,
                 content: params.content, status: finalStatus,
-                message: params.message || '', fingerprint: params.fingerprint
+                message: params.message || '', fingerprint: params.fingerprint,
+                collType: params.collType
             });
         }
         return true;

@@ -13,11 +13,12 @@ import {
     getLastRow, extractSubjectId, getDataSheet, getFilterStatus,
     getSequentialRowsBySeqCol, SyncToBangumiAsync,
     testSingleUpdate, getOrCreateSyncRecordSheet, getAllSyncRecords,
-    addSyncRecord, openSyncRecordSheet,wpsMsgBox,
-    previewSyncContent, refreshData,refreshSheets,toggleSheetLock ,clearSyncRecords,
+    addSyncRecord, openSyncRecordSheet, wpsMsgBox,
+    previewSyncContent, refreshData, refreshSheets, toggleSheetLock, clearSyncRecords,
     closeDetailModal,
     getIncrementalSync, setIncrementalSync,
     getSkipConflicts, setSkipConflicts,
+    COLLECTION_TYPE_NAMES,
 } from '../index.js';
 import{BGM_EVENTS, eventBus} from '../tools/events.js';
 
@@ -722,7 +723,8 @@ async function _doAPISync(sheetIndex: number, token: string): Promise<void> {
                     type: BGM_SUBJECT_TYPES[item.subject_type || 2],
                     content: '标记同步',
                     status: '成功',
-                    count: 1
+                    count: 1,
+                    collType: COLLECTION_TYPE_NAMES[item.type] || ''
                 });
             }
         }

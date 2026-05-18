@@ -28,7 +28,7 @@ export {
     // 面板配置（扫描行列限制等）
     PANEL_CONFIG,
     // Bangumi 条目类型映射
-    BGM_SUBJECT_TYPES,
+    BGM_SUBJECT_TYPES, COLLECTION_TYPE_NAMES,
     // 同步状态常量
     SYNC_STATUS,
     COLUMN_RULES,
