@@ -20,6 +20,7 @@ export interface SyncRecord {
     status?: string;
     message?: string;
     fingerprint?: string;
+    collType?: string;
     row?: number;
 }
 export interface UpdateRecordParams {
@@ -32,6 +33,7 @@ export interface UpdateRecordParams {
     message?: string;
     count?: number;
     fingerprint?: string;
+    collType?: string;
     row?: number;
 }
 /**
@@ -40,6 +42,7 @@ export interface UpdateRecordParams {
 export declare function getOrCreateSyncRecordSheet(): any;
 export declare function addSyncRecord(params: UpdateRecordParams): boolean;
 export declare function getAllSyncRecords(): SyncRecord[];
+export declare function deduplicateSyncRecords(): boolean;
 export declare function clearSyncRecords(): boolean;
 export declare function openSyncRecordSheet(): void;
 export declare function clearSheetMarksInSheet(sheetIndex: number): void;

@@ -373,6 +373,14 @@ export const WATCH_STATUS_MAP = {
     "抛弃": 5, "弃": 5, "弃番": 5, "drop": 5, "dropped": 5, "5": 5,
 };
 /**
+ * BGM API 收藏状态名称映射（下标即 API 数值）
+ * 1=想看, 2=在看, 3=看过, 4=搁置, 5=抛弃
+ *
+ * @constant
+ * @type {string[]}
+ */
+export const COLLECTION_TYPE_NAMES = ['', '想看', '在看', '看过', '搁置', '抛弃'];
+/**
  * 同步记录工作表名称
  *
  * @constant
@@ -387,7 +395,7 @@ export const SYNC_RECORD_SHEET_NAME = '同步记录';
  */
 export const SYNC_RECORD_COLUMNS = [
     '序号', '同步时间', '名称', 'URL', 'SID', '条目类型',
-    '次数', '内容', '状态', '备注', '数据指纹'
+    '次数', '内容', '状态', '备注', '数据指纹', '收藏状态'
 ];
 /**
  * 同步记录表列索引常量 (1-based，便于维护)
@@ -406,7 +414,8 @@ export const SYNC_RECORD_COL = {
     CONTENT: 8,
     STATUS: 9,
     MESSAGE: 10,
-    FINGERPRINT: 11
+    FINGERPRINT: 11,
+    COLL_TYPE: 12
 };
 /**
  * 同步记录类型颜色映射表

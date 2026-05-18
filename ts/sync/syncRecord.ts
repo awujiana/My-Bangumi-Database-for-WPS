@@ -210,6 +210,10 @@ function setSyncRecordColors(sheet: any, row: number, status: string, count: num
 export function addSyncRecord(params: UpdateRecordParams): boolean {
     try {
         const sheet = getOrCreateSyncRecordSheet();
+
+        // 写入数据前先去重，确保缓存数据干净
+        deduplicateSyncRecords();
+
         if (!_syncRecordCacheValid) buildCache(sheet);
 
         const sid = params.sid || '';
@@ -304,6 +308,59 @@ export function getAllSyncRecords(): SyncRecord[] {
     }
 }
 
+export function deduplicateSyncRecords(): boolean {
+    try {
+        const sheet = getOrCreateSyncRecordSheet();
+        const lastRow = getLastRow(sheet);
+        if (lastRow <= 1) return true;
+
+        // 按 SID 分组
+        const sidRows = new Map<string, number[]>();
+        for (let row = 2; row <= lastRow; row++) {
+            const sid = getCellValue(sheet, row, SYNC_RECORD_COL.SID).trim();
+            if (!sid) continue;
+            const rows = sidRows.get(sid) || [];
+            rows.push(row);
+            sidRows.set(sid, rows);
+        }
+
+        // 找出并合并重复 SID
+        let removedCount = 0;
+        let hasDuplicates = false;
+        for (const [sid, rows] of sidRows) {
+            if (rows.length <= 1) continue;
+            hasDuplicates = true;
+
+            const keepRow = rows[0];
+            let totalCount = parseInt(getCellValue(sheet, keepRow, SYNC_RECORD_COL.COUNT)) || 1;
+
+            const rowsToDelete = [...rows.slice(1)].sort((a, b) => b - a);
+            for (const delRow of rowsToDelete) {
+                const delCount = parseInt(getCellValue(sheet, delRow, SYNC_RECORD_COL.COUNT)) || 1;
+                totalCount += delCount;
+                sheet.Range(`${delRow}:${delRow}`).Delete();
+                removedCount++;
+            }
+
+            setCellValue(sheet, keepRow, SYNC_RECORD_COL.COUNT, totalCount);
+        }
+
+        if (hasDuplicates) {
+            const newLastRow = getLastRow(sheet);
+            for (let row = 2; row <= newLastRow; row++) {
+                setCellValue(sheet, row, SYNC_RECORD_COL.SEQ, row - 1);
+            }
+            bgmLog(LOG_LEVELS.INFO, `去重完成：删除了 ${removedCount} 条重复记录`);
+            invalidateCache();
+        }
+
+        return true;
+    } catch (e: any) {
+        BGM.handleError(e, { context: 'deduplicateSyncRecords', showAlert: false });
+        return false;
+    }
+}
+
 export function clearSyncRecords(): boolean {
     try {
         const sheet = getOrCreateSyncRecordSheet();
@@ -311,7 +368,7 @@ export function clearSyncRecords(): boolean {
             ? sheet.UsedRange.Row + sheet.UsedRange.Rows.Count - 1
             : sheet.Rows.Count;
         if (lastRow > 1) {
-            sheet.Range(`2:${lastRow}`).Delete();          // 修复语法
+            sheet.Range(`2:${lastRow}`).Delete();
         }
         _syncRecordSidCache.clear();
         _syncRecordListCache = [];

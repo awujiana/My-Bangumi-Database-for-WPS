@@ -139,6 +139,7 @@ export {
     getOrCreateSyncRecordSheet,
     getAllSyncRecords,
     addSyncRecord,
+    deduplicateSyncRecords,
     openSyncRecordSheet,
    type SyncRecord,
     type UpdateRecordParams,

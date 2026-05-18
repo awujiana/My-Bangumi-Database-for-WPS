@@ -58,7 +58,7 @@ export function getOrCreateSyncRecordSheet() {
     if (!syncSheet) {
         syncSheet = wb.Sheets.Add();
         syncSheet.Name = SYNC_RECORD_SHEET_NAME;
-        // 写入表头（修复：循环内正确创建每个单元格）
+        // 写入表头
         for (let i = 0; i < SYNC_RECORD_COLUMNS.length; i++) {
             const colLetter = colNumToLetter(i + 1);
             const cell = syncSheet.Range(`${colLetter}1`);
@@ -75,6 +75,23 @@ export function getOrCreateSyncRecordSheet() {
             BGM.handleError(moveError, { context: 'getOrCreateSyncRecordSheet', showAlert: false });
         }
         bgmLog(LOG_LEVELS.INFO, '已创建同步记录工作表');
+    }
+    else {
+        // 已有工作表，检查并补齐表头（修复历史遗留的表头错位问题）
+        const existingCols = SYNC_RECORD_COLUMNS.length;
+        for (let i = 0; i < existingCols; i++) {
+            const colLetter = colNumToLetter(i + 1);
+            const cell = syncSheet.Range(`${colLetter}1`);
+            const currentHeader = String(cell.Value2 ?? '').trim();
+            const expectedHeader = SYNC_RECORD_COLUMNS[i];
+            if (currentHeader !== expectedHeader) {
+                cell.Value2 = expectedHeader;
+                if (cell.Interior) {
+                    cell.Interior.Color = BGM_COLOR.GRAY;
+                }
+                bgmLog(LOG_LEVELS.INFO, `修复表头: ${colLetter}1 从 "${currentHeader}" → "${expectedHeader}"`);
+            }
+        }
     }
     invalidateCache();
     return syncSheet;
@@ -107,6 +124,7 @@ function buildCache(sheet) {
                 status: getCellValue(sheet, row, SYNC_RECORD_COL.STATUS) || SYNC_STATUS.SUCCESS,
                 message: getCellValue(sheet, row, SYNC_RECORD_COL.MESSAGE),
                 fingerprint: getCellValue(sheet, row, SYNC_RECORD_COL.FINGERPRINT),
+                collType: getCellValue(sheet, row, SYNC_RECORD_COL.COLL_TYPE),
                 row: row
             });
         }
@@ -145,6 +163,8 @@ function setSyncRecordColors(sheet, row, status, count) {
 export function addSyncRecord(params) {
     try {
         const sheet = getOrCreateSyncRecordSheet();
+        // 写入数据前先去重，确保缓存数据干净
+        deduplicateSyncRecords();
         if (!_syncRecordCacheValid)
             buildCache(sheet);
         const sid = params.sid || '';
@@ -171,6 +191,8 @@ export function addSyncRecord(params) {
                 setCellValue(sheet, existingRow, SYNC_RECORD_COL.TYPE, params.type);
             if (params.content)
                 setCellValue(sheet, existingRow, SYNC_RECORD_COL.CONTENT, params.content);
+            if (params.collType)
+                setCellValue(sheet, existingRow, SYNC_RECORD_COL.COLL_TYPE, params.collType);
             setSyncRecordColors(sheet, existingRow, finalStatus, newCount);
             // 更新缓存
             const cacheItem = _syncRecordListCache.find(item => item.sid === sid);
@@ -191,6 +213,8 @@ export function addSyncRecord(params) {
                     cacheItem.type = params.type;
                 if (params.content)
                     cacheItem.content = params.content;
+                if (params.collType)
+                    cacheItem.collType = params.collType;
             }
         }
         else {
@@ -217,13 +241,16 @@ export function addSyncRecord(params) {
             setCellValue(sheet, newRow, SYNC_RECORD_COL.MESSAGE, params.message || '');
             if (params.fingerprint !== undefined)
                 setCellValue(sheet, newRow, SYNC_RECORD_COL.FINGERPRINT, params.fingerprint);
+            if (params.collType)
+                setCellValue(sheet, newRow, SYNC_RECORD_COL.COLL_TYPE, params.collType);
             setSyncRecordColors(sheet, newRow, finalStatus, finalCount);
             _syncRecordSidCache.set(sid, newRow);
             _syncRecordListCache.push({
                 id: newRow, time: now, name: params.name, url: params.url,
                 sid: sid, type: params.type, count: finalCount,
                 content: params.content, status: finalStatus,
-                message: params.message || '', fingerprint: params.fingerprint
+                message: params.message || '', fingerprint: params.fingerprint,
+                collType: params.collType
             });
         }
         return true;
@@ -245,6 +272,55 @@ export function getAllSyncRecords() {
         return [];
     }
 }
+export function deduplicateSyncRecords() {
+    try {
+        const sheet = getOrCreateSyncRecordSheet();
+        const lastRow = getLastRow(sheet);
+        if (lastRow <= 1)
+            return true;
+        // 按 SID 分组
+        const sidRows = new Map();
+        for (let row = 2; row <= lastRow; row++) {
+            const sid = getCellValue(sheet, row, SYNC_RECORD_COL.SID).trim();
+            if (!sid)
+                continue;
+            const rows = sidRows.get(sid) || [];
+            rows.push(row);
+            sidRows.set(sid, rows);
+        }
+        // 找出并合并重复 SID
+        let removedCount = 0;
+        let hasDuplicates = false;
+        for (const [sid, rows] of sidRows) {
+            if (rows.length <= 1)
+                continue;
+            hasDuplicates = true;
+            const keepRow = rows[0];
+            let totalCount = parseInt(getCellValue(sheet, keepRow, SYNC_RECORD_COL.COUNT)) || 1;
+            const rowsToDelete = [...rows.slice(1)].sort((a, b) => b - a);
+            for (const delRow of rowsToDelete) {
+                const delCount = parseInt(getCellValue(sheet, delRow, SYNC_RECORD_COL.COUNT)) || 1;
+                totalCount += delCount;
+                sheet.Range(`${delRow}:${delRow}`).Delete();
+                removedCount++;
+            }
+            setCellValue(sheet, keepRow, SYNC_RECORD_COL.COUNT, totalCount);
+        }
+        if (hasDuplicates) {
+            const newLastRow = getLastRow(sheet);
+            for (let row = 2; row <= newLastRow; row++) {
+                setCellValue(sheet, row, SYNC_RECORD_COL.SEQ, row - 1);
+            }
+            bgmLog(LOG_LEVELS.INFO, `去重完成：删除了 ${removedCount} 条重复记录`);
+            invalidateCache();
+        }
+        return true;
+    }
+    catch (e) {
+        BGM.handleError(e, { context: 'deduplicateSyncRecords', showAlert: false });
+        return false;
+    }
+}
 export function clearSyncRecords() {
     try {
         const sheet = getOrCreateSyncRecordSheet();
@@ -252,7 +328,7 @@ export function clearSyncRecords() {
             ? sheet.UsedRange.Row + sheet.UsedRange.Rows.Count - 1
             : sheet.Rows.Count;
         if (lastRow > 1) {
-            sheet.Range(`2:${lastRow}`).Delete(); // 修复语法
+            sheet.Range(`2:${lastRow}`).Delete();
         }
         _syncRecordSidCache.clear();
         _syncRecordListCache = [];

@@ -24,7 +24,7 @@ ERROR_LEVELS,
 // 面板配置（扫描行列限制等）
 PANEL_CONFIG, 
 // Bangumi 条目类型映射
-BGM_SUBJECT_TYPES, 
+BGM_SUBJECT_TYPES, COLLECTION_TYPE_NAMES, 
 // 同步状态常量
 SYNC_STATUS, COLUMN_RULES, HEADER_KEYWORDS, IMPORTANT_COLS, FIELD_NAME_MAP, URL_PATTERNS, TOKEN_CONFIG, WATCH_STATUS_MAP, COLUMNS, SYNC_RECORD_SHEET_NAME, SYNC_RECORD_COLUMNS, SYNC_RECORD_COL, SYNC_RECORD_TYPE_COLOR, } from './core/constants.js';
 // ============================================================================
@@ -82,7 +82,7 @@ showUserIdDialog, markUploadedItems, updateTokenStatus, updateUserIdStatus, show
 // ============================================================================
 export { 
 // 导入同步记录模块的函数
-getOrCreateSyncRecordSheet, getAllSyncRecords, addSyncRecord, openSyncRecordSheet, clearSyncRecords, } from './sync/syncRecord.js';
+getOrCreateSyncRecordSheet, getAllSyncRecords, addSyncRecord, deduplicateSyncRecords, openSyncRecordSheet, clearSyncRecords, } from './sync/syncRecord.js';
 // ============================================================================
 // 9. 同步引擎（来自 sync/exceltobangumi.js）
 // ============================================================================

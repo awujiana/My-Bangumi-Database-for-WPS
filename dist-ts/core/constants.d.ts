@@ -282,6 +282,14 @@ export declare const TOKEN_CONFIG: {
  */
 export declare const WATCH_STATUS_MAP: Record<string, number>;
 /**
+ * BGM API 收藏状态名称映射（下标即 API 数值）
+ * 1=想看, 2=在看, 3=看过, 4=搁置, 5=抛弃
+ *
+ * @constant
+ * @type {string[]}
+ */
+export declare const COLLECTION_TYPE_NAMES: string[];
+/**
  * 同步记录工作表名称
  *
  * @constant
@@ -313,6 +321,7 @@ export declare const SYNC_RECORD_COL: {
     readonly STATUS: 9;
     readonly MESSAGE: 10;
     readonly FINGERPRINT: 11;
+    readonly COLL_TYPE: 12;
 };
 /**
  * 同步记录类型颜色映射表
