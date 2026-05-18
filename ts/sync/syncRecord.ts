@@ -391,12 +391,11 @@ export function formatSyncRecordSheet(): void {
         // 4. 自动列宽（全列）
         try { fullRange.EntireColumn.AutoFit(); } catch (_) {}
 
-        // 5. URL 列（D列）固定宽度，不显示完整URL
+        // 5. URL 列（D列）固定宽度，不撑宽也不撑高
         const urlColLetter = colNumToLetter(SYNC_RECORD_COL.URL);
         try {
             const urlRange = sheet.Range(`${urlColLetter}:${urlColLetter}`);
             urlRange.ColumnWidth = 42;
-            urlRange.WrapText = true;
         } catch (_) {}
 
         // 6. 名称列边框（C列）
