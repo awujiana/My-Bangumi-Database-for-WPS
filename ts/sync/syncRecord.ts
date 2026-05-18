@@ -135,6 +135,9 @@ export function getOrCreateSyncRecordSheet(): any {
         }
     }
 
+    // 自动设置格式（列宽、行高、字体、居中、边框等）
+    formatSyncRecordSheet();
+
     invalidateCache();
     return syncSheet;
 }
@@ -358,6 +361,65 @@ export function deduplicateSyncRecords(): boolean {
     } catch (e: any) {
         BGM.handleError(e, { context: 'deduplicateSyncRecords', showAlert: false });
         return false;
+    }
+}
+
+export function formatSyncRecordSheet(): void {
+    try {
+        const sheet = getOrCreateSyncRecordSheet();
+        const lastRow = getLastRow(sheet);
+        if (lastRow < 1) return;
+
+        const colCount = SYNC_RECORD_COLUMNS.length;
+        const lastColLetter = colNumToLetter(colCount);
+        const fullRange = sheet.Range(`A1:${lastColLetter}${lastRow}`);
+        const dataRange = lastRow >= 2 ? sheet.Range(`A2:${lastColLetter}${lastRow}`) : null;
+
+        // 1. 字体
+        try { fullRange.Font.Name = 'Maple Mono NF CN Medium'; } catch (_) {}
+
+        // 2. 自动行高
+        try { fullRange.EntireRow.AutoFit(); } catch (_) {}
+
+        // 3. 水平居中
+        if (dataRange) {
+            try { dataRange.HorizontalAlignment = -4108; } catch (_) {}
+        }
+        // 表头也居中
+        try { sheet.Range(`A1:${lastColLetter}1`).HorizontalAlignment = -4108; } catch (_) {}
+
+        // 4. 自动列宽（全列）
+        try { fullRange.EntireColumn.AutoFit(); } catch (_) {}
+
+        // 5. URL 列（D列）固定宽度，不显示完整URL
+        const urlColLetter = colNumToLetter(SYNC_RECORD_COL.URL);
+        try {
+            const urlRange = sheet.Range(`${urlColLetter}:${urlColLetter}`);
+            urlRange.ColumnWidth = 42;
+            urlRange.WrapText = true;
+        } catch (_) {}
+
+        // 6. 名称列边框（C列）
+        const nameColLetter = colNumToLetter(SYNC_RECORD_COL.NAME);
+        if (dataRange) {
+            try {
+                const nameRange = sheet.Range(`${nameColLetter}2:${nameColLetter}${lastRow}`);
+                nameRange.Borders.LineStyle = 1;
+            } catch (_) {}
+        }
+
+        // 7. 收藏状态列边框（L列）
+        const collTypeColLetter = colNumToLetter(SYNC_RECORD_COL.COLL_TYPE);
+        if (dataRange) {
+            try {
+                const collRange = sheet.Range(`${collTypeColLetter}2:${collTypeColLetter}${lastRow}`);
+                collRange.Borders.LineStyle = 1;
+            } catch (_) {}
+        }
+
+        bgmLog(LOG_LEVELS.INFO, '同步记录表格式已设置');
+    } catch (e: any) {
+        BGM.handleError(e, { context: 'formatSyncRecordSheet', showAlert: false });
     }
 }
 

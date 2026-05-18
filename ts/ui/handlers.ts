@@ -13,7 +13,7 @@ import {
     getLastRow, extractSubjectId, getDataSheet, getFilterStatus,
     getSequentialRowsBySeqCol, SyncToBangumiAsync,
     testSingleUpdate, getOrCreateSyncRecordSheet, getAllSyncRecords,
-    addSyncRecord, openSyncRecordSheet, wpsMsgBox,
+    addSyncRecord, openSyncRecordSheet, deduplicateSyncRecords, wpsMsgBox,
     previewSyncContent, refreshData, refreshSheets, toggleSheetLock, clearSyncRecords,
     closeDetailModal,
     getIncrementalSync, setIncrementalSync,
@@ -961,7 +961,14 @@ function handleActionClick(event: Event): void {
             clearSyncRecords();
             bgmLog(LOG_LEVELS.INFO, `[handleActionClick] 同步记录清除已触发，耗时: ${Date.now() - startTime}ms`);
             break;
-            
+
+        case 'deduplicateSyncRecords':
+            bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 开始去重同步记录');
+            deduplicateSyncRecords();
+            showToast('去重完成', 'success');
+            bgmLog(LOG_LEVELS.INFO, `[handleActionClick] 同步记录去重已触发，耗时: ${Date.now() - startTime}ms`);
+            break;
+
         case 'markUploadedItems':
             bgmLog(LOG_LEVELS.INFO, `[handleActionClick] 标记已上传项目，类型: ${args[0] || '全部'}`);
             markUploadedItems(args[0]);
