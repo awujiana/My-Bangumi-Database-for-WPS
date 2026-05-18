@@ -88,6 +88,7 @@ function extractResponseMessage(data: any): string {
  */
 function requestPromise(xhr: XMLHttpRequest): Promise<{ status: number; data: any; responseText: string }> {
     const startTime = Date.now();
+    if (!xhr.timeout) xhr.timeout = 30000;
     return new Promise((resolve, reject) => {
         xhr.onload = () => {
             const duration = Date.now() - startTime;
@@ -103,6 +104,15 @@ function requestPromise(xhr: XMLHttpRequest): Promise<{ status: number; data: an
         xhr.ontimeout = () => reject(new Error('请求超时'));
         xhr.send();
     });
+}
+
+function xhrGet(url: string, token: string): Promise<{ status: number; data: any }> {
+    const xhr = new XMLHttpRequest();
+    xhr.open('GET', url, true);
+    xhr.timeout = 30000;
+    xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+    xhr.setRequestHeader('Content-Type', 'application/json');
+    return requestPromise(xhr);
 }
 
 /**
@@ -208,23 +218,18 @@ export async function fetchAllUserCollections(
     while (offset < maxTotal) {
         try {
             const url = `${BGM_CONFIG.API_BASE}/v0/users/${userId}/collections?limit=${limit}&offset=${offset}`;
-            const response = await fetch(url, {
-                headers: {
-                    'Authorization': `Bearer ${token}`,
-                    'Content-Type': 'application/json'
-                }
-            });
+            const xhrResult = await xhrGet(url, token);
 
-            if (!response.ok) {
-                if (response.status === 429) {
+            if (xhrResult.status < 200 || xhrResult.status >= 300) {
+                if (xhrResult.status === 429) {
                     bgmLog(LOG_LEVELS.WARN, '[fetchAllUserCollections] API限流，等待重试...');
                     await new Promise(resolve => setTimeout(resolve, BGM_CONFIG.REQUEST_DELAY * 2));
                     continue;
                 }
-                throw new Error(`HTTP ${response.status}`);
+                throw new Error(`HTTP ${xhrResult.status}`);
             }
 
-            const data: CollectionListResponse = await response.json();
+            const data: CollectionListResponse = xhrResult.data;
 
             if (total === 0 && data.total) {
                 total = Math.min(data.total, maxTotal);
@@ -275,20 +280,15 @@ export async function fetchSubjectCollection(
 
     try {
         const url = `${BGM_CONFIG.API_BASE}/v0/users/-/collections/${subjectId}`;
-        const response = await fetch(url, {
-            headers: {
-                'Authorization': `Bearer ${token}`,
-                'Content-Type': 'application/json'
-            }
-        });
+        const xhrResult = await xhrGet(url, token);
 
-        result.status = response.status;
+        result.status = xhrResult.status;
 
-        if (response.ok) {
-            result.data = await response.json();
+        if (xhrResult.status >= 200 && xhrResult.status < 300) {
+            result.data = xhrResult.data;
             result.message = 'success';
         } else {
-            result.message = `HTTP ${response.status}`;
+            result.message = `HTTP ${xhrResult.status}`;
         }
 
     } catch (e: any) {

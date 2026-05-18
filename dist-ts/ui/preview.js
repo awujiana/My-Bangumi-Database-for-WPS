@@ -151,6 +151,16 @@ let detailPreviewData = {
     typeCount: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 },
     uploadedCount: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 },
 };
+function handlePreviewBodyClick(e) {
+    const target = e.target;
+    const btn = target.closest('.upload-single-btn');
+    if (!(btn instanceof HTMLElement))
+        return;
+    const rowNum = parseInt(btn.dataset.row || '', 10);
+    if (isNaN(rowNum))
+        return;
+    uploadSingleRow(rowNum, btn);
+}
 // 从映射表中提取标准中文状态列表（过滤数字和英文）
 const VALID_STATUSES = Object.keys(WATCH_STATUS_MAP)
     .filter(key => /^[\u4e00-\u9fa5]+$/.test(key)) // 只保留纯中文
@@ -254,17 +264,8 @@ export function previewSyncContent() {
         return;
     }
     else {
-        body.addEventListener('click', (e) => {
-            const target = e.target;
-            const btn = target.closest('.upload-single-btn');
-            // 确保 btn 是 HTMLElement 且包含 dataset
-            if (!(btn instanceof HTMLElement))
-                return;
-            const rowNum = parseInt(btn.dataset.row || '', 10);
-            if (isNaN(rowNum))
-                return;
-            uploadSingleRow(rowNum, btn);
-        });
+        body.removeEventListener('click', handlePreviewBodyClick);
+        body.addEventListener('click', handlePreviewBodyClick);
     }
     body.innerHTML = statsHtml + cardsHtml;
     modal.style.display = 'block';

@@ -18,7 +18,7 @@ import {
     closeDetailModal,
     getIncrementalSync, setIncrementalSync,
     getSkipConflicts, setSkipConflicts,
-} from '../index.js';5
+} from '../index.js';
 import{BGM_EVENTS, eventBus} from '../tools/events.js';
 
 //  

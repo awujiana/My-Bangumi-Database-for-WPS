@@ -536,8 +536,6 @@ Ribbon 专用服务。`syncWithConfirmation` 流程设计合理。
 
 | 优先级 | 任务 | 文件 |
 |--------|------|------|
-| P0 | ~~修复 WATCH_STATUS_MAP 映射颠倒~~ ✅ 已确认无问题 | constants.ts |
-| P0 | 删除 handlers.ts L21 的 `;5` | handlers.ts |
 | P0 | 移动 taskpane.html 按钮禁用脚本到 body 末尾 | taskpane.html |
 | P0 | 修复 preview.ts 事件监听器内存泄漏 | preview.ts |
 | P0 | 替换 scraping.ts 的 fetch() 为 XMLHttpRequest | scraping.ts |

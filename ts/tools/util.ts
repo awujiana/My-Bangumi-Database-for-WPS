@@ -182,10 +182,16 @@ export const BGM: {
                     case 'error':
                         this.error(title, message);
                         break;
+                    case 'confirm':
+                        this.confirm(message, (confirmed) => {
+                            if (confirmed) options?.onOk?.();
+                            else options?.onCancel?.();
+                        }, title);
+                        break;
                     case 'input':
                         this.input(title, message, options?.defaultValue, options?.onOk, options?.onCancel);
                         break;
-                    default: // 包括 'alert' 和已移除的 'confirm'
+                    default:
                         this.alert(title, message);
                 }
             }

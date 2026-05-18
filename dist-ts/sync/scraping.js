@@ -19,6 +19,8 @@ function extractResponseMessage(data) {
  */
 function requestPromise(xhr) {
     const startTime = Date.now();
+    if (!xhr.timeout)
+        xhr.timeout = 30000;
     return new Promise((resolve, reject) => {
         xhr.onload = () => {
             const duration = Date.now() - startTime;
@@ -35,6 +37,14 @@ function requestPromise(xhr) {
         xhr.ontimeout = () => reject(new Error('请求超时'));
         xhr.send();
     });
+}
+function xhrGet(url, token) {
+    const xhr = new XMLHttpRequest();
+    xhr.open('GET', url, true);
+    xhr.timeout = 30000;
+    xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+    xhr.setRequestHeader('Content-Type', 'application/json');
+    return requestPromise(xhr);
 }
 /**
  * 验证Bangumi API Token的有效性
@@ -121,21 +131,16 @@ export async function fetchAllUserCollections(token, userId, options) {
     while (offset < maxTotal) {
         try {
             const url = `${BGM_CONFIG.API_BASE}/v0/users/${userId}/collections?limit=${limit}&offset=${offset}`;
-            const response = await fetch(url, {
-                headers: {
-                    'Authorization': `Bearer ${token}`,
-                    'Content-Type': 'application/json'
-                }
-            });
-            if (!response.ok) {
-                if (response.status === 429) {
+            const xhrResult = await xhrGet(url, token);
+            if (xhrResult.status < 200 || xhrResult.status >= 300) {
+                if (xhrResult.status === 429) {
                     bgmLog(LOG_LEVELS.WARN, '[fetchAllUserCollections] API限流，等待重试...');
                     await new Promise(resolve => setTimeout(resolve, BGM_CONFIG.REQUEST_DELAY * 2));
                     continue;
                 }
-                throw new Error(`HTTP ${response.status}`);
+                throw new Error(`HTTP ${xhrResult.status}`);
             }
-            const data = await response.json();
+            const data = xhrResult.data;
             if (total === 0 && data.total) {
                 total = Math.min(data.total, maxTotal);
                 bgmLog(LOG_LEVELS.INFO, `[fetchAllUserCollections] 收藏总数: ${total}`);
@@ -176,19 +181,14 @@ export async function fetchSubjectCollection(token, subjectId) {
     const result = { data: null, status: 0, message: '' };
     try {
         const url = `${BGM_CONFIG.API_BASE}/v0/users/-/collections/${subjectId}`;
-        const response = await fetch(url, {
-            headers: {
-                'Authorization': `Bearer ${token}`,
-                'Content-Type': 'application/json'
-            }
-        });
-        result.status = response.status;
-        if (response.ok) {
-            result.data = await response.json();
+        const xhrResult = await xhrGet(url, token);
+        result.status = xhrResult.status;
+        if (xhrResult.status >= 200 && xhrResult.status < 300) {
+            result.data = xhrResult.data;
             result.message = 'success';
         }
         else {
-            result.message = `HTTP ${response.status}`;
+            result.message = `HTTP ${xhrResult.status}`;
         }
     }
     catch (e) {
