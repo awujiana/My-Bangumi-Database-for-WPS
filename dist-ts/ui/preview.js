@@ -3,7 +3,7 @@
  * @module ui/detail-preview
  * @description 数据预览、同步记录预览、详情模态框、单条上传
  */
-import { getApp, bgmLog, BGM, readCell, trim, _getUserApiPath, wpsMsgBox, getCell, escapeHtml, showAlert, showToast, LOG_LEVELS, BGM_COLOR, findHeaderRow, getColumnMap, getSyncPreview, detectConflicts, extractSubjectId, mapWatchStatus, buildJsonPayload, bgmRequestSync, addSyncRecord, addTagsFromStr, WATCH_STATUS_MAP, SyncToBangumiAsync } from '../index.js';
+import { getApp, bgmLog, BGM, getCellValue, trim, _getUserApiPath, wpsMsgBox, getCell, escapeHtml, showAlert, showToast, LOG_LEVELS, BGM_COLOR, findHeaderRow, getColumnMap, getSyncPreview, detectConflicts, extractSubjectId, mapWatchStatus, buildJsonPayload, bgmRequestSync, addSyncRecord, addTagsFromStr, WATCH_STATUS_MAP, SyncToBangumiAsync } from '../index.js';
 import { getAllSyncRecords } from '../sync/syncRecord.js';
 import { loadBgToken } from '../tools/util.js';
 // ========== 辅助函数 ==========
@@ -38,7 +38,7 @@ function getRowData(ws, rowNum, colMap, headerRow, seqCol = 9) {
     const readCol = (mapKey) => {
         if (colMap.has(mapKey)) {
             const col = colMap.get(mapKey);
-            const value = trim(readCell(ws, rowNum, col));
+            const value = trim(getCellValue(ws, rowNum, col));
             if (mapKey === 'Bangumi_URL') {
                 data.urlCell = getCell(ws, rowNum, col);
             }

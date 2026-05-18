@@ -28,7 +28,6 @@ import {
     BgmError,
     bgmLog,
     getApp,
-    readCell,
     getCell,
     setCellValue,
     trim,
@@ -574,7 +573,7 @@ export function getFilterStatus(
                 const r = rowList[i];
                 const vals: string[] = [];
                 for (let c = 1; c <= 3; c++) {
-                    vals.push(readCell(ws, r, c));   // 直接复用统一函数
+                    vals.push(getCellValue(ws, r, c));   // 直接复用统一函数
                 }
                 bgmLog(LOG_LEVELS.INFO, `  行 ${r}: ${vals.join(' | ')}`);
             }
@@ -635,7 +634,7 @@ export function getSequentialRowsBySeqCol(
         const seqCol = getSeqColIndex(colMap);
         for (let r = startRow; r <= endRow; r++) {
             try {
-                const val = readCell(ws, r, seqCol);
+                const val = getCellValue(ws, r, seqCol);
                 if (val !== null && val !== undefined && val !== '') {
                     const seqNum = String(val).trim();
                     if (/^\d+$/.test(seqNum)) {
@@ -684,7 +683,7 @@ export function buildJsonPayload(
         let rawStatusValue = '';
         for (const key of statusKeys) {
             if (colMap.has(key)) {
-                const statusVal = trim(readCell(ws, rowNum, colMap.get(key)!));
+                const statusVal = trim(getCellValue(ws, rowNum, colMap.get(key)!));
                 if (statusVal) {
                     rawStatusValue = statusVal;
                     const mappedStatus = mapWatchStatus(statusVal);
@@ -706,7 +705,7 @@ export function buildJsonPayload(
 
         // 评分
         if (colMap.has('打分')) {
-            const rateVal = trim(readCell(ws, rowNum, colMap.get('打分')!));
+            const rateVal = trim(getCellValue(ws, rowNum, colMap.get('打分')!));
             if (rateVal && rateVal !== 'true' && rateVal !== 'True') {
                 const rate = parseFloat(rateVal);
                 if (!isNaN(rate) && rate >= 0 && rate <= 10) {
@@ -717,7 +716,7 @@ export function buildJsonPayload(
 
         // 标签
         if (colMap.has('标签/分级')) {
-            const tagsVal = trim(readCell(ws, rowNum, colMap.get('标签/分级')!));
+            const tagsVal = trim(getCellValue(ws, rowNum, colMap.get('标签/分级')!));
             if (tagsVal) {
                 payload.tags = buildTagsArray(tagsVal);
             }
@@ -726,7 +725,7 @@ export function buildJsonPayload(
         // 感言
         if (colMap.has('剧透/感言') || colMap.has('感言')) {
             const commentKey = colMap.has('剧透/感言') ? '剧透/感言' : '感言';
-            const commentVal = trim(readCell(ws, rowNum, colMap.get(commentKey)!));
+            const commentVal = trim(getCellValue(ws, rowNum, colMap.get(commentKey)!));
             if (commentVal) {
                 payload.comment = commentVal;
             }
@@ -735,7 +734,7 @@ export function buildJsonPayload(
         // 集数
         if (colMap.has('集数') || colMap.has('集号')) {
             const epKey = colMap.has('集数') ? '集数' : '集号';
-            const epVal = trim(readCell(ws, rowNum, colMap.get(epKey)!));
+            const epVal = trim(getCellValue(ws, rowNum, colMap.get(epKey)!));
             if (epVal) {
                 const ep = parseInt(epVal, 10);
                 if (!isNaN(ep) && ep > 0) {
@@ -746,7 +745,7 @@ export function buildJsonPayload(
 
         // 私密收藏（仅当明确标记为“是”或“1”时才添加）
         if (colMap.has('私密收藏')) {
-            const privateVal = trim(readCell(ws, rowNum, colMap.get('私密收藏')!)).toLowerCase();
+            const privateVal = trim(getCellValue(ws, rowNum, colMap.get('私密收藏')!)).toLowerCase();
             if (privateVal === '是' || privateVal === '1' || privateVal === 'true') {
                 payload.private = true;
             }
@@ -1273,7 +1272,7 @@ export function testSingleUpdate(): void {
         }
 
         const urlCol = colMap.get('Bangumi_URL')!;
-        const bgmUrl = trim(readCell(ws, targetRow, urlCol) || '');
+        const bgmUrl = trim(getCellValue(ws, targetRow, urlCol) || '');
         bgmLog(LOG_LEVELS.INFO, `[testSingleUpdate] Bangumi URL: ${bgmUrl}`);
 
         if (!bgmUrl) {
@@ -1300,7 +1299,7 @@ export function testSingleUpdate(): void {
 
         // 构建测试请求体
         const finishedDate = colMap.has('完播日')
-            ? trim(readCell(ws, targetRow, colMap.get('完播日')!) || '')
+            ? trim(getCellValue(ws, targetRow, colMap.get('完播日')!) || '')
             : '';
         const jsonBody = buildJsonPayload(ws, targetRow, colMap, finishedDate);
         bgmLog(LOG_LEVELS.INFO, `[testSingleUpdate] 请求体构建完成: ${jsonBody.length > 500 ? jsonBody.substring(0, 500) + '...' : jsonBody}`);

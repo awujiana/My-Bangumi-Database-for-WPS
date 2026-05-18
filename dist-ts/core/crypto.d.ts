@@ -87,35 +87,4 @@ export declare function encryptToken(token: string): string;
  * console.log(decrypted); // 'my-secret-token'
  */
 export declare function decryptToken(encrypted: string): string | null;
-/**
- * 使用AES-GCM异步加密Token（更安全的加密方式）
- *
- * @async
- * @function encryptTokenAsync
- * @param {string} token - 原始Token字符串
- * @returns {Promise<string>} Base64编码的加密字符串
- *
- * @description
- * AES-GCM是AEAD加密模式，同时提供加密和完整性验证。
- * 比XOR加密更安全，推荐在支持Web Crypto API的环境使用。
- *
- * @example
- * const encrypted = await encryptTokenAsync('my-secret-token');
- * console.log(encrypted); // '2.abc123.xyz789'
- */
-export declare function encryptTokenAsync(token: string): Promise<string>;
-/**
- * 异步解密AES-GCM加密的Token
- *
- * @async
- * @function decryptTokenAsync
- * @param {string} encrypted - encryptTokenAsync生成的加密字符串
- * @returns {Promise<string | null>} 解密后的Token，失败返回null
- *
- * @example
- * const encrypted = await encryptTokenAsync('my-secret-token');
- * const decrypted = await decryptTokenAsync(encrypted);
- * console.log(decrypted); // 'my-secret-token'
- */
-export declare function decryptTokenAsync(encrypted: string): Promise<string | null>;
 //# sourceMappingURL=crypto.d.ts.map

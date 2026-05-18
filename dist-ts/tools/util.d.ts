@@ -68,14 +68,6 @@ export declare function getCell(ws: WpsWorksheet | null | undefined, row: number
  */
 export declare function getCellValue(ws: WpsWorksheet | null | undefined, row: number, col: number): string;
 /**
- * 读取单元格文本，兼容多种取值方式，且不依赖 Cells 方法
- * @param ws  WPS 工作表
- * @param row 行号 (1‑based)
- * @param col 列号 (1‑based)
- * @returns   单元格文本，若无法读取则返回空字符串
- */
-export declare function readCell(ws: WpsWorksheet | null | undefined, row: number, col: number): string;
-/**
  * 设置单元格值
  */
 export declare function setCellValue(ws: WpsWorksheet | null | undefined, row: number, col: number, value: unknown): boolean;

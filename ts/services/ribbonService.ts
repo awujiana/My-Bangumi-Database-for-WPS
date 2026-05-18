@@ -2,7 +2,7 @@
 import {
     getApp, bgmLog, BGM, wpsMsgBox, loadBgToken, storeBgToken,
     getDataSheet, findHeaderRow, getLastRow, getColumnMap,
-    extractSubjectId, mapWatchStatus, readCell, getCellValue,
+    extractSubjectId, mapWatchStatus,  getCellValue,
     readRangeValues, getFilterStatus, BGM_COLOR, LOG_LEVELS,
     SyncToBangumiAsync, openUserCollection,_getBgmUserId,
     testTokenValidityForRibbon, fetchAllUserCollections,
@@ -221,7 +221,7 @@ export async function detectConflicts(
     }
 
     const getField = (row: number, key: string): string => {
-        if (colMap.has(key)) return trim(readCell(ws, row, colMap.get(key)!));
+        if (colMap.has(key)) return trim(getCellValue(ws, row, colMap.get(key)!));
         return '';
     };
 

@@ -7,7 +7,7 @@
  * @author BGM Development Team
  * @version 1.1.0
  */
-import { LOG_LEVELS, SYNC_STATUS, BGM_COLOR, bgmLog, getApp, BGM, getLastRow, colNumToLetter, SYNC_RECORD_COLUMNS, SYNC_RECORD_SHEET_NAME, SYNC_RECORD_COL, SYNC_RECORD_TYPE_COLOR, getCellValue, setCellValue } from '../index.js';
+import { LOG_LEVELS, SYNC_STATUS, BGM_COLOR, bgmLog, getApp, BGM, getLastRow, colNumToLetter, SYNC_RECORD_COLUMNS, SYNC_RECORD_SHEET_NAME, SYNC_RECORD_COL, SYNC_RECORD_TYPE_COLOR, getCellValue, setCellValue, } from '../index.js';
 // ========== 内存缓存 ==========
 let _syncRecordSidCache = new Map();
 let _syncRecordListCache = [];

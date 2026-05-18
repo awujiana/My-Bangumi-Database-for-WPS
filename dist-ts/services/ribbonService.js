@@ -1,5 +1,5 @@
 // ts/services/ribbonService.ts
-import { bgmLog, BGM, wpsMsgBox, loadBgToken, storeBgToken, getDataSheet, findHeaderRow, getLastRow, getColumnMap, extractSubjectId, mapWatchStatus, readCell, getCellValue, readRangeValues, getFilterStatus, BGM_COLOR, LOG_LEVELS, SyncToBangumiAsync, _getBgmUserId, testTokenValidityForRibbon, fetchAllUserCollections, getCell, trim, calcFingerprint } from '../index.js';
+import { bgmLog, BGM, wpsMsgBox, loadBgToken, storeBgToken, getDataSheet, findHeaderRow, getLastRow, getColumnMap, extractSubjectId, mapWatchStatus, getCellValue, readRangeValues, getFilterStatus, BGM_COLOR, LOG_LEVELS, SyncToBangumiAsync, _getBgmUserId, testTokenValidityForRibbon, fetchAllUserCollections, getCell, trim, calcFingerprint } from '../index.js';
 /**
  * 获取同步预览统计（不发送请求，仅扫描 Excel）
  * @param ws 工作表对象
@@ -184,7 +184,7 @@ export async function detectConflicts(ws, colMap, lastRow, headerRow, token) {
     }
     const getField = (row, key) => {
         if (colMap.has(key))
-            return trim(readCell(ws, row, colMap.get(key)));
+            return trim(getCellValue(ws, row, colMap.get(key)));
         return '';
     };
     for (const rowNum of rowsToProcess) {

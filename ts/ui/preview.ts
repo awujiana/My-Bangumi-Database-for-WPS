@@ -5,7 +5,7 @@
  */
 
 import {
-  getApp, bgmLog, BGM, readCell, trim, _getUserApiPath,
+  getApp, bgmLog, BGM,getCellValue,trim, _getUserApiPath,
   wpsMsgBox, getCell, escapeHtml, showAlert, showToast,
   LOG_LEVELS, BGM_COLOR, type SyncRecord, findHeaderRow, getColumnMap, getSyncPreview,detectConflicts,
   extractSubjectId, mapWatchStatus, buildJsonPayload,WpsWorksheet,
@@ -89,7 +89,7 @@ function getRowData(
   const readCol = (mapKey: string): string => {
     if (colMap.has(mapKey)) {
       const col = colMap.get(mapKey)!;
-      const value = trim(readCell(ws, rowNum, col));
+      const value = trim(getCellValue(ws, rowNum, col));
       if (mapKey === 'Bangumi_URL') {
         data.urlCell = getCell(ws, rowNum, col) as WpsRange | null;
       }

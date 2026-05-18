@@ -200,10 +200,8 @@ export {
     colNumToLetter,
     // 安全获取单元格对象
     getCell,
-    // 安全获取单元格值
+    // 安全获取单元格值（单元格文本兼容多种取值方式）
     getCellValue,
-    // 读取单元格文本（兼容多种取值方式）
-    readCell,
     // 设置单元格值
     setCellValue,
     // 根据索引获取工作表对象

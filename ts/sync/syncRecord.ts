@@ -12,7 +12,7 @@ import {
     BGM_CONFIG, LOG_LEVELS, SYNC_STATUS, BGM_COLOR, bgmLog, getApp,
     trim, isEmptyValue, BGM, getLastRow, colNumToLetter,
     SYNC_RECORD_COLUMNS, SYNC_RECORD_SHEET_NAME, SYNC_RECORD_COL, SYNC_RECORD_TYPE_COLOR,
-    getCellValue, setCellValue, readCell
+    getCellValue, setCellValue, 
 } from '../index.js';
 
 export interface SyncRecord {

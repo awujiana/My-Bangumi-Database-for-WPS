@@ -21,7 +21,7 @@ export const BGM = {
     sync: {
         isRunning: false,
         shouldStop: false,
-        lastSyncTime: new Date().toISOString(),
+        lastSyncTime: null,
         startSync() {
             // 防重复
             if (this.isRunning) {
@@ -35,6 +35,7 @@ export const BGM = {
                 if (!confirmed)
                     return;
                 this.isRunning = true;
+                this.lastSyncTime = new Date().toISOString();
                 bgmLog(LOG_LEVELS.INFO, '开始执行同步...');
                 syncAllRows()
                     .then(() => {
@@ -417,28 +418,6 @@ function getCellRawValue(cell) {
  * @returns 单元格的字符串值；如果工作表无效或单元格不存在，则返回空字符串
  */
 export function getCellValue(ws, row, col) {
-    if (!ws)
-        return '';
-    try {
-        const address = colNumToLetter(col) + row;
-        const cell = ws.Range(address);
-        if (!cell)
-            return '';
-        const raw = getCellRawValue(cell);
-        return raw != null ? String(raw) : '';
-    }
-    catch {
-        return '';
-    }
-}
-/**
- * 读取单元格文本，兼容多种取值方式，且不依赖 Cells 方法
- * @param ws  WPS 工作表
- * @param row 行号 (1‑based)
- * @param col 列号 (1‑based)
- * @returns   单元格文本，若无法读取则返回空字符串
- */
-export function readCell(ws, row, col) {
     if (!ws)
         return '';
     try {

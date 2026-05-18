@@ -1,5 +1,5 @@
 
-import {  WPS_ENUM, XL, BGM_CONFIG, BGM_COLOR, LOG_LEVELS, ERROR_LEVELS, PANEL_CONFIG, BGM_SUBJECT_TYPES, SYNC_STATUS,ErrorLevel, type DialogOptions, type ErrorOptions,isWpsApp, type WpsApplication,BgmError,encryptToken, decryptToken, calcChecksum,COLUMN_RULES,COLUMNS,HEADER_KEYWORDS,BGMCache,BGMSheet,type BGMSync,BGMUserInfo,WpsWorksheet ,WpsRange,syncAllRows ,showConfirm} from '../index.js';
+import { BGM_CONFIG, LOG_LEVELS, ERROR_LEVELS, PANEL_CONFIG, ErrorLevel, type DialogOptions, type ErrorOptions, isWpsApp, type WpsApplication, BgmError, encryptToken, decryptToken, calcChecksum, COLUMN_RULES, HEADER_KEYWORDS, BGMCache, BGMSheet, type BGMSync, BGMUserInfo, WpsWorksheet, WpsRange, syncAllRows, showConfirm } from '../index.js';
 import { showAlert as customShowAlert, showError as customShowError, showInput as customShowInput } from '../ui/dialog.js';
 
 import { BGM_EVENTS ,eventBus } from '../tools/events.js';  
@@ -65,7 +65,7 @@ export const BGM: {
     sync: {
         isRunning: false,
         shouldStop: false,
-        lastSyncTime: new Date().toISOString(),
+        lastSyncTime: null,
         
         startSync() {
             // 防重复
@@ -80,6 +80,7 @@ export const BGM: {
             BGM.Dialog.confirm('确定要开始全面同步吗？', (confirmed: boolean) => {
                 if (!confirmed) return;
                 this.isRunning = true;
+                this.lastSyncTime = new Date().toISOString();
                 bgmLog(LOG_LEVELS.INFO, '开始执行同步...');
 
                 syncAllRows()
@@ -482,29 +483,6 @@ export function getCellValue(
     }
 }
 
-/**
- * 读取单元格文本，兼容多种取值方式，且不依赖 Cells 方法
- * @param ws  WPS 工作表
- * @param row 行号 (1‑based)
- * @param col 列号 (1‑based)
- * @returns   单元格文本，若无法读取则返回空字符串
- */
-export function readCell(
-    ws: WpsWorksheet | null | undefined,
-    row: number,
-    col: number
-): string {
-    if (!ws) return '';
-    try {
-        const address = colNumToLetter(col) + row;
-        const cell = ws.Range(address);
-        if (!cell) return '';
-        const raw = getCellRawValue(cell);
-        return raw != null ? String(raw) : '';
-    } catch {
-        return '';
-    }
-}
 
 /**
  * 设置单元格值

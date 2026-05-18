@@ -5,7 +5,7 @@
  */
 
 
-import { PANEL_CONFIG, WPS_ENUM , LOG_LEVELS ,getApp, bgmLog, BGM, escapeHtml, readCell, colNumToLetter,HEADER_KEYWORDS, IMPORTANT_COLS  ,initMessageListener,  markUploadedItems,  updateTokenStatus, updateUserIdStatus, loadBgToken, showTokenDialog, showUserIdDialog ,
+import { PANEL_CONFIG, WPS_ENUM , LOG_LEVELS ,getApp, bgmLog, BGM, escapeHtml, getCellValue, colNumToLetter,HEADER_KEYWORDS, IMPORTANT_COLS  ,initMessageListener,  markUploadedItems,  updateTokenStatus, updateUserIdStatus, loadBgToken, showTokenDialog, showUserIdDialog ,
      showAlert, showToast ,closeDetailModal,getFilterStatus,    getLastRow,clearSheetCache,WpsWorksheet, _getBgmUserId, _getBgmUsername, _setBgmUserId, _setBgmUsername,
      getIncrementalSync, getSkipConflicts
 }from './index.js';
@@ -198,7 +198,7 @@ function detectHeaderAndColumns(ws: WpsWorksheet | null | undefined, opts: { vis
             let colCount = 0;
            for (let c = 1; c <= PANEL_CONFIG.MAX_SCAN_COLUMNS; c++) {
                 try {
-                    const v = readCell(ws, r, c).trim();
+                    const v = getCellValue(ws, r, c).trim();
                     if (v) {
                         colCount++;
                         const cv = v.toLowerCase();
@@ -234,7 +234,7 @@ function detectHeaderAndColumns(ws: WpsWorksheet | null | undefined, opts: { vis
     const headerNames: string[] = [];
     const headerIsImportant: boolean[] = [];
     for (let c = 1; c <= PANEL_CONFIG.MAX_SCAN_COLUMNS; c++) {
-        const v = readCell(ws, headerRow, c).trim();
+        const v = getCellValue(ws, headerRow, c).trim();
         headerNames.push(v);
         headerIsImportant.push(IMPORTANT_COLS[v.toLowerCase()] || false);
     }
@@ -245,7 +245,7 @@ function detectHeaderAndColumns(ws: WpsWorksheet | null | undefined, opts: { vis
     if (headerRow + 1 <= secondHeaderRowLimit) {
         let filled = 0, total = 0;
         for (let c = 1; c <= PANEL_CONFIG.MAX_SCAN_COLUMNS; c++) {
-            const nv = readCell(ws, headerRow + 1, c).trim();
+            const nv = getCellValue(ws, headerRow + 1, c).trim();
             if (nv) {
                 total++;
                 if (!headerNames[c - 1]) filled++;
@@ -255,7 +255,7 @@ function detectHeaderAndColumns(ws: WpsWorksheet | null | undefined, opts: { vis
             dataStartRow = headerRow + 2;
             for (let c = 1; c <= PANEL_CONFIG.MAX_SCAN_COLUMNS; c++) {
                 if (!headerNames[c - 1]) {
-                    const nv = readCell(ws, headerRow + 1, c).trim();
+                    const nv = getCellValue(ws, headerRow + 1, c).trim();
                     if (nv) {
                         headerNames[c - 1] = nv;
                         headerIsImportant[c - 1] = IMPORTANT_COLS[nv.toLowerCase()] || false;
@@ -273,7 +273,7 @@ function detectHeaderAndColumns(ws: WpsWorksheet | null | undefined, opts: { vis
         if (!isRowVisible(dr, headerRow)) continue;
         samples++;
         for (let c = 1; c <= PANEL_CONFIG.MAX_SCAN_COLUMNS; c++) {
-            const v = readCell(ws, dr, c).trim();
+            const v = getCellValue(ws, dr, c).trim();
             if (v) {
                 if (firstDataCol < 0) firstDataCol = c;
                 if (c > lastDataCol) lastDataCol = c;
@@ -359,7 +359,7 @@ function autoDetectSheet(): { sheetIndex: number; sheetName: string; headerRow: 
             for (let dr = meta.dataStartRow; dr <= meta.dataStartRow + 10; dr++) {
                 let hasAny = false;
                 for (let c = 1; c <= meta.lastCol; c++) {
-                    if (readCell(ws, dr, c).trim()) { hasAny = true; break; }
+                    if (getCellValue(ws, dr, c).trim()) { hasAny = true; break; }
                 }
                 if (hasAny) {
                     dataRowCount++;
@@ -610,7 +610,7 @@ function refreshData(): void {
                     for (let ci = 0; ci < displayColCount; ci++) {
                         // ✅ 使用实际列号
                         const col = meta.previewColStartAbsolute + ci;
-                        const v = readCell(ws, dr, col).trim();
+                        const v = getCellValue(ws, dr, col).trim();
                         if (v) hasAny = true;
                         rowCols.push(v);
                     }
@@ -627,7 +627,7 @@ function refreshData(): void {
                 const cols: { text: string; important: boolean }[] = [];
                 let any = false;
                 for (let c = 1; c <= PANEL_CONFIG.MAX_SCAN_COLUMNS; c++) {
-                    const v = readCell(ws, r, c).trim();
+                    const v = getCellValue(ws, r, c).trim();
                     if (v) { cols.push({ text: v, important: false }); any = true; }
                 }
                 if (any) {
