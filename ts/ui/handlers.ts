@@ -13,7 +13,7 @@ import {
     getLastRow, extractSubjectId, getDataSheet, getFilterStatus,
     getSequentialRowsBySeqCol, SyncToBangumiAsync,
     testSingleUpdate, getOrCreateSyncRecordSheet, getAllSyncRecords,
-    addSyncRecord, openSyncRecordSheet, deduplicateSyncRecords, wpsMsgBox,
+    addSyncRecord, openSyncRecordSheet, deduplicateSyncRecords, formatSyncRecordSheet, wpsMsgBox,
     previewSyncContent, refreshData, refreshSheets, toggleSheetLock, clearSyncRecords,
     closeDetailModal,
     getIncrementalSync, setIncrementalSync,
@@ -34,6 +34,7 @@ interface FilterStatus {
 interface BangumiCollectionItem {
     subject_id: number;
     subject_type?: number;
+    type?: number;
     subject?: {
         name_cn?: string;
         name?: string;
@@ -967,6 +968,13 @@ function handleActionClick(event: Event): void {
             deduplicateSyncRecords();
             showToast('去重完成', 'success');
             bgmLog(LOG_LEVELS.INFO, `[handleActionClick] 同步记录去重已触发，耗时: ${Date.now() - startTime}ms`);
+            break;
+
+        case 'formatSyncRecordSheet':
+            bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 开始设置同步记录表格式');
+            formatSyncRecordSheet();
+            showToast('格式设置完成', 'success');
+            bgmLog(LOG_LEVELS.INFO, `[handleActionClick] 同步记录表格式设置已触发，耗时: ${Date.now() - startTime}ms`);
             break;
 
         case 'markUploadedItems':

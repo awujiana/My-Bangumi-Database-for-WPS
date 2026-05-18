@@ -43,6 +43,7 @@ export declare function getOrCreateSyncRecordSheet(): any;
 export declare function addSyncRecord(params: UpdateRecordParams): boolean;
 export declare function getAllSyncRecords(): SyncRecord[];
 export declare function deduplicateSyncRecords(): boolean;
+export declare function formatSyncRecordSheet(): void;
 export declare function clearSyncRecords(): boolean;
 export declare function openSyncRecordSheet(): void;
 export declare function clearSheetMarksInSheet(sheetIndex: number): void;

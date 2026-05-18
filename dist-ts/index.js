@@ -82,7 +82,7 @@ showUserIdDialog, markUploadedItems, updateTokenStatus, updateUserIdStatus, show
 // ============================================================================
 export { 
 // 导入同步记录模块的函数
-getOrCreateSyncRecordSheet, getAllSyncRecords, addSyncRecord, deduplicateSyncRecords, openSyncRecordSheet, clearSyncRecords, } from './sync/syncRecord.js';
+getOrCreateSyncRecordSheet, getAllSyncRecords, addSyncRecord, deduplicateSyncRecords, formatSyncRecordSheet, openSyncRecordSheet, clearSyncRecords, } from './sync/syncRecord.js';
 // ============================================================================
 // 9. 同步引擎（来自 sync/exceltobangumi.js）
 // ============================================================================

@@ -394,28 +394,27 @@ export const SYNC_RECORD_SHEET_NAME = '同步记录';
  * @type {string[]}
  */
 export const SYNC_RECORD_COLUMNS = [
-    '序号', '同步时间', '名称', 'URL', 'SID', '条目类型',
-    '次数', '内容', '状态', '备注', '数据指纹', '收藏状态'
+    'SID', '同步时间', '名称', 'URL', '条目类型',
+    '次数', '内容', '状态', '收藏状态', '备注', '数据指纹'
 ];
 /**
- * 同步记录表列索引常量 (1-based，便于维护)
+ * 同步记录表列索引常量 (1-based)
  *
  * @constant
  * @type {Object}
  */
 export const SYNC_RECORD_COL = {
-    SEQ: 1,
+    SID: 1,
     TIME: 2,
     NAME: 3,
     URL: 4,
-    SID: 5,
-    TYPE: 6,
-    COUNT: 7,
-    CONTENT: 8,
-    STATUS: 9,
+    TYPE: 5,
+    COUNT: 6,
+    CONTENT: 7,
+    STATUS: 8,
+    COLL_TYPE: 9,
     MESSAGE: 10,
-    FINGERPRINT: 11,
-    COLL_TYPE: 12
+    FINGERPRINT: 11
 };
 /**
  * 同步记录类型颜色映射表

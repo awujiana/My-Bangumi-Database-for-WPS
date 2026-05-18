@@ -118,7 +118,18 @@ export function getOrCreateSyncRecordSheet(): any {
 
         bgmLog(LOG_LEVELS.INFO, '已创建同步记录工作表');
     } else {
-        // 已有工作表，检查并补齐表头（修复历史遗留的表头错位问题）
+        // 检测并迁移旧 schema（旧 12 列含"序号" → 新 11 列 SID 放第一列）
+        try {
+            const oldHeader = String(syncSheet.Range('A1').Value2 ?? '').trim();
+            if (oldHeader === '序号') {
+                bgmLog(LOG_LEVELS.INFO, '检测到旧版本同步记录表，开始迁移...');
+                migrateSyncRecordSchema(syncSheet);
+                bgmLog(LOG_LEVELS.INFO, '同步记录表迁移完成');
+                invalidateCache();
+            }
+        } catch (_) {}
+
+        // 已有工作表，检查并补齐表头
         const existingCols = SYNC_RECORD_COLUMNS.length;
         for (let i = 0; i < existingCols; i++) {
             const colLetter = colNumToLetter(i + 1);
@@ -146,6 +157,60 @@ function invalidateCache(): void {
     _syncRecordCacheValid = false;
 }
 
+/**
+ * 迁移旧版同步记录表数据（旧 12 列含序号 → 新 11 列 SID 放第一列）
+ * 旧列序：序号(1) 同步时间(2) 名称(3) URL(4) SID(5) 条目类型(6) 次数(7) 内容(8) 状态(9) 备注(10) 数据指纹(11) 收藏状态(12)
+ * 新列序：SID(1) 同步时间(2) 名称(3) URL(4) 条目类型(5) 次数(6) 内容(7) 状态(8) 收藏状态(9) 备注(10) 数据指纹(11)
+ */
+function migrateSyncRecordSchema(sheet: any): void {
+    const lastRow = getLastRow(sheet);
+    if (lastRow <= 1) return;
+
+    const rows: string[][] = [];
+    for (let row = 2; row <= lastRow; row++) {
+        const oldSid = getCellValue(sheet, row, 5).trim();
+        const oldUrl = getCellValue(sheet, row, 4).trim();
+        if (!oldUrl && !oldSid) continue;
+
+        rows.push([
+            oldSid,
+            getCellValue(sheet, row, 2),
+            getCellValue(sheet, row, 3),
+            oldUrl,
+            getCellValue(sheet, row, 6),
+            getCellValue(sheet, row, 7),
+            getCellValue(sheet, row, 8),
+            getCellValue(sheet, row, 9),
+            getCellValue(sheet, row, 12),
+            getCellValue(sheet, row, 10),
+            getCellValue(sheet, row, 11),
+        ]);
+    }
+
+    if (lastRow > 1) {
+        sheet.Range(`2:${lastRow}`).Delete();
+    }
+
+    for (let i = 0; i < SYNC_RECORD_COLUMNS.length; i++) {
+        const colLetter = colNumToLetter(i + 1);
+        const cell = sheet.Range(`${colLetter}1`);
+        cell.Value2 = SYNC_RECORD_COLUMNS[i];
+        if (cell.Interior) {
+            cell.Interior.Color = BGM_COLOR.GRAY;
+        }
+    }
+
+    for (let i = 0; i < rows.length; i++) {
+        const newRow = i + 2;
+        const data = rows[i];
+        for (let col = 0; col < data.length; col++) {
+            setCellValue(sheet, newRow, col + 1, data[col]);
+        }
+    }
+
+    bgmLog(LOG_LEVELS.INFO, `数据迁移完成：${rows.length} 条记录已重组到新列结构`);
+}
+
 function buildCache(sheet: any): void {
     if (_syncRecordCacheValid) return;
     _syncRecordSidCache.clear();
@@ -160,7 +225,6 @@ function buildCache(sheet: any): void {
 
             _syncRecordSidCache.set(sid, row);
             _syncRecordListCache.push({
-                seq: getCellValue(sheet, row, SYNC_RECORD_COL.SEQ),
                 time: getCellValue(sheet, row, SYNC_RECORD_COL.TIME),
                 name: getCellValue(sheet, row, SYNC_RECORD_COL.NAME),
                 url: url,
@@ -194,8 +258,8 @@ function setSyncRecordColors(sheet: any, row: number, status: string, count: num
         if (cell?.Interior) cell.Interior.Color = color;
     };
 
-    // 序号列（A列）- 根据同步次数或状态设置颜色
-    setColor(SYNC_RECORD_COL.SEQ, status === SYNC_STATUS.FAIL ? BGM_COLOR.FAIL
+    // SID列（A列）- 根据同步次数或状态设置颜色
+    setColor(SYNC_RECORD_COL.SID, status === SYNC_STATUS.FAIL ? BGM_COLOR.FAIL
                 : status === SYNC_STATUS.SKIP ? BGM_COLOR.SKIP
                 : getCountColor(count));
 
@@ -269,7 +333,6 @@ export function addSyncRecord(params: UpdateRecordParams): boolean {
             const finalStatus = params.status || SYNC_STATUS.SUCCESS;
             const finalCount = params.count || 1;
 
-            setCellValue(sheet, newRow, SYNC_RECORD_COL.SEQ, newRow - 1);
             setCellValue(sheet, newRow, SYNC_RECORD_COL.TIME, now);
             setCellValue(sheet, newRow, SYNC_RECORD_COL.NAME, params.name || '');
             setCellValue(sheet, newRow, SYNC_RECORD_COL.URL, params.url || '');
@@ -349,10 +412,6 @@ export function deduplicateSyncRecords(): boolean {
         }
 
         if (hasDuplicates) {
-            const newLastRow = getLastRow(sheet);
-            for (let row = 2; row <= newLastRow; row++) {
-                setCellValue(sheet, row, SYNC_RECORD_COL.SEQ, row - 1);
-            }
             bgmLog(LOG_LEVELS.INFO, `去重完成：删除了 ${removedCount} 条重复记录`);
             invalidateCache();
         }

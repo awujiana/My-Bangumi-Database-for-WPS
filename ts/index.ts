@@ -140,6 +140,7 @@ export {
     getAllSyncRecords,
     addSyncRecord,
     deduplicateSyncRecords,
+    formatSyncRecordSheet,
     openSyncRecordSheet,
    type SyncRecord,
     type UpdateRecordParams,

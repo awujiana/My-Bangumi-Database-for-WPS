@@ -304,24 +304,23 @@ export declare const SYNC_RECORD_SHEET_NAME = "\u540C\u6B65\u8BB0\u5F55";
  */
 export declare const SYNC_RECORD_COLUMNS: string[];
 /**
- * 同步记录表列索引常量 (1-based，便于维护)
+ * 同步记录表列索引常量 (1-based)
  *
  * @constant
  * @type {Object}
  */
 export declare const SYNC_RECORD_COL: {
-    readonly SEQ: 1;
+    readonly SID: 1;
     readonly TIME: 2;
     readonly NAME: 3;
     readonly URL: 4;
-    readonly SID: 5;
-    readonly TYPE: 6;
-    readonly COUNT: 7;
-    readonly CONTENT: 8;
-    readonly STATUS: 9;
+    readonly TYPE: 5;
+    readonly COUNT: 6;
+    readonly CONTENT: 7;
+    readonly STATUS: 8;
+    readonly COLL_TYPE: 9;
     readonly MESSAGE: 10;
     readonly FINGERPRINT: 11;
-    readonly COLL_TYPE: 12;
 };
 /**
  * 同步记录类型颜色映射表
