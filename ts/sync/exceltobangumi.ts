@@ -208,6 +208,7 @@ export function testTokenValidityForRibbon(token?: string): void {
 
     const xhr = new XMLHttpRequest();
     xhr.open('GET', apiUrl, true);
+    xhr.timeout = 30000;
     xhr.setRequestHeader('Authorization', 'Bearer ' + testToken);
     xhr.setRequestHeader('Content-Type', 'application/json');
 

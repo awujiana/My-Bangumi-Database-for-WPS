@@ -31,9 +31,7 @@ export const BGM: {
         input: (title: string, prompt: string, defaultValue?: string, onOk?: (value: string) => void, onCancel?: () => void) => void;
         show: (type: 'alert' | 'confirm' | 'error' | 'input', title: string, message: string, options?: DialogOptions) => void;
     };
-    Message: {
-        send: (data: Record<string, unknown>, targetOrigin?: string) => boolean;
-    };
+   
     showAlert: (title: string, message: string) => void;
     showConfirm: (title: string, message: string, onConfirm?: () => void, onCancel?: () => void) => void;
     handleError: (error: unknown, options?: ErrorOptions) => BgmError;
@@ -198,29 +196,8 @@ export const BGM: {
             }
         }
     },
- // 统一消息通信
-    Message: {
-        send: function(data: Record<string, unknown>, targetOrigin?: string): boolean {
-            try {
-                if (typeof window !== 'undefined' && window.parent && window.parent !== window) {
-                    window.parent.postMessage(data, targetOrigin || '*');
-                    return true;
-                }
-            } catch (e) {
-                const err = e as Error;
-                if (typeof bgmLog === 'function') {
-                    bgmLog(LOG_LEVELS.INFO|| 0, 'postMessage 不可用: ' + err.message);
-                }
-            }
-            return false;
-        }
-    },
-    
     
     showAlert: function(title: string, message: string): void {
-        if (BGM.Message.send({ type: "showAlert", title: title, message: message })) {
-            return;
-        }
         BGM.Dialog.alert(title, message);
     },
     

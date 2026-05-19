@@ -89,7 +89,6 @@ export function showTokenDialog(currentToken?: string): void {
             storeBgToken(value);
             updateTokenStatus();
             showToast(_T.tokenSaved, 'success');
-           BGM.Message.send({ type: 'tokenUpdated' });
         }
     });
 }
@@ -101,7 +100,6 @@ export function showUserIdDialog(): void {
             _setBgmUserId(value.trim());
             updateUserIdStatus();
             showToast(_T.userIdSaved, 'success');
-            BGM.Message.send({ type: 'userIdUpdated' });
         }
     });
 }
@@ -787,28 +785,6 @@ async function _doAPISync(sheetIndex: number, token: string): Promise<void> {
     }
 }
 
-export async function markUploadedItems(sheetIndexOrName: number | string, collections?: unknown[]): Promise<void> {
-    if (typeof sheetIndexOrName === 'string' && collections === undefined) {
-        const sheetName = sheetIndexOrName;
-        const token = loadBgToken(); if (!token) { showAlert(_T.pleaseSetTokenFirst); return; }
-        const userId = _getBgmUserId(); if (!userId) { showAlert(_T.pleaseSetUserIdFirst + '！'); return; }
-        const app = getApp();
-        let targetIndex: number | null = null;
-        if (app?.ActiveWorkbook) {
-            for (let i = 1; i <= app.ActiveWorkbook.Worksheets.Count; i++) {
-                if (app.ActiveWorkbook.Worksheets.Item(i).Name === sheetName) { targetIndex = i; break; }
-            }
-        }
-        if (targetIndex === null) { showAlert(_T.sheetNotFound + sheetName); return; }
-        const cols = await fetchAllUserCollections(token, userId);
-        if (cols?.length) {
-            showToast(_T.marksToSheet + cols.length + _T.marksToSheetSuffix + sheetName, 'success');
-        }
-        return;
-    }
-    // 无操作
-}
-
 // ========== 事件监听 ==========
 
 function setupButtonListeners(): void {
@@ -983,14 +959,6 @@ function handleActionClick(event: Event): void {
             bgmLog(LOG_LEVELS.INFO, `[handleActionClick] 数据清洗完成，耗时: ${Date.now() - startTime}ms`);
             break;
 
-        case 'markUploadedItems':
-            bgmLog(LOG_LEVELS.INFO, `[handleActionClick] 标记已上传项目，类型: ${args[0] || '全部'}`);
-            markUploadedItems(args[0]);
-            bgmLog(LOG_LEVELS.INFO, `[handleActionClick] 已上传项目标记完成，耗时: ${Date.now() - startTime}ms`);
-            break;
-            
-
-            
         case 'openSyncRecordSheet':
             bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 打开同步记录工作表');
             openSyncRecordSheet();

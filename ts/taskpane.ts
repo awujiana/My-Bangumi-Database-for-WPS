@@ -5,7 +5,7 @@
  */
 
 
-import { PANEL_CONFIG, WPS_ENUM , LOG_LEVELS ,getApp, bgmLog, BGM, escapeHtml, getCellValue, colNumToLetter,HEADER_KEYWORDS, IMPORTANT_COLS  ,initMessageListener,  markUploadedItems,  updateTokenStatus, updateUserIdStatus, loadBgToken, showTokenDialog, showUserIdDialog ,
+import { PANEL_CONFIG, WPS_ENUM , LOG_LEVELS ,getApp, bgmLog, BGM, escapeHtml, getCellValue, colNumToLetter,HEADER_KEYWORDS, IMPORTANT_COLS  , updateTokenStatus, updateUserIdStatus, loadBgToken, showTokenDialog, showUserIdDialog ,
      showAlert, showToast ,closeDetailModal,getFilterStatus,    getLastRow,clearSheetCache,WpsWorksheet, _getBgmUserId, _getBgmUsername, _setBgmUserId, _setBgmUsername,
      getIncrementalSync, getSkipConflicts
 }from './index.js';
@@ -790,11 +790,10 @@ function initPanel(): void {
     if (typeof (window as any).Application !== 'undefined' && typeof (window as any).Application.Enum !== 'object') {
         (window as any).Application.Enum = WPS_ENUM;
     }
+    
+    bgmLog(LOG_LEVELS.INFO, '[taskpane] 锁定按钮监听器设置完成');
 
-    // 初始化消息监听（用于与其他任务窗格通信）
-    initMessageListener();
-
-    // 从 PluginStorage 恢复用户信息（Ribbon 设置后 Taskpane 读取）
+    // 初始化事件监听
     restoreUserInfoFromStorage();
     // 定时轮询 PluginStorage，确保在 Ribbon 设置 Token 后 Taskpane 能自动更新 UI
     startUserInfoPolling();
@@ -865,7 +864,6 @@ function initPanel(): void {
 export {
     initPanel, refreshSheets, refreshData, toggleSheetLock,
     onSelectModeChange, 
-    markUploadedItems, 
     autoDetectSheet, updateFilterStatus
 };
 

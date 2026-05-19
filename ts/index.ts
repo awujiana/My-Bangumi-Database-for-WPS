@@ -122,7 +122,6 @@ export {
 export {
     // 显示用户 ID 设置对话框
     showUserIdDialog,
-    markUploadedItems, 
     updateTokenStatus, 
     updateUserIdStatus, 
     showTokenDialog,
