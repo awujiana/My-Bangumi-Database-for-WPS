@@ -222,13 +222,15 @@ def main():
 
         # ── 标签合并（pandas 聚合） ──
         if tags_col_name and len(without_url) > 0:
-            before_tags = str(with_url.iloc[0].get(tags_col_name, '') or '')
+            raw_before = with_url.iloc[0].get(tags_col_name, '')
+            before_tags = '' if pd.isna(raw_before) or str(raw_before).strip() in ('', 'nan') else str(raw_before).strip()
             existing = parse_tags(before_tags)
             new_tags = []
 
             for _, del_row in without_url.iterrows():
-                del_tags = str(del_row.get(tags_col_name, '') or '')
-                if del_tags and del_tags != 'nan':
+                raw_del = del_row.get(tags_col_name, '')
+                del_tags = '' if pd.isna(raw_del) or str(raw_del).strip() in ('', 'nan') else str(raw_del).strip()
+                if del_tags:
                     delete_tag_log.append(f'    行{header_row + 1 + del_row.name} 标签 → "{del_tags}"')
                 for t in parse_tags(del_tags):
                     if t not in existing:
@@ -237,7 +239,6 @@ def main():
 
             if new_tags:
                 after = ' | '.join(sorted(existing))
-                # 写回 openpyxl
                 set_cell = ws.cell(row=keep_row_num, column=tags_col_idx)
                 set_cell.value = after
                 merged_groups += 1
@@ -294,23 +295,26 @@ def main():
     print(f'{"━"*60}')
     to_delete.sort(reverse=True)
     print('  删除顺序（从后往前）:')
-    ranges = []
+    ranges_label = []
+    del_ranges = []
     i = 0
     while i < len(to_delete):
         j = i
         while j + 1 < len(to_delete) and to_delete[j] - to_delete[j + 1] == 1:
             j += 1
-        ranges.append(str(to_delete[i]) if i == j else f'{to_delete[j]}~{to_delete[i]}')
+        start_row = to_delete[j]
+        count = j - i + 1
+        ranges_label.append(str(to_delete[i]) if i == j else f'{to_delete[j]}~{to_delete[i]}')
+        del_ranges.append((start_row, count))
         i = j + 1
-    print(f'    {", ".join(ranges)}')
-    print(f'  共 {len(ranges)} 个范围 / {len(to_delete)} 行')
+    print(f'    {", ".join(ranges_label)}')
+    print(f'  共 {len(del_ranges)} 个范围 / {len(to_delete)} 行')
 
     del_count = 0
-    for row in to_delete:
-        ws.delete_rows(row, 1)
-        del_count += 1
-        if del_count % 500 == 0:
-            print(f'  ...进度: 已删除 {del_count}/{len(to_delete)} 行')
+    for start_row, count in del_ranges:
+        ws.delete_rows(start_row, count)
+        del_count += count
+        print(f'  ...进度: 已删除 {del_count}/{len(to_delete)} 行')
     print(f'  ✅ 删除完成: 共删除 {del_count} 行')
 
     # ── 保存 ──
