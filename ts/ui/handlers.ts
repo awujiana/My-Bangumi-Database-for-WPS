@@ -1339,23 +1339,34 @@ function cleanLockedDataSheet(): void {
     }
 
     const lastRow = getLastRow(ws);
-    const maxCol = Math.max(nameCol, urlCol, tagsCol || 0);
-    bgmLog(LOG_LEVELS.INFO, `[cleanLockedDataSheet] 数据区间: headerRow=${headerRow}, lastRow=${lastRow}, 数据行数=${lastRow - headerRow}, 最大列=${maxCol}`);
+    const dataRows = lastRow - headerRow;
+    bgmLog(LOG_LEVELS.INFO, `[cleanLockedDataSheet] 数据区间: headerRow=${headerRow}, lastRow=${lastRow}, 数据行数=${dataRows}`);
 
-    // ========== 1. 批量读取所有数据（一次 COM 调用） ==========
-    const allData = readRangeValues(ws, headerRow + 1, lastRow, 1, maxCol);
-    if (!allData || allData.length === 0) {
-        bgmLog(LOG_LEVELS.WARN, '[cleanLockedDataSheet] 未读取到数据，终止');
-        showToast('未读取到数据', 'error');
+    if (dataRows <= 0) {
+        bgmLog(LOG_LEVELS.WARN, '[cleanLockedDataSheet] 无数据行，终止');
+        showToast('无数据行', 'info');
         return;
     }
 
-    // ========== 2. 按名称分组（内存操作，零 COM 调用） ==========
+    // ========== 1. 只读需要的 3 列（三次小范围 COM 调用，安全不卡死） ==========
+    const nameData = readRangeValues(ws, headerRow + 1, lastRow, nameCol, nameCol);
+    if (!nameData || nameData.length === 0) {
+        bgmLog(LOG_LEVELS.WARN, '[cleanLockedDataSheet] 未读取到名称列数据，终止');
+        showToast('未读取到数据', 'error');
+        return;
+    }
+    const urlData = readRangeValues(ws, headerRow + 1, lastRow, urlCol, urlCol);
+    const tagsData = tagsCol ? readRangeValues(ws, headerRow + 1, lastRow, tagsCol, tagsCol) : null;
+
+    const totalRows = nameData.length;
+    bgmLog(LOG_LEVELS.INFO, `[cleanLockedDataSheet] 数据读取完成: ${totalRows} 行`);
+
+    // ========== 2. 按名称分组（纯内存操作） ==========
     const nameRows = new Map<string, number[]>();
     let emptyNameCount = 0;
-    for (let i = 0; i < allData.length; i++) {
+    for (let i = 0; i < totalRows; i++) {
         const row = headerRow + 1 + i;
-        const name = String(allData[i][nameCol - 1] ?? '').trim();
+        const name = String(nameData[i][0] ?? '').trim();
         if (!name) {
             emptyNameCount++;
             continue;
@@ -1366,7 +1377,7 @@ function cleanLockedDataSheet(): void {
     }
     bgmLog(LOG_LEVELS.INFO, `[cleanLockedDataSheet] 名称扫描完成: 有效名称=${nameRows.size}个, 空名称行=${emptyNameCount}行`);
 
-    // ========== 3. 处理重复行（内存操作 + 仅合并标签时写回） ==========
+    // ========== 3. 处理重复行 ==========
     const toDelete: number[] = [];
     let mergedTagsCount = 0;
     let duplicateNameCount = 0;
@@ -1381,7 +1392,7 @@ function cleanLockedDataSheet(): void {
         const withoutUrl: number[] = [];
         for (const row of rows) {
             const idx = row - headerRow - 1;
-            const url = String(allData[idx][urlCol - 1] ?? '').trim();
+            const url = idx < urlData.length ? String(urlData[idx][0] ?? '').trim() : '';
             (url ? withUrl : withoutUrl).push(row);
         }
 
@@ -1394,17 +1405,17 @@ function cleanLockedDataSheet(): void {
         const keepRow = withUrl[0];
         duplicateDetails.push({ name, rows, keep: withUrl, del: withoutUrl });
 
-        // 合并标签：一次性收集所有标签后仅写回一次
         const nameNewTags: string[] = [];
-        if (tagsCol && withoutUrl.length > 0) {
+        if (tagsData && withoutUrl.length > 0) {
             const keepIdx = keepRow - headerRow - 1;
             const existingSet = new Set(
-                String(allData[keepIdx][tagsCol - 1] ?? '').split(/\s*\|\s*/).map(t => t.trim()).filter(Boolean)
+                (keepIdx < tagsData.length ? String(tagsData[keepIdx][0] ?? '') : '')
+                    .split(/\s*\|\s*/).map(t => t.trim()).filter(Boolean)
             );
 
             for (const delRow of withoutUrl) {
                 const delIdx = delRow - headerRow - 1;
-                const delTags = String(allData[delIdx][tagsCol - 1] ?? '').trim();
+                const delTags = delIdx < tagsData.length ? String(tagsData[delIdx][0] ?? '').trim() : '';
                 if (!delTags) continue;
 
                 for (const t of delTags.split(/\s*\|\s*/)) {
@@ -1418,7 +1429,7 @@ function cleanLockedDataSheet(): void {
 
             if (nameNewTags.length > 0) {
                 const mergedTags = [...existingSet].join(' | ');
-                setCellValue(ws, keepRow, tagsCol, mergedTags);
+                setCellValue(ws, keepRow, tagsCol!, mergedTags);
                 mergedTagsCount++;
                 mergedTagEntries.push(`${name}: ${nameNewTags.join(' | ')}`);
             }
@@ -1429,7 +1440,7 @@ function cleanLockedDataSheet(): void {
         }
     }
 
-    bgmLog(LOG_LEVELS.INFO, `[cleanLockedDataSheet] 统计: 重复名称=${duplicateNameCount}个, 待删除行=${toDelete.length}, 合并标签行=${mergedTagsCount}`);
+    bgmLog(LOG_LEVELS.INFO, `[cleanLockedDataSheet] 统计: 重复名称=${duplicateNameCount}个, 待删除行=${toDelete.length}, 合并标签组=${mergedTagsCount}`);
 
     if (duplicateDetails.length > 0) {
         const lines = duplicateDetails.map(d =>
@@ -1447,8 +1458,9 @@ function cleanLockedDataSheet(): void {
         return;
     }
 
-    // ========== 4. 批量删除行（合并连续行为范围删除，减少 COM 调用） ==========
+    // ========== 4. 批量删除行（合并连续行为范围删除） ==========
     toDelete.sort((a, b) => b - a);
+    bgmLog(LOG_LEVELS.INFO, `[cleanLockedDataSheet] 开始删除 ${toDelete.length} 行...`);
     let deleteCallCount = 0;
     let i = 0;
     while (i < toDelete.length) {
@@ -1466,9 +1478,9 @@ function cleanLockedDataSheet(): void {
     }
     bgmLog(LOG_LEVELS.INFO, `[cleanLockedDataSheet] 删除行: ${toDelete.length}行, 实际COM调用: ${deleteCallCount}次`);
 
-    const mergedSummary = mergedTagEntries.length > 0 ? `\n[cleanLockedDataSheet] 实际合并的标签:\n${mergedTagEntries.map(e => `  ${e}`).join('\n')}` : '';
+    const mergedSummary = mergedTagEntries.length > 0 ? `\n  ${mergedTagEntries.join('\n  ')}` : '';
     bgmLog(LOG_LEVELS.INFO, `[cleanLockedDataSheet] ======== 清洗完成: 删除 ${toDelete.length} 行${tagsCol ? `，合并 ${mergedTagsCount} 个名称组的标签` : ''}，耗时: ${Date.now() - startTime}ms ========`);
-    if (mergedSummary) bgmLog(LOG_LEVELS.INFO, mergedSummary);
+    if (mergedSummary) bgmLog(LOG_LEVELS.INFO, `[cleanLockedDataSheet] 实际合并的标签:\n${mergedSummary}`);
     showToast(`清洗完成：删除 ${toDelete.length} 行${tagsCol ? `，合并 ${mergedTagsCount} 个名称组的标签` : ''}`, 'success');
 }
 
