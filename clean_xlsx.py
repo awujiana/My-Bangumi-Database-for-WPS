@@ -15,20 +15,21 @@
   python clean_xlsx.py "C:\数据.xlsm" "动画"    # 也支持 xlsm，自动保留宏
   python clean_xlsx.py "C:\数据.xlsx"             # 自动选择第一个非空表
 
-依赖：pip install openpyxl
+依赖：pip install pandas openpyxl
 """
 
 import sys
 import os
 import shutil
 import time
-from collections import defaultdict
+import pandas as pd
 from openpyxl import load_workbook
 from openpyxl.utils import get_column_letter
 
 
-def find_header_row(ws, max_search=20):
-    """查找同时包含"名称"和"Bangumi_URL"的表头行"""
+def find_header_row(wb, sheet_name, max_search=20):
+    """用 pandas 扫描前 N 行，找到同时包含"名称"和"Bangumi_URL"的表头行"""
+    ws = wb[sheet_name]
     for row in ws.iter_rows(min_row=1, max_row=max_search, max_col=ws.max_column):
         values = [str(c.value or '').strip() for c in row]
         has_name = any('名称' in v for v in values)
@@ -38,28 +39,18 @@ def find_header_row(ws, max_search=20):
     return None
 
 
-def get_column_map(ws, header_row):
-    """建立 列名 → 列号 映射"""
-    return {
-        str(c.value).strip(): c.column
-        for c in ws[header_row] if c.value
-    }
-
-
-def col_val(ws, row, col):
-    """安全获取单元格字符串值"""
-    cell = ws.cell(row=row, column=col)
-    return str(cell.value or '').strip()
-
-
-def set_col_val(ws, row, col, value):
-    """写入单元格值"""
-    ws.cell(row=row, column=col).value = value
+def pick_column(col_map, keywords):
+    """从列名映射中选出匹配关键词的第一列"""
+    for col_name, col_idx in col_map.items():
+        for kw in keywords:
+            if kw in col_name:
+                return col_name, col_idx
+    return None, None
 
 
 def parse_tags(tag_str):
     """解析 ' | ' 分隔的标签为 set"""
-    return set(t.strip() for t in tag_str.split('|') if t.strip())
+    return set(t.strip() for t in str(tag_str).split('|') if t.strip())
 
 
 def main():
@@ -82,11 +73,9 @@ def main():
     else:
         print(f'[备份] 已存在: {backup_path}')
 
-    # ── 打开工作簿 ──
-    print(f'[加载] {filepath}')
-
-    # .xlsm 文件需保留 VBA 宏
+    # ── 打开工作簿（仅用于元信息读取 + 后续写回） ──
     is_xlsm = filepath.lower().endswith('.xlsm')
+    print(f'[加载] {filepath}')
     wb = load_workbook(filepath, keep_vba=is_xlsm)
     start_total = time.time()
 
@@ -98,10 +87,7 @@ def main():
             wb.close()
             sys.exit(1)
     else:
-        sheet_name = next(
-            (n for n in wb.sheetnames if wb[n].max_row > 1),
-            None
-        )
+        sheet_name = next((n for n in wb.sheetnames if wb[n].max_row > 1), None)
         if not sheet_name:
             print('[错误] 所有工作表均为空')
             wb.close()
@@ -112,141 +98,147 @@ def main():
     print(f'[信息] "{sheet_name}" → {ws.max_row}行 × {ws.max_column}列')
 
     # ── 查找表头行 ──
-    header_row = find_header_row(ws)
+    header_row = find_header_row(wb, sheet_name)
     if not header_row:
         print('[错误] 未找到表头行（需要包含"名称"和"Bangumi_URL"列）')
         wb.close()
         sys.exit(1)
-    print(f'[信息] 表头行: 第{header_row}行')
 
-    # ── 列映射 ──
-    col_map = get_column_map(ws, header_row)
-    print(f'[信息] 列名: {list(col_map.keys())}')
+    header_names = [str(c.value or '').strip() for c in ws[header_row]]
+    col_map = {n: i + 1 for i, n in enumerate(header_names) if n}
+    print(f'[信息] 表头行: 第{header_row}行 | 列名: {header_names}')
 
-    name_col = next((c for n, c in col_map.items() if '名称' in n), None)
-    url_col = next((c for n, c in col_map.items() if 'Bangumi_URL' in n), None)
-    tags_col = next((c for n, c in col_map.items() if '标签' in n or '分级' in n), None)
+    name_col_name, name_col_idx = pick_column(col_map, ['名称'])
+    url_col_name, url_col_idx = pick_column(col_map, ['Bangumi_URL'])
+    tags_col_name, tags_col_idx = pick_column(col_map, ['标签', '分级'])
 
-    if not name_col:
+    if not name_col_name:
         print('[错误] 未找到"名称"列')
         wb.close()
         sys.exit(1)
-    if not url_col:
+    if not url_col_name:
         print('[错误] 未找到"Bangumi_URL"列')
         wb.close()
         sys.exit(1)
 
-    print(f'[信息] 名称列 → {get_column_letter(name_col)} (列{name_col})')
-    print(f'[信息] URL列  → {get_column_letter(url_col)} (列{url_col})')
-    print(f'[信息] 标签列 → {get_column_letter(tags_col) if tags_col else "未找到"} (列{tags_col})')
+    name_col_l = get_column_letter(name_col_idx)
+    url_col_l = get_column_letter(url_col_idx)
+    tags_col_l = get_column_letter(tags_col_idx) if tags_col_idx else '-'
+    print(f'[信息] 名称列 → {name_col_l} (列{name_col_idx})')
+    print(f'[信息] URL列  → {url_col_l} (列{url_col_idx})')
+    print(f'[信息] 标签列 → {tags_col_l} (列{tags_col_idx})' if tags_col_idx else '[信息] 标签列 → 未找到')
 
-    # ── 按名称分组 ──
-    start_row = header_row + 1
-    end_row = ws.max_row
-    name_rows = defaultdict(list)
-    empty_count = 0
-    empty_rows_info = []
+    # ════════════════════════════════════════════════════════
+    #  用 pandas 读取数据
+    # ════════════════════════════════════════════════════════
+    df = pd.read_excel(
+        filepath,
+        sheet_name=sheet_name,
+        header=header_row - 1,
+        dtype=str
+    )
 
-    for r in range(start_row, end_row + 1):
-        name = col_val(ws, r, name_col)
-        if not name:
-            empty_count += 1
-            empty_rows_info.append(r)
-            continue
-        name_rows[name].append(r)
+    total_rows_before = len(df)
+    print(f'\n[Pandas] 读取完成: {total_rows_before} 行 × {len(df.columns)} 列')
 
-    total_data = end_row - start_row + 1
-    single_count = sum(1 for v in name_rows.values() if len(v) == 1)
-    multi_count = sum(1 for v in name_rows.values() if len(v) >= 2)
-    row_distribution = {}
-    for rows in name_rows.values():
-        k = len(rows)
-        row_distribution[k] = row_distribution.get(k, 0) + 1
+    # ── 过滤空名称行 ──
+    name_series = df[name_col_name].astype(str).str.strip()
+    empty_mask = (df[name_col_name].isna()) | (name_series == '')
+    empty_count = empty_mask.sum()
+    df_valid = df[~empty_mask].copy()
+    valid_count = len(df_valid)
+
+    # ── 名称分布统计（pandas 聚合） ──
+    name_counts = df_valid[name_col_name].value_counts()
+    single_count = (name_counts == 1).sum()
+    multi_count = (name_counts >= 2).sum()
+    dist_series = name_counts.value_counts().sort_index()
 
     print(f'\n{"─"*60}')
     print(f'  📊 数据扫描报告')
     print(f'{"─"*60}')
-    print(f'  数据区间:    第 {start_row}~{end_row} 行 ({total_data} 行)')
-    print(f'  有效名称:    {len(name_rows)} 个')
+    print(f'  数据区间:    第 {header_row+1}~{header_row+total_rows_before} 行 ({total_rows_before} 行)')
+    print(f'  读取列数:    {len(df.columns)} 列')
+    print(f'  有效名称:    {valid_count} 个')
     print(f'  单行名称:    {single_count} 个（无需处理）')
     print(f'  重复名称:    {multi_count} 个（待清洗）')
-    print(f'  空名称行:    {empty_count} 行（行{empty_rows_info}）' if empty_count <= 5 else
-          f'  空名称行:    {empty_count} 行')
+    print(f'  空名称行:    {empty_count} 行')
     print(f'')
     print(f'  名称分布:')
-    for k in sorted(row_distribution):
-        label = '行' if k == 1 else '行'
-        bar = '█' * min(row_distribution[k], 40)
-        print(f'    {k:>2}条/名称 → {row_distribution[k]:>4} 个 {bar}')
+    for k in dist_series.index:
+        bar = '█' * min(dist_series[k], 40)
+        print(f'    {int(k):>2}条/名称 → {int(dist_series[k]):>4} 个 {bar}')
     print(f'{"─"*60}')
 
-    # ── 处理重复 ──
+    # ════════════════════════════════════════════════════════
+    #  pandas 聚合处理重复
+    # ════════════════════════════════════════════════════════
+    url_series = df_valid[url_col_name].astype(str).str.strip()
+    has_url_mask = url_series.notna() & (url_series != '') & (url_series != 'nan')
+    df_valid.loc[:, '_has_url'] = has_url_mask
+
+    grouped = df_valid.groupby(name_col_name, sort=False)
+    duplicate_count = 0
     to_delete = []
     merged_groups = 0
-    duplicate_count = 0
-    duplicate_details = []
     skipped_no_url = []
+    duplicate_details = []
     merged_tag_log = []
     delete_tag_log = []
-    processing_log = []
 
-    for name, rows in name_rows.items():
-        if len(rows) <= 1:
+    for name, group in grouped:
+        if len(group) <= 1:
             continue
 
-        with_url = [r for r in rows if col_val(ws, r, url_col)]
-        without_url = [r for r in rows if not col_val(ws, r, url_col)]
+        with_url = group[group['_has_url']]
+        without_url = group[~group['_has_url']]
 
-        if not with_url:
+        if len(with_url) == 0:
             skipped_no_url.append(name)
             continue
 
         duplicate_count += 1
-        keep_row = with_url[0]
-        duplicate_details.append((name, with_url, without_url))
+        keep_idx = with_url.index[0]
+        keep_row_num = header_row + 1 + keep_idx
+        del_row_nums = [header_row + 1 + i for i in without_url.index]
 
-        name_entry = {
+        duplicate_details.append({
             'name': name,
-            'total': len(rows),
+            'total': len(group),
             'with_url_count': len(with_url),
             'without_url_count': len(without_url),
-            'keep_row': keep_row,
-            'other_url_rows': with_url[1:] if len(with_url) > 1 else [],
-            'delete_rows': without_url,
-            'merged_tags': [],
-            'existing_tags_before': '',
-            'existing_tags_after': '',
-        }
+            'keep_row': keep_row_num,
+            'other_url_rows': [header_row + 1 + i for i in with_url.index[1:]],
+            'delete_rows': del_row_nums,
+        })
 
-        new_tags = []
-        if tags_col and without_url:
-            before = col_val(ws, keep_row, tags_col)
-            existing = parse_tags(before)
-            name_entry['existing_tags_before'] = before or '（空）'
+        # ── 标签合并（pandas 聚合） ──
+        if tags_col_name and len(without_url) > 0:
+            before_tags = str(with_url.iloc[0].get(tags_col_name, '') or '')
+            existing = parse_tags(before_tags)
+            new_tags = []
 
-            for dr in without_url:
-                dt = col_val(ws, dr, tags_col)
-                if dt:
-                    delete_tag_log.append(f'    行{dr} 标签 → "{dt}"')
-                for t in parse_tags(dt):
+            for _, del_row in without_url.iterrows():
+                del_tags = str(del_row.get(tags_col_name, '') or '')
+                if del_tags and del_tags != 'nan':
+                    delete_tag_log.append(f'    行{header_row + 1 + del_row.name} 标签 → "{del_tags}"')
+                for t in parse_tags(del_tags):
                     if t not in existing:
                         new_tags.append(t)
                         existing.add(t)
+
             if new_tags:
                 after = ' | '.join(sorted(existing))
-                set_col_val(ws, keep_row, tags_col, after)
-                name_entry['merged_tags'] = new_tags
-                name_entry['existing_tags_after'] = after
+                # 写回 openpyxl
+                set_cell = ws.cell(row=keep_row_num, column=tags_col_idx)
+                set_cell.value = after
                 merged_groups += 1
-                merged_tag_log.append(f'  "{name}" (保留行{keep_row})')
-                merged_tag_log.append(f'    原始标签: {name_entry["existing_tags_before"]}')
+                merged_tag_log.append(f'  "{name}" (保留行{keep_row_num})')
+                merged_tag_log.append(f'    原始标签: {before_tags or "（空）"}')
                 merged_tag_log.append(f'    新增标签: {new_tags}')
                 merged_tag_log.append(f'    合并结果: {after}')
 
-        for del_row in without_url:
-            to_delete.append(del_row)
-
-        processing_log.append(name_entry)
+        to_delete.extend(del_row_nums)
 
     # ── 输出聚合处理报告 ──
     print(f'\n{"━"*60}')
@@ -257,21 +249,18 @@ def main():
     print(f'  标签合并:    {merged_groups} 个名称组')
 
     if duplicate_details:
-        print(f'')
-        for idx, (name, wu, wou) in enumerate(duplicate_details, 1):
-            keep_row = wu[0]
-            other_url = wu[1:] if len(wu) > 1 else []
-            print(f'  [{idx}] "{name}"')
-            print(f'       总 {len(wu)+len(wou)} 行 │ 保留行{keep_row} (含URL)')
-            if other_url:
-                print(f'       另含URL行: {other_url}（保留）')
-            print(f'       待删除 {len(wou)} 行(无URL): 行{wou}')
+        print('')
+        for idx, d in enumerate(duplicate_details, 1):
+            print(f'  [{idx}] "{d["name"]}"')
+            print(f'       总 {d["total"]} 行 │ 保留行{d["keep_row"]} (含URL)')
+            if d['other_url_rows']:
+                print(f'       另含URL行: {d["other_url_rows"]}（保留）')
+            print(f'       待删除 {d["without_url_count"]} 行(无URL): 行{d["delete_rows"]}')
 
     if skipped_no_url:
         print(f'\n  ⚠️  跳过(全无URL):')
         for n in skipped_no_url:
-            total = len(name_rows[n])
-            print(f'      "{n}" ({total} 行，均无 Bangumi_URL)')
+            print(f'      "{n}" ({name_counts[n]} 行，均无 Bangumi_URL)')
 
     if delete_tag_log:
         print(f'\n  🏷️  被删除行的标签内容:')
@@ -288,27 +277,22 @@ def main():
         print(f'  ✅ 无需清洗')
         print(f'{"─"*60}')
         wb.close()
-        td = time.time() - start_total
-        print(f'\n  ⏱️  耗时: {td:.2f}s')
+        print(f'\n  ⏱️  耗时: {time.time() - start_total:.2f}s')
         return
 
-    # ── 从后往前删除行（避免行号偏移） ──
+    # ── 从后往前删除行（合并连续范围） ──
     print(f'\n{"━"*60}')
     print(f'  🗑️  删除执行')
     print(f'{"━"*60}')
     to_delete.sort(reverse=True)
-    print(f'  删除顺序（从后往前）:')
-    # 合并连续行显示
+    print('  删除顺序（从后往前）:')
     ranges = []
     i = 0
     while i < len(to_delete):
         j = i
         while j + 1 < len(to_delete) and to_delete[j] - to_delete[j + 1] == 1:
             j += 1
-        if i == j:
-            ranges.append(str(to_delete[i]))
-        else:
-            ranges.append(f'{to_delete[j]}~{to_delete[i]}')
+        ranges.append(str(to_delete[i]) if i == j else f'{to_delete[j]}~{to_delete[i]}')
         i = j + 1
     print(f'    {", ".join(ranges)}')
     print(f'  共 {len(ranges)} 个范围 / {len(to_delete)} 行')
@@ -319,7 +303,6 @@ def main():
         del_count += 1
         if del_count % 500 == 0:
             print(f'  ...进度: 已删除 {del_count}/{len(to_delete)} 行')
-
     print(f'  ✅ 删除完成: 共删除 {del_count} 行')
 
     # ── 保存 ──
@@ -332,13 +315,29 @@ def main():
     wb.close()
     print(f'  备份: {backup_path}')
 
-    # ── 最终汇总 ──
+    # ── 最终汇总（pandas 聚合统计） ──
     print(f'\n{"═"*60}')
     print(f'  ✅ 清洗完成！')
     print(f'{"═"*60}')
     print(f'  删除无URL重复行:  {del_count} 行')
     print(f'  合并标签:         {merged_groups} 个名称组')
     print(f'  耗时:             {elapsed:.2f}s')
+    print(f'{"═"*60}')
+
+    # ── 最终数据快照（pandas 再读确认） ──
+    df_after = pd.read_excel(filepath, sheet_name=sheet_name, header=header_row - 1, dtype=str)
+    print(f'\n  📋 最终快照:')
+    print(f'  写入后总行数:  {len(df_after)} 行')
+    after_names = df_after[name_col_name].astype(str).str.strip()
+    after_valid = after_names[after_names.notna() & (after_names != '') & (after_names != 'nan')]
+    after_name_counts = after_valid.value_counts()
+    after_multi = (after_name_counts >= 2).sum()
+    print(f'  有效名称数:    {len(after_name_counts)} 个')
+    print(f'  剩余重复名称:  {after_multi} 个')
+    if after_multi == 0:
+        print(f'  ✅ 已无重复名称')
+    elif after_multi > 0:
+        print(f'  ⚠️  仍有 {after_multi} 个名称含多条（可能均有 URL，无需删除）')
     print(f'{"═"*60}')
 
 
