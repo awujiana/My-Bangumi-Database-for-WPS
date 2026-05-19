@@ -3,7 +3,7 @@
  * @module ui/handlers
  * @description 面板操作处理、按钮绑定、业务对话框
  */
-import { LOG_LEVELS, bgmLog, BGM, loadBgToken, storeBgToken, clearBgToken, _getBgmUserId, _setBgmUserId, _getBgmUsername, _setBgmUsername, getApp, getCell, trim, fetchBgmUserInfo, BGM_COLOR, showAlert, showConfirm, showError, showSuccess, showInput, showToast, setStatus, verifyToken, fetchAllUserCollections, findHeaderRow, getColumnMap, getLastRow, extractSubjectId, getDataSheet, SyncToBangumiAsync, testSingleUpdate, getOrCreateSyncRecordSheet, getAllSyncRecords, addSyncRecord, openSyncRecordSheet, deduplicateSyncRecords, formatSyncRecordSheet, previewSyncContent, refreshData, refreshSheets, toggleSheetLock, clearSyncRecords, closeDetailModal, getIncrementalSync, setIncrementalSync, getSkipConflicts, setSkipConflicts, COLLECTION_TYPE_NAMES, } from '../index.js';
+import { LOG_LEVELS, bgmLog, BGM, loadBgToken, storeBgToken, clearBgToken, _getBgmUserId, _setBgmUserId, _getBgmUsername, _setBgmUsername, getApp, getCell, trim, getCellValue, setCellValue, fetchBgmUserInfo, BGM_COLOR, showAlert, showConfirm, showError, showSuccess, showInput, showToast, setStatus, verifyToken, fetchAllUserCollections, findHeaderRow, getColumnMap, getLastRow, extractSubjectId, getDataSheet, SyncToBangumiAsync, testSingleUpdate, getOrCreateSyncRecordSheet, getAllSyncRecords, addSyncRecord, openSyncRecordSheet, deduplicateSyncRecords, formatSyncRecordSheet, previewSyncContent, refreshData, refreshSheets, toggleSheetLock, clearSyncRecords, closeDetailModal, getIncrementalSync, setIncrementalSync, getSkipConflicts, setSkipConflicts, COLLECTION_TYPE_NAMES, } from '../index.js';
 import { BGM_EVENTS, eventBus } from '../tools/events.js';
 //  
 import { getSyncPreview, detectConflicts } from '../services/ribbonService.js';
@@ -914,6 +914,11 @@ function handleActionClick(event) {
             showToast('格式设置完成', 'success');
             bgmLog(LOG_LEVELS.INFO, `[handleActionClick] 同步记录表格式设置已触发，耗时: ${Date.now() - startTime}ms`);
             break;
+        case 'cleanLockedDataSheet':
+            bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 开始清洗锁定数据表');
+            cleanLockedDataSheet();
+            bgmLog(LOG_LEVELS.INFO, `[handleActionClick] 数据清洗完成，耗时: ${Date.now() - startTime}ms`);
+            break;
         case 'markUploadedItems':
             bgmLog(LOG_LEVELS.INFO, `[handleActionClick] 标记已上传项目，类型: ${args[0] || '全部'}`);
             markUploadedItems(args[0]);
@@ -1215,6 +1220,124 @@ function initSkipConflictsFromRibbon() {
             }
         });
     }
+}
+function cleanLockedDataSheet() {
+    const startTime = Date.now();
+    bgmLog(LOG_LEVELS.INFO, '[cleanLockedDataSheet] ======== 开始清洗锁定数据表 ========');
+    const app = getApp();
+    if (!app?.ActiveWorkbook) {
+        bgmLog(LOG_LEVELS.WARN, '[cleanLockedDataSheet] 无法获取工作簿，终止');
+        showToast('无法获取工作簿', 'error');
+        return;
+    }
+    if (!BGM.sheet.isLocked || !BGM.sheet.lockedIndex) {
+        bgmLog(LOG_LEVELS.WARN, '[cleanLockedDataSheet] 未锁定数据表，终止');
+        showToast('请先锁定数据表', 'warn');
+        return;
+    }
+    const wb = app.ActiveWorkbook;
+    const ws = wb.Sheets.Item(BGM.sheet.lockedIndex);
+    const sheetName = ws.Name || '未知';
+    bgmLog(LOG_LEVELS.INFO, `[cleanLockedDataSheet] 锁定工作表: "${sheetName}" (索引: ${BGM.sheet.lockedIndex})`);
+    const headerRow = findHeaderRow(ws);
+    if (!headerRow) {
+        bgmLog(LOG_LEVELS.ERROR, '[cleanLockedDataSheet] 未找到表头行，终止');
+        showToast('未找到表头行', 'error');
+        return;
+    }
+    bgmLog(LOG_LEVELS.INFO, `[cleanLockedDataSheet] 表头行检测完成: headerRow=${headerRow}`);
+    const colMap = getColumnMap(ws, headerRow);
+    const nameCol = colMap.get('名称');
+    const urlCol = colMap.get('Bangumi_URL');
+    const tagsCol = colMap.get('标签/分级');
+    bgmLog(LOG_LEVELS.INFO, `[cleanLockedDataSheet] 列映射: 名称列=${nameCol}, Bangumi_URL列=${urlCol}, 标签/分级列=${tagsCol}`);
+    if (!nameCol) {
+        bgmLog(LOG_LEVELS.ERROR, '[cleanLockedDataSheet] 未找到"名称"列，终止');
+        showToast('未找到"名称"列', 'error');
+        return;
+    }
+    if (!urlCol) {
+        bgmLog(LOG_LEVELS.ERROR, '[cleanLockedDataSheet] 未找到"Bangumi_URL"列，终止');
+        showToast('未找到"Bangumi_URL"列', 'error');
+        return;
+    }
+    const lastRow = getLastRow(ws);
+    bgmLog(LOG_LEVELS.INFO, `[cleanLockedDataSheet] 数据区间: headerRow=${headerRow}, lastRow=${lastRow}, 数据行数=${lastRow - headerRow}`);
+    const nameRows = new Map();
+    let emptyNameCount = 0;
+    for (let row = headerRow + 1; row <= lastRow; row++) {
+        const name = String(getCellValue(ws, row, nameCol) || '').trim();
+        if (!name) {
+            emptyNameCount++;
+            continue;
+        }
+        const rows = nameRows.get(name) || [];
+        rows.push(row);
+        nameRows.set(name, rows);
+    }
+    bgmLog(LOG_LEVELS.INFO, `[cleanLockedDataSheet] 名称扫描完成: 有效名称=${nameRows.size}个, 空名称行=${emptyNameCount}行`);
+    const toDelete = [];
+    let mergedTagsCount = 0;
+    let duplicateNameCount = 0;
+    for (const [name, rows] of nameRows) {
+        if (rows.length <= 1)
+            continue;
+        duplicateNameCount++;
+        bgmLog(LOG_LEVELS.INFO, `[cleanLockedDataSheet] 发现重复名称 "${name}": 位于行 ${rows.join(', ')}`);
+        const withUrl = [];
+        const withoutUrl = [];
+        for (const row of rows) {
+            const url = String(getCellValue(ws, row, urlCol) || '').trim();
+            (url ? withUrl : withoutUrl).push(row);
+        }
+        if (withUrl.length === 0) {
+            bgmLog(LOG_LEVELS.INFO, `[cleanLockedDataSheet]   名称 "${name}" 的所有行均无 Bangumi_URL，跳过`);
+            continue;
+        }
+        const keepRow = withUrl[0];
+        bgmLog(LOG_LEVELS.INFO, `[cleanLockedDataSheet]   保留行: ${keepRow} (有URL), 删除行: ${withoutUrl.join(', ')} (无URL)`);
+        if (withUrl.length > 1) {
+            bgmLog(LOG_LEVELS.WARN, `[cleanLockedDataSheet]   名称 "${name}" 有 ${withUrl.length} 条含URL的行，仅保留第1条(行${keepRow})`);
+        }
+        for (const delRow of withoutUrl) {
+            if (tagsCol) {
+                const delTags = String(getCellValue(ws, delRow, tagsCol) || '').trim();
+                if (delTags) {
+                    const existingTags = String(getCellValue(ws, keepRow, tagsCol) || '').trim();
+                    bgmLog(LOG_LEVELS.INFO, `[cleanLockedDataSheet]   合并标签: 行${delRow} -> 行${keepRow}，标签: "${delTags}"`);
+                    const tagSet = new Set();
+                    for (const t of existingTags.split(/\s*\|\s*/)) {
+                        const trimmed = t.trim();
+                        if (trimmed)
+                            tagSet.add(trimmed);
+                    }
+                    for (const t of delTags.split(/\s*\|\s*/)) {
+                        const trimmed = t.trim();
+                        if (trimmed)
+                            tagSet.add(trimmed);
+                    }
+                    const mergedTags = [...tagSet].join(' | ');
+                    setCellValue(ws, keepRow, tagsCol, mergedTags);
+                    mergedTagsCount++;
+                    bgmLog(LOG_LEVELS.INFO, `[cleanLockedDataSheet]   合并后标签: "${mergedTags}"`);
+                }
+            }
+            toDelete.push(delRow);
+        }
+    }
+    bgmLog(LOG_LEVELS.INFO, `[cleanLockedDataSheet] 统计: 重复名称=${duplicateNameCount}个, 待删除行=${toDelete.length}, 合并标签行=${mergedTagsCount}`);
+    if (toDelete.length === 0) {
+        bgmLog(LOG_LEVELS.INFO, `[cleanLockedDataSheet] 未发现需清洗的重复数据，耗时: ${Date.now() - startTime}ms`);
+        showToast('未发现需清洗的重复数据', 'info');
+        return;
+    }
+    toDelete.sort((a, b) => b - a);
+    bgmLog(LOG_LEVELS.INFO, `[cleanLockedDataSheet] 开始删除行 (从后往前): ${toDelete.join(', ')}`);
+    for (const row of toDelete) {
+        ws.Range(`${row}:${row}`).Delete();
+    }
+    bgmLog(LOG_LEVELS.INFO, `[cleanLockedDataSheet] ======== 清洗完成: 删除 ${toDelete.length} 行${tagsCol ? `，合并 ${mergedTagsCount} 行标签` : ''}，耗时: ${Date.now() - startTime}ms ========`);
+    showToast(`清洗完成：删除 ${toDelete.length} 行${tagsCol ? `，合并 ${mergedTagsCount} 行标签` : ''}`, 'success');
 }
 // 监听模块初始化完成事件
 if (typeof document !== 'undefined') {

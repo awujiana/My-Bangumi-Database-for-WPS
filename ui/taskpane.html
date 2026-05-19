@@ -111,13 +111,14 @@
             </div>
             <div class="form-group">
                 <label>选择工作表：</label>
+                <select id="sheetSelect" class="input" style="flex:1;">
+                    <option value="">-- 请选择 --</option>
+                </select>
                 <div class="sheet-select-row">
-                    <select id="sheetSelect" class="input" style="flex:1;">
-                        <option value="">-- 请选择 --</option>
-                    </select>
                     <button class="btn small" data-action="refreshSheets">🔄 刷新</button>
                     <button class="btn small" id="lockSheetBtn" data-action="toggleSheetLock">🔒 锁定</button>
                     <span id="lockStatus" class="lock-status" style="display:none;"></span>
+                    <button class="btn small" data-action="cleanLockedDataSheet" title="去除无 Bangumi URL 的重复行，合并标签/分级">🧹 数据清洗</button>
                 </div>
             </div>
             <div id="manualRangeInputs" style="display:none;">

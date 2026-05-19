@@ -176,8 +176,8 @@ export const PANEL_CONFIG = {
     MAX_SCAN_COLUMNS: 60,
     /** 表头检测的最大行数 */
     MAX_SCAN_ROWS: 10,
-    /** 预览显示的数据行数上限 */
-    PREVIEW_LIMIT: 8,
+    /** 预览显示的数据行数上限（9999 ≈ 全部显示） */
+    PREVIEW_LIMIT: 9999,
     /** 筛选检测最大行数 */
     MAX_FILTER_SCAN_ROWS: 5000,
     /** 回退检测的最大行数 */
@@ -227,12 +227,16 @@ export const SYNC_STATUS = {
 /**
  * 列规则配置
  * 定义各列的数据验证和转换规则
+ * 每个元素为 [正则表达式, 标准字段名] 的元组
+ * 用于将Excel表头文本自动映射到标准字段名
  *
  * @constant
- * @type {Array<Object>}
+ * @type {Array<[RegExp, string]>}
+ *
+ * @example
+ * // 表头为 "Bangumi URL" → 映射到 "Bangumi_URL"
+ * // 表头为 "名称/标题" → 映射到 "名称"
  */
-
-// ✅ COLUMN_RULES 必须是数组（元素为 [正则, 映射名] 元组）
 export const COLUMN_RULES: [RegExp, string][] = [
     [/bangumi.*url|bgm.*url|subject.*url|url.*bgm/i, "Bangumi_URL"],
     [/是否看完|观看状态/, "是否看完"],
@@ -259,33 +263,45 @@ export const COLUMN_RULES: [RegExp, string][] = [
     [/制片国家/, "制片国家"],
     [/语言/, "语言"]
 ];
+
 /**
- * 列索引常量
- * 定义标准列对应的索引位置
+ * 列索引常量（模板默认列位置）
+ * 基于 Bangumi 数据模板的固定列约定
  *
  * @constant
  * @type {Object}
+ *
+ * @property {number} SEQUENCE - 序列号（第9列, I列）
+ * @property {number} DEFAULT_START - 默认起始列
+ * @property {number} NAME - 名称列（第1列, A列）
+ * @property {number} URL - Bangumi URL列（第2列, B列）
+ * @property {number} STATUS - 状态列（第3列, C列）
+ *
+ * @description
+ * 注意：实际运行时列位置由 getColumnMap() 动态匹配表头决定，
+ * 这里的固定索引仅作为模板默认值和新表创建时的参考。
  */
-
 export const COLUMNS = {
-  /** 序列号列 */
-    SEQUENCE: 9,      // I列 - 序号
+    /** 序列号列 - 第9列（I列），用于排序和行标识 */
+    SEQUENCE: 9,
     DEFAULT_START: 1,
-    // 如果需要 NAME, URL, STATUS 也可以保留
-     /** 名称列 */
+    /** 名称列 - 第1列（A列），条目名称 */
     NAME: 1,
-     /** URL列 */
+    /** URL列 - 第2列（B列），Bangumi 主题页链接 */
     URL: 2,
-      /** 状态列 */
+    /** 状态列 - 第3列（C列），观看/阅读状态 */
     STATUS: 3
 };
 
 /**
  * 表头关键字列表
  * 用于自动识别Excel表格中的表头行
+ * 当某行匹配到至少3个关键字时，判定为表头行
  *
  * @constant
  * @type {string[]}
+ *
+ * @see findHeaderRow - 在 util.ts 中使用此列表进行表头检测
  */
 export const HEADER_KEYWORDS = [
     "序列号", "是否看完", "看完时间", "开播季度",
@@ -302,7 +318,8 @@ export const HEADER_KEYWORDS = [
 
 /**
  * 重要列配置
- * 标记哪些列属于重要列，在预览时会高亮显示
+ * 标记哪些列在数据预览中需要高亮显示
+ * 键为标准字段名，值为布尔标记
  *
  * @constant
  * @type {Record<string, boolean>}
@@ -325,14 +342,17 @@ export const IMPORTANT_COLS: Record<string, boolean> = {
     "评价": true
 };
 
-
-
 /**
  * 字段名称映射表
- * 将各种可能的列名映射到标准字段名
+ * 将各种可能的Excel列名映射到统一的标准字段名
+ * 用于同步引擎统一处理不同模板格式的列名差异
  *
  * @constant
  * @type {Record<string, string>}
+ *
+ * @example
+ * // 表头"作品名" → 映射到 "name"
+ * // 表头"评分" → 映射到 "rate"
  */
 export const FIELD_NAME_MAP: Record<string, string> = {
     "名称": "name", "name": "name", "作品名": "name",
@@ -356,10 +376,15 @@ export const FIELD_NAME_MAP: Record<string, string> = {
 
 /**
  * URL匹配模式
- * 用于从各种格式的URL中提取Bangumi Subject ID
+ * 用于从URL文本中提取 Bangumi Subject ID
+ * 支持 bgm.tv / bangumi.tv / chii.in 三种域名格式
  *
  * @constant
  * @type {RegExp[]}
+ *
+ * @example
+ * // "https://bgm.tv/subject/72941" → 提取出 "72941"
+ * // "https://chii.in/subject/12345" → 提取出 "12345"
  */
 export const URL_PATTERNS = [
     /bgm\.tv\/subject\/(\d+)/i,
@@ -369,62 +394,77 @@ export const URL_PATTERNS = [
 
 /**
  * Token加密配置
- * 定义Token加密和解密的相关参数
+ * 定义Bangumi API Token的加密/解密相关参数
+ * 使用 XOR 简单加密方式存储在 WPS PluginStorage 中
  *
  * @constant
  * @type {Object}
  */
 export const TOKEN_CONFIG = {
-    /** Token版本标识 */
+    /** Token版本标识，写入存储时附带用于版本识别 */
     VERSION: "1",
-    /** XOR加密密钥 */
+    /** XOR加密密钥，用于混淆存储的Token */
     XOR_KEY: "bgmtoken_secret_key_2024"
 };
 
-
-/**
- * 观看状态文本到数值的反向映射（用于快速精确匹配）
- * 键：常见状态文本（小写），值：Bangumi 状态码 (1-5)
- */
 /**
  * 观看状态文本到数值的映射表
- * 用于将用户友好的状态文本转换为Bangumi API所需数值
+ * 用于将用户可读的状态文本转换为 Bangumi API 需要的数值
  *
  * @constant
  * @type {Record<string, number>}
+ *
  * @description
- * BGM API v0 状态码：
- * - 1: wish (想看)
- * - 2: collect (在看)
- * - 3: do (看过)
- * - 4: on_hold (搁置)
- * - 5: dropped (抛弃)
+ * BGM API v0 状态码定义：
+ * - 1: wish（想看）
+ * - 2: collect（看过/看完）
+ * - 3: do（在看）
+ * - 4: on_hold（搁置/暂停）
+ * - 5: dropped（抛弃/弃番）
+ *
+ * @example
+ * // WATCH_STATUS_MAP["想看"] → 1
+ * // WATCH_STATUS_MAP["看过"] → 2
+ * // WATCH_STATUS_MAP["完成"] → 2（"完"的反向也是2）
+ * // WATCH_STATUS_MAP["在看"] → 3
+ * // WATCH_STATUS_MAP["搁置"] → 4
+ * // WATCH_STATUS_MAP["抛弃"] → 5
  */
 export const WATCH_STATUS_MAP: Record<string, number> = {
-    // 想看 (1)
+    /** 想看 (1) - 包含"否"和"false"是因为在Excel模板中"是否看完"为"否" */
     "想看": 1, "想看动画": 1, "否": 1, "wish": 1, "1": 1, "false": 1,
-    // 看过 (2)
+    /** 看过 (2) - 包含"是"和"true"是"是否看完"列的肯定标记 */
     "看过": 2, "看完": 2, "已看": 2, "完": 2, "completed": 2, "2": 2, "是": 2, "true": 2,
-    // 在看 (3)
+    /** 在看 (3) */
     "在看": 3, "看动画": 3, "在看动画": 3, "在追": 3, "追": 3, "watching": 3, "3": 3,
-    // 搁置 (4)
+    /** 搁置 (4) */
     "搁置": 4, "暂停": 4, "停": 4, "on_hold": 4, "4": 4,
-    // 抛弃 (5)
+    /** 抛弃 (5) */
     "抛弃": 5, "弃": 5, "弃番": 5, "drop": 5, "dropped": 5, "5": 5,
 };
 
 /**
- * BGM API 收藏状态名称映射（下标即 API 数值）
+ * Bangumi API 收藏状态名称映射（下标即 API 数值）
+ * 空字符串占位索引0（API无此数值）
  * 1=想看, 2=在看, 3=看过, 4=搁置, 5=抛弃
  *
  * @constant
  * @type {string[]}
+ *
+ * @description
+ * 与 WATCH_STATUS_MAP 互补：
+ * - WATCH_STATUS_MAP: 文本 → 数值（以文本查数值）
+ * - COLLECTION_TYPE_NAMES: 数值 → 文本（数组下标即数值）
+ *
+ * @example
+ * // COLLECTION_TYPE_NAMES[1] → "想看"
+ * // COLLECTION_TYPE_NAMES[3] → "看过"
  */
 export const COLLECTION_TYPE_NAMES: string[] = ['', '想看', '在看', '看过', '搁置', '抛弃'];
 
-
 /**
  * 同步记录工作表名称
+ * 在工作簿中创建"同步记录"工作表来存储同步操作的历史记录
  *
  * @constant
  * @type {string}
@@ -432,7 +472,10 @@ export const COLLECTION_TYPE_NAMES: string[] = ['', '想看', '在看', '看过'
 export const SYNC_RECORD_SHEET_NAME = '同步记录';
 
 /**
- * 同步记录列配置
+ * 同步记录表列名定义
+ * 按顺序排列的11列：
+ * SID(1) → 同步时间(2) → 名称(3) → URL(4) → 条目类型(5)
+ * → 次数(6) → 内容(7) → 状态(8) → 收藏状态(9) → 备注(10) → 数据指纹(11)
  *
  * @constant
  * @type {string[]}
@@ -443,10 +486,23 @@ export const SYNC_RECORD_COLUMNS = [
 ];
 
 /**
- * 同步记录表列索引常量 (1-based)
+ * 同步记录表列索引常量（1-based，与Excel列号一致）
+ * 方便代码按名称引用列号，避免硬编码数字
  *
  * @constant
  * @type {Object}
+ *
+ * @property {number} SID - Bangumi Subject ID，条目唯一标识
+ * @property {number} TIME - 同步发生的时间
+ * @property {number} NAME - 条目名称（中文名/日文名）
+ * @property {number} URL - Bangumi 条目页面链接
+ * @property {number} TYPE - 条目类型（动画/书籍/游戏等）
+ * @property {number} COUNT - 同步次数累计
+ * @property {number} CONTENT - 同步内容描述（如"标记同步"）
+ * @property {number} STATUS - 同步结果状态（成功/失败/跳过）
+ * @property {number} COLL_TYPE - Bangumi收藏状态（想看/在看/看过等）
+ * @property {number} MESSAGE - 备注信息或错误详情
+ * @property {number} FINGERPRINT - 数据指纹，用于增量同步检测变更
  */
 export const SYNC_RECORD_COL = {
     SID: 1,
@@ -464,6 +520,8 @@ export const SYNC_RECORD_COL = {
 
 /**
  * 同步记录类型颜色映射表
+ * 根据收藏状态（想看/在看/看过/搁置/抛弃）显示对应颜色
+ * 用于在同步记录表中直观区分不同的收藏状态
  *
  * @constant
  * @type {Record<string, number>}
