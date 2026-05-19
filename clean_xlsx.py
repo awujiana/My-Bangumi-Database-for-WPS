@@ -9,7 +9,7 @@
 
 用法：
   python clean_xlsx.py <文件路径> [工作表名称]
-
+    python clean_xlsx.py "D:\编程\BGMAPI-VBA\测试.xlsm" "剧集和小说"  
 示例：
   python clean_xlsx.py "C:\数据.xlsx" "动画"
   python clean_xlsx.py "C:\数据.xlsm" "动画"    # 也支持 xlsm，自动保留宏
