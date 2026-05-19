@@ -1390,12 +1390,12 @@ function cleanLockedDataSheet(): void {
     const toDelete: number[] = [];
     let mergedTagsCount = 0;
     let duplicateNameCount = 0;
-    const mergedTagEntries: string[] = [];   // 收集实际的合并标签摘要
+    const mergedTagEntries: string[] = [];
+    const duplicateDetails: { name: string; rows: number[]; keep: number[]; del: number[] }[] = [];
+    const skippedNoUrl: string[] = [];
 
     for (const [name, rows] of nameRows) {
         if (rows.length <= 1) continue;
-        duplicateNameCount++;
-        bgmLog(LOG_LEVELS.INFO, `[cleanLockedDataSheet] 发现重复名称 "${name}": 位于行 ${rows.join(', ')}`);
 
         const withUrl: number[] = [];
         const withoutUrl: number[] = [];
@@ -1405,13 +1405,13 @@ function cleanLockedDataSheet(): void {
         }
 
         if (withUrl.length === 0) {
-            bgmLog(LOG_LEVELS.INFO, `[cleanLockedDataSheet]   名称 "${name}" 的所有行均无 Bangumi_URL，跳过`);
+            skippedNoUrl.push(name);
             continue;
         }
 
-        // 保留所有有URL的行，仅删除无URL的重复行
+        duplicateNameCount++;
         const keepRow = withUrl[0];
-        bgmLog(LOG_LEVELS.INFO, `[cleanLockedDataSheet]   保留 ${withUrl.length} 条含URL的行: ${withUrl.join(', ')}, 删除 ${withoutUrl.length} 条无URL的行: ${withoutUrl.join(', ')}`);
+        duplicateDetails.push({ name, rows, keep: withUrl, del: withoutUrl });
 
         const nameNewTags: string[] = [];
 
@@ -1436,7 +1436,6 @@ function cleanLockedDataSheet(): void {
                         setCellValue(ws, keepRow, tagsCol, mergedTags);
                         mergedTagsCount++;
                         nameNewTags.push(...newTags);
-                        bgmLog(LOG_LEVELS.INFO, `[cleanLockedDataSheet]   合并标签: 行${delRow} -> 行${keepRow}，新增: "${newTags.join(' | ')}"`);
                     }
                 }
             }
@@ -1449,6 +1448,17 @@ function cleanLockedDataSheet(): void {
     }
 
     bgmLog(LOG_LEVELS.INFO, `[cleanLockedDataSheet] 统计: 重复名称=${duplicateNameCount}个, 待删除行=${toDelete.length}, 合并标签行=${mergedTagsCount}`);
+
+    // 聚合输出重复名称详情
+    if (duplicateDetails.length > 0) {
+        const lines = duplicateDetails.map(d =>
+            `  "${d.name}": ${d.keep.length}条含URL(行${d.keep.join(',')}), ${d.del.length}条无URL(行${d.del.join(',')})`
+        );
+        bgmLog(LOG_LEVELS.INFO, `[cleanLockedDataSheet] 重复名称详情:\n${lines.join('\n')}`);
+    }
+    if (skippedNoUrl.length > 0) {
+        bgmLog(LOG_LEVELS.INFO, `[cleanLockedDataSheet] 因全无URL而跳过的名称: ${skippedNoUrl.join(', ')}`);
+    }
 
     if (toDelete.length === 0) {
         bgmLog(LOG_LEVELS.INFO, `[cleanLockedDataSheet] 未发现需清洗的重复数据，耗时: ${Date.now() - startTime}ms`);
