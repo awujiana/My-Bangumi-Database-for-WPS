@@ -9,7 +9,7 @@
 
 用法：
   python clean_xlsx.py <文件路径> [工作表名称]
-    python clean_xlsx.py "D:\编程\BGMAPI-VBA\测试.xlsm" "剧集和小说"  
+
 示例：
   python clean_xlsx.py "C:\数据.xlsx" "动画"
   python clean_xlsx.py "C:\数据.xlsm" "动画"    # 也支持 xlsm，自动保留宏
@@ -27,13 +27,13 @@ from openpyxl import load_workbook
 from openpyxl.utils import get_column_letter
 
 
-def find_header_row(wb, sheet_name, max_search=20):
-    """用 pandas 扫描前 N 行，找到同时包含"名称"和"Bangumi_URL"的表头行"""
+def find_header_row(wb, sheet_name, max_search=50):
+    """搜索前 max_search 行，找到同时包含"名称"和"Bangumi_URL"的表头行"""
     ws = wb[sheet_name]
     for row in ws.iter_rows(min_row=1, max_row=max_search, max_col=ws.max_column):
         values = [str(c.value or '').strip() for c in row]
         has_name = any('名称' in v for v in values)
-        has_url = any('Bangumi_URL' in v for v in values)
+        has_url = any('Bangumi_URL' in v or v == 'URL' or v == 'BGM_URL' for v in values)
         if has_name and has_url:
             return row[0].row
     return None
@@ -100,7 +100,15 @@ def main():
     # ── 查找表头行 ──
     header_row = find_header_row(wb, sheet_name)
     if not header_row:
-        print('[错误] 未找到表头行（需要包含"名称"和"Bangumi_URL"列）')
+        print('[错误] 在前50行中未找到表头行')
+        print('       需要包含"名称"和"Bangumi_URL"列')
+        print('')
+        # 输出前5行列名帮助调试
+        for r in range(1, min(6, ws.max_row + 1)):
+            vals = [str(c.value or '').strip() for c in ws[r]]
+            non_empty = [v for v in vals if v]
+            if non_empty:
+                print(f'       行{r}: {vals}')
         wb.close()
         sys.exit(1)
 
@@ -109,7 +117,7 @@ def main():
     print(f'[信息] 表头行: 第{header_row}行 | 列名: {header_names}')
 
     name_col_name, name_col_idx = pick_column(col_map, ['名称'])
-    url_col_name, url_col_idx = pick_column(col_map, ['Bangumi_URL'])
+    url_col_name, url_col_idx = pick_column(col_map, ['Bangumi_URL', 'URL', 'BGM_URL'])
     tags_col_name, tags_col_idx = pick_column(col_map, ['标签', '分级'])
 
     if not name_col_name:
