@@ -1390,6 +1390,7 @@ function cleanLockedDataSheet(): void {
     const toDelete: number[] = [];
     let mergedTagsCount = 0;
     let duplicateNameCount = 0;
+    const mergedTagEntries: string[] = [];   // 收集实际的合并标签摘要
 
     for (const [name, rows] of nameRows) {
         if (rows.length <= 1) continue;
@@ -1408,35 +1409,42 @@ function cleanLockedDataSheet(): void {
             continue;
         }
 
+        // 保留所有有URL的行，仅删除无URL的重复行
         const keepRow = withUrl[0];
-        bgmLog(LOG_LEVELS.INFO, `[cleanLockedDataSheet]   保留行: ${keepRow} (有URL), 删除行: ${withoutUrl.join(', ')} (无URL)`);
+        bgmLog(LOG_LEVELS.INFO, `[cleanLockedDataSheet]   保留 ${withUrl.length} 条含URL的行: ${withUrl.join(', ')}, 删除 ${withoutUrl.length} 条无URL的行: ${withoutUrl.join(', ')}`);
 
-        if (withUrl.length > 1) {
-            bgmLog(LOG_LEVELS.WARN, `[cleanLockedDataSheet]   名称 "${name}" 有 ${withUrl.length} 条含URL的行，仅保留第1条(行${keepRow})`);
-        }
+        const nameNewTags: string[] = [];
 
         for (const delRow of withoutUrl) {
             if (tagsCol) {
                 const delTags = String(getCellValue(ws, delRow, tagsCol) || '').trim();
                 if (delTags) {
                     const existingTags = String(getCellValue(ws, keepRow, tagsCol) || '').trim();
-                    bgmLog(LOG_LEVELS.INFO, `[cleanLockedDataSheet]   合并标签: 行${delRow} -> 行${keepRow}，标签: "${delTags}"`);
-                    const tagSet = new Set<string>();
-                    for (const t of existingTags.split(/\s*\|\s*/)) {
-                        const trimmed = t.trim();
-                        if (trimmed) tagSet.add(trimmed);
-                    }
+                    const existingSet = new Set(existingTags.split(/\s*\|\s*/).map(t => t.trim()).filter(Boolean));
+                    const newTags: string[] = [];
+
                     for (const t of delTags.split(/\s*\|\s*/)) {
                         const trimmed = t.trim();
-                        if (trimmed) tagSet.add(trimmed);
+                        if (trimmed && !existingSet.has(trimmed)) {
+                            newTags.push(trimmed);
+                            existingSet.add(trimmed);
+                        }
                     }
-                    const mergedTags = [...tagSet].join(' | ');
-                    setCellValue(ws, keepRow, tagsCol, mergedTags);
-                    mergedTagsCount++;
-                    bgmLog(LOG_LEVELS.INFO, `[cleanLockedDataSheet]   合并后标签: "${mergedTags}"`);
+
+                    if (newTags.length > 0) {
+                        const mergedTags = [...existingSet].join(' | ');
+                        setCellValue(ws, keepRow, tagsCol, mergedTags);
+                        mergedTagsCount++;
+                        nameNewTags.push(...newTags);
+                        bgmLog(LOG_LEVELS.INFO, `[cleanLockedDataSheet]   合并标签: 行${delRow} -> 行${keepRow}，新增: "${newTags.join(' | ')}"`);
+                    }
                 }
             }
             toDelete.push(delRow);
+        }
+
+        if (nameNewTags.length > 0) {
+            mergedTagEntries.push(`${name}: ${nameNewTags.join(' | ')}`);
         }
     }
 
@@ -1454,7 +1462,9 @@ function cleanLockedDataSheet(): void {
         ws.Range(`${row}:${row}`).Delete();
     }
 
+    const mergedSummary = mergedTagEntries.length > 0 ? `\n[cleanLockedDataSheet] 实际合并的标签:\n${mergedTagEntries.map(e => `  ${e}`).join('\n')}` : '';
     bgmLog(LOG_LEVELS.INFO, `[cleanLockedDataSheet] ======== 清洗完成: 删除 ${toDelete.length} 行${tagsCol ? `，合并 ${mergedTagsCount} 行标签` : ''}，耗时: ${Date.now() - startTime}ms ========`);
+    if (mergedSummary) bgmLog(LOG_LEVELS.INFO, mergedSummary);
     showToast(`清洗完成：删除 ${toDelete.length} 行${tagsCol ? `，合并 ${mergedTagsCount} 行标签` : ''}`, 'success');
 }
 
