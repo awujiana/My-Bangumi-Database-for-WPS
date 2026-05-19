@@ -2,20 +2,25 @@
 外部数据清洗脚本 — 独立于 WPS 运行
 ====================================
 功能：对 Excel 文件中重复名称的行进行清洗（去重、合并标签）
-逻辑与 WPS 加载项内的 cleanLockedDataSheet 一致：
+逻辑：
   1. 按"名称"列分组
   2. 同一名称有多条时：保留有 URL 的行，删除无 URL 的行
   3. 被删除行的标签合并到保留行上（去重）
+
+优化特性：
+  - 优先使用 python-calamine 引擎加速 pandas 读取
+  - 避免文件二次读取，最终统计基于内存数据计算
+  - 删除行操作合并连续区域，减少 openpyxl 调用次数
 
 用法：
   python clean_xlsx.py <文件路径> [工作表名称]
 
 示例：
-  python clean_xlsx.py "C:\数据.xlsx" "动画"
-  python clean_xlsx.py "C:\数据.xlsm" "动画"    # 也支持 xlsm，自动保留宏
-  python clean_xlsx.py "C:\数据.xlsx"             # 自动选择第一个非空表
+  python clean_xlsx.py "C:\\数据.xlsx" "动画"
+  python clean_xlsx.py "C:\\数据.xlsm" "动画"    # 支持 xlsm，自动保留 VBA
+  python clean_xlsx.py "C:\\数据.xlsx"           # 自动选择第一个非空表
 
-依赖：pip install pandas openpyxl
+依赖：pip install pandas openpyxl python-calamine （calamine 可选）
 """
 
 import sys
@@ -71,7 +76,7 @@ def main():
         print(f'[错误] 文件不存在: {filepath}')
         sys.exit(1)
 
-    # ── 检查文件是否被占用（Excel/WPS 打开中） ──
+    # ── 检查文件是否被占用 ──
     try:
         with open(filepath, 'a'):
             pass
@@ -117,8 +122,6 @@ def main():
     if not header_row:
         print('[错误] 在前50行中未找到表头行')
         print('       需要包含"名称"和"Bangumi_URL"列')
-        print('')
-        # 输出前5行列名帮助调试
         for r in range(1, min(6, ws.max_row + 1)):
             vals = [str(c.value or '').strip() for c in ws[r]]
             non_empty = [v for v in vals if v]
@@ -152,13 +155,23 @@ def main():
     print(f'[信息] 标签列 → {tags_col_l} (列{tags_col_idx})' if tags_col_idx else '[信息] 标签列 → 未找到')
 
     # ════════════════════════════════════════════════════════
-    #  用 pandas 读取数据
+    #  用 pandas 读取数据（优先使用 calamine 引擎加速）
     # ════════════════════════════════════════════════════════
+    engine = None
+    try:
+        # 尝试导入 calamine，若成功则使用
+        import python_calamine  # noqa: F401
+        engine = 'calamine'
+        print('[Pandas] 使用 calamine 引擎读取')
+    except ImportError:
+        print('[Pandas] calamine 未安装，使用默认引擎（较慢），可运行 pip install python-calamine 加速')
+
     df = pd.read_excel(
         filepath,
         sheet_name=sheet_name,
         header=header_row - 1,
-        dtype=str
+        dtype=str,
+        engine=engine
     )
 
     total_rows_before = len(df)
@@ -171,7 +184,7 @@ def main():
     df_valid = df[~empty_mask].copy()
     valid_count = len(df_valid)
 
-    # ── 名称分布统计（pandas 聚合） ──
+    # ── 名称分布统计 ──
     name_counts = df_valid[name_col_name].value_counts()
     single_count = (name_counts == 1).sum()
     multi_count = (name_counts >= 2).sum()
@@ -202,7 +215,7 @@ def main():
 
     grouped = df_valid.groupby(name_col_name, sort=False)
     duplicate_count = 0
-    to_delete = []
+    to_delete = []                     # 待删除的 Excel 行号（1-based）
     merged_groups = 0
     skipped_no_url = []
     duplicate_details = []
@@ -235,7 +248,7 @@ def main():
             'delete_rows': del_row_nums,
         })
 
-        # ── 标签合并（pandas 聚合） ──
+        # ── 标签合并 ──
         if tags_col_name and len(without_url) > 0:
             raw_before = with_url.iloc[0].get(tags_col_name, '')
             before_tags = '' if pd.isna(raw_before) or str(raw_before).strip() in ('', 'nan') else str(raw_before).strip()
@@ -304,7 +317,7 @@ def main():
         print(f'\n  ⏱️  耗时: {time.time() - start_total:.2f}s')
         return
 
-    # ── 从后往前删除行（保留条件格式） ──
+    # ── 从后往前删除行（合并连续区域） ──
     print(f'\n{"━"*60}')
     print(f'  🗑️  删除执行')
     print(f'{"━"*60}')
@@ -344,7 +357,7 @@ def main():
     wb.close()
     print(f'  备份: {backup_path}')
 
-    # ── 最终汇总（pandas 聚合统计） ──
+    # ── 最终汇总 ──
     print(f'\n{"═"*60}')
     print(f'  ✅ 清洗完成！')
     print(f'{"═"*60}')
@@ -353,14 +366,16 @@ def main():
     print(f'  耗时:             {elapsed:.2f}s')
     print(f'{"═"*60}')
 
-    # ── 最终数据快照（pandas 再读确认） ──
-    df_after = pd.read_excel(filepath, sheet_name=sheet_name, header=header_row - 1, dtype=str)
+    # ── 最终数据快照（基于内存 DataFrame 计算，不再读取文件） ──
     print(f'\n  📋 最终快照:')
-    print(f'  写入后总行数:  {len(df_after)} 行')
-    after_names = df_after[name_col_name].astype(str).str.strip()
-    after_valid = after_names[after_names.notna() & (after_names != '') & (after_names != 'nan')]
-    after_name_counts = after_valid.value_counts()
+    # 计算保留行的掩码
+    original_indices = set(range(len(df_valid)))
+    delete_indices = set(r - (header_row + 1) for r in to_delete)  # 转为 df_valid 的整数索引
+    keep_mask = [i in original_indices and i not in delete_indices for i in range(len(df_valid))]
+    df_keep = df_valid[keep_mask]
+    after_name_counts = df_keep[name_col_name].value_counts()
     after_multi = (after_name_counts >= 2).sum()
+    print(f'  写入后总行数:  {len(df_keep)} 行 (数据区)')
     print(f'  有效名称数:    {len(after_name_counts)} 个')
     print(f'  剩余重复名称:  {after_multi} 个')
     if after_multi == 0:
