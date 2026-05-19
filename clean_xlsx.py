@@ -289,33 +289,35 @@ def main():
         print(f'\n  ⏱️  耗时: {time.time() - start_total:.2f}s')
         return
 
-    # ── 从后往前删除行（合并连续范围） ──
+    # ── 批量写回方式删除（快：仅1次删除 + 1次写回） ──
     print(f'\n{"━"*60}')
     print(f'  🗑️  删除执行')
     print(f'{"━"*60}')
-    to_delete.sort(reverse=True)
-    print('  删除顺序（从后往前）:')
-    ranges_label = []
-    del_ranges = []
-    i = 0
-    while i < len(to_delete):
-        j = i
-        while j + 1 < len(to_delete) and to_delete[j] - to_delete[j + 1] == 1:
-            j += 1
-        start_row = to_delete[j]
-        count = j - i + 1
-        ranges_label.append(str(to_delete[i]) if i == j else f'{to_delete[j]}~{to_delete[i]}')
-        del_ranges.append((start_row, count))
-        i = j + 1
-    print(f'    {", ".join(ranges_label)}')
-    print(f'  共 {len(del_ranges)} 个范围 / {len(to_delete)} 行')
 
-    del_count = 0
-    for start_row, count in del_ranges:
-        ws.delete_rows(start_row, count)
-        del_count += count
-        print(f'  ...进度: 已删除 {del_count}/{len(to_delete)} 行')
-    print(f'  ✅ 删除完成: 共删除 {del_count} 行')
+    del_set = set(to_delete)
+    data_start = header_row + 1
+    data_end = ws.max_row
+
+    kept_data = []
+    for row_num in range(data_start, data_end + 1):
+        if row_num not in del_set:
+            row_vals = [ws.cell(row=row_num, column=c).value for c in range(1, ws.max_column + 1)]
+            kept_data.append(row_vals)
+
+    ws.delete_rows(data_start, data_end - data_start + 1)
+
+    bar_w = 30
+    total = len(kept_data)
+    for i, row_vals in enumerate(kept_data):
+        for c, val in enumerate(row_vals, 1):
+            ws.cell(row=data_start + i, column=c).value = val
+        p = (i + 1) / total
+        filled = int(bar_w * p)
+        bar = '█' * filled + '░' * (bar_w - filled)
+        print(f'\r  ⏳ 写回进度: [{bar}] {i+1}/{total} 行 ({p*100:.0f}%)', end='', flush=True)
+
+    del_count = len(to_delete)
+    print(f'\r  ✅ 删除完成: 共删除 {del_count} 行            ')
 
     # ── 保存 ──
     elapsed = time.time() - start_total
