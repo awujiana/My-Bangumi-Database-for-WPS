@@ -3,7 +3,7 @@
  * @module ui/handlers
  * @description 面板操作处理、按钮绑定、业务对话框
  */
-import { LOG_LEVELS, bgmLog, BGM, loadBgToken, storeBgToken, clearBgToken, _getBgmUserId, _setBgmUserId, _getBgmUsername, _setBgmUsername, getApp, getCell, trim, getCellValue, setCellValue, fetchBgmUserInfo, BGM_COLOR, showAlert, showConfirm, showError, showSuccess, showInput, showToast, setStatus, verifyToken, fetchAllUserCollections, findHeaderRow, getColumnMap, getLastRow, extractSubjectId, getDataSheet, SyncToBangumiAsync, testSingleUpdate, getOrCreateSyncRecordSheet, getAllSyncRecords, addSyncRecord, openSyncRecordSheet, deduplicateSyncRecords, formatSyncRecordSheet, previewSyncContent, refreshData, refreshSheets, toggleSheetLock, clearSyncRecords, closeDetailModal, getIncrementalSync, setIncrementalSync, getSkipConflicts, setSkipConflicts, COLLECTION_TYPE_NAMES, } from '../index.js';
+import { LOG_LEVELS, bgmLog, BGM, loadBgToken, storeBgToken, clearBgToken, _getBgmUserId, _setBgmUserId, _getBgmUsername, _setBgmUsername, getApp, getCell, trim, setCellValue, fetchBgmUserInfo, BGM_COLOR, showAlert, showConfirm, showError, showSuccess, showInput, showToast, setStatus, verifyToken, fetchAllUserCollections, findHeaderRow, getColumnMap, getLastRow, extractSubjectId, getDataSheet, SyncToBangumiAsync, testSingleUpdate, getOrCreateSyncRecordSheet, getAllSyncRecords, addSyncRecord, openSyncRecordSheet, deduplicateSyncRecords, formatSyncRecordSheet, previewSyncContent, refreshData, refreshSheets, toggleSheetLock, clearSyncRecords, closeDetailModal, getIncrementalSync, setIncrementalSync, getSkipConflicts, setSkipConflicts, COLLECTION_TYPE_NAMES, readRangeValues, } from '../index.js';
 import { BGM_EVENTS, eventBus } from '../tools/events.js';
 //  
 import { getSyncPreview, detectConflicts } from '../services/ribbonService.js';
@@ -1203,7 +1203,6 @@ function cleanLockedDataSheet() {
         showToast('未找到表头行', 'error');
         return;
     }
-    bgmLog(LOG_LEVELS.INFO, `[cleanLockedDataSheet] 表头行检测完成: headerRow=${headerRow}`);
     const colMap = getColumnMap(ws, headerRow);
     const nameCol = colMap.get('名称');
     const urlCol = colMap.get('Bangumi_URL');
@@ -1220,11 +1219,21 @@ function cleanLockedDataSheet() {
         return;
     }
     const lastRow = getLastRow(ws);
-    bgmLog(LOG_LEVELS.INFO, `[cleanLockedDataSheet] 数据区间: headerRow=${headerRow}, lastRow=${lastRow}, 数据行数=${lastRow - headerRow}`);
+    const maxCol = Math.max(nameCol, urlCol, tagsCol || 0);
+    bgmLog(LOG_LEVELS.INFO, `[cleanLockedDataSheet] 数据区间: headerRow=${headerRow}, lastRow=${lastRow}, 数据行数=${lastRow - headerRow}, 最大列=${maxCol}`);
+    // ========== 1. 批量读取所有数据（一次 COM 调用） ==========
+    const allData = readRangeValues(ws, headerRow + 1, lastRow, 1, maxCol);
+    if (!allData || allData.length === 0) {
+        bgmLog(LOG_LEVELS.WARN, '[cleanLockedDataSheet] 未读取到数据，终止');
+        showToast('未读取到数据', 'error');
+        return;
+    }
+    // ========== 2. 按名称分组（内存操作，零 COM 调用） ==========
     const nameRows = new Map();
     let emptyNameCount = 0;
-    for (let row = headerRow + 1; row <= lastRow; row++) {
-        const name = String(getCellValue(ws, row, nameCol) || '').trim();
+    for (let i = 0; i < allData.length; i++) {
+        const row = headerRow + 1 + i;
+        const name = String(allData[i][nameCol - 1] ?? '').trim();
         if (!name) {
             emptyNameCount++;
             continue;
@@ -1234,6 +1243,7 @@ function cleanLockedDataSheet() {
         nameRows.set(name, rows);
     }
     bgmLog(LOG_LEVELS.INFO, `[cleanLockedDataSheet] 名称扫描完成: 有效名称=${nameRows.size}个, 空名称行=${emptyNameCount}行`);
+    // ========== 3. 处理重复行（内存操作 + 仅合并标签时写回） ==========
     const toDelete = [];
     let mergedTagsCount = 0;
     let duplicateNameCount = 0;
@@ -1246,7 +1256,8 @@ function cleanLockedDataSheet() {
         const withUrl = [];
         const withoutUrl = [];
         for (const row of rows) {
-            const url = String(getCellValue(ws, row, urlCol) || '').trim();
+            const idx = row - headerRow - 1;
+            const url = String(allData[idx][urlCol - 1] ?? '').trim();
             (url ? withUrl : withoutUrl).push(row);
         }
         if (withUrl.length === 0) {
@@ -1256,37 +1267,36 @@ function cleanLockedDataSheet() {
         duplicateNameCount++;
         const keepRow = withUrl[0];
         duplicateDetails.push({ name, rows, keep: withUrl, del: withoutUrl });
+        // 合并标签：一次性收集所有标签后仅写回一次
         const nameNewTags = [];
-        for (const delRow of withoutUrl) {
-            if (tagsCol) {
-                const delTags = String(getCellValue(ws, delRow, tagsCol) || '').trim();
-                if (delTags) {
-                    const existingTags = String(getCellValue(ws, keepRow, tagsCol) || '').trim();
-                    const existingSet = new Set(existingTags.split(/\s*\|\s*/).map(t => t.trim()).filter(Boolean));
-                    const newTags = [];
-                    for (const t of delTags.split(/\s*\|\s*/)) {
-                        const trimmed = t.trim();
-                        if (trimmed && !existingSet.has(trimmed)) {
-                            newTags.push(trimmed);
-                            existingSet.add(trimmed);
-                        }
-                    }
-                    if (newTags.length > 0) {
-                        const mergedTags = [...existingSet].join(' | ');
-                        setCellValue(ws, keepRow, tagsCol, mergedTags);
-                        mergedTagsCount++;
-                        nameNewTags.push(...newTags);
+        if (tagsCol && withoutUrl.length > 0) {
+            const keepIdx = keepRow - headerRow - 1;
+            const existingSet = new Set(String(allData[keepIdx][tagsCol - 1] ?? '').split(/\s*\|\s*/).map(t => t.trim()).filter(Boolean));
+            for (const delRow of withoutUrl) {
+                const delIdx = delRow - headerRow - 1;
+                const delTags = String(allData[delIdx][tagsCol - 1] ?? '').trim();
+                if (!delTags)
+                    continue;
+                for (const t of delTags.split(/\s*\|\s*/)) {
+                    const trimmed = t.trim();
+                    if (trimmed && !existingSet.has(trimmed)) {
+                        nameNewTags.push(trimmed);
+                        existingSet.add(trimmed);
                     }
                 }
             }
-            toDelete.push(delRow);
+            if (nameNewTags.length > 0) {
+                const mergedTags = [...existingSet].join(' | ');
+                setCellValue(ws, keepRow, tagsCol, mergedTags);
+                mergedTagsCount++;
+                mergedTagEntries.push(`${name}: ${nameNewTags.join(' | ')}`);
+            }
         }
-        if (nameNewTags.length > 0) {
-            mergedTagEntries.push(`${name}: ${nameNewTags.join(' | ')}`);
+        for (const delRow of withoutUrl) {
+            toDelete.push(delRow);
         }
     }
     bgmLog(LOG_LEVELS.INFO, `[cleanLockedDataSheet] 统计: 重复名称=${duplicateNameCount}个, 待删除行=${toDelete.length}, 合并标签行=${mergedTagsCount}`);
-    // 聚合输出重复名称详情
     if (duplicateDetails.length > 0) {
         const lines = duplicateDetails.map(d => `  "${d.name}": ${d.keep.length}条含URL(行${d.keep.join(',')}), ${d.del.length}条无URL(行${d.del.join(',')})`);
         bgmLog(LOG_LEVELS.INFO, `[cleanLockedDataSheet] 重复名称详情:\n${lines.join('\n')}`);
@@ -1299,16 +1309,30 @@ function cleanLockedDataSheet() {
         showToast('未发现需清洗的重复数据', 'info');
         return;
     }
+    // ========== 4. 批量删除行（合并连续行为范围删除，减少 COM 调用） ==========
     toDelete.sort((a, b) => b - a);
-    bgmLog(LOG_LEVELS.INFO, `[cleanLockedDataSheet] 开始删除行 (从后往前): ${toDelete.join(', ')}`);
-    for (const row of toDelete) {
-        ws.Range(`${row}:${row}`).Delete();
+    let deleteCallCount = 0;
+    let i = 0;
+    while (i < toDelete.length) {
+        let j = i;
+        while (j + 1 < toDelete.length && toDelete[j] - toDelete[j + 1] === 1) {
+            j++;
+        }
+        if (i === j) {
+            ws.Range(`${toDelete[i]}:${toDelete[i]}`).Delete();
+        }
+        else {
+            ws.Range(`${toDelete[j]}:${toDelete[i]}`).Delete();
+        }
+        deleteCallCount++;
+        i = j + 1;
     }
+    bgmLog(LOG_LEVELS.INFO, `[cleanLockedDataSheet] 删除行: ${toDelete.length}行, 实际COM调用: ${deleteCallCount}次`);
     const mergedSummary = mergedTagEntries.length > 0 ? `\n[cleanLockedDataSheet] 实际合并的标签:\n${mergedTagEntries.map(e => `  ${e}`).join('\n')}` : '';
-    bgmLog(LOG_LEVELS.INFO, `[cleanLockedDataSheet] ======== 清洗完成: 删除 ${toDelete.length} 行${tagsCol ? `，合并 ${mergedTagsCount} 行标签` : ''}，耗时: ${Date.now() - startTime}ms ========`);
+    bgmLog(LOG_LEVELS.INFO, `[cleanLockedDataSheet] ======== 清洗完成: 删除 ${toDelete.length} 行${tagsCol ? `，合并 ${mergedTagsCount} 个名称组的标签` : ''}，耗时: ${Date.now() - startTime}ms ========`);
     if (mergedSummary)
         bgmLog(LOG_LEVELS.INFO, mergedSummary);
-    showToast(`清洗完成：删除 ${toDelete.length} 行${tagsCol ? `，合并 ${mergedTagsCount} 行标签` : ''}`, 'success');
+    showToast(`清洗完成：删除 ${toDelete.length} 行${tagsCol ? `，合并 ${mergedTagsCount} 个名称组的标签` : ''}`, 'success');
 }
 // 监听模块初始化完成事件
 if (typeof document !== 'undefined') {
