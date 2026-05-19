@@ -26,9 +26,6 @@ export declare const BGM: {
         input: (title: string, prompt: string, defaultValue?: string, onOk?: (value: string) => void, onCancel?: () => void) => void;
         show: (type: 'alert' | 'confirm' | 'error' | 'input', title: string, message: string, options?: DialogOptions) => void;
     };
-    Message: {
-        send: (data: Record<string, unknown>, targetOrigin?: string) => boolean;
-    };
     showAlert: (title: string, message: string) => void;
     showConfirm: (title: string, message: string, onConfirm?: () => void, onCancel?: () => void) => void;
     handleError: (error: unknown, options?: ErrorOptions) => BgmError;

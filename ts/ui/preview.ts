@@ -145,7 +145,7 @@ function renderDetailItemHtml(rowData: DetailItem, colMap: ColumnMap, ws: WpsWor
   // 构建JSON请求载荷
   let jsonBody = '';
   if (rowData.sid) {
-    jsonBody = buildJsonPayload(ws, rowData.row, colMap, rowData.finishedDate);
+    jsonBody = buildJsonPayload((key) => colMap.has(key) ? trim(getCellValue(ws, rowData.row, colMap.get(key)!)) : '', rowData.finishedDate);
   }
   // 截断显示URL，避免过长影响UI
   const urlDisplay = rowData.bgmUrl.length > 60 ? rowData.bgmUrl.substring(0, 60) + '...' : rowData.bgmUrl;
@@ -424,7 +424,7 @@ function buildStatsHtml(totalRows: number): string {
 }
 
 // ========== 单条上传 ==========
-export function uploadSingleRow(rowNum: number, btnElement?: HTMLButtonElement): void {
+export async function uploadSingleRow(rowNum: number, btnElement?: HTMLButtonElement): Promise<void> {
   const token = loadBgToken();
   if (!token) {
     safeAlert('请先设置 Bangumi Token！');
@@ -452,10 +452,10 @@ export function uploadSingleRow(rowNum: number, btnElement?: HTMLButtonElement):
     const rowData = getRowData(ws, rowNum, colMap, headerRow, 9);
     if (!rowData.sid) throw new Error('无法提取 Subject ID');
 
-    const jsonBody = buildJsonPayload(ws, rowNum, colMap, rowData.finishedDate);
+    const jsonBody = buildJsonPayload((key) => colMap.has(key) ? trim(getCellValue(ws, rowNum, colMap.get(key)!)) : '', rowData.finishedDate);
     if (!jsonBody) throw new Error('无法构建请求体');
 
-    const result = bgmRequestSync('POST', `/v0/users/${_getUserApiPath()}/collections/${rowData.sid}`, jsonBody, token);
+    const result = await bgmRequestSync('POST', `/v0/users/${_getUserApiPath()}/collections/${rowData.sid}`, jsonBody, token);
     const statusCode = result?.code || 0;
     // 从列映射中读取序列号列
     const actualSeqCol = colMap.get('序列号') || 9;

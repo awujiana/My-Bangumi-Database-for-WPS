@@ -153,28 +153,7 @@ export const BGM = {
             }
         }
     },
-    // 统一消息通信
-    Message: {
-        send: function (data, targetOrigin) {
-            try {
-                if (typeof window !== 'undefined' && window.parent && window.parent !== window) {
-                    window.parent.postMessage(data, targetOrigin || '*');
-                    return true;
-                }
-            }
-            catch (e) {
-                const err = e;
-                if (typeof bgmLog === 'function') {
-                    bgmLog(LOG_LEVELS.INFO || 0, 'postMessage 不可用: ' + err.message);
-                }
-            }
-            return false;
-        }
-    },
     showAlert: function (title, message) {
-        if (BGM.Message.send({ type: "showAlert", title: title, message: message })) {
-            return;
-        }
         BGM.Dialog.alert(title, message);
     },
     showConfirm: function (title, message, onConfirm, onCancel) {

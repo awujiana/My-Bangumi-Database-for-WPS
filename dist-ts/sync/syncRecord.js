@@ -7,7 +7,7 @@
  * @author BGM Development Team
  * @version 1.1.0
  */
-import { LOG_LEVELS, SYNC_STATUS, BGM_COLOR, bgmLog, getApp, BGM, getLastRow, colNumToLetter, SYNC_RECORD_COLUMNS, SYNC_RECORD_SHEET_NAME, SYNC_RECORD_COL, SYNC_RECORD_TYPE_COLOR, getCellValue, setCellValue, } from '../index.js';
+import { LOG_LEVELS, SYNC_STATUS, BGM_COLOR, bgmLog, getApp, BGM, getLastRow, colNumToLetter, SYNC_RECORD_COLUMNS, SYNC_RECORD_SHEET_NAME, SYNC_RECORD_COL, SYNC_RECORD_TYPE_COLOR, getCellValue, setCellValue, readRangeValues, } from '../index.js';
 // ========== 内存缓存 ==========
 let _syncRecordSidCache = new Map();
 let _syncRecordListCache = [];
@@ -167,25 +167,36 @@ function buildCache(sheet) {
     _syncRecordSidCache.clear();
     _syncRecordListCache.length = 0;
     const lastRow = getLastRow(sheet);
-    for (let row = 2; row <= lastRow; row++) {
+    if (lastRow < 2) {
+        _syncRecordCacheValid = true;
+        return;
+    }
+    const allData = readRangeValues(sheet, 2, lastRow, 1, SYNC_RECORD_COLUMNS.length);
+    if (!allData || allData.length === 0) {
+        _syncRecordCacheValid = true;
+        return;
+    }
+    for (let i = 0; i < allData.length; i++) {
         try {
-            const sid = getCellValue(sheet, row, SYNC_RECORD_COL.SID).trim();
-            const url = getCellValue(sheet, row, SYNC_RECORD_COL.URL).trim();
+            const rowData = allData[i];
+            const sid = String(rowData[SYNC_RECORD_COL.SID - 1] ?? '').trim();
+            const url = String(rowData[SYNC_RECORD_COL.URL - 1] ?? '').trim();
             if (!url && !sid)
                 continue;
+            const row = i + 2;
             _syncRecordSidCache.set(sid, row);
             _syncRecordListCache.push({
-                time: getCellValue(sheet, row, SYNC_RECORD_COL.TIME),
-                name: getCellValue(sheet, row, SYNC_RECORD_COL.NAME),
+                time: String(rowData[SYNC_RECORD_COL.TIME - 1] ?? ''),
+                name: String(rowData[SYNC_RECORD_COL.NAME - 1] ?? ''),
                 url: url,
                 sid: sid,
-                type: getCellValue(sheet, row, SYNC_RECORD_COL.TYPE),
-                count: parseInt(getCellValue(sheet, row, SYNC_RECORD_COL.COUNT)) || 1,
-                content: getCellValue(sheet, row, SYNC_RECORD_COL.CONTENT),
-                status: getCellValue(sheet, row, SYNC_RECORD_COL.STATUS) || SYNC_STATUS.SUCCESS,
-                message: getCellValue(sheet, row, SYNC_RECORD_COL.MESSAGE),
-                fingerprint: getCellValue(sheet, row, SYNC_RECORD_COL.FINGERPRINT),
-                collType: getCellValue(sheet, row, SYNC_RECORD_COL.COLL_TYPE),
+                type: String(rowData[SYNC_RECORD_COL.TYPE - 1] ?? ''),
+                count: parseInt(String(rowData[SYNC_RECORD_COL.COUNT - 1] ?? '')) || 1,
+                content: String(rowData[SYNC_RECORD_COL.CONTENT - 1] ?? ''),
+                status: String(rowData[SYNC_RECORD_COL.STATUS - 1] ?? '') || SYNC_STATUS.SUCCESS,
+                message: String(rowData[SYNC_RECORD_COL.MESSAGE - 1] ?? ''),
+                fingerprint: String(rowData[SYNC_RECORD_COL.FINGERPRINT - 1] ?? ''),
+                collType: String(rowData[SYNC_RECORD_COL.COLL_TYPE - 1] ?? ''),
                 row: row
             });
         }

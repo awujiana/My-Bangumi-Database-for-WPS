@@ -53,7 +53,6 @@ export function showTokenDialog(currentToken) {
             storeBgToken(value);
             updateTokenStatus();
             showToast(_T.tokenSaved, 'success');
-            BGM.Message.send({ type: 'tokenUpdated' });
         }
     });
 }
@@ -64,7 +63,6 @@ export function showUserIdDialog() {
             _setBgmUserId(value.trim());
             updateUserIdStatus();
             showToast(_T.userIdSaved, 'success');
-            BGM.Message.send({ type: 'userIdUpdated' });
         }
     });
 }
@@ -726,41 +724,6 @@ async function _doAPISync(sheetIndex, token) {
         }
     }
 }
-export async function markUploadedItems(sheetIndexOrName, collections) {
-    if (typeof sheetIndexOrName === 'string' && collections === undefined) {
-        const sheetName = sheetIndexOrName;
-        const token = loadBgToken();
-        if (!token) {
-            showAlert(_T.pleaseSetTokenFirst);
-            return;
-        }
-        const userId = _getBgmUserId();
-        if (!userId) {
-            showAlert(_T.pleaseSetUserIdFirst + '！');
-            return;
-        }
-        const app = getApp();
-        let targetIndex = null;
-        if (app?.ActiveWorkbook) {
-            for (let i = 1; i <= app.ActiveWorkbook.Worksheets.Count; i++) {
-                if (app.ActiveWorkbook.Worksheets.Item(i).Name === sheetName) {
-                    targetIndex = i;
-                    break;
-                }
-            }
-        }
-        if (targetIndex === null) {
-            showAlert(_T.sheetNotFound + sheetName);
-            return;
-        }
-        const cols = await fetchAllUserCollections(token, userId);
-        if (cols?.length) {
-            showToast(_T.marksToSheet + cols.length + _T.marksToSheetSuffix + sheetName, 'success');
-        }
-        return;
-    }
-    // 无操作
-}
 // ========== 事件监听 ==========
 function setupButtonListeners() {
     document.querySelectorAll('[data-action]').forEach(button => {
@@ -918,11 +881,6 @@ function handleActionClick(event) {
             bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 开始清洗锁定数据表');
             cleanLockedDataSheet();
             bgmLog(LOG_LEVELS.INFO, `[handleActionClick] 数据清洗完成，耗时: ${Date.now() - startTime}ms`);
-            break;
-        case 'markUploadedItems':
-            bgmLog(LOG_LEVELS.INFO, `[handleActionClick] 标记已上传项目，类型: ${args[0] || '全部'}`);
-            markUploadedItems(args[0]);
-            bgmLog(LOG_LEVELS.INFO, `[handleActionClick] 已上传项目标记完成，耗时: ${Date.now() - startTime}ms`);
             break;
         case 'openSyncRecordSheet':
             bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 打开同步记录工作表');
@@ -1279,12 +1237,12 @@ function cleanLockedDataSheet() {
     const toDelete = [];
     let mergedTagsCount = 0;
     let duplicateNameCount = 0;
-    const mergedTagEntries = []; // 收集实际的合并标签摘要
+    const mergedTagEntries = [];
+    const duplicateDetails = [];
+    const skippedNoUrl = [];
     for (const [name, rows] of nameRows) {
         if (rows.length <= 1)
             continue;
-        duplicateNameCount++;
-        bgmLog(LOG_LEVELS.INFO, `[cleanLockedDataSheet] 发现重复名称 "${name}": 位于行 ${rows.join(', ')}`);
         const withUrl = [];
         const withoutUrl = [];
         for (const row of rows) {
@@ -1292,12 +1250,12 @@ function cleanLockedDataSheet() {
             (url ? withUrl : withoutUrl).push(row);
         }
         if (withUrl.length === 0) {
-            bgmLog(LOG_LEVELS.INFO, `[cleanLockedDataSheet]   名称 "${name}" 的所有行均无 Bangumi_URL，跳过`);
+            skippedNoUrl.push(name);
             continue;
         }
-        // 保留所有有URL的行，仅删除无URL的重复行
+        duplicateNameCount++;
         const keepRow = withUrl[0];
-        bgmLog(LOG_LEVELS.INFO, `[cleanLockedDataSheet]   保留 ${withUrl.length} 条含URL的行: ${withUrl.join(', ')}, 删除 ${withoutUrl.length} 条无URL的行: ${withoutUrl.join(', ')}`);
+        duplicateDetails.push({ name, rows, keep: withUrl, del: withoutUrl });
         const nameNewTags = [];
         for (const delRow of withoutUrl) {
             if (tagsCol) {
@@ -1318,7 +1276,6 @@ function cleanLockedDataSheet() {
                         setCellValue(ws, keepRow, tagsCol, mergedTags);
                         mergedTagsCount++;
                         nameNewTags.push(...newTags);
-                        bgmLog(LOG_LEVELS.INFO, `[cleanLockedDataSheet]   合并标签: 行${delRow} -> 行${keepRow}，新增: "${newTags.join(' | ')}"`);
                     }
                 }
             }
@@ -1329,6 +1286,14 @@ function cleanLockedDataSheet() {
         }
     }
     bgmLog(LOG_LEVELS.INFO, `[cleanLockedDataSheet] 统计: 重复名称=${duplicateNameCount}个, 待删除行=${toDelete.length}, 合并标签行=${mergedTagsCount}`);
+    // 聚合输出重复名称详情
+    if (duplicateDetails.length > 0) {
+        const lines = duplicateDetails.map(d => `  "${d.name}": ${d.keep.length}条含URL(行${d.keep.join(',')}), ${d.del.length}条无URL(行${d.del.join(',')})`);
+        bgmLog(LOG_LEVELS.INFO, `[cleanLockedDataSheet] 重复名称详情:\n${lines.join('\n')}`);
+    }
+    if (skippedNoUrl.length > 0) {
+        bgmLog(LOG_LEVELS.INFO, `[cleanLockedDataSheet] 因全无URL而跳过的名称: ${skippedNoUrl.join(', ')}`);
+    }
     if (toDelete.length === 0) {
         bgmLog(LOG_LEVELS.INFO, `[cleanLockedDataSheet] 未发现需清洗的重复数据，耗时: ${Date.now() - startTime}ms`);
         showToast('未发现需清洗的重复数据', 'info');

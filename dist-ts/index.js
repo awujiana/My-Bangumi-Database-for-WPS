@@ -76,7 +76,7 @@ setSyncRunning, } from './ui/message.js';
 // ============================================================================
 export { 
 // 显示用户 ID 设置对话框
-showUserIdDialog, markUploadedItems, updateTokenStatus, updateUserIdStatus, showTokenDialog, testDebugConnection, syncCollectionFromBgm, openUserCollection } from './ui/handlers.js';
+showUserIdDialog, updateTokenStatus, updateUserIdStatus, showTokenDialog, testDebugConnection, syncCollectionFromBgm, openUserCollection } from './ui/handlers.js';
 // ============================================================================
 // 8. 同步记录工作表（来自 sync/syncRecord.js）
 // ============================================================================

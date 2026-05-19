@@ -31,7 +31,7 @@ export interface DetailPreviewData {
     uploadedCount: Record<number, number>;
 }
 export declare function previewSyncContent(): void;
-export declare function uploadSingleRow(rowNum: number, btnElement?: HTMLButtonElement): void;
+export declare function uploadSingleRow(rowNum: number, btnElement?: HTMLButtonElement): Promise<void>;
 export declare function showDetailModal(): void;
 export declare function closeDetailModal(): void;
 export declare function viewSyncRecordDetail(sid: string): void;

@@ -130,7 +130,7 @@ export declare function getSequentialRowsBySeqCol(startRow: number, endRow: numb
  * 包含字段：type（状态）、rate（评分）、tags（标签）、
  * comment（感言）、ep（集数）、private（是否私有）
  */
-export declare function buildJsonPayload(ws: any, rowNum: number, colMap: Map<string, number>, finishedDate: string): string;
+export declare function buildJsonPayload(getField: (key: string) => string, finishedDate: string): string;
 /**
  * 发送Bangumi同步请求
  *
@@ -141,10 +141,10 @@ export declare function buildJsonPayload(ws: any, rowNum: number, colMap: Map<st
  * @param {string} token - API Token
  * @returns {{ code: number; message: string }} 请求结果
  */
-export declare function bgmRequestSync(method: string, endpoint: string, jsonBody: string, token: string): {
+export declare function bgmRequestSync(method: string, endpoint: string, jsonBody: string, token: string): Promise<{
     code: number;
     message: string;
-};
+}>;
 /**
  * 设置Bangumi Token
  *
@@ -202,5 +202,5 @@ export declare function SyncToBangumiAsync(ws: any, colMap: Map<string, number>,
  *
  * @function testSingleUpdate
  */
-export declare function testSingleUpdate(): void;
+export declare function testSingleUpdate(): Promise<void>;
 //# sourceMappingURL=exceltobangumi.d.ts.map

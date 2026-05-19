@@ -142,6 +142,7 @@ export function testTokenValidityForRibbon(token) {
     bgmLog(LOG_LEVELS.INFO, `[exceltobangumi/testTokenValidityForRibbon] 请求头: Content-Type: application/json`);
     const xhr = new XMLHttpRequest();
     xhr.open('GET', apiUrl, true);
+    xhr.timeout = 30000;
     xhr.setRequestHeader('Authorization', 'Bearer ' + testToken);
     xhr.setRequestHeader('Content-Type', 'application/json');
     xhr.onload = () => {
@@ -570,7 +571,7 @@ export function getSequentialRowsBySeqCol(startRow, endRow, colMap) {
  * 包含字段：type（状态）、rate（评分）、tags（标签）、
  * comment（感言）、ep（集数）、private（是否私有）
  */
-export function buildJsonPayload(ws, rowNum, colMap, finishedDate) {
+export function buildJsonPayload(getField, finishedDate) {
     try {
         const payload = {};
         // 观看状态 - 支持多种列名
@@ -578,69 +579,55 @@ export function buildJsonPayload(ws, rowNum, colMap, finishedDate) {
         let statusFound = false;
         let rawStatusValue = '';
         for (const key of statusKeys) {
-            if (colMap.has(key)) {
-                const statusVal = trim(getCellValue(ws, rowNum, colMap.get(key)));
-                if (statusVal) {
-                    rawStatusValue = statusVal;
-                    const mappedStatus = mapWatchStatus(statusVal);
-                    if (mappedStatus !== undefined && mappedStatus > 0) {
-                        payload.type = mappedStatus;
-                        statusFound = true;
-                        bgmLog(LOG_LEVELS.INFO, `[buildJsonPayload] 从列 "${key}" 读取状态: "${statusVal}" -> ${mappedStatus}`);
-                        break;
-                    }
-                    else {
-                        bgmLog(LOG_LEVELS.WARN, `[buildJsonPayload] 从列 "${key}" 读取状态: "${statusVal}" -> ${mappedStatus} (无效)`);
-                    }
+            const statusVal = trim(getField(key));
+            if (statusVal) {
+                rawStatusValue = statusVal;
+                const mappedStatus = mapWatchStatus(statusVal);
+                if (mappedStatus !== undefined && mappedStatus > 0) {
+                    payload.type = mappedStatus;
+                    statusFound = true;
+                    bgmLog(LOG_LEVELS.INFO, `[buildJsonPayload] 从列 "${key}" 读取状态: "${statusVal}" -> ${mappedStatus}`);
+                    break;
+                }
+                else {
+                    bgmLog(LOG_LEVELS.WARN, `[buildJsonPayload] 从列 "${key}" 读取状态: "${statusVal}" -> ${mappedStatus} (无效)`);
                 }
             }
         }
         if (!statusFound) {
             bgmLog(LOG_LEVELS.ERROR, `[buildJsonPayload] 未找到有效的观看状态，返回空对象，原始值: "${rawStatusValue}"`);
-            return '{}'; // 失败标记
+            return '{}';
         }
         // 评分
-        if (colMap.has('打分')) {
-            const rateVal = trim(getCellValue(ws, rowNum, colMap.get('打分')));
-            if (rateVal && rateVal !== 'true' && rateVal !== 'True') {
-                const rate = parseFloat(rateVal);
-                if (!isNaN(rate) && rate >= 0 && rate <= 10) {
-                    payload.rate = rate;
-                }
+        const rateVal = trim(getField('打分'));
+        if (rateVal && rateVal !== 'true' && rateVal !== 'True') {
+            const rate = parseFloat(rateVal);
+            if (!isNaN(rate) && rate >= 0 && rate <= 10) {
+                payload.rate = rate;
             }
         }
         // 标签
-        if (colMap.has('标签/分级')) {
-            const tagsVal = trim(getCellValue(ws, rowNum, colMap.get('标签/分级')));
-            if (tagsVal) {
-                payload.tags = buildTagsArray(tagsVal);
-            }
+        const tagsVal = trim(getField('标签/分级'));
+        if (tagsVal) {
+            payload.tags = buildTagsArray(tagsVal);
         }
         // 感言
-        if (colMap.has('剧透/感言') || colMap.has('感言')) {
-            const commentKey = colMap.has('剧透/感言') ? '剧透/感言' : '感言';
-            const commentVal = trim(getCellValue(ws, rowNum, colMap.get(commentKey)));
-            if (commentVal) {
-                payload.comment = commentVal;
-            }
+        const commentVal = trim(getField('剧透/感言') || getField('感言'));
+        if (commentVal) {
+            payload.comment = commentVal;
         }
         // 集数
-        if (colMap.has('集数') || colMap.has('集号')) {
-            const epKey = colMap.has('集数') ? '集数' : '集号';
-            const epVal = trim(getCellValue(ws, rowNum, colMap.get(epKey)));
-            if (epVal) {
-                const ep = parseInt(epVal, 10);
-                if (!isNaN(ep) && ep > 0) {
-                    payload.ep = ep;
-                }
+        const epVal = trim(getField('集数') || getField('集号'));
+        if (epVal) {
+            const ep = parseInt(epVal, 10);
+            if (!isNaN(ep) && ep > 0) {
+                payload.ep = ep;
             }
         }
-        // 私密收藏（仅当明确标记为“是”或“1”时才添加）
-        if (colMap.has('私密收藏')) {
-            const privateVal = trim(getCellValue(ws, rowNum, colMap.get('私密收藏'))).toLowerCase();
-            if (privateVal === '是' || privateVal === '1' || privateVal === 'true') {
-                payload.private = true;
-            }
+        // 私密收藏
+        const privateVal = trim(getField('私密收藏')).toLowerCase();
+        if (privateVal === '是' || privateVal === '1' || privateVal === 'true') {
+            payload.private = true;
         }
         return JSON.stringify(payload);
     }
@@ -659,66 +646,54 @@ export function buildJsonPayload(ws, rowNum, colMap, finishedDate) {
  * @param {string} token - API Token
  * @returns {{ code: number; message: string }} 请求结果
  */
-export function bgmRequestSync(method, endpoint, jsonBody, token) {
-    const result = { code: 0, message: '' };
-    const startTime = Date.now();
+export async function bgmRequestSync(method, endpoint, jsonBody, token) {
     const fullUrl = `${BGM_CONFIG.API_BASE}${endpoint}`;
-    bgmLog(LOG_LEVELS.INFO, `[bgmRequestSync] ========== 开始同步请求 ==========`);
-    bgmLog(LOG_LEVELS.INFO, `[bgmRequestSync] URL: ${fullUrl}`);
-    bgmLog(LOG_LEVELS.INFO, `[bgmRequestSync] 方法: ${method.toUpperCase()}`);
-    bgmLog(LOG_LEVELS.INFO, `[bgmRequestSync] 请求头: Authorization: Bearer ${token.substring(0, 8)}...`);
-    bgmLog(LOG_LEVELS.INFO, `[bgmRequestSync] 请求体: ${jsonBody}`);
+    bgmLog(LOG_LEVELS.INFO, `[bgmRequestSync] ${method} ${fullUrl} 请求体长度: ${jsonBody.length}`);
     try {
-        const xhr = new XMLHttpRequest();
-        xhr.open(method.toUpperCase(), fullUrl, false);
-        xhr.setRequestHeader('Authorization', `Bearer ${token}`);
-        xhr.setRequestHeader('Content-Type', 'application/json');
-        bgmLog(LOG_LEVELS.INFO, `[bgmRequestSync] 正在发送请求...`);
-        xhr.send(jsonBody);
-        const duration = Date.now() - startTime;
-        result.code = xhr.status;
-        result.message = xhr.status >= 200 && xhr.status < 300 ? 'success' : parseErrorResponse(xhr);
-        bgmLog(LOG_LEVELS.INFO, `[bgmRequestSync] ========== 请求完成 ==========`);
-        bgmLog(LOG_LEVELS.INFO, `[bgmRequestSync] HTTP 状态码: ${xhr.status} (${xhr.statusText})`);
-        bgmLog(LOG_LEVELS.INFO, `[bgmRequestSync] 请求耗时: ${duration}ms`);
-        if (xhr.status >= 200 && xhr.status < 300) {
-            bgmLog(LOG_LEVELS.INFO, `[bgmRequestSync] 请求成功`);
-            if (xhr.responseText) {
-                try {
-                    const data = JSON.parse(xhr.responseText);
-                    result.message = extractResponseMessage(data);
-                    bgmLog(LOG_LEVELS.INFO, `[bgmRequestSync] 响应数据: ${JSON.stringify(data).length > 300 ? JSON.stringify(data).substring(0, 300) + '...' : JSON.stringify(data)}`);
+        return await new Promise((resolve) => {
+            const result = { code: 0, message: '' };
+            const xhr = new XMLHttpRequest();
+            xhr.open(method.toUpperCase(), fullUrl, true);
+            xhr.timeout = 30000;
+            xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+            xhr.setRequestHeader('Content-Type', 'application/json');
+            xhr.onload = function () {
+                result.code = xhr.status;
+                if (xhr.status >= 200 && xhr.status < 300) {
+                    result.message = 'success';
+                    if (xhr.responseText) {
+                        try {
+                            const data = JSON.parse(xhr.responseText);
+                            result.message = extractResponseMessage(data);
+                        }
+                        catch (_) { }
+                    }
                 }
-                catch (e) {
-                    BGM.handleError(e, { context: 'bgmRequestSync', showAlert: false });
+                else if (xhr.status === 429) {
+                    result.message = 'Rate limited';
                 }
-            }
-        }
-        else if (xhr.status === 429) {
-            result.message = 'Rate limited, please slow down';
-            bgmLog(LOG_LEVELS.WARN, `[bgmRequestSync] 请求被限流 (429)`);
-        }
-        else {
-            bgmLog(LOG_LEVELS.WARN, `[bgmRequestSync] 请求失败，状态码: ${xhr.status}`);
-            try {
-                const errData = JSON.parse(xhr.responseText);
-                result.message = errData.error || errData.description || `HTTP ${xhr.status}`;
-                bgmLog(LOG_LEVELS.INFO, `[bgmRequestSync] 错误响应: ${JSON.stringify(errData)}`);
-            }
-            catch (e) {
-                BGM.handleError(e, { context: 'bgmRequestSync', showAlert: false });
-                result.message = xhr.statusText || `HTTP ${xhr.status}`;
-                bgmLog(LOG_LEVELS.INFO, `[bgmRequestSync] 响应内容: ${xhr.responseText}`);
-            }
-        }
+                else {
+                    result.message = parseErrorResponse(xhr);
+                }
+                resolve(result);
+            };
+            xhr.onerror = function () {
+                result.code = 0;
+                result.message = 'Network error';
+                resolve(result);
+            };
+            xhr.ontimeout = function () {
+                result.code = 0;
+                result.message = 'Request timeout';
+                resolve(result);
+            };
+            xhr.send(jsonBody);
+        });
     }
     catch (e) {
-        BGM.handleError(e, { context: 'bgmRequestSync', showAlert: false });
-        result.code = 0;
-        result.message = e.message || 'Network error';
-        bgmLog(LOG_LEVELS.ERROR, `[bgmRequestSync] 网络错误: ${e.message}`);
+        bgmLog(LOG_LEVELS.ERROR, `[bgmRequestSync] 异常: ${e.message}`);
+        return { code: 0, message: e.message || 'Network error' };
     }
-    return result;
 }
 /**
  * 设置Bangumi Token
@@ -775,7 +750,7 @@ async function batchSyncRequests(tasks, token, userIdPath, concurrency = DEFAULT
                     if (elapsed < MIN_REQUEST_INTERVAL) {
                         await delay(MIN_REQUEST_INTERVAL - elapsed);
                     }
-                    const apiResult = bgmRequestSync('POST', `/v0/users${userIdPath}/collections/${task.sid}`, task.jsonBody, token);
+                    const apiResult = await bgmRequestSync('POST', `/v0/users${userIdPath}/collections/${task.sid}`, task.jsonBody, token);
                     lastRequestTime = Date.now();
                     if (apiResult.code >= 200 && apiResult.code < 300) {
                         success.push(task);
@@ -866,31 +841,24 @@ export async function SyncToBangumiAsync(ws, colMap, token, lastRow, headerRow, 
             }
             // 冲突跳过
             if (skipSids && skipSids.has(sid)) {
-                const name = getField(rowNum, '名称');
-                bgmLog(LOG_LEVELS.INFO, `[SyncToBangumiAsync] 行 ${rowNum} - ${name || '未命名'} (SID: ${sid}) 跳过：存在冲突`);
                 result.skip++;
                 continue;
             }
             // 检查观看状态是否为空
             const watchStatusField = getField(rowNum, '是否看完') || getField(rowNum, '状态') || getField(rowNum, '观看状态');
             if (!watchStatusField) {
-                const name = getField(rowNum, '名称');
-                bgmLog(LOG_LEVELS.WARN, `[SyncToBangumiAsync] 行 ${rowNum} - ${name || '未命名'} 跳过：观看状态为空`);
                 result.skip++;
                 continue;
             }
             // 获取观看状态类型
             const watchType = mapWatchStatus(watchStatusField);
             if (watchType === 0) {
-                const name = getField(rowNum, '名称');
-                bgmLog(LOG_LEVELS.WARN, `[SyncToBangumiAsync] 行 ${rowNum} - ${name || '未命名'} 跳过：状态无效 "${watchStatusField}"`);
                 result.skip++;
                 continue;
             }
             // 增量同步指纹检查
             let currentFingerprint;
             if (fingerprintMap) {
-                const name = getField(rowNum, '名称');
                 currentFingerprint = calcFingerprint([
                     getField(rowNum, '名称'),
                     watchType.toString(),
@@ -902,29 +870,17 @@ export async function SyncToBangumiAsync(ws, colMap, token, lastRow, headerRow, 
                 ]);
                 const storedFingerprint = fingerprintMap.get(sid);
                 if (storedFingerprint === currentFingerprint) {
-                    bgmLog(LOG_LEVELS.INFO, `[SyncToBangumiAsync] 行 ${rowNum} - ${name || '未命名'} (SID: ${sid}) 跳过：增量同步检测无变化`);
-                    bgmLog(LOG_LEVELS.INFO, `[SyncToBangumiAsync]   当前指纹: ${currentFingerprint}`);
-                    bgmLog(LOG_LEVELS.INFO, `[SyncToBangumiAsync]   历史指纹: ${storedFingerprint}`);
                     result.skip++;
                     continue;
-                }
-                else {
-                    bgmLog(LOG_LEVELS.INFO, `[SyncToBangumiAsync] 行 ${rowNum} - ${name || '未命名'} (SID: ${sid}) 增量同步检测有变化，加入同步队列`);
-                    if (storedFingerprint) {
-                        bgmLog(LOG_LEVELS.INFO, `[SyncToBangumiAsync]   当前指纹: ${currentFingerprint}`);
-                        bgmLog(LOG_LEVELS.INFO, `[SyncToBangumiAsync]   历史指纹: ${storedFingerprint}`);
-                    }
                 }
             }
             // 检查已上传颜色（非增量模式）
             if (!fingerprintMap && isCellMarkedSuccess(ws, rowNum, seqCol)) {
-                const name = getField(rowNum, '名称');
-                bgmLog(LOG_LEVELS.INFO, `[SyncToBangumiAsync] 行 ${rowNum} - ${name || '未命名'} 跳过：已标记为上传成功`);
                 result.skip++;
                 continue;
             }
             const finishedDate = getField(rowNum, '完播日');
-            const jsonBody = buildJsonPayload(ws, rowNum, colMap, finishedDate);
+            const jsonBody = buildJsonPayload((key) => getField(rowNum, key), finishedDate);
             const name = getField(rowNum, '名称');
             syncTasks.push({
                 rowNum,
@@ -941,7 +897,7 @@ export async function SyncToBangumiAsync(ws, colMap, token, lastRow, headerRow, 
             BGM.handleError(e, { level: BGM.ErrorLevel.WARN, context: 'SyncToBangumiAsync:preprocess' });
         }
     }
-    bgmLog(LOG_LEVELS.INFO, `[SyncToBangumiAsync] 预处理完成：${syncTasks.length} 条待同步，${result.skip} 条跳过`);
+    bgmLog(LOG_LEVELS.INFO, `[SyncToBangumiAsync] 预处理完成：${syncTasks.length} 条待同步，${result.skip} 条跳过（失败${result.fail}条）`);
     // ========== 5. 批量执行同步请求（并发控制） ==========
     const reportProgress = (current, message) => {
         if (options?.onProgress)
@@ -1013,7 +969,7 @@ export async function SyncToBangumiAsync(ws, colMap, token, lastRow, headerRow, 
  *
  * @function testSingleUpdate
  */
-export function testSingleUpdate() {
+export async function testSingleUpdate() {
     const startTime = Date.now();
     bgmLog(LOG_LEVELS.INFO, '[testSingleUpdate] ========== 开始单条测试更新 ==========');
     try {
@@ -1079,7 +1035,7 @@ export function testSingleUpdate() {
         const finishedDate = colMap.has('完播日')
             ? trim(getCellValue(ws, targetRow, colMap.get('完播日')) || '')
             : '';
-        const jsonBody = buildJsonPayload(ws, targetRow, colMap, finishedDate);
+        const jsonBody = buildJsonPayload((key) => colMap.has(key) ? trim(getCellValue(ws, targetRow, colMap.get(key))) : '', finishedDate);
         bgmLog(LOG_LEVELS.INFO, `[testSingleUpdate] 请求体构建完成: ${jsonBody.length > 500 ? jsonBody.substring(0, 500) + '...' : jsonBody}`);
         // 获取用户路径
         const userPath = _getUserApiPath();
@@ -1087,7 +1043,7 @@ export function testSingleUpdate() {
         // 发送请求
         const endpoint = `/v0/users${userPath}/collections/${sid}`;
         bgmLog(LOG_LEVELS.INFO, `[testSingleUpdate] 完整端点: ${endpoint}`);
-        const result = bgmRequestSync('POST', endpoint, jsonBody, token);
+        const result = await bgmRequestSync('POST', endpoint, jsonBody, token);
         if (result.code >= 200 && result.code < 300) {
             bgmLog(LOG_LEVELS.INFO, `[testSingleUpdate] 测试成功！SID: ${sid}, HTTP: ${result.code}`);
             wpsMsgBox(`✓ 测试成功！\n\nSID: ${sid}\nHTTP: ${result.code}\n消息: ${result.message}`, 0, 64);

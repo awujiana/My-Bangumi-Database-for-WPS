@@ -3,7 +3,7 @@
  * @module taskpane
  * @description 面板初始化、事件绑定、核心逻辑
  */
-import { PANEL_CONFIG, WPS_ENUM, LOG_LEVELS, getApp, bgmLog, BGM, escapeHtml, getCellValue, colNumToLetter, HEADER_KEYWORDS, IMPORTANT_COLS, initMessageListener, markUploadedItems, updateTokenStatus, updateUserIdStatus, loadBgToken, showToast, closeDetailModal, getFilterStatus, getLastRow, clearSheetCache, _getBgmUserId, _getBgmUsername, getIncrementalSync, getSkipConflicts } from './index.js';
+import { PANEL_CONFIG, WPS_ENUM, LOG_LEVELS, getApp, bgmLog, BGM, escapeHtml, getCellValue, colNumToLetter, HEADER_KEYWORDS, IMPORTANT_COLS, updateTokenStatus, updateUserIdStatus, loadBgToken, showToast, closeDetailModal, getFilterStatus, getLastRow, clearSheetCache, _getBgmUserId, _getBgmUsername, getIncrementalSync, getSkipConflicts } from './index.js';
 // ========== 工作表锁定功能 ==========
 function toggleSheetLock() {
     const select = document.getElementById('sheetSelect');
@@ -736,9 +736,8 @@ function initPanel() {
     if (typeof window.Application !== 'undefined' && typeof window.Application.Enum !== 'object') {
         window.Application.Enum = WPS_ENUM;
     }
-    // 初始化消息监听（用于与其他任务窗格通信）
-    initMessageListener();
-    // 从 PluginStorage 恢复用户信息（Ribbon 设置后 Taskpane 读取）
+    bgmLog(LOG_LEVELS.INFO, '[taskpane] 锁定按钮监听器设置完成');
+    // 初始化事件监听
     restoreUserInfoFromStorage();
     // 定时轮询 PluginStorage，确保在 Ribbon 设置 Token 后 Taskpane 能自动更新 UI
     startUserInfoPolling();
@@ -800,7 +799,7 @@ function initPanel() {
     bgmLog(LOG_LEVELS.INFO, 'initPanel 完成');
 }
 // ========== 导出 ==========
-export { initPanel, refreshSheets, refreshData, toggleSheetLock, onSelectModeChange, markUploadedItems, autoDetectSheet, updateFilterStatus };
+export { initPanel, refreshSheets, refreshData, toggleSheetLock, onSelectModeChange, autoDetectSheet, updateFilterStatus };
 // ========== 挂载到 window ==========
 window.initPanel = initPanel;
 /**

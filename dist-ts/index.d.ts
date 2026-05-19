@@ -17,7 +17,7 @@ showInput, // 输入
 showToast, } from './ui/dialog.js';
 export { type DialogButton, type DialogConfig, type DialogCallback, type DialogOptions, } from './ui/dialog.js';
 export { setStatus, initMessageListener, setSyncRunning, } from './ui/message.js';
-export { showUserIdDialog, markUploadedItems, updateTokenStatus, updateUserIdStatus, showTokenDialog, testDebugConnection, syncCollectionFromBgm, openUserCollection } from './ui/handlers.js';
+export { showUserIdDialog, updateTokenStatus, updateUserIdStatus, showTokenDialog, testDebugConnection, syncCollectionFromBgm, openUserCollection } from './ui/handlers.js';
 export { getOrCreateSyncRecordSheet, getAllSyncRecords, addSyncRecord, deduplicateSyncRecords, formatSyncRecordSheet, openSyncRecordSheet, type SyncRecord, type UpdateRecordParams, clearSyncRecords, } from './sync/syncRecord.js';
 export { extractSubjectId, getFilterStatus, getSequentialRowsBySeqCol, SyncToBangumiAsync, testSingleUpdate, mapWatchStatus, buildJsonPayload, bgmRequestSync, setBangumiToken, openBangumiTokenPage, testTokenValidityForRibbon, buildTagsArray, addTagsFromStr, } from './sync/exceltobangumi.js';
 export { verifyToken, fetchAllUserCollections, type BangumiUserData, type TokenVerifyResult, type ApiResponse, } from './sync/scraping.js';
