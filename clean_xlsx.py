@@ -33,7 +33,7 @@ def find_header_row(wb, sheet_name, max_search=50):
     for row in ws.iter_rows(min_row=1, max_row=max_search, max_col=ws.max_column):
         values = [str(c.value or '').strip() for c in row]
         has_name = any('名称' in v for v in values)
-        has_url = any('Bangumi_URL' in v or v == 'URL' or v == 'BGM_URL' for v in values)
+        has_url = any('Bangumi_URL' in v or 'Bangumi URL' in v or v == 'URL' or v == 'BGM_URL' for v in values)
         if has_name and has_url:
             return row[0].row
     return None
@@ -117,7 +117,7 @@ def main():
     print(f'[信息] 表头行: 第{header_row}行 | 列名: {header_names}')
 
     name_col_name, name_col_idx = pick_column(col_map, ['名称'])
-    url_col_name, url_col_idx = pick_column(col_map, ['Bangumi_URL', 'URL', 'BGM_URL'])
+    url_col_name, url_col_idx = pick_column(col_map, ['Bangumi_URL', 'Bangumi URL', 'URL', 'BGM_URL'])
     tags_col_name, tags_col_idx = pick_column(col_map, ['标签', '分级'])
 
     if not name_col_name:
