@@ -40,9 +40,13 @@ def find_header_row(wb, sheet_name, max_search=50):
 
 
 def pick_column(col_map, keywords):
-    """从列名映射中选出匹配关键词的第一列"""
-    for col_name, col_idx in col_map.items():
-        for kw in keywords:
+    """从列名映射中选出匹配关键词的列（按关键词顺序逐词优先精确匹配，其次子串匹配）"""
+    for kw in keywords:
+        for col_name, col_idx in col_map.items():
+            if col_name == kw:
+                return col_name, col_idx
+    for kw in keywords:
+        for col_name, col_idx in col_map.items():
             if kw in col_name:
                 return col_name, col_idx
     return None, None
