@@ -39,7 +39,7 @@ def find_header_row(wb, sheet_name, max_search=50):
     return None
 
 
-def pick_column(col_map, keywords):
+def pick_column(col_map, keywords, exclude_keywords=None):
     """从列名映射中选出匹配关键词的列（按关键词顺序逐词优先精确匹配，其次子串匹配）"""
     for kw in keywords:
         for col_name, col_idx in col_map.items():
@@ -48,6 +48,8 @@ def pick_column(col_map, keywords):
     for kw in keywords:
         for col_name, col_idx in col_map.items():
             if kw in col_name:
+                if exclude_keywords and any(ek in col_name for ek in exclude_keywords):
+                    continue
                 return col_name, col_idx
     return None, None
 
@@ -131,7 +133,7 @@ def main():
 
     name_col_name, name_col_idx = pick_column(col_map, ['名称'])
     url_col_name, url_col_idx = pick_column(col_map, ['Bangumi_URL', 'Bangumi URL', 'URL', 'BGM_URL'])
-    tags_col_name, tags_col_idx = pick_column(col_map, ['标签', '分级'])
+    tags_col_name, tags_col_idx = pick_column(col_map, ['标签/分级', '标签', '分级'], exclude_keywords=['原作'])
 
     if not name_col_name:
         print('[错误] 未找到"名称"列')
@@ -302,34 +304,34 @@ def main():
         print(f'\n  ⏱️  耗时: {time.time() - start_total:.2f}s')
         return
 
-    # ── 批量写回方式删除（快：仅1次删除 + 1次写回） ──
+    # ── 从后往前删除行（保留条件格式） ──
     print(f'\n{"━"*60}')
     print(f'  🗑️  删除执行')
     print(f'{"━"*60}')
 
-    del_set = set(to_delete)
-    data_start = header_row + 1
-    data_end = ws.max_row
-
-    kept_data = []
-    for row_num in range(data_start, data_end + 1):
-        if row_num not in del_set:
-            row_vals = [ws.cell(row=row_num, column=c).value for c in range(1, ws.max_column + 1)]
-            kept_data.append(row_vals)
-
-    ws.delete_rows(data_start, data_end - data_start + 1)
+    to_delete.sort(reverse=True)
+    del_ranges = []
+    i = 0
+    while i < len(to_delete):
+        j = i
+        while j + 1 < len(to_delete) and to_delete[j] - to_delete[j + 1] == 1:
+            j += 1
+        start_row = to_delete[j]
+        count = j - i + 1
+        del_ranges.append((start_row, count))
+        i = j + 1
 
     bar_w = 30
-    total = len(kept_data)
-    for i, row_vals in enumerate(kept_data):
-        for c, val in enumerate(row_vals, 1):
-            ws.cell(row=data_start + i, column=c).value = val
-        p = (i + 1) / total
+    total = len(to_delete)
+    del_count = 0
+    for start_row, count in del_ranges:
+        ws.delete_rows(start_row, count)
+        del_count += count
+        p = del_count / total
         filled = int(bar_w * p)
         bar = '█' * filled + '░' * (bar_w - filled)
-        print(f'\r  ⏳ 写回进度: [{bar}] {i+1}/{total} 行 ({p*100:.0f}%)', end='', flush=True)
+        print(f'\r  ⏳ 删除进度: [{bar}] {del_count}/{total} 行 ({p*100:.0f}%)', end='', flush=True)
 
-    del_count = len(to_delete)
     print(f'\r  ✅ 删除完成: 共删除 {del_count} 行            ')
 
     # ── 保存 ──
