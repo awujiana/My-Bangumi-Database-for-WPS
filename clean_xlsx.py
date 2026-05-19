@@ -69,6 +69,15 @@ def main():
         print(f'[错误] 文件不存在: {filepath}')
         sys.exit(1)
 
+    # ── 检查文件是否被占用（Excel/WPS 打开中） ──
+    try:
+        with open(filepath, 'a'):
+            pass
+    except PermissionError:
+        print(f'[错误] 文件被其他程序占用，请先关闭 Excel/WPS 再重试')
+        print(f'       文件: {filepath}')
+        sys.exit(1)
+
     # ── 备份 ──
     backup_path = filepath + '.bak'
     if not os.path.exists(backup_path):
