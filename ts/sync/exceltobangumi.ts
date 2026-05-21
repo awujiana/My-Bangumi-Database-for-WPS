@@ -1170,6 +1170,63 @@ export async function SyncToBangumiAsync(
 }
 
 /**
+ * 获取条目的所有章节 ID（按集号排序）
+ */
+async function fetchEpisodeIds(sid: string | number, token: string): Promise<number[]> {
+    const url = `${BGM_CONFIG.API_BASE}/v0/episodes?subject_id=${sid}&limit=1000`;
+    return new Promise((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        xhr.open('GET', url, true);
+        xhr.timeout = 30000;
+        xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+        xhr.onload = function () {
+            if (xhr.status >= 200 && xhr.status < 300) {
+                try {
+                    const data = JSON.parse(xhr.responseText);
+                    const episodes: { id: number; sort: number }[] = data.data || [];
+                    episodes.sort((a, b) => (a.sort || 0) - (b.sort || 0));
+                    resolve(episodes.map(ep => ep.id));
+                } catch {
+                    reject(new Error('解析章节数据失败'));
+                }
+            } else {
+                reject(new Error(`HTTP ${xhr.status}: ${xhr.responseText}`));
+            }
+        };
+        xhr.onerror = () => reject(new Error('网络错误'));
+        xhr.send();
+    });
+}
+
+/**
+ * 标记前 N 集为已完成
+ */
+async function markEpisodesComplete(
+    sid: string | number,
+    epCount: number,
+    token: string
+): Promise<{ success: boolean; message: string }> {
+    try {
+        const allIds = await fetchEpisodeIds(sid, token);
+        if (allIds.length === 0) {
+            return { success: false, message: '该条目没有章节数据' };
+        }
+        const targetIds = allIds.slice(0, epCount);
+        if (targetIds.length === 0) {
+            return { success: false, message: '没有需要标记的章节' };
+        }
+        const body = JSON.stringify({ episode_id: targetIds, type: 2 });
+        const result = await bgmRequestSync('PATCH', `/v0/users/-/collections/${sid}/episodes`, body, token);
+        if (result.code >= 200 && result.code < 300) {
+            return { success: true, message: `已标记前 ${targetIds.length} 集为已完成` };
+        }
+        return { success: false, message: result.message };
+    } catch (e: any) {
+        return { success: false, message: e.message || '未知错误' };
+    }
+}
+
+/**
  * 测试单个条目更新
  *
  * @function testSingleUpdate
@@ -1265,7 +1322,18 @@ export async function testSingleUpdate(): Promise<void> {
 
         if (result.code >= 200 && result.code < 300) {
             bgmLog(LOG_LEVELS.INFO, `[testSingleUpdate] 测试成功！SID: ${sid}, HTTP: ${result.code}`);
-            wpsMsgBox(`✓ 测试成功！\n\nSID: ${sid}\nHTTP: ${result.code}\n消息: ${result.message}`, 0, 64);
+
+            // 标记章节为已完成
+            const epRaw = trim(getCellValue(ws, targetRow, colMap.has('集数') ? colMap.get('集数')! : colMap.get('集号')!));
+            const epCount = parseInt(epRaw, 10);
+            if (!isNaN(epCount) && epCount > 0) {
+                bgmLog(LOG_LEVELS.INFO, `[testSingleUpdate] 集数: ${epCount}，开始标记章节...`);
+                const epResult = await markEpisodesComplete(sid, epCount, token);
+                bgmLog(LOG_LEVELS.INFO, `[testSingleUpdate] 章节标记结果: ${epResult.message}`);
+                wpsMsgBox(`✓ 测试成功！集合已更新\n📺 章节: ${epResult.message}`, 0, 64);
+            } else {
+                wpsMsgBox(`✓ 测试成功！\n\nSID: ${sid}\nHTTP: ${result.code}\n消息: ${result.message}`, 0, 64);
+            }
         } else {
             bgmLog(LOG_LEVELS.WARN, `[testSingleUpdate] 测试失败！SID: ${sid}, HTTP: ${result.code}, 消息: ${result.message}`);
             let detail = `✗ 测试失败\n\nSID: ${sid}\nHTTP: ${result.code}\n消息: ${result.message}`;
