@@ -7,7 +7,7 @@
  * @author BGM Development Team
  * @version 1.1.0 (优化版，保留原注释和日志)
  */
-import { URL_PATTERNS, WATCH_STATUS_MAP, BGM_CONFIG, BGM_COLOR, LOG_LEVELS, SYNC_STATUS, bgmLog, getApp, getCell, trim, getColumnMap, clearSheetCache, findHeaderRow, colNumToLetter, getCellValue, loadBgToken, storeBgToken, _setBgmUserId, _setBgmUsername, BGM, wpsMsgBox, _getUserApiPath, readRangeValues, delay, calcFingerprint, getAllSyncRecords, isWpsWorksheet } from '../index.js';
+import { URL_PATTERNS, WATCH_STATUS_MAP, BGM_CONFIG, BGM_COLOR, LOG_LEVELS, SYNC_STATUS, bgmLog, getApp, getCell, trim, getColumnMap, findHeaderRow, colNumToLetter, getCellValue, loadBgToken, storeBgToken, _setBgmUserId, _setBgmUsername, BGM, wpsMsgBox, _getUserApiPath, readRangeValues, delay, calcFingerprint, getAllSyncRecords, isWpsWorksheet, clearSheetCache } from '../index.js';
 import { getOrCreateSyncRecordSheet, addSyncRecord } from './syncRecord.js';
 import { showAlert, showSuccess, showError } from '../ui/dialog.js';
 // ========== 常量定义 (优化点：集中管理) ==========
