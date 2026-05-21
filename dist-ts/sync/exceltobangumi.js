@@ -1050,7 +1050,14 @@ export async function testSingleUpdate() {
         }
         else {
             bgmLog(LOG_LEVELS.WARN, `[testSingleUpdate] 测试失败！SID: ${sid}, HTTP: ${result.code}, 消息: ${result.message}`);
-            wpsMsgBox(`✗ 测试失败\n\nSID: ${sid}\nHTTP: ${result.code}\n消息: ${result.message}`, 0, 16);
+            let detail = `✗ 测试失败\n\nSID: ${sid}\nHTTP: ${result.code}\n消息: ${result.message}`;
+            if (jsonBody === '{}') {
+                detail += `\n\n⚠️ 请求体为空对象，请检查"状态/是否看完"列是否有值`;
+            }
+            else if (result.code === 400) {
+                detail += `\n\n请求体: ${jsonBody.length > 200 ? jsonBody.substring(0, 200) + '...' : jsonBody}`;
+            }
+            wpsMsgBox(detail, 0, 16);
         }
     }
     catch (e) {

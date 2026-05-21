@@ -210,7 +210,7 @@ export const SYNC_STATUS = {
  */
 export const COLUMN_RULES = [
     [/bangumi.*url|bgm.*url|subject.*url|url.*bgm/i, "Bangumi_URL"],
-    [/是否看完|观看状态/, "是否看完"],
+    [/是否看完|观看状态|状态/, "是否看完"],
     [/完播日|完播时间|看完时间/, "完播日"],
     [/开播日期|开播时间|首播/, "开播日期"],
     [/开播季度|季度|年份/, "开播季度"],
