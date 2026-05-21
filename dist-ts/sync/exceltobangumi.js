@@ -965,7 +965,7 @@ export async function SyncToBangumiAsync(ws, colMap, token, lastRow, headerRow, 
  * 获取条目的所有章节 ID（按集号排序）
  */
 async function fetchEpisodeIds(sid, token) {
-    const url = `https://api.bgm.tv/v0/episodes?subject_id=${sid}&limit=1000`;
+    const url = `${BGM_CONFIG.API_BASE}/v0/episodes?subject_id=${sid}&limit=1000`;
     return new Promise((resolve, reject) => {
         const xhr = new XMLHttpRequest();
         xhr.open('GET', url, true);
@@ -978,10 +978,12 @@ async function fetchEpisodeIds(sid, token) {
                     const episodes = data.data || [];
                     episodes.sort((a, b) => (a.sort || 0) - (b.sort || 0));
                     resolve(episodes.map(ep => ep.id));
-                } catch {
+                }
+                catch {
                     reject(new Error('解析章节数据失败'));
                 }
-            } else {
+            }
+            else {
                 reject(new Error(`HTTP ${xhr.status}: ${xhr.responseText}`));
             }
         };
@@ -1008,7 +1010,8 @@ async function markEpisodesComplete(sid, epCount, token) {
             return { success: true, message: `已标记前 ${targetIds.length} 集为已完成` };
         }
         return { success: false, message: result.message };
-    } catch (e) {
+    }
+    catch (e) {
         return { success: false, message: e.message || '未知错误' };
     }
 }
@@ -1094,7 +1097,6 @@ export async function testSingleUpdate() {
         const result = await bgmRequestSync('POST', endpoint, jsonBody, token);
         if (result.code >= 200 && result.code < 300) {
             bgmLog(LOG_LEVELS.INFO, `[testSingleUpdate] 测试成功！SID: ${sid}, HTTP: ${result.code}`);
-
             // 标记章节为已完成
             const epRaw = trim(getCellValue(ws, targetRow, colMap.has('集数') ? colMap.get('集数') : colMap.get('集号')));
             const epCount = parseInt(epRaw, 10);
@@ -1103,7 +1105,8 @@ export async function testSingleUpdate() {
                 const epResult = await markEpisodesComplete(sid, epCount, token);
                 bgmLog(LOG_LEVELS.INFO, `[testSingleUpdate] 章节标记结果: ${epResult.message}`);
                 wpsMsgBox(`✓ 测试成功！集合已更新\n📺 章节: ${epResult.message}`, 0, 64);
-            } else {
+            }
+            else {
                 wpsMsgBox(`✓ 测试成功！\n\nSID: ${sid}\nHTTP: ${result.code}\n消息: ${result.message}`, 0, 64);
             }
         }

@@ -718,6 +718,7 @@ export function buildJsonPayload(
         // 感言
         let commentVal = trim(getField('剧透/感言') || getField('感言'));
         const nVal = trim(getField('特点/印象'));
+        bgmLog(LOG_LEVELS.INFO, `[buildJsonPayload] 剧透/感言="${commentVal}", 特点/印象="${nVal}"`);
         if (nVal) {
             commentVal = commentVal ? `${commentVal}\n${nVal}` : nVal;
         }
@@ -1324,8 +1325,10 @@ export async function testSingleUpdate(): Promise<void> {
             bgmLog(LOG_LEVELS.INFO, `[testSingleUpdate] 测试成功！SID: ${sid}, HTTP: ${result.code}`);
 
             // 标记章节为已完成
+            bgmLog(LOG_LEVELS.INFO, `[testSingleUpdate] colMap.has('集数')=${colMap.has('集数')}, colMap.has('集号')=${colMap.has('集号')}`);
             const epRaw = trim(getCellValue(ws, targetRow, colMap.has('集数') ? colMap.get('集数')! : colMap.get('集号')!));
             const epCount = parseInt(epRaw, 10);
+            bgmLog(LOG_LEVELS.INFO, `[testSingleUpdate] 读取集数: "${epRaw}" -> ${epCount}`);
             if (!isNaN(epCount) && epCount > 0) {
                 bgmLog(LOG_LEVELS.INFO, `[testSingleUpdate] 集数: ${epCount}，开始标记章节...`);
                 const epResult = await markEpisodesComplete(sid, epCount, token);
