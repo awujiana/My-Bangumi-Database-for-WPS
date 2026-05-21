@@ -1098,8 +1098,10 @@ export async function testSingleUpdate() {
         if (result.code >= 200 && result.code < 300) {
             bgmLog(LOG_LEVELS.INFO, `[testSingleUpdate] 测试成功！SID: ${sid}, HTTP: ${result.code}`);
             // 标记章节为已完成
+            bgmLog(LOG_LEVELS.INFO, `[testSingleUpdate] colMap.has('集数')=${colMap.has('集数')}, colMap.has('集号')=${colMap.has('集号')}`);
             const epRaw = trim(getCellValue(ws, targetRow, colMap.has('集数') ? colMap.get('集数') : colMap.get('集号')));
             const epCount = parseInt(epRaw, 10);
+            bgmLog(LOG_LEVELS.INFO, `[testSingleUpdate] 读取集数: "${epRaw}" -> ${epCount}`);
             if (!isNaN(epCount) && epCount > 0) {
                 bgmLog(LOG_LEVELS.INFO, `[testSingleUpdate] 集数: ${epCount}，开始标记章节...`);
                 const epResult = await markEpisodesComplete(sid, epCount, token);
