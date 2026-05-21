@@ -1,11 +1,14 @@
 """
 外部数据清洗脚本 — 独立于 WPS 运行
 ====================================
-功能：对 Excel 文件中重复名称的行进行清洗（去重、合并标签）
+功能：
+  1. 按"名称"列分组，对重复名称的行进行清洗（去重、合并标签）
+  2. 清除 Bangumi_URL 列中的超链接，转为纯文本 URL
+
 逻辑：
-  1. 按"名称"列分组
-  2. 同一名称有多条时：保留有 URL 的行，删除无 URL 的行
-  3. 被删除行的标签合并到保留行上（去重）
+  - 同一名称有多条时：保留有 URL 的行，删除无 URL 的行
+  - 被删除行的标签合并到保留行上（去重）
+  - 处理完毕后，移除所有保留行中 URL 列的超链接
 
 优化特性：
   - 优先使用 python-calamine 引擎加速 pandas 读取
@@ -27,6 +30,7 @@ import sys
 import os
 import shutil
 import time
+import re
 import pandas as pd
 from openpyxl import load_workbook
 from openpyxl.utils import get_column_letter
@@ -62,6 +66,30 @@ def pick_column(col_map, keywords, exclude_keywords=None):
 def parse_tags(tag_str):
     """解析 ' | ' 分隔的标签为 set"""
     return set(t.strip() for t in str(tag_str).split('|') if t.strip())
+
+
+def clean_hyperlinks_in_column(ws, col_idx, start_row, end_row):
+    """清除指定列从 start_row 到 end_row 的超链接，保留 URL 文本"""
+    col_letter = get_column_letter(col_idx)
+    # 匹配 =HYPERLINK("url") 格式
+    url_pattern = re.compile(r'=HYPERLINK\("([^"]*)"[^)]*\)')
+    cleaned = 0
+    for row in range(start_row, end_row + 1):
+        cell = ws.cell(row=row, column=col_idx)
+        # 1. 如果存在超链接对象，提取目标并清除
+        if cell.hyperlink:
+            target = cell.hyperlink.target
+            cell.value = target
+            cell.hyperlink = None
+            cleaned += 1
+        # 2. 如果值是 HYPERLINK 公式字符串
+        if isinstance(cell.value, str) and cell.value.startswith('=HYPERLINK'):
+            match = url_pattern.match(cell.value.strip())
+            if match:
+                cell.value = match.group(1)
+                cleaned += 1
+    if cleaned > 0:
+        print(f'[超链接] 已清除 {cleaned} 个单元格的超链接')
 
 
 def main():
@@ -159,7 +187,6 @@ def main():
     # ════════════════════════════════════════════════════════
     engine = None
     try:
-        # 尝试导入 calamine，若成功则使用
         import python_calamine  # noqa: F401
         engine = 'calamine'
         print('[Pandas] 使用 calamine 引擎读取')
@@ -313,6 +340,10 @@ def main():
         print(f'\n{"─"*60}')
         print(f'  ✅ 无需清洗')
         print(f'{"─"*60}')
+        # 即使没有删除，也可能需要清除超链接
+        print(f'\n[超链接] 正在检查 URL 列的超链接...')
+        clean_hyperlinks_in_column(ws, url_col_idx, header_row + 1, ws.max_row)
+        wb.save(filepath)
         wb.close()
         print(f'\n  ⏱️  耗时: {time.time() - start_total:.2f}s')
         return
@@ -346,6 +377,10 @@ def main():
         print(f'\r  ⏳ 删除进度: [{bar}] {del_count}/{total} 行 ({p*100:.0f}%)', end='', flush=True)
 
     print(f'\r  ✅ 删除完成: 共删除 {del_count} 行            ')
+
+    # ── 清除超链接 ──（在保存前执行）
+    print(f'\n[超链接] 正在清除 URL 列的超链接...')
+    clean_hyperlinks_in_column(ws, url_col_idx, header_row + 1, ws.max_row)
 
     # ── 保存 ──
     elapsed = time.time() - start_total
