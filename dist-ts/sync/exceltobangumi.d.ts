@@ -128,7 +128,7 @@ export declare function getSequentialRowsBySeqCol(startRow: number, endRow: numb
  * @description
  * 根据工作表中的数据构建Bangumi API所需的JSON格式。
  * 包含字段：type（状态）、rate（评分）、tags（标签）、
- * comment（感言）、ep（集数）、private（是否私有）
+ * comment（感言）、private（是否私有）
  */
 export declare function buildJsonPayload(getField: (key: string) => string, finishedDate: string): string;
 /**

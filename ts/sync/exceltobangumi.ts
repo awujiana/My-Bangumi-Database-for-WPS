@@ -667,7 +667,7 @@ export function getSequentialRowsBySeqCol(
  * @description
  * 根据工作表中的数据构建Bangumi API所需的JSON格式。
  * 包含字段：type（状态）、rate（评分）、tags（标签）、
- * comment（感言）、ep（集数）、private（是否私有）
+ * comment（感言）、private（是否私有）
  */
 export function buildJsonPayload(
     getField: (key: string) => string,
@@ -721,16 +721,7 @@ export function buildJsonPayload(
             payload.comment = commentVal;
         }
 
-        // 集数
-        const epVal = trim(getField('集数') || getField('集号'));
-        if (epVal) {
-            const ep = parseInt(epVal, 10);
-            if (!isNaN(ep) && ep > 0) {
-                payload.ep = ep;
-            }
-        }
-
-        // 私密收藏
+        // 隐私收藏
         const privateVal = trim(getField('私密收藏')).toLowerCase();
         if (privateVal === '是' || privateVal === '1' || privateVal === 'true') {
             payload.private = true;
