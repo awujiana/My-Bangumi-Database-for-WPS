@@ -63,7 +63,7 @@ import { showAlert, showSuccess, showError } from '../ui/dialog.js';
 /** 批量读取时需要获取的列名 */
 const BATCH_READ_COLUMNS = [
     'Bangumi_URL', '名称', '是否看完', '状态', '观看状态', '打分',
-    '标签/分级', '完播日', '类别', '剧透/感言', '集号', '集数'
+    '标签/分级', '完播日', '类别', '剧透/感言', '集号', '集数', '特点/印象'
 ] as const;
 
 /** 观看状态类型名称映射 (优化点：提取常量) */
@@ -716,7 +716,11 @@ export function buildJsonPayload(
         }
 
         // 感言
-        const commentVal = trim(getField('剧透/感言') || getField('感言'));
+        let commentVal = trim(getField('剧透/感言') || getField('感言'));
+        const nVal = trim(getField('特点/印象'));
+        if (nVal) {
+            commentVal = commentVal ? `${commentVal}\n${nVal}` : nVal;
+        }
         if (commentVal) {
             payload.comment = commentVal;
         }
