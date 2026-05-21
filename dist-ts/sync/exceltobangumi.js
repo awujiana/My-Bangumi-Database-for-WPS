@@ -7,7 +7,7 @@
  * @author BGM Development Team
  * @version 1.1.0 (优化版，保留原注释和日志)
  */
-import { URL_PATTERNS, WATCH_STATUS_MAP, BGM_CONFIG, BGM_COLOR, LOG_LEVELS, SYNC_STATUS, bgmLog, getApp, getCell, trim, getColumnMap, findHeaderRow, colNumToLetter, getCellValue, loadBgToken, storeBgToken, _setBgmUserId, _setBgmUsername, BGM, wpsMsgBox, _getUserApiPath, readRangeValues, delay, calcFingerprint, getAllSyncRecords, isWpsWorksheet } from '../index.js';
+import { URL_PATTERNS, WATCH_STATUS_MAP, BGM_CONFIG, BGM_COLOR, LOG_LEVELS, SYNC_STATUS, bgmLog, getApp, getCell, trim, getColumnMap, clearSheetCache, findHeaderRow, colNumToLetter, getCellValue, loadBgToken, storeBgToken, _setBgmUserId, _setBgmUsername, BGM, wpsMsgBox, _getUserApiPath, readRangeValues, delay, calcFingerprint, getAllSyncRecords, isWpsWorksheet } from '../index.js';
 import { getOrCreateSyncRecordSheet, addSyncRecord } from './syncRecord.js';
 import { showAlert, showSuccess, showError } from '../ui/dialog.js';
 // ========== 常量定义 (优化点：集中管理) ==========
@@ -752,6 +752,17 @@ async function batchSyncRequests(tasks, token, userIdPath, concurrency = DEFAULT
                     if (apiResult.code >= 200 && apiResult.code < 300) {
                         success.push(task);
                         bgmLog(LOG_LEVELS.INFO, `[batchSyncRequests] SID ${task.sid} 同步成功，HTTP ${apiResult.code}`);
+                        // 标记章节为已完成
+                        if (task.epCount && task.epCount > 0) {
+                            try {
+                                bgmLog(LOG_LEVELS.INFO, `[batchSyncRequests] SID ${task.sid} 集数: ${task.epCount}，开始标记章节...`);
+                                const epResult = await markEpisodesComplete(task.sid, task.epCount, token);
+                                bgmLog(LOG_LEVELS.INFO, `[batchSyncRequests] SID ${task.sid} 章节标记结果: ${epResult.message}`);
+                            }
+                            catch (epErr) {
+                                bgmLog(LOG_LEVELS.WARN, `[batchSyncRequests] SID ${task.sid} 章节标记异常: ${epErr.message}`);
+                            }
+                        }
                     }
                     else {
                         fail.push(task);
@@ -886,7 +897,12 @@ export async function SyncToBangumiAsync(ws, colMap, token, lastRow, headerRow, 
                 name,
                 jsonBody,
                 fingerprint: currentFingerprint,
-                type: watchType
+                type: watchType,
+                epCount: (() => {
+                    const raw = trim(getField(rowNum, '集数') || getField(rowNum, '集号') || '');
+                    const n = parseInt(raw, 10);
+                    return (!isNaN(n) && n > 0) ? n : undefined;
+                })()
             });
         }
         catch (e) {
@@ -1053,8 +1069,10 @@ export async function testSingleUpdate() {
         // 查找URL列
         const headerRow = findHeaderRow(ws) || 1;
         bgmLog(LOG_LEVELS.INFO, `[testSingleUpdate] 表头行: ${headerRow}`);
+        clearSheetCache(ws);
         const colMap = getColumnMap(ws, headerRow);
         bgmLog(LOG_LEVELS.INFO, `[testSingleUpdate] 列映射完成，共 ${colMap.size} 列`);
+        bgmLog(LOG_LEVELS.INFO, `[testSingleUpdate] 集数列号: ${colMap.get('集数')}, 集号列号: ${colMap.get('集号')}, Bangumi_URL列号: ${colMap.get('Bangumi_URL')}`);
         if (!colMap.has('Bangumi_URL')) {
             bgmLog(LOG_LEVELS.WARN, '[testSingleUpdate] 未找到 Bangumi_URL 列');
             wpsMsgBox('未找到 Bangumi URL 列', 0, 48);

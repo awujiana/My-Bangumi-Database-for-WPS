@@ -962,8 +962,11 @@ export function getColumnMap(ws: any, headerRow: number): Map<string, number> {
             if (!colName) continue;
             for (const [pattern, key] of COLUMN_RULES) {
                 if (pattern.test(colName)) {
-                    colMap.set(key, i);
-                    break;  // 每个列名只匹配第一个规则
+                    if (!colMap.has(key)) {
+                        colMap.set(key, i);
+                        break;  // 匹配到未映射的key，处理下一列
+                    }
+                    // 该key已被前面的列匹配，继续尝试其他规则
                 }
             }
         }
