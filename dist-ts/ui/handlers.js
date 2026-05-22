@@ -3,7 +3,7 @@
  * @module ui/handlers
  * @description 面板操作处理、按钮绑定、业务对话框
  */
-import { LOG_LEVELS, bgmLog, BGM, loadBgToken, storeBgToken, clearBgToken, _getBgmUserId, _setBgmUserId, _getBgmUsername, _setBgmUsername, getApp, getCell, trim, setCellValue, fetchBgmUserInfo, BGM_COLOR, showAlert, showConfirm, showError, showSuccess, showInput, showToast, setStatus, verifyToken, fetchAllUserCollections, findHeaderRow, getColumnMap, getLastRow, extractSubjectId, getDataSheet, SyncToBangumiAsync, testSingleUpdate, testSelectedRowsUpdate, getOrCreateSyncRecordSheet, getAllSyncRecords, addSyncRecord, openSyncRecordSheet, deduplicateSyncRecords, formatSyncRecordSheet, previewSyncContent, refreshData, refreshSheets, toggleSheetLock, clearSyncRecords, closeDetailModal, getIncrementalSync, setIncrementalSync, getSkipConflicts, setSkipConflicts, COLLECTION_TYPE_NAMES, readRangeValues, } from '../index.js';
+import { LOG_LEVELS, bgmLog, BGM, loadBgToken, storeBgToken, clearBgToken, _getBgmUserId, _setBgmUserId, _getBgmUsername, _setBgmUsername, getApp, getCell, trim, setCellValue, fetchBgmUserInfo, BGM_COLOR, showAlert, showConfirm, showError, showSuccess, showInput, showToast, setStatus, verifyToken, fetchAllUserCollections, findHeaderRow, getColumnMap, getLastRow, extractSubjectId, getDataSheet, SyncToBangumiAsync, testSelectedRowsUpdate, getOrCreateSyncRecordSheet, getAllSyncRecords, addSyncRecord, openSyncRecordSheet, deduplicateSyncRecords, formatSyncRecordSheet, previewSyncContent, refreshData, refreshSheets, toggleSheetLock, clearSyncRecords, closeDetailModal, getIncrementalSync, setIncrementalSync, getSkipConflicts, setSkipConflicts, COLLECTION_TYPE_NAMES, readRangeValues, } from '../index.js';
 import { BGM_EVENTS, eventBus } from '../tools/events.js';
 //  
 import { getSyncPreview, detectConflicts } from '../services/ribbonService.js';
@@ -222,10 +222,6 @@ export function onAction(action) {
     switch (action) {
         case 'sync':
             syncFromPanel();
-            break;
-        case 'test':
-            if (typeof testSingleUpdate === 'function')
-                testSingleUpdate();
             break;
         case 'clear':
             showConfirm(_T.confirmClearMarks, (confirmed) => {
@@ -536,19 +532,6 @@ export function hideStopButton() {
         stopBtn.style.display = 'none';
     bgmLog(LOG_LEVELS.INFO, '[handlers] 停止按钮已隐藏，同步按钮已显示');
 }
-export function testSingleUpdateFromPanel() {
-    if (typeof findHeaderRow !== 'function') {
-        setTimeout(testSingleUpdateFromPanel, 500);
-        return;
-    }
-    const token = loadBgToken();
-    if (!token) {
-        showAlert(_T.pleaseSetBgmToken);
-        return;
-    }
-    if (typeof testSingleUpdate === 'function')
-        testSingleUpdate();
-}
 // ========== 从BGM同步收藏标记 ==========
 export async function syncCollectionFromBgm() {
     const startTime = Date.now();
@@ -758,16 +741,6 @@ function handleActionClick(event) {
             bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 开始执行同步操作');
             syncFromPanel();
             bgmLog(LOG_LEVELS.INFO, `[handleActionClick] 同步操作已触发，耗时: ${Date.now() - startTime}ms`);
-            break;
-        case 'test':
-            bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 开始执行单条测试更新');
-            if (typeof testSingleUpdate === 'function') {
-                testSingleUpdate();
-                bgmLog(LOG_LEVELS.INFO, `[handleActionClick] 单条测试更新已触发，耗时: ${Date.now() - startTime}ms`);
-            }
-            else {
-                bgmLog(LOG_LEVELS.WARN, '[handleActionClick] testSingleUpdate 函数未定义');
-            }
             break;
         case 'testSelected':
             bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 开始执行选中行同步');
