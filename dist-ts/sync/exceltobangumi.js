@@ -366,7 +366,8 @@ export function buildTagsArray(tagsRaw) {
  * @param headerRow 表头行号，用于排除
  * @returns hasFilter, visibleRows（不含表头和全空行）, hiddenRows
  */
-export function getFilterStatus(wsOrLastRow, lastRow, headerRow, deepCheck) {
+export function getFilterStatus(wsOrLastRow, lastRow, headerRow, deepCheck // true: 也检测非 AutoFilter 的隐藏行（性能开销）
+) {
     const result = {
         hasFilter: false,
         visibleRows: [],

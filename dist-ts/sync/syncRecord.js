@@ -12,6 +12,7 @@ import { LOG_LEVELS, SYNC_STATUS, BGM_COLOR, bgmLog, getApp, BGM, getLastRow, co
 let _syncRecordSidCache = new Map();
 let _syncRecordListCache = [];
 let _syncRecordCacheValid = false;
+let _formattingInProgress = false;
 /**
  * 根据同步次数获取颜色
  */
@@ -105,7 +106,7 @@ export function getOrCreateSyncRecordSheet() {
         }
     }
     // 自动设置格式（列宽、行高、字体、居中、边框等）
-    formatSyncRecordSheet();
+    formatSyncRecordSheet(syncSheet);
     invalidateCache();
     return syncSheet;
 }
@@ -388,16 +389,19 @@ export function deduplicateSyncRecords() {
         return false;
     }
 }
-export function formatSyncRecordSheet() {
+export function formatSyncRecordSheet(sheet) {
+    if (_formattingInProgress)
+        return;
+    _formattingInProgress = true;
     try {
-        const sheet = getOrCreateSyncRecordSheet();
-        const lastRow = getLastRow(sheet);
+        const target = sheet || getOrCreateSyncRecordSheet();
+        const lastRow = getLastRow(target);
         if (lastRow < 1)
             return;
         const colCount = SYNC_RECORD_COLUMNS.length;
         const lastColLetter = colNumToLetter(colCount);
-        const fullRange = sheet.Range(`A1:${lastColLetter}${lastRow}`);
-        const dataRange = lastRow >= 2 ? sheet.Range(`A2:${lastColLetter}${lastRow}`) : null;
+        const fullRange = target.Range(`A1:${lastColLetter}${lastRow}`);
+        const dataRange = lastRow >= 2 ? target.Range(`A2:${lastColLetter}${lastRow}`) : null;
         // 1. 字体
         try {
             fullRange.Font.Name = 'Maple Mono NF CN Medium';
@@ -417,7 +421,7 @@ export function formatSyncRecordSheet() {
         }
         // 表头也居中
         try {
-            sheet.Range(`A1:${lastColLetter}1`).HorizontalAlignment = -4108;
+            target.Range(`A1:${lastColLetter}1`).HorizontalAlignment = -4108;
         }
         catch (_) { }
         // 4. 自动列宽（全列）
@@ -428,7 +432,7 @@ export function formatSyncRecordSheet() {
         // 5. URL 列（D列）固定宽度，不撑宽也不撑高
         const urlColLetter = colNumToLetter(SYNC_RECORD_COL.URL);
         try {
-            const urlRange = sheet.Range(`${urlColLetter}:${urlColLetter}`);
+            const urlRange = target.Range(`${urlColLetter}:${urlColLetter}`);
             urlRange.ColumnWidth = 42;
         }
         catch (_) { }
@@ -451,8 +455,10 @@ export function formatSyncRecordSheet() {
             catch (_) { }
         }
         bgmLog(LOG_LEVELS.INFO, '同步记录表格式已设置');
+        _formattingInProgress = false;
     }
     catch (e) {
+        _formattingInProgress = false;
         BGM.handleError(e, { context: 'formatSyncRecordSheet', showAlert: false });
     }
 }

@@ -50,6 +50,7 @@ export interface UpdateRecordParams {
 let _syncRecordSidCache = new Map<string, number>();
 let _syncRecordListCache: SyncRecord[] = [];
 let _syncRecordCacheValid = false;
+let _formattingInProgress = false;
 
 /**
  * 根据同步次数获取颜色
@@ -147,7 +148,7 @@ export function getOrCreateSyncRecordSheet(): any {
     }
 
     // 自动设置格式（列宽、行高、字体、居中、边框等）
-    formatSyncRecordSheet();
+    formatSyncRecordSheet(syncSheet);
 
     invalidateCache();
     return syncSheet;
@@ -436,16 +437,18 @@ export function deduplicateSyncRecords(): boolean {
     }
 }
 
-export function formatSyncRecordSheet(): void {
+export function formatSyncRecordSheet(sheet?: any): void {
+    if (_formattingInProgress) return;
+    _formattingInProgress = true;
     try {
-        const sheet = getOrCreateSyncRecordSheet();
-        const lastRow = getLastRow(sheet);
+        const target = sheet || getOrCreateSyncRecordSheet();
+        const lastRow = getLastRow(target);
         if (lastRow < 1) return;
 
         const colCount = SYNC_RECORD_COLUMNS.length;
         const lastColLetter = colNumToLetter(colCount);
-        const fullRange = sheet.Range(`A1:${lastColLetter}${lastRow}`);
-        const dataRange = lastRow >= 2 ? sheet.Range(`A2:${lastColLetter}${lastRow}`) : null;
+        const fullRange = target.Range(`A1:${lastColLetter}${lastRow}`);
+        const dataRange = lastRow >= 2 ? target.Range(`A2:${lastColLetter}${lastRow}`) : null;
 
         // 1. 字体
         try { fullRange.Font.Name = 'Maple Mono NF CN Medium'; } catch (_) {}
@@ -458,7 +461,7 @@ export function formatSyncRecordSheet(): void {
             try { dataRange.HorizontalAlignment = -4108; } catch (_) {}
         }
         // 表头也居中
-        try { sheet.Range(`A1:${lastColLetter}1`).HorizontalAlignment = -4108; } catch (_) {}
+        try { target.Range(`A1:${lastColLetter}1`).HorizontalAlignment = -4108; } catch (_) {}
 
         // 4. 自动列宽（全列）
         try { fullRange.EntireColumn.AutoFit(); } catch (_) {}
@@ -466,7 +469,7 @@ export function formatSyncRecordSheet(): void {
         // 5. URL 列（D列）固定宽度，不撑宽也不撑高
         const urlColLetter = colNumToLetter(SYNC_RECORD_COL.URL);
         try {
-            const urlRange = sheet.Range(`${urlColLetter}:${urlColLetter}`);
+            const urlRange = target.Range(`${urlColLetter}:${urlColLetter}`);
             urlRange.ColumnWidth = 42;
         } catch (_) {}
 
@@ -489,7 +492,9 @@ export function formatSyncRecordSheet(): void {
         }
 
         bgmLog(LOG_LEVELS.INFO, '同步记录表格式已设置');
+        _formattingInProgress = false;
     } catch (e: any) {
+        _formattingInProgress = false;
         BGM.handleError(e, { context: 'formatSyncRecordSheet', showAlert: false });
     }
 }
