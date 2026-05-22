@@ -167,11 +167,15 @@ def main():
     music_col_name, music_col_idx = pick_column(col_map, ['音乐', '作曲', 'Music'])
     chara_design_col_name, chara_design_col_idx = pick_column(col_map, ['人物设定', '人设', '角色设计', 'Character Design'])
     mecha_design_col_name, mecha_design_col_idx = pick_column(col_map, ['机械设定', '机设', 'Mecha Design'])
-    original_col_name, original_col_idx = pick_column(col_map, ['原作', '原案', 'Original'])
+    original_col_name, original_col_idx = pick_column(col_map, ['原作', 'Original'])
+    original_plan_col_name, original_plan_col_idx = pick_column(col_map, ['原案', 'Original Plan'])
     script_col_name, script_col_idx = pick_column(col_map, ['脚本', '编剧', '剧本', 'Screenplay'])
+    series_composition_col_name, series_composition_col_idx = pick_column(col_map, ['系列构成', 'Series Composition'])
     storyboard_col_name, storyboard_col_idx = pick_column(col_map, ['分镜', 'Storyboard'])
     performance_col_name, performance_col_idx = pick_column(col_map, ['演出', 'Episode Director'])
     related_id_col_name, related_id_col_idx = pick_column(col_map, ['关联的动漫ID', '关联ID', '关联动漫', 'Related ID', 'RelatedAnimeID'])
+    start_date_col_name, start_date_col_idx = pick_column(col_map, ['开播日期', '开播', '首播', 'Start Date', 'StartDate'])
+    end_date_col_name, end_date_col_idx = pick_column(col_map, ['完播日', '完播日期', '完结', 'End Date', 'EndDate'])
 
     if not name_col_name:
         print('  ❌ 未找到"名称"列')
@@ -195,14 +199,18 @@ def main():
     chara_design_col_l = get_column_letter(chara_design_col_idx) if chara_design_col_idx else '-'
     mecha_design_col_l = get_column_letter(mecha_design_col_idx) if mecha_design_col_idx else '-'
     original_col_l = get_column_letter(original_col_idx) if original_col_idx else '-'
+    original_plan_col_l = get_column_letter(original_plan_col_idx) if original_plan_col_idx else '-'
     script_col_l = get_column_letter(script_col_idx) if script_col_idx else '-'
+    series_composition_col_l = get_column_letter(series_composition_col_idx) if series_composition_col_idx else '-'
     storyboard_col_l = get_column_letter(storyboard_col_idx) if storyboard_col_idx else '-'
     performance_col_l = get_column_letter(performance_col_idx) if performance_col_idx else '-'
     related_id_col_l = get_column_letter(related_id_col_idx) if related_id_col_idx else '-'
+    start_date_col_l = get_column_letter(start_date_col_idx) if start_date_col_idx else '-'
+    end_date_col_l = get_column_letter(end_date_col_idx) if end_date_col_idx else '-'
     print(f'  📋 {sheet_name} ({ws.max_row}行) | 名称={name_col_l} URL={url_col_l} 标签={tags_col_l} 别名={alias_col_l}')
     print(f'      类别={category_col_l} 制作={company_col_l} 集数={episodes_col_l} 时长={duration_col_l} 导演={director_col_l} 音乐={music_col_l}')
-    print(f'      人设={chara_design_col_l} 机设={mecha_design_col_l} 原作={original_col_l} 脚本={script_col_l} 分镜={storyboard_col_l} 演出={performance_col_l}')
-    print(f'      关联ID={related_id_col_l}')
+    print(f'      人设={chara_design_col_l} 机设={mecha_design_col_l} 原作={original_col_l} 原案={original_plan_col_l} 脚本={script_col_l} 系列构成={series_composition_col_l}')
+    print(f'      分镜={storyboard_col_l} 演出={performance_col_l} 关联ID={related_id_col_l} 开播={start_date_col_l} 完播={end_date_col_l}')
 
     engine = None
     if is_xlsm:
@@ -305,6 +313,7 @@ def main():
         # 无 URL 的行也加入删除列表
         del_row_nums.extend([header_row + 1 + i for i in without_url.index])
         keep_row_num = header_row + 1 + keep_idx
+        keep_df_row = df_valid.loc[keep_idx]
 
         # ── 增量合并列（| 分隔，去重追加） ──
         merge_cols = [
@@ -312,11 +321,13 @@ def main():
             (alias_col_name, alias_col_idx),
             (category_col_name, category_col_idx),
             (company_col_name, company_col_idx),
+            (related_id_col_name, related_id_col_idx),
+            (start_date_col_name, start_date_col_idx),
+            (end_date_col_name, end_date_col_idx),
         ]
         for col_name, col_idx in merge_cols:
             if not col_name or len(del_row_nums) == 0:
                 continue
-            keep_df_row = df_valid.loc[keep_idx]
             raw_before = keep_df_row.get(col_name, '')
             before = '' if pd.isna(raw_before) or str(raw_before).strip() in ('', 'nan') else str(raw_before).strip()
             existing = parse_tags(before)
@@ -345,15 +356,15 @@ def main():
             (chara_design_col_name, chara_design_col_idx),
             (mecha_design_col_name, mecha_design_col_idx),
             (original_col_name, original_col_idx),
+            (original_plan_col_name, original_plan_col_idx),
             (script_col_name, script_col_idx),
+            (series_composition_col_name, series_composition_col_idx),
             (storyboard_col_name, storyboard_col_idx),
             (performance_col_name, performance_col_idx),
-            (related_id_col_name, related_id_col_idx),
         ]
         for col_name, col_idx in overwrite_cols:
             if not col_name or len(del_row_nums) == 0:
                 continue
-            keep_df_row = df_valid.loc[keep_idx]
             raw_old = keep_df_row.get(col_name, '')
             old_val = '' if pd.isna(raw_old) or str(raw_old).strip() in ('', 'nan') else str(raw_old).strip()
             for del_row_num in del_row_nums:
