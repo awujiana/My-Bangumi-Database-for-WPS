@@ -457,7 +457,8 @@ export function buildTagsArray(tagsRaw: string): string[] {
 export function getFilterStatus(
     wsOrLastRow?: WpsWorksheet | number,
     lastRow?: number,
-    headerRow?: number
+    headerRow?: number,
+    deepCheck?: boolean  // true: 也检测非 AutoFilter 的隐藏行（性能开销）
 ): {
     hasFilter: boolean;
     visibleRows: number[];
@@ -498,17 +499,23 @@ export function getFilterStatus(
         try { autoFilterMode = !!ws.AutoFilterMode; } catch (e: any) {
             BGM.handleError(e, { context: 'getFilterStatus', showAlert: false });
         }
-        bgmLog(LOG_LEVELS.INFO, `getFilterStatus: AutoFilterMode=${autoFilterMode}, ws.Name=${ws.Name}`);
+        bgmLog(LOG_LEVELS.INFO, `getFilterStatus: AutoFilterMode=${autoFilterMode}, ws.Name=${ws.Name}, deepCheck=${deepCheck}`);
 
-        // 2. 确定扫描范围（直接用传入的 lastRow，不用 End 定位）
+        // 2. 快速检测：仅在 deepCheck 时才扫描全范围
+        //    旧用法（无 deepCheck）只查 AutoFilter，这是兼容的快速路径
+        if (!autoFilterMode && !deepCheck) {
+            bgmLog(LOG_LEVELS.INFO, 'getFilterStatus: 快速路径：无 AutoFilter');
+            return result;
+        }
+
+        // 3. 确定扫描范围（非 AutoFilter 模式需要全范围扫描隐藏行）
         const maxRow = effectiveLastRow && effectiveLastRow > 0 ? effectiveLastRow : ws.Rows.Count;
         const scanRange = ws.Range(`A1:A${maxRow}`);
         bgmLog(LOG_LEVELS.INFO, `getFilterStatus: 扫描范围 A1:A${maxRow}`);
 
-        // 3. 获取可见单元格来检测筛选/隐藏行
+        // 4. 获取可见单元格来检测筛选/隐藏行
         let visibleCells: WpsRange | null = null;
         if (autoFilterMode) {
-            // 有 AutoFilter → 用其范围（更精确）
             try {
                 if (ws.AutoFilter?.Range) {
                     visibleCells = ws.AutoFilter.Range.SpecialCells(12) as WpsRange;
@@ -518,7 +525,7 @@ export function getFilterStatus(
                 BGM.handleError(e, { context: 'getFilterStatus', showAlert: false });
             }
         } else {
-            // 无 AutoFilter → 用全范围检测手动隐藏行
+            // deepCheck 模式：用全范围检测手动隐藏行
             try {
                 visibleCells = scanRange.SpecialCells(12) as WpsRange;
             } catch (e: any) { /* 所有行可见时抛出异常，忽略 */ }
@@ -529,7 +536,7 @@ export function getFilterStatus(
             return result;
         }
 
-        // 4. 快速判断：可见行数 ≈ 总行数 → 无隐藏行（仅对非 AutoFilter 模式）
+        // 5. 快速判断：可见行数 ≈ 总行数 → 无隐藏行（仅对非 AutoFilter 的 deepCheck 模式）
         if (!autoFilterMode) {
             try {
                 const totalCount = scanRange.Count;
@@ -543,7 +550,7 @@ export function getFilterStatus(
 
         result.hasFilter = true;
 
-        // 5. 提取所有可见行号（去重）
+        // 6. 提取所有可见行号（去重）
         const rawRows = new Set<number>();
         if (visibleCells) {
             const areas: WpsRange[] = [];
@@ -992,7 +999,7 @@ export async function SyncToBangumiAsync(
     bgmLog(LOG_LEVELS.INFO, `[SyncToBangumiAsync]   - 序列号列: ${seqCol} (列${colNumToLetter(seqCol)})`);
 
     // ========== 1. 获取可见行（筛选状态） ==========
-    const filterStatus = getFilterStatus(ws, lastRow, headerRow);
+    const filterStatus = getFilterStatus(ws, lastRow, headerRow, true);
     let rowsToProcess: number[] = [];
     if (filterStatus.hasFilter && filterStatus.visibleRows.length > 0) {
         rowsToProcess = filterStatus.visibleRows.filter(r => r >= startRow);

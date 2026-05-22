@@ -93,7 +93,7 @@ export declare function buildTagsArray(tagsRaw: string): string[];
  * @param headerRow 表头行号，用于排除
  * @returns hasFilter, visibleRows（不含表头和全空行）, hiddenRows
  */
-export declare function getFilterStatus(wsOrLastRow?: WpsWorksheet | number, lastRow?: number, headerRow?: number): {
+export declare function getFilterStatus(wsOrLastRow?: WpsWorksheet | number, lastRow?: number, headerRow?: number, deepCheck?: boolean): {
     hasFilter: boolean;
     visibleRows: number[];
     hiddenRows: number[];
