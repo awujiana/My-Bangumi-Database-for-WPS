@@ -752,16 +752,19 @@ async function batchSyncRequests(tasks, token, userIdPath, concurrency = DEFAULT
                     if (apiResult.code >= 200 && apiResult.code < 300) {
                         success.push(task);
                         bgmLog(LOG_LEVELS.INFO, `[batchSyncRequests] SID ${task.sid} 同步成功，HTTP ${apiResult.code}`);
-                        // 标记章节为已完成
-                        if (task.epCount && task.epCount > 0) {
+                        // 标记章节为已完成（仅"看过"状态才需要标记）
+                        if (task.type === 3 && task.epCount && task.epCount > 0) {
                             try {
-                                bgmLog(LOG_LEVELS.INFO, `[batchSyncRequests] SID ${task.sid} 集数: ${task.epCount}，开始标记章节...`);
+                                bgmLog(LOG_LEVELS.INFO, `[batchSyncRequests] SID ${task.sid} 状态"看过"(type=3)，集数: ${task.epCount}，开始标记章节...`);
                                 const epResult = await markEpisodesComplete(task.sid, task.epCount, token);
                                 bgmLog(LOG_LEVELS.INFO, `[batchSyncRequests] SID ${task.sid} 章节标记结果: ${epResult.message}`);
                             }
                             catch (epErr) {
                                 bgmLog(LOG_LEVELS.WARN, `[batchSyncRequests] SID ${task.sid} 章节标记异常: ${epErr.message}`);
                             }
+                        }
+                        else if (task.epCount && task.epCount > 0) {
+                            bgmLog(LOG_LEVELS.INFO, `[batchSyncRequests] SID ${task.sid} 状态非"看过"(type=${task.type})，跳过章节标记`);
                         }
                     }
                     else {
@@ -1145,14 +1148,18 @@ export async function testSelectedRowsUpdate() {
                     successCount++;
                     details.push(`✓ 行${rowNum} ${name || sid} HTTP:${result.code}`);
                     bgmLog(LOG_LEVELS.INFO, `[testSelectedRowsUpdate] ${rowProgress} 行${rowNum} "${name || sid}" 同步成功！HTTP: ${result.code}`);
-                    // 标记章节为已完成
+                    // 标记章节为已完成（仅"看过"状态才需要标记）
+                    const watchType = JSON.parse(jsonBody).type;
                     const epRaw = trim(getCellValue(ws, rowNum, colMap.has('集数') ? colMap.get('集数') : colMap.get('集号')));
                     const epCount = parseInt(epRaw, 10);
-                    if (!isNaN(epCount) && epCount > 0) {
-                        bgmLog(LOG_LEVELS.INFO, `[testSelectedRowsUpdate] ${rowProgress} 行${rowNum} 集数: ${epCount}，开始标记章节...`);
+                    if (watchType === 3 && !isNaN(epCount) && epCount > 0) {
+                        bgmLog(LOG_LEVELS.INFO, `[testSelectedRowsUpdate] ${rowProgress} 行${rowNum} 状态"看过"(type=3)，集数: ${epCount}，开始标记章节...`);
                         const epResult = await markEpisodesComplete(sid, epCount, token);
                         episodeMarkCount++;
                         bgmLog(LOG_LEVELS.INFO, `[testSelectedRowsUpdate] ${rowProgress} 行${rowNum} 章节标记结果: ${epResult.message}`);
+                    }
+                    else if (!isNaN(epCount) && epCount > 0) {
+                        bgmLog(LOG_LEVELS.INFO, `[testSelectedRowsUpdate] ${rowProgress} 行${rowNum} 状态非"看过"(type=${watchType})，跳过章节标记`);
                     }
                 }
                 else {
