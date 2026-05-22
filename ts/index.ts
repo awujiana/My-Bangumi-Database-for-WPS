@@ -160,8 +160,8 @@ export {
     getSequentialRowsBySeqCol,
     // 异步同步到 Bangumi
     SyncToBangumiAsync,
-    // 测试选中行更新
-    testSelectedRowsUpdate,
+    // 同步选中行
+    syncSelectedRows,
     mapWatchStatus,
     buildJsonPayload,
     bgmRequestSync,

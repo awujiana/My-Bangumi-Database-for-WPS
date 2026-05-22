@@ -1035,31 +1035,31 @@ async function markEpisodesComplete(sid, epCount, token) {
     }
 }
 /**
- * 测试选中行更新（多行/单行）
+ * 选中行同步到 Bangumi（多行/单行）
  */
-export async function testSelectedRowsUpdate() {
+export async function syncSelectedRows() {
     const startTime = Date.now();
-    bgmLog(LOG_LEVELS.INFO, '[testSelectedRowsUpdate] ========== 开始选中行同步 ==========');
+    bgmLog(LOG_LEVELS.INFO, '[syncSelectedRows] ========== 开始选中行同步 ==========');
     try {
         const app = getApp();
         if (!app?.ActiveWorkbook) {
-            bgmLog(LOG_LEVELS.ERROR, '[testSelectedRowsUpdate] 无法获取 Application');
+            bgmLog(LOG_LEVELS.ERROR, '[syncSelectedRows] 无法获取 Application');
             wpsMsgBox('无法获取 Application', 0, 48);
             return;
         }
         const ws = app.ActiveWorkbook.ActiveSheet;
         if (!ws) {
-            bgmLog(LOG_LEVELS.ERROR, '[testSelectedRowsUpdate] 无法获取工作表');
+            bgmLog(LOG_LEVELS.ERROR, '[syncSelectedRows] 无法获取工作表');
             wpsMsgBox('无法获取工作表', 0, 48);
             return;
         }
-        bgmLog(LOG_LEVELS.INFO, '[testSelectedRowsUpdate] 工作表获取成功');
+        bgmLog(LOG_LEVELS.INFO, '[syncSelectedRows] 工作表获取成功');
         // 获取选中的行范围
         let rawRows = [];
         try {
             const sel = app.Selection;
             if (!sel) {
-                bgmLog(LOG_LEVELS.WARN, '[testSelectedRowsUpdate] 未选中任何区域');
+                bgmLog(LOG_LEVELS.WARN, '[syncSelectedRows] 未选中任何区域');
                 wpsMsgBox('请先在Excel中选中要同步的数据行', 0, 48);
                 return;
             }
@@ -1068,44 +1068,44 @@ export async function testSelectedRowsUpdate() {
             for (let r = startRow; r < startRow + rowCount; r++) {
                 rawRows.push(r);
             }
-            bgmLog(LOG_LEVELS.INFO, `[testSelectedRowsUpdate] 选中区域: ${rowCount} 行，行号 ${startRow}-${startRow + rowCount - 1}`);
+            bgmLog(LOG_LEVELS.INFO, `[syncSelectedRows] 选中区域: ${rowCount} 行，行号 ${startRow}-${startRow + rowCount - 1}`);
         }
         catch (e) {
-            BGM.handleError(e, { context: 'testSelectedRowsUpdate', showAlert: false });
+            BGM.handleError(e, { context: 'syncSelectedRows', showAlert: false });
             wpsMsgBox('获取选中区域失败，请检查是否选中了有效区域', 0, 48);
             return;
         }
         if (rawRows.length === 0) {
-            bgmLog(LOG_LEVELS.WARN, '[testSelectedRowsUpdate] 没有选中任何行');
+            bgmLog(LOG_LEVELS.WARN, '[syncSelectedRows] 没有选中任何行');
             wpsMsgBox('请先在Excel中选中要同步的数据行', 0, 48);
             return;
         }
         const headerRow = findHeaderRow(ws) || 1;
-        bgmLog(LOG_LEVELS.INFO, `[testSelectedRowsUpdate] 表头行: ${headerRow}`);
+        bgmLog(LOG_LEVELS.INFO, `[syncSelectedRows] 表头行: ${headerRow}`);
         // 排除表头行
         const rows = rawRows.filter(r => r > headerRow);
-        bgmLog(LOG_LEVELS.INFO, `[testSelectedRowsUpdate] 排除表头后有效数据行: ${rows.length} 行（原始选中 ${rawRows.length} 行）`);
+        bgmLog(LOG_LEVELS.INFO, `[syncSelectedRows] 排除表头后有效数据行: ${rows.length} 行（原始选中 ${rawRows.length} 行）`);
         if (rows.length === 0) {
-            bgmLog(LOG_LEVELS.WARN, '[testSelectedRowsUpdate] 排除表头后没有有效数据行');
+            bgmLog(LOG_LEVELS.WARN, '[syncSelectedRows] 排除表头后没有有效数据行');
             wpsMsgBox('当前选中区域只有表头行，没有数据行', 0, 48);
             return;
         }
         clearSheetCache(ws);
         const colMap = getColumnMap(ws, headerRow);
-        bgmLog(LOG_LEVELS.INFO, `[testSelectedRowsUpdate] 列映射完成，共 ${colMap.size} 列`);
-        bgmLog(LOG_LEVELS.INFO, `[testSelectedRowsUpdate] 集数列号: ${colMap.get('集数')}, 集号列号: ${colMap.get('集号')}, Bangumi_URL列号: ${colMap.get('Bangumi_URL')}`);
+        bgmLog(LOG_LEVELS.INFO, `[syncSelectedRows] 列映射完成，共 ${colMap.size} 列`);
+        bgmLog(LOG_LEVELS.INFO, `[syncSelectedRows] 集数列号: ${colMap.get('集数')}, 集号列号: ${colMap.get('集号')}, Bangumi_URL列号: ${colMap.get('Bangumi_URL')}`);
         if (!colMap.has('Bangumi_URL')) {
-            bgmLog(LOG_LEVELS.WARN, '[testSelectedRowsUpdate] 未找到 Bangumi_URL 列');
+            bgmLog(LOG_LEVELS.WARN, '[syncSelectedRows] 未找到 Bangumi_URL 列');
             wpsMsgBox('未找到 Bangumi URL 列', 0, 48);
             return;
         }
         const token = loadBgToken();
         if (!token) {
-            bgmLog(LOG_LEVELS.WARN, '[testSelectedRowsUpdate] Token 未设置');
+            bgmLog(LOG_LEVELS.WARN, '[syncSelectedRows] Token 未设置');
             wpsMsgBox('请先设置 Token', 0, 48);
             return;
         }
-        bgmLog(LOG_LEVELS.INFO, `[testSelectedRowsUpdate] Token 已设置（长度: ${token.length}）`);
+        bgmLog(LOG_LEVELS.INFO, `[syncSelectedRows] Token 已设置（长度: ${token.length}）`);
         const urlCol = colMap.get('Bangumi_URL');
         const nameCol = colMap.has('名称') ? colMap.get('名称') : undefined;
         const userPath = _getUserApiPath();
@@ -1121,63 +1121,63 @@ export async function testSelectedRowsUpdate() {
                 const bgmUrl = trim(getCellValue(ws, rowNum, urlCol) || '');
                 const name = nameCol ? trim(getCellValue(ws, nameCol === urlCol ? rowNum : rowNum, nameCol) || '') : '';
                 if (!bgmUrl) {
-                    bgmLog(LOG_LEVELS.WARN, `[testSelectedRowsUpdate] ${rowProgress} 行${rowNum} "${name || '无名'}" URL为空，跳过`);
+                    bgmLog(LOG_LEVELS.WARN, `[syncSelectedRows] ${rowProgress} 行${rowNum} "${name || '无名'}" URL为空，跳过`);
                     skipCount++;
                     continue;
                 }
                 const sid = extractSubjectId(bgmUrl);
                 if (!sid) {
-                    bgmLog(LOG_LEVELS.WARN, `[testSelectedRowsUpdate] ${rowProgress} 行${rowNum} "${name || '无名'}" 无法提取 Subject ID: ${bgmUrl}，跳过`);
+                    bgmLog(LOG_LEVELS.WARN, `[syncSelectedRows] ${rowProgress} 行${rowNum} "${name || '无名'}" 无法提取 Subject ID: ${bgmUrl}，跳过`);
                     skipCount++;
                     continue;
                 }
-                bgmLog(LOG_LEVELS.INFO, `[testSelectedRowsUpdate] ${rowProgress} 行${rowNum} 开始同步: 名称="${name || '无名'}", SID=${sid}, URL=${bgmUrl}`);
+                bgmLog(LOG_LEVELS.INFO, `[syncSelectedRows] ${rowProgress} 行${rowNum} 开始同步: 名称="${name || '无名'}", SID=${sid}, URL=${bgmUrl}`);
                 const finishedDate = colMap.has('完播日')
                     ? trim(getCellValue(ws, rowNum, colMap.get('完播日') || '') || '')
                     : '';
                 const jsonBody = buildJsonPayload((key) => colMap.has(key) ? trim(getCellValue(ws, rowNum, colMap.get(key))) : '', finishedDate);
                 if (jsonBody === '{}') {
-                    bgmLog(LOG_LEVELS.WARN, `[testSelectedRowsUpdate] ${rowProgress} 行${rowNum} "${name || sid}" 请求体为空，跳过`);
+                    bgmLog(LOG_LEVELS.WARN, `[syncSelectedRows] ${rowProgress} 行${rowNum} "${name || sid}" 请求体为空，跳过`);
                     skipCount++;
                     continue;
                 }
-                bgmLog(LOG_LEVELS.INFO, `[testSelectedRowsUpdate] ${rowProgress} 行${rowNum} 请求体: ${jsonBody.length > 300 ? jsonBody.substring(0, 300) + '...' : jsonBody}`);
+                bgmLog(LOG_LEVELS.INFO, `[syncSelectedRows] ${rowProgress} 行${rowNum} 请求体: ${jsonBody.length > 300 ? jsonBody.substring(0, 300) + '...' : jsonBody}`);
                 const endpoint = `/v0/users${userPath}/collections/${sid}`;
                 const result = await bgmRequestSync('POST', endpoint, jsonBody, token);
                 if (result.code >= 200 && result.code < 300) {
                     successCount++;
                     details.push(`✓ 行${rowNum} ${name || sid} HTTP:${result.code}`);
-                    bgmLog(LOG_LEVELS.INFO, `[testSelectedRowsUpdate] ${rowProgress} 行${rowNum} "${name || sid}" 同步成功！HTTP: ${result.code}`);
+                    bgmLog(LOG_LEVELS.INFO, `[syncSelectedRows] ${rowProgress} 行${rowNum} "${name || sid}" 同步成功！HTTP: ${result.code}`);
                     // 标记章节为已完成（仅"看过"状态才需要标记）
                     const watchType = JSON.parse(jsonBody).type;
                     const epRaw = trim(getCellValue(ws, rowNum, colMap.has('集数') ? colMap.get('集数') : colMap.get('集号')));
                     const epCount = parseInt(epRaw, 10);
                     if (watchType === 3 && !isNaN(epCount) && epCount > 0) {
-                        bgmLog(LOG_LEVELS.INFO, `[testSelectedRowsUpdate] ${rowProgress} 行${rowNum} 状态"看过"(type=3)，集数: ${epCount}，开始标记章节...`);
+                        bgmLog(LOG_LEVELS.INFO, `[syncSelectedRows] ${rowProgress} 行${rowNum} 状态"看过"(type=3)，集数: ${epCount}，开始标记章节...`);
                         const epResult = await markEpisodesComplete(sid, epCount, token);
                         episodeMarkCount++;
-                        bgmLog(LOG_LEVELS.INFO, `[testSelectedRowsUpdate] ${rowProgress} 行${rowNum} 章节标记结果: ${epResult.message}`);
+                        bgmLog(LOG_LEVELS.INFO, `[syncSelectedRows] ${rowProgress} 行${rowNum} 章节标记结果: ${epResult.message}`);
                     }
                     else if (!isNaN(epCount) && epCount > 0) {
-                        bgmLog(LOG_LEVELS.INFO, `[testSelectedRowsUpdate] ${rowProgress} 行${rowNum} 状态非"看过"(type=${watchType})，跳过章节标记`);
+                        bgmLog(LOG_LEVELS.INFO, `[syncSelectedRows] ${rowProgress} 行${rowNum} 状态非"看过"(type=${watchType})，跳过章节标记`);
                     }
                 }
                 else {
                     failCount++;
                     details.push(`✗ 行${rowNum} ${name || sid} HTTP:${result.code}`);
-                    bgmLog(LOG_LEVELS.WARN, `[testSelectedRowsUpdate] ${rowProgress} 行${rowNum} "${name || sid}" 同步失败！HTTP: ${result.code}, 消息: ${result.message}`);
+                    bgmLog(LOG_LEVELS.WARN, `[syncSelectedRows] ${rowProgress} 行${rowNum} "${name || sid}" 同步失败！HTTP: ${result.code}, 消息: ${result.message}`);
                 }
             }
             catch (e) {
                 failCount++;
-                bgmLog(LOG_LEVELS.ERROR, `[testSelectedRowsUpdate] ${rowProgress} 行${rowNum} 处理异常: ${e.message}`);
+                bgmLog(LOG_LEVELS.ERROR, `[syncSelectedRows] ${rowProgress} 行${rowNum} 处理异常: ${e.message}`);
             }
         }
         // 输出最终汇总日志
         const elapsed = Date.now() - startTime;
-        bgmLog(LOG_LEVELS.INFO, `[testSelectedRowsUpdate] ========== 汇总 ==========`);
-        bgmLog(LOG_LEVELS.INFO, `[testSelectedRowsUpdate] 总行数: ${rows.length}  |  成功: ${successCount}  |  失败: ${failCount}  |  跳过: ${skipCount}  |  标记章节: ${episodeMarkCount}  |  耗时: ${elapsed}ms`);
-        bgmLog(LOG_LEVELS.INFO, `[testSelectedRowsUpdate] 详情: ${details.join('  |  ')}`);
+        bgmLog(LOG_LEVELS.INFO, `[syncSelectedRows] ========== 汇总 ==========`);
+        bgmLog(LOG_LEVELS.INFO, `[syncSelectedRows] 总行数: ${rows.length}  |  成功: ${successCount}  |  失败: ${failCount}  |  跳过: ${skipCount}  |  标记章节: ${episodeMarkCount}  |  耗时: ${elapsed}ms`);
+        bgmLog(LOG_LEVELS.INFO, `[syncSelectedRows] 详情: ${details.join('  |  ')}`);
         // 弹出结果
         let summary = `📊 选中 ${rows.length} 行 | 耗时 ${(elapsed / 1000).toFixed(1)}s\n\n✅ 成功: ${successCount}\n❌ 失败: ${failCount}\n⏭️ 跳过: ${skipCount}\n📺 标记章节: ${episodeMarkCount}`;
         if (details.length > 0) {
@@ -1189,9 +1189,9 @@ export async function testSelectedRowsUpdate() {
         wpsMsgBox(summary, 0, 64);
     }
     catch (e) {
-        BGM.handleError(e, { context: 'testSelectedRowsUpdate', showAlert: false });
-        bgmLog(LOG_LEVELS.ERROR, `[testSelectedRowsUpdate] 测试异常: ${e.message}`);
+        BGM.handleError(e, { context: 'syncSelectedRows', showAlert: false });
+        bgmLog(LOG_LEVELS.ERROR, `[syncSelectedRows] 同步异常: ${e.message}`);
         wpsMsgBox(`选中行同步异常: ${e.message}`, 0, 16);
     }
-    bgmLog(LOG_LEVELS.INFO, `[testSelectedRowsUpdate] ========== 选中行同步结束，总耗时: ${Date.now() - startTime}ms ==========`);
+    bgmLog(LOG_LEVELS.INFO, `[syncSelectedRows] ========== 选中行同步结束，总耗时: ${Date.now() - startTime}ms ==========`);
 }
