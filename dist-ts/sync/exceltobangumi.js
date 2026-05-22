@@ -1170,7 +1170,7 @@ export async function testSelectedRowsUpdate() {
         }
         bgmLog(LOG_LEVELS.INFO, '[testSelectedRowsUpdate] 工作表获取成功');
         // 获取选中的行范围
-        let rows = [];
+        let rawRows = [];
         try {
             const sel = app.Selection;
             if (!sel) {
@@ -1181,25 +1181,34 @@ export async function testSelectedRowsUpdate() {
             const startRow = sel.Row;
             const rowCount = sel.Rows.Count;
             for (let r = startRow; r < startRow + rowCount; r++) {
-                rows.push(r);
+                rawRows.push(r);
             }
-            bgmLog(LOG_LEVELS.INFO, `[testSelectedRowsUpdate] 选中行: ${rows.length} 行 (${rows[0]}-${rows[rows.length - 1]})`);
+            bgmLog(LOG_LEVELS.INFO, `[testSelectedRowsUpdate] 选中区域: ${rowCount} 行，行号 ${startRow}-${startRow + rowCount - 1}`);
         }
         catch (e) {
             BGM.handleError(e, { context: 'testSelectedRowsUpdate', showAlert: false });
             wpsMsgBox('获取选中区域失败，请检查是否选中了有效区域', 0, 48);
             return;
         }
-        if (rows.length === 0) {
+        if (rawRows.length === 0) {
             bgmLog(LOG_LEVELS.WARN, '[testSelectedRowsUpdate] 没有选中任何行');
             wpsMsgBox('请先在Excel中选中要同步的数据行', 0, 48);
             return;
         }
         const headerRow = findHeaderRow(ws) || 1;
         bgmLog(LOG_LEVELS.INFO, `[testSelectedRowsUpdate] 表头行: ${headerRow}`);
+        // 排除表头行
+        const rows = rawRows.filter(r => r > headerRow);
+        bgmLog(LOG_LEVELS.INFO, `[testSelectedRowsUpdate] 排除表头后有效数据行: ${rows.length} 行（原始选中 ${rawRows.length} 行）`);
+        if (rows.length === 0) {
+            bgmLog(LOG_LEVELS.WARN, '[testSelectedRowsUpdate] 排除表头后没有有效数据行');
+            wpsMsgBox('当前选中区域只有表头行，没有数据行', 0, 48);
+            return;
+        }
         clearSheetCache(ws);
         const colMap = getColumnMap(ws, headerRow);
         bgmLog(LOG_LEVELS.INFO, `[testSelectedRowsUpdate] 列映射完成，共 ${colMap.size} 列`);
+        bgmLog(LOG_LEVELS.INFO, `[testSelectedRowsUpdate] 集数列号: ${colMap.get('集数')}, 集号列号: ${colMap.get('集号')}, Bangumi_URL列号: ${colMap.get('Bangumi_URL')}`);
         if (!colMap.has('Bangumi_URL')) {
             bgmLog(LOG_LEVELS.WARN, '[testSelectedRowsUpdate] 未找到 Bangumi_URL 列');
             wpsMsgBox('未找到 Bangumi URL 列', 0, 48);
@@ -1213,67 +1222,79 @@ export async function testSelectedRowsUpdate() {
         }
         bgmLog(LOG_LEVELS.INFO, `[testSelectedRowsUpdate] Token 已设置（长度: ${token.length}）`);
         const urlCol = colMap.get('Bangumi_URL');
+        const nameCol = colMap.has('名称') ? colMap.get('名称') : undefined;
         const userPath = _getUserApiPath();
         let successCount = 0;
         let failCount = 0;
         let skipCount = 0;
+        let episodeMarkCount = 0;
         const details = [];
         for (let idx = 0; idx < rows.length; idx++) {
             const rowNum = rows[idx];
-            bgmLog(LOG_LEVELS.INFO, `[testSelectedRowsUpdate] [${idx + 1}/${rows.length}] 处理行 ${rowNum}`);
+            const rowProgress = `[${idx + 1}/${rows.length}]`;
             try {
                 const bgmUrl = trim(getCellValue(ws, rowNum, urlCol) || '');
+                const name = nameCol ? trim(getCellValue(ws, nameCol === urlCol ? rowNum : rowNum, nameCol) || '') : '';
                 if (!bgmUrl) {
-                    bgmLog(LOG_LEVELS.WARN, `[testSelectedRowsUpdate] 第 ${rowNum} 行URL为空，跳过`);
+                    bgmLog(LOG_LEVELS.WARN, `[testSelectedRowsUpdate] ${rowProgress} 行${rowNum} "${name || '无名'}" URL为空，跳过`);
                     skipCount++;
                     continue;
                 }
                 const sid = extractSubjectId(bgmUrl);
                 if (!sid) {
-                    bgmLog(LOG_LEVELS.WARN, `[testSelectedRowsUpdate] 第 ${rowNum} 行无法提取 Subject ID，跳过`);
+                    bgmLog(LOG_LEVELS.WARN, `[testSelectedRowsUpdate] ${rowProgress} 行${rowNum} "${name || '无名'}" 无法提取 Subject ID: ${bgmUrl}，跳过`);
                     skipCount++;
                     continue;
                 }
+                bgmLog(LOG_LEVELS.INFO, `[testSelectedRowsUpdate] ${rowProgress} 行${rowNum} 开始同步: 名称="${name || '无名'}", SID=${sid}, URL=${bgmUrl}`);
                 const finishedDate = colMap.has('完播日')
                     ? trim(getCellValue(ws, rowNum, colMap.get('完播日') || '') || '')
                     : '';
                 const jsonBody = buildJsonPayload((key) => colMap.has(key) ? trim(getCellValue(ws, rowNum, colMap.get(key))) : '', finishedDate);
                 if (jsonBody === '{}') {
-                    bgmLog(LOG_LEVELS.WARN, `[testSelectedRowsUpdate] 第 ${rowNum} 行请求体为空，跳过`);
+                    bgmLog(LOG_LEVELS.WARN, `[testSelectedRowsUpdate] ${rowProgress} 行${rowNum} "${name || sid}" 请求体为空，跳过`);
                     skipCount++;
                     continue;
                 }
+                bgmLog(LOG_LEVELS.INFO, `[testSelectedRowsUpdate] ${rowProgress} 行${rowNum} 请求体: ${jsonBody.length > 300 ? jsonBody.substring(0, 300) + '...' : jsonBody}`);
                 const endpoint = `/v0/users${userPath}/collections/${sid}`;
                 const result = await bgmRequestSync('POST', endpoint, jsonBody, token);
                 if (result.code >= 200 && result.code < 300) {
                     successCount++;
-                    details.push(`✓ SID:${sid} HTTP:${result.code}`);
-                    bgmLog(LOG_LEVELS.INFO, `[testSelectedRowsUpdate] 第 ${rowNum} 行成功！SID: ${sid}, HTTP: ${result.code}`);
+                    details.push(`✓ 行${rowNum} ${name || sid} HTTP:${result.code}`);
+                    bgmLog(LOG_LEVELS.INFO, `[testSelectedRowsUpdate] ${rowProgress} 行${rowNum} "${name || sid}" 同步成功！HTTP: ${result.code}`);
                     // 标记章节为已完成
                     const epRaw = trim(getCellValue(ws, rowNum, colMap.has('集数') ? colMap.get('集数') : colMap.get('集号')));
                     const epCount = parseInt(epRaw, 10);
                     if (!isNaN(epCount) && epCount > 0) {
+                        bgmLog(LOG_LEVELS.INFO, `[testSelectedRowsUpdate] ${rowProgress} 行${rowNum} 集数: ${epCount}，开始标记章节...`);
                         const epResult = await markEpisodesComplete(sid, epCount, token);
-                        bgmLog(LOG_LEVELS.INFO, `[testSelectedRowsUpdate] 第 ${rowNum} 行章节标记: ${epResult.message}`);
+                        episodeMarkCount++;
+                        bgmLog(LOG_LEVELS.INFO, `[testSelectedRowsUpdate] ${rowProgress} 行${rowNum} 章节标记结果: ${epResult.message}`);
                     }
                 }
                 else {
                     failCount++;
-                    details.push(`✗ SID:${sid} HTTP:${result.code}`);
-                    bgmLog(LOG_LEVELS.WARN, `[testSelectedRowsUpdate] 第 ${rowNum} 行失败！SID: ${sid}, HTTP: ${result.code}, 消息: ${result.message}`);
+                    details.push(`✗ 行${rowNum} ${name || sid} HTTP:${result.code}`);
+                    bgmLog(LOG_LEVELS.WARN, `[testSelectedRowsUpdate] ${rowProgress} 行${rowNum} "${name || sid}" 同步失败！HTTP: ${result.code}, 消息: ${result.message}`);
                 }
             }
             catch (e) {
                 failCount++;
-                bgmLog(LOG_LEVELS.ERROR, `[testSelectedRowsUpdate] 第 ${rowNum} 行异常: ${e.message}`);
+                bgmLog(LOG_LEVELS.ERROR, `[testSelectedRowsUpdate] ${rowProgress} 行${rowNum} 处理异常: ${e.message}`);
             }
         }
-        const total = rows.length;
-        let summary = `📊 共 ${total} 行\n✅ 成功: ${successCount}\n❌ 失败: ${failCount}\n⏭️ 跳过: ${skipCount}`;
+        // 输出最终汇总日志
+        const elapsed = Date.now() - startTime;
+        bgmLog(LOG_LEVELS.INFO, `[testSelectedRowsUpdate] ========== 汇总 ==========`);
+        bgmLog(LOG_LEVELS.INFO, `[testSelectedRowsUpdate] 总行数: ${rows.length}  |  成功: ${successCount}  |  失败: ${failCount}  |  跳过: ${skipCount}  |  标记章节: ${episodeMarkCount}  |  耗时: ${elapsed}ms`);
+        bgmLog(LOG_LEVELS.INFO, `[testSelectedRowsUpdate] 详情: ${details.join('  |  ')}`);
+        // 弹出结果
+        let summary = `📊 选中 ${rows.length} 行 | 耗时 ${(elapsed / 1000).toFixed(1)}s\n\n✅ 成功: ${successCount}\n❌ 失败: ${failCount}\n⏭️ 跳过: ${skipCount}\n📺 标记章节: ${episodeMarkCount}`;
         if (details.length > 0) {
-            summary += `\n\n--- 详情 ---\n${details.slice(0, 20).join('\n')}`;
-            if (details.length > 20) {
-                summary += `\n... 还有 ${details.length - 20} 条`;
+            summary += `\n\n--- 详情 ---\n${details.slice(0, 30).join('\n')}`;
+            if (details.length > 30) {
+                summary += `\n... 还有 ${details.length - 30} 条`;
             }
         }
         wpsMsgBox(summary, 0, 64);
