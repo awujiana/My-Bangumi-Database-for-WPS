@@ -87,6 +87,7 @@ export interface WpsRange {
     Interior?: WpsInterior;
     Font?: WpsFont;
     Areas?: WpsAreas;
+    Count: number;
     End(direction: number): WpsRange;
     Select(): void;
     Delete(): void;

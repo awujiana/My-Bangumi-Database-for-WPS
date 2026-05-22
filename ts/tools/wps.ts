@@ -121,6 +121,7 @@ export interface WpsRange {
 
     // 区域属性
     Areas?: WpsAreas;
+    Count: number;
 
     // 方法
     End(direction: number): WpsRange;

@@ -498,51 +498,50 @@ export function getFilterStatus(
         try { autoFilterMode = !!ws.AutoFilterMode; } catch (e: any) {
             BGM.handleError(e, { context: 'getFilterStatus', showAlert: false });
         }
-        bgmLog(LOG_LEVELS.INFO, `getFilterStatus: AutoFilterMode=${autoFilterMode}, ws.AutoFilterMode=${ws.AutoFilterMode}, ws.Name=${ws.Name}`);
-        
-        if (!autoFilterMode) return result;
-        result.hasFilter = true;
+        bgmLog(LOG_LEVELS.INFO, `getFilterStatus: AutoFilterMode=${autoFilterMode}, ws.Name=${ws.Name}`);
 
-        // 2. 获取自动筛选区域
-        let filterRange: WpsRange | null = null;
-        try {
-            if (ws.AutoFilter?.Range) {
-                filterRange = ws.AutoFilter.Range;
-                bgmLog(LOG_LEVELS.INFO, `getFilterStatus: 获取到 AutoFilter.Range`);
-            } else {
-                bgmLog(LOG_LEVELS.INFO, `getFilterStatus: ws.AutoFilter?.Range 为空或不存在`);
-            }
-        } catch (e: any) {
-            BGM.handleError(e, { context: 'getFilterStatus', showAlert: false });
-            bgmLog(LOG_LEVELS.WARN, `getFilterStatus: 获取 AutoFilter.Range 失败: ${e.message}`);
-        }
+        // 2. 确定扫描范围（直接用传入的 lastRow，不用 End 定位）
+        const maxRow = effectiveLastRow && effectiveLastRow > 0 ? effectiveLastRow : ws.Rows.Count;
+        const scanRange = ws.Range(`A1:A${maxRow}`);
+        bgmLog(LOG_LEVELS.INFO, `getFilterStatus: 扫描范围 A1:A${maxRow}`);
 
-        // 3. 确定扫描范围
-        let scanRange: WpsRange;
-        if (filterRange) {
-            scanRange = filterRange;
-            bgmLog(LOG_LEVELS.INFO, '使用 AutoFilter.Range 做 SpecialCells');
-        } else {
-            const maxRow = effectiveLastRow && effectiveLastRow > 0 ? effectiveLastRow : ws.Rows.Count;
-            let lastUsedRow = maxRow;
+        // 3. 获取可见单元格来检测筛选/隐藏行
+        let visibleCells: WpsRange | null = null;
+        if (autoFilterMode) {
+            // 有 AutoFilter → 用其范围（更精确）
             try {
-                const bottomCell = ws.Range(`A${maxRow}`);
-                const endCell = bottomCell.End(-4162);
-                if (endCell && endCell.Row > 0) lastUsedRow = endCell.Row;
+                if (ws.AutoFilter?.Range) {
+                    visibleCells = ws.AutoFilter.Range.SpecialCells(12) as WpsRange;
+                    bgmLog(LOG_LEVELS.INFO, `getFilterStatus: AutoFilter 模式`);
+                }
             } catch (e: any) {
                 BGM.handleError(e, { context: 'getFilterStatus', showAlert: false });
             }
-            scanRange = ws.Range(`A1:A${lastUsedRow}`);
-            bgmLog(LOG_LEVELS.INFO, `无 AutoFilter.Range，使用回退范围 A1:A${lastUsedRow}`);
+        } else {
+            // 无 AutoFilter → 用全范围检测手动隐藏行
+            try {
+                visibleCells = scanRange.SpecialCells(12) as WpsRange;
+            } catch (e: any) { /* 所有行可见时抛出异常，忽略 */ }
         }
 
-        // 4. 获取可见单元格
-        let visibleCells: WpsRange | null = null;
-        try {
-            visibleCells = scanRange.SpecialCells(12) as WpsRange;
-        } catch (e: any) {
-            BGM.handleError(e, { context: 'getFilterStatus', showAlert: false });
+        if (!visibleCells) {
+            bgmLog(LOG_LEVELS.INFO, 'getFilterStatus: 无筛选');
+            return result;
         }
+
+        // 4. 快速判断：可见行数 ≈ 总行数 → 无隐藏行（仅对非 AutoFilter 模式）
+        if (!autoFilterMode) {
+            try {
+                const totalCount = scanRange.Count;
+                const visibleCount = visibleCells.Count;
+                if (visibleCount >= totalCount) {
+                    bgmLog(LOG_LEVELS.INFO, `getFilterStatus: 所有 ${maxRow} 行均可见，无筛选`);
+                    return result;
+                }
+            } catch (e: any) { /* Count 异常则继续走完整检测 */ }
+        }
+
+        result.hasFilter = true;
 
         // 5. 提取所有可见行号（去重）
         const rawRows = new Set<number>();
@@ -568,14 +567,13 @@ export function getFilterStatus(
                 }
             }
             bgmLog(LOG_LEVELS.INFO, `SpecialCells 收集到 ${rawRows.size} 个原始行号`);
-            // 在 getFilterStatus 中输出每个可见行及其前3 列数据
             const rowList = Array.from(rawRows).sort((a, b) => a - b);
             const previewCount = Math.min(rowList.length, 15);
             for (let i = 0; i < previewCount; i++) {
                 const r = rowList[i];
                 const vals: string[] = [];
                 for (let c = 1; c <= 3; c++) {
-                    vals.push(getCellValue(ws, r, c));   // 直接复用统一函数
+                    vals.push(getCellValue(ws, r, c));
                 }
                 bgmLog(LOG_LEVELS.INFO, `  行 ${r}: ${vals.join(' | ')}`);
             }

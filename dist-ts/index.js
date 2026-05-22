@@ -95,7 +95,7 @@ getFilterStatus,
 getSequentialRowsBySeqCol, 
 // 异步同步到 Bangumi
 SyncToBangumiAsync, 
-// 测试选中行更新
+// 同步选中行
 syncSelectedRows, mapWatchStatus, buildJsonPayload, bgmRequestSync, setBangumiToken, openBangumiTokenPage, testTokenValidityForRibbon, buildTagsArray, addTagsFromStr, } from './sync/exceltobangumi.js';
 // ============================================================================
 // 10. 同步收藏抓取（来自 sync/scraping.js）

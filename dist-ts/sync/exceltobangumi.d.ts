@@ -198,9 +198,9 @@ export declare function SyncToBangumiAsync(ws: any, colMap: Map<string, number>,
     stopped: boolean;
 }>;
 /**
- * 测试单个条目更新
+ * 选中行同步到 Bangumi（多行/单行）
  *
- * @function testSingleUpdate
+ * @function syncSelectedRows
  */
-export declare function testSingleUpdate(): Promise<void>;
+export declare function syncSelectedRows(): Promise<void>;
 //# sourceMappingURL=exceltobangumi.d.ts.map
