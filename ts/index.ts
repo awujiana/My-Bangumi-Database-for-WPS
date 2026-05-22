@@ -162,6 +162,8 @@ export {
     SyncToBangumiAsync,
     // 测试单个条目更新
     testSingleUpdate,
+    // 测试选中行更新
+    testSelectedRowsUpdate,
     mapWatchStatus,
     buildJsonPayload,
     bgmRequestSync,

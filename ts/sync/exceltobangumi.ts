@@ -1376,3 +1376,162 @@ export async function testSingleUpdate(): Promise<void> {
     
     bgmLog(LOG_LEVELS.INFO, `[testSingleUpdate] ========== 测试结束，总耗时: ${Date.now() - startTime}ms ==========`);
 }
+
+/**
+ * 测试选中行更新（多行/单行）
+ *
+ * @function testSelectedRowsUpdate
+ */
+export async function testSelectedRowsUpdate(): Promise<void> {
+    const startTime = Date.now();
+    bgmLog(LOG_LEVELS.INFO, '[testSelectedRowsUpdate] ========== 开始选中行同步 ==========');
+
+    try {
+        const app = getApp();
+        if (!app?.ActiveWorkbook) {
+            bgmLog(LOG_LEVELS.ERROR, '[testSelectedRowsUpdate] 无法获取 Application');
+            wpsMsgBox('无法获取 Application', 0, 48);
+            return;
+        }
+
+        const ws = app.ActiveWorkbook.ActiveSheet;
+        if (!ws) {
+            bgmLog(LOG_LEVELS.ERROR, '[testSelectedRowsUpdate] 无法获取工作表');
+            wpsMsgBox('无法获取工作表', 0, 48);
+            return;
+        }
+        bgmLog(LOG_LEVELS.INFO, '[testSelectedRowsUpdate] 工作表获取成功');
+
+        // 获取选中的行范围
+        let rows: number[] = [];
+        try {
+            const sel = app.Selection;
+            if (!sel) {
+                bgmLog(LOG_LEVELS.WARN, '[testSelectedRowsUpdate] 未选中任何区域');
+                wpsMsgBox('请先在Excel中选中要同步的数据行', 0, 48);
+                return;
+            }
+            const startRow = sel.Row;
+            const rowCount = sel.Rows.Count;
+            for (let r = startRow; r < startRow + rowCount; r++) {
+                rows.push(r);
+            }
+            bgmLog(LOG_LEVELS.INFO, `[testSelectedRowsUpdate] 选中行: ${rows.length} 行 (${rows[0]}-${rows[rows.length - 1]})`);
+        }
+        catch (e: any) {
+            BGM.handleError(e, { context: 'testSelectedRowsUpdate', showAlert: false });
+            wpsMsgBox('获取选中区域失败，请检查是否选中了有效区域', 0, 48);
+            return;
+        }
+
+        if (rows.length === 0) {
+            bgmLog(LOG_LEVELS.WARN, '[testSelectedRowsUpdate] 没有选中任何行');
+            wpsMsgBox('请先在Excel中选中要同步的数据行', 0, 48);
+            return;
+        }
+
+        const headerRow = findHeaderRow(ws) || 1;
+        bgmLog(LOG_LEVELS.INFO, `[testSelectedRowsUpdate] 表头行: ${headerRow}`);
+
+        clearSheetCache(ws);
+        const colMap = getColumnMap(ws, headerRow);
+        bgmLog(LOG_LEVELS.INFO, `[testSelectedRowsUpdate] 列映射完成，共 ${colMap.size} 列`);
+
+        if (!colMap.has('Bangumi_URL')) {
+            bgmLog(LOG_LEVELS.WARN, '[testSelectedRowsUpdate] 未找到 Bangumi_URL 列');
+            wpsMsgBox('未找到 Bangumi URL 列', 0, 48);
+            return;
+        }
+
+        const token = loadBgToken();
+        if (!token) {
+            bgmLog(LOG_LEVELS.WARN, '[testSelectedRowsUpdate] Token 未设置');
+            wpsMsgBox('请先设置 Token', 0, 48);
+            return;
+        }
+        bgmLog(LOG_LEVELS.INFO, `[testSelectedRowsUpdate] Token 已设置（长度: ${token.length}）`);
+
+        const urlCol = colMap.get('Bangumi_URL')!;
+        const userPath = _getUserApiPath();
+
+        let successCount = 0;
+        let failCount = 0;
+        let skipCount = 0;
+        const details: string[] = [];
+
+        for (let idx = 0; idx < rows.length; idx++) {
+            const rowNum = rows[idx];
+            bgmLog(LOG_LEVELS.INFO, `[testSelectedRowsUpdate] [${idx + 1}/${rows.length}] 处理行 ${rowNum}`);
+
+            try {
+                const bgmUrl = trim(getCellValue(ws, rowNum, urlCol) || '');
+                if (!bgmUrl) {
+                    bgmLog(LOG_LEVELS.WARN, `[testSelectedRowsUpdate] 第 ${rowNum} 行URL为空，跳过`);
+                    skipCount++;
+                    continue;
+                }
+
+                const sid = extractSubjectId(bgmUrl);
+                if (!sid) {
+                    bgmLog(LOG_LEVELS.WARN, `[testSelectedRowsUpdate] 第 ${rowNum} 行无法提取 Subject ID，跳过`);
+                    skipCount++;
+                    continue;
+                }
+
+                const finishedDate = colMap.has('完播日')
+                    ? trim(getCellValue(ws, rowNum, colMap.get('完播日')!) || '')
+                    : '';
+                const jsonBody = buildJsonPayload((key) => colMap.has(key) ? trim(getCellValue(ws, rowNum, colMap.get(key)!)) : '', finishedDate);
+
+                if (jsonBody === '{}') {
+                    bgmLog(LOG_LEVELS.WARN, `[testSelectedRowsUpdate] 第 ${rowNum} 行请求体为空，跳过`);
+                    skipCount++;
+                    continue;
+                }
+
+                const endpoint = `/v0/users${userPath}/collections/${sid}`;
+                const result = await bgmRequestSync('POST', endpoint, jsonBody, token);
+
+                if (result.code >= 200 && result.code < 300) {
+                    successCount++;
+                    details.push(`✓ SID:${sid} HTTP:${result.code}`);
+                    bgmLog(LOG_LEVELS.INFO, `[testSelectedRowsUpdate] 第 ${rowNum} 行成功！SID: ${sid}, HTTP: ${result.code}`);
+
+                    // 标记章节为已完成
+                    const epRaw = trim(getCellValue(ws, rowNum, colMap.has('集数') ? colMap.get('集数')! : colMap.get('集号')!));
+                    const epCount = parseInt(epRaw, 10);
+                    if (!isNaN(epCount) && epCount > 0) {
+                        const epResult = await markEpisodesComplete(sid, epCount, token);
+                        bgmLog(LOG_LEVELS.INFO, `[testSelectedRowsUpdate] 第 ${rowNum} 行章节标记: ${epResult.message}`);
+                    }
+                }
+                else {
+                    failCount++;
+                    details.push(`✗ SID:${sid} HTTP:${result.code}`);
+                    bgmLog(LOG_LEVELS.WARN, `[testSelectedRowsUpdate] 第 ${rowNum} 行失败！SID: ${sid}, HTTP: ${result.code}, 消息: ${result.message}`);
+                }
+            }
+            catch (e: any) {
+                failCount++;
+                bgmLog(LOG_LEVELS.ERROR, `[testSelectedRowsUpdate] 第 ${rowNum} 行异常: ${e.message}`);
+            }
+        }
+
+        const total = rows.length;
+        let summary = `📊 共 ${total} 行\n✅ 成功: ${successCount}\n❌ 失败: ${failCount}\n⏭️ 跳过: ${skipCount}`;
+        if (details.length > 0) {
+            summary += `\n\n--- 详情 ---\n${details.slice(0, 20).join('\n')}`;
+            if (details.length > 20) {
+                summary += `\n... 还有 ${details.length - 20} 条`;
+            }
+        }
+        wpsMsgBox(summary, 0, 64);
+    }
+    catch (e: any) {
+        BGM.handleError(e, { context: 'testSelectedRowsUpdate', showAlert: false });
+        bgmLog(LOG_LEVELS.ERROR, `[testSelectedRowsUpdate] 测试异常: ${e.message}`);
+        wpsMsgBox(`选中行同步异常: ${e.message}`, 0, 16);
+    }
+
+    bgmLog(LOG_LEVELS.INFO, `[testSelectedRowsUpdate] ========== 选中行同步结束，总耗时: ${Date.now() - startTime}ms ==========`);
+}

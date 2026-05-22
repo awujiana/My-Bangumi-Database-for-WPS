@@ -12,7 +12,7 @@ import {
     verifyToken, fetchAllUserCollections, findHeaderRow, getColumnMap,
     getLastRow, extractSubjectId, getDataSheet, getFilterStatus,
     getSequentialRowsBySeqCol, SyncToBangumiAsync,
-    testSingleUpdate, getOrCreateSyncRecordSheet, getAllSyncRecords,
+    testSingleUpdate, testSelectedRowsUpdate, getOrCreateSyncRecordSheet, getAllSyncRecords,
     addSyncRecord, openSyncRecordSheet, deduplicateSyncRecords, formatSyncRecordSheet, wpsMsgBox,
     previewSyncContent, refreshData, refreshSheets, toggleSheetLock, clearSyncRecords,
     closeDetailModal,
@@ -831,6 +831,16 @@ function handleActionClick(event: Event): void {
                 bgmLog(LOG_LEVELS.INFO, `[handleActionClick] 单条测试更新已触发，耗时: ${Date.now() - startTime}ms`);
             } else {
                 bgmLog(LOG_LEVELS.WARN, '[handleActionClick] testSingleUpdate 函数未定义');
+            }
+            break;
+
+        case 'testSelected':
+            bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 开始执行选中行同步');
+            if (typeof testSelectedRowsUpdate === 'function') {
+                testSelectedRowsUpdate();
+                bgmLog(LOG_LEVELS.INFO, `[handleActionClick] 选中行同步已触发，耗时: ${Date.now() - startTime}ms`);
+            } else {
+                bgmLog(LOG_LEVELS.WARN, '[handleActionClick] testSelectedRowsUpdate 函数未定义');
             }
             break;
             
