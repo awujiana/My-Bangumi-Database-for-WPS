@@ -529,22 +529,3 @@ export function openSyncRecordSheet(): void {
     }
 }
 
-export function clearSheetMarksInSheet(sheetIndex: number): void {
-    const app = getApp();
-    if (!app?.ActiveWorkbook) return;
-    const ws = app.ActiveWorkbook.Worksheets.Item(sheetIndex);
-    if (!ws) return;
-
-    const lastRow = getLastRow(ws);
-    for (let r = 1; r <= lastRow; r++) {
-        try {
-            const cell = ws.Range(`D${r}`);
-            if (cell?.Interior) {
-                cell.Interior.Color = 0xFFFFFF;      // 重置为白色（而非 ColorIndex）
-            }
-        } catch (e: any) {
-            BGM.handleError(e, { context: 'clearSheetMarksInSheet', showAlert: false });
-        }
-    }
-    bgmLog(LOG_LEVELS.INFO, `已清除工作表 ${sheetIndex} 的颜色标记`);
-}

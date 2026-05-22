@@ -46,5 +46,4 @@ export declare function deduplicateSyncRecords(): boolean;
 export declare function formatSyncRecordSheet(sheet?: any): void;
 export declare function clearSyncRecords(): boolean;
 export declare function openSyncRecordSheet(): void;
-export declare function clearSheetMarksInSheet(sheetIndex: number): void;
 //# sourceMappingURL=syncRecord.d.ts.map
