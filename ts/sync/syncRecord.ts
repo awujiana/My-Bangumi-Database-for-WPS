@@ -118,6 +118,9 @@ export function getOrCreateSyncRecordSheet(): any {
         }
 
         bgmLog(LOG_LEVELS.INFO, '已创建同步记录工作表');
+
+        // 新表设置格式（列宽、行高、字体、居中、边框等）
+        formatSyncRecordSheet(syncSheet);
     } else {
         // 检测并迁移旧 schema（旧 12 列含"序号" → 新 11 列 SID 放第一列）
         try {
@@ -146,9 +149,6 @@ export function getOrCreateSyncRecordSheet(): any {
             }
         }
     }
-
-    // 自动设置格式（列宽、行高、字体、居中、边框等）
-    formatSyncRecordSheet(syncSheet);
 
     invalidateCache();
     return syncSheet;
