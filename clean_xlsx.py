@@ -87,6 +87,82 @@ def parse_tags(tag_str):
     return set(t.strip() for t in str(tag_str).split('|') if t.strip())
 
 
+def extract_season_numbers(text):
+    """从文本中提取季数关键词，返回季数集合（文本回退策略）。
+    匹配模式：
+      - "Season X" / "season X"
+      - "S X" / "SX" (S1, s2 等)
+      - "第X季" / "第X期" / "第X部"
+      - "Xnd Season" / "Xth Season" / "2nd season" 等
+    返回 frozenset 以便作为字典键。"""
+    if not text:
+        return frozenset()
+    seasons = set()
+    # 英文: Season X / SX / S X / Xnd Season / Xth Season
+    season_pats = [
+        (r'(?:season|Season)\s*(\d+)', 1),
+        (r'(?:^|\s)([sS])\s*(\d+)(?:\s|$|,|\.)', 2),
+        (r'(\d+)\s*(?:st|nd|rd|th)?\s*(?:season|Season)', 1),
+    ]
+    for pat, group_num in season_pats:
+        for m in re.finditer(pat, text):
+            try:
+                seasons.add(int(m.group(group_num)))
+            except ValueError:
+                pass
+    # 中文: 第X季 / 第X期 / 第X部
+    for m in re.finditer(r'第\s*(\d+)\s*[季期部]', text):
+        try:
+            seasons.add(int(m.group(1)))
+        except ValueError:
+            pass
+    return frozenset(seasons)
+
+
+# ── 语言分类(别名排序用) ──
+_TRADITIONAL_CHARS = set(
+    '爲著畫會體國時書東樂關蘭萬愛學門開飛雲電號廣義靈驚號龍龜鳳歸發'
+    '當聲聽頭邊處從來將幾盡夢對應親轉辭謝醫護難顯鐵鑑爭舉繩隨塵陰陽'
+    '際雙離關霧隊隱雖靜響驚願廳鄉歸歡眾帶準幹壞壯態層壓豐遺龐臉色認'
+    '觸變斷數術贍覽豐富實踐際隊隱雖然響驚廳鄉歸歡眾帶準幹壞壯態層壓'
+    '豐遺龐臉色認觸變斷'
+)
+
+
+def _classify_alias(text):
+    """分类别名为 zh-CN(简体) | zh-TW(繁体) | ja(日语) | en(英语) | other"""
+    if not text:
+        return 'other'
+    has_hiragana = bool(re.search(r'[\u3040-\u309F]', text))
+    has_katakana = bool(re.search(r'[\u30A0-\u30FF]', text))
+    has_cjk = bool(re.search(r'[\u4E00-\u9FFF]', text))
+    if has_hiragana or has_katakana:
+        return 'ja'
+    if has_cjk:
+        trad_count = sum(1 for ch in text if ch in _TRADITIONAL_CHARS)
+        return 'zh-TW' if trad_count >= 2 else 'zh-CN'
+    if all(ord(c) < 128 for c in text):
+        return 'en'
+    return 'other'
+
+
+_LANG_ORDER = {'zh-CN': 0, 'zh-TW': 1, 'ja': 2, 'en': 3, 'other': 4}
+
+
+def _sort_aliases(values_set):
+    """按语言分组排序别名: 简中 → 繁中 → 日语 → 英语 → 其他"""
+    return sorted(values_set, key=lambda a: (_LANG_ORDER.get(_classify_alias(a), 4), a))
+
+
+def _join_values(values_set, col_name=None, alias_col=None):
+    """用 | 连接值集合，别名列按语言分组排序，其他列按字母排序"""
+    if not values_set:
+        return ''
+    if col_name and alias_col and col_name == alias_col:
+        return '|'.join(_sort_aliases(values_set))
+    return '|'.join(sorted(values_set))
+
+
 def _clean_val(raw):
     """统一清洗单个单元格值：NaN/None/nan → 空字符串"""
     if pd.isna(raw) or str(raw).strip() in ('', 'nan'):
@@ -308,58 +384,55 @@ def main():
     has_url_mask = url_series.notna() & (url_series != '') & (url_series != 'nan')
     df_valid['_has_url'] = has_url_mask
 
-    # ── 定义需要处理的列 ──
-    merge_cols = [
-        (tags_col_name, tags_col_idx),
-        (alias_col_name, alias_col_idx),
-        (category_col_name, category_col_idx),
-        (company_col_name, company_col_idx),
-        (original_tag_col_name, original_tag_col_idx),
-        (feature_col_name, feature_col_idx),
-        (spoiler_col_name, spoiler_col_idx),
-        (type_col_name, type_col_idx),
-        (related_id_col_name, related_id_col_idx),
-    ]
-    overwrite_cols = [
-        (watched_col_name, watched_col_idx),
-        (watch_end_col_name, watch_end_col_idx),
-        (season_col_name, season_col_idx),
-        (start_date_col_name, start_date_col_idx),
-        (end_date_col_name, end_date_col_idx),
-        (score_col_name, score_col_idx),
-        (episode_num_col_name, episode_num_col_idx),
-        (episodes_col_name, episodes_col_idx),
-        (series_col_name, series_col_idx),
-        (season_num_col_name, season_num_col_idx),
-        (series_ep_col_name, series_ep_col_idx),
-        (duration_col_name, duration_col_idx),
-        (cinema_col_name, cinema_col_idx),
-        (hall_col_name, hall_col_idx),
-        (ticket_col_name, ticket_col_idx),
-        (country_col_name, country_col_idx),
-        (lang_col_name, lang_col_idx),
-        (director_col_name, director_col_idx),
-        (music_col_name, music_col_idx),
-        (chara_design_col_name, chara_design_col_idx),
-        (mecha_design_col_name, mecha_design_col_idx),
-        (original_col_name, original_col_idx),
-        (script_col_name, script_col_idx),
-        (storyboard_col_name, storyboard_col_idx),
-        (performance_col_name, performance_col_idx),
-        (original_plan_col_name, original_plan_col_idx),
-        (series_composition_col_name, series_composition_col_idx),
+    # ── 列配置统一规范: (列名, 列索引, 模式) ──
+    #   模式: 'merge' = 增量合并(|分隔,去重); 'overwrite' = 新值覆盖旧值
+    _ALL_COL_SPECS = [
+        (tags_col_name, tags_col_idx, 'merge'),
+        (alias_col_name, alias_col_idx, 'merge'),
+        (category_col_name, category_col_idx, 'merge'),
+        (company_col_name, company_col_idx, 'merge'),
+        (original_tag_col_name, original_tag_col_idx, 'merge'),
+        (feature_col_name, feature_col_idx, 'merge'),
+        (spoiler_col_name, spoiler_col_idx, 'merge'),
+        (type_col_name, type_col_idx, 'merge'),
+        (related_id_col_name, related_id_col_idx, 'merge'),
+        (watched_col_name, watched_col_idx, 'overwrite'),
+        (watch_end_col_name, watch_end_col_idx, 'overwrite'),
+        (season_col_name, season_col_idx, 'overwrite'),
+        (start_date_col_name, start_date_col_idx, 'overwrite'),
+        (end_date_col_name, end_date_col_idx, 'overwrite'),
+        (score_col_name, score_col_idx, 'overwrite'),
+        (episode_num_col_name, episode_num_col_idx, 'overwrite'),
+        (episodes_col_name, episodes_col_idx, 'overwrite'),
+        (series_col_name, series_col_idx, 'overwrite'),
+        (season_num_col_name, season_num_col_idx, 'overwrite'),
+        (series_ep_col_name, series_ep_col_idx, 'overwrite'),
+        (duration_col_name, duration_col_idx, 'overwrite'),
+        (cinema_col_name, cinema_col_idx, 'overwrite'),
+        (hall_col_name, hall_col_idx, 'overwrite'),
+        (ticket_col_name, ticket_col_idx, 'overwrite'),
+        (country_col_name, country_col_idx, 'overwrite'),
+        (lang_col_name, lang_col_idx, 'overwrite'),
+        (director_col_name, director_col_idx, 'overwrite'),
+        (music_col_name, music_col_idx, 'overwrite'),
+        (chara_design_col_name, chara_design_col_idx, 'overwrite'),
+        (mecha_design_col_name, mecha_design_col_idx, 'overwrite'),
+        (original_col_name, original_col_idx, 'overwrite'),
+        (script_col_name, script_col_idx, 'overwrite'),
+        (storyboard_col_name, storyboard_col_idx, 'overwrite'),
+        (performance_col_name, performance_col_idx, 'overwrite'),
+        (original_plan_col_name, original_plan_col_idx, 'overwrite'),
+        (series_composition_col_name, series_composition_col_idx, 'overwrite'),
     ]
 
-    # ── 预计算循环常量(避免内层循环重复创建)──
-    _all_merge_cols = [(n, i) for n, i in merge_cols if n and i]
-    _all_overwrite_cols = [(n, i) for n, i in overwrite_cols if n and i]
-    _all_cols = _all_merge_cols + _all_overwrite_cols
-    _merge_col_names = {n for n, _ in _all_merge_cols}
+    # ── 从统一配置派生循环变量 ──
+    _all_cols = [(n, i) for n, i, m in _ALL_COL_SPECS if n and i]
+    _merge_col_names = {n for n, i, m in _ALL_COL_SPECS if m == 'merge' and n and i}
     _data_cols = [c for c in df_valid.columns if c not in (name_col_name, url_col_name, '_has_url')]
 
     # ── 构建单元格值缓存(向量化加速)──
     _cache_cols = set()
-    for col_name, _ in merge_cols + overwrite_cols:
+    for col_name, _, _ in _ALL_COL_SPECS:
         if col_name:
             _cache_cols.add(col_name)
     _cache_cols.add(url_col_name)
@@ -493,7 +566,7 @@ def main():
                             existing = parse_tags(old_val)
                             add_vals = [v for v in parse_tags(new_val) if v not in existing]
                             if add_vals:
-                                after = '|'.join(sorted(existing | set(add_vals)))
+                                after = _join_values(existing | set(add_vals), col_name, alias_col_name)
                                 df_updates[(pandas_idx, col_name)] = after
                                 old_cache[col_name] = after
                                 inc_merged += 1
@@ -564,6 +637,19 @@ def main():
                         ep_vals.add(v)
                 if len(ep_vals) >= 2:
                     continue
+            # ── 文本季数回退: 名称/别名中提取 Season 关键词 ──
+            rows_season = {}
+            for idx in with_url.index:
+                pos = df_valid.index.get_loc(idx)
+                texts = [_cell_cache[pos].get(name_col_name, '').strip()]
+                if alias_col_name:
+                    texts.append(_cell_cache[pos].get(alias_col_name, '').strip())
+                seasons = extract_season_numbers(' '.join(texts))
+                if seasons:
+                    rows_season[idx] = seasons
+            season_tuples = {tuple(sorted(s)) for s in rows_season.values()}
+            if len(season_tuples) >= 2:
+                continue
 
         duplicate_count += 1
 
@@ -612,7 +698,7 @@ def main():
                                 existing = parse_tags(old_val)
                                 add_vals = [v for v in parse_tags(new_val) if v not in existing]
                                 if add_vals:
-                                    after = '|'.join(sorted(existing | set(add_vals)))
+                                    after = _join_values(existing | set(add_vals), col_name, alias_col_name)
                                     df_updates[(keep_idx, col_name)] = after
                                     keep_cache[col_name] = after
                                     merged_groups += 1
@@ -665,7 +751,7 @@ def main():
                             existing = parse_tags(old_val)
                             add_vals = [v for v in parse_tags(new_val) if v not in existing]
                             if add_vals:
-                                after = '|'.join(sorted(existing | set(add_vals)))
+                                after = _join_values(existing | set(add_vals), col_name)
                                 df_updates[(keep_idx, col_name)] = after
                                 keep_cache[col_name] = after
                                 merged_groups += 1
@@ -715,7 +801,7 @@ def main():
                         existing = parse_tags(old_val)
                         add_vals = [v for v in parse_tags(new_val) if v not in existing]
                         if add_vals:
-                            after = '|'.join(sorted(existing | set(add_vals)))
+                            after = _join_values(existing | set(add_vals), col_name)
                             df_updates[(keep_idx, col_name)] = after
                             keep_cache[col_name] = after
                             merged_groups += 1
@@ -765,7 +851,7 @@ def main():
                         existing = parse_tags(old_val)
                         add_vals = [v for v in parse_tags(new_val) if v not in existing]
                         if add_vals:
-                            after = '|'.join(sorted(existing | set(add_vals)))
+                            after = _join_values(existing | set(add_vals), col_name)
                             df_updates[(keep_idx, col_name)] = after
                             keep_cache[col_name] = after
                             merged_groups += 1
