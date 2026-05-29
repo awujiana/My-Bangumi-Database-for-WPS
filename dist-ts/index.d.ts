@@ -23,6 +23,7 @@ export { extractSubjectId, getFilterStatus, getSequentialRowsBySeqCol, SyncToBan
 export { verifyToken, fetchAllUserCollections, type BangumiUserData, type TokenVerifyResult, type ApiResponse, } from './sync/scraping.js';
 export { bgmLog, getApp, colNumToLetter, getCell, getCellValue, setCellValue, getSheetByIndex, escapeHtml, storeBgToken, clearBgToken, loadBgToken, _getBgmUserId, _setBgmUserId, _getBgmUsername, _setBgmUsername, fetchBgmUserInfo, trim, BGM, _getUserApiPath, _fetchBgmUserInfo, showBangumiPanel, sleep, delay, readRangeValues, getColumnMap, cacheGet, clearSheetCache, getLastRow, isEmptyValue, getDataSheet, findHeaderRow, shellExecuteByOAAssist, GetUrlPath, calcFingerprint } from './tools/util.js';
 export { CONFIG_KEYS, setConfig, getConfig, removeConfig, setIncrementalSync, getIncrementalSync, setSkipConflicts, getSkipConflicts, } from './tools/config.js';
+export { autoFillUrls, showAutoFillUrlDialog, type AutoFillResult, type NameUrlMap, } from './tools/autoFillUrl.js';
 export interface BGMCache {
     /** WPS 文档总行数缓存 */
     totalRows: number;

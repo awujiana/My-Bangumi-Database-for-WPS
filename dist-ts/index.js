@@ -190,6 +190,14 @@ setIncrementalSync, getIncrementalSync,
 // 跳过冲突配置
 setSkipConflicts, getSkipConflicts, } from './tools/config.js';
 // ============================================================================
+// 13. URL 自动补全（来自 tools/autoFillUrl.js）
+// ============================================================================
+export { 
+// 执行 URL 自动补全
+autoFillUrls, 
+// 显示确认对话框后执行
+showAutoFillUrlDialog, } from './tools/autoFillUrl.js';
+// ============================================================================
 // 12. 页面逻辑（来自 taskpane.js）
 // ============================================================================
 export { refreshSheets, toggleSheetLock, 

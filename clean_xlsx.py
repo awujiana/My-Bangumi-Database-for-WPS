@@ -751,7 +751,7 @@ def main():
                             existing = parse_tags(old_val)
                             add_vals = [v for v in parse_tags(new_val) if v not in existing]
                             if add_vals:
-                                after = _join_values(existing | set(add_vals), col_name)
+                                after = _join_values(existing | set(add_vals), col_name, alias_col_name)
                                 df_updates[(keep_idx, col_name)] = after
                                 keep_cache[col_name] = after
                                 merged_groups += 1
@@ -801,7 +801,7 @@ def main():
                         existing = parse_tags(old_val)
                         add_vals = [v for v in parse_tags(new_val) if v not in existing]
                         if add_vals:
-                            after = _join_values(existing | set(add_vals), col_name)
+                            after = _join_values(existing | set(add_vals), col_name, alias_col_name)
                             df_updates[(keep_idx, col_name)] = after
                             keep_cache[col_name] = after
                             merged_groups += 1
@@ -851,7 +851,7 @@ def main():
                         existing = parse_tags(old_val)
                         add_vals = [v for v in parse_tags(new_val) if v not in existing]
                         if add_vals:
-                            after = _join_values(existing | set(add_vals), col_name)
+                            after = _join_values(existing | set(add_vals), col_name, alias_col_name)
                             df_updates[(keep_idx, col_name)] = after
                             keep_cache[col_name] = after
                             merged_groups += 1

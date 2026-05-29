@@ -281,6 +281,18 @@ export {
     getSkipConflicts,
 } from './tools/config.js';
 
+// ============================================================================
+// 13. URL 自动补全（来自 tools/autoFillUrl.js）
+// ============================================================================
+export {
+    // 执行 URL 自动补全
+    autoFillUrls,
+    // 显示确认对话框后执行
+    showAutoFillUrlDialog,
+    type AutoFillResult,
+    type NameUrlMap,
+} from './tools/autoFillUrl.js';
+
 // ========== BGM 缓存数据结构 ==========
 export interface BGMCache {
     /** WPS 文档总行数缓存 */
