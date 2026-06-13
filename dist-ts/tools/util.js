@@ -648,7 +648,7 @@ export function shellExecuteByOAAssist(param) {
 /**
  * 获取 URL 路径
  */
-export function GetUrlPath() {
+export function getUrlPath() {
     const app = getApp();
     const manifestPath = app?.PluginStorage?.getItem("manifest_base_path");
     if (manifestPath) {
@@ -678,7 +678,7 @@ export function showBangumiPanel() {
     }
     const tsId = app.PluginStorage?.getItem("taskpane_id");
     if (!tsId) {
-        const tskpane = app.CreateTaskPane?.(GetUrlPath() + "/ui/taskpane.html");
+        const tskpane = app.CreateTaskPane?.(getUrlPath() + "/ui/taskpane.html");
         if (tskpane) {
             const id = tskpane.ID;
             app.PluginStorage?.setItem("taskpane_id", id);

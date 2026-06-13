@@ -73,7 +73,7 @@ function getRowData(ws, rowNum, colMap, headerRow, seqCol = 9) {
  */
 function renderDetailItemHtml(rowData, colMap, ws) {
     // 定义观看状态类型映射
-    const typeNames = { 0: '', 1: '想看', 2: '在看', 3: '看过', 4: '搁置', 5: '抛弃' };
+    const typeNames = { 0: '', 1: '想看', 2: '看过', 3: '在看', 4: '搁置', 5: '抛弃' };
     const typeName = typeNames[rowData.typeNum] || '未知';
     // 解析标签数据
     const tagSet = new Set();
@@ -177,7 +177,7 @@ function normalizeStatus(rawStatus) {
     const code = WATCH_STATUS_MAP[trimmed.toLowerCase()];
     if (code !== undefined) {
         // 根据状态码返回标准中文名称
-        const reverseMap = { 1: '想看', 2: '在看', 3: '看过', 4: '搁置', 5: '抛弃', 0: '忽略' };
+        const reverseMap = { 1: '想看', 2: '看过', 3: '在看', 4: '搁置', 5: '抛弃', 0: '忽略' };
         return reverseMap[code] || trimmed;
     }
     return trimmed; // 未识别的保持原样

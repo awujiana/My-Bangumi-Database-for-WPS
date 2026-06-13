@@ -136,7 +136,7 @@ export declare function shellExecuteByOAAssist(param: string): void;
 /**
  * 获取 URL 路径
  */
-export declare function GetUrlPath(): string;
+export declare function getUrlPath(): string;
 /**
  * 显示同步面板
  */

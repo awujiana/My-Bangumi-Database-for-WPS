@@ -725,7 +725,7 @@ function startUserInfoPolling(): void {
     let lastIncrementalSync: boolean | null = null;
     let lastSkipConflicts: boolean | null = null;
     
-    setInterval(() => {
+    const pollingInterval = setInterval(() => {
         try {
             const currentUserId = _getBgmUserId();
             const currentUsername = _getBgmUsername();
@@ -781,6 +781,9 @@ function startUserInfoPolling(): void {
             // 静默处理轮询错误
         }
     }, 2000); // 每2秒轮询一次
+
+    // 面板关闭时清理定时器
+    window.addEventListener('beforeunload', () => clearInterval(pollingInterval));
 }
 
 function initPanel(): void {
@@ -847,11 +850,14 @@ function initPanel(): void {
         if (modal) modal.style.display = 'none';
     });
     // 按 Escape 键关闭详情模态框
-    document.addEventListener('keydown', (e: KeyboardEvent) => {
+    const handleKeydown = (e: KeyboardEvent) => {
         if (e.key === 'Escape') {
             closeDetailModal();
         }
-    });
+    };
+    document.addEventListener('keydown', handleKeydown);
+    // 面板关闭时移除键盘监听
+    window.addEventListener('beforeunload', () => document.removeEventListener('keydown', handleKeydown));
     // 通知模块就绪
     document.dispatchEvent(new CustomEvent('bgm:modulesReady'));
     bgmLog(LOG_LEVELS.INFO, 'initPanel 完成');

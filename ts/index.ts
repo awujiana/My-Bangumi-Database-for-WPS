@@ -258,7 +258,7 @@ export {
     // 根据表头关键字获取列映射
     shellExecuteByOAAssist,
     // 获取 URL 路径（用于 API 调用）
-    GetUrlPath,
+    getUrlPath,
     // 计算数据指纹（用于缓存）
     calcFingerprint
 } from './tools/util.js';

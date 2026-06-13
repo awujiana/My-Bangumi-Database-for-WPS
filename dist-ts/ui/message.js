@@ -5,9 +5,18 @@
  */
 import { BGM, showAlert, showConfirm, updateTokenStatus, updateUserIdStatus, refreshSheets, refreshData, bgmLog, LOG_LEVELS } from '../index.js';
 // ========== 消息监听 ==========
+let _messageHandler = null;
 export function initMessageListener() {
     bgmLog(LOG_LEVELS.INFO, `[message] initMessageListener 开始执行`);
-    window.addEventListener('message', (event) => {
+    // 先移除已有监听器，避免重复注册
+    if (_messageHandler) {
+        window.removeEventListener('message', _messageHandler);
+    }
+    _messageHandler = (event) => {
+        // 校验消息来源，防止跨站消息伪造
+        const ALLOWED_ORIGINS = ['https://bgm.tv', window.location.origin];
+        if (!ALLOWED_ORIGINS.includes(event.origin))
+            return;
         const data = event.data;
         if (!data?.type)
             return;
@@ -35,8 +44,11 @@ export function initMessageListener() {
                 bgmLog(LOG_LEVELS.INFO, `[message] 收到用户信息更新: username=${data.username}, userId=${data.userId}`);
                 updateUserIdStatus();
                 break;
+            default:
+                bgmLog(LOG_LEVELS.WARN, `[message] 未知消息类型: ${data.type}`);
         }
-    });
+    };
+    window.addEventListener('message', _messageHandler);
     bgmLog(LOG_LEVELS.INFO, `[message] initMessageListener 执行完成，监听器已注册`);
 }
 // ========== 状态显示 ==========

@@ -461,7 +461,7 @@ def main():
         if alias_col_name:
             alias_val = _cell_cache[pos].get(alias_col_name, '').strip()
             if alias_val:
-                for a in re.split(r'[/／]', alias_val):
+                for a in re.split(r'[/／|｜]', alias_val):
                     a = a.strip()
                     if a and a not in name_url_map:
                         name_url_map[a] = url_val

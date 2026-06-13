@@ -320,7 +320,7 @@ export declare const WATCH_STATUS_MAP: Record<string, number>;
 /**
  * Bangumi API 收藏状态名称映射（下标即 API 数值）
  * 空字符串占位索引0（API无此数值）
- * 1=想看, 2=在看, 3=看过, 4=搁置, 5=抛弃
+ * 1=想看, 2=看过, 3=在看, 4=搁置, 5=抛弃
  *
  * @constant
  * @type {string[]}
@@ -332,7 +332,8 @@ export declare const WATCH_STATUS_MAP: Record<string, number>;
  *
  * @example
  * // COLLECTION_TYPE_NAMES[1] → "想看"
- * // COLLECTION_TYPE_NAMES[3] → "看过"
+ * // COLLECTION_TYPE_NAMES[2] → "看过"
+ * // COLLECTION_TYPE_NAMES[3] → "在看"
  */
 export declare const COLLECTION_TYPE_NAMES: string[];
 /**

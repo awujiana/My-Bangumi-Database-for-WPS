@@ -90,6 +90,8 @@ export function showTokenDialog(currentToken?: string): void {
             storeBgToken(value);
             updateTokenStatus();
             showToast(_T.tokenSaved, 'success');
+        } else {
+            showToast('Token 不能为空', 'warn');
         }
     });
 }
@@ -101,6 +103,8 @@ export function showUserIdDialog(): void {
             _setBgmUserId(value.trim());
             updateUserIdStatus();
             showToast(_T.userIdSaved, 'success');
+        } else {
+            showToast('用户 ID 不能为空', 'warn');
         }
     });
 }
@@ -803,6 +807,8 @@ function handleActionClick(event: Event): void {
 
     const startTime = Date.now();
 
+    try {
+
     switch (action) {
         // 核心操作
         case 'sync':
@@ -846,6 +852,7 @@ function handleActionClick(event: Event): void {
             break;
             
         case 'setToken':
+            // 已废弃，由 showTokenDialog 替代，保留兼容
             bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 打开 Token 设置对话框');
             showTokenDialog(loadBgToken() || '');
             bgmLog(LOG_LEVELS.INFO, `[handleActionClick] Token 设置对话框已打开，耗时: ${Date.now() - startTime}ms`);
@@ -993,6 +1000,10 @@ function handleActionClick(event: Event): void {
 
         default:
             bgmLog(LOG_LEVELS.WARN, `[handleActionClick] 未知操作类型: ${action}`);
+    }
+    } catch (e: any) {
+        bgmLog(LOG_LEVELS.ERROR, `[handleActionClick] 操作执行失败: ${action}, 错误: ${e.message}`);
+        BGM.handleError(e, { context: `handleActionClick:${action}`, showAlert: true });
     }
 }
 

@@ -166,15 +166,19 @@ function bindAllEvents(): void {
         modal.style.display = 'none';
 
         if (_dialogCallback) {
-            if (eventType === 'ok' && _dialogCallback.onOk) {
-                if (modal.id === 'bgmInputDialog') {
-                    const inputValue = dom.bgmInputField ? (dom.bgmInputField as HTMLInputElement).value.trim() : '';
-                    _dialogCallback.onOk(inputValue);
-                } else {
-                    _dialogCallback.onOk();
+            try {
+                if (eventType === 'ok' && _dialogCallback.onOk) {
+                    if (modal.id === 'bgmInputDialog') {
+                        const inputValue = dom.bgmInputField ? (dom.bgmInputField as HTMLInputElement).value.trim() : '';
+                        _dialogCallback.onOk(inputValue);
+                    } else {
+                        _dialogCallback.onOk();
+                    }
+                } else if (eventType === 'cancel' && _dialogCallback.onCancel) {
+                    _dialogCallback.onCancel();
                 }
-            } else if (eventType === 'cancel' && _dialogCallback.onCancel) {
-                _dialogCallback.onCancel();
+            } catch (e) {
+                console.error('[dialog] 回调执行失败:', e);
             }
             _dialogCallback = null;
         }

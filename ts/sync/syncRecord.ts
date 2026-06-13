@@ -131,7 +131,9 @@ export function getOrCreateSyncRecordSheet(): any {
                 bgmLog(LOG_LEVELS.INFO, '同步记录表迁移完成');
                 invalidateCache();
             }
-        } catch (_) {}
+        } catch (e) {
+            bgmLog(LOG_LEVELS.WARN, '同步记录表迁移失败: ' + (e as Error).message);
+        }
 
         // 已有工作表，检查并补齐表头
         const existingCols = SYNC_RECORD_COLUMNS.length;
@@ -443,7 +445,10 @@ export function formatSyncRecordSheet(sheet?: any): void {
     try {
         const target = sheet || getOrCreateSyncRecordSheet();
         const lastRow = getLastRow(target);
-        if (lastRow < 1) return;
+        if (lastRow < 1) {
+            _formattingInProgress = false;
+            return;
+        }
 
         const colCount = SYNC_RECORD_COLUMNS.length;
         const lastColLetter = colNumToLetter(colCount);
