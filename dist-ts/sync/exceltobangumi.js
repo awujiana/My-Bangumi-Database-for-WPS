@@ -119,7 +119,13 @@ function createFieldGetter(ws, colMap, startRow, lastRow) {
  * @function openBangumiTokenPage
  */
 export function openBangumiTokenPage() {
-    window.open('https://bgm.tv/dev/app', '_blank');
+    const app = window.Application;
+    if (app?.OAAssist?.ShellExecute) {
+        app.OAAssist.ShellExecute('https://bgm.tv/dev/app');
+    }
+    else {
+        window.open('https://bgm.tv/dev/app', '_blank');
+    }
 }
 /**
  * 测试Token有效性（Ribbon版本）

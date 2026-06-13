@@ -311,10 +311,10 @@ export declare const TOKEN_CONFIG: {
  * @example
  * // WATCH_STATUS_MAP["想看"] → 1
  * // WATCH_STATUS_MAP["看过"] → 2
- * // WATCH_STATUS_MAP["完成"] → 2（"完"的反向也是2）
  * // WATCH_STATUS_MAP["在看"] → 3
  * // WATCH_STATUS_MAP["搁置"] → 4
  * // WATCH_STATUS_MAP["抛弃"] → 5
+ * // WATCH_STATUS_MAP["忽略"] → 0
  */
 export declare const WATCH_STATUS_MAP: Record<string, number>;
 /**

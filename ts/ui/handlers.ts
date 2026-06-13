@@ -19,7 +19,7 @@ import {
     getIncrementalSync, setIncrementalSync,
     getSkipConflicts, setSkipConflicts,
     COLLECTION_TYPE_NAMES,
-    readRangeValues,
+    readRangeValues, openBangumiTokenPage,
 } from '../index.js';
 import{BGM_EVENTS, eventBus} from '../tools/events.js';
 
@@ -895,6 +895,12 @@ function handleActionClick(event: Event): void {
             bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 尝试打开收藏页面');
             openUserCollection();
             bgmLog(LOG_LEVELS.INFO, `[handleActionClick] 收藏页面打开操作已触发，耗时: ${Date.now() - startTime}ms`);
+            break;
+
+        case 'openTokenPage':
+            bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 打开 Token 申请页面');
+            openBangumiTokenPage();
+            bgmLog(LOG_LEVELS.INFO, `[handleActionClick] Token 申请页面已触发，耗时: ${Date.now() - startTime}ms`);
             break;
             
         case 'syncCollectionFromBgm':

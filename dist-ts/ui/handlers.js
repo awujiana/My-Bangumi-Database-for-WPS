@@ -3,7 +3,7 @@
  * @module ui/handlers
  * @description 面板操作处理、按钮绑定、业务对话框
  */
-import { LOG_LEVELS, bgmLog, BGM, loadBgToken, storeBgToken, clearBgToken, _getBgmUserId, _setBgmUserId, _getBgmUsername, _setBgmUsername, getApp, getCell, trim, setCellValue, fetchBgmUserInfo, BGM_COLOR, showAlert, showConfirm, showError, showSuccess, showInput, showToast, setStatus, verifyToken, fetchAllUserCollections, findHeaderRow, getColumnMap, getLastRow, extractSubjectId, getDataSheet, SyncToBangumiAsync, syncSelectedRows, getOrCreateSyncRecordSheet, getAllSyncRecords, addSyncRecord, openSyncRecordSheet, deduplicateSyncRecords, formatSyncRecordSheet, previewSyncContent, refreshData, refreshSheets, toggleSheetLock, clearSyncRecords, closeDetailModal, getIncrementalSync, setIncrementalSync, getSkipConflicts, setSkipConflicts, COLLECTION_TYPE_NAMES, readRangeValues, } from '../index.js';
+import { LOG_LEVELS, bgmLog, BGM, loadBgToken, storeBgToken, clearBgToken, _getBgmUserId, _setBgmUserId, _getBgmUsername, _setBgmUsername, getApp, getCell, trim, setCellValue, fetchBgmUserInfo, BGM_COLOR, showAlert, showConfirm, showError, showSuccess, showInput, showToast, setStatus, verifyToken, fetchAllUserCollections, findHeaderRow, getColumnMap, getLastRow, extractSubjectId, getDataSheet, SyncToBangumiAsync, syncSelectedRows, getOrCreateSyncRecordSheet, getAllSyncRecords, addSyncRecord, openSyncRecordSheet, deduplicateSyncRecords, formatSyncRecordSheet, previewSyncContent, refreshData, refreshSheets, toggleSheetLock, clearSyncRecords, closeDetailModal, getIncrementalSync, setIncrementalSync, getSkipConflicts, setSkipConflicts, COLLECTION_TYPE_NAMES, readRangeValues, openBangumiTokenPage, } from '../index.js';
 import { BGM_EVENTS, eventBus } from '../tools/events.js';
 //  
 import { getSyncPreview, detectConflicts } from '../services/ribbonService.js';
@@ -822,6 +822,11 @@ function handleActionClick(event) {
             bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 尝试打开收藏页面');
             openUserCollection();
             bgmLog(LOG_LEVELS.INFO, `[handleActionClick] 收藏页面打开操作已触发，耗时: ${Date.now() - startTime}ms`);
+            break;
+        case 'openTokenPage':
+            bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 打开 Token 申请页面');
+            openBangumiTokenPage();
+            bgmLog(LOG_LEVELS.INFO, `[handleActionClick] Token 申请页面已触发，耗时: ${Date.now() - startTime}ms`);
             break;
         case 'syncCollectionFromBgm':
             bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 开始从 BGM 同步收藏');

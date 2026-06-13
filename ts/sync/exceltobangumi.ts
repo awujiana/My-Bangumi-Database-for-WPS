@@ -182,7 +182,12 @@ function createFieldGetter(
  * @function openBangumiTokenPage
  */
 export function openBangumiTokenPage(): void {
-    window.open('https://bgm.tv/dev/app', '_blank');
+    const app = (window as any).Application;
+    if (app?.OAAssist?.ShellExecute) {
+        app.OAAssist.ShellExecute('https://bgm.tv/dev/app');
+    } else {
+        window.open('https://bgm.tv/dev/app', '_blank');
+    }
 }
 
 /**

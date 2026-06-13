@@ -177,7 +177,7 @@ function normalizeStatus(rawStatus) {
     const code = WATCH_STATUS_MAP[trimmed.toLowerCase()];
     if (code !== undefined) {
         // 根据状态码返回标准中文名称
-        const reverseMap = { 0: '想看', 2: '在看', 3: '看过', 4: '搁置', 5: '抛弃' };
+        const reverseMap = { 1: '想看', 2: '在看', 3: '看过', 4: '搁置', 5: '抛弃', 0: '忽略' };
         return reverseMap[code] || trimmed;
     }
     return trimmed; // 未识别的保持原样
