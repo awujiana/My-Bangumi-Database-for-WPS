@@ -296,3 +296,40 @@
     color: #a6adc8;
     font-weight: 500;
 }
+
+/* ========== 内联样式迁移自 taskpane.html ========== */
+/* 同步预览模态框容器：覆盖默认 .modal，使用 base 半透明遮罩 */
+.sync-preview-modal {
+    display: none;                       /* 初始隐藏，由 JS 控制显示 */
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(30, 30, 46, 0.5);   /* base 的 rgba，替代 rgba(0,0,0,0.5) */
+    z-index: 10000;
+    overflow: auto;
+    /* 覆盖默认 .modal 的 flex 居中，改由内容区 margin:auto 居中 */
+    align-items: initial;
+    justify-content: initial;
+}
+
+/* 同步预览模态框内容区：宽度与居中
+   背景/圆角/阴影/文字颜色沿用既有 #syncPreviewModal .modal-content 规则（已使用 Mocha base） */
+.sync-preview-modal .modal-content {
+    margin: 20px auto;
+    width: 95%;
+    max-width: 1400px;
+}
+
+/* 标题栏按钮工具栏 */
+.sync-preview-modal-toolbar {
+    display: flex;
+    align-items: center;
+    column-gap: 12px;
+}
+
+/* 详细预览计数文本：替代内联 color:#aaa，映射到 subtext0 */
+#detailCount {
+    color: var(--subtext0, #a6adc8);
+}
