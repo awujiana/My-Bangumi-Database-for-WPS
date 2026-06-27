@@ -157,7 +157,7 @@ export declare const PANEL_CONFIG: {
     MAX_SCAN_COLUMNS: number;
     /** 表头检测的最大行数 */
     MAX_SCAN_ROWS: number;
-    /** 预览显示的数据行数上限（9999 ≈ 全部显示） */
+    /** 预览显示的数据行数上限 */
     PREVIEW_LIMIT: number;
     /** 筛选检测最大行数 */
     MAX_FILTER_SCAN_ROWS: number;

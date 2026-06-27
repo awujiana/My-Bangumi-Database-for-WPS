@@ -337,10 +337,10 @@ function autoDetectSheet() {
         }
     }
     if (bestMatch) {
-        BGM.handleError(new Error(`autoDetectSheet: 最终选中工作表 "${bestMatch.sheetName}" (列${bestMatch.colCount}, 行${bestMatch.headerRow})`));
+        bgmLog(LOG_LEVELS.INFO, `autoDetectSheet: 最终选中工作表 "${bestMatch.sheetName}" (列${bestMatch.colCount}, 行${bestMatch.headerRow})`);
     }
     else {
-        BGM.handleError(new Error('autoDetectSheet: 未在任何工作表中找到有效数据表头'));
+        bgmLog(LOG_LEVELS.WARN, 'autoDetectSheet: 未在任何工作表中找到有效数据表头（可在切换工作表后手动选择）');
     }
     return bestMatch;
 }
@@ -549,22 +549,68 @@ function refreshData() {
             const dataRows = (filterStatus?.visibleRows || [])
                 .filter(r => r !== meta.headerRow && r >= meta.dataStartRow);
             const maxPreview = Math.min(dataRows.length, PANEL_CONFIG.PREVIEW_LIMIT);
-            for (let i = 0; i < maxPreview; i++) {
-                const dr = dataRows[i];
-                const rowCols = [];
-                let hasAny = false;
-                for (let ci = 0; ci < displayColCount; ci++) {
-                    // ✅ 使用实际列号
-                    const col = meta.previewColStartAbsolute + ci;
-                    const v = getCellValue(ws, dr, col).trim();
-                    if (v)
-                        hasAny = true;
-                    rowCols.push(v);
+            // 批量读取：按连续行段一次性读取 Range.Value2，减少 COM 调用次数
+            let i = 0;
+            while (i < maxPreview) {
+                // 找到连续行段
+                let j = i;
+                while (j + 1 < maxPreview && dataRows[j + 1] === dataRows[j] + 1)
+                    j++;
+                const segStart = dataRows[i];
+                const segLen = j - i + 1;
+                try {
+                    // 一次性读取整个矩形区域
+                    const startColLetter = colNumToLetter(meta.previewColStartAbsolute);
+                    const endColLetter = colNumToLetter(meta.previewColStartAbsolute + displayColCount - 1);
+                    const rangeAddr = ws.Range(`${startColLetter}${segStart}:${endColLetter}${segStart + segLen - 1}`);
+                    const raw = rangeAddr.Value2;
+                    // WPS 返回二维数组（1-based），或单值
+                    const is2D = raw && typeof raw === 'object' && raw.length !== undefined;
+                    for (let r = 0; r < segLen; r++) {
+                        const dr = dataRows[i + r];
+                        const rowCols = [];
+                        let hasAny = false;
+                        for (let ci = 0; ci < displayColCount; ci++) {
+                            let v;
+                            if (is2D) {
+                                const cell = raw[r + 1][ci + 1];
+                                v = cell == null ? '' : String(cell).trim();
+                            }
+                            else {
+                                v = segLen === 1 && displayColCount === 1
+                                    ? (raw == null ? '' : String(raw).trim())
+                                    : getCellValue(ws, dr, meta.previewColStartAbsolute + ci).trim();
+                            }
+                            if (v)
+                                hasAny = true;
+                            rowCols.push(v);
+                        }
+                        if (hasAny) {
+                            previewRows.push({ row: dr, cols: rowCols, isHeader: false, aligned: true });
+                            hasData = true;
+                        }
+                    }
                 }
-                if (hasAny) {
-                    previewRows.push({ row: dr, cols: rowCols, isHeader: false, aligned: true });
-                    hasData = true;
+                catch (batchErr) {
+                    // 批量读取失败，回退到逐单元格
+                    for (let r = 0; r < segLen; r++) {
+                        const dr = dataRows[i + r];
+                        const rowCols = [];
+                        let hasAny = false;
+                        for (let ci = 0; ci < displayColCount; ci++) {
+                            const col = meta.previewColStartAbsolute + ci;
+                            const v = getCellValue(ws, dr, col).trim();
+                            if (v)
+                                hasAny = true;
+                            rowCols.push(v);
+                        }
+                        if (hasAny) {
+                            previewRows.push({ row: dr, cols: rowCols, isHeader: false, aligned: true });
+                            hasData = true;
+                        }
+                    }
                 }
+                i = j + 1;
             }
         }
         else {

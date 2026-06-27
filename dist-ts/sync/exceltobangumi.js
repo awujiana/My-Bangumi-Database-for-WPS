@@ -9,7 +9,7 @@
  */
 import { URL_PATTERNS, WATCH_STATUS_MAP, BGM_CONFIG, BGM_COLOR, LOG_LEVELS, SYNC_STATUS, bgmLog, getApp, getCell, trim, getColumnMap, findHeaderRow, colNumToLetter, getCellValue, loadBgToken, storeBgToken, _setBgmUserId, _setBgmUsername, BGM, wpsMsgBox, _getUserApiPath, readRangeValues, delay, calcFingerprint, getAllSyncRecords, isWpsWorksheet, clearSheetCache } from '../index.js';
 import { getOrCreateSyncRecordSheet, addSyncRecord } from './syncRecord.js';
-import { showAlert, showSuccess, showError } from '../ui/dialog.js';
+import { showAlert, showSuccess, showError, showConfirm } from '../ui/dialog.js';
 // ========== 常量定义 (优化点：集中管理) ==========
 /** 批量读取时需要获取的列名 */
 const BATCH_READ_COLUMNS = [
@@ -1071,12 +1071,40 @@ export async function syncSelectedRows() {
                 wpsMsgBox('请先在Excel中选中要同步的数据行', 0, 48);
                 return;
             }
-            const startRow = sel.Row;
-            const rowCount = sel.Rows.Count;
-            for (let r = startRow; r < startRow + rowCount; r++) {
-                rawRows.push(r);
+            // 记录选中区域地址用于调试
+            let selAddress = '';
+            try {
+                selAddress = sel.Address || '';
             }
-            bgmLog(LOG_LEVELS.INFO, `[syncSelectedRows] 选中区域: ${rowCount} 行，行号 ${startRow}-${startRow + rowCount - 1}`);
+            catch (_) {
+                selAddress = '(无法获取)';
+            }
+            bgmLog(LOG_LEVELS.INFO, `[syncSelectedRows] Selection.Address: ${selAddress}`);
+            // 处理非连续选择（多区域）
+            const areas = sel.Areas;
+            const areaCount = areas ? areas.Count : 1;
+            if (areaCount > 1) {
+                // 非连续选择：遍历每个 Area 收集行号
+                bgmLog(LOG_LEVELS.INFO, `[syncSelectedRows] 检测到非连续选择，共 ${areaCount} 个区域`);
+                for (let ai = 1; ai <= areaCount; ai++) {
+                    const area = areas.Item(ai);
+                    const aStartRow = area.Row;
+                    const aRowCount = area.Rows.Count;
+                    for (let r = aStartRow; r < aStartRow + aRowCount; r++) {
+                        if (!rawRows.includes(r))
+                            rawRows.push(r);
+                    }
+                }
+            }
+            else {
+                // 连续选择：直接读取
+                const startRow = sel.Row;
+                const rowCount = sel.Rows.Count;
+                for (let r = startRow; r < startRow + rowCount; r++) {
+                    rawRows.push(r);
+                }
+            }
+            bgmLog(LOG_LEVELS.INFO, `[syncSelectedRows] 选中区域: ${rawRows.length} 行，行号 ${Math.min(...rawRows)}-${Math.max(...rawRows)}`);
         }
         catch (e) {
             BGM.handleError(e, { context: 'syncSelectedRows', showAlert: false });
@@ -1088,8 +1116,13 @@ export async function syncSelectedRows() {
             wpsMsgBox('请先在Excel中选中要同步的数据行', 0, 48);
             return;
         }
-        const headerRow = findHeaderRow(ws) || 1;
+        const headerRow = findHeaderRow(ws);
         bgmLog(LOG_LEVELS.INFO, `[syncSelectedRows] 表头行: ${headerRow}`);
+        if (headerRow === 0) {
+            bgmLog(LOG_LEVELS.ERROR, '[syncSelectedRows] 未找到有效表头行，中止同步');
+            wpsMsgBox('未在当前工作表中检测到有效表头行！\n请确保表头包含"名称"、"是否看完"、"Bangumi URL"等关键词。', 0, 48);
+            return;
+        }
         // 排除表头行
         const rows = rawRows.filter(r => r > headerRow);
         bgmLog(LOG_LEVELS.INFO, `[syncSelectedRows] 排除表头后有效数据行: ${rows.length} 行（原始选中 ${rawRows.length} 行）`);
@@ -1097,6 +1130,18 @@ export async function syncSelectedRows() {
             bgmLog(LOG_LEVELS.WARN, '[syncSelectedRows] 排除表头后没有有效数据行');
             wpsMsgBox('当前选中区域只有表头行，没有数据行', 0, 48);
             return;
+        }
+        // 选中行数超过阈值时弹出确认对话框
+        if (rows.length > 10) {
+            bgmLog(LOG_LEVELS.INFO, `[syncSelectedRows] 选中 ${rows.length} 行，弹出确认对话框`);
+            const confirmed = await new Promise((resolve) => {
+                showConfirm(`选中了 ${rows.length} 行数据，确认要同步全部吗？\n\n行号范围: ${Math.min(...rows)} - ${Math.max(...rows)}`, (result) => resolve(result), '批量同步确认');
+            });
+            if (!confirmed) {
+                bgmLog(LOG_LEVELS.INFO, '[syncSelectedRows] 用户取消同步');
+                wpsMsgBox('已取消同步', 0, 64);
+                return;
+            }
         }
         clearSheetCache(ws);
         const colMap = getColumnMap(ws, headerRow);
