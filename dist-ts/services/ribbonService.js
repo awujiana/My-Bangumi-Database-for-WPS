@@ -387,3 +387,4 @@ export function openCollectionForRibbon() {
     window.open(collectionUrl, '_blank');
     bgmLog(LOG_LEVELS.INFO, `[openCollectionForRibbon] 完成，耗时: ${Date.now() - startTime}ms`);
 }
+//# sourceMappingURL=ribbonService.js.map

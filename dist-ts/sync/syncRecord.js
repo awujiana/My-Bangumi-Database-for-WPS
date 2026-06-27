@@ -496,3 +496,4 @@ export function openSyncRecordSheet() {
         BGM.handleError(e, { context: 'openSyncRecordSheet', showAlert: false });
     }
 }
+//# sourceMappingURL=syncRecord.js.map

@@ -149,3 +149,4 @@ window.GetIncrementalSyncPressed = GetIncrementalSyncPressed;
 window.GetSkipConflictsPressed = GetSkipConflictsPressed;
 window.OnIncrementalSyncChange = OnIncrementalSyncChange;
 window.OnSkipConflictsChange = OnSkipConflictsChange;
+//# sourceMappingURL=ribbon.js.map

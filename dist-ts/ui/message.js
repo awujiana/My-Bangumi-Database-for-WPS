@@ -68,3 +68,4 @@ export function setSyncRunning(isRunning) {
         syncBtn.textContent = isRunning ? '\u540C\u6B65\u4E2D...' : '\u{1F680} \u540C\u6B65\u5230 Bangumi';
     }
 }
+//# sourceMappingURL=message.js.map

@@ -7,9 +7,26 @@
  * @author BGM Development Team
  * @version 1.1.0 (优化版，保留原注释和日志)
  */
-import { URL_PATTERNS, WATCH_STATUS_MAP, BGM_CONFIG, BGM_COLOR, LOG_LEVELS, SYNC_STATUS, bgmLog, getApp, getCell, trim, getColumnMap, findHeaderRow, colNumToLetter, getCellValue, loadBgToken, storeBgToken, _setBgmUserId, _setBgmUsername, BGM, wpsMsgBox, _getUserApiPath, readRangeValues, delay, calcFingerprint, getAllSyncRecords, isWpsWorksheet, clearSheetCache } from '../index.js';
+import { URL_PATTERNS, WATCH_STATUS_MAP, BGM_CONFIG, BGM_COLOR, LOG_LEVELS, SYNC_STATUS, bgmLog, getApp, getCell, trim, getColumnMap, findHeaderRow, colNumToLetter, getCellValue, loadBgToken, storeBgToken, _setBgmUserId, _setBgmUsername, BGM, wpsMsgBox, _getUserApiPath, readRangeValues, delay, calcFingerprint, getAllSyncRecords, isWpsWorksheet, clearSheetCache, showToast } from '../index.js';
 import { getOrCreateSyncRecordSheet, addSyncRecord } from './syncRecord.js';
-import { showAlert, showSuccess, showError, showConfirm, showSyncResult } from '../ui/dialog.js';
+import { showAlert, showSuccess, showError, showConfirm, showSyncProgressDialog, updateSyncProgressDialog, setSyncProgressPaused, completeSyncProgressDialog, hideSyncProgressDialog } from '../ui/dialog.js';
+/**
+ * 判断字符串是否为 Bangumi 条目 URL（支持 bgm.tv / bangumi.tv / chii.in）
+ * @param url 待检测的字符串
+ * @returns 如果是 BGM 域名链接返回 true；纯数字 ID 也返回 true；否则返回 false
+ */
+function isBangumiUrl(url) {
+    if (!url)
+        return false;
+    const s = trim(url);
+    if (!s)
+        return false;
+    // 纯数字视为合法的 Subject ID
+    if (/^\d+$/.test(s))
+        return true;
+    // 检查是否匹配任一 BGM URL 模式
+    return URL_PATTERNS.some(pattern => pattern.test(s));
+}
 // ========== 常量定义 (优化点：集中管理) ==========
 /** 批量读取时需要获取的列名 */
 const BATCH_READ_COLUMNS = [
@@ -725,13 +742,15 @@ export function setBangumiToken(token) {
  * @param token API Token
  * @param userIdPath 用户路径
  * @param concurrency 并发数
+ * @param onProgress 进度回调（current=已完成数, total=总数, message=描述）
  * @returns 成功和失败的任务列表以及是否停止
  */
-async function batchSyncRequests(tasks, token, userIdPath, concurrency = DEFAULT_CONCURRENCY) {
+async function batchSyncRequests(tasks, token, userIdPath, concurrency = DEFAULT_CONCURRENCY, onProgress) {
     const success = [];
     const fail = [];
     let lastRequestTime = 0;
     let stopped = false;
+    const total = tasks.length;
     const queue = [...tasks];
     const executing = [];
     while (queue.length > 0 || executing.length > 0) {
@@ -743,8 +762,24 @@ async function batchSyncRequests(tasks, token, userIdPath, concurrency = DEFAULT
             }
             break;
         }
+        // 暂停检查：如果用户请求暂停，等待恢复后再继续
+        if (BGM.sync.checkPaused()) {
+            bgmLog(LOG_LEVELS.INFO, `[batchSyncRequests] 同步已暂停，剩余 ${queue.length} 个任务，等待恢复...`);
+            await BGM.sync.waitForResume();
+            if (BGM.sync.checkShouldStop()) {
+                bgmLog(LOG_LEVELS.INFO, '[batchSyncRequests] 暂停期间收到停止请求，正在停止...');
+                stopped = true;
+                if (executing.length > 0) {
+                    await Promise.all(executing.map(e => e.promise));
+                }
+                break;
+            }
+            bgmLog(LOG_LEVELS.INFO, '[batchSyncRequests] 同步已恢复，继续处理');
+        }
         while (executing.length < concurrency && queue.length > 0) {
             const task = queue.shift();
+            // 更新当前行号（工作表和列在调用方 SyncToBangumiAsync 中已通过 updatePosition 设置）
+            BGM.sync.updatePosition(undefined, task.rowNum);
             const entry = { promise: null, task, done: false };
             entry.promise = (async () => {
                 try {
@@ -784,6 +819,16 @@ async function batchSyncRequests(tasks, token, userIdPath, concurrency = DEFAULT
                 }
                 finally {
                     entry.done = true;
+                    // 报告进度（每完成一个任务回调一次）
+                    if (onProgress) {
+                        const completed = success.length + fail.length;
+                        try {
+                            onProgress(completed, total, `同步中 ${completed}/${total}`);
+                        }
+                        catch (e) {
+                            bgmLog(LOG_LEVELS.WARN, `[batchSyncRequests] onProgress 回调异常: ${e.message}`);
+                        }
+                    }
                 }
             })();
             executing.push(entry);
@@ -933,7 +978,9 @@ export async function SyncToBangumiAsync(ws, colMap, token, lastRow, headerRow, 
         BGM.handleError(e, { level: BGM.ErrorLevel.WARN, context: 'SyncToBangumiAsync:createSheet' });
     }
     bgmLog(LOG_LEVELS.INFO, '[SyncToBangumiAsync] 步骤5: 开始批量同步请求');
-    const { success: successTasks, fail: failTasks, stopped } = await batchSyncRequests(syncTasks, token, userIdPath, DEFAULT_CONCURRENCY);
+    // 设置同步状态机的当前位置（工作表 + 序列号列），供暂停时定位
+    BGM.sync.updatePosition(ws, headerRow, seqCol);
+    const { success: successTasks, fail: failTasks, stopped } = await batchSyncRequests(syncTasks, token, userIdPath, DEFAULT_CONCURRENCY, options?.onProgress);
     // ========== 6. 批量更新 UI 和记录 ==========
     bgmLog(LOG_LEVELS.INFO, '[SyncToBangumiAsync] 步骤6: 批量更新 UI 和记录');
     // 批量更新成功项
@@ -1167,31 +1214,78 @@ export async function syncSelectedRows() {
         let skipCount = 0;
         let episodeMarkCount = 0;
         const details = [];
+        // 启动同步状态机
+        BGM.sync.isRunning = true;
+        BGM.sync.resetStopFlag();
+        // 显示同步进度弹窗（不隐藏"同步到 Bangumi"按钮）
+        showSyncProgressDialog('正在同步 - 选中行同步', () => { BGM.sync.pause(); setSyncProgressPaused(true); }, () => { BGM.sync.resume(); setSyncProgressPaused(false); }, () => { BGM.sync.requestStop(); });
+        // 设置同步状态机位置（用于暂停时定位到单元格）
+        BGM.sync.updatePosition(ws, 0, urlCol);
         for (let idx = 0; idx < rows.length; idx++) {
+            // 检查停止
+            if (BGM.sync.checkShouldStop()) {
+                bgmLog(LOG_LEVELS.INFO, '[syncSelectedRows] 检测到停止请求，终止循环');
+                break;
+            }
+            // 暂停检查：等待恢复后再继续
+            if (BGM.sync.checkPaused()) {
+                bgmLog(LOG_LEVELS.INFO, `[syncSelectedRows] 同步已暂停，当前进度 ${idx}/${rows.length}，等待恢复...`);
+                await BGM.sync.waitForResume();
+                if (BGM.sync.checkShouldStop()) {
+                    bgmLog(LOG_LEVELS.INFO, '[syncSelectedRows] 暂停期间收到停止请求，终止循环');
+                    break;
+                }
+                bgmLog(LOG_LEVELS.INFO, '[syncSelectedRows] 同步已恢复，继续处理');
+            }
             const rowNum = rows[idx];
             const rowProgress = `[${idx + 1}/${rows.length}]`;
+            // 更新当前位置（行号），供暂停时定位
+            BGM.sync.updatePosition(undefined, rowNum);
             try {
                 const bgmUrl = trim(getCellValue(ws, rowNum, urlCol) || '');
                 const name = nameCol ? trim(getCellValue(ws, nameCol === urlCol ? rowNum : rowNum, nameCol) || '') : '';
                 if (!bgmUrl) {
-                    bgmLog(LOG_LEVELS.WARN, `[syncSelectedRows] ${rowProgress} 行${rowNum} "${name || '无名'}" URL为空，跳过`);
+                    const msg = `行${rowNum} "${name || '无名'}" URL为空，跳过`;
+                    bgmLog(LOG_LEVELS.WARN, `[syncSelectedRows] ${rowProgress} ${msg}`);
+                    showToast(msg, 'warn');
+                    details.push(`⊘ 行${rowNum} ${name || '无名'} 跳过: URL为空`);
                     skipCount++;
+                    updateSyncProgressDialog(idx + 1, rows.length, msg, `⊘ ${rowProgress} ${msg}`);
+                    continue;
+                }
+                // 检查是否为 BGM 链接（bgm.tv / bangumi.tv / chii.in 或纯数字 ID）
+                if (!isBangumiUrl(bgmUrl)) {
+                    const msg = `行${rowNum} "${name || '无名'}" 非BGM链接，跳过`;
+                    bgmLog(LOG_LEVELS.WARN, `[syncSelectedRows] ${rowProgress} ${msg}`);
+                    showToast(msg, 'warn');
+                    details.push(`⊘ 行${rowNum} ${name || '无名'} 跳过: 非BGM链接 (${bgmUrl.substring(0, 30)})`);
+                    skipCount++;
+                    updateSyncProgressDialog(idx + 1, rows.length, msg, `⊘ ${rowProgress} ${msg}`);
                     continue;
                 }
                 const sid = extractSubjectId(bgmUrl);
                 if (!sid) {
-                    bgmLog(LOG_LEVELS.WARN, `[syncSelectedRows] ${rowProgress} 行${rowNum} "${name || '无名'}" 无法提取 Subject ID: ${bgmUrl}，跳过`);
+                    const msg = `行${rowNum} "${name || '无名'}" 无法提取 Subject ID，跳过`;
+                    bgmLog(LOG_LEVELS.WARN, `[syncSelectedRows] ${rowProgress} ${msg}`);
+                    showToast(msg, 'warn');
+                    details.push(`⊘ 行${rowNum} ${name || '无名'} 跳过: 无效ID`);
                     skipCount++;
+                    updateSyncProgressDialog(idx + 1, rows.length, msg, `⊘ ${rowProgress} ${msg}`);
                     continue;
                 }
                 bgmLog(LOG_LEVELS.INFO, `[syncSelectedRows] ${rowProgress} 行${rowNum} 开始同步: 名称="${name || '无名'}", SID=${sid}, URL=${bgmUrl}`);
+                updateSyncProgressDialog(idx + 1, rows.length, `${rowProgress} 行${rowNum} "${name || sid}" 同步中...`, `⏳ ${rowProgress} 行${rowNum} "${name || sid}" SID=${sid} 开始同步`);
                 const finishedDate = colMap.has('完播日')
                     ? trim(getCellValue(ws, rowNum, colMap.get('完播日')) || '')
                     : '';
                 const jsonBody = buildJsonPayload((key) => colMap.has(key) ? trim(getCellValue(ws, rowNum, colMap.get(key))) : '', finishedDate);
                 if (jsonBody === '{}') {
-                    bgmLog(LOG_LEVELS.WARN, `[syncSelectedRows] ${rowProgress} 行${rowNum} "${name || sid}" 请求体为空，跳过`);
+                    const msg = `行${rowNum} "${name || sid}" 请求体为空，跳过`;
+                    bgmLog(LOG_LEVELS.WARN, `[syncSelectedRows] ${rowProgress} ${msg}`);
+                    showToast(msg, 'warn');
+                    details.push(`⊘ 行${rowNum} ${name || sid} 跳过: 请求体为空`);
                     skipCount++;
+                    updateSyncProgressDialog(idx + 1, rows.length, msg, `⊘ ${rowProgress} ${msg}`);
                     continue;
                 }
                 bgmLog(LOG_LEVELS.INFO, `[syncSelectedRows] ${rowProgress} 行${rowNum} 请求体: ${jsonBody.length > 300 ? jsonBody.substring(0, 300) + '...' : jsonBody}`);
@@ -1201,6 +1295,7 @@ export async function syncSelectedRows() {
                     successCount++;
                     details.push(`✓ 行${rowNum} ${name || sid} HTTP:${result.code}`);
                     bgmLog(LOG_LEVELS.INFO, `[syncSelectedRows] ${rowProgress} 行${rowNum} "${name || sid}" 同步成功！HTTP: ${result.code}`);
+                    updateSyncProgressDialog(idx + 1, rows.length, `${rowProgress} 行${rowNum} "${name || sid}" ✓ HTTP:${result.code}`, `✓ ${rowProgress} 行${rowNum} "${name || sid}" 成功 HTTP:${result.code}`);
                     // 标记章节为已完成（仅"看过"状态才需要标记）
                     const watchType = JSON.parse(jsonBody).type;
                     const epRaw = trim(getCellValue(ws, rowNum, colMap.has('集数') ? colMap.get('集数') : colMap.get('集号')));
@@ -1219,11 +1314,13 @@ export async function syncSelectedRows() {
                     failCount++;
                     details.push(`✗ 行${rowNum} ${name || sid} HTTP:${result.code}`);
                     bgmLog(LOG_LEVELS.WARN, `[syncSelectedRows] ${rowProgress} 行${rowNum} "${name || sid}" 同步失败！HTTP: ${result.code}, 消息: ${result.message}`);
+                    updateSyncProgressDialog(idx + 1, rows.length, `${rowProgress} 行${rowNum} "${name || sid}" ✗ HTTP:${result.code}`, `✗ ${rowProgress} 行${rowNum} "${name || sid}" 失败 HTTP:${result.code} ${result.message}`);
                 }
             }
             catch (e) {
                 failCount++;
                 bgmLog(LOG_LEVELS.ERROR, `[syncSelectedRows] ${rowProgress} 行${rowNum} 处理异常: ${e.message}`);
+                updateSyncProgressDialog(idx + 1, rows.length, `${rowProgress} 行${rowNum} 异常: ${e.message}`, `✗ ${rowProgress} 行${rowNum} 异常: ${e.message}`);
             }
         }
         // 输出最终汇总日志
@@ -1231,14 +1328,22 @@ export async function syncSelectedRows() {
         bgmLog(LOG_LEVELS.INFO, `[syncSelectedRows] ========== 汇总 ==========`);
         bgmLog(LOG_LEVELS.INFO, `[syncSelectedRows] 总行数: ${rows.length}  |  成功: ${successCount}  |  失败: ${failCount}  |  跳过: ${skipCount}  |  标记章节: ${episodeMarkCount}  |  耗时: ${elapsed}ms`);
         bgmLog(LOG_LEVELS.INFO, `[syncSelectedRows] 详情: ${details.join('  |  ')}`);
-        // 弹出结果
+        // 切换弹窗为完成状态（保留弹窗，显示统计 + 详情）
+        const wasStopped = BGM.sync.checkShouldStop();
         const summary = `📊 选中 ${rows.length} 行 | 耗时 ${(elapsed / 1000).toFixed(1)}s\n\n✅ 成功: ${successCount}\n❌ 失败: ${failCount}\n⏭️ 跳过: ${skipCount}\n📺 标记章节: ${episodeMarkCount}`;
-        showSyncResult(summary, details);
+        completeSyncProgressDialog(summary, details, wasStopped);
+        // 重置同步状态机
+        BGM.sync.isRunning = false;
+        BGM.sync.resetStopFlag();
     }
     catch (e) {
+        hideSyncProgressDialog();
+        BGM.sync.isRunning = false;
+        BGM.sync.resetStopFlag();
         BGM.handleError(e, { context: 'syncSelectedRows', showAlert: false });
         bgmLog(LOG_LEVELS.ERROR, `[syncSelectedRows] 同步异常: ${e.message}`);
         wpsMsgBox(`选中行同步异常: ${e.message}`, 0, 16);
     }
     bgmLog(LOG_LEVELS.INFO, `[syncSelectedRows] ========== 选中行同步结束，总耗时: ${Date.now() - startTime}ms ==========`);
 }
+//# sourceMappingURL=exceltobangumi.js.map

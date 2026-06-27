@@ -92,6 +92,11 @@ export {
     showInput,           // 输入
     showToast,           // Toast 通知
     showSyncResult,      // 同步结果（可展开详情）
+    showSyncProgressDialog,
+    updateSyncProgressDialog,
+    setSyncProgressPaused,
+    completeSyncProgressDialog,
+    hideSyncProgressDialog,
 } from './ui/dialog.js';
 
 export {
@@ -325,9 +330,17 @@ export interface BGMSync {
     isRunning: boolean;
     /** 是否请求停止同步 */
     shouldStop: boolean;
+    /** 是否暂停中 */
+    isPaused: boolean;
     /** 上次同步时间（ISO 格式） */
     lastSyncTime: string | null;
-     /**
+    /** 当前正在处理的行号（用于暂停时定位） */
+    currentRow: number;
+    /** 当前正在处理的工作表（用于暂停时定位） */
+    currentSheet: any;
+    /** 当前正在处理的列号（用于暂停时定位） */
+    currentCol: number;
+    /**
      * 启动同步流程（由“全面同步”按钮触发）
      * - 防重复：如果 isRunning === true 则提示并返回
      * - 检查 BGM.dataPreview 是否已加载
@@ -340,11 +353,23 @@ export interface BGMSync {
      * - 显示确认对话框
      */
     requestStop: () => void;
+    /** 暂停同步：设置 isPaused，并定位到当前单元格 */
+    pause: () => void;
+    /** 恢复同步：清除 isPaused */
+    resume: () => void;
     /**
      * 检查是否应该停止同步
      * @returns 是否应该停止
      */
     checkShouldStop: () => boolean;
+    /** 检查是否暂停中 */
+    checkPaused: () => boolean;
+    /** 暂停时等待恢复（每 200ms 轮询），恢复或停止后返回 */
+    waitForResume: () => Promise<void>;
+    /** 定位到当前正在处理的单元格 */
+    locateCurrentCell: () => void;
+    /** 更新当前位置（供同步循环调用） */
+    updatePosition: (ws: any, row: number, col?: number) => void;
     /**
      * 重置停止标志
      */

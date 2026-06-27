@@ -152,11 +152,11 @@ export const BGM: {
             }
         },
 
-        /** 更新当前位置（供同步循环调用） */
+        /** 更新当前位置（供同步循环调用，传 undefined 保留原值） */
         updatePosition(ws: any, row: number, col?: number) {
-            this.currentSheet = ws;
+            if (ws !== undefined) this.currentSheet = ws;
             this.currentRow = row;
-            if (col) this.currentCol = col;
+            if (col !== undefined) this.currentCol = col;
         },
 
         resetStopFlag() {

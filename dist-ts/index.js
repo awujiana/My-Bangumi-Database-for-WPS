@@ -63,7 +63,7 @@ showSuccess, // 成功
 showInput, // 输入
 showToast, // Toast 通知
 showSyncResult, // 同步结果（可展开详情）
- } from './ui/dialog.js';
+showSyncProgressDialog, updateSyncProgressDialog, setSyncProgressPaused, completeSyncProgressDialog, hideSyncProgressDialog, } from './ui/dialog.js';
 // ============================================================================
 // 6. UI 消息通信（来自 ui/message.js）
 // ============================================================================
@@ -219,3 +219,4 @@ isWpsWorksheet,
 // 判断对象是否为 WPS Range
 isWpsRange, wpsMsgBox, } from './tools/wps.js';
 export { detectConflicts, getSyncPreview } from './services/ribbonService.js';
+//# sourceMappingURL=index.js.map

@@ -9,7 +9,9 @@ import {
   wpsMsgBox, getCell, escapeHtml, showAlert, showToast,
   LOG_LEVELS, BGM_COLOR, type SyncRecord, findHeaderRow, getColumnMap, getSyncPreview,detectConflicts,
   extractSubjectId, mapWatchStatus, buildJsonPayload,WpsWorksheet,
-  bgmRequestSync, addSyncRecord, addTagsFromStr,WpsRange ,WATCH_STATUS_MAP ,SyncToBangumiAsync
+  bgmRequestSync, addSyncRecord, addTagsFromStr,WpsRange ,WATCH_STATUS_MAP ,SyncToBangumiAsync,
+  showSyncProgressDialog, updateSyncProgressDialog, setSyncProgressPaused,
+  completeSyncProgressDialog, hideSyncProgressDialog
 } from '../index.js';
 
 
@@ -250,7 +252,7 @@ function normalizeStatus(rawStatus: string): string {
 
 
 
-export function previewSyncContent(): void {
+export async function previewSyncContent(): Promise<void> {
     bgmLog(LOG_LEVELS.INFO, '[preview] 开始执行 previewSyncContent');
 
     const dp = BGM.dataPreview;
@@ -285,22 +287,64 @@ export function previewSyncContent(): void {
         uploadedCount: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 },
     };
 
+    // 显示同步进度弹窗（不隐藏"同步到 Bangumi"按钮）
+    showSyncProgressDialog(
+        '正在同步 - 预览同步',
+        () => { BGM.sync.pause(); setSyncProgressPaused(true); },
+        () => { BGM.sync.resume(); setSyncProgressPaused(false); },
+        () => { BGM.sync.requestStop(); }
+    );
+
+    // 启动同步状态机
+    BGM.sync.isRunning = true;
+    BGM.sync.resetStopFlag();
+    const urlColForLocate = colMap.get('Bangumi_URL') || 1;
+    BGM.sync.updatePosition(ws, 0, urlColForLocate);
+
     let cardsHtml = '<div class="detail-list">';
     let actualCardCount = 0;
+    const totalRows = dataRows.length;
+    let skippedCount = 0;
+    let errorCount = 0;
 
     for (let i = 0; i < dataRows.length; i++) {
+        // 停止检查
+        if (BGM.sync.checkShouldStop()) {
+            bgmLog(LOG_LEVELS.INFO, `[preview] 检测到停止请求，提前终止预览生成（已完成 ${i}/${totalRows}）`);
+            break;
+        }
+        // 暂停检查
+        if (BGM.sync.checkPaused()) {
+            bgmLog(LOG_LEVELS.INFO, `[preview] 已暂停，进度 ${i}/${totalRows}，等待恢复...`);
+            await BGM.sync.waitForResume();
+            if (BGM.sync.checkShouldStop()) {
+                bgmLog(LOG_LEVELS.INFO, `[preview] 暂停期间收到停止请求，终止`);
+                break;
+            }
+        }
+
         const rowNum = dataRows[i];
+        // 更新当前位置（行号）以便暂停时定位
+        BGM.sync.updatePosition(undefined, rowNum);
+
+        // 让出主线程，避免阻塞 UI
+        if (i % 20 === 0) await new Promise(r => setTimeout(r, 0));
+
         try {
             const rowData = getRowData(ws, rowNum, colMap, headerRow, 9);
 
             // 过滤无效行
             if (!rowData.bgmUrl || !rowData.sid) {
                 bgmLog(LOG_LEVELS.INFO, `[preview] 跳过行 ${rowNum} (无 Bangumi URL)`);
+                skippedCount++;
+                updateSyncProgressDialog(i + 1, totalRows, `预览生成 ${i + 1}/${totalRows}（卡片 ${actualCardCount}）`, `⊘ [${i + 1}/${totalRows}] 行${rowNum} 跳过: 无URL`);
                 continue;
             }
             // 可选：过滤全空（名称、状态、标签全空）
             if (!rowData.name && !rowData.status && !rowData.tagsRaw) {
                 bgmLog(LOG_LEVELS.INFO, `[preview] 跳过行 ${rowNum} (空卡片)`);
+                skippedCount++;
+                updateSyncProgressDialog(i + 1, totalRows, `预览生成 ${i + 1}/${totalRows}（卡片 ${actualCardCount}）`, `⊘ [${i + 1}/${totalRows}] 行${rowNum} 跳过: 空卡片`);
                 continue;
             }
 
@@ -325,12 +369,31 @@ export function previewSyncContent(): void {
 
             // 生成卡片 HTML
             cardsHtml += renderDetailItemHtml(rowData, colMap, ws);
+            updateSyncProgressDialog(i + 1, totalRows, `预览生成 ${i + 1}/${totalRows}（卡片 ${actualCardCount}）`, `✓ [${i + 1}/${totalRows}] 行${rowNum} "${rowData.name || ''}" 已渲染`);
         } catch (e: any) {
+            errorCount++;
             BGM.handleError(e, { showAlert: false, level: BGM.ErrorLevel.WARN, context: 'previewSyncContent' });
             cardsHtml += `<div class="detail-item error">行 ${rowNum} 处理出错: ${escapeHtml((e as Error).message)}</div>`;
+            updateSyncProgressDialog(i + 1, totalRows, `预览生成 ${i + 1}/${totalRows}（卡片 ${actualCardCount}）`, `✗ [${i + 1}/${totalRows}] 行${rowNum} 异常: ${(e as Error).message}`);
         }
     }
     cardsHtml += '</div>';
+
+    // 重置同步状态机
+    const wasStopped = BGM.sync.checkShouldStop();
+    BGM.sync.isRunning = false;
+    BGM.sync.resetStopFlag();
+
+    // 切换弹窗为完成状态
+    const summary = `📊 预览 ${totalRows} 行 | 卡片 ${actualCardCount}\n\n✅ 已渲染: ${actualCardCount}\n⏭️ 跳过: ${skippedCount}\n❌ 错误: ${errorCount}`;
+    const detailsArr: string[] = [
+        `总行数: ${totalRows}`,
+        `渲染卡片: ${actualCardCount}`,
+        `跳过行数: ${skippedCount}`,
+        `错误行数: ${errorCount}`
+    ];
+    if (wasStopped) detailsArr.unshift('⚠️ 预览被用户停止');
+    completeSyncProgressDialog(summary, detailsArr, wasStopped);
 
     // 生成统计卡片（使用 actualCardCount）
     const statsHtml = buildStatsHtml(actualCardCount);
@@ -376,9 +439,9 @@ export function previewSyncContent(): void {
     select.innerHTML = `<option value="all">全部 (${actualCardCount})</option>` +
         sortedStatus.map(s => `<option value="${escapeHtml(s)}">${escapeHtml(s)} (${statusMap.get(s)})</option>`).join('');
 
-    const syncBtn = document.getElementById('syncAllBtn');
-    if (syncBtn) {
-        syncBtn.insertAdjacentElement('afterend', select);
+    const syncAllBtn = document.getElementById('syncAllBtn');
+    if (syncAllBtn) {
+        syncAllBtn.insertAdjacentElement('afterend', select);
     } else {
         header.appendChild(select);
     }
