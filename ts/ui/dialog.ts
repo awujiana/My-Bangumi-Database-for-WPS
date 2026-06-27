@@ -288,12 +288,50 @@ export function showSyncResult(summary: string, details: string[]): void {
 // ========== 同步进度弹窗 ==========
 let _syncProgressDialog: HTMLElement | null = null;
 let _syncProgressLogCount = 0;
-const _SYNC_PROGRESS_LOG_MAX = 200;
+const _SYNC_PROGRESS_LOG_MAX = 500;
 
 /** 暂停/恢复/停止按钮回调 */
 let _syncPauseHandler: (() => void) | null = null;
 let _syncResumeHandler: (() => void) | null = null;
 let _syncStopHandler: (() => void) | null = null;
+
+/** 当前是否处于暂停状态（统一监听器据此决定调用 pause 还是 resume） */
+let _syncPaused = false;
+
+/** 触发同步弹窗的元素（关闭后恢复焦点） */
+let _syncProgressTrigger: HTMLElement | null = null;
+
+/** ESC 键监听器引用（仅在完成状态下注册） */
+let _syncProgressEscHandler: ((e: KeyboardEvent) => void) | null = null;
+
+/** 内部：根据暂停状态更新按钮文本/样式/aria-label */
+function _setSyncPausedState(paused: boolean): void {
+    _syncPaused = paused;
+    const pauseBtn = _syncProgressDialog?.querySelector('#bgmSyncProgressPauseBtn') as HTMLButtonElement | null;
+    if (!pauseBtn) return;
+    pauseBtn.textContent = paused ? '▶️ 继续' : '⏸️ 暂停';
+    pauseBtn.setAttribute('aria-label', paused ? '继续同步' : '暂停同步');
+    if (paused) {
+        pauseBtn.classList.remove('bgm-btn-default');
+        pauseBtn.classList.add('bgm-btn-success');
+    } else {
+        pauseBtn.classList.add('bgm-btn-default');
+        pauseBtn.classList.remove('bgm-btn-success');
+    }
+}
+
+/** 内部：清理所有回调与状态（complete/hide 时调用） */
+function _clearSyncProgressHandlers(): void {
+    _syncPauseHandler = null;
+    _syncResumeHandler = null;
+    _syncStopHandler = null;
+    _syncPaused = false;
+    // 移除 ESC 监听器，避免泄漏
+    if (_syncProgressEscHandler) {
+        document.removeEventListener('keydown', _syncProgressEscHandler);
+        _syncProgressEscHandler = null;
+    }
+}
 
 function ensureSyncProgressDialog(): HTMLElement {
     if (_syncProgressDialog) return _syncProgressDialog;
@@ -302,45 +340,50 @@ function ensureSyncProgressDialog(): HTMLElement {
     modal.id = 'bgmSyncProgressDialog';
     modal.className = 'bgm-modal';
     modal.style.display = 'none';
+    // 可访问性：声明对话框角色
+    modal.setAttribute('role', 'dialog');
+    modal.setAttribute('aria-modal', 'true');
+    modal.setAttribute('aria-labelledby', 'bgmSyncProgressTitle');
+    modal.setAttribute('aria-hidden', 'true');
 
     modal.innerHTML = `
-        <div class="bgm-modal-content" style="max-width: 640px;">
-            <div class="bgm-dialog-header" id="bgmSyncProgressHeader">
+        <div class="bgm-modal-content bgm-sync-progress__content">
+            <div class="bgm-dialog-header bgm-sync-progress__header" id="bgmSyncProgressHeader">
                 <span class="bgm-dialog-icon" id="bgmSyncProgressIcon">🔄</span>
                 <span class="bgm-dialog-title" id="bgmSyncProgressTitle">正在同步...</span>
             </div>
-            <div class="bgm-dialog-body" style="max-height: 60vh; overflow-y: auto;">
+            <div class="bgm-dialog-body bgm-sync-progress__body">
                 <!-- 进度区 -->
                 <div id="bgmSyncProgressSection">
-                    <div style="display: flex; justify-content: space-between; margin-bottom: 6px; font-size: 13px;">
+                    <div class="bgm-sync-progress__meta">
                         <span id="bgmSyncProgressLabel">进度: 0/0</span>
                         <span id="bgmSyncProgressPercent">0%</span>
                     </div>
-                    <div style="background: #444; border-radius: 4px; height: 20px; overflow: hidden;">
-                        <div id="bgmSyncProgressBar" style="width: 0%; height: 100%; background: #27ae60; text-align: center; line-height: 20px; color: white; font-size: 12px; transition: width 0.3s;"></div>
+                    <div class="bgm-sync-progress__track">
+                        <div id="bgmSyncProgressBar" class="bgm-sync-progress__bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"></div>
                     </div>
-                    <div id="bgmSyncProgressCurrent" style="margin-top: 8px; font-size: 12px; color: #aaa; min-height: 18px;"></div>
-                    <div style="margin-top: 8px;">
-                        <div style="font-size: 12px; color: #888; margin-bottom: 4px;">实时日志:</div>
-                        <div id="bgmSyncProgressLog" style="max-height: 180px; overflow-y: auto; font-size: 11px; line-height: 1.5; font-family: monospace; background: #1e1e1e; padding: 6px 8px; border-radius: 4px; white-space: pre-wrap; word-break: break-all;"></div>
+                    <div id="bgmSyncProgressCurrent" class="bgm-sync-progress__current"></div>
+                    <div class="bgm-sync-progress__log-wrap">
+                        <div class="bgm-sync-progress__log-label">实时日志:</div>
+                        <div id="bgmSyncProgressLog" class="bgm-sync-progress__log" role="log" aria-live="polite"></div>
                     </div>
                 </div>
                 <!-- 完成结果区（默认隐藏） -->
                 <div id="bgmSyncProgressResult" style="display: none;">
-                    <div id="bgmSyncProgressSummary" class="bgm-dialog-message" style="white-space: pre-line;"></div>
-                    <div id="bgmSyncProgressDetails" style="display:none; margin-top: 8px; max-height: 240px; overflow-y: auto; font-size: 12px; line-height: 1.6; white-space: pre; font-family: monospace;"></div>
+                    <div id="bgmSyncProgressSummary" class="bgm-dialog-message bgm-sync-progress__result-summary"></div>
+                    <div id="bgmSyncProgressDetails" class="bgm-sync-progress__result-details"></div>
                 </div>
             </div>
             <div class="bgm-dialog-footer" id="bgmSyncProgressFooter">
                 <!-- 运行中按钮 -->
-                <div id="bgmSyncProgressRunningBtns" style="display: flex; gap: 8px; justify-content: flex-end;">
-                    <button id="bgmSyncProgressPause" class="bgm-btn bgm-btn-default">⏸️ 暂停</button>
-                    <button id="bgmSyncProgressStop" class="bgm-btn bgm-btn-danger">⏹️ 停止</button>
+                <div id="bgmSyncProgressRunningBtns" class="bgm-sync-progress__running-btns">
+                    <button id="bgmSyncProgressPauseBtn" type="button" class="bgm-btn bgm-btn-default" aria-label="暂停同步">⏸️ 暂停</button>
+                    <button id="bgmSyncProgressStop" type="button" class="bgm-btn bgm-btn-danger" aria-label="停止同步">⏹️ 停止</button>
                 </div>
                 <!-- 完成按钮（默认隐藏） -->
-                <div id="bgmSyncProgressDoneBtns" style="display: none; gap: 8px; justify-content: flex-end;">
-                    <button id="bgmSyncProgressToggleDetails" class="bgm-btn bgm-btn-default">显示详情</button>
-                    <button id="bgmSyncProgressClose" class="bgm-btn bgm-btn-success">确定</button>
+                <div id="bgmSyncProgressDoneBtns" class="bgm-sync-progress__done-btns" style="display: none;">
+                    <button id="bgmSyncProgressToggleDetails" type="button" class="bgm-btn bgm-btn-default" aria-label="显示详情">显示详情</button>
+                    <button id="bgmSyncProgressClose" type="button" class="bgm-btn bgm-btn-success" aria-label="关闭弹窗">确定</button>
                 </div>
             </div>
         </div>
@@ -348,27 +391,49 @@ function ensureSyncProgressDialog(): HTMLElement {
 
     document.body.appendChild(modal);
 
-    // 绑定按钮事件
-    const pauseBtn = modal.querySelector('#bgmSyncProgressPause') as HTMLElement;
-    const stopBtn = modal.querySelector('#bgmSyncProgressStop') as HTMLElement;
-    const closeBtn = modal.querySelector('#bgmSyncProgressClose') as HTMLElement;
-    const toggleDetailsBtn = modal.querySelector('#bgmSyncProgressToggleDetails') as HTMLElement;
+    // 绑定按钮事件：统一使用 addEventListener，禁止 onclick 重绑定
+    const pauseBtn = modal.querySelector('#bgmSyncProgressPauseBtn') as HTMLButtonElement | null;
+    const stopBtn = modal.querySelector('#bgmSyncProgressStop') as HTMLButtonElement | null;
+    const closeBtn = modal.querySelector('#bgmSyncProgressClose') as HTMLButtonElement | null;
+    const toggleDetailsBtn = modal.querySelector('#bgmSyncProgressToggleDetails') as HTMLButtonElement | null;
 
-    pauseBtn.addEventListener('click', () => {
-        if (_syncPauseHandler) _syncPauseHandler();
-    });
-    stopBtn.addEventListener('click', () => {
-        if (_syncStopHandler) _syncStopHandler();
-    });
-    closeBtn.addEventListener('click', () => {
-        modal.style.display = 'none';
-    });
-    toggleDetailsBtn.addEventListener('click', () => {
-        const detailsEl = modal.querySelector('#bgmSyncProgressDetails') as HTMLElement;
-        const expanded = detailsEl.style.display !== 'none';
-        detailsEl.style.display = expanded ? 'none' : 'block';
-        toggleDetailsBtn.textContent = expanded ? '显示详情' : '收起详情';
-    });
+    // 暂停/继续按钮：根据 _syncPaused 标志自行决定调用哪个处理器，并自行更新按钮文本
+    if (pauseBtn) {
+        pauseBtn.addEventListener('click', (): void => {
+            if (!_syncProgressDialog || _syncProgressDialog.style.display === 'none') return;
+            if (_syncPaused) {
+                _syncResumeHandler?.();
+                _setSyncPausedState(false);
+            } else {
+                _syncPauseHandler?.();
+                _setSyncPausedState(true);
+            }
+        });
+    }
+    // 停止按钮
+    if (stopBtn) {
+        stopBtn.addEventListener('click', (): void => {
+            if (!_syncProgressDialog || _syncProgressDialog.style.display === 'none') return;
+            _syncStopHandler?.();
+        });
+    }
+    // 关闭按钮
+    if (closeBtn) {
+        closeBtn.addEventListener('click', (): void => {
+            hideSyncProgressDialog();
+        });
+    }
+    // 详情切换按钮
+    if (toggleDetailsBtn) {
+        toggleDetailsBtn.addEventListener('click', (): void => {
+            const detailsEl = modal.querySelector('#bgmSyncProgressDetails') as HTMLElement | null;
+            if (!detailsEl) return;
+            const expanded = detailsEl.style.display !== 'none';
+            detailsEl.style.display = expanded ? 'none' : 'block';
+            toggleDetailsBtn.textContent = expanded ? '显示详情' : '收起详情';
+            toggleDetailsBtn.setAttribute('aria-label', expanded ? '显示详情' : '收起详情');
+        });
+    }
 
     _syncProgressDialog = modal;
     return modal;
@@ -377,54 +442,69 @@ function ensureSyncProgressDialog(): HTMLElement {
 /**
  * 显示同步进度弹窗（运行中状态）
  * @param title 弹窗标题（如"正在同步 - 选中行同步"）
- * @param onPause 暂停回调
- * @param onResume 恢复回调
- * @param onStop 停止回调
+ * @param handlers 暂停/恢复/停止回调集合
  */
 export function showSyncProgressDialog(
     title: string,
-    onPause?: () => void,
-    onResume?: () => void,
-    onStop?: () => void
+    handlers: { onPause: () => void; onResume: () => void; onStop: () => void }
 ): void {
     const modal = ensureSyncProgressDialog();
-    _syncPauseHandler = onPause || null;
-    _syncResumeHandler = onResume || null;
-    _syncStopHandler = onStop || null;
+
+    // 保存触发元素，用于关闭后恢复焦点
+    _syncProgressTrigger = document.activeElement as HTMLElement | null;
+
+    // 重置回调与状态（必须在重置 UI 前完成，避免上次同步残留）
+    _clearSyncProgressHandlers();
+    _syncPauseHandler = handlers.onPause;
+    _syncResumeHandler = handlers.onResume;
+    _syncStopHandler = handlers.onStop;
+    _syncPaused = false;
+    _syncProgressLogCount = 0;
 
     // 重置为运行中状态
-    const titleEl = modal.querySelector('#bgmSyncProgressTitle') as HTMLElement;
-    const iconEl = modal.querySelector('#bgmSyncProgressIcon') as HTMLElement;
-    const progressSection = modal.querySelector('#bgmSyncProgressSection') as HTMLElement;
-    const resultSection = modal.querySelector('#bgmSyncProgressResult') as HTMLElement;
-    const runningBtns = modal.querySelector('#bgmSyncProgressRunningBtns') as HTMLElement;
-    const doneBtns = modal.querySelector('#bgmSyncProgressDoneBtns') as HTMLElement;
-    const pauseBtn = modal.querySelector('#bgmSyncProgressPause') as HTMLElement;
+    const titleEl = modal.querySelector('#bgmSyncProgressTitle') as HTMLElement | null;
+    const iconEl = modal.querySelector('#bgmSyncProgressIcon') as HTMLElement | null;
+    const progressSection = modal.querySelector('#bgmSyncProgressSection') as HTMLElement | null;
+    const resultSection = modal.querySelector('#bgmSyncProgressResult') as HTMLElement | null;
+    const runningBtns = modal.querySelector('#bgmSyncProgressRunningBtns') as HTMLElement | null;
+    const doneBtns = modal.querySelector('#bgmSyncProgressDoneBtns') as HTMLElement | null;
+    const pauseBtn = modal.querySelector('#bgmSyncProgressPauseBtn') as HTMLButtonElement | null;
 
-    titleEl.textContent = title;
-    iconEl.textContent = '🔄';
-    progressSection.style.display = '';
-    resultSection.style.display = 'none';
-    runningBtns.style.display = 'flex';
-    doneBtns.style.display = 'none';
-    pauseBtn.textContent = '⏸️ 暂停';
-    pauseBtn.classList.remove('bgm-btn-success');
-    pauseBtn.classList.add('bgm-btn-default');
+    if (titleEl) titleEl.textContent = title;
+    if (iconEl) iconEl.textContent = '🔄';
+    if (progressSection) progressSection.style.display = '';
+    if (resultSection) resultSection.style.display = 'none';
+    if (runningBtns) runningBtns.style.display = 'flex';
+    if (doneBtns) doneBtns.style.display = 'none';
+    // 重置暂停按钮（文本/样式/aria-label），避免上次同步残留的 resume 状态
+    if (pauseBtn) {
+        pauseBtn.textContent = '⏸️ 暂停';
+        pauseBtn.setAttribute('aria-label', '暂停同步');
+        pauseBtn.classList.remove('bgm-btn-success');
+        pauseBtn.classList.add('bgm-btn-default');
+    }
 
     // 重置进度
-    const bar = modal.querySelector('#bgmSyncProgressBar') as HTMLElement;
-    const label = modal.querySelector('#bgmSyncProgressLabel') as HTMLElement;
-    const percent = modal.querySelector('#bgmSyncProgressPercent') as HTMLElement;
-    const current = modal.querySelector('#bgmSyncProgressCurrent') as HTMLElement;
-    const log = modal.querySelector('#bgmSyncProgressLog') as HTMLElement;
-    if (bar) { bar.style.width = '0%'; bar.textContent = ''; }
+    const bar = modal.querySelector('#bgmSyncProgressBar') as HTMLElement | null;
+    const label = modal.querySelector('#bgmSyncProgressLabel') as HTMLElement | null;
+    const percent = modal.querySelector('#bgmSyncProgressPercent') as HTMLElement | null;
+    const current = modal.querySelector('#bgmSyncProgressCurrent') as HTMLElement | null;
+    const log = modal.querySelector('#bgmSyncProgressLog') as HTMLElement | null;
+    if (bar) {
+        bar.style.width = '0%';
+        bar.textContent = '';
+        bar.setAttribute('aria-valuenow', '0');
+    }
     if (label) label.textContent = '进度: 0/0';
     if (percent) percent.textContent = '0%';
     if (current) current.textContent = '';
     if (log) log.textContent = '';
-    _syncProgressLogCount = 0;
 
     modal.style.display = 'flex';
+    modal.setAttribute('aria-hidden', 'false');
+
+    // 焦点管理：将焦点移至暂停按钮，便于键盘操作
+    pauseBtn?.focus();
 }
 
 /**
@@ -440,53 +520,43 @@ export function updateSyncProgressDialog(
     message?: string,
     logLine?: string
 ): void {
-    const modal = ensureSyncProgressDialog();
-    const bar = modal.querySelector('#bgmSyncProgressBar') as HTMLElement;
-    const label = modal.querySelector('#bgmSyncProgressLabel') as HTMLElement;
-    const percent = modal.querySelector('#bgmSyncProgressPercent') as HTMLElement;
-    const currentEl = modal.querySelector('#bgmSyncProgressCurrent') as HTMLElement;
-    const log = modal.querySelector('#bgmSyncProgressLog') as HTMLElement;
+    const modal = _syncProgressDialog;
+    // 弹窗未显示时快速返回，避免无效 DOM 写入
+    if (!modal || modal.style.display === 'none') return;
+
+    const bar = modal.querySelector('#bgmSyncProgressBar') as HTMLElement | null;
+    const label = modal.querySelector('#bgmSyncProgressLabel') as HTMLElement | null;
+    const percent = modal.querySelector('#bgmSyncProgressPercent') as HTMLElement | null;
+    const currentEl = modal.querySelector('#bgmSyncProgressCurrent') as HTMLElement | null;
+    const log = modal.querySelector('#bgmSyncProgressLog') as HTMLElement | null;
 
     const pct = total > 0 ? Math.round((current / total) * 100) : 0;
-    if (bar) { bar.style.width = pct + '%'; bar.textContent = pct + '%'; }
+    if (bar) {
+        bar.style.width = pct + '%';
+        bar.textContent = pct + '%';
+        bar.setAttribute('aria-valuenow', String(pct));
+    }
     if (label) label.textContent = `进度: ${current}/${total}`;
     if (percent) percent.textContent = pct + '%';
     if (currentEl && message) currentEl.textContent = message;
 
     if (logLine && log) {
+        // 智能滚动：仅当用户已接近底部时才自动滚动，避免打断阅读
+        const nearBottom = log.scrollHeight - log.scrollTop - log.clientHeight < 30;
+        log.appendChild(document.createTextNode(logLine + '\n'));
         _syncProgressLogCount++;
-        const line = `${logLine}\n`;
-        log.appendChild(document.createTextNode(line));
         // 限制日志条数，避免过多 DOM 节点
-        if (_syncProgressLogCount > _SYNC_PROGRESS_LOG_MAX && log.firstChild) {
-            log.removeChild(log.firstChild);
-            _syncProgressLogCount--;
+        while (_syncProgressLogCount > _SYNC_PROGRESS_LOG_MAX) {
+            if (log.firstChild) {
+                log.removeChild(log.firstChild);
+                _syncProgressLogCount--;
+            } else {
+                break;
+            }
         }
-        // 自动滚动到底部
-        log.scrollTop = log.scrollHeight;
-    }
-}
-
-/** 切换暂停按钮为"继续"或"暂停" */
-export function setSyncProgressPaused(paused: boolean): void {
-    const modal = ensureSyncProgressDialog();
-    const pauseBtn = modal.querySelector('#bgmSyncProgressPause') as HTMLElement;
-    if (!pauseBtn) return;
-    if (paused) {
-        pauseBtn.textContent = '▶️ 继续';
-        pauseBtn.classList.remove('bgm-btn-default');
-        pauseBtn.classList.add('bgm-btn-success');
-        // 暂停时触发 resume 处理器
-        pauseBtn.onclick = () => {
-            if (_syncResumeHandler) _syncResumeHandler();
-        };
-    } else {
-        pauseBtn.textContent = '⏸️ 暂停';
-        pauseBtn.classList.add('bgm-btn-default');
-        pauseBtn.classList.remove('bgm-btn-success');
-        pauseBtn.onclick = () => {
-            if (_syncPauseHandler) _syncPauseHandler();
-        };
+        if (nearBottom) {
+            log.scrollTop = log.scrollHeight;
+        }
     }
 }
 
@@ -502,34 +572,60 @@ export function completeSyncProgressDialog(
     stopped: boolean = false
 ): void {
     const modal = ensureSyncProgressDialog();
-    const titleEl = modal.querySelector('#bgmSyncProgressTitle') as HTMLElement;
-    const iconEl = modal.querySelector('#bgmSyncProgressIcon') as HTMLElement;
-    const progressSection = modal.querySelector('#bgmSyncProgressSection') as HTMLElement;
-    const resultSection = modal.querySelector('#bgmSyncProgressResult') as HTMLElement;
-    const summaryEl = modal.querySelector('#bgmSyncProgressSummary') as HTMLElement;
-    const detailsEl = modal.querySelector('#bgmSyncProgressDetails') as HTMLElement;
-    const toggleBtn = modal.querySelector('#bgmSyncProgressToggleDetails') as HTMLElement;
-    const runningBtns = modal.querySelector('#bgmSyncProgressRunningBtns') as HTMLElement;
-    const doneBtns = modal.querySelector('#bgmSyncProgressDoneBtns') as HTMLElement;
+    const titleEl = modal.querySelector('#bgmSyncProgressTitle') as HTMLElement | null;
+    const iconEl = modal.querySelector('#bgmSyncProgressIcon') as HTMLElement | null;
+    const progressSection = modal.querySelector('#bgmSyncProgressSection') as HTMLElement | null;
+    const resultSection = modal.querySelector('#bgmSyncProgressResult') as HTMLElement | null;
+    const summaryEl = modal.querySelector('#bgmSyncProgressSummary') as HTMLElement | null;
+    const detailsEl = modal.querySelector('#bgmSyncProgressDetails') as HTMLElement | null;
+    const toggleBtn = modal.querySelector('#bgmSyncProgressToggleDetails') as HTMLButtonElement | null;
+    const runningBtns = modal.querySelector('#bgmSyncProgressRunningBtns') as HTMLElement | null;
+    const doneBtns = modal.querySelector('#bgmSyncProgressDoneBtns') as HTMLElement | null;
 
-    titleEl.textContent = stopped ? '同步已停止' : '同步完成';
-    iconEl.textContent = stopped ? '⏹️' : '✅';
-    progressSection.style.display = 'none';
-    resultSection.style.display = '';
-    runningBtns.style.display = 'none';
-    doneBtns.style.display = 'flex';
+    if (titleEl) titleEl.textContent = stopped ? '同步已停止' : '同步完成';
+    if (iconEl) iconEl.textContent = stopped ? '⏹️' : '✅';
+    if (progressSection) progressSection.style.display = 'none';
+    if (resultSection) resultSection.style.display = '';
+    if (runningBtns) runningBtns.style.display = 'none';
+    if (doneBtns) doneBtns.style.display = 'flex';
 
-    summaryEl.textContent = summary;
-    detailsEl.textContent = details.length > 0 ? details.join('\n') : '无详情';
-    detailsEl.style.display = 'none';
-    toggleBtn.textContent = '显示详情';
-    toggleBtn.style.display = details.length > 0 ? '' : 'none';
+    if (summaryEl) summaryEl.textContent = summary;
+    if (detailsEl) {
+        detailsEl.textContent = details.length > 0 ? details.join('\n') : '无详情';
+        detailsEl.style.display = 'none';
+    }
+    if (toggleBtn) {
+        toggleBtn.textContent = '显示详情';
+        toggleBtn.setAttribute('aria-label', '显示详情');
+        toggleBtn.style.display = details.length > 0 ? '' : 'none';
+    }
+
+    // 清理运行态回调（保留弹窗可见，供用户查看结果）
+    _clearSyncProgressHandlers();
+
+    // 完成状态下支持 ESC 关闭
+    _syncProgressEscHandler = (e: KeyboardEvent): void => {
+        if (e.key === 'Escape') {
+            hideSyncProgressDialog();
+        }
+    };
+    document.addEventListener('keydown', _syncProgressEscHandler);
+
+    // 焦点切换到关闭按钮，便于键盘用户立即操作
+    const closeBtn = modal.querySelector('#bgmSyncProgressClose') as HTMLButtonElement | null;
+    closeBtn?.focus();
 }
 
 /** 隐藏同步进度弹窗 */
 export function hideSyncProgressDialog(): void {
-    const modal = ensureSyncProgressDialog();
+    const modal = _syncProgressDialog;
+    if (!modal) return;
     modal.style.display = 'none';
+    modal.setAttribute('aria-hidden', 'true');
+    _clearSyncProgressHandlers();
+    // 焦点返回到触发元素
+    _syncProgressTrigger?.focus();
+    _syncProgressTrigger = null;
 }
 
 // ========== 公共 API ==========

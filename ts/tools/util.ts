@@ -1,8 +1,24 @@
 
-import { BGM_CONFIG, LOG_LEVELS, ERROR_LEVELS, PANEL_CONFIG, ErrorLevel, type DialogOptions, type ErrorOptions, isWpsApp, type WpsApplication, BgmError, encryptToken, decryptToken, calcChecksum, COLUMN_RULES, HEADER_KEYWORDS, BGMCache, BGMSheet, type BGMSync, BGMUserInfo, WpsWorksheet, WpsRange, syncAllRows, showConfirm } from '../index.js';
+// 直接从源模块导入，打破 util.ts ↔ index.ts 的循环依赖
+import {
+    BGM_CONFIG,
+    LOG_LEVELS,
+    ERROR_LEVELS,
+    PANEL_CONFIG,
+    COLUMN_RULES,
+    HEADER_KEYWORDS,
+    ErrorLevel,
+    type ErrorOptions,
+} from '../core/constants.js';
+import { BgmError } from '../core/result.js';
+import { encryptToken, decryptToken, calcChecksum } from '../core/crypto.js';
+import { showConfirm, type DialogOptions } from '../ui/dialog.js';
 import { showAlert as customShowAlert, showError as customShowError, showInput as customShowInput } from '../ui/dialog.js';
-
-import { BGM_EVENTS ,eventBus } from '../tools/events.js';  
+import { isWpsApp, type WpsApplication, type WpsWorksheet, type WpsRange } from './wps.js';
+import { syncAllRows } from '../ui/preview.js';
+// 类型只从 index.js 导入（type-only import 不会产生运行时循环依赖）
+import type { BGMCache, BGMSheet, BGMSync, BGMUserInfo } from '../index.js';
+import { BGM_EVENTS, eventBus } from './events.js';
 // ========== BGM 全局命名空间 ==========
 export const BGM: {
   cache: BGMCache;
@@ -66,10 +82,28 @@ export const BGM: {
         isPaused: false,
         lastSyncTime: null,
         currentRow: 0,
-        currentSheet: null as any,
+        currentSheet: null as WpsWorksheet | null,
         currentCol: 0,
 
-        startSync() {
+        /** 进入运行状态：防重复 + 重置标志 + 置位 */
+        enterRunningState(): boolean {
+            if (this.isRunning) {
+                BGM.Dialog.alert('同步正在进行中，请稍后', '提示');
+                return false;
+            }
+            this.resetStopFlag();
+            this.isRunning = true;
+            this.lastSyncTime = new Date().toISOString();
+            return true;
+        },
+
+        /** 退出运行状态：清运行标志 + 重置停止标志 */
+        exitRunningState(): void {
+            this.isRunning = false;
+            this.resetStopFlag();
+        },
+
+        startSync(): void {
             if (this.isRunning) {
                 BGM.Dialog.alert('同步正在进行中，请稍后', '提示');
                 return;
@@ -77,44 +111,42 @@ export const BGM: {
             this.resetStopFlag();
             BGM.Dialog.confirm('确定要开始全面同步吗？', (confirmed: boolean) => {
                 if (!confirmed) return;
-                this.isRunning = true;
-                this.lastSyncTime = new Date().toISOString();
+                // 复用统一入口，确保状态一致
+                if (!this.enterRunningState()) return;
                 bgmLog(LOG_LEVELS.INFO, '开始执行同步...');
                 syncAllRows()
                     .then(() => {
-                        this.isRunning = false;
+                        // 成功路径也清理状态，与 catch 分支对称
                         if (this.shouldStop) {
                             BGM.Dialog.alert('同步已停止', '提示');
-                            this.resetStopFlag();
                         }
+                        this.exitRunningState();
                     })
                     .catch((err: unknown) => {
-                        this.isRunning = false;
-                        this.resetStopFlag();
+                        this.exitRunningState();
                         BGM.handleError(err, { showAlert: true });
                     });
             });
         },
 
-        requestStop() {
-            if (!this.isRunning) {
-                BGM.Dialog.alert('当前没有正在进行的同步', '提示');
-                return;
-            }
+        requestStop(): void {
+            // 静默返回，不弹 alert
+            if (!this.isRunning) return;
             this.shouldStop = true;
             this.isPaused = false;
             bgmLog(LOG_LEVELS.INFO, '用户请求停止同步');
         },
 
-        pause() {
-            if (!this.isRunning || this.isPaused) return;
+        pause(): void {
+            // 增加 shouldStop 检查：已请求停止时不再允许暂停
+            if (!this.isRunning || this.isPaused || this.shouldStop) return;
             this.isPaused = true;
             bgmLog(LOG_LEVELS.INFO, `[sync] 同步已暂停，当前行: ${this.currentRow}`);
             // 定位到当前单元格
             this.locateCurrentCell();
         },
 
-        resume() {
+        resume(): void {
             if (!this.isPaused) return;
             this.isPaused = false;
             bgmLog(LOG_LEVELS.INFO, '[sync] 同步已恢复');
@@ -128,42 +160,47 @@ export const BGM: {
             return this.isPaused;
         },
 
-        /** 暂停时等待恢复，每 200ms 检查一次 */
+        /** 暂停时等待恢复，每 50ms 轮询一次 */
         async waitForResume(): Promise<void> {
             while (this.isPaused && !this.shouldStop) {
-                await new Promise(r => setTimeout(r, 200));
+                await new Promise(r => setTimeout(r, 50));
             }
         },
 
         /** 定位到当前正在处理的单元格 */
-        locateCurrentCell() {
-            if (!this.currentRow || !this.currentSheet) return;
+        locateCurrentCell(): void {
+            if (!this.currentRow || this.currentRow < 1 || !this.currentSheet) return;
             try {
                 const ws = this.currentSheet;
-                const col = this.currentCol || 1;
+                const col = this.currentCol > 0 ? this.currentCol : 1;
                 const cellAddr = `${colNumToLetter(col)}${this.currentRow}`;
                 const cell = ws.Range(cellAddr);
                 if (cell) {
                     cell.Select();
                     bgmLog(LOG_LEVELS.INFO, `[sync] 已定位到单元格: ${cellAddr}`);
                 }
-            } catch (e: any) {
-                bgmLog(LOG_LEVELS.WARN, `[sync] 定位单元格失败: ${e.message}`);
+            } catch (e: unknown) {
+                const msg = e instanceof Error ? e.message : String(e);
+                bgmLog(LOG_LEVELS.WARN, `[sync] 定位单元格失败: ${msg}`);
             }
         },
 
         /** 更新当前位置（供同步循环调用，传 undefined 保留原值） */
-        updatePosition(ws: any, row: number, col?: number) {
+        updatePosition(ws: WpsWorksheet | null | undefined, row: number, col?: number): void {
+            // 行号范围校验：必须为非负整数
+            if (!Number.isInteger(row) || row < 0) return;
             if (ws !== undefined) this.currentSheet = ws;
             this.currentRow = row;
-            if (col !== undefined) this.currentCol = col;
+            if (col !== undefined && col > 0) this.currentCol = col;
         },
 
-        resetStopFlag() {
+        resetStopFlag(): void {
             this.shouldStop = false;
             this.isPaused = false;
             this.currentRow = 0;
             this.currentSheet = null;
+            // 同步清理列号，避免遗留状态
+            this.currentCol = 0;
         }
     },
     // 日志级别（0=DEBUG, 1=INFO, 2=WARN, 3=ERROR）

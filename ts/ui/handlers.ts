@@ -20,7 +20,7 @@ import {
     getSkipConflicts, setSkipConflicts,
     COLLECTION_TYPE_NAMES,
     readRangeValues, openBangumiTokenPage,
-    showSyncProgressDialog, updateSyncProgressDialog, setSyncProgressPaused,
+    showSyncProgressDialog, updateSyncProgressDialog,
     completeSyncProgressDialog, hideSyncProgressDialog,
 } from '../index.js';
 import{BGM_EVENTS, eventBus} from '../tools/events.js';
@@ -323,17 +323,14 @@ export function onAction(action: string): void {
         case 'requestStopSync':
             bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 用户请求停止同步');
             BGM.sync.requestStop();
-            setSyncProgressPaused(false);
             break;
         case 'pauseSync':
             bgmLog(LOG_LEVELS.INFO, '用户请求暂停同步');
             BGM.sync.pause();
-            setSyncProgressPaused(true);
             break;
         case 'resumeSync':
             bgmLog(LOG_LEVELS.INFO, '用户请求恢复同步');
             BGM.sync.resume();
-            setSyncProgressPaused(false);
             break;
     }
 }
@@ -341,6 +338,11 @@ export function onAction(action: string): void {
 // ========== 从面板同步（异步，带进度条） ==========
 
 export async function syncFromPanel(): Promise<void> {
+    // P0: 防重入预检
+    if (BGM.sync.isRunning) {
+        showToast('同步正在进行中，请稍后', 'warn');
+        return;
+    }
     const startTime = Date.now();
     bgmLog(LOG_LEVELS.INFO, '[syncFromPanel] ========== 开始执行同步操作 ==========');
 

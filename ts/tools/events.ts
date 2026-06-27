@@ -7,14 +7,14 @@
  * @author BGM Development Team
  * @version 1.0.0
  */
-import { BGM, bgmLog, LOG_LEVELS } from '../index.js';
 /**
  * 事件处理器类型
  *
  * @callback EventHandler
- * @param {any} [data] - 事件携带的数据
+ * @param {unknown} [data] - 事件携带的数据
  */
-export type EventHandler = (data?: any) => void;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export type EventHandler<T = any> = (data?: T) => void;
 
 /**
  * 事件条目接口
@@ -79,9 +79,9 @@ export class EventBus {
     /**
      * 发布事件
      * @param {string} eventName - 事件名称
-     * @param {any} [data] - 事件数据
+     * @param {unknown} [data] - 事件数据
      */
-    emit(eventName: string, data?: any): void {
+    emit(eventName: string, data?: unknown): void {
         const handlers = this.events.get(eventName);
         if (!handlers || handlers.length === 0) return;
 
@@ -91,7 +91,8 @@ export class EventBus {
             try {
                 entry.handler(data);
             } catch (error) {
-                BGM.handleError(error, { level: BGM.ErrorLevel.ERROR, context: `EventBus:${eventName}` });
+                // 不依赖 BGM.handleError，避免循环依赖；直接输出到控制台
+                console.error('[EventBus]', error);
             }
             if (entry.once) {
                 this.off(eventName, entry.handler);
@@ -128,19 +129,6 @@ export class EventBus {
 }
 
 // 事件名称常量定义
-export const BANGUMI_EVENTS = {
-    LOGIN_SUCCESS: 'login:success',
-    LOGIN_FAILED: 'login:failed',
-    LOGOUT: 'logout',
-    SYNC_START: 'sync:start',
-    SYNC_END: 'sync:end',
-    SYNC_PROGRESS: 'sync:progress',
-    SYNC_ERROR: 'sync:error',
-    COLLECTION_UPDATED: 'collection:updated',
-    SETTINGS_CHANGED: 'settings:changed',
-    USERID_UPDATED: 'userid:updated',
-    PANEL_READY: 'panel:ready'
-} as const;
 export const BGM_EVENTS = {
     TOKEN_UPDATED:   'state:tokenUpdated',
     USER_ID_UPDATED: 'state:userIdUpdated',
