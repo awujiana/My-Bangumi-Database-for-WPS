@@ -63,28 +63,26 @@ export const BGM: {
     sync: {
         isRunning: false,
         shouldStop: false,
+        isPaused: false,
         lastSyncTime: null,
-        
+        currentRow: 0,
+        currentSheet: null as any,
+        currentCol: 0,
+
         startSync() {
-            // 防重复
             if (this.isRunning) {
                 BGM.Dialog.alert('同步正在进行中，请稍后', '提示');
                 return;
             }
-            // 重置停止标志
             this.resetStopFlag();
-            
-            // 显示确认对话框，避免误操作
             BGM.Dialog.confirm('确定要开始全面同步吗？', (confirmed: boolean) => {
                 if (!confirmed) return;
                 this.isRunning = true;
                 this.lastSyncTime = new Date().toISOString();
                 bgmLog(LOG_LEVELS.INFO, '开始执行同步...');
-
                 syncAllRows()
                     .then(() => {
                         this.isRunning = false;
-                        // 如果是因为停止而结束，显示提示
                         if (this.shouldStop) {
                             BGM.Dialog.alert('同步已停止', '提示');
                             this.resetStopFlag();
@@ -97,28 +95,75 @@ export const BGM: {
                     });
             });
         },
-        
+
         requestStop() {
             if (!this.isRunning) {
                 BGM.Dialog.alert('当前没有正在进行的同步', '提示');
                 return;
             }
-            
-            BGM.Dialog.confirm('确定要停止同步吗？已同步的数据不会回滚。', (confirmed: boolean) => {
-                if (confirmed) {
-                    this.shouldStop = true;
-                    bgmLog(LOG_LEVELS.INFO, '用户请求停止同步');
-                    BGM.Dialog.alert('正在停止同步，请稍候...', '提示');
-                }
-            }, '确认停止');
+            this.shouldStop = true;
+            this.isPaused = false;
+            bgmLog(LOG_LEVELS.INFO, '用户请求停止同步');
         },
-        
+
+        pause() {
+            if (!this.isRunning || this.isPaused) return;
+            this.isPaused = true;
+            bgmLog(LOG_LEVELS.INFO, `[sync] 同步已暂停，当前行: ${this.currentRow}`);
+            // 定位到当前单元格
+            this.locateCurrentCell();
+        },
+
+        resume() {
+            if (!this.isPaused) return;
+            this.isPaused = false;
+            bgmLog(LOG_LEVELS.INFO, '[sync] 同步已恢复');
+        },
+
         checkShouldStop(): boolean {
             return this.shouldStop;
         },
-        
+
+        checkPaused(): boolean {
+            return this.isPaused;
+        },
+
+        /** 暂停时等待恢复，每 200ms 检查一次 */
+        async waitForResume(): Promise<void> {
+            while (this.isPaused && !this.shouldStop) {
+                await new Promise(r => setTimeout(r, 200));
+            }
+        },
+
+        /** 定位到当前正在处理的单元格 */
+        locateCurrentCell() {
+            if (!this.currentRow || !this.currentSheet) return;
+            try {
+                const ws = this.currentSheet;
+                const col = this.currentCol || 1;
+                const cellAddr = `${colNumToLetter(col)}${this.currentRow}`;
+                const cell = ws.Range(cellAddr);
+                if (cell) {
+                    cell.Select();
+                    bgmLog(LOG_LEVELS.INFO, `[sync] 已定位到单元格: ${cellAddr}`);
+                }
+            } catch (e: any) {
+                bgmLog(LOG_LEVELS.WARN, `[sync] 定位单元格失败: ${e.message}`);
+            }
+        },
+
+        /** 更新当前位置（供同步循环调用） */
+        updatePosition(ws: any, row: number, col?: number) {
+            this.currentSheet = ws;
+            this.currentRow = row;
+            if (col) this.currentCol = col;
+        },
+
         resetStopFlag() {
             this.shouldStop = false;
+            this.isPaused = false;
+            this.currentRow = 0;
+            this.currentSheet = null;
         }
     },
     // 日志级别（0=DEBUG, 1=INFO, 2=WARN, 3=ERROR）

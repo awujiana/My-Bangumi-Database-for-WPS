@@ -27,6 +27,7 @@ export interface DialogCallback {
     onOk?: (value?: string) => void;
     onCancel?: () => void;
 }
+export declare function showSyncResult(summary: string, details: string[]): void;
 export declare function showAlert(message: string, title?: string, onOk?: () => void): void;
 export declare function showConfirm(message: string, callback: (confirmed: boolean) => void, title?: string): void;
 export declare function showError(message: string, title?: string, onOk?: () => void): void;

@@ -9,7 +9,7 @@
  */
 import { URL_PATTERNS, WATCH_STATUS_MAP, BGM_CONFIG, BGM_COLOR, LOG_LEVELS, SYNC_STATUS, bgmLog, getApp, getCell, trim, getColumnMap, findHeaderRow, colNumToLetter, getCellValue, loadBgToken, storeBgToken, _setBgmUserId, _setBgmUsername, BGM, wpsMsgBox, _getUserApiPath, readRangeValues, delay, calcFingerprint, getAllSyncRecords, isWpsWorksheet, clearSheetCache } from '../index.js';
 import { getOrCreateSyncRecordSheet, addSyncRecord } from './syncRecord.js';
-import { showAlert, showSuccess, showError, showConfirm } from '../ui/dialog.js';
+import { showAlert, showSuccess, showError, showConfirm, showSyncResult } from '../ui/dialog.js';
 // ========== 常量定义 (优化点：集中管理) ==========
 /** 批量读取时需要获取的列名 */
 const BATCH_READ_COLUMNS = [
@@ -1232,14 +1232,8 @@ export async function syncSelectedRows() {
         bgmLog(LOG_LEVELS.INFO, `[syncSelectedRows] 总行数: ${rows.length}  |  成功: ${successCount}  |  失败: ${failCount}  |  跳过: ${skipCount}  |  标记章节: ${episodeMarkCount}  |  耗时: ${elapsed}ms`);
         bgmLog(LOG_LEVELS.INFO, `[syncSelectedRows] 详情: ${details.join('  |  ')}`);
         // 弹出结果
-        let summary = `📊 选中 ${rows.length} 行 | 耗时 ${(elapsed / 1000).toFixed(1)}s\n\n✅ 成功: ${successCount}\n❌ 失败: ${failCount}\n⏭️ 跳过: ${skipCount}\n📺 标记章节: ${episodeMarkCount}`;
-        if (details.length > 0) {
-            summary += `\n\n--- 详情 ---\n${details.slice(0, 30).join('\n')}`;
-            if (details.length > 30) {
-                summary += `\n... 还有 ${details.length - 30} 条`;
-            }
-        }
-        wpsMsgBox(summary, 0, 64);
+        const summary = `📊 选中 ${rows.length} 行 | 耗时 ${(elapsed / 1000).toFixed(1)}s\n\n✅ 成功: ${successCount}\n❌ 失败: ${failCount}\n⏭️ 跳过: ${skipCount}\n📺 标记章节: ${episodeMarkCount}`;
+        showSyncResult(summary, details);
     }
     catch (e) {
         BGM.handleError(e, { context: 'syncSelectedRows', showAlert: false });

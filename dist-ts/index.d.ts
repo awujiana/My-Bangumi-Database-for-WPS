@@ -14,7 +14,8 @@ showConfirm, // 确认
 showError, // 错误
 showSuccess, // 成功
 showInput, // 输入
-showToast, } from './ui/dialog.js';
+showToast, // Toast 通知
+showSyncResult, } from './ui/dialog.js';
 export { type DialogButton, type DialogConfig, type DialogCallback, type DialogOptions, } from './ui/dialog.js';
 export { setStatus, initMessageListener, setSyncRunning, } from './ui/message.js';
 export { showUserIdDialog, updateTokenStatus, updateUserIdStatus, showTokenDialog, testDebugConnection, syncCollectionFromBgm, openUserCollection } from './ui/handlers.js';

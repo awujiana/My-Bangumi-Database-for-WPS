@@ -91,6 +91,7 @@ export {
     showSuccess,         // 成功
     showInput,           // 输入
     showToast,           // Toast 通知
+    showSyncResult,      // 同步结果（可展开详情）
 } from './ui/dialog.js';
 
 export {

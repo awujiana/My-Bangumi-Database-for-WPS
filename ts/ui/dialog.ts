@@ -221,7 +221,71 @@ function _showDialog(type: string, opts: DialogOptions = {}): void {
     dialog.style.display = 'flex';
 }
 
-// ========== 公开 API ==========
+// ========== 同步结果对话框 ==========
+let _syncResultDialog: HTMLElement | null = null;
+
+function ensureSyncResultDialog(): HTMLElement {
+    if (_syncResultDialog) return _syncResultDialog;
+
+    const modal = document.createElement('div');
+    modal.id = 'bgmSyncResultDialog';
+    modal.className = 'bgm-modal';
+    modal.style.display = 'none';
+
+    modal.innerHTML = `
+        <div class="bgm-modal-content success" style="max-width: 520px;">
+            <div class="bgm-dialog-header">
+                <span class="bgm-dialog-icon bgm-icon-success">&#10004;</span>
+                <span class="bgm-dialog-title">同步结果</span>
+            </div>
+            <div class="bgm-dialog-body" style="max-height: 60vh; overflow-y: auto;">
+                <div id="bgmSyncSummary" class="bgm-dialog-message" style="white-space: pre-line;"></div>
+                <div id="bgmSyncDetails" style="display:none; margin-top: 8px; max-height: 300px; overflow-y: auto; font-size: 12px; line-height: 1.6; white-space: pre; font-family: monospace;"></div>
+            </div>
+            <div class="bgm-dialog-footer">
+                <button id="bgmSyncToggleDetails" class="bgm-btn bgm-btn-default">显示详情</button>
+                <button id="bgmSyncResultOk" class="bgm-btn bgm-btn-success">确定</button>
+            </div>
+        </div>
+    `;
+
+    document.body.appendChild(modal);
+
+    const detailsEl = modal.querySelector('#bgmSyncDetails') as HTMLElement;
+    const toggleBtn = modal.querySelector('#bgmSyncToggleDetails') as HTMLElement;
+
+    toggleBtn.addEventListener('click', () => {
+        const expanded = detailsEl.style.display !== 'none';
+        detailsEl.style.display = expanded ? 'none' : 'block';
+        toggleBtn.textContent = expanded ? '显示详情' : '收起详情';
+    });
+
+    modal.querySelector('#bgmSyncResultOk')?.addEventListener('click', () => {
+        modal.style.display = 'none';
+    });
+
+    _syncResultDialog = modal;
+    return modal;
+}
+
+export function showSyncResult(summary: string, details: string[]): void {
+    const modal = ensureSyncResultDialog();
+    const summaryEl = modal.querySelector('#bgmSyncSummary') as HTMLElement;
+    const detailsEl = modal.querySelector('#bgmSyncDetails') as HTMLElement;
+    const toggleBtn = modal.querySelector('#bgmSyncToggleDetails') as HTMLElement;
+
+    summaryEl.textContent = summary;
+    detailsEl.textContent = details.length > 0 ? details.join('\n') : '无详情';
+
+    // 重置为收起状态
+    detailsEl.style.display = 'none';
+    toggleBtn.textContent = '显示详情';
+    toggleBtn.style.display = details.length > 0 ? '' : 'none';
+
+    modal.style.display = 'flex';
+}
+
+// ========== 公共 API ==========
 export function showAlert(message: string, title?: string, onOk?: () => void): void {
     _showDialog('alert', { message, title: title || '提示', onOk });
 }
