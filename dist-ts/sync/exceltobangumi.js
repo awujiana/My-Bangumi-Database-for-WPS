@@ -121,10 +121,10 @@ function createFieldGetter(ws, colMap, startRow, lastRow) {
 export function openBangumiTokenPage() {
     const app = window.Application;
     if (app?.OAAssist?.ShellExecute) {
-        app.OAAssist.ShellExecute('https://bgm.tv/dev/app');
+        app.OAAssist.ShellExecute('https://next.bgm.tv/demo/access-token');
     }
     else {
-        window.open('https://bgm.tv/dev/app', '_blank');
+        window.open('https://next.bgm.tv/demo/access-token', '_blank');
     }
 }
 /**
