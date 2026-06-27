@@ -532,12 +532,11 @@ export async function syncFromPanel(): Promise<void> {
     BGM.sync.isRunning = true;
     BGM.sync.resetStopFlag();
     // 显示同步进度弹窗（不隐藏"同步到 Bangumi"按钮）
-    showSyncProgressDialog(
-        '正在同步 - 同步到 Bangumi',
-        () => { BGM.sync.pause(); setSyncProgressPaused(true); },
-        () => { BGM.sync.resume(); setSyncProgressPaused(false); },
-        () => { BGM.sync.requestStop(); }
-    );
+    showSyncProgressDialog('正在同步 - 同步到 Bangumi', {
+        onPause: () => BGM.sync.pause(),
+        onResume: () => BGM.sync.resume(),
+        onStop: () => BGM.sync.requestStop()
+    });
     try {
         bgmLog(LOG_LEVELS.INFO, '[syncFromPanel] 调用 SyncToBangumiAsync...');
         const result = await SyncToBangumiAsync(ws, colMap, token, lastRow, headerRow, {
@@ -698,15 +697,19 @@ async function _doAPISync(sheetIndex: number, token: string): Promise<void> {
         BGM.sync.isRunning = true;
         BGM.sync.resetStopFlag();
         // 显示同步进度弹窗
-        showSyncProgressDialog(
-            '正在同步 - 从BGM同步收藏',
-            () => { BGM.sync.pause(); setSyncProgressPaused(true); },
-            () => { BGM.sync.resume(); setSyncProgressPaused(false); },
-            () => { BGM.sync.requestStop(); }
-        );
+        showSyncProgressDialog('正在同步 - 从BGM同步收藏', {
+            onPause: () => BGM.sync.pause(),
+            onResume: () => BGM.sync.resume(),
+            onStop: () => BGM.sync.requestStop()
+        });
+
+        // 两阶段进度合并：累计 total，避免阶段切换时进度条从 100% 回退到 0%
+        const totalCollect = userCollections.length;
+        const totalRows = rowsToProcess.length;
+        const totalCombined = totalCollect + totalRows;
+        let currentCombined = 0;
 
         // 阶段1：写入收藏到同步记录表（显示进度，但不需要定位单元格）
-        const totalCollect = userCollections.length;
         for (let i = 0; i < userCollections.length; i++) {
             if (BGM.sync.checkShouldStop()) break;
             if (BGM.sync.checkPaused()) await BGM.sync.waitForResume();
@@ -726,7 +729,8 @@ async function _doAPISync(sheetIndex: number, token: string): Promise<void> {
                     collType: COLLECTION_TYPE_NAMES[item.type] || ''
                 });
             }
-            updateSyncProgressDialog(i + 1, totalCollect, `收藏写入同步记录 ${i + 1}/${totalCollect}`, `📥 [${i + 1}/${totalCollect}] ${itemName}`);
+            currentCombined++;
+            updateSyncProgressDialog(currentCombined, totalCombined, `阶段1: 收藏写入同步记录 ${i + 1}/${totalCollect}`, `📥 [${i + 1}/${totalCollect}] ${itemName}`);
         }
 
         syncRecords = typeof getAllSyncRecords === 'function' ? getAllSyncRecords() : [];
@@ -747,7 +751,6 @@ async function _doAPISync(sheetIndex: number, token: string): Promise<void> {
         BGM.sync.updatePosition(ws, 0, seqColForLocate);
 
         let matchedCount = 0;
-        const totalRows = rowsToProcess.length;
         for (let i = 0; i < rowsToProcess.length; i++) {
             if (BGM.sync.checkShouldStop()) {
                 bgmLog(LOG_LEVELS.INFO, '[_doAPISync] 阶段2：检测到停止请求，终止');
@@ -778,7 +781,8 @@ async function _doAPISync(sheetIndex: number, token: string): Promise<void> {
                 matchedCount++;
                 matched = true;
             }
-            updateSyncProgressDialog(i + 1, totalRows, `标记数据表 ${i + 1}/${totalRows}（匹配 ${matchedCount}）`, matched ? `✓ [${i + 1}/${totalRows}] 行${row} 匹配 SID=${sid}` : `· [${i + 1}/${totalRows}] 行${row} 未匹配`);
+            currentCombined++;
+            updateSyncProgressDialog(currentCombined, totalCombined, `阶段2: 标记数据表 ${i + 1}/${totalRows}（匹配 ${matchedCount}）`, matched ? `✓ [${i + 1}/${totalRows}] 行${row} 匹配 SID=${sid}` : `· [${i + 1}/${totalRows}] 行${row} 未匹配`);
         }
 
         // 输出同步统计
@@ -1052,21 +1056,18 @@ function handleActionClick(event: Event): void {
         case 'requestStopSync':
             bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 用户请求停止同步');
             BGM.sync.requestStop();
-            setSyncProgressPaused(false);
             bgmLog(LOG_LEVELS.INFO, `[handleActionClick] 停止同步请求已发送，耗时: ${Date.now() - startTime}ms`);
             break;
 
         case 'pauseSync':
             bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 用户请求暂停同步');
             BGM.sync.pause();
-            setSyncProgressPaused(true);
             bgmLog(LOG_LEVELS.INFO, `[handleActionClick] 暂停同步请求已发送，耗时: ${Date.now() - startTime}ms`);
             break;
 
         case 'resumeSync':
             bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 用户请求恢复同步');
             BGM.sync.resume();
-            setSyncProgressPaused(false);
             bgmLog(LOG_LEVELS.INFO, `[handleActionClick] 恢复同步请求已发送，耗时: ${Date.now() - startTime}ms`);
             break;
 

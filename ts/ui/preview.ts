@@ -10,7 +10,7 @@ import {
   LOG_LEVELS, BGM_COLOR, type SyncRecord, findHeaderRow, getColumnMap, getSyncPreview,detectConflicts,
   extractSubjectId, mapWatchStatus, buildJsonPayload,WpsWorksheet,
   bgmRequestSync, addSyncRecord, addTagsFromStr,WpsRange ,WATCH_STATUS_MAP ,SyncToBangumiAsync,
-  showSyncProgressDialog, updateSyncProgressDialog, setSyncProgressPaused,
+  showSyncProgressDialog, updateSyncProgressDialog,
   completeSyncProgressDialog, hideSyncProgressDialog
 } from '../index.js';
 
@@ -255,6 +255,12 @@ function normalizeStatus(rawStatus: string): string {
 export async function previewSyncContent(): Promise<void> {
     bgmLog(LOG_LEVELS.INFO, '[preview] 开始执行 previewSyncContent');
 
+    // 入口预检：防重入
+    if (BGM.sync.isRunning) {
+        showToast('同步正在进行中，请稍后', 'warn');
+        return;
+    }
+
     const dp = BGM.dataPreview;
     if (!dp || !dp.ws) {
         showToast('请先在预览面板中加载数据', 'warn');
@@ -288,16 +294,14 @@ export async function previewSyncContent(): Promise<void> {
     };
 
     // 显示同步进度弹窗（不隐藏"同步到 Bangumi"按钮）
-    showSyncProgressDialog(
-        '正在同步 - 预览同步',
-        () => { BGM.sync.pause(); setSyncProgressPaused(true); },
-        () => { BGM.sync.resume(); setSyncProgressPaused(false); },
-        () => { BGM.sync.requestStop(); }
-    );
+    showSyncProgressDialog('正在同步 - 预览同步', {
+        onPause: () => BGM.sync.pause(),
+        onResume: () => BGM.sync.resume(),
+        onStop: () => BGM.sync.requestStop()
+    });
 
-    // 启动同步状态机
-    BGM.sync.isRunning = true;
-    BGM.sync.resetStopFlag();
+    // 进入运行状态（防重入，统一入口）
+    if (!BGM.sync.enterRunningState()) return;
     const urlColForLocate = colMap.get('Bangumi_URL') || 1;
     BGM.sync.updatePosition(ws, 0, urlColForLocate);
 
@@ -307,6 +311,7 @@ export async function previewSyncContent(): Promise<void> {
     let skippedCount = 0;
     let errorCount = 0;
 
+    try {
     for (let i = 0; i < dataRows.length; i++) {
         // 停止检查
         if (BGM.sync.checkShouldStop()) {
@@ -327,8 +332,8 @@ export async function previewSyncContent(): Promise<void> {
         // 更新当前位置（行号）以便暂停时定位
         BGM.sync.updatePosition(undefined, rowNum);
 
-        // 让出主线程，避免阻塞 UI
-        if (i % 20 === 0) await new Promise(r => setTimeout(r, 0));
+        // 每行让出主线程，确保暂停按钮及时响应
+        await new Promise(r => setTimeout(r, 0));
 
         try {
             const rowData = getRowData(ws, rowNum, colMap, headerRow, 9);
@@ -348,8 +353,6 @@ export async function previewSyncContent(): Promise<void> {
                 continue;
             }
 
-            actualCardCount++;
-
             // 标准化观看状态（用于 data-status 属性）
             const normalizedStatus = normalizeStatus(rowData.status);
             // 将标准化后的状态放回 rowData，便于后续统计和卡片渲染
@@ -367,10 +370,11 @@ export async function previewSyncContent(): Promise<void> {
                 }
             }
 
-            // 生成卡片 HTML
+            // 生成卡片 HTML（渲染成功后才计数）
             cardsHtml += renderDetailItemHtml(rowData, colMap, ws);
+            actualCardCount++;
             updateSyncProgressDialog(i + 1, totalRows, `预览生成 ${i + 1}/${totalRows}（卡片 ${actualCardCount}）`, `✓ [${i + 1}/${totalRows}] 行${rowNum} "${rowData.name || ''}" 已渲染`);
-        } catch (e: any) {
+        } catch (e: unknown) {
             errorCount++;
             BGM.handleError(e, { showAlert: false, level: BGM.ErrorLevel.WARN, context: 'previewSyncContent' });
             cardsHtml += `<div class="detail-item error">行 ${rowNum} 处理出错: ${escapeHtml((e as Error).message)}</div>`;
@@ -379,10 +383,8 @@ export async function previewSyncContent(): Promise<void> {
     }
     cardsHtml += '</div>';
 
-    // 重置同步状态机
+    // 捕获停止状态（必须在 exitRunningState 之前，因为 exitRunningState 会重置 shouldStop）
     const wasStopped = BGM.sync.checkShouldStop();
-    BGM.sync.isRunning = false;
-    BGM.sync.resetStopFlag();
 
     // 切换弹窗为完成状态
     const summary = `📊 预览 ${totalRows} 行 | 卡片 ${actualCardCount}\n\n✅ 已渲染: ${actualCardCount}\n⏭️ 跳过: ${skippedCount}\n❌ 错误: ${errorCount}`;
@@ -457,6 +459,10 @@ export async function previewSyncContent(): Promise<void> {
     select.dispatchEvent(new Event('change'));
 
     bgmLog(LOG_LEVELS.INFO, `[preview] 模态框已显示（${actualCardCount} 条卡片，下拉全部）`);
+    } finally {
+        // 退出运行状态，确保即使异常也能清理
+        BGM.sync.exitRunningState();
+    }
 }
 
 // ========== UI 辅助函数 ==========

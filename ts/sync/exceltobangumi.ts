@@ -61,7 +61,7 @@ import {
 import { getOrCreateSyncRecordSheet, addSyncRecord } from './syncRecord.js';
 import {
     showAlert, showSuccess, showError, showConfirm, showSyncResult,
-    showSyncProgressDialog, updateSyncProgressDialog, setSyncProgressPaused,
+    showSyncProgressDialog, updateSyncProgressDialog,
     completeSyncProgressDialog, hideSyncProgressDialog
 } from '../ui/dialog.js';
 
@@ -1315,9 +1315,17 @@ async function markEpisodesComplete(
  * @function syncSelectedRows
  */
 export async function syncSelectedRows(): Promise<void> {
+    // P0：防重入预检，避免并发同步
+    if (BGM.sync.isRunning) {
+        showToast('同步正在进行中，请稍后', 'warn');
+        return;
+    }
+
     const startTime = Date.now();
     bgmLog(LOG_LEVELS.INFO, '[syncSelectedRows] ========== 开始选中行同步 ==========');
 
+    // 标志位：是否已成功进入运行状态（用于 finally 中决定是否调用 exitRunningState）
+    let enteredRunning = false;
     try {
         const app = getApp();
         if (!app?.ActiveWorkbook) {
@@ -1401,7 +1409,7 @@ export async function syncSelectedRows(): Promise<void> {
 
         if (rows.length === 0) {
             bgmLog(LOG_LEVELS.WARN, '[syncSelectedRows] 排除表头后没有有效数据行');
-            wpsMsgBox('当前选中区域只有表头行，没有数据行', 0, 48);
+            showToast('未选中任何数据行', 'warn');
             return;
         }
 
@@ -1451,16 +1459,15 @@ export async function syncSelectedRows(): Promise<void> {
         let episodeMarkCount = 0;
         const details: string[] = [];
 
-        // 启动同步状态机
-        BGM.sync.isRunning = true;
-        BGM.sync.resetStopFlag();
-        // 显示同步进度弹窗（不隐藏"同步到 Bangumi"按钮）
-        showSyncProgressDialog(
-            '正在同步 - 选中行同步',
-            () => { BGM.sync.pause(); setSyncProgressPaused(true); },
-            () => { BGM.sync.resume(); setSyncProgressPaused(false); },
-            () => { BGM.sync.requestStop(); }
-        );
+        // P2：进入运行状态（防重入 + 重置标志 + 置位）
+        if (!BGM.sync.enterRunningState()) return;
+        enteredRunning = true;
+        // P1：显示同步进度弹窗（新 API：handlers 对象，暂停状态由 dialog 内部管理）
+        showSyncProgressDialog('正在同步 - 选中行同步', {
+            onPause: () => BGM.sync.pause(),
+            onResume: () => BGM.sync.resume(),
+            onStop: () => BGM.sync.requestStop()
+        });
         // 设置同步状态机位置（用于暂停时定位到单元格）
         BGM.sync.updatePosition(ws, 0, urlCol);
 
@@ -1589,17 +1596,20 @@ export async function syncSelectedRows(): Promise<void> {
         const wasStopped = BGM.sync.checkShouldStop();
         const summary = `📊 选中 ${rows.length} 行 | 耗时 ${(elapsed / 1000).toFixed(1)}s\n\n✅ 成功: ${successCount}\n❌ 失败: ${failCount}\n⏭️ 跳过: ${skipCount}\n📺 标记章节: ${episodeMarkCount}`;
         completeSyncProgressDialog(summary, details, wasStopped);
-        // 重置同步状态机
-        BGM.sync.isRunning = false;
-        BGM.sync.resetStopFlag();
     }
-    catch (e: any) {
+    catch (e: unknown) {
         hideSyncProgressDialog();
-        BGM.sync.isRunning = false;
-        BGM.sync.resetStopFlag();
         BGM.handleError(e, { context: 'syncSelectedRows', showAlert: false });
-        bgmLog(LOG_LEVELS.ERROR, `[syncSelectedRows] 同步异常: ${e.message}`);
-        wpsMsgBox(`选中行同步异常: ${e.message}`, 0, 16);
+        const errMsg = e instanceof Error ? e.message : String(e);
+        bgmLog(LOG_LEVELS.ERROR, `[syncSelectedRows] 同步异常: ${errMsg}`);
+        wpsMsgBox(`选中行同步异常: ${errMsg}`, 0, 16);
+    }
+    finally {
+        // 统一在 finally 中清理运行状态，避免 catch/success 路径重复调用 exitRunningState
+        // 正常完成时 completeSyncProgressDialog 已切换弹窗状态；异常时 hideSyncProgressDialog 已隐藏弹窗
+        if (enteredRunning) {
+            BGM.sync.exitRunningState();
+        }
     }
 
     bgmLog(LOG_LEVELS.INFO, `[syncSelectedRows] ========== 选中行同步结束，总耗时: ${Date.now() - startTime}ms ==========`);
