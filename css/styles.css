@@ -282,12 +282,13 @@ select.input {
 }
 
 .preview-box {
-    background: #2a2a2a;
-    border-radius: 8px;
+    background: var(--bg-deep, #181825);
+    border-radius: var(--radius-md, 8px);
     padding: 0;
     max-height: 280px;
     overflow-y: auto;
-    overflow-x: visible;
+    overflow-x: auto;
+    contain: content;
 }
 
 .preview-box::-webkit-scrollbar {
@@ -339,11 +340,11 @@ select.input {
 }
 
 .preview-box tr {
-    transition: all 0.2s;
+    /* 移除 transition: all 避免大量行时卡顿 */
 }
 
 .preview-box tr:hover {
-    background: #383838;
+    background: var(--bg-hover, #45475a);
 }
 
 .preview-box tr:last-child td {
