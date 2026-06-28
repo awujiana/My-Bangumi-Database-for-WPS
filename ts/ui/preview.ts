@@ -647,6 +647,12 @@ export function viewSyncRecordDetail(sid: string): void {
  * @returns 同步结果统计 { success, fail, skip }
  */
 export async function syncAllRows(): Promise<{ success: number; fail: number; skip: number }> {
+    // 防重入预检（与 syncFromPanel 一致）
+    if (BGM.sync.isRunning) {
+        showToast('同步正在进行中，请稍后', 'warn');
+        return { success: 0, fail: 0, skip: 0 };
+    }
+
     const dp = BGM.dataPreview;
     if (!dp?.ws) {
         showToast('请先在预览面板中加载数据', 'warn');
@@ -704,23 +710,42 @@ export async function syncAllRows(): Promise<{ success: number; fail: number; sk
     }
     bgmLog(LOG_LEVELS.INFO, `[syncAllRows] 增量同步: ${incremental ? '开启' : '关闭'}`);
 
-    // ---------- 4. 执行同步 ----------
+    // ---------- 4. 启动同步状态机 + 显示进度弹窗 ----------
+    BGM.sync.isRunning = true;
+    BGM.sync.resetStopFlag();
+    BGM.sync.updatePosition(ws, headerRow, colMap.get('序列号') || 9);
+
+    showSyncProgressDialog('正在同步 - 同步所有可见行', {
+        onPause: () => BGM.sync.pause(),
+        onResume: () => BGM.sync.resume(),
+        onStop: () => BGM.sync.requestStop()
+    });
+
     try {
         const result = await SyncToBangumiAsync(ws, colMap, token, lastRow, headerRow, {
             skipSids: conflictSids,        // 跳过冲突的 sid 集合
             incremental,                  // 从 Ribbon 设置读取
             onProgress: (current, total, message) => {
-                BGM.setSyncProgress(current, total, message);
+                updateSyncProgressDialog(current, total, message);
             },
             onItemComplete: (row, success, _result) => {
                 // 这里可以不做额外处理，因为颜色标记由内部完成
             }
         });
 
-        BGM.setSyncComplete(result);
-        showToast(`同步完成：成功 ${result.success}，失败 ${result.fail}，跳过 ${result.skip}`, 'success');
+        const summary = `📊 同步 ${result.success + result.fail + result.skip} 条\n\n✅ 成功: ${result.success}\n❌ 失败: ${result.fail}\n⏭️ 跳过: ${result.skip}`;
+        const details: string[] = result.stopped
+            ? ['⚠️ 同步被用户停止', `成功 ${result.success} 条`, `失败 ${result.fail} 条`, `跳过 ${result.skip} 条`]
+            : [`成功 ${result.success} 条`, `失败 ${result.fail} 条`, `跳过 ${result.skip} 条`];
+        completeSyncProgressDialog(summary, details, result.stopped);
+
+        BGM.sync.isRunning = false;
+        BGM.sync.resetStopFlag();
         return result;
     } catch (err: unknown) {
+        hideSyncProgressDialog();
+        BGM.sync.isRunning = false;
+        BGM.sync.resetStopFlag();
         BGM.handleError(err, { showAlert: true });
         return { success: 0, fail: 0, skip: 0 };
     }
