@@ -766,7 +766,7 @@ export function buildJsonPayload(
             bgmLog(LOG_LEVELS.INFO, `[buildJsonPayload] 标签合并: 标签/分级="${tagsGradeVal || '(空)'}" + 原作标签="${originalTagVal || '(空)'}" -> ${JSON.stringify(payload.tags)}`);
         }
 
-        // 感言
+        // 感言（支持 emoji、中文、日文等 UTF-8 字符；过滤控制字符并截断到 1000 字符）
         let commentVal = trim(getField('剧透/感言') || getField('感言'));
         const nVal = trim(getField('特点/印象'));
         bgmLog(LOG_LEVELS.INFO, `[buildJsonPayload] 剧透/感言="${commentVal}", 特点/印象="${nVal}"`);
@@ -774,7 +774,19 @@ export function buildJsonPayload(
             commentVal = commentVal ? `${commentVal}\n${nVal}` : nVal;
         }
         if (commentVal) {
-            payload.comment = commentVal;
+            // 移除控制字符（保留换行符 \n 和制表符 \t）
+            const cleaned = commentVal.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '');
+            // Bangumi API comment 字段长度限制约 1000 字符，超出截断
+            const MAX_COMMENT_LEN = 1000;
+            const finalComment = cleaned.length > MAX_COMMENT_LEN
+                ? cleaned.slice(0, MAX_COMMENT_LEN)
+                : cleaned;
+            if (finalComment) {
+                payload.comment = finalComment;
+                if (cleaned.length > MAX_COMMENT_LEN) {
+                    bgmLog(LOG_LEVELS.WARN, `[buildJsonPayload] 感言长度 ${cleaned.length} 超过 ${MAX_COMMENT_LEN}，已截断`);
+                }
+            }
         }
 
         // 隐私收藏

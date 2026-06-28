@@ -646,7 +646,7 @@ export function buildJsonPayload(getField, finishedDate) {
             payload.tags = Array.from(tagSet);
             bgmLog(LOG_LEVELS.INFO, `[buildJsonPayload] 标签合并: 标签/分级="${tagsGradeVal || '(空)'}" + 原作标签="${originalTagVal || '(空)'}" -> ${JSON.stringify(payload.tags)}`);
         }
-        // 感言
+        // 感言（支持 emoji、中文、日文等 UTF-8 字符；过滤控制字符并截断到 1000 字符）
         let commentVal = trim(getField('剧透/感言') || getField('感言'));
         const nVal = trim(getField('特点/印象'));
         bgmLog(LOG_LEVELS.INFO, `[buildJsonPayload] 剧透/感言="${commentVal}", 特点/印象="${nVal}"`);
@@ -654,7 +654,19 @@ export function buildJsonPayload(getField, finishedDate) {
             commentVal = commentVal ? `${commentVal}\n${nVal}` : nVal;
         }
         if (commentVal) {
-            payload.comment = commentVal;
+            // 移除控制字符（保留换行符 \n 和制表符 \t）
+            const cleaned = commentVal.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '');
+            // Bangumi API comment 字段长度限制约 1000 字符，超出截断
+            const MAX_COMMENT_LEN = 1000;
+            const finalComment = cleaned.length > MAX_COMMENT_LEN
+                ? cleaned.slice(0, MAX_COMMENT_LEN)
+                : cleaned;
+            if (finalComment) {
+                payload.comment = finalComment;
+                if (cleaned.length > MAX_COMMENT_LEN) {
+                    bgmLog(LOG_LEVELS.WARN, `[buildJsonPayload] 感言长度 ${cleaned.length} 超过 ${MAX_COMMENT_LEN}，已截断`);
+                }
+            }
         }
         // 隐私收藏
         const privateVal = trim(getField('私密收藏')).toLowerCase();
@@ -805,10 +817,10 @@ async function batchSyncRequests(tasks, token, userIdPath, concurrency = DEFAULT
                     if (apiResult.code >= 200 && apiResult.code < 300) {
                         success.push(task);
                         bgmLog(LOG_LEVELS.INFO, `[batchSyncRequests] SID ${task.sid} 同步成功，HTTP ${apiResult.code}`);
-                        // 标记章节为已完成（仅"看过"状态才需要标记）
-                        if (task.type === 3 && task.epCount && task.epCount > 0) {
+                        // 标记章节为已完成（"看过" type=2 和 "在看" type=3 都需要标记）
+                        if ((task.type === 2 || task.type === 3) && task.epCount && task.epCount > 0) {
                             try {
-                                bgmLog(LOG_LEVELS.INFO, `[batchSyncRequests] SID ${task.sid} 状态"看过"(type=3)，集数: ${task.epCount}，开始标记章节...`);
+                                bgmLog(LOG_LEVELS.INFO, `[batchSyncRequests] SID ${task.sid} 状态${task.type === 2 ? '"看过"' : '"在看"'}(type=${task.type})，集数: ${task.epCount}，开始标记章节...`);
                                 const epResult = await markEpisodesComplete(task.sid, task.epCount, token);
                                 bgmLog(LOG_LEVELS.INFO, `[batchSyncRequests] SID ${task.sid} 章节标记结果: ${epResult.message}`);
                             }
@@ -817,7 +829,7 @@ async function batchSyncRequests(tasks, token, userIdPath, concurrency = DEFAULT
                             }
                         }
                         else if (task.epCount && task.epCount > 0) {
-                            bgmLog(LOG_LEVELS.INFO, `[batchSyncRequests] SID ${task.sid} 状态非"看过"(type=${task.type})，跳过章节标记`);
+                            bgmLog(LOG_LEVELS.INFO, `[batchSyncRequests] SID ${task.sid} 状态非"看过/在看"(type=${task.type})，跳过章节标记`);
                         }
                     }
                     else {
@@ -1359,18 +1371,18 @@ async function executeSelectedSync(ws, rows, colMap, token, headerRow, startTime
                     details.push(`✓ 行${rowNum} ${name || sid} HTTP:${result.code}`);
                     bgmLog(LOG_LEVELS.INFO, `[syncSelectedRows] ${rowProgress} 行${rowNum} "${name || sid}" 同步成功！HTTP: ${result.code}`);
                     updateSyncProgressDialog(idx + 1, rows.length, `${rowProgress} 行${rowNum} "${name || sid}" ✓ HTTP:${result.code}`, `✓ ${rowProgress} 行${rowNum} "${name || sid}" 成功 HTTP:${result.code}`);
-                    // 标记章节为已完成（仅"看过"状态才需要标记）
+                    // 标记章节为已完成（"看过" type=2 和 "在看" type=3 都需要标记）
                     const watchType = JSON.parse(jsonBody).type;
                     const epRaw = trim(getCellValue(ws, rowNum, colMap.has('集数') ? colMap.get('集数') : colMap.get('集号')));
                     const epCount = parseInt(epRaw, 10);
-                    if (watchType === 3 && !isNaN(epCount) && epCount > 0) {
-                        bgmLog(LOG_LEVELS.INFO, `[syncSelectedRows] ${rowProgress} 行${rowNum} 状态"看过"(type=3)，集数: ${epCount}，开始标记章节...`);
+                    if ((watchType === 2 || watchType === 3) && !isNaN(epCount) && epCount > 0) {
+                        bgmLog(LOG_LEVELS.INFO, `[syncSelectedRows] ${rowProgress} 行${rowNum} 状态${watchType === 2 ? '"看过"' : '"在看"'}(type=${watchType})，集数: ${epCount}，开始标记章节...`);
                         const epResult = await markEpisodesComplete(sid, epCount, token);
                         episodeMarkCount++;
                         bgmLog(LOG_LEVELS.INFO, `[syncSelectedRows] ${rowProgress} 行${rowNum} 章节标记结果: ${epResult.message}`);
                     }
                     else if (!isNaN(epCount) && epCount > 0) {
-                        bgmLog(LOG_LEVELS.INFO, `[syncSelectedRows] ${rowProgress} 行${rowNum} 状态非"看过"(type=${watchType})，跳过章节标记`);
+                        bgmLog(LOG_LEVELS.INFO, `[syncSelectedRows] ${rowProgress} 行${rowNum} 状态非"看过/在看"(type=${watchType})，跳过章节标记`);
                     }
                 }
                 else {
