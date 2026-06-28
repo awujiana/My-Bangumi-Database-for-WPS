@@ -1392,6 +1392,7 @@ async function fetchEpisodeIds(sid: string | number, token: string): Promise<num
             }
         };
         xhr.onerror = () => reject(new Error('网络错误'));
+        xhr.ontimeout = () => reject(new Error('请求章节数据超时（30s），可能网络受限或被墙'));
         xhr.send();
     });
 }
@@ -1667,7 +1668,12 @@ async function executeSelectedSync(
                     updateSyncProgressDialog(idx + 1, rows.length, `${rowProgress} 行${rowNum} "${name || sid}" ✓ HTTP:${result.code}`, `✓ ${rowProgress} 行${rowNum} "${name || sid}" 成功 HTTP:${result.code}`);
 
                     // 标记章节为已完成（"看过" type=2 和 "在看" type=3 都需要标记）
-                    const watchType = JSON.parse(jsonBody).type;
+                    let watchType: number = 0;
+                    try {
+                        watchType = JSON.parse(jsonBody).type;
+                    } catch (parseErr: unknown) {
+                        bgmLog(LOG_LEVELS.WARN, `[syncSelectedRows] 行${rowNum} jsonBody 解析失败: ${(parseErr as Error).message}`);
+                    }
                     const epRaw = trim(getCellValue(ws, rowNum, colMap.has('集数') ? colMap.get('集数')! : colMap.get('集号')!));
                     const epCount = parseInt(epRaw, 10);
                     if ((watchType === 2 || watchType === 3) && !isNaN(epCount) && epCount > 0) {

@@ -624,12 +624,12 @@ export function escapeHtml(text: string | null | undefined): string {
 
 // ========== Token 存储 ==========
 /**
- * 存储 Token（加密）
+ * 存储 Token（明文存储，便于用户复制使用）
  */
 export function storeBgToken(token: string): boolean {
     const app = getApp() as { PluginStorage?: { setItem: (key: string, value: string) => void } };
     if (!app?.PluginStorage) return false;
-    app.PluginStorage.setItem("bgm_token", encryptToken(token));
+    app.PluginStorage.setItem("bgm_token", token);
     return true;
 }
 
@@ -644,17 +644,55 @@ export function clearBgToken(): boolean {
 }
 
 /**
- * 加载 Token（解密）
+ * 加载 Token（明文读取，自动兼容历史 XOR 加密数据）
  */
 export function loadBgToken(): string | null {
-    const app = getApp() as { PluginStorage?: { getItem: (key: string) => string | null } };
+    const app = getApp() as { PluginStorage?: { getItem: (key: string) => string | null; setItem: (key: string, value: string) => void } };
     if (!app?.PluginStorage) return null;
     const stored = app.PluginStorage.getItem("bgm_token");
     if (!stored) return null;
-    const token = decryptToken(stored);
-    if (token) return token;
-    clearBgToken();
-    return null;
+    // 兼容历史 XOR 加密数据：若格式为 "v1.iv.payload"，尝试解密
+    if (stored.startsWith("v1.")) {
+        const decrypted = decryptToken(stored);
+        if (decrypted) {
+            // 升级为明文存储
+            app.PluginStorage.setItem("bgm_token", decrypted);
+            return decrypted;
+        }
+        clearBgToken();
+        return null;
+    }
+    // 明文直接返回
+    return stored;
+}
+
+/**
+ * 复制 Token 到剪贴板
+ * @returns 是否复制成功
+ */
+export function copyTokenToClipboard(): boolean {
+    const token = loadBgToken();
+    if (!token) return false;
+    try {
+        const textarea = document.createElement('textarea');
+        textarea.value = token;
+        textarea.style.position = 'fixed';
+        textarea.style.opacity = '0';
+        textarea.style.pointerEvents = 'none';
+        document.body.appendChild(textarea);
+        textarea.select();
+        const ok = document.execCommand('copy');
+        document.body.removeChild(textarea);
+        if (ok) {
+            bgmLog(LOG_LEVELS.INFO, '[copyTokenToClipboard] Token 已复制到剪贴板');
+        } else {
+            bgmLog(LOG_LEVELS.WARN, '[copyTokenToClipboard] execCommand copy 失败');
+        }
+        return ok;
+    } catch (e: unknown) {
+        bgmLog(LOG_LEVELS.ERROR, `[copyTokenToClipboard] 复制失败: ${(e as Error).message}`);
+        return false;
+    }
 }
 
 /**

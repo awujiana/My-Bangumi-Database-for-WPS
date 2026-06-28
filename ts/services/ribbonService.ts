@@ -274,6 +274,7 @@ export async function syncWithConfirmation() {
     const app = getApp();
     const ws = getDataSheet();
     if (!ws) { wpsMsgBox('未找到数据工作表', 0, 64); return; }
+    if (BGM.sync.isRunning) { wpsMsgBox('同步正在进行中，请稍后再试', 0, 48); return; }
     const token = loadBgToken();
     if (!token) { wpsMsgBox('请先设置 Token', 0, 48); return; }
 
@@ -342,6 +343,10 @@ export async function syncWithConfirmation() {
     }
 
     // 5. 执行同步（传入跳过冲突集合和增量同步开关）
+    if (!BGM.sync.enterRunningState()) {
+        wpsMsgBox('同步正在进行中，请稍后再试', 0, 48);
+        return;
+    }
     try {
         bgmLog(LOG_LEVELS.INFO, '[syncWithConfirmation] 开始执行同步...');
         const result = await SyncToBangumiAsync(ws, colMap, token, lastRow, headerRow, {
@@ -352,12 +357,14 @@ export async function syncWithConfirmation() {
             }
         });
         if (app) app.StatusBar = false;
-        app?.MessageBox?.(
+        BGM.sync.exitRunningState();
+        app?.MessageBox?(
             `同步完成！\n成功: ${result.success} 条\n失败: ${result.fail} 条\n跳过: ${result.skip} 条`,
             0, 64
         );
     } catch (err: unknown) {
         if (app) app.StatusBar = false;
+        BGM.sync.exitRunningState();
         BGM.handleError(err, { context: 'Ribbon同步', showAlert: true });
     }
 }
@@ -398,8 +405,8 @@ function notifyPanelTokenUpdated(): void {
         BGM.notifyTokenUpdated();
         
         bgmLog(LOG_LEVELS.INFO, '已发送 Token 更新通知');
-    } catch (e) {
-        BGM.handleError(new Error('通知面板失败',e as Error), { showAlert: false });
+    } catch (e: unknown) {
+        BGM.handleError(new Error('通知面板失败', { cause: e }), { showAlert: false });
     }
 }
 

@@ -569,9 +569,12 @@ async function confirmAndExecuteSync(prepared: SyncPreparedData): Promise<boolea
 
     // 11. 执行同步
     bgmLog(LOG_LEVELS.INFO, '[syncFromPanel] 步骤11: 开始执行同步');
-    // 启动同步状态机（允许暂停/恢复/停止）
-    BGM.sync.isRunning = true;
-    BGM.sync.resetStopFlag();
+    // 启动同步状态机：使用 enterRunningState 进行防重入检查
+    if (!BGM.sync.enterRunningState()) {
+        bgmLog(LOG_LEVELS.WARN, '[syncFromPanel] 已有同步进行中，拒绝重入');
+        showAlert('同步正在进行中，请稍后再试', '提示');
+        return false;
+    }
     // 显示同步进度弹窗（不隐藏"同步到 Bangumi"按钮）
     showSyncProgressDialog('正在同步 - 同步到 Bangumi', {
         onPause: () => BGM.sync.pause(),
@@ -598,8 +601,7 @@ async function confirmAndExecuteSync(prepared: SyncPreparedData): Promise<boolea
             : [`成功 ${result.success} 条`, `失败 ${result.fail} 条`, `跳过 ${result.skip} 条`];
         completeSyncProgressDialog(summary, details, result.stopped);
         // 重置同步状态机
-        BGM.sync.isRunning = false;
-        BGM.sync.resetStopFlag();
+        BGM.sync.exitRunningState();
         if (app.StatusBar !== undefined) app.StatusBar = false;
 
         if (result.stopped) {
@@ -609,8 +611,7 @@ async function confirmAndExecuteSync(prepared: SyncPreparedData): Promise<boolea
         }
     } catch (err: unknown) {
         hideSyncProgressDialog();
-        BGM.sync.isRunning = false;
-        BGM.sync.resetStopFlag();
+        BGM.sync.exitRunningState();
         if (app.StatusBar !== undefined) app.StatusBar = false;
         bgmLog(LOG_LEVELS.ERROR, `[syncFromPanel] 同步失败: ${(err as Error).message}`);
         BGM.handleError(err, { context: 'syncFromPanel', showAlert: true });
@@ -748,9 +749,12 @@ async function _doAPISync(sheetIndex: number, token: string): Promise<void> {
 
         const BGM_SUBJECT_TYPES: Record<number, string> = (window as unknown as { BGM_SUBJECT_TYPES?: Record<number, string> }).BGM_SUBJECT_TYPES || { 1: '书籍', 2: '动画', 3: '音乐', 4: '游戏', 6: '真人剧' };
 
-        // 启动同步状态机（允许暂停/停止）
-        BGM.sync.isRunning = true;
-        BGM.sync.resetStopFlag();
+        // 启动同步状态机：使用 enterRunningState 进行防重入检查
+        if (!BGM.sync.enterRunningState()) {
+            bgmLog(LOG_LEVELS.WARN, '[_doAPISync] 已有同步进行中，拒绝重入');
+            showAlert('同步正在进行中，请稍后再试', '提示');
+            return;
+        }
         // 显示同步进度弹窗
         showSyncProgressDialog('正在同步 - 从BGM同步收藏', {
             onPause: () => BGM.sync.pause(),
@@ -862,8 +866,7 @@ async function _doAPISync(sheetIndex: number, token: string): Promise<void> {
         completeSyncProgressDialog(summary, detailsArr, wasStopped);
 
         // 重置同步状态机
-        BGM.sync.isRunning = false;
-        BGM.sync.resetStopFlag();
+        BGM.sync.exitRunningState();
 
         // 恢复原始工作表
         if (originalActiveSheet) {
@@ -876,8 +879,7 @@ async function _doAPISync(sheetIndex: number, token: string): Promise<void> {
         }
     } catch (e: unknown) {
         hideSyncProgressDialog();
-        BGM.sync.isRunning = false;
-        BGM.sync.resetStopFlag();
+        BGM.sync.exitRunningState();
         BGM.handleError(e, { showAlert: false, level: BGM.ErrorLevel.WARN, context: '_doAPISync' });
         showAlert(_T.syncFailed + (e as Error).message, _T.syncFailed);
         setStatus(_T.syncFailed, 'error');
