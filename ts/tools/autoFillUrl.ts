@@ -2,6 +2,7 @@ import {
     getDataSheet, getCellValue, setCellValue, getColumnMap, findHeaderRow,
     getLastRow, bgmLog, LOG_LEVELS, BGM, trim, showConfirm
 } from '../index.js';
+import type { WpsWorksheet } from '../index.js';
 
 export interface NameUrlMap {
     [nameOrAlias: string]: string;
@@ -20,7 +21,7 @@ function _splitAliases(aliasVal: string): string[] {
 }
 
 function _buildNameUrlMap(
-    ws: any,
+    ws: WpsWorksheet,
     headerRow: number,
     lastRow: number,
     colMap: Map<string, number>
@@ -115,7 +116,7 @@ export function autoFillUrls(): AutoFillResult {
 
         bgmLog(LOG_LEVELS.INFO, `[autoFillUrls] 补全完成: ${result.filled} 行`);
 
-    } catch (e: any) {
+    } catch (e: unknown) {
         BGM.handleError(e, { context: 'autoFillUrls', showAlert: true });
     }
 

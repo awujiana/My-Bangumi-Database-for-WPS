@@ -124,7 +124,7 @@ export function extractToken(encrypted: string): string | null {
         }
 
         return token;
-    } catch (e: any) {
+    } catch (e: unknown) {
         BGM.handleError(e, { context: 'extractToken', showAlert: false });
         return null;
     }
@@ -210,7 +210,7 @@ export function decryptToken(encrypted: string): string | null {
 
         const payload = bytesToStr(decrypted);
         return extractToken(payload);
-    } catch (e: any) {
+    } catch (e: unknown) {
         BGM.handleError(e, { context: 'decryptToken', showAlert: false });
         return null;
     }

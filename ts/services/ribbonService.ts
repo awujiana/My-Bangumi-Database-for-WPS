@@ -6,7 +6,7 @@ import {
     readRangeValues, getFilterStatus, BGM_COLOR, LOG_LEVELS,
     SyncToBangumiAsync, openUserCollection,_getBgmUserId,
     testTokenValidityForRibbon, fetchAllUserCollections,
-    type WpsRange, getCell, trim, getAllSyncRecords, calcFingerprint
+    type WpsRange, type WpsWorksheet, getCell, trim, getAllSyncRecords, calcFingerprint
 } from '../index.js';
 
 
@@ -20,7 +20,7 @@ import {
  * @returns 统计信息 { total, valid, willSync, willSkip, alreadyUploaded, noUrl, emptyStatus }
  */
 export function getSyncPreview(
-    ws: any,
+    ws: WpsWorksheet,
     colMap: Map<string, number>,
     lastRow: number,
     headerRow: number,
@@ -166,12 +166,21 @@ export function getSyncPreview(
     return { total, valid, willSync, willSkip, alreadyUploaded, noUrl, emptyStatus, incrementalSkipped };
 }
 
+/** Bangumi 收藏条目（用于冲突检测的本地缓存） */
+interface BgmCollectionEntry {
+    type: number;
+    rate?: number;
+    tags: string[];
+    comment: string;
+    subject_name: string;
+}
+
 /**
  * 异步检测 Excel 与 Bangumi 收藏之间的冲突
  * @returns 包含冲突条目列表及统计信息的对象
  */
 export async function detectConflicts(
-    ws: any,
+    ws: WpsWorksheet,
     colMap: Map<string, number>,
     lastRow: number,
     headerRow: number,
@@ -187,7 +196,7 @@ export async function detectConflicts(
     let bgmCollectionReady = false;
 
     // 1. 获取 Bangumi 收藏快照
-    let bgmCollection = new Map<string, any>();
+    let bgmCollection = new Map<string, BgmCollectionEntry>();
     try {
         const collections = await fetchAllUserCollections(token);
         for (const item of collections) {
@@ -201,7 +210,7 @@ export async function detectConflicts(
             });
         }
         bgmCollectionReady = true;
-    } catch (e: any) {
+    } catch (e: unknown) {
         BGM.handleError(e, { context: 'detectConflicts', showAlert: false });
         // 获取失败时，返回空冲突信息
         return { conflicts, conflictCount, bgmCollectionReady };
@@ -260,7 +269,7 @@ export async function detectConflicts(
  * @param conflictResolution 冲突处理策略，默认 'excel'（覆盖）
  */
 export async function syncWithConfirmation() {
-    const app = (window as any).Application;
+    const app = getApp();
     const ws = getDataSheet();
     if (!ws) { wpsMsgBox('未找到数据工作表', 0, 64); return; }
     const token = loadBgToken();
@@ -288,7 +297,7 @@ export async function syncWithConfirmation() {
                 incremental = true;
             }
         }
-    } catch (e: any) {
+    } catch (e: unknown) {
         BGM.handleError(e, { context: 'syncWithConfirmation:readRibbonOptions', showAlert: false });
     }
 
@@ -305,7 +314,7 @@ export async function syncWithConfirmation() {
                 conflictInfo = `检测到 ${conflictCount} 条冲突，将使用【Excel数据覆盖】。\n\n`;
             }
         }
-    } catch (e: any) {
+    } catch (e: unknown) {
         BGM.handleError(e, { context: 'syncWithConfirmation:conflictDetection', showAlert: false });
     }
 
@@ -328,16 +337,16 @@ export async function syncWithConfirmation() {
             skipSids,
             incremental,
             onProgress: (current, total, message) => {
-                if (app.StatusBar !== undefined) app.StatusBar = `[${current}/${total}] ${message}`;
+                if (app?.StatusBar !== undefined) app.StatusBar = `[${current}/${total}] ${message}`;
             }
         });
-        app.StatusBar = false;
+        if (app) app.StatusBar = false;
         app?.MessageBox?.(
             `同步完成！\n成功: ${result.success} 条\n失败: ${result.fail} 条\n跳过: ${result.skip} 条`,
             0, 64
         );
-    } catch (err: any) {
-        app.StatusBar = false;
+    } catch (err: unknown) {
+        if (app) app.StatusBar = false;
         BGM.handleError(err, { context: 'Ribbon同步', showAlert: true });
     }
 }
@@ -346,9 +355,9 @@ export async function syncWithConfirmation() {
 /** 设置 Token（Ribbon 版本） */
 export async function setTokenForRibbon() {
     const currentToken = loadBgToken() || '';
-    const app = (window as any).Application;
+    const app = getApp();
     const newToken = app?.InputBox?.('请输入 Access Token', '设置 Token', currentToken, 2);
-    if (newToken && newToken !== false && typeof newToken === 'string') {
+    if (newToken && typeof newToken === 'string') {
         const saved = storeBgToken(newToken);
         if (saved) {
             bgmLog(LOG_LEVELS.INFO, 'Token 已保存，通知面板更新...');
@@ -390,15 +399,15 @@ export function testTokenForRibbon() {
         testTokenValidityForRibbon(token);
         BGM.notifyTokenUpdated();
     } else {
-        (window as any).Application?.MessageBox?.('请先设置 Token！', 0, 48);
+        getApp()?.MessageBox?.('请先设置 Token！', 0, 48);
     }
 }
 
 /** 设置用户 ID（Ribbon 版本） */
 export function setUserIdForRibbon() {
-    const app = (window as any).Application;
+    const app = getApp();
     const userId = app?.InputBox?.('请输入用户 ID（数字）', '设置用户 ID', '', 2);
-    if (userId && userId !== false) {
+    if (userId && typeof userId === 'string') {
         const userIdStr = String(userId).trim();
         BGM.setUserId(userIdStr);
         bgmLog(LOG_LEVELS.INFO, `[setUserIdForRibbon] 用户ID已设置: ${userIdStr}`);
@@ -412,7 +421,7 @@ export function openCollectionForRibbon(): void {
     const startTime = Date.now();
     bgmLog(LOG_LEVELS.INFO, '[openCollectionForRibbon] ========== Ribbon 打开收藏页面 ==========');
     
-    const app = (window as any).Application;
+    const app = getApp();
     if (!app) {
         bgmLog(LOG_LEVELS.ERROR, '[openCollectionForRibbon] 无法获取 Application 对象');
         return;

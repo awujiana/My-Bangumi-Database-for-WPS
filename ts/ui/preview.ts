@@ -589,7 +589,7 @@ export async function uploadSingleRow(rowNum: number, btnElement?: HTMLButtonEle
       BGM.handleError(new Error('上传失败: ' + (result?.message || '未知错误')), { showAlert: false, level: BGM.ErrorLevel.WARN, context: 'UploadSingleRow' });
       showToast('上传失败: ' + ((result?.message || '未知错误').substring(0, 60)), 'error');
     }
-  } catch (e: any) {
+  } catch (e: unknown) {
     BGM.handleError(e, { showAlert: true, level: BGM.ErrorLevel.ERROR, context: 'UploadSingleRow' });
     if (btnElement) {
       btnElement.disabled = false;
@@ -597,7 +597,7 @@ export async function uploadSingleRow(rowNum: number, btnElement?: HTMLButtonEle
       btnElement.classList.add('error');
       btnElement.textContent = '✗ 错误';
     }
-    showToast('上传出错: ' + e.message.substring(0, 60), 'error');
+    showToast('上传出错: ' + (e as Error).message.substring(0, 60), 'error');
     BGM.handleError(e, { showAlert: true, level: BGM.ErrorLevel.ERROR, context: 'UploadSingleRow' });
   }
 }
@@ -628,7 +628,7 @@ export function viewSyncRecordDetail(sid: string): void {
     return;
   }
   let content = record.content || '';
-  try { content = JSON.stringify(JSON.parse(content), null, 2); } catch (e: any) {
+  try { content = JSON.stringify(JSON.parse(content), null, 2); } catch (e: unknown) {
     BGM.handleError(e, { showAlert: false, level: BGM.ErrorLevel.WARN, context: 'ViewSyncRecordDetail' });
   }
   const detail = `同步记录详情\n\n名称: ${record.name || ""}\nSID: ${record.sid || ""}\nURL: ${record.url || ""}\n时间: ${record.time || ""}\n状态: ${record.status || ""}\n同步次数: ${record.count || ""}\n备注: ${record.message || ""}\n\n同步内容:\n${content}`;
@@ -689,18 +689,18 @@ export async function syncAllRows(): Promise<{ success: number; fail: number; sk
             // 如需跳过，可启用下行代码（需传入 skipSids 给 SyncToBangumiAsync）
             // conflictSids = new Set(conflicts.map(c => c.sid));
         }
-    } catch (e: any) {
+    } catch (e: unknown) {
         const bgmErr = BGM.handleError(e, { showAlert: false });
         bgmErr.message = '冲突检测失败，已跳过此步骤。原始错误: ' + bgmErr.message;
     }
 
     // ---------- 3. 读取增量同步设置 ----------
-    const app = (window as any).Application;
+    const app = getApp();
     let incremental = false;
     try {
         incremental = app?.PluginStorage?.getItem('bgm_incremental_sync') === 'true';
-    } catch (e: any) {
-        bgmLog(LOG_LEVELS.WARN, `[syncAllRows] 读取增量同步设置失败: ${e.message}`);
+    } catch (e: unknown) {
+        bgmLog(LOG_LEVELS.WARN, `[syncAllRows] 读取增量同步设置失败: ${(e as Error).message}`);
     }
     bgmLog(LOG_LEVELS.INFO, `[syncAllRows] 增量同步: ${incremental ? '开启' : '关闭'}`);
 
@@ -720,7 +720,7 @@ export async function syncAllRows(): Promise<{ success: number; fail: number; sk
         BGM.setSyncComplete(result);
         showToast(`同步完成：成功 ${result.success}，失败 ${result.fail}，跳过 ${result.skip}`, 'success');
         return result;
-    } catch (err: any) {
+    } catch (err: unknown) {
         BGM.handleError(err, { showAlert: true });
         return { success: 0, fail: 0, skip: 0 };
     }

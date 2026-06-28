@@ -93,7 +93,7 @@ export async function httpRequest<T = unknown>(
     try {
         validateEndpoint(endpoint);
         validateMethod(method);
-    } catch (error: any) {
+    } catch (error: unknown) {
         BGM.handleError(error, { context: 'httpRequest', showAlert: false });
         const err = error instanceof BgmError ? error : new BgmError(String(error), 'VALIDATION_ERROR');
         return Result.fail(err);
@@ -127,7 +127,7 @@ export async function httpRequest<T = unknown>(
             const errorMessage = getErrorMessage(response.status);
             return Result.fail(new BgmError(errorMessage, 'HTTP_ERROR', { status: response.status }));
 
-        } catch (error: any) {
+        } catch (error: unknown) {
             BGM.handleError(error, { context: 'httpRequest', showAlert: false });
             if (attempt < retries) {
                 attempt++;
@@ -203,7 +203,7 @@ function executeXhrRequest<T>(
                 try {
                     data = JSON.parse(xhr.responseText);
                     bgmLog(LOG_LEVELS.INFO, `[HTTP] 响应数据: ${JSON.stringify(data).length > 500 ? JSON.stringify(data).substring(0, 500) + '...' : JSON.stringify(data)}`);
-                } catch (error: any) {
+                } catch (error: unknown) {
                     BGM.handleError(error, { context: 'executeXhrRequest', showAlert: false });
                     bgmLog(LOG_LEVELS.WARN, `[HTTP] 解析响应失败，返回原始文本: ${xhr.responseText.length > 200 ? xhr.responseText.substring(0, 200) + '...' : xhr.responseText}`);
                     data = xhr.responseText as unknown as T;
@@ -247,10 +247,11 @@ function executeXhrRequest<T>(
         try {
             bgmLog(LOG_LEVELS.INFO, `[HTTP] 正在发送请求...`);
             xhr.send(options.body);
-        } catch (error: any) {
+        } catch (error: unknown) {
             BGM.handleError(error, { context: 'executeXhrRequest', showAlert: false });
-            bgmLog(LOG_LEVELS.ERROR, `[HTTP] 发送请求失败: ${error.message}`);
-            reject(new Error(`发送请求失败: ${error.message}`));
+            const errMsg = error instanceof Error ? error.message : String(error);
+            bgmLog(LOG_LEVELS.ERROR, `[HTTP] 发送请求失败: ${errMsg}`);
+            reject(new Error(`发送请求失败: ${errMsg}`));
         }
     });
 }

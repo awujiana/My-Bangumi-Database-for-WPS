@@ -7,6 +7,32 @@
 import { WPS_ENUM, showBangumiPanel, BGM, getIncrementalSync, getSkipConflicts, setIncrementalSync, setSkipConflicts, bgmLog, LOG_LEVELS, getApp } from './index.js';
 import * as RibbonService from './services/ribbonService.js';
 
+/**
+ * WPS Ribbon UI 最小接口定义
+ * 第三方 WPS Ribbon API 无 @types，仅定义本项目使用到的方法
+ */
+interface WpsRibbonUI {
+    Invalidate(): void;
+    InvalidateControl(id: string): void;
+    ActivateTab?(tabId: string): void;
+}
+
+/**
+ * Ribbon 模块挂载到 window 上的全局扩展
+ * 用于 WPS Ribbon XML 回调桥接（只能调用 window 上的函数）
+ */
+interface RibbonWindowExtensions {
+    _bgmRibbonReady?: (
+        onAddinLoad: (ribbonUI: WpsRibbonUI) => boolean,
+        onAction: (control: { Id: string }) => boolean,
+        getImage: (control: { Id: string }) => string
+    ) => void;
+    GetIncrementalSyncPressed?: (control: unknown) => boolean;
+    GetSkipConflictsPressed?: (control: unknown) => boolean;
+    OnIncrementalSyncChange?: (control: unknown) => boolean;
+    OnSkipConflictsChange?: (control: unknown) => boolean;
+}
+
 // 在 Ribbon 启动时（例如 OnAddinLoad 中或文件顶部立即执行）
 // 【正确】监听侧边栏发来的配置更新，刷新 Ribbon UI
 function initRibbonMessageListener(): void {
@@ -16,7 +42,8 @@ function initRibbonMessageListener(): void {
         if (data?.type === 'BGM:configUpdated') {
             const key = data.data?.key;
             if (key === 'bgm_skip_conflicts' || key === 'bgm_incremental_sync') {
-                const ribbonUI = (window as any).Application?.ribbonUI;
+                const app = getApp();
+                const ribbonUI = app?.ribbonUI as WpsRibbonUI | undefined;
                 if (ribbonUI) {
                     const controlId = key === 'bgm_skip_conflicts' ? 'chkSkipConflicts' : 'chkIncrementalSync';
                     ribbonUI.InvalidateControl(controlId);
@@ -32,6 +59,7 @@ initRibbonMessageListener();
  * 获取"跳过冲突"复选框的初始按下状态
  * 从配置读取上次保存的设置，默认未选中
  */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- WPS Ribbon 控件无 @types
 export function GetSkipConflictsPressed(control: any): boolean {
     const result = getSkipConflicts();
     bgmLog(LOG_LEVELS.INFO, `[Ribbon] GetSkipConflictsPressed: ${result}`);
@@ -41,6 +69,7 @@ export function GetSkipConflictsPressed(control: any): boolean {
 /**
  * 当"跳过冲突"复选框被点击时，保存状态
  */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- WPS Ribbon 控件无 @types
 export function OnSkipConflictsChange(control: any): boolean {
     const newValue = control.Pressed;
     bgmLog(LOG_LEVELS.INFO, `[Ribbon] OnSkipConflictsChange: control.Pressed = ${newValue}`);
@@ -64,6 +93,7 @@ export function OnSkipConflictsChange(control: any): boolean {
  * 获取增量同步复选框的初始按下状态
  * 从配置读取上次保存的设置，默认未选中
  */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- WPS Ribbon 控件无 @types
 export function GetIncrementalSyncPressed(control: any): boolean {
     const result = getIncrementalSync();
     bgmLog(LOG_LEVELS.INFO, `[Ribbon] GetIncrementalSyncPressed: ${result}`);
@@ -73,6 +103,7 @@ export function GetIncrementalSyncPressed(control: any): boolean {
 /**
  * 当增量同步复选框被点击时，保存状态
  */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- WPS Ribbon 控件无 @types
 export function OnIncrementalSyncChange(control: any): boolean {
     const newValue = control.Pressed;
     let finalValue: boolean;
@@ -90,15 +121,17 @@ export function OnIncrementalSyncChange(control: any): boolean {
 
 // ========== Ribbon 回调 ==========
 
-export function OnAddinLoad(ribbonUI: any): boolean {
-    if (typeof (window as any).Application.ribbonUI !== 'object') {
-        (window as any).Application.ribbonUI = ribbonUI;
+export function OnAddinLoad(ribbonUI: WpsRibbonUI): boolean {
+    const app = getApp();
+    if (!app) return true;
+    if (typeof app.ribbonUI !== 'object') {
+        app.ribbonUI = ribbonUI;
     }
-    if (typeof (window as any).Application.Enum !== 'object') {
-        (window as any).Application.Enum = WPS_ENUM;
+    if (typeof app.Enum !== 'object') {
+        app.Enum = WPS_ENUM;
     }
-    (window as any).Application.PluginStorage.setItem('EnableFlag', false);
-    (window as any).Application.PluginStorage.setItem('ApiEventFlag', false);
+    app.PluginStorage?.setItem('EnableFlag', false as unknown as string);
+    app.PluginStorage?.setItem('ApiEventFlag', false as unknown as string);
     return true;
 }
 
@@ -134,7 +167,7 @@ export function OnAction(control: { Id: string }): boolean {
                             default:
                                 bgmLog(LOG_LEVELS.WARN, `[BGM] 未知按钮: ${control.Id}`);
                             }
-                        } catch (e: any) {
+                        } catch (e: unknown) {
                             BGM.handleError(e, { showAlert: true, level: BGM.ErrorLevel.ERROR, context: 'Ribbon OnAction' });
                         }
                         return true;
@@ -159,9 +192,10 @@ export function GetBangumiImage(control: { Id: string }): string {
 
 
                     // 通知 index.html 早期占位：真实实现已就绪
-                    (window as any)._bgmRibbonReady?.(OnAddinLoad, OnAction, GetBangumiImage);
+                    const ribbonWindow = window as unknown as RibbonWindowExtensions;
+                    ribbonWindow._bgmRibbonReady?.(OnAddinLoad, OnAction, GetBangumiImage);
                     // 挂载 Ribbon 复选框回调到全局（WPS Ribbon XML 只能调用 window 上的函数）
-                    (window as any).GetIncrementalSyncPressed = GetIncrementalSyncPressed;
-(window as any).GetSkipConflictsPressed = GetSkipConflictsPressed;
-(window as any).OnIncrementalSyncChange = OnIncrementalSyncChange;
-(window as any).OnSkipConflictsChange = OnSkipConflictsChange;
+                    ribbonWindow.GetIncrementalSyncPressed = GetIncrementalSyncPressed;
+                    ribbonWindow.GetSkipConflictsPressed = GetSkipConflictsPressed;
+                    ribbonWindow.OnIncrementalSyncChange = OnIncrementalSyncChange;
+                    ribbonWindow.OnSkipConflictsChange = OnSkipConflictsChange;

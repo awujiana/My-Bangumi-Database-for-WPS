@@ -41,7 +41,7 @@ export interface BangumiUserData {
 /**
  * API响应结构接口
  */
-export interface ApiResponse<T = any> {
+export interface ApiResponse<T = unknown> {
     data: T | null;
     status: number;
     message: string;
@@ -79,14 +79,20 @@ export interface CollectionListResponse {
 /**
  * 提取响应消息
  */
-function extractResponseMessage(data: any): string {
-    return data?.msg || data?.message || data?.error || 'success';
+function extractResponseMessage(data: unknown): string {
+    if (typeof data === 'object' && data !== null) {
+        const obj = data as Record<string, unknown>;
+        if (typeof obj.msg === 'string' && obj.msg) return obj.msg;
+        if (typeof obj.message === 'string' && obj.message) return obj.message;
+        if (typeof obj.error === 'string' && obj.error) return obj.error;
+    }
+    return 'success';
 }
 
 /**
  * 执行HTTP请求的通用Promise封装
  */
-function requestPromise(xhr: XMLHttpRequest): Promise<{ status: number; data: any; responseText: string }> {
+function requestPromise(xhr: XMLHttpRequest): Promise<{ status: number; data: unknown; responseText: string }> {
     const startTime = Date.now();
     if (!xhr.timeout) xhr.timeout = 30000;
     return new Promise((resolve, reject) => {
@@ -106,7 +112,7 @@ function requestPromise(xhr: XMLHttpRequest): Promise<{ status: number; data: an
     });
 }
 
-function xhrGet(url: string, token: string): Promise<{ status: number; data: any }> {
+function xhrGet(url: string, token: string): Promise<{ status: number; data: unknown }> {
     const xhr = new XMLHttpRequest();
     xhr.open('GET', url, true);
     xhr.timeout = 30000;
@@ -145,14 +151,15 @@ export async function verifyToken(token: string): Promise<TokenVerifyResult> {
         xhr.setRequestHeader('Content-Type', 'application/json');
 
         const response = await requestPromise(xhr);
+        const userData = response.data as BangumiUserData | null;
 
         if (response.status === 200) {
             result.valid = true;
             result.message = 'Token 有效';
-            bgmLog(LOG_LEVELS.INFO, `[scraping/verifyToken] Token 验证成功，用户ID: ${response.data?.id || '未知'}`);
-            if (response.data) {
-                result.userId = String(response.data.id || '');
-                result.username = response.data.username || response.data.nickname || '';
+            bgmLog(LOG_LEVELS.INFO, `[scraping/verifyToken] Token 验证成功，用户ID: ${userData?.id || '未知'}`);
+            if (userData) {
+                result.userId = String(userData.id || '');
+                result.username = userData.username || userData.nickname || '';
             }
         } else if (response.status === 401) {
             result.message = 'Token 无效或已过期';
@@ -162,8 +169,9 @@ export async function verifyToken(token: string): Promise<TokenVerifyResult> {
             bgmLog(LOG_LEVELS.ERROR, `[scraping/verifyToken] 验证失败，HTTP ${response.status}`);
         }
 
-    } catch (e: any) {
-        result.message = e.message || '验证过程出错';
+    } catch (e: unknown) {
+        const errMsg = e instanceof Error ? e.message : '';
+        result.message = errMsg || '验证过程出错';
         bgmLog(LOG_LEVELS.ERROR, `[scraping/verifyToken] error: ${result.message}`);
     }
 
@@ -229,7 +237,7 @@ export async function fetchAllUserCollections(
                 throw new Error(`HTTP ${xhrResult.status}`);
             }
 
-            const data: CollectionListResponse = xhrResult.data;
+            const data = xhrResult.data as CollectionListResponse;
 
             if (total === 0 && data.total) {
                 total = Math.min(data.total, maxTotal);
@@ -253,8 +261,9 @@ export async function fetchAllUserCollections(
 
             await new Promise(resolve => setTimeout(resolve, BGM_CONFIG.REQUEST_DELAY));
 
-        } catch (e: any) {
-            bgmLog(LOG_LEVELS.ERROR, `[fetchAllUserCollections] 请求失败: ${e.message}`);
+        } catch (e: unknown) {
+            const errMsg = e instanceof Error ? e.message : undefined;
+            bgmLog(LOG_LEVELS.ERROR, `[fetchAllUserCollections] 请求失败: ${errMsg}`);
             break;
         }
     }
@@ -291,8 +300,9 @@ export async function fetchSubjectCollection(
             result.message = `HTTP ${xhrResult.status}`;
         }
 
-    } catch (e: any) {
-        result.message = e.message || '请求失败';
+    } catch (e: unknown) {
+        const errMsg = e instanceof Error ? e.message : '';
+        result.message = errMsg || '请求失败';
         bgmLog(LOG_LEVELS.ERROR, `[fetchSubjectCollection] 请求失败: ${result.message}`);
     }
 

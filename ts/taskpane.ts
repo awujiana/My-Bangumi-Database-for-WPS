@@ -95,7 +95,7 @@ function restoreLockedSheet(): boolean {
                 BGM.sheet.lockedName = info.name || null;
                 BGM.sheet.isLocked = !!(info.index != null && info.name);
                 return true;
-            } catch (e: any) {
+            } catch (e: unknown) {
                 BGM.handleError(e, { showAlert: false, level: BGM.ErrorLevel.INFO, context: 'restoreLockedSheet' });
                 saveLockedSheet(null);
             }
@@ -168,12 +168,12 @@ function activateSheetIfNeeded(ws: WpsWorksheet): (() => void) | false {
         if (activeName !== (ws.Name || '')) {
             ws.Activate();
             return function restore() {
-                try { active.Activate(); } catch (e: any) {
+                try { active.Activate(); } catch (e: unknown) {
                     BGM.handleError(e, { showAlert: false, level: BGM.ErrorLevel.INFO, context: 'activateSheetIfNeeded' });
                 }
             };
         }
-    } catch (e: any) {
+    } catch (e: unknown) {
         BGM.handleError(e, { showAlert: false, level: BGM.ErrorLevel.INFO, context: 'activateSheetIfNeeded' });
     }
     return false;
@@ -391,7 +391,7 @@ function autoDetectSheet(): { sheetIndex: number; sheetName: string; headerRow: 
                     colCount: meta.lastCol
                 };
             }
-        } catch (e: any) {
+        } catch (e: unknown) {
             BGM.handleError(e, { showAlert: false, level: BGM.ErrorLevel.INFO, context: 'autoDetectSheet' });
         } finally {
             if (typeof needRestore === 'function') needRestore();
@@ -422,10 +422,10 @@ const ws: WpsWorksheet | null | undefined = sheet;
 if (!ws) { el.textContent = '未连接到工作表'; return; }
 
     let autoFilterMode = false;
-    try { autoFilterMode = !!ws.AutoFilterMode; } catch (e: any) {
+    try { autoFilterMode = !!ws.AutoFilterMode; } catch (e: unknown) {
         BGM.handleError(e, { showAlert: false, level: BGM.ErrorLevel.INFO, context: 'updateFilterStatus' });
     }
-    try { if (!autoFilterMode && ws.AutoFilter) autoFilterMode = !!ws.AutoFilter.Mode; } catch (e: any) {
+    try { if (!autoFilterMode && ws.AutoFilter) autoFilterMode = !!ws.AutoFilter.Mode; } catch (e: unknown) {
         BGM.handleError(e, { showAlert: false, level: BGM.ErrorLevel.INFO, context: 'updateFilterStatus' });
     }
 
@@ -450,7 +450,7 @@ if (!ws) { el.textContent = '未连接到工作表'; return; }
                     try {
                         const headerCell = ws.Range(colNumToLetter(i) + '1');
                         if (headerCell) colName = String(headerCell.Value2 || '').substring(0, 12);
-                    } catch (e: any) {
+                    } catch (e: unknown) {
                         BGM.handleError(e, { showAlert: false, level: BGM.ErrorLevel.INFO, context: 'updateFilterStatus' });
                     }
                     let criteria = f.Criteria1 || '';
@@ -460,7 +460,7 @@ if (!ws) { el.textContent = '未连接到工作表'; return; }
                     }
                     activeCols.push(colName ? `${colName}(${criteria})` : `列${i}`);
                 }
-            } catch (e: any) {
+            } catch (e: unknown) {
                 BGM.handleError(e, { showAlert: false, level: BGM.ErrorLevel.INFO, context: 'updateFilterStatus' });
             }
         }
@@ -473,7 +473,7 @@ if (!ws) { el.textContent = '未连接到工作表'; return; }
             el.textContent = '筛选已开启但无活动筛选，同步全部数据';
             el.removeAttribute('title');
         }
-    } catch (e: any) {
+    } catch (e: unknown) {
         el.textContent = '检测筛选状态失败: ' + (e as Error).message;
         BGM.handleError(e, { showAlert: false, level: BGM.ErrorLevel.INFO, context: 'updateFilterStatus' });
     }
@@ -532,7 +532,7 @@ function refreshData(): void {
 
     let ws: WpsWorksheet | null | undefined = null;
     try { ws = app.ActiveWorkbook.Worksheets.Item(sheetIndex); }
-    catch (e: any) {
+    catch (e: unknown) {
         if (previewBox) previewBox.innerHTML = `<p class="hint">无法获取工作表: ${sheetIndex}</p>`;
         BGM.handleError(e, { showAlert: false, level: BGM.ErrorLevel.INFO, context: 'refreshData' });
         updateFilterStatus();
@@ -751,8 +751,8 @@ function restoreUserInfoFromStorage(): void {
         if (storedUserId || storedUsername) {
             updateUserIdStatus();
         }
-    } catch (e: any) {
-        bgmLog(LOG_LEVELS.WARN, `[restoreUserInfoFromStorage] 恢复失败: ${e.message}`);
+    } catch (e: unknown) {
+        bgmLog(LOG_LEVELS.WARN, `[restoreUserInfoFromStorage] 恢复失败: ${(e as Error).message}`);
     }
 }
 
@@ -820,7 +820,7 @@ function startUserInfoPolling(): void {
                     bgmLog(LOG_LEVELS.INFO, `[startUserInfoPolling] 冲突策略 select 已同步: ${conflictStrategySelect.value}`);
                 }
             }
-        } catch (e: any) {
+        } catch (e: unknown) {
             // 静默处理轮询错误
         }
     }, 2000); // 每2秒轮询一次
@@ -833,8 +833,9 @@ function initPanel(): void {
     bgmLog(LOG_LEVELS.INFO, 'initPanel 开始');
 
     // 初始化 WPS 枚举（如果未设置）
-    if (typeof (window as any).Application !== 'undefined' && typeof (window as any).Application.Enum !== 'object') {
-        (window as any).Application.Enum = WPS_ENUM;
+    const app = getApp();
+    if (app && typeof app.Enum !== 'object') {
+        app.Enum = WPS_ENUM;
     }
     
     bgmLog(LOG_LEVELS.INFO, '[taskpane] 锁定按钮监听器设置完成');
@@ -918,25 +919,25 @@ export {
 
 
 // ========== 挂载到 window ==========
-(window as any).initPanel = initPanel;
+(window as unknown as { initPanel: () => void }).initPanel = initPanel;
 
 /**
  * 全局函数：供 Ribbon 通过 GetTaskPane 直接调用，
  * 从 PluginStorage 刷新所有 UI 状态（用户信息、配置等）
  * 如果 GetTaskPane 不可用，轮询也请购底机制。）
  */
-(window as any).refreshTaskpaneUI = function (): void {
+(window as unknown as { refreshTaskpaneUI: () => void }).refreshTaskpaneUI = function (): void {
     try {
         restoreUserInfoFromStorage();
         bgmLog(LOG_LEVELS.INFO, '[refreshTaskpaneUI] UI 已刷新');
-    } catch (e: any) {
-        bgmLog(LOG_LEVELS.WARN, '[refreshTaskpaneUI] 刷新失败: ' + e.message);
+    } catch (e: unknown) {
+        bgmLog(LOG_LEVELS.WARN, '[refreshTaskpaneUI] 刷新失败: ' + (e as Error).message);
     }
 };
 
 function safeInitPanel(): void {
     try { initPanel(); }
-    catch (e: any) {
+    catch (e: unknown) {
         BGM.handleError(e, { showAlert: false, level: BGM.ErrorLevel.INFO, context: 'initPanel' });
         document.dispatchEvent(new CustomEvent('bgm:modulesReady'));
     }

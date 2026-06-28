@@ -15,13 +15,14 @@ export interface WpsApplication {
     StatusBar?: string | boolean;
     OAAssist?: WpsOAAssist;
     InputBox?: (message: string, title: string, defaultVal: string, type: number) => string | false;
-    MessageBox?: (message: string, type: number) => number;
+    MessageBox?: (message: string, type: number, icon?: number) => number;
     Wait?: (date: Date) => void;
     DoEvents?: () => void;
     CreateTaskPane?: (url: string) => WpsTaskPane;
     GetTaskPane?: (id: string) => WpsTaskPane;
     Enum?: Record<string, number>;
     ribbonUI?: unknown;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- COM 边界：Selection 可能是 Range/Shape/Nothing 等多种类型
     Selection?: any;
 }
 
@@ -54,8 +55,8 @@ export interface WpsWorksheet {
     UsedRange?: WpsRange;
     Activate(): void;
     Calculate(): void;
-    Range(address: string): WpsRange; 
-    Move(Before?: any, After?: any): void;
+    Range(address: string): WpsRange;
+    Move(Before?: WpsWorksheet | null, After?: WpsWorksheet | null): void;
 }
 
 // ========== WPS 行/列 ==========
@@ -109,10 +110,14 @@ export interface WpsRange {
     Rows: WpsRows;
     Columns: WpsColumns;
 
-     // 值属性（WPS 中可能是属性也可能是函数，全部声明为 any）
+     // 值属性（WPS 中可能是属性也可能是函数，值类型为 string/number/boolean/Date/null，保留 any 为 COM 边界）
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- COM 边界：Value 可能是 string/number/boolean/Date/null/Error
     Value?: any;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- COM 边界：Value2 与 Value 同义，未格式化的原始值
     Value2?: any;
-    Text?: any;          // ← 关键补充，消除“never”错误
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- COM 边界：Text 为只读的格式化字符串，可能为 null
+    Text?: any;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- COM 边界：Formula 可能是字符串、数组或错误值
     Formula?: any;
 
     // 格式属性
@@ -123,11 +128,23 @@ export interface WpsRange {
     Areas?: WpsAreas;
     Count: number;
 
+    // 整行/整列
+    EntireRow: WpsRange;
+    EntireColumn: WpsRange;
+
+    // 对齐与尺寸
+    HorizontalAlignment: number;
+    ColumnWidth: number;
+
+    // 边框
+    Borders: WpsBorders;
+
     // 方法
     End(direction: number): WpsRange;
     Select(): void;
     Delete(): void;
     SpecialCells(type: number): WpsRange;
+    AutoFit(): void;
 }
 
 // ========== WPS 区域集合 ==========
@@ -143,15 +160,21 @@ export interface WpsInterior {
 }
 
 export interface WpsFont {
+    Name: string;
     Bold: boolean;
     Size: number;
     Color: number;
+}
+
+export interface WpsBorders {
+    LineStyle: number;
 }
 
 // ========== WPS 插件存储 ==========
 export interface WpsPluginStorage {
     setItem(key: string, value: string): void;
     getItem(key: string): string | null;
+    removeItem(key: string): void;
 }
 
 // ========== WPS 其他 ==========

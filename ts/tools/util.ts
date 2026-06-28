@@ -19,6 +19,21 @@ import { syncAllRows } from '../ui/preview.js';
 // 类型只从 index.js 导入（type-only import 不会产生运行时循环依赖）
 import type { BGMCache, BGMSheet, BGMSync, BGMUserInfo } from '../index.js';
 import { BGM_EVENTS, eventBus } from './events.js';
+
+// ========== BGM 全局窗口扩展接口 ==========
+interface BgmWindowGlobals {
+    Application?: unknown;
+    BGMDialog?: {
+        alert(title: string, message: string): void;
+        error(title: string, message: string): void;
+        input(title: string, prompt: string, defaultValue: string, onOk?: (value: string) => void, onCancel?: () => void): void;
+        show(type: 'alert' | 'confirm' | 'error' | 'input', title: string, message: string, options?: DialogOptions): void;
+    };
+    BGMAlert?(message: string, title: string, callback?: () => void): void;
+    BGMError?(message: string, title: string): void;
+    BGMInput?(title: string, prompt: string, defaultValue: string, onOk?: (value: string) => void, onCancel?: () => void): void;
+}
+
 // ========== BGM 全局命名空间 ==========
 export const BGM: {
   cache: BGMCache;
@@ -221,44 +236,64 @@ export const BGM: {
         // 统一对话框
     Dialog: {
         alert: function(title: string, message: string): void {
-            if (typeof window !== 'undefined' && (window as any).BGMDialog !== undefined) {
-                (window as any).BGMDialog.alert(title, message);
-            } else if (typeof window !== 'undefined' && typeof (window as any).BGMAlert === 'function') {
-                (window as any).BGMAlert(message, title);
-            } else {
-                // 使用自定义对话框
-                customShowAlert(message, title);
+            if (typeof window !== 'undefined') {
+                const win = window as unknown as BgmWindowGlobals;
+                if (win.BGMDialog !== undefined && win.BGMDialog) {
+                    win.BGMDialog.alert(title, message);
+                    return;
+                }
+                if (typeof win.BGMAlert === 'function') {
+                    win.BGMAlert(message, title);
+                    return;
+                }
             }
+            // 使用自定义对话框
+            customShowAlert(message, title);
         },
         confirm: function(message: string, callback: (confirmed: boolean) => void, title?: string): void {
             showConfirm(message, callback, title);
         },
         error: function(title: string, message: string): void {
-            if (typeof window !== 'undefined' && (window as any).BGMDialog !== undefined) {
-                (window as any).BGMDialog.error(title, message);
-            } else if (typeof window !== 'undefined' && typeof (window as any).BGMError === 'function') {
-                (window as any).BGMError(message, title);
-            } else {
-                // 使用自定义对话框
-                customShowError(message, title);
+            if (typeof window !== 'undefined') {
+                const win = window as unknown as BgmWindowGlobals;
+                if (win.BGMDialog !== undefined && win.BGMDialog) {
+                    win.BGMDialog.error(title, message);
+                    return;
+                }
+                if (typeof win.BGMError === 'function') {
+                    win.BGMError(message, title);
+                    return;
+                }
             }
+            // 使用自定义对话框
+            customShowError(message, title);
         },
         input: function(title: string, prompt: string, defaultValue?: string, onOk?: (value: string) => void, onCancel?: () => void): void {
-            if (typeof window !== 'undefined' && (window as any).BGMDialog !== undefined) {
-                (window as any).BGMDialog.input(title, prompt, defaultValue || '', onOk, onCancel);
-            } else if (typeof window !== 'undefined' && typeof (window as any).BGMInput === 'function') {
-                (window as any).BGMInput(title, prompt, defaultValue || '', onOk, onCancel);
-            } else {
-                // 使用自定义对话框
-                customShowInput(title, prompt, defaultValue, (value) => {
-                    if (onOk && value !== undefined) onOk(value);
-                }, onCancel);
+            if (typeof window !== 'undefined') {
+                const win = window as unknown as BgmWindowGlobals;
+                if (win.BGMDialog !== undefined && win.BGMDialog) {
+                    win.BGMDialog.input(title, prompt, defaultValue || '', onOk, onCancel);
+                    return;
+                }
+                if (typeof win.BGMInput === 'function') {
+                    win.BGMInput(title, prompt, defaultValue || '', onOk, onCancel);
+                    return;
+                }
             }
+            // 使用自定义对话框
+            customShowInput(title, prompt, defaultValue, (value) => {
+                if (onOk && value !== undefined) onOk(value);
+            }, onCancel);
         },
        show: function(type: 'alert' | 'confirm' | 'error' | 'input', title: string, message: string, options?: DialogOptions): void {
-            if (typeof window !== 'undefined' && (window as any).BGMDialog !== undefined) {
-                (window as any).BGMDialog.show(type, title, message, options);
-            } else {
+            if (typeof window !== 'undefined') {
+                const win = window as unknown as BgmWindowGlobals;
+                if (win.BGMDialog !== undefined && win.BGMDialog) {
+                    win.BGMDialog.show(type, title, message, options);
+                    return;
+                }
+            }
+            {
                 switch (type) {
                     case 'error':
                         this.error(title, message);
@@ -435,12 +470,12 @@ function getCallerFunctionName(skipAdditional = 0): string {
  */
 export function getApp(): WpsApplication | null {
     if (typeof window !== 'undefined') {
-        const winApp = (window as any).Application;
+        const winApp = (window as unknown as BgmWindowGlobals).Application;
         if (isWpsApp(winApp)) return winApp;
     }
     // 使用 window.Application 替代裸 Application
     if (typeof window !== 'undefined') {
-        const globalApp = (window as any).Application;
+        const globalApp = (window as unknown as BgmWindowGlobals).Application;
         if (isWpsApp(globalApp)) return globalApp;
     }
     return null;
@@ -477,23 +512,28 @@ export function getCell(
  * @param prop - 属性名称
  * @returns 属性的值；如果属性不存在或访问失败，则返回 undefined
  */
-function tryGetProperty(cell: any, prop: string): any {
-    if (!(prop in cell)) return undefined;
+function tryGetProperty(cell: unknown, prop: string): unknown {
+    if (cell == null || typeof cell !== 'object') return undefined;
+    const obj = cell as Record<string, unknown>;
+    if (!(prop in obj)) return undefined;
     try {
-        const val = cell[prop];
+        const val = obj[prop];
         if (typeof val === 'function') {
             try {
-                const result = val();
+                const result = (val as () => unknown)();
                 if (typeof result === 'function' && result.toString().includes('[native code]')) {
                     return undefined;
                 }
                 return result;
             } catch { return undefined; }
         }
-        if (val && typeof val === 'object' && typeof val.toString === 'function') {
-            const str = val.toString();
-            if (str.includes('function') || str.includes('[native code]')) {
-                return undefined;
+        if (val && typeof val === 'object') {
+            const valObj = val as { toString?: () => string };
+            if (typeof valObj.toString === 'function') {
+                const str = valObj.toString();
+                if (str.includes('function') || str.includes('[native code]')) {
+                    return undefined;
+                }
             }
         }
         return val;
@@ -507,7 +547,7 @@ function tryGetProperty(cell: any, prop: string): any {
  * @param cell - 单元格对象
  * @returns 单元格的原始值；如果单元格无效或没有值，则返回 null
  */
-function getCellRawValue(cell: any): any {
+function getCellRawValue(cell: WpsRange | null | undefined): unknown {
     if (!cell) return null;
     const val2 = tryGetProperty(cell, 'Value2');
     if (val2 !== undefined && val2 !== null) return val2;
@@ -548,7 +588,7 @@ export function getCellValue(
  */
 export function setCellValue(ws: WpsWorksheet | null | undefined, row: number, col: number, value: unknown): boolean {
     try {
-        const cell = getCell(ws, row, col) as any;
+        const cell = getCell(ws, row, col);
         if (!cell) {
             bgmLog(LOG_LEVELS.ERROR, `setCellValue - 无法获取单元格: (${row}, ${col})`);
             return false;
@@ -735,8 +775,8 @@ export function _fetchBgmUserInfo(callback?: (userInfo: BGMUserInfo | null) => v
                 bgmLog(LOG_LEVELS.INFO, `[_fetchBgmUserInfo] 获取用户信息成功: userId=${userId}, username=${username}`);
                 
                 if (callback) callback({ id: userId, username: username });
-            } catch (e: any) {
-                bgmLog(LOG_LEVELS.ERROR, `[_fetchBgmUserInfo] 解析响应失败: ${e.message}`);
+            } catch (e: unknown) {
+                bgmLog(LOG_LEVELS.ERROR, `[_fetchBgmUserInfo] 解析响应失败: ${(e as Error).message}`);
                 if (callback) callback(null);
             }
         } else {
@@ -914,43 +954,50 @@ export function delay(ms: number): Promise<void> {
  * @param endCol 结束列
  * @returns 字符串二维数组
  */
-function isNativeCode(val: any): boolean {
+function isNativeCode(val: unknown): boolean {
     if (typeof val === 'function') {
         const str = val.toString();
         return str.includes('[native code]') || str.includes('function Value()');
     }
-    if (val && typeof val === 'object' && typeof val.toString === 'function') {
-        const str = val.toString();
-        return str.includes('[native code]') || str.includes('function Value()');
+    if (val && typeof val === 'object') {
+        const obj = val as { toString?: () => string };
+        if (typeof obj.toString === 'function') {
+            const str = obj.toString();
+            return str.includes('[native code]') || str.includes('function Value()');
+        }
     }
     return false;
 }
 
-function safeCellValue(cell: any): string {
+function safeCellValue(cell: unknown): string {
     if (cell == null) return '';
     if (isNativeCode(cell)) return '';
     if (typeof cell === 'function') {
         try {
-            const result = cell();
+            const result = (cell as () => unknown)();
             if (isNativeCode(result)) return '';
             return result == null ? '' : String(result);
         } catch { return ''; }
     }
-    if (typeof cell === 'object' && cell.toString) {
-        const str = cell.toString();
-        if (isNativeCode(str) || isNativeCode(cell)) return '';
-        return str;
+    if (cell && typeof cell === 'object') {
+        const obj = cell as { toString?: () => string };
+        if (obj.toString) {
+            const str = obj.toString();
+            if (isNativeCode(str) || isNativeCode(cell)) return '';
+            return str;
+        }
     }
     return String(cell);
 }
 
 export function readRangeValues(
-    ws: any,
+    ws: WpsWorksheet | null | undefined,
     startRow: number,
     endRow: number,
     startCol: number,
     endCol: number
 ): string[][] {
+    if (!ws) return [];
     try {
         const range = ws.Range(`${colNumToLetter(startCol)}${startRow}:${colNumToLetter(endCol)}${endRow}`);
         const raw = tryGetProperty(range, 'Value2');
@@ -964,7 +1011,7 @@ export function readRangeValues(
             if (!Array.isArray(row)) {
                 result.push([safeCellValue(row)]);
             } else {
-                result.push(row.map((cell: any) => safeCellValue(cell)));
+                result.push(row.map((cell: unknown) => safeCellValue(cell)));
             }
         }
         return result;
@@ -973,7 +1020,7 @@ export function readRangeValues(
     }
 }
 // 缓存相关（放在文件顶部，导入之后）
-const sheetCache = new Map<string, any>();
+const sheetCache = new Map<string, unknown>();
 
 /**
  * 获取或设置缓存
@@ -989,7 +1036,7 @@ export function cacheGet<T>(key: string, factory: () => T): T {
     sheetCache.set(key, value);
     return value;
 }
-export function findHeaderRow(ws: any, startRow?: number): number {
+export function findHeaderRow(ws: WpsWorksheet | null | undefined, startRow?: number): number {
     const sheetName = ws?.Name || '';
     const cacheKey = `${sheetName}:headerRow:${startRow || 1}`;
     return cacheGet(cacheKey, () => {
@@ -1027,7 +1074,7 @@ export function findHeaderRow(ws: any, startRow?: number): number {
  * @param headerRow 表头行号
  * @returns Map<string, number> 列名 -> 列号
  */
-export function getColumnMap(ws: any, headerRow: number): Map<string, number> {
+export function getColumnMap(ws: WpsWorksheet | null | undefined, headerRow: number): Map<string, number> {
     const sheetName = ws?.Name || '';
     const cacheKey = `${sheetName}:columnMap:${headerRow}`;
     return cacheGet(cacheKey, () => {
@@ -1062,7 +1109,7 @@ export function getColumnMap(ws: any, headerRow: number): Map<string, number> {
     });
 }
 /** 清除指定工作表的所有缓存 */
-export function clearSheetCache(ws: any) {
+export function clearSheetCache(ws: WpsWorksheet | null | undefined): void {
     const prefix = ws?.Name || '';
     for (const key of sheetCache.keys()) {
         if (key.startsWith(prefix)) sheetCache.delete(key);
@@ -1203,7 +1250,7 @@ export function getLastRow(
 }
 
 
-export function isEmptyValue(val: any): boolean {
+export function isEmptyValue(val: unknown): boolean {
   return val === null || val === undefined || val === "" ||
          val === "null" || val === "NULL" || val === "Null" || val === "undefined";
 }
@@ -1220,8 +1267,8 @@ export function getDataSheet(): WpsWorksheet | null | undefined {
       const ws = app.ActiveWorkbook.Worksheets.Item(BGM.sheet.lockedIndex);
       bgmLog(LOG_LEVELS.INFO, `getDataSheet: 返回锁定的工作表: ${ws.Name}`);
       return ws;
-    } catch (e: any) {
-      bgmLog(LOG_LEVELS.WARN, "getDataSheet 锁定工作表失败: " + e.message);
+    } catch (e: unknown) {
+      bgmLog(LOG_LEVELS.WARN, "getDataSheet 锁定工作表失败: " + (e as Error).message);
     }
   }
 

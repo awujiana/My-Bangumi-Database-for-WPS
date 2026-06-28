@@ -6,6 +6,7 @@
  */
 
 import { getApp, bgmLog, LOG_LEVELS } from '../index.js';
+import type { WpsPluginStorage } from '../index.js';
 import { BGM_EVENTS, eventBus } from './events.js';
 
 // 配置键名常量
@@ -20,7 +21,7 @@ export const CONFIG_KEYS = {
 /**
  * 获取 PluginStorage
  */
-function getStorage(): any {
+function getStorage(): WpsPluginStorage | undefined {
     const app = getApp();
     const storage = app?.PluginStorage;
     if (!storage) {

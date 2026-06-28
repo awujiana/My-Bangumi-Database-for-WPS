@@ -12,8 +12,9 @@ import {
     BGM_CONFIG, LOG_LEVELS, SYNC_STATUS, BGM_COLOR, bgmLog, getApp,
     trim, isEmptyValue, BGM, getLastRow, colNumToLetter,
     SYNC_RECORD_COLUMNS, SYNC_RECORD_SHEET_NAME, SYNC_RECORD_COL, SYNC_RECORD_TYPE_COLOR,
-    getCellValue, setCellValue, readRangeValues, 
+    getCellValue, setCellValue, readRangeValues,
 } from '../index.js';
+import type { WpsWorksheet } from '../tools/wps.js';
 
 export interface SyncRecord {
     seq?: number | string;
@@ -75,12 +76,12 @@ function getStatusColor(status: string): number {
 /**
  * 获取或创建同步记录工作表
  */
-export function getOrCreateSyncRecordSheet(): any {
+export function getOrCreateSyncRecordSheet(): WpsWorksheet {
     const app = getApp();
     if (!app?.ActiveWorkbook) throw new Error('无法获取工作簿');
 
     const wb = app.ActiveWorkbook;
-    let syncSheet = null;
+    let syncSheet: WpsWorksheet | null = null;
 
     // 查找现有工作表
     try {
@@ -92,7 +93,7 @@ export function getOrCreateSyncRecordSheet(): any {
                 break;
             }
         }
-    } catch (e: any) {
+    } catch (e: unknown) {
         BGM.handleError(e, { context: 'getOrCreateSyncRecordSheet', showAlert: false });
     }
 
@@ -113,7 +114,7 @@ export function getOrCreateSyncRecordSheet(): any {
         // 移到末尾
         try {
             syncSheet.Move(null, wb.Sheets.Item(wb.Sheets.Count));
-        } catch (moveError: any) {
+        } catch (moveError: unknown) {
             BGM.handleError(moveError, { context: 'getOrCreateSyncRecordSheet', showAlert: false });
         }
 
@@ -165,7 +166,7 @@ function invalidateCache(): void {
  * 旧列序：序号(1) 同步时间(2) 名称(3) URL(4) SID(5) 条目类型(6) 次数(7) 内容(8) 状态(9) 备注(10) 数据指纹(11) 收藏状态(12)
  * 新列序：SID(1) 同步时间(2) 名称(3) URL(4) 条目类型(5) 次数(6) 内容(7) 状态(8) 收藏状态(9) 备注(10) 数据指纹(11)
  */
-function migrateSyncRecordSchema(sheet: any): void {
+function migrateSyncRecordSchema(sheet: WpsWorksheet): void {
     const lastRow = getLastRow(sheet);
     if (lastRow <= 1) return;
 
@@ -214,7 +215,7 @@ function migrateSyncRecordSchema(sheet: any): void {
     bgmLog(LOG_LEVELS.INFO, `数据迁移完成：${rows.length} 条记录已重组到新列结构`);
 }
 
-function buildCache(sheet: any): void {
+function buildCache(sheet: WpsWorksheet): void {
     if (_syncRecordCacheValid) return;
     _syncRecordSidCache.clear();
     _syncRecordListCache.length = 0;
@@ -254,7 +255,7 @@ function buildCache(sheet: any): void {
                 collType: String(rowData[SYNC_RECORD_COL.COLL_TYPE - 1] ?? ''),
                 row: row
             });
-        } catch (e: any) {
+        } catch (e: unknown) {
             BGM.handleError(e, { context: 'buildCache', showAlert: false });
         }
     }
@@ -268,7 +269,7 @@ function buildCache(sheet: any): void {
  * @param status 同步状态 (SUCCESS/FAIL/SKIP)
  * @param count 同步次数
  */
-function setSyncRecordColors(sheet: any, row: number, status: string, count: number): void {
+function setSyncRecordColors(sheet: WpsWorksheet, row: number, status: string, count: number): void {
     const setColor = (colIdx: number, color: number): void => {
         const cell = sheet.Range(`${colNumToLetter(colIdx)}${row}`);
         if (cell?.Interior) cell.Interior.Color = color;
@@ -373,7 +374,7 @@ export function addSyncRecord(params: UpdateRecordParams): boolean {
             });
         }
         return true;
-    } catch (e: any) {
+    } catch (e: unknown) {
         BGM.handleError(e, { context: 'addSyncRecord', showAlert: false });
         return false;
     }
@@ -384,7 +385,7 @@ export function getAllSyncRecords(): SyncRecord[] {
         const sheet = getOrCreateSyncRecordSheet();
         if (!_syncRecordCacheValid) buildCache(sheet);
         return [..._syncRecordListCache];
-    } catch (e: any) {
+    } catch (e: unknown) {
         BGM.handleError(e, { context: 'getAllSyncRecords', showAlert: false });
         return [];
     }
@@ -433,13 +434,13 @@ export function deduplicateSyncRecords(): boolean {
         }
 
         return true;
-    } catch (e: any) {
+    } catch (e: unknown) {
         BGM.handleError(e, { context: 'deduplicateSyncRecords', showAlert: false });
         return false;
     }
 }
 
-export function formatSyncRecordSheet(sheet?: any): void {
+export function formatSyncRecordSheet(sheet?: WpsWorksheet): void {
     if (_formattingInProgress) return;
     _formattingInProgress = true;
     try {
@@ -456,7 +457,7 @@ export function formatSyncRecordSheet(sheet?: any): void {
         const dataRange = lastRow >= 2 ? target.Range(`A2:${lastColLetter}${lastRow}`) : null;
 
         // 1. 字体
-        try { fullRange.Font.Name = 'Maple Mono NF CN Medium'; } catch (_) {}
+        try { if (fullRange.Font) fullRange.Font.Name = 'Maple Mono NF CN Medium'; } catch (_) {}
 
         // 2. 自动行高
         try { fullRange.EntireRow.AutoFit(); } catch (_) {}
@@ -482,7 +483,7 @@ export function formatSyncRecordSheet(sheet?: any): void {
         const nameColLetter = colNumToLetter(SYNC_RECORD_COL.NAME);
         if (dataRange) {
             try {
-                const nameRange = sheet.Range(`${nameColLetter}2:${nameColLetter}${lastRow}`);
+                const nameRange = target.Range(`${nameColLetter}2:${nameColLetter}${lastRow}`);
                 nameRange.Borders.LineStyle = 1;
             } catch (_) {}
         }
@@ -491,14 +492,14 @@ export function formatSyncRecordSheet(sheet?: any): void {
         const collTypeColLetter = colNumToLetter(SYNC_RECORD_COL.COLL_TYPE);
         if (dataRange) {
             try {
-                const collRange = sheet.Range(`${collTypeColLetter}2:${collTypeColLetter}${lastRow}`);
+                const collRange = target.Range(`${collTypeColLetter}2:${collTypeColLetter}${lastRow}`);
                 collRange.Borders.LineStyle = 1;
             } catch (_) {}
         }
 
         bgmLog(LOG_LEVELS.INFO, '同步记录表格式已设置');
         _formattingInProgress = false;
-    } catch (e: any) {
+    } catch (e: unknown) {
         _formattingInProgress = false;
         BGM.handleError(e, { context: 'formatSyncRecordSheet', showAlert: false });
     }
@@ -518,7 +519,7 @@ export function clearSyncRecords(): boolean {
         _syncRecordCacheValid = true;
         bgmLog(LOG_LEVELS.INFO, '已清除所有同步记录');
         return true;
-    } catch (e: any) {
+    } catch (e: unknown) {
         BGM.handleError(e, { context: 'clearSyncRecords', showAlert: false });
         return false;
     }
@@ -529,7 +530,7 @@ export function openSyncRecordSheet(): void {
         const sheet = getOrCreateSyncRecordSheet();
         sheet.Activate();
         bgmLog(LOG_LEVELS.INFO, '已切换到同步记录工作表');
-    } catch (e: any) {
+    } catch (e: unknown) {
         BGM.handleError(e, { context: 'openSyncRecordSheet', showAlert: false });
     }
 }

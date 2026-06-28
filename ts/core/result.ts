@@ -238,8 +238,8 @@ export class Result<T> {
      * try {
      *     const user = result.unwrap();
      *     console.log(user.name);
-     * } catch (e: any) {
-     *     console.error('获取用户失败:', e.message);
+     * } catch (e: unknown) {
+     *     console.error('获取用户失败:', (e as Error).message);
      * }
      */
     unwrap(): T {
