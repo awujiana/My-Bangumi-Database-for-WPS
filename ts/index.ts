@@ -144,6 +144,7 @@ export {
 export {
     // 导入同步记录模块的函数
     getOrCreateSyncRecordSheet,
+    getSyncRecordSheetIfExists,
     getAllSyncRecords,
     addSyncRecord,
     deduplicateSyncRecords,
@@ -287,6 +288,9 @@ export {
     // 跳过冲突配置
     setSkipConflicts,
     getSkipConflicts,
+    // 同步记录开关
+    setSyncRecordEnabled,
+    getSyncRecordEnabled,
 } from './tools/config.js';
 
 // ============================================================================

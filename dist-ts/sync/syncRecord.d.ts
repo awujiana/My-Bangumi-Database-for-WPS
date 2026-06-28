@@ -41,6 +41,11 @@ export interface UpdateRecordParams {
  * 获取或创建同步记录工作表
  */
 export declare function getOrCreateSyncRecordSheet(): WpsWorksheet;
+/**
+ * 查找现有的同步记录工作表（不创建新表）
+ * @returns 现有的同步记录工作表，若不存在则返回 null
+ */
+export declare function getSyncRecordSheetIfExists(): WpsWorksheet | null;
 export declare function addSyncRecord(params: UpdateRecordParams): boolean;
 export declare function getAllSyncRecords(): SyncRecord[];
 export declare function deduplicateSyncRecords(): boolean;

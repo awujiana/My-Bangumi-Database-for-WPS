@@ -7,7 +7,7 @@
  * @author BGM Development Team
  * @version 1.1.0
  */
-import { LOG_LEVELS, SYNC_STATUS, BGM_COLOR, bgmLog, getApp, BGM, getLastRow, colNumToLetter, SYNC_RECORD_COLUMNS, SYNC_RECORD_SHEET_NAME, SYNC_RECORD_COL, SYNC_RECORD_TYPE_COLOR, getCellValue, setCellValue, readRangeValues, } from '../index.js';
+import { LOG_LEVELS, SYNC_STATUS, BGM_COLOR, bgmLog, getApp, BGM, getLastRow, colNumToLetter, SYNC_RECORD_COLUMNS, SYNC_RECORD_SHEET_NAME, SYNC_RECORD_COL, SYNC_RECORD_TYPE_COLOR, getCellValue, setCellValue, readRangeValues, getSyncRecordEnabled, } from '../index.js';
 // ========== 内存缓存 ==========
 let _syncRecordSidCache = new Map();
 let _syncRecordListCache = [];
@@ -111,6 +111,27 @@ export function getOrCreateSyncRecordSheet() {
     }
     invalidateCache();
     return syncSheet;
+}
+/**
+ * 查找现有的同步记录工作表（不创建新表）
+ * @returns 现有的同步记录工作表，若不存在则返回 null
+ */
+export function getSyncRecordSheetIfExists() {
+    const app = getApp();
+    if (!app?.ActiveWorkbook)
+        return null;
+    try {
+        const sheets = app.ActiveWorkbook.Sheets;
+        for (let i = 1; i <= sheets.Count; i++) {
+            const sheet = sheets.Item(i);
+            if (sheet.Name === SYNC_RECORD_SHEET_NAME)
+                return sheet;
+        }
+    }
+    catch (e) {
+        BGM.handleError(e, { context: 'getSyncRecordSheetIfExists', showAlert: false });
+    }
+    return null;
 }
 function invalidateCache() {
     _syncRecordCacheValid = false;
@@ -236,6 +257,10 @@ function setSyncRecordColors(sheet, row, status, count) {
     }
 }
 export function addSyncRecord(params) {
+    if (!getSyncRecordEnabled()) {
+        bgmLog(LOG_LEVELS.INFO, '[addSyncRecord] 同步记录功能未启用，跳过');
+        return false;
+    }
     try {
         const sheet = getOrCreateSyncRecordSheet();
         // 写入数据前先去重，确保缓存数据干净
@@ -336,7 +361,11 @@ export function addSyncRecord(params) {
 }
 export function getAllSyncRecords() {
     try {
-        const sheet = getOrCreateSyncRecordSheet();
+        const sheet = getSyncRecordSheetIfExists();
+        if (!sheet) {
+            bgmLog(LOG_LEVELS.WARN, '[getAllSyncRecords] 同步记录表不存在，请先启用同步记录功能');
+            return [];
+        }
         if (!_syncRecordCacheValid)
             buildCache(sheet);
         return [..._syncRecordListCache];
@@ -348,7 +377,11 @@ export function getAllSyncRecords() {
 }
 export function deduplicateSyncRecords() {
     try {
-        const sheet = getOrCreateSyncRecordSheet();
+        const sheet = getSyncRecordSheetIfExists();
+        if (!sheet) {
+            bgmLog(LOG_LEVELS.WARN, '[deduplicateSyncRecords] 同步记录表不存在，请先启用同步记录功能');
+            return false;
+        }
         const lastRow = getLastRow(sheet);
         if (lastRow <= 1)
             return true;
@@ -396,7 +429,12 @@ export function formatSyncRecordSheet(sheet) {
         return;
     _formattingInProgress = true;
     try {
-        const target = sheet || getOrCreateSyncRecordSheet();
+        const target = sheet || getSyncRecordSheetIfExists();
+        if (!target) {
+            bgmLog(LOG_LEVELS.WARN, '[formatSyncRecordSheet] 同步记录表不存在，请先启用同步记录功能');
+            _formattingInProgress = false;
+            return;
+        }
         const lastRow = getLastRow(target);
         if (lastRow < 1) {
             _formattingInProgress = false;
@@ -469,7 +507,11 @@ export function formatSyncRecordSheet(sheet) {
 }
 export function clearSyncRecords() {
     try {
-        const sheet = getOrCreateSyncRecordSheet();
+        const sheet = getSyncRecordSheetIfExists();
+        if (!sheet) {
+            bgmLog(LOG_LEVELS.WARN, '[clearSyncRecords] 同步记录表不存在，请先启用同步记录功能');
+            return false;
+        }
         const lastRow = sheet.UsedRange
             ? sheet.UsedRange.Row + sheet.UsedRange.Rows.Count - 1
             : sheet.Rows.Count;
@@ -489,7 +531,11 @@ export function clearSyncRecords() {
 }
 export function openSyncRecordSheet() {
     try {
-        const sheet = getOrCreateSyncRecordSheet();
+        const sheet = getSyncRecordSheetIfExists();
+        if (!sheet) {
+            bgmLog(LOG_LEVELS.WARN, '[openSyncRecordSheet] 同步记录表不存在，请先启用同步记录功能');
+            return;
+        }
         sheet.Activate();
         bgmLog(LOG_LEVELS.INFO, '已切换到同步记录工作表');
     }

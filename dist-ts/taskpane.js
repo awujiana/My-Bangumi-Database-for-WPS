@@ -3,7 +3,7 @@
  * @module taskpane
  * @description 面板初始化、事件绑定、核心逻辑
  */
-import { PANEL_CONFIG, WPS_ENUM, LOG_LEVELS, getApp, bgmLog, BGM, escapeHtml, getCellValue, colNumToLetter, HEADER_KEYWORDS, IMPORTANT_COLS, updateTokenStatus, updateUserIdStatus, loadBgToken, showToast, closeDetailModal, getFilterStatus, getLastRow, clearSheetCache, _getBgmUserId, _getBgmUsername, getIncrementalSync, getSkipConflicts } from './index.js';
+import { PANEL_CONFIG, WPS_ENUM, LOG_LEVELS, getApp, bgmLog, BGM, escapeHtml, getCellValue, colNumToLetter, HEADER_KEYWORDS, IMPORTANT_COLS, updateTokenStatus, updateUserIdStatus, loadBgToken, showToast, closeDetailModal, getFilterStatus, getLastRow, clearSheetCache, _getBgmUserId, _getBgmUsername, getIncrementalSync, getSkipConflicts, getSyncRecordEnabled } from './index.js';
 // ========== 工作表锁定功能 ==========
 function toggleSheetLock() {
     const select = document.getElementById('sheetSelect');
@@ -759,6 +759,7 @@ function startUserInfoPolling() {
     let lastToken = loadBgToken();
     let lastIncrementalSync = null;
     let lastSkipConflicts = null;
+    let lastEnableSyncRecord = null;
     let lastPanelShownAt = null;
     const pollingInterval = setInterval(() => {
         try {
@@ -806,6 +807,16 @@ function startUserInfoPolling() {
                 if (conflictStrategySelect) {
                     conflictStrategySelect.value = currentSkipConflicts ? 'skip' : 'excel';
                     bgmLog(LOG_LEVELS.INFO, `[startUserInfoPolling] 冲突策略 select 已同步: ${conflictStrategySelect.value}`);
+                }
+            }
+            const currentEnableSyncRecord = getSyncRecordEnabled(true);
+            if (currentEnableSyncRecord !== lastEnableSyncRecord) {
+                bgmLog(LOG_LEVELS.INFO, `[startUserInfoPolling] 检测到同步记录开关变更: ${currentEnableSyncRecord ? '开启' : '关闭'}`);
+                lastEnableSyncRecord = currentEnableSyncRecord;
+                const chkEnableSyncRecord = document.getElementById('chkEnableSyncRecord');
+                if (chkEnableSyncRecord) {
+                    chkEnableSyncRecord.checked = currentEnableSyncRecord;
+                    bgmLog(LOG_LEVELS.INFO, `[startUserInfoPolling] 启用同步记录 checkbox 已同步: ${currentEnableSyncRecord ? '开启' : '关闭'}`);
                 }
             }
             // 检测面板显示信号：Ribbon 点击"打开同步面板"时会写入 bgm_panel_shown_at 时间戳

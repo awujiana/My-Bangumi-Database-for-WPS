@@ -7,7 +7,7 @@
 
 import { PANEL_CONFIG, WPS_ENUM , LOG_LEVELS ,getApp, bgmLog, BGM, escapeHtml, getCellValue, colNumToLetter,HEADER_KEYWORDS, IMPORTANT_COLS  , updateTokenStatus, updateUserIdStatus, loadBgToken, showTokenDialog, showUserIdDialog ,
      showAlert, showToast ,closeDetailModal,getFilterStatus,    getLastRow,clearSheetCache,WpsWorksheet, _getBgmUserId, _getBgmUsername, _setBgmUserId, _setBgmUsername,
-     getIncrementalSync, getSkipConflicts
+     getIncrementalSync, getSkipConflicts, getSyncRecordEnabled
 }from './index.js';
 // ========== 类型定义 ==========
 interface LockedSheetInfo {
@@ -805,6 +805,7 @@ function startUserInfoPolling(): void {
     let lastToken = loadBgToken();
     let lastIncrementalSync: boolean | null = null;
     let lastSkipConflicts: boolean | null = null;
+    let lastEnableSyncRecord: boolean | null = null;
     let lastPanelShownAt: string | null = null;
 
     const pollingInterval = setInterval(() => {
@@ -857,6 +858,17 @@ function startUserInfoPolling(): void {
                 if (conflictStrategySelect) {
                     conflictStrategySelect.value = currentSkipConflicts ? 'skip' : 'excel';
                     bgmLog(LOG_LEVELS.INFO, `[startUserInfoPolling] 冲突策略 select 已同步: ${conflictStrategySelect.value}`);
+                }
+            }
+
+            const currentEnableSyncRecord = getSyncRecordEnabled(true);
+            if (currentEnableSyncRecord !== lastEnableSyncRecord) {
+                bgmLog(LOG_LEVELS.INFO, `[startUserInfoPolling] 检测到同步记录开关变更: ${currentEnableSyncRecord ? '开启' : '关闭'}`);
+                lastEnableSyncRecord = currentEnableSyncRecord;
+                const chkEnableSyncRecord = document.getElementById('chkEnableSyncRecord') as HTMLInputElement;
+                if (chkEnableSyncRecord) {
+                    chkEnableSyncRecord.checked = currentEnableSyncRecord;
+                    bgmLog(LOG_LEVELS.INFO, `[startUserInfoPolling] 启用同步记录 checkbox 已同步: ${currentEnableSyncRecord ? '开启' : '关闭'}`);
                 }
             }
 

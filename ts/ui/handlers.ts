@@ -18,6 +18,7 @@ import {
     closeDetailModal,
     getIncrementalSync, setIncrementalSync,
     getSkipConflicts, setSkipConflicts,
+    setSyncRecordEnabled,
     COLLECTION_TYPE_NAMES,
     readRangeValues, openBangumiTokenPage,
     showSyncProgressDialog, updateSyncProgressDialog,
@@ -899,6 +900,18 @@ function setupButtonListeners(): void {
         button.removeEventListener('click', handleActionClick);
         button.addEventListener('click', handleActionClick);
     });
+
+    // 启用同步记录 开关
+    const chkEnableSyncRecord = document.getElementById('chkEnableSyncRecord') as HTMLInputElement | null;
+    if (chkEnableSyncRecord) {
+        chkEnableSyncRecord.addEventListener('change', () => {
+            const checked = chkEnableSyncRecord.checked;
+            bgmLog(LOG_LEVELS.INFO, `[handlers] 启用同步记录开关切换: ${checked ? '开启' : '关闭'}`);
+            setSyncRecordEnabled(checked);
+            showToast(checked ? '已启用同步记录功能' : '已关闭同步记录功能', 'info');
+        });
+        bgmLog(LOG_LEVELS.INFO, '[handlers] 启用同步记录 checkbox 监听器已注册');
+    }
 }
 
 interface ActionHandlerContext {

@@ -83,7 +83,7 @@ showUserIdDialog, updateTokenStatus, updateUserIdStatus, showTokenDialog, testDe
 // ============================================================================
 export { 
 // 导入同步记录模块的函数
-getOrCreateSyncRecordSheet, getAllSyncRecords, addSyncRecord, deduplicateSyncRecords, formatSyncRecordSheet, openSyncRecordSheet, clearSyncRecords, } from './sync/syncRecord.js';
+getOrCreateSyncRecordSheet, getSyncRecordSheetIfExists, getAllSyncRecords, addSyncRecord, deduplicateSyncRecords, formatSyncRecordSheet, openSyncRecordSheet, clearSyncRecords, } from './sync/syncRecord.js';
 // ============================================================================
 // 9. 同步引擎（来自 sync/exceltobangumi.js）
 // ============================================================================
@@ -189,7 +189,9 @@ setConfig, getConfig, removeConfig,
 // 增量同步配置
 setIncrementalSync, getIncrementalSync, 
 // 跳过冲突配置
-setSkipConflicts, getSkipConflicts, } from './tools/config.js';
+setSkipConflicts, getSkipConflicts, 
+// 同步记录开关
+setSyncRecordEnabled, getSyncRecordEnabled, } from './tools/config.js';
 // ============================================================================
 // 13. URL 自动补全（来自 tools/autoFillUrl.js）
 // ============================================================================

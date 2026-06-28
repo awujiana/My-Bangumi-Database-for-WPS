@@ -3,7 +3,7 @@
  * @module ribbon
  * @description WPS Office 功能区按钮回调处理
  */
-import { WPS_ENUM, showBangumiPanel, BGM, getIncrementalSync, getSkipConflicts, setIncrementalSync, setSkipConflicts, bgmLog, LOG_LEVELS, getApp } from './index.js';
+import { WPS_ENUM, showBangumiPanel, BGM, getIncrementalSync, getSkipConflicts, setIncrementalSync, setSkipConflicts, getSyncRecordEnabled, setSyncRecordEnabled, bgmLog, LOG_LEVELS, getApp } from './index.js';
 import * as RibbonService from './services/ribbonService.js';
 // 在 Ribbon 启动时（例如 OnAddinLoad 中或文件顶部立即执行）
 // 【正确】监听侧边栏发来的配置更新，刷新 Ribbon UI
@@ -56,6 +56,35 @@ export function OnSkipConflictsChange(control) {
     setSkipConflicts(finalValue);
     bgmLog(LOG_LEVELS.INFO, `[Ribbon] 跳过冲突状态已保存到 PluginStorage: ${finalValue}`);
     return true; // 必须返回 boolean
+}
+/**
+ * 获取"启用同步记录"复选框的初始按下状态
+ * 从配置读取上次保存的设置，默认未选中
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- WPS Ribbon 控件无 @types
+export function GetEnableSyncRecordPressed(control) {
+    const result = getSyncRecordEnabled();
+    bgmLog(LOG_LEVELS.INFO, `[Ribbon] GetEnableSyncRecordPressed: ${result}`);
+    return result;
+}
+/**
+ * 当"启用同步记录"复选框被点击时，保存状态
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- WPS Ribbon 控件无 @types
+export function OnEnableSyncRecordChange(control) {
+    const newValue = control.Pressed;
+    bgmLog(LOG_LEVELS.INFO, `[Ribbon] OnEnableSyncRecordChange: control.Pressed = ${newValue}`);
+    let finalValue;
+    if (typeof newValue === 'boolean') {
+        finalValue = newValue;
+    }
+    else {
+        finalValue = !getSyncRecordEnabled();
+        bgmLog(LOG_LEVELS.INFO, `[Ribbon] control.Pressed 不可用，切换状态为: ${finalValue}`);
+    }
+    setSyncRecordEnabled(finalValue);
+    bgmLog(LOG_LEVELS.INFO, `[Ribbon] 启用同步记录状态已保存到 PluginStorage: ${finalValue}`);
+    return true;
 }
 /**
  * 获取增量同步复选框的初始按下状态
@@ -163,3 +192,5 @@ ribbonWindow.GetIncrementalSyncPressed = GetIncrementalSyncPressed;
 ribbonWindow.GetSkipConflictsPressed = GetSkipConflictsPressed;
 ribbonWindow.OnIncrementalSyncChange = OnIncrementalSyncChange;
 ribbonWindow.OnSkipConflictsChange = OnSkipConflictsChange;
+ribbonWindow.GetEnableSyncRecordPressed = GetEnableSyncRecordPressed;
+ribbonWindow.OnEnableSyncRecordChange = OnEnableSyncRecordChange;

@@ -10,6 +10,7 @@ export declare const CONFIG_KEYS: {
     readonly INCREMENTAL_SYNC: "bgm_incremental_sync";
     readonly SKIP_CONFLICTS: "bgm_skip_conflicts";
     readonly LOCKED_SHEET: "bgm_locked_sheet";
+    readonly ENABLE_SYNC_RECORD: "bgm_enable_sync_record";
 };
 /**
  * 设置配置值
@@ -47,4 +48,13 @@ export declare function setSkipConflicts(enabled: boolean): boolean;
  * @param silent - 静默模式，不打印日志
  */
 export declare function getSkipConflicts(silent?: boolean): boolean;
+/**
+ * 设置同步记录开关
+ */
+export declare function setSyncRecordEnabled(enabled: boolean): boolean;
+/**
+ * 获取同步记录开关状态
+ * @param silent - 静默模式，不打印日志
+ */
+export declare function getSyncRecordEnabled(silent?: boolean): boolean;
 //# sourceMappingURL=config.d.ts.map

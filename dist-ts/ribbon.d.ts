@@ -22,6 +22,15 @@ export declare function GetSkipConflictsPressed(control: any): boolean;
  */
 export declare function OnSkipConflictsChange(control: any): boolean;
 /**
+ * 获取"启用同步记录"复选框的初始按下状态
+ * 从配置读取上次保存的设置，默认未选中
+ */
+export declare function GetEnableSyncRecordPressed(control: any): boolean;
+/**
+ * 当"启用同步记录"复选框被点击时，保存状态
+ */
+export declare function OnEnableSyncRecordChange(control: any): boolean;
+/**
  * 获取增量同步复选框的初始按下状态
  * 从配置读取上次保存的设置，默认未选中
  */

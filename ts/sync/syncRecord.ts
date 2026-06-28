@@ -12,7 +12,7 @@ import {
     BGM_CONFIG, LOG_LEVELS, SYNC_STATUS, BGM_COLOR, bgmLog, getApp,
     trim, isEmptyValue, BGM, getLastRow, colNumToLetter,
     SYNC_RECORD_COLUMNS, SYNC_RECORD_SHEET_NAME, SYNC_RECORD_COL, SYNC_RECORD_TYPE_COLOR,
-    getCellValue, setCellValue, readRangeValues,
+    getCellValue, setCellValue, readRangeValues, getSyncRecordEnabled,
 } from '../index.js';
 import type { WpsWorksheet } from '../tools/wps.js';
 
@@ -157,6 +157,25 @@ export function getOrCreateSyncRecordSheet(): WpsWorksheet {
     return syncSheet;
 }
 
+/**
+ * 查找现有的同步记录工作表（不创建新表）
+ * @returns 现有的同步记录工作表，若不存在则返回 null
+ */
+export function getSyncRecordSheetIfExists(): WpsWorksheet | null {
+    const app = getApp();
+    if (!app?.ActiveWorkbook) return null;
+    try {
+        const sheets = app.ActiveWorkbook.Sheets;
+        for (let i = 1; i <= sheets.Count; i++) {
+            const sheet = sheets.Item(i);
+            if (sheet.Name === SYNC_RECORD_SHEET_NAME) return sheet;
+        }
+    } catch (e: unknown) {
+        BGM.handleError(e, { context: 'getSyncRecordSheetIfExists', showAlert: false });
+    }
+    return null;
+}
+
 function invalidateCache(): void {
     _syncRecordCacheValid = false;
 }
@@ -292,6 +311,10 @@ function setSyncRecordColors(sheet: WpsWorksheet, row: number, status: string, c
 }
 
 export function addSyncRecord(params: UpdateRecordParams): boolean {
+    if (!getSyncRecordEnabled()) {
+        bgmLog(LOG_LEVELS.INFO, '[addSyncRecord] 同步记录功能未启用，跳过');
+        return false;
+    }
     try {
         const sheet = getOrCreateSyncRecordSheet();
 
@@ -382,7 +405,11 @@ export function addSyncRecord(params: UpdateRecordParams): boolean {
 
 export function getAllSyncRecords(): SyncRecord[] {
     try {
-        const sheet = getOrCreateSyncRecordSheet();
+        const sheet = getSyncRecordSheetIfExists();
+        if (!sheet) {
+            bgmLog(LOG_LEVELS.WARN, '[getAllSyncRecords] 同步记录表不存在，请先启用同步记录功能');
+            return [];
+        }
         if (!_syncRecordCacheValid) buildCache(sheet);
         return [..._syncRecordListCache];
     } catch (e: unknown) {
@@ -393,7 +420,11 @@ export function getAllSyncRecords(): SyncRecord[] {
 
 export function deduplicateSyncRecords(): boolean {
     try {
-        const sheet = getOrCreateSyncRecordSheet();
+        const sheet = getSyncRecordSheetIfExists();
+        if (!sheet) {
+            bgmLog(LOG_LEVELS.WARN, '[deduplicateSyncRecords] 同步记录表不存在，请先启用同步记录功能');
+            return false;
+        }
         const lastRow = getLastRow(sheet);
         if (lastRow <= 1) return true;
 
@@ -444,7 +475,12 @@ export function formatSyncRecordSheet(sheet?: WpsWorksheet): void {
     if (_formattingInProgress) return;
     _formattingInProgress = true;
     try {
-        const target = sheet || getOrCreateSyncRecordSheet();
+        const target = sheet || getSyncRecordSheetIfExists();
+        if (!target) {
+            bgmLog(LOG_LEVELS.WARN, '[formatSyncRecordSheet] 同步记录表不存在，请先启用同步记录功能');
+            _formattingInProgress = false;
+            return;
+        }
         const lastRow = getLastRow(target);
         if (lastRow < 1) {
             _formattingInProgress = false;
@@ -507,7 +543,11 @@ export function formatSyncRecordSheet(sheet?: WpsWorksheet): void {
 
 export function clearSyncRecords(): boolean {
     try {
-        const sheet = getOrCreateSyncRecordSheet();
+        const sheet = getSyncRecordSheetIfExists();
+        if (!sheet) {
+            bgmLog(LOG_LEVELS.WARN, '[clearSyncRecords] 同步记录表不存在，请先启用同步记录功能');
+            return false;
+        }
         const lastRow = sheet.UsedRange
             ? sheet.UsedRange.Row + sheet.UsedRange.Rows.Count - 1
             : sheet.Rows.Count;
@@ -527,7 +567,11 @@ export function clearSyncRecords(): boolean {
 
 export function openSyncRecordSheet(): void {
     try {
-        const sheet = getOrCreateSyncRecordSheet();
+        const sheet = getSyncRecordSheetIfExists();
+        if (!sheet) {
+            bgmLog(LOG_LEVELS.WARN, '[openSyncRecordSheet] 同步记录表不存在，请先启用同步记录功能');
+            return;
+        }
         sheet.Activate();
         bgmLog(LOG_LEVELS.INFO, '已切换到同步记录工作表');
     } catch (e: unknown) {

@@ -13,6 +13,7 @@ export const CONFIG_KEYS = {
     INCREMENTAL_SYNC: 'bgm_incremental_sync',
     SKIP_CONFLICTS: 'bgm_skip_conflicts',
     LOCKED_SHEET: 'bgm_locked_sheet',
+    ENABLE_SYNC_RECORD: 'bgm_enable_sync_record',
 };
 /**
  * 获取 PluginStorage
@@ -120,5 +121,22 @@ export function getSkipConflicts(silent = false) {
     const result = getConfig(CONFIG_KEYS.SKIP_CONFLICTS, '', silent) === 'true';
     if (!silent)
         bgmLog(LOG_LEVELS.INFO, `[config] 获取跳过冲突状态: ${result ? '开启' : '关闭'}`);
+    return result;
+}
+/**
+ * 设置同步记录开关
+ */
+export function setSyncRecordEnabled(enabled) {
+    bgmLog(LOG_LEVELS.INFO, `[config] 设置同步记录: ${enabled ? '开启' : '关闭'}`);
+    return setConfig(CONFIG_KEYS.ENABLE_SYNC_RECORD, enabled ? 'true' : 'false');
+}
+/**
+ * 获取同步记录开关状态
+ * @param silent - 静默模式，不打印日志
+ */
+export function getSyncRecordEnabled(silent = false) {
+    const result = getConfig(CONFIG_KEYS.ENABLE_SYNC_RECORD, '', silent) === 'true';
+    if (!silent)
+        bgmLog(LOG_LEVELS.INFO, `[config] 获取同步记录状态: ${result ? '开启' : '关闭'}`);
     return result;
 }
