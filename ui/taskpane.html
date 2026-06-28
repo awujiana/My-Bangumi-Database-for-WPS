@@ -62,7 +62,7 @@
             <div class="token-display">
                 <span id="tokenStatus">未设置</span>
                 <button class="btn small" data-action="showTokenDialog">设置/修改</button>
-                <button class="btn small" data-action="copyToken">📋 复制</button>
+                <button class="btn small" data-action="copyToken" aria-label="复制 Token 到剪贴板">📋 复制</button>
                 <button class="btn small" data-action="clearToken">清除</button>
                 <button class="btn small primary" data-action="testToken">测试</button>
             </div>
@@ -116,8 +116,8 @@
                     <option value="">-- 请选择 --</option>
                 </select>
                 <div class="sheet-select-row">
-                    <button class="btn small" data-action="refreshSheets">🔄 刷新</button>
-                    <button class="btn small" id="lockSheetBtn" data-action="toggleSheetLock">🔒 锁定</button>
+                    <button class="btn small" data-action="refreshSheets" aria-label="刷新工作表列表">🔄 刷新</button>
+                    <button class="btn small" id="lockSheetBtn" data-action="toggleSheetLock" aria-label="锁定或解锁当前工作表">🔒 锁定</button>
                     <span id="lockStatus" class="lock-status" style="display:none;"></span>
                     <button class="btn small" data-action="cleanLockedDataSheet" title="去除无 Bangumi URL 的重复行，合并标签/分级">🧹 数据清洗</button>
                 </div>
@@ -144,7 +144,7 @@
             <div class="detail-modal-content">
                 <div class="detail-modal-header">
                     <h3>📋 详细预览</h3>
-                    <button class="detail-close-btn" data-action="closeDetailModal">×</button>
+                    <button class="detail-close-btn" data-action="closeDetailModal" aria-label="关闭详细预览对话框">×</button>
                 </div>
                 <div class="detail-modal-toolbar" id="detailModalToolbar">
                     <span id="detailCount"></span>
@@ -179,10 +179,10 @@
                 </select>
             </div>
             <p class="hint">当Excel条目与Bangumi收藏状态不一致时，自动按所选策略处理。</p>
-            <div class="form-group">
-                <label>
-                    <input type="checkbox" id="chkIncremental">
-                    仅同步变更（增量同步）
+            <div class="form-group" style="margin: 8px 0; padding: 6px 10px; background: #3a3a3a; border-radius: 4px;">
+                <label style="display: flex; align-items: center; gap: 6px; cursor: pointer; font-size: 13px; color: #e0e0e0;">
+                    <input type="checkbox" id="chkIncremental" style="cursor: pointer;">
+                    <span>仅同步变更（增量同步）</span>
                 </label>
             </div>
         </div>

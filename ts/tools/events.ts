@@ -7,14 +7,14 @@
  * @author BGM Development Team
  * @version 1.0.0
  */
+
 /**
  * 事件处理器类型
  *
  * @callback EventHandler
- * @param {unknown} [data] - 事件携带的数据
+ * @param {unknown} data - 事件携带的数据（emit 不传时为 undefined）
  */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export type EventHandler<T = any> = (data?: T) => void;
+export type EventHandler<T = unknown> = (data: T) => void;
 
 /**
  * 事件条目接口
@@ -38,22 +38,24 @@ export class EventBus {
     /**
      * 订阅事件
      * @param {string} eventName - 事件名称
-     * @param {EventHandler} handler - 事件处理器
+     * @param {EventHandler<T>} handler - 事件处理器
      * @param {boolean} [once=false] - 是否只触发一次
      */
-    on(eventName: string, handler: EventHandler, once: boolean = false): void {
+    on<T = unknown>(eventName: string, handler: EventHandler<T>, once: boolean = false): void {
         if (!this.events.has(eventName)) {
             this.events.set(eventName, []);
         }
-        this.events.get(eventName)!.push({ handler, once });
+        // 内部以 EventHandler<unknown> 存储，调用方传入的 EventHandler<T> 在运行时
+        // 接收 emit 推送的实际 T 类型数据，此处断言是安全的（contravariance 限制仅类型层面）。
+        this.events.get(eventName)!.push({ handler: handler as EventHandler, once });
     }
 
     /**
      * 订阅事件（只触发一次）
      * @param {string} eventName - 事件名称
-     * @param {EventHandler} handler - 事件处理器
+     * @param {EventHandler<T>} handler - 事件处理器
      */
-    once(eventName: string, handler: EventHandler): void {
+    once<T = unknown>(eventName: string, handler: EventHandler<T>): void {
         this.on(eventName, handler, true);
     }
 

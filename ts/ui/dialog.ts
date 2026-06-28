@@ -77,6 +77,10 @@ function createDialogs(): void {
         modal.id = cfg.id;
         modal.className = 'bgm-modal';
         modal.style.display = 'none';
+        // 可访问性：声明对话框角色
+        modal.setAttribute('role', 'dialog');
+        modal.setAttribute('aria-modal', 'true');
+        modal.setAttribute('aria-labelledby', cfg.titleId);
 
         const content = document.createElement('div');
         content.className = 'bgm-modal-content ' + type;
@@ -231,6 +235,10 @@ function ensureSyncResultDialog(): HTMLElement {
     modal.id = 'bgmSyncResultDialog';
     modal.className = 'bgm-modal';
     modal.style.display = 'none';
+    // 可访问性：声明对话框角色
+    modal.setAttribute('role', 'dialog');
+    modal.setAttribute('aria-modal', 'true');
+    modal.setAttribute('aria-labelledby', 'bgmSyncResultTitle');
 
     modal.innerHTML = `
         <div class="bgm-modal-content success" style="max-width: 520px;">
@@ -355,7 +363,7 @@ function ensureSyncProgressDialog(): HTMLElement {
             <div class="bgm-dialog-body bgm-sync-progress__body">
                 <!-- 进度区 -->
                 <div id="bgmSyncProgressSection">
-                    <div class="bgm-sync-progress__meta">
+                    <div class="bgm-sync-progress__meta" aria-live="polite" aria-atomic="true">
                         <span id="bgmSyncProgressLabel">进度: 0/0</span>
                         <span id="bgmSyncProgressPercent">0%</span>
                     </div>

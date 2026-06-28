@@ -720,7 +720,7 @@ export function buildJsonPayload(
     finishedDate: string
 ): string {
     try {
-        const payload: Record<string, any> = {};
+        const payload: Record<string, unknown> = {};
 
         // 观看状态 - 支持多种列名
         const statusKeys = ['是否看完', '状态', '观看状态', '收藏类型', 'type'];
