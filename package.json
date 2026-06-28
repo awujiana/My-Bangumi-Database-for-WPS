@@ -8,15 +8,20 @@
 		"build:ts": "tsc --project tsconfig.build.json",
 		"debug": "npm run build:ts && concurrently \"tsc --project tsconfig.build.json --watch\" \"wpsjs debug\"",
 		"lint": "eslint . --ext .vue,.js,.jsx,.cjs,.mjs --fix --ignore-path .gitignore",
-		"format": "prettier --write src/"
+		"format": "prettier --write src/",
+		"test": "vitest run",
+		"test:watch": "vitest",
+		"test:coverage": "vitest run --coverage"
 	},
 	"description": "WPS Excel 加载项 - 追番标记助手",
 	"devDependencies": {
+		"@vitest/coverage-v8": "^4.1.9",
 		"concurrently": "^9.2.1",
 		"et-jsapi-declare": "latest",
 		"typescript": "^6.0.3",
 		"vite": "^6.0.0",
 		"vite-plugin-static-copy": "^4.1.0",
+		"vitest": "^4.1.9",
 		"wpsjs": "latest"
 	}
 }
