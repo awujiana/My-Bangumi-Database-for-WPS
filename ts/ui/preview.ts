@@ -268,8 +268,14 @@ export async function previewSyncContent(): Promise<void> {
     }
 
     const { ws, visibleRows, headerRow, dataStartRow } = dp;
-    const dataRows = visibleRows.filter(r => r !== headerRow && r >= dataStartRow);
+    // 防御性排序 + 去重：确保行号严格升序且无重复（修复"190-201后跳到3"问题）
+    const dataRows = Array.from(new Set(
+        visibleRows.filter(r => r !== headerRow && r >= dataStartRow)
+    )).sort((a, b) => a - b);
     bgmLog(LOG_LEVELS.INFO, `[preview] 过滤后得到 ${dataRows.length} 条数据行`);
+    if (dataRows.length > 0) {
+        bgmLog(LOG_LEVELS.INFO, `[preview] 数据行范围: ${dataRows[0]} ~ ${dataRows[dataRows.length - 1]}`);
+    }
 
     if (dataRows.length === 0) {
         showToast('没有可预览的数据行', 'info');
@@ -666,7 +672,10 @@ export async function syncAllRows(): Promise<{ success: number; fail: number; sk
     }
 
     const { ws, visibleRows, headerRow, dataStartRow } = dp;
-    const dataRows = visibleRows.filter(r => r !== headerRow && r >= dataStartRow);
+    // 防御性排序 + 去重：确保行号严格升序且无重复
+    const dataRows = Array.from(new Set(
+        visibleRows.filter(r => r !== headerRow && r >= dataStartRow)
+    )).sort((a, b) => a - b);
     if (dataRows.length === 0) {
         showToast('没有可同步的数据行', 'info');
         return { success: 0, fail: 0, skip: 0 };

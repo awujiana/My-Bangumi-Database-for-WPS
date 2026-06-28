@@ -1,3 +1,4 @@
+import type { WpsWorksheet } from '../index.js';
 export interface NameUrlMap {
     [nameOrAlias: string]: string;
 }
@@ -8,7 +9,7 @@ export interface AutoFillResult {
     mappedNames: number;
 }
 declare function _splitAliases(aliasVal: string): string[];
-declare function _buildNameUrlMap(ws: any, headerRow: number, lastRow: number, colMap: Map<string, number>): NameUrlMap;
+declare function _buildNameUrlMap(ws: WpsWorksheet, headerRow: number, lastRow: number, colMap: Map<string, number>): NameUrlMap;
 export declare function autoFillUrls(): AutoFillResult;
 export declare function showAutoFillUrlDialog(): void;
 export { _buildNameUrlMap, _splitAliases };

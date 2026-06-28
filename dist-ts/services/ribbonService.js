@@ -1,5 +1,5 @@
 // ts/services/ribbonService.ts
-import { bgmLog, BGM, wpsMsgBox, loadBgToken, storeBgToken, getDataSheet, findHeaderRow, getLastRow, getColumnMap, extractSubjectId, mapWatchStatus, getCellValue, readRangeValues, getFilterStatus, BGM_COLOR, LOG_LEVELS, SyncToBangumiAsync, _getBgmUserId, testTokenValidityForRibbon, fetchAllUserCollections, getCell, trim, calcFingerprint } from '../index.js';
+import { getApp, bgmLog, BGM, wpsMsgBox, loadBgToken, storeBgToken, getDataSheet, findHeaderRow, getLastRow, getColumnMap, extractSubjectId, mapWatchStatus, getCellValue, readRangeValues, getFilterStatus, BGM_COLOR, LOG_LEVELS, SyncToBangumiAsync, _getBgmUserId, testTokenValidityForRibbon, fetchAllUserCollections, getCell, trim, calcFingerprint } from '../index.js';
 /**
  * 获取同步预览统计（不发送请求，仅扫描 Excel）
  * @param ws 工作表对象
@@ -221,7 +221,7 @@ export async function detectConflicts(ws, colMap, lastRow, headerRow, token) {
  * @param conflictResolution 冲突处理策略，默认 'excel'（覆盖）
  */
 export async function syncWithConfirmation() {
-    const app = window.Application;
+    const app = getApp();
     const ws = getDataSheet();
     if (!ws) {
         wpsMsgBox('未找到数据工作表', 0, 64);
@@ -295,24 +295,26 @@ export async function syncWithConfirmation() {
             skipSids,
             incremental,
             onProgress: (current, total, message) => {
-                if (app.StatusBar !== undefined)
+                if (app?.StatusBar !== undefined)
                     app.StatusBar = `[${current}/${total}] ${message}`;
             }
         });
-        app.StatusBar = false;
+        if (app)
+            app.StatusBar = false;
         app?.MessageBox?.(`同步完成！\n成功: ${result.success} 条\n失败: ${result.fail} 条\n跳过: ${result.skip} 条`, 0, 64);
     }
     catch (err) {
-        app.StatusBar = false;
+        if (app)
+            app.StatusBar = false;
         BGM.handleError(err, { context: 'Ribbon同步', showAlert: true });
     }
 }
 /** 设置 Token（Ribbon 版本） */
 export async function setTokenForRibbon() {
     const currentToken = loadBgToken() || '';
-    const app = window.Application;
+    const app = getApp();
     const newToken = app?.InputBox?.('请输入 Access Token', '设置 Token', currentToken, 2);
-    if (newToken && newToken !== false && typeof newToken === 'string') {
+    if (newToken && typeof newToken === 'string') {
         const saved = storeBgToken(newToken);
         if (saved) {
             bgmLog(LOG_LEVELS.INFO, 'Token 已保存，通知面板更新...');
@@ -352,14 +354,14 @@ export function testTokenForRibbon() {
         BGM.notifyTokenUpdated();
     }
     else {
-        window.Application?.MessageBox?.('请先设置 Token！', 0, 48);
+        getApp()?.MessageBox?.('请先设置 Token！', 0, 48);
     }
 }
 /** 设置用户 ID（Ribbon 版本） */
 export function setUserIdForRibbon() {
-    const app = window.Application;
+    const app = getApp();
     const userId = app?.InputBox?.('请输入用户 ID（数字）', '设置用户 ID', '', 2);
-    if (userId && userId !== false) {
+    if (userId && typeof userId === 'string') {
         const userIdStr = String(userId).trim();
         BGM.setUserId(userIdStr);
         bgmLog(LOG_LEVELS.INFO, `[setUserIdForRibbon] 用户ID已设置: ${userIdStr}`);
@@ -370,7 +372,7 @@ export function setUserIdForRibbon() {
 export function openCollectionForRibbon() {
     const startTime = Date.now();
     bgmLog(LOG_LEVELS.INFO, '[openCollectionForRibbon] ========== Ribbon 打开收藏页面 ==========');
-    const app = window.Application;
+    const app = getApp();
     if (!app) {
         bgmLog(LOG_LEVELS.ERROR, '[openCollectionForRibbon] 无法获取 Application 对象');
         return;
@@ -387,4 +389,3 @@ export function openCollectionForRibbon() {
     window.open(collectionUrl, '_blank');
     bgmLog(LOG_LEVELS.INFO, `[openCollectionForRibbon] 完成，耗时: ${Date.now() - startTime}ms`);
 }
-//# sourceMappingURL=ribbonService.js.map

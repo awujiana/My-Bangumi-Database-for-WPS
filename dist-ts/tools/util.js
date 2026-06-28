@@ -1,6 +1,12 @@
-import { BGM_CONFIG, LOG_LEVELS, ERROR_LEVELS, PANEL_CONFIG, ErrorLevel, isWpsApp, BgmError, encryptToken, decryptToken, calcChecksum, COLUMN_RULES, HEADER_KEYWORDS, syncAllRows, showConfirm } from '../index.js';
+// 直接从源模块导入，打破 util.ts ↔ index.ts 的循环依赖
+import { BGM_CONFIG, LOG_LEVELS, ERROR_LEVELS, PANEL_CONFIG, COLUMN_RULES, HEADER_KEYWORDS, ErrorLevel, } from '../core/constants.js';
+import { BgmError } from '../core/result.js';
+import { encryptToken, decryptToken, calcChecksum } from '../core/crypto.js';
+import { showConfirm } from '../ui/dialog.js';
 import { showAlert as customShowAlert, showError as customShowError, showInput as customShowInput } from '../ui/dialog.js';
-import { BGM_EVENTS, eventBus } from '../tools/events.js';
+import { isWpsApp } from './wps.js';
+import { syncAllRows } from '../ui/preview.js';
+import { BGM_EVENTS, eventBus } from './events.js';
 // ========== BGM 全局命名空间 ==========
 export const BGM = {
     // 缓存数据
@@ -26,6 +32,22 @@ export const BGM = {
         currentRow: 0,
         currentSheet: null,
         currentCol: 0,
+        /** 进入运行状态：防重复 + 重置标志 + 置位 */
+        enterRunningState() {
+            if (this.isRunning) {
+                BGM.Dialog.alert('同步正在进行中，请稍后', '提示');
+                return false;
+            }
+            this.resetStopFlag();
+            this.isRunning = true;
+            this.lastSyncTime = new Date().toISOString();
+            return true;
+        },
+        /** 退出运行状态：清运行标志 + 重置停止标志 */
+        exitRunningState() {
+            this.isRunning = false;
+            this.resetStopFlag();
+        },
         startSync() {
             if (this.isRunning) {
                 BGM.Dialog.alert('同步正在进行中，请稍后', '提示');
@@ -35,35 +57,35 @@ export const BGM = {
             BGM.Dialog.confirm('确定要开始全面同步吗？', (confirmed) => {
                 if (!confirmed)
                     return;
-                this.isRunning = true;
-                this.lastSyncTime = new Date().toISOString();
+                // 复用统一入口，确保状态一致
+                if (!this.enterRunningState())
+                    return;
                 bgmLog(LOG_LEVELS.INFO, '开始执行同步...');
                 syncAllRows()
                     .then(() => {
-                    this.isRunning = false;
+                    // 成功路径也清理状态，与 catch 分支对称
                     if (this.shouldStop) {
                         BGM.Dialog.alert('同步已停止', '提示');
-                        this.resetStopFlag();
                     }
+                    this.exitRunningState();
                 })
                     .catch((err) => {
-                    this.isRunning = false;
-                    this.resetStopFlag();
+                    this.exitRunningState();
                     BGM.handleError(err, { showAlert: true });
                 });
             });
         },
         requestStop() {
-            if (!this.isRunning) {
-                BGM.Dialog.alert('当前没有正在进行的同步', '提示');
+            // 静默返回，不弹 alert
+            if (!this.isRunning)
                 return;
-            }
             this.shouldStop = true;
             this.isPaused = false;
             bgmLog(LOG_LEVELS.INFO, '用户请求停止同步');
         },
         pause() {
-            if (!this.isRunning || this.isPaused)
+            // 增加 shouldStop 检查：已请求停止时不再允许暂停
+            if (!this.isRunning || this.isPaused || this.shouldStop)
                 return;
             this.isPaused = true;
             bgmLog(LOG_LEVELS.INFO, `[sync] 同步已暂停，当前行: ${this.currentRow}`);
@@ -82,19 +104,19 @@ export const BGM = {
         checkPaused() {
             return this.isPaused;
         },
-        /** 暂停时等待恢复，每 200ms 检查一次 */
+        /** 暂停时等待恢复，每 50ms 轮询一次 */
         async waitForResume() {
             while (this.isPaused && !this.shouldStop) {
-                await new Promise(r => setTimeout(r, 200));
+                await new Promise(r => setTimeout(r, 50));
             }
         },
         /** 定位到当前正在处理的单元格 */
         locateCurrentCell() {
-            if (!this.currentRow || !this.currentSheet)
+            if (!this.currentRow || this.currentRow < 1 || !this.currentSheet)
                 return;
             try {
                 const ws = this.currentSheet;
-                const col = this.currentCol || 1;
+                const col = this.currentCol > 0 ? this.currentCol : 1;
                 const cellAddr = `${colNumToLetter(col)}${this.currentRow}`;
                 const cell = ws.Range(cellAddr);
                 if (cell) {
@@ -103,15 +125,19 @@ export const BGM = {
                 }
             }
             catch (e) {
-                bgmLog(LOG_LEVELS.WARN, `[sync] 定位单元格失败: ${e.message}`);
+                const msg = e instanceof Error ? e.message : String(e);
+                bgmLog(LOG_LEVELS.WARN, `[sync] 定位单元格失败: ${msg}`);
             }
         },
         /** 更新当前位置（供同步循环调用，传 undefined 保留原值） */
         updatePosition(ws, row, col) {
+            // 行号范围校验：必须为非负整数
+            if (!Number.isInteger(row) || row < 0)
+                return;
             if (ws !== undefined)
                 this.currentSheet = ws;
             this.currentRow = row;
-            if (col !== undefined)
+            if (col !== undefined && col > 0)
                 this.currentCol = col;
         },
         resetStopFlag() {
@@ -119,6 +145,8 @@ export const BGM = {
             this.isPaused = false;
             this.currentRow = 0;
             this.currentSheet = null;
+            // 同步清理列号，避免遗留状态
+            this.currentCol = 0;
         }
     },
     // 日志级别（0=DEBUG, 1=INFO, 2=WARN, 3=ERROR）
@@ -134,52 +162,65 @@ export const BGM = {
     // 统一对话框
     Dialog: {
         alert: function (title, message) {
-            if (typeof window !== 'undefined' && window.BGMDialog !== undefined) {
-                window.BGMDialog.alert(title, message);
+            if (typeof window !== 'undefined') {
+                const win = window;
+                if (win.BGMDialog !== undefined && win.BGMDialog) {
+                    win.BGMDialog.alert(title, message);
+                    return;
+                }
+                if (typeof win.BGMAlert === 'function') {
+                    win.BGMAlert(message, title);
+                    return;
+                }
             }
-            else if (typeof window !== 'undefined' && typeof window.BGMAlert === 'function') {
-                window.BGMAlert(message, title);
-            }
-            else {
-                // 使用自定义对话框
-                customShowAlert(message, title);
-            }
+            // 使用自定义对话框
+            customShowAlert(message, title);
         },
         confirm: function (message, callback, title) {
             showConfirm(message, callback, title);
         },
         error: function (title, message) {
-            if (typeof window !== 'undefined' && window.BGMDialog !== undefined) {
-                window.BGMDialog.error(title, message);
+            if (typeof window !== 'undefined') {
+                const win = window;
+                if (win.BGMDialog !== undefined && win.BGMDialog) {
+                    win.BGMDialog.error(title, message);
+                    return;
+                }
+                if (typeof win.BGMError === 'function') {
+                    win.BGMError(message, title);
+                    return;
+                }
             }
-            else if (typeof window !== 'undefined' && typeof window.BGMError === 'function') {
-                window.BGMError(message, title);
-            }
-            else {
-                // 使用自定义对话框
-                customShowError(message, title);
-            }
+            // 使用自定义对话框
+            customShowError(message, title);
         },
         input: function (title, prompt, defaultValue, onOk, onCancel) {
-            if (typeof window !== 'undefined' && window.BGMDialog !== undefined) {
-                window.BGMDialog.input(title, prompt, defaultValue || '', onOk, onCancel);
+            if (typeof window !== 'undefined') {
+                const win = window;
+                if (win.BGMDialog !== undefined && win.BGMDialog) {
+                    win.BGMDialog.input(title, prompt, defaultValue || '', onOk, onCancel);
+                    return;
+                }
+                if (typeof win.BGMInput === 'function') {
+                    win.BGMInput(title, prompt, defaultValue || '', onOk, onCancel);
+                    return;
+                }
             }
-            else if (typeof window !== 'undefined' && typeof window.BGMInput === 'function') {
-                window.BGMInput(title, prompt, defaultValue || '', onOk, onCancel);
-            }
-            else {
-                // 使用自定义对话框
-                customShowInput(title, prompt, defaultValue, (value) => {
-                    if (onOk && value !== undefined)
-                        onOk(value);
-                }, onCancel);
-            }
+            // 使用自定义对话框
+            customShowInput(title, prompt, defaultValue, (value) => {
+                if (onOk && value !== undefined)
+                    onOk(value);
+            }, onCancel);
         },
         show: function (type, title, message, options) {
-            if (typeof window !== 'undefined' && window.BGMDialog !== undefined) {
-                window.BGMDialog.show(type, title, message, options);
+            if (typeof window !== 'undefined') {
+                const win = window;
+                if (win.BGMDialog !== undefined && win.BGMDialog) {
+                    win.BGMDialog.show(type, title, message, options);
+                    return;
+                }
             }
-            else {
+            {
                 switch (type) {
                     case 'error':
                         this.error(title, message);
@@ -389,10 +430,13 @@ export function getCell(ws, row, col) {
  * @returns 属性的值；如果属性不存在或访问失败，则返回 undefined
  */
 function tryGetProperty(cell, prop) {
-    if (!(prop in cell))
+    if (cell == null || typeof cell !== 'object')
+        return undefined;
+    const obj = cell;
+    if (!(prop in obj))
         return undefined;
     try {
-        const val = cell[prop];
+        const val = obj[prop];
         if (typeof val === 'function') {
             try {
                 const result = val();
@@ -405,10 +449,13 @@ function tryGetProperty(cell, prop) {
                 return undefined;
             }
         }
-        if (val && typeof val === 'object' && typeof val.toString === 'function') {
-            const str = val.toString();
-            if (str.includes('function') || str.includes('[native code]')) {
-                return undefined;
+        if (val && typeof val === 'object') {
+            const valObj = val;
+            if (typeof valObj.toString === 'function') {
+                const str = valObj.toString();
+                if (str.includes('function') || str.includes('[native code]')) {
+                    return undefined;
+                }
             }
         }
         return val;
@@ -627,12 +674,15 @@ export function _getUserApiPath() {
 }
 /**
  * 获取 Bangumi 当前登录用户信息
+ * @param callback 回调函数，接收 userInfo 和错误类型
+ *   - errorType: 'none' | 'network' | 'http' | 'parse'
+ *   - network 错误通常意味着无法连接到 BGM API（如被 GFW 墙）
  */
 export function _fetchBgmUserInfo(callback) {
     const token = loadBgToken();
     if (!token) {
         if (callback)
-            callback(null);
+            callback(null, 'none');
         return;
     }
     const apiUrl = BGM_CONFIG.API_BASE + "/v0/me";
@@ -641,6 +691,7 @@ export function _fetchBgmUserInfo(callback) {
     xhr.open("GET", apiUrl, true);
     xhr.setRequestHeader("Authorization", "Bearer " + token);
     xhr.setRequestHeader("Content-Type", "application/json");
+    xhr.timeout = 15000; // 15 秒超时，便于快速感知网络问题
     xhr.onload = function () {
         if (xhr.status === 200) {
             try {
@@ -652,34 +703,44 @@ export function _fetchBgmUserInfo(callback) {
                 _setBgmUsername(username);
                 bgmLog(LOG_LEVELS.INFO, `[_fetchBgmUserInfo] 获取用户信息成功: userId=${userId}, username=${username}`);
                 if (callback)
-                    callback({ id: userId, username: username });
+                    callback({ id: userId, username: username }, 'none');
             }
             catch (e) {
                 bgmLog(LOG_LEVELS.ERROR, `[_fetchBgmUserInfo] 解析响应失败: ${e.message}`);
                 if (callback)
-                    callback(null);
+                    callback(null, 'parse');
             }
         }
         else {
             bgmLog(LOG_LEVELS.WARN, `[_fetchBgmUserInfo] 获取用户信息失败，HTTP 状态码: ${xhr.status}`);
             if (callback)
-                callback(null);
+                callback(null, 'http');
         }
     };
     xhr.onerror = function () {
-        BGM.handleError(new Error('获取用户信息网络错误'), { level: ErrorLevel.WARN, context: '_fetchBgmUserInfo' });
+        bgmLog(LOG_LEVELS.WARN, `[_fetchBgmUserInfo] 网络错误：无法连接到 ${apiUrl}（可能被 GFW 墙）`);
         if (callback)
-            callback(null);
+            callback(null, 'network');
+    };
+    xhr.ontimeout = function () {
+        bgmLog(LOG_LEVELS.WARN, `[_fetchBgmUserInfo] 请求超时（15s）：可能网络受限或被墙`);
+        if (callback)
+            callback(null, 'network');
     };
     xhr.send();
 }
 /**
  * 获取 Bangumi 用户信息（Promise 版本，供 handlers.js 等模块使用）
+ * @returns { userInfo, errorType } - errorType 用于区分网络错误与 Token 错误
+ *   - 'network': 网络错误（如被 GFW 墙、断网、DNS 失败等），Token 本身可能有效
+ *   - 'http': HTTP 错误（如 401 Token 失效、500 服务器错误等）
+ *   - 'parse': 响应解析失败
+ *   - 'none': 无错误（成功或无 Token）
  */
 export function fetchBgmUserInfo() {
     return new Promise((resolve) => {
-        _fetchBgmUserInfo((userInfo) => {
-            resolve(userInfo);
+        _fetchBgmUserInfo((userInfo, errorType) => {
+            resolve({ userInfo, errorType: errorType || 'none' });
         });
     });
 }
@@ -828,9 +889,12 @@ function isNativeCode(val) {
         const str = val.toString();
         return str.includes('[native code]') || str.includes('function Value()');
     }
-    if (val && typeof val === 'object' && typeof val.toString === 'function') {
-        const str = val.toString();
-        return str.includes('[native code]') || str.includes('function Value()');
+    if (val && typeof val === 'object') {
+        const obj = val;
+        if (typeof obj.toString === 'function') {
+            const str = obj.toString();
+            return str.includes('[native code]') || str.includes('function Value()');
+        }
     }
     return false;
 }
@@ -850,15 +914,20 @@ function safeCellValue(cell) {
             return '';
         }
     }
-    if (typeof cell === 'object' && cell.toString) {
-        const str = cell.toString();
-        if (isNativeCode(str) || isNativeCode(cell))
-            return '';
-        return str;
+    if (cell && typeof cell === 'object') {
+        const obj = cell;
+        if (obj.toString) {
+            const str = obj.toString();
+            if (isNativeCode(str) || isNativeCode(cell))
+                return '';
+            return str;
+        }
     }
     return String(cell);
 }
 export function readRangeValues(ws, startRow, endRow, startCol, endCol) {
+    if (!ws)
+        return [];
     try {
         const range = ws.Range(`${colNumToLetter(startCol)}${startRow}:${colNumToLetter(endCol)}${endRow}`);
         const raw = tryGetProperty(range, 'Value2');
@@ -949,7 +1018,7 @@ export function getColumnMap(ws, headerRow) {
         const lastCol = 50;
         for (let i = 1; i <= lastCol; i++) {
             const colName = trim(String(getCellValue(ws, headerRow, i)));
-            // 记录第一个非空列作为序列号列
+            // 记录第一个非空列作为序列号列候选
             if (!firstNonEmptyCol && colName) {
                 firstNonEmptyCol = i;
             }
@@ -965,9 +1034,31 @@ export function getColumnMap(ws, headerRow) {
                 }
             }
         }
-        // 如果没有通过规则匹配到序列号列，使用第一个非空列
-        if (!colMap.has('序列号') && firstNonEmptyCol) {
-            colMap.set('序列号', firstNonEmptyCol);
+        // 如果没有通过规则匹配到序列号列，尝试找一个未被其他 key 占用的列
+        // 修复：避免将"序列号"映射到已被"是否看完"等字段占用的列，导致两个字段读取同一列
+        if (!colMap.has('序列号')) {
+            const mappedCols = new Set(colMap.values());
+            let seqCol;
+            if (firstNonEmptyCol && !mappedCols.has(firstNonEmptyCol)) {
+                // 第一个非空列未被占用，使用它
+                seqCol = firstNonEmptyCol;
+            }
+            else {
+                // 第一个非空列已被占用，向后查找第一个未被占用的非空列
+                for (let i = 1; i <= lastCol; i++) {
+                    if (!mappedCols.has(i)) {
+                        const v = trim(String(getCellValue(ws, headerRow, i)));
+                        if (v) {
+                            seqCol = i;
+                            break;
+                        }
+                    }
+                }
+            }
+            if (seqCol) {
+                colMap.set('序列号', seqCol);
+                bgmLog(LOG_LEVELS.INFO, `[getColumnMap] 序列号列未匹配到表头，使用列 ${seqCol} 作为序列号列`);
+            }
         }
         return colMap;
     });
@@ -1136,4 +1227,3 @@ export function safeActivate(ws) {
         bgmLog(LOG_LEVELS.WARN, 'safeActivate: 无法激活工作表');
     }
 }
-//# sourceMappingURL=util.js.map

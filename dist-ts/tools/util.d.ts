@@ -1,4 +1,8 @@
-import { LOG_LEVELS, ERROR_LEVELS, ErrorLevel, type DialogOptions, type ErrorOptions, type WpsApplication, BgmError, BGMCache, BGMSheet, type BGMSync, BGMUserInfo, WpsWorksheet, WpsRange } from '../index.js';
+import { LOG_LEVELS, ERROR_LEVELS, ErrorLevel, type ErrorOptions } from '../core/constants.js';
+import { BgmError } from '../core/result.js';
+import { type DialogOptions } from '../ui/dialog.js';
+import { type WpsApplication, type WpsWorksheet, type WpsRange } from './wps.js';
+import type { BGMCache, BGMSheet, BGMSync, BGMUserInfo } from '../index.js';
 export declare const BGM: {
     cache: BGMCache;
     sheet: BGMSheet;
@@ -123,12 +127,23 @@ export declare function _getBgmUsername(): string | null;
 export declare function _getUserApiPath(): string;
 /**
  * 获取 Bangumi 当前登录用户信息
+ * @param callback 回调函数，接收 userInfo 和错误类型
+ *   - errorType: 'none' | 'network' | 'http' | 'parse'
+ *   - network 错误通常意味着无法连接到 BGM API（如被 GFW 墙）
  */
-export declare function _fetchBgmUserInfo(callback?: (userInfo: BGMUserInfo | null) => void): void;
+export declare function _fetchBgmUserInfo(callback?: (userInfo: BGMUserInfo | null, errorType?: 'none' | 'network' | 'http' | 'parse') => void): void;
 /**
  * 获取 Bangumi 用户信息（Promise 版本，供 handlers.js 等模块使用）
+ * @returns { userInfo, errorType } - errorType 用于区分网络错误与 Token 错误
+ *   - 'network': 网络错误（如被 GFW 墙、断网、DNS 失败等），Token 本身可能有效
+ *   - 'http': HTTP 错误（如 401 Token 失效、500 服务器错误等）
+ *   - 'parse': 响应解析失败
+ *   - 'none': 无错误（成功或无 Token）
  */
-export declare function fetchBgmUserInfo(): Promise<BGMUserInfo | null>;
+export declare function fetchBgmUserInfo(): Promise<{
+    userInfo: BGMUserInfo | null;
+    errorType: 'none' | 'network' | 'http' | 'parse';
+}>;
 /**
  * 通过 WPS 提供的接口执行脚本
  */
@@ -155,7 +170,7 @@ export declare function sleep(ms: number): void;
  * @returns Promise
  */
 export declare function delay(ms: number): Promise<void>;
-export declare function readRangeValues(ws: any, startRow: number, endRow: number, startCol: number, endCol: number): string[][];
+export declare function readRangeValues(ws: WpsWorksheet | null | undefined, startRow: number, endRow: number, startCol: number, endCol: number): string[][];
 /**
  * 获取或设置缓存
  * @param key 缓存键
@@ -163,7 +178,7 @@ export declare function readRangeValues(ws: any, startRow: number, endRow: numbe
  * @returns 缓存的值
  */
 export declare function cacheGet<T>(key: string, factory: () => T): T;
-export declare function findHeaderRow(ws: any, startRow?: number): number;
+export declare function findHeaderRow(ws: WpsWorksheet | null | undefined, startRow?: number): number;
 /**
  * 获取列名到列号的映射（优化版：使用正则规则数组，时间复杂度 O(N*M) 但 M 较小）
  * @param ws 工作表对象
@@ -176,9 +191,9 @@ export declare function findHeaderRow(ws: any, startRow?: number): number;
  * @param headerRow 表头行号
  * @returns Map<string, number> 列名 -> 列号
  */
-export declare function getColumnMap(ws: any, headerRow: number): Map<string, number>;
+export declare function getColumnMap(ws: WpsWorksheet | null | undefined, headerRow: number): Map<string, number>;
 /** 清除指定工作表的所有缓存 */
-export declare function clearSheetCache(ws: any): void;
+export declare function clearSheetCache(ws: WpsWorksheet | null | undefined): void;
 /**
  * 获取工作表的最后有效数据行
  * @param ws            工作表对象（WpsWorksheet）
@@ -188,7 +203,7 @@ export declare function clearSheetCache(ws: any): void;
  * @returns 最后数据行号（1‑based），至少返回 1
  */
 export declare function getLastRow(ws: WpsWorksheet | null | undefined, forceRefresh?: boolean, headerRow?: number): number;
-export declare function isEmptyValue(val: any): boolean;
+export declare function isEmptyValue(val: unknown): boolean;
 export declare function getDataSheet(): WpsWorksheet | null | undefined;
 /**
  * 计算 Excel 行数据的指纹（用于增量同步比较）

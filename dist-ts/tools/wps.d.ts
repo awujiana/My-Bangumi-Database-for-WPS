@@ -6,7 +6,7 @@ export interface WpsApplication {
     StatusBar?: string | boolean;
     OAAssist?: WpsOAAssist;
     InputBox?: (message: string, title: string, defaultVal: string, type: number) => string | false;
-    MessageBox?: (message: string, type: number) => number;
+    MessageBox?: (message: string, type: number, icon?: number) => number;
     Wait?: (date: Date) => void;
     DoEvents?: () => void;
     CreateTaskPane?: (url: string) => WpsTaskPane;
@@ -39,7 +39,7 @@ export interface WpsWorksheet {
     Activate(): void;
     Calculate(): void;
     Range(address: string): WpsRange;
-    Move(Before?: any, After?: any): void;
+    Move(Before?: WpsWorksheet | null, After?: WpsWorksheet | null): void;
 }
 export interface WpsRows {
     /** 行数 */
@@ -88,10 +88,16 @@ export interface WpsRange {
     Font?: WpsFont;
     Areas?: WpsAreas;
     Count: number;
+    EntireRow: WpsRange;
+    EntireColumn: WpsRange;
+    HorizontalAlignment: number;
+    ColumnWidth: number;
+    Borders: WpsBorders;
     End(direction: number): WpsRange;
     Select(): void;
     Delete(): void;
     SpecialCells(type: number): WpsRange;
+    AutoFit(): void;
 }
 export interface WpsAreas {
     Count: number;
@@ -102,13 +108,18 @@ export interface WpsInterior {
     ColorIndex?: number;
 }
 export interface WpsFont {
+    Name: string;
     Bold: boolean;
     Size: number;
     Color: number;
 }
+export interface WpsBorders {
+    LineStyle: number;
+}
 export interface WpsPluginStorage {
     setItem(key: string, value: string): void;
     getItem(key: string): string | null;
+    removeItem(key: string): void;
 }
 export interface WpsOAAssist {
     ShellExecute(param: string): void;

@@ -1,3 +1,4 @@
+import { type WpsWorksheet } from '../index.js';
 /**
  * 获取同步预览统计（不发送请求，仅扫描 Excel）
  * @param ws 工作表对象
@@ -7,7 +8,7 @@
  * @param options 可选参数 { incremental: boolean }
  * @returns 统计信息 { total, valid, willSync, willSkip, alreadyUploaded, noUrl, emptyStatus }
  */
-export declare function getSyncPreview(ws: any, colMap: Map<string, number>, lastRow: number, headerRow: number, options?: {
+export declare function getSyncPreview(ws: WpsWorksheet, colMap: Map<string, number>, lastRow: number, headerRow: number, options?: {
     incremental?: boolean;
     fingerprintMap?: Map<string, string>;
 }): {
@@ -24,7 +25,7 @@ export declare function getSyncPreview(ws: any, colMap: Map<string, number>, las
  * 异步检测 Excel 与 Bangumi 收藏之间的冲突
  * @returns 包含冲突条目列表及统计信息的对象
  */
-export declare function detectConflicts(ws: any, colMap: Map<string, number>, lastRow: number, headerRow: number, token: string): Promise<{
+export declare function detectConflicts(ws: WpsWorksheet, colMap: Map<string, number>, lastRow: number, headerRow: number, token: string): Promise<{
     conflicts: Array<{
         row: number;
         sid: string;

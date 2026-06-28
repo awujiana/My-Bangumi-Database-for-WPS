@@ -408,7 +408,8 @@ export function formatSyncRecordSheet(sheet) {
         const dataRange = lastRow >= 2 ? target.Range(`A2:${lastColLetter}${lastRow}`) : null;
         // 1. 字体
         try {
-            fullRange.Font.Name = 'Maple Mono NF CN Medium';
+            if (fullRange.Font)
+                fullRange.Font.Name = 'Maple Mono NF CN Medium';
         }
         catch (_) { }
         // 2. 自动行高
@@ -444,7 +445,7 @@ export function formatSyncRecordSheet(sheet) {
         const nameColLetter = colNumToLetter(SYNC_RECORD_COL.NAME);
         if (dataRange) {
             try {
-                const nameRange = sheet.Range(`${nameColLetter}2:${nameColLetter}${lastRow}`);
+                const nameRange = target.Range(`${nameColLetter}2:${nameColLetter}${lastRow}`);
                 nameRange.Borders.LineStyle = 1;
             }
             catch (_) { }
@@ -453,7 +454,7 @@ export function formatSyncRecordSheet(sheet) {
         const collTypeColLetter = colNumToLetter(SYNC_RECORD_COL.COLL_TYPE);
         if (dataRange) {
             try {
-                const collRange = sheet.Range(`${collTypeColLetter}2:${collTypeColLetter}${lastRow}`);
+                const collRange = target.Range(`${collTypeColLetter}2:${collTypeColLetter}${lastRow}`);
                 collRange.Borders.LineStyle = 1;
             }
             catch (_) { }
@@ -496,4 +497,3 @@ export function openSyncRecordSheet() {
         BGM.handleError(e, { context: 'openSyncRecordSheet', showAlert: false });
     }
 }
-//# sourceMappingURL=syncRecord.js.map

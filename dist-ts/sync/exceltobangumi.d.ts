@@ -191,7 +191,7 @@ export interface SyncOptions {
     /** 是否启用增量同步（基于指纹） */
     incremental?: boolean;
 }
-export declare function SyncToBangumiAsync(ws: any, colMap: Map<string, number>, token: string, lastRow: number, headerRow: number, options?: SyncOptions): Promise<{
+export declare function SyncToBangumiAsync(ws: WpsWorksheet, colMap: Map<string, number>, token: string, lastRow: number, headerRow: number, options?: SyncOptions): Promise<{
     success: number;
     fail: number;
     skip: number;

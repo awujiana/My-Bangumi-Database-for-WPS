@@ -1,10 +1,19 @@
 /**
+ * @fileoverview 事件总线模块
+ * @module tools/events
+ * @description 实现模块间的发布-订阅事件系统，提供松耦合的组件通信方式。
+ *              支持事件的订阅、退订、单次订阅和发布。
+ *
+ * @author BGM Development Team
+ * @version 1.0.0
+ */
+/**
  * 事件处理器类型
  *
  * @callback EventHandler
- * @param {any} [data] - 事件携带的数据
+ * @param {unknown} [data] - 事件携带的数据
  */
-export type EventHandler = (data?: any) => void;
+export type EventHandler<T = any> = (data?: T) => void;
 /**
  * 事件总线类
  * @class
@@ -34,9 +43,9 @@ export declare class EventBus {
     /**
      * 发布事件
      * @param {string} eventName - 事件名称
-     * @param {any} [data] - 事件数据
+     * @param {unknown} [data] - 事件数据
      */
-    emit(eventName: string, data?: any): void;
+    emit(eventName: string, data?: unknown): void;
     /**
      * 检查是否有指定事件的订阅者
      * @param {string} eventName - 事件名称
@@ -54,19 +63,6 @@ export declare class EventBus {
      */
     clear(): void;
 }
-export declare const BANGUMI_EVENTS: {
-    readonly LOGIN_SUCCESS: "login:success";
-    readonly LOGIN_FAILED: "login:failed";
-    readonly LOGOUT: "logout";
-    readonly SYNC_START: "sync:start";
-    readonly SYNC_END: "sync:end";
-    readonly SYNC_PROGRESS: "sync:progress";
-    readonly SYNC_ERROR: "sync:error";
-    readonly COLLECTION_UPDATED: "collection:updated";
-    readonly SETTINGS_CHANGED: "settings:changed";
-    readonly USERID_UPDATED: "userid:updated";
-    readonly PANEL_READY: "panel:ready";
-};
 export declare const BGM_EVENTS: {
     readonly TOKEN_UPDATED: "state:tokenUpdated";
     readonly USER_ID_UPDATED: "state:userIdUpdated";

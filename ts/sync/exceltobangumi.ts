@@ -294,13 +294,13 @@ export function testTokenValidityForRibbon(token?: string): void {
     xhr.onerror = () => {
         const duration = Date.now() - startTime;
         bgmLog(LOG_LEVELS.ERROR, `[exceltobangumi/testTokenValidityForRibbon] 网络错误，耗时: ${duration}ms`);
-        showError('网络错误，无法验证Token', '错误');
+        showError('网络错误，无法连接到 Bangumi API\n\n可能原因：\n• 网络被墙（GFW）\n• 断网或 DNS 失败\n• API 服务器不可达\n\nToken 本身可能有效，请在网络恢复后重试', '网络错误');
     };
     
     xhr.ontimeout = () => {
         const duration = Date.now() - startTime;
         bgmLog(LOG_LEVELS.WARN, `[exceltobangumi/testTokenValidityForRibbon] 请求超时，耗时: ${duration}ms`);
-        showError('请求超时', '错误');
+        showError('请求超时（30s）\n\n可能网络受限或被墙，Token 本身可能有效', '超时');
     };
     
     bgmLog(LOG_LEVELS.INFO, `[exceltobangumi/testTokenValidityForRibbon] 正在发送请求...`);

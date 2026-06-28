@@ -5,7 +5,7 @@
  */
 
 import {
-    type BGMUserInfo, type SyncRecord, LOG_LEVELS, bgmLog, BGM,
+    type SyncRecord, LOG_LEVELS, bgmLog, BGM,
     loadBgToken, storeBgToken, clearBgToken, _getBgmUserId, _setBgmUserId, _getBgmUsername, _setBgmUsername, getApp,
     getCell, trim, getCellValue, setCellValue, fetchBgmUserInfo, BGM_COLOR, showAlert, showConfirm,
     showError, showSuccess, showInput, showToast, setStatus,
@@ -127,16 +127,30 @@ export function updateTokenStatus(): void {
             tokenStatus.textContent = _T.set + ' (' + token.substring(0, 4) + '...)';
             
             // 尝试获取用户信息（但不阻塞 UI 更新）
-            // 注意：这里可能会因为 CORS 失败，但不影响 Token 状态显示
+            // 注意：这里可能会因为 CORS 或网络问题失败
             fetchBgmUserInfo()
-                .then((userInfo: BGMUserInfo | null) => {
+                .then(({ userInfo, errorType }) => {
                     if (userInfo?.username) {
+                        tokenStatus.style.color = '#4CAF50';
                         tokenStatus.textContent = _T.set + ': ' + userInfo.username;
                         updateUserIdStatus();
+                    } else if (errorType === 'network') {
+                        // 网络错误：Token 本身可能有效，但无法连接到 BGM API
+                        // 常见原因：被 GFW 墙、断网、DNS 失败
+                        tokenStatus.style.color = '#ff9800'; // 橙色警告
+                        tokenStatus.textContent = _T.set + ' (' + token.substring(0, 4) + '...) ⚠ 网络无法连接';
+                        bgmLog(LOG_LEVELS.WARN, '[updateTokenStatus] 网络错误：无法连接到 BGM API（可能被 GFW 墙）');
+                        showToast('Token 已设置，但无法连接到 Bangumi API\n可能原因：网络被墙（GFW）或断网\nToken 本身可能有效，请在网络恢复后重试', 'warn');
+                    } else if (errorType === 'http') {
+                        // HTTP 错误（如 401）：Token 失效
+                        tokenStatus.style.color = '#f44336';
+                        tokenStatus.textContent = _T.set + ' (Token 可能失效)';
+                        bgmLog(LOG_LEVELS.WARN, '[updateTokenStatus] HTTP 错误：Token 可能已失效');
                     }
+                    // errorType === 'parse' 或 'none'：保持原显示
                 })
                 .catch(() => {
-                    // CORS 错误或其他错误，静默处理
+                    // 意外错误，静默处理
                     bgmLog(LOG_LEVELS.INFO, '获取用户名失败（CORS或网络错误）');
                 });
         }

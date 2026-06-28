@@ -599,8 +599,11 @@ function refreshData(): void {
             
                 const displayColCount = meta.previewColEnd - meta.previewColStart;
                 // 使用 visibleRows 过滤，而不是遍历整个范围
-                const dataRows = (filterStatus?.visibleRows || [])
-                    .filter(r => r !== meta.headerRow && r >= meta.dataStartRow);
+                // 防御性排序 + 去重：确保行号严格升序且无重复（修复"190-201后跳到3"问题）
+                const dataRows = Array.from(new Set(
+                    (filterStatus?.visibleRows || [])
+                        .filter(r => r !== meta.headerRow && r >= meta.dataStartRow)
+                )).sort((a, b) => a - b);
                 const maxPreview = Math.min(dataRows.length, PANEL_CONFIG.PREVIEW_LIMIT);
 
                 // 批量读取：按连续行段一次性读取 Range.Value2，减少 COM 调用次数

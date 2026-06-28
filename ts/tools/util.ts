@@ -746,11 +746,16 @@ export function _getUserApiPath(): string {
 
 /**
  * 获取 Bangumi 当前登录用户信息
+ * @param callback 回调函数，接收 userInfo 和错误类型
+ *   - errorType: 'none' | 'network' | 'http' | 'parse'
+ *   - network 错误通常意味着无法连接到 BGM API（如被 GFW 墙）
  */
-export function _fetchBgmUserInfo(callback?: (userInfo: BGMUserInfo | null) => void): void {
+export function _fetchBgmUserInfo(
+    callback?: (userInfo: BGMUserInfo | null, errorType?: 'none' | 'network' | 'http' | 'parse') => void
+): void {
     const token = loadBgToken();
     if (!token) {
-        if (callback) callback(null);
+        if (callback) callback(null, 'none');
         return;
     }
     
@@ -761,6 +766,7 @@ export function _fetchBgmUserInfo(callback?: (userInfo: BGMUserInfo | null) => v
     xhr.open("GET", apiUrl, true);
     xhr.setRequestHeader("Authorization", "Bearer " + token);
     xhr.setRequestHeader("Content-Type", "application/json");
+    xhr.timeout = 15000; // 15 秒超时，便于快速感知网络问题
     
     xhr.onload = function(): void {
         if (xhr.status === 200) {
@@ -774,34 +780,41 @@ export function _fetchBgmUserInfo(callback?: (userInfo: BGMUserInfo | null) => v
                 _setBgmUsername(username);
                 bgmLog(LOG_LEVELS.INFO, `[_fetchBgmUserInfo] 获取用户信息成功: userId=${userId}, username=${username}`);
                 
-                if (callback) callback({ id: userId, username: username });
+                if (callback) callback({ id: userId, username: username }, 'none');
             } catch (e: unknown) {
                 bgmLog(LOG_LEVELS.ERROR, `[_fetchBgmUserInfo] 解析响应失败: ${(e as Error).message}`);
-                if (callback) callback(null);
+                if (callback) callback(null, 'parse');
             }
         } else {
             bgmLog(LOG_LEVELS.WARN, `[_fetchBgmUserInfo] 获取用户信息失败，HTTP 状态码: ${xhr.status}`);
-            if (callback) callback(null);
+            if (callback) callback(null, 'http');
         }
     };
     
     xhr.onerror = function(): void {
-        BGM.handleError(
-            new Error('获取用户信息网络错误'),
-            { level: ErrorLevel.WARN, context: '_fetchBgmUserInfo' }
-        );
-        if (callback) callback(null);
+        bgmLog(LOG_LEVELS.WARN, `[_fetchBgmUserInfo] 网络错误：无法连接到 ${apiUrl}（可能被 GFW 墙）`);
+        if (callback) callback(null, 'network');
+    };
+
+    xhr.ontimeout = function(): void {
+        bgmLog(LOG_LEVELS.WARN, `[_fetchBgmUserInfo] 请求超时（15s）：可能网络受限或被墙`);
+        if (callback) callback(null, 'network');
     };
     
     xhr.send();
 }
 /**
  * 获取 Bangumi 用户信息（Promise 版本，供 handlers.js 等模块使用）
+ * @returns { userInfo, errorType } - errorType 用于区分网络错误与 Token 错误
+ *   - 'network': 网络错误（如被 GFW 墙、断网、DNS 失败等），Token 本身可能有效
+ *   - 'http': HTTP 错误（如 401 Token 失效、500 服务器错误等）
+ *   - 'parse': 响应解析失败
+ *   - 'none': 无错误（成功或无 Token）
  */
-export function fetchBgmUserInfo(): Promise<BGMUserInfo | null> {
+export function fetchBgmUserInfo(): Promise<{ userInfo: BGMUserInfo | null; errorType: 'none' | 'network' | 'http' | 'parse' }> {
     return new Promise((resolve) => {
-        _fetchBgmUserInfo((userInfo) => {
-            resolve(userInfo);
+        _fetchBgmUserInfo((userInfo, errorType) => {
+            resolve({ userInfo, errorType: errorType || 'none' });
         });
     });
 }
@@ -1084,7 +1097,7 @@ export function getColumnMap(ws: WpsWorksheet | null | undefined, headerRow: num
         const lastCol = 50;
         for (let i = 1; i <= lastCol; i++) {
             const colName = trim(String(getCellValue(ws, headerRow, i)));
-            // 记录第一个非空列作为序列号列
+            // 记录第一个非空列作为序列号列候选
             if (!firstNonEmptyCol && colName) {
                 firstNonEmptyCol = i;
             }
@@ -1100,9 +1113,30 @@ export function getColumnMap(ws: WpsWorksheet | null | undefined, headerRow: num
             }
         }
 
-        // 如果没有通过规则匹配到序列号列，使用第一个非空列
-        if (!colMap.has('序列号') && firstNonEmptyCol) {
-            colMap.set('序列号', firstNonEmptyCol);
+        // 如果没有通过规则匹配到序列号列，尝试找一个未被其他 key 占用的列
+        // 修复：避免将"序列号"映射到已被"是否看完"等字段占用的列，导致两个字段读取同一列
+        if (!colMap.has('序列号')) {
+            const mappedCols = new Set(colMap.values());
+            let seqCol: number | undefined;
+            if (firstNonEmptyCol && !mappedCols.has(firstNonEmptyCol)) {
+                // 第一个非空列未被占用，使用它
+                seqCol = firstNonEmptyCol;
+            } else {
+                // 第一个非空列已被占用，向后查找第一个未被占用的非空列
+                for (let i = 1; i <= lastCol; i++) {
+                    if (!mappedCols.has(i)) {
+                        const v = trim(String(getCellValue(ws, headerRow, i)));
+                        if (v) {
+                            seqCol = i;
+                            break;
+                        }
+                    }
+                }
+            }
+            if (seqCol) {
+                colMap.set('序列号', seqCol);
+                bgmLog(LOG_LEVELS.INFO, `[getColumnMap] 序列号列未匹配到表头，使用列 ${seqCol} 作为序列号列`);
+            }
         }
 
         return colMap;

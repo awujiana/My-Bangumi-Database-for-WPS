@@ -9,7 +9,7 @@
  */
 import { URL_PATTERNS, WATCH_STATUS_MAP, BGM_CONFIG, BGM_COLOR, LOG_LEVELS, SYNC_STATUS, bgmLog, getApp, getCell, trim, getColumnMap, findHeaderRow, colNumToLetter, getCellValue, loadBgToken, storeBgToken, _setBgmUserId, _setBgmUsername, BGM, wpsMsgBox, _getUserApiPath, readRangeValues, delay, calcFingerprint, getAllSyncRecords, isWpsWorksheet, clearSheetCache, showToast } from '../index.js';
 import { getOrCreateSyncRecordSheet, addSyncRecord } from './syncRecord.js';
-import { showAlert, showSuccess, showError, showConfirm, showSyncProgressDialog, updateSyncProgressDialog, setSyncProgressPaused, completeSyncProgressDialog, hideSyncProgressDialog } from '../ui/dialog.js';
+import { showAlert, showSuccess, showError, showConfirm, showSyncProgressDialog, updateSyncProgressDialog, completeSyncProgressDialog, hideSyncProgressDialog } from '../ui/dialog.js';
 /**
  * 判断字符串是否为 Bangumi 条目 URL（支持 bgm.tv / bangumi.tv / chii.in）
  * @param url 待检测的字符串
@@ -89,7 +89,11 @@ function markSyncResultColor(ws, row, isSuccess, seqCol) {
  * 提取HTTP请求结果消息
  */
 function extractResponseMessage(data) {
-    return data?.msg || data?.message || data?.error || data?.description || 'success';
+    if (data && typeof data === 'object') {
+        const d = data;
+        return d.msg || d.message || d.error || d.description || 'success';
+    }
+    return 'success';
 }
 /**
  * 处理请求错误响应
@@ -205,12 +209,12 @@ export function testTokenValidityForRibbon(token) {
     xhr.onerror = () => {
         const duration = Date.now() - startTime;
         bgmLog(LOG_LEVELS.ERROR, `[exceltobangumi/testTokenValidityForRibbon] 网络错误，耗时: ${duration}ms`);
-        showError('网络错误，无法验证Token', '错误');
+        showError('网络错误，无法连接到 Bangumi API\n\n可能原因：\n• 网络被墙（GFW）\n• 断网或 DNS 失败\n• API 服务器不可达\n\nToken 本身可能有效，请在网络恢复后重试', '网络错误');
     };
     xhr.ontimeout = () => {
         const duration = Date.now() - startTime;
         bgmLog(LOG_LEVELS.WARN, `[exceltobangumi/testTokenValidityForRibbon] 请求超时，耗时: ${duration}ms`);
-        showError('请求超时', '错误');
+        showError('请求超时（30s）\n\n可能网络受限或被墙，Token 本身可能有效', '超时');
     };
     bgmLog(LOG_LEVELS.INFO, `[exceltobangumi/testTokenValidityForRibbon] 正在发送请求...`);
     xhr.send();
@@ -236,6 +240,7 @@ function notifyUserInfoUpdated(username, userId) {
             const app = getApp();
             const tsId = app?.PluginStorage?.getItem('taskpane_id');
             if (tsId) {
+                // GetTaskPane 返回的 WpsTaskPane 在 WPS 实际运行时还包含 contentWindow 等 COM 属性
                 const pane = app?.GetTaskPane?.(tsId);
                 if (pane?.contentWindow?.refreshTaskpaneUI) {
                     pane.contentWindow.refreshTaskpaneUI();
@@ -843,18 +848,20 @@ async function batchSyncRequests(tasks, token, userIdPath, concurrency = DEFAULT
     }
     return { success, fail, stopped };
 }
-export async function SyncToBangumiAsync(ws, colMap, token, lastRow, headerRow, options) {
-    const result = { success: 0, fail: 0, skip: 0, stopped: false };
-    const startRow = headerRow + 1;
-    const startTime = Date.now();
-    const seqCol = getSeqColIndex(colMap);
-    bgmLog(LOG_LEVELS.INFO, '[SyncToBangumiAsync] ========== 开始批量同步 ==========');
-    bgmLog(LOG_LEVELS.INFO, `[SyncToBangumiAsync] 配置参数：`);
-    bgmLog(LOG_LEVELS.INFO, `[SyncToBangumiAsync]   - 增量同步模式: ${options?.incremental ? '开启' : '关闭'}`);
-    bgmLog(LOG_LEVELS.INFO, `[SyncToBangumiAsync]   - 跳过冲突数量: ${options?.skipSids?.size || 0}`);
-    bgmLog(LOG_LEVELS.INFO, `[SyncToBangumiAsync]   - 表头行: ${headerRow}`);
-    bgmLog(LOG_LEVELS.INFO, `[SyncToBangumiAsync]   - 最后一行: ${lastRow}`);
-    bgmLog(LOG_LEVELS.INFO, `[SyncToBangumiAsync]   - 序列号列: ${seqCol} (列${colNumToLetter(seqCol)})`);
+/**
+ * 预处理同步任务（步骤 1-4）：筛选可见行、批量读取数据缓存、构建历史指纹映射、收集所有需要同步的任务。
+ * @param ws 工作表
+ * @param colMap 列映射
+ * @param options 同步选项
+ * @param startRow 起始数据行（headerRow + 1）
+ * @param lastRow 最后一行
+ * @param seqCol 序列号列索引
+ * @returns 待同步任务列表及预处理阶段的跳过/失败计数
+ */
+function prepareSyncTasks(ws, colMap, options, startRow, lastRow, seqCol) {
+    let skip = 0;
+    let fail = 0;
+    const headerRow = startRow - 1;
     // ========== 1. 获取可见行（筛选状态） ==========
     const filterStatus = getFilterStatus(ws, lastRow, headerRow, true);
     let rowsToProcess = [];
@@ -887,35 +894,34 @@ export async function SyncToBangumiAsync(ws, colMap, token, lastRow, headerRow, 
     bgmLog(LOG_LEVELS.INFO, '[SyncToBangumiAsync] 步骤4: 预处理收集同步任务');
     const syncTasks = [];
     const skipSids = options?.skipSids;
-    const userIdPath = _getUserApiPath();
     for (let idx = 0; idx < rowsToProcess.length; idx++) {
         const rowNum = rowsToProcess[idx];
         try {
             const bgmUrl = getField(rowNum, 'Bangumi_URL');
             if (!bgmUrl) {
-                result.skip++;
+                skip++;
                 continue;
             }
             const sid = extractSubjectId(bgmUrl);
             if (!sid) {
-                result.skip++;
+                skip++;
                 continue;
             }
             // 冲突跳过
             if (skipSids && skipSids.has(sid)) {
-                result.skip++;
+                skip++;
                 continue;
             }
             // 检查观看状态是否为空
             const watchStatusField = getField(rowNum, '是否看完') || getField(rowNum, '状态') || getField(rowNum, '观看状态');
             if (!watchStatusField) {
-                result.skip++;
+                skip++;
                 continue;
             }
             // 获取观看状态类型
             const watchType = mapWatchStatus(watchStatusField);
             if (watchType === 0) {
-                result.skip++;
+                skip++;
                 continue;
             }
             // 增量同步指纹检查
@@ -932,13 +938,13 @@ export async function SyncToBangumiAsync(ws, colMap, token, lastRow, headerRow, 
                 ]);
                 const storedFingerprint = fingerprintMap.get(sid);
                 if (storedFingerprint === currentFingerprint) {
-                    result.skip++;
+                    skip++;
                     continue;
                 }
             }
             // 检查已上传颜色（非增量模式）
             if (!fingerprintMap && isCellMarkedSuccess(ws, rowNum, seqCol)) {
-                result.skip++;
+                skip++;
                 continue;
             }
             const finishedDate = getField(rowNum, '完播日');
@@ -960,16 +966,25 @@ export async function SyncToBangumiAsync(ws, colMap, token, lastRow, headerRow, 
             });
         }
         catch (e) {
-            result.fail++;
+            fail++;
             BGM.handleError(e, { level: BGM.ErrorLevel.WARN, context: 'SyncToBangumiAsync:preprocess' });
         }
     }
-    bgmLog(LOG_LEVELS.INFO, `[SyncToBangumiAsync] 预处理完成：${syncTasks.length} 条待同步，${result.skip} 条跳过（失败${result.fail}条）`);
-    // ========== 5. 批量执行同步请求（并发控制） ==========
-    const reportProgress = (current, message) => {
-        if (options?.onProgress)
-            options.onProgress(current, syncTasks.length, message);
-    };
+    bgmLog(LOG_LEVELS.INFO, `[SyncToBangumiAsync] 预处理完成：${syncTasks.length} 条待同步，${skip} 条跳过（失败${fail}条）`);
+    return { syncTasks, skip, fail };
+}
+/**
+ * 批量执行同步请求（步骤 5）：创建同步记录表、设置同步状态机位置、调用 batchSyncRequests。
+ * @param syncTasks 待同步任务列表
+ * @param token API Token
+ * @param userIdPath 用户 API 路径
+ * @param options 同步选项
+ * @param ws 工作表
+ * @param headerRow 表头行
+ * @param seqCol 序列号列索引
+ * @returns 成功/失败任务列表及是否被停止
+ */
+async function executeBatchSync(syncTasks, token, userIdPath, options, ws, headerRow, seqCol) {
     // 尝试创建同步记录表
     try {
         getOrCreateSyncRecordSheet();
@@ -981,7 +996,21 @@ export async function SyncToBangumiAsync(ws, colMap, token, lastRow, headerRow, 
     // 设置同步状态机的当前位置（工作表 + 序列号列），供暂停时定位
     BGM.sync.updatePosition(ws, headerRow, seqCol);
     const { success: successTasks, fail: failTasks, stopped } = await batchSyncRequests(syncTasks, token, userIdPath, DEFAULT_CONCURRENCY, options?.onProgress);
-    // ========== 6. 批量更新 UI 和记录 ==========
+    return { successTasks, failTasks, stopped };
+}
+/**
+ * 批量更新 UI 和记录（步骤 6）：标记颜色、写同步记录、统计剩余任务、reportProgress、BGM.setSyncComplete。
+ * @param ws 工作表
+ * @param seqCol 序列号列索引
+ * @param successTasks 成功任务列表
+ * @param failTasks 失败任务列表
+ * @param syncTasks 全部待同步任务列表
+ * @param stopped 是否被停止
+ * @param result 同步结果统计对象（会被直接修改）
+ * @param startTime 开始时间戳
+ * @param reportProgress 进度回调
+ */
+function finalizeSyncResults(ws, seqCol, successTasks, failTasks, syncTasks, stopped, result, startTime, reportProgress) {
     bgmLog(LOG_LEVELS.INFO, '[SyncToBangumiAsync] 步骤6: 批量更新 UI 和记录');
     // 批量更新成功项
     for (const task of successTasks) {
@@ -1031,6 +1060,32 @@ export async function SyncToBangumiAsync(ws, colMap, token, lastRow, headerRow, 
     reportProgress(syncTasks.length, stopped ? '同步已停止' : '同步完成');
     BGM.setSyncComplete(result);
     bgmLog(LOG_LEVELS.INFO, `[SyncToBangumiAsync] 同步完成: 成功=${result.success}, 失败=${result.fail}, 跳过=${result.skip}, 已停止=${result.stopped}, 总耗时=${totalTime}ms`);
+}
+export async function SyncToBangumiAsync(ws, colMap, token, lastRow, headerRow, options) {
+    const result = { success: 0, fail: 0, skip: 0, stopped: false };
+    const startRow = headerRow + 1;
+    const startTime = Date.now();
+    const seqCol = getSeqColIndex(colMap);
+    const userIdPath = _getUserApiPath();
+    bgmLog(LOG_LEVELS.INFO, '[SyncToBangumiAsync] ========== 开始批量同步 ==========');
+    bgmLog(LOG_LEVELS.INFO, `[SyncToBangumiAsync] 配置参数：`);
+    bgmLog(LOG_LEVELS.INFO, `[SyncToBangumiAsync]   - 增量同步模式: ${options?.incremental ? '开启' : '关闭'}`);
+    bgmLog(LOG_LEVELS.INFO, `[SyncToBangumiAsync]   - 跳过冲突数量: ${options?.skipSids?.size || 0}`);
+    bgmLog(LOG_LEVELS.INFO, `[SyncToBangumiAsync]   - 表头行: ${headerRow}`);
+    bgmLog(LOG_LEVELS.INFO, `[SyncToBangumiAsync]   - 最后一行: ${lastRow}`);
+    bgmLog(LOG_LEVELS.INFO, `[SyncToBangumiAsync]   - 序列号列: ${seqCol} (列${colNumToLetter(seqCol)})`);
+    // 步骤 1-4: 预处理（筛选可见行 + 数据缓存 + 指纹映射 + 任务收集）
+    const { syncTasks, skip, fail } = prepareSyncTasks(ws, colMap, options, startRow, lastRow, seqCol);
+    result.skip = skip;
+    result.fail = fail;
+    // 步骤 5: 批量执行同步请求（并发控制）
+    const { successTasks, failTasks, stopped } = await executeBatchSync(syncTasks, token, userIdPath, options, ws, headerRow, seqCol);
+    // 步骤 6: 批量更新 UI 和记录
+    const reportProgress = (current, message) => {
+        if (options?.onProgress)
+            options.onProgress(current, syncTasks.length, message);
+    };
+    finalizeSyncResults(ws, seqCol, successTasks, failTasks, syncTasks, stopped, result, startTime, reportProgress);
     return result;
 }
 /**
@@ -1088,124 +1143,119 @@ async function markEpisodesComplete(sid, epCount, token) {
     }
 }
 /**
- * 选中行同步到 Bangumi（多行/单行）
- *
- * @function syncSelectedRows
+ * 从当前选中区域收集行号（含非连续区域 Areas 处理）
+ * @param app WPS Application 对象
+ * @returns 原始行号数组；若未选中或异常则返回空数组（已提示用户）
  */
-export async function syncSelectedRows() {
-    const startTime = Date.now();
-    bgmLog(LOG_LEVELS.INFO, '[syncSelectedRows] ========== 开始选中行同步 ==========');
+function collectSelectedRows(app) {
+    const rawRows = [];
     try {
-        const app = getApp();
-        if (!app?.ActiveWorkbook) {
-            bgmLog(LOG_LEVELS.ERROR, '[syncSelectedRows] 无法获取 Application');
-            wpsMsgBox('无法获取 Application', 0, 48);
-            return;
-        }
-        const ws = app.ActiveWorkbook.ActiveSheet;
-        if (!ws) {
-            bgmLog(LOG_LEVELS.ERROR, '[syncSelectedRows] 无法获取工作表');
-            wpsMsgBox('无法获取工作表', 0, 48);
-            return;
-        }
-        bgmLog(LOG_LEVELS.INFO, '[syncSelectedRows] 工作表获取成功');
-        // 获取选中的行范围
-        let rawRows = [];
-        try {
-            const sel = app.Selection;
-            if (!sel) {
-                bgmLog(LOG_LEVELS.WARN, '[syncSelectedRows] 未选中任何区域');
-                wpsMsgBox('请先在Excel中选中要同步的数据行', 0, 48);
-                return;
-            }
-            // 记录选中区域地址用于调试
-            let selAddress = '';
-            try {
-                selAddress = sel.Address || '';
-            }
-            catch (_) {
-                selAddress = '(无法获取)';
-            }
-            bgmLog(LOG_LEVELS.INFO, `[syncSelectedRows] Selection.Address: ${selAddress}`);
-            // 处理非连续选择（多区域）
-            const areas = sel.Areas;
-            const areaCount = areas ? areas.Count : 1;
-            if (areaCount > 1) {
-                // 非连续选择：遍历每个 Area 收集行号
-                bgmLog(LOG_LEVELS.INFO, `[syncSelectedRows] 检测到非连续选择，共 ${areaCount} 个区域`);
-                for (let ai = 1; ai <= areaCount; ai++) {
-                    const area = areas.Item(ai);
-                    const aStartRow = area.Row;
-                    const aRowCount = area.Rows.Count;
-                    for (let r = aStartRow; r < aStartRow + aRowCount; r++) {
-                        if (!rawRows.includes(r))
-                            rawRows.push(r);
-                    }
-                }
-            }
-            else {
-                // 连续选择：直接读取
-                const startRow = sel.Row;
-                const rowCount = sel.Rows.Count;
-                for (let r = startRow; r < startRow + rowCount; r++) {
-                    rawRows.push(r);
-                }
-            }
-            bgmLog(LOG_LEVELS.INFO, `[syncSelectedRows] 选中区域: ${rawRows.length} 行，行号 ${Math.min(...rawRows)}-${Math.max(...rawRows)}`);
-        }
-        catch (e) {
-            BGM.handleError(e, { context: 'syncSelectedRows', showAlert: false });
-            wpsMsgBox('获取选中区域失败，请检查是否选中了有效区域', 0, 48);
-            return;
-        }
-        if (rawRows.length === 0) {
-            bgmLog(LOG_LEVELS.WARN, '[syncSelectedRows] 没有选中任何行');
+        const sel = app.Selection;
+        if (!sel) {
+            bgmLog(LOG_LEVELS.WARN, '[syncSelectedRows] 未选中任何区域');
             wpsMsgBox('请先在Excel中选中要同步的数据行', 0, 48);
-            return;
+            return rawRows;
         }
-        const headerRow = findHeaderRow(ws);
-        bgmLog(LOG_LEVELS.INFO, `[syncSelectedRows] 表头行: ${headerRow}`);
-        if (headerRow === 0) {
-            bgmLog(LOG_LEVELS.ERROR, '[syncSelectedRows] 未找到有效表头行，中止同步');
-            wpsMsgBox('未在当前工作表中检测到有效表头行！\n请确保表头包含"名称"、"是否看完"、"Bangumi URL"等关键词。', 0, 48);
-            return;
+        // 记录选中区域地址用于调试
+        let selAddress = '';
+        try {
+            selAddress = sel.Address || '';
         }
-        // 排除表头行
-        const rows = rawRows.filter(r => r > headerRow);
-        bgmLog(LOG_LEVELS.INFO, `[syncSelectedRows] 排除表头后有效数据行: ${rows.length} 行（原始选中 ${rawRows.length} 行）`);
-        if (rows.length === 0) {
-            bgmLog(LOG_LEVELS.WARN, '[syncSelectedRows] 排除表头后没有有效数据行');
-            wpsMsgBox('当前选中区域只有表头行，没有数据行', 0, 48);
-            return;
+        catch (_) {
+            selAddress = '(无法获取)';
         }
-        // 选中行数超过阈值时弹出确认对话框
-        if (rows.length > 10) {
-            bgmLog(LOG_LEVELS.INFO, `[syncSelectedRows] 选中 ${rows.length} 行，弹出确认对话框`);
-            const confirmed = await new Promise((resolve) => {
-                showConfirm(`选中了 ${rows.length} 行数据，确认要同步全部吗？\n\n行号范围: ${Math.min(...rows)} - ${Math.max(...rows)}`, (result) => resolve(result), '批量同步确认');
-            });
-            if (!confirmed) {
-                bgmLog(LOG_LEVELS.INFO, '[syncSelectedRows] 用户取消同步');
-                wpsMsgBox('已取消同步', 0, 64);
-                return;
+        bgmLog(LOG_LEVELS.INFO, `[syncSelectedRows] Selection.Address: ${selAddress}`);
+        // 处理非连续选择（多区域）
+        const areas = sel.Areas;
+        const areaCount = areas ? areas.Count : 1;
+        if (areaCount > 1) {
+            // 非连续选择：遍历每个 Area 收集行号
+            bgmLog(LOG_LEVELS.INFO, `[syncSelectedRows] 检测到非连续选择，共 ${areaCount} 个区域`);
+            for (let ai = 1; ai <= areaCount; ai++) {
+                const area = areas.Item(ai);
+                const aStartRow = area.Row;
+                const aRowCount = area.Rows.Count;
+                for (let r = aStartRow; r < aStartRow + aRowCount; r++) {
+                    if (!rawRows.includes(r))
+                        rawRows.push(r);
+                }
             }
         }
-        clearSheetCache(ws);
-        const colMap = getColumnMap(ws, headerRow);
-        bgmLog(LOG_LEVELS.INFO, `[syncSelectedRows] 列映射完成，共 ${colMap.size} 列`);
-        bgmLog(LOG_LEVELS.INFO, `[syncSelectedRows] 集数列号: ${colMap.get('集数')}, 集号列号: ${colMap.get('集号')}, Bangumi_URL列号: ${colMap.get('Bangumi_URL')}`);
-        if (!colMap.has('Bangumi_URL')) {
-            bgmLog(LOG_LEVELS.WARN, '[syncSelectedRows] 未找到 Bangumi_URL 列');
-            wpsMsgBox('未找到 Bangumi URL 列', 0, 48);
-            return;
+        else {
+            // 连续选择：直接读取
+            const startRow = sel.Row;
+            const rowCount = sel.Rows.Count;
+            for (let r = startRow; r < startRow + rowCount; r++) {
+                rawRows.push(r);
+            }
         }
-        const token = loadBgToken();
-        if (!token) {
-            bgmLog(LOG_LEVELS.WARN, '[syncSelectedRows] Token 未设置');
-            wpsMsgBox('请先设置 Token', 0, 48);
-            return;
+        bgmLog(LOG_LEVELS.INFO, `[syncSelectedRows] 选中区域: ${rawRows.length} 行，行号 ${Math.min(...rawRows)}-${Math.max(...rawRows)}`);
+    }
+    catch (e) {
+        BGM.handleError(e, { context: 'syncSelectedRows', showAlert: false });
+        wpsMsgBox('获取选中区域失败，请检查是否选中了有效区域', 0, 48);
+        return [];
+    }
+    return rawRows;
+}
+/**
+ * 校验选中行并准备同步所需数据（排除表头、阈值确认、构建列映射、加载 Token）
+ * @param ws 工作表
+ * @param rawRows 原始选中行号
+ * @param headerRow 表头行号
+ * @returns 准备结果（rows/colMap/token）；若校验失败则返回 null（已提示用户）
+ */
+async function validateSelectedRows(ws, rawRows, headerRow) {
+    // 排除表头行
+    const rows = rawRows.filter(r => r > headerRow);
+    bgmLog(LOG_LEVELS.INFO, `[syncSelectedRows] 排除表头后有效数据行: ${rows.length} 行（原始选中 ${rawRows.length} 行）`);
+    if (rows.length === 0) {
+        bgmLog(LOG_LEVELS.WARN, '[syncSelectedRows] 排除表头后没有有效数据行');
+        showToast('未选中任何数据行', 'warn');
+        return null;
+    }
+    // 选中行数超过阈值时弹出确认对话框
+    if (rows.length > 10) {
+        bgmLog(LOG_LEVELS.INFO, `[syncSelectedRows] 选中 ${rows.length} 行，弹出确认对话框`);
+        const confirmed = await new Promise((resolve) => {
+            showConfirm(`选中了 ${rows.length} 行数据，确认要同步全部吗？\n\n行号范围: ${Math.min(...rows)} - ${Math.max(...rows)}`, (result) => resolve(result), '批量同步确认');
+        });
+        if (!confirmed) {
+            bgmLog(LOG_LEVELS.INFO, '[syncSelectedRows] 用户取消同步');
+            wpsMsgBox('已取消同步', 0, 64);
+            return null;
         }
-        bgmLog(LOG_LEVELS.INFO, `[syncSelectedRows] Token 已设置（长度: ${token.length}）`);
+    }
+    clearSheetCache(ws);
+    const colMap = getColumnMap(ws, headerRow);
+    bgmLog(LOG_LEVELS.INFO, `[syncSelectedRows] 列映射完成，共 ${colMap.size} 列`);
+    bgmLog(LOG_LEVELS.INFO, `[syncSelectedRows] 集数列号: ${colMap.get('集数')}, 集号列号: ${colMap.get('集号')}, Bangumi_URL列号: ${colMap.get('Bangumi_URL')}`);
+    if (!colMap.has('Bangumi_URL')) {
+        bgmLog(LOG_LEVELS.WARN, '[syncSelectedRows] 未找到 Bangumi_URL 列');
+        wpsMsgBox('未找到 Bangumi URL 列', 0, 48);
+        return null;
+    }
+    const token = loadBgToken();
+    if (!token) {
+        bgmLog(LOG_LEVELS.WARN, '[syncSelectedRows] Token 未设置');
+        wpsMsgBox('请先设置 Token', 0, 48);
+        return null;
+    }
+    bgmLog(LOG_LEVELS.INFO, `[syncSelectedRows] Token 已设置（长度: ${token.length}）`);
+    return { rows, colMap, token };
+}
+/**
+ * 执行选中行同步（启动状态机、显示进度弹窗、循环同步、完成弹窗、异常处理、重置状态机）
+ * @param ws 工作表
+ * @param rows 待同步行号数组（已排除表头）
+ * @param colMap 列映射
+ * @param token Bangumi Token
+ * @param headerRow 表头行号
+ * @param startTime 同步开始时间戳（用于耗时统计）
+ */
+async function executeSelectedSync(ws, rows, colMap, token, headerRow, startTime) {
+    let enteredRunning = false;
+    try {
         const urlCol = colMap.get('Bangumi_URL');
         const nameCol = colMap.has('名称') ? colMap.get('名称') : undefined;
         const userPath = _getUserApiPath();
@@ -1214,11 +1264,16 @@ export async function syncSelectedRows() {
         let skipCount = 0;
         let episodeMarkCount = 0;
         const details = [];
-        // 启动同步状态机
-        BGM.sync.isRunning = true;
-        BGM.sync.resetStopFlag();
-        // 显示同步进度弹窗（不隐藏"同步到 Bangumi"按钮）
-        showSyncProgressDialog('正在同步 - 选中行同步', () => { BGM.sync.pause(); setSyncProgressPaused(true); }, () => { BGM.sync.resume(); setSyncProgressPaused(false); }, () => { BGM.sync.requestStop(); });
+        // P2：进入运行状态（防重入 + 重置标志 + 置位）
+        if (!BGM.sync.enterRunningState())
+            return;
+        enteredRunning = true;
+        // P1：显示同步进度弹窗（新 API：handlers 对象，暂停状态由 dialog 内部管理）
+        showSyncProgressDialog('正在同步 - 选中行同步', {
+            onPause: () => BGM.sync.pause(),
+            onResume: () => BGM.sync.resume(),
+            onStop: () => BGM.sync.requestStop()
+        });
         // 设置同步状态机位置（用于暂停时定位到单元格）
         BGM.sync.updatePosition(ws, 0, urlCol);
         for (let idx = 0; idx < rows.length; idx++) {
@@ -1332,18 +1387,74 @@ export async function syncSelectedRows() {
         const wasStopped = BGM.sync.checkShouldStop();
         const summary = `📊 选中 ${rows.length} 行 | 耗时 ${(elapsed / 1000).toFixed(1)}s\n\n✅ 成功: ${successCount}\n❌ 失败: ${failCount}\n⏭️ 跳过: ${skipCount}\n📺 标记章节: ${episodeMarkCount}`;
         completeSyncProgressDialog(summary, details, wasStopped);
-        // 重置同步状态机
-        BGM.sync.isRunning = false;
-        BGM.sync.resetStopFlag();
     }
     catch (e) {
         hideSyncProgressDialog();
-        BGM.sync.isRunning = false;
-        BGM.sync.resetStopFlag();
         BGM.handleError(e, { context: 'syncSelectedRows', showAlert: false });
-        bgmLog(LOG_LEVELS.ERROR, `[syncSelectedRows] 同步异常: ${e.message}`);
-        wpsMsgBox(`选中行同步异常: ${e.message}`, 0, 16);
+        const errMsg = e instanceof Error ? e.message : String(e);
+        bgmLog(LOG_LEVELS.ERROR, `[syncSelectedRows] 同步异常: ${errMsg}`);
+        wpsMsgBox(`选中行同步异常: ${errMsg}`, 0, 16);
+    }
+    finally {
+        // 统一在 finally 中清理运行状态，避免 catch/success 路径重复调用 exitRunningState
+        // 正常完成时 completeSyncProgressDialog 已切换弹窗状态；异常时 hideSyncProgressDialog 已隐藏弹窗
+        if (enteredRunning) {
+            BGM.sync.exitRunningState();
+        }
+    }
+}
+/**
+ * 选中行同步到 Bangumi（多行/单行）
+ *
+ * @function syncSelectedRows
+ */
+export async function syncSelectedRows() {
+    // P0：防重入预检，避免并发同步
+    if (BGM.sync.isRunning) {
+        showToast('同步正在进行中，请稍后', 'warn');
+        return;
+    }
+    const startTime = Date.now();
+    bgmLog(LOG_LEVELS.INFO, '[syncSelectedRows] ========== 开始选中行同步 ==========');
+    try {
+        const app = getApp();
+        if (!app?.ActiveWorkbook) {
+            bgmLog(LOG_LEVELS.ERROR, '[syncSelectedRows] 无法获取 Application');
+            wpsMsgBox('无法获取 Application', 0, 48);
+            return;
+        }
+        const ws = app.ActiveWorkbook.ActiveSheet;
+        if (!ws) {
+            bgmLog(LOG_LEVELS.ERROR, '[syncSelectedRows] 无法获取工作表');
+            wpsMsgBox('无法获取工作表', 0, 48);
+            return;
+        }
+        bgmLog(LOG_LEVELS.INFO, '[syncSelectedRows] 工作表获取成功');
+        // 1. 收集选中行号（含非连续区域 Areas 处理）
+        const rawRows = collectSelectedRows(app);
+        if (rawRows.length === 0)
+            return;
+        // 2. 定位表头行
+        const headerRow = findHeaderRow(ws);
+        bgmLog(LOG_LEVELS.INFO, `[syncSelectedRows] 表头行: ${headerRow}`);
+        if (headerRow === 0) {
+            bgmLog(LOG_LEVELS.ERROR, '[syncSelectedRows] 未找到有效表头行，中止同步');
+            wpsMsgBox('未在当前工作表中检测到有效表头行！\n请确保表头包含"名称"、"是否看完"、"Bangumi URL"等关键词。', 0, 48);
+            return;
+        }
+        // 3. 校验选中行并准备同步数据（排除表头、阈值确认、列映射、Token）
+        const validated = await validateSelectedRows(ws, rawRows, headerRow);
+        if (!validated)
+            return;
+        // 4. 执行同步（状态机、弹窗、循环、完成、异常处理、重置状态机）
+        await executeSelectedSync(ws, validated.rows, validated.colMap, validated.token, headerRow, startTime);
+    }
+    catch (e) {
+        hideSyncProgressDialog();
+        BGM.handleError(e, { context: 'syncSelectedRows', showAlert: false });
+        const errMsg = e instanceof Error ? e.message : String(e);
+        bgmLog(LOG_LEVELS.ERROR, `[syncSelectedRows] 同步异常: ${errMsg}`);
+        wpsMsgBox(`选中行同步异常: ${errMsg}`, 0, 16);
     }
     bgmLog(LOG_LEVELS.INFO, `[syncSelectedRows] ========== 选中行同步结束，总耗时: ${Date.now() - startTime}ms ==========`);
 }
-//# sourceMappingURL=exceltobangumi.js.map

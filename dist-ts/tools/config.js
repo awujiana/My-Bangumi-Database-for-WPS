@@ -122,4 +122,3 @@ export function getSkipConflicts(silent = false) {
         bgmLog(LOG_LEVELS.INFO, `[config] 获取跳过冲突状态: ${result ? '开启' : '关闭'}`);
     return result;
 }
-//# sourceMappingURL=config.js.map

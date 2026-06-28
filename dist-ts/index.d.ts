@@ -5,6 +5,7 @@
  *              其他模块只需 `import { ... } from '../types/index.js'`
  *              即可获取所有核心功能与类型，降低模块间耦合。
  */
+import type { WpsWorksheet } from './tools/wps.js';
 export { ErrorLevel, type ErrorOptions, WPS_ENUM, XL, BGM_CONFIG, BGM_COLOR, LOG_LEVELS, ERROR_LEVELS, PANEL_CONFIG, BGM_SUBJECT_TYPES, COLLECTION_TYPE_NAMES, SYNC_STATUS, COLUMN_RULES, HEADER_KEYWORDS, IMPORTANT_COLS, FIELD_NAME_MAP, URL_PATTERNS, TOKEN_CONFIG, WATCH_STATUS_MAP, COLUMNS, SYNC_RECORD_SHEET_NAME, SYNC_RECORD_COLUMNS, SYNC_RECORD_COL, SYNC_RECORD_TYPE_COLOR, } from './core/constants.js';
 export { BgmError, Result, type BatchSyncResult, } from './core/result.js';
 export { calcChecksum, extractToken, encryptToken, decryptToken, } from './core/crypto.js';
@@ -15,7 +16,8 @@ showError, // 错误
 showSuccess, // 成功
 showInput, // 输入
 showToast, // Toast 通知
-showSyncResult, } from './ui/dialog.js';
+showSyncResult, // 同步结果（可展开详情）
+showSyncProgressDialog, updateSyncProgressDialog, completeSyncProgressDialog, hideSyncProgressDialog, } from './ui/dialog.js';
 export { type DialogButton, type DialogConfig, type DialogCallback, type DialogOptions, } from './ui/dialog.js';
 export { setStatus, initMessageListener, setSyncRunning, } from './ui/message.js';
 export { showUserIdDialog, updateTokenStatus, updateUserIdStatus, showTokenDialog, testDebugConnection, syncCollectionFromBgm, openUserCollection } from './ui/handlers.js';
@@ -57,11 +59,23 @@ export interface BGMSync {
     /** 当前正在处理的行号（用于暂停时定位） */
     currentRow: number;
     /** 当前正在处理的工作表（用于暂停时定位） */
-    currentSheet: any;
+    currentSheet: WpsWorksheet | null;
     /** 当前正在处理的列号（用于暂停时定位） */
     currentCol: number;
     /**
-     * 启动同步流程（由“全面同步”按钮触发）
+     * 进入运行状态（统一入口）
+     * - 防重复：如果 isRunning === true 则提示并返回 false
+     * - 重置停止标志，置 isRunning = true，记录 lastSyncTime
+     * @returns 是否成功进入运行状态
+     */
+    enterRunningState: () => boolean;
+    /**
+     * 退出运行状态（统一入口）
+     * - 清除 isRunning，重置停止标志
+     */
+    exitRunningState: () => void;
+    /**
+     * 启动同步流程（由"全面同步"按钮触发）
      * - 防重复：如果 isRunning === true 则提示并返回
      * - 检查 BGM.dataPreview 是否已加载
      * - 调用 preview.ts 中的 syncAllRows() 执行批量上传
@@ -70,7 +84,7 @@ export interface BGMSync {
     /**
      * 请求停止同步
      * - 设置 shouldStop 标志
-     * - 显示确认对话框
+     * - 未在运行时静默返回
      */
     requestStop: () => void;
     /** 暂停同步：设置 isPaused，并定位到当前单元格 */
@@ -84,14 +98,14 @@ export interface BGMSync {
     checkShouldStop: () => boolean;
     /** 检查是否暂停中 */
     checkPaused: () => boolean;
-    /** 暂停时等待恢复（每 200ms 轮询），恢复或停止后返回 */
+    /** 暂停时等待恢复（每 50ms 轮询），恢复或停止后返回 */
     waitForResume: () => Promise<void>;
     /** 定位到当前正在处理的单元格 */
     locateCurrentCell: () => void;
-    /** 更新当前位置（供同步循环调用） */
-    updatePosition: (ws: any, row: number, col?: number) => void;
+    /** 更新当前位置（供同步循环调用，传 undefined 保留原值） */
+    updatePosition: (ws: WpsWorksheet | null | undefined, row: number, col?: number) => void;
     /**
-     * 重置停止标志
+     * 重置停止标志（同时清理 currentRow/currentSheet/currentCol）
      */
     resetStopFlag: () => void;
 }

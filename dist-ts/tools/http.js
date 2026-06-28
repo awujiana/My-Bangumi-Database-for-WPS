@@ -189,8 +189,9 @@ function executeXhrRequest(url, options) {
         }
         catch (error) {
             BGM.handleError(error, { context: 'executeXhrRequest', showAlert: false });
-            bgmLog(LOG_LEVELS.ERROR, `[HTTP] 发送请求失败: ${error.message}`);
-            reject(new Error(`发送请求失败: ${error.message}`));
+            const errMsg = error instanceof Error ? error.message : String(error);
+            bgmLog(LOG_LEVELS.ERROR, `[HTTP] 发送请求失败: ${errMsg}`);
+            reject(new Error(`发送请求失败: ${errMsg}`));
         }
     });
 }
@@ -213,4 +214,3 @@ export const httpPut = (endpoint, body, token) => httpRequest(endpoint, { method
  * DELETE 请求
  */
 export const httpDelete = (endpoint, token) => httpRequest(endpoint, { method: 'DELETE', token });
-//# sourceMappingURL=http.js.map

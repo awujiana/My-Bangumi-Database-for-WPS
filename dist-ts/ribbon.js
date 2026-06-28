@@ -3,7 +3,7 @@
  * @module ribbon
  * @description WPS Office 功能区按钮回调处理
  */
-import { WPS_ENUM, showBangumiPanel, BGM, getIncrementalSync, getSkipConflicts, setIncrementalSync, setSkipConflicts, bgmLog, LOG_LEVELS } from './index.js';
+import { WPS_ENUM, showBangumiPanel, BGM, getIncrementalSync, getSkipConflicts, setIncrementalSync, setSkipConflicts, bgmLog, LOG_LEVELS, getApp } from './index.js';
 import * as RibbonService from './services/ribbonService.js';
 // 在 Ribbon 启动时（例如 OnAddinLoad 中或文件顶部立即执行）
 // 【正确】监听侧边栏发来的配置更新，刷新 Ribbon UI
@@ -15,7 +15,8 @@ function initRibbonMessageListener() {
         if (data?.type === 'BGM:configUpdated') {
             const key = data.data?.key;
             if (key === 'bgm_skip_conflicts' || key === 'bgm_incremental_sync') {
-                const ribbonUI = window.Application?.ribbonUI;
+                const app = getApp();
+                const ribbonUI = app?.ribbonUI;
                 if (ribbonUI) {
                     const controlId = key === 'bgm_skip_conflicts' ? 'chkSkipConflicts' : 'chkIncrementalSync';
                     ribbonUI.InvalidateControl(controlId);
@@ -29,6 +30,7 @@ initRibbonMessageListener();
  * 获取"跳过冲突"复选框的初始按下状态
  * 从配置读取上次保存的设置，默认未选中
  */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- WPS Ribbon 控件无 @types
 export function GetSkipConflictsPressed(control) {
     const result = getSkipConflicts();
     bgmLog(LOG_LEVELS.INFO, `[Ribbon] GetSkipConflictsPressed: ${result}`);
@@ -37,6 +39,7 @@ export function GetSkipConflictsPressed(control) {
 /**
  * 当"跳过冲突"复选框被点击时，保存状态
  */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- WPS Ribbon 控件无 @types
 export function OnSkipConflictsChange(control) {
     const newValue = control.Pressed;
     bgmLog(LOG_LEVELS.INFO, `[Ribbon] OnSkipConflictsChange: control.Pressed = ${newValue}`);
@@ -58,6 +61,7 @@ export function OnSkipConflictsChange(control) {
  * 获取增量同步复选框的初始按下状态
  * 从配置读取上次保存的设置，默认未选中
  */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- WPS Ribbon 控件无 @types
 export function GetIncrementalSyncPressed(control) {
     const result = getIncrementalSync();
     bgmLog(LOG_LEVELS.INFO, `[Ribbon] GetIncrementalSyncPressed: ${result}`);
@@ -66,6 +70,7 @@ export function GetIncrementalSyncPressed(control) {
 /**
  * 当增量同步复选框被点击时，保存状态
  */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- WPS Ribbon 控件无 @types
 export function OnIncrementalSyncChange(control) {
     const newValue = control.Pressed;
     let finalValue;
@@ -82,14 +87,17 @@ export function OnIncrementalSyncChange(control) {
 }
 // ========== Ribbon 回调 ==========
 export function OnAddinLoad(ribbonUI) {
-    if (typeof window.Application.ribbonUI !== 'object') {
-        window.Application.ribbonUI = ribbonUI;
+    const app = getApp();
+    if (!app)
+        return true;
+    if (typeof app.ribbonUI !== 'object') {
+        app.ribbonUI = ribbonUI;
     }
-    if (typeof window.Application.Enum !== 'object') {
-        window.Application.Enum = WPS_ENUM;
+    if (typeof app.Enum !== 'object') {
+        app.Enum = WPS_ENUM;
     }
-    window.Application.PluginStorage.setItem('EnableFlag', false);
-    window.Application.PluginStorage.setItem('ApiEventFlag', false);
+    app.PluginStorage?.setItem('EnableFlag', false);
+    app.PluginStorage?.setItem('ApiEventFlag', false);
     return true;
 }
 /**
@@ -143,10 +151,10 @@ export function GetBangumiImage(control) {
     return icons[control.Id] || 'images/newFromTemp.svg';
 }
 // 通知 index.html 早期占位：真实实现已就绪
-window._bgmRibbonReady?.(OnAddinLoad, OnAction, GetBangumiImage);
+const ribbonWindow = window;
+ribbonWindow._bgmRibbonReady?.(OnAddinLoad, OnAction, GetBangumiImage);
 // 挂载 Ribbon 复选框回调到全局（WPS Ribbon XML 只能调用 window 上的函数）
-window.GetIncrementalSyncPressed = GetIncrementalSyncPressed;
-window.GetSkipConflictsPressed = GetSkipConflictsPressed;
-window.OnIncrementalSyncChange = OnIncrementalSyncChange;
-window.OnSkipConflictsChange = OnSkipConflictsChange;
-//# sourceMappingURL=ribbon.js.map
+ribbonWindow.GetIncrementalSyncPressed = GetIncrementalSyncPressed;
+ribbonWindow.GetSkipConflictsPressed = GetSkipConflictsPressed;
+ribbonWindow.OnIncrementalSyncChange = OnIncrementalSyncChange;
+ribbonWindow.OnSkipConflictsChange = OnSkipConflictsChange;

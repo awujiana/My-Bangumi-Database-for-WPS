@@ -12,7 +12,16 @@ import { BGM_CONFIG, LOG_LEVELS, bgmLog } from '../index.js';
  * 提取响应消息
  */
 function extractResponseMessage(data) {
-    return data?.msg || data?.message || data?.error || 'success';
+    if (typeof data === 'object' && data !== null) {
+        const obj = data;
+        if (typeof obj.msg === 'string' && obj.msg)
+            return obj.msg;
+        if (typeof obj.message === 'string' && obj.message)
+            return obj.message;
+        if (typeof obj.error === 'string' && obj.error)
+            return obj.error;
+    }
+    return 'success';
 }
 /**
  * 执行HTTP请求的通用Promise封装
@@ -72,13 +81,14 @@ export async function verifyToken(token) {
         xhr.setRequestHeader('Authorization', `Bearer ${token}`);
         xhr.setRequestHeader('Content-Type', 'application/json');
         const response = await requestPromise(xhr);
+        const userData = response.data;
         if (response.status === 200) {
             result.valid = true;
             result.message = 'Token 有效';
-            bgmLog(LOG_LEVELS.INFO, `[scraping/verifyToken] Token 验证成功，用户ID: ${response.data?.id || '未知'}`);
-            if (response.data) {
-                result.userId = String(response.data.id || '');
-                result.username = response.data.username || response.data.nickname || '';
+            bgmLog(LOG_LEVELS.INFO, `[scraping/verifyToken] Token 验证成功，用户ID: ${userData?.id || '未知'}`);
+            if (userData) {
+                result.userId = String(userData.id || '');
+                result.username = userData.username || userData.nickname || '';
             }
         }
         else if (response.status === 401) {
@@ -91,7 +101,8 @@ export async function verifyToken(token) {
         }
     }
     catch (e) {
-        result.message = e.message || '验证过程出错';
+        const errMsg = e instanceof Error ? e.message : '';
+        result.message = errMsg || '验证过程出错';
         bgmLog(LOG_LEVELS.ERROR, `[scraping/verifyToken] error: ${result.message}`);
     }
     return result;
@@ -161,7 +172,8 @@ export async function fetchAllUserCollections(token, userId, options) {
             await new Promise(resolve => setTimeout(resolve, BGM_CONFIG.REQUEST_DELAY));
         }
         catch (e) {
-            bgmLog(LOG_LEVELS.ERROR, `[fetchAllUserCollections] 请求失败: ${e.message}`);
+            const errMsg = e instanceof Error ? e.message : undefined;
+            bgmLog(LOG_LEVELS.ERROR, `[fetchAllUserCollections] 请求失败: ${errMsg}`);
             break;
         }
     }
@@ -192,9 +204,9 @@ export async function fetchSubjectCollection(token, subjectId) {
         }
     }
     catch (e) {
-        result.message = e.message || '请求失败';
+        const errMsg = e instanceof Error ? e.message : '';
+        result.message = errMsg || '请求失败';
         bgmLog(LOG_LEVELS.ERROR, `[fetchSubjectCollection] 请求失败: ${result.message}`);
     }
     return result;
 }
-//# sourceMappingURL=scraping.js.map

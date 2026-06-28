@@ -546,8 +546,9 @@ function refreshData() {
             });
             const displayColCount = meta.previewColEnd - meta.previewColStart;
             // 使用 visibleRows 过滤，而不是遍历整个范围
-            const dataRows = (filterStatus?.visibleRows || [])
-                .filter(r => r !== meta.headerRow && r >= meta.dataStartRow);
+            // 防御性排序 + 去重：确保行号严格升序且无重复（修复"190-201后跳到3"问题）
+            const dataRows = Array.from(new Set((filterStatus?.visibleRows || [])
+                .filter(r => r !== meta.headerRow && r >= meta.dataStartRow))).sort((a, b) => a - b);
             const maxPreview = Math.min(dataRows.length, PANEL_CONFIG.PREVIEW_LIMIT);
             // 批量读取：按连续行段一次性读取 Range.Value2，减少 COM 调用次数
             let i = 0;
@@ -781,8 +782,9 @@ function startUserInfoPolling() {
 function initPanel() {
     bgmLog(LOG_LEVELS.INFO, 'initPanel 开始');
     // 初始化 WPS 枚举（如果未设置）
-    if (typeof window.Application !== 'undefined' && typeof window.Application.Enum !== 'object') {
-        window.Application.Enum = WPS_ENUM;
+    const app = getApp();
+    if (app && typeof app.Enum !== 'object') {
+        app.Enum = WPS_ENUM;
     }
     bgmLog(LOG_LEVELS.INFO, '[taskpane] 锁定按钮监听器设置完成');
     // 初始化事件监听
@@ -885,4 +887,3 @@ if (window.location.pathname.includes('taskpane.html')) {
         window.addEventListener('load', safeInitPanel);
     }
 }
-//# sourceMappingURL=taskpane.js.map

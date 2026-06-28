@@ -3,9 +3,9 @@
  * @module ui/handlers
  * @description 面板操作处理、按钮绑定、业务对话框
  */
-import { LOG_LEVELS, bgmLog, BGM, loadBgToken, storeBgToken, clearBgToken, _getBgmUserId, _setBgmUserId, _getBgmUsername, _setBgmUsername, getApp, getCell, trim, setCellValue, fetchBgmUserInfo, BGM_COLOR, showAlert, showConfirm, showError, showSuccess, showInput, showToast, setStatus, verifyToken, fetchAllUserCollections, findHeaderRow, getColumnMap, getLastRow, extractSubjectId, getDataSheet, SyncToBangumiAsync, syncSelectedRows, getOrCreateSyncRecordSheet, getAllSyncRecords, addSyncRecord, openSyncRecordSheet, deduplicateSyncRecords, formatSyncRecordSheet, previewSyncContent, refreshData, refreshSheets, toggleSheetLock, clearSyncRecords, closeDetailModal, getIncrementalSync, setIncrementalSync, getSkipConflicts, setSkipConflicts, COLLECTION_TYPE_NAMES, readRangeValues, openBangumiTokenPage, showSyncProgressDialog, updateSyncProgressDialog, setSyncProgressPaused, completeSyncProgressDialog, hideSyncProgressDialog, } from '../index.js';
+import { LOG_LEVELS, bgmLog, BGM, loadBgToken, storeBgToken, clearBgToken, _getBgmUserId, _setBgmUserId, _getBgmUsername, _setBgmUsername, getApp, getCell, trim, setCellValue, fetchBgmUserInfo, BGM_COLOR, showAlert, showConfirm, showError, showSuccess, showInput, showToast, setStatus, verifyToken, fetchAllUserCollections, findHeaderRow, getColumnMap, getLastRow, extractSubjectId, getDataSheet, SyncToBangumiAsync, syncSelectedRows, getOrCreateSyncRecordSheet, getAllSyncRecords, addSyncRecord, openSyncRecordSheet, deduplicateSyncRecords, formatSyncRecordSheet, previewSyncContent, refreshData, refreshSheets, toggleSheetLock, clearSyncRecords, closeDetailModal, getIncrementalSync, setIncrementalSync, getSkipConflicts, setSkipConflicts, COLLECTION_TYPE_NAMES, readRangeValues, openBangumiTokenPage, showSyncProgressDialog, updateSyncProgressDialog, completeSyncProgressDialog, hideSyncProgressDialog, } from '../index.js';
 import { BGM_EVENTS, eventBus } from '../tools/events.js';
-//  
+//
 import { getSyncPreview, detectConflicts } from '../services/ribbonService.js';
 // ========== 中文常量 ==========
 const _T = {
@@ -86,16 +86,32 @@ export function updateTokenStatus() {
         else {
             tokenStatus.textContent = _T.set + ' (' + token.substring(0, 4) + '...)';
             // 尝试获取用户信息（但不阻塞 UI 更新）
-            // 注意：这里可能会因为 CORS 失败，但不影响 Token 状态显示
+            // 注意：这里可能会因为 CORS 或网络问题失败
             fetchBgmUserInfo()
-                .then((userInfo) => {
+                .then(({ userInfo, errorType }) => {
                 if (userInfo?.username) {
+                    tokenStatus.style.color = '#4CAF50';
                     tokenStatus.textContent = _T.set + ': ' + userInfo.username;
                     updateUserIdStatus();
                 }
+                else if (errorType === 'network') {
+                    // 网络错误：Token 本身可能有效，但无法连接到 BGM API
+                    // 常见原因：被 GFW 墙、断网、DNS 失败
+                    tokenStatus.style.color = '#ff9800'; // 橙色警告
+                    tokenStatus.textContent = _T.set + ' (' + token.substring(0, 4) + '...) ⚠ 网络无法连接';
+                    bgmLog(LOG_LEVELS.WARN, '[updateTokenStatus] 网络错误：无法连接到 BGM API（可能被 GFW 墙）');
+                    showToast('Token 已设置，但无法连接到 Bangumi API\n可能原因：网络被墙（GFW）或断网\nToken 本身可能有效，请在网络恢复后重试', 'warn');
+                }
+                else if (errorType === 'http') {
+                    // HTTP 错误（如 401）：Token 失效
+                    tokenStatus.style.color = '#f44336';
+                    tokenStatus.textContent = _T.set + ' (Token 可能失效)';
+                    bgmLog(LOG_LEVELS.WARN, '[updateTokenStatus] HTTP 错误：Token 可能已失效');
+                }
+                // errorType === 'parse' 或 'none'：保持原显示
             })
                 .catch(() => {
-                // CORS 错误或其他错误，静默处理
+                // 意外错误，静默处理
                 bgmLog(LOG_LEVELS.INFO, '获取用户名失败（CORS或网络错误）');
             });
         }
@@ -264,22 +280,27 @@ export function onAction(action) {
         case 'requestStopSync':
             bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 用户请求停止同步');
             BGM.sync.requestStop();
-            setSyncProgressPaused(false);
             break;
         case 'pauseSync':
             bgmLog(LOG_LEVELS.INFO, '用户请求暂停同步');
             BGM.sync.pause();
-            setSyncProgressPaused(true);
             break;
         case 'resumeSync':
             bgmLog(LOG_LEVELS.INFO, '用户请求恢复同步');
             BGM.sync.resume();
-            setSyncProgressPaused(false);
             break;
     }
 }
-// ========== 从面板同步（异步，带进度条） ==========
-export async function syncFromPanel() {
+/**
+ * 准备同步所需的数据与工作表（步骤 1-10）。
+ * 任何检查失败时返回 null（已显示相应提示）。
+ */
+function prepareSyncFromPanel() {
+    // P0: 防重入预检
+    if (BGM.sync.isRunning) {
+        showToast('同步正在进行中，请稍后', 'warn');
+        return null;
+    }
     const startTime = Date.now();
     bgmLog(LOG_LEVELS.INFO, '[syncFromPanel] ========== 开始执行同步操作 ==========');
     // 1. 检查必要函数是否加载
@@ -288,7 +309,7 @@ export async function syncFromPanel() {
         bgmLog(LOG_LEVELS.WARN, '[syncFromPanel] 必要函数未加载完成');
         showAlert(_T.loadingWait);
         bgmLog(LOG_LEVELS.INFO, `[syncFromPanel] 同步操作终止（函数未加载），耗时: ${Date.now() - startTime}ms`);
-        return;
+        return null;
     }
     // 2. 检查 Token
     bgmLog(LOG_LEVELS.INFO, '[syncFromPanel] 步骤2: 检查 Token');
@@ -297,7 +318,7 @@ export async function syncFromPanel() {
         bgmLog(LOG_LEVELS.WARN, '[syncFromPanel] Token 未设置');
         showAlert(_T.pleaseSetBgmToken);
         bgmLog(LOG_LEVELS.INFO, `[syncFromPanel] 同步操作终止（Token未设置），耗时: ${Date.now() - startTime}ms`);
-        return;
+        return null;
     }
     bgmLog(LOG_LEVELS.INFO, `[syncFromPanel] Token 已设置（长度: ${token.length}）`);
     // 3. 获取应用和工作表对象
@@ -307,7 +328,7 @@ export async function syncFromPanel() {
         bgmLog(LOG_LEVELS.ERROR, '[syncFromPanel] 无法获取 Application 对象');
         showAlert('无法获取 Application 对象！');
         bgmLog(LOG_LEVELS.INFO, `[syncFromPanel] 同步操作终止（无法获取Application），耗时: ${Date.now() - startTime}ms`);
-        return;
+        return null;
     }
     bgmLog(LOG_LEVELS.INFO, '[syncFromPanel] Application 对象获取成功');
     // 3.1 记住用户当前活动的工作表
@@ -336,7 +357,7 @@ export async function syncFromPanel() {
         bgmLog(LOG_LEVELS.WARN, '[syncFromPanel] 未找到数据工作表');
         showAlert('未找到数据工作表，请先锁定工作表。');
         bgmLog(LOG_LEVELS.INFO, `[syncFromPanel] 同步操作终止（未找到数据工作表），耗时: ${Date.now() - startTime}ms`);
-        return;
+        return null;
     }
     bgmLog(LOG_LEVELS.INFO, '[syncFromPanel] 数据工作表获取成功');
     try {
@@ -358,7 +379,7 @@ export async function syncFromPanel() {
         bgmLog(LOG_LEVELS.WARN, '[syncFromPanel] 未找到 Bangumi_URL 列');
         showAlert('未找到 "Bangumi URL" 列！');
         bgmLog(LOG_LEVELS.INFO, `[syncFromPanel] 同步操作终止（缺少Bangumi_URL列），耗时: ${Date.now() - startTime}ms`);
-        return;
+        return null;
     }
     // 6. 增量同步开关（提前读取）
     bgmLog(LOG_LEVELS.INFO, '[syncFromPanel] 步骤6: 检查增量同步设置');
@@ -376,6 +397,17 @@ export async function syncFromPanel() {
         }
         bgmLog(LOG_LEVELS.INFO, `[syncFromPanel] 增量同步模式：已加载 ${fingerprintMap.size} 条历史指纹`);
     }
+    return {
+        ws, colMap, token, lastRow, headerRow, incremental, fingerprintMap,
+        originalActiveSheet, syncSheet, app, startTime,
+    };
+}
+/**
+ * 冲突确认与执行同步（步骤 11-16）。
+ * @returns true 表示同步已执行（成功或异常），false 表示用户取消。
+ */
+async function confirmAndExecuteSync(prepared) {
+    const { ws, colMap, token, lastRow, headerRow, incremental, fingerprintMap, syncSheet, app, startTime } = prepared;
     // 7. 获取同步预览统计（传入增量同步选项）
     bgmLog(LOG_LEVELS.INFO, '[syncFromPanel] 步骤7: 获取同步预览统计');
     const preview = getSyncPreview(ws, colMap, lastRow, headerRow, { incremental, fingerprintMap });
@@ -426,18 +458,8 @@ export async function syncFromPanel() {
     });
     if (!confirmed) {
         bgmLog(LOG_LEVELS.INFO, '[syncFromPanel] 用户取消同步');
-        // 恢复用户之前的工作表
-        if (originalActiveSheet) {
-            try {
-                originalActiveSheet.Activate();
-                bgmLog(LOG_LEVELS.INFO, `[syncFromPanel] 已恢复用户之前的工作表: ${originalActiveSheet.Name}`);
-            }
-            catch (e) {
-                bgmLog(LOG_LEVELS.WARN, `[syncFromPanel] 恢复工作表失败: ${e.message}`);
-            }
-        }
         bgmLog(LOG_LEVELS.INFO, `[syncFromPanel] 同步操作终止（用户取消），耗时: ${Date.now() - startTime}ms`);
-        return;
+        return false;
     }
     // 10. 切换到同步记录工作表，让用户看到实时写入
     bgmLog(LOG_LEVELS.INFO, '[syncFromPanel] 步骤10: 切换到同步记录工作表');
@@ -456,7 +478,11 @@ export async function syncFromPanel() {
     BGM.sync.isRunning = true;
     BGM.sync.resetStopFlag();
     // 显示同步进度弹窗（不隐藏"同步到 Bangumi"按钮）
-    showSyncProgressDialog('正在同步 - 同步到 Bangumi', () => { BGM.sync.pause(); setSyncProgressPaused(true); }, () => { BGM.sync.resume(); setSyncProgressPaused(false); }, () => { BGM.sync.requestStop(); });
+    showSyncProgressDialog('正在同步 - 同步到 Bangumi', {
+        onPause: () => BGM.sync.pause(),
+        onResume: () => BGM.sync.resume(),
+        onStop: () => BGM.sync.requestStop()
+    });
     try {
         bgmLog(LOG_LEVELS.INFO, '[syncFromPanel] 调用 SyncToBangumiAsync...');
         const result = await SyncToBangumiAsync(ws, colMap, token, lastRow, headerRow, {
@@ -497,19 +523,32 @@ export async function syncFromPanel() {
         bgmLog(LOG_LEVELS.ERROR, `[syncFromPanel] 同步失败: ${err.message}`);
         BGM.handleError(err, { context: 'syncFromPanel', showAlert: true });
     }
+    return true;
+}
+export async function syncFromPanel() {
+    const prepared = prepareSyncFromPanel();
+    if (prepared === null) {
+        return;
+    }
+    let completed = false;
+    try {
+        completed = await confirmAndExecuteSync(prepared);
+    }
     finally {
-        // 无论成功失败，最后都尝试恢复用户之前的工作表
-        if (originalActiveSheet) {
+        // 无论成功失败或取消，最后都尝试恢复用户之前的工作表
+        if (prepared.originalActiveSheet) {
             try {
-                originalActiveSheet.Activate();
-                bgmLog(LOG_LEVELS.INFO, `[syncFromPanel] 已恢复用户之前的工作表: ${originalActiveSheet.Name}`);
+                prepared.originalActiveSheet.Activate();
+                bgmLog(LOG_LEVELS.INFO, `[syncFromPanel] 已恢复用户之前的工作表: ${prepared.originalActiveSheet.Name}`);
             }
             catch (e) {
                 bgmLog(LOG_LEVELS.WARN, `[syncFromPanel] 恢复工作表失败: ${e.message}`);
             }
         }
     }
-    bgmLog(LOG_LEVELS.INFO, `[syncFromPanel] ========== 同步操作结束，总耗时: ${Date.now() - startTime}ms ==========`);
+    if (completed) {
+        bgmLog(LOG_LEVELS.INFO, `[syncFromPanel] ========== 同步操作结束，总耗时: ${Date.now() - prepared.startTime}ms ==========`);
+    }
 }
 // ========== 从BGM同步收藏标记 ==========
 export async function syncCollectionFromBgm() {
@@ -620,9 +659,17 @@ async function _doAPISync(sheetIndex, token) {
         BGM.sync.isRunning = true;
         BGM.sync.resetStopFlag();
         // 显示同步进度弹窗
-        showSyncProgressDialog('正在同步 - 从BGM同步收藏', () => { BGM.sync.pause(); setSyncProgressPaused(true); }, () => { BGM.sync.resume(); setSyncProgressPaused(false); }, () => { BGM.sync.requestStop(); });
-        // 阶段1：写入收藏到同步记录表（显示进度，但不需要定位单元格）
+        showSyncProgressDialog('正在同步 - 从BGM同步收藏', {
+            onPause: () => BGM.sync.pause(),
+            onResume: () => BGM.sync.resume(),
+            onStop: () => BGM.sync.requestStop()
+        });
+        // 两阶段进度合并：累计 total，避免阶段切换时进度条从 100% 回退到 0%
         const totalCollect = userCollections.length;
+        const totalRows = rowsToProcess.length;
+        const totalCombined = totalCollect + totalRows;
+        let currentCombined = 0;
+        // 阶段1：写入收藏到同步记录表（显示进度，但不需要定位单元格）
         for (let i = 0; i < userCollections.length; i++) {
             if (BGM.sync.checkShouldStop())
                 break;
@@ -644,7 +691,8 @@ async function _doAPISync(sheetIndex, token) {
                     collType: COLLECTION_TYPE_NAMES[item.type] || ''
                 });
             }
-            updateSyncProgressDialog(i + 1, totalCollect, `收藏写入同步记录 ${i + 1}/${totalCollect}`, `📥 [${i + 1}/${totalCollect}] ${itemName}`);
+            currentCombined++;
+            updateSyncProgressDialog(currentCombined, totalCombined, `阶段1: 收藏写入同步记录 ${i + 1}/${totalCollect}`, `📥 [${i + 1}/${totalCollect}] ${itemName}`);
         }
         syncRecords = typeof getAllSyncRecords === 'function' ? getAllSyncRecords() : [];
         syncCountMap.clear();
@@ -662,7 +710,6 @@ async function _doAPISync(sheetIndex, token) {
         const seqColForLocate = colMap.get('序列号') || 9;
         BGM.sync.updatePosition(ws, 0, seqColForLocate);
         let matchedCount = 0;
-        const totalRows = rowsToProcess.length;
         for (let i = 0; i < rowsToProcess.length; i++) {
             if (BGM.sync.checkShouldStop()) {
                 bgmLog(LOG_LEVELS.INFO, '[_doAPISync] 阶段2：检测到停止请求，终止');
@@ -692,7 +739,8 @@ async function _doAPISync(sheetIndex, token) {
                 matchedCount++;
                 matched = true;
             }
-            updateSyncProgressDialog(i + 1, totalRows, `标记数据表 ${i + 1}/${totalRows}（匹配 ${matchedCount}）`, matched ? `✓ [${i + 1}/${totalRows}] 行${row} 匹配 SID=${sid}` : `· [${i + 1}/${totalRows}] 行${row} 未匹配`);
+            currentCombined++;
+            updateSyncProgressDialog(currentCombined, totalCombined, `阶段2: 标记数据表 ${i + 1}/${totalRows}（匹配 ${matchedCount}）`, matched ? `✓ [${i + 1}/${totalRows}] 行${row} 匹配 SID=${sid}` : `· [${i + 1}/${totalRows}] 行${row} 未匹配`);
         }
         // 输出同步统计
         const totalCollections = userCollections.length;
@@ -755,6 +803,185 @@ function setupButtonListeners() {
         button.addEventListener('click', handleActionClick);
     });
 }
+const ACTION_HANDLERS = {
+    // 核心操作
+    sync: (ctx) => {
+        bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 开始执行同步操作');
+        syncFromPanel();
+        bgmLog(LOG_LEVELS.INFO, `[handleActionClick] 同步操作已触发，耗时: ${Date.now() - ctx.startTime}ms`);
+    },
+    testSelected: (ctx) => {
+        bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 开始执行选中行同步');
+        if (typeof syncSelectedRows === 'function') {
+            syncSelectedRows();
+            bgmLog(LOG_LEVELS.INFO, `[handleActionClick] 选中行同步已触发，耗时: ${Date.now() - ctx.startTime}ms`);
+        }
+        else {
+            bgmLog(LOG_LEVELS.WARN, '[handleActionClick] syncSelectedRows 函数未定义');
+        }
+    },
+    clear: (ctx) => {
+        bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 开始刷新数据');
+        showConfirm(_T.confirmClearMarks, (confirmed) => {
+            if (confirmed) {
+                bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 用户确认刷新数据');
+                if (typeof refreshData === 'function')
+                    refreshData();
+                bgmLog(LOG_LEVELS.INFO, `[handleActionClick] 刷新数据完成，耗时: ${Date.now() - ctx.startTime}ms`);
+            }
+            else {
+                bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 用户取消刷新数据');
+            }
+        });
+    },
+    previewSyncContent: (ctx) => {
+        bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 开始执行预览同步内容');
+        if (typeof previewSyncContent === 'function') {
+            previewSyncContent();
+            bgmLog(LOG_LEVELS.INFO, `[handleActionClick] 预览同步内容已触发，耗时: ${Date.now() - ctx.startTime}ms`);
+        }
+        else {
+            bgmLog(LOG_LEVELS.WARN, '[handleActionClick] previewSyncContent 函数未定义');
+        }
+    },
+    setToken: (ctx) => {
+        // 已废弃，由 showTokenDialog 替代，保留兼容
+        bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 打开 Token 设置对话框');
+        showTokenDialog(loadBgToken() || '');
+        bgmLog(LOG_LEVELS.INFO, `[handleActionClick] Token 设置对话框已打开，耗时: ${Date.now() - ctx.startTime}ms`);
+    },
+    // 快捷按钮
+    showTokenDialog: (ctx) => {
+        bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 显示 Token 设置对话框');
+        showTokenDialog(loadBgToken() || '');
+        bgmLog(LOG_LEVELS.INFO, `[handleActionClick] Token 设置对话框已显示，耗时: ${Date.now() - ctx.startTime}ms`);
+    },
+    clearToken: (ctx) => {
+        bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 清除 Token 设置');
+        try {
+            clearBgToken();
+            BGM.cache.userId = null;
+            BGM.cache.username = null;
+            const app = getApp();
+            if (app?.PluginStorage) {
+                app.PluginStorage.setItem('bgm_user_id', '');
+                app.PluginStorage.setItem('bgm_username', '');
+            }
+            updateTokenStatus();
+            updateUserIdStatus();
+            showToast('Token 已清除', 'info');
+            bgmLog(LOG_LEVELS.INFO, '[handleActionClick] Token 已清除');
+        }
+        catch (e) {
+            BGM.handleError(e, { showAlert: true, level: BGM.ErrorLevel.WARN, context: 'clearToken' });
+        }
+        bgmLog(LOG_LEVELS.INFO, `[handleActionClick] 清除 Token 操作完成，耗时: ${Date.now() - ctx.startTime}ms`);
+    },
+    testToken: (ctx) => {
+        bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 开始测试 Token 有效性');
+        testTokenValidity();
+        bgmLog(LOG_LEVELS.INFO, `[handleActionClick] Token 测试已触发，耗时: ${Date.now() - ctx.startTime}ms`);
+    },
+    showUserIdDialog: (ctx) => {
+        bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 显示用户ID设置对话框');
+        showUserIdDialog();
+        bgmLog(LOG_LEVELS.INFO, `[handleActionClick] 用户ID设置对话框已显示，耗时: ${Date.now() - ctx.startTime}ms`);
+    },
+    openUserCollection: (ctx) => {
+        bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 尝试打开收藏页面');
+        openUserCollection();
+        bgmLog(LOG_LEVELS.INFO, `[handleActionClick] 收藏页面打开操作已触发，耗时: ${Date.now() - ctx.startTime}ms`);
+    },
+    openTokenPage: (ctx) => {
+        bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 打开 Token 申请页面');
+        openBangumiTokenPage();
+        bgmLog(LOG_LEVELS.INFO, `[handleActionClick] Token 申请页面已触发，耗时: ${Date.now() - ctx.startTime}ms`);
+    },
+    syncCollectionFromBgm: (ctx) => {
+        bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 开始从 BGM 同步收藏');
+        syncCollectionFromBgm();
+        bgmLog(LOG_LEVELS.INFO, `[handleActionClick] 收藏同步已触发，耗时: ${Date.now() - ctx.startTime}ms`);
+    },
+    refreshSheets: (ctx) => {
+        bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 开始刷新工作表');
+        refreshSheets();
+        bgmLog(LOG_LEVELS.INFO, `[handleActionClick] 工作表刷新已触发，耗时: ${Date.now() - ctx.startTime}ms`);
+    },
+    refreshData: (ctx) => {
+        bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 开始刷新数据');
+        refreshData();
+        bgmLog(LOG_LEVELS.INFO, `[handleActionClick] 数据刷新已触发，耗时: ${Date.now() - ctx.startTime}ms`);
+    },
+    toggleSheetLock: (ctx) => {
+        bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 切换工作表锁定状态');
+        toggleSheetLock();
+        bgmLog(LOG_LEVELS.INFO, `[handleActionClick] 工作表锁定状态已切换，耗时: ${Date.now() - ctx.startTime}ms`);
+    },
+    clearSyncRecords: (ctx) => {
+        bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 开始清除同步记录');
+        clearSyncRecords();
+        bgmLog(LOG_LEVELS.INFO, `[handleActionClick] 同步记录清除已触发，耗时: ${Date.now() - ctx.startTime}ms`);
+    },
+    deduplicateSyncRecords: (ctx) => {
+        bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 开始去重同步记录');
+        deduplicateSyncRecords();
+        showToast('去重完成', 'success');
+        bgmLog(LOG_LEVELS.INFO, `[handleActionClick] 同步记录去重已触发，耗时: ${Date.now() - ctx.startTime}ms`);
+    },
+    formatSyncRecordSheet: (ctx) => {
+        bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 开始设置同步记录表格式');
+        formatSyncRecordSheet();
+        showToast('格式设置完成', 'success');
+        bgmLog(LOG_LEVELS.INFO, `[handleActionClick] 同步记录表格式设置已触发，耗时: ${Date.now() - ctx.startTime}ms`);
+    },
+    cleanLockedDataSheet: (ctx) => {
+        bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 开始清洗锁定数据表');
+        cleanLockedDataSheet();
+        bgmLog(LOG_LEVELS.INFO, `[handleActionClick] 数据清洗完成，耗时: ${Date.now() - ctx.startTime}ms`);
+    },
+    openSyncRecordSheet: (ctx) => {
+        bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 打开同步记录工作表');
+        openSyncRecordSheet();
+        bgmLog(LOG_LEVELS.INFO, `[handleActionClick] 同步记录工作表已打开，耗时: ${Date.now() - ctx.startTime}ms`);
+    },
+    testDebugConnection: (ctx) => {
+        bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 测试调试连接');
+        testDebugConnection();
+        bgmLog(LOG_LEVELS.INFO, `[handleActionClick] 调试连接测试已完成，耗时: ${Date.now() - ctx.startTime}ms`);
+    },
+    // 模态框操作
+    closeDetailModal: (ctx) => {
+        bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 关闭详情模态框');
+        closeDetailModal();
+        bgmLog(LOG_LEVELS.INFO, `[handleActionClick] 详情模态框已关闭，耗时: ${Date.now() - ctx.startTime}ms`);
+    },
+    // 弹窗快捷调用（参数形式）
+    showToast: (ctx) => {
+        bgmLog(LOG_LEVELS.INFO, `[handleActionClick] 显示 Toast 消息: ${ctx.args[0] || ''}`);
+        showToast(ctx.args[0], ctx.args[1]);
+        bgmLog(LOG_LEVELS.INFO, `[handleActionClick] Toast 已显示，耗时: ${Date.now() - ctx.startTime}ms`);
+    },
+    showAlert: (ctx) => {
+        bgmLog(LOG_LEVELS.INFO, `[handleActionClick] 显示警告框: ${ctx.args[0] || ''}`);
+        showAlert(ctx.args[0], ctx.args[1]);
+        bgmLog(LOG_LEVELS.INFO, `[handleActionClick] 警告框已显示，耗时: ${Date.now() - ctx.startTime}ms`);
+    },
+    requestStopSync: (ctx) => {
+        bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 用户请求停止同步');
+        BGM.sync.requestStop();
+        bgmLog(LOG_LEVELS.INFO, `[handleActionClick] 停止同步请求已发送，耗时: ${Date.now() - ctx.startTime}ms`);
+    },
+    pauseSync: (ctx) => {
+        bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 用户请求暂停同步');
+        BGM.sync.pause();
+        bgmLog(LOG_LEVELS.INFO, `[handleActionClick] 暂停同步请求已发送，耗时: ${Date.now() - ctx.startTime}ms`);
+    },
+    resumeSync: (ctx) => {
+        bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 用户请求恢复同步');
+        BGM.sync.resume();
+        bgmLog(LOG_LEVELS.INFO, `[handleActionClick] 恢复同步请求已发送，耗时: ${Date.now() - ctx.startTime}ms`);
+    },
+};
 function handleActionClick(event) {
     const target = event.currentTarget;
     const action = target.dataset.action;
@@ -777,189 +1004,12 @@ function handleActionClick(event) {
     }
     const startTime = Date.now();
     try {
-        switch (action) {
-            // 核心操作
-            case 'sync':
-                bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 开始执行同步操作');
-                syncFromPanel();
-                bgmLog(LOG_LEVELS.INFO, `[handleActionClick] 同步操作已触发，耗时: ${Date.now() - startTime}ms`);
-                break;
-            case 'testSelected':
-                bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 开始执行选中行同步');
-                if (typeof syncSelectedRows === 'function') {
-                    syncSelectedRows();
-                    bgmLog(LOG_LEVELS.INFO, `[handleActionClick] 选中行同步已触发，耗时: ${Date.now() - startTime}ms`);
-                }
-                else {
-                    bgmLog(LOG_LEVELS.WARN, '[handleActionClick] syncSelectedRows 函数未定义');
-                }
-                break;
-            case 'clear':
-                bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 开始刷新数据');
-                showConfirm(_T.confirmClearMarks, (confirmed) => {
-                    if (confirmed) {
-                        bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 用户确认刷新数据');
-                        if (typeof refreshData === 'function')
-                            refreshData();
-                        bgmLog(LOG_LEVELS.INFO, `[handleActionClick] 刷新数据完成，耗时: ${Date.now() - startTime}ms`);
-                    }
-                    else {
-                        bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 用户取消刷新数据');
-                    }
-                });
-                break;
-            case 'previewSyncContent':
-                bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 开始执行预览同步内容');
-                if (typeof previewSyncContent === 'function') {
-                    previewSyncContent();
-                    bgmLog(LOG_LEVELS.INFO, `[handleActionClick] 预览同步内容已触发，耗时: ${Date.now() - startTime}ms`);
-                }
-                else {
-                    bgmLog(LOG_LEVELS.WARN, '[handleActionClick] previewSyncContent 函数未定义');
-                }
-                break;
-            case 'setToken':
-                // 已废弃，由 showTokenDialog 替代，保留兼容
-                bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 打开 Token 设置对话框');
-                showTokenDialog(loadBgToken() || '');
-                bgmLog(LOG_LEVELS.INFO, `[handleActionClick] Token 设置对话框已打开，耗时: ${Date.now() - startTime}ms`);
-                break;
-            // 快捷按钮
-            case 'showTokenDialog':
-                bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 显示 Token 设置对话框');
-                showTokenDialog(loadBgToken() || '');
-                bgmLog(LOG_LEVELS.INFO, `[handleActionClick] Token 设置对话框已显示，耗时: ${Date.now() - startTime}ms`);
-                break;
-            case 'clearToken':
-                bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 清除 Token 设置');
-                try {
-                    clearBgToken();
-                    BGM.cache.userId = null;
-                    BGM.cache.username = null;
-                    const app = getApp();
-                    if (app?.PluginStorage) {
-                        app.PluginStorage.setItem('bgm_user_id', '');
-                        app.PluginStorage.setItem('bgm_username', '');
-                    }
-                    updateTokenStatus();
-                    updateUserIdStatus();
-                    showToast('Token 已清除', 'info');
-                    bgmLog(LOG_LEVELS.INFO, '[handleActionClick] Token 已清除');
-                }
-                catch (e) {
-                    BGM.handleError(e, { showAlert: true, level: BGM.ErrorLevel.WARN, context: 'clearToken' });
-                }
-                bgmLog(LOG_LEVELS.INFO, `[handleActionClick] 清除 Token 操作完成，耗时: ${Date.now() - startTime}ms`);
-                break;
-            case 'testToken':
-                bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 开始测试 Token 有效性');
-                testTokenValidity();
-                bgmLog(LOG_LEVELS.INFO, `[handleActionClick] Token 测试已触发，耗时: ${Date.now() - startTime}ms`);
-                break;
-            case 'showUserIdDialog':
-                bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 显示用户ID设置对话框');
-                showUserIdDialog();
-                bgmLog(LOG_LEVELS.INFO, `[handleActionClick] 用户ID设置对话框已显示，耗时: ${Date.now() - startTime}ms`);
-                break;
-            case 'openUserCollection':
-                bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 尝试打开收藏页面');
-                openUserCollection();
-                bgmLog(LOG_LEVELS.INFO, `[handleActionClick] 收藏页面打开操作已触发，耗时: ${Date.now() - startTime}ms`);
-                break;
-            case 'openTokenPage':
-                bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 打开 Token 申请页面');
-                openBangumiTokenPage();
-                bgmLog(LOG_LEVELS.INFO, `[handleActionClick] Token 申请页面已触发，耗时: ${Date.now() - startTime}ms`);
-                break;
-            case 'syncCollectionFromBgm':
-                bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 开始从 BGM 同步收藏');
-                syncCollectionFromBgm();
-                bgmLog(LOG_LEVELS.INFO, `[handleActionClick] 收藏同步已触发，耗时: ${Date.now() - startTime}ms`);
-                break;
-            case 'refreshSheets':
-                bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 开始刷新工作表');
-                refreshSheets();
-                bgmLog(LOG_LEVELS.INFO, `[handleActionClick] 工作表刷新已触发，耗时: ${Date.now() - startTime}ms`);
-                break;
-            case 'refreshData':
-                bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 开始刷新数据');
-                refreshData();
-                bgmLog(LOG_LEVELS.INFO, `[handleActionClick] 数据刷新已触发，耗时: ${Date.now() - startTime}ms`);
-                break;
-            case 'toggleSheetLock':
-                bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 切换工作表锁定状态');
-                toggleSheetLock();
-                bgmLog(LOG_LEVELS.INFO, `[handleActionClick] 工作表锁定状态已切换，耗时: ${Date.now() - startTime}ms`);
-                break;
-            case 'clearSyncRecords':
-                bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 开始清除同步记录');
-                clearSyncRecords();
-                bgmLog(LOG_LEVELS.INFO, `[handleActionClick] 同步记录清除已触发，耗时: ${Date.now() - startTime}ms`);
-                break;
-            case 'deduplicateSyncRecords':
-                bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 开始去重同步记录');
-                deduplicateSyncRecords();
-                showToast('去重完成', 'success');
-                bgmLog(LOG_LEVELS.INFO, `[handleActionClick] 同步记录去重已触发，耗时: ${Date.now() - startTime}ms`);
-                break;
-            case 'formatSyncRecordSheet':
-                bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 开始设置同步记录表格式');
-                formatSyncRecordSheet();
-                showToast('格式设置完成', 'success');
-                bgmLog(LOG_LEVELS.INFO, `[handleActionClick] 同步记录表格式设置已触发，耗时: ${Date.now() - startTime}ms`);
-                break;
-            case 'cleanLockedDataSheet':
-                bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 开始清洗锁定数据表');
-                cleanLockedDataSheet();
-                bgmLog(LOG_LEVELS.INFO, `[handleActionClick] 数据清洗完成，耗时: ${Date.now() - startTime}ms`);
-                break;
-            case 'openSyncRecordSheet':
-                bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 打开同步记录工作表');
-                openSyncRecordSheet();
-                bgmLog(LOG_LEVELS.INFO, `[handleActionClick] 同步记录工作表已打开，耗时: ${Date.now() - startTime}ms`);
-                break;
-            case 'testDebugConnection':
-                bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 测试调试连接');
-                testDebugConnection();
-                bgmLog(LOG_LEVELS.INFO, `[handleActionClick] 调试连接测试已完成，耗时: ${Date.now() - startTime}ms`);
-                break;
-            // 模态框操作
-            case 'closeDetailModal':
-                bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 关闭详情模态框');
-                closeDetailModal();
-                bgmLog(LOG_LEVELS.INFO, `[handleActionClick] 详情模态框已关闭，耗时: ${Date.now() - startTime}ms`);
-                break;
-            // 弹窗快捷调用（参数形式）
-            case 'showToast':
-                bgmLog(LOG_LEVELS.INFO, `[handleActionClick] 显示 Toast 消息: ${args[0] || ''}`);
-                showToast(args[0], args[1]);
-                bgmLog(LOG_LEVELS.INFO, `[handleActionClick] Toast 已显示，耗时: ${Date.now() - startTime}ms`);
-                break;
-            case 'showAlert':
-                bgmLog(LOG_LEVELS.INFO, `[handleActionClick] 显示警告框: ${args[0] || ''}`);
-                showAlert(args[0], args[1]);
-                bgmLog(LOG_LEVELS.INFO, `[handleActionClick] 警告框已显示，耗时: ${Date.now() - startTime}ms`);
-                break;
-            case 'requestStopSync':
-                bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 用户请求停止同步');
-                BGM.sync.requestStop();
-                setSyncProgressPaused(false);
-                bgmLog(LOG_LEVELS.INFO, `[handleActionClick] 停止同步请求已发送，耗时: ${Date.now() - startTime}ms`);
-                break;
-            case 'pauseSync':
-                bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 用户请求暂停同步');
-                BGM.sync.pause();
-                setSyncProgressPaused(true);
-                bgmLog(LOG_LEVELS.INFO, `[handleActionClick] 暂停同步请求已发送，耗时: ${Date.now() - startTime}ms`);
-                break;
-            case 'resumeSync':
-                bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 用户请求恢复同步');
-                BGM.sync.resume();
-                setSyncProgressPaused(false);
-                bgmLog(LOG_LEVELS.INFO, `[handleActionClick] 恢复同步请求已发送，耗时: ${Date.now() - startTime}ms`);
-                break;
-            default:
-                bgmLog(LOG_LEVELS.WARN, `[handleActionClick] 未知操作类型: ${action}`);
+        const handler = ACTION_HANDLERS[action];
+        if (handler) {
+            handler({ args, startTime });
+        }
+        else {
+            bgmLog(LOG_LEVELS.WARN, `[handleActionClick] 未知操作类型: ${action}`);
         }
     }
     catch (e) {
@@ -1402,4 +1452,3 @@ if (typeof document !== 'undefined') {
         initializeListeners();
     }
 }
-//# sourceMappingURL=handlers.js.map

@@ -7,6 +7,7 @@
  * @author BGM Development Team
  * @version 1.1.0
  */
+import type { WpsWorksheet } from '../tools/wps.js';
 export interface SyncRecord {
     seq?: number | string;
     id?: number;
@@ -39,11 +40,11 @@ export interface UpdateRecordParams {
 /**
  * 获取或创建同步记录工作表
  */
-export declare function getOrCreateSyncRecordSheet(): any;
+export declare function getOrCreateSyncRecordSheet(): WpsWorksheet;
 export declare function addSyncRecord(params: UpdateRecordParams): boolean;
 export declare function getAllSyncRecords(): SyncRecord[];
 export declare function deduplicateSyncRecords(): boolean;
-export declare function formatSyncRecordSheet(sheet?: any): void;
+export declare function formatSyncRecordSheet(sheet?: WpsWorksheet): void;
 export declare function clearSyncRecords(): boolean;
 export declare function openSyncRecordSheet(): void;
 //# sourceMappingURL=syncRecord.d.ts.map

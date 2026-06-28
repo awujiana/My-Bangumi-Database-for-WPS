@@ -63,7 +63,7 @@ showSuccess, // 成功
 showInput, // 输入
 showToast, // Toast 通知
 showSyncResult, // 同步结果（可展开详情）
-showSyncProgressDialog, updateSyncProgressDialog, setSyncProgressPaused, completeSyncProgressDialog, hideSyncProgressDialog, } from './ui/dialog.js';
+showSyncProgressDialog, updateSyncProgressDialog, completeSyncProgressDialog, hideSyncProgressDialog, } from './ui/dialog.js';
 // ============================================================================
 // 6. UI 消息通信（来自 ui/message.js）
 // ============================================================================
@@ -199,7 +199,7 @@ autoFillUrls,
 // 显示确认对话框后执行
 showAutoFillUrlDialog, } from './tools/autoFillUrl.js';
 // ============================================================================
-// 12. 页面逻辑（来自 taskpane.js）
+// 14. 页面逻辑（来自 taskpane.js）
 // ============================================================================
 export { refreshSheets, toggleSheetLock, 
 // 刷新数据预览
@@ -209,7 +209,7 @@ export {
 // 显示预览内容
 previewSyncContent, closeDetailModal, syncAllRows, } from './ui/preview.js';
 // ============================================================================
-// 14. WPS 操作接口（类型守卫与类型定义）
+// 16. WPS 操作接口（类型守卫与类型定义）
 // ============================================================================
 export { 
 // 判断对象是否为 WPS Application
@@ -218,5 +218,7 @@ isWpsApp,
 isWpsWorksheet, 
 // 判断对象是否为 WPS Range
 isWpsRange, wpsMsgBox, } from './tools/wps.js';
+// ============================================================================
+// 17. 服务层（来自 services/ribbonService.js）
+// ============================================================================
 export { detectConflicts, getSyncPreview } from './services/ribbonService.js';
-//# sourceMappingURL=index.js.map

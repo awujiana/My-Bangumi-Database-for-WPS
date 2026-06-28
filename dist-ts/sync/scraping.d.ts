@@ -36,7 +36,7 @@ export interface BangumiUserData {
 /**
  * API响应结构接口
  */
-export interface ApiResponse<T = any> {
+export interface ApiResponse<T = unknown> {
     data: T | null;
     status: number;
     message: string;

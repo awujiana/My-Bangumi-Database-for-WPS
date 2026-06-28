@@ -1,14 +1,4 @@
 /**
- * @fileoverview 事件总线模块
- * @module tools/events
- * @description 实现模块间的发布-订阅事件系统，提供松耦合的组件通信方式。
- *              支持事件的订阅、退订、单次订阅和发布。
- *
- * @author BGM Development Team
- * @version 1.0.0
- */
-import { BGM } from '../index.js';
-/**
  * 事件总线类
  * @class
  */
@@ -59,7 +49,7 @@ export class EventBus {
     /**
      * 发布事件
      * @param {string} eventName - 事件名称
-     * @param {any} [data] - 事件数据
+     * @param {unknown} [data] - 事件数据
      */
     emit(eventName, data) {
         const handlers = this.events.get(eventName);
@@ -72,7 +62,8 @@ export class EventBus {
                 entry.handler(data);
             }
             catch (error) {
-                BGM.handleError(error, { level: BGM.ErrorLevel.ERROR, context: `EventBus:${eventName}` });
+                // 不依赖 BGM.handleError，避免循环依赖；直接输出到控制台
+                console.error('[EventBus]', error);
             }
             if (entry.once) {
                 this.off(eventName, entry.handler);
@@ -105,19 +96,6 @@ export class EventBus {
     }
 }
 // 事件名称常量定义
-export const BANGUMI_EVENTS = {
-    LOGIN_SUCCESS: 'login:success',
-    LOGIN_FAILED: 'login:failed',
-    LOGOUT: 'logout',
-    SYNC_START: 'sync:start',
-    SYNC_END: 'sync:end',
-    SYNC_PROGRESS: 'sync:progress',
-    SYNC_ERROR: 'sync:error',
-    COLLECTION_UPDATED: 'collection:updated',
-    SETTINGS_CHANGED: 'settings:changed',
-    USERID_UPDATED: 'userid:updated',
-    PANEL_READY: 'panel:ready'
-};
 export const BGM_EVENTS = {
     TOKEN_UPDATED: 'state:tokenUpdated',
     USER_ID_UPDATED: 'state:userIdUpdated',
@@ -131,4 +109,3 @@ export const BGM_EVENTS = {
 };
 // 创建全局事件总线实例
 export const eventBus = new EventBus();
-//# sourceMappingURL=events.js.map
