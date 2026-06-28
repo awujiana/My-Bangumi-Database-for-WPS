@@ -111,9 +111,14 @@ export function OnAction(control) {
             case 'btnShowPanel':
                 showBangumiPanel();
                 break;
-            case 'btnSyncBangumi':
-                RibbonService.syncWithConfirmation();
+            case 'btnSyncBangumi': {
+                // syncWithConfirmation 是 async 函数，需要 .catch() 防止未处理的 Promise rejection
+                RibbonService.syncWithConfirmation().catch((e) => {
+                    bgmLog(LOG_LEVELS.ERROR, `[OnAction] syncWithConfirmation 异常: ${e?.message || String(e)}`);
+                    BGM.handleError(e, { showAlert: true, level: BGM.ErrorLevel.ERROR, context: 'Ribbon btnSyncBangumi' });
+                });
                 break;
+            }
             case 'btnSetToken':
                 RibbonService.setTokenForRibbon();
                 break;

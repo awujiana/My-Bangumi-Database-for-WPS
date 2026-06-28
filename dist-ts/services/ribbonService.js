@@ -261,10 +261,29 @@ export async function syncWithConfirmation() {
     catch (e) {
         BGM.handleError(e, { context: 'syncWithConfirmation:readRibbonOptions', showAlert: false });
     }
-    // 3. 冲突检测
+    // 3. 先弹确认框（让用户立刻看到反馈，避免冲突检测网络等待期间"无反应"）
+    const confirmMsg = `即将开始全面同步
+
+数据预览：
+  总行数：${preview.total}
+  有效条目：${preview.valid}
+  已上传（跳过）：${preview.alreadyUploaded}
+  待同步：${preview.willSync}
+  不上传（状态跳过）：${preview.willSkip}
+  无效（无SID）：${preview.total - preview.valid}
+
+冲突策略：${conflictStrategy === 'skip' ? '跳过冲突' : 'Excel数据覆盖'}
+增量同步：${incremental ? '开启' : '关闭'}
+
+点击"是"开始同步，点击"否"取消。`;
+    const confirmResult = app?.MessageBox?.(confirmMsg, 4 + 32);
+    if (confirmResult !== 6)
+        return;
+    // 4. 冲突检测（用户确认后执行，网络不通时会被 try/catch 捕获并跳过）
     let conflictInfo = '';
     let skipSids = undefined;
     try {
+        bgmLog(LOG_LEVELS.INFO, '[syncWithConfirmation] 开始冲突检测（需要请求 Bangumi API）...');
         const { conflicts, conflictCount } = await detectConflicts(ws, colMap, lastRow, headerRow, token);
         if (conflictCount > 0) {
             if (conflictStrategy === 'skip') {
@@ -275,24 +294,15 @@ export async function syncWithConfirmation() {
                 conflictInfo = `检测到 ${conflictCount} 条冲突，将使用【Excel数据覆盖】。\n\n`;
             }
         }
+        bgmLog(LOG_LEVELS.INFO, `[syncWithConfirmation] 冲突检测完成: ${conflictCount} 条冲突`);
     }
     catch (e) {
+        bgmLog(LOG_LEVELS.WARN, `[syncWithConfirmation] 冲突检测失败（可能网络不通），已跳过: ${e?.message}`);
         BGM.handleError(e, { context: 'syncWithConfirmation:conflictDetection', showAlert: false });
     }
-    // 4. 确认弹窗
-    const msg = `数据预览：
-        总行数：${preview.total}
-        有效条目：${preview.valid}
-        已上传（跳过）：${preview.alreadyUploaded}
-        待同步：${preview.willSync}
-        不上传（状态跳过）：${preview.willSkip}
-        无效（无SID）：${preview.total - preview.valid}
-        ${conflictInfo}是否继续同步？`;
-    const confirmResult = app?.MessageBox?.(msg, 4 + 32);
-    if (confirmResult !== 6)
-        return;
     // 5. 执行同步（传入跳过冲突集合和增量同步开关）
     try {
+        bgmLog(LOG_LEVELS.INFO, '[syncWithConfirmation] 开始执行同步...');
         const result = await SyncToBangumiAsync(ws, colMap, token, lastRow, headerRow, {
             skipSids,
             incremental,

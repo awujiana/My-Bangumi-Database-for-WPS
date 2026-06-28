@@ -149,29 +149,34 @@ export function OnAction(control: { Id: string }): boolean {
             case 'btnShowPanel':
                 showBangumiPanel();
                 break;
-                case 'btnSyncBangumi':
-                    RibbonService.syncWithConfirmation();
+            case 'btnSyncBangumi': {
+                // syncWithConfirmation 是 async 函数，需要 .catch() 防止未处理的 Promise rejection
+                RibbonService.syncWithConfirmation().catch((e: unknown) => {
+                    bgmLog(LOG_LEVELS.ERROR, `[OnAction] syncWithConfirmation 异常: ${(e as Error)?.message || String(e)}`);
+                    BGM.handleError(e, { showAlert: true, level: BGM.ErrorLevel.ERROR, context: 'Ribbon btnSyncBangumi' });
+                });
                 break;
-                case 'btnSetToken':
-                    RibbonService.setTokenForRibbon();
-                    break;
-                    case 'btnTestToken':
-                        RibbonService.testTokenForRibbon();
-                        break;
-                        case 'btnSetUserId':
-                            RibbonService.setUserIdForRibbon();
-                            break;
-                        case 'btnOpenCollection':
-                            RibbonService.openCollectionForRibbon();
-                            break;
-                            default:
-                                bgmLog(LOG_LEVELS.WARN, `[BGM] 未知按钮: ${control.Id}`);
-                            }
-                        } catch (e: unknown) {
-                            BGM.handleError(e, { showAlert: true, level: BGM.ErrorLevel.ERROR, context: 'Ribbon OnAction' });
-                        }
-                        return true;
-                    }
+            }
+            case 'btnSetToken':
+                RibbonService.setTokenForRibbon();
+                break;
+            case 'btnTestToken':
+                RibbonService.testTokenForRibbon();
+                break;
+            case 'btnSetUserId':
+                RibbonService.setUserIdForRibbon();
+                break;
+            case 'btnOpenCollection':
+                RibbonService.openCollectionForRibbon();
+                break;
+            default:
+                bgmLog(LOG_LEVELS.WARN, `[BGM] 未知按钮: ${control.Id}`);
+        }
+    } catch (e: unknown) {
+        BGM.handleError(e, { showAlert: true, level: BGM.ErrorLevel.ERROR, context: 'Ribbon OnAction' });
+    }
+    return true;
+}
                     /**
  * 获取按钮图标（占位函数，实际图标由 CSS 或图片提供）
  */
