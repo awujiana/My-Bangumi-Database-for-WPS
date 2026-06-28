@@ -36,7 +36,7 @@ export function getSyncPreview(
     bgmLog(LOG_LEVELS.INFO, `[getSyncPreview] 增量同步: ${isIncremental ? '开启' : '关闭'}`);
     
     // 批量读取（与同步函数相同的列范围）
-    const neededKeys = ['Bangumi_URL', '名称', '是否看完', '打分', '标签/分级', '剧透/感言', '集数', '集号'];
+    const neededKeys = ['Bangumi_URL', '名称', '是否看完', '打分', '标签/分级', '原作标签', '剧透/感言', '集数', '集号'];
     let maxCol = 1;
     for (const key of neededKeys) {
         if (colMap.has(key)) maxCol = Math.max(maxCol, colMap.get(key)!);
@@ -103,6 +103,7 @@ export function getSyncPreview(
                         mapWatchStatus(getField(rowNum, '是否看完') || getField(rowNum, '状态') || getField(rowNum, '观看状态')).toString(),
                         getField(rowNum, '打分'),
                         getField(rowNum, '标签/分级'),
+                        getField(rowNum, '原作标签'),
                         getField(rowNum, '剧透/感言'),
                         getField(rowNum, '集数'),
                         getField(rowNum, '集号')
@@ -139,6 +140,7 @@ export function getSyncPreview(
                         type.toString(),
                         getField(rowNum, '打分'),
                         getField(rowNum, '标签/分级'),
+                        getField(rowNum, '原作标签'),
                         getField(rowNum, '剧透/感言'),
                         getField(rowNum, '集数'),
                         getField(rowNum, '集号')

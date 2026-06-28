@@ -81,7 +81,7 @@ function updateLockButton() {
         }
     }
 }
-function refreshSheets() {
+function refreshSheets(opts) {
     const select = document.getElementById('sheetSelect');
     if (!select)
         return;
@@ -90,16 +90,52 @@ function refreshSheets() {
         bgmLog(LOG_LEVELS.WARN, 'refreshSheets: 无法获取 ActiveWorkbook');
         return;
     }
-    const sheets = app.ActiveWorkbook.Worksheets;
+    const workbook = app.ActiveWorkbook;
+    const sheets = workbook.Worksheets;
+    // 探测当前活动工作表索引（autoSelectActive 时用于自动选中）
+    let activeSheetIndex = 0;
+    try {
+        const activeSheet = workbook.ActiveSheet;
+        if (activeSheet) {
+            for (let i = 1; i <= sheets.Count; i++) {
+                if (sheets.Item(i) === activeSheet) {
+                    activeSheetIndex = i;
+                    break;
+                }
+            }
+        }
+    }
+    catch (e) {
+        BGM.handleError(e, { showAlert: false, level: BGM.ErrorLevel.INFO, context: 'refreshSheets.getActiveSheet' });
+    }
     select.innerHTML = '<option value="">-- 请选择 --</option>';
+    const autoSelectActive = opts?.autoSelectActive === true;
+    let selectedIndex = 0;
     for (let i = 1; i <= sheets.Count; i++) {
         const option = document.createElement('option');
         option.value = String(i);
         option.text = sheets.Item(i).Name;
         if (BGM.sheet.isLocked && BGM.sheet.lockedIndex === i) {
             option.selected = true;
+            selectedIndex = i;
+        }
+        else if (autoSelectActive && !BGM.sheet.isLocked && i === activeSheetIndex) {
+            option.selected = true;
+            selectedIndex = i;
         }
         select.appendChild(option);
+    }
+    // 同步 select.value，selectedIndex 已通过 option.selected 设置
+    if (selectedIndex > 0) {
+        select.value = String(selectedIndex);
+        bgmLog(LOG_LEVELS.INFO, `[refreshSheets] ${autoSelectActive ? '自动选中' : '已锁定'} 工作表索引: ${selectedIndex}`);
+    }
+    else if (autoSelectActive && activeSheetIndex > 0) {
+        select.value = String(activeSheetIndex);
+        bgmLog(LOG_LEVELS.INFO, `[refreshSheets] 自动选中当前活动工作表: ${activeSheetIndex}`);
+    }
+    else {
+        select.value = '';
     }
     updateLockButton();
 }
@@ -723,6 +759,7 @@ function startUserInfoPolling() {
     let lastToken = loadBgToken();
     let lastIncrementalSync = null;
     let lastSkipConflicts = null;
+    let lastPanelShownAt = null;
     const pollingInterval = setInterval(() => {
         try {
             const currentUserId = _getBgmUserId();
@@ -770,6 +807,16 @@ function startUserInfoPolling() {
                     conflictStrategySelect.value = currentSkipConflicts ? 'skip' : 'excel';
                     bgmLog(LOG_LEVELS.INFO, `[startUserInfoPolling] 冲突策略 select 已同步: ${conflictStrategySelect.value}`);
                 }
+            }
+            // 检测面板显示信号：Ribbon 点击"打开同步面板"时会写入 bgm_panel_shown_at 时间戳
+            const app = getApp();
+            const currentPanelShownAt = app?.PluginStorage?.getItem('bgm_panel_shown_at') || null;
+            if (currentPanelShownAt && currentPanelShownAt !== lastPanelShownAt) {
+                bgmLog(LOG_LEVELS.INFO, `[startUserInfoPolling] 检测到面板显示信号: ${currentPanelShownAt}`);
+                lastPanelShownAt = currentPanelShownAt;
+                // 自动刷新工作表（匹配当前活动工作表）+ 刷新数据预览
+                refreshSheets({ autoSelectActive: true });
+                refreshData();
             }
         }
         catch (e) {

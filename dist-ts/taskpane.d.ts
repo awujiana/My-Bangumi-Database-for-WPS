@@ -5,7 +5,9 @@
  */
 import { WpsWorksheet } from './index.js';
 declare function toggleSheetLock(): void;
-declare function refreshSheets(): void;
+declare function refreshSheets(opts?: {
+    autoSelectActive?: boolean;
+}): void;
 declare function autoDetectSheet(): {
     sheetIndex: number;
     sheetName: string;

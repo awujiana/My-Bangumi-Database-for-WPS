@@ -50,7 +50,10 @@ function getRowData(ws, rowNum, colMap, headerRow, seqCol = 9) {
     data.name = readCol('名称');
     data.status = readCol('是否看完');
     data.rate = readCol('打分');
-    data.tagsRaw = readCol('标签/分级');
+    // 合并 "标签/分级" 与 "原作标签" 两列，与 buildJsonPayload 保持一致
+    const tagsGradeRaw = readCol('标签/分级');
+    const originalTagRaw = readCol('原作标签');
+    data.tagsRaw = [tagsGradeRaw, originalTagRaw].filter(Boolean).join('|');
     data.finishedDate = readCol('完播日');
     if (data.bgmUrl) {
         data.sid = extractSubjectId(data.bgmUrl);

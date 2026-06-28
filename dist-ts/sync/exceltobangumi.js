@@ -31,7 +31,7 @@ function isBangumiUrl(url) {
 /** 批量读取时需要获取的列名 */
 const BATCH_READ_COLUMNS = [
     'Bangumi_URL', '名称', '是否看完', '状态', '观看状态', '打分',
-    '标签/分级', '完播日', '类别', '剧透/感言', '集号', '集数', '特点/印象'
+    '标签/分级', '原作标签', '完播日', '类别', '剧透/感言', '集号', '集数', '特点/印象'
 ];
 /** 观看状态类型名称映射 (优化点：提取常量) */
 const TYPE_NAMES = {
@@ -634,10 +634,17 @@ export function buildJsonPayload(getField, finishedDate) {
                 payload.rate = rate;
             }
         }
-        // 标签
-        const tagsVal = trim(getField('标签/分级'));
-        if (tagsVal) {
-            payload.tags = buildTagsArray(tagsVal);
+        // 标签 - 合并 "标签/分级" 与 "原作标签" 两列
+        const tagSet = new Set();
+        const tagsGradeVal = trim(getField('标签/分级'));
+        const originalTagVal = trim(getField('原作标签'));
+        if (tagsGradeVal)
+            addTagsFromStr(tagSet, tagsGradeVal);
+        if (originalTagVal)
+            addTagsFromStr(tagSet, originalTagVal);
+        if (tagSet.size > 0) {
+            payload.tags = Array.from(tagSet);
+            bgmLog(LOG_LEVELS.INFO, `[buildJsonPayload] 标签合并: 标签/分级="${tagsGradeVal || '(空)'}" + 原作标签="${originalTagVal || '(空)'}" -> ${JSON.stringify(payload.tags)}`);
         }
         // 感言
         let commentVal = trim(getField('剧透/感言') || getField('感言'));
@@ -924,7 +931,7 @@ function prepareSyncTasks(ws, colMap, options, startRow, lastRow, seqCol) {
                 skip++;
                 continue;
             }
-            // 增量同步指纹检查
+            // 增量同步指纹检查（标签包含 标签/分级 + 原作标签，与 buildJsonPayload 保持一致）
             let currentFingerprint;
             if (fingerprintMap) {
                 currentFingerprint = calcFingerprint([
@@ -932,6 +939,7 @@ function prepareSyncTasks(ws, colMap, options, startRow, lastRow, seqCol) {
                     watchType.toString(),
                     getField(rowNum, '打分'),
                     getField(rowNum, '标签/分级'),
+                    getField(rowNum, '原作标签'),
                     getField(rowNum, '剧透/感言'),
                     getField(rowNum, '集数'),
                     getField(rowNum, '集号')

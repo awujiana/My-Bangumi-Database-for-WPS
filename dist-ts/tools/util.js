@@ -786,18 +786,34 @@ export function showBangumiPanel() {
         return;
     }
     const tsId = app.PluginStorage?.getItem("taskpane_id");
+    let becameVisible = false;
     if (!tsId) {
         const tskpane = app.CreateTaskPane?.(getUrlPath() + "/ui/taskpane.html");
         if (tskpane) {
             const id = tskpane.ID;
             app.PluginStorage?.setItem("taskpane_id", id);
             tskpane.Visible = true;
+            becameVisible = true;
         }
     }
     else {
         const tskpane = app.GetTaskPane?.(tsId);
         if (tskpane) {
+            // 切换可见性：从隐藏→显示时才触发刷新信号
+            if (!tskpane.Visible) {
+                becameVisible = true;
+            }
             tskpane.Visible = !tskpane.Visible;
+        }
+    }
+    // 写入"面板已显示"信号（时间戳），taskpane 轮询检测到变化后自动刷新工作表
+    if (becameVisible) {
+        try {
+            app.PluginStorage?.setItem("bgm_panel_shown_at", String(Date.now()));
+            bgmLog(LOG_LEVELS.INFO, `[showBangumiPanel] 面板已显示，已写入刷新信号`);
+        }
+        catch (e) {
+            bgmLog(LOG_LEVELS.WARN, `[showBangumiPanel] 写入面板显示信号失败: ${e.message}`);
         }
     }
 }

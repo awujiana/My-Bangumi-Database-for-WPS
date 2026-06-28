@@ -903,8 +903,8 @@ const ACTION_HANDLERS = {
         bgmLog(LOG_LEVELS.INFO, `[handleActionClick] 收藏同步已触发，耗时: ${Date.now() - ctx.startTime}ms`);
     },
     refreshSheets: (ctx) => {
-        bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 开始刷新工作表');
-        refreshSheets();
+        bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 开始刷新工作表（自动匹配当前活动工作表）');
+        refreshSheets({ autoSelectActive: true });
         bgmLog(LOG_LEVELS.INFO, `[handleActionClick] 工作表刷新已触发，耗时: ${Date.now() - ctx.startTime}ms`);
     },
     refreshData: (ctx) => {
