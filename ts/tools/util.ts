@@ -11,7 +11,7 @@ import {
     type ErrorOptions,
 } from '../core/constants.js';
 import { BgmError } from '../core/result.js';
-import { encryptToken, decryptToken, calcChecksum } from '../core/crypto.js';
+import { decryptToken, calcChecksum } from '../core/crypto.js';
 import { showConfirm, type DialogOptions } from '../ui/dialog.js';
 import { showAlert as customShowAlert, showError as customShowError, showInput as customShowInput } from '../ui/dialog.js';
 import { isWpsApp, type WpsApplication, type WpsWorksheet, type WpsRange } from './wps.js';
@@ -109,6 +109,7 @@ export const BGM: {
             this.resetStopFlag();
             this.isRunning = true;
             this.lastSyncTime = new Date().toISOString();
+            eventBus.emit(BGM_EVENTS.SYNC_STATE_CHANGED, { state: 'running' });
             return true;
         },
 
@@ -116,6 +117,7 @@ export const BGM: {
         exitRunningState(): void {
             this.isRunning = false;
             this.resetStopFlag();
+            eventBus.emit(BGM_EVENTS.SYNC_STATE_CHANGED, { state: 'idle' });
         },
 
         startSync(): void {
@@ -150,6 +152,7 @@ export const BGM: {
             this.shouldStop = true;
             this.isPaused = false;
             bgmLog(LOG_LEVELS.INFO, '用户请求停止同步');
+            eventBus.emit(BGM_EVENTS.SYNC_STATE_CHANGED, { state: 'stopped' });
         },
 
         pause(): void {
@@ -157,6 +160,7 @@ export const BGM: {
             if (!this.isRunning || this.isPaused || this.shouldStop) return;
             this.isPaused = true;
             bgmLog(LOG_LEVELS.INFO, `[sync] 同步已暂停，当前行: ${this.currentRow}`);
+            eventBus.emit(BGM_EVENTS.SYNC_STATE_CHANGED, { state: 'paused', row: this.currentRow });
             // 定位到当前单元格
             this.locateCurrentCell();
         },
@@ -165,6 +169,7 @@ export const BGM: {
             if (!this.isPaused) return;
             this.isPaused = false;
             bgmLog(LOG_LEVELS.INFO, '[sync] 同步已恢复');
+            eventBus.emit(BGM_EVENTS.SYNC_STATE_CHANGED, { state: 'resumed' });
         },
 
         checkShouldStop(): boolean {

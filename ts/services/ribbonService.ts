@@ -1,6 +1,6 @@
 // ts/services/ribbonService.ts
 import {
-    getApp, bgmLog, BGM, wpsMsgBox, loadBgToken, storeBgToken,
+    getApp, bgmLog, BGM, wpsMsgBox, loadBgToken, storeBgToken, copyTokenToClipboard,
     getDataSheet, findHeaderRow, getLastRow, getColumnMap,
     extractSubjectId, mapWatchStatus,  getCellValue,
     readRangeValues, getFilterStatus, BGM_COLOR, LOG_LEVELS,
@@ -358,7 +358,7 @@ export async function syncWithConfirmation() {
         });
         if (app) app.StatusBar = false;
         BGM.sync.exitRunningState();
-        app?.MessageBox?(
+        app?.MessageBox?.(
             `同步完成！\n成功: ${result.success} 条\n失败: ${result.fail} 条\n跳过: ${result.skip} 条`,
             0, 64
         );
@@ -418,6 +418,16 @@ export function testTokenForRibbon() {
         BGM.notifyTokenUpdated();
     } else {
         getApp()?.MessageBox?.('请先设置 Token！', 0, 48);
+    }
+}
+
+/** 复制 Token 到剪贴板（Ribbon 版本） */
+export function copyTokenForRibbon() {
+    const ok = copyTokenToClipboard();
+    if (ok) {
+        wpsMsgBox('Token 已复制到剪贴板', 0, 64);
+    } else {
+        wpsMsgBox('复制失败，可能未设置 Token', 0, 48);
     }
 }
 

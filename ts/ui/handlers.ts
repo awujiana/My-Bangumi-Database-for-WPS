@@ -6,7 +6,7 @@
 
 import {
     type SyncRecord, LOG_LEVELS, bgmLog, BGM,
-    loadBgToken, storeBgToken, clearBgToken, _getBgmUserId, _setBgmUserId, _getBgmUsername, _setBgmUsername, getApp,
+    loadBgToken, storeBgToken, clearBgToken, copyTokenToClipboard, _getBgmUserId, _setBgmUserId, _getBgmUsername, _setBgmUsername, getApp,
     getCell, trim, getCellValue, setCellValue, fetchBgmUserInfo, BGM_COLOR, showAlert, showConfirm,
     showError, showSuccess, showInput, showToast, setStatus,
     verifyToken, fetchAllUserCollections, findHeaderRow, getColumnMap,
@@ -1000,6 +1000,21 @@ const ACTION_HANDLERS: Record<string, ActionHandler> = {
         bgmLog(LOG_LEVELS.INFO, `[handleActionClick] 清除 Token 操作完成，耗时: ${Date.now() - ctx.startTime}ms`);
     },
 
+    copyToken: (ctx) => {
+        bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 复制 Token 到剪贴板');
+        try {
+            const ok = copyTokenToClipboard();
+            if (ok) {
+                showToast('Token 已复制到剪贴板', 'success');
+            } else {
+                showToast('复制失败，可能未设置 Token 或浏览器不支持', 'error');
+            }
+        } catch (e: unknown) {
+            BGM.handleError(e, { showAlert: true, level: BGM.ErrorLevel.WARN, context: 'copyToken' });
+        }
+        bgmLog(LOG_LEVELS.INFO, `[handleActionClick] 复制 Token 操作完成，耗时: ${Date.now() - ctx.startTime}ms`);
+    },
+
     testToken: (ctx) => {
         bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 开始测试 Token 有效性');
         testTokenValidity();
@@ -1255,6 +1270,17 @@ function setupEventListeners(): void {
     // 同步进度事件（更新到同步进度弹窗，若弹窗未打开则忽略）
     eventBus.on(BGM_EVENTS.SYNC_PROGRESS, (data: { current: number; total: number; message: string }) => {
         updateSyncProgressDialog(data.current, data.total, data.message);
+    });
+
+    // 同步状态变更事件（开始/暂停/恢复/停止/空闲）
+    eventBus.on(BGM_EVENTS.SYNC_STATE_CHANGED, (payload: { state: string; row?: number }) => {
+        bgmLog(LOG_LEVELS.INFO, `[handlers] 同步状态变更: ${payload.state}${payload.row ? `, 行: ${payload.row}` : ''}`);
+        // 可选：根据状态刷新按钮禁用态
+        const syncButtons = document.querySelectorAll('button[data-action="sync"], button[data-action="syncCollectionFromBgm"], button[data-action="previewSyncContent"]');
+        syncButtons.forEach(btn => {
+            const el = btn as HTMLButtonElement;
+            el.disabled = payload.state === 'running' || payload.state === 'paused';
+        });
     });
 }
 

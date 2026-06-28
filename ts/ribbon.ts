@@ -195,6 +195,9 @@ export function OnAction(control: { Id: string }): boolean {
             case 'btnTestToken':
                 RibbonService.testTokenForRibbon();
                 break;
+            case 'btnCopyToken':
+                RibbonService.copyTokenForRibbon();
+                break;
             case 'btnSetUserId':
                 RibbonService.setUserIdForRibbon();
                 break;
@@ -219,6 +222,7 @@ export function GetBangumiImage(control: { Id: string }): string {
             btnSyncBangumi: 'images/sync.svg',
             btnSetToken: 'images/token.svg',
             btnTestToken: 'images/key.svg',
+            btnCopyToken: 'images/key.svg',
             btnSetUserId: 'images/user.svg',
             btnOpenCollection: 'images/link.svg',
             btnClearColors: 'images/cleartags.svg',

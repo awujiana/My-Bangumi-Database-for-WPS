@@ -10,6 +10,7 @@
                     <checkBox id="chkEnableSyncRecord" label="启用同步记录" getPressed="GetEnableSyncRecordPressed" onAction="OnEnableSyncRecordChange" />
                     <button id="btnSetToken" label="设置Token" onAction="OnAction" getImage="GetBangumiImage" size="large"/>
                     <button id="btnTestToken" label="测试Token" onAction="OnAction" getImage="GetBangumiImage" size="large"/>
+                    <button id="btnCopyToken" label="复制Token" onAction="OnAction" getImage="GetBangumiImage" size="large"/>
                     <button id="btnSetUserId" label="设置用户ID" onAction="OnAction" getImage="GetBangumiImage" size="large"/>
                     <button id="btnOpenCollection" label="打开收藏页" onAction="OnAction" getImage="GetBangumiImage" size="large"/>
                   

@@ -136,6 +136,8 @@ export const BGM_EVENTS = {
     SYNC_PROGRESS:   'sync:progress',
     SYNC_COMPLETED:  'sync:completed',
     SYNC_ERROR:      'sync:error',
+    /** 同步状态变更（开始/暂停/恢复/停止/空闲） */
+    SYNC_STATE_CHANGED: 'sync:stateChanged',
     SHEET_LOCKED:    'sheet:locked',
     SHEET_UNLOCKED:  'sheet:unlocked',
     CONFIG_UPDATED:  'config:updated',
