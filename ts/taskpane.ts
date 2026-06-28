@@ -657,14 +657,14 @@ function refreshData(): void {
                         const rangeAddr = ws.Range(`${startColLetter}${segStart}:${endColLetter}${segStart + segLen - 1}`);
                         const raw = rangeAddr.Value2;
                         // WPS 返回二维数组（1-based），或单值
-                        const is2D = raw && typeof raw === 'object' && raw.length !== undefined;
+                        const is2D = Array.isArray(raw);
                         for (let r = 0; r < segLen; r++) {
                             const dr = dataRows[i + r];
                             const rowCols: string[] = [];
                             let hasAny = false;
                             for (let ci = 0; ci < displayColCount; ci++) {
                                 let v: string;
-                                if (is2D) {
+                                if (is2D && Array.isArray(raw)) {
                                     const cell = raw[r + 1][ci + 1];
                                     v = cell == null ? '' : String(cell).trim();
                                 } else {

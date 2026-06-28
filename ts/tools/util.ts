@@ -588,7 +588,7 @@ export function setCellValue(ws: WpsWorksheet | null | undefined, row: number, c
             bgmLog(LOG_LEVELS.ERROR, `setCellValue - 无法获取单元格: (${row}, ${col})`);
             return false;
         }
-        cell.Value2 = value;
+        cell.Value2 = value as import('./wps.js').WpsCellValue;
         return true;
     } catch (e) {
         BGM.handleError(e, { level: BGM.ErrorLevel.ERROR, context: 'setCellValue' });

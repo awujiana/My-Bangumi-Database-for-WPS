@@ -1305,9 +1305,9 @@ function collectSelectedRows(app: WpsApplication): number[] {
 
         // 处理非连续选择（多区域）
         const areas = sel.Areas;
-        const areaCount = areas ? areas.Count : 1;
+        const areaCount = areas?.Count ?? 1;
 
-        if (areaCount > 1) {
+        if (areaCount > 1 && areas) {
             // 非连续选择：遍历每个 Area 收集行号
             bgmLog(LOG_LEVELS.INFO, `[syncSelectedRows] 检测到非连续选择，共 ${areaCount} 个区域`);
             for (let ai = 1; ai <= areaCount; ai++) {

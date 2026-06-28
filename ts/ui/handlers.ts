@@ -826,7 +826,7 @@ async function _doAPISync(sheetIndex: number, token: string): Promise<void> {
             BGM.sync.updatePosition(undefined, row);
 
             const bgmUrlCell = colMap.has('Bangumi_URL') ? getCell(ws, row, urlCol) : null;
-            const bgmUrl = bgmUrlCell ? trim(String(bgmUrlCell.Value() || '')) : '';
+            const bgmUrl = bgmUrlCell ? trim(String(bgmUrlCell.Value ?? '')) : '';
             const sid = typeof extractSubjectId === 'function' ? extractSubjectId(bgmUrl) : '';
             let matched = false;
             if (sid && collectionMap.has(sid)) {

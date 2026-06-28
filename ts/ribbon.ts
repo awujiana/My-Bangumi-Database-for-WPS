@@ -8,6 +8,22 @@ import { WPS_ENUM, showBangumiPanel, BGM, getIncrementalSync, getSkipConflicts, 
 import * as RibbonService from './services/ribbonService.js';
 
 /**
+ * WPS Ribbon 控件回调参数最小接口
+ * WPS Ribbon 系统在调用 getPressed/onAction 回调时传入的 control 对象。
+ * 第三方 WPS Ribbon API 无 @types，仅定义本项目使用到的字段。
+ */
+interface WpsRibbonControl {
+    /** 控件 ID（对应 ribbon.xml 中的 id 属性） */
+    Id?: string;
+    /** 控件 Tag（对应 ribbon.xml 中的 tag 属性） */
+    Tag?: string;
+    /** 复选框当前按下状态（仅 checkBox 控件回调使用） */
+    Pressed?: boolean;
+    /** 上下文对象（通常为当前 Workbook） */
+    Context?: unknown;
+}
+
+/**
  * WPS Ribbon UI 最小接口定义
  * 第三方 WPS Ribbon API 无 @types，仅定义本项目使用到的方法
  */
@@ -27,12 +43,12 @@ interface RibbonWindowExtensions {
         onAction: (control: { Id: string }) => boolean,
         getImage: (control: { Id: string }) => string
     ) => void;
-    GetIncrementalSyncPressed?: (control: unknown) => boolean;
-    GetSkipConflictsPressed?: (control: unknown) => boolean;
-    OnIncrementalSyncChange?: (control: unknown) => boolean;
-    OnSkipConflictsChange?: (control: unknown) => boolean;
-    GetEnableSyncRecordPressed?: (control: unknown) => boolean;
-    OnEnableSyncRecordChange?: (control: unknown) => boolean;
+    GetIncrementalSyncPressed?: (control: WpsRibbonControl) => boolean;
+    GetSkipConflictsPressed?: (control: WpsRibbonControl) => boolean;
+    OnIncrementalSyncChange?: (control: WpsRibbonControl) => boolean;
+    OnSkipConflictsChange?: (control: WpsRibbonControl) => boolean;
+    GetEnableSyncRecordPressed?: (control: WpsRibbonControl) => boolean;
+    OnEnableSyncRecordChange?: (control: WpsRibbonControl) => boolean;
 }
 
 // 在 Ribbon 启动时（例如 OnAddinLoad 中或文件顶部立即执行）
@@ -61,8 +77,7 @@ initRibbonMessageListener();
  * 获取"跳过冲突"复选框的初始按下状态
  * 从配置读取上次保存的设置，默认未选中
  */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any -- WPS Ribbon 控件无 @types
-export function GetSkipConflictsPressed(control: any): boolean {
+export function GetSkipConflictsPressed(control: WpsRibbonControl): boolean {
     const result = getSkipConflicts();
     bgmLog(LOG_LEVELS.INFO, `[Ribbon] GetSkipConflictsPressed: ${result}`);
     return result;
@@ -71,8 +86,7 @@ export function GetSkipConflictsPressed(control: any): boolean {
 /**
  * 当"跳过冲突"复选框被点击时，保存状态
  */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any -- WPS Ribbon 控件无 @types
-export function OnSkipConflictsChange(control: any): boolean {
+export function OnSkipConflictsChange(control: WpsRibbonControl): boolean {
     const newValue = control.Pressed;
     bgmLog(LOG_LEVELS.INFO, `[Ribbon] OnSkipConflictsChange: control.Pressed = ${newValue}`);
     
@@ -95,8 +109,7 @@ export function OnSkipConflictsChange(control: any): boolean {
  * 获取"启用同步记录"复选框的初始按下状态
  * 从配置读取上次保存的设置，默认未选中
  */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any -- WPS Ribbon 控件无 @types
-export function GetEnableSyncRecordPressed(control: any): boolean {
+export function GetEnableSyncRecordPressed(control: WpsRibbonControl): boolean {
     const result = getSyncRecordEnabled();
     bgmLog(LOG_LEVELS.INFO, `[Ribbon] GetEnableSyncRecordPressed: ${result}`);
     return result;
@@ -105,8 +118,7 @@ export function GetEnableSyncRecordPressed(control: any): boolean {
 /**
  * 当"启用同步记录"复选框被点击时，保存状态
  */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any -- WPS Ribbon 控件无 @types
-export function OnEnableSyncRecordChange(control: any): boolean {
+export function OnEnableSyncRecordChange(control: WpsRibbonControl): boolean {
     const newValue = control.Pressed;
     bgmLog(LOG_LEVELS.INFO, `[Ribbon] OnEnableSyncRecordChange: control.Pressed = ${newValue}`);
     let finalValue: boolean;
@@ -125,8 +137,7 @@ export function OnEnableSyncRecordChange(control: any): boolean {
  * 获取增量同步复选框的初始按下状态
  * 从配置读取上次保存的设置，默认未选中
  */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any -- WPS Ribbon 控件无 @types
-export function GetIncrementalSyncPressed(control: any): boolean {
+export function GetIncrementalSyncPressed(control: WpsRibbonControl): boolean {
     const result = getIncrementalSync();
     bgmLog(LOG_LEVELS.INFO, `[Ribbon] GetIncrementalSyncPressed: ${result}`);
     return result;
@@ -135,8 +146,7 @@ export function GetIncrementalSyncPressed(control: any): boolean {
 /**
  * 当增量同步复选框被点击时，保存状态
  */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any -- WPS Ribbon 控件无 @types
-export function OnIncrementalSyncChange(control: any): boolean {
+export function OnIncrementalSyncChange(control: WpsRibbonControl): boolean {
     const newValue = control.Pressed;
     let finalValue: boolean;
     if (typeof newValue === 'boolean') {

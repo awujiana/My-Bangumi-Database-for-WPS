@@ -6,6 +6,26 @@
 import { getApp, bgmLog, LOG_LEVELS, BGM } from '../index.js';
 import { showAlert as customShowAlert, showConfirm as customShowConfirm, showInput as customShowInput } from '../ui/dialog.js';
 
+/**
+ * WPS 单元格值类型
+ * WPS COM 的 Value/Value2/Formula 属性可能是以下任意一种类型。
+ * 调用方在使用前应通过 typeof/instanceof 进行类型守卫。
+ */
+export type WpsCellValue = string | number | boolean | Date | null;
+
+/**
+ * WPS 单元格公式类型
+ * Formula 可能是字符串公式（如 "=A1+B1"）或二维数组的值。
+ */
+export type WpsFormula = string | WpsCellValue[][] | null;
+
+/**
+ * WPS 当前选中对象
+ * Selection 可能是 Range、Shape、Chart 等多种对象或 null（无选中）。
+ * 项目当前仅使用 Range 路径，其他场景需调用方自行类型守卫。
+ */
+export type WpsSelection = WpsRange | null;
+
 // ========== WPS Application ==========
 export interface WpsApplication {
     ActiveWorkbook?: WpsWorkbook;
@@ -22,8 +42,7 @@ export interface WpsApplication {
     GetTaskPane?: (id: string) => WpsTaskPane;
     Enum?: Record<string, number>;
     ribbonUI?: unknown;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- COM 边界：Selection 可能是 Range/Shape/Nothing 等多种类型
-    Selection?: any;
+    Selection?: WpsSelection;
 }
 
 // ========== WPS 工作簿 ==========
@@ -110,15 +129,14 @@ export interface WpsRange {
     Rows: WpsRows;
     Columns: WpsColumns;
 
-     // 值属性（WPS 中可能是属性也可能是函数，值类型为 string/number/boolean/Date/null，保留 any 为 COM 边界）
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- COM 边界：Value 可能是 string/number/boolean/Date/null/Error
-    Value?: any;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- COM 边界：Value2 与 Value 同义，未格式化的原始值
-    Value2?: any;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- COM 边界：Text 为只读的格式化字符串，可能为 null
-    Text?: any;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- COM 边界：Formula 可能是字符串、数组或错误值
-    Formula?: any;
+    // 值属性（WPS 中可能是属性也可能是函数，使用联合类型覆盖所有可能）
+    Value?: WpsCellValue | WpsCellValue[][];
+    // Value2 与 Value 同义，未格式化的原始值
+    Value2?: WpsCellValue | WpsCellValue[][];
+    // Text 为只读的格式化字符串
+    Text?: string | null;
+    // Formula 可能是字符串公式、二维数组或错误值
+    Formula?: WpsFormula;
 
     // 格式属性
     Interior?: WpsInterior;
@@ -126,6 +144,8 @@ export interface WpsRange {
 
     // 区域属性
     Areas?: WpsAreas;
+    /** 区域地址（如 "A1:B10"），可能为本地或绝对引用格式 */
+    Address?: string;
     Count: number;
 
     // 整行/整列
