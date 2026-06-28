@@ -11,7 +11,7 @@ import {
     type ErrorOptions,
 } from '../core/constants.js';
 import { BgmError } from '../core/result.js';
-import { decryptToken, calcChecksum } from '../core/crypto.js';
+import { decryptToken } from '../core/crypto.js';
 import { showConfirm, type DialogOptions } from '../ui/dialog.js';
 import { showAlert as customShowAlert, showError as customShowError, showInput as customShowInput } from '../ui/dialog.js';
 import { isWpsApp, type WpsApplication, type WpsWorksheet, type WpsRange } from './wps.js';
@@ -19,6 +19,9 @@ import { syncAllRows } from '../ui/preview.js';
 // 类型只从 index.js 导入（type-only import 不会产生运行时循环依赖）
 import type { BGMCache, BGMSheet, BGMSync, BGMUserInfo } from '../index.js';
 import { BGM_EVENTS, eventBus } from './events.js';
+// 字符串工具已拆分到 stringUtils.ts，此处 import 供内部调用，并 re-export 保持向后兼容
+import { colNumToLetter, trim, escapeHtml, calcFingerprint } from './stringUtils.js';
+export { colNumToLetter, trim, escapeHtml, calcFingerprint };
 
 // ========== BGM 全局窗口扩展接口 ==========
 interface BgmWindowGlobals {
@@ -487,19 +490,6 @@ export function getApp(): WpsApplication | null {
 }
 
 // ========== 单元格操作 ==========
-/**
- * 列号转字母 (A, B, ..., Z, AA, AB, ...)
- */
-export function colNumToLetter(col: number): string {
-    let letter = "";
-    while (col > 0) {
-        const mod = (col - 1) % 26;
-        letter = String.fromCharCode(65 + mod) + letter;
-        col = Math.floor((col - mod) / 26);
-    }
-    return letter;
-}
-
 export function getCell(
                     ws: WpsWorksheet | null | undefined,
                     row: number,
@@ -614,17 +604,6 @@ export function getSheetByIndex(sheetIndex: number): unknown {
     const sheets = app.ActiveWorkbook.Sheets;
     if (sheets.Count === 0) return null;
     return sheets.Item(sheetIndex);
-}
-
-// ========== HTML 安全 ==========
-/**
- * HTML 转义（防止 XSS）
- */
-export function escapeHtml(text: string | null | undefined): string {
-    if (!text) return "";
-    const div = document.createElement("div");
-    div.textContent = text;
-    return div.innerHTML;
 }
 
 // ========== Token 存储 ==========
@@ -937,14 +916,6 @@ export function showBangumiPanel(): void {
             bgmLog(LOG_LEVELS.WARN, `[showBangumiPanel] 写入面板显示信号失败: ${(e as Error).message}`);
         }
     }
-}
-
-/**
- * 字符串去除首尾空格
- */
-export function trim(str: string | null | undefined): string {
-    if (!str) return "";
-    return String(str).replace(/^\s+|\s+$/g, "");
 }
 
 /**
@@ -1367,17 +1338,6 @@ export function getDataSheet(): WpsWorksheet | null | undefined {
   const ws = app.ActiveWorkbook.ActiveSheet;
   bgmLog(LOG_LEVELS.INFO, `getDataSheet: 返回当前活动工作表: ${ws.Name}`);
   return ws;
-}
-
-/**
- * 计算 Excel 行数据的指纹（用于增量同步比较）
- * @param fields 关键字段值数组，如 [name, type, rate, tags, comment]
- * @returns 指纹字符串
- */
-export function calcFingerprint(fields: string[]): string {
-    const raw = fields.join('|');
-    // 复用已有的 calcChecksum 生成简短校验和，或直接返回原始字符串前 50 字符
-    return calcChecksum(raw).toString(16).padStart(4, '0'); 
 }
 
 export function safeActivate(ws: WpsWorksheet | null | undefined): void {
