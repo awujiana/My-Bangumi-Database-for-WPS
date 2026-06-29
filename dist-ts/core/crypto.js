@@ -1,9 +1,10 @@
 /**
  * @fileoverview Token加密解密模块
  * @module core/crypto
- * @description 提供Bangumi API Token的安全加密存储功能。
- *              支持XOR加密（同步）和AES-GCM加密（异步）两种模式，
- *              以及Token完整性校验。
+ * @description 历史版本使用 XOR 加密 Token；当前版本改为明文存储以便用户复制。
+ *              decryptToken 仍保留用于读取历史加密数据并自动升级为明文。
+ *              新代码不应调用 encryptToken。
+ *              本模块同时提供 Token 完整性校验。
  *
  * @author BGM Development Team
  * @version 1.0.0

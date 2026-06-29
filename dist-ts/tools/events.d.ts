@@ -11,9 +11,9 @@
  * 事件处理器类型
  *
  * @callback EventHandler
- * @param {unknown} [data] - 事件携带的数据
+ * @param {unknown} data - 事件携带的数据（emit 不传时为 undefined）
  */
-export type EventHandler<T = any> = (data?: T) => void;
+export type EventHandler<T = unknown> = (data: T) => void;
 /**
  * 事件总线类
  * @class
@@ -24,16 +24,16 @@ export declare class EventBus {
     /**
      * 订阅事件
      * @param {string} eventName - 事件名称
-     * @param {EventHandler} handler - 事件处理器
+     * @param {EventHandler<T>} handler - 事件处理器
      * @param {boolean} [once=false] - 是否只触发一次
      */
-    on(eventName: string, handler: EventHandler, once?: boolean): void;
+    on<T = unknown>(eventName: string, handler: EventHandler<T>, once?: boolean): void;
     /**
      * 订阅事件（只触发一次）
      * @param {string} eventName - 事件名称
-     * @param {EventHandler} handler - 事件处理器
+     * @param {EventHandler<T>} handler - 事件处理器
      */
-    once(eventName: string, handler: EventHandler): void;
+    once<T = unknown>(eventName: string, handler: EventHandler<T>): void;
     /**
      * 退订事件
      * @param {string} eventName - 事件名称
@@ -70,6 +70,8 @@ export declare const BGM_EVENTS: {
     readonly SYNC_PROGRESS: "sync:progress";
     readonly SYNC_COMPLETED: "sync:completed";
     readonly SYNC_ERROR: "sync:error";
+    /** 同步状态变更（开始/暂停/恢复/停止/空闲） */
+    readonly SYNC_STATE_CHANGED: "sync:stateChanged";
     readonly SHEET_LOCKED: "sheet:locked";
     readonly SHEET_UNLOCKED: "sheet:unlocked";
     readonly CONFIG_UPDATED: "config:updated";

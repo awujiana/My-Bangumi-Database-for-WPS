@@ -1,3 +1,20 @@
+/**
+ * WPS 单元格值类型
+ * WPS COM 的 Value/Value2/Formula 属性可能是以下任意一种类型。
+ * 调用方在使用前应通过 typeof/instanceof 进行类型守卫。
+ */
+export type WpsCellValue = string | number | boolean | Date | null;
+/**
+ * WPS 单元格公式类型
+ * Formula 可能是字符串公式（如 "=A1+B1"）或二维数组的值。
+ */
+export type WpsFormula = string | WpsCellValue[][] | null;
+/**
+ * WPS 当前选中对象
+ * Selection 可能是 Range、Shape、Chart 等多种对象或 null（无选中）。
+ * 项目当前仅使用 Range 路径，其他场景需调用方自行类型守卫。
+ */
+export type WpsSelection = WpsRange | null;
 export interface WpsApplication {
     ActiveWorkbook?: WpsWorkbook;
     PluginStorage?: WpsPluginStorage;
@@ -13,7 +30,7 @@ export interface WpsApplication {
     GetTaskPane?: (id: string) => WpsTaskPane;
     Enum?: Record<string, number>;
     ribbonUI?: unknown;
-    Selection?: any;
+    Selection?: WpsSelection;
 }
 export interface WpsWorkbook {
     Worksheets: WpsWorksheets;
@@ -80,13 +97,15 @@ export interface WpsRange {
     Column: number;
     Rows: WpsRows;
     Columns: WpsColumns;
-    Value?: any;
-    Value2?: any;
-    Text?: any;
-    Formula?: any;
+    Value?: WpsCellValue | WpsCellValue[][];
+    Value2?: WpsCellValue | WpsCellValue[][];
+    Text?: string | null;
+    Formula?: WpsFormula;
     Interior?: WpsInterior;
     Font?: WpsFont;
     Areas?: WpsAreas;
+    /** 区域地址（如 "A1:B10"），可能为本地或绝对引用格式 */
+    Address?: string;
     Count: number;
     EntireRow: WpsRange;
     EntireColumn: WpsRange;

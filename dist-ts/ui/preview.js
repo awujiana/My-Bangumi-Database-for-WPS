@@ -607,8 +607,10 @@ export async function syncAllRows() {
     }
     bgmLog(LOG_LEVELS.INFO, `[syncAllRows] 增量同步: ${incremental ? '开启' : '关闭'}`);
     // ---------- 4. 启动同步状态机 + 显示进度弹窗 ----------
-    BGM.sync.isRunning = true;
-    BGM.sync.resetStopFlag();
+    if (!BGM.sync.enterRunningState()) {
+        bgmLog(LOG_LEVELS.WARN, '[syncAllRows] 已有同步进行中，拒绝重入');
+        return { success: 0, fail: 0, skip: 0 };
+    }
     BGM.sync.updatePosition(ws, headerRow, colMap.get('序列号') || 9);
     showSyncProgressDialog('正在同步 - 同步所有可见行', {
         onPause: () => BGM.sync.pause(),
@@ -631,14 +633,12 @@ export async function syncAllRows() {
             ? ['⚠️ 同步被用户停止', `成功 ${result.success} 条`, `失败 ${result.fail} 条`, `跳过 ${result.skip} 条`]
             : [`成功 ${result.success} 条`, `失败 ${result.fail} 条`, `跳过 ${result.skip} 条`];
         completeSyncProgressDialog(summary, details, result.stopped);
-        BGM.sync.isRunning = false;
-        BGM.sync.resetStopFlag();
+        BGM.sync.exitRunningState();
         return result;
     }
     catch (err) {
         hideSyncProgressDialog();
-        BGM.sync.isRunning = false;
-        BGM.sync.resetStopFlag();
+        BGM.sync.exitRunningState();
         BGM.handleError(err, { showAlert: true });
         return { success: 0, fail: 0, skip: 0 };
     }

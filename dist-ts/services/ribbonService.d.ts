@@ -45,6 +45,8 @@ export declare function syncWithConfirmation(): Promise<void>;
 export declare function setTokenForRibbon(): Promise<boolean>;
 /** 测试 Token（Ribbon 版本） */
 export declare function testTokenForRibbon(): void;
+/** 复制 Token 到剪贴板（Ribbon 版本） */
+export declare function copyTokenForRibbon(): void;
 /** 设置用户 ID（Ribbon 版本） */
 export declare function setUserIdForRibbon(): void;
 /** 打开收藏页面（Ribbon 版本） */

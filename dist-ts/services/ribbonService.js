@@ -1,5 +1,5 @@
 // ts/services/ribbonService.ts
-import { getApp, bgmLog, BGM, wpsMsgBox, loadBgToken, storeBgToken, getDataSheet, findHeaderRow, getLastRow, getColumnMap, extractSubjectId, mapWatchStatus, getCellValue, readRangeValues, getFilterStatus, BGM_COLOR, LOG_LEVELS, SyncToBangumiAsync, _getBgmUserId, testTokenValidityForRibbon, fetchAllUserCollections, getCell, trim, calcFingerprint } from '../index.js';
+import { getApp, bgmLog, BGM, wpsMsgBox, loadBgToken, storeBgToken, copyTokenToClipboard, getDataSheet, findHeaderRow, getLastRow, getColumnMap, extractSubjectId, mapWatchStatus, getCellValue, readRangeValues, getFilterStatus, BGM_COLOR, LOG_LEVELS, SyncToBangumiAsync, _getBgmUserId, testTokenValidityForRibbon, fetchAllUserCollections, getCell, trim, calcFingerprint } from '../index.js';
 /**
  * 获取同步预览统计（不发送请求，仅扫描 Excel）
  * @param ws 工作表对象
@@ -229,6 +229,10 @@ export async function syncWithConfirmation() {
         wpsMsgBox('未找到数据工作表', 0, 64);
         return;
     }
+    if (BGM.sync.isRunning) {
+        wpsMsgBox('同步正在进行中，请稍后再试', 0, 48);
+        return;
+    }
     const token = loadBgToken();
     if (!token) {
         wpsMsgBox('请先设置 Token', 0, 48);
@@ -301,6 +305,10 @@ export async function syncWithConfirmation() {
         BGM.handleError(e, { context: 'syncWithConfirmation:conflictDetection', showAlert: false });
     }
     // 5. 执行同步（传入跳过冲突集合和增量同步开关）
+    if (!BGM.sync.enterRunningState()) {
+        wpsMsgBox('同步正在进行中，请稍后再试', 0, 48);
+        return;
+    }
     try {
         bgmLog(LOG_LEVELS.INFO, '[syncWithConfirmation] 开始执行同步...');
         const result = await SyncToBangumiAsync(ws, colMap, token, lastRow, headerRow, {
@@ -313,11 +321,13 @@ export async function syncWithConfirmation() {
         });
         if (app)
             app.StatusBar = false;
+        BGM.sync.exitRunningState();
         app?.MessageBox?.(`同步完成！\n成功: ${result.success} 条\n失败: ${result.fail} 条\n跳过: ${result.skip} 条`, 0, 64);
     }
     catch (err) {
         if (app)
             app.StatusBar = false;
+        BGM.sync.exitRunningState();
         BGM.handleError(err, { context: 'Ribbon同步', showAlert: true });
     }
 }
@@ -355,7 +365,7 @@ function notifyPanelTokenUpdated() {
         bgmLog(LOG_LEVELS.INFO, '已发送 Token 更新通知');
     }
     catch (e) {
-        BGM.handleError(new Error('通知面板失败', e), { showAlert: false });
+        BGM.handleError(new Error('通知面板失败', { cause: e }), { showAlert: false });
     }
 }
 /** 测试 Token（Ribbon 版本） */
@@ -367,6 +377,16 @@ export function testTokenForRibbon() {
     }
     else {
         getApp()?.MessageBox?.('请先设置 Token！', 0, 48);
+    }
+}
+/** 复制 Token 到剪贴板（Ribbon 版本） */
+export function copyTokenForRibbon() {
+    const ok = copyTokenToClipboard();
+    if (ok) {
+        wpsMsgBox('Token 已复制到剪贴板', 0, 64);
+    }
+    else {
+        wpsMsgBox('复制失败，可能未设置 Token', 0, 48);
     }
 }
 /** 设置用户 ID（Ribbon 版本） */

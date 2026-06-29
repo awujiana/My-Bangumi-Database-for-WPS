@@ -3,6 +3,8 @@ import { BgmError } from '../core/result.js';
 import { type DialogOptions } from '../ui/dialog.js';
 import { type WpsApplication, type WpsWorksheet, type WpsRange } from './wps.js';
 import type { BGMCache, BGMSheet, BGMSync, BGMUserInfo } from '../index.js';
+import { colNumToLetter, trim, escapeHtml, calcFingerprint } from './stringUtils.js';
+export { colNumToLetter, trim, escapeHtml, calcFingerprint };
 export declare const BGM: {
     cache: BGMCache;
     sheet: BGMSheet;
@@ -55,10 +57,6 @@ export declare function bgmLog(level: number, message: string | null | undefined
  * 获取 Application 对象（使用类型守卫）
  */
 export declare function getApp(): WpsApplication | null;
-/**
- * 列号转字母 (A, B, ..., Z, AA, AB, ...)
- */
-export declare function colNumToLetter(col: number): string;
 export declare function getCell(ws: WpsWorksheet | null | undefined, row: number, col: number): WpsRange | null;
 /**
  * 获取单元格的值
@@ -77,11 +75,7 @@ export declare function setCellValue(ws: WpsWorksheet | null | undefined, row: n
  */
 export declare function getSheetByIndex(sheetIndex: number): unknown;
 /**
- * HTML 转义（防止 XSS）
- */
-export declare function escapeHtml(text: string | null | undefined): string;
-/**
- * 存储 Token（加密）
+ * 存储 Token（明文存储，便于用户复制使用）
  */
 export declare function storeBgToken(token: string): boolean;
 /**
@@ -89,9 +83,14 @@ export declare function storeBgToken(token: string): boolean;
  */
 export declare function clearBgToken(): boolean;
 /**
- * 加载 Token（解密）
+ * 加载 Token（明文读取，自动兼容历史 XOR 加密数据）
  */
 export declare function loadBgToken(): string | null;
+/**
+ * 复制 Token 到剪贴板
+ * @returns 是否复制成功
+ */
+export declare function copyTokenToClipboard(): boolean;
 /**
  * 设置 Bangumi 用户 ID（存储到全局缓存）
  * @param id - 用户 ID 字符串，不能为空
@@ -157,10 +156,6 @@ export declare function getUrlPath(): string;
  */
 export declare function showBangumiPanel(): void;
 /**
- * 字符串去除首尾空格
- */
-export declare function trim(str: string | null | undefined): string;
-/**
  * 延迟执行
  */
 export declare function sleep(ms: number): void;
@@ -205,11 +200,5 @@ export declare function clearSheetCache(ws: WpsWorksheet | null | undefined): vo
 export declare function getLastRow(ws: WpsWorksheet | null | undefined, forceRefresh?: boolean, headerRow?: number): number;
 export declare function isEmptyValue(val: unknown): boolean;
 export declare function getDataSheet(): WpsWorksheet | null | undefined;
-/**
- * 计算 Excel 行数据的指纹（用于增量同步比较）
- * @param fields 关键字段值数组，如 [name, type, rate, tags, comment]
- * @returns 指纹字符串
- */
-export declare function calcFingerprint(fields: string[]): string;
 export declare function safeActivate(ws: WpsWorksheet | null | undefined): void;
 //# sourceMappingURL=util.d.ts.map

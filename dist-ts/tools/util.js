@@ -1,12 +1,15 @@
 // 直接从源模块导入，打破 util.ts ↔ index.ts 的循环依赖
 import { BGM_CONFIG, LOG_LEVELS, ERROR_LEVELS, PANEL_CONFIG, COLUMN_RULES, HEADER_KEYWORDS, ErrorLevel, } from '../core/constants.js';
 import { BgmError } from '../core/result.js';
-import { encryptToken, decryptToken, calcChecksum } from '../core/crypto.js';
+import { decryptToken } from '../core/crypto.js';
 import { showConfirm } from '../ui/dialog.js';
 import { showAlert as customShowAlert, showError as customShowError, showInput as customShowInput } from '../ui/dialog.js';
 import { isWpsApp } from './wps.js';
 import { syncAllRows } from '../ui/preview.js';
 import { BGM_EVENTS, eventBus } from './events.js';
+// 字符串工具已拆分到 stringUtils.ts，此处 import 供内部调用，并 re-export 保持向后兼容
+import { colNumToLetter, trim, escapeHtml, calcFingerprint } from './stringUtils.js';
+export { colNumToLetter, trim, escapeHtml, calcFingerprint };
 // ========== BGM 全局命名空间 ==========
 export const BGM = {
     // 缓存数据
@@ -41,12 +44,14 @@ export const BGM = {
             this.resetStopFlag();
             this.isRunning = true;
             this.lastSyncTime = new Date().toISOString();
+            eventBus.emit(BGM_EVENTS.SYNC_STATE_CHANGED, { state: 'running' });
             return true;
         },
         /** 退出运行状态：清运行标志 + 重置停止标志 */
         exitRunningState() {
             this.isRunning = false;
             this.resetStopFlag();
+            eventBus.emit(BGM_EVENTS.SYNC_STATE_CHANGED, { state: 'idle' });
         },
         startSync() {
             if (this.isRunning) {
@@ -82,6 +87,7 @@ export const BGM = {
             this.shouldStop = true;
             this.isPaused = false;
             bgmLog(LOG_LEVELS.INFO, '用户请求停止同步');
+            eventBus.emit(BGM_EVENTS.SYNC_STATE_CHANGED, { state: 'stopped' });
         },
         pause() {
             // 增加 shouldStop 检查：已请求停止时不再允许暂停
@@ -89,6 +95,7 @@ export const BGM = {
                 return;
             this.isPaused = true;
             bgmLog(LOG_LEVELS.INFO, `[sync] 同步已暂停，当前行: ${this.currentRow}`);
+            eventBus.emit(BGM_EVENTS.SYNC_STATE_CHANGED, { state: 'paused', row: this.currentRow });
             // 定位到当前单元格
             this.locateCurrentCell();
         },
@@ -97,6 +104,7 @@ export const BGM = {
                 return;
             this.isPaused = false;
             bgmLog(LOG_LEVELS.INFO, '[sync] 同步已恢复');
+            eventBus.emit(BGM_EVENTS.SYNC_STATE_CHANGED, { state: 'resumed' });
         },
         checkShouldStop() {
             return this.shouldStop;
@@ -404,18 +412,6 @@ export function getApp() {
     return null;
 }
 // ========== 单元格操作 ==========
-/**
- * 列号转字母 (A, B, ..., Z, AA, AB, ...)
- */
-export function colNumToLetter(col) {
-    let letter = "";
-    while (col > 0) {
-        const mod = (col - 1) % 26;
-        letter = String.fromCharCode(65 + mod) + letter;
-        col = Math.floor((col - mod) / 26);
-    }
-    return letter;
-}
 export function getCell(ws, row, col) {
     if (!ws)
         return null;
@@ -536,26 +532,15 @@ export function getSheetByIndex(sheetIndex) {
         return null;
     return sheets.Item(sheetIndex);
 }
-// ========== HTML 安全 ==========
-/**
- * HTML 转义（防止 XSS）
- */
-export function escapeHtml(text) {
-    if (!text)
-        return "";
-    const div = document.createElement("div");
-    div.textContent = text;
-    return div.innerHTML;
-}
 // ========== Token 存储 ==========
 /**
- * 存储 Token（加密）
+ * 存储 Token（明文存储，便于用户复制使用）
  */
 export function storeBgToken(token) {
     const app = getApp();
     if (!app?.PluginStorage)
         return false;
-    app.PluginStorage.setItem("bgm_token", encryptToken(token));
+    app.PluginStorage.setItem("bgm_token", token);
     return true;
 }
 /**
@@ -569,7 +554,7 @@ export function clearBgToken() {
     return true;
 }
 /**
- * 加载 Token（解密）
+ * 加载 Token（明文读取，自动兼容历史 XOR 加密数据）
  */
 export function loadBgToken() {
     const app = getApp();
@@ -578,11 +563,50 @@ export function loadBgToken() {
     const stored = app.PluginStorage.getItem("bgm_token");
     if (!stored)
         return null;
-    const token = decryptToken(stored);
-    if (token)
-        return token;
-    clearBgToken();
-    return null;
+    // 兼容历史 XOR 加密数据：若格式为 "v1.iv.payload"，尝试解密
+    if (stored.startsWith("v1.")) {
+        const decrypted = decryptToken(stored);
+        if (decrypted) {
+            // 升级为明文存储
+            app.PluginStorage.setItem("bgm_token", decrypted);
+            return decrypted;
+        }
+        clearBgToken();
+        return null;
+    }
+    // 明文直接返回
+    return stored;
+}
+/**
+ * 复制 Token 到剪贴板
+ * @returns 是否复制成功
+ */
+export function copyTokenToClipboard() {
+    const token = loadBgToken();
+    if (!token)
+        return false;
+    try {
+        const textarea = document.createElement('textarea');
+        textarea.value = token;
+        textarea.style.position = 'fixed';
+        textarea.style.opacity = '0';
+        textarea.style.pointerEvents = 'none';
+        document.body.appendChild(textarea);
+        textarea.select();
+        const ok = document.execCommand('copy');
+        document.body.removeChild(textarea);
+        if (ok) {
+            bgmLog(LOG_LEVELS.INFO, '[copyTokenToClipboard] Token 已复制到剪贴板');
+        }
+        else {
+            bgmLog(LOG_LEVELS.WARN, '[copyTokenToClipboard] execCommand copy 失败');
+        }
+        return ok;
+    }
+    catch (e) {
+        bgmLog(LOG_LEVELS.ERROR, `[copyTokenToClipboard] 复制失败: ${e.message}`);
+        return false;
+    }
 }
 /**
  * 设置 Bangumi 用户 ID（存储到全局缓存）
@@ -816,14 +840,6 @@ export function showBangumiPanel() {
             bgmLog(LOG_LEVELS.WARN, `[showBangumiPanel] 写入面板显示信号失败: ${e.message}`);
         }
     }
-}
-/**
- * 字符串去除首尾空格
- */
-export function trim(str) {
-    if (!str)
-        return "";
-    return String(str).replace(/^\s+|\s+$/g, "");
 }
 /**
  * 延迟执行
@@ -1224,16 +1240,6 @@ export function getDataSheet() {
     const ws = app.ActiveWorkbook.ActiveSheet;
     bgmLog(LOG_LEVELS.INFO, `getDataSheet: 返回当前活动工作表: ${ws.Name}`);
     return ws;
-}
-/**
- * 计算 Excel 行数据的指纹（用于增量同步比较）
- * @param fields 关键字段值数组，如 [name, type, rate, tags, comment]
- * @returns 指纹字符串
- */
-export function calcFingerprint(fields) {
-    const raw = fields.join('|');
-    // 复用已有的 calcChecksum 生成简短校验和，或直接返回原始字符串前 50 字符
-    return calcChecksum(raw).toString(16).padStart(4, '0');
 }
 export function safeActivate(ws) {
     if (ws && typeof ws.Activate === 'function') {

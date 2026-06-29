@@ -28,10 +28,10 @@ export declare class BgmError extends Error {
     /**
      * 错误详情对象
      * 存储与错误相关的额外上下文信息
-     * @type {Record<string, any>}
+     * @type {Record<string, unknown>}
      * @example { expiredAt: '2024-01-01', userId: 123 }
      */
-    details: Record<string, any>;
+    details: Record<string, unknown>;
     /**
      * 错误发生时间的ISO格式字符串
      * @type {string}
@@ -44,7 +44,7 @@ export declare class BgmError extends Error {
      * @constructor
      * @param {string} message - 人类可读的错误消息
      * @param {string} [code='UNKNOWN'] - 错误代码，用于程序化处理
-     * @param {Record<string, any>} [details={}] - 额外的错误详情
+     * @param {Record<string, unknown>} [details={}] - 额外的错误详情
      *
      * @example
      * // 基本用法
@@ -57,7 +57,7 @@ export declare class BgmError extends Error {
      *     retryCount: 3
      * });
      */
-    constructor(message: string, code?: string, details?: Record<string, any>);
+    constructor(message: string, code?: string, details?: Record<string, unknown>);
     /**
      * 将错误转换为字符串格式
      * 输出格式：[错误码] 错误消息

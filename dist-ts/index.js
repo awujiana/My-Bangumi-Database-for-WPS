@@ -132,6 +132,8 @@ storeBgToken,
 clearBgToken, 
 // 加载并解密 Token
 loadBgToken, 
+// 复制 Token 到剪贴板
+copyTokenToClipboard, 
 // 获取用户 ID
 _getBgmUserId, 
 // 设置用户 ID

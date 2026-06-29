@@ -3,7 +3,7 @@
  * @module ui/handlers
  * @description 面板操作处理、按钮绑定、业务对话框
  */
-import { LOG_LEVELS, bgmLog, BGM, loadBgToken, storeBgToken, clearBgToken, _getBgmUserId, _setBgmUserId, _getBgmUsername, _setBgmUsername, getApp, getCell, trim, setCellValue, fetchBgmUserInfo, BGM_COLOR, showAlert, showConfirm, showError, showSuccess, showInput, showToast, setStatus, verifyToken, fetchAllUserCollections, findHeaderRow, getColumnMap, getLastRow, extractSubjectId, getDataSheet, SyncToBangumiAsync, syncSelectedRows, getOrCreateSyncRecordSheet, getAllSyncRecords, addSyncRecord, openSyncRecordSheet, deduplicateSyncRecords, formatSyncRecordSheet, previewSyncContent, refreshData, refreshSheets, toggleSheetLock, clearSyncRecords, closeDetailModal, getIncrementalSync, setIncrementalSync, getSkipConflicts, setSkipConflicts, setSyncRecordEnabled, COLLECTION_TYPE_NAMES, readRangeValues, openBangumiTokenPage, showSyncProgressDialog, updateSyncProgressDialog, completeSyncProgressDialog, hideSyncProgressDialog, } from '../index.js';
+import { LOG_LEVELS, bgmLog, BGM, loadBgToken, storeBgToken, clearBgToken, copyTokenToClipboard, _getBgmUserId, _setBgmUserId, _getBgmUsername, _setBgmUsername, getApp, getCell, trim, setCellValue, fetchBgmUserInfo, BGM_COLOR, showAlert, showConfirm, showError, showSuccess, showInput, showToast, setStatus, verifyToken, fetchAllUserCollections, findHeaderRow, getColumnMap, getLastRow, extractSubjectId, getDataSheet, SyncToBangumiAsync, syncSelectedRows, getOrCreateSyncRecordSheet, getAllSyncRecords, addSyncRecord, openSyncRecordSheet, deduplicateSyncRecords, formatSyncRecordSheet, previewSyncContent, refreshData, refreshSheets, toggleSheetLock, clearSyncRecords, closeDetailModal, getIncrementalSync, setIncrementalSync, getSkipConflicts, setSkipConflicts, setSyncRecordEnabled, COLLECTION_TYPE_NAMES, readRangeValues, openBangumiTokenPage, showSyncProgressDialog, updateSyncProgressDialog, completeSyncProgressDialog, hideSyncProgressDialog, } from '../index.js';
 import { BGM_EVENTS, eventBus } from '../tools/events.js';
 //
 import { getSyncPreview, detectConflicts } from '../services/ribbonService.js';
@@ -474,9 +474,12 @@ async function confirmAndExecuteSync(prepared) {
     }
     // 11. 执行同步
     bgmLog(LOG_LEVELS.INFO, '[syncFromPanel] 步骤11: 开始执行同步');
-    // 启动同步状态机（允许暂停/恢复/停止）
-    BGM.sync.isRunning = true;
-    BGM.sync.resetStopFlag();
+    // 启动同步状态机：使用 enterRunningState 进行防重入检查
+    if (!BGM.sync.enterRunningState()) {
+        bgmLog(LOG_LEVELS.WARN, '[syncFromPanel] 已有同步进行中，拒绝重入');
+        showAlert('同步正在进行中，请稍后再试', '提示');
+        return false;
+    }
     // 显示同步进度弹窗（不隐藏"同步到 Bangumi"按钮）
     showSyncProgressDialog('正在同步 - 同步到 Bangumi', {
         onPause: () => BGM.sync.pause(),
@@ -503,8 +506,7 @@ async function confirmAndExecuteSync(prepared) {
             : [`成功 ${result.success} 条`, `失败 ${result.fail} 条`, `跳过 ${result.skip} 条`];
         completeSyncProgressDialog(summary, details, result.stopped);
         // 重置同步状态机
-        BGM.sync.isRunning = false;
-        BGM.sync.resetStopFlag();
+        BGM.sync.exitRunningState();
         if (app.StatusBar !== undefined)
             app.StatusBar = false;
         if (result.stopped) {
@@ -516,8 +518,7 @@ async function confirmAndExecuteSync(prepared) {
     }
     catch (err) {
         hideSyncProgressDialog();
-        BGM.sync.isRunning = false;
-        BGM.sync.resetStopFlag();
+        BGM.sync.exitRunningState();
         if (app.StatusBar !== undefined)
             app.StatusBar = false;
         bgmLog(LOG_LEVELS.ERROR, `[syncFromPanel] 同步失败: ${err.message}`);
@@ -655,9 +656,12 @@ async function _doAPISync(sheetIndex, token) {
         const syncCountMap = new Map();
         syncRecords.forEach(r => syncCountMap.set(String(r.sid || ''), (syncCountMap.get(String(r.sid || '')) || 0) + 1));
         const BGM_SUBJECT_TYPES = window.BGM_SUBJECT_TYPES || { 1: '书籍', 2: '动画', 3: '音乐', 4: '游戏', 6: '真人剧' };
-        // 启动同步状态机（允许暂停/停止）
-        BGM.sync.isRunning = true;
-        BGM.sync.resetStopFlag();
+        // 启动同步状态机：使用 enterRunningState 进行防重入检查
+        if (!BGM.sync.enterRunningState()) {
+            bgmLog(LOG_LEVELS.WARN, '[_doAPISync] 已有同步进行中，拒绝重入');
+            showAlert('同步正在进行中，请稍后再试', '提示');
+            return;
+        }
         // 显示同步进度弹窗
         showSyncProgressDialog('正在同步 - 从BGM同步收藏', {
             onPause: () => BGM.sync.pause(),
@@ -725,7 +729,7 @@ async function _doAPISync(sheetIndex, token) {
             // 更新当前位置（行号）以便暂停时定位
             BGM.sync.updatePosition(undefined, row);
             const bgmUrlCell = colMap.has('Bangumi_URL') ? getCell(ws, row, urlCol) : null;
-            const bgmUrl = bgmUrlCell ? trim(String(bgmUrlCell.Value() || '')) : '';
+            const bgmUrl = bgmUrlCell ? trim(String(bgmUrlCell.Value ?? '')) : '';
             const sid = typeof extractSubjectId === 'function' ? extractSubjectId(bgmUrl) : '';
             let matched = false;
             if (sid && collectionMap.has(sid)) {
@@ -763,8 +767,7 @@ async function _doAPISync(sheetIndex, token) {
             detailsArr.unshift('⚠️ 同步被用户停止');
         completeSyncProgressDialog(summary, detailsArr, wasStopped);
         // 重置同步状态机
-        BGM.sync.isRunning = false;
-        BGM.sync.resetStopFlag();
+        BGM.sync.exitRunningState();
         // 恢复原始工作表
         if (originalActiveSheet) {
             try {
@@ -778,8 +781,7 @@ async function _doAPISync(sheetIndex, token) {
     }
     catch (e) {
         hideSyncProgressDialog();
-        BGM.sync.isRunning = false;
-        BGM.sync.resetStopFlag();
+        BGM.sync.exitRunningState();
         BGM.handleError(e, { showAlert: false, level: BGM.ErrorLevel.WARN, context: '_doAPISync' });
         showAlert(_T.syncFailed + e.message, _T.syncFailed);
         setStatus(_T.syncFailed, 'error');
@@ -887,6 +889,22 @@ const ACTION_HANDLERS = {
             BGM.handleError(e, { showAlert: true, level: BGM.ErrorLevel.WARN, context: 'clearToken' });
         }
         bgmLog(LOG_LEVELS.INFO, `[handleActionClick] 清除 Token 操作完成，耗时: ${Date.now() - ctx.startTime}ms`);
+    },
+    copyToken: (ctx) => {
+        bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 复制 Token 到剪贴板');
+        try {
+            const ok = copyTokenToClipboard();
+            if (ok) {
+                showToast('Token 已复制到剪贴板', 'success');
+            }
+            else {
+                showToast('复制失败，可能未设置 Token 或浏览器不支持', 'error');
+            }
+        }
+        catch (e) {
+            BGM.handleError(e, { showAlert: true, level: BGM.ErrorLevel.WARN, context: 'copyToken' });
+        }
+        bgmLog(LOG_LEVELS.INFO, `[handleActionClick] 复制 Token 操作完成，耗时: ${Date.now() - ctx.startTime}ms`);
     },
     testToken: (ctx) => {
         bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 开始测试 Token 有效性');
@@ -1121,6 +1139,16 @@ function setupEventListeners() {
     // 同步进度事件（更新到同步进度弹窗，若弹窗未打开则忽略）
     eventBus.on(BGM_EVENTS.SYNC_PROGRESS, (data) => {
         updateSyncProgressDialog(data.current, data.total, data.message);
+    });
+    // 同步状态变更事件（开始/暂停/恢复/停止/空闲）
+    eventBus.on(BGM_EVENTS.SYNC_STATE_CHANGED, (payload) => {
+        bgmLog(LOG_LEVELS.INFO, `[handlers] 同步状态变更: ${payload.state}${payload.row ? `, 行: ${payload.row}` : ''}`);
+        // 可选：根据状态刷新按钮禁用态
+        const syncButtons = document.querySelectorAll('button[data-action="sync"], button[data-action="syncCollectionFromBgm"], button[data-action="previewSyncContent"]');
+        syncButtons.forEach(btn => {
+            const el = btn;
+            el.disabled = payload.state === 'running' || payload.state === 'paused';
+        });
     });
 }
 // 尝试更新增量同步复选框（带重试机制）

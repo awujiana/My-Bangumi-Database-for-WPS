@@ -30,7 +30,6 @@ initRibbonMessageListener();
  * 获取"跳过冲突"复选框的初始按下状态
  * 从配置读取上次保存的设置，默认未选中
  */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any -- WPS Ribbon 控件无 @types
 export function GetSkipConflictsPressed(control) {
     const result = getSkipConflicts();
     bgmLog(LOG_LEVELS.INFO, `[Ribbon] GetSkipConflictsPressed: ${result}`);
@@ -39,7 +38,6 @@ export function GetSkipConflictsPressed(control) {
 /**
  * 当"跳过冲突"复选框被点击时，保存状态
  */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any -- WPS Ribbon 控件无 @types
 export function OnSkipConflictsChange(control) {
     const newValue = control.Pressed;
     bgmLog(LOG_LEVELS.INFO, `[Ribbon] OnSkipConflictsChange: control.Pressed = ${newValue}`);
@@ -61,7 +59,6 @@ export function OnSkipConflictsChange(control) {
  * 获取"启用同步记录"复选框的初始按下状态
  * 从配置读取上次保存的设置，默认未选中
  */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any -- WPS Ribbon 控件无 @types
 export function GetEnableSyncRecordPressed(control) {
     const result = getSyncRecordEnabled();
     bgmLog(LOG_LEVELS.INFO, `[Ribbon] GetEnableSyncRecordPressed: ${result}`);
@@ -70,7 +67,6 @@ export function GetEnableSyncRecordPressed(control) {
 /**
  * 当"启用同步记录"复选框被点击时，保存状态
  */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any -- WPS Ribbon 控件无 @types
 export function OnEnableSyncRecordChange(control) {
     const newValue = control.Pressed;
     bgmLog(LOG_LEVELS.INFO, `[Ribbon] OnEnableSyncRecordChange: control.Pressed = ${newValue}`);
@@ -90,7 +86,6 @@ export function OnEnableSyncRecordChange(control) {
  * 获取增量同步复选框的初始按下状态
  * 从配置读取上次保存的设置，默认未选中
  */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any -- WPS Ribbon 控件无 @types
 export function GetIncrementalSyncPressed(control) {
     const result = getIncrementalSync();
     bgmLog(LOG_LEVELS.INFO, `[Ribbon] GetIncrementalSyncPressed: ${result}`);
@@ -99,7 +94,6 @@ export function GetIncrementalSyncPressed(control) {
 /**
  * 当增量同步复选框被点击时，保存状态
  */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any -- WPS Ribbon 控件无 @types
 export function OnIncrementalSyncChange(control) {
     const newValue = control.Pressed;
     let finalValue;
@@ -154,6 +148,9 @@ export function OnAction(control) {
             case 'btnTestToken':
                 RibbonService.testTokenForRibbon();
                 break;
+            case 'btnCopyToken':
+                RibbonService.copyTokenForRibbon();
+                break;
             case 'btnSetUserId':
                 RibbonService.setUserIdForRibbon();
                 break;
@@ -178,6 +175,7 @@ export function GetBangumiImage(control) {
         btnSyncBangumi: 'images/sync.svg',
         btnSetToken: 'images/token.svg',
         btnTestToken: 'images/key.svg',
+        btnCopyToken: 'images/key.svg',
         btnSetUserId: 'images/user.svg',
         btnOpenCollection: 'images/link.svg',
         btnClearColors: 'images/cleartags.svg',
