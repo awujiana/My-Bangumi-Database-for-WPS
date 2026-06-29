@@ -569,12 +569,7 @@ async function confirmAndExecuteSync(prepared: SyncPreparedData): Promise<boolea
 
     // 11. 执行同步
     bgmLog(LOG_LEVELS.INFO, '[syncFromPanel] 步骤11: 开始执行同步');
-    // 启动同步状态机：使用 enterRunningState 进行防重入检查
-    if (!BGM.sync.enterRunningState()) {
-        bgmLog(LOG_LEVELS.WARN, '[syncFromPanel] 已有同步进行中，拒绝重入');
-        showAlert('同步正在进行中，请稍后再试', '提示');
-        return false;
-    }
+    // 运行锁已由 syncFromPanel 入口获取，此处直接显示进度弹窗
     // 显示同步进度弹窗（不隐藏"同步到 Bangumi"按钮）
     showSyncProgressDialog('正在同步 - 同步到 Bangumi', {
         onPause: () => BGM.sync.pause(),
@@ -621,14 +616,25 @@ async function confirmAndExecuteSync(prepared: SyncPreparedData): Promise<boolea
 }
 
 export async function syncFromPanel(): Promise<void> {
+    // 防重入检查：在执行任何耗时操作前就获取运行锁，避免预览/冲突检测期间用户重复点击
+    if (!BGM.sync.enterRunningState()) {
+        bgmLog(LOG_LEVELS.WARN, '[syncFromPanel] 同步正在进行中，拒绝重入');
+        showAlert('同步正在进行中，请稍后再试', '提示');
+        return;
+    }
     const prepared = prepareSyncFromPanel();
     if (prepared === null) {
+        BGM.sync.exitRunningState();
         return;
     }
     let completed = false;
     try {
         completed = await confirmAndExecuteSync(prepared);
     } finally {
+        // 兜底释放运行锁（正常完成/异常路径已由 confirmAndExecuteSync 释放，此处仅处理用户取消的情况）
+        if (BGM.sync.isRunning) {
+            BGM.sync.exitRunningState();
+        }
         // 无论成功失败或取消，最后都尝试恢复用户之前的工作表
         if (prepared.originalActiveSheet) {
             try {

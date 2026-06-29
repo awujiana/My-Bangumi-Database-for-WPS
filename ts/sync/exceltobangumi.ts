@@ -473,17 +473,10 @@ export function getFilterStatus(
             }
             bgmLog(LOG_LEVELS.INFO, `SpecialCells 收集到 ${rawRows.size} 个原始行号`);
             const rowList = Array.from(rawRows).sort((a, b) => a - b);
-            const previewCount = Math.min(rowList.length, 15);
-            for (let i = 0; i < previewCount; i++) {
-                const r = rowList[i];
-                const vals: string[] = [];
-                for (let c = 1; c <= 3; c++) {
-                    vals.push(getCellValue(ws, r, c));
-                }
-                bgmLog(LOG_LEVELS.INFO, `  行 ${r}: ${vals.join(' | ')}`);
-            }
-            if (rowList.length > previewCount) {
-                bgmLog(LOG_LEVELS.INFO, `  ... 剩余 ${rowList.length - previewCount} 行省略`);
+            // 仅打印行号摘要，不逐行读取单元格值（避免大量 COM 调用导致卡顿）
+            bgmLog(LOG_LEVELS.INFO, `  前 ${Math.min(rowList.length, 10)} 行: ${rowList.slice(0, 10).join(', ')}`);
+            if (rowList.length > 10) {
+                bgmLog(LOG_LEVELS.INFO, `  ... 剩余 ${rowList.length - 10} 行省略`);
             }
         }
 
