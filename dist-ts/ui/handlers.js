@@ -296,11 +296,7 @@ export function onAction(action) {
  * 任何检查失败时返回 null（已显示相应提示）。
  */
 function prepareSyncFromPanel() {
-    // P0: 防重入预检
-    if (BGM.sync.isRunning) {
-        showToast('同步正在进行中，请稍后', 'warn');
-        return null;
-    }
+    // 防重入检查已由 syncFromPanel 入口的 enterRunningState() 处理，此处不再重复
     const startTime = Date.now();
     bgmLog(LOG_LEVELS.INFO, '[syncFromPanel] ========== 开始执行同步操作 ==========');
     // 1. 检查必要函数是否加载
