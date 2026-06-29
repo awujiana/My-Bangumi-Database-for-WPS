@@ -519,14 +519,19 @@ if (!ws) { el.textContent = '未连接到工作表'; return; }
 
 function renderPreviewTable(rows: PreviewRow[], sheetIndex: number, sheetName: string, headerRow: number): string {
     let html = '<table class="preview-table"><tbody>';
+    // 以表头行列数作为统一列数，避免不同行列数不同导致错位
+    const headerItem = rows.find(r => r.isHeader);
+    const fixedColCount = headerItem && headerItem.aligned
+        ? (headerItem.cols as string[]).length
+        : 0;
     rows.forEach(item => {
         const rowClass = item.isHeader ? 'preview-header-row' : '';
         html += `<tr class="${rowClass}">`;
         html += `<td class="preview-row-num">${item.isHeader ? 'H' : item.row}</td>`;
         if (item.aligned) {
             const cols = item.cols as string[];
-            const lastNonEmpty = cols.map((v, i) => v ? i : -1).filter(i => i >= 0).pop() ?? -1;
-            const colLimit = lastNonEmpty + 1;
+            // 使用统一列数，确保所有行列对齐
+            const colLimit = fixedColCount > 0 ? fixedColCount : cols.length;
             for (let i = 0; i < colLimit; i++) {
                 const text = cols[i] || '';
                 let cls = '';
