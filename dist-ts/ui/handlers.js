@@ -123,30 +123,28 @@ export function updateTokenStatus() {
         BGM.cache.username = null;
     }
 }
+// 缓存上次更新的状态，避免重复日志和 DOM 操作
+let _lastUserIdSnapshot = undefined;
 export function updateUserIdStatus() {
     const userIdStatus = document.getElementById('userIdStatus');
-    bgmLog(LOG_LEVELS.INFO, `[updateUserIdStatus] userIdStatus 元素: ${userIdStatus ? '存在' : '不存在'}`);
-    // 如果元素不存在，直接返回，不要发送消息（避免和 taskpane 的监听器造成死循环）
-    if (!userIdStatus) {
-        bgmLog(LOG_LEVELS.INFO, `[updateUserIdStatus] 元素不存在，返回（避免循环）`);
+    if (!userIdStatus)
         return;
-    }
-    doUpdateUserIdStatus(userIdStatus);
-}
-function doUpdateUserIdStatus(userIdStatus) {
     const userId = _getBgmUserId();
     const username = _getBgmUsername();
-    bgmLog(LOG_LEVELS.INFO, `[updateUserIdStatus] 当前 userId: ${userId}, username: ${username}`);
+    const snapshot = `${userId ?? 'null'}|${username ?? 'null'}`;
+    // 去重：状态未变化时跳过
+    if (_lastUserIdSnapshot === snapshot)
+        return;
+    _lastUserIdSnapshot = snapshot;
+    bgmLog(LOG_LEVELS.INFO, `[updateUserIdStatus] userId: ${userId}, username: ${username}`);
     if (userId) {
         const display = username ? username + ' (' + userId + ')' : userId;
         userIdStatus.textContent = _T.set + ': ' + display;
         userIdStatus.style.color = '#4CAF50';
-        bgmLog(LOG_LEVELS.INFO, `[updateUserIdStatus] UI 已更新为: ${_T.set}: ${display}`);
     }
     else {
         userIdStatus.textContent = _T.notSet;
         userIdStatus.style.color = '#f44336';
-        bgmLog(LOG_LEVELS.INFO, `[updateUserIdStatus] UI 已更新为: ${_T.notSet}`);
     }
 }
 export function openUserCollection() {
