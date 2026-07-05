@@ -20,6 +20,7 @@ import {
     getSkipConflicts, setSkipConflicts,
     setSyncRecordEnabled,
     COLLECTION_TYPE_NAMES,
+    BGM_SUBJECT_TYPES,
     readRangeValues, openBangumiTokenPage,
     showSyncProgressDialog, updateSyncProgressDialog,
     completeSyncProgressDialog, hideSyncProgressDialog,
@@ -290,7 +291,8 @@ export function testTokenValidity(): void {
 }
 
 export function testDebugConnection(): void {
-    if (typeof (window as unknown as Record<string, unknown>).Application !== 'undefined') {
+    // 通过统一的 getApp() 获取 WPS Application 对象，避免直接访问 window 全局
+    if (getApp() !== null) {
         showToast(_T.debugConnOk, 'success');
     } else {
         showToast(_T.debugConnFail, 'error');
@@ -746,7 +748,7 @@ async function _doAPISync(sheetIndex: number, token: string): Promise<void> {
         const syncCountMap = new Map<string, number>();
         syncRecords.forEach(r => syncCountMap.set(String(r.sid || ''), (syncCountMap.get(String(r.sid || '')) || 0) + 1));
 
-        const BGM_SUBJECT_TYPES: Record<number, string> = (window as unknown as { BGM_SUBJECT_TYPES?: Record<number, string> }).BGM_SUBJECT_TYPES || { 1: '书籍', 2: '动画', 3: '音乐', 4: '游戏', 6: '真人剧' };
+        // 使用从 ../index.js 导入的 BGM_SUBJECT_TYPES 常量（与 core/constants.ts 中定义一致）
 
         // 启动同步状态机：使用 enterRunningState 进行防重入检查
         if (!BGM.sync.enterRunningState()) {

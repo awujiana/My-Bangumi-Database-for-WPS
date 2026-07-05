@@ -277,8 +277,10 @@ export function wpsPrompt(message: string, defaultValue?: string): Promise<strin
                 }
                 resolve(String(result));
                 return;
-            } catch (e) {
-                bgmLog(LOG_LEVELS.WARN, `WPS InputBox 不可用: ${(e as Error).message}`);
+            } catch (e: unknown) {
+                // 类型守卫：先缩窄类型再访问 message，符合 useUnknownInCatchVariables 规范
+                const errMsg = e instanceof Error ? e.message : String(e);
+                bgmLog(LOG_LEVELS.WARN, `WPS InputBox 不可用: ${errMsg}`);
             }
         }
         if (typeof window !== 'undefined' && typeof (window as unknown as Record<string, unknown>).BGMInput === 'function') {
@@ -306,8 +308,10 @@ export function wpsMsgBox(message: string, buttons?: number, icon?: number): Pro
                 const result = app.MessageBox(message, (buttons || 0) + (icon || 64));
                 resolve(result);
                 return;
-            } catch (e) {
-                bgmLog(LOG_LEVELS.WARN, `WPS MessageBox 不可用: ${(e as Error).message}`);
+            } catch (e: unknown) {
+                // 类型守卫：先缩窄类型再访问 message，符合 useUnknownInCatchVariables 规范
+                const errMsg = e instanceof Error ? e.message : String(e);
+                bgmLog(LOG_LEVELS.WARN, `WPS MessageBox 不可用: ${errMsg}`);
             }
         }
 

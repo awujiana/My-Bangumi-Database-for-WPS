@@ -270,7 +270,7 @@ export async function detectConflicts(
  * Ribbon 专用的完整同步流程：预览 → 冲突检测 → 确认 → 执行
  * @param conflictResolution 冲突处理策略，默认 'excel'（覆盖）
  */
-export async function syncWithConfirmation() {
+export async function syncWithConfirmation(): Promise<void> {
     const app = getApp();
     const ws = getDataSheet();
     if (!ws) { wpsMsgBox('未找到数据工作表', 0, 64); return; }
@@ -371,7 +371,7 @@ export async function syncWithConfirmation() {
 
 
 /** 设置 Token（Ribbon 版本） */
-export async function setTokenForRibbon() {
+export async function setTokenForRibbon(): Promise<boolean> {
     const currentToken = loadBgToken() || '';
     const app = getApp();
     const newToken = app?.InputBox?.('请输入 Access Token', '设置 Token', currentToken, 2);
@@ -411,7 +411,7 @@ function notifyPanelTokenUpdated(): void {
 }
 
 /** 测试 Token（Ribbon 版本） */
-export function testTokenForRibbon() {
+export function testTokenForRibbon(): void {
     const token = loadBgToken();
     if (token) {
         testTokenValidityForRibbon(token);
@@ -422,7 +422,7 @@ export function testTokenForRibbon() {
 }
 
 /** 复制 Token 到剪贴板（Ribbon 版本） */
-export function copyTokenForRibbon() {
+export function copyTokenForRibbon(): void {
     const ok = copyTokenToClipboard();
     if (ok) {
         wpsMsgBox('Token 已复制到剪贴板', 0, 64);
@@ -432,7 +432,7 @@ export function copyTokenForRibbon() {
 }
 
 /** 设置用户 ID（Ribbon 版本） */
-export function setUserIdForRibbon() {
+export function setUserIdForRibbon(): void {
     const app = getApp();
     const userId = app?.InputBox?.('请输入用户 ID（数字）', '设置用户 ID', '', 2);
     if (userId && typeof userId === 'string') {

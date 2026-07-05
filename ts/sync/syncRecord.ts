@@ -132,8 +132,10 @@ export function getOrCreateSyncRecordSheet(): WpsWorksheet {
                 bgmLog(LOG_LEVELS.INFO, '同步记录表迁移完成');
                 invalidateCache();
             }
-        } catch (e) {
-            bgmLog(LOG_LEVELS.WARN, '同步记录表迁移失败: ' + (e as Error).message);
+        } catch (e: unknown) {
+            // 类型守卫：先缩窄类型再访问 message，符合 useUnknownInCatchVariables 规范
+            const errMsg = e instanceof Error ? e.message : String(e);
+            bgmLog(LOG_LEVELS.WARN, '同步记录表迁移失败: ' + errMsg);
         }
 
         // 已有工作表，检查并补齐表头

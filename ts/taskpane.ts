@@ -711,12 +711,12 @@ function refreshData(): void {
             for (let r = 1; r <= Math.min(lastRow, 100) && count < 5; r++) {
                 if (isFiltered && visibleRowSet && !visibleRowSet.has(r)) continue;
                 const cols: { text: string; important: boolean }[] = [];
-                let any = false;
+                let hasAny = false;
                 for (let c = 1; c <= PANEL_CONFIG.MAX_SCAN_COLUMNS; c++) {
                     const v = getCellValue(ws, r, c).trim();
-                    if (v) { cols.push({ text: v, important: false }); any = true; }
+                    if (v) { cols.push({ text: v, important: false }); hasAny = true; }
                 }
-                if (any) {
+                if (hasAny) {
                     previewRows.push({ row: r, cols, isHeader: false, aligned: true });
                     hasData = true;
                     count++;
