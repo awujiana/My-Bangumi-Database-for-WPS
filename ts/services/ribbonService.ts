@@ -205,7 +205,7 @@ export async function detectConflicts(
             const sid = String(item.subject_id);
             bgmCollection.set(sid, {
                 type: item.type,
-                rate: item.rate,
+                ...(item.rate !== undefined && { rate: item.rate }),
                 tags: item.tags || [],
                 comment: item.comment || '',
                 subject_name: item.subject?.name || ''
@@ -350,7 +350,7 @@ export async function syncWithConfirmation(): Promise<void> {
     try {
         bgmLog(LOG_LEVELS.INFO, '[syncWithConfirmation] 开始执行同步...');
         const result = await SyncToBangumiAsync(ws, colMap, token, lastRow, headerRow, {
-            skipSids,
+            ...(skipSids !== undefined && { skipSids }),
             incremental,
             onProgress: (current, total, message) => {
                 if (app?.StatusBar !== undefined) app.StatusBar = `[${current}/${total}] ${message}`;

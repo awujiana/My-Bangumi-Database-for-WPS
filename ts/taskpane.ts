@@ -262,8 +262,8 @@ function detectHeaderAndColumns(ws: WpsWorksheet | null | undefined, opts: { vis
 
     // 选列数最多、行号最小的作为表头
     candidates.sort((a, b) => b.colCount - a.colCount || a.row - b.row);
-    const headerRow = candidates[0].row;
-    const headerMatchCount = candidates[0].matchCount;
+    const headerRow = candidates[0]!.row;
+    const headerMatchCount = candidates[0]!.matchCount;
 
     // 2. 读取表头名称
     const headerNames: string[] = [];
@@ -651,8 +651,8 @@ function refreshData(): void {
                 while (i < maxPreview) {
                     // 找到连续行段
                     let j = i;
-                    while (j + 1 < maxPreview && dataRows[j + 1] === dataRows[j] + 1) j++;
-                    const segStart = dataRows[i];
+                    while (j + 1 < maxPreview && dataRows[j + 1] === dataRows[j]! + 1) j++;
+                    const segStart = dataRows[i]!;
                     const segLen = j - i + 1;
 
                     try {
@@ -664,13 +664,13 @@ function refreshData(): void {
                         // WPS 返回二维数组（1-based），或单值
                         const is2D = Array.isArray(raw);
                         for (let r = 0; r < segLen; r++) {
-                            const dr = dataRows[i + r];
+                            const dr = dataRows[i + r]!;
                             const rowCols: string[] = [];
                             let hasAny = false;
                             for (let ci = 0; ci < displayColCount; ci++) {
                                 let v: string;
                                 if (is2D && Array.isArray(raw)) {
-                                    const cell = raw[r + 1][ci + 1];
+                                    const cell = raw[r + 1]?.[ci + 1];
                                     v = cell == null ? '' : String(cell).trim();
                                 } else {
                                     v = segLen === 1 && displayColCount === 1
@@ -688,7 +688,7 @@ function refreshData(): void {
                     } catch (batchErr) {
                         // 批量读取失败，回退到逐单元格
                         for (let r = 0; r < segLen; r++) {
-                            const dr = dataRows[i + r];
+                            const dr = dataRows[i + r]!;
                             const rowCols: string[] = [];
                             let hasAny = false;
                             for (let ci = 0; ci < displayColCount; ci++) {

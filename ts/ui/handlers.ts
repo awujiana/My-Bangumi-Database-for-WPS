@@ -498,7 +498,7 @@ async function confirmAndExecuteSync(prepared: SyncPreparedData): Promise<boolea
 
     // 7. 获取同步预览统计（传入增量同步选项）
     bgmLog(LOG_LEVELS.INFO, '[syncFromPanel] 步骤7: 获取同步预览统计');
-    const preview = getSyncPreview(ws, colMap, lastRow, headerRow, { incremental, fingerprintMap });
+    const preview = getSyncPreview(ws, colMap, lastRow, headerRow, { incremental, ...(fingerprintMap !== undefined && { fingerprintMap }) });
     bgmLog(LOG_LEVELS.INFO, `[syncFromPanel] 数据预览 - 总行数: ${preview.total}, 有效: ${preview.valid}, 已上传: ${preview.alreadyUploaded}, 待同步: ${preview.willSync}, 跳过: ${preview.willSkip}, 无URL: ${preview.noUrl}, 空状态: ${preview.emptyStatus}, 增量跳过: ${preview.incrementalSkipped}`);
 
     // 8. 冲突检测与策略
@@ -574,7 +574,7 @@ async function confirmAndExecuteSync(prepared: SyncPreparedData): Promise<boolea
     try {
         bgmLog(LOG_LEVELS.INFO, '[syncFromPanel] 调用 SyncToBangumiAsync...');
         const result = await SyncToBangumiAsync(ws, colMap, token, lastRow, headerRow, {
-            skipSids: conflictSids,
+            ...(conflictSids !== undefined && { skipSids: conflictSids }),
             incremental,
             onProgress: (current: number, total: number, message: string) => {
                 updateSyncProgressDialog(current, total, message);
@@ -776,13 +776,14 @@ async function _doAPISync(sheetIndex: number, token: string): Promise<void> {
             if (BGM.sync.checkShouldStop()) break;
 
             const item = userCollections[i];
+            if (item === undefined) continue;
             const itemName = item.subject?.name_cn || item.subject?.name || '(无名称)';
             if (typeof addSyncRecord === 'function') {
                 addSyncRecord({
                     name: itemName,
                     url: 'https://bgm.tv/subject/' + item.subject_id,
                     sid: String(item.subject_id),
-                    type: BGM_SUBJECT_TYPES[item.subject_type || 2],
+                    type: BGM_SUBJECT_TYPES[item.subject_type || 2] ?? '',
                     content: '标记同步',
                     status: '成功',
                     count: 1,
@@ -823,6 +824,7 @@ async function _doAPISync(sheetIndex: number, token: string): Promise<void> {
             }
 
             const row = rowsToProcess[i];
+            if (row === undefined) continue;
             // 更新当前位置（行号）以便暂停时定位
             BGM.sync.updatePosition(undefined, row);
 
@@ -1112,13 +1114,13 @@ const ACTION_HANDLERS: Record<string, ActionHandler> = {
     // 弹窗快捷调用（参数形式）
     showToast: (ctx) => {
         bgmLog(LOG_LEVELS.INFO, `[handleActionClick] 显示 Toast 消息: ${ctx.args[0] || ''}`);
-        showToast(ctx.args[0], ctx.args[1]);
+        showToast(ctx.args[0] ?? '', ctx.args[1] ?? '');
         bgmLog(LOG_LEVELS.INFO, `[handleActionClick] Toast 已显示，耗时: ${Date.now() - ctx.startTime}ms`);
     },
 
     showAlert: (ctx) => {
         bgmLog(LOG_LEVELS.INFO, `[handleActionClick] 显示警告框: ${ctx.args[0] || ''}`);
-        showAlert(ctx.args[0], ctx.args[1]);
+        showAlert(ctx.args[0] ?? '', ctx.args[1] ?? '');
         bgmLog(LOG_LEVELS.INFO, `[handleActionClick] 警告框已显示，耗时: ${Date.now() - ctx.startTime}ms`);
     },
 
@@ -1185,9 +1187,15 @@ function isTaskpaneContext(): boolean {
 function setupMessageListener(): void {
     if (typeof window !== 'undefined') {
         window.addEventListener('message', (event: MessageEvent) => {
+            // origin 白名单校验（防止跨域消息注入）
+            const allowedOrigins = ['null', '', window.location.origin];
+            if (!allowedOrigins.includes(event.origin)) {
+                bgmLog(LOG_LEVELS.WARN, `[message] 拒绝非预期 origin: ${event.origin}`);
+                return;
+            }
             const data = event.data;
             if (!data || typeof data !== 'object') return;
-            
+
             bgmLog(LOG_LEVELS.INFO, '[handlers] 收到消息: ' + JSON.stringify(data));
             
             switch (data.type) {
@@ -1545,7 +1553,7 @@ function cleanLockedDataSheet(): void {
     let emptyNameCount = 0;
     for (let i = 0; i < totalRows; i++) {
         const row = headerRow + 1 + i;
-        const name = String(nameData[i][0] ?? '').trim();
+        const name = String(nameData[i]?.[0] ?? '').trim();
         if (!name) {
             emptyNameCount++;
             continue;
@@ -1571,7 +1579,7 @@ function cleanLockedDataSheet(): void {
         const withoutUrl: number[] = [];
         for (const row of rows) {
             const idx = row - headerRow - 1;
-            const url = idx < urlData.length ? String(urlData[idx][0] ?? '').trim() : '';
+            const url = idx < urlData.length ? String(urlData[idx]?.[0] ?? '').trim() : '';
             (url ? withUrl : withoutUrl).push(row);
         }
 
@@ -1581,20 +1589,20 @@ function cleanLockedDataSheet(): void {
         }
 
         duplicateNameCount++;
-        const keepRow = withUrl[0];
+        const keepRow = withUrl[0]!;
         duplicateDetails.push({ name, rows, keep: withUrl, del: withoutUrl });
 
         const nameNewTags: string[] = [];
         if (tagsData && withoutUrl.length > 0) {
             const keepIdx = keepRow - headerRow - 1;
             const existingSet = new Set(
-                (keepIdx < tagsData.length ? String(tagsData[keepIdx][0] ?? '') : '')
+                (keepIdx < tagsData.length ? String(tagsData[keepIdx]?.[0] ?? '') : '')
                     .split(/\s*\|\s*/).map(t => t.trim()).filter(Boolean)
             );
 
             for (const delRow of withoutUrl) {
                 const delIdx = delRow - headerRow - 1;
-                const delTags = delIdx < tagsData.length ? String(tagsData[delIdx][0] ?? '').trim() : '';
+                const delTags = delIdx < tagsData.length ? String(tagsData[delIdx]?.[0] ?? '').trim() : '';
                 if (!delTags) continue;
 
                 for (const t of delTags.split(/\s*\|\s*/)) {
@@ -1644,7 +1652,7 @@ function cleanLockedDataSheet(): void {
     let i = 0;
     while (i < toDelete.length) {
         let j = i;
-        while (j + 1 < toDelete.length && toDelete[j] - toDelete[j + 1] === 1) {
+        while (j + 1 < toDelete.length && toDelete[j]! - toDelete[j + 1]! === 1) {
             j++;
         }
         if (i === j) {

@@ -338,6 +338,7 @@ export async function previewSyncContent(): Promise<void> {
         }
 
         const rowNum = dataRows[i];
+        if (rowNum === undefined) continue;
         // 更新当前位置（行号）以便暂停时定位
         BGM.sync.updatePosition(undefined, rowNum);
 
@@ -741,7 +742,7 @@ export async function syncAllRows(): Promise<{ success: number; fail: number; sk
         });
 
         const result = await SyncToBangumiAsync(ws, colMap, token, lastRow, headerRow, {
-            skipSids: conflictSids,        // 跳过冲突的 sid 集合
+            ...(conflictSids !== undefined && { skipSids: conflictSids }),        // 跳过冲突的 sid 集合
             incremental,                  // 从 Ribbon 设置读取
             onProgress: (current, total, message) => {
                 // 直接调用弹窗 API 更新进度，不再走事件总线

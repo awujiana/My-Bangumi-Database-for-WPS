@@ -11,6 +11,9 @@
     "noImplicitAny": true,                     // 禁止隐式 any 类型
     "strictNullChecks": true,                  // 严格 null/undefined 检查
     "strictFunctionTypes": true,               // 严格函数类型检查
+    "noUncheckedIndexedAccess": true,          // 访问数组/对象索引时返回 T | undefined
+    "exactOptionalPropertyTypes": true,        // 可选属性不能赋值为 undefined
+    "useUnknownInCatchVariables": true,        // catch 变量为 unknown 类型
     "noUnusedLocals": false,                   // 不报告未使用的局部变量（开发阶段宽松）
     "noUnusedParameters": false,               // 不报告未使用的参数
     "noImplicitReturns": true,                 // 函数必须有明确的返回值

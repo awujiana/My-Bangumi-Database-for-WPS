@@ -874,7 +874,7 @@ async function batchSyncRequests(
         if (executing.length > 0) {
             await Promise.race(executing.map(e => e.promise));
             for (let i = executing.length - 1; i >= 0; i--) {
-                if (executing[i].done) executing.splice(i, 1);
+                if (executing[i]!.done) executing.splice(i, 1);
             }
         }
     }
@@ -1054,9 +1054,9 @@ function processRowToSyncTask(
             bgmUrl,
             name,
             jsonBody,
-            fingerprint: currentFingerprint,
+            ...(currentFingerprint !== undefined ? { fingerprint: currentFingerprint } : {}),
             type: watchType,
-            epCount: (!isNaN(epNum) && epNum > 0) ? epNum : undefined
+            ...((!isNaN(epNum) && epNum > 0) ? { epCount: epNum } : {})
         };
 
         return { task, skipped: false, failed: false };
@@ -1191,7 +1191,7 @@ function applySyncSuccessResults(
             status: SYNC_STATUS.SUCCESS,
             message: '批量同步成功',
             count: 1,
-            fingerprint: task.fingerprint
+            ...(task.fingerprint !== undefined ? { fingerprint: task.fingerprint } : {})
         });
 
         result.success++;
@@ -1570,7 +1570,7 @@ async function executeSelectedSync(
                 bgmLog(LOG_LEVELS.INFO, '[syncSelectedRows] 同步已恢复，继续处理');
             }
 
-            const rowNum = rows[idx];
+            const rowNum = rows[idx]!;
             const rowProgress = `[${idx + 1}/${rows.length}]`;
             // 更新当前位置（行号），供暂停时定位
             BGM.sync.updatePosition(undefined, rowNum);

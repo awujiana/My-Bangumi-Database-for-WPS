@@ -105,7 +105,7 @@ export function getOrCreateSyncRecordSheet(): WpsWorksheet {
         for (let i = 0; i < SYNC_RECORD_COLUMNS.length; i++) {
             const colLetter = colNumToLetter(i + 1);
             const cell = syncSheet.Range(`${colLetter}1`);
-            cell.Value2 = SYNC_RECORD_COLUMNS[i];
+            cell.Value2 = SYNC_RECORD_COLUMNS[i] ?? '';
             if (cell.Interior) {
                 cell.Interior.Color = BGM_COLOR.GRAY;
             }
@@ -144,7 +144,7 @@ export function getOrCreateSyncRecordSheet(): WpsWorksheet {
             const colLetter = colNumToLetter(i + 1);
             const cell = syncSheet.Range(`${colLetter}1`);
             const currentHeader = String(cell.Value2 ?? '').trim();
-            const expectedHeader = SYNC_RECORD_COLUMNS[i];
+            const expectedHeader = SYNC_RECORD_COLUMNS[i] ?? '';
             if (currentHeader !== expectedHeader) {
                 cell.Value2 = expectedHeader;
                 if (cell.Interior) {
@@ -219,7 +219,7 @@ function migrateSyncRecordSchema(sheet: WpsWorksheet): void {
     for (let i = 0; i < SYNC_RECORD_COLUMNS.length; i++) {
         const colLetter = colNumToLetter(i + 1);
         const cell = sheet.Range(`${colLetter}1`);
-        cell.Value2 = SYNC_RECORD_COLUMNS[i];
+        cell.Value2 = SYNC_RECORD_COLUMNS[i] ?? '';
         if (cell.Interior) {
             cell.Interior.Color = BGM_COLOR.GRAY;
         }
@@ -228,6 +228,7 @@ function migrateSyncRecordSchema(sheet: WpsWorksheet): void {
     for (let i = 0; i < rows.length; i++) {
         const newRow = i + 2;
         const data = rows[i];
+        if (!data) continue;
         for (let col = 0; col < data.length; col++) {
             setCellValue(sheet, newRow, col + 1, data[col]);
         }
@@ -256,6 +257,7 @@ function buildCache(sheet: WpsWorksheet): void {
     for (let i = 0; i < allData.length; i++) {
         try {
             const rowData = allData[i];
+            if (!rowData) continue;
             const sid = String(rowData[SYNC_RECORD_COL.SID - 1] ?? '').trim();
             const url = String(rowData[SYNC_RECORD_COL.URL - 1] ?? '').trim();
             if (!url && !sid) continue;
@@ -391,11 +393,15 @@ export function addSyncRecord(params: UpdateRecordParams): boolean {
 
             _syncRecordSidCache.set(sid, newRow);
             _syncRecordListCache.push({
-                id: newRow, time: now, name: params.name, url: params.url,
-                sid: sid, type: params.type, count: finalCount,
-                content: params.content, status: finalStatus,
-                message: params.message || '', fingerprint: params.fingerprint,
-                collType: params.collType
+                id: newRow, time: now,
+                sid: sid, count: finalCount,
+                status: finalStatus, message: params.message || '',
+                ...(params.name ? { name: params.name } : {}),
+                ...(params.url ? { url: params.url } : {}),
+                ...(params.type ? { type: params.type } : {}),
+                ...(params.content ? { content: params.content } : {}),
+                ...(params.fingerprint !== undefined ? { fingerprint: params.fingerprint } : {}),
+                ...(params.collType ? { collType: params.collType } : {}),
             });
         }
         return true;
@@ -448,6 +454,7 @@ export function deduplicateSyncRecords(): boolean {
             hasDuplicates = true;
 
             const keepRow = rows[0];
+            if (keepRow === undefined) continue;
             let totalCount = parseInt(getCellValue(sheet, keepRow, SYNC_RECORD_COL.COUNT)) || 1;
 
             const rowsToDelete = [...rows.slice(1)].sort((a, b) => b - a);

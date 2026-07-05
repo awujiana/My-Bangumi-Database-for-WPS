@@ -224,3 +224,188 @@
    - 网络环境（是否需要代理）
    - 复现步骤
 5. 将以上信息反馈，便于定位修复
+
+---
+
+# P0 修复验证清单（2026-07-05）
+
+> 本节基于 `multi-dimension-audit-2026-06-27` 审查报告的 7 项 P0 问题修复。
+> 修复范围：postMessage origin 校验、CSP、tsconfig 严格性、setSyncRunning 状态机统一、.status 对比度、HTML lang/viewport。
+> Token 按用户指示保持明文存储（仅添加 JSDoc 标注）。
+
+## 静态验证（AI 已执行，全部通过）
+
+| 验证项 | 结果 | 证据 |
+|--------|------|------|
+| `tsc --noEmit` 退出码 0 | ✅ 通过 | 2026-07-05 编译验证 |
+| `: any` / `as any` 残留 | ✅ 0 处 | Grep 全库无匹配 |
+| `@ts-ignore` / `@ts-nocheck` | ✅ 0 处 | Grep 全库无匹配 |
+| `eval(` / `new Function(` / `setTimeout("` / `setInterval("` | ✅ 0 处 | Grep 全库无匹配 |
+| `document.write` | ✅ 0 处 | Grep 全库无匹配 |
+| `setAttribute("on...")` | ✅ 0 处 | Grep 全库无匹配 |
+| `innerHTML` 安全性 | ✅ 12 处全部安全 | 均为静态字符串或经 escapeHtml |
+| `JSON.parse` 异常处理 | ✅ 12 处全部在 try/catch 中 | 逐处确认 |
+| message 监听器 origin 校验 | ✅ 3 处全部有校验 | handlers.ts:1189 + ribbon.ts:58 + message.ts:30 |
+| `<html lang="zh-CN">` | ✅ 已添加 | taskpane.html 第 2 行 |
+| viewport meta | ✅ 已添加 | taskpane.html head |
+| color-scheme meta | ✅ 已添加 | taskpane.html head |
+| theme-color meta | ✅ 已添加 | taskpane.html head |
+| CSP meta | ✅ 已添加 | taskpane.html head |
+| 内联 `<script>` 移除 | ✅ 已移至 taskpane-bootstrap.js | taskpane.html |
+| 内联 `onchange`/`onclick` | ✅ 0 处 | Grep 无匹配 |
+| tsconfig 三个严格选项 | ✅ 已开启 | noUncheckedIndexedAccess + exactOptionalPropertyTypes + useUnknownInCatchVariables |
+| `setSyncRunning` 移除 | ✅ 已删除 | Grep 仅 index.ts 无导出 |
+| `.status` 对比度 | ✅ 8.74:1（≥ 4.5:1）| #cdd6f4 vs #333 |
+| Token 明文存储 JSDoc | ✅ 已标注 | util.ts storeBgToken/loadBgToken |
+
+## 运行时验证（需用户执行）
+
+### V-P0-1: postMessage origin 校验
+
+**目的**：验证非预期 origin 的 message 被拒绝
+
+**步骤**：
+1. 打开 WPS 加载项 Taskpane
+2. 打开 DevTools Console（F12）
+3. 在 Console 执行：
+   ```javascript
+   window.postMessage({ type: 'showAlert', message: '测试' }, 'https://evil.example.com');
+   ```
+4. 观察是否有 alert 弹窗
+
+**预期**：
+- ✅ 无 alert 弹窗
+- ✅ Console 有日志：`[message] 拒绝非预期 origin: https://evil.example.com`
+
+**结果**：______
+
+### V-P0-2: CSP 生效验证
+
+**目的**：验证 CSP 阻止内联脚本和外域脚本加载
+
+**步骤**：
+1. 打开 WPS 加载项 Taskpane
+2. 打开 DevTools Console
+3. 在 Console 执行：`eval('1+1')`
+4. 在 Console 执行：`var s = document.createElement('script'); s.text = 'console.log("inline")'; document.body.appendChild(s);`
+5. 观察 Console 输出
+
+**预期**：
+- ✅ `eval` 报错：`Refused to evaluate a string as JavaScript because 'unsafe-eval' is not allowed`
+- ✅ 内联 script 被拒绝：`Refused to execute inline script because it violates the following Content Security Policy directive: "script-src 'self'"`
+
+**结果**：______
+
+### V-P0-3: tsconfig 严格性验证
+
+**目的**：确认三个严格选项已开启
+
+**步骤**：
+1. 在项目根目录运行：`npx tsc --noEmit`
+2. 检查退出码：`echo $LASTEXITCODE`（PowerShell）
+
+**预期**：
+- ✅ 退出码 0
+- ✅ 无任何错误输出
+
+**结果**：______
+
+### V-P0-4: setSyncRunning 移除验证
+
+**目的**：确认 setSyncRunning 已无业务调用
+
+**步骤**：
+1. 在项目根目录运行：`Select-String -Path "ts\*.ts" -Pattern "setSyncRunning" -Recurse`
+2. 检查输出
+
+**预期**：
+- ✅ 无匹配（或仅文档/注释中的历史引用）
+
+**结果**：______
+
+### V-P0-5: .status 颜色对比度验证
+
+**目的**：确认状态栏文字在深色背景下清晰可读
+
+**步骤**：
+1. 打开 WPS 加载项 Taskpane
+2. 触发任意同步操作（如点击"同步到 Bangumi"）
+3. 观察 `.status` 元素的文字
+4. 打开 DevTools Elements 面板，选中 `.status` 元素
+5. 查看计算样式 `color` 值
+
+**预期**：
+- ✅ 文字清晰可读
+- ✅ `color: rgb(205, 214, 244)`（即 #cdd6f4）
+- ✅ DevTools 显示对比度 ≥ 4.5:1
+
+**结果**：______
+
+### V-P0-6: HTML lang/viewport 验证
+
+**目的**：确认 lang 和 viewport meta 正确设置
+
+**步骤**：
+1. 打开 WPS 加载项 Taskpane
+2. 打开 DevTools Elements 面板
+3. 检查 `<html>` 标签
+4. 检查 `<head>` 内的 meta 标签
+
+**预期**：
+- ✅ `<html lang="zh-CN">`
+- ✅ `<meta name="viewport" content="width=device-width, initial-scale=1">`
+- ✅ `<meta name="color-scheme" content="dark light">`
+- ✅ `<meta name="theme-color" content="#1e1e2e">`
+- ✅ `<meta http-equiv="Content-Security-Policy" content="...">`
+
+**结果**：______
+
+### V-P0-7: Token 明文存储验证
+
+**目的**：确认 Token 以明文存储，可复制使用
+
+**步骤**：
+1. 打开 WPS 加载项 Taskpane
+2. 在 Token 输入框输入测试 Token（如 `test_token_12345`）
+3. 点击保存
+4. 打开 DevTools Console
+5. 执行：`Application.PluginStorage.getItem('bgm_token')`（或在 Console 调用 `loadBgToken()`）
+6. 点击"复制 Token"按钮
+7. 在剪贴板粘贴查看
+
+**预期**：
+- ✅ PluginStorage 中存储的值为明文 `test_token_12345`（无 `v1.` 前缀）
+- ✅ 复制按钮可正常复制
+- ✅ 粘贴后为明文 Token
+
+**结果**：______
+
+### V-P0-8: 历史加密 Token 自动升级验证
+
+**目的**：确认历史 XOR 加密的 Token 能自动升级为明文
+
+**步骤**：
+1. 准备一个历史版本的加密 Token（`v1.` 前缀）
+2. 手动写入 PluginStorage：`Application.PluginStorage.setItem('bgm_token', 'v1.xxx.yyy')`
+3. 调用 `loadBgToken()`
+4. 再次读取 PluginStorage
+
+**预期**：
+- ✅ `loadBgToken()` 返回解密后的明文 Token
+- ✅ PluginStorage 中的值已升级为明文（无 `v1.` 前缀）
+- ✅ Console 有日志：`[crypto] ...`
+
+**结果**：______
+
+## P0 验证汇总
+
+| 验证项 | 类型 | 结果 |
+|--------|------|------|
+| V-P0-1 postMessage origin | 运行时 | ______ |
+| V-P0-2 CSP 生效 | 运行时 | ______ |
+| V-P0-3 tsconfig 严格性 | 静态+运行时 | ______ |
+| V-P0-4 setSyncRunning 移除 | 静态 | ✅ 通过 |
+| V-P0-5 .status 对比度 | 运行时 | ______ |
+| V-P0-6 HTML lang/viewport | 运行时 | ______ |
+| V-P0-7 Token 明文存储 | 运行时 | ______ |
+| V-P0-8 历史加密升级 | 运行时 | ______ |

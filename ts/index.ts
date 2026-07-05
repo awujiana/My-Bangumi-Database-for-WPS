@@ -120,8 +120,6 @@ export {
     // 设置状态栏消息
     setStatus,
     initMessageListener,
-    // 设置同步运行状态（是否正在同步）
-     setSyncRunning,
 } from './ui/message.js';
 
 // ============================================================================

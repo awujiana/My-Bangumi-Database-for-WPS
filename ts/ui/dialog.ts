@@ -73,6 +73,7 @@ function createDialogs(): void {
 
     function createDialogElement(type: string, iconClass: string, iconChar: string, defaultTitle: string): HTMLElement {
         const cfg = DIALOG_TYPES[type];
+        if (!cfg) return document.createElement('div');
         const modal = document.createElement('div');
         modal.id = cfg.id;
         modal.className = 'bgm-modal';
@@ -148,6 +149,7 @@ function createDialogs(): void {
 function bindAllEvents(): void {
     for (const type in DIALOG_TYPES) {
         const cfg = DIALOG_TYPES[type];
+        if (!cfg) continue;
         dom[cfg.id] = document.getElementById(cfg.id);
         dom[cfg.titleId] = document.getElementById(cfg.titleId);
         dom[cfg.msgId] = document.getElementById(cfg.msgId);
@@ -195,6 +197,7 @@ function bindAllEvents(): void {
 
 function _showDialog(type: string, opts: DialogOptions = {}): void {
     const cfg = DIALOG_TYPES[type];
+    if (!cfg) return;
     const dialog = dom[cfg.id];
     if (!dialog) {
         if (type === 'confirm') {
@@ -221,7 +224,10 @@ function _showDialog(type: string, opts: DialogOptions = {}): void {
         dom.bgmInputField.focus();
     }
 
-    _dialogCallback = { onOk: opts.onOk, onCancel: opts.onCancel };
+    const callback: DialogCallback = {};
+    if (opts.onOk) callback.onOk = opts.onOk;
+    if (opts.onCancel) callback.onCancel = opts.onCancel;
+    _dialogCallback = callback;
     dialog.style.display = 'flex';
 }
 
@@ -638,7 +644,7 @@ export function hideSyncProgressDialog(): void {
 
 // ========== 公共 API ==========
 export function showAlert(message: string, title?: string, onOk?: () => void): void {
-    _showDialog('alert', { message, title: title || '提示', onOk });
+    _showDialog('alert', { message, title: title || '提示', ...(onOk ? { onOk } : {}) });
 }
 
 /*
@@ -661,19 +667,25 @@ export function showConfirm(
 }
 
 export function showError(message: string, title?: string, onOk?: () => void): void {
-    _showDialog('error', { message, title: title || '错误', onOk });
+    _showDialog('error', { message, title: title || '错误', ...(onOk ? { onOk } : {}) });
 }
 
 export function showWarning(message: string, title?: string, onOk?: () => void): void {
-    _showDialog('warning', { message, title: title || '警告', onOk });
+    _showDialog('warning', { message, title: title || '警告', ...(onOk ? { onOk } : {}) });
 }
 
 export function showSuccess(message: string, title?: string, onOk?: () => void): void {
-    _showDialog('success', { message, title: title || '成功', onOk });
+    _showDialog('success', { message, title: title || '成功', ...(onOk ? { onOk } : {}) });
 }
 
 export function showInput(title: string, prompt: string, defaultValue?: string, onOk?: (value?: string) => void, onCancel?: () => void): void {
-    _showDialog('input', { title, message: prompt, onOk, onCancel, defaultValue });
+    _showDialog('input', {
+        title,
+        message: prompt,
+        ...(onOk ? { onOk } : {}),
+        ...(onCancel ? { onCancel } : {}),
+        ...(defaultValue !== undefined ? { defaultValue } : {}),
+    });
 }
 
 // ========== Toast 通知 ==========

@@ -78,14 +78,3 @@ export function setStatus(message: string, type?: string): void {
     statusEl.className = 'status ' + (type || 'info');
 }
 
-export function setSyncRunning(isRunning: boolean): void {
-    BGM.sync.isRunning = isRunning;
-    BGM.sync.lastSyncTime = isRunning ? null : new Date().toISOString();
-
-    const syncBtn = document.getElementById('syncBtn') as HTMLButtonElement | null;
-    if (syncBtn) {
-        syncBtn.disabled = isRunning;
-        syncBtn.textContent = isRunning ? '\u540C\u6B65\u4E2D...' : '\u{1F680} \u540C\u6B65\u5230 Bangumi';
-    }
-}
-

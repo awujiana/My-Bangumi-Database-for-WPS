@@ -1,38 +1,18 @@
 <!DOCTYPE html>
-<html>
+<html lang="zh-CN">
 <head>
     <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="dark light">
+    <meta name="theme-color" content="#1e1e2e">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; connect-src 'self' https://api.bgm.tv https://bangumi.tv">
     <link rel="stylesheet" href="../css/styles.css">
     <link rel="stylesheet" href="../css/preview.css">
 </head>
 <body>
-    <!-- ES6 模块加载 -->
-    <script type="module">
-        import '../dist-ts/index.js';
-        import '../dist-ts/core/constants.js';
-        import '../dist-ts/tools/config.js';
-        import '../dist-ts/tools/util.js';
-        import '../dist-ts/core/crypto.js';
-        import '../dist-ts/tools/events.js';
-        import '../dist-ts/core/result.js';
-        import '../dist-ts/tools/wps.js';
-        import '../dist-ts/tools/http.js';
-        import '../dist-ts/ui/dialog.js';
-        import '../dist-ts/ui/message.js';
-        import '../dist-ts/ui/preview.js';
-        import '../dist-ts/sync/syncRecord.js';
-        import '../dist-ts/sync/scraping.js';
-        import '../dist-ts/sync/exceltobangumi.js';
-        import '../dist-ts/ui/handlers.js';
-        import '../dist-ts/taskpane.js';
+    <!-- ES6 模块加载（外联，符合 CSP script-src 'self'） -->
+    <script type="module" src="./taskpane-bootstrap.js"></script>
 
-        if (typeof window.initPanel === 'function') {
-            console.log('[BGM] All modules loaded, window functions ready');
-        } else {
-            console.error('[BGM] Modules loaded but window.initPanel not found');
-        }
-    </script>
-    
     <script src="../wpsjsrpcsdk.js"></script>
 
     <div class="global">
@@ -99,12 +79,12 @@
                 <label>选择模式：</label>
                 <div class="mode-selector">
                     <label class="radio-label">
-                        <input type="radio" name="selectMode" value="auto" checked onchange="onSelectModeChange()">
+                        <input type="radio" name="selectMode" value="auto" checked>
                         <span class="radio-text">🤖 自动模式</span>
                         <span class="radio-desc">自动识别筛选后的可见数据</span>
                     </label>
                     <label class="radio-label">
-                        <input type="radio" name="selectMode" value="manual" onchange="onSelectModeChange()">
+                        <input type="radio" name="selectMode" value="manual">
                         <span class="radio-text">✋ 手动选择</span>
                         <span class="radio-desc">手动指定起始和结束行号</span>
                     </label>
@@ -265,18 +245,5 @@
             <div class="status" id="statusBox">就绪</div>
         </div>
     </div>
-
-    <script>
-    document.querySelectorAll('button[data-action]').forEach(function(btn) {
-        btn.disabled = true;
-    });
-
-    document.addEventListener('bgm:modulesReady', function() {
-        document.querySelectorAll('button[data-action]').forEach(function(btn) {
-            btn.disabled = false;
-        });
-        console.log('[BGM] 模块加载完成，按钮已启用');
-    });
-    </script>
 </body>
 </html>
