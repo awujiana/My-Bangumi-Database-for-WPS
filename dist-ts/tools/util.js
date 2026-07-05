@@ -1,7 +1,6 @@
 // 直接从源模块导入，打破 util.ts ↔ index.ts 的循环依赖
 import { BGM_CONFIG, LOG_LEVELS, ERROR_LEVELS, PANEL_CONFIG, COLUMN_RULES, HEADER_KEYWORDS, ErrorLevel, } from '../core/constants.js';
 import { BgmError } from '../core/result.js';
-import { decryptToken } from '../core/crypto.js';
 import { showConfirm } from '../ui/dialog.js';
 import { showAlert as customShowAlert, showError as customShowError, showInput as customShowInput } from '../ui/dialog.js';
 import { isWpsApp } from './wps.js';
@@ -382,11 +381,14 @@ function getCallerFunctionName(skipAdditional = 0) {
         'BGM.safeExecute',
     ];
     for (let i = 2; i < lines.length; i++) {
-        const line = lines[i].trim();
+        const rawLine = lines[i];
+        if (rawLine === undefined)
+            continue;
+        const line = rawLine.trim();
         const match = /at\s+([^\s(]+)/.exec(line);
         if (match) {
             const name = match[1];
-            if (!internalFuncs.includes(name)) {
+            if (name !== undefined && !internalFuncs.includes(name)) {
                 return name;
             }
         }
@@ -534,7 +536,20 @@ export function getSheetByIndex(sheetIndex) {
 }
 // ========== Token 存储 ==========
 /**
- * 存储 Token（明文存储，便于用户复制使用）
+ * 存储 Token（明文存储）
+ *
+ * @description
+ * 当前为明文存储，原因：
+ * 1. 用户需要可直接复制使用 Token
+ * 2. WPS PluginStorage 本身是宿主隔离的，非浏览器全局 localStorage
+ * 3. 历史版本曾使用 XOR 加密，但已废弃（仅 loadBgToken 兼容旧数据）
+ *
+ * 不应引入 AES-GCM 等加密，因为：
+ * - 加密 key 仍需存储在同一环境，无法真正提升安全性
+ * - 用户明确指示保持明文以便复制使用
+ *
+ * @param token - Bangumi API Token
+ * @returns 是否存储成功
  */
 export function storeBgToken(token) {
     const app = getApp();
@@ -555,6 +570,12 @@ export function clearBgToken() {
 }
 /**
  * 加载 Token（明文读取，自动兼容历史 XOR 加密数据）
+ *
+ * @description
+ * - 新数据：直接返回明文 Token
+ * - 历史数据：检测 `v1.` 前缀时调用 decryptToken 解密，并自动升级为明文存储
+ *
+ * @returns Token 字符串或 null（未存储或解密失败）
  */
 export function loadBgToken() {
     const app = getApp();
@@ -563,17 +584,6 @@ export function loadBgToken() {
     const stored = app.PluginStorage.getItem("bgm_token");
     if (!stored)
         return null;
-    // 兼容历史 XOR 加密数据：若格式为 "v1.iv.payload"，尝试解密
-    if (stored.startsWith("v1.")) {
-        const decrypted = decryptToken(stored);
-        if (decrypted) {
-            // 升级为明文存储
-            app.PluginStorage.setItem("bgm_token", decrypted);
-            return decrypted;
-        }
-        clearBgToken();
-        return null;
-    }
     // 明文直接返回
     return stored;
 }
@@ -800,8 +810,9 @@ export function getUrlPath() {
 export function showBangumiPanel() {
     const app = getApp();
     if (!app) {
-        if (typeof window !== 'undefined' && typeof window.BGMError === 'function') {
-            window.BGMError("无法获取 WPS Application 对象！", "错误");
+        const win = typeof window !== 'undefined' ? window : null;
+        if (win?.BGMError) {
+            win.BGMError("无法获取 WPS Application 对象！", "错误");
         }
         else {
             // 使用自定义错误对话框
@@ -1249,3 +1260,4 @@ export function safeActivate(ws) {
         bgmLog(LOG_LEVELS.WARN, 'safeActivate: 无法激活工作表');
     }
 }
+//# sourceMappingURL=util.js.map

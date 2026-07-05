@@ -5,6 +5,9 @@
  *              decryptToken 仍保留用于读取历史加密数据并自动升级为明文。
  *              新代码不应调用 encryptToken。
  *              本模块同时提供 Token 完整性校验。
+ *              【用户决策】Token 保持明文存储（util.ts storeBgToken/loadBgToken）。
+ *              本模块的 encryptToken 已废弃，仅保留 decryptToken 用于读取历史加密数据并自动升级为明文。
+ *              新代码不应调用 encryptToken。
  *
  * @author BGM Development Team
  * @version 1.0.0
@@ -150,7 +153,7 @@ export function encryptToken(token) {
     // XOR加密
     const encrypted = new Uint8Array(payloadBytes.length);
     for (let i = 0; i < payloadBytes.length; i++) {
-        encrypted[i] = payloadBytes[i] ^ keyBytes[i % keyBytes.length] ^ iv[i % iv.length];
+        encrypted[i] = (payloadBytes[i] ?? 0) ^ (keyBytes[i % keyBytes.length] ?? 0) ^ (iv[i % iv.length] ?? 0);
     }
     // 返回格式：版本.IV.Base64(加密数据)
     const ivBase64 = btoa(String.fromCharCode(...iv));
@@ -188,7 +191,7 @@ export function decryptToken(encrypted) {
         const keyBytes = strToBytes(TOKEN_CONFIG.XOR_KEY);
         const decrypted = new Uint8Array(encryptedData.length);
         for (let i = 0; i < encryptedData.length; i++) {
-            decrypted[i] = encryptedData[i] ^ keyBytes[i % keyBytes.length] ^ iv[i % iv.length];
+            decrypted[i] = (encryptedData[i] ?? 0) ^ (keyBytes[i % keyBytes.length] ?? 0) ^ (iv[i % iv.length] ?? 0);
         }
         const payload = bytesToStr(decrypted);
         return extractToken(payload);
@@ -198,3 +201,4 @@ export function decryptToken(encrypted) {
         return null;
     }
 }
+//# sourceMappingURL=crypto.js.map

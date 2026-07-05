@@ -39,7 +39,9 @@ export function wpsPrompt(message, defaultValue) {
                 return;
             }
             catch (e) {
-                bgmLog(LOG_LEVELS.WARN, `WPS InputBox 不可用: ${e.message}`);
+                // 类型守卫：先缩窄类型再访问 message，符合 useUnknownInCatchVariables 规范
+                const errMsg = e instanceof Error ? e.message : String(e);
+                bgmLog(LOG_LEVELS.WARN, `WPS InputBox 不可用: ${errMsg}`);
             }
         }
         if (typeof window !== 'undefined' && typeof window.BGMInput === 'function') {
@@ -69,7 +71,9 @@ export function wpsMsgBox(message, buttons, icon) {
                 return;
             }
             catch (e) {
-                bgmLog(LOG_LEVELS.WARN, `WPS MessageBox 不可用: ${e.message}`);
+                // 类型守卫：先缩窄类型再访问 message，符合 useUnknownInCatchVariables 规范
+                const errMsg = e instanceof Error ? e.message : String(e);
+                bgmLog(LOG_LEVELS.WARN, `WPS MessageBox 不可用: ${errMsg}`);
             }
         }
         if (buttons === 4) {
@@ -137,3 +141,4 @@ export function getRowRangeSafe(ws, row) {
         }
     }
 }
+//# sourceMappingURL=wps.js.map

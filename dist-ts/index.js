@@ -69,9 +69,7 @@ showSyncProgressDialog, updateSyncProgressDialog, completeSyncProgressDialog, hi
 // ============================================================================
 export { 
 // 设置状态栏消息
-setStatus, initMessageListener, 
-// 设置同步运行状态（是否正在同步）
-setSyncRunning, } from './ui/message.js';
+setStatus, initMessageListener, } from './ui/message.js';
 // ============================================================================
 // 7. UI 事件处理（来自 ui/handlers.js）
 // ============================================================================
@@ -226,3 +224,4 @@ isWpsRange, wpsMsgBox, } from './tools/wps.js';
 // 17. 服务层（来自 services/ribbonService.js）
 // ============================================================================
 export { detectConflicts, getSyncPreview } from './services/ribbonService.js';
+//# sourceMappingURL=index.js.map

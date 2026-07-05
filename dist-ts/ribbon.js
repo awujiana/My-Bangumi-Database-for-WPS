@@ -11,6 +11,12 @@ function initRibbonMessageListener() {
     if (typeof window === 'undefined')
         return;
     window.addEventListener('message', (event) => {
+        // origin 白名单校验（防止跨域消息注入）
+        const allowedOrigins = ['null', '', window.location.origin];
+        if (!allowedOrigins.includes(event.origin)) {
+            bgmLog(LOG_LEVELS.WARN, `[message] 拒绝非预期 origin: ${event.origin}`);
+            return;
+        }
         const data = event.data;
         if (data?.type === 'BGM:configUpdated') {
             const key = data.data?.key;
@@ -192,3 +198,4 @@ ribbonWindow.OnIncrementalSyncChange = OnIncrementalSyncChange;
 ribbonWindow.OnSkipConflictsChange = OnSkipConflictsChange;
 ribbonWindow.GetEnableSyncRecordPressed = GetEnableSyncRecordPressed;
 ribbonWindow.OnEnableSyncRecordChange = OnEnableSyncRecordChange;
+//# sourceMappingURL=ribbon.js.map

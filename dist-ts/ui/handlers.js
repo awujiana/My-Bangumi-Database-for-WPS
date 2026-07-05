@@ -3,7 +3,7 @@
  * @module ui/handlers
  * @description 面板操作处理、按钮绑定、业务对话框
  */
-import { LOG_LEVELS, bgmLog, BGM, loadBgToken, storeBgToken, clearBgToken, copyTokenToClipboard, _getBgmUserId, _setBgmUserId, _getBgmUsername, _setBgmUsername, getApp, getCell, trim, setCellValue, fetchBgmUserInfo, BGM_COLOR, showAlert, showConfirm, showError, showSuccess, showInput, showToast, setStatus, verifyToken, fetchAllUserCollections, findHeaderRow, getColumnMap, getLastRow, extractSubjectId, getDataSheet, SyncToBangumiAsync, syncSelectedRows, getOrCreateSyncRecordSheet, getAllSyncRecords, addSyncRecord, openSyncRecordSheet, deduplicateSyncRecords, formatSyncRecordSheet, previewSyncContent, refreshData, refreshSheets, toggleSheetLock, clearSyncRecords, closeDetailModal, getIncrementalSync, setIncrementalSync, getSkipConflicts, setSkipConflicts, setSyncRecordEnabled, COLLECTION_TYPE_NAMES, readRangeValues, openBangumiTokenPage, showSyncProgressDialog, updateSyncProgressDialog, completeSyncProgressDialog, hideSyncProgressDialog, } from '../index.js';
+import { LOG_LEVELS, bgmLog, BGM, loadBgToken, storeBgToken, clearBgToken, copyTokenToClipboard, _getBgmUserId, _setBgmUserId, _getBgmUsername, _setBgmUsername, getApp, getCell, trim, setCellValue, fetchBgmUserInfo, BGM_COLOR, showAlert, showConfirm, showError, showSuccess, showInput, showToast, setStatus, verifyToken, fetchAllUserCollections, findHeaderRow, getColumnMap, getLastRow, extractSubjectId, getDataSheet, SyncToBangumiAsync, syncSelectedRows, getOrCreateSyncRecordSheet, getAllSyncRecords, addSyncRecord, openSyncRecordSheet, deduplicateSyncRecords, formatSyncRecordSheet, previewSyncContent, refreshData, refreshSheets, toggleSheetLock, clearSyncRecords, closeDetailModal, getIncrementalSync, setIncrementalSync, getSkipConflicts, setSkipConflicts, setSyncRecordEnabled, COLLECTION_TYPE_NAMES, BGM_SUBJECT_TYPES, readRangeValues, openBangumiTokenPage, showSyncProgressDialog, updateSyncProgressDialog, completeSyncProgressDialog, hideSyncProgressDialog, } from '../index.js';
 import { BGM_EVENTS, eventBus } from '../tools/events.js';
 //
 import { getSyncPreview, detectConflicts } from '../services/ribbonService.js';
@@ -230,7 +230,8 @@ export function testTokenValidity() {
     xhr.send();
 }
 export function testDebugConnection() {
-    if (typeof window.Application !== 'undefined') {
+    // 通过统一的 getApp() 获取 WPS Application 对象，避免直接访问 window 全局
+    if (getApp() !== null) {
         showToast(_T.debugConnOk, 'success');
     }
     else {
@@ -404,7 +405,7 @@ async function confirmAndExecuteSync(prepared) {
     const { ws, colMap, token, lastRow, headerRow, incremental, fingerprintMap, syncSheet, app, startTime } = prepared;
     // 7. 获取同步预览统计（传入增量同步选项）
     bgmLog(LOG_LEVELS.INFO, '[syncFromPanel] 步骤7: 获取同步预览统计');
-    const preview = getSyncPreview(ws, colMap, lastRow, headerRow, { incremental, fingerprintMap });
+    const preview = getSyncPreview(ws, colMap, lastRow, headerRow, { incremental, ...(fingerprintMap !== undefined && { fingerprintMap }) });
     bgmLog(LOG_LEVELS.INFO, `[syncFromPanel] 数据预览 - 总行数: ${preview.total}, 有效: ${preview.valid}, 已上传: ${preview.alreadyUploaded}, 待同步: ${preview.willSync}, 跳过: ${preview.willSkip}, 无URL: ${preview.noUrl}, 空状态: ${preview.emptyStatus}, 增量跳过: ${preview.incrementalSkipped}`);
     // 8. 冲突检测与策略
     bgmLog(LOG_LEVELS.INFO, '[syncFromPanel] 步骤8: 冲突检测');
@@ -478,7 +479,7 @@ async function confirmAndExecuteSync(prepared) {
     try {
         bgmLog(LOG_LEVELS.INFO, '[syncFromPanel] 调用 SyncToBangumiAsync...');
         const result = await SyncToBangumiAsync(ws, colMap, token, lastRow, headerRow, {
-            skipSids: conflictSids,
+            ...(conflictSids !== undefined && { skipSids: conflictSids }),
             incremental,
             onProgress: (current, total, message) => {
                 updateSyncProgressDialog(current, total, message);
@@ -655,7 +656,7 @@ async function _doAPISync(sheetIndex, token) {
         let syncRecords = typeof getAllSyncRecords === 'function' ? getAllSyncRecords() : [];
         const syncCountMap = new Map();
         syncRecords.forEach(r => syncCountMap.set(String(r.sid || ''), (syncCountMap.get(String(r.sid || '')) || 0) + 1));
-        const BGM_SUBJECT_TYPES = window.BGM_SUBJECT_TYPES || { 1: '书籍', 2: '动画', 3: '音乐', 4: '游戏', 6: '真人剧' };
+        // 使用从 ../index.js 导入的 BGM_SUBJECT_TYPES 常量（与 core/constants.ts 中定义一致）
         // 启动同步状态机：使用 enterRunningState 进行防重入检查
         if (!BGM.sync.enterRunningState()) {
             bgmLog(LOG_LEVELS.WARN, '[_doAPISync] 已有同步进行中，拒绝重入');
@@ -682,13 +683,15 @@ async function _doAPISync(sheetIndex, token) {
             if (BGM.sync.checkShouldStop())
                 break;
             const item = userCollections[i];
+            if (item === undefined)
+                continue;
             const itemName = item.subject?.name_cn || item.subject?.name || '(无名称)';
             if (typeof addSyncRecord === 'function') {
                 addSyncRecord({
                     name: itemName,
                     url: 'https://bgm.tv/subject/' + item.subject_id,
                     sid: String(item.subject_id),
-                    type: BGM_SUBJECT_TYPES[item.subject_type || 2],
+                    type: BGM_SUBJECT_TYPES[item.subject_type || 2] ?? '',
                     content: '标记同步',
                     status: '成功',
                     count: 1,
@@ -726,6 +729,8 @@ async function _doAPISync(sheetIndex, token) {
                     break;
             }
             const row = rowsToProcess[i];
+            if (row === undefined)
+                continue;
             // 更新当前位置（行号）以便暂停时定位
             BGM.sync.updatePosition(undefined, row);
             const bgmUrlCell = colMap.has('Bangumi_URL') ? getCell(ws, row, urlCol) : null;
@@ -987,12 +992,12 @@ const ACTION_HANDLERS = {
     // 弹窗快捷调用（参数形式）
     showToast: (ctx) => {
         bgmLog(LOG_LEVELS.INFO, `[handleActionClick] 显示 Toast 消息: ${ctx.args[0] || ''}`);
-        showToast(ctx.args[0], ctx.args[1]);
+        showToast(ctx.args[0] ?? '', ctx.args[1] ?? '');
         bgmLog(LOG_LEVELS.INFO, `[handleActionClick] Toast 已显示，耗时: ${Date.now() - ctx.startTime}ms`);
     },
     showAlert: (ctx) => {
         bgmLog(LOG_LEVELS.INFO, `[handleActionClick] 显示警告框: ${ctx.args[0] || ''}`);
-        showAlert(ctx.args[0], ctx.args[1]);
+        showAlert(ctx.args[0] ?? '', ctx.args[1] ?? '');
         bgmLog(LOG_LEVELS.INFO, `[handleActionClick] 警告框已显示，耗时: ${Date.now() - ctx.startTime}ms`);
     },
     requestStopSync: (ctx) => {
@@ -1059,6 +1064,12 @@ function isTaskpaneContext() {
 function setupMessageListener() {
     if (typeof window !== 'undefined') {
         window.addEventListener('message', (event) => {
+            // origin 白名单校验（防止跨域消息注入）
+            const allowedOrigins = ['null', '', window.location.origin];
+            if (!allowedOrigins.includes(event.origin)) {
+                bgmLog(LOG_LEVELS.WARN, `[message] 拒绝非预期 origin: ${event.origin}`);
+                return;
+            }
             const data = event.data;
             if (!data || typeof data !== 'object')
                 return;
@@ -1380,7 +1391,7 @@ function cleanLockedDataSheet() {
     let emptyNameCount = 0;
     for (let i = 0; i < totalRows; i++) {
         const row = headerRow + 1 + i;
-        const name = String(nameData[i][0] ?? '').trim();
+        const name = String(nameData[i]?.[0] ?? '').trim();
         if (!name) {
             emptyNameCount++;
             continue;
@@ -1404,7 +1415,7 @@ function cleanLockedDataSheet() {
         const withoutUrl = [];
         for (const row of rows) {
             const idx = row - headerRow - 1;
-            const url = idx < urlData.length ? String(urlData[idx][0] ?? '').trim() : '';
+            const url = idx < urlData.length ? String(urlData[idx]?.[0] ?? '').trim() : '';
             (url ? withUrl : withoutUrl).push(row);
         }
         if (withUrl.length === 0) {
@@ -1417,11 +1428,11 @@ function cleanLockedDataSheet() {
         const nameNewTags = [];
         if (tagsData && withoutUrl.length > 0) {
             const keepIdx = keepRow - headerRow - 1;
-            const existingSet = new Set((keepIdx < tagsData.length ? String(tagsData[keepIdx][0] ?? '') : '')
+            const existingSet = new Set((keepIdx < tagsData.length ? String(tagsData[keepIdx]?.[0] ?? '') : '')
                 .split(/\s*\|\s*/).map(t => t.trim()).filter(Boolean));
             for (const delRow of withoutUrl) {
                 const delIdx = delRow - headerRow - 1;
-                const delTags = delIdx < tagsData.length ? String(tagsData[delIdx][0] ?? '').trim() : '';
+                const delTags = delIdx < tagsData.length ? String(tagsData[delIdx]?.[0] ?? '').trim() : '';
                 if (!delTags)
                     continue;
                 for (const t of delTags.split(/\s*\|\s*/)) {
@@ -1491,3 +1502,4 @@ if (typeof document !== 'undefined') {
         initializeListeners();
     }
 }
+//# sourceMappingURL=handlers.js.map

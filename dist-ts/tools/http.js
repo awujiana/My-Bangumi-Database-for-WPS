@@ -71,7 +71,9 @@ export async function httpRequest(endpoint, options = {}) {
     while (attempt <= retries) {
         try {
             const response = await executeXhrRequest(BGM_CONFIG.API_BASE + endpoint, {
-                method: validMethod, body, token, timeout, onProgress
+                method: validMethod, body, timeout,
+                ...(token !== undefined && { token }),
+                ...(onProgress !== undefined && { onProgress })
             });
             if (response.status === 204) {
                 return Result.ok({ status: 204, data: null });
@@ -200,17 +202,18 @@ function executeXhrRequest(url, options) {
  * GET 请求
  * @example httpGet<UserInfo>('/v0/me', token)
  */
-export const httpGet = (endpoint, token) => httpRequest(endpoint, { method: 'GET', token });
+export const httpGet = (endpoint, token) => httpRequest(endpoint, { method: 'GET', ...(token !== undefined && { token }) });
 /**
  * POST 请求
  * @example httpPost('/v0/users/123/collections', jsonBody, token)
  */
-export const httpPost = (endpoint, body, token) => httpRequest(endpoint, { method: 'POST', body, token });
+export const httpPost = (endpoint, body, token) => httpRequest(endpoint, { method: 'POST', body, ...(token !== undefined && { token }) });
 /**
  * PUT 请求
  */
-export const httpPut = (endpoint, body, token) => httpRequest(endpoint, { method: 'PUT', body, token });
+export const httpPut = (endpoint, body, token) => httpRequest(endpoint, { method: 'PUT', body, ...(token !== undefined && { token }) });
 /**
  * DELETE 请求
  */
-export const httpDelete = (endpoint, token) => httpRequest(endpoint, { method: 'DELETE', token });
+export const httpDelete = (endpoint, token) => httpRequest(endpoint, { method: 'DELETE', ...(token !== undefined && { token }) });
+//# sourceMappingURL=http.js.map

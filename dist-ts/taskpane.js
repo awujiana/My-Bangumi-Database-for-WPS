@@ -615,7 +615,7 @@ function refreshData() {
                         for (let ci = 0; ci < displayColCount; ci++) {
                             let v;
                             if (is2D && Array.isArray(raw)) {
-                                const cell = raw[r + 1][ci + 1];
+                                const cell = raw[r + 1]?.[ci + 1];
                                 v = cell == null ? '' : String(cell).trim();
                             }
                             else {
@@ -662,15 +662,15 @@ function refreshData() {
                 if (isFiltered && visibleRowSet && !visibleRowSet.has(r))
                     continue;
                 const cols = [];
-                let any = false;
+                let hasAny = false;
                 for (let c = 1; c <= PANEL_CONFIG.MAX_SCAN_COLUMNS; c++) {
                     const v = getCellValue(ws, r, c).trim();
                     if (v) {
                         cols.push({ text: v, important: false });
-                        any = true;
+                        hasAny = true;
                     }
                 }
-                if (any) {
+                if (hasAny) {
                     previewRows.push({ row: r, cols, isHeader: false, aligned: true });
                     hasData = true;
                     count++;
@@ -950,3 +950,4 @@ if (window.location.pathname.includes('taskpane.html')) {
         window.addEventListener('load', safeInitPanel);
     }
 }
+//# sourceMappingURL=taskpane.js.map

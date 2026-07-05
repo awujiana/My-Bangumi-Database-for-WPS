@@ -257,6 +257,8 @@ export async function previewSyncContent() {
                 }
             }
             const rowNum = dataRows[i];
+            if (rowNum === undefined)
+                continue;
             // 更新当前位置（行号）以便暂停时定位
             BGM.sync.updatePosition(undefined, rowNum);
             // 每行让出主线程，确保暂停按钮及时响应
@@ -545,7 +547,7 @@ export function viewSyncRecordDetail(sid) {
  * - 依赖 BGM.dataPreview 中的预览数据
  * - 使用 getSyncPreview 和 detectConflicts 进行统计和冲突检测
  * - 调用 SyncToBangumiAsync 执行批量同步
- * - 通过事件总线通知进度
+ * - 通过 showSyncProgressDialog/updateSyncProgressDialog/completeSyncProgressDialog 直接驱动进度弹窗
  * @returns 同步结果统计 { success, fail, skip }
  */
 export async function syncAllRows() {
@@ -607,39 +609,48 @@ export async function syncAllRows() {
     }
     bgmLog(LOG_LEVELS.INFO, `[syncAllRows] 增量同步: ${incremental ? '开启' : '关闭'}`);
     // ---------- 4. 启动同步状态机 + 显示进度弹窗 ----------
+    // 进入运行状态（防重入，统一入口）；失败则直接返回
     if (!BGM.sync.enterRunningState()) {
         bgmLog(LOG_LEVELS.WARN, '[syncAllRows] 已有同步进行中，拒绝重入');
         return { success: 0, fail: 0, skip: 0 };
     }
-    BGM.sync.updatePosition(ws, headerRow, colMap.get('序列号') || 9);
-    showSyncProgressDialog('正在同步 - 同步所有可见行', {
-        onPause: () => BGM.sync.pause(),
-        onResume: () => BGM.sync.resume(),
-        onStop: () => BGM.sync.requestStop()
-    });
     try {
+        // 更新当前位置（便于暂停时定位到表头）
+        BGM.sync.updatePosition(ws, headerRow, colMap.get('序列号') || 9);
+        // 显示同步进度弹窗（提供暂停/恢复/停止按钮）
+        showSyncProgressDialog('正在同步 - 全面同步', {
+            onPause: () => BGM.sync.pause(),
+            onResume: () => BGM.sync.resume(),
+            onStop: () => BGM.sync.requestStop()
+        });
         const result = await SyncToBangumiAsync(ws, colMap, token, lastRow, headerRow, {
-            skipSids: conflictSids, // 跳过冲突的 sid 集合
+            ...(conflictSids !== undefined && { skipSids: conflictSids }), // 跳过冲突的 sid 集合
             incremental, // 从 Ribbon 设置读取
             onProgress: (current, total, message) => {
+                // 直接调用弹窗 API 更新进度，不再走事件总线
                 updateSyncProgressDialog(current, total, message);
             },
             onItemComplete: (row, success, _result) => {
-                // 这里可以不做额外处理，因为颜色标记由内部完成
+                // 颜色标记由内部完成，此处无需额外处理
             }
         });
+        // 切换弹窗为完成状态（而非 BGM.setSyncComplete）
         const summary = `📊 同步 ${result.success + result.fail + result.skip} 条\n\n✅ 成功: ${result.success}\n❌ 失败: ${result.fail}\n⏭️ 跳过: ${result.skip}`;
         const details = result.stopped
             ? ['⚠️ 同步被用户停止', `成功 ${result.success} 条`, `失败 ${result.fail} 条`, `跳过 ${result.skip} 条`]
             : [`成功 ${result.success} 条`, `失败 ${result.fail} 条`, `跳过 ${result.skip} 条`];
         completeSyncProgressDialog(summary, details, result.stopped);
-        BGM.sync.exitRunningState();
         return result;
     }
     catch (err) {
+        // 异常时隐藏弹窗，避免残留运行态 UI
         hideSyncProgressDialog();
-        BGM.sync.exitRunningState();
         BGM.handleError(err, { showAlert: true });
         return { success: 0, fail: 0, skip: 0 };
     }
+    finally {
+        // 无论成功、失败还是停止，都退出运行状态
+        BGM.sync.exitRunningState();
+    }
 }
+//# sourceMappingURL=preview.js.map

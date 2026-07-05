@@ -158,7 +158,7 @@ export async function detectConflicts(ws, colMap, lastRow, headerRow, token) {
             const sid = String(item.subject_id);
             bgmCollection.set(sid, {
                 type: item.type,
-                rate: item.rate,
+                ...(item.rate !== undefined && { rate: item.rate }),
                 tags: item.tags || [],
                 comment: item.comment || '',
                 subject_name: item.subject?.name || ''
@@ -312,7 +312,7 @@ export async function syncWithConfirmation() {
     try {
         bgmLog(LOG_LEVELS.INFO, '[syncWithConfirmation] 开始执行同步...');
         const result = await SyncToBangumiAsync(ws, colMap, token, lastRow, headerRow, {
-            skipSids,
+            ...(skipSids !== undefined && { skipSids }),
             incremental,
             onProgress: (current, total, message) => {
                 if (app?.StatusBar !== undefined)
@@ -421,3 +421,4 @@ export function openCollectionForRibbon() {
     window.open(collectionUrl, '_blank');
     bgmLog(LOG_LEVELS.INFO, `[openCollectionForRibbon] 完成，耗时: ${Date.now() - startTime}ms`);
 }
+//# sourceMappingURL=ribbonService.js.map

@@ -40,6 +40,8 @@ function createDialogs() {
     document.body.appendChild(container);
     function createDialogElement(type, iconClass, iconChar, defaultTitle) {
         const cfg = DIALOG_TYPES[type];
+        if (!cfg)
+            return document.createElement('div');
         const modal = document.createElement('div');
         modal.id = cfg.id;
         modal.className = 'bgm-modal';
@@ -106,6 +108,8 @@ function createDialogs() {
 function bindAllEvents() {
     for (const type in DIALOG_TYPES) {
         const cfg = DIALOG_TYPES[type];
+        if (!cfg)
+            continue;
         dom[cfg.id] = document.getElementById(cfg.id);
         dom[cfg.titleId] = document.getElementById(cfg.titleId);
         dom[cfg.msgId] = document.getElementById(cfg.msgId);
@@ -155,6 +159,8 @@ function bindAllEvents() {
 }
 function _showDialog(type, opts = {}) {
     const cfg = DIALOG_TYPES[type];
+    if (!cfg)
+        return;
     const dialog = dom[cfg.id];
     if (!dialog) {
         if (type === 'confirm') {
@@ -186,7 +192,12 @@ function _showDialog(type, opts = {}) {
         dom.bgmInputField.value = opts.defaultValue || '';
         dom.bgmInputField.focus();
     }
-    _dialogCallback = { onOk: opts.onOk, onCancel: opts.onCancel };
+    const callback = {};
+    if (opts.onOk)
+        callback.onOk = opts.onOk;
+    if (opts.onCancel)
+        callback.onCancel = opts.onCancel;
+    _dialogCallback = callback;
     dialog.style.display = 'flex';
 }
 // ========== 同步结果对话框 ==========
@@ -575,7 +586,7 @@ export function hideSyncProgressDialog() {
 }
 // ========== 公共 API ==========
 export function showAlert(message, title, onOk) {
-    _showDialog('alert', { message, title: title || '提示', onOk });
+    _showDialog('alert', { message, title: title || '提示', ...(onOk ? { onOk } : {}) });
 }
 /*
  * 显示确认对话框（新签名）
@@ -592,16 +603,22 @@ export function showConfirm(message, callback, title) {
     });
 }
 export function showError(message, title, onOk) {
-    _showDialog('error', { message, title: title || '错误', onOk });
+    _showDialog('error', { message, title: title || '错误', ...(onOk ? { onOk } : {}) });
 }
 export function showWarning(message, title, onOk) {
-    _showDialog('warning', { message, title: title || '警告', onOk });
+    _showDialog('warning', { message, title: title || '警告', ...(onOk ? { onOk } : {}) });
 }
 export function showSuccess(message, title, onOk) {
-    _showDialog('success', { message, title: title || '成功', onOk });
+    _showDialog('success', { message, title: title || '成功', ...(onOk ? { onOk } : {}) });
 }
 export function showInput(title, prompt, defaultValue, onOk, onCancel) {
-    _showDialog('input', { title, message: prompt, onOk, onCancel, defaultValue });
+    _showDialog('input', {
+        title,
+        message: prompt,
+        ...(onOk ? { onOk } : {}),
+        ...(onCancel ? { onCancel } : {}),
+        ...(defaultValue !== undefined ? { defaultValue } : {}),
+    });
 }
 // ========== Toast 通知 ==========
 export function showToast(message, type) {
@@ -621,3 +638,4 @@ export function showToast(message, type) {
         _toastTimer = null;
     }, 3000);
 }
+//# sourceMappingURL=dialog.js.map

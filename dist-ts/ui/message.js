@@ -59,12 +59,4 @@ export function setStatus(message, type) {
     statusEl.textContent = message;
     statusEl.className = 'status ' + (type || 'info');
 }
-export function setSyncRunning(isRunning) {
-    BGM.sync.isRunning = isRunning;
-    BGM.sync.lastSyncTime = isRunning ? null : new Date().toISOString();
-    const syncBtn = document.getElementById('syncBtn');
-    if (syncBtn) {
-        syncBtn.disabled = isRunning;
-        syncBtn.textContent = isRunning ? '\u540C\u6B65\u4E2D...' : '\u{1F680} \u540C\u6B65\u5230 Bangumi';
-    }
-}
+//# sourceMappingURL=message.js.map
