@@ -833,17 +833,19 @@ async function batchSyncRequests(
                         success.push(task);
                         bgmLog(LOG_LEVELS.INFO, `[batchSyncRequests] SID ${task.sid} 同步成功，HTTP ${apiResult.code}`);
 
-                        // 标记章节为已完成（"看过" type=2 和 "在看" type=3 都需要标记）
-                        if ((task.type === 2 || task.type === 3) && task.epCount && task.epCount > 0) {
+                        // 标记章节为已完成（仅"看过" type=2 需要标记章节；"在看" ）
+                        if (task.type === 2 && task.epCount && task.epCount > 0) {
                             try {
-                                bgmLog(LOG_LEVELS.INFO, `[batchSyncRequests] SID ${task.sid} 状态${task.type === 2 ? '"看过"' : '"在看"'}(type=${task.type})，集数: ${task.epCount}，开始标记章节...`);
+                                bgmLog(LOG_LEVELS.INFO, `[batchSyncRequests] SID ${task.sid} 状态"看过"(type=2)，集数: ${task.epCount}，开始标记章节...`);
                                 const epResult = await markEpisodesComplete(task.sid, task.epCount, token);
                                 bgmLog(LOG_LEVELS.INFO, `[batchSyncRequests] SID ${task.sid} 章节标记结果: ${epResult.message}`);
                             } catch (epErr: unknown) {
                                 bgmLog(LOG_LEVELS.WARN, `[batchSyncRequests] SID ${task.sid} 章节标记异常: ${epErr instanceof Error ? epErr.message : String(epErr)}`);
                             }
+                        } else if (task.type === 3 && task.epCount && task.epCount > 0) {
+                            bgmLog(LOG_LEVELS.INFO, `[batchSyncRequests] SID ${task.sid} 状态"在看"(type=3)，跳过章节标记`);
                         } else if (task.epCount && task.epCount > 0) {
-                            bgmLog(LOG_LEVELS.INFO, `[batchSyncRequests] SID ${task.sid} 状态非"看过/在看"(type=${task.type})，跳过章节标记`);
+                            bgmLog(LOG_LEVELS.INFO, `[batchSyncRequests] SID ${task.sid} 状态非"看过"(type=${task.type})，跳过章节标记`);
                         }
                     } else {
                         fail.push(task);
