@@ -18,8 +18,11 @@ const MODULES = [
     { src: 'dist-ts/ui/message.js', type: 'module' },
     { src: 'dist-ts/ui/preview.js', type: 'module' },
     { src: 'dist-ts/sync/syncRecord.js', type: 'module' },
-    { src: 'dist-ts/sync/scraping.js', type: 'module' },                 
+    { src: 'dist-ts/sync/scraping.js', type: 'module' },
     { src: 'dist-ts/sync/exceltobangumi.js', type: 'module' },
+    { src: 'dist-ts/sync/githubSyncDiff.js', type: 'module' },   // GitHub 同步纯函数（零依赖）
+    { src: 'dist-ts/sync/githubConfig.js', type: 'module' },     // GitHub 仓库配置管理
+    { src: 'dist-ts/sync/githubSync.js', type: 'module' },       // GitHub 仓库增量同步主模块
     { src:'dist-ts/services/ribbonService.js', type:'module'},
     { src: 'dist-ts/ribbon.js', type: 'module', critical: true },
     { src: 'dist-ts/ui/handlers.js', type: 'module', critical: true },

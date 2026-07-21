@@ -19,11 +19,14 @@ showToast, // Toast 通知
 showSyncResult, // 同步结果（可展开详情）
 showSyncProgressDialog, updateSyncProgressDialog, completeSyncProgressDialog, hideSyncProgressDialog, } from './ui/dialog.js';
 export { type DialogButton, type DialogConfig, type DialogCallback, type DialogOptions, } from './ui/dialog.js';
-export { setStatus, initMessageListener, setSyncRunning, } from './ui/message.js';
+export { setStatus, initMessageListener, } from './ui/message.js';
 export { showUserIdDialog, updateTokenStatus, updateUserIdStatus, showTokenDialog, testDebugConnection, syncCollectionFromBgm, openUserCollection } from './ui/handlers.js';
 export { getOrCreateSyncRecordSheet, getSyncRecordSheetIfExists, getAllSyncRecords, addSyncRecord, deduplicateSyncRecords, formatSyncRecordSheet, openSyncRecordSheet, type SyncRecord, type UpdateRecordParams, clearSyncRecords, } from './sync/syncRecord.js';
 export { extractSubjectId, getFilterStatus, getSequentialRowsBySeqCol, SyncToBangumiAsync, syncSelectedRows, mapWatchStatus, buildJsonPayload, bgmRequestSync, setBangumiToken, openBangumiTokenPage, testTokenValidityForRibbon, buildTagsArray, addTagsFromStr, } from './sync/exceltobangumi.js';
 export { verifyToken, fetchAllUserCollections, type BangumiUserData, type TokenVerifyResult, type ApiResponse, } from './sync/scraping.js';
+export { syncFromGithub, fetchGithubJson, readLocalEntriesForSync, applyDiffToSheet, type GithubSyncResult, } from './sync/githubSync.js';
+export { computeDiff, mapTypeToWatchStatus, tagsToString, SYNC_STRATEGY_LABELS, type GithubRemoteEntry, type GithubSyncDiff, type LocalRowEntry, type SyncStrategy, } from './sync/githubSyncDiff.js';
+export { getGithubConfig, setGithubConfig, isGithubConfigComplete, buildRawUrl, getSyncStrategy, setSyncStrategy, DEFAULT_GITHUB_CONFIG, type GithubSyncConfig, } from './sync/githubConfig.js';
 export { bgmLog, getApp, colNumToLetter, getCell, getCellValue, setCellValue, getSheetByIndex, escapeHtml, storeBgToken, clearBgToken, loadBgToken, copyTokenToClipboard, _getBgmUserId, _setBgmUserId, _getBgmUsername, _setBgmUsername, fetchBgmUserInfo, trim, BGM, _getUserApiPath, _fetchBgmUserInfo, showBangumiPanel, sleep, delay, readRangeValues, getColumnMap, cacheGet, clearSheetCache, getLastRow, isEmptyValue, getDataSheet, findHeaderRow, shellExecuteByOAAssist, getUrlPath, calcFingerprint } from './tools/util.js';
 export { CONFIG_KEYS, setConfig, getConfig, removeConfig, setIncrementalSync, getIncrementalSync, setSkipConflicts, getSkipConflicts, setSyncRecordEnabled, getSyncRecordEnabled, } from './tools/config.js';
 export { autoFillUrls, showAutoFillUrlDialog, type AutoFillResult, type NameUrlMap, } from './tools/autoFillUrl.js';

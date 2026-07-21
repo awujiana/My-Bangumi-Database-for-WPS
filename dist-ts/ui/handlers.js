@@ -3,7 +3,7 @@
  * @module ui/handlers
  * @description 面板操作处理、按钮绑定、业务对话框
  */
-import { LOG_LEVELS, bgmLog, BGM, loadBgToken, storeBgToken, clearBgToken, copyTokenToClipboard, _getBgmUserId, _setBgmUserId, _getBgmUsername, _setBgmUsername, getApp, getCell, trim, setCellValue, fetchBgmUserInfo, BGM_COLOR, showAlert, showConfirm, showError, showSuccess, showInput, showToast, setStatus, verifyToken, fetchAllUserCollections, findHeaderRow, getColumnMap, getLastRow, extractSubjectId, getDataSheet, SyncToBangumiAsync, syncSelectedRows, getOrCreateSyncRecordSheet, getAllSyncRecords, addSyncRecord, openSyncRecordSheet, deduplicateSyncRecords, formatSyncRecordSheet, previewSyncContent, refreshData, refreshSheets, toggleSheetLock, clearSyncRecords, closeDetailModal, getIncrementalSync, setIncrementalSync, getSkipConflicts, setSkipConflicts, setSyncRecordEnabled, COLLECTION_TYPE_NAMES, BGM_SUBJECT_TYPES, readRangeValues, openBangumiTokenPage, showSyncProgressDialog, updateSyncProgressDialog, completeSyncProgressDialog, hideSyncProgressDialog, } from '../index.js';
+import { LOG_LEVELS, bgmLog, BGM, loadBgToken, storeBgToken, clearBgToken, copyTokenToClipboard, _getBgmUserId, _setBgmUserId, _getBgmUsername, _setBgmUsername, getApp, getCell, trim, setCellValue, fetchBgmUserInfo, BGM_COLOR, showAlert, showConfirm, showError, showSuccess, showInput, showToast, setStatus, verifyToken, fetchAllUserCollections, findHeaderRow, getColumnMap, getLastRow, extractSubjectId, getDataSheet, SyncToBangumiAsync, syncSelectedRows, getOrCreateSyncRecordSheet, getAllSyncRecords, addSyncRecord, openSyncRecordSheet, deduplicateSyncRecords, formatSyncRecordSheet, previewSyncContent, refreshData, refreshSheets, toggleSheetLock, clearSyncRecords, closeDetailModal, getIncrementalSync, setIncrementalSync, getSkipConflicts, setSkipConflicts, setSyncRecordEnabled, COLLECTION_TYPE_NAMES, BGM_SUBJECT_TYPES, readRangeValues, openBangumiTokenPage, showSyncProgressDialog, updateSyncProgressDialog, completeSyncProgressDialog, hideSyncProgressDialog, getGithubConfig, setGithubConfig, isGithubConfigComplete, getSyncStrategy, setSyncStrategy, syncFromGithub, buildRawUrl, } from '../index.js';
 import { BGM_EVENTS, eventBus } from '../tools/events.js';
 //
 import { getSyncPreview, detectConflicts } from '../services/ribbonService.js';
@@ -820,6 +820,33 @@ function setupButtonListeners() {
         });
         bgmLog(LOG_LEVELS.INFO, '[handlers] 启用同步记录 checkbox 监听器已注册');
     }
+    // GitHub 配置：面板加载时自动填充已保存的值（含策略）
+    try {
+        const cfg = getGithubConfig();
+        const ownerInput = document.getElementById('githubOwner');
+        const repoInput = document.getElementById('githubRepo');
+        const branchInput = document.getElementById('githubBranch');
+        const pathInput = document.getElementById('githubPath');
+        const strategySelect = document.getElementById('githubStrategy');
+        if (ownerInput)
+            ownerInput.value = cfg.owner;
+        if (repoInput)
+            repoInput.value = cfg.repo;
+        if (branchInput)
+            branchInput.value = cfg.branch;
+        if (pathInput)
+            pathInput.value = cfg.path;
+        // 回填策略
+        const savedStrategy = getSyncStrategy();
+        if (strategySelect)
+            strategySelect.value = savedStrategy;
+        if (cfg.owner || cfg.repo || cfg.path) {
+            bgmLog(LOG_LEVELS.INFO, `[handlers] GitHub 配置已加载: ${cfg.owner}/${cfg.repo}/${cfg.branch}/${cfg.path}, 策略: ${savedStrategy}`);
+        }
+    }
+    catch (e) {
+        bgmLog(LOG_LEVELS.WARN, `[handlers] 加载 GitHub 配置失败: ${e.message}`);
+    }
 }
 const ACTION_HANDLERS = {
     // 核心操作
@@ -1014,6 +1041,100 @@ const ACTION_HANDLERS = {
         bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 用户请求恢复同步');
         BGM.sync.resume();
         bgmLog(LOG_LEVELS.INFO, `[handleActionClick] 恢复同步请求已发送，耗时: ${Date.now() - ctx.startTime}ms`);
+    },
+    // GitHub 仓库同步：保存配置（含策略）
+    saveGithubConfig: (ctx) => {
+        bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 保存 GitHub 配置');
+        const ownerInput = document.getElementById('githubOwner');
+        const repoInput = document.getElementById('githubRepo');
+        const branchInput = document.getElementById('githubBranch');
+        const pathInput = document.getElementById('githubPath');
+        const strategySelect = document.getElementById('githubStrategy');
+        if (!ownerInput || !repoInput || !pathInput) {
+            showToast('UI 元素缺失', 'error');
+            return;
+        }
+        const config = {
+            owner: ownerInput.value.trim(),
+            repo: repoInput.value.trim(),
+            branch: branchInput?.value.trim() || 'main',
+            path: pathInput.value.trim(),
+        };
+        if (!config.owner || !config.repo || !config.path) {
+            showToast('owner / repo / path 不能为空', 'warn');
+            return;
+        }
+        const strategy = strategySelect?.value || 'add-update';
+        const okConfig = setGithubConfig(config);
+        const okStrategy = setSyncStrategy(strategy);
+        if (okConfig && okStrategy) {
+            showToast(`GitHub 配置已保存（策略：${strategy}）`, 'success');
+            bgmLog(LOG_LEVELS.INFO, `[handleActionClick] GitHub 配置已保存: ${config.owner}/${config.repo}/${config.branch}/${config.path}, 策略: ${strategy}`);
+        }
+        else {
+            showToast('保存失败：PluginStorage 不可用', 'error');
+        }
+        bgmLog(LOG_LEVELS.INFO, `[handleActionClick] 保存 GitHub 配置完成，耗时: ${Date.now() - ctx.startTime}ms`);
+    },
+    // GitHub 仓库同步：立即同步（异步，按当前策略）
+    syncFromGithub: (ctx) => {
+        bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 开始从 GitHub 同步');
+        if (!isGithubConfigComplete()) {
+            showToast('请先填写并保存 GitHub 配置', 'warn');
+            return;
+        }
+        // 读取策略：优先用下拉框当前值（未保存也能即时生效），兜底用已保存的策略
+        const strategySelect = document.getElementById('githubStrategy');
+        const strategy = strategySelect?.value || getSyncStrategy();
+        const strategyLabel = {
+            'add-update': '新增+更新（不删除）',
+            'add-only': '仅新增',
+            'update-only': '仅更新',
+            'mirror': '镜像同步（含删除）',
+            'force-overwrite': '强制覆盖',
+        }[strategy];
+        showConfirm(`将从 GitHub 仓库下载 JSON 并按策略【${strategyLabel}】合并到当前工作表。\n是否继续？`, (confirmed) => {
+            if (!confirmed) {
+                bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 用户取消 GitHub 同步');
+                return;
+            }
+            syncFromGithub((current, total, message) => {
+                if (total > 0) {
+                    setStatus(`GitHub 同步 ${current}/${total}: ${message}`);
+                }
+            }, strategy)
+                .then((result) => {
+                const summary = `GitHub 同步完成：远程 ${result.remoteTotal}，新增 ${result.added}，更新 ${result.updated}，删除 ${result.deleted}，失败 ${result.failed}`;
+                bgmLog(LOG_LEVELS.INFO, `[handleActionClick] ${summary}`);
+                showToast(summary, result.failed > 0 ? 'warn' : 'success');
+            })
+                .catch((e) => {
+                const errMsg = e instanceof Error ? e.message : String(e);
+                bgmLog(LOG_LEVELS.ERROR, `[handleActionClick] GitHub 同步失败: ${errMsg}`);
+                showToast(`GitHub 同步失败：${errMsg}`, 'error');
+            });
+        });
+        bgmLog(LOG_LEVELS.INFO, `[handleActionClick] GitHub 同步已触发（策略: ${strategy}），耗时: ${Date.now() - ctx.startTime}ms`);
+    },
+    // GitHub 仓库同步：测试配置（构造 URL 并提示）
+    testGithubConfig: (ctx) => {
+        bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 测试 GitHub 配置');
+        if (!isGithubConfigComplete()) {
+            showToast('请先填写并保存 GitHub 配置', 'warn');
+            return;
+        }
+        let url;
+        try {
+            url = buildRawUrl();
+        }
+        catch (e) {
+            const errMsg = e instanceof Error ? e.message : String(e);
+            showToast(`配置错误：${errMsg}`, 'error');
+            return;
+        }
+        showToast(`Raw URL：\n${url}`, 'info');
+        bgmLog(LOG_LEVELS.INFO, `[handleActionClick] GitHub Raw URL: ${url}`);
+        bgmLog(LOG_LEVELS.INFO, `[handleActionClick] 测试 GitHub 配置完成，耗时: ${Date.now() - ctx.startTime}ms`);
     },
 };
 function handleActionClick(event) {
@@ -1502,4 +1623,3 @@ if (typeof document !== 'undefined') {
         initializeListeners();
     }
 }
-//# sourceMappingURL=handlers.js.map

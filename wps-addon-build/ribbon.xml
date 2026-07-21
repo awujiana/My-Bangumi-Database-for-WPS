@@ -13,6 +13,7 @@
                     <button id="btnCopyToken" label="复制Token" onAction="OnAction" getImage="GetBangumiImage" size="large"/>
                     <button id="btnSetUserId" label="设置用户ID" onAction="OnAction" getImage="GetBangumiImage" size="large"/>
                     <button id="btnOpenCollection" label="打开收藏页" onAction="OnAction" getImage="GetBangumiImage" size="large"/>
+                    <button id="btnSyncFromGithub" label="GitHub 同步" onAction="OnAction" getImage="GetBangumiImage" size="large"/>
                   
 				</group>
             </tab>

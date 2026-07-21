@@ -5,6 +5,9 @@
  *              decryptToken 仍保留用于读取历史加密数据并自动升级为明文。
  *              新代码不应调用 encryptToken。
  *              本模块同时提供 Token 完整性校验。
+ *              【用户决策】Token 保持明文存储（util.ts storeBgToken/loadBgToken）。
+ *              本模块的 encryptToken 已废弃，仅保留 decryptToken 用于读取历史加密数据并自动升级为明文。
+ *              新代码不应调用 encryptToken。
  *
  * @author BGM Development Team
  * @version 1.0.0

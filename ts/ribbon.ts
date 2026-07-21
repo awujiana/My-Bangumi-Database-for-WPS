@@ -220,6 +220,14 @@ export function OnAction(control: { Id: string }): boolean {
             case 'btnOpenCollection':
                 RibbonService.openCollectionForRibbon();
                 break;
+            case 'btnSyncFromGithub': {
+                // syncFromGithubForRibbon 是 async 函数，需 .catch() 防止未处理 rejection
+                RibbonService.syncFromGithubForRibbon().catch((e: unknown) => {
+                    bgmLog(LOG_LEVELS.ERROR, `[OnAction] syncFromGithubForRibbon 异常: ${(e as Error)?.message || String(e)}`);
+                    BGM.handleError(e, { showAlert: true, level: BGM.ErrorLevel.ERROR, context: 'Ribbon btnSyncFromGithub' });
+                });
+                break;
+            }
             default:
                 bgmLog(LOG_LEVELS.WARN, `[BGM] 未知按钮: ${control.Id}`);
         }
@@ -242,6 +250,7 @@ export function GetBangumiImage(control: { Id: string }): string {
             btnSetUserId: 'images/user.svg',
             btnOpenCollection: 'images/link.svg',
             btnClearColors: 'images/cleartags.svg',
+            btnSyncFromGithub: 'images/github.svg',
         };
         return icons[control.Id] || 'images/newFromTemp.svg';
     }

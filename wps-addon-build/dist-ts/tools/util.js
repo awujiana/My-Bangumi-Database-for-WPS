@@ -1260,4 +1260,3 @@ export function safeActivate(ws) {
         bgmLog(LOG_LEVELS.WARN, 'safeActivate: 无法激活工作表');
     }
 }
-//# sourceMappingURL=util.js.map

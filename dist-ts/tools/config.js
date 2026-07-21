@@ -140,4 +140,3 @@ export function getSyncRecordEnabled(silent = false) {
         bgmLog(LOG_LEVELS.INFO, `[config] 获取同步记录状态: ${result ? '开启' : '关闭'}`);
     return result;
 }
-//# sourceMappingURL=config.js.map

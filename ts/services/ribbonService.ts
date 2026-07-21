@@ -6,7 +6,9 @@ import {
     readRangeValues, getFilterStatus, BGM_COLOR, LOG_LEVELS,
     SyncToBangumiAsync, openUserCollection,_getBgmUserId,
     testTokenValidityForRibbon, fetchAllUserCollections,
-    type WpsRange, type WpsWorksheet, getCell, trim, getAllSyncRecords, calcFingerprint
+    type WpsRange, type WpsWorksheet, getCell, trim, getAllSyncRecords, calcFingerprint,
+    syncFromGithub, isGithubConfigComplete, getSyncStrategy, SYNC_STRATEGY_LABELS,
+    type GithubSyncResult, type SyncStrategy,
 } from '../index.js';
 
 
@@ -468,4 +470,70 @@ export function openCollectionForRibbon(): void {
     bgmLog(LOG_LEVELS.INFO, `[openCollectionForRibbon] 打开收藏页面: ${collectionUrl}`);
     window.open(collectionUrl, '_blank');
     bgmLog(LOG_LEVELS.INFO, `[openCollectionForRibbon] 完成，耗时: ${Date.now() - startTime}ms`);
+}
+
+/**
+ * 从 GitHub 仓库增量同步数据到本地 Excel（Ribbon 入口）
+ *
+ * 流程：
+ * 1. 校验 GitHub 配置是否完整（owner/repo/path）
+ * 2. 读取已保存的同步策略
+ * 3. 用户确认对话框（提示当前策略）
+ * 4. 调用 syncFromGithub 执行下载、diff、应用
+ * 5. 显示结果统计
+ *
+ * @returns 同步结果统计，失败时返回 null
+ */
+export async function syncFromGithubForRibbon(): Promise<GithubSyncResult | null> {
+    const startTime = Date.now();
+    bgmLog(LOG_LEVELS.INFO, '[syncFromGithubForRibbon] ========== Ribbon GitHub 同步 ==========');
+
+    // 1. 配置校验
+    if (!isGithubConfigComplete()) {
+        bgmLog(LOG_LEVELS.ERROR, '[syncFromGithubForRibbon] GitHub 仓库配置不完整');
+        await wpsMsgBox('GitHub 仓库配置不完整，请先在面板中设置 owner/repo/path', 0, 48);
+        return null;
+    }
+
+    // 2. 读取策略
+    const strategy: SyncStrategy = getSyncStrategy();
+    const strategyLabel = SYNC_STRATEGY_LABELS[strategy];
+    bgmLog(LOG_LEVELS.INFO, `[syncFromGithubForRibbon] 同步策略: ${strategy} (${strategyLabel})`);
+
+    // 3. 用户确认
+    const confirmed = await wpsMsgBox(
+        `将从 GitHub 仓库下载 JSON 并按策略【${strategyLabel}】合并到当前工作表。\n是否继续？`,
+        4, // MB_YESNO
+        32 // MB_ICONQUESTION
+    );
+    if (confirmed !== 6) {
+        bgmLog(LOG_LEVELS.INFO, '[syncFromGithubForRibbon] 用户取消同步');
+        return null;
+    }
+
+    // 4. 执行同步
+    try {
+        const result = await syncFromGithub((current, total, message) => {
+            if (total > 0) {
+                bgmLog(LOG_LEVELS.INFO, `[syncFromGithubForRibbon] 进度 ${current}/${total}: ${message}`);
+            }
+        }, strategy);
+        bgmLog(LOG_LEVELS.INFO, `[syncFromGithubForRibbon] 完成：远程 ${result.remoteTotal}，新增 ${result.added}，更新 ${result.updated}，删除 ${result.deleted}，失败 ${result.failed}，耗时 ${Date.now() - startTime}ms`);
+
+        // 5. 结果提示
+        const summary = `GitHub 同步完成（策略：${strategyLabel}）\n\n` +
+            `远程条目: ${result.remoteTotal}\n` +
+            `新增: ${result.added}\n` +
+            `更新: ${result.updated}\n` +
+            `删除: ${result.deleted}\n` +
+            `无变更: ${result.unchanged}\n` +
+            `失败: ${result.failed}`;
+        await wpsMsgBox(summary, 0, result.failed > 0 ? 48 : 64);
+        return result;
+    } catch (e: unknown) {
+        const errMsg = e instanceof Error ? e.message : String(e);
+        bgmLog(LOG_LEVELS.ERROR, `[syncFromGithubForRibbon] 同步失败: ${errMsg}`);
+        await wpsMsgBox(`GitHub 同步失败：${errMsg}`, 0, 16);
+        return null;
+    }
 }

@@ -75,7 +75,20 @@ export declare function setCellValue(ws: WpsWorksheet | null | undefined, row: n
  */
 export declare function getSheetByIndex(sheetIndex: number): unknown;
 /**
- * 存储 Token（明文存储，便于用户复制使用）
+ * 存储 Token（明文存储）
+ *
+ * @description
+ * 当前为明文存储，原因：
+ * 1. 用户需要可直接复制使用 Token
+ * 2. WPS PluginStorage 本身是宿主隔离的，非浏览器全局 localStorage
+ * 3. 历史版本曾使用 XOR 加密，但已废弃（仅 loadBgToken 兼容旧数据）
+ *
+ * 不应引入 AES-GCM 等加密，因为：
+ * - 加密 key 仍需存储在同一环境，无法真正提升安全性
+ * - 用户明确指示保持明文以便复制使用
+ *
+ * @param token - Bangumi API Token
+ * @returns 是否存储成功
  */
 export declare function storeBgToken(token: string): boolean;
 /**
@@ -84,6 +97,12 @@ export declare function storeBgToken(token: string): boolean;
 export declare function clearBgToken(): boolean;
 /**
  * 加载 Token（明文读取，自动兼容历史 XOR 加密数据）
+ *
+ * @description
+ * - 新数据：直接返回明文 Token
+ * - 历史数据：检测 `v1.` 前缀时调用 decryptToken 解密，并自动升级为明文存储
+ *
+ * @returns Token 字符串或 null（未存储或解密失败）
  */
 export declare function loadBgToken(): string | null;
 /**

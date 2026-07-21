@@ -5,5 +5,4 @@
  */
 export declare function initMessageListener(): void;
 export declare function setStatus(message: string, type?: string): void;
-export declare function setSyncRunning(isRunning: boolean): void;
 //# sourceMappingURL=message.d.ts.map

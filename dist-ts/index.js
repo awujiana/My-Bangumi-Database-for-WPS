@@ -105,7 +105,37 @@ verifyToken,
 // 异步获取所有收藏
 fetchAllUserCollections, } from './sync/scraping.js';
 // ============================================================================
-// 11. 通用工具函数与全局状态（来自 tools/util.js）
+// 11. GitHub 仓库增量同步（来自 sync/githubSync.js + sync/githubConfig.js）
+// ============================================================================
+export { 
+// 主入口：从 GitHub 同步到本地 Excel
+syncFromGithub, 
+// 下载远程 JSON
+fetchGithubJson, 
+// 读取本地条目（封装入口）
+readLocalEntriesForSync, 
+// 应用差异到工作表
+applyDiffToSheet, } from './sync/githubSync.js';
+export { 
+// 纯函数：差异计算（零依赖，可在 Node 测试环境运行）
+computeDiff, mapTypeToWatchStatus, tagsToString, SYNC_STRATEGY_LABELS, } from './sync/githubSyncDiff.js';
+export { 
+// 读取 GitHub 仓库配置
+getGithubConfig, 
+// 保存 GitHub 仓库配置
+setGithubConfig, 
+// 校验配置是否完整
+isGithubConfigComplete, 
+// 构造 Raw 文件下载 URL
+buildRawUrl, 
+// 读取同步策略
+getSyncStrategy, 
+// 保存同步策略
+setSyncStrategy, 
+// 预设默认仓库配置
+DEFAULT_GITHUB_CONFIG, } from './sync/githubConfig.js';
+// ============================================================================
+// 12. 通用工具函数与全局状态（来自 tools/util.js）
 // ============================================================================
 export { 
 // 日志函数
@@ -179,7 +209,7 @@ getUrlPath,
 // 计算数据指纹（用于缓存）
 calcFingerprint } from './tools/util.js';
 // ============================================================================
-// 12. 配置管理模块（来自 tools/config.js）
+// 13. 配置管理模块（来自 tools/config.js）
 // ============================================================================
 export { 
 // 配置键名常量
@@ -193,7 +223,7 @@ setSkipConflicts, getSkipConflicts,
 // 同步记录开关
 setSyncRecordEnabled, getSyncRecordEnabled, } from './tools/config.js';
 // ============================================================================
-// 13. URL 自动补全（来自 tools/autoFillUrl.js）
+// 14. URL 自动补全（来自 tools/autoFillUrl.js）
 // ============================================================================
 export { 
 // 执行 URL 自动补全
@@ -201,7 +231,7 @@ autoFillUrls,
 // 显示确认对话框后执行
 showAutoFillUrlDialog, } from './tools/autoFillUrl.js';
 // ============================================================================
-// 14. 页面逻辑（来自 taskpane.js）
+// 15. 页面逻辑（来自 taskpane.js）
 // ============================================================================
 export { refreshSheets, toggleSheetLock, 
 // 刷新数据预览
@@ -211,7 +241,7 @@ export {
 // 显示预览内容
 previewSyncContent, closeDetailModal, syncAllRows, } from './ui/preview.js';
 // ============================================================================
-// 16. WPS 操作接口（类型守卫与类型定义）
+// 17. WPS 操作接口（类型守卫与类型定义）
 // ============================================================================
 export { 
 // 判断对象是否为 WPS Application
@@ -221,7 +251,6 @@ isWpsWorksheet,
 // 判断对象是否为 WPS Range
 isWpsRange, wpsMsgBox, } from './tools/wps.js';
 // ============================================================================
-// 17. 服务层（来自 services/ribbonService.js）
+// 18. 服务层（来自 services/ribbonService.js）
 // ============================================================================
 export { detectConflicts, getSyncPreview } from './services/ribbonService.js';
-//# sourceMappingURL=index.js.map

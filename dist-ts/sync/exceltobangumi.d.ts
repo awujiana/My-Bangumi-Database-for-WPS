@@ -55,7 +55,7 @@ export declare function getSequentialRowsBySeqCol(startRow: number, endRow: numb
  * 构建API请求的JSON Payload
  *
  * @function buildJsonPayload
- * @param {any} ws - 工作表对象
+ * @param {WpsWorksheet} ws - 工作表对象
  * @param {number} rowNum - 数据行号
  * @param {Map<string, number>} colMap - 列映射
  * @param {string} finishedDate - 完播日期
@@ -94,7 +94,7 @@ export declare function setBangumiToken(token: string): boolean;
  *
  * @async
  * @function SyncToBangumiAsync
- * @param {any} ws - 工作表对象
+ * @param {WpsWorksheet} ws - 工作表对象
  * @param {Map<string, number>} colMap - 列映射
  * @param {string} token - API Token
  * @param {number} lastRow - 最后一行行号

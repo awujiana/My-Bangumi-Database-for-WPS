@@ -1,4 +1,4 @@
-import { type WpsWorksheet } from '../index.js';
+import { type WpsWorksheet, type GithubSyncResult } from '../index.js';
 /**
  * 获取同步预览统计（不发送请求，仅扫描 Excel）
  * @param ws 工作表对象
@@ -51,4 +51,17 @@ export declare function copyTokenForRibbon(): void;
 export declare function setUserIdForRibbon(): void;
 /** 打开收藏页面（Ribbon 版本） */
 export declare function openCollectionForRibbon(): void;
+/**
+ * 从 GitHub 仓库增量同步数据到本地 Excel（Ribbon 入口）
+ *
+ * 流程：
+ * 1. 校验 GitHub 配置是否完整（owner/repo/path）
+ * 2. 读取已保存的同步策略
+ * 3. 用户确认对话框（提示当前策略）
+ * 4. 调用 syncFromGithub 执行下载、diff、应用
+ * 5. 显示结果统计
+ *
+ * @returns 同步结果统计，失败时返回 null
+ */
+export declare function syncFromGithubForRibbon(): Promise<GithubSyncResult | null>;
 //# sourceMappingURL=ribbonService.d.ts.map

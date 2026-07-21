@@ -229,6 +229,65 @@ body {
     margin-bottom: 14px;
 }
 
+/* GitHub 配置表单：label 与 input 同行 */
+.form-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 10px;
+}
+
+.form-row label {
+    flex: 0 0 90px;
+    color: #b0b0b0;
+    font-weight: 500;
+    font-size: 13px;
+}
+
+.form-row input {
+    flex: 1;
+    padding: 6px 10px;
+    background: #2a2a2a;
+    border: 1px solid #444;
+    border-radius: 4px;
+    color: #e0e0e0;
+    font-size: 13px;
+    font-family: 'Maple Mono', monospace;
+    transition: border-color 0.2s;
+}
+
+.form-row input:focus {
+    outline: none;
+    border-color: #5789d9;
+}
+
+.form-row input::placeholder {
+    color: #666;
+}
+
+.form-row select {
+    flex: 1;
+    padding: 6px 10px;
+    background: #2a2a2a;
+    border: 1px solid #444;
+    border-radius: 4px;
+    color: #e0e0e0;
+    font-size: 13px;
+    font-family: 'Maple Mono', monospace;
+    cursor: pointer;
+    transition: border-color 0.2s;
+}
+
+.form-row select:focus {
+    outline: none;
+    border-color: #5789d9;
+}
+
+.form-row select option {
+    background: #2a2a2a;
+    color: #e0e0e0;
+}
+
 .form-group label {
     display: block;
     margin-bottom: 6px;
