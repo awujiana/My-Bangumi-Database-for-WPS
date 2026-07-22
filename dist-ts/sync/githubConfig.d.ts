@@ -5,6 +5,15 @@
  *              使用 PluginStorage 持久化存储。仅支持公开仓库（不认证）。
  */
 import type { SyncStrategy } from './githubSyncDiff.js';
+/**
+ * 同步源类型枚举
+ * - github: GitHub 公开仓库（默认）
+ * - gitlab: GitLab 仓库（Task 22 实现）
+ * - gitee: Gitee 仓库（Task 23 实现）
+ * - local: 本地文件（Task 24 实现）
+ * - gist: GitHub Gist（Task 25 实现）
+ */
+export type SyncSourceType = 'github' | 'gitlab' | 'gitee' | 'local' | 'gist';
 /** GitHub 仓库配置 */
 export interface GithubSyncConfig {
     /** 仓库所有者（用户名或组织名） */
@@ -15,6 +24,19 @@ export interface GithubSyncConfig {
     branch: string;
     /** 文件路径（如 data/bangumi-data.json） */
     path: string;
+    /**
+     * 同步源类型（可选，默认 'github'）
+     * 用于 syncFromGithub 主流程按 sourceType 从 registry 获取对应 SyncSource 实例
+     */
+    sourceType?: SyncSourceType;
+    /**
+     * GitHub Gist ID（仅当 sourceType === 'gist' 时使用）
+     *
+     * 用于 Gist 同步源：通过 https://api.github.com/gists/{gistId} 获取 Gist 内容，
+     * 解析其 files[*].content 字段并拼接为 JSONL 文本。
+     * 与 owner/repo/branch/path 互斥：sourceType === 'gist' 时仅使用 gistId。
+     */
+    gistId?: string;
 }
 /**
  * 预设默认仓库配置
@@ -60,4 +82,41 @@ export declare function getSyncStrategy(): SyncStrategy;
  * @returns 成功返回 true
  */
 export declare function setSyncStrategy(strategy: SyncStrategy): boolean;
+/**
+ * 读取同步源类型
+ * @returns 同步源类型，未配置或非法时返回默认 'github'
+ */
+export declare function getSyncSourceType(): SyncSourceType;
+/**
+ * 保存同步源类型
+ * @param sourceType 同步源类型
+ * @returns 成功返回 true
+ */
+export declare function setSyncSourceType(sourceType: SyncSourceType): boolean;
+/**
+ * 读取 GitHub Gist ID
+ *
+ * 用于 Gist 同步源（sourceType === 'gist'）：构造 Gist API URL
+ * https://api.github.com/gists/{gistId}，从响应的 files[*].content 字段
+ * 提取 JSONL 文本。
+ *
+ * @returns Gist ID 字符串，未配置时返回空字符串
+ */
+export declare function getGistId(): string;
+/**
+ * 保存 GitHub Gist ID
+ *
+ * @param id Gist ID 字符串（不可为 undefined；空串表示清除配置）
+ * @returns 成功返回 true，PluginStorage 不可用时返回 false
+ */
+export declare function setGistId(id: string): boolean;
+/**
+ * 校验 Gist 配置是否可用
+ *
+ * Gist 同步源仅需 gistId 字段非空，不需要 owner/repo/branch/path。
+ * 与 isGithubConfigComplete() 互斥：sourceType === 'gist' 时调用本函数。
+ *
+ * @returns gistId 非空返回 true，否则返回 false
+ */
+export declare function isGistConfigured(): boolean;
 //# sourceMappingURL=githubConfig.d.ts.map

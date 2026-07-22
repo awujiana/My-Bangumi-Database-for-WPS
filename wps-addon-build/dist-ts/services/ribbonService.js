@@ -1,5 +1,55 @@
 // ts/services/ribbonService.ts
 import { getApp, bgmLog, BGM, wpsMsgBox, loadBgToken, storeBgToken, copyTokenToClipboard, getDataSheet, findHeaderRow, getLastRow, getColumnMap, extractSubjectId, mapWatchStatus, getCellValue, readRangeValues, getFilterStatus, BGM_COLOR, LOG_LEVELS, SyncToBangumiAsync, _getBgmUserId, testTokenValidityForRibbon, fetchAllUserCollections, getCell, trim, calcFingerprint, syncFromGithub, isGithubConfigComplete, getSyncStrategy, SYNC_STRATEGY_LABELS, } from '../index.js';
+import { undoLastSync, getLastSessionDescription } from '../sync/undoStack.js';
+/** 远程字段比对表（顺序固定，便于稳定测试） */
+const GITHUB_CONFLICT_FIELDS = Object.freeze([
+    { localField: '名称', remoteToString: r => r.name ?? '' },
+    { localField: '是否看完', remoteToString: r => (r.type !== undefined ? String(r.type) : '') },
+    { localField: '打分', remoteToString: r => (r.score !== undefined ? String(r.score) : '') },
+    { localField: '标签/分级', remoteToString: r => (Array.isArray(r.tags) ? r.tags.join('|') : '') },
+    { localField: '剧透/感言', remoteToString: r => r.comment ?? '' },
+    { localField: '集数', remoteToString: r => (r.episode !== undefined ? String(r.episode) : '') },
+]);
+/**
+ * 检测 GitHub 远程条目与本地 Excel 行之间的字段级冲突
+ *
+ * 比对规则：
+ * - 仅当 SID 同时存在于远程与本地时才可能产生冲突
+ * - 仅当远程字段非空（字符串化后非空字符串）且与本地不同时记录为冲突
+ * - 远程 type 字段以数值形式与本地「是否看完」文本做字符串比对（调用方负责映射）
+ *
+ * 注意：本函数为纯函数，不读取 Excel，不发起网络请求，可在 Node 测试环境直接运行。
+ *
+ * @param remote 远程条目数组
+ * @param local 本地条目映射（SID → 行）
+ * @returns 冲突列表（按远程数组顺序与字段比对表顺序）
+ */
+export function detectGithubConflicts(remote, local) {
+    const conflicts = [];
+    for (const entry of remote) {
+        if (!entry.sid)
+            continue;
+        const localEntry = local.get(entry.sid);
+        if (!localEntry)
+            continue;
+        for (const spec of GITHUB_CONFLICT_FIELDS) {
+            const remoteValue = spec.remoteToString(entry);
+            if (!remoteValue)
+                continue; // 远程无值，不视为冲突
+            const localValue = localEntry.fields[spec.localField] ?? '';
+            if (remoteValue !== localValue) {
+                conflicts.push({
+                    sid: entry.sid,
+                    field: spec.localField,
+                    localValue,
+                    remoteValue,
+                    localRow: localEntry.row,
+                });
+            }
+        }
+    }
+    return conflicts;
+}
 /**
  * 获取同步预览统计（不发送请求，仅扫描 Excel）
  * @param ws 工作表对象
@@ -478,5 +528,40 @@ export async function syncFromGithubForRibbon() {
         bgmLog(LOG_LEVELS.ERROR, `[syncFromGithubForRibbon] 同步失败: ${errMsg}`);
         await wpsMsgBox(`GitHub 同步失败：${errMsg}`, 0, 16);
         return null;
+    }
+}
+/**
+ * 撤销最近一次 GitHub 同步操作（Ribbon 入口）
+ *
+ * 流程：
+ * 1. 读取最近一次同步会话描述；若栈为空，提示无可撤销操作
+ * 2. 弹确认对话框，提示用户即将撤销的会话描述
+ * 3. 调用 undoLastSync 按单元格逆序恢复
+ * 4. 显示恢复条目数
+ */
+export async function undoLastSyncForRibbon() {
+    bgmLog(LOG_LEVELS.INFO, '[undoLastSyncForRibbon] ========== Ribbon 撤销最近同步 ==========');
+    const description = getLastSessionDescription();
+    if (!description) {
+        bgmLog(LOG_LEVELS.INFO, '[undoLastSyncForRibbon] 没有可撤销的同步操作');
+        await wpsMsgBox('没有可撤销的同步操作', 0, 48);
+        return;
+    }
+    const confirmed = await wpsMsgBox(`确认撤销最近一次同步操作？\n\n${description}\n\n将按单元格逆序恢复旧值。`, 4, // MB_YESNO
+    32 // MB_ICONQUESTION
+    );
+    if (confirmed !== 6) {
+        bgmLog(LOG_LEVELS.INFO, '[undoLastSyncForRibbon] 用户取消撤销');
+        return;
+    }
+    try {
+        const restored = undoLastSync();
+        bgmLog(LOG_LEVELS.INFO, `[undoLastSyncForRibbon] 已恢复 ${restored} 项变更`);
+        await wpsMsgBox(`已撤销 ${restored} 项变更`, 0, 64);
+    }
+    catch (e) {
+        const errMsg = e instanceof Error ? e.message : String(e);
+        bgmLog(LOG_LEVELS.ERROR, `[undoLastSyncForRibbon] 撤销失败: ${errMsg}`);
+        await wpsMsgBox(`撤销失败：${errMsg}`, 0, 16);
     }
 }

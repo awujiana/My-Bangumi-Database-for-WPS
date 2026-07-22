@@ -3,14 +3,51 @@
  * @module ui/dialog
  * @description 自定义对话框、确认对话框、Toast 通知
  */
+import { sanitizeHtml } from '../tools/sanitize.js';
 // ========== 常量与配置 ==========
 const DIALOG_TYPES = {
-    alert: { id: 'bgmAlertDialog', titleId: 'bgmAlertTitle', msgId: 'bgmAlertMessage', buttons: [{ id: 'bgmAlertOk', cls: 'bgm-btn-primary', text: '确定', event: 'ok' }] },
-    confirm: { id: 'bgmConfirmDialog', titleId: 'bgmConfirmTitle', msgId: 'bgmConfirmMessage', buttons: [{ id: 'bgmConfirmOk', cls: 'bgm-btn-primary', text: '确定', event: 'ok' }, { id: 'bgmConfirmCancel', cls: 'bgm-btn-default', text: '取消', event: 'cancel' }] },
-    error: { id: 'bgmErrorDialog', titleId: 'bgmErrorTitle', msgId: 'bgmErrorMessage', buttons: [{ id: 'bgmErrorOk', cls: 'bgm-btn-danger', text: '确定', event: 'ok' }] },
-    warning: { id: 'bgmWarningDialog', titleId: 'bgmWarningTitle', msgId: 'bgmWarningMessage', buttons: [{ id: 'bgmWarningOk', cls: 'bgm-btn-warning', text: '确定', event: 'ok' }] },
-    success: { id: 'bgmSuccessDialog', titleId: 'bgmSuccessTitle', msgId: 'bgmSuccessMessage', buttons: [{ id: 'bgmSuccessOk', cls: 'bgm-btn-success', text: '确定', event: 'ok' }] },
-    input: { id: 'bgmInputDialog', titleId: 'bgmInputTitle', msgId: 'bgmInputPrompt', buttons: [{ id: 'bgmInputOk', cls: 'bgm-btn-primary', text: '确定', event: 'ok' }, { id: 'bgmInputCancel', cls: 'bgm-btn-default', text: '取消', event: 'cancel' }] }
+    alert: {
+        id: 'bgmAlertDialog',
+        titleId: 'bgmAlertTitle',
+        msgId: 'bgmAlertMessage',
+        buttons: [{ id: 'bgmAlertOk', cls: 'bgm-btn-primary', text: '确定', event: 'ok' }],
+    },
+    confirm: {
+        id: 'bgmConfirmDialog',
+        titleId: 'bgmConfirmTitle',
+        msgId: 'bgmConfirmMessage',
+        buttons: [
+            { id: 'bgmConfirmOk', cls: 'bgm-btn-primary', text: '确定', event: 'ok' },
+            { id: 'bgmConfirmCancel', cls: 'bgm-btn-default', text: '取消', event: 'cancel' },
+        ],
+    },
+    error: {
+        id: 'bgmErrorDialog',
+        titleId: 'bgmErrorTitle',
+        msgId: 'bgmErrorMessage',
+        buttons: [{ id: 'bgmErrorOk', cls: 'bgm-btn-danger', text: '确定', event: 'ok' }],
+    },
+    warning: {
+        id: 'bgmWarningDialog',
+        titleId: 'bgmWarningTitle',
+        msgId: 'bgmWarningMessage',
+        buttons: [{ id: 'bgmWarningOk', cls: 'bgm-btn-warning', text: '确定', event: 'ok' }],
+    },
+    success: {
+        id: 'bgmSuccessDialog',
+        titleId: 'bgmSuccessTitle',
+        msgId: 'bgmSuccessMessage',
+        buttons: [{ id: 'bgmSuccessOk', cls: 'bgm-btn-success', text: '确定', event: 'ok' }],
+    },
+    input: {
+        id: 'bgmInputDialog',
+        titleId: 'bgmInputTitle',
+        msgId: 'bgmInputPrompt',
+        buttons: [
+            { id: 'bgmInputOk', cls: 'bgm-btn-primary', text: '确定', event: 'ok' },
+            { id: 'bgmInputCancel', cls: 'bgm-btn-default', text: '取消', event: 'cancel' },
+        ],
+    },
 };
 // ========== 模块内部状态 ==========
 let dialogInitialized = false;
@@ -56,7 +93,7 @@ function createDialogs() {
         header.className = 'bgm-dialog-header';
         const icon = document.createElement('span');
         icon.className = 'bgm-dialog-icon ' + iconClass;
-        icon.innerHTML = iconChar;
+        icon.innerHTML = sanitizeHtml(iconChar);
         const title = document.createElement('span');
         title.id = cfg.titleId;
         title.className = 'bgm-dialog-title';
@@ -113,7 +150,9 @@ function bindAllEvents() {
         dom[cfg.id] = document.getElementById(cfg.id);
         dom[cfg.titleId] = document.getElementById(cfg.titleId);
         dom[cfg.msgId] = document.getElementById(cfg.msgId);
-        cfg.buttons.forEach(btn => { dom[btn.id] = document.getElementById(btn.id); });
+        cfg.buttons.forEach((btn) => {
+            dom[btn.id] = document.getElementById(btn.id);
+        });
     }
     dom.bgmToast = document.getElementById('bgmToast');
     dom.bgmInputField = document.getElementById('bgmInputField');
@@ -135,7 +174,9 @@ function bindAllEvents() {
             try {
                 if (eventType === 'ok' && _dialogCallback.onOk) {
                     if (modal.id === 'bgmInputDialog') {
-                        const inputValue = dom.bgmInputField ? dom.bgmInputField.value.trim() : '';
+                        const inputValue = dom.bgmInputField
+                            ? dom.bgmInputField.value.trim()
+                            : '';
                         _dialogCallback.onOk(inputValue);
                     }
                     else {
@@ -189,6 +230,7 @@ function _showDialog(type, opts = {}) {
     if (msgEl)
         msgEl.textContent = opts.prompt || opts.message || '';
     if (type === 'input' && dom.bgmInputField) {
+        ;
         dom.bgmInputField.value = opts.defaultValue || '';
         dom.bgmInputField.focus();
     }
@@ -213,7 +255,7 @@ function ensureSyncResultDialog() {
     modal.setAttribute('role', 'dialog');
     modal.setAttribute('aria-modal', 'true');
     modal.setAttribute('aria-labelledby', 'bgmSyncResultTitle');
-    modal.innerHTML = `
+    modal.innerHTML = sanitizeHtml(`
         <div class="bgm-modal-content success" style="max-width: 520px;">
             <div class="bgm-dialog-header">
                 <span class="bgm-dialog-icon bgm-icon-success">&#10004;</span>
@@ -228,7 +270,7 @@ function ensureSyncResultDialog() {
                 <button id="bgmSyncResultOk" class="bgm-btn bgm-btn-success">确定</button>
             </div>
         </div>
-    `;
+    `);
     document.body.appendChild(modal);
     const detailsEl = modal.querySelector('#bgmSyncDetails');
     const toggleBtn = modal.querySelector('#bgmSyncToggleDetails');
@@ -311,7 +353,7 @@ function ensureSyncProgressDialog() {
     modal.setAttribute('aria-modal', 'true');
     modal.setAttribute('aria-labelledby', 'bgmSyncProgressTitle');
     modal.setAttribute('aria-hidden', 'true');
-    modal.innerHTML = `
+    modal.innerHTML = sanitizeHtml(`
         <div class="bgm-modal-content bgm-sync-progress__content">
             <div class="bgm-dialog-header bgm-sync-progress__header" id="bgmSyncProgressHeader">
                 <span class="bgm-dialog-icon" id="bgmSyncProgressIcon">🔄</span>
@@ -352,7 +394,7 @@ function ensureSyncProgressDialog() {
                 </div>
             </div>
         </div>
-    `;
+    `);
     document.body.appendChild(modal);
     // 绑定按钮事件：统一使用 addEventListener，禁止 onclick 重绑定
     const pauseBtn = modal.querySelector('#bgmSyncProgressPauseBtn');

@@ -8,117 +8,132 @@
  * @version 1.1.0 (优化版)
  */
 
-import { BGM_CONFIG, LOG_LEVELS, bgmLog, fetchBgmUserInfo, _getBgmUserId, _setBgmUserId } from '../index.js';
+import { BGM_CONFIG, LOG_LEVELS, bgmLog } from '../index.js'
 
 /**
  * Token验证结果接口
  */
 export interface TokenVerifyResult {
-    /** 验证是否通过 */
-    valid: boolean;
-    /** 验证消息 */
-    message: string;
-    /** 用户ID（如果验证成功） */
-    userId?: string;
-    /** 用户名（如果验证成功） */
-    username?: string;
+  /** 验证是否通过 */
+  valid: boolean
+  /** 验证消息 */
+  message: string
+  /** 用户ID（如果验证成功） */
+  userId?: string
+  /** 用户名（如果验证成功） */
+  username?: string
 }
 
 /**
  * Bangumi用户数据接口
  */
 export interface BangumiUserData {
-    id: number;
-    username: string;
-    nickname?: string;
-    avatar?: {
-        large: string;
-        medium: string;
-        small: string;
-    };
+  id: number
+  username: string
+  nickname?: string
+  avatar?: {
+    large: string
+    medium: string
+    small: string
+  }
 }
 
 /**
  * API响应结构接口
  */
 export interface ApiResponse<T = unknown> {
-    data: T | null;
-    status: number;
-    message: string;
+  data: T | null
+  status: number
+  message: string
 }
 
 /**
  * 收藏项接口
  */
 export interface CollectionItem {
-    subject_id: number;
-    type: number;
-    rate?: number;
-    tags?: string[];
-    comment?: string;
-    ep_status?: number;
-    vol_status?: number;
-    updated_at?: string;
-    subject_type?: number;
-    subject?: {
-        id: number;
-        name: string;
-        name_cn?: string;
-        type?: number;
-    };
+  subject_id: number
+  type: number
+  rate?: number
+  tags?: string[]
+  comment?: string
+  ep_status?: number
+  vol_status?: number
+  updated_at?: string
+  subject_type?: number
+  subject?: {
+    id: number
+    name: string
+    name_cn?: string
+    type?: number
+  }
 }
 
 /**
  * 收藏列表响应接口
  */
 export interface CollectionListResponse {
-    total?: number;
-    data?: CollectionItem[];
-}
-
-/**
- * 提取响应消息
- */
-function extractResponseMessage(data: unknown): string {
-    if (typeof data === 'object' && data !== null) {
-        const obj = data as Record<string, unknown>;
-        if (typeof obj.msg === 'string' && obj.msg) return obj.msg;
-        if (typeof obj.message === 'string' && obj.message) return obj.message;
-        if (typeof obj.error === 'string' && obj.error) return obj.error;
-    }
-    return 'success';
+  total?: number
+  data?: CollectionItem[]
 }
 
 /**
  * 执行HTTP请求的通用Promise封装
+ * @param xhr 已配置好的 XMLHttpRequest 对象
+ * @param signal 可选 AbortSignal，用于取消请求
  */
-function requestPromise(xhr: XMLHttpRequest): Promise<{ status: number; data: unknown; responseText: string }> {
-    const startTime = Date.now();
-    if (!xhr.timeout) xhr.timeout = 30000;
-    return new Promise((resolve, reject) => {
-        xhr.onload = () => {
-            const duration = Date.now() - startTime;
-            bgmLog(LOG_LEVELS.INFO, `[scraping] HTTP ${xhr.status} (${xhr.statusText}), 耗时: ${duration}ms`);
-            try {
-                const responseData = xhr.responseText ? JSON.parse(xhr.responseText) : null;
-                resolve({ status: xhr.status, data: responseData, responseText: xhr.responseText });
-            } catch {
-                reject(new Error('解析响应失败'));
-            }
-        };
-        xhr.onerror = () => reject(new Error('网络错误'));
-        xhr.ontimeout = () => reject(new Error('请求超时'));
-        xhr.send();
-    });
+function requestPromise(
+  xhr: XMLHttpRequest,
+  signal?: AbortSignal,
+): Promise<{ status: number; data: unknown; responseText: string }> {
+  const startTime = Date.now()
+  if (!xhr.timeout) xhr.timeout = 30000
+  return new Promise((resolve, reject) => {
+    // 如果 signal 已 aborted，立即 reject
+    if (signal?.aborted) {
+      reject(new Error('请求被取消'))
+      return
+    }
+
+    // AbortSignal 支持：监听 abort 事件触发 xhr.abort()
+    if (signal) {
+      signal.addEventListener('abort', () => {
+        xhr.abort()
+      })
+    }
+
+    xhr.onload = () => {
+      const duration = Date.now() - startTime
+      bgmLog(
+        LOG_LEVELS.INFO,
+        `[scraping] HTTP ${xhr.status} (${xhr.statusText}), 耗时: ${duration}ms`,
+      )
+      try {
+        const responseData = xhr.responseText ? JSON.parse(xhr.responseText) : null
+        resolve({ status: xhr.status, data: responseData, responseText: xhr.responseText })
+      } catch {
+        reject(new Error('解析响应失败'))
+      }
+    }
+    xhr.onerror = () => {
+      // 如果是 abort 导致的 onerror，归类为取消
+      reject(new Error(signal?.aborted ? '请求被取消' : '网络错误'))
+    }
+    xhr.ontimeout = () => reject(new Error('请求超时'))
+    xhr.send()
+  })
 }
 
-function xhrGet(url: string, token: string): Promise<{ status: number; data: unknown }> {
-    const xhr = new XMLHttpRequest();
-    xhr.open('GET', url, true);
-    xhr.timeout = 30000;
-    xhr.setRequestHeader('Authorization', `Bearer ${token}`);
-    xhr.setRequestHeader('Content-Type', 'application/json');
-    return requestPromise(xhr);
+function xhrGet(
+  url: string,
+  token: string,
+  signal?: AbortSignal,
+): Promise<{ status: number; data: unknown }> {
+  const xhr = new XMLHttpRequest()
+  xhr.open('GET', url, true)
+  xhr.timeout = 30000
+  xhr.setRequestHeader('Authorization', `Bearer ${token}`)
+  xhr.setRequestHeader('Content-Type', 'application/json')
+  return requestPromise(xhr, signal)
 }
 
 /**
@@ -127,55 +142,58 @@ function xhrGet(url: string, token: string): Promise<{ status: number; data: unk
  * @async
  * @function verifyToken
  * @param {string} token - 待验证的API Token
+ * @param {AbortSignal} [signal] - 可选 AbortSignal，用于取消请求
  * @returns {Promise<TokenVerifyResult>} 验证结果
  *
  * @description
  * 通过调用 /v0/me 接口验证Token是否有效。
  * 如果Token有效，会自动更新缓存中的用户信息。
  */
-export async function verifyToken(token: string): Promise<TokenVerifyResult> {
-    const result: TokenVerifyResult = { valid: false, message: '' };
+export async function verifyToken(token: string, signal?: AbortSignal): Promise<TokenVerifyResult> {
+  const result: TokenVerifyResult = { valid: false, message: '' }
 
-    if (!token) {
-        result.message = 'Token 不能为空';
-        return result;
+  if (!token) {
+    result.message = 'Token 不能为空'
+    return result
+  }
+
+  try {
+    const apiUrl = `${BGM_CONFIG.API_BASE}/v0/me`
+    bgmLog(LOG_LEVELS.INFO, `[scraping/verifyToken] 验证 Token: ${apiUrl}`)
+
+    const xhr = new XMLHttpRequest()
+    xhr.open('GET', apiUrl, true)
+    xhr.setRequestHeader('Authorization', `Bearer ${token}`)
+    xhr.setRequestHeader('Content-Type', 'application/json')
+
+    const response = await requestPromise(xhr, signal)
+    const userData = response.data as BangumiUserData | null
+
+    if (response.status === 200) {
+      result.valid = true
+      result.message = 'Token 有效'
+      bgmLog(
+        LOG_LEVELS.INFO,
+        `[scraping/verifyToken] Token 验证成功，用户ID: ${userData?.id || '未知'}`,
+      )
+      if (userData) {
+        result.userId = String(userData.id || '')
+        result.username = userData.username || userData.nickname || ''
+      }
+    } else if (response.status === 401) {
+      result.message = 'Token 无效或已过期'
+      bgmLog(LOG_LEVELS.WARN, `[scraping/verifyToken] Token 无效或已过期`)
+    } else {
+      result.message = `验证失败 (HTTP ${response.status})`
+      bgmLog(LOG_LEVELS.ERROR, `[scraping/verifyToken] 验证失败，HTTP ${response.status}`)
     }
+  } catch (e: unknown) {
+    const errMsg = e instanceof Error ? e.message : ''
+    result.message = errMsg || '验证过程出错'
+    bgmLog(LOG_LEVELS.ERROR, `[scraping/verifyToken] error: ${result.message}`)
+  }
 
-    try {
-        const apiUrl = `${BGM_CONFIG.API_BASE}/v0/me`;
-        bgmLog(LOG_LEVELS.INFO, `[scraping/verifyToken] 验证 Token: ${apiUrl}`);
-
-        const xhr = new XMLHttpRequest();
-        xhr.open('GET', apiUrl, true);
-        xhr.setRequestHeader('Authorization', `Bearer ${token}`);
-        xhr.setRequestHeader('Content-Type', 'application/json');
-
-        const response = await requestPromise(xhr);
-        const userData = response.data as BangumiUserData | null;
-
-        if (response.status === 200) {
-            result.valid = true;
-            result.message = 'Token 有效';
-            bgmLog(LOG_LEVELS.INFO, `[scraping/verifyToken] Token 验证成功，用户ID: ${userData?.id || '未知'}`);
-            if (userData) {
-                result.userId = String(userData.id || '');
-                result.username = userData.username || userData.nickname || '';
-            }
-        } else if (response.status === 401) {
-            result.message = 'Token 无效或已过期';
-            bgmLog(LOG_LEVELS.WARN, `[scraping/verifyToken] Token 无效或已过期`);
-        } else {
-            result.message = `验证失败 (HTTP ${response.status})`;
-            bgmLog(LOG_LEVELS.ERROR, `[scraping/verifyToken] 验证失败，HTTP ${response.status}`);
-        }
-
-    } catch (e: unknown) {
-        const errMsg = e instanceof Error ? e.message : '';
-        result.message = errMsg || '验证过程出错';
-        bgmLog(LOG_LEVELS.ERROR, `[scraping/verifyToken] error: ${result.message}`);
-    }
-
-    return result;
+  return result
 }
 
 /**
@@ -192,84 +210,83 @@ export async function verifyToken(token: string): Promise<TokenVerifyResult> {
  * @returns {Promise<CollectionItem[]>} 收藏列表
  */
 export async function fetchAllUserCollections(
-    token: string,
-    userId?: string,
-    options?: {
-        limit?: number;
-        maxTotal?: number;
-        onProgress?: (page: number, total: number) => void;
-    }
+  token: string,
+  userId?: string,
+  options?: {
+    limit?: number
+    maxTotal?: number
+    onProgress?: (page: number, total: number) => void
+  },
 ): Promise<CollectionItem[]> {
-    const limit = options?.limit || 30;
-    const maxTotal = options?.maxTotal || 1000;
+  const limit = options?.limit || 30
+  const maxTotal = options?.maxTotal || 1000
 
-    if (!userId) {
-        const verifyResult = await verifyToken(token);
-        if (!verifyResult.valid) {
-            bgmLog(LOG_LEVELS.ERROR, '[fetchAllUserCollections] Token无效');
-            return [];
+  if (!userId) {
+    const verifyResult = await verifyToken(token)
+    if (!verifyResult.valid) {
+      bgmLog(LOG_LEVELS.ERROR, '[fetchAllUserCollections] Token无效')
+      return []
+    }
+    userId = verifyResult.userId
+  }
+
+  if (!userId) {
+    bgmLog(LOG_LEVELS.ERROR, '[fetchAllUserCollections] 无法获取用户ID')
+    return []
+  }
+
+  const allCollections: CollectionItem[] = []
+  let offset = 0
+  let total = 0
+
+  bgmLog(LOG_LEVELS.INFO, `[fetchAllUserCollections] 开始获取用户 ${userId} 的收藏列表`)
+
+  while (offset < maxTotal) {
+    try {
+      const url = `${BGM_CONFIG.API_BASE}/v0/users/${userId}/collections?limit=${limit}&offset=${offset}`
+      const xhrResult = await xhrGet(url, token)
+
+      if (xhrResult.status < 200 || xhrResult.status >= 300) {
+        if (xhrResult.status === 429) {
+          bgmLog(LOG_LEVELS.WARN, '[fetchAllUserCollections] API限流，等待重试...')
+          await new Promise((resolve) => setTimeout(resolve, BGM_CONFIG.REQUEST_DELAY * 2))
+          continue
         }
-        userId = verifyResult.userId;
-    }
+        throw new Error(`HTTP ${xhrResult.status}`)
+      }
 
-    if (!userId) {
-        bgmLog(LOG_LEVELS.ERROR, '[fetchAllUserCollections] 无法获取用户ID');
-        return [];
-    }
+      const data = xhrResult.data as CollectionListResponse
 
-    const allCollections: CollectionItem[] = [];
-    let offset = 0;
-    let total = 0;
+      if (total === 0 && data.total) {
+        total = Math.min(data.total, maxTotal)
+        bgmLog(LOG_LEVELS.INFO, `[fetchAllUserCollections] 收藏总数: ${total}`)
+      }
 
-    bgmLog(LOG_LEVELS.INFO, `[fetchAllUserCollections] 开始获取用户 ${userId} 的收藏列表`);
+      if (data.data && Array.isArray(data.data)) {
+        allCollections.push(...data.data)
+        offset += data.data.length
 
-    while (offset < maxTotal) {
-        try {
-            const url = `${BGM_CONFIG.API_BASE}/v0/users/${userId}/collections?limit=${limit}&offset=${offset}`;
-            const xhrResult = await xhrGet(url, token);
-
-            if (xhrResult.status < 200 || xhrResult.status >= 300) {
-                if (xhrResult.status === 429) {
-                    bgmLog(LOG_LEVELS.WARN, '[fetchAllUserCollections] API限流，等待重试...');
-                    await new Promise(resolve => setTimeout(resolve, BGM_CONFIG.REQUEST_DELAY * 2));
-                    continue;
-                }
-                throw new Error(`HTTP ${xhrResult.status}`);
-            }
-
-            const data = xhrResult.data as CollectionListResponse;
-
-            if (total === 0 && data.total) {
-                total = Math.min(data.total, maxTotal);
-                bgmLog(LOG_LEVELS.INFO, `[fetchAllUserCollections] 收藏总数: ${total}`);
-            }
-
-            if (data.data && Array.isArray(data.data)) {
-                allCollections.push(...data.data);
-                offset += data.data.length;
-
-                if (options?.onProgress) {
-                    options.onProgress(Math.ceil(offset / limit), Math.ceil(total / limit));
-                }
-
-                if (data.data.length < limit || offset >= total) {
-                    break;
-                }
-            } else {
-                break;
-            }
-
-            await new Promise(resolve => setTimeout(resolve, BGM_CONFIG.REQUEST_DELAY));
-
-        } catch (e: unknown) {
-            const errMsg = e instanceof Error ? e.message : undefined;
-            bgmLog(LOG_LEVELS.ERROR, `[fetchAllUserCollections] 请求失败: ${errMsg}`);
-            break;
+        if (options?.onProgress) {
+          options.onProgress(Math.ceil(offset / limit), Math.ceil(total / limit))
         }
-    }
 
-    bgmLog(LOG_LEVELS.INFO, `[fetchAllUserCollections] 获取完成，共 ${allCollections.length} 条`);
-    return allCollections;
+        if (data.data.length < limit || offset >= total) {
+          break
+        }
+      } else {
+        break
+      }
+
+      await new Promise((resolve) => setTimeout(resolve, BGM_CONFIG.REQUEST_DELAY))
+    } catch (e: unknown) {
+      const errMsg = e instanceof Error ? e.message : undefined
+      bgmLog(LOG_LEVELS.ERROR, `[fetchAllUserCollections] 请求失败: ${errMsg}`)
+      break
+    }
+  }
+
+  bgmLog(LOG_LEVELS.INFO, `[fetchAllUserCollections] 获取完成，共 ${allCollections.length} 条`)
+  return allCollections
 }
 
 /**
@@ -282,29 +299,28 @@ export async function fetchAllUserCollections(
  * @returns {Promise<ApiResponse>} API响应
  */
 export async function fetchSubjectCollection(
-    token: string,
-    subjectId: string
+  token: string,
+  subjectId: string,
 ): Promise<ApiResponse> {
-    const result: ApiResponse = { data: null, status: 0, message: '' };
+  const result: ApiResponse = { data: null, status: 0, message: '' }
 
-    try {
-        const url = `${BGM_CONFIG.API_BASE}/v0/users/-/collections/${subjectId}`;
-        const xhrResult = await xhrGet(url, token);
+  try {
+    const url = `${BGM_CONFIG.API_BASE}/v0/users/-/collections/${subjectId}`
+    const xhrResult = await xhrGet(url, token)
 
-        result.status = xhrResult.status;
+    result.status = xhrResult.status
 
-        if (xhrResult.status >= 200 && xhrResult.status < 300) {
-            result.data = xhrResult.data;
-            result.message = 'success';
-        } else {
-            result.message = `HTTP ${xhrResult.status}`;
-        }
-
-    } catch (e: unknown) {
-        const errMsg = e instanceof Error ? e.message : '';
-        result.message = errMsg || '请求失败';
-        bgmLog(LOG_LEVELS.ERROR, `[fetchSubjectCollection] 请求失败: ${result.message}`);
+    if (xhrResult.status >= 200 && xhrResult.status < 300) {
+      result.data = xhrResult.data
+      result.message = 'success'
+    } else {
+      result.message = `HTTP ${xhrResult.status}`
     }
+  } catch (e: unknown) {
+    const errMsg = e instanceof Error ? e.message : ''
+    result.message = errMsg || '请求失败'
+    bgmLog(LOG_LEVELS.ERROR, `[fetchSubjectCollection] 请求失败: ${result.message}`)
+  }
 
-    return result;
+  return result
 }

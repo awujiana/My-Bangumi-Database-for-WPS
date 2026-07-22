@@ -1,0 +1,43 @@
+/**
+ * UI 事件处理模块 - 共享中文常量
+ * @module ui/handlers/_constants
+ * @description handlers 子模块共用的中文文案常量，避免重复定义。
+ */
+// ========== 中文常量 ==========
+export const _T = {
+    setBgmToken: '\u8BBE\u7F6E Bangumi Access Token',
+    inputToken: '\u8BF7\u8F93\u5165 Access Token',
+    tokenSaved: 'Token \u5DF2\u4FDD\u5B58',
+    setBgmUserId: '\u8BBE\u7F6E Bangumi \u7528\u6237ID',
+    inputUserId: '\u8BF7\u8F93\u5165\u7528\u6237ID\uFF08\u6570\u5B57\uFF09',
+    userIdSaved: '\u7528\u6237ID \u5DF2\u4FDD\u5B58',
+    set: '\u5DF2\u8BBE\u7F6E',
+    notSet: '\u672A\u8BBE\u7F6E',
+    pleaseSetUserIdFirst: '\u8BF7\u5148\u8BBE\u7F6E\u7528\u6237ID',
+    pleaseSetTokenFirst: '\u8BF7\u5148\u8BBE\u7F6E Token',
+    tokenValid: 'Token \u6709\u6548',
+    user: '\u7528\u6237: ',
+    unknownUser: '\u672A\u77E5\u7528\u6237',
+    parseFailed: '\u89E3\u6790\u5931\u8D25',
+    cannotParseResponse: '\u65E0\u6CD5\u89E3\u6790\u54CD\u5E94\u6570\u636E',
+    tokenInvalid: 'Token \u65E0\u6548',
+    tokenExpired: 'Access Token \u5DF2\u8FC7\u671F\u6216\u65E0\u6548',
+    networkError: '\u7F51\u7EDC\u9519\u8BEF',
+    cannotConnectBgm: '\u65E0\u6CD5\u8FDE\u63A5\u5230 Bangumi API',
+    debugConnOk: '\u8C03\u8BD5\u8FDE\u63A5\u6B63\u5E38',
+    debugConnFail: '\u8C03\u8BD5\u8FDE\u63A5\u5931\u8D25',
+    confirmClearMarks: '\u786E\u5B9A\u8981\u6E05\u9664\u6240\u6709\u6807\u8BB0\u5417\uFF1F',
+    loadingWait: '\u6B63\u5728\u52A0\u8F7D\u811A\u672C\uFF0C\u8BF7\u7A0D\u540E\u91CD\u8BD5...',
+    pleaseSetBgmToken: '\u8BF7\u5148\u8BBE\u7F6E Bangumi Token\uFF01',
+    cannotActivateSyncSheet: '\u65E0\u6CD5\u6FC0\u6D3B\u540C\u6B65\u8BB0\u5F55\u8868: ',
+    syncToBgmError: 'SyncToBangumiAsync \u51FA\u9519: ',
+    execError: '\u6267\u884C\u51FA\u9519',
+    syncBgmMarksStart: '\u5F00\u59CB\u4ECEBGM\u540C\u6B65\u6536\u85CF\u6807\u8BB0\uFF0C\u5DE5\u4F5C\u8868\u7D22\u5F15: ',
+    noCollectionData: '\u672A\u83B7\u53D6\u5230\u6536\u85CF\u6570\u636E\uFF0C\u8BF7\u68C0\u67E5 Token \u548C\u7528\u6237ID\uFF01',
+    syncComplete: '\u540C\u6B65\u5B8C\u6210',
+    fetchCollectionFailed: '\u83B7\u53D6\u6536\u85CF\u5931\u8D25',
+    syncFailed: '\u540C\u6B65\u5931\u8D25',
+    sheetNotFound: '\u672A\u627E\u5230\u5DE5\u4F5C\u8868: ',
+    marksToSheet: '\u5DF2\u6807\u8BB0 ',
+    marksToSheetSuffix: ' \u6761\u6536\u85CF\u5230 ',
+};

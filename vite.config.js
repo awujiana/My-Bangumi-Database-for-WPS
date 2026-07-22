@@ -26,6 +26,12 @@ export default defineConfig({
       ]
     })
   ],
+  resolve: {
+    alias: {
+      // 路径别名：@/ 映射到 ts/ 目录，与 tsconfig.json 的 paths 保持一致
+      '@': fileURLToPath(new URL('./ts', import.meta.url)),
+    },
+  },
   server: {
     host: '0.0.0.0',                       // 允许局域网访问
     port: 3889,                            // 开发服务器端口（仅 `npm run dev`）

@@ -1,8 +1,11 @@
-import { getDataSheet, getCellValue, setCellValue, getColumnMap, findHeaderRow, getLastRow, bgmLog, LOG_LEVELS, BGM, trim } from '../index.js';
+import { getDataSheet, getCellValue, setCellValue, getColumnMap, findHeaderRow, getLastRow, bgmLog, LOG_LEVELS, BGM, trim, } from '../index.js';
 function _splitAliases(aliasVal) {
     if (!aliasVal)
         return [];
-    return aliasVal.split(/[|｜/／]/).map(a => a.trim()).filter(Boolean);
+    return aliasVal
+        .split(/[|｜/／]/)
+        .map((a) => a.trim())
+        .filter(Boolean);
 }
 function _buildNameUrlMap(ws, headerRow, lastRow, colMap) {
     const nameUrlMap = {};

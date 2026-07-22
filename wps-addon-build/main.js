@@ -11,7 +11,7 @@ const MODULES = [
     { src: 'dist-ts/core/result.js', type: 'module', critical: true },     // BgmError + Result
     { src: 'dist-ts/core/constants.js', type: 'module', critical: true },
     { src: 'dist-ts/core/crypto.js', type: 'module', critical: true },
-    { src: 'dist-ts/tools/events.js', type: 'module', critical: true }, 
+    { src: 'dist-ts/tools/events.js', type: 'module', critical: true },
     { src: 'dist-ts/tools/wps.js', type: 'module', critical: true },        // isWpsApp 等
     { src: 'dist-ts/tools/http.js', type: 'module' },
     { src: 'dist-ts/ui/dialog.js', type: 'module' },
@@ -24,7 +24,10 @@ const MODULES = [
     { src: 'dist-ts/sync/githubConfig.js', type: 'module' },     // GitHub 仓库配置管理
     { src: 'dist-ts/sync/githubSync.js', type: 'module' },       // GitHub 仓库增量同步主模块
     { src:'dist-ts/services/ribbonService.js', type:'module'},
-    { src: 'dist-ts/ribbon.js', type: 'module', critical: true },
+    // 自 Task 13 重构后，ribbon.ts 不再在模块加载时自动注册 message 监听器。
+    // 改为通过 entry/ribbon-entry.ts 显式调用 initRibbon() 启动（入口模块内部
+    // 含 typeof window !== 'undefined' 守卫，确保 Node 测试环境导入不会触发副作用）。
+    { src: 'dist-ts/entry/ribbon-entry.js', type: 'module', critical: true },
     { src: 'dist-ts/ui/handlers.js', type: 'module', critical: true },
     { src: 'dist-ts/taskpane.js', type: 'module', critical: true }
 ];

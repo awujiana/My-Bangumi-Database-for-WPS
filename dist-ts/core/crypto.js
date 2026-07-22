@@ -12,8 +12,8 @@
  * @author BGM Development Team
  * @version 1.0.0
  */
-import { TOKEN_CONFIG, } from './constants.js';
 import { BGM, bgmLog, LOG_LEVELS } from '../index.js';
+import { TOKEN_CONFIG } from './constants.js';
 /**
  * 将字符串转换为UTF-8字节数组
  *
@@ -59,7 +59,7 @@ function bytesToStr(bytes) {
 export function calcChecksum(input) {
     let sum = 0;
     for (let i = 0; i < input.length; i++) {
-        sum = ((sum << 5) - sum + input.charCodeAt(i)) & 0xFF;
+        sum = ((sum << 5) - sum + input.charCodeAt(i)) & 0xff;
     }
     return Math.abs(sum) % 256;
 }
@@ -153,7 +153,8 @@ export function encryptToken(token) {
     // XOR加密
     const encrypted = new Uint8Array(payloadBytes.length);
     for (let i = 0; i < payloadBytes.length; i++) {
-        encrypted[i] = (payloadBytes[i] ?? 0) ^ (keyBytes[i % keyBytes.length] ?? 0) ^ (iv[i % iv.length] ?? 0);
+        encrypted[i] =
+            (payloadBytes[i] ?? 0) ^ (keyBytes[i % keyBytes.length] ?? 0) ^ (iv[i % iv.length] ?? 0);
     }
     // 返回格式：版本.IV.Base64(加密数据)
     const ivBase64 = btoa(String.fromCharCode(...iv));
@@ -185,13 +186,14 @@ export function decryptToken(encrypted) {
             return null;
         }
         // 解码Base64
-        const iv = Uint8Array.from(atob(ivBase64), c => c.charCodeAt(0));
-        const encryptedData = Uint8Array.from(atob(encryptedBase64), c => c.charCodeAt(0));
+        const iv = Uint8Array.from(atob(ivBase64), (c) => c.charCodeAt(0));
+        const encryptedData = Uint8Array.from(atob(encryptedBase64), (c) => c.charCodeAt(0));
         // XOR解密
         const keyBytes = strToBytes(TOKEN_CONFIG.XOR_KEY);
         const decrypted = new Uint8Array(encryptedData.length);
         for (let i = 0; i < encryptedData.length; i++) {
-            decrypted[i] = (encryptedData[i] ?? 0) ^ (keyBytes[i % keyBytes.length] ?? 0) ^ (iv[i % iv.length] ?? 0);
+            decrypted[i] =
+                (encryptedData[i] ?? 0) ^ (keyBytes[i % keyBytes.length] ?? 0) ^ (iv[i % iv.length] ?? 0);
         }
         const payload = bytesToStr(decrypted);
         return extractToken(payload);

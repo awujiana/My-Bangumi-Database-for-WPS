@@ -14,7 +14,7 @@ export const SYNC_STRATEGY_LABELS = Object.freeze({
     'add-update': '新增+更新（不删除）',
     'add-only': '仅新增',
     'update-only': '仅更新',
-    'mirror': '镜像同步（含删除）',
+    mirror: '镜像同步（含删除）',
     'force-overwrite': '强制覆盖',
 });
 /** type → 「是否看完」文本映射表 */

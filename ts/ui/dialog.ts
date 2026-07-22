@@ -4,249 +4,296 @@
  * @description 自定义对话框、确认对话框、Toast 通知
  */
 
+import { sanitizeHtml } from '../tools/sanitize.js'
+
 // ========== 类型定义 ==========
 export interface DialogOptions {
-    title?: string;
-    message?: string;
-    prompt?: string;
-    onOk?: (value?: string) => void;
-    onCancel?: () => void;
-    defaultValue?: string;
+  title?: string
+  message?: string
+  prompt?: string
+  onOk?: (value?: string) => void
+  onCancel?: () => void
+  defaultValue?: string
 }
 
 export interface DialogButton {
-    id: string;
-    cls: string;
-    text: string;
-    event: string;
+  id: string
+  cls: string
+  text: string
+  event: string
 }
 
 export interface DialogConfig {
-    id: string;
-    titleId: string;
-    msgId: string;
-    buttons: DialogButton[];
+  id: string
+  titleId: string
+  msgId: string
+  buttons: DialogButton[]
 }
 
 export interface DialogCallback {
-    onOk?: (value?: string) => void;
-    onCancel?: () => void;
+  onOk?: (value?: string) => void
+  onCancel?: () => void
 }
 
 // ========== 常量与配置 ==========
 const DIALOG_TYPES: Record<string, DialogConfig> = {
-    alert:   { id: 'bgmAlertDialog',   titleId: 'bgmAlertTitle',   msgId: 'bgmAlertMessage',   buttons: [{ id: 'bgmAlertOk',   cls: 'bgm-btn-primary', text: '确定', event: 'ok' }] },
-    confirm: { id: 'bgmConfirmDialog', titleId: 'bgmConfirmTitle', msgId: 'bgmConfirmMessage', buttons: [{ id: 'bgmConfirmOk', cls: 'bgm-btn-primary', text: '确定', event: 'ok' }, { id: 'bgmConfirmCancel', cls: 'bgm-btn-default', text: '取消', event: 'cancel' }] },
-    error:   { id: 'bgmErrorDialog',   titleId: 'bgmErrorTitle',   msgId: 'bgmErrorMessage',   buttons: [{ id: 'bgmErrorOk',   cls: 'bgm-btn-danger', text: '确定', event: 'ok' }] },
-    warning: { id: 'bgmWarningDialog', titleId: 'bgmWarningTitle', msgId: 'bgmWarningMessage', buttons: [{ id: 'bgmWarningOk', cls: 'bgm-btn-warning', text: '确定', event: 'ok' }] },
-    success: { id: 'bgmSuccessDialog', titleId: 'bgmSuccessTitle', msgId: 'bgmSuccessMessage', buttons: [{ id: 'bgmSuccessOk', cls: 'bgm-btn-success', text: '确定', event: 'ok' }] },
-    input:   { id: 'bgmInputDialog',   titleId: 'bgmInputTitle',   msgId: 'bgmInputPrompt',    buttons: [{ id: 'bgmInputOk',    cls: 'bgm-btn-primary', text: '确定', event: 'ok' }, { id: 'bgmInputCancel', cls: 'bgm-btn-default', text: '取消', event: 'cancel' }] }
-};
+  alert: {
+    id: 'bgmAlertDialog',
+    titleId: 'bgmAlertTitle',
+    msgId: 'bgmAlertMessage',
+    buttons: [{ id: 'bgmAlertOk', cls: 'bgm-btn-primary', text: '确定', event: 'ok' }],
+  },
+  confirm: {
+    id: 'bgmConfirmDialog',
+    titleId: 'bgmConfirmTitle',
+    msgId: 'bgmConfirmMessage',
+    buttons: [
+      { id: 'bgmConfirmOk', cls: 'bgm-btn-primary', text: '确定', event: 'ok' },
+      { id: 'bgmConfirmCancel', cls: 'bgm-btn-default', text: '取消', event: 'cancel' },
+    ],
+  },
+  error: {
+    id: 'bgmErrorDialog',
+    titleId: 'bgmErrorTitle',
+    msgId: 'bgmErrorMessage',
+    buttons: [{ id: 'bgmErrorOk', cls: 'bgm-btn-danger', text: '确定', event: 'ok' }],
+  },
+  warning: {
+    id: 'bgmWarningDialog',
+    titleId: 'bgmWarningTitle',
+    msgId: 'bgmWarningMessage',
+    buttons: [{ id: 'bgmWarningOk', cls: 'bgm-btn-warning', text: '确定', event: 'ok' }],
+  },
+  success: {
+    id: 'bgmSuccessDialog',
+    titleId: 'bgmSuccessTitle',
+    msgId: 'bgmSuccessMessage',
+    buttons: [{ id: 'bgmSuccessOk', cls: 'bgm-btn-success', text: '确定', event: 'ok' }],
+  },
+  input: {
+    id: 'bgmInputDialog',
+    titleId: 'bgmInputTitle',
+    msgId: 'bgmInputPrompt',
+    buttons: [
+      { id: 'bgmInputOk', cls: 'bgm-btn-primary', text: '确定', event: 'ok' },
+      { id: 'bgmInputCancel', cls: 'bgm-btn-default', text: '取消', event: 'cancel' },
+    ],
+  },
+}
 
 // ========== 模块内部状态 ==========
-let dialogInitialized = false;
-let _dialogCallback: DialogCallback | null = null;
-let _toastTimer: number | null = null;
-const dom: Record<string, HTMLElement | null> = {};
+let dialogInitialized = false
+let _dialogCallback: DialogCallback | null = null
+let _toastTimer: number | null = null
+const dom: Record<string, HTMLElement | null> = {}
 
 // ========== 初始化 ==========
 function ensureDialogs(): void {
-    if (dialogInitialized) return;
-    dialogInitialized = true;
-    createDialogs();
+  if (dialogInitialized) return
+  dialogInitialized = true
+  createDialogs()
 }
 
 if (typeof document !== 'undefined') {
-    if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', ensureDialogs);
-    } else {
-        setTimeout(ensureDialogs, 0);
-    }
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', ensureDialogs)
+  } else {
+    setTimeout(ensureDialogs, 0)
+  }
 }
 
 function createDialogs(): void {
-    if (document.getElementById('bgmDialogContainer')) return;
+  if (document.getElementById('bgmDialogContainer')) return
 
-    const container = document.createElement('div');
-    container.id = 'bgmDialogContainer';
-    document.body.appendChild(container);
+  const container = document.createElement('div')
+  container.id = 'bgmDialogContainer'
+  document.body.appendChild(container)
 
-    function createDialogElement(type: string, iconClass: string, iconChar: string, defaultTitle: string): HTMLElement {
-        const cfg = DIALOG_TYPES[type];
-        if (!cfg) return document.createElement('div');
-        const modal = document.createElement('div');
-        modal.id = cfg.id;
-        modal.className = 'bgm-modal';
-        modal.style.display = 'none';
-        // 可访问性：声明对话框角色
-        modal.setAttribute('role', 'dialog');
-        modal.setAttribute('aria-modal', 'true');
-        modal.setAttribute('aria-labelledby', cfg.titleId);
+  function createDialogElement(
+    type: string,
+    iconClass: string,
+    iconChar: string,
+    defaultTitle: string,
+  ): HTMLElement {
+    const cfg = DIALOG_TYPES[type]
+    if (!cfg) return document.createElement('div')
+    const modal = document.createElement('div')
+    modal.id = cfg.id
+    modal.className = 'bgm-modal'
+    modal.style.display = 'none'
+    // 可访问性：声明对话框角色
+    modal.setAttribute('role', 'dialog')
+    modal.setAttribute('aria-modal', 'true')
+    modal.setAttribute('aria-labelledby', cfg.titleId)
 
-        const content = document.createElement('div');
-        content.className = 'bgm-modal-content ' + type;
+    const content = document.createElement('div')
+    content.className = 'bgm-modal-content ' + type
 
-        const header = document.createElement('div');
-        header.className = 'bgm-dialog-header';
-        const icon = document.createElement('span');
-        icon.className = 'bgm-dialog-icon ' + iconClass;
-        icon.innerHTML = iconChar;
-        const title = document.createElement('span');
-        title.id = cfg.titleId;
-        title.className = 'bgm-dialog-title';
-        title.textContent = defaultTitle;
-        header.appendChild(icon);
-        header.appendChild(title);
-        content.appendChild(header);
+    const header = document.createElement('div')
+    header.className = 'bgm-dialog-header'
+    const icon = document.createElement('span')
+    icon.className = 'bgm-dialog-icon ' + iconClass
+    icon.innerHTML = sanitizeHtml(iconChar)
+    const title = document.createElement('span')
+    title.id = cfg.titleId
+    title.className = 'bgm-dialog-title'
+    title.textContent = defaultTitle
+    header.appendChild(icon)
+    header.appendChild(title)
+    content.appendChild(header)
 
-        const body = document.createElement('div');
-        body.className = 'bgm-dialog-body';
-        const msg = document.createElement('p');
-        msg.id = cfg.msgId;
-        msg.className = 'bgm-dialog-message';
-        body.appendChild(msg);
-        content.appendChild(body);
+    const body = document.createElement('div')
+    body.className = 'bgm-dialog-body'
+    const msg = document.createElement('p')
+    msg.id = cfg.msgId
+    msg.className = 'bgm-dialog-message'
+    body.appendChild(msg)
+    content.appendChild(body)
 
-        const footer = document.createElement('div');
-        footer.className = 'bgm-dialog-footer';
-        cfg.buttons.forEach((btn: DialogButton) => {
-            const button = document.createElement('button');
-            button.id = btn.id;
-            button.className = 'bgm-btn ' + btn.cls;
-            button.textContent = btn.text;
-            button.dataset.event = btn.event;
-            footer.appendChild(button);
-        });
-        content.appendChild(footer);
-        modal.appendChild(content);
-        return modal;
-    }
+    const footer = document.createElement('div')
+    footer.className = 'bgm-dialog-footer'
+    cfg.buttons.forEach((btn: DialogButton) => {
+      const button = document.createElement('button')
+      button.id = btn.id
+      button.className = 'bgm-btn ' + btn.cls
+      button.textContent = btn.text
+      button.dataset.event = btn.event
+      footer.appendChild(button)
+    })
+    content.appendChild(footer)
+    modal.appendChild(content)
+    return modal
+  }
 
-    container.appendChild(createDialogElement('alert', 'bgm-icon-info', '&#9432;', '提示'));
-    container.appendChild(createDialogElement('confirm', 'bgm-icon-question', '&#63;', '确认'));
-    container.appendChild(createDialogElement('error', 'bgm-icon-error', '&#10006;', '错误'));
-    container.appendChild(createDialogElement('warning', 'bgm-icon-warning', '&#9888;', '警告'));
-    container.appendChild(createDialogElement('success', 'bgm-icon-success', '&#10004;', '成功'));
-    container.appendChild(createDialogElement('input', 'bgm-icon-info', '&#9432;', '输入'));
+  container.appendChild(createDialogElement('alert', 'bgm-icon-info', '&#9432;', '提示'))
+  container.appendChild(createDialogElement('confirm', 'bgm-icon-question', '&#63;', '确认'))
+  container.appendChild(createDialogElement('error', 'bgm-icon-error', '&#10006;', '错误'))
+  container.appendChild(createDialogElement('warning', 'bgm-icon-warning', '&#9888;', '警告'))
+  container.appendChild(createDialogElement('success', 'bgm-icon-success', '&#10004;', '成功'))
+  container.appendChild(createDialogElement('input', 'bgm-icon-info', '&#9432;', '输入'))
 
-    const inputBody = document.querySelector('#bgmInputDialog .bgm-dialog-body');
-    if (inputBody) {
-        const inputField = document.createElement('input');
-        inputField.type = 'text';
-        inputField.id = 'bgmInputField';
-        inputField.className = 'bgm-input-field';
-        inputBody.appendChild(inputField);
-    }
+  const inputBody = document.querySelector('#bgmInputDialog .bgm-dialog-body')
+  if (inputBody) {
+    const inputField = document.createElement('input')
+    inputField.type = 'text'
+    inputField.id = 'bgmInputField'
+    inputField.className = 'bgm-input-field'
+    inputBody.appendChild(inputField)
+  }
 
-    const toast = document.createElement('div');
-    toast.id = 'bgmToast';
-    toast.className = 'bgm-toast';
-    container.appendChild(toast);
+  const toast = document.createElement('div')
+  toast.id = 'bgmToast'
+  toast.className = 'bgm-toast'
+  container.appendChild(toast)
 
-    bindAllEvents();
+  bindAllEvents()
 }
 
 function bindAllEvents(): void {
-    for (const type in DIALOG_TYPES) {
-        const cfg = DIALOG_TYPES[type];
-        if (!cfg) continue;
-        dom[cfg.id] = document.getElementById(cfg.id);
-        dom[cfg.titleId] = document.getElementById(cfg.titleId);
-        dom[cfg.msgId] = document.getElementById(cfg.msgId);
-        cfg.buttons.forEach(btn => { dom[btn.id] = document.getElementById(btn.id); });
-    }
-    dom.bgmToast = document.getElementById('bgmToast');
-    dom.bgmInputField = document.getElementById('bgmInputField');
+  for (const type in DIALOG_TYPES) {
+    const cfg = DIALOG_TYPES[type]
+    if (!cfg) continue
+    dom[cfg.id] = document.getElementById(cfg.id)
+    dom[cfg.titleId] = document.getElementById(cfg.titleId)
+    dom[cfg.msgId] = document.getElementById(cfg.msgId)
+    cfg.buttons.forEach((btn) => {
+      dom[btn.id] = document.getElementById(btn.id)
+    })
+  }
+  dom.bgmToast = document.getElementById('bgmToast')
+  dom.bgmInputField = document.getElementById('bgmInputField')
 
-    const container = document.getElementById('bgmDialogContainer');
-    if (!container) return;
+  const container = document.getElementById('bgmDialogContainer')
+  if (!container) return
 
-    container.addEventListener('click', (e: Event) => {
-        const btn = (e.target as HTMLElement).closest('button');
-        if (!btn) return;
-        const eventType = (btn as HTMLButtonElement).dataset.event;
-        if (!eventType) return;
-        const modal = btn.closest('.bgm-modal') as HTMLElement;
-        if (!modal) return;
+  container.addEventListener('click', (e: Event) => {
+    const btn = (e.target as HTMLElement).closest('button')
+    if (!btn) return
+    const eventType = (btn as HTMLButtonElement).dataset.event
+    if (!eventType) return
+    const modal = btn.closest('.bgm-modal') as HTMLElement
+    if (!modal) return
 
-        modal.style.display = 'none';
+    modal.style.display = 'none'
 
-        if (_dialogCallback) {
-            try {
-                if (eventType === 'ok' && _dialogCallback.onOk) {
-                    if (modal.id === 'bgmInputDialog') {
-                        const inputValue = dom.bgmInputField ? (dom.bgmInputField as HTMLInputElement).value.trim() : '';
-                        _dialogCallback.onOk(inputValue);
-                    } else {
-                        _dialogCallback.onOk();
-                    }
-                } else if (eventType === 'cancel' && _dialogCallback.onCancel) {
-                    _dialogCallback.onCancel();
-                }
-            } catch (e) {
-                console.error('[dialog] 回调执行失败:', e);
-            }
-            _dialogCallback = null;
+    if (_dialogCallback) {
+      try {
+        if (eventType === 'ok' && _dialogCallback.onOk) {
+          if (modal.id === 'bgmInputDialog') {
+            const inputValue = dom.bgmInputField
+              ? (dom.bgmInputField as HTMLInputElement).value.trim()
+              : ''
+            _dialogCallback.onOk(inputValue)
+          } else {
+            _dialogCallback.onOk()
+          }
+        } else if (eventType === 'cancel' && _dialogCallback.onCancel) {
+          _dialogCallback.onCancel()
         }
-    });
+      } catch (e) {
+        console.error('[dialog] 回调执行失败:', e)
+      }
+      _dialogCallback = null
+    }
+  })
 
-    dom.bgmInputField?.addEventListener('keypress', (e: KeyboardEvent) => {
-        if (e.key === 'Enter') dom.bgmInputOk?.click();
-    });
+  dom.bgmInputField?.addEventListener('keypress', (e: KeyboardEvent) => {
+    if (e.key === 'Enter') dom.bgmInputOk?.click()
+  })
 }
 
 function _showDialog(type: string, opts: DialogOptions = {}): void {
-    const cfg = DIALOG_TYPES[type];
-    if (!cfg) return;
-    const dialog = dom[cfg.id];
-    if (!dialog) {
-        if (type === 'confirm') {
-            if (window.confirm(opts.message || '')) opts.onOk?.();
-            else opts.onCancel?.();
-        } else if (type === 'input') {
-            const result = window.prompt(opts.prompt || opts.message || '', opts.defaultValue || '');
-            if (result !== null) opts.onOk?.(result);
-            else opts.onCancel?.();
-        } else {
-            window.alert(opts.message);
-            opts.onOk?.();
-        }
-        return;
+  const cfg = DIALOG_TYPES[type]
+  if (!cfg) return
+  const dialog = dom[cfg.id]
+  if (!dialog) {
+    if (type === 'confirm') {
+      if (window.confirm(opts.message || '')) opts.onOk?.()
+      else opts.onCancel?.()
+    } else if (type === 'input') {
+      const result = window.prompt(opts.prompt || opts.message || '', opts.defaultValue || '')
+      if (result !== null) opts.onOk?.(result)
+      else opts.onCancel?.()
+    } else {
+      window.alert(opts.message)
+      opts.onOk?.()
     }
+    return
+  }
 
-    const titleEl = dom[cfg.titleId];
-    const msgEl = dom[cfg.msgId];
-    if (titleEl) titleEl.textContent = opts.title || '';
-    if (msgEl) msgEl.textContent = opts.prompt || opts.message || '';
+  const titleEl = dom[cfg.titleId]
+  const msgEl = dom[cfg.msgId]
+  if (titleEl) titleEl.textContent = opts.title || ''
+  if (msgEl) msgEl.textContent = opts.prompt || opts.message || ''
 
-    if (type === 'input' && dom.bgmInputField) {
-        (dom.bgmInputField as HTMLInputElement).value = opts.defaultValue || '';
-        dom.bgmInputField.focus();
-    }
+  if (type === 'input' && dom.bgmInputField) {
+    ;(dom.bgmInputField as HTMLInputElement).value = opts.defaultValue || ''
+    dom.bgmInputField.focus()
+  }
 
-    const callback: DialogCallback = {};
-    if (opts.onOk) callback.onOk = opts.onOk;
-    if (opts.onCancel) callback.onCancel = opts.onCancel;
-    _dialogCallback = callback;
-    dialog.style.display = 'flex';
+  const callback: DialogCallback = {}
+  if (opts.onOk) callback.onOk = opts.onOk
+  if (opts.onCancel) callback.onCancel = opts.onCancel
+  _dialogCallback = callback
+  dialog.style.display = 'flex'
 }
 
 // ========== 同步结果对话框 ==========
-let _syncResultDialog: HTMLElement | null = null;
+let _syncResultDialog: HTMLElement | null = null
 
 function ensureSyncResultDialog(): HTMLElement {
-    if (_syncResultDialog) return _syncResultDialog;
+  if (_syncResultDialog) return _syncResultDialog
 
-    const modal = document.createElement('div');
-    modal.id = 'bgmSyncResultDialog';
-    modal.className = 'bgm-modal';
-    modal.style.display = 'none';
-    // 可访问性：声明对话框角色
-    modal.setAttribute('role', 'dialog');
-    modal.setAttribute('aria-modal', 'true');
-    modal.setAttribute('aria-labelledby', 'bgmSyncResultTitle');
+  const modal = document.createElement('div')
+  modal.id = 'bgmSyncResultDialog'
+  modal.className = 'bgm-modal'
+  modal.style.display = 'none'
+  // 可访问性：声明对话框角色
+  modal.setAttribute('role', 'dialog')
+  modal.setAttribute('aria-modal', 'true')
+  modal.setAttribute('aria-labelledby', 'bgmSyncResultTitle')
 
-    modal.innerHTML = `
+  modal.innerHTML = sanitizeHtml(`
         <div class="bgm-modal-content success" style="max-width: 520px;">
             <div class="bgm-dialog-header">
                 <span class="bgm-dialog-icon bgm-icon-success">&#10004;</span>
@@ -261,106 +308,108 @@ function ensureSyncResultDialog(): HTMLElement {
                 <button id="bgmSyncResultOk" class="bgm-btn bgm-btn-success">确定</button>
             </div>
         </div>
-    `;
+    `)
 
-    document.body.appendChild(modal);
+  document.body.appendChild(modal)
 
-    const detailsEl = modal.querySelector('#bgmSyncDetails') as HTMLElement;
-    const toggleBtn = modal.querySelector('#bgmSyncToggleDetails') as HTMLElement;
+  const detailsEl = modal.querySelector('#bgmSyncDetails') as HTMLElement
+  const toggleBtn = modal.querySelector('#bgmSyncToggleDetails') as HTMLElement
 
-    toggleBtn.addEventListener('click', () => {
-        const expanded = detailsEl.style.display !== 'none';
-        detailsEl.style.display = expanded ? 'none' : 'block';
-        toggleBtn.textContent = expanded ? '显示详情' : '收起详情';
-    });
+  toggleBtn.addEventListener('click', () => {
+    const expanded = detailsEl.style.display !== 'none'
+    detailsEl.style.display = expanded ? 'none' : 'block'
+    toggleBtn.textContent = expanded ? '显示详情' : '收起详情'
+  })
 
-    modal.querySelector('#bgmSyncResultOk')?.addEventListener('click', () => {
-        modal.style.display = 'none';
-    });
+  modal.querySelector('#bgmSyncResultOk')?.addEventListener('click', () => {
+    modal.style.display = 'none'
+  })
 
-    _syncResultDialog = modal;
-    return modal;
+  _syncResultDialog = modal
+  return modal
 }
 
 export function showSyncResult(summary: string, details: string[]): void {
-    const modal = ensureSyncResultDialog();
-    const summaryEl = modal.querySelector('#bgmSyncSummary') as HTMLElement;
-    const detailsEl = modal.querySelector('#bgmSyncDetails') as HTMLElement;
-    const toggleBtn = modal.querySelector('#bgmSyncToggleDetails') as HTMLElement;
+  const modal = ensureSyncResultDialog()
+  const summaryEl = modal.querySelector('#bgmSyncSummary') as HTMLElement
+  const detailsEl = modal.querySelector('#bgmSyncDetails') as HTMLElement
+  const toggleBtn = modal.querySelector('#bgmSyncToggleDetails') as HTMLElement
 
-    summaryEl.textContent = summary;
-    detailsEl.textContent = details.length > 0 ? details.join('\n') : '无详情';
+  summaryEl.textContent = summary
+  detailsEl.textContent = details.length > 0 ? details.join('\n') : '无详情'
 
-    // 重置为收起状态
-    detailsEl.style.display = 'none';
-    toggleBtn.textContent = '显示详情';
-    toggleBtn.style.display = details.length > 0 ? '' : 'none';
+  // 重置为收起状态
+  detailsEl.style.display = 'none'
+  toggleBtn.textContent = '显示详情'
+  toggleBtn.style.display = details.length > 0 ? '' : 'none'
 
-    modal.style.display = 'flex';
+  modal.style.display = 'flex'
 }
 
 // ========== 同步进度弹窗 ==========
-let _syncProgressDialog: HTMLElement | null = null;
-let _syncProgressLogCount = 0;
-const _SYNC_PROGRESS_LOG_MAX = 500;
+let _syncProgressDialog: HTMLElement | null = null
+let _syncProgressLogCount = 0
+const _SYNC_PROGRESS_LOG_MAX = 500
 
 /** 暂停/恢复/停止按钮回调 */
-let _syncPauseHandler: (() => void) | null = null;
-let _syncResumeHandler: (() => void) | null = null;
-let _syncStopHandler: (() => void) | null = null;
+let _syncPauseHandler: (() => void) | null = null
+let _syncResumeHandler: (() => void) | null = null
+let _syncStopHandler: (() => void) | null = null
 
 /** 当前是否处于暂停状态（统一监听器据此决定调用 pause 还是 resume） */
-let _syncPaused = false;
+let _syncPaused = false
 
 /** 触发同步弹窗的元素（关闭后恢复焦点） */
-let _syncProgressTrigger: HTMLElement | null = null;
+let _syncProgressTrigger: HTMLElement | null = null
 
 /** ESC 键监听器引用（仅在完成状态下注册） */
-let _syncProgressEscHandler: ((e: KeyboardEvent) => void) | null = null;
+let _syncProgressEscHandler: ((e: KeyboardEvent) => void) | null = null
 
 /** 内部：根据暂停状态更新按钮文本/样式/aria-label */
 function _setSyncPausedState(paused: boolean): void {
-    _syncPaused = paused;
-    const pauseBtn = _syncProgressDialog?.querySelector('#bgmSyncProgressPauseBtn') as HTMLButtonElement | null;
-    if (!pauseBtn) return;
-    pauseBtn.textContent = paused ? '▶️ 继续' : '⏸️ 暂停';
-    pauseBtn.setAttribute('aria-label', paused ? '继续同步' : '暂停同步');
-    if (paused) {
-        pauseBtn.classList.remove('bgm-btn-default');
-        pauseBtn.classList.add('bgm-btn-success');
-    } else {
-        pauseBtn.classList.add('bgm-btn-default');
-        pauseBtn.classList.remove('bgm-btn-success');
-    }
+  _syncPaused = paused
+  const pauseBtn = _syncProgressDialog?.querySelector(
+    '#bgmSyncProgressPauseBtn',
+  ) as HTMLButtonElement | null
+  if (!pauseBtn) return
+  pauseBtn.textContent = paused ? '▶️ 继续' : '⏸️ 暂停'
+  pauseBtn.setAttribute('aria-label', paused ? '继续同步' : '暂停同步')
+  if (paused) {
+    pauseBtn.classList.remove('bgm-btn-default')
+    pauseBtn.classList.add('bgm-btn-success')
+  } else {
+    pauseBtn.classList.add('bgm-btn-default')
+    pauseBtn.classList.remove('bgm-btn-success')
+  }
 }
 
 /** 内部：清理所有回调与状态（complete/hide 时调用） */
 function _clearSyncProgressHandlers(): void {
-    _syncPauseHandler = null;
-    _syncResumeHandler = null;
-    _syncStopHandler = null;
-    _syncPaused = false;
-    // 移除 ESC 监听器，避免泄漏
-    if (_syncProgressEscHandler) {
-        document.removeEventListener('keydown', _syncProgressEscHandler);
-        _syncProgressEscHandler = null;
-    }
+  _syncPauseHandler = null
+  _syncResumeHandler = null
+  _syncStopHandler = null
+  _syncPaused = false
+  // 移除 ESC 监听器，避免泄漏
+  if (_syncProgressEscHandler) {
+    document.removeEventListener('keydown', _syncProgressEscHandler)
+    _syncProgressEscHandler = null
+  }
 }
 
 function ensureSyncProgressDialog(): HTMLElement {
-    if (_syncProgressDialog) return _syncProgressDialog;
+  if (_syncProgressDialog) return _syncProgressDialog
 
-    const modal = document.createElement('div');
-    modal.id = 'bgmSyncProgressDialog';
-    modal.className = 'bgm-modal';
-    modal.style.display = 'none';
-    // 可访问性：声明对话框角色
-    modal.setAttribute('role', 'dialog');
-    modal.setAttribute('aria-modal', 'true');
-    modal.setAttribute('aria-labelledby', 'bgmSyncProgressTitle');
-    modal.setAttribute('aria-hidden', 'true');
+  const modal = document.createElement('div')
+  modal.id = 'bgmSyncProgressDialog'
+  modal.className = 'bgm-modal'
+  modal.style.display = 'none'
+  // 可访问性：声明对话框角色
+  modal.setAttribute('role', 'dialog')
+  modal.setAttribute('aria-modal', 'true')
+  modal.setAttribute('aria-labelledby', 'bgmSyncProgressTitle')
+  modal.setAttribute('aria-hidden', 'true')
 
-    modal.innerHTML = `
+  modal.innerHTML = sanitizeHtml(`
         <div class="bgm-modal-content bgm-sync-progress__content">
             <div class="bgm-dialog-header bgm-sync-progress__header" id="bgmSyncProgressHeader">
                 <span class="bgm-dialog-icon" id="bgmSyncProgressIcon">🔄</span>
@@ -401,56 +450,58 @@ function ensureSyncProgressDialog(): HTMLElement {
                 </div>
             </div>
         </div>
-    `;
+    `)
 
-    document.body.appendChild(modal);
+  document.body.appendChild(modal)
 
-    // 绑定按钮事件：统一使用 addEventListener，禁止 onclick 重绑定
-    const pauseBtn = modal.querySelector('#bgmSyncProgressPauseBtn') as HTMLButtonElement | null;
-    const stopBtn = modal.querySelector('#bgmSyncProgressStop') as HTMLButtonElement | null;
-    const closeBtn = modal.querySelector('#bgmSyncProgressClose') as HTMLButtonElement | null;
-    const toggleDetailsBtn = modal.querySelector('#bgmSyncProgressToggleDetails') as HTMLButtonElement | null;
+  // 绑定按钮事件：统一使用 addEventListener，禁止 onclick 重绑定
+  const pauseBtn = modal.querySelector('#bgmSyncProgressPauseBtn') as HTMLButtonElement | null
+  const stopBtn = modal.querySelector('#bgmSyncProgressStop') as HTMLButtonElement | null
+  const closeBtn = modal.querySelector('#bgmSyncProgressClose') as HTMLButtonElement | null
+  const toggleDetailsBtn = modal.querySelector(
+    '#bgmSyncProgressToggleDetails',
+  ) as HTMLButtonElement | null
 
-    // 暂停/继续按钮：根据 _syncPaused 标志自行决定调用哪个处理器，并自行更新按钮文本
-    if (pauseBtn) {
-        pauseBtn.addEventListener('click', (): void => {
-            if (!_syncProgressDialog || _syncProgressDialog.style.display === 'none') return;
-            if (_syncPaused) {
-                _syncResumeHandler?.();
-                _setSyncPausedState(false);
-            } else {
-                _syncPauseHandler?.();
-                _setSyncPausedState(true);
-            }
-        });
-    }
-    // 停止按钮
-    if (stopBtn) {
-        stopBtn.addEventListener('click', (): void => {
-            if (!_syncProgressDialog || _syncProgressDialog.style.display === 'none') return;
-            _syncStopHandler?.();
-        });
-    }
-    // 关闭按钮
-    if (closeBtn) {
-        closeBtn.addEventListener('click', (): void => {
-            hideSyncProgressDialog();
-        });
-    }
-    // 详情切换按钮
-    if (toggleDetailsBtn) {
-        toggleDetailsBtn.addEventListener('click', (): void => {
-            const detailsEl = modal.querySelector('#bgmSyncProgressDetails') as HTMLElement | null;
-            if (!detailsEl) return;
-            const expanded = detailsEl.style.display !== 'none';
-            detailsEl.style.display = expanded ? 'none' : 'block';
-            toggleDetailsBtn.textContent = expanded ? '显示详情' : '收起详情';
-            toggleDetailsBtn.setAttribute('aria-label', expanded ? '显示详情' : '收起详情');
-        });
-    }
+  // 暂停/继续按钮：根据 _syncPaused 标志自行决定调用哪个处理器，并自行更新按钮文本
+  if (pauseBtn) {
+    pauseBtn.addEventListener('click', (): void => {
+      if (!_syncProgressDialog || _syncProgressDialog.style.display === 'none') return
+      if (_syncPaused) {
+        _syncResumeHandler?.()
+        _setSyncPausedState(false)
+      } else {
+        _syncPauseHandler?.()
+        _setSyncPausedState(true)
+      }
+    })
+  }
+  // 停止按钮
+  if (stopBtn) {
+    stopBtn.addEventListener('click', (): void => {
+      if (!_syncProgressDialog || _syncProgressDialog.style.display === 'none') return
+      _syncStopHandler?.()
+    })
+  }
+  // 关闭按钮
+  if (closeBtn) {
+    closeBtn.addEventListener('click', (): void => {
+      hideSyncProgressDialog()
+    })
+  }
+  // 详情切换按钮
+  if (toggleDetailsBtn) {
+    toggleDetailsBtn.addEventListener('click', (): void => {
+      const detailsEl = modal.querySelector('#bgmSyncProgressDetails') as HTMLElement | null
+      if (!detailsEl) return
+      const expanded = detailsEl.style.display !== 'none'
+      detailsEl.style.display = expanded ? 'none' : 'block'
+      toggleDetailsBtn.textContent = expanded ? '显示详情' : '收起详情'
+      toggleDetailsBtn.setAttribute('aria-label', expanded ? '显示详情' : '收起详情')
+    })
+  }
 
-    _syncProgressDialog = modal;
-    return modal;
+  _syncProgressDialog = modal
+  return modal
 }
 
 /**
@@ -459,66 +510,66 @@ function ensureSyncProgressDialog(): HTMLElement {
  * @param handlers 暂停/恢复/停止回调集合
  */
 export function showSyncProgressDialog(
-    title: string,
-    handlers: { onPause: () => void; onResume: () => void; onStop: () => void }
+  title: string,
+  handlers: { onPause: () => void; onResume: () => void; onStop: () => void },
 ): void {
-    const modal = ensureSyncProgressDialog();
+  const modal = ensureSyncProgressDialog()
 
-    // 保存触发元素，用于关闭后恢复焦点
-    _syncProgressTrigger = document.activeElement as HTMLElement | null;
+  // 保存触发元素，用于关闭后恢复焦点
+  _syncProgressTrigger = document.activeElement as HTMLElement | null
 
-    // 重置回调与状态（必须在重置 UI 前完成，避免上次同步残留）
-    _clearSyncProgressHandlers();
-    _syncPauseHandler = handlers.onPause;
-    _syncResumeHandler = handlers.onResume;
-    _syncStopHandler = handlers.onStop;
-    _syncPaused = false;
-    _syncProgressLogCount = 0;
+  // 重置回调与状态（必须在重置 UI 前完成，避免上次同步残留）
+  _clearSyncProgressHandlers()
+  _syncPauseHandler = handlers.onPause
+  _syncResumeHandler = handlers.onResume
+  _syncStopHandler = handlers.onStop
+  _syncPaused = false
+  _syncProgressLogCount = 0
 
-    // 重置为运行中状态
-    const titleEl = modal.querySelector('#bgmSyncProgressTitle') as HTMLElement | null;
-    const iconEl = modal.querySelector('#bgmSyncProgressIcon') as HTMLElement | null;
-    const progressSection = modal.querySelector('#bgmSyncProgressSection') as HTMLElement | null;
-    const resultSection = modal.querySelector('#bgmSyncProgressResult') as HTMLElement | null;
-    const runningBtns = modal.querySelector('#bgmSyncProgressRunningBtns') as HTMLElement | null;
-    const doneBtns = modal.querySelector('#bgmSyncProgressDoneBtns') as HTMLElement | null;
-    const pauseBtn = modal.querySelector('#bgmSyncProgressPauseBtn') as HTMLButtonElement | null;
+  // 重置为运行中状态
+  const titleEl = modal.querySelector('#bgmSyncProgressTitle') as HTMLElement | null
+  const iconEl = modal.querySelector('#bgmSyncProgressIcon') as HTMLElement | null
+  const progressSection = modal.querySelector('#bgmSyncProgressSection') as HTMLElement | null
+  const resultSection = modal.querySelector('#bgmSyncProgressResult') as HTMLElement | null
+  const runningBtns = modal.querySelector('#bgmSyncProgressRunningBtns') as HTMLElement | null
+  const doneBtns = modal.querySelector('#bgmSyncProgressDoneBtns') as HTMLElement | null
+  const pauseBtn = modal.querySelector('#bgmSyncProgressPauseBtn') as HTMLButtonElement | null
 
-    if (titleEl) titleEl.textContent = title;
-    if (iconEl) iconEl.textContent = '🔄';
-    if (progressSection) progressSection.style.display = '';
-    if (resultSection) resultSection.style.display = 'none';
-    if (runningBtns) runningBtns.style.display = 'flex';
-    if (doneBtns) doneBtns.style.display = 'none';
-    // 重置暂停按钮（文本/样式/aria-label），避免上次同步残留的 resume 状态
-    if (pauseBtn) {
-        pauseBtn.textContent = '⏸️ 暂停';
-        pauseBtn.setAttribute('aria-label', '暂停同步');
-        pauseBtn.classList.remove('bgm-btn-success');
-        pauseBtn.classList.add('bgm-btn-default');
-    }
+  if (titleEl) titleEl.textContent = title
+  if (iconEl) iconEl.textContent = '🔄'
+  if (progressSection) progressSection.style.display = ''
+  if (resultSection) resultSection.style.display = 'none'
+  if (runningBtns) runningBtns.style.display = 'flex'
+  if (doneBtns) doneBtns.style.display = 'none'
+  // 重置暂停按钮（文本/样式/aria-label），避免上次同步残留的 resume 状态
+  if (pauseBtn) {
+    pauseBtn.textContent = '⏸️ 暂停'
+    pauseBtn.setAttribute('aria-label', '暂停同步')
+    pauseBtn.classList.remove('bgm-btn-success')
+    pauseBtn.classList.add('bgm-btn-default')
+  }
 
-    // 重置进度
-    const bar = modal.querySelector('#bgmSyncProgressBar') as HTMLElement | null;
-    const label = modal.querySelector('#bgmSyncProgressLabel') as HTMLElement | null;
-    const percent = modal.querySelector('#bgmSyncProgressPercent') as HTMLElement | null;
-    const current = modal.querySelector('#bgmSyncProgressCurrent') as HTMLElement | null;
-    const log = modal.querySelector('#bgmSyncProgressLog') as HTMLElement | null;
-    if (bar) {
-        bar.style.width = '0%';
-        bar.textContent = '';
-        bar.setAttribute('aria-valuenow', '0');
-    }
-    if (label) label.textContent = '进度: 0/0';
-    if (percent) percent.textContent = '0%';
-    if (current) current.textContent = '';
-    if (log) log.textContent = '';
+  // 重置进度
+  const bar = modal.querySelector('#bgmSyncProgressBar') as HTMLElement | null
+  const label = modal.querySelector('#bgmSyncProgressLabel') as HTMLElement | null
+  const percent = modal.querySelector('#bgmSyncProgressPercent') as HTMLElement | null
+  const current = modal.querySelector('#bgmSyncProgressCurrent') as HTMLElement | null
+  const log = modal.querySelector('#bgmSyncProgressLog') as HTMLElement | null
+  if (bar) {
+    bar.style.width = '0%'
+    bar.textContent = ''
+    bar.setAttribute('aria-valuenow', '0')
+  }
+  if (label) label.textContent = '进度: 0/0'
+  if (percent) percent.textContent = '0%'
+  if (current) current.textContent = ''
+  if (log) log.textContent = ''
 
-    modal.style.display = 'flex';
-    modal.setAttribute('aria-hidden', 'false');
+  modal.style.display = 'flex'
+  modal.setAttribute('aria-hidden', 'false')
 
-    // 焦点管理：将焦点移至暂停按钮，便于键盘操作
-    pauseBtn?.focus();
+  // 焦点管理：将焦点移至暂停按钮，便于键盘操作
+  pauseBtn?.focus()
 }
 
 /**
@@ -529,49 +580,49 @@ export function showSyncProgressDialog(
  * @param logLine 可选的实时日志行（追加到日志区）
  */
 export function updateSyncProgressDialog(
-    current: number,
-    total: number,
-    message?: string,
-    logLine?: string
+  current: number,
+  total: number,
+  message?: string,
+  logLine?: string,
 ): void {
-    const modal = _syncProgressDialog;
-    // 弹窗未显示时快速返回，避免无效 DOM 写入
-    if (!modal || modal.style.display === 'none') return;
+  const modal = _syncProgressDialog
+  // 弹窗未显示时快速返回，避免无效 DOM 写入
+  if (!modal || modal.style.display === 'none') return
 
-    const bar = modal.querySelector('#bgmSyncProgressBar') as HTMLElement | null;
-    const label = modal.querySelector('#bgmSyncProgressLabel') as HTMLElement | null;
-    const percent = modal.querySelector('#bgmSyncProgressPercent') as HTMLElement | null;
-    const currentEl = modal.querySelector('#bgmSyncProgressCurrent') as HTMLElement | null;
-    const log = modal.querySelector('#bgmSyncProgressLog') as HTMLElement | null;
+  const bar = modal.querySelector('#bgmSyncProgressBar') as HTMLElement | null
+  const label = modal.querySelector('#bgmSyncProgressLabel') as HTMLElement | null
+  const percent = modal.querySelector('#bgmSyncProgressPercent') as HTMLElement | null
+  const currentEl = modal.querySelector('#bgmSyncProgressCurrent') as HTMLElement | null
+  const log = modal.querySelector('#bgmSyncProgressLog') as HTMLElement | null
 
-    const pct = total > 0 ? Math.round((current / total) * 100) : 0;
-    if (bar) {
-        bar.style.width = pct + '%';
-        bar.textContent = pct + '%';
-        bar.setAttribute('aria-valuenow', String(pct));
+  const pct = total > 0 ? Math.round((current / total) * 100) : 0
+  if (bar) {
+    bar.style.width = pct + '%'
+    bar.textContent = pct + '%'
+    bar.setAttribute('aria-valuenow', String(pct))
+  }
+  if (label) label.textContent = `进度: ${current}/${total}`
+  if (percent) percent.textContent = pct + '%'
+  if (currentEl && message) currentEl.textContent = message
+
+  if (logLine && log) {
+    // 智能滚动：仅当用户已接近底部时才自动滚动，避免打断阅读
+    const nearBottom = log.scrollHeight - log.scrollTop - log.clientHeight < 30
+    log.appendChild(document.createTextNode(logLine + '\n'))
+    _syncProgressLogCount++
+    // 限制日志条数，避免过多 DOM 节点
+    while (_syncProgressLogCount > _SYNC_PROGRESS_LOG_MAX) {
+      if (log.firstChild) {
+        log.removeChild(log.firstChild)
+        _syncProgressLogCount--
+      } else {
+        break
+      }
     }
-    if (label) label.textContent = `进度: ${current}/${total}`;
-    if (percent) percent.textContent = pct + '%';
-    if (currentEl && message) currentEl.textContent = message;
-
-    if (logLine && log) {
-        // 智能滚动：仅当用户已接近底部时才自动滚动，避免打断阅读
-        const nearBottom = log.scrollHeight - log.scrollTop - log.clientHeight < 30;
-        log.appendChild(document.createTextNode(logLine + '\n'));
-        _syncProgressLogCount++;
-        // 限制日志条数，避免过多 DOM 节点
-        while (_syncProgressLogCount > _SYNC_PROGRESS_LOG_MAX) {
-            if (log.firstChild) {
-                log.removeChild(log.firstChild);
-                _syncProgressLogCount--;
-            } else {
-                break;
-            }
-        }
-        if (nearBottom) {
-            log.scrollTop = log.scrollHeight;
-        }
+    if (nearBottom) {
+      log.scrollTop = log.scrollHeight
     }
+  }
 }
 
 /**
@@ -581,70 +632,70 @@ export function updateSyncProgressDialog(
  * @param stopped 是否被用户停止
  */
 export function completeSyncProgressDialog(
-    summary: string,
-    details: string[],
-    stopped: boolean = false
+  summary: string,
+  details: string[],
+  stopped: boolean = false,
 ): void {
-    const modal = ensureSyncProgressDialog();
-    const titleEl = modal.querySelector('#bgmSyncProgressTitle') as HTMLElement | null;
-    const iconEl = modal.querySelector('#bgmSyncProgressIcon') as HTMLElement | null;
-    const progressSection = modal.querySelector('#bgmSyncProgressSection') as HTMLElement | null;
-    const resultSection = modal.querySelector('#bgmSyncProgressResult') as HTMLElement | null;
-    const summaryEl = modal.querySelector('#bgmSyncProgressSummary') as HTMLElement | null;
-    const detailsEl = modal.querySelector('#bgmSyncProgressDetails') as HTMLElement | null;
-    const toggleBtn = modal.querySelector('#bgmSyncProgressToggleDetails') as HTMLButtonElement | null;
-    const runningBtns = modal.querySelector('#bgmSyncProgressRunningBtns') as HTMLElement | null;
-    const doneBtns = modal.querySelector('#bgmSyncProgressDoneBtns') as HTMLElement | null;
+  const modal = ensureSyncProgressDialog()
+  const titleEl = modal.querySelector('#bgmSyncProgressTitle') as HTMLElement | null
+  const iconEl = modal.querySelector('#bgmSyncProgressIcon') as HTMLElement | null
+  const progressSection = modal.querySelector('#bgmSyncProgressSection') as HTMLElement | null
+  const resultSection = modal.querySelector('#bgmSyncProgressResult') as HTMLElement | null
+  const summaryEl = modal.querySelector('#bgmSyncProgressSummary') as HTMLElement | null
+  const detailsEl = modal.querySelector('#bgmSyncProgressDetails') as HTMLElement | null
+  const toggleBtn = modal.querySelector('#bgmSyncProgressToggleDetails') as HTMLButtonElement | null
+  const runningBtns = modal.querySelector('#bgmSyncProgressRunningBtns') as HTMLElement | null
+  const doneBtns = modal.querySelector('#bgmSyncProgressDoneBtns') as HTMLElement | null
 
-    if (titleEl) titleEl.textContent = stopped ? '同步已停止' : '同步完成';
-    if (iconEl) iconEl.textContent = stopped ? '⏹️' : '✅';
-    if (progressSection) progressSection.style.display = 'none';
-    if (resultSection) resultSection.style.display = '';
-    if (runningBtns) runningBtns.style.display = 'none';
-    if (doneBtns) doneBtns.style.display = 'flex';
+  if (titleEl) titleEl.textContent = stopped ? '同步已停止' : '同步完成'
+  if (iconEl) iconEl.textContent = stopped ? '⏹️' : '✅'
+  if (progressSection) progressSection.style.display = 'none'
+  if (resultSection) resultSection.style.display = ''
+  if (runningBtns) runningBtns.style.display = 'none'
+  if (doneBtns) doneBtns.style.display = 'flex'
 
-    if (summaryEl) summaryEl.textContent = summary;
-    if (detailsEl) {
-        detailsEl.textContent = details.length > 0 ? details.join('\n') : '无详情';
-        detailsEl.style.display = 'none';
+  if (summaryEl) summaryEl.textContent = summary
+  if (detailsEl) {
+    detailsEl.textContent = details.length > 0 ? details.join('\n') : '无详情'
+    detailsEl.style.display = 'none'
+  }
+  if (toggleBtn) {
+    toggleBtn.textContent = '显示详情'
+    toggleBtn.setAttribute('aria-label', '显示详情')
+    toggleBtn.style.display = details.length > 0 ? '' : 'none'
+  }
+
+  // 清理运行态回调（保留弹窗可见，供用户查看结果）
+  _clearSyncProgressHandlers()
+
+  // 完成状态下支持 ESC 关闭
+  _syncProgressEscHandler = (e: KeyboardEvent): void => {
+    if (e.key === 'Escape') {
+      hideSyncProgressDialog()
     }
-    if (toggleBtn) {
-        toggleBtn.textContent = '显示详情';
-        toggleBtn.setAttribute('aria-label', '显示详情');
-        toggleBtn.style.display = details.length > 0 ? '' : 'none';
-    }
+  }
+  document.addEventListener('keydown', _syncProgressEscHandler)
 
-    // 清理运行态回调（保留弹窗可见，供用户查看结果）
-    _clearSyncProgressHandlers();
-
-    // 完成状态下支持 ESC 关闭
-    _syncProgressEscHandler = (e: KeyboardEvent): void => {
-        if (e.key === 'Escape') {
-            hideSyncProgressDialog();
-        }
-    };
-    document.addEventListener('keydown', _syncProgressEscHandler);
-
-    // 焦点切换到关闭按钮，便于键盘用户立即操作
-    const closeBtn = modal.querySelector('#bgmSyncProgressClose') as HTMLButtonElement | null;
-    closeBtn?.focus();
+  // 焦点切换到关闭按钮，便于键盘用户立即操作
+  const closeBtn = modal.querySelector('#bgmSyncProgressClose') as HTMLButtonElement | null
+  closeBtn?.focus()
 }
 
 /** 隐藏同步进度弹窗 */
 export function hideSyncProgressDialog(): void {
-    const modal = _syncProgressDialog;
-    if (!modal) return;
-    modal.style.display = 'none';
-    modal.setAttribute('aria-hidden', 'true');
-    _clearSyncProgressHandlers();
-    // 焦点返回到触发元素
-    _syncProgressTrigger?.focus();
-    _syncProgressTrigger = null;
+  const modal = _syncProgressDialog
+  if (!modal) return
+  modal.style.display = 'none'
+  modal.setAttribute('aria-hidden', 'true')
+  _clearSyncProgressHandlers()
+  // 焦点返回到触发元素
+  _syncProgressTrigger?.focus()
+  _syncProgressTrigger = null
 }
 
 // ========== 公共 API ==========
 export function showAlert(message: string, title?: string, onOk?: () => void): void {
-    _showDialog('alert', { message, title: title || '提示', ...(onOk ? { onOk } : {}) });
+  _showDialog('alert', { message, title: title || '提示', ...(onOk ? { onOk } : {}) })
 }
 
 /*
@@ -654,57 +705,62 @@ export function showAlert(message: string, title?: string, onOk?: () => void): v
  * @param title    可选标题
  */
 export function showConfirm(
-    message: string,
-    callback: (confirmed: boolean) => void,
-    title?: string
+  message: string,
+  callback: (confirmed: boolean) => void,
+  title?: string,
 ): void {
-    _showDialog('confirm', {
-        message,
-        title: title || '确认',
-        onOk: () => callback(true),
-        onCancel: () => callback(false),
-    });
+  _showDialog('confirm', {
+    message,
+    title: title || '确认',
+    onOk: () => callback(true),
+    onCancel: () => callback(false),
+  })
 }
 
 export function showError(message: string, title?: string, onOk?: () => void): void {
-    _showDialog('error', { message, title: title || '错误', ...(onOk ? { onOk } : {}) });
+  _showDialog('error', { message, title: title || '错误', ...(onOk ? { onOk } : {}) })
 }
 
 export function showWarning(message: string, title?: string, onOk?: () => void): void {
-    _showDialog('warning', { message, title: title || '警告', ...(onOk ? { onOk } : {}) });
+  _showDialog('warning', { message, title: title || '警告', ...(onOk ? { onOk } : {}) })
 }
 
 export function showSuccess(message: string, title?: string, onOk?: () => void): void {
-    _showDialog('success', { message, title: title || '成功', ...(onOk ? { onOk } : {}) });
+  _showDialog('success', { message, title: title || '成功', ...(onOk ? { onOk } : {}) })
 }
 
-export function showInput(title: string, prompt: string, defaultValue?: string, onOk?: (value?: string) => void, onCancel?: () => void): void {
-    _showDialog('input', {
-        title,
-        message: prompt,
-        ...(onOk ? { onOk } : {}),
-        ...(onCancel ? { onCancel } : {}),
-        ...(defaultValue !== undefined ? { defaultValue } : {}),
-    });
+export function showInput(
+  title: string,
+  prompt: string,
+  defaultValue?: string,
+  onOk?: (value?: string) => void,
+  onCancel?: () => void,
+): void {
+  _showDialog('input', {
+    title,
+    message: prompt,
+    ...(onOk ? { onOk } : {}),
+    ...(onCancel ? { onCancel } : {}),
+    ...(defaultValue !== undefined ? { defaultValue } : {}),
+  })
 }
 
 // ========== Toast 通知 ==========
 export function showToast(message: string, type?: string): void {
-    const toast = dom.bgmToast;
-    if (!toast) return;
+  const toast = dom.bgmToast
+  if (!toast) return
 
-    if (_toastTimer !== null) {
-        clearTimeout(_toastTimer);
-        _toastTimer = null;
-    }
+  if (_toastTimer !== null) {
+    clearTimeout(_toastTimer)
+    _toastTimer = null
+  }
 
-    toast.textContent = message;
-    toast.className = 'bgm-toast bgm-toast-show';
-    if (type) toast.classList.add('bgm-toast-' + type);
+  toast.textContent = message
+  toast.className = 'bgm-toast bgm-toast-show'
+  if (type) toast.classList.add('bgm-toast-' + type)
 
-    _toastTimer = window.setTimeout(() => {
-        toast.className = 'bgm-toast';
-        _toastTimer = null;
-    }, 3000);
+  _toastTimer = window.setTimeout(() => {
+    toast.className = 'bgm-toast'
+    _toastTimer = null
+  }, 3000)
 }
-

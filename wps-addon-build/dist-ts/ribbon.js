@@ -5,12 +5,17 @@
  */
 import { WPS_ENUM, showBangumiPanel, BGM, getIncrementalSync, getSkipConflicts, setIncrementalSync, setSkipConflicts, getSyncRecordEnabled, setSyncRecordEnabled, bgmLog, LOG_LEVELS, getApp } from './index.js';
 import * as RibbonService from './services/ribbonService.js';
-// 在 Ribbon 启动时（例如 OnAddinLoad 中或文件顶部立即执行）
+// 在 Ribbon 启动时通过 initRibbon() 显式注册（不在模块加载时自动执行）
 // 【正确】监听侧边栏发来的配置更新，刷新 Ribbon UI
+let _ribbonMessageHandler = null;
 function initRibbonMessageListener() {
     if (typeof window === 'undefined')
         return;
-    window.addEventListener('message', (event) => {
+    // 防止重复注册：先移除旧监听器
+    if (_ribbonMessageHandler) {
+        window.removeEventListener('message', _ribbonMessageHandler);
+    }
+    _ribbonMessageHandler = (event) => {
         // origin 白名单校验（防止跨域消息注入）
         const allowedOrigins = ['null', '', window.location.origin];
         if (!allowedOrigins.includes(event.origin)) {
@@ -29,9 +34,27 @@ function initRibbonMessageListener() {
                 }
             }
         }
-    });
+    };
+    window.addEventListener('message', _ribbonMessageHandler);
 }
-initRibbonMessageListener();
+/**
+ * 初始化 Ribbon 模块：注册消息监听器。
+ *
+ * 必须由显式入口（如 `ts/entry/ribbon-entry.ts`）调用，
+ * 不在模块加载时自动执行，便于在测试环境按需初始化。
+ */
+export function initRibbon() {
+    initRibbonMessageListener();
+}
+/**
+ * 移除 Ribbon 消息监听器，防止内存泄漏
+ */
+export function removeRibbonMessageListener() {
+    if (_ribbonMessageHandler) {
+        window.removeEventListener('message', _ribbonMessageHandler);
+        _ribbonMessageHandler = null;
+    }
+}
 /**
  * 获取"跳过冲突"复选框的初始按下状态
  * 从配置读取上次保存的设置，默认未选中
@@ -125,8 +148,8 @@ export function OnAddinLoad(ribbonUI) {
     if (typeof app.Enum !== 'object') {
         app.Enum = WPS_ENUM;
     }
-    app.PluginStorage?.setItem('EnableFlag', false);
-    app.PluginStorage?.setItem('ApiEventFlag', false);
+    app.PluginStorage?.setItem('EnableFlag', 'false');
+    app.PluginStorage?.setItem('ApiEventFlag', 'false');
     return true;
 }
 /**
@@ -171,6 +194,14 @@ export function OnAction(control) {
                 });
                 break;
             }
+            case 'btnUndoLastSync': {
+                // undoLastSyncForRibbon 是 async 函数，需 .catch() 防止未处理 rejection
+                RibbonService.undoLastSyncForRibbon().catch((e) => {
+                    bgmLog(LOG_LEVELS.ERROR, `[OnAction] undoLastSyncForRibbon 异常: ${e?.message || String(e)}`);
+                    BGM.handleError(e, { showAlert: true, level: BGM.ErrorLevel.ERROR, context: 'Ribbon btnUndoLastSync' });
+                });
+                break;
+            }
             default:
                 bgmLog(LOG_LEVELS.WARN, `[BGM] 未知按钮: ${control.Id}`);
         }
@@ -194,6 +225,7 @@ export function GetBangumiImage(control) {
         btnOpenCollection: 'images/link.svg',
         btnClearColors: 'images/cleartags.svg',
         btnSyncFromGithub: 'images/github.svg',
+        btnUndoLastSync: 'images/undo.svg',
     };
     return icons[control.Id] || 'images/newFromTemp.svg';
 }

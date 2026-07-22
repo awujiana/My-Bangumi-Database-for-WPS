@@ -1,23 +1,24 @@
 {
   // ========== 继承基础配置 ==========
-  "extends": "./tsconfig.json",                // 继承 tsconfig.json 所有配置
+  "extends": "./tsconfig.json", // 继承 tsconfig.json 所有配置
 
   "compilerOptions": {
     // ========== 覆盖输出配置 ==========
-    "outDir": "./dist-ts",                     // TS 编译输出目录（与基础配置相同，显式覆盖）
-    "declaration": true,                       // 生成 .d.ts 类型声明文件
-    "declarationMap": true,                    // 生成声明文件的 source map
-    "sourceMap": false,                        // 不生成 .js.map（构建产物体积更小）
-    "noEmitOnError": false,                    // 即使有错也生成文件（方便调试）
-    "allowJs": false,                            // 允许 TS 导入 JS【关键】
+    "outDir": "./dist-ts", // TS 编译输出目录（与基础配置相同，显式覆盖）
+    "declaration": true, // 生成 .d.ts 类型声明文件
+    "declarationMap": true, // 生成声明文件的 source map
+    "sourceMap": false, // 不生成 .js.map（构建产物体积更小）
+    "noEmitOnError": false, // 即使有错也生成文件（方便调试）
+    "allowJs": false, // 允许 TS 导入 JS【关键】
+
+    // ========== 路径别名（与 tsconfig.json 保持一致，显式声明便于构建时解析）==========
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["ts/*"]
+    }
   },
   // ========== 包含的源文件 ==========
-  "include": ["ts/"],                          // 编译 ts/ 目录下所有文件
+  "include": ["ts/"], // 编译 ts/ 目录下所有文件
   // ========== 排除的目录 ==========
-  "exclude": [
-    "node_modules",
-    "dist",
-    "dist-ts",
-    "generated-types"
-  ]
+  "exclude": ["node_modules", "dist", "dist-ts", "generated-types"]
 }

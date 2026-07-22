@@ -43,9 +43,7 @@
   "paths": {
     "/calendar": {
       "get": {
-        "tags": [
-          "条目"
-        ],
+        "tags": ["条目"],
         "summary": "每日放送",
         "operationId": "getCalendar",
         "responses": {
@@ -96,9 +94,7 @@
     },
     "/v0/search/subjects": {
       "post": {
-        "tags": [
-          "条目"
-        ],
+        "tags": ["条目"],
         "summary": "条目搜索",
         "operationId": "searchSubjects",
         "description": "## 实验性 API， 本 schema 和实际的 API 行为都可能随时发生改动\n\n目前支持的筛选条件包括:\n- `type`: 条目类型，参照 `SubjectType` enum， `或`。\n- `tag`: 标签，可以多次出现。`且` 关系。\n- `air_date`: 播出日期/发售日期。`且` 关系。\n- `rating`: 用于搜索指定评分的条目。`且` 关系。\n- `rating_count`: 用于按照评分人数筛选条目。`且` 关系。\n- `rank`: 用于搜索指定排名的条目。`且` 关系。\n- `nsfw`: 使用 `include` 包含NSFW搜索结果。默认排除搜索NSFW条目。无权限情况下忽略此选项，不会返回NSFW条目。\n\n不同筛选条件之间为 `且`\n",
@@ -127,20 +123,13 @@
             "application/json": {
               "schema": {
                 "type": "object",
-                "required": [
-                  "keyword"
-                ],
+                "required": ["keyword"],
                 "properties": {
                   "keyword": {
                     "type": "string"
                   },
                   "sort": {
-                    "enum": [
-                      "match",
-                      "heat",
-                      "rank",
-                      "score"
-                    ],
+                    "enum": ["match", "heat", "rank", "score"],
                     "default": "match",
                     "type": "string",
                     "example": "rank",
@@ -162,10 +151,7 @@
                         "items": {
                           "type": "string"
                         },
-                        "example": [
-                          "童年",
-                          "原创"
-                        ],
+                        "example": ["童年", "原创"],
                         "description": "公共标签。多个值之间为 `且` 关系。可以用 `-` 排除标签。比如 `-科幻` 可以排除科幻标签。"
                       },
                       "tag": {
@@ -173,10 +159,7 @@
                         "items": {
                           "type": "string"
                         },
-                        "example": [
-                          "童年",
-                          "原创"
-                        ],
+                        "example": ["童年", "原创"],
                         "description": "标签，可以多次出现。多值之间为 `且` 关系。"
                       },
                       "air_date": {
@@ -184,10 +167,7 @@
                         "items": {
                           "type": "string"
                         },
-                        "example": [
-                          ">=2020-07-01",
-                          "<2020-10-01"
-                        ],
+                        "example": [">=2020-07-01", "<2020-10-01"],
                         "description": "播出日期/发售日期，日期必需为 `YYYY-MM-DD` 格式。多值之间为 `且` 关系。"
                       },
                       "rating": {
@@ -195,10 +175,7 @@
                         "items": {
                           "type": "string"
                         },
-                        "example": [
-                          ">=6",
-                          "<8"
-                        ],
+                        "example": [">=6", "<8"],
                         "description": "用于搜索指定评分的条目，多值之间为 `且` 关系。"
                       },
                       "rating_count": {
@@ -206,10 +183,7 @@
                         "items": {
                           "type": "string"
                         },
-                        "example": [
-                          ">=200",
-                          "<5000"
-                        ],
+                        "example": [">=200", "<5000"],
                         "description": "用于按照评分人数筛选条目，多值之间为 `且` 关系，格式与 `rating` 相同。"
                       },
                       "rank": {
@@ -217,10 +191,7 @@
                         "items": {
                           "type": "string"
                         },
-                        "example": [
-                          ">10",
-                          "<=18"
-                        ],
+                        "example": [">10", "<=18"],
                         "description": "用于搜索指定排名的条目，多值之间为 `且` 关系。"
                       },
                       "nsfw": {
@@ -250,9 +221,7 @@
     },
     "/v0/search/characters": {
       "post": {
-        "tags": [
-          "角色"
-        ],
+        "tags": ["角色"],
         "summary": "角色搜索",
         "operationId": "searchCharacters",
         "description": "## 实验性 API， 本 schema 和实际的 API 行为都可能随时发生改动\n\n目前支持的筛选条件包括:\n- `nsfw`: 使用 `include` 包含NSFW搜索结果。默认排除搜索NSFW条目。无权限情况下忽略此选项，不会返回NSFW条目。\n",
@@ -281,9 +250,7 @@
             "application/json": {
               "schema": {
                 "type": "object",
-                "required": [
-                  "keyword"
-                ],
+                "required": ["keyword"],
                 "properties": {
                   "keyword": {
                     "type": "string"
@@ -319,9 +286,7 @@
     },
     "/v0/search/persons": {
       "post": {
-        "tags": [
-          "人物"
-        ],
+        "tags": ["人物"],
         "summary": "人物搜索",
         "operationId": "searchPersons",
         "description": "## 实验性 API， 本 schema 和实际的 API 行为都可能随时发生改动\n\n目前支持的筛选条件包括:\n- `career`: 职业，可以多次出现。`且` 关系。\n\n不同筛选条件之间为 `且`\n",
@@ -350,9 +315,7 @@
             "application/json": {
               "schema": {
                 "type": "object",
-                "required": [
-                  "keyword"
-                ],
+                "required": ["keyword"],
                 "properties": {
                   "keyword": {
                     "type": "string"
@@ -366,10 +329,7 @@
                         "items": {
                           "type": "string"
                         },
-                        "example": [
-                          "artist",
-                          "director"
-                        ],
+                        "example": ["artist", "director"],
                         "description": "职业，可以多次出现。多值之间为 `且` 关系。"
                       }
                     }
@@ -395,9 +355,7 @@
     },
     "/v0/subjects": {
       "get": {
-        "tags": [
-          "条目"
-        ],
+        "tags": ["条目"],
         "summary": "浏览条目",
         "description": "第一页会 cache 24h，之后会 cache 1h",
         "operationId": "getSubjects",
@@ -514,9 +472,7 @@
     },
     "/v0/subjects/{subject_id}": {
       "get": {
-        "tags": [
-          "条目"
-        ],
+        "tags": ["条目"],
         "summary": "获取条目",
         "description": "cache with 300s",
         "operationId": "getSubjectById",
@@ -566,9 +522,7 @@
     },
     "/v0/subjects/{subject_id}/image": {
       "get": {
-        "tags": [
-          "条目"
-        ],
+        "tags": ["条目"],
         "summary": "Get Subject Image",
         "operationId": "getSubjectImageById",
         "parameters": [
@@ -628,9 +582,7 @@
     },
     "/v0/subjects/{subject_id}/persons": {
       "get": {
-        "tags": [
-          "条目"
-        ],
+        "tags": ["条目"],
         "summary": "Get Subject Persons",
         "operationId": "getRelatedPersonsBySubjectId",
         "parameters": [
@@ -682,9 +634,7 @@
     },
     "/v0/subjects/{subject_id}/characters": {
       "get": {
-        "tags": [
-          "条目"
-        ],
+        "tags": ["条目"],
         "summary": "Get Subject Characters",
         "operationId": "getRelatedCharactersBySubjectId",
         "parameters": [
@@ -736,9 +686,7 @@
     },
     "/v0/subjects/{subject_id}/subjects": {
       "get": {
-        "tags": [
-          "条目"
-        ],
+        "tags": ["条目"],
         "summary": "Get Subject Relations",
         "operationId": "getRelatedSubjectsBySubjectId",
         "parameters": [
@@ -790,9 +738,7 @@
     },
     "/v0/episodes": {
       "get": {
-        "tags": [
-          "章节"
-        ],
+        "tags": ["章节"],
         "summary": "Get Episodes",
         "operationId": "getEpisodes",
         "parameters": [
@@ -880,9 +826,7 @@
     },
     "/v0/episodes/{episode_id}": {
       "get": {
-        "tags": [
-          "章节"
-        ],
+        "tags": ["章节"],
         "summary": "Get Episode",
         "operationId": "getEpisodeById",
         "parameters": [
@@ -931,9 +875,7 @@
     },
     "/v0/characters/{character_id}": {
       "get": {
-        "tags": [
-          "角色"
-        ],
+        "tags": ["角色"],
         "summary": "Get Character Detail",
         "description": "cache with 60s",
         "operationId": "getCharacterById",
@@ -978,9 +920,7 @@
     },
     "/v0/characters/{character_id}/image": {
       "get": {
-        "tags": [
-          "角色"
-        ],
+        "tags": ["角色"],
         "summary": "Get Character Image",
         "operationId": "getCharacterImageById",
         "parameters": [
@@ -1040,9 +980,7 @@
     },
     "/v0/characters/{character_id}/subjects": {
       "get": {
-        "tags": [
-          "角色"
-        ],
+        "tags": ["角色"],
         "summary": "get character related subjects",
         "operationId": "getRelatedSubjectsByCharacterId",
         "parameters": [
@@ -1089,9 +1027,7 @@
     },
     "/v0/characters/{character_id}/persons": {
       "get": {
-        "tags": [
-          "角色"
-        ],
+        "tags": ["角色"],
         "summary": "get character related persons",
         "operationId": "getRelatedPersonsByCharacterId",
         "parameters": [
@@ -1138,9 +1074,7 @@
     },
     "/v0/characters/{character_id}/collect": {
       "post": {
-        "tags": [
-          "角色"
-        ],
+        "tags": ["角色"],
         "summary": "Collect character for current user",
         "operationId": "collectCharacterByCharacterIdAndUserId",
         "description": "为当前用户收藏角色",
@@ -1191,9 +1125,7 @@
         ]
       },
       "delete": {
-        "tags": [
-          "角色"
-        ],
+        "tags": ["角色"],
         "summary": "Uncollect character for current user",
         "operationId": "uncollectCharacterByCharacterIdAndUserId",
         "description": "为当前用户取消收藏角色",
@@ -1246,9 +1178,7 @@
     },
     "/v0/persons/{person_id}": {
       "get": {
-        "tags": [
-          "人物"
-        ],
+        "tags": ["人物"],
         "summary": "Get Person",
         "description": "cache with 60s",
         "operationId": "getPersonById",
@@ -1293,9 +1223,7 @@
     },
     "/v0/persons/{person_id}/image": {
       "get": {
-        "tags": [
-          "人物"
-        ],
+        "tags": ["人物"],
         "summary": "Get Person Image",
         "operationId": "getPersonImageById",
         "parameters": [
@@ -1355,9 +1283,7 @@
     },
     "/v0/persons/{person_id}/subjects": {
       "get": {
-        "tags": [
-          "人物"
-        ],
+        "tags": ["人物"],
         "summary": "get person related subjects",
         "operationId": "getRelatedSubjectsByPersonId",
         "parameters": [
@@ -1404,9 +1330,7 @@
     },
     "/v0/persons/{person_id}/characters": {
       "get": {
-        "tags": [
-          "人物"
-        ],
+        "tags": ["人物"],
         "summary": "get person related characters",
         "operationId": "getRelatedCharactersByPersonId",
         "parameters": [
@@ -1453,9 +1377,7 @@
     },
     "/v0/persons/{person_id}/collect": {
       "post": {
-        "tags": [
-          "人物"
-        ],
+        "tags": ["人物"],
         "summary": "Collect person for current user",
         "operationId": "collectPersonByPersonIdAndUserId",
         "description": "为当前用户收藏人物",
@@ -1506,9 +1428,7 @@
         ]
       },
       "delete": {
-        "tags": [
-          "人物"
-        ],
+        "tags": ["人物"],
         "summary": "Uncollect person for current user",
         "operationId": "uncollectPersonByPersonIdAndUserId",
         "description": "为当前用户取消收藏人物",
@@ -1561,9 +1481,7 @@
     },
     "/v0/users/{username}": {
       "get": {
-        "tags": [
-          "用户"
-        ],
+        "tags": ["用户"],
         "summary": "Get User by name",
         "description": "获取用户信息",
         "operationId": "getUserByName",
@@ -1608,9 +1526,7 @@
     },
     "/v0/users/{username}/avatar": {
       "get": {
-        "tags": [
-          "用户"
-        ],
+        "tags": ["用户"],
         "summary": "Get User Avatar by name",
         "description": "获取用户头像，302 重定向至头像地址，设置了 username 之后无法使用 UID 查询。",
         "operationId": "getUserAvatarByName",
@@ -1666,9 +1582,7 @@
     },
     "/v0/me": {
       "get": {
-        "tags": [
-          "用户"
-        ],
+        "tags": ["用户"],
         "summary": "Get User",
         "description": "返回当前 Access Token 对应的用户信息",
         "operationId": "getMyself",
@@ -1683,10 +1597,7 @@
                       "$ref": "#/components/schemas/User"
                     },
                     {
-                      "required": [
-                        "email",
-                        "reg_time"
-                      ]
+                      "required": ["email", "reg_time"]
                     },
                     {
                       "type": "object",
@@ -1732,9 +1643,7 @@
     },
     "/v0/users/{username}/collections": {
       "get": {
-        "tags": [
-          "收藏"
-        ],
+        "tags": ["收藏"],
         "summary": "获取用户收藏",
         "description": "获取对应用户的收藏，查看私有收藏需要access token。",
         "operationId": "getUserCollectionsByUsername",
@@ -1812,9 +1721,7 @@
     },
     "/v0/users/{username}/collections/{subject_id}": {
       "get": {
-        "tags": [
-          "收藏"
-        ],
+        "tags": ["收藏"],
         "summary": "获取用户单个条目收藏",
         "description": "获取对应用户的收藏，查看私有收藏需要 access token",
         "operationId": "getUserCollection",
@@ -1867,9 +1774,7 @@
     },
     "/v0/users/-/collections/{subject_id}": {
       "post": {
-        "tags": [
-          "收藏"
-        ],
+        "tags": ["收藏"],
         "summary": "新增或修改用户单个条目收藏",
         "description": "修改条目收藏状态, 如果不存在则创建，如果存在则修改\n\n由于直接修改剧集条目的完成度可能会引起意料之外效果，只能用于修改书籍类条目的完成度。\n\n方法的所有请求体字段均可选\n",
         "operationId": "postUserCollection",
@@ -1929,9 +1834,7 @@
         ]
       },
       "patch": {
-        "tags": [
-          "收藏"
-        ],
+        "tags": ["收藏"],
         "summary": "修改用户单个收藏",
         "description": "修改条目收藏状态\n\n由于直接修改剧集条目的完成度可能会引起意料之外效果，只能用于修改书籍类条目的完成度。\n\nPATCH 方法的所有请求体字段均可选\n",
         "operationId": "patchUserCollection",
@@ -1993,9 +1896,7 @@
     },
     "/v0/users/-/collections/{subject_id}/episodes": {
       "get": {
-        "tags": [
-          "收藏"
-        ],
+        "tags": ["收藏"],
         "summary": "章节收藏信息",
         "operationId": "getUserSubjectEpisodeCollection",
         "parameters": [
@@ -2092,9 +1993,7 @@
         ]
       },
       "patch": {
-        "tags": [
-          "收藏"
-        ],
+        "tags": ["收藏"],
         "summary": "章节收藏信息",
         "description": "同时会重新计算条目的完成度\n",
         "operationId": "patchUserSubjectEpisodeCollection",
@@ -2108,21 +2007,14 @@
             "application/json": {
               "schema": {
                 "type": "object",
-                "required": [
-                  "episode_id",
-                  "type"
-                ],
+                "required": ["episode_id", "type"],
                 "properties": {
                   "episode_id": {
                     "type": "array",
                     "items": {
                       "type": "integer"
                     },
-                    "example": [
-                      1,
-                      2,
-                      8
-                    ]
+                    "example": [1, 2, 8]
                   },
                   "type": {
                     "$ref": "#/components/schemas/EpisodeCollectionType"
@@ -2176,9 +2068,7 @@
     },
     "/v0/users/-/collections/-/episodes/{episode_id}": {
       "get": {
-        "tags": [
-          "收藏"
-        ],
+        "tags": ["收藏"],
         "summary": "章节收藏信息",
         "operationId": "getUserEpisodeCollection",
         "parameters": [
@@ -2235,9 +2125,7 @@
         ]
       },
       "put": {
-        "tags": [
-          "收藏"
-        ],
+        "tags": ["收藏"],
         "summary": "更新章节收藏信息",
         "operationId": "putUserEpisodeCollection",
         "parameters": [
@@ -2255,9 +2143,7 @@
                     "$ref": "#/components/schemas/EpisodeCollectionType"
                   }
                 },
-                "required": [
-                  "type"
-                ]
+                "required": ["type"]
               }
             }
           }
@@ -2306,9 +2192,7 @@
     },
     "/v0/users/{username}/collections/-/characters": {
       "get": {
-        "tags": [
-          "收藏"
-        ],
+        "tags": ["收藏"],
         "summary": "获取用户角色收藏列表",
         "operationId": "getUserCharacterCollections",
         "parameters": [
@@ -2342,9 +2226,7 @@
     },
     "/v0/users/{username}/collections/-/characters/{character_id}": {
       "get": {
-        "tags": [
-          "收藏"
-        ],
+        "tags": ["收藏"],
         "summary": "获取用户单个角色收藏信息",
         "operationId": "getUserCharacterCollection",
         "parameters": [
@@ -2391,9 +2273,7 @@
     },
     "/v0/users/{username}/collections/-/persons": {
       "get": {
-        "tags": [
-          "收藏"
-        ],
+        "tags": ["收藏"],
         "summary": "获取用户人物收藏列表",
         "operationId": "getUserPersonCollections",
         "parameters": [
@@ -2427,9 +2307,7 @@
     },
     "/v0/users/{username}/collections/-/persons/{person_id}": {
       "get": {
-        "tags": [
-          "收藏"
-        ],
+        "tags": ["收藏"],
         "summary": "获取用户单个人物收藏信息",
         "operationId": "getUserPersonCollection",
         "parameters": [
@@ -2476,9 +2354,7 @@
     },
     "/v0/revisions/persons": {
       "get": {
-        "tags": [
-          "编辑历史"
-        ],
+        "tags": ["编辑历史"],
         "summary": "Get Person Revisions",
         "operationId": "getPersonRevisions",
         "parameters": [
@@ -2526,9 +2402,7 @@
     },
     "/v0/revisions/persons/{revision_id}": {
       "get": {
-        "tags": [
-          "编辑历史"
-        ],
+        "tags": ["编辑历史"],
         "summary": "Get Person Revision",
         "operationId": "getPersonRevisionByRevisionId",
         "parameters": [
@@ -2580,9 +2454,7 @@
     },
     "/v0/revisions/characters": {
       "get": {
-        "tags": [
-          "编辑历史"
-        ],
+        "tags": ["编辑历史"],
         "summary": "Get Character Revisions",
         "operationId": "getCharacterRevisions",
         "parameters": [
@@ -2630,9 +2502,7 @@
     },
     "/v0/revisions/characters/{revision_id}": {
       "get": {
-        "tags": [
-          "编辑历史"
-        ],
+        "tags": ["编辑历史"],
         "summary": "Get Character Revision",
         "operationId": "getCharacterRevisionByRevisionId",
         "parameters": [
@@ -2676,9 +2546,7 @@
     },
     "/v0/revisions/subjects": {
       "get": {
-        "tags": [
-          "编辑历史"
-        ],
+        "tags": ["编辑历史"],
         "summary": "Get Subject Revisions",
         "operationId": "getSubjectRevisions",
         "parameters": [
@@ -2726,9 +2594,7 @@
     },
     "/v0/revisions/subjects/{revision_id}": {
       "get": {
-        "tags": [
-          "编辑历史"
-        ],
+        "tags": ["编辑历史"],
         "summary": "Get Subject Revision",
         "operationId": "getSubjectRevisionByRevisionId",
         "parameters": [
@@ -2772,9 +2638,7 @@
     },
     "/v0/revisions/episodes": {
       "get": {
-        "tags": [
-          "编辑历史"
-        ],
+        "tags": ["编辑历史"],
         "summary": "Get Episode Revisions",
         "operationId": "getEpisodeRevisions",
         "parameters": [
@@ -2822,9 +2686,7 @@
     },
     "/v0/revisions/episodes/{revision_id}": {
       "get": {
-        "tags": [
-          "编辑历史"
-        ],
+        "tags": ["编辑历史"],
         "summary": "Get Episode Revision",
         "operationId": "getEpisodeRevisionByRevisionId",
         "parameters": [
@@ -2868,9 +2730,7 @@
     },
     "/v0/indices": {
       "post": {
-        "tags": [
-          "目录"
-        ],
+        "tags": ["目录"],
         "summary": "Create a new index",
         "operationId": "newIndex",
         "responses": {
@@ -2904,9 +2764,7 @@
     },
     "/v0/indices/{index_id}": {
       "get": {
-        "tags": [
-          "目录"
-        ],
+        "tags": ["目录"],
         "summary": "Get Index By ID",
         "operationId": "getIndexById",
         "parameters": [
@@ -2936,9 +2794,7 @@
         ]
       },
       "put": {
-        "tags": [
-          "目录"
-        ],
+        "tags": ["目录"],
         "summary": "Edit index's information",
         "operationId": "editIndexById",
         "parameters": [
@@ -2985,9 +2841,7 @@
     },
     "/v0/indices/{index_id}/subjects": {
       "get": {
-        "tags": [
-          "目录"
-        ],
+        "tags": ["目录"],
         "summary": "Get Index Subjects",
         "operationId": "getIndexSubjectsByIndexId",
         "parameters": [
@@ -3028,9 +2882,7 @@
         ]
       },
       "post": {
-        "tags": [
-          "目录"
-        ],
+        "tags": ["目录"],
         "summary": "Add a subject to Index",
         "operationId": "addSubjectToIndexByIndexId",
         "parameters": [
@@ -3070,9 +2922,7 @@
     },
     "/v0/indices/{index_id}/subjects/{subject_id}": {
       "put": {
-        "tags": [
-          "目录"
-        ],
+        "tags": ["目录"],
         "summary": "Edit subject information in a index",
         "operationId": "editIndexSubjectsByIndexIdAndSubjectID",
         "description": "如果条目不存在于目录，会创建该条目",
@@ -3114,9 +2964,7 @@
         ]
       },
       "delete": {
-        "tags": [
-          "目录"
-        ],
+        "tags": ["目录"],
         "summary": "Delete a subject from a Index",
         "operationId": "delelteSubjectFromIndexByIndexIdAndSubjectID",
         "parameters": [
@@ -3147,9 +2995,7 @@
     },
     "/v0/indices/{index_id}/collect": {
       "post": {
-        "tags": [
-          "目录"
-        ],
+        "tags": ["目录"],
         "summary": "Collect index for current user",
         "operationId": "collectIndexByIndexIdAndUserId",
         "description": "为当前用户收藏一条目录",
@@ -3179,9 +3025,7 @@
         ]
       },
       "delete": {
-        "tags": [
-          "目录"
-        ],
+        "tags": ["目录"],
         "summary": "Uncollect index for current user",
         "operationId": "uncollectIndexByIndexIdAndUserId",
         "description": "为当前用户取消收藏一条目录",
@@ -3217,13 +3061,7 @@
       "Legacy_SubjectType": {
         "description": "条目类型 <br> 1 = book <br> 2 = anime <br> 3 = music <br> 4 = game <br> 6 = real",
         "type": "integer",
-        "enum": [
-          1,
-          2,
-          3,
-          4,
-          6
-        ],
+        "enum": [1, 2, 3, 4, 6],
         "example": 2
       },
       "Legacy_SubjectSmall": {
@@ -3242,33 +3080,15 @@
           "type": {
             "title": "SubjectType",
             "example": 2,
-            "enum": [
-              1,
-              2,
-              3,
-              4,
-              6
-            ],
+            "enum": [1, 2, 3, 4, 6],
             "type": "integer",
             "description": "条目类型\n- `1` 为 书籍\n- `2` 为 动画\n- `3` 为 音乐\n- `4` 为 游戏\n- `6` 为 三次元\n\n没有 `5`",
             "x-ms-enum": {
               "name": "SubjectType",
               "modelAsString": false,
-              "values": [
-                "Book",
-                "Anime",
-                "Music",
-                "Game",
-                "Real"
-              ]
+              "values": ["Book", "Anime", "Music", "Game", "Real"]
             },
-            "x-enum-varnames": [
-              "Book",
-              "Anime",
-              "Music",
-              "Game",
-              "Real"
-            ]
+            "x-enum-varnames": ["Book", "Anime", "Music", "Game", "Real"]
           },
           "name": {
             "description": "条目名称",
@@ -3528,15 +3348,7 @@
       "Legacy_EpisodeType": {
         "description": "章节类型 <br> 0 = 本篇 <br> 1 = 特别篇 <br> 2 = OP <br> 3 = ED <br> 4 = 预告/宣传/广告 <br> 5 = MAD <br> 6 = 其他",
         "type": "integer",
-        "enum": [
-          0,
-          1,
-          2,
-          3,
-          4,
-          5,
-          6
-        ],
+        "enum": [0, 1, 2, 3, 4, 5, 6],
         "example": 0
       },
       "Legacy_Episode": {
@@ -3593,11 +3405,7 @@
           "status": {
             "description": "放送状态 <br> Air = 已放送 <br> Today = 正在放送 <br> NA = 未放送",
             "type": "string",
-            "enum": [
-              "Air",
-              "Today",
-              "NA"
-            ],
+            "enum": ["Air", "Today", "NA"],
             "example": "Air"
           }
         }
@@ -3737,17 +3545,7 @@
       "Legacy_UserGroup": {
         "description": "用户组 <br> 1 = 管理员 <br> 2 = Bangumi 管理猿 <br> 3 = 天窗管理猿 <br> 4 = 禁言用户 <br> 5 = 禁止访问用户 <br> 8 = 人物管理猿 <br> 9 = 维基条目管理猿 <br> 10 = 用户 <br> 11 = 维基人",
         "type": "integer",
-        "enum": [
-          1,
-          2,
-          3,
-          4,
-          5,
-          8,
-          9,
-          10,
-          11
-        ],
+        "enum": [1, 2, 3, 4, 5, 8, 9, 10, 11],
         "example": 11
       },
       "Legacy_Person": {
@@ -3946,14 +3744,7 @@
         },
         "title": "User",
         "description": "实际的返回值可能包括文档未声明的 `url` 字段，此字段主要用于开发者从 api 响应直接转跳到网页。\n客户端开发者请不用依赖于此特性，此字段的值随时可能会改变。\n",
-        "required": [
-          "id",
-          "username",
-          "nickname",
-          "user_group",
-          "avatar",
-          "sign"
-        ],
+        "required": ["id", "username", "nickname", "user_group", "avatar", "sign"],
         "type": "object",
         "properties": {
           "id": {
@@ -3989,11 +3780,7 @@
           "small": "https://lain.bgm.tv/pic/user/s/000/00/00/1.jpg?r=1391790456"
         },
         "title": "Avatar",
-        "required": [
-          "large",
-          "medium",
-          "small"
-        ],
+        "required": ["large", "medium", "small"],
         "type": "object",
         "properties": {
           "large": {
@@ -4015,17 +3802,7 @@
       },
       "UserGroup": {
         "title": "UserGroup",
-        "enum": [
-          1,
-          2,
-          3,
-          4,
-          5,
-          8,
-          9,
-          10,
-          11
-        ],
+        "enum": [1, 2, 3, 4, 5, 8, 9, 10, 11],
         "type": "integer",
         "description": "用户组 - 1 = 管理员 - 2 = Bangumi 管理猿 - 3 = 天窗管理猿 - 4 = 禁言用户 - 5 = 禁止访问用户 - 8 = 人物管理猿 - 9 = 维基条目管理猿 - 10 = 用户 - 11 = 维基人",
         "x-ms-enum": {
@@ -4057,41 +3834,19 @@
       },
       "BloodType": {
         "title": "BloodType",
-        "enum": [
-          1,
-          2,
-          3,
-          4
-        ],
+        "enum": [1, 2, 3, 4],
         "type": "integer",
         "description": "Blood type of a person. A, B, AB, O",
         "x-ms-enum": {
           "name": "BloodType",
           "modelAsString": false,
-          "values": [
-            "A",
-            "B",
-            "AB",
-            "O"
-          ]
+          "values": ["A", "B", "AB", "O"]
         },
-        "x-enum-varnames": [
-          "A",
-          "B",
-          "AB",
-          "O"
-        ]
+        "x-enum-varnames": ["A", "B", "AB", "O"]
       },
       "Character": {
         "title": "Character",
-        "required": [
-          "id",
-          "name",
-          "type",
-          "summary",
-          "locked",
-          "stat"
-        ],
+        "required": ["id", "name", "type", "summary", "locked", "stat"],
         "type": "object",
         "properties": {
           "id": {
@@ -4234,93 +3989,45 @@
       },
       "CharacterType": {
         "title": "CharacterType",
-        "enum": [
-          1,
-          2,
-          3,
-          4
-        ],
+        "enum": [1, 2, 3, 4],
         "type": "integer",
         "description": "type of a character 角色，机体，舰船，组织...",
         "x-ms-enum": {
           "name": "CharacterType",
           "modelAsString": false,
-          "values": [
-            "Character",
-            "Mechanic",
-            "Ship",
-            "Organization"
-          ]
+          "values": ["Character", "Mechanic", "Ship", "Organization"]
         },
-        "x-enum-varnames": [
-          "Character",
-          "Mechanic",
-          "Ship",
-          "Organization"
-        ]
+        "x-enum-varnames": ["Character", "Mechanic", "Ship", "Organization"]
       },
       "SubjectCollectionType": {
         "title": "CollectionType",
         "example": 3,
-        "enum": [
-          1,
-          2,
-          3,
-          4,
-          5
-        ],
+        "enum": [1, 2, 3, 4, 5],
         "type": "integer",
         "description": "- `1`: 想看\n- `2`: 看过\n- `3`: 在看\n- `4`: 搁置\n- `5`: 抛弃",
         "x-ms-enum": {
           "name": "CollectionType",
           "modelAsString": false,
-          "values": [
-            "Wish",
-            "Done",
-            "Doing",
-            "OnHold",
-            "Dropped"
-          ]
+          "values": ["Wish", "Done", "Doing", "OnHold", "Dropped"]
         },
-        "x-enum-varnames": [
-          "Wish",
-          "Done",
-          "Doing",
-          "OnHold",
-          "Dropped"
-        ]
+        "x-enum-varnames": ["Wish", "Done", "Doing", "OnHold", "Dropped"]
       },
       "EpisodeCollectionType": {
         "title": "EpisodeCollectionType",
         "example": 2,
-        "enum": [
-          1,
-          2,
-          3
-        ],
+        "enum": [1, 2, 3],
         "type": "integer",
         "description": "- `0`: 未收藏\n- `1`: 想看\n- `2`: 看过\n- `3`: 抛弃",
         "x-ms-enum": {
           "name": "EpisodeCollectionType",
           "modelAsString": false,
-          "values": [
-            "Wish",
-            "Done",
-            "Dropped"
-          ]
+          "values": ["Wish", "Done", "Dropped"]
         },
-        "x-enum-varNames": [
-          "Wish",
-          "Done",
-          "Dropped"
-        ]
+        "x-enum-varNames": ["Wish", "Done", "Dropped"]
       },
       "Creator": {
         "title": "Creator",
-        "required": [
-          "username",
-          "nickname"
-        ],
+        "required": ["username", "nickname"],
         "type": "object",
         "properties": {
           "username": {
@@ -4336,12 +4043,7 @@
       },
       "DetailedRevision": {
         "title": "DetailedRevision",
-        "required": [
-          "id",
-          "type",
-          "summary",
-          "created_at"
-        ],
+        "required": ["id", "type", "summary", "created_at"],
         "type": "object",
         "properties": {
           "id": {
@@ -4393,13 +4095,7 @@
       },
       "PersonRevisionDataItem": {
         "title": "PersonRevisionDataItem",
-        "required": [
-          "prsn_infobox",
-          "prsn_summary",
-          "profession",
-          "extra",
-          "prsn_name"
-        ],
+        "required": ["prsn_infobox", "prsn_summary", "profession", "extra", "prsn_name"],
         "type": "object",
         "properties": {
           "prsn_infobox": {
@@ -4561,12 +4257,7 @@
       },
       "CharacterRevisionDataItem": {
         "title": "CharacterRevisionDataItem",
-        "required": [
-          "infobox",
-          "summary",
-          "name",
-          "extra"
-        ],
+        "required": ["infobox", "summary", "name", "extra"],
         "type": "object",
         "properties": {
           "infobox": {
@@ -4588,39 +4279,15 @@
       },
       "EpType": {
         "title": "EpType",
-        "enum": [
-          0,
-          1,
-          2,
-          3,
-          4,
-          5,
-          6
-        ],
+        "enum": [0, 1, 2, 3, 4, 5, 6],
         "type": "integer",
         "description": "本篇 = 0\n特别篇 = 1\nOP = 2\nED = 3\n预告/宣传/广告 = 4\nMAD = 5\n其他 = 6",
         "x-ms-enum": {
           "name": "EpType",
           "modelAsString": false,
-          "values": [
-            "MainStory",
-            "SP",
-            "OP",
-            "ED",
-            "PV",
-            "MAD",
-            "Other"
-          ]
+          "values": ["MainStory", "SP", "OP", "ED", "PV", "MAD", "Other"]
         },
-        "x-enum-varnames": [
-          "MainStory",
-          "SP",
-          "OP",
-          "ED",
-          "PV",
-          "MAD",
-          "Other"
-        ]
+        "x-enum-varnames": ["MainStory", "SP", "OP", "ED", "PV", "MAD", "Other"]
       },
       "Episode": {
         "title": "Episode",
@@ -4781,10 +4448,7 @@
       },
       "ErrorDetail": {
         "title": "ErrorDetail",
-        "required": [
-          "title",
-          "description"
-        ],
+        "required": ["title", "description"],
         "type": "object",
         "properties": {
           "title": {
@@ -4820,13 +4484,7 @@
       },
       "Images": {
         "title": "Images",
-        "required": [
-          "large",
-          "common",
-          "medium",
-          "small",
-          "grid"
-        ],
+        "required": ["large", "common", "medium", "small", "grid"],
         "type": "object",
         "properties": {
           "large": {
@@ -4921,13 +4579,7 @@
       },
       "IndexSubject": {
         "title": "IndexSubject",
-        "required": [
-          "id",
-          "type",
-          "name",
-          "comment",
-          "added_at"
-        ],
+        "required": ["id", "type", "name", "comment", "added_at"],
         "type": "object",
         "properties": {
           "id": {
@@ -5020,10 +4672,7 @@
         "type": "array",
         "items": {
           "title": "Item",
-          "required": [
-            "key",
-            "value"
-          ],
+          "required": ["key", "value"],
           "type": "object",
           "properties": {
             "key": {
@@ -5043,10 +4692,7 @@
                     "anyOf": [
                       {
                         "title": "KV",
-                        "required": [
-                          "k",
-                          "v"
-                        ],
+                        "required": ["k", "v"],
                         "type": "object",
                         "properties": {
                           "k": {
@@ -5061,9 +4707,7 @@
                       },
                       {
                         "title": "V",
-                        "required": [
-                          "v"
-                        ],
+                        "required": ["v"],
                         "type": "object",
                         "properties": {
                           "v": {
@@ -5148,11 +4792,7 @@
       },
       "Page": {
         "type": "object",
-        "required": [
-          "total",
-          "limit",
-          "offset"
-        ],
+        "required": ["total", "limit", "offset"],
         "properties": {
           "total": {
             "title": "Total",
@@ -5431,14 +5071,7 @@
       },
       "Person": {
         "title": "Person",
-        "required": [
-          "id",
-          "name",
-          "type",
-          "career",
-          "short_summary",
-          "locked"
-        ],
+        "required": ["id", "name", "type", "career", "short_summary", "locked"],
         "type": "object",
         "properties": {
           "id": {
@@ -5486,15 +5119,7 @@
       },
       "PersonCareer": {
         "title": "PersonCareer",
-        "enum": [
-          "producer",
-          "mangaka",
-          "artist",
-          "seiyu",
-          "writer",
-          "illustrator",
-          "actor"
-        ],
+        "enum": ["producer", "mangaka", "artist", "seiyu", "writer", "illustrator", "actor"],
         "type": "string",
         "description": "An enumeration."
       },
@@ -5560,16 +5185,7 @@
       },
       "PersonDetail": {
         "title": "PersonDetail",
-        "required": [
-          "id",
-          "name",
-          "type",
-          "career",
-          "summary",
-          "locked",
-          "last_modified",
-          "stat"
-        ],
+        "required": ["id", "name", "type", "career", "summary", "locked", "last_modified", "stat"],
         "type": "object",
         "properties": {
           "id": {
@@ -5663,12 +5279,7 @@
       },
       "PersonImages": {
         "title": "PersonImages",
-        "required": [
-          "large",
-          "medium",
-          "small",
-          "grid"
-        ],
+        "required": ["large", "medium", "small", "grid"],
         "type": "object",
         "properties": {
           "large": {
@@ -5691,37 +5302,19 @@
       },
       "PersonType": {
         "title": "PersonType",
-        "enum": [
-          1,
-          2,
-          3
-        ],
+        "enum": [1, 2, 3],
         "type": "integer",
         "description": "`1`, `2`, `3` 表示 `个人`, `公司`, `组合`",
         "x-ms-enum": {
           "name": "PersonType",
           "modelAsString": false,
-          "values": [
-            "Individual",
-            "Corporation",
-            "Association"
-          ]
+          "values": ["Individual", "Corporation", "Association"]
         },
-        "x-enum-varnames": [
-          "Individual",
-          "Corporation",
-          "Association"
-        ]
+        "x-enum-varnames": ["Individual", "Corporation", "Association"]
       },
       "RelatedCharacter": {
         "title": "RelatedCharacter",
-        "required": [
-          "id",
-          "name",
-          "summary",
-          "type",
-          "relation"
-        ],
+        "required": ["id", "name", "summary", "type", "relation"],
         "type": "object",
         "properties": {
           "id": {
@@ -5772,14 +5365,7 @@
       },
       "RelatedPerson": {
         "title": "RelatedPerson",
-        "required": [
-          "id",
-          "name",
-          "type",
-          "career",
-          "relation",
-          "eps"
-        ],
+        "required": ["id", "name", "type", "career", "relation", "eps"],
         "type": "object",
         "properties": {
           "id": {
@@ -5828,12 +5414,7 @@
       },
       "UserCharacterCollection": {
         "title": "UserCharacterCollection",
-        "required": [
-          "id",
-          "name",
-          "type",
-          "created_at"
-        ],
+        "required": ["id", "name", "type", "created_at"],
         "type": "object",
         "properties": {
           "id": {
@@ -5872,13 +5453,7 @@
       },
       "UserPersonCollection": {
         "title": "UserPersonCollection",
-        "required": [
-          "id",
-          "name",
-          "type",
-          "career",
-          "created_at"
-        ],
+        "required": ["id", "name", "type", "career", "created_at"],
         "type": "object",
         "properties": {
           "id": {
@@ -5923,12 +5498,7 @@
       },
       "Revision": {
         "title": "Revision",
-        "required": [
-          "id",
-          "type",
-          "summary",
-          "created_at"
-        ],
+        "required": ["id", "type", "summary", "created_at"],
         "type": "object",
         "properties": {
           "id": {
@@ -5955,10 +5525,7 @@
       },
       "Stat": {
         "title": "Stat",
-        "required": [
-          "comments",
-          "collects"
-        ],
+        "required": ["comments", "collects"],
         "type": "object",
         "properties": {
           "comments": {
@@ -6065,12 +5632,7 @@
           },
           "rating": {
             "title": "Rating",
-            "required": [
-              "rank",
-              "total",
-              "count",
-              "score"
-            ],
+            "required": ["rank", "total", "count", "score"],
             "type": "object",
             "properties": {
               "rank": {
@@ -6125,13 +5687,7 @@
           },
           "collection": {
             "title": "Collection",
-            "required": [
-              "wish",
-              "collect",
-              "doing",
-              "on_hold",
-              "dropped"
-            ],
+            "required": ["wish", "collect", "doing", "on_hold", "dropped"],
             "type": "object",
             "properties": {
               "wish": {
@@ -6260,10 +5816,7 @@
         "type": "array",
         "items": {
           "title": "Tag",
-          "required": [
-            "name",
-            "count"
-          ],
+          "required": ["name", "count"],
           "type": "object",
           "properties": {
             "name": {
@@ -6280,163 +5833,67 @@
       "SubjectType": {
         "title": "SubjectType",
         "example": 2,
-        "enum": [
-          1,
-          2,
-          3,
-          4,
-          6
-        ],
+        "enum": [1, 2, 3, 4, 6],
         "type": "integer",
         "description": "条目类型\n- `1` 为 书籍\n- `2` 为 动画\n- `3` 为 音乐\n- `4` 为 游戏\n- `6` 为 三次元\n\n没有 `5`",
         "x-ms-enum": {
           "name": "SubjectType",
           "modelAsString": false,
-          "values": [
-            "Book",
-            "Anime",
-            "Music",
-            "Game",
-            "Real"
-          ]
+          "values": ["Book", "Anime", "Music", "Game", "Real"]
         },
-        "x-enum-varnames": [
-          "Book",
-          "Anime",
-          "Music",
-          "Game",
-          "Real"
-        ]
+        "x-enum-varnames": ["Book", "Anime", "Music", "Game", "Real"]
       },
       "SubjectBookCategory": {
         "title": "SubjectBookCategory",
         "example": 1001,
-        "enum": [
-          0,
-          1001,
-          1002,
-          1003
-        ],
+        "enum": [0, 1001, 1002, 1003],
         "type": "integer",
         "description": "书籍类型\n- `0` 为 其他\n- `1001` 为 漫画\n- `1002` 为 小说\n- `1003` 为 画集",
         "x-ms-enum": {
           "name": "SubjectBookCategory",
           "modelAsString": false,
-          "values": [
-            "Other",
-            "Comic",
-            "Novel",
-            "Illustration"
-          ]
+          "values": ["Other", "Comic", "Novel", "Illustration"]
         },
-        "x-enum-varnames": [
-          "Other",
-          "Comic",
-          "Novel",
-          "Illustration"
-        ]
+        "x-enum-varnames": ["Other", "Comic", "Novel", "Illustration"]
       },
       "SubjectAnimeCategory": {
         "title": "SubjectAnimeCategory",
         "example": 1,
-        "enum": [
-          0,
-          1,
-          2,
-          3,
-          5
-        ],
+        "enum": [0, 1, 2, 3, 5],
         "type": "integer",
         "description": "动画类型\n- `0` 为 其他\n- `1` 为 TV\n- `2` 为 OVA\n- `3` 为 Movie\n- `5` 为 WEB",
         "x-ms-enum": {
           "name": "SubjectAnimeCategory",
           "modelAsString": false,
-          "values": [
-            "Other",
-            "TV",
-            "OVA",
-            "Movie",
-            "WEB"
-          ]
+          "values": ["Other", "TV", "OVA", "Movie", "WEB"]
         },
-        "x-enum-varnames": [
-          "Other",
-          "TV",
-          "OVA",
-          "Movie",
-          "WEB"
-        ]
+        "x-enum-varnames": ["Other", "TV", "OVA", "Movie", "WEB"]
       },
       "SubjectGameCategory": {
         "title": "SubjectGameCategory",
         "example": 4001,
-        "enum": [
-          0,
-          4001,
-          4003,
-          4002,
-          4005
-        ],
+        "enum": [0, 4001, 4003, 4002, 4005],
         "type": "integer",
         "description": "游戏类型\n- `0` 为 其他\n- `4001` 为 游戏\n- `4002` 为 软件\n- `4003` 为 扩展包\n- `4005` 为 桌游",
         "x-ms-enum": {
           "name": "SubjectGameCategory",
           "modelAsString": false,
-          "values": [
-            "Other",
-            "Games",
-            "Software",
-            "DLC",
-            "Tabletop"
-          ]
+          "values": ["Other", "Games", "Software", "DLC", "Tabletop"]
         },
-        "x-enum-varnames": [
-          "Other",
-          "Games",
-          "Software",
-          "DLC",
-          "Tabletop"
-        ]
+        "x-enum-varnames": ["Other", "Games", "Software", "DLC", "Tabletop"]
       },
       "SubjectRealCategory": {
         "title": "SubjectRealCategory",
         "example": 6,
-        "enum": [
-          0,
-          1,
-          2,
-          3,
-          6001,
-          6002,
-          6003,
-          6004
-        ],
+        "enum": [0, 1, 2, 3, 6001, 6002, 6003, 6004],
         "type": "integer",
         "description": "电影类型\n- `0` 为 其他\n- `1` 为 日剧\n- `2` 为 欧美剧\n- `3` 为 华语剧\n- `6001` 为 电视剧\n- `6002` 为 电影\n- `6003` 为 演出\n- `6004` 为 综艺",
         "x-ms-enum": {
           "name": "SubjectRealCategory",
           "modelAsString": false,
-          "values": [
-            "Other",
-            "JP",
-            "EN",
-            "CN",
-            "TV",
-            "Movie",
-            "Live",
-            "Show"
-          ]
+          "values": ["Other", "JP", "EN", "CN", "TV", "Movie", "Live", "Show"]
         },
-        "x-enum-varnames": [
-          "Other",
-          "JP",
-          "EN",
-          "CN",
-          "TV",
-          "Movie",
-          "Live",
-          "Show"
-        ]
+        "x-enum-varnames": ["Other", "JP", "EN", "CN", "TV", "Movie", "Live", "Show"]
       },
       "SubjectCategory": {
         "anyOf": [
@@ -6493,13 +5950,7 @@
           "tags": {
             "title": "Tags",
             "type": "array",
-            "example": [
-              "柯南",
-              "万年小学生",
-              "推理",
-              "青山刚昌",
-              "TV"
-            ],
+            "example": ["柯南", "万年小学生", "推理", "青山刚昌", "TV"],
             "items": {
               "type": "string"
             }
@@ -6594,29 +6045,15 @@
           "updated_at": {
             "type": "integer",
             "description": "A int64 unix timestamp, `0` as unknown or un-recorded.",
-            "example": [
-              0,
-              1700000000
-            ]
+            "example": [0, 1700000000]
           }
         },
-        "required": [
-          "episode",
-          "type",
-          "updated_at"
-        ],
+        "required": ["episode", "type", "updated_at"],
         "type": "object"
       },
       "v0_RelatedSubject": {
         "title": "RelatedSubject",
-        "required": [
-          "id",
-          "type",
-          "staff",
-          "eps",
-          "name",
-          "name_cn"
-        ],
+        "required": ["id", "type", "staff", "eps", "name", "name_cn"],
         "type": "object",
         "properties": {
           "id": {
@@ -6651,13 +6088,7 @@
       },
       "v0_subject_relation": {
         "title": "SubjectRelation",
-        "required": [
-          "id",
-          "type",
-          "name",
-          "name_cn",
-          "relation"
-        ],
+        "required": ["id", "type", "name", "name_cn", "relation"],
         "type": "object",
         "properties": {
           "id": {

@@ -1616,3 +1616,135 @@ select.input {
     gap: 8px;
     justify-content: flex-end;
 }
+
+/* ========== 系统日志面板 ========== */
+.log-entry {
+    padding: 6px 10px;
+    border-bottom: 1px solid #3a3a3a;
+    font-family: 'Maple Mono', monospace;
+    font-size: 12px;
+    color: #e0e0e0;
+    word-break: break-all;
+}
+.log-entry.log-error {
+    color: #ff6b6b;
+    background: rgba(255, 107, 107, 0.05);
+}
+.log-entry.log-warn {
+    color: #ffd93d;
+    background: rgba(255, 217, 61, 0.05);
+}
+.log-entry.log-info {
+    color: #6bcfff;
+}
+.log-entry.log-debug {
+    color: #888;
+}
+
+/* ========== 冲突解决 UI ========== */
+.conflict-modal {
+    z-index: 1100;
+}
+
+.conflict-modal-content {
+    background: #2a2a2a;
+    border: 1px solid #444;
+    border-radius: 8px;
+    padding: 16px;
+    width: 90%;
+    max-width: 800px;
+}
+
+.conflict-modal-header {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.conflict-modal-header h3 {
+    margin: 0;
+    color: #ffffff;
+    font-size: 16px;
+}
+
+.conflict-toolbar {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    margin-left: auto;
+    flex-wrap: wrap;
+}
+
+.conflict-count {
+    color: #ffd93d;
+    font-size: 13px;
+    font-weight: 600;
+    margin-right: 4px;
+}
+
+.conflict-modal-body {
+    margin-top: 12px;
+    max-height: 500px;
+    overflow-y: auto;
+}
+
+.conflict-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.conflict-table th,
+.conflict-table td {
+    padding: 8px 12px;
+    border: 1px solid #444;
+    text-align: left;
+    font-size: 13px;
+    color: #e0e0e0;
+    vertical-align: middle;
+}
+
+.conflict-table th {
+    background: #3a3a3a;
+    font-weight: 600;
+    color: #ffffff;
+    position: sticky;
+    top: 0;
+    z-index: 1;
+}
+
+.conflict-row:hover {
+    background: #333;
+}
+
+.conflict-col-local {
+    color: #6bcfff;
+    word-break: break-all;
+}
+
+.conflict-col-remote {
+    color: #ffd93d;
+    word-break: break-all;
+}
+
+.conflict-col-select {
+    white-space: nowrap;
+}
+
+.conflict-col-select input[type='radio'] {
+    margin: 0 2px 0 6px;
+    cursor: pointer;
+    vertical-align: middle;
+}
+
+.conflict-col-select input[type='radio']:first-child {
+    margin-left: 0;
+}
+
+.conflict-col-select label {
+    margin: 0 4px;
+    font-size: 12px;
+    color: #c0c0c0;
+    cursor: pointer;
+    vertical-align: middle;
+}

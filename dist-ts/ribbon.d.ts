@@ -28,10 +28,21 @@ interface WpsRibbonUI {
     ActivateTab?(tabId: string): void;
 }
 /**
+ * 初始化 Ribbon 模块：注册消息监听器。
+ *
+ * 必须由显式入口（如 `ts/entry/ribbon-entry.ts`）调用，
+ * 不在模块加载时自动执行，便于在测试环境按需初始化。
+ */
+export declare function initRibbon(): void;
+/**
+ * 移除 Ribbon 消息监听器，防止内存泄漏
+ */
+export declare function removeRibbonMessageListener(): void;
+/**
  * 获取"跳过冲突"复选框的初始按下状态
  * 从配置读取上次保存的设置，默认未选中
  */
-export declare function GetSkipConflictsPressed(control: WpsRibbonControl): boolean;
+export declare function GetSkipConflictsPressed(_control: WpsRibbonControl): boolean;
 /**
  * 当"跳过冲突"复选框被点击时，保存状态
  */
@@ -40,7 +51,7 @@ export declare function OnSkipConflictsChange(control: WpsRibbonControl): boolea
  * 获取"启用同步记录"复选框的初始按下状态
  * 从配置读取上次保存的设置，默认未选中
  */
-export declare function GetEnableSyncRecordPressed(control: WpsRibbonControl): boolean;
+export declare function GetEnableSyncRecordPressed(_control: WpsRibbonControl): boolean;
 /**
  * 当"启用同步记录"复选框被点击时，保存状态
  */
@@ -49,7 +60,7 @@ export declare function OnEnableSyncRecordChange(control: WpsRibbonControl): boo
  * 获取增量同步复选框的初始按下状态
  * 从配置读取上次保存的设置，默认未选中
  */
-export declare function GetIncrementalSyncPressed(control: WpsRibbonControl): boolean;
+export declare function GetIncrementalSyncPressed(_control: WpsRibbonControl): boolean;
 /**
  * 当增量同步复选框被点击时，保存状态
  */
@@ -63,8 +74,8 @@ export declare function OnAction(control: {
     Id: string;
 }): boolean;
 /**
-* 获取按钮图标（占位函数，实际图标由 CSS 或图片提供）
-*/
+ * 获取按钮图标（占位函数，实际图标由 CSS 或图片提供）
+ */
 export declare function GetBangumiImage(control: {
     Id: string;
 }): string;

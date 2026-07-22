@@ -1,0 +1,184 @@
+/**
+ * @fileoverview XSS 防护测试
+ *
+ * 验证 escapeHtml 和 sanitizeHtml 能正确中和常见的 XSS payload：
+ *   - `<img onerror=alert(1)>`
+ *   - `<script>alert(1)</script>`
+ *   - `<svg onload=alert(1)>`
+ *   - `"><script>alert(1)</script>`
+ *
+ * 测试环境：jsdom（escapeHtml 依赖 document.createElement，sanitizeHtml 依赖 DOMPurify）
+ *
+ * 模块依赖说明：
+ *   - escapeHtml 直接 import 自 stringUtilsPure.ts（零依赖纯模块），避免触发
+ *     stringUtils → crypto → index → handlers 的副作用链。
+ *   - sanitizeHtml 直接 import 自 sanitize.ts，该模块仅依赖 dompurify，无项目副作用。
+ */
+
+// @vitest-environment jsdom
+
+import { describe, it, expect } from 'vitest'
+import { sanitizeHtml } from '../ts/tools/sanitize.js'
+import { escapeHtml } from '../ts/tools/stringUtilsPure.js'
+
+// ========== 测试用 XSS payload ==========
+const XSS_PAYLOADS = [
+  '<img onerror=alert(1)>',
+  '<script>alert(1)</script>',
+  '<svg onload=alert(1)>',
+  '"><script>alert(1)</script>',
+] as const
+
+// ========== escapeHtml 测试 ==========
+describe('escapeHtml - XSS 防护', () => {
+  it('应转义 < > " \' & 五个字符', () => {
+    expect(escapeHtml('<>"\'&')).toBe('&lt;&gt;&quot;&#39;&amp;')
+  })
+
+  it('空值输入应返回空字符串', () => {
+    expect(escapeHtml(null)).toBe('')
+    expect(escapeHtml(undefined)).toBe('')
+    expect(escapeHtml('')).toBe('')
+  })
+
+  it.each(XSS_PAYLOADS)('payload 转义后不应包含原始标签起始符 <: %s', (payload) => {
+    const escaped = escapeHtml(payload)
+    // 转义后 < > 应变为 &lt; &gt;，浏览器不会将其解析为标签
+    expect(escaped).not.toMatch(/<(img|script|svg)\b/i)
+    // 转义后不应包含 <script（应被转义为 &lt;script）
+    expect(escaped).not.toMatch(/<script/i)
+  })
+
+  it('转义后的字符串写入 innerHTML 后不会生成可执行元素节点', () => {
+    for (const payload of XSS_PAYLOADS) {
+      const escaped = escapeHtml(payload)
+      const div = document.createElement('div')
+      // 通过 innerHTML 设置转义后的字符串，浏览器会将其视为文本而非标签
+      div.innerHTML = escaped
+      // 验证没有生成对应的元素节点
+      expect(div.querySelector('img')).toBeNull()
+      expect(div.querySelector('script')).toBeNull()
+      expect(div.querySelector('svg')).toBeNull()
+    }
+  })
+
+  it('转义后的字符串作为属性值不会逃逸引号', () => {
+    // 模拟 <option value="${escapeHtml(s)}"> 场景
+    const malicious = '"><script>alert(1)</script>'
+    const escaped = escapeHtml(malicious)
+    // 双引号应被转为 &quot;，无法逃逸属性引号
+    expect(escaped).not.toMatch(/"/)
+    expect(escaped).not.toMatch(/<script/i)
+  })
+})
+
+// ========== sanitizeHtml 测试 ==========
+describe('sanitizeHtml - XSS 防护', () => {
+  it('<img onerror=alert(1)> 应被剥离（img 不在白名单）', () => {
+    const cleaned = sanitizeHtml('<img onerror=alert(1)>')
+    expect(cleaned).not.toMatch(/<img\b/i)
+    // onerror 作为属性应不存在（img 标签整体被剥离）
+    expect(cleaned).not.toMatch(/<[^>]*\bonerror\s*=/i)
+  })
+
+  it('<script>alert(1)</script> 应被完全移除', () => {
+    const cleaned = sanitizeHtml('<script>alert(1)</script>')
+    expect(cleaned).not.toMatch(/<script\b/i)
+    expect(cleaned).not.toContain('alert(1)')
+  })
+
+  it('<svg onload=alert(1)> 应被剥离', () => {
+    const cleaned = sanitizeHtml('<svg onload=alert(1)>')
+    expect(cleaned).not.toMatch(/<svg\b/i)
+    expect(cleaned).not.toMatch(/<[^>]*\bonload\s*=/i)
+  })
+
+  it('"><script>alert(1)</script> 注入应被中和', () => {
+    const cleaned = sanitizeHtml('"><script>alert(1)</script>')
+    expect(cleaned).not.toMatch(/<script\b/i)
+    expect(cleaned).not.toContain('alert(1)')
+  })
+
+  it.each(XSS_PAYLOADS)('所有 payload 经 sanitizeHtml 后均无可执行标签: %s', (payload) => {
+    const cleaned = sanitizeHtml(payload)
+    // 不应保留任何危险标签
+    expect(cleaned).not.toMatch(/<(img|script|svg|iframe|object|embed)\b/i)
+    // 不应保留任何事件处理器属性（onError、onLoad 等）
+    // 注意：作为文本内容的 "onerror" 是安全的，这里只检查属性形式
+    expect(cleaned).not.toMatch(/<[^>]*\bon(error|load|click|mouseover|focus|blur|change)\s*=/i)
+  })
+
+  it('sanitizeHtml 不应破坏白名单内的合法 HTML 结构', () => {
+    const html =
+      '<div class="card"><p>名称：<b>测试</b></p><a href="https://example.com" target="_blank" rel="noopener">链接</a></div>'
+    const cleaned = sanitizeHtml(html)
+    expect(cleaned).toContain('<div')
+    expect(cleaned).toContain('<p>')
+    expect(cleaned).toContain('<b>测试</b>')
+    expect(cleaned).toContain('<a')
+    expect(cleaned).toContain('href="https://example.com"')
+  })
+
+  it('sanitizeHtml 应保留 <br> 换行标签', () => {
+    const cleaned = sanitizeHtml('第一行<br>第二行')
+    expect(cleaned).toContain('<br>')
+  })
+
+  it('sanitizeHtml 应剥离 javascript: 协议的 href', () => {
+    const cleaned = sanitizeHtml('<a href="javascript:alert(1)">点击</a>')
+    expect(cleaned).not.toMatch(/javascript:/i)
+  })
+
+  it('sanitizeHtml 空字符串输入应返回空字符串', () => {
+    expect(sanitizeHtml('')).toBe('')
+  })
+
+  it('sanitizeHtml 处理后写入 DOM 不应生成可执行脚本节点', () => {
+    const div = document.createElement('div')
+    for (const payload of XSS_PAYLOADS) {
+      div.innerHTML = sanitizeHtml(payload)
+      expect(div.querySelector('img')).toBeNull()
+      expect(div.querySelector('script')).toBeNull()
+      expect(div.querySelector('svg')).toBeNull()
+      expect(div.querySelector('iframe')).toBeNull()
+    }
+  })
+})
+
+// ========== 综合场景测试 ==========
+describe('XSS 防护综合场景', () => {
+  it('escapeHtml + sanitizeHtml 双重防护：卡片渲染场景', () => {
+    // 模拟 preview.ts 的卡片渲染场景
+    const userInput = '<img onerror=alert(1)>'
+    const cardHtml = `<div class="detail-item"><span class="name">${escapeHtml(userInput)}</span></div>`
+    const cleaned = sanitizeHtml(cardHtml)
+    // 卡片结构应保留
+    expect(cleaned).toContain('<div')
+    expect(cleaned).toContain('<span')
+    // 用户输入应被转义为文本（&lt;img ...），不应生成 <img> 标签
+    expect(cleaned).toContain('&lt;img')
+    expect(cleaned).not.toMatch(/<img\b/i)
+    // 不应保留 onerror 事件处理器属性
+    expect(cleaned).not.toMatch(/<[^>]*\bonerror\s*=/i)
+  })
+
+  it('sanitizeHtml 对含 table 的预览表格是安全的', () => {
+    // 模拟 renderPreviewTable 场景
+    const malicious = '<script>alert("xss")</script>'
+    const tableHtml = `<table class="preview-table"><tbody><tr><td>${escapeHtml(malicious)}</td></tr></tbody></table>`
+    const cleaned = sanitizeHtml(tableHtml)
+    expect(cleaned).toContain('<table')
+    expect(cleaned).toContain('<td>')
+    expect(cleaned).not.toMatch(/<script/i)
+  })
+
+  it('sanitizeHtml 对话框模板场景（含 button）', () => {
+    // 模拟 dialog.ts 的静态模板场景
+    const template = `<div class="bgm-modal-content"><button id="okBtn" class="bgm-btn">确定</button></div>`
+    const cleaned = sanitizeHtml(template)
+    expect(cleaned).toContain('<div')
+    expect(cleaned).toContain('<button')
+    expect(cleaned).toContain('id="okBtn"')
+    expect(cleaned).toContain('确定')
+  })
+})

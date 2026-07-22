@@ -49,13 +49,18 @@ function getErrorMessage(status) {
     };
     return statusMessages[status] || `HTTP 错误 (${status})`;
 }
-// ========== 异步 HTTP 请求（带进度） ==========
 /**
  * 异步发送 HTTP 请求（支持自动重试和进度回调）
+ *
+ * 类型说明：
+ * - 默认 T = unknown，函数不会"伪装"知道响应结构。
+ * - 若调用方需要类型化的响应，必须通过 options.zodSchema 提供运行时校验，
+ *   否则 data 字段为 unknown，调用方需自行做类型守卫。
+ *
  * @returns Promise<Result<{ status: number, data: T | null }>>
  */
 export async function httpRequest(endpoint, options = {}) {
-    const { method = 'GET', body = null, token, timeout = 30000, retries = BGM_CONFIG.MAX_RETRIES, onProgress } = options;
+    const { method = 'GET', body = null, token, timeout = 30000, retries = BGM_CONFIG.MAX_RETRIES, onProgress, zodSchema, signal } = options;
     // 输入验证
     try {
         validateEndpoint(endpoint);
@@ -66,20 +71,45 @@ export async function httpRequest(endpoint, options = {}) {
         const err = error instanceof BgmError ? error : new BgmError(String(error), 'VALIDATION_ERROR');
         return Result.fail(err);
     }
+    // 如果 signal 已 aborted，立即失败，不进入重试循环
+    if (signal?.aborted) {
+        return Result.fail(new BgmError('请求被取消', 'ABORTED'));
+    }
     const validMethod = validateMethod(method);
     let attempt = 0;
     while (attempt <= retries) {
+        // 每次重试前再次检查 signal 是否已 aborted
+        if (signal?.aborted) {
+            return Result.fail(new BgmError('请求被取消', 'ABORTED'));
+        }
         try {
             const response = await executeXhrRequest(BGM_CONFIG.API_BASE + endpoint, {
                 method: validMethod, body, timeout,
                 ...(token !== undefined && { token }),
-                ...(onProgress !== undefined && { onProgress })
+                ...(onProgress !== undefined && { onProgress }),
+                ...(signal !== undefined && { signal })
             });
             if (response.status === 204) {
                 return Result.ok({ status: 204, data: null });
             }
             if (response.status >= 200 && response.status < 300) {
-                return Result.ok(response);
+                // 边界处运行时校验：若提供 zodSchema，则解析得到类型化的 T；
+                // 否则保留 unknown，由调用方负责类型守卫。
+                if (zodSchema) {
+                    try {
+                        const parsed = zodSchema.parse(response.data);
+                        return Result.ok({ status: response.status, data: parsed });
+                    }
+                    catch (error) {
+                        BGM.handleError(error, { context: 'httpRequest', showAlert: false });
+                        const errMsg = error instanceof Error ? error.message : String(error);
+                        bgmLog(LOG_LEVELS.WARN, `[HTTP] 响应数据校验失败: ${errMsg}`);
+                        return Result.fail(new BgmError(`响应数据校验失败: ${errMsg}`, 'SCHEMA_VALIDATION_ERROR', { endpoint, status: response.status }));
+                    }
+                }
+                // TODO: 此处 unknown -> T 的单层断言仅为兼容未提供 zodSchema 的调用方。
+                //       后续应要求所有调用方提供 zodSchema，从而完全移除此断言。
+                return Result.ok({ status: response.status, data: response.data });
             }
             if (response.status === 429 && attempt < retries) {
                 attempt++;
@@ -92,6 +122,10 @@ export async function httpRequest(endpoint, options = {}) {
             return Result.fail(new BgmError(errorMessage, 'HTTP_ERROR', { status: response.status }));
         }
         catch (error) {
+            // 取消导致的失败不重试，直接返回
+            if (signal?.aborted) {
+                return Result.fail(new BgmError('请求被取消', 'ABORTED'));
+            }
             BGM.handleError(error, { context: 'httpRequest', showAlert: false });
             if (attempt < retries) {
                 attempt++;
@@ -108,6 +142,9 @@ export async function httpRequest(endpoint, options = {}) {
 }
 /**
  * 执行单次 XHR 请求并返回响应
+ *
+ * 注意：此函数返回的 data 类型为 unknown，因为 XHR 响应体本质上是不可信的外部数据，
+ * 无法在类型层面保证其结构。调用方（httpRequest）需通过 zodSchema 或类型守卫进行校验。
  */
 function executeXhrRequest(url, options) {
     return new Promise((resolve, reject) => {
@@ -125,6 +162,16 @@ function executeXhrRequest(url, options) {
         const xhr = new XMLHttpRequest();
         xhr.open(options.method, url, true);
         xhr.timeout = options.timeout;
+        // AbortSignal 支持：已 aborted 立即 reject；否则监听 abort 事件
+        if (options.signal) {
+            if (options.signal.aborted) {
+                reject(new Error('请求被取消'));
+                return;
+            }
+            options.signal.addEventListener('abort', () => {
+                xhr.abort();
+            });
+        }
         // 设置请求头
         if (options.token) {
             xhr.setRequestHeader('Authorization', `Bearer ${options.token}`);
@@ -143,6 +190,8 @@ function executeXhrRequest(url, options) {
             if (xhr.getAllResponseHeaders()) {
                 bgmLog(LOG_LEVELS.INFO, `[HTTP] 响应头: ${xhr.getAllResponseHeaders()}`);
             }
+            // data 始终为 unknown：JSON.parse 的返回值或原始 responseText 均不可信，
+            // 必须由上层 httpRequest 通过 zodSchema 校验后才能缩窄为具体类型。
             let data = null;
             if (xhr.responseText && xhr.responseText.length > 0) {
                 try {
@@ -152,6 +201,7 @@ function executeXhrRequest(url, options) {
                 catch (error) {
                     BGM.handleError(error, { context: 'executeXhrRequest', showAlert: false });
                     bgmLog(LOG_LEVELS.WARN, `[HTTP] 解析响应失败，返回原始文本: ${xhr.responseText.length > 200 ? xhr.responseText.substring(0, 200) + '...' : xhr.responseText}`);
+                    // responseText 是 string，可直接赋值给 unknown，无需任何断言
                     data = xhr.responseText;
                 }
             }

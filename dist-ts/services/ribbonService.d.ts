@@ -1,4 +1,50 @@
-import { type WpsWorksheet, type GithubSyncResult } from '../index.js';
+import { type WpsWorksheet, type GithubSyncResult, type GithubRemoteEntry, type LocalRowEntry } from '../index.js';
+/**
+ * 单条字段级冲突描述
+ *
+ * 用于 GitHub 同步流程中，远程条目与本地 Excel 行在同一字段上取值不同时记录。
+ */
+export interface Conflict {
+    /** Bangumi subject ID（主键） */
+    sid: string;
+    /** 冲突字段名（如 '打分', '名称', '是否看完'） */
+    field: string;
+    /** 本地值（字符串形式，便于直接渲染） */
+    localValue: string;
+    /** 远程值（字符串形式，便于直接渲染） */
+    remoteValue: string;
+    /** 本地行号（用于定位 Excel 行） */
+    localRow: number;
+}
+/**
+ * 用户对单条冲突的解决决策
+ *
+ * chosenValue 为 'local' 时表示保留本地值（从 diff.changedFields 中移除该字段）；
+ * 为 'remote' 时表示采用远程值（保留该字段在 diff.changedFields 中）。
+ */
+export interface ConflictResolution {
+    /** Bangumi subject ID（主键） */
+    sid: string;
+    /** 冲突字段名（与 Conflict.field 对应） */
+    field: string;
+    /** 用户选择的值来源 */
+    chosenValue: 'local' | 'remote';
+}
+/**
+ * 检测 GitHub 远程条目与本地 Excel 行之间的字段级冲突
+ *
+ * 比对规则：
+ * - 仅当 SID 同时存在于远程与本地时才可能产生冲突
+ * - 仅当远程字段非空（字符串化后非空字符串）且与本地不同时记录为冲突
+ * - 远程 type 字段以数值形式与本地「是否看完」文本做字符串比对（调用方负责映射）
+ *
+ * 注意：本函数为纯函数，不读取 Excel，不发起网络请求，可在 Node 测试环境直接运行。
+ *
+ * @param remote 远程条目数组
+ * @param local 本地条目映射（SID → 行）
+ * @returns 冲突列表（按远程数组顺序与字段比对表顺序）
+ */
+export declare function detectGithubConflicts(remote: GithubRemoteEntry[], local: Map<string, LocalRowEntry>): Conflict[];
 /**
  * 获取同步预览统计（不发送请求，仅扫描 Excel）
  * @param ws 工作表对象
@@ -64,4 +110,14 @@ export declare function openCollectionForRibbon(): void;
  * @returns 同步结果统计，失败时返回 null
  */
 export declare function syncFromGithubForRibbon(): Promise<GithubSyncResult | null>;
+/**
+ * 撤销最近一次 GitHub 同步操作（Ribbon 入口）
+ *
+ * 流程：
+ * 1. 读取最近一次同步会话描述；若栈为空，提示无可撤销操作
+ * 2. 弹确认对话框，提示用户即将撤销的会话描述
+ * 3. 调用 undoLastSync 按单元格逆序恢复
+ * 4. 显示恢复条目数
+ */
+export declare function undoLastSyncForRibbon(): Promise<void>;
 //# sourceMappingURL=ribbonService.d.ts.map

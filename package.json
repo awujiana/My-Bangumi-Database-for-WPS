@@ -1,27 +1,44 @@
 {
-	"name": "test",
-	"addonType": "et",
-	"version": "1.0.0",
-	"scripts": {
-		"dev": "vite --port 3889",
-		"build": "vite build",
-		"build:ts": "tsc --project tsconfig.build.json",
-		"debug": "npm run build:ts && concurrently \"tsc --project tsconfig.build.json --watch\" \"wpsjs debug\"",
-		"lint": "eslint . --ext .vue,.js,.jsx,.cjs,.mjs --fix --ignore-path .gitignore",
-		"format": "prettier --write src/",
-		"test": "vitest run",
-		"test:watch": "vitest",
-		"test:coverage": "vitest run --coverage"
-	},
-	"description": "WPS Excel 加载项 - 追番标记助手",
-	"devDependencies": {
-		"@vitest/coverage-v8": "^4.1.9",
-		"concurrently": "^9.2.1",
-		"et-jsapi-declare": "latest",
-		"typescript": "^6.0.3",
-		"vite": "^6.0.0",
-		"vite-plugin-static-copy": "^4.1.0",
-		"vitest": "^4.1.9",
-		"wpsjs": "latest"
-	}
+  "name": "test",
+  "addonType": "et",
+  "version": "1.0.0",
+  "scripts": {
+    "dev": "vite --port 3889",
+    "build": "vite build",
+    "build:ts": "tsc --project tsconfig.build.json",
+    "debug": "npm run build:ts && concurrently \"tsc --project tsconfig.build.json --watch\" \"wpsjs debug\"",
+    "lint": "eslint ts/ --ext .ts --fix",
+    "lint:check": "eslint ts/ --ext .ts",
+    "format": "prettier --write ts/ tests/",
+    "format:check": "prettier --check ts/ tests/",
+    "prepare": "husky",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage"
+  },
+  "description": "WPS Excel 加载项 - 追番标记助手",
+  "devDependencies": {
+    "@typescript-eslint/eslint-plugin": "^8.65.0",
+    "@typescript-eslint/parser": "^8.65.0",
+    "@vitest/coverage-v8": "^4.1.9",
+    "concurrently": "^9.2.1",
+    "eslint": "^8.57.1",
+    "eslint-import-resolver-typescript": "^4.4.5",
+    "eslint-plugin-import": "^2.32.0",
+    "et-jsapi-declare": "latest",
+    "husky": "^9.1.7",
+    "jsdom": "^29.1.1",
+    "lint-staged": "^16.4.0",
+    "prettier": "^3.9.5",
+    "typescript": "^6.0.3",
+    "vite": "^6.0.0",
+    "vite-plugin-static-copy": "^4.1.0",
+    "vitest": "^4.1.9",
+    "wpsjs": "latest"
+  },
+  "dependencies": {
+    "@types/dompurify": "^3.0.5",
+    "dompurify": "^3.4.12",
+    "zod": "^4.4.3"
+  }
 }

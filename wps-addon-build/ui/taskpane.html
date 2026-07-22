@@ -46,6 +46,10 @@
                 <button class="btn small" data-action="clearToken">清除</button>
                 <button class="btn small primary" data-action="testToken">测试</button>
             </div>
+            <div class="btn-group" style="margin-top:8px;">
+                <button class="btn small" data-action="exportConfig">📤 导出配置</button>
+                <button class="btn small" data-action="importConfig">📥 导入配置</button>
+            </div>
             <p class="hint">Access Token 获取方式：<a href="#" data-action="openTokenPage">点击创建</a><br>
             Token 以明文存储以便复制使用，关闭文档后会随插件存储清除</p>
         </div>
@@ -196,9 +200,19 @@
         </div>
 
         <!-- GitHub 仓库增量同步 -->
-        <div class="panel">
+        <div class="section">
             <h3>🌐 GitHub 仓库同步</h3>
             <p class="hint">从 GitHub 公开仓库下载 JSON 数据，按 SID 增量合并到当前工作表（新增+更新，不删除）。</p>
+            <div class="form-row">
+                <label for="syncSourceType">同步源类型</label>
+                <select id="syncSourceType" title="选择数据源">
+                    <option value="github">GitHub</option>
+                    <option value="gitlab">GitLab</option>
+                    <option value="gitee">Gitee</option>
+                    <option value="local">📁 本地文件</option>
+                    <option value="gist">Gist</option>
+                </select>
+            </div>
             <div class="form-row">
                 <label for="githubOwner">仓库所有者</label>
                 <input type="text" id="githubOwner" placeholder="如：your-username" autocomplete="off" spellcheck="false"/>
@@ -228,6 +242,7 @@
             <div class="btn-group">
                 <button class="btn small primary" data-action="saveGithubConfig">💾 保存配置</button>
                 <button class="btn small" data-action="syncFromGithub">⬇️ 立即同步</button>
+                <button class="btn small" data-action="undoLastSync">↩️ 撤销上次同步</button>
                 <button class="btn small" data-action="testGithubConfig" title="测试配置是否可用（HEAD 请求）">🔌 测试</button>
             </div>
             <p class="hint">
@@ -238,6 +253,39 @@
                 默认仓库：<code>awujiana/Bangumi-Archive-Anime-Excel-to-sync/main/data.jsonl</code><br>
                 示例 Raw URL：<code>https://raw.githubusercontent.com/{owner}/{repo}/{branch}/{path}</code>
             </p>
+        </div>
+
+        <!-- 系统日志面板 -->
+        <div class="section">
+            <h3>📜 系统日志</h3>
+            <div class="btn-group">
+                <button class="btn small" data-action="showLogPanel">📜 查看日志</button>
+                <button class="btn small" data-action="clearLogs">🗑️ 清空日志</button>
+            </div>
+            <p class="hint">查看最近 1000 条系统日志，用于排查同步失败等问题</p>
+        </div>
+
+        <!-- 日志面板模态框 -->
+        <div id="logModal" class="modal" style="display:none;">
+            <div class="modal-content" style="max-width:800px;">
+                <div class="modal-header">
+                    <h3>📜 系统日志</h3>
+                    <div class="btn-group">
+                        <select id="logLevelFilter" class="input" style="width:auto;">
+                            <option value="">全部级别</option>
+                            <option value="ERROR">仅 ERROR</option>
+                            <option value="WARN">仅 WARN</option>
+                            <option value="INFO">仅 INFO</option>
+                            <option value="DEBUG">仅 DEBUG</option>
+                        </select>
+                        <button class="btn small" data-action="exportLogs">📤 导出</button>
+                        <button class="btn small" data-action="closeLogModal">✕ 关闭</button>
+                    </div>
+                </div>
+                <div class="modal-body" id="logModalBody" style="max-height:500px;overflow-y:auto;">
+                    <!-- 日志条目动态填充 -->
+                </div>
+            </div>
         </div>
 
                             <!-- 同步预览模态框 -->

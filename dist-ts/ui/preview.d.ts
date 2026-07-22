@@ -3,7 +3,7 @@
  * @module ui/detail-preview
  * @description 数据预览、同步记录预览、详情模态框、单条上传
  */
-import { WpsRange } from '../index.js';
+import { type WpsRange } from '../index.js';
 export interface DetailItem {
     row: number;
     name: string;

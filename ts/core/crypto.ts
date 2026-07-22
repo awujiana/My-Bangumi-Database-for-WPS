@@ -13,8 +13,9 @@
  * @version 1.0.0
  */
 
-import { TOKEN_CONFIG, } from './constants.js';
-import  { BGM, bgmLog, LOG_LEVELS } from '../index.js';
+import { BGM, bgmLog, LOG_LEVELS } from '../index.js'
+
+import { TOKEN_CONFIG } from './constants.js'
 /**
  * 将字符串转换为UTF-8字节数组
  *
@@ -26,9 +27,9 @@ import  { BGM, bgmLog, LOG_LEVELS } from '../index.js';
  * const bytes = strToBytes('hello');
  * console.log(bytes); // Uint8Array([104, 101, 108, 108, 111])
  */
- function strToBytes(str: string): Uint8Array {
-    // .slice() 确保返回的 Uint8Array 的 buffer 是 ArrayBuffer，而不是 SharedArrayBuffer
-    return new TextEncoder().encode(str).slice();
+function strToBytes(str: string): Uint8Array {
+  // .slice() 确保返回的 Uint8Array 的 buffer 是 ArrayBuffer，而不是 SharedArrayBuffer
+  return new TextEncoder().encode(str).slice()
 }
 
 /**
@@ -44,7 +45,7 @@ import  { BGM, bgmLog, LOG_LEVELS } from '../index.js';
  * console.log(str); // 'hello'
  */
 function bytesToStr(bytes: Uint8Array): string {
-    return new TextDecoder().decode(bytes);
+  return new TextDecoder().decode(bytes)
 }
 
 /**
@@ -60,11 +61,11 @@ function bytesToStr(bytes: Uint8Array): string {
  * console.log(checksum); // 某个0-255的数字
  */
 export function calcChecksum(input: string): number {
-    let sum = 0;
-    for (let i = 0; i < input.length; i++) {
-        sum = ((sum << 5) - sum + input.charCodeAt(i)) & 0xFF;
-    }
-    return Math.abs(sum) % 256;
+  let sum = 0
+  for (let i = 0; i < input.length; i++) {
+    sum = ((sum << 5) - sum + input.charCodeAt(i)) & 0xff
+  }
+  return Math.abs(sum) % 256
 }
 
 /**
@@ -84,8 +85,8 @@ export function calcChecksum(input: string): number {
  * console.log(payload); // '1:123:mytoken123'
  */
 export function buildPayload(token: string): string {
-    const checksum = calcChecksum(token);
-    return `${TOKEN_CONFIG.VERSION}:${checksum}:${token}`;
+  const checksum = calcChecksum(token)
+  return `${TOKEN_CONFIG.VERSION}:${checksum}:${token}`
 }
 
 /**
@@ -105,33 +106,33 @@ export function buildPayload(token: string): string {
  * }
  */
 export function extractToken(encrypted: string): string | null {
-    try {
-        const parts = encrypted.split(':');
-        if (parts.length < 3) {
-            bgmLog(LOG_LEVELS.WARN, '[crypto] Payload格式无效');
-            return null;
-        }
-
-        const [version, checksumStr, ...tokenParts] = parts;
-        const token = tokenParts.join(':');
-        const checksum = parseInt(checksumStr!, 10);
-
-        if (version !== TOKEN_CONFIG.VERSION) {
-            bgmLog(LOG_LEVELS.WARN, `[crypto] Token版本不匹配: ${version}`);
-            return null;
-        }
-
-        const expectedChecksum = calcChecksum(token);
-        if (checksum !== expectedChecksum) {
-            bgmLog(LOG_LEVELS.WARN, '[crypto] Token校验和不匹配，可能已被篡改');
-            return null;
-        }
-
-        return token;
-    } catch (e: unknown) {
-        BGM.handleError(e, { context: 'extractToken', showAlert: false });
-        return null;
+  try {
+    const parts = encrypted.split(':')
+    if (parts.length < 3) {
+      bgmLog(LOG_LEVELS.WARN, '[crypto] Payload格式无效')
+      return null
     }
+
+    const [version, checksumStr, ...tokenParts] = parts
+    const token = tokenParts.join(':')
+    const checksum = parseInt(checksumStr!, 10)
+
+    if (version !== TOKEN_CONFIG.VERSION) {
+      bgmLog(LOG_LEVELS.WARN, `[crypto] Token版本不匹配: ${version}`)
+      return null
+    }
+
+    const expectedChecksum = calcChecksum(token)
+    if (checksum !== expectedChecksum) {
+      bgmLog(LOG_LEVELS.WARN, '[crypto] Token校验和不匹配，可能已被篡改')
+      return null
+    }
+
+    return token
+  } catch (e: unknown) {
+    BGM.handleError(e, { context: 'extractToken', showAlert: false })
+    return null
+  }
 }
 
 /**
@@ -153,25 +154,26 @@ export function extractToken(encrypted: string): string | null {
  * console.log(encrypted); // '1.abc123.xyz789'
  */
 export function encryptToken(token: string): string {
-    const payload = buildPayload(token);
-    const payloadBytes = strToBytes(payload);
-    const keyBytes = strToBytes(TOKEN_CONFIG.XOR_KEY);
+  const payload = buildPayload(token)
+  const payloadBytes = strToBytes(payload)
+  const keyBytes = strToBytes(TOKEN_CONFIG.XOR_KEY)
 
-    // 生成随机IV
-    const iv = new Uint8Array(16);
-    crypto.getRandomValues(iv);
+  // 生成随机IV
+  const iv = new Uint8Array(16)
+  crypto.getRandomValues(iv)
 
-    // XOR加密
-    const encrypted = new Uint8Array(payloadBytes.length);
-    for (let i = 0; i < payloadBytes.length; i++) {
-        encrypted[i] = (payloadBytes[i] ?? 0) ^ (keyBytes[i % keyBytes.length] ?? 0) ^ (iv[i % iv.length] ?? 0);
-    }
+  // XOR加密
+  const encrypted = new Uint8Array(payloadBytes.length)
+  for (let i = 0; i < payloadBytes.length; i++) {
+    encrypted[i] =
+      (payloadBytes[i] ?? 0) ^ (keyBytes[i % keyBytes.length] ?? 0) ^ (iv[i % iv.length] ?? 0)
+  }
 
-    // 返回格式：版本.IV.Base64(加密数据)
-    const ivBase64 = btoa(String.fromCharCode(...iv));
-    const encryptedBase64 = btoa(String.fromCharCode(...encrypted));
+  // 返回格式：版本.IV.Base64(加密数据)
+  const ivBase64 = btoa(String.fromCharCode(...iv))
+  const encryptedBase64 = btoa(String.fromCharCode(...encrypted))
 
-    return `${TOKEN_CONFIG.VERSION}.${ivBase64}.${encryptedBase64}`;
+  return `${TOKEN_CONFIG.VERSION}.${ivBase64}.${encryptedBase64}`
 }
 
 /**
@@ -187,35 +189,36 @@ export function encryptToken(token: string): string {
  * console.log(decrypted); // 'my-secret-token'
  */
 export function decryptToken(encrypted: string): string | null {
-    try {
-        const parts = encrypted.split('.');
-        if (parts.length < 3) {
-            bgmLog(LOG_LEVELS.WARN, '[crypto] 加密字符串格式无效');
-            return null;
-        }
-
-        const [version, ivBase64, encryptedBase64] = parts;
-
-        if (version !== TOKEN_CONFIG.VERSION) {
-            bgmLog(LOG_LEVELS.WARN, `[crypto] 加密版本不匹配: ${version}`);
-            return null;
-        }
-
-        // 解码Base64
-        const iv = Uint8Array.from(atob(ivBase64!), c => c.charCodeAt(0));
-        const encryptedData = Uint8Array.from(atob(encryptedBase64!), c => c.charCodeAt(0));
-
-        // XOR解密
-        const keyBytes = strToBytes(TOKEN_CONFIG.XOR_KEY);
-        const decrypted = new Uint8Array(encryptedData.length);
-        for (let i = 0; i < encryptedData.length; i++) {
-            decrypted[i] = (encryptedData[i] ?? 0) ^ (keyBytes[i % keyBytes.length] ?? 0) ^ (iv[i % iv.length] ?? 0);
-        }
-
-        const payload = bytesToStr(decrypted);
-        return extractToken(payload);
-    } catch (e: unknown) {
-        BGM.handleError(e, { context: 'decryptToken', showAlert: false });
-        return null;
+  try {
+    const parts = encrypted.split('.')
+    if (parts.length < 3) {
+      bgmLog(LOG_LEVELS.WARN, '[crypto] 加密字符串格式无效')
+      return null
     }
+
+    const [version, ivBase64, encryptedBase64] = parts
+
+    if (version !== TOKEN_CONFIG.VERSION) {
+      bgmLog(LOG_LEVELS.WARN, `[crypto] 加密版本不匹配: ${version}`)
+      return null
+    }
+
+    // 解码Base64
+    const iv = Uint8Array.from(atob(ivBase64!), (c) => c.charCodeAt(0))
+    const encryptedData = Uint8Array.from(atob(encryptedBase64!), (c) => c.charCodeAt(0))
+
+    // XOR解密
+    const keyBytes = strToBytes(TOKEN_CONFIG.XOR_KEY)
+    const decrypted = new Uint8Array(encryptedData.length)
+    for (let i = 0; i < encryptedData.length; i++) {
+      decrypted[i] =
+        (encryptedData[i] ?? 0) ^ (keyBytes[i % keyBytes.length] ?? 0) ^ (iv[i % iv.length] ?? 0)
+    }
+
+    const payload = bytesToStr(decrypted)
+    return extractToken(payload)
+  } catch (e: unknown) {
+    BGM.handleError(e, { context: 'decryptToken', showAlert: false })
+    return null
+  }
 }

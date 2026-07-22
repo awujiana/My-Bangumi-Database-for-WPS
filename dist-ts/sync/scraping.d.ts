@@ -74,13 +74,14 @@ export interface CollectionListResponse {
  * @async
  * @function verifyToken
  * @param {string} token - 待验证的API Token
+ * @param {AbortSignal} [signal] - 可选 AbortSignal，用于取消请求
  * @returns {Promise<TokenVerifyResult>} 验证结果
  *
  * @description
  * 通过调用 /v0/me 接口验证Token是否有效。
  * 如果Token有效，会自动更新缓存中的用户信息。
  */
-export declare function verifyToken(token: string): Promise<TokenVerifyResult>;
+export declare function verifyToken(token: string, signal?: AbortSignal): Promise<TokenVerifyResult>;
 /**
  * 获取用户的收藏列表
  *

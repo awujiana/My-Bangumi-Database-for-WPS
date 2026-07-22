@@ -5,6 +5,19 @@
  *              其他模块只需 `import { ... } from '../types/index.js'`
  *              即可获取所有核心功能与类型，降低模块间耦合。
  */
+// ========== 全局未捕获 Promise 拒绝处理（兜底机制） ==========
+// 监听 unhandledrejection 事件，作为异步错误处理的最后一道防线。
+// 此处理只作为兜底，不能替代局部 try/catch 与 Promise.catch()。
+if (typeof window !== 'undefined') {
+    window.addEventListener('unhandledrejection', (event) => {
+        const reason = event.reason;
+        const message = reason instanceof Error ? reason.message : String(reason);
+        // 使用 console.error 而非 bgmLog，避免在模块初始化阶段产生循环依赖
+        console.error('[unhandledrejection]', message);
+        // 阻止默认的控制台报错行为（已由本处理器记录）
+        event.preventDefault();
+    });
+}
 // ============================================================================
 // 1. 核心常量与枚举（来自 core/constants.js）
 // ============================================================================
@@ -75,7 +88,9 @@ setStatus, initMessageListener, } from './ui/message.js';
 // ============================================================================
 export { 
 // 显示用户 ID 设置对话框
-showUserIdDialog, updateTokenStatus, updateUserIdStatus, showTokenDialog, testDebugConnection, syncCollectionFromBgm, openUserCollection } from './ui/handlers.js';
+showUserIdDialog, updateTokenStatus, updateUserIdStatus, showTokenDialog, testDebugConnection, syncCollectionFromBgm, openUserCollection, 
+// 资源清理（防止事件监听器与定时器泄漏）
+removeMessageListener, clearAllPendingTimeouts, } from './ui/handlers.js';
 // ============================================================================
 // 8. 同步记录工作表（来自 sync/syncRecord.js）
 // ============================================================================
@@ -115,7 +130,9 @@ fetchGithubJson,
 // 读取本地条目（封装入口）
 readLocalEntriesForSync, 
 // 应用差异到工作表
-applyDiffToSheet, } from './sync/githubSync.js';
+applyDiffToSheet, 
+// 应用用户冲突解决决策到 diff 列表
+applyConflictResolutions, } from './sync/githubSync.js';
 export { 
 // 纯函数：差异计算（零依赖，可在 Node 测试环境运行）
 computeDiff, mapTypeToWatchStatus, tagsToString, SYNC_STRATEGY_LABELS, } from './sync/githubSyncDiff.js';
@@ -132,6 +149,10 @@ buildRawUrl,
 getSyncStrategy, 
 // 保存同步策略
 setSyncStrategy, 
+// 读取同步源类型
+getSyncSourceType, 
+// 保存同步源类型
+setSyncSourceType, 
 // 预设默认仓库配置
 DEFAULT_GITHUB_CONFIG, } from './sync/githubConfig.js';
 // ============================================================================
@@ -207,7 +228,7 @@ shellExecuteByOAAssist,
 // 获取 URL 路径（用于 API 调用）
 getUrlPath, 
 // 计算数据指纹（用于缓存）
-calcFingerprint } from './tools/util.js';
+calcFingerprint, } from './tools/util.js';
 // ============================================================================
 // 13. 配置管理模块（来自 tools/config.js）
 // ============================================================================
@@ -253,4 +274,8 @@ isWpsRange, wpsMsgBox, } from './tools/wps.js';
 // ============================================================================
 // 18. 服务层（来自 services/ribbonService.js）
 // ============================================================================
-export { detectConflicts, getSyncPreview } from './services/ribbonService.js';
+export { detectConflicts, getSyncPreview, detectGithubConflicts, } from './services/ribbonService.js';
+// ============================================================================
+// 19. 冲突解决 UI（来自 ui/conflictResolver.js）
+// ============================================================================
+export { showConflictResolver } from './ui/conflictResolver.js';

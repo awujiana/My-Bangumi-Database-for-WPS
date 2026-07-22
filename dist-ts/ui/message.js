@@ -3,7 +3,7 @@
  * @module ui/message
  * @description 消息监听、消息处理、状态设置
  */
-import { BGM, showAlert, showConfirm, updateTokenStatus, updateUserIdStatus, refreshSheets, refreshData, bgmLog, LOG_LEVELS } from '../index.js';
+import { BGM, showAlert, showConfirm, updateTokenStatus, updateUserIdStatus, refreshSheets, refreshData, bgmLog, LOG_LEVELS, } from '../index.js';
 // ========== 消息监听 ==========
 let _messageHandler = null;
 export function initMessageListener() {

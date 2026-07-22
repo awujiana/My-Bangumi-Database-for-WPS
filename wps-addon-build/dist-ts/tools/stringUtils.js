@@ -1,52 +1,23 @@
 /**
  * @fileoverview 字符串工具函数模块
  * @module tools/stringUtils
- * @description 提供 Excel 列号转换、字符串修剪、HTML 转义、指纹计算等纯函数。
- *              这些函数不依赖 WPS API，可独立测试。
- *              注意：calcFingerprint 依赖 core/crypto 中的 calcChecksum（纯算术函数），
- *              会随 util.ts 一同进入已有的循环依赖链（util → crypto → index → util），
- *              由于均为 hoisted 的 function 声明，运行时安全。
+ * @description 提供 Excel 列号转换、字符串修剪、HTML 转义、指纹计算等函数。
+ *
+ * 模块拆分说明：
+ *   - colNumToLetter / escapeHtml / trim 是无项目依赖的纯函数，已抽取到
+ *     ./stringUtilsPure.js（零依赖模块）。本模块 re-export 以保持向后兼容。
+ *   - calcFingerprint 依赖 core/crypto 中的 calcChecksum（纯算术函数），但
+ *     crypto.ts 又 import 自 index.ts，会随 util.ts 一同进入已有的循环依赖链
+ *     （util → crypto → index → util），由于均为 hoisted 的 function 声明，
+ *     运行时安全。
+ *
+ * 测试策略：单元测试应直接 import 自 stringUtilsPure.js，以避免触发
+ * handlers.ts 的 setTimeout / addEventListener 副作用。
  */
 import { calcChecksum } from '../core/crypto.js';
-/**
- * 列号转字母 (A, B, ..., Z, AA, AB, ...)
- *
- * @param col - 列号（1-based）
- * @returns 对应的字母表示
- */
-export function colNumToLetter(col) {
-    let letter = "";
-    while (col > 0) {
-        const mod = (col - 1) % 26;
-        letter = String.fromCharCode(65 + mod) + letter;
-        col = Math.floor((col - mod) / 26);
-    }
-    return letter;
-}
-/**
- * HTML 转义（防止 XSS）
- *
- * @param text - 待转义的字符串，可为 null/undefined
- * @returns 转义后的 HTML 安全字符串
- */
-export function escapeHtml(text) {
-    if (!text)
-        return "";
-    const div = document.createElement("div");
-    div.textContent = text;
-    return div.innerHTML;
-}
-/**
- * 字符串去除首尾空格
- *
- * @param str - 待修剪的字符串，可为 null/undefined
- * @returns 修剪后的字符串；输入为空值时返回空字符串
- */
-export function trim(str) {
-    if (!str)
-        return "";
-    return String(str).replace(/^\s+|\s+$/g, "");
-}
+import { colNumToLetter, escapeHtml, trim } from './stringUtilsPure.js';
+// Re-export 纯函数，保持向后兼容（其他模块仍可从 stringUtils 导入）
+export { colNumToLetter, escapeHtml, trim };
 /**
  * 计算 Excel 行数据的指纹（用于增量同步比较）
  *

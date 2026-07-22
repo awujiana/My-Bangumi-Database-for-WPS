@@ -149,6 +149,31 @@ export declare class Result<T> {
      */
     static fail<T>(error: BgmError): Result<T>;
     /**
+     * 创建表示成功但无返回值的结果（Result<void>）
+     * 用于配置校验、写入操作等"成功时无数据"的场景，
+     * 避免 Result.ok<void>(undefined) 触发 no-invalid-void-type 规则。
+     *
+     * @static
+     * @returns {Result<void>} 包装了 undefined 的成功 Result
+     *
+     * @example
+     * return Result.okVoid();
+     */
+    static okVoid(): Result<void>;
+    /**
+     * 创建表示失败且无返回值类型的结果（Result<void>）
+     * 用于配置校验等返回 Result<void> 的场景，
+     * 避免 Result.fail<void>(error) 触发 no-invalid-void-type 规则。
+     *
+     * @static
+     * @param {BgmError} error - 错误信息
+     * @returns {Result<void>} 包装了错误的 Result<void> 实例
+     *
+     * @example
+     * return Result.failVoid(new BgmError('配置不完整', 'CONFIG_INCOMPLETE'));
+     */
+    static failVoid(error: BgmError): Result<void>;
+    /**
      * 根据HTTP状态码创建结果
      * 2xx状态码视为成功，其他视为失败
      *

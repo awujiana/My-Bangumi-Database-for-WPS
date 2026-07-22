@@ -6,6 +6,7 @@
 import { getApp, bgmLog, BGM, getCellValue, trim, _getUserApiPath, wpsMsgBox, getCell, escapeHtml, showAlert, showToast, LOG_LEVELS, BGM_COLOR, findHeaderRow, getColumnMap, getSyncPreview, detectConflicts, extractSubjectId, mapWatchStatus, buildJsonPayload, bgmRequestSync, addSyncRecord, addTagsFromStr, WATCH_STATUS_MAP, SyncToBangumiAsync, showSyncProgressDialog, updateSyncProgressDialog, completeSyncProgressDialog, hideSyncProgressDialog } from '../index.js';
 import { getAllSyncRecords } from '../sync/syncRecord.js';
 import { loadBgToken } from '../tools/util.js';
+import { sanitizeHtml } from '../tools/sanitize.js';
 // ========== 辅助函数 ==========
 function safeAlert(message, title) {
     if (document.getElementById('bgmDialogContainer')) {
@@ -56,7 +57,7 @@ function getRowData(ws, rowNum, colMap, headerRow, seqCol = 9) {
     data.tagsRaw = [tagsGradeRaw, originalTagRaw].filter(Boolean).join('|');
     data.finishedDate = readCol('完播日');
     if (data.bgmUrl) {
-        data.sid = extractSubjectId(data.bgmUrl);
+        data.sid = extractSubjectId(data.bgmUrl) || '';
     }
     if (data.sid) {
         data.typeNum = mapWatchStatus(data.status);
@@ -334,7 +335,8 @@ export async function previewSyncContent() {
             body.removeEventListener('click', handlePreviewBodyClick);
             body.addEventListener('click', handlePreviewBodyClick);
         }
-        body.innerHTML = statsHtml + cardsHtml;
+        body.textContent = '';
+        body.insertAdjacentHTML('beforeend', sanitizeHtml(statsHtml + cardsHtml));
         modal.style.display = 'block';
         // ----- 状态下拉筛选器 -----
         const header = modal.querySelector('.modal-header');
@@ -360,8 +362,17 @@ export async function previewSyncContent() {
         const select = document.createElement('select');
         select.id = 'statusFilterSelect';
         select.className = 'status-filter-select';
-        select.innerHTML = `<option value="all">全部 (${actualCardCount})</option>` +
-            sortedStatus.map(s => `<option value="${escapeHtml(s)}">${escapeHtml(s)} (${statusMap.get(s)})</option>`).join('');
+        // 使用 DOM API 创建 option，避免 innerHTML 拼接（XSS 防护）
+        const allOption = document.createElement('option');
+        allOption.value = 'all';
+        allOption.textContent = `全部 (${actualCardCount})`;
+        select.appendChild(allOption);
+        for (const s of sortedStatus) {
+            const opt = document.createElement('option');
+            opt.value = s;
+            opt.textContent = `${s} (${statusMap.get(s) ?? 0})`;
+            select.appendChild(opt);
+        }
         const syncAllBtn = document.getElementById('syncAllBtn');
         if (syncAllBtn) {
             syncAllBtn.insertAdjacentElement('afterend', select);

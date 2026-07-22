@@ -9,28 +9,26 @@
  */
 import { BGM_CONFIG, LOG_LEVELS, bgmLog } from '../index.js';
 /**
- * 提取响应消息
- */
-function extractResponseMessage(data) {
-    if (typeof data === 'object' && data !== null) {
-        const obj = data;
-        if (typeof obj.msg === 'string' && obj.msg)
-            return obj.msg;
-        if (typeof obj.message === 'string' && obj.message)
-            return obj.message;
-        if (typeof obj.error === 'string' && obj.error)
-            return obj.error;
-    }
-    return 'success';
-}
-/**
  * 执行HTTP请求的通用Promise封装
+ * @param xhr 已配置好的 XMLHttpRequest 对象
+ * @param signal 可选 AbortSignal，用于取消请求
  */
-function requestPromise(xhr) {
+function requestPromise(xhr, signal) {
     const startTime = Date.now();
     if (!xhr.timeout)
         xhr.timeout = 30000;
     return new Promise((resolve, reject) => {
+        // 如果 signal 已 aborted，立即 reject
+        if (signal?.aborted) {
+            reject(new Error('请求被取消'));
+            return;
+        }
+        // AbortSignal 支持：监听 abort 事件触发 xhr.abort()
+        if (signal) {
+            signal.addEventListener('abort', () => {
+                xhr.abort();
+            });
+        }
         xhr.onload = () => {
             const duration = Date.now() - startTime;
             bgmLog(LOG_LEVELS.INFO, `[scraping] HTTP ${xhr.status} (${xhr.statusText}), 耗时: ${duration}ms`);
@@ -42,18 +40,21 @@ function requestPromise(xhr) {
                 reject(new Error('解析响应失败'));
             }
         };
-        xhr.onerror = () => reject(new Error('网络错误'));
+        xhr.onerror = () => {
+            // 如果是 abort 导致的 onerror，归类为取消
+            reject(new Error(signal?.aborted ? '请求被取消' : '网络错误'));
+        };
         xhr.ontimeout = () => reject(new Error('请求超时'));
         xhr.send();
     });
 }
-function xhrGet(url, token) {
+function xhrGet(url, token, signal) {
     const xhr = new XMLHttpRequest();
     xhr.open('GET', url, true);
     xhr.timeout = 30000;
     xhr.setRequestHeader('Authorization', `Bearer ${token}`);
     xhr.setRequestHeader('Content-Type', 'application/json');
-    return requestPromise(xhr);
+    return requestPromise(xhr, signal);
 }
 /**
  * 验证Bangumi API Token的有效性
@@ -61,13 +62,14 @@ function xhrGet(url, token) {
  * @async
  * @function verifyToken
  * @param {string} token - 待验证的API Token
+ * @param {AbortSignal} [signal] - 可选 AbortSignal，用于取消请求
  * @returns {Promise<TokenVerifyResult>} 验证结果
  *
  * @description
  * 通过调用 /v0/me 接口验证Token是否有效。
  * 如果Token有效，会自动更新缓存中的用户信息。
  */
-export async function verifyToken(token) {
+export async function verifyToken(token, signal) {
     const result = { valid: false, message: '' };
     if (!token) {
         result.message = 'Token 不能为空';
@@ -80,7 +82,7 @@ export async function verifyToken(token) {
         xhr.open('GET', apiUrl, true);
         xhr.setRequestHeader('Authorization', `Bearer ${token}`);
         xhr.setRequestHeader('Content-Type', 'application/json');
-        const response = await requestPromise(xhr);
+        const response = await requestPromise(xhr, signal);
         const userData = response.data;
         if (response.status === 200) {
             result.valid = true;
@@ -146,7 +148,7 @@ export async function fetchAllUserCollections(token, userId, options) {
             if (xhrResult.status < 200 || xhrResult.status >= 300) {
                 if (xhrResult.status === 429) {
                     bgmLog(LOG_LEVELS.WARN, '[fetchAllUserCollections] API限流，等待重试...');
-                    await new Promise(resolve => setTimeout(resolve, BGM_CONFIG.REQUEST_DELAY * 2));
+                    await new Promise((resolve) => setTimeout(resolve, BGM_CONFIG.REQUEST_DELAY * 2));
                     continue;
                 }
                 throw new Error(`HTTP ${xhrResult.status}`);
@@ -169,7 +171,7 @@ export async function fetchAllUserCollections(token, userId, options) {
             else {
                 break;
             }
-            await new Promise(resolve => setTimeout(resolve, BGM_CONFIG.REQUEST_DELAY));
+            await new Promise((resolve) => setTimeout(resolve, BGM_CONFIG.REQUEST_DELAY));
         }
         catch (e) {
             const errMsg = e instanceof Error ? e.message : undefined;

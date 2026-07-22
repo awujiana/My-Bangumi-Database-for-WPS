@@ -1,5 +1,58 @@
 // ts/services/ribbonService.ts
 import { getApp, bgmLog, BGM, wpsMsgBox, loadBgToken, storeBgToken, copyTokenToClipboard, getDataSheet, findHeaderRow, getLastRow, getColumnMap, extractSubjectId, mapWatchStatus, getCellValue, readRangeValues, getFilterStatus, BGM_COLOR, LOG_LEVELS, SyncToBangumiAsync, _getBgmUserId, testTokenValidityForRibbon, fetchAllUserCollections, getCell, trim, calcFingerprint, syncFromGithub, isGithubConfigComplete, getSyncStrategy, SYNC_STRATEGY_LABELS, } from '../index.js';
+import { undoLastSync, getLastSessionDescription } from '../sync/undoStack.js';
+/** 远程字段比对表（顺序固定，便于稳定测试） */
+const GITHUB_CONFLICT_FIELDS = Object.freeze([
+    { localField: '名称', remoteToString: (r) => r.name ?? '' },
+    { localField: '是否看完', remoteToString: (r) => (r.type !== undefined ? String(r.type) : '') },
+    { localField: '打分', remoteToString: (r) => (r.score !== undefined ? String(r.score) : '') },
+    {
+        localField: '标签/分级',
+        remoteToString: (r) => (Array.isArray(r.tags) ? r.tags.join('|') : ''),
+    },
+    { localField: '剧透/感言', remoteToString: (r) => r.comment ?? '' },
+    { localField: '集数', remoteToString: (r) => (r.episode !== undefined ? String(r.episode) : '') },
+]);
+/**
+ * 检测 GitHub 远程条目与本地 Excel 行之间的字段级冲突
+ *
+ * 比对规则：
+ * - 仅当 SID 同时存在于远程与本地时才可能产生冲突
+ * - 仅当远程字段非空（字符串化后非空字符串）且与本地不同时记录为冲突
+ * - 远程 type 字段以数值形式与本地「是否看完」文本做字符串比对（调用方负责映射）
+ *
+ * 注意：本函数为纯函数，不读取 Excel，不发起网络请求，可在 Node 测试环境直接运行。
+ *
+ * @param remote 远程条目数组
+ * @param local 本地条目映射（SID → 行）
+ * @returns 冲突列表（按远程数组顺序与字段比对表顺序）
+ */
+export function detectGithubConflicts(remote, local) {
+    const conflicts = [];
+    for (const entry of remote) {
+        if (!entry.sid)
+            continue;
+        const localEntry = local.get(entry.sid);
+        if (!localEntry)
+            continue;
+        for (const spec of GITHUB_CONFLICT_FIELDS) {
+            const remoteValue = spec.remoteToString(entry);
+            if (!remoteValue)
+                continue; // 远程无值，不视为冲突
+            const localValue = localEntry.fields[spec.localField] ?? '';
+            if (remoteValue !== localValue) {
+                conflicts.push({
+                    sid: entry.sid,
+                    field: spec.localField,
+                    localValue,
+                    remoteValue,
+                    localRow: localEntry.row,
+                });
+            }
+        }
+    }
+    return conflicts;
+}
 /**
  * 获取同步预览统计（不发送请求，仅扫描 Excel）
  * @param ws 工作表对象
@@ -18,7 +71,17 @@ export function getSyncPreview(ws, colMap, lastRow, headerRow, options) {
     bgmLog(LOG_LEVELS.INFO, `[getSyncPreview] 起始行: ${startRow}, 最后行: ${lastRow}, 总行数: ${lastRow - startRow + 1}`);
     bgmLog(LOG_LEVELS.INFO, `[getSyncPreview] 增量同步: ${isIncremental ? '开启' : '关闭'}`);
     // 批量读取（与同步函数相同的列范围）
-    const neededKeys = ['Bangumi_URL', '名称', '是否看完', '打分', '标签/分级', '原作标签', '剧透/感言', '集数', '集号'];
+    const neededKeys = [
+        'Bangumi_URL',
+        '名称',
+        '是否看完',
+        '打分',
+        '标签/分级',
+        '原作标签',
+        '剧透/感言',
+        '集数',
+        '集号',
+    ];
     let maxCol = 1;
     for (const key of neededKeys) {
         if (colMap.has(key))
@@ -32,7 +95,7 @@ export function getSyncPreview(ws, colMap, lastRow, headerRow, options) {
     bgmLog(LOG_LEVELS.INFO, `[getSyncPreview] 筛选检测结果: hasFilter=${filterStatus.hasFilter}, visibleRows=${filterStatus.visibleRows.length}`);
     let rowsToProcess = [];
     if (filterStatus.hasFilter && filterStatus.visibleRows.length > 0) {
-        rowsToProcess = filterStatus.visibleRows.filter(r => r >= startRow);
+        rowsToProcess = filterStatus.visibleRows.filter((r) => r >= startRow);
         bgmLog(LOG_LEVELS.INFO, `[getSyncPreview] 筛选模式: ${rowsToProcess.length} 行可见`);
     }
     else {
@@ -66,9 +129,10 @@ export function getSyncPreview(ws, colMap, lastRow, headerRow, options) {
         // 检查是否已上传（序列号列颜色）
         const seqCol = colMap.get('序列号') || 4;
         const seqCell = getCell(ws, rowNum, seqCol);
-        const isUploaded = seqCell?.Interior && (seqCell.Interior.Color === BGM_COLOR.SUCCESS ||
-            seqCell.Interior.Color === BGM_COLOR.LIGHT_GREEN ||
-            seqCell.Interior.Color === BGM_COLOR.DARK_GREEN);
+        const isUploaded = seqCell?.Interior &&
+            (seqCell.Interior.Color === BGM_COLOR.SUCCESS ||
+                seqCell.Interior.Color === BGM_COLOR.LIGHT_GREEN ||
+                seqCell.Interior.Color === BGM_COLOR.DARK_GREEN);
         if (isUploaded) {
             alreadyUploaded++;
             if (isIncremental) {
@@ -77,13 +141,15 @@ export function getSyncPreview(ws, colMap, lastRow, headerRow, options) {
                 if (sid && fingerprintMap) {
                     const currentFingerprint = calcFingerprint([
                         getField(rowNum, '名称'),
-                        mapWatchStatus(getField(rowNum, '是否看完') || getField(rowNum, '状态') || getField(rowNum, '观看状态')).toString(),
+                        mapWatchStatus(getField(rowNum, '是否看完') ||
+                            getField(rowNum, '状态') ||
+                            getField(rowNum, '观看状态')).toString(),
                         getField(rowNum, '打分'),
                         getField(rowNum, '标签/分级'),
                         getField(rowNum, '原作标签'),
                         getField(rowNum, '剧透/感言'),
                         getField(rowNum, '集数'),
-                        getField(rowNum, '集号')
+                        getField(rowNum, '集号'),
                     ]);
                     if (fingerprintMap.get(sid) === currentFingerprint) {
                         incrementalSkipped++;
@@ -119,7 +185,7 @@ export function getSyncPreview(ws, colMap, lastRow, headerRow, options) {
                         getField(rowNum, '原作标签'),
                         getField(rowNum, '剧透/感言'),
                         getField(rowNum, '集数'),
-                        getField(rowNum, '集号')
+                        getField(rowNum, '集号'),
                     ]);
                     if (fingerprintMap.get(sid) === currentFingerprint) {
                         incrementalSkipped++;
@@ -139,7 +205,16 @@ export function getSyncPreview(ws, colMap, lastRow, headerRow, options) {
     bgmLog(LOG_LEVELS.INFO, `[getSyncPreview] 无URL行数: ${noUrl}`);
     bgmLog(LOG_LEVELS.INFO, `[getSyncPreview] 空状态行数: ${emptyStatus}`);
     bgmLog(LOG_LEVELS.INFO, `[getSyncPreview] 增量跳过行数: ${incrementalSkipped}`);
-    return { total, valid, willSync, willSkip, alreadyUploaded, noUrl, emptyStatus, incrementalSkipped };
+    return {
+        total,
+        valid,
+        willSync,
+        willSkip,
+        alreadyUploaded,
+        noUrl,
+        emptyStatus,
+        incrementalSkipped,
+    };
 }
 /**
  * 异步检测 Excel 与 Bangumi 收藏之间的冲突
@@ -151,7 +226,7 @@ export async function detectConflicts(ws, colMap, lastRow, headerRow, token) {
     let conflictCount = 0;
     let bgmCollectionReady = false;
     // 1. 获取 Bangumi 收藏快照
-    let bgmCollection = new Map();
+    const bgmCollection = new Map();
     try {
         const collections = await fetchAllUserCollections(token);
         for (const item of collections) {
@@ -161,7 +236,7 @@ export async function detectConflicts(ws, colMap, lastRow, headerRow, token) {
                 ...(item.rate !== undefined && { rate: item.rate }),
                 tags: item.tags || [],
                 comment: item.comment || '',
-                subject_name: item.subject?.name || ''
+                subject_name: item.subject?.name || '',
             });
         }
         bgmCollectionReady = true;
@@ -176,7 +251,7 @@ export async function detectConflicts(ws, colMap, lastRow, headerRow, token) {
     bgmLog(LOG_LEVELS.INFO, `[detectConflicts] 筛选检测结果: hasFilter=${filterStatus.hasFilter}, visibleRows=${filterStatus.visibleRows.length}`);
     let rowsToProcess = [];
     if (filterStatus.hasFilter && filterStatus.visibleRows.length > 0) {
-        rowsToProcess = filterStatus.visibleRows.filter(r => r >= startRow);
+        rowsToProcess = filterStatus.visibleRows.filter((r) => r >= startRow);
         bgmLog(LOG_LEVELS.INFO, `[detectConflicts] 筛选模式: ${rowsToProcess.length} 行可见`);
     }
     else {
@@ -210,7 +285,7 @@ export async function detectConflicts(ws, colMap, lastRow, headerRow, token) {
                 sid,
                 name: getField(rowNum, '名称') || '',
                 existingType: Number(bgmEntry.type),
-                newType: excelType
+                newType: excelType,
             });
             conflictCount++;
         }
@@ -241,7 +316,7 @@ export async function syncWithConfirmation() {
     const headerRow = findHeaderRow(ws) || 1;
     const lastRow = getLastRow(ws);
     const colMap = getColumnMap(ws, headerRow);
-    if (!colMap.has("Bangumi_URL")) {
+    if (!colMap.has('Bangumi_URL')) {
         wpsMsgBox('未找到 Bangumi URL 列', 0, 48);
         return;
     }
@@ -284,18 +359,13 @@ export async function syncWithConfirmation() {
     if (confirmResult !== 6)
         return;
     // 4. 冲突检测（用户确认后执行，网络不通时会被 try/catch 捕获并跳过）
-    let conflictInfo = '';
     let skipSids = undefined;
     try {
         bgmLog(LOG_LEVELS.INFO, '[syncWithConfirmation] 开始冲突检测（需要请求 Bangumi API）...');
         const { conflicts, conflictCount } = await detectConflicts(ws, colMap, lastRow, headerRow, token);
         if (conflictCount > 0) {
             if (conflictStrategy === 'skip') {
-                skipSids = new Set(conflicts.map(c => c.sid));
-                conflictInfo = `检测到 ${conflictCount} 条冲突，已选择【跳过冲突】。\n\n`;
-            }
-            else {
-                conflictInfo = `检测到 ${conflictCount} 条冲突，将使用【Excel数据覆盖】。\n\n`;
+                skipSids = new Set(conflicts.map((c) => c.sid));
             }
         }
         bgmLog(LOG_LEVELS.INFO, `[syncWithConfirmation] 冲突检测完成: ${conflictCount} 条冲突`);
@@ -317,7 +387,7 @@ export async function syncWithConfirmation() {
             onProgress: (current, total, message) => {
                 if (app?.StatusBar !== undefined)
                     app.StatusBar = `[${current}/${total}] ${message}`;
-            }
+            },
         });
         if (app)
             app.StatusBar = false;
@@ -448,8 +518,7 @@ export async function syncFromGithubForRibbon() {
     bgmLog(LOG_LEVELS.INFO, `[syncFromGithubForRibbon] 同步策略: ${strategy} (${strategyLabel})`);
     // 3. 用户确认
     const confirmed = await wpsMsgBox(`将从 GitHub 仓库下载 JSON 并按策略【${strategyLabel}】合并到当前工作表。\n是否继续？`, 4, // MB_YESNO
-    32 // MB_ICONQUESTION
-    );
+    32);
     if (confirmed !== 6) {
         bgmLog(LOG_LEVELS.INFO, '[syncFromGithubForRibbon] 用户取消同步');
         return null;
@@ -478,5 +547,39 @@ export async function syncFromGithubForRibbon() {
         bgmLog(LOG_LEVELS.ERROR, `[syncFromGithubForRibbon] 同步失败: ${errMsg}`);
         await wpsMsgBox(`GitHub 同步失败：${errMsg}`, 0, 16);
         return null;
+    }
+}
+/**
+ * 撤销最近一次 GitHub 同步操作（Ribbon 入口）
+ *
+ * 流程：
+ * 1. 读取最近一次同步会话描述；若栈为空，提示无可撤销操作
+ * 2. 弹确认对话框，提示用户即将撤销的会话描述
+ * 3. 调用 undoLastSync 按单元格逆序恢复
+ * 4. 显示恢复条目数
+ */
+export async function undoLastSyncForRibbon() {
+    bgmLog(LOG_LEVELS.INFO, '[undoLastSyncForRibbon] ========== Ribbon 撤销最近同步 ==========');
+    const description = getLastSessionDescription();
+    if (!description) {
+        bgmLog(LOG_LEVELS.INFO, '[undoLastSyncForRibbon] 没有可撤销的同步操作');
+        await wpsMsgBox('没有可撤销的同步操作', 0, 48);
+        return;
+    }
+    const confirmed = await wpsMsgBox(`确认撤销最近一次同步操作？\n\n${description}\n\n将按单元格逆序恢复旧值。`, 4, // MB_YESNO
+    32);
+    if (confirmed !== 6) {
+        bgmLog(LOG_LEVELS.INFO, '[undoLastSyncForRibbon] 用户取消撤销');
+        return;
+    }
+    try {
+        const restored = undoLastSync();
+        bgmLog(LOG_LEVELS.INFO, `[undoLastSyncForRibbon] 已恢复 ${restored} 项变更`);
+        await wpsMsgBox(`已撤销 ${restored} 项变更`, 0, 64);
+    }
+    catch (e) {
+        const errMsg = e instanceof Error ? e.message : String(e);
+        bgmLog(LOG_LEVELS.ERROR, `[undoLastSyncForRibbon] 撤销失败: ${errMsg}`);
+        await wpsMsgBox(`撤销失败：${errMsg}`, 0, 16);
     }
 }

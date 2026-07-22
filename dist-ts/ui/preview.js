@@ -3,8 +3,9 @@
  * @module ui/detail-preview
  * @description 数据预览、同步记录预览、详情模态框、单条上传
  */
-import { getApp, bgmLog, BGM, getCellValue, trim, _getUserApiPath, wpsMsgBox, getCell, escapeHtml, showAlert, showToast, LOG_LEVELS, BGM_COLOR, findHeaderRow, getColumnMap, getSyncPreview, detectConflicts, extractSubjectId, mapWatchStatus, buildJsonPayload, bgmRequestSync, addSyncRecord, addTagsFromStr, WATCH_STATUS_MAP, SyncToBangumiAsync, showSyncProgressDialog, updateSyncProgressDialog, completeSyncProgressDialog, hideSyncProgressDialog } from '../index.js';
+import { getApp, bgmLog, BGM, getCellValue, trim, _getUserApiPath, wpsMsgBox, getCell, escapeHtml, showAlert, showToast, LOG_LEVELS, BGM_COLOR, findHeaderRow, getColumnMap, detectConflicts, extractSubjectId, mapWatchStatus, buildJsonPayload, bgmRequestSync, addSyncRecord, addTagsFromStr, WATCH_STATUS_MAP, SyncToBangumiAsync, showSyncProgressDialog, updateSyncProgressDialog, completeSyncProgressDialog, hideSyncProgressDialog, } from '../index.js';
 import { getAllSyncRecords } from '../sync/syncRecord.js';
+import { sanitizeHtml } from '../tools/sanitize.js';
 import { loadBgToken } from '../tools/util.js';
 // ========== 辅助函数 ==========
 function safeAlert(message, title) {
@@ -56,7 +57,7 @@ function getRowData(ws, rowNum, colMap, headerRow, seqCol = 9) {
     data.tagsRaw = [tagsGradeRaw, originalTagRaw].filter(Boolean).join('|');
     data.finishedDate = readCol('完播日');
     if (data.bgmUrl) {
-        data.sid = extractSubjectId(data.bgmUrl);
+        data.sid = extractSubjectId(data.bgmUrl) || '';
     }
     if (data.sid) {
         data.typeNum = mapWatchStatus(data.status);
@@ -76,7 +77,14 @@ function getRowData(ws, rowNum, colMap, headerRow, seqCol = 9) {
  */
 function renderDetailItemHtml(rowData, colMap, ws) {
     // 定义观看状态类型映射
-    const typeNames = { 0: '', 1: '想看', 2: '看过', 3: '在看', 4: '搁置', 5: '抛弃' };
+    const typeNames = {
+        0: '',
+        1: '想看',
+        2: '看过',
+        3: '在看',
+        4: '搁置',
+        5: '抛弃',
+    };
     const typeName = typeNames[rowData.typeNum] || '未知';
     // 解析标签数据
     const tagSet = new Set();
@@ -84,12 +92,12 @@ function renderDetailItemHtml(rowData, colMap, ws) {
     const tags = Array.from(tagSet);
     // 生成标签HTML
     const tagsHtml = tags.length > 0
-        ? `<div class="detail-value tags">${tags.map(t => `<span class="tag-badge">${escapeHtml(t)}</span>`).join('')}</div>`
+        ? `<div class="detail-value tags">${tags.map((t) => `<span class="tag-badge">${escapeHtml(t)}</span>`).join('')}</div>`
         : '<div class="detail-value">-</div>';
     // 构建JSON请求载荷
     let jsonBody = '';
     if (rowData.sid) {
-        jsonBody = buildJsonPayload((key) => colMap.has(key) ? trim(getCellValue(ws, rowData.row, colMap.get(key))) : '', rowData.finishedDate);
+        jsonBody = buildJsonPayload((key) => (colMap.has(key) ? trim(getCellValue(ws, rowData.row, colMap.get(key))) : ''), rowData.finishedDate);
     }
     // 截断显示URL，避免过长影响UI
     const urlDisplay = rowData.bgmUrl.length > 60 ? rowData.bgmUrl.substring(0, 60) + '...' : rowData.bgmUrl;
@@ -121,7 +129,7 @@ function renderDetailItemHtml(rowData, colMap, ws) {
         </div>
         <div class="detail-row">
           <span class="detail-label">完播日</span>
-          <span class="detail-value">${(!rowData.finishedDate || rowData.finishedDate === 'null') ? '(空白)' : escapeHtml(rowData.finishedDate)}</span>
+          <span class="detail-value">${!rowData.finishedDate || rowData.finishedDate === 'null' ? '(空白)' : escapeHtml(rowData.finishedDate)}</span>
         </div>
         <div class="detail-row">
           <span class="detail-label">评分</span>
@@ -131,7 +139,8 @@ function renderDetailItemHtml(rowData, colMap, ws) {
           <span class="detail-label">标签</span>
           ${tagsHtml}
         </div>
-        ${rowData.sid ? `
+        ${rowData.sid
+        ? `
         <div class="detail-row" style="flex-direction:column;gap:6px;">
           <span class="detail-label" style="min-width:auto;">将发送的请求</span>
           <div class="detail-value" style="color:#27ae60;font-weight:500;">
@@ -139,7 +148,8 @@ function renderDetailItemHtml(rowData, colMap, ws) {
           </div>
           <div class="detail-value json">${escapeHtml(jsonBody)}</div>
         </div>
-        ` : ''}
+        `
+        : ''}
       </div>
     </div>
   `;
@@ -166,7 +176,7 @@ function handlePreviewBodyClick(e) {
 }
 // 从映射表中提取标准中文状态列表（过滤数字和英文）
 const VALID_STATUSES = Object.keys(WATCH_STATUS_MAP)
-    .filter(key => /^[\u4e00-\u9fa5]+$/.test(key)) // 只保留纯中文
+    .filter((key) => /^[\u4e00-\u9fa5]+$/.test(key)) // 只保留纯中文
     .filter((key, idx, arr) => arr.indexOf(key) === idx); // 去重
 /**
  * 将非标准状态文本标准化（如 "是" → "看过"）
@@ -180,7 +190,14 @@ function normalizeStatus(rawStatus) {
     const code = WATCH_STATUS_MAP[trimmed.toLowerCase()];
     if (code !== undefined) {
         // 根据状态码返回标准中文名称
-        const reverseMap = { 1: '想看', 2: '看过', 3: '在看', 4: '搁置', 5: '抛弃', 0: '忽略' };
+        const reverseMap = {
+            1: '想看',
+            2: '看过',
+            3: '在看',
+            4: '搁置',
+            5: '抛弃',
+            0: '忽略',
+        };
         return reverseMap[code] || trimmed;
     }
     return trimmed; // 未识别的保持原样
@@ -200,7 +217,7 @@ export async function previewSyncContent() {
     }
     const { ws, visibleRows, headerRow, dataStartRow } = dp;
     // 防御性排序 + 去重：确保行号严格升序且无重复（修复"190-201后跳到3"问题）
-    const dataRows = Array.from(new Set(visibleRows.filter(r => r !== headerRow && r >= dataStartRow))).sort((a, b) => a - b);
+    const dataRows = Array.from(new Set(visibleRows.filter((r) => r !== headerRow && r >= dataStartRow))).sort((a, b) => a - b);
     bgmLog(LOG_LEVELS.INFO, `[preview] 过滤后得到 ${dataRows.length} 条数据行`);
     if (dataRows.length > 0) {
         bgmLog(LOG_LEVELS.INFO, `[preview] 数据行范围: ${dataRows[0]} ~ ${dataRows[dataRows.length - 1]}`);
@@ -228,7 +245,7 @@ export async function previewSyncContent() {
     showSyncProgressDialog('正在同步 - 预览同步', {
         onPause: () => BGM.sync.pause(),
         onResume: () => BGM.sync.resume(),
-        onStop: () => BGM.sync.requestStop()
+        onStop: () => BGM.sync.requestStop(),
     });
     // 进入运行状态（防重入，统一入口）
     if (!BGM.sync.enterRunningState())
@@ -262,7 +279,7 @@ export async function previewSyncContent() {
             // 更新当前位置（行号）以便暂停时定位
             BGM.sync.updatePosition(undefined, rowNum);
             // 每行让出主线程，确保暂停按钮及时响应
-            await new Promise(r => setTimeout(r, 0));
+            await new Promise((r) => setTimeout(r, 0));
             try {
                 const rowData = getRowData(ws, rowNum, colMap, headerRow, 9);
                 // 过滤无效行
@@ -301,7 +318,11 @@ export async function previewSyncContent() {
             }
             catch (e) {
                 errorCount++;
-                BGM.handleError(e, { showAlert: false, level: BGM.ErrorLevel.WARN, context: 'previewSyncContent' });
+                BGM.handleError(e, {
+                    showAlert: false,
+                    level: BGM.ErrorLevel.WARN,
+                    context: 'previewSyncContent',
+                });
                 cardsHtml += `<div class="detail-item error">行 ${rowNum} 处理出错: ${escapeHtml(e.message)}</div>`;
                 updateSyncProgressDialog(i + 1, totalRows, `预览生成 ${i + 1}/${totalRows}（卡片 ${actualCardCount}）`, `✗ [${i + 1}/${totalRows}] 行${rowNum} 异常: ${e.message}`);
             }
@@ -315,7 +336,7 @@ export async function previewSyncContent() {
             `总行数: ${totalRows}`,
             `渲染卡片: ${actualCardCount}`,
             `跳过行数: ${skippedCount}`,
-            `错误行数: ${errorCount}`
+            `错误行数: ${errorCount}`,
         ];
         if (wasStopped)
             detailsArr.unshift('⚠️ 预览被用户停止');
@@ -334,7 +355,8 @@ export async function previewSyncContent() {
             body.removeEventListener('click', handlePreviewBodyClick);
             body.addEventListener('click', handlePreviewBodyClick);
         }
-        body.innerHTML = statsHtml + cardsHtml;
+        body.textContent = '';
+        body.insertAdjacentHTML('beforeend', sanitizeHtml(statsHtml + cardsHtml));
         modal.style.display = 'block';
         // ----- 状态下拉筛选器 -----
         const header = modal.querySelector('.modal-header');
@@ -345,23 +367,35 @@ export async function previewSyncContent() {
             oldSelect.remove();
         // 收集卡片中出现的标准状态及其计数
         const statusMap = new Map();
-        body.querySelectorAll('.detail-item').forEach(item => {
+        body.querySelectorAll('.detail-item').forEach((item) => {
             const s = item.dataset.status;
-            if (s && VALID_STATUSES.includes(s)) { // 只统计有效标准状态
+            if (s && VALID_STATUSES.includes(s)) {
+                // 只统计有效标准状态
                 statusMap.set(s, (statusMap.get(s) || 0) + 1);
             }
         });
         // 按预定义顺序排序
         const priorityStatus = ['想看', '在看', '看过', '搁置', '抛弃'];
         const sortedStatus = [
-            ...priorityStatus.filter(s => statusMap.has(s)),
-            ...Array.from(statusMap.keys()).filter(s => !priorityStatus.includes(s)).sort()
+            ...priorityStatus.filter((s) => statusMap.has(s)),
+            ...Array.from(statusMap.keys())
+                .filter((s) => !priorityStatus.includes(s))
+                .sort(),
         ];
         const select = document.createElement('select');
         select.id = 'statusFilterSelect';
         select.className = 'status-filter-select';
-        select.innerHTML = `<option value="all">全部 (${actualCardCount})</option>` +
-            sortedStatus.map(s => `<option value="${escapeHtml(s)}">${escapeHtml(s)} (${statusMap.get(s)})</option>`).join('');
+        // 使用 DOM API 创建 option，避免 innerHTML 拼接（XSS 防护）
+        const allOption = document.createElement('option');
+        allOption.value = 'all';
+        allOption.textContent = `全部 (${actualCardCount})`;
+        select.appendChild(allOption);
+        for (const s of sortedStatus) {
+            const opt = document.createElement('option');
+            opt.value = s;
+            opt.textContent = `${s} (${statusMap.get(s) ?? 0})`;
+            select.appendChild(opt);
+        }
         const syncAllBtn = document.getElementById('syncAllBtn');
         if (syncAllBtn) {
             syncAllBtn.insertAdjacentElement('afterend', select);
@@ -371,8 +405,8 @@ export async function previewSyncContent() {
         }
         select.addEventListener('change', () => {
             const filter = select.value;
-            body.querySelectorAll('.detail-item').forEach(item => {
-                item.style.display = (filter === 'all' || item.dataset.status === filter) ? '' : 'none';
+            body.querySelectorAll('.detail-item').forEach((item) => {
+                item.style.display = filter === 'all' || item.dataset.status === filter ? '' : 'none';
             });
         });
         select.value = 'all';
@@ -434,7 +468,7 @@ export async function uploadSingleRow(rowNum, btnElement) {
         const rowData = getRowData(ws, rowNum, colMap, headerRow, 9);
         if (!rowData.sid)
             throw new Error('无法提取 Subject ID');
-        const jsonBody = buildJsonPayload((key) => colMap.has(key) ? trim(getCellValue(ws, rowNum, colMap.get(key))) : '', rowData.finishedDate);
+        const jsonBody = buildJsonPayload((key) => (colMap.has(key) ? trim(getCellValue(ws, rowNum, colMap.get(key))) : ''), rowData.finishedDate);
         if (!jsonBody)
             throw new Error('无法构建请求体');
         const result = await bgmRequestSync('POST', `/v0/users/${_getUserApiPath()}/collections/${rowData.sid}`, jsonBody, token);
@@ -495,8 +529,12 @@ export async function uploadSingleRow(rowNum, btnElement) {
                 message: result?.message || 'HTTP ' + statusCode,
                 count: 1,
             });
-            BGM.handleError(new Error('上传失败: ' + (result?.message || '未知错误')), { showAlert: false, level: BGM.ErrorLevel.WARN, context: 'UploadSingleRow' });
-            showToast('上传失败: ' + ((result?.message || '未知错误').substring(0, 60)), 'error');
+            BGM.handleError(new Error('上传失败: ' + (result?.message || '未知错误')), {
+                showAlert: false,
+                level: BGM.ErrorLevel.WARN,
+                context: 'UploadSingleRow',
+            });
+            showToast('上传失败: ' + (result?.message || '未知错误').substring(0, 60), 'error');
         }
     }
     catch (e) {
@@ -537,9 +575,13 @@ export function viewSyncRecordDetail(sid) {
         content = JSON.stringify(JSON.parse(content), null, 2);
     }
     catch (e) {
-        BGM.handleError(e, { showAlert: false, level: BGM.ErrorLevel.WARN, context: 'ViewSyncRecordDetail' });
+        BGM.handleError(e, {
+            showAlert: false,
+            level: BGM.ErrorLevel.WARN,
+            context: 'ViewSyncRecordDetail',
+        });
     }
-    const detail = `同步记录详情\n\n名称: ${record.name || ""}\nSID: ${record.sid || ""}\nURL: ${record.url || ""}\n时间: ${record.time || ""}\n状态: ${record.status || ""}\n同步次数: ${record.count || ""}\n备注: ${record.message || ""}\n\n同步内容:\n${content}`;
+    const detail = `同步记录详情\n\n名称: ${record.name || ''}\nSID: ${record.sid || ''}\nURL: ${record.url || ''}\n时间: ${record.time || ''}\n状态: ${record.status || ''}\n同步次数: ${record.count || ''}\n备注: ${record.message || ''}\n\n同步内容:\n${content}`;
     safeAlert(detail, '同步记录详情');
 }
 /*
@@ -568,7 +610,7 @@ export async function syncAllRows() {
     }
     const { ws, visibleRows, headerRow, dataStartRow } = dp;
     // 防御性排序 + 去重：确保行号严格升序且无重复
-    const dataRows = Array.from(new Set(visibleRows.filter(r => r !== headerRow && r >= dataStartRow))).sort((a, b) => a - b);
+    const dataRows = Array.from(new Set(visibleRows.filter((r) => r !== headerRow && r >= dataStartRow))).sort((a, b) => a - b);
     if (dataRows.length === 0) {
         showToast('没有可同步的数据行', 'info');
         return { success: 0, fail: 0, skip: 0 };
@@ -580,12 +622,11 @@ export async function syncAllRows() {
     }
     const lastRow = Math.max(...dataRows); // 使用可见行最大行号作为数据范围
     // ---------- 1. 同步预览统计 ----------
-    const preview = getSyncPreview(ws, colMap, lastRow, headerRow);
     // ---------- 2. 冲突检测（可选，默认以 Excel 覆盖） ----------
-    let conflictSids = undefined;
+    const conflictSids = undefined;
     let conflictInfo = '';
     try {
-        const { conflicts, conflictCount } = await detectConflicts(ws, colMap, lastRow, headerRow, token);
+        const { conflictCount } = await detectConflicts(ws, colMap, lastRow, headerRow, token);
         if (conflictCount > 0) {
             // 使用 Ribbon 的统一策略：默认以 Excel 覆盖，所以只需记录，不跳过
             conflictInfo = `检测到 ${conflictCount} 条冲突，将以 Excel 数据覆盖。`;
@@ -621,7 +662,7 @@ export async function syncAllRows() {
         showSyncProgressDialog('正在同步 - 全面同步', {
             onPause: () => BGM.sync.pause(),
             onResume: () => BGM.sync.resume(),
-            onStop: () => BGM.sync.requestStop()
+            onStop: () => BGM.sync.requestStop(),
         });
         const result = await SyncToBangumiAsync(ws, colMap, token, lastRow, headerRow, {
             ...(conflictSids !== undefined && { skipSids: conflictSids }), // 跳过冲突的 sid 集合
@@ -630,14 +671,19 @@ export async function syncAllRows() {
                 // 直接调用弹窗 API 更新进度，不再走事件总线
                 updateSyncProgressDialog(current, total, message);
             },
-            onItemComplete: (row, success, _result) => {
+            onItemComplete: (_row, _success, _result) => {
                 // 颜色标记由内部完成，此处无需额外处理
-            }
+            },
         });
         // 切换弹窗为完成状态（而非 BGM.setSyncComplete）
         const summary = `📊 同步 ${result.success + result.fail + result.skip} 条\n\n✅ 成功: ${result.success}\n❌ 失败: ${result.fail}\n⏭️ 跳过: ${result.skip}`;
         const details = result.stopped
-            ? ['⚠️ 同步被用户停止', `成功 ${result.success} 条`, `失败 ${result.fail} 条`, `跳过 ${result.skip} 条`]
+            ? [
+                '⚠️ 同步被用户停止',
+                `成功 ${result.success} 条`,
+                `失败 ${result.fail} 条`,
+                `跳过 ${result.skip} 条`,
+            ]
             : [`成功 ${result.success} 条`, `失败 ${result.fail} 条`, `跳过 ${result.skip} 条`];
         completeSyncProgressDialog(summary, details, result.stopped);
         return result;

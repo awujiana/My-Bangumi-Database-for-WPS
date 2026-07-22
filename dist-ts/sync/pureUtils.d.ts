@@ -1,56 +1,24 @@
 /**
  * @fileoverview Bangumi 同步纯函数模块
  * @module sync/pureUtils
- * @description 提供 URL 识别、Subject ID 提取、观看状态映射等纯函数。
- *              这些函数不依赖 WPS API，仅依赖常量定义和字符串工具。
+ * @description 提供 URL 识别、Subject ID 提取、观看状态映射、标签解析等函数。
+ *
+ * 模块拆分说明：
+ *   - isBangumiUrl / extractSubjectId / mapWatchStatus 是无副作用依赖的纯函数，
+ *     已抽取到 ./pureUtilsCore.js（仅依赖 core/constants 与 tools/stringUtilsPure）。
+ *     本模块 re-export 以保持向后兼容。
+ *   - mapWatchStatus 在状态无法识别时调用 bgmLog 记录警告。pureUtilsCore.ts 通过
+ *     setLogger 接受注入的日志函数；本模块在加载时注入实际的 bgmLog。
+ *   - getSeqColIndex / addTagsFromStr / buildTagsArray 不依赖副作用模块，保留在本模块。
+ *
+ * 测试策略：单元测试应直接 import 自 pureUtilsCore.js，并通过 setLogger(vi.fn())
+ * 注入 mock 日志函数，以避免触发 tools/util → ui/handlers 的副作用链。
  */
-/**
- * 判断字符串是否为 Bangumi 条目 URL（支持 bgm.tv / bangumi.tv / chii.in）
- * @param url 待检测的字符串
- * @returns 如果是 BGM 域名链接返回 true；纯数字 ID 也返回 true；否则返回 false
- */
-export declare function isBangumiUrl(url: string): boolean;
+export { isBangumiUrl, extractSubjectId, mapWatchStatus } from './pureUtilsCore.js';
 /**
  * 获取序列号列索引（支持 colMap 或默认列号）
  */
 export declare function getSeqColIndex(colMap: Map<string, number> | undefined): number;
-/**
- * 从URL或文本中提取Bangumi Subject ID
- *
- * @function extractSubjectId
- * @param {string} input - URL或包含ID的文本
- * @returns {string} 提取的Subject ID，失败返回空字符串
- *
- * @description
- * 支持的URL格式：
- * - https://bgm.tv/subject/123456
- * - https://bangumi.tv/subject/123456
- * - https://chii.in/subject/123456
- * - 直接输入数字ID
- *
- * @example
- * extractSubjectId('https://bgm.tv/subject/123456'); // 返回 '123456'
- * extractSubjectId('123456'); // 返回 '123456'
- */
-export declare function extractSubjectId(input: string): string;
-/**
- * @function mapWatchStatus
- * @param {string} status - 观看状态文本
- * @returns {number} API数值：1=想看, 2=在看, 3=看过, 4=搁置, 5=抛弃
- *
- * @description
- * 支持的状态文本映射：
- * - 想看/想看动画/否/wish → 1
- * - 在看/在看动画/在追/追/watching → 2
- * - 看过/看完/已看/完/completed → 3
- * - 搁置/暂停/on_hold → 4
- * - 抛弃/弃/弃番/drop/dropped → 5
- *
- * @example
- * mapWatchStatus('看完'); // 返回 3
- * mapWatchStatus('在看'); // 返回 2
- */
-export declare function mapWatchStatus(status: string): number;
 /**
  * 从字符串解析标签数组
  *

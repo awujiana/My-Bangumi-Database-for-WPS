@@ -9,7 +9,7 @@
  */
 import { LOG_LEVELS, SYNC_STATUS, BGM_COLOR, bgmLog, getApp, BGM, getLastRow, colNumToLetter, SYNC_RECORD_COLUMNS, SYNC_RECORD_SHEET_NAME, SYNC_RECORD_COL, SYNC_RECORD_TYPE_COLOR, getCellValue, setCellValue, readRangeValues, getSyncRecordEnabled, } from '../index.js';
 // ========== 内存缓存 ==========
-let _syncRecordSidCache = new Map();
+const _syncRecordSidCache = new Map();
 let _syncRecordListCache = [];
 let _syncRecordCacheValid = false;
 let _formattingInProgress = false;
@@ -28,9 +28,12 @@ function getCountColor(count) {
  */
 function getStatusColor(status) {
     switch (status) {
-        case SYNC_STATUS.FAIL: return BGM_COLOR.FAIL;
-        case SYNC_STATUS.SKIP: return BGM_COLOR.SKIP;
-        default: return BGM_COLOR.SUCCESS;
+        case SYNC_STATUS.FAIL:
+            return BGM_COLOR.FAIL;
+        case SYNC_STATUS.SKIP:
+            return BGM_COLOR.SKIP;
+        default:
+            return BGM_COLOR.SUCCESS;
     }
 }
 /**
@@ -227,7 +230,7 @@ function buildCache(sheet) {
                 message: String(rowData[SYNC_RECORD_COL.MESSAGE - 1] ?? ''),
                 fingerprint: String(rowData[SYNC_RECORD_COL.FINGERPRINT - 1] ?? ''),
                 collType: String(rowData[SYNC_RECORD_COL.COLL_TYPE - 1] ?? ''),
-                row: row
+                row: row,
             });
         }
         catch (e) {
@@ -250,8 +253,10 @@ function setSyncRecordColors(sheet, row, status, count) {
             cell.Interior.Color = color;
     };
     // SID列（A列）- 根据同步次数或状态设置颜色
-    setColor(SYNC_RECORD_COL.SID, status === SYNC_STATUS.FAIL ? BGM_COLOR.FAIL
-        : status === SYNC_STATUS.SKIP ? BGM_COLOR.SKIP
+    setColor(SYNC_RECORD_COL.SID, status === SYNC_STATUS.FAIL
+        ? BGM_COLOR.FAIL
+        : status === SYNC_STATUS.SKIP
+            ? BGM_COLOR.SKIP
             : getCountColor(count));
     // 状态列（I列）- 根据状态设置颜色
     setColor(SYNC_RECORD_COL.STATUS, getStatusColor(status));
@@ -301,7 +306,7 @@ export function addSyncRecord(params) {
                 setCellValue(sheet, existingRow, SYNC_RECORD_COL.COLL_TYPE, params.collType);
             setSyncRecordColors(sheet, existingRow, finalStatus, newCount);
             // 更新缓存
-            const cacheItem = _syncRecordListCache.find(item => item.sid === sid);
+            const cacheItem = _syncRecordListCache.find((item) => item.sid === sid);
             if (cacheItem) {
                 cacheItem.time = now;
                 cacheItem.count = newCount;
@@ -351,9 +356,12 @@ export function addSyncRecord(params) {
             setSyncRecordColors(sheet, newRow, finalStatus, finalCount);
             _syncRecordSidCache.set(sid, newRow);
             _syncRecordListCache.push({
-                id: newRow, time: now,
-                sid: sid, count: finalCount,
-                status: finalStatus, message: params.message || '',
+                id: newRow,
+                time: now,
+                sid: sid,
+                count: finalCount,
+                status: finalStatus,
+                message: params.message || '',
                 ...(params.name ? { name: params.name } : {}),
                 ...(params.url ? { url: params.url } : {}),
                 ...(params.type ? { type: params.type } : {}),
@@ -408,7 +416,7 @@ export function deduplicateSyncRecords() {
         // 找出并合并重复 SID
         let removedCount = 0;
         let hasDuplicates = false;
-        for (const [sid, rows] of sidRows) {
+        for (const [, rows] of sidRows) {
             if (rows.length <= 1)
                 continue;
             hasDuplicates = true;
@@ -461,36 +469,48 @@ export function formatSyncRecordSheet(sheet) {
             if (fullRange.Font)
                 fullRange.Font.Name = 'Maple Mono NF CN Medium';
         }
-        catch (_) { }
+        catch {
+            // 忽略：此处无需处理错误
+        }
         // 2. 自动行高
         try {
             fullRange.EntireRow.AutoFit();
         }
-        catch (_) { }
+        catch {
+            // 忽略：此处无需处理错误
+        }
         // 3. 水平居中
         if (dataRange) {
             try {
                 dataRange.HorizontalAlignment = -4108;
             }
-            catch (_) { }
+            catch {
+                // 忽略：此处无需处理错误
+            }
         }
         // 表头也居中
         try {
             target.Range(`A1:${lastColLetter}1`).HorizontalAlignment = -4108;
         }
-        catch (_) { }
+        catch {
+            // 忽略：此处无需处理错误
+        }
         // 4. 自动列宽（全列）
         try {
             fullRange.EntireColumn.AutoFit();
         }
-        catch (_) { }
+        catch {
+            // 忽略：此处无需处理错误
+        }
         // 5. URL 列（D列）固定宽度，不撑宽也不撑高
         const urlColLetter = colNumToLetter(SYNC_RECORD_COL.URL);
         try {
             const urlRange = target.Range(`${urlColLetter}:${urlColLetter}`);
             urlRange.ColumnWidth = 42;
         }
-        catch (_) { }
+        catch {
+            // 忽略：此处无需处理错误
+        }
         // 6. 名称列边框（C列）
         const nameColLetter = colNumToLetter(SYNC_RECORD_COL.NAME);
         if (dataRange) {
@@ -498,7 +518,9 @@ export function formatSyncRecordSheet(sheet) {
                 const nameRange = target.Range(`${nameColLetter}2:${nameColLetter}${lastRow}`);
                 nameRange.Borders.LineStyle = 1;
             }
-            catch (_) { }
+            catch {
+                // 忽略：此处无需处理错误
+            }
         }
         // 7. 收藏状态列边框（L列）
         const collTypeColLetter = colNumToLetter(SYNC_RECORD_COL.COLL_TYPE);
@@ -507,7 +529,9 @@ export function formatSyncRecordSheet(sheet) {
                 const collRange = target.Range(`${collTypeColLetter}2:${collTypeColLetter}${lastRow}`);
                 collRange.Borders.LineStyle = 1;
             }
-            catch (_) { }
+            catch {
+                // 忽略：此处无需处理错误
+            }
         }
         bgmLog(LOG_LEVELS.INFO, '同步记录表格式已设置');
         _formattingInProgress = false;

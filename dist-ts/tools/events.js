@@ -48,7 +48,7 @@ export class EventBus {
         if (!handlers)
             return;
         if (handler) {
-            const index = handlers.findIndex(h => h.handler === handler);
+            const index = handlers.findIndex((h) => h.handler === handler);
             if (index !== -1) {
                 handlers.splice(index, 1);
             }
