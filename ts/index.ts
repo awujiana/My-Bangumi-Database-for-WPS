@@ -230,7 +230,6 @@ export {
 export {
   // 纯函数：差异计算（零依赖，可在 Node 测试环境运行）
   computeDiff,
-  mapTypeToWatchStatus,
   tagsToString,
   SYNC_STRATEGY_LABELS,
   // 远程条目类型

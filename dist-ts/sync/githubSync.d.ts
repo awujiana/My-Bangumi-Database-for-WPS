@@ -4,22 +4,19 @@
  * @description 从 GitHub 公开仓库下载 JSON 数据，按 SID 主键比对本地 Excel 行，
  *              增量更新（新增+更新，不删除本地多余行）。
  *
- * 数据格式（远程 JSON 文件）：
- * [
+ * 数据格式（远程 JSONL 文件，每行一个 JSON 对象）：
  *   { "sid": "12345", "url": "https://bgm.tv/subject/12345", "name": "...",
  *     "type": 2, "score": 8, "tags": ["标签1","标签2"], "comment": "...",
- *     "episode": 12, "updatedAt": "2026-07-05T10:00:00Z" },
- *   ...
- * ]
+ *     "episode": 12, "updatedAt": "2026-07-05T10:00:00Z" }
  *
- * type 字段约定（与 Bangumi 一致）：
- *   1=想看  2=在看  3=看过  4=搁置  5=抛弃
+ * type 字段为 Bangumi 条目类别（不是观看状态）：
+ *   1=书籍  2=动漫  3=音乐  4=游戏  6=三次元
  */
 import { Result } from '../core/result.js';
 import type { ConflictResolution } from '../services/ribbonService.js';
 import { type GithubRemoteEntry, type GithubSyncDiff, type LocalRowEntry, type SyncStrategy } from './githubSyncDiff.js';
 import type { SyncSource } from './SyncSource.js';
-export { computeDiff, mapTypeToWatchStatus, tagsToString, parseJsonl, isGithubRemoteEntry, SYNC_STRATEGY_LABELS, type GithubRemoteEntry, type GithubSyncDiff, type LocalRowEntry, type SyncStrategy, } from './githubSyncDiff.js';
+export { computeDiff, tagsToString, parseJsonl, isGithubRemoteEntry, SYNC_STRATEGY_LABELS, type GithubRemoteEntry, type GithubSyncDiff, type LocalRowEntry, type SyncStrategy, } from './githubSyncDiff.js';
 /** 同步结果统计 */
 export interface GithubSyncResult {
     /** 远程总条目数 */

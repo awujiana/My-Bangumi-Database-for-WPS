@@ -89,7 +89,7 @@ describe('computeDiff', () => {
     const diffs = computeDiff(remote, local)
     expect(diffs).toHaveLength(1)
     expect(diffs[0]?.changedFields).toEqual(
-      expect.arrayContaining(['名称', '是否看完', '打分', '标签/分级', '剧透/感言']),
+      expect.arrayContaining(['名称', '打分', '标签/分级', '剧透/感言']),
     )
   })
 
@@ -115,7 +115,7 @@ describe('computeDiff', () => {
     expect(diffs).toHaveLength(0)
   })
 
-  it('type 映射为观看状态文本后比对', () => {
+  it('type 为条目类别，不映射为观看状态，不产生差异', () => {
     const remote: GithubRemoteEntry[] = [{ sid: '666', type: 2 }]
     const local = new Map<string, LocalRowEntry>([
       [
@@ -124,12 +124,13 @@ describe('computeDiff', () => {
           row: 6,
           sid: '666',
           fields: {
-            是否看完: '在看', // type=2 → '在看'
+            是否看完: '在看',
           },
         },
       ],
     ])
     const diffs = computeDiff(remote, local)
+    // type 是条目类别（2=动漫），不是观看状态，不应影响「是否看完」比对
     expect(diffs).toHaveLength(0)
   })
 })
@@ -140,8 +141,8 @@ describe('computeDiff 策略修饰', () => {
   // 公共测试数据：远程 3 条（sid=1 新增，sid=2 需更新，sid=3 无变化），本地 3 条（sid=2、3、4，sid=4 远程不存在）
   const remote: GithubRemoteEntry[] = [
     { sid: '1', name: '远程新增', type: 2, score: 8 },
-    { sid: '2', name: '远程改名', type: 3, score: 9 }, // 本地 sid=2 名称+是否看完均不同
-    { sid: '3', name: '一致', type: 3, score: 7 }, // 本地 sid=3 完全一致（type=3→'看过'）
+    { sid: '2', name: '远程改名', type: 3, score: 9 }, // 本地 sid=2 名称不同
+    { sid: '3', name: '一致', type: 3, score: 7 }, // 本地 sid=3 完全一致
   ]
   const local = new Map<string, LocalRowEntry>([
     ['2', { row: 10, sid: '2', fields: { 名称: '本地名', 是否看完: '在看', 打分: '9' } }],
@@ -164,7 +165,7 @@ describe('computeDiff 策略修饰', () => {
     const addCount = diffs.filter((d) => d.kind === 'add').length
     const updateCount = diffs.filter((d) => d.kind === 'update').length
     const deleteCount = diffs.filter((d) => d.kind === 'delete').length
-    // sid=1 新增，sid=2 更新（名称+是否看完），sid=3 无变化，sid=4 不处理
+    // sid=1 新增，sid=2 更新（名称），sid=3 无变化，sid=4 不处理
     expect(addCount).toBe(1)
     expect(updateCount).toBe(1)
     expect(deleteCount).toBe(0)
@@ -231,8 +232,8 @@ describe('computeDiff 策略修饰', () => {
     const diffs = computeDiff(r, l, 'mirror')
     expect(diffs.filter((d) => d.kind === 'delete')).toHaveLength(0)
     expect(diffs.filter((d) => d.kind === 'add')).toHaveLength(0)
-    // 是否看完 在远程 type=2 → '在看'，本地 '看过'，故 1 个 update
-    expect(diffs.filter((d) => d.kind === 'update')).toHaveLength(1)
+    // type 是条目类别，不影响「是否看完」比对，名称一致 → 无 update
+    expect(diffs.filter((d) => d.kind === 'update')).toHaveLength(0)
   })
 })
 

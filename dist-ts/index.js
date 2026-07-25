@@ -135,7 +135,7 @@ applyDiffToSheet,
 applyConflictResolutions, } from './sync/githubSync.js';
 export { 
 // 纯函数：差异计算（零依赖，可在 Node 测试环境运行）
-computeDiff, mapTypeToWatchStatus, tagsToString, SYNC_STRATEGY_LABELS, } from './sync/githubSyncDiff.js';
+computeDiff, tagsToString, SYNC_STRATEGY_LABELS, } from './sync/githubSyncDiff.js';
 export { 
 // 读取 GitHub 仓库配置
 getGithubConfig, 

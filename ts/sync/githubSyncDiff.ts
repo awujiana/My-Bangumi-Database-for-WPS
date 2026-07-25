@@ -18,7 +18,7 @@ export interface GithubRemoteEntry {
   url?: string
   /** 条目名称 */
   name?: string
-  /** 观看状态（1-5） */
+  /** 条目类别（1=书籍, 2=动漫, 3=音乐, 4=游戏, 6=三次元） */
   type?: number
   /** 评分（0-10） */
   score?: number
@@ -73,23 +73,6 @@ export interface LocalRowEntry {
   sid: string
   /** 各字段值 */
   fields: Record<string, string>
-}
-
-/** type → 「是否看完」文本映射表 */
-const TYPE_TO_WATCH_STATUS: Readonly<Record<number, string>> = Object.freeze({
-  1: '想看',
-  2: '在看',
-  3: '看过',
-  4: '搁置',
-  5: '抛弃',
-})
-
-/**
- * 将远程 type 数值映射为本地「是否看完」文本
- * 与 pureUtils.mapWatchStatus 的逆映射
- */
-export function mapTypeToWatchStatus(type: number): string {
-  return TYPE_TO_WATCH_STATUS[type] ?? ''
 }
 
 /**
@@ -163,7 +146,7 @@ export function parseJsonl(text: string): {
  * - 远程有、本地无 → add（changedFields = ['*']）
  * - 远程与本地 SID 相同 → 逐字段比对，任一字段不同则 update
  * - 远程字段为 undefined/空 → 不视为差异（保留本地值）
- * - 远程 type 映射为「是否看完」文本后比对
+ * - 远程 type 为条目类别，不参与「是否看完」比对
  * - 远程 score/episode 转为字符串后比对
  * - 远程 tags 数组用 | 拼接后比对
  *
@@ -227,12 +210,6 @@ export function computeDiff(
     // 比对名称
     if (remote.name && remote.name !== local.fields['名称']) {
       changedFields.push('名称')
-    }
-
-    // 比对观看状态
-    const remoteWatchStatus = remote.type !== undefined ? mapTypeToWatchStatus(remote.type) : ''
-    if (remoteWatchStatus && remoteWatchStatus !== local.fields['是否看完']) {
-      changedFields.push('是否看完')
     }
 
     // 比对打分

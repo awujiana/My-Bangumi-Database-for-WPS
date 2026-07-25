@@ -17,7 +17,7 @@ export interface GithubRemoteEntry {
     url?: string;
     /** 条目名称 */
     name?: string;
-    /** 观看状态（1-5） */
+    /** 条目类别（1=书籍, 2=动漫, 3=音乐, 4=游戏, 6=三次元） */
     type?: number;
     /** 评分（0-10） */
     score?: number;
@@ -64,11 +64,6 @@ export interface LocalRowEntry {
     fields: Record<string, string>;
 }
 /**
- * 将远程 type 数值映射为本地「是否看完」文本
- * 与 pureUtils.mapWatchStatus 的逆映射
- */
-export declare function mapTypeToWatchStatus(type: number): string;
-/**
  * 将远程 tags 数组转为本地「标签/分级」文本（用 | 分隔）
  */
 export declare function tagsToString(tags: string[] | undefined): string;
@@ -99,7 +94,7 @@ export declare function parseJsonl(text: string): {
  * - 远程有、本地无 → add（changedFields = ['*']）
  * - 远程与本地 SID 相同 → 逐字段比对，任一字段不同则 update
  * - 远程字段为 undefined/空 → 不视为差异（保留本地值）
- * - 远程 type 映射为「是否看完」文本后比对
+ * - 远程 type 为条目类别，不参与「是否看完」比对
  * - 远程 score/episode 转为字符串后比对
  * - 远程 tags 数组用 | 拼接后比对
  *

@@ -66,17 +66,17 @@ https://raw.githubusercontent.com/awujiana/Bangumi-Archive-Anime-Excel-to-sync/m
 
 ### 字段定义
 
-| 字段        | 类型     | 必填 | 说明                                         |
-| ----------- | -------- | ---- | -------------------------------------------- |
-| `sid`       | string   | 是   | Bangumi subject ID（主键，用于比对去重）     |
-| `url`       | string   | 否   | 条目 URL，如 `https://bgm.tv/subject/8`      |
-| `name`      | string   | 否   | 条目名称                                     |
-| `type`      | number   | 否   | 观看状态：1=想看 2=在看 3=看过 4=搁置 5=抛弃 |
-| `score`     | number   | 否   | 评分（0-10，支持小数如 8.3）                 |
-| `tags`      | string[] | 否   | 标签数组                                     |
-| `comment`   | string   | 否   | 个人评论（可为空字符串）                     |
-| `episode`   | number   | 否   | 看到集数                                     |
-| `updatedAt` | string   | 否   | 远程更新时间戳（ISO 8601）                   |
+| 字段        | 类型     | 必填 | 说明                                           |
+| ----------- | -------- | ---- | ---------------------------------------------- |
+| `sid`       | string   | 是   | Bangumi subject ID（主键，用于比对去重）       |
+| `url`       | string   | 否   | 条目 URL，如 `https://bgm.tv/subject/8`        |
+| `name`      | string   | 否   | 条目名称                                       |
+| `type`      | number   | 否   | 条目类别：1=书籍 2=动漫 3=音乐 4=游戏 6=三次元 |
+| `score`     | number   | 否   | 评分（0-10，支持小数如 8.3）                   |
+| `tags`      | string[] | 否   | 标签数组                                       |
+| `comment`   | string   | 否   | 个人评论（可为空字符串）                       |
+| `episode`   | number   | 否   | 看到集数                                       |
+| `updatedAt` | string   | 否   | 远程更新时间戳（ISO 8601）                     |
 
 > 插件解析时仅要求 `sid` 为字符串类型，其余字段均为可选。空行与非法行会被跳过并记录警告日志，不中断整体解析。
 
