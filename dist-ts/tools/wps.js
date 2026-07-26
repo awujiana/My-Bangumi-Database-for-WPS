@@ -46,7 +46,6 @@ export function wpsPrompt(message, defaultValue) {
         }
         if (typeof window !== 'undefined' &&
             typeof window.BGMInput === 'function') {
-            ;
             window.BGMInput('输入', message, defaultValue || '', (value) => {
                 resolve(value);
             }, () => {
@@ -81,7 +80,6 @@ export function wpsMsgBox(message, buttons, icon) {
         if (buttons === 4) {
             if (typeof window !== 'undefined' &&
                 typeof window.BGMConfirm === 'function') {
-                ;
                 window.BGMConfirm(message, '确认', () => {
                     resolve(6);
                 }, () => {
@@ -98,7 +96,6 @@ export function wpsMsgBox(message, buttons, icon) {
         else {
             if (typeof window !== 'undefined' &&
                 typeof window.BGMAlert === 'function') {
-                ;
                 window
                     .BGMAlert(message, '提示', () => {
                     resolve(1);

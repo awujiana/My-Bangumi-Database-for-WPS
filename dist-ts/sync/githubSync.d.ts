@@ -13,10 +13,9 @@
  *   1=书籍  2=动漫  3=音乐  4=游戏  6=三次元
  */
 import { Result } from '../core/result.js';
-import type { ConflictResolution } from '../services/ribbonService.js';
-import { type GithubRemoteEntry, type GithubSyncDiff, type LocalRowEntry, type SyncStrategy } from './githubSyncDiff.js';
+import { type ConflictResolution, type GithubRemoteEntry, type GithubSyncDiff, type LocalRowEntry, type SyncStrategy } from './githubSyncDiff.js';
 import type { SyncSource } from './SyncSource.js';
-export { computeDiff, tagsToString, parseJsonl, isGithubRemoteEntry, SYNC_STRATEGY_LABELS, type GithubRemoteEntry, type GithubSyncDiff, type LocalRowEntry, type SyncStrategy, } from './githubSyncDiff.js';
+export { computeDiff, tagsToString, parseJsonl, isGithubRemoteEntry, SYNC_STRATEGY_LABELS, EXTENDED_FIELD_MAP, type GithubRemoteEntry, type GithubSyncDiff, type LocalRowEntry, type SyncStrategy, } from './githubSyncDiff.js';
 /** 同步结果统计 */
 export interface GithubSyncResult {
     /** 远程总条目数 */
@@ -81,9 +80,10 @@ export declare function readLocalEntriesForSync(): {
  * @param diffs 差异列表
  * @param strategy 同步策略（决定 force-overwrite 与 delete 行为）
  * @param onProgress 进度回调（current, total, message）
+ * @param source 同步来源显示名称（如 GitHub/GitLab/Gitee），用于写入同步记录
  * @returns 同步结果统计
  */
-export declare function applyDiffToSheet(diffs: GithubSyncDiff[], strategy: SyncStrategy, onProgress?: (current: number, total: number, message: string) => void): GithubSyncResult;
+export declare function applyDiffToSheet(diffs: GithubSyncDiff[], strategy: SyncStrategy, onProgress?: (current: number, total: number, message: string) => void, source?: string): GithubSyncResult;
 /**
  * 根据用户冲突解决决策调整 diff 列表
  *
@@ -103,18 +103,19 @@ export declare function applyDiffToSheet(diffs: GithubSyncDiff[], strategy: Sync
  */
 export declare function applyConflictResolutions(diffs: GithubSyncDiff[], resolutions: ConflictResolution[]): GithubSyncDiff[];
 /**
- * GitHub 同步主入口（供 ribbonService 调用）
+ * GitHub 同步入口（GitHub 源专用）
  *
- * 通过 syncSourceRegistry 按 sourceType 动态选择 SyncSource 实现。
- * 默认 sourceType 为 'github'，由 syncSourceRegistry 注册的 GithubSyncSource 处理；
- * 未来 Task 22-25 注册的 GitLab/Gitee/本地文件/Gist 实现可无缝替换。
+ * 直接使用本模块的 GithubSyncSource 完成同步，不再依赖 syncSourceRegistry，
+ * 从而打破 githubSync.ts ↔ syncSourceRegistry.ts 的循环依赖。
+ *
+ * 如需按 sourceType 动态选择数据源，请使用 syncSourceRegistry.ts 中的 syncFromRemote。
  *
  * @param onProgress 进度回调
  * @param strategy 同步策略，默认 'add-update'
  * @param signal 可选 AbortSignal，用于取消请求
  * @param conflictResolution 可选冲突解决决策列表；提供时将按用户选择过滤 update diff 的字段
  * @returns 同步结果统计
- * @throws 配置错误、网络错误、解析错误、未知 sourceType 时抛出
+ * @throws 配置错误、网络错误、解析错误时抛出
  */
 export declare function syncFromGithub(onProgress?: (current: number, total: number, message: string) => void, strategy?: SyncStrategy, signal?: AbortSignal, conflictResolution?: ConflictResolution[]): Promise<GithubSyncResult>;
 //# sourceMappingURL=githubSync.d.ts.map

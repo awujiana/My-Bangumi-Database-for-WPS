@@ -78,6 +78,21 @@ export interface GithubRemoteEntry {
 }
 
 /**
+ * 用户对单条冲突的解决决策
+ *
+ * chosenValue 为 'local' 时表示保留本地值（从 diff.changedFields 中移除该字段）；
+ * 为 'remote' 时表示采用远程值（保留该字段在 changedFields 中）。
+ */
+export interface ConflictResolution {
+  /** Bangumi subject ID（主键） */
+  sid: string
+  /** 冲突字段名（与 Conflict.field 对应） */
+  field: string
+  /** 用户选择的值来源 */
+  chosenValue: 'local' | 'remote'
+}
+
+/**
  * 扩展字段映射表：JSONL 字段名 → Excel 标准字段名（colMap key）
  *
  * 用于 computeDiff 比对和 writeRemoteEntryToRow 写入扩展字段。

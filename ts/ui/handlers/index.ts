@@ -43,7 +43,7 @@ import {
   setSyncStrategy,
   getSyncSourceType,
   setSyncSourceType,
-  syncFromGithub,
+  syncFromRemote,
   buildRawUrl,
   updateSyncProgressDialog,
   type SyncStrategy,
@@ -52,7 +52,7 @@ import {
 import { exportConfig, importConfig } from '../../services/configService.js'
 import { undoLastSyncForRibbon } from '../../services/ribbonService.js'
 import { debounce } from '../../tools/debounce.js'
-import { BGM_EVENTS, eventBus } from '../../tools/events.js'
+import { BGM_EVENTS, eventBus, type EventHandler } from '../../tools/events.js'
 import { getRecentLogs, exportLogsToFile, clearLogs, type LogLevel } from '../../tools/logger.js'
 
 // 子模块
@@ -108,6 +108,60 @@ export function clearAllPendingTimeouts(): void {
   _pendingTimeouts.clear()
 }
 
+// ========== 模块级 DOM / 事件总线监听器追踪（防止重复注册与内存泄漏） ==========
+
+type TrackedDomListener = {
+  kind: 'dom'
+  element: EventTarget
+  type: string
+  handler: EventListenerOrEventListenerObject
+}
+
+type TrackedBusListener = {
+  kind: 'eventBus'
+  eventName: string
+  handler: EventHandler
+}
+
+type TrackedListener = TrackedDomListener | TrackedBusListener
+
+const _trackedListeners: TrackedListener[] = []
+
+/**
+ * 清理所有已追踪的监听器。
+ * 在 initHandlers 重新初始化前调用，防止同一面板内重复注册。
+ */
+function clearTrackedListeners(): void {
+  for (const item of _trackedListeners) {
+    if (item.kind === 'dom') {
+      item.element.removeEventListener(item.type, item.handler)
+    } else {
+      eventBus.off(item.eventName, item.handler)
+    }
+  }
+  _trackedListeners.length = 0
+}
+
+/**
+ * 受追踪的 addEventListener：自动记录，便于统一清理。
+ */
+function trackedAddEventListener(
+  element: EventTarget,
+  type: string,
+  handler: EventListenerOrEventListenerObject,
+): void {
+  element.addEventListener(type, handler)
+  _trackedListeners.push({ kind: 'dom', element, type, handler })
+}
+
+/**
+ * 受追踪的 eventBus.on：自动记录，便于统一清理。
+ */
+function trackedEventBusOn<T = unknown>(eventName: string, handler: EventHandler<T>): void {
+  eventBus.on(eventName, handler)
+  _trackedListeners.push({ kind: 'eventBus', eventName, handler: handler as EventHandler })
+}
+
 // ========== 面板操作分发 ==========
 
 export function onAction(action: string): void {
@@ -159,12 +213,70 @@ export function onAction(action: string): void {
   }
 }
 
+// ========== 事件处理器（模块级，便于追踪与去重） ==========
+
+const handleEnableSyncRecordChange = (): void => {
+  const chkEnableSyncRecord = document.getElementById(
+    'chkEnableSyncRecord',
+  ) as HTMLInputElement | null
+  if (!chkEnableSyncRecord) return
+  const checked = chkEnableSyncRecord.checked
+  bgmLog(LOG_LEVELS.INFO, `[handlers] 启用同步记录开关切换: ${checked ? '开启' : '关闭'}`)
+  setSyncRecordEnabled(checked)
+  showToast(checked ? '已启用同步记录功能' : '已关闭同步记录功能', 'info')
+}
+
+const handleLogLevelFilterChange = (): void => {
+  renderLogEntries()
+}
+
+/**
+ * GitHub 配置输入框防抖自动保存（300ms）。
+ * 每次从 DOM 实时读取值，避免闭包持有过时的元素引用。
+ */
+const debouncedSaveGithubConfig = debounce((): void => {
+  try {
+    const ownerInput = document.getElementById('githubOwner') as HTMLInputElement | null
+    const repoInput = document.getElementById('githubRepo') as HTMLInputElement | null
+    const branchInput = document.getElementById('githubBranch') as HTMLInputElement | null
+    const pathInput = document.getElementById('githubPath') as HTMLInputElement | null
+    const strategySelect = document.getElementById('githubStrategy') as HTMLSelectElement | null
+    const sourceTypeSelect = document.getElementById('syncSourceType') as HTMLSelectElement | null
+
+    const owner = (ownerInput?.value ?? '').trim()
+    const repo = (repoInput?.value ?? '').trim()
+    const branch = (branchInput?.value ?? '').trim() || 'main'
+    const path = (pathInput?.value ?? '').trim()
+    const strategy = (strategySelect?.value as SyncStrategy) || 'add-update'
+    const sourceType = (sourceTypeSelect?.value as SyncSourceType) || 'github'
+
+    // 本地文件源仅需 path 字段；远程源要求 owner/repo/path 均非空
+    // 用户可能正在输入，必填项未完成时跳过自动保存
+    if (sourceType === 'local') {
+      if (!path) return
+    } else {
+      if (!owner || !repo || !path) return
+    }
+
+    const okConfig = setGithubConfig({ owner, repo, branch, path, sourceType })
+    const okStrategy = setSyncStrategy(strategy)
+    const okSourceType = setSyncSourceType(sourceType)
+    if (okConfig && okStrategy && okSourceType) {
+      bgmLog(
+        LOG_LEVELS.INFO,
+        `[handlers] GitHub 配置已自动保存: ${owner}/${repo}/${branch}/${path}, 策略: ${strategy}, 同步源: ${sourceType}`,
+      )
+    }
+  } catch (e: unknown) {
+    bgmLog(LOG_LEVELS.WARN, `[handlers] GitHub 配置自动保存失败: ${(e as Error).message}`)
+  }
+}, 300)
+
 // ========== 事件监听 ==========
 
 export function setupButtonListeners(): void {
   document.querySelectorAll('[data-action]').forEach((button) => {
-    button.removeEventListener('click', handleActionClick)
-    button.addEventListener('click', handleActionClick)
+    trackedAddEventListener(button, 'click', handleActionClick)
   })
 
   // 启用同步记录 开关
@@ -172,12 +284,7 @@ export function setupButtonListeners(): void {
     'chkEnableSyncRecord',
   ) as HTMLInputElement | null
   if (chkEnableSyncRecord) {
-    chkEnableSyncRecord.addEventListener('change', () => {
-      const checked = chkEnableSyncRecord.checked
-      bgmLog(LOG_LEVELS.INFO, `[handlers] 启用同步记录开关切换: ${checked ? '开启' : '关闭'}`)
-      setSyncRecordEnabled(checked)
-      showToast(checked ? '已启用同步记录功能' : '已关闭同步记录功能', 'info')
-    })
+    trackedAddEventListener(chkEnableSyncRecord, 'change', handleEnableSyncRecordChange)
     bgmLog(LOG_LEVELS.INFO, '[handlers] 启用同步记录 checkbox 监听器已注册')
   }
 
@@ -211,40 +318,13 @@ export function setupButtonListeners(): void {
     // 用户输入时静默保存，避免每次按键都触发 PluginStorage 写入。
     // 注意：按钮点击 "保存配置"（saveGithubConfig action）不走此路径，
     // 仍保留同步保存 + Toast 反馈，确保用户主动保存的即时确认体验。
-    const debouncedSaveGithubConfig = debounce((): void => {
-      try {
-        const owner = (ownerInput?.value ?? '').trim()
-        const repo = (repoInput?.value ?? '').trim()
-        const branch = (branchInput?.value ?? '').trim() || 'main'
-        const path = (pathInput?.value ?? '').trim()
-        const strategy = (strategySelect?.value as SyncStrategy) || 'add-update'
-        const sourceType = (sourceTypeSelect?.value as SyncSourceType) || 'github'
-        // 本地文件源仅需 path 字段；远程源要求 owner/repo/path 均非空
-        // 用户可能正在输入，必填项未完成时跳过自动保存
-        if (sourceType === 'local') {
-          if (!path) return
-        } else {
-          if (!owner || !repo || !path) return
-        }
-        const okConfig = setGithubConfig({ owner, repo, branch, path, sourceType })
-        const okStrategy = setSyncStrategy(strategy)
-        const okSourceType = setSyncSourceType(sourceType)
-        if (okConfig && okStrategy && okSourceType) {
-          bgmLog(
-            LOG_LEVELS.INFO,
-            `[handlers] GitHub 配置已自动保存: ${owner}/${repo}/${branch}/${path}, 策略: ${strategy}, 同步源: ${sourceType}`,
-          )
-        }
-      } catch (e: unknown) {
-        bgmLog(LOG_LEVELS.WARN, `[handlers] GitHub 配置自动保存失败: ${(e as Error).message}`)
-      }
-    }, 300)
-    if (ownerInput) ownerInput.addEventListener('input', debouncedSaveGithubConfig)
-    if (repoInput) repoInput.addEventListener('input', debouncedSaveGithubConfig)
-    if (branchInput) branchInput.addEventListener('input', debouncedSaveGithubConfig)
-    if (pathInput) pathInput.addEventListener('input', debouncedSaveGithubConfig)
-    if (strategySelect) strategySelect.addEventListener('change', debouncedSaveGithubConfig)
-    if (sourceTypeSelect) sourceTypeSelect.addEventListener('change', debouncedSaveGithubConfig)
+    if (ownerInput) trackedAddEventListener(ownerInput, 'input', debouncedSaveGithubConfig)
+    if (repoInput) trackedAddEventListener(repoInput, 'input', debouncedSaveGithubConfig)
+    if (branchInput) trackedAddEventListener(branchInput, 'input', debouncedSaveGithubConfig)
+    if (pathInput) trackedAddEventListener(pathInput, 'input', debouncedSaveGithubConfig)
+    if (strategySelect) trackedAddEventListener(strategySelect, 'change', debouncedSaveGithubConfig)
+    if (sourceTypeSelect)
+      trackedAddEventListener(sourceTypeSelect, 'change', debouncedSaveGithubConfig)
     bgmLog(LOG_LEVELS.INFO, '[handlers] GitHub 配置输入框防抖自动保存监听器已注册')
   } catch (e: unknown) {
     bgmLog(LOG_LEVELS.WARN, `[handlers] 加载 GitHub 配置失败: ${(e as Error).message}`)
@@ -253,9 +333,7 @@ export function setupButtonListeners(): void {
   // 系统日志：级别筛选下拉框变化时重新渲染日志列表
   const logLevelFilter = document.getElementById('logLevelFilter') as HTMLSelectElement | null
   if (logLevelFilter) {
-    logLevelFilter.addEventListener('change', () => {
-      renderLogEntries()
-    })
+    trackedAddEventListener(logLevelFilter, 'change', handleLogLevelFilterChange)
     bgmLog(LOG_LEVELS.INFO, '[handlers] 日志级别筛选 change 监听器已注册')
   }
 }
@@ -660,7 +738,7 @@ const ACTION_HANDLERS: Record<string, ActionHandler> = {
           bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 用户取消 GitHub 同步')
           return
         }
-        syncFromGithub((current, total, message) => {
+        syncFromRemote((current, total, message) => {
           if (total > 0) {
             setStatus(`GitHub 同步 ${current}/${total}: ${message}`)
           }
@@ -917,6 +995,8 @@ function handleActionClick(event: Event): void {
  */
 export function initHandlers(): void {
   const start = (): void => {
+    // 先清理旧监听器，防止面板重新初始化时重复注册
+    clearTrackedListeners()
     setupButtonListeners()
     setupMessageListener()
     setupEventListeners()
@@ -1077,65 +1157,72 @@ export function removeMessageListener(): void {
   }
 }
 
-// ========== 事件监听（用于接收事件总线通知）==========
-function setupEventListeners(): void {
-  eventBus.on(BGM_EVENTS.TOKEN_UPDATED, () => {
-    bgmLog(LOG_LEVELS.INFO, '[handlers] 收到 TOKEN_UPDATED 事件')
-    updateTokenStatus()
-    updateUserIdStatus()
-  })
+// ========== 事件总线处理器（模块级，便于追踪与去重） ==========
 
-  eventBus.on(BGM_EVENTS.USER_ID_UPDATED, () => {
-    bgmLog(LOG_LEVELS.INFO, '[handlers] 收到 USER_ID_UPDATED 事件')
-    updateUserIdStatus()
-  })
+const handleTokenUpdatedEvent = (): void => {
+  bgmLog(LOG_LEVELS.INFO, '[handlers] 收到 TOKEN_UPDATED 事件')
+  updateTokenStatus()
+  updateUserIdStatus()
+}
 
-  eventBus.on(BGM_EVENTS.USER_NAME_UPDATED, () => {
-    bgmLog(LOG_LEVELS.INFO, '[handlers] 收到 USER_NAME_UPDATED 事件')
-    updateUserIdStatus()
-  })
+const handleUserIdUpdatedEvent = (): void => {
+  bgmLog(LOG_LEVELS.INFO, '[handlers] 收到 USER_ID_UPDATED 事件')
+  updateUserIdStatus()
+}
 
-  // 配置更新事件（用于同步增量同步和跳过冲突状态）
-  eventBus.on(BGM_EVENTS.CONFIG_UPDATED, (data: { key: string; value: string }) => {
-    if (!isTaskpaneContext()) return
+const handleUserNameUpdatedEvent = (): void => {
+  bgmLog(LOG_LEVELS.INFO, '[handlers] 收到 USER_NAME_UPDATED 事件')
+  updateUserIdStatus()
+}
 
-    bgmLog(
-      LOG_LEVELS.INFO,
-      `[handlers] 收到 CONFIG_UPDATED 事件: key=${data.key}, value=${data.value}`,
-    )
+const handleConfigUpdatedEvent = (data: { key: string; value: string }): void => {
+  if (!isTaskpaneContext()) return
 
-    if (data.key === 'bgm_incremental_sync') {
-      bgmLog(LOG_LEVELS.INFO, `[handlers] ========== 更新增量同步复选框 ==========`)
-      tryUpdateIncrementalCheckbox(data.value === 'true')
-    } else if (data.key === 'bgm_skip_conflicts') {
-      bgmLog(LOG_LEVELS.INFO, `[handlers] ========== 更新跳过冲突 UI ==========`)
-      tryUpdateSkipConflictsUI(data.value === 'true')
-    }
-  })
-
-  // 同步进度事件（更新到同步进度弹窗，若弹窗未打开则忽略）
-  eventBus.on(
-    BGM_EVENTS.SYNC_PROGRESS,
-    (data: { current: number; total: number; message: string }) => {
-      updateSyncProgressDialog(data.current, data.total, data.message)
-    },
+  bgmLog(
+    LOG_LEVELS.INFO,
+    `[handlers] 收到 CONFIG_UPDATED 事件: key=${data.key}, value=${data.value}`,
   )
 
-  // 同步状态变更事件（开始/暂停/恢复/停止/空闲）
-  eventBus.on(BGM_EVENTS.SYNC_STATE_CHANGED, (payload: { state: string; row?: number }) => {
-    bgmLog(
-      LOG_LEVELS.INFO,
-      `[handlers] 同步状态变更: ${payload.state}${payload.row ? `, 行: ${payload.row}` : ''}`,
-    )
-    // 可选：根据状态刷新按钮禁用态
-    const syncButtons = document.querySelectorAll(
-      'button[data-action="sync"], button[data-action="syncCollectionFromBgm"], button[data-action="previewSyncContent"]',
-    )
-    syncButtons.forEach((btn) => {
-      const el = btn as HTMLButtonElement
-      el.disabled = payload.state === 'running' || payload.state === 'paused'
-    })
+  if (data.key === 'bgm_incremental_sync') {
+    bgmLog(LOG_LEVELS.INFO, `[handlers] ========== 更新增量同步复选框 ==========`)
+    tryUpdateIncrementalCheckbox(data.value === 'true')
+  } else if (data.key === 'bgm_skip_conflicts') {
+    bgmLog(LOG_LEVELS.INFO, `[handlers] ========== 更新跳过冲突 UI ==========`)
+    tryUpdateSkipConflictsUI(data.value === 'true')
+  }
+}
+
+const handleSyncProgressEvent = (data: {
+  current: number
+  total: number
+  message: string
+}): void => {
+  updateSyncProgressDialog(data.current, data.total, data.message)
+}
+
+const handleSyncStateChangedEvent = (payload: { state: string; row?: number }): void => {
+  bgmLog(
+    LOG_LEVELS.INFO,
+    `[handlers] 同步状态变更: ${payload.state}${payload.row ? `, 行: ${payload.row}` : ''}`,
+  )
+  // 可选：根据状态刷新按钮禁用态
+  const syncButtons = document.querySelectorAll(
+    'button[data-action="sync"], button[data-action="syncCollectionFromBgm"], button[data-action="previewSyncContent"]',
+  )
+  syncButtons.forEach((btn) => {
+    const el = btn as HTMLButtonElement
+    el.disabled = payload.state === 'running' || payload.state === 'paused'
   })
+}
+
+// ========== 事件监听（用于接收事件总线通知）==========
+function setupEventListeners(): void {
+  trackedEventBusOn(BGM_EVENTS.TOKEN_UPDATED, handleTokenUpdatedEvent)
+  trackedEventBusOn(BGM_EVENTS.USER_ID_UPDATED, handleUserIdUpdatedEvent)
+  trackedEventBusOn(BGM_EVENTS.USER_NAME_UPDATED, handleUserNameUpdatedEvent)
+  trackedEventBusOn(BGM_EVENTS.CONFIG_UPDATED, handleConfigUpdatedEvent)
+  trackedEventBusOn(BGM_EVENTS.SYNC_PROGRESS, handleSyncProgressEvent)
+  trackedEventBusOn(BGM_EVENTS.SYNC_STATE_CHANGED, handleSyncStateChangedEvent)
 }
 
 // 尝试更新增量同步复选框（带重试机制）
@@ -1218,6 +1305,83 @@ function tryUpdateSkipConflictsUI(skipConflicts: boolean, attempts: number = 0):
   }
 }
 
+const handleIncrementalChange = (): void => {
+  const chkIncremental = document.getElementById('chkIncremental') as HTMLInputElement | null
+  if (!chkIncremental) return
+  const checked = chkIncremental.checked
+
+  bgmLog(LOG_LEVELS.INFO, `[handlers] ========== 增量同步状态变更 ==========`)
+  bgmLog(LOG_LEVELS.INFO, `[handlers] 新状态: ${checked ? '开启' : '关闭'}`)
+
+  try {
+    const result = setIncrementalSync(checked)
+
+    if (result) {
+      bgmLog(LOG_LEVELS.INFO, `[handlers] 增量同步状态已成功同步到配置和 Ribbon`)
+    } else {
+      bgmLog(LOG_LEVELS.WARN, `[handlers] 增量同步状态同步失败`)
+    }
+  } catch (e: unknown) {
+    bgmLog(LOG_LEVELS.WARN, `[handlers] 更新增量同步状态失败: ${(e as Error).message}`)
+  }
+}
+
+const handleConflictStrategyChange = (): void => {
+  const conflictStrategySelect = document.getElementById(
+    'conflictStrategy',
+  ) as HTMLSelectElement | null
+  if (!conflictStrategySelect) return
+  const selectedValue = conflictStrategySelect.value
+  const isSkip = selectedValue === 'skip'
+
+  bgmLog(LOG_LEVELS.INFO, `[handlers] ========== 冲突策略变更 ==========`)
+  bgmLog(LOG_LEVELS.INFO, `[handlers] 当前值: ${selectedValue}`)
+  bgmLog(
+    LOG_LEVELS.INFO,
+    `[handlers] 策略类型: ${isSkip ? '跳过冲突（保留Bangumi数据）' : 'Excel覆盖（用Excel数据覆盖）'}`,
+  )
+
+  const result = setSkipConflicts(isSkip)
+
+  if (result) {
+    bgmLog(LOG_LEVELS.INFO, `[handlers] 冲突策略已成功同步到配置和 Ribbon`)
+  } else {
+    bgmLog(LOG_LEVELS.WARN, `[handlers] 冲突策略同步失败`)
+  }
+}
+
+const handleSkipRadioChange = (): void => {
+  const skipRadio = document.querySelector(
+    'input[name="conflictStrategy"][value="skip"]',
+  ) as HTMLInputElement | null
+  if (skipRadio?.checked) {
+    setSkipConflicts(true)
+    bgmLog(LOG_LEVELS.INFO, `[handlers] 冲突策略已更新: 跳过冲突`)
+  }
+}
+
+const handleOverwriteRadioChange = (): void => {
+  const overwriteRadio = document.querySelector(
+    'input[name="conflictStrategy"][value="overwrite"]',
+  ) as HTMLInputElement | null
+  if (overwriteRadio?.checked) {
+    setSkipConflicts(false)
+    bgmLog(LOG_LEVELS.INFO, `[handlers] 冲突策略已更新: Excel覆盖`)
+  }
+}
+
+const handleChkSkipConflictsChange = (): void => {
+  const chkSkipConflicts = document.getElementById('chkSkipConflicts') as HTMLInputElement | null
+  if (!chkSkipConflicts) return
+  const checked = chkSkipConflicts.checked
+  try {
+    setSkipConflicts(checked)
+    bgmLog(LOG_LEVELS.INFO, `[handlers] 跳过冲突状态已更新: ${checked ? '跳过冲突' : 'Excel覆盖'}`)
+  } catch (e: unknown) {
+    bgmLog(LOG_LEVELS.WARN, `[handlers] 更新跳过冲突状态失败: ${(e as Error).message}`)
+  }
+}
+
 // 从配置读取增量同步状态并初始化 checkbox
 function initIncrementalSyncFromRibbon(): void {
   if (!isTaskpaneContext()) return
@@ -1234,24 +1398,7 @@ function initIncrementalSyncFromRibbon(): void {
   }
 
   // 监听 checkbox 变化，同步到配置
-  chkIncremental.addEventListener('change', () => {
-    const checked = chkIncremental.checked
-
-    bgmLog(LOG_LEVELS.INFO, `[handlers] ========== 增量同步状态变更 ==========`)
-    bgmLog(LOG_LEVELS.INFO, `[handlers] 新状态: ${checked ? '开启' : '关闭'}`)
-
-    try {
-      const result = setIncrementalSync(checked)
-
-      if (result) {
-        bgmLog(LOG_LEVELS.INFO, `[handlers] 增量同步状态已成功同步到配置和 Ribbon`)
-      } else {
-        bgmLog(LOG_LEVELS.WARN, `[handlers] 增量同步状态同步失败`)
-      }
-    } catch (e: unknown) {
-      bgmLog(LOG_LEVELS.WARN, `[handlers] 更新增量同步状态失败: ${(e as Error).message}`)
-    }
-  })
+  trackedAddEventListener(chkIncremental, 'change', handleIncrementalChange)
 
   // 同时初始化跳过冲突选项
   initSkipConflictsFromRibbon()
@@ -1280,25 +1427,7 @@ function initSkipConflictsFromRibbon(): void {
   const conflictStrategySelect = document.getElementById('conflictStrategy') as HTMLSelectElement
 
   if (conflictStrategySelect) {
-    conflictStrategySelect.addEventListener('change', () => {
-      const selectedValue = conflictStrategySelect.value
-      const isSkip = selectedValue === 'skip'
-
-      bgmLog(LOG_LEVELS.INFO, `[handlers] ========== 冲突策略变更 ==========`)
-      bgmLog(LOG_LEVELS.INFO, `[handlers] 当前值: ${selectedValue}`)
-      bgmLog(
-        LOG_LEVELS.INFO,
-        `[handlers] 策略类型: ${isSkip ? '跳过冲突（保留Bangumi数据）' : 'Excel覆盖（用Excel数据覆盖）'}`,
-      )
-
-      const result = setSkipConflicts(isSkip)
-
-      if (result) {
-        bgmLog(LOG_LEVELS.INFO, `[handlers] 冲突策略已成功同步到配置和 Ribbon`)
-      } else {
-        bgmLog(LOG_LEVELS.WARN, `[handlers] 冲突策略同步失败`)
-      }
-    })
+    trackedAddEventListener(conflictStrategySelect, 'change', handleConflictStrategyChange)
     bgmLog(LOG_LEVELS.INFO, `[handlers] 已注册冲突策略 select 变化监听器`)
     return
   }
@@ -1312,35 +1441,14 @@ function initSkipConflictsFromRibbon(): void {
   ) as HTMLInputElement
 
   if (skipRadio && overwriteRadio) {
-    skipRadio.addEventListener('change', () => {
-      if (skipRadio.checked) {
-        setSkipConflicts(true)
-        bgmLog(LOG_LEVELS.INFO, `[handlers] 冲突策略已更新: 跳过冲突`)
-      }
-    })
-    overwriteRadio.addEventListener('change', () => {
-      if (overwriteRadio.checked) {
-        setSkipConflicts(false)
-        bgmLog(LOG_LEVELS.INFO, `[handlers] 冲突策略已更新: Excel覆盖`)
-      }
-    })
+    trackedAddEventListener(skipRadio, 'change', handleSkipRadioChange)
+    trackedAddEventListener(overwriteRadio, 'change', handleOverwriteRadioChange)
     return
   }
 
   // 备用：如果是 checkbox
   const chkSkipConflicts = document.getElementById('chkSkipConflicts') as HTMLInputElement
   if (chkSkipConflicts) {
-    chkSkipConflicts.addEventListener('change', () => {
-      const checked = chkSkipConflicts.checked
-      try {
-        setSkipConflicts(checked)
-        bgmLog(
-          LOG_LEVELS.INFO,
-          `[handlers] 跳过冲突状态已更新: ${checked ? '跳过冲突' : 'Excel覆盖'}`,
-        )
-      } catch (e: unknown) {
-        bgmLog(LOG_LEVELS.WARN, `[handlers] 更新跳过冲突状态失败: ${(e as Error).message}`)
-      }
-    })
+    trackedAddEventListener(chkSkipConflicts, 'change', handleChkSkipConflictsChange)
   }
 }

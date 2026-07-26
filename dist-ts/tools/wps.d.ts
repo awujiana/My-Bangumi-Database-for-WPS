@@ -115,6 +115,7 @@ export interface WpsRange {
     End(direction: number): WpsRange;
     Select(): void;
     Delete(): void;
+    Insert(): void;
     SpecialCells(type: number): WpsRange;
     AutoFit(): void;
 }

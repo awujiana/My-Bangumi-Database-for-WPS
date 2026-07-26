@@ -72,13 +72,22 @@ export function testTokenValidityForRibbon(token, signal) {
     xhr.timeout = 30000;
     xhr.setRequestHeader('Authorization', 'Bearer ' + testToken);
     xhr.setRequestHeader('Content-Type', 'application/json');
-    // AbortSignal 支持：监听 abort 事件触发 xhr.abort()
+    // AbortSignal 支持：监听 abort 事件触发 xhr.abort()，并在请求完成后移除监听器
+    let abortHandler = null;
+    const removeAbortHandler = () => {
+        if (abortHandler && signal) {
+            signal.removeEventListener('abort', abortHandler);
+            abortHandler = null;
+        }
+    };
     if (signal) {
-        signal.addEventListener('abort', () => {
+        abortHandler = () => {
             xhr.abort();
-        });
+        };
+        signal.addEventListener('abort', abortHandler);
     }
     xhr.onload = () => {
+        removeAbortHandler();
         const duration = Date.now() - startTime;
         bgmLog(LOG_LEVELS.INFO, `[exceltobangumi/testTokenValidityForRibbon] ========== 请求完成 ==========`);
         bgmLog(LOG_LEVELS.INFO, `[exceltobangumi/testTokenValidityForRibbon] HTTP 状态码: ${xhr.status} (${xhr.statusText})`);
@@ -113,11 +122,13 @@ export function testTokenValidityForRibbon(token, signal) {
         }
     };
     xhr.onerror = () => {
+        removeAbortHandler();
         const duration = Date.now() - startTime;
         bgmLog(LOG_LEVELS.ERROR, `[exceltobangumi/testTokenValidityForRibbon] 网络错误，耗时: ${duration}ms`);
         showError('网络错误，无法连接到 Bangumi API\n\n可能原因：\n• 网络被墙（GFW）\n• 断网或 DNS 失败\n• API 服务器不可达\n\nToken 本身可能有效，请在网络恢复后重试', '网络错误');
     };
     xhr.ontimeout = () => {
+        removeAbortHandler();
         const duration = Date.now() - startTime;
         bgmLog(LOG_LEVELS.WARN, `[exceltobangumi/testTokenValidityForRibbon] 请求超时，耗时: ${duration}ms`);
         showError('请求超时（30s）\n\n可能网络受限或被墙，Token 本身可能有效', '超时');
@@ -190,13 +201,22 @@ export async function bgmRequestSync(method, endpoint, jsonBody, token, signal) 
             xhr.timeout = 30000;
             xhr.setRequestHeader('Authorization', `Bearer ${token}`);
             xhr.setRequestHeader('Content-Type', 'application/json');
-            // AbortSignal 支持：监听 abort 事件触发 xhr.abort()
+            // AbortSignal 支持：监听 abort 事件触发 xhr.abort()，并在请求完成后移除监听器
+            let abortHandler = null;
+            const removeAbortHandler = () => {
+                if (abortHandler && signal) {
+                    signal.removeEventListener('abort', abortHandler);
+                    abortHandler = null;
+                }
+            };
             if (signal) {
-                signal.addEventListener('abort', () => {
+                abortHandler = () => {
                     xhr.abort();
-                });
+                };
+                signal.addEventListener('abort', abortHandler);
             }
             xhr.onload = function () {
+                removeAbortHandler();
                 result.code = xhr.status;
                 if (xhr.status >= 200 && xhr.status < 300) {
                     result.message = 'success';
@@ -220,12 +240,14 @@ export async function bgmRequestSync(method, endpoint, jsonBody, token, signal) 
                 resolve(result);
             };
             xhr.onerror = function () {
+                removeAbortHandler();
                 result.code = 0;
                 // 如果是 abort 导致的 onerror，归类为取消
                 result.message = signal?.aborted ? '请求被取消' : 'Network error';
                 resolve(result);
             };
             xhr.ontimeout = function () {
+                removeAbortHandler();
                 result.code = 0;
                 result.message = 'Request timeout';
                 resolve(result);

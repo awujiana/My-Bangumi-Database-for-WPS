@@ -23,13 +23,83 @@ export interface GithubRemoteEntry {
     score?: number;
     /** 标签数组 */
     tags?: string[];
-    /** 个人评论 */
-    comment?: string;
     /** 看到集数 */
     episode?: number;
     /** 远程更新时间戳 */
     updatedAt?: string;
+    /** 开播日期（dump.date） */
+    date?: string;
+    /** 类别（dump.platform） */
+    platform?: number;
+    /** 标签/分级（dump.meta_tags，优先于 tags 写入「标签/分级」列） */
+    meta_tags?: string[];
+    /** 布尔（dump.nsfw） */
+    nsfw?: boolean;
+    /** 完播日（infobox.播放结束） */
+    播放结束?: string;
+    /** 制作公司（infobox.动画制作公司） */
+    动画制作公司?: string;
+    /** 集数（infobox.话数，优先于 episode 写入「集数」列） */
+    话数?: string;
+    /** 时长/分钟（infobox.片长） */
+    片长?: string;
+    /** 制片国家（infobox.制片国家） */
+    制片国家?: string;
+    /** 语言（infobox.语言） */
+    语言?: string;
+    /** 类型（infobox.类型） */
+    类型?: string;
+    /** 导演（infobox.导演） */
+    导演?: string;
+    /** 音乐（infobox.音乐） */
+    音乐?: string;
+    /** 人物设定（infobox.人物设定） */
+    人物设定?: string;
+    /** 机械设定（infobox.机械设定） */
+    机械设定?: string;
+    /** 原作（infobox.原作） */
+    原作?: string;
+    /** 脚本（infobox.脚本） */
+    脚本?: string;
+    /** 分镜（infobox.分镜） */
+    分镜?: string;
+    /** 演出（infobox.演出） */
+    演出?: string;
+    /** 原案（infobox.原案） */
+    原案?: string;
+    /** 系列构成（infobox.系列构成） */
+    系列构成?: string;
+    /** 在线播放平台（infobox.在线播放平台） */
+    在线播放平台?: string;
+    /** 关联的动漫ID（subject-relations） */
+    关联的动漫ID?: string;
 }
+/**
+ * 用户对单条冲突的解决决策
+ *
+ * chosenValue 为 'local' 时表示保留本地值（从 diff.changedFields 中移除该字段）；
+ * 为 'remote' 时表示采用远程值（保留该字段在 changedFields 中）。
+ */
+export interface ConflictResolution {
+    /** Bangumi subject ID（主键） */
+    sid: string;
+    /** 冲突字段名（与 Conflict.field 对应） */
+    field: string;
+    /** 用户选择的值来源 */
+    chosenValue: 'local' | 'remote';
+}
+/**
+ * 扩展字段映射表：JSONL 字段名 → Excel 标准字段名（colMap key）
+ *
+ * 用于 computeDiff 比对和 writeRemoteEntryToRow 写入扩展字段。
+ * 基础字段（url, name, score, tags, comment, episode）有独立的处理逻辑，不在此表中。
+ *
+ * 特殊处理（不在此表中）：
+ * - '话数' 通过 episode 逻辑处理（优先于 episode 写入「集数」列）
+ * - 'meta_tags' 通过 tags 逻辑处理（优先于 tags 写入「标签/分级」列）
+ * - 'nsfw' 无明确 Excel 列映射，暂不处理
+ */
+export declare const EXTENDED_FIELD_MAP: ReadonlyArray<readonly [string, string]>;
 /**
  * 同步策略枚举
  * - add-update: 新增+更新，不删除（默认，保守）

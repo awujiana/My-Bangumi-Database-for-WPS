@@ -19,7 +19,7 @@ export interface LogEntry {
 export declare function getRecentLogs(level?: LogLevel, limit?: number): LogEntry[];
 /** 清空日志缓冲区 */
 export declare function clearLogs(): void;
-/** Token 脱敏：保留前 4 后 4，中间替换为 * */
+/** Token 脱敏：隐藏前缀，仅保留后 4 位，其余替换为 * */
 export declare function maskToken(token: string): string;
 /** 脱敏字符串中的 token（检测形如 token=xxx / token:xxx / Bearer xxx 的模式） */
 export declare function maskSensitiveData(input: string): string;

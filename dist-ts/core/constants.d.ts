@@ -280,18 +280,14 @@ export declare const FIELD_NAME_MAP: Record<string, string>;
  */
 export declare const URL_PATTERNS: RegExp[];
 /**
- * Token加密配置
- * 定义Bangumi API Token的加密/解密相关参数
- * 使用 XOR 简单加密方式存储在 WPS PluginStorage 中
+ * Token 版本配置（仅用于识别历史 XOR 加密数据）
  *
- * @constant
- * @type {Object}
+ * 当前 Token 已改为明文存储，XOR 加密仅保留用于读取历史数据并自动升级。
+ * XOR_KEY 不再全局暴露，仅在 core/crypto.ts 内部保留以兼容旧数据。
  */
 export declare const TOKEN_CONFIG: {
-    /** Token版本标识，写入存储时附带用于版本识别 */
+    /** Token版本标识，用于识别历史 XOR 加密数据 */
     VERSION: string;
-    /** XOR加密密钥，用于混淆存储的Token */
-    XOR_KEY: string;
 };
 /**
  * 观看状态文本到数值的映射表
@@ -346,9 +342,9 @@ export declare const COLLECTION_TYPE_NAMES: string[];
 export declare const SYNC_RECORD_SHEET_NAME = "\u540C\u6B65\u8BB0\u5F55";
 /**
  * 同步记录表列名定义
- * 按顺序排列的11列：
- * SID(1) → 同步时间(2) → 名称(3) → URL(4) → 条目类型(5)
- * → 次数(6) → 内容(7) → 状态(8) → 收藏状态(9) → 备注(10) → 数据指纹(11)
+ * 按顺序排列的12列：
+ * SID(1) → 同步时间(2) → 名称(3) → URL(4) → 条目类型(5) → 来源(6)
+ * → 次数(7) → 内容(8) → 状态(9) → 收藏状态(10) → 备注(11) → 数据指纹(12)
  *
  * @constant
  * @type {string[]}
@@ -366,6 +362,7 @@ export declare const SYNC_RECORD_COLUMNS: string[];
  * @property {number} NAME - 条目名称（中文名/日文名）
  * @property {number} URL - Bangumi 条目页面链接
  * @property {number} TYPE - 条目类型（动画/书籍/游戏等）
+ * @property {number} SOURCE - 同步来源（GitHub/GitLab/Gitee/Gist/本地文件/BGM等）
  * @property {number} COUNT - 同步次数累计
  * @property {number} CONTENT - 同步内容描述（如"标记同步"）
  * @property {number} STATUS - 同步结果状态（成功/失败/跳过）
@@ -379,12 +376,13 @@ export declare const SYNC_RECORD_COL: {
     readonly NAME: 3;
     readonly URL: 4;
     readonly TYPE: 5;
-    readonly COUNT: 6;
-    readonly CONTENT: 7;
-    readonly STATUS: 8;
-    readonly COLL_TYPE: 9;
-    readonly MESSAGE: 10;
-    readonly FINGERPRINT: 11;
+    readonly SOURCE: 6;
+    readonly COUNT: 7;
+    readonly CONTENT: 8;
+    readonly STATUS: 9;
+    readonly COLL_TYPE: 10;
+    readonly MESSAGE: 11;
+    readonly FINGERPRINT: 12;
 };
 /**
  * 同步记录类型颜色映射表

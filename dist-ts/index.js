@@ -96,7 +96,7 @@ removeMessageListener, clearAllPendingTimeouts, } from './ui/handlers.js';
 // ============================================================================
 export { 
 // 导入同步记录模块的函数
-getOrCreateSyncRecordSheet, getSyncRecordSheetIfExists, getAllSyncRecords, addSyncRecord, deduplicateSyncRecords, formatSyncRecordSheet, openSyncRecordSheet, clearSyncRecords, } from './sync/syncRecord.js';
+getOrCreateSyncRecordSheet, getSyncRecordSheetIfExists, getAllSyncRecords, addSyncRecord, addSyncRecords, addSyncRecordSummary, deduplicateSyncRecords, formatSyncRecordSheet, openSyncRecordSheet, clearSyncRecords, } from './sync/syncRecord.js';
 // ============================================================================
 // 9. 同步引擎（来自 sync/exceltobangumi.js）
 // ============================================================================
@@ -123,7 +123,7 @@ fetchAllUserCollections, } from './sync/scraping.js';
 // 11. GitHub 仓库增量同步（来自 sync/githubSync.js + sync/githubConfig.js）
 // ============================================================================
 export { 
-// 主入口：从 GitHub 同步到本地 Excel
+// GitHub 源专用入口
 syncFromGithub, 
 // 下载远程 JSON
 fetchGithubJson, 
@@ -133,6 +133,11 @@ readLocalEntriesForSync,
 applyDiffToSheet, 
 // 应用用户冲突解决决策到 diff 列表
 applyConflictResolutions, } from './sync/githubSync.js';
+export { 
+// 多源统一调度入口（按 sourceType 选择 GitHub/GitLab/Gitee/本地/Gist）
+syncFromRemote, 
+// 同步源注册与查询
+registerSyncSource, getSyncSource, getRegisteredSourceTypes, isSyncSourceRegistered, } from './sync/syncSourceRegistry.js';
 export { 
 // 纯函数：差异计算（零依赖，可在 Node 测试环境运行）
 computeDiff, tagsToString, SYNC_STRATEGY_LABELS, } from './sync/githubSyncDiff.js';

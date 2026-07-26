@@ -2,7 +2,8 @@
  * @fileoverview Undo/Redo 栈，记录单元格变更以支持撤销操作
  * @module sync/undoStack
  */
-import { getDataSheet, setCellValue } from '../tools/util.js';
+import { LOG_LEVELS } from '../core/constants.js';
+import { bgmLog, getDataSheet, setCellValue } from '../tools/util.js';
 /** Undo 会话栈保留上限（最近 N 次同步） */
 const MAX_SESSIONS = 20;
 /** Undo 会话栈 */
@@ -27,7 +28,16 @@ export function beginUndoSession(description) {
 export function recordUndoEntry(entry) {
     if (!currentSession)
         return;
-    currentSession.entries.push(entry);
+    currentSession.entries.push({ ...entry, type: 'cell' });
+}
+/**
+ * 记录一次整行删除到当前会话
+ * @param rowSnapshot 被删除行的完整快照
+ */
+export function recordRowDeleteEntry(rowSnapshot) {
+    if (!currentSession)
+        return;
+    currentSession.entries.push({ type: 'row-delete', rowSnapshot });
 }
 /**
  * 结束当前会话并压入栈。空会话不入栈。
@@ -44,19 +54,39 @@ export function endUndoSession() {
     currentSession = null;
 }
 /**
- * 撤销最近一次同步操作（按执行逆序恢复单元格值）
+ * 撤销最近一次同步操作
+ *
+ * 恢复顺序：
+ * 1. 先逆序恢复所有单元格变更；
+ * 2. 再按行号从大到小恢复被删除的行（避免先行插入导致后续行号偏移）。
+ *
  * @returns 恢复的条目数，若无可撤销会话返回 0
  */
 export function undoLastSync() {
     const session = sessions.pop();
     if (!session)
         return 0;
-    // 逆序恢复（与执行顺序相反）
-    for (let i = session.entries.length - 1; i >= 0; i--) {
-        const entry = session.entries[i];
+    const cellEntries = [];
+    const rowDeleteEntries = [];
+    for (const entry of session.entries) {
+        if (entry.type === 'row-delete') {
+            rowDeleteEntries.push(entry.rowSnapshot);
+        }
+        else {
+            cellEntries.push(entry);
+        }
+    }
+    // 1. 逆序恢复单元格变更（与执行顺序相反）
+    for (let i = cellEntries.length - 1; i >= 0; i--) {
+        const entry = cellEntries[i];
         if (entry) {
             restoreCellValue(entry.row, entry.col, entry.oldValue);
         }
+    }
+    // 2. 按行号从大到小恢复被删除的行
+    rowDeleteEntries.sort((a, b) => b.row - a.row);
+    for (const snapshot of rowDeleteEntries) {
+        restoreDeletedRow(snapshot);
     }
     return session.entries.length;
 }
@@ -93,4 +123,29 @@ function restoreCellValue(row, col, value) {
     if (!ws)
         return;
     setCellValue(ws, row, col, value);
+}
+/**
+ * 恢复被删除的整行
+ * @param snapshot 删除前保存的行快照
+ */
+function restoreDeletedRow(snapshot) {
+    const ws = getDataSheet();
+    if (!ws)
+        return;
+    try {
+        // 在删除位置插入新行
+        ws.Range(`${snapshot.row}:${snapshot.row}`).Insert();
+    }
+    catch (e) {
+        const errMsg = e instanceof Error ? e.message : String(e);
+        bgmLog(LOG_LEVELS.WARN, `[undoStack] 插入行 ${snapshot.row} 失败: ${errMsg}`);
+        return;
+    }
+    // 恢复该行所有列的值
+    for (const [colStr, value] of Object.entries(snapshot.values)) {
+        const col = parseInt(colStr, 10);
+        if (Number.isNaN(col))
+            continue;
+        setCellValue(ws, snapshot.row, col, value);
+    }
 }

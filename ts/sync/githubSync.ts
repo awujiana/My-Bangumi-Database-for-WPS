@@ -17,7 +17,6 @@
 // 注意：bgmLog 定义在 tools/util.ts（不在 core/constants.ts），与 BGM/getDataSheet 等同源导入
 import { LOG_LEVELS, BGM_SUBJECT_TYPES } from '../core/constants.js'
 import { Result, BgmError } from '../core/result.js'
-import type { ConflictResolution } from '../services/ribbonService.js'
 import {
   bgmLog,
   getDataSheet,
@@ -30,12 +29,13 @@ import {
 } from '../tools/util.js'
 import type { WpsWorksheet } from '../tools/wps.js'
 
-import { buildRawUrl, isGithubConfigComplete, getSyncSourceType } from './githubConfig.js'
+import { buildRawUrl, isGithubConfigComplete } from './githubConfig.js'
 import {
   computeDiff,
   tagsToString,
   parseJsonl,
   EXTENDED_FIELD_MAP,
+  type ConflictResolution,
   type GithubRemoteEntry,
   type GithubSyncDiff,
   type LocalRowEntry,
@@ -45,7 +45,6 @@ import { extractSubjectId } from './pureUtils.js'
 import { addSyncRecords, addSyncRecordSummary } from './syncRecord.js'
 import type { UpdateRecordParams } from './syncRecord.js'
 import type { SyncSource } from './SyncSource.js'
-import { getSyncSource } from './syncSourceRegistry.js'
 import {
   beginUndoSession,
   endUndoSession,
@@ -126,14 +125,23 @@ export function fetchGithubJson(signal?: AbortSignal): Promise<GithubRemoteEntry
     xhr.timeout = REQUEST_TIMEOUT_MS
     xhr.setRequestHeader('Accept', 'application/json')
 
-    // AbortSignal 支持：监听 abort 事件触发 xhr.abort()
+    // AbortSignal 支持：监听 abort 事件触发 xhr.abort()，并在请求完成后移除监听器
+    let abortHandler: (() => void) | null = null
+    const removeAbortHandler = (): void => {
+      if (abortHandler && signal) {
+        signal.removeEventListener('abort', abortHandler)
+        abortHandler = null
+      }
+    }
     if (signal) {
-      signal.addEventListener('abort', () => {
+      abortHandler = () => {
         xhr.abort()
-      })
+      }
+      signal.addEventListener('abort', abortHandler)
     }
 
     xhr.onload = (): void => {
+      removeAbortHandler()
       if (xhr.status === 200) {
         try {
           const { entries, errors } = parseJsonl(xhr.responseText)
@@ -171,6 +179,7 @@ export function fetchGithubJson(signal?: AbortSignal): Promise<GithubRemoteEntry
     }
 
     xhr.onerror = (): void => {
+      removeAbortHandler()
       // 如果是 abort 导致的 onerror，归类为取消
       if (signal?.aborted) {
         reject(new Error('请求被取消'))
@@ -180,6 +189,7 @@ export function fetchGithubJson(signal?: AbortSignal): Promise<GithubRemoteEntry
     }
 
     xhr.ontimeout = (): void => {
+      removeAbortHandler()
       reject(new Error(`请求超时（${REQUEST_TIMEOUT_MS}ms）：${url}`))
     }
 
@@ -334,6 +344,8 @@ function writeRemoteEntryToRow(
     if (!forceOverwrite && !value) return
     // 记录 undo 条目（旧值 → 新值），便于撤销时恢复
     const oldValue = getCellValue(ws, row, col)
+    // 值无变化时跳过写入，避免空字符串重复写入并污染 undo 栈
+    if (oldValue === value) return
     recordUndoEntry({ row, col, oldValue, newValue: value })
     setCellValue(ws, row, col, value)
   }
@@ -604,18 +616,19 @@ export function applyConflictResolutions(
 }
 
 /**
- * GitHub 同步主入口（供 ribbonService 调用）
+ * GitHub 同步入口（GitHub 源专用）
  *
- * 通过 syncSourceRegistry 按 sourceType 动态选择 SyncSource 实现。
- * 默认 sourceType 为 'github'，由 syncSourceRegistry 注册的 GithubSyncSource 处理；
- * 未来 Task 22-25 注册的 GitLab/Gitee/本地文件/Gist 实现可无缝替换。
+ * 直接使用本模块的 GithubSyncSource 完成同步，不再依赖 syncSourceRegistry，
+ * 从而打破 githubSync.ts ↔ syncSourceRegistry.ts 的循环依赖。
+ *
+ * 如需按 sourceType 动态选择数据源，请使用 syncSourceRegistry.ts 中的 syncFromRemote。
  *
  * @param onProgress 进度回调
  * @param strategy 同步策略，默认 'add-update'
  * @param signal 可选 AbortSignal，用于取消请求
  * @param conflictResolution 可选冲突解决决策列表；提供时将按用户选择过滤 update diff 的字段
  * @returns 同步结果统计
- * @throws 配置错误、网络错误、解析错误、未知 sourceType 时抛出
+ * @throws 配置错误、网络错误、解析错误时抛出
  */
 export async function syncFromGithub(
   onProgress?: (current: number, total: number, message: string) => void,
@@ -623,21 +636,14 @@ export async function syncFromGithub(
   signal?: AbortSignal,
   conflictResolution?: ConflictResolution[],
 ): Promise<GithubSyncResult> {
-  // 1. 按 sourceType 从注册表获取 SyncSource 实例
-  const sourceType = getSyncSourceType()
-  const source = getSyncSource(sourceType)
-  if (!source) {
-    throw new Error(`未知的同步源类型: ${sourceType}`)
-  }
+  const source: SyncSource = new GithubSyncSource()
 
-  // 2. 调用 source.validateConfig() 校验配置完整性
   const validationResult = source.validateConfig()
   if (validationResult.isFail()) {
-    const errMsg = validationResult.error?.message ?? `同步源 ${sourceType} 配置校验失败`
+    const errMsg = validationResult.error?.message ?? 'GitHub 同步源配置校验失败'
     throw new Error(errMsg)
   }
 
-  // 3. 调用 source.fetchRemoteEntries() 下载远程数据
   onProgress?.(0, 0, `开始下载远程数据（${source.getDisplayName()} - 策略：${strategy}）...`)
   const remoteEntries = await source.fetchRemoteEntries(signal)
   onProgress?.(1, 3, `下载完成：${remoteEntries.length} 条`)

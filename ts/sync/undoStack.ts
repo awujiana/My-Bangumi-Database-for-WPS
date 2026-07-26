@@ -3,8 +3,8 @@
  * @module sync/undoStack
  */
 
-import { LOG_LEVELS, bgmLog } from '../core/constants.js'
-import { getDataSheet, setCellValue } from '../tools/util.js'
+import { LOG_LEVELS } from '../core/constants.js'
+import { bgmLog, getDataSheet, setCellValue } from '../tools/util.js'
 import type { WpsWorksheet } from '../tools/wps.js'
 
 /** 被删除行的完整快照 */

@@ -817,6 +817,16 @@ async function batchSyncRequests(
           )
           lastRequestTime = Date.now()
 
+          // 防御：_bgmRequestSync 在极端异常下可能返回 undefined，避免后续访问属性抛错
+          if (!apiResult) {
+            fail.push(task)
+            bgmLog(
+              LOG_LEVELS.ERROR,
+              `[batchSyncRequests] SID ${task.sid} 请求返回异常：apiResult 为 undefined`,
+            )
+            return
+          }
+
           if (apiResult.code >= 200 && apiResult.code < 300) {
             success.push(task)
             bgmLog(

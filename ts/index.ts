@@ -215,7 +215,7 @@ export {
 // 11. GitHub 仓库增量同步（来自 sync/githubSync.js + sync/githubConfig.js）
 // ============================================================================
 export {
-  // 主入口：从 GitHub 同步到本地 Excel
+  // GitHub 源专用入口
   syncFromGithub,
   // 下载远程 JSON
   fetchGithubJson,
@@ -228,6 +228,16 @@ export {
   // 同步结果统计类型
   type GithubSyncResult,
 } from './sync/githubSync.js'
+
+export {
+  // 多源统一调度入口（按 sourceType 选择 GitHub/GitLab/Gitee/本地/Gist）
+  syncFromRemote,
+  // 同步源注册与查询
+  registerSyncSource,
+  getSyncSource,
+  getRegisteredSourceTypes,
+  isSyncSourceRegistered,
+} from './sync/syncSourceRegistry.js'
 
 export {
   // 纯函数：差异计算（零依赖，可在 Node 测试环境运行）

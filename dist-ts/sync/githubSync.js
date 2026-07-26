@@ -14,18 +14,18 @@
  */
 // 直接从子模块导入，避开 index.ts 的副作用链（index → handlers → document.readyState）
 // 注意：bgmLog 定义在 tools/util.ts（不在 core/constants.ts），与 BGM/getDataSheet 等同源导入
-import { LOG_LEVELS } from '../core/constants.js';
+import { LOG_LEVELS, BGM_SUBJECT_TYPES } from '../core/constants.js';
 import { Result, BgmError } from '../core/result.js';
 import { bgmLog, getDataSheet, findHeaderRow, getLastRow, getColumnMap, getCellValue, setCellValue, trim, } from '../tools/util.js';
-import { buildRawUrl, isGithubConfigComplete, getSyncSourceType } from './githubConfig.js';
-import { computeDiff, tagsToString, parseJsonl, } from './githubSyncDiff.js';
+import { buildRawUrl, isGithubConfigComplete } from './githubConfig.js';
+import { computeDiff, tagsToString, parseJsonl, EXTENDED_FIELD_MAP, } from './githubSyncDiff.js';
 import { extractSubjectId } from './pureUtils.js';
-import { getSyncSource } from './syncSourceRegistry.js';
-import { beginUndoSession, endUndoSession, recordUndoEntry } from './undoStack.js';
+import { addSyncRecords, addSyncRecordSummary } from './syncRecord.js';
+import { beginUndoSession, endUndoSession, recordRowDeleteEntry, recordUndoEntry, } from './undoStack.js';
 // 类型导入：避免运行时循环依赖（githubSync → ribbonService → index → githubSync）
 // 纯函数与类型从 githubSyncDiff.ts re-export，避免重复定义
 // githubSyncDiff.ts 为零依赖纯模块，可在 Node 测试环境中直接运行
-export { computeDiff, tagsToString, parseJsonl, isGithubRemoteEntry, SYNC_STRATEGY_LABELS, } from './githubSyncDiff.js';
+export { computeDiff, tagsToString, parseJsonl, isGithubRemoteEntry, SYNC_STRATEGY_LABELS, EXTENDED_FIELD_MAP, } from './githubSyncDiff.js';
 /** HTTP 请求超时（毫秒） */
 const REQUEST_TIMEOUT_MS = 30000;
 /**
@@ -61,13 +61,22 @@ export function fetchGithubJson(signal) {
         xhr.open('GET', url, true);
         xhr.timeout = REQUEST_TIMEOUT_MS;
         xhr.setRequestHeader('Accept', 'application/json');
-        // AbortSignal 支持：监听 abort 事件触发 xhr.abort()
+        // AbortSignal 支持：监听 abort 事件触发 xhr.abort()，并在请求完成后移除监听器
+        let abortHandler = null;
+        const removeAbortHandler = () => {
+            if (abortHandler && signal) {
+                signal.removeEventListener('abort', abortHandler);
+                abortHandler = null;
+            }
+        };
         if (signal) {
-            signal.addEventListener('abort', () => {
+            abortHandler = () => {
                 xhr.abort();
-            });
+            };
+            signal.addEventListener('abort', abortHandler);
         }
         xhr.onload = () => {
+            removeAbortHandler();
             if (xhr.status === 200) {
                 try {
                     const { entries, errors } = parseJsonl(xhr.responseText);
@@ -100,6 +109,7 @@ export function fetchGithubJson(signal) {
             }
         };
         xhr.onerror = () => {
+            removeAbortHandler();
             // 如果是 abort 导致的 onerror，归类为取消
             if (signal?.aborted) {
                 reject(new Error('请求被取消'));
@@ -108,6 +118,7 @@ export function fetchGithubJson(signal) {
             reject(new Error(`网络请求失败：${url}（可能是 CORS 或网络不通）`));
         };
         xhr.ontimeout = () => {
+            removeAbortHandler();
             reject(new Error(`请求超时（${REQUEST_TIMEOUT_MS}ms）：${url}`));
         };
         xhr.send();
@@ -175,6 +186,11 @@ function readLocalEntries(ws, colMap, headerRow, lastRow) {
         const sid = extractSubjectId(url);
         if (!sid)
             continue;
+        // 读取扩展字段（EXTENDED_FIELD_MAP 中定义的 20 个 Excel 字段）
+        const extFields = {};
+        for (const [, excelField] of EXTENDED_FIELD_MAP) {
+            extFields[excelField] = getField(row, excelField);
+        }
         result.set(sid, {
             row,
             sid,
@@ -184,9 +200,9 @@ function readLocalEntries(ws, colMap, headerRow, lastRow) {
                 是否看完: getField(row, '是否看完') || getField(row, '状态') || getField(row, '观看状态'),
                 打分: getField(row, '打分'),
                 '标签/分级': getField(row, '标签/分级'),
-                '剧透/感言': getField(row, '剧透/感言') || getField(row, '感想') || getField(row, '评价'),
                 集数: getField(row, '集数'),
                 集号: getField(row, '集号'),
+                ...extFields,
             },
         });
     }
@@ -230,6 +246,9 @@ function writeRemoteEntryToRow(ws, colMap, row, remote, fieldsToWrite, forceOver
             return;
         // 记录 undo 条目（旧值 → 新值），便于撤销时恢复
         const oldValue = getCellValue(ws, row, col);
+        // 值无变化时跳过写入，避免空字符串重复写入并污染 undo 栈
+        if (oldValue === value)
+            return;
         recordUndoEntry({ row, col, oldValue, newValue: value });
         setCellValue(ws, row, col, value);
     };
@@ -242,21 +261,34 @@ function writeRemoteEntryToRow(ws, colMap, row, remote, fieldsToWrite, forceOver
     if (writeAll || fieldsToWrite.includes('名称')) {
         safeSet('名称', remote.name ?? '');
     }
-    // 打分
+    // 打分（score=0 视为"未打分"，写入空字符串，避免覆盖本地实际打分）
     if (writeAll || fieldsToWrite.includes('打分')) {
-        safeSet('打分', remote.score !== undefined ? String(remote.score) : '');
+        const scoreValue = remote.score !== undefined && remote.score !== 0 ? String(remote.score) : '';
+        safeSet('打分', scoreValue);
     }
-    // 标签
+    // 标签（优先使用 meta_tags，回退到 tags）
     if (writeAll || fieldsToWrite.includes('标签/分级')) {
-        safeSet('标签/分级', tagsToString(remote.tags));
+        safeSet('标签/分级', tagsToString(remote.meta_tags ?? remote.tags));
     }
-    // 评论
-    if (writeAll || fieldsToWrite.includes('剧透/感言')) {
-        safeSet('剧透/感言', remote.comment ?? '');
-    }
-    // 集数
+    // 集数（优先使用 infobox 的「话数」，回退到 episode；
+    //   episode=0 视为"未看"，写入空字符串，避免覆盖本地实际集数）
     if (writeAll || fieldsToWrite.includes('集数')) {
-        safeSet('集数', remote.episode !== undefined ? String(remote.episode) : '');
+        const episodeValue = remote['话数'] ??
+            (remote.episode !== undefined && remote.episode !== 0 ? String(remote.episode) : '');
+        safeSet('集数', episodeValue);
+    }
+    // 扩展字段（EXTENDED_FIELD_MAP 中定义的 20 个字段）
+    for (const [jsonlField, excelField] of EXTENDED_FIELD_MAP) {
+        if (writeAll || fieldsToWrite.includes(excelField)) {
+            const value = remote[jsonlField];
+            if (typeof value === 'string') {
+                safeSet(excelField, value);
+            }
+            else if (typeof value === 'number') {
+                safeSet(excelField, String(value));
+            }
+            // 忽略 undefined / null / boolean / string[]（EXTENDED_FIELD_MAP 不含这些类型）
+        }
     }
 }
 /**
@@ -264,9 +296,10 @@ function writeRemoteEntryToRow(ws, colMap, row, remote, fieldsToWrite, forceOver
  * @param diffs 差异列表
  * @param strategy 同步策略（决定 force-overwrite 与 delete 行为）
  * @param onProgress 进度回调（current, total, message）
+ * @param source 同步来源显示名称（如 GitHub/GitLab/Gitee），用于写入同步记录
  * @returns 同步结果统计
  */
-export function applyDiffToSheet(diffs, strategy, onProgress) {
+export function applyDiffToSheet(diffs, strategy, onProgress, source) {
     const result = {
         remoteTotal: 0,
         added: 0,
@@ -288,13 +321,15 @@ export function applyDiffToSheet(diffs, strategy, onProgress) {
     let nextAppendRow = lastRow + 1;
     const forceOverwrite = strategy === 'force-overwrite';
     // 开启 undo 会话：记录本次同步的所有单元格变更，便于用户撤销
-    beginUndoSession(`GitHub 同步 - 策略: ${strategy}`);
+    beginUndoSession(`${source ?? 'GitHub'} 同步 - 策略: ${strategy}`);
     // delete 操作需倒序执行（从大行号到小行号），避免行号错位
     const sortedDiffs = [...diffs].sort((a, b) => {
         const aRow = a.localRow ?? Number.MAX_SAFE_INTEGER;
         const bRow = b.localRow ?? Number.MAX_SAFE_INTEGER;
         return bRow - aRow;
     });
+    // 收集本次同步记录（最后批量写入，减少 COM 调用）
+    const syncRecords = [];
     const total = diffs.length;
     sortedDiffs.forEach((diff, idx) => {
         try {
@@ -303,32 +338,71 @@ export function applyDiffToSheet(diffs, strategy, onProgress) {
                 writeRemoteEntryToRow(ws, colMap, nextAppendRow, diff.remote, ['*'], forceOverwrite);
                 nextAppendRow++;
                 result.added++;
+                syncRecords.push({
+                    sid: diff.sid,
+                    name: diff.remote.name ?? '',
+                    url: diff.remote.url ?? '',
+                    type: BGM_SUBJECT_TYPES[diff.remote.type ?? 2] ?? '',
+                    source,
+                    content: '仓库同步-新增',
+                    status: '成功',
+                    count: 1,
+                });
                 onProgress?.(idx + 1, total, `新增 ${diff.remote.name ?? diff.sid}`);
             }
             else if (diff.kind === 'update' && diff.localRow !== undefined && diff.remote) {
                 // 更新：仅写入变更字段
                 writeRemoteEntryToRow(ws, colMap, diff.localRow, diff.remote, diff.changedFields, forceOverwrite);
                 result.updated++;
+                syncRecords.push({
+                    sid: diff.sid,
+                    name: diff.remote.name ?? '',
+                    url: diff.remote.url ?? '',
+                    type: BGM_SUBJECT_TYPES[diff.remote.type ?? 2] ?? '',
+                    source,
+                    content: '仓库同步-更新',
+                    status: '成功',
+                    message: diff.changedFields.join(', '),
+                    count: 1,
+                });
                 onProgress?.(idx + 1, total, `更新 ${diff.remote.name ?? diff.sid}`);
             }
             else if (diff.kind === 'delete' && diff.localRow !== undefined) {
                 // 删除：删除整行（mirror 策略）
-                // 先记录该行所有列的旧值，便于 undo 时按单元格恢复
+                // 先记录整行快照，便于 undo 时恢复整行
+                const rowValues = {};
                 for (const col of colMap.values()) {
-                    const oldValue = getCellValue(ws, diff.localRow, col);
-                    recordUndoEntry({ row: diff.localRow, col, oldValue, newValue: '' });
+                    rowValues[col] = getCellValue(ws, diff.localRow, col);
                 }
+                recordRowDeleteEntry({ row: diff.localRow, values: rowValues });
                 try {
                     const rowRange = ws.Rows.Item(diff.localRow);
                     // WPS Row 没有 Delete 方法，通过 Range 删除整行
                     ws.Range(`${diff.localRow}:${diff.localRow}`).Delete();
                     void rowRange; // 仅用于类型存在性引用
                     result.deleted++;
+                    syncRecords.push({
+                        sid: diff.sid,
+                        source,
+                        content: '仓库同步-删除',
+                        status: '成功',
+                        message: `删除行 ${diff.localRow}`,
+                        count: 1,
+                    });
                     onProgress?.(idx + 1, total, `删除 行${diff.localRow} sid=${diff.sid}`);
                 }
                 catch (e) {
-                    bgmLog(LOG_LEVELS.WARN, `[githubSync] 删除行 ${diff.localRow} 失败: ${e instanceof Error ? e.message : String(e)}`);
+                    const errMsg = e instanceof Error ? e.message : String(e);
+                    bgmLog(LOG_LEVELS.WARN, `[githubSync] 删除行 ${diff.localRow} 失败: ${errMsg}`);
                     result.failed++;
+                    syncRecords.push({
+                        sid: diff.sid,
+                        source,
+                        content: '仓库同步-删除失败',
+                        status: '失败',
+                        message: errMsg,
+                        count: 1,
+                    });
                 }
             }
             else {
@@ -336,12 +410,32 @@ export function applyDiffToSheet(diffs, strategy, onProgress) {
             }
         }
         catch (e) {
+            const errMsg = e instanceof Error ? e.message : String(e);
             result.failed++;
-            bgmLog(LOG_LEVELS.ERROR, `[githubSync] 应用差异失败 sid=${diff.sid}: ${e instanceof Error ? e.message : String(e)}`);
+            bgmLog(LOG_LEVELS.ERROR, `[githubSync] 应用差异失败 sid=${diff.sid}: ${errMsg}`);
+            syncRecords.push({
+                sid: diff.sid,
+                source,
+                content: '仓库同步-失败',
+                status: '失败',
+                message: errMsg,
+                count: 1,
+            });
         }
     });
     // 结束 undo 会话（空会话不入栈）
     endUndoSession();
+    // 批量写入同步记录与汇总行
+    if (syncRecords.length > 0) {
+        addSyncRecords(syncRecords);
+        addSyncRecordSummary({
+            source,
+            content: '仓库同步汇总',
+            status: result.failed > 0 ? '失败' : '成功',
+            message: `远程 ${result.remoteTotal}，新增 ${result.added}，更新 ${result.updated}，删除 ${result.deleted}，失败 ${result.failed}，策略: ${strategy}`,
+            count: 1,
+        });
+    }
     bgmLog(LOG_LEVELS.INFO, `[githubSync] 应用完成: 新增 ${result.added}，更新 ${result.updated}，删除 ${result.deleted}，失败 ${result.failed}`);
     return result;
 }
@@ -396,33 +490,27 @@ export function applyConflictResolutions(diffs, resolutions) {
     return diffs;
 }
 /**
- * GitHub 同步主入口（供 ribbonService 调用）
+ * GitHub 同步入口（GitHub 源专用）
  *
- * 通过 syncSourceRegistry 按 sourceType 动态选择 SyncSource 实现。
- * 默认 sourceType 为 'github'，由 syncSourceRegistry 注册的 GithubSyncSource 处理；
- * 未来 Task 22-25 注册的 GitLab/Gitee/本地文件/Gist 实现可无缝替换。
+ * 直接使用本模块的 GithubSyncSource 完成同步，不再依赖 syncSourceRegistry，
+ * 从而打破 githubSync.ts ↔ syncSourceRegistry.ts 的循环依赖。
+ *
+ * 如需按 sourceType 动态选择数据源，请使用 syncSourceRegistry.ts 中的 syncFromRemote。
  *
  * @param onProgress 进度回调
  * @param strategy 同步策略，默认 'add-update'
  * @param signal 可选 AbortSignal，用于取消请求
  * @param conflictResolution 可选冲突解决决策列表；提供时将按用户选择过滤 update diff 的字段
  * @returns 同步结果统计
- * @throws 配置错误、网络错误、解析错误、未知 sourceType 时抛出
+ * @throws 配置错误、网络错误、解析错误时抛出
  */
 export async function syncFromGithub(onProgress, strategy = 'add-update', signal, conflictResolution) {
-    // 1. 按 sourceType 从注册表获取 SyncSource 实例
-    const sourceType = getSyncSourceType();
-    const source = getSyncSource(sourceType);
-    if (!source) {
-        throw new Error(`未知的同步源类型: ${sourceType}`);
-    }
-    // 2. 调用 source.validateConfig() 校验配置完整性
+    const source = new GithubSyncSource();
     const validationResult = source.validateConfig();
     if (validationResult.isFail()) {
-        const errMsg = validationResult.error?.message ?? `同步源 ${sourceType} 配置校验失败`;
+        const errMsg = validationResult.error?.message ?? 'GitHub 同步源配置校验失败';
         throw new Error(errMsg);
     }
-    // 3. 调用 source.fetchRemoteEntries() 下载远程数据
     onProgress?.(0, 0, `开始下载远程数据（${source.getDisplayName()} - 策略：${strategy}）...`);
     const remoteEntries = await source.fetchRemoteEntries(signal);
     onProgress?.(1, 3, `下载完成：${remoteEntries.length} 条`);
@@ -441,7 +529,7 @@ export async function syncFromGithub(onProgress, strategy = 'add-update', signal
     const updateCount = diffs.filter((d) => d.kind === 'update').length;
     const deleteCount = diffs.filter((d) => d.kind === 'delete').length;
     bgmLog(LOG_LEVELS.INFO, `[githubSync] diff 完成（${strategy}）：新增 ${addCount}，更新 ${updateCount}，删除 ${deleteCount}`);
-    const result = applyDiffToSheet(diffs, strategy, onProgress);
+    const result = applyDiffToSheet(diffs, strategy, onProgress, source.getDisplayName());
     result.remoteTotal = remoteEntries.length;
     // unchanged = 远程总数 - (新增+更新)（delete 不计入 unchanged）
     result.unchanged = Math.max(0, remoteEntries.length - addCount - updateCount);

@@ -1,5 +1,5 @@
 // ts/services/ribbonService.ts
-import { getApp, bgmLog, BGM, wpsMsgBox, loadBgToken, storeBgToken, copyTokenToClipboard, getDataSheet, findHeaderRow, getLastRow, getColumnMap, extractSubjectId, mapWatchStatus, getCellValue, readRangeValues, getFilterStatus, BGM_COLOR, LOG_LEVELS, SyncToBangumiAsync, _getBgmUserId, testTokenValidityForRibbon, fetchAllUserCollections, getCell, trim, calcFingerprint, syncFromGithub, isGithubConfigComplete, getSyncStrategy, SYNC_STRATEGY_LABELS, } from '../index.js';
+import { getApp, bgmLog, BGM, wpsMsgBox, loadBgToken, storeBgToken, copyTokenToClipboard, getDataSheet, findHeaderRow, getLastRow, getColumnMap, extractSubjectId, mapWatchStatus, getCellValue, readRangeValues, getFilterStatus, BGM_COLOR, LOG_LEVELS, SyncToBangumiAsync, _getBgmUserId, testTokenValidityForRibbon, fetchAllUserCollections, getCell, trim, calcFingerprint, syncFromRemote, isGithubConfigComplete, getSyncStrategy, SYNC_STRATEGY_LABELS, } from '../index.js';
 import { undoLastSync, getLastSessionDescription } from '../sync/undoStack.js';
 /** 远程字段比对表（顺序固定，便于稳定测试） */
 const GITHUB_CONFLICT_FIELDS = Object.freeze([
@@ -10,7 +10,6 @@ const GITHUB_CONFLICT_FIELDS = Object.freeze([
         localField: '标签/分级',
         remoteToString: (r) => (Array.isArray(r.tags) ? r.tags.join('|') : ''),
     },
-    { localField: '剧透/感言', remoteToString: (r) => r.comment ?? '' },
     { localField: '集数', remoteToString: (r) => (r.episode !== undefined ? String(r.episode) : '') },
 ]);
 /**
@@ -525,7 +524,7 @@ export async function syncFromGithubForRibbon() {
     }
     // 4. 执行同步
     try {
-        const result = await syncFromGithub((current, total, message) => {
+        const result = await syncFromRemote((current, total, message) => {
             if (total > 0) {
                 bgmLog(LOG_LEVELS.INFO, `[syncFromGithubForRibbon] 进度 ${current}/${total}: ${message}`);
             }

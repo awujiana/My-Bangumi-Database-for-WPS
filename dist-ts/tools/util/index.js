@@ -12,7 +12,8 @@
  *   - util/index.ts：BGM 命名空间、bgmLog、getApp、Token 存储、用户 ID/用户名、辅助函数（shellExecuteByOAAssist、getUrlPath、showBangumiPanel）
  */
 // 直接从源模块导入，打破 util.ts ↔ index.ts 的循环依赖
-import { BGM_CONFIG, LOG_LEVELS, ERROR_LEVELS, ErrorLevel, } from '../../core/constants.js';
+import { BGM_CONFIG, LOG_LEVELS, ERROR_LEVELS, ErrorLevel, TOKEN_CONFIG, } from '../../core/constants.js';
+import { decryptToken } from '../../core/crypto.js';
 import { BgmError } from '../../core/result.js';
 import { showConfirm } from '../../ui/dialog.js';
 import { showAlert as customShowAlert, showError as customShowError, showInput as customShowInput, } from '../../ui/dialog.js';
@@ -506,6 +507,18 @@ export function loadBgToken() {
     const stored = app.PluginStorage.getItem('bgm_token');
     if (!stored)
         return null;
+    // 兼容历史 XOR 加密数据：格式为 "{VERSION}.{ivBase64}.{encryptedBase64}"
+    if (stored.startsWith(`${TOKEN_CONFIG.VERSION}.`)) {
+        const decrypted = decryptToken(stored);
+        if (decrypted) {
+            // 自动升级为明文存储
+            app.PluginStorage.setItem('bgm_token', decrypted);
+            bgmLog(LOG_LEVELS.INFO, '[loadBgToken] 历史加密 Token 已升级为明文存储');
+            return decrypted;
+        }
+        bgmLog(LOG_LEVELS.WARN, '[loadBgToken] 历史加密 Token 解密失败，视为无效');
+        return null;
+    }
     // 明文直接返回
     return stored;
 }

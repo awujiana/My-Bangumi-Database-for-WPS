@@ -140,6 +140,8 @@ export async function fetchAllUserCollections(token, userId, options) {
     const allCollections = [];
     let offset = 0;
     let total = 0;
+    let retryCount = 0;
+    const MAX_RETRY_COUNT = BGM_CONFIG.MAX_RETRIES;
     bgmLog(LOG_LEVELS.INFO, `[fetchAllUserCollections] 开始获取用户 ${userId} 的收藏列表`);
     while (offset < maxTotal) {
         try {
@@ -147,12 +149,19 @@ export async function fetchAllUserCollections(token, userId, options) {
             const xhrResult = await xhrGet(url, token);
             if (xhrResult.status < 200 || xhrResult.status >= 300) {
                 if (xhrResult.status === 429) {
-                    bgmLog(LOG_LEVELS.WARN, '[fetchAllUserCollections] API限流，等待重试...');
-                    await new Promise((resolve) => setTimeout(resolve, BGM_CONFIG.REQUEST_DELAY * 2));
-                    continue;
+                    if (retryCount < MAX_RETRY_COUNT) {
+                        retryCount++;
+                        const delayMs = BGM_CONFIG.RETRY_DELAY_BASE * Math.pow(2, retryCount - 1);
+                        bgmLog(LOG_LEVELS.WARN, `[fetchAllUserCollections] API限流，第 ${retryCount} 次重试，等待 ${delayMs}ms...`);
+                        await new Promise((resolve) => setTimeout(resolve, delayMs));
+                        continue;
+                    }
+                    throw new Error(`HTTP 429：请求过于频繁，已超过最大重试次数`);
                 }
                 throw new Error(`HTTP ${xhrResult.status}`);
             }
+            // 成功请求后重置重试计数
+            retryCount = 0;
             const data = xhrResult.data;
             if (total === 0 && data.total) {
                 total = Math.min(data.total, maxTotal);

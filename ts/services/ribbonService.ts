@@ -27,7 +27,7 @@ import {
   getCell,
   trim,
   calcFingerprint,
-  syncFromGithub,
+  syncFromRemote,
   isGithubConfigComplete,
   getSyncStrategy,
   SYNC_STRATEGY_LABELS,
@@ -64,14 +64,7 @@ export interface Conflict {
  * chosenValue 为 'local' 时表示保留本地值（从 diff.changedFields 中移除该字段）；
  * 为 'remote' 时表示采用远程值（保留该字段在 diff.changedFields 中）。
  */
-export interface ConflictResolution {
-  /** Bangumi subject ID（主键） */
-  sid: string
-  /** 冲突字段名（与 Conflict.field 对应） */
-  field: string
-  /** 用户选择的值来源 */
-  chosenValue: 'local' | 'remote'
-}
+export { type ConflictResolution } from '../sync/githubSyncDiff.js'
 
 /**
  * 字段比对配置：远程字段 → 本地字段名 + 字符串化函数
@@ -720,7 +713,7 @@ export async function syncFromGithubForRibbon(): Promise<GithubSyncResult | null
 
   // 4. 执行同步
   try {
-    const result = await syncFromGithub((current, total, message) => {
+    const result = await syncFromRemote((current, total, message) => {
       if (total > 0) {
         bgmLog(LOG_LEVELS.INFO, `[syncFromGithubForRibbon] 进度 ${current}/${total}: ${message}`)
       }

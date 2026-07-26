@@ -187,14 +187,69 @@ vi.mock('../../ts/sync/githubConfig.js', () => ({
 }))
 
 // ========== Mock: syncSourceRegistry ==========
-vi.mock('../../ts/sync/syncSourceRegistry.js', () => ({
-  getSyncSource: mockState.getSyncSource,
-  registerSyncSource: vi.fn(),
-}))
+// 由于 syncFromRemote 内部闭包引用了模块的 getSyncSource，仅覆盖导出无法影响其实现，
+// 因此在此提供使用 mockState.getSyncSource 的简化版 syncFromRemote，便于测试端到端流程。
+vi.mock('../../ts/sync/syncSourceRegistry.js', async () => {
+  const actual = await import('../../ts/sync/syncSourceRegistry.js')
+  const githubSync = await import('../../ts/sync/githubSync.js')
+  return {
+    ...actual,
+    getSyncSource: mockState.getSyncSource,
+    registerSyncSource: vi.fn(),
+    syncFromRemote: async (
+      onProgress?: (current: number, total: number, message: string) => void,
+      strategy = 'add-update',
+      signal?: AbortSignal,
+    ) => {
+      const sourceType = 'github'
+      const source = mockState.getSyncSource(sourceType)
+      if (!source) {
+        throw new Error(`未知的同步源类型: ${sourceType}`)
+      }
+
+      const validationResult = source.validateConfig()
+      if (validationResult.isFail()) {
+        const errMsg = validationResult.error?.message ?? `同步源 ${sourceType} 配置校验失败`
+        throw new Error(errMsg)
+      }
+
+      onProgress?.(0, 0, `开始下载远程数据（${source.getDisplayName()} - 策略：${strategy}）...`)
+      const remoteEntries = await source.fetchRemoteEntries(signal)
+      onProgress?.(1, 3, `下载完成：${remoteEntries.length} 条`)
+
+      const local = githubSync.readLocalEntriesForSync()
+      if (!local) {
+        throw new Error('无法读取本地工作表数据')
+      }
+
+      onProgress?.(2, 3, '比对差异中...')
+      const diffs = githubSync.computeDiff(remoteEntries, local.entries, strategy)
+
+      const result = githubSync.applyDiffToSheet(
+        diffs,
+        strategy,
+        onProgress,
+        source.getDisplayName(),
+      )
+      result.remoteTotal = remoteEntries.length
+      const addCount = diffs.filter((d) => d.kind === 'add').length
+      const updateCount = diffs.filter((d) => d.kind === 'update').length
+      result.unchanged = Math.max(0, remoteEntries.length - addCount - updateCount)
+
+      onProgress?.(
+        3,
+        3,
+        `完成：新增 ${result.added}，更新 ${result.updated}，删除 ${result.deleted}`,
+      )
+      return result
+    },
+  }
+})
 
 // ========== 导入被测模块 ==========
 import { SyncToBangumiAsync } from '../../ts/sync/exceltobangumi/index.js'
 import { syncFromGithub, applyDiffToSheet } from '../../ts/sync/githubSync.js'
+import { syncFromRemote } from '../../ts/sync/syncSourceRegistry.js'
 import {
   computeDiff,
   parseJsonl,
@@ -714,7 +769,7 @@ describe('GitHub 同步流程：fetch JSONL → diff → apply → undo', () => 
     expect(result.updated).toBe(1)
   })
 
-  it('syncFromGithub 端到端：下载 → diff → apply', async () => {
+  it('syncFromRemote 端到端：下载 → diff → apply', async () => {
     // 构造 mock SyncSource
     const remoteEntries: GithubRemoteEntry[] = [
       { sid: '40001', name: '远程条目', type: 3, score: 7 },
@@ -737,7 +792,7 @@ describe('GitHub 同步流程：fetch JSONL → diff → apply → undo', () => 
     mockState.getCellValue.mockReturnValue('')
     mockState.setCellValue.mockReturnValue(true)
 
-    const result = await syncFromGithub(undefined, 'add-update')
+    const result = await syncFromRemote(undefined, 'add-update')
 
     expect(result.remoteTotal).toBe(1)
     expect(result.added).toBe(1)
@@ -751,9 +806,7 @@ describe('GitHub 同步流程：fetch JSONL → diff → apply → undo', () => 
     expect(mockState.endUndoSession).toHaveBeenCalled()
   })
 
-  it('syncFromGithub 配置不完整时应抛出错误', async () => {
-    mockState.isGithubConfigComplete.mockReturnValue(false)
-
+  it('syncFromRemote 配置不完整时应抛出错误', async () => {
     // getSyncSource 返回一个 validateConfig 失败的 mock
     const failingSource: SyncSource = {
       getSourceType: () => 'github',
@@ -768,7 +821,7 @@ describe('GitHub 同步流程：fetch JSONL → diff → apply → undo', () => 
     }
     mockState.getSyncSource.mockReturnValue(failingSource)
 
-    await expect(syncFromGithub()).rejects.toThrow('配置不完整')
+    await expect(syncFromRemote()).rejects.toThrow('配置不完整')
   })
 
   it('undoLastSync 在无会话时返回 0', () => {

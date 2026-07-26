@@ -24,11 +24,11 @@ export function getRecentLogs(level, limit = 100) {
 export function clearLogs() {
     logBuffer.clear();
 }
-/** Token 脱敏：保留前 4 后 4，中间替换为 * */
+/** Token 脱敏：隐藏前缀，仅保留后 4 位，其余替换为 * */
 export function maskToken(token) {
-    if (token.length <= 8)
+    if (token.length <= 4)
         return '*'.repeat(token.length);
-    return token.slice(0, 4) + '*'.repeat(Math.min(token.length - 8, 20)) + token.slice(-4);
+    return '*'.repeat(Math.min(token.length - 4, 24)) + token.slice(-4);
 }
 /** 脱敏字符串中的 token（检测形如 token=xxx / token:xxx / Bearer xxx 的模式） */
 export function maskSensitiveData(input) {
