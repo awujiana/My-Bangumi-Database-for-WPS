@@ -24,12 +24,102 @@ export interface GithubRemoteEntry {
   score?: number
   /** 标签数组 */
   tags?: string[]
-  /** 个人评论 */
-  comment?: string
   /** 看到集数 */
   episode?: number
   /** 远程更新时间戳 */
   updatedAt?: string
+  // ── 扩展字段（dump 顶层 + infobox 解析，对应 Excel 完整表头）──
+  /** 开播日期（dump.date） */
+  date?: string
+  /** 类别（dump.platform） */
+  platform?: number
+  /** 标签/分级（dump.meta_tags，优先于 tags 写入「标签/分级」列） */
+  meta_tags?: string[]
+  /** 布尔（dump.nsfw） */
+  nsfw?: boolean
+  /** 完播日（infobox.播放结束） */
+  播放结束?: string
+  /** 制作公司（infobox.动画制作公司） */
+  动画制作公司?: string
+  /** 集数（infobox.话数，优先于 episode 写入「集数」列） */
+  话数?: string
+  /** 时长/分钟（infobox.片长） */
+  片长?: string
+  /** 制片国家（infobox.制片国家） */
+  制片国家?: string
+  /** 语言（infobox.语言） */
+  语言?: string
+  /** 类型（infobox.类型） */
+  类型?: string
+  /** 导演（infobox.导演） */
+  导演?: string
+  /** 音乐（infobox.音乐） */
+  音乐?: string
+  /** 人物设定（infobox.人物设定） */
+  人物设定?: string
+  /** 机械设定（infobox.机械设定） */
+  机械设定?: string
+  /** 原作（infobox.原作） */
+  原作?: string
+  /** 脚本（infobox.脚本） */
+  脚本?: string
+  /** 分镜（infobox.分镜） */
+  分镜?: string
+  /** 演出（infobox.演出） */
+  演出?: string
+  /** 原案（infobox.原案） */
+  原案?: string
+  /** 系列构成（infobox.系列构成） */
+  系列构成?: string
+  /** 在线播放平台（infobox.在线播放平台） */
+  在线播放平台?: string
+  /** 关联的动漫ID（subject-relations） */
+  关联的动漫ID?: string
+}
+
+/**
+ * 扩展字段映射表：JSONL 字段名 → Excel 标准字段名（colMap key）
+ *
+ * 用于 computeDiff 比对和 writeRemoteEntryToRow 写入扩展字段。
+ * 基础字段（url, name, score, tags, comment, episode）有独立的处理逻辑，不在此表中。
+ *
+ * 特殊处理（不在此表中）：
+ * - '话数' 通过 episode 逻辑处理（优先于 episode 写入「集数」列）
+ * - 'meta_tags' 通过 tags 逻辑处理（优先于 tags 写入「标签/分级」列）
+ * - 'nsfw' 无明确 Excel 列映射，暂不处理
+ */
+export const EXTENDED_FIELD_MAP: ReadonlyArray<readonly [string, string]> = [
+  ['date', '开播日期'],
+  ['播放结束', '完播日'],
+  ['platform', '类别'],
+  ['动画制作公司', '制作公司'],
+  ['片长', '时长'],
+  ['制片国家', '制片国家'],
+  ['语言', '语言'],
+  ['类型', '类型'],
+  ['导演', '导演'],
+  ['音乐', '音乐'],
+  ['人物设定', '人物设定'],
+  ['机械设定', '机械设定'],
+  ['原作', '原作'],
+  ['脚本', '脚本'],
+  ['分镜', '分镜'],
+  ['演出', '演出'],
+  ['原案', '原案'],
+  ['系列构成', '系列构成'],
+  ['在线播放平台', '在线播放平台'],
+  ['关联的动漫ID', '关联的动漫ID'],
+] as const
+
+/**
+ * 将远程扩展字段值转为字符串用于比对
+ * @param value 远程字段值（string | number | undefined）
+ * @returns 字符串表示；undefined/null/空字符串 → ''
+ */
+function toExtStringValue(value: string | number | undefined): string {
+  if (value === undefined || value === null) return ''
+  if (typeof value === 'number') return String(value)
+  return value
 }
 
 /**
@@ -212,27 +302,38 @@ export function computeDiff(
       changedFields.push('名称')
     }
 
-    // 比对打分
-    const remoteScore = remote.score !== undefined ? String(remote.score) : ''
-    if (remoteScore && remoteScore !== local.fields['打分']) {
-      changedFields.push('打分')
+    // 比对打分（score=0 视为"未打分"，不触发更新，避免覆盖本地实际打分）
+    if (remote.score !== undefined && remote.score !== 0) {
+      const remoteScore = String(remote.score)
+      if (remoteScore !== local.fields['打分']) {
+        changedFields.push('打分')
+      }
     }
 
-    // 比对标签
-    const remoteTags = tagsToString(remote.tags)
+    // 比对标签（优先使用 meta_tags，回退到 tags）
+    const remoteTags = tagsToString(remote.meta_tags ?? remote.tags)
     if (remoteTags && remoteTags !== local.fields['标签/分级']) {
       changedFields.push('标签/分级')
     }
 
-    // 比对评论
-    if (remote.comment && remote.comment !== local.fields['剧透/感言']) {
-      changedFields.push('剧透/感言')
+    // 比对集数（优先使用 infobox 的「话数」，回退到 episode；
+    //   episode=0 视为"未看"，不触发更新，避免覆盖本地实际集数）
+    const remoteEpisodeValue =
+      remote['话数'] ??
+      (remote.episode !== undefined && remote.episode !== 0 ? String(remote.episode) : '')
+    if (remoteEpisodeValue && remoteEpisodeValue !== local.fields['集数']) {
+      changedFields.push('集数')
     }
 
-    // 比对集数
-    const remoteEpisode = remote.episode !== undefined ? String(remote.episode) : ''
-    if (remoteEpisode && remoteEpisode !== local.fields['集数']) {
-      changedFields.push('集数')
+    // 比对扩展字段（EXTENDED_FIELD_MAP 中定义的 20 个字段）
+    for (const [jsonlField, excelField] of EXTENDED_FIELD_MAP) {
+      const remoteValue = remote[jsonlField as keyof GithubRemoteEntry]
+      if (remoteValue === undefined || remoteValue === null) continue
+      // 扩展字段类型为 string | number，统一转为字符串比对
+      const remoteStr = toExtStringValue(remoteValue as string | number)
+      if (remoteStr && remoteStr !== (local.fields[excelField] ?? '')) {
+        changedFields.push(excelField)
+      }
     }
 
     if (changedFields.length > 0) {

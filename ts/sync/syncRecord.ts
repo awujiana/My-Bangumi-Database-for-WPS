@@ -12,20 +12,22 @@ import {
   LOG_LEVELS,
   SYNC_STATUS,
   BGM_COLOR,
+  SYNC_RECORD_COLUMNS,
+  SYNC_RECORD_SHEET_NAME,
+  SYNC_RECORD_COL,
+  SYNC_RECORD_TYPE_COLOR,
+} from '../core/constants.js'
+import { getSyncRecordEnabled } from '../tools/config.js'
+import {
   bgmLog,
   getApp,
   BGM,
   getLastRow,
   colNumToLetter,
-  SYNC_RECORD_COLUMNS,
-  SYNC_RECORD_SHEET_NAME,
-  SYNC_RECORD_COL,
-  SYNC_RECORD_TYPE_COLOR,
   getCellValue,
   setCellValue,
   readRangeValues,
-  getSyncRecordEnabled,
-} from '../index.js'
+} from '../tools/util/index.js'
 import type { WpsWorksheet } from '../tools/wps.js'
 
 export interface SyncRecord {
@@ -36,6 +38,7 @@ export interface SyncRecord {
   url?: string
   sid?: string
   type?: string
+  source?: string | undefined
   count?: number
   content?: string
   status?: string
@@ -50,6 +53,7 @@ export interface UpdateRecordParams {
   url?: string
   sid?: string
   type?: string
+  source?: string | undefined
   content?: string
   status?: string
   message?: string
@@ -138,10 +142,11 @@ export function getOrCreateSyncRecordSheet(): WpsWorksheet {
     // 新表设置格式（列宽、行高、字体、居中、边框等）
     formatSyncRecordSheet(syncSheet)
   } else {
-    // 检测并迁移旧 schema（旧 12 列含"序号" → 新 11 列 SID 放第一列）
+    // 检测并迁移旧 schema（旧版无"来源"列 → 当前 12 列结构）
     try {
-      const oldHeader = String(syncSheet.Range('A1').Value2 ?? '').trim()
-      if (oldHeader === '序号') {
+      const firstHeader = String(syncSheet.Range('A1').Value2 ?? '').trim()
+      const sourceHeader = String(syncSheet.Range('F1').Value2 ?? '').trim()
+      if (firstHeader === '序号' || (firstHeader === 'SID' && sourceHeader !== '来源')) {
         bgmLog(LOG_LEVELS.INFO, '检测到旧版本同步记录表，开始迁移...')
         migrateSyncRecordSchema(syncSheet)
         bgmLog(LOG_LEVELS.INFO, '同步记录表迁移完成')
@@ -201,18 +206,54 @@ function invalidateCache(): void {
 }
 
 /**
- * 迁移旧版同步记录表数据（旧 12 列含序号 → 新 11 列 SID 放第一列）
- * 旧列序：序号(1) 同步时间(2) 名称(3) URL(4) SID(5) 条目类型(6) 次数(7) 内容(8) 状态(9) 备注(10) 数据指纹(11) 收藏状态(12)
- * 新列序：SID(1) 同步时间(2) 名称(3) URL(4) 条目类型(5) 次数(6) 内容(7) 状态(8) 收藏状态(9) 备注(10) 数据指纹(11)
+ * 迁移旧版同步记录表数据到当前 12 列结构
+ * 当前列序：SID(1) 同步时间(2) 名称(3) URL(4) 条目类型(5) 来源(6)
+ *          → 次数(7) 内容(8) 状态(9) 收藏状态(10) 备注(11) 数据指纹(12)
+ *
+ * 支持两种旧结构：
+ * - 旧 12 列（序号第一列）：序号(1) 同步时间(2) 名称(3) URL(4) SID(5) 条目类型(6) 次数(7) 内容(8) 状态(9) 备注(10) 数据指纹(11) 收藏状态(12)
+ * - 旧 11 列（SID第一列无来源）：SID(1) 同步时间(2) 名称(3) URL(4) 条目类型(5) 次数(6) 内容(7) 状态(8) 收藏状态(9) 备注(10) 数据指纹(11)
  */
 function migrateSyncRecordSchema(sheet: WpsWorksheet): void {
+  const firstHeader = String(sheet.Range('A1').Value2 ?? '').trim()
+  const isLegacyWithSeq = firstHeader === '序号'
   const lastRow = getLastRow(sheet)
   if (lastRow <= 1) return
 
   const rows: string[][] = []
   for (let row = 2; row <= lastRow; row++) {
-    const oldSid = getCellValue(sheet, row, 5).trim()
-    const oldUrl = getCellValue(sheet, row, 4).trim()
+    let oldSid: string
+    let oldUrl: string
+    let oldType: string
+    let oldCount: string
+    let oldContent: string
+    let oldStatus: string
+    let oldCollType: string
+    let oldMessage: string
+    let oldFingerprint: string
+
+    if (isLegacyWithSeq) {
+      oldSid = getCellValue(sheet, row, 5).trim()
+      oldUrl = getCellValue(sheet, row, 4).trim()
+      oldType = getCellValue(sheet, row, 6)
+      oldCount = getCellValue(sheet, row, 7)
+      oldContent = getCellValue(sheet, row, 8)
+      oldStatus = getCellValue(sheet, row, 9)
+      oldCollType = getCellValue(sheet, row, 12)
+      oldMessage = getCellValue(sheet, row, 10)
+      oldFingerprint = getCellValue(sheet, row, 11)
+    } else {
+      oldSid = getCellValue(sheet, row, 1).trim()
+      oldUrl = getCellValue(sheet, row, 4).trim()
+      oldType = getCellValue(sheet, row, 5)
+      oldCount = getCellValue(sheet, row, 6)
+      oldContent = getCellValue(sheet, row, 7)
+      oldStatus = getCellValue(sheet, row, 8)
+      oldCollType = getCellValue(sheet, row, 9)
+      oldMessage = getCellValue(sheet, row, 10)
+      oldFingerprint = getCellValue(sheet, row, 11)
+    }
+
     if (!oldUrl && !oldSid) continue
 
     rows.push([
@@ -220,13 +261,14 @@ function migrateSyncRecordSchema(sheet: WpsWorksheet): void {
       getCellValue(sheet, row, 2),
       getCellValue(sheet, row, 3),
       oldUrl,
-      getCellValue(sheet, row, 6),
-      getCellValue(sheet, row, 7),
-      getCellValue(sheet, row, 8),
-      getCellValue(sheet, row, 9),
-      getCellValue(sheet, row, 12),
-      getCellValue(sheet, row, 10),
-      getCellValue(sheet, row, 11),
+      oldType,
+      '', // 来源：旧数据无此字段，默认空
+      oldCount,
+      oldContent,
+      oldStatus,
+      oldCollType,
+      oldMessage,
+      oldFingerprint,
     ])
   }
 
@@ -252,7 +294,7 @@ function migrateSyncRecordSchema(sheet: WpsWorksheet): void {
     }
   }
 
-  bgmLog(LOG_LEVELS.INFO, `数据迁移完成：${rows.length} 条记录已重组到新列结构`)
+  bgmLog(LOG_LEVELS.INFO, `数据迁移完成：${rows.length} 条记录已重组到 12 列结构`)
 }
 
 function buildCache(sheet: WpsWorksheet): void {
@@ -288,6 +330,7 @@ function buildCache(sheet: WpsWorksheet): void {
         url: url,
         sid: sid,
         type: String(rowData[SYNC_RECORD_COL.TYPE - 1] ?? ''),
+        source: String(rowData[SYNC_RECORD_COL.SOURCE - 1] ?? ''),
         count: parseInt(String(rowData[SYNC_RECORD_COL.COUNT - 1] ?? '')) || 1,
         content: String(rowData[SYNC_RECORD_COL.CONTENT - 1] ?? ''),
         status: String(rowData[SYNC_RECORD_COL.STATUS - 1] ?? '') || SYNC_STATUS.SUCCESS,
@@ -374,6 +417,7 @@ export function addSyncRecord(params: UpdateRecordParams): boolean {
       if (params.name) setCellValue(sheet, existingRow, SYNC_RECORD_COL.NAME, params.name)
       if (params.url) setCellValue(sheet, existingRow, SYNC_RECORD_COL.URL, params.url)
       if (params.type) setCellValue(sheet, existingRow, SYNC_RECORD_COL.TYPE, params.type)
+      if (params.source) setCellValue(sheet, existingRow, SYNC_RECORD_COL.SOURCE, params.source)
       if (params.content) setCellValue(sheet, existingRow, SYNC_RECORD_COL.CONTENT, params.content)
       if (params.collType)
         setCellValue(sheet, existingRow, SYNC_RECORD_COL.COLL_TYPE, params.collType)
@@ -391,6 +435,7 @@ export function addSyncRecord(params: UpdateRecordParams): boolean {
         if (params.name) cacheItem.name = params.name
         if (params.url) cacheItem.url = params.url
         if (params.type) cacheItem.type = params.type
+        if (params.source) cacheItem.source = params.source
         if (params.content) cacheItem.content = params.content
         if (params.collType) cacheItem.collType = params.collType
       }
@@ -412,6 +457,7 @@ export function addSyncRecord(params: UpdateRecordParams): boolean {
       setCellValue(sheet, newRow, SYNC_RECORD_COL.URL, params.url || '')
       setCellValue(sheet, newRow, SYNC_RECORD_COL.SID, sid)
       setCellValue(sheet, newRow, SYNC_RECORD_COL.TYPE, params.type || '')
+      setCellValue(sheet, newRow, SYNC_RECORD_COL.SOURCE, params.source || '')
       setCellValue(sheet, newRow, SYNC_RECORD_COL.COUNT, finalCount)
       setCellValue(sheet, newRow, SYNC_RECORD_COL.CONTENT, params.content || '')
       setCellValue(sheet, newRow, SYNC_RECORD_COL.STATUS, finalStatus)
@@ -433,6 +479,7 @@ export function addSyncRecord(params: UpdateRecordParams): boolean {
         ...(params.name ? { name: params.name } : {}),
         ...(params.url ? { url: params.url } : {}),
         ...(params.type ? { type: params.type } : {}),
+        ...(params.source ? { source: params.source } : {}),
         ...(params.content ? { content: params.content } : {}),
         ...(params.fingerprint !== undefined ? { fingerprint: params.fingerprint } : {}),
         ...(params.collType ? { collType: params.collType } : {}),
@@ -443,6 +490,138 @@ export function addSyncRecord(params: UpdateRecordParams): boolean {
     BGM.handleError(e, { context: 'addSyncRecord', showAlert: false })
     return false
   }
+}
+
+/**
+ * 批量写入同步记录
+ *
+ * 性能优化入口：相比逐条调用 addSyncRecord，本函数一次性计算所有新行的起始位置，
+ * 并通过 Range.Value2 批量写入二维数组，显著减少 WPS COM 调用次数。
+ * 对于已存在的 SID，仍按单条更新（合并次数）。
+ *
+ * @param records 待写入的记录数组
+ * @returns 是否全部成功
+ */
+export function addSyncRecords(records: UpdateRecordParams[]): boolean {
+  if (!getSyncRecordEnabled()) {
+    bgmLog(LOG_LEVELS.INFO, '[addSyncRecords] 同步记录功能未启用，跳过')
+    return false
+  }
+  if (records.length === 0) return true
+
+  try {
+    const sheet = getOrCreateSyncRecordSheet()
+    deduplicateSyncRecords()
+    if (!_syncRecordCacheValid) buildCache(sheet)
+
+    const now = new Date().toLocaleString('zh-CN')
+    const newRows: string[][] = []
+    const sidToUpdate = new Map<
+      string,
+      { row: number; newCount: number; status: string; params: UpdateRecordParams }
+    >()
+
+    for (const params of records) {
+      const sid = params.sid || ''
+      if (sid && _syncRecordSidCache.has(sid)) {
+        const existingRow = _syncRecordSidCache.get(sid)!
+        const existingCount = parseInt(getCellValue(sheet, existingRow, SYNC_RECORD_COL.COUNT)) || 0
+        const existing = sidToUpdate.get(sid)
+        const totalCount = (existing?.newCount ?? existingCount) + (params.count || 1)
+        sidToUpdate.set(sid, {
+          row: existingRow,
+          newCount: totalCount,
+          status: params.status || SYNC_STATUS.SUCCESS,
+          params,
+        })
+        continue
+      }
+
+      newRows.push([
+        now,
+        params.name || '',
+        params.url || '',
+        sid,
+        params.type || '',
+        params.source || '',
+        String(params.count || 1),
+        params.content || '',
+        params.status || SYNC_STATUS.SUCCESS,
+        params.collType || '',
+        params.message || '',
+        params.fingerprint !== undefined ? params.fingerprint : '',
+      ])
+    }
+
+    // 批量写入新行：通过 Range.Value2 一次性写入二维数组
+    if (newRows.length > 0) {
+      const usedRange = sheet.UsedRange
+      let startRow = 2
+      if (usedRange) {
+        startRow = usedRange.Row + usedRange.Rows.Count
+      }
+      const endRow = startRow + newRows.length - 1
+      const startColLetter = colNumToLetter(1)
+      const endColLetter = colNumToLetter(SYNC_RECORD_COLUMNS.length)
+      const range = sheet.Range(`${startColLetter}${startRow}:${endColLetter}${endRow}`)
+      range.Value2 = newRows
+
+      // 设置新增行的颜色
+      for (let i = 0; i < newRows.length; i++) {
+        const row = startRow + i
+        const data = newRows[i]
+        if (!data) continue
+        const status = data[SYNC_RECORD_COL.STATUS - 1] ?? SYNC_STATUS.SUCCESS
+        const count = parseInt(data[SYNC_RECORD_COL.COUNT - 1] ?? '') || 1
+        setSyncRecordColors(sheet, row, status, count)
+      }
+    }
+
+    // 更新已有 SID 的时间、次数、状态及其他字段
+    for (const [sid, { row, newCount, status, params }] of sidToUpdate) {
+      setCellValue(sheet, row, SYNC_RECORD_COL.TIME, now)
+      setCellValue(sheet, row, SYNC_RECORD_COL.COUNT, newCount)
+      setCellValue(sheet, row, SYNC_RECORD_COL.STATUS, status)
+      if (params.name) setCellValue(sheet, row, SYNC_RECORD_COL.NAME, params.name)
+      if (params.url) setCellValue(sheet, row, SYNC_RECORD_COL.URL, params.url)
+      if (params.type) setCellValue(sheet, row, SYNC_RECORD_COL.TYPE, params.type)
+      if (params.source) setCellValue(sheet, row, SYNC_RECORD_COL.SOURCE, params.source)
+      if (params.content) setCellValue(sheet, row, SYNC_RECORD_COL.CONTENT, params.content)
+      if (params.message) setCellValue(sheet, row, SYNC_RECORD_COL.MESSAGE, params.message)
+      if (params.fingerprint !== undefined)
+        setCellValue(sheet, row, SYNC_RECORD_COL.FINGERPRINT, params.fingerprint)
+      if (params.collType) setCellValue(sheet, row, SYNC_RECORD_COL.COLL_TYPE, params.collType)
+      setSyncRecordColors(sheet, row, status, newCount)
+      _syncRecordSidCache.set(sid, row)
+    }
+
+    invalidateCache()
+    bgmLog(
+      LOG_LEVELS.INFO,
+      `[addSyncRecords] 批量写入完成：新增 ${newRows.length} 条，更新 ${sidToUpdate.size} 条`,
+    )
+    return true
+  } catch (e: unknown) {
+    BGM.handleError(e, { context: 'addSyncRecords', showAlert: false })
+    return false
+  }
+}
+
+/**
+ * 写入汇总同步记录
+ *
+ * 用于记录一次批量同步的整体结果（如 GitHub 仓库同步结束后新增/更新/删除统计）。
+ * 汇总行以 SID 为空标识，不参与按 SID 合并次数。
+ *
+ * @param params 汇总记录参数，建议 content 写"仓库同步汇总"，message 写统计信息
+ * @returns 是否成功
+ */
+export function addSyncRecordSummary(params: UpdateRecordParams): boolean {
+  return addSyncRecord({
+    ...params,
+    sid: '',
+    count: 1,
+  })
 }
 
 export function getAllSyncRecords(): SyncRecord[] {
@@ -591,7 +770,7 @@ export function formatSyncRecordSheet(sheet?: WpsWorksheet): void {
       }
     }
 
-    // 7. 收藏状态列边框（L列）
+    // 7. 收藏状态列边框
     const collTypeColLetter = colNumToLetter(SYNC_RECORD_COL.COLL_TYPE)
     if (dataRange) {
       try {

@@ -16,6 +16,14 @@
 import { BGM, bgmLog, LOG_LEVELS } from '../index.js'
 
 import { TOKEN_CONFIG } from './constants.js'
+
+/**
+ * 历史 XOR 加密密钥（仅用于兼容旧数据）。
+ *
+ * 当前 Token 已改为明文存储，该密钥不再用于新数据的加密，
+ * 仅保留在 crypto.ts 内部，避免在 constants.ts 中全局暴露。
+ */
+const LEGACY_XOR_KEY = 'bgmtoken_secret_key_2024'
 /**
  * 将字符串转换为UTF-8字节数组
  *
@@ -156,7 +164,7 @@ export function extractToken(encrypted: string): string | null {
 export function encryptToken(token: string): string {
   const payload = buildPayload(token)
   const payloadBytes = strToBytes(payload)
-  const keyBytes = strToBytes(TOKEN_CONFIG.XOR_KEY)
+  const keyBytes = strToBytes(LEGACY_XOR_KEY)
 
   // 生成随机IV
   const iv = new Uint8Array(16)
@@ -208,7 +216,7 @@ export function decryptToken(encrypted: string): string | null {
     const encryptedData = Uint8Array.from(atob(encryptedBase64!), (c) => c.charCodeAt(0))
 
     // XOR解密
-    const keyBytes = strToBytes(TOKEN_CONFIG.XOR_KEY)
+    const keyBytes = strToBytes(LEGACY_XOR_KEY)
     const decrypted = new Uint8Array(encryptedData.length)
     for (let i = 0; i < encryptedData.length; i++) {
       decrypted[i] =

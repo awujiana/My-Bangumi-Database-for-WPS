@@ -33,6 +33,8 @@ const mockState = vi.hoisted(() => ({
   handleStoppedRemainingTasks: vi.fn(),
   getOrCreateSyncRecordSheet: vi.fn(),
   getAllSyncRecords: vi.fn(() => []),
+  addSyncRecords: vi.fn(() => true),
+  addSyncRecordSummary: vi.fn(() => true),
 
   // tools/util.js mock（可按测试配置）
   getDataSheet: vi.fn(() => null),
@@ -85,6 +87,8 @@ vi.mock('../../ts/sync/exceltobangumi/progressReporter.js', () => ({
 vi.mock('../../ts/sync/syncRecord.js', () => ({
   getOrCreateSyncRecordSheet: mockState.getOrCreateSyncRecordSheet,
   getAllSyncRecords: mockState.getAllSyncRecords,
+  addSyncRecords: mockState.addSyncRecords,
+  addSyncRecordSummary: mockState.addSyncRecordSummary,
 }))
 
 // ========== Mock: tools/util.js（WPS API 边界） ==========
@@ -558,6 +562,8 @@ describe('GitHub 同步流程：fetch JSONL → diff → apply → undo', () => 
     mockState.applySyncFailResults.mockReset()
     mockState.handleStoppedRemainingTasks.mockReset()
     mockState.getOrCreateSyncRecordSheet.mockReset()
+    mockState.addSyncRecords.mockReset()
+    mockState.addSyncRecordSummary.mockReset()
     mockState.readRangeValues.mockReset()
 
     // 默认配置
@@ -646,6 +652,20 @@ describe('GitHub 同步流程：fetch JSONL → diff → apply → undo', () => 
 
     // 验证 setCellValue 被调用（写入数据）
     expect(mockState.setCellValue).toHaveBeenCalled()
+
+    // 验证同步记录被批量写入：2 条差异（1 新增 + 1 更新）+ 1 条汇总
+    expect(mockState.addSyncRecords).toHaveBeenCalled()
+    const records = mockState.addSyncRecords.mock.calls[0]?.[0] as Array<Record<string, unknown>>
+    expect(records).toHaveLength(2)
+    expect(records?.some((r) => r.content === '仓库同步-新增' && r.sid === '10001')).toBe(true)
+    expect(records?.some((r) => r.content === '仓库同步-更新' && r.sid === '10002')).toBe(true)
+
+    // 验证汇总行
+    expect(mockState.addSyncRecordSummary).toHaveBeenCalled()
+    const summary = mockState.addSyncRecordSummary.mock.calls[0]?.[0] as Record<string, unknown>
+    expect(summary?.content).toBe('仓库同步汇总')
+    expect(summary?.message).toContain('新增 1')
+    expect(summary?.message).toContain('更新 1')
 
     // 6. undoLastSync（撤销上次同步）
     mockState.undoLastSync.mockReturnValue(2)

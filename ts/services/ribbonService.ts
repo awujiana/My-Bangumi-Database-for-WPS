@@ -94,7 +94,6 @@ const GITHUB_CONFLICT_FIELDS: readonly FieldCompareSpec[] = Object.freeze([
     localField: '标签/分级',
     remoteToString: (r) => (Array.isArray(r.tags) ? r.tags.join('|') : ''),
   },
-  { localField: '剧透/感言', remoteToString: (r) => r.comment ?? '' },
   { localField: '集数', remoteToString: (r) => (r.episode !== undefined ? String(r.episode) : '') },
 ])
 

@@ -68,7 +68,7 @@ describe('computeDiff', () => {
 
   it('多个字段变更 → 全部列入 changedFields', () => {
     const remote: GithubRemoteEntry[] = [
-      { sid: '444', name: '新名', type: 2, score: 9, tags: ['Tag1', 'Tag2'], comment: '新评论' },
+      { sid: '444', name: '新名', type: 2, score: 9, tags: ['Tag1', 'Tag2'] },
     ]
     const local = new Map<string, LocalRowEntry>([
       [
@@ -81,16 +81,13 @@ describe('computeDiff', () => {
             是否看完: '看过',
             打分: '7',
             '标签/分级': 'OldTag',
-            '剧透/感言': '旧评论',
           },
         },
       ],
     ])
     const diffs = computeDiff(remote, local)
     expect(diffs).toHaveLength(1)
-    expect(diffs[0]?.changedFields).toEqual(
-      expect.arrayContaining(['名称', '打分', '标签/分级', '剧透/感言']),
-    )
+    expect(diffs[0]?.changedFields).toEqual(expect.arrayContaining(['名称', '打分', '标签/分级']))
   })
 
   it('远程字段为空 → 不视为差异（保留本地）', () => {
@@ -322,7 +319,7 @@ describe('parseJsonl', () => {
 
   it('带全部字段的完整记录正确解析', () => {
     const text =
-      '{"sid":"12345","url":"https://bgm.tv/subject/12345","name":"测试","type":2,"score":8,"tags":["标签1","标签2"],"comment":"评论","episode":12,"updatedAt":"2026-07-21"}'
+      '{"sid":"12345","url":"https://bgm.tv/subject/12345","name":"测试","type":2,"score":8,"tags":["标签1","标签2"],"episode":12,"updatedAt":"2026-07-21"}'
     const { entries, errors } = parseJsonl(text)
     expect(entries).toHaveLength(1)
     expect(errors).toHaveLength(0)
@@ -333,7 +330,6 @@ describe('parseJsonl', () => {
     expect(entry.type).toBe(2)
     expect(entry.score).toBe(8)
     expect(entry.tags).toEqual(['标签1', '标签2'])
-    expect(entry.comment).toBe('评论')
     expect(entry.episode).toBe(12)
     expect(entry.updatedAt).toBe('2026-07-21')
   })

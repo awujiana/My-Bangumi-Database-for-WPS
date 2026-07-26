@@ -161,6 +161,8 @@ export {
   getSyncRecordSheetIfExists,
   getAllSyncRecords,
   addSyncRecord,
+  addSyncRecords,
+  addSyncRecordSummary,
   deduplicateSyncRecords,
   formatSyncRecordSheet,
   openSyncRecordSheet,

@@ -15,7 +15,7 @@
 
 // 直接从子模块导入，避开 index.ts 的副作用链（index → handlers → document.readyState）
 // 注意：bgmLog 定义在 tools/util.ts（不在 core/constants.ts），与 BGM/getDataSheet 等同源导入
-import { LOG_LEVELS } from '../core/constants.js'
+import { LOG_LEVELS, BGM_SUBJECT_TYPES } from '../core/constants.js'
 import { Result, BgmError } from '../core/result.js'
 import type { ConflictResolution } from '../services/ribbonService.js'
 import {
@@ -35,15 +35,23 @@ import {
   computeDiff,
   tagsToString,
   parseJsonl,
+  EXTENDED_FIELD_MAP,
   type GithubRemoteEntry,
   type GithubSyncDiff,
   type LocalRowEntry,
   type SyncStrategy,
 } from './githubSyncDiff.js'
 import { extractSubjectId } from './pureUtils.js'
+import { addSyncRecords, addSyncRecordSummary } from './syncRecord.js'
+import type { UpdateRecordParams } from './syncRecord.js'
 import type { SyncSource } from './SyncSource.js'
 import { getSyncSource } from './syncSourceRegistry.js'
-import { beginUndoSession, endUndoSession, recordUndoEntry } from './undoStack.js'
+import {
+  beginUndoSession,
+  endUndoSession,
+  recordRowDeleteEntry,
+  recordUndoEntry,
+} from './undoStack.js'
 
 // 类型导入：避免运行时循环依赖（githubSync → ribbonService → index → githubSync）
 
@@ -55,6 +63,7 @@ export {
   parseJsonl,
   isGithubRemoteEntry,
   SYNC_STRATEGY_LABELS,
+  EXTENDED_FIELD_MAP,
   type GithubRemoteEntry,
   type GithubSyncDiff,
   type LocalRowEntry,
@@ -253,6 +262,12 @@ function readLocalEntries(
     const sid = extractSubjectId(url)
     if (!sid) continue
 
+    // 读取扩展字段（EXTENDED_FIELD_MAP 中定义的 20 个 Excel 字段）
+    const extFields: Record<string, string> = {}
+    for (const [, excelField] of EXTENDED_FIELD_MAP) {
+      extFields[excelField] = getField(row, excelField)
+    }
+
     result.set(sid, {
       row,
       sid,
@@ -262,9 +277,9 @@ function readLocalEntries(
         是否看完: getField(row, '是否看完') || getField(row, '状态') || getField(row, '观看状态'),
         打分: getField(row, '打分'),
         '标签/分级': getField(row, '标签/分级'),
-        '剧透/感言': getField(row, '剧透/感言') || getField(row, '感想') || getField(row, '评价'),
         集数: getField(row, '集数'),
         集号: getField(row, '集号'),
+        ...extFields,
       },
     })
   }
@@ -333,21 +348,34 @@ function writeRemoteEntryToRow(
   if (writeAll || fieldsToWrite.includes('名称')) {
     safeSet('名称', remote.name ?? '')
   }
-  // 打分
+  // 打分（score=0 视为"未打分"，写入空字符串，避免覆盖本地实际打分）
   if (writeAll || fieldsToWrite.includes('打分')) {
-    safeSet('打分', remote.score !== undefined ? String(remote.score) : '')
+    const scoreValue = remote.score !== undefined && remote.score !== 0 ? String(remote.score) : ''
+    safeSet('打分', scoreValue)
   }
-  // 标签
+  // 标签（优先使用 meta_tags，回退到 tags）
   if (writeAll || fieldsToWrite.includes('标签/分级')) {
-    safeSet('标签/分级', tagsToString(remote.tags))
+    safeSet('标签/分级', tagsToString(remote.meta_tags ?? remote.tags))
   }
-  // 评论
-  if (writeAll || fieldsToWrite.includes('剧透/感言')) {
-    safeSet('剧透/感言', remote.comment ?? '')
-  }
-  // 集数
+  // 集数（优先使用 infobox 的「话数」，回退到 episode；
+  //   episode=0 视为"未看"，写入空字符串，避免覆盖本地实际集数）
   if (writeAll || fieldsToWrite.includes('集数')) {
-    safeSet('集数', remote.episode !== undefined ? String(remote.episode) : '')
+    const episodeValue =
+      remote['话数'] ??
+      (remote.episode !== undefined && remote.episode !== 0 ? String(remote.episode) : '')
+    safeSet('集数', episodeValue)
+  }
+  // 扩展字段（EXTENDED_FIELD_MAP 中定义的 20 个字段）
+  for (const [jsonlField, excelField] of EXTENDED_FIELD_MAP) {
+    if (writeAll || fieldsToWrite.includes(excelField)) {
+      const value = remote[jsonlField as keyof GithubRemoteEntry]
+      if (typeof value === 'string') {
+        safeSet(excelField, value)
+      } else if (typeof value === 'number') {
+        safeSet(excelField, String(value))
+      }
+      // 忽略 undefined / null / boolean / string[]（EXTENDED_FIELD_MAP 不含这些类型）
+    }
   }
 }
 
@@ -356,12 +384,14 @@ function writeRemoteEntryToRow(
  * @param diffs 差异列表
  * @param strategy 同步策略（决定 force-overwrite 与 delete 行为）
  * @param onProgress 进度回调（current, total, message）
+ * @param source 同步来源显示名称（如 GitHub/GitLab/Gitee），用于写入同步记录
  * @returns 同步结果统计
  */
 export function applyDiffToSheet(
   diffs: GithubSyncDiff[],
   strategy: SyncStrategy,
   onProgress?: (current: number, total: number, message: string) => void,
+  source?: string,
 ): GithubSyncResult {
   const result: GithubSyncResult = {
     remoteTotal: 0,
@@ -387,7 +417,7 @@ export function applyDiffToSheet(
   const forceOverwrite = strategy === 'force-overwrite'
 
   // 开启 undo 会话：记录本次同步的所有单元格变更，便于用户撤销
-  beginUndoSession(`GitHub 同步 - 策略: ${strategy}`)
+  beginUndoSession(`${source ?? 'GitHub'} 同步 - 策略: ${strategy}`)
 
   // delete 操作需倒序执行（从大行号到小行号），避免行号错位
   const sortedDiffs = [...diffs].sort((a, b) => {
@@ -395,6 +425,9 @@ export function applyDiffToSheet(
     const bRow = b.localRow ?? Number.MAX_SAFE_INTEGER
     return bRow - aRow
   })
+
+  // 收集本次同步记录（最后批量写入，减少 COM 调用）
+  const syncRecords: UpdateRecordParams[] = []
 
   const total = diffs.length
   sortedDiffs.forEach((diff, idx) => {
@@ -404,6 +437,16 @@ export function applyDiffToSheet(
         writeRemoteEntryToRow(ws, colMap, nextAppendRow, diff.remote, ['*'], forceOverwrite)
         nextAppendRow++
         result.added++
+        syncRecords.push({
+          sid: diff.sid,
+          name: diff.remote.name ?? '',
+          url: diff.remote.url ?? '',
+          type: BGM_SUBJECT_TYPES[diff.remote.type ?? 2] ?? '',
+          source,
+          content: '仓库同步-新增',
+          status: '成功',
+          count: 1,
+        })
         onProgress?.(idx + 1, total, `新增 ${diff.remote.name ?? diff.sid}`)
       } else if (diff.kind === 'update' && diff.localRow !== undefined && diff.remote) {
         // 更新：仅写入变更字段
@@ -416,42 +459,86 @@ export function applyDiffToSheet(
           forceOverwrite,
         )
         result.updated++
+        syncRecords.push({
+          sid: diff.sid,
+          name: diff.remote.name ?? '',
+          url: diff.remote.url ?? '',
+          type: BGM_SUBJECT_TYPES[diff.remote.type ?? 2] ?? '',
+          source,
+          content: '仓库同步-更新',
+          status: '成功',
+          message: diff.changedFields.join(', '),
+          count: 1,
+        })
         onProgress?.(idx + 1, total, `更新 ${diff.remote.name ?? diff.sid}`)
       } else if (diff.kind === 'delete' && diff.localRow !== undefined) {
         // 删除：删除整行（mirror 策略）
-        // 先记录该行所有列的旧值，便于 undo 时按单元格恢复
+        // 先记录整行快照，便于 undo 时恢复整行
+        const rowValues: Record<number, string> = {}
         for (const col of colMap.values()) {
-          const oldValue = getCellValue(ws, diff.localRow, col)
-          recordUndoEntry({ row: diff.localRow, col, oldValue, newValue: '' })
+          rowValues[col] = getCellValue(ws, diff.localRow, col)
         }
+        recordRowDeleteEntry({ row: diff.localRow, values: rowValues })
         try {
           const rowRange = ws.Rows.Item(diff.localRow)
           // WPS Row 没有 Delete 方法，通过 Range 删除整行
           ws.Range(`${diff.localRow}:${diff.localRow}`).Delete()
           void rowRange // 仅用于类型存在性引用
           result.deleted++
+          syncRecords.push({
+            sid: diff.sid,
+            source,
+            content: '仓库同步-删除',
+            status: '成功',
+            message: `删除行 ${diff.localRow}`,
+            count: 1,
+          })
           onProgress?.(idx + 1, total, `删除 行${diff.localRow} sid=${diff.sid}`)
         } catch (e: unknown) {
-          bgmLog(
-            LOG_LEVELS.WARN,
-            `[githubSync] 删除行 ${diff.localRow} 失败: ${e instanceof Error ? e.message : String(e)}`,
-          )
+          const errMsg = e instanceof Error ? e.message : String(e)
+          bgmLog(LOG_LEVELS.WARN, `[githubSync] 删除行 ${diff.localRow} 失败: ${errMsg}`)
           result.failed++
+          syncRecords.push({
+            sid: diff.sid,
+            source,
+            content: '仓库同步-删除失败',
+            status: '失败',
+            message: errMsg,
+            count: 1,
+          })
         }
       } else {
         result.skipped++
       }
     } catch (e: unknown) {
+      const errMsg = e instanceof Error ? e.message : String(e)
       result.failed++
-      bgmLog(
-        LOG_LEVELS.ERROR,
-        `[githubSync] 应用差异失败 sid=${diff.sid}: ${e instanceof Error ? e.message : String(e)}`,
-      )
+      bgmLog(LOG_LEVELS.ERROR, `[githubSync] 应用差异失败 sid=${diff.sid}: ${errMsg}`)
+      syncRecords.push({
+        sid: diff.sid,
+        source,
+        content: '仓库同步-失败',
+        status: '失败',
+        message: errMsg,
+        count: 1,
+      })
     }
   })
 
   // 结束 undo 会话（空会话不入栈）
   endUndoSession()
+
+  // 批量写入同步记录与汇总行
+  if (syncRecords.length > 0) {
+    addSyncRecords(syncRecords)
+    addSyncRecordSummary({
+      source,
+      content: '仓库同步汇总',
+      status: result.failed > 0 ? '失败' : '成功',
+      message: `远程 ${result.remoteTotal}，新增 ${result.added}，更新 ${result.updated}，删除 ${result.deleted}，失败 ${result.failed}，策略: ${strategy}`,
+      count: 1,
+    })
+  }
 
   bgmLog(
     LOG_LEVELS.INFO,
@@ -577,7 +664,7 @@ export async function syncFromGithub(
     `[githubSync] diff 完成（${strategy}）：新增 ${addCount}，更新 ${updateCount}，删除 ${deleteCount}`,
   )
 
-  const result = applyDiffToSheet(diffs, strategy, onProgress)
+  const result = applyDiffToSheet(diffs, strategy, onProgress, source.getDisplayName())
   result.remoteTotal = remoteEntries.length
   // unchanged = 远程总数 - (新增+更新)（delete 不计入 unchanged）
   result.unchanged = Math.max(0, remoteEntries.length - addCount - updateCount)

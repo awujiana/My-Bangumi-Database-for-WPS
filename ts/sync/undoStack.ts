@@ -3,16 +3,31 @@
  * @module sync/undoStack
  */
 
+import { LOG_LEVELS, bgmLog } from '../core/constants.js'
 import { getDataSheet, setCellValue } from '../tools/util.js'
 import type { WpsWorksheet } from '../tools/wps.js'
 
-/** 单次单元格变更记录 */
-export interface UndoEntry {
+/** 被删除行的完整快照 */
+export interface RowSnapshot {
+  /** 删除时的行号 */
   row: number
-  col: number
-  oldValue: string
-  newValue: string
+  /** 列号 → 单元格值的映射 */
+  values: Record<number, string>
 }
+
+/** 单次变更记录类型 */
+export type UndoEntry =
+  | {
+      type: 'cell'
+      row: number
+      col: number
+      oldValue: string
+      newValue: string
+    }
+  | {
+      type: 'row-delete'
+      rowSnapshot: RowSnapshot
+    }
 
 /** 一次同步操作的所有变更 */
 export interface UndoSession {
@@ -49,9 +64,18 @@ export function beginUndoSession(description: string): void {
  * 记录一次单元格变更到当前会话
  * @param entry 变更记录
  */
-export function recordUndoEntry(entry: UndoEntry): void {
+export function recordUndoEntry(entry: Omit<Extract<UndoEntry, { type: 'cell' }>, 'type'>): void {
   if (!currentSession) return
-  currentSession.entries.push(entry)
+  currentSession.entries.push({ ...entry, type: 'cell' })
+}
+
+/**
+ * 记录一次整行删除到当前会话
+ * @param rowSnapshot 被删除行的完整快照
+ */
+export function recordRowDeleteEntry(rowSnapshot: RowSnapshot): void {
+  if (!currentSession) return
+  currentSession.entries.push({ type: 'row-delete', rowSnapshot })
 }
 
 /**
@@ -69,19 +93,43 @@ export function endUndoSession(): void {
 }
 
 /**
- * 撤销最近一次同步操作（按执行逆序恢复单元格值）
+ * 撤销最近一次同步操作
+ *
+ * 恢复顺序：
+ * 1. 先逆序恢复所有单元格变更；
+ * 2. 再按行号从大到小恢复被删除的行（避免先行插入导致后续行号偏移）。
+ *
  * @returns 恢复的条目数，若无可撤销会话返回 0
  */
 export function undoLastSync(): number {
   const session = sessions.pop()
   if (!session) return 0
-  // 逆序恢复（与执行顺序相反）
-  for (let i = session.entries.length - 1; i >= 0; i--) {
-    const entry = session.entries[i]
+
+  const cellEntries: Extract<UndoEntry, { type: 'cell' }>[] = []
+  const rowDeleteEntries: RowSnapshot[] = []
+
+  for (const entry of session.entries) {
+    if (entry.type === 'row-delete') {
+      rowDeleteEntries.push(entry.rowSnapshot)
+    } else {
+      cellEntries.push(entry)
+    }
+  }
+
+  // 1. 逆序恢复单元格变更（与执行顺序相反）
+  for (let i = cellEntries.length - 1; i >= 0; i--) {
+    const entry = cellEntries[i]
     if (entry) {
       restoreCellValue(entry.row, entry.col, entry.oldValue)
     }
   }
+
+  // 2. 按行号从大到小恢复被删除的行
+  rowDeleteEntries.sort((a, b) => b.row - a.row)
+  for (const snapshot of rowDeleteEntries) {
+    restoreDeletedRow(snapshot)
+  }
+
   return session.entries.length
 }
 
@@ -120,4 +168,29 @@ function restoreCellValue(row: number, col: number, value: string): void {
   const ws: WpsWorksheet | null | undefined = getDataSheet()
   if (!ws) return
   setCellValue(ws, row, col, value)
+}
+
+/**
+ * 恢复被删除的整行
+ * @param snapshot 删除前保存的行快照
+ */
+function restoreDeletedRow(snapshot: RowSnapshot): void {
+  const ws: WpsWorksheet | null | undefined = getDataSheet()
+  if (!ws) return
+
+  try {
+    // 在删除位置插入新行
+    ws.Range(`${snapshot.row}:${snapshot.row}`).Insert()
+  } catch (e: unknown) {
+    const errMsg = e instanceof Error ? e.message : String(e)
+    bgmLog(LOG_LEVELS.WARN, `[undoStack] 插入行 ${snapshot.row} 失败: ${errMsg}`)
+    return
+  }
+
+  // 恢复该行所有列的值
+  for (const [colStr, value] of Object.entries(snapshot.values)) {
+    const col = parseInt(colStr, 10)
+    if (Number.isNaN(col)) continue
+    setCellValue(ws, snapshot.row, col, value)
+  }
 }
