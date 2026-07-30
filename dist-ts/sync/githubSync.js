@@ -6,7 +6,7 @@
  *
  * 数据格式（远程 JSONL 文件，每行一个 JSON 对象）：
  *   { "sid": "12345", "url": "https://bgm.tv/subject/12345", "name": "...",
- *     "type": 2, "score": 8, "tags": ["标签1","标签2"], "comment": "...",
+ *     "type": 2, "tags": ["标签1","标签2"],
  *     "episode": 12, "updatedAt": "2026-07-05T10:00:00Z" }
  *
  * type 字段为 Bangumi 条目类别（不是观看状态）：
@@ -198,7 +198,6 @@ function readLocalEntries(ws, colMap, headerRow, lastRow) {
                 Bangumi_URL: url,
                 名称: getField(row, '名称'),
                 是否看完: getField(row, '是否看完') || getField(row, '状态') || getField(row, '观看状态'),
-                打分: getField(row, '打分'),
                 '标签/分级': getField(row, '标签/分级'),
                 集数: getField(row, '集数'),
                 集号: getField(row, '集号'),
@@ -260,11 +259,6 @@ function writeRemoteEntryToRow(ws, colMap, row, remote, fieldsToWrite, forceOver
     // 名称
     if (writeAll || fieldsToWrite.includes('名称')) {
         safeSet('名称', remote.name ?? '');
-    }
-    // 打分（score=0 视为"未打分"，写入空字符串，避免覆盖本地实际打分）
-    if (writeAll || fieldsToWrite.includes('打分')) {
-        const scoreValue = remote.score !== undefined && remote.score !== 0 ? String(remote.score) : '';
-        safeSet('打分', scoreValue);
     }
     // 标签（优先使用 meta_tags，回退到 tags）
     if (writeAll || fieldsToWrite.includes('标签/分级')) {

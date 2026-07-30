@@ -13,13 +13,10 @@
  *              复用 githubSyncDiff.ts 的 parseJsonl / isGithubRemoteEntry 解析逻辑，
  *              不重复解析实现。
  *
- * 数据格式（远程 JSON 文件）与 GitHub 一致：
- * [
+ * 数据格式（远程 JSONL 文件，每行一个 JSON 对象）与 GitHub 一致：
  *   { "sid": "12345", "url": "https://bgm.tv/subject/12345", "name": "...",
- *     "type": 2, "score": 8, "tags": ["标签1","标签2"], "comment": "...",
- *     "episode": 12, "updatedAt": "2026-07-05T10:00:00Z" },
- *   ...
- * ]
+ *     "type": 2, "tags": ["标签1","标签2"],
+ *     "episode": 12, "updatedAt": "2026-07-05T10:00:00Z" }
  */
 
 import { LOG_LEVELS } from '../core/constants.js'

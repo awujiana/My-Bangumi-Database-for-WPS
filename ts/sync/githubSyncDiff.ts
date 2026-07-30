@@ -20,8 +20,6 @@ export interface GithubRemoteEntry {
   name?: string
   /** 条目类别（1=书籍, 2=动漫, 3=音乐, 4=游戏, 6=三次元） */
   type?: number
-  /** 评分（0-10） */
-  score?: number
   /** 标签数组 */
   tags?: string[]
   /** 看到集数 */
@@ -96,7 +94,7 @@ export interface ConflictResolution {
  * 扩展字段映射表：JSONL 字段名 → Excel 标准字段名（colMap key）
  *
  * 用于 computeDiff 比对和 writeRemoteEntryToRow 写入扩展字段。
- * 基础字段（url, name, score, tags, comment, episode）有独立的处理逻辑，不在此表中。
+ * 基础字段（url, name, tags, episode）有独立的处理逻辑，不在此表中。
  *
  * 特殊处理（不在此表中）：
  * - '话数' 通过 episode 逻辑处理（优先于 episode 写入「集数」列）
@@ -252,7 +250,7 @@ export function parseJsonl(text: string): {
  * - 远程与本地 SID 相同 → 逐字段比对，任一字段不同则 update
  * - 远程字段为 undefined/空 → 不视为差异（保留本地值）
  * - 远程 type 为条目类别，不参与「是否看完」比对
- * - 远程 score/episode 转为字符串后比对
+ * - 远程 episode 转为字符串后比对
  * - 远程 tags 数组用 | 拼接后比对
  *
  * 策略修饰：
@@ -315,14 +313,6 @@ export function computeDiff(
     // 比对名称
     if (remote.name && remote.name !== local.fields['名称']) {
       changedFields.push('名称')
-    }
-
-    // 比对打分（score=0 视为"未打分"，不触发更新，避免覆盖本地实际打分）
-    if (remote.score !== undefined && remote.score !== 0) {
-      const remoteScore = String(remote.score)
-      if (remoteScore !== local.fields['打分']) {
-        changedFields.push('打分')
-      }
     }
 
     // 比对标签（优先使用 meta_tags，回退到 tags）

@@ -82,7 +82,6 @@ interface FieldCompareSpec {
 const GITHUB_CONFLICT_FIELDS: readonly FieldCompareSpec[] = Object.freeze([
   { localField: '名称', remoteToString: (r) => r.name ?? '' },
   { localField: '是否看完', remoteToString: (r) => (r.type !== undefined ? String(r.type) : '') },
-  { localField: '打分', remoteToString: (r) => (r.score !== undefined ? String(r.score) : '') },
   {
     localField: '标签/分级',
     remoteToString: (r) => (Array.isArray(r.tags) ? r.tags.join('|') : ''),

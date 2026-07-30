@@ -40,7 +40,7 @@ export const DEFAULT_GITHUB_CONFIG = Object.freeze({
     owner: 'awujiana',
     repo: 'Bangumi-Archive-Anime-Excel-to-sync',
     branch: 'main',
-    path: 'data.jsonl',
+    path: 'data/bangumi.jsonl',
     sourceType: 'github',
 });
 // 内部引用（保持向后兼容）

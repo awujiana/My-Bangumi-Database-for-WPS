@@ -120,9 +120,7 @@ describe('GithubEntrySchema', () => {
       url: 'https://bgm.tv/subject/265',
       name: 'Chobits',
       type: 2,
-      score: 8,
       tags: ['sci-fi'],
-      comment: 'good',
       episode: 26,
       updatedAt: '2024-01-01T00:00:00Z',
     }
@@ -146,20 +144,70 @@ describe('GithubEntrySchema', () => {
     expect(() => GithubEntrySchema.parse(invalid)).toThrow()
   })
 
-  it('type=6 抛错', () => {
-    const invalid = {
+  it('type=6 合法通过（Bangumi 三次元类别）', () => {
+    const valid = {
       sid: '265',
       type: 6,
+    }
+    const parsed = GithubEntrySchema.parse(valid)
+    expect(parsed.type).toBe(6)
+  })
+
+  it('type=0 抛错（不在 1-6 范围）', () => {
+    const invalid = {
+      sid: '265',
+      type: 0,
     }
     expect(() => GithubEntrySchema.parse(invalid)).toThrow()
   })
 
-  it('score 超出 0-10 抛错', () => {
+  it('type=7 抛错（超出 1-6 范围）', () => {
     const invalid = {
       sid: '265',
-      score: 12,
+      type: 7,
     }
     expect(() => GithubEntrySchema.parse(invalid)).toThrow()
+  })
+
+  it('扩展字段通过 passthrough 保留', () => {
+    const valid = {
+      sid: '265',
+      url: 'https://bgm.tv/subject/265',
+      name: 'Chobits',
+      type: 2,
+      tags: ['sci-fi'],
+      episode: 26,
+      updatedAt: '2024-01-01T00:00:00Z',
+      // 扩展字段
+      date: '2002-04-08',
+      platform: 2,
+      meta_tags: ['科幻'],
+      nsfw: false,
+      播放结束: '2002-09-30',
+      动画制作公司: 'Madhouse',
+      话数: '26',
+      片长: '24分钟',
+      制片国家: '日本',
+      语言: '日语',
+      类型: 'TV',
+      导演: '浅香守生',
+      音乐: '田中秀和',
+      人物设定: 'CLAMP',
+      机械设定: '无',
+      原作: 'CLAMP',
+      脚本: '大桥志吉',
+      分镜: '浅香守生',
+      演出: '浅香守生',
+      原案: 'CLAMP',
+      系列构成: '大桥志吉',
+      在线播放平台: 'Bilibili',
+      关联的动漫ID: '265 | 266',
+    }
+    const parsed = GithubEntrySchema.parse(valid) as Record<string, unknown>
+    expect(parsed.sid).toBe('265')
+    expect(parsed.date).toBe('2002-04-08')
+    expect(parsed.动画制作公司).toBe('Madhouse')
+    expect(parsed.关联的动漫ID).toBe('265 | 266')
   })
 })
 

@@ -22,7 +22,7 @@ export interface GithubSyncConfig {
     repo: string;
     /** 分支名（默认 main） */
     branch: string;
-    /** 文件路径（如 data/bangumi-data.json） */
+    /** 文件路径（如 data/bangumi.jsonl） */
     path: string;
     /**
      * 同步源类型（可选，默认 'github'）
@@ -35,8 +35,12 @@ export interface GithubSyncConfig {
      * 用于 Gist 同步源：通过 https://api.github.com/gists/{gistId} 获取 Gist 内容，
      * 解析其 files[*].content 字段并拼接为 JSONL 文本。
      * 与 owner/repo/branch/path 互斥：sourceType === 'gist' 时仅使用 gistId。
+     *
+     * 注意：开启 exactOptionalPropertyTypes 时，可选属性不允许赋 undefined。
+     * 调用方应仅在 gistId 有值时才设置此字段，否则应省略。
+     * 本接口为兼容「可能赋 undefined」的调用方，显式允许 string | undefined。
      */
-    gistId?: string;
+    gistId?: string | undefined;
 }
 /**
  * 预设默认仓库配置

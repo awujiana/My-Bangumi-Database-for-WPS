@@ -240,37 +240,78 @@ const debouncedSaveGithubConfig = debounce((): void => {
     const repoInput = document.getElementById('githubRepo') as HTMLInputElement | null
     const branchInput = document.getElementById('githubBranch') as HTMLInputElement | null
     const pathInput = document.getElementById('githubPath') as HTMLInputElement | null
+    const localFilePathInput = document.getElementById('localFilePath') as HTMLInputElement | null
+    const gistIdInput = document.getElementById('gistId') as HTMLInputElement | null
     const strategySelect = document.getElementById('githubStrategy') as HTMLSelectElement | null
     const sourceTypeSelect = document.getElementById('syncSourceType') as HTMLSelectElement | null
 
     const owner = (ownerInput?.value ?? '').trim()
     const repo = (repoInput?.value ?? '').trim()
     const branch = (branchInput?.value ?? '').trim() || 'main'
-    const path = (pathInput?.value ?? '').trim()
     const strategy = (strategySelect?.value as SyncStrategy) || 'add-update'
     const sourceType = (sourceTypeSelect?.value as SyncSourceType) || 'github'
 
-    // 本地文件源仅需 path 字段；远程源要求 owner/repo/path 均非空
-    // 用户可能正在输入，必填项未完成时跳过自动保存
+    // 按数据源类型读取对应字段值
+    // - local: 复用 githubConfig.path 字段存储本地文件路径（与远程源 path 字段互斥复用）
+    // - gist: 使用独立的 gistId 字段
+    // - github/gitlab/gitee: 使用 owner/repo/branch/path
+    let path: string
+    let gistId: string | undefined
+    if (sourceType === 'local') {
+      path = (localFilePathInput?.value ?? '').trim()
+    } else {
+      path = (pathInput?.value ?? '').trim()
+    }
+    if (sourceType === 'gist') {
+      gistId = (gistIdInput?.value ?? '').trim() || undefined
+    }
+
+    // 必填项校验：用户可能正在输入，未完成时跳过自动保存
     if (sourceType === 'local') {
       if (!path) return
+    } else if (sourceType === 'gist') {
+      if (!gistId) return
     } else {
       if (!owner || !repo || !path) return
     }
 
-    const okConfig = setGithubConfig({ owner, repo, branch, path, sourceType })
+    const okConfig = setGithubConfig({ owner, repo, branch, path, sourceType, gistId })
     const okStrategy = setSyncStrategy(strategy)
     const okSourceType = setSyncSourceType(sourceType)
     if (okConfig && okStrategy && okSourceType) {
       bgmLog(
         LOG_LEVELS.INFO,
-        `[handlers] GitHub 配置已自动保存: ${owner}/${repo}/${branch}/${path}, 策略: ${strategy}, 同步源: ${sourceType}`,
+        `[handlers] GitHub 配置已自动保存: ${owner}/${repo}/${branch}/${path}, 策略: ${strategy}, 同步源: ${sourceType}${gistId ? `, gistId: ${gistId}` : ''}`,
       )
     }
   } catch (e: unknown) {
     bgmLog(LOG_LEVELS.WARN, `[handlers] GitHub 配置自动保存失败: ${(e as Error).message}`)
   }
 }, 300)
+
+/**
+ * 按同步源类型切换 UI 字段显示/隐藏
+ *
+ * - github/gitlab/gitee: 显示 owner/repo/branch/path（#remoteSourceFields）
+ * - local: 显示本地文件路径输入框 + 选择按钮（#localFileFields）
+ * - gist: 显示 gistId 输入框（#gistFields）
+ *
+ * @param sourceType 同步源类型
+ */
+function toggleSourceFields(sourceType: SyncSourceType): void {
+  const remoteFields = document.getElementById('remoteSourceFields')
+  const localFields = document.getElementById('localFileFields')
+  const gistFields = document.getElementById('gistFields')
+  if (remoteFields) {
+    remoteFields.style.display = sourceType === 'local' || sourceType === 'gist' ? 'none' : ''
+  }
+  if (localFields) {
+    localFields.style.display = sourceType === 'local' ? '' : 'none'
+  }
+  if (gistFields) {
+    gistFields.style.display = sourceType === 'gist' ? '' : 'none'
+  }
+}
 
 // ========== 事件监听 ==========
 
@@ -295,18 +336,25 @@ export function setupButtonListeners(): void {
     const repoInput = document.getElementById('githubRepo') as HTMLInputElement | null
     const branchInput = document.getElementById('githubBranch') as HTMLInputElement | null
     const pathInput = document.getElementById('githubPath') as HTMLInputElement | null
+    const localFilePathInput = document.getElementById('localFilePath') as HTMLInputElement | null
+    const gistIdInput = document.getElementById('gistId') as HTMLInputElement | null
     const strategySelect = document.getElementById('githubStrategy') as HTMLSelectElement | null
     const sourceTypeSelect = document.getElementById('syncSourceType') as HTMLSelectElement | null
     if (ownerInput) ownerInput.value = cfg.owner
     if (repoInput) repoInput.value = cfg.repo
     if (branchInput) branchInput.value = cfg.branch
     if (pathInput) pathInput.value = cfg.path
+    // 本地文件路径复用 githubConfig.path 字段，回填到独立输入框
+    if (localFilePathInput) localFilePathInput.value = cfg.path
+    // Gist ID 回填
+    if (gistIdInput && cfg.gistId) gistIdInput.value = cfg.gistId
     // 回填策略
     const savedStrategy = getSyncStrategy()
     if (strategySelect) strategySelect.value = savedStrategy
-    // 回填同步源类型
+    // 回填同步源类型，并触发字段显示/隐藏切换
     const savedSourceType = getSyncSourceType()
     if (sourceTypeSelect) sourceTypeSelect.value = savedSourceType
+    toggleSourceFields(savedSourceType)
     if (cfg.owner || cfg.repo || cfg.path) {
       bgmLog(
         LOG_LEVELS.INFO,
@@ -322,9 +370,18 @@ export function setupButtonListeners(): void {
     if (repoInput) trackedAddEventListener(repoInput, 'input', debouncedSaveGithubConfig)
     if (branchInput) trackedAddEventListener(branchInput, 'input', debouncedSaveGithubConfig)
     if (pathInput) trackedAddEventListener(pathInput, 'input', debouncedSaveGithubConfig)
+    if (localFilePathInput)
+      trackedAddEventListener(localFilePathInput, 'input', debouncedSaveGithubConfig)
+    if (gistIdInput) trackedAddEventListener(gistIdInput, 'input', debouncedSaveGithubConfig)
     if (strategySelect) trackedAddEventListener(strategySelect, 'change', debouncedSaveGithubConfig)
-    if (sourceTypeSelect)
-      trackedAddEventListener(sourceTypeSelect, 'change', debouncedSaveGithubConfig)
+    if (sourceTypeSelect) {
+      // sourceType 切换时：1) 触发字段显示/隐藏；2) 触发防抖保存
+      trackedAddEventListener(sourceTypeSelect, 'change', () => {
+        const newSourceType = (sourceTypeSelect.value as SyncSourceType) || 'github'
+        toggleSourceFields(newSourceType)
+        debouncedSaveGithubConfig()
+      })
+    }
     bgmLog(LOG_LEVELS.INFO, '[handlers] GitHub 配置输入框防抖自动保存监听器已注册')
   } catch (e: unknown) {
     bgmLog(LOG_LEVELS.WARN, `[handlers] 加载 GitHub 配置失败: ${(e as Error).message}`)
@@ -652,6 +709,8 @@ const ACTION_HANDLERS: Record<string, ActionHandler> = {
     const repoInput = document.getElementById('githubRepo') as HTMLInputElement | null
     const branchInput = document.getElementById('githubBranch') as HTMLInputElement | null
     const pathInput = document.getElementById('githubPath') as HTMLInputElement | null
+    const localFilePathInput = document.getElementById('localFilePath') as HTMLInputElement | null
+    const gistIdInput = document.getElementById('gistId') as HTMLInputElement | null
     const strategySelect = document.getElementById('githubStrategy') as HTMLSelectElement | null
     const sourceTypeSelect = document.getElementById('syncSourceType') as HTMLSelectElement | null
     if (!ownerInput || !repoInput || !pathInput) {
@@ -659,18 +718,36 @@ const ACTION_HANDLERS: Record<string, ActionHandler> = {
       return
     }
     const sourceType = (sourceTypeSelect?.value as SyncSourceType) || 'github'
+
+    // 按数据源类型读取对应字段
+    let path: string
+    let gistId: string | undefined
+    if (sourceType === 'local') {
+      path = (localFilePathInput?.value ?? '').trim()
+    } else {
+      path = pathInput.value.trim()
+    }
+    if (sourceType === 'gist') {
+      gistId = (gistIdInput?.value ?? '').trim() || undefined
+    }
+
     const config = {
       owner: ownerInput.value.trim(),
       repo: repoInput.value.trim(),
       branch: branchInput?.value.trim() || 'main',
-      path: pathInput.value.trim(),
+      path,
       sourceType,
+      gistId,
     }
-    // 本地文件源仅需 path 字段（不需要 owner/repo/branch）
-    // 远程源（github/gitlab/gitee）要求 owner/repo/path 均非空
+    // 必填项校验
     if (sourceType === 'local') {
       if (!config.path) {
         showToast('本地文件路径不能为空', 'warn')
+        return
+      }
+    } else if (sourceType === 'gist') {
+      if (!gistId) {
+        showToast('Gist ID 不能为空', 'warn')
         return
       }
     } else {
@@ -684,10 +761,10 @@ const ACTION_HANDLERS: Record<string, ActionHandler> = {
     const okStrategy = setSyncStrategy(strategy)
     const okSourceType = setSyncSourceType(sourceType)
     if (okConfig && okStrategy && okSourceType) {
-      showToast(`GitHub 配置已保存（策略：${strategy}，同步源：${sourceType}）`, 'success')
+      showToast(`配置已保存（策略：${strategy}，同步源：${sourceType}）`, 'success')
       bgmLog(
         LOG_LEVELS.INFO,
-        `[handleActionClick] GitHub 配置已保存: ${config.owner}/${config.repo}/${config.branch}/${config.path}, 策略: ${strategy}, 同步源: ${sourceType}`,
+        `[handleActionClick] GitHub 配置已保存: ${config.owner}/${config.repo}/${config.branch}/${config.path}, 策略: ${strategy}, 同步源: ${sourceType}${gistId ? `, gistId: ${gistId}` : ''}`,
       )
     } else {
       showToast('保存失败：PluginStorage 不可用', 'error')
@@ -781,6 +858,54 @@ const ACTION_HANDLERS: Record<string, ActionHandler> = {
     bgmLog(
       LOG_LEVELS.INFO,
       `[handleActionClick] 测试 GitHub 配置完成，耗时: ${Date.now() - ctx.startTime}ms`,
+    )
+  },
+
+  // 本地文件源：选择本地 JSONL/JSON 文件
+  browseLocalFile: (ctx) => {
+    bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 选择本地文件')
+    try {
+      // 通过 WPS Application.GetOpenFilename 弹出文件选择对话框
+      const app = (window as unknown as { wps?: { Application?: unknown } }).wps
+      const wpsApp = app?.Application as
+        { GetOpenFilename?: (fileFilter: string, title: string) => unknown } | undefined
+      if (!wpsApp || typeof wpsApp.GetOpenFilename !== 'function') {
+        // 降级：提示用户手动输入路径
+        const input = document.getElementById('localFilePath') as HTMLInputElement | null
+        if (input) {
+          input.focus()
+          input.placeholder = 'WPS 文件对话框不可用，请手动输入绝对路径'
+        }
+        showToast('WPS 文件对话框不可用，请手动输入路径', 'warn')
+        return
+      }
+      // 文件过滤器：JSONL / JSON / 所有文件
+      const selected = wpsApp.GetOpenFilename(
+        'JSONL 文件 (*.jsonl),*.jsonl,JSON 文件 (*.json),*.json,所有文件 (*.*),*.*',
+        '选择 JSONL/JSON 文件',
+      )
+      // GetOpenFilename 返回 false 表示用户取消
+      if (typeof selected === 'boolean' || selected === false) {
+        bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 用户取消文件选择')
+        return
+      }
+      const filePath = String(selected)
+      const input = document.getElementById('localFilePath') as HTMLInputElement | null
+      if (input) {
+        input.value = filePath
+        // 触发 input 事件，激活防抖自动保存
+        input.dispatchEvent(new Event('input', { bubbles: true }))
+      }
+      showToast(`已选择：${filePath}`, 'success')
+      bgmLog(LOG_LEVELS.INFO, `[handleActionClick] 已选择本地文件: ${filePath}`)
+    } catch (e: unknown) {
+      const errMsg = e instanceof Error ? e.message : String(e)
+      showToast(`选择文件失败：${errMsg}`, 'error')
+      bgmLog(LOG_LEVELS.ERROR, `[handleActionClick] 选择本地文件失败: ${errMsg}`)
+    }
+    bgmLog(
+      LOG_LEVELS.INFO,
+      `[handleActionClick] 选择本地文件完成，耗时: ${Date.now() - ctx.startTime}ms`,
     )
   },
 
@@ -1053,14 +1178,20 @@ function refreshGithubConfigInputs(): void {
     const repoInput = document.getElementById('githubRepo') as HTMLInputElement | null
     const branchInput = document.getElementById('githubBranch') as HTMLInputElement | null
     const pathInput = document.getElementById('githubPath') as HTMLInputElement | null
+    const localFilePathInput = document.getElementById('localFilePath') as HTMLInputElement | null
+    const gistIdInput = document.getElementById('gistId') as HTMLInputElement | null
     const strategySelect = document.getElementById('githubStrategy') as HTMLSelectElement | null
     const sourceTypeSelect = document.getElementById('syncSourceType') as HTMLSelectElement | null
     if (ownerInput) ownerInput.value = cfg.owner
     if (repoInput) repoInput.value = cfg.repo
     if (branchInput) branchInput.value = cfg.branch
     if (pathInput) pathInput.value = cfg.path
+    if (localFilePathInput) localFilePathInput.value = cfg.path
+    if (gistIdInput && cfg.gistId) gistIdInput.value = cfg.gistId
     if (strategySelect) strategySelect.value = getSyncStrategy()
-    if (sourceTypeSelect) sourceTypeSelect.value = getSyncSourceType()
+    const sourceType = getSyncSourceType()
+    if (sourceTypeSelect) sourceTypeSelect.value = sourceType
+    toggleSourceFields(sourceType)
     bgmLog(
       LOG_LEVELS.INFO,
       `[refreshGithubConfigInputs] 已刷新 GitHub 配置输入框: ${cfg.owner}/${cfg.repo}/${cfg.branch}/${cfg.path}`,
