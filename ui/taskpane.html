@@ -201,8 +201,8 @@
 
         <!-- GitHub 仓库增量同步 -->
         <div class="section">
-            <h3>🌐 GitHub 仓库同步</h3>
-            <p class="hint">从 GitHub 公开仓库下载 JSON 数据，按 SID 增量合并到当前工作表（新增+更新，不删除）。</p>
+            <h3>🌐 远程仓库同步</h3>
+            <p class="hint">从远程仓库或本地文件下载 JSONL 数据，按 SID 增量合并到当前工作表（新增+更新，不删除）。</p>
             <div class="form-row">
                 <label for="syncSourceType">同步源类型</label>
                 <select id="syncSourceType" title="选择数据源">
@@ -213,22 +213,48 @@
                     <option value="gist">Gist</option>
                 </select>
             </div>
-            <div class="form-row">
-                <label for="githubOwner">仓库所有者</label>
-                <input type="text" id="githubOwner" placeholder="如：your-username" autocomplete="off" spellcheck="false"/>
+
+            <!-- 远程源配置（github/gitlab/gitee）：owner/repo/branch/path -->
+            <div id="remoteSourceFields">
+                <div class="form-row">
+                    <label for="githubOwner">仓库所有者</label>
+                    <input type="text" id="githubOwner" placeholder="如：awujiana" autocomplete="off" spellcheck="false"/>
+                </div>
+                <div class="form-row">
+                    <label for="githubRepo">仓库名</label>
+                    <input type="text" id="githubRepo" placeholder="如：Bangumi-Archive-Anime-Excel-to-sync" autocomplete="off" spellcheck="false"/>
+                </div>
+                <div class="form-row">
+                    <label for="githubBranch">分支名</label>
+                    <input type="text" id="githubBranch" placeholder="默认 main" autocomplete="off" spellcheck="false"/>
+                </div>
+                <div class="form-row">
+                    <label for="githubPath">文件路径</label>
+                    <input type="text" id="githubPath" placeholder="如：data/bangumi.jsonl" autocomplete="off" spellcheck="false"/>
+                </div>
             </div>
-            <div class="form-row">
-                <label for="githubRepo">仓库名</label>
-                <input type="text" id="githubRepo" placeholder="如：bangumi-data" autocomplete="off" spellcheck="false"/>
+
+            <!-- 本地文件源配置：文件路径选择 -->
+            <div id="localFileFields" style="display:none;">
+                <div class="form-row">
+                    <label for="githubPath">本地文件路径</label>
+                    <div style="display:flex;gap:6px;align-items:center;">
+                        <input type="text" id="localFilePath" placeholder="如：D:\data\bangumi.jsonl（绝对路径）" autocomplete="off" spellcheck="false" style="flex:1;"/>
+                        <button class="btn small" data-action="browseLocalFile" title="选择本地 JSONL 文件">📁 选择</button>
+                    </div>
+                </div>
+                <p class="hint">支持 .jsonl 和 .json 文件；复用 #githubPath 字段存储路径（与远程源互斥）。</p>
             </div>
-            <div class="form-row">
-                <label for="githubBranch">分支名</label>
-                <input type="text" id="githubBranch" placeholder="默认 main" autocomplete="off" spellcheck="false"/>
+
+            <!-- Gist 源配置：gistId -->
+            <div id="gistFields" style="display:none;">
+                <div class="form-row">
+                    <label for="gistId">Gist ID</label>
+                    <input type="text" id="gistId" placeholder="如：abc123def456（Gist URL 末段）" autocomplete="off" spellcheck="false"/>
+                </div>
+                <p class="hint">通过 <code>https://api.github.com/gists/{gistId}</code> 获取，未认证限流 60 次/小时。</p>
             </div>
-            <div class="form-row">
-                <label for="githubPath">文件路径</label>
-                <input type="text" id="githubPath" placeholder="如：data/bangumi-data.json" autocomplete="off" spellcheck="false"/>
-            </div>
+
             <div class="form-row">
                 <label for="githubStrategy">同步策略</label>
                 <select id="githubStrategy" title="选择增量更新策略">
@@ -247,10 +273,10 @@
             </div>
             <p class="hint">
                 <strong>JSONL 格式</strong>：每行一个 JSON 对象（无外层数组括号，无逗号分隔）<br>
-                <code>{"sid":"12345","name":"...","type":2,"score":8,"tags":["..."],"comment":"...","episode":12}</code><br>
-                <code>{"sid":"67890","name":"...","type":3,"score":9}</code><br>
-                type: 1=想看 2=在看 3=看过 4=搁置 5=抛弃<br>
-                默认仓库：<code>awujiana/Bangumi-Archive-Anime-Excel-to-sync/main/data.jsonl</code><br>
+                <code>{"sid":"12345","name":"...","type":2,"tags":["标签1"],"episode":12}</code><br>
+                <code>{"sid":"67890","name":"...","type":3,"url":"https://bgm.tv/subject/67890"}</code><br>
+                type: 1=书籍 2=动漫 3=音乐 4=游戏 6=三次元（条目类别，非观看状态）<br>
+                默认仓库：<code>awujiana/Bangumi-Archive-Anime-Excel-to-sync/main/data/bangumi.jsonl</code><br>
                 示例 Raw URL：<code>https://raw.githubusercontent.com/{owner}/{repo}/{branch}/{path}</code>
             </p>
         </div>
