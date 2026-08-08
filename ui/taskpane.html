@@ -24,15 +24,16 @@
         <div class="section">
             <h3>快捷操作</h3>
             <div class="btn-group">
-                <button class="btn primary" id="syncBtn" data-action="sync">🔄 同步到 Bangumi</button>
+                <button class="btn primary" id="syncBtn" data-action="sync">📤 上传同步</button>
                 <button class="btn" data-action="testSelected">📋 选中行同步</button>
             </div>
             <div class="btn-group" style="margin-top:8px;">
-                <button class="btn success" data-action="syncCollectionFromBgm">⬇️ 从BGM同步收藏</button>
+                <button class="btn success" data-action="syncCollectionFromBgm">📥 收藏回写</button>
                 <button class="btn" data-action="previewSyncContent">👁️ 预览同步</button>
             </div>
             <p class="hint" style="margin-top:8px;">
-                ⬇️ 从BGM同步：获取你在Bangumi的收藏列表并标记到Excel<br>
+                <strong>📤 上传同步</strong>：将Excel中的观看状态、评分、标签等上传到Bangumi<br>
+                <strong>📥 收藏回写</strong>：从Bangumi获取你的收藏列表并标记到Excel<br>
                 支持：collect(已看)、wish(想看)、do(在看)
             </p>
         </div>
@@ -150,7 +151,7 @@
                 <span class="btn-icon">🔍</span> 详细预览同步内容
             </button>
             <button class="btn" id="syncCollectionBtn" data-action="syncCollectionFromBgm">
-                <span class="btn-icon">⬇️</span> 从BGM同步收藏标记
+                <span class="btn-icon">📥</span> 收藏回写
             </button>
         </div>
 
@@ -184,7 +185,7 @@
                     <span class="btn-icon">📋</span> 查看同步记录
                 </button>
                 <button class="btn success" data-action="syncCollectionFromBgm">
-                    <span class="btn-icon">⬇️</span> 从BGM同步收藏记录
+                    <span class="btn-icon">📥</span> 收藏回写
                 </button>
                 <button class="btn warning" data-action="clearSyncRecords">
                     <span class="btn-icon">🗑️</span> 清除同步记录
@@ -201,8 +202,9 @@
 
         <!-- GitHub 仓库增量同步 -->
         <div class="section">
-            <h3>🌐 远程仓库同步</h3>
-            <p class="hint">从远程仓库或本地文件下载 JSONL 数据，按 SID 增量合并到当前工作表（新增+更新，不删除）。</p>
+            <h3>📥 数据同步（远程仓库 → 本地）</h3>
+            <p class="hint">从远程仓库下载 Bangumi 资料数据（名称、标签、集数等），按 SID 增量合并到当前工作表（新增+更新，不删除）。<br>
+            与「📤 上传同步」方向相反：上传同步是 Excel→Bangumi，数据同步是 远程仓库→Excel。</p>
             <div class="form-row">
                 <label for="syncSourceType">同步源类型</label>
                 <select id="syncSourceType" title="选择数据源">
@@ -222,7 +224,7 @@
                 </div>
                 <div class="form-row">
                     <label for="githubRepo">仓库名</label>
-                    <input type="text" id="githubRepo" placeholder="如：Bangumi-Archive-Anime-Excel-to-sync" autocomplete="off" spellcheck="false"/>
+                    <input type="text" id="githubRepo" placeholder="如：Bangumi-Archive-Anime-Excel" autocomplete="off" spellcheck="false"/>
                 </div>
                 <div class="form-row">
                     <label for="githubBranch">分支名</label>
@@ -276,7 +278,7 @@
                 <code>{"sid":"12345","name":"...","type":2,"tags":["标签1"],"episode":12}</code><br>
                 <code>{"sid":"67890","name":"...","type":3,"url":"https://bgm.tv/subject/67890"}</code><br>
                 type: 1=书籍 2=动漫 3=音乐 4=游戏 6=三次元（条目类别，非观看状态）<br>
-                默认仓库：<code>awujiana/Bangumi-Archive-Anime-Excel-to-sync/main/data/bangumi.jsonl</code><br>
+                默认仓库：<code>awujiana/Bangumi-Archive-Anime-Excel/main/data/bangumi.jsonl</code><br>
                 示例 Raw URL：<code>https://raw.githubusercontent.com/{owner}/{repo}/{branch}/{path}</code>
             </p>
         </div>
