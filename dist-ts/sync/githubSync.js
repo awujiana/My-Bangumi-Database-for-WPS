@@ -5,11 +5,13 @@
  *              增量更新（新增+更新，不删除本地多余行）。
  *
  * 数据格式（远程 JSONL 文件，每行一个 JSON 对象）：
- *   { "sid": "12345", "name": "...", "updatedAt": "2026-07-05T10:00:00Z",
- *     "date": "2024-01-01", "meta_tags": ["标签1","标签2"], "话数": "12", ... }
+ *   { "sid": "12345", "name": "...", "updatedAt": "2026-07-21",
+ *     "date": "2024-01-01", "meta_tags": ["标签1","标签2"], "nsfw": false,
+ *     "话数": "12", "播放结束": "...", "动画制作公司": "...", ... }
  *
  * url 字段从 sid 构造：https://bgm.tv/subject/{sid}
  * type 字段默认为 2（动漫），用于同步记录显示。
+ * updatedAt 为 YYYY-MM-DD 格式（仅日期，不含时间，节省空间）。
  */
 // 直接从子模块导入，避开 index.ts 的副作用链（index → handlers → document.readyState）
 // 注意：bgmLog 定义在 tools/util.ts（不在 core/constants.ts），与 BGM/getDataSheet 等同源导入

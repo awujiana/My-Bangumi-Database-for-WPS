@@ -14,9 +14,13 @@
  *              复用 githubSyncDiff.ts 的 parseJsonl 解析逻辑，不重复解析实现。
  *
  * 数据格式（远程 JSONL 文件，每行一个 JSON 对象）与 GitHub 一致：
- *   { "sid": "12345", "url": "https://bgm.tv/subject/12345", "name": "...",
- *     "type": 2, "tags": ["标签1","标签2"],
- *     "episode": 12, "updatedAt": "2026-07-05T10:00:00Z" }
+ *   { "sid": "12345", "name": "...", "updatedAt": "2026-07-21",
+ *     "date": "2024-01-01", "meta_tags": ["标签1","标签2"], "nsfw": false,
+ *     "话数": "12", "播放结束": "...", "动画制作公司": "...", ... }
+ *
+ * url 字段从 sid 构造：https://bgm.tv/subject/{sid}
+ * type 字段默认为 2（动漫），用于同步记录显示。
+ * updatedAt 为 YYYY-MM-DD 格式（仅日期，不含时间，节省空间）。
  */
 import { Result } from '../core/result.js';
 import { type GithubRemoteEntry } from './githubSyncDiff.js';

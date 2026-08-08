@@ -230,6 +230,7 @@ function _showDialog(type, opts = {}) {
     if (msgEl)
         msgEl.textContent = opts.prompt || opts.message || '';
     if (type === 'input' && dom.bgmInputField) {
+        ;
         dom.bgmInputField.value = opts.defaultValue || '';
         dom.bgmInputField.focus();
     }
