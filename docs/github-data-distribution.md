@@ -3,7 +3,7 @@
 本文档说明如何配置 GitHub 仓库，使其作为本插件的数据下发源。
 
 当前已启用 **直接 JSONL 模式**，使用仓库：
-[awujiana/Bangumi-Archive-Anime-Excel-to-sync](https://github.com/awujiana/Bangumi-Archive-Anime-Excel-to-sync)
+[awujiana/Bangumi-Archive-Anime-Excel](https://github.com/awujiana/Bangumi-Archive-Anime-Excel)
 
 ## 工作流程（直接 JSONL 模式）
 
@@ -21,17 +21,14 @@
 
 ## 仓库结构
 
-实际仓库 `awujiana/Bangumi-Archive-Anime-Excel-to-sync` 结构：
+实际仓库 `awujiana/Bangumi-Archive-Anime-Excel` 结构：
 
 ```
-Bangumi-Archive-Anime-Excel-to-sync/
+Bangumi-Archive-Anime-Excel/
 ├── data/
 │   └── bangumi.jsonl        ← 数据文件（~15.80 MB，30502 条，直接 JSONL 模式）
 ├── differences/             ← 差异文件目录
-├── dump/                    ← 原始 dump 目录
-├── scripts/
-│   ├── convert_dump_to_jsonl.py  ← Python 转换脚本（唯一实现）
-│   └── wiki_subject_parser.py    ← infobox 解析器（来自 Archive 项目）
+├── xlsx/                    ← Excel 文件目录
 ├── .gitignore
 ├── github-data-distribution.md
 └── 项目操作指南.md
@@ -41,18 +38,18 @@ Bangumi-Archive-Anime-Excel-to-sync/
 
 在 WPS Excel 加载项面板中填写以下配置：
 
-| 配置项 | 值                                    | 说明                    |
-| ------ | ------------------------------------- | ----------------------- |
-| 同步源 | GitHub                                | 选择 GitHub 同步源      |
-| owner  | `awujiana`                            | GitHub 仓库所有者       |
-| repo   | `Bangumi-Archive-Anime-Excel-to-sync` | 仓库名称                |
-| branch | `main`                                | 分支名（默认 main）     |
-| path   | `data/bangumi.jsonl`                  | 仓库中 JSONL 文件的路径 |
+| 配置项 | 值                            | 说明                    |
+| ------ | ----------------------------- | ----------------------- |
+| 同步源 | GitHub                        | 选择 GitHub 同步源      |
+| owner  | `awujiana`                    | GitHub 仓库所有者       |
+| repo   | `Bangumi-Archive-Anime-Excel` | 仓库名称                |
+| branch | `main`                        | 分支名（默认 main）     |
+| path   | `data/bangumi.jsonl`          | 仓库中 JSONL 文件的路径 |
 
 插件会从以下 URL 读取数据：
 
 ```
-https://raw.githubusercontent.com/awujiana/Bangumi-Archive-Anime-Excel-to-sync/main/data/bangumi.jsonl
+https://raw.githubusercontent.com/awujiana/Bangumi-Archive-Anime-Excel/main/data/bangumi.jsonl
 ```
 
 ## 数据格式
@@ -168,7 +165,7 @@ git push origin main
 
 ### 2. 验证
 
-在 WPS Excel 中点击「GitHub 同步」，插件会：
+在 WPS Excel 中点击「数据同步」，插件会：
 
 1. 从 raw URL 下载 `data/bangumi.jsonl`
 2. 逐行解析 JSONL
@@ -192,7 +189,7 @@ git push origin main
 
 ```json
 {
-  "browser_download_url": "https://github.com/awujiana/Bangumi-Archive-Anime-Excel-to-sync/releases/download/v2026-07-21/dump-2026-07-21.zip",
+  "browser_download_url": "https://github.com/awujiana/Bangumi-Archive-Anime-Excel/releases/download/v2026-07-21/dump-2026-07-21.zip",
   "content_type": "application/zip",
   "created_at": "2026-07-21T21:04:41Z",
   "digest": "sha256:e1120169088407c66a94dacacda4dffaabe0e2e08cbcc8238c880f6c0140dd57",
@@ -201,7 +198,7 @@ git push origin main
   "name": "dump-2026-07-21.zip",
   "size": 419054508,
   "updated_at": "2026-07-21T21:05:00Z",
-  "url": "https://api.github.com/repos/awujiana/Bangumi-Archive-Anime-Excel-to-sync/releases/assets/485155893"
+  "url": "https://api.github.com/repos/awujiana/Bangumi-Archive-Anime-Excel/releases/assets/485155893"
 }
 ```
 

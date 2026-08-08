@@ -659,7 +659,7 @@ export async function syncAllRows() {
         // 更新当前位置（便于暂停时定位到表头）
         BGM.sync.updatePosition(ws, headerRow, colMap.get('序列号') || 9);
         // 显示同步进度弹窗（提供暂停/恢复/停止按钮）
-        showSyncProgressDialog('正在同步 - 全面同步', {
+        showSyncProgressDialog('正在上传同步', {
             onPause: () => BGM.sync.pause(),
             onResume: () => BGM.sync.resume(),
             onStop: () => BGM.sync.requestStop(),

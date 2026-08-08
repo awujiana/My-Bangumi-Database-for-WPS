@@ -78,7 +78,7 @@ export const BGM = {
                 return;
             }
             this.resetStopFlag();
-            BGM.Dialog.confirm('确定要开始全面同步吗？', (confirmed) => {
+            BGM.Dialog.confirm('确定要开始上传同步吗？', (confirmed) => {
                 if (!confirmed)
                     return;
                 // 复用统一入口，确保状态一致

@@ -4,7 +4,7 @@
             <tab id="wpsAddinTab" label="Bangumi同步">
 				<group id="bangumiGroup" label="Bangumi">
                     <button id="btnShowPanel" label="打开同步面板" onAction="OnAction" getImage="GetBangumiImage" size="large"/>
-                    <button id="btnSyncBangumi" label="全面同步" onAction="OnAction" getImage="GetBangumiImage" size="large"/>
+                    <button id="btnSyncBangumi" label="上传同步" onAction="OnAction" getImage="GetBangumiImage" size="large"/>
                     <checkBox id="chkIncrementalSync" label="仅同步变更" getPressed="GetIncrementalSyncPressed" onAction="OnIncrementalSyncChange" />
                     <checkBox id="chkSkipConflicts" label="跳过冲突" getPressed="GetSkipConflictsPressed" onAction="OnSkipConflictsChange" />
                     <checkBox id="chkEnableSyncRecord" label="启用同步记录" getPressed="GetEnableSyncRecordPressed" onAction="OnEnableSyncRecordChange" />
@@ -13,7 +13,7 @@
                     <button id="btnCopyToken" label="复制Token" onAction="OnAction" getImage="GetBangumiImage" size="large"/>
                     <button id="btnSetUserId" label="设置用户ID" onAction="OnAction" getImage="GetBangumiImage" size="large"/>
                     <button id="btnOpenCollection" label="打开收藏页" onAction="OnAction" getImage="GetBangumiImage" size="large"/>
-                    <button id="btnSyncFromGithub" label="GitHub 同步" onAction="OnAction" getImage="GetBangumiImage" size="large"/>
+                    <button id="btnSyncFromGithub" label="数据同步" onAction="OnAction" getImage="GetBangumiImage" size="large"/>
                     <button id="btnUndoLastSync" label="撤销同步" onAction="OnAction" getImage="GetBangumiImage" size="large"/>
                   
 				</group>

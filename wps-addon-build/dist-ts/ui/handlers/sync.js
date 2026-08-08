@@ -382,7 +382,7 @@ async function _doAPISync(sheetIndex, token) {
             return;
         }
         // 显示同步进度弹窗
-        showSyncProgressDialog('正在同步 - 从BGM同步收藏', {
+        showSyncProgressDialog('正在收藏回写', {
             onPause: () => BGM.sync.pause(),
             onResume: () => BGM.sync.resume(),
             onStop: () => BGM.sync.requestStop()

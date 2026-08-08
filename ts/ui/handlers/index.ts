@@ -777,7 +777,7 @@ const ACTION_HANDLERS: Record<string, ActionHandler> = {
 
   // GitHub 仓库同步：立即同步（异步，按当前策略）
   syncFromGithub: (ctx) => {
-    bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 开始从 GitHub 同步')
+    bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 开始数据同步（远程仓库 → Excel）')
     // 读取同步源类型：优先用下拉框当前值，兜底用已保存的值
     const sourceTypeSelect = document.getElementById('syncSourceType') as HTMLSelectElement | null
     const currentSourceType: SyncSourceType =
@@ -791,7 +791,7 @@ const ACTION_HANDLERS: Record<string, ActionHandler> = {
         return
       }
     } else if (!isGithubConfigComplete()) {
-      showToast('请先填写并保存 GitHub 配置', 'warn')
+      showToast('请先填写并保存远程仓库配置', 'warn')
       return
     }
     // 读取策略：优先用下拉框当前值（未保存也能即时生效），兜底用已保存的策略
@@ -806,35 +806,35 @@ const ACTION_HANDLERS: Record<string, ActionHandler> = {
         'force-overwrite': '强制覆盖',
       } as const
     )[strategy]
-    // 同步源类型对应的来源描述（本地文件 vs GitHub 仓库）
-    const sourceLabel = currentSourceType === 'local' ? '本地文件' : 'GitHub 仓库'
+    // 同步源类型对应的来源描述（本地文件 vs 远程仓库）
+    const sourceLabel = currentSourceType === 'local' ? '本地文件' : '远程仓库'
     showConfirm(
-      `将从${sourceLabel}读取 JSON 并按策略【${strategyLabel}】合并到当前工作表。\n是否继续？`,
+      `将从${sourceLabel}下载数据并按策略【${strategyLabel}】合并到当前工作表。\n（远程仓库 → Excel，与上传同步方向相反）\n是否继续？`,
       (confirmed) => {
         if (!confirmed) {
-          bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 用户取消 GitHub 同步')
+          bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 用户取消数据同步')
           return
         }
         syncFromRemote((current, total, message) => {
           if (total > 0) {
-            setStatus(`GitHub 同步 ${current}/${total}: ${message}`)
+            setStatus(`数据同步 ${current}/${total}: ${message}`)
           }
         }, strategy)
           .then((result) => {
-            const summary = `GitHub 同步完成：远程 ${result.remoteTotal}，新增 ${result.added}，更新 ${result.updated}，删除 ${result.deleted}，失败 ${result.failed}`
+            const summary = `数据同步完成：远程 ${result.remoteTotal}，新增 ${result.added}，更新 ${result.updated}，删除 ${result.deleted}，失败 ${result.failed}`
             bgmLog(LOG_LEVELS.INFO, `[handleActionClick] ${summary}`)
             showToast(summary, result.failed > 0 ? 'warn' : 'success')
           })
           .catch((e: unknown) => {
             const errMsg = e instanceof Error ? e.message : String(e)
-            bgmLog(LOG_LEVELS.ERROR, `[handleActionClick] GitHub 同步失败: ${errMsg}`)
-            showToast(`GitHub 同步失败：${errMsg}`, 'error')
+            bgmLog(LOG_LEVELS.ERROR, `[handleActionClick] 数据同步失败: ${errMsg}`)
+            showToast(`数据同步失败：${errMsg}`, 'error')
           })
       },
     )
     bgmLog(
       LOG_LEVELS.INFO,
-      `[handleActionClick] GitHub 同步已触发（策略: ${strategy}），耗时: ${Date.now() - ctx.startTime}ms`,
+      `[handleActionClick] 数据同步已触发（策略: ${strategy}），耗时: ${Date.now() - ctx.startTime}ms`,
     )
   },
 

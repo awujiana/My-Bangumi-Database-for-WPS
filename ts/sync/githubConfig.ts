@@ -86,7 +86,7 @@ const DEFAULT_STRATEGY: SyncStrategy = 'add-update'
  */
 export const DEFAULT_GITHUB_CONFIG: Readonly<GithubSyncConfig> = Object.freeze({
   owner: 'awujiana',
-  repo: 'Bangumi-Archive-Anime-Excel-to-sync',
+  repo: 'Bangumi-Archive-Anime-Excel',
   branch: 'main',
   path: 'data/bangumi.jsonl',
   sourceType: 'github',

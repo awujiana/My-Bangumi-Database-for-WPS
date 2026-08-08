@@ -500,7 +500,7 @@ export async function syncWithConfirmation(): Promise<void> {
   }
 
   // 3. 先弹确认框（让用户立刻看到反馈，避免冲突检测网络等待期间"无反应"）
-  const confirmMsg = `即将开始全面同步
+  const confirmMsg = `即将开始上传同步（Excel → Bangumi）
 
 数据预览：
   总行数：${preview.total}
@@ -700,7 +700,7 @@ export async function syncFromGithubForRibbon(): Promise<GithubSyncResult | null
 
   // 3. 用户确认
   const confirmed = await wpsMsgBox(
-    `将从 GitHub 仓库下载 JSON 并按策略【${strategyLabel}】合并到当前工作表。\n是否继续？`,
+    `将从远程仓库下载数据并按策略【${strategyLabel}】合并到当前工作表。\n（远程仓库 → Excel，与上传同步方向相反）\n是否继续？`,
     4, // MB_YESNO
     32, // MB_ICONQUESTION
   )
@@ -723,7 +723,7 @@ export async function syncFromGithubForRibbon(): Promise<GithubSyncResult | null
 
     // 5. 结果提示
     const summary =
-      `GitHub 同步完成（策略：${strategyLabel}）\n\n` +
+      `数据同步完成（策略：${strategyLabel}）\n\n` +
       `远程条目: ${result.remoteTotal}\n` +
       `新增: ${result.added}\n` +
       `更新: ${result.updated}\n` +
@@ -735,7 +735,7 @@ export async function syncFromGithubForRibbon(): Promise<GithubSyncResult | null
   } catch (e: unknown) {
     const errMsg = e instanceof Error ? e.message : String(e)
     bgmLog(LOG_LEVELS.ERROR, `[syncFromGithubForRibbon] 同步失败: ${errMsg}`)
-    await wpsMsgBox(`GitHub 同步失败：${errMsg}`, 0, 16)
+    await wpsMsgBox(`数据同步失败：${errMsg}`, 0, 16)
     return null
   }
 }
