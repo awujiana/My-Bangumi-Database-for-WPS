@@ -82,3 +82,4 @@ export async function markEpisodesComplete(sid, epCount, token, signal) {
         return { success: false, message: e instanceof Error ? e.message : '未知错误' };
     }
 }
+//# sourceMappingURL=chapterMarker.js.map

@@ -128,3 +128,4 @@ export function startUserInfoPolling() {
         BGM.abortController.abort();
     });
 }
+//# sourceMappingURL=userInfoPolling.js.map

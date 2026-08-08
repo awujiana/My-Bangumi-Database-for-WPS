@@ -29,26 +29,67 @@ function getPurify() {
         _purify = (dirty) => factory.sanitize(dirty, {
             ALLOWED_TAGS: [
                 // 文本格式
-                'b', 'i', 'em', 'strong', 'br', 'span', 'div', 'p', 'a',
+                'b',
+                'i',
+                'em',
+                'strong',
+                'br',
+                'span',
+                'div',
+                'p',
+                'a',
                 // 列表
-                'ul', 'ol', 'li',
+                'ul',
+                'ol',
+                'li',
                 // 表格
-                'table', 'thead', 'tbody', 'tr', 'td', 'th',
+                'table',
+                'thead',
+                'tbody',
+                'tr',
+                'td',
+                'th',
                 // 表单（对话框、筛选器需要）
-                'button', 'input', 'select', 'option', 'label',
+                'button',
+                'input',
+                'select',
+                'option',
+                'label',
             ],
             ALLOWED_ATTR: [
                 // 通用
-                'class', 'id', 'style', 'title',
+                'class',
+                'id',
+                'style',
+                'title',
                 // 链接
-                'href', 'target', 'rel',
+                'href',
+                'target',
+                'rel',
                 // 表单
-                'type', 'value', 'placeholder', 'disabled', 'for', 'name',
+                'type',
+                'value',
+                'placeholder',
+                'disabled',
+                'for',
+                'name',
                 // 无障碍
-                'role', 'aria-label', 'aria-modal', 'aria-labelledby', 'aria-hidden',
-                'aria-live', 'aria-atomic', 'aria-valuenow', 'aria-valuemin', 'aria-valuemax',
+                'role',
+                'aria-label',
+                'aria-modal',
+                'aria-labelledby',
+                'aria-hidden',
+                'aria-live',
+                'aria-atomic',
+                'aria-valuenow',
+                'aria-valuemin',
+                'aria-valuemax',
                 // 数据属性（卡片标识等）
-                'data-event', 'data-status', 'data-type', 'data-row', 'data-sid',
+                'data-event',
+                'data-status',
+                'data-type',
+                'data-row',
+                'data-sid',
             ],
             ALLOW_DATA_ATTR: false,
         });
@@ -86,3 +127,4 @@ export function sanitizeHtml(dirty) {
     const purify = getPurify();
     return purify(dirty);
 }
+//# sourceMappingURL=sanitize.js.map

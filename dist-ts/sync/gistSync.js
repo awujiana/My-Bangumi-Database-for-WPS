@@ -287,3 +287,4 @@ export class GistSyncSource {
         return Result.okVoid();
     }
 }
+//# sourceMappingURL=gistSync.js.map

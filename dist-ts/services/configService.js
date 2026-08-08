@@ -6,7 +6,7 @@
  */
 // 直接从子模块导入，避开 index.ts 的副作用链（index → handlers → document.readyState）
 import { BgmError, Result } from '../core/result.js';
-import { FullConfigSchema } from '../schemas/pluginStorage.js';
+import { FullConfigSchema, SyncStrategySchema } from '../schemas/pluginStorage.js';
 import { getGithubConfig, setGithubConfig, getSyncStrategy, setSyncStrategy, } from '../sync/githubConfig.js';
 import { loadBgToken, storeBgToken, _getBgmUserId, _setBgmUserId } from '../tools/util.js';
 /** 导出配置的当前版本号，与 FullConfigSchema.version 保持一致 */
@@ -83,7 +83,9 @@ export function importConfig(json) {
     }
     const result = FullConfigSchema.safeParse(parsed);
     if (!result.success) {
-        const errors = result.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join('; ');
+        const errors = result.error.issues
+            .map((i) => `${(i.path ?? []).join('.')}: ${i.message}`)
+            .join('; ');
         return Result.failVoid(new BgmError(`配置校验失败: ${errors}`, 'CONFIG_INVALID'));
     }
     const config = result.data;
@@ -105,8 +107,16 @@ export function importConfig(json) {
             path: gc.path,
         });
         if (gc.strategy) {
-            setSyncStrategy(gc.strategy);
+            // 配置里的 default 已经保证 value ∈ SyncStrategy；这里用一次 schema 缩窄
+            const sResult = SyncStrategySchema.safeParse(gc.strategy);
+            if (sResult.success) {
+                setSyncStrategy(sResult.data);
+            }
+            else {
+                setSyncStrategy('add-update');
+            }
         }
     }
     return Result.okVoid();
 }
+//# sourceMappingURL=configService.js.map

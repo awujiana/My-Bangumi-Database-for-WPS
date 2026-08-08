@@ -808,3 +808,4 @@ export function onSelectModeChange() {
         }
     }
 }
+//# sourceMappingURL=panelLifecycle.js.map

@@ -60,3 +60,4 @@ export function trim(str) {
         return '';
     return String(str).replace(/^\s+|\s+$/g, '');
 }
+//# sourceMappingURL=stringUtilsPure.js.map

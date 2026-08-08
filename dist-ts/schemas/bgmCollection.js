@@ -1,4 +1,4 @@
-import { z } from 'zod';
+import { z } from '../tools/zodCompat.js';
 /** Bangumi 收藏条目 Schema（subject 信息） */
 export const BgmCollectionSubjectSchema = z.object({
     id: z.number().int().positive(),
@@ -27,3 +27,4 @@ export const BgmCollectionSchema = z.object({
     comment: z.string().optional().default(''),
     ep_status: z.number().int().optional(),
 });
+//# sourceMappingURL=bgmCollection.js.map

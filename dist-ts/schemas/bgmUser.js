@@ -1,4 +1,4 @@
-import { z } from 'zod';
+import { z } from '../tools/zodCompat.js';
 /** Bangumi 用户信息 Schema */
 export const BgmUserSchema = z.object({
     id: z.number().int().positive(),
@@ -12,3 +12,4 @@ export const BgmUserSchema = z.object({
     })
         .optional(),
 });
+//# sourceMappingURL=bgmUser.js.map

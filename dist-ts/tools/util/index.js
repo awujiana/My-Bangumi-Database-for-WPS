@@ -814,3 +814,4 @@ export function showBangumiPanel() {
         }
     }
 }
+//# sourceMappingURL=index.js.map

@@ -3,8 +3,8 @@
  * @module http
  * @description 支持异步请求、进度回调、自动重试、限流处理
  */
-import type { ZodSchema } from './zodCompat.js';
 import { Result } from '../index.js';
+import type { ZodSchema } from './zodCompat.js';
 export type HttpMethod = 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH';
 export type SyncProgressCallback = (current: number, total: number, message: string) => void;
 /**

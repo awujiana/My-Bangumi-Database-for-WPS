@@ -1,4 +1,4 @@
-import { z } from 'zod';
+import { type infer as zInfer } from '../tools/zodCompat.js';
 /**
  * GitHub 同步条目 Schema（与 GithubRemoteEntry 接口保持一致）
  *
@@ -15,10 +15,40 @@ import { z } from 'zod';
  * - platform：已从 EXTENDED_FIELD_MAP 移除
  * - score：数据源平均分，非用户打分，不输出
  */
-export declare const GithubEntrySchema: z.ZodObject<{
-    sid: z.ZodString;
-    name: z.ZodOptional<z.ZodString>;
-    updatedAt: z.ZodOptional<z.ZodString>;
-}, z.core.$loose>;
-export type GithubEntry = z.infer<typeof GithubEntrySchema>;
+export declare const GithubEntrySchema: {
+    [k: string]: any;
+    readonly __isZodLite: true;
+    readonly _shape: Record<string, import("../tools/zodCompat.js").ZodSchema<any>>;
+    readonly _passthrough: boolean;
+    passthrough(): /*elided*/ any;
+    strict(): /*elided*/ any;
+    optional(): import("../tools/zodCompat.js").ZodSchema<{
+        sid: string;
+        name: string | undefined;
+        updatedAt: string | undefined;
+    } | undefined>;
+    default(d: any): any;
+    safeParse(input: unknown): {
+        success: false;
+        error: {
+            issues: {
+                message: string;
+                path?: Array<string | number>;
+            }[];
+        };
+    } | {
+        success: true;
+        data: {
+            sid: string;
+            name: string | undefined;
+            updatedAt: string | undefined;
+        };
+    };
+    parse(input: unknown): {
+        sid: string;
+        name: string | undefined;
+        updatedAt: string | undefined;
+    };
+};
+export type GithubEntry = zInfer<typeof GithubEntrySchema>;
 //# sourceMappingURL=githubEntry.d.ts.map

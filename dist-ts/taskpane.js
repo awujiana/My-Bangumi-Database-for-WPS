@@ -14,3 +14,4 @@
  *       window.initPanel / window.refreshTaskpaneUI 仍在模块加载时挂载（仅为全局函数引用，无副作用）。
  */
 export * from './taskpane/index.js';
+//# sourceMappingURL=taskpane.js.map

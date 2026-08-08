@@ -528,3 +528,4 @@ export async function syncFromGithub(onProgress, strategy = 'add-update', signal
     onProgress?.(3, 3, `完成：新增 ${result.added}，更新 ${result.updated}，删除 ${result.deleted}`);
     return result;
 }
+//# sourceMappingURL=githubSync.js.map

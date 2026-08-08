@@ -2,103 +2,101 @@
  * @fileoverview Zod 兼容层
  * @module tools/zodCompat
  * @description 为 wpsjs debug 纯静态模式（浏览器原生 ES module，无打包器、无 importmap）
- *              提供 Zod 的降级兼容：优先使用 `window.z`（若通过 <script src="./libs/zod.umd.js">
- *              或 CDN 预先挂载真正的 zod），缺失时返回结构近似 + 运行时类型断言的
- *              最小 safeParse 实现，保证模块加载不卡死、核心功能不中断。
+ *              提供 Zod 的降级兼容：优先使用 `window.z`（若通过 <script> 预加载真正的 zod），
+ *              缺失时返回结构近似 + 运行时类型断言的最小 safeParse 实现，保证模块加载
+ *              不卡死、核心功能不中断。
  *
  *              注意：降级版并非完整 Zod —— safeParse 只做保守校验（字符串最小长度、
  *              对象 shape、枚举、字面量、默认值、optional 等核心行为），链式调用
- *              （int/positive/min/max/url/array/passthrough 等）在降级版仅作为 fluent
- *              接口存在，不在运行时增加额外限制；若需要精确校验请在 index.html 预加载
+ *              （int/positive/min/max/url/passthrough 等）在降级版仅作为 fluent 接口
+ *              存在，不在运行时增加额外限制；若需要精确校验请在 index.html 预加载
  *              真实 zod UMD 到 window.z。
- *
- *              在 Vite 构建环境可通过 importmap 将此文件指向真正的 zod。
  */
-// ---------- 辅助工具 ----------
 function ok(data) {
     return { success: true, data };
 }
-function fail(msg) {
-    return { success: false, error: { issues: [{ message: msg }] } };
+function fail(msg, path) {
+    // exactOptionalPropertyTypes: path 为 undefined 时不能把 undefined 赋值给 ? 属性，
+    // 因此只有 path 真正有值时才附加该字段
+    const issue = { message: msg };
+    if (path !== undefined && path !== null && path.length > 0)
+        issue.path = path;
+    return { success: false, error: { issues: [issue] } };
 }
-/** 包装一个 schema 并在其之上叠加 no-op fluent 调用（int/positive/min/max/url 等），
- *  以便在降级模式下不报错（这些约束仅用真实 zod 才执行）。 */
-function withNoopFluent(base) {
-    const NOOP_FLUENTS = [
-        'int', 'positive', 'negative', 'nonnegative', 'nonpositive',
-        'min', 'max', 'gt', 'lt', 'gte', 'lte',
-        'length', 'email', 'url', 'uuid', 'cuid', 'regex', 'startsWith', 'endsWith',
-        'trim', 'datetime', 'date', 'time', 'ip',
-        'array', 'passthrough', 'strip', 'strict',
-        'safe', 'brand', 'transform', 'pipe', 'or', 'and', 'refine', 'superRefine',
-        'describe', 'catch', 'nullable', 'nullish',
-    ];
-    const proxy = base;
+// ============================================================
+//  No-op Fluent 注入
+// ============================================================
+const NOOP_FLUENTS = [
+    'int', 'integer', 'positive', 'negative', 'nonnegative', 'nonpositive',
+    'min', 'max', 'gt', 'lt', 'gte', 'lte',
+    'length', 'email', 'url', 'uuid', 'cuid', 'regex', 'startsWith', 'endsWith',
+    'trim', 'datetime', 'date', 'time', 'ip',
+    'array', 'passthrough', 'strip', 'strict',
+    'safe', 'brand', 'transform', 'pipe', 'or', 'and', 'refine', 'superRefine',
+    'describe', 'catch', 'nullable', 'nullish', 'coerce', 'finite',
+    'nonempty', 'nonmax', 'nonmin',
+];
+/** 在 target 对象的同一实例上挂 noop fluent，返回 any 规避严格检查 */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function flu(target) {
+    const rec = target;
     for (const fn of NOOP_FLUENTS) {
-        if (typeof proxy[fn] !== 'function') {
-            proxy[fn] = function () {
-                return withNoopFluent(this);
+        if (typeof rec[fn] !== 'function') {
+            rec[fn] = function () {
+                // eslint-disable-next-line @typescript-eslint/no-unsafe-return
+                return flu(target);
             };
         }
     }
-    return proxy;
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-return
+    return target;
 }
-// ---------- 核心实现 ----------
-class SString {
-    _minLen;
-    _maxLen;
+// ============================================================
+//  运行时实现（类字段均不加 private，避免 declaration 导出时报 private class 字段错）
+// ============================================================
+class LiteString {
     __isZodLite = true;
-    constructor(_minLen = 0, _maxLen = Infinity) {
-        this._minLen = _minLen;
-        this._maxLen = _maxLen;
+    /** @internal */ _min;
+    /** @internal */ _max;
+    constructor(min = 0, max = Infinity) {
+        this._min = min;
+        this._max = max;
     }
-    min(n) {
-        return withNoopFluent(new SString(n, this._maxLen));
-    }
-    max(n) {
-        return withNoopFluent(new SString(this._minLen, n));
-    }
-    length(n) {
-        return withNoopFluent(new SString(n, n));
-    }
-    optional() {
-        return withNoopFluent(new SOptional(this));
-    }
-    default(d) {
-        return withNoopFluent(new SWithDefault(this, d));
-    }
+    min(n) { return flu(new LiteString(n, this._max)); }
+    max(n) { return flu(new LiteString(this._min, n)); }
+    length(n) { return flu(new LiteString(n, n)); }
+    optional() { return flu(new LiteOptional(this)); }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    default(d) { return flu(new LiteWithDefault(this, d)); }
     safeParse(input) {
         if (typeof input !== 'string')
             return fail('expected string');
-        if (input.length < this._minLen)
+        if (input.length < this._min)
             return fail('string shorter than min');
-        if (input.length > this._maxLen)
+        if (input.length > this._max)
             return fail('string longer than max');
         return ok(input);
     }
+    parse(input) {
+        const r = this.safeParse(input);
+        if (!r.success)
+            throw new Error(r.error.issues[0]?.message ?? 'parse failed');
+        return r.data;
+    }
 }
-class SNumber {
+class LiteNumber {
     __isZodLite = true;
-    _min = -Infinity;
-    _max = Infinity;
-    withBounds(min, max) {
-        const n = new SNumber();
-        n._min = min;
-        n._max = max;
-        return withNoopFluent(n);
+    /** @internal */ _min;
+    /** @internal */ _max;
+    constructor(min = -Infinity, max = Infinity) {
+        this._min = min;
+        this._max = max;
     }
-    min(n) {
-        return this.withBounds(Math.max(this._min, n), this._max);
-    }
-    max(n) {
-        return this.withBounds(this._min, Math.min(this._max, n));
-    }
-    optional() {
-        return withNoopFluent(new SOptional(this));
-    }
-    default(d) {
-        return withNoopFluent(new SWithDefault(this, d));
-    }
+    min(n) { return flu(new LiteNumber(Math.max(this._min, n), this._max)); }
+    max(n) { return flu(new LiteNumber(this._min, Math.min(this._max, n))); }
+    optional() { return flu(new LiteOptional(this)); }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    default(d) { return flu(new LiteWithDefault(this, d)); }
     safeParse(input) {
         if (typeof input === 'bigint')
             return fail('unexpected bigint');
@@ -110,51 +108,56 @@ class SNumber {
             return fail('number above max');
         return ok(input);
     }
+    parse(input) {
+        const r = this.safeParse(input);
+        if (!r.success)
+            throw new Error(r.error.issues[0]?.message ?? 'parse failed');
+        return r.data;
+    }
 }
-class SBoolean {
+class LiteBoolean {
     __isZodLite = true;
-    optional() {
-        return withNoopFluent(new SOptional(this));
-    }
-    default(d) {
-        return withNoopFluent(new SWithDefault(this, d));
-    }
+    optional() { return flu(new LiteOptional(this)); }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    default(d) { return flu(new LiteWithDefault(this, d)); }
     safeParse(input) {
         if (typeof input === 'boolean')
             return ok(input);
         return fail('expected boolean');
     }
+    parse(input) {
+        const r = this.safeParse(input);
+        if (!r.success)
+            throw new Error(r.error.issues[0]?.message ?? 'parse failed');
+        return r.data;
+    }
 }
-class SLiteral {
-    _val;
+class LiteLiteral {
     __isZodLite = true;
-    constructor(_val) {
-        this._val = _val;
-    }
-    optional() {
-        return withNoopFluent(new SOptional(this));
-    }
-    default(d) {
-        return withNoopFluent(new SWithDefault(this, d));
-    }
+    /** @internal */ _val;
+    constructor(val) { this._val = val; }
+    optional() { return flu(new LiteOptional(this)); }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    default(d) { return flu(new LiteWithDefault(this, d)); }
     safeParse(input) {
         if (input === this._val)
             return ok(this._val);
         return fail(`expected literal ${String(this._val)}`);
     }
+    parse(input) {
+        const r = this.safeParse(input);
+        if (!r.success)
+            throw new Error(r.error.issues[0]?.message ?? 'parse failed');
+        return r.data;
+    }
 }
-class SEnum {
-    _vals;
+class LiteEnum {
     __isZodLite = true;
-    constructor(_vals) {
-        this._vals = _vals;
-    }
-    optional() {
-        return withNoopFluent(new SOptional(this));
-    }
-    default(d) {
-        return withNoopFluent(new SWithDefault(this, d));
-    }
+    /** @internal */ _vals;
+    constructor(vals) { this._vals = vals; }
+    optional() { return flu(new LiteOptional(this)); }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    default(d) { return flu(new LiteWithDefault(this, d)); }
     safeParse(input) {
         if (typeof input !== 'string')
             return fail('enum value must be string');
@@ -162,121 +165,136 @@ class SEnum {
             return fail(`not in enum: ${input}`);
         return ok(input);
     }
+    parse(input) {
+        const r = this.safeParse(input);
+        if (!r.success)
+            throw new Error(r.error.issues[0]?.message ?? 'parse failed');
+        return r.data;
+    }
 }
-class SArraySchema {
-    _item;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+class LiteArray {
     __isZodLite = true;
-    constructor(_item) {
-        this._item = _item;
-    }
-    optional() {
-        return withNoopFluent(new SOptional(this));
-    }
-    default(d) {
-        return withNoopFluent(new SWithDefault(this, d));
-    }
+    /** @internal */
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    _item;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    constructor(item) { this._item = item; }
+    optional() { return flu(new LiteOptional(this)); }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    default(d) { return flu(new LiteWithDefault(this, d)); }
     safeParse(input) {
         if (!Array.isArray(input))
             return fail('expected array');
         const out = [];
         for (let i = 0; i < input.length; i++) {
             const r = this._item.safeParse(input[i]);
-            if (!r.success)
-                return fail(`[${i}]: ${r.error.issues[0]?.message ?? 'invalid'}`);
+            if (!r.success) {
+                const issue = r.error.issues[0];
+                return fail(`[${i}]: ${issue?.message ?? 'invalid'}`, [i, ...(issue?.path ?? [])]);
+            }
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
             out.push(r.data);
         }
         return ok(out);
     }
+    parse(input) {
+        const r = this.safeParse(input);
+        if (!r.success)
+            throw new Error(r.error.issues[0]?.message ?? 'parse failed');
+        return r.data;
+    }
 }
-class SObject {
-    _shape;
-    _passthrough;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+class LiteObject {
     __isZodLite = true;
-    constructor(_shape, 
-    /** passthrough = 保留未知字段；默认 strip（与 zod 默认一致） */
-    _passthrough = false) {
-        this._shape = _shape;
-        this._passthrough = _passthrough;
+    /** @internal */
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    _shape;
+    /** @internal */ _passthrough;
+    constructor(
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    shape, passthrough = false) {
+        this._shape = shape;
+        this._passthrough = passthrough;
     }
-    passthrough() {
-        return withNoopFluent(new SObject(this._shape, true));
-    }
-    strict() {
-        return withNoopFluent(new SObject(this._shape, false));
-    }
-    optional() {
-        return withNoopFluent(new SOptional(this));
-    }
-    default(d) {
-        return withNoopFluent(new SWithDefault(this, d));
-    }
+    passthrough() { return flu(new LiteObject(this._shape, true)); }
+    strict() { return flu(new LiteObject(this._shape, false)); }
+    optional() { return flu(new LiteOptional(this)); }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    default(d) { return flu(new LiteWithDefault(this, d)); }
     safeParse(input) {
-        if (typeof input !== 'object' || input === null || Array.isArray(input)) {
+        if (typeof input !== 'object' || input === null || Array.isArray(input))
             return fail('expected object');
-        }
         const src = input;
         const out = {};
-        // 先 passthrough：若启用，拷贝所有字段（然后覆盖 shape 中对应 key）
-        if (this._passthrough) {
+        if (this._passthrough)
             for (const k of Object.keys(src))
                 out[k] = src[k];
-        }
-        // 处理已知 shape
         for (const key of Object.keys(this._shape)) {
             const schema = this._shape[key];
+            if (!schema)
+                continue;
             const has = Object.prototype.hasOwnProperty.call(src, key);
             const rawVal = has ? src[key] : undefined;
             const r = schema.safeParse(rawVal);
             if (!r.success) {
-                return fail(`key "${key}": ${r.error.issues[0]?.message ?? 'invalid'}`);
+                const issue = r.error.issues[0];
+                return fail(`key "${key}": ${issue?.message ?? 'invalid'}`, [key, ...(issue?.path ?? [])]);
             }
-            if (r.data !== undefined || has) {
+            if (r.data !== undefined || has)
                 out[key] = r.data;
-            }
         }
         return ok(out);
     }
+    parse(input) {
+        const r = this.safeParse(input);
+        if (!r.success)
+            throw new Error(r.error.issues[0]?.message ?? 'parse failed');
+        return r.data;
+    }
 }
-class SOptional {
-    _inner;
+class LiteOptional {
     __isZodLite = true;
-    constructor(_inner) {
-        this._inner = _inner;
-    }
-    optional() {
-        return this;
-    }
-    nullable() {
-        return withNoopFluent(new SNullable(this._inner, true, true));
-    }
-    nullish() {
-        return withNoopFluent(new SNullable(this._inner, true, true));
-    }
-    default(d) {
-        return withNoopFluent(new SWithDefault(this, d));
-    }
+    /** @internal */
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    _inner;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    constructor(inner) { this._inner = inner; }
+    optional() { return this; }
+    nullable() { return flu(new LiteNullable(this._inner, true, true)); }
+    nullish() { return flu(new LiteNullable(this._inner, true, true)); }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    default(d) { return flu(new LiteWithDefault(this, d)); }
     safeParse(input) {
         if (input === undefined)
             return ok(undefined);
         return this._inner.safeParse(input);
     }
+    parse(input) {
+        const r = this.safeParse(input);
+        if (!r.success)
+            throw new Error(r.error.issues[0]?.message ?? 'parse failed');
+        return r.data;
+    }
 }
-class SNullable {
-    _inner;
-    _allowNull;
-    _allowUndefined;
+class LiteNullable {
     __isZodLite = true;
-    constructor(_inner, _allowNull = true, _allowUndefined = true) {
-        this._inner = _inner;
-        this._allowNull = _allowNull;
-        this._allowUndefined = _allowUndefined;
+    /** @internal */
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    _inner;
+    /** @internal */ _allowNull;
+    /** @internal */ _allowUndefined;
+    constructor(
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    inner, allowNull = true, allowUndefined = true) {
+        this._inner = inner;
+        this._allowNull = allowNull;
+        this._allowUndefined = allowUndefined;
     }
-    optional() {
-        return withNoopFluent(new SNullable(this._inner, this._allowNull, true));
-    }
-    default(d) {
-        return withNoopFluent(new SWithDefault(this, d));
-    }
+    optional() { return flu(new LiteNullable(this._inner, this._allowNull, true)); }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    default(d) { return flu(new LiteWithDefault(this, d)); }
     safeParse(input) {
         if (this._allowUndefined && input === undefined)
             return ok(undefined);
@@ -284,20 +302,31 @@ class SNullable {
             return ok(null);
         return this._inner.safeParse(input);
     }
+    parse(input) {
+        const r = this.safeParse(input);
+        if (!r.success)
+            throw new Error(r.error.issues[0]?.message ?? 'parse failed');
+        return r.data;
+    }
 }
-class SWithDefault {
-    _inner;
-    _def;
+class LiteWithDefault {
     __isZodLite = true;
-    constructor(_inner, _def) {
-        this._inner = _inner;
-        this._def = _def;
+    /** @internal */
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    _inner;
+    /** @internal */ _def;
+    constructor(
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    inner, def) {
+        this._inner = inner;
+        this._def = def;
     }
     optional() {
-        return withNoopFluent(new SOptional(this));
+        return flu(new LiteOptional(this));
     }
-    default(d) {
-        return withNoopFluent(new SWithDefault(this, d));
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    default(newDef) {
+        return flu(new LiteWithDefault(this, newDef));
     }
     safeParse(input) {
         if (input === undefined)
@@ -305,17 +334,23 @@ class SWithDefault {
         const r = this._inner.safeParse(input);
         if (!r.success)
             return fail((r.error.issues[0]?.message ?? 'invalid'));
-        return ok(r.data);
+        return r;
+    }
+    parse(input) {
+        const r = this.safeParse(input);
+        if (!r.success)
+            throw new Error(r.error.issues[0]?.message ?? 'parse failed');
+        return r.data;
     }
 }
-const LiteZod = {
-    string: () => withNoopFluent(new SString()),
-    number: () => withNoopFluent(new SNumber()),
-    boolean: () => withNoopFluent(new SBoolean()),
-    literal: (v) => withNoopFluent(new SLiteral(v)),
-    enum: (vs) => withNoopFluent(new SEnum(vs)),
-    object: (shape) => withNoopFluent(new SObject(shape)),
-    array: (item) => withNoopFluent(new SArraySchema(item)),
+const LiteZodImpl = {
+    string: () => flu(new LiteString()),
+    number: () => flu(new LiteNumber()),
+    boolean: () => flu(new LiteBoolean()),
+    literal: (v) => flu(new LiteLiteral(v)),
+    enum: (vs) => flu(new LiteEnum(vs)),
+    object: (shape) => flu(new LiteObject(shape)),
+    array: (item) => flu(new LiteArray(item)),
 };
 function resolveZod() {
     const w = globalThis;
@@ -324,9 +359,10 @@ function resolveZod() {
         typeof cand === 'object' &&
         typeof cand.string === 'function' &&
         typeof cand.object === 'function') {
-        // 真实 zod 也应支持 z.enum/z.literal/z.array/z.number/z.string
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-return
         return cand;
     }
-    return LiteZod;
+    return LiteZodImpl;
 }
 export const z = resolveZod();
+//# sourceMappingURL=zodCompat.js.map

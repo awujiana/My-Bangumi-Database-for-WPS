@@ -32,6 +32,11 @@ const MODULES = [
     { src: 'dist-ts/taskpane.js', type: 'module', critical: true }
 ];
 
+// 暴露模块加载状态给调试面板（debugPanel.ts 读取）
+window.__BGM_MODULE_STATUS__ = MODULES.map(function(m) {
+    return { src: m.src, loaded: false, critical: m.critical || false, error: undefined };
+});
+
 function loadScript(src, type) {
     return new Promise((resolve, reject) => {
         const script = document.createElement('script');
@@ -39,10 +44,16 @@ function loadScript(src, type) {
         if (type === 'module') script.type = 'module';
         script.onload = () => {
             console.log('[BGM] Loaded: ' + src);
+            var status = window.__BGM_MODULE_STATUS__;
+            var entry = status.find(function(m) { return m.src === src; });
+            if (entry) entry.loaded = true;
             resolve();
         };
         script.onerror = (e) => {
             console.error('[BGM] Failed to load: ' + src, e);
+            var status = window.__BGM_MODULE_STATUS__;
+            var entry = status.find(function(m) { return m.src === src; });
+            if (entry) { entry.loaded = false; entry.error = 'Failed to load'; }
             reject(new Error('Failed to load script: ' + src));
         };
         document.head.appendChild(script);

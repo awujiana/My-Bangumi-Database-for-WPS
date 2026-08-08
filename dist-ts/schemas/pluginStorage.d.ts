@@ -1,61 +1,134 @@
-import { z } from 'zod';
+import { type infer as zInfer } from '../tools/zodCompat.js';
 /** 同步策略 Schema */
-export declare const SyncStrategySchema: z.ZodEnum<{
-    "add-update": "add-update";
-    "add-only": "add-only";
-    "update-only": "update-only";
-    mirror: "mirror";
-    "force-overwrite": "force-overwrite";
-}>;
-export type SyncStrategy = z.infer<typeof SyncStrategySchema>;
+export declare const SyncStrategySchema: {
+    [k: string]: any;
+    readonly __isZodLite: true;
+    readonly _vals: readonly string[];
+    optional(): import("../tools/zodCompat.js").ZodSchema<string | undefined>;
+    default(d: any): any;
+    safeParse(input: unknown): {
+        success: false;
+        error: {
+            issues: {
+                message: string;
+                path?: Array<string | number>;
+            }[];
+        };
+    } | {
+        success: true;
+        data: string;
+    };
+    parse(input: unknown): string;
+};
+export type SyncStrategy = zInfer<typeof SyncStrategySchema>;
 /** GitHub 同步配置 Schema */
-export declare const GithubConfigSchema: z.ZodObject<{
-    owner: z.ZodString;
-    repo: z.ZodString;
-    branch: z.ZodString;
-    path: z.ZodString;
-    strategy: z.ZodDefault<z.ZodOptional<z.ZodEnum<{
-        "add-update": "add-update";
-        "add-only": "add-only";
-        "update-only": "update-only";
-        mirror: "mirror";
-        "force-overwrite": "force-overwrite";
-    }>>>;
-    sourceType: z.ZodDefault<z.ZodOptional<z.ZodEnum<{
-        github: "github";
-        gitlab: "gitlab";
-        gitee: "gitee";
-        local: "local";
-        gist: "gist";
-    }>>>;
-}, z.core.$strip>;
-export type GithubConfig = z.infer<typeof GithubConfigSchema>;
+export declare const GithubConfigSchema: {
+    [k: string]: any;
+    readonly __isZodLite: true;
+    readonly _shape: Record<string, import("../tools/zodCompat.js").ZodSchema<any>>;
+    readonly _passthrough: boolean;
+    passthrough(): /*elided*/ any;
+    strict(): /*elided*/ any;
+    optional(): import("../tools/zodCompat.js").ZodSchema<{
+        owner: string;
+        repo: string;
+        branch: string;
+        path: string;
+        strategy: unknown;
+        sourceType: unknown;
+    } | undefined>;
+    default(d: any): any;
+    safeParse(input: unknown): {
+        success: false;
+        error: {
+            issues: {
+                message: string;
+                path?: Array<string | number>;
+            }[];
+        };
+    } | {
+        success: true;
+        data: {
+            owner: string;
+            repo: string;
+            branch: string;
+            path: string;
+            strategy: unknown;
+            sourceType: unknown;
+        };
+    };
+    parse(input: unknown): {
+        owner: string;
+        repo: string;
+        branch: string;
+        path: string;
+        strategy: unknown;
+        sourceType: unknown;
+    };
+};
+export type GithubConfig = zInfer<typeof GithubConfigSchema>;
 /** 完整配置 Schema（用于导入导出） */
-export declare const FullConfigSchema: z.ZodObject<{
-    version: z.ZodLiteral<1>;
-    exportedAt: z.ZodString;
-    token: z.ZodOptional<z.ZodString>;
-    userId: z.ZodOptional<z.ZodString>;
-    githubConfig: z.ZodOptional<z.ZodObject<{
-        owner: z.ZodString;
-        repo: z.ZodString;
-        branch: z.ZodString;
-        path: z.ZodString;
-        strategy: z.ZodDefault<z.ZodOptional<z.ZodEnum<{
-            "add-update": "add-update";
-            "add-only": "add-only";
-            "update-only": "update-only";
-            mirror: "mirror";
-            "force-overwrite": "force-overwrite";
-        }>>>;
-        sourceType: z.ZodDefault<z.ZodOptional<z.ZodEnum<{
-            github: "github";
-            gitlab: "gitlab";
-            gitee: "gitee";
-            local: "local";
-            gist: "gist";
-        }>>>;
-    }, z.core.$strip>>;
-}, z.core.$strip>;
-export type FullConfig = z.infer<typeof FullConfigSchema>;
+export declare const FullConfigSchema: {
+    [k: string]: any;
+    readonly __isZodLite: true;
+    readonly _shape: Record<string, import("../tools/zodCompat.js").ZodSchema<any>>;
+    readonly _passthrough: boolean;
+    passthrough(): /*elided*/ any;
+    strict(): /*elided*/ any;
+    optional(): import("../tools/zodCompat.js").ZodSchema<{
+        version: 1;
+        exportedAt: string;
+        token: string | undefined;
+        userId: string | undefined;
+        githubConfig: {
+            owner: string;
+            repo: string;
+            branch: string;
+            path: string;
+            strategy: unknown;
+            sourceType: unknown;
+        } | undefined;
+    } | undefined>;
+    default(d: any): any;
+    safeParse(input: unknown): {
+        success: false;
+        error: {
+            issues: {
+                message: string;
+                path?: Array<string | number>;
+            }[];
+        };
+    } | {
+        success: true;
+        data: {
+            version: 1;
+            exportedAt: string;
+            token: string | undefined;
+            userId: string | undefined;
+            githubConfig: {
+                owner: string;
+                repo: string;
+                branch: string;
+                path: string;
+                strategy: unknown;
+                sourceType: unknown;
+            } | undefined;
+        };
+    };
+    parse(input: unknown): {
+        version: 1;
+        exportedAt: string;
+        token: string | undefined;
+        userId: string | undefined;
+        githubConfig: {
+            owner: string;
+            repo: string;
+            branch: string;
+            path: string;
+            strategy: unknown;
+            sourceType: unknown;
+        } | undefined;
+    };
+};
+export type FullConfig = zInfer<typeof FullConfigSchema>;
 //# sourceMappingURL=pluginStorage.d.ts.map

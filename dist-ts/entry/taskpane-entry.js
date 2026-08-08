@@ -31,3 +31,4 @@ export function startTaskpane() {
 if (typeof window !== 'undefined' && window.location.pathname.includes('taskpane.html')) {
     startTaskpane();
 }
+//# sourceMappingURL=taskpane-entry.js.map
