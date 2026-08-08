@@ -1,4 +1,4 @@
-import { z } from 'zod'
+import { z, type infer as zInfer } from '../tools/zodCompat.js'
 
 /** Bangumi 收藏条目 Schema（subject 信息） */
 export const BgmCollectionSubjectSchema = z.object({
@@ -30,5 +30,5 @@ export const BgmCollectionSchema = z.object({
   ep_status: z.number().int().optional(),
 })
 
-export type BgmCollection = z.infer<typeof BgmCollectionSchema>
-export type BgmCollectionSubject = z.infer<typeof BgmCollectionSubjectSchema>
+export type BgmCollection = zInfer<typeof BgmCollectionSchema>
+export type BgmCollectionSubject = zInfer<typeof BgmCollectionSubjectSchema>

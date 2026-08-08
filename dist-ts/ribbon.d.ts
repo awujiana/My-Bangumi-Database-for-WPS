@@ -74,7 +74,11 @@ export declare function OnAction(control: {
     Id: string;
 }): boolean;
 /**
- * 获取按钮图标（占位函数，实际图标由 CSS 或图片提供）
+ * 获取按钮图标：返回绝对 HTTP URL（WPS getImage 回调会将 URL 转成 IPictureDisp）。
+ *
+ * 注意：WPS Ribbon 回调的 JS 上下文不在浏览器页面内，相对路径基准是 WPS 安装目录。
+ * 因此必须使用绝对 HTTP URL，WPS 才能通过本地调试服务器（127.0.0.1:3889）下载 SVG 并显示。
+ * 若 URL 不可达，则自动跳过图标渲染（按钮文本仍可见）。
  */
 export declare function GetBangumiImage(control: {
     Id: string;

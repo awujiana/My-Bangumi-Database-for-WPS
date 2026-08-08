@@ -1,4 +1,4 @@
-import { z } from 'zod';
+import { z } from '../tools/zodCompat.js';
 /** 同步策略 Schema */
 export const SyncStrategySchema = z.enum([
     'add-update',
@@ -22,5 +22,4 @@ export const FullConfigSchema = z.object({
     exportedAt: z.string(),
     token: z.string().optional(),
     userId: z.string().optional(),
-    githubConfig: GithubConfigSchema.optional(),
-});
+    githubConfig: GithubConfigSchem

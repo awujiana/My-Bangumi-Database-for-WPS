@@ -1,4 +1,4 @@
-import { z } from 'zod'
+import { z, type infer as zInfer } from '../tools/zodCompat.js'
 
 /**
  * GitHub 同步条目 Schema（与 GithubRemoteEntry 接口保持一致）
@@ -24,4 +24,4 @@ export const GithubEntrySchema = z
   })
   .passthrough()
 
-export type GithubEntry = z.infer<typeof GithubEntrySchema>
+export type GithubEntry = zInfer<typeof GithubEntrySchema>

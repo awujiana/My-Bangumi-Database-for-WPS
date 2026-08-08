@@ -4,9 +4,9 @@
  * @description 支持异步请求、进度回调、自动重试、限流处理
  */
 
-import type { ZodSchema } from 'zod'
-
 import { Result, BgmError, BGM_CONFIG, LOG_LEVELS, bgmLog, BGM } from '../index.js'
+
+import type { ZodSchema } from './zodCompat.js'
 
 export type HttpMethod = 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH'
 export type SyncProgressCallback = (current: number, total: number, message: string) => void

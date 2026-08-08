@@ -1,4 +1,4 @@
-import { z } from 'zod'
+import { z, type infer as zInfer } from '../tools/zodCompat.js'
 
 /** 同步策略 Schema */
 export const SyncStrategySchema = z.enum([
@@ -8,7 +8,7 @@ export const SyncStrategySchema = z.enum([
   'mirror',
   'force-overwrite',
 ])
-export type SyncStrategy = z.infer<typeof SyncStrategySchema>
+export type SyncStrategy = zInfer<typeof SyncStrategySchema>
 
 /** GitHub 同步配置 Schema */
 export const GithubConfigSchema = z.object({
@@ -20,7 +20,7 @@ export const GithubConfigSchema = z.object({
   sourceType: z.enum(['github', 'gitlab', 'gitee', 'local', 'gist']).optional().default('github'),
 })
 
-export type GithubConfig = z.infer<typeof GithubConfigSchema>
+export type GithubConfig = zInfer<typeof GithubConfigSchema>
 
 /** 完整配置 Schema（用于导入导出） */
 export const FullConfigSchema = z.object({
@@ -30,4 +30,4 @@ export const FullConfigSchema = z.object({
   userId: z.string().optional(),
   githubConfig: GithubConfigSchema.optional(),
 })
-export type FullConfig = z.infer<typeof FullConfigSchema>
+export type FullConfig = zInfer<typeof FullConfigSchema>
