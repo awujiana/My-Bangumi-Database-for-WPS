@@ -54,4 +54,3 @@ export function clearDebounceTimer(fn) {
     // 这是一个简单的清理辅助，实际清理需要在调用点保存 timerId
     void fn;
 }
-//# sourceMappingURL=debounce.js.map

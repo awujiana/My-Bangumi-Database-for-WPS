@@ -220,4 +220,3 @@ function createConflictModal(conflicts, onComplete) {
     };
     return modal;
 }
-//# sourceMappingURL=conflictResolver.js.map

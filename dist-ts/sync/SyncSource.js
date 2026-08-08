@@ -10,4 +10,3 @@
  * - 通过统一校验接口让配置错误在调用前暴露
  */
 export {};
-//# sourceMappingURL=SyncSource.js.map

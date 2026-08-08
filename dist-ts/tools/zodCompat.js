@@ -27,14 +27,52 @@ function fail(msg, path) {
 //  No-op Fluent 注入
 // ============================================================
 const NOOP_FLUENTS = [
-    'int', 'integer', 'positive', 'negative', 'nonnegative', 'nonpositive',
-    'min', 'max', 'gt', 'lt', 'gte', 'lte',
-    'length', 'email', 'url', 'uuid', 'cuid', 'regex', 'startsWith', 'endsWith',
-    'trim', 'datetime', 'date', 'time', 'ip',
-    'array', 'passthrough', 'strip', 'strict',
-    'safe', 'brand', 'transform', 'pipe', 'or', 'and', 'refine', 'superRefine',
-    'describe', 'catch', 'nullable', 'nullish', 'coerce', 'finite',
-    'nonempty', 'nonmax', 'nonmin',
+    'int',
+    'integer',
+    'positive',
+    'negative',
+    'nonnegative',
+    'nonpositive',
+    'min',
+    'max',
+    'gt',
+    'lt',
+    'gte',
+    'lte',
+    'length',
+    'email',
+    'url',
+    'uuid',
+    'cuid',
+    'regex',
+    'startsWith',
+    'endsWith',
+    'trim',
+    'datetime',
+    'date',
+    'time',
+    'ip',
+    'array',
+    'passthrough',
+    'strip',
+    'strict',
+    'safe',
+    'brand',
+    'transform',
+    'pipe',
+    'or',
+    'and',
+    'refine',
+    'superRefine',
+    'describe',
+    'catch',
+    'nullable',
+    'nullish',
+    'coerce',
+    'finite',
+    'nonempty',
+    'nonmax',
+    'nonmin',
 ];
 /** 在 target 对象的同一实例上挂 noop fluent，返回 any 规避严格检查 */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -62,12 +100,22 @@ class LiteString {
         this._min = min;
         this._max = max;
     }
-    min(n) { return flu(new LiteString(n, this._max)); }
-    max(n) { return flu(new LiteString(this._min, n)); }
-    length(n) { return flu(new LiteString(n, n)); }
-    optional() { return flu(new LiteOptional(this)); }
+    min(n) {
+        return flu(new LiteString(n, this._max));
+    }
+    max(n) {
+        return flu(new LiteString(this._min, n));
+    }
+    length(n) {
+        return flu(new LiteString(n, n));
+    }
+    optional() {
+        return flu(new LiteOptional(this));
+    }
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    default(d) { return flu(new LiteWithDefault(this, d)); }
+    default(d) {
+        return flu(new LiteWithDefault(this, d));
+    }
     safeParse(input) {
         if (typeof input !== 'string')
             return fail('expected string');
@@ -92,11 +140,19 @@ class LiteNumber {
         this._min = min;
         this._max = max;
     }
-    min(n) { return flu(new LiteNumber(Math.max(this._min, n), this._max)); }
-    max(n) { return flu(new LiteNumber(this._min, Math.min(this._max, n))); }
-    optional() { return flu(new LiteOptional(this)); }
+    min(n) {
+        return flu(new LiteNumber(Math.max(this._min, n), this._max));
+    }
+    max(n) {
+        return flu(new LiteNumber(this._min, Math.min(this._max, n)));
+    }
+    optional() {
+        return flu(new LiteOptional(this));
+    }
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    default(d) { return flu(new LiteWithDefault(this, d)); }
+    default(d) {
+        return flu(new LiteWithDefault(this, d));
+    }
     safeParse(input) {
         if (typeof input === 'bigint')
             return fail('unexpected bigint');
@@ -117,9 +173,13 @@ class LiteNumber {
 }
 class LiteBoolean {
     __isZodLite = true;
-    optional() { return flu(new LiteOptional(this)); }
+    optional() {
+        return flu(new LiteOptional(this));
+    }
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    default(d) { return flu(new LiteWithDefault(this, d)); }
+    default(d) {
+        return flu(new LiteWithDefault(this, d));
+    }
     safeParse(input) {
         if (typeof input === 'boolean')
             return ok(input);
@@ -135,10 +195,16 @@ class LiteBoolean {
 class LiteLiteral {
     __isZodLite = true;
     /** @internal */ _val;
-    constructor(val) { this._val = val; }
-    optional() { return flu(new LiteOptional(this)); }
+    constructor(val) {
+        this._val = val;
+    }
+    optional() {
+        return flu(new LiteOptional(this));
+    }
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    default(d) { return flu(new LiteWithDefault(this, d)); }
+    default(d) {
+        return flu(new LiteWithDefault(this, d));
+    }
     safeParse(input) {
         if (input === this._val)
             return ok(this._val);
@@ -154,10 +220,16 @@ class LiteLiteral {
 class LiteEnum {
     __isZodLite = true;
     /** @internal */ _vals;
-    constructor(vals) { this._vals = vals; }
-    optional() { return flu(new LiteOptional(this)); }
+    constructor(vals) {
+        this._vals = vals;
+    }
+    optional() {
+        return flu(new LiteOptional(this));
+    }
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    default(d) { return flu(new LiteWithDefault(this, d)); }
+    default(d) {
+        return flu(new LiteWithDefault(this, d));
+    }
     safeParse(input) {
         if (typeof input !== 'string')
             return fail('enum value must be string');
@@ -179,10 +251,16 @@ class LiteArray {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     _item;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    constructor(item) { this._item = item; }
-    optional() { return flu(new LiteOptional(this)); }
+    constructor(item) {
+        this._item = item;
+    }
+    optional() {
+        return flu(new LiteOptional(this));
+    }
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    default(d) { return flu(new LiteWithDefault(this, d)); }
+    default(d) {
+        return flu(new LiteWithDefault(this, d));
+    }
     safeParse(input) {
         if (!Array.isArray(input))
             return fail('expected array');
@@ -218,11 +296,19 @@ class LiteObject {
         this._shape = shape;
         this._passthrough = passthrough;
     }
-    passthrough() { return flu(new LiteObject(this._shape, true)); }
-    strict() { return flu(new LiteObject(this._shape, false)); }
-    optional() { return flu(new LiteOptional(this)); }
+    passthrough() {
+        return flu(new LiteObject(this._shape, true));
+    }
+    strict() {
+        return flu(new LiteObject(this._shape, false));
+    }
+    optional() {
+        return flu(new LiteOptional(this));
+    }
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    default(d) { return flu(new LiteWithDefault(this, d)); }
+    default(d) {
+        return flu(new LiteWithDefault(this, d));
+    }
     safeParse(input) {
         if (typeof input !== 'object' || input === null || Array.isArray(input))
             return fail('expected object');
@@ -240,7 +326,10 @@ class LiteObject {
             const r = schema.safeParse(rawVal);
             if (!r.success) {
                 const issue = r.error.issues[0];
-                return fail(`key "${key}": ${issue?.message ?? 'invalid'}`, [key, ...(issue?.path ?? [])]);
+                return fail(`key "${key}": ${issue?.message ?? 'invalid'}`, [
+                    key,
+                    ...(issue?.path ?? []),
+                ]);
             }
             if (r.data !== undefined || has)
                 out[key] = r.data;
@@ -260,12 +349,22 @@ class LiteOptional {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     _inner;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    constructor(inner) { this._inner = inner; }
-    optional() { return this; }
-    nullable() { return flu(new LiteNullable(this._inner, true, true)); }
-    nullish() { return flu(new LiteNullable(this._inner, true, true)); }
+    constructor(inner) {
+        this._inner = inner;
+    }
+    optional() {
+        return this;
+    }
+    nullable() {
+        return flu(new LiteNullable(this._inner, true, true));
+    }
+    nullish() {
+        return flu(new LiteNullable(this._inner, true, true));
+    }
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    default(d) { return flu(new LiteWithDefault(this, d)); }
+    default(d) {
+        return flu(new LiteWithDefault(this, d));
+    }
     safeParse(input) {
         if (input === undefined)
             return ok(undefined);
@@ -292,9 +391,13 @@ class LiteNullable {
         this._allowNull = allowNull;
         this._allowUndefined = allowUndefined;
     }
-    optional() { return flu(new LiteNullable(this._inner, this._allowNull, true)); }
+    optional() {
+        return flu(new LiteNullable(this._inner, this._allowNull, true));
+    }
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    default(d) { return flu(new LiteWithDefault(this, d)); }
+    default(d) {
+        return flu(new LiteWithDefault(this, d));
+    }
     safeParse(input) {
         if (this._allowUndefined && input === undefined)
             return ok(undefined);
@@ -333,7 +436,7 @@ class LiteWithDefault {
             return ok(this._def);
         const r = this._inner.safeParse(input);
         if (!r.success)
-            return fail((r.error.issues[0]?.message ?? 'invalid'));
+            return fail(r.error.issues[0]?.message ?? 'invalid');
         return r;
     }
     parse(input) {
@@ -365,4 +468,3 @@ function resolveZod() {
     return LiteZodImpl;
 }
 export const z = resolveZod();
-//# sourceMappingURL=zodCompat.js.map

@@ -34,7 +34,8 @@ function isDebugEnvironment() {
 // ========== 状态读取 ==========
 /** 从 window.__BGM_MODULE_STATUS__ 读取模块加载状态 */
 function getModuleStatuses() {
-    const raw = window.__BGM_MODULE_STATUS__;
+    const raw = window
+        .__BGM_MODULE_STATUS__;
     return raw ?? [];
 }
 /** 动态加载 logger 模块并获取引用 */
@@ -329,9 +330,9 @@ function buildHeaderHTML() {
   `;
 }
 function buildStatusBarHTML(modules) {
-    const loaded = modules.filter(m => m.loaded).length;
-    const failed = modules.filter(m => !m.loaded);
-    const failedCritical = failed.filter(m => m.critical);
+    const loaded = modules.filter((m) => m.loaded).length;
+    const failed = modules.filter((m) => !m.loaded);
+    const failedCritical = failed.filter((m) => m.critical);
     const ribbonReady = typeof window._bgmRibbonReady === 'function';
     const badges = [];
     badges.push(`<span class="bgm-dp-badge ${ribbonReady ? 'bgm-dp-badge-ok' : 'bgm-dp-badge-err'}">${ribbonReady ? '● Ribbon 就绪' : '○ Ribbon 未就绪'}</span>`);
@@ -403,43 +404,63 @@ function buildEnvPanelHTML() {
         { label: '页面 URL', value: w.location.href, cls: '' },
         {
             label: 'WpsInvoke',
-            value: typeof w.WpsInvoke === 'undefined' ? 'undefined (开发模式)' : 'available',
-            cls: typeof w.WpsInvoke === 'undefined' ? 'bgm-dp-env-value-warn' : 'bgm-dp-env-value-ok',
+            value: typeof w.WpsInvoke === 'undefined'
+                ? 'undefined (开发模式)'
+                : 'available',
+            cls: typeof w.WpsInvoke === 'undefined'
+                ? 'bgm-dp-env-value-warn'
+                : 'bgm-dp-env-value-ok',
         },
         {
             label: 'Ribbon 就绪 (_ribbonReady)',
             value: String(w._ribbonReady ?? false),
-            cls: w._ribbonReady ? 'bgm-dp-env-value-ok' : 'bgm-dp-env-value-err',
+            cls: w._ribbonReady
+                ? 'bgm-dp-env-value-ok'
+                : 'bgm-dp-env-value-err',
         },
         {
             label: 'OnAddinLoad',
             value: typeof w.OnAddinLoad,
-            cls: typeof w.OnAddinLoad === 'function' ? 'bgm-dp-env-value-ok' : 'bgm-dp-env-value-err',
+            cls: typeof w.OnAddinLoad === 'function'
+                ? 'bgm-dp-env-value-ok'
+                : 'bgm-dp-env-value-err',
         },
         {
             label: 'OnAction',
             value: typeof w.OnAction,
-            cls: typeof w.OnAction === 'function' ? 'bgm-dp-env-value-ok' : 'bgm-dp-env-value-err',
+            cls: typeof w.OnAction === 'function'
+                ? 'bgm-dp-env-value-ok'
+                : 'bgm-dp-env-value-err',
         },
         {
             label: 'GetBangumiImage',
             value: typeof w.GetBangumiImage,
-            cls: typeof w.GetBangumiImage === 'function' ? 'bgm-dp-env-value-ok' : 'bgm-dp-env-value-err',
+            cls: typeof w.GetBangumiImage === 'function'
+                ? 'bgm-dp-env-value-ok'
+                : 'bgm-dp-env-value-err',
         },
         {
             label: 'GetIncrementalSyncPressed',
-            value: typeof w.GetIncrementalSyncPressed,
-            cls: typeof w.GetIncrementalSyncPressed === 'function' ? 'bgm-dp-env-value-ok' : 'bgm-dp-env-value-err',
+            value: typeof w
+                .GetIncrementalSyncPressed,
+            cls: typeof w
+                .GetIncrementalSyncPressed === 'function'
+                ? 'bgm-dp-env-value-ok'
+                : 'bgm-dp-env-value-err',
         },
         {
             label: 'DOMPurify (window)',
             value: typeof w.DOMPurify,
-            cls: typeof w.DOMPurify === 'object' ? 'bgm-dp-env-value-ok' : 'bgm-dp-env-value-warn',
+            cls: typeof w.DOMPurify === 'object'
+                ? 'bgm-dp-env-value-ok'
+                : 'bgm-dp-env-value-warn',
         },
         {
             label: 'Zod (window.z)',
             value: typeof w.z,
-            cls: typeof w.z === 'object' ? 'bgm-dp-env-value-ok' : 'bgm-dp-env-value-warn',
+            cls: typeof w.z === 'object'
+                ? 'bgm-dp-env-value-ok'
+                : 'bgm-dp-env-value-warn',
         },
     ];
     const cards = envItems
@@ -678,7 +699,9 @@ function exportDiagnosticReport() {
         zod: typeof w.z,
         moduleStatuses: modules,
     };
-    const blob = new Blob([JSON.stringify(report, null, 2)], { type: 'application/json;charset=utf-8' });
+    const blob = new Blob([JSON.stringify(report, null, 2)], {
+        type: 'application/json;charset=utf-8',
+    });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
@@ -771,7 +794,7 @@ export function initDebugPanel() {
     // 定期刷新状态栏（每 3 秒，反映模块加载进度）
     const statusInterval = setInterval(() => {
         const newModules = getModuleStatuses();
-        const loaded = newModules.filter(m => m.loaded).length;
+        const loaded = newModules.filter((m) => m.loaded).length;
         const allLoaded = loaded === newModules.length && newModules.length > 0;
         if (allLoaded) {
             clearInterval(statusInterval);
@@ -797,4 +820,3 @@ if (typeof document !== 'undefined') {
         initDebugPanel();
     }
 }
-//# sourceMappingURL=debugPanel.js.map

@@ -112,4 +112,3 @@ registerSyncSource('gitlab', () => new GitlabSyncSource());
 registerSyncSource('gitee', () => new GiteeSyncSource());
 registerSyncSource('local', () => new LocalFileSyncSource());
 registerSyncSource('gist', () => new GistSyncSource());
-//# sourceMappingURL=syncSourceRegistry.js.map

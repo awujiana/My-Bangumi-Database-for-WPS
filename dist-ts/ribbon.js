@@ -266,4 +266,3 @@ ribbonWindow.OnIncrementalSyncChange = OnIncrementalSyncChange;
 ribbonWindow.OnSkipConflictsChange = OnSkipConflictsChange;
 ribbonWindow.GetEnableSyncRecordPressed = GetEnableSyncRecordPressed;
 ribbonWindow.OnEnableSyncRecordChange = OnEnableSyncRecordChange;
-//# sourceMappingURL=ribbon.js.map

@@ -271,4 +271,3 @@ export const httpPut = (endpoint, body, token) => httpRequest(endpoint, { method
  * DELETE 请求
  */
 export const httpDelete = (endpoint, token) => httpRequest(endpoint, { method: 'DELETE', ...(token !== undefined && { token }) });
-//# sourceMappingURL=http.js.map

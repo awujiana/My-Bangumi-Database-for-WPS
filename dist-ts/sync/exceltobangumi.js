@@ -11,4 +11,3 @@
  *   - exceltobangumi/index.ts：核心同步流程（常量、辅助函数、getFilterStatus、SyncToBangumiAsync、syncSelectedRows 等）
  */
 export * from './exceltobangumi/index.js';
-//# sourceMappingURL=exceltobangumi.js.map

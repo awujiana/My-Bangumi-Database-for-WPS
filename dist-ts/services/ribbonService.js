@@ -580,4 +580,3 @@ export async function undoLastSyncForRibbon() {
         await wpsMsgBox(`撤销失败：${errMsg}`, 0, 16);
     }
 }
-//# sourceMappingURL=ribbonService.js.map

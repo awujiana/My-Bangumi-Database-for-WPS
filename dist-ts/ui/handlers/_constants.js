@@ -41,4 +41,3 @@ export const _T = {
     marksToSheet: '\u5DF2\u6807\u8BB0 ',
     marksToSheetSuffix: ' \u6761\u6536\u85CF\u5230 ',
 };
-//# sourceMappingURL=_constants.js.map

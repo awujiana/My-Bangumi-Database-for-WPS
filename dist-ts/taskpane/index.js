@@ -141,4 +141,3 @@ export function initTaskpane() {
         window.addEventListener('load', safeInitPanel);
     }
 }
-//# sourceMappingURL=index.js.map

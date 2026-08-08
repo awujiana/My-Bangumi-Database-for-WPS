@@ -130,4 +130,3 @@ export function getSheetByIndex(sheetIndex) {
         return null;
     return sheets.Item(sheetIndex);
 }
-//# sourceMappingURL=cell.js.map

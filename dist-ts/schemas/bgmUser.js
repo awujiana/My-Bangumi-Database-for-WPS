@@ -12,4 +12,3 @@ export const BgmUserSchema = z.object({
     })
         .optional(),
 });
-//# sourceMappingURL=bgmUser.js.map

@@ -273,4 +273,3 @@ export function setGistId(id) {
 export function isGistConfigured() {
     return getGistId().length > 0;
 }
-//# sourceMappingURL=githubConfig.js.map

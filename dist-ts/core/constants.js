@@ -636,4 +636,3 @@ export const SYNC_RECORD_TYPE_COLOR = {
     搁置: BGM_COLOR.SKIP,
     抛弃: BGM_COLOR.FAIL,
 };
-//# sourceMappingURL=constants.js.map
