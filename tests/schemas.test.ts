@@ -117,17 +117,13 @@ describe('GithubEntrySchema', () => {
   it('合法条目通过', () => {
     const valid = {
       sid: '265',
-      url: 'https://bgm.tv/subject/265',
       name: 'Chobits',
-      type: 2,
-      tags: ['sci-fi'],
-      episode: 26,
       updatedAt: '2024-01-01T00:00:00Z',
     }
     const parsed = GithubEntrySchema.parse(valid)
     expect(parsed.sid).toBe('265')
-    expect(parsed.type).toBe(2)
-    expect(parsed.tags).toEqual(['sci-fi'])
+    expect(parsed.name).toBe('Chobits')
+    expect(parsed.updatedAt).toBe('2024-01-01T00:00:00Z')
   })
 
   it('sid 为空字符串抛错', () => {
@@ -144,43 +140,13 @@ describe('GithubEntrySchema', () => {
     expect(() => GithubEntrySchema.parse(invalid)).toThrow()
   })
 
-  it('type=6 合法通过（Bangumi 三次元类别）', () => {
-    const valid = {
-      sid: '265',
-      type: 6,
-    }
-    const parsed = GithubEntrySchema.parse(valid)
-    expect(parsed.type).toBe(6)
-  })
-
-  it('type=0 抛错（不在 1-6 范围）', () => {
-    const invalid = {
-      sid: '265',
-      type: 0,
-    }
-    expect(() => GithubEntrySchema.parse(invalid)).toThrow()
-  })
-
-  it('type=7 抛错（超出 1-6 范围）', () => {
-    const invalid = {
-      sid: '265',
-      type: 7,
-    }
-    expect(() => GithubEntrySchema.parse(invalid)).toThrow()
-  })
-
   it('扩展字段通过 passthrough 保留', () => {
     const valid = {
       sid: '265',
-      url: 'https://bgm.tv/subject/265',
       name: 'Chobits',
-      type: 2,
-      tags: ['sci-fi'],
-      episode: 26,
       updatedAt: '2024-01-01T00:00:00Z',
       // 扩展字段
       date: '2002-04-08',
-      platform: 2,
       meta_tags: ['科幻'],
       nsfw: false,
       播放结束: '2002-09-30',

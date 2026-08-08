@@ -5,12 +5,13 @@
  *              增量更新（新增+更新，不删除本地多余行）。
  *
  * 数据格式（远程 JSONL 文件，每行一个 JSON 对象）：
- *   { "sid": "12345", "url": "https://bgm.tv/subject/12345", "name": "...",
- *     "type": 2, "tags": ["标签1","标签2"],
- *     "episode": 12, "updatedAt": "2026-07-05T10:00:00Z" }
+ *   { "sid": "12345", "name": "...", "updatedAt": "2026-07-21",
+ *     "date": "2024-01-01", "meta_tags": ["标签1","标签2"], "nsfw": false,
+ *     "话数": "12", "播放结束": "...", "动画制作公司": "...", ... }
  *
- * type 字段为 Bangumi 条目类别（不是观看状态）：
- *   1=书籍  2=动漫  3=音乐  4=游戏  6=三次元
+ * url 字段从 sid 构造：https://bgm.tv/subject/{sid}
+ * type 字段默认为 2（动漫），用于同步记录显示。
+ * updatedAt 为 YYYY-MM-DD 格式（仅日期，不含时间，节省空间）。
  */
 
 // 直接从子模块导入，避开 index.ts 的副作用链（index → handlers → document.readyState）
@@ -351,27 +352,23 @@ function writeRemoteEntryToRow(
 
   const writeAll = fieldsToWrite.includes('*')
 
-  // URL
+  // URL（从 sid 构造）
   if (writeAll || fieldsToWrite.includes('Bangumi_URL')) {
-    safeSet('Bangumi_URL', remote.url ?? '')
+    safeSet('Bangumi_URL', `https://bgm.tv/subject/${remote.sid}`)
   }
   // 名称
   if (writeAll || fieldsToWrite.includes('名称')) {
     safeSet('名称', remote.name ?? '')
   }
-  // 标签（优先使用 meta_tags，回退到 tags）
+  // 标签（使用 meta_tags）
   if (writeAll || fieldsToWrite.includes('标签/分级')) {
-    safeSet('标签/分级', tagsToString(remote.meta_tags ?? remote.tags))
+    safeSet('标签/分级', tagsToString(remote.meta_tags))
   }
-  // 集数（优先使用 infobox 的「话数」，回退到 episode；
-  //   episode=0 视为"未看"，写入空字符串，避免覆盖本地实际集数）
+  // 集数（使用 infobox 的「话数」）
   if (writeAll || fieldsToWrite.includes('集数')) {
-    const episodeValue =
-      remote['话数'] ??
-      (remote.episode !== undefined && remote.episode !== 0 ? String(remote.episode) : '')
-    safeSet('集数', episodeValue)
+    safeSet('集数', remote['话数'] ?? '')
   }
-  // 扩展字段（EXTENDED_FIELD_MAP 中定义的 20 个字段）
+  // 扩展字段（EXTENDED_FIELD_MAP 中定义的 19 个字段）
   for (const [jsonlField, excelField] of EXTENDED_FIELD_MAP) {
     if (writeAll || fieldsToWrite.includes(excelField)) {
       const value = remote[jsonlField as keyof GithubRemoteEntry]
@@ -446,8 +443,8 @@ export function applyDiffToSheet(
         syncRecords.push({
           sid: diff.sid,
           name: diff.remote.name ?? '',
-          url: diff.remote.url ?? '',
-          type: BGM_SUBJECT_TYPES[diff.remote.type ?? 2] ?? '',
+          url: `https://bgm.tv/subject/${diff.sid}`,
+          type: BGM_SUBJECT_TYPES[2] ?? '',
           source,
           content: '仓库同步-新增',
           status: '成功',
@@ -468,8 +465,8 @@ export function applyDiffToSheet(
         syncRecords.push({
           sid: diff.sid,
           name: diff.remote.name ?? '',
-          url: diff.remote.url ?? '',
-          type: BGM_SUBJECT_TYPES[diff.remote.type ?? 2] ?? '',
+          url: `https://bgm.tv/subject/${diff.sid}`,
+          type: BGM_SUBJECT_TYPES[2] ?? '',
           source,
           content: '仓库同步-更新',
           status: '成功',

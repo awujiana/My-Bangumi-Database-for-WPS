@@ -14,7 +14,7 @@ import {
 
 describe('computeDiff', () => {
   it('远程有本地无 → 标记为 add', () => {
-    const remote: GithubRemoteEntry[] = [{ sid: '111', name: '条目A', type: 3 }]
+    const remote: GithubRemoteEntry[] = [{ sid: '111', name: '条目A' }]
     const local = new Map<string, LocalRowEntry>()
     const diffs = computeDiff(remote, local)
     expect(diffs).toHaveLength(1)
@@ -24,7 +24,7 @@ describe('computeDiff', () => {
   })
 
   it('远程与本地完全一致 → 无差异', () => {
-    const remote: GithubRemoteEntry[] = [{ sid: '222', name: '相同名称', type: 3 }]
+    const remote: GithubRemoteEntry[] = [{ sid: '222', name: '相同名称' }]
     const local = new Map<string, LocalRowEntry>([
       [
         '222',
@@ -43,7 +43,7 @@ describe('computeDiff', () => {
   })
 
   it('名称变更 → 标记为 update，仅含名称字段', () => {
-    const remote: GithubRemoteEntry[] = [{ sid: '333', name: '新名称', type: 3 }]
+    const remote: GithubRemoteEntry[] = [{ sid: '333', name: '新名称' }]
     const local = new Map<string, LocalRowEntry>([
       [
         '333',
@@ -65,9 +65,7 @@ describe('computeDiff', () => {
   })
 
   it('多个字段变更 → 全部列入 changedFields', () => {
-    const remote: GithubRemoteEntry[] = [
-      { sid: '444', name: '新名', type: 2, tags: ['Tag1', 'Tag2'] },
-    ]
+    const remote: GithubRemoteEntry[] = [{ sid: '444', name: '新名', meta_tags: ['Tag1', 'Tag2'] }]
     const local = new Map<string, LocalRowEntry>([
       [
         '444',
@@ -88,7 +86,7 @@ describe('computeDiff', () => {
   })
 
   it('远程字段为空 → 不视为差异（保留本地）', () => {
-    const remote: GithubRemoteEntry[] = [{ sid: '555', name: undefined, type: undefined }]
+    const remote: GithubRemoteEntry[] = [{ sid: '555', name: undefined }]
     const local = new Map<string, LocalRowEntry>([
       [
         '555',
@@ -106,8 +104,8 @@ describe('computeDiff', () => {
     expect(diffs).toHaveLength(0)
   })
 
-  it('type 为条目类别，不映射为观看状态，不产生差异', () => {
-    const remote: GithubRemoteEntry[] = [{ sid: '666', type: 2 }]
+  it('仅含 sid 时无字段可比对，不产生差异', () => {
+    const remote: GithubRemoteEntry[] = [{ sid: '666' }]
     const local = new Map<string, LocalRowEntry>([
       [
         '666',
@@ -121,7 +119,7 @@ describe('computeDiff', () => {
       ],
     ])
     const diffs = computeDiff(remote, local)
-    // type 是条目类别（2=动漫），不是观看状态，不应影响「是否看完」比对
+    // 仅含 sid，无 name/meta_tags/话数 等可比对字段 → 无差异
     expect(diffs).toHaveLength(0)
   })
 })
@@ -131,9 +129,9 @@ describe('computeDiff', () => {
 describe('computeDiff 策略修饰', () => {
   // 公共测试数据：远程 3 条（sid=1 新增，sid=2 需更新，sid=3 无变化），本地 3 条（sid=2、3、4，sid=4 远程不存在）
   const remote: GithubRemoteEntry[] = [
-    { sid: '1', name: '远程新增', type: 2 },
-    { sid: '2', name: '远程改名', type: 3 }, // 本地 sid=2 名称不同
-    { sid: '3', name: '一致', type: 3 }, // 本地 sid=3 完全一致
+    { sid: '1', name: '远程新增' },
+    { sid: '2', name: '远程改名' }, // 本地 sid=2 名称不同
+    { sid: '3', name: '一致' }, // 本地 sid=3 完全一致
   ]
   const local = new Map<string, LocalRowEntry>([
     ['2', { row: 10, sid: '2', fields: { 名称: '本地名', 是否看完: '在看' } }],
@@ -216,14 +214,14 @@ describe('computeDiff 策略修饰', () => {
 
   it('策略 mirror 在远程=本地时无 delete', () => {
     // 远程与本地完全一致（SID 集合相同）
-    const r: GithubRemoteEntry[] = [{ sid: '1', name: 'A', type: 2 }]
+    const r: GithubRemoteEntry[] = [{ sid: '1', name: 'A' }]
     const l = new Map<string, LocalRowEntry>([
       ['1', { row: 5, sid: '1', fields: { 名称: 'A', 是否看完: '看过' } }],
     ])
     const diffs = computeDiff(r, l, 'mirror')
     expect(diffs.filter((d) => d.kind === 'delete')).toHaveLength(0)
     expect(diffs.filter((d) => d.kind === 'add')).toHaveLength(0)
-    // type 是条目类别，不影响「是否看完」比对，名称一致 → 无 update
+    // 名称一致 → 无 update
     expect(diffs.filter((d) => d.kind === 'update')).toHaveLength(0)
   })
 })
@@ -313,18 +311,16 @@ describe('parseJsonl', () => {
 
   it('带全部字段的完整记录正确解析', () => {
     const text =
-      '{"sid":"12345","url":"https://bgm.tv/subject/12345","name":"测试","type":2,"tags":["标签1","标签2"],"episode":12,"updatedAt":"2026-07-21"}'
+      '{"sid":"12345","name":"测试","updatedAt":"2026-07-21","date":"2024-01-01","meta_tags":["标签1","标签2"],"话数":"12"}'
     const { entries, errors } = parseJsonl(text)
     expect(entries).toHaveLength(1)
     expect(errors).toHaveLength(0)
     const entry = entries[0]!
     expect(entry.sid).toBe('12345')
-    expect(entry.url).toBe('https://bgm.tv/subject/12345')
     expect(entry.name).toBe('测试')
-    expect(entry.type).toBe(2)
-    expect(entry.tags).toEqual(['标签1', '标签2'])
-    expect(entry.episode).toBe(12)
     expect(entry.updatedAt).toBe('2026-07-21')
+    expect(entry.meta_tags).toEqual(['标签1', '标签2'])
+    expect(entry['话数']).toBe('12')
   })
 })
 

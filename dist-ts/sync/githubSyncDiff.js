@@ -13,17 +13,15 @@
  * 扩展字段映射表：JSONL 字段名 → Excel 标准字段名（colMap key）
  *
  * 用于 computeDiff 比对和 writeRemoteEntryToRow 写入扩展字段。
- * 基础字段（url, name, tags, episode）有独立的处理逻辑，不在此表中。
  *
  * 特殊处理（不在此表中）：
- * - '话数' 通过 episode 逻辑处理（优先于 episode 写入「集数」列）
- * - 'meta_tags' 通过 tags 逻辑处理（优先于 tags 写入「标签/分级」列）
+ * - '话数' 写入「集数」列（有独立处理逻辑）
+ * - 'meta_tags' 写入「标签/分级」列（有独立处理逻辑）
  * - 'nsfw' 无明确 Excel 列映射，暂不处理
  */
 export const EXTENDED_FIELD_MAP = [
     ['date', '开播日期'],
     ['播放结束', '完播日'],
-    ['platform', '类别'],
     ['动画制作公司', '制作公司'],
     ['片长', '时长'],
     ['制片国家', '制片国家'],
@@ -126,9 +124,8 @@ export function parseJsonl(text) {
  * - 远程有、本地无 → add（changedFields = ['*']）
  * - 远程与本地 SID 相同 → 逐字段比对，任一字段不同则 update
  * - 远程字段为 undefined/空 → 不视为差异（保留本地值）
- * - 远程 type 为条目类别，不参与「是否看完」比对
- * - 远程 episode 转为字符串后比对
- * - 远程 tags 数组用 | 拼接后比对
+ * - 远程 meta_tags 数组用 | 拼接后比对
+ * - 远程「话数」转为字符串后比对
  *
  * 策略修饰：
  * - add-update: 基础规则（add + update，无 delete）
@@ -184,19 +181,17 @@ export function computeDiff(remoteEntries, localEntries, strategy = 'add-update'
         if (remote.name && remote.name !== local.fields['名称']) {
             changedFields.push('名称');
         }
-        // 比对标签（优先使用 meta_tags，回退到 tags）
-        const remoteTags = tagsToString(remote.meta_tags ?? remote.tags);
+        // 比对标签（使用 meta_tags）
+        const remoteTags = tagsToString(remote.meta_tags);
         if (remoteTags && remoteTags !== local.fields['标签/分级']) {
             changedFields.push('标签/分级');
         }
-        // 比对集数（优先使用 infobox 的「话数」，回退到 episode；
-        //   episode=0 视为"未看"，不触发更新，避免覆盖本地实际集数）
-        const remoteEpisodeValue = remote['话数'] ??
-            (remote.episode !== undefined && remote.episode !== 0 ? String(remote.episode) : '');
+        // 比对集数（使用 infobox 的「话数」）
+        const remoteEpisodeValue = remote['话数'] ?? '';
         if (remoteEpisodeValue && remoteEpisodeValue !== local.fields['集数']) {
             changedFields.push('集数');
         }
-        // 比对扩展字段（EXTENDED_FIELD_MAP 中定义的 20 个字段）
+        // 比对扩展字段（EXTENDED_FIELD_MAP 中定义的 19 个字段）
         for (const [jsonlField, excelField] of EXTENDED_FIELD_MAP) {
             const remoteValue = remote[jsonlField];
             if (remoteValue === undefined || remoteValue === null)

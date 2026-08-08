@@ -13,23 +13,13 @@
 export interface GithubRemoteEntry {
     /** Bangumi subject ID（主键） */
     sid: string;
-    /** Bangumi 条目 URL */
-    url?: string;
     /** 条目名称 */
     name?: string;
-    /** 条目类别（1=书籍, 2=动漫, 3=音乐, 4=游戏, 6=三次元） */
-    type?: number;
-    /** 标签数组 */
-    tags?: string[];
-    /** 看到集数 */
-    episode?: number;
     /** 远程更新时间戳 */
     updatedAt?: string;
     /** 开播日期（dump.date） */
     date?: string;
-    /** 类别（dump.platform） */
-    platform?: number;
-    /** 标签/分级（dump.meta_tags，优先于 tags 写入「标签/分级」列） */
+    /** 标签/分级（dump.meta_tags，写入「标签/分级」列） */
     meta_tags?: string[];
     /** 布尔（dump.nsfw） */
     nsfw?: boolean;
@@ -37,7 +27,7 @@ export interface GithubRemoteEntry {
     播放结束?: string;
     /** 制作公司（infobox.动画制作公司） */
     动画制作公司?: string;
-    /** 集数（infobox.话数，优先于 episode 写入「集数」列） */
+    /** 集数（infobox.话数，写入「集数」列） */
     话数?: string;
     /** 时长/分钟（infobox.片长） */
     片长?: string;
@@ -90,11 +80,10 @@ export interface ConflictResolution {
  * 扩展字段映射表：JSONL 字段名 → Excel 标准字段名（colMap key）
  *
  * 用于 computeDiff 比对和 writeRemoteEntryToRow 写入扩展字段。
- * 基础字段（url, name, tags, episode）有独立的处理逻辑，不在此表中。
  *
  * 特殊处理（不在此表中）：
- * - '话数' 通过 episode 逻辑处理（优先于 episode 写入「集数」列）
- * - 'meta_tags' 通过 tags 逻辑处理（优先于 tags 写入「标签/分级」列）
+ * - '话数' 写入「集数」列（有独立处理逻辑）
+ * - 'meta_tags' 写入「标签/分级」列（有独立处理逻辑）
  * - 'nsfw' 无明确 Excel 列映射，暂不处理
  */
 export declare const EXTENDED_FIELD_MAP: ReadonlyArray<readonly [string, string]>;
@@ -162,9 +151,8 @@ export declare function parseJsonl(text: string): {
  * - 远程有、本地无 → add（changedFields = ['*']）
  * - 远程与本地 SID 相同 → 逐字段比对，任一字段不同则 update
  * - 远程字段为 undefined/空 → 不视为差异（保留本地值）
- * - 远程 type 为条目类别，不参与「是否看完」比对
- * - 远程 episode 转为字符串后比对
- * - 远程 tags 数组用 | 拼接后比对
+ * - 远程 meta_tags 数组用 | 拼接后比对
+ * - 远程「话数」转为字符串后比对
  *
  * 策略修饰：
  * - add-update: 基础规则（add + update，无 delete）

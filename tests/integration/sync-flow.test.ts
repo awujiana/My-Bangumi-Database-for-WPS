@@ -651,17 +651,12 @@ describe('GitHub 同步流程：fetch JSONL → diff → apply → undo', () => 
       JSON.stringify({
         sid: '10001',
         name: '新条目',
-        type: 3,
-        score: 8,
-        tags: ['标签1'],
-        comment: '评论',
+        meta_tags: ['标签1'],
       }) +
       '\n' +
       JSON.stringify({
         sid: '10002',
         name: '更新名称',
-        type: 2,
-        score: 9,
       })
 
     // 2. 解析 JSONL
@@ -729,7 +724,7 @@ describe('GitHub 同步流程：fetch JSONL → diff → apply → undo', () => 
   })
 
   it('mirror 策略应删除本地多余行', () => {
-    const remote: GithubRemoteEntry[] = [{ sid: '20001', name: '保留', type: 3 }]
+    const remote: GithubRemoteEntry[] = [{ sid: '20001', name: '保留' }]
     const local = createLocalEntries([
       { row: 2, sid: '20001', fields: { 名称: '保留', 是否看完: '看过' } },
       { row: 3, sid: '20002', fields: { 名称: '应删除', 是否看完: '看过' } },
@@ -755,7 +750,7 @@ describe('GitHub 同步流程：fetch JSONL → diff → apply → undo', () => 
   })
 
   it('force-overwrite 策略应强制更新所有字段', () => {
-    const remote: GithubRemoteEntry[] = [{ sid: '30001', name: '新名', type: 2, score: 10 }]
+    const remote: GithubRemoteEntry[] = [{ sid: '30001', name: '新名' }]
     const local = createLocalEntries([
       { row: 2, sid: '30001', fields: { 名称: '旧名', 是否看完: '看过', 打分: '5' } },
     ])
@@ -771,9 +766,7 @@ describe('GitHub 同步流程：fetch JSONL → diff → apply → undo', () => 
 
   it('syncFromRemote 端到端：下载 → diff → apply', async () => {
     // 构造 mock SyncSource
-    const remoteEntries: GithubRemoteEntry[] = [
-      { sid: '40001', name: '远程条目', type: 3, score: 7 },
-    ]
+    const remoteEntries: GithubRemoteEntry[] = [{ sid: '40001', name: '远程条目' }]
     const mockSource = createMockSyncSource(remoteEntries)
     mockState.getSyncSource.mockReturnValue(mockSource)
 
@@ -836,18 +829,18 @@ describe('GitHub 同步流程：fetch JSONL → diff → apply → undo', () => 
 describe('parseJsonl 集成解析', () => {
   it('合法 JSONL 应正确解析为条目数组', () => {
     const text = [
-      JSON.stringify({ sid: '1', name: 'A', type: 3 }),
-      JSON.stringify({ sid: '2', name: 'B', type: 2, score: 8 }),
+      JSON.stringify({ sid: '1', name: 'A', meta_tags: ['标签'] }),
+      JSON.stringify({ sid: '2', name: 'B', 话数: '12' }),
       '', // 空行应跳过
-      JSON.stringify({ sid: '3', name: 'C', type: 1 }),
+      JSON.stringify({ sid: '3', name: 'C' }),
     ].join('\n')
 
     const { entries, errors } = parseJsonl(text)
     expect(entries).toHaveLength(3)
     expect(errors).toHaveLength(0)
     expect(entries[0]?.sid).toBe('1')
-    expect(entries[1]?.score).toBe(8)
-    expect(entries[2]?.type).toBe(1)
+    expect(entries[1]?.['话数']).toBe('12')
+    expect(entries[2]?.name).toBe('C')
   })
 
   it('非法行应收集到 errors 不中断解析', () => {

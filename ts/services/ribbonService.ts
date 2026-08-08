@@ -81,12 +81,11 @@ interface FieldCompareSpec {
 /** 远程字段比对表（顺序固定，便于稳定测试） */
 const GITHUB_CONFLICT_FIELDS: readonly FieldCompareSpec[] = Object.freeze([
   { localField: '名称', remoteToString: (r) => r.name ?? '' },
-  { localField: '是否看完', remoteToString: (r) => (r.type !== undefined ? String(r.type) : '') },
   {
     localField: '标签/分级',
-    remoteToString: (r) => (Array.isArray(r.tags) ? r.tags.join('|') : ''),
+    remoteToString: (r) => (Array.isArray(r.meta_tags) ? r.meta_tags.join('|') : ''),
   },
-  { localField: '集数', remoteToString: (r) => (r.episode !== undefined ? String(r.episode) : '') },
+  { localField: '集数', remoteToString: (r) => r['话数'] ?? '' },
 ])
 
 /**
@@ -95,7 +94,7 @@ const GITHUB_CONFLICT_FIELDS: readonly FieldCompareSpec[] = Object.freeze([
  * 比对规则：
  * - 仅当 SID 同时存在于远程与本地时才可能产生冲突
  * - 仅当远程字段非空（字符串化后非空字符串）且与本地不同时记录为冲突
- * - 远程 type 字段以数值形式与本地「是否看完」文本做字符串比对（调用方负责映射）
+ * - 「是否看完」为用户本地字段，远程数据不含此字段，不参与冲突比对
  *
  * 注意：本函数为纯函数，不读取 Excel，不发起网络请求，可在 Node 测试环境直接运行。
  *
