@@ -1420,6 +1420,16 @@ function setupEventListeners(): void {
   trackedEventBusOn(BGM_EVENTS.CONFIG_UPDATED, handleConfigUpdatedEvent)
   trackedEventBusOn(BGM_EVENTS.SYNC_PROGRESS, handleSyncProgressEvent)
   trackedEventBusOn(BGM_EVENTS.SYNC_STATE_CHANGED, handleSyncStateChangedEvent)
+  // Ribbon 按钮触发数据同步：复用 taskpane handler，显示模块化进度弹窗
+  trackedEventBusOn(BGM_EVENTS.REQUEST_GITHUB_SYNC, () => {
+    bgmLog(LOG_LEVELS.INFO, '[handlers] 收到 Ribbon 数据同步请求，触发 syncFromGithub handler')
+    const handler = ACTION_HANDLERS['syncFromGithub']
+    if (handler) {
+      handler({ args: [], startTime: Date.now() })
+    } else {
+      bgmLog(LOG_LEVELS.ERROR, '[handlers] syncFromGithub handler 未注册')
+    }
+  })
 }
 
 // 尝试更新增量同步复选框（带重试机制）

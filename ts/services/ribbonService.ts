@@ -28,16 +28,13 @@ import {
   getCell,
   trim,
   calcFingerprint,
-  syncFromRemote,
   isGithubConfigComplete,
-  getSyncStrategy,
-  SYNC_STRATEGY_LABELS,
   type GithubSyncResult,
-  type SyncStrategy,
   type GithubRemoteEntry,
   type LocalRowEntry,
 } from '../index.js'
 import { undoLastSync, getLastSessionDescription } from '../sync/undoStack.js'
+import { eventBus, BGM_EVENTS } from '../tools/events.js'
 
 // ========== GitHub 同步冲突解决类型 ==========
 
@@ -760,15 +757,14 @@ export function openCollectionForRibbon(): void {
  *
  * 流程：
  * 1. 校验 GitHub 配置是否完整（owner/repo/path）
- * 2. 读取已保存的同步策略
- * 3. 用户确认对话框（提示当前策略）
- * 4. 调用 syncFromGithub 执行下载、diff、应用
- * 5. 显示结果统计
+ * 2. 确保 taskpane 面板可见（不切换，只显示）
+ * 3. 通过事件总线触发 taskpane 的 syncFromGithub handler
+ *    - taskpane handler 负责显示确认对话框 + 模块化进度弹窗
+ *    - Ribbon 入口不再直接调用 syncFromRemote，避免 UI 不一致
  *
- * @returns 同步结果统计，失败时返回 null
+ * @returns 同步结果统计（事件触发模式返回 null，实际结果由 taskpane handler 处理）
  */
 export async function syncFromGithubForRibbon(): Promise<GithubSyncResult | null> {
-  const startTime = Date.now()
   bgmLog(LOG_LEVELS.INFO, '[syncFromGithubForRibbon] ========== Ribbon GitHub 同步 ==========')
 
   // 1. 配置校验
@@ -778,50 +774,50 @@ export async function syncFromGithubForRibbon(): Promise<GithubSyncResult | null
     return null
   }
 
-  // 2. 读取策略
-  const strategy: SyncStrategy = getSyncStrategy()
-  const strategyLabel = SYNC_STRATEGY_LABELS[strategy]
-  bgmLog(LOG_LEVELS.INFO, `[syncFromGithubForRibbon] 同步策略: ${strategy} (${strategyLabel})`)
+  // 2. 确保 taskpane 面板可见（不切换隐藏，仅设置为可见）
+  ensureTaskpaneVisible()
 
-  // 3. 用户确认
-  const confirmed = await wpsMsgBox(
-    `将从远程仓库下载数据并按策略【${strategyLabel}】合并到当前工作表。\n（远程仓库 → Excel，与上传同步方向相反）\n是否继续？`,
-    4, // MB_YESNO
-    32, // MB_ICONQUESTION
-  )
-  if (confirmed !== 6) {
-    bgmLog(LOG_LEVELS.INFO, '[syncFromGithubForRibbon] 用户取消同步')
-    return null
-  }
+  // 3. 通过事件总线触发 taskpane 的 syncFromGithub handler
+  // taskpane handler 会显示确认对话框 + 模块化进度弹窗
+  bgmLog(LOG_LEVELS.INFO, '[syncFromGithubForRibbon] 发送 REQUEST_GITHUB_SYNC 事件到 taskpane')
+  eventBus.emit(BGM_EVENTS.REQUEST_GITHUB_SYNC, undefined)
 
-  // 4. 执行同步
+  return null
+}
+
+/**
+ * 确保 taskpane 面板可见（不切换，仅显示）
+ *
+ * 与 showBangumiPanel 的区别：showBangumiPanel 会切换可见性（可见→隐藏），
+ * 本函数仅确保面板可见，不会隐藏已显示的面板。
+ */
+function ensureTaskpaneVisible(): void {
   try {
-    const result = await syncFromRemote((current, total, message) => {
-      if (total > 0) {
-        bgmLog(LOG_LEVELS.INFO, `[syncFromGithubForRibbon] 进度 ${current}/${total}: ${message}`)
+    const app = getApp() as {
+      PluginStorage?: {
+        getItem: (k: string) => string | null
+        setItem: (k: string, v: string) => void
       }
-    }, strategy)
-    bgmLog(
-      LOG_LEVELS.INFO,
-      `[syncFromGithubForRibbon] 完成：远程 ${result.remoteTotal}，新增 ${result.added}，更新 ${result.updated}，删除 ${result.deleted}，失败 ${result.failed}，耗时 ${Date.now() - startTime}ms`,
-    )
+      GetTaskPane?: (id: string) => { Visible: boolean }
+      CreateTaskPane?: (url: string) => { ID: string; Visible: boolean }
+    }
+    if (!app) return
 
-    // 5. 结果提示
-    const summary =
-      `数据同步完成（策略：${strategyLabel}）\n\n` +
-      `远程条目: ${result.remoteTotal}\n` +
-      `新增: ${result.added}\n` +
-      `更新: ${result.updated}\n` +
-      `删除: ${result.deleted}\n` +
-      `无变更: ${result.unchanged}\n` +
-      `失败: ${result.failed}`
-    await wpsMsgBox(summary, 0, result.failed > 0 ? 48 : 64)
-    return result
+    const tsId = app.PluginStorage?.getItem('taskpane_id')
+    if (!tsId) {
+      // 面板未创建，调用 showBangumiPanel 创建并显示
+      import('../index.js').then(({ showBangumiPanel }) => showBangumiPanel())
+      return
+    }
+
+    const tskpane = app.GetTaskPane?.(tsId)
+    if (tskpane && !tskpane.Visible) {
+      tskpane.Visible = true
+      app.PluginStorage?.setItem('bgm_panel_shown_at', String(Date.now()))
+      bgmLog(LOG_LEVELS.INFO, '[ensureTaskpaneVisible] 面板已显示')
+    }
   } catch (e: unknown) {
-    const errMsg = e instanceof Error ? e.message : String(e)
-    bgmLog(LOG_LEVELS.ERROR, `[syncFromGithubForRibbon] 同步失败: ${errMsg}`)
-    await wpsMsgBox(`数据同步失败：${errMsg}`, 0, 16)
-    return null
+    bgmLog(LOG_LEVELS.WARN, `[ensureTaskpaneVisible] 失败: ${(e as Error).message}`)
   }
 }
 
