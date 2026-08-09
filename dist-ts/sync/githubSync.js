@@ -420,14 +420,15 @@ export function applyDiffToSheet(diffs, strategy, onProgress, source) {
     // 批量写入同步记录与汇总行
     if (syncRecords.length > 0) {
         addSyncRecords(syncRecords);
-        addSyncRecordSummary({
-            source,
-            content: '仓库同步汇总',
-            status: result.failed > 0 ? '失败' : '成功',
-            message: `远程 ${result.remoteTotal}，新增 ${result.added}，更新 ${result.updated}，删除 ${result.deleted}，失败 ${result.failed}，策略: ${strategy}`,
-            count: 1,
-        });
     }
+    // 始终写入汇总行（即使无变更，也记录本次同步操作）
+    addSyncRecordSummary({
+        source,
+        content: '仓库同步汇总',
+        status: result.failed > 0 ? '失败' : '成功',
+        message: `远程 ${result.remoteTotal}，新增 ${result.added}，更新 ${result.updated}，删除 ${result.deleted}，无变更 ${result.unchanged}，失败 ${result.failed}，策略: ${strategy}`,
+        count: 1,
+    });
     bgmLog(LOG_LEVELS.INFO, `[githubSync] 应用完成: 新增 ${result.added}，更新 ${result.updated}，删除 ${result.deleted}，失败 ${result.failed}`);
     return result;
 }

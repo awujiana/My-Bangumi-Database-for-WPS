@@ -1329,6 +1329,9 @@ const handleConfigUpdatedEvent = (data: { key: string; value: string }): void =>
   } else if (data.key === 'bgm_skip_conflicts') {
     bgmLog(LOG_LEVELS.INFO, `[handlers] ========== 更新跳过冲突 UI ==========`)
     tryUpdateSkipConflictsUI(data.value === 'true')
+  } else if (data.key === 'bgm_enable_sync_record') {
+    bgmLog(LOG_LEVELS.INFO, `[handlers] ========== 更新启用同步记录复选框 ==========`)
+    tryUpdateEnableSyncRecordUI(data.value === 'true')
   }
 }
 
@@ -1442,6 +1445,31 @@ function tryUpdateSkipConflictsUI(skipConflicts: boolean, attempts: number = 0):
   if (chkSkipConflicts) {
     chkSkipConflicts.checked = skipConflicts
     bgmLog(LOG_LEVELS.INFO, `[handlers] 跳过冲突复选框已更新`)
+  }
+}
+
+// 尝试更新启用同步记录复选框（带重试机制，与另外两个开关保持一致）
+function tryUpdateEnableSyncRecordUI(enabled: boolean, attempts: number = 0): void {
+  if (!isTaskpaneContext()) return
+
+  const chkEnableSyncRecord = document.getElementById('chkEnableSyncRecord') as HTMLInputElement
+
+  if (chkEnableSyncRecord) {
+    bgmLog(LOG_LEVELS.INFO, `[handlers] 找到 chkEnableSyncRecord 元素`)
+    bgmLog(
+      LOG_LEVELS.INFO,
+      `[handlers] 当前状态: ${chkEnableSyncRecord.checked ? '开启' : '关闭'}，目标状态: ${enabled ? '开启' : '关闭'}`,
+    )
+    chkEnableSyncRecord.checked = enabled
+    bgmLog(LOG_LEVELS.INFO, `[handlers] 启用同步记录复选框已更新: ${enabled ? '开启' : '关闭'}`)
+  } else if (attempts < 3) {
+    bgmLog(
+      LOG_LEVELS.WARN,
+      `[handlers] 未找到 chkEnableSyncRecord 元素，延迟重试 (${attempts + 1}/3)...`,
+    )
+    trackedSetTimeout(() => tryUpdateEnableSyncRecordUI(enabled, attempts + 1), 100)
+  } else {
+    bgmLog(LOG_LEVELS.ERROR, `[handlers] 重试3次后仍未找到 chkEnableSyncRecord 元素，放弃更新`)
   }
 }
 

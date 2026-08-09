@@ -25,12 +25,21 @@ function initRibbonMessageListener() {
         const data = event.data;
         if (data?.type === 'BGM:configUpdated') {
             const key = data.data?.key;
-            if (key === 'bgm_skip_conflicts' || key === 'bgm_incremental_sync') {
+            const controlIdMap = {
+                bgm_incremental_sync: 'chkIncrementalSync',
+                bgm_skip_conflicts: 'chkSkipConflicts',
+                bgm_enable_sync_record: 'chkEnableSyncRecord',
+            };
+            const controlId = controlIdMap[key];
+            if (controlId) {
                 const app = getApp();
                 const ribbonUI = app?.ribbonUI;
                 if (ribbonUI) {
-                    const controlId = key === 'bgm_skip_conflicts' ? 'chkSkipConflicts' : 'chkIncrementalSync';
                     ribbonUI.InvalidateControl(controlId);
+                    bgmLog(LOG_LEVELS.INFO, `[ribbon-message] 已 InvalidateControl ${controlId} (config key=${key})`);
+                }
+                else {
+                    bgmLog(LOG_LEVELS.WARN, `[ribbon-message] ribbonUI 不可用，无法刷新 ${controlId}`);
                 }
             }
         }
@@ -178,12 +187,30 @@ export function OnAction(control) {
             case 'btnSetToken':
                 RibbonService.setTokenForRibbon();
                 break;
-            case 'btnTestToken':
-                RibbonService.testTokenForRibbon();
+            case 'btnTestToken': {
+                // testTokenForRibbon 是 async 函数，需 .catch() 防止未处理 rejection
+                RibbonService.testTokenForRibbon().catch((e) => {
+                    bgmLog(LOG_LEVELS.ERROR, `[OnAction] testTokenForRibbon 异常: ${e?.message || String(e)}`);
+                    BGM.handleError(e, {
+                        showAlert: true,
+                        level: BGM.ErrorLevel.ERROR,
+                        context: 'Ribbon btnTestToken',
+                    });
+                });
                 break;
-            case 'btnCopyToken':
-                RibbonService.copyTokenForRibbon();
+            }
+            case 'btnCopyToken': {
+                // copyTokenForRibbon 是 async 函数，需 .catch() 防止未处理 rejection
+                RibbonService.copyTokenForRibbon().catch((e) => {
+                    bgmLog(LOG_LEVELS.ERROR, `[OnAction] copyTokenForRibbon 异常: ${e?.message || String(e)}`);
+                    BGM.handleError(e, {
+                        showAlert: true,
+                        level: BGM.ErrorLevel.ERROR,
+                        context: 'Ribbon btnCopyToken',
+                    });
+                });
                 break;
+            }
             case 'btnSetUserId':
                 RibbonService.setUserIdForRibbon();
                 break;

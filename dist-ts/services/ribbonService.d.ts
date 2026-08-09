@@ -82,10 +82,19 @@ export declare function detectConflicts(ws: WpsWorksheet, colMap: Map<string, nu
 export declare function syncWithConfirmation(): Promise<void>;
 /** 设置 Token（Ribbon 版本） */
 export declare function setTokenForRibbon(): Promise<boolean>;
-/** 测试 Token（Ribbon 版本） */
-export declare function testTokenForRibbon(): void;
-/** 复制 Token 到剪贴板（Ribbon 版本） */
-export declare function copyTokenForRibbon(): void;
+/**
+ * 测试 Token（Ribbon 版本）
+ *
+ * Ribbon 上下文中 index.html 对用户不可见，DOM 弹窗（showAlert/showSuccess）无法展示。
+ * 因此本函数使用 wpsMsgBox（带浏览器 alert 兜底）替代 DOM 弹窗进行所有用户交互。
+ */
+export declare function testTokenForRibbon(): Promise<void>;
+/**
+ * 复制 Token 到剪贴板（Ribbon 版本）
+ *
+ * 使用 wpsMsgBox（带浏览器兜底）显示结果，确保在 Ribbon 和浏览器环境均可见。
+ */
+export declare function copyTokenForRibbon(): Promise<void>;
 /** 设置用户 ID（Ribbon 版本） */
 export declare function setUserIdForRibbon(): void;
 /** 打开收藏页面（Ribbon 版本） */

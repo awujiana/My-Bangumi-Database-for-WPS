@@ -85,12 +85,23 @@ function initRibbonMessageListener(): void {
     const data = event.data
     if (data?.type === 'BGM:configUpdated') {
       const key = data.data?.key
-      if (key === 'bgm_skip_conflicts' || key === 'bgm_incremental_sync') {
+      const controlIdMap: Record<string, string> = {
+        bgm_incremental_sync: 'chkIncrementalSync',
+        bgm_skip_conflicts: 'chkSkipConflicts',
+        bgm_enable_sync_record: 'chkEnableSyncRecord',
+      }
+      const controlId = controlIdMap[key as string]
+      if (controlId) {
         const app = getApp()
         const ribbonUI = app?.ribbonUI as WpsRibbonUI | undefined
         if (ribbonUI) {
-          const controlId = key === 'bgm_skip_conflicts' ? 'chkSkipConflicts' : 'chkIncrementalSync'
           ribbonUI.InvalidateControl(controlId)
+          bgmLog(
+            LOG_LEVELS.INFO,
+            `[ribbon-message] 已 InvalidateControl ${controlId} (config key=${key})`,
+          )
+        } else {
+          bgmLog(LOG_LEVELS.WARN, `[ribbon-message] ribbonUI 不可用，无法刷新 ${controlId}`)
         }
       }
     }

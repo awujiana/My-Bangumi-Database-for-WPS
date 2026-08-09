@@ -59,6 +59,34 @@ export function setConfig(key: string, value: string): boolean {
   bgmLog(LOG_LEVELS.INFO, `[config] 触发内部事件: ${BGM_EVENTS.CONFIG_UPDATED}`)
   eventBus.emit(BGM_EVENTS.CONFIG_UPDATED, { key, value })
 
+  // 跨文档 postMessage 通知（Ribbon ↔ Taskpane 双向同步）：
+  // 当 Taskpane 侧修改配置时，需通知 Ribbon 侧 ribbonUI.InvalidateControl() 重新拉取状态；
+  // 反之，Ribbon 侧修改时通知 Taskpane 侧更新 checkbox。
+  // window.parent / window.top 在同源场景下均指向 index.html 顶层（Ribbon 上下文）。
+  if (oldValue !== value && typeof window !== 'undefined') {
+    const messagePayload = {
+      type: 'BGM:configUpdated',
+      data: { key, value },
+    } as const
+    try {
+      // 通知所有可能的窗口（顶层和父级），兼顾 iframe 和顶层窗口场景
+      if (window.parent && window.parent !== window) {
+        window.parent.postMessage(messagePayload, '*')
+      }
+      if (window.top && window.top !== window && window.top !== window.parent) {
+        window.top.postMessage(messagePayload, '*')
+      }
+      // 同时通知当前窗口自身（防止 postMessage 只到父窗口时当前窗口的 ribbon 监听器漏掉）
+      window.postMessage(messagePayload, '*')
+      bgmLog(LOG_LEVELS.INFO, `[config] 已广播 BGM:configUpdated 跨文档消息: key=${key}`)
+    } catch (e: unknown) {
+      bgmLog(
+        LOG_LEVELS.WARN,
+        `[config] postMessage 广播失败: ${(e as Error)?.message || String(e)}`,
+      )
+    }
+  }
+
   return true
 }
 

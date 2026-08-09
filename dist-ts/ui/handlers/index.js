@@ -4,7 +4,7 @@
  * @description 资源追踪、按钮监听、ACTION_HANDLERS 分发、消息监听、事件总线监听、
  *              配置 UI 回填等。同时 re-export 子模块的公开 API，保持原 handlers.ts 的外部接口。
  */
-import { LOG_LEVELS, bgmLog, BGM, loadBgToken, clearBgToken, copyTokenToClipboard, _setBgmUserId, _setBgmUsername, getApp, showAlert, showConfirm, showInput, showToast, setStatus, refreshData, refreshSheets, toggleSheetLock, clearSyncRecords, deduplicateSyncRecords, formatSyncRecordSheet, openSyncRecordSheet, closeDetailModal, previewSyncContent, syncSelectedRows, openBangumiTokenPage, setSyncRecordEnabled, getIncrementalSync, setIncrementalSync, getSkipConflicts, setSkipConflicts, getGithubConfig, setGithubConfig, isGithubConfigComplete, getSyncStrategy, setSyncStrategy, getSyncSourceType, setSyncSourceType, syncFromRemote, buildRawUrl, updateSyncProgressDialog, } from '../../index.js';
+import { LOG_LEVELS, bgmLog, BGM, loadBgToken, clearBgToken, copyTokenToClipboard, _setBgmUserId, _setBgmUsername, getApp, showAlert, showConfirm, showInput, showToast, setStatus, refreshData, refreshSheets, toggleSheetLock, clearSyncRecords, deduplicateSyncRecords, formatSyncRecordSheet, openSyncRecordSheet, closeDetailModal, previewSyncContent, syncSelectedRows, openBangumiTokenPage, setSyncRecordEnabled, getSyncRecordEnabled, getIncrementalSync, setIncrementalSync, getSkipConflicts, setSkipConflicts, getGithubConfig, setGithubConfig, isGithubConfigComplete, getSyncStrategy, setSyncStrategy, getSyncSourceType, setSyncSourceType, syncFromRemote, buildRawUrl, updateSyncProgressDialog, } from '../../index.js';
 import { exportConfig, importConfig } from '../../services/configService.js';
 import { undoLastSyncForRibbon } from '../../services/ribbonService.js';
 import { debounce } from '../../tools/debounce.js';
@@ -223,9 +223,18 @@ export function setupButtonListeners() {
     document.querySelectorAll('[data-action]').forEach((button) => {
         trackedAddEventListener(button, 'click', handleActionClick);
     });
-    // 启用同步记录 开关
+    // 启用同步记录 开关：从 config 读取初始状态 + 注册 change 监听器
     const chkEnableSyncRecord = document.getElementById('chkEnableSyncRecord');
     if (chkEnableSyncRecord) {
+        // 从 config 读取初始状态（与 chkIncremental/chkSkipConflicts 一致的双向同步机制）
+        try {
+            const enabled = getSyncRecordEnabled();
+            chkEnableSyncRecord.checked = enabled;
+            bgmLog(LOG_LEVELS.INFO, `[handlers] 从配置读取同步记录状态: ${enabled ? '开启' : '关闭'}`);
+        }
+        catch (e) {
+            bgmLog(LOG_LEVELS.WARN, `[handlers] 读取同步记录状态失败: ${e.message}`);
+        }
         trackedAddEventListener(chkEnableSyncRecord, 'change', handleEnableSyncRecordChange);
         bgmLog(LOG_LEVELS.INFO, '[handlers] 启用同步记录 checkbox 监听器已注册');
     }
@@ -1048,6 +1057,10 @@ const handleConfigUpdatedEvent = (data) => {
         bgmLog(LOG_LEVELS.INFO, `[handlers] ========== 更新跳过冲突 UI ==========`);
         tryUpdateSkipConflictsUI(data.value === 'true');
     }
+    else if (data.key === 'bgm_enable_sync_record') {
+        bgmLog(LOG_LEVELS.INFO, `[handlers] ========== 更新启用同步记录复选框 ==========`);
+        tryUpdateEnableSyncRecordUI(data.value === 'true');
+    }
 };
 const handleSyncProgressEvent = (data) => {
     updateSyncProgressDialog(data.current, data.total, data.message);
@@ -1125,6 +1138,25 @@ function tryUpdateSkipConflictsUI(skipConflicts, attempts = 0) {
     if (chkSkipConflicts) {
         chkSkipConflicts.checked = skipConflicts;
         bgmLog(LOG_LEVELS.INFO, `[handlers] 跳过冲突复选框已更新`);
+    }
+}
+// 尝试更新启用同步记录复选框（带重试机制，与另外两个开关保持一致）
+function tryUpdateEnableSyncRecordUI(enabled, attempts = 0) {
+    if (!isTaskpaneContext())
+        return;
+    const chkEnableSyncRecord = document.getElementById('chkEnableSyncRecord');
+    if (chkEnableSyncRecord) {
+        bgmLog(LOG_LEVELS.INFO, `[handlers] 找到 chkEnableSyncRecord 元素`);
+        bgmLog(LOG_LEVELS.INFO, `[handlers] 当前状态: ${chkEnableSyncRecord.checked ? '开启' : '关闭'}，目标状态: ${enabled ? '开启' : '关闭'}`);
+        chkEnableSyncRecord.checked = enabled;
+        bgmLog(LOG_LEVELS.INFO, `[handlers] 启用同步记录复选框已更新: ${enabled ? '开启' : '关闭'}`);
+    }
+    else if (attempts < 3) {
+        bgmLog(LOG_LEVELS.WARN, `[handlers] 未找到 chkEnableSyncRecord 元素，延迟重试 (${attempts + 1}/3)...`);
+        trackedSetTimeout(() => tryUpdateEnableSyncRecordUI(enabled, attempts + 1), 100);
+    }
+    else {
+        bgmLog(LOG_LEVELS.ERROR, `[handlers] 重试3次后仍未找到 chkEnableSyncRecord 元素，放弃更新`);
     }
 }
 const handleIncrementalChange = () => {
