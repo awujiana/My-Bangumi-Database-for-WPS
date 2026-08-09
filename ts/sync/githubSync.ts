@@ -26,11 +26,12 @@ import {
   getColumnMap,
   getCellValue,
   setCellValue,
+  colNumToLetter,
   trim,
   ensureSheetHeaders,
   getApp,
 } from '../tools/util.js'
-import type { WpsWorksheet } from '../tools/wps.js'
+import type { WpsCellValue, WpsWorksheet } from '../tools/wps.js'
 
 import { buildRawUrl, isGithubConfigComplete } from './githubConfig.js'
 import {
@@ -393,20 +394,184 @@ function writeRemoteEntryToRow(
   }
 }
 
+// ========== 批量写入与性能追踪 ==========
+
+/** 批量写入批次大小（行数），防止单次 COM 调用数据量过大 */
+const BATCH_WRITE_SIZE = 500
+
+/**
+ * 让出事件循环，允许 DOM 渲染和 UI 响应
+ * 通过在批次间调用此函数，避免同步 COM 操作阻塞主线程
+ */
+function yieldToEventLoop(): Promise<void> {
+  // 使用 10ms 延迟替代 0ms，确保 WPS 浏览器控件有足够时间处理 DOM 渲染
+  // 在 WPS 内嵌浏览器中，setTimeout(0) 可能被合并到当前渲染批次而无法触发重绘
+  return new Promise<void>((resolve) => setTimeout(resolve, 10))
+}
+
+/**
+ * 格式化持续时间（毫秒 → 可读字符串）
+ */
+function formatDuration(ms: number): string {
+  if (ms < 1000) return `${ms}ms`
+  const seconds = Math.floor(ms / 1000)
+  if (seconds < 60) return `${seconds}秒`
+  const minutes = Math.floor(seconds / 60)
+  const secs = seconds % 60
+  return `${minutes}分${secs}秒`
+}
+
+/**
+ * 格式化预估剩余时间
+ */
+function formatEta(ms: number): string {
+  if (ms <= 0) return '剩余: 即将完成'
+  return `预计剩余: ${formatDuration(ms)}`
+}
+
+/**
+ * 批量写入新增行（使用 Range.Value2 二维数组，比逐行写入快 100-1000x）
+ *
+ * 原理：WPS COM 的跨进程调用是主要瓶颈。逐行写入时每个 setCellValue 都是
+ * 一次独立 COM 调用。Range.Value2 接受二维数组后，WPS 内部批量处理，
+ * 一次 COM 调用即可完成整个矩形区域的写入。
+ *
+ * @param ws 工作表
+ * @param colMap 列映射（列名 → 列号）
+ * @param startRow 起始行号
+ * @param rows 要写入的行数据（GithubRemoteEntry 格式）
+ * @param records 同步记录收集器（传入后函数会 push 记录）
+ * @returns 成功写入的行数
+ */
+function batchWriteNewRows(
+  ws: WpsWorksheet,
+  colMap: Map<string, number>,
+  startRow: number,
+  rows: { remote: GithubRemoteEntry; sid: string }[],
+  records: UpdateRecordParams[],
+): number {
+  if (rows.length === 0) return 0
+
+  // 1. 收集需要写入的列（按列号升序排列）
+  interface WriteCol {
+    name: string
+    col: number
+  }
+  const writeCols: WriteCol[] = []
+  const seen = new Set<string>()
+  const tryAddCol = (name: string): void => {
+    if (seen.has(name)) return
+    seen.add(name)
+    const col = colMap.get(name)
+    if (col) writeCols.push({ name, col })
+  }
+
+  tryAddCol('Bangumi_URL')
+  tryAddCol('名称')
+  tryAddCol('标签/分级')
+  tryAddCol('集数')
+  for (const [, excelField] of EXTENDED_FIELD_MAP) {
+    tryAddCol(excelField)
+  }
+
+  if (writeCols.length === 0) {
+    bgmLog(LOG_LEVELS.WARN, '[batchWriteNewRows] 未找到任何可写入的列')
+    return 0
+  }
+
+  writeCols.sort((a, b) => a.col - b.col)
+  const minCol = writeCols[0]!.col
+  const maxCol = writeCols[writeCols.length - 1]!.col
+  const colCount = maxCol - minCol + 1
+
+  // 2. 构建二维值数组（列对齐到 minCol 偏移）
+  const values: (string | null)[][] = []
+  for (const entry of rows) {
+    const row = new Array<string | null>(colCount).fill(null)
+    for (const wc of writeCols) {
+      const idx = wc.col - minCol
+      let value = ''
+      if (wc.name === 'Bangumi_URL') {
+        value = `https://bgm.tv/subject/${entry.remote.sid}`
+      } else if (wc.name === '名称') {
+        value = entry.remote.name ?? ''
+      } else if (wc.name === '标签/分级') {
+        value = tagsToString(entry.remote.meta_tags)
+      } else if (wc.name === '集数') {
+        value = entry.remote['话数'] ?? ''
+      } else {
+        // 扩展字段：遍历 EXTENDED_FIELD_MAP 匹配
+        for (const [jsonlField, excelField] of EXTENDED_FIELD_MAP) {
+          if (excelField === wc.name) {
+            const v = entry.remote[jsonlField as keyof GithubRemoteEntry]
+            if (typeof v === 'string') value = v
+            else if (typeof v === 'number') value = String(v)
+            break
+          }
+        }
+      }
+      row[idx] = value || null
+    }
+    values.push(row)
+  }
+
+  // 3. 批量写入 Range.Value2
+  const startColLetter = colNumToLetter(minCol)
+  const endColLetter = colNumToLetter(maxCol)
+  const endRow = startRow + rows.length - 1
+  try {
+    const rangeAddr = `${startColLetter}${startRow}:${endColLetter}${endRow}`
+    const range = ws.Range(rangeAddr)
+    if (range) {
+      range.Value2 = values as unknown as WpsCellValue
+    } else {
+      bgmLog(LOG_LEVELS.WARN, '[batchWriteNewRows] Range 对象无效，回退到逐行写入')
+      return 0
+    }
+  } catch (e: unknown) {
+    bgmLog(
+      LOG_LEVELS.WARN,
+      `[batchWriteNewRows] 批量写入失败，回退到逐行写入: ${(e as Error).message}`,
+    )
+    return 0
+  }
+
+  // 4. 记录 undo 条目（一次性记录所有变更）
+  for (let i = 0; i < rows.length; i++) {
+    for (const wc of writeCols) {
+      const row = startRow + i
+      const val = values[i]![wc.col - minCol] ?? ''
+      recordUndoEntry({ row, col: wc.col, oldValue: '', newValue: val })
+    }
+    records.push({
+      sid: rows[i]!.sid,
+      name: rows[i]!.remote.name ?? '',
+      url: `https://bgm.tv/subject/${rows[i]!.sid}`,
+      type: BGM_SUBJECT_TYPES[2] ?? '',
+      source: 'repo',
+      content: '仓库同步-新增',
+      status: '成功',
+      count: 1,
+    })
+  }
+
+  return rows.length
+}
+
 /**
  * 应用 diff 到 Excel 工作表
  * @param diffs 差异列表
  * @param strategy 同步策略（决定 force-overwrite 与 delete 行为）
- * @param onProgress 进度回调（current, total, message）
+ * @param onProgress 进度回调（current, total, message, eta）
  * @param source 同步来源显示名称（如 GitHub/GitLab/Gitee），用于写入同步记录
  * @returns 同步结果统计
  */
-export function applyDiffToSheet(
+export async function applyDiffToSheet(
   diffs: GithubSyncDiff[],
   strategy: SyncStrategy,
-  onProgress?: (current: number, total: number, message: string) => void,
+  onProgress?: (current: number, total: number, message: string, eta?: string) => void,
   source?: string,
-): GithubSyncResult {
+): Promise<GithubSyncResult> {
   const result: GithubSyncResult = {
     remoteTotal: 0,
     added: 0,
@@ -430,6 +595,18 @@ export function applyDiffToSheet(
   let nextAppendRow = lastRow + 1
   const forceOverwrite = strategy === 'force-overwrite'
 
+  // delete 操作需倒序执行（从大行号到小行号），避免行号错位
+  const sortedDiffs = [...diffs]
+
+  // 在开始前先发送初始进度：显示总条目数，避免进度条停留在"0/0"
+  const total = diffs.length
+  const addDiffs = sortedDiffs.filter((d) => d.kind === 'add' && d.remote)
+  const addTotal = addDiffs.length
+  onProgress?.(0, total, `准备写入：新增 ${addTotal} 条，共 ${total} 条差异`)
+
+  // 让出事件循环，允许 DOM 渲染初始进度
+  await yieldToEventLoop()
+
   // 性能优化：关闭屏幕刷新和自动计算，大幅减少 COM 调用开销
   const app = getApp()
   let prevScreenUpdating: boolean | undefined
@@ -446,40 +623,104 @@ export function applyDiffToSheet(
     bgmLog(LOG_LEVELS.WARN, `[githubSync] 关闭屏幕刷新失败: ${(e as Error).message}`)
   }
 
+  // 性能追踪：记录开始时间
+  const syncStartTime = Date.now()
+  let lastProgressTime = syncStartTime
+
   // 开启 undo 会话：记录本次同步的所有单元格变更，便于用户撤销
   beginUndoSession(`${source ?? 'GitHub'} 同步 - 策略: ${strategy}`)
 
-  // delete 操作需倒序执行（从大行号到小行号），避免行号错位
-  const sortedDiffs = [...diffs].sort((a, b) => {
+  // 收集本次同步记录
+  const syncRecords: UpdateRecordParams[] = []
+
+  const nonAddDiffs = sortedDiffs.filter((d) => d.kind !== 'add')
+
+  // 将 add diffs 分批写入（每批 BATCH_WRITE_SIZE 行）
+  let addProcessed = 0
+  for (let batchStart = 0; batchStart < addTotal; batchStart += BATCH_WRITE_SIZE) {
+    const batch = addDiffs.slice(batchStart, batchStart + BATCH_WRITE_SIZE)
+    const batchEntries = batch.map((d) => ({ remote: d.remote!, sid: d.sid }))
+
+    // 尝试批量写入
+    const batchWritten = batchWriteNewRows(ws, colMap, nextAppendRow, batchEntries, syncRecords)
+
+    if (batchWritten > 0) {
+      result.added += batchWritten
+      nextAppendRow += batchWritten
+    } else {
+      // 批量写入失败，回退到逐行写入
+      for (const diff of batch) {
+        if (diff.remote) {
+          try {
+            writeRemoteEntryToRow(ws, colMap, nextAppendRow, diff.remote, ['*'], forceOverwrite)
+            nextAppendRow++
+            result.added++
+            syncRecords.push({
+              sid: diff.sid,
+              name: diff.remote.name ?? '',
+              url: `https://bgm.tv/subject/${diff.sid}`,
+              type: BGM_SUBJECT_TYPES[2] ?? '',
+              source,
+              content: '仓库同步-新增',
+              status: '成功',
+              count: 1,
+            })
+          } catch (e: unknown) {
+            result.failed++
+            bgmLog(
+              LOG_LEVELS.ERROR,
+              `[githubSync] 逐行写入失败 sid=${diff.sid}: ${(e as Error).message}`,
+            )
+            syncRecords.push({
+              sid: diff.sid,
+              source,
+              content: '仓库同步-新增失败',
+              status: '失败',
+              message: (e as Error).message,
+              count: 1,
+            })
+          }
+        }
+      }
+    }
+
+    addProcessed += batch.length
+    const now = Date.now()
+    const elapsed = now - syncStartTime
+    const speed = addProcessed > 0 && elapsed > 0 ? (addProcessed / elapsed) * 1000 : 0
+    const remaining = addTotal - addProcessed
+    const eta = speed > 0 ? (remaining / speed) * 1000 : 0
+
+    // 每批或每 500ms 更新一次进度（避免高频回调）
+    if (now - lastProgressTime > 500 || addProcessed >= addTotal) {
+      onProgress?.(
+        addProcessed,
+        addTotal,
+        `新增 ${addProcessed}/${addTotal} 条 (${speed > 0 ? speed.toFixed(0) : '?'} 行/秒)`,
+        formatEta(eta),
+      )
+      lastProgressTime = now
+    }
+
+    // 让出事件循环，允许 DOM 渲染进度更新，避免 UI 卡顿
+    if (addProcessed < addTotal) {
+      await yieldToEventLoop()
+    }
+  }
+
+  // ---- 阶段 2: 处理 'update' / 'delete' / 'skip' diffs ----
+  // 按行号倒序排列（delete 需从大行号到小行号）
+  nonAddDiffs.sort((a, b) => {
     const aRow = a.localRow ?? Number.MAX_SAFE_INTEGER
     const bRow = b.localRow ?? Number.MAX_SAFE_INTEGER
     return bRow - aRow
   })
 
-  // 收集本次同步记录（最后批量写入，减少 COM 调用）
-  const syncRecords: UpdateRecordParams[] = []
-
-  const total = diffs.length
-  sortedDiffs.forEach((diff, idx) => {
+  let otherProcessed = 0
+  const otherTotal = nonAddDiffs.length
+  for (const diff of nonAddDiffs) {
     try {
-      if (diff.kind === 'add' && diff.remote) {
-        // 新增：追加到末尾
-        writeRemoteEntryToRow(ws, colMap, nextAppendRow, diff.remote, ['*'], forceOverwrite)
-        nextAppendRow++
-        result.added++
-        syncRecords.push({
-          sid: diff.sid,
-          name: diff.remote.name ?? '',
-          url: `https://bgm.tv/subject/${diff.sid}`,
-          type: BGM_SUBJECT_TYPES[2] ?? '',
-          source,
-          content: '仓库同步-新增',
-          status: '成功',
-          count: 1,
-        })
-        onProgress?.(idx + 1, total, `新增 ${diff.remote.name ?? diff.sid}`)
-      } else if (diff.kind === 'update' && diff.localRow !== undefined && diff.remote) {
-        // 更新：仅写入变更字段
+      if (diff.kind === 'update' && diff.localRow !== undefined && diff.remote) {
         writeRemoteEntryToRow(
           ws,
           colMap,
@@ -500,20 +741,14 @@ export function applyDiffToSheet(
           message: diff.changedFields.join(', '),
           count: 1,
         })
-        onProgress?.(idx + 1, total, `更新 ${diff.remote.name ?? diff.sid}`)
       } else if (diff.kind === 'delete' && diff.localRow !== undefined) {
-        // 删除：删除整行（mirror 策略）
-        // 先记录整行快照，便于 undo 时恢复整行
         const rowValues: Record<number, string> = {}
         for (const col of colMap.values()) {
           rowValues[col] = getCellValue(ws, diff.localRow, col)
         }
         recordRowDeleteEntry({ row: diff.localRow, values: rowValues })
         try {
-          const rowRange = ws.Rows.Item(diff.localRow)
-          // WPS Row 没有 Delete 方法，通过 Range 删除整行
           ws.Range(`${diff.localRow}:${diff.localRow}`).Delete()
-          void rowRange // 仅用于类型存在性引用
           result.deleted++
           syncRecords.push({
             sid: diff.sid,
@@ -523,7 +758,6 @@ export function applyDiffToSheet(
             message: `删除行 ${diff.localRow}`,
             count: 1,
           })
-          onProgress?.(idx + 1, total, `删除 行${diff.localRow} sid=${diff.sid}`)
         } catch (e: unknown) {
           const errMsg = e instanceof Error ? e.message : String(e)
           bgmLog(LOG_LEVELS.WARN, `[githubSync] 删除行 ${diff.localRow} 失败: ${errMsg}`)
@@ -553,10 +787,36 @@ export function applyDiffToSheet(
         count: 1,
       })
     }
-  })
+
+    otherProcessed++
+    const now = Date.now()
+    if (now - lastProgressTime > 500 || otherProcessed >= otherTotal) {
+      const totalProcessed = addTotal + otherProcessed
+      const elapsed = now - syncStartTime
+      const speed = totalProcessed > 0 && elapsed > 0 ? (totalProcessed / elapsed) * 1000 : 0
+      onProgress?.(
+        totalProcessed,
+        total,
+        `更新 ${otherProcessed}/${otherTotal} 条 (${speed > 0 ? speed.toFixed(0) : '?'} 行/秒)`,
+        formatEta(0),
+      )
+      lastProgressTime = now
+    }
+
+    // 每 50 条让出事件循环，允许 DOM 渲染
+    if (otherProcessed % 50 === 0 && otherProcessed < otherTotal) {
+      await yieldToEventLoop()
+    }
+  }
 
   // 结束 undo 会话（空会话不入栈）
   endUndoSession()
+
+  // 计算总耗时
+  const totalElapsed = Date.now() - syncStartTime
+  const totalProcessed = addTotal + otherTotal
+  const avgSpeed =
+    totalProcessed > 0 && totalElapsed > 0 ? (totalProcessed / totalElapsed) * 1000 : 0
 
   // 恢复屏幕刷新和自动计算
   try {
@@ -569,11 +829,10 @@ export function applyDiffToSheet(
     bgmLog(LOG_LEVELS.WARN, `[githubSync] 恢复屏幕刷新失败: ${(e as Error).message}`)
   }
 
-  // 批量写入同步记录与汇总行
+  // 写入同步记录与汇总行
   if (syncRecords.length > 0) {
     addSyncRecords(syncRecords)
   }
-  // 始终写入汇总行（即使无变更，也记录本次同步操作）
   addSyncRecordSummary({
     source,
     content: '仓库同步汇总',
@@ -584,7 +843,7 @@ export function applyDiffToSheet(
 
   bgmLog(
     LOG_LEVELS.INFO,
-    `[githubSync] 应用完成: 新增 ${result.added}，更新 ${result.updated}，删除 ${result.deleted}，失败 ${result.failed}`,
+    `[githubSync] 应用完成: 新增 ${result.added}，更新 ${result.updated}，删除 ${result.deleted}，失败 ${result.failed}，耗时 ${formatDuration(totalElapsed)}，平均 ${avgSpeed > 0 ? avgSpeed.toFixed(0) : '?'} 行/秒`,
   )
   return result
 }
@@ -661,7 +920,7 @@ export function applyConflictResolutions(
  * @throws 配置错误、网络错误、解析错误时抛出
  */
 export async function syncFromGithub(
-  onProgress?: (current: number, total: number, message: string) => void,
+  onProgress?: (current: number, total: number, message: string, eta?: string) => void,
   strategy: SyncStrategy = 'add-update',
   signal?: AbortSignal,
   conflictResolution?: ConflictResolution[],
@@ -675,64 +934,96 @@ export async function syncFromGithub(
     throw new Error(errMsg)
   }
 
-  onProgress?.(0, 0, `开始下载远程数据（${source.getDisplayName()} - 策略：${strategy}）...`)
+  // 使用 total=1 避免进度条显示"0/0"带来的困惑
+  onProgress?.(0, 1, `开始下载远程数据（${source.getDisplayName()} - 策略：${strategy}）...`)
   const remoteEntries = await source.fetchRemoteEntries(signal)
   onProgress?.(1, 3, `下载完成：${remoteEntries.length} 条`)
 
-  // 空文档自动填充表头
-  const ws = getDataSheet()
-  if (ws) {
-    const filled = ensureSheetHeaders(ws)
-    if (filled) {
-      bgmLog(LOG_LEVELS.INFO, '[syncFromGithub] 空文档已自动填充标准表头')
-      onProgress?.(1, 3, '已自动填充表头，继续同步...')
+  // 关闭屏幕刷新，减少 COM 调用开销（ensureSheetHeaders / readLocalEntriesForSync 等 COM 操作）
+  const app = getApp()
+  let prevScreenUpdating: boolean | undefined
+  let prevCalculation: number | undefined
+  try {
+    if (app) {
+      prevScreenUpdating = app.ScreenUpdating
+      prevCalculation = app.Calculation
+      app.ScreenUpdating = false
+      app.Calculation = -4135 // xlCalculationManual
     }
+  } catch {
+    // 忽略关闭失败
   }
 
-  // 仅同步选中行：过滤远程条目
-  let effectiveRemoteEntries = remoteEntries
-  if (selectedRowsOnly) {
-    const selectedSids = getSelectedRowSids()
-    if (selectedSids.size === 0) {
-      throw new Error('未选中任何行，或选中行中未找到 Bangumi URL')
+  try {
+    // 空文档自动填充表头
+    const ws = getDataSheet()
+    if (ws) {
+      const filled = ensureSheetHeaders(ws)
+      if (filled) {
+        bgmLog(LOG_LEVELS.INFO, '[syncFromGithub] 空文档已自动填充标准表头')
+        onProgress?.(1, 3, '已自动填充表头，继续同步...')
+      }
     }
-    effectiveRemoteEntries = remoteEntries.filter((e) => selectedSids.has(e.sid))
+
+    // 仅同步选中行：过滤远程条目
+    let effectiveRemoteEntries = remoteEntries
+    if (selectedRowsOnly) {
+      const selectedSids = getSelectedRowSids()
+      if (selectedSids.size === 0) {
+        throw new Error('未选中任何行，或选中行中未找到 Bangumi URL')
+      }
+      effectiveRemoteEntries = remoteEntries.filter((e) => selectedSids.has(e.sid))
+      bgmLog(
+        LOG_LEVELS.INFO,
+        `[syncFromGithub] 仅同步选中行：选中 ${selectedSids.size} 个 SID，匹配远程 ${effectiveRemoteEntries.length} 条`,
+      )
+      onProgress?.(
+        1,
+        3,
+        `选中 ${selectedSids.size} 行，匹配远程 ${effectiveRemoteEntries.length} 条`,
+      )
+    }
+
+    const local = readLocalEntriesForSync()
+    if (!local) {
+      throw new Error('无法读取本地工作表数据')
+    }
+
+    onProgress?.(2, 3, '比对差异中...')
+    const diffs = computeDiff(effectiveRemoteEntries, local.entries, strategy)
+
+    // 应用用户冲突解决决策：过滤掉用户选择「本地」的字段
+    if (conflictResolution && conflictResolution.length > 0) {
+      applyConflictResolutions(diffs, conflictResolution)
+      bgmLog(LOG_LEVELS.INFO, `[githubSync] 已应用 ${conflictResolution.length} 条冲突解决决策`)
+    }
+
+    const addCount = diffs.filter((d) => d.kind === 'add').length
+    const updateCount = diffs.filter((d) => d.kind === 'update').length
+    const deleteCount = diffs.filter((d) => d.kind === 'delete').length
     bgmLog(
       LOG_LEVELS.INFO,
-      `[syncFromGithub] 仅同步选中行：选中 ${selectedSids.size} 个 SID，匹配远程 ${effectiveRemoteEntries.length} 条`,
+      `[githubSync] diff 完成（${strategy}）：新增 ${addCount}，更新 ${updateCount}，删除 ${deleteCount}`,
     )
-    onProgress?.(1, 3, `选中 ${selectedSids.size} 行，匹配远程 ${effectiveRemoteEntries.length} 条`)
+
+    const result = await applyDiffToSheet(diffs, strategy, onProgress, source.getDisplayName())
+    result.remoteTotal = effectiveRemoteEntries.length
+    // unchanged = 远程总数 - (新增+更新)（delete 不计入 unchanged）
+    result.unchanged = Math.max(0, effectiveRemoteEntries.length - addCount - updateCount)
+
+    onProgress?.(3, 3, `完成：新增 ${result.added}，更新 ${result.updated}，删除 ${result.deleted}`)
+    return result
+  } finally {
+    // 恢复屏幕刷新和自动计算
+    try {
+      if (app) {
+        if (prevScreenUpdating !== undefined) app.ScreenUpdating = prevScreenUpdating
+        if (prevCalculation !== undefined) app.Calculation = prevCalculation
+      }
+    } catch {
+      // 忽略恢复失败
+    }
   }
-
-  const local = readLocalEntriesForSync()
-  if (!local) {
-    throw new Error('无法读取本地工作表数据')
-  }
-
-  onProgress?.(2, 3, '比对差异中...')
-  const diffs = computeDiff(effectiveRemoteEntries, local.entries, strategy)
-
-  // 应用用户冲突解决决策：过滤掉用户选择「本地」的字段
-  if (conflictResolution && conflictResolution.length > 0) {
-    applyConflictResolutions(diffs, conflictResolution)
-    bgmLog(LOG_LEVELS.INFO, `[githubSync] 已应用 ${conflictResolution.length} 条冲突解决决策`)
-  }
-
-  const addCount = diffs.filter((d) => d.kind === 'add').length
-  const updateCount = diffs.filter((d) => d.kind === 'update').length
-  const deleteCount = diffs.filter((d) => d.kind === 'delete').length
-  bgmLog(
-    LOG_LEVELS.INFO,
-    `[githubSync] diff 完成（${strategy}）：新增 ${addCount}，更新 ${updateCount}，删除 ${deleteCount}`,
-  )
-
-  const result = applyDiffToSheet(diffs, strategy, onProgress, source.getDisplayName())
-  result.remoteTotal = effectiveRemoteEntries.length
-  // unchanged = 远程总数 - (新增+更新)（delete 不计入 unchanged）
-  result.unchanged = Math.max(0, effectiveRemoteEntries.length - addCount - updateCount)
-
-  onProgress?.(3, 3, `完成：新增 ${result.added}，更新 ${result.updated}，删除 ${result.deleted}`)
-  return result
 }
 
 /**

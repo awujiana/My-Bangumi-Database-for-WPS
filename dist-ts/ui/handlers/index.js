@@ -637,18 +637,33 @@ const ACTION_HANDLERS = {
             });
             // 状态栏同步更新（与 syncFromPanel 行为一致）
             const app = getApp();
-            syncFromRemote((current, total, message) => {
-                updateSyncProgressDialog(current, total, message);
+            // 性能追踪：记录同步开始时间，用于计算总耗时
+            const syncStartTime = Date.now();
+            syncFromRemote((current, total, message, eta) => {
+                // 将 ETA 作为 logLine 传入，updateSyncProgressDialog 会自动识别并显示
+                updateSyncProgressDialog(current, total, message, eta);
                 if (app?.StatusBar !== undefined) {
-                    app.StatusBar = `[${current}/${total}] ${message}`;
+                    const statusMsg = eta ? `${message} | ${eta}` : message;
+                    app.StatusBar = `[${current}/${total}] ${statusMsg}`;
                 }
             }, strategy, abortController.signal, selectedRowsOnly)
                 .then((result) => {
+                const totalElapsed = Date.now() - syncStartTime;
+                const totalProcessed = result.added + result.updated;
+                const avgSpeed = totalProcessed > 0 && totalElapsed > 0
+                    ? Math.round((totalProcessed / totalElapsed) * 1000)
+                    : 0;
+                const elapsedStr = totalElapsed < 1000
+                    ? `${totalElapsed}ms`
+                    : totalElapsed < 60000
+                        ? `${Math.floor(totalElapsed / 1000)}秒`
+                        : `${Math.floor(totalElapsed / 60000)}分${Math.floor((totalElapsed % 60000) / 1000)}秒`;
                 const summary = `📊 数据同步完成（策略：${strategyLabel}）\n\n` +
                     `远程 ${result.remoteTotal} 条\n` +
                     `✅ 新增 ${result.added}，🔄 更新 ${result.updated}\n` +
                     `❌ 删除 ${result.deleted}，⏭️ 无变更 ${result.unchanged}\n` +
-                    `⚠️ 失败 ${result.failed}`;
+                    `⚠️ 失败 ${result.failed}\n\n` +
+                    `⏱ 耗时 ${elapsedStr}，平均 ${avgSpeed} 行/秒`;
                 const details = [
                     `远程条目 ${result.remoteTotal} 条`,
                     `新增 ${result.added} 条`,
@@ -657,6 +672,8 @@ const ACTION_HANDLERS = {
                     `无变更 ${result.unchanged} 条`,
                     `失败 ${result.failed} 条`,
                     `策略：${strategyLabel}`,
+                    `⏱ 总耗时: ${elapsedStr}`,
+                    `⚡ 平均速度: ${avgSpeed} 行/秒`,
                 ];
                 completeSyncProgressDialog(summary, details, false);
                 bgmLog(LOG_LEVELS.INFO, `[handleActionClick] 数据同步完成: ${details.join('，')}`);

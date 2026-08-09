@@ -225,7 +225,7 @@ vi.mock('../../ts/sync/syncSourceRegistry.js', async () => {
       onProgress?.(2, 3, '比对差异中...')
       const diffs = githubSync.computeDiff(remoteEntries, local.entries, strategy)
 
-      const result = githubSync.applyDiffToSheet(
+      const result = await githubSync.applyDiffToSheet(
         diffs,
         strategy,
         onProgress,
@@ -594,6 +594,9 @@ describe('空 Excel 数据场景', () => {
 // ========== 5. GitHub 同步流程 ==========
 describe('GitHub 同步流程：fetch JSONL → diff → apply → undo', () => {
   beforeEach(() => {
+    // 使用真实定时器，避免 yieldToEventLoop (setTimeout) 被 fake timers 阻塞
+    vi.useRealTimers()
+
     // 重置 GitHub 同步相关 mock
     mockState.beginUndoSession.mockReset()
     mockState.endUndoSession.mockReset()
@@ -645,6 +648,11 @@ describe('GitHub 同步流程：fetch JSONL → diff → apply → undo', () => 
     mockState.getAllSyncRecords.mockReturnValue([])
   })
 
+  afterEach(() => {
+    // 恢复 fake timers，避免影响其他 describe 块
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'setInterval', 'clearInterval'] })
+  })
+
   it('完整流程：fetch JSONL → computeDiff → applyDiffToSheet → undoLastSync', async () => {
     // 1. 构造远程 JSONL 数据（2 条：1 条新增，1 条更新）
     const jsonlText =
@@ -692,7 +700,7 @@ describe('GitHub 同步流程：fetch JSONL → diff → apply → undo', () => 
     // 配置 getCellValue 返回合理的行数据（用于 readLocalEntries）
     // 由于 applyDiffToSheet 内部调用 getDataSheet/findHeaderRow/getLastRow/getColumnMap（已 mock），
     // 以及 setCellValue（已 mock），可直接调用
-    const result = applyDiffToSheet(diffs, 'add-update')
+    const result = await applyDiffToSheet(diffs, 'add-update')
     expect(result.added).toBe(1)
     expect(result.updated).toBe(1)
 
@@ -723,7 +731,7 @@ describe('GitHub 同步流程：fetch JSONL → diff → apply → undo', () => 
     expect(restored).toBe(2)
   })
 
-  it('mirror 策略应删除本地多余行', () => {
+  it('mirror 策略应删除本地多余行', async () => {
     const remote: GithubRemoteEntry[] = [{ sid: '20001', name: '保留' }]
     const local = createLocalEntries([
       { row: 2, sid: '20001', fields: { 名称: '保留', 是否看完: '看过' } },
@@ -743,13 +751,13 @@ describe('GitHub 同步流程：fetch JSONL → diff → apply → undo', () => 
       return ''
     })
 
-    const result = applyDiffToSheet(diffs, 'mirror')
+    const result = await applyDiffToSheet(diffs, 'mirror')
     expect(result.deleted).toBeGreaterThanOrEqual(0)
     expect(mockState.beginUndoSession).toHaveBeenCalled()
     expect(mockState.endUndoSession).toHaveBeenCalled()
   })
 
-  it('force-overwrite 策略应强制更新所有字段', () => {
+  it('force-overwrite 策略应强制更新所有字段', async () => {
     const remote: GithubRemoteEntry[] = [{ sid: '30001', name: '新名' }]
     const local = createLocalEntries([
       { row: 2, sid: '30001', fields: { 名称: '旧名', 是否看完: '看过', 打分: '5' } },
@@ -760,7 +768,7 @@ describe('GitHub 同步流程：fetch JSONL → diff → apply → undo', () => 
     expect(diffs[0]?.kind).toBe('update')
     expect(diffs[0]?.changedFields).toEqual(['*'])
 
-    const result = applyDiffToSheet(diffs, 'force-overwrite')
+    const result = await applyDiffToSheet(diffs, 'force-overwrite')
     expect(result.updated).toBe(1)
   })
 

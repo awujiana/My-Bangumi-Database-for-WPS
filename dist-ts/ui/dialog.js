@@ -365,6 +365,7 @@ function ensureSyncProgressDialog() {
                     <div class="bgm-sync-progress__meta" aria-live="polite" aria-atomic="true">
                         <span id="bgmSyncProgressLabel">进度: 0/0</span>
                         <span id="bgmSyncProgressPercent">0%</span>
+                        <span id="bgmSyncProgressEta" class="bgm-sync-progress__eta" style="display:none;"></span>
                     </div>
                     <div class="bgm-sync-progress__track">
                         <div id="bgmSyncProgressBar" class="bgm-sync-progress__bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"></div>
@@ -494,6 +495,7 @@ export function showSyncProgressDialog(title, handlers) {
     const percent = modal.querySelector('#bgmSyncProgressPercent');
     const current = modal.querySelector('#bgmSyncProgressCurrent');
     const log = modal.querySelector('#bgmSyncProgressLog');
+    const etaEl = modal.querySelector('#bgmSyncProgressEta');
     if (bar) {
         bar.style.width = '0%';
         bar.textContent = '';
@@ -507,6 +509,10 @@ export function showSyncProgressDialog(title, handlers) {
         current.textContent = '';
     if (log)
         log.textContent = '';
+    if (etaEl) {
+        etaEl.textContent = '';
+        etaEl.style.display = 'none';
+    }
     modal.style.display = 'flex';
     modal.setAttribute('aria-hidden', 'false');
     // 焦点管理：将焦点移至暂停按钮，便于键盘操作
@@ -517,7 +523,7 @@ export function showSyncProgressDialog(title, handlers) {
  * @param current 当前完成数
  * @param total 总数
  * @param message 当前任务描述（显示在进度条下方）
- * @param logLine 可选的实时日志行（追加到日志区）
+ * @param logLine 可选的实时日志行（追加到日志区）或 ETA 字符串
  */
 export function updateSyncProgressDialog(current, total, message, logLine) {
     const modal = _syncProgressDialog;
@@ -529,6 +535,7 @@ export function updateSyncProgressDialog(current, total, message, logLine) {
     const percent = modal.querySelector('#bgmSyncProgressPercent');
     const currentEl = modal.querySelector('#bgmSyncProgressCurrent');
     const log = modal.querySelector('#bgmSyncProgressLog');
+    const etaEl = modal.querySelector('#bgmSyncProgressEta');
     const pct = total > 0 ? Math.round((current / total) * 100) : 0;
     if (bar) {
         bar.style.width = pct + '%';
@@ -541,6 +548,14 @@ export function updateSyncProgressDialog(current, total, message, logLine) {
         percent.textContent = pct + '%';
     if (currentEl && message)
         currentEl.textContent = message;
+    // 显示 ETA（当 logLine 以"预计剩余"或"剩余:"开头时，视为 ETA 信息）
+    if (etaEl && logLine && (logLine.startsWith('预计剩余') || logLine.startsWith('剩余:'))) {
+        etaEl.textContent = logLine;
+        etaEl.style.display = '';
+    }
+    else if (etaEl && !logLine) {
+        etaEl.style.display = 'none';
+    }
     if (logLine && log) {
         // 智能滚动：仅当用户已接近底部时才自动滚动，避免打断阅读
         const nearBottom = log.scrollHeight - log.scrollTop - log.clientHeight < 30;

@@ -1534,8 +1534,14 @@ select.input {
     display: flex;
     justify-content: space-between;
     margin-bottom: 6px;
-    font-size: 13px;
+    font-size: 12px;
     color: var(--subtext0, #a6adc8);
+}
+
+.bgm-sync-progress__eta {
+    font-size: 12px;
+    color: var(--yellow, #f9e2af);
+    font-weight: 500;
 }
 
 .bgm-sync-progress__track {

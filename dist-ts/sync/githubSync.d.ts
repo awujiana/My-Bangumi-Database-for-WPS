@@ -85,11 +85,11 @@ export declare function readLocalEntriesForSync(): {
  * 应用 diff 到 Excel 工作表
  * @param diffs 差异列表
  * @param strategy 同步策略（决定 force-overwrite 与 delete 行为）
- * @param onProgress 进度回调（current, total, message）
+ * @param onProgress 进度回调（current, total, message, eta）
  * @param source 同步来源显示名称（如 GitHub/GitLab/Gitee），用于写入同步记录
  * @returns 同步结果统计
  */
-export declare function applyDiffToSheet(diffs: GithubSyncDiff[], strategy: SyncStrategy, onProgress?: (current: number, total: number, message: string) => void, source?: string): GithubSyncResult;
+export declare function applyDiffToSheet(diffs: GithubSyncDiff[], strategy: SyncStrategy, onProgress?: (current: number, total: number, message: string, eta?: string) => void, source?: string): Promise<GithubSyncResult>;
 /**
  * 根据用户冲突解决决策调整 diff 列表
  *
@@ -123,5 +123,5 @@ export declare function applyConflictResolutions(diffs: GithubSyncDiff[], resolu
  * @returns 同步结果统计
  * @throws 配置错误、网络错误、解析错误时抛出
  */
-export declare function syncFromGithub(onProgress?: (current: number, total: number, message: string) => void, strategy?: SyncStrategy, signal?: AbortSignal, conflictResolution?: ConflictResolution[], selectedRowsOnly?: boolean): Promise<GithubSyncResult>;
+export declare function syncFromGithub(onProgress?: (current: number, total: number, message: string, eta?: string) => void, strategy?: SyncStrategy, signal?: AbortSignal, conflictResolution?: ConflictResolution[], selectedRowsOnly?: boolean): Promise<GithubSyncResult>;
 //# sourceMappingURL=githubSync.d.ts.map

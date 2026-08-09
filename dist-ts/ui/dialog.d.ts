@@ -43,7 +43,7 @@ export declare function showSyncProgressDialog(title: string, handlers: {
  * @param current 当前完成数
  * @param total 总数
  * @param message 当前任务描述（显示在进度条下方）
- * @param logLine 可选的实时日志行（追加到日志区）
+ * @param logLine 可选的实时日志行（追加到日志区）或 ETA 字符串
  */
 export declare function updateSyncProgressDialog(current: number, total: number, message?: string, logLine?: string): void;
 /**
