@@ -11,13 +11,13 @@
  */
 import { LOG_LEVELS } from '../core/constants.js';
 import { bgmLog, getApp, getCellValue, findHeaderRow, getColumnMap, trim, ensureSheetHeaders, getDataSheet, } from '../tools/util.js';
-import { extractSubjectId } from './pureUtils.js';
 import { GistSyncSource } from './gistSync.js';
 import { GiteeSyncSource } from './giteeSync.js';
 import { getSyncSourceType } from './githubConfig.js';
 import { applyConflictResolutions, applyDiffToSheet, computeDiff, GithubSyncSource, readLocalEntriesForSync, } from './githubSync.js';
 import { GitlabSyncSource } from './gitlabSync.js';
 import { LocalFileSyncSource } from './localFileSync.js';
+import { extractSubjectId } from './pureUtils.js';
 /** 注册表内部存储：type → factory */
 const registry = new Map();
 /**

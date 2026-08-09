@@ -4,7 +4,7 @@
  * @description 批量读取范围值、表头定位、列映射、最后行检测、缓存管理。
  *              本模块对 index.js 存在循环依赖（调用 BGM/bgmLog/getApp），仅在函数体内引用，运行时安全。
  */
-import { LOG_LEVELS, PANEL_CONFIG, HEADER_KEYWORDS, COLUMN_RULES, STANDARD_HEADERS } from '../../core/constants.js';
+import { LOG_LEVELS, PANEL_CONFIG, HEADER_KEYWORDS, COLUMN_RULES, STANDARD_HEADERS, } from '../../core/constants.js';
 import { colNumToLetter, trim } from '../stringUtils.js';
 // 循环依赖：仅在函数体内使用 BGM/bgmLog/getApp，运行时安全
 import { getCellValue } from './cell.js';
@@ -394,8 +394,6 @@ export function ensureSheetHeaders(ws) {
     }
     bgmLog(LOG_LEVELS.INFO, '[ensureSheetHeaders] 工作表为空，开始写入标准表头（39 列）');
     // 逐列写入表头
-    const cellModule = './cell.js';
-    void cellModule; // setCellValue 已在 index.js re-export
     for (let i = 0; i < STANDARD_HEADERS.length; i++) {
         const header = STANDARD_HEADERS[i];
         if (header !== undefined) {

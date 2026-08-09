@@ -631,7 +631,6 @@ const ACTION_HANDLERS = {
             });
             // 状态栏同步更新（与 syncFromPanel 行为一致）
             const app = getApp();
-            const prevStatusBar = app?.StatusBar;
             syncFromRemote((current, total, message) => {
                 updateSyncProgressDialog(current, total, message);
                 if (app?.StatusBar !== undefined) {
@@ -672,7 +671,6 @@ const ACTION_HANDLERS = {
                 }
                 if (app?.StatusBar !== undefined)
                     app.StatusBar = false;
-                void prevStatusBar;
             });
         });
         bgmLog(LOG_LEVELS.INFO, `[handleActionClick] 数据同步已触发（策略: ${strategy}），耗时: ${Date.now() - ctx.startTime}ms`);
