@@ -46,23 +46,86 @@ function initRibbonMessageListener() {
     };
     window.addEventListener('message', _ribbonMessageHandler);
 }
+// ========== PluginStorage 配置轮询（Ribbon ↔ Taskpane 跨 WebView 同步）==========
+// WPS 中 Ribbon 和 Taskpane 是独立 WebView，postMessage 无法跨上下文通信。
+// Taskpane 侧通过 userInfoPolling 轮询 PluginStorage 同步 Ribbon 的变更，
+// Ribbon 侧也需要同等轮询机制，定期检查 Taskpane 写入的配置变更并刷新按钮状态。
+let _configPollingTimer = null;
 /**
- * 初始化 Ribbon 模块：注册消息监听器。
+ * 启动 Ribbon 配置轮询：每 2 秒检查 PluginStorage 中配置值的变化，
+ * 发现变化时调用 InvalidateControl 刷新 Ribbon 按钮状态。
+ *
+ * 需要与 Taskpane 的 startUserInfoPolling（2 秒间隔）保持一致，
+ * 确保双边同步延迟在 2 秒以内。
+ */
+function startRibbonConfigPolling() {
+    // 防止重复启动
+    if (_configPollingTimer)
+        return;
+    let lastIncrementalSync = null;
+    let lastSkipConflicts = null;
+    let lastEnableSyncRecord = null;
+    _configPollingTimer = setInterval(() => {
+        try {
+            const currentIncrementalSync = getIncrementalSync(true);
+            const currentSkipConflicts = getSkipConflicts(true);
+            const currentEnableSyncRecord = getSyncRecordEnabled(true);
+            const app = getApp();
+            const ribbonUI = app?.ribbonUI;
+            if (!ribbonUI)
+                return;
+            if (currentIncrementalSync !== lastIncrementalSync) {
+                lastIncrementalSync = currentIncrementalSync;
+                ribbonUI.InvalidateControl('chkIncrementalSync');
+                bgmLog(LOG_LEVELS.INFO, `[ribbon-polling] 增量同步配置变更: ${currentIncrementalSync ? '开启' : '关闭'}，已 InvalidateControl chkIncrementalSync`);
+            }
+            if (currentSkipConflicts !== lastSkipConflicts) {
+                lastSkipConflicts = currentSkipConflicts;
+                ribbonUI.InvalidateControl('chkSkipConflicts');
+                bgmLog(LOG_LEVELS.INFO, `[ribbon-polling] 跳过冲突配置变更: ${currentSkipConflicts ? '跳过' : 'Excel覆盖'}，已 InvalidateControl chkSkipConflicts`);
+            }
+            if (currentEnableSyncRecord !== lastEnableSyncRecord) {
+                lastEnableSyncRecord = currentEnableSyncRecord;
+                ribbonUI.InvalidateControl('chkEnableSyncRecord');
+                bgmLog(LOG_LEVELS.INFO, `[ribbon-polling] 同步记录开关变更: ${currentEnableSyncRecord ? '开启' : '关闭'}，已 InvalidateControl chkEnableSyncRecord`);
+            }
+        }
+        catch {
+            // 静默处理轮询错误
+        }
+    }, 2000);
+}
+/**
+ * 停止 Ribbon 配置轮询，防止内存泄漏
+ */
+function stopRibbonConfigPolling() {
+    if (_configPollingTimer !== null) {
+        clearInterval(_configPollingTimer);
+        _configPollingTimer = null;
+    }
+}
+/**
+ * 初始化 Ribbon 模块：注册消息监听器 + 启动配置轮询。
+ *
+ * postMessage 仅在同上下文（同源 iframe）中生效，
+ * 轮询机制作为跨 WebView 通信的兜底方案。
  *
  * 必须由显式入口（如 `ts/entry/ribbon-entry.ts`）调用，
  * 不在模块加载时自动执行，便于在测试环境按需初始化。
  */
 export function initRibbon() {
     initRibbonMessageListener();
+    startRibbonConfigPolling();
 }
 /**
- * 移除 Ribbon 消息监听器，防止内存泄漏
+ * 移除 Ribbon 消息监听器 + 停止配置轮询，防止内存泄漏
  */
 export function removeRibbonMessageListener() {
     if (_ribbonMessageHandler) {
         window.removeEventListener('message', _ribbonMessageHandler);
         _ribbonMessageHandler = null;
     }
+    stopRibbonConfigPolling();
 }
 /**
  * 获取"跳过冲突"复选框的初始按下状态

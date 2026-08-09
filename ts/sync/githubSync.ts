@@ -39,11 +39,13 @@ import {
   tagsToString,
   parseJsonl,
   EXTENDED_FIELD_MAP,
+  filterByTime,
   type ConflictResolution,
   type GithubRemoteEntry,
   type GithubSyncDiff,
   type LocalRowEntry,
   type SyncStrategy,
+  type SyncTimeFilter,
 } from './githubSyncDiff.js'
 import { extractSubjectId } from './pureUtils.js'
 import { addSyncRecords, addSyncRecordSummary } from './syncRecord.js'
@@ -65,12 +67,14 @@ export {
   tagsToString,
   parseJsonl,
   isGithubRemoteEntry,
+  filterByTime,
   SYNC_STRATEGY_LABELS,
   EXTENDED_FIELD_MAP,
   type GithubRemoteEntry,
   type GithubSyncDiff,
   type LocalRowEntry,
   type SyncStrategy,
+  type SyncTimeFilter,
 } from './githubSyncDiff.js'
 
 /** 同步结果统计 */
@@ -425,7 +429,7 @@ function formatDuration(ms: number): string {
  * 格式化预估剩余时间
  */
 function formatEta(ms: number): string {
-  if (ms <= 0) return '剩余: 即将完成'
+  if (ms <= 0) return '剩余: 计算中...'
   return `预计剩余: ${formatDuration(ms)}`
 }
 
@@ -794,11 +798,13 @@ export async function applyDiffToSheet(
       const totalProcessed = addTotal + otherProcessed
       const elapsed = now - syncStartTime
       const speed = totalProcessed > 0 && elapsed > 0 ? (totalProcessed / elapsed) * 1000 : 0
+      const remaining = otherTotal - otherProcessed
+      const eta = speed > 0 ? (remaining / speed) * 1000 : 0
       onProgress?.(
         totalProcessed,
         total,
         `更新 ${otherProcessed}/${otherTotal} 条 (${speed > 0 ? speed.toFixed(0) : '?'} 行/秒)`,
-        formatEta(0),
+        formatEta(eta),
       )
       lastProgressTime = now
     }
@@ -925,6 +931,7 @@ export async function syncFromGithub(
   signal?: AbortSignal,
   conflictResolution?: ConflictResolution[],
   selectedRowsOnly?: boolean,
+  timeFilter?: SyncTimeFilter,
 ): Promise<GithubSyncResult> {
   const source: SyncSource = new GithubSyncSource()
 
@@ -981,6 +988,21 @@ export async function syncFromGithub(
         1,
         3,
         `选中 ${selectedSids.size} 行，匹配远程 ${effectiveRemoteEntries.length} 条`,
+      )
+    }
+
+    // 时间筛选：按年份/季度/月份过滤远程条目
+    if (timeFilter?.enabled && timeFilter.range !== 'all') {
+      const beforeCount = effectiveRemoteEntries.length
+      effectiveRemoteEntries = filterByTime(effectiveRemoteEntries, timeFilter)
+      bgmLog(
+        LOG_LEVELS.INFO,
+        `[syncFromGithub] 时间筛选（${timeFilter.range}）：${beforeCount} → ${effectiveRemoteEntries.length} 条`,
+      )
+      onProgress?.(
+        1,
+        3,
+        `时间筛选：${timeFilter.range === 'year' ? `${timeFilter.year}年` : timeFilter.range === 'quarter' ? `${timeFilter.year}年${timeFilter.quarter}月新番` : `${timeFilter.year}年${timeFilter.month}月`}，匹配 ${effectiveRemoteEntries.length} 条`,
       )
     }
 

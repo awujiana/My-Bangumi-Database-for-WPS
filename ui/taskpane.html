@@ -287,6 +287,73 @@
                     仅同步选中行（按 Bangumi URL 列匹配 SID）
                 </label>
             </div>
+            <div class="form-row" style="border:1px solid #555;border-radius:4px;padding:8px;margin:8px 0;background:#383838;">
+                <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px;color:#e0e0e0;">
+                    <input type="checkbox" id="chkTimeFilter" style="cursor:pointer;" />
+                    <span>启用时间筛选（按开播日期过滤）</span>
+                </label>
+                <div id="timeFilterControls" style="margin-top:8px;padding:8px;background:#444;border-radius:4px;display:none;">
+                    <div class="form-row">
+                        <label for="timeFilterYear">年份</label>
+                        <select id="timeFilterYear" class="input" style="flex:1;">
+                            <option value="2026">2026</option>
+                            <option value="2025">2025</option>
+                            <option value="2024">2024</option>
+                            <option value="2023">2023</option>
+                            <option value="2022">2022</option>
+                            <option value="2021">2021</option>
+                            <option value="2020">2020</option>
+                            <option value="2019">2019</option>
+                            <option value="2018">2018</option>
+                            <option value="2017">2017</option>
+                            <option value="2016">2016</option>
+                            <option value="2015">2015</option>
+                            <option value="2014">2014</option>
+                            <option value="2013">2013</option>
+                            <option value="2012">2012</option>
+                            <option value="2011">2011</option>
+                            <option value="2010">2010</option>
+                        </select>
+                    </div>
+                    <div class="form-row">
+                        <label for="timeFilterRange">筛选范围</label>
+                        <select id="timeFilterRange" class="input" style="flex:1;">
+                            <option value="year">全年</option>
+                            <option value="quarter">季度新番</option>
+                            <option value="month">具体月份</option>
+                        </select>
+                    </div>
+                    <div class="form-row" id="quarterRow" style="display:none;">
+                        <label for="timeFilterQuarter">季度</label>
+                        <select id="timeFilterQuarter" class="input" style="flex:1;">
+                            <option value="1">1月新番（上年12月-本年2月）</option>
+                            <option value="4">4月新番（3月-5月）</option>
+                            <option value="7">7月新番（6月-8月）</option>
+                            <option value="10">10月新番（9月-11月）</option>
+                        </select>
+                    </div>
+                    <div class="form-row" id="monthRow" style="display:none;">
+                        <label for="timeFilterMonth">月份</label>
+                        <select id="timeFilterMonth" class="input" style="flex:1;">
+                            <option value="1">1月</option>
+                            <option value="2">2月</option>
+                            <option value="3">3月</option>
+                            <option value="4">4月</option>
+                            <option value="5">5月</option>
+                            <option value="6">6月</option>
+                            <option value="7">7月</option>
+                            <option value="8">8月</option>
+                            <option value="9">9月</option>
+                            <option value="10">10月</option>
+                            <option value="11">11月</option>
+                            <option value="12">12月</option>
+                        </select>
+                    </div>
+                </div>
+                <p class="hint" style="margin-top:4px;font-size:11px;">
+                    季度划分：1月新番=上年12月~本年2月，4月新番=3月~5月，7月新番=6月~8月，10月新番=9月~11月
+                </p>
+            </div>
             <div class="btn-group">
                 <button class="btn small primary" data-action="saveGithubConfig">💾 保存配置</button>
                 <button class="btn small" data-action="syncFromGithub">⬇️ 立即同步</button>

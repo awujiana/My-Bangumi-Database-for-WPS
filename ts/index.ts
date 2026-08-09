@@ -252,6 +252,8 @@ export {
   type LocalRowEntry,
   // 同步策略类型
   type SyncStrategy,
+  // 同步时间筛选类型
+  type SyncTimeFilter,
 } from './sync/githubSyncDiff.js'
 
 export {
@@ -570,3 +572,19 @@ export {
 // 19. 冲突解决 UI（来自 ui/conflictResolver.js）
 // ============================================================================
 export { showConflictResolver } from './ui/conflictResolver.js'
+
+// ============================================================================
+// 20. 同步结果增强弹窗（来自 ui/syncResultDialog.js）
+// ============================================================================
+export {
+  showSyncResultDialog,
+  hideSyncResultDialog,
+  computeDateStatsFromSheet,
+  type DateStats,
+  type SyncResultDialogOptions,
+} from './ui/syncResultDialog.js'
+
+// ============================================================================
+// 21. JSONL 导出（来自 sync/exportJsonl.js）
+// ============================================================================
+export { exportSheetToJsonlFile, buildJsonlFromSheet } from './sync/exportJsonl.js'

@@ -28,14 +28,17 @@ interface WpsRibbonUI {
     ActivateTab?(tabId: string): void;
 }
 /**
- * 初始化 Ribbon 模块：注册消息监听器。
+ * 初始化 Ribbon 模块：注册消息监听器 + 启动配置轮询。
+ *
+ * postMessage 仅在同上下文（同源 iframe）中生效，
+ * 轮询机制作为跨 WebView 通信的兜底方案。
  *
  * 必须由显式入口（如 `ts/entry/ribbon-entry.ts`）调用，
  * 不在模块加载时自动执行，便于在测试环境按需初始化。
  */
 export declare function initRibbon(): void;
 /**
- * 移除 Ribbon 消息监听器，防止内存泄漏
+ * 移除 Ribbon 消息监听器 + 停止配置轮询，防止内存泄漏
  */
 export declare function removeRibbonMessageListener(): void;
 /**

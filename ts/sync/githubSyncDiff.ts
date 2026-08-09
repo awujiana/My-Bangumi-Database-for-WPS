@@ -230,6 +230,106 @@ export function parseJsonl(text: string): {
   return { entries, errors }
 }
 
+// ========== 同步时间筛选 ==========
+
+/**
+ * 同步时间筛选配置
+ *
+ * 支持三种筛选模式：
+ * - 'all': 不过滤（全部同步）
+ * - 'year': 按年份筛选（如 2026 年所有动漫）
+ * - 'quarter': 按季度筛选（如 2026 年 4 月新番）
+ * - 'month': 按月份筛选（如 2025 年 1 月）
+ */
+export interface SyncTimeFilter {
+  /** 是否启用时间筛选 */
+  enabled: boolean
+  /** 目标年份 */
+  year: number
+  /** 筛选范围 */
+  range: 'all' | 'year' | 'quarter' | 'month'
+  /** 季度值（仅 range='quarter' 时有效）：1 | 4 | 7 | 10 */
+  quarter?: 1 | 4 | 7 | 10
+  /** 月份值（仅 range='month' 时有效）：1-12 */
+  month?: number
+}
+
+/**
+ * 季度范围定义（按日本动漫季度划分）
+ *
+ * - 1月新番：上年12月 — 本年2月
+ * - 4月新番：3月 — 5月
+ * - 7月新番：6月 — 8月
+ * - 10月新番：9月 — 11月
+ */
+const QUARTER_MONTH_RANGES: Readonly<Record<number, readonly [number, number, number]>> = {
+  1: [12, 1, 2], // 1月新番：上年12月、本年1月、本年2月
+  4: [3, 4, 5], // 4月新番：3月、4月、5月
+  7: [6, 7, 8], // 7月新番：6月、7月、8月
+  10: [9, 10, 11], // 10月新番：9月、10月、11月
+} as const
+
+/**
+ * 按时间筛选远程条目
+ *
+ * 根据 {@link SyncTimeFilter} 配置，基于远程条目的 `date` 字段（开播日期）
+ * 进行年份/季度/月份筛选。日期格式支持 YYYY-MM-DD、YYYY/MM/DD、YYYY.MM.DD 等。
+ *
+ * 季度规则：
+ * - 1月新番（Q1）：上年12月 + 本年1月 + 本年2月
+ * - 4月新番（Q2）：3月 + 4月 + 5月
+ * - 7月新番（Q3）：6月 + 7月 + 8月
+ * - 10月新番（Q4）：9月 + 10月 + 11月
+ *
+ * @param entries 远程条目数组
+ * @param filter 时间筛选配置
+ * @returns 筛选后的条目数组
+ */
+export function filterByTime(
+  entries: GithubRemoteEntry[],
+  filter: SyncTimeFilter,
+): GithubRemoteEntry[] {
+  if (!filter.enabled || filter.range === 'all') return entries
+
+  return entries.filter((entry) => {
+    if (!entry.date) return false
+
+    // 解析日期：支持 YYYY-MM-DD、YYYY/MM/DD、YYYY.MM.DD 等格式
+    const match = String(entry.date).match(/^(\d{4})[-/.](\d{1,2})/)
+    if (!match) return false
+
+    const yearStr = match[1]
+    const monthStr = match[2]
+    if (!yearStr || !monthStr) return false
+    const year = parseInt(yearStr, 10)
+    const month = parseInt(monthStr, 10)
+    if (isNaN(year) || isNaN(month)) return false
+
+    switch (filter.range) {
+      case 'year':
+        // 按年份筛选：匹配给定年份的任意月份
+        return year === filter.year
+
+      case 'quarter': {
+        // 按季度筛选
+        const qMonths = QUARTER_MONTH_RANGES[filter.quarter ?? 1]
+        if (!qMonths) return false
+        if (!qMonths.includes(month)) return false
+        // 处理季度跨年：1月新番的12月属于上年
+        if (month === 12) return year === filter.year - 1
+        return year === filter.year
+      }
+
+      case 'month':
+        // 按月份筛选
+        return year === filter.year && month === (filter.month ?? 1)
+
+      default:
+        return false
+    }
+  })
+}
+
 /**
  * 计算远程条目与本地条目的差异（按指定策略）
  *

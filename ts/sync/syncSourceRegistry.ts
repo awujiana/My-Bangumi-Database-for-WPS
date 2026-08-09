@@ -34,7 +34,7 @@ import {
   type GithubSyncResult,
   type SyncStrategy,
 } from './githubSync.js'
-import { type ConflictResolution } from './githubSyncDiff.js'
+import { filterByTime, type ConflictResolution, type SyncTimeFilter } from './githubSyncDiff.js'
 import { GitlabSyncSource } from './gitlabSync.js'
 import { LocalFileSyncSource } from './localFileSync.js'
 import { extractSubjectId } from './pureUtils.js'
@@ -102,6 +102,7 @@ export async function syncFromRemote(
   signal?: AbortSignal,
   selectedRowsOnly?: boolean,
   conflictResolution?: ConflictResolution[],
+  timeFilter?: SyncTimeFilter,
 ): Promise<GithubSyncResult> {
   // 1. 按 sourceType 从注册表获取 SyncSource 实例
   const sourceType = getSyncSourceType()
@@ -165,6 +166,21 @@ export async function syncFromRemote(
         1,
         3,
         `选中 ${selectedSids.size} 行，匹配远程 ${effectiveRemoteEntries.length} 条`,
+      )
+    }
+
+    // 3.7 时间筛选：按年份/季度/月份过滤远程条目
+    if (timeFilter?.enabled && timeFilter.range !== 'all') {
+      const beforeCount = effectiveRemoteEntries.length
+      effectiveRemoteEntries = filterByTime(effectiveRemoteEntries, timeFilter)
+      bgmLog(
+        LOG_LEVELS.INFO,
+        `[syncFromRemote] 时间筛选（${timeFilter.range}）：${beforeCount} → ${effectiveRemoteEntries.length} 条`,
+      )
+      onProgress?.(
+        1,
+        3,
+        `时间筛选：${timeFilter.range === 'year' ? `${timeFilter.year}年` : timeFilter.range === 'quarter' ? `${timeFilter.year}年${timeFilter.quarter}月新番` : `${timeFilter.year}年${timeFilter.month}月`}，匹配 ${effectiveRemoteEntries.length} 条`,
       )
     }
 

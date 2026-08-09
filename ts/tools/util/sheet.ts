@@ -391,11 +391,6 @@ export function getDataSheet(): WpsWorksheet | null | undefined {
   const app = getApp()
   if (!app || !app.ActiveWorkbook) return null
 
-  bgmLog(
-    LOG_LEVELS.INFO,
-    `getDataSheet: isLocked=${BGM.sheet.isLocked}, lockedIndex=${BGM.sheet.lockedIndex}, lockedWorkbook=${BGM.sheet.lockedWorkbookName}`,
-  )
-
   if (BGM.sheet.isLocked && BGM.sheet.lockedIndex) {
     try {
       // 如果锁定的是特定工作簿，先尝试查找该工作簿
@@ -414,10 +409,6 @@ export function getDataSheet(): WpsWorksheet | null | undefined {
       }
 
       const ws = targetWb.Worksheets.Item(BGM.sheet.lockedIndex)
-      bgmLog(
-        LOG_LEVELS.INFO,
-        `getDataSheet: 返回锁定的工作表: ${ws.Name}（工作簿: ${targetWb.Name}）`,
-      )
       return ws
     } catch (e: unknown) {
       bgmLog(LOG_LEVELS.WARN, 'getDataSheet 锁定工作表失败: ' + (e as Error).message)
@@ -425,7 +416,6 @@ export function getDataSheet(): WpsWorksheet | null | undefined {
   }
 
   const ws = app.ActiveWorkbook.ActiveSheet
-  bgmLog(LOG_LEVELS.INFO, `getDataSheet: 返回当前活动工作表: ${ws.Name}`)
   return ws
 }
 

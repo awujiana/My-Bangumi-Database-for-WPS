@@ -99,6 +99,8 @@ export function endUndoSession(): void {
  * 1. 先逆序恢复所有单元格变更；
  * 2. 再按行号从大到小恢复被删除的行（避免先行插入导致后续行号偏移）。
  *
+ * 性能优化：缓存工作表引用，避免每次恢复都调用 getDataSheet()（COM 跨进程调用 + 日志输出）。
+ *
  * @returns 恢复的条目数，若无可撤销会话返回 0
  */
 export function undoLastSync(): number {
@@ -116,18 +118,25 @@ export function undoLastSync(): number {
     }
   }
 
+  // 缓存工作表引用，避免每次恢复都调用 getDataSheet()
+  const ws: WpsWorksheet | null | undefined = getDataSheet()
+  if (!ws) {
+    bgmLog(LOG_LEVELS.WARN, '[undoLastSync] 无法获取数据工作表，撤销失败')
+    return 0
+  }
+
   // 1. 逆序恢复单元格变更（与执行顺序相反）
   for (let i = cellEntries.length - 1; i >= 0; i--) {
     const entry = cellEntries[i]
     if (entry) {
-      restoreCellValue(entry.row, entry.col, entry.oldValue)
+      setCellValue(ws, entry.row, entry.col, entry.oldValue)
     }
   }
 
   // 2. 按行号从大到小恢复被删除的行
   rowDeleteEntries.sort((a, b) => b.row - a.row)
   for (const snapshot of rowDeleteEntries) {
-    restoreDeletedRow(snapshot)
+    restoreDeletedRowWithWs(ws, snapshot)
   }
 
   return session.entries.length
@@ -159,25 +168,11 @@ export function clearUndoStack(): void {
 // ========== 内部辅助：恢复单元格值 ==========
 
 /**
- * 将指定单元格恢复为 oldValue
- * @param row 行号
- * @param col 列号
- * @param value 要恢复的旧值
- */
-function restoreCellValue(row: number, col: number, value: string): void {
-  const ws: WpsWorksheet | null | undefined = getDataSheet()
-  if (!ws) return
-  setCellValue(ws, row, col, value)
-}
-
-/**
- * 恢复被删除的整行
+ * 恢复被删除的整行（使用已缓存的工作表引用）
+ * @param ws 数据工作表引用
  * @param snapshot 删除前保存的行快照
  */
-function restoreDeletedRow(snapshot: RowSnapshot): void {
-  const ws: WpsWorksheet | null | undefined = getDataSheet()
-  if (!ws) return
-
+function restoreDeletedRowWithWs(ws: WpsWorksheet, snapshot: RowSnapshot): void {
   try {
     // 在删除位置插入新行
     ws.Range(`${snapshot.row}:${snapshot.row}`).Insert()
