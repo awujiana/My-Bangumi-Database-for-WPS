@@ -32,6 +32,7 @@ import {
   syncSelectedRows,
   openBangumiTokenPage,
   setSyncRecordEnabled,
+  getSyncRecordEnabled,
   getIncrementalSync,
   setIncrementalSync,
   getSkipConflicts,
@@ -320,11 +321,19 @@ export function setupButtonListeners(): void {
     trackedAddEventListener(button, 'click', handleActionClick)
   })
 
-  // 启用同步记录 开关
+  // 启用同步记录 开关：从 config 读取初始状态 + 注册 change 监听器
   const chkEnableSyncRecord = document.getElementById(
     'chkEnableSyncRecord',
   ) as HTMLInputElement | null
   if (chkEnableSyncRecord) {
+    // 从 config 读取初始状态（与 chkIncremental/chkSkipConflicts 一致的双向同步机制）
+    try {
+      const enabled = getSyncRecordEnabled()
+      chkEnableSyncRecord.checked = enabled
+      bgmLog(LOG_LEVELS.INFO, `[handlers] 从配置读取同步记录状态: ${enabled ? '开启' : '关闭'}`)
+    } catch (e: unknown) {
+      bgmLog(LOG_LEVELS.WARN, `[handlers] 读取同步记录状态失败: ${(e as Error).message}`)
+    }
     trackedAddEventListener(chkEnableSyncRecord, 'change', handleEnableSyncRecordChange)
     bgmLog(LOG_LEVELS.INFO, '[handlers] 启用同步记录 checkbox 监听器已注册')
   }
