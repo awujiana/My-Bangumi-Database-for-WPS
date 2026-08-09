@@ -18,6 +18,8 @@
   },
   "description": "WPS Excel 加载项 - 追番标记助手",
   "devDependencies": {
+    "@napi-rs/canvas": "^1.0.3",
+    "@resvg/resvg-js": "^2.6.2",
     "@typescript-eslint/eslint-plugin": "^8.65.0",
     "@typescript-eslint/parser": "^8.65.0",
     "@vitest/coverage-v8": "^4.1.9",

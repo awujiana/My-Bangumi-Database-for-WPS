@@ -40,8 +40,11 @@
             if (_ribbonReady && typeof window._GetBangumiImageReal === 'function') {
                 return window._GetBangumiImageReal(control);
             }
-            // 返回默认图标（避免 WPS 报错）
-            return 'images/newFromTemp.svg';
+            // 【关键】早期占位必须返回绝对 HTTP URL：WPS Ribbon 回调上下文不在当前
+            // 浏览器页面内，相对路径基准是 WPS 安装目录，会找不到本地 SVG 文件导致
+            // 全部按钮图标显示为问号。
+            var origin = (window.location && window.location.origin) ? window.location.origin : '';
+            return origin + '/images/newFromTemp.svg';
         };
 
         // 模块就绪后由 ribbon.js 调用此函数完成初始化
@@ -67,6 +70,19 @@
             actions.forEach(function(ctrl) {
                 try { realOnAction(ctrl); } catch(e) { console.error(e); }
             });
+
+            // 【关键】强制刷新 Ribbon：真实 GetBangumiImage 就位后，
+            // WPS 不会自动重新拉取图标，必须显式 Invalidate 让它二次调用
+            // getImage 回调，此时才能拿到每个按钮对应的真实 SVG URL。
+            // 若只 Invalidate 早期占位返回的默认图标，按钮会一直显示占位图或问号。
+            if (window.__ribbonUI && typeof window.__ribbonUI.Invalidate === 'function') {
+                try {
+                    window.__ribbonUI.Invalidate();
+                    console.log('[BGM] Ribbon UI 已 Invalidate，图标将重新加载');
+                } catch(e) {
+                    console.error('[BGM] Ribbon Invalidate 失败:', e);
+                }
+            }
         };
         // 调试通知功能：向开发服务器发送请求
         window.onload = function() {
