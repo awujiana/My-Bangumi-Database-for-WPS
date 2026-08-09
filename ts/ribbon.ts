@@ -251,12 +251,36 @@ export function OnAction(control: { Id: string }): boolean {
       case 'btnSetToken':
         RibbonService.setTokenForRibbon()
         break
-      case 'btnTestToken':
-        RibbonService.testTokenForRibbon()
+      case 'btnTestToken': {
+        // testTokenForRibbon 是 async 函数，需 .catch() 防止未处理 rejection
+        RibbonService.testTokenForRibbon().catch((e: unknown) => {
+          bgmLog(
+            LOG_LEVELS.ERROR,
+            `[OnAction] testTokenForRibbon 异常: ${(e as Error)?.message || String(e)}`,
+          )
+          BGM.handleError(e, {
+            showAlert: true,
+            level: BGM.ErrorLevel.ERROR,
+            context: 'Ribbon btnTestToken',
+          })
+        })
         break
-      case 'btnCopyToken':
-        RibbonService.copyTokenForRibbon()
+      }
+      case 'btnCopyToken': {
+        // copyTokenForRibbon 是 async 函数，需 .catch() 防止未处理 rejection
+        RibbonService.copyTokenForRibbon().catch((e: unknown) => {
+          bgmLog(
+            LOG_LEVELS.ERROR,
+            `[OnAction] copyTokenForRibbon 异常: ${(e as Error)?.message || String(e)}`,
+          )
+          BGM.handleError(e, {
+            showAlert: true,
+            level: BGM.ErrorLevel.ERROR,
+            context: 'Ribbon btnCopyToken',
+          })
+        })
         break
+      }
       case 'btnSetUserId':
         RibbonService.setUserIdForRibbon()
         break

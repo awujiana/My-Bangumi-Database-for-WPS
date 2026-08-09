@@ -280,9 +280,9 @@
             </div>
             <p class="hint">
                 <strong>JSONL 格式</strong>：每行一个 JSON 对象（无外层数组括号，无逗号分隔）<br>
-                <code>{"sid":"12345","name":"...","type":2,"tags":["标签1"],"episode":12}</code><br>
-                <code>{"sid":"67890","name":"...","type":3,"url":"https://bgm.tv/subject/67890"}</code><br>
-                type: 1=书籍 2=动漫 3=音乐 4=游戏 6=三次元（条目类别，非观看状态）<br>
+                <code>{"sid":"8","name":"Code Geass R2","updatedAt":"2026-08-04","date":"2008-04-06","meta_tags":["机战","TV","日本"],"nsfw":false,"话数":"25","导演":"谷口悟朗","动画制作公司":"サンライズ","系列构成":"大河内一楼"}</code><br>
+                基础字段：<code>sid</code>（必填）、<code>name</code>、<code>updatedAt</code>（YYYY-MM-DD）<br>
+                扩展字段：<code>date</code>、<code>meta_tags</code>（标签数组）、<code>nsfw</code>（布尔）、<code>话数</code>、<code>导演</code>、<code>音乐</code>、<code>动画制作公司</code>、<code>系列构成</code> 等 infobox 解析字段<br>
                 默认仓库：<code>awujiana/Bangumi-Archive-Anime-Excel/main/data/bangumi.jsonl</code><br>
                 示例 Raw URL：<code>https://raw.githubusercontent.com/{owner}/{repo}/{branch}/{path}</code>
             </p>

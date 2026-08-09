@@ -6,7 +6,6 @@ import {
   wpsMsgBox,
   loadBgToken,
   storeBgToken,
-  copyTokenToClipboard,
   getDataSheet,
   findHeaderRow,
   getLastRow,
@@ -20,6 +19,8 @@ import {
   LOG_LEVELS,
   SyncToBangumiAsync,
   _getBgmUserId,
+  _setBgmUserId,
+  _setBgmUsername,
   testTokenValidityForRibbon,
   fetchAllUserCollections,
   type WpsRange,
@@ -610,24 +611,108 @@ function notifyPanelTokenUpdated(): void {
   }
 }
 
-/** 测试 Token（Ribbon 版本） */
-export function testTokenForRibbon(): void {
+/**
+ * 测试 Token（Ribbon 版本）
+ *
+ * Ribbon 上下文中 index.html 对用户不可见，DOM 弹窗（showAlert/showSuccess）无法展示。
+ * 因此本函数使用 wpsMsgBox（带浏览器 alert 兜底）替代 DOM 弹窗进行所有用户交互。
+ */
+export async function testTokenForRibbon(): Promise<void> {
   const token = loadBgToken()
-  if (token) {
-    testTokenValidityForRibbon(token)
-    BGM.notifyTokenUpdated()
-  } else {
-    getApp()?.MessageBox?.('请先设置 Token！', 0, 48)
+  if (!token) {
+    await wpsMsgBox('请先设置 Token！', 0, 48)
+    return
   }
+
+  // Ribbon 上下文：使用 XHR + wpsMsgBox，避免依赖不可见的 DOM 弹窗
+  const apiUrl = 'https://api.bgm.tv/v0/me'
+  bgmLog(LOG_LEVELS.INFO, `[testTokenForRibbon] 开始测试 Token，API: ${apiUrl}`)
+
+  await new Promise<void>((resolve) => {
+    const xhr = new XMLHttpRequest()
+    xhr.open('GET', apiUrl, true)
+    xhr.timeout = 15000
+    xhr.setRequestHeader('Authorization', 'Bearer ' + token)
+    xhr.setRequestHeader('Content-Type', 'application/json')
+
+    xhr.onload = async () => {
+      if (xhr.status === 200) {
+        try {
+          const data = JSON.parse(xhr.responseText) as {
+            nickname?: string
+            username?: string
+            id?: number
+          }
+          const nickname = data.nickname || data.username || '未知用户'
+          const userId = String(data.id || '')
+          bgmLog(LOG_LEVELS.INFO, `[testTokenForRibbon] Token 有效，用户: ${nickname} (${userId})`)
+          _setBgmUserId(userId)
+          _setBgmUsername(nickname)
+          BGM.notifyTokenUpdated()
+          await wpsMsgBox(`Token 有效！\n用户: ${nickname}\nID: ${userId}`, 0, 64)
+        } catch (e: unknown) {
+          bgmLog(LOG_LEVELS.ERROR, `[testTokenForRibbon] 解析响应失败: ${(e as Error).message}`)
+          await wpsMsgBox('解析响应失败，请重试', 0, 16)
+        }
+      } else if (xhr.status === 401) {
+        bgmLog(LOG_LEVELS.WARN, '[testTokenForRibbon] Token 无效或已过期')
+        await wpsMsgBox('Token 无效或已过期，请重新设置', 0, 48)
+      } else {
+        bgmLog(LOG_LEVELS.ERROR, `[testTokenForRibbon] HTTP ${xhr.status}`)
+        await wpsMsgBox(`Token 验证失败 (HTTP ${xhr.status})`, 0, 16)
+      }
+      resolve()
+    }
+
+    xhr.onerror = async () => {
+      bgmLog(LOG_LEVELS.ERROR, '[testTokenForRibbon] 网络错误')
+      await wpsMsgBox('网络错误，无法连接到 Bangumi API\n可能原因：网络被墙或断网', 0, 16)
+      resolve()
+    }
+
+    xhr.ontimeout = async () => {
+      bgmLog(LOG_LEVELS.WARN, '[testTokenForRibbon] 请求超时（15s）')
+      await wpsMsgBox('网络超时，请重试', 0, 48)
+      resolve()
+    }
+
+    xhr.send()
+  })
 }
 
-/** 复制 Token 到剪贴板（Ribbon 版本） */
-export function copyTokenForRibbon(): void {
-  const ok = copyTokenToClipboard()
-  if (ok) {
-    wpsMsgBox('Token 已复制到剪贴板', 0, 64)
-  } else {
-    wpsMsgBox('复制失败，可能未设置 Token', 0, 48)
+/**
+ * 复制 Token 到剪贴板（Ribbon 版本）
+ *
+ * 使用 wpsMsgBox（带浏览器兜底）显示结果，确保在 Ribbon 和浏览器环境均可见。
+ */
+export async function copyTokenForRibbon(): Promise<void> {
+  const token = loadBgToken()
+  if (!token) {
+    await wpsMsgBox('未设置 Token，请先设置！', 0, 48)
+    return
+  }
+
+  try {
+    const textarea = document.createElement('textarea')
+    textarea.value = token
+    textarea.style.position = 'fixed'
+    textarea.style.opacity = '0'
+    textarea.style.pointerEvents = 'none'
+    document.body.appendChild(textarea)
+    textarea.select()
+    const ok = document.execCommand('copy')
+    document.body.removeChild(textarea)
+    if (ok) {
+      bgmLog(LOG_LEVELS.INFO, '[copyTokenForRibbon] Token 已复制到剪贴板')
+      await wpsMsgBox('Token 已复制到剪贴板', 0, 64)
+    } else {
+      bgmLog(LOG_LEVELS.WARN, '[copyTokenForRibbon] execCommand copy 失败')
+      await wpsMsgBox('复制失败，浏览器不支持剪贴板操作', 0, 48)
+    }
+  } catch (e: unknown) {
+    const errMsg = e instanceof Error ? e.message : String(e)
+    bgmLog(LOG_LEVELS.ERROR, `[copyTokenForRibbon] 复制失败: ${errMsg}`)
+    await wpsMsgBox(`复制失败: ${errMsg}`, 0, 16)
   }
 }
 

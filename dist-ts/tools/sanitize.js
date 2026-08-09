@@ -29,9 +29,7 @@ let _cachedFallback = null;
 function getPurify() {
     const w = globalThis;
     // 先尝试拿 DOMPurify（即便之前走了降级，现在也可能加载好了）
-    if (!_cachedDomPurifyFactory &&
-        w.DOMPurify &&
-        typeof w.DOMPurify.sanitize === 'function') {
+    if (!_cachedDomPurifyFactory && w.DOMPurify && typeof w.DOMPurify.sanitize === 'function') {
         _cachedDomPurifyFactory = w.DOMPurify;
     }
     if (_cachedDomPurifyFactory) {
