@@ -302,6 +302,11 @@ function readLocalEntries(
 
 /**
  * 内部读取本地条目（供外部调用，封装为纯函数入口）
+ *
+ * 边界情况处理：
+ * - 工作表无效（ws 为 null）：返回 null，调用方应抛出错误
+ * - 无 Bangumi_URL 列（空文档或表头未识别）：返回空 entries + lastRow=0
+ *   调用方 computeDiff 会将所有远程条目视为新增
  */
 export function readLocalEntriesForSync(): {
   entries: Map<string, LocalRowEntry>
@@ -313,8 +318,12 @@ export function readLocalEntriesForSync(): {
   const lastRow = getLastRow(ws)
   const colMap = getColumnMap(ws, headerRow)
   if (!colMap.has('Bangumi_URL')) {
-    bgmLog(LOG_LEVELS.ERROR, '[githubSync] 未找到 Bangumi_URL 列')
-    return null
+    bgmLog(
+      LOG_LEVELS.WARN,
+      `[githubSync] 未找到 Bangumi_URL 列（headerRow=${headerRow}），视为空文档，所有远程条目将作为新增`,
+    )
+    // 返回空 entries，让 computeDiff 将所有远程条目视为新增
+    return { entries: new Map(), lastRow: headerRow }
   }
   const entries = readLocalEntries(ws, colMap, headerRow, lastRow)
   return { entries, lastRow }

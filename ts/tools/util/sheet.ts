@@ -12,7 +12,7 @@ import {
   STANDARD_HEADERS,
 } from '../../core/constants.js'
 import { colNumToLetter, trim } from '../stringUtils.js'
-import type { WpsWorksheet } from '../wps.js'
+import type { WpsWorksheet, WpsCellValue } from '../wps.js'
 
 // 循环依赖：仅在函数体内使用 BGM/bgmLog/getApp，运行时安全
 import { getCellValue } from './cell.js'
@@ -444,11 +444,21 @@ export function ensureSheetHeaders(ws: WpsWorksheet | null | undefined): boolean
   bgmLog(LOG_LEVELS.INFO, '[ensureSheetHeaders] 工作表为空，开始写入标准表头（39 列）')
 
   // 逐列写入表头
+  let writeCount = 0
   for (let i = 0; i < STANDARD_HEADERS.length; i++) {
     const header = STANDARD_HEADERS[i]
     if (header !== undefined) {
       setCellValueDirect(ws, 1, i + 1, header)
+      writeCount++
     }
+  }
+  bgmLog(LOG_LEVELS.INFO, `[ensureSheetHeaders] 写入完成，共 ${writeCount} 列`)
+
+  // 验证写入：读回第 25 列（Bangumi URL）确认写入成功
+  const verifyVal = getCellValue(ws, 1, 25)
+  bgmLog(LOG_LEVELS.INFO, `[ensureSheetHeaders] 验证第25列读回: "${verifyVal}"`)
+  if (!verifyVal) {
+    bgmLog(LOG_LEVELS.ERROR, '[ensureSheetHeaders] 表头写入验证失败，第25列为空')
   }
 
   // 设置表头行样式：灰色背景 + 加粗
@@ -467,12 +477,27 @@ export function ensureSheetHeaders(ws: WpsWorksheet | null | undefined): boolean
 
   // 清除缓存，确保后续读取能拿到新表头
   clearSheetCache(ws)
-  bgmLog(LOG_LEVELS.INFO, '[ensureSheetHeaders] 标准表头写入完成，缓存已清除')
+  // 验证 findHeaderRow 是否能识别新表头
+  const newHeaderRow = findHeaderRow(ws)
+  bgmLog(
+    LOG_LEVELS.INFO,
+    `[ensureSheetHeaders] 缓存已清除，findHeaderRow 重新检测: ${newHeaderRow}`,
+  )
+  if (newHeaderRow !== 1) {
+    bgmLog(
+      LOG_LEVELS.WARN,
+      `[ensureSheetHeaders] findHeaderRow 返回 ${newHeaderRow}（预期 1），表头关键字匹配可能失败`,
+    )
+  }
+  bgmLog(LOG_LEVELS.INFO, '[ensureSheetHeaders] 标准表头写入完成')
   return true
 }
 
 /**
  * 直接写入单元格值（绕过 undo 记录，仅供表头初始化使用）
+ *
+ * 使用 Value2 而非 Value，与 setCellValue 保持一致。
+ * WPS 中 Value 属性的 setter 在某些版本不可用，会导致写入静默失败。
  */
 function setCellValueDirect(ws: WpsWorksheet, row: number, col: number, value: string): void {
   try {
@@ -482,7 +507,9 @@ function setCellValueDirect(ws: WpsWorksheet, row: number, col: number, value: s
     const address = colNumToLetter(col) + row
     const cell = ws.Range(address)
     if (cell) {
-      cell.Value = value
+      cell.Value2 = value as WpsCellValue
+    } else {
+      bgmLog(LOG_LEVELS.WARN, `[setCellValueDirect] 单元格 ${address} 为 null`)
     }
   } catch (e: unknown) {
     bgmLog(
