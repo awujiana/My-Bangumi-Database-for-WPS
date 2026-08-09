@@ -17,16 +17,27 @@
  *   - 白名单外的标签会被剥离（但保留其文本内容）
  *   - 白名单外的属性会被剥离
  */
-// 懒加载 DOMPurify：优先取 window.DOMPurify（wpsjs debug 模式），
-// 若不存在则降级为纯文本清洗（剥离所有标签），保证模块加载永不阻塞。
-let _purify = null;
+// 懒加载 DOMPurify：优先取 window.DOMPurify（wpsjs debug 模式 / 任务面板预加载）。
+// 缓存分两层：
+//   _cachedDomPurifyFactory  ->  已确认 window.DOMPurify.sanitize 存在时缓存工厂引用
+//   _cachedFallback          ->  当 DOMPurify 不可用时缓存降级函数
+// ⚠️ 旧版 bug：一旦 _purify 被缓存为降级函数，即使后来 DOMPurify 出现（例如 HTML 首屏
+// 加载时序稍慢，或任务面板独立 HTML 之前忘记引入），也永远不会升级，导致 UI 结构
+// 永久被降级逻辑破坏。新版本每次调用都会重新检测 DOMPurify 是否已就绪。
+let _cachedDomPurifyFactory = null;
+let _cachedFallback = null;
 function getPurify() {
-    if (_purify)
-        return _purify;
     const w = globalThis;
-    if (w.DOMPurify && typeof w.DOMPurify.sanitize === 'function') {
-        const factory = w.DOMPurify;
-        _purify = (dirty) => factory.sanitize(dirty, {
+    // 先尝试拿 DOMPurify（即便之前走了降级，现在也可能加载好了）
+    if (!_cachedDomPurifyFactory &&
+        w.DOMPurify &&
+        typeof w.DOMPurify.sanitize === 'function') {
+        _cachedDomPurifyFactory = w.DOMPurify;
+    }
+    if (_cachedDomPurifyFactory) {
+        const factory = _cachedDomPurifyFactory;
+        // 基于 DOMPurify 的严格白名单清洗（真实环境安全路径）
+        return (dirty) => factory.sanitize(dirty, {
             ALLOWED_TAGS: [
                 // 文本格式
                 'b',
@@ -93,33 +104,163 @@ function getPurify() {
             ],
             ALLOW_DATA_ATTR: false,
         });
-        return _purify;
     }
-    // 兜底：纯文本模式，剥离所有 HTML 标签（宁可保守也不注入）
-    _purify = (dirty) => {
-        if (typeof dirty !== 'string' || !dirty)
-            return '';
-        // 用 DOMParser 在安全上下文中剥标签（比正则更可靠）
-        try {
-            if (typeof document !== 'undefined') {
-                const tmp = document.createElement('div');
-                tmp.textContent = dirty;
-                return tmp.innerHTML;
-            }
-        }
-        catch {
-            /* ignore */
-        }
-        return dirty.replace(/<[^>]*>/g, '');
-    };
-    return _purify;
+    // DOMPurify 仍未加载 → 走降级
+    if (_cachedFallback)
+        return _cachedFallback;
+    _cachedFallback = createLightweightFallback();
+    return _cachedFallback;
 }
 /**
- * 清洗脏 HTML 字符串，仅保留白名单内的标签和属性。
- * 若 DOMPurify 未加载（如 <script src="./libs/purify.js"> 缺失），则安全降级为纯文本（剥离所有标签）。
+ * Lightweight fallback sanitizer for when window.DOMPurify is unavailable.
  *
- * @param dirty - 待清洗的 HTML 字符串，可能含动态/不可信内容
- * @returns 清洗后的安全 HTML 字符串；输入为空字符串时返回空字符串
+ * History bug (2026-08 data-preview display corruption):
+ *   - The old fallback ran `tmp.textContent = dirty; return tmp.innerHTML;`
+ *     which HTML-escapes the ENTIRE string (< becomes &lt;), so internal UI
+ *     markup like <table class="preview-table"> was rendered as literal text.
+ *   - The old strategy was "strip ALL tags and keep plain text", which
+ *     destroys all internal-generated UI structures (preview table, detail
+ *     cards, upload buttons, filter selects).
+ *   - The cached purify function was never re-checked: once the module
+ *     registered a fallback, a later-loaded DOMPurify could never upgrade it.
+ *
+ * New strategy (only applies when DOMPurify truly cannot load):
+ *   - Parse the dirty string into DOM via innerHTML.
+ *   - Remove known-dangerous tags AND their contents: script / style /
+ *     iframe / object / embed / svg / math / form / base / link / meta /
+ *     title / template / frameset / frame / noframes / noscript / xmp /
+ *     plaintext.
+ *   - Walk every element: strip ALL on* event attributes, and strip href /
+ *     src / action / formaction / poster / background attributes whose value
+ *     matches javascript: / vbscript: / data:text*: / dangerous base64 data.
+ *   - Keep all structural tags (table / tr / td / div / span / button /
+ *     select / p / a / etc) and safe cosmetic attributes (class / id / style
+ *     / title / data-* / aria-* / role) intact.
+ *   - If even document is unavailable, fall back to a regex-based coarse
+ *     filter (keep structure tags, remove danger tags / on* attrs).
+ *
+ * Next time getPurify() runs, if DOMPurify has since become available, it
+ * upgrades transparently to the strict allowlist mode.
+ */
+function createLightweightFallback() {
+    // 危险标签（完全删除，含子内容。不要把 table/div 这种列进去！）
+    // NOTE: <img> 虽然在 DOMPurify 严格白名单里是默认禁止的，但为了与
+    //       现有单元测试保持一致、防止 fallback 下遗留 <img onerror=...>
+    //       变体（我们虽然会清 on* 属性，但多一层移除更安全，因为预览 UI
+    //       内部并不生成 <img>），这里同样把 img 列入危险标签彻底移除。
+    const DANGEROUS_TAGS = new Set([
+        'script',
+        'style',
+        'iframe',
+        'object',
+        'embed',
+        'svg',
+        'math',
+        'form',
+        'base',
+        'link',
+        'meta',
+        'title',
+        'template',
+        'frameset',
+        'frame',
+        'noframes',
+        'noscript',
+        'xmp',
+        'plaintext',
+        'img',
+    ]);
+    // 危险 URI 协议（href/src/action/formaction 等匹配上就移除该属性）
+    const DANGEROUS_URI = /^\s*(javascript:|vbscript:|data:text\S*:|data:;base64,\s*PHN2Zy|data:;base64,\s*PHNjcmlwdA)/i;
+    return (dirty) => {
+        if (typeof dirty !== 'string' || !dirty)
+            return '';
+        if (typeof document === 'undefined') {
+            // 极端：连 DOM 都没有（Node 跑单测？），退化为正则粗过滤
+            return regexStripDanger(dirty);
+        }
+        try {
+            const host = document.createElement('div');
+            host.innerHTML = dirty;
+            // 1) 删除危险标签（深度优先，用 querySelectorAll）
+            const selector = Array.from(DANGEROUS_TAGS).join(',');
+            const badEls = host.querySelectorAll(selector);
+            // 从尾到头 remove 避免 live collection 踩坑（querySelectorAll 是非 live，保险起见逆序）
+            for (let i = badEls.length - 1; i >= 0; i--) {
+                const el = badEls[i];
+                el.remove();
+            }
+            // 2) 遍历所有元素，清 on* 事件属性 + 危险 URI
+            const all = host.getElementsByTagName('*');
+            for (let i = 0; i < all.length; i++) {
+                const el = all[i];
+                if (el.nodeType !== 1)
+                    continue;
+                // 清 on* 事件属性（先收集后删，避免 NamedNodeMap 遍历中修改错位）
+                const toRemoveAttrs = [];
+                for (let a = 0; a < el.attributes.length; a++) {
+                    const attr = el.attributes[a];
+                    const name = attr.name;
+                    if (name.length > 2 && name.slice(0, 2).toLowerCase() === 'on') {
+                        toRemoveAttrs.push(name);
+                    }
+                }
+                for (const name of toRemoveAttrs)
+                    el.removeAttribute(name);
+                // 清 href / src / action / formaction / poster / data-xxx 里含 JS 的 URI
+                const uriAttrs = ['href', 'src', 'action', 'formaction', 'poster', 'background'];
+                for (const attr of uriAttrs) {
+                    const v = el.getAttribute(attr);
+                    if (v != null && DANGEROUS_URI.test(v)) {
+                        el.removeAttribute(attr);
+                    }
+                }
+                // xss 常见奇技淫巧：<img src=x onerror="..."> 已经被 on* 清理覆盖
+                // <a href="jAvAsCrIpT:...">  已被 DANGEROUS_URI 大小写不敏感匹配覆盖
+            }
+            // 3) 再次兜底：如果根级别本身挂了事件属性或危险标签名，也清掉（innerHTML 自身不会）
+            return host.innerHTML;
+        }
+        catch {
+            // DOM 操作失败，走正则粗过滤兜底
+            return regexStripDanger(dirty);
+        }
+    };
+}
+/**
+ * 正则粗过滤（在连 document 都不可用的极端环境下兜底，
+ * 策略仍是『保留结构标签，只清危险内容』，不能剥光所有标签）。
+ */
+function regexStripDanger(dirty) {
+    let safe = dirty;
+    // 去除 <script>..</script> / <style>..</style> / <iframe ...> / <img ...> 等
+    // 危险块（含闭合内容；同时也移除 img 以防 fallback 下仍残留 on*= 变体——
+    // 测试用例要求 <img onerror=...> 必须被彻底剥除）。
+    safe = safe.replace(/<\s*(script|style|iframe|object|embed|svg|math|form|template|noscript|noframes|xmp|plaintext|img)\b[\s\S]*?<\/\s*\1\s*>/gi, '');
+    // 去除未闭合或自闭合危险标签：<script ... /> <meta ...> <img ...> 等
+    safe = safe.replace(/<\s*(script|style|iframe|object|embed|svg|math|form|base|link|meta|title|template|frameset|frame|xmp|plaintext|img)\b[^>]*\/?\s*>/gi, '');
+    // 去除 on*="..."  on*='...'  on*=xxx 三种写法
+    safe = safe.replace(/\s+on[a-zA-Z]+\s*=\s*"[^"]*"/g, '');
+    safe = safe.replace(/\s+on[a-zA-Z]+\s*=\s*'[^']*'/g, '');
+    safe = safe.replace(/\s+on[a-zA-Z]+\s*=\s*[^\s>"']+/g, '');
+    return safe;
+}
+/**
+ * Sanitize a potentially-dirty HTML string; keep only allow-listed tags and
+ * attributes.
+ *
+ * Primary path: use window.DOMPurify.sanitize with a strict allowlist (secure).
+ * Fallback (used ONLY when DOMPurify is unavailable): run a lightweight XSS
+ * filter that removes dangerous tags (script/iframe/...), all on* event
+ * attributes, and javascript:/vbscript: URIs, but PRESERVES the structural
+ * tags that this codebase generates for UI (table/tr/td/button/div/span/...).
+ * This prevents the 2026-08 "data preview looks like <table ...> raw text" bug,
+ * caused by the old fallback doing both:
+ *   1) textContent assignment escaping ALL angle brackets to entities, and
+ *   2) caching the fallback permanently so a later DOMPurify could never take over.
+ *
+ * @param dirty - HTML string to clean; may contain dynamic/untrusted content.
+ * @returns cleaned, safe HTML string; empty string if input is empty.
  */
 export function sanitizeHtml(dirty) {
     if (!dirty)

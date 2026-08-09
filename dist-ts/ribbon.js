@@ -224,37 +224,23 @@ export function OnAction(control) {
     return true;
 }
 /**
- * 获取按钮图标：返回绝对 HTTP URL（WPS getImage 回调会将 URL 转成 IPictureDisp）。
- *
- * 注意：WPS Ribbon 回调的 JS 上下文不在浏览器页面内，相对路径基准是 WPS 安装目录。
- * 因此必须使用绝对 HTTP URL，WPS 才能通过本地调试服务器（127.0.0.1:3889）下载 SVG 并显示。
- * 若 URL 不可达，则自动跳过图标渲染（按钮文本仍可见）。
+ * 获取按钮图标：返回 SVG 文件相对路径。
+ * WPS 会从加载项所在目录解析该路径并加载图片（与成功案例一致）。
  */
+const ICON_PATHS = {
+    btnShowPanel: 'images/panel.svg',
+    btnSyncBangumi: 'images/sync.svg',
+    btnSetToken: 'images/token.svg',
+    btnTestToken: 'images/key.svg',
+    btnCopyToken: 'images/key.svg',
+    btnSetUserId: 'images/user.svg',
+    btnOpenCollection: 'images/link.svg',
+    btnClearColors: 'images/btnClearColors.svg',
+    btnSyncFromGithub: 'images/github.svg',
+    btnUndoLastSync: 'images/undo.svg',
+};
 export function GetBangumiImage(control) {
-    const icons = {
-        btnShowPanel: 'images/panel.svg',
-        btnSyncBangumi: 'images/sync.svg',
-        btnSetToken: 'images/token.svg',
-        btnTestToken: 'images/key.svg',
-        btnCopyToken: 'images/key.svg',
-        btnSetUserId: 'images/user.svg',
-        btnOpenCollection: 'images/link.svg',
-        btnClearColors: 'images/cleartags.svg',
-        btnSyncFromGithub: 'images/github.svg',
-        btnUndoLastSync: 'images/undo.svg',
-    };
-    const relative = icons[control.Id] || 'images/newFromTemp.svg';
-    // Ribbon 回调内依然可以访问 window.location（来自 index.html 的宿主环境）
-    try {
-        if (typeof window !== 'undefined' && window.location?.origin) {
-            return `${window.location.origin}/${relative}`;
-        }
-    }
-    catch {
-        /* ignore */
-    }
-    // 兜底：相对路径（离线模式/自定义安装时可能可用）
-    return relative;
+    return ICON_PATHS[control.Id] || 'images/newFromTemp.svg';
 }
 // 通知 index.html 早期占位：真实实现已就绪
 const ribbonWindow = window;

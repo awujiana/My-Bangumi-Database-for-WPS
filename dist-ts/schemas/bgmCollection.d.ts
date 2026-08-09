@@ -8,7 +8,7 @@ export declare const BgmCollectionSubjectSchema: {
     passthrough(): /*elided*/ any;
     strict(): /*elided*/ any;
     optional(): import("../tools/zodCompat.js").ZodSchema<{
-        id: unknown;
+        id: number;
         name: string;
         name_cn: unknown;
         url: unknown;
@@ -32,7 +32,7 @@ export declare const BgmCollectionSubjectSchema: {
     } | {
         success: true;
         data: {
-            id: unknown;
+            id: number;
             name: string;
             name_cn: unknown;
             url: unknown;
@@ -46,7 +46,7 @@ export declare const BgmCollectionSubjectSchema: {
         };
     };
     parse(input: unknown): {
-        id: unknown;
+        id: number;
         name: string;
         name_cn: unknown;
         url: unknown;
@@ -69,10 +69,10 @@ export declare const BgmCollectionSchema: {
     strict(): /*elided*/ any;
     optional(): import("../tools/zodCompat.js").ZodSchema<{
         date: string | undefined;
-        type: unknown;
-        rate: unknown;
+        type: number;
+        rate: number | undefined;
         subject: {
-            id: unknown;
+            id: number;
             name: string;
             name_cn: unknown;
             url: unknown;
@@ -84,11 +84,11 @@ export declare const BgmCollectionSchema: {
                 grid: string | undefined;
             } | undefined;
         };
-        subject_id: unknown;
+        subject_id: number;
         private: boolean | undefined;
         tags: unknown;
         comment: unknown;
-        ep_status: unknown;
+        ep_status: number | undefined;
     } | undefined>;
     default(d: any): any;
     safeParse(input: unknown): {
@@ -103,10 +103,10 @@ export declare const BgmCollectionSchema: {
         success: true;
         data: {
             date: string | undefined;
-            type: unknown;
-            rate: unknown;
+            type: number;
+            rate: number | undefined;
             subject: {
-                id: unknown;
+                id: number;
                 name: string;
                 name_cn: unknown;
                 url: unknown;
@@ -118,19 +118,19 @@ export declare const BgmCollectionSchema: {
                     grid: string | undefined;
                 } | undefined;
             };
-            subject_id: unknown;
+            subject_id: number;
             private: boolean | undefined;
             tags: unknown;
             comment: unknown;
-            ep_status: unknown;
+            ep_status: number | undefined;
         };
     };
     parse(input: unknown): {
         date: string | undefined;
-        type: unknown;
-        rate: unknown;
+        type: number;
+        rate: number | undefined;
         subject: {
-            id: unknown;
+            id: number;
             name: string;
             name_cn: unknown;
             url: unknown;
@@ -142,11 +142,11 @@ export declare const BgmCollectionSchema: {
                 grid: string | undefined;
             } | undefined;
         };
-        subject_id: unknown;
+        subject_id: number;
         private: boolean | undefined;
         tags: unknown;
         comment: unknown;
-        ep_status: unknown;
+        ep_status: number | undefined;
     };
 };
 export type BgmCollection = zInfer<typeof BgmCollectionSchema>;

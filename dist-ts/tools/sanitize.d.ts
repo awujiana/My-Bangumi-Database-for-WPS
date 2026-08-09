@@ -18,11 +18,21 @@
  *   - 白名单外的属性会被剥离
  */
 /**
- * 清洗脏 HTML 字符串，仅保留白名单内的标签和属性。
- * 若 DOMPurify 未加载（如 <script src="./libs/purify.js"> 缺失），则安全降级为纯文本（剥离所有标签）。
+ * Sanitize a potentially-dirty HTML string; keep only allow-listed tags and
+ * attributes.
  *
- * @param dirty - 待清洗的 HTML 字符串，可能含动态/不可信内容
- * @returns 清洗后的安全 HTML 字符串；输入为空字符串时返回空字符串
+ * Primary path: use window.DOMPurify.sanitize with a strict allowlist (secure).
+ * Fallback (used ONLY when DOMPurify is unavailable): run a lightweight XSS
+ * filter that removes dangerous tags (script/iframe/...), all on* event
+ * attributes, and javascript:/vbscript: URIs, but PRESERVES the structural
+ * tags that this codebase generates for UI (table/tr/td/button/div/span/...).
+ * This prevents the 2026-08 "data preview looks like <table ...> raw text" bug,
+ * caused by the old fallback doing both:
+ *   1) textContent assignment escaping ALL angle brackets to entities, and
+ *   2) caching the fallback permanently so a later DOMPurify could never take over.
+ *
+ * @param dirty - HTML string to clean; may contain dynamic/untrusted content.
+ * @returns cleaned, safe HTML string; empty string if input is empty.
  */
 export declare function sanitizeHtml(dirty: string): string;
 //# sourceMappingURL=sanitize.d.ts.map

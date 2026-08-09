@@ -1,4 +1,4 @@
-﻿/**
+/**
  * @fileoverview Zod 兼容层
  * @module tools/zodCompat
  * @description 为 wpsjs debug 纯静态模式（浏览器原生 ES module，无打包器、无 importmap）
@@ -164,21 +164,47 @@ class LiteString implements ZodSchema<string> {
   }
 }
 
+type LiteNumberSign = 'positive' | 'nonnegative' | 'negative' | 'nonpositive'
+
 class LiteNumber implements ZodSchema<number> {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   [k: string]: any
   readonly __isZodLite = true as const
   /** @internal */ readonly _min: number
   /** @internal */ readonly _max: number
-  constructor(min = -Infinity, max = Infinity) {
+  /** @internal */ readonly _int: boolean
+  /** @internal */ readonly _sign: LiteNumberSign | undefined
+  constructor(
+    min = -Infinity,
+    max = Infinity,
+    int = false,
+    sign: LiteNumberSign | undefined = undefined,
+  ) {
     this._min = min
     this._max = max
+    this._int = int
+    this._sign = sign
   }
   min(n: number): LiteNumber {
-    return flu(new LiteNumber(Math.max(this._min, n), this._max))
+    return flu(new LiteNumber(Math.max(this._min, n), this._max, this._int, this._sign))
   }
   max(n: number): LiteNumber {
-    return flu(new LiteNumber(this._min, Math.min(this._max, n)))
+    return flu(new LiteNumber(this._min, Math.min(this._max, n), this._int, this._sign))
+  }
+  int(): LiteNumber {
+    return flu(new LiteNumber(this._min, this._max, true, this._sign))
+  }
+  positive(): LiteNumber {
+    return flu(new LiteNumber(this._min, this._max, this._int, 'positive'))
+  }
+  nonnegative(): LiteNumber {
+    return flu(new LiteNumber(this._min, this._max, this._int, 'nonnegative'))
+  }
+  negative(): LiteNumber {
+    return flu(new LiteNumber(this._min, this._max, this._int, 'negative'))
+  }
+  nonpositive(): LiteNumber {
+    return flu(new LiteNumber(this._min, this._max, this._int, 'nonpositive'))
   }
   optional(): ZodSchema<number | undefined> {
     return flu(new LiteOptional<number>(this))
@@ -191,6 +217,13 @@ class LiteNumber implements ZodSchema<number> {
     if (typeof input === 'bigint') return fail<number>('unexpected bigint')
     if (typeof input !== 'number' || !Number.isFinite(input))
       return fail<number>('expected finite number')
+    if (this._int && !Number.isInteger(input)) return fail<number>('expected integer')
+    if (this._sign === 'positive' && !(input > 0)) return fail<number>('expected positive number')
+    if (this._sign === 'nonnegative' && input < 0)
+      return fail<number>('expected nonnegative number')
+    if (this._sign === 'negative' && !(input < 0)) return fail<number>('expected negative number')
+    if (this._sign === 'nonpositive' && input > 0)
+      return fail<number>('expected nonpositive number')
     if (input < this._min) return fail<number>('number below min')
     if (input > this._max) return fail<number>('number above max')
     return ok(input)

@@ -136,15 +136,34 @@ class LiteNumber {
     __isZodLite = true;
     /** @internal */ _min;
     /** @internal */ _max;
-    constructor(min = -Infinity, max = Infinity) {
+    /** @internal */ _int;
+    /** @internal */ _sign;
+    constructor(min = -Infinity, max = Infinity, int = false, sign = undefined) {
         this._min = min;
         this._max = max;
+        this._int = int;
+        this._sign = sign;
     }
     min(n) {
-        return flu(new LiteNumber(Math.max(this._min, n), this._max));
+        return flu(new LiteNumber(Math.max(this._min, n), this._max, this._int, this._sign));
     }
     max(n) {
-        return flu(new LiteNumber(this._min, Math.min(this._max, n)));
+        return flu(new LiteNumber(this._min, Math.min(this._max, n), this._int, this._sign));
+    }
+    int() {
+        return flu(new LiteNumber(this._min, this._max, true, this._sign));
+    }
+    positive() {
+        return flu(new LiteNumber(this._min, this._max, this._int, 'positive'));
+    }
+    nonnegative() {
+        return flu(new LiteNumber(this._min, this._max, this._int, 'nonnegative'));
+    }
+    negative() {
+        return flu(new LiteNumber(this._min, this._max, this._int, 'negative'));
+    }
+    nonpositive() {
+        return flu(new LiteNumber(this._min, this._max, this._int, 'nonpositive'));
     }
     optional() {
         return flu(new LiteOptional(this));
@@ -158,6 +177,16 @@ class LiteNumber {
             return fail('unexpected bigint');
         if (typeof input !== 'number' || !Number.isFinite(input))
             return fail('expected finite number');
+        if (this._int && !Number.isInteger(input))
+            return fail('expected integer');
+        if (this._sign === 'positive' && !(input > 0))
+            return fail('expected positive number');
+        if (this._sign === 'nonnegative' && input < 0)
+            return fail('expected nonnegative number');
+        if (this._sign === 'negative' && !(input < 0))
+            return fail('expected negative number');
+        if (this._sign === 'nonpositive' && input > 0)
+            return fail('expected nonpositive number');
         if (input < this._min)
             return fail('number below min');
         if (input > this._max)

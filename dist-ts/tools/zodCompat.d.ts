@@ -52,14 +52,22 @@ declare class LiteString implements ZodSchema<string> {
     safeParse(input: unknown): ParseResult<string>;
     parse(input: unknown): string;
 }
+type LiteNumberSign = 'positive' | 'nonnegative' | 'negative' | 'nonpositive';
 declare class LiteNumber implements ZodSchema<number> {
     [k: string]: any;
     readonly __isZodLite: true;
     /** @internal */ readonly _min: number;
     /** @internal */ readonly _max: number;
-    constructor(min?: number, max?: number);
+    /** @internal */ readonly _int: boolean;
+    /** @internal */ readonly _sign: LiteNumberSign | undefined;
+    constructor(min?: number, max?: number, int?: boolean, sign?: LiteNumberSign | undefined);
     min(n: number): LiteNumber;
     max(n: number): LiteNumber;
+    int(): LiteNumber;
+    positive(): LiteNumber;
+    nonnegative(): LiteNumber;
+    negative(): LiteNumber;
+    nonpositive(): LiteNumber;
     optional(): ZodSchema<number | undefined>;
     default(d: any): AnySchema;
     safeParse(input: unknown): ParseResult<number>;

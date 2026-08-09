@@ -8,7 +8,7 @@ export declare const BgmUserSchema: {
     passthrough(): /*elided*/ any;
     strict(): /*elided*/ any;
     optional(): import("../tools/zodCompat.js").ZodSchema<{
-        id: unknown;
+        id: number;
         username: string;
         nickname: unknown;
         avatar: {
@@ -29,7 +29,7 @@ export declare const BgmUserSchema: {
     } | {
         success: true;
         data: {
-            id: unknown;
+            id: number;
             username: string;
             nickname: unknown;
             avatar: {
@@ -40,7 +40,7 @@ export declare const BgmUserSchema: {
         };
     };
     parse(input: unknown): {
-        id: unknown;
+        id: number;
         username: string;
         nickname: unknown;
         avatar: {
