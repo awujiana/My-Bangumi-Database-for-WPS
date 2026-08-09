@@ -19,7 +19,7 @@ import { colNumToLetter, trim, escapeHtml, calcFingerprint } from '../stringUtil
 import { type WpsApplication, type WpsWorksheet } from '../wps.js';
 export { colNumToLetter, trim, escapeHtml, calcFingerprint };
 export { getCell, getCellValue, setCellValue, getSheetByIndex } from './cell.js';
-export { readRangeValues, cacheGet, findHeaderRow, getColumnMap, clearSheetCache, getLastRow, isEmptyValue, getDataSheet, safeActivate, } from './sheet.js';
+export { readRangeValues, cacheGet, findHeaderRow, getColumnMap, clearSheetCache, getLastRow, isEmptyValue, getDataSheet, safeActivate, ensureSheetHeaders, } from './sheet.js';
 export { sleep, delay } from './sleep.js';
 export declare const BGM: {
     cache: BGMCache;

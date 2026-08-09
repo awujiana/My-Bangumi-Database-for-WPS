@@ -245,6 +245,15 @@ export declare const COLUMNS: {
  */
 export declare const HEADER_KEYWORDS: string[];
 /**
+ * 标准表头列表（37 列）
+ *
+ * 当工作表为空（无表头行）时，按此顺序在第 1 行写入表头。
+ * 列顺序与用户模板一致，getColumnMap() 会通过 COLUMN_RULES 自动映射。
+ *
+ * @constant
+ */
+export declare const STANDARD_HEADERS: readonly string[];
+/**
  * 重要列配置
  * 标记哪些列在数据预览中需要高亮显示
  * 键为标准字段名，值为布尔标记

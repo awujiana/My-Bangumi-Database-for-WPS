@@ -118,5 +118,5 @@ export declare function applyConflictResolutions(diffs: GithubSyncDiff[], resolu
  * @returns 同步结果统计
  * @throws 配置错误、网络错误、解析错误时抛出
  */
-export declare function syncFromGithub(onProgress?: (current: number, total: number, message: string) => void, strategy?: SyncStrategy, signal?: AbortSignal, conflictResolution?: ConflictResolution[]): Promise<GithubSyncResult>;
+export declare function syncFromGithub(onProgress?: (current: number, total: number, message: string) => void, strategy?: SyncStrategy, signal?: AbortSignal, conflictResolution?: ConflictResolution[], selectedRowsOnly?: boolean): Promise<GithubSyncResult>;
 //# sourceMappingURL=githubSync.d.ts.map

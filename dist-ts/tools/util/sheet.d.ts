@@ -29,4 +29,15 @@ export declare function getLastRow(ws: WpsWorksheet | null | undefined, forceRef
 export declare function isEmptyValue(val: unknown): boolean;
 export declare function getDataSheet(): WpsWorksheet | null | undefined;
 export declare function safeActivate(ws: WpsWorksheet | null | undefined): void;
+/**
+ * 检查工作表是否为空（无表头行），若是则写入标准表头
+ *
+ * 判定逻辑：findHeaderRow() 返回 0（前 10 行未匹配到 ≥3 个关键字）。
+ * 写入位置：第 1 行，按 STANDARD_HEADERS 顺序逐列写入。
+ * 写入后清除缓存，确保后续 getColumnMap / findHeaderRow 能读到新表头。
+ *
+ * @param ws 工作表对象
+ * @returns true 表示已填充表头（原为空表），false 表示已有表头无需填充
+ */
+export declare function ensureSheetHeaders(ws: WpsWorksheet | null | undefined): boolean;
 //# sourceMappingURL=sheet.d.ts.map

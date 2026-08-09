@@ -29,7 +29,7 @@ import { isWpsApp } from '../wps.js';
 export { colNumToLetter, trim, escapeHtml, calcFingerprint };
 // re-export 子模块
 export { getCell, getCellValue, setCellValue, getSheetByIndex } from './cell.js';
-export { readRangeValues, cacheGet, findHeaderRow, getColumnMap, clearSheetCache, getLastRow, isEmptyValue, getDataSheet, safeActivate, } from './sheet.js';
+export { readRangeValues, cacheGet, findHeaderRow, getColumnMap, clearSheetCache, getLastRow, isEmptyValue, getDataSheet, safeActivate, ensureSheetHeaders, } from './sheet.js';
 export { sleep, delay } from './sleep.js';
 // ========== BGM 全局命名空间 ==========
 export const BGM = {

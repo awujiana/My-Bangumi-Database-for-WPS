@@ -50,6 +50,6 @@ export declare function isSyncSourceRegistered(type: string): boolean;
  * @returns 同步结果统计
  * @throws 配置错误、网络错误、解析错误、未知 sourceType 时抛出
  */
-export declare function syncFromRemote(onProgress?: (current: number, total: number, message: string) => void, strategy?: SyncStrategy, signal?: AbortSignal, conflictResolution?: ConflictResolution[]): Promise<GithubSyncResult>;
+export declare function syncFromRemote(onProgress?: (current: number, total: number, message: string) => void, strategy?: SyncStrategy, signal?: AbortSignal, selectedRowsOnly?: boolean, conflictResolution?: ConflictResolution[]): Promise<GithubSyncResult>;
 export {};
 //# sourceMappingURL=syncSourceRegistry.d.ts.map

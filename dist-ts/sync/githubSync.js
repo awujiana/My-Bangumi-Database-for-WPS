@@ -17,7 +17,7 @@
 // 注意：bgmLog 定义在 tools/util.ts（不在 core/constants.ts），与 BGM/getDataSheet 等同源导入
 import { LOG_LEVELS, BGM_SUBJECT_TYPES } from '../core/constants.js';
 import { Result, BgmError } from '../core/result.js';
-import { bgmLog, getDataSheet, findHeaderRow, getLastRow, getColumnMap, getCellValue, setCellValue, trim, } from '../tools/util.js';
+import { bgmLog, getDataSheet, findHeaderRow, getLastRow, getColumnMap, getCellValue, setCellValue, trim, ensureSheetHeaders, getApp, } from '../tools/util.js';
 import { buildRawUrl, isGithubConfigComplete } from './githubConfig.js';
 import { computeDiff, tagsToString, parseJsonl, EXTENDED_FIELD_MAP, } from './githubSyncDiff.js';
 import { extractSubjectId } from './pureUtils.js';
@@ -312,6 +312,22 @@ export function applyDiffToSheet(diffs, strategy, onProgress, source) {
     const colMap = getColumnMap(ws, headerRow);
     let nextAppendRow = lastRow + 1;
     const forceOverwrite = strategy === 'force-overwrite';
+    // 性能优化：关闭屏幕刷新和自动计算，大幅减少 COM 调用开销
+    const app = getApp();
+    let prevScreenUpdating;
+    let prevCalculation;
+    try {
+        if (app) {
+            prevScreenUpdating = app.ScreenUpdating;
+            prevCalculation = app.Calculation;
+            app.ScreenUpdating = false;
+            app.Calculation = -4135; // xlCalculationManual
+            bgmLog(LOG_LEVELS.INFO, '[githubSync] 已关闭屏幕刷新和自动计算');
+        }
+    }
+    catch (e) {
+        bgmLog(LOG_LEVELS.WARN, `[githubSync] 关闭屏幕刷新失败: ${e.message}`);
+    }
     // 开启 undo 会话：记录本次同步的所有单元格变更，便于用户撤销
     beginUndoSession(`${source ?? 'GitHub'} 同步 - 策略: ${strategy}`);
     // delete 操作需倒序执行（从大行号到小行号），避免行号错位
@@ -417,6 +433,19 @@ export function applyDiffToSheet(diffs, strategy, onProgress, source) {
     });
     // 结束 undo 会话（空会话不入栈）
     endUndoSession();
+    // 恢复屏幕刷新和自动计算
+    try {
+        if (app) {
+            if (prevScreenUpdating !== undefined)
+                app.ScreenUpdating = prevScreenUpdating;
+            if (prevCalculation !== undefined)
+                app.Calculation = prevCalculation;
+            bgmLog(LOG_LEVELS.INFO, '[githubSync] 已恢复屏幕刷新和自动计算');
+        }
+    }
+    catch (e) {
+        bgmLog(LOG_LEVELS.WARN, `[githubSync] 恢复屏幕刷新失败: ${e.message}`);
+    }
     // 批量写入同步记录与汇总行
     if (syncRecords.length > 0) {
         addSyncRecords(syncRecords);
@@ -497,7 +526,7 @@ export function applyConflictResolutions(diffs, resolutions) {
  * @returns 同步结果统计
  * @throws 配置错误、网络错误、解析错误时抛出
  */
-export async function syncFromGithub(onProgress, strategy = 'add-update', signal, conflictResolution) {
+export async function syncFromGithub(onProgress, strategy = 'add-update', signal, conflictResolution, selectedRowsOnly) {
     const source = new GithubSyncSource();
     const validationResult = source.validateConfig();
     if (validationResult.isFail()) {
@@ -507,12 +536,32 @@ export async function syncFromGithub(onProgress, strategy = 'add-update', signal
     onProgress?.(0, 0, `开始下载远程数据（${source.getDisplayName()} - 策略：${strategy}）...`);
     const remoteEntries = await source.fetchRemoteEntries(signal);
     onProgress?.(1, 3, `下载完成：${remoteEntries.length} 条`);
+    // 空文档自动填充表头
+    const ws = getDataSheet();
+    if (ws) {
+        const filled = ensureSheetHeaders(ws);
+        if (filled) {
+            bgmLog(LOG_LEVELS.INFO, '[syncFromGithub] 空文档已自动填充标准表头');
+            onProgress?.(1, 3, '已自动填充表头，继续同步...');
+        }
+    }
+    // 仅同步选中行：过滤远程条目
+    let effectiveRemoteEntries = remoteEntries;
+    if (selectedRowsOnly) {
+        const selectedSids = getSelectedRowSids();
+        if (selectedSids.size === 0) {
+            throw new Error('未选中任何行，或选中行中未找到 Bangumi URL');
+        }
+        effectiveRemoteEntries = remoteEntries.filter((e) => selectedSids.has(e.sid));
+        bgmLog(LOG_LEVELS.INFO, `[syncFromGithub] 仅同步选中行：选中 ${selectedSids.size} 个 SID，匹配远程 ${effectiveRemoteEntries.length} 条`);
+        onProgress?.(1, 3, `选中 ${selectedSids.size} 行，匹配远程 ${effectiveRemoteEntries.length} 条`);
+    }
     const local = readLocalEntriesForSync();
     if (!local) {
         throw new Error('无法读取本地工作表数据');
     }
     onProgress?.(2, 3, '比对差异中...');
-    const diffs = computeDiff(remoteEntries, local.entries, strategy);
+    const diffs = computeDiff(effectiveRemoteEntries, local.entries, strategy);
     // 应用用户冲突解决决策：过滤掉用户选择「本地」的字段
     if (conflictResolution && conflictResolution.length > 0) {
         applyConflictResolutions(diffs, conflictResolution);
@@ -523,9 +572,56 @@ export async function syncFromGithub(onProgress, strategy = 'add-update', signal
     const deleteCount = diffs.filter((d) => d.kind === 'delete').length;
     bgmLog(LOG_LEVELS.INFO, `[githubSync] diff 完成（${strategy}）：新增 ${addCount}，更新 ${updateCount}，删除 ${deleteCount}`);
     const result = applyDiffToSheet(diffs, strategy, onProgress, source.getDisplayName());
-    result.remoteTotal = remoteEntries.length;
+    result.remoteTotal = effectiveRemoteEntries.length;
     // unchanged = 远程总数 - (新增+更新)（delete 不计入 unchanged）
-    result.unchanged = Math.max(0, remoteEntries.length - addCount - updateCount);
+    result.unchanged = Math.max(0, effectiveRemoteEntries.length - addCount - updateCount);
     onProgress?.(3, 3, `完成：新增 ${result.added}，更新 ${result.updated}，删除 ${result.deleted}`);
     return result;
+}
+/**
+ * 从 WPS 当前选区提取所有行的 SID 集合（用于「仅同步选中行」）
+ *
+ * @returns SID 字符串集合；空集合表示未选中行或未找到 URL
+ */
+function getSelectedRowSids() {
+    const sids = new Set();
+    try {
+        const app = getApp();
+        if (!app)
+            return sids;
+        const selection = app.Selection;
+        if (!selection) {
+            bgmLog(LOG_LEVELS.WARN, '[getSelectedRowSids] 无选区');
+            return sids;
+        }
+        const firstRow = selection.Row;
+        const lastRow = selection.Row + selection.Rows.Count - 1;
+        bgmLog(LOG_LEVELS.INFO, `[getSelectedRowSids] 选区行范围: ${firstRow}-${lastRow}`);
+        const ws = app.ActiveSheet;
+        if (!ws)
+            return sids;
+        const headerRow = findHeaderRow(ws) || 1;
+        const colMap = getColumnMap(ws, headerRow);
+        const urlCol = colMap.get('Bangumi_URL');
+        if (!urlCol) {
+            bgmLog(LOG_LEVELS.WARN, '[getSelectedRowSids] 未找到 Bangumi_URL 列');
+            return sids;
+        }
+        for (let row = firstRow; row <= lastRow; row++) {
+            if (row === headerRow)
+                continue;
+            const url = trim(getCellValue(ws, row, urlCol));
+            if (!url)
+                continue;
+            const sid = extractSubjectId(url);
+            if (sid) {
+                sids.add(sid);
+            }
+        }
+        bgmLog(LOG_LEVELS.INFO, `[getSelectedRowSids] 提取到 ${sids.size} 个 SID`);
+    }
+    catch (e) {
+        bgmLog(LOG_LEVELS.ERROR, `[getSelectedRowSids] 提取失败: ${e.message}`);
+    }
+    return sids;
 }
