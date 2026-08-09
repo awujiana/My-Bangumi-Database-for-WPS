@@ -17,6 +17,7 @@ export type WpsFormula = string | WpsCellValue[][] | null;
 export type WpsSelection = WpsRange | null;
 export interface WpsApplication {
     ActiveWorkbook?: WpsWorkbook;
+    Workbooks?: WpsWorkbooks;
     PluginStorage?: WpsPluginStorage;
     ActiveSheet?: WpsWorksheet;
     ActiveCell?: WpsRange;
@@ -36,7 +37,13 @@ export interface WpsApplication {
     /** 计算模式：-4135=手动, -4105=自动 */
     Calculation?: number;
 }
+export interface WpsWorkbooks {
+    Count: number;
+    Item(index: number): WpsWorkbook;
+}
 export interface WpsWorkbook {
+    Name: string;
+    FullName: string;
     Worksheets: WpsWorksheets;
     Sheets: WpsSheets;
     ActiveSheet: WpsWorksheet;
@@ -112,6 +119,7 @@ export interface WpsRange {
     Value2?: WpsCellValue | WpsCellValue[][];
     Text?: string | null;
     Formula?: WpsFormula;
+    FormulaR1C1?: string;
     Interior?: WpsInterior;
     Font?: WpsFont;
     Areas?: WpsAreas;

@@ -28,6 +28,7 @@ import { sanitizeHtml } from '../tools/sanitize.js'
 interface LockedSheetInfo {
   index: number
   name: string
+  workbookName?: string
 }
 
 interface CandidateHeader {
@@ -73,15 +74,24 @@ export function toggleSheetLock(): void {
     BGM.sheet.lockedIndex = null
     BGM.sheet.lockedName = null
     BGM.sheet.isLocked = false
+    BGM.sheet.lockedWorkbookName = null
     saveLockedSheet(null)
     showToast('已解锁工作表', 'info')
   } else {
     const sheetName = select.options[select.selectedIndex]?.text || ''
+    // 获取选中的工作簿名称
+    const wbSelect = document.getElementById('workbookSelect') as HTMLSelectElement | null
+    const wbName = wbSelect?.value || ''
     BGM.sheet.lockedIndex = sheetIndex
     BGM.sheet.lockedName = sheetName
+    BGM.sheet.lockedWorkbookName = wbName || null
     BGM.sheet.isLocked = true
-    saveLockedSheet({ index: sheetIndex, name: sheetName })
-    showToast('已锁定工作表: ' + sheetName, 'info')
+    const sheetInfo: LockedSheetInfo = { index: sheetIndex, name: sheetName }
+    if (wbName) {
+      sheetInfo.workbookName = wbName
+    }
+    saveLockedSheet(sheetInfo)
+    showToast('已锁定工作表: ' + sheetName + (wbName ? '（工作簿: ' + wbName + '）' : ''), 'info')
   }
   updateLockButton()
   refreshData()
@@ -103,7 +113,32 @@ export function restoreLockedSheet(): boolean {
         const info = JSON.parse(raw) as LockedSheetInfo
         BGM.sheet.lockedIndex = info.index != null ? info.index : null
         BGM.sheet.lockedName = info.name || null
+        BGM.sheet.lockedWorkbookName = info.workbookName || null
         BGM.sheet.isLocked = !!(info.index != null && info.name)
+
+        // 验证锁定的工作簿是否仍然存在
+        if (BGM.sheet.isLocked && info.workbookName && app.Workbooks) {
+          let workbookFound = false
+          for (let i = 1; i <= app.Workbooks.Count; i++) {
+            if (app.Workbooks.Item(i).Name === info.workbookName) {
+              workbookFound = true
+              break
+            }
+          }
+          if (!workbookFound) {
+            bgmLog(
+              LOG_LEVELS.WARN,
+              `[restoreLockedSheet] 锁定的工作簿 "${info.workbookName}" 已不存在，清除锁信息`,
+            )
+            BGM.sheet.lockedIndex = null
+            BGM.sheet.lockedName = null
+            BGM.sheet.lockedWorkbookName = null
+            BGM.sheet.isLocked = false
+            saveLockedSheet(null)
+            return false
+          }
+        }
+
         return true
       } catch (e: unknown) {
         BGM.handleError(e, {
@@ -152,7 +187,21 @@ export function refreshSheets(opts?: { autoSelectActive?: boolean }): void {
     return
   }
 
-  const workbook = app.ActiveWorkbook
+  // 获取选中的工作簿
+  const wbSelect = document.getElementById('workbookSelect') as HTMLSelectElement | null
+  let workbook = app.ActiveWorkbook
+  if (wbSelect?.value) {
+    const wbs = app.Workbooks
+    if (wbs) {
+      for (let i = 1; i <= wbs.Count; i++) {
+        if (wbs.Item(i).Name === wbSelect.value) {
+          workbook = wbs.Item(i)
+          break
+        }
+      }
+    }
+  }
+
   const sheets = workbook.Worksheets
 
   // 探测当前活动工作表索引（autoSelectActive 时用于自动选中）
@@ -215,6 +264,58 @@ export function refreshSheets(opts?: { autoSelectActive?: boolean }): void {
   }
 
   updateLockButton()
+}
+
+/**
+ * 刷新工作簿列表（所有打开的 Excel 工作簿）
+ */
+export function refreshWorkbooks(): void {
+  const select = document.getElementById('workbookSelect') as HTMLSelectElement | null
+  if (!select) return
+
+  const app = getApp()
+  if (!app?.Workbooks) {
+    bgmLog(LOG_LEVELS.WARN, 'refreshWorkbooks: 无法获取 Workbooks')
+    return
+  }
+
+  const wbs = app.Workbooks
+
+  // 保存当前选中值
+  const currentValue = select.value
+
+  // 使用 DOM API 创建选项
+  select.textContent = ''
+  const defaultOption = document.createElement('option')
+  defaultOption.value = ''
+  defaultOption.textContent = '-- 当前活动工作簿 --'
+  select.appendChild(defaultOption)
+
+  let hasActiveWorkbook = false
+  const activeWbName = app.ActiveWorkbook?.Name || ''
+
+  for (let i = 1; i <= wbs.Count; i++) {
+    const option = document.createElement('option')
+    const wb = wbs.Item(i)
+    option.value = wb.Name
+    option.text = wb.Name
+
+    // 恢复之前选中值，或默认选中当前活动工作簿
+    if (currentValue && currentValue === wb.Name) {
+      option.selected = true
+    } else if (!currentValue && wb.Name === activeWbName) {
+      option.selected = true
+      hasActiveWorkbook = true
+    }
+
+    select.appendChild(option)
+  }
+
+  if (!currentValue && !hasActiveWorkbook) {
+    select.value = ''
+  }
+
+  bgmLog(LOG_LEVELS.INFO, `[refreshWorkbooks] 刷新工作簿列表: ${wbs.Count} 个`)
 }
 
 export function activateSheetIfNeeded(ws: WpsWorksheet): (() => void) | false {

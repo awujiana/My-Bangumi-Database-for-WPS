@@ -21,6 +21,7 @@ import {
   showToast,
   refreshData,
   refreshSheets,
+  refreshWorkbooks,
   toggleSheetLock,
   clearSyncRecords,
   deduplicateSyncRecords,
@@ -580,6 +581,16 @@ const ACTION_HANDLERS: Record<string, ActionHandler> = {
     bgmLog(
       LOG_LEVELS.INFO,
       `[handleActionClick] 工作表刷新已触发，耗时: ${Date.now() - ctx.startTime}ms`,
+    )
+  },
+
+  refreshWorkbooks: (ctx) => {
+    bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 开始刷新工作簿列表')
+    refreshWorkbooks()
+    refreshSheets({ autoSelectActive: true })
+    bgmLog(
+      LOG_LEVELS.INFO,
+      `[handleActionClick] 工作簿刷新已触发，耗时: ${Date.now() - ctx.startTime}ms`,
     )
   },
 

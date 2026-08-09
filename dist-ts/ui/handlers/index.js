@@ -4,7 +4,7 @@
  * @description 资源追踪、按钮监听、ACTION_HANDLERS 分发、消息监听、事件总线监听、
  *              配置 UI 回填等。同时 re-export 子模块的公开 API，保持原 handlers.ts 的外部接口。
  */
-import { LOG_LEVELS, bgmLog, BGM, loadBgToken, clearBgToken, copyTokenToClipboard, _setBgmUserId, _setBgmUsername, getApp, showAlert, showConfirm, showInput, showToast, refreshData, refreshSheets, toggleSheetLock, clearSyncRecords, deduplicateSyncRecords, formatSyncRecordSheet, openSyncRecordSheet, closeDetailModal, previewSyncContent, syncSelectedRows, openBangumiTokenPage, setSyncRecordEnabled, getSyncRecordEnabled, getIncrementalSync, setIncrementalSync, getSkipConflicts, setSkipConflicts, getGithubConfig, setGithubConfig, isGithubConfigComplete, getSyncStrategy, setSyncStrategy, getSyncSourceType, setSyncSourceType, syncFromRemote, buildRawUrl, showSyncProgressDialog, updateSyncProgressDialog, completeSyncProgressDialog, hideSyncProgressDialog, } from '../../index.js';
+import { LOG_LEVELS, bgmLog, BGM, loadBgToken, clearBgToken, copyTokenToClipboard, _setBgmUserId, _setBgmUsername, getApp, showAlert, showConfirm, showInput, showToast, refreshData, refreshSheets, refreshWorkbooks, toggleSheetLock, clearSyncRecords, deduplicateSyncRecords, formatSyncRecordSheet, openSyncRecordSheet, closeDetailModal, previewSyncContent, syncSelectedRows, openBangumiTokenPage, setSyncRecordEnabled, getSyncRecordEnabled, getIncrementalSync, setIncrementalSync, getSkipConflicts, setSkipConflicts, getGithubConfig, setGithubConfig, isGithubConfigComplete, getSyncStrategy, setSyncStrategy, getSyncSourceType, setSyncSourceType, syncFromRemote, buildRawUrl, showSyncProgressDialog, updateSyncProgressDialog, completeSyncProgressDialog, hideSyncProgressDialog, } from '../../index.js';
 import { exportConfig, importConfig } from '../../services/configService.js';
 import { undoLastSyncForRibbon } from '../../services/ribbonService.js';
 import { debounce } from '../../tools/debounce.js';
@@ -432,6 +432,12 @@ const ACTION_HANDLERS = {
         bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 开始刷新工作表（自动匹配当前活动工作表）');
         refreshSheets({ autoSelectActive: true });
         bgmLog(LOG_LEVELS.INFO, `[handleActionClick] 工作表刷新已触发，耗时: ${Date.now() - ctx.startTime}ms`);
+    },
+    refreshWorkbooks: (ctx) => {
+        bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 开始刷新工作簿列表');
+        refreshWorkbooks();
+        refreshSheets({ autoSelectActive: true });
+        bgmLog(LOG_LEVELS.INFO, `[handleActionClick] 工作簿刷新已触发，耗时: ${Date.now() - ctx.startTime}ms`);
     },
     refreshData: (ctx) => {
         bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 开始刷新数据');
@@ -1128,6 +1134,17 @@ function setupEventListeners() {
     trackedEventBusOn(BGM_EVENTS.CONFIG_UPDATED, handleConfigUpdatedEvent);
     trackedEventBusOn(BGM_EVENTS.SYNC_PROGRESS, handleSyncProgressEvent);
     trackedEventBusOn(BGM_EVENTS.SYNC_STATE_CHANGED, handleSyncStateChangedEvent);
+    // Ribbon 按钮触发数据同步：复用 taskpane handler，显示模块化进度弹窗
+    trackedEventBusOn(BGM_EVENTS.REQUEST_GITHUB_SYNC, () => {
+        bgmLog(LOG_LEVELS.INFO, '[handlers] 收到 Ribbon 数据同步请求，触发 syncFromGithub handler');
+        const handler = ACTION_HANDLERS['syncFromGithub'];
+        if (handler) {
+            handler({ args: [], startTime: Date.now() });
+        }
+        else {
+            bgmLog(LOG_LEVELS.ERROR, '[handlers] syncFromGithub handler 未注册');
+        }
+    });
 }
 // 尝试更新增量同步复选框（带重试机制）
 function tryUpdateIncrementalCheckbox(checked, attempts = 0) {

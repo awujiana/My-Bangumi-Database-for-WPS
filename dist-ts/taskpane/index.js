@@ -13,7 +13,7 @@
  *       无可拆分内容。遵循"保守策略"，不为对齐文件清单而创建空模块。
  */
 import { WPS_ENUM, LOG_LEVELS, getApp, bgmLog, BGM, updateTokenStatus, updateUserIdStatus, closeDetailModal, removeMessageListener, clearAllPendingTimeouts, } from '../index.js';
-import { toggleSheetLock, saveLockedSheet, restoreLockedSheet, updateLockButton, refreshSheets, autoDetectSheet, updateFilterStatus, refreshData, onSelectModeChange, } from './panelLifecycle.js';
+import { toggleSheetLock, saveLockedSheet, restoreLockedSheet, updateLockButton, refreshSheets, refreshWorkbooks, autoDetectSheet, updateFilterStatus, refreshData, onSelectModeChange, } from './panelLifecycle.js';
 import { restoreUserInfoFromStorage, startUserInfoPolling } from './userInfoPolling.js';
 // ========== 初始化 ==========
 function initPanel() {
@@ -31,6 +31,7 @@ function initPanel() {
     // 恢复上次锁定的工作表
     const restored = restoreLockedSheet();
     refreshSheets();
+    refreshWorkbooks();
     // 自动检测最佳工作表并锁定
     const detected = autoDetectSheet();
     if (detected) {
@@ -63,6 +64,13 @@ function initPanel() {
             saveLockedSheet(null);
             updateLockButton();
             refreshData(); // 切换工作表时刷新预览
+        });
+    }
+    // 工作簿选择器变更事件：切换工作簿时刷新工作表列表
+    const wbSelect = document.getElementById('workbookSelect');
+    if (wbSelect) {
+        wbSelect.addEventListener('change', () => {
+            refreshSheets();
         });
     }
     // 模式切换（自动/手动）
@@ -98,7 +106,7 @@ function initPanel() {
     bgmLog(LOG_LEVELS.INFO, 'initPanel 完成');
 }
 // ========== 导出 ==========
-export { initPanel, refreshSheets, refreshData, toggleSheetLock, onSelectModeChange, autoDetectSheet, updateFilterStatus, };
+export { initPanel, refreshSheets, refreshWorkbooks, refreshData, toggleSheetLock, onSelectModeChange, autoDetectSheet, updateFilterStatus, };
 window.initPanel = initPanel;
 window.refreshTaskpaneUI = function () {
     try {

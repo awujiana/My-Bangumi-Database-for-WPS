@@ -349,11 +349,25 @@ export function getDataSheet() {
     const app = getApp();
     if (!app || !app.ActiveWorkbook)
         return null;
-    bgmLog(LOG_LEVELS.INFO, `getDataSheet: isLocked=${BGM.sheet.isLocked}, lockedIndex=${BGM.sheet.lockedIndex}`);
+    bgmLog(LOG_LEVELS.INFO, `getDataSheet: isLocked=${BGM.sheet.isLocked}, lockedIndex=${BGM.sheet.lockedIndex}, lockedWorkbook=${BGM.sheet.lockedWorkbookName}`);
     if (BGM.sheet.isLocked && BGM.sheet.lockedIndex) {
         try {
-            const ws = app.ActiveWorkbook.Worksheets.Item(BGM.sheet.lockedIndex);
-            bgmLog(LOG_LEVELS.INFO, `getDataSheet: 返回锁定的工作表: ${ws.Name}`);
+            // 如果锁定的是特定工作簿，先尝试查找该工作簿
+            let targetWb = app.ActiveWorkbook;
+            if (BGM.sheet.lockedWorkbookName) {
+                const wbs = app.Workbooks;
+                if (wbs) {
+                    for (let i = 1; i <= wbs.Count; i++) {
+                        const wb = wbs.Item(i);
+                        if (wb.Name === BGM.sheet.lockedWorkbookName) {
+                            targetWb = wb;
+                            break;
+                        }
+                    }
+                }
+            }
+            const ws = targetWb.Worksheets.Item(BGM.sheet.lockedIndex);
+            bgmLog(LOG_LEVELS.INFO, `getDataSheet: 返回锁定的工作表: ${ws.Name}（工作簿: ${targetWb.Name}）`);
             return ws;
         }
         catch (e) {
@@ -394,11 +408,37 @@ export function ensureSheetHeaders(ws) {
     }
     bgmLog(LOG_LEVELS.INFO, '[ensureSheetHeaders] 工作表为空，开始写入标准表头（39 列）');
     // 逐列写入表头
+    let writeCount = 0;
+    let failCount = 0;
+    const failCols = [];
     for (let i = 0; i < STANDARD_HEADERS.length; i++) {
         const header = STANDARD_HEADERS[i];
         if (header !== undefined) {
-            setCellValueDirect(ws, 1, i + 1, header);
+            const ok = setCellValueDirect(ws, 1, i + 1, header);
+            if (ok) {
+                writeCount++;
+            }
+            else {
+                failCount++;
+                failCols.push(i + 1);
+            }
         }
+    }
+    bgmLog(LOG_LEVELS.INFO, `[ensureSheetHeaders] 写入完成：成功 ${writeCount} 列，失败 ${failCount} 列`);
+    if (failCount > 0) {
+        bgmLog(LOG_LEVELS.ERROR, `[ensureSheetHeaders] 表头写入失败列：${failCols.join(',')}，前 5 列失败无法继续`);
+        // 前 5 列（序列号/是否看完/看完时间/开播季度/开播日期）是后续同步的关键字段，
+        // 如果这些列写入失败，整个同步流程无法继续，直接返回 false
+        if (failCols.some((c) => c <= 5)) {
+            bgmLog(LOG_LEVELS.ERROR, '[ensureSheetHeaders] 关键列写入失败，返回 false');
+            return false;
+        }
+    }
+    // 验证写入：读回第 25 列（Bangumi URL）确认写入成功
+    const verifyVal = getCellValue(ws, 1, 25);
+    bgmLog(LOG_LEVELS.INFO, `[ensureSheetHeaders] 验证第25列读回: "${verifyVal}"`);
+    if (!verifyVal) {
+        bgmLog(LOG_LEVELS.ERROR, '[ensureSheetHeaders] 表头写入验证失败，第25列为空');
     }
     // 设置表头行样式：灰色背景 + 加粗
     try {
@@ -416,24 +456,88 @@ export function ensureSheetHeaders(ws) {
     }
     // 清除缓存，确保后续读取能拿到新表头
     clearSheetCache(ws);
-    bgmLog(LOG_LEVELS.INFO, '[ensureSheetHeaders] 标准表头写入完成，缓存已清除');
+    // 验证 findHeaderRow 是否能识别新表头
+    const newHeaderRow = findHeaderRow(ws);
+    bgmLog(LOG_LEVELS.INFO, `[ensureSheetHeaders] 缓存已清除，findHeaderRow 重新检测: ${newHeaderRow}`);
+    if (newHeaderRow !== 1) {
+        bgmLog(LOG_LEVELS.WARN, `[ensureSheetHeaders] findHeaderRow 返回 ${newHeaderRow}（预期 1），表头关键字匹配可能失败`);
+    }
+    bgmLog(LOG_LEVELS.INFO, '[ensureSheetHeaders] 标准表头写入完成');
     return true;
 }
 /**
  * 直接写入单元格值（绕过 undo 记录，仅供表头初始化使用）
+ *
+ * 使用 Formula 而非 Value/Value2，因为 WPS 的 COM 桥接层对 Range 对象的
+ * Value/Value2 setter 设置了不可配置属性拦截，会抛出 "Cannot redefine property: Value"。
+ * Formula 是 WPS/Excel 的原生内容属性，走不同的内部路径，不受此限制。
+ *
+ * 多重回退策略：
+ *   1. Formula（首选，不同属性路径）
+ *   2. Value2（回退，与 setCellValue 保持一致）
+ *   3. Value（最终回退）
+ *
+ * @returns true 写入成功，false 写入失败
  */
 function setCellValueDirect(ws, row, col, value) {
+    const address = colNumToLetter(col) + row;
+    // 方案 1: Cells.Item(row, col) + FormulaR1C1
+    // 完全不同的 COM 路径（Cells.Item 而非 Range）+ 不同属性（FormulaR1C1 而非 Formula/Value/Value2），
+    // 最大概率绕过 WPS COM 桥接层 Proxy 拦截。
     try {
-        // 使用 Range(address) 方式访问单元格，与项目其他地方（getCell/getCellValue）保持一致。
-        // 不使用 ws.Cells.Item(row, col)，因为 WPS 某些版本不支持该调用形式，
-        // 会导致表头写入静默失败，进而触发"无法读取本地工作表数据"。
-        const address = colNumToLetter(col) + row;
-        const cell = ws.Range(address);
+        const cell = ws.Cells.Item(row, col);
         if (cell) {
-            cell.Value = value;
+            cell.FormulaR1C1 = value;
+            return true;
         }
     }
     catch (e) {
-        bgmLog(LOG_LEVELS.WARN, `[setCellValueDirect] 写入 (${row},${col}) 失败: ${e.message}`);
+        bgmLog(LOG_LEVELS.WARN, `[setCellValueDirect] Cells.FormulaR1C1 (${row},${col}) 失败: ${e.message}`);
     }
+    // 方案 2: Range + Formula（不同属性路径，不受 Value/Value2 拦截影响）
+    try {
+        const cell = ws.Range(address);
+        if (cell) {
+            cell.Formula = value;
+            return true;
+        }
+    }
+    catch (e) {
+        bgmLog(LOG_LEVELS.WARN, `[setCellValueDirect] Range.Formula (${row},${col}) 失败: ${e.message}`);
+    }
+    // 方案 3: Range + FormulaR1C1（不同属性路径）
+    try {
+        const cell = ws.Range(address);
+        if (cell) {
+            cell.FormulaR1C1 = value;
+            return true;
+        }
+    }
+    catch (e) {
+        bgmLog(LOG_LEVELS.WARN, `[setCellValueDirect] Range.FormulaR1C1 (${row},${col}) 失败: ${e.message}`);
+    }
+    // 方案 4: Range + Value2（回退）
+    try {
+        const cell = ws.Range(address);
+        if (cell) {
+            cell.Value2 = value;
+            return true;
+        }
+    }
+    catch (e) {
+        bgmLog(LOG_LEVELS.WARN, `[setCellValueDirect] Range.Value2 (${row},${col}) 失败: ${e.message}`);
+    }
+    // 方案 5: Range + Value（最终回退）
+    try {
+        const cell = ws.Range(address);
+        if (cell) {
+            cell.Value = value;
+            return true;
+        }
+    }
+    catch (e) {
+        bgmLog(LOG_LEVELS.WARN, `[setCellValueDirect] Range.Value (${row},${col}) 失败: ${e.message}`);
+    }
+    bgmLog(LOG_LEVELS.ERROR, `[setCellValueDirect] 所有写入方式均失败 (${row},${col})`);
+    return false;
 }

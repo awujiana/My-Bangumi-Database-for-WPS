@@ -104,12 +104,17 @@ export declare function openCollectionForRibbon(): void;
  *
  * 流程：
  * 1. 校验 GitHub 配置是否完整（owner/repo/path）
- * 2. 读取已保存的同步策略
- * 3. 用户确认对话框（提示当前策略）
- * 4. 调用 syncFromGithub 执行下载、diff、应用
- * 5. 显示结果统计
+ * 2. 确保 taskpane 面板可见（不切换，只显示）
+ * 3. 写入 PluginStorage 信号（bgm_request_github_sync = 时间戳）
+ *    - taskpane 通过 userInfoPolling 轮询检测该信号
+ *    - 检测到后通过 taskpane 内部 eventBus 触发 syncFromGithub handler
+ *    - taskpane handler 负责显示确认对话框 + 模块化进度弹窗
  *
- * @returns 同步结果统计，失败时返回 null
+ * 跨上下文通信说明：
+ * WPS 中 Ribbon 和 Taskpane 是独立 iframe，eventBus 无法跨上下文通信。
+ * 必须通过 PluginStorage 作为中间介质，taskpane 轮询检测信号变化。
+ *
+ * @returns 同步结果统计（信号触发模式返回 null，实际结果由 taskpane handler 处理）
  */
 export declare function syncFromGithubForRibbon(): Promise<GithubSyncResult | null>;
 /**

@@ -33,6 +33,7 @@ export type WpsSelection = WpsRange | null
 // ========== WPS Application ==========
 export interface WpsApplication {
   ActiveWorkbook?: WpsWorkbook
+  Workbooks?: WpsWorkbooks
   PluginStorage?: WpsPluginStorage
   ActiveSheet?: WpsWorksheet
   ActiveCell?: WpsRange
@@ -53,8 +54,16 @@ export interface WpsApplication {
   Calculation?: number
 }
 
+// ========== WPS 工作簿集合 ==========
+export interface WpsWorkbooks {
+  Count: number
+  Item(index: number): WpsWorkbook
+}
+
 // ========== WPS 工作簿 ==========
 export interface WpsWorkbook {
+  Name: string
+  FullName: string
   Worksheets: WpsWorksheets
   Sheets: WpsSheets
   ActiveSheet: WpsWorksheet
@@ -154,6 +163,8 @@ export interface WpsRange {
   Text?: string | null
   // Formula 可能是字符串公式、二维数组或错误值
   Formula?: WpsFormula
+  // FormulaR1C1：R1C1 格式的公式字符串（走不同属性路径，绕过某些 Proxy 拦截）
+  FormulaR1C1?: string
 
   // 格式属性
   Interior?: WpsInterior

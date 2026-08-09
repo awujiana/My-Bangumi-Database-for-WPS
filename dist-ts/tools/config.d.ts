@@ -10,6 +10,7 @@ export declare const CONFIG_KEYS: {
     readonly INCREMENTAL_SYNC: "bgm_incremental_sync";
     readonly SKIP_CONFLICTS: "bgm_skip_conflicts";
     readonly LOCKED_SHEET: "bgm_locked_sheet";
+    readonly LOCKED_WORKBOOK: "bgm_locked_workbook";
     readonly ENABLE_SYNC_RECORD: "bgm_enable_sync_record";
 };
 /**

@@ -75,6 +75,8 @@ export declare const BGM_EVENTS: {
     readonly SHEET_LOCKED: "sheet:locked";
     readonly SHEET_UNLOCKED: "sheet:unlocked";
     readonly CONFIG_UPDATED: "config:updated";
+    /** Ribbon 请求执行数据同步（远程仓库 → Excel） */
+    readonly REQUEST_GITHUB_SYNC: "request:githubSync";
 };
 export declare const eventBus: EventBus;
 //# sourceMappingURL=events.d.ts.map

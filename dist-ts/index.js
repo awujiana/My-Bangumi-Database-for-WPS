@@ -259,7 +259,7 @@ showAutoFillUrlDialog, } from './tools/autoFillUrl.js';
 // ============================================================================
 // 15. 页面逻辑（来自 taskpane.js）
 // ============================================================================
-export { refreshSheets, toggleSheetLock, 
+export { refreshSheets, refreshWorkbooks, toggleSheetLock, 
 // 刷新数据预览
 refreshData, } from './taskpane.js';
 // 预览函数

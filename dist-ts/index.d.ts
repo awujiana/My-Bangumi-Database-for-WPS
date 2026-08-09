@@ -50,6 +50,8 @@ export interface BGMSheet {
     lockedName: string | null;
     /** 是否已锁定 */
     isLocked: boolean;
+    /** 锁定的工作簿名称（空字符串表示当前活动工作簿） */
+    lockedWorkbookName: string | null;
 }
 export interface BGMSync {
     /** 是否正在同步 */
@@ -119,7 +121,7 @@ export interface BGMUserInfo {
     /** 用户名 */
     username: string;
 }
-export { refreshSheets, toggleSheetLock, refreshData, } from './taskpane.js';
+export { refreshSheets, refreshWorkbooks, toggleSheetLock, refreshData, } from './taskpane.js';
 export type { DetailItem, PreviewItem, DetailPreviewData, } from './ui/preview.js';
 export { previewSyncContent, closeDetailModal, syncAllRows, } from './ui/preview.js';
 export { isWpsApp, isWpsWorksheet, isWpsRange, wpsMsgBox, } from './tools/wps.js';

@@ -119,6 +119,8 @@ export const BGM_EVENTS = {
     SHEET_LOCKED: 'sheet:locked',
     SHEET_UNLOCKED: 'sheet:unlocked',
     CONFIG_UPDATED: 'config:updated',
+    /** Ribbon 请求执行数据同步（远程仓库 → Excel） */
+    REQUEST_GITHUB_SYNC: 'request:githubSync',
 };
 // 创建全局事件总线实例
 export const eventBus = new EventBus();

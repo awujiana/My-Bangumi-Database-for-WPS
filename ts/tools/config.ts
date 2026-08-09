@@ -17,6 +17,7 @@ export const CONFIG_KEYS = {
   INCREMENTAL_SYNC: 'bgm_incremental_sync',
   SKIP_CONFLICTS: 'bgm_skip_conflicts',
   LOCKED_SHEET: 'bgm_locked_sheet',
+  LOCKED_WORKBOOK: 'bgm_locked_workbook',
   ENABLE_SYNC_RECORD: 'bgm_enable_sync_record',
 } as const
 

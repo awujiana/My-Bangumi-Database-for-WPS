@@ -32,6 +32,7 @@ import {
   restoreLockedSheet,
   updateLockButton,
   refreshSheets,
+  refreshWorkbooks,
   autoDetectSheet,
   updateFilterStatus,
   refreshData,
@@ -60,6 +61,7 @@ function initPanel(): void {
   // 恢复上次锁定的工作表
   const restored = restoreLockedSheet()
   refreshSheets()
+  refreshWorkbooks()
 
   // 自动检测最佳工作表并锁定
   const detected = autoDetectSheet()
@@ -92,6 +94,14 @@ function initPanel(): void {
       saveLockedSheet(null)
       updateLockButton()
       refreshData() // 切换工作表时刷新预览
+    })
+  }
+
+  // 工作簿选择器变更事件：切换工作簿时刷新工作表列表
+  const wbSelect = document.getElementById('workbookSelect')
+  if (wbSelect) {
+    wbSelect.addEventListener('change', () => {
+      refreshSheets()
     })
   }
 
@@ -132,6 +142,7 @@ function initPanel(): void {
 export {
   initPanel,
   refreshSheets,
+  refreshWorkbooks,
   refreshData,
   toggleSheetLock,
   onSelectModeChange,

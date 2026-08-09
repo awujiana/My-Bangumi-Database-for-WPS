@@ -411,6 +411,8 @@ export interface BGMSheet {
   lockedName: string | null
   /** 是否已锁定 */
   isLocked: boolean
+  /** 锁定的工作簿名称（空字符串表示当前活动工作簿） */
+  lockedWorkbookName: string | null
 }
 
 // ========== BGM 同步状态 ==========
@@ -491,6 +493,7 @@ export interface BGMUserInfo {
 
 export {
   refreshSheets,
+  refreshWorkbooks,
   toggleSheetLock,
   // 刷新数据预览
   refreshData,

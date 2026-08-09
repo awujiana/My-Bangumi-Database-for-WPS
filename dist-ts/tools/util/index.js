@@ -46,6 +46,7 @@ export const BGM = {
         lockedIndex: null,
         lockedName: null,
         isLocked: false,
+        lockedWorkbookName: null,
     },
     // 同步状态
     sync: {

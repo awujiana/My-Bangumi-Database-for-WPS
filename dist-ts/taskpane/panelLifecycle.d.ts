@@ -8,6 +8,7 @@ import type { WpsWorksheet } from '../index.js';
 interface LockedSheetInfo {
     index: number;
     name: string;
+    workbookName?: string;
 }
 interface HeaderMeta {
     headerRow: number;
@@ -28,6 +29,10 @@ export declare function updateLockButton(): void;
 export declare function refreshSheets(opts?: {
     autoSelectActive?: boolean;
 }): void;
+/**
+ * 刷新工作簿列表（所有打开的 Excel 工作簿）
+ */
+export declare function refreshWorkbooks(): void;
 export declare function activateSheetIfNeeded(ws: WpsWorksheet): (() => void) | false;
 export declare function detectHeaderAndColumns(ws: WpsWorksheet | null | undefined, opts?: {
     visibleRowSet?: Set<number> | null;

@@ -101,6 +101,15 @@
                 </div>
             </div>
             <div class="form-group">
+                <label>选择工作簿：</label>
+                <select id="workbookSelect" class="input" style="flex:1;">
+                    <option value="">-- 当前活动工作簿 --</option>
+                </select>
+                <div class="sheet-select-row">
+                    <button class="btn small" data-action="refreshWorkbooks" aria-label="刷新工作簿列表">🔄 刷新</button>
+                </div>
+            </div>
+            <div class="form-group">
                 <label>选择工作表：</label>
                 <select id="sheetSelect" class="input" style="flex:1;">
                     <option value="">-- 请选择 --</option>

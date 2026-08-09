@@ -21,7 +21,7 @@ import {
 } from '../index.js'
 import { eventBus, BGM_EVENTS } from '../tools/events.js'
 
-import { refreshSheets, refreshData } from './panelLifecycle.js'
+import { refreshSheets, refreshWorkbooks, refreshData } from './panelLifecycle.js'
 
 /**
  * 从 PluginStorage 恢复用户信息到内存缓存
@@ -166,7 +166,8 @@ export function startUserInfoPolling(): void {
       if (currentPanelShownAt && currentPanelShownAt !== lastPanelShownAt) {
         bgmLog(LOG_LEVELS.INFO, `[startUserInfoPolling] 检测到面板显示信号: ${currentPanelShownAt}`)
         lastPanelShownAt = currentPanelShownAt
-        // 自动刷新工作表（匹配当前活动工作表）+ 刷新数据预览
+        // 自动刷新工作簿列表 + 工作表（匹配当前活动工作表）+ 刷新数据预览
+        refreshWorkbooks()
         refreshSheets({ autoSelectActive: true })
         refreshData()
       }
