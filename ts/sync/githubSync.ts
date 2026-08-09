@@ -334,6 +334,42 @@ export function readLocalEntriesForSync(): {
   return { entries, lastRow }
 }
 
+// ========== 日期工具函数 ==========
+
+/**
+ * 日期列名集合（写入时转换为数值序列号以保留本地列格式）
+ */
+const DATE_COLUMNS = new Set(['开播日期', '完播日'])
+
+/**
+ * 将日期字符串（YYYY-MM-DD 等格式）转换为 Excel/WPS 日期序列号
+ *
+ * Excel/WPS 日期序列号：1900-01-01 = 1，1900-01-02 = 2，...
+ * 注意：Excel/WPS 有 1900-02-29 的 bug（Lotus 123 兼容），但日期序列号计算不需特殊处理。
+ *
+ * @param dateStr 日期字符串，支持 YYYY-MM-DD、YYYY/MM/DD、YYYY.MM.DD 等格式
+ * @returns 日期序列号，解析失败返回 null
+ */
+function dateStringToSerial(dateStr: string): number | null {
+  if (!dateStr) return null
+  const match = String(dateStr).match(/^(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})/)
+  if (!match) return null
+  const yearStr = match[1]
+  const monthStr = match[2]
+  const dayStr = match[3]
+  if (!yearStr || !monthStr || !dayStr) return null
+  const year = parseInt(yearStr, 10)
+  const month = parseInt(monthStr, 10)
+  const day = parseInt(dayStr, 10)
+  if (isNaN(year) || isNaN(month) || isNaN(day)) return null
+
+  // Excel/WPS 日期序列号基准：1899-12-30 = 0（即 1900-01-01 = 1）
+  const base = new Date(1899, 11, 30)
+  const target = new Date(year, month - 1, day)
+  const diff = target.getTime() - base.getTime()
+  return Math.floor(diff / (24 * 60 * 60 * 1000))
+}
+
 // ========== 应用差异到工作表 ==========
 
 /**
@@ -353,7 +389,10 @@ function writeRemoteEntryToRow(
   fieldsToWrite: string[],
   forceOverwrite: boolean,
 ): void {
-  /** 安全写入：列存在时写入值（forceOverwrite=true 时空值也写入清空本地） */
+  /**
+   * 安全写入字符串值：列存在时写入值（forceOverwrite=true 时空值也写入清空本地）
+   * 对于日期列（开播日期、完播日），自动转换为数值序列号以保留本地列格式。
+   */
   const safeSet = (key: string, value: string): void => {
     const col = colMap.get(key)
     if (!col) return
@@ -362,6 +401,18 @@ function writeRemoteEntryToRow(
     const oldValue = getCellValue(ws, row, col)
     // 值无变化时跳过写入，避免空字符串重复写入并污染 undo 栈
     if (oldValue === value) return
+
+    // 日期列：写入数值序列号以保留本地列格式（WPS 根据 NumberFormat 自动格式化）
+    if (DATE_COLUMNS.has(key)) {
+      const serial = dateStringToSerial(value)
+      if (serial !== null) {
+        recordUndoEntry({ row, col, oldValue, newValue: String(serial) })
+        setCellValue(ws, row, col, serial)
+        return
+      }
+    }
+
+    // 非日期列或日期解析失败：写入字符串
     recordUndoEntry({ row, col, oldValue, newValue: value })
     setCellValue(ws, row, col, value)
   }
@@ -489,32 +540,42 @@ function batchWriteNewRows(
   const colCount = maxCol - minCol + 1
 
   // 2. 构建二维值数组（列对齐到 minCol 偏移）
-  const values: (string | null)[][] = []
+  // 日期列（开播日期、完播日）写入数值序列号以保留本地列格式
+  const values: (string | number | null)[][] = []
   for (const entry of rows) {
-    const row = new Array<string | null>(colCount).fill(null)
+    const row = new Array<string | number | null>(colCount).fill(null)
     for (const wc of writeCols) {
       const idx = wc.col - minCol
-      let value = ''
+      let value: string | number | null = null
       if (wc.name === 'Bangumi_URL') {
         value = `https://bgm.tv/subject/${entry.remote.sid}`
       } else if (wc.name === '名称') {
-        value = entry.remote.name ?? ''
+        value = entry.remote.name ?? null
       } else if (wc.name === '标签/分级') {
-        value = tagsToString(entry.remote.meta_tags)
+        value = tagsToString(entry.remote.meta_tags) || null
       } else if (wc.name === '集数') {
-        value = entry.remote['话数'] ?? ''
+        value = entry.remote['话数'] ?? null
       } else {
         // 扩展字段：遍历 EXTENDED_FIELD_MAP 匹配
         for (const [jsonlField, excelField] of EXTENDED_FIELD_MAP) {
           if (excelField === wc.name) {
             const v = entry.remote[jsonlField as keyof GithubRemoteEntry]
-            if (typeof v === 'string') value = v
-            else if (typeof v === 'number') value = String(v)
+            if (typeof v === 'string') {
+              // 日期列：转换为数值序列号以保留本地列格式
+              if (DATE_COLUMNS.has(wc.name)) {
+                const serial = dateStringToSerial(v)
+                value = serial !== null ? serial : v
+              } else {
+                value = v
+              }
+            } else if (typeof v === 'number') {
+              value = String(v)
+            }
             break
           }
         }
       }
-      row[idx] = value || null
+      row[idx] = value
     }
     values.push(row)
   }
@@ -541,10 +602,12 @@ function batchWriteNewRows(
   }
 
   // 4. 记录 undo 条目（一次性记录所有变更）
+  // 注意：日期列的值可能是数值序列号，需转换为字符串存储 undo 记录
   for (let i = 0; i < rows.length; i++) {
     for (const wc of writeCols) {
       const row = startRow + i
-      const val = values[i]![wc.col - minCol] ?? ''
+      const raw = values[i]![wc.col - minCol]
+      const val = raw != null ? String(raw) : ''
       recordUndoEntry({ row, col: wc.col, oldValue: '', newValue: val })
     }
     records.push({
