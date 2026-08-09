@@ -502,9 +502,9 @@ export function showSyncProgressDialog(title, handlers) {
         bar.setAttribute('aria-valuenow', '0');
     }
     if (label)
-        label.textContent = '进度: 0/0';
+        label.textContent = '进度: 准备中...';
     if (percent)
-        percent.textContent = '0%';
+        percent.textContent = '--%';
     if (current)
         current.textContent = '';
     if (log)

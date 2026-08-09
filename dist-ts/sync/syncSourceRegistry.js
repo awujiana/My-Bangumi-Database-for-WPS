@@ -85,47 +85,78 @@ export async function syncFromRemote(onProgress, strategy = 'add-update', signal
     onProgress?.(0, 1, `开始下载远程数据（${source.getDisplayName()} - 策略：${strategy}）...`);
     const remoteEntries = await source.fetchRemoteEntries(signal);
     onProgress?.(1, 3, `下载完成：${remoteEntries.length} 条`);
-    // 3.5 空文档自动填充表头
-    const ws = getDataSheet();
-    if (ws) {
-        const filled = ensureSheetHeaders(ws);
-        if (filled) {
-            bgmLog(LOG_LEVELS.INFO, '[syncFromRemote] 空文档已自动填充标准表头');
-            onProgress?.(1, 3, '已自动填充表头，继续同步...');
+    // 关闭屏幕刷新，减少 COM 调用开销（ensureSheetHeaders / readLocalEntriesForSync 等 COM 操作）
+    const app = getApp();
+    let prevScreenUpdating;
+    let prevCalculation;
+    try {
+        if (app) {
+            prevScreenUpdating = app.ScreenUpdating;
+            prevCalculation = app.Calculation;
+            app.ScreenUpdating = false;
+            app.Calculation = -4135; // xlCalculationManual
         }
     }
-    // 3.6 仅同步选中行：从 WPS Selection 提取 SID 集合，过滤远程条目
-    let effectiveRemoteEntries = remoteEntries;
-    if (selectedRowsOnly) {
-        const selectedSids = getSelectedRowSids();
-        if (selectedSids.size === 0) {
-            throw new Error('未选中任何行，或选中行中未找到 Bangumi URL');
+    catch {
+        // 忽略关闭失败
+    }
+    try {
+        // 3.5 空文档自动填充表头
+        const ws = getDataSheet();
+        if (ws) {
+            const filled = ensureSheetHeaders(ws);
+            if (filled) {
+                bgmLog(LOG_LEVELS.INFO, '[syncFromRemote] 空文档已自动填充标准表头');
+                onProgress?.(1, 3, '已自动填充表头，继续同步...');
+            }
         }
-        effectiveRemoteEntries = remoteEntries.filter((e) => selectedSids.has(e.sid));
-        bgmLog(LOG_LEVELS.INFO, `[syncFromRemote] 仅同步选中行：选中 ${selectedSids.size} 个 SID，匹配远程 ${effectiveRemoteEntries.length} 条`);
-        onProgress?.(1, 3, `选中 ${selectedSids.size} 行，匹配远程 ${effectiveRemoteEntries.length} 条`);
+        // 3.6 仅同步选中行：从 WPS Selection 提取 SID 集合，过滤远程条目
+        let effectiveRemoteEntries = remoteEntries;
+        if (selectedRowsOnly) {
+            const selectedSids = getSelectedRowSids();
+            if (selectedSids.size === 0) {
+                throw new Error('未选中任何行，或选中行中未找到 Bangumi URL');
+            }
+            effectiveRemoteEntries = remoteEntries.filter((e) => selectedSids.has(e.sid));
+            bgmLog(LOG_LEVELS.INFO, `[syncFromRemote] 仅同步选中行：选中 ${selectedSids.size} 个 SID，匹配远程 ${effectiveRemoteEntries.length} 条`);
+            onProgress?.(1, 3, `选中 ${selectedSids.size} 行，匹配远程 ${effectiveRemoteEntries.length} 条`);
+        }
+        const local = readLocalEntriesForSync();
+        if (!local) {
+            throw new Error('无法读取本地工作表数据');
+        }
+        onProgress?.(2, 3, '比对差异中...');
+        const diffs = computeDiff(effectiveRemoteEntries, local.entries, strategy);
+        // 应用用户冲突解决决策：过滤掉用户选择「本地」的字段
+        if (conflictResolution && conflictResolution.length > 0) {
+            applyConflictResolutions(diffs, conflictResolution);
+            bgmLog(LOG_LEVELS.INFO, `[syncFromRemote] 已应用 ${conflictResolution.length} 条冲突解决决策`);
+        }
+        const addCount = diffs.filter((d) => d.kind === 'add').length;
+        const updateCount = diffs.filter((d) => d.kind === 'update').length;
+        const deleteCount = diffs.filter((d) => d.kind === 'delete').length;
+        bgmLog(LOG_LEVELS.INFO, `[syncFromRemote] diff 完成（${strategy}）：新增 ${addCount}，更新 ${updateCount}，删除 ${deleteCount}`);
+        const result = await applyDiffToSheet(diffs, strategy, onProgress, source.getDisplayName());
+        result.remoteTotal = effectiveRemoteEntries.length;
+        // unchanged = 远程总数 - (新增+更新)（delete 不计入 unchanged）
+        result.unchanged = Math.max(0, effectiveRemoteEntries.length - addCount - updateCount);
+        onProgress?.(3, 3, `完成：新增 ${result.added}，更新 ${result.updated}，删除 ${result.deleted}`);
+        return result;
     }
-    const local = readLocalEntriesForSync();
-    if (!local) {
-        throw new Error('无法读取本地工作表数据');
+    finally {
+        // 恢复屏幕刷新和自动计算
+        try {
+            if (app) {
+                if (prevScreenUpdating !== undefined)
+                    app.ScreenUpdating = prevScreenUpdating;
+                if (prevCalculation !== undefined)
+                    app.Calculation = prevCalculation;
+            }
+        }
+        catch {
+            // 忽略恢复失败
+        }
     }
-    onProgress?.(2, 3, '比对差异中...');
-    const diffs = computeDiff(effectiveRemoteEntries, local.entries, strategy);
-    // 应用用户冲突解决决策：过滤掉用户选择「本地」的字段
-    if (conflictResolution && conflictResolution.length > 0) {
-        applyConflictResolutions(diffs, conflictResolution);
-        bgmLog(LOG_LEVELS.INFO, `[syncFromRemote] 已应用 ${conflictResolution.length} 条冲突解决决策`);
-    }
-    const addCount = diffs.filter((d) => d.kind === 'add').length;
-    const updateCount = diffs.filter((d) => d.kind === 'update').length;
-    const deleteCount = diffs.filter((d) => d.kind === 'delete').length;
-    bgmLog(LOG_LEVELS.INFO, `[syncFromRemote] diff 完成（${strategy}）：新增 ${addCount}，更新 ${updateCount}，删除 ${deleteCount}`);
-    const result = await applyDiffToSheet(diffs, strategy, onProgress, source.getDisplayName());
-    result.remoteTotal = effectiveRemoteEntries.length;
-    // unchanged = 远程总数 - (新增+更新)（delete 不计入 unchanged）
-    result.unchanged = Math.max(0, effectiveRemoteEntries.length - addCount - updateCount);
-    onProgress?.(3, 3, `完成：新增 ${result.added}，更新 ${result.updated}，删除 ${result.deleted}`);
-    return result;
 }
 // 默认注册所有同步源
 // 各实现类模块仅被注册表依赖，不反向依赖注册表，避免循环依赖
