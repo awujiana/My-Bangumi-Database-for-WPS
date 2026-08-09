@@ -40,11 +40,20 @@
             if (_ribbonReady && typeof window._GetBangumiImageReal === 'function') {
                 return window._GetBangumiImageReal(control);
             }
-            // 【关键】早期占位必须返回绝对 HTTP URL：WPS Ribbon 回调上下文不在当前
-            // 浏览器页面内，相对路径基准是 WPS 安装目录，会找不到本地 SVG 文件导致
-            // 全部按钮图标显示为问号。
-            var origin = (window.location && window.location.origin) ? window.location.origin : '';
-            return origin + '/images/newFromTemp.svg';
+            // 早期占位：返回相对路径（与成功案例一致），WPS 从加载项目录解析。
+            // 真实模块加载后通过 _bgmRibbonReady 替换，并由 Invalidate() 刷新。
+            var icons = {
+                btnShowPanel: 'images/panel.svg',
+                btnSyncBangumi: 'images/sync.svg',
+                btnSetToken: 'images/token.svg',
+                btnTestToken: 'images/key.svg',
+                btnCopyToken: 'images/key.svg',
+                btnSetUserId: 'images/user.svg',
+                btnOpenCollection: 'images/link.svg',
+                btnSyncFromGithub: 'images/github.svg',
+                btnUndoLastSync: 'images/undo.svg'
+            };
+            return icons[control && control.Id] || 'images/newFromTemp.svg';
         };
 
         // 模块就绪后由 ribbon.js 调用此函数完成初始化

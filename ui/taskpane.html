@@ -11,6 +11,11 @@
 </head>
 <body>
     <!-- ES6 模块加载（外联，符合 CSP script-src 'self'） -->
+    <!-- ⚠️ 预加载 DOMPurify UMD：任务面板是独立 HTML，TS 模块无法裸 import 'dompurify'
+         必须在这里提前挂到 window.DOMPurify，否则 sanitizeHtml 永久降级，
+         数据预览表格、卡片、按钮等内部生成的 HTML 结构会被降级逻辑破坏（甚至
+         被转义为纯文本字面量，造成用户看到 <table ...> 原样输出的 bug）。 -->
+    <script src="../libs/purify.js"></script>
     <script type="module" src="./taskpane-bootstrap.js"></script>
 
     <script src="../wpsjsrpcsdk.js"></script>
