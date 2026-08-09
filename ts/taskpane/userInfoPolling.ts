@@ -19,6 +19,7 @@ import {
   getSkipConflicts,
   getSyncRecordEnabled,
 } from '../index.js'
+import { eventBus, BGM_EVENTS } from '../tools/events.js'
 
 import { refreshSheets, refreshData } from './panelLifecycle.js'
 
@@ -65,6 +66,7 @@ export function startUserInfoPolling(): void {
   let lastSkipConflicts: boolean | null = null
   let lastEnableSyncRecord: boolean | null = null
   let lastPanelShownAt: string | null = null
+  let lastRequestGithubSync: string | null = null
 
   const pollingInterval = setInterval(() => {
     try {
@@ -167,6 +169,21 @@ export function startUserInfoPolling(): void {
         // 自动刷新工作表（匹配当前活动工作表）+ 刷新数据预览
         refreshSheets({ autoSelectActive: true })
         refreshData()
+      }
+
+      // 检测数据同步请求信号：Ribbon 点击"btnSyncFromGithub"时写入 bgm_request_github_sync 时间戳
+      // taskpane 检测到后通过内部 eventBus 触发 syncFromGithub handler（显示模块化进度弹窗）
+      const currentRequestGithubSync =
+        app?.PluginStorage?.getItem('bgm_request_github_sync') || null
+      if (currentRequestGithubSync && currentRequestGithubSync !== lastRequestGithubSync) {
+        bgmLog(
+          LOG_LEVELS.INFO,
+          `[startUserInfoPolling] 检测到数据同步请求信号: ${currentRequestGithubSync}`,
+        )
+        lastRequestGithubSync = currentRequestGithubSync
+        // 通过 taskpane 内部 eventBus 触发 handlers/index.ts 中的监听器
+        // handlers 监听器会调用 ACTION_HANDLERS['syncFromGithub'] 显示进度弹窗
+        eventBus.emit(BGM_EVENTS.REQUEST_GITHUB_SYNC, undefined)
       }
     } catch {
       // 静默处理轮询错误

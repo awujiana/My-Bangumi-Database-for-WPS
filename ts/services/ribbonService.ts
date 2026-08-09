@@ -34,7 +34,6 @@ import {
   type LocalRowEntry,
 } from '../index.js'
 import { undoLastSync, getLastSessionDescription } from '../sync/undoStack.js'
-import { eventBus, BGM_EVENTS } from '../tools/events.js'
 
 // ========== GitHub 同步冲突解决类型 ==========
 
@@ -758,11 +757,16 @@ export function openCollectionForRibbon(): void {
  * 流程：
  * 1. 校验 GitHub 配置是否完整（owner/repo/path）
  * 2. 确保 taskpane 面板可见（不切换，只显示）
- * 3. 通过事件总线触发 taskpane 的 syncFromGithub handler
+ * 3. 写入 PluginStorage 信号（bgm_request_github_sync = 时间戳）
+ *    - taskpane 通过 userInfoPolling 轮询检测该信号
+ *    - 检测到后通过 taskpane 内部 eventBus 触发 syncFromGithub handler
  *    - taskpane handler 负责显示确认对话框 + 模块化进度弹窗
- *    - Ribbon 入口不再直接调用 syncFromRemote，避免 UI 不一致
  *
- * @returns 同步结果统计（事件触发模式返回 null，实际结果由 taskpane handler 处理）
+ * 跨上下文通信说明：
+ * WPS 中 Ribbon 和 Taskpane 是独立 iframe，eventBus 无法跨上下文通信。
+ * 必须通过 PluginStorage 作为中间介质，taskpane 轮询检测信号变化。
+ *
+ * @returns 同步结果统计（信号触发模式返回 null，实际结果由 taskpane handler 处理）
  */
 export async function syncFromGithubForRibbon(): Promise<GithubSyncResult | null> {
   bgmLog(LOG_LEVELS.INFO, '[syncFromGithubForRibbon] ========== Ribbon GitHub 同步 ==========')
@@ -777,10 +781,19 @@ export async function syncFromGithubForRibbon(): Promise<GithubSyncResult | null
   // 2. 确保 taskpane 面板可见（不切换隐藏，仅设置为可见）
   ensureTaskpaneVisible()
 
-  // 3. 通过事件总线触发 taskpane 的 syncFromGithub handler
-  // taskpane handler 会显示确认对话框 + 模块化进度弹窗
-  bgmLog(LOG_LEVELS.INFO, '[syncFromGithubForRibbon] 发送 REQUEST_GITHUB_SYNC 事件到 taskpane')
-  eventBus.emit(BGM_EVENTS.REQUEST_GITHUB_SYNC, undefined)
+  // 3. 写入 PluginStorage 信号，taskpane 轮询检测后触发 syncFromGithub handler
+  try {
+    const app = getApp()
+    if (app?.PluginStorage) {
+      app.PluginStorage.setItem('bgm_request_github_sync', String(Date.now()))
+      bgmLog(LOG_LEVELS.INFO, '[syncFromGithubForRibbon] 已写入数据同步请求信号到 PluginStorage')
+    } else {
+      bgmLog(LOG_LEVELS.ERROR, '[syncFromGithubForRibbon] PluginStorage 不可用，无法通知 taskpane')
+      await wpsMsgBox('无法通知任务面板执行同步，请手动在面板中点击「立即同步」', 0, 48)
+    }
+  } catch (e: unknown) {
+    bgmLog(LOG_LEVELS.ERROR, `[syncFromGithubForRibbon] 写入信号失败: ${(e as Error).message}`)
+  }
 
   return null
 }
