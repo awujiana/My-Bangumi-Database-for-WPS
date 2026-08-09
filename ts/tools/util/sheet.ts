@@ -4,7 +4,13 @@
  * @description 批量读取范围值、表头定位、列映射、最后行检测、缓存管理。
  *              本模块对 index.js 存在循环依赖（调用 BGM/bgmLog/getApp），仅在函数体内引用，运行时安全。
  */
-import { LOG_LEVELS, PANEL_CONFIG, HEADER_KEYWORDS, COLUMN_RULES } from '../../core/constants.js'
+import {
+  LOG_LEVELS,
+  PANEL_CONFIG,
+  HEADER_KEYWORDS,
+  COLUMN_RULES,
+  STANDARD_HEADERS,
+} from '../../core/constants.js'
 import { colNumToLetter, trim } from '../stringUtils.js'
 import type { WpsWorksheet } from '../wps.js'
 
@@ -410,5 +416,78 @@ export function safeActivate(ws: WpsWorksheet | null | undefined): void {
     ws.Activate()
   } else {
     bgmLog(LOG_LEVELS.WARN, 'safeActivate: 无法激活工作表')
+  }
+}
+
+/**
+ * 检查工作表是否为空（无表头行），若是则写入标准表头
+ *
+ * 判定逻辑：findHeaderRow() 返回 0（前 10 行未匹配到 ≥3 个关键字）。
+ * 写入位置：第 1 行，按 STANDARD_HEADERS 顺序逐列写入。
+ * 写入后清除缓存，确保后续 getColumnMap / findHeaderRow 能读到新表头。
+ *
+ * @param ws 工作表对象
+ * @returns true 表示已填充表头（原为空表），false 表示已有表头无需填充
+ */
+export function ensureSheetHeaders(ws: WpsWorksheet | null | undefined): boolean {
+  if (!ws) {
+    bgmLog(LOG_LEVELS.WARN, '[ensureSheetHeaders] 工作表无效')
+    return false
+  }
+
+  const headerRow = findHeaderRow(ws)
+  if (headerRow > 0) {
+    bgmLog(LOG_LEVELS.INFO, `[ensureSheetHeaders] 已有表头行 ${headerRow}，无需填充`)
+    return false
+  }
+
+  bgmLog(LOG_LEVELS.INFO, '[ensureSheetHeaders] 工作表为空，开始写入标准表头（39 列）')
+
+  // 逐列写入表头
+  for (let i = 0; i < STANDARD_HEADERS.length; i++) {
+    const header = STANDARD_HEADERS[i]
+    if (header !== undefined) {
+      setCellValueDirect(ws, 1, i + 1, header)
+    }
+  }
+
+  // 设置表头行样式：灰色背景 + 加粗
+  try {
+    const lastColLetter = colNumToLetter(STANDARD_HEADERS.length)
+    const headerRange = ws.Range(`A1:${lastColLetter}1`)
+    if (headerRange?.Font) {
+      headerRange.Font.Bold = true
+    }
+    if (headerRange?.Interior) {
+      headerRange.Interior.Color = 0xd3d3d3 // GRAY
+    }
+  } catch (e: unknown) {
+    bgmLog(LOG_LEVELS.WARN, `[ensureSheetHeaders] 设置表头样式失败: ${(e as Error).message}`)
+  }
+
+  // 清除缓存，确保后续读取能拿到新表头
+  clearSheetCache(ws)
+  bgmLog(LOG_LEVELS.INFO, '[ensureSheetHeaders] 标准表头写入完成，缓存已清除')
+  return true
+}
+
+/**
+ * 直接写入单元格值（绕过 undo 记录，仅供表头初始化使用）
+ */
+function setCellValueDirect(ws: WpsWorksheet, row: number, col: number, value: string): void {
+  try {
+    // 使用 Range(address) 方式访问单元格，与项目其他地方（getCell/getCellValue）保持一致。
+    // 不使用 ws.Cells.Item(row, col)，因为 WPS 某些版本不支持该调用形式，
+    // 会导致表头写入静默失败，进而触发"无法读取本地工作表数据"。
+    const address = colNumToLetter(col) + row
+    const cell = ws.Range(address)
+    if (cell) {
+      cell.Value = value
+    }
+  } catch (e: unknown) {
+    bgmLog(
+      LOG_LEVELS.WARN,
+      `[setCellValueDirect] 写入 (${row},${col}) 失败: ${(e as Error).message}`,
+    )
   }
 }

@@ -52,6 +52,7 @@ export {
   isEmptyValue,
   getDataSheet,
   safeActivate,
+  ensureSheetHeaders,
 } from './sheet.js'
 export { sleep, delay } from './sleep.js'
 

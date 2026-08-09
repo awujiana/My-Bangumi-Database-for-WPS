@@ -47,6 +47,10 @@ export interface WpsApplication {
   Enum?: Record<string, number>
   ribbonUI?: unknown
   Selection?: WpsSelection
+  /** 屏幕刷新开关（性能优化） */
+  ScreenUpdating?: boolean
+  /** 计算模式：-4135=手动, -4105=自动 */
+  Calculation?: number
 }
 
 // ========== WPS 工作簿 ==========
@@ -73,6 +77,7 @@ export interface WpsWorksheet {
   Name: string
   Rows: WpsRows
   Columns: WpsColumns
+  Cells: WpsCells
   AutoFilter?: WpsAutoFilter
   AutoFilterMode?: boolean
   UsedRange?: WpsRange
@@ -102,6 +107,14 @@ export interface WpsRow {
 
 export interface WpsColumns {
   Count: number
+}
+
+// ========== WPS 单元格集合 ==========
+export interface WpsCells {
+  /** 单元格总数（全表单元格数，通常很大） */
+  Count: number
+  /** 获取指定行列的单元格（1‑based） */
+  Item(row: number, col: number): WpsRange
 }
 
 // ========== WPS 自动筛选 ==========

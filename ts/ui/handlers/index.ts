@@ -19,7 +19,6 @@ import {
   showConfirm,
   showInput,
   showToast,
-  setStatus,
   refreshData,
   refreshSheets,
   toggleSheetLock,
@@ -46,7 +45,10 @@ import {
   setSyncSourceType,
   syncFromRemote,
   buildRawUrl,
+  showSyncProgressDialog,
   updateSyncProgressDialog,
+  completeSyncProgressDialog,
+  hideSyncProgressDialog,
   type SyncStrategy,
   type SyncSourceType,
 } from '../../index.js'
@@ -791,6 +793,11 @@ const ACTION_HANDLERS: Record<string, ActionHandler> = {
     const sourceTypeSelect = document.getElementById('syncSourceType') as HTMLSelectElement | null
     const currentSourceType: SyncSourceType =
       (sourceTypeSelect?.value as SyncSourceType) || getSyncSourceType()
+    // 读取「仅同步选中行」开关
+    const chkSelectedOnly = document.getElementById(
+      'chkSyncSelectedOnly',
+    ) as HTMLInputElement | null
+    const selectedRowsOnly = chkSelectedOnly?.checked === true
     // 本地文件源仅需 path 字段；远程源（github/gitlab/gitee）要求 owner/repo/path
     // 本地文件路径复用 #githubPath 输入框（用户可手动粘贴绝对路径，UI 后续可扩展文件选择对话框）
     if (currentSourceType === 'local') {
@@ -818,26 +825,73 @@ const ACTION_HANDLERS: Record<string, ActionHandler> = {
     // 同步源类型对应的来源描述（本地文件 vs 远程仓库）
     const sourceLabel = currentSourceType === 'local' ? '本地文件' : '远程仓库'
     showConfirm(
-      `将从${sourceLabel}下载数据并按策略【${strategyLabel}】合并到当前工作表。\n（远程仓库 → Excel，与上传同步方向相反）\n是否继续？`,
+      `将从${sourceLabel}下载数据并按策略【${strategyLabel}】合并到当前工作表。\n（远程仓库 → Excel，与上传同步方向相反）${selectedRowsOnly ? '\n⚠️ 仅同步选中行' : ''}\n是否继续？`,
       (confirmed) => {
         if (!confirmed) {
           bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 用户取消数据同步')
           return
         }
-        syncFromRemote((current, total, message) => {
-          if (total > 0) {
-            setStatus(`数据同步 ${current}/${total}: ${message}`)
-          }
-        }, strategy)
+        // 使用模块化进度弹窗（与「同步到 Bangumi」「选中行同步」保持一致）
+        // AbortController 支持：用户点击「停止」时取消下载阶段（applyDiffToSheet 为同步函数，不支持取消）
+        const abortController = new AbortController()
+        showSyncProgressDialog(`正在同步 - 数据同步（${sourceLabel} → Excel）`, {
+          onPause: () => {
+            bgmLog(LOG_LEVELS.INFO, '[syncFromGithub] 数据同步不支持暂停')
+          },
+          onResume: () => {
+            bgmLog(LOG_LEVELS.INFO, '[syncFromGithub] 数据同步不支持恢复')
+          },
+          onStop: () => {
+            bgmLog(LOG_LEVELS.INFO, '[syncFromGithub] 用户请求停止数据同步')
+            abortController.abort()
+          },
+        })
+
+        // 状态栏同步更新（与 syncFromPanel 行为一致）
+        const app = getApp()
+        syncFromRemote(
+          (current, total, message) => {
+            updateSyncProgressDialog(current, total, message)
+            if (app?.StatusBar !== undefined) {
+              app.StatusBar = `[${current}/${total}] ${message}`
+            }
+          },
+          strategy,
+          abortController.signal,
+          selectedRowsOnly,
+        )
           .then((result) => {
-            const summary = `数据同步完成：远程 ${result.remoteTotal}，新增 ${result.added}，更新 ${result.updated}，删除 ${result.deleted}，失败 ${result.failed}`
-            bgmLog(LOG_LEVELS.INFO, `[handleActionClick] ${summary}`)
-            showToast(summary, result.failed > 0 ? 'warn' : 'success')
+            const summary =
+              `📊 数据同步完成（策略：${strategyLabel}）\n\n` +
+              `远程 ${result.remoteTotal} 条\n` +
+              `✅ 新增 ${result.added}，🔄 更新 ${result.updated}\n` +
+              `❌ 删除 ${result.deleted}，⏭️ 无变更 ${result.unchanged}\n` +
+              `⚠️ 失败 ${result.failed}`
+            const details: string[] = [
+              `远程条目 ${result.remoteTotal} 条`,
+              `新增 ${result.added} 条`,
+              `更新 ${result.updated} 条`,
+              `删除 ${result.deleted} 条`,
+              `无变更 ${result.unchanged} 条`,
+              `失败 ${result.failed} 条`,
+              `策略：${strategyLabel}`,
+            ]
+            completeSyncProgressDialog(summary, details, false)
+            bgmLog(LOG_LEVELS.INFO, `[handleActionClick] 数据同步完成: ${details.join('，')}`)
+            if (app?.StatusBar !== undefined) app.StatusBar = false
           })
           .catch((e: unknown) => {
             const errMsg = e instanceof Error ? e.message : String(e)
-            bgmLog(LOG_LEVELS.ERROR, `[handleActionClick] 数据同步失败: ${errMsg}`)
-            showToast(`数据同步失败：${errMsg}`, 'error')
+            const isAborted = abortController.signal.aborted
+            if (isAborted) {
+              completeSyncProgressDialog('⏹️ 数据同步已停止', ['用户主动停止了数据同步'], true)
+              bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 数据同步被用户停止')
+            } else {
+              hideSyncProgressDialog()
+              bgmLog(LOG_LEVELS.ERROR, `[handleActionClick] 数据同步失败: ${errMsg}`)
+              showToast(`数据同步失败：${errMsg}`, 'error')
+            }
+            if (app?.StatusBar !== undefined) app.StatusBar = false
           })
       },
     )
