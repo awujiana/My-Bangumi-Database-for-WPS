@@ -337,37 +337,27 @@ export function readLocalEntriesForSync(): {
 // ========== 日期工具函数 ==========
 
 /**
- * 日期列名集合（写入时转换为数值序列号以保留本地列格式）
+ * 日期列名集合（写入时转换为本地"年月日"字符串格式）
  */
 const DATE_COLUMNS = new Set(['开播日期', '完播日'])
 
 /**
- * 将日期字符串（YYYY-MM-DD 等格式）转换为 Excel/WPS 日期序列号
+ * 将远程日期字符串（YYYY-MM-DD 等格式）转换为本地"年月日"格式字符串
  *
- * Excel/WPS 日期序列号：1900-01-01 = 1，1900-01-02 = 2，...
- * 注意：Excel/WPS 有 1900-02-29 的 bug（Lotus 123 兼容），但日期序列号计算不需特殊处理。
+ * 本地 Excel 的"开播日期""完播日"列使用"YYYY年MM月DD日"格式的字符串，
+ * 远程仓库使用 YYYY-MM-DD 格式，同步时需转换为本地格式写入。
  *
  * @param dateStr 日期字符串，支持 YYYY-MM-DD、YYYY/MM/DD、YYYY.MM.DD 等格式
- * @returns 日期序列号，解析失败返回 null
+ * @returns "年月日"格式字符串，如"2015年12月15日"，解析失败返回 null
  */
-function dateStringToSerial(dateStr: string): number | null {
+function formatDateToLocal(dateStr: string): string | null {
   if (!dateStr) return null
   const match = String(dateStr).match(/^(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})/)
   if (!match) return null
-  const yearStr = match[1]
-  const monthStr = match[2]
-  const dayStr = match[3]
-  if (!yearStr || !monthStr || !dayStr) return null
-  const year = parseInt(yearStr, 10)
-  const month = parseInt(monthStr, 10)
-  const day = parseInt(dayStr, 10)
-  if (isNaN(year) || isNaN(month) || isNaN(day)) return null
-
-  // Excel/WPS 日期序列号基准：1899-12-30 = 0（即 1900-01-01 = 1）
-  const base = new Date(1899, 11, 30)
-  const target = new Date(year, month - 1, day)
-  const diff = target.getTime() - base.getTime()
-  return Math.floor(diff / (24 * 60 * 60 * 1000))
+  const year = match[1]
+  const month = match[2]!.padStart(2, '0')
+  const day = match[3]!.padStart(2, '0')
+  return `${year}年${month}月${day}日`
 }
 
 // ========== 应用差异到工作表 ==========
@@ -402,12 +392,12 @@ function writeRemoteEntryToRow(
     // 值无变化时跳过写入，避免空字符串重复写入并污染 undo 栈
     if (oldValue === value) return
 
-    // 日期列：写入数值序列号以保留本地列格式（WPS 根据 NumberFormat 自动格式化）
+    // 日期列：转换为本地"年月日"字符串格式
     if (DATE_COLUMNS.has(key)) {
-      const serial = dateStringToSerial(value)
-      if (serial !== null) {
-        recordUndoEntry({ row, col, oldValue, newValue: String(serial) })
-        setCellValue(ws, row, col, serial)
+      const localDate = formatDateToLocal(value)
+      if (localDate !== null) {
+        recordUndoEntry({ row, col, oldValue, newValue: localDate })
+        setCellValue(ws, row, col, localDate)
         return
       }
     }
@@ -561,10 +551,9 @@ function batchWriteNewRows(
           if (excelField === wc.name) {
             const v = entry.remote[jsonlField as keyof GithubRemoteEntry]
             if (typeof v === 'string') {
-              // 日期列：转换为数值序列号以保留本地列格式
+              // 日期列：转换为本地"年月日"字符串格式
               if (DATE_COLUMNS.has(wc.name)) {
-                const serial = dateStringToSerial(v)
-                value = serial !== null ? serial : v
+                value = formatDateToLocal(v) ?? v
               } else {
                 value = v
               }
