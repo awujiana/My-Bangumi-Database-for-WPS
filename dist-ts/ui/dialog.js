@@ -632,7 +632,7 @@ function renderSyncStatsChart(container, stats) {
     const totalActive = totalProcessed + stats.unchanged + stats.failed;
     const totalAll = totalActive + stats.skipped;
     // 各部分占比（基于 totalAll，包含 skipped）
-    const pctOf = (v) => totalAll > 0 ? (v / totalAll) * 100 : 0;
+    const pctOf = (v) => (totalAll > 0 ? (v / totalAll) * 100 : 0);
     const addedPct = pctOf(stats.added);
     const updatedPct = pctOf(stats.updated);
     const deletedPct = pctOf(stats.deleted);
@@ -640,13 +640,9 @@ function renderSyncStatsChart(container, stats) {
     const failedPct = pctOf(stats.failed);
     const skippedPct = pctOf(stats.skipped);
     // 完成度（已处理/总计，不含跳过）
-    const completionPct = totalActive > 0
-        ? Math.round((totalProcessed / totalActive) * 100)
-        : 0;
+    const completionPct = totalActive > 0 ? Math.round((totalProcessed / totalActive) * 100) : 0;
     // 效率（处理数/活跃总数）
-    const efficiencyPct = totalActive > 0
-        ? Math.round((totalProcessed / totalActive) * 100)
-        : 0;
+    const efficiencyPct = totalActive > 0 ? Math.round((totalProcessed / totalActive) * 100) : 0;
     // 环形图 SVG 参数
     const radius = 52;
     const circumference = 2 * Math.PI * radius;
@@ -656,9 +652,7 @@ function renderSyncStatsChart(container, stats) {
     const speedStr = stats.avgSpeed > 0 ? stats.avgSpeed.toFixed(1) : '--';
     // 预计剩余
     const remaining = totalActive - totalProcessed;
-    const etaMs = stats.avgSpeed > 0 && remaining > 0
-        ? Math.round((remaining / stats.avgSpeed) * 1000)
-        : 0;
+    const etaMs = stats.avgSpeed > 0 && remaining > 0 ? Math.round((remaining / stats.avgSpeed) * 1000) : 0;
     // 概览卡片数据
     const overviewCards = [
         {
@@ -687,7 +681,8 @@ function renderSyncStatsChart(container, stats) {
     <!-- ===== 顶部概览条 ===== -->
     <div class="bgm-overview-bar">
       <div class="bgm-overview-cards">
-        ${overviewCards.map(c => `
+        ${overviewCards
+        .map((c) => `
           <div class="bgm-overview-card ${c.cls}">
             <div class="bgm-overview-card-header">
               <span class="bgm-overview-icon">${c.icon}</span>
@@ -696,7 +691,8 @@ function renderSyncStatsChart(container, stats) {
             <div class="bgm-overview-value">${c.value}</div>
             <div class="bgm-overview-sub">${c.sub}</div>
           </div>
-        `).join('')}
+        `)
+        .join('')}
       </div>
       <div class="bgm-completion-ring">
         <svg viewBox="0 0 120 120" class="bgm-progress-svg">
@@ -723,7 +719,8 @@ function renderSyncStatsChart(container, stats) {
         <div class="bgm-donut-chart">
           <svg viewBox="0 0 140 140" class="bgm-donut-svg">
             <circle cx="70" cy="70" r="${radius}" fill="none" stroke="var(--surface0, #313244)" stroke-width="14" />
-            ${totalAll > 0 ? `
+            ${totalAll > 0
+        ? `
               <circle cx="70" cy="70" r="${radius}" fill="none"
                 stroke="var(--green, #a6e3a1)" stroke-width="14"
                 stroke-dasharray="${seg(addedPct)} ${circumference}"
@@ -744,19 +741,24 @@ function renderSyncStatsChart(container, stats) {
                 stroke-dasharray="${seg(unchangedPct)} ${circumference}"
                 stroke-dashoffset="${-(seg(addedPct) + seg(updatedPct) + seg(deletedPct))}"
                 transform="rotate(-90 70 70)" stroke-linecap="butt" />
-              ${stats.failed > 0 ? `
+              ${stats.failed > 0
+            ? `
               <circle cx="70" cy="70" r="${radius}" fill="none"
                 stroke="var(--peach, #fab387)" stroke-width="14"
                 stroke-dasharray="${seg(failedPct)} ${circumference}"
                 stroke-dashoffset="${-(seg(addedPct) + seg(updatedPct) + seg(deletedPct) + seg(unchangedPct))}"
-                transform="rotate(-90 70 70)" stroke-linecap="butt" />` : ''}
-              ${stats.skipped > 0 ? `
+                transform="rotate(-90 70 70)" stroke-linecap="butt" />`
+            : ''}
+              ${stats.skipped > 0
+            ? `
               <circle cx="70" cy="70" r="${radius}" fill="none"
                 stroke="var(--lavender, #b4befe)" stroke-width="14"
                 stroke-dasharray="${seg(skippedPct)} ${circumference}"
                 stroke-dashoffset="${-(seg(addedPct) + seg(updatedPct) + seg(deletedPct) + seg(unchangedPct) + seg(failedPct))}"
-                transform="rotate(-90 70 70)" stroke-linecap="butt" />` : ''}
-            ` : ''}
+                transform="rotate(-90 70 70)" stroke-linecap="butt" />`
+            : ''}
+            `
+        : ''}
           </svg>
           <div class="bgm-donut-center">
             <div class="bgm-donut-center-value">${totalProcessed}</div>
@@ -795,18 +797,22 @@ function renderSyncStatsChart(container, stats) {
             <div class="bgm-bar-track"><div class="bgm-bar-fill bgm-bar-unchanged" style="width:${unchangedPct}%"></div></div>
             <span class="bgm-bar-value">${stats.unchanged}<span class="bgm-bar-pct">(${unchangedPct.toFixed(0)}%)</span></span>
           </div>
-          ${stats.failed > 0 ? `
+          ${stats.failed > 0
+        ? `
           <div class="bgm-bar-row">
             <span class="bgm-bar-label">⚠️ 失败</span>
             <div class="bgm-bar-track"><div class="bgm-bar-fill bgm-bar-fail" style="width:${failedPct}%"></div></div>
             <span class="bgm-bar-value">${stats.failed}<span class="bgm-bar-pct">(${failedPct.toFixed(0)}%)</span></span>
-          </div>` : ''}
-          ${stats.skipped > 0 ? `
+          </div>`
+        : ''}
+          ${stats.skipped > 0
+        ? `
           <div class="bgm-bar-row">
             <span class="bgm-bar-label">🔍 跳过</span>
             <div class="bgm-bar-track"><div class="bgm-bar-fill bgm-bar-skip" style="width:${skippedPct}%"></div></div>
             <span class="bgm-bar-value">${stats.skipped}<span class="bgm-bar-pct">(${skippedPct.toFixed(0)}%)</span></span>
-          </div>` : ''}
+          </div>`
+        : ''}
         </div>
       </div>
     </div>
@@ -873,7 +879,7 @@ function renderSyncStatsChart(container, stats) {
             <circle cx="40" cy="40" r="32" fill="none" stroke="var(--surface0, #313244)" stroke-width="6" />
             <circle cx="40" cy="40" r="32" fill="none"
               stroke="var(--sapphire, #74c7ec)" stroke-width="6"
-              stroke-dasharray="${Math.min((totalProcessed / Math.max(stats.elapsedMs / 1000, 1)) / 50, 1) * 2 * Math.PI * 32} ${2 * Math.PI * 32}"
+              stroke-dasharray="${Math.min(totalProcessed / Math.max(stats.elapsedMs / 1000, 1) / 50, 1) * 2 * Math.PI * 32} ${2 * Math.PI * 32}"
               stroke-dashoffset="${2 * Math.PI * 32 * 0.25}"
               stroke-linecap="round"
               transform="rotate(-90 40 40)" />

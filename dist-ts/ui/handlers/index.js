@@ -10,6 +10,7 @@ import { undoLastSyncForRibbon } from '../../services/ribbonService.js';
 import { debounce } from '../../tools/debounce.js';
 import { BGM_EVENTS, eventBus } from '../../tools/events.js';
 import { getRecentLogs, exportLogsToFile, clearLogs } from '../../tools/logger.js';
+import { showConnectionTestDialog, hideConnectionTestDialog } from '../githubConfigDialog.js';
 // 子模块
 import { _T } from './_constants.js';
 import { cleanLockedDataSheet } from './sheet.js';
@@ -20,7 +21,6 @@ export { showTokenDialog, showUserIdDialog, updateTokenStatus, updateUserIdStatu
 export { syncFromPanel, syncCollectionFromBgm, syncFromBgmByAPI } from './sync.js';
 export { cleanLockedDataSheet } from './sheet.js';
 // 连接测试弹窗
-import { showConnectionTestDialog, hideConnectionTestDialog } from '../githubConfigDialog.js';
 export { showConnectionTestDialog, hideConnectionTestDialog };
 // ========== 模块级资源追踪（防止事件监听器与定时器泄漏） ==========
 const _pendingTimeouts = new Set();

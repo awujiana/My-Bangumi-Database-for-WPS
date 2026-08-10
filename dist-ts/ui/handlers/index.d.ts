@@ -4,10 +4,10 @@
  * @description 资源追踪、按钮监听、ACTION_HANDLERS 分发、消息监听、事件总线监听、
  *              配置 UI 回填等。同时 re-export 子模块的公开 API，保持原 handlers.ts 的外部接口。
  */
+import { showConnectionTestDialog, hideConnectionTestDialog } from '../githubConfigDialog.js';
 export { showTokenDialog, showUserIdDialog, updateTokenStatus, updateUserIdStatus, openUserCollection, testTokenValidity, testDebugConnection, showUserProfile, hideUserProfile, renewToken, } from './token.js';
 export { syncFromPanel, syncCollectionFromBgm, syncFromBgmByAPI } from './sync.js';
 export { cleanLockedDataSheet } from './sheet.js';
-import { showConnectionTestDialog, hideConnectionTestDialog } from '../githubConfigDialog.js';
 export { showConnectionTestDialog, hideConnectionTestDialog };
 /**
  * 清理所有仍在等待的 setTimeout，防止面板关闭后回调仍被触发。

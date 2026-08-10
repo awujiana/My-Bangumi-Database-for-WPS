@@ -154,7 +154,7 @@ function buildSyncChartSection(result, elapsedMs, avgSpeed, strategyLabel) {
     const totalActive = totalProcessed + result.unchanged + result.failed;
     const totalAll = totalActive + result.skipped;
     // 各部分占比（基于 totalAll，包含 skipped）
-    const pctOf = (v) => totalAll > 0 ? (v / totalAll) * 100 : 0;
+    const pctOf = (v) => (totalAll > 0 ? (v / totalAll) * 100 : 0);
     const addedPct = pctOf(result.added);
     const updatedPct = pctOf(result.updated);
     const deletedPct = pctOf(result.deleted);
@@ -162,13 +162,9 @@ function buildSyncChartSection(result, elapsedMs, avgSpeed, strategyLabel) {
     const failedPct = pctOf(result.failed);
     const skippedPct = pctOf(result.skipped);
     // 完成度（已处理/总计，不含跳过）
-    const completionPct = totalActive > 0
-        ? Math.round((totalProcessed / totalActive) * 100)
-        : 0;
+    const completionPct = totalActive > 0 ? Math.round((totalProcessed / totalActive) * 100) : 0;
     // 效率（处理数/活跃总数）
-    const efficiencyPct = totalActive > 0
-        ? Math.round((totalProcessed / totalActive) * 100)
-        : 0;
+    const efficiencyPct = totalActive > 0 ? Math.round((totalProcessed / totalActive) * 100) : 0;
     // 环形图 SVG
     const radius = 52;
     const circumference = 2 * Math.PI * radius;
@@ -178,9 +174,7 @@ function buildSyncChartSection(result, elapsedMs, avgSpeed, strategyLabel) {
     const speedStr = avgSpeed > 0 ? avgSpeed.toFixed(1) : '--';
     // 预计剩余
     const remaining = totalActive - totalProcessed;
-    const etaMs = avgSpeed > 0 && remaining > 0
-        ? Math.round((remaining / avgSpeed) * 1000)
-        : 0;
+    const etaMs = avgSpeed > 0 && remaining > 0 ? Math.round((remaining / avgSpeed) * 1000) : 0;
     // 概览卡片数据
     const overviewCards = [
         {
@@ -210,7 +204,8 @@ function buildSyncChartSection(result, elapsedMs, avgSpeed, strategyLabel) {
     <div class="bgm-overview-bar">
       <!-- 左侧：概览卡片组 -->
       <div class="bgm-overview-cards">
-        ${overviewCards.map(c => `
+        ${overviewCards
+        .map((c) => `
           <div class="bgm-overview-card ${c.cls}">
             <div class="bgm-overview-card-header">
               <span class="bgm-overview-icon">${c.icon}</span>
@@ -219,7 +214,8 @@ function buildSyncChartSection(result, elapsedMs, avgSpeed, strategyLabel) {
             <div class="bgm-overview-value">${c.value}</div>
             <div class="bgm-overview-sub">${c.sub}</div>
           </div>
-        `).join('')}
+        `)
+        .join('')}
       </div>
 
       <!-- 右侧：完成度环 -->
@@ -249,7 +245,8 @@ function buildSyncChartSection(result, elapsedMs, avgSpeed, strategyLabel) {
         <div class="bgm-donut-chart">
           <svg viewBox="0 0 140 140" class="bgm-donut-svg">
             <circle cx="70" cy="70" r="${radius}" fill="none" stroke="var(--surface0, #313244)" stroke-width="14" />
-            ${totalAll > 0 ? `
+            ${totalAll > 0
+        ? `
               <circle cx="70" cy="70" r="${radius}" fill="none"
                 stroke="var(--green, #a6e3a1)" stroke-width="14"
                 stroke-dasharray="${seg(addedPct)} ${circumference}"
@@ -270,19 +267,24 @@ function buildSyncChartSection(result, elapsedMs, avgSpeed, strategyLabel) {
                 stroke-dasharray="${seg(unchangedPct)} ${circumference}"
                 stroke-dashoffset="${-(seg(addedPct) + seg(updatedPct) + seg(deletedPct))}"
                 transform="rotate(-90 70 70)" stroke-linecap="butt" />
-              ${result.failed > 0 ? `
+              ${result.failed > 0
+            ? `
               <circle cx="70" cy="70" r="${radius}" fill="none"
                 stroke="var(--peach, #fab387)" stroke-width="14"
                 stroke-dasharray="${seg(failedPct)} ${circumference}"
                 stroke-dashoffset="${-(seg(addedPct) + seg(updatedPct) + seg(deletedPct) + seg(unchangedPct))}"
-                transform="rotate(-90 70 70)" stroke-linecap="butt" />` : ''}
-              ${result.skipped > 0 ? `
+                transform="rotate(-90 70 70)" stroke-linecap="butt" />`
+            : ''}
+              ${result.skipped > 0
+            ? `
               <circle cx="70" cy="70" r="${radius}" fill="none"
                 stroke="var(--lavender, #b4befe)" stroke-width="14"
                 stroke-dasharray="${seg(skippedPct)} ${circumference}"
                 stroke-dashoffset="${-(seg(addedPct) + seg(updatedPct) + seg(deletedPct) + seg(unchangedPct) + seg(failedPct))}"
-                transform="rotate(-90 70 70)" stroke-linecap="butt" />` : ''}
-            ` : ''}
+                transform="rotate(-90 70 70)" stroke-linecap="butt" />`
+            : ''}
+            `
+        : ''}
           </svg>
           <div class="bgm-donut-center">
             <div class="bgm-donut-center-value">${totalProcessed}</div>
@@ -322,18 +324,22 @@ function buildSyncChartSection(result, elapsedMs, avgSpeed, strategyLabel) {
             <div class="bgm-bar-track"><div class="bgm-bar-fill bgm-bar-unchanged" style="width:${unchangedPct}%"></div></div>
             <span class="bgm-bar-value">${result.unchanged}<span class="bgm-bar-pct">(${unchangedPct.toFixed(0)}%)</span></span>
           </div>
-          ${result.failed > 0 ? `
+          ${result.failed > 0
+        ? `
           <div class="bgm-bar-row">
             <span class="bgm-bar-label">⚠️ 失败</span>
             <div class="bgm-bar-track"><div class="bgm-bar-fill bgm-bar-fail" style="width:${failedPct}%"></div></div>
             <span class="bgm-bar-value">${result.failed}<span class="bgm-bar-pct">(${failedPct.toFixed(0)}%)</span></span>
-          </div>` : ''}
-          ${result.skipped > 0 ? `
+          </div>`
+        : ''}
+          ${result.skipped > 0
+        ? `
           <div class="bgm-bar-row">
             <span class="bgm-bar-label">🔍 跳过</span>
             <div class="bgm-bar-track"><div class="bgm-bar-fill bgm-bar-skip" style="width:${skippedPct}%"></div></div>
             <span class="bgm-bar-value">${result.skipped}<span class="bgm-bar-pct">(${skippedPct.toFixed(0)}%)</span></span>
-          </div>` : ''}
+          </div>`
+        : ''}
         </div>
       </div>
     </div>
@@ -400,7 +406,7 @@ function buildSyncChartSection(result, elapsedMs, avgSpeed, strategyLabel) {
             <circle cx="40" cy="40" r="32" fill="none" stroke="var(--surface0, #313244)" stroke-width="6" />
             <circle cx="40" cy="40" r="32" fill="none"
               stroke="var(--sapphire, #74c7ec)" stroke-width="6"
-              stroke-dasharray="${Math.min((totalProcessed / Math.max(elapsedMs / 1000, 1)) / 50, 1) * 2 * Math.PI * 32} ${2 * Math.PI * 32}"
+              stroke-dasharray="${Math.min(totalProcessed / Math.max(elapsedMs / 1000, 1) / 50, 1) * 2 * Math.PI * 32} ${2 * Math.PI * 32}"
               stroke-dashoffset="${2 * Math.PI * 32 * 0.25}"
               stroke-linecap="round"
               transform="rotate(-90 40 40)" />
@@ -532,10 +538,7 @@ export function showSyncResultDialog(options) {
     // 查看详情（打开同步记录表，或弹窗预览）
     const viewDetailsBtn = modal.querySelector('#bgmResultViewDetailsBtn');
     viewDetailsBtn?.addEventListener('click', () => {
-        Promise.all([
-            import('../sync/syncRecord.js'),
-            import('../tools/config.js'),
-        ])
+        Promise.all([import('../sync/syncRecord.js'), import('../tools/config.js')])
             .then(([syncRecordMod, configMod]) => {
             const { getSyncRecordSheetIfExists, openSyncRecordSheet } = syncRecordMod;
             const { getSyncRecordEnabled } = configMod;
@@ -649,20 +652,26 @@ function showSyncDetailPreviewDialog(options) {
               <span class="bgm-preview-detail-label">跳过条目</span>
               <span class="bgm-preview-detail-value">${result.skipped}</span>
             </div>
-            ${scrollToRow !== undefined ? `
+            ${scrollToRow !== undefined
+        ? `
             <div class="bgm-preview-detail-item">
               <span class="bgm-preview-detail-label">起始行号</span>
               <span class="bgm-preview-detail-value">第 ${scrollToRow} 行</span>
-            </div>` : ''}
+            </div>`
+        : ''}
           </div>
         </div>
         <div class="bgm-result-section">
           <div class="bgm-result-section-title">💡 操作建议</div>
           <div class="bgm-preview-suggestions">
-            ${!syncEnabled ? `
-              <p>• 启用同步记录功能，可在 Excel 中查看每次同步的详细历史，支持按 SID 去重和颜色标记。</p>` : ''}
-            ${!sheetExists && syncEnabled ? `
-              <p>• 同步记录表已启用但尚未创建，下次同步时会自动创建。</p>` : ''}
+            ${!syncEnabled
+        ? `
+              <p>• 启用同步记录功能，可在 Excel 中查看每次同步的详细历史，支持按 SID 去重和颜色标记。</p>`
+        : ''}
+            ${!sheetExists && syncEnabled
+        ? `
+              <p>• 同步记录表已启用但尚未创建，下次同步时会自动创建。</p>`
+        : ''}
             <p>• 点击"📥 导出 JSONL"可将当前 Excel 数据导出为 JSONL 文件。</p>
             <p>• 使用"📤 导出配置"可备份当前设置，方便迁移和恢复。</p>
           </div>

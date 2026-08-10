@@ -44,11 +44,13 @@ export function showConnectionTestDialog(result) {
           <span class="detail-label">状态码：</span>
           <span class="detail-value" style="color:${statusColor};">${statusCodeText}</span>
         </div>
-        ${errorMessage ? `
+        ${errorMessage
+        ? `
         <div class="detail-row error-row">
           <span class="detail-label">错误信息：</span>
           <span class="detail-value error-msg">${escapeHtml(errorMessage)}</span>
-        </div>` : ''}
+        </div>`
+        : ''}
       </div>
     </div>
   `;
