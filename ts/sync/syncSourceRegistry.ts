@@ -190,7 +190,7 @@ export async function syncFromRemote(
     }
 
     onProgress?.(2, 3, '比对差异中...')
-    const diffs = computeDiff(effectiveRemoteEntries, local.entries, strategy)
+    const diffs = computeDiff(effectiveRemoteEntries, local.entries, strategy, timeFilter)
 
     // 应用用户冲突解决决策：过滤掉用户选择「本地」的字段
     if (conflictResolution && conflictResolution.length > 0) {
