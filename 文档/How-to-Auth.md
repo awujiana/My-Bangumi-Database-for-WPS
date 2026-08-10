@@ -2,6 +2,21 @@
 
 Bangumi 使用 OAuth 2.0 [ authorization code grant type](https://tools.ietf.org/html/rfc6749#section-4.1) 进行用户验证，如果你对这种验证方式有所了解，可以直接查看对应的 API。
 
+## 实现状态（2026-08-10）
+
+| API 流程                                | 实现状态       | 说明                                                    |
+| --------------------------------------- | -------------- | ------------------------------------------------------- |
+| 手动输入 Access Token                   | ✅ 已实现      | 用户复制粘贴 Token 到任务窗格                           |
+| 测试 Token 有效性 (`/v0/me`)            | ✅ 已实现      | 点击「测试」按钮同时验证 + 刷新用户信息 + 查询有效期    |
+| 查询 Token 状态 (`/oauth/token_status`) | ✅ 已实现      | 显示剩余天数/小时，分级颜色预警（绿/黄/橙/红）          |
+| 过期提醒（Toast）                       | ✅ 已实现      | <3天红色警告、3-7天黄色预警、已过期强制提示             |
+| 授权码流程 (`authorization_code`)       | ⏳ 待实现 (P3) | 需先在 Bangumi 注册应用获取 `client_id`/`client_secret` |
+| Refresh Token 自动续期                  | ⏳ 待实现 (P2) | 依赖 P3 获取 `refresh_token`                            |
+
+> **当前交互模型**：用户点击「测试」→ 自动完成 Token 验证 + 用户信息刷新 + 剩余天数显示，原「续约」按钮已合并到测试功能。
+
+---
+
 ```
 
 +----------+
@@ -40,10 +55,10 @@ Figure 3: Authorization Code Flow
 
 验证流程为：
 
-1. 第三方应用引导用户访问 Bangumi 授权页获取授权
-2. Bangumi 返回 `code`（验证代码）并跳转至第三方应用
-3. 第三方应用使用 `code`（验证代码）换取 Access Token
-4. 使用 Access Token 访问 API
+1. 第三方应用引导用户访问 Bangumi 授权页获取授权 ⏳ (P3)
+2. Bangumi 返回 `code`（验证代码）并跳转至第三方应用 ⏳ (P3)
+3. 第三方应用使用 `code`（验证代码）换取 Access Token ⏳ (P3)
+4. 使用 Access Token 访问 API ✅ 已实现（用户手动粘贴 Token 后直接使用）
 
 **注意用户验证使用的 Base URL 与 API 不同**
 
@@ -143,9 +158,21 @@ POST https://bgm.tv/oauth/access_token
 }
 ```
 
-## 查询授权信息
+## 查询授权信息 ✅ 已实现
 
-获取当前 Access Token 的相关信息，
+获取当前 Access Token 的相关信息。
+
+**在本项目中**：调用 `POST /oauth/token_status` 查询 Token 剩余有效期，结果用于：
+
+1. **UI 显示**：任务窗格 Token 区域显示「Token 有效期: 6天12小时后过期」
+2. **分级预警**：
+   - 🟢 绿色 (normal)：>7 天正常
+   - 🟡 黄色 (warning)：3-7 天预警
+   - 🟠 橙色 (danger)：<3 天紧急
+   - 🔴 红色 (expired)：已过期
+3. **Toast 提醒**：过期/即将过期时弹出 Toast 通知
+4. **触发时机**：点击「测试」按钮成功验证 Token 后自动查询
+5. **离线容错**：网络失败时读取本地缓存的 `expires` 时间戳
 
 ```
 POST https://bgm.tv/oauth/token_status

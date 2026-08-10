@@ -99,6 +99,35 @@ export declare function storeBgToken(token: string): boolean;
  */
 export declare function clearBgToken(): boolean;
 /**
+ * 存储 Token 过期时间戳
+ *
+ * @param expires - Unix 时间戳（秒），来自 /oauth/token_status 接口
+ */
+export declare function storeTokenExpires(expires: number): void;
+/**
+ * 加载 Token 过期时间戳
+ *
+ * @returns Unix 时间戳（秒）或 null（未存储）
+ */
+export declare function loadTokenExpires(): number | null;
+/**
+ * 清除 Token 过期时间戳
+ */
+export declare function clearTokenExpires(): void;
+/**
+ * 计算 Token 剩余有效期信息
+ *
+ * @param expires - Unix 时间戳（秒）
+ * @returns 剩余天数/小时数/状态描述，过期返回 expired 状态
+ */
+export declare function getTokenRemainingTime(expires: number): {
+    days: number;
+    hours: number;
+    totalSeconds: number;
+    status: 'normal' | 'warning' | 'danger' | 'expired';
+    label: string;
+};
+/**
  * 加载 Token（明文读取，自动兼容历史 XOR 加密数据）
  *
  * @description

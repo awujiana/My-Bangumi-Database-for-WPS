@@ -11,6 +11,38 @@ export declare function openUserCollection(): void;
 export declare function testTokenValidity(): void;
 export declare function testDebugConnection(): void;
 /**
+ * 查询 Token 状态（有效期、过期时间）
+ *
+ * 通过 POST /oauth/token_status 接口获取 Access Token 的过期时间戳。
+ * Bangumi API 返回 expires 字段（Unix 时间戳，秒），据此可计算剩余天数。
+ *
+ * @param token - Bangumi Access Token
+ * @returns Promise  resolving to { expires: number, userId: string }
+ */
+export declare function queryTokenStatus(token: string): Promise<{
+    expires: number;
+    userId: string;
+}>;
+/**
+ * 在 UI 上显示 Token 过期信息
+ *
+ * 更新 tokenExpiresDisplay 元素，显示剩余天数和状态。
+ * 同时更新 tokenStatus 颜色以反映过期紧迫程度。
+ *
+ * @param expires - Unix 时间戳（秒）
+ */
+export declare function showTokenExpiryInfo(expires: number): void;
+/**
+ * 检查 Token 过期并发送提醒（P1）
+ *
+ * - expired: 红色 Toast，强烈建议重新获取
+ * - danger (<3天): 红色 Toast，提醒尽快获取
+ * - warning (<7天): 黄色 Toast，建议关注
+ *
+ * @param expires - Unix 时间戳（秒）
+ */
+export declare function checkTokenExpiryWarning(expires: number): void;
+/**
  * 显示用户头像和信息
  * 根据 BGM.cache 中的数据更新头像显示区域
  */
@@ -20,13 +52,10 @@ export declare function showUserProfile(): void;
  */
 export declare function hideUserProfile(): void;
 /**
- * 续约/刷新 Token
- * 通过测试现有 Token 的有效性，重新获取用户信息和头像
- * 如果 Token 已失效，提示用户重新输入
+ * Token 续约（已合并到 testTokenValidity）
  *
- * 说明：Bangumi OAuth Token 本身没有"刷新租期"的概念，
- * 此操作的实质是"验证 Token 有效性"和"刷新用户缓存数据"。
- * 不会延长 Token 的有效期（Token 有效期由 Bangumi 服务端决定）。
+ * @deprecated 此函数保留用于向后兼容，内部委托给 testTokenValidity。
+ * 测试和续约功能已统一：点击「测试」按钮即可同时验证 Token 并显示剩余天数。
  */
 export declare function renewToken(): void;
 //# sourceMappingURL=token.d.ts.map

@@ -56,5 +56,18 @@ export declare const _T: {
     readonly sourceTypeLabel: "数据源类型";
     readonly retryTest: "重新测试";
     readonly closeDialog: "关闭";
+    readonly tokenExpiresLabel: "Token 有效期";
+    readonly tokenExpiresNormal: "状态良好";
+    readonly tokenExpiresWarning: "即将到期";
+    readonly tokenExpiresDanger: "即将过期";
+    readonly tokenExpiresExpired: "已过期";
+    readonly tokenExpiresUnknown: "未知";
+    readonly tokenDaysUnit: "天";
+    readonly tokenHoursUnit: "小时";
+    readonly tokenStatusQuerying: "检查中...";
+    readonly tokenStatusQueryFailed: "状态查询失败";
+    readonly tokenExpiringSoon: "Token 将在 {} 后过期，建议提前重新获取";
+    readonly tokenExpiringCritical: "Token 即将过期（{}），请尽快重新获取！";
+    readonly tokenExpiredWarning: "Token 已过期，请重新获取";
 };
 //# sourceMappingURL=_constants.d.ts.map
