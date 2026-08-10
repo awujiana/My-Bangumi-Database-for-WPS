@@ -406,7 +406,10 @@
             <div class="modal-content" style="max-width:800px;">
                 <div class="modal-header">
                     <h3>📜 系统日志</h3>
-                    <div class="btn-group">
+                    <button class="modal-close-btn" data-action="closeLogModal" aria-label="关闭">×</button>
+                </div>
+                <div class="modal-body">
+                    <div class="btn-group" style="flex-direction:row;gap:8px;margin-bottom:12px;">
                         <select id="logLevelFilter" class="input" style="width:auto;">
                             <option value="">全部级别</option>
                             <option value="ERROR">仅 ERROR</option>
@@ -415,11 +418,10 @@
                             <option value="DEBUG">仅 DEBUG</option>
                         </select>
                         <button class="btn small" data-action="exportLogs">📤 导出</button>
-                        <button class="btn small" data-action="closeLogModal">✕ 关闭</button>
                     </div>
-                </div>
-                <div class="modal-body" id="logModalBody" style="max-height:500px;overflow-y:auto;">
-                    <!-- 日志条目动态填充 -->
+                    <div id="logModalBody" style="max-height:440px;overflow-y:auto;">
+                        <!-- 日志条目动态填充 -->
+                    </div>
                 </div>
             </div>
         </div>
