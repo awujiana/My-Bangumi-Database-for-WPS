@@ -121,7 +121,7 @@ export interface BGMUserInfo {
     /** 用户名 */
     username: string;
 }
-export { refreshSheets, refreshWorkbooks, toggleSheetLock, refreshData, } from './taskpane.js';
+export { refreshSheets, refreshWorkbooks, toggleSheetLock, refreshData, enlargePreview, } from './taskpane.js';
 export type { DetailItem, PreviewItem, DetailPreviewData, } from './ui/preview.js';
 export { previewSyncContent, closeDetailModal, syncAllRows, } from './ui/preview.js';
 export { isWpsApp, isWpsWorksheet, isWpsRange, wpsMsgBox, } from './tools/wps.js';

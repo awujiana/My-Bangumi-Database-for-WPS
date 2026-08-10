@@ -13,7 +13,7 @@
  *       无可拆分内容。遵循"保守策略"，不为对齐文件清单而创建空模块。
  */
 import { WPS_ENUM, LOG_LEVELS, getApp, bgmLog, BGM, updateTokenStatus, updateUserIdStatus, closeDetailModal, removeMessageListener, clearAllPendingTimeouts, } from '../index.js';
-import { toggleSheetLock, saveLockedSheet, restoreLockedSheet, updateLockButton, refreshSheets, refreshWorkbooks, autoDetectSheet, updateFilterStatus, refreshData, onSelectModeChange, } from './panelLifecycle.js';
+import { toggleSheetLock, saveLockedSheet, restoreLockedSheet, updateLockButton, refreshSheets, refreshWorkbooks, autoDetectSheet, updateFilterStatus, refreshData, onSelectModeChange, enlargePreview, autoDetectAndLockSheet, } from './panelLifecycle.js';
 import { restoreUserInfoFromStorage, startUserInfoPolling } from './userInfoPolling.js';
 // ========== 初始化 ==========
 function initPanel() {
@@ -66,11 +66,13 @@ function initPanel() {
             refreshData(); // 切换工作表时刷新预览
         });
     }
-    // 工作簿选择器变更事件：切换工作簿时刷新工作表列表
+    // 工作簿选择器变更事件：切换工作簿时刷新工作表列表并自动检测表头
     const wbSelect = document.getElementById('workbookSelect');
     if (wbSelect) {
         wbSelect.addEventListener('change', () => {
             refreshSheets();
+            // 自动检测新工作簿的表头
+            autoDetectAndLockSheet();
         });
     }
     // 模式切换（自动/手动）
@@ -106,7 +108,7 @@ function initPanel() {
     bgmLog(LOG_LEVELS.INFO, 'initPanel 完成');
 }
 // ========== 导出 ==========
-export { initPanel, refreshSheets, refreshWorkbooks, refreshData, toggleSheetLock, onSelectModeChange, autoDetectSheet, updateFilterStatus, };
+export { initPanel, refreshSheets, refreshWorkbooks, refreshData, toggleSheetLock, onSelectModeChange, enlargePreview, autoDetectSheet, autoDetectAndLockSheet, updateFilterStatus, };
 window.initPanel = initPanel;
 window.refreshTaskpaneUI = function () {
     try {

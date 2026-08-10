@@ -48,5 +48,11 @@ export declare function autoDetectSheet(): {
 export declare function updateFilterStatus(targetWs?: WpsWorksheet): void;
 export declare function refreshData(): void;
 export declare function onSelectModeChange(): void;
+export declare function enlargePreview(): void;
+/**
+ * 在当前活动工作簿中自动检测表头，找到后锁定该工作表并刷新预览
+ * 返回 true 表示成功检测并锁定，false 表示未找到有效表头
+ */
+export declare function autoDetectAndLockSheet(): boolean;
 export {};
 //# sourceMappingURL=panelLifecycle.d.ts.map

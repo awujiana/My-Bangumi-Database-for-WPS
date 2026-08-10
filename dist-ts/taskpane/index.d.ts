@@ -12,9 +12,9 @@
  *       updateTokenStatus/updateUserIdStatus 等函数均来自 `../index.js`（实现在 handlers/token.ts），
  *       无可拆分内容。遵循"保守策略"，不为对齐文件清单而创建空模块。
  */
-import { toggleSheetLock, refreshSheets, refreshWorkbooks, autoDetectSheet, updateFilterStatus, refreshData, onSelectModeChange } from './panelLifecycle.js';
+import { toggleSheetLock, refreshSheets, refreshWorkbooks, autoDetectSheet, updateFilterStatus, refreshData, onSelectModeChange, enlargePreview, autoDetectAndLockSheet } from './panelLifecycle.js';
 declare function initPanel(): void;
-export { initPanel, refreshSheets, refreshWorkbooks, refreshData, toggleSheetLock, onSelectModeChange, autoDetectSheet, updateFilterStatus, };
+export { initPanel, refreshSheets, refreshWorkbooks, refreshData, toggleSheetLock, onSelectModeChange, enlargePreview, autoDetectSheet, autoDetectAndLockSheet, updateFilterStatus, };
 /**
  * 初始化任务面板。
  *

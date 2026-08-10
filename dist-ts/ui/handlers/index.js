@@ -4,7 +4,7 @@
  * @description 资源追踪、按钮监听、ACTION_HANDLERS 分发、消息监听、事件总线监听、
  *              配置 UI 回填等。同时 re-export 子模块的公开 API，保持原 handlers.ts 的外部接口。
  */
-import { LOG_LEVELS, bgmLog, BGM, loadBgToken, clearBgToken, copyTokenToClipboard, _setBgmUserId, _setBgmUsername, getApp, showAlert, showConfirm, showInput, showToast, refreshData, refreshSheets, refreshWorkbooks, toggleSheetLock, clearSyncRecords, deduplicateSyncRecords, formatSyncRecordSheet, openSyncRecordSheet, closeDetailModal, previewSyncContent, syncSelectedRows, openBangumiTokenPage, setSyncRecordEnabled, getSyncRecordEnabled, getIncrementalSync, setIncrementalSync, getSkipConflicts, setSkipConflicts, getGithubConfig, setGithubConfig, isGithubConfigComplete, getSyncStrategy, setSyncStrategy, getSyncSourceType, setSyncSourceType, syncFromRemote, buildRawUrl, showSyncProgressDialog, updateSyncProgressDialog, hideSyncProgressDialog, showSyncResultDialog, } from '../../index.js';
+import { LOG_LEVELS, bgmLog, BGM, loadBgToken, clearBgToken, copyTokenToClipboard, _setBgmUserId, _setBgmUsername, getApp, showAlert, showConfirm, showInput, showToast, refreshData, refreshSheets, refreshWorkbooks, toggleSheetLock, enlargePreview, clearSyncRecords, deduplicateSyncRecords, formatSyncRecordSheet, openSyncRecordSheet, closeDetailModal, previewSyncContent, syncSelectedRows, openBangumiTokenPage, setSyncRecordEnabled, getSyncRecordEnabled, getIncrementalSync, setIncrementalSync, getSkipConflicts, setSkipConflicts, getGithubConfig, setGithubConfig, isGithubConfigComplete, getSyncStrategy, setSyncStrategy, getSyncSourceType, setSyncSourceType, syncFromRemote, buildRawUrl, showSyncProgressDialog, updateSyncProgressDialog, hideSyncProgressDialog, showSyncResultDialog, } from '../../index.js';
 import { exportConfig, importConfig } from '../../services/configService.js';
 import { undoLastSyncForRibbon } from '../../services/ribbonService.js';
 import { debounce } from '../../tools/debounce.js';
@@ -378,6 +378,15 @@ const ACTION_HANDLERS = {
         }
         else {
             bgmLog(LOG_LEVELS.WARN, '[handleActionClick] previewSyncContent 函数未定义');
+        }
+    },
+    enlargePreview: () => {
+        bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 放大预览表格');
+        if (typeof enlargePreview === 'function') {
+            enlargePreview();
+        }
+        else {
+            bgmLog(LOG_LEVELS.WARN, '[handleActionClick] enlargePreview 函数未定义');
         }
     },
     setToken: (ctx) => {
@@ -1193,7 +1202,7 @@ const handleSyncProgressEvent = (data) => {
 const handleSyncStateChangedEvent = (payload) => {
     bgmLog(LOG_LEVELS.INFO, `[handlers] 同步状态变更: ${payload.state}${payload.row ? `, 行: ${payload.row}` : ''}`);
     // 可选：根据状态刷新按钮禁用态
-    const syncButtons = document.querySelectorAll('button[data-action="sync"], button[data-action="syncCollectionFromBgm"], button[data-action="previewSyncContent"]');
+    const syncButtons = document.querySelectorAll('button[data-action="sync"], button[data-action="syncCollectionFromBgm"], button[data-action="previewSyncContent"], button[data-action="enlargePreview"]');
     syncButtons.forEach((btn) => {
         const el = btn;
         el.disabled = payload.state === 'running' || payload.state === 'paused';

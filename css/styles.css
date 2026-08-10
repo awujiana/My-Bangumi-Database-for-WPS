@@ -1754,3 +1754,64 @@ select.input {
     cursor: pointer;
     vertical-align: middle;
 }
+
+/* ========== 按钮行布局：同行显示 ========== */
+.btn-row {
+    flex-direction: row;
+}
+
+/* ========== 时间筛选区美化 ========== */
+.time-filter-box {
+    display: block;
+}
+
+.time-filter-box > label {
+    display: flex;
+}
+
+.time-filter-row {
+    margin-bottom: 12px;
+}
+
+.time-filter-row:last-child {
+    margin-bottom: 0;
+}
+
+.time-filter-label {
+    flex: 0 0 80px !important;
+    color: #d0d0d0 !important;
+    font-weight: 600 !important;
+    font-size: 14px !important;
+    padding: 10px 0;
+}
+
+.time-filter-select {
+    padding: 12px 16px !important;
+    font-size: 15px !important;
+    border: 2px solid #4a4a4a !important;
+    border-radius: 8px !important;
+    background: #333 !important;
+    color: #ffffff !important;
+    min-height: 44px;
+    cursor: pointer;
+    transition: all 0.25s ease;
+}
+
+.time-filter-select:hover {
+    border-color: #5789d9 !important;
+    background: #383838 !important;
+}
+
+.time-filter-select:focus {
+    outline: none;
+    border-color: #4a9eff !important;
+    box-shadow: 0 0 0 4px rgba(74, 158, 255, 0.25) !important;
+    background: #383838 !important;
+}
+
+.time-filter-select option {
+    background: #2a2a2a;
+    color: #e0e0e0;
+    padding: 8px;
+    font-size: 14px;
+}
