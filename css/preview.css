@@ -333,3 +333,55 @@
 #detailCount {
     color: var(--subtext0, #a6adc8);
 }
+
+/* ========== 滚动控制按钮 ========== */
+.scroll-btn {
+    position: absolute;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    background: rgba(49, 50, 68, 0.9);
+    color: #cdd6f4;
+    font-size: 18px;
+    line-height: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    z-index: 10;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+    transition: background 0.2s, transform 0.15s, opacity 0.2s;
+    user-select: none;
+}
+
+.scroll-btn:hover {
+    background: rgba(137, 180, 250, 0.8);
+    color: #1e1e2e;
+    transform: scale(1.1);
+}
+
+.scroll-btn:active {
+    transform: scale(0.95);
+}
+
+.scroll-to-top {
+    top: 72px;
+    right: 16px;
+}
+
+.scroll-to-bottom {
+    bottom: 16px;
+    right: 16px;
+}
+
+/* 模态内容容器需要 position:relative 以便滚动按钮绝对定位 */
+.sync-preview-modal .modal-content {
+    position: relative;
+}
+
+/* 滚动按钮不可见状态 */
+.scroll-btn.hidden {
+    opacity: 0;
+    pointer-events: none;
+}
