@@ -52,9 +52,9 @@
                 <button class="btn small" data-action="clearToken">清除</button>
                 <button class="btn small primary" data-action="testToken">测试</button>
             </div>
-            <div class="btn-group" style="margin-top:8px;">
-                <button class="btn small" data-action="exportConfig">📤 导出配置</button>
-                <button class="btn small" data-action="importConfig">📥 导入配置</button>
+            <div class="btn-group btn-row" style="margin-top:8px;">
+                <button class="btn small" data-action="exportConfig" style="flex:1;">📤 导出配置</button>
+                <button class="btn small" data-action="importConfig" style="flex:1;">📥 导入配置</button>
             </div>
             <p class="hint">Access Token 获取方式：<a href="#" data-action="openTokenPage">点击创建</a><br>
             Token 以明文存储以便复制使用，关闭文档后会随插件存储清除</p>
@@ -161,17 +161,17 @@
                     <p class="hint">点击"刷新数据"加载预览（支持筛选后数据）</p>
                 </div>
             </div>
-            <div class="btn-group" style="display:flex;gap:8px;margin-top:8px;">
+            <div class="btn-group btn-row" style="margin-top:8px;">
                 <button class="btn" id="enlargePreviewBtn" data-action="enlargePreview" style="flex:1;">
                     <span class="btn-icon">🔍</span> 放大预览
                 </button>
                 <button class="btn" id="previewBtn" data-action="previewSyncContent" style="flex:1;">
                     <span class="btn-icon">📋</span> 预览详情
                 </button>
+                <button class="btn success" id="syncCollectionBtn" data-action="syncCollectionFromBgm" style="flex:1;">
+                    <span class="btn-icon">📥</span> 收藏回写
+                </button>
             </div>
-            <button class="btn" id="syncCollectionBtn" data-action="syncCollectionFromBgm" style="margin-top:8px;width:100%;">
-                <span class="btn-icon">📥</span> 收藏回写
-            </button>
         </div>
 
         <div class="section">
@@ -292,15 +292,15 @@
                     仅同步选中行（按 Bangumi URL 列匹配 SID）
                 </label>
             </div>
-            <div class="form-row" style="border:1px solid #555;border-radius:4px;padding:8px;margin:8px 0;background:#383838;">
-                <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px;color:#e0e0e0;">
-                    <input type="checkbox" id="chkTimeFilter" style="cursor:pointer;" />
-                    <span>启用时间筛选（按开播日期过滤）</span>
+            <div class="form-row time-filter-box" style="border:1px solid #555;border-radius:8px;padding:12px;margin:8px 0;background:linear-gradient(145deg,#3a3a3a 0%,#2e2e2e 100%);box-shadow:0 2px 8px rgba(0,0,0,0.2);">
+                <label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-size:14px;color:#e0e0e0;padding:6px 0;border-bottom:1px dashed #555;margin-bottom:10px;">
+                    <input type="checkbox" id="chkTimeFilter" style="cursor:pointer;width:18px;height:18px;accent-color:#4a9eff;" />
+                    <span style="font-weight:600;">✅ 启用时间筛选（按开播日期过滤）</span>
                 </label>
-                <div id="timeFilterControls" style="margin-top:8px;padding:8px;background:#444;border-radius:4px;display:none;">
-                    <div class="form-row">
-                        <label for="timeFilterYear">年份</label>
-                        <select id="timeFilterYear" class="input" style="flex:1;">
+                <div id="timeFilterControls" style="padding:8px;background:#2a2a2a;border-radius:6px;display:none;">
+                    <div class="form-row time-filter-row">
+                        <label for="timeFilterYear" class="time-filter-label">年份</label>
+                        <select id="timeFilterYear" class="input time-filter-select" style="flex:1;">
                             <option value="2026">2026</option>
                             <option value="2025">2025</option>
                             <option value="2024">2024</option>
@@ -320,26 +320,26 @@
                             <option value="2010">2010</option>
                         </select>
                     </div>
-                    <div class="form-row">
-                        <label for="timeFilterRange">筛选范围</label>
-                        <select id="timeFilterRange" class="input" style="flex:1;">
+                    <div class="form-row time-filter-row">
+                        <label for="timeFilterRange" class="time-filter-label">筛选范围</label>
+                        <select id="timeFilterRange" class="input time-filter-select" style="flex:1;">
                             <option value="year">全年</option>
                             <option value="quarter">季度新番</option>
                             <option value="month">具体月份</option>
                         </select>
                     </div>
-                    <div class="form-row" id="quarterRow" style="display:none;">
-                        <label for="timeFilterQuarter">季度</label>
-                        <select id="timeFilterQuarter" class="input" style="flex:1;">
+                    <div class="form-row time-filter-row" id="quarterRow" style="display:none;">
+                        <label for="timeFilterQuarter" class="time-filter-label">季度</label>
+                        <select id="timeFilterQuarter" class="input time-filter-select" style="flex:1;">
                             <option value="1">1月新番（上年12月-本年2月）</option>
                             <option value="4">4月新番（3月-5月）</option>
                             <option value="7">7月新番（6月-8月）</option>
                             <option value="10">10月新番（9月-11月）</option>
                         </select>
                     </div>
-                    <div class="form-row" id="monthRow" style="display:none;">
-                        <label for="timeFilterMonth">月份</label>
-                        <select id="timeFilterMonth" class="input" style="flex:1;">
+                    <div class="form-row time-filter-row" id="monthRow" style="display:none;">
+                        <label for="timeFilterMonth" class="time-filter-label">月份</label>
+                        <select id="timeFilterMonth" class="input time-filter-select" style="flex:1;">
                             <option value="1">1月</option>
                             <option value="2">2月</option>
                             <option value="3">3月</option>
@@ -355,8 +355,8 @@
                         </select>
                     </div>
                 </div>
-                <p class="hint" style="margin-top:4px;font-size:11px;">
-                    季度划分：1月新番=上年12月~本年2月，4月新番=3月~5月，7月新番=6月~8月，10月新番=9月~11月
+                <p class="hint" style="margin-top:8px;font-size:11px;color:#999;padding:0 2px;">
+                    💡 季度划分：1月新番=上年12月~本年2月，4月新番=3月~5月，7月新番=6月~8月，10月新番=9月~11月
                 </p>
             </div>
             <div class="btn-group">
