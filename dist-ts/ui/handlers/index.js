@@ -4,7 +4,7 @@
  * @description 资源追踪、按钮监听、ACTION_HANDLERS 分发、消息监听、事件总线监听、
  *              配置 UI 回填等。同时 re-export 子模块的公开 API，保持原 handlers.ts 的外部接口。
  */
-import { LOG_LEVELS, bgmLog, BGM, loadBgToken, clearBgToken, copyTokenToClipboard, _setBgmUserId, _setBgmUsername, getApp, showAlert, showConfirm, showInput, showToast, refreshData, refreshSheets, refreshWorkbooks, toggleSheetLock, enlargePreview, clearSyncRecords, deduplicateSyncRecords, formatSyncRecordSheet, openSyncRecordSheet, closeDetailModal, previewSyncContent, syncSelectedRows, openBangumiTokenPage, setSyncRecordEnabled, getSyncRecordEnabled, getIncrementalSync, setIncrementalSync, getSkipConflicts, setSkipConflicts, getGithubConfig, setGithubConfig, isGithubConfigComplete, getSyncStrategy, setSyncStrategy, getSyncSourceType, setSyncSourceType, syncFromRemote, buildRawUrl, showSyncProgressDialog, updateSyncProgressDialog, completeSyncProgressDialog, hideSyncProgressDialog, showSyncResultDialog, formatDuration, } from '../../index.js';
+import { LOG_LEVELS, bgmLog, BGM, loadBgToken, clearBgToken, copyTokenToClipboard, _setBgmUserId, _setBgmUsername, getApp, getLastRow, getSyncRecordSheetIfExists, showAlert, showConfirm, showInput, showToast, refreshData, refreshSheets, refreshWorkbooks, toggleSheetLock, enlargePreview, clearSyncRecords, deduplicateSyncRecords, formatSyncRecordSheet, openSyncRecordSheet, closeDetailModal, previewSyncContent, syncSelectedRows, openBangumiTokenPage, setSyncRecordEnabled, getSyncRecordEnabled, getIncrementalSync, setIncrementalSync, getSkipConflicts, setSkipConflicts, getGithubConfig, setGithubConfig, isGithubConfigComplete, getSyncStrategy, setSyncStrategy, getSyncSourceType, setSyncSourceType, syncFromRemote, buildRawUrl, showSyncProgressDialog, updateSyncProgressDialog, completeSyncProgressDialog, hideSyncProgressDialog, showSyncResultDialog, formatDuration, } from '../../index.js';
 import { exportConfig, importConfig } from '../../services/configService.js';
 import { undoLastSyncForRibbon } from '../../services/ribbonService.js';
 import { debounce } from '../../tools/debounce.js';
@@ -14,11 +14,14 @@ import { getRecentLogs, exportLogsToFile, clearLogs } from '../../tools/logger.j
 import { _T } from './_constants.js';
 import { cleanLockedDataSheet } from './sheet.js';
 import { syncFromPanel, syncCollectionFromBgm } from './sync.js';
-import { showTokenDialog, showUserIdDialog, updateTokenStatus, updateUserIdStatus, openUserCollection, testTokenValidity, testDebugConnection, } from './token.js';
+import { showTokenDialog, showUserIdDialog, updateTokenStatus, updateUserIdStatus, openUserCollection, testTokenValidity, testDebugConnection, renewToken, } from './token.js';
 // 子模块 re-export（保持原 handlers.ts 的对外 API）
-export { showTokenDialog, showUserIdDialog, updateTokenStatus, updateUserIdStatus, openUserCollection, testTokenValidity, testDebugConnection, } from './token.js';
+export { showTokenDialog, showUserIdDialog, updateTokenStatus, updateUserIdStatus, openUserCollection, testTokenValidity, testDebugConnection, showUserProfile, hideUserProfile, renewToken, } from './token.js';
 export { syncFromPanel, syncCollectionFromBgm, syncFromBgmByAPI } from './sync.js';
 export { cleanLockedDataSheet } from './sheet.js';
+// 连接测试弹窗
+import { showConnectionTestDialog, hideConnectionTestDialog } from '../githubConfigDialog.js';
+export { showConnectionTestDialog, hideConnectionTestDialog };
 // ========== 模块级资源追踪（防止事件监听器与定时器泄漏） ==========
 const _pendingTimeouts = new Set();
 /**
@@ -443,6 +446,17 @@ const ACTION_HANDLERS = {
         testTokenValidity();
         bgmLog(LOG_LEVELS.INFO, `[handleActionClick] Token 测试已触发，耗时: ${Date.now() - ctx.startTime}ms`);
     },
+    // Token 续约：刷新用户信息和头像
+    renewToken: (ctx) => {
+        bgmLog(LOG_LEVELS.INFO, '[handleActionClick] Token 续约');
+        renewToken();
+        bgmLog(LOG_LEVELS.INFO, `[handleActionClick] Token 续约已触发，耗时: ${Date.now() - ctx.startTime}ms`);
+    },
+    // 关闭连接测试弹窗
+    closeConnectionTest: () => {
+        bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 关闭连接测试弹窗');
+        hideConnectionTestDialog();
+    },
     showUserIdDialog: (ctx) => {
         bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 显示用户ID设置对话框');
         showUserIdDialog();
@@ -720,7 +734,13 @@ const ACTION_HANDLERS = {
                 const avgSpeed = totalProcessed > 0 && totalElapsed > 0
                     ? Math.round((totalProcessed / totalElapsed) * 1000)
                     : 0;
-                const summary = `远程 ${result.remoteTotal} 条 → 新增 ${result.added}，更新 ${result.updated}，删除 ${result.deleted}，无变更 ${result.unchanged}，失败 ${result.failed}\n耗时 ${formatDuration(totalElapsed)}，平均 ${avgSpeed > 0 ? avgSpeed : '?'} 行/秒`;
+                const efficiency = totalProcessed > 0 || result.unchanged > 0
+                    ? Math.round((totalProcessed / (totalProcessed + result.unchanged)) * 100)
+                    : 0;
+                const etaMs = avgSpeed > 0 && result.remoteTotal > totalProcessed
+                    ? Math.round(((result.remoteTotal - totalProcessed) / avgSpeed) * 1000)
+                    : 0;
+                const summary = `远程 ${result.remoteTotal} 条 → ✅${result.added} 🔄${result.updated} ❌${result.deleted} ⏭️${result.unchanged} ⚠️${result.failed} | 耗时 ${formatDuration(totalElapsed)} | ${avgSpeed > 0 ? avgSpeed : '?'} 行/秒 | 效率 ${efficiency}%`;
                 const details = [
                     `📥 远程数据总量: ${result.remoteTotal}`,
                     `➕ 新增: ${result.added}`,
@@ -728,9 +748,12 @@ const ACTION_HANDLERS = {
                     `🗑️ 删除: ${result.deleted}`,
                     `⏭️ 无变更: ${result.unchanged}`,
                     `❌ 失败: ${result.failed}`,
+                    `🔍 跳过: ${result.skipped}`,
+                    `📊 实际处理: ${totalProcessed} 条`,
                     `⏱️ 总耗时: ${formatDuration(totalElapsed)}`,
                     `⚡ 平均速度: ${avgSpeed > 0 ? avgSpeed + ' 行/秒' : '--'}`,
-                    `📊 处理条目: ${totalProcessed} 条`,
+                    `📈 处理效率: ${efficiency}%`,
+                    `${etaMs > 0 ? `🔮 预计剩余: ${formatDuration(etaMs)}` : '✅ 全部完成'}`,
                 ];
                 const stats = {
                     added: result.added,
@@ -738,19 +761,36 @@ const ACTION_HANDLERS = {
                     deleted: result.deleted,
                     unchanged: result.unchanged,
                     failed: result.failed,
+                    skipped: result.skipped,
+                    remoteTotal: result.remoteTotal,
                     elapsedMs: totalElapsed,
                     avgSpeed,
+                    strategyLabel: strategyLabel ?? '未知策略',
                 };
                 completeSyncProgressDialog(summary, details, false, () => {
-                    showSyncResultDialog({
+                    let scrollToRow;
+                    try {
+                        const recordSheet = getSyncRecordSheetIfExists();
+                        if (recordSheet) {
+                            scrollToRow = getLastRow(recordSheet);
+                        }
+                    }
+                    catch {
+                        // ignore
+                    }
+                    const options = {
                         result,
                         elapsedMs: totalElapsed,
                         avgSpeed,
                         strategyLabel: strategyLabel ?? '未知策略',
                         stopped: false,
-                    });
+                    };
+                    if (scrollToRow !== undefined) {
+                        options.scrollToRow = scrollToRow;
+                    }
+                    showSyncResultDialog(options);
                 }, stats);
-                bgmLog(LOG_LEVELS.INFO, `[handleActionClick] 数据同步完成: 远程 ${result.remoteTotal}，新增 ${result.added}，更新 ${result.updated}，删除 ${result.deleted}，无变更 ${result.unchanged}，失败 ${result.failed}，耗时 ${formatDuration(totalElapsed)}，平均 ${avgSpeed > 0 ? avgSpeed : '?'} 行/秒`);
+                bgmLog(LOG_LEVELS.INFO, `[handleActionClick] 同步完成 | 远程:${result.remoteTotal} ✅:${result.added} 🔄:${result.updated} ❌:${result.deleted} ⏭️:${result.unchanged} ⚠️:${result.failed} 🔍:${result.skipped} | 耗时:${formatDuration(totalElapsed)} | 速度:${avgSpeed > 0 ? avgSpeed + '/s' : '?'} | 效率:${efficiency}%`);
                 if (app?.StatusBar !== undefined)
                     app.StatusBar = false;
             })
@@ -799,11 +839,65 @@ const ACTION_HANDLERS = {
         catch (e) {
             const errMsg = e instanceof Error ? e.message : String(e);
             showToast(`配置错误：${errMsg}`, 'error');
+            showConnectionTestDialog({
+                success: false,
+                statusCode: null,
+                responseTime: 0,
+                url: 'N/A',
+                sourceType: getSyncSourceType(),
+                errorMessage: errMsg,
+            });
             return;
         }
-        showToast(`Raw URL：\n${url}`, 'info');
-        bgmLog(LOG_LEVELS.INFO, `[handleActionClick] GitHub Raw URL: ${url}`);
-        bgmLog(LOG_LEVELS.INFO, `[handleActionClick] 测试 GitHub 配置完成，耗时: ${Date.now() - ctx.startTime}ms`);
+        // 显示测试中提示
+        showToast('正在测试连接...', 'info');
+        // 获取数据源类型
+        const sourceType = getSyncSourceType();
+        // 发送 HEAD 请求测试连接
+        const testStartTs = Date.now();
+        const xhr = new XMLHttpRequest();
+        xhr.open('HEAD', url, true);
+        xhr.timeout = 10000;
+        xhr.onload = () => {
+            const responseTime = Date.now() - testStartTs;
+            const statusCode = xhr.status;
+            const success = statusCode >= 200 && statusCode < 400;
+            bgmLog(LOG_LEVELS.INFO, `[handleActionClick] 连接测试完成: status=${statusCode}, time=${responseTime}ms, url=${url}`);
+            showConnectionTestDialog({
+                success,
+                statusCode,
+                responseTime,
+                url,
+                sourceType,
+                errorMessage: !success ? `HTTP ${statusCode}` : undefined,
+            });
+        };
+        xhr.onerror = () => {
+            const responseTime = Date.now() - testStartTs;
+            bgmLog(LOG_LEVELS.ERROR, `[handleActionClick] 连接测试失败: ${url}`);
+            showConnectionTestDialog({
+                success: false,
+                statusCode: null,
+                responseTime,
+                url,
+                sourceType,
+                errorMessage: '网络错误：无法连接到服务器',
+            });
+        };
+        xhr.ontimeout = () => {
+            const responseTime = Date.now() - testStartTs;
+            bgmLog(LOG_LEVELS.ERROR, `[handleActionClick] 连接测试超时: ${url}`);
+            showConnectionTestDialog({
+                success: false,
+                statusCode: null,
+                responseTime,
+                url,
+                sourceType,
+                errorMessage: '请求超时（10秒）',
+            });
+        };
+        xhr.send();
+        bgmLog(LOG_LEVELS.INFO, `[handleActionClick] 测试 GitHub 配置已发起，耗时: ${Date.now() - ctx.startTime}ms`);
     },
     // 本地文件源：选择本地 JSONL/JSON 文件
     browseLocalFile: (ctx) => {

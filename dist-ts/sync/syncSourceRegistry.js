@@ -155,7 +155,9 @@ export async function syncFromRemote(onProgress, strategy = 'add-update', signal
         result.unchanged = Math.max(0, effectiveRemoteEntries.length - addCount - updateCount);
         const totalElapsed = Date.now() - syncStartTs;
         const totalProcessed = addCount + updateCount + deleteCount;
-        const overallSpeed = totalProcessed > 0 && totalElapsed > 0 ? Math.round((totalProcessed / totalElapsed) * 1000) : 0;
+        const overallSpeed = totalProcessed > 0 && totalElapsed > 0
+            ? Math.round((totalProcessed / totalElapsed) * 1000)
+            : 0;
         onProgress?.(3, 3, `完成：新增 ${result.added}，更新 ${result.updated}，删除 ${result.deleted}（总耗时 ${totalElapsed}ms，${overallSpeed > 0 ? overallSpeed : '?'} 行/秒）`);
         bgmLog(LOG_LEVELS.INFO, `[syncFromRemote] 同步完成：下载 ${downloadElapsed}ms，diff ${diffElapsed}ms，应用耗时已计入，总耗时 ${totalElapsed}ms，处理 ${totalProcessed} 条，平均 ${overallSpeed > 0 ? overallSpeed : '?'} 行/秒`);
         return result;

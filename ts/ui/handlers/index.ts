@@ -15,6 +15,8 @@ import {
   _setBgmUserId,
   _setBgmUsername,
   getApp,
+  getLastRow,
+  getSyncRecordSheetIfExists,
   showAlert,
   showConfirm,
   showInput,
@@ -53,6 +55,7 @@ import {
   type SyncProgressStats,
   hideSyncProgressDialog,
   showSyncResultDialog,
+  type SyncResultDialogOptions,
   formatDuration,
   type SyncStrategy,
   type SyncSourceType,
@@ -64,6 +67,7 @@ import { undoLastSyncForRibbon } from '../../services/ribbonService.js'
 import { debounce } from '../../tools/debounce.js'
 import { BGM_EVENTS, eventBus, type EventHandler } from '../../tools/events.js'
 import { getRecentLogs, exportLogsToFile, clearLogs, type LogLevel } from '../../tools/logger.js'
+import { showConnectionTestDialog, hideConnectionTestDialog } from '../githubConfigDialog.js'
 
 // 子模块
 import { _T } from './_constants.js'
@@ -77,6 +81,7 @@ import {
   openUserCollection,
   testTokenValidity,
   testDebugConnection,
+  renewToken,
 } from './token.js'
 
 // 子模块 re-export（保持原 handlers.ts 的对外 API）
@@ -88,9 +93,15 @@ export {
   openUserCollection,
   testTokenValidity,
   testDebugConnection,
+  showUserProfile,
+  hideUserProfile,
+  renewToken,
 } from './token.js'
 export { syncFromPanel, syncCollectionFromBgm, syncFromBgmByAPI } from './sync.js'
 export { cleanLockedDataSheet } from './sheet.js'
+
+// 连接测试弹窗
+export { showConnectionTestDialog, hideConnectionTestDialog }
 
 // ========== 模块级资源追踪（防止事件监听器与定时器泄漏） ==========
 const _pendingTimeouts = new Set<ReturnType<typeof setTimeout>>()
@@ -584,6 +595,22 @@ const ACTION_HANDLERS: Record<string, ActionHandler> = {
     )
   },
 
+  // Token 续约：刷新用户信息和头像
+  renewToken: (ctx) => {
+    bgmLog(LOG_LEVELS.INFO, '[handleActionClick] Token 续约')
+    renewToken()
+    bgmLog(
+      LOG_LEVELS.INFO,
+      `[handleActionClick] Token 续约已触发，耗时: ${Date.now() - ctx.startTime}ms`,
+    )
+  },
+
+  // 关闭连接测试弹窗
+  closeConnectionTest: () => {
+    bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 关闭连接测试弹窗')
+    hideConnectionTestDialog()
+  },
+
   showUserIdDialog: (ctx) => {
     bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 显示用户ID设置对话框')
     showUserIdDialog()
@@ -962,7 +989,16 @@ const ACTION_HANDLERS: Record<string, ActionHandler> = {
                 ? Math.round((totalProcessed / totalElapsed) * 1000)
                 : 0
 
-            const summary = `远程 ${result.remoteTotal} 条 → 新增 ${result.added}，更新 ${result.updated}，删除 ${result.deleted}，无变更 ${result.unchanged}，失败 ${result.failed}\n耗时 ${formatDuration(totalElapsed)}，平均 ${avgSpeed > 0 ? avgSpeed : '?'} 行/秒`
+            const efficiency =
+              totalProcessed > 0 || result.unchanged > 0
+                ? Math.round((totalProcessed / (totalProcessed + result.unchanged)) * 100)
+                : 0
+            const etaMs =
+              avgSpeed > 0 && result.remoteTotal > totalProcessed
+                ? Math.round(((result.remoteTotal - totalProcessed) / avgSpeed) * 1000)
+                : 0
+
+            const summary = `远程 ${result.remoteTotal} 条 → ✅${result.added} 🔄${result.updated} ❌${result.deleted} ⏭️${result.unchanged} ⚠️${result.failed} | 耗时 ${formatDuration(totalElapsed)} | ${avgSpeed > 0 ? avgSpeed : '?'} 行/秒 | 效率 ${efficiency}%`
             const details = [
               `📥 远程数据总量: ${result.remoteTotal}`,
               `➕ 新增: ${result.added}`,
@@ -970,9 +1006,12 @@ const ACTION_HANDLERS: Record<string, ActionHandler> = {
               `🗑️ 删除: ${result.deleted}`,
               `⏭️ 无变更: ${result.unchanged}`,
               `❌ 失败: ${result.failed}`,
+              `🔍 跳过: ${result.skipped}`,
+              `📊 实际处理: ${totalProcessed} 条`,
               `⏱️ 总耗时: ${formatDuration(totalElapsed)}`,
               `⚡ 平均速度: ${avgSpeed > 0 ? avgSpeed + ' 行/秒' : '--'}`,
-              `📊 处理条目: ${totalProcessed} 条`,
+              `📈 处理效率: ${efficiency}%`,
+              `${etaMs > 0 ? `🔮 预计剩余: ${formatDuration(etaMs)}` : '✅ 全部完成'}`,
             ]
 
             const stats: SyncProgressStats = {
@@ -981,8 +1020,11 @@ const ACTION_HANDLERS: Record<string, ActionHandler> = {
               deleted: result.deleted,
               unchanged: result.unchanged,
               failed: result.failed,
+              skipped: result.skipped,
+              remoteTotal: result.remoteTotal,
               elapsedMs: totalElapsed,
               avgSpeed,
+              strategyLabel: strategyLabel ?? '未知策略',
             }
 
             completeSyncProgressDialog(
@@ -990,20 +1032,33 @@ const ACTION_HANDLERS: Record<string, ActionHandler> = {
               details,
               false,
               () => {
-                showSyncResultDialog({
+                let scrollToRow: number | undefined
+                try {
+                  const recordSheet = getSyncRecordSheetIfExists()
+                  if (recordSheet) {
+                    scrollToRow = getLastRow(recordSheet)
+                  }
+                } catch {
+                  // ignore
+                }
+                const options: SyncResultDialogOptions = {
                   result,
                   elapsedMs: totalElapsed,
                   avgSpeed,
                   strategyLabel: strategyLabel ?? '未知策略',
                   stopped: false,
-                })
+                }
+                if (scrollToRow !== undefined) {
+                  options.scrollToRow = scrollToRow
+                }
+                showSyncResultDialog(options)
               },
               stats,
             )
 
             bgmLog(
               LOG_LEVELS.INFO,
-              `[handleActionClick] 数据同步完成: 远程 ${result.remoteTotal}，新增 ${result.added}，更新 ${result.updated}，删除 ${result.deleted}，无变更 ${result.unchanged}，失败 ${result.failed}，耗时 ${formatDuration(totalElapsed)}，平均 ${avgSpeed > 0 ? avgSpeed : '?'} 行/秒`,
+              `[handleActionClick] 同步完成 | 远程:${result.remoteTotal} ✅:${result.added} 🔄:${result.updated} ❌:${result.deleted} ⏭️:${result.unchanged} ⚠️:${result.failed} 🔍:${result.skipped} | 耗时:${formatDuration(totalElapsed)} | 速度:${avgSpeed > 0 ? avgSpeed + '/s' : '?'} | 效率:${efficiency}%`,
             )
             if (app?.StatusBar !== undefined) app.StatusBar = false
           })
@@ -1054,13 +1109,82 @@ const ACTION_HANDLERS: Record<string, ActionHandler> = {
     } catch (e: unknown) {
       const errMsg = e instanceof Error ? e.message : String(e)
       showToast(`配置错误：${errMsg}`, 'error')
+      showConnectionTestDialog({
+        success: false,
+        statusCode: null,
+        responseTime: 0,
+        url: 'N/A',
+        sourceType: getSyncSourceType(),
+        errorMessage: errMsg,
+      })
       return
     }
-    showToast(`Raw URL：\n${url}`, 'info')
-    bgmLog(LOG_LEVELS.INFO, `[handleActionClick] GitHub Raw URL: ${url}`)
+
+    // 显示测试中提示
+    showToast('正在测试连接...', 'info')
+
+    // 获取数据源类型
+    const sourceType = getSyncSourceType()
+
+    // 发送 HEAD 请求测试连接
+    const testStartTs = Date.now()
+    const xhr = new XMLHttpRequest()
+    xhr.open('HEAD', url, true)
+    xhr.timeout = 10000
+
+    xhr.onload = () => {
+      const responseTime = Date.now() - testStartTs
+      const statusCode = xhr.status
+      const success = statusCode >= 200 && statusCode < 400
+
+      bgmLog(
+        LOG_LEVELS.INFO,
+        `[handleActionClick] 连接测试完成: status=${statusCode}, time=${responseTime}ms, url=${url}`,
+      )
+
+      showConnectionTestDialog({
+        success,
+        statusCode,
+        responseTime,
+        url,
+        sourceType,
+        errorMessage: !success ? `HTTP ${statusCode}` : undefined,
+      })
+    }
+
+    xhr.onerror = () => {
+      const responseTime = Date.now() - testStartTs
+      bgmLog(LOG_LEVELS.ERROR, `[handleActionClick] 连接测试失败: ${url}`)
+
+      showConnectionTestDialog({
+        success: false,
+        statusCode: null,
+        responseTime,
+        url,
+        sourceType,
+        errorMessage: '网络错误：无法连接到服务器',
+      })
+    }
+
+    xhr.ontimeout = () => {
+      const responseTime = Date.now() - testStartTs
+      bgmLog(LOG_LEVELS.ERROR, `[handleActionClick] 连接测试超时: ${url}`)
+
+      showConnectionTestDialog({
+        success: false,
+        statusCode: null,
+        responseTime,
+        url,
+        sourceType,
+        errorMessage: '请求超时（10秒）',
+      })
+    }
+
+    xhr.send()
+
     bgmLog(
       LOG_LEVELS.INFO,
-      `[handleActionClick] 测试 GitHub 配置完成，耗时: ${Date.now() - ctx.startTime}ms`,
+      `[handleActionClick] 测试 GitHub 配置已发起，耗时: ${Date.now() - ctx.startTime}ms`,
     )
   },
 

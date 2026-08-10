@@ -39,5 +39,22 @@ export declare const _T: {
     readonly sheetNotFound: "未找到工作表: ";
     readonly marksToSheet: "已标记 ";
     readonly marksToSheetSuffix: " 条收藏到 ";
+    readonly avatarLoading: "加载头像中...";
+    readonly avatarLoadFailed: "头像加载失败";
+    readonly avatarDefault: "无头像";
+    readonly tokenRenewed: "Token 已续约";
+    readonly tokenRenewFailed: "Token 续约失败";
+    readonly testConnection: "测试连接";
+    readonly testingConnection: "正在测试连接...";
+    readonly connectionSuccess: "连接成功";
+    readonly connectionFailed: "连接失败";
+    readonly connectionTesting: "测试中...";
+    readonly testResult: "测试结果";
+    readonly responseTime: "响应时间";
+    readonly statusCode: "状态码";
+    readonly testedUrl: "测试地址";
+    readonly sourceTypeLabel: "数据源类型";
+    readonly retryTest: "重新测试";
+    readonly closeDialog: "关闭";
 };
 //# sourceMappingURL=_constants.d.ts.map

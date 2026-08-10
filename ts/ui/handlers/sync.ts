@@ -35,6 +35,8 @@ import {
   updateSyncProgressDialog,
   completeSyncProgressDialog,
   hideSyncProgressDialog,
+  type SyncProgressStats,
+  formatDuration,
 } from '../../index.js'
 import { getSyncPreview, detectConflicts } from '../../services/ribbonService.js'
 import type { WpsApplication, WpsWorksheet } from '../../tools/wps.js'
@@ -353,16 +355,43 @@ async function confirmAndExecuteSync(prepared: SyncPreparedData): Promise<boolea
       },
     })
     // 切换弹窗为完成状态
-    const summary = `📊 同步 ${result.success + result.fail + result.skip} 条 | 耗时未知\n\n✅ 成功: ${result.success}\n❌ 失败: ${result.fail}\n⏭️ 跳过: ${result.skip}`
+    const totalElapsed = Date.now() - startTime
+    const totalProcessed = result.success + result.fail
+    const avgSpeed =
+      totalProcessed > 0 && totalElapsed > 0
+        ? Math.round((totalProcessed / totalElapsed) * 1000)
+        : 0
+    const summary = `📊 同步 ${result.success + result.fail + result.skip} 条 | 耗时 ${formatDuration(totalElapsed)}\n\n✅ 成功: ${result.success}\n❌ 失败: ${result.fail}\n⏭️ 跳过: ${result.skip}`
     const details: string[] = result.stopped
       ? [
           '⚠️ 同步被用户停止',
           `成功 ${result.success} 条`,
           `失败 ${result.fail} 条`,
           `跳过 ${result.skip} 条`,
+          `⏱️ 耗时: ${formatDuration(totalElapsed)}`,
+          `⚡ 平均速度: ${avgSpeed > 0 ? avgSpeed + ' 行/秒' : '--'}`,
         ]
-      : [`成功 ${result.success} 条`, `失败 ${result.fail} 条`, `跳过 ${result.skip} 条`]
-    completeSyncProgressDialog(summary, details, result.stopped)
+      : [
+          `成功 ${result.success} 条`,
+          `失败 ${result.fail} 条`,
+          `跳过 ${result.skip} 条`,
+          `⏱️ 耗时: ${formatDuration(totalElapsed)}`,
+          `⚡ 平均速度: ${avgSpeed > 0 ? avgSpeed + ' 行/秒' : '--'}`,
+        ]
+    // 构造 SyncProgressStats 用于图表渲染（将 Bangumi 同步的 success 映射为 added）
+    const stats: SyncProgressStats = {
+      added: result.success,
+      updated: 0,
+      deleted: 0,
+      unchanged: 0,
+      failed: result.fail,
+      skipped: result.skip,
+      remoteTotal: result.success + result.fail + result.skip,
+      elapsedMs: totalElapsed,
+      avgSpeed,
+      strategyLabel: '同步到 Bangumi',
+    }
+    completeSyncProgressDialog(summary, details, result.stopped, undefined, stats)
     // 重置同步状态机
     BGM.sync.exitRunningState()
     if (app.StatusBar !== undefined) app.StatusBar = false
@@ -485,6 +514,7 @@ export async function syncFromBgmByAPI(sheetIndex: number): Promise<void> {
 }
 
 async function _doAPISync(sheetIndex: number, token: string): Promise<void> {
+  const syncStartTs = Date.now()
   setStatus('正在获取收藏列表...', 'info')
 
   // 记住原始活动工作表
@@ -689,15 +719,35 @@ async function _doAPISync(sheetIndex: number, token: string): Promise<void> {
     bgmLog(LOG_LEVELS.INFO, `[_doAPISync] ================================`)
 
     // 切换弹窗为完成状态
-    const summary = `📊 BGM 收藏 ${totalCollections} 条 | 数据表 ${rowsToProcess.length} 行\n\n✅ 匹配标记: ${matchedCount}\n📝 同步记录: ${syncRecords.length}`
+    const totalElapsed = Date.now() - syncStartTs
+    const totalProcessed = matchedCount
+    const avgSpeed =
+      totalProcessed > 0 && totalElapsed > 0
+        ? Math.round((totalProcessed / totalElapsed) * 1000)
+        : 0
+    const summary = `📊 BGM 收藏 ${totalCollections} 条 | 数据表 ${rowsToProcess.length} 行 | 耗时 ${formatDuration(totalElapsed)}\n\n✅ 匹配标记: ${matchedCount}\n📝 同步记录: ${syncRecords.length}`
     const detailsArr: string[] = [
       `BGM 收藏总数: ${totalCollections}`,
       `数据表总行数: ${rowsToProcess.length}`,
       `匹配标记数: ${matchedCount}`,
       `同步记录条数: ${syncRecords.length}`,
+      `⏱️ 耗时: ${formatDuration(totalElapsed)}`,
+      `⚡ 平均速度: ${avgSpeed > 0 ? avgSpeed + ' 行/秒' : '--'}`,
     ]
     if (wasStopped) detailsArr.unshift('⚠️ 同步被用户停止')
-    completeSyncProgressDialog(summary, detailsArr, wasStopped)
+    const stats: SyncProgressStats = {
+      added: matchedCount,
+      updated: 0,
+      deleted: 0,
+      unchanged: rowsToProcess.length - matchedCount,
+      failed: 0,
+      skipped: 0,
+      remoteTotal: totalCollections,
+      elapsedMs: totalElapsed,
+      avgSpeed,
+      strategyLabel: 'BGM 收藏同步',
+    }
+    completeSyncProgressDialog(summary, detailsArr, wasStopped, undefined, stats)
 
     // 重置同步状态机
     BGM.sync.exitRunningState()

@@ -655,7 +655,7 @@ export function updateSyncProgressDialog(
 }
 
 /**
- * 同步统计数据接口
+ * 同步统计数据接口（增强版，支持完整仪表盘渲染）
  */
 export interface SyncProgressStats {
   added: number
@@ -663,103 +663,343 @@ export interface SyncProgressStats {
   deleted: number
   unchanged: number
   failed: number
+  skipped: number
+  remoteTotal: number
   elapsedMs: number
   avgSpeed: number
+  strategyLabel: string
 }
 
 /**
- * 渲染同步统计图表（SVG 实现，无需外部依赖）
- * @param container 图表容器元素
- * @param stats 同步统计数据
+ * 格式化耗时为可读字符串
+ */
+function formatDuration(ms: number): string {
+  if (ms < 1000) return `${ms}ms`
+  const seconds = Math.floor(ms / 1000)
+  if (seconds < 60) return `${seconds}秒`
+  const minutes = Math.floor(seconds / 60)
+  const secs = seconds % 60
+  return secs > 0 ? `${minutes}分${secs}秒` : `${minutes}分`
+}
+
+/**
+ * 渲染同步统计图表（完整仪表盘布局，与 syncResultDialog 风格一致）
+ *
+ * 布局：
+ * ┌─ 概览条（进度环 + 关键指标） ──────────────────────────┐
+ * │  总条目  │  完成进度环  │  处理效率  │  耗时  │  速度   │
+ * └──────────────────────────────────────────────────────┘
+ * ┌─ 图表区 ──────────────────────────────────────────────┐
+ * │  ┌─ 环形分布图 ─┐  ┌─ 水平柱状图 ──────────────┐      │
+ * │  │   🍩 SVG     │  │  ✅ 新增 ████████         │      │
+ * │  │   图例       │  │  🔄 更新 ████            │      │
+ * │  └──────────────┘  │  ❌ 删除 ██             │      │
+ * │                    │  ⏭️ 无变更 ██████████     │      │
+ * │                    │  ⚠️ 失败  █              │      │
+ * │                    │  🔍 跳过  ███            │      │
+ * │                    └──────────────────────────┘      │
+ * └──────────────────────────────────────────────────────┘
+ * ┌─ 性能仪表盘 ────────────────────────────────────────┐
+ * │  ⏱ 1分30秒  │  ⚡ 15/s  │  📈 44%  │  🔮 预计剩余  │
+ * └──────────────────────────────────────────────────────┘
+ * ┌─ 元信息栏 ──────────────────────────────────────────┐
+ * │  🎯 策略  📥 远程  ✅ 完成  🔍 跳过  ⚠️ 失败        │
+ * └──────────────────────────────────────────────────────┘
  */
 function renderSyncStatsChart(container: HTMLElement, stats: SyncProgressStats): void {
-  const total = stats.added + stats.updated + stats.deleted + stats.unchanged + stats.failed
-  const elapsedSec =
-    stats.elapsedMs < 1000 ? `${stats.elapsedMs}ms` : `${(stats.elapsedMs / 1000).toFixed(1)}s`
+  const totalProcessed = stats.added + stats.updated + stats.deleted
+  const totalActive = totalProcessed + stats.unchanged + stats.failed
+  const totalAll = totalActive + stats.skipped
 
-  // 百分比计算（以 total 为基数，避免为 0）
-  const denom = Math.max(total, 1)
-  const pct = (n: number): string => ((n / denom) * 100).toFixed(1)
+  // 各部分占比（基于 totalAll，包含 skipped）
+  const pctOf = (v: number): number => (totalAll > 0 ? (v / totalAll) * 100 : 0)
+  const addedPct = pctOf(stats.added)
+  const updatedPct = pctOf(stats.updated)
+  const deletedPct = pctOf(stats.deleted)
+  const unchangedPct = pctOf(stats.unchanged)
+  const failedPct = pctOf(stats.failed)
+  const skippedPct = pctOf(stats.skipped)
 
-  // 统计卡片 HTML（带颜色条）
-  const statCards: Array<{ label: string; value: number; color: string; icon: string }> = [
-    { label: '新增', value: stats.added, color: '#22c55e', icon: '➕' },
-    { label: '更新', value: stats.updated, color: '#3b82f6', icon: '✏️' },
-    { label: '删除', value: stats.deleted, color: '#f59e0b', icon: '🗑️' },
-    { label: '无变更', value: stats.unchanged, color: '#6b7280', icon: '⏭️' },
+  // 完成度（已处理/总计，不含跳过）
+  const completionPct = totalActive > 0 ? Math.round((totalProcessed / totalActive) * 100) : 0
+
+  // 效率（处理数/活跃总数）
+  const efficiencyPct = totalActive > 0 ? Math.round((totalProcessed / totalActive) * 100) : 0
+
+  // 环形图 SVG 参数
+  const radius = 52
+  const circumference = 2 * Math.PI * radius
+  const seg = (pct: number): number => (pct / 100) * circumference
+
+  // 耗时格式化
+  const elapsedStr = formatDuration(stats.elapsedMs)
+  const speedStr = stats.avgSpeed > 0 ? stats.avgSpeed.toFixed(1) : '--'
+
+  // 预计剩余
+  const remaining = totalActive - totalProcessed
+  const etaMs =
+    stats.avgSpeed > 0 && remaining > 0 ? Math.round((remaining / stats.avgSpeed) * 1000) : 0
+
+  // 概览卡片数据
+  const overviewCards = [
+    {
+      label: '远程总条目',
+      value: stats.remoteTotal,
+      sub: `本地 ${totalAll} 条`,
+      icon: '📥',
+      cls: 'bgm-overview-card-primary',
+    },
+    {
+      label: '本次处理',
+      value: totalProcessed,
+      sub: '新增+更新+删除',
+      icon: '🔧',
+      cls: 'bgm-overview-card-success',
+    },
+    {
+      label: '失败',
+      value: stats.failed,
+      sub: stats.failed > 0 ? '需关注' : '无异常',
+      icon: stats.failed > 0 ? '⚠️' : '✅',
+      cls: stats.failed > 0 ? 'bgm-overview-card-warning' : 'bgm-overview-card-muted',
+    },
   ]
 
-  const failedPct = pct(stats.failed)
-  const barMax = Math.max(stats.added, stats.updated, stats.deleted, stats.unchanged, 1)
-
-  // 构建 SVG 柱状图
-  const barWidth = 36
-  const barGap = 16
-  const chartHeight = 120
-  const chartPadding = 20
-  const barsTotalWidth = statCards.length * (barWidth + barGap) - barGap
-  const chartWidth = Math.max(barsTotalWidth + chartPadding * 2, 320)
-
-  const barsSvg = statCards
-    .map((s, i) => {
-      const barH = Math.max(
-        s.value > 0 ? (s.value / barMax) * (chartHeight - chartPadding * 2) : 2,
-        2,
-      )
-      const x = chartPadding + i * (barWidth + barGap)
-      const y = chartHeight - chartPadding - barH
-      const displayVal = s.value >= 10000 ? `${(s.value / 1000).toFixed(1)}k` : String(s.value)
-      return `
-        <g>
-          <rect x="${x}" y="${chartHeight - chartPadding}" width="${barWidth}" height="${chartPadding}" fill="rgba(255,255,255,0.03)" rx="3"/>
-          <rect x="${x}" y="${y}" width="${barWidth}" height="${barH}" fill="${s.color}" rx="4" opacity="0.9">
-            <animate attributeName="height" from="0" to="${barH}" dur="0.5s" fill="freeze"/>
-            <animate attributeName="y" from="${chartHeight - chartPadding}" to="${y}" dur="0.5s" fill="freeze"/>
-          </rect>
-          <text x="${x + barWidth / 2}" y="${y - 4}" text-anchor="middle" fill="#e2e8f0" font-size="13" font-weight="600">${displayVal}</text>
-          <text x="${x + barWidth / 2}" y="${chartHeight - 4}" text-anchor="middle" fill="#94a3b8" font-size="11">${s.label}</text>
-        </g>
-      `
-    })
-    .join('')
-
-  // 统计卡片
-  const statCardsHtml = statCards
-    .map(
-      (s) => `
-      <div class="bgm-stat-card" style="--accent:${s.color}">
-        <div class="bgm-stat-card__icon">${s.icon}</div>
-        <div class="bgm-stat-card__info">
-          <div class="bgm-stat-card__value">${s.value.toLocaleString()}</div>
-          <div class="bgm-stat-card__label">${s.label}</div>
-        </div>
-        <div class="bgm-stat-card__bar" style="width:${pct(s.value)}%;background:${s.color}"></div>
-      </div>
-    `,
-    )
-    .join('')
-
-  const failedBadge =
-    stats.failed > 0
-      ? `<div class="bgm-stat-badge bgm-stat-badge--error">❌ 失败 ${stats.failed} (${failedPct}%)</div>`
-      : ''
-
   container.innerHTML = `
-    <div class="bgm-stats-header">
-      <div class="bgm-stats-title">📊 同步统计</div>
-      <div class="bgm-stats-meta">
-        <span class="bgm-stats-chip">⏱️ ${elapsedSec}</span>
-        <span class="bgm-stats-chip">⚡ ${stats.avgSpeed > 0 ? stats.avgSpeed + ' 行/秒' : '--'}</span>
-        <span class="bgm-stats-chip">📈 共处理 ${total.toLocaleString()} 条</span>
+    <!-- ===== 顶部概览条 ===== -->
+    <div class="bgm-overview-bar">
+      <div class="bgm-overview-cards">
+        ${overviewCards
+          .map(
+            (c) => `
+          <div class="bgm-overview-card ${c.cls}">
+            <div class="bgm-overview-card-header">
+              <span class="bgm-overview-icon">${c.icon}</span>
+              <span class="bgm-overview-label">${c.label}</span>
+            </div>
+            <div class="bgm-overview-value">${c.value}</div>
+            <div class="bgm-overview-sub">${c.sub}</div>
+          </div>
+        `,
+          )
+          .join('')}
+      </div>
+      <div class="bgm-completion-ring">
+        <svg viewBox="0 0 120 120" class="bgm-progress-svg">
+          <circle cx="60" cy="60" r="50" fill="none" stroke="var(--surface0, #313244)" stroke-width="10" />
+          <circle cx="60" cy="60" r="50" fill="none"
+            stroke="${completionPct >= 90 ? 'var(--green, #a6e3a1)' : completionPct >= 50 ? 'var(--yellow, #f9e2af)' : 'var(--red, #f38ba8)'}"
+            stroke-width="10"
+            stroke-dasharray="${(completionPct / 100) * 2 * Math.PI * 50} ${2 * Math.PI * 50}"
+            stroke-dashoffset="${2 * Math.PI * 50 * 0.25}"
+            stroke-linecap="round"
+            transform="rotate(-90 60 60)"
+            class="bgm-progress-ring" />
+        </svg>
+        <div class="bgm-progress-center">
+          <div class="bgm-progress-value">${completionPct}%</div>
+          <div class="bgm-progress-label">完成度</div>
+        </div>
       </div>
     </div>
-    <div class="bgm-stat-cards">${statCardsHtml}</div>
-    ${failedBadge}
-    <div class="bgm-stats-chart-wrap">
-      <svg viewBox="0 0 ${chartWidth} ${chartHeight}" class="bgm-stats-chart" preserveAspectRatio="xMidYMid meet">
-        <line x1="${chartPadding}" y1="${chartHeight - chartPadding}" x2="${chartWidth - chartPadding}" y2="${chartHeight - chartPadding}" stroke="rgba(255,255,255,0.1)" stroke-width="1"/>
-        ${barsSvg}
-      </svg>
+
+    <!-- ===== 图表区 ===== -->
+    <div class="bgm-chart-container">
+      <div class="bgm-chart-left">
+        <div class="bgm-donut-chart">
+          <svg viewBox="0 0 140 140" class="bgm-donut-svg">
+            <circle cx="70" cy="70" r="${radius}" fill="none" stroke="var(--surface0, #313244)" stroke-width="14" />
+            ${
+              totalAll > 0
+                ? `
+              <circle cx="70" cy="70" r="${radius}" fill="none"
+                stroke="var(--green, #a6e3a1)" stroke-width="14"
+                stroke-dasharray="${seg(addedPct)} ${circumference}"
+                stroke-dashoffset="0"
+                transform="rotate(-90 70 70)" stroke-linecap="butt" />
+              <circle cx="70" cy="70" r="${radius}" fill="none"
+                stroke="var(--yellow, #f9e2af)" stroke-width="14"
+                stroke-dasharray="${seg(updatedPct)} ${circumference}"
+                stroke-dashoffset="${-seg(addedPct)}"
+                transform="rotate(-90 70 70)" stroke-linecap="butt" />
+              <circle cx="70" cy="70" r="${radius}" fill="none"
+                stroke="var(--red, #f38ba8)" stroke-width="14"
+                stroke-dasharray="${seg(deletedPct)} ${circumference}"
+                stroke-dashoffset="${-(seg(addedPct) + seg(updatedPct))}"
+                transform="rotate(-90 70 70)" stroke-linecap="butt" />
+              <circle cx="70" cy="70" r="${radius}" fill="none"
+                stroke="var(--overlay1, #7f849c)" stroke-width="14"
+                stroke-dasharray="${seg(unchangedPct)} ${circumference}"
+                stroke-dashoffset="${-(seg(addedPct) + seg(updatedPct) + seg(deletedPct))}"
+                transform="rotate(-90 70 70)" stroke-linecap="butt" />
+              ${
+                stats.failed > 0
+                  ? `
+              <circle cx="70" cy="70" r="${radius}" fill="none"
+                stroke="var(--peach, #fab387)" stroke-width="14"
+                stroke-dasharray="${seg(failedPct)} ${circumference}"
+                stroke-dashoffset="${-(seg(addedPct) + seg(updatedPct) + seg(deletedPct) + seg(unchangedPct))}"
+                transform="rotate(-90 70 70)" stroke-linecap="butt" />`
+                  : ''
+              }
+              ${
+                stats.skipped > 0
+                  ? `
+              <circle cx="70" cy="70" r="${radius}" fill="none"
+                stroke="var(--lavender, #b4befe)" stroke-width="14"
+                stroke-dasharray="${seg(skippedPct)} ${circumference}"
+                stroke-dashoffset="${-(seg(addedPct) + seg(updatedPct) + seg(deletedPct) + seg(unchangedPct) + seg(failedPct))}"
+                transform="rotate(-90 70 70)" stroke-linecap="butt" />`
+                  : ''
+              }
+            `
+                : ''
+            }
+          </svg>
+          <div class="bgm-donut-center">
+            <div class="bgm-donut-center-value">${totalProcessed}</div>
+            <div class="bgm-donut-center-label">已处理</div>
+          </div>
+        </div>
+        <div class="bgm-chart-legend">
+          <div class="bgm-legend-item"><span class="bgm-legend-dot" style="background:var(--green, #a6e3a1)"></span>新增 ${stats.added}</div>
+          <div class="bgm-legend-item"><span class="bgm-legend-dot" style="background:var(--yellow, #f9e2af)"></span>更新 ${stats.updated}</div>
+          <div class="bgm-legend-item"><span class="bgm-legend-dot" style="background:var(--red, #f38ba8)"></span>删除 ${stats.deleted}</div>
+          <div class="bgm-legend-item"><span class="bgm-legend-dot" style="background:var(--overlay1, #7f849c)"></span>无变更 ${stats.unchanged}</div>
+          ${stats.failed > 0 ? `<div class="bgm-legend-item"><span class="bgm-legend-dot" style="background:var(--peach, #fab387)"></span>失败 ${stats.failed}</div>` : ''}
+          ${stats.skipped > 0 ? `<div class="bgm-legend-item"><span class="bgm-legend-dot" style="background:var(--lavender, #b4befe)"></span>跳过 ${stats.skipped}</div>` : ''}
+        </div>
+      </div>
+
+      <div class="bgm-chart-right">
+        <div class="bgm-bar-chart">
+          <div class="bgm-bar-row">
+            <span class="bgm-bar-label">✅ 新增</span>
+            <div class="bgm-bar-track"><div class="bgm-bar-fill bgm-bar-add" style="width:${addedPct}%"></div></div>
+            <span class="bgm-bar-value">${stats.added}<span class="bgm-bar-pct">(${addedPct.toFixed(0)}%)</span></span>
+          </div>
+          <div class="bgm-bar-row">
+            <span class="bgm-bar-label">🔄 更新</span>
+            <div class="bgm-bar-track"><div class="bgm-bar-fill bgm-bar-update" style="width:${updatedPct}%"></div></div>
+            <span class="bgm-bar-value">${stats.updated}<span class="bgm-bar-pct">(${updatedPct.toFixed(0)}%)</span></span>
+          </div>
+          <div class="bgm-bar-row">
+            <span class="bgm-bar-label">❌ 删除</span>
+            <div class="bgm-bar-track"><div class="bgm-bar-fill bgm-bar-delete" style="width:${deletedPct}%"></div></div>
+            <span class="bgm-bar-value">${stats.deleted}<span class="bgm-bar-pct">(${deletedPct.toFixed(0)}%)</span></span>
+          </div>
+          <div class="bgm-bar-row">
+            <span class="bgm-bar-label">⏭️ 无变更</span>
+            <div class="bgm-bar-track"><div class="bgm-bar-fill bgm-bar-unchanged" style="width:${unchangedPct}%"></div></div>
+            <span class="bgm-bar-value">${stats.unchanged}<span class="bgm-bar-pct">(${unchangedPct.toFixed(0)}%)</span></span>
+          </div>
+          ${
+            stats.failed > 0
+              ? `
+          <div class="bgm-bar-row">
+            <span class="bgm-bar-label">⚠️ 失败</span>
+            <div class="bgm-bar-track"><div class="bgm-bar-fill bgm-bar-fail" style="width:${failedPct}%"></div></div>
+            <span class="bgm-bar-value">${stats.failed}<span class="bgm-bar-pct">(${failedPct.toFixed(0)}%)</span></span>
+          </div>`
+              : ''
+          }
+          ${
+            stats.skipped > 0
+              ? `
+          <div class="bgm-bar-row">
+            <span class="bgm-bar-label">🔍 跳过</span>
+            <div class="bgm-bar-track"><div class="bgm-bar-fill bgm-bar-skip" style="width:${skippedPct}%"></div></div>
+            <span class="bgm-bar-value">${stats.skipped}<span class="bgm-bar-pct">(${skippedPct.toFixed(0)}%)</span></span>
+          </div>`
+              : ''
+          }
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== 性能仪表盘 ===== -->
+    <div class="bgm-perf-dashboard">
+      <div class="bgm-perg-item">
+        <div class="bgm-perg-ring">
+          <svg viewBox="0 0 80 80" class="bgm-perg-svg">
+            <circle cx="40" cy="40" r="32" fill="none" stroke="var(--surface0, #313244)" stroke-width="6" />
+            <circle cx="40" cy="40" r="32" fill="none"
+              stroke="var(--blue, #89b4fa)" stroke-width="6"
+              stroke-dasharray="${(completionPct / 100) * 2 * Math.PI * 32} ${2 * Math.PI * 32}"
+              stroke-dashoffset="${2 * Math.PI * 32 * 0.25}"
+              stroke-linecap="round"
+              transform="rotate(-90 40 40)" />
+          </svg>
+          <div class="bgm-perg-center"><span>⏱</span></div>
+        </div>
+        <div class="bgm-perg-info">
+          <div class="bgm-perg-value">${elapsedStr}</div>
+          <div class="bgm-perg-label">总耗时</div>
+        </div>
+      </div>
+      <div class="bgm-perg-item">
+        <div class="bgm-perg-ring">
+          <svg viewBox="0 0 80 80" class="bgm-perg-svg">
+            <circle cx="40" cy="40" r="32" fill="none" stroke="var(--surface0, #313244)" stroke-width="6" />
+            <circle cx="40" cy="40" r="32" fill="none"
+              stroke="var(--green, #a6e3a1)" stroke-width="6"
+              stroke-dasharray="${Math.min(stats.avgSpeed / 50, 1) * 2 * Math.PI * 32} ${2 * Math.PI * 32}"
+              stroke-dashoffset="${2 * Math.PI * 32 * 0.25}"
+              stroke-linecap="round"
+              transform="rotate(-90 40 40)" />
+          </svg>
+          <div class="bgm-perg-center"><span>⚡</span></div>
+        </div>
+        <div class="bgm-perg-info">
+          <div class="bgm-perg-value">${speedStr}</div>
+          <div class="bgm-perg-label">行/秒</div>
+        </div>
+      </div>
+      <div class="bgm-perg-item">
+        <div class="bgm-perg-ring">
+          <svg viewBox="0 0 80 80" class="bgm-perg-svg">
+            <circle cx="40" cy="40" r="32" fill="none" stroke="var(--surface0, #313244)" stroke-width="6" />
+            <circle cx="40" cy="40" r="32" fill="none"
+              stroke="var(--peach, #fab387)" stroke-width="6"
+              stroke-dasharray="${(efficiencyPct / 100) * 2 * Math.PI * 32} ${2 * Math.PI * 32}"
+              stroke-dashoffset="${2 * Math.PI * 32 * 0.25}"
+              stroke-linecap="round"
+              transform="rotate(-90 40 40)" />
+          </svg>
+          <div class="bgm-perg-center"><span>📈</span></div>
+        </div>
+        <div class="bgm-perg-info">
+          <div class="bgm-perg-value">${efficiencyPct}%</div>
+          <div class="bgm-perg-label">处理效率</div>
+        </div>
+      </div>
+      <div class="bgm-perg-item">
+        <div class="bgm-perg-ring">
+          <svg viewBox="0 0 80 80" class="bgm-perg-svg">
+            <circle cx="40" cy="40" r="32" fill="none" stroke="var(--surface0, #313244)" stroke-width="6" />
+            <circle cx="40" cy="40" r="32" fill="none"
+              stroke="var(--sapphire, #74c7ec)" stroke-width="6"
+              stroke-dasharray="${Math.min(totalProcessed / Math.max(stats.elapsedMs / 1000, 1) / 50, 1) * 2 * Math.PI * 32} ${2 * Math.PI * 32}"
+              stroke-dashoffset="${2 * Math.PI * 32 * 0.25}"
+              stroke-linecap="round"
+              transform="rotate(-90 40 40)" />
+          </svg>
+          <div class="bgm-perg-center"><span>🔮</span></div>
+        </div>
+        <div class="bgm-perg-info">
+          <div class="bgm-perg-value">${etaMs > 0 ? formatDuration(etaMs) : '完成'}</div>
+          <div class="bgm-perg-label">预计剩余</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== 元信息栏 ===== -->
+    <div class="bgm-meta-bar">
+      <span class="bgm-meta-tag">🎯 ${stats.strategyLabel}</span>
+      <span class="bgm-meta-tag">📥 远程 ${stats.remoteTotal}</span>
+      <span class="bgm-meta-tag">✅ 完成 ${completionPct}%</span>
+      ${stats.skipped > 0 ? `<span class="bgm-meta-tag">🔍 跳过 ${stats.skipped}</span>` : ''}
+      ${stats.failed > 0 ? `<span class="bgm-meta-tag bgm-meta-tag-warn">⚠️ 失败 ${stats.failed}</span>` : ''}
     </div>
   `
 }
@@ -801,8 +1041,8 @@ export function completeSyncProgressDialog(
 
   if (summaryEl) summaryEl.textContent = summary
 
-  // 渲染统计图表
-  if (chartEl && stats && !stopped) {
+  // 渲染统计图表（停止时也显示，展示已完成的部分统计）
+  if (chartEl && stats) {
     chartEl.style.display = ''
     renderSyncStatsChart(chartEl, stats)
   } else if (chartEl) {

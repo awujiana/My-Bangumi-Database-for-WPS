@@ -43,4 +43,23 @@ export const _T = {
   sheetNotFound: '\u672A\u627E\u5230\u5DE5\u4F5C\u8868: ',
   marksToSheet: '\u5DF2\u6807\u8BB0 ',
   marksToSheetSuffix: ' \u6761\u6536\u85CF\u5230 ',
+  // 头像相关
+  avatarLoading: '\u52A0\u8F7D\u5934\u50CF\u4E2D...',
+  avatarLoadFailed: '\u5934\u50CF\u52A0\u8F7D\u5931\u8D25',
+  avatarDefault: '\u65E0\u5934\u50CF',
+  tokenRenewed: 'Token \u5DF2\u7EED\u7EA6',
+  tokenRenewFailed: 'Token \u7EED\u7EA6\u5931\u8D25',
+  // 连接测试相关
+  testConnection: '\u6D4B\u8BD5\u8FDE\u63A5',
+  testingConnection: '\u6B63\u5728\u6D4B\u8BD5\u8FDE\u63A5...',
+  connectionSuccess: '\u8FDE\u63A5\u6210\u529F',
+  connectionFailed: '\u8FDE\u63A5\u5931\u8D25',
+  connectionTesting: '\u6D4B\u8BD5\u4E2D...',
+  testResult: '\u6D4B\u8BD5\u7ED3\u679C',
+  responseTime: '\u54CD\u5E94\u65F6\u95F4',
+  statusCode: '\u72B6\u6001\u7801',
+  testedUrl: '\u6D4B\u8BD5\u5730\u5740',
+  sourceTypeLabel: '\u6570\u636E\u6E90\u7C7B\u578B',
+  retryTest: '\u91CD\u65B0\u6D4B\u8BD5',
+  closeDialog: '\u5173\u95ED',
 } as const

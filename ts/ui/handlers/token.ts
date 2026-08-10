@@ -64,6 +64,7 @@ export function updateTokenStatus(): void {
     // 如果已经有用户名缓存，直接显示
     if (BGM.cache.username) {
       tokenStatus.textContent = _T.set + ': ' + BGM.cache.username
+      showUserProfile()
     } else {
       tokenStatus.textContent = _T.set + ' (' + token.substring(0, 4) + '...)'
 
@@ -75,6 +76,7 @@ export function updateTokenStatus(): void {
             tokenStatus.style.color = '#4CAF50'
             tokenStatus.textContent = _T.set + ': ' + userInfo.username
             updateUserIdStatus()
+            showUserProfile()
           } else if (errorType === 'network') {
             // 网络错误：Token 本身可能有效，但无法连接到 BGM API
             // 常见原因：被 GFW 墙、断网、DNS 失败
@@ -107,6 +109,7 @@ export function updateTokenStatus(): void {
     tokenStatus.style.color = '#f44336'
     BGM.cache.userId = null
     BGM.cache.username = null
+    hideUserProfile()
   }
 }
 
@@ -259,4 +262,97 @@ export function testDebugConnection(): void {
   } else {
     showToast(_T.debugConnFail, 'error')
   }
+}
+
+// ========== 用户头像显示 ==========
+
+/**
+ * 显示用户头像和信息
+ * 根据 BGM.cache 中的数据更新头像显示区域
+ */
+export function showUserProfile(): void {
+  const profileEl = document.getElementById('userProfile')
+  if (!profileEl) return
+
+  const avatarUrl = BGM.cache.avatarUrl
+  const username = BGM.cache.username
+  const userId = BGM.cache.userId
+
+  if (avatarUrl || username) {
+    profileEl.style.display = 'flex'
+
+    const avatarImg = document.getElementById('userAvatar') as HTMLImageElement | null
+    if (avatarImg) {
+      if (avatarUrl) {
+        avatarImg.src = avatarUrl
+        avatarImg.alt = username || _T.avatarDefault
+        avatarImg.onerror = () => {
+          avatarImg.style.display = 'none'
+          bgmLog(LOG_LEVELS.WARN, '[showUserProfile] 头像加载失败')
+        }
+        avatarImg.style.display = ''
+      } else {
+        avatarImg.style.display = 'none'
+      }
+    }
+
+    const nameEl = document.getElementById('userNameDisplay')
+    if (nameEl && username) {
+      nameEl.textContent = username
+    }
+
+    const idEl = document.getElementById('userIdDisplay')
+    if (idEl && userId) {
+      idEl.textContent = `ID: ${userId}`
+    }
+  } else {
+    profileEl.style.display = 'none'
+  }
+}
+
+/**
+ * 隐藏用户头像区域
+ */
+export function hideUserProfile(): void {
+  const profileEl = document.getElementById('userProfile')
+  if (profileEl) {
+    profileEl.style.display = 'none'
+  }
+}
+
+// ========== Token 续约 ==========
+
+/**
+ * 续约/刷新 Token
+ * 通过测试现有 Token 的有效性，重新获取用户信息和头像
+ * 如果 Token 已失效，提示用户重新输入
+ */
+export function renewToken(): void {
+  const token = loadBgToken()
+  if (!token) {
+    showAlert(_T.pleaseSetTokenFirst)
+    return
+  }
+
+  bgmLog(LOG_LEVELS.INFO, '[renewToken] 开始续约 Token...')
+
+  // 先测试 Token 有效性
+  testTokenValidity()
+
+  // 同时刷新用户信息和头像
+  fetchBgmUserInfo()
+    .then(({ userInfo, errorType }) => {
+      if (userInfo?.username) {
+        showUserProfile()
+        bgmLog(LOG_LEVELS.INFO, `[renewToken] Token 续约成功: ${userInfo.username}`)
+      } else if (errorType === 'http') {
+        // Token 失效
+        showToast(_T.tokenRenewFailed, 'error')
+        hideUserProfile()
+      }
+    })
+    .catch((err: unknown) => {
+      const errMsg = err instanceof Error ? err.message : String(err)
+      bgmLog(LOG_LEVELS.ERROR, `[renewToken] Token 续约失败: ${errMsg}`)
+    })
 }

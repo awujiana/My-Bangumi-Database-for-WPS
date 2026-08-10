@@ -38,6 +38,7 @@ export const BGM = {
         totalRows: 0,
         userId: null,
         username: null,
+        avatarUrl: null,
         sidCache: new Map(),
         listCache: [],
     },
@@ -689,9 +690,24 @@ export function _fetchBgmUserInfo(callback, signal) {
                 const username = String(data.nickname || data.username || data.user_name || data.name || '');
                 _setBgmUserId(userId);
                 _setBgmUsername(username);
-                bgmLog(LOG_LEVELS.INFO, `[_fetchBgmUserInfo] 获取用户信息成功: userId=${userId}, username=${username}`);
+                // 构造头像 URL（浏览器会自动跟随 302 重定向）
+                const avatarUrl = username
+                    ? `${BGM_CONFIG.API_BASE}/v0/users/${encodeURIComponent(username)}/avatar?type=large`
+                    : null;
+                BGM.cache.avatarUrl = avatarUrl;
+                // 持久化头像 URL 到 PluginStorage
+                try {
+                    const app = getApp();
+                    if (app?.PluginStorage) {
+                        app.PluginStorage.setItem('bgm_avatar_url', avatarUrl || '');
+                    }
+                }
+                catch {
+                    // 静默处理
+                }
+                bgmLog(LOG_LEVELS.INFO, `[_fetchBgmUserInfo] 获取用户信息成功: userId=${userId}, username=${username}, hasAvatar=${!!avatarUrl}`);
                 if (callback)
-                    callback({ id: userId, username: username }, 'none');
+                    callback({ id: userId, username: username, avatarUrl: avatarUrl || undefined }, 'none');
             }
             catch (e) {
                 bgmLog(LOG_LEVELS.ERROR, `[_fetchBgmUserInfo] 解析响应失败: ${e.message}`);

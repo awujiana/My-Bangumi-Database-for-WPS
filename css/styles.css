@@ -1987,7 +1987,7 @@ select.input {
     gap: 10px;
 }
 
-/* 统计卡片 */
+/* 统计卡片（保留兼容） */
 .bgm-result-stat-card {
     background: var(--surface0, #313244);
     border-radius: 10px;
@@ -2002,7 +2002,6 @@ select.input {
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
 }
 
-/* 统计数值 */
 .bgm-result-stat-value {
     font-size: 26px;
     font-weight: 800;
@@ -2012,40 +2011,132 @@ select.input {
     font-variant-numeric: tabular-nums;
 }
 
-/* 统计标签 */
 .bgm-result-stat-label {
     font-size: 12px;
     color: var(--subtext0, #a6adc8);
     font-weight: 500;
 }
 
-/* 各类型统计卡片颜色 */
-.bgm-result-stat-add {
-    border-top-color: var(--green, #a6e3a1);
-}
-.bgm-result-stat-add .bgm-result-stat-value {
-    color: var(--green, #a6e3a1);
+.bgm-result-stat-add { border-top-color: var(--green, #a6e3a1); }
+.bgm-result-stat-add .bgm-result-stat-value { color: var(--green, #a6e3a1); }
+.bgm-result-stat-update { border-top-color: var(--blue, #89b4fa); }
+.bgm-result-stat-update .bgm-result-stat-value { color: var(--blue, #89b4fa); }
+.bgm-result-stat-delete { border-top-color: var(--red, #f38ba8); }
+.bgm-result-stat-delete .bgm-result-stat-value { color: var(--red, #f38ba8); }
+.bgm-result-stat-fail { border-top-color: var(--peach, #fab387); }
+.bgm-result-stat-fail .bgm-result-stat-value { color: var(--peach, #fab387); }
+
+/* ========== 概览条（Dashboard Top Bar） ========== */
+.bgm-overview-bar {
+    display: flex;
+    gap: 16px;
+    padding: 12px;
+    background: var(--surface0, #313244);
+    border-radius: 12px;
+    border: 1px solid var(--surface1, #45475a);
+    margin-bottom: 12px;
 }
 
-.bgm-result-stat-update {
-    border-top-color: var(--blue, #89b4fa);
-}
-.bgm-result-stat-update .bgm-result-stat-value {
-    color: var(--blue, #89b4fa);
-}
-
-.bgm-result-stat-delete {
-    border-top-color: var(--red, #f38ba8);
-}
-.bgm-result-stat-delete .bgm-result-stat-value {
-    color: var(--red, #f38ba8);
+.bgm-overview-cards {
+    display: flex;
+    gap: 10px;
+    flex: 1;
 }
 
-.bgm-result-stat-fail {
-    border-top-color: var(--peach, #fab387);
+.bgm-overview-card {
+    flex: 1;
+    background: var(--surface1, #45475a);
+    border-radius: 10px;
+    padding: 10px 12px;
+    border-left: 3px solid var(--overlay0, #6c7086);
+    min-width: 0;
 }
-.bgm-result-stat-fail .bgm-result-stat-value {
-    color: var(--peach, #fab387);
+
+.bgm-overview-card-primary {
+    border-left-color: var(--blue, #89b4fa);
+}
+
+.bgm-overview-card-success {
+    border-left-color: var(--green, #a6e3a1);
+}
+
+.bgm-overview-card-warning {
+    border-left-color: var(--peach, #fab387);
+    background: rgba(250, 179, 135, 0.08);
+}
+
+.bgm-overview-card-muted {
+    border-left-color: var(--overlay0, #6c7086);
+}
+
+.bgm-overview-card-header {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 4px;
+}
+
+.bgm-overview-icon {
+    font-size: 14px;
+}
+
+.bgm-overview-label {
+    font-size: 11px;
+    color: var(--overlay1, #7f849c);
+    font-weight: 500;
+    letter-spacing: 0.3px;
+}
+
+.bgm-overview-value {
+    font-size: 22px;
+    font-weight: 800;
+    color: var(--text, #cdd6f4);
+    line-height: 1.1;
+    font-variant-numeric: tabular-nums;
+}
+
+.bgm-overview-sub {
+    font-size: 10px;
+    color: var(--overlay1, #7f849c);
+    margin-top: 2px;
+}
+
+/* 完成度环 */
+.bgm-completion-ring {
+    position: relative;
+    width: 100px;
+    height: 100px;
+    flex-shrink: 0;
+}
+
+.bgm-progress-svg {
+    width: 100px;
+    height: 100px;
+}
+
+.bgm-progress-ring {
+    transition: stroke-dasharray 0.8s ease-out;
+}
+
+.bgm-progress-center {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    text-align: center;
+}
+
+.bgm-progress-value {
+    font-size: 20px;
+    font-weight: 800;
+    color: var(--text, #cdd6f4);
+    font-variant-numeric: tabular-nums;
+}
+
+.bgm-progress-label {
+    font-size: 10px;
+    color: var(--overlay1, #7f849c);
+    margin-top: 2px;
 }
 
 /* 日期统计网格 */
@@ -2109,4 +2200,619 @@ select.input {
 
 .bgm-dialog-body::-webkit-scrollbar-thumb:hover {
     background: var(--overlay0, #6c7086);
+}
+
+/* ========== 用户头像显示 ========== */
+.user-profile {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px;
+    margin-bottom: 10px;
+    background: rgba(74, 158, 255, 0.08);
+    border: 1px solid rgba(74, 158, 255, 0.2);
+    border-radius: 10px;
+    animation: userProfileFadeIn 0.3s ease;
+}
+
+@keyframes userProfileFadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(-5px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.avatar-container {
+    flex-shrink: 0;
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    overflow: hidden;
+    background: #333;
+    border: 2px solid rgba(74, 158, 255, 0.4);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.user-avatar {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+}
+
+.user-info {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+}
+
+.user-name {
+    font-size: 14px;
+    font-weight: 600;
+    color: #e0e0e0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.user-id {
+    font-size: 11px;
+    color: #888;
+    font-family: monospace;
+}
+
+/* ========== 连接测试弹窗 ========== */
+.connection-test-body {
+    padding: 16px 0;
+}
+
+.connection-test-footer {
+    display: flex;
+    gap: 8px;
+    justify-content: flex-end;
+    padding-top: 12px;
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.connection-test-result {
+    padding: 8px 0;
+}
+
+.connection-status {
+    font-size: 16px;
+    margin-bottom: 16px;
+    padding: 12px 16px;
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.03);
+}
+
+.connection-status strong {
+    font-size: 15px;
+}
+
+.connection-test-details {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.connection-test-details .detail-row {
+    display: flex;
+    gap: 8px;
+    font-size: 13px;
+    line-height: 1.5;
+}
+
+.connection-test-details .detail-label {
+    color: #888;
+    flex-shrink: 0;
+    min-width: 80px;
+}
+
+.connection-test-details .detail-value {
+    color: #e0e0e0;
+    word-break: break-all;
+}
+
+.connection-test-details .error-row {
+    margin-top: 8px;
+    padding: 10px;
+    background: rgba(244, 67, 54, 0.1);
+    border: 1px solid rgba(244, 67, 54, 0.3);
+    border-radius: 8px;
+}
+
+.connection-test-details .error-msg {
+    color: #ff6b6b;
+}
+
+/* ========== 同步详情预览弹窗 ========== */
+.bgm-preview-dialog {
+    max-width: 520px;
+}
+
+.bgm-preview-notice {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 12px 14px;
+    border-radius: 10px;
+    margin-bottom: 16px;
+    font-size: 13px;
+    line-height: 1.5;
+}
+
+.bgm-preview-notice.notice-warning {
+    background: rgba(255, 193, 7, 0.1);
+    border: 1px solid rgba(255, 193, 7, 0.3);
+    color: #ffc107;
+}
+
+.bgm-preview-notice.notice-info {
+    background: rgba(74, 158, 255, 0.1);
+    border: 1px solid rgba(74, 158, 255, 0.3);
+    color: #4a9eff;
+}
+
+.bgm-preview-notice .notice-icon {
+    font-size: 16px;
+    flex-shrink: 0;
+}
+
+.bgm-preview-stats-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+    margin-top: 12px;
+}
+
+.bgm-preview-stat-card {
+    background: var(--surface0, #313244);
+    border-radius: 8px;
+    padding: 10px 8px;
+    text-align: center;
+    border-left: 3px solid var(--blue, #89b4fa);
+}
+
+.bgm-preview-stat-card.bgm-preview-stat-add {
+    border-left-color: var(--green, #a6e3a1);
+}
+
+.bgm-preview-stat-card.bgm-preview-stat-update {
+    border-left-color: var(--yellow, #f9e2af);
+}
+
+.bgm-preview-stat-card.bgm-preview-stat-delete {
+    border-left-color: var(--red, #f38ba8);
+}
+
+.bgm-preview-stat-card.bgm-preview-stat-fail {
+    border-left-color: var(--peach, #fab387);
+    background: rgba(243, 139, 168, 0.1);
+}
+
+.bgm-preview-stat-value {
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--text, #cdd6f4);
+    line-height: 1.2;
+}
+
+.bgm-preview-stat-label {
+    font-size: 11px;
+    color: var(--overlay1, #7f849c);
+    margin-top: 4px;
+}
+
+.bgm-preview-detail-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-top: 10px;
+}
+
+.bgm-preview-detail-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 12px;
+    background: var(--surface0, #313244);
+    border-radius: 6px;
+    font-size: 13px;
+}
+
+.bgm-preview-detail-label {
+    color: var(--overlay1, #7f849c);
+    font-weight: 500;
+}
+
+.bgm-preview-detail-value {
+    color: var(--text, #cdd6f4);
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+}
+
+.bgm-preview-suggestions {
+    margin-top: 10px;
+    padding: 12px 14px;
+    background: rgba(74, 158, 255, 0.06);
+    border: 1px solid rgba(74, 158, 255, 0.15);
+    border-radius: 8px;
+}
+
+.bgm-preview-suggestions p {
+    margin: 0 0 6px 0;
+    font-size: 12px;
+    color: var(--subtext1, #bac2de);
+    line-height: 1.6;
+}
+
+.bgm-preview-suggestions p:last-child {
+    margin-bottom: 0;
+}
+
+/* ========== 同步图表样式 ========== */
+.bgm-chart-container {
+    display: flex;
+    gap: 20px;
+    margin-top: 12px;
+}
+
+.bgm-chart-left {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+    flex-shrink: 0;
+}
+
+.bgm-chart-right {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    min-width: 0;
+}
+
+/* 环形图 */
+.bgm-donut-chart {
+    position: relative;
+    width: 140px;
+    height: 140px;
+}
+
+.bgm-donut-svg {
+    width: 140px;
+    height: 140px;
+    transform: rotate(0deg);
+}
+
+.bgm-donut-svg circle {
+    transition: stroke-dasharray 0.6s ease, stroke-dashoffset 0.6s ease;
+}
+
+.bgm-donut-center {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    text-align: center;
+    pointer-events: none;
+}
+
+.bgm-donut-center-value {
+    font-size: 24px;
+    font-weight: 800;
+    color: var(--text, #cdd6f4);
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+}
+
+.bgm-donut-center-label {
+    font-size: 11px;
+    color: var(--overlay1, #7f849c);
+    margin-top: 4px;
+}
+
+/* 图例 */
+.bgm-chart-legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 10px;
+    justify-content: center;
+    font-size: 11px;
+    color: var(--subtext1, #bac2de);
+    max-width: 160px;
+}
+
+.bgm-legend-item {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    white-space: nowrap;
+}
+
+.bgm-legend-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+/* 柱状图 */
+.bgm-bar-chart {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.bgm-bar-row {
+    display: grid;
+    grid-template-columns: 60px 1fr 90px;
+    align-items: center;
+    gap: 8px;
+    font-size: 12px;
+}
+
+.bgm-bar-label {
+    color: var(--subtext1, #bac2de);
+    white-space: nowrap;
+}
+
+.bgm-bar-track {
+    height: 16px;
+    background: var(--surface0, #313244);
+    border-radius: 4px;
+    overflow: hidden;
+    position: relative;
+}
+
+.bgm-bar-fill {
+    height: 100%;
+    border-radius: 4px;
+    transition: width 0.6s ease;
+    min-width: 0;
+}
+
+.bgm-bar-add {
+    background: linear-gradient(90deg, var(--green, #a6e3a1), var(--green, #a6e3a1)dd);
+    box-shadow: 0 0 6px rgba(166, 227, 161, 0.4);
+}
+
+.bgm-bar-update {
+    background: linear-gradient(90deg, var(--yellow, #f9e2af), var(--yellow, #f9e2af)dd);
+    box-shadow: 0 0 6px rgba(249, 226, 175, 0.4);
+}
+
+.bgm-bar-delete {
+    background: linear-gradient(90deg, var(--red, #f38ba8), var(--red, #f38ba8)dd);
+    box-shadow: 0 0 6px rgba(243, 139, 168, 0.4);
+}
+
+.bgm-bar-unchanged {
+    background: linear-gradient(90deg, var(--overlay1, #7f849c), var(--overlay1, #7f849c)dd);
+}
+
+.bgm-bar-fail {
+    background: linear-gradient(90deg, var(--peach, #fab387), var(--peach, #fab387)dd);
+    box-shadow: 0 0 6px rgba(250, 179, 135, 0.5);
+    animation: bar-pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes bar-pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.6; }
+}
+
+.bgm-bar-value {
+    text-align: right;
+    color: var(--text, #cdd6f4);
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+}
+
+.bgm-bar-pct {
+    color: var(--overlay1, #7f849c);
+    font-weight: 400;
+    font-size: 11px;
+}
+
+/* 性能面板 */
+.bgm-perf-panel {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 12px;
+    background: var(--surface0, #313244);
+    border-radius: 8px;
+    border: 1px solid var(--surface1, #45475a);
+}
+
+.bgm-perf-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex: 1;
+    min-width: 0;
+}
+
+.bgm-perf-icon {
+    font-size: 18px;
+    flex-shrink: 0;
+}
+
+.bgm-perf-data {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+
+.bgm-perf-value {
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--text, #cdd6f4);
+    line-height: 1.2;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.bgm-perf-label {
+    font-size: 10px;
+    color: var(--overlay1, #7f849c);
+    margin-top: 2px;
+}
+
+.bgm-perf-divider {
+    width: 1px;
+    height: 28px;
+    background: var(--overlay0, #585b70);
+    flex-shrink: 0;
+}
+
+.bgm-perf-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 14px;
+    font-size: 11px;
+    color: var(--overlay1, #7f849c);
+    padding: 8px 12px;
+    background: rgba(74, 158, 255, 0.06);
+    border-radius: 6px;
+    border: 1px solid rgba(74, 158, 255, 0.12);
+}
+
+/* ========== 性能仪表盘（圆环仪表） ========== */
+.bgm-perf-dashboard {
+    display: flex;
+    gap: 12px;
+    margin-top: 16px;
+    padding: 12px;
+    background: var(--surface0, #313244);
+    border-radius: 10px;
+    border: 1px solid var(--surface1, #45475a);
+}
+
+.bgm-perg-item {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
+}
+
+.bgm-perg-ring {
+    position: relative;
+    width: 70px;
+    height: 70px;
+}
+
+.bgm-perg-svg {
+    width: 70px;
+    height: 70px;
+}
+
+.bgm-perg-svg circle {
+    transition: stroke-dasharray 0.8s ease-out;
+}
+
+.bgm-perg-center {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 18px;
+    line-height: 1;
+}
+
+.bgm-perg-info {
+    text-align: center;
+    min-width: 0;
+}
+
+.bgm-perg-value {
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--text, #cdd6f4);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.bgm-perg-label {
+    font-size: 10px;
+    color: var(--overlay1, #7f849c);
+    margin-top: 2px;
+}
+
+/* ========== 元信息栏 ========== */
+.bgm-meta-bar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 10px;
+    margin-top: 12px;
+    padding: 10px 12px;
+    background: rgba(137, 180, 250, 0.06);
+    border-radius: 8px;
+    border: 1px solid rgba(137, 180, 250, 0.12);
+    font-size: 12px;
+}
+
+.bgm-meta-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 3px 10px;
+    background: var(--surface1, #45475a);
+    border-radius: 12px;
+    color: var(--subtext1, #bac2de);
+    white-space: nowrap;
+}
+
+.bgm-meta-tag-warn {
+    background: rgba(243, 139, 168, 0.15);
+    color: var(--red, #f38ba8);
+    border: 1px solid rgba(243, 139, 168, 0.3);
+}
+
+/* ========== 跳过条（柱状图） ========== */
+.bgm-bar-skip {
+    background: linear-gradient(90deg, var(--lavender, #b4befe), var(--lavender, #b4befe)dd);
+    box-shadow: 0 0 6px rgba(180, 190, 254, 0.4);
+}
+
+/* 响应式：窄屏时图表上下排列 */
+@media (max-width: 520px) {
+    .bgm-chart-container {
+        flex-direction: column;
+        gap: 16px;
+    }
+
+    .bgm-chart-left {
+        flex-direction: row;
+        justify-content: center;
+    }
+
+    .bgm-bar-row {
+        grid-template-columns: 50px 1fr 80px;
+    }
+
+    .bgm-perf-dashboard {
+        flex-wrap: wrap;
+    }
+
+    .bgm-perg-item {
+        flex: 1 1 calc(50% - 12px);
+    }
 }

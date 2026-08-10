@@ -399,6 +399,8 @@ export interface BGMCache {
   userId: string | null
   /** 当前用户名 */
   username: string | null
+  /** 当前用户头像 URL */
+  avatarUrl: string | null
   /** Subject ID 缓存（sid → 行号） */
   sidCache: Map<string, string>
   /** 列表缓存（通用数据） */
@@ -488,6 +490,8 @@ export interface BGMUserInfo {
   id: string
   /** 用户名 */
   username: string
+  /** 头像 URL */
+  avatarUrl?: string | undefined
 }
 
 // ============================================================================

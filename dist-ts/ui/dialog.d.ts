@@ -47,7 +47,7 @@ export declare function showSyncProgressDialog(title: string, handlers: {
  */
 export declare function updateSyncProgressDialog(current: number, total: number, message?: string, logLine?: string): void;
 /**
- * 同步统计数据接口
+ * 同步统计数据接口（增强版，支持完整仪表盘渲染）
  */
 export interface SyncProgressStats {
     added: number;
@@ -55,8 +55,11 @@ export interface SyncProgressStats {
     deleted: number;
     unchanged: number;
     failed: number;
+    skipped: number;
+    remoteTotal: number;
     elapsedMs: number;
     avgSpeed: number;
+    strategyLabel: string;
 }
 /**
  * 切换弹窗为完成状态，显示统计结果

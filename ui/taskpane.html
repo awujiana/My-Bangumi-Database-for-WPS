@@ -45,6 +45,17 @@
 
         <div class="section">
             <h3>Token 设置</h3>
+            <!-- 用户头像显示区域 -->
+            <div class="user-profile" id="userProfile" style="display:none;">
+                <div class="avatar-container">
+                    <img id="userAvatar" class="user-avatar" src="" alt="用户头像" />
+                </div>
+                <div class="user-info">
+                    <span id="userNameDisplay" class="user-name"></span>
+                    <span id="userIdDisplay" class="user-id"></span>
+                </div>
+                <button class="btn small" data-action="renewToken" title="续约/刷新 Token">🔄 续约</button>
+            </div>
             <div class="token-display">
                 <span id="tokenStatus">未设置</span>
                 <button class="btn small" data-action="showTokenDialog">设置/修改</button>
@@ -421,6 +432,24 @@
             <div class="modal-body"></div>
           </div>
         </div>
+
+        <!-- 连接测试结果弹窗 -->
+        <div id="connectionTestModal" class="modal" style="display:none;">
+            <div class="modal-content" style="max-width:500px;">
+                <div class="modal-header">
+                    <h3>🔌 连接测试结果</h3>
+                    <button class="detail-close-btn" data-action="closeConnectionTest" aria-label="关闭连接测试对话框">×</button>
+                </div>
+                <div class="connection-test-body" id="connectionTestBody">
+                    <!-- 测试结果动态填充 -->
+                </div>
+                <div class="connection-test-footer">
+                    <button class="btn small" data-action="testGithubConfig" id="retryConnectionTestBtn">🔄 重新测试</button>
+                    <button class="btn small primary" data-action="closeConnectionTest">✕ 关闭</button>
+                </div>
+            </div>
+        </div>
+
         <div class="section">
             <h3>📖 使用引导</h3>
             <div class="guide">
