@@ -22,7 +22,6 @@ import {
   fetchBgmUserInfo,
   showAlert,
   showInput,
-  showSuccess,
   showError,
   showToast,
 } from '../../index.js'
@@ -241,7 +240,6 @@ export function testTokenValidity(): void {
           LOG_LEVELS.INFO,
           `[testTokenValidity] Token 验证成功！用户名: ${nickname}, 用户ID: ${userId}`,
         )
-        showSuccess(_T.tokenValid, _T.user + nickname)
 
         _setBgmUserId(userId)
         _setBgmUsername(nickname)
@@ -263,10 +261,20 @@ export function testTokenValidity(): void {
           showUserProfile()
         }
 
-        // 查询 Token 有效期（异步，不阻塞弹窗）
-        void queryTokenStatus(token).catch(() => {
-          bgmLog(LOG_LEVELS.WARN, '[testTokenValidity] Token 状态查询失败，不影响主流程')
-        })
+        // 查询 Token 有效期，完成后显示剩余天数
+        void queryTokenStatus(token)
+          .then(({ expires }) => {
+            const remaining = getTokenRemainingTime(expires)
+            bgmLog(
+              LOG_LEVELS.INFO,
+              `[testTokenValidity] 📅 Token 剩余时间: ${remaining.label} | 过期时间: ${new Date(expires * 1000).toLocaleString('zh-CN')}`,
+            )
+            showToast(`✅ Token 有效 | 用户: ${nickname} | ${remaining.label}`, 'success')
+          })
+          .catch(() => {
+            bgmLog(LOG_LEVELS.WARN, '[testTokenValidity] Token 状态查询失败，不影响主流程')
+            showToast(`✅ Token 有效 | 用户: ${nickname}`, 'success')
+          })
       } catch (e: unknown) {
         bgmLog(LOG_LEVELS.ERROR, `[testTokenValidity] 解析响应失败: ${(e as Error).message}`)
         showError(_T.parseFailed, _T.cannotParseResponse)
@@ -566,70 +574,15 @@ export function hideUserProfile(): void {
   }
 }
 
-// ========== Token 续约 ==========
+// ========== Token 续约（已合并到测试） ==========
 
 /**
- * 续约/刷新 Token
- * 通过测试现有 Token 的有效性，重新获取用户信息和头像
- * 如果 Token 已失效，提示用户重新输入
+ * Token 续约（已合并到 testTokenValidity）
  *
- * 说明：Bangumi OAuth Token 本身没有"刷新租期"的概念，
- * 此操作的实质是"验证 Token 有效性"和"刷新用户缓存数据"。
- * 不会延长 Token 的有效期（Token 有效期由 Bangumi 服务端决定）。
+ * @deprecated 此函数保留用于向后兼容，内部委托给 testTokenValidity。
+ * 测试和续约功能已统一：点击「测试」按钮即可同时验证 Token 并显示剩余天数。
  */
 export function renewToken(): void {
-  const token = loadBgToken()
-  if (!token) {
-    showAlert(_T.pleaseSetTokenFirst)
-    return
-  }
-
-  const startTime = Date.now()
-  bgmLog(LOG_LEVELS.INFO, `[renewToken] ========== Token 续约流程开始 ==========`)
-  bgmLog(LOG_LEVELS.INFO, `[renewToken] 触发时间: ${new Date().toLocaleString('zh-CN')}`)
-  bgmLog(
-    LOG_LEVELS.INFO,
-    `[renewToken] 【重要说明】本操作≠延长Token有效期。Bangumi OAuth Token的有效期由官方服务器决定。本操作实际执行的是：① 调用 /v0/me 接口验证Token是否仍然有效并刷新用户信息；② 调用 /oauth/token_status 查询Token剩余有效期。`,
-  )
-  bgmLog(LOG_LEVELS.INFO, `[renewToken] 正在向 Bangumi API 发起验证请求...`)
-
-  // 同时刷新用户信息和头像 + 查询 Token 状态
-  fetchBgmUserInfo()
-    .then(({ userInfo, errorType }) => {
-      const duration = Date.now() - startTime
-      if (userInfo?.username) {
-        showUserProfile()
-        bgmLog(
-          LOG_LEVELS.INFO,
-          `[renewToken] ✅ Token 验证通过，耗时: ${duration}ms | 用户: ${userInfo.username} (ID: ${userInfo.id}) | 头像已刷新`,
-        )
-        showToast(`Token 验证成功，用户: ${userInfo.username}`, 'success')
-
-        // 查询 Token 剩余有效期
-        void queryTokenStatus(token)
-          .then(({ expires }) => {
-            const remaining = getTokenRemainingTime(expires)
-            bgmLog(
-              LOG_LEVELS.INFO,
-              `[renewToken] 📅 Token 剩余时间: ${remaining.label} | 过期时间: ${new Date(expires * 1000).toLocaleString('zh-CN')}`,
-            )
-          })
-          .catch(() => {
-            bgmLog(LOG_LEVELS.WARN, '[renewToken] Token 状态查询失败，不影响主流程')
-          })
-      } else if (errorType === 'http') {
-        // Token 失效
-        bgmLog(LOG_LEVELS.WARN, `[renewToken] Token 续约失败（HTTP错误），耗时: ${duration}ms`)
-        showToast(_T.tokenRenewFailed, 'error')
-        hideUserProfile()
-        clearTokenExpires()
-      } else if (errorType === 'network') {
-        bgmLog(LOG_LEVELS.WARN, `[renewToken] Token 续约失败（网络错误），耗时: ${duration}ms`)
-        showToast('网络连接失败，无法验证 Token', 'warn')
-      }
-    })
-    .catch((err: unknown) => {
-      const errMsg = err instanceof Error ? err.message : String(err)
-      bgmLog(LOG_LEVELS.ERROR, `[renewToken] Token 续约异常: ${errMsg}`)
-    })
+  bgmLog(LOG_LEVELS.INFO, '[renewToken] 已合并到 testTokenValidity，调用测试流程')
+  testTokenValidity()
 }
