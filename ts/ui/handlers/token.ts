@@ -366,11 +366,13 @@ export function renewToken(): void {
   }
 
   const startTime = Date.now()
-  bgmLog(LOG_LEVELS.INFO, `[renewToken] Token 续约开始，当前时间: ${new Date().toISOString()}`)
+  bgmLog(LOG_LEVELS.INFO, `[renewToken] ========== Token 续约流程开始 ==========`)
+  bgmLog(LOG_LEVELS.INFO, `[renewToken] 触发时间: ${new Date().toLocaleString('zh-CN')}`)
   bgmLog(
     LOG_LEVELS.INFO,
-    `[renewToken] 功能说明：本操作将验证 Token 有效性并刷新用户信息（头像、ID、用户名），不会延长 Token 有效期`,
+    `[renewToken] 【重要说明】本操作≠延长Token有效期。Bangumi OAuth Token的有效期由官方服务器决定（代码端无法查询或修改剩余天数）。本操作实际执行的是：① 调用 /v0/me 接口验证Token是否仍然有效；② 若有效，重新拉取最新的用户头像、ID、用户名并刷新本地缓存。`,
   )
+  bgmLog(LOG_LEVELS.INFO, `[renewToken] 正在向 Bangumi API 发起验证请求...`)
 
   // 同时刷新用户信息和头像
   fetchBgmUserInfo()
@@ -380,7 +382,7 @@ export function renewToken(): void {
         showUserProfile()
         bgmLog(
           LOG_LEVELS.INFO,
-          `[renewToken] Token 续约成功，耗时: ${duration}ms，用户名: ${userInfo.username}`,
+          `[renewToken] ✅ Token 验证通过，耗时: ${duration}ms | 用户: ${userInfo.username} (ID: ${userInfo.id}) | 头像已刷新 | 注意: 本次操作未延长Token有效期，剩余天数需登录Bangumi官网查看`,
         )
         showToast(`Token 验证成功，用户: ${userInfo.username}`, 'success')
       } else if (errorType === 'http') {
