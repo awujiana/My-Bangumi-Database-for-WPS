@@ -173,40 +173,107 @@ export class GithubSyncSource {
 function readLocalEntries(ws, colMap, headerRow, lastRow) {
     const result = new Map();
     const startRow = headerRow + 1;
-    /** 读取单元格值并 trim */
-    const getField = (row, key) => {
+    if (startRow > lastRow) {
+        bgmLog(LOG_LEVELS.INFO, '[githubSync] 本地无数据行');
+        return result;
+    }
+    // ===== 批量读取优化：用一次 Range.Value2 替代逐单元格 getCellValue =====
+    // 收集需要读取的列（与旧版 getField 读取的列一致）
+    const readColNames = [
+        'Bangumi_URL',
+        '名称',
+        '是否看完',
+        '状态',
+        '观看状态',
+        '标签/分级',
+        '集数',
+        '集号',
+        ...EXTENDED_FIELD_MAP.map(([, excel]) => excel),
+    ];
+    const readCols = [];
+    for (const name of readColNames) {
+        const col = colMap.get(name);
+        if (col)
+            readCols.push({ name, col });
+    }
+    if (readCols.length === 0 || !colMap.has('Bangumi_URL')) {
+        bgmLog(LOG_LEVELS.WARN, '[githubSync] 未找到任何可读取的列');
+        return result;
+    }
+    readCols.sort((a, b) => a.col - b.col);
+    const minCol = readCols[0].col;
+    const maxCol = readCols[readCols.length - 1].col;
+    const rowCount = lastRow - startRow + 1;
+    // 一次性读取整个矩形区域
+    let rawData = null;
+    try {
+        const startColLetter = colNumToLetter(minCol);
+        const endColLetter = colNumToLetter(maxCol);
+        const rangeAddr = `${startColLetter}${startRow}:${endColLetter}${lastRow}`;
+        const range = ws.Range(rangeAddr);
+        if (range) {
+            const raw = range.Value2;
+            if (Array.isArray(raw)) {
+                rawData = raw;
+            }
+        }
+    }
+    catch (e) {
+        bgmLog(LOG_LEVELS.WARN, `[githubSync] 批量读取失败，回退到逐单元格: ${e.message}`);
+    }
+    // 构建 col name → 数组索引 的映射
+    const colIndexMap = new Map();
+    for (const rc of readCols) {
+        colIndexMap.set(rc.name, rc.col - minCol);
+    }
+    /** 从批量数据中读取字段值 */
+    const getFieldFromBatch = (rowOffset, key) => {
+        const idx = colIndexMap.get(key);
+        if (idx === undefined)
+            return '';
+        const rowArr = rawData?.[rowOffset];
+        if (!rowArr)
+            return '';
+        const val = rowArr[idx];
+        if (val === null || val === undefined)
+            return '';
+        return trim(String(val));
+    };
+    /** 逐单元格读取（回退用） */
+    const getFieldFromCell = (row, key) => {
         const col = colMap.get(key);
         if (!col)
             return '';
         return trim(getCellValue(ws, row, col));
     };
-    for (let row = startRow; row <= lastRow; row++) {
-        const url = getField(row, 'Bangumi_URL');
+    for (let i = 0; i < rowCount; i++) {
+        const row = startRow + i;
+        const getField = (key) => rawData ? getFieldFromBatch(i, key) : getFieldFromCell(row, key);
+        const url = getField('Bangumi_URL');
         if (!url)
             continue;
         const sid = extractSubjectId(url);
         if (!sid)
             continue;
-        // 读取扩展字段（EXTENDED_FIELD_MAP 中定义的 20 个 Excel 字段）
         const extFields = {};
         for (const [, excelField] of EXTENDED_FIELD_MAP) {
-            extFields[excelField] = getField(row, excelField);
+            extFields[excelField] = getField(excelField);
         }
         result.set(sid, {
             row,
             sid,
             fields: {
                 Bangumi_URL: url,
-                名称: getField(row, '名称'),
-                是否看完: getField(row, '是否看完') || getField(row, '状态') || getField(row, '观看状态'),
-                '标签/分级': getField(row, '标签/分级'),
-                集数: getField(row, '集数'),
-                集号: getField(row, '集号'),
+                名称: getField('名称'),
+                是否看完: getField('是否看完') || getField('状态') || getField('观看状态'),
+                '标签/分级': getField('标签/分级'),
+                集数: getField('集数'),
+                集号: getField('集号'),
                 ...extFields,
             },
         });
     }
-    bgmLog(LOG_LEVELS.INFO, `[githubSync] 本地读取完成：${result.size} 条有效记录`);
+    bgmLog(LOG_LEVELS.INFO, `[githubSync] 本地读取完成：${result.size} 条有效记录（批量模式: ${rawData ? '是' : '否'}）`);
     return result;
 }
 /**
@@ -330,6 +397,8 @@ function writeRemoteEntryToRow(ws, colMap, row, remote, fieldsToWrite, forceOver
 // ========== 批量写入与性能追踪 ==========
 /** 批量写入批次大小（行数），防止单次 COM 调用数据量过大 */
 const BATCH_WRITE_SIZE = 500;
+/** 更新阶段批量写入的批次大小（行数），远小于新增批次，确保频繁让出主线程 */
+const BATCH_UPDATE_SIZE = 50;
 /**
  * 让出事件循环，允许 DOM 渲染和 UI 响应
  * 通过在批次间调用此函数，避免同步 COM 操作阻塞主线程
@@ -489,6 +558,218 @@ function batchWriteNewRows(ws, colMap, startRow, rows, records) {
     return rows.length;
 }
 /**
+ * 批量更新已存在的行（使用 Range.Value2 二维数组，避免逐行逐字段 COM 调用）
+ *
+ * 与 writeRemoteEntryToRow 的区别：
+ * - writeRemoteEntryToRow：每行每字段一次 setCellValue COM 调用（~23 次/行）
+ * - batchUpdateRows：收集所有变更，一次 Range.Value2 写入整个矩形区域（1 次/批）
+ *
+ * @param ws 工作表
+ * @param colMap 列映射
+ * @param updates 要更新的行列表（row=行号, remote=远程数据, fields=要更新的字段）
+ * @param forceOverwrite 是否强制覆盖
+ * @param records 同步记录收集器
+ * @returns 成功更新的行数
+ */
+function batchUpdateRows(ws, colMap, updates, forceOverwrite, records) {
+    if (updates.length === 0)
+        return 0;
+    const writeCols = [];
+    const seen = new Set();
+    const tryAddCol = (name) => {
+        if (seen.has(name))
+            return;
+        seen.add(name);
+        const col = colMap.get(name);
+        if (col)
+            writeCols.push({ name, col });
+    };
+    // 根据 updates 中所有 fields 的并集确定需要写入的列
+    for (const u of updates) {
+        const writeAll = u.fields.includes('*');
+        if (writeAll || u.fields.includes('Bangumi_URL'))
+            tryAddCol('Bangumi_URL');
+        if (writeAll || u.fields.includes('名称'))
+            tryAddCol('名称');
+        if (writeAll || u.fields.includes('标签/分级'))
+            tryAddCol('标签/分级');
+        if (writeAll || u.fields.includes('集数'))
+            tryAddCol('集数');
+        for (const [, excelField] of EXTENDED_FIELD_MAP) {
+            if (writeAll || u.fields.includes(excelField))
+                tryAddCol(excelField);
+        }
+    }
+    if (writeCols.length === 0) {
+        bgmLog(LOG_LEVELS.WARN, '[batchUpdateRows] 未找到任何可写入的列');
+        return 0;
+    }
+    writeCols.sort((a, b) => a.col - b.col);
+    const minCol = writeCols[0].col;
+    const maxCol = writeCols[writeCols.length - 1].col;
+    const colCount = maxCol - minCol + 1;
+    // 2. 逐行计算新值，并记录 undo 条目
+    // 注意：更新行的行号不连续，不能一次 Range.Value2 写入，需按行逐个写入
+    // 但仍然比逐字段 setCellValue 快，因为每行只 1 次 COM 调用而非 ~23 次
+    let successCount = 0;
+    for (const u of updates) {
+        const row = u.row;
+        const remote = u.remote;
+        const fields = u.fields;
+        const writeAll = fields.includes('*');
+        // 构建该行的值数组
+        const rowValues = new Array(colCount).fill(null);
+        for (const wc of writeCols) {
+            const idx = wc.col - minCol;
+            let value = null;
+            let shouldWrite = false;
+            if (wc.name === 'Bangumi_URL') {
+                if (writeAll || fields.includes('Bangumi_URL')) {
+                    value = `https://bgm.tv/subject/${remote.sid}`;
+                    shouldWrite = true;
+                }
+            }
+            else if (wc.name === '名称') {
+                if (writeAll || fields.includes('名称')) {
+                    value = remote.name ?? '';
+                    shouldWrite = true;
+                }
+            }
+            else if (wc.name === '标签/分级') {
+                if (writeAll || fields.includes('标签/分级')) {
+                    value = tagsToString(remote.meta_tags);
+                    shouldWrite = true;
+                }
+            }
+            else if (wc.name === '集数') {
+                if (writeAll || fields.includes('集数')) {
+                    value = remote['话数'] ?? '';
+                    shouldWrite = true;
+                }
+            }
+            else {
+                // 扩展字段
+                for (const [jsonlField, excelField] of EXTENDED_FIELD_MAP) {
+                    if (excelField === wc.name && (writeAll || fields.includes(excelField))) {
+                        const v = remote[jsonlField];
+                        if (typeof v === 'string') {
+                            if (DATE_COLUMNS.has(wc.name)) {
+                                value = formatDateToLocal(v) ?? v;
+                            }
+                            else {
+                                value = v;
+                            }
+                            shouldWrite = true;
+                        }
+                        else if (typeof v === 'number') {
+                            value = String(v);
+                            shouldWrite = true;
+                        }
+                        break;
+                    }
+                }
+            }
+            if (shouldWrite) {
+                // 空值且非强制覆盖时跳过
+                if (!forceOverwrite && !value)
+                    continue;
+                // 日期列特殊处理
+                if (DATE_COLUMNS.has(wc.name) && typeof value === 'string' && value) {
+                    const localDate = formatDateToLocal(value);
+                    if (localDate !== null)
+                        value = localDate;
+                }
+                rowValues[idx] = value;
+            }
+        }
+        // 3. 写入该行（一次 COM 调用写入整行）
+        try {
+            const startColLetter = colNumToLetter(minCol);
+            const endColLetter = colNumToLetter(maxCol);
+            const rangeAddr = `${startColLetter}${row}:${endColLetter}${row}`;
+            const range = ws.Range(rangeAddr);
+            if (range) {
+                // 读取旧值用于 undo 记录
+                const oldValues = range.Value2;
+                const oldArr = Array.isArray(oldValues)
+                    ? (oldValues[0] ?? [])
+                    : [];
+                // 只写入有变化的单元格
+                let hasChanges = false;
+                const finalValues = [...rowValues];
+                for (let c = 0; c < colCount; c++) {
+                    const newVal = finalValues[c];
+                    if (newVal === null)
+                        continue;
+                    const oldVal = oldArr[c] != null ? String(oldArr[c]) : '';
+                    const newValStr = String(newVal);
+                    if (oldVal === newValStr) {
+                        finalValues[c] = null; // 无变化，跳过
+                    }
+                    else {
+                        hasChanges = true;
+                        // 记录 undo
+                        recordUndoEntry({
+                            row,
+                            col: minCol + c,
+                            oldValue: oldVal,
+                            newValue: newValStr,
+                        });
+                    }
+                }
+                if (hasChanges) {
+                    // 只写入有变化的列：构建最小写入范围
+                    // 简化处理：直接写入整行（一次 COM 调用）
+                    range.Value2 = finalValues;
+                }
+                successCount++;
+                records.push({
+                    sid: u.sid,
+                    name: remote.name ?? '',
+                    url: `https://bgm.tv/subject/${u.sid}`,
+                    type: BGM_SUBJECT_TYPES[2] ?? '',
+                    source: 'repo',
+                    content: '仓库同步-更新',
+                    status: '成功',
+                    message: u.fields.join(', '),
+                    count: 1,
+                });
+            }
+        }
+        catch (e) {
+            bgmLog(LOG_LEVELS.WARN, `[batchUpdateRows] 行 ${row} 写入失败，回退到逐字段写入: ${e.message}`);
+            // 回退到逐字段写入
+            try {
+                writeRemoteEntryToRow(ws, colMap, row, remote, fields, forceOverwrite);
+                successCount++;
+                records.push({
+                    sid: u.sid,
+                    name: remote.name ?? '',
+                    url: `https://bgm.tv/subject/${u.sid}`,
+                    type: BGM_SUBJECT_TYPES[2] ?? '',
+                    source: 'repo',
+                    content: '仓库同步-更新',
+                    status: '成功',
+                    message: u.fields.join(', '),
+                    count: 1,
+                });
+            }
+            catch (e2) {
+                bgmLog(LOG_LEVELS.ERROR, `[batchUpdateRows] 行 ${row} 逐字段写入也失败: ${e2.message}`);
+                records.push({
+                    sid: u.sid,
+                    source: 'repo',
+                    content: '仓库同步-更新失败',
+                    status: '失败',
+                    message: e2.message,
+                    count: 1,
+                });
+            }
+        }
+    }
+    return successCount;
+}
+/**
  * 应用 diff 到 Excel 工作表
  * @param diffs 差异列表
  * @param strategy 同步策略（决定 force-overwrite 与 delete 行为）
@@ -618,65 +899,79 @@ export async function applyDiffToSheet(diffs, strategy, onProgress, source) {
         const bRow = b.localRow ?? Number.MAX_SAFE_INTEGER;
         return bRow - aRow;
     });
-    let otherProcessed = 0;
-    const otherTotal = nonAddDiffs.length;
-    for (const diff of nonAddDiffs) {
+    // 分离 update 和 delete diffs
+    const updateDiffs = nonAddDiffs.filter((d) => d.kind === 'update' && d.localRow !== undefined && d.remote);
+    const deleteDiffs = nonAddDiffs.filter((d) => d.kind === 'delete' && d.localRow !== undefined);
+    // ---- 阶段 2a: 批量处理 update diffs ----
+    let updateProcessed = 0;
+    const updateTotal = updateDiffs.length;
+    for (let batchStart = 0; batchStart < updateTotal; batchStart += BATCH_UPDATE_SIZE) {
+        const batch = updateDiffs.slice(batchStart, batchStart + BATCH_UPDATE_SIZE);
+        const batchUpdates = batch.map((d) => ({
+            row: d.localRow,
+            remote: d.remote,
+            sid: d.sid,
+            fields: d.changedFields,
+        }));
+        const batchUpdated = batchUpdateRows(ws, colMap, batchUpdates, forceOverwrite, syncRecords);
+        result.updated += batchUpdated;
+        result.failed += batch.length - batchUpdated;
+        updateProcessed += batch.length;
+        const now = Date.now();
+        if (now - lastProgressTime > 300 || updateProcessed >= updateTotal) {
+            const totalProcessed = addTotal + updateProcessed;
+            const elapsed = now - syncStartTime;
+            const speed = totalProcessed > 0 && elapsed > 0 ? (totalProcessed / elapsed) * 1000 : 0;
+            const remaining = updateTotal - updateProcessed + deleteDiffs.length;
+            const eta = speed > 0 ? (remaining / speed) * 1000 : 0;
+            onProgress?.(totalProcessed, total, `更新 ${updateProcessed}/${updateTotal} 条 (${speed > 0 ? speed.toFixed(0) : '?'} 行/秒)`, formatEta(eta));
+            lastProgressTime = now;
+        }
+        // 每批让出事件循环，确保 UI 流畅
+        if (updateProcessed < updateTotal) {
+            await yieldToEventLoop();
+        }
+    }
+    // ---- 阶段 2b: 逐行处理 delete diffs（需倒序执行）----
+    let deleteProcessed = 0;
+    const deleteTotal = deleteDiffs.length;
+    for (const diff of deleteDiffs) {
         try {
-            if (diff.kind === 'update' && diff.localRow !== undefined && diff.remote) {
-                writeRemoteEntryToRow(ws, colMap, diff.localRow, diff.remote, diff.changedFields, forceOverwrite);
-                result.updated++;
+            const rowValues = {};
+            for (const col of colMap.values()) {
+                rowValues[col] = getCellValue(ws, diff.localRow, col);
+            }
+            recordRowDeleteEntry({ row: diff.localRow, values: rowValues });
+            try {
+                ws.Range(`${diff.localRow}:${diff.localRow}`).Delete();
+                result.deleted++;
                 syncRecords.push({
                     sid: diff.sid,
-                    name: diff.remote.name ?? '',
-                    url: `https://bgm.tv/subject/${diff.sid}`,
-                    type: BGM_SUBJECT_TYPES[2] ?? '',
                     source,
-                    content: '仓库同步-更新',
+                    content: '仓库同步-删除',
                     status: '成功',
-                    message: diff.changedFields.join(', '),
+                    message: `删除行 ${diff.localRow}`,
                     count: 1,
                 });
             }
-            else if (diff.kind === 'delete' && diff.localRow !== undefined) {
-                const rowValues = {};
-                for (const col of colMap.values()) {
-                    rowValues[col] = getCellValue(ws, diff.localRow, col);
-                }
-                recordRowDeleteEntry({ row: diff.localRow, values: rowValues });
-                try {
-                    ws.Range(`${diff.localRow}:${diff.localRow}`).Delete();
-                    result.deleted++;
-                    syncRecords.push({
-                        sid: diff.sid,
-                        source,
-                        content: '仓库同步-删除',
-                        status: '成功',
-                        message: `删除行 ${diff.localRow}`,
-                        count: 1,
-                    });
-                }
-                catch (e) {
-                    const errMsg = e instanceof Error ? e.message : String(e);
-                    bgmLog(LOG_LEVELS.WARN, `[githubSync] 删除行 ${diff.localRow} 失败: ${errMsg}`);
-                    result.failed++;
-                    syncRecords.push({
-                        sid: diff.sid,
-                        source,
-                        content: '仓库同步-删除失败',
-                        status: '失败',
-                        message: errMsg,
-                        count: 1,
-                    });
-                }
-            }
-            else {
-                result.skipped++;
+            catch (e) {
+                const errMsg = e instanceof Error ? e.message : String(e);
+                bgmLog(LOG_LEVELS.WARN, `[githubSync] 删除行 ${diff.localRow} 失败: ${errMsg}`);
+                result.failed++;
+                syncRecords.push({
+                    sid: diff.sid,
+                    source,
+                    content: '仓库同步-删除失败',
+                    status: '失败',
+                    message: errMsg,
+                    count: 1,
+                });
             }
         }
         catch (e) {
             const errMsg = e instanceof Error ? e.message : String(e);
             result.failed++;
-            bgmLog(LOG_LEVELS.ERROR, `[githubSync] 应用差异失败 sid=${diff.sid}: ${errMsg}`);
+            bgmLog(LOG_LEVELS.ERROR, `[githubSync] 删除处理失败 sid=${diff.sid}: ${errMsg}`);
             syncRecords.push({
                 sid: diff.sid,
                 source,
@@ -686,27 +981,29 @@ export async function applyDiffToSheet(diffs, strategy, onProgress, source) {
                 count: 1,
             });
         }
-        otherProcessed++;
+        deleteProcessed++;
         const now = Date.now();
-        if (now - lastProgressTime > 500 || otherProcessed >= otherTotal) {
-            const totalProcessed = addTotal + otherProcessed;
+        if (now - lastProgressTime > 300 || deleteProcessed >= deleteTotal) {
+            const totalProcessed = addTotal + updateTotal + deleteProcessed;
             const elapsed = now - syncStartTime;
             const speed = totalProcessed > 0 && elapsed > 0 ? (totalProcessed / elapsed) * 1000 : 0;
-            const remaining = otherTotal - otherProcessed;
+            const remaining = deleteTotal - deleteProcessed;
             const eta = speed > 0 ? (remaining / speed) * 1000 : 0;
-            onProgress?.(totalProcessed, total, `更新 ${otherProcessed}/${otherTotal} 条 (${speed > 0 ? speed.toFixed(0) : '?'} 行/秒)`, formatEta(eta));
+            onProgress?.(totalProcessed, total, `删除 ${deleteProcessed}/${deleteTotal} 条 (${speed > 0 ? speed.toFixed(0) : '?'} 行/秒)`, formatEta(eta));
             lastProgressTime = now;
         }
-        // 每 50 条让出事件循环，允许 DOM 渲染
-        if (otherProcessed % 50 === 0 && otherProcessed < otherTotal) {
+        // 每 10 条让出事件循环（delete 比 update 轻量，但仍需频繁让出）
+        if (deleteProcessed % 10 === 0 && deleteProcessed < deleteTotal) {
             await yieldToEventLoop();
         }
     }
+    // 统计 skip 数量（nonAddDiffs 中 kind='skip' 的条目）
+    result.skipped = nonAddDiffs.length - updateDiffs.length - deleteDiffs.length;
     // 结束 undo 会话（空会话不入栈）
     endUndoSession();
     // 计算总耗时
     const totalElapsed = Date.now() - syncStartTime;
-    const totalProcessed = addTotal + otherTotal;
+    const totalProcessed = addTotal + nonAddDiffs.length;
     const avgSpeed = totalProcessed > 0 && totalElapsed > 0 ? (totalProcessed / totalElapsed) * 1000 : 0;
     // 恢复屏幕刷新和自动计算
     try {
@@ -859,7 +1156,7 @@ export async function syncFromGithub(onProgress, strategy = 'add-update', signal
             throw new Error('无法读取本地工作表数据');
         }
         onProgress?.(2, 3, '比对差异中...');
-        const diffs = computeDiff(effectiveRemoteEntries, local.entries, strategy);
+        const diffs = computeDiff(effectiveRemoteEntries, local.entries, strategy, timeFilter);
         // 应用用户冲突解决决策：过滤掉用户选择「本地」的字段
         if (conflictResolution && conflictResolution.length > 0) {
             applyConflictResolutions(diffs, conflictResolution);

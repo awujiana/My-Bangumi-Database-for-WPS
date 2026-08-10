@@ -205,5 +205,5 @@ export declare function filterByTime(entries: GithubRemoteEntry[], filter: SyncT
  * @param strategy 同步策略，默认 'add-update'
  * @returns 差异列表（按策略包含 add/update/delete，不含 unchanged）
  */
-export declare function computeDiff(remoteEntries: GithubRemoteEntry[], localEntries: Map<string, LocalRowEntry>, strategy?: SyncStrategy): GithubSyncDiff[];
+export declare function computeDiff(remoteEntries: GithubRemoteEntry[], localEntries: Map<string, LocalRowEntry>, strategy?: SyncStrategy, timeFilter?: SyncTimeFilter): GithubSyncDiff[];
 //# sourceMappingURL=githubSyncDiff.d.ts.map

@@ -190,6 +190,48 @@ export function filterByTime(entries, filter) {
     });
 }
 /**
+ * 检查日期字符串是否匹配时间筛选条件
+ *
+ * 用于 mirror 策略下判断本地条目是否在筛选范围内，
+ * 避免因远程数据被时间筛选过滤而导致本地条目被误删。
+ *
+ * @param dateStr 日期字符串（本地格式如"2015年12月15日"或远程格式"2015-12-15"）
+ * @param filter 时间筛选配置
+ * @returns true 表示在筛选范围内
+ */
+function matchTimeFilter(dateStr, filter) {
+    // 支持本地"YYYY年MM月DD日"格式和远程"YYYY-MM-DD"格式
+    const match = String(dateStr).match(/(\d{4})[-/.年](\d{1,2})/);
+    if (!match)
+        return false;
+    const yearStr = match[1];
+    const monthStr = match[2];
+    if (!yearStr || !monthStr)
+        return false;
+    const year = parseInt(yearStr, 10);
+    const month = parseInt(monthStr, 10);
+    if (isNaN(year) || isNaN(month))
+        return false;
+    switch (filter.range) {
+        case 'year':
+            return year === filter.year;
+        case 'quarter': {
+            const qMonths = QUARTER_MONTH_RANGES[filter.quarter ?? 1];
+            if (!qMonths)
+                return false;
+            if (!qMonths.includes(month))
+                return false;
+            if (month === 12)
+                return year === filter.year - 1;
+            return year === filter.year;
+        }
+        case 'month':
+            return year === filter.year && month === (filter.month ?? 1);
+        default:
+            return true;
+    }
+}
+/**
  * 计算远程条目与本地条目的差异（按指定策略）
  *
  * 比对规则（基础）：
@@ -212,7 +254,7 @@ export function filterByTime(entries, filter) {
  * @param strategy 同步策略，默认 'add-update'
  * @returns 差异列表（按策略包含 add/update/delete，不含 unchanged）
  */
-export function computeDiff(remoteEntries, localEntries, strategy = 'add-update') {
+export function computeDiff(remoteEntries, localEntries, strategy = 'add-update', timeFilter) {
     const diffs = [];
     const remoteSids = new Set();
     for (const remote of remoteEntries) {
@@ -288,6 +330,13 @@ export function computeDiff(remoteEntries, localEntries, strategy = 'add-update'
     if (strategy === 'mirror') {
         for (const [sid, local] of localEntries) {
             if (!remoteSids.has(sid)) {
+                // 时间筛选启用时：本地条目的开播日期不在筛选范围内的，跳过 delete
+                // 避免因时间筛选过滤了远程数据，导致本地其他时间段的数据被误删
+                if (timeFilter?.enabled && timeFilter.range !== 'all') {
+                    const localDate = local.fields['开播日期'];
+                    if (!localDate || !matchTimeFilter(localDate, timeFilter))
+                        continue;
+                }
                 diffs.push({
                     kind: 'delete',
                     sid,
