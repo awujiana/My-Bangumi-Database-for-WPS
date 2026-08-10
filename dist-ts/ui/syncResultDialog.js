@@ -118,7 +118,7 @@ function _clearEscHandler() {
 /**
  * 计算格式化耗时字符串
  */
-function formatDuration(ms) {
+export function formatDuration(ms) {
     if (ms < 1000)
         return `${ms}ms`;
     const seconds = Math.floor(ms / 1000);
@@ -134,7 +134,7 @@ function formatDuration(ms) {
  * @param options 同步结果选项
  */
 export function showSyncResultDialog(options) {
-    const { result, elapsedMs, avgSpeed, strategyLabel, stopped } = options;
+    const { result, elapsedMs, avgSpeed, strategyLabel, stopped, scrollToRow } = options;
     // 移除旧对话框
     if (_resultDialog) {
         _clearEscHandler();
@@ -209,12 +209,12 @@ export function showSyncResultDialog(options) {
       </div>`;
     }
     const content = `
-    <div class="bgm-modal-content" style="max-width: 560px; max-height: 80vh; display: flex; flex-direction: column;">
+    <div class="bgm-modal-content">
       <div class="bgm-dialog-header">
         <span class="bgm-dialog-icon bgm-icon-success">${icon}</span>
         <span class="bgm-dialog-title" id="bgmResultTitle">${title}</span>
       </div>
-      <div class="bgm-dialog-body" style="flex: 1; overflow-y: auto; margin-bottom: 12px;">
+      <div class="bgm-dialog-body">
         <div class="bgm-result-section">
           <div class="bgm-result-section-title">📊 数据统计</div>
           <div class="bgm-result-meta">
@@ -228,13 +228,13 @@ export function showSyncResultDialog(options) {
         <div class="bgm-result-section">
           <div class="bgm-result-section-title">📋 操作</div>
           <div class="bgm-result-actions">
-            <button id="bgmResultExportBtn" type="button" class="bgm-btn bgm-btn-primary" style="flex: 1;">📥 导出 JSONL</button>
-            <button id="bgmResultViewDetailsBtn" type="button" class="bgm-btn bgm-btn-default" style="flex: 1;">📄 查看详情</button>
+            <button id="bgmResultExportBtn" type="button" class="bgm-btn bgm-btn-primary">📥 导出 JSONL</button>
+            <button id="bgmResultViewDetailsBtn" type="button" class="bgm-btn bgm-btn-default">📄 查看详情</button>
           </div>
         </div>
       </div>
       <div class="bgm-dialog-footer">
-        <button id="bgmResultCloseBtn" type="button" class="bgm-btn bgm-btn-success" style="min-width: 120px;">确定</button>
+        <button id="bgmResultCloseBtn" type="button" class="bgm-btn bgm-btn-success">确定</button>
       </div>
     </div>`;
     modal.innerHTML = content;
@@ -273,7 +273,7 @@ export function showSyncResultDialog(options) {
         // 动态导入避免循环依赖
         import('../sync/syncRecord.js')
             .then(({ openSyncRecordSheet }) => {
-            openSyncRecordSheet();
+            openSyncRecordSheet(scrollToRow);
         })
             .catch(() => {
             bgmLog(LOG_LEVELS.WARN, '[syncResultDialog] 无法打开同步记录表');

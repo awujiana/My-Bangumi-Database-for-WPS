@@ -289,7 +289,7 @@ export { showConflictResolver } from './ui/conflictResolver.js';
 // ============================================================================
 // 20. 同步结果增强弹窗（来自 ui/syncResultDialog.js）
 // ============================================================================
-export { showSyncResultDialog, hideSyncResultDialog, computeDateStatsFromSheet, } from './ui/syncResultDialog.js';
+export { showSyncResultDialog, hideSyncResultDialog, computeDateStatsFromSheet, formatDuration, } from './ui/syncResultDialog.js';
 // ============================================================================
 // 21. JSONL 导出（来自 sync/exportJsonl.js）
 // ============================================================================

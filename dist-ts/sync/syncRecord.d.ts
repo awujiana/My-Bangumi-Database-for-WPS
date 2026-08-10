@@ -74,5 +74,5 @@ export declare function getAllSyncRecords(): SyncRecord[];
 export declare function deduplicateSyncRecords(): boolean;
 export declare function formatSyncRecordSheet(sheet?: WpsWorksheet): void;
 export declare function clearSyncRecords(): boolean;
-export declare function openSyncRecordSheet(): void;
+export declare function openSyncRecordSheet(scrollToRow?: number): void;
 //# sourceMappingURL=syncRecord.d.ts.map

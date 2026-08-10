@@ -32,6 +32,8 @@ export interface SyncResultDialogOptions {
     strategyLabel: string;
     /** 是否被用户停止 */
     stopped: boolean;
+    /** 查看详情时滚动到的目标行号（可选，默认跳转到最新记录） */
+    scrollToRow?: number;
 }
 /**
  * 从 Excel 工作表中计算开播日期统计
@@ -42,6 +44,10 @@ export interface SyncResultDialogOptions {
  * @returns 日期统计信息
  */
 export declare function computeDateStatsFromSheet(): DateStats;
+/**
+ * 计算格式化耗时字符串
+ */
+export declare function formatDuration(ms: number): string;
 /**
  * 显示同步完成增强结果弹窗
  *

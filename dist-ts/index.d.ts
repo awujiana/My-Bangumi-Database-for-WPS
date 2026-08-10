@@ -17,7 +17,7 @@ showSuccess, // 成功
 showInput, // 输入
 showToast, // Toast 通知
 showSyncResult, // 同步结果（可展开详情）
-showSyncProgressDialog, updateSyncProgressDialog, completeSyncProgressDialog, hideSyncProgressDialog, } from './ui/dialog.js';
+showSyncProgressDialog, updateSyncProgressDialog, completeSyncProgressDialog, type SyncProgressStats, hideSyncProgressDialog, } from './ui/dialog.js';
 export { type DialogButton, type DialogConfig, type DialogCallback, type DialogOptions, } from './ui/dialog.js';
 export { setStatus, initMessageListener, } from './ui/message.js';
 export { showUserIdDialog, updateTokenStatus, updateUserIdStatus, showTokenDialog, testDebugConnection, syncCollectionFromBgm, openUserCollection, removeMessageListener, clearAllPendingTimeouts, } from './ui/handlers.js';
@@ -128,6 +128,6 @@ export { isWpsApp, isWpsWorksheet, isWpsRange, wpsMsgBox, } from './tools/wps.js
 export type { BgmWindow, WpsApplication, WpsWorkbook, WpsWorksheets, WpsSheets, WpsWorksheet, WpsRows, WpsRow, WpsColumns, WpsRange, WpsAutoFilter, WpsFilters, WpsFilter, WpsInterior, WpsFont, WpsAreas, WpsPluginStorage, WpsOAAssist, WpsTaskPane, } from './tools/wps.js';
 export { detectConflicts, getSyncPreview, detectGithubConflicts, type Conflict, type ConflictResolution, } from './services/ribbonService.js';
 export { showConflictResolver } from './ui/conflictResolver.js';
-export { showSyncResultDialog, hideSyncResultDialog, computeDateStatsFromSheet, type DateStats, type SyncResultDialogOptions, } from './ui/syncResultDialog.js';
+export { showSyncResultDialog, hideSyncResultDialog, computeDateStatsFromSheet, formatDuration, type DateStats, type SyncResultDialogOptions, } from './ui/syncResultDialog.js';
 export { exportSheetToJsonlFile, buildJsonlFromSheet } from './sync/exportJsonl.js';
 //# sourceMappingURL=index.d.ts.map

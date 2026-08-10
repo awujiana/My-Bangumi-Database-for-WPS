@@ -49,8 +49,11 @@ import {
   buildRawUrl,
   showSyncProgressDialog,
   updateSyncProgressDialog,
+  completeSyncProgressDialog,
+  type SyncProgressStats,
   hideSyncProgressDialog,
   showSyncResultDialog,
+  formatDuration,
   type SyncStrategy,
   type SyncSourceType,
   type GithubSyncResult,
@@ -953,22 +956,54 @@ const ACTION_HANDLERS: Record<string, ActionHandler> = {
         )
           .then((result) => {
             const totalElapsed = Date.now() - syncStartTime
-            const totalProcessed = result.added + result.updated
+            const totalProcessed = result.added + result.updated + result.deleted
             const avgSpeed =
               totalProcessed > 0 && totalElapsed > 0
                 ? Math.round((totalProcessed / totalElapsed) * 1000)
                 : 0
 
-            showSyncResultDialog({
-              result,
+            const summary = `远程 ${result.remoteTotal} 条 → 新增 ${result.added}，更新 ${result.updated}，删除 ${result.deleted}，无变更 ${result.unchanged}，失败 ${result.failed}\n耗时 ${formatDuration(totalElapsed)}，平均 ${avgSpeed > 0 ? avgSpeed : '?'} 行/秒`
+            const details = [
+              `📥 远程数据总量: ${result.remoteTotal}`,
+              `➕ 新增: ${result.added}`,
+              `✏️ 更新: ${result.updated}`,
+              `🗑️ 删除: ${result.deleted}`,
+              `⏭️ 无变更: ${result.unchanged}`,
+              `❌ 失败: ${result.failed}`,
+              `⏱️ 总耗时: ${formatDuration(totalElapsed)}`,
+              `⚡ 平均速度: ${avgSpeed > 0 ? avgSpeed + ' 行/秒' : '--'}`,
+              `📊 处理条目: ${totalProcessed} 条`,
+            ]
+
+            const stats: SyncProgressStats = {
+              added: result.added,
+              updated: result.updated,
+              deleted: result.deleted,
+              unchanged: result.unchanged,
+              failed: result.failed,
               elapsedMs: totalElapsed,
               avgSpeed,
-              strategyLabel: strategyLabel ?? '未知策略',
-              stopped: false,
-            })
+            }
+
+            completeSyncProgressDialog(
+              summary,
+              details,
+              false,
+              () => {
+                showSyncResultDialog({
+                  result,
+                  elapsedMs: totalElapsed,
+                  avgSpeed,
+                  strategyLabel: strategyLabel ?? '未知策略',
+                  stopped: false,
+                })
+              },
+              stats,
+            )
+
             bgmLog(
               LOG_LEVELS.INFO,
-              `[handleActionClick] 数据同步完成: 远程 ${result.remoteTotal}，新增 ${result.added}，更新 ${result.updated}，删除 ${result.deleted}，无变更 ${result.unchanged}，失败 ${result.failed}`,
+              `[handleActionClick] 数据同步完成: 远程 ${result.remoteTotal}，新增 ${result.added}，更新 ${result.updated}，删除 ${result.deleted}，无变更 ${result.unchanged}，失败 ${result.failed}，耗时 ${formatDuration(totalElapsed)}，平均 ${avgSpeed > 0 ? avgSpeed : '?'} 行/秒`,
             )
             if (app?.StatusBar !== undefined) app.StatusBar = false
           })

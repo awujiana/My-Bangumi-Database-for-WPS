@@ -813,7 +813,7 @@ export function clearSyncRecords(): boolean {
   }
 }
 
-export function openSyncRecordSheet(): void {
+export function openSyncRecordSheet(scrollToRow?: number): void {
   try {
     const sheet = getSyncRecordSheetIfExists()
     if (!sheet) {
@@ -821,7 +821,20 @@ export function openSyncRecordSheet(): void {
       return
     }
     sheet.Activate()
-    bgmLog(LOG_LEVELS.INFO, '已切换到同步记录工作表')
+
+    // 定位到目标行（默认滚动到最后一行数据）
+    const targetRow = scrollToRow ?? getLastRow(sheet)
+    if (targetRow > 1) {
+      try {
+        const range = sheet.Range(`${targetRow}:${targetRow}`)
+        range.Select()
+        bgmLog(LOG_LEVELS.INFO, `已切换到同步记录工作表，定位到第 ${targetRow} 行`)
+      } catch {
+        bgmLog(LOG_LEVELS.INFO, '已切换到同步记录工作表')
+      }
+    } else {
+      bgmLog(LOG_LEVELS.INFO, '已切换到同步记录工作表（暂无数据）')
+    }
   } catch (e: unknown) {
     BGM.handleError(e, { context: 'openSyncRecordSheet', showAlert: false })
   }

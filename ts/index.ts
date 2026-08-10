@@ -112,6 +112,7 @@ export {
   showSyncProgressDialog,
   updateSyncProgressDialog,
   completeSyncProgressDialog,
+  type SyncProgressStats,
   hideSyncProgressDialog,
 } from './ui/dialog.js'
 
@@ -582,6 +583,7 @@ export {
   showSyncResultDialog,
   hideSyncResultDialog,
   computeDateStatsFromSheet,
+  formatDuration,
   type DateStats,
   type SyncResultDialogOptions,
 } from './ui/syncResultDialog.js'

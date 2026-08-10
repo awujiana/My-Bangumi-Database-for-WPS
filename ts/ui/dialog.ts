@@ -355,6 +355,8 @@ const _SYNC_PROGRESS_LOG_MAX = 500
 let _syncPauseHandler: (() => void) | null = null
 let _syncResumeHandler: (() => void) | null = null
 let _syncStopHandler: (() => void) | null = null
+/** 下一步按钮回调（点击后打开同步完成详情弹窗） */
+let _syncNextHandler: (() => void) | null = null
 
 /** 当前是否处于暂停状态（统一监听器据此决定调用 pause 还是 resume） */
 let _syncPaused = false
@@ -388,6 +390,7 @@ function _clearSyncProgressHandlers(): void {
   _syncPauseHandler = null
   _syncResumeHandler = null
   _syncStopHandler = null
+  _syncNextHandler = null
   _syncPaused = false
   // 移除 ESC 监听器，避免泄漏
   if (_syncProgressEscHandler) {
@@ -435,6 +438,7 @@ function ensureSyncProgressDialog(): HTMLElement {
                 <!-- 完成结果区（默认隐藏） -->
                 <div id="bgmSyncProgressResult" style="display: none;">
                     <div id="bgmSyncProgressSummary" class="bgm-dialog-message bgm-sync-progress__result-summary"></div>
+                    <div id="bgmSyncProgressChart" class="bgm-sync-progress__chart"></div>
                     <div id="bgmSyncProgressDetails" class="bgm-sync-progress__result-details"></div>
                 </div>
             </div>
@@ -447,7 +451,8 @@ function ensureSyncProgressDialog(): HTMLElement {
                 <!-- 完成按钮（默认隐藏） -->
                 <div id="bgmSyncProgressDoneBtns" class="bgm-sync-progress__done-btns" style="display: none;">
                     <button id="bgmSyncProgressToggleDetails" type="button" class="bgm-btn bgm-btn-default" aria-label="显示详情">显示详情</button>
-                    <button id="bgmSyncProgressClose" type="button" class="bgm-btn bgm-btn-success" aria-label="关闭弹窗">确定</button>
+                    <button id="bgmSyncProgressClose" type="button" class="bgm-btn bgm-btn-default" aria-label="关闭弹窗">关闭</button>
+                    <button id="bgmSyncProgressNext" type="button" class="bgm-btn bgm-btn-primary" aria-label="下一步">下一步 →</button>
                 </div>
             </div>
         </div>
@@ -459,6 +464,7 @@ function ensureSyncProgressDialog(): HTMLElement {
   const pauseBtn = modal.querySelector('#bgmSyncProgressPauseBtn') as HTMLButtonElement | null
   const stopBtn = modal.querySelector('#bgmSyncProgressStop') as HTMLButtonElement | null
   const closeBtn = modal.querySelector('#bgmSyncProgressClose') as HTMLButtonElement | null
+  const nextBtn = modal.querySelector('#bgmSyncProgressNext') as HTMLButtonElement | null
   const toggleDetailsBtn = modal.querySelector(
     '#bgmSyncProgressToggleDetails',
   ) as HTMLButtonElement | null
@@ -487,6 +493,13 @@ function ensureSyncProgressDialog(): HTMLElement {
   if (closeBtn) {
     closeBtn.addEventListener('click', (): void => {
       hideSyncProgressDialog()
+    })
+  }
+  // 下一步按钮
+  if (nextBtn) {
+    nextBtn.addEventListener('click', (): void => {
+      hideSyncProgressDialog()
+      _syncNextHandler?.()
     })
   }
   // 详情切换按钮
@@ -642,15 +655,129 @@ export function updateSyncProgressDialog(
 }
 
 /**
+ * 同步统计数据接口
+ */
+export interface SyncProgressStats {
+  added: number
+  updated: number
+  deleted: number
+  unchanged: number
+  failed: number
+  elapsedMs: number
+  avgSpeed: number
+}
+
+/**
+ * 渲染同步统计图表（SVG 实现，无需外部依赖）
+ * @param container 图表容器元素
+ * @param stats 同步统计数据
+ */
+function renderSyncStatsChart(container: HTMLElement, stats: SyncProgressStats): void {
+  const total = stats.added + stats.updated + stats.deleted + stats.unchanged + stats.failed
+  const elapsedSec =
+    stats.elapsedMs < 1000 ? `${stats.elapsedMs}ms` : `${(stats.elapsedMs / 1000).toFixed(1)}s`
+
+  // 百分比计算（以 total 为基数，避免为 0）
+  const denom = Math.max(total, 1)
+  const pct = (n: number): string => ((n / denom) * 100).toFixed(1)
+
+  // 统计卡片 HTML（带颜色条）
+  const statCards: Array<{ label: string; value: number; color: string; icon: string }> = [
+    { label: '新增', value: stats.added, color: '#22c55e', icon: '➕' },
+    { label: '更新', value: stats.updated, color: '#3b82f6', icon: '✏️' },
+    { label: '删除', value: stats.deleted, color: '#f59e0b', icon: '🗑️' },
+    { label: '无变更', value: stats.unchanged, color: '#6b7280', icon: '⏭️' },
+  ]
+
+  const failedPct = pct(stats.failed)
+  const barMax = Math.max(stats.added, stats.updated, stats.deleted, stats.unchanged, 1)
+
+  // 构建 SVG 柱状图
+  const barWidth = 36
+  const barGap = 16
+  const chartHeight = 120
+  const chartPadding = 20
+  const barsTotalWidth = statCards.length * (barWidth + barGap) - barGap
+  const chartWidth = Math.max(barsTotalWidth + chartPadding * 2, 320)
+
+  const barsSvg = statCards
+    .map((s, i) => {
+      const barH = Math.max(
+        s.value > 0 ? (s.value / barMax) * (chartHeight - chartPadding * 2) : 2,
+        2,
+      )
+      const x = chartPadding + i * (barWidth + barGap)
+      const y = chartHeight - chartPadding - barH
+      const displayVal = s.value >= 10000 ? `${(s.value / 1000).toFixed(1)}k` : String(s.value)
+      return `
+        <g>
+          <rect x="${x}" y="${chartHeight - chartPadding}" width="${barWidth}" height="${chartPadding}" fill="rgba(255,255,255,0.03)" rx="3"/>
+          <rect x="${x}" y="${y}" width="${barWidth}" height="${barH}" fill="${s.color}" rx="4" opacity="0.9">
+            <animate attributeName="height" from="0" to="${barH}" dur="0.5s" fill="freeze"/>
+            <animate attributeName="y" from="${chartHeight - chartPadding}" to="${y}" dur="0.5s" fill="freeze"/>
+          </rect>
+          <text x="${x + barWidth / 2}" y="${y - 4}" text-anchor="middle" fill="#e2e8f0" font-size="13" font-weight="600">${displayVal}</text>
+          <text x="${x + barWidth / 2}" y="${chartHeight - 4}" text-anchor="middle" fill="#94a3b8" font-size="11">${s.label}</text>
+        </g>
+      `
+    })
+    .join('')
+
+  // 统计卡片
+  const statCardsHtml = statCards
+    .map(
+      (s) => `
+      <div class="bgm-stat-card" style="--accent:${s.color}">
+        <div class="bgm-stat-card__icon">${s.icon}</div>
+        <div class="bgm-stat-card__info">
+          <div class="bgm-stat-card__value">${s.value.toLocaleString()}</div>
+          <div class="bgm-stat-card__label">${s.label}</div>
+        </div>
+        <div class="bgm-stat-card__bar" style="width:${pct(s.value)}%;background:${s.color}"></div>
+      </div>
+    `,
+    )
+    .join('')
+
+  const failedBadge =
+    stats.failed > 0
+      ? `<div class="bgm-stat-badge bgm-stat-badge--error">❌ 失败 ${stats.failed} (${failedPct}%)</div>`
+      : ''
+
+  container.innerHTML = `
+    <div class="bgm-stats-header">
+      <div class="bgm-stats-title">📊 同步统计</div>
+      <div class="bgm-stats-meta">
+        <span class="bgm-stats-chip">⏱️ ${elapsedSec}</span>
+        <span class="bgm-stats-chip">⚡ ${stats.avgSpeed > 0 ? stats.avgSpeed + ' 行/秒' : '--'}</span>
+        <span class="bgm-stats-chip">📈 共处理 ${total.toLocaleString()} 条</span>
+      </div>
+    </div>
+    <div class="bgm-stat-cards">${statCardsHtml}</div>
+    ${failedBadge}
+    <div class="bgm-stats-chart-wrap">
+      <svg viewBox="0 0 ${chartWidth} ${chartHeight}" class="bgm-stats-chart" preserveAspectRatio="xMidYMid meet">
+        <line x1="${chartPadding}" y1="${chartHeight - chartPadding}" x2="${chartWidth - chartPadding}" y2="${chartHeight - chartPadding}" stroke="rgba(255,255,255,0.1)" stroke-width="1"/>
+        ${barsSvg}
+      </svg>
+    </div>
+  `
+}
+
+/**
  * 切换弹窗为完成状态，显示统计结果
  * @param summary 统计摘要文本
  * @param details 详情数组
  * @param stopped 是否被用户停止
+ * @param onNext 点击"下一步"时的回调（用于打开同步完成详情弹窗）
+ * @param stats 同步统计数据（用于渲染图表）
  */
 export function completeSyncProgressDialog(
   summary: string,
   details: string[],
   stopped: boolean = false,
+  onNext?: () => void,
+  stats?: SyncProgressStats,
 ): void {
   const modal = ensureSyncProgressDialog()
   const titleEl = modal.querySelector('#bgmSyncProgressTitle') as HTMLElement | null
@@ -658,8 +785,10 @@ export function completeSyncProgressDialog(
   const progressSection = modal.querySelector('#bgmSyncProgressSection') as HTMLElement | null
   const resultSection = modal.querySelector('#bgmSyncProgressResult') as HTMLElement | null
   const summaryEl = modal.querySelector('#bgmSyncProgressSummary') as HTMLElement | null
+  const chartEl = modal.querySelector('#bgmSyncProgressChart') as HTMLElement | null
   const detailsEl = modal.querySelector('#bgmSyncProgressDetails') as HTMLElement | null
   const toggleBtn = modal.querySelector('#bgmSyncProgressToggleDetails') as HTMLButtonElement | null
+  const nextBtn = modal.querySelector('#bgmSyncProgressNext') as HTMLButtonElement | null
   const runningBtns = modal.querySelector('#bgmSyncProgressRunningBtns') as HTMLElement | null
   const doneBtns = modal.querySelector('#bgmSyncProgressDoneBtns') as HTMLElement | null
 
@@ -671,6 +800,15 @@ export function completeSyncProgressDialog(
   if (doneBtns) doneBtns.style.display = 'flex'
 
   if (summaryEl) summaryEl.textContent = summary
+
+  // 渲染统计图表
+  if (chartEl && stats && !stopped) {
+    chartEl.style.display = ''
+    renderSyncStatsChart(chartEl, stats)
+  } else if (chartEl) {
+    chartEl.style.display = 'none'
+  }
+
   if (detailsEl) {
     detailsEl.textContent = details.length > 0 ? details.join('\n') : '无详情'
     detailsEl.style.display = 'none'
@@ -681,8 +819,20 @@ export function completeSyncProgressDialog(
     toggleBtn.style.display = details.length > 0 ? '' : 'none'
   }
 
+  // 下一步按钮：仅当提供 onNext 回调时显示
+  if (nextBtn) {
+    if (onNext) {
+      nextBtn.style.display = ''
+      _syncNextHandler = onNext
+    } else {
+      nextBtn.style.display = 'none'
+    }
+  }
+
   // 清理运行态回调（保留弹窗可见，供用户查看结果）
   _clearSyncProgressHandlers()
+  // 恢复下一步回调（_clearSyncProgressHandlers 会清空，需重新设置）
+  if (onNext) _syncNextHandler = onNext
 
   // 完成状态下支持 ESC 关闭
   _syncProgressEscHandler = (e: KeyboardEvent): void => {
@@ -692,9 +842,11 @@ export function completeSyncProgressDialog(
   }
   document.addEventListener('keydown', _syncProgressEscHandler)
 
-  // 焦点切换到关闭按钮，便于键盘用户立即操作
-  const closeBtn = modal.querySelector('#bgmSyncProgressClose') as HTMLButtonElement | null
-  closeBtn?.focus()
+  // 焦点切换到下一步按钮或关闭按钮，便于键盘用户立即操作
+  const focusTarget = onNext
+    ? (modal.querySelector('#bgmSyncProgressNext') as HTMLButtonElement | null)
+    : (modal.querySelector('#bgmSyncProgressClose') as HTMLButtonElement | null)
+  focusTarget?.focus()
 }
 
 /** 隐藏同步进度弹窗 */

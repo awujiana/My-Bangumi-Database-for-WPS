@@ -51,6 +51,8 @@ export interface SyncResultDialogOptions {
   strategyLabel: string
   /** 是否被用户停止 */
   stopped: boolean
+  /** 查看详情时滚动到的目标行号（可选，默认跳转到最新记录） */
+  scrollToRow?: number
 }
 
 // ========== 日期统计计算 ==========
@@ -167,7 +169,7 @@ function _clearEscHandler(): void {
 /**
  * 计算格式化耗时字符串
  */
-function formatDuration(ms: number): string {
+export function formatDuration(ms: number): string {
   if (ms < 1000) return `${ms}ms`
   const seconds = Math.floor(ms / 1000)
   if (seconds < 60) return `${seconds}秒`
@@ -182,7 +184,7 @@ function formatDuration(ms: number): string {
  * @param options 同步结果选项
  */
 export function showSyncResultDialog(options: SyncResultDialogOptions): void {
-  const { result, elapsedMs, avgSpeed, strategyLabel, stopped } = options
+  const { result, elapsedMs, avgSpeed, strategyLabel, stopped, scrollToRow } = options
 
   // 移除旧对话框
   if (_resultDialog) {
@@ -265,12 +267,12 @@ export function showSyncResultDialog(options: SyncResultDialogOptions): void {
   }
 
   const content = `
-    <div class="bgm-modal-content" style="max-width: 560px; max-height: 80vh; display: flex; flex-direction: column;">
+    <div class="bgm-modal-content">
       <div class="bgm-dialog-header">
         <span class="bgm-dialog-icon bgm-icon-success">${icon}</span>
         <span class="bgm-dialog-title" id="bgmResultTitle">${title}</span>
       </div>
-      <div class="bgm-dialog-body" style="flex: 1; overflow-y: auto; margin-bottom: 12px;">
+      <div class="bgm-dialog-body">
         <div class="bgm-result-section">
           <div class="bgm-result-section-title">📊 数据统计</div>
           <div class="bgm-result-meta">
@@ -284,13 +286,13 @@ export function showSyncResultDialog(options: SyncResultDialogOptions): void {
         <div class="bgm-result-section">
           <div class="bgm-result-section-title">📋 操作</div>
           <div class="bgm-result-actions">
-            <button id="bgmResultExportBtn" type="button" class="bgm-btn bgm-btn-primary" style="flex: 1;">📥 导出 JSONL</button>
-            <button id="bgmResultViewDetailsBtn" type="button" class="bgm-btn bgm-btn-default" style="flex: 1;">📄 查看详情</button>
+            <button id="bgmResultExportBtn" type="button" class="bgm-btn bgm-btn-primary">📥 导出 JSONL</button>
+            <button id="bgmResultViewDetailsBtn" type="button" class="bgm-btn bgm-btn-default">📄 查看详情</button>
           </div>
         </div>
       </div>
       <div class="bgm-dialog-footer">
-        <button id="bgmResultCloseBtn" type="button" class="bgm-btn bgm-btn-success" style="min-width: 120px;">确定</button>
+        <button id="bgmResultCloseBtn" type="button" class="bgm-btn bgm-btn-success">确定</button>
       </div>
     </div>`
 
@@ -330,7 +332,7 @@ export function showSyncResultDialog(options: SyncResultDialogOptions): void {
     // 动态导入避免循环依赖
     import('../sync/syncRecord.js')
       .then(({ openSyncRecordSheet }) => {
-        openSyncRecordSheet()
+        openSyncRecordSheet(scrollToRow)
       })
       .catch(() => {
         bgmLog(LOG_LEVELS.WARN, '[syncResultDialog] 无法打开同步记录表')

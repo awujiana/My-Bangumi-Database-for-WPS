@@ -1105,9 +1105,12 @@ export async function syncFromGithub(onProgress, strategy = 'add-update', signal
         throw new Error(errMsg);
     }
     // 使用 total=1 避免进度条显示"0/0"带来的困惑
+    const syncStartTs = Date.now();
     onProgress?.(0, 1, `开始下载远程数据（${source.getDisplayName()} - 策略：${strategy}）...`);
+    const downloadStartTs = Date.now();
     const remoteEntries = await source.fetchRemoteEntries(signal);
-    onProgress?.(1, 3, `下载完成：${remoteEntries.length} 条`);
+    const downloadElapsed = Date.now() - downloadStartTs;
+    onProgress?.(1, 3, `下载完成：${remoteEntries.length} 条（耗时 ${formatDuration(downloadElapsed)}）`);
     // 关闭屏幕刷新，减少 COM 调用开销（ensureSheetHeaders / readLocalEntriesForSync 等 COM 操作）
     const app = getApp();
     let prevScreenUpdating;
@@ -1156,7 +1159,9 @@ export async function syncFromGithub(onProgress, strategy = 'add-update', signal
             throw new Error('无法读取本地工作表数据');
         }
         onProgress?.(2, 3, '比对差异中...');
+        const diffStartTs = Date.now();
         const diffs = computeDiff(effectiveRemoteEntries, local.entries, strategy, timeFilter);
+        const diffElapsed = Date.now() - diffStartTs;
         // 应用用户冲突解决决策：过滤掉用户选择「本地」的字段
         if (conflictResolution && conflictResolution.length > 0) {
             applyConflictResolutions(diffs, conflictResolution);
@@ -1165,12 +1170,16 @@ export async function syncFromGithub(onProgress, strategy = 'add-update', signal
         const addCount = diffs.filter((d) => d.kind === 'add').length;
         const updateCount = diffs.filter((d) => d.kind === 'update').length;
         const deleteCount = diffs.filter((d) => d.kind === 'delete').length;
-        bgmLog(LOG_LEVELS.INFO, `[githubSync] diff 完成（${strategy}）：新增 ${addCount}，更新 ${updateCount}，删除 ${deleteCount}`);
+        bgmLog(LOG_LEVELS.INFO, `[githubSync] diff 完成（${strategy}）：新增 ${addCount}，更新 ${updateCount}，删除 ${deleteCount}，耗时 ${formatDuration(diffElapsed)}`);
         const result = await applyDiffToSheet(diffs, strategy, onProgress, source.getDisplayName());
         result.remoteTotal = effectiveRemoteEntries.length;
         // unchanged = 远程总数 - (新增+更新)（delete 不计入 unchanged）
         result.unchanged = Math.max(0, effectiveRemoteEntries.length - addCount - updateCount);
-        onProgress?.(3, 3, `完成：新增 ${result.added}，更新 ${result.updated}，删除 ${result.deleted}`);
+        const totalElapsed = Date.now() - syncStartTs;
+        const totalProcessed = addCount + updateCount + deleteCount;
+        const overallSpeed = totalProcessed > 0 && totalElapsed > 0 ? Math.round((totalProcessed / totalElapsed) * 1000) : 0;
+        onProgress?.(3, 3, `完成：新增 ${result.added}，更新 ${result.updated}，删除 ${result.deleted}（总耗时 ${formatDuration(totalElapsed)}，${overallSpeed > 0 ? overallSpeed : '?'} 行/秒）`);
+        bgmLog(LOG_LEVELS.INFO, `[githubSync] 同步完成：下载 ${formatDuration(downloadElapsed)}，diff ${formatDuration(diffElapsed)}，应用耗时已计入，总耗时 ${formatDuration(totalElapsed)}，处理 ${totalProcessed} 条，平均 ${overallSpeed > 0 ? overallSpeed : '?'} 行/秒`);
         return result;
     }
     finally {

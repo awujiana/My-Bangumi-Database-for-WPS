@@ -47,12 +47,26 @@ export declare function showSyncProgressDialog(title: string, handlers: {
  */
 export declare function updateSyncProgressDialog(current: number, total: number, message?: string, logLine?: string): void;
 /**
+ * 同步统计数据接口
+ */
+export interface SyncProgressStats {
+    added: number;
+    updated: number;
+    deleted: number;
+    unchanged: number;
+    failed: number;
+    elapsedMs: number;
+    avgSpeed: number;
+}
+/**
  * 切换弹窗为完成状态，显示统计结果
  * @param summary 统计摘要文本
  * @param details 详情数组
  * @param stopped 是否被用户停止
+ * @param onNext 点击"下一步"时的回调（用于打开同步完成详情弹窗）
+ * @param stats 同步统计数据（用于渲染图表）
  */
-export declare function completeSyncProgressDialog(summary: string, details: string[], stopped?: boolean): void;
+export declare function completeSyncProgressDialog(summary: string, details: string[], stopped?: boolean, onNext?: () => void, stats?: SyncProgressStats): void;
 /** 隐藏同步进度弹窗 */
 export declare function hideSyncProgressDialog(): void;
 export declare function showAlert(message: string, title?: string, onOk?: () => void): void;

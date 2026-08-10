@@ -4,7 +4,7 @@
  * @description 资源追踪、按钮监听、ACTION_HANDLERS 分发、消息监听、事件总线监听、
  *              配置 UI 回填等。同时 re-export 子模块的公开 API，保持原 handlers.ts 的外部接口。
  */
-import { LOG_LEVELS, bgmLog, BGM, loadBgToken, clearBgToken, copyTokenToClipboard, _setBgmUserId, _setBgmUsername, getApp, showAlert, showConfirm, showInput, showToast, refreshData, refreshSheets, refreshWorkbooks, toggleSheetLock, enlargePreview, clearSyncRecords, deduplicateSyncRecords, formatSyncRecordSheet, openSyncRecordSheet, closeDetailModal, previewSyncContent, syncSelectedRows, openBangumiTokenPage, setSyncRecordEnabled, getSyncRecordEnabled, getIncrementalSync, setIncrementalSync, getSkipConflicts, setSkipConflicts, getGithubConfig, setGithubConfig, isGithubConfigComplete, getSyncStrategy, setSyncStrategy, getSyncSourceType, setSyncSourceType, syncFromRemote, buildRawUrl, showSyncProgressDialog, updateSyncProgressDialog, hideSyncProgressDialog, showSyncResultDialog, } from '../../index.js';
+import { LOG_LEVELS, bgmLog, BGM, loadBgToken, clearBgToken, copyTokenToClipboard, _setBgmUserId, _setBgmUsername, getApp, showAlert, showConfirm, showInput, showToast, refreshData, refreshSheets, refreshWorkbooks, toggleSheetLock, enlargePreview, clearSyncRecords, deduplicateSyncRecords, formatSyncRecordSheet, openSyncRecordSheet, closeDetailModal, previewSyncContent, syncSelectedRows, openBangumiTokenPage, setSyncRecordEnabled, getSyncRecordEnabled, getIncrementalSync, setIncrementalSync, getSkipConflicts, setSkipConflicts, getGithubConfig, setGithubConfig, isGithubConfigComplete, getSyncStrategy, setSyncStrategy, getSyncSourceType, setSyncSourceType, syncFromRemote, buildRawUrl, showSyncProgressDialog, updateSyncProgressDialog, completeSyncProgressDialog, hideSyncProgressDialog, showSyncResultDialog, formatDuration, } from '../../index.js';
 import { exportConfig, importConfig } from '../../services/configService.js';
 import { undoLastSyncForRibbon } from '../../services/ribbonService.js';
 import { debounce } from '../../tools/debounce.js';
@@ -716,18 +716,41 @@ const ACTION_HANDLERS = {
             timeFilter)
                 .then((result) => {
                 const totalElapsed = Date.now() - syncStartTime;
-                const totalProcessed = result.added + result.updated;
+                const totalProcessed = result.added + result.updated + result.deleted;
                 const avgSpeed = totalProcessed > 0 && totalElapsed > 0
                     ? Math.round((totalProcessed / totalElapsed) * 1000)
                     : 0;
-                showSyncResultDialog({
-                    result,
+                const summary = `远程 ${result.remoteTotal} 条 → 新增 ${result.added}，更新 ${result.updated}，删除 ${result.deleted}，无变更 ${result.unchanged}，失败 ${result.failed}\n耗时 ${formatDuration(totalElapsed)}，平均 ${avgSpeed > 0 ? avgSpeed : '?'} 行/秒`;
+                const details = [
+                    `📥 远程数据总量: ${result.remoteTotal}`,
+                    `➕ 新增: ${result.added}`,
+                    `✏️ 更新: ${result.updated}`,
+                    `🗑️ 删除: ${result.deleted}`,
+                    `⏭️ 无变更: ${result.unchanged}`,
+                    `❌ 失败: ${result.failed}`,
+                    `⏱️ 总耗时: ${formatDuration(totalElapsed)}`,
+                    `⚡ 平均速度: ${avgSpeed > 0 ? avgSpeed + ' 行/秒' : '--'}`,
+                    `📊 处理条目: ${totalProcessed} 条`,
+                ];
+                const stats = {
+                    added: result.added,
+                    updated: result.updated,
+                    deleted: result.deleted,
+                    unchanged: result.unchanged,
+                    failed: result.failed,
                     elapsedMs: totalElapsed,
                     avgSpeed,
-                    strategyLabel: strategyLabel ?? '未知策略',
-                    stopped: false,
-                });
-                bgmLog(LOG_LEVELS.INFO, `[handleActionClick] 数据同步完成: 远程 ${result.remoteTotal}，新增 ${result.added}，更新 ${result.updated}，删除 ${result.deleted}，无变更 ${result.unchanged}，失败 ${result.failed}`);
+                };
+                completeSyncProgressDialog(summary, details, false, () => {
+                    showSyncResultDialog({
+                        result,
+                        elapsedMs: totalElapsed,
+                        avgSpeed,
+                        strategyLabel: strategyLabel ?? '未知策略',
+                        stopped: false,
+                    });
+                }, stats);
+                bgmLog(LOG_LEVELS.INFO, `[handleActionClick] 数据同步完成: 远程 ${result.remoteTotal}，新增 ${result.added}，更新 ${result.updated}，删除 ${result.deleted}，无变更 ${result.unchanged}，失败 ${result.failed}，耗时 ${formatDuration(totalElapsed)}，平均 ${avgSpeed > 0 ? avgSpeed : '?'} 行/秒`);
                 if (app?.StatusBar !== undefined)
                     app.StatusBar = false;
             })
