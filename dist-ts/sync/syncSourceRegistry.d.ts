@@ -10,7 +10,7 @@
  *   从而打破 githubSync.ts ↔ syncSourceRegistry.ts 的循环依赖。
  */
 import { type GithubSyncResult, type SyncStrategy } from './githubSync.js';
-import { type ConflictResolution } from './githubSyncDiff.js';
+import { type ConflictResolution, type SyncTimeFilter } from './githubSyncDiff.js';
 import type { SyncSource } from './SyncSource.js';
 /** 同步源工厂函数：每次调用返回新实例，避免实例间状态共享 */
 type SyncSourceFactory = () => SyncSource;
@@ -50,6 +50,6 @@ export declare function isSyncSourceRegistered(type: string): boolean;
  * @returns 同步结果统计
  * @throws 配置错误、网络错误、解析错误、未知 sourceType 时抛出
  */
-export declare function syncFromRemote(onProgress?: (current: number, total: number, message: string, eta?: string) => void, strategy?: SyncStrategy, signal?: AbortSignal, selectedRowsOnly?: boolean, conflictResolution?: ConflictResolution[]): Promise<GithubSyncResult>;
+export declare function syncFromRemote(onProgress?: (current: number, total: number, message: string, eta?: string) => void, strategy?: SyncStrategy, signal?: AbortSignal, selectedRowsOnly?: boolean, conflictResolution?: ConflictResolution[], timeFilter?: SyncTimeFilter): Promise<GithubSyncResult>;
 export {};
 //# sourceMappingURL=syncSourceRegistry.d.ts.map

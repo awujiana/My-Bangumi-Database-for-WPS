@@ -15,6 +15,7 @@ import { GistSyncSource } from './gistSync.js';
 import { GiteeSyncSource } from './giteeSync.js';
 import { getSyncSourceType } from './githubConfig.js';
 import { applyConflictResolutions, applyDiffToSheet, computeDiff, GithubSyncSource, readLocalEntriesForSync, } from './githubSync.js';
+import { filterByTime } from './githubSyncDiff.js';
 import { GitlabSyncSource } from './gitlabSync.js';
 import { LocalFileSyncSource } from './localFileSync.js';
 import { extractSubjectId } from './pureUtils.js';
@@ -67,7 +68,7 @@ export function isSyncSourceRegistered(type) {
  * @returns 同步结果统计
  * @throws 配置错误、网络错误、解析错误、未知 sourceType 时抛出
  */
-export async function syncFromRemote(onProgress, strategy = 'add-update', signal, selectedRowsOnly, conflictResolution) {
+export async function syncFromRemote(onProgress, strategy = 'add-update', signal, selectedRowsOnly, conflictResolution, timeFilter) {
     // 1. 按 sourceType 从注册表获取 SyncSource 实例
     const sourceType = getSyncSourceType();
     const source = getSyncSource(sourceType);
@@ -120,6 +121,13 @@ export async function syncFromRemote(onProgress, strategy = 'add-update', signal
             effectiveRemoteEntries = remoteEntries.filter((e) => selectedSids.has(e.sid));
             bgmLog(LOG_LEVELS.INFO, `[syncFromRemote] 仅同步选中行：选中 ${selectedSids.size} 个 SID，匹配远程 ${effectiveRemoteEntries.length} 条`);
             onProgress?.(1, 3, `选中 ${selectedSids.size} 行，匹配远程 ${effectiveRemoteEntries.length} 条`);
+        }
+        // 3.7 时间筛选：按年份/季度/月份过滤远程条目
+        if (timeFilter?.enabled && timeFilter.range !== 'all') {
+            const beforeCount = effectiveRemoteEntries.length;
+            effectiveRemoteEntries = filterByTime(effectiveRemoteEntries, timeFilter);
+            bgmLog(LOG_LEVELS.INFO, `[syncFromRemote] 时间筛选（${timeFilter.range}）：${beforeCount} → ${effectiveRemoteEntries.length} 条`);
+            onProgress?.(1, 3, `时间筛选：${timeFilter.range === 'year' ? `${timeFilter.year}年` : timeFilter.range === 'quarter' ? `${timeFilter.year}年${timeFilter.quarter}月新番` : `${timeFilter.year}年${timeFilter.month}月`}，匹配 ${effectiveRemoteEntries.length} 条`);
         }
         const local = readLocalEntriesForSync();
         if (!local) {

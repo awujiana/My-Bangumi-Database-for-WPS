@@ -284,3 +284,11 @@ export { detectConflicts, getSyncPreview, detectGithubConflicts, } from './servi
 // 19. 冲突解决 UI（来自 ui/conflictResolver.js）
 // ============================================================================
 export { showConflictResolver } from './ui/conflictResolver.js';
+// ============================================================================
+// 20. 同步结果增强弹窗（来自 ui/syncResultDialog.js）
+// ============================================================================
+export { showSyncResultDialog, hideSyncResultDialog, computeDateStatsFromSheet, } from './ui/syncResultDialog.js';
+// ============================================================================
+// 21. JSONL 导出（来自 sync/exportJsonl.js）
+// ============================================================================
+export { exportSheetToJsonlFile, buildJsonlFromSheet } from './sync/exportJsonl.js';

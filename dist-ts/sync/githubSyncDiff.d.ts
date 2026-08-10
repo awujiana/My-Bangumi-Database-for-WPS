@@ -145,6 +145,44 @@ export declare function parseJsonl(text: string): {
     }>;
 };
 /**
+ * 同步时间筛选配置
+ *
+ * 支持三种筛选模式：
+ * - 'all': 不过滤（全部同步）
+ * - 'year': 按年份筛选（如 2026 年所有动漫）
+ * - 'quarter': 按季度筛选（如 2026 年 4 月新番）
+ * - 'month': 按月份筛选（如 2025 年 1 月）
+ */
+export interface SyncTimeFilter {
+    /** 是否启用时间筛选 */
+    enabled: boolean;
+    /** 目标年份 */
+    year: number;
+    /** 筛选范围 */
+    range: 'all' | 'year' | 'quarter' | 'month';
+    /** 季度值（仅 range='quarter' 时有效）：1 | 4 | 7 | 10 */
+    quarter?: 1 | 4 | 7 | 10;
+    /** 月份值（仅 range='month' 时有效）：1-12 */
+    month?: number;
+}
+/**
+ * 按时间筛选远程条目
+ *
+ * 根据 {@link SyncTimeFilter} 配置，基于远程条目的 `date` 字段（开播日期）
+ * 进行年份/季度/月份筛选。日期格式支持 YYYY-MM-DD、YYYY/MM/DD、YYYY.MM.DD 等。
+ *
+ * 季度规则：
+ * - 1月新番（Q1）：上年12月 + 本年1月 + 本年2月
+ * - 4月新番（Q2）：3月 + 4月 + 5月
+ * - 7月新番（Q3）：6月 + 7月 + 8月
+ * - 10月新番（Q4）：9月 + 10月 + 11月
+ *
+ * @param entries 远程条目数组
+ * @param filter 时间筛选配置
+ * @returns 筛选后的条目数组
+ */
+export declare function filterByTime(entries: GithubRemoteEntry[], filter: SyncTimeFilter): GithubRemoteEntry[];
+/**
  * 计算远程条目与本地条目的差异（按指定策略）
  *
  * 比对规则（基础）：

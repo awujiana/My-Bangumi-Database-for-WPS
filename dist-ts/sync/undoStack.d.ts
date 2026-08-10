@@ -57,6 +57,8 @@ export declare function endUndoSession(): void;
  * 1. 先逆序恢复所有单元格变更；
  * 2. 再按行号从大到小恢复被删除的行（避免先行插入导致后续行号偏移）。
  *
+ * 性能优化：缓存工作表引用，避免每次恢复都调用 getDataSheet()（COM 跨进程调用 + 日志输出）。
+ *
  * @returns 恢复的条目数，若无可撤销会话返回 0
  */
 export declare function undoLastSync(): number;

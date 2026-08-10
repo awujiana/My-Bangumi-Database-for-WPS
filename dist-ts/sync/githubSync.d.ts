@@ -14,9 +14,9 @@
  * updatedAt 为 YYYY-MM-DD 格式（仅日期，不含时间，节省空间）。
  */
 import { Result } from '../core/result.js';
-import { type ConflictResolution, type GithubRemoteEntry, type GithubSyncDiff, type LocalRowEntry, type SyncStrategy } from './githubSyncDiff.js';
+import { type ConflictResolution, type GithubRemoteEntry, type GithubSyncDiff, type LocalRowEntry, type SyncStrategy, type SyncTimeFilter } from './githubSyncDiff.js';
 import type { SyncSource } from './SyncSource.js';
-export { computeDiff, tagsToString, parseJsonl, isGithubRemoteEntry, SYNC_STRATEGY_LABELS, EXTENDED_FIELD_MAP, type GithubRemoteEntry, type GithubSyncDiff, type LocalRowEntry, type SyncStrategy, } from './githubSyncDiff.js';
+export { computeDiff, tagsToString, parseJsonl, isGithubRemoteEntry, filterByTime, SYNC_STRATEGY_LABELS, EXTENDED_FIELD_MAP, type GithubRemoteEntry, type GithubSyncDiff, type LocalRowEntry, type SyncStrategy, type SyncTimeFilter, } from './githubSyncDiff.js';
 /** 同步结果统计 */
 export interface GithubSyncResult {
     /** 远程总条目数 */
@@ -123,5 +123,5 @@ export declare function applyConflictResolutions(diffs: GithubSyncDiff[], resolu
  * @returns 同步结果统计
  * @throws 配置错误、网络错误、解析错误时抛出
  */
-export declare function syncFromGithub(onProgress?: (current: number, total: number, message: string, eta?: string) => void, strategy?: SyncStrategy, signal?: AbortSignal, conflictResolution?: ConflictResolution[], selectedRowsOnly?: boolean): Promise<GithubSyncResult>;
+export declare function syncFromGithub(onProgress?: (current: number, total: number, message: string, eta?: string) => void, strategy?: SyncStrategy, signal?: AbortSignal, conflictResolution?: ConflictResolution[], selectedRowsOnly?: boolean, timeFilter?: SyncTimeFilter): Promise<GithubSyncResult>;
 //# sourceMappingURL=githubSync.d.ts.map

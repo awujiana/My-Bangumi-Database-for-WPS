@@ -4,7 +4,7 @@
  * @description 资源追踪、按钮监听、ACTION_HANDLERS 分发、消息监听、事件总线监听、
  *              配置 UI 回填等。同时 re-export 子模块的公开 API，保持原 handlers.ts 的外部接口。
  */
-import { LOG_LEVELS, bgmLog, BGM, loadBgToken, clearBgToken, copyTokenToClipboard, _setBgmUserId, _setBgmUsername, getApp, showAlert, showConfirm, showInput, showToast, refreshData, refreshSheets, refreshWorkbooks, toggleSheetLock, clearSyncRecords, deduplicateSyncRecords, formatSyncRecordSheet, openSyncRecordSheet, closeDetailModal, previewSyncContent, syncSelectedRows, openBangumiTokenPage, setSyncRecordEnabled, getSyncRecordEnabled, getIncrementalSync, setIncrementalSync, getSkipConflicts, setSkipConflicts, getGithubConfig, setGithubConfig, isGithubConfigComplete, getSyncStrategy, setSyncStrategy, getSyncSourceType, setSyncSourceType, syncFromRemote, buildRawUrl, showSyncProgressDialog, updateSyncProgressDialog, completeSyncProgressDialog, hideSyncProgressDialog, } from '../../index.js';
+import { LOG_LEVELS, bgmLog, BGM, loadBgToken, clearBgToken, copyTokenToClipboard, _setBgmUserId, _setBgmUsername, getApp, showAlert, showConfirm, showInput, showToast, refreshData, refreshSheets, refreshWorkbooks, toggleSheetLock, clearSyncRecords, deduplicateSyncRecords, formatSyncRecordSheet, openSyncRecordSheet, closeDetailModal, previewSyncContent, syncSelectedRows, openBangumiTokenPage, setSyncRecordEnabled, getSyncRecordEnabled, getIncrementalSync, setIncrementalSync, getSkipConflicts, setSkipConflicts, getGithubConfig, setGithubConfig, isGithubConfigComplete, getSyncStrategy, setSyncStrategy, getSyncSourceType, setSyncSourceType, syncFromRemote, buildRawUrl, showSyncProgressDialog, updateSyncProgressDialog, hideSyncProgressDialog, showSyncResultDialog, } from '../../index.js';
 import { exportConfig, importConfig } from '../../services/configService.js';
 import { undoLastSyncForRibbon } from '../../services/ribbonService.js';
 import { debounce } from '../../tools/debounce.js';
@@ -313,6 +313,32 @@ export function setupButtonListeners() {
         bgmLog(LOG_LEVELS.INFO, '[handlers] 日志级别筛选 change 监听器已注册');
     }
 }
+// ========== 时间筛选 UI 控制 ==========
+/**
+ * 初始化时间筛选控件的显示/隐藏逻辑
+ * - 勾选「启用时间筛选」时显示筛选控件区域
+ * - 筛选范围切换时显示/隐藏季度/月份下拉框
+ */
+function setupTimeFilterControls() {
+    const chkTimeFilter = document.getElementById('chkTimeFilter');
+    const timeFilterControls = document.getElementById('timeFilterControls');
+    const rangeSelect = document.getElementById('timeFilterRange');
+    const quarterRow = document.getElementById('quarterRow');
+    const monthRow = document.getElementById('monthRow');
+    if (!chkTimeFilter || !timeFilterControls)
+        return;
+    // 复选框切换：显示/隐藏筛选控件
+    chkTimeFilter.addEventListener('change', () => {
+        timeFilterControls.style.display = chkTimeFilter.checked ? 'block' : 'none';
+    });
+    // 筛选范围切换：显示/隐藏季度/月份行
+    if (rangeSelect && quarterRow && monthRow) {
+        rangeSelect.addEventListener('change', () => {
+            quarterRow.style.display = rangeSelect.value === 'quarter' ? '' : 'none';
+            monthRow.style.display = rangeSelect.value === 'month' ? '' : 'none';
+        });
+    }
+}
 const ACTION_HANDLERS = {
     // 核心操作
     sync: (ctx) => {
@@ -590,6 +616,27 @@ const ACTION_HANDLERS = {
         // 读取「仅同步选中行」开关
         const chkSelectedOnly = document.getElementById('chkSyncSelectedOnly');
         const selectedRowsOnly = chkSelectedOnly?.checked === true;
+        // 读取时间筛选配置
+        const chkTimeFilter = document.getElementById('chkTimeFilter');
+        const timeFilterEnabled = chkTimeFilter?.checked === true;
+        let timeFilter;
+        if (timeFilterEnabled) {
+            const yearSelect = document.getElementById('timeFilterYear');
+            const rangeSelect = document.getElementById('timeFilterRange');
+            const quarterSelect = document.getElementById('timeFilterQuarter');
+            const monthSelect = document.getElementById('timeFilterMonth');
+            const year = parseInt(yearSelect?.value || '2026', 10);
+            const range = rangeSelect?.value || 'year';
+            timeFilter = {
+                enabled: true,
+                year,
+                range,
+                ...(range === 'quarter'
+                    ? { quarter: parseInt(quarterSelect?.value || '1', 10) }
+                    : {}),
+                ...(range === 'month' ? { month: parseInt(monthSelect?.value || '1', 10) } : {}),
+            };
+        }
         // 本地文件源仅需 path 字段；远程源（github/gitlab/gitee）要求 owner/repo/path
         // 本地文件路径复用 #githubPath 输入框（用户可手动粘贴绝对路径，UI 后续可扩展文件选择对话框）
         if (currentSourceType === 'local') {
@@ -615,7 +662,17 @@ const ACTION_HANDLERS = {
         }[strategy];
         // 同步源类型对应的来源描述（本地文件 vs 远程仓库）
         const sourceLabel = currentSourceType === 'local' ? '本地文件' : '远程仓库';
-        showConfirm(`将从${sourceLabel}下载数据并按策略【${strategyLabel}】合并到当前工作表。\n（远程仓库 → Excel，与上传同步方向相反）${selectedRowsOnly ? '\n⚠️ 仅同步选中行' : ''}\n是否继续？`, (confirmed) => {
+        // 构建时间筛选描述
+        let timeFilterDesc = '';
+        if (timeFilter) {
+            timeFilterDesc =
+                timeFilter.range === 'year'
+                    ? `\n📅 时间筛选：${timeFilter.year}年全年`
+                    : timeFilter.range === 'quarter'
+                        ? `\n📅 时间筛选：${timeFilter.year}年${timeFilter.quarter}月新番`
+                        : `\n📅 时间筛选：${timeFilter.year}年${timeFilter.month}月`;
+        }
+        showConfirm(`将从${sourceLabel}下载数据并按策略【${strategyLabel}】合并到当前工作表。\n（远程仓库 → Excel，与上传同步方向相反）${selectedRowsOnly ? '\n⚠️ 仅同步选中行' : ''}${timeFilterDesc}\n是否继续？`, (confirmed) => {
             if (!confirmed) {
                 bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 用户取消数据同步');
                 return;
@@ -646,37 +703,22 @@ const ACTION_HANDLERS = {
                     const statusMsg = eta ? `${message} | ${eta}` : message;
                     app.StatusBar = `[${current}/${total}] ${statusMsg}`;
                 }
-            }, strategy, abortController.signal, selectedRowsOnly)
+            }, strategy, abortController.signal, selectedRowsOnly, undefined, // conflictResolution
+            timeFilter)
                 .then((result) => {
                 const totalElapsed = Date.now() - syncStartTime;
                 const totalProcessed = result.added + result.updated;
                 const avgSpeed = totalProcessed > 0 && totalElapsed > 0
                     ? Math.round((totalProcessed / totalElapsed) * 1000)
                     : 0;
-                const elapsedStr = totalElapsed < 1000
-                    ? `${totalElapsed}ms`
-                    : totalElapsed < 60000
-                        ? `${Math.floor(totalElapsed / 1000)}秒`
-                        : `${Math.floor(totalElapsed / 60000)}分${Math.floor((totalElapsed % 60000) / 1000)}秒`;
-                const summary = `📊 数据同步完成（策略：${strategyLabel}）\n\n` +
-                    `远程 ${result.remoteTotal} 条\n` +
-                    `✅ 新增 ${result.added}，🔄 更新 ${result.updated}\n` +
-                    `❌ 删除 ${result.deleted}，⏭️ 无变更 ${result.unchanged}\n` +
-                    `⚠️ 失败 ${result.failed}\n\n` +
-                    `⏱ 耗时 ${elapsedStr}，平均 ${avgSpeed} 行/秒`;
-                const details = [
-                    `远程条目 ${result.remoteTotal} 条`,
-                    `新增 ${result.added} 条`,
-                    `更新 ${result.updated} 条`,
-                    `删除 ${result.deleted} 条`,
-                    `无变更 ${result.unchanged} 条`,
-                    `失败 ${result.failed} 条`,
-                    `策略：${strategyLabel}`,
-                    `⏱ 总耗时: ${elapsedStr}`,
-                    `⚡ 平均速度: ${avgSpeed} 行/秒`,
-                ];
-                completeSyncProgressDialog(summary, details, false);
-                bgmLog(LOG_LEVELS.INFO, `[handleActionClick] 数据同步完成: ${details.join('，')}`);
+                showSyncResultDialog({
+                    result,
+                    elapsedMs: totalElapsed,
+                    avgSpeed,
+                    strategyLabel: strategyLabel ?? '未知策略',
+                    stopped: false,
+                });
+                bgmLog(LOG_LEVELS.INFO, `[handleActionClick] 数据同步完成: 远程 ${result.remoteTotal}，新增 ${result.added}，更新 ${result.updated}，删除 ${result.deleted}，无变更 ${result.unchanged}，失败 ${result.failed}`);
                 if (app?.StatusBar !== undefined)
                     app.StatusBar = false;
             })
@@ -684,7 +726,20 @@ const ACTION_HANDLERS = {
                 const errMsg = e instanceof Error ? e.message : String(e);
                 const isAborted = abortController.signal.aborted;
                 if (isAborted) {
-                    completeSyncProgressDialog('⏹️ 数据同步已停止', ['用户主动停止了数据同步'], true);
+                    showSyncResultDialog({
+                        result: {
+                            remoteTotal: 0,
+                            added: 0,
+                            updated: 0,
+                            deleted: 0,
+                            unchanged: 0,
+                            failed: 0,
+                        },
+                        elapsedMs: Date.now() - syncStartTime,
+                        avgSpeed: 0,
+                        strategyLabel: strategyLabel ?? '未知策略',
+                        stopped: true,
+                    });
                     bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 数据同步被用户停止');
                 }
                 else {
@@ -944,6 +999,7 @@ export function initHandlers() {
         // 先清理旧监听器，防止面板重新初始化时重复注册
         clearTrackedListeners();
         setupButtonListeners();
+        setupTimeFilterControls();
         setupMessageListener();
         setupEventListeners();
         initIncrementalSyncFromRibbon();

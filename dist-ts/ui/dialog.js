@@ -556,7 +556,8 @@ export function updateSyncProgressDialog(current, total, message, logLine) {
     else if (etaEl && !logLine) {
         etaEl.style.display = 'none';
     }
-    if (logLine && log) {
+    // 仅将非 ETA 的日志行追加到日志区（ETA 已单独显示在 ETA 元素中，避免重复）
+    if (logLine && log && !logLine.startsWith('预计剩余') && !logLine.startsWith('剩余:')) {
         // 智能滚动：仅当用户已接近底部时才自动滚动，避免打断阅读
         const nearBottom = log.scrollHeight - log.scrollTop - log.clientHeight < 30;
         log.appendChild(document.createTextNode(logLine + '\n'));

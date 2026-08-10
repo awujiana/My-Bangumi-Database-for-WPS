@@ -19,14 +19,14 @@ import { LOG_LEVELS, BGM_SUBJECT_TYPES } from '../core/constants.js';
 import { Result, BgmError } from '../core/result.js';
 import { bgmLog, getDataSheet, findHeaderRow, getLastRow, getColumnMap, getCellValue, setCellValue, colNumToLetter, trim, ensureSheetHeaders, getApp, } from '../tools/util.js';
 import { buildRawUrl, isGithubConfigComplete } from './githubConfig.js';
-import { computeDiff, tagsToString, parseJsonl, EXTENDED_FIELD_MAP, } from './githubSyncDiff.js';
+import { computeDiff, tagsToString, parseJsonl, EXTENDED_FIELD_MAP, filterByTime, } from './githubSyncDiff.js';
 import { extractSubjectId } from './pureUtils.js';
 import { addSyncRecords, addSyncRecordSummary } from './syncRecord.js';
 import { beginUndoSession, endUndoSession, recordRowDeleteEntry, recordUndoEntry, } from './undoStack.js';
 // 类型导入：避免运行时循环依赖（githubSync → ribbonService → index → githubSync）
 // 纯函数与类型从 githubSyncDiff.ts re-export，避免重复定义
 // githubSyncDiff.ts 为零依赖纯模块，可在 Node 测试环境中直接运行
-export { computeDiff, tagsToString, parseJsonl, isGithubRemoteEntry, SYNC_STRATEGY_LABELS, EXTENDED_FIELD_MAP, } from './githubSyncDiff.js';
+export { computeDiff, tagsToString, parseJsonl, isGithubRemoteEntry, filterByTime, SYNC_STRATEGY_LABELS, EXTENDED_FIELD_MAP, } from './githubSyncDiff.js';
 /** HTTP 请求超时（毫秒） */
 const REQUEST_TIMEOUT_MS = 30000;
 /**
@@ -232,6 +232,31 @@ export function readLocalEntriesForSync() {
     const entries = readLocalEntries(ws, colMap, headerRow, lastRow);
     return { entries, lastRow };
 }
+// ========== 日期工具函数 ==========
+/**
+ * 日期列名集合（写入时转换为本地"年月日"字符串格式）
+ */
+const DATE_COLUMNS = new Set(['开播日期', '完播日']);
+/**
+ * 将远程日期字符串（YYYY-MM-DD 等格式）转换为本地"年月日"格式字符串
+ *
+ * 本地 Excel 的"开播日期""完播日"列使用"YYYY年MM月DD日"格式的字符串，
+ * 远程仓库使用 YYYY-MM-DD 格式，同步时需转换为本地格式写入。
+ *
+ * @param dateStr 日期字符串，支持 YYYY-MM-DD、YYYY/MM/DD、YYYY.MM.DD 等格式
+ * @returns "年月日"格式字符串，如"2015年12月15日"，解析失败返回 null
+ */
+function formatDateToLocal(dateStr) {
+    if (!dateStr)
+        return null;
+    const match = String(dateStr).match(/^(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})/);
+    if (!match)
+        return null;
+    const year = match[1];
+    const month = match[2].padStart(2, '0');
+    const day = match[3].padStart(2, '0');
+    return `${year}年${month}月${day}日`;
+}
 // ========== 应用差异到工作表 ==========
 /**
  * 将单条远程条目数据写入指定行的指定字段
@@ -243,7 +268,10 @@ export function readLocalEntriesForSync() {
  * @param forceOverwrite 是否强制覆盖（true 时远程空值也清空本地；false 时远程空值跳过）
  */
 function writeRemoteEntryToRow(ws, colMap, row, remote, fieldsToWrite, forceOverwrite) {
-    /** 安全写入：列存在时写入值（forceOverwrite=true 时空值也写入清空本地） */
+    /**
+     * 安全写入字符串值：列存在时写入值（forceOverwrite=true 时空值也写入清空本地）
+     * 对于日期列（开播日期、完播日），自动转换为数值序列号以保留本地列格式。
+     */
     const safeSet = (key, value) => {
         const col = colMap.get(key);
         if (!col)
@@ -255,6 +283,16 @@ function writeRemoteEntryToRow(ws, colMap, row, remote, fieldsToWrite, forceOver
         // 值无变化时跳过写入，避免空字符串重复写入并污染 undo 栈
         if (oldValue === value)
             return;
+        // 日期列：转换为本地"年月日"字符串格式
+        if (DATE_COLUMNS.has(key)) {
+            const localDate = formatDateToLocal(value);
+            if (localDate !== null) {
+                recordUndoEntry({ row, col, oldValue, newValue: localDate });
+                setCellValue(ws, row, col, localDate);
+                return;
+            }
+        }
+        // 非日期列或日期解析失败：写入字符串
         recordUndoEntry({ row, col, oldValue, newValue: value });
         setCellValue(ws, row, col, value);
     };
@@ -319,7 +357,7 @@ function formatDuration(ms) {
  */
 function formatEta(ms) {
     if (ms <= 0)
-        return '剩余: 即将完成';
+        return '剩余: 计算中...';
     return `预计剩余: ${formatDuration(ms)}`;
 }
 /**
@@ -365,38 +403,47 @@ function batchWriteNewRows(ws, colMap, startRow, rows, records) {
     const maxCol = writeCols[writeCols.length - 1].col;
     const colCount = maxCol - minCol + 1;
     // 2. 构建二维值数组（列对齐到 minCol 偏移）
+    // 日期列（开播日期、完播日）写入数值序列号以保留本地列格式
     const values = [];
     for (const entry of rows) {
         const row = new Array(colCount).fill(null);
         for (const wc of writeCols) {
             const idx = wc.col - minCol;
-            let value = '';
+            let value = null;
             if (wc.name === 'Bangumi_URL') {
                 value = `https://bgm.tv/subject/${entry.remote.sid}`;
             }
             else if (wc.name === '名称') {
-                value = entry.remote.name ?? '';
+                value = entry.remote.name ?? null;
             }
             else if (wc.name === '标签/分级') {
-                value = tagsToString(entry.remote.meta_tags);
+                value = tagsToString(entry.remote.meta_tags) || null;
             }
             else if (wc.name === '集数') {
-                value = entry.remote['话数'] ?? '';
+                value = entry.remote['话数'] ?? null;
             }
             else {
                 // 扩展字段：遍历 EXTENDED_FIELD_MAP 匹配
                 for (const [jsonlField, excelField] of EXTENDED_FIELD_MAP) {
                     if (excelField === wc.name) {
                         const v = entry.remote[jsonlField];
-                        if (typeof v === 'string')
-                            value = v;
-                        else if (typeof v === 'number')
+                        if (typeof v === 'string') {
+                            // 日期列：转换为本地"年月日"字符串格式
+                            if (DATE_COLUMNS.has(wc.name)) {
+                                value = formatDateToLocal(v) ?? v;
+                            }
+                            else {
+                                value = v;
+                            }
+                        }
+                        else if (typeof v === 'number') {
                             value = String(v);
+                        }
                         break;
                     }
                 }
             }
-            row[idx] = value || null;
+            row[idx] = value;
         }
         values.push(row);
     }
@@ -420,10 +467,12 @@ function batchWriteNewRows(ws, colMap, startRow, rows, records) {
         return 0;
     }
     // 4. 记录 undo 条目（一次性记录所有变更）
+    // 注意：日期列的值可能是数值序列号，需转换为字符串存储 undo 记录
     for (let i = 0; i < rows.length; i++) {
         for (const wc of writeCols) {
             const row = startRow + i;
-            const val = values[i][wc.col - minCol] ?? '';
+            const raw = values[i][wc.col - minCol];
+            const val = raw != null ? String(raw) : '';
             recordUndoEntry({ row, col: wc.col, oldValue: '', newValue: val });
         }
         records.push({
@@ -643,7 +692,9 @@ export async function applyDiffToSheet(diffs, strategy, onProgress, source) {
             const totalProcessed = addTotal + otherProcessed;
             const elapsed = now - syncStartTime;
             const speed = totalProcessed > 0 && elapsed > 0 ? (totalProcessed / elapsed) * 1000 : 0;
-            onProgress?.(totalProcessed, total, `更新 ${otherProcessed}/${otherTotal} 条 (${speed > 0 ? speed.toFixed(0) : '?'} 行/秒)`, formatEta(0));
+            const remaining = otherTotal - otherProcessed;
+            const eta = speed > 0 ? (remaining / speed) * 1000 : 0;
+            onProgress?.(totalProcessed, total, `更新 ${otherProcessed}/${otherTotal} 条 (${speed > 0 ? speed.toFixed(0) : '?'} 行/秒)`, formatEta(eta));
             lastProgressTime = now;
         }
         // 每 50 条让出事件循环，允许 DOM 渲染
@@ -749,7 +800,7 @@ export function applyConflictResolutions(diffs, resolutions) {
  * @returns 同步结果统计
  * @throws 配置错误、网络错误、解析错误时抛出
  */
-export async function syncFromGithub(onProgress, strategy = 'add-update', signal, conflictResolution, selectedRowsOnly) {
+export async function syncFromGithub(onProgress, strategy = 'add-update', signal, conflictResolution, selectedRowsOnly, timeFilter) {
     const source = new GithubSyncSource();
     const validationResult = source.validateConfig();
     if (validationResult.isFail()) {
@@ -795,6 +846,13 @@ export async function syncFromGithub(onProgress, strategy = 'add-update', signal
             effectiveRemoteEntries = remoteEntries.filter((e) => selectedSids.has(e.sid));
             bgmLog(LOG_LEVELS.INFO, `[syncFromGithub] 仅同步选中行：选中 ${selectedSids.size} 个 SID，匹配远程 ${effectiveRemoteEntries.length} 条`);
             onProgress?.(1, 3, `选中 ${selectedSids.size} 行，匹配远程 ${effectiveRemoteEntries.length} 条`);
+        }
+        // 时间筛选：按年份/季度/月份过滤远程条目
+        if (timeFilter?.enabled && timeFilter.range !== 'all') {
+            const beforeCount = effectiveRemoteEntries.length;
+            effectiveRemoteEntries = filterByTime(effectiveRemoteEntries, timeFilter);
+            bgmLog(LOG_LEVELS.INFO, `[syncFromGithub] 时间筛选（${timeFilter.range}）：${beforeCount} → ${effectiveRemoteEntries.length} 条`);
+            onProgress?.(1, 3, `时间筛选：${timeFilter.range === 'year' ? `${timeFilter.year}年` : timeFilter.range === 'quarter' ? `${timeFilter.year}年${timeFilter.quarter}月新番` : `${timeFilter.year}年${timeFilter.month}月`}，匹配 ${effectiveRemoteEntries.length} 条`);
         }
         const local = readLocalEntriesForSync();
         if (!local) {
