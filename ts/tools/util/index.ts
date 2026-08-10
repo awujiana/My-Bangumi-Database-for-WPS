@@ -653,6 +653,93 @@ export function clearBgToken(): boolean {
 }
 
 /**
+ * 存储 Token 过期时间戳
+ *
+ * @param expires - Unix 时间戳（秒），来自 /oauth/token_status 接口
+ */
+export function storeTokenExpires(expires: number): void {
+  const app = getApp() as { PluginStorage?: { setItem: (key: string, value: string) => void } }
+  if (!app?.PluginStorage) return
+  app.PluginStorage.setItem('bgm_token_expires', String(expires))
+  bgmLog(
+    LOG_LEVELS.INFO,
+    `[storeTokenExpires] Token 过期时间已存储: ${new Date(expires * 1000).toLocaleString('zh-CN')}`,
+  )
+}
+
+/**
+ * 加载 Token 过期时间戳
+ *
+ * @returns Unix 时间戳（秒）或 null（未存储）
+ */
+export function loadTokenExpires(): number | null {
+  const app = getApp() as { PluginStorage?: { getItem: (key: string) => string | null } }
+  if (!app?.PluginStorage) return null
+  const raw = app.PluginStorage.getItem('bgm_token_expires')
+  if (!raw) return null
+  const expires = Number(raw)
+  return Number.isFinite(expires) && expires > 0 ? expires : null
+}
+
+/**
+ * 清除 Token 过期时间戳
+ */
+export function clearTokenExpires(): void {
+  const app = getApp() as { PluginStorage?: { setItem: (key: string, value: string) => void } }
+  if (!app?.PluginStorage) return
+  app.PluginStorage.setItem('bgm_token_expires', '')
+}
+
+/**
+ * 计算 Token 剩余有效期信息
+ *
+ * @param expires - Unix 时间戳（秒）
+ * @returns 剩余天数/小时数/状态描述，过期返回 expired 状态
+ */
+export function getTokenRemainingTime(expires: number): {
+  days: number
+  hours: number
+  totalSeconds: number
+  status: 'normal' | 'warning' | 'danger' | 'expired'
+  label: string
+} {
+  const now = Math.floor(Date.now() / 1000)
+  const diffSeconds = expires - now
+  const absSeconds = Math.abs(diffSeconds)
+
+  if (diffSeconds <= 0) {
+    const days = Math.floor(absSeconds / 86400)
+    const hours = Math.floor((absSeconds % 86400) / 3600)
+    return {
+      days,
+      hours,
+      totalSeconds: absSeconds,
+      status: 'expired',
+      label: `已过期 ${days > 0 ? days + '天' : hours + '小时'}`,
+    }
+  }
+
+  const days = Math.floor(diffSeconds / 86400)
+  const hours = Math.floor((diffSeconds % 86400) / 3600)
+
+  let status: 'normal' | 'warning' | 'danger' = 'normal'
+  let label = `${days}天${hours}小时后过期`
+
+  if (diffSeconds < 86400) {
+    status = 'danger'
+    label = `${hours}小时后过期`
+  } else if (diffSeconds < 86400 * 3) {
+    status = 'danger'
+    label = `${days}天${hours}小时后过期`
+  } else if (diffSeconds < 86400 * 7) {
+    status = 'warning'
+    label = `${days}天后过期`
+  }
+
+  return { days, hours, totalSeconds: diffSeconds, status, label }
+}
+
+/**
  * 加载 Token（明文读取，自动兼容历史 XOR 加密数据）
  *
  * @description

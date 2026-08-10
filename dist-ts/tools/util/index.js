@@ -690,10 +690,14 @@ export function _fetchBgmUserInfo(callback, signal) {
                 const username = String(data.nickname || data.username || data.user_name || data.name || '');
                 _setBgmUserId(userId);
                 _setBgmUsername(username);
-                // 构造头像 URL（浏览器会自动跟随 302 重定向）
-                const avatarUrl = username
-                    ? `${BGM_CONFIG.API_BASE}/v0/users/${encodeURIComponent(username)}/avatar?type=large`
-                    : null;
+                // 从 API 响应中提取头像 URL，并清理可能存在的反引号包裹
+                const rawAvatarUrl = data.avatar?.large || data.avatar?.medium || data.avatar?.small || '';
+                const cleanAvatarUrl = rawAvatarUrl ? rawAvatarUrl.replace(/`/g, '').trim() : '';
+                // 优先使用 API 返回的头像 URL，若不存在则回退到构造的 URL
+                const avatarUrl = cleanAvatarUrl ||
+                    (username
+                        ? `${BGM_CONFIG.API_BASE}/v0/users/${encodeURIComponent(username)}/avatar?type=large`
+                        : null);
                 BGM.cache.avatarUrl = avatarUrl;
                 // 持久化头像 URL 到 PluginStorage
                 try {

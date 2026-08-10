@@ -62,4 +62,18 @@ export const _T = {
   sourceTypeLabel: '\u6570\u636E\u6E90\u7C7B\u578B',
   retryTest: '\u91CD\u65B0\u6D4B\u8BD5',
   closeDialog: '\u5173\u95ED',
+  // Token 有效期相关
+  tokenExpiresLabel: 'Token 有效期',
+  tokenExpiresNormal: '状态良好',
+  tokenExpiresWarning: '即将到期',
+  tokenExpiresDanger: '即将过期',
+  tokenExpiresExpired: '已过期',
+  tokenExpiresUnknown: '未知',
+  tokenDaysUnit: '天',
+  tokenHoursUnit: '小时',
+  tokenStatusQuerying: '检查中...',
+  tokenStatusQueryFailed: '状态查询失败',
+  tokenExpiringSoon: 'Token 将在 {} 后过期，建议提前重新获取',
+  tokenExpiringCritical: 'Token 即将过期（{}），请尽快重新获取！',
+  tokenExpiredWarning: 'Token 已过期，请重新获取',
 } as const

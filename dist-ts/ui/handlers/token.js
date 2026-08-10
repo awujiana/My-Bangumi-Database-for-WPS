@@ -164,6 +164,23 @@ export function testTokenValidity() {
                 showSuccess(_T.tokenValid, _T.user + nickname);
                 _setBgmUserId(userId);
                 _setBgmUsername(nickname);
+                // 处理头像 URL：移除可能存在的反引号包裹
+                const rawAvatarUrl = data.avatar?.large || data.avatar?.medium || data.avatar?.small || '';
+                const cleanAvatarUrl = rawAvatarUrl.replace(/`/g, '').trim();
+                if (cleanAvatarUrl) {
+                    BGM.cache.avatarUrl = cleanAvatarUrl;
+                    // 持久化头像 URL
+                    try {
+                        const app = getApp();
+                        if (app?.PluginStorage) {
+                            app.PluginStorage.setItem('bgm_avatar_url', cleanAvatarUrl);
+                        }
+                    }
+                    catch {
+                        // 静默处理
+                    }
+                    showUserProfile();
+                }
             }
             catch (e) {
                 bgmLog(LOG_LEVELS.ERROR, `[testTokenValidity] 解析响应失败: ${e.message}`);
@@ -178,6 +195,7 @@ export function testTokenValidity() {
         else if (xhr.status === 401) {
             bgmLog(LOG_LEVELS.WARN, '[testTokenValidity] Token 无效或已过期');
             showError(_T.tokenInvalid, _T.tokenExpired);
+            hideUserProfile();
         }
         else {
             bgmLog(LOG_LEVELS.ERROR, `[testTokenValidity] Token 验证失败，HTTP 状态码: ${xhr.status}`);
@@ -266,6 +284,10 @@ export function hideUserProfile() {
  * 续约/刷新 Token
  * 通过测试现有 Token 的有效性，重新获取用户信息和头像
  * 如果 Token 已失效，提示用户重新输入
+ *
+ * 说明：Bangumi OAuth Token 本身没有"刷新租期"的概念，
+ * 此操作的实质是"验证 Token 有效性"和"刷新用户缓存数据"。
+ * 不会延长 Token 的有效期（Token 有效期由 Bangumi 服务端决定）。
  */
 export function renewToken() {
     const token = loadBgToken();
@@ -273,24 +295,33 @@ export function renewToken() {
         showAlert(_T.pleaseSetTokenFirst);
         return;
     }
-    bgmLog(LOG_LEVELS.INFO, '[renewToken] 开始续约 Token...');
-    // 先测试 Token 有效性
-    testTokenValidity();
+    const startTime = Date.now();
+    bgmLog(LOG_LEVELS.INFO, `[renewToken] ========== Token 续约流程开始 ==========`);
+    bgmLog(LOG_LEVELS.INFO, `[renewToken] 触发时间: ${new Date().toLocaleString('zh-CN')}`);
+    bgmLog(LOG_LEVELS.INFO, `[renewToken] 【重要说明】本操作≠延长Token有效期。Bangumi OAuth Token的有效期由官方服务器决定（代码端无法查询或修改剩余天数）。本操作实际执行的是：① 调用 /v0/me 接口验证Token是否仍然有效；② 若有效，重新拉取最新的用户头像、ID、用户名并刷新本地缓存。`);
+    bgmLog(LOG_LEVELS.INFO, `[renewToken] 正在向 Bangumi API 发起验证请求...`);
     // 同时刷新用户信息和头像
     fetchBgmUserInfo()
         .then(({ userInfo, errorType }) => {
+        const duration = Date.now() - startTime;
         if (userInfo?.username) {
             showUserProfile();
-            bgmLog(LOG_LEVELS.INFO, `[renewToken] Token 续约成功: ${userInfo.username}`);
+            bgmLog(LOG_LEVELS.INFO, `[renewToken] ✅ Token 验证通过，耗时: ${duration}ms | 用户: ${userInfo.username} (ID: ${userInfo.id}) | 头像已刷新 | 注意: 本次操作未延长Token有效期，剩余天数需登录Bangumi官网查看`);
+            showToast(`Token 验证成功，用户: ${userInfo.username}`, 'success');
         }
         else if (errorType === 'http') {
             // Token 失效
+            bgmLog(LOG_LEVELS.WARN, `[renewToken] Token 续约失败（HTTP错误），耗时: ${duration}ms`);
             showToast(_T.tokenRenewFailed, 'error');
             hideUserProfile();
+        }
+        else if (errorType === 'network') {
+            bgmLog(LOG_LEVELS.WARN, `[renewToken] Token 续约失败（网络错误），耗时: ${duration}ms`);
+            showToast('网络连接失败，无法验证 Token', 'warn');
         }
     })
         .catch((err) => {
         const errMsg = err instanceof Error ? err.message : String(err);
-        bgmLog(LOG_LEVELS.ERROR, `[renewToken] Token 续约失败: ${errMsg}`);
+        bgmLog(LOG_LEVELS.ERROR, `[renewToken] Token 续约异常: ${errMsg}`);
     });
 }

@@ -53,15 +53,21 @@
                 <div class="user-info">
                     <span id="userNameDisplay" class="user-name"></span>
                     <span id="userIdDisplay" class="user-id"></span>
+                    <span id="profileExpiresDisplay" class="profile-expires" style="display:none;"></span>
                 </div>
                 <button class="btn small" data-action="renewToken" title="续约/刷新 Token">🔄 续约</button>
             </div>
             <div class="token-display">
-                <span id="tokenStatus">未设置</span>
-                <button class="btn small" data-action="showTokenDialog">设置/修改</button>
-                <button class="btn small" data-action="copyToken" aria-label="复制 Token 到剪贴板">📋 复制</button>
-                <button class="btn small" data-action="clearToken">清除</button>
-                <button class="btn small primary" data-action="testToken">测试</button>
+                <div class="token-status-info">
+                    <span id="tokenStatus">未设置</span>
+                    <span id="tokenExpiresDisplay" class="token-expires" style="display:none;"></span>
+                </div>
+                <div class="token-buttons">
+                    <button class="btn small" data-action="showTokenDialog">设置/修改</button>
+                    <button class="btn small" data-action="copyToken" aria-label="复制 Token 到剪贴板">📋 复制</button>
+                    <button class="btn small" data-action="clearToken">清除</button>
+                    <button class="btn small primary" data-action="testToken">测试</button>
+                </div>
             </div>
             <div class="btn-group btn-row" style="margin-top:8px;">
                 <button class="btn small" data-action="exportConfig" style="flex:1;">📤 导出配置</button>

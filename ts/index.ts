@@ -308,6 +308,14 @@ export {
   clearBgToken,
   // 加载并解密 Token
   loadBgToken,
+  // 存储 Token 过期时间戳
+  storeTokenExpires,
+  // 加载 Token 过期时间戳
+  loadTokenExpires,
+  // 清除 Token 过期时间戳
+  clearTokenExpires,
+  // 计算 Token 剩余有效期
+  getTokenRemainingTime,
   // 复制 Token 到剪贴板
   copyTokenToClipboard,
   // 获取用户 ID
