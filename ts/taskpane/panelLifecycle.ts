@@ -920,7 +920,7 @@ export function refreshData(): void {
             `${startColLetter}${segStart}:${endColLetter}${segStart + segLen - 1}`,
           )
           const raw = rangeAddr.Value2
-          // WPS 返回二维数组（1-based），或单值
+          // WPS JS API 返回 0-based 二维数组（raw[0][0] 为第一行第一列）
           const is2D = Array.isArray(raw)
           for (let r = 0; r < segLen; r++) {
             const dr = dataRows[i + r]!
@@ -929,7 +929,7 @@ export function refreshData(): void {
             for (let ci = 0; ci < displayColCount; ci++) {
               let v: string
               if (is2D && Array.isArray(raw)) {
-                const cell = raw[r + 1]?.[ci + 1]
+                const cell = raw[r]?.[ci]
                 v = cell == null ? '' : String(cell).trim()
               } else {
                 v =
@@ -1036,4 +1036,77 @@ export function onSelectModeChange(): void {
       break
     }
   }
+}
+
+let _enlargeModal: HTMLElement | null = null
+let _enlargeEscHandler: ((e: KeyboardEvent) => void) | null = null
+
+export function enlargePreview(): void {
+  const previewBox = document.getElementById('previewBox')
+  if (!previewBox) {
+    showToast('没有可放大的预览内容', 'info')
+    return
+  }
+
+  const content = previewBox.innerHTML.trim()
+  if (!content || !content.includes('<table')) {
+    showToast('请先刷新数据加载预览', 'info')
+    return
+  }
+
+  if (_enlargeModal) {
+    _enlargeModal.remove()
+    _enlargeModal = null
+  }
+
+  const modal = document.createElement('div')
+  modal.className = 'bgm-modal enlarge-preview-modal'
+  modal.setAttribute('role', 'dialog')
+  modal.setAttribute('aria-modal', 'true')
+
+  modal.innerHTML = sanitizeHtml(`
+    <div class="bgm-modal-content" style="max-width: 95vw; max-height: 95vh; display: flex; flex-direction: column; background: #2d2d2d; border-radius: 12px; width: 95vw;">
+      <div class="bgm-dialog-header" style="display:flex;justify-content:space-between;align-items:center;padding:14px 20px;border-bottom:1px solid #444;">
+        <span class="bgm-dialog-title" style="color:#fff;font-size:16px;font-weight:600;">🔍 数据预览（放大）</span>
+        <button class="bgm-close-btn enlarge-close-btn" aria-label="关闭放大预览" style="background:none;border:none;color:#888;font-size:28px;cursor:pointer;padding:0;line-height:1;">×</button>
+      </div>
+      <div class="enlarged-preview-body" style="flex:1;overflow:auto;padding:16px;">
+        <div class="preview-box enlarged-preview-box" style="max-height:none;overflow:auto;font-size:14px;transform-origin:top left;transform:scale(1.3);">
+          ${content}
+        </div>
+      </div>
+      <div class="bgm-dialog-footer" style="padding:10px 20px;border-top:1px solid #444;display:flex;justify-content:flex-end;gap:8px;">
+        <button class="btn enlarge-close-btn" type="button">关闭</button>
+      </div>
+    </div>
+  `)
+
+  document.body.appendChild(modal)
+  _enlargeModal = modal
+
+  const closeModal = (): void => {
+    if (_enlargeModal) {
+      _enlargeModal.remove()
+      _enlargeModal = null
+    }
+    if (_enlargeEscHandler) {
+      document.removeEventListener('keydown', _enlargeEscHandler)
+      _enlargeEscHandler = null
+    }
+  }
+
+  modal.querySelectorAll('.enlarge-close-btn').forEach((btn) => {
+    btn.addEventListener('click', closeModal)
+  })
+
+  modal.addEventListener('click', (e) => {
+    if (e.target === modal) closeModal()
+  })
+
+  _enlargeEscHandler = (e: KeyboardEvent) => {
+    if (e.key === 'Escape') closeModal()
+  }
+  document.addEventListener('keydown', _enlargeEscHandler)
+
+  modal.style.display = 'flex'
 }

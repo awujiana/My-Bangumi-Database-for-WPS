@@ -161,10 +161,15 @@
                     <p class="hint">点击"刷新数据"加载预览（支持筛选后数据）</p>
                 </div>
             </div>
-            <button class="btn" id="previewBtn" data-action="previewSyncContent">
-                <span class="btn-icon">🔍</span> 详细预览同步内容
-            </button>
-            <button class="btn" id="syncCollectionBtn" data-action="syncCollectionFromBgm">
+            <div class="btn-group" style="display:flex;gap:8px;margin-top:8px;">
+                <button class="btn" id="enlargePreviewBtn" data-action="enlargePreview" style="flex:1;">
+                    <span class="btn-icon">🔍</span> 放大预览
+                </button>
+                <button class="btn" id="previewBtn" data-action="previewSyncContent" style="flex:1;">
+                    <span class="btn-icon">📋</span> 预览详情
+                </button>
+            </div>
+            <button class="btn" id="syncCollectionBtn" data-action="syncCollectionFromBgm" style="margin-top:8px;width:100%;">
                 <span class="btn-icon">📥</span> 收藏回写
             </button>
         </div>

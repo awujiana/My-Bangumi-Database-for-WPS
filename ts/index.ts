@@ -499,6 +499,8 @@ export {
   toggleSheetLock,
   // 刷新数据预览
   refreshData,
+  // 放大预览表格
+  enlargePreview,
 } from './taskpane.js'
 // ============================================================================
 // 16. 预览模块（类型部分）

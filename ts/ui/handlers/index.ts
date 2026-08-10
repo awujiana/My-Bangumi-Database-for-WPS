@@ -23,6 +23,7 @@ import {
   refreshSheets,
   refreshWorkbooks,
   toggleSheetLock,
+  enlargePreview,
   clearSyncRecords,
   deduplicateSyncRecords,
   formatSyncRecordSheet,
@@ -497,6 +498,15 @@ const ACTION_HANDLERS: Record<string, ActionHandler> = {
       )
     } else {
       bgmLog(LOG_LEVELS.WARN, '[handleActionClick] previewSyncContent 函数未定义')
+    }
+  },
+
+  enlargePreview: () => {
+    bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 放大预览表格')
+    if (typeof enlargePreview === 'function') {
+      enlargePreview()
+    } else {
+      bgmLog(LOG_LEVELS.WARN, '[handleActionClick] enlargePreview 函数未定义')
     }
   },
 
@@ -1500,7 +1510,7 @@ const handleSyncStateChangedEvent = (payload: { state: string; row?: number }): 
   )
   // 可选：根据状态刷新按钮禁用态
   const syncButtons = document.querySelectorAll(
-    'button[data-action="sync"], button[data-action="syncCollectionFromBgm"], button[data-action="previewSyncContent"]',
+    'button[data-action="sync"], button[data-action="syncCollectionFromBgm"], button[data-action="previewSyncContent"], button[data-action="enlargePreview"]',
   )
   syncButtons.forEach((btn) => {
     const el = btn as HTMLButtonElement

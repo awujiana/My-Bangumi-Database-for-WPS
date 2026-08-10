@@ -37,6 +37,7 @@ import {
   updateFilterStatus,
   refreshData,
   onSelectModeChange,
+  enlargePreview,
 } from './panelLifecycle.js'
 import { restoreUserInfoFromStorage, startUserInfoPolling } from './userInfoPolling.js'
 
@@ -146,6 +147,7 @@ export {
   refreshData,
   toggleSheetLock,
   onSelectModeChange,
+  enlargePreview,
   autoDetectSheet,
   updateFilterStatus,
 }
