@@ -1,9 +1,10 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 
-// Mock WPS API：测试环境无 WPS，getDataSheet 返回 null 使 restoreCellValue 提前返回
+// Mock WPS API：测试环境无 WPS，用空对象模拟工作表使 setCellValue 能被调用
 vi.mock('../ts/tools/util.js', () => ({
-  getDataSheet: (): null => null,
+  getDataSheet: (): object => ({}),
   setCellValue: vi.fn(),
+  bgmLog: vi.fn(),
 }))
 
 import {
