@@ -94,13 +94,6 @@ function renderDetailItemHtml(rowData, colMap, ws) {
     const tagsHtml = tags.length > 0
         ? `<div class="detail-value tags">${tags.map((t) => `<span class="tag-badge">${escapeHtml(t)}</span>`).join('')}</div>`
         : '<div class="detail-value">-</div>';
-    // 构建JSON请求载荷
-    let jsonBody = '';
-    if (rowData.sid) {
-        jsonBody = buildJsonPayload((key) => (colMap.has(key) ? trim(getCellValue(ws, rowData.row, colMap.get(key))) : ''), rowData.finishedDate);
-    }
-    // 截断显示URL，避免过长影响UI
-    const urlDisplay = rowData.bgmUrl.length > 60 ? rowData.bgmUrl.substring(0, 60) + '...' : rowData.bgmUrl;
     // 返回完整的HTML模板字符串
     return `
     <div class="detail-item ${rowData.isUploaded ? 'uploaded' : 'pending'}" data-type="${rowData.typeNum}" data-row="${rowData.row}" data-sid="${rowData.sid}" data-status="${escapeHtml(rowData.status)}">
@@ -115,10 +108,6 @@ function renderDetailItemHtml(rowData, colMap, ws) {
         ${rowData.isUploaded ? '<span class="uploaded-badge">✓ 已上传</span>' : ''}
       </div>
       <div class="detail-item-body">
-        <div class="detail-row">
-          <span class="detail-label">Bangumi URL</span>
-          <span class="detail-value url">${escapeHtml(urlDisplay) || '(空)'}</span>
-        </div>
         <div class="detail-row">
           <span class="detail-label">Subject ID</span>
           <span class="detail-value sid ${rowData.sid ? 'valid' : ''}">${rowData.sid || '✘ 无法提取'}</span>
@@ -139,17 +128,6 @@ function renderDetailItemHtml(rowData, colMap, ws) {
           <span class="detail-label">标签</span>
           ${tagsHtml}
         </div>
-        ${rowData.sid
-        ? `
-        <div class="detail-row" style="flex-direction:column;gap:6px;">
-          <span class="detail-label" style="min-width:auto;">将发送的请求</span>
-          <div class="detail-value" style="color:#27ae60;font-weight:500;">
-            POST /v0/users/{userId}/collections/${rowData.sid}
-          </div>
-          <div class="detail-value json">${escapeHtml(jsonBody)}</div>
-        </div>
-        `
-        : ''}
       </div>
     </div>
   `;

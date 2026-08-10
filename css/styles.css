@@ -1278,16 +1278,17 @@ select.input {
 
 /* ========== 富预览 - 详情条目 ========== */
 .detail-item {
-    background: #2a2a2a;
-    border: 1px solid #3a3a3a;
-    border-radius: 10px;
-    margin-bottom: 10px;
+    background: linear-gradient(180deg, #252530 0%, #1f1f28 100%);
+    border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 8px;
+    margin-bottom: 6px;
     overflow: hidden;
-    transition: border-color 0.2s;
+    transition: border-color 0.2s, box-shadow 0.2s;
 }
 
 .detail-item:hover {
-    border-color: #555;
+    border-color: rgba(74,158,255,0.35);
+    box-shadow: 0 2px 12px rgba(74,158,255,0.08);
 }
 
 .detail-item.uploaded {
@@ -1302,27 +1303,27 @@ select.input {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 10px 14px;
-    background: rgba(255,255,255,0.03);
-    border-bottom: 1px solid #333;
-    gap: 8px;
+    padding: 6px 10px;
+    background: rgba(255,255,255,0.02);
+    border-bottom: 1px solid rgba(255,255,255,0.04);
+    gap: 6px;
 }
 
 .detail-item-title {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 6px;
     min-width: 0;
     flex: 1;
 }
 
 .detail-item-row {
     display: inline-block;
-    padding: 2px 7px;
+    padding: 1px 6px;
     border-radius: 4px;
     background: rgba(74,158,255,0.15);
     color: #4a9eff;
-    font-size: 11px;
+    font-size: 10px;
     font-weight: 600;
     flex-shrink: 0;
 }
@@ -1330,7 +1331,7 @@ select.input {
 .detail-item-name {
     font-weight: 600;
     color: #e8e8e8;
-    font-size: 14px;
+    font-size: 13px;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -1338,10 +1339,10 @@ select.input {
 
 /* ========== 富预览 - 单条上传按钮 ========== */
 .upload-single-btn {
-    padding: 5px 14px;
+    padding: 3px 10px;
     border: none;
-    border-radius: 6px;
-    font-size: 12px;
+    border-radius: 5px;
+    font-size: 11px;
     font-weight: 600;
     cursor: pointer;
     transition: all 0.2s;
@@ -1374,9 +1375,9 @@ select.input {
 
 .uploaded-badge {
     display: inline-block;
-    padding: 3px 10px;
-    border-radius: 10px;
-    font-size: 11px;
+    padding: 2px 8px;
+    border-radius: 8px;
+    font-size: 10px;
     font-weight: 600;
     background: rgba(74,222,128,0.15);
     color: #4ade80;
@@ -1385,15 +1386,16 @@ select.input {
 
 /* ========== 富预览 - 详情内容行 ========== */
 .detail-item-body {
-    padding: 12px 14px;
+    padding: 6px 10px;
 }
 
 .detail-row {
     display: flex;
-    align-items: flex-start;
-    padding: 6px 0;
-    border-bottom: 1px solid rgba(255,255,255,0.04);
-    gap: 10px;
+    align-items: center;
+    padding: 2px 0;
+    border-bottom: 1px solid rgba(255,255,255,0.03);
+    gap: 8px;
+    min-height: 20px;
 }
 
 .detail-row:last-child {
@@ -1402,19 +1404,18 @@ select.input {
 
 .detail-label {
     display: inline-block;
-    min-width: 90px;
-    font-size: 12px;
-    color: #888;
-    font-weight: 600;
+    min-width: 70px;
+    font-size: 11px;
+    color: #6a6a7a;
+    font-weight: 500;
     flex-shrink: 0;
-    padding-top: 1px;
 }
 
 .detail-value {
-    font-size: 13px;
-    color: #ddd;
+    font-size: 12px;
+    color: #ccc;
     word-break: break-all;
-    line-height: 1.5;
+    line-height: 1.4;
 }
 
 .detail-value.url {
@@ -1429,8 +1430,8 @@ select.input {
 
 .detail-value.json {
     background: #1a1a1a;
-    padding: 8px 10px;
-    border-radius: 6px;
+    padding: 6px 8px;
+    border-radius: 5px;
     font-family: 'Consolas', 'Monaco', monospace;
     font-size: 11px;
     color: #4ade80;
@@ -1445,14 +1446,14 @@ select.input {
 .detail-value.tags {
     display: flex;
     flex-wrap: wrap;
-    gap: 4px;
+    gap: 3px;
 }
 
 .tag-badge {
     display: inline-block;
-    padding: 2px 8px;
-    border-radius: 8px;
-    font-size: 11px;
+    padding: 1px 6px;
+    border-radius: 6px;
+    font-size: 10px;
     background: rgba(74,158,255,0.1);
     color: #4a9eff;
     border: 1px solid rgba(74,158,255,0.2);
