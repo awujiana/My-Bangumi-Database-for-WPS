@@ -21,7 +21,12 @@ import {
 } from '../index.js'
 import { eventBus, BGM_EVENTS } from '../tools/events.js'
 
-import { refreshSheets, refreshWorkbooks, refreshData } from './panelLifecycle.js'
+import {
+  refreshSheets,
+  refreshWorkbooks,
+  refreshData,
+  autoDetectAndLockSheet,
+} from './panelLifecycle.js'
 
 /**
  * 从 PluginStorage 恢复用户信息到内存缓存
@@ -67,9 +72,46 @@ export function startUserInfoPolling(): void {
   let lastEnableSyncRecord: boolean | null = null
   let lastPanelShownAt: string | null = null
   let lastRequestGithubSync: string | null = null
+  let lastWorkbookCount = -1
+  let lastActiveWorkbookName: string | null = null
 
   const pollingInterval = setInterval(() => {
     try {
+      const app = getApp()
+      // 检测工作簿数量变化：打开/关闭新工作簿时自动刷新列表并检测表头
+      const currentWorkbookCount = app?.Workbooks?.Count ?? 0
+      if (lastWorkbookCount === -1) {
+        lastWorkbookCount = currentWorkbookCount
+      } else if (currentWorkbookCount !== lastWorkbookCount) {
+        bgmLog(
+          LOG_LEVELS.INFO,
+          `[startUserInfoPolling] 检测到工作簿数量变化: ${lastWorkbookCount} → ${currentWorkbookCount}（打开新工作簿或关闭）`,
+        )
+        lastWorkbookCount = currentWorkbookCount
+        // 刷新工作簿和工作表列表
+        refreshWorkbooks()
+        refreshSheets({ autoSelectActive: true })
+        // 自动在新活动工作簿中搜索一次表头，并锁定它
+        autoDetectAndLockSheet()
+      }
+
+      // 检测活动工作簿切换（用户直接在 WPS 中切换不同工作簿）
+      const activeWbName = app?.ActiveWorkbook?.Name || null
+      if (lastActiveWorkbookName === null) {
+        lastActiveWorkbookName = activeWbName
+      } else if (activeWbName !== lastActiveWorkbookName) {
+        bgmLog(
+          LOG_LEVELS.INFO,
+          `[startUserInfoPolling] 检测到活动工作簿切换: ${lastActiveWorkbookName} → ${activeWbName}`,
+        )
+        lastActiveWorkbookName = activeWbName
+        // 刷新工作簿和工作表列表
+        refreshWorkbooks()
+        refreshSheets({ autoSelectActive: true })
+        // 自动检测新工作簿的表头
+        autoDetectAndLockSheet()
+      }
+
       const currentUserId = _getBgmUserId()
       const currentUsername = _getBgmUsername()
       const currentToken = loadBgToken()
@@ -161,7 +203,6 @@ export function startUserInfoPolling(): void {
       }
 
       // 检测面板显示信号：Ribbon 点击"打开同步面板"时会写入 bgm_panel_shown_at 时间戳
-      const app = getApp()
       const currentPanelShownAt = app?.PluginStorage?.getItem('bgm_panel_shown_at') || null
       if (currentPanelShownAt && currentPanelShownAt !== lastPanelShownAt) {
         bgmLog(LOG_LEVELS.INFO, `[startUserInfoPolling] 检测到面板显示信号: ${currentPanelShownAt}`)

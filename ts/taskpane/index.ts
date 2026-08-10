@@ -38,6 +38,7 @@ import {
   refreshData,
   onSelectModeChange,
   enlargePreview,
+  autoDetectAndLockSheet,
 } from './panelLifecycle.js'
 import { restoreUserInfoFromStorage, startUserInfoPolling } from './userInfoPolling.js'
 
@@ -98,11 +99,13 @@ function initPanel(): void {
     })
   }
 
-  // 工作簿选择器变更事件：切换工作簿时刷新工作表列表
+  // 工作簿选择器变更事件：切换工作簿时刷新工作表列表并自动检测表头
   const wbSelect = document.getElementById('workbookSelect')
   if (wbSelect) {
     wbSelect.addEventListener('change', () => {
       refreshSheets()
+      // 自动检测新工作簿的表头
+      autoDetectAndLockSheet()
     })
   }
 
@@ -149,6 +152,7 @@ export {
   onSelectModeChange,
   enlargePreview,
   autoDetectSheet,
+  autoDetectAndLockSheet,
   updateFilterStatus,
 }
 

@@ -1110,3 +1110,35 @@ export function enlargePreview(): void {
 
   modal.style.display = 'flex'
 }
+
+// ========== 自动检测并锁定工作表 ==========
+
+/**
+ * 在当前活动工作簿中自动检测表头，找到后锁定该工作表并刷新预览
+ * 返回 true 表示成功检测并锁定，false 表示未找到有效表头
+ */
+export function autoDetectAndLockSheet(): boolean {
+  const app = getApp()
+  const detected = autoDetectSheet()
+  if (detected) {
+    const select = document.getElementById('sheetSelect') as HTMLSelectElement | null
+    if (select) select.value = String(detected.sheetIndex)
+    BGM.sheet.lockedIndex = detected.sheetIndex
+    BGM.sheet.lockedName = detected.sheetName
+    BGM.sheet.isLocked = true
+    const activeWbName = app?.ActiveWorkbook?.Name || ''
+    if (activeWbName) {
+      BGM.sheet.lockedWorkbookName = activeWbName
+    }
+    saveLockedSheet({
+      index: detected.sheetIndex,
+      name: detected.sheetName,
+      ...(activeWbName ? { workbookName: activeWbName } : {}),
+    })
+    updateLockButton()
+    refreshData()
+    showToast('已自动检测表头: ' + detected.sheetName, 'info')
+    return true
+  }
+  return false
+}
