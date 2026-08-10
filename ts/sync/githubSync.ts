@@ -266,24 +266,92 @@ function readLocalEntries(
 ): Map<string, LocalRowEntry> {
   const result = new Map<string, LocalRowEntry>()
   const startRow = headerRow + 1
+  if (startRow > lastRow) {
+    bgmLog(LOG_LEVELS.INFO, '[githubSync] 本地无数据行')
+    return result
+  }
 
-  /** 读取单元格值并 trim */
-  const getField = (row: number, key: string): string => {
+  // ===== 批量读取优化：用一次 Range.Value2 替代逐单元格 getCellValue =====
+  // 收集需要读取的列（与旧版 getField 读取的列一致）
+  const readColNames = [
+    'Bangumi_URL',
+    '名称',
+    '是否看完',
+    '状态',
+    '观看状态',
+    '标签/分级',
+    '集数',
+    '集号',
+    ...EXTENDED_FIELD_MAP.map(([, excel]) => excel),
+  ]
+  const readCols: { name: string; col: number }[] = []
+  for (const name of readColNames) {
+    const col = colMap.get(name)
+    if (col) readCols.push({ name, col })
+  }
+  if (readCols.length === 0 || !colMap.has('Bangumi_URL')) {
+    bgmLog(LOG_LEVELS.WARN, '[githubSync] 未找到任何可读取的列')
+    return result
+  }
+
+  readCols.sort((a, b) => a.col - b.col)
+  const minCol = readCols[0]!.col
+  const maxCol = readCols[readCols.length - 1]!.col
+  const rowCount = lastRow - startRow + 1
+
+  // 一次性读取整个矩形区域
+  let rawData: unknown[][] | null = null
+  try {
+    const startColLetter = colNumToLetter(minCol)
+    const endColLetter = colNumToLetter(maxCol)
+    const rangeAddr = `${startColLetter}${startRow}:${endColLetter}${lastRow}`
+    const range = ws.Range(rangeAddr)
+    if (range) {
+      const raw = range.Value2 as unknown
+      if (Array.isArray(raw)) {
+        rawData = raw as unknown[][]
+      }
+    }
+  } catch (e: unknown) {
+    bgmLog(LOG_LEVELS.WARN, `[githubSync] 批量读取失败，回退到逐单元格: ${(e as Error).message}`)
+  }
+
+  // 构建 col name → 数组索引 的映射
+  const colIndexMap = new Map<string, number>()
+  for (const rc of readCols) {
+    colIndexMap.set(rc.name, rc.col - minCol)
+  }
+
+  /** 从批量数据中读取字段值 */
+  const getFieldFromBatch = (rowOffset: number, key: string): string => {
+    const idx = colIndexMap.get(key)
+    if (idx === undefined) return ''
+    const rowArr = rawData?.[rowOffset]
+    if (!rowArr) return ''
+    const val = rowArr[idx]
+    if (val === null || val === undefined) return ''
+    return trim(String(val))
+  }
+
+  /** 逐单元格读取（回退用） */
+  const getFieldFromCell = (row: number, key: string): string => {
     const col = colMap.get(key)
     if (!col) return ''
     return trim(getCellValue(ws, row, col))
   }
 
-  for (let row = startRow; row <= lastRow; row++) {
-    const url = getField(row, 'Bangumi_URL')
+  for (let i = 0; i < rowCount; i++) {
+    const row = startRow + i
+    const getField = (key: string): string =>
+      rawData ? getFieldFromBatch(i, key) : getFieldFromCell(row, key)
+    const url = getField('Bangumi_URL')
     if (!url) continue
     const sid = extractSubjectId(url)
     if (!sid) continue
 
-    // 读取扩展字段（EXTENDED_FIELD_MAP 中定义的 20 个 Excel 字段）
     const extFields: Record<string, string> = {}
     for (const [, excelField] of EXTENDED_FIELD_MAP) {
-      extFields[excelField] = getField(row, excelField)
+      extFields[excelField] = getField(excelField)
     }
 
     result.set(sid, {
@@ -291,17 +359,20 @@ function readLocalEntries(
       sid,
       fields: {
         Bangumi_URL: url,
-        名称: getField(row, '名称'),
-        是否看完: getField(row, '是否看完') || getField(row, '状态') || getField(row, '观看状态'),
-        '标签/分级': getField(row, '标签/分级'),
-        集数: getField(row, '集数'),
-        集号: getField(row, '集号'),
+        名称: getField('名称'),
+        是否看完: getField('是否看完') || getField('状态') || getField('观看状态'),
+        '标签/分级': getField('标签/分级'),
+        集数: getField('集数'),
+        集号: getField('集号'),
         ...extFields,
       },
     })
   }
 
-  bgmLog(LOG_LEVELS.INFO, `[githubSync] 本地读取完成：${result.size} 条有效记录`)
+  bgmLog(
+    LOG_LEVELS.INFO,
+    `[githubSync] 本地读取完成：${result.size} 条有效记录（批量模式: ${rawData ? '是' : '否'}）`,
+  )
   return result
 }
 
