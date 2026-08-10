@@ -77,6 +77,8 @@ export declare const BGM_EVENTS: {
     readonly CONFIG_UPDATED: "config:updated";
     /** Ribbon 请求执行数据同步（远程仓库 → Excel） */
     readonly REQUEST_GITHUB_SYNC: "request:githubSync";
+    /** Ribbon 请求撤销最近一次同步 */
+    readonly REQUEST_UNDO_LAST_SYNC: "request:undoLastSync";
 };
 export declare const eventBus: EventBus;
 //# sourceMappingURL=events.d.ts.map

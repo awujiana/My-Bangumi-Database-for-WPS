@@ -145,6 +145,8 @@ export const BGM_EVENTS = {
   CONFIG_UPDATED: 'config:updated',
   /** Ribbon 请求执行数据同步（远程仓库 → Excel） */
   REQUEST_GITHUB_SYNC: 'request:githubSync',
+  /** Ribbon 请求撤销最近一次同步 */
+  REQUEST_UNDO_LAST_SYNC: 'request:undoLastSync',
 } as const
 
 // 创建全局事件总线实例

@@ -6,7 +6,7 @@
  */
 import { LOG_LEVELS, bgmLog, BGM, loadBgToken, clearBgToken, copyTokenToClipboard, _setBgmUserId, _setBgmUsername, getApp, getLastRow, getSyncRecordSheetIfExists, showAlert, showConfirm, showInput, showToast, refreshData, refreshSheets, refreshWorkbooks, toggleSheetLock, enlargePreview, clearSyncRecords, deduplicateSyncRecords, formatSyncRecordSheet, openSyncRecordSheet, closeDetailModal, previewSyncContent, syncSelectedRows, openBangumiTokenPage, setSyncRecordEnabled, getSyncRecordEnabled, getIncrementalSync, setIncrementalSync, getSkipConflicts, setSkipConflicts, getGithubConfig, setGithubConfig, isGithubConfigComplete, getSyncStrategy, setSyncStrategy, getSyncSourceType, setSyncSourceType, syncFromRemote, buildRawUrl, showSyncProgressDialog, updateSyncProgressDialog, completeSyncProgressDialog, hideSyncProgressDialog, showSyncResultDialog, formatDuration, } from '../../index.js';
 import { exportConfig, importConfig } from '../../services/configService.js';
-import { undoLastSyncForRibbon } from '../../services/ribbonService.js';
+import { executeUndoLastSync } from '../../services/ribbonService.js';
 import { debounce } from '../../tools/debounce.js';
 import { BGM_EVENTS, eventBus } from '../../tools/events.js';
 import { getRecentLogs, exportLogsToFile, clearLogs } from '../../tools/logger.js';
@@ -943,7 +943,7 @@ const ACTION_HANDLERS = {
     // GitHub 仓库同步：撤销最近一次同步（按单元格逆序恢复旧值）
     undoLastSync: (ctx) => {
         bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 撤销最近一次 GitHub 同步');
-        undoLastSyncForRibbon().catch((e) => {
+        executeUndoLastSync().catch((e) => {
             const errMsg = e instanceof Error ? e.message : String(e);
             bgmLog(LOG_LEVELS.ERROR, `[handleActionClick] 撤销同步失败: ${errMsg}`);
             showToast(`撤销失败：${errMsg}`, 'error');
@@ -1342,6 +1342,18 @@ function setupEventListeners() {
         }
         else {
             bgmLog(LOG_LEVELS.ERROR, '[handlers] syncFromGithub handler 未注册');
+        }
+    });
+    // Ribbon 按钮触发撤销同步：通过 eventBus 调用 taskpane 的 undoLastSync handler
+    // 在 taskpane 环境中执行，可访问 undoStack 中的实际会话数据
+    trackedEventBusOn(BGM_EVENTS.REQUEST_UNDO_LAST_SYNC, () => {
+        bgmLog(LOG_LEVELS.INFO, '[handlers] 收到 Ribbon 撤销同步请求，触发 undoLastSync handler');
+        const handler = ACTION_HANDLERS['undoLastSync'];
+        if (handler) {
+            handler({ args: [], startTime: Date.now() });
+        }
+        else {
+            bgmLog(LOG_LEVELS.ERROR, '[handlers] undoLastSync handler 未注册');
         }
     });
 }

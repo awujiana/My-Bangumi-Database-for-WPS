@@ -120,11 +120,30 @@ export declare function syncFromGithubForRibbon(): Promise<GithubSyncResult | nu
 /**
  * 撤销最近一次 GitHub 同步操作（Ribbon 入口）
  *
+ * Ribbon 与 Taskpane 为独立 iframe，撤销栈仅在 taskpane 环境中有效。
+ * 因此本函数通过 PluginStorage 写入请求信号，交由 taskpane 轮询后执行实际撤销流程
+ *（包含检查会话、确认对话框、恢复操作、结果提示）。
+ *
  * 流程：
- * 1. 读取最近一次同步会话描述；若栈为空，提示无可撤销操作
- * 2. 弹确认对话框，提示用户即将撤销的会话描述
- * 3. 调用 undoLastSync 按单元格逆序恢复
- * 4. 显示恢复条目数
+ * 1. 写入 PluginStorage 信号（bgm_request_undo_sync = 时间戳）
+ * 2. 通知用户已发送撤销请求
  */
 export declare function undoLastSyncForRibbon(): Promise<void>;
+/**
+ * 执行撤销最近一次同步操作（Taskpane 上下文）
+ *
+ * 本函数在 taskpane 环境中运行，可访问 undoStack 中的实际会话数据。
+ * 流程：
+ * 1. 检查是否有可撤销的会话；若无，提示并返回
+ * 2. 弹出确认对话框，展示会话描述
+ * 3. 执行撤销操作（undoLastSync）
+ * 4. 显示恢复结果
+ *
+ * 适用于：
+ * - Taskpane 面板中的"撤销同步"按钮点击
+ * - Ribbon 通过 PluginStorage 信号转发后的事件监听
+ *
+ * @returns 恢复的条目数，若用户取消或无会话则返回 0
+ */
+export declare function executeUndoLastSync(): Promise<number>;
 //# sourceMappingURL=ribbonService.d.ts.map

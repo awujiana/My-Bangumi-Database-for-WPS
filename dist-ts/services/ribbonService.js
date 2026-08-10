@@ -639,34 +639,72 @@ function ensureTaskpaneVisible() {
 /**
  * 撤销最近一次 GitHub 同步操作（Ribbon 入口）
  *
+ * Ribbon 与 Taskpane 为独立 iframe，撤销栈仅在 taskpane 环境中有效。
+ * 因此本函数通过 PluginStorage 写入请求信号，交由 taskpane 轮询后执行实际撤销流程
+ *（包含检查会话、确认对话框、恢复操作、结果提示）。
+ *
  * 流程：
- * 1. 读取最近一次同步会话描述；若栈为空，提示无可撤销操作
- * 2. 弹确认对话框，提示用户即将撤销的会话描述
- * 3. 调用 undoLastSync 按单元格逆序恢复
- * 4. 显示恢复条目数
+ * 1. 写入 PluginStorage 信号（bgm_request_undo_sync = 时间戳）
+ * 2. 通知用户已发送撤销请求
  */
 export async function undoLastSyncForRibbon() {
     bgmLog(LOG_LEVELS.INFO, '[undoLastSyncForRibbon] ========== Ribbon 撤销最近同步 ==========');
+    try {
+        const app = getApp();
+        if (!app?.PluginStorage) {
+            bgmLog(LOG_LEVELS.ERROR, '[undoLastSyncForRibbon] PluginStorage 不可用');
+            await wpsMsgBox('无法连接到任务面板，请稍后重试', 0, 48);
+            return;
+        }
+        app.PluginStorage.setItem('bgm_request_undo_sync', String(Date.now()));
+        bgmLog(LOG_LEVELS.INFO, '[undoLastSyncForRibbon] 已写入撤销请求信号到 PluginStorage');
+        await wpsMsgBox('已发送撤销请求，请在任务面板中确认操作', 0, 64);
+    }
+    catch (e) {
+        bgmLog(LOG_LEVELS.ERROR, `[undoLastSyncForRibbon] 写入撤销信号失败: ${e.message}`);
+        await wpsMsgBox('发送撤销请求失败，请稍后重试', 0, 16);
+    }
+}
+/**
+ * 执行撤销最近一次同步操作（Taskpane 上下文）
+ *
+ * 本函数在 taskpane 环境中运行，可访问 undoStack 中的实际会话数据。
+ * 流程：
+ * 1. 检查是否有可撤销的会话；若无，提示并返回
+ * 2. 弹出确认对话框，展示会话描述
+ * 3. 执行撤销操作（undoLastSync）
+ * 4. 显示恢复结果
+ *
+ * 适用于：
+ * - Taskpane 面板中的"撤销同步"按钮点击
+ * - Ribbon 通过 PluginStorage 信号转发后的事件监听
+ *
+ * @returns 恢复的条目数，若用户取消或无会话则返回 0
+ */
+export async function executeUndoLastSync() {
+    bgmLog(LOG_LEVELS.INFO, '[executeUndoLastSync] ========== 执行撤销最近同步 ==========');
     const description = getLastSessionDescription();
     if (!description) {
-        bgmLog(LOG_LEVELS.INFO, '[undoLastSyncForRibbon] 没有可撤销的同步操作');
+        bgmLog(LOG_LEVELS.INFO, '[executeUndoLastSync] 没有可撤销的同步操作');
         await wpsMsgBox('没有可撤销的同步操作', 0, 48);
-        return;
+        return 0;
     }
     const confirmed = await wpsMsgBox(`确认撤销最近一次同步操作？\n\n${description}\n\n将按单元格逆序恢复旧值。`, 4, // MB_YESNO
     32);
     if (confirmed !== 6) {
-        bgmLog(LOG_LEVELS.INFO, '[undoLastSyncForRibbon] 用户取消撤销');
-        return;
+        bgmLog(LOG_LEVELS.INFO, '[executeUndoLastSync] 用户取消撤销');
+        return 0;
     }
     try {
         const restored = undoLastSync();
-        bgmLog(LOG_LEVELS.INFO, `[undoLastSyncForRibbon] 已恢复 ${restored} 项变更`);
+        bgmLog(LOG_LEVELS.INFO, `[executeUndoLastSync] 已恢复 ${restored} 项变更`);
         await wpsMsgBox(`已撤销 ${restored} 项变更`, 0, 64);
+        return restored;
     }
     catch (e) {
         const errMsg = e instanceof Error ? e.message : String(e);
-        bgmLog(LOG_LEVELS.ERROR, `[undoLastSyncForRibbon] 撤销失败: ${errMsg}`);
+        bgmLog(LOG_LEVELS.ERROR, `[executeUndoLastSync] 撤销失败: ${errMsg}`);
         await wpsMsgBox(`撤销失败：${errMsg}`, 0, 16);
+        return 0;
     }
 }

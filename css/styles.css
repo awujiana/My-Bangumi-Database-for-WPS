@@ -14,16 +14,74 @@
 
 .modal-content {
     background: #2d2d2d;
-    padding: 25px;
+    padding: 0;
     border-radius: 12px;
-    width: 380px;
+    min-width: 340px;
+    max-width: 560px;
     box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+    display: flex;
+    flex-direction: column;
+    max-height: 85vh;
 }
 
-.modal-content h3 { 
-    margin: 0 0 15px 0; 
+.modal-content h3 {
+    margin: 0;
     color: #ffffff;
-    font-size: 18px;
+    font-size: 17px;
+    font-weight: 600;
+}
+
+.modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 20px;
+    border-bottom: 1px solid rgba(255,255,255,0.08);
+    flex-shrink: 0;
+}
+
+.modal-header h3 {
+    flex: 1;
+    color: #fff;
+    font-size: 17px;
+    font-weight: 600;
+}
+
+.modal-close-btn {
+    background: transparent;
+    border: none;
+    color: #888;
+    font-size: 22px;
+    cursor: pointer;
+    padding: 4px 8px;
+    line-height: 1;
+    border-radius: 6px;
+    transition: all 0.2s;
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.modal-close-btn:hover {
+    background: rgba(255,255,255,0.1);
+    color: #fff;
+}
+
+.modal-body {
+    padding: 16px 20px;
+    overflow-y: auto;
+    flex: 1;
+}
+
+.modal-footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    padding: 12px 20px;
+    border-top: 1px solid rgba(255,255,255,0.08);
+    flex-shrink: 0;
 }
 
 #dialogMessage {
@@ -56,6 +114,67 @@
 
 .confirm-yes {
     background: linear-gradient(135deg, #4a9eff 0%, #3a8ee8 100%);
+}
+
+/* ========== 同步预览弹窗 ========== */
+.sync-preview-modal .modal-content {
+    max-width: 600px;
+}
+
+.sync-preview-modal-toolbar {
+    padding: 10px 20px;
+    border-bottom: 1px solid rgba(255,255,255,0.08);
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    background: rgba(74,158,255,0.05);
+}
+
+.modal-action-btn {
+    padding: 6px 14px;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 13px;
+    background: linear-gradient(135deg, #4a9eff 0%, #3a8ee8 100%);
+    color: white;
+    transition: all 0.2s;
+}
+
+.modal-action-btn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 10px rgba(74,158,255,0.3);
+}
+
+.modal-action-btn.secondary {
+    background: #3a3a3a;
+}
+
+.modal-action-btn.secondary:hover {
+    background: #4a4a4a;
+}
+
+/* ========== 关闭按钮样式兼容 ========== */
+.detail-close-btn {
+    background: transparent;
+    border: none;
+    color: #888;
+    font-size: 22px;
+    cursor: pointer;
+    padding: 4px 8px;
+    line-height: 1;
+    border-radius: 6px;
+    transition: all 0.2s;
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.detail-close-btn:hover {
+    background: rgba(255,255,255,0.1);
+    color: #fff;
 }
 
 /* ========== 基础重置 ========== */
@@ -710,20 +829,6 @@ select.input {
     margin: 0;
     border: none;
     padding: 0;
-}
-
-.detail-close-btn {
-    background: none;
-    border: none;
-    color: #888;
-    font-size: 28px;
-    cursor: pointer;
-    padding: 0;
-    line-height: 1;
-}
-
-.detail-close-btn:hover {
-    color: #fff;
 }
 
 .detail-modal-toolbar {

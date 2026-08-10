@@ -72,6 +72,7 @@ export function startUserInfoPolling(): void {
   let lastEnableSyncRecord: boolean | null = null
   let lastPanelShownAt: string | null = null
   let lastRequestGithubSync: string | null = null
+  let lastRequestUndoSync: string | null = null
   let lastWorkbookCount = -1
   let lastActiveWorkbookName: string | null = null
 
@@ -226,6 +227,20 @@ export function startUserInfoPolling(): void {
         // 通过 taskpane 内部 eventBus 触发 handlers/index.ts 中的监听器
         // handlers 监听器会调用 ACTION_HANDLERS['syncFromGithub'] 显示进度弹窗
         eventBus.emit(BGM_EVENTS.REQUEST_GITHUB_SYNC, undefined)
+      }
+
+      // 检测撤销同步请求信号：Ribbon 点击"btnUndoLastSync"时写入 bgm_request_undo_sync 时间戳
+      // taskpane 检测到后通过内部 eventBus 触发 undoLastSync handler（包含确认对话框和恢复操作）
+      const currentRequestUndoSync = app?.PluginStorage?.getItem('bgm_request_undo_sync') || null
+      if (currentRequestUndoSync && currentRequestUndoSync !== lastRequestUndoSync) {
+        bgmLog(
+          LOG_LEVELS.INFO,
+          `[startUserInfoPolling] 检测到撤销同步请求信号: ${currentRequestUndoSync}`,
+        )
+        lastRequestUndoSync = currentRequestUndoSync
+        // 通过 taskpane 内部 eventBus 触发 handlers/index.ts 中的监听器
+        // handlers 监听器会调用 ACTION_HANDLERS['undoLastSync'] 弹出确认对话框并执行撤销
+        eventBus.emit(BGM_EVENTS.REQUEST_UNDO_LAST_SYNC, undefined)
       }
     } catch {
       // 静默处理轮询错误
