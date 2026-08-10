@@ -445,11 +445,17 @@ export function buildJsonPayload(getField: (key: string) => string, _finishedDat
       }
     }
     if (!statusFound) {
-      bgmLog(
-        LOG_LEVELS.ERROR,
-        `[buildJsonPayload] 未找到有效的观看状态，返回空对象，原始值: "${rawStatusValue}"`,
-      )
-      return '{}'
+      if (!rawStatusValue) {
+        // 所有状态字段为空 → 默认视为「想看」(status=1)
+        payload.type = 1
+        bgmLog(LOG_LEVELS.INFO, `[buildJsonPayload] 未找到观看状态，默认设为「想看」(type=1)`)
+      } else {
+        bgmLog(
+          LOG_LEVELS.ERROR,
+          `[buildJsonPayload] 未找到有效的观看状态，返回空对象，原始值: "${rawStatusValue}"`,
+        )
+        return '{}'
+      }
     }
 
     // 评分
@@ -622,14 +628,11 @@ function processRowToSyncTask(
       return { task: null, skipped: true, failed: false }
     }
 
-    // 检查观看状态是否为空
+    // 读取观看状态（空状态视为「想看」，由 mapWatchStatus 返回 1）
     const watchStatusField =
       getField(rowNum, '是否看完') || getField(rowNum, '状态') || getField(rowNum, '观看状态')
-    if (!watchStatusField) {
-      return { task: null, skipped: true, failed: false }
-    }
 
-    // 获取观看状态类型
+    // 获取观看状态类型（空值 → 1=想看，未识别 → 0 跳过）
     const watchType = mapWatchStatus(watchStatusField)
     if (watchType === 0) {
       return { task: null, skipped: true, failed: false }

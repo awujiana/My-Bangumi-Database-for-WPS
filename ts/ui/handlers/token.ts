@@ -202,7 +202,16 @@ export function testTokenValidity(): void {
 
     if (xhr.status === 200) {
       try {
-        const data = JSON.parse(xhr.responseText)
+        const data = JSON.parse(xhr.responseText) as {
+          nickname?: string
+          username?: string
+          id?: string | number
+          avatar?: {
+            large?: string
+            medium?: string
+            small?: string
+          }
+        }
         bgmLog(LOG_LEVELS.INFO, '[testTokenValidity] 响应数据: ' + JSON.stringify(data))
 
         const nickname = data.nickname || data.username || _T.unknownUser
@@ -216,6 +225,23 @@ export function testTokenValidity(): void {
 
         _setBgmUserId(userId)
         _setBgmUsername(nickname)
+
+        // 处理头像 URL：移除可能存在的反引号包裹
+        const rawAvatarUrl = data.avatar?.large || data.avatar?.medium || data.avatar?.small || ''
+        const cleanAvatarUrl = rawAvatarUrl.replace(/`/g, '').trim()
+        if (cleanAvatarUrl) {
+          BGM.cache.avatarUrl = cleanAvatarUrl
+          // 持久化头像 URL
+          try {
+            const app = getApp()
+            if (app?.PluginStorage) {
+              app.PluginStorage.setItem('bgm_avatar_url', cleanAvatarUrl)
+            }
+          } catch {
+            // 静默处理
+          }
+          showUserProfile()
+        }
       } catch (e: unknown) {
         bgmLog(LOG_LEVELS.ERROR, `[testTokenValidity] 解析响应失败: ${(e as Error).message}`)
         showError(_T.parseFailed, _T.cannotParseResponse)
@@ -228,6 +254,7 @@ export function testTokenValidity(): void {
     } else if (xhr.status === 401) {
       bgmLog(LOG_LEVELS.WARN, '[testTokenValidity] Token 无效或已过期')
       showError(_T.tokenInvalid, _T.tokenExpired)
+      hideUserProfile()
     } else {
       bgmLog(LOG_LEVELS.ERROR, `[testTokenValidity] Token 验证失败，HTTP 状态码: ${xhr.status}`)
       bgmLog(LOG_LEVELS.INFO, `[testTokenValidity] 响应内容: ${xhr.responseText}`)
@@ -326,6 +353,10 @@ export function hideUserProfile(): void {
  * 续约/刷新 Token
  * 通过测试现有 Token 的有效性，重新获取用户信息和头像
  * 如果 Token 已失效，提示用户重新输入
+ *
+ * 说明：Bangumi OAuth Token 本身没有"刷新租期"的概念，
+ * 此操作的实质是"验证 Token 有效性"和"刷新用户缓存数据"。
+ * 不会延长 Token 的有效期（Token 有效期由 Bangumi 服务端决定）。
  */
 export function renewToken(): void {
   const token = loadBgToken()
@@ -334,25 +365,36 @@ export function renewToken(): void {
     return
   }
 
-  bgmLog(LOG_LEVELS.INFO, '[renewToken] 开始续约 Token...')
-
-  // 先测试 Token 有效性
-  testTokenValidity()
+  const startTime = Date.now()
+  bgmLog(LOG_LEVELS.INFO, `[renewToken] Token 续约开始，当前时间: ${new Date().toISOString()}`)
+  bgmLog(
+    LOG_LEVELS.INFO,
+    `[renewToken] 功能说明：本操作将验证 Token 有效性并刷新用户信息（头像、ID、用户名），不会延长 Token 有效期`,
+  )
 
   // 同时刷新用户信息和头像
   fetchBgmUserInfo()
     .then(({ userInfo, errorType }) => {
+      const duration = Date.now() - startTime
       if (userInfo?.username) {
         showUserProfile()
-        bgmLog(LOG_LEVELS.INFO, `[renewToken] Token 续约成功: ${userInfo.username}`)
+        bgmLog(
+          LOG_LEVELS.INFO,
+          `[renewToken] Token 续约成功，耗时: ${duration}ms，用户名: ${userInfo.username}`,
+        )
+        showToast(`Token 验证成功，用户: ${userInfo.username}`, 'success')
       } else if (errorType === 'http') {
         // Token 失效
+        bgmLog(LOG_LEVELS.WARN, `[renewToken] Token 续约失败（HTTP错误），耗时: ${duration}ms`)
         showToast(_T.tokenRenewFailed, 'error')
         hideUserProfile()
+      } else if (errorType === 'network') {
+        bgmLog(LOG_LEVELS.WARN, `[renewToken] Token 续约失败（网络错误），耗时: ${duration}ms`)
+        showToast('网络连接失败，无法验证 Token', 'warn')
       }
     })
     .catch((err: unknown) => {
       const errMsg = err instanceof Error ? err.message : String(err)
-      bgmLog(LOG_LEVELS.ERROR, `[renewToken] Token 续约失败: ${errMsg}`)
+      bgmLog(LOG_LEVELS.ERROR, `[renewToken] Token 续约异常: ${errMsg}`)
     })
 }

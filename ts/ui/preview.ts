@@ -526,6 +526,64 @@ export async function previewSyncContent(): Promise<void> {
     select.value = 'all'
     select.dispatchEvent(new Event('change'))
 
+    // ----- 绑定「全部同步」按钮点击事件 -----
+    const syncAllBtnEl = document.getElementById('syncAllBtn')
+    if (syncAllBtnEl) {
+      syncAllBtnEl.onclick = () => {
+        syncAllRows().catch((e: unknown) => {
+          bgmLog(LOG_LEVELS.ERROR, `[preview] syncAllRows 异常: ${(e as Error).message}`)
+        })
+      }
+    }
+
+    // ----- 绑定滚动按钮事件 -----
+    const scrollTopBtn = document.getElementById('scrollToTopBtn')
+    const scrollBottomBtn = document.getElementById('scrollToBottomBtn')
+
+    const updateScrollButtons = () => {
+      const scrollTop = body.scrollTop
+      const scrollHeight = body.scrollHeight
+      const clientHeight = body.clientHeight
+      const maxScroll = scrollHeight - clientHeight
+
+      // 只有内容可滚动时才显示按钮
+      if (maxScroll <= 0) {
+        scrollTopBtn?.classList.add('hidden')
+        scrollBottomBtn?.classList.add('hidden')
+        return
+      }
+
+      // 根据位置显示/隐藏按钮
+      if (scrollTop <= 10) {
+        scrollTopBtn?.classList.add('hidden')
+      } else {
+        scrollTopBtn?.classList.remove('hidden')
+      }
+
+      if (scrollTop >= maxScroll - 10) {
+        scrollBottomBtn?.classList.add('hidden')
+      } else {
+        scrollBottomBtn?.classList.remove('hidden')
+      }
+    }
+
+    // 初始化按钮可见性
+    updateScrollButtons()
+
+    // 滚动事件监听
+    body.addEventListener('scroll', updateScrollButtons)
+
+    // 按钮点击事件
+    scrollTopBtn?.addEventListener('click', () => {
+      body.scrollTo({ top: 0, behavior: 'smooth' })
+    })
+    scrollBottomBtn?.addEventListener('click', () => {
+      body.scrollTo({ top: body.scrollHeight, behavior: 'smooth' })
+    })
+
+    // 窗口大小变化时更新
+    window.addEventListener('resize', updateScrollButtons)
+
     bgmLog(LOG_LEVELS.INFO, `[preview] 模态框已显示（${actualCardCount} 条卡片，下拉全部）`)
   } finally {
     // 退出运行状态，确保即使异常也能清理
@@ -742,7 +800,22 @@ export async function syncAllRows(): Promise<{ success: number; fail: number; sk
 
   const token = loadBgToken()
   if (!token) {
-    safeAlert('请先设置 Bangumi Token！')
+    // 无 token 流程：显示进度弹窗提示用户，不退出页面
+    showSyncProgressDialog('Bangumi Token 未设置', {
+      onPause: () => {},
+      onResume: () => {},
+      onStop: () => {},
+    })
+    completeSyncProgressDialog(
+      '⚠️ 无法同步：缺少 Bangumi Token',
+      [
+        '请先设置 Bangumi Token 后再尝试同步',
+        '点击 Ribbon 上的「设置 Token」按钮进行配置',
+        '或在任务窗格的「Token 设置」区域输入 Token',
+      ],
+      false,
+    )
+    showToast('请先设置 Bangumi Token', 'warn')
     return { success: 0, fail: 0, skip: 0 }
   }
 
