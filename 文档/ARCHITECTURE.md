@@ -1,6 +1,6 @@
 # Bangumi WPS Excel 加载项 - 架构与项目知识文档
 
-> 版本: 1.1 | 更新日期: 2026-08-12
+> 版本: 2.3 | 更新日期: 2026-08-12
 
 ---
 
@@ -13,6 +13,8 @@
 | v1.2 | 2026-08-10 | 撤销栈增加工作表身份校验，httpRequest 强制 zodSchema                                               |
 | v2.0 | 2026-08-10 | 架构文档：新增 debugPanel 模块详解，补充模块依赖关系树                                             |
 | v2.1 | 2026-08-12 | Token 明文存储（移除 XOR 加密），httpGet/httpPost 标记 @deprecated，新增 BroadcastChannel 单元测试 |
+| v2.2 | 2026-08-12 | 补充同步策略对比表、删除机制详解、撤销恢复机制、删除保护机制文档                                   |
+| v2.3 | 2026-08-12 | 补充 SID 白名单过滤详解（两层过滤机制，确保非 BGM 条目不被误删）                                   |
 
 ## 一、架构概览
 
@@ -639,6 +641,92 @@ handlers/sync.ts → syncCollectionFromBgm
 ```
 
 ### 4.3 数据同步流程 (远程仓库 → Excel)
+
+#### 同步策略对比
+
+| 策略                | 新增 (add) | 更新 (update) | 删除 (delete) | 代码位置                      | 适用场景                             |
+| ------------------- | :--------: | :-----------: | :-----------: | ----------------------------- | ------------------------------------ |
+| `add-update` (默认) |     ✅     |      ✅       |      ❌       | `githubSyncDiff.ts#L412-L424` | 保守同步，不丢失本地数据             |
+| `add-only`          |     ✅     |      ❌       |      ❌       | `githubSyncDiff.ts#L422-L423` | 只添加新条目到 Excel                 |
+| `update-only`       |     ❌     |      ✅       |      ❌       | `githubSyncDiff.ts#L411-L412` | 只更新已有行，不新增                 |
+| **`mirror`**        |     ✅     |      ✅       |    **✅**     | `githubSyncDiff.ts#L479-L497` | **完整镜像，远程删除后同步删除本地** |
+| `force-overwrite`   |     ✅     |  ✅ (全字段)  |      ❌       | `githubSyncDiff.ts#L425-L435` | 强制覆盖，含空值覆盖                 |
+
+> ⚠️ **关键提醒**：默认 `add-update` 策略**不会删除**任何本地行。若需同步远程删除，必须选择 `mirror` 策略。
+
+#### 删除机制详解
+
+当使用 `mirror` 策略时，插件通过以下流程处理删除：
+
+**1. 差异计算阶段** (`computeDiff()`)
+
+| 步骤 | 操作                                                  | 代码位置                      |
+| ---- | ----------------------------------------------------- | ----------------------------- |
+| ①    | 构建远程 SID 集合 `remoteSids`                        | `githubSyncDiff.ts#L402-L406` |
+| ②    | 遍历本地 Excel 所有 SID                               | `githubSyncDiff.ts#L480-L496` |
+| ③    | 本地 SID 不在 `remoteSids` 中 → 标记 `kind: 'delete'` | `githubSyncDiff.ts#L489-L494` |
+| ④    | 时间筛选保护：筛选范围外的本地行跳过删除              | `githubSyncDiff.ts#L485-L488` |
+
+**2. 执行删除阶段** (`applyDiffToSheet()`)
+
+| 步骤 | 操作                                                  | 代码位置                    |
+| ---- | ----------------------------------------------------- | --------------------------- |
+| ①    | 按行号**倒序**排列 diffs（避免先行删除导致行号错位）  | `githubSync.ts#L1066-L1070` |
+| ②    | 分离 `deleteDiffs`（仅保留有 `localRow` 的删除项）    | `githubSync.ts#L1076`       |
+| ③    | 记录撤销快照：`recordRowDeleteEntry({ row, values })` | `githubSync.ts#L1122-L1126` |
+| ④    | 调用 `ws.Range("行号:行号").Delete()` 删除整行        | `githubSync.ts#L1128`       |
+| ⑤    | 写入同步记录（状态：成功/失败）                       | `githubSync.ts#L1130-L1137` |
+
+**3. 撤销恢复机制** (`undoStack.undoLastSync()`)
+
+| 操作 | 说明                                       | 代码位置                 |
+| ---- | ------------------------------------------ | ------------------------ |
+| ①    | 撤销时按行号**从大到小**恢复被删除的行     | `undoStack.ts#L136`      |
+| ②    | 从快照中读取 `rowValues`，在原位置插入新行 | `undoStack.ts#L171-L177` |
+| ③    | 恢复完成后弹出会话                         | `undoStack.ts#L162-L164` |
+
+**删除保护机制**
+
+| 保护措施           | 说明                                                                                                          | 代码位置                                                 |
+| ------------------ | ------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------- |
+| **SID 白名单过滤** | 两层过滤：① 无 Bangumi_URL 列值的行直接跳过；② `extractSubjectId()` 无法提取有效 SID（非 1-8 位数字）的行跳过 | `githubSync.ts#L347-L350`<br>`pureUtilsCore.ts#L82-L118` |
+| 时间筛选           | 筛选范围外的本地行不执行删除                                                                                  | `githubSyncDiff.ts#L485-L488`                            |
+| 行号倒序           | 防止先行删除导致后续行号偏移                                                                                  | `githubSync.ts#L1066-L1070`                              |
+| 撤销栈             | 删除前保存快照，可一键恢复                                                                                    | `undoStack.ts#L73-L78`                                   |
+| 异常捕获           | 删除失败不中断整体同步流程                                                                                    | `githubSync.ts#L1138-L1154`                              |
+
+**SID 白名单过滤详解（非 BGM 条目不删除）**
+
+`readLocalEntries()` 在构建本地条目 Map 时，通过两层关卡过滤，只有满足条件的行才会进入同步视野：
+
+| 本地行状态                                 |      能否进入 `localEntries`      | 能否被 `mirror` 删除 |
+| ------------------------------------------ | :-------------------------------: | :------------------: |
+| 无 Bangumi_URL 列值（空行/非 BGM 条目）    |        ❌ `continue` 跳过         |          ❌          |
+| URL 不是 Bangumi 域名（手写备注/外部链接） |  ❌ `extractSubjectId` 返回 null  |          ❌          |
+| URL 格式不合法（特殊字符/目录遍历）        |  ❌ `extractSubjectId` 返回 null  |          ❌          |
+| URL 纯数字但 ≥ 9 位（脏数据）              | ❌ `/\d{1,8}$/.test(id)` 校验失败 |          ❌          |
+| URL 有效，SID 在远程仓库中                 |    ✅ 但在 `remoteSids` 中找到    |    ❌（正常保留）    |
+| URL 有效，SID 不在远程仓库                 |                ✅                 |    ✅（会被删除）    |
+
+```typescript
+// 两层过滤代码（githubSync.ts#L347-L350）
+const url = getField('Bangumi_URL')
+if (!url) continue        // 关卡1：没有 URL → 跳过
+const sid = extractSubjectId(url)
+if (!sid) continue        // 关卡2：URL 无法提取 SID → 跳过
+
+result.set(sid, { row, sid, fields: {...} })  // 只有通过两关才加入 Map
+```
+
+`extractSubjectId()` 核心校验（pureUtilsCore.ts#L115-L117）：
+
+```typescript
+// 强制校验为 1-8 位数字（防止脏数据：超长数字、目录遍历字符等）
+if (!/^\d{1,8}$/.test(id)) return null
+return id
+```
+
+**完整流程图**
 
 ```
 用户点击「从仓库同步」或 Ribbon 按钮
