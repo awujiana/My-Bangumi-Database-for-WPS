@@ -1,17 +1,18 @@
 # Bangumi WPS Excel 加载项 - 架构与项目知识文档
 
-> 版本: 1.0 | 更新日期: 2026-08-10
+> 版本: 1.1 | 更新日期: 2026-08-12
 
 ---
 
 ## 版本历史
 
-| 版本 | 日期       | 变更说明                                               |
-| ---- | ---------- | ------------------------------------------------------ |
-| v1.0 | 2026-08-10 | 初始版本                                               |
-| v1.1 | 2026-08-10 | 补充调试区域文档，postMessage 源校验加固               |
-| v1.2 | 2026-08-10 | 撤销栈增加工作表身份校验，httpRequest 强制 zodSchema   |
-| v2.0 | 2026-08-10 | 架构文档：新增 debugPanel 模块详解，补充模块依赖关系树 |
+| 版本 | 日期       | 变更说明                                                                                           |
+| ---- | ---------- | -------------------------------------------------------------------------------------------------- |
+| v1.0 | 2026-08-10 | 初始版本                                                                                           |
+| v1.1 | 2026-08-10 | 补充调试区域文档，postMessage 源校验加固                                                           |
+| v1.2 | 2026-08-10 | 撤销栈增加工作表身份校验，httpRequest 强制 zodSchema                                               |
+| v2.0 | 2026-08-10 | 架构文档：新增 debugPanel 模块详解，补充模块依赖关系树                                             |
+| v2.1 | 2026-08-12 | Token 明文存储（移除 XOR 加密），httpGet/httpPost 标记 @deprecated，新增 BroadcastChannel 单元测试 |
 
 ## 一、架构概览
 
@@ -45,7 +46,7 @@
 ts/index.ts (barrel export)
   ├── ts/core/           (零依赖基础层)
   │   ├── constants.ts     → 常量、枚举、映射表
-  │   ├── crypto.ts        → Token 加解密 (XOR 历史兼容)
+  │   ├── crypto.ts        → Token 校验与完整性验证 (明文存储 + 校验和)
   │   └── result.ts        → Result<T> 类型 + BgmError
   │
   ├── ts/tools/          (基础设施层)
@@ -149,17 +150,15 @@ ts/index.ts (barrel export)
 - **表头关键字** (`HEADER_KEYWORDS`): 52 个关键字用于自动检测表头行
 - **标准表头** (`STANDARD_HEADERS`): 37 列标准模板列序
 - **同步记录表列** (`SYNC_RECORD_COLUMNS`): 12 列 (SID/同步时间/名称/URL/条目类型/来源/次数/内容/状态/收藏状态/备注/数据指纹)
-- **Token 配置** (`TOKEN_CONFIG`): VERSION='1'（用于识别历史 XOR 加密数据）
+- **Token 配置** (`TOKEN_CONFIG`): VERSION='1'（Token 明文存储版本号）
 
-#### `crypto.ts` — Token 加密/解密
+#### `crypto.ts` — Token 校验与完整性验证
 
-- **当前策略**: Token 明文存储，XOR 加密仅用于兼容历史数据读取
-- `encryptToken(token)`: XOR 加密（已废弃，仅保留用于向后兼容）
-- `decryptToken(encrypted)`: 解密历史 XOR 数据，自动升级为明文
+- **当前策略**: Token 明文存储，校验和验证完整性
 - `calcChecksum(input)`: 32 位左移+求和校验和
 - `buildPayload(token)`: 构建 `{version}:{checksum}:{token}` 格式
 - `extractToken(encrypted)`: 从 Payload 提取 Token 并校验版本号与校验和
-- **历史 XOR 密钥**: `LEGACY_XOR_KEY = 'bgmtoken_secret_key_2024'`（仅在模块内部保留）
+- **历史 XOR 加密**: 已移除（`encryptToken`/`decryptToken` 函数及 `LEGACY_XOR_KEY` 常量均已删除）
 
 #### `result.ts` — 结果类型封装
 
@@ -365,7 +364,7 @@ ts/index.ts (barrel export)
   - 支持 AbortSignal 取消
   - 可选 Zod Schema 运行时校验
   - 返回 `Result<{ status, data }>` 类型
-- **便捷方法**: `httpGet()`, `httpPost()`, `httpPut()`, `httpDelete()`
+- **便捷方法**: `httpGet()`, `httpPost()`, `httpPut()`, `httpDelete()` — 均已标记 `@deprecated`，推荐使用 `httpRequest()` 并传入 `zodSchema` 以确保类型安全
 - **Endpoint 安全校验**: 禁止 `..` 路径遍历和 `http` 前缀
 - **进度回调**: `onProgress(current, total)` 用于上传进度
 - **默认超时**: 30000ms
@@ -528,7 +527,7 @@ ts/index.ts (barrel export)
 1. `ribbon-entry.ts` 启动 → `OnAddinLoad()` → 设置 `EnableFlag='false'` 和 `ApiEventFlag='false'`
 2. `taskpane-entry.ts` 启动 → `initTaskpane()` → 从 PluginStorage 恢复用户信息
 3. `getGithubConfig()` 首次读取时，若 owner/repo/path 全为空，自动写入 `DEFAULT_GITHUB_CONFIG`
-4. Token 通过 `loadBgToken()` 读取，检测到历史 XOR 加密格式（`v1.` 前缀）时自动升级为明文
+4. Token 通过 `loadBgToken()` 明文读取（已移除历史 XOR 加密自动升级逻辑）
 
 ### 3.3 配置读写路径
 
@@ -547,7 +546,17 @@ ts/index.ts (barrel export)
   Ribbon ↔ Taskpane:
     - postMessage (同源 iframe 直接通信)
     - PluginStorage 轮询 (每 2 秒，兜底方案)
+    - BroadcastChannel (备用方案，跨 WebView 消息广播)
 ```
+
+### 3.4 BroadcastChannel 跨 WebView 通信
+
+项目使用 `BroadcastChannel` API 作为跨 WebView 消息传递的后备机制：
+
+- **频道名称**: `BGM-config`
+- **消息格式**: `{ type: 'BGM:configUpdated', data: { key, value } }`
+- **安全校验**: 仅接受同源 (`window.location.origin`) 来源的消息
+- **单元测试**: `tests/broadcastChannel.test.ts` 包含 13 个测试用例，覆盖初始化、消息传递、错误处理和生命周期管理
 
 ---
 
