@@ -72,6 +72,10 @@
                 <button class="btn small" data-action="exportConfig" style="flex:1;">📤 导出配置</button>
                 <button class="btn small" data-action="importConfig" style="flex:1;">📥 导入配置</button>
             </div>
+            <div class="btn-group" style="margin-top:8px;">
+                <button class="btn small" data-action="exportConfig">📤 导出配置</button>
+                <button class="btn small" data-action="importConfig">📥 导入配置</button>
+            </div>
             <p class="hint">Access Token 获取方式：<a href="#" data-action="openTokenPage">点击创建</a><br>
             Token 以明文存储以便复制使用，关闭文档后会随插件存储清除</p>
         </div>
@@ -97,6 +101,26 @@
                 </select>
             </div>
             <p class="hint">collect - 已看完的番剧<br>wish - 想看还没看的<br>do - 正在追的番剧</p>
+        </div>
+
+        <div class="section">
+            <h3>收藏回写数据源</h3>
+            <div class="form-group">
+                <label>空表时填充数据源：</label>
+                <select id="writebackSourceSelect" class="input">
+                    <option value="api" selected>Bangumi API（推荐）</option>
+                    <option value="github">GitHub 仓库</option>
+                </select>
+            </div>
+            <p class="hint">
+                当 Excel 工作表为空（无 Bangumi URL 条目）时，收藏回写会先从此数据源获取数据填充 Excel，<br>
+                然后标记你的收藏状态。<br>
+                <strong>Bangumi API</strong>：获取你自己的收藏列表（需 Token）。<br>
+                <strong>GitHub 仓库</strong>：从远程仓库获取 bangumi.jsonl 全量数据。
+            </p>
+            <div class="btn-group">
+                <button class="btn small primary" data-action="saveWritebackSource">💾 保存</button>
+            </div>
         </div>
 
         <div class="section">
@@ -380,7 +404,11 @@
                 <button class="btn small" data-action="syncFromGithub">⬇️ 立即同步</button>
                 <button class="btn small" data-action="undoLastSync">↩️ 撤销上次同步</button>
                 <button class="btn small" data-action="testGithubConfig" title="测试配置是否可用（HEAD 请求）">🔌 测试</button>
+                <button class="btn small" data-action="clearGithubCache" id="clearCacheBtn" title="清除本地缓存的 GitHub 数据">🗑️ 清除缓存</button>
             </div>
+            <p class="hint" id="githubCacheStatus">
+                💾 数据缓存：<span id="githubCacheStatusText">检查中...</span>
+            </p>
             <p class="hint">
                 <strong>JSONL 格式</strong>：每行一个 JSON 对象（无外层数组括号，无逗号分隔）<br>
                 <code>{"sid":"8","name":"Code Geass R2","updatedAt":"2026-08-04","date":"2008-04-06","meta_tags":["机战","TV","日本"],"nsfw":false,"话数":"25","导演":"谷口悟朗","动画制作公司":"サンライズ","系列构成":"大河内一楼"}</code><br>
@@ -445,17 +473,17 @@
 
         <!-- 连接测试结果弹窗 -->
         <div id="connectionTestModal" class="modal" style="display:none;">
-            <div class="modal-content" style="max-width:500px;">
+            <div class="modal-content" style="max-width:520px;">
                 <div class="modal-header">
                     <h3>🔌 连接测试结果</h3>
-                    <button class="detail-close-btn" data-action="closeConnectionTest" aria-label="关闭连接测试对话框">×</button>
+                    <button class="modal-close-btn" data-action="closeConnectionTest" aria-label="关闭">×</button>
                 </div>
-                <div class="connection-test-body" id="connectionTestBody">
+                <div class="modal-body" id="connectionTestBody">
                     <!-- 测试结果动态填充 -->
                 </div>
-                <div class="connection-test-footer">
+                <div class="modal-footer">
                     <button class="btn small" data-action="testGithubConfig" id="retryConnectionTestBtn">🔄 重新测试</button>
-                    <button class="btn small primary" data-action="closeConnectionTest">✕ 关闭</button>
+                    <button class="btn small primary" data-action="closeConnectionTest">关闭</button>
                 </div>
             </div>
         </div>

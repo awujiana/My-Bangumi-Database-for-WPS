@@ -2407,20 +2407,8 @@ select.input {
 }
 
 /* ========== 连接测试弹窗 ========== */
-.connection-test-body {
-    padding: 16px 0;
-}
-
-.connection-test-footer {
-    display: flex;
-    gap: 8px;
-    justify-content: flex-end;
-    padding-top: 12px;
-    border-top: 1px solid rgba(255, 255, 255, 0.08);
-}
-
 .connection-test-result {
-    padding: 8px 0;
+    padding: 4px 0;
 }
 
 .connection-status {
