@@ -4,6 +4,15 @@
 
 ---
 
+## 版本历史
+
+| 版本 | 日期       | 变更说明                                               |
+| ---- | ---------- | ------------------------------------------------------ |
+| v1.0 | 2026-08-10 | 初始版本                                               |
+| v1.1 | 2026-08-10 | 补充调试区域文档，postMessage 源校验加固               |
+| v1.2 | 2026-08-10 | 撤销栈增加工作表身份校验，httpRequest 强制 zodSchema   |
+| v2.0 | 2026-08-10 | 架构文档：新增 debugPanel 模块详解，补充模块依赖关系树 |
+
 ## 一、架构概览
 
 ### 1.1 系统分层模型
@@ -94,6 +103,9 @@ ts/index.ts (barrel export)
       ├── bgmCollection.ts  → 收藏数据校验
       ├── bgmUser.ts        → 用户数据校验
       └── githubEntry.ts    → GitHub 条目校验
+  │
+  └── ts/debugPanel.ts  (独立调试模块，仅开发环境)
+      └── 无依赖：仅读取 window 状态 + 动态 import logger
 ```
 
 ### 1.3 入口点
@@ -400,6 +412,61 @@ ts/index.ts (barrel export)
 #### `githubEntry.ts` — GitHub 条目校验
 
 - GitHub 远程条目的 Zod Schema 定义
+
+### 2.7 调试面板 (`ts/debugPanel.ts`)
+
+- **文件**: `ts/debugPanel.ts`（约 938 行）
+- **目的**: 开发环境调试工具，**不在生产环境中激活**
+- **激活条件**: 当 `typeof WpsInvoke === 'undefined'` 时自动启动（即 WPS 加载项宿主不可用，代表开发服务器环境）
+- **设计原则**: 无侵入——不修改任何现有模块逻辑，仅通过读取 `window` 状态获取信息
+
+#### 四大功能区
+
+1. **模块状态 (modules)**
+   - 从 `window.__BGM_MODULE_STATUS__` 读取各模块加载状态
+   - 显示已加载/失败模块列表，标记 critical 模块
+   - 每 3 秒自动刷新状态栏（反映模块加载进度）
+
+2. **Ribbon 测试 (ribbon)**
+   - 卡片式布局展示 9 个 Ribbon 按钮（与 `ribbon.xml` 同步）
+   - 点击卡片可直接调用 `OnAction({ Id: btnId })` 和 `GetBangumiImage({ Id: btnId })`
+   - 验证 Ribbon 回调函数是否正确注册
+
+3. **控制台日志 (console)**
+   - 动态 `import('./tools/logger.js')` 获取 logger 引用
+   - 支持按级别筛选（全部/Info/Warn/Error）
+   - 深色主题控制台显示，2 秒轮询刷新
+   - 支持清空和导出日志到文件
+
+4. **环境信息 (env)**
+   - 显示页面 URL、WpsInvoke 状态、Ribbon 就绪状态
+   - 检测关键回调函数（OnAddinLoad、OnAction、GetBangumiImage 等）
+   - 检测 DOMPurify、Zod 等依赖是否可用
+   - 提供快捷操作：刷新页面、清除缓存刷新、导出诊断报告、重新加载模块
+
+#### 关键导出与函数
+
+| 函数                       | 说明                                                 |
+| -------------------------- | ---------------------------------------------------- |
+| `initDebugPanel()`         | 主入口，检测环境后自动构建并挂载面板到 DOM           |
+| `isDebugEnvironment()`     | 检测是否为开发环境（无 WpsInvoke）                   |
+| `getModuleStatuses()`      | 读取 `window.__BGM_MODULE_STATUS__` 获取模块加载状态 |
+| `getLogger()`              | 动态导入 logger 模块（懒加载，避免影响生产环境）     |
+| `exportDiagnosticReport()` | 导出包含环境信息的 JSON 诊断报告                     |
+| `buildStatusBarHTML()`     | 构建状态栏 HTML（Ribbon 就绪状态 + 模块加载进度）    |
+
+#### 集成方式
+
+- **自动启动**: 文件末尾通过 `DOMContentLoaded` 事件自动调用 `initDebugPanel()`
+- **状态读取**: 从 `window.__BGM_MODULE_STATUS__`（由 `index.ts` main.js 写入）获取模块状态
+- **Logger 集成**: 通过动态 `import('./tools/logger.js')` 获取 `LoggerModule` 接口，读取 `getRecentLogs()`、调用 `clearLogs()` 和 `exportLogsToFile()`
+- **Ribbon 测试**: 直接调用 `window.OnAction()` 和 `window.GetBangumiImage()`，无需 Ribbon UI 参与
+
+#### 何时使用
+
+- **开发模式**: 在浏览器中直接打开 HTML 页面时，因 `WpsInvoke` 不存在，面板自动激活
+- **生产环境**: WPS 宿主中 `WpsInvoke` 可用，`isDebugEnvironment()` 返回 `false`，面板不渲染
+- **诊断报告**: 遇到线上问题时，可在开发环境复现后导出 JSON 诊断信息辅助排查
 
 ---
 

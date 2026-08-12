@@ -55,11 +55,7 @@ export {
 // 计算校验和
 calcChecksum, 
 // 从解密字符串提取 Token
-extractToken, 
-// XOR 加密
-encryptToken, 
-// XOR 解密
-decryptToken, } from './core/crypto.js';
+extractToken, } from './core/crypto.js';
 // ============================================================================
 // 4. HTTP 请求模块（来自 tools/http.js）
 // ============================================================================

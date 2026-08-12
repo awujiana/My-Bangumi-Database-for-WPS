@@ -17,10 +17,8 @@ import {
   LOG_LEVELS,
   ERROR_LEVELS,
   ErrorLevel,
-  TOKEN_CONFIG,
   type ErrorOptions,
 } from '../../core/constants.js'
-import { decryptToken } from '../../core/crypto.js'
 import { BgmError } from '../../core/result.js'
 import type { BGMCache, BGMSheet, BGMSync, BGMUserInfo } from '../../index.js'
 import { showConfirm, type DialogOptions } from '../../ui/dialog.js'
@@ -740,39 +738,20 @@ export function getTokenRemainingTime(expires: number): {
 }
 
 /**
- * 加载 Token（明文读取，自动兼容历史 XOR 加密数据）
+ * 加载 Token（明文读取）
  *
- * @description
- * - 新数据：直接返回明文 Token
- * - 历史数据：检测 `v1.` 前缀时调用 decryptToken 解密，并自动升级为明文存储
- *
- * @returns Token 字符串或 null（未存储或解密失败）
+ * @returns Token 字符串或 null（未存储）
  */
 export function loadBgToken(): string | null {
   const app = getApp() as {
     PluginStorage?: {
       getItem: (key: string) => string | null
-      setItem: (key: string, value: string) => void
     }
   }
   if (!app?.PluginStorage) return null
   const stored = app.PluginStorage.getItem('bgm_token')
   if (!stored) return null
 
-  // 兼容历史 XOR 加密数据：格式为 "{VERSION}.{ivBase64}.{encryptedBase64}"
-  if (stored.startsWith(`${TOKEN_CONFIG.VERSION}.`)) {
-    const decrypted = decryptToken(stored)
-    if (decrypted) {
-      // 自动升级为明文存储
-      app.PluginStorage.setItem('bgm_token', decrypted)
-      bgmLog(LOG_LEVELS.INFO, '[loadBgToken] 历史加密 Token 已升级为明文存储')
-      return decrypted
-    }
-    bgmLog(LOG_LEVELS.WARN, '[loadBgToken] 历史加密 Token 解密失败，视为无效')
-    return null
-  }
-
-  // 明文直接返回
   return stored
 }
 

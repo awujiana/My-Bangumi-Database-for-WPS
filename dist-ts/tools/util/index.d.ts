@@ -128,13 +128,9 @@ export declare function getTokenRemainingTime(expires: number): {
     label: string;
 };
 /**
- * 加载 Token（明文读取，自动兼容历史 XOR 加密数据）
+ * 加载 Token（明文读取）
  *
- * @description
- * - 新数据：直接返回明文 Token
- * - 历史数据：检测 `v1.` 前缀时调用 decryptToken 解密，并自动升级为明文存储
- *
- * @returns Token 字符串或 null（未存储或解密失败）
+ * @returns Token 字符串或 null（未存储）
  */
 export declare function loadBgToken(): string | null;
 /**

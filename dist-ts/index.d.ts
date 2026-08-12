@@ -8,7 +8,7 @@
 import type { WpsWorksheet } from './tools/wps.js';
 export { ErrorLevel, type ErrorOptions, WPS_ENUM, XL, BGM_CONFIG, BGM_COLOR, LOG_LEVELS, ERROR_LEVELS, PANEL_CONFIG, BGM_SUBJECT_TYPES, COLLECTION_TYPE_NAMES, SYNC_STATUS, COLUMN_RULES, HEADER_KEYWORDS, IMPORTANT_COLS, FIELD_NAME_MAP, URL_PATTERNS, TOKEN_CONFIG, WATCH_STATUS_MAP, COLUMNS, SYNC_RECORD_SHEET_NAME, SYNC_RECORD_COLUMNS, SYNC_RECORD_COL, SYNC_RECORD_TYPE_COLOR, } from './core/constants.js';
 export { BgmError, Result, type BatchSyncResult, } from './core/result.js';
-export { calcChecksum, extractToken, encryptToken, decryptToken, } from './core/crypto.js';
+export { calcChecksum, extractToken, } from './core/crypto.js';
 export { httpRequest, type HttpMethod, } from './tools/http.js';
 export { showAlert, // 提示
 showConfirm, // 确认

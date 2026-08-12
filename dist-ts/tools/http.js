@@ -255,19 +255,54 @@ function executeXhrRequest(url, options) {
 // ========== 便捷方法 ==========
 /**
  * GET 请求
- * @example httpGet<UserInfo>('/v0/me', token)
+ *
+ * @deprecated 请使用 httpRequest 并提供 zodSchema 以确保类型安全
+ * @example
+ * // 推荐使用 httpRequest：
+ * const result = await httpRequest<UserInfo>('/v0/me', {
+ *   method: 'GET',
+ *   token,
+ *   zodSchema: userInfoSchema,
+ * });
  */
 export const httpGet = (endpoint, token) => httpRequest(endpoint, { method: 'GET', ...(token !== undefined && { token }) });
 /**
  * POST 请求
- * @example httpPost('/v0/users/123/collections', jsonBody, token)
+ *
+ * @deprecated 请使用 httpRequest 并提供 zodSchema 以确保类型安全
+ * @example
+ * // 推荐使用 httpRequest：
+ * const result = await httpRequest<Collection>('/v0/users/123/collections', {
+ *   method: 'POST',
+ *   body: jsonBody,
+ *   token,
+ *   zodSchema: collectionSchema,
+ * });
  */
 export const httpPost = (endpoint, body, token) => httpRequest(endpoint, { method: 'POST', body, ...(token !== undefined && { token }) });
 /**
  * PUT 请求
+ *
+ * @deprecated 请使用 httpRequest 并提供 zodSchema 以确保类型安全
+ * @example
+ * // 推荐使用 httpRequest：
+ * const result = await httpRequest<Collection>('/v0/users/123/collections/456', {
+ *   method: 'PUT',
+ *   body: jsonBody,
+ *   token,
+ *   zodSchema: collectionSchema,
+ * });
  */
 export const httpPut = (endpoint, body, token) => httpRequest(endpoint, { method: 'PUT', body, ...(token !== undefined && { token }) });
 /**
  * DELETE 请求
+ *
+ * @deprecated 请使用 httpRequest 并提供 zodSchema 以确保类型安全
+ * @example
+ * // 推荐使用 httpRequest：
+ * const result = await httpRequest<null>('/v0/users/123/collections/456', {
+ *   method: 'DELETE',
+ *   token,
+ * });
  */
 export const httpDelete = (endpoint, token) => httpRequest(endpoint, { method: 'DELETE', ...(token !== undefined && { token }) });

@@ -46,7 +46,15 @@ export declare function httpRequest<T = unknown>(endpoint: string, options?: Htt
 }>>;
 /**
  * GET 请求
- * @example httpGet<UserInfo>('/v0/me', token)
+ *
+ * @deprecated 请使用 httpRequest 并提供 zodSchema 以确保类型安全
+ * @example
+ * // 推荐使用 httpRequest：
+ * const result = await httpRequest<UserInfo>('/v0/me', {
+ *   method: 'GET',
+ *   token,
+ *   zodSchema: userInfoSchema,
+ * });
  */
 export declare const httpGet: <T = unknown>(endpoint: string, token?: string) => Promise<Result<{
     status: number;
@@ -54,7 +62,16 @@ export declare const httpGet: <T = unknown>(endpoint: string, token?: string) =>
 }>>;
 /**
  * POST 请求
- * @example httpPost('/v0/users/123/collections', jsonBody, token)
+ *
+ * @deprecated 请使用 httpRequest 并提供 zodSchema 以确保类型安全
+ * @example
+ * // 推荐使用 httpRequest：
+ * const result = await httpRequest<Collection>('/v0/users/123/collections', {
+ *   method: 'POST',
+ *   body: jsonBody,
+ *   token,
+ *   zodSchema: collectionSchema,
+ * });
  */
 export declare const httpPost: <T = unknown>(endpoint: string, body: string, token?: string) => Promise<Result<{
     status: number;
@@ -62,6 +79,16 @@ export declare const httpPost: <T = unknown>(endpoint: string, body: string, tok
 }>>;
 /**
  * PUT 请求
+ *
+ * @deprecated 请使用 httpRequest 并提供 zodSchema 以确保类型安全
+ * @example
+ * // 推荐使用 httpRequest：
+ * const result = await httpRequest<Collection>('/v0/users/123/collections/456', {
+ *   method: 'PUT',
+ *   body: jsonBody,
+ *   token,
+ *   zodSchema: collectionSchema,
+ * });
  */
 export declare const httpPut: <T = unknown>(endpoint: string, body: string, token?: string) => Promise<Result<{
     status: number;
@@ -69,6 +96,14 @@ export declare const httpPut: <T = unknown>(endpoint: string, body: string, toke
 }>>;
 /**
  * DELETE 请求
+ *
+ * @deprecated 请使用 httpRequest 并提供 zodSchema 以确保类型安全
+ * @example
+ * // 推荐使用 httpRequest：
+ * const result = await httpRequest<null>('/v0/users/123/collections/456', {
+ *   method: 'DELETE',
+ *   token,
+ * });
  */
 export declare const httpDelete: <T = unknown>(endpoint: string, token?: string) => Promise<Result<{
     status: number;

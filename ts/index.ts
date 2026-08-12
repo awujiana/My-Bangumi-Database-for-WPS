@@ -82,10 +82,6 @@ export {
   calcChecksum,
   // 从解密字符串提取 Token
   extractToken,
-  // XOR 加密
-  encryptToken,
-  // XOR 解密
-  decryptToken,
 } from './core/crypto.js'
 
 // ============================================================================

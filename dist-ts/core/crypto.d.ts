@@ -1,13 +1,7 @@
 /**
- * @fileoverview Token加密解密模块
+ * @fileoverview Token 校验与完整性验证模块
  * @module core/crypto
- * @description 历史版本使用 XOR 加密 Token；当前版本改为明文存储以便用户复制。
- *              decryptToken 仍保留用于读取历史加密数据并自动升级为明文。
- *              新代码不应调用 encryptToken。
- *              本模块同时提供 Token 完整性校验。
- *              【用户决策】Token 保持明文存储（util.ts storeBgToken/loadBgToken）。
- *              本模块的 encryptToken 已废弃，仅保留 decryptToken 用于读取历史加密数据并自动升级为明文。
- *              新代码不应调用 encryptToken。
+ * @description 提供 Token 校验和计算、Payload 构建与提取功能，用于验证 Token 完整性。
  *
  * @author BGM Development Team
  * @version 1.0.0
@@ -59,36 +53,4 @@ export declare function buildPayload(token: string): string;
  * }
  */
 export declare function extractToken(encrypted: string): string | null;
-/**
- * XOR加密Token
- * 使用简单的XOR运算对Token进行混淆
- *
- * @function encryptToken
- * @param {string} token - 原始Token字符串
- * @returns {string} Base64编码的加密字符串
- *
- * @description
- * 加密格式：{版本}.{IV}.{加密数据}
- * - 版本：1（表示使用XOR加密）
- * - IV：初始向量（Base64编码）
- * - 加密数据：XOR加密后的数据（Base64编码）
- *
- * @example
- * const encrypted = encryptToken('my-secret-token');
- * console.log(encrypted); // '1.abc123.xyz789'
- */
-export declare function encryptToken(token: string): string;
-/**
- * 解密XOR加密的Token
- *
- * @function decryptToken
- * @param {string} encrypted - encryptToken生成的加密字符串
- * @returns {string | null} 解密后的Token，失败返回null
- *
- * @example
- * const encrypted = encryptToken('my-secret-token');
- * const decrypted = decryptToken(encrypted);
- * console.log(decrypted); // 'my-secret-token'
- */
-export declare function decryptToken(encrypted: string): string | null;
 //# sourceMappingURL=crypto.d.ts.map
