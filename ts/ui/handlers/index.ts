@@ -61,6 +61,7 @@ import {
   type SyncSourceType,
   type GithubSyncResult,
   type SyncTimeFilter,
+  showSettingsPanel,
 } from '../../index.js'
 import { exportConfig, importConfig } from '../../services/configService.js'
 import { executeUndoLastSync } from '../../services/ribbonService.js'
@@ -1365,6 +1366,99 @@ const ACTION_HANDLERS: Record<string, ActionHandler> = {
       LOG_LEVELS.INFO,
       `[handleActionClick] 导入配置对话框已显示，耗时: ${Date.now() - ctx.startTime}ms`,
     )
+  },
+
+  // 关闭主面板（taskpane）
+  closePanel: (ctx) => {
+    bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 关闭主面板')
+    const app = getApp() as {
+      PluginStorage?: { getItem: (k: string) => string | null }
+      GetTaskPane?: (id: string) => { Visible: boolean }
+    }
+    if (!app) {
+      bgmLog(LOG_LEVELS.WARN, '[handleActionClick] 无法获取 Application 对象')
+      return
+    }
+    const tsId = app.PluginStorage?.getItem('taskpane_id')
+    if (tsId) {
+      const tskpane = app.GetTaskPane?.(tsId)
+      if (tskpane) {
+        tskpane.Visible = false
+        bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 主面板已关闭')
+        showToast('面板已关闭', 'info')
+      }
+    } else {
+      bgmLog(LOG_LEVELS.WARN, '[handleActionClick] 未找到主面板ID')
+    }
+    bgmLog(
+      LOG_LEVELS.INFO,
+      `[handleActionClick] 关闭主面板操作完成，耗时: ${Date.now() - ctx.startTime}ms`,
+    )
+  },
+
+  // 打开/切换设置面板
+  openSettings: (ctx) => {
+    bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 打开设置面板')
+    showSettingsPanel()
+    bgmLog(
+      LOG_LEVELS.INFO,
+      `[handleActionClick] 设置面板操作已触发，耗时: ${Date.now() - ctx.startTime}ms`,
+    )
+  },
+
+  // 关闭设置面板
+  closeSettingsPanel: (ctx) => {
+    bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 关闭设置面板')
+    const app = getApp() as {
+      PluginStorage?: { getItem: (k: string) => string | null }
+      GetTaskPane?: (id: string) => { Visible: boolean }
+    }
+    if (!app) {
+      bgmLog(LOG_LEVELS.WARN, '[handleActionClick] 无法获取 Application 对象')
+      return
+    }
+    const settingsId = app.PluginStorage?.getItem('settings_pane_id')
+    if (settingsId) {
+      const settingsPane = app.GetTaskPane?.(settingsId)
+      if (settingsPane) {
+        settingsPane.Visible = false
+        bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 设置面板已关闭')
+        showToast('设置面板已关闭', 'info')
+      }
+    } else {
+      window.close()
+    }
+    bgmLog(
+      LOG_LEVELS.INFO,
+      `[handleActionClick] 关闭设置面板操作完成，耗时: ${Date.now() - ctx.startTime}ms`,
+    )
+  },
+
+  // 设置页面：切换增量同步开关
+  toggleIncrementalSync: (_ctx) => {
+    const checkbox = document.getElementById('chkIncrementalSync') as HTMLInputElement | null
+    const enabled = checkbox?.checked ?? false
+    setIncrementalSync(enabled)
+    showToast(`增量同步已${enabled ? '开启' : '关闭'}`, 'success')
+    bgmLog(LOG_LEVELS.INFO, `[handleActionClick] 增量同步: ${enabled ? '开启' : '关闭'}`)
+  },
+
+  // 设置页面：切换跳过冲突开关
+  toggleSkipConflicts: (_ctx) => {
+    const checkbox = document.getElementById('chkSkipConflicts') as HTMLInputElement | null
+    const enabled = checkbox?.checked ?? false
+    setSkipConflicts(enabled)
+    showToast(`冲突处理: ${enabled ? '跳过冲突' : 'Excel覆盖'}`, 'success')
+    bgmLog(LOG_LEVELS.INFO, `[handleActionClick] 跳过冲突: ${enabled ? '开启' : '关闭'}`)
+  },
+
+  // 设置页面：切换启用同步记录开关
+  toggleEnableSyncRecord: (_ctx) => {
+    const checkbox = document.getElementById('chkEnableSyncRecord') as HTMLInputElement | null
+    const enabled = checkbox?.checked ?? false
+    setSyncRecordEnabled(enabled)
+    showToast(`同步记录已${enabled ? '开启' : '关闭'}`, 'success')
+    bgmLog(LOG_LEVELS.INFO, `[handleActionClick] 启用同步记录: ${enabled ? '开启' : '关闭'}`)
   },
 }
 

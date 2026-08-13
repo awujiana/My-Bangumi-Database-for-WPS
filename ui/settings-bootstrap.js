@@ -1,0 +1,32 @@
+// Settings 页面启动引导脚本
+// 作为 ES Module 加载，避免内联 script（CSP script-src 'self' 要求）
+// 职责：1) 按依赖顺序加载所有模块；2) 在模块就绪前禁用按钮，就绪后启用
+import '../dist-ts/index.js';
+import '../dist-ts/core/constants.js';
+import '../dist-ts/tools/config.js';
+import '../dist-ts/tools/util.js';
+import '../dist-ts/core/crypto.js';
+import '../dist-ts/tools/events.js';
+import '../dist-ts/core/result.js';
+import '../dist-ts/tools/wps.js';
+import '../dist-ts/tools/http.js';
+import '../dist-ts/ui/dialog.js';
+import '../dist-ts/ui/message.js';
+import '../dist-ts/ui/preview.js';
+import '../dist-ts/sync/syncRecord.js';
+import '../dist-ts/sync/scraping.js';
+import '../dist-ts/sync/exceltobangumi.js';
+import '../dist-ts/entry/settings-entry.js';
+
+// 模块就绪前禁用所有 data-action 按钮
+document.querySelectorAll('button[data-action]').forEach(function (btn) {
+    btn.disabled = true;
+});
+
+// 接收到 modulesReady 事件后启用按钮
+document.addEventListener('bgm:modulesReady', function () {
+    document.querySelectorAll('button[data-action]').forEach(function (btn) {
+        btn.disabled = false;
+    });
+    console.log('[BGM Settings] 模块加载完成，按钮已启用');
+});

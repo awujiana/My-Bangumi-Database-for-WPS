@@ -334,6 +334,8 @@ export {
   _fetchBgmUserInfo,
   // 显示主面板
   showBangumiPanel,
+  // 显示设置面板（带动态停靠位置）
+  showSettingsPanel,
   // 等待指定毫秒数
   sleep,
   // 延迟执行（用于模拟异步操作）

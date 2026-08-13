@@ -9,6 +9,7 @@ import * as RibbonService from './services/ribbonService.js'
 import {
   WPS_ENUM,
   showBangumiPanel,
+  showSettingsPanel,
   BGM,
   getIncrementalSync,
   getSkipConflicts,
@@ -407,6 +408,9 @@ export function OnAction(control: { Id: string }): boolean {
         })
         break
       }
+      case 'btnOpenSettings':
+        showSettingsPanel()
+        break
       default:
         bgmLog(LOG_LEVELS.WARN, `[BGM] 未知按钮: ${control.Id}`)
     }
@@ -430,6 +434,7 @@ const ICON_PATHS: Record<string, string> = {
   btnClearColors: 'images/btnClearColors.svg',
   btnSyncFromGithub: 'images/github.svg',
   btnUndoLastSync: 'images/undo.svg',
+  btnOpenSettings: 'images/settings.svg',
 }
 
 export function GetBangumiImage(control: { Id: string }): string {

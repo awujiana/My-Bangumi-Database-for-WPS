@@ -1,6 +1,6 @@
 # Bangumi WPS Excel 加载项 - 架构与项目知识文档
 
-> 版本: 2.3 | 更新日期: 2026-08-12
+> 版本: 2.4 | 更新日期: 2026-08-14
 
 ---
 
@@ -15,6 +15,7 @@
 | v2.1 | 2026-08-12 | Token 明文存储（移除 XOR 加密），httpGet/httpPost 标记 @deprecated，新增 BroadcastChannel 单元测试 |
 | v2.2 | 2026-08-12 | 补充同步策略对比表、删除机制详解、撤销恢复机制、删除保护机制文档                                   |
 | v2.3 | 2026-08-12 | 补充 SID 白名单过滤详解（两层过滤机制，确保非 BGM 条目不被误删）                                   |
+| v2.4 | 2026-08-14 | 新增设置面板（settings.html）、Taskpane 头部图标按钮、双面板位置协调逻辑（主面板左/设置面板右）    |
 
 ## 一、架构概览
 
@@ -101,6 +102,11 @@ ts/index.ts (barrel export)
   │   ├── panelLifecycle.ts → 工作表锁定/解锁
   │   └── userInfoPolling.ts → 用户信息轮询 (PluginStorage)
   │
+  ├── ts/entry/          (入口绑定)
+  │   ├── ribbon-entry.ts   → Ribbon OnAction 入口
+  │   ├── taskpane-entry.ts → Taskpane 入口
+  │   └── settings-entry.ts → Settings 面板入口（加载配置、注册事件）
+  │
   └── ts/schemas/        (Zod 校验模式)
       ├── pluginStorage.ts  → FullConfigSchema
       ├── bgmCollection.ts  → 收藏数据校验
@@ -128,6 +134,15 @@ ts/index.ts (barrel export)
   1. `initTaskpane()`: 工作表锁定状态恢复、用户信息轮询、Token 状态检查
   2. `initHandlers()`: 注册按钮监听器、消息监听器、事件总线监听器
 - **自动启动条件**: `typeof window !== 'undefined' && window.location.pathname.includes('taskpane.html')`
+
+#### Settings 入口
+
+- **文件**: `ts/entry/settings-entry.ts`
+- **启动链**: `startSettings()` →
+  1. `initHandlers()`: 复用 Taskpane 的事件处理器（统一事件分发）
+  2. `initSettingsPage()`: 加载 Token 状态、用户信息、同步偏好、GitHub 配置
+- **自动启动条件**: `typeof window !== 'undefined' && window.location.pathname.includes('settings.html')`
+- **UI 结构**: 独立 TaskPane (`settings.html`)，包含 Token 管理、用户信息、同步偏好、GitHub 配置、收藏回写数据源等模块
 
 ---
 
@@ -385,8 +400,25 @@ ts/index.ts (barrel export)
 - **`cell.ts`**: `getCell()`, `getCellValue()`, `setCellValue()`, `getSheetByIndex()`
 - **`sheet.ts`**: `readRangeValues()`, `cacheGet()`, `findHeaderRow()`, `getColumnMap()`, `clearSheetCache()`, `getLastRow()`, `isEmptyValue()`, `getDataSheet()`, `ensureSheetHeaders()`
 - **`sleep.ts`**: `sleep()`, `delay()`
-- **`index.ts`**: `BGM` 全局命名空间、`bgmLog()`、`getApp()`、Token 存储、用户信息、`showBangumiPanel()`、辅助函数
+- **`index.ts`**: `BGM` 全局命名空间、`bgmLog()`、`getApp()`、Token 存储、用户信息、`showBangumiPanel()`、`showSettingsPanel()`、辅助函数
+  - `showSettingsPanel()`: 设置面板管理器，支持根据主面板可见性动态切换停靠位置
 - **`stringUtils.ts`**: `colNumToLetter()`, `trim()`, `escapeHtml()`, `calcFingerprint()`
+
+#### 双面板位置协调逻辑
+
+项目支持两个独立的 TaskPane：主面板（`taskpane.html`）和设置面板（`settings.html`）。为避免两个面板争夺同一侧空间，`showSettingsPanel()` 实现了动态位置协调：
+
+| 主面板(taskpane)状态 | 设置面板(settings)停靠位置 | 说明                                   |
+| -------------------- | -------------------------- | -------------------------------------- |
+| 可见                 | 右侧                       | 主面板在左，设置面板在右，用户并排操作 |
+| 隐藏                 | 左侧                       | 主面板关闭后，设置面板占用左侧主要空间 |
+
+实现细节：
+
+- 首次调用时通过 `app.CreateTaskPane(url)` 创建设置面板，持久化 `settings_pane_id` 到 PluginStorage
+- 后续调用通过 `app.GetTaskPane(id)` 获取现有面板，切换 `Visible` 状态并更新 `DockPosition`
+- 主面板状态通过 `PluginStorage.getItem('taskpane_id')` + `GetTaskPane` 的 `Visible` 属性判断
+- 位置常量：`WPS_ENUM.msoCTPDockPositionLeft = 0`，`WPS_ENUM.msoCTPDockPositionRight = 2`
 
 #### 其他工具
 
@@ -517,6 +549,7 @@ ts/index.ts (barrel export)
 | `EnableFlag`              | string | `'false'` | WPS 加载项启用标志（Ribbon 初始化时设置） |
 | `ApiEventFlag`            | string | `'false'` | API 事件标志（Ribbon 初始化时设置）       |
 | `taskpane_id`             | string | `null`    | 任务面板 ID（由 `CreateTaskPane` 返回）   |
+| `settings_pane_id`        | string | `null`    | 设置面板 ID（由 `CreateTaskPane` 返回）   |
 | `bgm_panel_shown_at`      | string | 时间戳    | 面板显示信号（用于触发 Taskpane 刷新）    |
 | `bgm_request_github_sync` | string | 时间戳    | GitHub 同步请求信号（Ribbon→Taskpane）    |
 | `bgm_request_undo_sync`   | string | 时间戳    | 撤销同步请求信号（Ribbon→Taskpane）       |
