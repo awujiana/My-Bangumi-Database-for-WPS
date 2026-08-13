@@ -4,7 +4,7 @@
  * @description 资源追踪、按钮监听、ACTION_HANDLERS 分发、消息监听、事件总线监听、
  *              配置 UI 回填等。同时 re-export 子模块的公开 API，保持原 handlers.ts 的外部接口。
  */
-import { LOG_LEVELS, bgmLog, BGM, loadBgToken, clearBgToken, copyTokenToClipboard, _setBgmUserId, _setBgmUsername, getApp, getLastRow, getSyncRecordSheetIfExists, showAlert, showConfirm, showInput, showToast, refreshData, refreshSheets, refreshWorkbooks, toggleSheetLock, enlargePreview, clearSyncRecords, deduplicateSyncRecords, formatSyncRecordSheet, openSyncRecordSheet, closeDetailModal, previewSyncContent, syncSelectedRows, openBangumiTokenPage, setSyncRecordEnabled, getSyncRecordEnabled, getIncrementalSync, setIncrementalSync, getSkipConflicts, setSkipConflicts, getGithubConfig, setGithubConfig, isGithubConfigComplete, getSyncStrategy, setSyncStrategy, getSyncSourceType, setSyncSourceType, syncFromRemote, buildRawUrl, showSyncProgressDialog, updateSyncProgressDialog, completeSyncProgressDialog, hideSyncProgressDialog, showSyncResultDialog, formatDuration, } from '../../index.js';
+import { LOG_LEVELS, bgmLog, BGM, loadBgToken, storeBgToken, clearBgToken, copyTokenToClipboard, _setBgmUserId, _getBgmUserId, _setBgmUsername, getApp, getLastRow, getSyncRecordSheetIfExists, showAlert, showConfirm, showInput, showToast, refreshData, refreshSheets, refreshWorkbooks, toggleSheetLock, enlargePreview, clearSyncRecords, deduplicateSyncRecords, formatSyncRecordSheet, openSyncRecordSheet, closeDetailModal, previewSyncContent, syncSelectedRows, openBangumiTokenPage, setSyncRecordEnabled, getSyncRecordEnabled, getIncrementalSync, setIncrementalSync, getSkipConflicts, setSkipConflicts, getGithubConfig, setGithubConfig, isGithubConfigComplete, getSyncStrategy, setSyncStrategy, getSyncSourceType, setSyncSourceType, syncFromRemote, buildRawUrl, showSyncProgressDialog, updateSyncProgressDialog, completeSyncProgressDialog, hideSyncProgressDialog, showSyncResultDialog, formatDuration, showSettingsPanel, } from '../../index.js';
 import { exportConfig, importConfig } from '../../services/configService.js';
 import { executeUndoLastSync } from '../../services/ribbonService.js';
 import { debounce } from '../../tools/debounce.js';
@@ -990,6 +990,52 @@ const ACTION_HANDLERS = {
         showToast('日志已清空', 'info');
         bgmLog(LOG_LEVELS.INFO, `[handleActionClick] 系统日志已清空，耗时: ${Date.now() - ctx.startTime}ms`);
     },
+    // 保存所有配置：重新保存当前所有配置项到 PluginStorage
+    saveAllConfig: (ctx) => {
+        bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 保存所有配置');
+        try {
+            const parts = [];
+            // 1. Token
+            const token = loadBgToken();
+            if (token) {
+                storeBgToken(token);
+                parts.push('Token');
+            }
+            // 2. 用户 ID
+            const userId = _getBgmUserId();
+            if (userId) {
+                parts.push(`用户ID: ${userId}`);
+            }
+            // 3. GitHub 配置
+            const ghCfg = getGithubConfig();
+            if (ghCfg.owner && ghCfg.repo) {
+                setGithubConfig(ghCfg);
+                parts.push(`GitHub: ${ghCfg.owner}/${ghCfg.repo}`);
+            }
+            // 4. 同步偏好（重新持久化）
+            const incremental = getIncrementalSync();
+            setIncrementalSync(incremental);
+            parts.push(`增量同步: ${incremental ? '开' : '关'}`);
+            const skipConflicts = getSkipConflicts();
+            setSkipConflicts(skipConflicts);
+            parts.push(`冲突策略: ${skipConflicts ? '跳过' : '覆盖'}`);
+            const syncRecord = getSyncRecordEnabled();
+            setSyncRecordEnabled(syncRecord);
+            parts.push(`同步记录: ${syncRecord ? '开' : '关'}`);
+            // 5. 同步策略
+            const strategy = getSyncStrategy();
+            setSyncStrategy(strategy);
+            parts.push(`同步策略: ${strategy}`);
+            bgmLog(LOG_LEVELS.INFO, `[handleActionClick] 配置已保存: ${parts.join('; ')}`);
+            showToast('所有配置已保存', 'success');
+        }
+        catch (e) {
+            const errMsg = e instanceof Error ? e.message : String(e);
+            bgmLog(LOG_LEVELS.ERROR, `[handleActionClick] 保存配置失败: ${errMsg}`);
+            showToast(`保存失败：${errMsg}`, 'error');
+        }
+        bgmLog(LOG_LEVELS.INFO, `[handleActionClick] 保存配置操作完成，耗时: ${Date.now() - ctx.startTime}ms`);
+    },
     // 配置导入导出：导出全部配置为 JSON 文件并复制到剪贴板
     exportConfig: (ctx) => {
         bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 导出配置');
@@ -1041,6 +1087,80 @@ const ACTION_HANDLERS = {
             }
         });
         bgmLog(LOG_LEVELS.INFO, `[handleActionClick] 导入配置对话框已显示，耗时: ${Date.now() - ctx.startTime}ms`);
+    },
+    // 关闭主面板（taskpane）
+    closePanel: (ctx) => {
+        bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 关闭主面板');
+        const app = getApp();
+        if (!app) {
+            bgmLog(LOG_LEVELS.WARN, '[handleActionClick] 无法获取 Application 对象');
+            return;
+        }
+        const tsId = app.PluginStorage?.getItem('taskpane_id');
+        if (tsId) {
+            const tskpane = app.GetTaskPane?.(tsId);
+            if (tskpane) {
+                tskpane.Visible = false;
+                bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 主面板已关闭');
+                showToast('面板已关闭', 'info');
+            }
+        }
+        else {
+            bgmLog(LOG_LEVELS.WARN, '[handleActionClick] 未找到主面板ID');
+        }
+        bgmLog(LOG_LEVELS.INFO, `[handleActionClick] 关闭主面板操作完成，耗时: ${Date.now() - ctx.startTime}ms`);
+    },
+    // 打开/切换设置面板
+    openSettings: (ctx) => {
+        bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 打开设置面板');
+        showSettingsPanel();
+        bgmLog(LOG_LEVELS.INFO, `[handleActionClick] 设置面板操作已触发，耗时: ${Date.now() - ctx.startTime}ms`);
+    },
+    // 关闭设置面板
+    closeSettingsPanel: (ctx) => {
+        bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 关闭设置面板');
+        const app = getApp();
+        if (!app) {
+            bgmLog(LOG_LEVELS.WARN, '[handleActionClick] 无法获取 Application 对象');
+            return;
+        }
+        const settingsId = app.PluginStorage?.getItem('settings_pane_id');
+        if (settingsId) {
+            const settingsPane = app.GetTaskPane?.(settingsId);
+            if (settingsPane) {
+                settingsPane.Visible = false;
+                bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 设置面板已关闭');
+                showToast('设置面板已关闭', 'info');
+            }
+        }
+        else {
+            window.close();
+        }
+        bgmLog(LOG_LEVELS.INFO, `[handleActionClick] 关闭设置面板操作完成，耗时: ${Date.now() - ctx.startTime}ms`);
+    },
+    // 设置页面：切换增量同步开关
+    toggleIncrementalSync: (_ctx) => {
+        const checkbox = document.getElementById('chkIncrementalSync');
+        const enabled = checkbox?.checked ?? false;
+        setIncrementalSync(enabled);
+        showToast(`增量同步已${enabled ? '开启' : '关闭'}`, 'success');
+        bgmLog(LOG_LEVELS.INFO, `[handleActionClick] 增量同步: ${enabled ? '开启' : '关闭'}`);
+    },
+    // 设置页面：切换跳过冲突开关
+    toggleSkipConflicts: (_ctx) => {
+        const checkbox = document.getElementById('chkSkipConflicts');
+        const enabled = checkbox?.checked ?? false;
+        setSkipConflicts(enabled);
+        showToast(`冲突处理: ${enabled ? '跳过冲突' : 'Excel覆盖'}`, 'success');
+        bgmLog(LOG_LEVELS.INFO, `[handleActionClick] 跳过冲突: ${enabled ? '开启' : '关闭'}`);
+    },
+    // 设置页面：切换启用同步记录开关
+    toggleEnableSyncRecord: (_ctx) => {
+        const checkbox = document.getElementById('chkEnableSyncRecord');
+        const enabled = checkbox?.checked ?? false;
+        setSyncRecordEnabled(enabled);
+        showToast(`同步记录已${enabled ? '开启' : '关闭'}`, 'success');
+        bgmLog(LOG_LEVELS.INFO, `[handleActionClick] 启用同步记录: ${enabled ? '开启' : '关闭'}`);
     },
 };
 /** 渲染日志条目到日志面板 */

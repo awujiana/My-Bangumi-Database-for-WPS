@@ -15,6 +15,7 @@
                     <button id="btnOpenCollection" label="打开收藏页" onAction="OnAction" getImage="GetBangumiImage" size="large"/>
                     <button id="btnSyncFromGithub" label="数据同步" onAction="OnAction" getImage="GetBangumiImage" size="large"/>
                     <button id="btnUndoLastSync" label="撤销同步" onAction="OnAction" getImage="GetBangumiImage" size="large"/>
+                    <button id="btnOpenSettings" label="设置" onAction="OnAction" getImage="GetBangumiImage" size="large"/>
                   
 				</group>
             </tab>

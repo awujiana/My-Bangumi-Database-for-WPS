@@ -205,4 +205,12 @@ export declare function getUrlPath(): string;
  * 显示同步面板
  */
 export declare function showBangumiPanel(): void;
+/**
+ * 显示/切换设置面板
+ * 设置面板位置逻辑：
+ * - 主面板(taskpane)可见时 → 设置面板停靠右侧
+ * - 主面板隐藏时 → 设置面板停靠左侧
+ * 这样确保两个面板不会同时占用同一侧，提供更好的用户体验。
+ */
+export declare function showSettingsPanel(): void;
 //# sourceMappingURL=index.d.ts.map

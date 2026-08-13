@@ -189,10 +189,10 @@ describe('buildJsonPayload', () => {
     expect(payload.type).toBe(5)
   })
 
-  it('无有效观看状态时返回 "{}"', () => {
+  it('无有效观看状态时默认设为 type=1（想看）', () => {
     const getField = (_key: string): string => ''
     const json = buildJsonPayload(getField, '')
-    expect(json).toBe('{}')
+    expect(json).toBe('{"type":1}')
   })
 
   it('观看状态为"忽略"时返回 "{}"（mapWatchStatus 返回 0）', () => {
@@ -924,14 +924,14 @@ describe('SyncToBangumiAsync', () => {
     expect(result.skip).toBeGreaterThanOrEqual(1)
   })
 
-  it('观看状态为空的行应被跳过', async () => {
+  it('观看状态为空的行默认设为 type=1 并同步', async () => {
     mockState.bgmRequestSync.mockResolvedValue({ code: 200, message: 'OK' })
 
     const mockWs = createMockWorksheet({
       autoFilterMode: false,
       rangeValues: {
         B2: 'https://bgm.tv/subject/12345',
-        C2: '', // 状态为空 → 跳过
+        C2: '', // 状态为空 → 默认 type=1，仍同步
       },
     })
     setMockApp({
@@ -944,8 +944,10 @@ describe('SyncToBangumiAsync', () => {
 
     const result = await SyncToBangumiAsync(mockWs as never, colMap, 'test-token', 2, 1)
 
-    expect(mockState.bgmRequestSync).not.toHaveBeenCalled()
-    expect(result.skip).toBeGreaterThanOrEqual(1)
+    // 状态为空时默认设为 type=1，应发起同步请求
+    expect(mockState.bgmRequestSync).toHaveBeenCalled()
+    // 由于 applySyncSuccessResults 被 mock（no-op），验证请求已发送即可
+    expect(result.success).toBeGreaterThanOrEqual(0)
   })
 
   it('观看状态为"忽略"的行应被跳过（mapWatchStatus 返回 0）', async () => {

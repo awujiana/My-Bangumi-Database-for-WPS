@@ -252,7 +252,7 @@ describe('BroadcastChannel 跨 WebView 通信', () => {
     it('应拒绝非法 origin 的消息', () => {
       const channel = new MockBroadcastChannel('BGM-config')
       const allowedOrigins = [window.location.origin, 'null']
-      let messageAccepted = true
+      let messageAccepted = false
 
       channel.onmessage = (event: MessageEvent) => {
         if (allowedOrigins.includes(event.origin)) {

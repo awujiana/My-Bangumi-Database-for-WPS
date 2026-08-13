@@ -10,9 +10,11 @@ import {
   bgmLog,
   BGM,
   loadBgToken,
+  storeBgToken,
   clearBgToken,
   copyTokenToClipboard,
   _setBgmUserId,
+  _getBgmUserId,
   _setBgmUsername,
   getApp,
   getLastRow,
@@ -1302,6 +1304,63 @@ const ACTION_HANDLERS: Record<string, ActionHandler> = {
     bgmLog(
       LOG_LEVELS.INFO,
       `[handleActionClick] 系统日志已清空，耗时: ${Date.now() - ctx.startTime}ms`,
+    )
+  },
+
+  // 保存所有配置：重新保存当前所有配置项到 PluginStorage
+  saveAllConfig: (ctx) => {
+    bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 保存所有配置')
+    try {
+      const parts: string[] = []
+
+      // 1. Token
+      const token = loadBgToken()
+      if (token) {
+        storeBgToken(token)
+        parts.push('Token')
+      }
+
+      // 2. 用户 ID
+      const userId = _getBgmUserId()
+      if (userId) {
+        parts.push(`用户ID: ${userId}`)
+      }
+
+      // 3. GitHub 配置
+      const ghCfg = getGithubConfig()
+      if (ghCfg.owner && ghCfg.repo) {
+        setGithubConfig(ghCfg)
+        parts.push(`GitHub: ${ghCfg.owner}/${ghCfg.repo}`)
+      }
+
+      // 4. 同步偏好（重新持久化）
+      const incremental = getIncrementalSync()
+      setIncrementalSync(incremental)
+      parts.push(`增量同步: ${incremental ? '开' : '关'}`)
+
+      const skipConflicts = getSkipConflicts()
+      setSkipConflicts(skipConflicts)
+      parts.push(`冲突策略: ${skipConflicts ? '跳过' : '覆盖'}`)
+
+      const syncRecord = getSyncRecordEnabled()
+      setSyncRecordEnabled(syncRecord)
+      parts.push(`同步记录: ${syncRecord ? '开' : '关'}`)
+
+      // 5. 同步策略
+      const strategy = getSyncStrategy()
+      setSyncStrategy(strategy)
+      parts.push(`同步策略: ${strategy}`)
+
+      bgmLog(LOG_LEVELS.INFO, `[handleActionClick] 配置已保存: ${parts.join('; ')}`)
+      showToast('所有配置已保存', 'success')
+    } catch (e: unknown) {
+      const errMsg = e instanceof Error ? e.message : String(e)
+      bgmLog(LOG_LEVELS.ERROR, `[handleActionClick] 保存配置失败: ${errMsg}`)
+      showToast(`保存失败：${errMsg}`, 'error')
+    }
+    bgmLog(
+      LOG_LEVELS.INFO,
+      `[handleActionClick] 保存配置操作完成，耗时: ${Date.now() - ctx.startTime}ms`,
     )
   },
 

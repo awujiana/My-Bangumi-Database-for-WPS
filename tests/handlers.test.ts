@@ -51,9 +51,26 @@ const mockState = vi.hoisted(() => ({
   cleanLockedDataSheet: vi.fn(),
   // services/ribbonService.js
   undoLastSyncForRibbon: vi.fn(),
+  executeUndoLastSync: vi.fn(() => Promise.resolve(0)),
   // services/configService.js
   exportConfig: vi.fn(() => '{}'),
   importConfig: vi.fn(() => ({ isOk: () => true, isFail: () => false })),
+  // tools/config.js
+  getIncrementalSync: vi.fn(() => false),
+  setIncrementalSync: vi.fn(),
+  getSkipConflicts: vi.fn(() => false),
+  setSkipConflicts: vi.fn(),
+  getSyncRecordEnabled: vi.fn(() => false),
+  setSyncRecordEnabled: vi.fn(),
+  getConfig: vi.fn(() => ''),
+  setConfig: vi.fn(() => true),
+  // sync/githubConfig.js
+  getGithubConfig: vi.fn(() => ({ owner: '', repo: '', branch: '', path: '' })),
+  setGithubConfig: vi.fn(),
+  getSyncStrategy: vi.fn(() => 'add-update'),
+  setSyncStrategy: vi.fn(),
+  getSyncSourceType: vi.fn(() => 'api'),
+  setSyncSourceType: vi.fn(),
   // tools/logger.js
   getRecentLogs: vi.fn(() => []),
   exportLogsToFile: vi.fn(),
@@ -88,11 +105,42 @@ vi.mock('../ts/ui/handlers/_constants.js', () => ({
 
 vi.mock('../ts/services/ribbonService.js', () => ({
   undoLastSyncForRibbon: mockState.undoLastSyncForRibbon,
+  executeUndoLastSync: mockState.executeUndoLastSync,
 }))
 
 vi.mock('../ts/services/configService.js', () => ({
   exportConfig: mockState.exportConfig,
   importConfig: mockState.importConfig,
+}))
+
+vi.mock('../ts/tools/config.js', () => ({
+  getIncrementalSync: mockState.getIncrementalSync,
+  setIncrementalSync: mockState.setIncrementalSync,
+  getSkipConflicts: mockState.getSkipConflicts,
+  setSkipConflicts: mockState.setSkipConflicts,
+  getSyncRecordEnabled: mockState.getSyncRecordEnabled,
+  setSyncRecordEnabled: mockState.setSyncRecordEnabled,
+  getConfig: mockState.getConfig,
+  setConfig: mockState.setConfig,
+  removeConfig: vi.fn(() => true),
+  CONFIG_KEYS: {
+    INCREMENTAL_SYNC: 'bgm_incremental_sync',
+    SKIP_CONFLICTS: 'bgm_skip_conflicts',
+    ENABLE_SYNC_RECORD: 'bgm_enable_sync_record',
+  },
+}))
+
+vi.mock('../ts/sync/githubConfig.js', () => ({
+  getGithubConfig: mockState.getGithubConfig,
+  setGithubConfig: mockState.setGithubConfig,
+  isGithubConfigComplete: vi.fn(() => true),
+  buildRawUrl: vi.fn(() => ''),
+  getSyncStrategy: mockState.getSyncStrategy,
+  setSyncStrategy: mockState.setSyncStrategy,
+  getSyncSourceType: mockState.getSyncSourceType,
+  setSyncSourceType: mockState.setSyncSourceType,
+  DEFAULT_GITHUB_CONFIG: { owner: '', repo: '', branch: 'main', path: '' },
+  GithubConfigSchema: { parse: vi.fn() },
 }))
 
 vi.mock('../ts/tools/logger.js', () => ({
@@ -107,6 +155,96 @@ vi.mock('../ts/tools/logger.js', () => ({
   exportLogsToFile: mockState.exportLogsToFile,
   clearLogs: mockState.clearLogs,
   LogLevel: { INFO: 'INFO', WARN: 'WARN', ERROR: 'ERROR' },
+}))
+
+vi.mock('../index.js', () => ({
+  // ---- 基础工具 ----
+  getApp: mockState.getApp,
+  showToast: mockState.showToast,
+  confirm: mockState.confirm,
+  showConfirm: mockState.showConfirm,
+  showError: mockState.showError,
+  showInfo: mockState.showInfo,
+  bgmLog: mockState.bgmLog,
+  LOG_LEVELS: { DEBUG: 'DEBUG', INFO: 'INFO', WARN: 'WARN', ERROR: 'ERROR' },
+
+  // ---- Token / 用户 ----
+  loadBgToken: mockState.loadBgToken,
+  storeBgToken: mockState.storeBgToken,
+  clearBgToken: mockState.clearBgToken,
+  getBgToken: mockState.getBgToken,
+  getCurrentUser: mockState.getCurrentUser,
+  _setBgmUserId: mockState._setBgmUserId,
+  _getBgmUserId: mockState._getBgmUserId,
+  _setBgmUsername: mockState._setBgmUsername,
+  _getBgmUsername: mockState._getBgmUsername,
+  copyTokenToClipboard: mockState.copyTokenToClipboard,
+
+  // ---- Bangumi Token ----
+  getBangumiToken: mockState.getBangumiToken,
+  setBangumiToken: mockState.setBangumiToken,
+
+  // ---- 同步 ----
+  syncFromPanel: mockState.syncFromPanel,
+  previewSyncContent: mockState.previewSyncContent,
+  showClearConfirm: mockState.showClearConfirm,
+  requestStop: mockState.requestStop,
+  pauseSync: mockState.pauseSync,
+  resumeSync: mockState.resumeSync,
+
+  // ---- Sheet 操作 ----
+  cleanLockedDataSheet: mockState.cleanLockedDataSheet,
+  openSyncRecordSheet: mockState.openSyncRecordSheet,
+
+  // ---- 调试 / 日志 ----
+  testDebugConnection: mockState.testDebugConnection,
+  getRecentLogs: mockState.getRecentLogs,
+  exportLogsToFile: mockState.exportLogsToFile,
+  clearLogs: mockState.clearLogs,
+
+  // ---- 配置相关（saveAllConfig 使用） ----
+  getIncrementalSync: mockState.getIncrementalSync,
+  setIncrementalSync: mockState.setIncrementalSync,
+  getSkipConflicts: mockState.getSkipConflicts,
+  setSkipConflicts: mockState.setSkipConflicts,
+  getSyncRecordEnabled: mockState.getSyncRecordEnabled,
+  setSyncRecordEnabled: mockState.setSyncRecordEnabled,
+  getGithubConfig: mockState.getGithubConfig,
+  setGithubConfig: mockState.setGithubConfig,
+  getSyncStrategy: mockState.getSyncStrategy,
+  setSyncStrategy: mockState.setSyncStrategy,
+  getSyncSourceType: mockState.getSyncSourceType,
+  setSyncSourceType: mockState.setSyncSourceType,
+  isGithubConfigComplete: vi.fn(() => true),
+  buildRawUrl: vi.fn(() => ''),
+
+  // ---- 其它 ----
+  showSettingsPanel: mockState.showSettingsPanel,
+  refreshData: mockState.refreshData,
+  refreshSheets: mockState.refreshSheets,
+  refreshWorkbooks: mockState.refreshWorkbooks,
+  toggleSheetLock: mockState.toggleSheetLock,
+  clearSyncRecords: mockState.clearSyncRecords,
+  deduplicateSyncRecords: mockState.deduplicateSyncRecords,
+  formatSyncRecordSheet: mockState.formatSyncRecordSheet,
+  closeDetailModal: mockState.closeDetailModal,
+  getLastRow: vi.fn(() => 1),
+  getSyncRecordSheetIfExists: vi.fn(() => true),
+  showAlert: vi.fn(),
+  showInput: vi.fn(() => 'test'),
+  enlargePreview: vi.fn(),
+  syncSelectedRows: vi.fn(),
+  openBangumiTokenPage: vi.fn(),
+  showConnectionTestDialog: vi.fn(),
+  hideConnectionTestDialog: vi.fn(),
+  showSyncProgressDialog: vi.fn(),
+  updateSyncProgressDialog: vi.fn(),
+  completeSyncProgressDialog: vi.fn(),
+  hideSyncProgressDialog: vi.fn(),
+  showSyncResultDialog: vi.fn(),
+  syncFromRemote: vi.fn(),
+  // 类型
+  LOG_LEVELS_ENUM: { DEBUG: 'DEBUG', INFO: 'INFO', WARN: 'WARN', ERROR: 'ERROR' },
 }))
 
 vi.mock('../ts/tools/debounce.js', () => ({
@@ -371,13 +509,57 @@ describe('ACTION_HANDLERS 分发（通过 DOM click 触发）', () => {
     expect(() => clickAction('closeLogModal')).not.toThrow()
   })
 
-  it('点击 [data-action="exportConfig"] 不抛错', () => {
-    expect(() => clickAction('exportConfig')).not.toThrow()
+  it('点击 [data-action="exportConfig"] 触发 configService.exportConfig', () => {
+    clickAction('exportConfig')
+    expect(mockState.exportConfig).toHaveBeenCalled()
   })
 
-  it('点击 [data-action="undoLastSync"] 触发 undoLastSyncForRibbon', () => {
+  it('点击 [data-action="saveAllConfig"] 触发配置保存流程', () => {
+    // 模拟有配置需要保存（返回非默认值）
+    mockState.getIncrementalSync.mockImplementation(() => true)
+    mockState.getSkipConflicts.mockImplementation(() => true)
+    mockState.getSyncRecordEnabled.mockImplementation(() => true)
+    mockState.getSyncStrategy.mockImplementation(() => 'skip-existing')
+    mockState.getGithubConfig.mockImplementation(() => ({
+      owner: 'test-owner',
+      repo: 'test-repo',
+      branch: 'main',
+      path: 'data',
+    }))
+
+    clickAction('saveAllConfig')
+
+    // 验证各配置项的 set 函数被调用
+    expect(mockState.setIncrementalSync).toHaveBeenCalledWith(true)
+    expect(mockState.setSkipConflicts).toHaveBeenCalledWith(true)
+    expect(mockState.setSyncRecordEnabled).toHaveBeenCalledWith(true)
+    expect(mockState.setSyncStrategy).toHaveBeenCalledWith('skip-existing')
+    expect(mockState.setGithubConfig).toHaveBeenCalledWith({
+      owner: 'test-owner',
+      repo: 'test-repo',
+      branch: 'main',
+      path: 'data',
+    })
+  })
+
+  it('点击 [data-action="saveAllConfig"] 配置为默认值时不抛错', () => {
+    // 默认返回值（false、空对象等）
+    mockState.getIncrementalSync.mockImplementation(() => false)
+    mockState.getSkipConflicts.mockImplementation(() => false)
+    mockState.getSyncRecordEnabled.mockImplementation(() => false)
+    mockState.getGithubConfig.mockImplementation(() => ({
+      owner: '',
+      repo: '',
+      branch: '',
+      path: '',
+    }))
+
+    expect(() => clickAction('saveAllConfig')).not.toThrow()
+  })
+
+  it('点击 [data-action="undoLastSync"] 触发 executeUndoLastSync', () => {
     clickAction('undoLastSync')
-    expect(mockState.undoLastSyncForRibbon).toHaveBeenCalled()
+    expect(mockState.executeUndoLastSync).toHaveBeenCalled()
   })
 })
 

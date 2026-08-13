@@ -12,7 +12,7 @@
  *   - util/index.ts：BGM 命名空间、bgmLog、getApp、Token 存储、用户 ID/用户名、辅助函数（shellExecuteByOAAssist、getUrlPath、showBangumiPanel）
  */
 // 直接从源模块导入，打破 util.ts ↔ index.ts 的循环依赖
-import { BGM_CONFIG, LOG_LEVELS, ERROR_LEVELS, ErrorLevel, } from '../../core/constants.js';
+import { BGM_CONFIG, LOG_LEVELS, ERROR_LEVELS, ErrorLevel, WPS_ENUM, } from '../../core/constants.js';
 import { BgmError } from '../../core/result.js';
 import { showConfirm } from '../../ui/dialog.js';
 import { showAlert as customShowAlert, showError as customShowError, showInput as customShowInput, } from '../../ui/dialog.js';
@@ -889,6 +889,68 @@ export function showBangumiPanel() {
         }
         catch (e) {
             bgmLog(LOG_LEVELS.WARN, `[showBangumiPanel] 写入面板显示信号失败: ${e.message}`);
+        }
+    }
+}
+/**
+ * 显示/切换设置面板
+ * 设置面板位置逻辑：
+ * - 主面板(taskpane)可见时 → 设置面板停靠右侧
+ * - 主面板隐藏时 → 设置面板停靠左侧
+ * 这样确保两个面板不会同时占用同一侧，提供更好的用户体验。
+ */
+export function showSettingsPanel() {
+    const app = getApp();
+    if (!app) {
+        bgmLog(LOG_LEVELS.ERROR, '[showSettingsPanel] 无法获取 WPS Application 对象');
+        return;
+    }
+    const settingsId = app.PluginStorage?.getItem('settings_pane_id');
+    const mainPanelId = app.PluginStorage?.getItem('taskpane_id');
+    // 检查主面板当前可见性
+    let mainPanelVisible = false;
+    if (mainPanelId) {
+        const mainPanel = app.GetTaskPane?.(mainPanelId);
+        mainPanelVisible = mainPanel?.Visible ?? false;
+    }
+    bgmLog(LOG_LEVELS.INFO, `[showSettingsPanel] 主面板状态: ${mainPanelVisible ? '可见' : '隐藏'}, settingsId: ${settingsId ?? '无'}`);
+    // 根据主面板状态决定设置面板停靠位置
+    const targetPosition = mainPanelVisible
+        ? WPS_ENUM.msoCTPDockPositionRight
+        : WPS_ENUM.msoCTPDockPositionLeft;
+    const positionLabel = mainPanelVisible ? '右侧' : '左侧';
+    if (!settingsId) {
+        // 首次创建设置面板
+        const settingsPane = app.CreateTaskPane?.(getUrlPath() + '/ui/settings.html');
+        if (settingsPane) {
+            settingsPane.DockPosition = targetPosition;
+            settingsPane.Visible = true;
+            app.PluginStorage?.setItem('settings_pane_id', settingsPane.ID);
+            bgmLog(LOG_LEVELS.INFO, `[showSettingsPanel] 设置面板已创建(ID:${settingsPane.ID}, 停靠:${positionLabel})`);
+        }
+        else {
+            bgmLog(LOG_LEVELS.ERROR, '[showSettingsPanel] 创建设置面板失败');
+        }
+    }
+    else {
+        // 已存在：切换可见性并更新停靠位置
+        const settingsPane = app.GetTaskPane?.(settingsId);
+        if (settingsPane) {
+            // 如果当前可见，则隐藏；如果隐藏，则显示并调整位置
+            if (settingsPane.Visible) {
+                settingsPane.Visible = false;
+                bgmLog(LOG_LEVELS.INFO, '[showSettingsPanel] 设置面板已隐藏');
+            }
+            else {
+                settingsPane.DockPosition = targetPosition;
+                settingsPane.Visible = true;
+                bgmLog(LOG_LEVELS.INFO, `[showSettingsPanel] 设置面板已显示(停靠:${positionLabel})`);
+            }
+        }
+        else {
+            // 面板ID失效（可能被用户手动关闭），清除存储以便下次重新创建
+            app.PluginStorage?.setItem('settings_pane_id', '');
+            bgmLog(LOG_LEVELS.WARN, '[showSettingsPanel] 设置面板ID失效，已清除存储');
         }
     }
 }
