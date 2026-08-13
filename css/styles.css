@@ -209,13 +209,62 @@ body {
     box-shadow: 0 4px 15px rgba(0,0,0,0.3);
 }
 
-.header h2 {
+.header-inner {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 10px;
+}
+
+.header-text {
+    flex: 1;
+    text-align: center;
+}
+
+.header-text h2 {
     color: #ffffff;
     margin-bottom: 5px;
     font-size: 22px;
 }
 
-.subtitle {
+.header-actions {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    flex-shrink: 0;
+    margin-top: 2px;
+}
+
+.header-icon-btn {
+    width: 28px;
+    height: 28px;
+    border: none;
+    background: transparent;
+    color: #888;
+    cursor: pointer;
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+    padding: 0;
+}
+
+.header-icon-btn:hover {
+    background: rgba(255, 255, 255, 0.1);
+    color: #fff;
+}
+
+.header-icon-btn:active {
+    background: rgba(255, 255, 255, 0.2);
+    transform: scale(0.95);
+}
+
+.header-icon-btn svg {
+    display: block;
+}
+
+.header-text .subtitle {
     color: #888;
     font-size: 13px;
 }
