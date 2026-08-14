@@ -136,5 +136,9 @@ export function getSheetByIndex(sheetIndex: number): unknown {
   if (!appObj?.ActiveWorkbook?.Sheets) return null
   const sheets = appObj.ActiveWorkbook.Sheets
   if (sheets.Count === 0) return null
-  return sheets.Item(sheetIndex)
+  try {
+    return sheets.Item(sheetIndex)
+  } catch {
+    return undefined
+  }
 }

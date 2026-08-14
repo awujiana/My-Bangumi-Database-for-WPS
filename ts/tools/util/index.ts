@@ -608,11 +608,7 @@ export function getApp(): WpsApplication | null {
   if (typeof window !== 'undefined') {
     const winApp = (window as unknown as BgmWindowGlobals).Application
     if (isWpsApp(winApp)) return winApp
-  }
-  // 使用 window.Application 替代裸 Application
-  if (typeof window !== 'undefined') {
-    const globalApp = (window as unknown as BgmWindowGlobals).Application
-    if (isWpsApp(globalApp)) return globalApp
+    if (winApp && typeof winApp === 'object') return winApp as WpsApplication
   }
   return null
 }

@@ -1,18 +1,18 @@
 // @vitest-environment jsdom
-import { describe, it, expect, vi, afterEach, afterAll } from 'vitest'
+import { describe, it, expect, vi, afterEach, afterAll, beforeEach } from 'vitest'
 
-// 与 tests/syncSource.test.ts 一致：syncSourceRegistry.ts 在模块加载时会注册
-// 'github' / 'gitlab' / 'gitee' → 触发 githubSync.ts / gitlabSync.ts / giteeSync.ts →
-// tools/util.js → tools/wps.js → index.js → ui/handlers.js 的副作用链，handlers.js
-// 顶层访问 document.readyState 并通过 trackedSetTimeout 调度延迟回调。使用 fake timers
-// 使这些 setTimeout 进入 fake 队列而不会真实触发。
+// 与 tests/gistSync.test.ts / gitlabSync.test.ts 一致：
+// syncSourceRegistry.ts 在模块加载时会注册 'github' / 'gitlab' / 'gitee'，
+// 触发 githubSync.ts / gitlabSync.ts / giteeSync.ts →
+// tools/util.js → tools/wps.js → index.js → ui/handlers.js 的副作用链，
+// handlers.js 顶层访问 document.readyState 并通过 trackedSetTimeout 调度延迟回调。
+// 使用 fake timers 使这些 setTimeout 进入 fake 队列而不会真实触发。
 vi.hoisted(() => {
   vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'setInterval', 'clearInterval'] })
 })
 
 // mock githubConfig 模块：buildGiteeRawUrl 与 validateConfig 依赖
 // getGithubConfig / isGithubConfigComplete，通过 mock 控制其返回值以测试各分支。
-// 工厂函数必须提供 giteeSync.ts 可能引入的所有 githubConfig 导出，避免 TS 类型缺失。
 vi.mock('../ts/sync/githubConfig.js', () => ({
   getGithubConfig: vi.fn(),
   isGithubConfigComplete: vi.fn(),
@@ -31,7 +31,7 @@ vi.mock('../ts/sync/githubConfig.js', () => ({
   }),
 }))
 
-import { buildGiteeRawUrl, GiteeSyncSource } from '../ts/sync/giteeSync.js'
+import { buildGiteeRawUrl, fetchGiteeJson, GiteeSyncSource } from '../ts/sync/giteeSync.js'
 import {
   getSyncSource,
   isSyncSourceRegistered,
@@ -46,9 +46,110 @@ const mockedIsGithubConfigComplete = vi.mocked(isGithubConfigComplete)
 // 清空模块加载期间累积的 fake timers，避免它们在测试中被意外触发
 vi.clearAllTimers()
 
+// ========== XHR Mock 工具 ==========
+interface MockXHRCall {
+  method: string
+  url: string
+  async: boolean
+  timeout: number
+  headers: Record<string, string>
+}
+
+let lastXhrCall: MockXHRCall | null = null
+let lastMockXhr: MockXHR | null = null
+let mockXhrConstructor: typeof MockXHR | null = null
+
+class MockXHR {
+  status = 0
+  statusText = ''
+  responseText = ''
+  timeout = 0
+  onload: (() => void) | null = null
+  onerror: (() => void) | null = null
+  ontimeout: (() => void) | null = null
+  onabort: (() => void) | null = null
+  private method = ''
+  private url = ''
+  private async = true
+  private headers: Record<string, string> = {}
+  private _aborted = false
+
+  open(method: string, url: string, async: boolean): void {
+    this.method = method
+    this.url = url
+    this.async = async
+  }
+
+  setRequestHeader(key: string, value: string): void {
+    this.headers[key] = value
+  }
+
+  addEventListener(event: string, handler: () => void): void {
+    if (event === 'abort') {
+      this.onabort = handler
+    }
+  }
+
+  abort(): void {
+    this._aborted = true
+  }
+
+  send(): void {
+    lastXhrCall = {
+      method: this.method,
+      url: this.url,
+      async: this.async,
+      timeout: this.timeout,
+      headers: { ...this.headers },
+    }
+    lastMockXhr = this
+  }
+
+  _respondOk(body: string, status = 200): void {
+    this.status = status
+    this.statusText = 'OK'
+    this.responseText = body
+    if (this.onload) this.onload()
+  }
+
+  _respondError(status: number, statusText = 'Error'): void {
+    this.status = status
+    this.statusText = statusText
+    this.responseText = ''
+    if (this.onload) this.onload()
+  }
+
+  _triggerError(): void {
+    if (this.onerror) this.onerror()
+  }
+
+  _triggerTimeout(): void {
+    if (this.ontimeout) this.ontimeout()
+  }
+
+  _triggerAbort(): void {
+    if (this.onabort) this.onabort()
+  }
+}
+
+function installMockXhr(): void {
+  mockXhrConstructor = MockXHR
+  ;(globalThis as { XMLHttpRequest: typeof MockXHR }).XMLHttpRequest = MockXHR
+  lastXhrCall = null
+  lastMockXhr = null
+}
+
+beforeEach(() => {
+  installMockXhr()
+})
+
 afterEach(() => {
   vi.clearAllTimers()
   vi.clearAllMocks()
+  if (mockXhrConstructor !== null) {
+    ;(globalThis as { XMLHttpRequest?: typeof MockXHR }).XMLHttpRequest = mockXhrConstructor
+    mockXhrConstructor = null
+  }
 })
 
 afterAll(() => {
@@ -95,13 +196,9 @@ describe('buildGiteeRawUrl', () => {
     mockedIsGithubConfigComplete.mockReturnValue(true)
 
     const url = buildGiteeRawUrl()
-    // 关键：Gitee 使用 /raw/，不是 /-/raw/
     expect(url).toContain('/raw/')
-    // 确保不出现 GitLab 风格的 /-/raw/ 段
     expect(url).not.toContain('/-/raw/')
-    // 确保不出现 GitHub 风格的 raw.githubusercontent.com 域名
     expect(url).not.toContain('raw.githubusercontent.com')
-    // 精确匹配：完整 URL 形态
     expect(url).toBe('https://gitee.com/owner/repo/raw/branch/path')
   })
 
@@ -147,6 +244,177 @@ describe('buildGiteeRawUrl', () => {
   })
 })
 
+// ========== fetchGiteeJson ==========
+describe('fetchGiteeJson', () => {
+  beforeEach(() => {
+    mockedGetGithubConfig.mockReturnValue({
+      owner: 'testuser',
+      repo: 'testrepo',
+      branch: 'main',
+      path: 'data.jsonl',
+      sourceType: 'gitee',
+    })
+    mockedIsGithubConfigComplete.mockReturnValue(true)
+  })
+
+  it('成功下载并解析 JSONL', async () => {
+    const jsonlContent = '{"sid":"1","name":"条目1"}\n{"sid":"2","name":"条目2"}'
+    const promise = fetchGiteeJson()
+    lastMockXhr!._respondOk(jsonlContent)
+    const entries = await promise
+    expect(entries.length).toBe(2)
+    expect(entries[0]!.sid).toBe('1')
+    expect(entries[1]!.sid).toBe('2')
+  })
+
+  it('请求构造正确的 Gitee URL', async () => {
+    mockedGetGithubConfig.mockReturnValue({
+      owner: 'myowner',
+      repo: 'myrepo',
+      branch: 'develop',
+      path: 'data.jsonl',
+      sourceType: 'gitee',
+    })
+    const promise = fetchGiteeJson()
+    lastMockXhr!._respondOk('{"sid":"1"}')
+    await promise
+    expect(lastXhrCall?.url).toBe('https://gitee.com/myowner/myrepo/raw/develop/data.jsonl')
+    expect(lastXhrCall?.method).toBe('GET')
+  })
+
+  it('设置 Accept 请求头为 application/json', async () => {
+    const promise = fetchGiteeJson()
+    lastMockXhr!._respondOk('{"sid":"1"}')
+    await promise
+    expect(lastXhrCall?.headers['Accept']).toBe('application/json')
+  })
+
+  it('设置 30 秒超时', async () => {
+    const promise = fetchGiteeJson()
+    lastMockXhr!._respondOk('{"sid":"1"}')
+    await promise
+    expect(lastXhrCall?.timeout).toBe(30000)
+  })
+
+  it('配置不完整时 reject', async () => {
+    mockedIsGithubConfigComplete.mockReturnValue(false)
+    await expect(fetchGiteeJson()).rejects.toThrow(/Gitee 仓库配置不完整/)
+  })
+
+  it('HTTP 404 时 reject', async () => {
+    const promise = fetchGiteeJson()
+    lastMockXhr!._respondError(404, 'Not Found')
+    await expect(promise).rejects.toThrow(/文件不存在（404）/)
+  })
+
+  it('HTTP 403 时 reject', async () => {
+    const promise = fetchGiteeJson()
+    lastMockXhr!._respondError(403, 'Forbidden')
+    await expect(promise).rejects.toThrow(/访问被拒（403）/)
+  })
+
+  it('其他 HTTP 错误时 reject', async () => {
+    const promise = fetchGiteeJson()
+    lastMockXhr!._respondError(500, 'Internal Server Error')
+    await expect(promise).rejects.toThrow(/HTTP 错误 500/)
+  })
+
+  it('网络错误时 reject', async () => {
+    const promise = fetchGiteeJson()
+    lastMockXhr!._triggerError()
+    await expect(promise).rejects.toThrow(/网络请求失败/)
+  })
+
+  it('请求超时时 reject', async () => {
+    const promise = fetchGiteeJson()
+    lastMockXhr!._triggerTimeout()
+    await expect(promise).rejects.toThrow(/请求超时（30000ms）/)
+  })
+
+  it('AbortSignal 已 aborted 时立即 reject', async () => {
+    const controller = new AbortController()
+    controller.abort()
+    await expect(fetchGiteeJson(controller.signal)).rejects.toThrow(/请求被取消/)
+  })
+
+  it('AbortSignal abort 事件触发 xhr.abort()', async () => {
+    const controller = new AbortController()
+    const promise = fetchGiteeJson(controller.signal)
+    // 触发 abort 事件（模拟 signal.abort）
+    lastMockXhr!._triggerAbort()
+    // 同时 xhr.onerror 会因 signal.aborted 为 true 而 reject 为取消
+    Object.defineProperty(controller.signal, 'aborted', { value: true })
+    lastMockXhr!._triggerError()
+    await expect(promise).rejects.toThrow(/请求被取消/)
+  })
+
+  it('解析结果全为非法行时 reject', async () => {
+    const jsonlContent = 'invalid json\nalso broken\n'
+    const promise = fetchGiteeJson()
+    lastMockXhr!._respondOk(jsonlContent)
+    await expect(promise).rejects.toThrow(/JSONL 解析失败/)
+  })
+
+  it('部分非法行仍返回合法条目', async () => {
+    const jsonlContent = '{"sid":"1","name":"有效"}\ninvalid\n{"sid":"2","name":"也有效"}'
+    const promise = fetchGiteeJson()
+    lastMockXhr!._respondOk(jsonlContent)
+    const entries = await promise
+    expect(entries.length).toBe(2)
+    expect(entries[0]!.sid).toBe('1')
+    expect(entries[1]!.sid).toBe('2')
+  })
+
+  it('空 JSONL 返回空数组', async () => {
+    const promise = fetchGiteeJson()
+    lastMockXhr!._respondOk('')
+    const entries = await promise
+    expect(entries).toEqual([])
+  })
+
+  it('单行有效 JSONL', async () => {
+    const jsonlContent = '{"sid":"42","name":"单条记录","updatedAt":"2026-08-01"}'
+    const promise = fetchGiteeJson()
+    lastMockXhr!._respondOk(jsonlContent)
+    const entries = await promise
+    expect(entries.length).toBe(1)
+    expect(entries[0]!.sid).toBe('42')
+    expect(entries[0]!.name).toBe('单条记录')
+    expect(entries[0]!.updatedAt).toBe('2026-08-01')
+  })
+})
+
+// ========== GiteeSyncSource.fetchRemoteEntries ==========
+describe('GiteeSyncSource.fetchRemoteEntries', () => {
+  beforeEach(() => {
+    mockedGetGithubConfig.mockReturnValue({
+      owner: 'testuser',
+      repo: 'testrepo',
+      branch: 'main',
+      path: 'data.jsonl',
+      sourceType: 'gitee',
+    })
+    mockedIsGithubConfigComplete.mockReturnValue(true)
+  })
+
+  it('委托给 fetchGiteeJson 并返回条目', async () => {
+    const source = new GiteeSyncSource()
+    const jsonlContent = '{"sid":"1","name":"条目1"}'
+    const promise = source.fetchRemoteEntries()
+    lastMockXhr!._respondOk(jsonlContent)
+    const entries = await promise
+    expect(entries.length).toBe(1)
+    expect(entries[0]!.sid).toBe('1')
+  })
+
+  it('传递已 aborted 的 AbortSignal 给 fetchGiteeJson', async () => {
+    const source = new GiteeSyncSource()
+    const controller = new AbortController()
+    controller.abort()
+    await expect(source.fetchRemoteEntries(controller.signal)).rejects.toThrow(/请求被取消/)
+  })
+})
+
 // ========== 配置校验 ==========
 describe('GiteeSyncSource.validateConfig', () => {
   it('配置完整时返回 Result.ok', () => {
@@ -167,7 +435,6 @@ describe('GiteeSyncSource.validateConfig', () => {
   })
 
   it('owner 缺失时配置不完整', () => {
-    // isGithubConfigComplete 内部检查 owner/repo/path，缺失任一返回 false
     mockedIsGithubConfigComplete.mockReturnValue(false)
     const source = new GiteeSyncSource()
     const result = source.validateConfig()

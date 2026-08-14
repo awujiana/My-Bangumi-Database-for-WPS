@@ -839,3 +839,11 @@ export function openSyncRecordSheet(scrollToRow?: number): void {
     BGM.handleError(e, { context: 'openSyncRecordSheet', showAlert: false })
   }
 }
+
+// For testing only: reset internal cache state
+export function __resetSyncRecordCache(): void {
+  _syncRecordSidCache.clear()
+  _syncRecordListCache = []
+  _syncRecordCacheValid = false
+  _formattingInProgress = false
+}
