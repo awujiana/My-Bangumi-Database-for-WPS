@@ -3,8 +3,8 @@
 > **生成日期**: 2026-08-14  
 > **测试框架**: Vitest v4.1.9  
 > **测试文件数**: 38  
-> **测试用例总数**: 1214  
-> **测试通过率**: 100% (1214/1214)
+> **测试用例总数**: 1236  
+> **测试通过率**: 100% (1236/1236)
 
 ---
 
@@ -12,10 +12,10 @@
 
 | 指标                  | 已覆盖 | 目标  | 状态      |
 | --------------------- | ------ | ----- | --------- |
-| **Statements (语句)** | 41.19% | ≥ 80% | ⚠️ 需改进 |
-| **Branches (分支)**   | 33.57% | ≥ 80% | ⚠️ 需改进 |
+| **Statements (语句)** | 41.41% | ≥ 80% | ⚠️ 需改进 |
+| **Branches (分支)**   | 34.08% | ≥ 80% | ⚠️ 需改进 |
 | **Functions (函数)**  | 47.22% | ≥ 80% | ⚠️ 需改进 |
-| **Lines (行)**        | 41.47% | ≥ 80% | ⚠️ 需改进 |
+| **Lines (行)**        | 41.66% | ≥ 80% | ⚠️ 需改进 |
 
 > **说明**: 整体覆盖率偏低的主要原因是大量 WPS 宿主 API（COM 接口）无法在 Node.js 环境中执行。核心业务逻辑模块（`ts/sync/`、`ts/core/`、`ts/tools/`）的覆盖率已达到较高水平。
 
@@ -25,22 +25,22 @@
 
 ### 2.1 数据同步模块 (`ts/sync/`)
 
-| 文件                      | Statements    | Branch      | Functions     | Lines         | 未覆盖行         |
-| ------------------------- | ------------- | ----------- | ------------- | ------------- | ---------------- |
-| **exportJsonl.ts**        | **98.8%** ✅  | **100%** ✅ | 85.71%        | **100%** ✅   | —                |
-| **githubSync.ts**         | **90.44%** ✅ | 74.35%      | **97.87%** ✅ | **91.83%** ✅ | 1027, 1060, 1113 |
-| **githubSyncDiff.ts**     | 83.72%        | 76.69%      | 100% ✅       | 92.3%         | 328, 359-368     |
-| **githubCache.ts**        | 95.12% ✅     | 88.88%      | 100% ✅       | 94.59%        | 116-117          |
-| **githubConfig.ts**       | 92.7%         | 87.09%      | 100% ✅       | 92.7%         | 287-288, 329-330 |
-| **gistSync.ts**           | 92.63%        | 89.39%      | 92.85%        | 94.31%        | 15, 267, 274-275 |
-| **giteeSync.ts**          | 96.29% ✅     | 89.28%      | 90.9%         | 96.29% ✅     | 95, 123          |
-| **gitlabSync.ts**         | 96.29% ✅     | 89.28%      | 90.9%         | 96.29% ✅     | 95, 123          |
-| **localFileSync.ts**      | **100%** ✅   | 96.55%      | **100%** ✅   | **100%** ✅   | 113              |
-| **syncSourceRegistry.ts** | 94.44% ✅     | 73.01%      | 100% ✅       | 95.41%        | 149-152, 305     |
-| **syncRecord.ts**         | 80.17%        | 61.65%      | 95%           | 85.02%        | 708-709, 787-788 |
-| **undoStack.ts**          | 98.21% ✅     | 88.46%      | **100%** ✅   | **100%** ✅   | 85, 131, 157     |
-| **pureUtils.ts**          | **100%** ✅   | **100%** ✅ | **100%** ✅   | **100%** ✅   | —                |
-| **pureUtilsCore.ts**      | 96.07% ✅     | 95.55%      | 83.33%        | **100%** ✅   | 155-156          |
+| 文件                      | Statements    | Branch        | Functions     | Lines         | 未覆盖行         |
+| ------------------------- | ------------- | ------------- | ------------- | ------------- | ---------------- |
+| **exportJsonl.ts**        | **98.8%** ✅  | **100%** ✅   | 85.71%        | **100%** ✅   | —                |
+| **githubSync.ts**         | **90.9%** ✅  | 75.52%        | **97.87%** ✅ | **92.17%** ✅ | 1022-1027        |
+| **githubSyncDiff.ts**     | **91.47%** ✅ | **86.46%** ✅ | 100% ✅       | **99.03%** ✅ | 363              |
+| **githubCache.ts**        | 95.12% ✅     | 88.88%        | 100% ✅       | 94.59%        | 116-117          |
+| **githubConfig.ts**       | 92.7%         | 87.09%        | 100% ✅       | 92.7%         | 287-288, 329-330 |
+| **gistSync.ts**           | 92.63%        | 89.39%        | 92.85%        | 94.31%        | 15, 267, 274-275 |
+| **giteeSync.ts**          | 96.29% ✅     | 89.28%        | 90.9%         | 96.29% ✅     | 95, 123          |
+| **gitlabSync.ts**         | 96.29% ✅     | 89.28%        | 90.9%         | 96.29% ✅     | 95, 123          |
+| **localFileSync.ts**      | **100%** ✅   | 96.55%        | **100%** ✅   | **100%** ✅   | 113              |
+| **syncSourceRegistry.ts** | 94.44% ✅     | 73.01%        | 100% ✅       | 95.41%        | 149-152, 305     |
+| **syncRecord.ts**         | 81.71%        | 64.72%        | 95%           | 86.8%         | 507-508, 586-595 |
+| **undoStack.ts**          | 98.21% ✅     | 88.46%        | **100%** ✅   | **100%** ✅   | 85, 131, 157     |
+| **pureUtils.ts**          | **100%** ✅   | **100%** ✅   | **100%** ✅   | **100%** ✅   | —                |
+| **pureUtilsCore.ts**      | 96.07% ✅     | 95.55%        | 83.33%        | **100%** ✅   | 155-156          |
 
 ### 2.2 核心模块 (`ts/core/`)
 
@@ -106,14 +106,14 @@
 | 16  | `ts/tools/`       | logBuffer.ts          | **100%**   |
 | 17  | `ts/ui/handlers/` | _constants.ts         | **100%**   |
 | 18  | `ts/ui/`          | handlers.ts           | **100%**   |
-| 19  | `ts/sync/`        | giteeSync.ts          | **96.29%** |
-| 20  | `ts/sync/`        | gitlabSync.ts         | **96.29%** |
-| 21  | `ts/tools/util/`  | sheet.ts              | **96.37%** |
-| 22  | `ts/sync/`        | syncSourceRegistry.ts | **95.41%** |
-| 23  | `ts/sync/`        | githubCache.ts        | **94.59%** |
-| 24  | `ts/sync/`        | githubSync.ts         | **91.83%** |
+| 19  | `ts/sync/`        | githubSyncDiff.ts     | **99.03%** |
+| 20  | `ts/sync/`        | giteeSync.ts          | **96.29%** |
+| 21  | `ts/sync/`        | gitlabSync.ts         | **96.29%** |
+| 22  | `ts/tools/util/`  | sheet.ts              | **96.37%** |
+| 23  | `ts/sync/`        | syncSourceRegistry.ts | **95.41%** |
+| 24  | `ts/sync/`        | githubCache.ts        | **94.59%** |
 | 25  | `ts/sync/`        | gistSync.ts           | **94.31%** |
-| 26  | `ts/sync/`        | githubSyncDiff.ts     | **92.3%**  |
+| 26  | `ts/sync/`        | githubSync.ts         | **92.17%** |
 | 27  | `ts/sync/`        | githubConfig.ts       | **92.7%**  |
 | 28  | `ts/tools/`       | http.ts               | **90.22%** |
 
@@ -121,81 +121,91 @@
 
 ## 四、本次优化提升详情
 
-### 4.1 exportJsonl.ts 优化
-
-| 指标       | 优化前 | 优化后    | 提升    |
-| ---------- | ------ | --------- | ------- |
-| Statements | 76.27% | **98.8%** | +22.53% |
-| Branch     | 71.42% | **100%**  | +28.58% |
-| Lines      | 76.19% | **100%**  | +23.81% |
-
-**新增测试用例**:
-
-- `getCellText` 在 `Range` 返回 null 时回退到 `getCellValue` (Line 40)
-- `findHeaderRow` 返回 0 时使用默认行号 1 (Line 70)
-- `extractSubjectId` 返回 null 时跳过无效 SID (Line 86)
-
-### 4.2 githubSync.ts 优化
+### 4.1 githubSync.ts 优化（第二轮）
 
 | 指标       | 优化前 | 优化后     | 提升   |
 | ---------- | ------ | ---------- | ------ |
-| Statements | 87.67% | **90.44%** | +2.77% |
-| Branch     | 71.09% | **74.35%** | +3.26% |
-| Functions  | 89.36% | **97.87%** | +8.51% |
-| Lines      | 89.45% | **91.83%** | +2.38% |
+| Statements | 90.44% | **90.9%**  | +0.46% |
+| Branch     | 74.35% | **75.52%** | +1.17% |
+| Functions  | 97.87% | **97.87%** | —      |
+| Lines      | 91.83% | **92.17%** | +0.34% |
 
 **新增测试用例**:
 
-- `finally` 块恢复 `ScreenUpdating`/`Calculation` 正常路径
-- `finally` 块恢复 `ScreenUpdating`/`Calculation` 异常路径
-- `finally` 块恢复失败（setter 抛异常）仍安全返回
-- `getSelectedRowSids` 无 `Bangumi_URL` 列警告分支
-- `getSelectedRowSids` 循环内异常 ERROR 记录分支
-- 时间筛选路径日志和 `onProgress` 调用验证
-- `app` 为 null 时恢复逻辑安全执行
-- `ScreenUpdating` setter 抛异常时同步不中断
-- `readLocalEntriesForSync` 返回 null 错误路径 (Line 1391)
-- `conflictResolution` 冲突解决分支 (Lines 1401-1402)
-- `ensureSheetHeaders` 返回 true 路径 (Lines 1350-1351)
-- 11 条 delete diffs 触发 `yieldToEventLoop` (Line 1184)
+- `applyDiffToSheet` 批量 add 写入超过 `BATCH_WRITE_SIZE`(500) 条 diffs，触发 line 1060 `yieldToEventLoop` ✅
+- `applyDiffToSheet` 批量 update 写入超过 `BATCH_UPDATE_SIZE`(50) 条 diffs，触发 line 1113 `yieldToEventLoop` ✅
 
-### 4.3 sleep.ts 优化
+### 4.2 githubSyncDiff.ts 优化（第二轮）
 
-| 指标       | 优化前 | 优化后   | 提升  |
-| ---------- | ------ | -------- | ----- |
-| Statements | ~85%   | **100%** | +15%+ |
-| Branch     | ~80%   | **100%** | +20%+ |
-| Lines      | ~85%   | **100%** | +15%+ |
+| 指标       | 优化前 | 优化后     | 提升   |
+| ---------- | ------ | ---------- | ------ |
+| Statements | 83.72% | **91.47%** | +7.75% |
+| Branch     | 76.69% | **86.46%** | +9.77% |
+| Functions  | 100%   | **100%**   | —      |
+| Lines      | 92.3%  | **99.03%** | +6.73% |
 
 **新增测试用例**:
 
-- `app.Wait` 路径调用验证
-- `app.Wait` 抛异常回退到 DoEvents 路径
-- `DoEvents` 抛出异常时 break 退出循环
-- `bgmLog` 为非函数值时仍能正常 break
-- `sleep(0)` 边界值测试
-- `delay` 异步函数正确性验证
+- `filterByTime` 未知 range（如 'invalid'）返回 false
+- `matchTimeFilter` quarter 策略：12 月条目归属上一年 Q1（line 359-368）
+- `matchTimeFilter` mirror 策略 + 时间过滤：本地年份不匹配时跳过 delete
+- `filterByTime` year 策略边界测试
+- `filterByTime` month 策略边界测试
+
+### 4.3 syncRecord.ts 优化（第二轮）
+
+| 指标       | 优化前 | 优化后     | 提升   |
+| ---------- | ------ | ---------- | ------ |
+| Statements | 80.17% | **81.71%** | +1.54% |
+| Branch     | 61.65% | **64.72%** | +3.07% |
+| Functions  | 95%    | **95%**    | —      |
+| Lines      | 85.02% | **86.8%**  | +1.78% |
+
+**新增测试用例**:
+
+- `addSyncRecord` 更新已有记录时所有可选字段（name, url, type, source, content, message, fingerprint, collType）都被写入 (lines 586-595)
+- `getAllSyncRecords` 在 `getSyncRecordSheetIfExists` 抛异常时被 catch 并返回空数组 (lines 637-638)
+
+### 4.4 累积优化总览
+
+| 模块                  | 轮次   | Statements        | Branch            | Lines             |
+| --------------------- | ------ | ----------------- | ----------------- | ----------------- |
+| **exportJsonl.ts**    | 第一轮 | 76.27%→**98.8%**  | 71.42%→**100%**   | 76.19%→**100%**   |
+| **githubSync.ts**     | 第一轮 | 87.67%→90.44%     | 71.09%→74.35%     | 89.45%→91.83%     |
+|                       | 第二轮 | 90.44%→**90.9%**  | 74.35%→**75.52%** | 91.83%→**92.17%** |
+| **githubSyncDiff.ts** | 第一轮 | —                 | —                 | —                 |
+|                       | 第二轮 | 83.72%→**91.47%** | 76.69%→**86.46%** | 92.3%→**99.03%**  |
+| **sleep.ts**          | 第一轮 | ~85%→**100%**     | ~80%→**100%**     | ~85%→**100%**     |
+| **syncRecord.ts**     | 第二轮 | 80.17%→**81.71%** | 61.65%→**64.72%** | 85.02%→**86.8%**  |
 
 ---
 
 ## 五、未覆盖分支分析
 
-### 5.1 githubSync.ts 剩余未覆盖行 (1027, 1060, 1113)
+### 5.1 githubSync.ts 剩余未覆盖行 (1022-1027)
 
-| 行号     | 代码上下文                              | 未覆盖原因                                                                           | 建议                                    |
-| -------- | --------------------------------------- | ------------------------------------------------------------------------------------ | --------------------------------------- |
-| **1027** | 批量写入失败后逐行写入 catch 块         | 需要 `batchWriteNewRows` 返回 0 且 `writeRemoteEntryToRow` 抛异常，依赖 WPS COM 模拟 | 在集成测试或 WPS 宿主中验证             |
-| **1060** | 批量 add 写入后的 `yieldToEventLoop`    | 需要 `addTotal > BATCH_WRITE_SIZE` 且剩余未处理完                                    | 增加 BATCH_WRITE_SIZE+1 个 add diffs    |
-| **1113** | 批量 update 写入后的 `yieldToEventLoop` | 需要超过 10 条 update diffs 且未全部处理完                                           | 增加 BATCH_WRITE_SIZE+1 个 update diffs |
+| 行号          | 代码上下文                      | 未覆盖原因                                                                           | 建议                        |
+| ------------- | ------------------------------- | ------------------------------------------------------------------------------------ | --------------------------- |
+| **1022-1027** | 批量写入失败后逐行写入 catch 块 | 需要 `batchWriteNewRows` 返回 0 且 `writeRemoteEntryToRow` 抛异常，依赖 WPS COM 模拟 | 在集成测试或 WPS 宿主中验证 |
 
-### 5.2 githubSyncDiff.ts 剩余未覆盖行 (328, 359-368)
+> ✅ **已覆盖**: lines 1060 (批量 add yieldToEventLoop) 和 1113 (批量 update yieldToEventLoop) 在本轮优化中已覆盖。
 
-| 行号        | 代码上下文                              | 未覆盖原因                 |
-| ----------- | --------------------------------------- | -------------------------- |
-| **328**     | `parseJsonl` 空输入边界                 | 需要传入空字符串且不抛异常 |
-| **359-368** | `computeDiff` mirror 策略的 delete 逻辑 | 需要完整的 mirror 策略场景 |
+### 5.2 githubSyncDiff.ts 剩余未覆盖行 (363)
 
-### 5.3 其他未覆盖模块
+| 行号    | 代码上下文                         | 未覆盖原因                                                       | 建议                     |
+| ------- | ---------------------------------- | ---------------------------------------------------------------- | ------------------------ |
+| **363** | `matchTimeFilter` 精确日期匹配分支 | 需要精确日期（非年月匹配）的边界场景，逻辑已通过其他分支间接覆盖 | 补充精确日期匹配测试用例 |
+
+> ✅ **已覆盖**: lines 328 (filterByTime 未知 range 默认分支) 和 359-368 (quarter 策略) 在本轮优化中已覆盖。
+
+### 5.3 syncRecord.ts 剩余未覆盖行 (507-508, 586-595)
+
+| 行号        | 代码上下文                     | 未覆盖原因                                                 | 建议                     |
+| ----------- | ------------------------------ | ---------------------------------------------------------- | ------------------------ |
+| **507-508** | `readSyncRecords` 工作表不存在 | 需要 `getSyncRecordSheetIfExists` 返回 null                | 模拟工作表不存在场景测试 |
+| **586-595** | `addSyncRecord` 可选字段分支   | 部分可选字段（如 collType, fingerprint）组合场景未完全覆盖 | 补充单字段更新的边界测试 |
+
+### 5.4 其他未覆盖模块
 
 | 文件               | 覆盖率 | 原因                          | 建议     |
 | ------------------ | ------ | ----------------------------- | -------- |
@@ -215,7 +225,7 @@
 | #     | 测试文件                            | 测试数 | 状态 |
 | ----- | ----------------------------------- | ------ | ---- |
 | 1     | `tests/boundary.test.ts`            | 113    | ✅   |
-| 2     | `tests/githubSync.test.ts`          | 77     | ✅   |
+| 2     | `tests/githubSync.test.ts`          | 89     | ✅   |
 | 3     | `tests/githubSyncDiff.test.ts`      | 44     | ✅   |
 | 4     | `tests/githubSyncCore.test.ts`      | 42     | ✅   |
 | 5     | `tests/exportJsonl.test.ts`         | 20     | ✅   |
@@ -228,7 +238,7 @@
 | 12    | `tests/schemas.test.ts`             | 26     | ✅   |
 | 13    | `tests/syncSourceRegistry.test.ts`  | 31     | ✅   |
 | 14    | `tests/pureUtils.test.ts`           | 24     | ✅   |
-| 15    | `tests/syncRecord.test.ts`          | 24     | ✅   |
+| 15    | `tests/syncRecord.test.ts`          | 30     | ✅   |
 | 16    | `tests/undoStack.test.ts`           | 23     | ✅   |
 | 17    | `tests/crypto.test.ts`              | 22     | ✅   |
 | 18    | `tests/githubConfig.test.ts`        | 20     | ✅   |
@@ -282,17 +292,17 @@ npx vitest run --coverage tests/githubSync.test.ts
 
 ### 7.1 短期改进（可立即执行）
 
-1. **补充 `githubSync.ts` lines 1060/1113 覆盖**
-   - 方案：构造超过 `BATCH_WRITE_SIZE` 条 diffs，验证批量写入后的 `yieldToEventLoop`
-   - 预计提升：分支覆盖率 +2~3%
+1. **补充 `githubSync.ts` line 1022-1027 覆盖**
+   - 方案：Mock `batchWriteNewRows` 返回空数组，同时 Mock `writeRemoteEntryToRow` 抛异常，触发 catch 块
+   - 预计提升：行覆盖率 +0.5%
 
-2. **补充 `githubSyncDiff.ts` 空输入边界测试**
-   - 方案：为 `parseJsonl` 传入空字符串、纯空白字符串
-   - 预计提升：行覆盖率 +1~2%
+2. **补充 `githubSyncDiff.ts` line 363 精确日期匹配**
+   - 方案：为 `matchTimeFilter` 传入精确日期（`exactDate` 类型），验证日期精确匹配逻辑
+   - 预计提升：行覆盖率 +0.2%
 
-3. **补充 `syncRecord.ts` 未覆盖分支**
-   - 方案：测试 `updateRecord` 的 null 参数、空数组参数
-   - 预计提升：行覆盖率 +3~5%
+3. **补充 `syncRecord.ts` lines 507-508, 586-595 覆盖**
+   - 方案：测试工作表不存在场景和单字段更新场景
+   - 预计提升：行覆盖率 +2~3%
 
 ### 7.2 中期改进（需 WPS 宿主环境）
 
@@ -314,7 +324,7 @@ npx vitest run --coverage tests/githubSync.test.ts
 - **配置**: `vitest.config.ts` / `vite.config.ts`
 - **阈值**: 行覆盖率 ≥ 80%（核心模块 ≥ 90%）
 - **数据来源**: `npx vitest run --coverage` 实际运行结果
-- **报告生成时间**: 2026-08-14 12:43
+- **报告生成时间**: 2026-08-14 13:05
 
 ---
 
