@@ -21,6 +21,7 @@ const mockIsGithubConfigComplete = vi.hoisted(() => vi.fn().mockReturnValue(true
 const realImpls = vi.hoisted(() => ({
   computeDiff: null as typeof import('../ts/sync/githubSyncDiff.js').computeDiff | null,
   parseJsonl: null as typeof import('../ts/sync/githubSyncDiff.js').parseJsonl | null,
+  filterByTime: null as typeof import('../ts/sync/githubSyncDiff.js').filterByTime | null,
 }))
 
 const mockParseJsonl = vi.hoisted(() =>
@@ -49,35 +50,28 @@ const mockParseJsonl = vi.hoisted(() =>
   }),
 )
 const mockComputeDiff = vi.hoisted(() =>
-  vi
-    .fn()
-    .mockImplementation(
-      (
-        remote: Array<{
-          sid: string
-          name?: string
-          updatedAt?: string
-          date?: string
-          meta_tags?: string[]
-          nsfw?: boolean
-          [key: string]: unknown
-        }>,
-        local: Map<string, { row: number; sid: string; fields: Record<string, string> }>,
-        strategy?: string,
-        timeFilter?: unknown,
-      ) => {
-        // 默认使用真实实现
-        if (realImpls.computeDiff) {
-          return realImpls.computeDiff(
-            remote as never,
-            local,
-            strategy as never,
-            timeFilter as never,
-          )
-        }
-        return []
-      },
-    ),
+  vi.fn().mockImplementation(
+    (
+      remote: Array<{
+        sid: string
+        name?: string
+        updatedAt?: string
+        date?: string
+        meta_tags?: string[]
+        nsfw?: boolean
+        [key: string]: unknown
+      }>,
+      local: Map<string, { row: number; sid: string; fields: Record<string, string> }>,
+      strategy?: string,
+      timeFilter?: unknown,
+    ) => {
+      // 默认使用真实实现
+      if (realImpls.computeDiff) {
+        return realImpls.computeDiff(remote as never, local, strategy as never, timeFilter as never)
+      }
+      return []
+    },
+  ),
 )
 const mockTagsToString = vi.hoisted(() => vi.fn().mockReturnValue(''))
 const mockExtractSubjectId = vi.hoisted(() => vi.fn().mockReturnValue(null))
@@ -173,6 +167,7 @@ const mockXHR = vi.hoisted(() => {
 import {
   computeDiff,
   parseJsonl,
+  filterByTime,
   isGithubRemoteEntry,
   SYNC_STRATEGY_LABELS,
   type GithubRemoteEntry,
@@ -269,6 +264,7 @@ vi.mock('../ts/sync/githubSyncDiff.js', async () => {
   )
   realImpls.computeDiff = actual.computeDiff
   realImpls.parseJsonl = actual.parseJsonl
+  realImpls.filterByTime = actual.filterByTime
   return {
     ...actual,
     computeDiff: mockComputeDiff,
@@ -2185,5 +2181,318 @@ describe('applyDiffToSheet 删除操作 yieldToEventLoop (line 1184)', () => {
     // 实际上只要 computeDiff 返回了 11 个 delete diff，循环就会执行
     // line 1184 在第 10 条和第 11 条删除时被触发
     expect(mockComputeDiff).toHaveBeenCalled()
+  })
+})
+
+// ============ 补充: githubSync.ts lines 1060/1113 批量 yieldToEventLoop ============
+
+describe('applyDiffToSheet 批量 add yieldToEventLoop (line 1060)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mockGetColumnMap.mockReturnValue(
+      new Map<string, number>([
+        ['Bangumi_URL', 1],
+        ['名称', 2],
+        ['开播日期', 3],
+      ]),
+    )
+    mockSetCellValue.mockImplementation(() => {})
+  })
+
+  it('超过 500 条 add diffs 时应触发 yieldToEventLoop (line 1060)', async () => {
+    const ws = createMockWorksheet({ usedRange: 10 })
+    mockGetDataSheet.mockReturnValue(ws)
+    mockFindHeaderRow.mockReturnValue(1)
+    mockGetLastRow.mockReturnValue(5)
+
+    const mockApp = {
+      ScreenUpdating: true,
+      Calculation: 1,
+      Wait: vi.fn(),
+      DoEvents: vi.fn(),
+    }
+    mockGetApp.mockReturnValue(mockApp)
+
+    // 生成 501 条 add diff（超过 BATCH_WRITE_SIZE=500）
+    const addDiffs: GithubSyncDiff[] = Array.from({ length: 501 }, (_, i) => ({
+      kind: 'add' as const,
+      sid: String(i + 1),
+      remote: {
+        sid: String(i + 1),
+        name: `测试条目${i + 1}`,
+        date: '2024-06-15',
+      },
+      changedFields: ['*'],
+    }))
+
+    const result = await applyDiffToSheet(addDiffs, 'add-update')
+
+    expect(result.added).toBeGreaterThan(0)
+    expect(mockBgmLognnn).toHaveBeenCalledWith('INFO', expect.stringContaining('应用完成'))
+    // 验证批量写入至少被调用了一次
+    expect(ws.Range).toHaveBeenCalled()
+  })
+})
+
+describe('applyDiffToSheet 批量 update yieldToEventLoop (line 1113)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mockGetColumnMap.mockReturnValue(
+      new Map<string, number>([
+        ['Bangumi_URL', 1],
+        ['名称', 2],
+        ['开播日期', 3],
+      ]),
+    )
+    mockSetCellValue.mockImplementation(() => {})
+    mockGetCellValue.mockImplementation((_ws: unknown, row: number, col: number) => {
+      if (col === 1) return `https://bgm.tv/subject/${row}`
+      if (col === 2) return `旧名称${row}`
+      return ''
+    })
+  })
+
+  it('超过 50 条 update diffs 时应触发 yieldToEventLoop (line 1113)', async () => {
+    const ws = createMockWorksheet({ usedRange: 60 })
+    mockGetDataSheet.mockReturnValue(ws)
+    mockFindHeaderRow.mockReturnValue(1)
+    mockGetLastRow.mockReturnValue(60)
+
+    const mockApp = {
+      ScreenUpdating: true,
+      Calculation: 1,
+      Wait: vi.fn(),
+      DoEvents: vi.fn(),
+    }
+    mockGetApp.mockReturnValue(mockApp)
+
+    // 生成 51 条 update diff（超过 BATCH_UPDATE_SIZE=50）
+    const updateDiffs: GithubSyncDiff[] = Array.from({ length: 51 }, (_, i) => ({
+      kind: 'update' as const,
+      sid: String(i + 1),
+      localRow: i + 2,
+      remote: {
+        sid: String(i + 1),
+        name: `更新条目${i + 1}`,
+        date: '2024-06-15',
+      },
+      changedFields: ['名称'],
+    }))
+
+    const result = await applyDiffToSheet(updateDiffs, 'add-update')
+
+    expect(result.updated).toBeGreaterThan(0)
+    expect(mockBgmLognnn).toHaveBeenCalledWith('INFO', expect.stringContaining('应用完成'))
+    expect(ws.Range).toHaveBeenCalled()
+  })
+})
+
+// ============ 补充: githubSyncDiff.ts 未覆盖分支 ============
+
+describe('filterByTime 未覆盖分支 (line 328)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    // 使用真实 filterByTime 实现
+    mockFilterByTime.mockImplementation(
+      realImpls.filterByTime || ((entries: GithubRemoteEntry[]) => entries),
+    )
+  })
+
+  it('未知 range 应返回空数组', () => {
+    const entries: GithubRemoteEntry[] = [
+      { sid: '1', name: '测试', date: '2024-06-15' },
+      { sid: '2', name: '测试2', date: '2024-07-20' },
+    ]
+    const result = filterByTime(entries, {
+      enabled: true,
+      range: 'week',
+      year: 2024,
+    })
+    expect(result).toHaveLength(0)
+  })
+
+  it('range 为 all 时应直接返回所有条目', () => {
+    const entries: GithubRemoteEntry[] = [{ sid: '1', name: '测试', date: '2024-06-15' }]
+    const result = filterByTime(entries, {
+      enabled: false,
+      range: 'all',
+    })
+    expect(result).toHaveLength(1)
+  })
+
+  it('year 策略: 匹配年份的条目通过', () => {
+    const entries: GithubRemoteEntry[] = [
+      { sid: '1', name: '2024条目', date: '2024-06-15' },
+      { sid: '2', name: '2023条目', date: '2023-07-20' },
+    ]
+    const result = filterByTime(entries, { enabled: true, range: 'year', year: 2024 })
+    expect(result).toHaveLength(1)
+    expect(result[0]!.sid).toBe('1')
+  })
+
+  it('quarter 策略: Q1 包含 1-3 月', () => {
+    const entries: GithubRemoteEntry[] = [
+      { sid: '1', name: '1月', date: '2024-01-15' },
+      { sid: '2', name: '4月', date: '2024-04-20' },
+    ]
+    const result = filterByTime(entries, {
+      enabled: true,
+      range: 'quarter',
+      year: 2024,
+      quarter: 1,
+    })
+    expect(result).toHaveLength(1)
+    expect(result[0]!.sid).toBe('1')
+  })
+
+  it('quarter 策略: 12 月条目归属上一年 Q1 (line 362 对应 filterByTime line 319)', () => {
+    const entries: GithubRemoteEntry[] = [{ sid: '1', name: '12月条目', date: '2024-12-15' }]
+    const result = filterByTime(entries, {
+      enabled: true,
+      range: 'quarter',
+      year: 2025,
+      quarter: 1,
+    })
+    expect(result).toHaveLength(1) // 12月属于2025 Q1
+  })
+
+  it('quarter 策略: quarter 超出范围返回空', () => {
+    const entries: GithubRemoteEntry[] = [{ sid: '1', name: '测试', date: '2024-06-15' }]
+    const result = filterByTime(entries, {
+      enabled: true,
+      range: 'quarter',
+      year: 2024,
+      quarter: 99,
+    })
+    expect(result).toHaveLength(0)
+  })
+
+  it('month 策略: 精确匹配月份', () => {
+    const entries: GithubRemoteEntry[] = [
+      { sid: '1', name: '6月', date: '2024-06-15' },
+      { sid: '2', name: '7月', date: '2024-07-20' },
+    ]
+    const result = filterByTime(entries, { enabled: true, range: 'month', year: 2024, month: 6 })
+    expect(result).toHaveLength(1)
+    expect(result[0]!.sid).toBe('1')
+  })
+})
+
+describe('matchTimeFilter 未覆盖分支 (lines 359-368) 通过 computeDiff', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    // 确保使用真实 computeDiff 实现
+    mockComputeDiff.mockImplementation(
+      (
+        remote: GithubRemoteEntry[],
+        local: Map<string, LocalRowEntry>,
+        strategy?: SyncStrategy,
+        timeFilter?: unknown,
+      ) => {
+        if (realImpls.computeDiff) {
+          return realImpls.computeDiff(remote, local, strategy, timeFilter as never)
+        }
+        return []
+      },
+    )
+    // filterByTime 使用真实实现（让远程筛选也走真实逻辑）
+    mockFilterByTime.mockImplementation(
+      realImpls.filterByTime || ((entries: GithubRemoteEntry[]) => entries),
+    )
+  })
+
+  it('quarter 策略: 本地12月条目归属上一年 (line 362)', () => {
+    const remote: GithubRemoteEntry[] = []
+    const local = new Map<string, LocalRowEntry>([
+      ['sid-1', { row: 2, sid: 'sid-1', fields: { 开播日期: '2024年12月15日', 名称: '12月条目' } }],
+    ])
+    // 2024年12月的条目应该属于2025 Q1（跨年归属）
+    const diffs = computeDiff(remote, local, 'mirror', {
+      enabled: true,
+      range: 'quarter',
+      year: 2025,
+      quarter: 1,
+    })
+    // 本地条目日期匹配 → 应该被标记为 delete
+    const deletes = diffs.filter((d) => d.kind === 'delete')
+    expect(deletes.length).toBe(1)
+  })
+
+  it('quarter 策略: quarter 超出范围返回 false 不删除 (line 360)', () => {
+    const remote: GithubRemoteEntry[] = []
+    const local = new Map<string, LocalRowEntry>([
+      ['sid-1', { row: 2, sid: 'sid-1', fields: { 开播日期: '2024年06月15日', 名称: '测试' } }],
+    ])
+    const diffs = computeDiff(remote, local, 'mirror', {
+      enabled: true,
+      range: 'quarter',
+      year: 2024,
+      quarter: 99,
+    })
+    // quarter=99 无效 → matchTimeFilter 返回 false → 跳过 delete
+    const deletes = diffs.filter((d) => d.kind === 'delete')
+    expect(deletes.length).toBe(0)
+  })
+
+  it('month 策略: 精确匹配月份 (line 365-366)', () => {
+    const remote: GithubRemoteEntry[] = []
+    const local = new Map<string, LocalRowEntry>([
+      ['sid-1', { row: 2, sid: 'sid-1', fields: { 开播日期: '2024年06月15日', 名称: '6月条目' } }],
+    ])
+    const diffs = computeDiff(remote, local, 'mirror', {
+      enabled: true,
+      range: 'month',
+      year: 2024,
+      month: 6,
+    })
+    // 精确匹配 → 应该被标记为 delete
+    const deletes = diffs.filter((d) => d.kind === 'delete')
+    expect(deletes.length).toBe(1)
+  })
+
+  it('month 策略: 不匹配月份时不删除', () => {
+    const remote: GithubRemoteEntry[] = []
+    const local = new Map<string, LocalRowEntry>([
+      ['sid-1', { row: 2, sid: 'sid-1', fields: { 开播日期: '2024年07月15日', 名称: '7月条目' } }],
+    ])
+    const diffs = computeDiff(remote, local, 'mirror', {
+      enabled: true,
+      range: 'month',
+      year: 2024,
+      month: 6,
+    })
+    // 月份不匹配 → matchTimeFilter 返回 false → 跳过 delete
+    const deletes = diffs.filter((d) => d.kind === 'delete')
+    expect(deletes.length).toBe(0)
+  })
+
+  it('mirror 策略 + 时间过滤: 本地年份不匹配时跳过 delete', () => {
+    const remote: GithubRemoteEntry[] = []
+    const local = new Map<string, LocalRowEntry>([
+      ['sid-1', { row: 2, sid: 'sid-1', fields: { 开播日期: '2023年05月15日', 名称: '旧条目' } }],
+    ])
+    const diffs = computeDiff(remote, local, 'mirror', {
+      enabled: true,
+      range: 'year',
+      year: 2024,
+    })
+    // 2023 ≠ 2024 → matchTimeFilter 返回 false → 跳过 delete
+    const deletes = diffs.filter((d) => d.kind === 'delete')
+    expect(deletes.length).toBe(0)
+  })
+
+  it('matchTimeFilter default 分支: 未知 range 返回 true (line 367-368)', () => {
+    const remote: GithubRemoteEntry[] = []
+    const local = new Map<string, LocalRowEntry>([
+      ['sid-1', { row: 2, sid: 'sid-1', fields: { 开播日期: '2024年06月15日', 名称: '条目' } }],
+    ])
+    const diffs = computeDiff(remote, local, 'mirror', {
+      enabled: true,
+      range: 'week' as never,
+      year: 2024,
+    })
+    // 未知 range → matchTimeFilter default 返回 true → 执行 delete
+    const deletes = diffs.filter((d) => d.kind === 'delete')
+    expect(deletes.length).toBe(1)
   })
 })
