@@ -95,6 +95,7 @@ class MockXHR {
   onload: (() => void) | null = null
   onerror: (() => void) | null = null
   ontimeout: (() => void) | null = null
+  _aborted = false
   private method = ''
   private url = ''
   private async = true
@@ -108,6 +109,10 @@ class MockXHR {
 
   setRequestHeader(key: string, value: string): void {
     this.headers[key] = value
+  }
+
+  abort(): void {
+    this._aborted = true
   }
 
   send(): void {
@@ -569,6 +574,152 @@ describe('fetchGistJson', () => {
     expect(lastXhrCall?.timeout).toBe(30000)
     lastMockXhr!._respondOk(JSON.stringify({ files: {} }))
     await promise
+  })
+
+  it('AbortSignal abort 事件触发时 xhr.abort() 被调用 (line 215)', async () => {
+    mockedGetGistId.mockReturnValue('abort-test')
+    const controller = new AbortController()
+    const promise = fetchGistJson(controller.signal)
+    controller.abort()
+    expect(lastMockXhr!._aborted).toBe(true)
+    lastMockXhr!._triggerError()
+    await expect(promise).rejects.toThrow(/请求被取消/)
+  })
+
+  it('HTTP 500 时 reject 并返回错误信息 (line 267)', async () => {
+    mockedGetGistId.mockReturnValue('server-error')
+    const promise = fetchGistJson()
+    lastMockXhr!._respondError(500, 'Internal Server Error')
+    await expect(promise).rejects.toThrow(/HTTP 错误 500/)
+  })
+
+  it('onerror 且 signal.aborted 时返回取消错误 (line 274-275)', async () => {
+    mockedGetGistId.mockReturnValue('onerror-abort')
+    const controller = new AbortController()
+    const promise = fetchGistJson(controller.signal)
+    // 直接触发 abort 标记 + onerror
+    controller.abort()
+    // onerror 时 signal.aborted 为 true，应返回取消错误
+    lastMockXhr!.onerror?.()
+    await expect(promise).rejects.toThrow(/请求被取消/)
+  })
+
+  it('单文件且有内容时返回该内容 (line 163)', async () => {
+    mockedGetGistId.mockReturnValue('single-file')
+    const content = '{"sid":"single","name":"单文件测试"}'
+    const gistApiResponse = {
+      files: { 'data.jsonl': { content } },
+    }
+    const promise = fetchGistJson()
+    lastMockXhr!._respondOk(JSON.stringify(gistApiResponse))
+    const entries = await promise
+    expect(entries.length).toBeGreaterThan(0)
+  })
+
+  it('files 映射中值为 undefined 时跳过 (line 151)', async () => {
+    mockedGetGistId.mockReturnValue('undefined-file')
+    // 手动构造：files 中某个键对应值为 undefined
+    const gistApiResponse = {
+      files: { 'valid.jsonl': { content: '{"sid":"v1"}' }, 'bad.jsonl': undefined },
+    }
+    const promise = fetchGistJson()
+    lastMockXhr!._respondOk(JSON.stringify(gistApiResponse))
+    const entries = await promise
+    expect(entries.length).toBe(1)
+  })
+
+  it('isGistFile 遇到非对象值时整体响应被拒绝，返回空结果 (line 86)', async () => {
+    mockedGetGistId.mockReturnValue('non-object')
+    // files 中某个键对应值为数字（非法类型）→ isGistApiResponse 返回 false
+    // extractGistContent 返回空字符串 → parseJsonl 返回空结果
+    const gistApiResponse = {
+      files: { 'data.jsonl': 42 },
+    }
+    const promise = fetchGistJson()
+    lastMockXhr!._respondOk(JSON.stringify(gistApiResponse))
+    const entries = await promise
+    // 非法响应被拒绝，返回空数组
+    expect(entries.length).toBe(0)
+  })
+
+  it('content 为 null 时被 isGistFile 拒绝，返回空结果', async () => {
+    mockedGetGistId.mockReturnValue('null-content')
+    // content 为 null → isGistFile 拒绝该文件 → isGistApiResponse 返回 false
+    // extractGistContent 返回 '' → parseJsonl 返回空 → resolve([])
+    const gistApiResponse = {
+      files: { 'data.jsonl': { content: null } },
+    }
+    const promise = fetchGistJson()
+    lastMockXhr!._respondOk(JSON.stringify(gistApiResponse))
+    const entries = await promise
+    expect(entries.length).toBe(0)
+  })
+
+  it('catch 分支中非 Error 异常应使用 String(e) 格式化 (line 256)', async () => {
+    mockedGetGistId.mockReturnValue('non-error')
+    // Mock JSON.parse 抛出非 Error 值（字符串），覆盖 e instanceof Error 的 false 分支
+    const origParse = JSON.parse
+    const parseSpy = vi.spyOn(JSON, 'parse').mockImplementation((_text: string) => {
+      throw 'a string error is not an Error instance'
+    })
+    try {
+      const promise = fetchGistJson()
+      lastMockXhr!._respondOk('{"files":{}}')
+      await expect(promise).rejects.toThrow(/a string error is not an Error instance/)
+    } finally {
+      parseSpy.mockRestore()
+      expect(JSON.parse).toBe(origParse)
+    }
+  })
+
+  // ========== 补充测试：extractGistContent 分支覆盖 ==========
+  describe('extractGistContent 分支覆盖', () => {
+    it('单文件内容为有效 JSONL 时正常返回 (line 163)', async () => {
+      mockedGetGistId.mockReturnValue('valid-single')
+      const gistApiResponse = {
+        files: { 'data.jsonl': { content: '{"sid":"s1","name":"单文件"}' } },
+      }
+      const promise = fetchGistJson()
+      lastMockXhr!._respondOk(JSON.stringify(gistApiResponse))
+      const entries = await promise
+      expect(entries.length).toBe(1)
+      expect(entries[0].sid).toBe('s1')
+    })
+
+    it('files 中有 null 值条目时 isGistApiResponse 提前返回空', async () => {
+      mockedGetGistId.mockReturnValue('null-file')
+      // null 文件使 isGistApiResponse 返回 false → extractGistContent 返回 ''
+      const gistApiResponse = {
+        files: { 'valid.jsonl': { content: '{"sid":"v1"}' }, 'null.jsonl': null },
+      }
+      const promise = fetchGistJson()
+      lastMockXhr!._respondOk(JSON.stringify(gistApiResponse))
+      const entries = await promise
+      // isGistApiResponse 返回 false → 返回 '' → parseJsonl 返回空
+      expect(entries.length).toBe(0)
+    })
+
+    it('catch 分支中 Error 实例使用 e.message (line 259-260)', async () => {
+      mockedGetGistId.mockReturnValue('parse-error')
+      const origParse = JSON.parse
+      const parseSpy = vi.spyOn(JSON, 'parse').mockImplementation((_text: string) => {
+        throw new Error('模拟解析错误')
+      })
+      try {
+        const promise = fetchGistJson()
+        lastMockXhr!._respondOk('{"files":{"data.jsonl":{"content":"test"}}}')
+        await expect(promise).rejects.toThrow(/模拟解析错误/)
+      } finally {
+        parseSpy.mockRestore()
+      }
+    })
+
+    it('onerror 网络错误处理 (line 277)', async () => {
+      mockedGetGistId.mockReturnValue('network-error')
+      const promise = fetchGistJson()
+      lastMockXhr!._triggerError()
+      await expect(promise).rejects.toThrow(/网络请求失败/)
+    })
   })
 })
 

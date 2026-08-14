@@ -12,17 +12,15 @@ const mockEnsureSheetHeaders = vi.hoisted(() => vi.fn().mockReturnValue(false))
 const mockGetDataSheet = vi.hoisted(() => vi.fn().mockReturnValue(null))
 const mockApplyConflictResolutions = vi.hoisted(() => vi.fn())
 const mockApplyDiffToSheet = vi.hoisted(() =>
-  vi
-    .fn()
-    .mockResolvedValue({
-      added: 0,
-      updated: 0,
-      deleted: 0,
-      failed: 0,
-      remoteTotal: 0,
-      unchanged: 0,
-      skipped: 0,
-    }),
+  vi.fn().mockResolvedValue({
+    added: 0,
+    updated: 0,
+    deleted: 0,
+    failed: 0,
+    remoteTotal: 0,
+    unchanged: 0,
+    skipped: 0,
+  }),
 )
 const mockComputeDiff = vi.hoisted(() => vi.fn().mockReturnValue([]))
 const mockReadLocalEntriesForSync = vi.hoisted(() =>
@@ -456,6 +454,84 @@ describe('getSelectedRowSids（间接测试 via syncFromRemote）', () => {
 
   it('app 为 null 时应返回空集合', async () => {
     mockGetApp.mockReturnValue(null)
+    await expect(syncFromRemote(undefined, 'add-update', undefined, true)).rejects.toThrow()
+  })
+})
+
+// ========== 补充测试：syncSourceRegistry 未覆盖分支 ==========
+describe('syncSourceRegistry 未覆盖分支', () => {
+  beforeEach(() => {
+    // 不使用 vi.restoreAllMocks，因为它会清除 bgmLog 的 mock 实现
+    // 改为手动清除各 mock 的调用记录
+    mockBgmLogn.mockClear()
+    mockGetApp.mockClear()
+    mockGetCellValue.mockClear()
+    mockFindHeaderRow.mockClear()
+    mockGetColumnMap.mockClear()
+    mockEnsureSheetHeaders.mockClear()
+    mockGetDataSheet.mockClear()
+    mockExtractSubjectId.mockClear()
+    mockReadLocalEntriesForSync.mockClear()
+    mockComputeDiff.mockClear()
+    mockApplyDiffToSheet.mockClear()
+    mockFilterByTime.mockClear()
+    mockGetSyncSourceType.mockClear()
+    mockGithubSourceRef.fetchRemoteEntries.mockClear()
+    mockGithubSourceRef.validateConfig.mockClear()
+
+    mockGetSyncSourceType.mockReturnValue('github')
+    mockGithubSourceRef.validateConfig.mockReturnValue({ isFail: () => false, error: null })
+    mockGithubSourceRef.fetchRemoteEntries.mockResolvedValue([{ sid: '1', name: 'A' }])
+    mockReadLocalEntriesForSync.mockReturnValue({ entries: new Map(), lastRow: 1 })
+    mockComputeDiff.mockReturnValue([])
+    mockApplyDiffToSheet.mockResolvedValue({
+      added: 0,
+      updated: 0,
+      deleted: 0,
+      failed: 0,
+      remoteTotal: 0,
+      unchanged: 0,
+      skipped: 0,
+    })
+    mockGetApp.mockReturnValue({ ScreenUpdating: true, Calculation: 1 })
+    mockBgmLogn.mockClear()
+  })
+
+  it('ensureSheetHeaders 返回 true 时记录日志 (line 149-151)', async () => {
+    // 先设置 getDataSheet 返回非空 ws 和 ensureSheetHeaders 返回 true
+    mockGetDataSheet.mockReturnValue({ Name: 'Sheet1' })
+    mockEnsureSheetHeaders.mockReturnValue(true)
+    mockGithubSourceRef.fetchRemoteEntries.mockResolvedValue([])
+    mockReadLocalEntriesForSync.mockReturnValue({ entries: new Map(), lastRow: 0 })
+
+    await syncFromRemote()
+    expect(mockBgmLogn).toHaveBeenCalledWith(
+      'INFO',
+      expect.stringContaining('空文档已自动填充标准表头'),
+    )
+  })
+
+  it('ensureSheetHeaders 返回 false 时不记录填充日志', async () => {
+    mockGetDataSheet.mockReturnValue({ Name: 'Sheet1' })
+    mockEnsureSheetHeaders.mockReturnValue(false)
+    mockGithubSourceRef.fetchRemoteEntries.mockResolvedValue([])
+    mockReadLocalEntriesForSync.mockReturnValue({ entries: new Map(), lastRow: 0 })
+
+    await syncFromRemote()
+    // 不应包含"自动填充"日志
+    const fillCalls = mockBgmLogn.mock.calls.filter(
+      (call: string[]) => typeof call[1] === 'string' && call[1].includes('自动填充'),
+    )
+    expect(fillCalls.length).toBe(0)
+  })
+
+  it('getSelectedRowSids 捕获异常并记录 ERROR (line 305)', async () => {
+    // 当 getApp 抛错时，getSelectedRowSids 应捕获异常并记录 ERROR
+    // 异常被 getSelectedRowSids 内部 catch，返回空集合
+    // syncFromRemote 因 selectedSids.size === 0 重新抛出
+    mockGetApp.mockImplementation(() => {
+      throw new Error('WPS 运行时错误')
+    })
     await expect(syncFromRemote(undefined, 'add-update', undefined, true)).rejects.toThrow()
   })
 })

@@ -31,6 +31,23 @@ vi.mock('../ts/sync/githubConfig.js', () => ({
   }),
 }))
 
+// Mock githubSyncDiff 以覆盖 parseJsonl 异常分支
+const mockParseJsonl = vi.hoisted(() => vi.fn())
+const realParseJsonlHolder = vi.hoisted(() => ({
+  current: null as ((text: string) => { entries: unknown[]; errors: unknown[] }) | null,
+}))
+vi.mock('../ts/sync/githubSyncDiff.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../ts/sync/githubSyncDiff.js')>(
+    '../ts/sync/githubSyncDiff.js',
+  )
+  realParseJsonlHolder.current = actual.parseJsonl
+  mockParseJsonl.mockImplementation((text: string) => realParseJsonlHolder.current!(text))
+  return {
+    ...actual,
+    parseJsonl: mockParseJsonl,
+  }
+})
+
 import { buildGiteeRawUrl, fetchGiteeJson, GiteeSyncSource } from '../ts/sync/giteeSync.js'
 import {
   getSyncSource,
@@ -42,6 +59,7 @@ import { getGithubConfig, isGithubConfigComplete } from '../ts/sync/githubConfig
 
 const mockedGetGithubConfig = vi.mocked(getGithubConfig)
 const mockedIsGithubConfigComplete = vi.mocked(isGithubConfigComplete)
+const mockedParseJsonl = vi.mocked(mockParseJsonl)
 
 // 清空模块加载期间累积的 fake timers，避免它们在测试中被意外触发
 vi.clearAllTimers()
@@ -381,6 +399,40 @@ describe('fetchGiteeJson', () => {
     expect(entries[0]!.sid).toBe('42')
     expect(entries[0]!.name).toBe('单条记录')
     expect(entries[0]!.updatedAt).toBe('2026-08-01')
+  })
+
+  it('buildGiteeRawUrl 抛出非 Error 时被包装为 Error (line 76)', async () => {
+    mockedGetGithubConfig.mockImplementation(() => {
+      throw '非 Error 异常：配置获取失败'
+    })
+    await expect(fetchGiteeJson()).rejects.toThrow(/非 Error 异常/)
+  })
+
+  it('parseJsonl 抛出异常时 reject (line 123)', async () => {
+    mockedParseJsonl.mockImplementationOnce(() => {
+      throw new Error('JSON 解析器内部错误')
+    })
+    const promise = fetchGiteeJson()
+    lastMockXhr!._respondOk('{"sid":"1"}')
+    await expect(promise).rejects.toThrow(/JSONL 解析失败/)
+  })
+
+  it('parseJsonl 抛出非 Error 时使用 String() 转换 (line 123)', async () => {
+    mockedParseJsonl.mockImplementationOnce(() => {
+      throw '字符串异常'
+    })
+    const promise = fetchGiteeJson()
+    lastMockXhr!._respondOk('{"sid":"1"}')
+    await expect(promise).rejects.toThrow(/JSONL 解析失败: 字符串异常/)
+  })
+
+  it('AbortSignal abort 事件触发时 xhr.abort() 被调用 (line 95)', async () => {
+    const controller = new AbortController()
+    const promise = fetchGiteeJson(controller.signal)
+    controller.abort()
+    expect(lastMockXhr!._aborted).toBe(true)
+    lastMockXhr!._triggerError()
+    await expect(promise).rejects.toThrow(/请求被取消/)
   })
 })
 

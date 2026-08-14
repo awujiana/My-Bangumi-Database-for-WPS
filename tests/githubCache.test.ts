@@ -1,8 +1,10 @@
 // @vitest-environment jsdom
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 
+const mockBgmLog = vi.hoisted(() => vi.fn())
+
 vi.mock('../ts/tools/util.js', () => ({
-  bgmLog: vi.fn(),
+  bgmLog: mockBgmLog,
   LOG_LEVELS: { INFO: 'INFO', WARN: 'WARN', ERROR: 'ERROR', DEBUG: 'DEBUG' },
 }))
 
@@ -151,6 +153,34 @@ describe('Cache 操作', () => {
       const cache = buildCache([], 'test', testUrl)
       cache.fetchedAt = Date.now() - 2 * 24 * 60 * 60 * 1000
       expect(getCacheAge(cache)).toContain('天前')
+    })
+  })
+
+  // ========== 补充测试：saveCache catch 分支 (lines 116-117) ==========
+  describe('saveCache catch 分支 (lines 116-117)', () => {
+    it('JSON.stringify 抛异常时应记录 WARN 日志', () => {
+      mockBgmLog.mockClear()
+      const circular: Record<string, unknown> = {}
+      circular.self = circular
+      const cache = buildCache(testEntries, 'test', testUrl)
+      const badCache = { ...cache, entries: circular as unknown as typeof testEntries }
+      saveCache(badCache)
+      expect(mockBgmLog).toHaveBeenCalledWith('WARN', expect.stringContaining('缓存保存失败'))
+    })
+
+    it('捕获非 Error 实例异常时应使用 String(e) 格式化 (line 116)', () => {
+      mockBgmLog.mockClear()
+      const origStringify = JSON.stringify
+      vi.spyOn(JSON, 'stringify').mockImplementation(() => {
+        throw '一个字符串异常，不是 Error 实例'
+      })
+      try {
+        const cache = buildCache(testEntries, 'test', testUrl)
+        saveCache(cache)
+        expect(mockBgmLog).toHaveBeenCalledWith('WARN', expect.stringContaining('一个字符串异常'))
+      } finally {
+        vi.restoreAllMocks()
+      }
     })
   })
 })
