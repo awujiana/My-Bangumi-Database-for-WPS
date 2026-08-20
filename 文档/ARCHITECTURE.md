@@ -1,21 +1,23 @@
 # Bangumi WPS Excel 加载项 - 架构与项目知识文档
 
-> 版本: 2.4 | 更新日期: 2026-08-14
+> 版本: 2.6 | 更新日期: 2026-08-20
 
 ---
 
 ## 版本历史
 
-| 版本 | 日期       | 变更说明                                                                                           |
-| ---- | ---------- | -------------------------------------------------------------------------------------------------- |
-| v1.0 | 2026-08-10 | 初始版本                                                                                           |
-| v1.1 | 2026-08-10 | 补充调试区域文档，postMessage 源校验加固                                                           |
-| v1.2 | 2026-08-10 | 撤销栈增加工作表身份校验，httpRequest 强制 zodSchema                                               |
-| v2.0 | 2026-08-10 | 架构文档：新增 debugPanel 模块详解，补充模块依赖关系树                                             |
-| v2.1 | 2026-08-12 | Token 明文存储（移除 XOR 加密），httpGet/httpPost 标记 @deprecated，新增 BroadcastChannel 单元测试 |
-| v2.2 | 2026-08-12 | 补充同步策略对比表、删除机制详解、撤销恢复机制、删除保护机制文档                                   |
-| v2.3 | 2026-08-12 | 补充 SID 白名单过滤详解（两层过滤机制，确保非 BGM 条目不被误删）                                   |
-| v2.4 | 2026-08-14 | 新增设置面板（settings.html）、Taskpane 头部图标按钮、双面板位置协调逻辑（主面板左/设置面板右）    |
+| 版本 | 日期       | 变更说明                                                                                                                                                                                                                                   |
+| ---- | ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| v1.0 | 2026-08-10 | 初始版本                                                                                                                                                                                                                                   |
+| v1.1 | 2026-08-10 | 补充调试区域文档，postMessage 源校验加固                                                                                                                                                                                                   |
+| v1.2 | 2026-08-10 | 撤销栈增加工作表身份校验，httpRequest 强制 zodSchema                                                                                                                                                                                       |
+| v2.0 | 2026-08-10 | 架构文档：新增 debugPanel 模块详解，补充模块依赖关系树                                                                                                                                                                                     |
+| v2.1 | 2026-08-12 | Token 明文存储（移除 XOR 加密），httpGet/httpPost 标记 @deprecated，新增 BroadcastChannel 单元测试                                                                                                                                         |
+| v2.2 | 2026-08-12 | 补充同步策略对比表、删除机制详解、撤销恢复机制、删除保护机制文档                                                                                                                                                                           |
+| v2.3 | 2026-08-12 | 补充 SID 白名单过滤详解（两层过滤机制，确保非 BGM 条目不被误删）                                                                                                                                                                           |
+| v2.4 | 2026-08-14 | 新增设置面板（settings.html）、Taskpane 头部图标按钮、双面板位置协调逻辑（主面板左/设置面板右）                                                                                                                                            |
+| v2.5 | 2026-08-20 | 增强使用引导（toggleUsageGuide 详细操作说明）、同步策略引导（showSyncGuide 动态策略说明）、修复进度弹窗「下一步」按钮 handler 时序问题、全局 ETA 追踪（含暂停时间扣除）、Bangumi_URL 字段同步修复、标签/名称追加合并策略、制作公司双列映射 |
+| v2.6 | 2026-08-20 | 进度弹窗右上角关闭按钮（bgmSyncProgressCloseTop）、CSS Flex 布局修复（解决内容区域无法滚动问题）、移除内联 max-height 样式改用 flex:1 + min-height:0                                                                                       |
 
 ## 一、架构概览
 
@@ -239,6 +241,14 @@ ts/index.ts (barrel export)
 - **`readLocalEntriesForSync()`**: 读取本地 Excel 条目
 - **`applyDiffToSheet()`**: 将差异应用到工作表
 - **`applyConflictResolutions()`**: 应用用户冲突解决决策
+- **`writeRemoteEntryToRow()`**: 将远程条目写入本地行（支持新增全量写入 + 更新追加合并策略）
+- **`batchUpdateRows()`**: 批量更新多行（支持逐行追加合并）
+- **`appendValueWithSeparator()`**: 值追加合并工具函数（`|` 分隔，自动去重）
+- **字段追加合并规则**:
+  - 标签/分级：远程标签追加到本地后面，以 `|` 分隔（已包含值时不重复追加）
+  - 名称：更新时远程名称追加到「别名」列，保留本地「名称」列不变；新增时直接写入「名称」列
+  - 制作公司/动画制作公司：远程 `动画制作公司` 字段同步到本地 `制作公司` 和 `动画制作公司` 两列（双列映射）
+  - Bangumi_URL：根据远程 sid 构造预期 URL `https://bgm.tv/subject/{sid}`，仅当本地存在该字段时进行比对和更新
 - **缓存管理**: `clearGithubDataCache()`, `isGithubDataCacheValid()`, `getGithubDataCacheAge()`, `loadGithubDataCache()`
 
 #### `githubSyncDiff.ts` — 差异计算 (纯函数)
@@ -250,6 +260,8 @@ ts/index.ts (barrel export)
 - **`SyncStrategy`**: 五种同步策略
 - **`SyncTimeFilter`**: 同步时间筛选类型
 - **`SYNC_STRATEGY_LABELS`**: 策略中文标签映射
+- **字段别名映射** (`JSONL_FIELD_EXCEL_ALIASES`): 支持一个远程字段映射到多个本地列（如 `动画制作公司` → `制作公司` + `动画制作公司`）
+- **`getExcelAliases()`**: 获取远程字段的所有本地列名别名
 
 #### `syncSourceRegistry.ts` — 多源同步注册表
 
@@ -326,6 +338,11 @@ ts/index.ts (barrel export)
 - `buildSyncConfig()`: 配置摘要工厂函数，统一各同步入口的配置构造逻辑
 - `renderConfigSummary()`: 将配置摘要渲染为 HTML 字符串
 - **全局 ETA 追踪**: 基于开始时间戳和当前进度实时计算「已用时间 / 预计剩余 / 总计」，支持暂停时间扣除
+- **进度弹窗按钮交互**:
+  - 「右上角关闭按钮」(`bgmSyncProgressCloseTop`): 始终可见，位于 header 右侧，点击隐藏弹窗
+  - 「下一步」按钮：先保存 `_syncNextHandler` 到局部变量，再调用 `hideSyncProgressDialog()`，最后执行保存的回调（避免 handler 被清除导致回调不执行）
+  - 「关闭」按钮：仅隐藏弹窗，不触发回调（仅在完成状态显示）
+- **CSS Flex 布局**: 弹窗主体使用 `flex: 1; min-height: 0; overflow-y: auto` 确保内容区域可滚动，移除内联 `max-height` 样式
 - 类型: `DialogButton`, `DialogConfig`, `DialogCallback`, `DialogOptions`, `SyncProgressStats`, `SyncConfigSummary`, `BuildSyncConfigContext`
 
 #### `preview.ts` — 预览组件
@@ -338,6 +355,12 @@ ts/index.ts (barrel export)
 #### `handlers/` — 事件处理器
 
 - **`index.ts`**: 主 handler 分发，`initHandlers()` 注册所有监听器
+  - `toggleUsageGuide`: 使用引导详情切换（展开/收起详细操作说明面板）
+  - `showSyncGuide`: 同步策略引导切换（根据所选策略动态显示策略说明和通用规则）
+  - `saveAllConfig`: 保存所有配置到 PluginStorage
+  - `exportConfig` / `importConfig`: 配置导入导出
+  - `closePanel`: 关闭 Taskpane
+  - `openSettings`: 打开设置面板
 - **`sync.ts`**: 同步相关 handler（GitHub 同步、撤销等）
 - **`token.ts`**: Token 相关 handler（设置、验证、状态更新）
 - **`sheet.ts`**: 工作表相关 handler（锁定、切换、表头检测）

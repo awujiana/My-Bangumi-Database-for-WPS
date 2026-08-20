@@ -289,7 +289,7 @@ function ensureSyncResultDialog() {
                 <span class="bgm-dialog-icon bgm-icon-success">&#10004;</span>
                 <span class="bgm-dialog-title">同步结果</span>
             </div>
-            <div class="bgm-dialog-body" style="max-height: 60vh; overflow-y: auto;">
+            <div class="bgm-dialog-body">
                 <div id="bgmSyncSummary" class="bgm-dialog-message" style="white-space: pre-line;"></div>
                 <div id="bgmSyncDetails" style="display:none; margin-top: 8px; max-height: 300px; overflow-y: auto; font-size: 12px; line-height: 1.6; white-space: pre; font-family: monospace;"></div>
             </div>
@@ -401,8 +401,11 @@ function ensureSyncProgressDialog() {
     modal.innerHTML = sanitizeHtml(`
         <div class="bgm-modal-content bgm-sync-progress__content">
             <div class="bgm-dialog-header bgm-sync-progress__header" id="bgmSyncProgressHeader">
-                <span class="bgm-dialog-icon" id="bgmSyncProgressIcon">🔄</span>
-                <span class="bgm-dialog-title" id="bgmSyncProgressTitle">正在同步...</span>
+                <div class="bgm-dialog-header-left">
+                    <span class="bgm-dialog-icon" id="bgmSyncProgressIcon">🔄</span>
+                    <span class="bgm-dialog-title" id="bgmSyncProgressTitle">正在同步...</span>
+                </div>
+                <button id="bgmSyncProgressCloseTop" type="button" class="bgm-dialog-close-btn" aria-label="关闭弹窗" title="关闭">✕</button>
             </div>
             <div class="bgm-dialog-body bgm-sync-progress__body">
                 <!-- 配置摘要区（默认隐藏，由 showSyncProgressDialog 填充） -->
@@ -451,6 +454,7 @@ function ensureSyncProgressDialog() {
     const pauseBtn = modal.querySelector('#bgmSyncProgressPauseBtn');
     const stopBtn = modal.querySelector('#bgmSyncProgressStop');
     const closeBtn = modal.querySelector('#bgmSyncProgressClose');
+    const closeTopBtn = modal.querySelector('#bgmSyncProgressCloseTop');
     const nextBtn = modal.querySelector('#bgmSyncProgressNext');
     const toggleDetailsBtn = modal.querySelector('#bgmSyncProgressToggleDetails');
     // 暂停/继续按钮：根据 _syncPaused 标志自行决定调用哪个处理器，并自行更新按钮文本
@@ -479,6 +483,12 @@ function ensureSyncProgressDialog() {
     // 关闭按钮
     if (closeBtn) {
         closeBtn.addEventListener('click', () => {
+            hideSyncProgressDialog();
+        });
+    }
+    // 右上角关闭按钮（始终可见）
+    if (closeTopBtn) {
+        closeTopBtn.addEventListener('click', () => {
             hideSyncProgressDialog();
         });
     }
