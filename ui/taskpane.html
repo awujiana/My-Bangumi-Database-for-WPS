@@ -527,9 +527,43 @@
             <h3>📖 使用引导</h3>
             <div class="guide">
                 <div class="step"><span class="step-num">1</span><span>设置 Token（只需设置一次）</span></div>
-                <div class="step"><span class="step-num">2</span><span>确保 Excel 包含必填列</span></div>
+                <div class="step"><span class="step-num">2</span><span>确保 Excel 包含必填列（Bangumi_URL）</span></div>
                 <div class="step"><span class="step-num">3</span><span>选择工作表和行范围</span></div>
-                <div class="step"><span class="step-num">4</span><span>点击"上传同步"</span></div>
+                <div class="step"><span class="step-num">4</span><span>选择操作类型并执行</span></div>
+            </div>
+            <div class="btn-group" style="margin-top:8px;">
+                <button class="btn small" data-action="toggleUsageGuide" id="toggleUsageGuideBtn">📖 显示详细操作</button>
+            </div>
+            <div id="usageGuideDetail" style="display:none;margin-top:10px;padding:12px;background:#2a2a2a;border-radius:8px;border:1px solid #444;font-size:12px;line-height:1.7;color:#ccc;">
+                <strong style="color:#4a9eff;">📘 操作流程详解</strong><br><br>
+                <strong>1️⃣ Token 设置</strong><br>
+                • 点击「设置/修改」按钮，按引导创建 Bangumi OAuth Token<br>
+                • Token 有效期通常为 30 天，过期后需重新获取<br>
+                • 设置后自动显示用户头像和信息<br><br>
+                <strong>2️⃣ 数据同步（远程仓库 → 本地 Excel）</strong><br>
+                • 配置远程仓库地址（GitHub/GitLab/Gitee/Gist/本地文件）<br>
+                • 选择同步策略：新增+更新 / 仅新增 / 仅更新 / 镜像同步 / 强制覆盖<br>
+                • 可选：启用时间筛选（按开播日期过滤）<br>
+                • 点击「立即同步」开始下载并合并数据<br>
+                • 同步规则：名称追加到「别名」、标签追加到「标签/分级」（以 <code> | </code> 分隔）<br><br>
+                <strong>3️⃣ 上传同步（本地 Excel → Bangumi）</strong><br>
+                • 确保每行包含 Bangumi_URL 列（如 https://bgm.tv/subject/12345）<br>
+                • 选择行范围（自动模式按筛选结果 / 手动指定起止行）<br>
+                • 设置冲突处理策略（保留 Bangumi 数据 / 用 Excel 覆盖）<br>
+                • 点击「📤 上传同步」执行<br><br>
+                <strong>4️⃣ 收藏回写（Bangumi → 本地 Excel）</strong><br>
+                • 选择收藏类型：已看 / 想看 / 在看<br>
+                • 当 Excel 为空时，选择数据源填充（Bangumi API / GitHub 仓库）<br>
+                • 点击「📥 收藏回写」从 Bangumi 获取收藏并标记到 Excel<br><br>
+                <strong>5️⃣ 预览与验证</strong><br>
+                • 点击「🔍 放大预览」查看详细数据预览<br>
+                • 点击「📋 预览详情」查看完整条目列表<br>
+                • 同步完成后可查看同步记录（需先启用）<br><br>
+                <strong style="color:#f0a020;">⚠️ 注意事项</strong><br>
+                • 镜像同步不是完全镜像！要完全与远程一致需先删除本地数据<br>
+                • 制作公司/动画制作公司映射：远程「动画制作公司」→ 本地「制作公司」+「动画制作公司」<br>
+                • 建议定期启用同步记录功能，便于追溯变更历史<br>
+                • 批量操作建议先在副本上测试确认无误后再在正式数据上执行
             </div>
         </div>
 
