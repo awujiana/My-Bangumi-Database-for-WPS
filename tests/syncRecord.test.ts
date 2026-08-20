@@ -2824,3 +2824,76 @@ describe('deduplicateSyncRecords keepRow 为 undefined (line 670)', () => {
     expect(typeof result).toBe('boolean')
   })
 })
+
+// ========== 补充测试：deduplicateSyncRecords 其他分支 ==========
+describe('deduplicateSyncRecords 分支覆盖', () => {
+  it('sheet 不存在时应返回 false', async () => {
+    mockGetApp.mockReturnValue(null)
+    const result = deduplicateSyncRecords()
+    expect(result).toBe(false)
+  })
+
+  it('lastRow <= 1 时应返回 true 跳过去重 (line 650)', async () => {
+    mockGetApp.mockReturnValue({ ActiveWorkbook: createMockWorkbook() })
+    mockGetLastRow.mockReturnValue(1)
+    const result = deduplicateSyncRecords()
+    expect(result).toBe(true)
+  })
+
+  it('SID 全为空字符串时应跳过 (line 656)', async () => {
+    mockGetApp.mockReturnValue({ ActiveWorkbook: createMockWorkbook() })
+    mockGetLastRow.mockReturnValue(3)
+    mockGetCellValue.mockImplementation(() => '')
+    const result = deduplicateSyncRecords()
+    expect(result).toBe(true)
+  })
+
+  it('无重复 SID 时不应触发去重日志 (line 666)', async () => {
+    mockGetApp.mockReturnValue({ ActiveWorkbook: createMockWorkbook() })
+    mockGetLastRow.mockReturnValue(3)
+    mockGetCellValue.mockImplementation((_sheet: unknown, row: unknown, col: unknown) => {
+      const r = row as number
+      const c = col as number
+      if (c === 1) return `sid-${r}`
+      if (c === 7) return '1'
+      return ''
+    })
+    const result = deduplicateSyncRecords()
+    expect(result).toBe(true)
+  })
+})
+
+// ========== 补充测试：getAllSyncRecords 异常路径 ==========
+describe('getAllSyncRecords 异常路径', () => {
+  it('sheet 不存在时返回空数组', async () => {
+    mockGetApp.mockReturnValue(null)
+    const result = getAllSyncRecords()
+    expect(result).toEqual([])
+  })
+
+  it('内部抛异常时应返回空数组', async () => {
+    mockGetApp.mockImplementation(() => {
+      throw new Error('宿主异常')
+    })
+    const result = getAllSyncRecords()
+    expect(result).toEqual([])
+  })
+})
+
+// ========== 补充测试：addSyncRecordSummary ==========
+describe('addSyncRecordSummary 行为', () => {
+  it('应委托给 addSyncRecord 并强制 sid 为空、count 为 1', async () => {
+    __resetSyncRecordCache()
+    mockGetApp.mockReturnValue({ ActiveWorkbook: createMockWorkbook() })
+    mockGetLastRow.mockReturnValue(5)
+
+    const result = addSyncRecordSummary({
+      name: '仓库同步汇总',
+      content: '新增 5 条',
+      status: 'success',
+      count: 10, // 即使传入 count，也应被覆盖为 1
+    })
+
+    expect(result).toBe(true)
+  })
+})

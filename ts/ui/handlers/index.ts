@@ -1465,61 +1465,6 @@ const ACTION_HANDLERS: Record<string, ActionHandler> = {
     )
   },
 
-  // 关闭设置面板
-  closeSettingsPanel: (ctx) => {
-    bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 关闭设置面板')
-    const app = getApp() as {
-      PluginStorage?: { getItem: (k: string) => string | null }
-      GetTaskPane?: (id: string) => { Visible: boolean }
-      TaskPanes?: Array<{ ID: string; Visible: boolean }>
-    }
-    if (!app) {
-      bgmLog(LOG_LEVELS.ERROR, '[handleActionClick] 无法获取 Application 对象')
-      showToast('无法关闭设置面板：未连接到 WPS', 'error')
-      return
-    }
-
-    const settingsId = app.PluginStorage?.getItem('settings_pane_id')
-    let closed = false
-
-    if (settingsId) {
-      const settingsPane = app.GetTaskPane?.(settingsId)
-      if (settingsPane) {
-        settingsPane.Visible = false
-        closed = true
-        bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 设置面板已关闭 (ID:' + settingsId + ')')
-      } else {
-        bgmLog(LOG_LEVELS.WARN, '[handleActionClick] GetTaskPane 返回空 (ID:' + settingsId + ')')
-      }
-    } else {
-      bgmLog(LOG_LEVELS.WARN, '[handleActionClick] settings_pane_id 为空，尝试遍历查找')
-    }
-
-    // 兜底方案：如果 PluginStorage 中找不到 ID，尝试通过 TaskPanes 遍历
-    if (!closed && app.TaskPanes) {
-      for (const pane of app.TaskPanes) {
-        if (pane && pane.ID && pane.ID.includes('settings-pane')) {
-          pane.Visible = false
-          closed = true
-          bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 通过遍历关闭设置面板 (ID:' + pane.ID + ')')
-          break
-        }
-      }
-    }
-
-    if (closed) {
-      showToast('设置面板已关闭', 'success')
-    } else {
-      showToast('关闭失败，请尝试手动关闭', 'error')
-      bgmLog(LOG_LEVELS.ERROR, '[handleActionClick] 所有关闭方式均失败')
-    }
-
-    bgmLog(
-      LOG_LEVELS.INFO,
-      '[handleActionClick] 关闭设置面板操作完成，耗时: ' + (Date.now() - ctx.startTime) + 'ms',
-    )
-  },
-
   // 设置页面：切换增量同步开关
   toggleIncrementalSync: (_ctx) => {
     const checkbox = document.getElementById('chkIncrementalSync') as HTMLInputElement | null

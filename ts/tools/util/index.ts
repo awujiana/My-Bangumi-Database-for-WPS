@@ -1101,9 +1101,8 @@ export function showBangumiPanel(): void {
 /**
  * 显示/切换设置面板
  * 设置面板位置逻辑：
- * - 主面板(taskpane)可见时 → 设置面板停靠右侧
- * - 主面板隐藏时 → 设置面板停靠左侧
- * 这样确保两个面板不会同时占用同一侧，提供更好的用户体验。
+ * - 始终停靠右侧（msoCTPDockPositionRight）
+ * - 有主面板时在主面板右边弹出，无主面板时直接弹出在右侧
  */
 export function showSettingsPanel(): void {
   const app = getApp() as {
@@ -1134,11 +1133,9 @@ export function showSettingsPanel(): void {
     `[showSettingsPanel] 主面板状态: ${mainPanelVisible ? '可见' : '隐藏'}, settingsId: ${settingsId ?? '无'}`,
   )
 
-  // 根据主面板状态决定设置面板停靠位置
-  const targetPosition = mainPanelVisible
-    ? WPS_ENUM.msoCTPDockPositionRight
-    : WPS_ENUM.msoCTPDockPositionLeft
-  const positionLabel = mainPanelVisible ? '右侧' : '左侧'
+  // 始终停靠右侧
+  const targetPosition = WPS_ENUM.msoCTPDockPositionRight
+  const positionLabel = '右侧'
 
   if (!settingsId) {
     // 首次创建设置面板
@@ -1155,10 +1152,9 @@ export function showSettingsPanel(): void {
       bgmLog(LOG_LEVELS.ERROR, '[showSettingsPanel] 创建设置面板失败')
     }
   } else {
-    // 已存在：切换可见性并更新停靠位置
+    // 已存在：显示并更新停靠位置
     const settingsPane = app.GetTaskPane?.(settingsId)
     if (settingsPane) {
-      // 如果当前可见，则隐藏；如果隐藏，则显示并调整位置
       if (settingsPane.Visible) {
         settingsPane.Visible = false
         bgmLog(LOG_LEVELS.INFO, '[showSettingsPanel] 设置面板已隐藏')

@@ -267,3 +267,64 @@ describe('getGistId / setGistId / isGistConfigured', () => {
     expect(isGistConfigured()).toBe(true)
   })
 })
+
+// ========== 补充测试：storage.setItem 异常与 storage 为 undefined 分支 ==========
+describe('githubConfig 异常与回退分支', () => {
+  it('非法 sourceType 参数时 setSyncSourceType 返回 false', () => {
+    vi.mocked(getApp).mockReturnValue(createMockApp({}))
+    expect(setSyncSourceType('invalid' as never)).toBe(false)
+  })
+
+  it('setSyncSourceType 正常场景应写入 storage 并返回 true', () => {
+    const storage = createMockStorage({})
+    vi.mocked(getApp).mockReturnValue({ PluginStorage: storage })
+    const result = setSyncSourceType('gitlab')
+    expect(result).toBe(true)
+    expect(storage.getItem('github_sync_source_type')).toBe('gitlab')
+  })
+
+  it('PluginStorage 为 undefined 时 setSyncSourceType 返回 false (line 287-288)', () => {
+    vi.mocked(getApp).mockReturnValue(null)
+    const result = setSyncSourceType('github')
+    expect(result).toBe(false)
+  })
+
+  it('PluginStorage 为 undefined 时 setGistId 返回 false (line 329-330)', () => {
+    vi.mocked(getApp).mockReturnValue(null)
+    const result = setGistId('gist-id')
+    expect(result).toBe(false)
+  })
+
+  it('PluginStorage 为 undefined 时 setSyncStrategy 返回 false', () => {
+    vi.mocked(getApp).mockReturnValue(null)
+    const result = setSyncStrategy('add-update')
+    expect(result).toBe(false)
+  })
+
+  it('getStorage 返回 storage 为 undefined 时 getGithubConfig 仍能返回默认值', () => {
+    vi.mocked(getApp).mockReturnValue(null)
+    const config = getGithubConfig()
+    expect(config.owner).toBe(DEFAULT_GITHUB_CONFIG.owner)
+    expect(config.repo).toBe(DEFAULT_GITHUB_CONFIG.repo)
+  })
+
+  it('storage.setItem 抛异常时 setGithubConfig 应向外抛出', () => {
+    const badStorage = {
+      getItem: (_key: string) => '' as string | null,
+      setItem: (_key: string, _value: string) => {
+        throw new Error('Storage 写入异常')
+      },
+      removeItem: (_key: string) => {},
+    }
+    vi.mocked(getApp).mockReturnValue({ PluginStorage: badStorage })
+    // setGithubConfig 未做 try/catch，setItem 抛异常会向外抛出
+    expect(() =>
+      setGithubConfig({
+        owner: 'o',
+        repo: 'r',
+        branch: 'main',
+        path: 'p',
+      }),
+    ).toThrow('Storage 写入异常')
+  })
+})

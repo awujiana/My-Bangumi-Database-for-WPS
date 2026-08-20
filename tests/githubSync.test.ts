@@ -4813,3 +4813,111 @@ describe('getSelectedRowSids row===headerRow continue (line 1479)', () => {
     expect(mockBgmLognnn).toHaveBeenCalledWith('INFO', expect.stringContaining('提取到 1 个 SID'))
   })
 })
+
+// ============ 补充: githubSync.ts BATCH_WRITE_SIZE 边界测试 (501条触发 ms>0) ============
+
+describe('applyDiffToSheet BATCH_WRITE_SIZE 边界 (501条 add)', () => {
+  it('501 条 add diff 应触发两批写入，并通过 onProgress 覆盖 formatEta ms>0', async () => {
+    const ws = { Range: vi.fn().mockReturnValue({ Value2: null }) }
+    mockGetDataSheet.mockReturnValue(ws)
+    mockFindHeaderRow.mockReturnValue(1)
+    mockGetLastRow.mockReturnValue(1)
+    mockGetColumnMap.mockReturnValue(
+      new Map([
+        ['Bangumi_URL', 1],
+        ['名称', 2],
+      ]),
+    )
+
+    const mockApp = {
+      ScreenUpdating: true,
+      Calculation: 1,
+      Wait: vi.fn(),
+      DoEvents: vi.fn(),
+    }
+    mockGetApp.mockReturnValue(mockApp)
+
+    // 生成 501 条 add diff（刚好超过 BATCH_WRITE_SIZE=500）
+    // 这将触发两批写入：第一批 500 条，第二批 1 条
+    const diffs: GithubSyncDiff[] = []
+    for (let i = 0; i < 501; i++) {
+      diffs.push({
+        kind: 'add',
+        sid: `sid-${i}`,
+        remote: {
+          sid: `sid-${i}`,
+          name: `条目${i}`,
+          date: '2024-06-15',
+        },
+      })
+    }
+
+    // 记录进度回调中的 eta 参数
+    const progressCalls: Array<{ current: number; total: number; eta: string }> = []
+    const onProgressMock = vi.fn(
+      (current: number, total: number, _message: string, eta: string) => {
+        progressCalls.push({ current, total, eta })
+      },
+    )
+
+    const result = await applyDiffToSheet(diffs, 'add-update', onProgressMock)
+
+    // 验证结果
+    expect(result.added).toBeGreaterThan(0)
+    expect(result.added).toBeLessThanOrEqual(501)
+
+    // 验证 onProgress 被调用
+    expect(onProgressMock).toHaveBeenCalled()
+
+    // 验证 onProgress 被调用次数（至少 2 次：第一批后 + 最后一批后）
+    expect(progressCalls.length).toBeGreaterThanOrEqual(2)
+
+    // 验证最后一次进度回调是完成状态
+    const lastCall = progressCalls[progressCalls.length - 1]
+    expect(lastCall).toBeDefined()
+    expect(lastCall!.eta).toBeDefined()
+
+    // 验证 ws.Range 被调用（批量写入）
+    expect(ws.Range).toHaveBeenCalled()
+  })
+
+  it('onProgress 不传时不应出错', async () => {
+    const ws = { Range: vi.fn().mockReturnValue({ Value2: null }) }
+    mockGetDataSheet.mockReturnValue(ws)
+    mockFindHeaderRow.mockReturnValue(1)
+    mockGetLastRow.mockReturnValue(1)
+    mockGetColumnMap.mockReturnValue(
+      new Map([
+        ['Bangumi_URL', 1],
+        ['名称', 2],
+      ]),
+    )
+
+    const mockApp = {
+      ScreenUpdating: true,
+      Calculation: 1,
+      Wait: vi.fn(),
+      DoEvents: vi.fn(),
+    }
+    mockGetApp.mockReturnValue(mockApp)
+
+    const diffs: GithubSyncDiff[] = []
+    for (let i = 0; i < 600; i++) {
+      diffs.push({
+        kind: 'add',
+        sid: `sid-${i}`,
+        remote: {
+          sid: `sid-${i}`,
+          name: `条目${i}`,
+          date: '2024-06-15',
+        },
+      })
+    }
+
+    // 不传 onProgress，验证代码不会崩溃
+    const result = await applyDiffToSheet(diffs, 'add-update')
+
+    expect(result.added).toBeGreaterThan(0)
+    expect(ws.Range).toHaveBeenCalled()
+  })
+})

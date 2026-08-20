@@ -492,20 +492,6 @@ export function ensureSheetHeaders(ws: WpsWorksheet | null | undefined): boolean
     bgmLog(LOG_LEVELS.ERROR, '[ensureSheetHeaders] 表头写入验证失败，第25列为空')
   }
 
-  // 设置表头行样式：灰色背景 + 加粗
-  try {
-    const lastColLetter = colNumToLetter(STANDARD_HEADERS.length)
-    const headerRange = ws.Range(`A1:${lastColLetter}1`)
-    if (headerRange?.Font) {
-      headerRange.Font.Bold = true
-    }
-    if (headerRange?.Interior) {
-      headerRange.Interior.Color = 0xd3d3d3 // GRAY
-    }
-  } catch (e: unknown) {
-    bgmLog(LOG_LEVELS.WARN, `[ensureSheetHeaders] 设置表头样式失败: ${(e as Error).message}`)
-  }
-
   // 清除缓存，确保后续读取能拿到新表头
   clearSheetCache(ws)
   // 验证 findHeaderRow 是否能识别新表头
