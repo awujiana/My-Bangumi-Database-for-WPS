@@ -1122,6 +1122,37 @@ select.input {
     align-items: center;
     gap: 12px;
     margin-bottom: 16px;
+    flex-shrink: 0;
+}
+
+.bgm-dialog-header-left {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex: 1;
+}
+
+.bgm-dialog-close-btn {
+    background: transparent;
+    border: none;
+    color: #888;
+    font-size: 18px;
+    cursor: pointer;
+    padding: 4px 8px;
+    line-height: 1;
+    border-radius: 6px;
+    transition: all 0.2s;
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-left: auto;
+}
+
+.bgm-dialog-close-btn:hover {
+    background: rgba(255, 255, 255, 0.1);
+    color: #fff;
 }
 
 .bgm-dialog-icon {
@@ -1166,7 +1197,10 @@ select.input {
 }
 
 .bgm-dialog-body {
-    margin-bottom: 20px;
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    margin-bottom: 0;
 }
 
 .bgm-dialog-message {
@@ -1181,6 +1215,27 @@ select.input {
     display: flex;
     justify-content: flex-end;
     gap: 10px;
+    flex-shrink: 0;
+    position: relative;
+    min-height: 48px;
+}
+
+.bgm-sync-progress__running-btns {
+    display: flex;
+    gap: 8px;
+    justify-content: flex-end;
+    position: absolute;
+    right: 0;
+    top: 0;
+}
+
+.bgm-sync-progress__done-btns {
+    display: flex;
+    gap: 8px;
+    justify-content: flex-end;
+    position: absolute;
+    right: 0;
+    top: 0;
 }
 
 /* 按钮样式 */
@@ -1712,8 +1767,7 @@ select.input {
 }
 
 .bgm-sync-progress__body {
-    max-height: 60vh;
-    overflow-y: auto;
+    overflow: visible;
 }
 
 .bgm-sync-progress__config {
@@ -1940,18 +1994,6 @@ select.input {
     white-space: pre;
     font-family: monospace;
     color: var(--subtext0, #a6adc8);
-}
-
-.bgm-sync-progress__running-btns {
-    display: flex;
-    gap: 8px;
-    justify-content: flex-end;
-}
-
-.bgm-sync-progress__done-btns {
-    display: flex;
-    gap: 8px;
-    justify-content: flex-end;
 }
 
 /* ========== 系统日志面板 ========== */
