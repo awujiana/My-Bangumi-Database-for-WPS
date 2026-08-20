@@ -596,13 +596,15 @@ export function showSyncProgressDialog(
  * @param current 当前完成数
  * @param total 总数
  * @param message 当前任务描述（显示在进度条下方）
- * @param logLine 可选的实时日志行（追加到日志区）或 ETA 字符串
+ * @param logLine 可选的实时日志行（追加到日志区）
+ * @param eta 可选的 ETA 字符串（显示在 ETA 区域，独立于 logLine）
  */
 export function updateSyncProgressDialog(
   current: number,
   total: number,
   message?: string,
   logLine?: string,
+  eta?: string,
 ): void {
   const modal = _syncProgressDialog
   // 弹窗未显示时快速返回，避免无效 DOM 写入
@@ -625,21 +627,20 @@ export function updateSyncProgressDialog(
   if (percent) percent.textContent = pct + '%'
   if (currentEl && message) currentEl.textContent = message
 
-  // 显示 ETA（当 logLine 以"预计剩余"或"剩余:"开头时，视为 ETA 信息）
-  if (etaEl && logLine && (logLine.startsWith('预计剩余') || logLine.startsWith('剩余:'))) {
-    etaEl.textContent = logLine
+  // 显示 ETA：优先使用独立的 eta 参数，兼容旧版 logLine 以"预计剩余"/"剩余:"开头的情况
+  const etaText = eta ?? (logLine && (logLine.startsWith('预计剩余') || logLine.startsWith('剩余:') ? logLine : undefined))
+  if (etaEl && etaText) {
+    etaEl.textContent = etaText
     etaEl.style.display = ''
-  } else if (etaEl && !logLine) {
+  } else if (etaEl) {
     etaEl.style.display = 'none'
   }
 
-  // 仅将非 ETA 的日志行追加到日志区（ETA 已单独显示在 ETA 元素中，避免重复）
-  if (logLine && log && !logLine.startsWith('预计剩余') && !logLine.startsWith('剩余:')) {
-    // 智能滚动：仅当用户已接近底部时才自动滚动，避免打断阅读
+  // 将日志行追加到日志区（ETA 类型的 logLine 已在上方处理，不再重复追加）
+  if (logLine && log && logLine !== etaText) {
     const nearBottom = log.scrollHeight - log.scrollTop - log.clientHeight < 30
     log.appendChild(document.createTextNode(logLine + '\n'))
     _syncProgressLogCount++
-    // 限制日志条数，避免过多 DOM 节点
     while (_syncProgressLogCount > _SYNC_PROGRESS_LOG_MAX) {
       if (log.firstChild) {
         log.removeChild(log.firstChild)

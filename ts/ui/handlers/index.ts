@@ -971,8 +971,8 @@ const ACTION_HANDLERS: Record<string, ActionHandler> = {
         const syncStartTime = Date.now()
         syncFromRemote(
           (current, total, message, eta) => {
-            // 将 ETA 作为 logLine 传入，updateSyncProgressDialog 会自动识别并显示
-            updateSyncProgressDialog(current, total, message, eta)
+            // message 写入日志区，eta 独立传入 ETA 区
+            updateSyncProgressDialog(current, total, message, message, eta)
             if (app?.StatusBar !== undefined) {
               const statusMsg = eta ? `${message} | ${eta}` : message
               app.StatusBar = `[${current}/${total}] ${statusMsg}`
