@@ -353,6 +353,13 @@
                     <option value="mirror">镜像同步（含删除）</option>
                     <option value="force-overwrite">强制覆盖（含空值）</option>
                 </select>
+                <button class="btn tiny" data-action="showSyncGuide" title="查看策略详细说明">❓</button>
+            </div>
+            <div id="mirrorSyncNote" class="hint" style="display:none;padding:8px 12px;margin:4px 0;border-left:3px solid #f0a020;background:#3a2f1a;border-radius:4px;color:#ffd98a;font-size:12px;line-height:1.6;">
+                ⚠️ <strong>镜像同步</strong>说明：该策略并非完全镜像远程仓库。若要完全与远程一致，需先删除本地全部数据后再同步。<br>
+                • <strong>新增条目</strong>（writeAll=true）：正常写入所有字段<br>
+                • <strong>更新条目</strong>：名称追加到「别名」列、标签追加到「标签/分级」列（以 <code> | </code> 分隔），其他字段直接覆盖<br>
+                • <strong>制作公司/动画制作公司</strong>：远程「动画制作公司」字段会同时更新本地「制作公司」和「动画制作公司」两列
             </div>
             <div class="form-row">
                 <label>
