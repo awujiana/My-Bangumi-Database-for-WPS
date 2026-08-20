@@ -36,6 +36,8 @@ import {
   completeSyncProgressDialog,
   hideSyncProgressDialog,
   type SyncProgressStats,
+  type SyncConfigSummary,
+  buildSyncConfig,
   formatDuration,
 } from '../../index.js'
 import { getSyncPreview, detectConflicts } from '../../services/ribbonService.js'
@@ -335,12 +337,26 @@ async function confirmAndExecuteSync(prepared: SyncPreparedData): Promise<boolea
   // 11. 执行同步
   bgmLog(LOG_LEVELS.INFO, '[syncFromPanel] 步骤11: 开始执行同步')
   // 运行锁已由 syncFromPanel 入口获取，此处直接显示进度弹窗
-  // 显示同步进度弹窗（不隐藏"同步到 Bangumi"按钮）
-  showSyncProgressDialog('正在同步 - 同步到 Bangumi', {
-    onPause: () => BGM.sync.pause(),
-    onResume: () => BGM.sync.resume(),
-    onStop: () => BGM.sync.requestStop(),
+  const syncFromPanelConfig: SyncConfigSummary = buildSyncConfig({
+    source: '当前工作表',
+    strategy: conflictStrategy === 'skip' ? '跳过冲突' : '覆盖冲突',
+    direction: 'Excel → Bangumi',
+    extra: [
+      { label: '数据范围', value: `第${headerRow + 1}~${lastRow}行` },
+      { label: '增量同步', value: incremental ? '开启' : '关闭' },
+      { label: '冲突数', value: conflictMsg ? String(conflictSids?.size ?? 0) : '0' },
+    ],
   })
+  // 显示同步进度弹窗（不隐藏"同步到 Bangumi"按钮）
+  showSyncProgressDialog(
+    '正在同步 - 同步到 Bangumi',
+    {
+      onPause: () => BGM.sync.pause(),
+      onResume: () => BGM.sync.resume(),
+      onStop: () => BGM.sync.requestStop(),
+    },
+    syncFromPanelConfig,
+  )
   try {
     bgmLog(LOG_LEVELS.INFO, '[syncFromPanel] 调用 SyncToBangumiAsync...')
     const result = await SyncToBangumiAsync(ws, colMap, token, lastRow, headerRow, {
@@ -599,12 +615,25 @@ async function _doAPISync(sheetIndex: number, token: string): Promise<void> {
       showAlert('同步正在进行中，请稍后再试', '提示')
       return
     }
-    // 显示同步进度弹窗
-    showSyncProgressDialog('正在收藏回写', {
-      onPause: () => BGM.sync.pause(),
-      onResume: () => BGM.sync.resume(),
-      onStop: () => BGM.sync.requestStop(),
+    const collectionConfig: SyncConfigSummary = buildSyncConfig({
+      source: 'Bangumi 收藏列表',
+      strategy: '收藏回写',
+      direction: 'Bangumi → Excel',
+      extra: [
+        { label: '收藏条目', value: String(userCollections.length) },
+        { label: '待处理行', value: String(rowsToProcess.length) },
+      ],
     })
+    // 显示同步进度弹窗
+    showSyncProgressDialog(
+      '正在收藏回写',
+      {
+        onPause: () => BGM.sync.pause(),
+        onResume: () => BGM.sync.resume(),
+        onStop: () => BGM.sync.requestStop(),
+      },
+      collectionConfig,
+    )
 
     // 两阶段进度合并：累计 total，避免阶段切换时进度条从 100% 回退到 0%
     const totalCollect = userCollections.length

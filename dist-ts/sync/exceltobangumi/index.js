@@ -14,7 +14,7 @@
  * @version 1.1.0 (优化版，保留原注释和日志)
  */
 import { BGM_COLOR, LOG_LEVELS, bgmLog, getApp, getCell, trim, getColumnMap, findHeaderRow, colNumToLetter, getCellValue, loadBgToken, BGM, wpsMsgBox, _getUserApiPath, readRangeValues, delay, calcFingerprint, getAllSyncRecords, isWpsWorksheet, clearSheetCache, showToast, } from '../../index.js';
-import { showConfirm, showSyncProgressDialog, updateSyncProgressDialog, completeSyncProgressDialog, hideSyncProgressDialog, } from '../../ui/dialog.js';
+import { showConfirm, showSyncProgressDialog, buildSyncConfig, updateSyncProgressDialog, completeSyncProgressDialog, hideSyncProgressDialog, } from '../../ui/dialog.js';
 import { isBangumiUrl, extractSubjectId, mapWatchStatus, getSeqColIndex, addTagsFromStr, } from '../pureUtils.js';
 import { getOrCreateSyncRecordSheet } from '../syncRecord.js';
 // Re-export 纯函数，保持模块对外 API 兼容
@@ -849,12 +849,22 @@ async function executeSelectedSync(ws, rows, colMap, token, headerRow, startTime
         if (!BGM.sync.enterRunningState())
             return;
         enteredRunning = true;
+        const selectedRowsConfig = buildSyncConfig({
+            source: '当前工作表',
+            strategy: '选中行同步',
+            direction: 'Excel → Bangumi',
+            selectedRowsOnly: true,
+            extra: [
+                { label: '选中行数', value: String(rows.length) },
+                { label: '行号范围', value: rows.length > 0 ? `${rows[0]}~${rows[rows.length - 1]}` : '-' },
+            ],
+        });
         // P1：显示同步进度弹窗（新 API：handlers 对象，暂停状态由 dialog 内部管理）
         showSyncProgressDialog('正在同步 - 选中行同步', {
             onPause: () => BGM.sync.pause(),
             onResume: () => BGM.sync.resume(),
             onStop: () => BGM.sync.requestStop(),
-        });
+        }, selectedRowsConfig);
         // 设置同步状态机位置（用于暂停时定位到单元格）
         BGM.sync.updatePosition(ws, 0, urlCol);
         for (let idx = 0; idx < rows.length; idx++) {

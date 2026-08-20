@@ -935,6 +935,8 @@ export async function applyDiffToSheet(diffs, strategy, onProgress, source) {
     // ---- 阶段 2b: 逐行处理 delete diffs（需倒序执行）----
     let deleteProcessed = 0;
     const deleteTotal = deleteDiffs.length;
+    // 记录删除阶段开始时间，用于计算删除阶段专用速度（更准确地估算剩余时间）
+    const deleteStartTime = Date.now();
     for (const diff of deleteDiffs) {
         try {
             const rowValues = {};
@@ -985,11 +987,12 @@ export async function applyDiffToSheet(diffs, strategy, onProgress, source) {
         const now = Date.now();
         if (now - lastProgressTime > 300 || deleteProcessed >= deleteTotal) {
             const totalProcessed = addTotal + updateTotal + deleteProcessed;
-            const elapsed = now - syncStartTime;
-            const speed = totalProcessed > 0 && elapsed > 0 ? (totalProcessed / elapsed) * 1000 : 0;
+            // 使用删除阶段专用速度（基于 deleteStartTime），避免被前面快速的 add/update 拉高平均速度
+            const deleteElapsed = now - deleteStartTime;
+            const deleteSpeed = deleteProcessed > 0 && deleteElapsed > 0 ? (deleteProcessed / deleteElapsed) * 1000 : 0;
             const remaining = deleteTotal - deleteProcessed;
-            const eta = speed > 0 ? (remaining / speed) * 1000 : 0;
-            onProgress?.(totalProcessed, total, `删除 ${deleteProcessed}/${deleteTotal} 条 (${speed > 0 ? speed.toFixed(0) : '?'} 行/秒)`, formatEta(eta));
+            const eta = deleteSpeed > 0 ? (remaining / deleteSpeed) * 1000 : 0;
+            onProgress?.(totalProcessed, total, `删除 ${deleteProcessed}/${deleteTotal} 条 (${deleteSpeed > 0 ? deleteSpeed.toFixed(0) : '?'} 行/秒)`, formatEta(eta));
             lastProgressTime = now;
         }
         // 每 10 条让出事件循环（delete 比 update 轻量，但仍需频繁让出）

@@ -4,6 +4,34 @@
  * @description 自定义对话框、确认对话框、Toast 通知
  */
 import { sanitizeHtml } from '../tools/sanitize.js';
+/**
+ * 构造同步配置摘要的工厂函数，统一各入口的配置构造逻辑。
+ * @param ctx 配置上下文
+ * @returns SyncConfigSummary 对象
+ */
+export function buildSyncConfig(ctx) {
+    const cfg = {};
+    if (ctx.source)
+        cfg.sourceLabel = ctx.source;
+    if (ctx.strategy)
+        cfg.strategyLabel = ctx.strategy;
+    if (ctx.direction)
+        cfg.directionLabel = ctx.direction;
+    if (ctx.selectedRowsOnly)
+        cfg.selectedRowsOnly = true;
+    if (ctx.timeFilter) {
+        const tf = ctx.timeFilter;
+        cfg.timeFilterLabel =
+            tf.range === 'year'
+                ? `${tf.year}年全年`
+                : tf.range === 'quarter'
+                    ? `${tf.year}年${tf.quarter}月新番`
+                    : `${tf.year}年${tf.month}月`;
+    }
+    if (ctx.extra && ctx.extra.length > 0)
+        cfg.extra = ctx.extra;
+    return cfg;
+}
 // ========== 常量与配置 ==========
 const DIALOG_TYPES = {
     alert: {
@@ -363,6 +391,8 @@ function ensureSyncProgressDialog() {
                 <span class="bgm-dialog-title" id="bgmSyncProgressTitle">正在同步...</span>
             </div>
             <div class="bgm-dialog-body bgm-sync-progress__body">
+                <!-- 配置摘要区（默认隐藏，由 showSyncProgressDialog 填充） -->
+                <div id="bgmSyncProgressConfig" class="bgm-sync-progress__config" style="display:none;"></div>
                 <!-- 进度区 -->
                 <div id="bgmSyncProgressSection">
                     <div class="bgm-sync-progress__meta" aria-live="polite" aria-atomic="true">
@@ -460,11 +490,36 @@ function ensureSyncProgressDialog() {
     return modal;
 }
 /**
+ * 渲染配置摘要为 HTML 字符串
+ */
+export function renderConfigSummary(cfg) {
+    const items = [];
+    if (cfg.sourceLabel)
+        items.push(`<span class="cfg-item">📁 ${cfg.sourceLabel}</span>`);
+    if (cfg.strategyLabel)
+        items.push(`<span class="cfg-item">🔧 ${cfg.strategyLabel}</span>`);
+    if (cfg.directionLabel)
+        items.push(`<span class="cfg-item">📡 ${cfg.directionLabel}</span>`);
+    if (cfg.timeFilterLabel)
+        items.push(`<span class="cfg-item">📅 ${cfg.timeFilterLabel}</span>`);
+    if (cfg.selectedRowsOnly)
+        items.push(`<span class="cfg-item warn">⚠️ 仅选中行</span>`);
+    if (cfg.extra) {
+        for (const ex of cfg.extra) {
+            items.push(`<span class="cfg-item">${ex.label}: ${ex.value}</span>`);
+        }
+    }
+    return items.length > 0
+        ? `<div class="cfg-summary">${items.join('')}</div>`
+        : '';
+}
+/**
  * 显示同步进度弹窗（运行中状态）
  * @param title 弹窗标题（如"正在同步 - 选中行同步"）
  * @param handlers 暂停/恢复/停止回调集合
+ * @param config 可选的同步配置摘要，显示在进度区上方
  */
-export function showSyncProgressDialog(title, handlers) {
+export function showSyncProgressDialog(title, handlers, config) {
     const modal = ensureSyncProgressDialog();
     // 保存触发元素，用于关闭后恢复焦点
     _syncProgressTrigger = document.activeElement;
@@ -502,6 +557,18 @@ export function showSyncProgressDialog(title, handlers) {
         pauseBtn.classList.remove('bgm-btn-success');
         pauseBtn.classList.add('bgm-btn-default');
     }
+    // 渲染配置摘要
+    const configEl = modal.querySelector('#bgmSyncProgressConfig');
+    if (configEl) {
+        if (config) {
+            configEl.innerHTML = renderConfigSummary(config);
+            configEl.style.display = '';
+        }
+        else {
+            configEl.innerHTML = '';
+            configEl.style.display = 'none';
+        }
+    }
     // 重置进度
     const bar = modal.querySelector('#bgmSyncProgressBar');
     const label = modal.querySelector('#bgmSyncProgressLabel');
@@ -536,9 +603,10 @@ export function showSyncProgressDialog(title, handlers) {
  * @param current 当前完成数
  * @param total 总数
  * @param message 当前任务描述（显示在进度条下方）
- * @param logLine 可选的实时日志行（追加到日志区）或 ETA 字符串
+ * @param logLine 可选的实时日志行（追加到日志区）
+ * @param eta 可选的 ETA 字符串（显示在 ETA 区域，独立于 logLine）
  */
-export function updateSyncProgressDialog(current, total, message, logLine) {
+export function updateSyncProgressDialog(current, total, message, logLine, eta) {
     const modal = _syncProgressDialog;
     // 弹窗未显示时快速返回，避免无效 DOM 写入
     if (!modal || modal.style.display === 'none')
@@ -561,21 +629,20 @@ export function updateSyncProgressDialog(current, total, message, logLine) {
         percent.textContent = pct + '%';
     if (currentEl && message)
         currentEl.textContent = message;
-    // 显示 ETA（当 logLine 以"预计剩余"或"剩余:"开头时，视为 ETA 信息）
-    if (etaEl && logLine && (logLine.startsWith('预计剩余') || logLine.startsWith('剩余:'))) {
-        etaEl.textContent = logLine;
+    // 显示 ETA：优先使用独立的 eta 参数，兼容旧版 logLine 以"预计剩余"/"剩余:"开头的情况
+    const etaText = eta ?? (logLine && (logLine.startsWith('预计剩余') || logLine.startsWith('剩余:') ? logLine : undefined));
+    if (etaEl && etaText) {
+        etaEl.textContent = etaText;
         etaEl.style.display = '';
     }
-    else if (etaEl && !logLine) {
+    else if (etaEl) {
         etaEl.style.display = 'none';
     }
-    // 仅将非 ETA 的日志行追加到日志区（ETA 已单独显示在 ETA 元素中，避免重复）
-    if (logLine && log && !logLine.startsWith('预计剩余') && !logLine.startsWith('剩余:')) {
-        // 智能滚动：仅当用户已接近底部时才自动滚动，避免打断阅读
+    // 将日志行追加到日志区（ETA 类型的 logLine 已在上方处理，不再重复追加）
+    if (logLine && log && logLine !== etaText) {
         const nearBottom = log.scrollHeight - log.scrollTop - log.clientHeight < 30;
         log.appendChild(document.createTextNode(logLine + '\n'));
         _syncProgressLogCount++;
-        // 限制日志条数，避免过多 DOM 节点
         while (_syncProgressLogCount > _SYNC_PROGRESS_LOG_MAX) {
             if (log.firstChild) {
                 log.removeChild(log.firstChild);

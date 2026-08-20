@@ -35,6 +35,67 @@ export interface DialogCallback {
   onCancel?: () => void
 }
 
+/** 同步配置摘要，显示在进度弹窗顶部 */
+export interface SyncConfigSummary {
+  /** 同步源标签（如 "远程仓库" / "本地文件"） */
+  sourceLabel?: string
+  /** 同步策略标签 */
+  strategyLabel?: string
+  /** 时间筛选描述 */
+  timeFilterLabel?: string
+  /** 是否仅同步选中行 */
+  selectedRowsOnly?: boolean
+  /** 同步方向描述（如 "远程仓库 → Excel"） */
+  directionLabel?: string
+  /** 额外的自定义配置行（key-value） */
+  extra?: Array<{ label: string; value: string }>
+}
+
+/** 构建同步配置摘要的上下文 */
+export interface BuildSyncConfigContext {
+  /** 数据源标签 */
+  source?: string
+  /** 策略标签 */
+  strategy?: string
+  /** 方向标签 */
+  direction?: string
+  /** 是否选中行 */
+  selectedRowsOnly?: boolean
+  /** 时间筛选 */
+  timeFilter?: {
+    range: 'year' | 'quarter' | 'month'
+    year: number
+    quarter?: number
+    month?: number
+  }
+  /** 额外的 key-value 对 */
+  extra?: Array<{ label: string; value: string }>
+}
+
+/**
+ * 构造同步配置摘要的工厂函数，统一各入口的配置构造逻辑。
+ * @param ctx 配置上下文
+ * @returns SyncConfigSummary 对象
+ */
+export function buildSyncConfig(ctx: BuildSyncConfigContext): SyncConfigSummary {
+  const cfg: SyncConfigSummary = {}
+  if (ctx.source) cfg.sourceLabel = ctx.source
+  if (ctx.strategy) cfg.strategyLabel = ctx.strategy
+  if (ctx.direction) cfg.directionLabel = ctx.direction
+  if (ctx.selectedRowsOnly) cfg.selectedRowsOnly = true
+  if (ctx.timeFilter) {
+    const tf = ctx.timeFilter
+    cfg.timeFilterLabel =
+      tf.range === 'year'
+        ? `${tf.year}年全年`
+        : tf.range === 'quarter'
+          ? `${tf.year}年${tf.quarter}月新番`
+          : `${tf.year}年${tf.month}月`
+  }
+  if (ctx.extra && ctx.extra.length > 0) cfg.extra = ctx.extra
+  return cfg
+}
+
 // ========== 常量与配置 ==========
 const DIALOG_TYPES: Record<string, DialogConfig> = {
   alert: {
@@ -419,6 +480,8 @@ function ensureSyncProgressDialog(): HTMLElement {
                 <span class="bgm-dialog-title" id="bgmSyncProgressTitle">正在同步...</span>
             </div>
             <div class="bgm-dialog-body bgm-sync-progress__body">
+                <!-- 配置摘要区（默认隐藏，由 showSyncProgressDialog 填充） -->
+                <div id="bgmSyncProgressConfig" class="bgm-sync-progress__config" style="display:none;"></div>
                 <!-- 进度区 -->
                 <div id="bgmSyncProgressSection">
                     <div class="bgm-sync-progress__meta" aria-live="polite" aria-atomic="true">
@@ -519,13 +582,33 @@ function ensureSyncProgressDialog(): HTMLElement {
 }
 
 /**
+ * 渲染配置摘要为 HTML 字符串
+ */
+export function renderConfigSummary(cfg: SyncConfigSummary): string {
+  const items: string[] = []
+  if (cfg.sourceLabel) items.push(`<span class="cfg-item">📁 ${cfg.sourceLabel}</span>`)
+  if (cfg.strategyLabel) items.push(`<span class="cfg-item">🔧 ${cfg.strategyLabel}</span>`)
+  if (cfg.directionLabel) items.push(`<span class="cfg-item">📡 ${cfg.directionLabel}</span>`)
+  if (cfg.timeFilterLabel) items.push(`<span class="cfg-item">📅 ${cfg.timeFilterLabel}</span>`)
+  if (cfg.selectedRowsOnly) items.push(`<span class="cfg-item warn">⚠️ 仅选中行</span>`)
+  if (cfg.extra) {
+    for (const ex of cfg.extra) {
+      items.push(`<span class="cfg-item">${ex.label}: ${ex.value}</span>`)
+    }
+  }
+  return items.length > 0 ? `<div class="cfg-summary">${items.join('')}</div>` : ''
+}
+
+/**
  * 显示同步进度弹窗（运行中状态）
  * @param title 弹窗标题（如"正在同步 - 选中行同步"）
  * @param handlers 暂停/恢复/停止回调集合
+ * @param config 可选的同步配置摘要，显示在进度区上方
  */
 export function showSyncProgressDialog(
   title: string,
   handlers: { onPause: () => void; onResume: () => void; onStop: () => void },
+  config?: SyncConfigSummary,
 ): void {
   const modal = ensureSyncProgressDialog()
 
@@ -561,6 +644,18 @@ export function showSyncProgressDialog(
     pauseBtn.setAttribute('aria-label', '暂停同步')
     pauseBtn.classList.remove('bgm-btn-success')
     pauseBtn.classList.add('bgm-btn-default')
+  }
+
+  // 渲染配置摘要
+  const configEl = modal.querySelector('#bgmSyncProgressConfig') as HTMLElement | null
+  if (configEl) {
+    if (config) {
+      configEl.innerHTML = renderConfigSummary(config)
+      configEl.style.display = ''
+    } else {
+      configEl.innerHTML = ''
+      configEl.style.display = 'none'
+    }
   }
 
   // 重置进度
@@ -628,7 +723,10 @@ export function updateSyncProgressDialog(
   if (currentEl && message) currentEl.textContent = message
 
   // 显示 ETA：优先使用独立的 eta 参数，兼容旧版 logLine 以"预计剩余"/"剩余:"开头的情况
-  const etaText = eta ?? (logLine && (logLine.startsWith('预计剩余') || logLine.startsWith('剩余:') ? logLine : undefined))
+  const etaText =
+    eta ??
+    (logLine &&
+      (logLine.startsWith('预计剩余') || logLine.startsWith('剩余:') ? logLine : undefined))
   if (etaEl && etaText) {
     etaEl.textContent = etaText
     etaEl.style.display = ''

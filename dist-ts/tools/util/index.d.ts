@@ -208,9 +208,8 @@ export declare function showBangumiPanel(): void;
 /**
  * 显示/切换设置面板
  * 设置面板位置逻辑：
- * - 主面板(taskpane)可见时 → 设置面板停靠右侧
- * - 主面板隐藏时 → 设置面板停靠左侧
- * 这样确保两个面板不会同时占用同一侧，提供更好的用户体验。
+ * - 始终停靠右侧（msoCTPDockPositionRight）
+ * - 有主面板时在主面板右边弹出，无主面板时直接弹出在右侧
  */
 export declare function showSettingsPanel(): void;
 //# sourceMappingURL=index.d.ts.map

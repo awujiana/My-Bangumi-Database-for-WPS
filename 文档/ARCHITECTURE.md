@@ -321,9 +321,11 @@ ts/index.ts (barrel export)
 - `showInput()`: 输入对话框
 - `showToast()`: Toast 通知
 - `showSyncResult()`: 同步结果弹窗（可展开详情）
-- `showSyncProgressDialog()` / `updateSyncProgressDialog()` / `completeSyncProgressDialog()`: 进度弹窗
+- `showSyncProgressDialog()` / `updateSyncProgressDialog()` / `completeSyncProgressDialog()`: 进度弹窗（支持配置摘要展示）
 - `hideSyncProgressDialog()`: 关闭进度弹窗
-- 类型: `DialogButton`, `DialogConfig`, `DialogCallback`, `DialogOptions`, `SyncProgressStats`
+- `buildSyncConfig()`: 配置摘要工厂函数，统一各同步入口的配置构造逻辑
+- `renderConfigSummary()`: 将配置摘要渲染为 HTML 字符串
+- 类型: `DialogButton`, `DialogConfig`, `DialogCallback`, `DialogOptions`, `SyncProgressStats`, `SyncConfigSummary`, `BuildSyncConfigContext`
 
 #### `preview.ts` — 预览组件
 

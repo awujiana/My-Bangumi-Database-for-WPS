@@ -109,6 +109,10 @@ export {
   updateSyncProgressDialog,
   completeSyncProgressDialog,
   type SyncProgressStats,
+  type SyncConfigSummary,
+  type BuildSyncConfigContext,
+  buildSyncConfig,
+  renderConfigSummary,
   hideSyncProgressDialog,
 } from './ui/dialog.js'
 

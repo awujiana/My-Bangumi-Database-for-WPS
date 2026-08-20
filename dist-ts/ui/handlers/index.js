@@ -4,7 +4,7 @@
  * @description 资源追踪、按钮监听、ACTION_HANDLERS 分发、消息监听、事件总线监听、
  *              配置 UI 回填等。同时 re-export 子模块的公开 API，保持原 handlers.ts 的外部接口。
  */
-import { LOG_LEVELS, bgmLog, BGM, loadBgToken, storeBgToken, clearBgToken, copyTokenToClipboard, _setBgmUserId, _getBgmUserId, _setBgmUsername, getApp, getLastRow, getSyncRecordSheetIfExists, showAlert, showConfirm, showInput, showToast, refreshData, refreshSheets, refreshWorkbooks, toggleSheetLock, enlargePreview, clearSyncRecords, deduplicateSyncRecords, formatSyncRecordSheet, openSyncRecordSheet, closeDetailModal, previewSyncContent, syncSelectedRows, openBangumiTokenPage, setSyncRecordEnabled, getSyncRecordEnabled, getIncrementalSync, setIncrementalSync, getSkipConflicts, setSkipConflicts, getGithubConfig, setGithubConfig, isGithubConfigComplete, getSyncStrategy, setSyncStrategy, getSyncSourceType, setSyncSourceType, syncFromRemote, buildRawUrl, showSyncProgressDialog, updateSyncProgressDialog, completeSyncProgressDialog, hideSyncProgressDialog, showSyncResultDialog, formatDuration, showSettingsPanel, } from '../../index.js';
+import { LOG_LEVELS, bgmLog, BGM, loadBgToken, storeBgToken, clearBgToken, copyTokenToClipboard, _setBgmUserId, _getBgmUserId, _setBgmUsername, getApp, getLastRow, getSyncRecordSheetIfExists, showAlert, showConfirm, showInput, showToast, refreshData, refreshSheets, refreshWorkbooks, toggleSheetLock, enlargePreview, clearSyncRecords, deduplicateSyncRecords, formatSyncRecordSheet, openSyncRecordSheet, closeDetailModal, previewSyncContent, syncSelectedRows, openBangumiTokenPage, setSyncRecordEnabled, getSyncRecordEnabled, getIncrementalSync, setIncrementalSync, getSkipConflicts, setSkipConflicts, getGithubConfig, setGithubConfig, isGithubConfigComplete, getSyncStrategy, setSyncStrategy, getSyncSourceType, setSyncSourceType, syncFromRemote, buildRawUrl, showSyncProgressDialog, buildSyncConfig, updateSyncProgressDialog, completeSyncProgressDialog, hideSyncProgressDialog, showSyncResultDialog, formatDuration, showSettingsPanel, } from '../../index.js';
 import { exportConfig, importConfig } from '../../services/configService.js';
 import { executeUndoLastSync } from '../../services/ribbonService.js';
 import { debounce } from '../../tools/debounce.js';
@@ -703,6 +703,25 @@ const ACTION_HANDLERS = {
             // 使用模块化进度弹窗（与「同步到 Bangumi」「选中行同步」保持一致）
             // AbortController 支持：用户点击「停止」时取消下载阶段（applyDiffToSheet 为同步函数，不支持取消）
             const abortController = new AbortController();
+            // 构建配置摘要，显示在同步进度弹窗顶部
+            const configCtx = {
+                source: sourceLabel,
+                strategy: strategyLabel,
+                direction: '远程仓库 → Excel',
+                selectedRowsOnly,
+            };
+            if (timeFilter) {
+                const tfCtx = {
+                    range: timeFilter.range === 'all' ? 'year' : timeFilter.range,
+                    year: timeFilter.year,
+                };
+                if (timeFilter.quarter !== undefined)
+                    tfCtx.quarter = timeFilter.quarter;
+                if (timeFilter.month !== undefined)
+                    tfCtx.month = timeFilter.month;
+                configCtx.timeFilter = tfCtx;
+            }
+            const configSummary = buildSyncConfig(configCtx);
             showSyncProgressDialog(`正在同步 - 数据同步（${sourceLabel} → Excel）`, {
                 onPause: () => {
                     bgmLog(LOG_LEVELS.INFO, '[syncFromGithub] 数据同步不支持暂停');
@@ -714,14 +733,14 @@ const ACTION_HANDLERS = {
                     bgmLog(LOG_LEVELS.INFO, '[syncFromGithub] 用户请求停止数据同步');
                     abortController.abort();
                 },
-            });
+            }, configSummary);
             // 状态栏同步更新（与 syncFromPanel 行为一致）
             const app = getApp();
             // 性能追踪：记录同步开始时间，用于计算总耗时
             const syncStartTime = Date.now();
             syncFromRemote((current, total, message, eta) => {
-                // 将 ETA 作为 logLine 传入，updateSyncProgressDialog 会自动识别并显示
-                updateSyncProgressDialog(current, total, message, eta);
+                // message 写入日志区，eta 独立传入 ETA 区
+                updateSyncProgressDialog(current, total, message, message, eta);
                 if (app?.StatusBar !== undefined) {
                     const statusMsg = eta ? `${message} | ${eta}` : message;
                     app.StatusBar = `[${current}/${total}] ${statusMsg}`;
@@ -1115,28 +1134,6 @@ const ACTION_HANDLERS = {
         bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 打开设置面板');
         showSettingsPanel();
         bgmLog(LOG_LEVELS.INFO, `[handleActionClick] 设置面板操作已触发，耗时: ${Date.now() - ctx.startTime}ms`);
-    },
-    // 关闭设置面板
-    closeSettingsPanel: (ctx) => {
-        bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 关闭设置面板');
-        const app = getApp();
-        if (!app) {
-            bgmLog(LOG_LEVELS.WARN, '[handleActionClick] 无法获取 Application 对象');
-            return;
-        }
-        const settingsId = app.PluginStorage?.getItem('settings_pane_id');
-        if (settingsId) {
-            const settingsPane = app.GetTaskPane?.(settingsId);
-            if (settingsPane) {
-                settingsPane.Visible = false;
-                bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 设置面板已关闭');
-                showToast('设置面板已关闭', 'info');
-            }
-        }
-        else {
-            window.close();
-        }
-        bgmLog(LOG_LEVELS.INFO, `[handleActionClick] 关闭设置面板操作完成，耗时: ${Date.now() - ctx.startTime}ms`);
     },
     // 设置页面：切换增量同步开关
     toggleIncrementalSync: (_ctx) => {

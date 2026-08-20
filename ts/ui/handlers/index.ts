@@ -52,6 +52,8 @@ import {
   syncFromRemote,
   buildRawUrl,
   showSyncProgressDialog,
+  buildSyncConfig,
+  type BuildSyncConfigContext,
   updateSyncProgressDialog,
   completeSyncProgressDialog,
   type SyncProgressStats,
@@ -952,18 +954,46 @@ const ACTION_HANDLERS: Record<string, ActionHandler> = {
         // 使用模块化进度弹窗（与「同步到 Bangumi」「选中行同步」保持一致）
         // AbortController 支持：用户点击「停止」时取消下载阶段（applyDiffToSheet 为同步函数，不支持取消）
         const abortController = new AbortController()
-        showSyncProgressDialog(`正在同步 - 数据同步（${sourceLabel} → Excel）`, {
-          onPause: () => {
-            bgmLog(LOG_LEVELS.INFO, '[syncFromGithub] 数据同步不支持暂停')
+
+        // 构建配置摘要，显示在同步进度弹窗顶部
+        const configCtx: BuildSyncConfigContext = {
+          source: sourceLabel,
+          strategy: strategyLabel,
+          direction: '远程仓库 → Excel',
+          selectedRowsOnly,
+        }
+        if (timeFilter) {
+          const tfCtx: {
+            range: 'year' | 'quarter' | 'month'
+            year: number
+            quarter?: number
+            month?: number
+          } = {
+            range: timeFilter.range === 'all' ? 'year' : timeFilter.range,
+            year: timeFilter.year,
+          }
+          if (timeFilter.quarter !== undefined) tfCtx.quarter = timeFilter.quarter
+          if (timeFilter.month !== undefined) tfCtx.month = timeFilter.month
+          configCtx.timeFilter = tfCtx
+        }
+        const configSummary = buildSyncConfig(configCtx)
+
+        showSyncProgressDialog(
+          `正在同步 - 数据同步（${sourceLabel} → Excel）`,
+          {
+            onPause: () => {
+              bgmLog(LOG_LEVELS.INFO, '[syncFromGithub] 数据同步不支持暂停')
+            },
+            onResume: () => {
+              bgmLog(LOG_LEVELS.INFO, '[syncFromGithub] 数据同步不支持恢复')
+            },
+            onStop: () => {
+              bgmLog(LOG_LEVELS.INFO, '[syncFromGithub] 用户请求停止数据同步')
+              abortController.abort()
+            },
           },
-          onResume: () => {
-            bgmLog(LOG_LEVELS.INFO, '[syncFromGithub] 数据同步不支持恢复')
-          },
-          onStop: () => {
-            bgmLog(LOG_LEVELS.INFO, '[syncFromGithub] 用户请求停止数据同步')
-            abortController.abort()
-          },
-        })
+          configSummary,
+        )
 
         // 状态栏同步更新（与 syncFromPanel 行为一致）
         const app = getApp()

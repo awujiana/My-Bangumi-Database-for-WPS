@@ -1716,6 +1716,31 @@ select.input {
     overflow-y: auto;
 }
 
+.bgm-sync-progress__config {
+    margin-bottom: 8px;
+}
+
+.bgm-sync-progress__config .cfg-summary {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    padding: 8px 10px;
+    background: var(--surface0, #313244);
+    border-radius: 6px;
+    font-size: 12px;
+    line-height: 1.6;
+}
+
+.bgm-sync-progress__config .cfg-item {
+    color: var(--text, #cdd6f4);
+    white-space: nowrap;
+}
+
+.bgm-sync-progress__config .cfg-item.warn {
+    color: var(--yellow, #f9e2af);
+    font-weight: 600;
+}
+
 .bgm-sync-progress__meta {
     display: flex;
     justify-content: space-between;

@@ -69,9 +69,6 @@ export function getOrCreateSyncRecordSheet() {
             const colLetter = colNumToLetter(i + 1);
             const cell = syncSheet.Range(`${colLetter}1`);
             cell.Value2 = SYNC_RECORD_COLUMNS[i] ?? '';
-            if (cell.Interior) {
-                cell.Interior.Color = BGM_COLOR.GRAY;
-            }
         }
         // 移到末尾
         try {
@@ -110,9 +107,6 @@ export function getOrCreateSyncRecordSheet() {
             const expectedHeader = SYNC_RECORD_COLUMNS[i] ?? '';
             if (currentHeader !== expectedHeader) {
                 cell.Value2 = expectedHeader;
-                if (cell.Interior) {
-                    cell.Interior.Color = BGM_COLOR.GRAY;
-                }
                 bgmLog(LOG_LEVELS.INFO, `修复表头: ${colLetter}1 从 "${currentHeader}" → "${expectedHeader}"`);
             }
         }
@@ -661,13 +655,6 @@ export function formatSyncRecordSheet(sheet) {
                 // 忽略：此处无需处理错误
             }
         }
-        // 表头也居中
-        try {
-            target.Range(`A1:${lastColLetter}1`).HorizontalAlignment = -4108;
-        }
-        catch {
-            // 忽略：此处无需处理错误
-        }
         // 4. 自动列宽（全列）
         try {
             fullRange.EntireColumn.AutoFit();
@@ -765,4 +752,11 @@ export function openSyncRecordSheet(scrollToRow) {
     catch (e) {
         BGM.handleError(e, { context: 'openSyncRecordSheet', showAlert: false });
     }
+}
+// For testing only: reset internal cache state
+export function __resetSyncRecordCache() {
+    _syncRecordSidCache.clear();
+    _syncRecordListCache = [];
+    _syncRecordCacheValid = false;
+    _formattingInProgress = false;
 }

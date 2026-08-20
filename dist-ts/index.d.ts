@@ -17,7 +17,7 @@ showSuccess, // 成功
 showInput, // 输入
 showToast, // Toast 通知
 showSyncResult, // 同步结果（可展开详情）
-showSyncProgressDialog, updateSyncProgressDialog, completeSyncProgressDialog, type SyncProgressStats, hideSyncProgressDialog, } from './ui/dialog.js';
+showSyncProgressDialog, updateSyncProgressDialog, completeSyncProgressDialog, type SyncProgressStats, type SyncConfigSummary, type BuildSyncConfigContext, buildSyncConfig, renderConfigSummary, hideSyncProgressDialog, } from './ui/dialog.js';
 export { type DialogButton, type DialogConfig, type DialogCallback, type DialogOptions, } from './ui/dialog.js';
 export { setStatus, initMessageListener, } from './ui/message.js';
 export { showUserIdDialog, updateTokenStatus, updateUserIdStatus, showTokenDialog, testDebugConnection, syncCollectionFromBgm, openUserCollection, removeMessageListener, clearAllPendingTimeouts, } from './ui/handlers.js';

@@ -128,5 +128,10 @@ export function getSheetByIndex(sheetIndex) {
     const sheets = appObj.ActiveWorkbook.Sheets;
     if (sheets.Count === 0)
         return null;
-    return sheets.Item(sheetIndex);
+    try {
+        return sheets.Item(sheetIndex);
+    }
+    catch {
+        return undefined;
+    }
 }

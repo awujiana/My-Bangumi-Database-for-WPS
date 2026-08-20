@@ -3,7 +3,7 @@
  * @module ui/detail-preview
  * @description 数据预览、同步记录预览、详情模态框、单条上传
  */
-import { getApp, bgmLog, BGM, getCellValue, trim, _getUserApiPath, wpsMsgBox, getCell, escapeHtml, showAlert, showToast, LOG_LEVELS, BGM_COLOR, findHeaderRow, getColumnMap, detectConflicts, extractSubjectId, mapWatchStatus, buildJsonPayload, bgmRequestSync, addSyncRecord, addTagsFromStr, WATCH_STATUS_MAP, SyncToBangumiAsync, showSyncProgressDialog, updateSyncProgressDialog, completeSyncProgressDialog, hideSyncProgressDialog, } from '../index.js';
+import { getApp, bgmLog, BGM, getCellValue, trim, _getUserApiPath, wpsMsgBox, getCell, escapeHtml, showAlert, showToast, LOG_LEVELS, BGM_COLOR, findHeaderRow, getColumnMap, detectConflicts, extractSubjectId, mapWatchStatus, buildJsonPayload, bgmRequestSync, addSyncRecord, addTagsFromStr, WATCH_STATUS_MAP, SyncToBangumiAsync, showSyncProgressDialog, buildSyncConfig, updateSyncProgressDialog, completeSyncProgressDialog, hideSyncProgressDialog, } from '../index.js';
 import { getAllSyncRecords } from '../sync/syncRecord.js';
 import { sanitizeHtml } from '../tools/sanitize.js';
 import { loadBgToken } from '../tools/util.js';
@@ -220,11 +220,17 @@ export async function previewSyncContent() {
         uploadedCount: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 },
     };
     // 显示同步进度弹窗（不隐藏"同步到 Bangumi"按钮）
+    const previewConfig = buildSyncConfig({
+        source: '当前工作表',
+        strategy: '预览同步',
+        direction: 'Excel → Bangumi',
+        extra: [{ label: '总行数', value: String(dataRows.length) }],
+    });
     showSyncProgressDialog('正在同步 - 预览同步', {
         onPause: () => BGM.sync.pause(),
         onResume: () => BGM.sync.resume(),
         onStop: () => BGM.sync.requestStop(),
-    });
+    }, previewConfig);
     // 进入运行状态（防重入，统一入口）
     if (!BGM.sync.enterRunningState())
         return;
@@ -697,12 +703,21 @@ export async function syncAllRows() {
     try {
         // 更新当前位置（便于暂停时定位到表头）
         BGM.sync.updatePosition(ws, headerRow, colMap.get('序列号') || 9);
+        const uploadConfig = buildSyncConfig({
+            source: '当前工作表',
+            strategy: conflictInfo ? 'Excel覆盖冲突' : '标准同步',
+            direction: 'Excel → Bangumi',
+            extra: [
+                { label: '数据行', value: String(dataRows.length) },
+                { label: '增量同步', value: incremental ? '开启' : '关闭' },
+            ],
+        });
         // 显示同步进度弹窗（提供暂停/恢复/停止按钮）
         showSyncProgressDialog('正在上传同步', {
             onPause: () => BGM.sync.pause(),
             onResume: () => BGM.sync.resume(),
             onStop: () => BGM.sync.requestStop(),
-        });
+        }, uploadConfig);
         const result = await SyncToBangumiAsync(ws, colMap, token, lastRow, headerRow, {
             ...(conflictSids !== undefined && { skipSids: conflictSids }), // 跳过冲突的 sid 集合
             incremental, // 从 Ribbon 设置读取

@@ -41,6 +41,8 @@ import {
 import {
   showConfirm,
   showSyncProgressDialog,
+  type SyncConfigSummary,
+  buildSyncConfig,
   updateSyncProgressDialog,
   completeSyncProgressDialog,
   hideSyncProgressDialog,
@@ -1179,12 +1181,26 @@ async function executeSelectedSync(
     // P2：进入运行状态（防重入 + 重置标志 + 置位）
     if (!BGM.sync.enterRunningState()) return
     enteredRunning = true
-    // P1：显示同步进度弹窗（新 API：handlers 对象，暂停状态由 dialog 内部管理）
-    showSyncProgressDialog('正在同步 - 选中行同步', {
-      onPause: () => BGM.sync.pause(),
-      onResume: () => BGM.sync.resume(),
-      onStop: () => BGM.sync.requestStop(),
+    const selectedRowsConfig: SyncConfigSummary = buildSyncConfig({
+      source: '当前工作表',
+      strategy: '选中行同步',
+      direction: 'Excel → Bangumi',
+      selectedRowsOnly: true,
+      extra: [
+        { label: '选中行数', value: String(rows.length) },
+        { label: '行号范围', value: rows.length > 0 ? `${rows[0]}~${rows[rows.length - 1]}` : '-' },
+      ],
     })
+    // P1：显示同步进度弹窗（新 API：handlers 对象，暂停状态由 dialog 内部管理）
+    showSyncProgressDialog(
+      '正在同步 - 选中行同步',
+      {
+        onPause: () => BGM.sync.pause(),
+        onResume: () => BGM.sync.resume(),
+        onStop: () => BGM.sync.requestStop(),
+      },
+      selectedRowsConfig,
+    )
     // 设置同步状态机位置（用于暂停时定位到单元格）
     BGM.sync.updatePosition(ws, 0, urlCol)
 
