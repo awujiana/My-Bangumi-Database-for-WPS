@@ -291,6 +291,15 @@ export function computeDiff(remoteEntries, localEntries, strategy = 'add-update'
         }
         // 比对字段差异（add-update / mirror 策略走此分支）
         const changedFields = [];
+        // 比对 Bangumi_URL（从 sid 构造的派生字段，确保 URL 列总是被正确更新）
+        // 仅当本地存在 Bangumi_URL 字段时才比对（列映射中包含该列）
+        const expectedUrl = `https://bgm.tv/subject/${remote.sid}`;
+        if ('Bangumi_URL' in local.fields) {
+            const localUrl = local.fields['Bangumi_URL'];
+            if (localUrl !== expectedUrl) {
+                changedFields.push('Bangumi_URL');
+            }
+        }
         // 比对名称
         if (remote.name && remote.name !== local.fields['名称']) {
             changedFields.push('名称');
