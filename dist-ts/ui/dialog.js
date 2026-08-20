@@ -330,6 +330,12 @@ export function showSyncResult(summary, details) {
 let _syncProgressDialog = null;
 let _syncProgressLogCount = 0;
 const _SYNC_PROGRESS_LOG_MAX = 500;
+/** 全局同步开始时间戳（ms），用于计算整体 ETA */
+let _syncGlobalStart = 0;
+/** 全局累计暂停时长（ms），用于在暂停时扣除时间 */
+let _syncPausedDuration = 0;
+/** 暂停开始时间戳（ms） */
+let _syncPauseStart = 0;
 /** 暂停/恢复/停止按钮回调 */
 let _syncPauseHandler = null;
 let _syncResumeHandler = null;
@@ -342,8 +348,16 @@ let _syncPaused = false;
 let _syncProgressTrigger = null;
 /** ESC 键监听器引用（仅在完成状态下注册） */
 let _syncProgressEscHandler = null;
-/** 内部：根据暂停状态更新按钮文本/样式/aria-label */
+/** 内部：根据暂停状态更新按钮文本/样式/aria-label，并追踪暂停时间用于全局 ETA */
 function _setSyncPausedState(paused) {
+    // 追踪暂停时间，用于全局 ETA 扣除
+    if (paused) {
+        _syncPauseStart = Date.now();
+    }
+    else if (_syncPauseStart > 0) {
+        _syncPausedDuration += Date.now() - _syncPauseStart;
+        _syncPauseStart = 0;
+    }
     _syncPaused = paused;
     const pauseBtn = _syncProgressDialog?.querySelector('#bgmSyncProgressPauseBtn');
     if (!pauseBtn)
@@ -399,6 +413,7 @@ function ensureSyncProgressDialog() {
                         <span id="bgmSyncProgressLabel">进度: 0/0</span>
                         <span id="bgmSyncProgressPercent">0%</span>
                         <span id="bgmSyncProgressEta" class="bgm-sync-progress__eta" style="display:none;"></span>
+                        <span id="bgmSyncProgressGlobalEta" class="bgm-sync-progress__global-eta" style="display:none;"></span>
                     </div>
                     <div class="bgm-sync-progress__track">
                         <div id="bgmSyncProgressBar" class="bgm-sync-progress__bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"></div>
@@ -509,9 +524,7 @@ export function renderConfigSummary(cfg) {
             items.push(`<span class="cfg-item">${ex.label}: ${ex.value}</span>`);
         }
     }
-    return items.length > 0
-        ? `<div class="cfg-summary">${items.join('')}</div>`
-        : '';
+    return items.length > 0 ? `<div class="cfg-summary">${items.join('')}</div>` : '';
 }
 /**
  * 显示同步进度弹窗（运行中状态）
@@ -530,6 +543,10 @@ export function showSyncProgressDialog(title, handlers, config) {
     _syncStopHandler = handlers.onStop;
     _syncPaused = false;
     _syncProgressLogCount = 0;
+    // 初始化全局 ETA 追踪
+    _syncGlobalStart = Date.now();
+    _syncPausedDuration = 0;
+    _syncPauseStart = 0;
     // 重置为运行中状态
     const titleEl = modal.querySelector('#bgmSyncProgressTitle');
     const iconEl = modal.querySelector('#bgmSyncProgressIcon');
@@ -576,6 +593,7 @@ export function showSyncProgressDialog(title, handlers, config) {
     const current = modal.querySelector('#bgmSyncProgressCurrent');
     const log = modal.querySelector('#bgmSyncProgressLog');
     const etaEl = modal.querySelector('#bgmSyncProgressEta');
+    const globalEtaEl = modal.querySelector('#bgmSyncProgressGlobalEta');
     if (bar) {
         bar.style.width = '0%';
         bar.textContent = '';
@@ -592,6 +610,10 @@ export function showSyncProgressDialog(title, handlers, config) {
     if (etaEl) {
         etaEl.textContent = '';
         etaEl.style.display = 'none';
+    }
+    if (globalEtaEl) {
+        globalEtaEl.textContent = '';
+        globalEtaEl.style.display = 'none';
     }
     modal.style.display = 'flex';
     modal.setAttribute('aria-hidden', 'false');
@@ -617,6 +639,7 @@ export function updateSyncProgressDialog(current, total, message, logLine, eta) 
     const currentEl = modal.querySelector('#bgmSyncProgressCurrent');
     const log = modal.querySelector('#bgmSyncProgressLog');
     const etaEl = modal.querySelector('#bgmSyncProgressEta');
+    const globalEtaEl = modal.querySelector('#bgmSyncProgressGlobalEta');
     const pct = total > 0 ? Math.round((current / total) * 100) : 0;
     if (bar) {
         bar.style.width = pct + '%';
@@ -629,14 +652,43 @@ export function updateSyncProgressDialog(current, total, message, logLine, eta) 
         percent.textContent = pct + '%';
     if (currentEl && message)
         currentEl.textContent = message;
-    // 显示 ETA：优先使用独立的 eta 参数，兼容旧版 logLine 以"预计剩余"/"剩余:"开头的情况
-    const etaText = eta ?? (logLine && (logLine.startsWith('预计剩余') || logLine.startsWith('剩余:') ? logLine : undefined));
+    // 显示阶段 ETA：优先使用独立的 eta 参数，兼容旧版 logLine 以"预计剩余"/"剩余:"开头的情况
+    const etaText = eta ??
+        (logLine &&
+            (logLine.startsWith('预计剩余') || logLine.startsWith('剩余:') ? logLine : undefined));
     if (etaEl && etaText) {
         etaEl.textContent = etaText;
         etaEl.style.display = '';
     }
     else if (etaEl) {
         etaEl.style.display = 'none';
+    }
+    // 计算全局 ETA（基于整体进度和已用时间）
+    if (globalEtaEl && _syncGlobalStart > 0 && total > 0) {
+        const now = Date.now();
+        // 扣除暂停时间
+        const effectiveElapsed = now - _syncGlobalStart - _syncPausedDuration;
+        if (effectiveElapsed > 0 && current > 0) {
+            // 处理的项数 / 有效耗时 = 速率
+            const rate = current / effectiveElapsed;
+            // 剩余项数 / 速率 = 剩余时间
+            const remaining = total - current;
+            const remainingMs = remaining / rate;
+            const elapsedStr = formatDuration(effectiveElapsed);
+            const remainingStr = formatDuration(remainingMs);
+            const totalStr = formatDuration(effectiveElapsed + remainingMs);
+            globalEtaEl.textContent = `⏱ 已用${elapsedStr} · 预计剩余${remainingStr} · 总计${totalStr}`;
+            globalEtaEl.style.display = '';
+        }
+        else if (current === 0) {
+            // 尚未开始，只显示已用时间
+            const elapsedStr = formatDuration(now - _syncGlobalStart);
+            globalEtaEl.textContent = `⏱ 已用${elapsedStr} · 计算中...`;
+            globalEtaEl.style.display = '';
+        }
+        else {
+            globalEtaEl.style.display = 'none';
+        }
     }
     // 将日志行追加到日志区（ETA 类型的 logLine 已在上方处理，不再重复追加）
     if (logLine && log && logLine !== etaText) {
@@ -1003,8 +1055,19 @@ export function completeSyncProgressDialog(summary, details, stopped = false, on
         runningBtns.style.display = 'none';
     if (doneBtns)
         doneBtns.style.display = 'flex';
+    // 在 summary 中追加全局耗时
+    let finalSummary = summary;
+    if (_syncGlobalStart > 0) {
+        const totalElapsed = Date.now() - _syncGlobalStart - _syncPausedDuration;
+        const elapsedStr = formatDuration(totalElapsed);
+        finalSummary = `${summary} 用时 ${elapsedStr}`;
+        // 重置全局 ETA 追踪
+        _syncGlobalStart = 0;
+        _syncPausedDuration = 0;
+        _syncPauseStart = 0;
+    }
     if (summaryEl)
-        summaryEl.textContent = summary;
+        summaryEl.textContent = finalSummary;
     // 渲染统计图表（停止时也显示，展示已完成的部分统计）
     if (chartEl && stats) {
         chartEl.style.display = '';
@@ -1058,6 +1121,10 @@ export function hideSyncProgressDialog() {
     modal.style.display = 'none';
     modal.setAttribute('aria-hidden', 'true');
     _clearSyncProgressHandlers();
+    // 重置全局 ETA 追踪状态
+    _syncGlobalStart = 0;
+    _syncPausedDuration = 0;
+    _syncPauseStart = 0;
     // 焦点返回到触发元素
     _syncProgressTrigger?.focus();
     _syncProgressTrigger = null;

@@ -321,10 +321,11 @@ ts/index.ts (barrel export)
 - `showInput()`: 输入对话框
 - `showToast()`: Toast 通知
 - `showSyncResult()`: 同步结果弹窗（可展开详情）
-- `showSyncProgressDialog()` / `updateSyncProgressDialog()` / `completeSyncProgressDialog()`: 进度弹窗（支持配置摘要展示）
+- `showSyncProgressDialog()` / `updateSyncProgressDialog()` / `completeSyncProgressDialog()`: 进度弹窗（支持配置摘要展示 + 全局 ETA 追踪）
 - `hideSyncProgressDialog()`: 关闭进度弹窗
 - `buildSyncConfig()`: 配置摘要工厂函数，统一各同步入口的配置构造逻辑
 - `renderConfigSummary()`: 将配置摘要渲染为 HTML 字符串
+- **全局 ETA 追踪**: 基于开始时间戳和当前进度实时计算「已用时间 / 预计剩余 / 总计」，支持暂停时间扣除
 - 类型: `DialogButton`, `DialogConfig`, `DialogCallback`, `DialogOptions`, `SyncProgressStats`, `SyncConfigSummary`, `BuildSyncConfigContext`
 
 #### `preview.ts` — 预览组件
