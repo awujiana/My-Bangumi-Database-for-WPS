@@ -485,8 +485,9 @@ function ensureSyncProgressDialog() {
     // 下一步按钮
     if (nextBtn) {
         nextBtn.addEventListener('click', () => {
+            const handler = _syncNextHandler;
             hideSyncProgressDialog();
-            _syncNextHandler?.();
+            handler?.();
         });
     }
     // 详情切换按钮

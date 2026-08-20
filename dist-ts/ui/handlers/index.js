@@ -1038,6 +1038,18 @@ const ACTION_HANDLERS = {
         }
         bgmLog(LOG_LEVELS.INFO, `[handleActionClick] 同步策略引导已打开，耗时: ${Date.now() - ctx.startTime}ms`);
     },
+    // 使用引导：显示/隐藏详细操作说明
+    toggleUsageGuide: (ctx) => {
+        bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 切换使用引导详情');
+        const detail = document.getElementById('usageGuideDetail');
+        const btn = document.getElementById('toggleUsageGuideBtn');
+        if (detail && btn) {
+            const isHidden = detail.style.display === 'none';
+            detail.style.display = isHidden ? 'block' : 'none';
+            btn.textContent = isHidden ? '📖 收起详细操作' : '📖 显示详细操作';
+        }
+        bgmLog(LOG_LEVELS.INFO, `[handleActionClick] 使用引导已${detail?.style.display === 'none' ? '隐藏' : '显示'}，耗时: ${Date.now() - ctx.startTime}ms`);
+    },
     // 保存所有配置：重新保存当前所有配置项到 PluginStorage
     saveAllConfig: (ctx) => {
         bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 保存所有配置');

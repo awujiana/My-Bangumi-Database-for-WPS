@@ -576,8 +576,9 @@ function ensureSyncProgressDialog(): HTMLElement {
   // 下一步按钮
   if (nextBtn) {
     nextBtn.addEventListener('click', (): void => {
+      const handler = _syncNextHandler
       hideSyncProgressDialog()
-      _syncNextHandler?.()
+      handler?.()
     })
   }
   // 详情切换按钮
