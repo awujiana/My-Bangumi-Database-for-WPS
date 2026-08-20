@@ -140,6 +140,16 @@ vi.mock('../ts/sync/githubSyncDiff.js', () => ({
     mirror: '镜像同步',
     'force-overwrite': '强制覆盖',
   },
+  getExcelAliases: vi.fn((jsonlField: string): readonly string[] => {
+    // 简单实现：返回 EXTENDED_FIELD_MAP 中对应的 excel 字段
+    const map: Record<string, readonly string[]> = {
+      date: ['开播日期'],
+      meta_tags: ['标签/分级'],
+      话数: ['集数'],
+      动画制作公司: ['制作公司', '动画制作公司'],
+    }
+    return map[jsonlField] ?? [jsonlField]
+  }),
 }))
 
 vi.mock('../ts/sync/pureUtils.js', () => ({

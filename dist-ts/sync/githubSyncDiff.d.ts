@@ -88,6 +88,13 @@ export interface ConflictResolution {
  */
 export declare const EXTENDED_FIELD_MAP: ReadonlyArray<readonly [string, string]>;
 /**
+ * 获取指定 JSONL 字段对应的所有 Excel 列名（含主映射和别名）
+ *
+ * @param jsonlField JSONL 字段名
+ * @returns Excel 列名数组（至少包含 1 个元素）
+ */
+export declare function getExcelAliases(jsonlField: string): readonly string[];
+/**
  * 同步策略枚举
  * - add-update: 新增+更新，不删除（默认，保守）
  * - add-only: 仅新增本地不存在的 SID，不更新已有行

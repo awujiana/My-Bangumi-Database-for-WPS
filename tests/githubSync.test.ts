@@ -2930,7 +2930,12 @@ describe('batchUpdateRows 逐字段写入也失败 (lines 895-899)', () => {
     })
     mockGetCellValue.mockReturnValue('旧值')
 
-    mockGetColumnMap.mockReturnValue(new Map<string, number>([['名称', 2]]))
+    mockGetColumnMap.mockReturnValue(
+      new Map<string, number>([
+        ['名称', 2],
+        ['别名', 3],
+      ]),
+    )
 
     const mockApp = {
       ScreenUpdating: true,
@@ -2954,7 +2959,10 @@ describe('batchUpdateRows 逐字段写入也失败 (lines 895-899)', () => {
     // 批量写入失败 + 逐字段写入也失败 → result.updated 为 0, failed 为 1
     expect(result.updated).toBe(0)
     expect(result.failed).toBe(1)
-    expect(mockBgmLognnn).toHaveBeenCalledWith('ERROR', expect.stringContaining('逐字段写入也失败'))
+    expect(mockBgmLognnn).toHaveBeenCalledWith(
+      'ERROR',
+      expect.stringContaining('回退逐字段写入异常'),
+    )
   })
 })
 
@@ -4392,7 +4400,7 @@ describe('safeSet 日期列分支 (lines 468-472) 通过 writeRemoteEntryToRow f
     mockGetDataSheet.mockReturnValue(mockWs)
     mockFindHeaderRow.mockReturnValue(1)
     mockGetLastRow.mockReturnValue(10)
-    mockSetCellValue.mockImplementation(() => {})
+    mockSetCellValue.mockImplementation(() => true)
     mockColNumToLetter.mockImplementation((c: number) => String.fromCharCode(64 + c))
 
     mockGetColumnMap.mockReturnValue(
@@ -4437,7 +4445,7 @@ describe('safeSet 数字扩展字段 (line 506)', () => {
     mockGetDataSheet.mockReturnValue(mockWs)
     mockFindHeaderRow.mockReturnValue(1)
     mockGetLastRow.mockReturnValue(10)
-    mockSetCellValue.mockImplementation(() => {})
+    mockSetCellValue.mockImplementation(() => true)
     mockColNumToLetter.mockImplementation((c: number) => String.fromCharCode(64 + c))
 
     // '片长' 在 EXTENDED_FIELD_MAP 中映射到 jsonlField '片长'

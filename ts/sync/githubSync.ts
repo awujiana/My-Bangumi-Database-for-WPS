@@ -31,7 +31,7 @@ import {
   ensureSheetHeaders,
   getApp,
 } from '../tools/util.js'
-import type { WpsCellValue, WpsWorksheet } from '../tools/wps.js'
+import type { WpsCellValue, WpsRange, WpsWorksheet } from '../tools/wps.js'
 
 import { buildRawUrl, isGithubConfigComplete } from './githubConfig.js'
 import {
@@ -39,6 +39,7 @@ import {
   tagsToString,
   parseJsonl,
   EXTENDED_FIELD_MAP,
+  getExcelAliases,
   filterByTime,
   type ConflictResolution,
   type GithubRemoteEntry,
@@ -282,8 +283,17 @@ function readLocalEntries(
     '标签/分级',
     '集数',
     '集号',
-    ...EXTENDED_FIELD_MAP.map(([, excel]) => excel),
   ]
+  // 扩展字段：同时读取所有可能的 Excel 列别名（如「制作公司」和「动画制作公司」）
+  const excelFieldsToRead = new Set<string>()
+  for (const [, excelField] of EXTENDED_FIELD_MAP) {
+    excelFieldsToRead.add(excelField)
+  }
+  // 特殊处理：动画制作公司字段别名
+  for (const alias of getExcelAliases('动画制作公司')) {
+    excelFieldsToRead.add(alias)
+  }
+  readColNames.push(...excelFieldsToRead)
   const readCols: { name: string; col: number }[] = []
   for (const name of readColNames) {
     const col = colMap.get(name)
@@ -352,6 +362,12 @@ function readLocalEntries(
     const extFields: Record<string, string> = {}
     for (const [, excelField] of EXTENDED_FIELD_MAP) {
       extFields[excelField] = getField(excelField)
+    }
+    // 同时写入「动画制作公司」的所有别名列到 extFields，便于 computeDiff 比对时使用
+    for (const alias of getExcelAliases('动画制作公司')) {
+      if (!extFields[alias]) {
+        extFields[alias] = getField(alias)
+      }
     }
 
     result.set(sid, {
@@ -431,10 +447,37 @@ function formatDateToLocal(dateStr: string): string | null {
   return `${year}年${month}月${day}日`
 }
 
+/**
+ * 追加值到现有值后面，使用 ` | ` 分隔符
+ *
+ * 规则：
+ * - 本地为空 → 直接返回新值
+ * - 远程为空 → 返回本地值（不追加空值）
+ * - 本地已包含新值 → 返回本地值（避免重复）
+ * - 否则 → 返回 "本地 | 新值"
+ *
+ * @param localValue 本地现有值
+ * @param remoteValue 远程新值
+ * @returns 合并后的字符串
+ */
+function appendValueWithSeparator(localValue: string, remoteValue: string): string {
+  const local = trim(localValue)
+  const remote = trim(remoteValue)
+  if (!remote) return local
+  if (!local) return remote
+  if (local.includes(remote)) return local
+  return `${local} | ${remote}`
+}
+
 // ========== 应用差异到工作表 ==========
 
 /**
  * 将单条远程条目数据写入指定行的指定字段
+ *
+ * 特殊合并策略：
+ * - 标签/分级：远程标签追加到本地后面，使用 ` | ` 分隔
+ * - 名称：远程名称追加到「别名」列，使用 ` | ` 分隔（保留本地名称列不变）
+ *
  * @param ws 工作表
  * @param colMap 列映射
  * @param row 行号
@@ -449,7 +492,10 @@ function writeRemoteEntryToRow(
   remote: GithubRemoteEntry,
   fieldsToWrite: string[],
   forceOverwrite: boolean,
-): void {
+): { attempted: boolean; success: boolean } {
+  let anyAttempted = false
+  let anySucceeded = false
+
   /**
    * 安全写入字符串值：列存在时写入值（forceOverwrite=true 时空值也写入清空本地）
    * 对于日期列（开播日期、完播日），自动转换为数值序列号以保留本地列格式。
@@ -463,19 +509,47 @@ function writeRemoteEntryToRow(
     // 值无变化时跳过写入，避免空字符串重复写入并污染 undo 栈
     if (oldValue === value) return
 
+    anyAttempted = true
+
     // 日期列：转换为本地"年月日"字符串格式
     if (DATE_COLUMNS.has(key)) {
       const localDate = formatDateToLocal(value)
       if (localDate !== null) {
         recordUndoEntry({ row, col, oldValue, newValue: localDate })
-        setCellValue(ws, row, col, localDate)
+        if (setCellValue(ws, row, col, localDate)) {
+          anySucceeded = true
+        }
         return
       }
     }
 
     // 非日期列或日期解析失败：写入字符串
     recordUndoEntry({ row, col, oldValue, newValue: value })
-    setCellValue(ws, row, col, value)
+    if (setCellValue(ws, row, col, value)) {
+      anySucceeded = true
+    }
+  }
+
+  /**
+   * 安全追加值：读取本地值，追加远程值（使用 ` | ` 分隔），写回
+   * - 本地为空 → 直接写入远程值
+   * - 远程为空 → 不写入
+   * - 本地已包含远程值 → 不写入（避免重复）
+   */
+  const safeAppend = (key: string, appendValue: string): void => {
+    const col = colMap.get(key)
+    if (!col) return
+    if (!appendValue) return
+
+    const oldValue = getCellValue(ws, row, col)
+    const newValue = appendValueWithSeparator(oldValue, appendValue)
+    if (newValue === oldValue) return
+
+    anyAttempted = true
+    recordUndoEntry({ row, col, oldValue, newValue })
+    if (setCellValue(ws, row, col, newValue)) {
+      anySucceeded = true
+    }
   }
 
   const writeAll = fieldsToWrite.includes('*')
@@ -484,30 +558,58 @@ function writeRemoteEntryToRow(
   if (writeAll || fieldsToWrite.includes('Bangumi_URL')) {
     safeSet('Bangumi_URL', `https://bgm.tv/subject/${remote.sid}`)
   }
-  // 名称
-  if (writeAll || fieldsToWrite.includes('名称')) {
+  // 名称处理：
+  // - 新增条目（writeAll）：直接写入「名称」列
+  // - 更新条目（仅名称字段）：追加到「别名」列，保留本地名称不变
+  if (writeAll) {
     safeSet('名称', remote.name ?? '')
+  } else if (fieldsToWrite.includes('名称')) {
+    const remoteName = remote.name ?? ''
+    if (remoteName) {
+      safeAppend('别名', remoteName)
+    }
   }
-  // 标签（使用 meta_tags）
+  // 标签处理：
+  // - 新增条目（writeAll）：直接写入远程标签
+  // - 更新条目（仅标签字段）：追加远程标签到本地后面，使用 ` | ` 分隔
   if (writeAll || fieldsToWrite.includes('标签/分级')) {
-    safeSet('标签/分级', tagsToString(remote.meta_tags))
+    const remoteTags = tagsToString(remote.meta_tags)
+    if (remoteTags) {
+      if (writeAll) {
+        safeSet('标签/分级', remoteTags)
+      } else {
+        // 更新模式：合并本地和远程标签
+        const col = colMap.get('标签/分级')
+        const localTags = col ? getCellValue(ws, row, col) : ''
+        const mergedTags = appendValueWithSeparator(localTags, remoteTags)
+        safeSet('标签/分级', mergedTags)
+      }
+    }
   }
   // 集数（使用 infobox 的「话数」）
   if (writeAll || fieldsToWrite.includes('集数')) {
     safeSet('集数', remote['话数'] ?? '')
   }
   // 扩展字段（EXTENDED_FIELD_MAP 中定义的 19 个字段）
-  for (const [jsonlField, excelField] of EXTENDED_FIELD_MAP) {
-    if (writeAll || fieldsToWrite.includes(excelField)) {
-      const value = remote[jsonlField as keyof GithubRemoteEntry]
-      if (typeof value === 'string') {
-        safeSet(excelField, value)
-      } else if (typeof value === 'number') {
-        safeSet(excelField, String(value))
+  // 对于有多个 Excel 列名的字段（如「动画制作公司」），所有别名列均写入相同的远程值
+  const handledJsonlFields = new Set<string>()
+  for (const [jsonlField] of EXTENDED_FIELD_MAP) {
+    if (handledJsonlFields.has(jsonlField)) continue
+    handledJsonlFields.add(jsonlField)
+    const excelAliases = getExcelAliases(jsonlField)
+    const anyAliasMatched = excelAliases.some((alias) => writeAll || fieldsToWrite.includes(alias))
+    if (!anyAliasMatched) continue
+    const value = remote[jsonlField as keyof GithubRemoteEntry]
+    if (typeof value !== 'string' && typeof value !== 'number') continue
+    const strValue = typeof value === 'number' ? String(value) : value
+    for (const alias of excelAliases) {
+      if (writeAll || fieldsToWrite.includes(alias)) {
+        safeSet(alias, strValue)
       }
-      // 忽略 undefined / null / boolean / string[]（EXTENDED_FIELD_MAP 不含这些类型）
     }
   }
+
+  return { attempted: anyAttempted, success: anySucceeded }
 }
 
 // ========== 批量写入与性能追踪 ==========
@@ -620,12 +722,12 @@ function batchWriteNewRows(
       } else if (wc.name === '集数') {
         value = entry.remote['话数'] ?? null
       } else {
-        // 扩展字段：遍历 EXTENDED_FIELD_MAP 匹配
-        for (const [jsonlField, excelField] of EXTENDED_FIELD_MAP) {
-          if (excelField === wc.name) {
+        // 扩展字段：遍历 EXTENDED_FIELD_MAP 匹配（支持别名列映射）
+        for (const [jsonlField] of EXTENDED_FIELD_MAP) {
+          const aliases = getExcelAliases(jsonlField)
+          if (aliases.includes(wc.name)) {
             const v = entry.remote[jsonlField as keyof GithubRemoteEntry]
             if (typeof v === 'string') {
-              // 日期列：转换为本地"年月日"字符串格式
               if (DATE_COLUMNS.has(wc.name)) {
                 value = formatDateToLocal(v) ?? v
               } else {
@@ -691,9 +793,9 @@ function batchWriteNewRows(
 /**
  * 批量更新已存在的行（使用 Range.Value2 二维数组，避免逐行逐字段 COM 调用）
  *
- * 与 writeRemoteEntryToRow 的区别：
- * - writeRemoteEntryToRow：每行每字段一次 setCellValue COM 调用（~23 次/行）
- * - batchUpdateRows：收集所有变更，一次 Range.Value2 写入整个矩形区域（1 次/批）
+ * 特殊合并策略（与 writeRemoteEntryToRow 一致）：
+ * - 标签/分级：远程标签追加到本地后面，使用 ` | ` 分隔
+ * - 名称：远程名称追加到「别名」列，使用 ` | ` 分隔（保留本地名称列不变）
  *
  * @param ws 工作表
  * @param colMap 列映射
@@ -726,14 +828,27 @@ function batchUpdateRows(
   }
 
   // 根据 updates 中所有 fields 的并集确定需要写入的列
+  // 注意：名称字段在不同场景下有不同处理：
+  // - forceOverwrite 或 writeAll：写入「名称」列
+  // - 普通更新：追加到「别名」列
   for (const u of updates) {
     const writeAll = u.fields.includes('*')
     if (writeAll || u.fields.includes('Bangumi_URL')) tryAddCol('Bangumi_URL')
-    if (writeAll || u.fields.includes('名称')) tryAddCol('名称')
+    if (writeAll || u.fields.includes('名称')) {
+      tryAddCol('名称') // 强制覆盖/新增时写入名称列
+      tryAddCol('别名') // 普通更新时写入别名列
+    }
     if (writeAll || u.fields.includes('标签/分级')) tryAddCol('标签/分级')
     if (writeAll || u.fields.includes('集数')) tryAddCol('集数')
-    for (const [, excelField] of EXTENDED_FIELD_MAP) {
-      if (writeAll || u.fields.includes(excelField)) tryAddCol(excelField)
+    // 扩展字段：同时检查主映射和所有别名（如「动画制作公司」→「制作公司」/「动画制作公司」）
+    const handled = new Set<string>()
+    for (const [jsonlField] of EXTENDED_FIELD_MAP) {
+      if (handled.has(jsonlField)) continue
+      handled.add(jsonlField)
+      const aliases = getExcelAliases(jsonlField)
+      if (writeAll || aliases.some((a) => u.fields.includes(a))) {
+        for (const a of aliases) tryAddCol(a)
+      }
     }
   }
 
@@ -757,6 +872,27 @@ function batchUpdateRows(
     const fields = u.fields
     const writeAll = fields.includes('*')
 
+    // 先读取当前行的值（用于合并逻辑和 undo 记录）
+    let oldArr: (string | number | null)[] = []
+    let range: WpsRange | null = null
+    try {
+      const startColLetter = colNumToLetter(minCol)
+      const endColLetter = colNumToLetter(maxCol)
+      const rangeAddr = `${startColLetter}${row}:${endColLetter}${row}`
+      range = ws.Range(rangeAddr)
+
+      // 读取旧值
+      if (range) {
+        const oldValues = range.Value2 as unknown as (string | number | null)[] | null
+        oldArr = Array.isArray(oldValues)
+          ? ((oldValues[0] as (string | number | null)[] | undefined) ?? [])
+          : []
+      }
+    } catch {
+      // Range 访问失败时，oldArr 保持为空数组，将使用空字符串进行合并
+      bgmLog(LOG_LEVELS.WARN, `[batchUpdateRows] 行 ${row} 读取旧值失败，使用空值`)
+    }
+
     // 构建该行的值数组
     const rowValues = new Array<string | number | null>(colCount).fill(null)
 
@@ -764,21 +900,49 @@ function batchUpdateRows(
       const idx = wc.col - minCol
       let value: string | number | null = null
       let shouldWrite = false
+      // 获取当前单元格的旧值（用于合并）
+      const oldCellValue = oldArr[idx] != null ? String(oldArr[idx]) : ''
 
       if (wc.name === 'Bangumi_URL') {
         if (writeAll || fields.includes('Bangumi_URL')) {
           value = `https://bgm.tv/subject/${remote.sid}`
           shouldWrite = true
         }
+      } else if (wc.name === '别名') {
+        // 名称追加到「别名」列（合并策略）
+        // forceOverwrite 或 writeAll 时直接写入名称列（不合并）
+        if (!forceOverwrite && !writeAll && fields.includes('名称')) {
+          const remoteName = remote.name ?? ''
+          if (remoteName) {
+            value = appendValueWithSeparator(oldCellValue, remoteName)
+            if (value !== oldCellValue) {
+              shouldWrite = true
+            }
+          }
+        }
+        // forceOverwrite 或 writeAll 时不处理别名（由名称列处理）
       } else if (wc.name === '名称') {
-        if (writeAll || fields.includes('名称')) {
+        // 名称列仅在 forceOverwrite 或 writeAll 时写入（新增或强制覆盖）
+        if (forceOverwrite || writeAll || fields.includes('名称')) {
           value = remote.name ?? ''
           shouldWrite = true
         }
       } else if (wc.name === '标签/分级') {
         if (writeAll || fields.includes('标签/分级')) {
-          value = tagsToString(remote.meta_tags)
-          shouldWrite = true
+          const remoteTags = tagsToString(remote.meta_tags)
+          if (remoteTags) {
+            if (forceOverwrite || writeAll) {
+              // 强制覆盖或新增：直接写入
+              value = remoteTags
+              shouldWrite = true
+            } else {
+              // 普通更新：合并本地和远程标签
+              value = appendValueWithSeparator(oldCellValue, remoteTags)
+              if (value !== oldCellValue) {
+                shouldWrite = true
+              }
+            }
+          }
         }
       } else if (wc.name === '集数') {
         if (writeAll || fields.includes('集数')) {
@@ -786,10 +950,19 @@ function batchUpdateRows(
           shouldWrite = true
         }
       } else {
-        // 扩展字段
-        for (const [jsonlField, excelField] of EXTENDED_FIELD_MAP) {
-          if (excelField === wc.name && (writeAll || fields.includes(excelField))) {
-            const v = remote[jsonlField as keyof GithubRemoteEntry]
+        // 扩展字段：根据列名查找对应的 JSONL 字段（支持别名列映射，如「制作公司」/「动画制作公司」）
+        let matchedJsonlField: string | null = null
+        for (const [jsonlField] of EXTENDED_FIELD_MAP) {
+          const aliases = getExcelAliases(jsonlField)
+          if (aliases.includes(wc.name)) {
+            matchedJsonlField = jsonlField
+            break
+          }
+        }
+        if (matchedJsonlField) {
+          const aliases = getExcelAliases(matchedJsonlField)
+          if (writeAll || aliases.some((a) => fields.includes(a))) {
+            const v = remote[matchedJsonlField as keyof GithubRemoteEntry]
             if (typeof v === 'string') {
               if (DATE_COLUMNS.has(wc.name)) {
                 value = formatDateToLocal(v) ?? v
@@ -801,7 +974,6 @@ function batchUpdateRows(
               value = String(v)
               shouldWrite = true
             }
-            break
           }
         }
       }
@@ -820,17 +992,8 @@ function batchUpdateRows(
 
     // 3. 写入该行（一次 COM 调用写入整行）
     try {
-      const startColLetter = colNumToLetter(minCol)
-      const endColLetter = colNumToLetter(maxCol)
-      const rangeAddr = `${startColLetter}${row}:${endColLetter}${row}`
-      const range = ws.Range(rangeAddr)
       if (range) {
-        // 读取旧值用于 undo 记录
-        const oldValues = range.Value2 as unknown as (string | number | null)[] | null
-        const oldArr = Array.isArray(oldValues)
-          ? ((oldValues[0] as (string | number | null)[] | undefined) ?? [])
-          : []
-
+        // 使用已读取的旧值（oldArr 在循环开始前已读取）
         // 只写入有变化的单元格
         let hasChanges = false
         const finalValues = [...rowValues]
@@ -870,6 +1033,53 @@ function batchUpdateRows(
           message: u.fields.join(', '),
           count: 1,
         })
+      } else {
+        // range 为 null（读取旧值失败），回退到逐字段写入
+        const hasValuesToWrite = rowValues.some((v) => v !== null)
+        if (hasValuesToWrite) {
+          try {
+            const result = writeRemoteEntryToRow(ws, colMap, row, remote, fields, forceOverwrite)
+            if (result.success || !result.attempted) {
+              // 写入成功 或 没有写入需要尝试（如空列映射）→ 视为成功
+              successCount++
+              records.push({
+                sid: u.sid,
+                name: remote.name ?? '',
+                url: `https://bgm.tv/subject/${u.sid}`,
+                type: BGM_SUBJECT_TYPES[2] ?? '',
+                source: 'repo',
+                content: '仓库同步-更新',
+                status: '成功',
+                message: `${u.fields.join(', ')} (回退逐字段写入)`,
+                count: 1,
+              })
+            } else {
+              // 尝试了写入但全部失败
+              bgmLog(LOG_LEVELS.ERROR, `[batchUpdateRows] 行 ${row} 回退逐字段写入全部失败`)
+              records.push({
+                sid: u.sid,
+                source: 'repo',
+                content: '仓库同步-更新失败',
+                status: '失败',
+                message: '逐字段写入失败',
+                count: 1,
+              })
+            }
+          } catch (e: unknown) {
+            bgmLog(
+              LOG_LEVELS.ERROR,
+              `[batchUpdateRows] 行 ${row} 回退逐字段写入异常: ${(e as Error).message}`,
+            )
+            records.push({
+              sid: u.sid,
+              source: 'repo',
+              content: '仓库同步-更新失败',
+              status: '失败',
+              message: (e as Error).message,
+              count: 1,
+            })
+          }
+        }
       }
     } catch (e: unknown) {
       bgmLog(
@@ -878,19 +1088,32 @@ function batchUpdateRows(
       )
       // 回退到逐字段写入
       try {
-        writeRemoteEntryToRow(ws, colMap, row, remote, fields, forceOverwrite)
-        successCount++
-        records.push({
-          sid: u.sid,
-          name: remote.name ?? '',
-          url: `https://bgm.tv/subject/${u.sid}`,
-          type: BGM_SUBJECT_TYPES[2] ?? '',
-          source: 'repo',
-          content: '仓库同步-更新',
-          status: '成功',
-          message: u.fields.join(', '),
-          count: 1,
-        })
+        const result = writeRemoteEntryToRow(ws, colMap, row, remote, fields, forceOverwrite)
+        if (result.success || !result.attempted) {
+          // 写入成功 或 没有写入需要尝试（如空列映射）→ 视为成功
+          successCount++
+          records.push({
+            sid: u.sid,
+            name: remote.name ?? '',
+            url: `https://bgm.tv/subject/${u.sid}`,
+            type: BGM_SUBJECT_TYPES[2] ?? '',
+            source: 'repo',
+            content: '仓库同步-更新',
+            status: '成功',
+            message: u.fields.join(', '),
+            count: 1,
+          })
+        } else {
+          // 尝试了写入但全部失败
+          records.push({
+            sid: u.sid,
+            source: 'repo',
+            content: '仓库同步-更新失败',
+            status: '失败',
+            message: '逐字段写入失败',
+            count: 1,
+          })
+        }
       } catch (e2: unknown) {
         bgmLog(
           LOG_LEVELS.ERROR,
@@ -1005,19 +1228,41 @@ export async function applyDiffToSheet(
       for (const diff of batch) {
         if (diff.remote) {
           try {
-            writeRemoteEntryToRow(ws, colMap, nextAppendRow, diff.remote, ['*'], forceOverwrite)
-            nextAppendRow++
-            result.added++
-            syncRecords.push({
-              sid: diff.sid,
-              name: diff.remote.name ?? '',
-              url: `https://bgm.tv/subject/${diff.sid}`,
-              type: BGM_SUBJECT_TYPES[2] ?? '',
-              source,
-              content: '仓库同步-新增',
-              status: '成功',
-              count: 1,
-            })
+            const writeResult = writeRemoteEntryToRow(
+              ws,
+              colMap,
+              nextAppendRow,
+              diff.remote,
+              ['*'],
+              forceOverwrite,
+            )
+            if (writeResult.success || !writeResult.attempted) {
+              // 写入成功 或 没有写入需要尝试（如空列映射）→ 视为成功
+              nextAppendRow++
+              result.added++
+              syncRecords.push({
+                sid: diff.sid,
+                name: diff.remote.name ?? '',
+                url: `https://bgm.tv/subject/${diff.sid}`,
+                type: BGM_SUBJECT_TYPES[2] ?? '',
+                source,
+                content: '仓库同步-新增',
+                status: '成功',
+                count: 1,
+              })
+            } else {
+              // 尝试了写入但全部失败
+              result.failed++
+              bgmLog(LOG_LEVELS.ERROR, `[githubSync] 逐行写入失败 sid=${diff.sid}: 写入全部失败`)
+              syncRecords.push({
+                sid: diff.sid,
+                source,
+                content: '仓库同步-新增失败',
+                status: '失败',
+                message: '逐字段写入失败',
+                count: 1,
+              })
+            }
           } catch (e: unknown) {
             result.failed++
             bgmLog(

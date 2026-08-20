@@ -279,6 +279,7 @@ export const COLUMN_RULES: [RegExp, string][] = [
   [/类型/, '类型'],
 
   // ── 制作人员(续)──
+  [/动画制作公司/, '动画制作公司'],
   [/制作公司|studio/i, '制作公司'],
   [/导演|director/i, '导演'],
   [/音乐|music/i, '音乐'],

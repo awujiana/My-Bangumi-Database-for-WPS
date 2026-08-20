@@ -41,6 +41,40 @@ export const EXTENDED_FIELD_MAP = [
     ['关联的动漫ID', '关联的动漫ID'],
 ];
 /**
+ * JSONL 字段 → Excel 列名别名映射
+ *
+ * 用于处理一个 JSONL 字段可能对应多个 Excel 列名的情况。
+ * 目前仅用于「动画制作公司」：本地可能使用「制作公司」或「动画制作公司」作为列名，
+ * 远程仓库统一使用「动画制作公司」字段。
+ *
+ * - 比对时：本地任一列名存在且与远程值不同均视为差异
+ * - 写入时：同时写入所有存在的列（避免丢失本地另一列的数据）
+ */
+const JSONL_FIELD_EXCEL_ALIASES = {
+    动画制作公司: ['制作公司', '动画制作公司'],
+};
+/**
+ * 获取指定 JSONL 字段对应的所有 Excel 列名（含主映射和别名）
+ *
+ * @param jsonlField JSONL 字段名
+ * @returns Excel 列名数组（至少包含 1 个元素）
+ */
+export function getExcelAliases(jsonlField) {
+    const mapped = EXTENDED_FIELD_MAP.find(([jf]) => jf === jsonlField);
+    const primary = mapped ? [mapped[1]] : [];
+    const aliases = JSONL_FIELD_EXCEL_ALIASES[jsonlField] ?? [];
+    // 合并去重：主映射在前，别名在后
+    const seen = new Set();
+    const result = [];
+    for (const name of [...primary, ...aliases]) {
+        if (!seen.has(name)) {
+            seen.add(name);
+            result.push(name);
+        }
+    }
+    return result;
+}
+/**
  * 将远程扩展字段值转为字符串用于比对
  * @param value 远程字段值（string | number | undefined）
  * @returns 字符串表示；undefined/null/空字符串 → ''
@@ -315,14 +349,22 @@ export function computeDiff(remoteEntries, localEntries, strategy = 'add-update'
             changedFields.push('集数');
         }
         // 比对扩展字段（EXTENDED_FIELD_MAP 中定义的 19 个字段）
-        for (const [jsonlField, excelField] of EXTENDED_FIELD_MAP) {
+        // 对于有多个 Excel 列名的字段（如「动画制作公司」→「制作公司」/「动画制作公司」），
+        // 任一列存在且与远程值不同都视为差异。
+        const comparedFields = new Set();
+        for (const [jsonlField] of EXTENDED_FIELD_MAP) {
             const remoteValue = remote[jsonlField];
             if (remoteValue === undefined || remoteValue === null)
                 continue;
-            // 扩展字段类型为 string | number，统一转为字符串比对
             const remoteStr = toExtStringValue(remoteValue);
-            if (remoteStr && remoteStr !== (local.fields[excelField] ?? '')) {
-                changedFields.push(excelField);
+            const excelAliases = getExcelAliases(jsonlField);
+            for (const excelField of excelAliases) {
+                if (comparedFields.has(excelField))
+                    continue;
+                if (remoteStr && remoteStr !== (local.fields[excelField] ?? '')) {
+                    changedFields.push(excelField);
+                    comparedFields.add(excelField);
+                }
             }
         }
         if (changedFields.length > 0) {

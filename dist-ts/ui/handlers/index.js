@@ -1009,6 +1009,35 @@ const ACTION_HANDLERS = {
         showToast('日志已清空', 'info');
         bgmLog(LOG_LEVELS.INFO, `[handleActionClick] 系统日志已清空，耗时: ${Date.now() - ctx.startTime}ms`);
     },
+    // 同步策略使用引导：显示/隐藏同步策略详细说明
+    showSyncGuide: (ctx) => {
+        bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 打开同步策略使用引导');
+        const note = document.getElementById('mirrorSyncNote');
+        const strategySelect = document.getElementById('githubStrategy');
+        const strategy = strategySelect?.value ?? '';
+        if (note) {
+            // 根据所选策略更新说明文案
+            const strategyLabels = {
+                'add-update': '新增+更新：不删除本地数据，仅同步新增和有差异的条目。',
+                'add-only': '仅新增：不更新本地已有条目，仅同步远程新增的 SID。',
+                'update-only': '仅更新：不新增本地不存在的 SID，仅同步已有条目的变更。',
+                mirror: '镜像同步：新增+更新+删除本地多余行（建议先备份或使用「新工作簿」以完全与远程一致）。',
+                'force-overwrite': '强制覆盖：无视字段比对，远程值全部覆盖本地（含空值）。',
+            };
+            const prefix = strategyLabels[strategy] ?? '';
+            note.innerHTML = `
+        <strong>📘 同步策略说明</strong><br>
+        ${prefix ? `<em>当前策略：</em>${prefix}<br><br>` : ''}
+        <strong>通用规则</strong><br>
+        • <strong>新增条目</strong>（writeAll=true）：正常写入所有字段<br>
+        • <strong>更新条目</strong>：名称追加到「别名」列、标签追加到「标签/分级」列（以 <code> | </code> 分隔），其他字段直接覆盖<br>
+        • <strong>制作公司/动画制作公司</strong>：远程「动画制作公司」字段会同步到本地「制作公司」和「动画制作公司」两列<br>
+        • <strong>完全镜像</strong>：要完全与远程一致，需先删除本地全部数据后再同步，或选择新建工作簿同步<br>
+      `;
+            note.style.display = note.style.display === 'block' ? 'none' : 'block';
+        }
+        bgmLog(LOG_LEVELS.INFO, `[handleActionClick] 同步策略引导已打开，耗时: ${Date.now() - ctx.startTime}ms`);
+    },
     // 保存所有配置：重新保存当前所有配置项到 PluginStorage
     saveAllConfig: (ctx) => {
         bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 保存所有配置');
