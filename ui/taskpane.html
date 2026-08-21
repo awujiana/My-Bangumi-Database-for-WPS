@@ -373,7 +373,7 @@
                     <span style="font-weight:600;">✅ 启用时间筛选（按开播日期过滤）</span>
                 </label>
                 <div id="timeFilterControls" style="padding:8px;background:#2a2a2a;border-radius:6px;display:none;">
-                    <div class="form-row time-filter-row">
+                    <div class="form-row time-filter-row" id="yearRow">
                         <label for="timeFilterYear" class="time-filter-label">年份</label>
                         <select id="timeFilterYear" class="input time-filter-select" style="flex:1;">
                             <option value="2026">2026</option>
@@ -401,6 +401,7 @@
                             <option value="year">全年</option>
                             <option value="quarter">季度新番</option>
                             <option value="month">具体月份</option>
+                            <option value="future">🔮 预告/未来动漫</option>
                         </select>
                     </div>
                     <div class="form-row time-filter-row" id="quarterRow" style="display:none;">
@@ -429,9 +430,16 @@
                             <option value="12">12月</option>
                         </select>
                     </div>
+                    <div class="form-row time-filter-row" id="futureHintRow" style="display:none;">
+                        <p class="hint" style="margin:4px 0 0;padding:8px;background:rgba(74,158,255,0.1);border-radius:6px;border:1px solid rgba(74,158,255,0.3);">
+                            📌 将筛选所有无开播日期的条目（预告/未来动漫），<br/>
+                            <strong>不限年份</strong>，仅下载 date 字段为空的条目。
+                        </p>
+                    </div>
                 </div>
                 <p class="hint" style="margin-top:8px;font-size:11px;color:#999;padding:0 2px;">
-                    💡 季度划分：1月新番=上年12月~本年2月，4月新番=3月~5月，7月新番=6月~8月，10月新番=9月~11月
+                    💡 季度划分：1月新番=上年12月~本年2月，4月新番=3月~5月，7月新番=6月~8月，10月新番=9月~11月<br/>
+                    💡 预告/未来动漫：筛选无开播日期的条目（适用于未公布播出时间的动漫）
                 </p>
             </div>
             <div class="btn-group">
