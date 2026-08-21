@@ -154,11 +154,12 @@ export declare function parseJsonl(text: string): {
 /**
  * 同步时间筛选配置
  *
- * 支持三种筛选模式：
+ * 支持五种筛选模式：
  * - 'all': 不过滤（全部同步）
  * - 'year': 按年份筛选（如 2026 年所有动漫）
  * - 'quarter': 按季度筛选（如 2026 年 4 月新番）
  * - 'month': 按月份筛选（如 2025 年 1 月）
+ * - 'future': 预告/未来动漫（无开播日期的条目）
  */
 export interface SyncTimeFilter {
     /** 是否启用时间筛选 */
@@ -166,7 +167,7 @@ export interface SyncTimeFilter {
     /** 目标年份 */
     year: number;
     /** 筛选范围 */
-    range: 'all' | 'year' | 'quarter' | 'month';
+    range: 'all' | 'year' | 'quarter' | 'month' | 'future';
     /** 季度值（仅 range='quarter' 时有效）：1 | 4 | 7 | 10 */
     quarter?: 1 | 4 | 7 | 10;
     /** 月份值（仅 range='month' 时有效）：1-12 */
@@ -176,7 +177,11 @@ export interface SyncTimeFilter {
  * 按时间筛选远程条目
  *
  * 根据 {@link SyncTimeFilter} 配置，基于远程条目的 `date` 字段（开播日期）
- * 进行年份/季度/月份筛选。日期格式支持 YYYY-MM-DD、YYYY/MM/DD、YYYY.MM.DD 等。
+ * 进行年份/季度/月份筛选，或筛选预告/未来动漫（无开播日期）。
+ * 日期格式支持 YYYY-MM-DD、YYYY/MM/DD、YYYY.MM.DD 等。
+ *
+ * 特殊模式：
+ * - future: 筛选无开播日期的条目（预告/未来动漫）
  *
  * 季度规则：
  * - 1月新番（Q1）：上年12月 + 本年1月 + 本年2月

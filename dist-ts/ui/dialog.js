@@ -22,11 +22,13 @@ export function buildSyncConfig(ctx) {
     if (ctx.timeFilter) {
         const tf = ctx.timeFilter;
         cfg.timeFilterLabel =
-            tf.range === 'year'
-                ? `${tf.year}年全年`
-                : tf.range === 'quarter'
-                    ? `${tf.year}年${tf.quarter}月新番`
-                    : `${tf.year}年${tf.month}月`;
+            tf.range === 'future'
+                ? '预告/未来动漫'
+                : tf.range === 'year'
+                    ? `${tf.year}年全年`
+                    : tf.range === 'quarter'
+                        ? `${tf.year}年${tf.quarter}月新番`
+                        : `${tf.year}年${tf.month}月`;
     }
     if (ctx.extra && ctx.extra.length > 0)
         cfg.extra = ctx.extra;

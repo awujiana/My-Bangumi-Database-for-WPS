@@ -57,7 +57,7 @@ export interface BuildSyncConfigContext {
     selectedRowsOnly?: boolean;
     /** 时间筛选 */
     timeFilter?: {
-        range: 'year' | 'quarter' | 'month';
+        range: 'year' | 'quarter' | 'month' | 'future';
         year: number;
         quarter?: number;
         month?: number;

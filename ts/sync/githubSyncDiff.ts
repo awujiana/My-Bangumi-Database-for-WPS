@@ -271,11 +271,12 @@ export function parseJsonl(text: string): {
 /**
  * 同步时间筛选配置
  *
- * 支持三种筛选模式：
+ * 支持五种筛选模式：
  * - 'all': 不过滤（全部同步）
  * - 'year': 按年份筛选（如 2026 年所有动漫）
  * - 'quarter': 按季度筛选（如 2026 年 4 月新番）
  * - 'month': 按月份筛选（如 2025 年 1 月）
+ * - 'future': 预告/未来动漫（无开播日期的条目）
  */
 export interface SyncTimeFilter {
   /** 是否启用时间筛选 */
@@ -283,7 +284,7 @@ export interface SyncTimeFilter {
   /** 目标年份 */
   year: number
   /** 筛选范围 */
-  range: 'all' | 'year' | 'quarter' | 'month'
+  range: 'all' | 'year' | 'quarter' | 'month' | 'future'
   /** 季度值（仅 range='quarter' 时有效）：1 | 4 | 7 | 10 */
   quarter?: 1 | 4 | 7 | 10
   /** 月份值（仅 range='month' 时有效）：1-12 */
@@ -309,7 +310,11 @@ const QUARTER_MONTH_RANGES: Readonly<Record<number, readonly [number, number, nu
  * 按时间筛选远程条目
  *
  * 根据 {@link SyncTimeFilter} 配置，基于远程条目的 `date` 字段（开播日期）
- * 进行年份/季度/月份筛选。日期格式支持 YYYY-MM-DD、YYYY/MM/DD、YYYY.MM.DD 等。
+ * 进行年份/季度/月份筛选，或筛选预告/未来动漫（无开播日期）。
+ * 日期格式支持 YYYY-MM-DD、YYYY/MM/DD、YYYY.MM.DD 等。
+ *
+ * 特殊模式：
+ * - future: 筛选无开播日期的条目（预告/未来动漫）
  *
  * 季度规则：
  * - 1月新番（Q1）：上年12月 + 本年1月 + 本年2月
@@ -327,8 +332,13 @@ export function filterByTime(
 ): GithubRemoteEntry[] {
   if (!filter.enabled || filter.range === 'all') return entries
 
+  // 预告/未来动漫筛选：无开播日期的条目
+  if (filter.range === 'future') {
+    return entries.filter((entry) => !entry.date || entry.date.trim() === '')
+  }
+
   return entries.filter((entry) => {
-    if (!entry.date) return false
+    if (!entry.date || entry.date.trim() === '') return false
 
     // 解析日期：支持 YYYY-MM-DD、YYYY/MM/DD、YYYY.MM.DD 等格式
     const match = String(entry.date).match(/^(\d{4})[-/.](\d{1,2})/)
@@ -372,11 +382,17 @@ export function filterByTime(
  * 用于 mirror 策略下判断本地条目是否在筛选范围内，
  * 避免因远程数据被时间筛选过滤而导致本地条目被误删。
  *
+ * 对于 'future' 模式，所有本地条目都被视为在筛选范围内（保留不删除），
+ * 因为预告/未来筛选仅影响远程数据下载，不影响本地已有数据。
+ *
  * @param dateStr 日期字符串（本地格式如"2015年12月15日"或远程格式"2015-12-15"）
  * @param filter 时间筛选配置
  * @returns true 表示在筛选范围内
  */
 function matchTimeFilter(dateStr: string, filter: SyncTimeFilter): boolean {
+  // 预告/未来模式：所有本地条目都保留
+  if (filter.range === 'future') return true
+
   // 支持本地"YYYY年MM月DD日"格式和远程"YYYY-MM-DD"格式
   const match = String(dateStr).match(/(\d{4})[-/.年](\d{1,2})/)
   if (!match) return false

@@ -321,24 +321,32 @@ export function setupButtonListeners() {
  * 初始化时间筛选控件的显示/隐藏逻辑
  * - 勾选「启用时间筛选」时显示筛选控件区域
  * - 筛选范围切换时显示/隐藏季度/月份下拉框
+ * - 选择「预告/未来动漫」时隐藏年份/季度/月份，显示提示
  */
 function setupTimeFilterControls() {
     const chkTimeFilter = document.getElementById('chkTimeFilter');
     const timeFilterControls = document.getElementById('timeFilterControls');
     const rangeSelect = document.getElementById('timeFilterRange');
+    const yearRow = document.getElementById('yearRow');
     const quarterRow = document.getElementById('quarterRow');
     const monthRow = document.getElementById('monthRow');
+    const futureHintRow = document.getElementById('futureHintRow');
     if (!chkTimeFilter || !timeFilterControls)
         return;
     // 复选框切换：显示/隐藏筛选控件
     chkTimeFilter.addEventListener('change', () => {
         timeFilterControls.style.display = chkTimeFilter.checked ? 'block' : 'none';
     });
-    // 筛选范围切换：显示/隐藏季度/月份行
-    if (rangeSelect && quarterRow && monthRow) {
+    // 筛选范围切换：显示/隐藏年份/季度/月份/提示行
+    if (rangeSelect && yearRow && quarterRow && monthRow) {
         rangeSelect.addEventListener('change', () => {
+            const isFuture = rangeSelect.value === 'future';
+            yearRow.style.display = isFuture ? 'none' : '';
             quarterRow.style.display = rangeSelect.value === 'quarter' ? '' : 'none';
             monthRow.style.display = rangeSelect.value === 'month' ? '' : 'none';
+            if (futureHintRow) {
+                futureHintRow.style.display = isFuture ? '' : 'none';
+            }
         });
     }
 }
@@ -689,11 +697,13 @@ const ACTION_HANDLERS = {
         let timeFilterDesc = '';
         if (timeFilter) {
             timeFilterDesc =
-                timeFilter.range === 'year'
-                    ? `\n📅 时间筛选：${timeFilter.year}年全年`
-                    : timeFilter.range === 'quarter'
-                        ? `\n📅 时间筛选：${timeFilter.year}年${timeFilter.quarter}月新番`
-                        : `\n📅 时间筛选：${timeFilter.year}年${timeFilter.month}月`;
+                timeFilter.range === 'future'
+                    ? `\n🔮 时间筛选：预告/未来动漫（无开播日期）`
+                    : timeFilter.range === 'year'
+                        ? `\n📅 时间筛选：${timeFilter.year}年全年`
+                        : timeFilter.range === 'quarter'
+                            ? `\n📅 时间筛选：${timeFilter.year}年${timeFilter.quarter}月新番`
+                            : `\n📅 时间筛选：${timeFilter.year}年${timeFilter.month}月`;
         }
         showConfirm(`将从${sourceLabel}下载数据并按策略【${strategyLabel}】合并到当前工作表。\n（远程仓库 → Excel，与上传同步方向相反）${selectedRowsOnly ? '\n⚠️ 仅同步选中行' : ''}${timeFilterDesc}\n是否继续？`, (confirmed) => {
             if (!confirmed) {
