@@ -14,9 +14,9 @@
  * updatedAt 为 YYYY-MM-DD 格式（仅日期，不含时间，节省空间）。
  */
 import { Result } from '../core/result.js';
-import { type ConflictResolution, type GithubRemoteEntry, type GithubSyncDiff, type LocalRowEntry, type SyncStrategy, type SyncTimeFilter } from './githubSyncDiff.js';
+import { type ConflictResolution, type GithubRemoteEntry, type GithubSyncDiff, type GithubSyncDetailItem, type LocalRowEntry, type SyncStrategy, type SyncTimeFilter } from './githubSyncDiff.js';
 import type { SyncSource } from './SyncSource.js';
-export { computeDiff, tagsToString, parseJsonl, isGithubRemoteEntry, filterByTime, SYNC_STRATEGY_LABELS, EXTENDED_FIELD_MAP, type GithubRemoteEntry, type GithubSyncDiff, type LocalRowEntry, type SyncStrategy, type SyncTimeFilter, } from './githubSyncDiff.js';
+export { computeDiff, tagsToString, parseJsonl, isGithubRemoteEntry, filterByTime, SYNC_STRATEGY_LABELS, EXTENDED_FIELD_MAP, type GithubRemoteEntry, type GithubSyncDiff, type LocalRowEntry, type SyncStrategy, type SyncTimeFilter, type GithubSyncDetailItem, } from './githubSyncDiff.js';
 /** 同步结果统计 */
 export interface GithubSyncResult {
     /** 远程总条目数 */
@@ -33,6 +33,8 @@ export interface GithubSyncResult {
     skipped: number;
     /** 失败条目数 */
     failed: number;
+    /** 新增/更新/删除/失败明细（用于详情表格展示） */
+    details?: GithubSyncDetailItem[];
 }
 /**
  * 从 GitHub Raw 下载 JSONL 文件

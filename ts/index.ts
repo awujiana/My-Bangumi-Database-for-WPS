@@ -249,6 +249,8 @@ export {
   type GithubRemoteEntry,
   // 差异记录类型
   type GithubSyncDiff,
+  // 同步明细类型（用于详情表格展示）
+  type GithubSyncDetailItem,
   // 本地行条目类型
   type LocalRowEntry,
   // 同步策略类型

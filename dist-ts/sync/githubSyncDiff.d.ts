@@ -118,6 +118,21 @@ export interface GithubSyncDiff {
     /** 变更字段列表（add/force-overwrite 时为 ['*']） */
     changedFields: string[];
 }
+/** 同步结果单条明细（用于详情表格展示） */
+export interface GithubSyncDetailItem {
+    /** 操作类型 */
+    kind: 'add' | 'update' | 'delete' | 'fail';
+    /** 主键 SID */
+    sid: string;
+    /** 条目名称 */
+    name?: string | undefined;
+    /** 本地行号（add 成功后可回填） */
+    row?: number | undefined;
+    /** 变更字段列表（add/force-overwrite 时为 ['全部字段']） */
+    fields?: string[] | undefined;
+    /** 失败原因或删除备注 */
+    message?: string | undefined;
+}
 /** 本地行数据（仅包含 diff 所需字段） */
 export interface LocalRowEntry {
     /** 行号 */

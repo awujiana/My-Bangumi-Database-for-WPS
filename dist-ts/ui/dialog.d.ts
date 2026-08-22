@@ -3,6 +3,7 @@
  * @module ui/dialog
  * @description 自定义对话框、确认对话框、Toast 通知
  */
+import type { GithubSyncDetailItem } from '../sync/githubSyncDiff.js';
 export interface DialogOptions {
     title?: string;
     message?: string;
@@ -115,14 +116,21 @@ export interface SyncProgressStats {
     strategyLabel: string;
 }
 /**
+ * 将同步明细数据渲染为可折叠的 HTML 表格
+ * @param items 同步明细条目数组
+ * @returns 已做 HTML 转义的表格 HTML 字符串
+ */
+export declare function renderSyncDetailTable(items: GithubSyncDetailItem[]): string;
+/**
  * 切换弹窗为完成状态，显示统计结果
  * @param summary 统计摘要文本
- * @param details 详情数组
+ * @param details 详情文本数组（无明细对象时的兼容显示）
  * @param stopped 是否被用户停止
  * @param onNext 点击"下一步"时的回调（用于打开同步完成详情弹窗）
  * @param stats 同步统计数据（用于渲染图表）
+ * @param detailItems 同步明细数据（用于渲染详情表格）
  */
-export declare function completeSyncProgressDialog(summary: string, details: string[], stopped?: boolean, onNext?: () => void, stats?: SyncProgressStats): void;
+export declare function completeSyncProgressDialog(summary: string, details: string[], stopped?: boolean, onNext?: () => void, stats?: SyncProgressStats, detailItems?: GithubSyncDetailItem[]): void;
 /** 隐藏同步进度弹窗 */
 export declare function hideSyncProgressDialog(): void;
 export declare function showAlert(message: string, title?: string, onOk?: () => void): void;

@@ -64,6 +64,7 @@ import {
   type SyncStrategy,
   type SyncSourceType,
   type GithubSyncResult,
+  type GithubSyncDetailItem,
   type SyncTimeFilter,
   showSettingsPanel,
 } from '../../index.js'
@@ -1070,6 +1071,8 @@ const ACTION_HANDLERS: Record<string, ActionHandler> = {
               strategyLabel: strategyLabel ?? '未知策略',
             }
 
+            const detailItems: GithubSyncDetailItem[] | undefined =
+              result.details && result.details.length > 0 ? result.details : undefined
             completeSyncProgressDialog(
               summary,
               details,
@@ -1097,6 +1100,7 @@ const ACTION_HANDLERS: Record<string, ActionHandler> = {
                 showSyncResultDialog(options)
               },
               stats,
+              detailItems,
             )
 
             bgmLog(

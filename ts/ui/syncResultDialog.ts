@@ -12,6 +12,7 @@
 import { LOG_LEVELS } from '../core/constants.js'
 import { exportSheetToJsonlFile } from '../sync/exportJsonl.js'
 import type { GithubSyncResult } from '../sync/githubSync.js'
+import type { GithubSyncDetailItem } from '../sync/githubSyncDiff.js'
 import { extractSubjectId } from '../sync/pureUtils.js'
 import {
   getDataSheet,
@@ -22,6 +23,8 @@ import {
   trim,
 } from '../tools/util/index.js'
 import { bgmLog } from '../tools/util.js'
+
+import { renderSyncDetailTable } from './dialog.js'
 
 // ========== 日期统计类型 ==========
 
@@ -170,12 +173,15 @@ function _clearEscHandler(): void {
  * 计算格式化耗时字符串
  */
 export function formatDuration(ms: number): string {
-  if (ms < 1000) return `${ms}ms`
+  if (ms < 1000) {
+    const seconds = Math.max(0, ms / 1000)
+    return `${seconds.toFixed(2)}秒`
+  }
   const seconds = Math.floor(ms / 1000)
   if (seconds < 60) return `${seconds}秒`
   const minutes = Math.floor(seconds / 60)
   const secs = seconds % 60
-  return `${minutes}分${secs}秒`
+  return `${minutes}分${secs.toString().padStart(2, '0')}秒`
 }
 
 /**
@@ -699,6 +705,21 @@ let _previewDialog: HTMLElement | null = null
 let _previewDialogEscHandler: ((e: KeyboardEvent) => void) | null = null
 
 /**
+ * 渲染同步明细折叠表格
+ * @param details 同步明细条目数组
+ * @returns 折叠区域 HTML 字符串
+ */
+function renderDetailSection(details: GithubSyncDetailItem[] | undefined): string {
+  if (!details || details.length === 0) return ''
+  return `
+    <div class="bgm-preview-detail-table">
+      <div class="bgm-preview-detail-table-title">📑 同步明细（${details.length} 条）</div>
+      ${renderSyncDetailTable(details)}
+    </div>
+  `
+}
+
+/**
  * 显示同步详情预览弹窗（当同步记录表不存在或未启用时使用）
  */
 function showSyncDetailPreviewDialog(options: SyncDetailPreviewOptions): void {
@@ -770,6 +791,7 @@ function showSyncDetailPreviewDialog(options: SyncDetailPreviewOptions): void {
                 : ''
             }
           </div>
+          ${renderDetailSection(result.details)}
         </div>
         <div class="bgm-result-section">
           <div class="bgm-result-section-title">💡 操作建议</div>

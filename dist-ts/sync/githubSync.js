@@ -516,14 +516,16 @@ function yieldToEventLoop() {
  * 格式化持续时间（毫秒 → 可读字符串）
  */
 function formatDuration(ms) {
-    if (ms < 1000)
-        return `${ms}ms`;
+    if (ms < 1000) {
+        const seconds = Math.max(0, ms / 1000);
+        return `${seconds.toFixed(2)}秒`;
+    }
     const seconds = Math.floor(ms / 1000);
     if (seconds < 60)
         return `${seconds}秒`;
     const minutes = Math.floor(seconds / 60);
     const secs = seconds % 60;
-    return `${minutes}分${secs}秒`;
+    return `${minutes}分${secs.toString().padStart(2, '0')}秒`;
 }
 /**
  * 格式化预估剩余时间
@@ -673,9 +675,10 @@ function batchWriteNewRows(ws, colMap, startRow, rows, records) {
  * @param updates 要更新的行列表（row=行号, remote=远程数据, fields=要更新的字段）
  * @param forceOverwrite 是否强制覆盖
  * @param records 同步记录收集器
+ * @param details 同步明细收集器（用于详情表格展示）
  * @returns 成功更新的行数
  */
-function batchUpdateRows(ws, colMap, updates, forceOverwrite, records) {
+function batchUpdateRows(ws, colMap, updates, forceOverwrite, records, details) {
     if (updates.length === 0)
         return 0;
     const writeCols = [];
@@ -890,6 +893,13 @@ function batchUpdateRows(ws, colMap, updates, forceOverwrite, records) {
                     range.Value2 = finalValues;
                 }
                 successCount++;
+                details?.push({
+                    kind: 'update',
+                    sid: u.sid,
+                    name: remote.name,
+                    row,
+                    fields: u.fields.includes('*') ? ['全部字段'] : [...u.fields],
+                });
                 records.push({
                     sid: u.sid,
                     name: remote.name ?? '',
@@ -911,6 +921,13 @@ function batchUpdateRows(ws, colMap, updates, forceOverwrite, records) {
                         if (result.success || !result.attempted) {
                             // 写入成功 或 没有写入需要尝试（如空列映射）→ 视为成功
                             successCount++;
+                            details?.push({
+                                kind: 'update',
+                                sid: u.sid,
+                                name: remote.name,
+                                row,
+                                fields: u.fields.includes('*') ? ['全部字段'] : [...u.fields],
+                            });
                             records.push({
                                 sid: u.sid,
                                 name: remote.name ?? '',
@@ -926,6 +943,13 @@ function batchUpdateRows(ws, colMap, updates, forceOverwrite, records) {
                         else {
                             // 尝试了写入但全部失败
                             bgmLog(LOG_LEVELS.ERROR, `[batchUpdateRows] 行 ${row} 回退逐字段写入全部失败`);
+                            details?.push({
+                                kind: 'fail',
+                                sid: u.sid,
+                                name: remote.name,
+                                row,
+                                message: '逐字段写入失败',
+                            });
                             records.push({
                                 sid: u.sid,
                                 source: 'repo',
@@ -937,13 +961,21 @@ function batchUpdateRows(ws, colMap, updates, forceOverwrite, records) {
                         }
                     }
                     catch (e) {
-                        bgmLog(LOG_LEVELS.ERROR, `[batchUpdateRows] 行 ${row} 回退逐字段写入异常: ${e.message}`);
+                        const errMsg = e instanceof Error ? e.message : String(e);
+                        bgmLog(LOG_LEVELS.ERROR, `[batchUpdateRows] 行 ${row} 回退逐字段写入异常: ${errMsg}`);
+                        details?.push({
+                            kind: 'fail',
+                            sid: u.sid,
+                            name: remote.name,
+                            row,
+                            message: errMsg,
+                        });
                         records.push({
                             sid: u.sid,
                             source: 'repo',
                             content: '仓库同步-更新失败',
                             status: '失败',
-                            message: e.message,
+                            message: errMsg,
                             count: 1,
                         });
                     }
@@ -958,6 +990,13 @@ function batchUpdateRows(ws, colMap, updates, forceOverwrite, records) {
                 if (result.success || !result.attempted) {
                     // 写入成功 或 没有写入需要尝试（如空列映射）→ 视为成功
                     successCount++;
+                    details?.push({
+                        kind: 'update',
+                        sid: u.sid,
+                        name: remote.name,
+                        row,
+                        fields: u.fields.includes('*') ? ['全部字段'] : [...u.fields],
+                    });
                     records.push({
                         sid: u.sid,
                         name: remote.name ?? '',
@@ -972,6 +1011,13 @@ function batchUpdateRows(ws, colMap, updates, forceOverwrite, records) {
                 }
                 else {
                     // 尝试了写入但全部失败
+                    details?.push({
+                        kind: 'fail',
+                        sid: u.sid,
+                        name: remote.name,
+                        row,
+                        message: '逐字段写入失败',
+                    });
                     records.push({
                         sid: u.sid,
                         source: 'repo',
@@ -983,13 +1029,21 @@ function batchUpdateRows(ws, colMap, updates, forceOverwrite, records) {
                 }
             }
             catch (e2) {
-                bgmLog(LOG_LEVELS.ERROR, `[batchUpdateRows] 行 ${row} 逐字段写入也失败: ${e2.message}`);
+                const errMsg = e2 instanceof Error ? e2.message : String(e2);
+                bgmLog(LOG_LEVELS.ERROR, `[batchUpdateRows] 行 ${row} 逐字段写入也失败: ${errMsg}`);
+                details?.push({
+                    kind: 'fail',
+                    sid: u.sid,
+                    name: remote.name,
+                    row,
+                    message: errMsg,
+                });
                 records.push({
                     sid: u.sid,
                     source: 'repo',
                     content: '仓库同步-更新失败',
                     status: '失败',
-                    message: e2.message,
+                    message: errMsg,
                     count: 1,
                 });
             }
@@ -1014,6 +1068,7 @@ export async function applyDiffToSheet(diffs, strategy, onProgress, source) {
         unchanged: 0,
         skipped: 0,
         failed: 0,
+        details: [],
     };
     const ws = getDataSheet();
     if (!ws) {
@@ -1068,6 +1123,18 @@ export async function applyDiffToSheet(diffs, strategy, onProgress, source) {
         const batchWritten = batchWriteNewRows(ws, colMap, nextAppendRow, batchEntries, syncRecords);
         if (batchWritten > 0) {
             result.added += batchWritten;
+            for (let i = 0; i < batchWritten; i++) {
+                const entry = batch[i];
+                if (!entry?.remote)
+                    continue;
+                result.details.push({
+                    kind: 'add',
+                    sid: entry.sid,
+                    name: entry.remote.name,
+                    row: nextAppendRow + i,
+                    fields: ['全部字段'],
+                });
+            }
             nextAppendRow += batchWritten;
         }
         else {
@@ -1078,8 +1145,16 @@ export async function applyDiffToSheet(diffs, strategy, onProgress, source) {
                         const writeResult = writeRemoteEntryToRow(ws, colMap, nextAppendRow, diff.remote, ['*'], forceOverwrite);
                         if (writeResult.success || !writeResult.attempted) {
                             // 写入成功 或 没有写入需要尝试（如空列映射）→ 视为成功
+                            const writtenRow = nextAppendRow;
                             nextAppendRow++;
                             result.added++;
+                            result.details.push({
+                                kind: 'add',
+                                sid: diff.sid,
+                                name: diff.remote.name,
+                                row: writtenRow,
+                                fields: ['全部字段'],
+                            });
                             syncRecords.push({
                                 sid: diff.sid,
                                 name: diff.remote.name ?? '',
@@ -1095,6 +1170,12 @@ export async function applyDiffToSheet(diffs, strategy, onProgress, source) {
                             // 尝试了写入但全部失败
                             result.failed++;
                             bgmLog(LOG_LEVELS.ERROR, `[githubSync] 逐行写入失败 sid=${diff.sid}: 写入全部失败`);
+                            result.details.push({
+                                kind: 'fail',
+                                sid: diff.sid,
+                                name: diff.remote.name,
+                                message: '逐字段写入失败',
+                            });
                             syncRecords.push({
                                 sid: diff.sid,
                                 source,
@@ -1106,14 +1187,21 @@ export async function applyDiffToSheet(diffs, strategy, onProgress, source) {
                         }
                     }
                     catch (e) {
+                        const errMsg = e instanceof Error ? e.message : String(e);
                         result.failed++;
-                        bgmLog(LOG_LEVELS.ERROR, `[githubSync] 逐行写入失败 sid=${diff.sid}: ${e.message}`);
+                        bgmLog(LOG_LEVELS.ERROR, `[githubSync] 逐行写入失败 sid=${diff.sid}: ${errMsg}`);
+                        result.details.push({
+                            kind: 'fail',
+                            sid: diff.sid,
+                            name: diff.remote.name,
+                            message: errMsg,
+                        });
                         syncRecords.push({
                             sid: diff.sid,
                             source,
                             content: '仓库同步-新增失败',
                             status: '失败',
-                            message: e.message,
+                            message: errMsg,
                             count: 1,
                         });
                     }
@@ -1157,7 +1245,7 @@ export async function applyDiffToSheet(diffs, strategy, onProgress, source) {
             sid: d.sid,
             fields: d.changedFields,
         }));
-        const batchUpdated = batchUpdateRows(ws, colMap, batchUpdates, forceOverwrite, syncRecords);
+        const batchUpdated = batchUpdateRows(ws, colMap, batchUpdates, forceOverwrite, syncRecords, result.details);
         result.updated += batchUpdated;
         result.failed += batch.length - batchUpdated;
         updateProcessed += batch.length;
@@ -1191,6 +1279,12 @@ export async function applyDiffToSheet(diffs, strategy, onProgress, source) {
             try {
                 ws.Range(`${diff.localRow}:${diff.localRow}`).Delete();
                 result.deleted++;
+                result.details.push({
+                    kind: 'delete',
+                    sid: diff.sid,
+                    row: diff.localRow,
+                    message: `删除行 ${diff.localRow}`,
+                });
                 syncRecords.push({
                     sid: diff.sid,
                     source,
@@ -1204,6 +1298,12 @@ export async function applyDiffToSheet(diffs, strategy, onProgress, source) {
                 const errMsg = e instanceof Error ? e.message : String(e);
                 bgmLog(LOG_LEVELS.WARN, `[githubSync] 删除行 ${diff.localRow} 失败: ${errMsg}`);
                 result.failed++;
+                result.details.push({
+                    kind: 'fail',
+                    sid: diff.sid,
+                    row: diff.localRow,
+                    message: errMsg,
+                });
                 syncRecords.push({
                     sid: diff.sid,
                     source,
@@ -1218,6 +1318,12 @@ export async function applyDiffToSheet(diffs, strategy, onProgress, source) {
             const errMsg = e instanceof Error ? e.message : String(e);
             result.failed++;
             bgmLog(LOG_LEVELS.ERROR, `[githubSync] 删除处理失败 sid=${diff.sid}: ${errMsg}`);
+            result.details.push({
+                kind: 'fail',
+                sid: diff.sid,
+                row: diff.localRow,
+                message: errMsg,
+            });
             syncRecords.push({
                 sid: diff.sid,
                 source,

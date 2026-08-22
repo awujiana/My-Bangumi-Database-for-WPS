@@ -4,6 +4,7 @@
  * @description 自定义对话框、确认对话框、Toast 通知
  */
 
+import type { GithubSyncDetailItem } from '../sync/githubSyncDiff.js'
 import { sanitizeHtml } from '../tools/sanitize.js'
 
 // ========== 类型定义 ==========
@@ -838,12 +839,15 @@ export interface SyncProgressStats {
  * 格式化耗时为可读字符串
  */
 function formatDuration(ms: number): string {
-  if (ms < 1000) return `${ms}ms`
+  if (ms < 1000) {
+    const seconds = Math.max(0, ms / 1000)
+    return `${seconds.toFixed(2)}秒`
+  }
   const seconds = Math.floor(ms / 1000)
   if (seconds < 60) return `${seconds}秒`
   const minutes = Math.floor(seconds / 60)
   const secs = seconds % 60
-  return secs > 0 ? `${minutes}分${secs}秒` : `${minutes}分`
+  return secs > 0 ? `${minutes}分${secs.toString().padStart(2, '0')}秒` : `${minutes}分`
 }
 
 /**
@@ -1169,12 +1173,77 @@ function renderSyncStatsChart(container: HTMLElement, stats: SyncProgressStats):
 }
 
 /**
+ * 将同步明细数据渲染为可折叠的 HTML 表格
+ * @param items 同步明细条目数组
+ * @returns 已做 HTML 转义的表格 HTML 字符串
+ */
+export function renderSyncDetailTable(items: GithubSyncDetailItem[]): string {
+  if (items.length === 0) return '<p>无明细数据</p>'
+
+  const kindLabels: Record<GithubSyncDetailItem['kind'], string> = {
+    add: '➕ 新增',
+    update: '🔄 更新',
+    delete: '🗑️ 删除',
+    fail: '❌ 失败',
+  }
+  const kindClasses: Record<GithubSyncDetailItem['kind'], string> = {
+    add: 'bgm-detail-kind--add',
+    update: 'bgm-detail-kind--update',
+    delete: 'bgm-detail-kind--delete',
+    fail: 'bgm-detail-kind--fail',
+  }
+
+  const rows = items
+    .map((item) => {
+      const kind = item.kind
+      const name = item.name ?? '--'
+      const sid = item.sid
+      const row = item.row !== undefined ? String(item.row) : '--'
+      const fields = item.fields && item.fields.length > 0 ? item.fields.join(', ') : '--'
+      const message = item.message ?? ''
+      return `
+        <tr>
+          <td><span class="bgm-detail-kind ${kindClasses[kind]}">${sanitizeHtml(kindLabels[kind])}</span></td>
+          <td>${sanitizeHtml(sid)}</td>
+          <td>${sanitizeHtml(name)}</td>
+          <td>${sanitizeHtml(row)}</td>
+          <td>${sanitizeHtml(fields)}</td>
+          <td>${sanitizeHtml(message)}</td>
+        </tr>
+      `
+    })
+    .join('')
+
+  return `
+    <div class="bgm-detail-table-wrap">
+      <table class="bgm-detail-table">
+        <thead>
+          <tr>
+            <th>操作</th>
+            <th>SID</th>
+            <th>名称</th>
+            <th>行号</th>
+            <th>变更字段</th>
+            <th>备注</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${rows}
+        </tbody>
+      </table>
+    </div>
+    <div class="bgm-detail-table-footer">共 ${items.length} 条明细</div>
+  `
+}
+
+/**
  * 切换弹窗为完成状态，显示统计结果
  * @param summary 统计摘要文本
- * @param details 详情数组
+ * @param details 详情文本数组（无明细对象时的兼容显示）
  * @param stopped 是否被用户停止
  * @param onNext 点击"下一步"时的回调（用于打开同步完成详情弹窗）
  * @param stats 同步统计数据（用于渲染图表）
+ * @param detailItems 同步明细数据（用于渲染详情表格）
  */
 export function completeSyncProgressDialog(
   summary: string,
@@ -1182,6 +1251,7 @@ export function completeSyncProgressDialog(
   stopped: boolean = false,
   onNext?: () => void,
   stats?: SyncProgressStats,
+  detailItems?: GithubSyncDetailItem[],
 ): void {
   const modal = ensureSyncProgressDialog()
   const titleEl = modal.querySelector('#bgmSyncProgressTitle') as HTMLElement | null
@@ -1225,13 +1295,20 @@ export function completeSyncProgressDialog(
   }
 
   if (detailsEl) {
-    detailsEl.textContent = details.length > 0 ? details.join('\n') : '无详情'
+    detailsEl.classList.remove('bgm-sync-progress__result-details--table')
+    if (detailItems && detailItems.length > 0) {
+      detailsEl.innerHTML = renderSyncDetailTable(detailItems)
+      detailsEl.classList.add('bgm-sync-progress__result-details--table')
+    } else {
+      detailsEl.textContent = details.length > 0 ? details.join('\n') : '无详情'
+    }
     detailsEl.style.display = 'none'
   }
   if (toggleBtn) {
     toggleBtn.textContent = '显示详情'
     toggleBtn.setAttribute('aria-label', '显示详情')
-    toggleBtn.style.display = details.length > 0 ? '' : 'none'
+    const hasDetails = details.length > 0 || (detailItems && detailItems.length > 0)
+    toggleBtn.style.display = hasDetails ? '' : 'none'
   }
 
   // 下一步按钮：仅当提供 onNext 回调时显示

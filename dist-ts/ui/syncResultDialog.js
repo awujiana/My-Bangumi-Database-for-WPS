@@ -11,6 +11,7 @@
 import { LOG_LEVELS } from '../core/constants.js';
 import { exportSheetToJsonlFile } from '../sync/exportJsonl.js';
 import { extractSubjectId } from '../sync/pureUtils.js';
+import { renderSyncDetailTable } from './dialog.js';
 import { getDataSheet, findHeaderRow, getColumnMap, getLastRow, getCellValue, trim, } from '../tools/util/index.js';
 import { bgmLog } from '../tools/util.js';
 // ========== 日期统计计算 ==========
@@ -119,14 +120,16 @@ function _clearEscHandler() {
  * 计算格式化耗时字符串
  */
 export function formatDuration(ms) {
-    if (ms < 1000)
-        return `${ms}ms`;
+    if (ms < 1000) {
+        const seconds = Math.max(0, ms / 1000);
+        return `${seconds.toFixed(2)}秒`;
+    }
     const seconds = Math.floor(ms / 1000);
     if (seconds < 60)
         return `${seconds}秒`;
     const minutes = Math.floor(seconds / 60);
     const secs = seconds % 60;
-    return `${minutes}分${secs}秒`;
+    return `${minutes}分${secs.toString().padStart(2, '0')}秒`;
 }
 /**
  * 构建同步统计图表 HTML（完整仪表盘布局）
@@ -596,6 +599,21 @@ export function hideSyncResultDialog() {
 let _previewDialog = null;
 let _previewDialogEscHandler = null;
 /**
+ * 渲染同步明细折叠表格
+ * @param details 同步明细条目数组
+ * @returns 折叠区域 HTML 字符串
+ */
+function renderDetailSection(details) {
+    if (!details || details.length === 0)
+        return '';
+    return `
+    <div class="bgm-preview-detail-table">
+      <div class="bgm-preview-detail-table-title">📑 同步明细（${details.length} 条）</div>
+      ${renderSyncDetailTable(details)}
+    </div>
+  `;
+}
+/**
  * 显示同步详情预览弹窗（当同步记录表不存在或未启用时使用）
  */
 function showSyncDetailPreviewDialog(options) {
@@ -660,6 +678,7 @@ function showSyncDetailPreviewDialog(options) {
             </div>`
         : ''}
           </div>
+          ${renderDetailSection(result.details)}
         </div>
         <div class="bgm-result-section">
           <div class="bgm-result-section-title">💡 操作建议</div>

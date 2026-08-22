@@ -458,10 +458,10 @@ export function addSyncRecords(records) {
                 continue;
             }
             newRows.push([
+                sid,
                 now,
                 params.name || '',
                 params.url || '',
-                sid,
                 params.type || '',
                 params.source || '',
                 String(params.count || 1),

@@ -796,6 +796,7 @@ const ACTION_HANDLERS = {
                     avgSpeed,
                     strategyLabel: strategyLabel ?? '未知策略',
                 };
+                const detailItems = result.details && result.details.length > 0 ? result.details : undefined;
                 completeSyncProgressDialog(summary, details, false, () => {
                     let scrollToRow;
                     try {
@@ -818,7 +819,7 @@ const ACTION_HANDLERS = {
                         options.scrollToRow = scrollToRow;
                     }
                     showSyncResultDialog(options);
-                }, stats);
+                }, stats, detailItems);
                 bgmLog(LOG_LEVELS.INFO, `[handleActionClick] 同步完成 | 远程:${result.remoteTotal} ✅:${result.added} 🔄:${result.updated} ❌:${result.deleted} ⏭️:${result.unchanged} ⚠️:${result.failed} 🔍:${result.skipped} | 耗时:${formatDuration(totalElapsed)} | 速度:${avgSpeed > 0 ? avgSpeed + '/s' : '?'} | 效率:${efficiency}%`);
                 if (app?.StatusBar !== undefined)
                     app.StatusBar = false;
