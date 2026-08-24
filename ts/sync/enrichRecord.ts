@@ -1,0 +1,317 @@
+/**
+ * @fileoverview 富化记录管理模块
+ * @module sync/enrichRecord
+ * @description 管理「富化记录」工作表，记录所有新番表富化操作的详细信息。
+ *
+ * @author BGM Development Team
+ * @version 1.0.0
+ */
+
+import { LOG_LEVELS, BGM_COLOR } from '../core/constants.js'
+import {
+  bgmLog,
+  getApp,
+  getLastRow,
+  colNumToLetter,
+  setCellValue,
+  readRangeValues,
+  BGM,
+} from '../tools/util/index.js'
+import type { WpsWorksheet } from '../tools/wps.js'
+
+export const ENRICH_RECORD_SHEET_NAME = '富化记录'
+
+export const ENRICH_RECORD_COLUMNS = [
+  '时间戳',
+  '匹配方式',
+  '动漫名称',
+  '行号',
+  '富化字段',
+  '原字段',
+  '新字段',
+  '操作类型',
+  '备注',
+] as const
+
+export const ENRICH_RECORD_COL = {
+  TIMESTAMP: 1,
+  MATCH_TYPE: 2,
+  NAME: 3,
+  ROW: 4,
+  ENRICHED_FIELD: 5,
+  OLD_VALUE: 6,
+  NEW_VALUE: 7,
+  ACTION: 8,
+  NOTE: 9,
+} as const
+
+export interface EnrichRecord {
+  timestamp: string
+  matchType: '精确' | '别名' | '未匹配'
+  name: string
+  row: number
+  enrichedField: string
+  oldValue: string
+  newValue: string
+  action: 'fill' | 'append' | 'skip' | 'error'
+  note?: string
+}
+
+export interface AddEnrichRecordParams {
+  timestamp: string
+  matchType: '精确' | '别名' | '未匹配'
+  name: string
+  row: number
+  enrichedField: string
+  oldValue: string
+  newValue: string
+  action: 'fill' | 'append' | 'skip' | 'error'
+  note?: string
+}
+
+export function getActionColor(action: string): number {
+  switch (action) {
+    case 'fill':
+      return BGM_COLOR.SUCCESS
+    case 'append':
+      return 0xffff80
+    case 'skip':
+      return BGM_COLOR.SKIP
+    case 'error':
+      return BGM_COLOR.FAIL
+    default:
+      return BGM_COLOR.GRAY
+  }
+}
+
+export function getOrCreateEnrichRecordSheet(): WpsWorksheet {
+  const app = getApp()
+  if (!app?.ActiveWorkbook) throw new Error('无法获取工作簿')
+
+  const wb = app.ActiveWorkbook
+  let enrichSheet: WpsWorksheet | null = null
+
+  try {
+    const sheets = wb.Sheets
+    for (let i = 1; i <= sheets.Count; i++) {
+      const sheet = sheets.Item(i)
+      if (sheet.Name === ENRICH_RECORD_SHEET_NAME) {
+        enrichSheet = sheet
+        break
+      }
+    }
+  } catch (e: unknown) {
+    BGM.handleError(e, { context: 'getOrCreateEnrichRecordSheet', showAlert: false })
+  }
+
+  if (!enrichSheet) {
+    enrichSheet = wb.Sheets.Add()
+    enrichSheet.Name = ENRICH_RECORD_SHEET_NAME
+
+    for (let i = 0; i < ENRICH_RECORD_COLUMNS.length; i++) {
+      const colLetter = colNumToLetter(i + 1)
+      const cell = enrichSheet.Range(`${colLetter}1`)
+      cell.Value2 = ENRICH_RECORD_COLUMNS[i] ?? ''
+      if (cell.Interior) {
+        cell.Interior.Color = BGM_COLOR.GRAY
+      }
+    }
+
+    try {
+      enrichSheet.Move(null, wb.Sheets.Item(wb.Sheets.Count))
+    } catch (moveError: unknown) {
+      BGM.handleError(moveError, { context: 'getOrCreateEnrichRecordSheet', showAlert: false })
+    }
+
+    const lastColLetter = colNumToLetter(ENRICH_RECORD_COLUMNS.length)
+    const fullRange = enrichSheet.Range(`A1:${lastColLetter}1`)
+    try {
+      if (fullRange.Font) fullRange.Font.Name = 'Maple Mono NF CN Medium'
+    } catch {
+      // 忽略字体设置失败
+    }
+    try {
+      fullRange.EntireColumn.AutoFit()
+    } catch {
+      // 忽略列宽自适应失败
+    }
+
+    bgmLog(LOG_LEVELS.INFO, '已创建富化记录工作表')
+  } else {
+    const existingCols = ENRICH_RECORD_COLUMNS.length
+    for (let i = 0; i < existingCols; i++) {
+      const colLetter = colNumToLetter(i + 1)
+      const cell = enrichSheet.Range(`${colLetter}1`)
+      const currentHeader = String(cell.Value2 ?? '').trim()
+      const expectedHeader = ENRICH_RECORD_COLUMNS[i] ?? ''
+      if (currentHeader !== expectedHeader) {
+        cell.Value2 = expectedHeader
+        bgmLog(
+          LOG_LEVELS.INFO,
+          `修复表头: ${colLetter}1 从 "${currentHeader}" → "${expectedHeader}"`,
+        )
+      }
+    }
+  }
+
+  return enrichSheet
+}
+
+export function addEnrichRecord(params: AddEnrichRecordParams): void {
+  try {
+    const sheet = getOrCreateEnrichRecordSheet()
+
+    let newRow = 1
+    const usedRange = sheet.UsedRange
+    if (usedRange) {
+      const lastUsedRow = usedRange.Row + usedRange.Rows.Count - 1
+      newRow = lastUsedRow + 1
+    } else {
+      newRow = sheet.Rows.Count > 1 ? 2 : 1
+    }
+
+    setCellValue(sheet, newRow, ENRICH_RECORD_COL.TIMESTAMP, params.timestamp)
+    setCellValue(sheet, newRow, ENRICH_RECORD_COL.MATCH_TYPE, params.matchType)
+    setCellValue(sheet, newRow, ENRICH_RECORD_COL.NAME, params.name)
+    setCellValue(sheet, newRow, ENRICH_RECORD_COL.ROW, params.row)
+    setCellValue(sheet, newRow, ENRICH_RECORD_COL.ENRICHED_FIELD, params.enrichedField)
+    setCellValue(sheet, newRow, ENRICH_RECORD_COL.OLD_VALUE, params.oldValue)
+    setCellValue(sheet, newRow, ENRICH_RECORD_COL.NEW_VALUE, params.newValue)
+    setCellValue(sheet, newRow, ENRICH_RECORD_COL.ACTION, params.action)
+    if (params.note !== undefined) {
+      setCellValue(sheet, newRow, ENRICH_RECORD_COL.NOTE, params.note)
+    }
+
+    const actionColor = getActionColor(params.action)
+    const actionColLetter = colNumToLetter(ENRICH_RECORD_COL.ACTION)
+    const actionCell = sheet.Range(`${actionColLetter}${newRow}`)
+    if (actionCell?.Interior) {
+      actionCell.Interior.Color = actionColor
+    }
+
+    bgmLog(
+      LOG_LEVELS.INFO,
+      `[addEnrichRecord] ${params.name} (${params.enrichedField}): ${params.action}`,
+    )
+  } catch (e: unknown) {
+    BGM.handleError(e, { context: 'addEnrichRecord', showAlert: false })
+  }
+}
+
+export function addEnrichRecords(records: AddEnrichRecordParams[]): void {
+  if (records.length === 0) return
+
+  try {
+    const sheet = getOrCreateEnrichRecordSheet()
+
+    let startRow = 2
+    const usedRange = sheet.UsedRange
+    if (usedRange) {
+      startRow = usedRange.Row + usedRange.Rows.Count
+    }
+
+    const newRows: string[][] = records.map((r) => [
+      r.timestamp,
+      r.matchType,
+      r.name,
+      String(r.row),
+      r.enrichedField,
+      r.oldValue,
+      r.newValue,
+      r.action,
+      r.note ?? '',
+    ])
+
+    const endRow = startRow + newRows.length - 1
+    const startColLetter = colNumToLetter(1)
+    const endColLetter = colNumToLetter(ENRICH_RECORD_COLUMNS.length)
+    const range = sheet.Range(`${startColLetter}${startRow}:${endColLetter}${endRow}`)
+    range.Value2 = newRows
+
+    for (let i = 0; i < newRows.length; i++) {
+      const row = startRow + i
+      const action = newRows[i]?.[ENRICH_RECORD_COL.ACTION - 1] ?? ''
+      const color = getActionColor(action)
+      const actionColLetter = colNumToLetter(ENRICH_RECORD_COL.ACTION)
+      const cell = sheet.Range(`${actionColLetter}${row}`)
+      if (cell?.Interior) {
+        cell.Interior.Color = color
+      }
+    }
+
+    bgmLog(LOG_LEVELS.INFO, `[addEnrichRecords] 批量写入完成：${records.length} 条记录`)
+  } catch (e: unknown) {
+    BGM.handleError(e, { context: 'addEnrichRecords', showAlert: false })
+  }
+}
+
+export function clearEnrichRecords(): void {
+  try {
+    const sheet = getOrCreateEnrichRecordSheet()
+    const lastRow = sheet.UsedRange
+      ? sheet.UsedRange.Row + sheet.UsedRange.Rows.Count - 1
+      : sheet.Rows.Count
+    if (lastRow > 1) {
+      sheet.Range(`2:${lastRow}`).Delete()
+    }
+    bgmLog(LOG_LEVELS.INFO, '已清除所有富化记录')
+  } catch (e: unknown) {
+    BGM.handleError(e, { context: 'clearEnrichRecords', showAlert: false })
+  }
+}
+
+export function getAllEnrichRecords(): EnrichRecord[] {
+  try {
+    const app = getApp()
+    if (!app?.ActiveWorkbook) return []
+
+    const wb = app.ActiveWorkbook
+    let sheet: WpsWorksheet | null = null
+
+    try {
+      const sheets = wb.Sheets
+      for (let i = 1; i <= sheets.Count; i++) {
+        const s = sheets.Item(i)
+        if (s.Name === ENRICH_RECORD_SHEET_NAME) {
+          sheet = s
+          break
+        }
+      }
+    } catch (e: unknown) {
+      BGM.handleError(e, { context: 'getAllEnrichRecords', showAlert: false })
+      return []
+    }
+
+    if (!sheet) return []
+
+    const lastRow = getLastRow(sheet)
+    if (lastRow < 2) return []
+
+    const allData = readRangeValues(sheet, 2, lastRow, 1, ENRICH_RECORD_COLUMNS.length)
+    if (!allData || allData.length === 0) return []
+
+    const records: EnrichRecord[] = []
+    for (const rowData of allData) {
+      if (!rowData) continue
+      const record: EnrichRecord = {
+        timestamp: String(rowData[ENRICH_RECORD_COL.TIMESTAMP - 1] ?? ''),
+        matchType: String(
+          rowData[ENRICH_RECORD_COL.MATCH_TYPE - 1] ?? '未匹配',
+        ) as EnrichRecord['matchType'],
+        name: String(rowData[ENRICH_RECORD_COL.NAME - 1] ?? ''),
+        row: parseInt(String(rowData[ENRICH_RECORD_COL.ROW - 1] ?? '0')) || 0,
+        enrichedField: String(rowData[ENRICH_RECORD_COL.ENRICHED_FIELD - 1] ?? ''),
+        oldValue: String(rowData[ENRICH_RECORD_COL.OLD_VALUE - 1] ?? ''),
+        newValue: String(rowData[ENRICH_RECORD_COL.NEW_VALUE - 1] ?? ''),
+        action: String(rowData[ENRICH_RECORD_COL.ACTION - 1] ?? 'skip') as EnrichRecord['action'],
+        note: String(rowData[ENRICH_RECORD_COL.NOTE - 1] ?? ''),
+      }
+      records.push(record)
+    }
+
+    return records
+  } catch (e: unknown) {
+    BGM.handleError(e, { context: 'getAllEnrichRecords', showAlert: false })
+    return []
+  }
+}
