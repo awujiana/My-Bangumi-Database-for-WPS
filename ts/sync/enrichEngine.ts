@@ -50,6 +50,23 @@ const KNOWN_COLUMN_MAP: Record<string, keyof EnrichColumnMapping> = {
   独播: 'exclusiveCol',
   特殊: 'specialCol',
   备注: 'specialCol',
+  // 简介工作表列名
+  简介: 'introCol',
+  剧情简介: 'introCol',
+  作品简介: 'introCol',
+  介绍: 'introCol',
+  制作公司: 'studioCol',
+  动画制作: 'studioCol',
+  制作: 'studioCol',
+  导演: 'directorCol',
+  监督: 'directorCol',
+  音乐: 'musicCol',
+  配乐: 'musicCol',
+  声优: 'voiceCol',
+  声优阵容: 'voiceCol',
+  OP: 'opCol',
+  ED: 'edCol',
+  PV: 'pvCol',
 }
 
 /** 标签分隔符 */
@@ -73,6 +90,14 @@ export interface EnrichColumnMapping {
   platformCol?: number
   exclusiveCol?: number
   specialCol?: number
+  introCol?: number
+  studioCol?: number
+  directorCol?: number
+  musicCol?: number
+  voiceCol?: number
+  opCol?: number
+  edCol?: number
+  pvCol?: number
 }
 
 /**
@@ -739,14 +764,22 @@ export function enrichEntries(
 
     stats.matched++
 
-    const newData = readNewAnimeRow(newAnimeSheet, match.newAnimeRow, config.columnMapping)
+    const isIntro = isIntroSheet(config.columnMapping)
+    const newData = isIntro
+      ? readIntroSheetRow(newAnimeSheet, match.newAnimeRow, config.columnMapping)
+      : readNewAnimeRow(newAnimeSheet, match.newAnimeRow, config.columnMapping)
     const enrichedFields: EnrichedField[] = []
 
     try {
-      enrichTags(bangumiSheet, bangumiRow, newData, bangumiColMap, enrichedFields)
-      enrichDate(bangumiSheet, bangumiRow, newData, bangumiColMap, enrichedFields)
-      enrichEpisodes(bangumiSheet, bangumiRow, newData, bangumiColMap, enrichedFields)
-      enrichFeatures(bangumiSheet, bangumiRow, newData, bangumiColMap, enrichedFields)
+      if (isIntro) {
+        enrichIntroData(bangumiSheet, bangumiRow, newData, bangumiColMap, enrichedFields)
+        enrichOpEdPv(bangumiSheet, bangumiRow, newData, bangumiColMap, enrichedFields)
+      } else {
+        enrichTags(bangumiSheet, bangumiRow, newData, bangumiColMap, enrichedFields)
+        enrichDate(bangumiSheet, bangumiRow, newData, bangumiColMap, enrichedFields)
+        enrichEpisodes(bangumiSheet, bangumiRow, newData, bangumiColMap, enrichedFields)
+        enrichFeatures(bangumiSheet, bangumiRow, newData, bangumiColMap, enrichedFields)
+      }
 
       const hasEnrichment = enrichedFields.some((f) => f.action !== 'skip')
       if (hasEnrichment) {
@@ -833,4 +866,187 @@ interface AddEnrichRecordParams {
   newValue: string
   action: 'fill' | 'append' | 'skip' | 'error'
   note?: string
+}
+
+// ========== 简介工作表富化函数 ==========
+
+/**
+ * 富化简介数据
+ * 将简介工作表中的制作公司、导演、音乐等信息追加到特点/印象列
+ */
+export function enrichIntroData(
+  sheet: WpsWorksheet,
+  row: number,
+  newData: Record<string, string>,
+  colMap: Map<string, number>,
+  enriched: EnrichedField[],
+): void {
+  const bangumiFeatureCol = colMap.get('特点/印象')
+  if (!bangumiFeatureCol) return
+
+  const introParts: string[] = []
+
+  const studio = newData['制作公司'] || ''
+  if (!isEmptyValue(studio)) {
+    introParts.push(`制作:${studio}`)
+  }
+
+  const director = newData['导演'] || ''
+  if (!isEmptyValue(director)) {
+    introParts.push(`导演:${director}`)
+  }
+
+  const music = newData['音乐'] || ''
+  if (!isEmptyValue(music)) {
+    introParts.push(`音乐:${music}`)
+  }
+
+  const voice = newData['声优'] || ''
+  if (!isEmptyValue(voice)) {
+    introParts.push(`声优:${voice}`)
+  }
+
+  const intro = newData['简介'] || ''
+  if (!isEmptyValue(intro)) {
+    const introSummary = intro.length > 100 ? intro.substring(0, 100) + '...' : intro
+    introParts.push(`简介:${introSummary}`)
+  }
+
+  if (introParts.length === 0) return
+
+  const newFeatureText = introParts.join(FEATURE_SEPARATOR)
+  const oldFeature = getCellValue(sheet, row, bangumiFeatureCol)
+
+  if (isEmptyValue(oldFeature)) {
+    setCellValue(sheet, row, bangumiFeatureCol, newFeatureText)
+    enriched.push({
+      fieldName: '特点/印象',
+      bangumiColumn: bangumiFeatureCol,
+      oldValue: null,
+      newValue: newFeatureText,
+      action: 'fill',
+    })
+  } else {
+    const merged = appendFeatures(oldFeature, newFeatureText)
+    if (merged !== oldFeature) {
+      setCellValue(sheet, row, bangumiFeatureCol, merged)
+      enriched.push({
+        fieldName: '特点/印象',
+        bangumiColumn: bangumiFeatureCol,
+        oldValue: oldFeature,
+        newValue: merged,
+        action: 'append',
+      })
+    } else {
+      enriched.push({
+        fieldName: '特点/印象',
+        bangumiColumn: bangumiFeatureCol,
+        oldValue: oldFeature,
+        newValue: merged,
+        action: 'skip',
+      })
+    }
+  }
+}
+
+/**
+ * 富化 OP/ED/PV 信息
+ * 追加到特点/印象列
+ */
+export function enrichOpEdPv(
+  sheet: WpsWorksheet,
+  row: number,
+  newData: Record<string, string>,
+  colMap: Map<string, number>,
+  enriched: EnrichedField[],
+): void {
+  const bangumiFeatureCol = colMap.get('特点/印象')
+  if (!bangumiFeatureCol) return
+
+  const parts: string[] = []
+
+  const op = newData['OP'] || ''
+  if (!isEmptyValue(op)) {
+    parts.push(`OP:${op}`)
+  }
+
+  const ed = newData['ED'] || ''
+  if (!isEmptyValue(ed)) {
+    parts.push(`ED:${ed}`)
+  }
+
+  const pv = newData['PV'] || ''
+  if (!isEmptyValue(pv)) {
+    parts.push(`PV:${pv}`)
+  }
+
+  if (parts.length === 0) return
+
+  const newFeatureText = parts.join(FEATURE_SEPARATOR)
+  const oldFeature = getCellValue(sheet, row, bangumiFeatureCol)
+
+  if (isEmptyValue(oldFeature)) {
+    setCellValue(sheet, row, bangumiFeatureCol, newFeatureText)
+    enriched.push({
+      fieldName: '特点/印象',
+      bangumiColumn: bangumiFeatureCol,
+      oldValue: null,
+      newValue: newFeatureText,
+      action: 'fill',
+    })
+  } else {
+    const merged = appendFeatures(oldFeature, newFeatureText)
+    if (merged !== oldFeature) {
+      setCellValue(sheet, row, bangumiFeatureCol, merged)
+      enriched.push({
+        fieldName: '特点/印象',
+        bangumiColumn: bangumiFeatureCol,
+        oldValue: oldFeature,
+        newValue: merged,
+        action: 'append',
+      })
+    } else {
+      enriched.push({
+        fieldName: '特点/印象',
+        bangumiColumn: bangumiFeatureCol,
+        oldValue: oldFeature,
+        newValue: merged,
+        action: 'skip',
+      })
+    }
+  }
+}
+
+/**
+ * 读取简介工作表一行数据
+ * 扩展 readNewAnimeRow 支持简介特有字段
+ */
+export function readIntroSheetRow(
+  sheet: WpsWorksheet,
+  row: number,
+  mapping: EnrichColumnMapping,
+): Record<string, string> {
+  const data: Record<string, string> = {}
+  data['名称'] = getCellValue(sheet, row, mapping.nameCol) || ''
+  if (mapping.introCol) data['简介'] = getCellValue(sheet, row, mapping.introCol) || ''
+  if (mapping.studioCol) data['制作公司'] = getCellValue(sheet, row, mapping.studioCol) || ''
+  if (mapping.directorCol) data['导演'] = getCellValue(sheet, row, mapping.directorCol) || ''
+  if (mapping.musicCol) data['音乐'] = getCellValue(sheet, row, mapping.musicCol) || ''
+  if (mapping.voiceCol) data['声优'] = getCellValue(sheet, row, mapping.voiceCol) || ''
+  if (mapping.opCol) data['OP'] = getCellValue(sheet, row, mapping.opCol) || ''
+  if (mapping.edCol) data['ED'] = getCellValue(sheet, row, mapping.edCol) || ''
+  if (mapping.pvCol) data['PV'] = getCellValue(sheet, row, mapping.pvCol) || ''
+  return data
+}
+
+/**
+ * 判断是否为简介工作表
+ * 基于列名特征判断
+ */
+export function isIntroSheet(mapping: EnrichColumnMapping): boolean {
+  return (
+    mapping.introCol !== undefined ||
+    mapping.studioCol !== undefined ||
+    mapping.directorCol !== undefined
+  )
 }

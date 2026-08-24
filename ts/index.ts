@@ -631,6 +631,11 @@ export {
   enrichDate,
   enrichEpisodes,
   enrichFeatures,
+  // 简介工作表富化函数（第二阶段）
+  enrichIntroData,
+  enrichOpEdPv,
+  readIntroSheetRow,
+  isIntroSheet,
   // 富化引擎类型
   type EnrichColumnMapping,
   type EnrichConfig,
