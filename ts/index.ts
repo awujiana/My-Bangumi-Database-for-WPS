@@ -636,6 +636,8 @@ export {
   enrichOpEdPv,
   readIntroSheetRow,
   isIntroSheet,
+  // 别名富化函数
+  enrichAlias,
   // 富化引擎类型
   type EnrichColumnMapping,
   type EnrichConfig,

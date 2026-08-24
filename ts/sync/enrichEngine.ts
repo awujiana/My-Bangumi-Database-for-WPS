@@ -803,6 +803,16 @@ export function enrichEntries(
         enrichFeatures(bangumiSheet, bangumiRow, newData, bangumiColMap, enrichedFields)
       }
 
+      // 别名富化：新番表名称与 Bangumi 追踪表不一致时补全
+      enrichAlias(
+        bangumiSheet,
+        bangumiRow,
+        match.newAnimeName,
+        match.bangumiName,
+        bangumiColMap,
+        enrichedFields,
+      )
+
       const hasEnrichment = enrichedFields.some((f) => f.action !== 'skip')
       if (hasEnrichment) {
         stats.enriched++
@@ -1142,4 +1152,63 @@ export function isIntroSheet(mapping: EnrichColumnMapping): boolean {
     mapping.characterDesignCol !== undefined ||
     mapping.cgDirectorCol !== undefined
   )
+}
+
+/**
+ * 富化别名
+ * 当新番表名称与 Bangumi 追踪表名称/别名不一致时，
+ * 将新番表名称补充到 Bangumi 追踪表的别名列
+ */
+export function enrichAlias(
+  sheet: WpsWorksheet,
+  row: number,
+  newAnimeName: string,
+  bangumiName: string | undefined,
+  colMap: Map<string, number>,
+  enriched: EnrichedField[],
+): void {
+  const nameCol = colMap.get('名称')
+  if (!nameCol) return
+
+  if (newAnimeName === bangumiName) {
+    enriched.push({
+      fieldName: '别名',
+      bangumiColumn: nameCol,
+      oldValue: '',
+      newValue: newAnimeName,
+      action: 'skip',
+    })
+    return
+  }
+
+  const aliasCol = findAliasColumn(sheet)
+  if (aliasCol === 0) return
+
+  const existingAliases = getCellValue(sheet, row, aliasCol)
+  const aliasList = splitAliases(existingAliases)
+
+  const normalizedNew = normalizeName(newAnimeName)
+  const alreadyExists = aliasList.some((a) => normalizeName(a) === normalizedNew)
+
+  if (alreadyExists) {
+    enriched.push({
+      fieldName: '别名',
+      bangumiColumn: aliasCol,
+      oldValue: existingAliases,
+      newValue: newAnimeName,
+      action: 'skip',
+    })
+    return
+  }
+
+  const merged = existingAliases ? `${existingAliases} / ${newAnimeName}` : newAnimeName
+
+  setCellValue(sheet, row, aliasCol, merged)
+  enriched.push({
+    fieldName: '别名',
+    bangumiColumn: aliasCol,
+    oldValue: existingAliases || null,
+    newValue: merged,
+    action: 'append',
+  })
 }
