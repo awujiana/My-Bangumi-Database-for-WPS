@@ -68,3 +68,4 @@ export class RingBuffer {
         this._size = 0;
     }
 }
+//# sourceMappingURL=logBuffer.js.map

@@ -22,3 +22,4 @@ export const GithubEntrySchema = z
     updatedAt: z.string().optional(),
 })
     .passthrough();
+//# sourceMappingURL=githubEntry.js.map

@@ -237,3 +237,4 @@ function getSelectedRowSids() {
     }
     return sids;
 }
+//# sourceMappingURL=syncSourceRegistry.js.map

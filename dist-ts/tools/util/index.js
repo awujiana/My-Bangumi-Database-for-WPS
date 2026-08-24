@@ -946,3 +946,4 @@ export function showSettingsPanel() {
         }
     }
 }
+//# sourceMappingURL=index.js.map

@@ -24,3 +24,4 @@ export const FullConfigSchema = z.object({
     userId: z.string().optional(),
     githubConfig: GithubConfigSchema.optional(),
 });
+//# sourceMappingURL=pluginStorage.js.map

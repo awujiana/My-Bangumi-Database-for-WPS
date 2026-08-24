@@ -229,7 +229,7 @@ function bindRecordControls(): void {
 
 // ========== 文件选择 ==========
 
-function selectNewAnimeFile(): void {
+export function selectNewAnimeFile(): void {
   try {
     const app = getApp() as {
       GetOpenFilename?: (fileFilter: string, title: string) => unknown
@@ -271,7 +271,7 @@ function selectNewAnimeFile(): void {
 
 // ========== 表头自动识别 ==========
 
-function autoDetectHeader(): void {
+export function autoDetectHeader(): void {
   const app = getApp()
   if (!app?.ActiveWorkbook) {
     BGM.Dialog.alert('提示', '未连接到 Excel，请先打开包含新番表的工作簿')
@@ -613,7 +613,7 @@ function renderSourcePreview(ws: WpsWorksheet, _mapping: EnrichColumnMapping): v
 
 // ========== 匹配预览 ==========
 
-function previewMatch(): void {
+export function previewMatch(): void {
   if (!state.newAnimeSheet) {
     BGM.Dialog.alert('提示', '请先选择新番表文件并识别表头')
     return
@@ -722,7 +722,7 @@ function renderMatchResultsToTable(matches: MatchResult[]): void {
 
 // ========== 富化执行 ==========
 
-function startEnrichment(): void {
+export function startEnrichment(): void {
   if (state.isEnriching) {
     bgmLog(LOG_LEVELS.WARN, '[enrich] 富化正在进行中，忽略重复请求')
     return
@@ -866,7 +866,7 @@ function renderEnrichSummary(results: EnrichResultItem[]): void {
 
 // ========== 富化记录 ==========
 
-function openEnrichRecordSheet(): void {
+export function openEnrichRecordSheet(): void {
   try {
     const sheet = getOrCreateEnrichRecordSheet()
     const app = getApp()
@@ -884,7 +884,7 @@ function openEnrichRecordSheet(): void {
   }
 }
 
-function clearRecords(): void {
+export function clearRecords(): void {
   BGM.Dialog.confirm('确定要清除所有富化记录吗？此操作不可撤销。', (confirmed: boolean) => {
     if (!confirmed) return
     try {

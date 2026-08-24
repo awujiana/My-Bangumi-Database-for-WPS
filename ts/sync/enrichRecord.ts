@@ -315,3 +315,93 @@ export function getAllEnrichRecords(): EnrichRecord[] {
     return []
   }
 }
+
+/**
+ * 获取富化记录表（如果存在）
+ * @returns 工作表或 null
+ */
+export function getEnrichRecordSheetIfExists(): WpsWorksheet | null {
+  try {
+    const app = getApp()
+    if (!app) return null
+    const wb = app.ActiveWorkbook
+    if (!wb) return null
+    const sheets = wb.Worksheets
+    const count = sheets?.Count ?? 0
+    for (let i = 1; i <= count; i++) {
+      const sheet = sheets?.Item(i)
+      if (sheet && sheet.Name === ENRICH_RECORD_SHEET_NAME) {
+        return sheet
+      }
+    }
+    return null
+  } catch {
+    return null
+  }
+}
+
+/**
+ * 打开富化记录表（激活工作表）
+ */
+export function openEnrichRecordSheet(): void {
+  try {
+    const sheet = getOrCreateEnrichRecordSheet()
+    sheet?.Activate()
+  } catch (e: unknown) {
+    BGM.handleError(e, { context: 'openEnrichRecordSheet', showAlert: true })
+  }
+}
+
+/**
+ * 格式化富化记录表样式
+ */
+export function formatEnrichRecordSheet(): void {
+  try {
+    const sheet = getOrCreateEnrichRecordSheet()
+    if (!sheet) return
+
+    const lastCol = ENRICH_RECORD_COLUMNS.length
+    const lastRow = getLastRow(sheet)
+
+    for (let c = 1; c <= lastCol; c++) {
+      setCellValue(sheet, 1, c, ENRICH_RECORD_COLUMNS[c - 1])
+    }
+
+    const headerRange = sheet.Range('1:1')
+    if (headerRange) {
+      if (headerRange.Font) {
+        headerRange.Font.Bold = true
+      }
+      if (headerRange.Interior) {
+        headerRange.Interior.Color = BGM_COLOR.GRAY
+      }
+      headerRange.HorizontalAlignment = -4108
+    }
+
+    if (lastRow >= 2) {
+      const dataRange = sheet.Range(`A${2}:${colNumToLetter(lastCol)}${lastRow}`)
+      if (dataRange) {
+        dataRange.Borders.LineStyle = 1
+      }
+    }
+
+    for (let c = 1; c <= lastCol; c++) {
+      const colLetter = colNumToLetter(c)
+      const colRange = sheet.Range(`${colLetter}:${colLetter}`)
+      if (colRange) {
+        colRange.ColumnWidth = 15
+      }
+    }
+
+    const nameCol = sheet.Range('C:C')
+    if (nameCol) nameCol.ColumnWidth = 25
+    const oldValCol = sheet.Range('F:F')
+    if (oldValCol) oldValCol.ColumnWidth = 20
+    const newValCol = sheet.Range('G:G')
+    if (newValCol) newValCol.ColumnWidth = 40
+    const noteCol = sheet.Range('I:I')
+    if (noteCol) noteCol.ColumnWidth = 20
+  } catch (e: unknown) {
+    BGM.handleError(e, { context: 'formatEnrichRecordSheet', showAlert: false })
+  }
+}

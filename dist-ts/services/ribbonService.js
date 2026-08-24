@@ -708,3 +708,4 @@ export async function executeUndoLastSync() {
         return 0;
     }
 }
+//# sourceMappingURL=ribbonService.js.map

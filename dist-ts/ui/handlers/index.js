@@ -1723,3 +1723,4 @@ function initSkipConflictsFromRibbon() {
         trackedAddEventListener(chkSkipConflicts, 'change', handleChkSkipConflictsChange);
     }
 }
+//# sourceMappingURL=index.js.map

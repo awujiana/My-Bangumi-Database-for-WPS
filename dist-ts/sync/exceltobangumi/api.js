@@ -280,3 +280,4 @@ export function setBangumiToken(token) {
         return false;
     }
 }
+//# sourceMappingURL=api.js.map

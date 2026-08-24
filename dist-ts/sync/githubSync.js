@@ -1599,3 +1599,4 @@ function getSelectedRowSids() {
     }
     return sids;
 }
+//# sourceMappingURL=githubSync.js.map

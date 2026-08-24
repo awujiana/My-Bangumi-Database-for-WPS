@@ -266,3 +266,4 @@ export function sanitizeHtml(dirty) {
     const purify = getPurify();
     return purify(dirty);
 }
+//# sourceMappingURL=sanitize.js.map

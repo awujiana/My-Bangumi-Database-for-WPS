@@ -29,3 +29,4 @@ export function calcFingerprint(fields) {
     // 复用已有的 calcChecksum 生成简短校验和，或直接返回原始字符串前 50 字符
     return calcChecksum(raw).toString(16).padStart(4, '0');
 }
+//# sourceMappingURL=stringUtils.js.map

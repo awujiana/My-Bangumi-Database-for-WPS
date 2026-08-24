@@ -59,3 +59,4 @@ export function setStatus(message, type) {
     statusEl.textContent = message;
     statusEl.className = 'status ' + (type || 'info');
 }
+//# sourceMappingURL=message.js.map

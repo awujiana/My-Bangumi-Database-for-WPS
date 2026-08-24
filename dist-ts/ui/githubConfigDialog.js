@@ -71,3 +71,4 @@ function escapeHtml(text) {
     div.textContent = text;
     return div.innerHTML;
 }
+//# sourceMappingURL=githubConfigDialog.js.map
