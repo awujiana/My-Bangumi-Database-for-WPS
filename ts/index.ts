@@ -638,12 +638,15 @@ export {
   isIntroSheet,
   // 别名富化函数
   enrichAlias,
+  // 冲突解决函数
+  resolveConflictField,
   // 富化引擎类型
   type EnrichColumnMapping,
   type EnrichConfig,
   type MatchResult,
   type EnrichResultItem,
   type EnrichedField,
+  type ConflictInfo,
   type EnrichProgress,
   type ProgressCallback,
 } from './sync/enrichEngine.js'

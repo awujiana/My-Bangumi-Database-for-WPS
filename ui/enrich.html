@@ -129,7 +129,12 @@
             </div>
             <div class="strategy-desc" style="margin-top:8px;padding-top:8px;border-top:1px dashed #e0e0e0;">
                 <div class="strategy-item" style="color:#666;font-size:12px;">📖 <strong>简介工作表映射</strong>：
-                    导演→导演 | 编剧→脚本 | 人设→人物设定 | CG导演→演出 | 音乐→音乐 | 动画制作→类型 | 系列构成→系列构成 | 分镜→分镜 | 原作→原作
+                    导演→导演 | 编剧→脚本 | 人设→人物设定 | CG导演→演出 | 音乐→音乐 | 动画制作→动画制作公司 | 系列构成→系列构成 | 分镜→分镜 | 原作→原作
+                </div>
+                <div class="strategy-item" style="color:#666;font-size:11px;margin-top:4px;">⚡ <strong>冲突处理</strong>：当 Bangumi 追踪表已有字段值时，弹出确认对话框：
+                    <span style="color:#4a9eff;">🔗 全部增量更新</span>（追加 | 分隔符）| 
+                    <span style="color:#666;">📋 保留原名</span>（跳过）| 
+                    <span style="color:#e74c3c;">✏️ 使用新番表名</span>（覆盖）
                 </div>
             </div>
             <button class="btn primary" id="startEnrichBtn" data-action="startEnrich">🚀 开始富化</button>
@@ -206,7 +211,7 @@
                 </div>
                 <div class="tip-item">
                     <span class="tip-num">3</span>
-                    <span>选择目标工作簿和工作表，锁定防止误操作</span>
+                    <span>选择目标 Bangumi 追踪表工作表</span>
                 </div>
                 <div class="tip-item">
                     <span class="tip-num">4</span>
@@ -214,10 +219,17 @@
                 </div>
                 <div class="tip-item">
                     <span class="tip-num">5</span>
+                    <span>简介工作表富化时，字段冲突会弹出确认对话框</span>
+                </div>
+                <div class="tip-item">
+                    <span class="tip-num">6</span>
                     <span>富化完成后查看记录，验证数据正确性</span>
                 </div>
             </div>
         </div>
+
+        <!-- 冲突对话框 -->
+        <div id="conflictDialog" class="conflict-dialog" style="display:none;"></div>
 
         </div>
 </body>

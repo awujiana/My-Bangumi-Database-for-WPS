@@ -159,6 +159,20 @@ export interface EnrichedField {
 }
 
 /**
+ * 字段冲突信息（需用户确认）
+ */
+export interface ConflictInfo {
+  fieldName: string
+  bangumiColumn: number
+  bangumiRow: number
+  oldValue: string
+  newValue: string
+  newAnimeRow: number
+  newAnimeName: string
+  resolution: 'append' | 'keep' | 'overwrite'
+}
+
+/**
  * 富化结果条目
  */
 export interface EnrichResultItem {
@@ -167,6 +181,7 @@ export interface EnrichResultItem {
   name: string
   matchType?: 'exact' | 'alias' | 'unmatched' | 'error'
   enrichedFields: EnrichedField[]
+  conflicts?: ConflictInfo[] | undefined
   errorMessage?: string
 }
 
@@ -791,10 +806,20 @@ export function enrichEntries(
       ? readIntroSheetRow(newAnimeSheet, match.newAnimeRow, config.columnMapping)
       : readNewAnimeRow(newAnimeSheet, match.newAnimeRow, config.columnMapping)
     const enrichedFields: EnrichedField[] = []
+    const fieldConflicts: ConflictInfo[] = []
 
     try {
       if (isIntro) {
-        enrichIntroData(bangumiSheet, bangumiRow, newData, bangumiColMap, enrichedFields)
+        enrichIntroData(
+          bangumiSheet,
+          bangumiRow,
+          newData,
+          bangumiColMap,
+          enrichedFields,
+          fieldConflicts,
+          match.newAnimeRow,
+          match.newAnimeName,
+        )
         enrichOpEdPv(bangumiSheet, bangumiRow, newData, bangumiColMap, enrichedFields)
       } else {
         enrichTags(bangumiSheet, bangumiRow, newData, bangumiColMap, enrichedFields)
@@ -841,6 +866,7 @@ export function enrichEntries(
         name: match.newAnimeName,
         matchType: match.matchType,
         enrichedFields,
+        conflicts: fieldConflicts.length > 0 ? fieldConflicts : undefined,
       })
     } catch (e: unknown) {
       const errMsg = e instanceof Error ? e.message : String(e)
@@ -912,7 +938,7 @@ const INTRO_FIELD_TO_BANGUMI: Record<string, string> = {
   人设: '人物设定',
   CG导演: '演出',
   音乐: '音乐',
-  动画制作: '类型',
+  动画制作: '动画制作公司',
   系列构成: '系列构成',
   分镜: '分镜',
   原作: '原作',
@@ -925,9 +951,85 @@ const INTRO_FIELD_TO_BANGUMI: Record<string, string> = {
 const INTRO_FEATURE_FIELDS = new Set(['简介', 'OP', 'ED', 'PV'])
 
 /**
+ * 解析字段冲突：根据用户选择的 resolution 执行相应操作
+ * append: 增量更新（old | new）
+ * keep: 保留原名
+ * overwrite: 使用新番表字段的名字
+ */
+export function resolveConflictField(
+  sheet: WpsWorksheet,
+  conflict: ConflictInfo,
+  enriched: EnrichedField[],
+): void {
+  const { fieldName, bangumiColumn, bangumiRow, oldValue, newValue, resolution } = conflict
+
+  if (resolution === 'keep') {
+    enriched.push({
+      fieldName,
+      bangumiColumn,
+      oldValue,
+      newValue,
+      action: 'skip',
+    })
+    return
+  }
+
+  if (resolution === 'overwrite') {
+    setCellValue(sheet, bangumiRow, bangumiColumn, newValue)
+    enriched.push({
+      fieldName,
+      bangumiColumn,
+      oldValue,
+      newValue,
+      action: 'fill',
+    })
+    return
+  }
+
+  if (resolution === 'append') {
+    if (oldValue.includes(' | ') || oldValue.includes('|')) {
+      const parts = oldValue
+        .split(/\s*\|\s*/)
+        .map((s) => s.trim())
+        .filter(Boolean)
+      if (!parts.includes(newValue)) {
+        const merged = parts.join(TAG_SEPARATOR) + TAG_SEPARATOR + newValue
+        setCellValue(sheet, bangumiRow, bangumiColumn, merged)
+        enriched.push({
+          fieldName,
+          bangumiColumn,
+          oldValue,
+          newValue: merged,
+          action: 'append',
+        })
+      } else {
+        enriched.push({
+          fieldName,
+          bangumiColumn,
+          oldValue,
+          newValue,
+          action: 'skip',
+        })
+      }
+    } else {
+      const merged = oldValue + TAG_SEPARATOR + newValue
+      setCellValue(sheet, bangumiRow, bangumiColumn, merged)
+      enriched.push({
+        fieldName,
+        bangumiColumn,
+        oldValue,
+        newValue: merged,
+        action: 'append',
+      })
+    }
+  }
+}
+
+/**
  * 富化简介数据
  * 精准映射：导演→导演、编剧→脚本、人设→人物设定 等列
  * 无匹配列的字段回退到特点/印象
+ * 冲突（两边都有值）时记录到 conflicts 数组，由用户确认
  */
 export function enrichIntroData(
   sheet: WpsWorksheet,
@@ -935,6 +1037,9 @@ export function enrichIntroData(
   newData: Record<string, string>,
   colMap: Map<string, number>,
   enriched: EnrichedField[],
+  conflicts: ConflictInfo[],
+  newAnimeRow: number,
+  newAnimeName: string,
 ): void {
   const bangumiFeatureCol = colMap.get('特点/印象')
 
@@ -955,12 +1060,15 @@ export function enrichIntroData(
           action: 'fill',
         })
       } else {
-        enriched.push({
+        conflicts.push({
           fieldName: targetColName,
           bangumiColumn: targetCol,
+          bangumiRow: row,
           oldValue,
           newValue: value,
-          action: 'skip',
+          newAnimeRow,
+          newAnimeName,
+          resolution: 'append',
         })
       }
     } else if (bangumiFeatureCol !== undefined) {

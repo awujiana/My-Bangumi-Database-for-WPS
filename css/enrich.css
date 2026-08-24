@@ -797,6 +797,121 @@
     flex-direction: row;
 }
 
+/* ========== 冲突对话框 ========== */
+.conflict-dialog {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: #1a1a2e;
+    border: 2px solid #4a9eff;
+    border-radius: 12px 12px 0 0;
+    padding: 16px;
+    z-index: 1000;
+    box-shadow: 0 -4px 20px rgba(74, 158, 255, 0.3);
+}
+
+.conflict-header {
+    margin-bottom: 12px;
+}
+
+.conflict-title {
+    font-size: 15px;
+    font-weight: 700;
+    color: #4a9eff;
+}
+
+.conflict-progress {
+    margin-top: 8px;
+    background: #333;
+    border-radius: 2px;
+    overflow: hidden;
+}
+
+.conflict-body {
+    background: #0f0f1a;
+    border-radius: 8px;
+    padding: 12px;
+    margin-bottom: 12px;
+}
+
+.conflict-item {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-bottom: 10px;
+}
+
+.conflict-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 6px;
+    font-size: 13px;
+}
+
+.conflict-label {
+    color: #888;
+    min-width: 60px;
+    flex-shrink: 0;
+}
+
+.conflict-name {
+    color: #4ecdc4;
+    font-weight: 600;
+}
+
+.conflict-field {
+    color: #ffd93d;
+    font-weight: 600;
+}
+
+.conflict-old {
+    color: #e74c3c;
+    word-break: break-all;
+}
+
+.conflict-new {
+    color: #2ecc71;
+    word-break: break-all;
+}
+
+.conflict-hint {
+    font-size: 12px;
+    color: #888;
+    border-top: 1px dashed #444;
+    padding-top: 8px;
+    margin-top: 8px;
+}
+
+.conflict-footer {
+    display: flex;
+    gap: 8px;
+}
+
+.conflict-footer .btn {
+    flex: 1;
+    padding: 10px 8px;
+    font-size: 12px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.conflict-btn-btn {
+    background: #4a9eff;
+    color: #fff;
+}
+
+.conflict-btn-keep {
+    background: #666;
+    color: #fff;
+}
+
+.conflict-btn-overwrite {
+    background: #e74c3c;
+    color: #fff;
+}
+
 /* ========== 锁定状态 ========== */
 .locked-indicator {
     display: inline-flex;

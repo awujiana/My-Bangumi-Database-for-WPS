@@ -9,12 +9,15 @@ import {
   detectColumns,
   matchEntries,
   enrichEntries,
+  resolveConflictField,
   type EnrichColumnMapping,
   type EnrichConfig,
   type MatchResult,
   type EnrichResultItem,
   type EnrichProgress,
   type ProgressCallback,
+  type ConflictInfo,
+  type EnrichedField,
 } from '../sync/enrichEngine.js'
 import {
   getAllEnrichRecords,
@@ -46,6 +49,8 @@ interface EnrichPageState {
   matches: MatchResult[]
   isEnriching: boolean
   cancelRequested: boolean
+  pendingConflicts: ConflictInfo[]
+  currentConflictIndex: number
 }
 
 // ========== 状态 ==========
@@ -60,6 +65,8 @@ const state: EnrichPageState = {
   matches: [],
   isEnriching: false,
   cancelRequested: false,
+  pendingConflicts: [],
+  currentConflictIndex: 0,
 }
 
 // ========== 列映射字段元数据 ==========
@@ -780,9 +787,20 @@ export function startEnrichment(): void {
     )
 
     showProgressUI(false)
-    renderEnrichSummary(results)
 
-    bgmLog(LOG_LEVELS.INFO, `[enrich] 富化完成: ${results.length} 条结果`)
+    const allConflicts = collectAllConflicts(results)
+    if (allConflicts.length > 0) {
+      state.pendingConflicts = allConflicts
+      state.currentConflictIndex = 0
+      showConflictDialog()
+    } else {
+      renderEnrichSummary(results)
+    }
+
+    bgmLog(
+      LOG_LEVELS.INFO,
+      `[enrich] 富化完成: ${results.length} 条结果, 冲突 ${allConflicts.length} 条`,
+    )
   } catch (e: unknown) {
     BGM.handleError(e, {
       showAlert: false,
@@ -1071,6 +1089,126 @@ export function renderMatchResults(container: HTMLElement | null, matches: Match
 
 export function renderProgress(progress: EnrichProgress): void {
   updateProgressUI(progress)
+}
+
+// ========== 冲突对话框 ==========
+
+function collectAllConflicts(results: EnrichResultItem[]): ConflictInfo[] {
+  const all: ConflictInfo[] = []
+  for (const r of results) {
+    if (r.conflicts && r.conflicts.length > 0) {
+      all.push(...r.conflicts)
+    }
+  }
+  return all
+}
+
+function showConflictDialog(): void {
+  const dialogEl = safeGetElement('conflictDialog')
+  if (!dialogEl) return
+
+  const conflict = state.pendingConflicts[state.currentConflictIndex]
+  if (!conflict) {
+    hideConflictDialog()
+    return
+  }
+
+  const total = state.pendingConflicts.length
+  const current = state.currentConflictIndex + 1
+  const percent = Math.round((current / total) * 100)
+
+  const html = `
+    <div class="conflict-header">
+      <span class="conflict-title">⚡ 字段冲突确认 (${current}/${total})</span>
+      <div class="conflict-progress">
+        <div style="width:${percent}%;height:4px;background:#4a90d9;border-radius:2px;"></div>
+      </div>
+    </div>
+    <div class="conflict-body">
+      <div class="conflict-item">
+        <div class="conflict-row">
+          <span class="conflict-label">条目：</span>
+          <span class="conflict-name">${escapeHtml(conflict.newAnimeName)}</span>
+        </div>
+        <div class="conflict-row">
+          <span class="conflict-label">字段：</span>
+          <span class="conflict-field">${escapeHtml(conflict.fieldName)}</span>
+        </div>
+        <div class="conflict-row">
+          <span class="conflict-label">现有值：</span>
+          <span class="conflict-old">${escapeHtml(conflict.oldValue)}</span>
+        </div>
+        <div class="conflict-row">
+          <span class="conflict-label">新番表值：</span>
+          <span class="conflict-new">${escapeHtml(conflict.newValue)}</span>
+        </div>
+      </div>
+      <div class="conflict-hint">💡 选择如何处理此冲突</div>
+    </div>
+    <div class="conflict-footer">
+      <button class="btn conflict-btn-btn" id="conflictAppend" data-resolution="append">
+        🔗 全部增量更新
+      </button>
+      <button class="btn conflict-btn-keep" id="conflictKeep" data-resolution="keep">
+        📋 保留原名
+      </button>
+      <button class="btn conflict-btn-overwrite" id="conflictOverwrite" data-resolution="overwrite">
+        ✏️ 使用新番表名
+      </button>
+    </div>
+  `
+
+  dialogEl.innerHTML = sanitizeHtml(html)
+  dialogEl.style.display = 'block'
+
+  dialogEl.querySelectorAll('[data-resolution]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const resolution = (btn as HTMLElement).dataset.resolution as ConflictInfo['resolution']
+      handleConflictResolution(resolution)
+    })
+  })
+}
+
+function hideConflictDialog(): void {
+  const dialogEl = safeGetElement('conflictDialog')
+  if (dialogEl) {
+    dialogEl.style.display = 'none'
+    dialogEl.innerHTML = ''
+  }
+}
+
+function handleConflictResolution(resolution: ConflictInfo['resolution']): void {
+  const conflict = state.pendingConflicts[state.currentConflictIndex]
+  if (!conflict) return
+
+  conflict.resolution = resolution
+
+  try {
+    const enriched: EnrichedField[] = []
+    if (state.bangumiSheet) {
+      resolveConflictField(state.bangumiSheet, conflict, enriched)
+    }
+
+    bgmLog(
+      LOG_LEVELS.INFO,
+      `[conflict] 字段 "${conflict.fieldName}" (${conflict.newAnimeName}): ${resolution}`,
+    )
+  } catch (e: unknown) {
+    bgmLog(
+      LOG_LEVELS.ERROR,
+      `[conflict] 解析冲突失败: ${e instanceof Error ? e.message : String(e)}`,
+    )
+  }
+
+  state.currentConflictIndex++
+
+  if (state.currentConflictIndex < state.pendingConflicts.length) {
+    showConflictDialog()
+  } else {
+    hideConflictDialog()
+    bgmLog(LOG_LEVELS.INFO, '[conflict] 所有冲突已解决')
+    BGM.Dialog.alert('冲突解决完成', `共处理 ${state.currentConflictIndex} 个字段冲突`)
+  }
 }
 
 // ========== 导出 ==========
