@@ -55,8 +55,8 @@ const KNOWN_COLUMN_MAP: Record<string, keyof EnrichColumnMapping> = {
   剧情简介: 'introCol',
   作品简介: 'introCol',
   介绍: 'introCol',
-  制作公司: 'studioCol',
   动画制作: 'studioCol',
+  制作公司: 'studioCol',
   制作: 'studioCol',
   导演: 'directorCol',
   监督: 'directorCol',
@@ -67,6 +67,19 @@ const KNOWN_COLUMN_MAP: Record<string, keyof EnrichColumnMapping> = {
   OP: 'opCol',
   ED: 'edCol',
   PV: 'pvCol',
+  // 简介专有列
+  编剧: 'screenplayCol',
+  脚本: 'screenplayCol',
+  人设: 'characterDesignCol',
+  人物设定: 'characterDesignCol',
+  CG导演: 'cgDirectorCol',
+  演出: 'cgDirectorCol',
+  系列构成: 'seriesCompositionCol',
+  分镜: 'storyboardCol',
+  原作: 'originalWorkCol',
+  语言: 'languageCol',
+  制片国家: 'productionCountryCol',
+  类型: 'typeCol',
 }
 
 /** 标签分隔符 */
@@ -98,6 +111,15 @@ export interface EnrichColumnMapping {
   opCol?: number
   edCol?: number
   pvCol?: number
+  screenplayCol?: number
+  characterDesignCol?: number
+  cgDirectorCol?: number
+  seriesCompositionCol?: number
+  storyboardCol?: number
+  originalWorkCol?: number
+  languageCol?: number
+  productionCountryCol?: number
+  typeCol?: number
 }
 
 /**
@@ -871,8 +893,31 @@ interface AddEnrichRecordParams {
 // ========== 简介工作表富化函数 ==========
 
 /**
+ * 简介字段 → Bangumi追踪表列名映射
+ * 键：新番表中的字段名；值：Bangumi追踪表中的列名
+ */
+const INTRO_FIELD_TO_BANGUMI: Record<string, string> = {
+  导演: '导演',
+  编剧: '脚本',
+  人设: '人物设定',
+  CG导演: '演出',
+  音乐: '音乐',
+  动画制作: '类型',
+  系列构成: '系列构成',
+  分镜: '分镜',
+  原作: '原作',
+  语言: '语言',
+  制片国家: '制片国家',
+  声优: '声优',
+}
+
+/** 简介字段中需追加到特点/印象的键 */
+const INTRO_FEATURE_FIELDS = new Set(['简介', 'OP', 'ED', 'PV'])
+
+/**
  * 富化简介数据
- * 将简介工作表中的制作公司、导演、音乐等信息追加到特点/印象列
+ * 精准映射：导演→导演、编剧→脚本、人设→人物设定 等列
+ * 无匹配列的字段回退到特点/印象
  */
 export function enrichIntroData(
   sheet: WpsWorksheet,
@@ -882,69 +927,103 @@ export function enrichIntroData(
   enriched: EnrichedField[],
 ): void {
   const bangumiFeatureCol = colMap.get('特点/印象')
-  if (!bangumiFeatureCol) return
 
-  const introParts: string[] = []
+  for (const [sourceKey, targetColName] of Object.entries(INTRO_FIELD_TO_BANGUMI)) {
+    const value = newData[sourceKey] || ''
+    if (isEmptyValue(value)) continue
 
-  const studio = newData['制作公司'] || ''
-  if (!isEmptyValue(studio)) {
-    introParts.push(`制作:${studio}`)
+    const targetCol = colMap.get(targetColName)
+    if (targetCol !== undefined) {
+      const oldValue = getCellValue(sheet, row, targetCol)
+      if (isEmptyValue(oldValue)) {
+        setCellValue(sheet, row, targetCol, value)
+        enriched.push({
+          fieldName: targetColName,
+          bangumiColumn: targetCol,
+          oldValue: null,
+          newValue: value,
+          action: 'fill',
+        })
+      } else {
+        enriched.push({
+          fieldName: targetColName,
+          bangumiColumn: targetCol,
+          oldValue,
+          newValue: value,
+          action: 'skip',
+        })
+      }
+    } else if (bangumiFeatureCol !== undefined) {
+      const oldFeature = getCellValue(sheet, row, bangumiFeatureCol)
+      const featureEntry = `${sourceKey}:${value}`
+      if (isEmptyValue(oldFeature)) {
+        setCellValue(sheet, row, bangumiFeatureCol, featureEntry)
+        enriched.push({
+          fieldName: `特点/印象(${sourceKey})`,
+          bangumiColumn: bangumiFeatureCol,
+          oldValue: null,
+          newValue: featureEntry,
+          action: 'fill',
+        })
+      } else {
+        const merged = appendFeatures(oldFeature, featureEntry)
+        if (merged !== oldFeature) {
+          setCellValue(sheet, row, bangumiFeatureCol, merged)
+          enriched.push({
+            fieldName: `特点/印象(${sourceKey})`,
+            bangumiColumn: bangumiFeatureCol,
+            oldValue: oldFeature,
+            newValue: merged,
+            action: 'append',
+          })
+        } else {
+          enriched.push({
+            fieldName: `特点/印象(${sourceKey})`,
+            bangumiColumn: bangumiFeatureCol,
+            oldValue: oldFeature,
+            newValue: merged,
+            action: 'skip',
+          })
+        }
+      }
+    }
   }
 
-  const director = newData['导演'] || ''
-  if (!isEmptyValue(director)) {
-    introParts.push(`导演:${director}`)
-  }
-
-  const music = newData['音乐'] || ''
-  if (!isEmptyValue(music)) {
-    introParts.push(`音乐:${music}`)
-  }
-
-  const voice = newData['声优'] || ''
-  if (!isEmptyValue(voice)) {
-    introParts.push(`声优:${voice}`)
-  }
-
-  const intro = newData['简介'] || ''
-  if (!isEmptyValue(intro)) {
-    const introSummary = intro.length > 100 ? intro.substring(0, 100) + '...' : intro
-    introParts.push(`简介:${introSummary}`)
-  }
-
-  if (introParts.length === 0) return
-
-  const newFeatureText = introParts.join(FEATURE_SEPARATOR)
-  const oldFeature = getCellValue(sheet, row, bangumiFeatureCol)
-
-  if (isEmptyValue(oldFeature)) {
-    setCellValue(sheet, row, bangumiFeatureCol, newFeatureText)
-    enriched.push({
-      fieldName: '特点/印象',
-      bangumiColumn: bangumiFeatureCol,
-      oldValue: null,
-      newValue: newFeatureText,
-      action: 'fill',
-    })
-  } else {
-    const merged = appendFeatures(oldFeature, newFeatureText)
-    if (merged !== oldFeature) {
-      setCellValue(sheet, row, bangumiFeatureCol, merged)
-      enriched.push({
-        fieldName: '特点/印象',
-        bangumiColumn: bangumiFeatureCol,
-        oldValue: oldFeature,
-        newValue: merged,
-        action: 'append',
-      })
-    } else {
-      enriched.push({
-        fieldName: '特点/印象',
-        bangumiColumn: bangumiFeatureCol,
-        oldValue: oldFeature,
-        newValue: merged,
-        action: 'skip',
-      })
+  if (bangumiFeatureCol !== undefined) {
+    const featureParts: string[] = []
+    for (const key of INTRO_FEATURE_FIELDS) {
+      const value = newData[key] || ''
+      if (!isEmptyValue(value)) {
+        const label = key === '简介' ? '简介' : key
+        const display = key === '简介' && value.length > 80 ? value.substring(0, 80) + '...' : value
+        featureParts.push(`${label}:${display}`)
+      }
+    }
+    if (featureParts.length > 0) {
+      const oldFeature = getCellValue(sheet, row, bangumiFeatureCol)
+      const merged = featureParts.join(FEATURE_SEPARATOR)
+      if (isEmptyValue(oldFeature)) {
+        setCellValue(sheet, row, bangumiFeatureCol, merged)
+        enriched.push({
+          fieldName: '特点/印象(简介补充)',
+          bangumiColumn: bangumiFeatureCol,
+          oldValue: null,
+          newValue: merged,
+          action: 'fill',
+        })
+      } else {
+        const combined = appendFeatures(oldFeature, merged)
+        if (combined !== oldFeature) {
+          setCellValue(sheet, row, bangumiFeatureCol, combined)
+          enriched.push({
+            fieldName: '特点/印象(简介补充)',
+            bangumiColumn: bangumiFeatureCol,
+            oldValue: oldFeature,
+            newValue: combined,
+            action: 'append',
+          })
+        }
+      }
     }
   }
 }
@@ -1019,7 +1098,7 @@ export function enrichOpEdPv(
 
 /**
  * 读取简介工作表一行数据
- * 扩展 readNewAnimeRow 支持简介特有字段
+ * 支持简介专有字段：编剧/人设/CG导演/系列构成/分镜/原作/语言/制片国家 等
  */
 export function readIntroSheetRow(
   sheet: WpsWorksheet,
@@ -1029,13 +1108,26 @@ export function readIntroSheetRow(
   const data: Record<string, string> = {}
   data['名称'] = getCellValue(sheet, row, mapping.nameCol) || ''
   if (mapping.introCol) data['简介'] = getCellValue(sheet, row, mapping.introCol) || ''
-  if (mapping.studioCol) data['制作公司'] = getCellValue(sheet, row, mapping.studioCol) || ''
+  if (mapping.studioCol) data['动画制作'] = getCellValue(sheet, row, mapping.studioCol) || ''
   if (mapping.directorCol) data['导演'] = getCellValue(sheet, row, mapping.directorCol) || ''
   if (mapping.musicCol) data['音乐'] = getCellValue(sheet, row, mapping.musicCol) || ''
   if (mapping.voiceCol) data['声优'] = getCellValue(sheet, row, mapping.voiceCol) || ''
   if (mapping.opCol) data['OP'] = getCellValue(sheet, row, mapping.opCol) || ''
   if (mapping.edCol) data['ED'] = getCellValue(sheet, row, mapping.edCol) || ''
   if (mapping.pvCol) data['PV'] = getCellValue(sheet, row, mapping.pvCol) || ''
+  if (mapping.screenplayCol) data['编剧'] = getCellValue(sheet, row, mapping.screenplayCol) || ''
+  if (mapping.characterDesignCol)
+    data['人设'] = getCellValue(sheet, row, mapping.characterDesignCol) || ''
+  if (mapping.cgDirectorCol) data['CG导演'] = getCellValue(sheet, row, mapping.cgDirectorCol) || ''
+  if (mapping.seriesCompositionCol)
+    data['系列构成'] = getCellValue(sheet, row, mapping.seriesCompositionCol) || ''
+  if (mapping.storyboardCol) data['分镜'] = getCellValue(sheet, row, mapping.storyboardCol) || ''
+  if (mapping.originalWorkCol)
+    data['原作'] = getCellValue(sheet, row, mapping.originalWorkCol) || ''
+  if (mapping.languageCol) data['语言'] = getCellValue(sheet, row, mapping.languageCol) || ''
+  if (mapping.productionCountryCol)
+    data['制片国家'] = getCellValue(sheet, row, mapping.productionCountryCol) || ''
+  if (mapping.typeCol) data['类型'] = getCellValue(sheet, row, mapping.typeCol) || ''
   return data
 }
 
@@ -1046,7 +1138,8 @@ export function readIntroSheetRow(
 export function isIntroSheet(mapping: EnrichColumnMapping): boolean {
   return (
     mapping.introCol !== undefined ||
-    mapping.studioCol !== undefined ||
-    mapping.directorCol !== undefined
+    mapping.screenplayCol !== undefined ||
+    mapping.characterDesignCol !== undefined ||
+    mapping.cgDirectorCol !== undefined
   )
 }
