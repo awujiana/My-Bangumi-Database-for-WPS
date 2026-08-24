@@ -83,7 +83,7 @@ const KNOWN_COLUMN_MAP: Record<string, keyof EnrichColumnMapping> = {
 }
 
 /** 标签分隔符 */
-const TAG_SEPARATOR = ' / '
+const TAG_SEPARATOR = ' | '
 
 /** 特点/印象分隔符 */
 const FEATURE_SEPARATOR = ' | '
@@ -214,7 +214,7 @@ export function normalizeName(name: string): string {
 export function splitAliases(aliasesStr: string): string[] {
   if (!aliasesStr) return []
   return aliasesStr
-    .split(/[|/;，、]/)
+    .split(/\s*\|\s*|\s*[;，、]\s*|\s*\/\s*/)
     .map((a) => a.trim())
     .filter((a) => a.length > 0)
 }
@@ -226,7 +226,7 @@ export function splitAliases(aliasesStr: string): string[] {
 export function splitTags(tags: string): string[] {
   if (!tags) return []
   return tags
-    .split(/\s*[/,、|;]\s*|\s*TAG_SEPARATOR\s*/)
+    .split(/\s*\|\s*|\s*[,、;]\s*|\s*\/\s*/)
     .map((t) => t.trim())
     .filter((t) => t.length > 0)
 }
@@ -1201,7 +1201,7 @@ export function enrichAlias(
     return
   }
 
-  const merged = existingAliases ? `${existingAliases} / ${newAnimeName}` : newAnimeName
+  const merged = existingAliases ? existingAliases + TAG_SEPARATOR + newAnimeName : newAnimeName
 
   setCellValue(sheet, row, aliasCol, merged)
   enriched.push({
