@@ -342,6 +342,8 @@ export {
   showBangumiPanel,
   // 显示设置面板（带动态停靠位置）
   showSettingsPanel,
+  // 显示新番表富化面板
+  showEnrichPanel,
   // 等待指定毫秒数
   sleep,
   // 延迟执行（用于模拟异步操作）
@@ -608,3 +610,66 @@ export {
 // 21. JSONL 导出（来自 sync/exportJsonl.js）
 // ============================================================================
 export { exportSheetToJsonlFile, buildJsonlFromSheet } from './sync/exportJsonl.js'
+
+// ============================================================================
+// 22. 新番表富化引擎（来自 sync/enrichEngine.js + sync/enrichRecord.js）
+// ============================================================================
+export {
+  // 富化引擎核心函数
+  detectColumns,
+  matchEntries,
+  enrichEntries,
+  normalizeName,
+  mergeTags,
+  splitTags,
+  splitAliases,
+  appendFeatures,
+  findAliasColumn,
+  getBangumiColumnMap,
+  readNewAnimeRow,
+  enrichTags,
+  enrichDate,
+  enrichEpisodes,
+  enrichFeatures,
+  // 富化引擎类型
+  type EnrichColumnMapping,
+  type EnrichConfig,
+  type MatchResult,
+  type EnrichResultItem,
+  type EnrichedField,
+  type EnrichProgress,
+  type ProgressCallback,
+} from './sync/enrichEngine.js'
+
+export {
+  // 富化记录表函数
+  getOrCreateEnrichRecordSheet,
+  getEnrichRecordSheetIfExists,
+  getAllEnrichRecords,
+  addEnrichRecord,
+  addEnrichRecords,
+  clearEnrichRecords,
+  openEnrichRecordSheet,
+  formatEnrichRecordSheet,
+  // 富化记录表类型
+  type EnrichRecord,
+  type AddEnrichRecordParams,
+  // 富化记录表常量
+  ENRICH_RECORD_SHEET_NAME,
+  ENRICH_RECORD_COLUMNS,
+  ENRICH_RECORD_COL,
+} from './sync/enrichRecord.js'
+
+// ============================================================================
+// 23. 富化页面 UI 控制器（来自 taskpane/enrich.js）
+// ============================================================================
+export {
+  initEnrichPage,
+  selectNewAnimeFile,
+  autoDetectHeader,
+  previewMatch,
+  startEnrichment,
+  cancelEnrichment,
+  openEnrichRecordSheet as openEnrichRecordSheetFromPage,
+  clearRecords,
+} from './taskpane/enrich.js'

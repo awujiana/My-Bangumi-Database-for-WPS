@@ -1099,6 +1099,41 @@ export function showBangumiPanel(): void {
 }
 
 /**
+ * 显示新番表富化面板
+ * 独立面板，与主同步面板分离
+ */
+export function showEnrichPanel(): void {
+  const app = getApp() as {
+    PluginStorage?: {
+      getItem: (k: string) => string | null
+      setItem: (k: string, v: string) => void
+    }
+    CreateTaskPane?: (url: string) => { ID: string; Visible: boolean }
+    GetTaskPane?: (id: string) => { Visible: boolean }
+  }
+  if (!app) {
+    bgmLog(LOG_LEVELS.ERROR, '[showEnrichPanel] 无法获取 WPS Application 对象')
+    return
+  }
+  const tsId = app.PluginStorage?.getItem('enrich_pane_id')
+  if (!tsId) {
+    const tskpane = app.CreateTaskPane?.(getUrlPath() + '/ui/enrich.html')
+    if (tskpane) {
+      const id = tskpane.ID
+      app.PluginStorage?.setItem('enrich_pane_id', id)
+      tskpane.Visible = true
+      bgmLog(LOG_LEVELS.INFO, '[showEnrichPanel] 富化面板已创建并显示')
+    }
+  } else {
+    const tskpane = app.GetTaskPane?.(tsId)
+    if (tskpane) {
+      tskpane.Visible = !tskpane.Visible
+      bgmLog(LOG_LEVELS.INFO, `[showEnrichPanel] 富化面板可见性切换: ${tskpane.Visible}`)
+    }
+  }
+}
+
+/**
  * 显示/切换设置面板
  * 设置面板位置逻辑：
  * - 始终停靠右侧（msoCTPDockPositionRight）

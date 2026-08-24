@@ -9,6 +9,7 @@ import * as RibbonService from './services/ribbonService.js'
 import {
   WPS_ENUM,
   showBangumiPanel,
+  showEnrichPanel,
   showSettingsPanel,
   BGM,
   getIncrementalSync,
@@ -411,6 +412,9 @@ export function OnAction(control: { Id: string }): boolean {
       case 'btnOpenSettings':
         showSettingsPanel()
         break
+      case 'btnOpenEnrichPanel':
+        showEnrichPanel()
+        break
       default:
         bgmLog(LOG_LEVELS.WARN, `[BGM] 未知按钮: ${control.Id}`)
     }
@@ -435,6 +439,7 @@ const ICON_PATHS: Record<string, string> = {
   btnSyncFromGithub: 'images/github.svg',
   btnUndoLastSync: 'images/undo.svg',
   btnOpenSettings: 'images/settings.svg',
+  btnOpenEnrichPanel: 'images/enrich.svg',
 }
 
 export function GetBangumiImage(control: { Id: string }): string {

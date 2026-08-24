@@ -18,6 +18,9 @@
                     <button id="btnOpenSettings" label="设置" onAction="OnAction" getImage="GetBangumiImage" size="large"/>
                   
 				</group>
+				<group id="enrichGroup" label="新番表富化">
+                    <button id="btnOpenEnrichPanel" label="新番表富化" onAction="OnAction" getImage="GetBangumiImage" size="large"/>
+                </group>
             </tab>
         </tabs>
     </ribbon>
