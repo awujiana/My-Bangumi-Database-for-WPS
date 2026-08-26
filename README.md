@@ -223,14 +223,16 @@ npm run test:coverage    # 生成覆盖率报告
 
 ## 📚 文档索引
 
-| 文档                                                                   | 说明                                                  |
-| ---------------------------------------------------------------------- | ----------------------------------------------------- |
-| [`docs/ui-and-interaction.md`](docs/ui-and-interaction.md)             | UI 架构、面板交互、事件机制、Processor 清单           |
-| [`docs/github-data-distribution.md`](docs/github-data-distribution.md) | 远程数据下发机制、JSONL 格式、同步策略                |
-| [`docs/README.data-distribution.md`](docs/README.data-distribution.md) | 数据源仓库（Bangumi-Archive-Anime-Excel）说明（参考） |
-| [`docs/coverage-report.md`](docs/coverage-report.md)                   | 测试覆盖率报告                                        |
+| 文档                                                                   | 说明                                                      |
+| ---------------------------------------------------------------------- | --------------------------------------------------------- |
+| [`docs/ui-and-interaction.md`](docs/ui-and-interaction.md)             | UI 架构、面板交互、事件机制、Processor 清单               |
+| [`docs/github-data-distribution.md`](docs/github-data-distribution.md) | 远程数据下发机制、JSONL 格式、同步策略                    |
+| [`docs/README.data-distribution.md`](docs/README.data-distribution.md) | 数据源仓库（Bangumi-Archive-Anime-Excel）说明（参考）     |
+| [`docs/项目文档.md`](docs/项目文档.md)                                 | 数据源仓库项目文档：仓库级架构、转换脚本、CI 流程（参考） |
+| [`docs/项目操作指南.md`](docs/项目操作指南.md)                         | 数据源仓库维护操作指南：初始化、发布、验证、回滚（参考）  |
+| [`docs/coverage-report.md`](docs/coverage-report.md)                   | 测试覆盖率报告                                            |
 
-> 根目录的 `项目文档.md` / `项目操作指南.md` 亦为数据源仓库的参考文档，如需进一步整理可移入 `docs/`。
+> 数据源仓库（Bangumi-Archive-Anime-Excel）的参考文档已统一置于 `docs/` 下。
 
 ---
 

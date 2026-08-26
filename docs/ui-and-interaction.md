@@ -45,7 +45,7 @@ Bangumi 同步工具是一个 WPS/Excel 加载项，用于在本地 Excel 表格
 | URL       | `ui/taskpane.html`   | `ui/settings.html` |
 | 默认停靠  | 左侧                 | 动态（见下方）     |
 | 生命周期  | 持久化，由功能区创建 | 按需创建/销毁      |
-| 持久化 ID | `taskpane_id`        | `settings_pane_id` |
+| 持久化 ID | `panel_id`           | `settings_pane_id` |
 
 ### 2.2 动态停靠逻辑
 
@@ -54,8 +54,8 @@ Bangumi 同步工具是一个 WPS/Excel 加载项，用于在本地 Excel 表格
 ```
 showSettingsPanel() 调用时：
     │
-    ├── 读取 PluginStorage['taskpane_id']
-    ├── GetTaskPane(taskpane_id) → 检查主面板 Visible
+    ├── 读取 PluginStorage['panel_id']
+    ├── GetTaskPane(panel_id) → 检查主面板 Visible
     │
     ├── 主面板可见？
     │   ├── 是  → 设置面板 DockPosition = Right
@@ -376,7 +376,7 @@ interface HandlerContext {
 
 | Key                       | 类型        | 说明               |
 | ------------------------- | ----------- | ------------------ |
-| `taskpane_id`             | string      | 主面板实例 ID      |
+| `panel_id`                | string      | 主面板实例 ID      |
 | `settings_pane_id`        | string      | 设置面板实例 ID    |
 | `bgm_token`               | string      | Bangumi API Token  |
 | `bgm_user_id`             | string      | 用户 ID            |
