@@ -162,7 +162,7 @@ ts/index.ts (thin barrel — 仅 re-export)
   1. `initHandlers()`: 复用 Taskpane 的事件处理器（统一事件分发）
   2. `initSettingsPage()`: 加载 Token 状态、用户信息、同步偏好、GitHub 配置
 - **自动启动条件**: `typeof window !== 'undefined' && window.location.pathname.includes('settings.html')`
-- **UI 结构**: 独立 TaskPane (`settings.html`)，包含 Token 管理、用户信息、同步偏好、GitHub 配置、收藏回写数据源等模块
+- **UI 结构**: 独立 TaskPane (`settings.html`)，包含 Token 管理、用户信息、同步偏好、GitHub 配置等模块
 
 ---
 
@@ -283,7 +283,6 @@ ts/index.ts (thin barrel — 仅 re-export)
 - **默认配置**: `DEFAULT_GITHUB_CONFIG = { owner: 'awujiana', repo: 'Bangumi-Archive-Anime-Excel', branch: 'main', path: 'data/bangumi.jsonl', sourceType: 'github' }`
 - **同步策略** (`SyncStrategy`): 'add-update' | 'add-only' | 'update-only' | 'mirror' | 'force-overwrite'
 - **同步源类型** (`SyncSourceType`): 'github' | 'gitlab' | 'gitee' | 'local' | 'gist'
-- **收藏回写数据源** (`CollectionWritebackSource`): 'api' | 'github'
 - **配置完整性校验**: `isGithubConfigComplete()` 检查 owner/repo/path 非空
 - **Gist 配置校验**: `isGistConfigured()` 检查 gistId 非空（独立于 GitHub 配置）
 - **Raw URL 构造**: `buildRawUrl()` → `https://raw.githubusercontent.com/{owner}/{repo}/{branch}/{path}`
@@ -661,16 +660,15 @@ ts/index.ts (thin barrel — 仅 re-export)
 
 #### GitHub / 远程同步配置
 
-| 键名                          | 类型   | 默认值                          | 说明              |
-| ----------------------------- | ------ | ------------------------------- | ----------------- |
-| `github_sync_owner`           | string | `'awujiana'`                    | GitHub 仓库所有者 |
-| `github_sync_repo`            | string | `'Bangumi-Archive-Anime-Excel'` | GitHub 仓库名     |
-| `github_sync_branch`          | string | `'main'`                        | 分支名            |
-| `github_sync_path`            | string | `'data/bangumi.jsonl'`          | JSONL 文件路径    |
-| `github_sync_strategy`        | string | `'add-update'`                  | 同步策略          |
-| `github_sync_source_type`     | string | `'github'`                      | 同步源类型        |
-| `github_sync_gist_id`         | string | `''` (空)                       | GitHub Gist ID    |
-| `collection_writeback_source` | string | `'api'`                         | 收藏回写数据源    |
+| 键名                      | 类型   | 默认值                          | 说明              |
+| ------------------------- | ------ | ------------------------------- | ----------------- |
+| `github_sync_owner`       | string | `'awujiana'`                    | GitHub 仓库所有者 |
+| `github_sync_repo`        | string | `'Bangumi-Archive-Anime-Excel'` | GitHub 仓库名     |
+| `github_sync_branch`      | string | `'main'`                        | 分支名            |
+| `github_sync_path`        | string | `'data/bangumi.jsonl'`          | JSONL 文件路径    |
+| `github_sync_strategy`    | string | `'add-update'`                  | 同步策略          |
+| `github_sync_source_type` | string | `'github'`                      | 同步源类型        |
+| `github_sync_gist_id`     | string | `''` (空)                       | GitHub Gist ID    |
 
 #### UI 与通信配置
 

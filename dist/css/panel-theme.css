@@ -4,8 +4,8 @@
  * 设计目标：
  *   1) 优先布局 —— 顶栏 + 侧栏导航 + 核心操作指令中心 + 自适应卡片网格；
  *      核心功能（上传同步 / 收藏回写 / 预览）置于视觉焦点。
- *   2) 配色方案 —— 以 Catppuccin Mocha 深色为基底（契合「音乐 / BGM」氛围），
- *      低视觉疲劳；明确主色 / 强调色 / 背景层级 / 文字对比规范（WCAG 2.2 AA）。
+ *   2) 配色方案 —— 纯黑深色模式（black dark mode），中性单色，去除蓝/紫罗兰/青；
+ *      黑底白字高对比、低视觉疲劳；明确主色 / 强调色 / 背景层级 / 文字对比规范（WCAG 2.2 AA）。
  *   3) 字体方案 —— 无衬线字体族，标题 / 正文 / 控件文字的字号字重行距层级化。
  *   约束：仅桌面端；窗口缩放时通过 CSS Grid auto-fit 与 clamp() 实现重排与缩放。
  *
@@ -16,33 +16,33 @@
 
 /* ============================ 1. 设计 Token ============================== */
 :root {
-  /* ---- 背景层级（由深到浅，营造空间纵深）---- */
-  --bg-app:        #11111b;   /* crust  应用底色 */
-  --bg-base:       #1e1e2e;   /* base   卡片背景 */
-  --bg-mantle:     #181825;   /* mantle 嵌套/侧栏 */
-  --bg-surface:    #313244;   /* surface0 输入框 / 弹出层 */
-  --bg-surface-2:  #45475a;   /* surface1 悬停态 */
-  --bg-overlay:    rgba(17,17,27,0.72);
+  /* ---- 背景层级（纯黑基底，由深到浅营造纵深）---- */
+  --bg-app:        #000000;   /* 应用底色：纯黑 */
+  --bg-base:       #141414;   /* 卡片背景 */
+  --bg-mantle:     #0c0c0c;   /* 嵌套/侧栏 */
+  --bg-surface:    #1f1f1f;   /* 输入框 / 弹出层 */
+  --bg-surface-2:  #2a2a2a;   /* 悬停态 */
+  --bg-overlay:    rgba(0,0,0,0.72);
 
-  /* ---- 边框 / 分隔 ---- */
-  --border:        rgba(205,214,244,0.08);
-  --border-strong: rgba(205,214,244,0.16);
+  /* ---- 边框 / 分隔（中性白透明）---- */
+  --border:        rgba(255,255,255,0.08);
+  --border-strong: rgba(255,255,255,0.16);
 
-  /* ---- 文字（对比度均满足 AA）---- */
-  --text-1:        #cdd6f4;   /* 主文字  on base ≈ 10.5:1 */
-  --text-2:        #a6adc8;   /* 次文字  on base ≈ 7.0:1  */
-  --text-3:        #9399b2;   /* 弱化文字 on base ≈ 5.5:1（仅用于辅助说明） */
-  --text-on-accent:#11111b;   /* 浅色按钮上的深色文字 */
+  /* ---- 文字（黑底白字，高对比，均满足 AA）---- */
+  --text-1:        #f2f2f2;   /* 主文字  on base ≈ 14:1 */
+  --text-2:        #b5b5b5;   /* 次文字  on base ≈ 7.5:1 */
+  --text-3:        #808080;   /* 弱化文字 on base ≈ 4.6:1（仅用于辅助说明） */
+  --text-on-accent:#0a0a0a;   /* 浅色按钮上的深色文字 */
 
-  /* ---- 主色 / 强调色（音乐氛围：蓝 + 紫罗兰 + 青）---- */
-  --primary:       #89b4fa;   /* blue   主操作 / 链接 / 焦点 */
-  --primary-strong:#74a0f0;   /* 主色 hover */
-  --accent:        #cba6f7;   /* mauve  品牌 / 次级高亮（紫罗兰，音乐感） */
-  --accent-2:      #94e2d5;   /* teal   第三强调 / 中性高亮 */
-  --primary-grad:  linear-gradient(135deg, #89b4fa 0%, #74a0f0 100%);
-  --accent-grad:   linear-gradient(135deg, #cba6f7 0%, #b4befe 100%);
+  /* ---- 主色 / 强调色（中性单色，黑模式下以浅灰为主操作色）---- */
+  --primary:       #e8e8e8;   /* 浅中性：主操作 / 链接 / 焦点 */
+  --primary-strong:#ffffff;   /* 主色 hover */
+  --accent:        #cfcfcf;   /* 次级高亮（中性） */
+  --accent-2:      #9a9a9a;   /* 第三强调（中性灰） */
+  --primary-grad:  linear-gradient(135deg, #ededed 0%, #cfcfcf 100%);
+  --accent-grad:   linear-gradient(135deg, #2c2c2c 0%, #3a3a3a 100%);
 
-  /* ---- 语义色 ---- */
+  /* ---- 语义色（状态反馈，保留）---- */
   --success:       #a6e3a1;
   --warning:       #f9e2af;
   --danger:        #f38ba8;
@@ -91,10 +91,7 @@ body {
   font-size: var(--fs-body);
   line-height: 1.6;
   color: var(--text-1);
-  background:
-    radial-gradient(1200px 600px at 12% -10%, rgba(203,166,247,0.10), transparent 60%),
-    radial-gradient(1000px 500px at 100% 0%, rgba(137,180,250,0.10), transparent 55%),
-    var(--bg-app);
+  background: var(--bg-app);
   background-attachment: fixed;
   min-height: 100vh;
   -webkit-font-smoothing: antialiased;
@@ -133,7 +130,7 @@ body {
   justify-content: space-between;
   gap: var(--gap);
   padding: clamp(10px, 0.9vw, 16px) clamp(16px, 1.4vw, 28px);
-  background: rgba(24,24,37,0.82);
+  background: rgba(12,12,12,0.85);
   backdrop-filter: blur(10px);
   border-bottom: 1px solid var(--border);
 }
@@ -143,8 +140,8 @@ body {
   border-radius: 11px;
   background: var(--accent-grad);
   display: grid; place-items: center;
-  color: #1e1e2e; font-weight: 800; font-size: 18px;
-  box-shadow: 0 4px 14px rgba(203,166,247,0.35);
+  color: #0a0a0a; font-weight: 800; font-size: 18px;
+  box-shadow: 0 4px 14px rgba(255,255,255,0.14);
 }
 .brand-text { display: flex; flex-direction: column; min-width: 0; }
 .brand-title {
@@ -218,9 +215,9 @@ body {
 .nav a .nav-ico { width: 18px; text-align: center; flex-shrink: 0; opacity: .9; }
 .nav a:hover { background: var(--bg-surface); color: var(--text-1); transform: translateX(2px); }
 .nav a.active {
-  background: rgba(137,180,250,0.12);
+  background: rgba(255,255,255,0.10);
   color: var(--primary);
-  border-color: rgba(137,180,250,0.30);
+  border-color: rgba(255,255,255,0.20);
 }
 
 /* ---- 主区 ---- */
@@ -234,7 +231,7 @@ body {
 /* ============================ 4. 核心操作指令中心 ======================== */
 /* 置于视觉焦点：顶部通栏，承载 4 个主操作 + Token 状态 */
 .command-center {
-  background: linear-gradient(135deg, rgba(49,50,68,0.9), rgba(30,30,46,0.95));
+  background: linear-gradient(135deg, rgba(31,31,31,0.9), rgba(20,20,20,0.95));
   border: 1px solid var(--border-strong);
   border-radius: var(--r-lg);
   padding: clamp(16px, 1.4vw, 24px);
@@ -290,7 +287,7 @@ body {
 }
 .section h3::before {
   content: ""; width: 4px; height: 1em; border-radius: var(--r-pill);
-  background: var(--primary-grad); flex-shrink: 0;
+  background: var(--primary); flex-shrink: 0;
 }
 
 /* ============================ 6. 按钮 ==================================== */
@@ -318,9 +315,9 @@ body {
 
 .bgm-btn.primary {
   background: var(--primary); color: var(--text-on-accent);
-  box-shadow: 0 4px 12px rgba(137,180,250,0.28);
+  box-shadow: 0 4px 12px rgba(255,255,255,0.15);
 }
-.bgm-btn.primary:hover { background: var(--primary-strong); box-shadow: 0 6px 16px rgba(137,180,250,0.38); }
+.bgm-btn.primary:hover { background: var(--primary-strong); box-shadow: 0 6px 16px rgba(255,255,255,0.22); }
 
 .bgm-btn.success { background: var(--success); color: #1e1e2e; box-shadow: 0 4px 12px rgba(166,227,161,0.25); }
 .bgm-btn.success:hover { background: #95d78f; }
@@ -368,7 +365,7 @@ select.input,
 select.input:focus {
   outline: none;
   border-color: var(--primary);
-  box-shadow: 0 0 0 3px rgba(137,180,250,0.20);
+  box-shadow: 0 0 0 3px rgba(255,255,255,0.18);
 }
 .input::placeholder,
 .form-row input::placeholder { color: var(--text-3); }
@@ -391,7 +388,7 @@ select.input option, .form-row select option { background: var(--bg-surface); co
 .radio-label:hover { background: var(--bg-surface-2); }
 .radio-label:has(input:checked) {
   border-color: var(--primary);
-  background: rgba(137,180,250,0.10);
+  background: rgba(255,255,255,0.08);
 }
 .radio-label input { accent-color: var(--primary); }
 .radio-text { font-weight: 600; color: var(--text-1); }
@@ -419,7 +416,7 @@ select.input option, .form-row select option { background: var(--bg-surface); co
 .token-expires, .profile-expires {
   font-size: var(--fs-sm); font-weight: 500;
   padding: 2px 7px; border-radius: var(--r-sm);
-  background: rgba(205,214,244,0.06); color: var(--text-2);
+  background: rgba(255,255,255,0.06); color: var(--text-2);
 }
 #tokenStatus, #userIdStatus { font-weight: 700; color: var(--danger); font-size: var(--fs-ctrl); }
 #tokenStatus.set, #userIdStatus.set { color: var(--success); }
@@ -427,7 +424,7 @@ select.input option, .form-row select option { background: var(--bg-surface); co
 .hint { color: var(--text-3); font-size: var(--fs-sm); line-height: 1.6; margin-top: 10px; }
 .hint code {
   font-family: var(--font-mono); font-size: 11.5px;
-  background: var(--bg-surface); color: var(--accent-2);
+  background: var(--bg-surface); color: var(--text-2);
   padding: 1px 6px; border-radius: 4px; border: 1px solid var(--border);
 }
 .hint a { color: var(--primary); text-decoration: none; }
@@ -477,7 +474,7 @@ select.input option, .form-row select option { background: var(--bg-surface); co
   position: sticky; top: 0; z-index: 10; white-space: nowrap;
 }
 .preview-box td { padding: 9px 10px; border-bottom: 1px solid var(--border); color: var(--text-2); vertical-align: middle; }
-.preview-box tr:hover { background: rgba(137,180,250,0.07); }
+.preview-box tr:hover { background: rgba(255,255,255,0.06); }
 .preview-box tr:last-child td { border-bottom: none; }
 .preview-box .row-num { font-weight: 600; color: var(--text-3); font-size: 11px; }
 
@@ -490,7 +487,7 @@ select.input option, .form-row select option { background: var(--bg-surface); co
 }
 .step-num {
   width: 28px; height: 28px; border-radius: 50%; flex-shrink: 0;
-  background: var(--primary-grad); color: #11111b;
+  background: var(--primary-grad); color: #0a0a0a;
   display: grid; place-items: center; font-weight: 700; font-size: 13px;
 }
 

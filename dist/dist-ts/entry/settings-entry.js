@@ -15,7 +15,6 @@ import { initHandlers } from '../ui/handlers/index.js';
  *  - 用户信息（updateUserIdStatus）
  *  - 同步偏好（增量同步、跳过冲突、启用同步记录）
  *  - GitHub 配置（owner/repo/branch/path/strategy）
- *  - 收藏回写数据源
  */
 function initSettingsPage() {
     // 1. 加载 Token 和用户信息状态
@@ -46,12 +45,6 @@ function initSettingsPage() {
         if (strategySelect) {
             const savedStrategy = getConfig('bgm_conflict_strategy', 'skip', true);
             strategySelect.value = savedStrategy;
-        }
-        // 设置收藏回写数据源下拉
-        const sourceSelect = document.getElementById('writebackSourceType');
-        if (sourceSelect) {
-            const savedSource = getConfig('bgm_writeback_source', 'api', true);
-            sourceSelect.value = savedSource;
         }
     })
         .catch(() => {
