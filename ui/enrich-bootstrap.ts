@@ -7,7 +7,7 @@
  * bootstrap 文件从 dist-ts/ 目录导入已编译的模块。
  */
 
-import { initEnrichPage } from '../dist-ts/taskpane/enrich.js'
+import { initEnrichPage } from '../dist-ts/panel/enrichPage.js'
 
 if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', () => {

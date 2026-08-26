@@ -16,12 +16,12 @@ export default defineConfig({
         // 修复嵌套问题：src 保留完整路径，dest 是前缀
         // 原 { src: 'images/*', dest: 'images' } 会复制到 dist/images/images/，导致路径错误
         { src: 'images/*', dest: '.' },     // 按钮图标 → dist/images/*.svg
-        { src: 'ui/*', dest: '.' },         // 任务面板 HTML → dist/ui/taskpane.html
+        { src: 'ui/*', dest: '.' },         // 任务面板 HTML → dist/ui/panel.html
         { src: 'main.js', dest: '.' },      // 动态模块加载器
         { src: 'node_modules/wpsjs-rpc-sdk-new/wpsjsrpcsdk.js', dest: '.' }, // WPS SDK
-        // 新增：复制 dist-ts 目录（TS 编译产物，main.js 和 taskpane.html 均依赖）
+        // 新增：复制 dist-ts 目录（TS 编译产物，main.js 和 panel.html 均依赖）
         { src: 'dist-ts/**/*.js', dest: '.' }, // → dist/dist-ts/core/constants.js 等
-        // 新增：复制 css 目录（taskpane.html 通过 ../css/ 引用）
+        // 新增：复制 css 目录（panel.html 通过 ../css/ 引用）
         { src: 'css/*', dest: '.' }           // → dist/css/styles.css
       ]
     })

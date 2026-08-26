@@ -1078,7 +1078,7 @@ export function showBangumiPanel(): void {
   const tsId = app.PluginStorage?.getItem('taskpane_id')
   let becameVisible = false
   if (!tsId) {
-    const tskpane = app.CreateTaskPane?.(getUrlPath() + '/ui/taskpane.html')
+    const tskpane = app.CreateTaskPane?.(getUrlPath() + '/ui/panel.html')
     if (tskpane) {
       const id = tskpane.ID
       app.PluginStorage?.setItem('taskpane_id', id)

@@ -1689,7 +1689,7 @@ export function initHandlers(): void {
 }
 
 function isTaskpaneContext(): boolean {
-  return typeof window !== 'undefined' && window.location.pathname.includes('taskpane.html')
+  return typeof window !== 'undefined' && window.location.pathname.includes('panel.html')
 }
 
 /**

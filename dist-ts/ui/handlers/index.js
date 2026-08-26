@@ -1314,7 +1314,7 @@ export function initHandlers() {
     }
 }
 function isTaskpaneContext() {
-    return typeof window !== 'undefined' && window.location.pathname.includes('taskpane.html');
+    return typeof window !== 'undefined' && window.location.pathname.includes('panel.html');
 }
 /**
  * 将文本复制到剪贴板（使用临时 textarea + execCommand）

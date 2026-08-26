@@ -19,7 +19,7 @@ import { initHandlers } from '../ui/handlers/index.js';
  */
 function initSettingsPage() {
     // 1. 加载 Token 和用户信息状态
-    // 这些函数使用 DOM ID 查找元素，settings.html 已使用与 taskpane.html 相同的 ID
+    // 这些函数使用 DOM ID 查找元素，settings.html 已使用与 panel.html 相同的 ID
     import('../ui/handlers/token.js')
         .then(({ updateTokenStatus, updateUserIdStatus }) => {
         updateTokenStatus();

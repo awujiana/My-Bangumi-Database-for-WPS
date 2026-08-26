@@ -29,7 +29,7 @@ const MODULES = [
     // 含 typeof window !== 'undefined' 守卫，确保 Node 测试环境导入不会触发副作用）。
     { src: 'dist-ts/entry/ribbon-entry.js', type: 'module', critical: true },
     { src: 'dist-ts/ui/handlers.js', type: 'module', critical: true },
-    { src: 'dist-ts/taskpane.js', type: 'module', critical: true }
+    { src: 'dist-ts/panel/panelPage.js', type: 'module', critical: true }
 ];
 
 // 暴露模块加载状态给调试面板（debugPanel.ts 读取）
