@@ -31,7 +31,7 @@ export { getGithubConfig, setGithubConfig, isGithubConfigComplete, buildRawUrl, 
 export { bgmLog, getApp, colNumToLetter, getCell, getCellValue, setCellValue, getSheetByIndex, escapeHtml, storeBgToken, clearBgToken, loadBgToken, storeTokenExpires, loadTokenExpires, clearTokenExpires, getTokenRemainingTime, copyTokenToClipboard, _getBgmUserId, _setBgmUserId, _getBgmUsername, _setBgmUsername, fetchBgmUserInfo, trim, BGM, _getUserApiPath, _fetchBgmUserInfo, showBangumiPanel, showSettingsPanel, showEnrichPanel, sleep, delay, readRangeValues, getColumnMap, cacheGet, clearSheetCache, getLastRow, isEmptyValue, getDataSheet, findHeaderRow, shellExecuteByOAAssist, getUrlPath, calcFingerprint, } from './tools/util.js';
 export { CONFIG_KEYS, setConfig, getConfig, removeConfig, setIncrementalSync, getIncrementalSync, setSkipConflicts, getSkipConflicts, setSyncRecordEnabled, getSyncRecordEnabled, } from './tools/config.js';
 export { autoFillUrls, showAutoFillUrlDialog, type AutoFillResult, type NameUrlMap, } from './tools/autoFillUrl.js';
-export type { BGMCache, BGMSheet, BGMSync, BGMUserInfo, EnrichWorkbookState, } from './core/types.js';
+export type { BGMCache, BGMSheet, BGMSync, BGMUserInfo, EnrichWorkbookState } from './core/types.js';
 export { refreshSheets, refreshWorkbooks, toggleSheetLock, refreshData, enlargePreview, } from './panel/panelPage.js';
 export type { DetailItem, PreviewItem, DetailPreviewData, } from './ui/preview.js';
 export { previewSyncContent, closeDetailModal, syncAllRows, } from './ui/preview.js';

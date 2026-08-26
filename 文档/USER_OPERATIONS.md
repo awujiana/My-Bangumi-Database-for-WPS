@@ -18,6 +18,43 @@
 | v2.4 | 2026-08-21 | 新增「🔮 预告/未来动漫」筛选选项（筛选无开播日期条目）、增强进度条视觉效果（渐变色+光泽）、更新时间筛选说明文档                                                            |
 | v2.5 | 2026-08-21 | 同步完成弹窗新增「显示详情」明细表格（新增/更新/删除/失败）、同步详情预览弹窗同步展示明细表格、修复设置按钮模块加载失败问题、预计剩余时间统一保留两位小数                  |
 | v2.6 | 2026-08-26 | 统一命名规范：Taskpane → Panel，更新文档术语，新增命名规范说明                                                                                                             |
+| v2.7 | 2026-08-26 | 补充 Panel 命名规范说明章节，更新术语定义与函数名映射                                                                                                                      |
+
+---
+
+## 命名规范说明
+
+本文档中涉及的核心术语和命名约定如下：
+
+### 术语定义
+
+| 术语                 | 说明                                                                 | 对应代码/路径                                    |
+| -------------------- | -------------------------------------------------------------------- | ------------------------------------------------ |
+| **Panel**            | 主侧边栏面板（原 Taskpane），提供数据操作入口                        | `ui/panel.html`、`ts/panel/panelPage.ts`         |
+| **Settings Panel**   | 设置面板，独立于主 Panel 的配置管理界面                              | `ui/settings.html`、`ts/entry/settings-entry.ts` |
+| **panel_id**         | 主 Panel 在 PluginStorage 中存储的唯一标识，用于跨会话持久化面板状态 | PluginStorage key: `panel_id`                    |
+| **settings_pane_id** | Settings Panel 在 PluginStorage 中存储的唯一标识                     | PluginStorage key: `settings_pane_id`            |
+
+### 函数名映射（Taskpane → Panel）
+
+为统一命名规范，以下函数名已从 `taskpane` 前缀改为 `panel` 前缀：
+
+| 旧函数名                | 新函数名             | 说明                      |
+| ----------------------- | -------------------- | ------------------------- |
+| `initTaskpane`          | `initPanel`          | Panel 初始化入口          |
+| `startTaskpane`         | `startPanel`         | Panel 启动函数            |
+| `refreshTaskpaneUI`     | `refreshPanelUI`     | 刷新 Panel UI             |
+| `isTaskpaneContext`     | `isPanelContext`     | 判断是否在 Panel 上下文中 |
+| `ensureTaskpaneVisible` | `ensurePanelVisible` | 确保 Panel 可见           |
+
+### 日志前缀
+
+日志输出中的前缀已统一为 `[panel]`，替代原有的 `[taskpane]`。
+
+### 数据兼容
+
+- `panel_id` 替代原 `taskpane_id`，无旧数据兼容需求
+- 已存储的旧 `taskpane_id` 键值会在下次启动时被新的 `panel_id` 替代
 
 ## 目录
 
@@ -423,11 +460,11 @@ WPS 菜单栏 →「Bangumi 同步」选项卡 →「Bangumi」分组，共包�
 
 ### 1.13 设置（btnOpenSettings）
 
-| 属性     | 说明                                                            |
-| -------- | --------------------------------------------------------------- |
-| **位置** | Ribbon → Bangumi 同步 → Bangumi → 设置                          |
-| **功能** | 打开/切换设置面板（独立 TaskPane，包含 Token/同步/GitHub 配置） |
-| **图标** | `images/settings.svg`                                           |
+| 属性     | 说明                                                         |
+| -------- | ------------------------------------------------------------ |
+| **位置** | Ribbon → Bangumi 同步 → Bangumi → 设置                       |
+| **功能** | 打开/切换设置面板（独立 Panel，包含 Token/同步/GitHub 配置） |
+| **图标** | `images/settings.svg`                                        |
 
 **前置条件：** 无。
 

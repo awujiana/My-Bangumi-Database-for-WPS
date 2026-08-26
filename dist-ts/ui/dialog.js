@@ -40,42 +40,42 @@ const DIALOG_TYPES = {
         id: 'bgmAlertDialog',
         titleId: 'bgmAlertTitle',
         msgId: 'bgmAlertMessage',
-        buttons: [{ id: 'bgmAlertOk', cls: 'bgm-btn-primary', text: '确定', event: 'ok' }],
+        buttons: [{ id: 'bgmAlertOk', cls: 'bgm-dialog-btn-primary', text: '确定', event: 'ok' }],
     },
     confirm: {
         id: 'bgmConfirmDialog',
         titleId: 'bgmConfirmTitle',
         msgId: 'bgmConfirmMessage',
         buttons: [
-            { id: 'bgmConfirmOk', cls: 'bgm-btn-primary', text: '确定', event: 'ok' },
-            { id: 'bgmConfirmCancel', cls: 'bgm-btn-default', text: '取消', event: 'cancel' },
+            { id: 'bgmConfirmOk', cls: 'bgm-dialog-btn-primary', text: '确定', event: 'ok' },
+            { id: 'bgmConfirmCancel', cls: 'bgm-dialog-btn-default', text: '取消', event: 'cancel' },
         ],
     },
     error: {
         id: 'bgmErrorDialog',
         titleId: 'bgmErrorTitle',
         msgId: 'bgmErrorMessage',
-        buttons: [{ id: 'bgmErrorOk', cls: 'bgm-btn-danger', text: '确定', event: 'ok' }],
+        buttons: [{ id: 'bgmErrorOk', cls: 'bgm-dialog-btn-danger', text: '确定', event: 'ok' }],
     },
     warning: {
         id: 'bgmWarningDialog',
         titleId: 'bgmWarningTitle',
         msgId: 'bgmWarningMessage',
-        buttons: [{ id: 'bgmWarningOk', cls: 'bgm-btn-warning', text: '确定', event: 'ok' }],
+        buttons: [{ id: 'bgmWarningOk', cls: 'bgm-dialog-btn-warning', text: '确定', event: 'ok' }],
     },
     success: {
         id: 'bgmSuccessDialog',
         titleId: 'bgmSuccessTitle',
         msgId: 'bgmSuccessMessage',
-        buttons: [{ id: 'bgmSuccessOk', cls: 'bgm-btn-success', text: '确定', event: 'ok' }],
+        buttons: [{ id: 'bgmSuccessOk', cls: 'bgm-dialog-btn-success', text: '确定', event: 'ok' }],
     },
     input: {
         id: 'bgmInputDialog',
         titleId: 'bgmInputTitle',
         msgId: 'bgmInputPrompt',
         buttons: [
-            { id: 'bgmInputOk', cls: 'bgm-btn-primary', text: '确定', event: 'ok' },
-            { id: 'bgmInputCancel', cls: 'bgm-btn-default', text: '取消', event: 'cancel' },
+            { id: 'bgmInputOk', cls: 'bgm-dialog-btn-primary', text: '确定', event: 'ok' },
+            { id: 'bgmInputCancel', cls: 'bgm-dialog-btn-default', text: '取消', event: 'cancel' },
         ],
     },
 };
@@ -143,7 +143,7 @@ function createDialogs() {
         cfg.buttons.forEach((btn) => {
             const button = document.createElement('button');
             button.id = btn.id;
-            button.className = 'bgm-btn ' + btn.cls;
+            button.className = 'bgm-dialog-btn ' + btn.cls;
             button.textContent = btn.text;
             button.dataset.event = btn.event;
             footer.appendChild(button);
@@ -296,8 +296,8 @@ function ensureSyncResultDialog() {
                 <div id="bgmSyncDetails" style="display:none; margin-top: 8px; max-height: 300px; overflow-y: auto; font-size: 12px; line-height: 1.6; white-space: pre; font-family: monospace;"></div>
             </div>
             <div class="bgm-dialog-footer">
-                <button id="bgmSyncToggleDetails" class="bgm-btn bgm-btn-default">显示详情</button>
-                <button id="bgmSyncResultOk" class="bgm-btn bgm-btn-success">确定</button>
+                <button id="bgmSyncToggleDetails" class="bgm-dialog-btn bgm-dialog-btn-default">显示详情</button>
+                <button id="bgmSyncResultOk" class="bgm-dialog-btn bgm-dialog-btn-success">确定</button>
             </div>
         </div>
     `);
@@ -367,12 +367,12 @@ function _setSyncPausedState(paused) {
     pauseBtn.textContent = paused ? '▶️ 继续' : '⏸️ 暂停';
     pauseBtn.setAttribute('aria-label', paused ? '继续同步' : '暂停同步');
     if (paused) {
-        pauseBtn.classList.remove('bgm-btn-default');
-        pauseBtn.classList.add('bgm-btn-success');
+        pauseBtn.classList.remove('bgm-dialog-btn-default');
+        pauseBtn.classList.add('bgm-dialog-btn-success');
     }
     else {
-        pauseBtn.classList.add('bgm-btn-default');
-        pauseBtn.classList.remove('bgm-btn-success');
+        pauseBtn.classList.add('bgm-dialog-btn-default');
+        pauseBtn.classList.remove('bgm-dialog-btn-success');
     }
 }
 /** 内部：清理所有回调与状态（complete/hide 时调用） */
@@ -439,14 +439,14 @@ function ensureSyncProgressDialog() {
             <div class="bgm-dialog-footer" id="bgmSyncProgressFooter">
                 <!-- 运行中按钮 -->
                 <div id="bgmSyncProgressRunningBtns" class="bgm-sync-progress__running-btns">
-                    <button id="bgmSyncProgressPauseBtn" type="button" class="bgm-btn bgm-btn-default" aria-label="暂停同步">⏸️ 暂停</button>
-                    <button id="bgmSyncProgressStop" type="button" class="bgm-btn bgm-btn-danger" aria-label="停止同步">⏹️ 停止</button>
+                    <button id="bgmSyncProgressPauseBtn" type="button" class="bgm-dialog-btn bgm-dialog-btn-default" aria-label="暂停同步">⏸️ 暂停</button>
+                    <button id="bgmSyncProgressStop" type="button" class="bgm-dialog-btn bgm-dialog-btn-danger" aria-label="停止同步">⏹️ 停止</button>
                 </div>
                 <!-- 完成按钮（默认隐藏） -->
                 <div id="bgmSyncProgressDoneBtns" class="bgm-sync-progress__done-btns" style="display: none;">
-                    <button id="bgmSyncProgressToggleDetails" type="button" class="bgm-btn bgm-btn-default" aria-label="显示详情">显示详情</button>
-                    <button id="bgmSyncProgressClose" type="button" class="bgm-btn bgm-btn-default" aria-label="关闭弹窗">关闭</button>
-                    <button id="bgmSyncProgressNext" type="button" class="bgm-btn bgm-btn-primary" aria-label="下一步">下一步 →</button>
+                    <button id="bgmSyncProgressToggleDetails" type="button" class="bgm-dialog-btn bgm-dialog-btn-default" aria-label="显示详情">显示详情</button>
+                    <button id="bgmSyncProgressClose" type="button" class="bgm-dialog-btn bgm-dialog-btn-default" aria-label="关闭弹窗">关闭</button>
+                    <button id="bgmSyncProgressNext" type="button" class="bgm-dialog-btn bgm-dialog-btn-primary" aria-label="下一步">下一步 →</button>
                 </div>
             </div>
         </div>
@@ -584,8 +584,8 @@ export function showSyncProgressDialog(title, handlers, config) {
     if (pauseBtn) {
         pauseBtn.textContent = '⏸️ 暂停';
         pauseBtn.setAttribute('aria-label', '暂停同步');
-        pauseBtn.classList.remove('bgm-btn-success');
-        pauseBtn.classList.add('bgm-btn-default');
+        pauseBtn.classList.remove('bgm-dialog-btn-success');
+        pauseBtn.classList.add('bgm-dialog-btn-default');
     }
     // 渲染配置摘要
     const configEl = modal.querySelector('#bgmSyncProgressConfig');

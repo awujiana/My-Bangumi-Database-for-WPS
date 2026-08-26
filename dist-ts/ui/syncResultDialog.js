@@ -500,13 +500,13 @@ export function showSyncResultDialog(options) {
         <div class="bgm-result-section">
           <div class="bgm-result-section-title">📋 操作</div>
           <div class="bgm-result-actions">
-            <button id="bgmResultExportBtn" type="button" class="bgm-btn bgm-btn-primary">📥 导出 JSONL</button>
-            <button id="bgmResultViewDetailsBtn" type="button" class="bgm-btn bgm-btn-default">📄 查看详情</button>
+            <button id="bgmResultExportBtn" type="button" class="bgm-dialog-btn bgm-dialog-btn-primary">📥 导出 JSONL</button>
+            <button id="bgmResultViewDetailsBtn" type="button" class="bgm-dialog-btn bgm-dialog-btn-default">📄 查看详情</button>
           </div>
         </div>
       </div>
       <div class="bgm-dialog-footer">
-        <button id="bgmResultCloseBtn" type="button" class="bgm-btn bgm-btn-success">确定</button>
+        <button id="bgmResultCloseBtn" type="button" class="bgm-dialog-btn bgm-dialog-btn-success">确定</button>
       </div>
     </div>`;
     modal.innerHTML = content;
@@ -697,7 +697,7 @@ function showSyncDetailPreviewDialog(options) {
         </div>
       </div>
       <div class="bgm-dialog-footer">
-        <button id="bgmPreviewCloseBtn" type="button" class="bgm-btn bgm-btn-success">确定</button>
+        <button id="bgmPreviewCloseBtn" type="button" class="bgm-dialog-btn bgm-dialog-btn-success">确定</button>
       </div>
     </div>
   `;

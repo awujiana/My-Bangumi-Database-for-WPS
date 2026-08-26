@@ -439,7 +439,7 @@ const ICON_PATHS: Record<string, string> = {
   btnSyncFromGithub: 'images/github.svg',
   btnUndoLastSync: 'images/undo.svg',
   btnOpenSettings: 'images/settings.svg',
-  btnOpenEnrichPanel: 'images/enrich.svg',
+  btnOpenEnrichPanel: 'images/enrichPage.svg',
 }
 
 export function GetBangumiImage(control: { Id: string }): string {

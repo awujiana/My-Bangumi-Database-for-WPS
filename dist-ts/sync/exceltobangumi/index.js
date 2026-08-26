@@ -16,10 +16,9 @@
 import { BGM_COLOR, LOG_LEVELS } from '../../core/constants.js';
 import { bgmLog, getApp, getCell, trim, getColumnMap, findHeaderRow, colNumToLetter, getCellValue, loadBgToken, BGM, _getUserApiPath, readRangeValues, delay, calcFingerprint, clearSheetCache, } from '../../tools/util/index.js';
 import { wpsMsgBox, isWpsWorksheet } from '../../tools/wps.js';
-import { getAllSyncRecords } from '../syncRecord.js';
 import { showConfirm, showSyncProgressDialog, buildSyncConfig, updateSyncProgressDialog, completeSyncProgressDialog, hideSyncProgressDialog, showToast, } from '../../ui/dialog.js';
 import { isBangumiUrl, extractSubjectId, mapWatchStatus, getSeqColIndex, addTagsFromStr, } from '../pureUtils.js';
-import { getOrCreateSyncRecordSheet } from '../syncRecord.js';
+import { getAllSyncRecords, getOrCreateSyncRecordSheet } from '../syncRecord.js';
 // Re-export 纯函数，保持模块对外 API 兼容
 export { isBangumiUrl, extractSubjectId, mapWatchStatus, getSeqColIndex, addTagsFromStr, buildTagsArray, } from '../pureUtils.js';
 // Re-export 子模块公开 API

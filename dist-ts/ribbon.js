@@ -335,7 +335,7 @@ const ICON_PATHS = {
     btnSyncFromGithub: 'images/github.svg',
     btnUndoLastSync: 'images/undo.svg',
     btnOpenSettings: 'images/settings.svg',
-    btnOpenEnrichPanel: 'images/enrich.svg',
+    btnOpenEnrichPanel: 'images/enrichPage.svg',
 };
 export function GetBangumiImage(control) {
     return ICON_PATHS[control.Id] || 'images/newFromTemp.svg';
