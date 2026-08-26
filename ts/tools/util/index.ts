@@ -818,7 +818,7 @@ export function _setBgmUserId(id: string): void {
  */
 export function _getBgmUserId(): string | null {
   if (BGM.cache.userId) return BGM.cache.userId
-  // 回退到 PluginStorage（Ribbon 设置后 Taskpane 可从持久化存储读取）
+  // 回退到 PluginStorage（Ribbon 设置后 Panel 可从持久化存储读取）
   try {
     const app = getApp()
     if (app?.PluginStorage) {

@@ -106,22 +106,22 @@ export declare function openCollectionForRibbon(): void;
  * 1. 校验 GitHub 配置是否完整（owner/repo/path）
  * 2. 确保 taskpane 面板可见（不切换，只显示）
  * 3. 写入 PluginStorage 信号（bgm_request_github_sync = 时间戳）
- *    - taskpane 通过 userInfoPolling 轮询检测该信号
- *    - 检测到后通过 taskpane 内部 eventBus 触发 syncFromGithub handler
- *    - taskpane handler 负责显示确认对话框 + 模块化进度弹窗
+ *    - panel 通过 userInfoPolling 轮询检测该信号
+ *    - 检测到后通过 panel 内部 eventBus 触发 syncFromGithub handler
+ *    - panel handler 负责显示确认对话框 + 模块化进度弹窗
  *
  * 跨上下文通信说明：
- * WPS 中 Ribbon 和 Taskpane 是独立 iframe，eventBus 无法跨上下文通信。
- * 必须通过 PluginStorage 作为中间介质，taskpane 轮询检测信号变化。
+ * WPS 中 Ribbon 和 Panel 是独立 iframe，eventBus 无法跨上下文通信。
+ * 必须通过 PluginStorage 作为中间介质，panel 轮询检测信号变化。
  *
- * @returns 同步结果统计（信号触发模式返回 null，实际结果由 taskpane handler 处理）
+ * @returns 同步结果统计（信号触发模式返回 null，实际结果由 panel handler 处理）
  */
 export declare function syncFromGithubForRibbon(): Promise<GithubSyncResult | null>;
 /**
  * 撤销最近一次 GitHub 同步操作（Ribbon 入口）
  *
- * Ribbon 与 Taskpane 为独立 iframe，撤销栈仅在 taskpane 环境中有效。
- * 因此本函数通过 PluginStorage 写入请求信号，交由 taskpane 轮询后执行实际撤销流程
+ * Ribbon 与 Panel 为独立 iframe，撤销栈仅在 panel 环境中有效。
+ * 因此本函数通过 PluginStorage 写入请求信号，交由 panel 轮询后执行实际撤销流程
  *（包含检查会话、确认对话框、恢复操作、结果提示）。
  *
  * 流程：

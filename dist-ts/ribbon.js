@@ -46,16 +46,16 @@ function initRibbonMessageListener() {
     };
     window.addEventListener('message', _ribbonMessageHandler);
 }
-// ========== PluginStorage 配置轮询（Ribbon ↔ Taskpane 跨 WebView 同步）==========
-// WPS 中 Ribbon 和 Taskpane 是独立 WebView，postMessage 无法跨上下文通信。
-// Taskpane 侧通过 userInfoPolling 轮询 PluginStorage 同步 Ribbon 的变更，
-// Ribbon 侧也需要同等轮询机制，定期检查 Taskpane 写入的配置变更并刷新按钮状态。
+// ========== PluginStorage 配置轮询（Ribbon ↔ Panel 跨 WebView 同步）==========
+// WPS 中 Ribbon 和 Panel 是独立 WebView，postMessage 无法跨上下文通信。
+// Panel 侧通过 userInfoPolling 轮询 PluginStorage 同步 Ribbon 的变更，
+// Ribbon 侧也需要同等轮询机制，定期检查 Panel 写入的配置变更并刷新按钮状态。
 let _configPollingTimer = null;
 /**
  * 启动 Ribbon 配置轮询：每 2 秒检查 PluginStorage 中配置值的变化，
  * 发现变化时调用 InvalidateControl 刷新 Ribbon 按钮状态。
  *
- * 需要与 Taskpane 的 startUserInfoPolling（2 秒间隔）保持一致，
+ * 需要与 Panel 的 startUserInfoPolling（2 秒间隔）保持一致，
  * 确保双边同步延迟在 2 秒以内。
  */
 function startRibbonConfigPolling() {

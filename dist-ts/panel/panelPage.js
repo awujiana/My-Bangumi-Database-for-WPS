@@ -22,7 +22,7 @@ function initPanel() {
     bgmLog(LOG_LEVELS.INFO, '[panel] 锁定按钮监听器设置完成');
     // 初始化事件监听
     restoreUserInfoFromStorage();
-    // 定时轮询 PluginStorage，确保在 Ribbon 设置 Token 后 Taskpane 能自动更新 UI
+    // 定时轮询 PluginStorage，确保在 Ribbon 设置 Token 后 Panel 能自动更新 UI
     startUserInfoPolling();
     // 恢复上次锁定的工作表
     const restored = restoreLockedSheet();

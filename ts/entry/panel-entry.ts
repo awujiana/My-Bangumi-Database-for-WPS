@@ -1,5 +1,5 @@
 /**
- * Taskpane 显式入口模块
+ * Panel 显式入口模块
  * @module entry/panel-entry
  * @description 任务面板的统一启动入口。
  *

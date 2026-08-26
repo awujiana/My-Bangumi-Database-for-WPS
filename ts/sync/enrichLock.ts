@@ -2,7 +2,7 @@
  * 富化功能 - 工作簿锁定模块
  * @module sync/enrichLock
  * @description 管理富化功能的 Bangumi 追踪表工作簿选择与锁定。
- *              与 Taskpane 的 BGM.sheet 锁定独立，使用 BGM.enrich 命名空间，
+ *              与 Panel 的 BGM.sheet 锁定独立，使用 BGM.enrich 命名空间，
  *              通过 PluginStorage 键 `bgm_enrich_locked_workbook` 持久化。
  */
 

@@ -61,9 +61,9 @@ export function setConfig(key: string, value: string): boolean {
   bgmLog(LOG_LEVELS.INFO, `[config] 触发内部事件: ${BGM_EVENTS.CONFIG_UPDATED}`)
   eventBus.emit(BGM_EVENTS.CONFIG_UPDATED, { key, value })
 
-  // 跨文档 postMessage 通知（Ribbon ↔ Taskpane 双向同步）：
-  // 当 Taskpane 侧修改配置时，需通知 Ribbon 侧 ribbonUI.InvalidateControl() 重新拉取状态；
-  // 反之，Ribbon 侧修改时通知 Taskpane 侧更新 checkbox。
+  // 跨文档 postMessage 通知（Ribbon ↔ Panel 双向同步）：
+  // 当 Panel 侧修改配置时，需通知 Ribbon 侧 ribbonUI.InvalidateControl() 重新拉取状态；
+  // 反之，Ribbon 侧修改时通知 Panel 侧更新 checkbox。
   // window.parent / window.top 在同源场景下均指向 index.html 顶层（Ribbon 上下文）。
   if (oldValue !== value && typeof window !== 'undefined') {
     const messagePayload = {
