@@ -1532,7 +1532,7 @@ const ACTION_HANDLERS: Record<string, ActionHandler> = {
       bgmLog(LOG_LEVELS.WARN, '[handleActionClick] 无法获取 Application 对象')
       return
     }
-    const tsId = app.PluginStorage?.getItem('taskpane_id')
+    const tsId = app.PluginStorage?.getItem('panel_id')
     if (tsId) {
       const tskpane = app.GetTaskPane?.(tsId)
       if (tskpane) {

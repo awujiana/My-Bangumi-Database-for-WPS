@@ -250,7 +250,7 @@ describe('showSettingsPanel — 主面板可见时停靠右侧', () => {
   it('首次创建：主面板可见 → 设置面板 DockPosition = Right (2)', () => {
     const app = createMockApp()
     // 主面板已存在且可见
-    app.PluginStorage.setItem('taskpane_id', 'main-pane-1')
+    app.PluginStorage.setItem('panel_id', 'main-pane-1')
     getTaskPaneResults['main-pane-1'] = createMockTaskPane('main-pane-1', true)
 
     setMockApp(app)
@@ -277,7 +277,7 @@ describe('showSettingsPanel — 主面板可见时停靠右侧', () => {
   it('已存在：主面板可见 → 设置面板停靠右侧', () => {
     const app = createMockApp()
     // 主面板可见
-    app.PluginStorage.setItem('taskpane_id', 'main-pane-1')
+    app.PluginStorage.setItem('panel_id', 'main-pane-1')
     getTaskPaneResults['main-pane-1'] = createMockTaskPane('main-pane-1', true)
 
     // 设置面板已存在且当前可见
@@ -299,7 +299,7 @@ describe('showSettingsPanel — 主面板可见时停靠右侧', () => {
   it('已存在但隐藏：主面板可见 → 设置面板停靠右侧并显示', () => {
     const app = createMockApp()
     // 主面板可见
-    app.PluginStorage.setItem('taskpane_id', 'main-pane-1')
+    app.PluginStorage.setItem('panel_id', 'main-pane-1')
     getTaskPaneResults['main-pane-1'] = createMockTaskPane('main-pane-1', true)
 
     // 设置面板已存在但当前隐藏
@@ -326,7 +326,7 @@ describe('showSettingsPanel — 主面板隐藏时仍停靠右侧', () => {
   it('首次创建：主面板隐藏 → 设置面板 DockPosition = Right (2)', () => {
     const app = createMockApp()
     // 主面板存在但隐藏
-    app.PluginStorage.setItem('taskpane_id', 'main-pane-1')
+    app.PluginStorage.setItem('panel_id', 'main-pane-1')
     getTaskPaneResults['main-pane-1'] = createMockTaskPane('main-pane-1', false)
 
     setMockApp(app)
@@ -367,7 +367,7 @@ describe('showSettingsPanel — 主面板隐藏时仍停靠右侧', () => {
   it('已存在但隐藏：主面板隐藏 → 设置面板停靠右侧并显示', () => {
     const app = createMockApp()
     // 主面板隐藏
-    app.PluginStorage.setItem('taskpane_id', 'main-pane-1')
+    app.PluginStorage.setItem('panel_id', 'main-pane-1')
     getTaskPaneResults['main-pane-1'] = createMockTaskPane('main-pane-1', false)
 
     // 设置面板已存在但隐藏，且当前停靠在右侧
@@ -412,7 +412,7 @@ describe('showSettingsPanel — 边界情况', () => {
 
   it('GetTaskPane 返回 null（主面板 ID 失效）→ 默认主面板不可见，停靠右侧', () => {
     const app = createMockApp()
-    app.PluginStorage.setItem('taskpane_id', 'invalid-pane-id')
+    app.PluginStorage.setItem('panel_id', 'invalid-pane-id')
     // GetTaskPane 返回 null（未注册的 ID）
 
     setMockApp(app)
@@ -456,7 +456,7 @@ describe('showSettingsPanel — 边界情况', () => {
 
   it('日志应输出主面板状态和目标停靠位置', () => {
     const app = createMockApp()
-    app.PluginStorage.setItem('taskpane_id', 'main-pane-1')
+    app.PluginStorage.setItem('panel_id', 'main-pane-1')
     getTaskPaneResults['main-pane-1'] = createMockTaskPane('main-pane-1', true)
 
     setMockApp(app)

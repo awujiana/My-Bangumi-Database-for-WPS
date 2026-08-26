@@ -238,7 +238,7 @@ export function notifyUserInfoUpdated(username: string, userId: string): void {
     // Taskpane 的轮询机制会在 1-2 秒内检测到变更
     try {
       const app = getApp()
-      const tsId = app?.PluginStorage?.getItem('taskpane_id')
+      const tsId = app?.PluginStorage?.getItem('panel_id')
       if (tsId) {
         // GetTaskPane 返回的 WpsTaskPane 在 WPS 实际运行时还包含 contentWindow 等 COM 属性
         const pane = app?.GetTaskPane?.(tsId) as

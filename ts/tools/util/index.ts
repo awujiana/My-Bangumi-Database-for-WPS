@@ -1075,13 +1075,13 @@ export function showBangumiPanel(): void {
     }
     return
   }
-  const tsId = app.PluginStorage?.getItem('taskpane_id')
+  const tsId = app.PluginStorage?.getItem('panel_id')
   let becameVisible = false
   if (!tsId) {
     const tskpane = app.CreateTaskPane?.(getUrlPath() + '/ui/panel.html')
     if (tskpane) {
       const id = tskpane.ID
-      app.PluginStorage?.setItem('taskpane_id', id)
+      app.PluginStorage?.setItem('panel_id', id)
       tskpane.Visible = true
       becameVisible = true
     }
@@ -1162,7 +1162,7 @@ export function showSettingsPanel(): void {
   }
 
   const settingsId = app.PluginStorage?.getItem('settings_pane_id')
-  const mainPanelId = app.PluginStorage?.getItem('taskpane_id')
+  const mainPanelId = app.PluginStorage?.getItem('panel_id')
 
   // 检查主面板当前可见性
   let mainPanelVisible = false

@@ -619,7 +619,7 @@ function ensureTaskpaneVisible() {
         const app = getApp();
         if (!app)
             return;
-        const tsId = app.PluginStorage?.getItem('taskpane_id');
+        const tsId = app.PluginStorage?.getItem('panel_id');
         if (!tsId) {
             // 面板未创建，调用 showBangumiPanel 创建并显示
             import('../index.js').then(({ showBangumiPanel }) => showBangumiPanel());
