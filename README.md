@@ -1,284 +1,245 @@
-# Bangumi-Archive-Anime-Excel
+# BGM Excel 加载项（WPS 追番标记助手）
 
-> Bangumi 动画存档数据下发仓库 · 提供 JSONL 数据源与差异摘要供 BGM 插件同步使用
-
-[![License: CC BY-NC-SA 4.0](https://img.shields.io/badge/License-CC%20BY--NC--SA%204.0-2da44e.svg)](https://creativecommons.org/licenses/by-nc-sa/4.0/)
-[![Data Update](https://img.shields.io/badge/更新频率-每周三-2da44e.svg)](https://github.com/bangumi/Archive)
-[![Records](https://img.shields.io/badge/记录数-30610-2da44e.svg)](data/bangumi.jsonl)
+> 一个运行在 **WPS Office / Excel** 中的加载项，用于在本地 Excel 表格与 Bangumi 番组计划（[bgm.tv](https://bgm.tv/)）之间同步动画收藏数据：把 Excel 中的观看状态 / 评分 / 标签上传到 Bangumi，或从远程仓库拉取 Bangumi 资料数据填充 Excel。
 
 ---
 
-## 📖 项目简介
+## 📌 功能特性
 
-本仓库是 [Bangumi Archive](https://github.com/bangumi/Archive) 数据处理链路的**数据下发仓库**，由上游 [Archive 项目](../Archive) 每周处理后同步而来。
+| 能力                | 说明                                                                                                                                 |
+| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| 📤 **上传同步**     | 将 Excel 中的观看状态、评分、标签批量同步到 Bangumi API（指数退避重试 + 请求竞态防护）。                                             |
+| 📥 **数据同步**     | 从远程仓库（GitHub / GitLab / Gitee / Gist / 本地文件）下载 Bangumi 资料 JSONL 并增量写入 Excel，内置 24h 本地缓存与 DJB2 哈希比对。 |
+| ↩️ **收藏回写**     | 从 Bangumi 拉取收藏列表标记到 Excel。                                                                                                |
+| 🔄 **5 种同步策略** | `add-update` / `add-only` / `update-only` / `mirror` / `force-overwrite`。                                                           |
+| ✅ **同步偏好**     | 增量同步、冲突跳过、同步记录开关；基于同步记录的「撤销同步」。                                                                       |
+| 🪄 **新番表富化**   | 自动补全新番表的名称 / 别名差异，映射 infobox 字段，减少手工录入。                                                                   |
+| 🔑 **Token 管理**   | 设置、测试、复制、清除 Bangumi API Token。                                                                                           |
+| ⚙️ **双面板 UI**    | 主面板 + 设置面板动态停靠协调；基于 `data-action` 的统一事件分发（30+ action）。                                                     |
 
-**数据链路**：
+---
 
-```
-Bangumi 官方 Archive (每周三 dump)
-        ↓
-Archive 项目 (处理 dump、生成 Excel 与差异)
-        ↓ convert_dump_to_jsonl.py + sync_to_awujiana.py
-本仓库 (Bangumi-Archive-Anime-Excel)
-        ↓ raw URL
-BGM 插件 (读取 JSONL → 写入 Excel → 同步 Bangumi API)
-```
+## 🧰 技术栈
 
-本项目的Releases页面仅包含以下三类 Excel 文件:
-
-| 文件名                                       | 类型         | 说明                                                                  |
-| -------------------------------------------- | ------------ | --------------------------------------------------------------------- |
-| `ani-bangumi-type2-YYYY-MM-DD.xlsx`          | 主数据文件   | 完整原始导出字段(73 列),按日期归档的全量动画条目数据                  |
-| `type2_subject_YYMMDD_vs_YYMMDD.xlsx`        | 差异对比文件 | 相邻期次之间的差异记录(新增、删除、修改),命名格式为"新日期_vs_旧日期" |
-| `ani-bangumi-type2-YYYY-MM-DD-template.xlsx` | 模板转换文件 | 在主数据文件基础上精简的 41 列模板,面向用户填写收藏信息               |
-
-### 数据预览图
-
-ani-bangumi-type2-YYYY-MM-DD.xlsx
-[![Archive提取为Excel预览图](https://free.picui.cn/free/2026/06/30/6a437e24cbe7f.png)]
-
-ani-bangumi-type2-YYYY-MM-DD-template.xlsx
-[![Archive模板转换为Excel预览图](https://free.picui.cn/free/2026/06/30/6a437e5e7ba36.png)]
+- **语言**：TypeScript（strict 模式，ES2022 目标）
+- **构建**：Vite 6（打包 `dist/`）+ `tsc`（编译 `dist-ts/`）
+- **运行环境**：WPS Office JSAPI（ET 加载项），通过 `wpsjs` CLI 调试
+- **代码质量**：ESLint 8 + Prettier 3 + Husky + lint-staged
+- **测试**：Vitest 4（含 `@vitest/coverage-v8`）
+- **运行时依赖**：`zod`（数据校验）、`dompurify`（HTML 净化）
+- **构建期依赖**：`@napi-rs/canvas` / `@resvg/resvg-js`（图像导出）
 
 ---
 
 ## 📂 目录结构
 
 ```
-Bangumi-Archive-Anime-Excel/
-├── data/
-│   └── bangumi.jsonl                    # BGM 插件数据源（~16 MB，30610 条）
-├── differences/                         # 差异摘要（每周对比）
-│   ├── 2026-07-21_to_2026-07-28/
-│   │   ├── diff_report.html             # 差异报告（浏览器可读）
-│   │   ├── diff_summary.json            # 差异统计
-│   │   ├── type2_subject_*_added.jsonlines      # 新增条目
-│   │   ├── type2_subject_*_deleted.jsonlines    # 删除条目
-│   │   └── 差异数据_type2_*.html         # 差异可视化
-│   └── 2026-07-28_to_2026-08-04/
-│       └── ...
+BGM/
+├── index.html                  # 加载项入口（WPS 启动时加载）
+├── main.js                     # 动态模块加载器（Ribbon 早期占位 + 模块就绪后替换真实实现）
+├── manifest.xml                # 加载项清单（ApiVersion / Name）
+├── ribbon.xml                  # 功能区按钮配置（"Bangumi同步" Tab）
+├── vite.config.js              # Vite 构建配置
+├── tsconfig.json               # TS 编译配置（strict）
+├── package.json                # 脚本与依赖
+├── ts/                         # TypeScript 源码
+│   ├── core/                   # 常量、容器、类型、加密、服务
+│   ├── entry/                  # ribbon / panel / settings 入口
+│   ├── sync/                   # 同步引擎（githubSync / gitlabSync / giteeSync / gistSync / localFileSync / exceltobangumi）
+│   ├── ui/                     # 面板 UI 与事件处理（handlers/）
+│   ├── panel/                  # 主面板 / 设置面板页面逻辑
+│   ├── services/               # 配置 / Ribbon 服务
+│   ├── schemas/                # zod 校验 schema
+│   └── tools/                  # 工具函数（http / wps / logger / sanitize ...）
+├── ui/                         # 面板 HTML（panel.html / settings.html）
+├── css/                        # 面板样式
+├── images/                     # 功能区与面板 SVG 图标
 ├── config/
-│   └── field_mappings.json              # 字段映射配置
-├── .gitignore
-├── LICENSE
-└── README.md
+│   └── field_mappings.json     # Excel 列 ↔ 数据字段映射
+├── data/
+│   └── bangumi.jsonl           # 数据源本地副本（用于本地文件同步 / 开发测试）
+├── differences/                # 数据差异摘要
+├── docs/                       # 详细文档（见下方「文档索引」）
+├── tests/                      # Vitest 单元测试
+├── scripts/                    # 构建 / 工具脚本（convert-icons.mjs 等）
+└── dist/ , dist-ts/            # 构建产物（dist 由 Vite 生成，dist-ts 由 tsc 生成）
 ```
 
-> **注意**：`*.xlsx` 文件已通过 `.gitignore` 排除，仅在本地使用，不上传到 GitHub。
+> `dist/`、`dist-ts/`、`node_modules/` 由构建生成；`*.xlsx` 被 `.gitignore` 排除。`data/`、`differences/` 及其数据文件按 `.gitignore` 约定入库。
 
 ---
 
-## 📊 数据文件说明
+## 🔧 环境要求
 
-### 1. `data/bangumi.jsonl`（核心数据源）
+| 依赖       | 版本                    | 说明                                       |
+| ---------- | ----------------------- | ------------------------------------------ |
+| WPS Office | 2019+（Windows）        | 需支持 JSAPI / 加载项调试（`wpsjs debug`） |
+| Node.js    | 18+（推荐 LTS 20 / 22） | 构建与调试工具链                           |
+| npm        | 随 Node 安装            | 包管理                                     |
+| Git        | 较新版本                | 版本控制                                   |
 
-BGM 插件通过 raw URL 读取的 JSONL 格式动画数据。
+---
 
-- **大小**：约 16 MB
-- **记录数**：30610 条
-- **编码**：UTF-8 无 BOM，LF 换行
-- **更新频率**：每周三（跟随 Bangumi 官方 dump 节奏）
-- **访问地址**：
-  ```
-  https://raw.githubusercontent.com/awujiana/Bangumi-Archive-Anime-Excel/main/data/bangumi.jsonl
-  ```
+## 📥 安装步骤
 
-#### 单条记录示例
+```bash
+# 1. 克隆仓库
+git clone <本仓库地址>
+cd BGM
 
-```json
-{
-  "sid": "8",
-  "name": "Code Geass 反叛的鲁路修R2",
-  "updatedAt": "2026-08-04",
-  "date": "2008-04-06",
-  "meta_tags": ["机战", "TV", "日本", "原创", "战斗"],
-  "nsfw": false,
-  "播放结束": "2008年9月28日",
-  "动画制作公司": "サンライズ",
-  "话数": "25",
-  "导演": "谷口悟朗",
-  "音乐": "中川幸太郎、黒石ひとみ",
-  "人物设定": "木村貴宏",
-  "原作": "大河内一楼、谷口悟朗",
-  "系列构成": "大河内一楼",
-  "关联的动漫ID": "85 | 344 | 793 | 1081 | 3219 | 8813"
-}
+# 2. 安装依赖
+npm install
 ```
 
-#### 字段说明
-
-本数据集包含以下字段，全面记录每部动画的详细信息：
-
-##### 基础信息字段
-
-| 字段名       | 含义           | 数据类型           | 来源版本                      |
-| ------------ | -------------- | ------------------ | ----------------------------- |
-| **id**       | 条目ID         | 数字               | 初始版本                      |
-| **type**     | 作品类型       | 数字               | 初始版本（固定为2，表示动画） |
-| **name**     | 条目名         | 字符串             | 初始版本                      |
-| **name_cn**  | 条目简体中文名 | 字符串             | 初始版本                      |
-| **platform** | 条目平台       | 字符串             | 初始版本                      |
-| **summary**  | 条目简介       | 长文本             | 初始版本                      |
-| **nsfw**     | 是否为NSFW     | 布尔值             | 初始版本                      |
-| **date**     | 发行日期       | 日期（YYYY-MM-DD） | 初始版本                      |
-| **favorite** | 收藏状态       | 字符串             | 初始版本                      |
-| **series**   | 是否为系列作品 | 布尔值             | 初始版本                      |
-
-##### 原始信息字段
-
-| 字段名      | 含义               | 数据类型    | 来源版本                                 |
-| ----------- | ------------------ | ----------- | ---------------------------------------- |
-| **infobox** | 条目原始wiki字符串 | 长文本/HTML | 初始版本（2024-08-30起正确处理HTML转义） |
-
-##### 评分与排名字段
-
-| 字段名            | 含义         | 数据类型     | 来源版本   |
-| ----------------- | ------------ | ------------ | ---------- |
-| **tags**          | 标签（部分） | 字符串/数组  | 2023-07-27 |
-| **score**         | 评分         | 数字（0-10） | 2023-07-27 |
-| **score_details** | 评分细节     | 字符串/JSON  | 2023-07-27 |
-| **rank**          | 类别内排名   | 数字         | 2023-07-27 |
-
-##### 元数据字段
-
-| 字段名        | 含义     | 数据类型    | 来源版本   |
-| ------------- | -------- | ----------- | ---------- |
-| **meta_tags** | 公共标签 | 字符串/数组 | 2025-04-18 |
-
-##### infobox解析字段 <span style="color:#2da44e"> 新增 2026-06-19</span>
-
-以下字段从infobox原始wiki字符串中解析提取为独立列：
-
-| 字段名                                              | 含义          | 数据类型 | 来源版本   |
-| --------------------------------------------------- | ------------- | -------- | ---------- |
-| <span style="color:#2da44e">**制片国家**</span>     | 制片国家/地区 | 字符串   | 2026-06-19 |
-| <span style="color:#2da44e">**语言**</span>         | 作品语言      | 字符串   | 2026-06-19 |
-| <span style="color:#2da44e">**类型**</span>         | 作品类型标签  | 字符串   | 2026-06-19 |
-| <span style="color:#2da44e">**导演**</span>         | 导演          | 字符串   | 2026-06-19 |
-| <span style="color:#2da44e">**音乐**</span>         | 音乐制作      | 字符串   | 2026-06-19 |
-| <span style="color:#2da44e">**人物设定**</span>     | 人物设定      | 字符串   | 2026-06-19 |
-| <span style="color:#2da44e">**机械设定**</span>     | 机械设定      | 字符串   | 2026-06-19 |
-| <span style="color:#2da44e">**原作**</span>         | 原作          | 字符串   | 2026-06-19 |
-| <span style="color:#2da44e">**脚本**</span>         | 脚本          | 字符串   | 2026-06-19 |
-| <span style="color:#2da44e">**分镜**</span>         | 分镜          | 字符串   | 2026-06-19 |
-| <span style="color:#2da44e">**演出**</span>         | 演出          | 字符串   | 2026-06-19 |
-| <span style="color:#2da44e">**原案**</span>         | 原案          | 字符串   | 2026-06-19 |
-| <span style="color:#2da44e">**系列构成**</span>     | 系列构成      | 字符串   | 2026-06-19 |
-| <span style="color:#2da44e">**在线播放平台**</span> | 在线播放平台  | 字符串   | 2026-06-19 |
-
-##### 关联数据字段 <span style="color:#2da44e"> 新增 2026-06-19</span>
-
-| 字段名                                              | 含义             | 数据类型                   | 来源版本   |
-| --------------------------------------------------- | ---------------- | -------------------------- | ---------- |
-| <span style="color:#2da44e">**关联的动漫ID**</span> | 关联的动画条目ID | 字符串（多个ID以`\|`分隔） | 2026-06-19 |
-
-#### <span style="color:#2da44e"> 新增 2026-07-05</span> infobox字段解析说明
-
-infobox字段包含条目原始wiki字符串，其中可能包含以下信息（通过解析可提取）：
-
-- 话数
-- 片长
-- 制片国家/地区
-- 语言
-- 官方网站
-- 放送开始时间
-- 播放结束时间
-- 动画制作公司
-- 导演
-- 音乐
-- 链接
-- 其他
-- Copyright
-- 人物设定
-- 机械设定
-- 原作
-- 企画
-- 制片人
-- 动画制片人
-- 脚本
-- 分镜
-- 演出
-- 作画监督
-- 美术监督
-- 色彩设计
-- 摄影监督
-- 音响监督
-- 主题歌作曲
-- 主题歌作词
-- 主题歌演出
-- 主题歌编曲
-- 原画
-- 第二原画
-- 补间动画
-- 动画检查
-- 3DCG
-- CG导演
-- 配音
-- 监制
-- 摄影
-- 制片
-- 音乐制作
-- 道具设计
-- 原案
-- 系列构成
-- 编剧
-- 美术设计
-- 背景美术
-- 音响
-- 音效
-- 效果
-- 录音
-- 剪辑
-
-注意：这些详细信息包含在infobox字段中，本数据集的Excel格式已将其解析为独立字段（详见上方"infobox解析字段"章节）。
-
-### 2. `differences/`（差异摘要）
-
-每周 dump 对比生成的差异摘要，保留新增/删除的小文件和可视化报告。
-
-| 文件                                | 说明                       |
-| ----------------------------------- | -------------------------- |
-| `diff_report.html`                  | 差异对比报告（浏览器可读） |
-| `diff_summary.json`                 | 差异统计数据               |
-| `type2_subject_*_added.jsonlines`   | 新增条目列表               |
-| `type2_subject_*_deleted.jsonlines` | 删除条目列表               |
-| `差异数据_type2_*.html`             | 差异可视化页面             |
+> `wpsjs`、`vite` 等 CLI 已作为 devDependencies 随 `npm install` 安装，无需全局安装。
 
 ---
 
-## 🔄 数据更新流程
+## 🐞 开发调试
 
-1. **Bangumi 官方**每周三凌晨发布 wiki 数据 dump
-2. **Archive 项目**下载 dump 并处理：
-   - 解析 infobox、生成 Excel 全量存档与差异报告
-   - 执行 `convert_dump_to_jsonl.py` 生成 `bangumi.jsonl`
-   - 执行 `sync_to_awujiana.py` 同步差异摘要到本仓库
-3. **本仓库**通过 `git push` 更新到 GitHub
-4. **BGM 插件**通过 raw URL 拉取最新 `bangumi.jsonl`
+加载项通过 WPS 的 `wpsjs debug` 启动调试会话（会编译 TS 并拉起 WPS 加载项）：
 
----
+```bash
+# 推荐：一键调试（先 tsc 编译，再 watch + 启动 WPS 调试）
+npm run debug
+```
 
-## 🔗 相关项目
+`npm run debug` 等价于：
 
-| 项目                 | 仓库                                                  | 说明                                        |
-| -------------------- | ----------------------------------------------------- | ------------------------------------------- |
-| Archive 项目         | 本地 `../Archive`                                     | 数据处理流水线（上游）                      |
-| Bangumi 官方 Archive | [bangumi/Archive](https://github.com/bangumi/Archive) | 原始数据源                                  |
-| BGM 插件             | —                                                     | Excel 加载项，读取 JSONL 并同步 Bangumi API |
+```bash
+npm run build:ts                 # tsc --project tsconfig.build.json → dist-ts/
+# 并行：tsc --watch 监听改动 + wpsjs debug 拉起 WPS
+```
 
----
-
-## 📜 许可协议
-
-本数据集遵循 [知识共享署名-非商业性使用-相同方式共享 4.0 国际许可协议 (CC BY-NC-SA 4.0)](https://creativecommons.org/licenses/by-nc-sa/4.0/)。
-
-- ✅ **允许**：个人使用、学习、研究、非商业分享、数据分析
-- ❌ **禁止**：商业用途、未署名使用、移除许可声明
-
-数据来源：[Bangumi Archive](https://github.com/bangumi/Archive)
+- **调试入口**：WPS 启动时加载 `index.html`，`main.js` 完成 Ribbon 早期占位；TypeScript 模块就绪后由 `ts/ribbon.ts` 通过 `window._bgmRibbonReady` 替换真实实现并 `Invalidate` 刷新图标。
+- 若仅需 Vite 开发服务器（`npm run dev`，端口 `3889`）：**生产构建与 WPS 加载仍使用 `npm run debug` / `npm run build`**，Vite dev server 仅用于前端资源调试，不代表最终加载行为。
 
 ---
 
-## 📧 联系方式
+## 📦 构建与打包
 
-如有疑问或反馈，请联系：**bingshanlengtie@qq.com**
+```bash
+# 完整构建：tsc → dist-ts/ ，再 Vite 打包 → dist/
+npm run build
+
+# 仅编译 TypeScript（不打包）
+npm run build:ts
+```
+
+**构建产物**：
+
+- `dist-ts/`：`tsc` 编译后的 JS（被 `main.js` / `panel.html` 运行时依赖）。
+- `dist/`：`vite build` 输出，含 `manifest.xml`、`ribbon.xml`、`images/`、`ui/`、`main.js`、`dist-ts/**`、`css/` 与经哈希的 `assets/`。将此目录作为加载项发布包部署到 WPS。
+
+---
+
+## 📖 使用示例
+
+### 1. 设置 Bangumi Token
+
+1. 在 Bangumi 个人设置中获取 **API Token**。
+2. 点击功能区 **设置Token**（或主面板 Token 区「设置」），粘贴 Token。
+3. 点击 **测试Token** 验证有效性，再点 **保存**。
+
+### 2. 上传同步（Excel → Bangumi）
+
+1. 在 Excel 中准备好追踪表（含「名称 / 是否看完 / 打分 / 标签分级」等列）。
+2. 打开 **同步面板**，在「数据选择区」选择目标工作簿与工作表（支持自动 / 手动选择模式）。
+3. 点击 **上传同步**（整表）或 **选中行同步**（仅选中范围）。
+4. 实时进度条显示成功 / 失败 / 跳过计数；完成后写入同步记录并 Toast 总结。
+
+### 3. 数据同步（远程仓库 → Excel）
+
+1. 打开 **设置面板** →「远程仓库配置」，填写：
+
+   | 配置项 | 值                            |
+   | ------ | ----------------------------- |
+   | 同步源 | GitHub                        |
+   | owner  | `awujiana`                    |
+   | repo   | `Bangumi-Archive-Anime-Excel` |
+   | branch | `main`                        |
+   | path   | `data/bangumi.jsonl`          |
+
+2. 选择同步策略（`add-update` 默认，保守）。
+3. 点击 **立即同步**（或功能区 **数据同步**）。插件下载 JSONL → 哈希比对缓存 → 按 SID 增量写入 Excel。
+4. 可用 **撤销同步** 回滚上一次操作；**清缓存** 强制重新下载。
+
+> 数据源格式、缓存机制与 5 种策略详见 [`docs/github-data-distribution.md`](docs/github-data-distribution.md)。
+
+### 4. 新番表富化
+
+点击功能区 **新番表富化**，对「新番表」执行字段自动补全（名称 / 别名差异补全、infobox 字段映射），减少手工录入。
+
+---
+
+## 🧪 测试
+
+```bash
+npm test                 # 运行全部单元测试（Vitest）
+npm run test:watch       # 监视模式
+npm run test:coverage    # 生成覆盖率报告
+```
+
+---
+
+## 🤝 代码规范与贡献指南
+
+### 分支与提交流程
+
+1. 从 `main` 切出特性分支：`git checkout -b feat/xxx` 或 `fix/xxx`。
+2. 开发，并确保通过 lint / format / test。
+3. 使用 **Conventional Commits** 规范提交：
+
+   ```
+   <type>(<scope>): <subject>
+   ```
+
+   - `type`：`feat` / `fix` / `refactor` / `docs` / `test` / `chore` / `style` / `perf`
+   - 示例：`feat(sync): 实现别名富化 - 新番表名称差异自动补全`、`fix: 修复状态泄漏 + 统一 Button 命名空间`
+
+4. 提交至 `main`（或发起 PR，视团队流程）。
+
+### 代码质量
+
+- **ESLint**：`npm run lint:check`（检查）/ `npm run lint`（自动修复），规则见 `.eslintrc.cjs`。
+- **Prettier**：`npm run format:check` / `npm run format`，配置见 `.prettierrc`。
+- **Husky + lint-staged**：`prepare` 安装 Git hook，提交时自动对暂存文件执行 lint / format（配置见 `lint-staged.config.js`、`.husky/`）。
+- **TypeScript**：`tsconfig.json` 开启 `strict`、`noUncheckedIndexedAccess`、`exactOptionalPropertyTypes` 等严格检查；新增代码需通过 `npm run build:ts` 类型检查。
+
+### 架构约定
+
+- **模块解耦 / 循环依赖治理**：避免 `ts/` 模块间的循环依赖（参见提交「循环依赖治理与模块解耦完成」）。
+- **面板命名**：统一 `taskpane` → `panel` 命名，页面逻辑文件使用 `Page` 后缀（`ts/panel/`）。
+- **事件分发**：UI 通过 `data-action` 属性 + 统一 `handleActionClick(action, event)` 路由（见 `ts/ui/handlers/` 与 [`docs/ui-and-interaction.md`](docs/ui-and-interaction.md)）。
+- **持久化**：配置经 `PluginStorage` 存储（`bgm_token` / `github_config` / `bgm_incremental_sync` 等键）。
+- **数据校验**：外部数据经 `ts/schemas/` 下的 zod schema 校验，再写入 Excel。
+
+### 扩展：新增同步源 / 字段映射
+
+- **新增同步源**：在 `ts/sync/` 下实现 `SyncSource` 接口并注册到 `syncSourceRegistry.ts`。
+- **字段映射**：编辑 `config/field_mappings.json`，并在 `ts/schemas/` 补充对应 zod 校验。
+
+---
+
+## 📚 文档索引
+
+| 文档                                                                   | 说明                                                  |
+| ---------------------------------------------------------------------- | ----------------------------------------------------- |
+| [`docs/ui-and-interaction.md`](docs/ui-and-interaction.md)             | UI 架构、面板交互、事件机制、Processor 清单           |
+| [`docs/github-data-distribution.md`](docs/github-data-distribution.md) | 远程数据下发机制、JSONL 格式、同步策略                |
+| [`docs/README.data-distribution.md`](docs/README.data-distribution.md) | 数据源仓库（Bangumi-Archive-Anime-Excel）说明（参考） |
+| [`docs/coverage-report.md`](docs/coverage-report.md)                   | 测试覆盖率报告                                        |
+
+> 根目录的 `项目文档.md` / `项目操作指南.md` 亦为数据源仓库的参考文档，如需进一步整理可移入 `docs/`。
+
+---
+
+## 🗂️ 数据来源
+
+插件默认从公开仓库 [`awujiana/Bangumi-Archive-Anime-Excel`](https://github.com/awujiana/Bangumi-Archive-Anime-Excel) 读取 `data/bangumi.jsonl`（Bangumi 官方 Archive 每周 dump 处理后的动画条目数据）。本仓库 `data/` 下保留一份本地副本，用于「本地文件同步」与开发测试。
+
+---
+
+## 📜 许可证
+
+本项目采用 [CC BY-NC-SA 4.0](https://creativecommons.org/licenses/by-nc-sa/4.0/)（署名 – 非商业性使用 – 相同方式共享）。数据来源于 [Bangumi Archive](https://github.com/bangumi/Archive)。
