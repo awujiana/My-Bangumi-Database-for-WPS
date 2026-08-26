@@ -295,14 +295,14 @@ body {
 }
 
 /* ========== 按钮组 ========== */
-.btn-group {
+.bgm-btn-group {
     display: flex;
     flex-direction: column;
     gap: 8px;
 }
 
 /* ========== 按钮 ========== */
-.btn {
+.bgm-btn {
     padding: 12px 18px;
     border: none;
     border-radius: 8px;
@@ -317,49 +317,49 @@ body {
     gap: 8px;
 }
 
-.btn:hover {
+.bgm-btn:hover {
     background: #4a4a4a;
     transform: translateY(-1px);
 }
 
-.btn-icon {
+.bgm-btn-icon {
     font-size: 16px;
 }
 
-.btn.primary {
+.bgm-btn.primary {
     background: linear-gradient(135deg, #4a9eff 0%, #3a8ee8 100%);
     color: white;
     box-shadow: 0 4px 10px rgba(74, 158, 255, 0.3);
 }
 
-.btn.primary:hover {
+.bgm-btn.primary:hover {
     background: linear-gradient(135deg, #3a8ee8 0%, #2a7ed8 100%);
     box-shadow: 0 6px 15px rgba(74, 158, 255, 0.4);
 }
 
-.btn.warning {
+.bgm-btn.warning {
     background: linear-gradient(135deg, #ff6b6b 0%, #ee5a5a 100%);
     color: white;
     box-shadow: 0 4px 10px rgba(255, 107, 107, 0.3);
 }
 
-.btn.warning:hover {
+.bgm-btn.warning:hover {
     background: linear-gradient(135deg, #ee5a5a 0%, #de4a4a 100%);
     box-shadow: 0 6px 15px rgba(255, 107, 107, 0.4);
 }
 
-.btn.success {
+.bgm-btn.success {
     background: linear-gradient(135deg, #4ade80 0%, #3ace70 100%);
     color: white;
     box-shadow: 0 4px 10px rgba(74, 222, 128, 0.3);
 }
 
-.btn.success:hover {
+.bgm-btn.success:hover {
     background: linear-gradient(135deg, #3ace70 0%, #2abe60 100%);
     box-shadow: 0 6px 15px rgba(74, 222, 128, 0.4);
 }
 
-.btn.small {
+.bgm-btn.small {
     padding: 6px 12px;
     font-size: 12px;
 }
@@ -1238,8 +1238,8 @@ select.input {
     top: 0;
 }
 
-/* 按钮样式 */
-.bgm-btn {
+/* 对话框按钮样式 */
+.bgm-dialog-btn {
     padding: 10px 24px;
     border: none;
     border-radius: 8px;
@@ -1250,49 +1250,49 @@ select.input {
     min-width: 80px;
 }
 
-.bgm-btn-primary {
+.bgm-dialog-btn-primary {
     background: linear-gradient(135deg, #4a9eff 0%, #3a8ee8 100%);
     color: white;
 }
 
-.bgm-btn-primary:hover {
+.bgm-dialog-btn-primary:hover {
     background: linear-gradient(135deg, #3a8ee8 0%, #2a7ed8 100%);
     transform: translateY(-1px);
 }
 
-.bgm-btn-default {
+.bgm-dialog-btn-default {
     background: #3a3a3a;
     color: #e0e0e0;
 }
 
-.bgm-btn-default:hover {
+.bgm-dialog-btn-default:hover {
     background: #4a4a4a;
 }
 
-.bgm-btn-danger {
+.bgm-dialog-btn-danger {
     background: linear-gradient(135deg, #ff6b6b 0%, #ee5a5a 100%);
     color: white;
 }
 
-.bgm-btn-danger:hover {
+.bgm-dialog-btn-danger:hover {
     background: linear-gradient(135deg, #ee5a5a 0%, #de4a4a 100%);
 }
 
-.bgm-btn-warning {
+.bgm-dialog-btn-warning {
     background: linear-gradient(135deg, #ff9800 0%, #f57c00 100%);
     color: white;
 }
 
-.bgm-btn-warning:hover {
+.bgm-dialog-btn-warning:hover {
     background: linear-gradient(135deg, #f57c00 0%, #e65100 100%);
 }
 
-.bgm-btn-success {
+.bgm-dialog-btn-success {
     background: linear-gradient(135deg, #4ade80 0%, #3ace70 100%);
     color: white;
 }
 
-.bgm-btn-success:hover {
+.bgm-dialog-btn-success:hover {
     background: linear-gradient(135deg, #3ace70 0%, #2abe60 100%);
 }
 
@@ -2242,7 +2242,7 @@ select.input {
 }
 
 /* ========== 按钮行布局：同行显示 ========== */
-.btn-row {
+.bgm-btn-row {
     flex-direction: row;
 }
 
@@ -2551,7 +2551,7 @@ select.input {
     margin-top: 4px;
 }
 
-.bgm-result-actions .bgm-btn {
+.bgm-result-actions .bgm-dialog-btn {
     flex: 1;
     justify-content: center;
 }

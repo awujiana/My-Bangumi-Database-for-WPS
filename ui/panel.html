@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="utf-8">
@@ -60,13 +60,13 @@
 
         <div class="section">
             <h3>快捷操作</h3>
-            <div class="btn-group">
-                <button class="btn primary" id="syncBtn" data-action="sync">📤 上传同步</button>
-                <button class="btn" data-action="testSelected">📋 选中行同步</button>
+            <div class="bgm-btn-group">
+                <button class="bgm-btn primary" id="syncBtn" data-action="sync">📤 上传同步</button>
+                <button class="bgm-btn" data-action="testSelected">📋 选中行同步</button>
             </div>
-            <div class="btn-group" style="margin-top:8px;">
-                <button class="btn success" data-action="syncCollectionFromBgm">📥 收藏回写</button>
-                <button class="btn" data-action="previewSyncContent">👁️ 预览同步</button>
+            <div class="bgm-btn-group" style="margin-top:8px;">
+                <button class="bgm-btn success" data-action="syncCollectionFromBgm">📥 收藏回写</button>
+                <button class="bgm-btn" data-action="previewSyncContent">👁️ 预览同步</button>
             </div>
             <p class="hint" style="margin-top:8px;">
                 <strong>📤 上传同步</strong>：将Excel中的观看状态、评分、标签等上传到Bangumi<br>
@@ -94,15 +94,15 @@
                     <span id="tokenExpiresDisplay" class="token-expires" style="display:none;"></span>
                 </div>
                 <div class="token-buttons">
-                    <button class="btn small" data-action="showTokenDialog">设置/修改</button>
-                    <button class="btn small" data-action="copyToken" aria-label="复制 Token 到剪贴板">📋 复制</button>
-                    <button class="btn small" data-action="clearToken">清除</button>
-                    <button class="btn small primary" data-action="testToken">测试</button>
+                    <button class="bgm-btn small" data-action="showTokenDialog">设置/修改</button>
+                    <button class="bgm-btn small" data-action="copyToken" aria-label="复制 Token 到剪贴板">📋 复制</button>
+                    <button class="bgm-btn small" data-action="clearToken">清除</button>
+                    <button class="bgm-btn small primary" data-action="testToken">测试</button>
                 </div>
             </div>
-            <div class="btn-group btn-row" style="margin-top:8px;">
-                <button class="btn small" data-action="exportConfig" style="flex:1;">📤 导出配置</button>
-                <button class="btn small" data-action="importConfig" style="flex:1;">📥 导入配置</button>
+            <div class="bgm-btn-group bgm-btn-row" style="margin-top:8px;">
+                <button class="bgm-btn small" data-action="exportConfig" style="flex:1;">📤 导出配置</button>
+                <button class="bgm-btn small" data-action="importConfig" style="flex:1;">📥 导入配置</button>
             </div>
             <p class="hint">Access Token 获取方式：<a href="#" data-action="openTokenPage">点击创建</a><br>
             Token 以明文存储以便复制使用，关闭文档后会随插件存储清除</p>
@@ -112,8 +112,8 @@
             <h3>收藏页面访问</h3>
             <div class="token-display">
                 <span id="userIdStatus">未设置</span>
-                <button class="btn small" data-action="showUserIdDialog">设置用户ID</button>
-                <button class="btn small primary" data-action="openUserCollection">打开收藏页</button>
+                <button class="bgm-btn small" data-action="showUserIdDialog">设置用户ID</button>
+                <button class="bgm-btn small primary" data-action="openUserCollection">打开收藏页</button>
             </div>
             <p class="hint">用户ID：Bangumi主页URL中的数字/字母</p>
         </div>
@@ -146,8 +146,8 @@
                 <strong>Bangumi API</strong>：获取你自己的收藏列表（需 Token）。<br>
                 <strong>GitHub 仓库</strong>：从远程仓库获取 bangumi.jsonl 全量数据。
             </p>
-            <div class="btn-group">
-                <button class="btn small primary" data-action="saveWritebackSource">💾 保存</button>
+            <div class="bgm-btn-group">
+                <button class="bgm-btn small primary" data-action="saveWritebackSource">💾 保存</button>
             </div>
         </div>
 
@@ -174,7 +174,7 @@
                     <option value="">-- 当前活动工作簿 --</option>
                 </select>
                 <div class="sheet-select-row">
-                    <button class="btn small" data-action="refreshWorkbooks" aria-label="刷新工作簿列表">🔄 刷新</button>
+                    <button class="bgm-btn small" data-action="refreshWorkbooks" aria-label="刷新工作簿列表">🔄 刷新</button>
                 </div>
             </div>
             <div class="form-group">
@@ -183,10 +183,10 @@
                     <option value="">-- 请选择 --</option>
                 </select>
                 <div class="sheet-select-row">
-                    <button class="btn small" data-action="refreshSheets" aria-label="刷新工作表列表">🔄 刷新</button>
-                    <button class="btn small" id="lockSheetBtn" data-action="toggleSheetLock" aria-label="锁定或解锁当前工作表">🔒 锁定</button>
+                    <button class="bgm-btn small" data-action="refreshSheets" aria-label="刷新工作表列表">🔄 刷新</button>
+                    <button class="bgm-btn small" id="lockSheetBtn" data-action="toggleSheetLock" aria-label="锁定或解锁当前工作表">🔒 锁定</button>
                     <span id="lockStatus" class="lock-status" style="display:none;"></span>
-                    <button class="btn small" data-action="cleanLockedDataSheet" title="去除无 Bangumi URL 的重复行，合并标签/分级">🧹 数据清洗</button>
+                    <button class="bgm-btn small" data-action="cleanLockedDataSheet" title="去除无 Bangumi URL 的重复行，合并标签/分级">🧹 数据清洗</button>
                 </div>
             </div>
             <div id="manualRangeInputs" style="display:none;">
@@ -203,7 +203,7 @@
                 <span class="info-icon">ℹ️</span>
                 <span id="filterStatus">正在检测筛选状态...</span>
             </div>
-            <button class="btn" data-action="refreshData">🔄 刷新数据</button>
+            <button class="bgm-btn" data-action="refreshData">🔄 刷新数据</button>
         </div>
 
         <!-- 详细预览模态框 -->
@@ -229,15 +229,15 @@
                     <p class="hint">点击"刷新数据"加载预览（支持筛选后数据）</p>
                 </div>
             </div>
-            <div class="btn-group btn-row" style="margin-top:8px;">
-                <button class="btn" id="enlargePreviewBtn" data-action="enlargePreview" style="flex:1;">
-                    <span class="btn-icon">🔍</span> 放大预览
+            <div class="bgm-btn-group bgm-btn-row" style="margin-top:8px;">
+                <button class="bgm-btn" id="enlargePreviewBtn" data-action="enlargePreview" style="flex:1;">
+                    <span class="bgm-btn-icon">🔍</span> 放大预览
                 </button>
-                <button class="btn" id="previewBtn" data-action="previewSyncContent" style="flex:1;">
-                    <span class="btn-icon">📋</span> 预览详情
+                <button class="bgm-btn" id="previewBtn" data-action="previewSyncContent" style="flex:1;">
+                    <span class="bgm-btn-icon">📋</span> 预览详情
                 </button>
-                <button class="btn success" id="syncCollectionBtn" data-action="syncCollectionFromBgm" style="flex:1;">
-                    <span class="btn-icon">📥</span> 收藏回写
+                <button class="bgm-btn success" id="syncCollectionBtn" data-action="syncCollectionFromBgm" style="flex:1;">
+                    <span class="bgm-btn-icon">📥</span> 收藏回写
                 </button>
             </div>
         </div>
@@ -267,21 +267,21 @@
                     <span>启用同步记录</span>
                 </label>
             </div>
-            <div class="btn-group">
-                <button class="btn" data-action="openSyncRecordSheet">
-                    <span class="btn-icon">📋</span> 查看同步记录
+            <div class="bgm-btn-group">
+                <button class="bgm-btn" data-action="openSyncRecordSheet">
+                    <span class="bgm-btn-icon">📋</span> 查看同步记录
                 </button>
-                <button class="btn success" data-action="syncCollectionFromBgm">
-                    <span class="btn-icon">📥</span> 收藏回写
+                <button class="bgm-btn success" data-action="syncCollectionFromBgm">
+                    <span class="bgm-btn-icon">📥</span> 收藏回写
                 </button>
-                <button class="btn warning" data-action="clearSyncRecords">
-                    <span class="btn-icon">🗑️</span> 清除同步记录
+                <button class="bgm-btn warning" data-action="clearSyncRecords">
+                    <span class="bgm-btn-icon">🗑️</span> 清除同步记录
                 </button>
-                <button class="btn" data-action="deduplicateSyncRecords">
-                    <span class="btn-icon">🔗</span> 去重同步记录
+                <button class="bgm-btn" data-action="deduplicateSyncRecords">
+                    <span class="bgm-btn-icon">🔗</span> 去重同步记录
                 </button>
-                <button class="btn" data-action="formatSyncRecordSheet" title="自动列宽/行高 · 字体 Maple Mono · 水平居中 · 名称+收藏状态边框 · URL列固定42宽">
-                    <span class="btn-icon">🎨</span> 设置格式
+                <button class="bgm-btn" data-action="formatSyncRecordSheet" title="自动列宽/行高 · 字体 Maple Mono · 水平居中 · 名称+收藏状态边框 · URL列固定42宽">
+                    <span class="bgm-btn-icon">🎨</span> 设置格式
                 </button>
             </div>
             <p class="hint">同步记录会保存在"同步记录"工作表中，包含：名称、URL、SID、类型、同步时间等</p>
@@ -329,7 +329,7 @@
                     <label for="githubPath">本地文件路径</label>
                     <div style="display:flex;gap:6px;align-items:center;">
                         <input type="text" id="localFilePath" placeholder="如：D:\data\bangumi.jsonl（绝对路径）" autocomplete="off" spellcheck="false" style="flex:1;"/>
-                        <button class="btn small" data-action="browseLocalFile" title="选择本地 JSONL 文件">📁 选择</button>
+                        <button class="bgm-btn small" data-action="browseLocalFile" title="选择本地 JSONL 文件">📁 选择</button>
                     </div>
                 </div>
                 <p class="hint">支持 .jsonl 和 .json 文件；复用 #githubPath 字段存储路径（与远程源互斥）。</p>
@@ -353,7 +353,7 @@
                     <option value="mirror">镜像同步（含删除）</option>
                     <option value="force-overwrite">强制覆盖（含空值）</option>
                 </select>
-                <button class="btn tiny" data-action="showSyncGuide" title="查看策略详细说明">❓</button>
+                <button class="bgm-btn tiny" data-action="showSyncGuide" title="查看策略详细说明">❓</button>
             </div>
             <div id="mirrorSyncNote" class="hint" style="display:none;padding:8px 12px;margin:4px 0;border-left:3px solid #f0a020;background:#3a2f1a;border-radius:4px;color:#ffd98a;font-size:12px;line-height:1.6;">
                 ⚠️ <strong>镜像同步</strong>说明：该策略并非完全镜像远程仓库。若要完全与远程一致，需先删除本地全部数据后再同步。<br>
@@ -442,12 +442,12 @@
                     💡 预告/未来动漫：筛选无开播日期的条目（适用于未公布播出时间的动漫）
                 </p>
             </div>
-            <div class="btn-group">
-                <button class="btn small primary" data-action="saveGithubConfig">💾 保存配置</button>
-                <button class="btn small" data-action="syncFromGithub">⬇️ 立即同步</button>
-                <button class="btn small" data-action="undoLastSync">↩️ 撤销上次同步</button>
-                <button class="btn small" data-action="testGithubConfig" title="测试配置是否可用（HEAD 请求）">🔌 测试</button>
-                <button class="btn small" data-action="clearGithubCache" id="clearCacheBtn" title="清除本地缓存的 GitHub 数据">🗑️ 清除缓存</button>
+            <div class="bgm-btn-group">
+                <button class="bgm-btn small primary" data-action="saveGithubConfig">💾 保存配置</button>
+                <button class="bgm-btn small" data-action="syncFromGithub">⬇️ 立即同步</button>
+                <button class="bgm-btn small" data-action="undoLastSync">↩️ 撤销上次同步</button>
+                <button class="bgm-btn small" data-action="testGithubConfig" title="测试配置是否可用（HEAD 请求）">🔌 测试</button>
+                <button class="bgm-btn small" data-action="clearGithubCache" id="clearCacheBtn" title="清除本地缓存的 GitHub 数据">🗑️ 清除缓存</button>
             </div>
             <p class="hint" id="githubCacheStatus">
                 💾 数据缓存：<span id="githubCacheStatusText">检查中...</span>
@@ -465,9 +465,9 @@
         <!-- 系统日志面板 -->
         <div class="section">
             <h3>📜 系统日志</h3>
-            <div class="btn-group">
-                <button class="btn small" data-action="showLogPanel">📜 查看日志</button>
-                <button class="btn small" data-action="clearLogs">🗑️ 清空日志</button>
+            <div class="bgm-btn-group">
+                <button class="bgm-btn small" data-action="showLogPanel">📜 查看日志</button>
+                <button class="bgm-btn small" data-action="clearLogs">🗑️ 清空日志</button>
             </div>
             <p class="hint">查看最近 1000 条系统日志，用于排查同步失败等问题</p>
         </div>
@@ -480,7 +480,7 @@
                     <button class="modal-close-btn" data-action="closeLogModal" aria-label="关闭">×</button>
                 </div>
                 <div class="modal-body">
-                    <div class="btn-group" style="flex-direction:row;gap:8px;margin-bottom:12px;">
+                    <div class="bgm-btn-group" style="flex-direction:row;gap:8px;margin-bottom:12px;">
                         <select id="logLevelFilter" class="input" style="width:auto;">
                             <option value="">全部级别</option>
                             <option value="ERROR">仅 ERROR</option>
@@ -488,7 +488,7 @@
                             <option value="INFO">仅 INFO</option>
                             <option value="DEBUG">仅 DEBUG</option>
                         </select>
-                        <button class="btn small" data-action="exportLogs">📤 导出</button>
+                        <button class="bgm-btn small" data-action="exportLogs">📤 导出</button>
                     </div>
                     <div id="logModalBody" style="max-height:440px;overflow-y:auto;">
                         <!-- 日志条目动态填充 -->
@@ -525,8 +525,8 @@
                     <!-- 测试结果动态填充 -->
                 </div>
                 <div class="modal-footer">
-                    <button class="btn small" data-action="testGithubConfig" id="retryConnectionTestBtn">🔄 重新测试</button>
-                    <button class="btn small primary" data-action="closeConnectionTest">关闭</button>
+                    <button class="bgm-btn small" data-action="testGithubConfig" id="retryConnectionTestBtn">🔄 重新测试</button>
+                    <button class="bgm-btn small primary" data-action="closeConnectionTest">关闭</button>
                 </div>
             </div>
         </div>
@@ -539,8 +539,8 @@
                 <div class="step"><span class="step-num">3</span><span>选择工作表和行范围</span></div>
                 <div class="step"><span class="step-num">4</span><span>选择操作类型并执行</span></div>
             </div>
-            <div class="btn-group" style="margin-top:8px;">
-                <button class="btn small" data-action="toggleUsageGuide" id="toggleUsageGuideBtn">📖 显示详细操作</button>
+            <div class="bgm-btn-group" style="margin-top:8px;">
+                <button class="bgm-btn small" data-action="toggleUsageGuide" id="toggleUsageGuideBtn">📖 显示详细操作</button>
             </div>
             <div id="usageGuideDetail" style="display:none;margin-top:10px;padding:12px;background:#2a2a2a;border-radius:8px;border:1px solid #444;font-size:12px;line-height:1.7;color:#ccc;">
                 <strong style="color:#4a9eff;">📘 操作流程详解</strong><br><br>
@@ -595,7 +595,7 @@
         <div class="section debug-section" id="debugSection" style="display:none;">
             <h3>🐛 调试信息</h3>
             <div id="DemoSpan" class="debug-content"></div>
-            <button class="btn small" data-action="testDebugConnection">测试连接</button>
+            <button class="bgm-btn small" data-action="testDebugConnection">测试连接</button>
         </div>
 
         </div>

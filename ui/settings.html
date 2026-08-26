@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="utf-8">
@@ -33,10 +33,10 @@
                     <span id="tokenExpiresDisplay" class="token-expires" style="display:none;"></span>
                 </div>
                 <div class="token-buttons">
-                    <button class="btn small" data-action="showTokenDialog">设置/修改</button>
-                    <button class="btn small" data-action="copyToken">📋 复制</button>
-                    <button class="btn small" data-action="clearToken">清除</button>
-                    <button class="btn small primary" data-action="testToken">测试</button>
+                    <button class="bgm-btn small" data-action="showTokenDialog">设置/修改</button>
+                    <button class="bgm-btn small" data-action="copyToken">📋 复制</button>
+                    <button class="bgm-btn small" data-action="clearToken">清除</button>
+                    <button class="bgm-btn small primary" data-action="testToken">测试</button>
                 </div>
             </div>
             <p class="hint">Access Token 获取方式：<a href="#" data-action="openTokenPage">点击创建</a></p>
@@ -55,9 +55,9 @@
                 </div>
             </div>
             <div class="status" id="userIdStatus">未设置</div>
-            <div class="btn-group" style="margin-top:10px;">
-                <button class="btn small" data-action="showUserIdDialog">设置用户ID</button>
-                <button class="btn small primary" data-action="openUserCollection">打开收藏页</button>
+            <div class="bgm-btn-group" style="margin-top:10px;">
+                <button class="bgm-btn small" data-action="showUserIdDialog">设置用户ID</button>
+                <button class="bgm-btn small primary" data-action="openUserCollection">打开收藏页</button>
             </div>
         </div>
 
@@ -127,10 +127,10 @@
                 <label for="githubPath">文件路径</label>
                 <input type="text" id="githubPath" placeholder="如：data/bangumi.jsonl" autocomplete="off" spellcheck="false"/>
             </div>
-            <div class="btn-group">
-                <button class="btn small primary" data-action="saveGithubConfig">💾 保存配置</button>
-                <button class="btn small" data-action="testGithubConfig">🔌 测试连接</button>
-                <button class="btn small" data-action="clearGithubCache">🗑️ 清除缓存</button>
+            <div class="bgm-btn-group">
+                <button class="bgm-btn small primary" data-action="saveGithubConfig">💾 保存配置</button>
+                <button class="bgm-btn small" data-action="testGithubConfig">🔌 测试连接</button>
+                <button class="bgm-btn small" data-action="clearGithubCache">🗑️ 清除缓存</button>
             </div>
             <p class="hint">默认仓库：<code>awujiana/Bangumi-Archive-Anime-Excel/main/data/bangumi.jsonl</code></p>
         </div>
@@ -138,9 +138,9 @@
         <!-- 数据导入导出 -->
         <div class="section">
             <h3>📦 配置导入导出</h3>
-            <div class="btn-group btn-row">
-                <button class="btn small" data-action="exportConfig" style="flex:1;">📤 导出配置</button>
-                <button class="btn small" data-action="importConfig" style="flex:1;">📥 导入配置</button>
+            <div class="bgm-btn-group bgm-btn-row">
+                <button class="bgm-btn small" data-action="exportConfig" style="flex:1;">📤 导出配置</button>
+                <button class="bgm-btn small" data-action="importConfig" style="flex:1;">📥 导入配置</button>
             </div>
             <p class="hint">导出会下载配置文件并复制到剪贴板，导入支持从粘贴的 JSON 恢复。</p>
         </div>
@@ -148,9 +148,9 @@
         <!-- 系统日志 -->
         <div class="section">
             <h3>📜 系统日志</h3>
-            <div class="btn-group">
-                <button class="btn small" data-action="showLogPanel">📜 查看日志</button>
-                <button class="btn small" data-action="clearLogs">🗑️ 清空日志</button>
+            <div class="bgm-btn-group">
+                <button class="bgm-btn small" data-action="showLogPanel">📜 查看日志</button>
+                <button class="bgm-btn small" data-action="clearLogs">🗑️ 清空日志</button>
             </div>
         </div>
 
@@ -176,7 +176,7 @@
                     <button class="modal-close-btn" data-action="closeLogModal" aria-label="关闭">×</button>
                 </div>
                 <div class="modal-body">
-                    <div class="btn-group" style="flex-direction:row;gap:8px;margin-bottom:12px;">
+                    <div class="bgm-btn-group" style="flex-direction:row;gap:8px;margin-bottom:12px;">
                         <select id="logLevelFilter" class="input" style="width:auto;">
                             <option value="">全部级别</option>
                             <option value="ERROR">仅 ERROR</option>
@@ -184,7 +184,7 @@
                             <option value="INFO">仅 INFO</option>
                             <option value="DEBUG">仅 DEBUG</option>
                         </select>
-                        <button class="btn small" data-action="exportLogs">📤 导出</button>
+                        <button class="bgm-btn small" data-action="exportLogs">📤 导出</button>
                     </div>
                     <div id="logModalBody" style="max-height:440px;overflow-y:auto;">
                     </div>
