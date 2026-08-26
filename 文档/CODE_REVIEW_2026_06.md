@@ -47,33 +47,33 @@
 
 ### P2 中（大部分已修复）
 
-| 编号  | 位置                                                                               | 描述                                     | 状态                      |
-| ----- | ---------------------------------------------------------------------------------- | ---------------------------------------- | ------------------------- |
-| P2-1  | [util.ts](file:///d:/编程/Excel加载项/BGM/BGM/ts/tools/util.ts)                    | pause() 不检查 shouldStop                | ✅ 在追                   |
-| P2-2  | [util.ts](file:///d:/编程/Excel加载项/BGM/BGM/ts/tools/util.ts)                    | locateCurrentCell 异常降级不完整         | ✅ 在追                   |
-| P2-3  | [util.ts](file:///d:/编程/Excel加载项/BGM/BGM/ts/tools/util.ts)                    | updatePosition 无范围校验                | ✅ 在追                   |
-| P2-4  | [util.ts](file:///d:/编程/Excel加载项/BGM/BGM/ts/tools/util.ts)                    | resetStopFlag 未清理 currentCol          | ✅ 在追                   |
-| P2-5  | [util.ts](file:///d:/编程/Excel加载项/BGM/BGM/ts/tools/util.ts)                    | startSync 成功路径不清状态               | ✅ 在追                   |
-| P2-7  | [util.ts](file:///d:/编程/Excel加载项/BGM/BGM/ts/tools/util.ts)                    | currentSheet 悬空引用                    | ✅ 在追                   |
-| P2-8  | [dialog.ts](file:///d:/编程/Excel加载项/BGM/BGM/ts/ui/dialog.ts)                   | 回调泄漏                                 | ✅ 在追                   |
-| P2-10 | [dialog.ts](file:///d:/编程/Excel加载项/BGM/BGM/ts/ui/dialog.ts)                   | 内联样式硬编码颜色                       | ✅ 在追                   |
-| P2-11 | [dialog.ts](file:///d:/编程/Excel加载项/BGM/BGM/ts/ui/dialog.ts)                   | 可访问性缺失                             | ✅ 在追                   |
-| P2-14 | [preview.ts](file:///d:/编程/Excel加载项/BGM/BGM/ts/ui/preview.ts)                 | actualCardCount 双重计数                 | ✅ 在追                   |
-| P2-15 | [exceltobangumi.ts](file:///d:/编程/Excel加载项/BGM/BGM/ts/sync/exceltobangumi.ts) | rows.length=0 空弹窗                     | ✅ 在追                   |
-| P2-16 | [taskpane.html](file:///d:/编程/Excel加载项/BGM/BGM/ui/taskpane.html)              | 内联样式迁移                             | ✅ 在追                   |
-| P2-17 | [events.ts](file:///d:/编程/Excel加载项/BGM/BGM/ts/tools/events.ts)                | BANGUMI\_EVENTS 死代码                   | ✅ 在追                   |
-| P2-6  | [util.ts](file:///d:/编程/Excel加载项/BGM/BGM/ts/tools/util.ts)                    | SYNC\_COMPLETED/SYNC\_ERROR 事件无监听者 | 🟡 再看（保留供未来扩展） |
+| 编号  | 位置                                                                               | 描述                                     | 状态                                   |
+| ----- | ---------------------------------------------------------------------------------- | ---------------------------------------- | -------------------------------------- |
+| P2-1  | [util.ts](file:///d:/编程/Excel加载项/BGM/BGM/ts/tools/util.ts)                    | pause() 不检查 shouldStop                | ✅ 在追                                |
+| P2-2  | [util.ts](file:///d:/编程/Excel加载项/BGM/BGM/ts/tools/util.ts)                    | locateCurrentCell 异常降级不完整         | ✅ 在追                                |
+| P2-3  | [util.ts](file:///d:/编程/Excel加载项/BGM/BGM/ts/tools/util.ts)                    | updatePosition 无范围校验                | ✅ 在追                                |
+| P2-4  | [util.ts](file:///d:/编程/Excel加载项/BGM/BGM/ts/tools/util.ts)                    | resetStopFlag 未清理 currentCol          | ✅ 在追                                |
+| P2-5  | [util.ts](file:///d:/编程/Excel加载项/BGM/BGM/ts/tools/util.ts)                    | startSync 成功路径不清状态               | ✅ 在追                                |
+| P2-7  | [util.ts](file:///d:/编程/Excel加载项/BGM/BGM/ts/tools/util.ts)                    | currentSheet 悬空引用                    | ✅ 在追                                |
+| P2-8  | [dialog.ts](file:///d:/编程/Excel加载项/BGM/BGM/ts/ui/dialog.ts)                   | 回调泄漏                                 | ✅ 在追                                |
+| P2-10 | [dialog.ts](file:///d:/编程/Excel加载项/BGM/BGM/ts/ui/dialog.ts)                   | 内联样式硬编码颜色                       | ✅ 在追                                |
+| P2-11 | [dialog.ts](file:///d:/编程/Excel加载项/BGM/BGM/ts/ui/dialog.ts)                   | 可访问性缺失                             | ✅ 在追                                |
+| P2-14 | [preview.ts](file:///d:/编程/Excel加载项/BGM/BGM/ts/ui/preview.ts)                 | actualCardCount 双重计数                 | ✅ 在追                                |
+| P2-15 | [exceltobangumi.ts](file:///d:/编程/Excel加载项/BGM/BGM/ts/sync/exceltobangumi.ts) | rows.length=0 空弹窗                     | ✅ 在追                                |
+| P2-16 | [taskpane.html](file:///d:/编程/Excel加载项/BGM/BGM/ui/taskpane.html)              | 内联样式迁移                             | ✅ 在追                                |
+| P2-17 | [events.ts](file:///d:/编程/Excel加载项/BGM/BGM/ts/tools/events.ts)                | BANGUMI\_EVENTS 死代码                   | ✅ 在追                                |
+| P2-6  | [util.ts](file:///d:/编程/Excel加载项/BGM/BGM/ts/tools/util.ts)                    | SYNC\_COMPLETED/SYNC\_ERROR 事件无监听者 | ✅ 已修复（v3.3：添加 Toast 通知监听） |
 
 ### P3 低（大部分已修复）
 
-| 编号 | 位置                                                                 | 描述                        | 状态                  |
-| ---- | -------------------------------------------------------------------- | --------------------------- | --------------------- |
-| P3-2 | [util.ts](file:///d:/编程/Excel加载项/BGM/BGM/ts/tools/util.ts)      | waitForResume 轮询延迟      | ✅ 在追（50ms）       |
-| P3-4 | [dialog.ts](file:///d:/编程/Excel加载项/BGM/BGM/ts/ui/dialog.ts)     | 日志强制滚动                | ✅ 在追（智能滚动）   |
-| P3-5 | [dialog.ts](file:///d:/编程/Excel加载项/BGM/BGM/ts/ui/dialog.ts)     | 弹窗隐藏时无效 DOM 写入     | ✅ 在追               |
-| P3-9 | [index.ts](file:///d:/编程/Excel加载项/BGM/BGM/ts/index.ts)          | barrel 段落编号             | ✅ 在追               |
-| P3-1 | [util.ts](file:///d:/编程/Excel加载项/BGM/BGM/ts/tools/util.ts)      | pause 定位失败无反馈        | 🟡 再看（已记录日志） |
-| P3-7 | [handlers.ts](file:///d:/编程/Excel加载项/BGM/BGM/ts/ui/handlers.ts) | SYNC\_PROGRESS 监听器无 off | 🟡 再看（无累积泄漏） |
+| 编号 | 位置                                                                 | 描述                        | 状态                                          |
+| ---- | -------------------------------------------------------------------- | --------------------------- | --------------------------------------------- |
+| P3-2 | [util.ts](file:///d:/编程/Excel加载项/BGM/BGM/ts/tools/util.ts)      | waitForResume 轮询延迟      | ✅ 在追（50ms）                               |
+| P3-4 | [dialog.ts](file:///d:/编程/Excel加载项/BGM/BGM/ts/ui/dialog.ts)     | 日志强制滚动                | ✅ 在追（智能滚动）                           |
+| P3-5 | [dialog.ts](file:///d:/编程/Excel加载项/BGM/BGM/ts/ui/dialog.ts)     | 弹窗隐藏时无效 DOM 写入     | ✅ 在追                                       |
+| P3-9 | [index.ts](file:///d:/编程/Excel加载项/BGM/BGM/ts/index.ts)          | barrel 段落编号             | ✅ 在追                                       |
+| P3-1 | [util.ts](file:///d:/编程/Excel加载项/BGM/BGM/ts/tools/util.ts)      | pause 定位失败无反馈        | ✅ 已修复（v3.3：添加 Toast 反馈）            |
+| P3-7 | [handlers.ts](file:///d:/编程/Excel加载项/BGM/BGM/ts/ui/handlers.ts) | SYNC\_PROGRESS 监听器无 off | ✅ 已修复（v3.3：trackedEventBusOn 清理机制） |
 
 ---
 
@@ -231,12 +231,12 @@ SyncToBangumiAsync (主协调)
 - 超级函数拆分
 - syncAllRows 统一弹窗
 
-### 再看（暂保留，未来迭代）
+### 再看（v3.3 已全部修复）
 
-- P2-6：`SYNC_COMPLETED`/`SYNC_ERROR` 事件无监听者（保留供未来扩展）
-- P3-1：`pause` 定位失败无用户层反馈（已记录日志）
-- P3-7：`SYNC_PROGRESS` 监听器无 `off`（无累积泄漏）
-- shadcn 组件化建议（当前 CSS 已够用）
+- P2-6：`SYNC_COMPLETED`/`SYNC_ERROR` 事件 → ✅ 已添加 Toast 通知监听
+- P3-1：`pause` 定位失败 → ✅ 已添加 Toast 用户反馈
+- P3-7：`SYNC_PROGRESS` 监听器无 `off` → ✅ 已实现 `trackedEventBusOn`/`clearTrackedListeners` 清理机制
+- shadcn 组件化建议（当前 CSS 已够用，保留为未来优化方向）
 
 ### 搁置（暂不处理）
 
@@ -338,15 +338,214 @@ SyncToBangumiAsync (主协调)
 - ✅ Git 提交：`refactor: 重命名 taskpane.html 为 panel.html`
 - ✅ Git 提交：`refactor: 重命名 taskpane_id 为 panel_id`
 
-### 9.6 待处理事项
+### 9.6 待处理事项（v3.3 已全部完成）
 
-| 项目         | 说明                                                          | 优先级 |
-| ------------ | ------------------------------------------------------------- | ------ |
-| 函数名 API   | `initPanel()`、`isTaskpaneContext()` 等保留原名以维持向后兼容 | 🟡 低  |
-| 全局属性     | `window.refreshPanelUI` 保留原名                              | 🟡 低  |
-| 事件日志前缀 | `[taskpane]` 日志前缀可在后续迭代中统一为 `[panel]`           | 🟡 低  |
-| 用户文档     | `USER_OPERATIONS.md` 中术语更新（已标注为文档迭代项）         | 🟡 低  |
+| 项目         | 说明                                                                         | 状态    |
+| ------------ | ---------------------------------------------------------------------------- | ------- |
+| 函数名 API   | `initTaskpane()` → `initPanel()`、`isTaskpaneContext()` → `isPanelContext()` | ✅ 完成 |
+| 全局属性     | `window.refreshTaskpaneUI` → `window.refreshPanelUI`                         | ✅ 完成 |
+| 事件日志前缀 | `[taskpane]` → `[panel]` 日志前缀统一                                        | ✅ 完成 |
+| 用户文档     | `USER_OPERATIONS.md` 术语更新                                                | ✅ 完成 |
 
 ---
 
-_报告生成完毕。所有在追项已修复并通过编译验证；再看项保留供未来迭代。_
+## 十、2026-08 重构：循环依赖治理与模块解耦
+
+### 10.1 重构目标
+
+解决 `ts/index.ts` 作为"上帝模块"引发的循环依赖问题，通过三阶段渐进式方案实现模块解耦。
+
+### 10.2 问题分析
+
+**核心循环依赖链：**
+
+1. `index.ts` ↔ `tools/util/index.ts`：类型导入 + 函数引用双向
+2. `index.ts` ↔ `tools/wps.ts`：工具函数引用反向
+3. `index.ts` ↔ `core/crypto.ts`：日志函数循环
+4. `index.ts` ↔ `tools/config.ts`：配置读写双向
+
+**问题影响：**
+
+- TypeScript 编译产生循环依赖警告
+- 模块独立性差，难以单独测试
+- 任何模块修改可能引发 `index.ts` 连锁变更
+
+### 10.3 三阶段执行计划
+
+| 阶段                        | 内容                                          | 新增/修改     | 风险 |
+| --------------------------- | --------------------------------------------- | ------------- | ---- |
+| **阶段 1: 类型提取**        | 创建 `core/types.ts`，提取核心接口            | 4 个新文件    | 极低 |
+| **阶段 2: CDI 容器**        | 创建 `core/container.ts` + `core/services.ts` | 6 个新文件    | 低   |
+| **阶段 3: 事件总线 + 瘦身** | 扩展 EventBus、提取 errorHandler、移除依赖    | 14 个文件修改 | 中   |
+
+### 10.4 阶段 1: 类型提取
+
+**新增文件：**
+
+- `ts/core/types.ts` — 核心接口定义
+
+**提取的接口：**
+
+- `BGMCache`: 缓存数据结构
+- `BGMSheet`: 工作表引用与元数据
+- `BGMSync`: 同步状态机接口（含 `locateCurrentCell: () => boolean` 返回类型更新）
+- `BGMUserInfo`: 用户信息结构
+- `EnrichWorkbookState`: 富化工作簿锁定状态
+
+**收益：** 消除 `tools/util` 与 `index.ts` 的类型级循环依赖
+
+### 10.5 阶段 2: CDI 容器
+
+**新增文件：**
+
+- `ts/core/container.ts` — 轻量服务容器
+- `ts/core/services.ts` — 核心服务注册
+
+**容器 API：**
+
+```typescript
+class ServiceContainer {
+  register(key: string, factory: () => T): void
+  resolve<T>(key: string): T
+  has(key: string): boolean
+  clear(): void
+}
+```
+
+**注册的服务：**
+
+- `logService`: 日志服务
+- `eventBusService`: 事件总线
+- `configService`: 配置服务
+
+**收益：** 实现模块间松耦合通信，支持服务替换和测试 mock
+
+### 10.6 阶段 3: 事件总线 + 瘦身
+
+**扩展 EventBus：**
+
+- 新增 `STATE_CHANGED` 和 `CONFIG_CHANGED` 事件
+- 新增 `emitStateChanged()` 和 `emitConfigChanged()` 便捷方法
+
+**新增文件：**
+
+- `ts/core/errorHandler.ts` — 全局错误处理模块
+
+**提取的逻辑：**
+
+- `initGlobalErrorHandler()` 从 `index.ts` 提取至独立模块
+- 注册 `window.onerror` 和 `window.onunhandledrejection` 监听
+
+**移除的依赖：**
+
+- `tools/config.ts` → 直接从 `tools/util/index.ts` 导入
+- `tools/http.ts` → 直接从源模块导入
+- `sync/scraping.ts` → 直接从 `tools/util/index.ts` 导入
+- `sync/exceltobangumi/*` → 直接从源模块导入
+- `tools/wps.ts` → 直接从 `tools/util/index.ts` 导入
+
+**index.ts 瘦身：**
+
+- 从 723 行瘦身为仅包含 re-export 的便利桶
+- 移除所有内联实现逻辑
+
+### 10.7 "再看"项修复
+
+| 编号 | 修复内容                               | 实现方式                                                                                  |
+| ---- | -------------------------------------- | ----------------------------------------------------------------------------------------- |
+| P2-6 | `SYNC_COMPLETED`/`SYNC_ERROR` 事件监听 | 在 `handlers/index.ts` 中添加 `handleSyncCompletedEvent` 和 `handleSyncErrorEvent` 处理器 |
+| P3-1 | `pause` 定位失败用户反馈               | 修改 `locateCurrentCell()` 返回 `boolean`，失败时调用 `showToast()`                       |
+| P3-7 | `SYNC_PROGRESS` 监听器清理             | 实现 `trackedEventBusOn()` 和 `clearTrackedListeners()` 统一清理机制                      |
+
+### 10.8 命名统一
+
+| 原名                      | 新名                   | 涉及文件                                                 |
+| ------------------------- | ---------------------- | -------------------------------------------------------- |
+| `initTaskpane()`          | `initPanel()`          | `panelPage.ts`, `panel-entry.ts`                         |
+| `startTaskpane()`         | `startPanel()`         | `panel-entry.ts`                                         |
+| `refreshTaskpaneUI()`     | `refreshPanelUI()`     | `panelPage.ts`                                           |
+| `isTaskpaneContext()`     | `isPanelContext()`     | `handlers/index.ts`                                      |
+| `ensureTaskpaneVisible()` | `ensurePanelVisible()` | `ribbonService.ts`                                       |
+| `taskpane_id`             | `panel_id`             | `util/index.ts`, `ribbonService.ts`, `handlers/index.ts` |
+| `[taskpane]` 日志前缀     | `[panel]`              | 全库日志输出                                             |
+
+### 10.9 验证结果
+
+- ✅ TypeScript 编译通过（`npm run build:ts`）
+- ✅ ESLint 检查 0 errors（`npm run lint`）
+- ✅ 42 个测试文件、1627 个测试用例全部通过（`npm test`）
+- ✅ Pre-commit hooks 执行成功
+- ✅ Git 提交：`refactor: 循环依赖治理与模块解耦完成`
+
+### 10.10 后续建议
+
+1. **CDI 容器推广**：将更多全局单例（如 dialog 管理器、状态管理器）迁移至容器管理
+2. **事件总线深化**：利用 `STATE_CHANGED` 事件实现跨模块状态同步，减少直接函数调用
+3. **模块独立测试**：各核心模块（core/tools）可在不加载 index.ts 的情况下独立测试
+4. **依赖图可视化**：使用 madge 等工具生成模块依赖图，持续监控循环依赖
+
+---
+
+## 十一、2026-08 修复：状态泄漏与 Button 命名空间统一
+
+### 11.1 P0 状态泄漏修复
+
+**问题描述：**
+
+- `confirmAndExecuteSync()` 和 `_doAPISync()` 函数中存在状态泄漏风险
+- `showSyncProgressDialog()` 在 `try` 块外调用，若 DOM 操作失败会导致 `enterRunningState()` 获取的锁无法释放
+- `exitRunningState()` 在正常流程和 `catch` 块中重复调用，可能导致状态异常
+
+**修复方案：**
+
+1. 将 `showSyncProgressDialog()` 和配置构建逻辑移入 `try` 块
+2. 移除 `catch` 块中的 `exitRunningState()` 调用
+3. 在 `finally` 块统一调用 `BGM.sync.exitRunningState()`，确保无论成功失败均释放同步锁
+
+**涉及文件：**
+
+- `ts/ui/handlers/sync.ts` — `confirmAndExecuteSync()` 和 `_doAPISync()` 函数重构
+
+### 11.2 P2 Button 命名空间统一
+
+**问题描述：**
+
+- 项目中存在两套按钮样式类名：`.btn-*` 和 `.bgm-btn-*`
+- 对话框专用按钮使用 `.bgm-btn-*`，与通用按钮命名空间冲突
+- 跨文件 12+ 处引用，样式维护成本高
+
+**修复方案：**
+
+1. **对话框按钮独立命名**：将 `.bgm-btn-*` 重命名为 `.bgm-dialog-btn-*`（对话框专用）
+2. **通用按钮统一前缀**：将 `.btn-*` 统一为 `.bgm-btn-*`（通用按钮）
+
+**变更映射：**
+
+| 原类名               | 新类名                      | 适用范围       |
+| -------------------- | --------------------------- | -------------- |
+| `.bgm-btn`           | `.bgm-dialog-btn`           | 对话框按钮     |
+| `.bgm-btn-primary`   | `.bgm-dialog-btn-primary`   | 对话框主要按钮 |
+| `.bgm-btn-secondary` | `.bgm-dialog-btn-secondary` | 对话框次要按钮 |
+| `.btn-group`         | `.bgm-btn-group`            | 按钮组         |
+| `.btn-icon`          | `.bgm-btn-icon`             | 图标按钮       |
+| `.btn-row`           | `.bgm-btn-row`              | 按钮行         |
+
+**涉及文件：**
+
+- `css/styles.css` — 对话框按钮样式定义
+- `css/enrich.css` — 富化页按钮样式定义
+- `ui/panel.html` — 面板按钮类名更新
+- `ui/settings.html` — 设置面板按钮类名更新
+- `ui/enrich.html` — 富化页按钮类名更新
+- `ts/ui/dialog.ts` — 对话框按钮类名引用更新
+- `ts/ui/syncResultDialog.ts` — 同步结果对话框按钮类名更新
+
+### 11.3 验证结果
+
+- ✅ TypeScript 编译通过（`npm run build:ts`）
+- ✅ 42 个测试文件、1627 个测试用例全部通过（`npm test`）
+- ✅ CSS 样式定义与 HTML 引用完全匹配
+
+---
+
+_报告生成完毕。所有在追项已修复并通过编译验证；再看项 v3.3 已全部完成；循环依赖治理三阶段方案已落地；状态泄漏修复与 Button 命名空间统一已完成。_

@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="utf-8">
@@ -36,9 +36,9 @@
             <h3>📁 新番表文件</h3>
             <div class="file-selector">
                 <div class="file-path-display" id="filePathDisplay" readonly placeholder="未选择文件..."></div>
-                <div class="btn-group btn-row">
-                    <button class="btn small primary" id="selectFileBtn" data-action="selectFile" style="flex:1;">📂 选择文件</button>
-                    <button class="btn small" id="detectHeaderBtn" data-action="detectHeader" style="flex:1;">🔍 自动识别表头</button>
+                <div class="bgm-btn-group bgm-btn-row">
+                    <button class="bgm-btn small primary" id="selectFileBtn" data-action="selectFile" style="flex:1;">📂 选择文件</button>
+                    <button class="bgm-btn small" id="detectHeaderBtn" data-action="detectHeader" style="flex:1;">🔍 自动识别表头</button>
                 </div>
             </div>
             <div class="detect-result" id="detectResult" style="display:none;">
@@ -71,9 +71,9 @@
                     </select>
                 </div>
             </div>
-            <div class="btn-group btn-row">
-                <button class="btn small" data-action="refreshSheets" style="flex:1;">🔄 刷新</button>
-                <button class="btn small" id="lockSheetBtn" data-action="toggleSheetLock" style="flex:1;">🔒 锁定</button>
+            <div class="bgm-btn-group bgm-btn-row">
+                <button class="bgm-btn small" data-action="refreshSheets" style="flex:1;">🔄 刷新</button>
+                <button class="bgm-btn small" id="lockSheetBtn" data-action="toggleSheetLock" style="flex:1;">🔒 锁定</button>
             </div>
             <div id="lockStatus" style="display:none;margin-top:6px;padding:4px 8px;background:#2d5a27;color:#a3d977;border-radius:4px;font-size:12px;"></div>
         </div>
@@ -138,7 +138,7 @@
                     <span style="color:#e74c3c;">✏️ 使用新番表名</span>（覆盖）
                 </div>
             </div>
-            <button class="btn primary" id="startEnrichBtn" data-action="startEnrich">🚀 开始富化</button>
+            <button class="bgm-btn primary" id="startEnrichBtn" data-action="startEnrich">🚀 开始富化</button>
             <div class="enrich-progress" id="enrichProgress" style="display:none;">
                 <div class="progress-bar">
                     <div class="progress-bar-fill" id="progressBarFill" style="width:0%;">0%</div>
@@ -190,9 +190,9 @@
                     <div class="stat-label">错误</div>
                 </div>
             </div>
-            <div class="btn-group btn-row">
-                <button class="btn small" data-action="openRecordSheet" style="flex:1;">📋 打开记录表</button>
-                <button class="btn small" data-action="clearRecords" style="flex:1;">🗑️ 清除记录</button>
+            <div class="bgm-btn-group bgm-btn-row">
+                <button class="bgm-btn small" data-action="openRecordSheet" style="flex:1;">📋 打开记录表</button>
+                <button class="bgm-btn small" data-action="clearRecords" style="flex:1;">🗑️ 清除记录</button>
             </div>
             <div class="record-list" id="recentRecords">
                 <div class="record-empty">暂无记录</div>

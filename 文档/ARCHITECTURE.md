@@ -1,19 +1,20 @@
 ﻿# Bangumi WPS Excel 加载项 - 架构与项目知识文档
 
-> 版本: 3.2 | 更新日期: 2026-08-26
+> 版本: 3.3 | 更新日期: 2026-08-26
 
 ---
 
 ## 版本历史
 
-| 版本 | 日期       | 变更说明                                                                                                                                                                                                                  |
-| ---- | ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| v1.0 | 2026-08-10 | 初始版本                                                                                                                                                                                                                  |
-| v2.8 | 2026-08-21 | 修复 GitHub 同步编译错误、同步完成弹窗支持明细表格                                                                                                                                                                        |
-| v2.9 | 2026-08-26 | 新增 enrichEngine 富化引擎（新番表+简介工作表双阶段富化）、标注白名单机制、自动添加缺失列、声优字段支持、数据同步列位置无关性验证、边界情况修复（parseRemoteContent 空值检查、getAnnotatedValue 空值守卫）、42 项边界测试 |
-| v3.0 | 2026-08-26 | 新增富化功能工作簿选择与锁定机制（enrichLock.ts）：跨工作簿 Bangumi 追踪表选择、PluginStorage 持久化、启动恢复校验、与 Taskpane 锁定独立运行                                                                              |
-| v3.1 | 2026-08-26 | enrichLock.ts 边界加固：WPS API null 返回安全处理、冗余查找逻辑简化、边界情况文档完善                                                                                                                                     |
-| v3.2 | 2026-08-26 | 命名规范重构：`taskpane/` 目录重命名为 `panel/`，页面文件使用 `Page` 后缀（`panelPage.ts`/`enrichPage.ts`），`taskpane-entry.ts` → `panel-entry.ts`；删除旧兼容文件 `ts/taskpane.ts`；统一 `@module` JSDoc 标签           |
+| 版本 | 日期       | 变更说明                                                                                                                                                                                                                                                               |
+| ---- | ---------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| v1.0 | 2026-08-10 | 初始版本                                                                                                                                                                                                                                                               |
+| v2.8 | 2026-08-21 | 修复 GitHub 同步编译错误、同步完成弹窗支持明细表格                                                                                                                                                                                                                     |
+| v2.9 | 2026-08-26 | 新增 enrichEngine 富化引擎（新番表+简介工作表双阶段富化）、标注白名单机制、自动添加缺失列、声优字段支持、数据同步列位置无关性验证、边界情况修复（parseRemoteContent 空值检查、getAnnotatedValue 空值守卫）、42 项边界测试                                              |
+| v3.0 | 2026-08-26 | 新增富化功能工作簿选择与锁定机制（enrichLock.ts）：跨工作簿 Bangumi 追踪表选择、PluginStorage 持久化、启动恢复校验、与 Taskpane 锁定独立运行                                                                                                                           |
+| v3.1 | 2026-08-26 | enrichLock.ts 边界加固：WPS API null 返回安全处理、冗余查找逻辑简化、边界情况文档完善                                                                                                                                                                                  |
+| v3.2 | 2026-08-26 | 命名规范重构：`taskpane/` 目录重命名为 `panel/`，页面文件使用 `Page` 后缀（`panelPage.ts`/`enrichPage.ts`），`taskpane-entry.ts` → `panel-entry.ts`；删除旧兼容文件 `ts/taskpane.ts`；统一 `@module` JSDoc 标签                                                        |
+| v3.3 | 2026-08-26 | 循环依赖治理：创建 `types.ts`/`container.ts`/`services.ts`/`errorHandler.ts` 核心模块；扩展 EventBus 新增 `STATE_CHANGED`/`CONFIG_CHANGED` 事件；`index.ts` 瘦身为纯 re-export 便利桶；移除各模块对 `index.ts` 的直接依赖；函数名统一（`initTaskpane`→`initPanel` 等） |
 
 ## 一、架构概览
 
@@ -44,14 +45,19 @@
 ### 1.2 模块依赖关系
 
 ```
-ts/index.ts (barrel export)
-  ├── ts/core/           (零依赖基础层)
-  │   ├── constants.ts     → 常量、枚举、映射表
-  │   ├── crypto.ts        → Token 校验与完整性验证 (明文存储 + 校验和)
-  │   └── result.ts        → Result<T> 类型 + BgmError
+ts/index.ts (thin barrel — 仅 re-export)
   │
-  ├── ts/tools/          (基础设施层)
-  │   ├── events.ts        → EventBus (发布-订阅)
+  ├── ts/core/           (零依赖基础层 · 循环依赖治理核心)
+  │   ├── constants.ts     → 常量、枚举、映射表
+  │   ├── types.ts         → 核心接口 (BGMCache/BGMSheet/BGMSync/BGMUserInfo/EnrichWorkbookState)
+  │   ├── crypto.ts        → Token 校验与完整性验证 (明文存储 + 校验和)
+  │   ├── result.ts        → Result<T> 类型 + BgmError
+  │   ├── container.ts     → 轻量 CDI 服务容器 (register/resolve)
+  │   ├── services.ts      → 核心服务注册 (logService/eventBusService)
+  │   └── errorHandler.ts  → 全局错误处理 (initGlobalErrorHandler)
+  │
+  ├── ts/tools/          (基础设施层 · 直接从源模块导入，不再经 index.ts)
+  │   ├── events.ts        → EventBus (发布-订阅 + STATE_CHANGED/CONFIG_CHANGED)
   │   ├── logger.ts        → 分级日志 + Token 脱敏
   │   ├── http.ts          → XHR 封装 + 重试 + Zod 校验
   │   ├── config.ts        → PluginStorage 配置读写
@@ -64,7 +70,11 @@ ts/index.ts (barrel export)
   │   └── configService.ts → 配置导入/导出 (Zod 校验)
   │
   ├── ts/sync/           (数据同步层)
-  │   ├── exceltobangumi.ts → Excel → Bangumi 上传引擎
+  │   ├── exceltobangumi/  → Excel → Bangumi 上传引擎
+  │   │   ├── index.ts       → SyncToBangumiAsync 主引擎
+  │   │   ├── api.ts         → Bangumi API 调用
+  │   │   ├── progressReporter.ts → 进度报告
+  │   │   └── chapterMarker.ts  → 章节标记
   │   ├── scraping.ts       → Bangumi → Excel 收藏抓取
   │   ├── githubSync.ts     → GitHub 仓库同步
   │   ├── githubConfig.ts   → GitHub 配置 (PluginStorage)
@@ -92,22 +102,22 @@ ts/index.ts (barrel export)
   │   ├── conflictResolver.ts → 冲突解决 UI
   │   ├── syncResultDialog.ts → 同步结果弹窗
   │   └── handlers/         → 事件处理器
-  │       ├── index.ts      → 主 handler 分发
+  │       ├── index.ts      → 主 handler 分发 (含 trackedEventBusOn 清理机制)
   │       ├── sync.ts       → 同步相关 handler
   │       ├── token.ts      → Token 相关 handler
   │       ├── sheet.ts      → 工作表相关 handler
   │       └── _constants.ts → 中文常量
   │
-  ├── ts/panel/          (任务面板子模块)
-  │   ├── panelPage.ts      → 任务面板主模块（聚合入口）
+  ├── ts/panel/          (Panel 子模块)
+  │   ├── panelPage.ts      → Panel 主模块（initPanel/refreshPanelUI）
   │   ├── panelLifecycle.ts → 工作表锁定/解锁
   │   ├── userInfoPolling.ts → 用户信息轮询 (PluginStorage)
   │   └── enrichPage.ts     → 新番表富化 UI 控制器
   │
   ├── ts/entry/          (入口绑定)
   │   ├── ribbon-entry.ts   → Ribbon OnAction 入口
-  │   ├── panel-entry.ts    → 面板（Taskpane/Settings）入口
-  │   └── settings-entry.ts → Settings 面板入口（加载配置、注册事件）
+  │   ├── panel-entry.ts    → Panel/Settings 入口 (startPanel)
+  │   └── settings-entry.ts → Settings 面板入口
   │
   └── ts/schemas/        (Zod 校验模式)
       ├── pluginStorage.ts  → FullConfigSchema
@@ -119,6 +129,13 @@ ts/index.ts (barrel export)
       └── 无依赖：仅读取 window 状态 + 动态 import logger
 ```
 
+**依赖方向规则（v3.3 确立）：**
+
+- 模块间直接从源模块导入，不再通过 `index.ts` 中转
+- 基础设施层（core/tools）零业务依赖
+- 业务层（services/sync/ui）可依赖基础设施层
+- `index.ts` 仅作为便利桶（convenience barrel），不包含实现逻辑
+
 ### 1.3 入口点
 
 #### Ribbon 入口
@@ -129,13 +146,14 @@ ts/index.ts (barrel export)
   2. 启动 PluginStorage 配置轮询（每 2 秒检查增量同步/跳过冲突/同步记录开关的变化）
 - **自动启动条件**: `typeof window !== 'undefined'`（浏览器上下文）
 
-#### Taskpane 入口
+#### Panel 入口
 
 - **文件**: `ts/entry/panel-entry.ts`
 - **启动链**: `startPanel()` →
   1. `initPanel()`: 工作表锁定状态恢复、用户信息轮询、Token 状态检查
   2. `initHandlers()`: 注册按钮监听器、消息监听器、事件总线监听器
-- **自动启动条件**: `typeof window !== 'undefined' && window.location.pathname.includes('taskpane.html')`
+  3. `initGlobalErrorHandler()`: 注册全局错误处理（v3.3 新增）
+- **自动启动条件**: `typeof window !== 'undefined' && window.location.pathname.includes('panel.html')`
 
 #### Settings 入口
 
@@ -151,6 +169,43 @@ ts/index.ts (barrel export)
 ## 二、模块详解
 
 ### 2.1 核心模块 (`ts/core/`)
+
+#### `types.ts` — 核心类型定义（v3.3 新增）
+
+- **`BGMCache`**: 缓存数据结构（token/userInfo/syncRecords）
+- **`BGMSheet`**: 工作表引用与元数据（ws/headerRow/colMap/lastRow）
+- **`BGMSync`**: 同步状态机接口（enterRunningState/exitRunningState/pause/resume/stop/locateCurrentCell）
+- **`BGMUserInfo`**: 用户信息结构（userId/username/avatarUrl）
+- **`EnrichWorkbookState`**: 富化工作簿锁定状态
+- **设计原则**: 所有模块直接从 `core/types.js` 导入类型，消除类型级循环依赖
+
+#### `container.ts` — 轻量 CDI 服务容器（v3.3 新增）
+
+- **`ServiceContainer` 类**: 依赖注入容器
+  - `.register(key, factory)`: 注册服务工厂（懒加载）
+  - `.resolve(key)`: 解析服务实例（单例缓存）
+  - `.has(key)`: 检查服务是否已注册
+  - `.clear()`: 清空所有服务
+- **设计模式**: 工厂+单例，支持服务替换和测试 mock
+- **使用场景**: 日志服务、事件总线、配置服务等全局单例的统一管理
+
+#### `services.ts` — 核心服务注册（v3.3 新增）
+
+- **`registerCoreServices()`**: 注册核心服务到容器
+  - `logService`: 日志服务（bgmLog + LOG_LEVELS）
+  - `eventBusService`: 事件总线（eventBus 单例）
+  - `configService`: 配置服务（PluginStorage 读写）
+- **容器实例**: `container`（全局单例，供所有模块 resolve）
+
+#### `errorHandler.ts` — 全局错误处理（v3.3 新增）
+
+- **`initGlobalErrorHandler()`**: 注册全局错误监听
+  - `window.onerror`: 捕获未处理异常
+  - `window.onunhandledrejection`: 捕获未处理 Promise 拒绝
+- **错误分级**: 按 ErrorLevel 分类处理（SILENT/WARN/ERROR/THROW）
+- **日志上报**: 自动记录错误到日志系统，便于排查
+- **用户反馈**: 对 ERROR/THROW 级别错误显示 Toast 提示
+- **调用时机**: 在 `index.ts` 初始化时调用一次
 
 #### `constants.ts` — 全局常量中心
 
@@ -431,9 +486,13 @@ ts/index.ts (barrel export)
   - `SYNC_PROGRESS`, `SYNC_COMPLETED`, `SYNC_ERROR`
   - `SYNC_STATE_CHANGED` (running/idle/paused/resumed/stopped)
   - `SHEET_LOCKED`, `SHEET_UNLOCKED`
-  - `CONFIG_UPDATED`
+  - `CONFIG_UPDATED`, `STATE_CHANGED`, `CONFIG_CHANGED`（v3.3 新增：通用状态/配置同步）
   - `REQUEST_GITHUB_SYNC`, `REQUEST_UNDO_LAST_SYNC`
+- **便捷发射方法**（v3.3 新增）:
+  - `emitStateChanged(state, payload)`: 发射状态变更事件
+  - `emitConfigChanged(key, value)`: 发射配置变更事件
 - **全局实例**: `eventBus`（单例）
+- **监听器清理**（v3.3 新增）: 通过 `trackedEventBusOn()` 注册的监听器可由 `clearTrackedListeners()` 统一清理
 
 #### `logger.ts` — 日志系统
 
@@ -470,24 +529,24 @@ ts/index.ts (barrel export)
 - **`sheet.ts`**: `readRangeValues()`, `cacheGet()`, `findHeaderRow()`, `getColumnMap()`, `clearSheetCache()`, `getLastRow()`, `isEmptyValue()`, `getDataSheet()`, `ensureSheetHeaders()`
 - **`sleep.ts`**: `sleep()`, `delay()`
 - **`index.ts`**: `BGM` 全局命名空间、`bgmLog()`、`getApp()`、Token 存储、用户信息、`showBangumiPanel()`、`showSettingsPanel()`、辅助函数
-  - BGM 命名空间结构：`BGM.sheet`（Taskpane 锁定状态）、`BGM.sync`（同步状态机）、`BGM.enrich`（富化工作簿锁定状态，v3.0 新增）
+  - BGM 命名空间结构：`BGM.sheet`（Panel 锁定状态）、`BGM.sync`（同步状态机）、`BGM.enrich`（富化工作簿锁定状态，v3.0 新增）
   - `showSettingsPanel()`: 设置面板管理器，支持根据主面板可见性动态切换停靠位置
 - **`stringUtils.ts`**: `colNumToLetter()`, `trim()`, `escapeHtml()`, `calcFingerprint()`
 
 #### 双面板位置协调逻辑
 
-项目支持两个独立的 TaskPane：主面板（`taskpane.html`）和设置面板（`settings.html`）。为避免两个面板争夺同一侧空间，`showSettingsPanel()` 实现了动态位置协调：
+项目支持两个独立的 TaskPane：主面板（`panel.html`）和设置面板（`settings.html`）。为避免两个面板争夺同一侧空间，`showSettingsPanel()` 实现了动态位置协调：
 
-| 主面板(taskpane)状态 | 设置面板(settings)停靠位置 | 说明                                   |
-| -------------------- | -------------------------- | -------------------------------------- |
-| 可见                 | 右侧                       | 主面板在左，设置面板在右，用户并排操作 |
-| 隐藏                 | 左侧                       | 主面板关闭后，设置面板占用左侧主要空间 |
+| 主面板(panel)状态 | 设置面板(settings)停靠位置 | 说明                                   |
+| ----------------- | -------------------------- | -------------------------------------- |
+| 可见              | 右侧                       | 主面板在左，设置面板在右，用户并排操作 |
+| 隐藏              | 左侧                       | 主面板关闭后，设置面板占用左侧主要空间 |
 
 实现细节：
 
 - 首次调用时通过 `app.CreateTaskPane(url)` 创建设置面板，持久化 `settings_pane_id` 到 PluginStorage
 - 后续调用通过 `app.GetTaskPane(id)` 获取现有面板，切换 `Visible` 状态并更新 `DockPosition`
-- 主面板状态通过 `PluginStorage.getItem('taskpane_id')` + `GetTaskPane` 的 `Visible` 属性判断
+- 主面板状态通过 `PluginStorage.getItem('panel_id')` + `GetTaskPane` 的 `Visible` 属性判断
 - 位置常量：`WPS_ENUM.msoCTPDockPositionLeft = 0`，`WPS_ENUM.msoCTPDockPositionRight = 2`
 
 #### 其他工具
@@ -619,7 +678,7 @@ ts/index.ts (barrel export)
 | ------------------------- | ------ | --------- | ----------------------------------------- |
 | `EnableFlag`              | string | `'false'` | WPS 加载项启用标志（Ribbon 初始化时设置） |
 | `ApiEventFlag`            | string | `'false'` | API 事件标志（Ribbon 初始化时设置）       |
-| `taskpane_id`             | string | `null`    | 任务面板 ID（由 `CreateTaskPane` 返回）   |
+| `panel_id`                | string | `null`    | Panel ID（由 `CreateTaskPane` 返回）      |
 | `settings_pane_id`        | string | `null`    | 设置面板 ID（由 `CreateTaskPane` 返回）   |
 | `bgm_panel_shown_at`      | string | 时间戳    | 面板显示信号（用于触发 Taskpane 刷新）    |
 | `bgm_request_github_sync` | string | 时间戳    | GitHub 同步请求信号（Ribbon→Taskpane）    |
