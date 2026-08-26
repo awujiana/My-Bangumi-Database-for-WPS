@@ -21,7 +21,7 @@ import {
   WPS_ENUM,
 } from '../../core/constants.js'
 import { BgmError } from '../../core/result.js'
-import type { BGMCache, BGMSheet, BGMSync, BGMUserInfo } from '../../index.js'
+import type { BGMCache, BGMSheet, BGMSync, BGMUserInfo, EnrichWorkbookState } from '../../index.js'
 import { showConfirm, type DialogOptions } from '../../ui/dialog.js'
 import {
   showAlert as customShowAlert,
@@ -91,6 +91,7 @@ export const BGM: {
   cache: BGMCache
   sheet: BGMSheet
   sync: BGMSync
+  enrich: EnrichWorkbookState
   LOG_LEVEL: number
   LOG_LEVELS: typeof LOG_LEVELS
   ERROR_LEVELS: typeof ERROR_LEVELS
@@ -163,6 +164,13 @@ export const BGM: {
     lockedName: null,
     isLocked: false,
     lockedWorkbookName: null,
+  },
+  // 富化工作簿锁定状态（与 BGM.sheet 独立）
+  enrich: {
+    lockedWorkbookName: null,
+    lockedSheetName: null,
+    lockedSheetIndex: null,
+    isLocked: false,
   },
   // 同步状态
   sync: {

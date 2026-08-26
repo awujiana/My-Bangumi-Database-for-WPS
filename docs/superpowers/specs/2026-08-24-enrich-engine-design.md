@@ -1,8 +1,8 @@
 # 新番表富化功能设计文档
 
 **创建日期**: 2026-08-24
-**状态**: 已批准
-**版本**: 1.0
+**版本**: 2.2（+ 边界情况加固）
+**状态**: 已实现 + 待 UI 集成
 
 ## 1. 概述
 
@@ -59,7 +59,14 @@ BGM/
 │ 📺 新番表富化工具          [← 返回] [✕]       │
 ├─────────────────────────────────────────────┤
 │                                             │
-│ 📂 文件选择与识别                            │
+│ 🎯 目标 Bangumi 追踪表                      │
+│ ┌─────────────────────────────────────────┐ │
+│ │ 📁 工作簿:   [当前活动工作簿 ▼]  [🔒锁定] │ │
+│ │ 📑 工作表:   [Bangumi追踪表 ▼]  [🔄 刷新] │ │
+│ │ 📊 状态:     ✅ 已锁定: Bangumi.xlsx      │ │
+│ └─────────────────────────────────────────┘ │
+│                                             │
+│ 📂 新番表文件选择与识别                      │
 │ ┌─────────────────────────────────────────┐ │
 │ │ 📁 文件路径: [_________________________] │ │
 │ │ 📑 工作表:   [2026年4月新番表 ▼]       │ │
@@ -109,12 +116,16 @@ BGM/
 ### 3.2 交互流程
 
 1. **进入页面**：点击 Ribbon 按钮或 Task Pane 链接进入
-2. **选择文件**：通过文件对话框选择 .xlsx 文件，或手动输入路径
-3. **自动识别**：点击「🔍 自动识别」解析表头结构
-4. **调整映射**：确认或手动调整列映射
-5. **匹配预览**：查看匹配结果，确认无误
-6. **执行富化**：点击「📤 执行富化」开始处理
-7. **查看记录**：富化完成后查看记录
+2. **确认目标 Bangumi 追踪表**：
+   - 若已锁定工作簿，自动选中锁定的工作簿和工作表
+   - 若未锁定，从下拉框选择目标工作簿和工作表
+   - 点击「🔒 锁定」保存选择，下次自动恢复
+3. **选择新番表文件**：通过文件对话框选择 .xlsx 文件，或手动输入路径
+4. **自动识别**：点击「🔍 自动识别」解析新番表表头结构
+5. **调整映射**：确认或手动调整列映射
+6. **匹配预览**：查看匹配结果，确认无误
+7. **执行富化**：点击「📤 执行富化」开始处理
+8. **查看记录**：富化完成后查看记录
 
 ## 4. 核心引擎设计
 
@@ -185,10 +196,12 @@ function matchEntries(bangumiRows: BangumiRow[], newAnimeRows: NewAnimeRow[]): M
 
 ### 4.3 富化规则
 
+#### 4.3.1 第一阶段：新番表主工作表富化
+
 | 新番表字段  | Bangumi 追踪表目标列 | 冲突策略                  | 说明               |
 | ----------- | -------------------- | ------------------------- | ------------------ |
 | 名称        | —                    | 匹配用                    | 不写入             |
-| 标签 (TAGS) | 标签列               | 追加 `现有 / 新标签`      | 去重合并           |
+| 标签 (TAGS) | 标签/分级列          | 追加 `现有 \| 新标签`     | 去重合并           |
 | 首播        | 开播日期列           | 空值填充                  | 仅当目标为空时写入 |
 | 集数        | 集数列               | 空值填充                  | 仅当目标为空时写入 |
 | 周更时间    | 特点/印象列          | 追加 `现有 \| 周更: 周一` | 去重合并           |
@@ -196,7 +209,55 @@ function matchEntries(bangumiRows: BangumiRow[], newAnimeRows: NewAnimeRow[]): M
 | 独播        | 特点/印象列          | 追加 `现有 \| 独播: ...`  | 去重合并           |
 | 特殊        | 特点/印象列          | 追加 `现有 \| 特殊: ...`  | 去重合并           |
 
+#### 4.3.2 第二阶段：简介工作表富化
+
+简介工作表（如"2026年4月新番简介"）提供制作人员、声优、原作等详细信息。
+通过 `isIntroSheet()` 自动检测是否为简介工作表。
+
+**字段映射表**：
+
+| 简介工作表字段 | Bangumi 追踪表列 | 标注处理               | 说明                  |
+| -------------- | ---------------- | ---------------------- | --------------------- |
+| 导演           | 导演             | 不标注（同名）         | 直接写入              |
+| 编剧           | 脚本             | ✅ 标注 `值(编剧)`     | 源字段名→目标列名不同 |
+| 人设           | 人物设定         | ✅ 标注 `值(人设)`     | 源字段名→目标列名不同 |
+| CG导演         | 演出             | ✅ 标注 `值(CG导演)`   | 源字段名→目标列名不同 |
+| 音乐           | 音乐             | 不标注（同名）         | 直接写入              |
+| 动画制作       | 动画制作公司     | **不标注**（用户指定） | 映射到公司列          |
+| 系列构成       | 系列构成         | 不标注（同名）         | 直接写入              |
+| 分镜           | 分镜             | 不标注（同名）         | 直接写入              |
+| 原作           | 原作             | 不标注（同名）         | 直接写入              |
+| 语言           | 语言             | 不标注（同名）         | 直接写入              |
+| 制片国家       | 制片国家         | 不标注（同名）         | 直接写入              |
+| 声优           | 声优             | 不标注（同名）         | 直接写入（需新增列）  |
+
+**标注白名单机制**：
+
+```typescript
+const ANNOTATED_FIELD_MAPPINGS = new Set<string>(['编剧→脚本', '人设→人物设定', 'CG导演→演出'])
+
+function getAnnotatedValue(sourceKey: string, targetColName: string, value: string): string {
+  if (!value) return value // 空值不添加标注
+  if (sourceKey === targetColName) return value // 同名不标注
+  const mappingKey = `${sourceKey}→${targetColName}`
+  if (!ANNOTATED_FIELD_MAPPINGS.has(mappingKey)) return value
+  return `${value}(${sourceKey})` // 白名单映射添加标注
+}
+```
+
+**自动添加缺失列**：
+
+`ensureBangumiColumns()` 会自动检测 Bangumi 追踪表中缺失的列，在最后添加并从现有列复制样式：
+
+```typescript
+// 列映射常量（COLUMN_RULES）已添加声优等字段
+[/声优|配音|cv/i, '声优'],
+[/角色设定|人物设定|人设/, '人物设定'],
+```
+
 ### 4.4 字段映射自动识别
+
+#### 4.4.1 新番表列名映射
 
 ```typescript
 // 已知列名映射表（用于自动识别表头）
@@ -219,7 +280,91 @@ const KNOWN_COLUMN_MAP: Record<string, keyof EnrichColumnMapping> = {
   独播: 'exclusiveCol',
   特殊: 'specialCol',
   备注: 'specialCol',
+  // 简介工作表列名
+  简介: 'introCol',
+  剧情简介: 'introCol',
+  动画制作: 'studioCol',
+  制作公司: 'studioCol',
+  导演: 'directorCol',
+  监督: 'directorCol',
+  音乐: 'musicCol',
+  配乐: 'musicCol',
+  声优: 'voiceCol',
+  声优阵容: 'voiceCol',
+  OP: 'opCol',
+  ED: 'edCol',
+  PV: 'pvCol',
+  // 简介专有列
+  编剧: 'screenplayCol',
+  脚本: 'screenplayCol',
+  人设: 'characterDesignCol',
+  人物设定: 'characterDesignCol',
+  CG导演: 'cgDirectorCol',
+  演出: 'cgDirectorCol',
+  系列构成: 'seriesCompositionCol',
+  分镜: 'storyboardCol',
+  原作: 'originalWorkCol',
+  语言: 'languageCol',
+  制片国家: 'productionCountryCol',
+  类型: 'typeCol',
 }
+```
+
+#### 4.4.2 Bangumi 追踪表列识别（COLUMN_RULES）
+
+使用正则匹配表头文本，动态定位列位置，**不受列顺序变化影响**：
+
+```typescript
+const COLUMN_RULES: [RegExp, string][] = [
+  // URL / ID
+  [/bangumi.*url/i, 'Bangumi_URL'],
+  // 状态/日期
+  [/是否看完|观看状态|状态/, '是否看完'],
+  [/开播日期|首播/, '开播日期'],
+  // 标签/分级
+  [/原作标签/, '原作标签'],
+  [/标签\/分级|标签|分级/, '标签/分级'],
+  [/特点\/印象|特点|印象/, '特点/印象'],
+  // 制作人员
+  [/人物设定|人设|角色设计/, '人物设定'],
+  [/系列构成/, '系列构成'],
+  [/集数|总集/, '集数'],
+  [/动画制作公司/, '动画制作公司'],
+  [/导演|director/i, '导演'],
+  [/音乐|music/i, '音乐'],
+  [/脚本|编剧|剧本/, '脚本'],
+  [/声优|配音|cv/i, '声优'], // 新增
+  // 其他
+  [/序列号|序号/, '序列号'],
+  // ... 更多规则
+]
+```
+
+#### 4.4.3 数据同步字段映射（EXTENDED_FIELD_MAP）
+
+远程 JSONL 字段 → Excel 列名映射，用于数据同步功能：
+
+```typescript
+export const EXTENDED_FIELD_MAP: ReadonlyArray<readonly [string, string]> = [
+  ['date', '开播日期'],
+  ['播放结束', '完播日'],
+  ['动画制作公司', '制作公司'],
+  ['片长', '时长'],
+  ['制片国家', '制片国家'],
+  ['语言', '语言'],
+  ['类型', '类型'],
+  ['导演', '导演'],
+  ['音乐', '音乐'],
+  ['人物设定', '人物设定'],
+  ['原作', '原作'],
+  ['脚本', '脚本'],
+  ['分镜', '分镜'],
+  ['演出', '演出'],
+  ['原案', '原案'],
+  ['系列构成', '系列构成'],
+  ['在线播放平台', '在线播放平台'],
+  ['关联的动漫ID', '关联的动漫ID'],
+] as const
 ```
 
 ## 5. 数据结构
@@ -247,6 +392,22 @@ interface EnrichConfig {
   dataStartRow: number
   columnMapping: EnrichColumnMapping
   targetSheetName?: string // Bangumi 追踪表工作表名
+  targetWorkbookName?: string // Bangumi 追踪表工作簿名（新增：支持跨工作簿）
+}
+
+// 富化工作簿锁定状态
+interface EnrichWorkbookState {
+  lockedWorkbookName: string | null
+  lockedSheetName: string | null
+  isLocked: boolean
+  lockedSheetIndex: number | null
+}
+
+// 锁定信息（用于 PluginStorage 持久化）
+interface EnrichLockedInfo {
+  workbookName: string
+  sheetName: string
+  sheetIndex: number
 }
 
 // 匹配结果
@@ -356,27 +517,283 @@ enrich.html → enrich.ts → enrichEngine.ts → wps.ts / logger.ts
 - 进度计时器在操作取消/完成时清除
 - WPS ScreenUpdating 在操作完成时恢复
 
+### 7.3 工作簿选择与锁定机制
+
+#### 7.3.1 设计目标
+
+富化功能需要支持从**任意打开的工作簿**中选择 Bangumi 追踪表作为目标，而非仅限于当前活动工作簿。选择后可锁定，确保后续富化操作始终写入同一目标。
+
+#### 7.3.2 状态管理
+
+富化工作簿锁定状态存储在 `BGM.enrich` 命名空间中，与 Taskpane 的 `BGM.sheet` 锁定状态独立：
+
+```typescript
+// BGM 命名空间扩展
+namespace BGM {
+  const enrich: {
+    workbook: EnrichWorkbookState
+  }
+}
+```
+
+PluginStorage 持久化键：`bgm_enrich_locked_workbook`
+
+#### 7.3.3 核心函数
+
+```typescript
+/**
+ * 刷新工作簿列表（所有打开的 Excel 工作簿）
+ * 填充 workbookSelect 下拉框
+ */
+export function refreshEnrichWorkbooks(): void
+
+/**
+ * 刷新指定工作簿的工作表列表
+ * @param workbookName 目标工作簿名称，null 表示当前活动工作簿
+ */
+export function refreshEnrichSheets(workbookName?: string | null): void
+
+/**
+ * 切换工作簿锁定状态
+ * 锁定：保存当前选中的工作簿+工作表到 PluginStorage
+ * 解锁：清除锁定信息
+ */
+export function toggleEnrichWorkbookLock(): void
+
+/**
+ * 保存锁定信息到 PluginStorage
+ */
+export function saveEnrichLockedWorkbook(info: EnrichLockedInfo | null): void
+
+/**
+ * 启动时恢复锁定状态
+ * 验证锁定的工作簿是否仍存在，不存在则清除
+ * @returns 是否成功恢复
+ */
+export function restoreEnrichLockedWorkbook(): boolean
+
+/**
+ * 获取锁定的 Bangumi 追踪表工作表引用
+ * @returns [工作簿, 工作表] 或 null
+ */
+export function getLockedEnrichSheet(): [WpsWorkbook, WpsWorksheet] | null
+```
+
+#### 7.3.4 锁定状态流转
+
+```
+┌──────────────┐  用户选择工作簿   ┌──────────────┐
+│  未锁定状态   │ ──────────────→  │  已锁定状态   │
+│              │  + 锁定按钮      │              │
+│ - 默认活动WB │                 │ - 持久化存储  │
+│ - 无持久化   │                 │ - 启动恢复    │
+└──────────────┘                 └──────────────┘
+       ↑                               │
+       │          用户点击解锁          │
+       └───────────────────────────────┘
+```
+
+#### 7.3.5 启动恢复与校验
+
+```typescript
+export function restoreEnrichLockedWorkbook(): boolean {
+  const app = getApp()
+  if (!app?.PluginStorage) return false
+
+  const raw = app.PluginStorage.getItem('bgm_enrich_locked_workbook')
+  if (!raw) return false
+
+  try {
+    const info = JSON.parse(raw) as EnrichLockedInfo
+
+    // 验证锁定的工作簿是否仍然存在
+    if (app.Workbooks) {
+      let workbookFound = false
+      for (let i = 1; i <= app.Workbooks.Count; i++) {
+        if (app.Workbooks.Item(i).Name === info.workbookName) {
+          workbookFound = true
+          break
+        }
+      }
+      if (!workbookFound) {
+        // 工作簿已关闭，清除锁信息
+        saveEnrichLockedWorkbook(null)
+        return false
+      }
+    }
+
+    // 恢复状态
+    BGM.enrich.workbook = {
+      lockedWorkbookName: info.workbookName,
+      lockedSheetName: info.sheetName,
+      lockedSheetIndex: info.sheetIndex,
+      isLocked: true,
+    }
+    return true
+  } catch {
+    saveEnrichLockedWorkbook(null)
+    return false
+  }
+}
+```
+
+#### 7.3.6 与富化引擎集成
+
+`enrichEntries()` 和 `matchEntries()` 函数在执行前，优先从锁定状态获取目标工作表：
+
+```typescript
+export function enrichEntries(
+  newAnimeSheet: WpsWorksheet,
+  config: EnrichConfig,
+  progressCb?: ProgressCallback,
+): EnrichResult[] {
+  // 若配置中未指定目标工作簿，尝试从锁定状态获取
+  let bangumiSheet: WpsWorksheet
+  if (config.targetWorkbookName) {
+    const locked = getLockedEnrichSheet()
+    if (locked) {
+      bangumiSheet = locked[1] // 使用锁定的工作表
+    } else {
+      // 跨工作簿查找指定工作表
+      bangumiSheet = findSheetInWorkbook(config.targetWorkbookName, config.targetSheetName)
+    }
+  } else {
+    // 使用当前活动工作表（兼容旧逻辑）
+    bangumiSheet = getApp()?.ActiveWorkbook?.ActiveSheet as WpsWorksheet
+  }
+
+  // ... 执行富化逻辑
+}
+```
+
+#### 7.3.7 UI 组件结构
+
+```html
+<!-- 目标 Bangumi 追踪表选择区域 -->
+<div class="enrich-target-section">
+  <div class="enrich-section-title">🎯 目标 Bangumi 追踪表</div>
+  <div class="enrich-form-row">
+    <label>工作簿：</label>
+    <select id="enrichWorkbookSelect" onchange="onEnrichWorkbookChange()">
+      <option value="">-- 当前活动工作簿 --</option>
+      <!-- 动态填充：所有打开的 Excel 工作簿 -->
+    </select>
+    <button id="enrichLockBtn" onclick="toggleEnrichWorkbookLock()">🔒 锁定</button>
+  </div>
+  <div class="enrich-form-row">
+    <label>工作表：</label>
+    <select id="enrichSheetSelect">
+      <option value="">-- 请选择 --</option>
+      <!-- 动态填充：所选工作簿的工作表 -->
+    </select>
+    <button onclick="refreshEnrichSheets()">🔄 刷新</button>
+  </div>
+  <div id="enrichLockStatus" class="enrich-lock-status" style="display:none;">
+    ✅ 已锁定: <span id="enrichLockStatusText"></span>
+  </div>
+</div>
+```
+
+#### 7.3.8 与 Taskpane 锁定的对比
+
+| 特性             | Taskpane 锁定            | 富化功能锁定                 |
+| ---------------- | ------------------------ | ---------------------------- |
+| PluginStorage 键 | `bgm_locked_sheet`       | `bgm_enrich_locked_workbook` |
+| 目标对象         | Bangumi 追踪表工作表     | Bangumi 追踪表工作簿+工作表  |
+| 跨工作簿         | 不支持（仅限当前活动WB） | **支持**（任意打开的WB）     |
+| 自动恢复         | 启动时恢复               | 进入富化页面时恢复           |
+| 影响范围         | 主 Taskpane 所有操作     | 仅富化功能                   |
+| 解锁影响         | 不影响富化锁定           | 不影响 Taskpane 锁定         |
+
+#### 7.3.9 边界情况处理
+
+| 场景                       | 处理方式                                                                 |
+| -------------------------- | ------------------------------------------------------------------------ |
+| 锁定的工作簿被关闭         | 清除锁定状态，提示"锁定的工作簿已关闭"                                   |
+| 锁定的工作表被删除         | 清除锁定状态，提示"锁定的工作表已被删除"                                 |
+| 切换工作簿后工作表列表变化 | 重新加载工作表列表，若之前锁定的工作表不存在则清除锁定                   |
+| 无任何工作簿打开           | 禁用下拉框，提示"请先打开包含 Bangumi 追踪表的工作簿"                    |
+| 锁定后新增工作簿           | 不影响锁定状态，仅在下拉框中显示新工作簿                                 |
+| WPS API 返回 null          | `Workbooks.Item(i)` 和 `Worksheets.Item(i)` 均添加 null 检查，跳过无效项 |
+| PluginStorage 不可用       | 记录警告日志，返回 false，不影响功能继续使用                             |
+| 持久化数据损坏             | JSON 解析失败时自动清除锁定状态，降级为未锁定模式                        |
+| 重复锁定同一目标           | 自动切换为解锁状态，清除所有锁定信息                                     |
+
 ## 8. 测试策略
 
 ### 8.1 单元测试
 
-- `enrichEngine.test.ts`：匹配算法、富化规则、冲突策略
-- `enrichRecord.test.ts`：记录表读写
-- 列名自动识别：覆盖已知列名映射表
+- `enrichEngine.boundary.test.ts`：边界情况测试（42 个用例）
+  - `normalizeName` 空值/特殊字符处理
+  - `splitAliases`/`splitTags` 分隔符识别
+  - `mergeTags`/`appendFeatures` 去重逻辑
+  - `parseRemoteContent` 空值/格式异常处理
+  - 标注白名单机制验证
+- `enrichLock.test.ts`：工作簿锁定模块测试（43 个用例）
+  - `refreshEnrichWorkbooks` 工作簿列表刷新
+  - `refreshEnrichSheets` 工作表列表刷新
+  - `toggleEnrichWorkbookLock` 锁定/解锁切换
+  - `updateEnrichLockButton` 按钮状态更新
+  - `saveEnrichLockedWorkbook` 持久化存储
+  - `restoreEnrichLockedWorkbook` 启动恢复与校验
+  - `getLockedEnrichSheet` 获取锁定工作表引用
+  - `findWorkbookByName` / `findSheetInWorkbook` 辅助函数
+  - `initEnrichLock` 初始化流程
+  - WPS API null 返回安全处理
+  - 锁定状态失效自动清除
+- `enrichEngine.test.ts`：富化引擎核心测试
+  - `getLockedEnrichSheet` 锁定状态获取
+  - `restoreEnrichLockedWorkbook` 恢复与校验
+  - `toggleEnrichWorkbookLock` 锁定/解锁切换
+  - `saveEnrichLockedWorkbook` 持久化
+  - 跨工作簿工作表查找 `findSheetInWorkbook`
+- `githubSync.test.ts`：数据同步核心逻辑
+- `githubSyncDiff.test.ts`：差异计算和字段映射
 
-### 8.2 集成测试
+### 8.2 列位置无关性验证
+
+数据同步功能通过以下机制保证不受列位置变化影响：
+
+| 组件                 | 工作方式                                   | 验证      |
+| -------------------- | ------------------------------------------ | --------- |
+| `getColumnMap`       | 扫描表头行，用 `COLUMN_RULES` 正则匹配列名 | ✅ 已验证 |
+| `githubSync.ts`      | 使用 `colMap.get(key)` 动态获取列号        | ✅ 已验证 |
+| `EXTENDED_FIELD_MAP` | 定义远程字段→Excel列名映射                 | ✅ 已验证 |
+
+**验证方法**：
+
+1. 调整工作表列顺序后，运行同步功能
+2. 验证数据正确写入对应列（而非原位置）
+3. 确认新增列能被正确识别和写入
+
+### 8.3 集成测试
 
 - 使用目标文件 `2026年4月新番表v2.13 byHazx.xlsx` 进行端到端测试
 - 验证富化结果写入正确
 - 验证记录表完整记录
+- 验证标注白名单行为符合预期
+- **工作簿锁定集成测试**：
+  - 跨工作簿选择 Bangumi 追踪表并锁定
+  - 关闭锁定的工作簿后验证自动清除锁定
+  - 重新打开工作簿后验证恢复失败的提示
+  - 锁定状态在页面刷新后正确恢复
+  - Taskpane 锁定与富化锁定互不干扰
 
-### 8.3 异常测试
+### 8.4 边界与异常测试
 
 - 空文件/空工作表
 - Bangumi 追踪表为空
 - 特殊字符名称匹配
 - 用户中途取消
-- 网络异常（如适用）
+- `parseRemoteContent` null/undefined 输入
+- `getAnnotatedValue` 空值处理
+- 纯空行 JSONL 文件
+- 行列数不匹配的 CSV 数据
+- 工作簿锁定失效自动清除
+- PluginStorage 不可用降级处理
+- JSON 损坏恢复机制
+- WPS API Item() 返回 null 安全跳过
+- 重复锁定同一目标切换为解锁
 
 ## 9. 实施计划
 

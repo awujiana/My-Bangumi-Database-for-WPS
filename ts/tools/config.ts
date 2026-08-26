@@ -19,6 +19,7 @@ export const CONFIG_KEYS = {
   LOCKED_SHEET: 'bgm_locked_sheet',
   LOCKED_WORKBOOK: 'bgm_locked_workbook',
   ENABLE_SYNC_RECORD: 'bgm_enable_sync_record',
+  ENRICH_LOCKED_WORKBOOK: 'bgm_enrich_locked_workbook',
 } as const
 
 /**

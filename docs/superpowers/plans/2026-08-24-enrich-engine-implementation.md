@@ -10,6 +10,32 @@
 
 ---
 
+## 实施状态总览
+
+| 任务                             | 状态        | 完成日期   |
+| -------------------------------- | ----------- | ---------- |
+| 任务 1：创建富化记录表模块       | ✅ 已完成   | 2026-08-24 |
+| 任务 2：创建富化引擎核心模块     | ✅ 已完成   | 2026-08-24 |
+| 任务 3：创建富化页面 HTML 和 CSS | ⏳ 待完成   | —          |
+| 任务 4：创建富化页面 UI 控制器   | ⏳ 待完成   | —          |
+| 任务 5：集成与注册               | ⏳ 待完成   | —          |
+| 任务 6：集成测试与验证           | ✅ 部分完成 | 2026-08-26 |
+
+### 已完成的扩展功能
+
+| 功能                        | 状态 | 说明                                                    |
+| --------------------------- | ---- | ------------------------------------------------------- |
+| 第二阶段：简介工作表富化    | ✅   | 支持制作人员、声优、原作等字段映射                      |
+| 字段映射标注白名单          | ✅   | 编剧→脚本、人设→人物设定、CG导演→演出 标注              |
+| 动画制作→动画制作公司不标注 | ✅   | 用户指定不标注                                          |
+| 自动添加缺失列              | ✅   | ensureBangumiColumns 自动在末尾添加并复制样式           |
+| 数据同步列位置无关性        | ✅   | getColumnMap + COLUMN_RULES 动态定位                    |
+| 声优字段支持                | ✅   | COLUMN_RULES + KNOWN_COLUMN_MAP 已添加                  |
+| 边界情况修复                | ✅   | parseRemoteContent 空值检查、getAnnotatedValue 空值守卫 |
+| 边界测试                    | ✅   | 42 个测试用例全部通过                                   |
+
+---
+
 ## 文件结构
 
 ### 新增文件
@@ -248,14 +274,108 @@ export {
 
 ---
 
+## 任务 7：工作簿选择与锁定机制
+
+**Files:**
+
+- Create: `ts/sync/enrichLock.ts` — 工作簿锁定核心逻辑
+- Modify: `ts/sync/enrichEngine.ts` — 集成锁定状态
+- Modify: `ts/index.ts` — 导出新模块
+- Modify: `dist-ts/index.d.ts` — 添加 BGM.enrich 类型定义
+
+- [ ] **Step 1: 创建 enrichLock.ts 核心模块**
+
+创建工作簿锁定模块，包含：
+
+- 类型定义：`EnrichWorkbookState`、`EnrichLockedInfo`
+- 常量：`ENRICH_LOCK_STORAGE_KEY = 'bgm_enrich_locked_workbook'`
+- 核心函数：
+  - `refreshEnrichWorkbooks()` — 刷新工作簿列表
+  - `refreshEnrichSheets(workbookName?)` — 刷新工作表列表
+  - `toggleEnrichWorkbookLock()` — 切换锁定状态
+  - `saveEnrichLockedWorkbook(info)` — 持久化到 PluginStorage
+  - `restoreEnrichLockedWorkbook()` — 启动时恢复+校验
+  - `getLockedEnrichSheet()` — 获取锁定的 [工作簿, 工作表]
+  - `findSheetInWorkbook(wbName, sheetName)` — 跨工作簿查找工作表
+- 辅助函数：
+  - `updateEnrichLockButton()` — 更新锁定按钮 UI
+  - `updateEnrichLockStatus()` — 更新锁定状态显示
+
+- [ ] **Step 2: 更新 BGM 命名空间类型**
+
+在 `dist-ts/index.d.ts` 中添加 `BGM.enrich` 命名空间：
+
+```typescript
+namespace BGM {
+  const enrich: {
+    workbook: {
+      lockedWorkbookName: string | null
+      lockedSheetName: string | null
+      isLocked: boolean
+      lockedSheetIndex: number | null
+    }
+  }
+}
+```
+
+- [ ] **Step 3: 集成到 enrichEngine**
+
+修改 `enrichEntries()` 和 `matchEntries()` 函数：
+
+- 新增 `targetWorkbookName` 参数支持
+- 执行前优先从锁定状态获取目标工作表
+- 跨工作簿场景下使用 `findSheetInWorkbook` 查找
+
+- [ ] **Step 4: 添加 UI 区域**
+
+在 `ui/enrich.html` 中添加目标 Bangumi 追踪表选择区域：
+
+```html
+<div class="enrich-target-section">
+  <div class="enrich-section-title">🎯 目标 Bangumi 追踪表</div>
+  <div class="enrich-form-row">
+    <label>工作簿：</label>
+    <select id="enrichWorkbookSelect">
+      ...
+    </select>
+    <button id="enrichLockBtn">🔒 锁定</button>
+  </div>
+  <div class="enrich-form-row">
+    <label>工作表：</label>
+    <select id="enrichSheetSelect">
+      ...
+    </select>
+    <button>🔄 刷新</button>
+  </div>
+  <div id="enrichLockStatus">...</div>
+</div>
+```
+
+- [ ] **Step 5: 添加单元测试**
+
+创建测试用例：
+
+- `toggleEnrichWorkbookLock` 锁定/解锁切换
+- `restoreEnrichLockedWorkbook` 恢复与校验（工作簿存在/不存在）
+- `findSheetInWorkbook` 跨工作簿查找
+- 锁定状态与 Taskpane 锁定独立性
+
+- [ ] **Step 6: 验证代码无类型错误**
+
+运行 TypeScript 编译检查，确保无类型错误。
+
+---
+
 ## 风险与缓解
 
-| 风险                         | 缓解措施                          |
-| ---------------------------- | --------------------------------- |
-| 新番表列名不规范导致识别失败 | 提供手动调整列映射功能            |
-| 大文件处理超时               | 分批次处理 + 进度回调 + 可取消    |
-| 名称匹配误判                 | 支持预览后确认，提供精确/别名标记 |
-| WPS COM 性能瓶颈             | 使用 ScreenUpdating 暂停屏幕刷新  |
+| 风险                         | 缓解措施                            |
+| ---------------------------- | ----------------------------------- |
+| 新番表列名不规范导致识别失败 | 提供手动调整列映射功能              |
+| 大文件处理超时               | 分批次处理 + 进度回调 + 可取消      |
+| 名称匹配误判                 | 支持预览后确认，提供精确/别名标记   |
+| WPS COM 性能瓶颈             | 使用 ScreenUpdating 暂停屏幕刷新    |
+| 锁定的工作簿被关闭导致失效   | 启动时校验 + 运行时自动检测         |
+| Taskpane 锁定与富化锁定冲突  | 使用独立 PluginStorage 键，互不干扰 |
 
 ---
 

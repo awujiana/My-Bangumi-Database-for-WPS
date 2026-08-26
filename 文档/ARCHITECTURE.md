@@ -1,25 +1,18 @@
 # Bangumi WPS Excel 加载项 - 架构与项目知识文档
 
-> 版本: 2.7 | 更新日期: 2026-08-21
+> 版本: 3.1 | 更新日期: 2026-08-26
 
 ---
 
 ## 版本历史
 
-| 版本 | 日期       | 变更说明                                                                                                                                                                                                                                   |
-| ---- | ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| v1.0 | 2026-08-10 | 初始版本                                                                                                                                                                                                                                   |
-| v1.1 | 2026-08-10 | 补充调试区域文档，postMessage 源校验加固                                                                                                                                                                                                   |
-| v1.2 | 2026-08-10 | 撤销栈增加工作表身份校验，httpRequest 强制 zodSchema                                                                                                                                                                                       |
-| v2.0 | 2026-08-10 | 架构文档：新增 debugPanel 模块详解，补充模块依赖关系树                                                                                                                                                                                     |
-| v2.1 | 2026-08-12 | Token 明文存储（移除 XOR 加密），httpGet/httpPost 标记 @deprecated，新增 BroadcastChannel 单元测试                                                                                                                                         |
-| v2.2 | 2026-08-12 | 补充同步策略对比表、删除机制详解、撤销恢复机制、删除保护机制文档                                                                                                                                                                           |
-| v2.3 | 2026-08-12 | 补充 SID 白名单过滤详解（两层过滤机制，确保非 BGM 条目不被误删）                                                                                                                                                                           |
-| v2.4 | 2026-08-14 | 新增设置面板（settings.html）、Taskpane 头部图标按钮、双面板位置协调逻辑（主面板左/设置面板右）                                                                                                                                            |
-| v2.5 | 2026-08-20 | 增强使用引导（toggleUsageGuide 详细操作说明）、同步策略引导（showSyncGuide 动态策略说明）、修复进度弹窗「下一步」按钮 handler 时序问题、全局 ETA 追踪（含暂停时间扣除）、Bangumi_URL 字段同步修复、标签/名称追加合并策略、制作公司双列映射 |
-| v2.6 | 2026-08-20 | 进度弹窗右上角关闭按钮（bgmSyncProgressCloseTop）、CSS Flex 布局修复（解决内容区域无法滚动问题）、移除内联 max-height 样式改用 flex:1 + min-height:0                                                                                       |
-| v2.7 | 2026-08-21 | 新增预告/未来动漫筛选（range='future'，筛选无开播日期条目）、增强进度条视觉效果（渐变色+光泽效果+阴影发光）、修复同步完成弹窗滚动问题                                                                                                      |
-| v2.8 | 2026-08-21 | 修复 GitHub 同步编译错误（`GithubSyncDetailItem` 未导入/类型不匹配）、同步完成弹窗支持明细表格展示（新增/更新/删除/失败）、同步详情预览弹窗同步展示明细表格、修复设置按钮因编译失败导致 `dist-ts/index.js` 加载失败问题                    |
+| 版本 | 日期       | 变更说明                                                                                                                                                                                                                  |
+| ---- | ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| v1.0 | 2026-08-10 | 初始版本                                                                                                                                                                                                                  |
+| v2.8 | 2026-08-21 | 修复 GitHub 同步编译错误、同步完成弹窗支持明细表格                                                                                                                                                                        |
+| v2.9 | 2026-08-26 | 新增 enrichEngine 富化引擎（新番表+简介工作表双阶段富化）、标注白名单机制、自动添加缺失列、声优字段支持、数据同步列位置无关性验证、边界情况修复（parseRemoteContent 空值检查、getAnnotatedValue 空值守卫）、42 项边界测试 |
+| v3.0 | 2026-08-26 | 新增富化功能工作簿选择与锁定机制（enrichLock.ts）：跨工作簿 Bangumi 追踪表选择、PluginStorage 持久化、启动恢复校验、与 Taskpane 锁定独立运行                                                                              |
+| v3.1 | 2026-08-26 | enrichLock.ts 边界加固：WPS API null 返回安全处理、冗余查找逻辑简化、边界情况文档完善                                                                                                                                     |
 
 ## 一、架构概览
 
@@ -86,7 +79,10 @@ ts/index.ts (barrel export)
   │   ├── conflictResolver.ts → 冲突检测与解决
   │   ├── pureUtils.ts      → 纯工具函数
   │   ├── pureUtilsCore.ts  → 核心纯工具
-  │   └── exportJsonl.ts    → JSONL 导出
+  │   ├── exportJsonl.ts    → JSONL 导出
+  │   ├── enrichEngine.ts   → 新番表富化引擎 (双重匹配/数据合并/标注白名单)
+  │   ├── enrichRecord.ts   → 富化记录表操作
+  │   └── enrichLock.ts     → 富化工作簿锁定 (跨WB选择/持久化/恢复校验)
   │
   ├── ts/ui/             (表示层)
   │   ├── dialog.ts         → 对话框系统 (alert/confirm/error/input/toast)
@@ -322,6 +318,49 @@ ts/index.ts (barrel export)
 - **`localFileSync.ts`**: 本地文件同步源
 - **`conflictResolver.ts`**: 冲突检测与解决策略
 - **`pureUtils.ts` / `pureUtilsCore.ts`**: 零依赖纯工具函数
+
+#### `enrichEngine.ts` — 新番表富化引擎
+
+- **双重匹配算法**: 名称精确匹配 + 别名辅助匹配
+- **字段映射**: 新番表字段 → Bangumi 追踪表列（含 12 个简介工作表字段映射）
+- **标注白名单**: `ANNOTATED_FIELD_MAPPINGS` 仅对指定映射添加原字段名标注（编剧→脚本、人设→人物设定、CG导演→演出）
+- **数据合并策略**: 空值填充 + 标签追加（`|` 分隔）
+- **`detectColumns()`**: 列名自动识别（表头关键字匹配）
+- **`matchEntries()`**: 条目匹配（精确+别名双重匹配）
+- **`enrichEntries()`**: 富化执行（含进度回调、自动添加缺失列）
+- **`ensureBangumiColumns()`**: 自动检测缺失列并复制样式
+- **`parseRemoteContent()`**: 远程 JSONL/CSV 解析（含 null 输入防护）
+- **边界修复**: `getAnnotatedValue()` 空值守卫、`parseRemoteContent()` null 输入检查
+
+#### `enrichRecord.ts` — 富化记录表
+
+- **工作表名称**: `富化记录`
+- **9 列结构**: 时间戳 | 匹配方式 | 动漫名称 | 行号 | 富化字段 | 原字段 | 新字段 | 操作类型 | 备注
+- **`getOrCreateEnrichRecordSheet()`**: 创建/获取记录表
+- **`addEnrichRecord()` / `addEnrichRecords()`**: 单条/批量写入
+- **`clearEnrichRecords()` / `getAllEnrichRecords()`**: 清空与查询
+
+#### `enrichLock.ts` — 富化工作簿锁定（v3.0 新增）
+
+- **PluginStorage 键**: `bgm_enrich_locked_workbook`
+- **状态命名空间**: `BGM.enrich.workbook`（与 `BGM.sheet` 独立）
+- **`EnrichWorkbookState`**: `lockedWorkbookName`、`lockedSheetName`、`lockedSheetIndex`、`isLocked`
+- **核心函数**:
+  - `refreshEnrichWorkbooks()`: 刷新所有打开的 Excel 工作簿列表
+  - `refreshEnrichSheets(workbookName?)`: 刷新指定工作簿的工作表列表
+  - `toggleEnrichWorkbookLock()`: 锁定/解锁切换
+  - `saveEnrichLockedWorkbook(info)`: 持久化到 PluginStorage
+  - `restoreEnrichLockedWorkbook()`: 启动时恢复 + 校验工作簿是否仍存在
+  - `getLockedEnrichSheet()`: 获取锁定的 `[WpsWorkbook, WpsWorksheet]` 引用
+  - `findSheetInWorkbook(wbName, sheetName)`: 跨工作簿查找工作表
+- **边界处理**:
+  - 锁定工作簿被关闭时自动清除锁定 + 提示
+  - `Workbooks.Item(i)` / `Worksheets.Item(i)` 返回 null 时安全跳过
+  - PluginStorage 不可用时记录警告日志，降级为内存状态
+  - 持久化数据 JSON 损坏时自动清除并降级为未锁定模式
+  - 重复锁定同一目标自动切换为解锁状态
+  - 启动恢复校验：工作簿/工作表不存在时自动清除失效锁定
+
 - **`exportJsonl.ts`**: Excel → JSONL 文件导出
 
 ### 2.4 UI 模块 (`ts/ui/`)
@@ -417,7 +456,7 @@ ts/index.ts (barrel export)
 
 #### `config.ts` — 配置工具
 
-- **`CONFIG_KEYS`**: TOKEN, USER_ID, INCREMENTAL_SYNC, SKIP_CONFLICTS, LOCKED_SHEET, LOCKED_WORKBOOK, ENABLE_SYNC_RECORD
+- **`CONFIG_KEYS`**: TOKEN, USER_ID, INCREMENTAL_SYNC, SKIP_CONFLICTS, LOCKED_SHEET, LOCKED_WORKBOOK, ENABLE_SYNC_RECORD, ENRICH_LOCKED_WORKBOOK
 - **`setConfig(key, value)`**: 写入 PluginStorage + 触发 eventBus + 跨文档 postMessage 广播
 - **`getConfig(key, defaultValue, silent)`**: 读取（支持静默模式用于轮询）
 - **`removeConfig(key)`**: 删除配置
@@ -429,6 +468,7 @@ ts/index.ts (barrel export)
 - **`sheet.ts`**: `readRangeValues()`, `cacheGet()`, `findHeaderRow()`, `getColumnMap()`, `clearSheetCache()`, `getLastRow()`, `isEmptyValue()`, `getDataSheet()`, `ensureSheetHeaders()`
 - **`sleep.ts`**: `sleep()`, `delay()`
 - **`index.ts`**: `BGM` 全局命名空间、`bgmLog()`、`getApp()`、Token 存储、用户信息、`showBangumiPanel()`、`showSettingsPanel()`、辅助函数
+  - BGM 命名空间结构：`BGM.sheet`（Taskpane 锁定状态）、`BGM.sync`（同步状态机）、`BGM.enrich`（富化工作簿锁定状态，v3.0 新增）
   - `showSettingsPanel()`: 设置面板管理器，支持根据主面板可见性动态切换停靠位置
 - **`stringUtils.ts`**: `colNumToLetter()`, `trim()`, `escapeHtml()`, `calcFingerprint()`
 
@@ -549,13 +589,14 @@ ts/index.ts (barrel export)
 
 #### 功能开关配置
 
-| 键名                     | 类型   | 默认值    | 说明                          |
-| ------------------------ | ------ | --------- | ----------------------------- |
-| `bgm_incremental_sync`   | string | `'false'` | 增量同步开关 ('true'/'false') |
-| `bgm_skip_conflicts`     | string | `'false'` | 跳过冲突开关 ('true'/'false') |
-| `bgm_enable_sync_record` | string | `'false'` | 同步记录开关 ('true'/'false') |
-| `bgm_locked_sheet`       | string | `null`    | 锁定的工作表索引              |
-| `bgm_locked_workbook`    | string | `null`    | 锁定的工作簿名称              |
+| 键名                         | 类型   | 默认值    | 说明                                               |
+| ---------------------------- | ------ | --------- | -------------------------------------------------- |
+| `bgm_incremental_sync`       | string | `'false'` | 增量同步开关 ('true'/'false')                      |
+| `bgm_skip_conflicts`         | string | `'false'` | 跳过冲突开关 ('true'/'false')                      |
+| `bgm_enable_sync_record`     | string | `'false'` | 同步记录开关 ('true'/'false')                      |
+| `bgm_locked_sheet`           | string | `null`    | 锁定的工作表索引                                   |
+| `bgm_locked_workbook`        | string | `null`    | 锁定的工作簿名称                                   |
+| `bgm_enrich_locked_workbook` | string | `null`    | 富化功能锁定的 Bangumi 追踪表工作簿+工作表（JSON） |
 
 #### GitHub / 远程同步配置
 

@@ -508,6 +508,18 @@ export interface BGMUserInfo {
   avatarUrl?: string | undefined
 }
 
+// ========== BGM 富化工作簿锁定状态（与 BGM.sheet 独立） ==========
+export interface EnrichWorkbookState {
+  /** 锁定的工作簿名称 */
+  lockedWorkbookName: string | null
+  /** 锁定的工作表名称 */
+  lockedSheetName: string | null
+  /** 锁定的工作表索引（1-based） */
+  lockedSheetIndex: number | null
+  /** 是否已锁定 */
+  isLocked: boolean
+}
+
 // ============================================================================
 // 15. 页面逻辑（来自 taskpane.js）
 // ============================================================================
@@ -640,6 +652,14 @@ export {
   enrichAlias,
   // 冲突解决函数
   resolveConflictField,
+  // 列管理函数
+  ensureBangumiColumns,
+  // 搜索与查询函数
+  searchSheet,
+  // 远程仓库函数
+  fetchRemoteFile,
+  parseRemoteContent,
+  writeRemoteDataToSheet,
   // 富化引擎类型
   type EnrichColumnMapping,
   type EnrichConfig,
@@ -647,6 +667,8 @@ export {
   type EnrichResultItem,
   type EnrichedField,
   type ConflictInfo,
+  type SearchResult,
+  type RemoteRepoConfig,
   type EnrichProgress,
   type ProgressCallback,
 } from './sync/enrichEngine.js'
@@ -683,3 +705,19 @@ export {
   openEnrichRecordSheet as openEnrichRecordSheetFromPage,
   clearRecords,
 } from './taskpane/enrich.js'
+
+// ============================================================================
+// 24. 富化工作簿锁定（来自 sync/enrichLock.js）
+// ============================================================================
+export {
+  refreshEnrichWorkbooks,
+  refreshEnrichSheets,
+  toggleEnrichWorkbookLock,
+  updateEnrichLockButton,
+  saveEnrichLockedWorkbook,
+  restoreEnrichLockedWorkbook,
+  getLockedEnrichSheet,
+  findWorkbookByName,
+  findSheetInWorkbook,
+  initEnrichLock,
+} from './sync/enrichLock.js'

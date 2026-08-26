@@ -125,6 +125,16 @@ export interface BGMUserInfo {
     /** 头像 URL */
     avatarUrl?: string | undefined;
 }
+export interface EnrichWorkbookState {
+    /** 锁定的工作簿名称 */
+    lockedWorkbookName: string | null;
+    /** 锁定的工作表名称 */
+    lockedSheetName: string | null;
+    /** 锁定的工作表索引（1-based） */
+    lockedSheetIndex: number | null;
+    /** 是否已锁定 */
+    isLocked: boolean;
+}
 export { refreshSheets, refreshWorkbooks, toggleSheetLock, refreshData, enlargePreview, } from './taskpane.js';
 export type { DetailItem, PreviewItem, DetailPreviewData, } from './ui/preview.js';
 export { previewSyncContent, closeDetailModal, syncAllRows, } from './ui/preview.js';
@@ -134,4 +144,16 @@ export { detectConflicts, getSyncPreview, detectGithubConflicts, type Conflict, 
 export { showConflictResolver } from './ui/conflictResolver.js';
 export { showSyncResultDialog, hideSyncResultDialog, computeDateStatsFromSheet, formatDuration, type DateStats, type SyncResultDialogOptions, } from './ui/syncResultDialog.js';
 export { exportSheetToJsonlFile, buildJsonlFromSheet } from './sync/exportJsonl.js';
+export {
+    refreshEnrichWorkbooks,
+    refreshEnrichSheets,
+    toggleEnrichWorkbookLock,
+    updateEnrichLockButton,
+    saveEnrichLockedWorkbook,
+    restoreEnrichLockedWorkbook,
+    getLockedEnrichSheet,
+    findWorkbookByName,
+    findSheetInWorkbook,
+    initEnrichLock,
+} from './sync/enrichLock.js';
 //# sourceMappingURL=index.d.ts.map

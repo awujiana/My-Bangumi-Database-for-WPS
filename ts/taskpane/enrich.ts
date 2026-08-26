@@ -20,6 +20,14 @@ import {
   type EnrichedField,
 } from '../sync/enrichEngine.js'
 import {
+  refreshEnrichWorkbooks,
+  refreshEnrichSheets,
+  toggleEnrichWorkbookLock,
+  updateEnrichLockButton,
+  getLockedEnrichSheet,
+  initEnrichLock,
+} from '../sync/enrichLock.js'
+import {
   getAllEnrichRecords,
   getOrCreateEnrichRecordSheet,
   clearEnrichRecords,
@@ -119,6 +127,9 @@ function formatEta(etaMs: number): string {
 export function initEnrichPage(): void {
   bgmLog(LOG_LEVELS.INFO, '[enrich] initEnrichPage 开始')
 
+  // 初始化富化工作簿锁定模块（恢复持久化的锁定状态）
+  initEnrichLock('workbookSelect', 'sheetSelect', 'lockSheetBtn', 'lockStatus')
+
   bindFileSelector()
   bindDetectHeaderButton()
   bindTargetSheetControls()
@@ -126,6 +137,15 @@ export function initEnrichPage(): void {
   bindStartEnrichButton()
   bindRecordControls()
   loadRecentRecords()
+
+  // 如果有锁定的工作表，自动填充到 state
+  if (BGM.enrich.isLocked && BGM.enrich.lockedSheetIndex) {
+    const locked = getLockedEnrichSheet()
+    if (locked) {
+      state.bangumiSheet = locked[1]
+      bgmLog(LOG_LEVELS.INFO, `[enrich] 已恢复锁定的目标工作表: ${locked[1].Name}`)
+    }
+  }
 
   bgmLog(LOG_LEVELS.INFO, '[enrich] initEnrichPage 完成')
 }
@@ -153,6 +173,8 @@ function bindTargetSheetControls(): void {
   if (wbSelect) {
     wbSelect.addEventListener('change', () => {
       refreshSheetList()
+      // 切换工作簿时同步锁定状态显示
+      updateEnrichLockButton('lockSheetBtn', 'lockStatus')
     })
   }
 
@@ -160,6 +182,8 @@ function bindTargetSheetControls(): void {
   if (sheetSelect) {
     sheetSelect.addEventListener('change', () => {
       selectTargetSheet()
+      // 切换工作表时同步锁定状态显示
+      updateEnrichLockButton('lockSheetBtn', 'lockStatus')
     })
   }
 
@@ -168,6 +192,7 @@ function bindTargetSheetControls(): void {
     refreshBtn.addEventListener('click', () => {
       refreshWorkbookList()
       refreshSheetList()
+      updateEnrichLockButton('lockSheetBtn', 'lockStatus')
     })
   }
 
@@ -462,56 +487,26 @@ function getSelectedWorkbook(): WpsWorkbook | null {
 }
 
 function refreshWorkbookList(): void {
-  const wbSelect = safeGetSelect('workbookSelect')
-  if (!wbSelect) return
+  refreshEnrichWorkbooks('workbookSelect')
 
-  const app = getApp()
-  if (!app?.Workbooks) return
-
-  const wbs = app.Workbooks
-  const currentValue = wbSelect.value
-
-  wbSelect.innerHTML = sanitizeHtml('<option value="">-- 当前活动工作簿 --</option>')
-
-  for (let i = 1; i <= wbs.Count; i++) {
-    const wb = wbs.Item(i)
-    const option = document.createElement('option')
-    option.value = wb.Name
-    option.textContent = wb.Name
-    if (wb.Name === currentValue) {
-      option.selected = true
-    }
-    wbSelect.appendChild(option)
+  // 如果已锁定，选中锁定的工作簿
+  if (BGM.enrich.isLocked && BGM.enrich.lockedWorkbookName) {
+    const wbSelect = safeGetSelect('workbookSelect')
+    if (wbSelect) wbSelect.value = BGM.enrich.lockedWorkbookName
   }
-
-  bgmLog(LOG_LEVELS.INFO, `[enrich] 工作簿列表已刷新: ${wbs.Count} 个`)
 }
 
 function refreshSheetList(): void {
-  const sheetSelect = safeGetSelect('sheetSelect')
-  if (!sheetSelect) return
+  const wbSelect = safeGetSelect('workbookSelect')
+  const wbName = wbSelect?.value || undefined
 
-  const wb = getSelectedWorkbook()
-  if (!wb) return
+  refreshEnrichSheets(wbName, 'sheetSelect', 'workbookSelect')
 
-  const sheets = wb.Worksheets
-  if (!sheets) return
-
-  const currentValue = sheetSelect.value
-
-  sheetSelect.innerHTML = sanitizeHtml('<option value="">-- 请选择 --</option>')
-
-  for (let i = 1; i <= sheets.Count; i++) {
-    const option = document.createElement('option')
-    option.value = String(i)
-    option.textContent = sheets.Item(i).Name
-    if (String(i) === currentValue) {
-      option.selected = true
-    }
-    sheetSelect.appendChild(option)
+  // 如果已锁定，选中锁定的工作表
+  if (BGM.enrich.isLocked && BGM.enrich.lockedSheetIndex) {
+    const sheetSelect = safeGetSelect('sheetSelect')
+    if (sheetSelect) sheetSelect.value = String(BGM.enrich.lockedSheetIndex)
   }
-
-  bgmLog(LOG_LEVELS.INFO, `[enrich] 工作表列表已刷新: ${sheets.Count} 个`)
 }
 
 function selectTargetSheet(): void {
@@ -532,6 +527,13 @@ function selectTargetSheet(): void {
     const ws = wb.Worksheets.Item(sheetIndex)
     state.bangumiSheet = ws
     bgmLog(LOG_LEVELS.INFO, `[enrich] 已选择目标工作表: ${ws.Name} (索引: ${sheetIndex})`)
+
+    // 同步到 BGM.enrich 状态（未锁定时自动更新）
+    if (!BGM.enrich.isLocked) {
+      BGM.enrich.lockedWorkbookName = wb.Name
+      BGM.enrich.lockedSheetName = ws.Name
+      BGM.enrich.lockedSheetIndex = sheetIndex
+    }
   } catch (e: unknown) {
     state.bangumiSheet = null
     BGM.handleError(e, {
@@ -542,29 +544,15 @@ function selectTargetSheet(): void {
   }
 }
 
-let sheetLocked = false
-
 function toggleSheetLock(): void {
-  const lockBtn = safeGetButton('lockSheetBtn')
-  if (!lockBtn) return
+  toggleEnrichWorkbookLock('sheetSelect', 'workbookSelect', 'lockSheetBtn', 'lockStatus')
 
   const sheetSelect = safeGetSelect('sheetSelect')
-  if (!sheetSelect?.value) {
-    BGM.Dialog.alert('提示', '请先选择目标工作表')
-    return
-  }
+  if (!sheetSelect) return
+  sheetSelect.disabled = BGM.enrich.isLocked
 
-  sheetLocked = !sheetLocked
-  if (sheetLocked) {
-    lockBtn.textContent = '🔓 解锁'
-    lockBtn.classList.add('locked')
-    sheetSelect.disabled = true
-    bgmLog(LOG_LEVELS.INFO, '[enrich] 目标工作表已锁定')
-  } else {
-    lockBtn.textContent = '🔒 锁定'
-    lockBtn.classList.remove('locked')
-    sheetSelect.disabled = false
-    bgmLog(LOG_LEVELS.INFO, '[enrich] 目标工作表已解锁')
+  if (!BGM.enrich.isLocked) {
+    state.bangumiSheet = null
   }
 }
 
@@ -739,6 +727,16 @@ export function startEnrichment(): void {
     BGM.Dialog.alert('提示', '请先选择新番表文件并识别表头')
     return
   }
+
+  // 如果 state 中没有 bangumiSheet，尝试从锁定状态获取
+  if (!state.bangumiSheet) {
+    const locked = getLockedEnrichSheet()
+    if (locked) {
+      state.bangumiSheet = locked[1]
+      bgmLog(LOG_LEVELS.INFO, `[enrich] 使用锁定的目标工作表: ${locked[1].Name}`)
+    }
+  }
+
   if (!state.bangumiSheet) {
     BGM.Dialog.alert('提示', '请先选择目标 Bangumi 工作表')
     return

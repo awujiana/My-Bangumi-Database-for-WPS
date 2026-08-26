@@ -170,6 +170,7 @@ export interface ConflictInfo {
   newAnimeRow: number
   newAnimeName: string
   resolution: 'append' | 'keep' | 'overwrite'
+  note?: string
 }
 
 /**
@@ -753,7 +754,16 @@ export function enrichEntries(
     return results
   }
 
-  const bangumiColMap = getBangumiColumnMap(bangumiSheet)
+  let bangumiColMap = getBangumiColumnMap(bangumiSheet)
+
+  if (isIntroSheet(config.columnMapping)) {
+    bangumiColMap = ensureBangumiColumns(
+      bangumiSheet,
+      bangumiColMap,
+      INTRO_FIELD_TO_BANGUMI,
+      config.headerRow,
+    )
+  }
 
   for (let i = 0; i < matches.length; i++) {
     const match = matches[i]
@@ -1026,8 +1036,136 @@ export function resolveConflictField(
 }
 
 /**
+ * 需要标注的字段映射白名单（只有这些映射会添加括号）
+ * 格式: "源字段名→目标列名"
+ */
+const ANNOTATED_FIELD_MAPPINGS = new Set<string>(['编剧→脚本', '人设→人物设定', 'CG导演→演出'])
+
+/**
+ * 获取带字段名标注的值
+ * 当源字段名与 Bangumi 列名不同时，只有在白名单中的映射才追加 (源字段名) 后缀
+ * 空值不添加标注
+ */
+function getAnnotatedValue(sourceKey: string, targetColName: string, value: string): string {
+  if (!value) return value
+  if (sourceKey === targetColName) return value
+  const mappingKey = `${sourceKey}→${targetColName}`
+  if (!ANNOTATED_FIELD_MAPPINGS.has(mappingKey)) return value
+  return `${value}(${sourceKey})`
+}
+
+/**
+ * 检查并添加缺失的列到 Bangumi 追踪表
+ * 返回更新后的列映射
+ */
+export function ensureBangumiColumns(
+  sheet: WpsWorksheet,
+  colMap: Map<string, number>,
+  requiredFields: Record<string, string>,
+  headerRow: number,
+): Map<string, number> {
+  const updatedMap = new Map(colMap)
+  let maxCol = 0
+
+  for (const col of Array.from(updatedMap.values())) {
+    if (col > maxCol) maxCol = col
+  }
+
+  const missing: Array<{ field: string; sourceKey: string }> = []
+  for (const [sourceKey, targetName] of Object.entries(requiredFields)) {
+    if (!updatedMap.has(targetName)) {
+      missing.push({ field: targetName, sourceKey })
+    }
+  }
+
+  if (missing.length === 0) return updatedMap
+
+  try {
+    // 复制现有表头样式
+    const existingStyleCol = maxCol > 0 ? 1 : maxCol + 1
+    const styleSourceRange = sheet.Range(
+      `${WpsCellRef(headerRow, existingStyleCol)}:${WpsCellRef(headerRow, existingStyleCol)}`,
+    )
+    let templateFont: typeof styleSourceRange.Font | null = null
+    let templateInterior: typeof styleSourceRange.Interior | null = null
+
+    try {
+      templateFont = styleSourceRange.Font
+      templateInterior = styleSourceRange.Interior
+    } catch {
+      bgmLog(LOG_LEVELS.WARN, '[ensureBangumiColumns] 无法获取样式模板')
+    }
+
+    // 创建新列表头
+    const headerRange = sheet.Range(
+      `${WpsCellRef(headerRow, maxCol + 1)}:${WpsCellRef(headerRow, maxCol + missing.length)}`,
+    )
+    const headers: string[][] = []
+    for (const m of missing) {
+      headers.push([m.field])
+    }
+    headerRange.Value = headers
+
+    // 应用样式到新列
+    try {
+      if (templateFont) {
+        const newFont = headerRange.Font
+        if (newFont) {
+          newFont.Name = templateFont.Name
+          newFont.Size = templateFont.Size
+          newFont.Bold = templateFont.Bold
+          newFont.Color = templateFont.Color
+        }
+      }
+      if (templateInterior) {
+        const newInterior = headerRange.Interior
+        if (newInterior) {
+          newInterior.Color = templateInterior.Color
+        }
+      }
+    } catch {
+      bgmLog(LOG_LEVELS.WARN, '[ensureBangumiColumns] 复制样式失败，使用默认样式')
+    }
+
+    for (let i = 0; i < missing.length; i++) {
+      const newCol = maxCol + 1 + i
+      const field = missing[i]?.field
+      if (field) {
+        updatedMap.set(field, newCol)
+        bgmLog(
+          LOG_LEVELS.INFO,
+          `[ensureBangumiColumns] 新增列: ${field} → 第 ${newCol} 列 (样式已跟随现有列)`,
+        )
+      }
+    }
+  } catch (e) {
+    bgmLog(
+      LOG_LEVELS.ERROR,
+      `[ensureBangumiColumns] 添加列失败: ${e instanceof Error ? e.message : String(e)}`,
+    )
+  }
+
+  return updatedMap
+}
+
+/**
+ * WpsCellRef 辅助函数：生成单元格引用
+ */
+function WpsCellRef(row: number, col: number): string {
+  let colStr = ''
+  let c = col
+  while (c > 0) {
+    c--
+    colStr = String.fromCharCode(65 + (c % 26)) + colStr
+    c = Math.floor(c / 26)
+  }
+  return `${colStr}${row}`
+}
+
+/**
  * 富化简介数据
  * 精准映射：导演→导演、编剧→脚本、人设→人物设定 等列
+ * 字段名差异时追加标注：如 樋口七海(编剧)
  * 无匹配列的字段回退到特点/印象
  * 冲突（两边都有值）时记录到 conflicts 数组，由用户确认
  */
@@ -1044,20 +1182,24 @@ export function enrichIntroData(
   const bangumiFeatureCol = colMap.get('特点/印象')
 
   for (const [sourceKey, targetColName] of Object.entries(INTRO_FIELD_TO_BANGUMI)) {
-    const value = newData[sourceKey] || ''
-    if (isEmptyValue(value)) continue
+    const rawValue = newData[sourceKey] || ''
+    if (isEmptyValue(rawValue)) continue
 
+    const annotatedValue = getAnnotatedValue(sourceKey, targetColName, rawValue)
     const targetCol = colMap.get(targetColName)
     if (targetCol !== undefined) {
       const oldValue = getCellValue(sheet, row, targetCol)
       if (isEmptyValue(oldValue)) {
-        setCellValue(sheet, row, targetCol, value)
+        setCellValue(sheet, row, targetCol, annotatedValue)
         enriched.push({
           fieldName: targetColName,
           bangumiColumn: targetCol,
           oldValue: null,
-          newValue: value,
+          newValue: annotatedValue,
           action: 'fill',
+          ...(sourceKey !== targetColName
+            ? { note: `字段名差异: ${sourceKey} → ${targetColName}` }
+            : {}),
         })
       } else {
         conflicts.push({
@@ -1065,15 +1207,18 @@ export function enrichIntroData(
           bangumiColumn: targetCol,
           bangumiRow: row,
           oldValue,
-          newValue: value,
+          newValue: annotatedValue,
           newAnimeRow,
           newAnimeName,
           resolution: 'append',
+          ...(sourceKey !== targetColName
+            ? { note: `字段名差异: ${sourceKey} → ${targetColName}` }
+            : {}),
         })
       }
     } else if (bangumiFeatureCol !== undefined) {
       const oldFeature = getCellValue(sheet, row, bangumiFeatureCol)
-      const featureEntry = `${sourceKey}:${value}`
+      const featureEntry = `${sourceKey}:${annotatedValue}`
       if (isEmptyValue(oldFeature)) {
         setCellValue(sheet, row, bangumiFeatureCol, featureEntry)
         enriched.push({
@@ -1319,4 +1464,166 @@ export function enrichAlias(
     newValue: merged,
     action: 'append',
   })
+}
+
+// ========== 搜索与查询 ==========
+
+/**
+ * 搜索结果条目
+ */
+export interface SearchResult {
+  row: number
+  name: string
+  fieldMatches: Array<{ column: string; value: string }>
+}
+
+/**
+ * 在工作表中搜索关键词
+ * 支持多字段匹配，返回所有匹配行
+ */
+export function searchSheet(
+  sheet: WpsWorksheet,
+  keyword: string,
+  colMap: Map<string, number>,
+  dataStartRow: number,
+): SearchResult[] {
+  if (!keyword.trim()) return []
+
+  const results: SearchResult[] = []
+  const normalizedKeyword = normalizeName(keyword)
+  const nameCol = colMap.get('名称') || colMap.get('动漫名称') || colMap.get('番组名') || 0
+
+  if (nameCol === 0) return results
+
+  const lastRow = getLastRow(sheet)
+  if (lastRow < dataStartRow) return results
+
+  for (let row = dataStartRow; row <= lastRow; row++) {
+    const nameValue = getCellValue(sheet, row, nameCol)
+    if (!nameValue) continue
+
+    const normalizedName = normalizeName(nameValue)
+    if (normalizedName.includes(normalizedKeyword)) {
+      const fieldMatches: SearchResult['fieldMatches'] = [{ column: '名称', value: nameValue }]
+
+      const aliasCol = colMap.get('别名')
+      if (aliasCol) {
+        const aliasValue = getCellValue(sheet, row, aliasCol)
+        if (aliasValue) {
+          const aliases = splitAliases(aliasValue)
+          const matchedAliases = aliases.filter((a) => normalizeName(a).includes(normalizedKeyword))
+          for (const alias of matchedAliases) {
+            fieldMatches.push({ column: '别名', value: alias })
+          }
+        }
+      }
+
+      results.push({ row, name: nameValue, fieldMatches })
+    }
+  }
+
+  bgmLog(LOG_LEVELS.INFO, `[searchSheet] 搜索 "${keyword}" 找到 ${results.length} 条结果`)
+  return results
+}
+
+// ========== 远程仓库下载 ==========
+
+/**
+ * 远程仓库配置
+ */
+export interface RemoteRepoConfig {
+  url: string
+  branch: string
+  filePath: string
+  localPath: string
+}
+
+/**
+ * 从远程仓库获取文件内容（以 base64 方式）
+ * 绕过中间列影响，直接下载原始数据
+ */
+export async function fetchRemoteFile(config: RemoteRepoConfig): Promise<string | null> {
+  try {
+    const { url, branch, filePath } = config
+    const rawUrl = `${url}/raw/${branch}/${filePath}`
+
+    bgmLog(LOG_LEVELS.INFO, `[fetchRemoteFile] 正在获取: ${rawUrl}`)
+
+    const response = await fetch(rawUrl)
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`)
+    }
+
+    const content = await response.text()
+    bgmLog(LOG_LEVELS.INFO, `[fetchRemoteFile] 下载成功: ${content.length} 字节`)
+    return content
+  } catch (e) {
+    const errMsg = e instanceof Error ? e.message : String(e)
+    bgmLog(LOG_LEVELS.ERROR, `[fetchRemoteFile] 下载失败: ${errMsg}`)
+    return null
+  }
+}
+
+/**
+ * 解析远程文件内容为 Excel 可导入格式
+ * 支持 CSV/TSV 纯文本格式，不受中间列干扰
+ */
+export function parseRemoteContent(content: string): Array<Record<string, string>> {
+  const records: Array<Record<string, string>> = []
+  if (!content) return records
+  const lines = content.split(/\r?\n/).filter((line) => line.trim())
+
+  if (lines.length === 0) return records
+
+  const firstLine = lines[0]
+  if (firstLine === undefined) return records
+
+  const delimiter = firstLine.includes('\t') ? '\t' : ','
+  const headers = firstLine.split(delimiter).map((h) => h.trim())
+
+  for (let i = 1; i < lines.length; i++) {
+    const line = lines[i]
+    if (line === undefined) continue
+    const values = line.split(delimiter)
+    const record: Record<string, string> = {}
+    for (let j = 0; j < headers.length; j++) {
+      const key = headers[j]
+      const val = values[j]
+      if (key !== undefined) {
+        record[key] = val !== undefined ? val : ''
+      }
+    }
+    records.push(record)
+  }
+
+  bgmLog(LOG_LEVELS.INFO, `[parseRemoteContent] 解析 ${records.length} 条记录`)
+  return records
+}
+
+/**
+ * 将远程获取的数据写入工作表
+ * 支持指定列映射，避免中间列影响
+ */
+export function writeRemoteDataToSheet(
+  sheet: WpsWorksheet,
+  data: Array<Record<string, string>>,
+  colMap: Map<string, number>,
+  startRow: number,
+): number {
+  let row = startRow
+  let written = 0
+
+  for (const record of data) {
+    for (const [field, value] of Object.entries(record)) {
+      const col = colMap.get(field)
+      if (col !== undefined && value) {
+        setCellValue(sheet, row, col, value)
+      }
+    }
+    row++
+    written++
+  }
+
+  bgmLog(LOG_LEVELS.INFO, `[writeRemoteDataToSheet] 写入 ${written} 行数据`)
+  return written
 }
