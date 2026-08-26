@@ -24,7 +24,7 @@ import '../dist-ts/sync/scraping.js';
 import '../dist-ts/sync/exceltobangumi.js';
 import '../dist-ts/sync/enrichEngine.js';
 import '../dist-ts/sync/enrichRecord.js';
-import { initEnrichPage } from '../dist-ts/taskpane/enrich.js';
+import { initEnrichPage } from '../dist-ts/panel/enrichPage.js';
 
 // 模块就绪前禁用所有 data-action 按钮，避免误触发未初始化的处理逻辑
 document.querySelectorAll('button[data-action]').forEach(function (btn) {
