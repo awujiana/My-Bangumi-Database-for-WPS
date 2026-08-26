@@ -64,9 +64,9 @@ export default defineConfig({
         //   - ts/ui/handlers/sync.ts (0%)                    — UI，目标 50%
         //   - ts/ui/handlers/sheet.ts (0%)                   — UI，目标 50%
         //   - ts/ui/handlers/token.ts (0.76%)                — UI，目标 50%
-        //   - ts/taskpane/index.ts (2.85%)                   — UI，目标 50%
-        //   - ts/taskpane/panelLifecycle.ts (5.29%)          — UI，目标 50%
-        //   - ts/taskpane/userInfoPolling.ts (0%)            — UI，目标 50%
+        //   - ts/panel/panelPage.ts (2.85%)                    — UI，目标 50%
+        //   - ts/panel/panelLifecycle.ts (5.29%)              — UI，目标 50%
+        //   - ts/panel/userInfoPolling.ts (0%)                — UI，目标 50%
         //   - ts/services/ribbonService.ts (0.32%)           — UI，目标 50%
         // ====================================================================
         // 提升路径：

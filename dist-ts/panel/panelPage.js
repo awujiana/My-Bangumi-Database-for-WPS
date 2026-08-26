@@ -1,16 +1,12 @@
 /**
  * 任务面板主模块 - 聚合入口
- * @module taskpane
+ * @module panel/panelPage
  * @description 面板初始化、事件绑定、核心逻辑。
  *
- * 拆分结构（从原 taskpane.ts 拆分而来）：
- *   - panel/panelLifecycle.ts：工作表锁定/解锁、表头检测、筛选状态、预览渲染（toggleSheetLock、refreshSheets、refreshData、autoDetectSheet、updateFilterStatus 等）
- *   - panel/userInfoPolling.ts：用户信息恢复与轮询（restoreUserInfoFromStorage、startUserInfoPolling）
- *   - panel/index.ts：initPanel 初始化入口、window 全局挂载、自动初始化逻辑、re-export
- *
- * 备注：原计划中的 tokenDisplay.ts 未创建。原因：本文件中并无独立的 Token 显示逻辑，
- *       updateTokenStatus/updateUserIdStatus 等函数均来自 `../index.js`（实现在 handlers/token.ts），
- *       无可拆分内容。遵循"保守策略"，不为对齐文件清单而创建空模块。
+ * 模块拆分结构：
+ *   - panel/panelLifecycle.ts：工作表锁定/解锁、表头检测、筛选状态、预览渲染
+ *   - panel/userInfoPolling.ts：用户信息恢复与轮询
+ *   - panel/enrichPage.ts：新番表富化 UI 控制器
  */
 import { WPS_ENUM, LOG_LEVELS, getApp, bgmLog, BGM, updateTokenStatus, updateUserIdStatus, closeDetailModal, removeMessageListener, clearAllPendingTimeouts, } from '../index.js';
 import { toggleSheetLock, saveLockedSheet, restoreLockedSheet, updateLockButton, refreshSheets, refreshWorkbooks, autoDetectSheet, updateFilterStatus, refreshData, onSelectModeChange, enlargePreview, autoDetectAndLockSheet, } from './panelLifecycle.js';
@@ -23,7 +19,7 @@ function initPanel() {
     if (app && typeof app.Enum !== 'object') {
         app.Enum = WPS_ENUM;
     }
-    bgmLog(LOG_LEVELS.INFO, '[taskpane] 锁定按钮监听器设置完成');
+    bgmLog(LOG_LEVELS.INFO, '[panel] 锁定按钮监听器设置完成');
     // 初始化事件监听
     restoreUserInfoFromStorage();
     // 定时轮询 PluginStorage，确保在 Ribbon 设置 Token 后 Taskpane 能自动更新 UI
@@ -131,8 +127,8 @@ function safeInitPanel() {
 /**
  * 初始化任务面板。
  *
- * 显式入口函数，由 `ts/entry/taskpane-entry.ts` 调用。
- * 不在模块加载时自动执行，避免在测试或非 taskpane 上下文下意外触发副作用。
+ * 显式入口函数，由 `ts/entry/panel-entry.ts` 调用。
+ * 不在模块加载时自动执行，避免在测试或非 panel 上下文下意外触发副作用。
  *
  * 行为：
  *  - 若文档已加载完成（readyState === 'complete'），立即执行 safeInitPanel()

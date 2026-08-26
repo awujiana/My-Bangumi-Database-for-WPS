@@ -1,6 +1,6 @@
 /**
  * @fileoverview 富化页面的 UI 控制器
- * @module panel/enrich
+ * @module panel/enrichPage
  * @description 负责文件选择、表头识别、列映射编辑、匹配预览、富化执行与进度、富化记录查看。
  */
 import { LOG_LEVELS } from '../core/constants.js';

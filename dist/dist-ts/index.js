@@ -265,13 +265,13 @@ autoFillUrls,
 // 显示确认对话框后执行
 showAutoFillUrlDialog, } from './tools/autoFillUrl.js';
 // ============================================================================
-// 15. 页面逻辑（来自 taskpane.js）
+// 15. 页面逻辑（来自 panel/panelPage.js）
 // ============================================================================
 export { refreshSheets, refreshWorkbooks, toggleSheetLock, 
 // 刷新数据预览
 refreshData, 
 // 放大预览表格
-enlargePreview, } from './taskpane/index.js';
+enlargePreview, } from './panel/panelPage.js';
 // 预览函数
 export { 
 // 显示预览内容
@@ -326,9 +326,9 @@ getOrCreateEnrichRecordSheet, getEnrichRecordSheetIfExists, getAllEnrichRecords,
 // 富化记录表常量
 ENRICH_RECORD_SHEET_NAME, ENRICH_RECORD_COLUMNS, ENRICH_RECORD_COL, } from './sync/enrichRecord.js';
 // ============================================================================
-// 23. 富化页面 UI 控制器（来自 taskpane/enrich.js）
+// 23. 富化页面 UI 控制器（来自 panel/enrichPage.js）
 // ============================================================================
-export { initEnrichPage, selectNewAnimeFile, autoDetectHeader, previewMatch, startEnrichment, cancelEnrichment, openEnrichRecordSheet as openEnrichRecordSheetFromPage, clearRecords, } from './taskpane/enrich.js';
+export { initEnrichPage, selectNewAnimeFile, autoDetectHeader, previewMatch, startEnrichment, cancelEnrichment, openEnrichRecordSheet as openEnrichRecordSheetFromPage, clearRecords, } from './panel/enrichPage.js';
 // ============================================================================
 // 24. 富化工作簿锁定（来自 sync/enrichLock.js）
 // ============================================================================

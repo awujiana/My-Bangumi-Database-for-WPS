@@ -2,8 +2,8 @@
 // 作为 ES Module 加载，避免内联 script（CSP script-src 'self' 要求）
 // 职责：1) 按依赖顺序加载所有模块；2) 在模块就绪前禁用按钮，就绪后启用
 //
-// 注意：自 Task 13 重构后，taskpane/index.ts 与 ui/handlers/index.ts 不再在模块加载时
-// 自动注册 DOMContentLoaded 监听器。统一通过 ts/entry/taskpane-entry.ts 入口模块
+// 注意：自 Task 13 重构后，panel/panelPage.ts 与 ui/handlers/index.ts 不再在模块加载时
+// 自动注册 DOMContentLoaded 监听器。统一通过 ts/entry/panel-entry.ts 入口模块
 // 显式调用 initTaskpane() + initHandlers() 启动（入口模块内部含 taskpane.html 路径守卫，
 // 在非浏览器或非 taskpane 上下文下不会触发副作用）。
 import '../dist-ts/index.js';
@@ -21,7 +21,7 @@ import '../dist-ts/ui/preview.js';
 import '../dist-ts/sync/syncRecord.js';
 import '../dist-ts/sync/scraping.js';
 import '../dist-ts/sync/exceltobangumi.js';
-import '../dist-ts/entry/taskpane-entry.js';
+import '../dist-ts/entry/panel-entry.js';
 
 // 模块加载完成检查
 if (typeof window.initPanel === 'function') {

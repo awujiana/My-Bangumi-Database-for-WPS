@@ -1652,7 +1652,7 @@ function handleActionClick(event: Event): void {
 /**
  * 初始化 UI 事件处理模块。
  *
- * 显式入口函数，由 `ts/entry/taskpane-entry.ts` 调用。
+ * 显式入口函数，由 `ts/entry/panel-entry.ts` 调用。
  * 不在模块加载时自动执行，避免：
  *  - 模块加载期间触发 trackedSetTimeout(setupButtonListeners, 0)
  *  - 在测试环境（无 DOM/BGM 全局对象）下意外触发副作用

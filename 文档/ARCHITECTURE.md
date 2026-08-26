@@ -1,6 +1,6 @@
 # Bangumi WPS Excel 加载项 - 架构与项目知识文档
 
-> 版本: 3.1 | 更新日期: 2026-08-26
+> 版本: 3.2 | 更新日期: 2026-08-26
 
 ---
 
@@ -13,6 +13,7 @@
 | v2.9 | 2026-08-26 | 新增 enrichEngine 富化引擎（新番表+简介工作表双阶段富化）、标注白名单机制、自动添加缺失列、声优字段支持、数据同步列位置无关性验证、边界情况修复（parseRemoteContent 空值检查、getAnnotatedValue 空值守卫）、42 项边界测试 |
 | v3.0 | 2026-08-26 | 新增富化功能工作簿选择与锁定机制（enrichLock.ts）：跨工作簿 Bangumi 追踪表选择、PluginStorage 持久化、启动恢复校验、与 Taskpane 锁定独立运行                                                                              |
 | v3.1 | 2026-08-26 | enrichLock.ts 边界加固：WPS API null 返回安全处理、冗余查找逻辑简化、边界情况文档完善                                                                                                                                     |
+| v3.2 | 2026-08-26 | 命名规范重构：`taskpane/` 目录重命名为 `panel/`，页面文件使用 `Page` 后缀（`panelPage.ts`/`enrichPage.ts`），`taskpane-entry.ts` → `panel-entry.ts`；删除旧兼容文件 `ts/taskpane.ts`；统一 `@module` JSDoc 标签           |
 
 ## 一、架构概览
 
@@ -97,14 +98,15 @@ ts/index.ts (barrel export)
   │       ├── sheet.ts      → 工作表相关 handler
   │       └── _constants.ts → 中文常量
   │
-  ├── ts/taskpane/       (任务面板子模块)
-  │   ├── index.ts          → initTaskpane 初始化
+  ├── ts/panel/          (任务面板子模块)
+  │   ├── panelPage.ts      → 任务面板主模块（聚合入口）
   │   ├── panelLifecycle.ts → 工作表锁定/解锁
-  │   └── userInfoPolling.ts → 用户信息轮询 (PluginStorage)
+  │   ├── userInfoPolling.ts → 用户信息轮询 (PluginStorage)
+  │   └── enrichPage.ts     → 新番表富化 UI 控制器
   │
   ├── ts/entry/          (入口绑定)
   │   ├── ribbon-entry.ts   → Ribbon OnAction 入口
-  │   ├── taskpane-entry.ts → Taskpane 入口
+  │   ├── panel-entry.ts    → 面板（Taskpane/Settings）入口
   │   └── settings-entry.ts → Settings 面板入口（加载配置、注册事件）
   │
   └── ts/schemas/        (Zod 校验模式)
@@ -129,7 +131,7 @@ ts/index.ts (barrel export)
 
 #### Taskpane 入口
 
-- **文件**: `ts/entry/taskpane-entry.ts`
+- **文件**: `ts/entry/panel-entry.ts`
 - **启动链**: `startTaskpane()` →
   1. `initTaskpane()`: 工作表锁定状态恢复、用户信息轮询、Token 状态检查
   2. `initHandlers()`: 注册按钮监听器、消息监听器、事件总线监听器
@@ -629,7 +631,7 @@ ts/index.ts (barrel export)
 **首次初始化流程：**
 
 1. `ribbon-entry.ts` 启动 → `OnAddinLoad()` → 设置 `EnableFlag='false'` 和 `ApiEventFlag='false'`
-2. `taskpane-entry.ts` 启动 → `initTaskpane()` → 从 PluginStorage 恢复用户信息
+2. `panel-entry.ts` 启动 → `initTaskpane()` → 从 PluginStorage 恢复用户信息
 3. `getGithubConfig()` 首次读取时，若 owner/repo/path 全为空，自动写入 `DEFAULT_GITHUB_CONFIG`
 4. Token 通过 `loadBgToken()` 明文读取（已移除历史 XOR 加密自动升级逻辑）
 
@@ -1077,7 +1079,7 @@ npx vitest
 
 - `entry/` 模块使用 `typeof window !== 'undefined'` 守卫，测试环境导入不触发副作用
 - `ribbon.ts` 的消息监听和轮询通过显式 `initRibbon()` 调用启动
-- `taskpane/index.ts` 的 DOM 操作通过 `initTaskpane()` 显式调用触发
+- `panel/panelPage.ts` 的 DOM 操作通过 `initTaskpane()` 显式调用触发
 
 ### 7.3 代码规范
 
