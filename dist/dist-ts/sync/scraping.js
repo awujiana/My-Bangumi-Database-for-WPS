@@ -7,7 +7,8 @@
  * @author BGM Development Team
  * @version 1.1.0 (优化版)
  */
-import { BGM_CONFIG, LOG_LEVELS, bgmLog } from '../index.js';
+import { BGM_CONFIG, LOG_LEVELS } from '../core/constants.js';
+import { bgmLog } from '../tools/util/index.js';
 /**
  * 执行HTTP请求的通用Promise封装
  * @param xhr 已配置好的 XMLHttpRequest 对象

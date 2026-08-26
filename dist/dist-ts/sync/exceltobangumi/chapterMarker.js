@@ -3,7 +3,8 @@
  * @module sync/exceltobangumi/chapterMarker
  * @description 获取条目章节列表并标记前 N 集为已观看。
  */
-import { BGM_CONFIG, LOG_LEVELS, bgmLog } from '../../index.js';
+import { BGM_CONFIG, LOG_LEVELS } from '../../core/constants.js';
+import { bgmLog } from '../../tools/util/index.js';
 import { bgmRequestSync } from './api.js';
 /**
  * 获取条目的所有章节 ID（按集号排序）

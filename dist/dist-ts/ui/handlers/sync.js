@@ -201,24 +201,22 @@ async function confirmAndExecuteSync(prepared) {
     }
     // 11. 执行同步
     bgmLog(LOG_LEVELS.INFO, '[syncFromPanel] 步骤11: 开始执行同步');
-    // 运行锁已由 syncFromPanel 入口获取，此处直接显示进度弹窗
-    const syncFromPanelConfig = buildSyncConfig({
-        source: '当前工作表',
-        strategy: conflictStrategy === 'skip' ? '跳过冲突' : '覆盖冲突',
-        direction: 'Excel → Bangumi',
-        extra: [
-            { label: '数据范围', value: `第${headerRow + 1}~${lastRow}行` },
-            { label: '增量同步', value: incremental ? '开启' : '关闭' },
-            { label: '冲突数', value: conflictMsg ? String(conflictSids?.size ?? 0) : '0' },
-        ],
-    });
-    // 显示同步进度弹窗（不隐藏"同步到 Bangumi"按钮）
-    showSyncProgressDialog('正在同步 - 同步到 Bangumi', {
-        onPause: () => BGM.sync.pause(),
-        onResume: () => BGM.sync.resume(),
-        onStop: () => BGM.sync.requestStop(),
-    }, syncFromPanelConfig);
     try {
+        const syncFromPanelConfig = buildSyncConfig({
+            source: '当前工作表',
+            strategy: conflictStrategy === 'skip' ? '跳过冲突' : '覆盖冲突',
+            direction: 'Excel → Bangumi',
+            extra: [
+                { label: '数据范围', value: `第${headerRow + 1}~${lastRow}行` },
+                { label: '增量同步', value: incremental ? '开启' : '关闭' },
+                { label: '冲突数', value: conflictMsg ? String(conflictSids?.size ?? 0) : '0' },
+            ],
+        });
+        showSyncProgressDialog('正在同步 - 同步到 Bangumi', {
+            onPause: () => BGM.sync.pause(),
+            onResume: () => BGM.sync.resume(),
+            onStop: () => BGM.sync.requestStop(),
+        }, syncFromPanelConfig);
         bgmLog(LOG_LEVELS.INFO, '[syncFromPanel] 调用 SyncToBangumiAsync...');
         const result = await SyncToBangumiAsync(ws, colMap, token, lastRow, headerRow, {
             ...(conflictSids !== undefined && { skipSids: conflictSids }),
@@ -268,8 +266,6 @@ async function confirmAndExecuteSync(prepared) {
             strategyLabel: '同步到 Bangumi',
         };
         completeSyncProgressDialog(summary, details, result.stopped, undefined, stats);
-        // 重置同步状态机
-        BGM.sync.exitRunningState();
         if (app.StatusBar !== undefined)
             app.StatusBar = false;
         if (result.stopped) {
@@ -281,11 +277,13 @@ async function confirmAndExecuteSync(prepared) {
     }
     catch (err) {
         hideSyncProgressDialog();
-        BGM.sync.exitRunningState();
         if (app.StatusBar !== undefined)
             app.StatusBar = false;
         bgmLog(LOG_LEVELS.ERROR, `[syncFromPanel] 同步失败: ${err.message}`);
         BGM.handleError(err, { context: 'syncFromPanel', showAlert: true });
+    }
+    finally {
+        BGM.sync.exitRunningState();
     }
     return true;
 }
@@ -390,53 +388,53 @@ async function _doAPISync(sheetIndex, token) {
             return;
         }
     }
+    const ws = app.ActiveWorkbook.Worksheets.Item(sheetIndex);
+    const headerRow = typeof findHeaderRow === 'function' ? findHeaderRow(ws) : 1;
+    const colMap = typeof getColumnMap === 'function' ? getColumnMap(ws, headerRow) : new Map();
+    if (!colMap.has('Bangumi_URL')) {
+        showAlert('未找到 Bangumi URL 列！');
+        return;
+    }
+    const lastRow = typeof getLastRow === 'function' ? getLastRow(ws) : 200;
+    const rowsToProcess = [];
+    for (let r = headerRow + 1; r <= lastRow; r++)
+        rowsToProcess.push(r);
+    if (rowsToProcess.length === 0) {
+        showAlert('没有需要处理的数据行！');
+        return;
+    }
+    setStatus('正在验证 Token...', 'info');
+    const verifyResult = await verifyToken(token);
+    if (!verifyResult.valid) {
+        showAlert('✘ ' + verifyResult.message);
+        return;
+    }
+    _setBgmUserId(verifyResult.userId || '');
+    setStatus('正在获取收藏列表...', 'info');
+    const userCollections = await fetchAllUserCollections(token);
+    const collectionMap = new Map();
+    userCollections.forEach((c) => collectionMap.set(String(c.subject_id), c));
+    // 切换到同步记录工作表，让用户能看到实时写入
+    if (syncSheet) {
+        try {
+            syncSheet.Activate();
+            bgmLog(LOG_LEVELS.INFO, `[_doAPISync] 已激活同步记录工作表: ${syncSheet.Name}`);
+        }
+        catch (e) {
+            bgmLog(LOG_LEVELS.WARN, `[_doAPISync] 激活同步记录工作表失败: ${e.message}`);
+        }
+    }
+    let syncRecords = typeof getAllSyncRecords === 'function' ? getAllSyncRecords() : [];
+    const syncCountMap = new Map();
+    syncRecords.forEach((r) => syncCountMap.set(String(r.sid || ''), (syncCountMap.get(String(r.sid || '')) || 0) + 1));
+    // 使用从 ../index.js 导入的 BGM_SUBJECT_TYPES 常量（与 core/constants.ts 中定义一致）
+    // 启动同步状态机：使用 enterRunningState 进行防重入检查
+    if (!BGM.sync.enterRunningState()) {
+        bgmLog(LOG_LEVELS.WARN, '[_doAPISync] 已有同步进行中，拒绝重入');
+        showAlert('同步正在进行中，请稍后再试', '提示');
+        return;
+    }
     try {
-        const ws = app.ActiveWorkbook.Worksheets.Item(sheetIndex);
-        const headerRow = typeof findHeaderRow === 'function' ? findHeaderRow(ws) : 1;
-        const colMap = typeof getColumnMap === 'function' ? getColumnMap(ws, headerRow) : new Map();
-        if (!colMap.has('Bangumi_URL')) {
-            showAlert('未找到 Bangumi URL 列！');
-            return;
-        }
-        const lastRow = typeof getLastRow === 'function' ? getLastRow(ws) : 200;
-        const rowsToProcess = [];
-        for (let r = headerRow + 1; r <= lastRow; r++)
-            rowsToProcess.push(r);
-        if (rowsToProcess.length === 0) {
-            showAlert('没有需要处理的数据行！');
-            return;
-        }
-        setStatus('正在验证 Token...', 'info');
-        const verifyResult = await verifyToken(token);
-        if (!verifyResult.valid) {
-            showAlert('✘ ' + verifyResult.message);
-            return;
-        }
-        _setBgmUserId(verifyResult.userId || '');
-        setStatus('正在获取收藏列表...', 'info');
-        const userCollections = await fetchAllUserCollections(token);
-        const collectionMap = new Map();
-        userCollections.forEach((c) => collectionMap.set(String(c.subject_id), c));
-        // 切换到同步记录工作表，让用户能看到实时写入
-        if (syncSheet) {
-            try {
-                syncSheet.Activate();
-                bgmLog(LOG_LEVELS.INFO, `[_doAPISync] 已激活同步记录工作表: ${syncSheet.Name}`);
-            }
-            catch (e) {
-                bgmLog(LOG_LEVELS.WARN, `[_doAPISync] 激活同步记录工作表失败: ${e.message}`);
-            }
-        }
-        let syncRecords = typeof getAllSyncRecords === 'function' ? getAllSyncRecords() : [];
-        const syncCountMap = new Map();
-        syncRecords.forEach((r) => syncCountMap.set(String(r.sid || ''), (syncCountMap.get(String(r.sid || '')) || 0) + 1));
-        // 使用从 ../index.js 导入的 BGM_SUBJECT_TYPES 常量（与 core/constants.ts 中定义一致）
-        // 启动同步状态机：使用 enterRunningState 进行防重入检查
-        if (!BGM.sync.enterRunningState()) {
-            bgmLog(LOG_LEVELS.WARN, '[_doAPISync] 已有同步进行中，拒绝重入');
-            showAlert('同步正在进行中，请稍后再试', '提示');
-            return;
-        }
         const collectionConfig = buildSyncConfig({
             source: 'Bangumi 收藏列表',
             strategy: '收藏回写',
@@ -446,7 +444,6 @@ async function _doAPISync(sheetIndex, token) {
                 { label: '待处理行', value: String(rowsToProcess.length) },
             ],
         });
-        // 显示同步进度弹窗
         showSyncProgressDialog('正在收藏回写', {
             onPause: () => BGM.sync.pause(),
             onResume: () => BGM.sync.resume(),
@@ -579,8 +576,6 @@ async function _doAPISync(sheetIndex, token) {
             strategyLabel: 'BGM 收藏同步',
         };
         completeSyncProgressDialog(summary, detailsArr, wasStopped, undefined, stats);
-        // 重置同步状态机
-        BGM.sync.exitRunningState();
         // 恢复原始工作表
         if (originalActiveSheet) {
             try {
@@ -594,12 +589,12 @@ async function _doAPISync(sheetIndex, token) {
     }
     catch (e) {
         hideSyncProgressDialog();
-        BGM.sync.exitRunningState();
         BGM.handleError(e, { showAlert: false, level: BGM.ErrorLevel.WARN, context: '_doAPISync' });
         showAlert(_T.syncFailed + e.message, _T.syncFailed);
         setStatus(_T.syncFailed, 'error');
     }
     finally {
+        BGM.sync.exitRunningState();
         // 确保即使发生异常也尝试恢复原始工作表
         if (originalActiveSheet) {
             try {

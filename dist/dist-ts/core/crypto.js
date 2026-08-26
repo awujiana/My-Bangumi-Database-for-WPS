@@ -6,8 +6,8 @@
  * @author BGM Development Team
  * @version 1.0.0
  */
-import { BGM, bgmLog, LOG_LEVELS } from '../index.js';
-import { TOKEN_CONFIG } from './constants.js';
+import { bgmLog } from '../tools/util/index.js';
+import { LOG_LEVELS, TOKEN_CONFIG } from './constants.js';
 /**
  * 计算字符串的校验和
  * 用于验证Token数据的完整性
@@ -85,7 +85,7 @@ export function extractToken(encrypted) {
         return token;
     }
     catch (e) {
-        BGM?.handleError?.(e, { context: 'extractToken', showAlert: false });
+        bgmLog(LOG_LEVELS.ERROR, `[crypto] extractToken 异常: ${e.message}`);
         return null;
     }
 }

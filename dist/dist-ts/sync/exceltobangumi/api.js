@@ -3,7 +3,8 @@
  * @module sync/exceltobangumi/api
  * @description Bangumi API 请求封装、Token 测试、用户信息通知等。
  */
-import { BGM_CONFIG, LOG_LEVELS, bgmLog, getApp, loadBgToken, storeBgToken, _setBgmUserId, _setBgmUsername, BGM, } from '../../index.js';
+import { BGM_CONFIG, LOG_LEVELS } from '../../core/constants.js';
+import { bgmLog, getApp, loadBgToken, storeBgToken, _setBgmUserId, _setBgmUsername, BGM, } from '../../tools/util/index.js';
 import { showAlert, showSuccess, showError } from '../../ui/dialog.js';
 /**
  * 提取HTTP请求结果消息
@@ -150,18 +151,18 @@ export function notifyUserInfoUpdated(username, userId) {
         BGM.cache.username = username;
         BGM.cache.userId = userId;
         bgmLog(LOG_LEVELS.INFO, `[notifyUserInfoUpdated] 用户信息已持久化到 PluginStorage`);
-        // 尝试通过 GetTaskPane 直接通知 Taskpane 刷新 UI
+        // 尝试通过 GetTaskPane 直接通知 Panel 刷新 UI
         // 如果 GetTaskPane.contentWindow 不可用（不同 WPS 版本或安全限制），
-        // Taskpane 的轮询机制会在 1-2 秒内检测到变更
+        // Panel 的轮询机制会在 1-2 秒内检测到变更
         try {
             const app = getApp();
-            const tsId = app?.PluginStorage?.getItem('taskpane_id');
+            const tsId = app?.PluginStorage?.getItem('panel_id');
             if (tsId) {
                 // GetTaskPane 返回的 WpsTaskPane 在 WPS 实际运行时还包含 contentWindow 等 COM 属性
                 const pane = app?.GetTaskPane?.(tsId);
-                if (pane?.contentWindow?.refreshTaskpaneUI) {
-                    pane.contentWindow.refreshTaskpaneUI();
-                    bgmLog(LOG_LEVELS.INFO, `[notifyUserInfoUpdated] 已通过 GetTaskPane 通知 Taskpane 刷新`);
+                if (pane?.contentWindow?.refreshPanelUI) {
+                    pane.contentWindow.refreshPanelUI();
+                    bgmLog(LOG_LEVELS.INFO, `[notifyUserInfoUpdated] 已通过 GetTaskPane 通知 Panel 刷新`);
                 }
             }
         }

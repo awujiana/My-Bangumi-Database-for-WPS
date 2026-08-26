@@ -88,7 +88,7 @@ export function readLocalFileContent(filePath) {
  * 获取本地文件路径（从 githubConfig.path 字段读取）
  *
  * 复用 githubConfig.path 字段存储本地文件路径，避免引入独立的本地文件配置存储。
- * UI 层（taskpane.html）在 sourceType === 'local' 时把 #githubPath 输入框作为文件路径输入。
+ * UI 层（panel.html）在 sourceType === 'local' 时把 #githubPath 输入框作为文件路径输入。
  *
  * @returns 文件路径字符串，未配置时返回空字符串
  */

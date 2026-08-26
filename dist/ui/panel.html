@@ -1,0 +1,589 @@
+﻿<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="dark light">
+    <meta name="theme-color" content="#11111b">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; connect-src 'self' https://api.bgm.tv https://bangumi.tv https://raw.githubusercontent.com https://api.github.com https://gitlab.com https://gitee.com">
+    <link rel="stylesheet" href="../css/styles.css">
+    <link rel="stylesheet" href="../css/preview.css">
+    <link rel="stylesheet" href="../css/panel-theme.css">
+</head>
+<body>
+    <!-- ES6 模块加载（外联，符合 CSP script-src 'self'） -->
+    <script src="../libs/purify.js"></script>
+    <script type="module" src="./panel-bootstrap.js"></script>
+    <script src="../wpsjsrpcsdk.js"></script>
+
+    <div class="global">
+        <!-- ===================== 顶栏 ===================== -->
+        <header class="topbar">
+            <div class="brand">
+                <div class="brand-mark" aria-hidden="true">B</div>
+                <div class="brand-text">
+                    <span class="brand-title">Bangumi 同步工具</span>
+                    <span class="brand-sub">上传同步 · 收藏回写 · 远程数据同步</span>
+                </div>
+            </div>
+            <div class="topbar-actions">
+                <button class="header-icon-btn" id="saveBtn" data-action="saveAllConfig" title="保存所有配置" aria-label="保存所有配置">
+                    <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M13.5 11.5V12a3 3 0 0 1-3 3h-5a3 3 0 0 1-3-3v-.5"/>
+                        <path d="M.5 8.5V8a3 3 0 0 1 3-3h.5"/>
+                        <polyline points="4 7.5 7 10.5 12 5.5"/>
+                    </svg>
+                </button>
+                <button class="header-icon-btn" id="exportBtn" data-action="exportConfig" title="导出所有配置" aria-label="导出所有配置">
+                    <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M8 12V3"/><path d="M5 6l3-3 3 3"/>
+                        <path d="M2 11v1.5A1.5 1.5 0 003.5 14h9A1.5 1.5 0 0014 12.5V11"/>
+                    </svg>
+                </button>
+                <button class="header-icon-btn" id="settingsBtn" data-action="openSettings" title="设置" aria-label="设置">
+                    <svg viewBox="0 0 16 16" width="16" height="16" fill="currentColor">
+                        <path d="M8 0a8 8 0 110 16A8 8 0 018 0zm0 1.5a6.5 6.5 0 100 13 6.5 6.5 0 000-13zM8 4a4 4 0 110 8 4 4 0 010-8zm0 1.5a2.5 2.5 0 100 5 2.5 2.5 0 000-5z"/>
+                        <path d="M8 5a3 3 0 100 6 3 3 0 000-6zm0 1a2 2 0 110 4 2 2 0 010-4z"/>
+                    </svg>
+                </button>
+                <button class="header-icon-btn" id="closeBtn" data-action="closePanel" title="关闭面板" aria-label="关闭面板">
+                    <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+                        <line x1="4" y1="4" x2="12" y2="12"/><line x1="12" y1="4" x2="4" y2="12"/>
+                    </svg>
+                </button>
+            </div>
+        </header>
+
+        <!-- ===================== 侧栏（导航 + 账户卡） ===================== -->
+        <aside class="sidebar">
+            <div class="side-card">
+                <div class="user-profile" id="userProfile" style="display:none;">
+                    <div class="avatar-container">
+                        <img id="userAvatar" class="user-avatar" src="" alt="用户头像" />
+                    </div>
+                    <div class="user-info">
+                        <span id="userNameDisplay" class="user-name"></span>
+                        <span id="userIdDisplay" class="user-id"></span>
+                        <span id="profileExpiresDisplay" class="profile-expires" style="display:none;"></span>
+                    </div>
+                </div>
+                <div class="token-status-line" id="sidebarTokenLine" style="display:none;">
+                    <span id="userIdStatus">未设置</span>
+                </div>
+                <p class="hint" id="sidebarHint" style="margin-top:8px;">未登录：点击右上角或下方「Token 设置」配置 Access Token</p>
+            </div>
+
+            <nav class="nav" aria-label="功能导航">
+                <div class="nav-label">功能导航</div>
+                <a href="#sec-account"><span class="nav-ico">🔑</span>账户与凭证</a>
+                <a href="#sec-scope"><span class="nav-ico">🎯</span>同步范围与选择</a>
+                <a href="#sec-strategy"><span class="nav-ico">⚖️</span>同步策略</a>
+                <a href="#sec-remote"><span class="nav-ico">📥</span>远程数据同步</a>
+                <a href="#sec-preview"><span class="nav-ico">📋</span>数据预览</a>
+                <a href="#sec-records"><span class="nav-ico">📊</span>记录与日志</a>
+                <a href="#sec-help"><span class="nav-ico">📖</span>帮助与格式</a>
+            </nav>
+        </aside>
+
+        <!-- ===================== 主区 ===================== -->
+        <main class="main">
+            <!-- 核心操作指令中心（视觉焦点） -->
+            <section class="command-center" aria-label="核心操作">
+                <div class="command-head">
+                    <div class="command-title">开始同步</div>
+                    <div class="command-desc">选择一种操作：将 Excel 观看记录上传至 Bangumi，或从 Bangumi 回写收藏、拉取远程资料数据。</div>
+                </div>
+                <div class="command-actions">
+                    <button class="bgm-btn primary" id="syncBtn" data-action="sync">📤 上传同步</button>
+                    <button class="bgm-btn" data-action="testSelected">📋 选中行同步</button>
+                    <button class="bgm-btn success" data-action="syncCollectionFromBgm">📥 收藏回写</button>
+                    <button class="bgm-btn" data-action="previewSyncContent">👁️ 预览同步</button>
+                </div>
+            </section>
+
+            <div class="content-grid">
+                <!-- 账户与凭证 -->
+                <section class="section" id="sec-account">
+                    <h3>🔑 账户与凭证</h3>
+
+                    <div class="form-group">
+                        <label>Token 设置</label>
+                        <div class="token-display">
+                            <div class="token-status-info">
+                                <span id="tokenStatus">未设置</span>
+                                <span id="tokenExpiresDisplay" class="token-expires" style="display:none;"></span>
+                            </div>
+                            <div class="token-buttons">
+                                <button class="bgm-btn small" data-action="showTokenDialog">设置/修改</button>
+                                <button class="bgm-btn small" data-action="copyToken" aria-label="复制 Token 到剪贴板">📋 复制</button>
+                                <button class="bgm-btn small" data-action="clearToken">清除</button>
+                                <button class="bgm-btn small primary" data-action="testToken">测试</button>
+                            </div>
+                        </div>
+                        <div class="bgm-btn-group bgm-btn-row" style="margin-top:8px;">
+                            <button class="bgm-btn small" data-action="exportConfig" style="flex:1;">📤 导出配置</button>
+                            <button class="bgm-btn small" data-action="importConfig" style="flex:1;">📥 导入配置</button>
+                        </div>
+                        <p class="hint">Access Token 获取方式：<a href="#" data-action="openTokenPage">点击创建</a><br>
+                        Token 以明文存储以便复制使用，关闭文档后会随插件存储清除</p>
+                    </div>
+
+                    <div class="form-group" style="margin-top:6px;">
+                        <label>收藏页面访问</label>
+                        <div class="token-display">
+                            <span id="userIdStatus">未设置</span>
+                            <button class="bgm-btn small" data-action="showUserIdDialog">设置用户ID</button>
+                            <button class="bgm-btn small primary" data-action="openUserCollection">打开收藏页</button>
+                        </div>
+                        <p class="hint">用户ID：Bangumi 主页 URL 中的数字 / 字母</p>
+                    </div>
+                </section>
+
+                <!-- 同步范围与选择 -->
+                <section class="section" id="sec-scope">
+                    <h3>🎯 同步范围与选择</h3>
+
+                    <div class="form-group">
+                        <label>收藏列表类型</label>
+                        <select id="listTypeSelect" class="input">
+                            <option value="collect">已看（Collect）</option>
+                            <option value="wish">想看（Wish）</option>
+                            <option value="do">在看（Do）</option>
+                        </select>
+                        <p class="hint">collect - 已看完的番剧 · wish - 想看 · do - 正在追</p>
+                    </div>
+
+                    <div class="form-group">
+                        <label>收藏回写数据源</label>
+                        <select id="writebackSourceSelect" class="input">
+                            <option value="api" selected>Bangumi API（推荐）</option>
+                            <option value="github">GitHub 仓库</option>
+                        </select>
+                        <p class="hint">Excel 为空时，先从该数据源填充再标记收藏状态。</p>
+                        <div class="bgm-btn-group">
+                            <button class="bgm-btn small primary" data-action="saveWritebackSource">💾 保存</button>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label>数据选择</label>
+                        <div class="mode-selector">
+                            <label class="radio-label">
+                                <input type="radio" name="selectMode" value="auto" checked>
+                                <span class="radio-text">🤖 自动模式</span>
+                                <span class="radio-desc">自动识别筛选后的可见数据</span>
+                            </label>
+                            <label class="radio-label">
+                                <input type="radio" name="selectMode" value="manual">
+                                <span class="radio-text">✋ 手动选择</span>
+                                <span class="radio-desc">手动指定起始和结束行号</span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label>选择工作簿</label>
+                        <select id="workbookSelect" class="input" style="flex:1;">
+                            <option value="">-- 当前活动工作簿 --</option>
+                        </select>
+                        <div class="sheet-select-row">
+                            <button class="bgm-btn small" data-action="refreshWorkbooks" aria-label="刷新工作簿列表">🔄 刷新</button>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label>选择工作表</label>
+                        <select id="sheetSelect" class="input" style="flex:1;">
+                            <option value="">-- 请选择 --</option>
+                        </select>
+                        <div class="sheet-select-row">
+                            <button class="bgm-btn small" data-action="refreshSheets" aria-label="刷新工作表列表">🔄 刷新</button>
+                            <button class="bgm-btn small" id="lockSheetBtn" data-action="toggleSheetLock" aria-label="锁定或解锁当前工作表">🔒 锁定</button>
+                            <span id="lockStatus" class="lock-status" style="display:none;"></span>
+                            <button class="bgm-btn small" data-action="cleanLockedDataSheet" title="去除无 Bangumi URL 的重复行，合并标签/分级">🧹 数据清洗</button>
+                        </div>
+                    </div>
+
+                    <div id="manualRangeInputs" style="display:none;">
+                        <div class="form-group">
+                            <label>起始行号</label>
+                            <input type="number" id="startRow" class="input" value="2" min="2" placeholder="从第几行开始">
+                        </div>
+                        <div class="form-group">
+                            <label>结束行号</label>
+                            <input type="number" id="endRow" class="input" value="0" min="0" placeholder="0=到最后一行">
+                        </div>
+                    </div>
+
+                    <div id="autoRangeInfo" class="range-info">
+                        <span class="info-icon">ℹ️</span>
+                        <span id="filterStatus">正在检测筛选状态...</span>
+                    </div>
+                    <button class="bgm-btn" data-action="refreshData">🔄 刷新数据</button>
+                </section>
+
+                <!-- 同步策略 -->
+                <section class="section" id="sec-strategy">
+                    <h3>⚖️ 同步策略</h3>
+                    <div class="form-group">
+                        <label>冲突处理策略</label>
+                        <select id="conflictStrategy" class="input">
+                            <option value="skip" selected>跳过冲突（保留 Bangumi 数据）</option>
+                            <option value="excel">Excel 覆盖（用 Excel 数据覆盖）</option>
+                        </select>
+                        <p class="hint">当 Excel 条目与 Bangumi 收藏状态不一致时，自动按所选策略处理。</p>
+                    </div>
+                    <label class="check-row" style="margin:8px 0;padding:10px 12px;background:var(--bg-surface);border-radius:var(--r-md);font-size:var(--fs-body);color:var(--text-1);cursor:pointer;">
+                        <input type="checkbox" id="chkIncremental" style="cursor:pointer;width:16px;height:16px;accent-color:var(--primary);">
+                        <span>仅同步变更（增量同步）</span>
+                    </label>
+                </section>
+
+                <!-- 远程数据同步 -->
+                <section class="section" id="sec-remote">
+                    <h3>📥 数据同步（远程仓库 → 本地）</h3>
+                    <p class="hint">从远程仓库下载 Bangumi 资料数据（名称、标签、集数等），按 SID 增量合并到当前工作表（新增+更新，不删除）。<br>
+                    与「📤 上传同步」方向相反：上传同步是 Excel→Bangumi，数据同步是 远程仓库→Excel。</p>
+
+                    <div class="form-row">
+                        <label for="syncSourceType">同步源类型</label>
+                        <select id="syncSourceType" title="选择数据源">
+                            <option value="github">GitHub</option>
+                            <option value="gitlab">GitLab</option>
+                            <option value="gitee">Gitee</option>
+                            <option value="local">📁 本地文件</option>
+                            <option value="gist">Gist</option>
+                        </select>
+                    </div>
+
+                    <div id="remoteSourceFields">
+                        <div class="form-row">
+                            <label for="githubOwner">仓库所有者</label>
+                            <input type="text" id="githubOwner" placeholder="如：awujiana" autocomplete="off" spellcheck="false"/>
+                        </div>
+                        <div class="form-row">
+                            <label for="githubRepo">仓库名</label>
+                            <input type="text" id="githubRepo" placeholder="如：Bangumi-Archive-Anime-Excel" autocomplete="off" spellcheck="false"/>
+                        </div>
+                        <div class="form-row">
+                            <label for="githubBranch">分支名</label>
+                            <input type="text" id="githubBranch" placeholder="默认 main" autocomplete="off" spellcheck="false"/>
+                        </div>
+                        <div class="form-row">
+                            <label for="githubPath">文件路径</label>
+                            <input type="text" id="githubPath" placeholder="如：data/bangumi.jsonl" autocomplete="off" spellcheck="false"/>
+                        </div>
+                    </div>
+
+                    <div id="localFileFields" style="display:none;">
+                        <div class="form-row">
+                            <label for="localFilePath">本地文件路径</label>
+                            <div style="display:flex;gap:6px;align-items:center;flex:1;min-width:0;">
+                                <input type="text" id="localFilePath" placeholder="如：D:\data\bangumi.jsonl（绝对路径）" autocomplete="off" spellcheck="false" style="flex:1;"/>
+                                <button class="bgm-btn small" data-action="browseLocalFile" title="选择本地 JSONL 文件">📁 选择</button>
+                            </div>
+                        </div>
+                        <p class="hint">支持 .jsonl 和 .json 文件；复用 #githubPath 字段存储路径（与远程源互斥）。</p>
+                    </div>
+
+                    <div id="gistFields" style="display:none;">
+                        <div class="form-row">
+                            <label for="gistId">Gist ID</label>
+                            <input type="text" id="gistId" placeholder="如：abc123def456（Gist URL 末段）" autocomplete="off" spellcheck="false"/>
+                        </div>
+                        <p class="hint">通过 <code>https://api.github.com/gists/{gistId}</code> 获取，未认证限流 60 次/小时。</p>
+                    </div>
+
+                    <div class="form-row">
+                        <label for="githubStrategy">同步策略</label>
+                        <select id="githubStrategy" title="选择增量更新策略">
+                            <option value="add-update">新增+更新（不删除）</option>
+                            <option value="add-only">仅新增（不更新已有）</option>
+                            <option value="update-only">仅更新（不新增）</option>
+                            <option value="mirror">镜像同步（含删除）</option>
+                            <option value="force-overwrite">强制覆盖（含空值）</option>
+                        </select>
+                        <button class="bgm-btn tiny" data-action="showSyncGuide" title="查看策略详细说明">❓</button>
+                    </div>
+                    <div id="mirrorSyncNote" class="hint" style="display:none;padding:8px 12px;margin:4px 0;border-left:3px solid var(--warning);background:rgba(249,226,175,0.10);border-radius:4px;color:var(--warning);font-size:12px;line-height:1.6;">
+                        ⚠️ <strong>镜像同步</strong>说明：该策略并非完全镜像远程仓库。若要完全与远程一致，需先删除本地全部数据后再同步。<br>
+                        • <strong>新增条目</strong>（writeAll=true）：正常写入所有字段<br>
+                        • <strong>更新条目</strong>：名称追加到「别名」列、标签追加到「标签/分级」列（以 <code> | </code> 分隔），其他字段直接覆盖<br>
+                        • <strong>制作公司/动画制作公司</strong>：远程「动画制作公司」字段会同时更新本地「制作公司」和「动画制作公司」两列
+                    </div>
+                    <div class="form-row">
+                        <label>
+                            <input type="checkbox" id="chkSyncSelectedOnly" />
+                            仅同步选中行（按 Bangumi URL 列匹配 SID）
+                        </label>
+                    </div>
+                    <div class="form-row time-filter-box" style="border:1px solid var(--border-strong);border-radius:var(--r-md);padding:12px;margin:8px 0;background:var(--bg-surface);">
+                        <label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-size:var(--fs-body);color:var(--text-1);padding:6px 0;border-bottom:1px dashed var(--border);margin-bottom:10px;">
+                            <input type="checkbox" id="chkTimeFilter" style="cursor:pointer;width:18px;height:18px;accent-color:var(--primary);" />
+                            <span style="font-weight:600;">✅ 启用时间筛选（按开播日期过滤）</span>
+                        </label>
+                        <div id="timeFilterControls" style="padding:8px;background:var(--bg-mantle);border-radius:var(--r-sm);display:none;">
+                            <div class="form-row time-filter-row" id="yearRow">
+                                <label for="timeFilterYear" class="time-filter-label">年份</label>
+                                <select id="timeFilterYear" class="input time-filter-select" style="flex:1;">
+                                    <option value="2026">2026</option><option value="2025">2025</option><option value="2024">2024</option>
+                                    <option value="2023">2023</option><option value="2022">2022</option><option value="2021">2021</option>
+                                    <option value="2020">2020</option><option value="2019">2019</option><option value="2018">2018</option>
+                                    <option value="2017">2017</option><option value="2016">2016</option><option value="2015">2015</option>
+                                    <option value="2014">2014</option><option value="2013">2013</option><option value="2012">2012</option>
+                                    <option value="2011">2011</option><option value="2010">2010</option>
+                                </select>
+                            </div>
+                            <div class="form-row time-filter-row">
+                                <label for="timeFilterRange" class="time-filter-label">筛选范围</label>
+                                <select id="timeFilterRange" class="input time-filter-select" style="flex:1;">
+                                    <option value="year">全年</option>
+                                    <option value="quarter">季度新番</option>
+                                    <option value="month">具体月份</option>
+                                    <option value="future">🔮 预告/未来动漫</option>
+                                </select>
+                            </div>
+                            <div class="form-row time-filter-row" id="quarterRow" style="display:none;">
+                                <label for="timeFilterQuarter" class="time-filter-label">季度</label>
+                                <select id="timeFilterQuarter" class="input time-filter-select" style="flex:1;">
+                                    <option value="1">1月新番（上年12月-本年2月）</option>
+                                    <option value="4">4月新番（3月-5月）</option>
+                                    <option value="7">7月新番（6月-8月）</option>
+                                    <option value="10">10月新番（9月-11月）</option>
+                                </select>
+                            </div>
+                            <div class="form-row time-filter-row" id="monthRow" style="display:none;">
+                                <label for="timeFilterMonth" class="time-filter-label">月份</label>
+                                <select id="timeFilterMonth" class="input time-filter-select" style="flex:1;">
+                                    <option value="1">1月</option><option value="2">2月</option><option value="3">3月</option>
+                                    <option value="4">4月</option><option value="5">5月</option><option value="6">6月</option>
+                                    <option value="7">7月</option><option value="8">8月</option><option value="9">9月</option>
+                                    <option value="10">10月</option><option value="11">11月</option><option value="12">12月</option>
+                                </select>
+                            </div>
+                            <div class="form-row time-filter-row" id="futureHintRow" style="display:none;">
+                                <p class="hint" style="margin:4px 0 0;padding:8px;background:rgba(137,180,250,0.10);border-radius:var(--r-sm);border:1px solid rgba(137,180,250,0.3);">
+                                    📌 将筛选所有无开播日期的条目（预告/未来动漫），<br/>
+                                    <strong>不限年份</strong>，仅下载 date 字段为空的条目。
+                                </p>
+                            </div>
+                        </div>
+                        <p class="hint" style="margin-top:8px;font-size:11px;color:var(--text-3);padding:0 2px;">
+                            💡 季度划分：1月新番=上年12月~本年2月，4月新番=3月~5月，7月新番=6月~8月，10月新番=9月~11月<br/>
+                            💡 预告/未来动漫：筛选无开播日期的条目（适用于未公布播出时间的动漫）
+                        </p>
+                    </div>
+                    <div class="bgm-btn-group">
+                        <button class="bgm-btn small primary" data-action="saveGithubConfig">💾 保存配置</button>
+                        <button class="bgm-btn small" data-action="syncFromGithub">⬇️ 立即同步</button>
+                        <button class="bgm-btn small" data-action="undoLastSync">↩️ 撤销上次同步</button>
+                        <button class="bgm-btn small" data-action="testGithubConfig" title="测试配置是否可用（HEAD 请求）">🔌 测试</button>
+                        <button class="bgm-btn small" data-action="clearGithubCache" id="clearCacheBtn" title="清除本地缓存的 GitHub 数据">🗑️ 清除缓存</button>
+                    </div>
+                    <p class="hint" id="githubCacheStatus">
+                        💾 数据缓存：<span id="githubCacheStatusText">检查中...</span>
+                    </p>
+                    <p class="hint">
+                        <strong>JSONL 格式</strong>：每行一个 JSON 对象（无外层数组括号，无逗号分隔）<br>
+                        <code>{"sid":"8","name":"Code Geass R2","updatedAt":"2026-08-04","date":"2008-04-06","meta_tags":["机战","TV","日本"],"nsfw":false,"话数":"25","导演":"谷口悟朗","动画制作公司":"サンライズ","系列构成":"大河内一楼"}</code><br>
+                        基础字段：<code>sid</code>（必填）、<code>name</code>、<code>updatedAt</code>（YYYY-MM-DD）<br>
+                        扩展字段：<code>date</code>、<code>meta_tags</code>、<code>nsfw</code>、<code>话数</code>、<code>导演</code>、<code>音乐</code>、<code>动画制作公司</code>、<code>系列构成</code> 等<br>
+                        默认仓库：<code>awujiana/Bangumi-Archive-Anime-Excel/main/data/bangumi.jsonl</code>
+                    </p>
+                </section>
+
+                <!-- 数据预览 -->
+                <section class="section" id="sec-preview">
+                    <h3>📋 数据预览 <span id="previewCount"></span></h3>
+                    <div class="preview-wrapper">
+                        <div class="preview-box" id="previewBox">
+                            <p class="hint">点击"刷新数据"加载预览（支持筛选后数据）</p>
+                        </div>
+                    </div>
+                    <div class="bgm-btn-group bgm-btn-row" style="margin-top:8px;">
+                        <button class="bgm-btn" id="enlargePreviewBtn" data-action="enlargePreview" style="flex:1;">
+                            <span class="bgm-btn-icon">🔍</span> 放大预览
+                        </button>
+                        <button class="bgm-btn" id="previewBtn" data-action="previewSyncContent" style="flex:1;">
+                            <span class="bgm-btn-icon">📋</span> 预览详情
+                        </button>
+                        <button class="bgm-btn success" id="syncCollectionBtn" data-action="syncCollectionFromBgm" style="flex:1;">
+                            <span class="bgm-btn-icon">📥</span> 收藏回写
+                        </button>
+                    </div>
+                </section>
+
+                <!-- 记录与日志 -->
+                <section class="section" id="sec-records">
+                    <h3>📊 记录与日志</h3>
+
+                    <div class="form-group">
+                        <label>同步记录</label>
+                        <label class="check-row" style="margin:0 0 8px;padding:10px 12px;background:var(--bg-surface);border-radius:var(--r-md);font-size:var(--fs-body);color:var(--text-1);cursor:pointer;">
+                            <input type="checkbox" id="chkEnableSyncRecord" style="cursor:pointer;width:16px;height:16px;accent-color:var(--primary);">
+                            <span>启用同步记录</span>
+                        </label>
+                        <div class="bgm-btn-group">
+                            <button class="bgm-btn" data-action="openSyncRecordSheet">
+                                <span class="bgm-btn-icon">📋</span> 查看同步记录
+                            </button>
+                            <button class="bgm-btn success" data-action="syncCollectionFromBgm">
+                                <span class="bgm-btn-icon">📥</span> 收藏回写
+                            </button>
+                            <button class="bgm-btn warning" data-action="clearSyncRecords">
+                                <span class="bgm-btn-icon">🗑️</span> 清除记录
+                            </button>
+                            <button class="bgm-btn" data-action="deduplicateSyncRecords">
+                                <span class="bgm-btn-icon">🔗</span> 去重记录
+                            </button>
+                            <button class="bgm-btn" data-action="formatSyncRecordSheet" title="自动列宽/行高 · 字体 Maple Mono · 水平居中 · 名称+收藏状态边框 · URL列固定42宽">
+                                <span class="bgm-btn-icon">🎨</span> 设置格式
+                            </button>
+                        </div>
+                        <p class="hint">同步记录会保存在"同步记录"工作表中，包含：名称、URL、SID、类型、同步时间等</p>
+                    </div>
+
+                    <div class="form-group">
+                        <label>系统日志</label>
+                        <div class="bgm-btn-group">
+                            <button class="bgm-btn small" data-action="showLogPanel">📜 查看日志</button>
+                            <button class="bgm-btn small" data-action="clearLogs">🗑️ 清空日志</button>
+                        </div>
+                        <p class="hint">查看最近 1000 条系统日志，用于排查同步失败等问题</p>
+                    </div>
+                </section>
+
+                <!-- 帮助与格式 -->
+                <section class="section" id="sec-help">
+                    <h3>📖 帮助与格式</h3>
+
+                    <div class="form-group">
+                        <label>使用引导</label>
+                        <div class="guide">
+                            <div class="step"><span class="step-num">1</span><span>设置 Token（只需设置一次）</span></div>
+                            <div class="step"><span class="step-num">2</span><span>确保 Excel 包含必填列（Bangumi_URL）</span></div>
+                            <div class="step"><span class="step-num">3</span><span>选择工作表和行范围</span></div>
+                            <div class="step"><span class="step-num">4</span><span>选择操作类型并执行</span></div>
+                        </div>
+                        <div class="bgm-btn-group" style="margin-top:8px;">
+                            <button class="bgm-btn small" data-action="toggleUsageGuide" id="toggleUsageGuideBtn">📖 显示详细操作</button>
+                        </div>
+                        <div id="usageGuideDetail" style="display:none;margin-top:10px;padding:12px;background:var(--bg-surface);border-radius:var(--r-md);border:1px solid var(--border);font-size:12px;line-height:1.7;color:var(--text-2);">
+                            <strong style="color:var(--primary);">📘 操作流程详解</strong><br><br>
+                            <strong>1️⃣ Token 设置</strong><br>
+                            • 点击「设置/修改」按钮，按引导创建 Bangumi OAuth Token<br>
+                            • Token 有效期通常为 30 天，过期后需重新获取<br>
+                            • 设置后自动显示用户头像和信息<br><br>
+                            <strong>2️⃣ 数据同步（远程仓库 → 本地 Excel）</strong><br>
+                            • 配置远程仓库地址（GitHub/GitLab/Gitee/Gist/本地文件）<br>
+                            • 选择同步策略：新增+更新 / 仅新增 / 仅更新 / 镜像同步 / 强制覆盖<br>
+                            • 可选：启用时间筛选（按开播日期过滤）<br>
+                            • 点击「立即同步」开始下载并合并数据<br><br>
+                            <strong>3️⃣ 上传同步（本地 Excel → Bangumi）</strong><br>
+                            • 确保每行包含 Bangumi_URL 列<br>
+                            • 选择行范围，设置冲突处理策略<br>
+                            • 点击「📤 上传同步」执行<br><br>
+                            <strong>4️⃣ 收藏回写（Bangumi → 本地 Excel）</strong><br>
+                            • 选择收藏类型：已看 / 想看 / 在看<br>
+                            • 点击「📥 收藏回写」标记到 Excel<br><br>
+                            <strong style="color:var(--warning);">⚠️ 注意事项</strong><br>
+                            • 镜像同步不是完全镜像！要完全与远程一致需先删除本地数据<br>
+                            • 批量操作建议先在副本上测试确认无误后再在正式数据上执行
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label>数据格式要求</label>
+                        <div class="format-table">
+                            <table>
+                                <tr><th>列名（支持模糊匹配）</th><th>说明</th><th>必填</th></tr>
+                                <tr><td>Bangumi_URL / bgm</td><td>Bangumi 条目链接</td><td class="required">✅ 必填</td></tr>
+                                <tr><td>是否看完 / 观看状态</td><td>是/否/在看</td><td></td></tr>
+                                <tr><td>完播时间 / 看完时间</td><td>如 2024-01-01</td><td></td></tr>
+                                <tr><td>打分 / 评分</td><td>1-10 分</td><td></td></tr>
+                                <tr><td>感想 / 评价 / 简评</td><td>个人评论</td><td></td></tr>
+                                <tr><td>标签 / 分类</td><td>用 | 、/ 分隔</td><td></td></tr>
+                                <tr><td>特典 / 印象</td><td>用 | 、/ 分隔</td><td></td></tr>
+                                <tr><td>集数 / 看到</td><td>如 1-12</td><td></td></tr>
+                            </table>
+                        </div>
+                    </div>
+
+                    <div class="section debug-section" id="debugSection" style="display:none;background:var(--bg-mantle);border:1px dashed var(--border-strong);">
+                        <h3>🐛 调试信息</h3>
+                        <div id="DemoSpan" class="debug-content"></div>
+                        <button class="bgm-btn small" data-action="testDebugConnection">测试连接</button>
+                    </div>
+                </section>
+            </div>
+        </main>
+    </div>
+
+    <!-- ===================== 模态框（覆盖层） ===================== -->
+    <div id="detailModal" class="detail-modal" style="display:none;">
+        <div class="detail-modal-content">
+            <div class="detail-modal-header">
+                <h3>📋 详细预览</h3>
+                <button class="detail-close-btn" data-action="closeDetailModal" aria-label="关闭详细预览对话框">×</button>
+            </div>
+            <div class="detail-modal-toolbar" id="detailModalToolbar">
+                <span id="detailCount"></span>
+            </div>
+            <div class="detail-modal-body" id="detailModalBody">
+                <div id="detailList"></div>
+            </div>
+        </div>
+    </div>
+
+    <div id="logModal" class="modal" style="display:none;">
+        <div class="modal-content" style="max-width:800px;">
+            <div class="modal-header">
+                <h3>📜 系统日志</h3>
+                <button class="modal-close-btn" data-action="closeLogModal" aria-label="关闭">×</button>
+            </div>
+            <div class="modal-body">
+                <div class="bgm-btn-group" style="flex-direction:row;gap:8px;margin-bottom:12px;">
+                    <select id="logLevelFilter" class="input" style="width:auto;">
+                        <option value="">全部级别</option>
+                        <option value="ERROR">仅 ERROR</option>
+                        <option value="WARN">仅 WARN</option>
+                        <option value="INFO">仅 INFO</option>
+                        <option value="DEBUG">仅 DEBUG</option>
+                    </select>
+                    <button class="bgm-btn small" data-action="exportLogs">📤 导出</button>
+                </div>
+                <div id="logModalBody" style="max-height:440px;overflow-y:auto;"></div>
+            </div>
+        </div>
+    </div>
+
+    <div id="syncPreviewModal" class="modal sync-preview-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>同步预览数据</h3>
+                <div class="sync-preview-modal-toolbar">
+                    <button id="syncAllBtn" class="modal-action-btn">全部同步</button>
+                    <button id="closeSyncPreview">&times;</button>
+                </div>
+            </div>
+            <div class="modal-body"></div>
+            <button id="scrollToTopBtn" class="scroll-btn scroll-to-top" title="回到顶部">↑</button>
+            <button id="scrollToBottomBtn" class="scroll-btn scroll-to-bottom" title="滚到底部">↓</button>
+        </div>
+    </div>
+
+    <div id="connectionTestModal" class="modal" style="display:none;">
+        <div class="modal-content" style="max-width:520px;">
+            <div class="modal-header">
+                <h3>🔌 连接测试结果</h3>
+                <button class="modal-close-btn" data-action="closeConnectionTest" aria-label="关闭">×</button>
+            </div>
+            <div class="modal-body" id="connectionTestBody"></div>
+            <div class="modal-footer">
+                <button class="bgm-btn small" data-action="testGithubConfig" id="retryConnectionTestBtn">🔄 重新测试</button>
+                <button class="bgm-btn small primary" data-action="closeConnectionTest">关闭</button>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

@@ -2,7 +2,7 @@
  * 任务面板 - 工作表生命周期与预览渲染
  * @module panel/panelLifecycle
  * @description 工作表锁定/解锁、表头检测、筛选状态、预览渲染等核心 UI 逻辑。
- *              从原 taskpane.ts 拆分而来，保持函数签名与行为不变。
+ *              从原 panel 模块拆分而来，保持函数签名与行为不变。
  */
 import { PANEL_CONFIG, LOG_LEVELS, getApp, bgmLog, BGM, escapeHtml, getCellValue, colNumToLetter, HEADER_KEYWORDS, IMPORTANT_COLS, showToast, getFilterStatus, getLastRow, clearSheetCache, } from '../index.js';
 import { sanitizeHtml } from '../tools/sanitize.js';

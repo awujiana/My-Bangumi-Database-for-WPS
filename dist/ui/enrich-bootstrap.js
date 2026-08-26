@@ -4,7 +4,7 @@
 //
 // 注意：此文件对应 enrich-bootstrap.ts 源文件，TypeScript 源文件位于 ui/ 目录，
 // 但不在 tsconfig.json 的 include 范围内，因此需手动维护此 .js 文件。
-// 参考 taskpane-bootstrap.js 和 settings-bootstrap.js 的模式。
+// 参考 panel-bootstrap.js 和 settings-bootstrap.js 的模式。
 import '../dist-ts/index.js';
 import '../dist-ts/core/constants.js';
 import '../dist-ts/tools/config.js';
@@ -24,7 +24,7 @@ import '../dist-ts/sync/scraping.js';
 import '../dist-ts/sync/exceltobangumi.js';
 import '../dist-ts/sync/enrichEngine.js';
 import '../dist-ts/sync/enrichRecord.js';
-import { initEnrichPage } from '../dist-ts/taskpane/enrich.js';
+import { initEnrichPage } from '../dist-ts/panel/enrichPage.js';
 
 // 模块就绪前禁用所有 data-action 按钮，避免误触发未初始化的处理逻辑
 document.querySelectorAll('button[data-action]').forEach(function (btn) {

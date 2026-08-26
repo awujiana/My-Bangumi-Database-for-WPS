@@ -4,7 +4,8 @@
  * @description 同步任务类型定义、同步结果应用到 UI（颜色标记）、写入同步记录、汇总上报。
  *              本模块定义共享类型 SyncTask / SyncResultStats，供 index.ts 使用。
  */
-import { LOG_LEVELS, SYNC_STATUS, bgmLog, BGM, getCell, BGM_COLOR } from '../../index.js';
+import { LOG_LEVELS, SYNC_STATUS, BGM_COLOR } from '../../core/constants.js';
+import { bgmLog, BGM, getCell } from '../../tools/util/index.js';
 import { addSyncRecord } from '../syncRecord.js';
 /** 观看状态类型名称映射 (优化点：提取常量) */
 export const TYPE_NAMES = {
