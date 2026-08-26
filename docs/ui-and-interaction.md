@@ -14,7 +14,7 @@ Bangumi 同步工具是一个 WPS/Excel 加载项，用于在本地 Excel 表格
 
 - 📤 **上传同步**：将 Excel 中的观看状态、评分、标签同步到 Bangumi
 - 📥 **数据同步**：从远程仓库（GitHub/GitLab/Gitee）下载 Bangumi 资料数据到 Excel
-- ↩️ **收藏回写**：从 Bangumi 拉取收藏列表标记到 Excel
+- ↩️ **收藏回写**：从 Bangumi 拉取收藏列表；工作表为空时可自动填充为 Bangumi 账号的收藏条目，再标记到 Excel
 
 **界面模式**：采用"主面板 + 设置面板"的双面板任务窗格（Task Pane）设计，支持动态位置协调。
 
@@ -94,7 +94,7 @@ showSettingsPanel() 调用时：
 
 - 📤 **上传同步**：将 Excel 数据同步至 Bangumi API
 - 📋 **选中行同步**：仅同步当前选中的单元格范围
-- 📥 **收藏回写**：从 Bangumi 拉取收藏列表标记到 Excel
+- 📥 **收藏回写**：从 Bangumi 拉取收藏列表；工作表为空时先自动填充 Bangumi 账号收藏条目，再标记到 Excel
 - 👁️ **预览同步**：弹窗形式预览即将同步的数据
 
 #### B. Token 设置区

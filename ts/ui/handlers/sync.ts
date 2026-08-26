@@ -31,6 +31,8 @@ import {
   BGM_COLOR,
   COLLECTION_TYPE_NAMES,
   BGM_SUBJECT_TYPES,
+  setCellValue,
+  clearSheetCache,
   showSyncProgressDialog,
   updateSyncProgressDialog,
   completeSyncProgressDialog,
@@ -41,6 +43,7 @@ import {
   formatDuration,
 } from '../../index.js'
 import { getSyncPreview, detectConflicts } from '../../services/ribbonService.js'
+import { ensureSheetHeaders } from '../../tools/util/index.js'
 import type { WpsApplication, WpsWorksheet } from '../../tools/wps.js'
 
 import { _T } from './_constants.js'
@@ -55,6 +58,9 @@ interface BangumiCollectionItem {
   subject_id: number
   subject_type?: number
   type?: number
+  rate?: number
+  tags?: string[]
+  comment?: string
   subject?: {
     name_cn?: string
     name?: string
@@ -76,6 +82,88 @@ type SyncPreparedData = {
   syncSheet: WpsWorksheet | null
   app: WpsApplication
   startTime: number
+}
+
+/**
+ * 将 Bangumi 收藏列表填充到空工作表。
+ * 仅写入 colMap 中存在的列，避免向不存在的列写入。
+ * @returns 实际写入的数据行数
+ */
+async function _fillSheetWithCollections(
+  ws: WpsWorksheet,
+  collections: BangumiCollectionItem[],
+  headerRow: number,
+  colMap: Map<string, number>,
+): Promise<number> {
+  let written = 0
+  const total = collections.length
+
+  for (let i = 0; i < total; i++) {
+    const item = collections[i]
+    if (!item || !item.subject_id) continue
+
+    const row = headerRow + 1 + i
+    const subject = item.subject
+    const name = subject?.name_cn || subject?.name || ''
+    const alias = subject?.name_cn && subject?.name ? subject.name : ''
+    const url = `https://bgm.tv/subject/${item.subject_id}`
+
+    const writes: { col: number; value: unknown }[] = []
+
+    const seqCol = colMap.get('序列号')
+    if (seqCol !== undefined) writes.push({ col: seqCol, value: i + 1 })
+
+    const nameCol = colMap.get('名称')
+    if (nameCol !== undefined && name) writes.push({ col: nameCol, value: name })
+
+    const aliasCol = colMap.get('别名')
+    if (aliasCol !== undefined && alias) writes.push({ col: aliasCol, value: alias })
+
+    const urlCol = colMap.get('Bangumi_URL')
+    if (urlCol !== undefined) writes.push({ col: urlCol, value: url })
+
+    const categoryCol = colMap.get('类别')
+    if (categoryCol !== undefined) {
+      writes.push({ col: categoryCol, value: BGM_SUBJECT_TYPES[item.subject_type || 2] ?? '' })
+    }
+
+    const finishedCol = colMap.get('是否看完')
+    if (finishedCol !== undefined) {
+      // type 2 = 看过，视为已看完；其余状态视为未看完
+      writes.push({ col: finishedCol, value: item.type === 2 ? '是' : '否' })
+    }
+
+    const scoreCol = colMap.get('打分')
+    if (scoreCol !== undefined && item.rate != null)
+      writes.push({ col: scoreCol, value: item.rate })
+
+    const tagsCol = colMap.get('标签/分级')
+    if (tagsCol !== undefined && item.tags && item.tags.length > 0) {
+      writes.push({ col: tagsCol, value: item.tags.join(', ') })
+    }
+
+    const commentCol = colMap.get('剧透/感言')
+    if (commentCol !== undefined && item.comment) {
+      writes.push({ col: commentCol, value: item.comment })
+    }
+
+    let rowOk = true
+    for (const { col, value } of writes) {
+      if (!setCellValue(ws, row, col, value)) {
+        rowOk = false
+      }
+    }
+    if (rowOk) written++
+
+    // 每 50 行更新一次状态并让出事件循环，避免 UI 卡死
+    if ((i + 1) % 50 === 0) {
+      setStatus(`正在填充收藏数据：${i + 1}/${total}`, 'info')
+      await new Promise((resolve) => setTimeout(resolve, 0))
+    }
+  }
+
+  setStatus(`收藏数据填充完成：${written}/${total}`, 'info')
+  return written
 }
 
 // ========== 从面板同步（异步，带进度条） ==========
@@ -528,7 +616,6 @@ export async function syncFromBgmByAPI(sheetIndex: number): Promise<void> {
 
 async function _doAPISync(sheetIndex: number, token: string): Promise<void> {
   const syncStartTs = Date.now()
-  setStatus('正在获取收藏列表...', 'info')
 
   // 记住原始活动工作表
   const app = getApp()
@@ -556,23 +643,7 @@ async function _doAPISync(sheetIndex: number, token: string): Promise<void> {
 
   const ws = app.ActiveWorkbook.Worksheets.Item(sheetIndex)
 
-  const headerRow = typeof findHeaderRow === 'function' ? findHeaderRow(ws) : 1
-  const colMap =
-    typeof getColumnMap === 'function' ? getColumnMap(ws, headerRow) : new Map<string, number>()
-  if (!colMap.has('Bangumi_URL')) {
-    showAlert('未找到 Bangumi URL 列！')
-    return
-  }
-
-  const lastRow = typeof getLastRow === 'function' ? getLastRow(ws) : 200
-  const rowsToProcess: number[] = []
-  for (let r = headerRow + 1; r <= lastRow; r++) rowsToProcess.push(r)
-
-  if (rowsToProcess.length === 0) {
-    showAlert('没有需要处理的数据行！')
-    return
-  }
-
+  // 1. 验证 Token 并获取收藏列表
   setStatus('正在验证 Token...', 'info')
   const verifyResult = await verifyToken(token)
   if (!verifyResult.valid) {
@@ -583,6 +654,75 @@ async function _doAPISync(sheetIndex: number, token: string): Promise<void> {
 
   setStatus('正在获取收藏列表...', 'info')
   const userCollections = await fetchAllUserCollections(token)
+
+  // 2. 解析表头与空表检测
+  let headerRow = typeof findHeaderRow === 'function' ? findHeaderRow(ws) : 1
+  let colMap =
+    typeof getColumnMap === 'function' ? getColumnMap(ws, headerRow) : new Map<string, number>()
+  let lastRow = typeof getLastRow === 'function' ? getLastRow(ws) : 200
+
+  // 空表时提供从 Bangumi API 自动填充
+  if (lastRow <= headerRow || headerRow === 0) {
+    if (userCollections.length === 0) {
+      bgmLog(LOG_LEVELS.INFO, '[_doAPISync] 工作表为空且 Bangumi 账号无收藏数据')
+      showAlert('当前工作表为空，且 Bangumi 账号暂无收藏数据，无法填充。')
+      return
+    }
+
+    const confirmed = await new Promise<boolean>((resolve) => {
+      showConfirm(
+        `当前工作表为空，是否从 Bangumi 收藏列表自动填充 ${userCollections.length} 条条目？`,
+        (confirmed) => resolve(confirmed),
+      )
+    })
+    if (!confirmed) {
+      bgmLog(LOG_LEVELS.INFO, '[_doAPISync] 用户取消空表填充')
+      return
+    }
+
+    // 缺少表头时先写入标准表头
+    if (headerRow === 0 || !colMap.has('Bangumi_URL')) {
+      if (typeof ensureSheetHeaders !== 'function' || !ensureSheetHeaders(ws)) {
+        showAlert('工作表为空且无法写入标准表头，请检查工作表状态。')
+        return
+      }
+      clearSheetCache(ws)
+      headerRow = findHeaderRow(ws)
+      colMap = getColumnMap(ws, headerRow)
+      if (headerRow === 0 || !colMap.has('Bangumi_URL')) {
+        showAlert('写入标准表头后仍未找到 Bangumi URL 列，请检查模板。')
+        return
+      }
+    }
+
+    setStatus('正在填充收藏数据到 Excel...', 'info')
+    const filledCount = await _fillSheetWithCollections(ws, userCollections, headerRow, colMap)
+    if (filledCount === 0) {
+      showAlert('未能写入任何收藏数据，请检查工作表是否可编辑。')
+      return
+    }
+    bgmLog(LOG_LEVELS.INFO, `[_doAPISync] 空表填充完成：${filledCount}/${userCollections.length}`)
+
+    // 重新计算待处理行
+    clearSheetCache(ws)
+    lastRow = typeof getLastRow === 'function' ? getLastRow(ws, true, headerRow) : lastRow
+    headerRow = typeof findHeaderRow === 'function' ? findHeaderRow(ws) : headerRow
+    colMap = typeof getColumnMap === 'function' ? getColumnMap(ws, headerRow) : colMap
+  }
+
+  // 3. 必须有 Bangumi_URL 列
+  if (!colMap.has('Bangumi_URL')) {
+    showAlert('未找到 Bangumi URL 列！')
+    return
+  }
+
+  const rowsToProcess: number[] = []
+  for (let r = headerRow + 1; r <= lastRow; r++) rowsToProcess.push(r)
+
+  if (rowsToProcess.length === 0) {
+    showAlert('没有需要处理的数据行！')
+    return
+  }
 
   const collectionMap = new Map<string, BangumiCollectionItem>()
   userCollections.forEach((c) => collectionMap.set(String(c.subject_id), c))
