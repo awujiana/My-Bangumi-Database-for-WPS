@@ -214,6 +214,8 @@ _fetchBgmUserInfo,
 showBangumiPanel, 
 // 显示设置面板（带动态停靠位置）
 showSettingsPanel, 
+// 显示新番表富化面板
+showEnrichPanel, 
 // 等待指定毫秒数
 sleep, 
 // 延迟执行（用于模拟异步操作）
@@ -269,7 +271,7 @@ export { refreshSheets, refreshWorkbooks, toggleSheetLock,
 // 刷新数据预览
 refreshData, 
 // 放大预览表格
-enlargePreview, } from './taskpane.js';
+enlargePreview, } from './panel/panelPage.js';
 // 预览函数
 export { 
 // 显示预览内容
@@ -300,4 +302,34 @@ export { showSyncResultDialog, hideSyncResultDialog, computeDateStatsFromSheet, 
 // 21. JSONL 导出（来自 sync/exportJsonl.js）
 // ============================================================================
 export { exportSheetToJsonlFile, buildJsonlFromSheet } from './sync/exportJsonl.js';
-//# sourceMappingURL=index.js.map
+// ============================================================================
+// 22. 新番表富化引擎（来自 sync/enrichEngine.js + sync/enrichRecord.js）
+// ============================================================================
+export { 
+// 富化引擎核心函数
+detectColumns, matchEntries, enrichEntries, normalizeName, mergeTags, splitTags, splitAliases, appendFeatures, findAliasColumn, getBangumiColumnMap, readNewAnimeRow, enrichTags, enrichDate, enrichEpisodes, enrichFeatures, 
+// 简介工作表富化函数（第二阶段）
+enrichIntroData, enrichOpEdPv, readIntroSheetRow, isIntroSheet, 
+// 别名富化函数
+enrichAlias, 
+// 冲突解决函数
+resolveConflictField, 
+// 列管理函数
+ensureBangumiColumns, 
+// 搜索与查询函数
+searchSheet, 
+// 远程仓库函数
+fetchRemoteFile, parseRemoteContent, writeRemoteDataToSheet, } from './sync/enrichEngine.js';
+export { 
+// 富化记录表函数
+getOrCreateEnrichRecordSheet, getEnrichRecordSheetIfExists, getAllEnrichRecords, addEnrichRecord, addEnrichRecords, clearEnrichRecords, openEnrichRecordSheet, formatEnrichRecordSheet, 
+// 富化记录表常量
+ENRICH_RECORD_SHEET_NAME, ENRICH_RECORD_COLUMNS, ENRICH_RECORD_COL, } from './sync/enrichRecord.js';
+// ============================================================================
+// 23. 富化页面 UI 控制器（来自 taskpane/enrich.js）
+// ============================================================================
+export { initEnrichPage, selectNewAnimeFile, autoDetectHeader, previewMatch, startEnrichment, cancelEnrichment, openEnrichRecordSheet as openEnrichRecordSheetFromPage, clearRecords, } from './panel/enrichPage.js';
+// ============================================================================
+// 24. 富化工作簿锁定（来自 sync/enrichLock.js）
+// ============================================================================
+export { refreshEnrichWorkbooks, refreshEnrichSheets, toggleEnrichWorkbookLock, updateEnrichLockButton, saveEnrichLockedWorkbook, restoreEnrichLockedWorkbook, getLockedEnrichSheet, findWorkbookByName, findSheetInWorkbook, initEnrichLock, } from './sync/enrichLock.js';

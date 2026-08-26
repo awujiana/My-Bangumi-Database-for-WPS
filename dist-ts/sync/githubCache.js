@@ -142,4 +142,3 @@ export function getCacheAge(cache) {
         return `${Math.floor(diff / 3_600_000)} 小时前`;
     return `${Math.floor(diff / 86_400_000)} 天前`;
 }
-//# sourceMappingURL=githubCache.js.map

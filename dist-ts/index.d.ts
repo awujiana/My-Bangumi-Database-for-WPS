@@ -28,7 +28,7 @@ export { syncFromGithub, fetchGithubJson, readLocalEntriesForSync, applyDiffToSh
 export { syncFromRemote, registerSyncSource, getSyncSource, getRegisteredSourceTypes, isSyncSourceRegistered, } from './sync/syncSourceRegistry.js';
 export { computeDiff, tagsToString, SYNC_STRATEGY_LABELS, type GithubRemoteEntry, type GithubSyncDiff, type GithubSyncDetailItem, type LocalRowEntry, type SyncStrategy, type SyncTimeFilter, } from './sync/githubSyncDiff.js';
 export { getGithubConfig, setGithubConfig, isGithubConfigComplete, buildRawUrl, getSyncStrategy, setSyncStrategy, getSyncSourceType, setSyncSourceType, DEFAULT_GITHUB_CONFIG, type GithubSyncConfig, type SyncSourceType, } from './sync/githubConfig.js';
-export { bgmLog, getApp, colNumToLetter, getCell, getCellValue, setCellValue, getSheetByIndex, escapeHtml, storeBgToken, clearBgToken, loadBgToken, storeTokenExpires, loadTokenExpires, clearTokenExpires, getTokenRemainingTime, copyTokenToClipboard, _getBgmUserId, _setBgmUserId, _getBgmUsername, _setBgmUsername, fetchBgmUserInfo, trim, BGM, _getUserApiPath, _fetchBgmUserInfo, showBangumiPanel, showSettingsPanel, sleep, delay, readRangeValues, getColumnMap, cacheGet, clearSheetCache, getLastRow, isEmptyValue, getDataSheet, findHeaderRow, shellExecuteByOAAssist, getUrlPath, calcFingerprint, } from './tools/util.js';
+export { bgmLog, getApp, colNumToLetter, getCell, getCellValue, setCellValue, getSheetByIndex, escapeHtml, storeBgToken, clearBgToken, loadBgToken, storeTokenExpires, loadTokenExpires, clearTokenExpires, getTokenRemainingTime, copyTokenToClipboard, _getBgmUserId, _setBgmUserId, _getBgmUsername, _setBgmUsername, fetchBgmUserInfo, trim, BGM, _getUserApiPath, _fetchBgmUserInfo, showBangumiPanel, showSettingsPanel, showEnrichPanel, sleep, delay, readRangeValues, getColumnMap, cacheGet, clearSheetCache, getLastRow, isEmptyValue, getDataSheet, findHeaderRow, shellExecuteByOAAssist, getUrlPath, calcFingerprint, } from './tools/util.js';
 export { CONFIG_KEYS, setConfig, getConfig, removeConfig, setIncrementalSync, getIncrementalSync, setSkipConflicts, getSkipConflicts, setSyncRecordEnabled, getSyncRecordEnabled, } from './tools/config.js';
 export { autoFillUrls, showAutoFillUrlDialog, type AutoFillResult, type NameUrlMap, } from './tools/autoFillUrl.js';
 export interface BGMCache {
@@ -135,7 +135,7 @@ export interface EnrichWorkbookState {
     /** 是否已锁定 */
     isLocked: boolean;
 }
-export { refreshSheets, refreshWorkbooks, toggleSheetLock, refreshData, enlargePreview, } from './taskpane.js';
+export { refreshSheets, refreshWorkbooks, toggleSheetLock, refreshData, enlargePreview, } from './panel/panelPage.js';
 export type { DetailItem, PreviewItem, DetailPreviewData, } from './ui/preview.js';
 export { previewSyncContent, closeDetailModal, syncAllRows, } from './ui/preview.js';
 export { isWpsApp, isWpsWorksheet, isWpsRange, wpsMsgBox, } from './tools/wps.js';
@@ -144,16 +144,8 @@ export { detectConflicts, getSyncPreview, detectGithubConflicts, type Conflict, 
 export { showConflictResolver } from './ui/conflictResolver.js';
 export { showSyncResultDialog, hideSyncResultDialog, computeDateStatsFromSheet, formatDuration, type DateStats, type SyncResultDialogOptions, } from './ui/syncResultDialog.js';
 export { exportSheetToJsonlFile, buildJsonlFromSheet } from './sync/exportJsonl.js';
-export {
-    refreshEnrichWorkbooks,
-    refreshEnrichSheets,
-    toggleEnrichWorkbookLock,
-    updateEnrichLockButton,
-    saveEnrichLockedWorkbook,
-    restoreEnrichLockedWorkbook,
-    getLockedEnrichSheet,
-    findWorkbookByName,
-    findSheetInWorkbook,
-    initEnrichLock,
-} from './sync/enrichLock.js';
+export { detectColumns, matchEntries, enrichEntries, normalizeName, mergeTags, splitTags, splitAliases, appendFeatures, findAliasColumn, getBangumiColumnMap, readNewAnimeRow, enrichTags, enrichDate, enrichEpisodes, enrichFeatures, enrichIntroData, enrichOpEdPv, readIntroSheetRow, isIntroSheet, enrichAlias, resolveConflictField, ensureBangumiColumns, searchSheet, fetchRemoteFile, parseRemoteContent, writeRemoteDataToSheet, type EnrichColumnMapping, type EnrichConfig, type MatchResult, type EnrichResultItem, type EnrichedField, type ConflictInfo, type SearchResult, type RemoteRepoConfig, type EnrichProgress, type ProgressCallback, } from './sync/enrichEngine.js';
+export { getOrCreateEnrichRecordSheet, getEnrichRecordSheetIfExists, getAllEnrichRecords, addEnrichRecord, addEnrichRecords, clearEnrichRecords, openEnrichRecordSheet, formatEnrichRecordSheet, type EnrichRecord, type AddEnrichRecordParams, ENRICH_RECORD_SHEET_NAME, ENRICH_RECORD_COLUMNS, ENRICH_RECORD_COL, } from './sync/enrichRecord.js';
+export { initEnrichPage, selectNewAnimeFile, autoDetectHeader, previewMatch, startEnrichment, cancelEnrichment, openEnrichRecordSheet as openEnrichRecordSheetFromPage, clearRecords, } from './panel/enrichPage.js';
+export { refreshEnrichWorkbooks, refreshEnrichSheets, toggleEnrichWorkbookLock, updateEnrichLockButton, saveEnrichLockedWorkbook, restoreEnrichLockedWorkbook, getLockedEnrichSheet, findWorkbookByName, findSheetInWorkbook, initEnrichLock, } from './sync/enrichLock.js';
 //# sourceMappingURL=index.d.ts.map

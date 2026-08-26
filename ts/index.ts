@@ -532,7 +532,7 @@ export {
   refreshData,
   // 放大预览表格
   enlargePreview,
-} from './taskpane.js'
+} from './panel/panelPage.js'
 // ============================================================================
 // 16. 预览模块（类型部分）
 // ============================================================================
@@ -704,7 +704,7 @@ export {
   cancelEnrichment,
   openEnrichRecordSheet as openEnrichRecordSheetFromPage,
   clearRecords,
-} from './taskpane/enrich.js'
+} from './panel/enrichPage.js'
 
 // ============================================================================
 // 24. 富化工作簿锁定（来自 sync/enrichLock.js）

@@ -168,4 +168,3 @@ export class GitlabSyncSource {
         return Result.okVoid();
     }
 }
-//# sourceMappingURL=gitlabSync.js.map

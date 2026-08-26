@@ -4,7 +4,7 @@
  * @description WPS Office 功能区按钮回调处理
  */
 import * as RibbonService from './services/ribbonService.js';
-import { WPS_ENUM, showBangumiPanel, showSettingsPanel, BGM, getIncrementalSync, getSkipConflicts, setIncrementalSync, setSkipConflicts, getSyncRecordEnabled, setSyncRecordEnabled, bgmLog, LOG_LEVELS, getApp, } from './index.js';
+import { WPS_ENUM, showBangumiPanel, showEnrichPanel, showSettingsPanel, BGM, getIncrementalSync, getSkipConflicts, setIncrementalSync, setSkipConflicts, getSyncRecordEnabled, setSyncRecordEnabled, bgmLog, LOG_LEVELS, getApp, } from './index.js';
 // 在 Ribbon 启动时通过 initRibbon() 显式注册（不在模块加载时自动执行）
 // 【正确】监听侧边栏发来的配置更新，刷新 Ribbon UI
 let _ribbonMessageHandler = null;
@@ -307,6 +307,9 @@ export function OnAction(control) {
             case 'btnOpenSettings':
                 showSettingsPanel();
                 break;
+            case 'btnOpenEnrichPanel':
+                showEnrichPanel();
+                break;
             default:
                 bgmLog(LOG_LEVELS.WARN, `[BGM] 未知按钮: ${control.Id}`);
         }
@@ -332,6 +335,7 @@ const ICON_PATHS = {
     btnSyncFromGithub: 'images/github.svg',
     btnUndoLastSync: 'images/undo.svg',
     btnOpenSettings: 'images/settings.svg',
+    btnOpenEnrichPanel: 'images/enrich.svg',
 };
 export function GetBangumiImage(control) {
     return ICON_PATHS[control.Id] || 'images/newFromTemp.svg';
@@ -346,4 +350,3 @@ ribbonWindow.OnIncrementalSyncChange = OnIncrementalSyncChange;
 ribbonWindow.OnSkipConflictsChange = OnSkipConflictsChange;
 ribbonWindow.GetEnableSyncRecordPressed = GetEnableSyncRecordPressed;
 ribbonWindow.OnEnableSyncRecordChange = OnEnableSyncRecordChange;
-//# sourceMappingURL=ribbon.js.map

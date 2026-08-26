@@ -36,9 +36,39 @@ const KNOWN_COLUMN_MAP = {
     独播: 'exclusiveCol',
     特殊: 'specialCol',
     备注: 'specialCol',
+    // 简介工作表列名
+    简介: 'introCol',
+    剧情简介: 'introCol',
+    作品简介: 'introCol',
+    介绍: 'introCol',
+    动画制作: 'studioCol',
+    制作公司: 'studioCol',
+    制作: 'studioCol',
+    导演: 'directorCol',
+    监督: 'directorCol',
+    音乐: 'musicCol',
+    配乐: 'musicCol',
+    声优: 'voiceCol',
+    声优阵容: 'voiceCol',
+    OP: 'opCol',
+    ED: 'edCol',
+    PV: 'pvCol',
+    // 简介专有列
+    编剧: 'screenplayCol',
+    脚本: 'screenplayCol',
+    人设: 'characterDesignCol',
+    人物设定: 'characterDesignCol',
+    CG导演: 'cgDirectorCol',
+    演出: 'cgDirectorCol',
+    系列构成: 'seriesCompositionCol',
+    分镜: 'storyboardCol',
+    原作: 'originalWorkCol',
+    语言: 'languageCol',
+    制片国家: 'productionCountryCol',
+    类型: 'typeCol',
 };
 /** 标签分隔符 */
-const TAG_SEPARATOR = ' / ';
+const TAG_SEPARATOR = ' | ';
 /** 特点/印象分隔符 */
 const FEATURE_SEPARATOR = ' | ';
 // ========== 辅助函数 ==========
@@ -63,7 +93,7 @@ export function splitAliases(aliasesStr) {
     if (!aliasesStr)
         return [];
     return aliasesStr
-        .split(/[|/;，、]/)
+        .split(/\s*\|\s*|\s*[;，、]\s*|\s*\/\s*/)
         .map((a) => a.trim())
         .filter((a) => a.length > 0);
 }
@@ -75,7 +105,7 @@ export function splitTags(tags) {
     if (!tags)
         return [];
     return tags
-        .split(/\s*[/,、|;]\s*|\s*TAG_SEPARATOR\s*/)
+        .split(/\s*\|\s*|\s*[,、;]\s*|\s*\/\s*/)
         .map((t) => t.trim())
         .filter((t) => t.length > 0);
 }
@@ -516,7 +546,10 @@ export function enrichEntries(newAnimeSheet, bangumiSheet, matches, config, prog
         bgmLog(LOG_LEVELS.INFO, '[enrichEntries] 无匹配结果，跳过富化');
         return results;
     }
-    const bangumiColMap = getBangumiColumnMap(bangumiSheet);
+    let bangumiColMap = getBangumiColumnMap(bangumiSheet);
+    if (isIntroSheet(config.columnMapping)) {
+        bangumiColMap = ensureBangumiColumns(bangumiSheet, bangumiColMap, INTRO_FIELD_TO_BANGUMI, config.headerRow);
+    }
     for (let i = 0; i < matches.length; i++) {
         const match = matches[i];
         if (!match)
@@ -559,13 +592,25 @@ export function enrichEntries(newAnimeSheet, bangumiSheet, matches, config, prog
             continue;
         }
         stats.matched++;
-        const newData = readNewAnimeRow(newAnimeSheet, match.newAnimeRow, config.columnMapping);
+        const isIntro = isIntroSheet(config.columnMapping);
+        const newData = isIntro
+            ? readIntroSheetRow(newAnimeSheet, match.newAnimeRow, config.columnMapping)
+            : readNewAnimeRow(newAnimeSheet, match.newAnimeRow, config.columnMapping);
         const enrichedFields = [];
+        const fieldConflicts = [];
         try {
-            enrichTags(bangumiSheet, bangumiRow, newData, bangumiColMap, enrichedFields);
-            enrichDate(bangumiSheet, bangumiRow, newData, bangumiColMap, enrichedFields);
-            enrichEpisodes(bangumiSheet, bangumiRow, newData, bangumiColMap, enrichedFields);
-            enrichFeatures(bangumiSheet, bangumiRow, newData, bangumiColMap, enrichedFields);
+            if (isIntro) {
+                enrichIntroData(bangumiSheet, bangumiRow, newData, bangumiColMap, enrichedFields, fieldConflicts, match.newAnimeRow, match.newAnimeName);
+                enrichOpEdPv(bangumiSheet, bangumiRow, newData, bangumiColMap, enrichedFields);
+            }
+            else {
+                enrichTags(bangumiSheet, bangumiRow, newData, bangumiColMap, enrichedFields);
+                enrichDate(bangumiSheet, bangumiRow, newData, bangumiColMap, enrichedFields);
+                enrichEpisodes(bangumiSheet, bangumiRow, newData, bangumiColMap, enrichedFields);
+                enrichFeatures(bangumiSheet, bangumiRow, newData, bangumiColMap, enrichedFields);
+            }
+            // 别名富化：新番表名称与 Bangumi 追踪表不一致时补全
+            enrichAlias(bangumiSheet, bangumiRow, match.newAnimeName, match.bangumiName, bangumiColMap, enrichedFields);
             const hasEnrichment = enrichedFields.some((f) => f.action !== 'skip');
             if (hasEnrichment) {
                 stats.enriched++;
@@ -593,6 +638,7 @@ export function enrichEntries(newAnimeSheet, bangumiSheet, matches, config, prog
                 name: match.newAnimeName,
                 matchType: match.matchType,
                 enrichedFields,
+                conflicts: fieldConflicts.length > 0 ? fieldConflicts : undefined,
             });
         }
         catch (e) {
@@ -624,4 +670,595 @@ export function enrichEntries(newAnimeSheet, bangumiSheet, matches, config, prog
         `跳过 ${stats.skipped}, 失败 ${stats.failed}, 耗时 ${Date.now() - startTime}ms`);
     return results;
 }
-//# sourceMappingURL=enrichEngine.js.map
+// ========== 简介工作表富化函数 ==========
+/**
+ * 简介字段 → Bangumi追踪表列名映射
+ * 键：新番表中的字段名；值：Bangumi追踪表中的列名
+ */
+const INTRO_FIELD_TO_BANGUMI = {
+    导演: '导演',
+    编剧: '脚本',
+    人设: '人物设定',
+    CG导演: '演出',
+    音乐: '音乐',
+    动画制作: '动画制作公司',
+    系列构成: '系列构成',
+    分镜: '分镜',
+    原作: '原作',
+    语言: '语言',
+    制片国家: '制片国家',
+    声优: '声优',
+};
+/** 简介字段中需追加到特点/印象的键 */
+const INTRO_FEATURE_FIELDS = new Set(['简介', 'OP', 'ED', 'PV']);
+/**
+ * 解析字段冲突：根据用户选择的 resolution 执行相应操作
+ * append: 增量更新（old | new）
+ * keep: 保留原名
+ * overwrite: 使用新番表字段的名字
+ */
+export function resolveConflictField(sheet, conflict, enriched) {
+    const { fieldName, bangumiColumn, bangumiRow, oldValue, newValue, resolution } = conflict;
+    if (resolution === 'keep') {
+        enriched.push({
+            fieldName,
+            bangumiColumn,
+            oldValue,
+            newValue,
+            action: 'skip',
+        });
+        return;
+    }
+    if (resolution === 'overwrite') {
+        setCellValue(sheet, bangumiRow, bangumiColumn, newValue);
+        enriched.push({
+            fieldName,
+            bangumiColumn,
+            oldValue,
+            newValue,
+            action: 'fill',
+        });
+        return;
+    }
+    if (resolution === 'append') {
+        if (oldValue.includes(' | ') || oldValue.includes('|')) {
+            const parts = oldValue
+                .split(/\s*\|\s*/)
+                .map((s) => s.trim())
+                .filter(Boolean);
+            if (!parts.includes(newValue)) {
+                const merged = parts.join(TAG_SEPARATOR) + TAG_SEPARATOR + newValue;
+                setCellValue(sheet, bangumiRow, bangumiColumn, merged);
+                enriched.push({
+                    fieldName,
+                    bangumiColumn,
+                    oldValue,
+                    newValue: merged,
+                    action: 'append',
+                });
+            }
+            else {
+                enriched.push({
+                    fieldName,
+                    bangumiColumn,
+                    oldValue,
+                    newValue,
+                    action: 'skip',
+                });
+            }
+        }
+        else {
+            const merged = oldValue + TAG_SEPARATOR + newValue;
+            setCellValue(sheet, bangumiRow, bangumiColumn, merged);
+            enriched.push({
+                fieldName,
+                bangumiColumn,
+                oldValue,
+                newValue: merged,
+                action: 'append',
+            });
+        }
+    }
+}
+/**
+ * 需要标注的字段映射白名单（只有这些映射会添加括号）
+ * 格式: "源字段名→目标列名"
+ */
+const ANNOTATED_FIELD_MAPPINGS = new Set(['编剧→脚本', '人设→人物设定', 'CG导演→演出']);
+/**
+ * 获取带字段名标注的值
+ * 当源字段名与 Bangumi 列名不同时，只有在白名单中的映射才追加 (源字段名) 后缀
+ * 空值不添加标注
+ */
+function getAnnotatedValue(sourceKey, targetColName, value) {
+    if (!value)
+        return value;
+    if (sourceKey === targetColName)
+        return value;
+    const mappingKey = `${sourceKey}→${targetColName}`;
+    if (!ANNOTATED_FIELD_MAPPINGS.has(mappingKey))
+        return value;
+    return `${value}(${sourceKey})`;
+}
+/**
+ * 检查并添加缺失的列到 Bangumi 追踪表
+ * 返回更新后的列映射
+ */
+export function ensureBangumiColumns(sheet, colMap, requiredFields, headerRow) {
+    const updatedMap = new Map(colMap);
+    let maxCol = 0;
+    for (const col of Array.from(updatedMap.values())) {
+        if (col > maxCol)
+            maxCol = col;
+    }
+    const missing = [];
+    for (const [sourceKey, targetName] of Object.entries(requiredFields)) {
+        if (!updatedMap.has(targetName)) {
+            missing.push({ field: targetName, sourceKey });
+        }
+    }
+    if (missing.length === 0)
+        return updatedMap;
+    try {
+        // 复制现有表头样式
+        const existingStyleCol = maxCol > 0 ? 1 : maxCol + 1;
+        const styleSourceRange = sheet.Range(`${WpsCellRef(headerRow, existingStyleCol)}:${WpsCellRef(headerRow, existingStyleCol)}`);
+        let templateFont = null;
+        let templateInterior = null;
+        try {
+            templateFont = styleSourceRange.Font;
+            templateInterior = styleSourceRange.Interior;
+        }
+        catch {
+            bgmLog(LOG_LEVELS.WARN, '[ensureBangumiColumns] 无法获取样式模板');
+        }
+        // 创建新列表头
+        const headerRange = sheet.Range(`${WpsCellRef(headerRow, maxCol + 1)}:${WpsCellRef(headerRow, maxCol + missing.length)}`);
+        const headers = [];
+        for (const m of missing) {
+            headers.push([m.field]);
+        }
+        headerRange.Value = headers;
+        // 应用样式到新列
+        try {
+            if (templateFont) {
+                const newFont = headerRange.Font;
+                if (newFont) {
+                    newFont.Name = templateFont.Name;
+                    newFont.Size = templateFont.Size;
+                    newFont.Bold = templateFont.Bold;
+                    newFont.Color = templateFont.Color;
+                }
+            }
+            if (templateInterior) {
+                const newInterior = headerRange.Interior;
+                if (newInterior) {
+                    newInterior.Color = templateInterior.Color;
+                }
+            }
+        }
+        catch {
+            bgmLog(LOG_LEVELS.WARN, '[ensureBangumiColumns] 复制样式失败，使用默认样式');
+        }
+        for (let i = 0; i < missing.length; i++) {
+            const newCol = maxCol + 1 + i;
+            const field = missing[i]?.field;
+            if (field) {
+                updatedMap.set(field, newCol);
+                bgmLog(LOG_LEVELS.INFO, `[ensureBangumiColumns] 新增列: ${field} → 第 ${newCol} 列 (样式已跟随现有列)`);
+            }
+        }
+    }
+    catch (e) {
+        bgmLog(LOG_LEVELS.ERROR, `[ensureBangumiColumns] 添加列失败: ${e instanceof Error ? e.message : String(e)}`);
+    }
+    return updatedMap;
+}
+/**
+ * WpsCellRef 辅助函数：生成单元格引用
+ */
+function WpsCellRef(row, col) {
+    let colStr = '';
+    let c = col;
+    while (c > 0) {
+        c--;
+        colStr = String.fromCharCode(65 + (c % 26)) + colStr;
+        c = Math.floor(c / 26);
+    }
+    return `${colStr}${row}`;
+}
+/**
+ * 富化简介数据
+ * 精准映射：导演→导演、编剧→脚本、人设→人物设定 等列
+ * 字段名差异时追加标注：如 樋口七海(编剧)
+ * 无匹配列的字段回退到特点/印象
+ * 冲突（两边都有值）时记录到 conflicts 数组，由用户确认
+ */
+export function enrichIntroData(sheet, row, newData, colMap, enriched, conflicts, newAnimeRow, newAnimeName) {
+    const bangumiFeatureCol = colMap.get('特点/印象');
+    for (const [sourceKey, targetColName] of Object.entries(INTRO_FIELD_TO_BANGUMI)) {
+        const rawValue = newData[sourceKey] || '';
+        if (isEmptyValue(rawValue))
+            continue;
+        const annotatedValue = getAnnotatedValue(sourceKey, targetColName, rawValue);
+        const targetCol = colMap.get(targetColName);
+        if (targetCol !== undefined) {
+            const oldValue = getCellValue(sheet, row, targetCol);
+            if (isEmptyValue(oldValue)) {
+                setCellValue(sheet, row, targetCol, annotatedValue);
+                enriched.push({
+                    fieldName: targetColName,
+                    bangumiColumn: targetCol,
+                    oldValue: null,
+                    newValue: annotatedValue,
+                    action: 'fill',
+                    ...(sourceKey !== targetColName
+                        ? { note: `字段名差异: ${sourceKey} → ${targetColName}` }
+                        : {}),
+                });
+            }
+            else {
+                conflicts.push({
+                    fieldName: targetColName,
+                    bangumiColumn: targetCol,
+                    bangumiRow: row,
+                    oldValue,
+                    newValue: annotatedValue,
+                    newAnimeRow,
+                    newAnimeName,
+                    resolution: 'append',
+                    ...(sourceKey !== targetColName
+                        ? { note: `字段名差异: ${sourceKey} → ${targetColName}` }
+                        : {}),
+                });
+            }
+        }
+        else if (bangumiFeatureCol !== undefined) {
+            const oldFeature = getCellValue(sheet, row, bangumiFeatureCol);
+            const featureEntry = `${sourceKey}:${annotatedValue}`;
+            if (isEmptyValue(oldFeature)) {
+                setCellValue(sheet, row, bangumiFeatureCol, featureEntry);
+                enriched.push({
+                    fieldName: `特点/印象(${sourceKey})`,
+                    bangumiColumn: bangumiFeatureCol,
+                    oldValue: null,
+                    newValue: featureEntry,
+                    action: 'fill',
+                });
+            }
+            else {
+                const merged = appendFeatures(oldFeature, featureEntry);
+                if (merged !== oldFeature) {
+                    setCellValue(sheet, row, bangumiFeatureCol, merged);
+                    enriched.push({
+                        fieldName: `特点/印象(${sourceKey})`,
+                        bangumiColumn: bangumiFeatureCol,
+                        oldValue: oldFeature,
+                        newValue: merged,
+                        action: 'append',
+                    });
+                }
+                else {
+                    enriched.push({
+                        fieldName: `特点/印象(${sourceKey})`,
+                        bangumiColumn: bangumiFeatureCol,
+                        oldValue: oldFeature,
+                        newValue: merged,
+                        action: 'skip',
+                    });
+                }
+            }
+        }
+    }
+    if (bangumiFeatureCol !== undefined) {
+        const featureParts = [];
+        for (const key of INTRO_FEATURE_FIELDS) {
+            const value = newData[key] || '';
+            if (!isEmptyValue(value)) {
+                const label = key === '简介' ? '简介' : key;
+                const display = key === '简介' && value.length > 80 ? value.substring(0, 80) + '...' : value;
+                featureParts.push(`${label}:${display}`);
+            }
+        }
+        if (featureParts.length > 0) {
+            const oldFeature = getCellValue(sheet, row, bangumiFeatureCol);
+            const merged = featureParts.join(FEATURE_SEPARATOR);
+            if (isEmptyValue(oldFeature)) {
+                setCellValue(sheet, row, bangumiFeatureCol, merged);
+                enriched.push({
+                    fieldName: '特点/印象(简介补充)',
+                    bangumiColumn: bangumiFeatureCol,
+                    oldValue: null,
+                    newValue: merged,
+                    action: 'fill',
+                });
+            }
+            else {
+                const combined = appendFeatures(oldFeature, merged);
+                if (combined !== oldFeature) {
+                    setCellValue(sheet, row, bangumiFeatureCol, combined);
+                    enriched.push({
+                        fieldName: '特点/印象(简介补充)',
+                        bangumiColumn: bangumiFeatureCol,
+                        oldValue: oldFeature,
+                        newValue: combined,
+                        action: 'append',
+                    });
+                }
+            }
+        }
+    }
+}
+/**
+ * 富化 OP/ED/PV 信息
+ * 追加到特点/印象列
+ */
+export function enrichOpEdPv(sheet, row, newData, colMap, enriched) {
+    const bangumiFeatureCol = colMap.get('特点/印象');
+    if (!bangumiFeatureCol)
+        return;
+    const parts = [];
+    const op = newData['OP'] || '';
+    if (!isEmptyValue(op)) {
+        parts.push(`OP:${op}`);
+    }
+    const ed = newData['ED'] || '';
+    if (!isEmptyValue(ed)) {
+        parts.push(`ED:${ed}`);
+    }
+    const pv = newData['PV'] || '';
+    if (!isEmptyValue(pv)) {
+        parts.push(`PV:${pv}`);
+    }
+    if (parts.length === 0)
+        return;
+    const newFeatureText = parts.join(FEATURE_SEPARATOR);
+    const oldFeature = getCellValue(sheet, row, bangumiFeatureCol);
+    if (isEmptyValue(oldFeature)) {
+        setCellValue(sheet, row, bangumiFeatureCol, newFeatureText);
+        enriched.push({
+            fieldName: '特点/印象',
+            bangumiColumn: bangumiFeatureCol,
+            oldValue: null,
+            newValue: newFeatureText,
+            action: 'fill',
+        });
+    }
+    else {
+        const merged = appendFeatures(oldFeature, newFeatureText);
+        if (merged !== oldFeature) {
+            setCellValue(sheet, row, bangumiFeatureCol, merged);
+            enriched.push({
+                fieldName: '特点/印象',
+                bangumiColumn: bangumiFeatureCol,
+                oldValue: oldFeature,
+                newValue: merged,
+                action: 'append',
+            });
+        }
+        else {
+            enriched.push({
+                fieldName: '特点/印象',
+                bangumiColumn: bangumiFeatureCol,
+                oldValue: oldFeature,
+                newValue: merged,
+                action: 'skip',
+            });
+        }
+    }
+}
+/**
+ * 读取简介工作表一行数据
+ * 支持简介专有字段：编剧/人设/CG导演/系列构成/分镜/原作/语言/制片国家 等
+ */
+export function readIntroSheetRow(sheet, row, mapping) {
+    const data = {};
+    data['名称'] = getCellValue(sheet, row, mapping.nameCol) || '';
+    if (mapping.introCol)
+        data['简介'] = getCellValue(sheet, row, mapping.introCol) || '';
+    if (mapping.studioCol)
+        data['动画制作'] = getCellValue(sheet, row, mapping.studioCol) || '';
+    if (mapping.directorCol)
+        data['导演'] = getCellValue(sheet, row, mapping.directorCol) || '';
+    if (mapping.musicCol)
+        data['音乐'] = getCellValue(sheet, row, mapping.musicCol) || '';
+    if (mapping.voiceCol)
+        data['声优'] = getCellValue(sheet, row, mapping.voiceCol) || '';
+    if (mapping.opCol)
+        data['OP'] = getCellValue(sheet, row, mapping.opCol) || '';
+    if (mapping.edCol)
+        data['ED'] = getCellValue(sheet, row, mapping.edCol) || '';
+    if (mapping.pvCol)
+        data['PV'] = getCellValue(sheet, row, mapping.pvCol) || '';
+    if (mapping.screenplayCol)
+        data['编剧'] = getCellValue(sheet, row, mapping.screenplayCol) || '';
+    if (mapping.characterDesignCol)
+        data['人设'] = getCellValue(sheet, row, mapping.characterDesignCol) || '';
+    if (mapping.cgDirectorCol)
+        data['CG导演'] = getCellValue(sheet, row, mapping.cgDirectorCol) || '';
+    if (mapping.seriesCompositionCol)
+        data['系列构成'] = getCellValue(sheet, row, mapping.seriesCompositionCol) || '';
+    if (mapping.storyboardCol)
+        data['分镜'] = getCellValue(sheet, row, mapping.storyboardCol) || '';
+    if (mapping.originalWorkCol)
+        data['原作'] = getCellValue(sheet, row, mapping.originalWorkCol) || '';
+    if (mapping.languageCol)
+        data['语言'] = getCellValue(sheet, row, mapping.languageCol) || '';
+    if (mapping.productionCountryCol)
+        data['制片国家'] = getCellValue(sheet, row, mapping.productionCountryCol) || '';
+    if (mapping.typeCol)
+        data['类型'] = getCellValue(sheet, row, mapping.typeCol) || '';
+    return data;
+}
+/**
+ * 判断是否为简介工作表
+ * 基于列名特征判断
+ */
+export function isIntroSheet(mapping) {
+    return (mapping.introCol !== undefined ||
+        mapping.screenplayCol !== undefined ||
+        mapping.characterDesignCol !== undefined ||
+        mapping.cgDirectorCol !== undefined);
+}
+/**
+ * 富化别名
+ * 当新番表名称与 Bangumi 追踪表名称/别名不一致时，
+ * 将新番表名称补充到 Bangumi 追踪表的别名列
+ */
+export function enrichAlias(sheet, row, newAnimeName, bangumiName, colMap, enriched) {
+    const nameCol = colMap.get('名称');
+    if (!nameCol)
+        return;
+    if (newAnimeName === bangumiName) {
+        enriched.push({
+            fieldName: '别名',
+            bangumiColumn: nameCol,
+            oldValue: '',
+            newValue: newAnimeName,
+            action: 'skip',
+        });
+        return;
+    }
+    const aliasCol = findAliasColumn(sheet);
+    if (aliasCol === 0)
+        return;
+    const existingAliases = getCellValue(sheet, row, aliasCol);
+    const aliasList = splitAliases(existingAliases);
+    const normalizedNew = normalizeName(newAnimeName);
+    const alreadyExists = aliasList.some((a) => normalizeName(a) === normalizedNew);
+    if (alreadyExists) {
+        enriched.push({
+            fieldName: '别名',
+            bangumiColumn: aliasCol,
+            oldValue: existingAliases,
+            newValue: newAnimeName,
+            action: 'skip',
+        });
+        return;
+    }
+    const merged = existingAliases ? existingAliases + TAG_SEPARATOR + newAnimeName : newAnimeName;
+    setCellValue(sheet, row, aliasCol, merged);
+    enriched.push({
+        fieldName: '别名',
+        bangumiColumn: aliasCol,
+        oldValue: existingAliases || null,
+        newValue: merged,
+        action: 'append',
+    });
+}
+/**
+ * 在工作表中搜索关键词
+ * 支持多字段匹配，返回所有匹配行
+ */
+export function searchSheet(sheet, keyword, colMap, dataStartRow) {
+    if (!keyword.trim())
+        return [];
+    const results = [];
+    const normalizedKeyword = normalizeName(keyword);
+    const nameCol = colMap.get('名称') || colMap.get('动漫名称') || colMap.get('番组名') || 0;
+    if (nameCol === 0)
+        return results;
+    const lastRow = getLastRow(sheet);
+    if (lastRow < dataStartRow)
+        return results;
+    for (let row = dataStartRow; row <= lastRow; row++) {
+        const nameValue = getCellValue(sheet, row, nameCol);
+        if (!nameValue)
+            continue;
+        const normalizedName = normalizeName(nameValue);
+        if (normalizedName.includes(normalizedKeyword)) {
+            const fieldMatches = [{ column: '名称', value: nameValue }];
+            const aliasCol = colMap.get('别名');
+            if (aliasCol) {
+                const aliasValue = getCellValue(sheet, row, aliasCol);
+                if (aliasValue) {
+                    const aliases = splitAliases(aliasValue);
+                    const matchedAliases = aliases.filter((a) => normalizeName(a).includes(normalizedKeyword));
+                    for (const alias of matchedAliases) {
+                        fieldMatches.push({ column: '别名', value: alias });
+                    }
+                }
+            }
+            results.push({ row, name: nameValue, fieldMatches });
+        }
+    }
+    bgmLog(LOG_LEVELS.INFO, `[searchSheet] 搜索 "${keyword}" 找到 ${results.length} 条结果`);
+    return results;
+}
+/**
+ * 从远程仓库获取文件内容（以 base64 方式）
+ * 绕过中间列影响，直接下载原始数据
+ */
+export async function fetchRemoteFile(config) {
+    try {
+        const { url, branch, filePath } = config;
+        const rawUrl = `${url}/raw/${branch}/${filePath}`;
+        bgmLog(LOG_LEVELS.INFO, `[fetchRemoteFile] 正在获取: ${rawUrl}`);
+        const response = await fetch(rawUrl);
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+        const content = await response.text();
+        bgmLog(LOG_LEVELS.INFO, `[fetchRemoteFile] 下载成功: ${content.length} 字节`);
+        return content;
+    }
+    catch (e) {
+        const errMsg = e instanceof Error ? e.message : String(e);
+        bgmLog(LOG_LEVELS.ERROR, `[fetchRemoteFile] 下载失败: ${errMsg}`);
+        return null;
+    }
+}
+/**
+ * 解析远程文件内容为 Excel 可导入格式
+ * 支持 CSV/TSV 纯文本格式，不受中间列干扰
+ */
+export function parseRemoteContent(content) {
+    const records = [];
+    if (!content)
+        return records;
+    const lines = content.split(/\r?\n/).filter((line) => line.trim());
+    if (lines.length === 0)
+        return records;
+    const firstLine = lines[0];
+    if (firstLine === undefined)
+        return records;
+    const delimiter = firstLine.includes('\t') ? '\t' : ',';
+    const headers = firstLine.split(delimiter).map((h) => h.trim());
+    for (let i = 1; i < lines.length; i++) {
+        const line = lines[i];
+        if (line === undefined)
+            continue;
+        const values = line.split(delimiter);
+        const record = {};
+        for (let j = 0; j < headers.length; j++) {
+            const key = headers[j];
+            const val = values[j];
+            if (key !== undefined) {
+                record[key] = val !== undefined ? val : '';
+            }
+        }
+        records.push(record);
+    }
+    bgmLog(LOG_LEVELS.INFO, `[parseRemoteContent] 解析 ${records.length} 条记录`);
+    return records;
+}
+/**
+ * 将远程获取的数据写入工作表
+ * 支持指定列映射，避免中间列影响
+ */
+export function writeRemoteDataToSheet(sheet, data, colMap, startRow) {
+    let row = startRow;
+    let written = 0;
+    for (const record of data) {
+        for (const [field, value] of Object.entries(record)) {
+            const col = colMap.get(field);
+            if (col !== undefined && value) {
+                setCellValue(sheet, row, col, value);
+            }
+        }
+        row++;
+        written++;
+    }
+    bgmLog(LOG_LEVELS.INFO, `[writeRemoteDataToSheet] 写入 ${written} 行数据`);
+    return written;
+}

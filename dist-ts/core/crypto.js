@@ -89,4 +89,3 @@ export function extractToken(encrypted) {
         return null;
     }
 }
-//# sourceMappingURL=crypto.js.map

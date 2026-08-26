@@ -1,0 +1,387 @@
+/* ========== 同步预览模态框 - 深色模式 ========== */
+#syncPreviewModal .modal-content {
+    background: #1e1e2e;            /* 深色背景 */
+    border-radius: 12px;
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5);
+    overflow: hidden;
+    color: #cdd6f4;                 /* 浅色文字 */
+}
+
+#syncPreviewModal .modal-header {
+    background: linear-gradient(135deg, #313244, #45475a);  /* 深色渐变标题栏 */
+    color: #cdd6f4;
+    padding: 16px 24px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid #45475a;
+}
+
+#syncPreviewModal .modal-header h3 {
+    margin: 0;
+    font-size: 18px;
+    font-weight: 600;
+    color: #f5e0dc;                /* 暖白色标题 */
+}
+
+#closeSyncPreview,
+#syncAllBtn {
+    background: rgba(205, 214, 244, 0.15);
+    border: none;
+    color: #cdd6f4;
+    font-size: 14px;
+    border-radius: 6px;
+    padding: 6px 16px;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+#closeSyncPreview {
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    border-radius: 50%;
+    font-size: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+#syncAllBtn:hover,
+#closeSyncPreview:hover {
+    background: rgba(205, 214, 244, 0.3);
+}
+
+#syncAllBtn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+#syncPreviewModal .modal-body {
+    padding: 20px 24px;
+    max-height: 70vh;
+    overflow: auto;
+    background: #1e1e2e;
+}
+
+/* ========== 卡片列表（深色） ========== */
+.detail-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.detail-item {
+    background: #313244;            /* 深色卡片背景 */
+    border: 1px solid #45475a;
+    border-radius: 8px;
+    padding: 20px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+    color: #cdd6f4;
+}
+
+.detail-item.error {
+    background: #3e2a2a;
+    border-color: #e64553;
+    color: #e64553;
+}
+
+.detail-item-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+}
+
+.detail-item-title {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+}
+
+.detail-item-row {
+    font-size: 12px;
+    color: #a6adc8;
+}
+
+.detail-item-name {
+    font-size: 16px;
+    font-weight: 600;
+    color: #f5e0dc;
+}
+
+/* 上传按钮 */
+.upload-single-btn {
+    padding: 6px 16px;
+    border: none;
+    border-radius: 6px;
+    background: #89b4fa;
+    color: #1e1e2e;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.upload-single-btn:hover {
+    background: #b4d0fb;
+}
+
+.upload-single-btn.uploading {
+    background: #a6adc8;
+    color: #1e1e2e;
+    pointer-events: none;
+}
+
+.upload-single-btn.reupload {
+    background: #a6e3a1;
+    color: #1e1e2e;
+}
+
+.upload-single-btn.error {
+    background: #e64553;
+    color: #cdd6f4;
+}
+
+.uploaded-badge {
+    font-size: 12px;
+    color: #a6e3a1;
+    margin-left: 10px;
+}
+
+/* 卡片详情行 */
+.detail-row {
+    display: flex;
+    align-items: baseline;
+    gap: 12px;
+    margin-bottom: 8px;
+}
+
+.detail-label {
+    min-width: 90px;
+    font-size: 13px;
+    font-weight: 500;
+    color: #a6adc8;
+}
+
+.detail-value {
+    font-size: 13px;
+    color: #cdd6f4;
+    word-break: break-all;
+}
+
+.detail-value.url {
+    color: #89b4fa;
+    text-decoration: underline;
+    text-underline-offset: 3px;
+}
+
+.detail-value.sid {
+    font-family: monospace;
+    color: #f9e2af;
+}
+
+.detail-value.json {
+    background: #181825;
+    border: 1px solid #45475a;
+    border-radius: 4px;
+    padding: 8px 12px;
+    font-family: monospace;
+    font-size: 12px;
+    white-space: pre-wrap;
+    color: #a6e3a1;
+    max-height: 120px;
+    overflow: auto;
+}
+
+/* 标签样式 */
+.tag-badge {
+    display: inline-block;
+    background: #45475a;
+    color: #cdd6f4;
+    border-radius: 4px;
+    padding: 2px 8px;
+    font-size: 12px;
+    margin-right: 6px;
+    margin-bottom: 4px;
+}
+
+/* 滚动条美化（深色） */
+#syncPreviewModal .modal-body::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+#syncPreviewModal .modal-body::-webkit-scrollbar-thumb {
+    background: #585b70;
+    border-radius: 4px;
+}
+
+#syncPreviewModal .modal-body::-webkit-scrollbar-track {
+    background: #313244;
+}
+
+/* 状态下拉筛选框 */
+#statusFilterSelect {
+    padding: 6px 12px;
+    border: 1px solid #45475a;
+    border-radius: 6px;
+    background: #313244;
+    color: #cdd6f4;
+    font-size: 13px;
+    cursor: pointer;
+    outline: none;
+    transition: border-color 0.2s;
+    margin-left: 8px;
+    -webkit-appearance: none;          /* 隐藏默认箭头 */
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23cdd6f4' d='M6 8.825a.5.5 0 0 1-.354-.146L2.22 5.254a.5.5 0 1 1 .707-.708L6 7.618l3.073-3.072a.5.5 0 0 1 .708.708L6.354 8.68A.5.5 0 0 1 6 8.825z'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 10px center;
+    padding-right: 30px;               /* 给箭头留空间 */
+}
+
+#statusFilterSelect:hover {
+    border-color: #6c7086;
+}
+
+#statusFilterSelect:focus {
+    border-color: #89b4fa;
+    box-shadow: 0 0 0 2px rgba(137, 180, 250, 0.2);
+}
+
+#statusFilterSelect option {
+    background: #313244;
+    color: #cdd6f4;
+}
+
+
+/* 统计卡片容器居中 */
+.stat-cards-centered {
+    margin-left: auto;
+    margin-right: auto;
+    max-width: 640px;          /* 可根据需要调整 */
+    display: flex;
+    gap: 12px;
+    margin-bottom: 12px;
+}
+
+/* 可选：为边框颜色添加专属类（如果不想保留内联 style） */
+.stat-card-pending {
+    border-left: 3px solid #f59e0b;
+}
+
+.stat-card-uploaded {
+    border-left: 3px solid #22c55e;
+}
+/* 统计卡片通用样式 */
+.stat-card {
+    background: #313244;
+    border-radius: 8px;
+    padding: 16px;
+    text-align: center;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.2);
+    flex: 1;
+}
+
+.stat-value {
+    font-size: 28px;
+    font-weight: 700;
+    color: #cdd6f4;
+    margin-bottom: 4px;
+}
+
+.stat-label {
+    font-size: 13px;
+    color: #a6adc8;
+    font-weight: 500;
+}
+
+/* ========== 内联样式迁移自 taskpane.html ========== */
+/* 同步预览模态框容器：覆盖默认 .modal，使用 base 半透明遮罩 */
+.sync-preview-modal {
+    display: none;                       /* 初始隐藏，由 JS 控制显示 */
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(30, 30, 46, 0.5);   /* base 的 rgba，替代 rgba(0,0,0,0.5) */
+    z-index: 10000;
+    overflow: auto;
+    /* 覆盖默认 .modal 的 flex 居中，改由内容区 margin:auto 居中 */
+    align-items: initial;
+    justify-content: initial;
+}
+
+/* 同步预览模态框内容区：宽度与居中
+   背景/圆角/阴影/文字颜色沿用既有 #syncPreviewModal .modal-content 规则（已使用 Mocha base） */
+.sync-preview-modal .modal-content {
+    margin: 20px auto;
+    width: 95%;
+    max-width: 1400px;
+}
+
+/* 标题栏按钮工具栏 */
+.sync-preview-modal-toolbar {
+    display: flex;
+    align-items: center;
+    column-gap: 12px;
+}
+
+/* 详细预览计数文本：替代内联 color:#aaa，映射到 subtext0 */
+#detailCount {
+    color: var(--subtext0, #a6adc8);
+}
+
+/* ========== 滚动控制按钮 ========== */
+.scroll-btn {
+    position: absolute;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    background: rgba(49, 50, 68, 0.9);
+    color: #cdd6f4;
+    font-size: 18px;
+    line-height: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    z-index: 10;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+    transition: background 0.2s, transform 0.15s, opacity 0.2s;
+    user-select: none;
+}
+
+.scroll-btn:hover {
+    background: rgba(137, 180, 250, 0.8);
+    color: #1e1e2e;
+    transform: scale(1.1);
+}
+
+.scroll-btn:active {
+    transform: scale(0.95);
+}
+
+.scroll-to-top {
+    top: 72px;
+    right: 16px;
+}
+
+.scroll-to-bottom {
+    bottom: 16px;
+    right: 16px;
+}
+
+/* 模态内容容器需要 position:relative 以便滚动按钮绝对定位 */
+.sync-preview-modal .modal-content {
+    position: relative;
+}
+
+/* 滚动按钮不可见状态 */
+.scroll-btn.hidden {
+    opacity: 0;
+    pointer-events: none;
+}

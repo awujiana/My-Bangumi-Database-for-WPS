@@ -306,4 +306,3 @@ export const httpPut = (endpoint, body, token) => httpRequest(endpoint, { method
  * });
  */
 export const httpDelete = (endpoint, token) => httpRequest(endpoint, { method: 'DELETE', ...(token !== undefined && { token }) });
-//# sourceMappingURL=http.js.map

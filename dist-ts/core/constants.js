@@ -252,6 +252,8 @@ export const COLUMN_RULES = [
     [/脚本|编剧|剧本/, '脚本'],
     [/分镜/, '分镜'],
     [/演出/, '演出'],
+    [/声优|配音|cv/i, '声优'],
+    [/角色设定|人物设定|人设/, '人物设定'],
     // ── 地点/平台 ──
     [/电影院|影院/, '电影院'],
     [/影厅/, '影厅'],
@@ -686,4 +688,3 @@ export const SYNC_RECORD_TYPE_COLOR = {
     搁置: BGM_COLOR.SKIP,
     抛弃: BGM_COLOR.FAIL,
 };
-//# sourceMappingURL=constants.js.map

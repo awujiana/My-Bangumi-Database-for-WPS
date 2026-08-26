@@ -143,4 +143,3 @@ function restoreDeletedRowWithWs(ws, snapshot) {
         setCellValue(ws, snapshot.row, col, value);
     }
 }
-//# sourceMappingURL=undoStack.js.map

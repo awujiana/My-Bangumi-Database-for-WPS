@@ -256,7 +256,7 @@ showAutoFillUrlDialog, } from './tools/autoFillUrl.js';
 // ============================================================================
 export { refreshSheets, toggleSheetLock, 
 // 刷新数据预览
-refreshData, } from './taskpane.js';
+refreshData, } from './taskpane/index.js';
 // 预览函数
 export { 
 // 显示预览内容

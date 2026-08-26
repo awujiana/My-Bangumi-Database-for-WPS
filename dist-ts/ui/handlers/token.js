@@ -490,4 +490,3 @@ export function renewToken() {
     bgmLog(LOG_LEVELS.INFO, '[renewToken] 已合并到 testTokenValidity，调用测试流程');
     testTokenValidity();
 }
-//# sourceMappingURL=token.js.map

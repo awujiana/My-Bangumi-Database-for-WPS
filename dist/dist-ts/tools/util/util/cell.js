@@ -1,0 +1,125 @@
+import { colNumToLetter } from '../stringUtils.js';
+import { LOG_LEVELS } from '../../core/constants.js';
+// 循环依赖：仅在函数体内使用 BGM.handleError / bgmLog / getApp，运行时安全
+import { BGM, bgmLog, getApp } from './index.js';
+// ========== 单元格操作 ==========
+export function getCell(ws, row, col) {
+    if (!ws)
+        return null;
+    const address = colNumToLetter(col) + row;
+    return ws.Range(address);
+}
+// 内部辅助函数，不导出
+/**
+ * 安全地获取对象属性值，处理属性值为函数的情况
+ * @param cell - 要获取属性的对象
+ * @param prop - 属性名称
+ * @returns 属性的值；如果属性不存在或访问失败，则返回 undefined
+ */
+function tryGetProperty(cell, prop) {
+    if (cell == null || typeof cell !== 'object')
+        return undefined;
+    const obj = cell;
+    if (!(prop in obj))
+        return undefined;
+    try {
+        const val = obj[prop];
+        if (typeof val === 'function') {
+            try {
+                const result = val();
+                if (typeof result === 'function' && result.toString().includes('[native code]')) {
+                    return undefined;
+                }
+                return result;
+            }
+            catch {
+                return undefined;
+            }
+        }
+        if (val && typeof val === 'object') {
+            const valObj = val;
+            if (typeof valObj.toString === 'function') {
+                const str = valObj.toString();
+                if (str.includes('function') || str.includes('[native code]')) {
+                    return undefined;
+                }
+            }
+        }
+        return val;
+    }
+    catch {
+        return undefined;
+    }
+}
+//内部辅助函数，不导出
+/**
+ * 获取单元格的原始值，按优先级尝试 Value2、Value 和 Text 属性
+ * @param cell - 单元格对象
+ * @returns 单元格的原始值；如果单元格无效或没有值，则返回 null
+ */
+function getCellRawValue(cell) {
+    if (!cell)
+        return null;
+    const val2 = tryGetProperty(cell, 'Value2');
+    if (val2 !== undefined && val2 !== null)
+        return val2;
+    const val = tryGetProperty(cell, 'Value');
+    if (val !== undefined && val !== null)
+        return val;
+    const text = tryGetProperty(cell, 'Text');
+    if (text !== undefined && text !== null)
+        return text;
+    return null;
+}
+/**
+ * 获取单元格的值
+ * @param ws - 工作表对象，可能为 null 或 undefined
+ * @param row - 行号
+ * @param col - 列号
+ * @returns 单元格的字符串值；如果工作表无效或单元格不存在，则返回空字符串
+ */
+export function getCellValue(ws, row, col) {
+    if (!ws)
+        return '';
+    try {
+        const address = colNumToLetter(col) + row;
+        const cell = ws.Range(address);
+        if (!cell)
+            return '';
+        const raw = getCellRawValue(cell);
+        return raw != null ? String(raw) : '';
+    }
+    catch {
+        return '';
+    }
+}
+/**
+ * 设置单元格值
+ */
+export function setCellValue(ws, row, col, value) {
+    try {
+        const cell = getCell(ws, row, col);
+        if (!cell) {
+            bgmLog(LOG_LEVELS.ERROR, `setCellValue - 无法获取单元格: (${row}, ${col})`);
+            return false;
+        }
+        cell.Value2 = value;
+        return true;
+    }
+    catch (e) {
+        BGM.handleError(e, { level: BGM.ErrorLevel.ERROR, context: 'setCellValue' });
+    }
+    return false;
+}
+/**
+ * 获取工作表对象
+ */
+export function getSheetByIndex(sheetIndex) {
+    const appObj = getApp();
+    if (!appObj?.ActiveWorkbook?.Sheets)
+        return null;
+    const sheets = appObj.ActiveWorkbook.Sheets;
+    if (sheets.Count === 0)
+        return null;
+    return sheets.Item(sheetIndex);
+}

@@ -129,4 +129,3 @@ export function finalizeSyncResults(ws, seqCol, successTasks, failTasks, syncTas
     BGM.setSyncComplete(result);
     bgmLog(LOG_LEVELS.INFO, `[SyncToBangumiAsync] 同步完成: 成功=${result.success}, 失败=${result.fail}, 跳过=${result.skip}, 已停止=${result.stopped}, 总耗时=${totalTime}ms`);
 }
-//# sourceMappingURL=progressReporter.js.map

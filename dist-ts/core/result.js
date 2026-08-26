@@ -313,4 +313,3 @@ export class Result {
         return this;
     }
 }
-//# sourceMappingURL=result.js.map

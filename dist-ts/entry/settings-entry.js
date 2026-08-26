@@ -89,4 +89,3 @@ export function startSettings() {
 if (typeof window !== 'undefined' && window.location.pathname.includes('settings.html')) {
     startSettings();
 }
-//# sourceMappingURL=settings-entry.js.map

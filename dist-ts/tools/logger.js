@@ -95,4 +95,3 @@ export const logger = {
         console.debug(`[DEBUG] ${entry.message}`);
     },
 };
-//# sourceMappingURL=logger.js.map

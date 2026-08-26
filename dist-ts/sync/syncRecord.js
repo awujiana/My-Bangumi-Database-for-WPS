@@ -760,4 +760,3 @@ export function __resetSyncRecordCache() {
     _syncRecordCacheValid = false;
     _formattingInProgress = false;
 }
-//# sourceMappingURL=syncRecord.js.map

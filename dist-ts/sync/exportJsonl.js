@@ -178,4 +178,3 @@ export function exportSheetToJsonlFile() {
         return false;
     }
 }
-//# sourceMappingURL=exportJsonl.js.map

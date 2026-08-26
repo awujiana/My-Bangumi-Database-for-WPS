@@ -126,4 +126,3 @@ export const BGM_EVENTS = {
 };
 // 创建全局事件总线实例
 export const eventBus = new EventBus();
-//# sourceMappingURL=events.js.map

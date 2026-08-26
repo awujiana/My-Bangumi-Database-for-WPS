@@ -178,4 +178,3 @@ export function cleanLockedDataSheet() {
         bgmLog(LOG_LEVELS.INFO, `[cleanLockedDataSheet] 实际合并的标签:\n${mergedSummary}`);
     showToast(`清洗完成：删除 ${toDelete.length} 行${tagsCol ? `，合并 ${mergedTagsCount} 个名称组的标签` : ''}`, 'success');
 }
-//# sourceMappingURL=sheet.js.map

@@ -12,4 +12,3 @@
  *   - handlers/index.ts：资源追踪、按钮监听、ACTION_HANDLERS、消息监听、事件总线、配置 UI 回填
  */
 export * from './handlers/index.js';
-//# sourceMappingURL=handlers.js.map

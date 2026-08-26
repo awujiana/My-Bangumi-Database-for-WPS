@@ -12,6 +12,7 @@ export declare const CONFIG_KEYS: {
     readonly LOCKED_SHEET: "bgm_locked_sheet";
     readonly LOCKED_WORKBOOK: "bgm_locked_workbook";
     readonly ENABLE_SYNC_RECORD: "bgm_enable_sync_record";
+    readonly ENRICH_LOCKED_WORKBOOK: "bgm_enrich_locked_workbook";
 };
 /**
  * 设置配置值

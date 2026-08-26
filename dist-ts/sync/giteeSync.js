@@ -168,4 +168,3 @@ export class GiteeSyncSource {
         return Result.okVoid();
     }
 }
-//# sourceMappingURL=giteeSync.js.map

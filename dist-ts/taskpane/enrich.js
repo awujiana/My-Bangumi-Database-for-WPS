@@ -4,13 +4,14 @@
  * @description 负责文件选择、表头识别、列映射编辑、匹配预览、富化执行与进度、富化记录查看。
  */
 import { LOG_LEVELS } from '../core/constants.js';
-import { getCellValue, getLastRow, findHeaderRow, getDataSheet, bgmLog, BGM, getApp, } from '../tools/util/index.js';
-import { detectColumns, matchEntries, enrichEntries, } from '../sync/enrichEngine.js';
+import { detectColumns, matchEntries, enrichEntries, resolveConflictField, } from '../sync/enrichEngine.js';
+import { refreshEnrichWorkbooks, refreshEnrichSheets, toggleEnrichWorkbookLock, updateEnrichLockButton, getLockedEnrichSheet, initEnrichLock, } from '../sync/enrichLock.js';
 import { getAllEnrichRecords, getOrCreateEnrichRecordSheet, clearEnrichRecords, } from '../sync/enrichRecord.js';
 import { sanitizeHtml } from '../tools/sanitize.js';
 import { escapeHtml } from '../tools/stringUtils.js';
+import { getCellValue, getLastRow, findHeaderRow, getDataSheet, bgmLog, BGM, getApp, } from '../tools/util/index.js';
 // ========== 状态 ==========
-let state = {
+const state = {
     filePath: '',
     newAnimeSheet: null,
     bangumiSheet: null,
@@ -20,6 +21,8 @@ let state = {
     matches: [],
     isEnriching: false,
     cancelRequested: false,
+    pendingConflicts: [],
+    currentConflictIndex: 0,
 };
 // ========== 列映射字段元数据 ==========
 const COLUMN_MAPPING_FIELDS = [
@@ -61,6 +64,8 @@ function formatEta(etaMs) {
 // ========== 初始化 ==========
 export function initEnrichPage() {
     bgmLog(LOG_LEVELS.INFO, '[enrich] initEnrichPage 开始');
+    // 初始化富化工作簿锁定模块（恢复持久化的锁定状态）
+    initEnrichLock('workbookSelect', 'sheetSelect', 'lockSheetBtn', 'lockStatus');
     bindFileSelector();
     bindDetectHeaderButton();
     bindTargetSheetControls();
@@ -68,6 +73,14 @@ export function initEnrichPage() {
     bindStartEnrichButton();
     bindRecordControls();
     loadRecentRecords();
+    // 如果有锁定的工作表，自动填充到 state
+    if (BGM.enrich.isLocked && BGM.enrich.lockedSheetIndex) {
+        const locked = getLockedEnrichSheet();
+        if (locked) {
+            state.bangumiSheet = locked[1];
+            bgmLog(LOG_LEVELS.INFO, `[enrich] 已恢复锁定的目标工作表: ${locked[1].Name}`);
+        }
+    }
     bgmLog(LOG_LEVELS.INFO, '[enrich] initEnrichPage 完成');
 }
 function bindFileSelector() {
@@ -91,12 +104,16 @@ function bindTargetSheetControls() {
     if (wbSelect) {
         wbSelect.addEventListener('change', () => {
             refreshSheetList();
+            // 切换工作簿时同步锁定状态显示
+            updateEnrichLockButton('lockSheetBtn', 'lockStatus');
         });
     }
     const sheetSelect = safeGetSelect('sheetSelect');
     if (sheetSelect) {
         sheetSelect.addEventListener('change', () => {
             selectTargetSheet();
+            // 切换工作表时同步锁定状态显示
+            updateEnrichLockButton('lockSheetBtn', 'lockStatus');
         });
     }
     const refreshBtn = document.querySelector('[data-action="refreshSheets"]');
@@ -104,6 +121,7 @@ function bindTargetSheetControls() {
         refreshBtn.addEventListener('click', () => {
             refreshWorkbookList();
             refreshSheetList();
+            updateEnrichLockButton('lockSheetBtn', 'lockStatus');
         });
     }
     const lockBtn = safeGetButton('lockSheetBtn');
@@ -164,7 +182,7 @@ function bindRecordControls() {
     }
 }
 // ========== 文件选择 ==========
-function selectNewAnimeFile() {
+export function selectNewAnimeFile() {
     try {
         const app = getApp();
         if (!app || typeof app.GetOpenFilename !== 'function') {
@@ -186,11 +204,15 @@ function selectNewAnimeFile() {
         bgmLog(LOG_LEVELS.INFO, `[enrich] 已选择文件: ${filePath}`);
     }
     catch (e) {
-        BGM.handleError(e, { showAlert: true, level: BGM.ErrorLevel.ERROR, context: 'selectNewAnimeFile' });
+        BGM.handleError(e, {
+            showAlert: true,
+            level: BGM.ErrorLevel.ERROR,
+            context: 'selectNewAnimeFile',
+        });
     }
 }
 // ========== 表头自动识别 ==========
-function autoDetectHeader() {
+export function autoDetectHeader() {
     const app = getApp();
     if (!app?.ActiveWorkbook) {
         BGM.Dialog.alert('提示', '未连接到 Excel，请先打开包含新番表的工作簿');
@@ -206,7 +228,11 @@ function autoDetectHeader() {
                 ws = wb.Worksheets.Item(sheetIndex);
             }
             catch (e) {
-                BGM.handleError(e, { showAlert: false, level: BGM.ErrorLevel.INFO, context: 'autoDetectHeader' });
+                BGM.handleError(e, {
+                    showAlert: false,
+                    level: BGM.ErrorLevel.INFO,
+                    context: 'autoDetectHeader',
+                });
             }
         }
     }
@@ -237,7 +263,11 @@ function autoDetectHeader() {
         renderSourcePreview(ws, mapping);
     }
     catch (e) {
-        BGM.handleError(e, { showAlert: false, level: BGM.ErrorLevel.ERROR, context: 'autoDetectHeader' });
+        BGM.handleError(e, {
+            showAlert: false,
+            level: BGM.ErrorLevel.ERROR,
+            context: 'autoDetectHeader',
+        });
         BGM.Dialog.error('错误', '识别表头失败: ' + (e instanceof Error ? e.message : String(e)));
     }
 }
@@ -334,49 +364,24 @@ function getSelectedWorkbook() {
     return app.ActiveWorkbook;
 }
 function refreshWorkbookList() {
-    const wbSelect = safeGetSelect('workbookSelect');
-    if (!wbSelect)
-        return;
-    const app = getApp();
-    if (!app?.Workbooks)
-        return;
-    const wbs = app.Workbooks;
-    const currentValue = wbSelect.value;
-    wbSelect.innerHTML = sanitizeHtml('<option value="">-- 当前活动工作簿 --</option>');
-    for (let i = 1; i <= wbs.Count; i++) {
-        const wb = wbs.Item(i);
-        const option = document.createElement('option');
-        option.value = wb.Name;
-        option.textContent = wb.Name;
-        if (wb.Name === currentValue) {
-            option.selected = true;
-        }
-        wbSelect.appendChild(option);
+    refreshEnrichWorkbooks('workbookSelect');
+    // 如果已锁定，选中锁定的工作簿
+    if (BGM.enrich.isLocked && BGM.enrich.lockedWorkbookName) {
+        const wbSelect = safeGetSelect('workbookSelect');
+        if (wbSelect)
+            wbSelect.value = BGM.enrich.lockedWorkbookName;
     }
-    bgmLog(LOG_LEVELS.INFO, `[enrich] 工作簿列表已刷新: ${wbs.Count} 个`);
 }
 function refreshSheetList() {
-    const sheetSelect = safeGetSelect('sheetSelect');
-    if (!sheetSelect)
-        return;
-    const wb = getSelectedWorkbook();
-    if (!wb)
-        return;
-    const sheets = wb.Worksheets;
-    if (!sheets)
-        return;
-    const currentValue = sheetSelect.value;
-    sheetSelect.innerHTML = sanitizeHtml('<option value="">-- 请选择 --</option>');
-    for (let i = 1; i <= sheets.Count; i++) {
-        const option = document.createElement('option');
-        option.value = String(i);
-        option.textContent = sheets.Item(i).Name;
-        if (String(i) === currentValue) {
-            option.selected = true;
-        }
-        sheetSelect.appendChild(option);
+    const wbSelect = safeGetSelect('workbookSelect');
+    const wbName = wbSelect?.value || undefined;
+    refreshEnrichSheets(wbName, 'sheetSelect', 'workbookSelect');
+    // 如果已锁定，选中锁定的工作表
+    if (BGM.enrich.isLocked && BGM.enrich.lockedSheetIndex) {
+        const sheetSelect = safeGetSelect('sheetSelect');
+        if (sheetSelect)
+            sheetSelect.value = String(BGM.enrich.lockedSheetIndex);
     }
-    bgmLog(LOG_LEVELS.INFO, `[enrich] 工作表列表已刷新: ${sheets.Count} 个`);
 }
 function selectTargetSheet() {
     const sheetSelect = safeGetSelect('sheetSelect');
@@ -394,34 +399,30 @@ function selectTargetSheet() {
         const ws = wb.Worksheets.Item(sheetIndex);
         state.bangumiSheet = ws;
         bgmLog(LOG_LEVELS.INFO, `[enrich] 已选择目标工作表: ${ws.Name} (索引: ${sheetIndex})`);
+        // 同步到 BGM.enrich 状态（未锁定时自动更新）
+        if (!BGM.enrich.isLocked) {
+            BGM.enrich.lockedWorkbookName = wb.Name;
+            BGM.enrich.lockedSheetName = ws.Name;
+            BGM.enrich.lockedSheetIndex = sheetIndex;
+        }
     }
     catch (e) {
         state.bangumiSheet = null;
-        BGM.handleError(e, { showAlert: false, level: BGM.ErrorLevel.INFO, context: 'selectTargetSheet' });
+        BGM.handleError(e, {
+            showAlert: false,
+            level: BGM.ErrorLevel.INFO,
+            context: 'selectTargetSheet',
+        });
     }
 }
-let sheetLocked = false;
 function toggleSheetLock() {
-    const lockBtn = safeGetButton('lockSheetBtn');
-    if (!lockBtn)
-        return;
+    toggleEnrichWorkbookLock('sheetSelect', 'workbookSelect', 'lockSheetBtn', 'lockStatus');
     const sheetSelect = safeGetSelect('sheetSelect');
-    if (!sheetSelect?.value) {
-        BGM.Dialog.alert('提示', '请先选择目标工作表');
+    if (!sheetSelect)
         return;
-    }
-    sheetLocked = !sheetLocked;
-    if (sheetLocked) {
-        lockBtn.textContent = '🔓 解锁';
-        lockBtn.classList.add('locked');
-        sheetSelect.disabled = true;
-        bgmLog(LOG_LEVELS.INFO, '[enrich] 目标工作表已锁定');
-    }
-    else {
-        lockBtn.textContent = '🔒 锁定';
-        lockBtn.classList.remove('locked');
-        sheetSelect.disabled = false;
-        bgmLog(LOG_LEVELS.INFO, '[enrich] 目标工作表已解锁');
+    sheetSelect.disabled = BGM.enrich.isLocked;
+    if (!BGM.enrich.isLocked) {
+        state.bangumiSheet = null;
     }
 }
 // ========== 源数据预览 ==========
@@ -466,7 +467,7 @@ function renderSourcePreview(ws, _mapping) {
     bgmLog(LOG_LEVELS.INFO, `[enrich] 源数据预览已渲染: ${rowsHtml.length} 行`);
 }
 // ========== 匹配预览 ==========
-function previewMatch() {
+export function previewMatch() {
     if (!state.newAnimeSheet) {
         BGM.Dialog.alert('提示', '请先选择新番表文件并识别表头');
         return;
@@ -562,7 +563,7 @@ function renderMatchResultsToTable(matches) {
     }
 }
 // ========== 富化执行 ==========
-function startEnrichment() {
+export function startEnrichment() {
     if (state.isEnriching) {
         bgmLog(LOG_LEVELS.WARN, '[enrich] 富化正在进行中，忽略重复请求');
         return;
@@ -570,6 +571,14 @@ function startEnrichment() {
     if (!state.newAnimeSheet) {
         BGM.Dialog.alert('提示', '请先选择新番表文件并识别表头');
         return;
+    }
+    // 如果 state 中没有 bangumiSheet，尝试从锁定状态获取
+    if (!state.bangumiSheet) {
+        const locked = getLockedEnrichSheet();
+        if (locked) {
+            state.bangumiSheet = locked[1];
+            bgmLog(LOG_LEVELS.INFO, `[enrich] 使用锁定的目标工作表: ${locked[1].Name}`);
+        }
     }
     if (!state.bangumiSheet) {
         BGM.Dialog.alert('提示', '请先选择目标 Bangumi 工作表');
@@ -606,11 +615,23 @@ function startEnrichment() {
         bgmLog(LOG_LEVELS.INFO, `[enrich] 开始富化，共 ${state.matches.length} 条匹配`);
         const results = enrichEntries(state.newAnimeSheet, state.bangumiSheet, state.matches, config, progressCallback);
         showProgressUI(false);
-        renderEnrichSummary(results);
-        bgmLog(LOG_LEVELS.INFO, `[enrich] 富化完成: ${results.length} 条结果`);
+        const allConflicts = collectAllConflicts(results);
+        if (allConflicts.length > 0) {
+            state.pendingConflicts = allConflicts;
+            state.currentConflictIndex = 0;
+            showConflictDialog();
+        }
+        else {
+            renderEnrichSummary(results);
+        }
+        bgmLog(LOG_LEVELS.INFO, `[enrich] 富化完成: ${results.length} 条结果, 冲突 ${allConflicts.length} 条`);
     }
     catch (e) {
-        BGM.handleError(e, { showAlert: false, level: BGM.ErrorLevel.ERROR, context: 'startEnrichment' });
+        BGM.handleError(e, {
+            showAlert: false,
+            level: BGM.ErrorLevel.ERROR,
+            context: 'startEnrichment',
+        });
         BGM.Dialog.error('错误', '富化执行失败: ' + (e instanceof Error ? e.message : String(e)));
     }
     finally {
@@ -669,11 +690,15 @@ function renderEnrichSummary(results) {
         loadRecentRecords();
     }
     catch (e) {
-        BGM.handleError(e, { showAlert: false, level: BGM.ErrorLevel.INFO, context: 'renderEnrichSummary' });
+        BGM.handleError(e, {
+            showAlert: false,
+            level: BGM.ErrorLevel.INFO,
+            context: 'renderEnrichSummary',
+        });
     }
 }
 // ========== 富化记录 ==========
-function openEnrichRecordSheet() {
+export function openEnrichRecordSheet() {
     try {
         const sheet = getOrCreateEnrichRecordSheet();
         const app = getApp();
@@ -683,11 +708,15 @@ function openEnrichRecordSheet() {
         }
     }
     catch (e) {
-        BGM.handleError(e, { showAlert: false, level: BGM.ErrorLevel.ERROR, context: 'openEnrichRecordSheet' });
+        BGM.handleError(e, {
+            showAlert: false,
+            level: BGM.ErrorLevel.ERROR,
+            context: 'openEnrichRecordSheet',
+        });
         BGM.Dialog.error('错误', '无法打开富化记录工作表');
     }
 }
-function clearRecords() {
+export function clearRecords() {
     BGM.Dialog.confirm('确定要清除所有富化记录吗？此操作不可撤销。', (confirmed) => {
         if (!confirmed)
             return;
@@ -730,7 +759,13 @@ function loadRecentRecords() {
         const recordsHtml = recentRecords
             .map((r) => {
             const actionClass = `record-action-${r.action}`;
-            const actionText = r.action === 'fill' ? '填充' : r.action === 'append' ? '追加' : r.action === 'skip' ? '跳过' : '错误';
+            const actionText = r.action === 'fill'
+                ? '填充'
+                : r.action === 'append'
+                    ? '追加'
+                    : r.action === 'skip'
+                        ? '跳过'
+                        : '错误';
             const name = escapeHtml(r.name);
             const field = escapeHtml(r.enrichedField);
             const newValue = escapeHtml(r.newValue);
@@ -754,7 +789,11 @@ function loadRecentRecords() {
         bgmLog(LOG_LEVELS.INFO, `[enrich] 最近记录已加载: ${records.length} 条`);
     }
     catch (e) {
-        BGM.handleError(e, { showAlert: false, level: BGM.ErrorLevel.INFO, context: 'loadRecentRecords' });
+        BGM.handleError(e, {
+            showAlert: false,
+            level: BGM.ErrorLevel.INFO,
+            context: 'loadRecentRecords',
+        });
     }
 }
 // ========== 预览表格渲染（导出函数） ==========
@@ -844,6 +883,108 @@ export function renderMatchResults(container, matches) {
 export function renderProgress(progress) {
     updateProgressUI(progress);
 }
+// ========== 冲突对话框 ==========
+function collectAllConflicts(results) {
+    const all = [];
+    for (const r of results) {
+        if (r.conflicts && r.conflicts.length > 0) {
+            all.push(...r.conflicts);
+        }
+    }
+    return all;
+}
+function showConflictDialog() {
+    const dialogEl = safeGetElement('conflictDialog');
+    if (!dialogEl)
+        return;
+    const conflict = state.pendingConflicts[state.currentConflictIndex];
+    if (!conflict) {
+        hideConflictDialog();
+        return;
+    }
+    const total = state.pendingConflicts.length;
+    const current = state.currentConflictIndex + 1;
+    const percent = Math.round((current / total) * 100);
+    const html = `
+    <div class="conflict-header">
+      <span class="conflict-title">⚡ 字段冲突确认 (${current}/${total})</span>
+      <div class="conflict-progress">
+        <div style="width:${percent}%;height:4px;background:#4a90d9;border-radius:2px;"></div>
+      </div>
+    </div>
+    <div class="conflict-body">
+      <div class="conflict-item">
+        <div class="conflict-row">
+          <span class="conflict-label">条目：</span>
+          <span class="conflict-name">${escapeHtml(conflict.newAnimeName)}</span>
+        </div>
+        <div class="conflict-row">
+          <span class="conflict-label">字段：</span>
+          <span class="conflict-field">${escapeHtml(conflict.fieldName)}</span>
+        </div>
+        <div class="conflict-row">
+          <span class="conflict-label">现有值：</span>
+          <span class="conflict-old">${escapeHtml(conflict.oldValue)}</span>
+        </div>
+        <div class="conflict-row">
+          <span class="conflict-label">新番表值：</span>
+          <span class="conflict-new">${escapeHtml(conflict.newValue)}</span>
+        </div>
+      </div>
+      <div class="conflict-hint">💡 选择如何处理此冲突</div>
+    </div>
+    <div class="conflict-footer">
+      <button class="btn conflict-btn-btn" id="conflictAppend" data-resolution="append">
+        🔗 全部增量更新
+      </button>
+      <button class="btn conflict-btn-keep" id="conflictKeep" data-resolution="keep">
+        📋 保留原名
+      </button>
+      <button class="btn conflict-btn-overwrite" id="conflictOverwrite" data-resolution="overwrite">
+        ✏️ 使用新番表名
+      </button>
+    </div>
+  `;
+    dialogEl.innerHTML = sanitizeHtml(html);
+    dialogEl.style.display = 'block';
+    dialogEl.querySelectorAll('[data-resolution]').forEach((btn) => {
+        btn.addEventListener('click', () => {
+            const resolution = btn.dataset.resolution;
+            handleConflictResolution(resolution);
+        });
+    });
+}
+function hideConflictDialog() {
+    const dialogEl = safeGetElement('conflictDialog');
+    if (dialogEl) {
+        dialogEl.style.display = 'none';
+        dialogEl.innerHTML = '';
+    }
+}
+function handleConflictResolution(resolution) {
+    const conflict = state.pendingConflicts[state.currentConflictIndex];
+    if (!conflict)
+        return;
+    conflict.resolution = resolution;
+    try {
+        const enriched = [];
+        if (state.bangumiSheet) {
+            resolveConflictField(state.bangumiSheet, conflict, enriched);
+        }
+        bgmLog(LOG_LEVELS.INFO, `[conflict] 字段 "${conflict.fieldName}" (${conflict.newAnimeName}): ${resolution}`);
+    }
+    catch (e) {
+        bgmLog(LOG_LEVELS.ERROR, `[conflict] 解析冲突失败: ${e instanceof Error ? e.message : String(e)}`);
+    }
+    state.currentConflictIndex++;
+    if (state.currentConflictIndex < state.pendingConflicts.length) {
+        showConflictDialog();
+    }
+    else {
+        hideConflictDialog();
+        bgmLog(LOG_LEVELS.INFO, '[conflict] 所有冲突已解决');
+        BGM.Dialog.alert('冲突解决完成', `共处理 ${state.currentConflictIndex} 个字段冲突`);
+    }
+}
 // ========== 导出 ==========
 export { state, cancelEnrichment, COLUMN_MAPPING_FIELDS };
-//# sourceMappingURL=enrich.js.map

@@ -611,4 +611,3 @@ async function _doAPISync(sheetIndex, token) {
         }
     }
 }
-//# sourceMappingURL=sync.js.map

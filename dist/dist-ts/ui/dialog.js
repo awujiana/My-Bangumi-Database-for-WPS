@@ -1,0 +1,1270 @@
+/**
+ * UI 对话框模块
+ * @module ui/dialog
+ * @description 自定义对话框、确认对话框、Toast 通知
+ */
+import { sanitizeHtml } from '../tools/sanitize.js';
+/**
+ * 构造同步配置摘要的工厂函数，统一各入口的配置构造逻辑。
+ * @param ctx 配置上下文
+ * @returns SyncConfigSummary 对象
+ */
+export function buildSyncConfig(ctx) {
+    const cfg = {};
+    if (ctx.source)
+        cfg.sourceLabel = ctx.source;
+    if (ctx.strategy)
+        cfg.strategyLabel = ctx.strategy;
+    if (ctx.direction)
+        cfg.directionLabel = ctx.direction;
+    if (ctx.selectedRowsOnly)
+        cfg.selectedRowsOnly = true;
+    if (ctx.timeFilter) {
+        const tf = ctx.timeFilter;
+        cfg.timeFilterLabel =
+            tf.range === 'future'
+                ? '预告/未来动漫'
+                : tf.range === 'year'
+                    ? `${tf.year}年全年`
+                    : tf.range === 'quarter'
+                        ? `${tf.year}年${tf.quarter}月新番`
+                        : `${tf.year}年${tf.month}月`;
+    }
+    if (ctx.extra && ctx.extra.length > 0)
+        cfg.extra = ctx.extra;
+    return cfg;
+}
+// ========== 常量与配置 ==========
+const DIALOG_TYPES = {
+    alert: {
+        id: 'bgmAlertDialog',
+        titleId: 'bgmAlertTitle',
+        msgId: 'bgmAlertMessage',
+        buttons: [{ id: 'bgmAlertOk', cls: 'bgm-btn-primary', text: '确定', event: 'ok' }],
+    },
+    confirm: {
+        id: 'bgmConfirmDialog',
+        titleId: 'bgmConfirmTitle',
+        msgId: 'bgmConfirmMessage',
+        buttons: [
+            { id: 'bgmConfirmOk', cls: 'bgm-btn-primary', text: '确定', event: 'ok' },
+            { id: 'bgmConfirmCancel', cls: 'bgm-btn-default', text: '取消', event: 'cancel' },
+        ],
+    },
+    error: {
+        id: 'bgmErrorDialog',
+        titleId: 'bgmErrorTitle',
+        msgId: 'bgmErrorMessage',
+        buttons: [{ id: 'bgmErrorOk', cls: 'bgm-btn-danger', text: '确定', event: 'ok' }],
+    },
+    warning: {
+        id: 'bgmWarningDialog',
+        titleId: 'bgmWarningTitle',
+        msgId: 'bgmWarningMessage',
+        buttons: [{ id: 'bgmWarningOk', cls: 'bgm-btn-warning', text: '确定', event: 'ok' }],
+    },
+    success: {
+        id: 'bgmSuccessDialog',
+        titleId: 'bgmSuccessTitle',
+        msgId: 'bgmSuccessMessage',
+        buttons: [{ id: 'bgmSuccessOk', cls: 'bgm-btn-success', text: '确定', event: 'ok' }],
+    },
+    input: {
+        id: 'bgmInputDialog',
+        titleId: 'bgmInputTitle',
+        msgId: 'bgmInputPrompt',
+        buttons: [
+            { id: 'bgmInputOk', cls: 'bgm-btn-primary', text: '确定', event: 'ok' },
+            { id: 'bgmInputCancel', cls: 'bgm-btn-default', text: '取消', event: 'cancel' },
+        ],
+    },
+};
+// ========== 模块内部状态 ==========
+let dialogInitialized = false;
+let _dialogCallback = null;
+let _toastTimer = null;
+const dom = {};
+// ========== 初始化 ==========
+function ensureDialogs() {
+    if (dialogInitialized)
+        return;
+    dialogInitialized = true;
+    createDialogs();
+}
+if (typeof document !== 'undefined') {
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', ensureDialogs);
+    }
+    else {
+        setTimeout(ensureDialogs, 0);
+    }
+}
+function createDialogs() {
+    if (document.getElementById('bgmDialogContainer'))
+        return;
+    const container = document.createElement('div');
+    container.id = 'bgmDialogContainer';
+    document.body.appendChild(container);
+    function createDialogElement(type, iconClass, iconChar, defaultTitle) {
+        const cfg = DIALOG_TYPES[type];
+        if (!cfg)
+            return document.createElement('div');
+        const modal = document.createElement('div');
+        modal.id = cfg.id;
+        modal.className = 'bgm-modal';
+        modal.style.display = 'none';
+        // 可访问性：声明对话框角色
+        modal.setAttribute('role', 'dialog');
+        modal.setAttribute('aria-modal', 'true');
+        modal.setAttribute('aria-labelledby', cfg.titleId);
+        const content = document.createElement('div');
+        content.className = 'bgm-modal-content ' + type;
+        const header = document.createElement('div');
+        header.className = 'bgm-dialog-header';
+        const icon = document.createElement('span');
+        icon.className = 'bgm-dialog-icon ' + iconClass;
+        icon.innerHTML = sanitizeHtml(iconChar);
+        const title = document.createElement('span');
+        title.id = cfg.titleId;
+        title.className = 'bgm-dialog-title';
+        title.textContent = defaultTitle;
+        header.appendChild(icon);
+        header.appendChild(title);
+        content.appendChild(header);
+        const body = document.createElement('div');
+        body.className = 'bgm-dialog-body';
+        const msg = document.createElement('p');
+        msg.id = cfg.msgId;
+        msg.className = 'bgm-dialog-message';
+        body.appendChild(msg);
+        content.appendChild(body);
+        const footer = document.createElement('div');
+        footer.className = 'bgm-dialog-footer';
+        cfg.buttons.forEach((btn) => {
+            const button = document.createElement('button');
+            button.id = btn.id;
+            button.className = 'bgm-btn ' + btn.cls;
+            button.textContent = btn.text;
+            button.dataset.event = btn.event;
+            footer.appendChild(button);
+        });
+        content.appendChild(footer);
+        modal.appendChild(content);
+        return modal;
+    }
+    container.appendChild(createDialogElement('alert', 'bgm-icon-info', '&#9432;', '提示'));
+    container.appendChild(createDialogElement('confirm', 'bgm-icon-question', '&#63;', '确认'));
+    container.appendChild(createDialogElement('error', 'bgm-icon-error', '&#10006;', '错误'));
+    container.appendChild(createDialogElement('warning', 'bgm-icon-warning', '&#9888;', '警告'));
+    container.appendChild(createDialogElement('success', 'bgm-icon-success', '&#10004;', '成功'));
+    container.appendChild(createDialogElement('input', 'bgm-icon-info', '&#9432;', '输入'));
+    const inputBody = document.querySelector('#bgmInputDialog .bgm-dialog-body');
+    if (inputBody) {
+        const inputField = document.createElement('input');
+        inputField.type = 'text';
+        inputField.id = 'bgmInputField';
+        inputField.className = 'bgm-input-field';
+        inputBody.appendChild(inputField);
+    }
+    const toast = document.createElement('div');
+    toast.id = 'bgmToast';
+    toast.className = 'bgm-toast';
+    container.appendChild(toast);
+    bindAllEvents();
+}
+function bindAllEvents() {
+    for (const type in DIALOG_TYPES) {
+        const cfg = DIALOG_TYPES[type];
+        if (!cfg)
+            continue;
+        dom[cfg.id] = document.getElementById(cfg.id);
+        dom[cfg.titleId] = document.getElementById(cfg.titleId);
+        dom[cfg.msgId] = document.getElementById(cfg.msgId);
+        cfg.buttons.forEach((btn) => {
+            dom[btn.id] = document.getElementById(btn.id);
+        });
+    }
+    dom.bgmToast = document.getElementById('bgmToast');
+    dom.bgmInputField = document.getElementById('bgmInputField');
+    const container = document.getElementById('bgmDialogContainer');
+    if (!container)
+        return;
+    container.addEventListener('click', (e) => {
+        const btn = e.target.closest('button');
+        if (!btn)
+            return;
+        const eventType = btn.dataset.event;
+        if (!eventType)
+            return;
+        const modal = btn.closest('.bgm-modal');
+        if (!modal)
+            return;
+        modal.style.display = 'none';
+        if (_dialogCallback) {
+            try {
+                if (eventType === 'ok' && _dialogCallback.onOk) {
+                    if (modal.id === 'bgmInputDialog') {
+                        const inputValue = dom.bgmInputField
+                            ? dom.bgmInputField.value.trim()
+                            : '';
+                        _dialogCallback.onOk(inputValue);
+                    }
+                    else {
+                        _dialogCallback.onOk();
+                    }
+                }
+                else if (eventType === 'cancel' && _dialogCallback.onCancel) {
+                    _dialogCallback.onCancel();
+                }
+            }
+            catch (e) {
+                console.error('[dialog] 回调执行失败:', e);
+            }
+            _dialogCallback = null;
+        }
+    });
+    dom.bgmInputField?.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter')
+            dom.bgmInputOk?.click();
+    });
+}
+function _showDialog(type, opts = {}) {
+    const cfg = DIALOG_TYPES[type];
+    if (!cfg)
+        return;
+    const dialog = dom[cfg.id];
+    if (!dialog) {
+        if (type === 'confirm') {
+            if (window.confirm(opts.message || ''))
+                opts.onOk?.();
+            else
+                opts.onCancel?.();
+        }
+        else if (type === 'input') {
+            const result = window.prompt(opts.prompt || opts.message || '', opts.defaultValue || '');
+            if (result !== null)
+                opts.onOk?.(result);
+            else
+                opts.onCancel?.();
+        }
+        else {
+            window.alert(opts.message);
+            opts.onOk?.();
+        }
+        return;
+    }
+    const titleEl = dom[cfg.titleId];
+    const msgEl = dom[cfg.msgId];
+    if (titleEl)
+        titleEl.textContent = opts.title || '';
+    if (msgEl)
+        msgEl.textContent = opts.prompt || opts.message || '';
+    if (type === 'input' && dom.bgmInputField) {
+        ;
+        dom.bgmInputField.value = opts.defaultValue || '';
+        dom.bgmInputField.focus();
+    }
+    const callback = {};
+    if (opts.onOk)
+        callback.onOk = opts.onOk;
+    if (opts.onCancel)
+        callback.onCancel = opts.onCancel;
+    _dialogCallback = callback;
+    dialog.style.display = 'flex';
+}
+// ========== 同步结果对话框 ==========
+let _syncResultDialog = null;
+function ensureSyncResultDialog() {
+    if (_syncResultDialog)
+        return _syncResultDialog;
+    const modal = document.createElement('div');
+    modal.id = 'bgmSyncResultDialog';
+    modal.className = 'bgm-modal';
+    modal.style.display = 'none';
+    // 可访问性：声明对话框角色
+    modal.setAttribute('role', 'dialog');
+    modal.setAttribute('aria-modal', 'true');
+    modal.setAttribute('aria-labelledby', 'bgmSyncResultTitle');
+    modal.innerHTML = sanitizeHtml(`
+        <div class="bgm-modal-content success" style="max-width: 520px;">
+            <div class="bgm-dialog-header">
+                <span class="bgm-dialog-icon bgm-icon-success">&#10004;</span>
+                <span class="bgm-dialog-title">同步结果</span>
+            </div>
+            <div class="bgm-dialog-body">
+                <div id="bgmSyncSummary" class="bgm-dialog-message" style="white-space: pre-line;"></div>
+                <div id="bgmSyncDetails" style="display:none; margin-top: 8px; max-height: 300px; overflow-y: auto; font-size: 12px; line-height: 1.6; white-space: pre; font-family: monospace;"></div>
+            </div>
+            <div class="bgm-dialog-footer">
+                <button id="bgmSyncToggleDetails" class="bgm-btn bgm-btn-default">显示详情</button>
+                <button id="bgmSyncResultOk" class="bgm-btn bgm-btn-success">确定</button>
+            </div>
+        </div>
+    `);
+    document.body.appendChild(modal);
+    const detailsEl = modal.querySelector('#bgmSyncDetails');
+    const toggleBtn = modal.querySelector('#bgmSyncToggleDetails');
+    toggleBtn.addEventListener('click', () => {
+        const expanded = detailsEl.style.display !== 'none';
+        detailsEl.style.display = expanded ? 'none' : 'block';
+        toggleBtn.textContent = expanded ? '显示详情' : '收起详情';
+    });
+    modal.querySelector('#bgmSyncResultOk')?.addEventListener('click', () => {
+        modal.style.display = 'none';
+    });
+    _syncResultDialog = modal;
+    return modal;
+}
+export function showSyncResult(summary, details) {
+    const modal = ensureSyncResultDialog();
+    const summaryEl = modal.querySelector('#bgmSyncSummary');
+    const detailsEl = modal.querySelector('#bgmSyncDetails');
+    const toggleBtn = modal.querySelector('#bgmSyncToggleDetails');
+    summaryEl.textContent = summary;
+    detailsEl.textContent = details.length > 0 ? details.join('\n') : '无详情';
+    // 重置为收起状态
+    detailsEl.style.display = 'none';
+    toggleBtn.textContent = '显示详情';
+    toggleBtn.style.display = details.length > 0 ? '' : 'none';
+    modal.style.display = 'flex';
+}
+// ========== 同步进度弹窗 ==========
+let _syncProgressDialog = null;
+let _syncProgressLogCount = 0;
+const _SYNC_PROGRESS_LOG_MAX = 500;
+/** 全局同步开始时间戳（ms），用于计算整体 ETA */
+let _syncGlobalStart = 0;
+/** 全局累计暂停时长（ms），用于在暂停时扣除时间 */
+let _syncPausedDuration = 0;
+/** 暂停开始时间戳（ms） */
+let _syncPauseStart = 0;
+/** 暂停/恢复/停止按钮回调 */
+let _syncPauseHandler = null;
+let _syncResumeHandler = null;
+let _syncStopHandler = null;
+/** 下一步按钮回调（点击后打开同步完成详情弹窗） */
+let _syncNextHandler = null;
+/** 当前是否处于暂停状态（统一监听器据此决定调用 pause 还是 resume） */
+let _syncPaused = false;
+/** 触发同步弹窗的元素（关闭后恢复焦点） */
+let _syncProgressTrigger = null;
+/** ESC 键监听器引用（仅在完成状态下注册） */
+let _syncProgressEscHandler = null;
+/** 内部：根据暂停状态更新按钮文本/样式/aria-label，并追踪暂停时间用于全局 ETA */
+function _setSyncPausedState(paused) {
+    // 追踪暂停时间，用于全局 ETA 扣除
+    if (paused) {
+        _syncPauseStart = Date.now();
+    }
+    else if (_syncPauseStart > 0) {
+        _syncPausedDuration += Date.now() - _syncPauseStart;
+        _syncPauseStart = 0;
+    }
+    _syncPaused = paused;
+    const pauseBtn = _syncProgressDialog?.querySelector('#bgmSyncProgressPauseBtn');
+    if (!pauseBtn)
+        return;
+    pauseBtn.textContent = paused ? '▶️ 继续' : '⏸️ 暂停';
+    pauseBtn.setAttribute('aria-label', paused ? '继续同步' : '暂停同步');
+    if (paused) {
+        pauseBtn.classList.remove('bgm-btn-default');
+        pauseBtn.classList.add('bgm-btn-success');
+    }
+    else {
+        pauseBtn.classList.add('bgm-btn-default');
+        pauseBtn.classList.remove('bgm-btn-success');
+    }
+}
+/** 内部：清理所有回调与状态（complete/hide 时调用） */
+function _clearSyncProgressHandlers() {
+    _syncPauseHandler = null;
+    _syncResumeHandler = null;
+    _syncStopHandler = null;
+    _syncNextHandler = null;
+    _syncPaused = false;
+    // 移除 ESC 监听器，避免泄漏
+    if (_syncProgressEscHandler) {
+        document.removeEventListener('keydown', _syncProgressEscHandler);
+        _syncProgressEscHandler = null;
+    }
+}
+function ensureSyncProgressDialog() {
+    if (_syncProgressDialog)
+        return _syncProgressDialog;
+    const modal = document.createElement('div');
+    modal.id = 'bgmSyncProgressDialog';
+    modal.className = 'bgm-modal';
+    modal.style.display = 'none';
+    // 可访问性：声明对话框角色
+    modal.setAttribute('role', 'dialog');
+    modal.setAttribute('aria-modal', 'true');
+    modal.setAttribute('aria-labelledby', 'bgmSyncProgressTitle');
+    modal.setAttribute('aria-hidden', 'true');
+    modal.innerHTML = sanitizeHtml(`
+        <div class="bgm-modal-content bgm-sync-progress__content">
+            <div class="bgm-dialog-header bgm-sync-progress__header" id="bgmSyncProgressHeader">
+                <div class="bgm-dialog-header-left">
+                    <span class="bgm-dialog-icon" id="bgmSyncProgressIcon">🔄</span>
+                    <span class="bgm-dialog-title" id="bgmSyncProgressTitle">正在同步...</span>
+                </div>
+                <button id="bgmSyncProgressCloseTop" type="button" class="bgm-dialog-close-btn" aria-label="关闭弹窗" title="关闭">✕</button>
+            </div>
+            <div class="bgm-dialog-body bgm-sync-progress__body">
+                <!-- 配置摘要区（默认隐藏，由 showSyncProgressDialog 填充） -->
+                <div id="bgmSyncProgressConfig" class="bgm-sync-progress__config" style="display:none;"></div>
+                <!-- 进度区 -->
+                <div id="bgmSyncProgressSection">
+                    <div class="bgm-sync-progress__meta" aria-live="polite" aria-atomic="true">
+                        <span id="bgmSyncProgressLabel">进度: 0/0</span>
+                        <span id="bgmSyncProgressPercent">0%</span>
+                        <span id="bgmSyncProgressEta" class="bgm-sync-progress__eta" style="display:none;"></span>
+                        <span id="bgmSyncProgressGlobalEta" class="bgm-sync-progress__global-eta" style="display:none;"></span>
+                    </div>
+                    <div class="bgm-sync-progress__track">
+                        <div id="bgmSyncProgressBar" class="bgm-sync-progress__bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"></div>
+                    </div>
+                    <div id="bgmSyncProgressCurrent" class="bgm-sync-progress__current"></div>
+                    <div class="bgm-sync-progress__log-wrap">
+                        <div class="bgm-sync-progress__log-label">实时日志:</div>
+                        <div id="bgmSyncProgressLog" class="bgm-sync-progress__log" role="log" aria-live="polite"></div>
+                    </div>
+                </div>
+                <!-- 完成结果区（默认隐藏） -->
+                <div id="bgmSyncProgressResult" style="display: none;">
+                    <div id="bgmSyncProgressSummary" class="bgm-dialog-message bgm-sync-progress__result-summary"></div>
+                    <div id="bgmSyncProgressChart" class="bgm-sync-progress__chart"></div>
+                    <div id="bgmSyncProgressDetails" class="bgm-sync-progress__result-details"></div>
+                </div>
+            </div>
+            <div class="bgm-dialog-footer" id="bgmSyncProgressFooter">
+                <!-- 运行中按钮 -->
+                <div id="bgmSyncProgressRunningBtns" class="bgm-sync-progress__running-btns">
+                    <button id="bgmSyncProgressPauseBtn" type="button" class="bgm-btn bgm-btn-default" aria-label="暂停同步">⏸️ 暂停</button>
+                    <button id="bgmSyncProgressStop" type="button" class="bgm-btn bgm-btn-danger" aria-label="停止同步">⏹️ 停止</button>
+                </div>
+                <!-- 完成按钮（默认隐藏） -->
+                <div id="bgmSyncProgressDoneBtns" class="bgm-sync-progress__done-btns" style="display: none;">
+                    <button id="bgmSyncProgressToggleDetails" type="button" class="bgm-btn bgm-btn-default" aria-label="显示详情">显示详情</button>
+                    <button id="bgmSyncProgressClose" type="button" class="bgm-btn bgm-btn-default" aria-label="关闭弹窗">关闭</button>
+                    <button id="bgmSyncProgressNext" type="button" class="bgm-btn bgm-btn-primary" aria-label="下一步">下一步 →</button>
+                </div>
+            </div>
+        </div>
+    `);
+    document.body.appendChild(modal);
+    // 绑定按钮事件：统一使用 addEventListener，禁止 onclick 重绑定
+    const pauseBtn = modal.querySelector('#bgmSyncProgressPauseBtn');
+    const stopBtn = modal.querySelector('#bgmSyncProgressStop');
+    const closeBtn = modal.querySelector('#bgmSyncProgressClose');
+    const closeTopBtn = modal.querySelector('#bgmSyncProgressCloseTop');
+    const nextBtn = modal.querySelector('#bgmSyncProgressNext');
+    const toggleDetailsBtn = modal.querySelector('#bgmSyncProgressToggleDetails');
+    // 暂停/继续按钮：根据 _syncPaused 标志自行决定调用哪个处理器，并自行更新按钮文本
+    if (pauseBtn) {
+        pauseBtn.addEventListener('click', () => {
+            if (!_syncProgressDialog || _syncProgressDialog.style.display === 'none')
+                return;
+            if (_syncPaused) {
+                _syncResumeHandler?.();
+                _setSyncPausedState(false);
+            }
+            else {
+                _syncPauseHandler?.();
+                _setSyncPausedState(true);
+            }
+        });
+    }
+    // 停止按钮
+    if (stopBtn) {
+        stopBtn.addEventListener('click', () => {
+            if (!_syncProgressDialog || _syncProgressDialog.style.display === 'none')
+                return;
+            _syncStopHandler?.();
+        });
+    }
+    // 关闭按钮
+    if (closeBtn) {
+        closeBtn.addEventListener('click', () => {
+            hideSyncProgressDialog();
+        });
+    }
+    // 右上角关闭按钮（始终可见）
+    if (closeTopBtn) {
+        closeTopBtn.addEventListener('click', () => {
+            hideSyncProgressDialog();
+        });
+    }
+    // 下一步按钮
+    if (nextBtn) {
+        nextBtn.addEventListener('click', () => {
+            const handler = _syncNextHandler;
+            hideSyncProgressDialog();
+            handler?.();
+        });
+    }
+    // 详情切换按钮
+    if (toggleDetailsBtn) {
+        toggleDetailsBtn.addEventListener('click', () => {
+            const detailsEl = modal.querySelector('#bgmSyncProgressDetails');
+            if (!detailsEl)
+                return;
+            const expanded = detailsEl.style.display !== 'none';
+            detailsEl.style.display = expanded ? 'none' : 'block';
+            toggleDetailsBtn.textContent = expanded ? '显示详情' : '收起详情';
+            toggleDetailsBtn.setAttribute('aria-label', expanded ? '显示详情' : '收起详情');
+        });
+    }
+    _syncProgressDialog = modal;
+    return modal;
+}
+/**
+ * 渲染配置摘要为 HTML 字符串
+ */
+export function renderConfigSummary(cfg) {
+    const items = [];
+    if (cfg.sourceLabel)
+        items.push(`<span class="cfg-item">📁 ${cfg.sourceLabel}</span>`);
+    if (cfg.strategyLabel)
+        items.push(`<span class="cfg-item">🔧 ${cfg.strategyLabel}</span>`);
+    if (cfg.directionLabel)
+        items.push(`<span class="cfg-item">📡 ${cfg.directionLabel}</span>`);
+    if (cfg.timeFilterLabel)
+        items.push(`<span class="cfg-item">📅 ${cfg.timeFilterLabel}</span>`);
+    if (cfg.selectedRowsOnly)
+        items.push(`<span class="cfg-item warn">⚠️ 仅选中行</span>`);
+    if (cfg.extra) {
+        for (const ex of cfg.extra) {
+            items.push(`<span class="cfg-item">${ex.label}: ${ex.value}</span>`);
+        }
+    }
+    return items.length > 0 ? `<div class="cfg-summary">${items.join('')}</div>` : '';
+}
+/**
+ * 显示同步进度弹窗（运行中状态）
+ * @param title 弹窗标题（如"正在同步 - 选中行同步"）
+ * @param handlers 暂停/恢复/停止回调集合
+ * @param config 可选的同步配置摘要，显示在进度区上方
+ */
+export function showSyncProgressDialog(title, handlers, config) {
+    const modal = ensureSyncProgressDialog();
+    // 保存触发元素，用于关闭后恢复焦点
+    _syncProgressTrigger = document.activeElement;
+    // 重置回调与状态（必须在重置 UI 前完成，避免上次同步残留）
+    _clearSyncProgressHandlers();
+    _syncPauseHandler = handlers.onPause;
+    _syncResumeHandler = handlers.onResume;
+    _syncStopHandler = handlers.onStop;
+    _syncPaused = false;
+    _syncProgressLogCount = 0;
+    // 初始化全局 ETA 追踪
+    _syncGlobalStart = Date.now();
+    _syncPausedDuration = 0;
+    _syncPauseStart = 0;
+    // 重置为运行中状态
+    const titleEl = modal.querySelector('#bgmSyncProgressTitle');
+    const iconEl = modal.querySelector('#bgmSyncProgressIcon');
+    const progressSection = modal.querySelector('#bgmSyncProgressSection');
+    const resultSection = modal.querySelector('#bgmSyncProgressResult');
+    const runningBtns = modal.querySelector('#bgmSyncProgressRunningBtns');
+    const doneBtns = modal.querySelector('#bgmSyncProgressDoneBtns');
+    const pauseBtn = modal.querySelector('#bgmSyncProgressPauseBtn');
+    if (titleEl)
+        titleEl.textContent = title;
+    if (iconEl)
+        iconEl.textContent = '🔄';
+    if (progressSection)
+        progressSection.style.display = '';
+    if (resultSection)
+        resultSection.style.display = 'none';
+    if (runningBtns)
+        runningBtns.style.display = 'flex';
+    if (doneBtns)
+        doneBtns.style.display = 'none';
+    // 重置暂停按钮（文本/样式/aria-label），避免上次同步残留的 resume 状态
+    if (pauseBtn) {
+        pauseBtn.textContent = '⏸️ 暂停';
+        pauseBtn.setAttribute('aria-label', '暂停同步');
+        pauseBtn.classList.remove('bgm-btn-success');
+        pauseBtn.classList.add('bgm-btn-default');
+    }
+    // 渲染配置摘要
+    const configEl = modal.querySelector('#bgmSyncProgressConfig');
+    if (configEl) {
+        if (config) {
+            configEl.innerHTML = renderConfigSummary(config);
+            configEl.style.display = '';
+        }
+        else {
+            configEl.innerHTML = '';
+            configEl.style.display = 'none';
+        }
+    }
+    // 重置进度
+    const bar = modal.querySelector('#bgmSyncProgressBar');
+    const label = modal.querySelector('#bgmSyncProgressLabel');
+    const percent = modal.querySelector('#bgmSyncProgressPercent');
+    const current = modal.querySelector('#bgmSyncProgressCurrent');
+    const log = modal.querySelector('#bgmSyncProgressLog');
+    const etaEl = modal.querySelector('#bgmSyncProgressEta');
+    const globalEtaEl = modal.querySelector('#bgmSyncProgressGlobalEta');
+    if (bar) {
+        bar.style.width = '0%';
+        bar.textContent = '';
+        bar.setAttribute('aria-valuenow', '0');
+    }
+    if (label)
+        label.textContent = '进度: 准备中...';
+    if (percent)
+        percent.textContent = '--%';
+    if (current)
+        current.textContent = '';
+    if (log)
+        log.textContent = '';
+    if (etaEl) {
+        etaEl.textContent = '';
+        etaEl.style.display = 'none';
+    }
+    if (globalEtaEl) {
+        globalEtaEl.textContent = '';
+        globalEtaEl.style.display = 'none';
+    }
+    modal.style.display = 'flex';
+    modal.setAttribute('aria-hidden', 'false');
+    // 焦点管理：将焦点移至暂停按钮，便于键盘操作
+    pauseBtn?.focus();
+}
+/**
+ * 更新进度条
+ * @param current 当前完成数
+ * @param total 总数
+ * @param message 当前任务描述（显示在进度条下方）
+ * @param logLine 可选的实时日志行（追加到日志区）
+ * @param eta 可选的 ETA 字符串（显示在 ETA 区域，独立于 logLine）
+ */
+export function updateSyncProgressDialog(current, total, message, logLine, eta) {
+    const modal = _syncProgressDialog;
+    // 弹窗未显示时快速返回，避免无效 DOM 写入
+    if (!modal || modal.style.display === 'none')
+        return;
+    const bar = modal.querySelector('#bgmSyncProgressBar');
+    const label = modal.querySelector('#bgmSyncProgressLabel');
+    const percent = modal.querySelector('#bgmSyncProgressPercent');
+    const currentEl = modal.querySelector('#bgmSyncProgressCurrent');
+    const log = modal.querySelector('#bgmSyncProgressLog');
+    const etaEl = modal.querySelector('#bgmSyncProgressEta');
+    const globalEtaEl = modal.querySelector('#bgmSyncProgressGlobalEta');
+    const pct = total > 0 ? Math.round((current / total) * 100) : 0;
+    if (bar) {
+        bar.style.width = pct + '%';
+        bar.textContent = pct + '%';
+        bar.setAttribute('aria-valuenow', String(pct));
+    }
+    if (label)
+        label.textContent = `进度: ${current}/${total}`;
+    if (percent)
+        percent.textContent = pct + '%';
+    if (currentEl && message)
+        currentEl.textContent = message;
+    // 显示阶段 ETA：优先使用独立的 eta 参数，兼容旧版 logLine 以"预计剩余"/"剩余:"开头的情况
+    const etaText = eta ??
+        (logLine &&
+            (logLine.startsWith('预计剩余') || logLine.startsWith('剩余:') ? logLine : undefined));
+    if (etaEl && etaText) {
+        etaEl.textContent = etaText;
+        etaEl.style.display = '';
+    }
+    else if (etaEl) {
+        etaEl.style.display = 'none';
+    }
+    // 计算全局 ETA（基于整体进度和已用时间）
+    if (globalEtaEl && _syncGlobalStart > 0 && total > 0) {
+        const now = Date.now();
+        // 扣除暂停时间
+        const effectiveElapsed = now - _syncGlobalStart - _syncPausedDuration;
+        if (effectiveElapsed > 0 && current > 0) {
+            // 处理的项数 / 有效耗时 = 速率
+            const rate = current / effectiveElapsed;
+            // 剩余项数 / 速率 = 剩余时间
+            const remaining = total - current;
+            const remainingMs = remaining / rate;
+            const elapsedStr = formatDuration(effectiveElapsed);
+            const remainingStr = formatDuration(remainingMs);
+            const totalStr = formatDuration(effectiveElapsed + remainingMs);
+            globalEtaEl.textContent = `⏱ 已用${elapsedStr} · 预计剩余${remainingStr} · 总计${totalStr}`;
+            globalEtaEl.style.display = '';
+        }
+        else if (current === 0) {
+            // 尚未开始，只显示已用时间
+            const elapsedStr = formatDuration(now - _syncGlobalStart);
+            globalEtaEl.textContent = `⏱ 已用${elapsedStr} · 计算中...`;
+            globalEtaEl.style.display = '';
+        }
+        else {
+            globalEtaEl.style.display = 'none';
+        }
+    }
+    // 将日志行追加到日志区（ETA 类型的 logLine 已在上方处理，不再重复追加）
+    if (logLine && log && logLine !== etaText) {
+        const nearBottom = log.scrollHeight - log.scrollTop - log.clientHeight < 30;
+        log.appendChild(document.createTextNode(logLine + '\n'));
+        _syncProgressLogCount++;
+        while (_syncProgressLogCount > _SYNC_PROGRESS_LOG_MAX) {
+            if (log.firstChild) {
+                log.removeChild(log.firstChild);
+                _syncProgressLogCount--;
+            }
+            else {
+                break;
+            }
+        }
+        if (nearBottom) {
+            log.scrollTop = log.scrollHeight;
+        }
+    }
+}
+/**
+ * 格式化耗时为可读字符串
+ */
+function formatDuration(ms) {
+    if (ms < 1000) {
+        const seconds = Math.max(0, ms / 1000);
+        return `${seconds.toFixed(2)}秒`;
+    }
+    const seconds = Math.floor(ms / 1000);
+    if (seconds < 60)
+        return `${seconds}秒`;
+    const minutes = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return secs > 0 ? `${minutes}分${secs.toString().padStart(2, '0')}秒` : `${minutes}分`;
+}
+/**
+ * 渲染同步统计图表（完整仪表盘布局，与 syncResultDialog 风格一致）
+ *
+ * 布局：
+ * ┌─ 概览条（进度环 + 关键指标） ──────────────────────────┐
+ * │  总条目  │  完成进度环  │  处理效率  │  耗时  │  速度   │
+ * └──────────────────────────────────────────────────────┘
+ * ┌─ 图表区 ──────────────────────────────────────────────┐
+ * │  ┌─ 环形分布图 ─┐  ┌─ 水平柱状图 ──────────────┐      │
+ * │  │   🍩 SVG     │  │  ✅ 新增 ████████         │      │
+ * │  │   图例       │  │  🔄 更新 ████            │      │
+ * │  └──────────────┘  │  ❌ 删除 ██             │      │
+ * │                    │  ⏭️ 无变更 ██████████     │      │
+ * │                    │  ⚠️ 失败  █              │      │
+ * │                    │  🔍 跳过  ███            │      │
+ * │                    └──────────────────────────┘      │
+ * └──────────────────────────────────────────────────────┘
+ * ┌─ 性能仪表盘 ────────────────────────────────────────┐
+ * │  ⏱ 1分30秒  │  ⚡ 15/s  │  📈 44%  │  🔮 预计剩余  │
+ * └──────────────────────────────────────────────────────┘
+ * ┌─ 元信息栏 ──────────────────────────────────────────┐
+ * │  🎯 策略  📥 远程  ✅ 完成  🔍 跳过  ⚠️ 失败        │
+ * └──────────────────────────────────────────────────────┘
+ */
+function renderSyncStatsChart(container, stats) {
+    const totalProcessed = stats.added + stats.updated + stats.deleted;
+    const totalActive = totalProcessed + stats.unchanged + stats.failed;
+    const totalAll = totalActive + stats.skipped;
+    // 各部分占比（基于 totalAll，包含 skipped）
+    const pctOf = (v) => (totalAll > 0 ? (v / totalAll) * 100 : 0);
+    const addedPct = pctOf(stats.added);
+    const updatedPct = pctOf(stats.updated);
+    const deletedPct = pctOf(stats.deleted);
+    const unchangedPct = pctOf(stats.unchanged);
+    const failedPct = pctOf(stats.failed);
+    const skippedPct = pctOf(stats.skipped);
+    // 完成度（已处理/总计，不含跳过）
+    const completionPct = totalActive > 0 ? Math.round((totalProcessed / totalActive) * 100) : 0;
+    // 效率（处理数/活跃总数）
+    const efficiencyPct = totalActive > 0 ? Math.round((totalProcessed / totalActive) * 100) : 0;
+    // 环形图 SVG 参数
+    const radius = 52;
+    const circumference = 2 * Math.PI * radius;
+    const seg = (pct) => (pct / 100) * circumference;
+    // 耗时格式化
+    const elapsedStr = formatDuration(stats.elapsedMs);
+    const speedStr = stats.avgSpeed > 0 ? stats.avgSpeed.toFixed(1) : '--';
+    // 预计剩余
+    const remaining = totalActive - totalProcessed;
+    const etaMs = stats.avgSpeed > 0 && remaining > 0 ? Math.round((remaining / stats.avgSpeed) * 1000) : 0;
+    // 概览卡片数据
+    const overviewCards = [
+        {
+            label: '远程总条目',
+            value: stats.remoteTotal,
+            sub: `本地 ${totalAll} 条`,
+            icon: '📥',
+            cls: 'bgm-overview-card-primary',
+        },
+        {
+            label: '本次处理',
+            value: totalProcessed,
+            sub: '新增+更新+删除',
+            icon: '🔧',
+            cls: 'bgm-overview-card-success',
+        },
+        {
+            label: '失败',
+            value: stats.failed,
+            sub: stats.failed > 0 ? '需关注' : '无异常',
+            icon: stats.failed > 0 ? '⚠️' : '✅',
+            cls: stats.failed > 0 ? 'bgm-overview-card-warning' : 'bgm-overview-card-muted',
+        },
+    ];
+    container.innerHTML = `
+    <!-- ===== 顶部概览条 ===== -->
+    <div class="bgm-overview-bar">
+      <div class="bgm-overview-cards">
+        ${overviewCards
+        .map((c) => `
+          <div class="bgm-overview-card ${c.cls}">
+            <div class="bgm-overview-card-header">
+              <span class="bgm-overview-icon">${c.icon}</span>
+              <span class="bgm-overview-label">${c.label}</span>
+            </div>
+            <div class="bgm-overview-value">${c.value}</div>
+            <div class="bgm-overview-sub">${c.sub}</div>
+          </div>
+        `)
+        .join('')}
+      </div>
+      <div class="bgm-completion-ring">
+        <svg viewBox="0 0 120 120" class="bgm-progress-svg">
+          <circle cx="60" cy="60" r="50" fill="none" stroke="var(--surface0, #313244)" stroke-width="10" />
+          <circle cx="60" cy="60" r="50" fill="none"
+            stroke="${completionPct >= 90 ? 'var(--green, #a6e3a1)' : completionPct >= 50 ? 'var(--yellow, #f9e2af)' : 'var(--red, #f38ba8)'}"
+            stroke-width="10"
+            stroke-dasharray="${(completionPct / 100) * 2 * Math.PI * 50} ${2 * Math.PI * 50}"
+            stroke-dashoffset="${2 * Math.PI * 50 * 0.25}"
+            stroke-linecap="round"
+            transform="rotate(-90 60 60)"
+            class="bgm-progress-ring" />
+        </svg>
+        <div class="bgm-progress-center">
+          <div class="bgm-progress-value">${completionPct}%</div>
+          <div class="bgm-progress-label">完成度</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== 图表区 ===== -->
+    <div class="bgm-chart-container">
+      <div class="bgm-chart-left">
+        <div class="bgm-donut-chart">
+          <svg viewBox="0 0 140 140" class="bgm-donut-svg">
+            <circle cx="70" cy="70" r="${radius}" fill="none" stroke="var(--surface0, #313244)" stroke-width="14" />
+            ${totalAll > 0
+        ? `
+              <circle cx="70" cy="70" r="${radius}" fill="none"
+                stroke="var(--green, #a6e3a1)" stroke-width="14"
+                stroke-dasharray="${seg(addedPct)} ${circumference}"
+                stroke-dashoffset="0"
+                transform="rotate(-90 70 70)" stroke-linecap="butt" />
+              <circle cx="70" cy="70" r="${radius}" fill="none"
+                stroke="var(--yellow, #f9e2af)" stroke-width="14"
+                stroke-dasharray="${seg(updatedPct)} ${circumference}"
+                stroke-dashoffset="${-seg(addedPct)}"
+                transform="rotate(-90 70 70)" stroke-linecap="butt" />
+              <circle cx="70" cy="70" r="${radius}" fill="none"
+                stroke="var(--red, #f38ba8)" stroke-width="14"
+                stroke-dasharray="${seg(deletedPct)} ${circumference}"
+                stroke-dashoffset="${-(seg(addedPct) + seg(updatedPct))}"
+                transform="rotate(-90 70 70)" stroke-linecap="butt" />
+              <circle cx="70" cy="70" r="${radius}" fill="none"
+                stroke="var(--overlay1, #7f849c)" stroke-width="14"
+                stroke-dasharray="${seg(unchangedPct)} ${circumference}"
+                stroke-dashoffset="${-(seg(addedPct) + seg(updatedPct) + seg(deletedPct))}"
+                transform="rotate(-90 70 70)" stroke-linecap="butt" />
+              ${stats.failed > 0
+            ? `
+              <circle cx="70" cy="70" r="${radius}" fill="none"
+                stroke="var(--peach, #fab387)" stroke-width="14"
+                stroke-dasharray="${seg(failedPct)} ${circumference}"
+                stroke-dashoffset="${-(seg(addedPct) + seg(updatedPct) + seg(deletedPct) + seg(unchangedPct))}"
+                transform="rotate(-90 70 70)" stroke-linecap="butt" />`
+            : ''}
+              ${stats.skipped > 0
+            ? `
+              <circle cx="70" cy="70" r="${radius}" fill="none"
+                stroke="var(--lavender, #b4befe)" stroke-width="14"
+                stroke-dasharray="${seg(skippedPct)} ${circumference}"
+                stroke-dashoffset="${-(seg(addedPct) + seg(updatedPct) + seg(deletedPct) + seg(unchangedPct) + seg(failedPct))}"
+                transform="rotate(-90 70 70)" stroke-linecap="butt" />`
+            : ''}
+            `
+        : ''}
+          </svg>
+          <div class="bgm-donut-center">
+            <div class="bgm-donut-center-value">${totalProcessed}</div>
+            <div class="bgm-donut-center-label">已处理</div>
+          </div>
+        </div>
+        <div class="bgm-chart-legend">
+          <div class="bgm-legend-item"><span class="bgm-legend-dot" style="background:var(--green, #a6e3a1)"></span>新增 ${stats.added}</div>
+          <div class="bgm-legend-item"><span class="bgm-legend-dot" style="background:var(--yellow, #f9e2af)"></span>更新 ${stats.updated}</div>
+          <div class="bgm-legend-item"><span class="bgm-legend-dot" style="background:var(--red, #f38ba8)"></span>删除 ${stats.deleted}</div>
+          <div class="bgm-legend-item"><span class="bgm-legend-dot" style="background:var(--overlay1, #7f849c)"></span>无变更 ${stats.unchanged}</div>
+          ${stats.failed > 0 ? `<div class="bgm-legend-item"><span class="bgm-legend-dot" style="background:var(--peach, #fab387)"></span>失败 ${stats.failed}</div>` : ''}
+          ${stats.skipped > 0 ? `<div class="bgm-legend-item"><span class="bgm-legend-dot" style="background:var(--lavender, #b4befe)"></span>跳过 ${stats.skipped}</div>` : ''}
+        </div>
+      </div>
+
+      <div class="bgm-chart-right">
+        <div class="bgm-bar-chart">
+          <div class="bgm-bar-row">
+            <span class="bgm-bar-label">✅ 新增</span>
+            <div class="bgm-bar-track"><div class="bgm-bar-fill bgm-bar-add" style="width:${addedPct}%"></div></div>
+            <span class="bgm-bar-value">${stats.added}<span class="bgm-bar-pct">(${addedPct.toFixed(0)}%)</span></span>
+          </div>
+          <div class="bgm-bar-row">
+            <span class="bgm-bar-label">🔄 更新</span>
+            <div class="bgm-bar-track"><div class="bgm-bar-fill bgm-bar-update" style="width:${updatedPct}%"></div></div>
+            <span class="bgm-bar-value">${stats.updated}<span class="bgm-bar-pct">(${updatedPct.toFixed(0)}%)</span></span>
+          </div>
+          <div class="bgm-bar-row">
+            <span class="bgm-bar-label">❌ 删除</span>
+            <div class="bgm-bar-track"><div class="bgm-bar-fill bgm-bar-delete" style="width:${deletedPct}%"></div></div>
+            <span class="bgm-bar-value">${stats.deleted}<span class="bgm-bar-pct">(${deletedPct.toFixed(0)}%)</span></span>
+          </div>
+          <div class="bgm-bar-row">
+            <span class="bgm-bar-label">⏭️ 无变更</span>
+            <div class="bgm-bar-track"><div class="bgm-bar-fill bgm-bar-unchanged" style="width:${unchangedPct}%"></div></div>
+            <span class="bgm-bar-value">${stats.unchanged}<span class="bgm-bar-pct">(${unchangedPct.toFixed(0)}%)</span></span>
+          </div>
+          ${stats.failed > 0
+        ? `
+          <div class="bgm-bar-row">
+            <span class="bgm-bar-label">⚠️ 失败</span>
+            <div class="bgm-bar-track"><div class="bgm-bar-fill bgm-bar-fail" style="width:${failedPct}%"></div></div>
+            <span class="bgm-bar-value">${stats.failed}<span class="bgm-bar-pct">(${failedPct.toFixed(0)}%)</span></span>
+          </div>`
+        : ''}
+          ${stats.skipped > 0
+        ? `
+          <div class="bgm-bar-row">
+            <span class="bgm-bar-label">🔍 跳过</span>
+            <div class="bgm-bar-track"><div class="bgm-bar-fill bgm-bar-skip" style="width:${skippedPct}%"></div></div>
+            <span class="bgm-bar-value">${stats.skipped}<span class="bgm-bar-pct">(${skippedPct.toFixed(0)}%)</span></span>
+          </div>`
+        : ''}
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== 性能仪表盘 ===== -->
+    <div class="bgm-perf-dashboard">
+      <div class="bgm-perg-item">
+        <div class="bgm-perg-ring">
+          <svg viewBox="0 0 80 80" class="bgm-perg-svg">
+            <circle cx="40" cy="40" r="32" fill="none" stroke="var(--surface0, #313244)" stroke-width="6" />
+            <circle cx="40" cy="40" r="32" fill="none"
+              stroke="var(--blue, #89b4fa)" stroke-width="6"
+              stroke-dasharray="${(completionPct / 100) * 2 * Math.PI * 32} ${2 * Math.PI * 32}"
+              stroke-dashoffset="${2 * Math.PI * 32 * 0.25}"
+              stroke-linecap="round"
+              transform="rotate(-90 40 40)" />
+          </svg>
+          <div class="bgm-perg-center"><span>⏱</span></div>
+        </div>
+        <div class="bgm-perg-info">
+          <div class="bgm-perg-value">${elapsedStr}</div>
+          <div class="bgm-perg-label">总耗时</div>
+        </div>
+      </div>
+      <div class="bgm-perg-item">
+        <div class="bgm-perg-ring">
+          <svg viewBox="0 0 80 80" class="bgm-perg-svg">
+            <circle cx="40" cy="40" r="32" fill="none" stroke="var(--surface0, #313244)" stroke-width="6" />
+            <circle cx="40" cy="40" r="32" fill="none"
+              stroke="var(--green, #a6e3a1)" stroke-width="6"
+              stroke-dasharray="${Math.min(stats.avgSpeed / 50, 1) * 2 * Math.PI * 32} ${2 * Math.PI * 32}"
+              stroke-dashoffset="${2 * Math.PI * 32 * 0.25}"
+              stroke-linecap="round"
+              transform="rotate(-90 40 40)" />
+          </svg>
+          <div class="bgm-perg-center"><span>⚡</span></div>
+        </div>
+        <div class="bgm-perg-info">
+          <div class="bgm-perg-value">${speedStr}</div>
+          <div class="bgm-perg-label">行/秒</div>
+        </div>
+      </div>
+      <div class="bgm-perg-item">
+        <div class="bgm-perg-ring">
+          <svg viewBox="0 0 80 80" class="bgm-perg-svg">
+            <circle cx="40" cy="40" r="32" fill="none" stroke="var(--surface0, #313244)" stroke-width="6" />
+            <circle cx="40" cy="40" r="32" fill="none"
+              stroke="var(--peach, #fab387)" stroke-width="6"
+              stroke-dasharray="${(efficiencyPct / 100) * 2 * Math.PI * 32} ${2 * Math.PI * 32}"
+              stroke-dashoffset="${2 * Math.PI * 32 * 0.25}"
+              stroke-linecap="round"
+              transform="rotate(-90 40 40)" />
+          </svg>
+          <div class="bgm-perg-center"><span>📈</span></div>
+        </div>
+        <div class="bgm-perg-info">
+          <div class="bgm-perg-value">${efficiencyPct}%</div>
+          <div class="bgm-perg-label">处理效率</div>
+        </div>
+      </div>
+      <div class="bgm-perg-item">
+        <div class="bgm-perg-ring">
+          <svg viewBox="0 0 80 80" class="bgm-perg-svg">
+            <circle cx="40" cy="40" r="32" fill="none" stroke="var(--surface0, #313244)" stroke-width="6" />
+            <circle cx="40" cy="40" r="32" fill="none"
+              stroke="var(--sapphire, #74c7ec)" stroke-width="6"
+              stroke-dasharray="${Math.min(totalProcessed / Math.max(stats.elapsedMs / 1000, 1) / 50, 1) * 2 * Math.PI * 32} ${2 * Math.PI * 32}"
+              stroke-dashoffset="${2 * Math.PI * 32 * 0.25}"
+              stroke-linecap="round"
+              transform="rotate(-90 40 40)" />
+          </svg>
+          <div class="bgm-perg-center"><span>🔮</span></div>
+        </div>
+        <div class="bgm-perg-info">
+          <div class="bgm-perg-value">${etaMs > 0 ? formatDuration(etaMs) : '完成'}</div>
+          <div class="bgm-perg-label">预计剩余</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== 元信息栏 ===== -->
+    <div class="bgm-meta-bar">
+      <span class="bgm-meta-tag">🎯 ${stats.strategyLabel}</span>
+      <span class="bgm-meta-tag">📥 远程 ${stats.remoteTotal}</span>
+      <span class="bgm-meta-tag">✅ 完成 ${completionPct}%</span>
+      ${stats.skipped > 0 ? `<span class="bgm-meta-tag">🔍 跳过 ${stats.skipped}</span>` : ''}
+      ${stats.failed > 0 ? `<span class="bgm-meta-tag bgm-meta-tag-warn">⚠️ 失败 ${stats.failed}</span>` : ''}
+    </div>
+  `;
+}
+/**
+ * 将同步明细数据渲染为可折叠的 HTML 表格
+ * @param items 同步明细条目数组
+ * @returns 已做 HTML 转义的表格 HTML 字符串
+ */
+export function renderSyncDetailTable(items) {
+    if (items.length === 0)
+        return '<p>无明细数据</p>';
+    const kindLabels = {
+        add: '➕ 新增',
+        update: '🔄 更新',
+        delete: '🗑️ 删除',
+        fail: '❌ 失败',
+    };
+    const kindClasses = {
+        add: 'bgm-detail-kind--add',
+        update: 'bgm-detail-kind--update',
+        delete: 'bgm-detail-kind--delete',
+        fail: 'bgm-detail-kind--fail',
+    };
+    const rows = items
+        .map((item) => {
+        const kind = item.kind;
+        const name = item.name ?? '--';
+        const sid = item.sid;
+        const row = item.row !== undefined ? String(item.row) : '--';
+        const fields = item.fields && item.fields.length > 0 ? item.fields.join(', ') : '--';
+        const message = item.message ?? '';
+        return `
+        <tr>
+          <td><span class="bgm-detail-kind ${kindClasses[kind]}">${sanitizeHtml(kindLabels[kind])}</span></td>
+          <td>${sanitizeHtml(sid)}</td>
+          <td>${sanitizeHtml(name)}</td>
+          <td>${sanitizeHtml(row)}</td>
+          <td>${sanitizeHtml(fields)}</td>
+          <td>${sanitizeHtml(message)}</td>
+        </tr>
+      `;
+    })
+        .join('');
+    return `
+    <div class="bgm-detail-table-wrap">
+      <table class="bgm-detail-table">
+        <thead>
+          <tr>
+            <th>操作</th>
+            <th>SID</th>
+            <th>名称</th>
+            <th>行号</th>
+            <th>变更字段</th>
+            <th>备注</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${rows}
+        </tbody>
+      </table>
+    </div>
+    <div class="bgm-detail-table-footer">共 ${items.length} 条明细</div>
+  `;
+}
+/**
+ * 切换弹窗为完成状态，显示统计结果
+ * @param summary 统计摘要文本
+ * @param details 详情文本数组（无明细对象时的兼容显示）
+ * @param stopped 是否被用户停止
+ * @param onNext 点击"下一步"时的回调（用于打开同步完成详情弹窗）
+ * @param stats 同步统计数据（用于渲染图表）
+ * @param detailItems 同步明细数据（用于渲染详情表格）
+ */
+export function completeSyncProgressDialog(summary, details, stopped = false, onNext, stats, detailItems) {
+    const modal = ensureSyncProgressDialog();
+    const titleEl = modal.querySelector('#bgmSyncProgressTitle');
+    const iconEl = modal.querySelector('#bgmSyncProgressIcon');
+    const progressSection = modal.querySelector('#bgmSyncProgressSection');
+    const resultSection = modal.querySelector('#bgmSyncProgressResult');
+    const summaryEl = modal.querySelector('#bgmSyncProgressSummary');
+    const chartEl = modal.querySelector('#bgmSyncProgressChart');
+    const detailsEl = modal.querySelector('#bgmSyncProgressDetails');
+    const toggleBtn = modal.querySelector('#bgmSyncProgressToggleDetails');
+    const nextBtn = modal.querySelector('#bgmSyncProgressNext');
+    const runningBtns = modal.querySelector('#bgmSyncProgressRunningBtns');
+    const doneBtns = modal.querySelector('#bgmSyncProgressDoneBtns');
+    if (titleEl)
+        titleEl.textContent = stopped ? '同步已停止' : '同步完成';
+    if (iconEl)
+        iconEl.textContent = stopped ? '⏹️' : '✅';
+    if (progressSection)
+        progressSection.style.display = 'none';
+    if (resultSection)
+        resultSection.style.display = '';
+    if (runningBtns)
+        runningBtns.style.display = 'none';
+    if (doneBtns)
+        doneBtns.style.display = 'flex';
+    // 在 summary 中追加全局耗时
+    let finalSummary = summary;
+    if (_syncGlobalStart > 0) {
+        const totalElapsed = Date.now() - _syncGlobalStart - _syncPausedDuration;
+        const elapsedStr = formatDuration(totalElapsed);
+        finalSummary = `${summary} 用时 ${elapsedStr}`;
+        // 重置全局 ETA 追踪
+        _syncGlobalStart = 0;
+        _syncPausedDuration = 0;
+        _syncPauseStart = 0;
+    }
+    if (summaryEl)
+        summaryEl.textContent = finalSummary;
+    // 渲染统计图表（停止时也显示，展示已完成的部分统计）
+    if (chartEl && stats) {
+        chartEl.style.display = '';
+        renderSyncStatsChart(chartEl, stats);
+    }
+    else if (chartEl) {
+        chartEl.style.display = 'none';
+    }
+    if (detailsEl) {
+        detailsEl.classList.remove('bgm-sync-progress__result-details--table');
+        if (detailItems && detailItems.length > 0) {
+            detailsEl.innerHTML = renderSyncDetailTable(detailItems);
+            detailsEl.classList.add('bgm-sync-progress__result-details--table');
+        }
+        else {
+            detailsEl.textContent = details.length > 0 ? details.join('\n') : '无详情';
+        }
+        detailsEl.style.display = 'none';
+    }
+    if (toggleBtn) {
+        toggleBtn.textContent = '显示详情';
+        toggleBtn.setAttribute('aria-label', '显示详情');
+        const hasDetails = details.length > 0 || (detailItems && detailItems.length > 0);
+        toggleBtn.style.display = hasDetails ? '' : 'none';
+    }
+    // 下一步按钮：仅当提供 onNext 回调时显示
+    if (nextBtn) {
+        if (onNext) {
+            nextBtn.style.display = '';
+            _syncNextHandler = onNext;
+        }
+        else {
+            nextBtn.style.display = 'none';
+        }
+    }
+    // 清理运行态回调（保留弹窗可见，供用户查看结果）
+    _clearSyncProgressHandlers();
+    // 恢复下一步回调（_clearSyncProgressHandlers 会清空，需重新设置）
+    if (onNext)
+        _syncNextHandler = onNext;
+    // 完成状态下支持 ESC 关闭
+    _syncProgressEscHandler = (e) => {
+        if (e.key === 'Escape') {
+            hideSyncProgressDialog();
+        }
+    };
+    document.addEventListener('keydown', _syncProgressEscHandler);
+    // 焦点切换到下一步按钮或关闭按钮，便于键盘用户立即操作
+    const focusTarget = onNext
+        ? modal.querySelector('#bgmSyncProgressNext')
+        : modal.querySelector('#bgmSyncProgressClose');
+    focusTarget?.focus();
+}
+/** 隐藏同步进度弹窗 */
+export function hideSyncProgressDialog() {
+    const modal = _syncProgressDialog;
+    if (!modal)
+        return;
+    modal.style.display = 'none';
+    modal.setAttribute('aria-hidden', 'true');
+    _clearSyncProgressHandlers();
+    // 重置全局 ETA 追踪状态
+    _syncGlobalStart = 0;
+    _syncPausedDuration = 0;
+    _syncPauseStart = 0;
+    // 焦点返回到触发元素
+    _syncProgressTrigger?.focus();
+    _syncProgressTrigger = null;
+}
+// ========== 公共 API ==========
+export function showAlert(message, title, onOk) {
+    _showDialog('alert', { message, title: title || '提示', ...(onOk ? { onOk } : {}) });
+}
+/*
+ * 显示确认对话框（新签名）
+ * @param message  提示内容
+ * @param callback 回调函数，参数 confirmed 为 true 表示用户点击了确定
+ * @param title    可选标题
+ */
+export function showConfirm(message, callback, title) {
+    _showDialog('confirm', {
+        message,
+        title: title || '确认',
+        onOk: () => callback(true),
+        onCancel: () => callback(false),
+    });
+}
+export function showError(message, title, onOk) {
+    _showDialog('error', { message, title: title || '错误', ...(onOk ? { onOk } : {}) });
+}
+export function showWarning(message, title, onOk) {
+    _showDialog('warning', { message, title: title || '警告', ...(onOk ? { onOk } : {}) });
+}
+export function showSuccess(message, title, onOk) {
+    _showDialog('success', { message, title: title || '成功', ...(onOk ? { onOk } : {}) });
+}
+export function showInput(title, prompt, defaultValue, onOk, onCancel) {
+    _showDialog('input', {
+        title,
+        message: prompt,
+        ...(onOk ? { onOk } : {}),
+        ...(onCancel ? { onCancel } : {}),
+        ...(defaultValue !== undefined ? { defaultValue } : {}),
+    });
+}
+// ========== Toast 通知 ==========
+export function showToast(message, type) {
+    const toast = dom.bgmToast;
+    if (!toast)
+        return;
+    if (_toastTimer !== null) {
+        clearTimeout(_toastTimer);
+        _toastTimer = null;
+    }
+    toast.textContent = message;
+    toast.className = 'bgm-toast bgm-toast-show';
+    if (type)
+        toast.classList.add('bgm-toast-' + type);
+    _toastTimer = window.setTimeout(() => {
+        toast.className = 'bgm-toast';
+        _toastTimer = null;
+    }, 3000);
+}

@@ -820,4 +820,3 @@ if (typeof document !== 'undefined') {
         initDebugPanel();
     }
 }
-//# sourceMappingURL=debugPanel.js.map

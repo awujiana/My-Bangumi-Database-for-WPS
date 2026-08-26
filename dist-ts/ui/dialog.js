@@ -1268,4 +1268,3 @@ export function showToast(message, type) {
         _toastTimer = null;
     }, 3000);
 }
-//# sourceMappingURL=dialog.js.map

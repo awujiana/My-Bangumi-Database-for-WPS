@@ -987,4 +987,3 @@ export function autoDetectAndLockSheet() {
     }
     return false;
 }
-//# sourceMappingURL=panelLifecycle.js.map

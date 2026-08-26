@@ -24,4 +24,3 @@ export function startRibbon() {
 if (typeof window !== 'undefined') {
     startRibbon();
 }
-//# sourceMappingURL=ribbon-entry.js.map
