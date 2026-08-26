@@ -8,7 +8,8 @@
  * @version 1.1.0 (优化版)
  */
 
-import { BGM_CONFIG, LOG_LEVELS, bgmLog } from '../index.js'
+import { BGM_CONFIG, LOG_LEVELS } from '../core/constants.js'
+import { bgmLog } from '../tools/util/index.js'
 
 /**
  * Token验证结果接口

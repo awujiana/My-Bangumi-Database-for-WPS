@@ -1159,7 +1159,7 @@ const ACTION_HANDLERS = {
         });
         bgmLog(LOG_LEVELS.INFO, `[handleActionClick] 导入配置对话框已显示，耗时: ${Date.now() - ctx.startTime}ms`);
     },
-    // 关闭主面板（taskpane）
+    // 关闭主面板（panel）
     closePanel: (ctx) => {
         bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 关闭主面板');
         const app = getApp();
@@ -1313,7 +1313,7 @@ export function initHandlers() {
         start();
     }
 }
-function isTaskpaneContext() {
+function isPanelContext() {
     return typeof window !== 'undefined' && window.location.pathname.includes('panel.html');
 }
 /**
@@ -1466,7 +1466,7 @@ const handleUserNameUpdatedEvent = () => {
     updateUserIdStatus();
 };
 const handleConfigUpdatedEvent = (data) => {
-    if (!isTaskpaneContext())
+    if (!isPanelContext())
         return;
     bgmLog(LOG_LEVELS.INFO, `[handlers] 收到 CONFIG_UPDATED 事件: key=${data.key}, value=${data.value}`);
     if (data.key === 'bgm_incremental_sync') {
@@ -1487,12 +1487,21 @@ const handleSyncProgressEvent = (data) => {
 };
 const handleSyncStateChangedEvent = (payload) => {
     bgmLog(LOG_LEVELS.INFO, `[handlers] 同步状态变更: ${payload.state}${payload.row ? `, 行: ${payload.row}` : ''}`);
-    // 可选：根据状态刷新按钮禁用态
     const syncButtons = document.querySelectorAll('button[data-action="sync"], button[data-action="syncCollectionFromBgm"], button[data-action="previewSyncContent"], button[data-action="enlargePreview"]');
     syncButtons.forEach((btn) => {
         const el = btn;
         el.disabled = payload.state === 'running' || payload.state === 'paused';
     });
+};
+const handleSyncCompletedEvent = (results) => {
+    bgmLog(LOG_LEVELS.INFO, `[handlers] 同步完成事件触发`);
+    const stats = results ?? {};
+    showToast(`同步完成: 成功 ${stats.success ?? 0}, 失败 ${stats.fail ?? 0}, 跳过 ${stats.skip ?? 0}`, 'success');
+};
+const handleSyncErrorEvent = (error) => {
+    const message = error instanceof Error ? error.message : String(error);
+    bgmLog(LOG_LEVELS.ERROR, `[handlers] 同步错误事件: ${message}`);
+    showToast(`同步失败: ${message}`, 'error');
 };
 // ========== 事件监听（用于接收事件总线通知）==========
 function setupEventListeners() {
@@ -1502,7 +1511,9 @@ function setupEventListeners() {
     trackedEventBusOn(BGM_EVENTS.CONFIG_UPDATED, handleConfigUpdatedEvent);
     trackedEventBusOn(BGM_EVENTS.SYNC_PROGRESS, handleSyncProgressEvent);
     trackedEventBusOn(BGM_EVENTS.SYNC_STATE_CHANGED, handleSyncStateChangedEvent);
-    // Ribbon 按钮触发数据同步：复用 taskpane handler，显示模块化进度弹窗
+    trackedEventBusOn(BGM_EVENTS.SYNC_COMPLETED, handleSyncCompletedEvent);
+    trackedEventBusOn(BGM_EVENTS.SYNC_ERROR, handleSyncErrorEvent);
+    // Ribbon 按钮触发数据同步：复用 panel handler，显示模块化进度弹窗
     trackedEventBusOn(BGM_EVENTS.REQUEST_GITHUB_SYNC, () => {
         bgmLog(LOG_LEVELS.INFO, '[handlers] 收到 Ribbon 数据同步请求，触发 syncFromGithub handler');
         const handler = ACTION_HANDLERS['syncFromGithub'];
@@ -1513,8 +1524,8 @@ function setupEventListeners() {
             bgmLog(LOG_LEVELS.ERROR, '[handlers] syncFromGithub handler 未注册');
         }
     });
-    // Ribbon 按钮触发撤销同步：通过 eventBus 调用 taskpane 的 undoLastSync handler
-    // 在 taskpane 环境中执行，可访问 undoStack 中的实际会话数据
+    // Ribbon 按钮触发撤销同步：通过 eventBus 调用 panel 的 undoLastSync handler
+    // 在 panel 环境中执行，可访问 undoStack 中的实际会话数据
     trackedEventBusOn(BGM_EVENTS.REQUEST_UNDO_LAST_SYNC, () => {
         bgmLog(LOG_LEVELS.INFO, '[handlers] 收到 Ribbon 撤销同步请求，触发 undoLastSync handler');
         const handler = ACTION_HANDLERS['undoLastSync'];
@@ -1528,7 +1539,7 @@ function setupEventListeners() {
 }
 // 尝试更新增量同步复选框（带重试机制）
 function tryUpdateIncrementalCheckbox(checked, attempts = 0) {
-    if (!isTaskpaneContext())
+    if (!isPanelContext())
         return;
     const chkIncremental = document.getElementById('chkIncremental');
     if (chkIncremental) {
@@ -1548,7 +1559,7 @@ function tryUpdateIncrementalCheckbox(checked, attempts = 0) {
 }
 // 尝试更新跳过冲突 UI（带重试机制）
 function tryUpdateSkipConflictsUI(skipConflicts, attempts = 0) {
-    if (!isTaskpaneContext())
+    if (!isPanelContext())
         return;
     bgmLog(LOG_LEVELS.INFO, `[handlers] 目标状态: ${skipConflicts ? '跳过冲突' : 'Excel覆盖'}`);
     const conflictStrategySelect = document.getElementById('conflictStrategy');
@@ -1585,7 +1596,7 @@ function tryUpdateSkipConflictsUI(skipConflicts, attempts = 0) {
 }
 // 尝试更新启用同步记录复选框（带重试机制，与另外两个开关保持一致）
 function tryUpdateEnableSyncRecordUI(enabled, attempts = 0) {
-    if (!isTaskpaneContext())
+    if (!isPanelContext())
         return;
     const chkEnableSyncRecord = document.getElementById('chkEnableSyncRecord');
     if (chkEnableSyncRecord) {
@@ -1668,7 +1679,7 @@ const handleChkSkipConflictsChange = () => {
 };
 // 从配置读取增量同步状态并初始化 checkbox
 function initIncrementalSyncFromRibbon() {
-    if (!isTaskpaneContext())
+    if (!isPanelContext())
         return;
     const chkIncremental = document.getElementById('chkIncremental');
     if (!chkIncremental)
@@ -1688,7 +1699,7 @@ function initIncrementalSyncFromRibbon() {
 }
 // 从配置读取跳过冲突状态并初始化 UI
 function initSkipConflictsFromRibbon() {
-    if (!isTaskpaneContext())
+    if (!isPanelContext())
         return;
     try {
         const skipConflicts = getSkipConflicts();

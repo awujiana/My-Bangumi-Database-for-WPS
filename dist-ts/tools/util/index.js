@@ -14,7 +14,7 @@
 // 直接从源模块导入，打破 util.ts ↔ index.ts 的循环依赖
 import { BGM_CONFIG, LOG_LEVELS, ERROR_LEVELS, ErrorLevel, WPS_ENUM, } from '../../core/constants.js';
 import { BgmError } from '../../core/result.js';
-import { showConfirm } from '../../ui/dialog.js';
+import { showConfirm, showToast } from '../../ui/dialog.js';
 import { showAlert as customShowAlert, showError as customShowError, showInput as customShowInput, } from '../../ui/dialog.js';
 import { syncAllRows } from '../../ui/preview.js';
 // 类型只从 index.js 导入（type-only import 不会产生运行时循环依赖）
@@ -126,7 +126,10 @@ export const BGM = {
             bgmLog(LOG_LEVELS.INFO, `[sync] 同步已暂停，当前行: ${this.currentRow}`);
             eventBus.emit(BGM_EVENTS.SYNC_STATE_CHANGED, { state: 'paused', row: this.currentRow });
             // 定位到当前单元格
-            this.locateCurrentCell();
+            const located = this.locateCurrentCell();
+            if (!located) {
+                showToast('已暂停，但无法定位到当前单元格', 'warn');
+            }
         },
         resume() {
             if (!this.isPaused)
@@ -150,7 +153,7 @@ export const BGM = {
         /** 定位到当前正在处理的单元格 */
         locateCurrentCell() {
             if (!this.currentRow || this.currentRow < 1 || !this.currentSheet)
-                return;
+                return false;
             try {
                 const ws = this.currentSheet;
                 const col = this.currentCol > 0 ? this.currentCol : 1;
@@ -159,11 +162,15 @@ export const BGM = {
                 if (cell) {
                     cell.Select();
                     bgmLog(LOG_LEVELS.INFO, `[sync] 已定位到单元格: ${cellAddr}`);
+                    return true;
                 }
+                return false;
             }
             catch (e) {
                 const msg = e instanceof Error ? e.message : String(e);
                 bgmLog(LOG_LEVELS.WARN, `[sync] 定位单元格失败: ${msg}`);
+                showToast(`定位单元格失败: ${msg}`, 'error');
+                return false;
             }
         },
         /** 更新当前位置（供同步循环调用，传 undefined 保留原值） */
@@ -884,7 +891,7 @@ export function showBangumiPanel() {
             tskpane.Visible = !tskpane.Visible;
         }
     }
-    // 写入"面板已显示"信号（时间戳），taskpane 轮询检测到变化后自动刷新工作表
+    // 写入"面板已显示"信号（时间戳），panel 轮询检测到变化后自动刷新工作表
     if (becameVisible) {
         try {
             app.PluginStorage?.setItem('bgm_panel_shown_at', String(Date.now()));

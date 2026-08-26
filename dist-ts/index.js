@@ -2,22 +2,16 @@
  * BGM 全局类型定义（统一中转模块）
  * @module types/index
  * @description 所有项目的全局类型、接口、类、枚举的统一导出入口。
- *              其他模块只需 `import { ... } from '../types/index.js'`
+ *              其他模块只需 `import { ... } from '../index.js'`
  *              即可获取所有核心功能与类型，降低模块间耦合。
  */
-// ========== 全局未捕获 Promise 拒绝处理（兜底机制） ==========
-// 监听 unhandledrejection 事件，作为异步错误处理的最后一道防线。
-// 此处理只作为兜底，不能替代局部 try/catch 与 Promise.catch()。
-if (typeof window !== 'undefined') {
-    window.addEventListener('unhandledrejection', (event) => {
-        const reason = event.reason;
-        const message = reason instanceof Error ? reason.message : String(reason);
-        // 使用 console.error 而非 bgmLog，避免在模块初始化阶段产生循环依赖
-        console.error('[unhandledrejection]', message);
-        // 阻止默认的控制台报错行为（已由本处理器记录）
-        event.preventDefault();
-    });
-}
+// ========== 全局错误处理初始化 ==========
+import { initGlobalErrorHandler } from './core/errorHandler.js';
+initGlobalErrorHandler();
+// ============================================================================
+// 0. 全局初始化（来自 core/errorHandler.js）
+// ============================================================================
+export { initGlobalErrorHandler } from './core/errorHandler.js';
 // ============================================================================
 // 1. 核心常量与枚举（来自 core/constants.js）
 // ============================================================================

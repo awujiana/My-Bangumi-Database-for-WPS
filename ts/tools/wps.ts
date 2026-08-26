@@ -3,12 +3,14 @@
  * @module types/wps
  * @description 定义 WPS COM 对象的核心接口，避免 unknown 强制转换
  */
-import { getApp, bgmLog, LOG_LEVELS } from '../index.js'
+import { LOG_LEVELS } from '../core/constants.js'
 import {
   showAlert as customShowAlert,
   showConfirm as customShowConfirm,
   showInput as customShowInput,
 } from '../ui/dialog.js'
+
+import { getApp, bgmLog } from './util/index.js'
 
 /**
  * WPS 单元格值类型

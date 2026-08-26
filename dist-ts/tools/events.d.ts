@@ -62,8 +62,34 @@ export declare class EventBus {
      * 清空所有事件
      */
     clear(): void;
+    /**
+     * 便捷方法：发射通用状态变更事件
+     * @param key - 状态键名
+     * @param value - 状态值
+     */
+    emitStateChanged(key: string, value: unknown): void;
+    /**
+     * 便捷方法：发射通用配置变更事件
+     * @param key - 配置键名
+     * @param value - 配置值
+     */
+    emitConfigChanged(key: string, value: unknown): void;
 }
+/**
+ * 事件名称常量定义
+ *
+ * 事件命名规范：
+ * - state: 前缀 → 应用状态变更（Token、用户信息、同步状态等）
+ * - sync: 前缀 → 同步进度与结果
+ * - sheet: 前缀 → 工作表操作
+ * - config: 前缀 → 配置变更
+ * - request: 前缀 → 组件间请求（Ribbon ↔ Panel）
+ */
 export declare const BGM_EVENTS: {
+    /** 任意应用状态变更，payload: { key: string, value: unknown } */
+    readonly STATE_CHANGED: "state:changed";
+    /** 应用配置变更，payload: { key: string, value: unknown } */
+    readonly CONFIG_CHANGED: "config:changed";
     readonly TOKEN_UPDATED: "state:tokenUpdated";
     readonly USER_ID_UPDATED: "state:userIdUpdated";
     readonly USER_NAME_UPDATED: "state:userNameUpdated";

@@ -3,9 +3,8 @@
  * @module sync/exceltobangumi/api
  * @description Bangumi API 请求封装、Token 测试、用户信息通知等。
  */
+import { BGM_CONFIG, LOG_LEVELS } from '../../core/constants.js'
 import {
-  BGM_CONFIG,
-  LOG_LEVELS,
   bgmLog,
   getApp,
   loadBgToken,
@@ -13,7 +12,7 @@ import {
   _setBgmUserId,
   _setBgmUsername,
   BGM,
-} from '../../index.js'
+} from '../../tools/util/index.js'
 import { showAlert, showSuccess, showError } from '../../ui/dialog.js'
 
 /**
@@ -242,10 +241,10 @@ export function notifyUserInfoUpdated(username: string, userId: string): void {
       if (tsId) {
         // GetTaskPane 返回的 WpsTaskPane 在 WPS 实际运行时还包含 contentWindow 等 COM 属性
         const pane = app?.GetTaskPane?.(tsId) as
-          { contentWindow?: { refreshTaskpaneUI?: () => void } } | undefined
-        if (pane?.contentWindow?.refreshTaskpaneUI) {
-          pane.contentWindow.refreshTaskpaneUI()
-          bgmLog(LOG_LEVELS.INFO, `[notifyUserInfoUpdated] 已通过 GetTaskPane 通知 Taskpane 刷新`)
+          { contentWindow?: { refreshPanelUI?: () => void } } | undefined
+        if (pane?.contentWindow?.refreshPanelUI) {
+          pane.contentWindow.refreshPanelUI()
+          bgmLog(LOG_LEVELS.INFO, `[notifyUserInfoUpdated] 已通过 GetTaskPane 通知 Panel 刷新`)
         }
       }
     } catch (e: unknown) {

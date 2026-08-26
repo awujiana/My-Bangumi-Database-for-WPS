@@ -3,7 +3,8 @@
  * @module sync/exceltobangumi/api
  * @description Bangumi API 请求封装、Token 测试、用户信息通知等。
  */
-import { BGM_CONFIG, LOG_LEVELS, bgmLog, getApp, loadBgToken, storeBgToken, _setBgmUserId, _setBgmUsername, BGM, } from '../../index.js';
+import { BGM_CONFIG, LOG_LEVELS } from '../../core/constants.js';
+import { bgmLog, getApp, loadBgToken, storeBgToken, _setBgmUserId, _setBgmUsername, BGM, } from '../../tools/util/index.js';
 import { showAlert, showSuccess, showError } from '../../ui/dialog.js';
 /**
  * 提取HTTP请求结果消息
@@ -159,9 +160,9 @@ export function notifyUserInfoUpdated(username, userId) {
             if (tsId) {
                 // GetTaskPane 返回的 WpsTaskPane 在 WPS 实际运行时还包含 contentWindow 等 COM 属性
                 const pane = app?.GetTaskPane?.(tsId);
-                if (pane?.contentWindow?.refreshTaskpaneUI) {
-                    pane.contentWindow.refreshTaskpaneUI();
-                    bgmLog(LOG_LEVELS.INFO, `[notifyUserInfoUpdated] 已通过 GetTaskPane 通知 Taskpane 刷新`);
+                if (pane?.contentWindow?.refreshPanelUI) {
+                    pane.contentWindow.refreshPanelUI();
+                    bgmLog(LOG_LEVELS.INFO, `[notifyUserInfoUpdated] 已通过 GetTaskPane 通知 Panel 刷新`);
                 }
             }
         }

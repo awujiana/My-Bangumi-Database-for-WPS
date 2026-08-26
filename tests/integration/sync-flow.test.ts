@@ -91,9 +91,9 @@ vi.mock('../../ts/sync/syncRecord.js', () => ({
   addSyncRecordSummary: mockState.addSyncRecordSummary,
 }))
 
-// ========== Mock: tools/util.js（WPS API 边界） ==========
+// ========== Mock: tools/util/index.js（WPS API 边界） ==========
 // 提供完整导出，覆盖 exceltobangumi/index.ts 与 githubSync.ts 的所有引用
-vi.mock('../../ts/tools/util.js', () => ({
+vi.mock('../../ts/tools/util/index.js', () => ({
   BGM: {
     handleError: vi.fn(),
     safeExecute: vi.fn(),

@@ -13,7 +13,7 @@
  */
 import { LOG_LEVELS, ERROR_LEVELS, ErrorLevel, type ErrorOptions } from '../../core/constants.js';
 import { BgmError } from '../../core/result.js';
-import type { BGMCache, BGMSheet, BGMSync, BGMUserInfo, EnrichWorkbookState } from '../../index.js';
+import type { BGMCache, BGMSheet, BGMSync, BGMUserInfo, EnrichWorkbookState } from '../../core/types.js';
 import { type DialogOptions } from '../../ui/dialog.js';
 import { colNumToLetter, trim, escapeHtml, calcFingerprint } from '../stringUtils.js';
 import { type WpsApplication, type WpsWorksheet } from '../wps.js';

@@ -9,10 +9,10 @@
  *   - panel/enrichPage.ts：新番表富化 UI 控制器
  */
 import { toggleSheetLock, refreshSheets, refreshWorkbooks, autoDetectSheet, updateFilterStatus, refreshData, onSelectModeChange, enlargePreview, autoDetectAndLockSheet } from './panelLifecycle.js';
-declare function initPanel(): void;
-export { initPanel, refreshSheets, refreshWorkbooks, refreshData, toggleSheetLock, onSelectModeChange, enlargePreview, autoDetectSheet, autoDetectAndLockSheet, updateFilterStatus, };
+declare function initPanelCore(): void;
+export { initPanelCore, refreshSheets, refreshWorkbooks, refreshData, toggleSheetLock, onSelectModeChange, enlargePreview, autoDetectSheet, autoDetectAndLockSheet, updateFilterStatus, };
 /**
- * 初始化任务面板。
+ * 初始化面板。
  *
  * 显式入口函数，由 `ts/entry/panel-entry.ts` 调用。
  * 不在模块加载时自动执行，避免在测试或非 panel 上下文下意外触发副作用。
@@ -21,5 +21,5 @@ export { initPanel, refreshSheets, refreshWorkbooks, refreshData, toggleSheetLoc
  *  - 若文档已加载完成（readyState === 'complete'），立即执行 safeInitPanel()
  *  - 否则推迟到 window load 事件后执行
  */
-export declare function initTaskpane(): void;
+export declare function initPanel(): void;
 //# sourceMappingURL=panelPage.d.ts.map

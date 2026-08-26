@@ -1,4 +1,4 @@
-# Bangumi WPS Excel 加载项 - 架构与项目知识文档
+﻿# Bangumi WPS Excel 加载项 - 架构与项目知识文档
 
 > 版本: 3.2 | 更新日期: 2026-08-26
 
@@ -132,8 +132,8 @@ ts/index.ts (barrel export)
 #### Taskpane 入口
 
 - **文件**: `ts/entry/panel-entry.ts`
-- **启动链**: `startTaskpane()` →
-  1. `initTaskpane()`: 工作表锁定状态恢复、用户信息轮询、Token 状态检查
+- **启动链**: `startPanel()` →
+  1. `initPanel()`: 工作表锁定状态恢复、用户信息轮询、Token 状态检查
   2. `initHandlers()`: 注册按钮监听器、消息监听器、事件总线监听器
 - **自动启动条件**: `typeof window !== 'undefined' && window.location.pathname.includes('taskpane.html')`
 
@@ -631,7 +631,7 @@ ts/index.ts (barrel export)
 **首次初始化流程：**
 
 1. `ribbon-entry.ts` 启动 → `OnAddinLoad()` → 设置 `EnableFlag='false'` 和 `ApiEventFlag='false'`
-2. `panel-entry.ts` 启动 → `initTaskpane()` → 从 PluginStorage 恢复用户信息
+2. `panel-entry.ts` 启动 → `initPanel()` → 从 PluginStorage 恢复用户信息
 3. `getGithubConfig()` 首次读取时，若 owner/repo/path 全为空，自动写入 `DEFAULT_GITHUB_CONFIG`
 4. Token 通过 `loadBgToken()` 明文读取（已移除历史 XOR 加密自动升级逻辑）
 
@@ -1079,7 +1079,7 @@ npx vitest
 
 - `entry/` 模块使用 `typeof window !== 'undefined'` 守卫，测试环境导入不触发副作用
 - `ribbon.ts` 的消息监听和轮询通过显式 `initRibbon()` 调用启动
-- `panel/panelPage.ts` 的 DOM 操作通过 `initTaskpane()` 显式调用触发
+- `panel/panelPage.ts` 的 DOM 操作通过 `initPanel()` 显式调用触发
 
 ### 7.3 代码规范
 

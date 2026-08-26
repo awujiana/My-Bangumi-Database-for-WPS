@@ -2,7 +2,7 @@
  * 任务面板 - 用户信息轮询
  * @module panel/userInfoPolling
  * @description 从 PluginStorage 恢复用户信息、定时轮询 Token/用户信息/配置变更。
- *              从原 taskpane.ts 拆分而来，保持函数签名与行为不变。
+ *              从原 panel 模块拆分而来，保持函数签名与行为不变。
  */
 /**
  * 从 PluginStorage 恢复用户信息到内存缓存

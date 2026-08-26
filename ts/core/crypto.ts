@@ -7,9 +7,9 @@
  * @version 1.0.0
  */
 
-import { BGM, bgmLog, LOG_LEVELS } from '../index.js'
+import { bgmLog } from '../tools/util/index.js'
 
-import { TOKEN_CONFIG } from './constants.js'
+import { LOG_LEVELS, TOKEN_CONFIG } from './constants.js'
 
 /**
  * 计算字符串的校验和
@@ -93,7 +93,7 @@ export function extractToken(encrypted: string): string | null {
 
     return token
   } catch (e: unknown) {
-    BGM?.handleError?.(e, { context: 'extractToken', showAlert: false })
+    bgmLog(LOG_LEVELS.ERROR, `[crypto] extractToken 异常: ${(e as Error).message}`)
     return null
   }
 }

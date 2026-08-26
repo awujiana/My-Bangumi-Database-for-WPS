@@ -13,7 +13,7 @@
  * @author BGM Development Team
  * @version 1.1.0 (优化版，保留原注释和日志)
  */
-import type { WpsWorksheet } from '../../index.js';
+import type { WpsWorksheet } from '../../tools/wps.js';
 export { isBangumiUrl, extractSubjectId, mapWatchStatus, getSeqColIndex, addTagsFromStr, buildTagsArray, } from '../pureUtils.js';
 export { openBangumiTokenPage, testTokenValidityForRibbon, bgmRequestSync, setBangumiToken, notifyUserInfoUpdated, type BgmApiResponse, extractResponseMessage, parseErrorResponse, } from './api.js';
 export { fetchEpisodeIds, markEpisodesComplete } from './chapterMarker.js';

@@ -14,10 +14,8 @@
  * @version 1.1.0 (优化版，保留原注释和日志)
  */
 
-import type { WpsApplication, WpsWorksheet, WpsRange } from '../../index.js'
+import { BGM_COLOR, LOG_LEVELS } from '../../core/constants.js'
 import {
-  BGM_COLOR,
-  LOG_LEVELS,
   bgmLog,
   getApp,
   getCell,
@@ -28,16 +26,14 @@ import {
   getCellValue,
   loadBgToken,
   BGM,
-  wpsMsgBox,
   _getUserApiPath,
   readRangeValues,
   delay,
   calcFingerprint,
-  getAllSyncRecords,
-  isWpsWorksheet,
   clearSheetCache,
-  showToast,
-} from '../../index.js'
+} from '../../tools/util/index.js'
+import type { WpsApplication, WpsWorksheet, WpsRange } from '../../tools/wps.js'
+import { wpsMsgBox, isWpsWorksheet } from '../../tools/wps.js'
 import {
   showConfirm,
   showSyncProgressDialog,
@@ -46,6 +42,7 @@ import {
   updateSyncProgressDialog,
   completeSyncProgressDialog,
   hideSyncProgressDialog,
+  showToast,
 } from '../../ui/dialog.js'
 import {
   isBangumiUrl,
@@ -54,7 +51,7 @@ import {
   getSeqColIndex,
   addTagsFromStr,
 } from '../pureUtils.js'
-import { getOrCreateSyncRecordSheet } from '../syncRecord.js'
+import { getAllSyncRecords, getOrCreateSyncRecordSheet } from '../syncRecord.js'
 
 // Re-export 纯函数，保持模块对外 API 兼容
 export {

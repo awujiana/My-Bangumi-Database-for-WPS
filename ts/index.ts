@@ -2,26 +2,19 @@
  * BGM 全局类型定义（统一中转模块）
  * @module types/index
  * @description 所有项目的全局类型、接口、类、枚举的统一导出入口。
- *              其他模块只需 `import { ... } from '../types/index.js'`
+ *              其他模块只需 `import { ... } from '../index.js'`
  *              即可获取所有核心功能与类型，降低模块间耦合。
  */
 
-// ========== 全局未捕获 Promise 拒绝处理（兜底机制） ==========
-// 监听 unhandledrejection 事件，作为异步错误处理的最后一道防线。
-// 此处理只作为兜底，不能替代局部 try/catch 与 Promise.catch()。
-if (typeof window !== 'undefined') {
-  window.addEventListener('unhandledrejection', (event: PromiseRejectionEvent) => {
-    const reason: unknown = event.reason
-    const message = reason instanceof Error ? reason.message : String(reason)
-    // 使用 console.error 而非 bgmLog，避免在模块初始化阶段产生循环依赖
-    console.error('[unhandledrejection]', message)
-    // 阻止默认的控制台报错行为（已由本处理器记录）
-    event.preventDefault()
-  })
-}
+// ========== 全局错误处理初始化 ==========
+import { initGlobalErrorHandler } from './core/errorHandler.js'
 
-// 类型导入：用于 BGMSync 接口中的 currentSheet 字段类型
-import type { WpsWorksheet } from './tools/wps.js'
+initGlobalErrorHandler()
+
+// ============================================================================
+// 0. 全局初始化（来自 core/errorHandler.js）
+// ============================================================================
+export { initGlobalErrorHandler } from './core/errorHandler.js'
 
 // ============================================================================
 // 1. 核心常量与枚举（来自 core/constants.js）
@@ -405,120 +398,8 @@ export {
   type NameUrlMap,
 } from './tools/autoFillUrl.js'
 
-// ========== BGM 缓存数据结构 ==========
-export interface BGMCache {
-  /** WPS 文档总行数缓存 */
-  totalRows: number
-  /** 当前用户 ID */
-  userId: string | null
-  /** 当前用户名 */
-  username: string | null
-  /** 当前用户头像 URL */
-  avatarUrl: string | null
-  /** Subject ID 缓存（sid → 行号） */
-  sidCache: Map<string, string>
-  /** 列表缓存（通用数据） */
-  listCache: unknown[]
-}
-
-// BGM 状态接口（用于描述 BGM 对象的类型）
-// ========== BGM 工作表状态 ==========
-export interface BGMSheet {
-  /** 锁定的工作表索引 */
-  lockedIndex: number | null
-  /** 锁定的工作表名称 */
-  lockedName: string | null
-  /** 是否已锁定 */
-  isLocked: boolean
-  /** 锁定的工作簿名称（空字符串表示当前活动工作簿） */
-  lockedWorkbookName: string | null
-}
-
-// ========== BGM 同步状态 ==========
-export interface BGMSync {
-  /** 是否正在同步 */
-  isRunning: boolean
-  /** 是否请求停止同步 */
-  shouldStop: boolean
-  /** 是否暂停中 */
-  isPaused: boolean
-  /** 上次同步时间（ISO 格式） */
-  lastSyncTime: string | null
-  /** 当前正在处理的行号（用于暂停时定位） */
-  currentRow: number
-  /** 当前正在处理的工作表（用于暂停时定位） */
-  currentSheet: WpsWorksheet | null
-  /** 当前正在处理的列号（用于暂停时定位） */
-  currentCol: number
-  /**
-   * 进入运行状态（统一入口）
-   * - 防重复：如果 isRunning === true 则提示并返回 false
-   * - 重置停止标志，置 isRunning = true，记录 lastSyncTime
-   * @returns 是否成功进入运行状态
-   */
-  enterRunningState: () => boolean
-  /**
-   * 退出运行状态（统一入口）
-   * - 清除 isRunning，重置停止标志
-   */
-  exitRunningState: () => void
-  /**
-   * 启动同步流程（由"全面同步"按钮触发）
-   * - 防重复：如果 isRunning === true 则提示并返回
-   * - 检查 BGM.dataPreview 是否已加载
-   * - 调用 preview.ts 中的 syncAllRows() 执行批量上传
-   */
-  startSync: () => void
-  /**
-   * 请求停止同步
-   * - 设置 shouldStop 标志
-   * - 未在运行时静默返回
-   */
-  requestStop: () => void
-  /** 暂停同步：设置 isPaused，并定位到当前单元格 */
-  pause: () => void
-  /** 恢复同步：清除 isPaused */
-  resume: () => void
-  /**
-   * 检查是否应该停止同步
-   * @returns 是否应该停止
-   */
-  checkShouldStop: () => boolean
-  /** 检查是否暂停中 */
-  checkPaused: () => boolean
-  /** 暂停时等待恢复（每 50ms 轮询），恢复或停止后返回 */
-  waitForResume: () => Promise<void>
-  /** 定位到当前正在处理的单元格 */
-  locateCurrentCell: () => void
-  /** 更新当前位置（供同步循环调用，传 undefined 保留原值） */
-  updatePosition: (ws: WpsWorksheet | null | undefined, row: number, col?: number) => void
-  /**
-   * 重置停止标志（同时清理 currentRow/currentSheet/currentCol）
-   */
-  resetStopFlag: () => void
-}
-
-// ========== BGM 用户信息 ==========
-export interface BGMUserInfo {
-  /** 用户 ID */
-  id: string
-  /** 用户名 */
-  username: string
-  /** 头像 URL */
-  avatarUrl?: string | undefined
-}
-
-// ========== BGM 富化工作簿锁定状态（与 BGM.sheet 独立） ==========
-export interface EnrichWorkbookState {
-  /** 锁定的工作簿名称 */
-  lockedWorkbookName: string | null
-  /** 锁定的工作表名称 */
-  lockedSheetName: string | null
-  /** 锁定的工作表索引（1-based） */
-  lockedSheetIndex: number | null
-  /** 是否已锁定 */
-  isLocked: boolean
-}
+// ========== 核心类型（从 core/types.ts re-export） ==========
+export type { BGMCache, BGMSheet, BGMSync, BGMUserInfo, EnrichWorkbookState } from './core/types.js'
 
 // ============================================================================
 // 15. 页面逻辑（来自 panel/panelPage.js）

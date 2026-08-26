@@ -4,8 +4,10 @@
  * @description 支持异步请求、进度回调、自动重试、限流处理
  */
 
-import { Result, BgmError, BGM_CONFIG, LOG_LEVELS, bgmLog, BGM } from '../index.js'
+import { BGM_CONFIG, LOG_LEVELS } from '../core/constants.js'
+import { Result, BgmError } from '../core/result.js'
 
+import { bgmLog, BGM } from './util/index.js'
 import type { ZodSchema } from './zodCompat.js'
 
 export type HttpMethod = 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH'

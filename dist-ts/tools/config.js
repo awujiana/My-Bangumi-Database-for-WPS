@@ -4,7 +4,8 @@
  * @description 提供统一的配置存储和管理功能。
  *              使用 PluginStorage 持久化存储，通过 eventBus 通知同上下文更新。
  */
-import { getApp, bgmLog, LOG_LEVELS } from '../index.js';
+import { getApp, bgmLog } from './util/index.js';
+import { LOG_LEVELS } from '../core/constants.js';
 import { BGM_EVENTS, eventBus } from './events.js';
 // 配置键名常量
 export const CONFIG_KEYS = {

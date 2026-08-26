@@ -12,8 +12,8 @@ import { WPS_ENUM, LOG_LEVELS, getApp, bgmLog, BGM, updateTokenStatus, updateUse
 import { toggleSheetLock, saveLockedSheet, restoreLockedSheet, updateLockButton, refreshSheets, refreshWorkbooks, autoDetectSheet, updateFilterStatus, refreshData, onSelectModeChange, enlargePreview, autoDetectAndLockSheet, } from './panelLifecycle.js';
 import { restoreUserInfoFromStorage, startUserInfoPolling } from './userInfoPolling.js';
 // ========== 初始化 ==========
-function initPanel() {
-    bgmLog(LOG_LEVELS.INFO, 'initPanel 开始');
+function initPanelCore() {
+    bgmLog(LOG_LEVELS.INFO, 'initPanelCore 开始');
     // 初始化 WPS 枚举（如果未设置）
     const app = getApp();
     if (app && typeof app.Enum !== 'object') {
@@ -101,31 +101,31 @@ function initPanel() {
     });
     // 通知模块就绪
     document.dispatchEvent(new CustomEvent('bgm:modulesReady'));
-    bgmLog(LOG_LEVELS.INFO, 'initPanel 完成');
+    bgmLog(LOG_LEVELS.INFO, 'initPanelCore 完成');
 }
 // ========== 导出 ==========
-export { initPanel, refreshSheets, refreshWorkbooks, refreshData, toggleSheetLock, onSelectModeChange, enlargePreview, autoDetectSheet, autoDetectAndLockSheet, updateFilterStatus, };
-window.initPanel = initPanel;
-window.refreshTaskpaneUI = function () {
+export { initPanelCore, refreshSheets, refreshWorkbooks, refreshData, toggleSheetLock, onSelectModeChange, enlargePreview, autoDetectSheet, autoDetectAndLockSheet, updateFilterStatus, };
+window.initPanelCore = initPanelCore;
+window.refreshPanelUI = function () {
     try {
         restoreUserInfoFromStorage();
-        bgmLog(LOG_LEVELS.INFO, '[refreshTaskpaneUI] UI 已刷新');
+        bgmLog(LOG_LEVELS.INFO, '[refreshPanelUI] UI 已刷新');
     }
     catch (e) {
-        bgmLog(LOG_LEVELS.WARN, '[refreshTaskpaneUI] 刷新失败: ' + e.message);
+        bgmLog(LOG_LEVELS.WARN, '[refreshPanelUI] 刷新失败: ' + e.message);
     }
 };
 function safeInitPanel() {
     try {
-        initPanel();
+        initPanelCore();
     }
     catch (e) {
-        BGM.handleError(e, { showAlert: false, level: BGM.ErrorLevel.INFO, context: 'initPanel' });
+        BGM.handleError(e, { showAlert: false, level: BGM.ErrorLevel.INFO, context: 'initPanelCore' });
         document.dispatchEvent(new CustomEvent('bgm:modulesReady'));
     }
 }
 /**
- * 初始化任务面板。
+ * 初始化面板。
  *
  * 显式入口函数，由 `ts/entry/panel-entry.ts` 调用。
  * 不在模块加载时自动执行，避免在测试或非 panel 上下文下意外触发副作用。
@@ -134,7 +134,7 @@ function safeInitPanel() {
  *  - 若文档已加载完成（readyState === 'complete'），立即执行 safeInitPanel()
  *  - 否则推迟到 window load 事件后执行
  */
-export function initTaskpane() {
+export function initPanel() {
     if (typeof document === 'undefined') {
         // 无 DOM 环境（如 Node 测试环境），直接同步初始化
         safeInitPanel();

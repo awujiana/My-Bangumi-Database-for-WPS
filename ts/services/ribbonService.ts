@@ -756,7 +756,7 @@ export function openCollectionForRibbon(): void {
  *
  * 流程：
  * 1. 校验 GitHub 配置是否完整（owner/repo/path）
- * 2. 确保 taskpane 面板可见（不切换，只显示）
+ * 2. 确保 panel 面板可见（不切换，只显示）
  * 3. 写入 PluginStorage 信号（bgm_request_github_sync = 时间戳）
  *    - panel 通过 userInfoPolling 轮询检测该信号
  *    - 检测到后通过 panel 内部 eventBus 触发 syncFromGithub handler
@@ -778,17 +778,17 @@ export async function syncFromGithubForRibbon(): Promise<GithubSyncResult | null
     return null
   }
 
-  // 2. 确保 taskpane 面板可见（不切换隐藏，仅设置为可见）
-  ensureTaskpaneVisible()
+  // 2. 确保 panel 面板可见（不切换隐藏，仅设置为可见）
+  ensurePanelVisible()
 
-  // 3. 写入 PluginStorage 信号，taskpane 轮询检测后触发 syncFromGithub handler
+  // 3. 写入 PluginStorage 信号，panel 轮询检测后触发 syncFromGithub handler
   try {
     const app = getApp()
     if (app?.PluginStorage) {
       app.PluginStorage.setItem('bgm_request_github_sync', String(Date.now()))
       bgmLog(LOG_LEVELS.INFO, '[syncFromGithubForRibbon] 已写入数据同步请求信号到 PluginStorage')
     } else {
-      bgmLog(LOG_LEVELS.ERROR, '[syncFromGithubForRibbon] PluginStorage 不可用，无法通知 taskpane')
+      bgmLog(LOG_LEVELS.ERROR, '[syncFromGithubForRibbon] PluginStorage 不可用，无法通知 panel')
       await wpsMsgBox('无法通知任务面板执行同步，请手动在面板中点击「立即同步」', 0, 48)
     }
   } catch (e: unknown) {
@@ -799,12 +799,12 @@ export async function syncFromGithubForRibbon(): Promise<GithubSyncResult | null
 }
 
 /**
- * 确保 taskpane 面板可见（不切换，仅显示）
+ * 确保 panel 面板可见（不切换，仅显示）
  *
  * 与 showBangumiPanel 的区别：showBangumiPanel 会切换可见性（可见→隐藏），
  * 本函数仅确保面板可见，不会隐藏已显示的面板。
  */
-function ensureTaskpaneVisible(): void {
+function ensurePanelVisible(): void {
   try {
     const app = getApp() as {
       PluginStorage?: {
@@ -827,10 +827,10 @@ function ensureTaskpaneVisible(): void {
     if (tskpane && !tskpane.Visible) {
       tskpane.Visible = true
       app.PluginStorage?.setItem('bgm_panel_shown_at', String(Date.now()))
-      bgmLog(LOG_LEVELS.INFO, '[ensureTaskpaneVisible] 面板已显示')
+      bgmLog(LOG_LEVELS.INFO, '[ensurePanelVisible] 面板已显示')
     }
   } catch (e: unknown) {
-    bgmLog(LOG_LEVELS.WARN, `[ensureTaskpaneVisible] 失败: ${(e as Error).message}`)
+    bgmLog(LOG_LEVELS.WARN, `[ensurePanelVisible] 失败: ${(e as Error).message}`)
   }
 }
 
@@ -871,9 +871,9 @@ export async function undoLastSyncForRibbon(): Promise<void> {
 }
 
 /**
- * 执行撤销最近一次同步操作（Taskpane 上下文）
+ * 执行撤销最近一次同步操作（Panel 上下文）
  *
- * 本函数在 taskpane 环境中运行，可访问 undoStack 中的实际会话数据。
+ * 本函数在 panel 环境中运行，可访问 undoStack 中的实际会话数据。
  * 流程：
  * 1. 检查是否有可撤销的会话；若无，提示并返回
  * 2. 弹出确认对话框，展示会话描述
@@ -881,7 +881,7 @@ export async function undoLastSyncForRibbon(): Promise<void> {
  * 4. 显示恢复结果
  *
  * 适用于：
- * - Taskpane 面板中的"撤销同步"按钮点击
+ * - Panel 面板中的"撤销同步"按钮点击
  * - Ribbon 通过 PluginStorage 信号转发后的事件监听
  *
  * @returns 恢复的条目数，若用户取消或无会话则返回 0

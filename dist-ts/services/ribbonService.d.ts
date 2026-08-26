@@ -104,7 +104,7 @@ export declare function openCollectionForRibbon(): void;
  *
  * 流程：
  * 1. 校验 GitHub 配置是否完整（owner/repo/path）
- * 2. 确保 taskpane 面板可见（不切换，只显示）
+ * 2. 确保 panel 面板可见（不切换，只显示）
  * 3. 写入 PluginStorage 信号（bgm_request_github_sync = 时间戳）
  *    - panel 通过 userInfoPolling 轮询检测该信号
  *    - 检测到后通过 panel 内部 eventBus 触发 syncFromGithub handler
@@ -130,9 +130,9 @@ export declare function syncFromGithubForRibbon(): Promise<GithubSyncResult | nu
  */
 export declare function undoLastSyncForRibbon(): Promise<void>;
 /**
- * 执行撤销最近一次同步操作（Taskpane 上下文）
+ * 执行撤销最近一次同步操作（Panel 上下文）
  *
- * 本函数在 taskpane 环境中运行，可访问 undoStack 中的实际会话数据。
+ * 本函数在 panel 环境中运行，可访问 undoStack 中的实际会话数据。
  * 流程：
  * 1. 检查是否有可撤销的会话；若无，提示并返回
  * 2. 弹出确认对话框，展示会话描述
@@ -140,7 +140,7 @@ export declare function undoLastSyncForRibbon(): Promise<void>;
  * 4. 显示恢复结果
  *
  * 适用于：
- * - Taskpane 面板中的"撤销同步"按钮点击
+ * - Panel 面板中的"撤销同步"按钮点击
  * - Ribbon 通过 PluginStorage 信号转发后的事件监听
  *
  * @returns 恢复的条目数，若用户取消或无会话则返回 0

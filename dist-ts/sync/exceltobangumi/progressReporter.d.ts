@@ -1,4 +1,4 @@
-import type { WpsWorksheet } from '../../index.js';
+import type { WpsWorksheet } from '../../tools/wps.js';
 /**
  * 同步任务项接口
  */

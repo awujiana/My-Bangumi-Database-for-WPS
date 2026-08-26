@@ -40,8 +40,8 @@ import { restoreUserInfoFromStorage, startUserInfoPolling } from './userInfoPoll
 
 // ========== 初始化 ==========
 
-function initPanel(): void {
-  bgmLog(LOG_LEVELS.INFO, 'initPanel 开始')
+function initPanelCore(): void {
+  bgmLog(LOG_LEVELS.INFO, 'initPanelCore 开始')
 
   // 初始化 WPS 枚举（如果未设置）
   const app = getApp()
@@ -135,12 +135,12 @@ function initPanel(): void {
   })
   // 通知模块就绪
   document.dispatchEvent(new CustomEvent('bgm:modulesReady'))
-  bgmLog(LOG_LEVELS.INFO, 'initPanel 完成')
+  bgmLog(LOG_LEVELS.INFO, 'initPanelCore 完成')
 }
 
 // ========== 导出 ==========
 export {
-  initPanel,
+  initPanelCore,
   refreshSheets,
   refreshWorkbooks,
   refreshData,
@@ -153,33 +153,33 @@ export {
 }
 
 // ========== 挂载到 window ==========
-;(window as unknown as { initPanel: () => void }).initPanel = initPanel
+;(window as unknown as { initPanelCore: () => void }).initPanelCore = initPanelCore
 
 /**
  * 全局函数：供 Ribbon 通过 GetTaskPane 直接调用，
  * 从 PluginStorage 刷新所有 UI 状态（用户信息、配置等）
  * 如果 GetTaskPane 不可用，轮询也请购底机制。）
  */
-;(window as unknown as { refreshTaskpaneUI: () => void }).refreshTaskpaneUI = function (): void {
+;(window as unknown as { refreshPanelUI: () => void }).refreshPanelUI = function (): void {
   try {
     restoreUserInfoFromStorage()
-    bgmLog(LOG_LEVELS.INFO, '[refreshTaskpaneUI] UI 已刷新')
+    bgmLog(LOG_LEVELS.INFO, '[refreshPanelUI] UI 已刷新')
   } catch (e: unknown) {
-    bgmLog(LOG_LEVELS.WARN, '[refreshTaskpaneUI] 刷新失败: ' + (e as Error).message)
+    bgmLog(LOG_LEVELS.WARN, '[refreshPanelUI] 刷新失败: ' + (e as Error).message)
   }
 }
 
 function safeInitPanel(): void {
   try {
-    initPanel()
+    initPanelCore()
   } catch (e: unknown) {
-    BGM.handleError(e, { showAlert: false, level: BGM.ErrorLevel.INFO, context: 'initPanel' })
+    BGM.handleError(e, { showAlert: false, level: BGM.ErrorLevel.INFO, context: 'initPanelCore' })
     document.dispatchEvent(new CustomEvent('bgm:modulesReady'))
   }
 }
 
 /**
- * 初始化任务面板。
+ * 初始化面板。
  *
  * 显式入口函数，由 `ts/entry/panel-entry.ts` 调用。
  * 不在模块加载时自动执行，避免在测试或非 panel 上下文下意外触发副作用。
@@ -188,7 +188,7 @@ function safeInitPanel(): void {
  *  - 若文档已加载完成（readyState === 'complete'），立即执行 safeInitPanel()
  *  - 否则推迟到 window load 事件后执行
  */
-export function initTaskpane(): void {
+export function initPanel(): void {
   if (typeof document === 'undefined') {
     // 无 DOM 环境（如 Node 测试环境），直接同步初始化
     safeInitPanel()

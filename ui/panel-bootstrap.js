@@ -1,10 +1,10 @@
-// Taskpane 启动引导脚本
+// Panel 启动引导脚本
 // 作为 ES Module 加载，避免内联 script（CSP script-src 'self' 要求）
 // 职责：1) 按依赖顺序加载所有模块；2) 在模块就绪前禁用按钮，就绪后启用
 //
 // 注意：自 Task 13 重构后，panel/panelPage.ts 与 ui/handlers/index.ts 不再在模块加载时
 // 自动注册 DOMContentLoaded 监听器。统一通过 ts/entry/panel-entry.ts 入口模块
-// 显式调用 initTaskpane() + initHandlers() 启动（入口模块内部含 panel.html 路径守卫，
+// 显式调用 initPanel() + initHandlers() 启动（入口模块内部含 panel.html 路径守卫，
 // 在非浏览器或非 panel 上下文下不会触发副作用）。
 import '../dist-ts/index.js';
 import '../dist-ts/core/constants.js';
