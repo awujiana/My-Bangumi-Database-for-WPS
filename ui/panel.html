@@ -23,7 +23,7 @@
                 <div class="brand-mark" aria-hidden="true">B</div>
                 <div class="brand-text">
                     <span class="brand-title">Bangumi 同步工具</span>
-                    <span class="brand-sub">上传同步 · 收藏回写 · 远程数据同步</span>
+                    <span class="brand-sub">上传同步 · 收藏下载 · 远程数据同步</span>
                 </div>
             </div>
             <div class="topbar-actions">
@@ -96,7 +96,7 @@
                 <div class="command-actions">
                     <button class="bgm-btn primary" id="syncBtn" data-action="sync">📤 上传同步</button>
                     <button class="bgm-btn" data-action="testSelected">📋 选中行同步</button>
-                    <button class="bgm-btn success" data-action="syncCollectionFromBgm">📥 收藏回写</button>
+                    <button class="bgm-btn success" data-action="syncCollectionFromBgm">📥 收藏下载</button>
                     <button class="bgm-btn" data-action="previewSyncContent">👁️ 预览同步</button>
                 </div>
             </section>
@@ -396,7 +396,7 @@
                             <span class="bgm-btn-icon">📋</span> 预览详情
                         </button>
                         <button class="bgm-btn success" id="syncCollectionBtn" data-action="syncCollectionFromBgm" style="flex:1;">
-                            <span class="bgm-btn-icon">📥</span> 收藏回写
+                            <span class="bgm-btn-icon">📥</span> 收藏下载
                         </button>
                     </div>
                 </section>
@@ -416,7 +416,7 @@
                                 <span class="bgm-btn-icon">📋</span> 查看同步记录
                             </button>
                             <button class="bgm-btn success" data-action="syncCollectionFromBgm">
-                                <span class="bgm-btn-icon">📥</span> 收藏回写
+                                <span class="bgm-btn-icon">📥</span> 收藏下载
                             </button>
                             <button class="bgm-btn warning" data-action="clearSyncRecords">
                                 <span class="bgm-btn-icon">🗑️</span> 清除记录
@@ -471,9 +471,9 @@
                             • 确保每行包含 Bangumi_URL 列<br>
                             • 选择行范围，设置冲突处理策略<br>
                             • 点击「📤 上传同步」执行<br><br>
-                            <strong>4️⃣ 收藏回写（Bangumi → 本地 Excel）</strong><br>
+                            <strong>4️⃣ 收藏下载（Bangumi → 本地 Excel）</strong><br>
                             • 选择收藏类型：已看 / 想看 / 在看<br>
-                            • 点击「📥 收藏回写」标记到 Excel<br><br>
+                            • 点击「📥 收藏下载」标记到 Excel<br><br>
                             <strong style="color:var(--warning);">⚠️ 注意事项</strong><br>
                             • 镜像同步不是完全镜像！要完全与远程一致需先删除本地数据<br>
                             • 批量操作建议先在副本上测试确认无误后再在正式数据上执行
