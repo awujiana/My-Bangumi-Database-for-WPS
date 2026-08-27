@@ -774,7 +774,7 @@ BGM.sync.exitRunningState() → 退出运行状态
     └─ WPS MessageBox → 显示同步结果统计
 ```
 
-### 4.2 收藏回写流程 (Bangumi → Excel)
+### 4.2 收藏下载流程 (Bangumi → Excel)
 
 ```
 用户点击「从 Bangumi 同步收藏」

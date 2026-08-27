@@ -216,11 +216,15 @@ export async function fetchAllUserCollections(
   options?: {
     limit?: number
     maxTotal?: number
+    type?: 'collect' | 'wish' | 'do' | null
     onProgress?: (page: number, total: number) => void
   },
 ): Promise<CollectionItem[]> {
   const limit = options?.limit || 30
   const maxTotal = options?.maxTotal || 1000
+
+  const typeMap: Record<string, number> = { wish: 1, collect: 2, do: 3 }
+  const typeNum = options?.type ? typeMap[options.type] : null
 
   if (!userId) {
     const verifyResult = await verifyToken(token)
@@ -246,7 +250,8 @@ export async function fetchAllUserCollections(
 
   while (offset < maxTotal) {
     try {
-      const url = `${BGM_CONFIG.API_BASE}/v0/users/${userId}/collections?limit=${limit}&offset=${offset}`
+      const typeParam = typeNum !== null ? `&type=${typeNum}` : ''
+      const url = `${BGM_CONFIG.API_BASE}/v0/users/${userId}/collections?limit=${limit}&offset=${offset}${typeParam}`
       const xhrResult = await xhrGet(url, token)
 
       if (xhrResult.status < 200 || xhrResult.status >= 300) {

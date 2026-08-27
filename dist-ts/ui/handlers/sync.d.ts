@@ -5,5 +5,5 @@
  */
 export declare function syncFromPanel(): Promise<void>;
 export declare function syncCollectionFromBgm(): Promise<void>;
-export declare function syncFromBgmByAPI(sheetIndex: number): Promise<void>;
+export declare function syncFromBgmByAPI(sheetIndex: number, type?: 'collect' | 'wish' | 'do' | null): Promise<void>;
 //# sourceMappingURL=sync.d.ts.map

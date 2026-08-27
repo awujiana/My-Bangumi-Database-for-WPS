@@ -1,4 +1,4 @@
-# Bangumi 同步工具 — UI 与交互流程文档
+﻿# Bangumi 同步工具 — UI 与交互流程文档
 
 > **版本**: v3.0  
 > **最后更新**: 2026-08-13  
@@ -14,7 +14,7 @@ Bangumi 同步工具是一个 WPS/Excel 加载项，用于在本地 Excel 表格
 
 - 📤 **上传同步**：将 Excel 中的观看状态、评分、标签同步到 Bangumi
 - 📥 **数据同步**：从远程仓库（GitHub/GitLab/Gitee）下载 Bangumi 资料数据到 Excel
-- ↩️ **收藏回写**：从 Bangumi 拉取收藏列表；工作表为空时可自动填充为 Bangumi 账号的收藏条目，再标记到 Excel
+- ↩️ **收藏下载**：从 Bangumi 拉取收藏列表；工作表为空时可自动填充为 Bangumi 账号的收藏条目，再标记到 Excel
 
 **界面模式**：采用"主面板 + 设置面板"的双面板任务窗格（Task Pane）设计，支持动态位置协调。
 
@@ -75,7 +75,7 @@ showSettingsPanel() 调用时：
 ```
 ┌─────────────────────────────────────────────────────────────┐
 │  Bangumi 同步工具                           💾  ⬆️  ⚙️  ✖️  │
-│  Bangumi 数据管理工具 · 上传同步 / 数据同步 / 收藏回写        │
+│  Bangumi 数据管理工具 · 上传同步 / 数据同步 / 收藏下载        │
 └─────────────────────────────────────────────────────────────┘
 ```
 
@@ -94,7 +94,7 @@ showSettingsPanel() 调用时：
 
 - 📤 **上传同步**：将 Excel 数据同步至 Bangumi API
 - 📋 **选中行同步**：仅同步当前选中的单元格范围
-- 📥 **收藏回写**：从 Bangumi 拉取收藏列表；工作表为空时先自动填充 Bangumi 账号收藏条目，再标记到 Excel
+- 📥 **收藏下载**：从 Bangumi 拉取收藏列表；工作表为空时先自动填充 Bangumi 账号收藏条目，再标记到 Excel
 - 👁️ **预览同步**：弹窗形式预览即将同步的数据
 
 #### B. Token 设置区
@@ -123,7 +123,7 @@ showSettingsPanel() 调用时：
 - 展示将被同步的数据摘要
 - **🔍 放大预览**：弹窗查看详细列表
 - **📋 预览详情**：查看完整同步内容
-- **📥 收藏回写**：快速触发回写流程
+- **📥 收藏下载**：快速触发回写流程
 
 #### F. 冲突处理策略区
 
@@ -479,7 +479,7 @@ interface HandlerContext {
 | `importConfig`          | handlers/index.ts | 从 JSON 导入配置         |
 | `sync`                  | handlers/index.ts | 上传同步主流程           |
 | `testSelected`          | handlers/index.ts | 选中行同步               |
-| `syncCollectionFromBgm` | handlers/index.ts | 收藏回写                 |
+| `syncCollectionFromBgm` | handlers/index.ts | 收藏下载                 |
 | `previewSyncContent`    | handlers/index.ts | 预览同步内容             |
 | `undoLastSync`          | handlers/index.ts | 撤销上次同步             |
 | `saveGithubConfig`      | handlers/index.ts | 保存 GitHub 配置         |

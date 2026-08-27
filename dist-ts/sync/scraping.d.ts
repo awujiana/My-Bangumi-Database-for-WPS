@@ -98,6 +98,7 @@ export declare function verifyToken(token: string, signal?: AbortSignal): Promis
 export declare function fetchAllUserCollections(token: string, userId?: string, options?: {
     limit?: number;
     maxTotal?: number;
+    type?: 'collect' | 'wish' | 'do' | null;
     onProgress?: (page: number, total: number) => void;
 }): Promise<CollectionItem[]>;
 /**

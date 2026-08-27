@@ -15,7 +15,7 @@
                 <div class="brand-mark" aria-hidden="true">B</div>
                 <div class="brand-text">
                     <span class="brand-title">Bangumi 同步工具</span>
-                    <span class="brand-sub">上传同步 · 收藏回写 · 远程数据同步</span>
+                    <span class="brand-sub">上传同步 · 收藏下载 · 远程数据同步</span>
                 </div>
             </div>
             <div class="topbar-actions">
@@ -82,7 +82,7 @@
                 <div class="command-actions">
                     <button class="bgm-btn primary" id="syncBtn" data-action="sync">📤 上传同步</button>
                     <button class="bgm-btn" data-action="testSelected">📋 选中行同步</button>
-                    <button class="bgm-btn success" data-action="syncCollectionFromBgm">📥 收藏回写</button>
+                    <button class="bgm-btn success" data-action="syncCollectionFromBgm">📥 收藏下载</button>
                     <button class="bgm-btn" data-action="previewSyncContent">👁️ 预览同步</button>
                 </div>
             </section>
@@ -240,7 +240,7 @@
                     <div class="bgm-btn-group bgm-btn-row" style="margin-top:8px;">
                         <button class="bgm-btn" id="enlargePreviewBtn" data-action="enlargePreview" style="flex:1;"><span class="bgm-btn-icon">🔍</span> 放大预览</button>
                         <button class="bgm-btn" id="previewBtn" data-action="previewSyncContent" style="flex:1;"><span class="bgm-btn-icon">📋</span> 预览详情</button>
-                        <button class="bgm-btn success" id="syncCollectionBtn" data-action="syncCollectionFromBgm" style="flex:1;"><span class="bgm-btn-icon">📥</span> 收藏回写</button>
+                        <button class="bgm-btn success" id="syncCollectionBtn" data-action="syncCollectionFromBgm" style="flex:1;"><span class="bgm-btn-icon">📥</span> 收藏下载</button>
                     </div>
                 </section>
 
@@ -252,7 +252,7 @@
                             <input type="checkbox" id="chkEnableSyncRecord" style="cursor:pointer;width:16px;height:16px;accent-color:var(--primary);"><span>启用同步记录</span></label>
                         <div class="bgm-btn-group">
                             <button class="bgm-btn" data-action="openSyncRecordSheet"><span class="bgm-btn-icon">📋</span> 查看同步记录</button>
-                            <button class="bgm-btn success" data-action="syncCollectionFromBgm"><span class="bgm-btn-icon">📥</span> 收藏回写</button>
+                            <button class="bgm-btn success" data-action="syncCollectionFromBgm"><span class="bgm-btn-icon">📥</span> 收藏下载</button>
                             <button class="bgm-btn warning" data-action="clearSyncRecords"><span class="bgm-btn-icon">🗑️</span> 清除记录</button>
                             <button class="bgm-btn" data-action="deduplicateSyncRecords"><span class="bgm-btn-icon">🔗</span> 去重记录</button>
                             <button class="bgm-btn" data-action="formatSyncRecordSheet"><span class="bgm-btn-icon">🎨</span> 设置格式</button>
@@ -285,7 +285,7 @@
                             <strong>1️⃣ Token 设置</strong>：点击「设置/修改」按引导创建 OAuth Token，有效期约 30 天。<br><br>
                             <strong>2️⃣ 数据同步（远程→本地）</strong>：配置仓库地址与策略，可选时间筛选，点击「立即同步」。<br><br>
                             <strong>3️⃣ 上传同步（本地→Bangumi）</strong>：确保每行含 Bangumi_URL，设置冲突策略，点击「📤 上传同步」。<br><br>
-                            <strong>4️⃣ 收藏回写（Bangumi→本地）</strong>：选择收藏类型，点击「📥 收藏回写」。<br><br>
+                            <strong>4️⃣ 收藏下载（Bangumi→本地）</strong>：选择收藏类型，点击「📥 收藏下载」。<br><br>
                             <strong style="color:var(--warning);">⚠️ 注意</strong>：镜像同步非完全镜像；批量操作建议先在副本测试。
                         </div>
                     </div>
