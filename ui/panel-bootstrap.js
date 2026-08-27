@@ -6,6 +6,20 @@
 // 自动注册 DOMContentLoaded 监听器。统一通过 ts/entry/panel-entry.ts 入口模块
 // 显式调用 initPanel() + initHandlers() 启动（入口模块内部含 panel.html 路径守卫，
 // 在非浏览器或非 panel 上下文下不会触发副作用）。
+
+if (typeof window !== 'undefined') {
+    window.addEventListener('error', function (e) {
+        var target = e.target || e.srcElement;
+        if (target && (target.tagName === 'SCRIPT' || target.tagName === 'LINK')) {
+            console.error('[BGM] Resource load failed:', target.src || target.href);
+        }
+    }, true);
+
+    window.addEventListener('unhandledrejection', function (e) {
+        console.error('[BGM] Unhandled promise rejection:', e.reason);
+    });
+}
+
 import '../dist-ts/index.js';
 import '../dist-ts/core/constants.js';
 import '../dist-ts/tools/config.js';

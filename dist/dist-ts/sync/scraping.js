@@ -126,6 +126,8 @@ export async function verifyToken(token, signal) {
 export async function fetchAllUserCollections(token, userId, options) {
     const limit = options?.limit || 30;
     const maxTotal = options?.maxTotal || 1000;
+    const typeMap = { wish: 1, collect: 2, do: 3 };
+    const typeNum = options?.type ? typeMap[options.type] : null;
     if (!userId) {
         const verifyResult = await verifyToken(token);
         if (!verifyResult.valid) {
@@ -146,7 +148,8 @@ export async function fetchAllUserCollections(token, userId, options) {
     bgmLog(LOG_LEVELS.INFO, `[fetchAllUserCollections] 开始获取用户 ${userId} 的收藏列表`);
     while (offset < maxTotal) {
         try {
-            const url = `${BGM_CONFIG.API_BASE}/v0/users/${userId}/collections?limit=${limit}&offset=${offset}`;
+            const typeParam = typeNum !== null ? `&type=${typeNum}` : '';
+            const url = `${BGM_CONFIG.API_BASE}/v0/users/${userId}/collections?limit=${limit}&offset=${offset}${typeParam}`;
             const xhrResult = await xhrGet(url, token);
             if (xhrResult.status < 200 || xhrResult.status >= 300) {
                 if (xhrResult.status === 429) {

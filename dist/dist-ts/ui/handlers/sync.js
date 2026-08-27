@@ -398,6 +398,10 @@ export async function syncCollectionFromBgm() {
     const select = document.getElementById('sheetSelect');
     const sheetIndex = BGM.sheet.lockedIndex || parseInt(select?.value || '') || 1;
     bgmLog(LOG_LEVELS.INFO, `[syncCollectionFromBgm] 目标工作表索引: ${sheetIndex}`);
+    const listTypeSelect = document.getElementById('listTypeSelect');
+    const listType = listTypeSelect?.value;
+    const typeLabelMap = { collect: '已看', wish: '想看', do: '在看' };
+    bgmLog(LOG_LEVELS.INFO, `[syncCollectionFromBgm] 收藏类型: ${listType ? typeLabelMap[listType] : '未选择'}`);
     const token = loadBgToken();
     if (!token) {
         bgmLog(LOG_LEVELS.WARN, '[syncCollectionFromBgm] Token 未设置');
@@ -408,7 +412,7 @@ export async function syncCollectionFromBgm() {
     bgmLog(LOG_LEVELS.INFO, `[syncCollectionFromBgm] Token 已设置（长度: ${token.length}）`);
     try {
         bgmLog(LOG_LEVELS.INFO, '[syncCollectionFromBgm] 调用 syncFromBgmByAPI...');
-        await syncFromBgmByAPI(sheetIndex);
+        await syncFromBgmByAPI(sheetIndex, listType ?? null);
         bgmLog(LOG_LEVELS.INFO, `[syncCollectionFromBgm] 同步完成，耗时: ${Date.now() - startTime}ms`);
     }
     catch (e) {
@@ -417,20 +421,22 @@ export async function syncCollectionFromBgm() {
     }
     bgmLog(LOG_LEVELS.INFO, `[syncCollectionFromBgm] ========== 操作结束，总耗时: ${Date.now() - startTime}ms ==========`);
 }
-export async function syncFromBgmByAPI(sheetIndex) {
+export async function syncFromBgmByAPI(sheetIndex, type) {
     const token = loadBgToken();
     if (!token) {
         showAlert(_T.pleaseSetBgmToken);
         showTokenDialog('');
         return;
     }
-    showConfirm('将 从 BGM API 获取你的收藏列表，并在 D 列标记已收藏的条目，同时写入同步记录表。\n\n是否继续？', async (confirmed) => {
+    const typeLabelMap = { collect: '已看', wish: '想看', do: '在看' };
+    const typeLabel = type ? typeLabelMap[type] : '全部';
+    showConfirm(`将 从 BGM API 获取你的${typeLabel}收藏列表，并在 D 列标记已收藏的条目，同时写入同步记录表。\n\n是否继续？`, async (confirmed) => {
         if (confirmed) {
-            await _doAPISync(sheetIndex, token);
+            await _doAPISync(sheetIndex, token, type);
         }
     });
 }
-async function _doAPISync(sheetIndex, token) {
+async function _doAPISync(sheetIndex, token, type) {
     const syncStartTs = Date.now();
     // 记住原始活动工作表
     const app = getApp();
@@ -465,7 +471,10 @@ async function _doAPISync(sheetIndex, token) {
     }
     _setBgmUserId(verifyResult.userId || '');
     setStatus('正在获取收藏列表...', 'info');
-    const userCollections = await fetchAllUserCollections(token);
+    const collectionOptions = {};
+    if (type)
+        collectionOptions.type = type;
+    const userCollections = await fetchAllUserCollections(token, undefined, collectionOptions);
     // 2. 解析表头与空表检测
     let headerRow = typeof findHeaderRow === 'function' ? findHeaderRow(ws) : 1;
     let colMap = typeof getColumnMap === 'function' ? getColumnMap(ws, headerRow) : new Map();
@@ -548,14 +557,14 @@ async function _doAPISync(sheetIndex, token) {
     try {
         const collectionConfig = buildSyncConfig({
             source: 'Bangumi 收藏列表',
-            strategy: '收藏回写',
+            strategy: '收藏下载',
             direction: 'Bangumi → Excel',
             extra: [
                 { label: '收藏条目', value: String(userCollections.length) },
                 { label: '待处理行', value: String(rowsToProcess.length) },
             ],
         });
-        showSyncProgressDialog('正在收藏回写', {
+        showSyncProgressDialog('正在收藏下载', {
             onPause: () => BGM.sync.pause(),
             onResume: () => BGM.sync.resume(),
             onStop: () => BGM.sync.requestStop(),

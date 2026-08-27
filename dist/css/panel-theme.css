@@ -3,7 +3,7 @@
  * ----------------------------------------------------------------------------
  * 设计目标：
  *   1) 优先布局 —— 顶栏 + 侧栏导航 + 核心操作指令中心 + 自适应卡片网格；
- *      核心功能（上传同步 / 收藏回写 / 预览）置于视觉焦点。
+ *      核心功能（上传同步 / 收藏下载 / 预览）置于视觉焦点。
  *   2) 配色方案 —— 纯黑深色模式（black dark mode），中性单色，去除蓝/紫罗兰/青；
  *      黑底白字高对比、低视觉疲劳；明确主色 / 强调色 / 背景层级 / 文字对比规范（WCAG 2.2 AA）。
  *   3) 字体方案 —— 无衬线字体族，标题 / 正文 / 控件文字的字号字重行距层级化。
@@ -263,6 +263,11 @@ body {
   grid-template-columns: repeat(auto-fit, minmax(clamp(280px, 26vw, 360px), 1fr));
   gap: var(--gap);
   align-items: start;
+  min-width: 0;
+}
+
+.content-grid > * {
+  min-width: 0;
 }
 
 /* 卡片（沿用原 .section 语义，重做为设计系统组件） */
@@ -271,9 +276,10 @@ body {
   border: 1px solid var(--border);
   border-radius: var(--r-lg);
   padding: var(--pad-card);
-  margin: 0;                      /* 去除原纵向堆叠外距，交由网格 gap 控制 */
+  margin: 0;
   box-shadow: var(--shadow-card);
   transition: border-color var(--dur), transform var(--dur) var(--ease), box-shadow var(--dur);
+  overflow: hidden;
 }
 .section:hover { transform: none; border-color: var(--border-strong); }  /* 降低位移动效，减少疲劳 */
 .section h3 {
@@ -465,7 +471,11 @@ select.input option, .form-row select option { background: var(--bg-surface); co
 .preview-box {
   background: var(--bg-mantle);
   border-radius: var(--r-sm);
-  max-height: 300px; overflow: auto; contain: content;
+  max-height: 300px;
+  overflow: auto;
+  contain: content;
+  scrollbar-width: thin;
+  scrollbar-gutter: stable;
 }
 .preview-box table { width: max-content; min-width: 100%; border-collapse: collapse; font-size: var(--fs-sm); }
 .preview-box th {
@@ -473,7 +483,13 @@ select.input option, .form-row select option { background: var(--bg-surface); co
   padding: 10px 10px; text-align: left; font-weight: 600;
   position: sticky; top: 0; z-index: 10; white-space: nowrap;
 }
-.preview-box td { padding: 9px 10px; border-bottom: 1px solid var(--border); color: var(--text-2); vertical-align: middle; }
+.preview-box td {
+  padding: 9px 10px;
+  border-bottom: 1px solid var(--border);
+  color: var(--text-2);
+  vertical-align: middle;
+  white-space: nowrap;
+}
 .preview-box tr:hover { background: rgba(255,255,255,0.06); }
 .preview-box tr:last-child td { border-bottom: none; }
 .preview-box .row-num { font-weight: 600; color: var(--text-3); font-size: 11px; }

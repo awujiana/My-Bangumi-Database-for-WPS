@@ -1171,3 +1171,139 @@ npx vitest
 - `entry/` 目录存放显式启动入口
 - `schemas/` 目录存放 Zod 校验模式
 - `util/` 子目录拆分工具函数（cell.ts / sheet.ts / sleep.ts）
+
+## 八、UI 布局规范
+
+### 8.1 CSS Grid 卡片网格约束
+
+Panel 侧边栏的核心布局使用 CSS Grid uto-fit 实现自适应卡片网格。以下是必须遵守的设计约束：
+
+#### Grid 子项 min-width 必须显式设为 0
+
+`css
+.content-grid {
+display: grid;
+grid-template-columns: repeat(auto-fit, minmax(280px, 400px));
+gap: var(--gap);
+min-width: 0; /* 防止自身被内容撑开 */
+}
+
+.content-grid > * {
+min-width: 0; /* 关键！Grid 子项默认 min-width: auto 会被内容撑开 */
+}
+`
+
+**原因**：Grid 布局中，子元素默认 min-width: auto，这会导致子元素的内容（如表格、长文本）向外溢出，撑开父容器，破坏整体布局。显式设置 min-width: 0 允许子元素在 Grid 轨道内正常压缩。
+
+#### minmax 上限禁止使用 1fr
+
+`css
+/* ❌ 错误：1fr 会让卡片在宽屏时无限拉伸 */
+grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+
+/* ❌ 错误：clamp 配合 1fr 仍无法限制最大宽度 */
+grid-template-columns: repeat(auto-fit, minmax(clamp(280px, 26vw, 360px), 1fr));
+
+/* ✅ 正确：固定值上限控制卡片最大宽度 */
+grid-template-columns: repeat(auto-fit, minmax(280px, 400px));
+`
+
+**原因**：1fr 表示"剩余空间均分"，在超宽面板（1200px+）下会导致每列卡片被拉至 500px+，单行信息密度过低。使用固定像素值（400px）作为上限，让 uto-fit 在宽屏时自动增加列数（3~4 列），保持卡片内容密度合理。
+
+#### section 容器必须 overflow: hidden
+
+`css
+.section {
+  overflow: hidden;      /* 阻止 section 内的长内容向外溢出 */
+}
+`
+
+### 8.2 滚动容器层级设计
+
+`.global (最外层容器，不滚动)
+  └── .content-grid (Grid 布局容器)
+       └── .section (卡片，overflow: hidden)
+            ├── .section-content (普通内容区)
+            └── .preview-box (唯一允许滚动的区域)
+                 └── table (数据预览表格，可横向/纵向滚动)`
+
+**原则**：
+
+1. **滚动只在叶子节点发生**：.preview-box 是唯一的滚动容器，上层不设置 overflow: auto/scroll
+2. **横向滚动独立于外层**：表格横向溢出时，滚动条只出现在 .preview-box 内部，不影响整个面板
+3. **稳定的滚动条占位**：使用 scrollbar-gutter: stable 防止数据变化时滚动条出现/消失导致布局抖动
+
+`css
+.preview-box {
+  max-height: 320px;
+  overflow-y: auto;
+  overflow-x: auto;
+  scrollbar-gutter: stable;       /* 滚动条预留空间，防止布局抖动 */
+  scrollbar-width: thin;
+}
+`
+
+### 8.3 不同面板宽度的预期表现
+
+| 面板宽度   | 列数 | 卡片宽度  | 典型场景        |
+| ---------- | ---- | --------- | --------------- |
+| ≤ 400px    | 1    | 280-400px | 最小停靠面板    |
+| 500-800px  | 2    | 280-400px | 常规侧边栏      |
+| 800-1200px | 3    | 280-400px | 宽屏停靠面板    |
+| ≥ 1200px   | 4+   | 280-400px | 浮动/最大化面板 |
+
+所有宽度下卡片宽度保持在 280-400px 范围内，通过增加列数而非拉伸宽度来利用更多空间。
+
+### 8.4 新增卡片的样式清单
+
+在 .content-grid 中新增卡片组件时，必须：
+
+1. 继承 .section 基类样式（背景、边框、圆角、shadow）
+2. 确保内部长文本/表格有独立滚动容器，不溢出卡片边界
+3. 避免设置 width 或 max-width（由 Grid 轨道控制）
+4. 避免使用 loat 或绝对定位脱离文档流
+
+### 8.5 模态框显示逻辑
+
+#### CSS 默认隐藏，JS 控制显示
+
+所有模态框（.modal / .detail-modal / .sync-preview-modal / .bgm-modal）**必须**在 CSS 中定义 display: none 为默认值，由 JS 显式设置 display: flex 来显示。
+
+`css
+/* ✅ 正确：CSS 默认隐藏 */
+.modal { display: none; align-items: center; justify-content: center; }
+
+/* ❌ 禁止：CSS 默认显示（会导致忘记加 style="display:none" 时直接弹出） */
+.modal { display: flex; }
+`
+
+**历史教训**：.modal 曾默认 display: flex，依赖每个 HTML 元素手动写 style="display:none;" 来隐藏。syncPreviewModal 漏掉了这条内联样式，导致页面一加载就弹出。2026-08-27 改为 CSS 默认隐藏，从源头消除此类问题。
+
+#### JS 显示/隐藏约定
+
+` ypescript
+// 显示：设置 display 为 flex，激活 flex 居中布局
+modal.style.display = 'flex';
+
+// 隐藏
+modal.style.display = 'none';
+`
+
+所有模态框统一使用 inline style 控制显示，不依赖 CSS class toggle。
+
+#### 两类模态框
+
+| 类型               | CSS 类     | 创建方式                  | 隐藏保障                                |
+| ------------------ | ---------- | ------------------------- | --------------------------------------- |
+| 静态（HTML 预置）  | .modal     | HTML 直接定义             | CSS 默认 display: none                  |
+| 动态（运行时创建） | .bgm-modal | JS document.createElement | 创建时显式 modal.style.display = 'none' |
+
+#### 模态框清单
+
+| ID / 类名            | 类型                      | 文件                                            | 用途                                 |
+| -------------------- | ------------------------- | ----------------------------------------------- | ------------------------------------ |
+| #detailModal         | .detail-modal             | panel.html / panel-preview.html                 | 详细预览                             |
+| #logModal            | .modal                    | panel.html / panel-preview.html / settings.html | 系统日志                             |
+| #syncPreviewModal    | .modal.sync-preview-modal | panel.html / panel-preview.html                 | 同步预览数据                         |
+| #connectionTestModal | .modal                    | panel.html                                      | 连接测试结果                         |
+| .bgm-modal           | 动态                      | dialog.ts 运行时注入                            | confirm / alert / toast / syncResult |

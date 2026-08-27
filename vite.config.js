@@ -22,7 +22,9 @@ export default defineConfig({
         // 新增：复制 dist-ts 目录（TS 编译产物，main.js 和 panel.html 均依赖）
         { src: 'dist-ts/**/*.js', dest: '.' }, // → dist/dist-ts/core/constants.js 等
         // 新增：复制 css 目录（panel.html 通过 ../css/ 引用）
-        { src: 'css/*', dest: '.' }           // → dist/css/styles.css
+        { src: 'css/*', dest: '.' },           // → dist/css/styles.css
+        // 新增：复制 libs 目录（purify.js 等，panel.html 通过 ../libs/ 引用）
+        { src: 'libs/*', dest: '.' }           // → dist/libs/purify.js
       ]
     })
   ],
