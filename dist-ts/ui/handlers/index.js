@@ -4,7 +4,7 @@
  * @description 资源追踪、按钮监听、ACTION_HANDLERS 分发、消息监听、事件总线监听、
  *              配置 UI 回填等。同时 re-export 子模块的公开 API，保持原 handlers.ts 的外部接口。
  */
-import { LOG_LEVELS, bgmLog, BGM, loadBgToken, storeBgToken, clearBgToken, copyTokenToClipboard, _setBgmUserId, _getBgmUserId, _setBgmUsername, getApp, getLastRow, getSyncRecordSheetIfExists, showAlert, showConfirm, showInput, showToast, refreshData, refreshSheets, refreshWorkbooks, toggleSheetLock, enlargePreview, clearSyncRecords, deduplicateSyncRecords, formatSyncRecordSheet, openSyncRecordSheet, closeDetailModal, previewSyncContent, syncSelectedRows, openBangumiTokenPage, setSyncRecordEnabled, getSyncRecordEnabled, getIncrementalSync, setIncrementalSync, getSkipConflicts, setSkipConflicts, getGithubConfig, setGithubConfig, isGithubConfigComplete, getSyncStrategy, setSyncStrategy, getSyncSourceType, setSyncSourceType, syncFromRemote, buildRawUrl, showSyncProgressDialog, buildSyncConfig, updateSyncProgressDialog, completeSyncProgressDialog, hideSyncProgressDialog, showSyncResultDialog, formatDuration, showSettingsPanel, } from '../../index.js';
+import { LOG_LEVELS, bgmLog, BGM, loadBgToken, storeBgToken, clearBgToken, copyTokenToClipboard, _setBgmUserId, _getBgmUserId, _setBgmUsername, getApp, getLastRow, getSyncRecordSheetIfExists, showAlert, showConfirm, showInput, showToast, refreshData, refreshSheets, refreshWorkbooks, toggleSheetLock, enlargePreview, clearSyncRecords, deduplicateSyncRecords, formatSyncRecordSheet, openSyncRecordSheet, closeDetailModal, previewSyncContent, syncSelectedRows, openBangumiTokenPage, setSyncRecordEnabled, getSyncRecordEnabled, getIncrementalSync, setIncrementalSync, getSkipConflicts, setSkipConflicts, setNavIconsOnly, getGithubConfig, setGithubConfig, isGithubConfigComplete, getSyncStrategy, setSyncStrategy, getSyncSourceType, setSyncSourceType, syncFromRemote, buildRawUrl, showSyncProgressDialog, buildSyncConfig, updateSyncProgressDialog, completeSyncProgressDialog, hideSyncProgressDialog, showSyncResultDialog, formatDuration, showSettingsPanel, } from '../../index.js';
 import { exportConfig, importConfig } from '../../services/configService.js';
 import { executeUndoLastSync } from '../../services/ribbonService.js';
 import { debounce } from '../../tools/debounce.js';
@@ -1210,6 +1210,16 @@ const ACTION_HANDLERS = {
         setSyncRecordEnabled(enabled);
         showToast(`同步记录已${enabled ? '开启' : '关闭'}`, 'success');
         bgmLog(LOG_LEVELS.INFO, `[handleActionClick] 启用同步记录: ${enabled ? '开启' : '关闭'}`);
+    },
+    toggleNavIconsOnly: (_ctx) => {
+        const checkbox = document.getElementById('chkNavIconsOnly');
+        const enabled = checkbox?.checked ?? false;
+        setNavIconsOnly(enabled);
+        showToast(`导航模式: ${enabled ? '仅图标' : '图标+文字'}`, 'success');
+        if (typeof document !== 'undefined') {
+            document.body.classList.toggle('nav-icons-only', enabled);
+        }
+        bgmLog(LOG_LEVELS.INFO, `[handleActionClick] 导航模式: ${enabled ? '仅图标' : '图标+文字'}`);
     },
 };
 /** 渲染日志条目到日志面板 */

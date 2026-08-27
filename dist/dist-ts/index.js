@@ -249,7 +249,9 @@ setIncrementalSync, getIncrementalSync,
 // 跳过冲突配置
 setSkipConflicts, getSkipConflicts, 
 // 同步记录开关
-setSyncRecordEnabled, getSyncRecordEnabled, } from './tools/config.js';
+setSyncRecordEnabled, getSyncRecordEnabled, 
+// 导航显示模式
+setNavIconsOnly, getNavIconsOnly, } from './tools/config.js';
 // ============================================================================
 // 14. URL 自动补全（来自 tools/autoFillUrl.js）
 // ============================================================================

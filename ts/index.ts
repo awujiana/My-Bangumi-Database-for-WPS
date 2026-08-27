@@ -384,6 +384,9 @@ export {
   // 同步记录开关
   setSyncRecordEnabled,
   getSyncRecordEnabled,
+  // 导航显示模式
+  setNavIconsOnly,
+  getNavIconsOnly,
 } from './tools/config.js'
 
 // ============================================================================

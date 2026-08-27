@@ -32,28 +32,39 @@ function initSettingsPage(): void {
 
   // 2. 加载同步偏好设置
   import('../tools/config.js')
-    .then(({ getIncrementalSync, getSkipConflicts, getSyncRecordEnabled, getConfig }) => {
-      // 设置复选框
-      const chkIncremental = document.getElementById(
-        'chkIncrementalSync',
-      ) as HTMLInputElement | null
-      if (chkIncremental) chkIncremental.checked = getIncrementalSync(true)
+    .then(
+      ({
+        getIncrementalSync,
+        getSkipConflicts,
+        getSyncRecordEnabled,
+        getConfig,
+        getNavIconsOnly,
+      }) => {
+        // 设置复选框
+        const chkIncremental = document.getElementById(
+          'chkIncrementalSync',
+        ) as HTMLInputElement | null
+        if (chkIncremental) chkIncremental.checked = getIncrementalSync(true)
 
-      const chkSkip = document.getElementById('chkSkipConflicts') as HTMLInputElement | null
-      if (chkSkip) chkSkip.checked = getSkipConflicts(true)
+        const chkSkip = document.getElementById('chkSkipConflicts') as HTMLInputElement | null
+        if (chkSkip) chkSkip.checked = getSkipConflicts(true)
 
-      const chkSyncRecord = document.getElementById(
-        'chkEnableSyncRecord',
-      ) as HTMLInputElement | null
-      if (chkSyncRecord) chkSyncRecord.checked = getSyncRecordEnabled(true)
+        const chkSyncRecord = document.getElementById(
+          'chkEnableSyncRecord',
+        ) as HTMLInputElement | null
+        if (chkSyncRecord) chkSyncRecord.checked = getSyncRecordEnabled(true)
 
-      // 设置冲突策略下拉
-      const strategySelect = document.getElementById('githubStrategy') as HTMLSelectElement | null
-      if (strategySelect) {
-        const savedStrategy = getConfig('bgm_conflict_strategy', 'skip', true)
-        strategySelect.value = savedStrategy
-      }
-    })
+        const chkNavIcons = document.getElementById('chkNavIconsOnly') as HTMLInputElement | null
+        if (chkNavIcons) chkNavIcons.checked = getNavIconsOnly(true)
+
+        // 设置冲突策略下拉
+        const strategySelect = document.getElementById('githubStrategy') as HTMLSelectElement | null
+        if (strategySelect) {
+          const savedStrategy = getConfig('bgm_conflict_strategy', 'skip', true)
+          strategySelect.value = savedStrategy
+        }
+      },
+    )
     .catch(() => {
       // 静默处理
     })

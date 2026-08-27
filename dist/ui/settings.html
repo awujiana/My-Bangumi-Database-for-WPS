@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="utf-8">
@@ -9,7 +9,7 @@
     <link rel="stylesheet" href="../css/styles.css">
 </head>
 <body>
-    <script src="../libs/purify.js"></script>
+    <script type="text/javascript" src="../libs/purify.js"></script>
     <script type="module" src="./settings-bootstrap.js"></script>
     <script src="../wpsjsrpcsdk.js"></script>
 
@@ -80,6 +80,12 @@
                 <label style="display: flex; align-items: center; gap: 6px; cursor: pointer; font-size: 13px; color: #e0e0e0;">
                     <input type="checkbox" id="chkEnableSyncRecord" data-action="toggleEnableSyncRecord" style="cursor: pointer;">
                     <span>启用同步记录</span>
+                </label>
+            </div>
+            <div class="form-group" style="margin: 8px 0; padding: 6px 10px; background: #3a3a3a; border-radius: 4px;">
+                <label style="display: flex; align-items: center; gap: 6px; cursor: pointer; font-size: 13px; color: #e0e0e0;">
+                    <input type="checkbox" id="chkNavIconsOnly" data-action="toggleNavIconsOnly" style="cursor: pointer;">
+                    <span>导航仅显示图标（鼠标悬停显示名称）</span>
                 </label>
             </div>
         </div>

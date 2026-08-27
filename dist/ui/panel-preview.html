@@ -12,7 +12,6 @@
     <div class="global">
         <header class="topbar">
             <div class="brand">
-                <div class="brand-mark" aria-hidden="true">B</div>
                 <div class="brand-text">
                     <span class="brand-title">Bangumi 同步工具</span>
                     <span class="brand-sub">上传同步 · 收藏下载 · 远程数据同步</span>
@@ -63,13 +62,13 @@
 
             <nav class="nav" aria-label="功能导航">
                 <div class="nav-label">功能导航</div>
-                <a href="#sec-account"><span class="nav-ico">🔑</span>账户与凭证</a>
-                <a href="#sec-scope"><span class="nav-ico">🎯</span>同步范围与选择</a>
-                <a href="#sec-strategy"><span class="nav-ico">⚖️</span>同步策略</a>
-                <a href="#sec-remote"><span class="nav-ico">📥</span>远程数据同步</a>
-                <a href="#sec-preview"><span class="nav-ico">📋</span>数据预览</a>
-                <a href="#sec-records"><span class="nav-ico">📊</span>记录与日志</a>
-                <a href="#sec-help"><span class="nav-ico">📖</span>帮助与格式</a>
+                <a href="#sec-account" title="账户与凭证"><span class="nav-ico">🔑</span><span class="nav-text">账户与凭证</span></a>
+                <a href="#sec-scope" title="同步范围与选择"><span class="nav-ico">🎯</span><span class="nav-text">同步范围与选择</span></a>
+                <a href="#sec-strategy" title="同步策略"><span class="nav-ico">⚖️</span><span class="nav-text">同步策略</span></a>
+                <a href="#sec-remote" title="远程数据同步"><span class="nav-ico">📥</span><span class="nav-text">远程数据同步</span></a>
+                <a href="#sec-preview" title="数据预览"><span class="nav-ico">📋</span><span class="nav-text">数据预览</span></a>
+                <a href="#sec-records" title="记录与日志"><span class="nav-ico">📊</span><span class="nav-text">记录与日志</span></a>
+                <a href="#sec-help" title="帮助与格式"><span class="nav-ico">📖</span><span class="nav-text">帮助与格式</span></a>
             </nav>
         </aside>
 
@@ -321,7 +320,7 @@
         <div class="modal-header"><h3>📜 系统日志</h3><button class="modal-close-btn" data-action="closeLogModal" aria-label="关闭">×</button></div>
         <div class="modal-body"><div id="logModalBody" style="max-height:440px;overflow-y:auto;"></div></div>
     </div></div>
-    <div id="syncPreviewModal" class="modal sync-preview-modal"><div class="modal-content">
+    <div id="syncPreviewModal" class="modal sync-preview-modal" style="display:none;"><div class="modal-content">
         <div class="modal-header"><h3>同步预览数据</h3><div class="sync-preview-modal-toolbar"><button id="syncAllBtn" class="modal-action-btn">全部同步</button><button id="closeSyncPreview">&times;</button></div></div>
         <div class="modal-body"></div>
         <button id="scrollToTopBtn" class="scroll-btn scroll-to-top" title="回到顶部">↑</button>

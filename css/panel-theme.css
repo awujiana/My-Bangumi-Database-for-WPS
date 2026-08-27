@@ -203,6 +203,44 @@ body {
   transition: background var(--dur), color var(--dur), border-color var(--dur), transform var(--dur) var(--ease);
 }
 .nav a .nav-ico { width: 18px; text-align: center; flex-shrink: 0; opacity: .9; }
+.nav a .nav-text { transition: opacity var(--dur); }
+
+/* ---- 图标仅模式（通过 body.nav-icons-only 切换） ---- */
+body.nav-icons-only .global { grid-template-columns: 64px minmax(0, 1fr); }
+body.nav-icons-only .sidebar { padding: var(--sp-4) var(--sp-3); }
+body.nav-icons-only .side-card { padding: var(--sp-3); }
+body.nav-icons-only .user-profile { display: none; }
+body.nav-icons-only .token-status-line { display: none; }
+body.nav-icons-only .sidebar .hint { display: none; }
+body.nav-icons-only .nav-label { display: none; }
+body.nav-icons-only .nav a {
+  justify-content: center;
+  padding: 9px 0;
+  gap: 0;
+  position: relative;
+}
+body.nav-icons-only .nav a .nav-text { display: none; }
+body.nav-icons-only .nav a:hover { transform: translateX(0); }
+body.nav-icons-only .nav a::after {
+  content: attr(title);
+  position: absolute;
+  left: calc(100% + 8px);
+  top: 50%;
+  transform: translateY(-50%);
+  background: var(--bg-mantle, #1e1e2e);
+  color: var(--text-1, #e0e0e0);
+  border: 1px solid var(--border, #444);
+  padding: 4px 10px;
+  border-radius: var(--r-sm);
+  font-size: 12px;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity var(--dur);
+  z-index: 100;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+}
+body.nav-icons-only .nav a:hover::after { opacity: 1; }
 .nav a:hover { background: var(--bg-surface); color: var(--text-1); transform: translateX(2px); }
 .nav a.active {
   background: rgba(255,255,255,0.10);

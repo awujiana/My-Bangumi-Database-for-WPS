@@ -29,7 +29,7 @@ function initSettingsPage() {
     });
     // 2. 加载同步偏好设置
     import('../tools/config.js')
-        .then(({ getIncrementalSync, getSkipConflicts, getSyncRecordEnabled, getConfig }) => {
+        .then(({ getIncrementalSync, getSkipConflicts, getSyncRecordEnabled, getConfig, getNavIconsOnly }) => {
         // 设置复选框
         const chkIncremental = document.getElementById('chkIncrementalSync');
         if (chkIncremental)
@@ -40,6 +40,9 @@ function initSettingsPage() {
         const chkSyncRecord = document.getElementById('chkEnableSyncRecord');
         if (chkSyncRecord)
             chkSyncRecord.checked = getSyncRecordEnabled(true);
+        const chkNavIcons = document.getElementById('chkNavIconsOnly');
+        if (chkNavIcons)
+            chkNavIcons.checked = getNavIconsOnly(true);
         // 设置冲突策略下拉
         const strategySelect = document.getElementById('githubStrategy');
         if (strategySelect) {

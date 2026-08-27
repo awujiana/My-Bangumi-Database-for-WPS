@@ -16,7 +16,15 @@
  */
 
 import { initPanel } from '../panel/panelPage.js'
+import { getNavIconsOnly } from '../tools/config.js'
 import { initHandlers } from '../ui/handlers/index.js'
+
+function applyNavMode(): void {
+  if (typeof document === 'undefined') return
+  if (getNavIconsOnly(true)) {
+    document.body.classList.add('nav-icons-only')
+  }
+}
 
 /**
  * 启动面板：依次执行面板初始化与 UI 事件处理初始化。
@@ -32,5 +40,6 @@ export function startPanel(): void {
 // 仅在浏览器上下文且当前页面为 panel.html 时自动启动；
 // 通过 typeof window !== 'undefined' 守卫，确保 Node 环境（如部分单元测试）导入此模块不会触发副作用。
 if (typeof window !== 'undefined' && window.location.pathname.includes('panel.html')) {
+  applyNavMode()
   startPanel()
 }

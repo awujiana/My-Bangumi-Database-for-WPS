@@ -42,6 +42,7 @@ import {
   setIncrementalSync,
   getSkipConflicts,
   setSkipConflicts,
+  setNavIconsOnly,
   getGithubConfig,
   setGithubConfig,
   isGithubConfigComplete,
@@ -1584,6 +1585,17 @@ const ACTION_HANDLERS: Record<string, ActionHandler> = {
     setSyncRecordEnabled(enabled)
     showToast(`同步记录已${enabled ? '开启' : '关闭'}`, 'success')
     bgmLog(LOG_LEVELS.INFO, `[handleActionClick] 启用同步记录: ${enabled ? '开启' : '关闭'}`)
+  },
+
+  toggleNavIconsOnly: (_ctx) => {
+    const checkbox = document.getElementById('chkNavIconsOnly') as HTMLInputElement | null
+    const enabled = checkbox?.checked ?? false
+    setNavIconsOnly(enabled)
+    showToast(`导航模式: ${enabled ? '仅图标' : '图标+文字'}`, 'success')
+    if (typeof document !== 'undefined') {
+      document.body.classList.toggle('nav-icons-only', enabled)
+    }
+    bgmLog(LOG_LEVELS.INFO, `[handleActionClick] 导航模式: ${enabled ? '仅图标' : '图标+文字'}`)
   },
 }
 

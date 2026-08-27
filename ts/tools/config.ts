@@ -21,6 +21,7 @@ export const CONFIG_KEYS = {
   LOCKED_WORKBOOK: 'bgm_locked_workbook',
   ENABLE_SYNC_RECORD: 'bgm_enable_sync_record',
   ENRICH_LOCKED_WORKBOOK: 'bgm_enrich_locked_workbook',
+  NAV_ICONS_ONLY: 'bgm_nav_icons_only',
 } as const
 
 /**
@@ -189,5 +190,16 @@ export function setSyncRecordEnabled(enabled: boolean): boolean {
 export function getSyncRecordEnabled(silent: boolean = false): boolean {
   const result = getConfig(CONFIG_KEYS.ENABLE_SYNC_RECORD, '', silent) === 'true'
   if (!silent) bgmLog(LOG_LEVELS.INFO, `[config] 获取同步记录状态: ${result ? '开启' : '关闭'}`)
+  return result
+}
+
+export function setNavIconsOnly(enabled: boolean): boolean {
+  bgmLog(LOG_LEVELS.INFO, `[config] 设置导航仅图标模式: ${enabled ? '开启' : '关闭'}`)
+  return setConfig(CONFIG_KEYS.NAV_ICONS_ONLY, enabled ? 'true' : 'false')
+}
+
+export function getNavIconsOnly(silent: boolean = false): boolean {
+  const result = getConfig(CONFIG_KEYS.NAV_ICONS_ONLY, '', silent) === 'true'
+  if (!silent) bgmLog(LOG_LEVELS.INFO, `[config] 获取导航仅图标状态: ${result ? '开启' : '关闭'}`)
   return result
 }
