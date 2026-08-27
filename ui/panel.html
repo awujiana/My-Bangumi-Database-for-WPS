@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="utf-8">
@@ -12,7 +12,7 @@
 </head>
 <body>
     <!-- ES6 模块加载（外联，符合 CSP script-src 'self'） -->
-    <script src="../libs/purify.js"></script>
+    <script type="text/javascript" src="../libs/purify.js"></script>
     <script type="module" src="./panel-bootstrap.js"></script>
     <script src="../wpsjsrpcsdk.js"></script>
 
@@ -20,7 +20,6 @@
         <!-- ===================== 顶栏 ===================== -->
         <header class="topbar">
             <div class="brand">
-                <div class="brand-mark" aria-hidden="true">B</div>
                 <div class="brand-text">
                     <span class="brand-title">Bangumi 同步工具</span>
                     <span class="brand-sub">上传同步 · 收藏下载 · 远程数据同步</span>
@@ -545,7 +544,7 @@
         </div>
     </div>
 
-    <div id="syncPreviewModal" class="modal sync-preview-modal">
+    <div id="syncPreviewModal" class="modal sync-preview-modal" style="display:none;">
         <div class="modal-content">
             <div class="modal-header">
                 <h3>同步预览数据</h3>
