@@ -10,7 +10,7 @@
 | ------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
 | 📤 **上传同步**     | 将 Excel 中的观看状态、评分、标签批量同步到 Bangumi API（指数退避重试 + 请求竞态防护）。                                             |
 | 📥 **数据同步**     | 从远程仓库（GitHub / GitLab / Gitee / Gist / 本地文件）下载 Bangumi 资料 JSONL 并增量写入 Excel，内置 24h 本地缓存与 DJB2 哈希比对。 |
-| ↩️ **收藏下载**     | 从 Bangumi 拉取收藏列表标记到 Excel。                                                                                                |
+| ↩️ **收藏下载**     | 从 Bangumi 拉取收藏列表标记到 Excel；工作表为空时可自动填充为 Bangumi 账号收藏条目，再标记到 Excel。                                 |
 | 🔄 **5 种同步策略** | `add-update` / `add-only` / `update-only` / `mirror` / `force-overwrite`。                                                           |
 | ✅ **同步偏好**     | 增量同步、冲突跳过、同步记录开关；基于同步记录的「撤销同步」。                                                                       |
 | 🪄 **新番表富化**   | 自动补全新番表的名称 / 别名差异，映射 infobox 字段，减少手工录入。                                                                   |
@@ -59,13 +59,15 @@ BGM/
 ├── data/
 │   └── bangumi.jsonl           # 数据源本地副本（用于本地文件同步 / 开发测试）
 ├── differences/                # 数据差异摘要
-├── docs/                       # 详细文档（见下方「文档索引」）
+├── docs/                       # 参考与补充文档（UI/交互、数据下发、数据源仓库说明、覆盖率报告）
+├── 文档/                        # 核心文档（架构知识、用户操作手册、历史审计/评审，见「文档索引」）
 ├── tests/                      # Vitest 单元测试
 ├── scripts/                    # 构建 / 工具脚本（convert-icons.mjs 等）
+├── wps-addon-build/            # 遗留发布构建产物（含打包用的 test.exe，旧 taskpane 命名，非日常开发所需）
 └── dist/ , dist-ts/            # 构建产物（dist 由 Vite 生成，dist-ts 由 tsc 生成）
 ```
 
-> `dist/`、`dist-ts/`、`node_modules/` 由构建生成；`*.xlsx` 被 `.gitignore` 排除。`data/`、`differences/` 及其数据文件按 `.gitignore` 约定入库。
+> `dist/`、`dist-ts/`、`node_modules/`、`wps-addon-build/` 由构建或发布生成；`*.xlsx` 被 `.gitignore` 排除。`data/`、`differences/` 及其数据文件按 `.gitignore` 约定入库。
 
 ---
 
@@ -223,16 +225,19 @@ npm run test:coverage    # 生成覆盖率报告
 
 ## 📚 文档索引
 
-| 文档                                                                   | 说明                                                      |
-| ---------------------------------------------------------------------- | --------------------------------------------------------- |
-| [`docs/ui-and-interaction.md`](docs/ui-and-interaction.md)             | UI 架构、面板交互、事件机制、Processor 清单               |
-| [`docs/github-data-distribution.md`](docs/github-data-distribution.md) | 远程数据下发机制、JSONL 格式、同步策略                    |
-| [`docs/README.data-distribution.md`](docs/README.data-distribution.md) | 数据源仓库（Bangumi-Archive-Anime-Excel）说明（参考）     |
-| [`docs/项目文档.md`](docs/项目文档.md)                                 | 数据源仓库项目文档：仓库级架构、转换脚本、CI 流程（参考） |
-| [`docs/项目操作指南.md`](docs/项目操作指南.md)                         | 数据源仓库维护操作指南：初始化、发布、验证、回滚（参考）  |
-| [`docs/coverage-report.md`](docs/coverage-report.md)                   | 测试覆盖率报告                                            |
+| 文档                                                                   | 说明                                                            |
+| ---------------------------------------------------------------------- | --------------------------------------------------------------- |
+| [`CHANGELOG.md`](CHANGELOG.md)                                         | 跨文档变更总览（按内部功能版本记录）                            |
+| [`文档/ARCHITECTURE.md`](文档/ARCHITECTURE.md)                         | 架构与项目知识：分层模型、模块详解、配置体系、数据流、构建发布  |
+| [`文档/USER_OPERATIONS.md`](文档/USER_OPERATIONS.md)                   | 用户操作手册：每个按钮 / 面板 / 模态框的操作流程与边界          |
+| [`docs/ui-and-interaction.md`](docs/ui-and-interaction.md)             | UI 架构、面板交互、事件机制、Processor 清单                     |
+| [`docs/github-data-distribution.md`](docs/github-data-distribution.md) | 远程数据下发机制、JSONL 格式、同步策略                          |
+| [`docs/README.data-distribution.md`](docs/README.data-distribution.md) | 数据源仓库（Bangumi-Archive-Anime-Excel）说明（参考）           |
+| [`docs/项目文档.md`](docs/项目文档.md)                                 | 数据源仓库项目文档：仓库级架构、转换脚本、CI 流程（参考）       |
+| [`docs/项目操作指南.md`](docs/项目操作指南.md)                         | 数据源仓库维护操作指南：初始化、发布、验证、回滚（参考）        |
+| [`docs/coverage-report.md`](docs/coverage-report.md)                   | 测试覆盖率报告（历史快照，以本地 `npm run test:coverage` 为准） |
 
-> 数据源仓库（Bangumi-Archive-Anime-Excel）的参考文档已统一置于 `docs/` 下。
+> 数据源仓库（Bangumi-Archive-Anime-Excel）的参考文档已统一置于 `docs/` 下；架构与操作类核心文档置于 `文档/` 下。
 
 ---
 

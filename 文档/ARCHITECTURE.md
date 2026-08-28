@@ -1,20 +1,22 @@
 ﻿# Bangumi WPS Excel 加载项 - 架构与项目知识文档
 
-> 版本: 3.3 | 更新日期: 2026-08-26
+> 版本: 3.5 | 更新日期: 2026-08-28
 
 ---
 
 ## 版本历史
 
-| 版本 | 日期       | 变更说明                                                                                                                                                                                                                                                               |
-| ---- | ---------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| v1.0 | 2026-08-10 | 初始版本                                                                                                                                                                                                                                                               |
-| v2.8 | 2026-08-21 | 修复 GitHub 同步编译错误、同步完成弹窗支持明细表格                                                                                                                                                                                                                     |
-| v2.9 | 2026-08-26 | 新增 enrichEngine 富化引擎（新番表+简介工作表双阶段富化）、标注白名单机制、自动添加缺失列、声优字段支持、数据同步列位置无关性验证、边界情况修复（parseRemoteContent 空值检查、getAnnotatedValue 空值守卫）、42 项边界测试                                              |
-| v3.0 | 2026-08-26 | 新增富化功能工作簿选择与锁定机制（enrichLock.ts）：跨工作簿 Bangumi 追踪表选择、PluginStorage 持久化、启动恢复校验、与 Taskpane 锁定独立运行                                                                                                                           |
-| v3.1 | 2026-08-26 | enrichLock.ts 边界加固：WPS API null 返回安全处理、冗余查找逻辑简化、边界情况文档完善                                                                                                                                                                                  |
-| v3.2 | 2026-08-26 | 命名规范重构：`taskpane/` 目录重命名为 `panel/`，页面文件使用 `Page` 后缀（`panelPage.ts`/`enrichPage.ts`），`taskpane-entry.ts` → `panel-entry.ts`；删除旧兼容文件 `ts/taskpane.ts`；统一 `@module` JSDoc 标签                                                        |
-| v3.3 | 2026-08-26 | 循环依赖治理：创建 `types.ts`/`container.ts`/`services.ts`/`errorHandler.ts` 核心模块；扩展 EventBus 新增 `STATE_CHANGED`/`CONFIG_CHANGED` 事件；`index.ts` 瘦身为纯 re-export 便利桶；移除各模块对 `index.ts` 的直接依赖；函数名统一（`initTaskpane`→`initPanel` 等） |
+| 版本 | 日期       | 变更说明                                                                                                                                                                                                                                                           |
+| ---- | ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| v1.0 | 2026-08-10 | 初始版本                                                                                                                                                                                                                                                           |
+| v2.8 | 2026-08-21 | 修复 GitHub 同步编译错误、同步完成弹窗支持明细表格                                                                                                                                                                                                                 |
+| v2.9 | 2026-08-26 | 新增 enrichEngine 富化引擎（新番表+简介工作表双阶段富化）、标注白名单机制、自动添加缺失列、声优字段支持、数据同步列位置无关性验证、边界情况修复（parseRemoteContent 空值检查、getAnnotatedValue 空值守卫）、42 项边界测试                                          |
+| v3.0 | 2026-08-26 | 新增富化功能工作簿选择与锁定机制（enrichLock.ts）：跨工作簿 Bangumi 追踪表选择、PluginStorage 持久化、启动恢复校验、与面板锁定独立运行                                                                                                                             |
+| v3.1 | 2026-08-26 | enrichLock.ts 边界加固：WPS API null 返回安全处理、冗余查找逻辑简化、边界情况文档完善                                                                                                                                                                              |
+| v3.2 | 2026-08-26 | 命名规范重构：`taskpane/` 目录重命名为 `panel/`，页面文件使用 `Page` 后缀（`panelPage.ts`/`enrichPage.ts`），`taskpane-entry.ts` → `panel-entry.ts`；删除旧兼容文件 `ts/taskpane.ts`；统一 `@module` JSDoc 标签                                                    |
+| v3.3 | 2026-08-26 | 循环依赖治理：创建 `types.ts`/`container.ts`/`services.ts`/`errorHandler.ts` 核心模块；扩展 EventBus 新增 `STATE_CHANGED`/`CONFIG_CHANGED` 事件；`index.ts` 瘦身为纯 re-export 便利桶；移除各模块对 `index.ts` 的直接依赖；函数名统一（`init面板`→`initPanel` 等） |
+| v3.4 | 2026-08-26 | 移除收藏回写数据源选择：收藏回写固定走 Bangumi API，删除「Bangumi API / GitHub 仓库」二选一下拉框、对应 UI、配置键 `bgm_writeback_source` 及文档说明                                                                                                               |
+| v3.5 | 2026-08-28 | 收藏回写空表自动填充：工作表为空时，经用户确认后自动写入标准表头并用 Bangumi 账号收藏条目填充 Excel，再执行标记；恢复缺失的 `css/panel-theme.css` 源文件                                                                                                           |
 
 ## 一、架构概览
 
@@ -142,7 +144,7 @@ ts/index.ts (thin barrel — 仅 re-export)
 
 - **文件**: `ts/entry/ribbon-entry.ts`
 - **启动链**: `startRibbon()` → `initRibbon()` →
-  1. 注册 window message 监听器（接收 Taskpane 发来的 `BGM:configUpdated` 消息）
+  1. 注册 window message 监听器（接收面板发来的 `BGM:configUpdated` 消息）
   2. 启动 PluginStorage 配置轮询（每 2 秒检查增量同步/跳过冲突/同步记录开关的变化）
 - **自动启动条件**: `typeof window !== 'undefined'`（浏览器上下文）
 
@@ -159,10 +161,10 @@ ts/index.ts (thin barrel — 仅 re-export)
 
 - **文件**: `ts/entry/settings-entry.ts`
 - **启动链**: `startSettings()` →
-  1. `initHandlers()`: 复用 Taskpane 的事件处理器（统一事件分发）
+  1. `initHandlers()`: 复用面板的事件处理器（统一事件分发）
   2. `initSettingsPage()`: 加载 Token 状态、用户信息、同步偏好、GitHub 配置
 - **自动启动条件**: `typeof window !== 'undefined' && window.location.pathname.includes('settings.html')`
-- **UI 结构**: 独立 TaskPane (`settings.html`)，包含 Token 管理、用户信息、同步偏好、GitHub 配置等模块
+- **UI 结构**: 独立面板（`settings.html`，均通过 WPS `CreateTaskPane` 创建），包含 Token 管理、用户信息、同步偏好、GitHub 配置等模块
 
 ---
 
@@ -264,9 +266,9 @@ ts/index.ts (thin barrel — 仅 re-export)
 - **`copyTokenForRibbon()`**: 通过 execCommand('copy') 复制 Token
 - **`setUserIdForRibbon()`**: 设置用户 ID
 - **`openCollectionForRibbon()`**: 打开 Bangumi 收藏页面
-- **`syncFromGithubForRibbon()`**: 写入 PluginStorage 信号（`bgm_request_github_sync`），由 Taskpane 轮询后执行
-- **`undoLastSyncForRibbon()`**: 写入 PluginStorage 信号（`bgm_request_undo_sync`），由 Taskpane 轮询后执行
-- **`executeUndoLastSync()`**: Taskpane 上下文中的撤销执行（调用 `undoStack.undoLastSync()`）
+- **`syncFromGithubForRibbon()`**: 写入 PluginStorage 信号（`bgm_request_github_sync`），由面板轮询后执行
+- **`undoLastSyncForRibbon()`**: 写入 PluginStorage 信号（`bgm_request_undo_sync`），由面板轮询后执行
+- **`executeUndoLastSync()`**: 面板上下文中的撤销执行（调用 `undoStack.undoLastSync()`）
 
 #### `configService.ts` — 配置导入/导出
 
@@ -456,7 +458,7 @@ ts/index.ts (thin barrel — 仅 re-export)
   - `showSyncGuide`: 同步策略引导切换（根据所选策略动态显示策略说明和通用规则）
   - `saveAllConfig`: 保存所有配置到 PluginStorage
   - `exportConfig` / `importConfig`: 配置导入导出
-  - `closePanel`: 关闭 Taskpane
+  - `closePanel`: 关闭面板
   - `openSettings`: 打开设置面板
 - **`sync.ts`**: 同步相关 handler（GitHub 同步、撤销等）
 - **`token.ts`**: Token 相关 handler（设置、验证、状态更新）
@@ -534,7 +536,7 @@ ts/index.ts (thin barrel — 仅 re-export)
 
 #### 双面板位置协调逻辑
 
-项目支持两个独立的 TaskPane：主面板（`panel.html`）和设置面板（`settings.html`）。为避免两个面板争夺同一侧空间，`showSettingsPanel()` 实现了动态位置协调：
+项目支持两个独立的面板（均通过 WPS `CreateTaskPane` 创建）：主面板（`panel.html`）和设置面板（`settings.html`）。为避免两个面板争夺同一侧空间，`showSettingsPanel()` 实现了动态位置协调：
 
 | 主面板(panel)状态 | 设置面板(settings)停靠位置 | 说明                                   |
 | ----------------- | -------------------------- | -------------------------------------- |
@@ -676,11 +678,12 @@ ts/index.ts (thin barrel — 仅 re-export)
 | ------------------------- | ------ | --------- | ----------------------------------------- |
 | `EnableFlag`              | string | `'false'` | WPS 加载项启用标志（Ribbon 初始化时设置） |
 | `ApiEventFlag`            | string | `'false'` | API 事件标志（Ribbon 初始化时设置）       |
-| `panel_id`                | string | `null`    | Panel ID（由 `CreateTaskPane` 返回）      |
+| `panel_id`                | string | `null`    | 主面板 ID（由 `CreateTaskPane` 返回）     |
 | `settings_pane_id`        | string | `null`    | 设置面板 ID（由 `CreateTaskPane` 返回）   |
-| `bgm_panel_shown_at`      | string | 时间戳    | 面板显示信号（用于触发 Taskpane 刷新）    |
-| `bgm_request_github_sync` | string | 时间戳    | GitHub 同步请求信号（Ribbon→Taskpane）    |
-| `bgm_request_undo_sync`   | string | 时间戳    | 撤销同步请求信号（Ribbon→Taskpane）       |
+| `enrich_pane_id`          | string | `null`    | 富化面板 ID（由 `CreateTaskPane` 返回）   |
+| `bgm_panel_shown_at`      | string | 时间戳    | 面板显示信号（用于触发面板刷新）          |
+| `bgm_request_github_sync` | string | 时间戳    | GitHub 同步请求信号（Ribbon→面板）        |
+| `bgm_request_undo_sync`   | string | 时间戳    | 撤销同步请求信号（Ribbon→面板）           |
 | `manifest_base_path`      | string | `null`    | 清单基础路径（用于 URL 解析）             |
 
 ### 3.2 默认值与初始化
@@ -706,7 +709,7 @@ ts/index.ts (thin barrel — 仅 re-export)
     → PluginStorage.getItem(key) ?? defaultValue
 
 跨 WebView 同步:
-  Ribbon ↔ Taskpane:
+  Ribbon ↔ 面板:
     - postMessage (同源 iframe 直接通信)
     - PluginStorage 轮询 (每 2 秒，兜底方案)
     - BroadcastChannel (备用方案，跨 WebView 消息广播)
@@ -777,18 +780,28 @@ BGM.sync.exitRunningState() → 退出运行状态
 ### 4.2 收藏下载流程 (Bangumi → Excel)
 
 ```
-用户点击「从 Bangumi 同步收藏」
+用户点击「从 Bangumi 同步收藏」（data-action: syncCollectionFromBgm）
     │
     ▼
-handlers/sync.ts → syncCollectionFromBgm
+handlers/sync.ts → _doAPISync(sheetIndex, token)
     │
-    ├─ loadBgToken() → 读取 Token
+    ├─ verifyToken(token) → 验证 Token 有效性并记录 userId
     ├─ fetchAllUserCollections(token) → 分页获取全部收藏
     │   ├─ BGM API /v0/users/-/collections?type=...&limit=50
     │   └─ 自动处理分页 offset
     │
     ▼
-遍历 Excel 行
+检测空表（lastRow <= headerRow 或 headerRow === 0）
+    │
+    ├─ [空表] 账号有收藏 → 弹出确认对话框
+    │       ├─ 用户确认 → ensureSheetHeaders(ws) 写入标准表头
+    │       ├─ _fillSheetWithCollections() 按 colMap 填充
+    │       │      URL / 名称 / 别名 / 类别 / 是否看完 / 打分 / 标签 / 感言 / 序列号
+    │       └─ 重新计算 lastRow / headerRow / colMap
+    │       └─ 用户取消 或 账号无收藏 → 终止并提示
+    │
+    ▼
+遍历 Excel 行（含刚填充的收藏条目）
     │
     ├─ 对每行提取 SID
     ├─ 在 Bangumi 收藏 Map 中查找匹配
@@ -985,7 +998,7 @@ applyDiffToSheet(diffList)
 
 ### 5.3 用户提示策略
 
-| 场景       | Ribbon 环境                           | Taskpane 环境                        |
+| 场景       | Ribbon 环境                           | 面板 环境                            |
 | ---------- | ------------------------------------- | ------------------------------------ |
 | Token 设置 | `app.InputBox()` + `app.MessageBox()` | DOM `<input>` + `showToast()`        |
 | Token 验证 | XHR + `wpsMsgBox()`                   | `httpRequest()` + `showToast()`      |
@@ -1000,13 +1013,13 @@ applyDiffToSheet(diffList)
 
 ## 六、跨 WebView 通信
 
-### 6.1 Ribbon ↔ Taskpane 通信机制
+### 6.1 Ribbon ↔ 面板 通信机制
 
-WPS 中 Ribbon 和 Taskpane 是**独立的 iframe**（独立 WebView 上下文），通信存在障碍。项目采用双通道保障：
+WPS 中 Ribbon 和 面板 是**独立的 iframe**（独立 WebView 上下文），通信存在障碍。项目采用双通道保障：
 
 #### 通道 1: postMessage（主通道）
 
-- **方向**: Taskpane → Ribbon
+- **方向**: 面板 → Ribbon
 - **触发**: `config.setConfig()` / `config.removeConfig()`
 - **实现**:
   ```typescript
@@ -1022,17 +1035,17 @@ WPS 中 Ribbon 和 Taskpane 是**独立的 iframe**（独立 WebView 上下文�
 - **方向**: 双向
 - **间隔**: 每 2 秒
 - **Ribbon 侧**: `startRibbonConfigPolling()` 轮询 `bgm_incremental_sync`, `bgm_skip_conflicts`, `bgm_enable_sync_record`
-- **Taskpane 侧**: `userInfoPolling` 轮询用户信息、Token 状态、面板显示信号
+- **面板 侧**: `userInfoPolling` 轮询用户信息、Token 状态、面板显示信号
 - **检测到变化时**: 调用 `ribbonUI.InvalidateControl()` 刷新 Ribbon 按钮状态
 
 #### 通信信号约定
 
-| PluginStorage 键                  | 方向              | 触发时机                      | 接收方行为                                      |
-| --------------------------------- | ----------------- | ----------------------------- | ----------------------------------------------- |
-| `bgm_request_github_sync`         | Ribbon → Taskpane | 用户点击 Ribbon「从仓库同步」 | Taskpane 轮询检测 → 触发 syncFromGithub handler |
-| `bgm_request_undo_sync`           | Ribbon → Taskpane | 用户点击 Ribbon「撤销同步」   | Taskpane 轮询检测 → 触发 executeUndoLastSync    |
-| `bgm_panel_shown_at`              | Taskpane → 自身   | 面板从隐藏变为显示            | Taskpane 轮询检测 → 刷新工作表列表              |
-| `BGM:configUpdated` (postMessage) | Taskpane → Ribbon | 配置变更                      | Ribbon InvalidateControl 刷新按钮               |
+| PluginStorage 键                  | 方向          | 触发时机                      | 接收方行为                                  |
+| --------------------------------- | ------------- | ----------------------------- | ------------------------------------------- |
+| `bgm_request_github_sync`         | Ribbon → 面板 | 用户点击 Ribbon「从仓库同步」 | 面板 轮询检测 → 触发 syncFromGithub handler |
+| `bgm_request_undo_sync`           | Ribbon → 面板 | 用户点击 Ribbon「撤销同步」   | 面板 轮询检测 → 触发 executeUndoLastSync    |
+| `bgm_panel_shown_at`              | 面板 → 自身   | 面板从隐藏变为显示            | 面板 轮询检测 → 刷新工作表列表              |
+| `BGM:configUpdated` (postMessage) | 面板 → Ribbon | 配置变更                      | Ribbon InvalidateControl 刷新按钮           |
 
 ### 6.2 PluginStorage 轮询
 
@@ -1046,7 +1059,7 @@ Ribbon 侧 (每 2 秒):
     if (值变化) ribbonUI.InvalidateControl(controlId)
   }, 2000)
 
-Taskpane 侧 (每 2 秒):
+面板 侧 (每 2 秒):
   setInterval(() => {
     // 检测面板显示信号
     bgm_panel_shown_at → 刷新工作表
@@ -1064,19 +1077,19 @@ Taskpane 侧 (每 2 秒):
 
 EventBus 仅在**同一 WebView 上下文**内生效，用于模块间松耦合通信：
 
-| 事件名                            | 触发方                 | 订阅方                  | 说明                           |
-| --------------------------------- | ---------------------- | ----------------------- | ------------------------------ |
-| `state:tokenUpdated`              | Token 写入后           | Taskpane 面板、handlers | 刷新 Token 状态显示            |
-| `state:userIdUpdated`             | 用户 ID 写入后         | Taskpane 面板           | 刷新用户信息显示               |
-| `state:userNameUpdated`           | 用户名写入后           | Taskpane 面板           | 刷新用户信息显示               |
-| `sync:progress`                   | 同步引擎               | Taskpane 进度弹窗       | 更新进度条                     |
-| `sync:completed`                  | 同步引擎               | Taskpane 结果弹窗       | 显示同步结果                   |
-| `sync:error`                      | 同步引擎               | Taskpane 错误提示       | 显示错误信息                   |
-| `sync:stateChanged`               | BGM.sync 状态变更      | UI 组件                 | running/idle/paused 等状态切换 |
-| `sheet:locked` / `sheet:unlocked` | 工作表锁定/解锁        | UI 组件                 | 刷新锁定状态                   |
-| `config:updated`                  | 配置写入后             | Ribbon/TaksPane 多处    | 配置变更广播                   |
-| `request:githubSync`              | PluginStorage 信号触发 | sync handler            | 执行 GitHub 同步               |
-| `request:undoLastSync`            | PluginStorage 信号触发 | sync handler            | 执行撤销操作                   |
+| 事件名                            | 触发方                 | 订阅方               | 说明                           |
+| --------------------------------- | ---------------------- | -------------------- | ------------------------------ |
+| `state:tokenUpdated`              | Token 写入后           | 面板 面板、handlers  | 刷新 Token 状态显示            |
+| `state:userIdUpdated`             | 用户 ID 写入后         | 面板 面板            | 刷新用户信息显示               |
+| `state:userNameUpdated`           | 用户名写入后           | 面板 面板            | 刷新用户信息显示               |
+| `sync:progress`                   | 同步引擎               | 面板 进度弹窗        | 更新进度条                     |
+| `sync:completed`                  | 同步引擎               | 面板 结果弹窗        | 显示同步结果                   |
+| `sync:error`                      | 同步引擎               | 面板 错误提示        | 显示错误信息                   |
+| `sync:stateChanged`               | BGM.sync 状态变更      | UI 组件              | running/idle/paused 等状态切换 |
+| `sheet:locked` / `sheet:unlocked` | 工作表锁定/解锁        | UI 组件              | 刷新锁定状态                   |
+| `config:updated`                  | 配置写入后             | Ribbon/TaksPane 多处 | 配置变更广播                   |
+| `request:githubSync`              | PluginStorage 信号触发 | sync handler         | 执行 GitHub 同步               |
+| `request:undoLastSync`            | PluginStorage 信号触发 | sync handler         | 执行撤销操作                   |
 
 ---
 
