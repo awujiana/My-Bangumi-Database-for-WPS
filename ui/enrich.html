@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="utf-8">
@@ -51,6 +51,36 @@
                     <div class="mapping-header">列映射（可修正）</div>
                     <div class="mapping-list" id="mappingList">
                     </div>
+                </div>
+            </div>
+
+            <!-- 批量文件选择区域 -->
+            <div class="batch-section" id="batchSection" style="margin-top:16px;">
+                <h3>📚 批量富化（多文件）</h3>
+                <div class="bgm-btn-group bgm-btn-row" style="margin-bottom:8px;">
+                    <button class="bgm-btn small" id="batchSelectBtn" data-action="batchSelectFiles" style="flex:1;">📂 批量选择文件</button>
+                    <button class="bgm-btn small primary" id="batchStartBtn" data-action="batchStartEnrich" style="flex:1;display:none;">🚀 批量富化</button>
+                    <button class="bgm-btn small" id="batchClearBtn" data-action="batchClear" style="flex:1;display:none;">🗑️ 清空列表</button>
+                </div>
+
+                <!-- 文件列表 -->
+                <div id="batchFileList" style="display:none;max-height:180px;overflow-y:auto;background:#1a1a1a;border:1px solid #333;border-radius:6px;padding:6px;"></div>
+
+                <!-- 批量进度 -->
+                <div id="batchProgress" style="display:none;margin-top:8px;">
+                    <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px;">
+                        <span id="batchCurrentFile"></span>
+                        <span id="batchPercent">0%</span>
+                    </div>
+                    <div style="background:#333;border-radius:4px;height:6px;overflow:hidden;">
+                        <div id="batchProgressFill" style="height:100%;background:linear-gradient(90deg,#4a9eff,#3a8ee8);width:0%;transition:width 0.2s;"></div>
+                    </div>
+                </div>
+
+                <!-- 最终汇总 -->
+                <div id="batchSummary" style="display:none;margin-top:8px;background:#1e1e1e;border:1px solid #444;border-radius:6px;padding:10px;">
+                    <div style="font-weight:600;margin-bottom:8px;color:#a6e3a1;">📊 批量富化汇总</div>
+                    <div id="batchSummaryContent"></div>
                 </div>
             </div>
         </div>

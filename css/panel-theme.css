@@ -50,8 +50,8 @@
   /* ---- 间距（8px 基线，流体化以适配窗口缩放）---- */
   --sp-1: 4px;  --sp-2: 8px;  --sp-3: 12px; --sp-4: 16px;
   --sp-5: 20px; --sp-6: 24px; --sp-8: 32px;
-  --gap:   clamp(12px, 1vw, 20px);          /* 卡片/栅格间距随窗口缩放 */
-  --pad-card: clamp(16px, 1.3vw, 24px);     /* 卡片内边距 */
+  --gap:   clamp(10px, 0.7vw, 16px);         /* 卡片/栅格间距随窗口缩放（整体收敛 2 档） */
+  --pad-card: clamp(14px, 1vw, 20px);        /* 卡片内边距（收敛 1 档，窄面板保持 14px） */
 
   /* ---- 圆角 ---- */
   --r-sm: 6px; --r-md: 10px; --r-lg: 14px; --r-pill: 999px;
@@ -206,8 +206,11 @@ body {
 .nav a .nav-text { transition: opacity var(--dur); }
 
 /* ---- 图标仅模式（通过 body.nav-icons-only 切换） ---- */
-body.nav-icons-only .global { grid-template-columns: 64px minmax(0, 1fr); }
-body.nav-icons-only .sidebar { padding: var(--sp-4) var(--sp-3); }
+/* 注意：本块仅在面板宽度 ≥ 880px 时生效。窄窗口下由下方媒体查询接管，
+   恢复横排导航布局，避免 CSS 选择器优先级冲突（body.nav-icons-only .global
+   选择器权重高于媒体查询内的 .global，必须在每个断点显式覆盖）。 */
+body.nav-icons-only .global { grid-template-columns: 64px minmax(0, 1fr); min-width: 0; }
+body.nav-icons-only .sidebar { padding: var(--sp-4) var(--sp-3); overflow-x: hidden; }
 body.nav-icons-only .side-card { padding: var(--sp-3); }
 body.nav-icons-only .user-profile { display: none; }
 body.nav-icons-only .token-status-line { display: none; }
@@ -251,7 +254,7 @@ body.nav-icons-only .nav a:hover::after { opacity: 1; }
 /* ---- 主区 ---- */
 .main {
   grid-area: main;
-  padding: clamp(16px, 1.4vw, 28px);
+  padding: clamp(12px, 1vw, 20px);
   display: flex; flex-direction: column; gap: var(--gap);
   min-width: 0;
 }
@@ -315,8 +318,8 @@ body.nav-icons-only .nav a:hover::after { opacity: 1; }
   color: var(--text-1);
   font-size: var(--fs-h2);
   font-weight: 600;
-  margin-bottom: var(--sp-4);
-  padding-bottom: var(--sp-3);
+  margin-bottom: clamp(10px, 0.6vw, 14px);
+  padding-bottom: clamp(8px, 0.5vw, 12px);
   border-bottom: 1px solid var(--border);
   display: flex; align-items: center; gap: 8px;
 }
@@ -349,10 +352,15 @@ body.nav-icons-only .nav a:hover::after { opacity: 1; }
 .bgm-btn-icon { font-size: 15px; line-height: 1; }
 
 .bgm-btn.primary {
-  background: var(--primary); color: var(--text-on-accent);
-  box-shadow: 0 4px 12px rgba(255,255,255,0.15);
+  background: var(--bg-surface-2); color: var(--text-1);
+  border-color: var(--border-strong);
 }
-.bgm-btn.primary:hover { background: var(--primary-strong); box-shadow: 0 6px 16px rgba(255,255,255,0.22); }
+.bgm-btn.primary:hover { background: #363636; border-color: rgba(255,255,255,0.28); }
+
+.bgm-btn.success { background: var(--bg-surface-2); color: var(--success); border-color: var(--border-strong); }
+.bgm-btn.success:hover { background: #363636; border-color: rgba(166,227,161,0.45); }
+.bgm-btn.warning { background: var(--bg-surface-2); color: var(--warning); border-color: var(--border-strong); }
+.bgm-btn.warning:hover { background: #363636; border-color: rgba(249,226,175,0.45); }
 
 .bgm-btn.small { padding: 7px 12px; font-size: var(--fs-sm); }
 .bgm-btn.tiny { padding: 5px 9px; font-size: 11px; }
@@ -590,29 +598,45 @@ select.input option, .form-row select option { background: var(--bg-surface); co
   .command-center { grid-template-columns: 1fr; }
   .command-actions { justify-content: stretch; }
   .command-actions .bgm-btn { flex: 1; min-width: 0; }
+  /* 图标模式下：侧栏可进一步收窄，content-grid 防止溢出 */
+  body.nav-icons-only .global { grid-template-columns: 64px minmax(0, 1fr); }
+  body.nav-icons-only .content-grid { grid-template-columns: minmax(280px, 1fr); }
 }
 
 /* 窄桌面 / 被缩小的面板：侧栏转为顶部横向导航，主区单列 */
+/* 关键：必须覆盖 body.nav-icons-only .global，否则选择器优先级（2 类 > 1 类）
+   会忽略媒体查询，强制保持 64px + 1fr 两列，把内容挤爆 */
 @media (max-width: 880px) {
-  .global {
+  .global,
+  body.nav-icons-only .global {
     grid-template-columns: 1fr;
     grid-template-areas:
       "topbar"
       "sidebar"
       "main";
   }
-  .sidebar {
+  .sidebar,
+  body.nav-icons-only .sidebar {
     position: sticky; top: 0; z-index: 40;
     height: auto; flex-direction: row; align-items: center;
     gap: var(--sp-4); padding: var(--sp-3) var(--sp-4);
     border-right: none; border-bottom: 1px solid var(--border);
-    overflow-x: auto; overflow-y: hidden;
+    overflow-x: hidden; overflow-y: auto;
   }
-  .side-card { display: none; }          /* 窄态隐藏账户卡，避免挤压导航 */
-  .nav-label { display: none; }
-  .nav { flex-direction: row; flex-wrap: nowrap; gap: 6px; }
-  .nav a { white-space: nowrap; padding: 8px 12px; }
+  .side-card,
+  body.nav-icons-only .side-card { display: none; }  /* 窄态隐藏账户卡，避免挤压导航 */
+  .nav-label,
+  body.nav-icons-only .nav-label { display: none; }
+  .nav { flex-direction: row; flex-wrap: wrap; gap: 6px; }
+  .nav a,
+  body.nav-icons-only .nav a {
+    white-space: nowrap; padding: 8px 12px;
+    justify-content: flex-start;
+    position: static;
+  }
   .nav a:hover { transform: none; }
+  body.nav-icons-only .nav a .nav-text { display: inline; }
+  body.nav-icons-only .nav a:hover::after { display: none; }  /* 窄态不用 tooltip，太拥挤 */
   .content-grid { grid-template-columns: 1fr; }
   .command-actions { flex-direction: column; }
 }
@@ -622,6 +646,8 @@ select.input option, .form-row select option { background: var(--bg-surface); co
   .topbar { flex-wrap: wrap; }
   .brand-sub { display: none; }
   .section { padding: 14px; }
+  .nav { gap: 4px; }
+  .nav a { padding: 7px 10px; font-size: 12.5px; }
 }
 
 /* ============================ 14. 降低动效偏好 ========================== */

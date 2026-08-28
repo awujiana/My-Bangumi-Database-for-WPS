@@ -372,14 +372,16 @@
     padding: 14px 20px;
     font-size: 15px;
     font-weight: 600;
-    background: linear-gradient(135deg, #4a9eff 0%, #3a8ee8 100%);
-    color: white;
-    box-shadow: 0 4px 12px rgba(74, 158, 255, 0.35);
+    background: var(--bg-surface-2, #2a2a2a);
+    color: var(--text-1, #f2f2f2);
+    border: 1px solid rgba(255,255,255,0.16);
+    box-shadow: none;
 }
 
 #startEnrichBtn:hover {
-    background: linear-gradient(135deg, #3a8ee8 0%, #2a7ed8 100%);
-    box-shadow: 0 6px 18px rgba(74, 158, 255, 0.5);
+    background: #363636;
+    border-color: rgba(255,255,255,0.28);
+    box-shadow: none;
     transform: translateY(-1px);
 }
 
@@ -644,7 +646,7 @@
 /* ========== 按钮状态 ========== */
 .bgm-btn.primary:active {
     transform: translateY(0);
-    box-shadow: 0 2px 6px rgba(74, 158, 255, 0.3);
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
 }
 
 .bgm-btn:disabled {
@@ -658,8 +660,8 @@
 }
 
 .bgm-btn.primary:disabled:hover {
-    background: linear-gradient(135deg, #4a9eff 0%, #3a8ee8 100%);
-    box-shadow: 0 4px 10px rgba(74, 158, 255, 0.3);
+    background: #2a2a2a;
+    box-shadow: none;
 }
 
 /* ========== 响应式（300-400px 任务面板） ========== */
