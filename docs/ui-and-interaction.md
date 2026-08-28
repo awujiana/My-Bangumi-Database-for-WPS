@@ -1,4 +1,4 @@
-﻿# Bangumi 同步工具 — UI 与交互流程文档
+# Bangumi 同步工具 — UI 与交互流程文档
 
 > **版本**: v3.0  
 > **最后更新**: 2026-08-13  
@@ -30,7 +30,7 @@ Bangumi 同步工具是一个 WPS/Excel 加载项，用于在本地 Excel 表格
 │                                                           │
 │  ┌──────────────────┐  ┌──────────────────┐              │
 │  │   主面板          │  │   设置面板        │              │
-│  │   taskpane.html  │  │   settings.html   │              │
+│  │   panel.html     │  │   settings.html   │              │
 │  │                  │  │                  │              │
 │  │   默认停靠: 左侧  │  │   动态停靠:       │              │
 │  │                  │  │ 主面板可见 → 右侧  │              │
@@ -42,7 +42,7 @@ Bangumi 同步工具是一个 WPS/Excel 加载项，用于在本地 Excel 表格
 
 | 属性      | 主面板               | 设置面板           |
 | --------- | -------------------- | ------------------ |
-| URL       | `ui/taskpane.html`   | `ui/settings.html` |
+| URL       | `ui/panel.html`      | `ui/settings.html` |
 | 默认停靠  | 左侧                 | 动态（见下方）     |
 | 生命周期  | 持久化，由功能区创建 | 按需创建/销毁      |
 | 持久化 ID | `panel_id`           | `settings_pane_id` |
@@ -384,6 +384,7 @@ interface HandlerContext {
 | `bgm_skip_conflicts`      | boolean     | 跳过冲突开关       |
 | `bgm_sync_record_enabled` | boolean     | 同步记录开关       |
 | `bgm_conflict_strategy`   | string      | 冲突处理策略       |
+| `bgm_nav_icons_only`      | boolean     | 导航仅显示图标开关 |
 
 ### 7.2 生命周期
 
@@ -464,6 +465,171 @@ interface HandlerContext {
 - 耗时操作需显示加载状态
 - 批量操作需显示进度计数（如"已完成 3/10"）
 - 危险操作（删除/清空/覆盖）需二次确认
+
+---
+
+## 10. 布局响应式规则
+
+### 10.1 断点定义
+
+| 断点               | 面板宽度   | 布局行为                             |
+| ------------------ | ---------- | ------------------------------------ |
+| 宽面板             | ≥ 1180px   | 完整两列布局：侧栏 64px + 主区自适应 |
+| 中面板             | 880~1179px | 侧栏缩窄 + 卡片紧凑排列              |
+| 窄面板（WPS 默认） | 620~879px  | 侧栏自动转为顶部横向导航             |
+| 超窄面板           | < 620px    | 单列堆叠 + 卡片内部元素自动换行      |
+
+> **注意**：WPS Task Pane 默认停靠宽度约 480~550px，属于「窄面板」范围，导航自动横排是常态。
+
+### 10.2 Grid 防溢出铁律
+
+任何使用 Grid 布局的容器，必须对可能溢出的方向设置以下约束：
+
+```css
+/* 1. Grid 容器：防止子元素撑开 */
+.content-grid {
+  display: grid;
+  min-width: 0; /* 🔴 必加：阻止 grid item 以 max-content 撑爆容器 */
+  grid-template-columns: minmax(0, 64px) minmax(0, 1fr);
+}
+
+/* 2. 内容分区：隐藏溢出 */
+.section {
+  overflow: hidden; /* 🔴 必加：防止内部长文本/固定宽元素撑破 */
+}
+
+/* 3. 可横向滚动的表格单元格 */
+.preview-box td {
+  white-space: nowrap; /* 单行不换行 */
+}
+.preview-box {
+  overflow-x: auto; /* 超出时提供横向滚动条 */
+}
+```
+
+**反例**（已在代码库修复）：
+
+```css
+/* ❌ 旧代码：缺少 min-width:0，导致 500px 面板下内容撑爆 700px+ */
+.content-grid {
+  grid-template-columns: 64px 1fr; /* 1fr 内的内容按 max-content 计算 */
+}
+```
+
+### 10.3 图标仅模式的优先级陷阱
+
+**问题**：当图标仅模式开启（`body.nav-icons-only`），CSS 选择器 `body.nav-icons-only .global`（2 类）优先级高于媒体查询内的 `.global`（1 类），导致窄窗口下图标模式布局（侧栏 64px 固定）无法被媒体查询覆盖，内容区被挤爆。
+
+**解决**：在每个媒体查询断点中显式覆盖图标模式：
+
+```css
+/* 基础：图标模式（仅在宽窗口下作为预期行为） */
+body.nav-icons-only .global {
+  grid-template-columns: 64px minmax(0, 1fr);
+}
+
+/* 窄窗口：显式覆盖，强制降级 */
+@media (max-width: 880px) {
+  .global,                    /* 普通模式 */
+  body.nav-icons-only .global {
+    /* 图标模式 ← 必须一起覆盖 */
+    grid-template-columns: 1fr;
+  }
+
+  .sidebar,
+  body.nav-icons-only .sidebar {
+    /* 同理：侧栏方向也要覆盖 */
+    flex-direction: row;
+  }
+
+  /* 窄窗口下图标模式自动恢复文字（不再隐藏） */
+  body.nav-icons-only .nav a .nav-text {
+    display: inline;
+  }
+}
+```
+
+**核心原则**：任何通过 `body.X .Y` 这类"body 状态类 + 元素"组合选择器定义的样式，在媒体查询中必须用**相同或更高优先级的选择器**覆盖，不能依赖单独的 `.Y`。
+
+### 10.4 模态框显示机制
+
+所有模态框 CSS 默认 `display: none`，JS 显示时设置 `display: flex`。HTML 中内联 `style="display:none;"` 作为双重保障，防止 CSS 加载前闪烁：
+
+```html
+<!-- ✅ 正确 -->
+<div id="syncPreviewModal" class="modal sync-preview-modal" style="display:none;"></div>
+```
+
+---
+
+## 11. Chrome 预览测试规范
+
+### 11.1 为什么用 Chrome
+
+WPS/Excel 加载项的 Task Pane 本质是一个嵌在 Office 宿主内的 WebView（Chromium 内核），使用 Chrome 做 UI 预览是**最接近真实运行环境**的选择：
+
+- **DOM/CSS 渲染完全一致**：Chrome DevTools 的 Elements/Styles 面板可精确模拟 Task Pane 内的渲染结果
+- **CSS Grid/Flex 调试工具**：DevTools 可视化的 Grid 叠加层、Flex 箭头指示能快速定位布局问题
+- **响应式模拟**：Device Toolbar 可精确设定 Task Pane 停靠宽度（480~880px）
+- **与 Playwright 兼容**：自动化测试用的就是 Chrome，手工预览环境一致
+
+### 11.2 启动预览服务
+
+```bash
+# 项目根目录下
+python -m http.server 3889 --directory .
+
+# 打开预览页
+# http://localhost:3889/ui/panel-preview.html
+# http://localhost:3889/ui/panel.html       （真实面板）
+# http://localhost:3889/ui/settings.html    （设置面板）
+```
+
+### 11.3 Task Pane 宽度模拟
+
+在 Chrome DevTools → Device Toolbar 中设定以下宽度验证响应式：
+
+| 模拟场景         | 视口宽度 | 验证要点                             |
+| ---------------- | -------- | ------------------------------------ |
+| WPS 左侧停靠默认 | 500px    | 导航横排、单列、内容不溢出           |
+| WPS 手动拉宽     | 700px    | 导航横排、侧栏紧凑                   |
+| 宽桌面面板       | 900px    | 侧栏恢复纵向、图标模式隐藏文字       |
+| 宽桌面（极宽）   | 1280px   | 完整两列、卡片布局舒展               |
+| 超窄（极限测试） | 400px    | 所有按钮横排可滚动、表单元素自动换行 |
+
+### 11.4 图标仅模式测试步骤
+
+1. 打开 Chrome DevTools → Console
+2. 模拟窄窗口（`deviceToolbar` → 500px）
+3. 注入：`document.body.classList.add('nav-icons-only')`
+4. **预期**：Grid 变为单列（`grid-template-columns: 1fr`），侧栏变为横向（`flex-direction: row`），导航文字显示（`.nav-text { display: inline }`）
+5. 拉宽到 1280px
+6. **预期**：Grid 恢复 `64px 1fr`，侧栏恢复纵向，导航文字隐藏
+
+**自动化验证脚本**（Console 一行命令）：
+
+```js
+;(() => {
+  const g = document.querySelector('.global')
+  const s = document.querySelector('.sidebar')
+  const t = getComputedStyle
+  return {
+    w: innerWidth,
+    grid: t(g).gridTemplateColumns,
+    sidebarDir: t(s).flexDirection,
+    navText: t(document.querySelector('.nav a .nav-text')).display,
+  }
+})()
+```
+
+### 11.5 常见问题排查
+
+| 现象                             | 原因                                                  | 排查方法                                                                            |
+| -------------------------------- | ----------------------------------------------------- | ----------------------------------------------------------------------------------- |
+| 内容区被挤爆，出现横向溢出滚动条 | Grid 子元素缺少 `min-width: 0`                        | DevTools Elements 面板看 `.content-grid` 子元素的 computed `width` 是否远大于父容器 |
+| 图标模式下窄窗口布局不降级       | 媒体查询未覆盖 `body.nav-icons-only`                  | 用 DevTools Styles 面板看 @media 内的选择器是否命中                                 |
+| 模态框打开时页面闪烁白底         | CSS 还没加载完，默认 `display: block`                 | 检查 HTML 模态框是否有内联 `style="display:none;"`                                  |
+| 滚动条不出现但内容被裁切         | 缺少 `overflow-x: auto` 或容器用了 `overflow: hidden` | 检查 `.preview-box` 和其父级的 overflow 属性                                        |
 
 ---
 

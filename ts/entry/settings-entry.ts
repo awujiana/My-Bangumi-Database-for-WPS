@@ -12,6 +12,23 @@
 import { initHandlers } from '../ui/handlers/index.js'
 
 /**
+ * 判断当前是否为设置页面上下文（宽松匹配）。
+ * 覆盖 WPS Task Pane 中可能的 URL 格式：
+ *   - wps-local://.../settings.html
+ *   - file:///.../settings.html
+ *   - http://localhost/settings.html
+ * 以及 document.title 包含 "设置" 的情况。
+ */
+function isSettingsContext(): boolean {
+  if (typeof window === 'undefined') return false
+  const loc = window.location
+  if (loc.pathname.includes('settings.html')) return true
+  if (loc.href.includes('settings.html')) return true
+  if (document.title.includes('设置')) return true
+  return false
+}
+
+/**
  * 设置页面初始化：加载已保存的配置到表单元素。
  *  - Token 状态（updateTokenStatus）
  *  - 用户信息（updateUserIdStatus）
@@ -92,13 +109,19 @@ function initSettingsPage(): void {
 
 /**
  * 启动设置面板：执行 UI 事件处理初始化 + 设置页面初始化。
+ * 完成后触发 bgm:modulesReady 事件，通知 settings-bootstrap.js 启用按钮。
  */
 export function startSettings(): void {
   initHandlers()
   initSettingsPage()
+  // 通知模块就绪，启用按钮（与 panelPage.ts 的 initPanelCore 对齐）
+  if (typeof document !== 'undefined') {
+    document.dispatchEvent(new CustomEvent('bgm:modulesReady'))
+    console.log('[BGM Settings] startSettings() 完成，bgm:modulesReady 已触发')
+  }
 }
 
-// 仅在浏览器上下文且当前页面为 settings.html 时自动启动
-if (typeof window !== 'undefined' && window.location.pathname.includes('settings.html')) {
+// 仅在浏览器上下文且当前页面为设置页面时自动启动
+if (isSettingsContext()) {
   startSettings()
 }

@@ -5,6 +5,16 @@
  */
 import { type EnrichColumnMapping, type MatchResult, type EnrichProgress, type ConflictInfo } from '../sync/enrichEngine.js';
 import type { WpsWorksheet } from '../tools/wps.js';
+interface BatchFileResult {
+    filePath: string;
+    fileName: string;
+    matched: number;
+    newEntries: number;
+    updatedEntries: number;
+    unmatched: number;
+    success: boolean;
+    error?: string;
+}
 interface EnrichPageState {
     filePath: string;
     newAnimeSheet: WpsWorksheet | null;
@@ -17,6 +27,11 @@ interface EnrichPageState {
     cancelRequested: boolean;
     pendingConflicts: ConflictInfo[];
     currentConflictIndex: number;
+    batchFiles: string[];
+    batchResults: BatchFileResult[];
+    batchIndex: number;
+    isBatchEnriching: boolean;
+    batchCancelRequested: boolean;
 }
 declare const state: EnrichPageState;
 declare const COLUMN_MAPPING_FIELDS: {
@@ -35,5 +50,12 @@ export declare function clearRecords(): void;
 export declare function renderPreviewTable(container: HTMLElement | null, sheet: WpsWorksheet, _mapping: EnrichColumnMapping, maxRows?: number): void;
 export declare function renderMatchResults(container: HTMLElement | null, matches: MatchResult[]): void;
 export declare function renderProgress(progress: EnrichProgress): void;
+/**
+ * 批量文件选择入口
+ * 通过循环调用 GetOpenFilename 实现多选（WPS 不支持原生多选）
+ */
+export declare function batchSelectFiles(): void;
+/** 批量富化主入口 */
+export declare function batchStartEnrichment(): void;
 export { state, cancelEnrichment, COLUMN_MAPPING_FIELDS };
 //# sourceMappingURL=enrichPage.d.ts.map

@@ -47,6 +47,17 @@ import type { WpsWorksheet, WpsWorkbook } from '../tools/wps.js'
 
 // ========== 类型定义 ==========
 
+interface BatchFileResult {
+  filePath: string
+  fileName: string
+  matched: number
+  newEntries: number
+  updatedEntries: number
+  unmatched: number
+  success: boolean
+  error?: string
+}
+
 interface EnrichPageState {
   filePath: string
   newAnimeSheet: WpsWorksheet | null
@@ -59,6 +70,13 @@ interface EnrichPageState {
   cancelRequested: boolean
   pendingConflicts: ConflictInfo[]
   currentConflictIndex: number
+
+  // 批量字段
+  batchFiles: string[]
+  batchResults: BatchFileResult[]
+  batchIndex: number
+  isBatchEnriching: boolean
+  batchCancelRequested: boolean
 }
 
 // ========== 状态 ==========
@@ -75,6 +93,12 @@ const state: EnrichPageState = {
   cancelRequested: false,
   pendingConflicts: [],
   currentConflictIndex: 0,
+
+  batchFiles: [],
+  batchResults: [],
+  batchIndex: 0,
+  isBatchEnriching: false,
+  batchCancelRequested: false,
 }
 
 // ========== 列映射字段元数据 ==========
@@ -136,6 +160,7 @@ export function initEnrichPage(): void {
   bindTabSwitches()
   bindStartEnrichButton()
   bindRecordControls()
+  bindBatchControls()
   loadRecentRecords()
 
   // 如果有锁定的工作表，自动填充到 state
@@ -1207,6 +1232,455 @@ function handleConflictResolution(resolution: ConflictInfo['resolution']): void 
     bgmLog(LOG_LEVELS.INFO, '[conflict] 所有冲突已解决')
     BGM.Dialog.alert('冲突解决完成', `共处理 ${state.currentConflictIndex} 个字段冲突`)
   }
+}
+
+// ========== 批量富化 ==========
+
+/** 从文件路径提取文件名 */
+function extractFileName(filePath: string): string {
+  const lastSlash = Math.max(filePath.lastIndexOf('/'), filePath.lastIndexOf('\\'))
+  return lastSlash >= 0 ? filePath.substring(lastSlash + 1) : filePath
+}
+
+/** 绑定批量控件事件 */
+function bindBatchControls(): void {
+  const batchSelectBtn = safeGetButton('batchSelectBtn')
+  if (batchSelectBtn) {
+    batchSelectBtn.addEventListener('click', batchSelectFiles)
+  }
+
+  const batchStartBtn = safeGetButton('batchStartBtn')
+  if (batchStartBtn) {
+    batchStartBtn.addEventListener('click', batchStartEnrichment)
+  }
+
+  const batchClearBtn = safeGetButton('batchClearBtn')
+  if (batchClearBtn) {
+    batchClearBtn.addEventListener('click', () => {
+      state.batchFiles = []
+      state.batchResults = []
+      renderBatchFileList()
+    })
+  }
+}
+
+/**
+ * 批量文件选择入口
+ * 通过循环调用 GetOpenFilename 实现多选（WPS 不支持原生多选）
+ */
+export function batchSelectFiles(): void {
+  try {
+    const app = getApp() as {
+      GetOpenFilename?: (fileFilter: string, title: string) => unknown
+    } | null
+
+    if (!app || typeof app.GetOpenFilename !== 'function') {
+      BGM.Dialog.alert('提示', 'WPS 文件对话框不可用')
+      return
+    }
+
+    const seen = new Set<string>(state.batchFiles)
+
+    // eslint-disable-next-line no-constant-condition
+    while (true) {
+      const selected = app.GetOpenFilename(
+        'Excel 文件 (*.xlsx),*.xlsx,Excel 97-2003 文件 (*.xls),*.xls,CSV 文件 (*.csv),*.csv,所有文件 (*.*),*.*',
+        `选择新番表文件（已选 ${state.batchFiles.length} 个）`,
+      )
+
+      if (typeof selected === 'boolean' || selected === false) {
+        // 用户取消 —— 如果已经选了至少一个文件就退出循环
+        if (state.batchFiles.length > 0) break
+        bgmLog(LOG_LEVELS.INFO, '[enrich-batch] 用户取消文件选择（尚未选到文件）')
+        break
+      }
+
+      const filePath = String(selected)
+
+      if (seen.has(filePath)) {
+        BGM.Dialog.alert('提示', `文件已在列表中：\n${extractFileName(filePath)}`)
+        continue
+      }
+
+      seen.add(filePath)
+      state.batchFiles.push(filePath)
+
+      const fileName = extractFileName(filePath)
+      bgmLog(
+        LOG_LEVELS.INFO,
+        `[enrich-batch] 添加文件: ${fileName}（共 ${state.batchFiles.length} 个）`,
+      )
+
+      // 用 confirm 询问是否继续
+      let shouldContinue = true
+      BGM.Dialog.confirm(
+        `已添加 ${fileName}\n当前共 ${state.batchFiles.length} 个文件\n点击【确定】继续添加，点击【取消】开始处理`,
+        (confirmed: boolean) => {
+          shouldContinue = confirmed
+        },
+        '继续添加？',
+      )
+      if (!shouldContinue) break
+    }
+
+    renderBatchFileList()
+  } catch (e: unknown) {
+    BGM.handleError(e, {
+      showAlert: true,
+      level: BGM.ErrorLevel.ERROR,
+      context: 'batchSelectFiles',
+    })
+  }
+}
+
+/** 渲染批量文件列表 UI */
+function renderBatchFileList(): void {
+  const listEl = safeGetElement('batchFileList')
+  const selectBtn = safeGetButton('batchSelectBtn')
+  const startBtn = safeGetButton('batchStartBtn')
+  const clearBtn = safeGetButton('batchClearBtn')
+
+  if (state.batchFiles.length === 0) {
+    if (listEl) listEl.style.display = 'none'
+    if (startBtn) startBtn.style.display = 'none'
+    if (clearBtn) clearBtn.style.display = 'none'
+    return
+  }
+
+  const rows = state.batchFiles.map((filePath, index) => {
+    const fileName = extractFileName(filePath)
+    return `
+      <div style="display:flex;align-items:center;gap:6px;padding:4px 6px;border-bottom:1px solid #2a2a2a;font-size:12px;">
+        <span style="color:#888;flex-shrink:0;">#${index + 1}</span>
+        <span style="flex:1;color:#e0e0e0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${escapeHtml(filePath)}">${escapeHtml(fileName)}</span>
+        <button class="bgm-btn small" data-batch-remove="${index}" style="flex-shrink:0;padding:2px 6px;font-size:11px;">✕</button>
+      </div>
+    `
+  })
+
+  if (listEl) {
+    listEl.innerHTML = sanitizeHtml(rows.join(''))
+    listEl.style.display = ''
+
+    // 绑定删除按钮
+    listEl.querySelectorAll('[data-batch-remove]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const idx = parseInt((btn as HTMLElement).dataset.batchRemove || '-1', 10)
+        if (idx >= 0) batchRemoveFile(idx)
+      })
+    })
+  }
+
+  if (startBtn) startBtn.style.display = ''
+  if (clearBtn) clearBtn.style.display = ''
+  if (selectBtn) selectBtn.textContent = `📂 继续添加 (${state.batchFiles.length})`
+}
+
+/** 从列表中移除某个文件 */
+function batchRemoveFile(index: number): void {
+  if (index < 0 || index >= state.batchFiles.length) return
+  const removed = state.batchFiles[index]!
+  state.batchFiles.splice(index, 1)
+  bgmLog(LOG_LEVELS.INFO, `[enrich-batch] 移除文件: ${extractFileName(removed)}`)
+  renderBatchFileList()
+}
+
+/** 展示/更新批量进度 UI */
+function showBatchProgress(visible: boolean): void {
+  const progressEl = safeGetElement('batchProgress')
+  if (progressEl) progressEl.style.display = visible ? '' : 'none'
+}
+
+/** 更新批量进度条 */
+function updateBatchProgressUI(current: number, total: number, currentFileName: string): void {
+  const percent = total > 0 ? Math.round((current / total) * 100) : 0
+
+  const fillEl = safeGetElement('batchProgressFill')
+  if (fillEl) fillEl.style.width = `${percent}%`
+
+  const percentEl = safeGetElement('batchPercent')
+  if (percentEl) percentEl.textContent = `${percent}%`
+
+  const currentEl = safeGetElement('batchCurrentFile')
+  if (currentEl) {
+    currentEl.textContent = `[${current}/${total}] ${extractFileName(currentFileName)}`
+  }
+}
+
+/**
+ * 对单个文件执行表头识别 + 匹配 + 富化
+ * @returns 包含 matched/newEntries/updatedEntries/unmatched 的统计对象
+ */
+function processSingleBatchFile(filePath: string, bangumiSheet: WpsWorksheet): BatchFileResult {
+  const fileName = extractFileName(filePath)
+  const result: BatchFileResult = {
+    filePath,
+    fileName,
+    matched: 0,
+    newEntries: 0,
+    updatedEntries: 0,
+    unmatched: 0,
+    success: false,
+  }
+
+  let wb: WpsWorkbook | null = null
+  try {
+    const app = getApp()
+    if (!app?.Workbooks) {
+      throw new Error('WPS 应用不可用')
+    }
+
+    // WPS Workbooks.Open 是运行时扩展，不在类型定义中
+    const workbooks = app.Workbooks as unknown as {
+      Open?: (path: string) => WpsWorkbook | null
+    }
+
+    bgmLog(LOG_LEVELS.INFO, `[enrich-batch] 打开文件: ${fileName}`)
+    if (typeof workbooks.Open !== 'function') {
+      throw new Error('WPS Workbooks.Open 不可用')
+    }
+    wb = workbooks.Open(filePath)
+    if (!wb) {
+      throw new Error('无法打开文件：WPS 返回了 null')
+    }
+
+    // 获取第一个工作表
+    const ws = wb.Worksheets.Item(1) as WpsWorksheet
+    if (!ws) {
+      throw new Error('文件中没有工作表')
+    }
+
+    // 自动识别表头
+    const headerRow = findHeaderRow(ws)
+    if (headerRow === 0) {
+      result.error = '未检测到有效的表头行'
+      return result
+    }
+
+    const dataStartRow = headerRow + 1
+    const columnMapping = detectColumns(ws, headerRow)
+
+    // 匹配
+    const config: EnrichConfig = {
+      filePath,
+      sheetName: ws.Name || '',
+      headerRow,
+      dataStartRow,
+      columnMapping,
+      targetSheetName: bangumiSheet.Name || '',
+    }
+
+    const matches = matchEntries(ws, bangumiSheet, config)
+    const matched = matches.filter(
+      (m) => m.matchType !== 'unmatched' && m.matchType !== 'error',
+    ).length
+    const unmatched = matches.length - matched
+
+    // 富化
+    const enrichResults = enrichEntries(
+      ws,
+      bangumiSheet,
+      matches,
+      config,
+      () => {}, // 批量模式不回调进度（已由外层控制）
+    )
+
+    // EnrichResultItem 没有 stats，通过 enrichedFields 判断
+    const updatedEntries = enrichResults.filter((r) => r.kind === 'matched').length
+    const newEntries = enrichResults.filter(
+      (r) => r.kind === 'matched' && r.enrichedFields.length > 0,
+    ).length
+
+    result.matched = matched
+    result.newEntries = newEntries
+    result.updatedEntries = updatedEntries
+    result.unmatched = unmatched
+    result.success = true
+
+    bgmLog(
+      LOG_LEVELS.INFO,
+      `[enrich-batch] ${fileName}: 匹配 ${matched}，未匹配 ${unmatched}，处理 ${updatedEntries}`,
+    )
+  } catch (e: unknown) {
+    result.error = e instanceof Error ? e.message : String(e)
+    bgmLog(LOG_LEVELS.ERROR, `[enrich-batch] ${fileName} 处理失败: ${result.error}`)
+  } finally {
+    // 关闭源文件，不保存
+    if (wb) {
+      try {
+        const wbWithClose = wb as unknown as { Close?: (saveChanges?: boolean) => unknown }
+        if (typeof wbWithClose.Close === 'function') {
+          const closeResult = wbWithClose.Close(false)
+          void closeResult
+        }
+        bgmLog(LOG_LEVELS.INFO, `[enrich-batch] 已关闭文件: ${fileName}`)
+      } catch (closeErr: unknown) {
+        bgmLog(
+          LOG_LEVELS.WARN,
+          `[enrich-batch] 关闭文件时警告: ${closeErr instanceof Error ? closeErr.message : String(closeErr)}`,
+        )
+      }
+    }
+  }
+
+  return result
+}
+
+/** 批量富化主入口 */
+export function batchStartEnrichment(): void {
+  if (state.isBatchEnriching) {
+    bgmLog(LOG_LEVELS.WARN, '[enrich-batch] 批量富化正在进行中，忽略重复请求')
+    return
+  }
+
+  if (state.batchFiles.length === 0) {
+    BGM.Dialog.alert('提示', '请先选择至少一个新番表文件')
+    return
+  }
+
+  // 前置检查：目标 Bangumi 工作表已锁定
+  let bangumiSheet: WpsWorksheet | null = state.bangumiSheet
+  if (!bangumiSheet) {
+    const locked = getLockedEnrichSheet()
+    if (locked) {
+      bangumiSheet = locked[1]
+      state.bangumiSheet = locked[1]
+      bgmLog(LOG_LEVELS.INFO, `[enrich-batch] 使用锁定的目标工作表: ${locked[1].Name}`)
+    }
+  }
+
+  if (!bangumiSheet) {
+    BGM.Dialog.alert('提示', '请先选择并锁定目标 Bangumi 工作表（在上方"🎯 目标工作表"区域）')
+    return
+  }
+
+  // 清空之前的结果
+  state.batchResults = []
+  state.batchIndex = 0
+  state.isBatchEnriching = true
+  state.batchCancelRequested = false
+
+  // 隐藏批量汇总
+  const summaryEl = safeGetElement('batchSummary')
+  if (summaryEl) summaryEl.style.display = 'none'
+
+  // 禁用开始按钮
+  const startBtn = safeGetButton('batchStartBtn')
+  if (startBtn) startBtn.disabled = true
+
+  // 确认
+  let confirmed = false
+  BGM.Dialog.confirm(
+    `将依次对 ${state.batchFiles.length} 个文件执行富化。\n目标工作表：${bangumiSheet.Name}\n是否继续？`,
+    (ok: boolean) => {
+      confirmed = ok
+    },
+    '开始批量富化',
+  )
+  if (confirmed) {
+    void runBatchEnrichment(bangumiSheet!)
+  } else {
+    state.isBatchEnriching = false
+    if (startBtn) startBtn.disabled = false
+  }
+}
+
+/** 实际执行批量富化（避免阻塞 UI，循环中通过 await 让出主线程） */
+async function runBatchEnrichment(bangumiSheet: WpsWorksheet): Promise<void> {
+  showBatchProgress(true)
+
+  const total = state.batchFiles.length
+
+  for (let i = 0; i < total; i++) {
+    if (state.batchCancelRequested) {
+      bgmLog(LOG_LEVELS.WARN, '[enrich-batch] 用户取消批量富化')
+      break
+    }
+
+    state.batchIndex = i + 1
+    const filePath = state.batchFiles[i]!
+    const fileName = extractFileName(filePath)
+
+    updateBatchProgressUI(state.batchIndex, total, fileName)
+
+    // 让出主线程，给 UI 更新机会
+    await new Promise<void>((resolve) => setTimeout(resolve, 30))
+
+    const result = processSingleBatchFile(filePath, bangumiSheet)
+    state.batchResults.push(result)
+
+    // 让出主线程，给 WPS 资源释放机会
+    await new Promise<void>((resolve) => setTimeout(resolve, 50))
+  }
+
+  state.isBatchEnriching = false
+
+  // 恢复 UI
+  showBatchProgress(false)
+  const startBtn = safeGetButton('batchStartBtn')
+  if (startBtn) startBtn.disabled = false
+
+  // 显示汇总
+  renderBatchSummary()
+
+  // 刷新富化记录
+  try {
+    getOrCreateEnrichRecordSheet()
+    loadRecentRecords()
+  } catch {
+    // 忽略
+  }
+
+  bgmLog(
+    LOG_LEVELS.INFO,
+    `[enrich-batch] 批量富化结束: ${state.batchResults.filter((r) => r.success).length}/${total} 成功`,
+  )
+}
+
+/** 渲染批量富化最终汇总 */
+function renderBatchSummary(): void {
+  const summaryEl = safeGetElement('batchSummary')
+  const contentEl = safeGetElement('batchSummaryContent')
+  if (!summaryEl || !contentEl) return
+
+  const total = state.batchResults.length
+  const successCount = state.batchResults.filter((r) => r.success).length
+  const failCount = total - successCount
+  const totalMatched = state.batchResults.reduce((s, r) => s + r.matched, 0)
+  const totalUpdated = state.batchResults.reduce((s, r) => s + r.updatedEntries, 0)
+  const totalUnmatched = state.batchResults.reduce((s, r) => s + r.unmatched, 0)
+
+  const fileRows = state.batchResults
+    .map((r, i) => {
+      const statusIcon = r.success ? '✅' : '❌'
+      const detail = r.success
+        ? `匹配 ${r.matched} / 更新 ${r.updatedEntries} / 未匹配 ${r.unmatched}`
+        : `失败：${escapeHtml(r.error || '未知错误')}`
+      return `
+        <div style="display:flex;justify-content:space-between;font-size:12px;padding:2px 0;border-bottom:1px dashed #333;">
+          <span style="color:#ddd;">${statusIcon} #${i + 1} ${escapeHtml(r.fileName)}</span>
+          <span style="color:${r.success ? '#a6e3a1' : '#f38ba8'};">${detail}</span>
+        </div>
+      `
+    })
+    .join('')
+
+  const html = `
+    <div style="display:flex;gap:16px;margin-bottom:8px;font-size:13px;">
+      <span>📄 <b>${total}</b> 个文件</span>
+      <span style="color:#a6e3a1;">✅ ${successCount} 成功</span>
+      ${failCount > 0 ? `<span style="color:#f38ba8;">❌ ${failCount} 失败</span>` : ''}
+    </div>
+    <div style="display:flex;gap:16px;margin-bottom:10px;font-size:12px;color:#bac2de;">
+      <span>匹配总数 <b style="color:#a6e3a1;">${totalMatched}</b></span>
+      <span>已更新 <b style="color:#89b4fa;">${totalUpdated}</b></span>
+      <span>未匹配 <b style="color:#f9e2af;">${totalUnmatched}</b></span>
+    </div>
+    <div style="max-height:200px;overflow-y:auto;">${fileRows}</div>
+  `
+
+  contentEl.innerHTML = sanitizeHtml(html)
+  summaryEl.style.display = ''
 }
 
 // ========== 导出 ==========

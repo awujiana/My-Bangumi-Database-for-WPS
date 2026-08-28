@@ -15,8 +15,8 @@
  *  - 测试可在不污染 DOM / 全局状态的前提下导入源码
  */
 import { initPanel } from '../panel/panelPage.js';
-import { initHandlers } from '../ui/handlers/index.js';
 import { getNavIconsOnly } from '../tools/config.js';
+import { initHandlers } from '../ui/handlers/index.js';
 function applyNavMode() {
     if (typeof document === 'undefined')
         return;
