@@ -45,11 +45,9 @@
                         <path d="M8 5a3 3 0 100 6 3 3 0 000-6zm0 1a2 2 0 110 4 2 2 0 010-4z"/>
                     </svg>
                 </button>
-                <button class="header-icon-btn" id="closeBtn" data-action="closePanel" title="关闭面板" aria-label="关闭面板">
-                    <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
-                        <line x1="4" y1="4" x2="12" y2="12"/><line x1="12" y1="4" x2="4" y2="12"/>
-                    </svg>
-                </button>
+                <div class="topbar-avatar" id="topbarAvatar" style="display:none;" title="" aria-label="用户头像">
+                    <img id="topbarAvatarImg" src="" alt="用户头像" />
+                </div>
             </div>
         </header>
 
@@ -109,8 +107,19 @@
                         <label>Token 设置</label>
                         <div class="token-display">
                             <div class="token-status-info">
-                                <span id="tokenStatus">未设置</span>
-                                <span id="tokenExpiresDisplay" class="token-expires" style="display:none;"></span>
+                                <div class="token-status-left">
+                                    <span id="tokenStatus">未设置</span>
+                                    <span id="tokenExpiresDisplay" class="token-expires" style="display:none;"></span>
+                                </div>
+                                <div class="token-status-right" id="tokenStatusRight" style="display:none;">
+                                    <div class="token-user-info">
+                                        <span id="tokenUserName" class="token-user-name"></span>
+                                        <span id="tokenUserId" class="token-user-id"></span>
+                                    </div>
+                                    <div class="token-avatar">
+                                        <img id="tokenAvatarImg" src="" alt="用户头像" />
+                                    </div>
+                                </div>
                             </div>
                             <div class="token-buttons">
                                 <button class="bgm-btn small" data-action="showTokenDialog">设置/修改</button>

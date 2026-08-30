@@ -419,13 +419,13 @@ export function checkTokenExpiryWarning(expires) {
  */
 export function showUserProfile() {
     const profileEl = document.getElementById('userProfile');
-    if (!profileEl)
-        return;
     const avatarUrl = BGM.cache.avatarUrl;
     const username = BGM.cache.username;
     const userId = BGM.cache.userId;
     if (avatarUrl || username) {
-        profileEl.style.display = 'flex';
+        if (profileEl) {
+            profileEl.style.display = 'flex';
+        }
         const avatarImg = document.getElementById('userAvatar');
         if (avatarImg) {
             if (avatarUrl) {
@@ -439,6 +439,55 @@ export function showUserProfile() {
             }
             else {
                 avatarImg.style.display = 'none';
+            }
+        }
+        // 同步更新顶栏头像（窄页面时显示）
+        const topbarAvatarEl = document.getElementById('topbarAvatar');
+        const topbarAvatarImg = document.getElementById('topbarAvatarImg');
+        if (topbarAvatarEl) {
+            topbarAvatarEl.style.display = ''; // 让 CSS 媒体查询控制显示/隐藏
+            topbarAvatarEl.title = username || _T.avatarDefault;
+            topbarAvatarEl.setAttribute('aria-label', username || _T.avatarDefault);
+            if (topbarAvatarImg && avatarUrl) {
+                topbarAvatarImg.src = avatarUrl;
+                topbarAvatarImg.alt = username || _T.avatarDefault;
+                topbarAvatarImg.onerror = () => {
+                    topbarAvatarEl.style.display = 'none';
+                    bgmLog(LOG_LEVELS.WARN, '[showUserProfile] 顶栏头像加载失败');
+                };
+            }
+        }
+        // 同步更新 Token 区域右侧的用户信息和头像
+        const tokenStatusRight = document.getElementById('tokenStatusRight');
+        const tokenUserNameEl = document.getElementById('tokenUserName');
+        const tokenUserIdEl = document.getElementById('tokenUserId');
+        const tokenAvatarImg = document.getElementById('tokenAvatarImg');
+        if (tokenStatusRight) {
+            if (username || userId || avatarUrl) {
+                tokenStatusRight.style.display = 'flex';
+                if (tokenUserNameEl && username) {
+                    tokenUserNameEl.textContent = username;
+                }
+                if (tokenUserIdEl && userId) {
+                    tokenUserIdEl.textContent = `ID: ${userId}`;
+                }
+                if (tokenAvatarImg) {
+                    if (avatarUrl) {
+                        tokenAvatarImg.src = avatarUrl;
+                        tokenAvatarImg.alt = username || _T.avatarDefault;
+                        tokenAvatarImg.onerror = () => {
+                            tokenAvatarImg.style.display = 'none';
+                            bgmLog(LOG_LEVELS.WARN, '[showUserProfile] Token 区头像加载失败');
+                        };
+                        tokenAvatarImg.style.display = '';
+                    }
+                    else {
+                        tokenAvatarImg.style.display = 'none';
+                    }
+                }
+            }
+            else {
+                tokenStatusRight.style.display = 'none';
             }
         }
         const nameEl = document.getElementById('userNameDisplay');
@@ -456,7 +505,19 @@ export function showUserProfile() {
         }
     }
     else {
-        profileEl.style.display = 'none';
+        if (profileEl) {
+            profileEl.style.display = 'none';
+        }
+        // 同时隐藏顶栏头像
+        const topbarAvatarEl = document.getElementById('topbarAvatar');
+        if (topbarAvatarEl) {
+            topbarAvatarEl.style.display = 'none';
+        }
+        // 同时隐藏 Token 区右侧用户信息
+        const tokenStatusRight = document.getElementById('tokenStatusRight');
+        if (tokenStatusRight) {
+            tokenStatusRight.style.display = 'none';
+        }
     }
 }
 /**
@@ -466,6 +527,16 @@ export function hideUserProfile() {
     const profileEl = document.getElementById('userProfile');
     if (profileEl) {
         profileEl.style.display = 'none';
+    }
+    // 隐藏顶栏头像
+    const topbarAvatarEl = document.getElementById('topbarAvatar');
+    if (topbarAvatarEl) {
+        topbarAvatarEl.style.display = 'none';
+    }
+    // 隐藏 Token 区右侧用户信息
+    const tokenStatusRight = document.getElementById('tokenStatusRight');
+    if (tokenStatusRight) {
+        tokenStatusRight.style.display = 'none';
     }
     // 隐藏过期信息显示
     const expiresEl = document.getElementById('tokenExpiresDisplay');

@@ -1,0 +1,240 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "BGM Excel 加载项 · 运行时架构",
+    "output": "bgm-runtime-architecture.html",
+    "quality_profile": "showcase",
+    "viewBox": [1400, 720],
+    "views": [
+      {
+        "id": "load-chain",
+        "label": "宿主与入口链",
+        "focus": ["wps-host", "ribbon", "panel", "settings", "state"],
+        "note": "WPS 宿主加载模块并创建 Ribbon 与双面板，用户动作经 EventBus 进入状态层。"
+      },
+      {
+        "id": "data-sync",
+        "label": "数据同步链路",
+        "focus": ["services", "sync", "core", "storage", "bangumi", "remoterepo", "localfile"],
+        "note": "业务层调度同步引擎，经基础设施层访问 Bangumi / 远程仓库 / 本地文件，凭据与配置持久化到 PluginStorage。"
+      },
+      {
+        "id": "config-flow",
+        "label": "配置与跨 WebView 刷新",
+        "focus": ["settings", "state", "services", "storage"],
+        "note": "设置面板变更配置，经状态层持久化到 PluginStorage，跨 WebView 触发面板刷新信号。"
+      }
+    ]
+  },
+  "components": [
+    {
+      "id": "wps-host",
+      "type": "external",
+      "label": "WPS Office 宿主",
+      "sublabel": "JSAPI / ET 加载项 (Windows)",
+      "pos": [40, 330],
+      "size": [140, 72]
+    },
+    {
+      "id": "ribbon",
+      "type": "frontend",
+      "label": "功能区 Ribbon",
+      "sublabel": "ribbon.ts · 按钮回调",
+      "pos": [260, 90],
+      "size": [160, 64]
+    },
+    {
+      "id": "panel",
+      "type": "frontend",
+      "label": "主面板",
+      "sublabel": "panel.html · panelPage",
+      "pos": [260, 260],
+      "size": [160, 64]
+    },
+    {
+      "id": "settings",
+      "type": "frontend",
+      "label": "设置面板",
+      "sublabel": "settings.html · 动态停靠",
+      "pos": [260, 430],
+      "size": [160, 64]
+    },
+    {
+      "id": "state",
+      "type": "messagebus",
+      "label": "状态层 · EventBus",
+      "sublabel": "BGM 命名空间 + 事件",
+      "pos": [500, 160],
+      "size": [160, 70]
+    },
+    {
+      "id": "services",
+      "type": "backend",
+      "label": "业务层 · 服务",
+      "sublabel": "ribbonService / configService",
+      "pos": [500, 350],
+      "size": [160, 64]
+    },
+    {
+      "id": "sync",
+      "type": "backend",
+      "label": "数据层 · 同步引擎",
+      "sublabel": "6 下载源 + 上传 + 富化",
+      "pos": [760, 190],
+      "size": [180, 76]
+    },
+    {
+      "id": "storage",
+      "type": "database",
+      "label": "PluginStorage",
+      "sublabel": "跨 WebView 持久化 · Token/配置",
+      "pos": [760, 410],
+      "size": [180, 72]
+    },
+    {
+      "id": "core",
+      "type": "backend",
+      "label": "基础设施层",
+      "sublabel": "core/ + tools/ (http·wps·crypto·log)",
+      "pos": [495, 580],
+      "size": [170, 70]
+    },
+    {
+      "id": "bangumi",
+      "type": "external",
+      "label": "Bangumi API",
+      "sublabel": "bgm.tv · 收藏/上传/Token",
+      "pos": [1160, 120],
+      "size": [160, 70]
+    },
+    {
+      "id": "remoterepo",
+      "type": "cloud",
+      "label": "远程数据仓库",
+      "sublabel": "GitHub / GitLab / Gitee / Gist",
+      "pos": [1160, 290],
+      "size": [160, 70]
+    },
+    {
+      "id": "localfile",
+      "type": "database",
+      "label": "本地文件",
+      "sublabel": "data/*.jsonl",
+      "pos": [1160, 460],
+      "size": [160, 64]
+    }
+  ],
+  "boundaries": [
+    {
+      "kind": "region",
+      "label": "BGM 加载项运行时 (WPS/Excel 进程内)",
+      "wraps": ["ribbon", "panel", "settings", "state", "services", "core", "sync", "storage"]
+    },
+    { "kind": "security-group", "label": "凭据与配置隔离 (crypto 加解密)", "wraps": ["storage"] }
+  ],
+  "connections": [
+    {
+      "id": "c1",
+      "from": "wps-host",
+      "to": "ribbon",
+      "label": "JSAPI 回调",
+      "fromSide": "top",
+      "toSide": "bottom",
+      "labelAt": [200, 175]
+    },
+    {
+      "id": "c2",
+      "from": "wps-host",
+      "to": "panel",
+      "label": "CreateTaskPane",
+      "fromSide": "right",
+      "toSide": "left",
+      "via": [
+        [236, 366],
+        [236, 292]
+      ],
+      "labelAt": [220, 329]
+    },
+    {
+      "id": "c3",
+      "from": "panel",
+      "to": "settings",
+      "label": "打开设置面板",
+      "labelAt": [320, 378]
+    },
+    { "id": "c4", "from": "ribbon", "to": "state", "label": "动作事件", "labelAt": [455, 168] },
+    { "id": "c5", "from": "panel", "to": "state", "label": "用户操作", "labelAt": [430, 235] },
+    { "id": "c6", "from": "settings", "to": "state", "label": "配置变更", "labelAt": [430, 380] },
+    { "id": "c7", "from": "state", "to": "services", "label": "服务调度", "labelAt": [585, 292] },
+    { "id": "c8", "from": "services", "to": "sync", "label": "同步任务", "labelAt": [712, 320] },
+    { "id": "c9", "from": "services", "to": "storage", "label": "读写配置", "labelAt": [712, 432] },
+    {
+      "id": "c10",
+      "from": "services",
+      "to": "core",
+      "label": "基础设施",
+      "fromSide": "bottom",
+      "toSide": "top",
+      "labelAt": [560, 508]
+    },
+    {
+      "id": "c11",
+      "from": "core",
+      "to": "storage",
+      "label": "Token 加解密",
+      "labelAt": [718, 556]
+    },
+    {
+      "id": "c12",
+      "from": "sync",
+      "to": "bangumi",
+      "label": "收藏拉取 / 上传",
+      "labelAt": [1000, 185]
+    },
+    {
+      "id": "c13",
+      "from": "sync",
+      "to": "remoterepo",
+      "label": "拉取 JSONL",
+      "labelAt": [1000, 280]
+    },
+    {
+      "id": "c14",
+      "from": "sync",
+      "to": "localfile",
+      "label": "本地文件同步",
+      "labelAt": [1000, 345]
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "宿主与入口",
+      "items": [
+        "index.html → main.js → dist-ts 模块（顺序加载，critical 优先）",
+        "功能区经 window._bgmRibbonReady + Invalidate 接管按钮",
+        "主/设置面板由 CreateTaskPane 创建"
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "分层运行时",
+      "items": [
+        "表示层：Ribbon + 双面板（panel.html / settings.html）",
+        "状态层：BGM 命名空间 + EventBus（STATE_CHANGED / CONFIG_CHANGED）",
+        "业务/数据层：服务 + 6 下载源 / 上传 / 富化",
+        "基础设施：core/ + tools/（http·wps·crypto·logger）"
+      ]
+    },
+    {
+      "dot": "violet",
+      "title": "外部与持久化",
+      "items": [
+        "Bangumi API：收藏拉取 / 上传同步 / Token 校验",
+        "远程仓库：GitHub / GitLab / Gitee / Gist",
+        "PluginStorage 跨 WebView 持久化与通信"
+      ]
+    }
+  ]
+}
