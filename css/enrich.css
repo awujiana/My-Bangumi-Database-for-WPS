@@ -4,7 +4,7 @@
 .enrich-header {
     text-align: center;
     padding: 20px 15px;
-    background: #2d2d2d;
+    background: var(--bg-base);
     border-radius: 12px;
     margin-bottom: 15px;
     box-shadow: 0 4px 15px rgba(0,0,0,0.3);
@@ -23,13 +23,13 @@
 }
 
 .enrich-header h2 {
-    color: #ffffff;
+    color: var(--text-1);
     margin-bottom: 5px;
     font-size: 20px;
 }
 
 .enrich-header .subtitle {
-    color: #888;
+    color: var(--text-3);
     font-size: 13px;
 }
 
@@ -43,7 +43,7 @@
 
 /* ========== 富化区域卡片 ========== */
 .enrich-section {
-    background: #2d2d2d;
+    background: var(--bg-base);
     border-radius: 12px;
     padding: 18px;
     margin-bottom: 12px;
@@ -55,15 +55,25 @@
     transform: translateY(-2px);
 }
 
+/* 与 panel-theme.css .section h3 统一：中性 1px 分隔线 + 强调色块，去除蓝强调线 */
 .enrich-section h3 {
-    color: #ffffff;
-    font-size: 15px;
-    margin-bottom: 14px;
-    padding-bottom: 10px;
-    border-bottom: 2px solid #4a9eff;
+    color: var(--text-1);
+    font-size: var(--fs-h2);
+    font-weight: 600;
+    margin-bottom: clamp(10px, 0.6vw, 14px);
+    padding-bottom: clamp(8px, 0.5vw, 12px);
+    border-bottom: 1px solid var(--border);
     display: flex;
     align-items: center;
     gap: 8px;
+}
+.enrich-section h3::before {
+    content: "";
+    width: 4px;
+    height: 1em;
+    border-radius: var(--r-pill);
+    background: var(--primary);
+    flex-shrink: 0;
 }
 
 /* ========== 文件选择器 ========== */
@@ -76,10 +86,10 @@
 .file-path-display {
     width: 100%;
     padding: 10px 14px;
-    background: #333;
-    border: 2px solid #444;
+    background: var(--bg-surface);
+    border: 2px solid var(--border-strong);
     border-radius: 8px;
-    color: #e0e0e0;
+    color: var(--text-1);
     font-size: 13px;
     font-family: 'Maple Mono', 'Consolas', monospace;
     cursor: default;
@@ -89,21 +99,21 @@
 
 .file-path-display:focus {
     outline: none;
-    border-color: #4a9eff;
+    border-color: var(--accent-blue);
     box-shadow: 0 0 0 3px rgba(74, 158, 255, 0.2);
 }
 
 .file-path-display::placeholder {
-    color: #666;
+    color: var(--text-3);
 }
 
 /* ========== 识别结果 ========== */
 .detect-result {
     margin-top: 12px;
     padding: 14px;
-    background: #333;
+    background: var(--bg-surface);
     border-radius: 10px;
-    border: 1px solid #444;
+    border: 1px solid var(--border-strong);
 }
 
 .result-info {
@@ -112,18 +122,18 @@
     gap: 6px;
     margin-bottom: 12px;
     padding-bottom: 10px;
-    border-bottom: 1px solid #444;
+    border-bottom: 1px solid var(--border-strong);
 }
 
 .result-item {
     display: flex;
     align-items: center;
     font-size: 13px;
-    color: #e0e0e0;
+    color: var(--text-1);
 }
 
 .result-label {
-    color: #888;
+    color: var(--text-3);
     min-width: 90px;
 }
 
@@ -137,7 +147,7 @@
 .mapping-header {
     font-size: 13px;
     font-weight: 600;
-    color: #4a9eff;
+    color: var(--accent-blue);
     margin-bottom: 4px;
 }
 
@@ -152,15 +162,15 @@
     align-items: center;
     gap: 8px;
     padding: 8px 10px;
-    background: #2a2a2a;
+    background: var(--bg-surface-2);
     border-radius: 6px;
-    border: 1px solid #3a3a3a;
+    border: 1px solid var(--bg-surface-2);
 }
 
 .mapping-row .mapping-col-name {
     flex: 1;
     font-size: 12px;
-    color: #e0e0e0;
+    color: var(--text-1);
     min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -169,10 +179,10 @@
 
 .mapping-row select {
     padding: 4px 8px;
-    background: #333;
-    border: 1px solid #444;
+    background: var(--bg-surface);
+    border: 1px solid var(--border-strong);
     border-radius: 4px;
-    color: #e0e0e0;
+    color: var(--text-1);
     font-size: 12px;
     cursor: pointer;
     transition: border-color 0.2s;
@@ -181,12 +191,12 @@
 
 .mapping-row select:focus {
     outline: none;
-    border-color: #4a9eff;
+    border-color: var(--accent-blue);
 }
 
 .mapping-row select option {
-    background: #2a2a2a;
-    color: #e0e0e0;
+    background: var(--bg-surface-2);
+    color: var(--text-1);
 }
 
 /* ========== 预览 Tab ========== */
@@ -194,7 +204,7 @@
     display: flex;
     gap: 4px;
     margin-bottom: 12px;
-    background: #333;
+    background: var(--bg-surface);
     border-radius: 8px;
     padding: 4px;
 }
@@ -205,7 +215,7 @@
     background: transparent;
     border: none;
     border-radius: 6px;
-    color: #888;
+    color: var(--text-3);
     font-size: 13px;
     cursor: pointer;
     transition: all 0.2s;
@@ -213,23 +223,23 @@
 }
 
 .preview-tab:hover {
-    color: #e0e0e0;
+    color: var(--text-1);
     background: rgba(255, 255, 255, 0.05);
 }
 
 .preview-tab.active {
-    background: linear-gradient(135deg, #4a9eff 0%, #3a8ee8 100%);
-    color: #fff;
+    background: linear-gradient(135deg, var(--accent-blue) 0%, var(--accent-blue-strong) 100%);
+    color: var(--text-1);
     box-shadow: 0 2px 8px rgba(74, 158, 255, 0.3);
 }
 
 /* ========== 预览表格 ========== */
 .preview-table {
-    background: #333;
+    background: var(--bg-surface);
     border-radius: 8px;
     overflow-x: auto;
     max-height: 280px;
-    border: 1px solid #444;
+    border: 1px solid var(--border-strong);
 }
 
 .preview-table table {
@@ -239,7 +249,7 @@
 }
 
 .preview-table th {
-    background: linear-gradient(135deg, #4a9eff 0%, #3a8ee8 100%);
+    background: linear-gradient(135deg, var(--accent-blue) 0%, var(--accent-blue-strong) 100%);
     color: white;
     padding: 10px 8px;
     text-align: left;
@@ -253,8 +263,8 @@
 
 .preview-table td {
     padding: 8px;
-    border-bottom: 1px solid #3a3a3a;
-    color: #e0e0e0;
+    border-bottom: 1px solid var(--bg-surface-2);
+    color: var(--text-1);
     font-size: 12px;
     vertical-align: middle;
     white-space: nowrap;
@@ -289,17 +299,17 @@
 
 .preview-table .match-status.exact {
     background: rgba(78, 205, 196, 0.15);
-    color: #4ecdc4;
+    color: var(--teal);
 }
 
 .preview-table .match-status.alias {
     background: rgba(240, 160, 32, 0.15);
-    color: #f0a020;
+    color: var(--amber);
 }
 
 .preview-table .match-status.unmatched {
     background: rgba(255, 107, 107, 0.15);
-    color: #ff6b6b;
+    color: var(--red);
 }
 
 /* ========== 匹配统计卡片 ========== */
@@ -311,60 +321,60 @@
 }
 
 .match-stat-card {
-    background: #333;
+    background: var(--bg-surface);
     padding: 12px 8px;
     border-radius: 8px;
     text-align: center;
-    border-left: 3px solid #4a9eff;
+    border-left: 3px solid var(--accent-blue);
 }
 
 .match-stat-card .stat-value {
     font-size: 22px;
     font-weight: 700;
-    color: #4a9eff;
+    color: var(--accent-blue);
     line-height: 1.2;
 }
 
 .match-stat-card:nth-child(2) {
-    border-left-color: #f0a020;
+    border-left-color: var(--amber);
 }
 
 .match-stat-card:nth-child(2) .stat-value {
-    color: #f0a020;
+    color: var(--amber);
 }
 
 .match-stat-card:nth-child(3) {
-    border-left-color: #ff6b6b;
+    border-left-color: var(--red);
 }
 
 .match-stat-card:nth-child(3) .stat-value {
-    color: #ff6b6b;
+    color: var(--red);
 }
 
 .match-stat-card .stat-label {
     font-size: 11px;
-    color: #888;
+    color: var(--text-3);
     margin-top: 3px;
 }
 
 /* ========== 富化执行区域 ========== */
 .strategy-desc {
-    background: #333;
+    background: var(--bg-surface);
     border-radius: 8px;
     padding: 12px;
     margin-bottom: 12px;
-    border: 1px solid #444;
+    border: 1px solid var(--border-strong);
 }
 
 .strategy-item {
     font-size: 12px;
-    color: #ccc;
+    color: var(--text-2);
     padding: 4px 0;
     line-height: 1.5;
 }
 
 .strategy-item strong {
-    color: #e0e0e0;
+    color: var(--text-1);
 }
 
 #startEnrichBtn {
@@ -372,14 +382,14 @@
     padding: 14px 20px;
     font-size: 15px;
     font-weight: 600;
-    background: var(--bg-surface-2, #2a2a2a);
-    color: var(--text-1, #f2f2f2);
+    background: var(--bg-surface-2, var(--bg-surface-2));
+    color: var(--text-1);
     border: 1px solid rgba(255,255,255,0.16);
     box-shadow: none;
 }
 
 #startEnrichBtn:hover {
-    background: #363636;
+    background: var(--bg-surface-2);
     border-color: rgba(255,255,255,0.28);
     box-shadow: none;
     transform: translateY(-1px);
@@ -399,30 +409,30 @@
 .enrich-progress {
     margin-top: 14px;
     padding: 14px;
-    background: #333;
+    background: var(--bg-surface);
     border-radius: 10px;
-    border: 1px solid #444;
+    border: 1px solid var(--border-strong);
 }
 
 .progress-bar {
     width: 100%;
     height: 22px;
-    background: #2a2a2a;
+    background: var(--bg-surface-2);
     border-radius: 11px;
     overflow: hidden;
     margin-bottom: 12px;
-    border: 1px solid #444;
+    border: 1px solid var(--border-strong);
 }
 
 .progress-bar-fill {
     height: 100%;
-    background: linear-gradient(90deg, #4a9eff 0%, #4ecdc4 100%);
+    background: linear-gradient(90deg, var(--accent-blue) 0%, var(--teal) 100%);
     transition: width 0.4s ease;
     display: flex;
     align-items: center;
     justify-content: center;
     font-size: 12px;
-    color: #fff;
+    color: var(--text-1);
     font-weight: 600;
     min-width: 40px;
 }
@@ -441,11 +451,11 @@
 }
 
 .enrich-stat-label {
-    color: #888;
+    color: var(--text-3);
 }
 
 .enrich-stat-value {
-    color: #e0e0e0;
+    color: var(--text-1);
     font-weight: 500;
 }
 
@@ -458,7 +468,7 @@
 .enrich-stat-item {
     text-align: center;
     padding: 8px 4px;
-    background: #2a2a2a;
+    background: var(--bg-surface-2);
     border-radius: 6px;
 }
 
@@ -466,21 +476,21 @@
     display: block;
     font-size: 18px;
     font-weight: 700;
-    color: #4a9eff;
+    color: var(--accent-blue);
     line-height: 1.2;
 }
 
 .enrich-stat-item:nth-child(2) .enrich-stat-num {
-    color: #f0a020;
+    color: var(--amber);
 }
 
 .enrich-stat-item:nth-child(3) .enrich-stat-num {
-    color: #ff6b6b;
+    color: var(--red);
 }
 
 .enrich-stat-text {
     font-size: 11px;
-    color: #888;
+    color: var(--text-3);
 }
 
 /* ========== 富化记录 ========== */
@@ -492,47 +502,47 @@
 }
 
 .record-stat-card {
-    background: #333;
+    background: var(--bg-surface);
     padding: 10px 6px;
     border-radius: 8px;
     text-align: center;
-    border-top: 3px solid #4a9eff;
+    border-top: 3px solid var(--accent-blue);
 }
 
 .record-stat-card .stat-value {
     font-size: 18px;
     font-weight: 700;
-    color: #4a9eff;
+    color: var(--accent-blue);
     line-height: 1.2;
 }
 
 .record-stat-card.success {
-    border-top-color: #4ecdc4;
+    border-top-color: var(--teal);
 }
 
 .record-stat-card.success .stat-value {
-    color: #4ecdc4;
+    color: var(--teal);
 }
 
 .record-stat-card.warning {
-    border-top-color: #f0a020;
+    border-top-color: var(--amber);
 }
 
 .record-stat-card.warning .stat-value {
-    color: #f0a020;
+    color: var(--amber);
 }
 
 .record-stat-card.error {
-    border-top-color: #ff6b6b;
+    border-top-color: var(--red);
 }
 
 .record-stat-card.error .stat-value {
-    color: #ff6b6b;
+    color: var(--red);
 }
 
 .record-stat-card .stat-label {
     font-size: 10px;
-    color: #888;
+    color: var(--text-3);
     margin-top: 3px;
 }
 
@@ -544,7 +554,7 @@
 
 .record-empty {
     text-align: center;
-    color: #666;
+    color: var(--text-3);
     font-size: 13px;
     padding: 16px;
 }
@@ -554,34 +564,34 @@
     align-items: center;
     gap: 8px;
     padding: 8px 10px;
-    background: #2a2a2a;
+    background: var(--bg-surface-2);
     border-radius: 6px;
     margin-bottom: 4px;
     font-size: 12px;
-    border-left: 3px solid #4a9eff;
+    border-left: 3px solid var(--accent-blue);
 }
 
 .record-item.success {
-    border-left-color: #4ecdc4;
+    border-left-color: var(--teal);
 }
 
 .record-item.warning {
-    border-left-color: #f0a020;
+    border-left-color: var(--amber);
 }
 
 .record-item.error {
-    border-left-color: #ff6b6b;
+    border-left-color: var(--red);
 }
 
 .record-item-time {
-    color: #888;
+    color: var(--text-3);
     font-size: 11px;
     flex-shrink: 0;
 }
 
 .record-item-name {
     flex: 1;
-    color: #e0e0e0;
+    color: var(--text-1);
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -594,20 +604,20 @@
 }
 
 .record-item-status.success {
-    color: #4ecdc4;
+    color: var(--teal);
 }
 
 .record-item-status.warning {
-    color: #f0a020;
+    color: var(--amber);
 }
 
 .record-item-status.error {
-    color: #ff6b6b;
+    color: var(--red);
 }
 
 /* ========== 使用提示 ========== */
 .tips-section {
-    background: linear-gradient(180deg, #2d2d2d 0%, #282828 100%);
+    background: linear-gradient(180deg, var(--bg-base) 0%, var(--bg-base) 100%);
 }
 
 .tips-list {
@@ -621,12 +631,12 @@
     align-items: flex-start;
     gap: 10px;
     padding: 10px 12px;
-    background: #333;
+    background: var(--bg-surface);
     border-radius: 8px;
     font-size: 13px;
-    color: #ccc;
+    color: var(--text-2);
     line-height: 1.5;
-    border-left: 3px solid #4a9eff;
+    border-left: 3px solid var(--accent-blue);
 }
 
 .tip-num {
@@ -634,7 +644,7 @@
     width: 24px;
     height: 24px;
     border-radius: 50%;
-    background: linear-gradient(135deg, #4a9eff 0%, #3a8ee8 100%);
+    background: linear-gradient(135deg, var(--accent-blue) 0%, var(--accent-blue-strong) 100%);
     color: white;
     display: flex;
     align-items: center;
@@ -656,11 +666,11 @@
 
 .bgm-btn:disabled:hover {
     transform: none;
-    background: #3a3a3a;
+    background: var(--bg-surface-2);
 }
 
 .bgm-btn.primary:disabled:hover {
-    background: #2a2a2a;
+    background: var(--bg-surface-2);
     box-shadow: none;
 }
 
@@ -714,21 +724,21 @@
 .detect-result::-webkit-scrollbar-track,
 .preview-table::-webkit-scrollbar-track,
 .record-list::-webkit-scrollbar-track {
-    background: #333;
+    background: var(--bg-surface);
     border-radius: 3px;
 }
 
 .detect-result::-webkit-scrollbar-thumb,
 .preview-table::-webkit-scrollbar-thumb,
 .record-list::-webkit-scrollbar-thumb {
-    background: #4a9eff;
+    background: var(--accent-blue);
     border-radius: 3px;
 }
 
 .detect-result::-webkit-scrollbar-thumb:hover,
 .preview-table::-webkit-scrollbar-thumb:hover,
 .record-list::-webkit-scrollbar-thumb:hover {
-    background: #3a8ee8;
+    background: var(--accent-blue-strong);
 }
 
 /* ========== 表单覆盖 ========== */
@@ -743,30 +753,30 @@
 .enrich-section .input {
     width: 100%;
     padding: 8px 12px;
-    border: 2px solid #444;
+    border: 2px solid var(--border-strong);
     border-radius: 8px;
     font-size: 13px;
     transition: all 0.3s;
-    background: #333;
-    color: #e0e0e0;
+    background: var(--bg-surface);
+    color: var(--text-1);
 }
 
 .enrich-section .input:focus {
     outline: none;
-    border-color: #4a9eff;
+    border-color: var(--accent-blue);
     box-shadow: 0 0 0 3px rgba(74, 158, 255, 0.2);
 }
 
 .enrich-section select.input {
     cursor: pointer;
-    background: #333;
-    color: #e0e0e0;
+    background: var(--bg-surface);
+    color: var(--text-1);
 }
 
 .enrich-section label {
     display: block;
     margin-bottom: 6px;
-    color: #b0b0b0;
+    color: var(--text-2);
     font-weight: 500;
     font-size: 13px;
 }
@@ -805,8 +815,8 @@
     bottom: 0;
     left: 0;
     right: 0;
-    background: #1a1a2e;
-    border: 2px solid #4a9eff;
+    background: var(--bg-mantle);
+    border: 2px solid var(--accent-blue);
     border-radius: 12px 12px 0 0;
     padding: 16px;
     z-index: 1000;
@@ -820,18 +830,18 @@
 .conflict-title {
     font-size: 15px;
     font-weight: 700;
-    color: #4a9eff;
+    color: var(--accent-blue);
 }
 
 .conflict-progress {
     margin-top: 8px;
-    background: #333;
+    background: var(--bg-surface);
     border-radius: 2px;
     overflow: hidden;
 }
 
 .conflict-body {
-    background: #0f0f1a;
+    background: var(--bg-app);
     border-radius: 8px;
     padding: 12px;
     margin-bottom: 12px;
@@ -852,35 +862,35 @@
 }
 
 .conflict-label {
-    color: #888;
+    color: var(--text-3);
     min-width: 60px;
     flex-shrink: 0;
 }
 
 .conflict-name {
-    color: #4ecdc4;
+    color: var(--teal);
     font-weight: 600;
 }
 
 .conflict-field {
-    color: #ffd93d;
+    color: var(--yellow);
     font-weight: 600;
 }
 
 .conflict-old {
-    color: #e74c3c;
+    color: var(--red-strong);
     word-break: break-all;
 }
 
 .conflict-new {
-    color: #2ecc71;
+    color: var(--green);
     word-break: break-all;
 }
 
 .conflict-hint {
     font-size: 12px;
-    color: #888;
-    border-top: 1px dashed #444;
+    color: var(--text-3);
+    border-top: 1px dashed var(--border-strong);
     padding-top: 8px;
     margin-top: 8px;
 }
@@ -900,18 +910,18 @@
 }
 
 .conflict-btn-btn {
-    background: #4a9eff;
-    color: #fff;
+    background: var(--accent-blue);
+    color: var(--text-1);
 }
 
 .conflict-btn-keep {
-    background: #666;
-    color: #fff;
+    background: var(--text-3);
+    color: var(--text-1);
 }
 
 .conflict-btn-overwrite {
-    background: #e74c3c;
-    color: #fff;
+    background: var(--red-strong);
+    color: var(--text-1);
 }
 
 /* ========== 锁定状态 ========== */
@@ -921,7 +931,7 @@
     gap: 4px;
     padding: 4px 10px;
     background: rgba(74, 158, 255, 0.15);
-    color: #4a9eff;
+    color: var(--accent-blue);
     border-radius: 12px;
     font-size: 12px;
     font-weight: 600;

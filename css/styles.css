@@ -235,12 +235,13 @@ body {
     margin-top: 2px;
 }
 
+/* 与 panel-theme.css .header-icon-btn 对齐：颜色改用 token */
 .header-icon-btn {
     width: 28px;
     height: 28px;
     border: none;
     background: transparent;
-    color: #888;
+    color: var(--text-3);
     cursor: pointer;
     border-radius: 6px;
     display: flex;
@@ -251,12 +252,12 @@ body {
 }
 
 .header-icon-btn:hover {
-    background: rgba(255, 255, 255, 0.1);
-    color: #fff;
+    background: var(--bg-surface-2);
+    color: var(--text-1);
 }
 
 .header-icon-btn:active {
-    background: rgba(255, 255, 255, 0.2);
+    background: var(--border-strong);
     transform: scale(0.95);
 }
 
@@ -284,15 +285,25 @@ body {
     transform: translateY(-2px);
 }
 
+/* 与 panel-theme.css .section h3 统一：中性 1px 分隔线 + 强调色块，颜色改用 token */
 .section h3 {
-    color: #ffffff;
-    font-size: 15px;
-    margin-bottom: 14px;
-    padding-bottom: 10px;
-    border-bottom: 2px solid #4a9eff;
+    color: var(--text-1);
+    font-size: var(--fs-h2);
+    font-weight: 600;
+    margin-bottom: clamp(10px, 0.6vw, 14px);
+    padding-bottom: clamp(8px, 0.5vw, 12px);
+    border-bottom: 1px solid var(--border);
     display: flex;
     align-items: center;
     gap: 8px;
+}
+.section h3::before {
+    content: "";
+    width: 4px;
+    height: 1em;
+    border-radius: var(--r-pill);
+    background: var(--primary);
+    flex-shrink: 0;
 }
 
 /* ========== 按钮组 ========== */

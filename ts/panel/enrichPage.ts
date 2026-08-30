@@ -288,7 +288,19 @@ function bindRecordControls(): void {
   }
 }
 
-// ========== 文件选择 ==========
+// ========== 文件选择（单/多选统一入口） ==========
+//
+// WPS 不支持原生多选文件对话框，这里采用"循环单选 + 询问是否继续"的模式：
+//   1. 首次进入循环：弹出 GetOpenFilename 让用户选一个文件
+//   2. 选中后：自动加入 state.batchFiles
+//   3. 弹 confirm"继续添加？"，确定 → 回到步骤 1，取消 → 退出循环
+//   4. 第一次选中的文件同时作为 state.filePath（单文件"开始富化"的目标）
+// 这样不管是单文件富化还是批量富化，都只走这一个入口。
+//
+// state.batchFiles 与 state.filePath 的关系：
+//   - state.batchFiles = []              → 还没选过文件
+//   - state.batchFiles = [f1]            → 只选了 f1（单文件）
+//   - state.batchFiles = [f1, f2, ...]   → 批量（f1 = state.filePath 是首个）
 
 export function selectNewAnimeFile(): void {
   try {
@@ -301,32 +313,138 @@ export function selectNewAnimeFile(): void {
       return
     }
 
-    const selected = app.GetOpenFilename(
-      'Excel 文件 (*.xlsx),*.xlsx,Excel 97-2003 文件 (*.xls),*.xls,CSV 文件 (*.csv),*.csv,所有文件 (*.*),*.*',
-      '选择新番表文件',
-    )
+    const fileFilter =
+      'Excel 文件 (*.xlsx),*.xlsx,Excel 97-2003 文件 (*.xls),*.xls,CSV 文件 (*.csv),*.csv,所有文件 (*.*),*.*'
 
-    if (typeof selected === 'boolean' || selected === false) {
-      bgmLog(LOG_LEVELS.INFO, '[enrich] 用户取消文件选择')
-      return
+    // eslint-disable-next-line no-constant-condition
+    while (true) {
+      const titleSuffix =
+        state.batchFiles.length > 0
+          ? `（已选 ${state.batchFiles.length} 个，继续添加按"取消"结束）`
+          : ''
+      const selected = app.GetOpenFilename(fileFilter, `选择新番表文件${titleSuffix}`)
+
+      // 用户取消
+      if (typeof selected === 'boolean' || selected === false) {
+        bgmLog(LOG_LEVELS.INFO, '[enrich] 用户取消文件选择')
+        break
+      }
+
+      const filePath = String(selected)
+      const fileName = extractFileName(filePath)
+
+      // 重复文件跳过
+      if (state.batchFiles.includes(filePath)) {
+        BGM.Dialog.alert('提示', `文件已在列表中：\n${fileName}`)
+        continue
+      }
+
+      state.batchFiles.push(filePath)
+      // 首个文件同时作为单文件富化目标
+      if (state.batchFiles.length === 1) {
+        state.filePath = filePath
+      }
+      bgmLog(
+        LOG_LEVELS.INFO,
+        `[enrich] 已选择文件: ${fileName}（共 ${state.batchFiles.length} 个）`,
+      )
+
+      // 每次选完后同步刷新 UI（让用户看到当前已选列表）
+      renderBatchFileList()
+
+      // 询问是否继续添加（WPS 同步阻塞式 confirm：回调里改 shouldContinue，随后立即读取）
+      let shouldContinue = false
+      BGM.Dialog.confirm(
+        `已添加 ${fileName}\n当前共 ${state.batchFiles.length} 个文件\n点击【确定】继续添加，点击【取消】完成选择`,
+        (confirmed: boolean) => {
+          shouldContinue = confirmed
+        },
+        '继续添加？',
+      )
+      if (!shouldContinue) break
     }
-
-    const filePath = String(selected)
-    state.filePath = filePath
-
-    const display = safeGetElement('filePathDisplay')
-    if (display) {
-      display.textContent = filePath
-      display.title = filePath
-    }
-
-    bgmLog(LOG_LEVELS.INFO, `[enrich] 已选择文件: ${filePath}`)
   } catch (e: unknown) {
     BGM.handleError(e, {
       showAlert: true,
       level: BGM.ErrorLevel.ERROR,
       context: 'selectNewAnimeFile',
     })
+  }
+}
+
+/** 渲染文件选择区 UI：路径展示、文件列表、批量按钮可见性 */
+function renderBatchFileList(): void {
+  const pathEl = safeGetElement('filePathDisplay')
+  const listEl = safeGetElement('batchFileList')
+  const startBtn = safeGetButton('batchStartBtn')
+  const clearBtn = safeGetButton('batchClearBtn')
+  const progressEl = safeGetElement('batchProgress')
+  const summaryEl = safeGetElement('batchSummary')
+  const singleEnrichBtn = safeGetButton('startEnrichBtn')
+
+  const n = state.batchFiles.length
+
+  // 1) 路径展示
+  if (pathEl) {
+    if (n === 0) {
+      pathEl.textContent = ''
+      pathEl.setAttribute('placeholder', '未选择文件...')
+      pathEl.removeAttribute('title')
+    } else if (n === 1) {
+      pathEl.textContent = state.batchFiles[0]!
+      pathEl.setAttribute('title', state.batchFiles[0]!)
+    } else {
+      const firstName = extractFileName(state.batchFiles[0]!)
+      pathEl.textContent = `已选 ${n} 个文件（首个：${firstName}）`
+      pathEl.setAttribute('title', state.batchFiles.join('\n'))
+    }
+  }
+
+  // 2) 单文件"开始富化"按钮的启用状态
+  if (singleEnrichBtn) {
+    singleEnrichBtn.disabled = n === 0
+  }
+
+  // 3) 文件列表（只在 N≥1 时显示）
+  if (listEl) {
+    if (n === 0) {
+      listEl.style.display = 'none'
+      listEl.innerHTML = ''
+    } else {
+      const rows = state.batchFiles.map((filePath, index) => {
+        const fileName = extractFileName(filePath)
+        return `
+          <div style="display:flex;align-items:center;gap:6px;padding:4px 6px;border-bottom:1px solid #2a2a2a;font-size:12px;">
+            <span style="color:#888;flex-shrink:0;">#${index + 1}</span>
+            <span style="flex:1;color:#e0e0e0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${escapeHtml(filePath)}">${escapeHtml(fileName)}</span>
+            <button class="bgm-btn small" data-batch-remove="${index}" style="flex-shrink:0;padding:2px 6px;font-size:11px;">✕</button>
+          </div>
+        `
+      })
+      listEl.innerHTML = sanitizeHtml(rows.join(''))
+      listEl.style.display = ''
+
+      listEl.querySelectorAll('[data-batch-remove]').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          const idx = parseInt((btn as HTMLElement).dataset.batchRemove || '-1', 10)
+          if (idx >= 0) batchRemoveFile(idx)
+        })
+      })
+    }
+  }
+
+  // 4) 批量按钮可见性
+  //    - 批量富化：N≥2 才显示（单文件走"开始富化"）
+  //    - 清空列表：N≥1 才显示
+  if (startBtn) startBtn.style.display = n >= 2 ? '' : 'none'
+  if (clearBtn) clearBtn.style.display = n >= 1 ? '' : 'none'
+
+  // 5) 进行中/汇总进度区域重置（清空时一并隐藏）
+  if (n === 0) {
+    if (progressEl) progressEl.style.display = 'none'
+    if (summaryEl) summaryEl.style.display = 'none'
+    state.batchResults = []
+    state.filePath = ''
   }
 }
 
@@ -1246,13 +1364,8 @@ function extractFileName(filePath: string): string {
   return lastSlash >= 0 ? filePath.substring(lastSlash + 1) : filePath
 }
 
-/** 绑定批量控件事件 */
+/** 绑定批量控件事件（单/多选统一入口后，只剩开始富化 + 清空列表两个按钮） */
 function bindBatchControls(): void {
-  const batchSelectBtn = safeGetButton('batchSelectBtn')
-  if (batchSelectBtn) {
-    batchSelectBtn.addEventListener('click', batchSelectFiles)
-  }
-
   const batchStartBtn = safeGetButton('batchStartBtn')
   if (batchStartBtn) {
     batchStartBtn.addEventListener('click', batchStartEnrichment)
@@ -1263,121 +1376,20 @@ function bindBatchControls(): void {
     batchClearBtn.addEventListener('click', () => {
       state.batchFiles = []
       state.batchResults = []
+      state.filePath = ''
       renderBatchFileList()
     })
   }
 }
 
 /**
- * 批量文件选择入口
- * 通过循环调用 GetOpenFilename 实现多选（WPS 不支持原生多选）
+ * 批量文件选择入口（已废弃）
+ * @deprecated 自 2026-08-30 起，"选择文件"按钮已合并为单/多选统一入口。
+ *   该函数仅作向后兼容保留，不再被任何 UI 触发；新逻辑在 selectNewAnimeFile() 中。
  */
 export function batchSelectFiles(): void {
-  try {
-    const app = getApp() as {
-      GetOpenFilename?: (fileFilter: string, title: string) => unknown
-    } | null
-
-    if (!app || typeof app.GetOpenFilename !== 'function') {
-      BGM.Dialog.alert('提示', 'WPS 文件对话框不可用')
-      return
-    }
-
-    const seen = new Set<string>(state.batchFiles)
-
-    // eslint-disable-next-line no-constant-condition
-    while (true) {
-      const selected = app.GetOpenFilename(
-        'Excel 文件 (*.xlsx),*.xlsx,Excel 97-2003 文件 (*.xls),*.xls,CSV 文件 (*.csv),*.csv,所有文件 (*.*),*.*',
-        `选择新番表文件（已选 ${state.batchFiles.length} 个）`,
-      )
-
-      if (typeof selected === 'boolean' || selected === false) {
-        // 用户取消 —— 如果已经选了至少一个文件就退出循环
-        if (state.batchFiles.length > 0) break
-        bgmLog(LOG_LEVELS.INFO, '[enrich-batch] 用户取消文件选择（尚未选到文件）')
-        break
-      }
-
-      const filePath = String(selected)
-
-      if (seen.has(filePath)) {
-        BGM.Dialog.alert('提示', `文件已在列表中：\n${extractFileName(filePath)}`)
-        continue
-      }
-
-      seen.add(filePath)
-      state.batchFiles.push(filePath)
-
-      const fileName = extractFileName(filePath)
-      bgmLog(
-        LOG_LEVELS.INFO,
-        `[enrich-batch] 添加文件: ${fileName}（共 ${state.batchFiles.length} 个）`,
-      )
-
-      // 用 confirm 询问是否继续
-      let shouldContinue = true
-      BGM.Dialog.confirm(
-        `已添加 ${fileName}\n当前共 ${state.batchFiles.length} 个文件\n点击【确定】继续添加，点击【取消】开始处理`,
-        (confirmed: boolean) => {
-          shouldContinue = confirmed
-        },
-        '继续添加？',
-      )
-      if (!shouldContinue) break
-    }
-
-    renderBatchFileList()
-  } catch (e: unknown) {
-    BGM.handleError(e, {
-      showAlert: true,
-      level: BGM.ErrorLevel.ERROR,
-      context: 'batchSelectFiles',
-    })
-  }
-}
-
-/** 渲染批量文件列表 UI */
-function renderBatchFileList(): void {
-  const listEl = safeGetElement('batchFileList')
-  const selectBtn = safeGetButton('batchSelectBtn')
-  const startBtn = safeGetButton('batchStartBtn')
-  const clearBtn = safeGetButton('batchClearBtn')
-
-  if (state.batchFiles.length === 0) {
-    if (listEl) listEl.style.display = 'none'
-    if (startBtn) startBtn.style.display = 'none'
-    if (clearBtn) clearBtn.style.display = 'none'
-    return
-  }
-
-  const rows = state.batchFiles.map((filePath, index) => {
-    const fileName = extractFileName(filePath)
-    return `
-      <div style="display:flex;align-items:center;gap:6px;padding:4px 6px;border-bottom:1px solid #2a2a2a;font-size:12px;">
-        <span style="color:#888;flex-shrink:0;">#${index + 1}</span>
-        <span style="flex:1;color:#e0e0e0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${escapeHtml(filePath)}">${escapeHtml(fileName)}</span>
-        <button class="bgm-btn small" data-batch-remove="${index}" style="flex-shrink:0;padding:2px 6px;font-size:11px;">✕</button>
-      </div>
-    `
-  })
-
-  if (listEl) {
-    listEl.innerHTML = sanitizeHtml(rows.join(''))
-    listEl.style.display = ''
-
-    // 绑定删除按钮
-    listEl.querySelectorAll('[data-batch-remove]').forEach((btn) => {
-      btn.addEventListener('click', () => {
-        const idx = parseInt((btn as HTMLElement).dataset.batchRemove || '-1', 10)
-        if (idx >= 0) batchRemoveFile(idx)
-      })
-    })
-  }
-
-  if (startBtn) startBtn.style.display = ''
-  if (clearBtn) clearBtn.style.display = ''
-  if (selectBtn) selectBtn.textContent = `📂 继续添加 (${state.batchFiles.length})`
+  // 兼容旧引用：直接走新的统一入口
+  selectNewAnimeFile()
 }
 
 /** 从列表中移除某个文件 */
@@ -1385,6 +1397,8 @@ function batchRemoveFile(index: number): void {
   if (index < 0 || index >= state.batchFiles.length) return
   const removed = state.batchFiles[index]!
   state.batchFiles.splice(index, 1)
+  // 单/多选统一入口：移除后保持 state.filePath 始终指向 batchFiles 的首位
+  state.filePath = state.batchFiles[0] ?? ''
   bgmLog(LOG_LEVELS.INFO, `[enrich-batch] 移除文件: ${extractFileName(removed)}`)
   renderBatchFileList()
 }
