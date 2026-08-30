@@ -158,6 +158,22 @@ body {
 .header-icon-btn:active { transform: scale(0.94); }
 .header-icon-btn svg { display: block; }
 
+/* 顶栏头像（窄页面时显示，替代 side-card） */
+.topbar-avatar {
+  width: 34px; height: 34px;
+  border-radius: 50%;
+  border: 2px solid var(--border-strong);
+  overflow: hidden;
+  flex-shrink: 0;
+  background: var(--bg-surface);
+  display: none;  /* 默认宽页面时隐藏，避免与 side-card 冲突 */
+}
+.topbar-avatar img {
+  width: 100%; height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
 /* ---- 侧栏 ---- */
 .sidebar {
   grid-area: sidebar;
@@ -448,7 +464,18 @@ select.input option, .form-row select option { background: var(--bg-surface); co
   border-radius: var(--r-md);
   border: 1px solid var(--border);
 }
-.token-status-info { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.token-status-info { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: space-between; }
+.token-status-left { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; min-width: 0; }
+.token-status-right { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
+.token-user-info { display: flex; flex-direction: column; align-items: flex-end; min-width: 0; }
+.token-user-name { font-size: var(--fs-ctrl); font-weight: 600; color: var(--text-1); line-height: 1.2; }
+.token-user-id { font-size: var(--fs-sm); color: var(--text-3); font-family: var(--font-mono); line-height: 1.2; }
+.token-avatar {
+  width: 36px; height: 36px; border-radius: 50%;
+  border: 2px solid var(--border-strong); overflow: hidden;
+  background: var(--bg-surface); flex-shrink: 0;
+}
+.token-avatar img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .token-buttons { display: flex; gap: 6px; flex-wrap: wrap; }
 .token-expires, .profile-expires {
   font-size: var(--fs-sm); font-weight: 500;
@@ -625,6 +652,7 @@ select.input option, .form-row select option { background: var(--bg-surface); co
   }
   .side-card,
   body.nav-icons-only .side-card { display: none; }  /* 窄态隐藏账户卡，避免挤压导航 */
+  .topbar-avatar { display: block; }  /* 窄态显示顶栏头像，替代 side-card */
   .nav-label,
   body.nav-icons-only .nav-label { display: none; }
   .nav { flex-direction: row; flex-wrap: wrap; gap: 6px; }

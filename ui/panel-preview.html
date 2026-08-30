@@ -75,14 +75,25 @@
         <main class="main">
             <section class="command-center" aria-label="核心操作">
                 <div class="command-head">
+                    <div class="command-eyebrow">Excel ⇄ Bangumi</div>
                     <div class="command-title">开始同步</div>
-                    <div class="command-desc">选择一种操作：将 Excel 观看记录上传至 Bangumi，或从 Bangumi 回写收藏、拉取远程资料数据。</div>
+                    <div class="command-desc">把表格里的观看记录同步到 Bangumi，或把收藏拉回表格——两个方向都在这里完成。</div>
                 </div>
-                <div class="command-actions">
-                    <button class="bgm-btn primary" id="syncBtn" data-action="sync">📤 上传同步</button>
-                    <button class="bgm-btn" data-action="testSelected">📋 选中行同步</button>
-                    <button class="bgm-btn success" data-action="syncCollectionFromBgm">📥 收藏下载</button>
-                    <button class="bgm-btn" data-action="previewSyncContent">👁️ 预览同步</button>
+                <div class="command-side">
+                    <div class="sync-ring" id="syncRing" role="img" aria-label="同步状态：已就绪">
+                        <svg viewBox="0 0 120 120" aria-hidden="true">
+                            <circle class="ring-track" cx="60" cy="60" r="50"></circle>
+                            <circle class="ring-prog" cx="60" cy="60" r="50"></circle>
+                        </svg>
+                        <span class="sync-glyph" aria-hidden="true">⇄</span>
+                        <span class="sync-ring-label" id="syncRingLabel">就绪</span>
+                    </div>
+                    <div class="command-actions">
+                        <button class="bgm-btn primary" id="syncBtn" data-action="sync">📤 上传同步</button>
+                        <button class="bgm-btn" data-action="testSelected">📋 选中行同步</button>
+                        <button class="bgm-btn success" data-action="syncCollectionFromBgm">📥 收藏下载</button>
+                        <button class="bgm-btn" data-action="previewSyncContent">👁️ 预览同步</button>
+                    </div>
                 </div>
             </section>
 
@@ -365,6 +376,25 @@
           });
         });
         if (links[0]) links[0].classList.add('active');
+
+        // 签名同步环：演示「上传同步」的状态流转（就绪 → 同步中 → 已同步）
+        var ring = document.getElementById('syncRing');
+        var ringLabel = document.getElementById('syncRingLabel');
+        var syncBtn = document.getElementById('syncBtn');
+        if (ring && syncBtn) {
+          syncBtn.addEventListener('click', function () {
+            ring.classList.remove('done');
+            ring.classList.add('syncing');
+            if (ringLabel) ringLabel.textContent = '同步中…';
+            ring.setAttribute('aria-label', '同步状态：同步中');
+            setTimeout(function () {
+              ring.classList.remove('syncing');
+              ring.classList.add('done');
+              if (ringLabel) ringLabel.textContent = '已同步';
+              ring.setAttribute('aria-label', '同步状态：已同步');
+            }, 1800);
+          });
+        }
       });
     </script>
 </body>
