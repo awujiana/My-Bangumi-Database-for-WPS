@@ -12,10 +12,11 @@
 | 📥 **数据同步**     | 从远程仓库（GitHub / GitLab / Gitee / Gist / 本地文件）下载 Bangumi 资料 JSONL 并增量写入 Excel，内置 24h 本地缓存与 DJB2 哈希比对。 |
 | ↩️ **收藏下载**     | 从 Bangumi 拉取收藏列表标记到 Excel；工作表为空时可自动填充为 Bangumi 账号收藏条目，再标记到 Excel。                                 |
 | 🔄 **5 种同步策略** | `add-update` / `add-only` / `update-only` / `mirror` / `force-overwrite`。                                                           |
-| ✅ **同步偏好**     | 增量同步、冲突跳过、同步记录开关；基于同步记录的「撤销同步」。                                                                       |
+| ✅ **同步偏好**     | 增量同步、冲突跳过、同步记录开关、默认收藏列表类型、默认时间筛选范围、自动刷新间隔；基于同步记录的「撤销同步」。                     |
+| 🎨 **外观主题**     | 深色 / 浅色 / 跟随系统三种主题模式，`data-theme` 变量切换，跟随系统实时响应。                                                        |
 | 🪄 **新番表富化**   | 自动补全新番表的名称 / 别名差异，映射 infobox 字段，减少手工录入。                                                                   |
 | 🔑 **Token 管理**   | 设置、测试、复制、清除 Bangumi API Token。                                                                                           |
-| ⚙️ **双面板 UI**    | 主面板 + 设置面板动态停靠协调；基于 `data-action` 的统一事件分发（30+ action）。                                                     |
+| ⚙️ **双面板 UI**    | 主面板 + 设置面板动态停靠协调；设置面板侧边功能导航（支持仅图标 + 悬停提示）；基于 `data-action` 的统一事件分发（30+ action）。      |
 
 ---
 
@@ -212,7 +213,7 @@ npm run test:coverage    # 生成覆盖率报告
 - **模块解耦 / 循环依赖治理**：避免 `ts/` 模块间的循环依赖（参见提交「循环依赖治理与模块解耦完成」）。
 - **面板命名**：统一 `taskpane` → `panel` 命名，页面逻辑文件使用 `Page` 后缀（`ts/panel/`）。
 - **事件分发**：UI 通过 `data-action` 属性 + 统一 `handleActionClick(action, event)` 路由（见 `ts/ui/handlers/` 与 [`文档/ui-and-interaction.md`](文档/ui-and-interaction.md)）。
-- **持久化**：配置经 `PluginStorage` 存储（`bgm_token` / `github_config` / `bgm_incremental_sync` 等键）。
+- **持久化**：配置经 `PluginStorage` 存储（`bgm_token` / `github_config` / `bgm_incremental_sync` / `bgm_theme` / `bgm_list_type` / `bgm_time_filter` / `bgm_refresh_interval` / `bgm_nav_icons_only` 等键）。
 - **数据校验**：外部数据经 `ts/schemas/` 下的 zod schema 校验，再写入 Excel。
 
 ### 扩展：新增同步源 / 字段映射

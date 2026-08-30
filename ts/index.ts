@@ -387,7 +387,27 @@ export {
   // 导航显示模式
   setNavIconsOnly,
   getNavIconsOnly,
+  // 外观主题
+  setTheme,
+  getTheme,
+  type ThemeMode,
+  // 默认收藏列表类型
+  setListType,
+  getListType,
+  type ListType,
+  // 默认时间筛选范围
+  setTimeFilter,
+  getTimeFilter,
+  type TimeFilterRange,
+  // 自动刷新间隔
+  setRefreshInterval,
+  getRefreshInterval,
 } from './tools/config.js'
+
+// ============================================================================
+// 13.1 外观主题应用（来自 tools/theme.js）
+// ============================================================================
+export { applyTheme, initTheme, saveTheme, resolveTheme } from './tools/theme.js'
 
 // ============================================================================
 // 14. URL 自动补全（来自 tools/autoFillUrl.js）

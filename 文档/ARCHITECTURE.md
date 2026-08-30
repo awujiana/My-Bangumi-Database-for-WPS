@@ -6,17 +6,18 @@
 
 ## 版本历史
 
-| 版本 | 日期       | 变更说明                                                                                                                                                                                                                                                           |
-| ---- | ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| v1.0 | 2026-08-10 | 初始版本                                                                                                                                                                                                                                                           |
-| v2.8 | 2026-08-21 | 修复 GitHub 同步编译错误、同步完成弹窗支持明细表格                                                                                                                                                                                                                 |
-| v2.9 | 2026-08-26 | 新增 enrichEngine 富化引擎（新番表+简介工作表双阶段富化）、标注白名单机制、自动添加缺失列、声优字段支持、数据同步列位置无关性验证、边界情况修复（parseRemoteContent 空值检查、getAnnotatedValue 空值守卫）、42 项边界测试                                          |
-| v3.0 | 2026-08-26 | 新增富化功能工作簿选择与锁定机制（enrichLock.ts）：跨工作簿 Bangumi 追踪表选择、PluginStorage 持久化、启动恢复校验、与面板锁定独立运行                                                                                                                             |
-| v3.1 | 2026-08-26 | enrichLock.ts 边界加固：WPS API null 返回安全处理、冗余查找逻辑简化、边界情况文档完善                                                                                                                                                                              |
-| v3.2 | 2026-08-26 | 命名规范重构：`taskpane/` 目录重命名为 `panel/`，页面文件使用 `Page` 后缀（`panelPage.ts`/`enrichPage.ts`），`taskpane-entry.ts` → `panel-entry.ts`；删除旧兼容文件 `ts/taskpane.ts`；统一 `@module` JSDoc 标签                                                    |
-| v3.3 | 2026-08-26 | 循环依赖治理：创建 `types.ts`/`container.ts`/`services.ts`/`errorHandler.ts` 核心模块；扩展 EventBus 新增 `STATE_CHANGED`/`CONFIG_CHANGED` 事件；`index.ts` 瘦身为纯 re-export 便利桶；移除各模块对 `index.ts` 的直接依赖；函数名统一（`init面板`→`initPanel` 等） |
-| v3.4 | 2026-08-26 | 移除收藏回写数据源选择：收藏回写固定走 Bangumi API，删除「Bangumi API / GitHub 仓库」二选一下拉框、对应 UI、配置键 `bgm_writeback_source` 及文档说明                                                                                                               |
-| v3.5 | 2026-08-28 | 收藏回写空表自动填充：工作表为空时，经用户确认后自动写入标准表头并用 Bangumi 账号收藏条目填充 Excel，再执行标记；恢复缺失的 `css/panel-theme.css` 源文件                                                                                                           |
+| 版本 | 日期       | 变更说明                                                                                                                                                                                                                                                                                       |
+| ---- | ---------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| v1.0 | 2026-08-10 | 初始版本                                                                                                                                                                                                                                                                                       |
+| v2.8 | 2026-08-21 | 修复 GitHub 同步编译错误、同步完成弹窗支持明细表格                                                                                                                                                                                                                                             |
+| v2.9 | 2026-08-26 | 新增 enrichEngine 富化引擎（新番表+简介工作表双阶段富化）、标注白名单机制、自动添加缺失列、声优字段支持、数据同步列位置无关性验证、边界情况修复（parseRemoteContent 空值检查、getAnnotatedValue 空值守卫）、42 项边界测试                                                                      |
+| v3.0 | 2026-08-26 | 新增富化功能工作簿选择与锁定机制（enrichLock.ts）：跨工作簿 Bangumi 追踪表选择、PluginStorage 持久化、启动恢复校验、与面板锁定独立运行                                                                                                                                                         |
+| v3.1 | 2026-08-26 | enrichLock.ts 边界加固：WPS API null 返回安全处理、冗余查找逻辑简化、边界情况文档完善                                                                                                                                                                                                          |
+| v3.2 | 2026-08-26 | 命名规范重构：`taskpane/` 目录重命名为 `panel/`，页面文件使用 `Page` 后缀（`panelPage.ts`/`enrichPage.ts`），`taskpane-entry.ts` → `panel-entry.ts`；删除旧兼容文件 `ts/taskpane.ts`；统一 `@module` JSDoc 标签                                                                                |
+| v3.3 | 2026-08-26 | 循环依赖治理：创建 `types.ts`/`container.ts`/`services.ts`/`errorHandler.ts` 核心模块；扩展 EventBus 新增 `STATE_CHANGED`/`CONFIG_CHANGED` 事件；`index.ts` 瘦身为纯 re-export 便利桶；移除各模块对 `index.ts` 的直接依赖；函数名统一（`init面板`→`initPanel` 等）                             |
+| v3.4 | 2026-08-26 | 移除收藏回写数据源选择：收藏回写固定走 Bangumi API，删除「Bangumi API / GitHub 仓库」二选一下拉框、对应 UI、配置键 `bgm_writeback_source` 及文档说明                                                                                                                                           |
+| v3.5 | 2026-08-28 | 收藏回写空表自动填充：工作表为空时，经用户确认后自动写入标准表头并用 Bangumi 账号收藏条目填充 Excel，再执行标记；恢复缺失的 `css/panel-theme.css` 源文件                                                                                                                                       |
+| v3.6 | 2026-08-30 | 设置面板重构：顶栏+侧边功能导航+主区布局、滚动高亮、导航仅图标模式（`bgm_nav_icons_only`）；新增外观主题（`bgm_theme`，dark/light/system，`ts/tools/theme.ts`）与同步偏好扩展（`bgm_list_type`/`bgm_time_filter`/`bgm_refresh_interval`）；修复 `bgm:modulesReady` 派发时序与导航 tooltip 裁剪 |
 
 ## 一、架构概览
 
@@ -63,6 +64,7 @@ ts/index.ts (thin barrel — 仅 re-export)
   │   ├── logger.ts        → 分级日志 + Token 脱敏
   │   ├── http.ts          → XHR 封装 + 重试 + Zod 校验
   │   ├── config.ts        → PluginStorage 配置读写
+  │   ├── theme.ts         → 主题解析/应用/初始化 + 系统主题监听
   │   ├── util/            → 单元格/工作表操作、Token 存储、BGM 命名空间
   │   ├── stringUtils.ts   → colNumToLetter, trim, escapeHtml, calcFingerprint
   │   └── wps.ts           → WPS 类型守卫与类型定义
@@ -518,11 +520,12 @@ ts/index.ts (thin barrel — 仅 re-export)
 
 #### `config.ts` — 配置工具
 
-- **`CONFIG_KEYS`**: TOKEN, USER_ID, INCREMENTAL_SYNC, SKIP_CONFLICTS, LOCKED_SHEET, LOCKED_WORKBOOK, ENABLE_SYNC_RECORD, ENRICH_LOCKED_WORKBOOK
+- **`CONFIG_KEYS`**: TOKEN, USER_ID, INCREMENTAL_SYNC, SKIP_CONFLICTS, LOCKED_SHEET, LOCKED_WORKBOOK, ENABLE_SYNC_RECORD, ENRICH_LOCKED_WORKBOOK, NAV_ICONS_ONLY, THEME, LIST_TYPE, TIME_FILTER, REFRESH_INTERVAL
 - **`setConfig(key, value)`**: 写入 PluginStorage + 触发 eventBus + 跨文档 postMessage 广播
 - **`getConfig(key, defaultValue, silent)`**: 读取（支持静默模式用于轮询）
 - **`removeConfig(key)`**: 删除配置
-- **布尔配置便捷方法**: `setIncrementalSync()`, `getIncrementalSync()`, `setSkipConflicts()`, `getSkipConflicts()`, `setSyncRecordEnabled()`, `getSyncRecordEnabled()`
+- **布尔配置便捷方法**: `setIncrementalSync()`, `getIncrementalSync()`, `setSkipConflicts()`, `getSkipConflicts()`, `setSyncRecordEnabled()`, `getSyncRecordEnabled()`, `setNavIconsOnly()`, `getNavIconsOnly()`
+- **外观与偏好便捷方法**: `setTheme()/getTheme()`（dark/light/system）、`setListType()/getListType()`（all/collect/wish/do）、`setTimeFilter()/getTimeFilter()`（all/year/quarter/month/future）、`setRefreshInterval()/getRefreshInterval()`（0–1440 分钟）
 
 #### `util/` — 通用工具
 
@@ -659,6 +662,16 @@ ts/index.ts (thin barrel — 仅 re-export)
 | `bgm_locked_sheet`           | string | `null`    | 锁定的工作表索引                                   |
 | `bgm_locked_workbook`        | string | `null`    | 锁定的工作簿名称                                   |
 | `bgm_enrich_locked_workbook` | string | `null`    | 富化功能锁定的 Bangumi 追踪表工作簿+工作表（JSON） |
+| `bgm_nav_icons_only`         | string | `'false'` | 设置面板导航仅显示图标开关 ('true'/'false')        |
+
+#### 外观与偏好配置
+
+| 键名                   | 类型   | 默认值   | 说明                                                              |
+| ---------------------- | ------ | -------- | ----------------------------------------------------------------- |
+| `bgm_theme`            | string | `'dark'` | 主题模式：`dark` / `light` / `system`（跟随系统）                 |
+| `bgm_list_type`        | string | `'all'`  | 默认收藏列表类型：`all` / `collect` / `wish` / `do`               |
+| `bgm_time_filter`      | string | `'year'` | 默认时间筛选范围：`all` / `year` / `quarter` / `month` / `future` |
+| `bgm_refresh_interval` | string | `'0'`    | 自动刷新间隔（分钟），0 表示关闭，有效范围 0–1440                 |
 
 #### GitHub / 远程同步配置
 

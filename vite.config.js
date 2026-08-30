@@ -6,6 +6,10 @@ import { defineConfig } from 'vite'
 import { viteStaticCopy } from 'vite-plugin-static-copy'
 
 export default defineConfig({
+  // 关闭 SPA 回退：开发服务器对缺失的静态文件直接 404（响亮报错），
+  // 而不是静默返回 index.html（HTTP 200 / text/html），否则 main.js 加载的
+  // dist-ts/*.js 缺失时会被当成 HTML，出现「MIME 拒绝」式误导。
+  appType: 'custom',
   base: './',                              // 相对路径基础
   root: '.',                               // 项目根目录
   plugins: [
@@ -36,7 +40,9 @@ export default defineConfig({
   },
   server: {
     host: '0.0.0.0',                       // 允许局域网访问
-    port: 3889,                            // 开发服务器端口（仅 `npm run dev`）
+    // 注意：务必与 wpsjs debug 的端口（默认 3889）错开，避免两者抢同一端口——
+    // 否则 vite 占用 3889 后 wpsjs 启动失败，WPS 仍连到 vite 触发 SPA 回退。
+    port: 5173,                            // 开发服务器端口（仅 `npm run dev`，与 debug 的 3889 错开）
     fs: {
       allow: ['.']                         // 允许访问项目根目录外的文件
     }

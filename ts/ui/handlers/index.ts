@@ -43,6 +43,14 @@ import {
   getSkipConflicts,
   setSkipConflicts,
   setNavIconsOnly,
+  getTheme,
+  setListType,
+  getListType,
+  setTimeFilter,
+  getTimeFilter,
+  setRefreshInterval,
+  getRefreshInterval,
+  saveTheme,
   getGithubConfig,
   setGithubConfig,
   isGithubConfigComplete,
@@ -258,6 +266,102 @@ const handleLogLevelFilterChange = (): void => {
   renderLogEntries()
 }
 
+// ========== 设置页：外观主题 / 列表类型 / 时间筛选 / 刷新间隔 ==========
+
+/** 同步主题预览卡片的 active 高亮 */
+function updateThemePreview(mode: string): void {
+  document.querySelectorAll<HTMLElement>('[data-theme-card]').forEach((card) => {
+    card.classList.toggle('active', card.dataset.themeCard === mode)
+  })
+}
+
+const handleThemeChange = (): void => {
+  const select = document.getElementById('themeSelect') as HTMLSelectElement | null
+  const mode = select?.value || 'dark'
+  // 乐观更新预览卡片，即使持久化失败也保持视觉一致
+  updateThemePreview(mode)
+  const ok = saveTheme(mode)
+  if (ok) {
+    const labels: Record<string, string> = {
+      dark: '深色模式',
+      light: '浅色模式',
+      system: '跟随系统',
+    }
+    showToast(`主题已切换为「${labels[mode] || mode}」`, 'success')
+  } else {
+    showToast('主题保存失败', 'error')
+  }
+}
+
+const handleThemePreviewClick = (event: Event): void => {
+  const card = (event.currentTarget as HTMLElement).closest(
+    '[data-theme-card]',
+  ) as HTMLElement | null
+  const mode = card?.dataset.themeCard
+  if (!mode) return
+  const select = document.getElementById('themeSelect') as HTMLSelectElement | null
+  if (select) select.value = mode
+  handleThemeChange()
+}
+
+const handleListTypeChange = (): void => {
+  const select = document.getElementById('listTypeSelect') as HTMLSelectElement | null
+  if (!select) return
+  const ok = setListType(select.value)
+  if (ok) {
+    const labels: Record<string, string> = {
+      all: '全部收藏',
+      collect: '已看',
+      wish: '想看',
+      do: '在看',
+    }
+    showToast(`默认收藏列表类型：${labels[select.value] || select.value}`, 'success')
+  } else {
+    showToast('收藏列表类型保存失败', 'error')
+  }
+}
+
+const handleTimeFilterChange = (): void => {
+  const select = document.getElementById('timeFilterSelect') as HTMLSelectElement | null
+  if (!select) return
+  const ok = setTimeFilter(select.value)
+  if (ok) {
+    const labels: Record<string, string> = {
+      all: '全部时间',
+      year: '全年',
+      quarter: '季度新番',
+      month: '月份',
+      future: '预告 / 未来',
+    }
+    showToast(`默认时间筛选范围：${labels[select.value] || select.value}`, 'success')
+  } else {
+    showToast('时间筛选范围保存失败', 'error')
+  }
+}
+
+const handleRefreshIntervalChange = (): void => {
+  const input = document.getElementById('refreshIntervalInput') as HTMLInputElement | null
+  if (!input) return
+  const raw = input.value.trim()
+  if (raw === '') {
+    input.value = String(getRefreshInterval(true))
+    return
+  }
+  const minutes = Number(raw)
+  if (!Number.isFinite(minutes) || minutes < 0 || minutes > 1440) {
+    showToast('刷新间隔需为 0–1440 之间的整数（分钟）', 'warn')
+    input.value = String(getRefreshInterval(true))
+    return
+  }
+  const ok = setRefreshInterval(minutes)
+  if (ok) {
+    const value = Math.round(minutes)
+    showToast(`自动刷新间隔已设为 ${value} 分钟${value === 0 ? '（已关闭）' : ''}`, 'success')
+  } else {
+    showToast('刷新间隔保存失败', 'error')
+  }
+}
+
 /**
  * GitHub 配置输入框防抖自动保存（300ms）。
  * 每次从 DOM 实时读取值，避免闭包持有过时的元素引用。
@@ -428,6 +532,44 @@ export function setupButtonListeners(): void {
   if (logLevelFilter) {
     trackedAddEventListener(logLevelFilter, 'change', handleLogLevelFilterChange)
     bgmLog(LOG_LEVELS.INFO, '[handlers] 日志级别筛选 change 监听器已注册')
+  }
+
+  // 设置页：外观主题选择 / 预览卡片
+  const themeSelect = document.getElementById('themeSelect') as HTMLSelectElement | null
+  if (themeSelect) {
+    themeSelect.value = getTheme(true)
+    trackedAddEventListener(themeSelect, 'change', handleThemeChange)
+    bgmLog(LOG_LEVELS.INFO, '[handlers] 主题选择 change 监听器已注册')
+  }
+  document.querySelectorAll<HTMLElement>('[data-theme-card]').forEach((card) => {
+    trackedAddEventListener(card, 'click', handleThemePreviewClick)
+  })
+  updateThemePreview(getTheme(true))
+
+  // 设置页：默认收藏列表类型
+  const listTypeSelect = document.getElementById('listTypeSelect') as HTMLSelectElement | null
+  if (listTypeSelect) {
+    listTypeSelect.value = getListType(true)
+    trackedAddEventListener(listTypeSelect, 'change', handleListTypeChange)
+    bgmLog(LOG_LEVELS.INFO, '[handlers] 收藏列表类型 change 监听器已注册')
+  }
+
+  // 设置页：默认时间筛选范围
+  const timeFilterSelect = document.getElementById('timeFilterSelect') as HTMLSelectElement | null
+  if (timeFilterSelect) {
+    timeFilterSelect.value = getTimeFilter(true)
+    trackedAddEventListener(timeFilterSelect, 'change', handleTimeFilterChange)
+    bgmLog(LOG_LEVELS.INFO, '[handlers] 时间筛选范围 change 监听器已注册')
+  }
+
+  // 设置页：自动刷新间隔（含校验）
+  const refreshIntervalInput = document.getElementById(
+    'refreshIntervalInput',
+  ) as HTMLInputElement | null
+  if (refreshIntervalInput) {
+    refreshIntervalInput.value = String(getRefreshInterval(true))
+    trackedAddEventListener(refreshIntervalInput, 'change', handleRefreshIntervalChange)
+    bgmLog(LOG_LEVELS.INFO, '[handlers] 刷新间隔 change 监听器已注册')
   }
 }
 

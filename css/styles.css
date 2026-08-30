@@ -2710,9 +2710,84 @@ select.input {
     color: #ff6b6b;
 }
 
-/* ========== 同步详情预览弹窗 ========== */
-.bgm-preview-dialog {
-    max-width: 520px;
+/* ========== 设置页专属样式 ========== */
+/* 设置页全屏布局：去除 styles.css 的 body 内边距，与 panel 顶栏吸顶对齐 */
+body {
+    padding: 0;
+}
+
+/* 主题预览 */
+.theme-preview {
+    display: flex;
+    gap: 12px;
+    margin-top: 4px;
+}
+
+.theme-preview-card {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    padding: 12px;
+    border: 2px solid var(--border);
+    border-radius: var(--r-md);
+    cursor: pointer;
+    transition: border-color var(--dur), background var(--dur), box-shadow var(--dur);
+    background: var(--bg-surface);
+}
+
+.theme-preview-card:hover {
+    border-color: var(--border-strong);
+}
+
+.theme-preview-card.active {
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px var(--border-strong);
+}
+
+.theme-preview-swatch {
+    width: 100%;
+    height: 44px;
+    border-radius: var(--r-sm);
+    border: 1px solid var(--border);
+}
+
+.swatch-dark {
+    background: linear-gradient(135deg, #000000 0%, #1f1f1f 100%);
+}
+
+.swatch-light {
+    background: linear-gradient(135deg, #f5f6f8 0%, #ffffff 100%);
+}
+
+.theme-preview-name {
+    font-size: var(--fs-sm);
+    color: var(--text-2);
+}
+
+/* 带单位的输入框 */
+.input-with-unit {
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+
+.input-with-unit .input {
+    padding-right: 52px;
+}
+
+.input-unit {
+    position: absolute;
+    right: 12px;
+    color: var(--text-3);
+    font-size: var(--fs-sm);
+    pointer-events: none;
+}
+
+/* 设置页表单区段间距 */
+.section .form-group + .form-group {
+    margin-top: 14px;
 }
 
 .bgm-preview-notice {

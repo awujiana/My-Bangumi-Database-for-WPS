@@ -17,6 +17,7 @@
 
 import { initPanel } from '../panel/panelPage.js'
 import { getNavIconsOnly } from '../tools/config.js'
+import { initTheme } from '../tools/theme.js'
 import { initHandlers } from '../ui/handlers/index.js'
 
 function applyNavMode(): void {
@@ -33,6 +34,7 @@ function applyNavMode(): void {
  * - 再调用 initHandlers() 注册按钮监听器、消息监听器、事件总线监听器
  */
 export function startPanel(): void {
+  initTheme()
   initPanel()
   initHandlers()
 }

@@ -9,6 +9,8 @@
  *  3. 仅在浏览器上下文且当前页面为 settings.html 时自动启动。
  */
 
+import { getNavIconsOnly } from '../tools/config.js'
+import { initTheme } from '../tools/theme.js'
 import { initHandlers } from '../ui/handlers/index.js'
 
 /**
@@ -108,16 +110,54 @@ function initSettingsPage(): void {
 }
 
 /**
+ * 应用外观主题与导航显示模式，并初始化滚动高亮（scrollspy）。
+ */
+function applyAppearance(): void {
+  if (typeof document === 'undefined') return
+  // 主题：从配置读取并应用（含跟随系统监听）
+  initTheme()
+  // 导航仅图标模式
+  if (getNavIconsOnly(true)) {
+    document.body.classList.add('nav-icons-only')
+  }
+  // 滚动高亮：当前可视区段对应的导航项高亮
+  const sections = Array.from(document.querySelectorAll<HTMLElement>('main .section[id]'))
+  const navLinks = Array.from(document.querySelectorAll<HTMLAnchorElement>('.nav a[href^="#"]'))
+  if (sections.length === 0 || navLinks.length === 0) return
+  if (typeof IntersectionObserver === 'undefined') return
+  const observer = new IntersectionObserver(
+    (entries) => {
+      entries.forEach((entry) => {
+        if (entry.isIntersecting) {
+          navLinks.forEach((link) => {
+            link.classList.toggle('active', link.getAttribute('href') === `#${entry.target.id}`)
+          })
+        }
+      })
+    },
+    { rootMargin: '-20% 0px -70% 0px' },
+  )
+  sections.forEach((section) => observer.observe(section))
+}
+
+/**
  * 启动设置面板：执行 UI 事件处理初始化 + 设置页面初始化。
  * 完成后触发 bgm:modulesReady 事件，通知 panel/settingsBootstrap 入口启用按钮。
  */
 export function startSettings(): void {
+  applyAppearance()
   initHandlers()
   initSettingsPage()
-  // 通知模块就绪，启用按钮（与 panelPage.ts 的 initPanelCore 对齐）
+  // 通知模块就绪，启用按钮（与 panelPage.ts 的 initPanelCore 对齐）。
+  // 必须异步派发：本模块在 settingsBootstrap 的 import 阶段被求值，若同步派发，
+  // settingsBootstrap 中注册的 bgm:modulesReady 监听器尚未挂载，按钮会一直禁用
+  // 直到 5s 兜底超时。queueMicrotask 在模块求值完成后、settingsBootstrap 主体
+  // 注册监听器之后再派发，保证按钮立即启用。
   if (typeof document !== 'undefined') {
-    document.dispatchEvent(new CustomEvent('bgm:modulesReady'))
-    console.log('[BGM Settings] startSettings() 完成，bgm:modulesReady 已触发')
+    queueMicrotask(() => {
+      document.dispatchEvent(new CustomEvent('bgm:modulesReady'))
+      console.log('[BGM Settings] startSettings() 完成，bgm:modulesReady 已触发')
+    })
   }
 }
 

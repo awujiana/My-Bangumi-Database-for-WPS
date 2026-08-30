@@ -22,6 +22,10 @@ export const CONFIG_KEYS = {
   ENABLE_SYNC_RECORD: 'bgm_enable_sync_record',
   ENRICH_LOCKED_WORKBOOK: 'bgm_enrich_locked_workbook',
   NAV_ICONS_ONLY: 'bgm_nav_icons_only',
+  THEME: 'bgm_theme',
+  LIST_TYPE: 'bgm_list_type',
+  TIME_FILTER: 'bgm_time_filter',
+  REFRESH_INTERVAL: 'bgm_refresh_interval',
 } as const
 
 /**
@@ -201,5 +205,90 @@ export function setNavIconsOnly(enabled: boolean): boolean {
 export function getNavIconsOnly(silent: boolean = false): boolean {
   const result = getConfig(CONFIG_KEYS.NAV_ICONS_ONLY, '', silent) === 'true'
   if (!silent) bgmLog(LOG_LEVELS.INFO, `[config] 获取导航仅图标状态: ${result ? '开启' : '关闭'}`)
+  return result
+}
+
+// ========== 外观主题 ==========
+
+const THEME_MODES = ['dark', 'light', 'system'] as const
+export type ThemeMode = (typeof THEME_MODES)[number]
+
+export function setTheme(mode: string): boolean {
+  if (!THEME_MODES.includes(mode as ThemeMode)) {
+    bgmLog(LOG_LEVELS.WARN, `[config] 无效主题模式: ${mode}，已忽略`)
+    return false
+  }
+  bgmLog(LOG_LEVELS.INFO, `[config] 设置主题模式: ${mode}`)
+  return setConfig(CONFIG_KEYS.THEME, mode)
+}
+
+export function getTheme(silent: boolean = false): ThemeMode {
+  const v = getConfig(CONFIG_KEYS.THEME, 'dark', silent)
+  const result = THEME_MODES.includes(v as ThemeMode) ? (v as ThemeMode) : 'dark'
+  if (!silent) bgmLog(LOG_LEVELS.INFO, `[config] 获取主题模式: ${result}`)
+  return result
+}
+
+// ========== 默认收藏列表类型 ==========
+
+const LIST_TYPES = ['all', 'collect', 'wish', 'do'] as const
+export type ListType = (typeof LIST_TYPES)[number]
+
+export function setListType(type: string): boolean {
+  if (!LIST_TYPES.includes(type as ListType)) {
+    bgmLog(LOG_LEVELS.WARN, `[config] 无效收藏列表类型: ${type}，已忽略`)
+    return false
+  }
+  bgmLog(LOG_LEVELS.INFO, `[config] 设置默认收藏列表类型: ${type}`)
+  return setConfig(CONFIG_KEYS.LIST_TYPE, type)
+}
+
+export function getListType(silent: boolean = false): ListType {
+  const v = getConfig(CONFIG_KEYS.LIST_TYPE, 'all', silent)
+  const result = LIST_TYPES.includes(v as ListType) ? (v as ListType) : 'all'
+  if (!silent) bgmLog(LOG_LEVELS.INFO, `[config] 获取默认收藏列表类型: ${result}`)
+  return result
+}
+
+// ========== 默认时间筛选范围 ==========
+
+const TIME_FILTERS = ['all', 'year', 'quarter', 'month', 'future'] as const
+export type TimeFilterRange = (typeof TIME_FILTERS)[number]
+
+export function setTimeFilter(range: string): boolean {
+  if (!TIME_FILTERS.includes(range as TimeFilterRange)) {
+    bgmLog(LOG_LEVELS.WARN, `[config] 无效时间筛选范围: ${range}，已忽略`)
+    return false
+  }
+  bgmLog(LOG_LEVELS.INFO, `[config] 设置默认时间筛选范围: ${range}`)
+  return setConfig(CONFIG_KEYS.TIME_FILTER, range)
+}
+
+export function getTimeFilter(silent: boolean = false): TimeFilterRange {
+  const v = getConfig(CONFIG_KEYS.TIME_FILTER, 'year', silent)
+  const result = TIME_FILTERS.includes(v as TimeFilterRange) ? (v as TimeFilterRange) : 'year'
+  if (!silent) bgmLog(LOG_LEVELS.INFO, `[config] 获取默认时间筛选范围: ${result}`)
+  return result
+}
+
+// ========== 自动刷新间隔（分钟，0 表示关闭） ==========
+
+const REFRESH_MIN = 0
+const REFRESH_MAX = 1440
+
+export function setRefreshInterval(minutes: number): boolean {
+  if (!Number.isFinite(minutes) || minutes < REFRESH_MIN || minutes > REFRESH_MAX) {
+    bgmLog(LOG_LEVELS.WARN, `[config] 无效刷新间隔: ${minutes}，已忽略`)
+    return false
+  }
+  const value = String(Math.round(minutes))
+  bgmLog(LOG_LEVELS.INFO, `[config] 设置自动刷新间隔: ${value} 分钟`)
+  return setConfig(CONFIG_KEYS.REFRESH_INTERVAL, value)
+}
+
+export function getRefreshInterval(silent: boolean = false): number {
+  const raw = parseInt(getConfig(CONFIG_KEYS.REFRESH_INTERVAL, '0', silent), 10)
+  const result = Number.isFinite(raw) && raw >= REFRESH_MIN ? raw : 0
+  if (!silent) bgmLog(LOG_LEVELS.INFO, `[config] 获取自动刷新间隔: ${result} 分钟`)
   return result
 }

@@ -24,9 +24,14 @@ import '../ui/preview.js'
 import '../sync/syncRecord.js'
 import '../sync/scraping.js'
 import '../sync/exceltobangumi.js'
+import { initTheme } from '../tools/theme.js'
+
 import { initEnrichPage } from './enrichPage.js'
 
 if (typeof document !== 'undefined') {
+  // 应用外观主题（深色 / 浅色 / 跟随系统）
+  initTheme()
+
   // 模块就绪前禁用所有 data-action 按钮，避免误触发未初始化的处理逻辑
   document.querySelectorAll('button[data-action]').forEach((btn) => {
     const b = btn as HTMLButtonElement
