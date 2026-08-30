@@ -172,7 +172,11 @@ export function initEnrichPage(): void {
     }
   }
 
-  bgmLog(LOG_LEVELS.INFO, '[enrich] initEnrichPage 完成')
+  // 通知模块就绪，启用按钮（与 panelPage.initPanelCore / settings-entry.startSettings 对齐）
+  if (typeof document !== 'undefined') {
+    document.dispatchEvent(new CustomEvent('bgm:modulesReady'))
+    bgmLog(LOG_LEVELS.INFO, '[enrich] initEnrichPage 完成，bgm:modulesReady 已触发')
+  }
 }
 
 function bindFileSelector(): void {

@@ -109,7 +109,7 @@ function initSettingsPage(): void {
 
 /**
  * 启动设置面板：执行 UI 事件处理初始化 + 设置页面初始化。
- * 完成后触发 bgm:modulesReady 事件，通知 settings-bootstrap.js 启用按钮。
+ * 完成后触发 bgm:modulesReady 事件，通知 panel/settingsBootstrap 入口启用按钮。
  */
 export function startSettings(): void {
   initHandlers()
