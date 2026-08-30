@@ -1,0 +1,93 @@
+/* ============================================================================
+ * BGM 加载项 · 共享设计 Token（css/tokens.css）
+ * ----------------------------------------------------------------------------
+ * 三个面板（panel.html / enrich.html / settings.html）统一加载此文件，
+ * 让所有页面共享同一套颜色、间距、圆角、字体、阴影 token，消除硬编码差异。
+ *
+ * Token 体系源自 panel-theme.css（最早在 panel 上落地），现抽离为共享层。
+ * 使用方：css/*.css 任意规则、HTML 内联 style（如 var(--bg-base)）。
+ *
+ * 加载顺序：tokens.css 必须在使用它的样式表之前引入。
+ * ==========================================================================*/
+
+:root {
+  /* ---- 背景层级（由深到浅营造纵深）---- */
+  --bg-app:        #000000;   /* 应用底色（panel 纯黑） */
+  --bg-base:       #1f1f1f;   /* 卡片背景（任务面板主流灰） */
+  --bg-mantle:     #181818;   /* 嵌套/侧栏 */
+  --bg-surface:    #2a2a2a;   /* 输入框 / 弹出层 */
+  --bg-surface-2:  #333333;   /* 悬停态 */
+  --bg-overlay:    rgba(0, 0, 0, 0.72);
+
+  /* ---- 边框 / 分隔（中性白透明）---- */
+  --border:        rgba(255, 255, 255, 0.08);
+  --border-strong: rgba(255, 255, 255, 0.16);
+
+  /* ---- 文字（深底浅字，高对比，均满足 WCAG AA）---- */
+  --text-1:        #f2f2f2;   /* 主文字（卡片正文 / 标题） */
+  --text-2:        #c8c8c8;   /* 次文字（标签 / 提示） */
+  --text-3:        #888888;   /* 弱化文字（说明 / 占位） */
+  --text-on-accent:#0a0a0a;   /* 浅色按钮上的深色文字 */
+
+  /* ---- 主色 / 强调色 ---- */
+  --primary:        #e8e8e8;   /* 浅中性：主操作 / 链接 / 焦点 */
+  --primary-strong: #ffffff;   /* 主色 hover */
+  --accent:         #cfcfcf;   /* 次级高亮（中性） */
+  --accent-2:       #9a9a9a;   /* 第三强调（中性灰） */
+  --accent-blue:    #4a9eff;   /* 蓝强调（Bangumi 品牌色，用于分隔线 / 焦点描边） */
+  --accent-blue-strong: #3a8ee8; /* 蓝强调 hover/pressed */
+  --primary-grad:   linear-gradient(135deg, #ededed 0%, #cfcfcf 100%);
+  --accent-grad:    linear-gradient(135deg, #2c2c2c 0%, #3a3a3a 100%);
+  --accent-blue-grad: linear-gradient(135deg, var(--accent-blue) 0%, var(--accent-blue-strong) 100%);
+
+  /* ---- 语义色（图标 / 文字状态反馈 / 状态徽标）---- */
+  --success:        #a6e3a1;
+  --warning:        #f9e2af;
+  --danger:         #f38ba8;
+  --info:           #89b4fa;
+  --teal:           #4ecdc4;   /* 匹配/精确命中 */
+  --amber:          #f0a020;   /* 别名匹配/警告 */
+  --red:            #ff6b6b;   /* 错误 */
+  --red-strong:     #e74c3c;   /* 严重错误 / 覆盖 */
+  --green:          #2ecc71;   /* 新增/成功 */
+  --yellow:         #ffd93d;   /* 字段名/重点强调 */
+
+  /* ---- 间距（8px 基线；流体化以适配窗口缩放）---- */
+  --sp-1: 4px;
+  --sp-2: 8px;
+  --sp-3: 12px;
+  --sp-4: 16px;
+  --sp-5: 20px;
+  --sp-6: 24px;
+  --sp-8: 32px;
+  --gap:      clamp(10px, 0.7vw, 16px);
+  --pad-card: clamp(14px, 1vw, 20px);
+
+  /* ---- 圆角 ---- */
+  --r-sm:   6px;
+  --r-md:   10px;
+  --r-lg:   14px;
+  --r-pill: 999px;
+
+  /* ---- 字体族 ---- */
+  --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+               "Microsoft YaHei", "Hiragino Sans GB", "Noto Sans CJK SC",
+               "Source Han Sans SC", sans-serif;
+  --font-mono: "Maple Mono", "JetBrains Mono", "Cascadia Code", Consolas,
+               "SF Mono", "Courier New", monospace;
+
+  /* ---- 字体刻度（流体）---- */
+  --fs-display: clamp(18px, 1.0vw + 14px, 22px);  /* 应用标题  700 */
+  --fs-h2:      clamp(15px, 0.7vw + 13px, 17px);  /* 卡片标题  600 */
+  --fs-h3:      clamp(13px, 0.4vw + 12px, 14px);  /* 子标题    600 */
+  --fs-body:    clamp(13px, 0.3vw + 12.5px, 14px);/* 正文      400 */
+  --fs-sm:      clamp(11.5px, 0.2vw + 11px, 12.5px);/* 说明/弱化 400 */
+  --fs-ctrl:    clamp(13px, 0.3vw + 12.5px, 14px);/* 按钮/输入 500 */
+  --fs-mono:    12.5px;
+
+  /* ---- 阴影 / 动效 ---- */
+  --shadow-card: 0 4px 18px rgba(0, 0, 0, 0.35);
+  --shadow-pop:  0 12px 40px rgba(0, 0, 0, 0.5);
+  --ease:        cubic-bezier(0.22, 0.61, 0.36, 1);
+  --dur:         0.18s;
+}

@@ -6,6 +6,7 @@
     <meta name="color-scheme" content="dark light">
     <meta name="theme-color" content="#1e1e2e">
     <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; connect-src 'self' https://api.bgm.tv https://bangumi.tv https://raw.githubusercontent.com https://api.github.com https://gitlab.com https://gitee.com">
+    <link rel="stylesheet" href="../css/tokens.css">
     <link rel="stylesheet" href="../css/styles.css">
 </head>
 <body>
@@ -20,7 +21,14 @@
                     <h2>⚙️ BGM 设置</h2>
                     <p class="subtitle">插件配置管理 · Token · 同步偏好 · 数据源</p>
                 </div>
-                
+                <div class="header-actions">
+                    <button class="header-icon-btn" id="closeBtn" data-action="closePanel" title="关闭面板" aria-label="关闭面板">
+                        <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+                            <line x1="4" y1="4" x2="12" y2="12"/>
+                            <line x1="12" y1="4" x2="4" y2="12"/>
+                        </svg>
+                    </button>
+                </div>
             </div>
         </div>
 
@@ -64,26 +72,26 @@
         <!-- 同步偏好设置 -->
         <div class="section">
             <h3>🔄 同步偏好</h3>
-            <div class="form-group" style="margin: 8px 0; padding: 6px 10px; background: #3a3a3a; border-radius: 4px;">
-                <label style="display: flex; align-items: center; gap: 6px; cursor: pointer; font-size: 13px; color: #e0e0e0;">
+            <div class="form-group" style="margin: 8px 0; padding: 6px 10px; background: var(--bg-surface); border-radius: var(--r-sm);">
+                <label style="display: flex; align-items: center; gap: 6px; cursor: pointer; font-size: 13px; color: var(--text-1);">
                     <input type="checkbox" id="chkIncrementalSync" data-action="toggleIncrementalSync" style="cursor: pointer;">
                     <span>仅同步变更（增量同步）</span>
                 </label>
             </div>
-            <div class="form-group" style="margin: 8px 0; padding: 6px 10px; background: #3a3a3a; border-radius: 4px;">
-                <label style="display: flex; align-items: center; gap: 6px; cursor: pointer; font-size: 13px; color: #e0e0e0;">
+            <div class="form-group" style="margin: 8px 0; padding: 6px 10px; background: var(--bg-surface); border-radius: var(--r-sm);">
+                <label style="display: flex; align-items: center; gap: 6px; cursor: pointer; font-size: 13px; color: var(--text-1);">
                     <input type="checkbox" id="chkSkipConflicts" data-action="toggleSkipConflicts" style="cursor: pointer;">
                     <span>跳过冲突（保留Bangumi数据）</span>
                 </label>
             </div>
-            <div class="form-group" style="margin: 8px 0; padding: 6px 10px; background: #3a3a3a; border-radius: 4px;">
-                <label style="display: flex; align-items: center; gap: 6px; cursor: pointer; font-size: 13px; color: #e0e0e0;">
+            <div class="form-group" style="margin: 8px 0; padding: 6px 10px; background: var(--bg-surface); border-radius: var(--r-sm);">
+                <label style="display: flex; align-items: center; gap: 6px; cursor: pointer; font-size: 13px; color: var(--text-1);">
                     <input type="checkbox" id="chkEnableSyncRecord" data-action="toggleEnableSyncRecord" style="cursor: pointer;">
                     <span>启用同步记录</span>
                 </label>
             </div>
-            <div class="form-group" style="margin: 8px 0; padding: 6px 10px; background: #3a3a3a; border-radius: 4px;">
-                <label style="display: flex; align-items: center; gap: 6px; cursor: pointer; font-size: 13px; color: #e0e0e0;">
+            <div class="form-group" style="margin: 8px 0; padding: 6px 10px; background: var(--bg-surface); border-radius: var(--r-sm);">
+                <label style="display: flex; align-items: center; gap: 6px; cursor: pointer; font-size: 13px; color: var(--text-1);">
                     <input type="checkbox" id="chkNavIconsOnly" data-action="toggleNavIconsOnly" style="cursor: pointer;">
                     <span>导航仅显示图标（鼠标悬停显示名称）</span>
                 </label>

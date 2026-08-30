@@ -6,6 +6,7 @@
     <meta name="color-scheme" content="dark light">
     <meta name="theme-color" content="#1e1e2e">
     <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; connect-src 'self' https://api.bgm.tv https://bangumi.tv https://raw.githubusercontent.com https://api.github.com https://gitlab.com https://gitee.com">
+    <link rel="stylesheet" href="../css/tokens.css">
     <link rel="stylesheet" href="../css/styles.css">
     <link rel="stylesheet" href="../css/enrich.css">
 </head>
@@ -40,6 +41,33 @@
                     <button class="bgm-btn small primary" id="selectFileBtn" data-action="selectFile" style="flex:1;">📂 选择文件</button>
                     <button class="bgm-btn small" id="detectHeaderBtn" data-action="detectHeader" style="flex:1;">🔍 自动识别表头</button>
                 </div>
+                <!-- 批量行内控件：选择文件后显示；
+                     「🚀 批量富化」在 N≥2 时显示，「🗑️ 清空列表」在 N≥1 时显示。
+                     文件选择/批量/单文件富化统一由「📂 选择文件」入口触发。 -->
+                <div class="bgm-btn-group bgm-btn-row" style="margin-top:6px;">
+                    <button class="bgm-btn small primary" id="batchStartBtn" data-action="batchStartEnrich" style="flex:1;display:none;">🚀 批量富化</button>
+                    <button class="bgm-btn small" id="batchClearBtn" data-action="batchClear" style="flex:1;display:none;">🗑️ 清空列表</button>
+                </div>
+
+                <!-- 已选文件列表（多选时显示） -->
+                <div id="batchFileList" style="display:none;max-height:180px;overflow-y:auto;background:var(--bg-mantle);border:1px solid var(--bg-surface);border-radius:6px;padding:6px;"></div>
+
+                <!-- 批量进度 -->
+                <div id="batchProgress" style="display:none;margin-top:8px;">
+                    <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px;">
+                        <span id="batchCurrentFile"></span>
+                        <span id="batchPercent">0%</span>
+                    </div>
+                    <div style="background:var(--bg-surface);border-radius:4px;height:6px;overflow:hidden;">
+                        <div id="batchProgressFill" style="height:100%;background:linear-gradient(90deg,var(--accent-blue),var(--accent-blue-strong));width:0%;transition:width 0.2s;"></div>
+                    </div>
+                </div>
+
+                <!-- 最终汇总 -->
+                <div id="batchSummary" style="display:none;margin-top:8px;background:var(--bg-mantle);border:1px solid var(--border-strong);border-radius:6px;padding:10px;">
+                    <div style="font-weight:600;margin-bottom:8px;color:var(--success);">📊 批量富化汇总</div>
+                    <div id="batchSummaryContent"></div>
+                </div>
             </div>
             <div class="detect-result" id="detectResult" style="display:none;">
                 <div class="result-info">
@@ -51,36 +79,6 @@
                     <div class="mapping-header">列映射（可修正）</div>
                     <div class="mapping-list" id="mappingList">
                     </div>
-                </div>
-            </div>
-
-            <!-- 批量文件选择区域 -->
-            <div class="batch-section" id="batchSection" style="margin-top:16px;">
-                <h3>📚 批量富化（多文件）</h3>
-                <div class="bgm-btn-group bgm-btn-row" style="margin-bottom:8px;">
-                    <button class="bgm-btn small" id="batchSelectBtn" data-action="batchSelectFiles" style="flex:1;">📂 批量选择文件</button>
-                    <button class="bgm-btn small primary" id="batchStartBtn" data-action="batchStartEnrich" style="flex:1;display:none;">🚀 批量富化</button>
-                    <button class="bgm-btn small" id="batchClearBtn" data-action="batchClear" style="flex:1;display:none;">🗑️ 清空列表</button>
-                </div>
-
-                <!-- 文件列表 -->
-                <div id="batchFileList" style="display:none;max-height:180px;overflow-y:auto;background:#1a1a1a;border:1px solid #333;border-radius:6px;padding:6px;"></div>
-
-                <!-- 批量进度 -->
-                <div id="batchProgress" style="display:none;margin-top:8px;">
-                    <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px;">
-                        <span id="batchCurrentFile"></span>
-                        <span id="batchPercent">0%</span>
-                    </div>
-                    <div style="background:#333;border-radius:4px;height:6px;overflow:hidden;">
-                        <div id="batchProgressFill" style="height:100%;background:linear-gradient(90deg,#4a9eff,#3a8ee8);width:0%;transition:width 0.2s;"></div>
-                    </div>
-                </div>
-
-                <!-- 最终汇总 -->
-                <div id="batchSummary" style="display:none;margin-top:8px;background:#1e1e1e;border:1px solid #444;border-radius:6px;padding:10px;">
-                    <div style="font-weight:600;margin-bottom:8px;color:#a6e3a1;">📊 批量富化汇总</div>
-                    <div id="batchSummaryContent"></div>
                 </div>
             </div>
         </div>
@@ -105,7 +103,7 @@
                 <button class="bgm-btn small" data-action="refreshSheets" style="flex:1;">🔄 刷新</button>
                 <button class="bgm-btn small" id="lockSheetBtn" data-action="toggleSheetLock" style="flex:1;">🔒 锁定</button>
             </div>
-            <div id="lockStatus" style="display:none;margin-top:6px;padding:4px 8px;background:#2d5a27;color:#a3d977;border-radius:4px;font-size:12px;"></div>
+            <div id="lockStatus" style="display:none;margin-top:6px;padding:4px 8px;background:var(--green);color:var(--text-1);border-radius:4px;font-size:12px;"></div>
         </div>
 
         <div class="enrich-section">
@@ -158,14 +156,14 @@
                 <div class="strategy-item">✨ <strong>特点追加</strong>：追加播放平台、独播等信息</div>
                 <div class="strategy-item">🔗 <strong>别名富化</strong>：新番表名称与 Bangumi 不一致时补充到别名列</div>
             </div>
-            <div class="strategy-desc" style="margin-top:8px;padding-top:8px;border-top:1px dashed #e0e0e0;">
-                <div class="strategy-item" style="color:#666;font-size:12px;">📖 <strong>简介工作表映射</strong>：
+            <div class="strategy-desc" style="margin-top:8px;padding-top:8px;border-top:1px dashed var(--text-1);">
+                <div class="strategy-item" style="color:var(--text-3);font-size:12px;">📖 <strong>简介工作表映射</strong>：
                     导演→导演 | 编剧→脚本 | 人设→人物设定 | CG导演→演出 | 音乐→音乐 | 动画制作→动画制作公司 | 系列构成→系列构成 | 分镜→分镜 | 原作→原作
                 </div>
-                <div class="strategy-item" style="color:#666;font-size:11px;margin-top:4px;">⚡ <strong>冲突处理</strong>：当 Bangumi 追踪表已有字段值时，弹出确认对话框：
-                    <span style="color:#4a9eff;">🔗 全部增量更新</span>（追加 | 分隔符）| 
-                    <span style="color:#666;">📋 保留原名</span>（跳过）| 
-                    <span style="color:#e74c3c;">✏️ 使用新番表名</span>（覆盖）
+                <div class="strategy-item" style="color:var(--text-3);font-size:11px;margin-top:4px;">⚡ <strong>冲突处理</strong>：当 Bangumi 追踪表已有字段值时，弹出确认对话框：
+                    <span style="color:var(--accent-blue);">🔗 全部增量更新</span>（追加 | 分隔符）|
+                    <span style="color:var(--text-3);">📋 保留原名</span>（跳过）|
+                    <span style="color:var(--red-strong);">✏️ 使用新番表名</span>（覆盖）
                 </div>
             </div>
             <button class="bgm-btn primary" id="startEnrichBtn" data-action="startEnrich">🚀 开始富化</button>
