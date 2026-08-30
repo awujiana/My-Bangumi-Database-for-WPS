@@ -82,7 +82,11 @@
 /* ============================ 2. 基础重置 ================================ */
 * { margin: 0; padding: 0; box-sizing: border-box; }
 
-html { scroll-behavior: smooth; }
+html {
+  scroll-behavior: smooth;
+  /* 锚点跳转偏移补偿：避免吸顶的顶栏 + 窄页面导航遮挡目标区 */
+  scroll-padding-top: calc(var(--topbar-h, 0px) + var(--nav-h, 0px));
+}
 
 body {
   font-family: var(--font-sans);
@@ -178,9 +182,9 @@ body {
 .sidebar {
   grid-area: sidebar;
   position: sticky;
-  top: 0;            /* 与顶栏等高由 JS 高度决定，这里用粘性 + 自身滚动 */
+  top: var(--topbar-h, 0px);   /* 吸顶在顶栏正下方，避免被 topbar 遮挡 */
   align-self: start;
-  height: 100vh;
+  height: calc(100vh - var(--topbar-h, 0px));
   padding: var(--sp-5) var(--sp-4);
   background: linear-gradient(180deg, var(--bg-mantle) 0%, var(--bg-app) 100%);
   border-right: 1px solid var(--border);
@@ -644,7 +648,7 @@ select.input option, .form-row select option { background: var(--bg-surface); co
   }
   .sidebar,
   body.nav-icons-only .sidebar {
-    position: sticky; top: 0; z-index: 40;
+    position: sticky; top: var(--topbar-h, 0px); z-index: 40;
     height: auto; flex-direction: row; align-items: center;
     gap: var(--sp-4); padding: var(--sp-3) var(--sp-4);
     border-right: none; border-bottom: 1px solid var(--border);
@@ -655,7 +659,10 @@ select.input option, .form-row select option { background: var(--bg-surface); co
   .topbar-avatar { display: block; }  /* 窄态显示顶栏头像，替代 side-card */
   .nav-label,
   body.nav-icons-only .nav-label { display: none; }
-  .nav { flex-direction: row; flex-wrap: wrap; gap: 6px; }
+  .nav {
+    flex: 1 1 auto; min-width: 0;   /* 允许收缩，保证 flex-wrap 在窄态真正换行显示全部项 */
+    flex-direction: row; flex-wrap: wrap; gap: 6px;
+  }
   .nav a,
   body.nav-icons-only .nav a {
     white-space: nowrap; padding: 8px 12px;

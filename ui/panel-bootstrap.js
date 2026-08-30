@@ -56,3 +56,25 @@ document.addEventListener('bgm:modulesReady', function () {
     });
     console.log('[BGM] 模块加载完成，按钮已启用');
 });
+
+// ========== 吸顶偏移测量 ==========
+// 将顶栏实际高度写入 --topbar-h，窄态整个吸顶导航块高度写入 --nav-h，
+// 供 CSS 控制 sidebar 吸顶位置与锚点 scroll-padding 偏移补偿。
+function updateStickyOffsets() {
+    var root = document.documentElement;
+    var topbar = document.querySelector('.topbar');
+    var topbarH = topbar ? topbar.offsetHeight : 0;
+    root.style.setProperty('--topbar-h', topbarH + 'px');
+    var narrow = typeof window.matchMedia === 'function' &&
+        window.matchMedia('(max-width: 880px)').matches;
+    var navH = 0;
+    if (narrow) {
+        // 窄态侧栏整块吸顶（含内边距），其高度才是真正的锚点偏移量
+        var sb = document.querySelector('.sidebar');
+        navH = sb ? sb.offsetHeight : 0;
+    }
+    root.style.setProperty('--nav-h', navH + 'px');
+}
+updateStickyOffsets();
+window.addEventListener('load', updateStickyOffsets);
+window.addEventListener('resize', updateStickyOffsets);

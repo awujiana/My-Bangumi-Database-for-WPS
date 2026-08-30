@@ -136,8 +136,8 @@ export function updateTokenStatus(): void {
 let _lastUserIdSnapshot: string | null | undefined = undefined
 
 export function updateUserIdStatus(): void {
-  const userIdStatus = document.getElementById('userIdStatus')
-  if (!userIdStatus) return
+  const userIdStatusEls = document.querySelectorAll<HTMLElement>('#userIdStatus')
+  if (!userIdStatusEls.length) return
 
   const userId = _getBgmUserId()
   const username = _getBgmUsername()
@@ -151,11 +151,16 @@ export function updateUserIdStatus(): void {
 
   if (userId) {
     const display = username ? username + ' (' + userId + ')' : userId
-    userIdStatus.textContent = _T.set + ': ' + display
-    userIdStatus.style.color = '#4CAF50'
+    const text = _T.set + ': ' + display
+    userIdStatusEls.forEach((el) => {
+      el.textContent = text
+      el.style.color = '#4CAF50'
+    })
   } else {
-    userIdStatus.textContent = _T.notSet
-    userIdStatus.style.color = '#f44336'
+    userIdStatusEls.forEach((el) => {
+      el.textContent = _T.notSet
+      el.style.color = '#f44336'
+    })
   }
 }
 
@@ -243,6 +248,8 @@ export function testTokenValidity(): void {
 
         _setBgmUserId(userId)
         _setBgmUsername(nickname)
+        // Token 验证成功后自动刷新「收藏页面访问」区的用户 ID
+        updateUserIdStatus()
 
         // 处理头像 URL：移除可能存在的反引号包裹
         const rawAvatarUrl = data.avatar?.large || data.avatar?.medium || data.avatar?.small || ''
@@ -613,6 +620,8 @@ export function showUserProfile(): void {
       tokenStatusRight.style.display = 'none'
     }
   }
+  // 兜底：同步「收藏页面访问」区的用户 ID（内部有去重）
+  updateUserIdStatus()
 }
 
 /**
@@ -633,6 +642,8 @@ export function hideUserProfile(): void {
   if (tokenStatusRight) {
     tokenStatusRight.style.display = 'none'
   }
+  // 兜底：同步「收藏页面访问」区的用户 ID（内部有去重）
+  updateUserIdStatus()
   // 隐藏过期信息显示
   const expiresEl = document.getElementById('tokenExpiresDisplay')
   if (expiresEl) {
