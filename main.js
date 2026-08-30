@@ -85,28 +85,61 @@ function diagnoseScriptFailure(src) {
         .then(function (resp) {
             const ct = resp.headers && resp.headers.get ? resp.headers.get('content-type') : '(未知)';
             const isJsMime = ct && /\/(javascript|ecmascript)|\+xml|text\/plain/i.test(ct);
-            let verdict;
-            if (resp.status === 404 || resp.status === 0) {
-                verdict = '疑似 404 / 文件缺失（路径错误、dist 未构建或部署包陈旧）';
-            } else if (resp.status === 200 && !isJsMime) {
-                verdict = '疑似 MIME 拒绝：状态码 200 但 Content-Type 非 JS（宿主/服务器配置或 CSP 拦截）';
-            } else if (resp.status === 403 || resp.status === 401) {
-                verdict = '疑似权限/鉴权拒绝（' + resp.status + '）';
-            } else {
-                verdict = '状态码 ' + resp.status + '，Content-Type="' + ct + '"';
-            }
-            console.error(
-                '[BGM] 诊断 ' + src + '\n' +
-                '    状态码: ' + resp.status + '\n' +
-                '    Content-Type: ' + ct + '\n' +
-                '    → ' + verdict
-            );
-            // 缓存最近一次诊断，供崩溃覆盖层读取展示
-            if (typeof window !== 'undefined') {
-                window.__BGM_LAST_DIAG__ = window.__BGM_LAST_DIAG__ || {};
-                window.__BGM_LAST_DIAG__[src] = { status: resp.status, contentType: ct, verdict: verdict };
-            }
-            return { status: resp.status, contentType: ct, verdict: verdict };
+            // 读取响应体前几字节，区分「真 JS 只是 MIME 标头错」与「服务器返回了 HTML 回退页」
+            let bodyHead = '';
+            let isHtmlBody = false;
+            const probe = resp.clone();
+            return probe.text().then(function (text) {
+                bodyHead = (text || '').slice(0, 120).replace(/\s+/g, ' ');
+                isHtmlBody = /^\s*<!?(doctype|html|html\b)/i.test(text || '');
+                let verdict;
+                if (resp.status === 404 || resp.status === 0) {
+                    verdict = '疑似 404 / 文件缺失（路径错误、dist 未构建或部署包陈旧）';
+                } else if (isHtmlBody) {
+                    verdict = '服务器把该请求当页面返回了 HTML（SPA 回退 / 路由重写 / 路径未命中静态文件），并非真正的 JS 文件';
+                } else if (resp.status === 200 && !isJsMime) {
+                    verdict = '疑似 MIME 拒绝：状态码 200 且确为 JS 内容，但 Content-Type 非 JS（宿主/服务器 MIME 配置错误）';
+                } else if (resp.status === 403 || resp.status === 401) {
+                    verdict = '疑似权限/鉴权拒绝（' + resp.status + '）';
+                } else {
+                    verdict = '状态码 ' + resp.status + '，Content-Type="' + ct + '"';
+                }
+                console.error(
+                    '[BGM] 诊断 ' + src + '\n' +
+                    '    状态码: ' + resp.status + '\n' +
+                    '    Content-Type: ' + ct + '\n' +
+                    '    响应体前 120 字: ' + (bodyHead || '(空)') + '\n' +
+                    '    → ' + verdict
+                );
+                // 缓存最近一次诊断，供崩溃覆盖层读取展示
+                if (typeof window !== 'undefined') {
+                    window.__BGM_LAST_DIAG__ = window.__BGM_LAST_DIAG__ || {};
+                    window.__BGM_LAST_DIAG__[src] = {
+                        status: resp.status,
+                        contentType: ct,
+                        verdict: verdict,
+                        isHtmlBody: isHtmlBody,
+                    };
+                }
+                return { status: resp.status, contentType: ct, verdict: verdict, isHtmlBody: isHtmlBody };
+            }).catch(function () {
+                // 读取响应体失败（如流式/受限），退回到仅看状态码+标头
+                let verdict;
+                if (resp.status === 404 || resp.status === 0) {
+                    verdict = '疑似 404 / 文件缺失';
+                } else if (resp.status === 200 && !isJsMime) {
+                    verdict = '疑似 MIME 拒绝：状态码 200 但 Content-Type 非 JS';
+                } else if (resp.status === 403 || resp.status === 401) {
+                    verdict = '疑似权限/鉴权拒绝（' + resp.status + '）';
+                } else {
+                    verdict = '状态码 ' + resp.status + '，Content-Type="' + ct + '"';
+                }
+                if (typeof window !== 'undefined') {
+                    window.__BGM_LAST_DIAG__ = window.__BGM_LAST_DIAG__ || {};
+                    window.__BGM_LAST_DIAG__[src] = { status: resp.status, contentType: ct, verdict: verdict };
+                }
+                return { status: resp.status, contentType: ct, verdict: verdict };
+            });
         })
         .catch(function (err) {
             console.error('[BGM] 诊断 ' + src + ' 的 fetch 探测失败: ' + (err && err.message ? err.message : err));
@@ -124,7 +157,9 @@ async function loadAllModules() {
             if (mod.critical) {
                 const diag = window.__BGM_LAST_DIAG__ && window.__BGM_LAST_DIAG__[mod.src];
                 const diagLine = diag
-                    ? `<p>探测结果：HTTP ${diag.status} / Content-Type: ${diag.contentType}<br>${diag.verdict}</p>`
+                    ? `<p>探测结果：HTTP ${diag.status} / Content-Type: ${diag.contentType}` +
+                      (diag.isHtmlBody ? ' / 实为 HTML 页面（SPA 回退）' : '') +
+                      `<br>${diag.verdict}</p>`
                     : '';
                 document.body.innerHTML = `<div style="color:red;padding:20px;font-size:16px;">
                     <h3>核心模块加载失败</h3>
