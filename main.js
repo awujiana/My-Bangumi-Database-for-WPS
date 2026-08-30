@@ -54,10 +54,64 @@ function loadScript(src, type) {
             var status = window.__BGM_MODULE_STATUS__;
             var entry = status.find(function(m) { return m.src === src; });
             if (entry) { entry.loaded = false; entry.error = 'Failed to load'; }
-            reject(new Error('Failed to load script: ' + src));
+            // 探测真实 HTTP 状态码 + Content-Type，一眼区分「404 文件缺失」与「MIME 拒绝」
+            diagnoseScriptFailure(src).then(function (diag) {
+                if (entry && diag) {
+                    entry.error = 'HTTP ' + diag.status + ' / ' + diag.contentType;
+                }
+                reject(new Error('Failed to load script: ' + src));
+            }).catch(function () {
+                reject(new Error('Failed to load script: ' + src));
+            });
         };
         document.head.appendChild(script);
     });
+}
+
+/**
+ * 通过 fetch 探测脚本 URL 的真实响应，打印 HTTP 状态码与 Content-Type。
+ * 目的：<script onerror> 本身拿不到状态码，无法区分
+ *   - 404 / 0（文件不存在、路径错误、部署包陈旧）
+ *   - 200 但 Content-Type 非 JS（MIME 拒绝 / 宿主 CSP 拦截）
+ * 直接在控制台输出，方便下次定位根因。
+ * @param {string} src 脚本地址
+ */
+function diagnoseScriptFailure(src) {
+    if (typeof fetch !== 'function') {
+        console.error('[BGM] diagnoseScriptFailure: fetch 不可用，无法探测 ' + src);
+        return Promise.resolve(null);
+    }
+    return fetch(src, { method: 'GET', cache: 'no-store' })
+        .then(function (resp) {
+            const ct = resp.headers && resp.headers.get ? resp.headers.get('content-type') : '(未知)';
+            const isJsMime = ct && /\/(javascript|ecmascript)|\+xml|text\/plain/i.test(ct);
+            let verdict;
+            if (resp.status === 404 || resp.status === 0) {
+                verdict = '疑似 404 / 文件缺失（路径错误、dist 未构建或部署包陈旧）';
+            } else if (resp.status === 200 && !isJsMime) {
+                verdict = '疑似 MIME 拒绝：状态码 200 但 Content-Type 非 JS（宿主/服务器配置或 CSP 拦截）';
+            } else if (resp.status === 403 || resp.status === 401) {
+                verdict = '疑似权限/鉴权拒绝（' + resp.status + '）';
+            } else {
+                verdict = '状态码 ' + resp.status + '，Content-Type="' + ct + '"';
+            }
+            console.error(
+                '[BGM] 诊断 ' + src + '\n' +
+                '    状态码: ' + resp.status + '\n' +
+                '    Content-Type: ' + ct + '\n' +
+                '    → ' + verdict
+            );
+            // 缓存最近一次诊断，供崩溃覆盖层读取展示
+            if (typeof window !== 'undefined') {
+                window.__BGM_LAST_DIAG__ = window.__BGM_LAST_DIAG__ || {};
+                window.__BGM_LAST_DIAG__[src] = { status: resp.status, contentType: ct, verdict: verdict };
+            }
+            return { status: resp.status, contentType: ct, verdict: verdict };
+        })
+        .catch(function (err) {
+            console.error('[BGM] 诊断 ' + src + ' 的 fetch 探测失败: ' + (err && err.message ? err.message : err));
+            return null;
+        });
 }
 
 async function loadAllModules() {
@@ -68,10 +122,15 @@ async function loadAllModules() {
         } catch (e) {
             console.error('[BGM] Module loading failed:', e);
             if (mod.critical) {
+                const diag = window.__BGM_LAST_DIAG__ && window.__BGM_LAST_DIAG__[mod.src];
+                const diagLine = diag
+                    ? `<p>探测结果：HTTP ${diag.status} / Content-Type: ${diag.contentType}<br>${diag.verdict}</p>`
+                    : '';
                 document.body.innerHTML = `<div style="color:red;padding:20px;font-size:16px;">
                     <h3>核心模块加载失败</h3>
                     <p>模块: ${mod.src}</p>
                     <p>${e.message}</p>
+                    ${diagLine}
                     <p>请检查网络或文件完整性，然后重新加载。</p>
                 </div>`;
                 return;
