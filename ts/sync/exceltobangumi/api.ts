@@ -26,6 +26,15 @@ export interface BgmApiResponse {
 }
 
 /**
+ * GET /v0/me 用户信息响应
+ */
+interface BgmUserInfo {
+  nickname?: string
+  username?: string
+  id?: number | string
+}
+
+/**
  * 提取HTTP请求结果消息
  */
 export function extractResponseMessage(data: unknown): string {
@@ -41,10 +50,10 @@ export function extractResponseMessage(data: unknown): string {
  */
 export function parseErrorResponse(xhr: XMLHttpRequest): string {
   try {
-    const errData = JSON.parse(xhr.responseText)
-    return errData.error || errData.description || `HTTP ${xhr.status}`
+    const errData = JSON.parse(xhr.responseText) as BgmApiResponse
+    return errData.error || errData.description || `HTTP ${String(xhr.status)}`
   } catch {
-    return xhr.statusText || `HTTP ${xhr.status}`
+    return xhr.statusText || `HTTP ${String(xhr.status)}`
   }
 }
 
@@ -135,9 +144,12 @@ export function testTokenValidityForRibbon(token?: string, signal?: AbortSignal)
     )
     bgmLog(
       LOG_LEVELS.INFO,
-      `[exceltobangumi/testTokenValidityForRibbon] HTTP 状态码: ${xhr.status} (${xhr.statusText})`,
+      `[exceltobangumi/testTokenValidityForRibbon] HTTP 状态码: ${String(xhr.status)} (${xhr.statusText})`,
     )
-    bgmLog(LOG_LEVELS.INFO, `[exceltobangumi/testTokenValidityForRibbon] 请求耗时: ${duration}ms`)
+    bgmLog(
+      LOG_LEVELS.INFO,
+      `[exceltobangumi/testTokenValidityForRibbon] 请求耗时: ${String(duration)}ms`,
+    )
 
     if (xhr.getAllResponseHeaders()) {
       bgmLog(
@@ -148,7 +160,7 @@ export function testTokenValidityForRibbon(token?: string, signal?: AbortSignal)
 
     if (xhr.status === 200) {
       try {
-        const data = JSON.parse(xhr.responseText)
+        const data = JSON.parse(xhr.responseText) as BgmUserInfo
         bgmLog(
           LOG_LEVELS.INFO,
           `[exceltobangumi/testTokenValidityForRibbon] 响应数据: ${JSON.stringify(data).length > 300 ? JSON.stringify(data).substring(0, 300) + '...' : JSON.stringify(data)}`,
@@ -178,13 +190,13 @@ export function testTokenValidityForRibbon(token?: string, signal?: AbortSignal)
     } else {
       bgmLog(
         LOG_LEVELS.ERROR,
-        `[exceltobangumi/testTokenValidityForRibbon] Token验证失败，HTTP 状态码: ${xhr.status}`,
+        `[exceltobangumi/testTokenValidityForRibbon] Token验证失败，HTTP 状态码: ${String(xhr.status)}`,
       )
       bgmLog(
         LOG_LEVELS.INFO,
         `[exceltobangumi/testTokenValidityForRibbon] 响应内容: ${xhr.responseText}`,
       )
-      showError(`Token验证失败 (HTTP ${xhr.status})`, '错误')
+      showError(`Token验证失败 (HTTP ${String(xhr.status)})`, '错误')
     }
   }
 
@@ -193,7 +205,7 @@ export function testTokenValidityForRibbon(token?: string, signal?: AbortSignal)
     const duration = Date.now() - startTime
     bgmLog(
       LOG_LEVELS.ERROR,
-      `[exceltobangumi/testTokenValidityForRibbon] 网络错误，耗时: ${duration}ms`,
+      `[exceltobangumi/testTokenValidityForRibbon] 网络错误，耗时: ${String(duration)}ms`,
     )
     showError(
       '网络错误，无法连接到 Bangumi API\n\n可能原因：\n• 网络被墙（GFW）\n• 断网或 DNS 失败\n• API 服务器不可达\n\nToken 本身可能有效，请在网络恢复后重试',
@@ -206,7 +218,7 @@ export function testTokenValidityForRibbon(token?: string, signal?: AbortSignal)
     const duration = Date.now() - startTime
     bgmLog(
       LOG_LEVELS.WARN,
-      `[exceltobangumi/testTokenValidityForRibbon] 请求超时，耗时: ${duration}ms`,
+      `[exceltobangumi/testTokenValidityForRibbon] 请求超时，耗时: ${String(duration)}ms`,
     )
     showError('请求超时（30s）\n\n可能网络受限或被墙，Token 本身可能有效', '超时')
   }
@@ -279,7 +291,10 @@ export async function bgmRequestSync(
   signal?: AbortSignal,
 ): Promise<{ code: number; message: string }> {
   const fullUrl = `${BGM_CONFIG.API_BASE}${endpoint}`
-  bgmLog(LOG_LEVELS.INFO, `[bgmRequestSync] ${method} ${fullUrl} 请求体长度: ${jsonBody.length}`)
+  bgmLog(
+    LOG_LEVELS.INFO,
+    `[bgmRequestSync] ${method} ${fullUrl} 请求体长度: ${String(jsonBody.length)}`,
+  )
 
   // 如果 signal 已 aborted，立即返回
   if (signal?.aborted) {
@@ -318,7 +333,7 @@ export async function bgmRequestSync(
           result.message = 'success'
           if (xhr.responseText) {
             try {
-              const data = JSON.parse(xhr.responseText)
+              const data = JSON.parse(xhr.responseText) as BgmApiResponse
               result.message = extractResponseMessage(data)
             } catch (e: unknown) {
               bgmLog(

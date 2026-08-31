@@ -175,10 +175,10 @@ export function clearUndoStack(): void {
 function restoreDeletedRowWithWs(ws: WpsWorksheet, snapshot: RowSnapshot): void {
   try {
     // 在删除位置插入新行
-    ws.Range(`${snapshot.row}:${snapshot.row}`).Insert()
+    ws.Range(`${String(snapshot.row)}:${String(snapshot.row)}`).Insert()
   } catch (e: unknown) {
     const errMsg = e instanceof Error ? e.message : String(e)
-    bgmLog(LOG_LEVELS.WARN, `[undoStack] 插入行 ${snapshot.row} 失败: ${errMsg}`)
+    bgmLog(LOG_LEVELS.WARN, `[undoStack] 插入行 ${String(snapshot.row)} 失败: ${errMsg}`)
     return
   }
 

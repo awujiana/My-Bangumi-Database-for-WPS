@@ -72,7 +72,7 @@ if (typeof document !== 'undefined') {
   setTimeout(() => {
     if (!forced) {
       console.warn(
-        `[BGM Settings] ${timeoutMs}ms 内未收到 bgm:modulesReady 事件，强制启用按钮（兜底）`,
+        `[BGM Settings] ${String(timeoutMs)}ms 内未收到 bgm:modulesReady 事件，强制启用按钮（兜底）`,
       )
       document.querySelectorAll('button[data-action]').forEach((btn) => {
         const b = btn as HTMLButtonElement

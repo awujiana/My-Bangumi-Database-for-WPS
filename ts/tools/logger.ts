@@ -69,7 +69,7 @@ export function exportLogsToFile(): void {
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')
   a.href = url
-  a.download = `bgm-logs-${Date.now()}.txt`
+  a.download = `bgm-logs-${String(Date.now())}.txt`
   document.body.appendChild(a)
   a.click()
   document.body.removeChild(a)

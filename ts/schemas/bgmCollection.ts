@@ -1,11 +1,33 @@
-import { z, type infer as zInfer } from '../tools/zodCompat.js'
+import { z, type infer as zInfer, type ZodSchema } from '../tools/zodCompat.js'
+
+/**
+ * 降级版 zodCompat 的 ZodSchema 带 `[k: string]: any` 索引签名，
+ * url/default 等 fluent 方法在类型上会退化为 any；这里在“any 边界”处用
+ * 精确的 ZodSchema 类型收窄返回结果。运行时仍走相同的 fluent 调用，行为不变。
+ */
+
+/** 可选字符串 schema（默认值 v） */
+function strWithDefault(v: string): ZodSchema<string> {
+  return z.string().optional().default(v) as ZodSchema<string>
+}
+
+/** 可选 URL 字符串 schema */
+function strUrl(): ZodSchema<string | undefined> {
+  const urlSchema = z.string() as unknown as ZodSchema<string> & { url(): ZodSchema<string> }
+  return urlSchema.url().optional() as ZodSchema<string | undefined>
+}
+
+/** 可选字符串数组 schema（默认空数组） */
+function strArrayDefault(): ZodSchema<string[]> {
+  return z.array(z.string()).optional().default([]) as ZodSchema<string[]>
+}
 
 /** Bangumi 收藏条目 Schema（subject 信息） */
 export const BgmCollectionSubjectSchema = z.object({
   id: z.number().int().positive(),
   name: z.string(),
-  name_cn: z.string().optional().default(''),
-  url: z.string().url().optional(),
+  name_cn: strWithDefault(''),
+  url: strUrl(),
   images: z
     .object({
       large: z.string().optional(),
@@ -25,8 +47,8 @@ export const BgmCollectionSchema = z.object({
   subject: BgmCollectionSubjectSchema,
   subject_id: z.number().int().positive(),
   private: z.boolean().optional(),
-  tags: z.array(z.string()).optional().default([]),
-  comment: z.string().optional().default(''),
+  tags: strArrayDefault(),
+  comment: strWithDefault(''),
   ep_status: z.number().int().optional(),
 })
 

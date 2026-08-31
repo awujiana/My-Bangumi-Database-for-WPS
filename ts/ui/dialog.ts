@@ -90,10 +90,10 @@ export function buildSyncConfig(ctx: BuildSyncConfigContext): SyncConfigSummary 
       tf.range === 'future'
         ? '预告/未来动漫'
         : tf.range === 'year'
-          ? `${tf.year}年全年`
+          ? `${String(tf.year)}年全年`
           : tf.range === 'quarter'
-            ? `${tf.year}年${tf.quarter}月新番`
-            : `${tf.year}年${tf.month}月`
+            ? `${String(tf.year)}年${String(tf.quarter)}月新番`
+            : `${String(tf.year)}年${String(tf.month)}月`
   }
   if (ctx.extra && ctx.extra.length > 0) cfg.extra = ctx.extra
   return cfg
@@ -273,9 +273,9 @@ function bindAllEvents(): void {
   container.addEventListener('click', (e: Event) => {
     const btn = (e.target as HTMLElement).closest('button')
     if (!btn) return
-    const eventType = (btn as HTMLButtonElement).dataset.event
+    const eventType = btn.dataset.event
     if (!eventType) return
-    const modal = btn.closest('.bgm-modal') as HTMLElement
+    const modal = btn.closest<HTMLElement>('.bgm-modal')
     if (!modal) return
 
     modal.style.display = 'none'
@@ -545,14 +545,12 @@ function ensureSyncProgressDialog(): HTMLElement {
   document.body.appendChild(modal)
 
   // 绑定按钮事件：统一使用 addEventListener，禁止 onclick 重绑定
-  const pauseBtn = modal.querySelector('#bgmSyncProgressPauseBtn') as HTMLButtonElement | null
-  const stopBtn = modal.querySelector('#bgmSyncProgressStop') as HTMLButtonElement | null
-  const closeBtn = modal.querySelector('#bgmSyncProgressClose') as HTMLButtonElement | null
-  const closeTopBtn = modal.querySelector('#bgmSyncProgressCloseTop') as HTMLButtonElement | null
-  const nextBtn = modal.querySelector('#bgmSyncProgressNext') as HTMLButtonElement | null
-  const toggleDetailsBtn = modal.querySelector(
-    '#bgmSyncProgressToggleDetails',
-  ) as HTMLButtonElement | null
+  const pauseBtn = modal.querySelector('#bgmSyncProgressPauseBtn')
+  const stopBtn = modal.querySelector('#bgmSyncProgressStop')
+  const closeBtn = modal.querySelector('#bgmSyncProgressClose')
+  const closeTopBtn = modal.querySelector('#bgmSyncProgressCloseTop')
+  const nextBtn = modal.querySelector('#bgmSyncProgressNext')
+  const toggleDetailsBtn = modal.querySelector('#bgmSyncProgressToggleDetails')
 
   // 暂停/继续按钮：根据 _syncPaused 标志自行决定调用哪个处理器，并自行更新按钮文本
   if (pauseBtn) {
@@ -597,7 +595,7 @@ function ensureSyncProgressDialog(): HTMLElement {
   // 详情切换按钮
   if (toggleDetailsBtn) {
     toggleDetailsBtn.addEventListener('click', (): void => {
-      const detailsEl = modal.querySelector('#bgmSyncProgressDetails') as HTMLElement | null
+      const detailsEl = modal.querySelector<HTMLElement>('#bgmSyncProgressDetails')
       if (!detailsEl) return
       const expanded = detailsEl.style.display !== 'none'
       detailsEl.style.display = expanded ? 'none' : 'block'
@@ -658,13 +656,13 @@ export function showSyncProgressDialog(
   _syncPauseStart = 0
 
   // 重置为运行中状态
-  const titleEl = modal.querySelector('#bgmSyncProgressTitle') as HTMLElement | null
-  const iconEl = modal.querySelector('#bgmSyncProgressIcon') as HTMLElement | null
-  const progressSection = modal.querySelector('#bgmSyncProgressSection') as HTMLElement | null
-  const resultSection = modal.querySelector('#bgmSyncProgressResult') as HTMLElement | null
-  const runningBtns = modal.querySelector('#bgmSyncProgressRunningBtns') as HTMLElement | null
-  const doneBtns = modal.querySelector('#bgmSyncProgressDoneBtns') as HTMLElement | null
-  const pauseBtn = modal.querySelector('#bgmSyncProgressPauseBtn') as HTMLButtonElement | null
+  const titleEl = modal.querySelector('#bgmSyncProgressTitle')
+  const iconEl = modal.querySelector('#bgmSyncProgressIcon')
+  const progressSection = modal.querySelector<HTMLElement>('#bgmSyncProgressSection')
+  const resultSection = modal.querySelector<HTMLElement>('#bgmSyncProgressResult')
+  const runningBtns = modal.querySelector<HTMLElement>('#bgmSyncProgressRunningBtns')
+  const doneBtns = modal.querySelector<HTMLElement>('#bgmSyncProgressDoneBtns')
+  const pauseBtn = modal.querySelector<HTMLElement>('#bgmSyncProgressPauseBtn')
 
   if (titleEl) titleEl.textContent = title
   if (iconEl) iconEl.textContent = '🔄'
@@ -681,7 +679,7 @@ export function showSyncProgressDialog(
   }
 
   // 渲染配置摘要
-  const configEl = modal.querySelector('#bgmSyncProgressConfig') as HTMLElement | null
+  const configEl = modal.querySelector<HTMLElement>('#bgmSyncProgressConfig')
   if (configEl) {
     if (config) {
       configEl.innerHTML = renderConfigSummary(config)
@@ -693,13 +691,13 @@ export function showSyncProgressDialog(
   }
 
   // 重置进度
-  const bar = modal.querySelector('#bgmSyncProgressBar') as HTMLElement | null
-  const label = modal.querySelector('#bgmSyncProgressLabel') as HTMLElement | null
-  const percent = modal.querySelector('#bgmSyncProgressPercent') as HTMLElement | null
-  const current = modal.querySelector('#bgmSyncProgressCurrent') as HTMLElement | null
-  const log = modal.querySelector('#bgmSyncProgressLog') as HTMLElement | null
-  const etaEl = modal.querySelector('#bgmSyncProgressEta') as HTMLElement | null
-  const globalEtaEl = modal.querySelector('#bgmSyncProgressGlobalEta') as HTMLElement | null
+  const bar = modal.querySelector<HTMLElement>('#bgmSyncProgressBar')
+  const label = modal.querySelector('#bgmSyncProgressLabel')
+  const percent = modal.querySelector<HTMLElement>('#bgmSyncProgressPercent')
+  const current = modal.querySelector('#bgmSyncProgressCurrent')
+  const log = modal.querySelector('#bgmSyncProgressLog')
+  const etaEl = modal.querySelector<HTMLElement>('#bgmSyncProgressEta')
+  const globalEtaEl = modal.querySelector<HTMLElement>('#bgmSyncProgressGlobalEta')
   if (bar) {
     bar.style.width = '0%'
     bar.textContent = ''
@@ -744,22 +742,22 @@ export function updateSyncProgressDialog(
   // 弹窗未显示时快速返回，避免无效 DOM 写入
   if (!modal || modal.style.display === 'none') return
 
-  const bar = modal.querySelector('#bgmSyncProgressBar') as HTMLElement | null
-  const label = modal.querySelector('#bgmSyncProgressLabel') as HTMLElement | null
-  const percent = modal.querySelector('#bgmSyncProgressPercent') as HTMLElement | null
-  const currentEl = modal.querySelector('#bgmSyncProgressCurrent') as HTMLElement | null
-  const log = modal.querySelector('#bgmSyncProgressLog') as HTMLElement | null
-  const etaEl = modal.querySelector('#bgmSyncProgressEta') as HTMLElement | null
-  const globalEtaEl = modal.querySelector('#bgmSyncProgressGlobalEta') as HTMLElement | null
+  const bar = modal.querySelector<HTMLElement>('#bgmSyncProgressBar')
+  const label = modal.querySelector('#bgmSyncProgressLabel')
+  const percent = modal.querySelector('#bgmSyncProgressPercent')
+  const currentEl = modal.querySelector('#bgmSyncProgressCurrent')
+  const log = modal.querySelector('#bgmSyncProgressLog')
+  const etaEl = modal.querySelector<HTMLElement>('#bgmSyncProgressEta')
+  const globalEtaEl = modal.querySelector<HTMLElement>('#bgmSyncProgressGlobalEta')
 
   const pct = total > 0 ? Math.round((current / total) * 100) : 0
   if (bar) {
-    bar.style.width = pct + '%'
-    bar.textContent = pct + '%'
+    bar.style.width = String(pct) + '%'
+    bar.textContent = String(pct) + '%'
     bar.setAttribute('aria-valuenow', String(pct))
   }
-  if (label) label.textContent = `进度: ${current}/${total}`
-  if (percent) percent.textContent = pct + '%'
+  if (label) label.textContent = `进度: ${String(current)}/${String(total)}`
+  if (percent) percent.textContent = String(pct) + '%'
   if (currentEl && message) currentEl.textContent = message
 
   // 显示阶段 ETA：优先使用独立的 eta 参数，兼容旧版 logLine 以"预计剩余"/"剩余:"开头的情况
@@ -844,10 +842,12 @@ function formatDuration(ms: number): string {
     return `${seconds.toFixed(2)}秒`
   }
   const seconds = Math.floor(ms / 1000)
-  if (seconds < 60) return `${seconds}秒`
+  if (seconds < 60) return `${String(seconds)}秒`
   const minutes = Math.floor(seconds / 60)
   const secs = seconds % 60
-  return secs > 0 ? `${minutes}分${secs.toString().padStart(2, '0')}秒` : `${minutes}分`
+  return secs > 0
+    ? `${String(minutes)}分${secs.toString().padStart(2, '0')}秒`
+    : `${String(minutes)}分`
 }
 
 /**
@@ -913,7 +913,7 @@ function renderSyncStatsChart(container: HTMLElement, stats: SyncProgressStats):
     {
       label: '远程总条目',
       value: stats.remoteTotal,
-      sub: `本地 ${totalAll} 条`,
+      sub: `本地 ${String(totalAll)} 条`,
       icon: '📥',
       cls: 'bgm-overview-card-primary',
     },
@@ -945,7 +945,7 @@ function renderSyncStatsChart(container: HTMLElement, stats: SyncProgressStats):
               <span class="bgm-overview-icon">${c.icon}</span>
               <span class="bgm-overview-label">${c.label}</span>
             </div>
-            <div class="bgm-overview-value">${c.value}</div>
+            <div class="bgm-overview-value">${String(c.value)}</div>
             <div class="bgm-overview-sub">${c.sub}</div>
           </div>
         `,
@@ -958,14 +958,14 @@ function renderSyncStatsChart(container: HTMLElement, stats: SyncProgressStats):
           <circle cx="60" cy="60" r="50" fill="none"
             stroke="${completionPct >= 90 ? 'var(--green, #a6e3a1)' : completionPct >= 50 ? 'var(--yellow, #f9e2af)' : 'var(--red, #f38ba8)'}"
             stroke-width="10"
-            stroke-dasharray="${(completionPct / 100) * 2 * Math.PI * 50} ${2 * Math.PI * 50}"
-            stroke-dashoffset="${2 * Math.PI * 50 * 0.25}"
+            stroke-dasharray="${String((completionPct / 100) * 2 * Math.PI * 50)} ${String(2 * Math.PI * 50)}"
+            stroke-dashoffset="${String(2 * Math.PI * 50 * 0.25)}"
             stroke-linecap="round"
             transform="rotate(-90 60 60)"
             class="bgm-progress-ring" />
         </svg>
         <div class="bgm-progress-center">
-          <div class="bgm-progress-value">${completionPct}%</div>
+          <div class="bgm-progress-value">${String(completionPct)}%</div>
           <div class="bgm-progress-label">完成度</div>
         </div>
       </div>
@@ -976,47 +976,47 @@ function renderSyncStatsChart(container: HTMLElement, stats: SyncProgressStats):
       <div class="bgm-chart-left">
         <div class="bgm-donut-chart">
           <svg viewBox="0 0 140 140" class="bgm-donut-svg">
-            <circle cx="70" cy="70" r="${radius}" fill="none" stroke="var(--surface0, #313244)" stroke-width="14" />
+            <circle cx="70" cy="70" r="${String(radius)}" fill="none" stroke="var(--surface0, #313244)" stroke-width="14" />
             ${
               totalAll > 0
                 ? `
-              <circle cx="70" cy="70" r="${radius}" fill="none"
+              <circle cx="70" cy="70" r="${String(radius)}" fill="none"
                 stroke="var(--green, #a6e3a1)" stroke-width="14"
-                stroke-dasharray="${seg(addedPct)} ${circumference}"
+                stroke-dasharray="${String(seg(addedPct))} ${String(circumference)}"
                 stroke-dashoffset="0"
                 transform="rotate(-90 70 70)" stroke-linecap="butt" />
-              <circle cx="70" cy="70" r="${radius}" fill="none"
+              <circle cx="70" cy="70" r="${String(radius)}" fill="none"
                 stroke="var(--yellow, #f9e2af)" stroke-width="14"
-                stroke-dasharray="${seg(updatedPct)} ${circumference}"
-                stroke-dashoffset="${-seg(addedPct)}"
+                stroke-dasharray="${String(seg(updatedPct))} ${String(circumference)}"
+                stroke-dashoffset="${String(-seg(addedPct))}"
                 transform="rotate(-90 70 70)" stroke-linecap="butt" />
-              <circle cx="70" cy="70" r="${radius}" fill="none"
+              <circle cx="70" cy="70" r="${String(radius)}" fill="none"
                 stroke="var(--red, #f38ba8)" stroke-width="14"
-                stroke-dasharray="${seg(deletedPct)} ${circumference}"
-                stroke-dashoffset="${-(seg(addedPct) + seg(updatedPct))}"
+                stroke-dasharray="${String(seg(deletedPct))} ${String(circumference)}"
+                stroke-dashoffset="${String(-(seg(addedPct) + seg(updatedPct)))}"
                 transform="rotate(-90 70 70)" stroke-linecap="butt" />
-              <circle cx="70" cy="70" r="${radius}" fill="none"
+              <circle cx="70" cy="70" r="${String(radius)}" fill="none"
                 stroke="var(--overlay1, #7f849c)" stroke-width="14"
-                stroke-dasharray="${seg(unchangedPct)} ${circumference}"
-                stroke-dashoffset="${-(seg(addedPct) + seg(updatedPct) + seg(deletedPct))}"
+                stroke-dasharray="${String(seg(unchangedPct))} ${String(circumference)}"
+                stroke-dashoffset="${String(-(seg(addedPct) + seg(updatedPct) + seg(deletedPct)))}"
                 transform="rotate(-90 70 70)" stroke-linecap="butt" />
               ${
                 stats.failed > 0
                   ? `
-              <circle cx="70" cy="70" r="${radius}" fill="none"
+              <circle cx="70" cy="70" r="${String(radius)}" fill="none"
                 stroke="var(--peach, #fab387)" stroke-width="14"
-                stroke-dasharray="${seg(failedPct)} ${circumference}"
-                stroke-dashoffset="${-(seg(addedPct) + seg(updatedPct) + seg(deletedPct) + seg(unchangedPct))}"
+                stroke-dasharray="${String(seg(failedPct))} ${String(circumference)}"
+                stroke-dashoffset="${String(-(seg(addedPct) + seg(updatedPct) + seg(deletedPct) + seg(unchangedPct)))}"
                 transform="rotate(-90 70 70)" stroke-linecap="butt" />`
                   : ''
               }
               ${
                 stats.skipped > 0
                   ? `
-              <circle cx="70" cy="70" r="${radius}" fill="none"
+              <circle cx="70" cy="70" r="${String(radius)}" fill="none"
                 stroke="var(--lavender, #b4befe)" stroke-width="14"
-                stroke-dasharray="${seg(skippedPct)} ${circumference}"
-                stroke-dashoffset="${-(seg(addedPct) + seg(updatedPct) + seg(deletedPct) + seg(unchangedPct) + seg(failedPct))}"
+                stroke-dasharray="${String(seg(skippedPct))} ${String(circumference)}"
+                stroke-dashoffset="${String(-(seg(addedPct) + seg(updatedPct) + seg(deletedPct) + seg(unchangedPct) + seg(failedPct)))}"
                 transform="rotate(-90 70 70)" stroke-linecap="butt" />`
                   : ''
               }
@@ -1025,17 +1025,17 @@ function renderSyncStatsChart(container: HTMLElement, stats: SyncProgressStats):
             }
           </svg>
           <div class="bgm-donut-center">
-            <div class="bgm-donut-center-value">${totalProcessed}</div>
+            <div class="bgm-donut-center-value">${String(totalProcessed)}</div>
             <div class="bgm-donut-center-label">已处理</div>
           </div>
         </div>
         <div class="bgm-chart-legend">
-          <div class="bgm-legend-item"><span class="bgm-legend-dot" style="background:var(--green, #a6e3a1)"></span>新增 ${stats.added}</div>
-          <div class="bgm-legend-item"><span class="bgm-legend-dot" style="background:var(--yellow, #f9e2af)"></span>更新 ${stats.updated}</div>
-          <div class="bgm-legend-item"><span class="bgm-legend-dot" style="background:var(--red, #f38ba8)"></span>删除 ${stats.deleted}</div>
-          <div class="bgm-legend-item"><span class="bgm-legend-dot" style="background:var(--overlay1, #7f849c)"></span>无变更 ${stats.unchanged}</div>
-          ${stats.failed > 0 ? `<div class="bgm-legend-item"><span class="bgm-legend-dot" style="background:var(--peach, #fab387)"></span>失败 ${stats.failed}</div>` : ''}
-          ${stats.skipped > 0 ? `<div class="bgm-legend-item"><span class="bgm-legend-dot" style="background:var(--lavender, #b4befe)"></span>跳过 ${stats.skipped}</div>` : ''}
+          <div class="bgm-legend-item"><span class="bgm-legend-dot" style="background:var(--green, #a6e3a1)"></span>新增 ${String(stats.added)}</div>
+          <div class="bgm-legend-item"><span class="bgm-legend-dot" style="background:var(--yellow, #f9e2af)"></span>更新 ${String(stats.updated)}</div>
+          <div class="bgm-legend-item"><span class="bgm-legend-dot" style="background:var(--red, #f38ba8)"></span>删除 ${String(stats.deleted)}</div>
+          <div class="bgm-legend-item"><span class="bgm-legend-dot" style="background:var(--overlay1, #7f849c)"></span>无变更 ${String(stats.unchanged)}</div>
+          ${stats.failed > 0 ? `<div class="bgm-legend-item"><span class="bgm-legend-dot" style="background:var(--peach, #fab387)"></span>失败 ${String(stats.failed)}</div>` : ''}
+          ${stats.skipped > 0 ? `<div class="bgm-legend-item"><span class="bgm-legend-dot" style="background:var(--lavender, #b4befe)"></span>跳过 ${String(stats.skipped)}</div>` : ''}
         </div>
       </div>
 
@@ -1043,31 +1043,31 @@ function renderSyncStatsChart(container: HTMLElement, stats: SyncProgressStats):
         <div class="bgm-bar-chart">
           <div class="bgm-bar-row">
             <span class="bgm-bar-label">✅ 新增</span>
-            <div class="bgm-bar-track"><div class="bgm-bar-fill bgm-bar-add" style="width:${addedPct}%"></div></div>
-            <span class="bgm-bar-value">${stats.added}<span class="bgm-bar-pct">(${addedPct.toFixed(0)}%)</span></span>
+            <div class="bgm-bar-track"><div class="bgm-bar-fill bgm-bar-add" style="width:${String(addedPct)}%"></div></div>
+            <span class="bgm-bar-value">${String(stats.added)}<span class="bgm-bar-pct">(${addedPct.toFixed(0)}%)</span></span>
           </div>
           <div class="bgm-bar-row">
             <span class="bgm-bar-label">🔄 更新</span>
-            <div class="bgm-bar-track"><div class="bgm-bar-fill bgm-bar-update" style="width:${updatedPct}%"></div></div>
-            <span class="bgm-bar-value">${stats.updated}<span class="bgm-bar-pct">(${updatedPct.toFixed(0)}%)</span></span>
+            <div class="bgm-bar-track"><div class="bgm-bar-fill bgm-bar-update" style="width:${String(updatedPct)}%"></div></div>
+            <span class="bgm-bar-value">${String(stats.updated)}<span class="bgm-bar-pct">(${updatedPct.toFixed(0)}%)</span></span>
           </div>
           <div class="bgm-bar-row">
             <span class="bgm-bar-label">❌ 删除</span>
-            <div class="bgm-bar-track"><div class="bgm-bar-fill bgm-bar-delete" style="width:${deletedPct}%"></div></div>
-            <span class="bgm-bar-value">${stats.deleted}<span class="bgm-bar-pct">(${deletedPct.toFixed(0)}%)</span></span>
+            <div class="bgm-bar-track"><div class="bgm-bar-fill bgm-bar-delete" style="width:${String(deletedPct)}%"></div></div>
+            <span class="bgm-bar-value">${String(stats.deleted)}<span class="bgm-bar-pct">(${deletedPct.toFixed(0)}%)</span></span>
           </div>
           <div class="bgm-bar-row">
             <span class="bgm-bar-label">⏭️ 无变更</span>
-            <div class="bgm-bar-track"><div class="bgm-bar-fill bgm-bar-unchanged" style="width:${unchangedPct}%"></div></div>
-            <span class="bgm-bar-value">${stats.unchanged}<span class="bgm-bar-pct">(${unchangedPct.toFixed(0)}%)</span></span>
+            <div class="bgm-bar-track"><div class="bgm-bar-fill bgm-bar-unchanged" style="width:${String(unchangedPct)}%"></div></div>
+            <span class="bgm-bar-value">${String(stats.unchanged)}<span class="bgm-bar-pct">(${unchangedPct.toFixed(0)}%)</span></span>
           </div>
           ${
             stats.failed > 0
               ? `
           <div class="bgm-bar-row">
             <span class="bgm-bar-label">⚠️ 失败</span>
-            <div class="bgm-bar-track"><div class="bgm-bar-fill bgm-bar-fail" style="width:${failedPct}%"></div></div>
-            <span class="bgm-bar-value">${stats.failed}<span class="bgm-bar-pct">(${failedPct.toFixed(0)}%)</span></span>
+            <div class="bgm-bar-track"><div class="bgm-bar-fill bgm-bar-fail" style="width:${String(failedPct)}%"></div></div>
+            <span class="bgm-bar-value">${String(stats.failed)}<span class="bgm-bar-pct">(${failedPct.toFixed(0)}%)</span></span>
           </div>`
               : ''
           }
@@ -1076,8 +1076,8 @@ function renderSyncStatsChart(container: HTMLElement, stats: SyncProgressStats):
               ? `
           <div class="bgm-bar-row">
             <span class="bgm-bar-label">🔍 跳过</span>
-            <div class="bgm-bar-track"><div class="bgm-bar-fill bgm-bar-skip" style="width:${skippedPct}%"></div></div>
-            <span class="bgm-bar-value">${stats.skipped}<span class="bgm-bar-pct">(${skippedPct.toFixed(0)}%)</span></span>
+            <div class="bgm-bar-track"><div class="bgm-bar-fill bgm-bar-skip" style="width:${String(skippedPct)}%"></div></div>
+            <span class="bgm-bar-value">${String(stats.skipped)}<span class="bgm-bar-pct">(${skippedPct.toFixed(0)}%)</span></span>
           </div>`
               : ''
           }
@@ -1093,8 +1093,8 @@ function renderSyncStatsChart(container: HTMLElement, stats: SyncProgressStats):
             <circle cx="40" cy="40" r="32" fill="none" stroke="var(--surface0, #313244)" stroke-width="6" />
             <circle cx="40" cy="40" r="32" fill="none"
               stroke="var(--blue, #89b4fa)" stroke-width="6"
-              stroke-dasharray="${(completionPct / 100) * 2 * Math.PI * 32} ${2 * Math.PI * 32}"
-              stroke-dashoffset="${2 * Math.PI * 32 * 0.25}"
+              stroke-dasharray="${String((completionPct / 100) * 2 * Math.PI * 32)} ${String(2 * Math.PI * 32)}"
+              stroke-dashoffset="${String(2 * Math.PI * 32 * 0.25)}"
               stroke-linecap="round"
               transform="rotate(-90 40 40)" />
           </svg>
@@ -1111,8 +1111,8 @@ function renderSyncStatsChart(container: HTMLElement, stats: SyncProgressStats):
             <circle cx="40" cy="40" r="32" fill="none" stroke="var(--surface0, #313244)" stroke-width="6" />
             <circle cx="40" cy="40" r="32" fill="none"
               stroke="var(--green, #a6e3a1)" stroke-width="6"
-              stroke-dasharray="${Math.min(stats.avgSpeed / 50, 1) * 2 * Math.PI * 32} ${2 * Math.PI * 32}"
-              stroke-dashoffset="${2 * Math.PI * 32 * 0.25}"
+              stroke-dasharray="${String(Math.min(stats.avgSpeed / 50, 1) * 2 * Math.PI * 32)} ${String(2 * Math.PI * 32)}"
+              stroke-dashoffset="${String(2 * Math.PI * 32 * 0.25)}"
               stroke-linecap="round"
               transform="rotate(-90 40 40)" />
           </svg>
@@ -1129,15 +1129,15 @@ function renderSyncStatsChart(container: HTMLElement, stats: SyncProgressStats):
             <circle cx="40" cy="40" r="32" fill="none" stroke="var(--surface0, #313244)" stroke-width="6" />
             <circle cx="40" cy="40" r="32" fill="none"
               stroke="var(--peach, #fab387)" stroke-width="6"
-              stroke-dasharray="${(efficiencyPct / 100) * 2 * Math.PI * 32} ${2 * Math.PI * 32}"
-              stroke-dashoffset="${2 * Math.PI * 32 * 0.25}"
+              stroke-dasharray="${String((efficiencyPct / 100) * 2 * Math.PI * 32)} ${String(2 * Math.PI * 32)}"
+              stroke-dashoffset="${String(2 * Math.PI * 32 * 0.25)}"
               stroke-linecap="round"
               transform="rotate(-90 40 40)" />
           </svg>
           <div class="bgm-perg-center"><span>📈</span></div>
         </div>
         <div class="bgm-perg-info">
-          <div class="bgm-perg-value">${efficiencyPct}%</div>
+          <div class="bgm-perg-value">${String(efficiencyPct)}%</div>
           <div class="bgm-perg-label">处理效率</div>
         </div>
       </div>
@@ -1147,8 +1147,8 @@ function renderSyncStatsChart(container: HTMLElement, stats: SyncProgressStats):
             <circle cx="40" cy="40" r="32" fill="none" stroke="var(--surface0, #313244)" stroke-width="6" />
             <circle cx="40" cy="40" r="32" fill="none"
               stroke="var(--sapphire, #74c7ec)" stroke-width="6"
-              stroke-dasharray="${Math.min(totalProcessed / Math.max(stats.elapsedMs / 1000, 1) / 50, 1) * 2 * Math.PI * 32} ${2 * Math.PI * 32}"
-              stroke-dashoffset="${2 * Math.PI * 32 * 0.25}"
+              stroke-dasharray="${String(Math.min(totalProcessed / Math.max(stats.elapsedMs / 1000, 1) / 50, 1) * 2 * Math.PI * 32)} ${String(2 * Math.PI * 32)}"
+              stroke-dashoffset="${String(2 * Math.PI * 32 * 0.25)}"
               stroke-linecap="round"
               transform="rotate(-90 40 40)" />
           </svg>
@@ -1164,10 +1164,10 @@ function renderSyncStatsChart(container: HTMLElement, stats: SyncProgressStats):
     <!-- ===== 元信息栏 ===== -->
     <div class="bgm-meta-bar">
       <span class="bgm-meta-tag">🎯 ${stats.strategyLabel}</span>
-      <span class="bgm-meta-tag">📥 远程 ${stats.remoteTotal}</span>
-      <span class="bgm-meta-tag">✅ 完成 ${completionPct}%</span>
-      ${stats.skipped > 0 ? `<span class="bgm-meta-tag">🔍 跳过 ${stats.skipped}</span>` : ''}
-      ${stats.failed > 0 ? `<span class="bgm-meta-tag bgm-meta-tag-warn">⚠️ 失败 ${stats.failed}</span>` : ''}
+      <span class="bgm-meta-tag">📥 远程 ${String(stats.remoteTotal)}</span>
+      <span class="bgm-meta-tag">✅ 完成 ${String(completionPct)}%</span>
+      ${stats.skipped > 0 ? `<span class="bgm-meta-tag">🔍 跳过 ${String(stats.skipped)}</span>` : ''}
+      ${stats.failed > 0 ? `<span class="bgm-meta-tag bgm-meta-tag-warn">⚠️ 失败 ${String(stats.failed)}</span>` : ''}
     </div>
   `
 }
@@ -1232,7 +1232,7 @@ export function renderSyncDetailTable(items: GithubSyncDetailItem[]): string {
         </tbody>
       </table>
     </div>
-    <div class="bgm-detail-table-footer">共 ${items.length} 条明细</div>
+    <div class="bgm-detail-table-footer">共 ${String(items.length)} 条明细</div>
   `
 }
 
@@ -1254,17 +1254,17 @@ export function completeSyncProgressDialog(
   detailItems?: GithubSyncDetailItem[],
 ): void {
   const modal = ensureSyncProgressDialog()
-  const titleEl = modal.querySelector('#bgmSyncProgressTitle') as HTMLElement | null
-  const iconEl = modal.querySelector('#bgmSyncProgressIcon') as HTMLElement | null
-  const progressSection = modal.querySelector('#bgmSyncProgressSection') as HTMLElement | null
-  const resultSection = modal.querySelector('#bgmSyncProgressResult') as HTMLElement | null
-  const summaryEl = modal.querySelector('#bgmSyncProgressSummary') as HTMLElement | null
-  const chartEl = modal.querySelector('#bgmSyncProgressChart') as HTMLElement | null
-  const detailsEl = modal.querySelector('#bgmSyncProgressDetails') as HTMLElement | null
-  const toggleBtn = modal.querySelector('#bgmSyncProgressToggleDetails') as HTMLButtonElement | null
-  const nextBtn = modal.querySelector('#bgmSyncProgressNext') as HTMLButtonElement | null
-  const runningBtns = modal.querySelector('#bgmSyncProgressRunningBtns') as HTMLElement | null
-  const doneBtns = modal.querySelector('#bgmSyncProgressDoneBtns') as HTMLElement | null
+  const titleEl = modal.querySelector<HTMLElement>('#bgmSyncProgressTitle')
+  const iconEl = modal.querySelector<HTMLElement>('#bgmSyncProgressIcon')
+  const progressSection = modal.querySelector<HTMLElement>('#bgmSyncProgressSection')
+  const resultSection = modal.querySelector<HTMLElement>('#bgmSyncProgressResult')
+  const summaryEl = modal.querySelector<HTMLElement>('#bgmSyncProgressSummary')
+  const chartEl = modal.querySelector<HTMLElement>('#bgmSyncProgressChart')
+  const detailsEl = modal.querySelector<HTMLElement>('#bgmSyncProgressDetails')
+  const toggleBtn = modal.querySelector<HTMLElement>('#bgmSyncProgressToggleDetails')
+  const nextBtn = modal.querySelector<HTMLElement>('#bgmSyncProgressNext')
+  const runningBtns = modal.querySelector<HTMLElement>('#bgmSyncProgressRunningBtns')
+  const doneBtns = modal.querySelector<HTMLElement>('#bgmSyncProgressDoneBtns')
 
   if (titleEl) titleEl.textContent = stopped ? '同步已停止' : '同步完成'
   if (iconEl) iconEl.textContent = stopped ? '⏹️' : '✅'
@@ -1336,8 +1336,8 @@ export function completeSyncProgressDialog(
 
   // 焦点切换到下一步按钮或关闭按钮，便于键盘用户立即操作
   const focusTarget = onNext
-    ? (modal.querySelector('#bgmSyncProgressNext') as HTMLButtonElement | null)
-    : (modal.querySelector('#bgmSyncProgressClose') as HTMLButtonElement | null)
+    ? modal.querySelector<HTMLElement>('#bgmSyncProgressNext')
+    : modal.querySelector<HTMLElement>('#bgmSyncProgressClose')
   focusTarget?.focus()
 }
 
@@ -1376,8 +1376,12 @@ export function showConfirm(
   _showDialog('confirm', {
     message,
     title: title || '确认',
-    onOk: () => callback(true),
-    onCancel: () => callback(false),
+    onOk: () => {
+      callback(true)
+    },
+    onCancel: () => {
+      callback(false)
+    },
   })
 }
 

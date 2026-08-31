@@ -62,7 +62,7 @@ function getErrorMessage(status: number): string {
     502: '网关错误',
     503: '服务暂时不可用',
   }
-  return statusMessages[status] || `HTTP 错误 (${status})`
+  return statusMessages[status] || `HTTP 错误 (${String(status)})`
 }
 
 // ========== 异步 HTTP 请求（带进度） ==========
@@ -179,7 +179,10 @@ export async function httpRequest<T = unknown>(
       if (response.status === 429 && attempt < retries) {
         attempt++
         const delayMs = BGM_CONFIG.RETRY_DELAY_BASE * Math.pow(2, attempt - 1)
-        bgmLog(LOG_LEVELS.WARN, `API 限流 (429)，第 ${attempt} 次重试，等待 ${delayMs}ms`)
+        bgmLog(
+          LOG_LEVELS.WARN,
+          `API 限流 (429)，第 ${String(attempt)} 次重试，等待 ${String(delayMs)}ms`,
+        )
         await sleep(delayMs)
         continue
       }
@@ -195,7 +198,7 @@ export async function httpRequest<T = unknown>(
       if (attempt < retries) {
         attempt++
         const delayMs = BGM_CONFIG.RETRY_DELAY_BASE * Math.pow(2, attempt - 1)
-        bgmLog(LOG_LEVELS.WARN, `网络错误，第 ${attempt} 次重试，等待 ${delayMs}ms`)
+        bgmLog(LOG_LEVELS.WARN, `网络错误，第 ${String(attempt)} 次重试，等待 ${String(delayMs)}ms`)
         await sleep(delayMs)
         continue
       }
@@ -232,7 +235,7 @@ function executeXhrRequest(
     bgmLog(LOG_LEVELS.INFO, `[HTTP] ========== 开始请求 ==========`)
     bgmLog(LOG_LEVELS.INFO, `[HTTP] URL: ${url}`)
     bgmLog(LOG_LEVELS.INFO, `[HTTP] 方法: ${options.method}`)
-    bgmLog(LOG_LEVELS.INFO, `[HTTP] 超时: ${options.timeout}ms`)
+    bgmLog(LOG_LEVELS.INFO, `[HTTP] 超时: ${String(options.timeout)}ms`)
 
     if (options.token) {
       bgmLog(
@@ -277,8 +280,8 @@ function executeXhrRequest(
 
       bgmLog(LOG_LEVELS.INFO, `[HTTP] ========== 请求完成 ==========`)
       bgmLog(LOG_LEVELS.INFO, `[HTTP] URL: ${url}`)
-      bgmLog(LOG_LEVELS.INFO, `[HTTP] HTTP 状态码: ${xhr.status} (${xhr.statusText})`)
-      bgmLog(LOG_LEVELS.INFO, `[HTTP] 请求耗时: ${duration}ms`)
+      bgmLog(LOG_LEVELS.INFO, `[HTTP] HTTP 状态码: ${String(xhr.status)} (${xhr.statusText})`)
+      bgmLog(LOG_LEVELS.INFO, `[HTTP] 请求耗时: ${String(duration)}ms`)
 
       if (xhr.getAllResponseHeaders()) {
         bgmLog(LOG_LEVELS.INFO, `[HTTP] 响应头: ${xhr.getAllResponseHeaders()}`)
@@ -308,7 +311,7 @@ function executeXhrRequest(
       if (xhr.status >= 200 && xhr.status < 300) {
         bgmLog(LOG_LEVELS.INFO, `[HTTP] 请求成功`)
       } else {
-        bgmLog(LOG_LEVELS.WARN, `[HTTP] 请求失败，状态码: ${xhr.status}`)
+        bgmLog(LOG_LEVELS.WARN, `[HTTP] 请求失败，状态码: ${String(xhr.status)}`)
       }
 
       resolve({ status: xhr.status, xhr, data })
@@ -317,23 +320,26 @@ function executeXhrRequest(
     // 错误处理
     xhr.onerror = () => {
       const duration = Date.now() - startTime
-      bgmLog(LOG_LEVELS.ERROR, `[HTTP] 请求发生网络错误，URL: ${url}，耗时: ${duration}ms`)
+      bgmLog(LOG_LEVELS.ERROR, `[HTTP] 请求发生网络错误，URL: ${url}，耗时: ${String(duration)}ms`)
       reject(new Error(`网络请求失败: ${url}`))
     }
 
     xhr.ontimeout = () => {
       const duration = Date.now() - startTime
-      bgmLog(LOG_LEVELS.WARN, `[HTTP] 请求超时，URL: ${url}，耗时: ${duration}ms`)
-      reject(new Error(`请求超时 (${options.timeout}ms): ${url}`))
+      bgmLog(LOG_LEVELS.WARN, `[HTTP] 请求超时，URL: ${url}，耗时: ${String(duration)}ms`)
+      reject(new Error(`请求超时 (${String(options.timeout)}ms): ${url}`))
     }
 
     // 上传进度
-    if (options.onProgress && xhr.upload) {
+    if (options.onProgress) {
       xhr.upload.onprogress = (e) => {
         if (e.lengthComputable) {
           options.onProgress!(e.loaded, e.total)
           const progress = Math.round((e.loaded / e.total) * 100)
-          bgmLog(LOG_LEVELS.INFO, `[HTTP] 上传进度: ${progress}% (${e.loaded}/${e.total})`)
+          bgmLog(
+            LOG_LEVELS.INFO,
+            `[HTTP] 上传进度: ${String(progress)}% (${String(e.loaded)}/${String(e.total)})`,
+          )
         }
       }
     }
@@ -365,8 +371,8 @@ function executeXhrRequest(
  *   zodSchema: userInfoSchema,
  * });
  */
-export const httpGet = <T = unknown>(endpoint: string, token?: string) =>
-  httpRequest<T>(endpoint, { method: 'GET', ...(token !== undefined && { token }) })
+export const httpGet = (endpoint: string, token?: string) =>
+  httpRequest(endpoint, { method: 'GET', ...(token !== undefined && { token }) })
 
 /**
  * POST 请求
@@ -381,8 +387,8 @@ export const httpGet = <T = unknown>(endpoint: string, token?: string) =>
  *   zodSchema: collectionSchema,
  * });
  */
-export const httpPost = <T = unknown>(endpoint: string, body: string, token?: string) =>
-  httpRequest<T>(endpoint, { method: 'POST', body, ...(token !== undefined && { token }) })
+export const httpPost = (endpoint: string, body: string, token?: string) =>
+  httpRequest(endpoint, { method: 'POST', body, ...(token !== undefined && { token }) })
 
 /**
  * PUT 请求
@@ -397,8 +403,8 @@ export const httpPost = <T = unknown>(endpoint: string, body: string, token?: st
  *   zodSchema: collectionSchema,
  * });
  */
-export const httpPut = <T = unknown>(endpoint: string, body: string, token?: string) =>
-  httpRequest<T>(endpoint, { method: 'PUT', body, ...(token !== undefined && { token }) })
+export const httpPut = (endpoint: string, body: string, token?: string) =>
+  httpRequest(endpoint, { method: 'PUT', body, ...(token !== undefined && { token }) })
 
 /**
  * DELETE 请求
@@ -411,5 +417,5 @@ export const httpPut = <T = unknown>(endpoint: string, body: string, token?: str
  *   token,
  * });
  */
-export const httpDelete = <T = unknown>(endpoint: string, token?: string) =>
-  httpRequest<T>(endpoint, { method: 'DELETE', ...(token !== undefined && { token }) })
+export const httpDelete = (endpoint: string, token?: string) =>
+  httpRequest(endpoint, { method: 'DELETE', ...(token !== undefined && { token }) })

@@ -575,13 +575,13 @@ WPS/Excel 加载项的 Task Pane 本质是一个嵌在 Office 宿主内的 WebVi
 ### 11.2 启动预览服务
 
 ```bash
-# 项目根目录下
-python -m http.server 3889 --directory .
+# 项目根目录下（端口与 wpsjs 调试端口 3889 错开，避免冲突）
+python -m http.server 5173 --directory .
 
 # 打开预览页
-# http://localhost:3889/ui/panel-preview.html
-# http://localhost:3889/ui/panel.html       （真实面板）
-# http://localhost:3889/ui/settings.html    （设置面板）
+# http://localhost:5173/ui/panel-preview.html
+# http://localhost:5173/ui/panel.html       （真实面板）
+# http://localhost:5173/ui/settings.html    （设置面板）
 ```
 
 ### 11.3 Task Pane 宽度模拟

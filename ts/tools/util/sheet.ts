@@ -12,7 +12,7 @@ import {
   STANDARD_HEADERS,
 } from '../../core/constants.js'
 import { colNumToLetter, trim } from '../stringUtils.js'
-import type { WpsWorksheet, WpsCellValue } from '../wps.js'
+import type { WpsWorksheet } from '../wps.js'
 
 // 循环依赖：仅在函数体内使用 BGM/bgmLog/getApp，运行时安全
 import { getCellValue } from './cell.js'
@@ -45,27 +45,48 @@ function isNativeCode(val: unknown): boolean {
   return false
 }
 
+/**
+ * 将 WPS 桥接层返回的未知值安全转换为字符串：
+ * - null/undefined 返回空串
+ * - 原生代码对象（WPS 内部 Proxy）返回空串
+ * - 对象仅当其自带可调用 toString 时才序列化，否则返回空串
+ * - 其余基本类型（string/number/boolean/symbol/bigint/function）按 String() 语义转换
+ */
+function safeStringify(value: unknown): string {
+  if (value == null) return ''
+  if (isNativeCode(value)) return ''
+  if (
+    typeof value === 'string' ||
+    typeof value === 'number' ||
+    typeof value === 'boolean' ||
+    typeof value === 'bigint' ||
+    typeof value === 'symbol' ||
+    typeof value === 'function'
+  ) {
+    return String(value)
+  }
+  // 对象类型：仅当自带可调用 toString 时才序列化，否则返回空串
+  const obj = value as { toString?: () => string }
+  if (typeof obj.toString === 'function') {
+    const str = obj.toString()
+    if (isNativeCode(str)) return ''
+    return str
+  }
+  return ''
+}
+
 function safeCellValue(cell: unknown): string {
   if (cell == null) return ''
+  // 原生代码对象/函数（WPS 内部 Proxy、mock 的 native 函数）直接返回空串，不调用
   if (isNativeCode(cell)) return ''
   if (typeof cell === 'function') {
     try {
-      const result = (cell as () => unknown)()
-      if (isNativeCode(result)) return ''
-      return result == null ? '' : String(result)
+      return safeStringify((cell as () => unknown)())
     } catch {
       return ''
     }
   }
-  if (cell && typeof cell === 'object') {
-    const obj = cell as { toString?: () => string }
-    if (obj.toString) {
-      const str = obj.toString()
-      if (isNativeCode(str) || isNativeCode(cell)) return ''
-      return str
-    }
-  }
-  return String(cell)
+  return safeStringify(cell)
 }
 
 export function readRangeValues(
@@ -78,7 +99,7 @@ export function readRangeValues(
   if (!ws) return []
   try {
     const range = ws.Range(
-      `${colNumToLetter(startCol)}${startRow}:${colNumToLetter(endCol)}${endRow}`,
+      `${colNumToLetter(startCol)}${String(startRow)}:${colNumToLetter(endCol)}${String(endRow)}`,
     )
     // 复用 cell.ts 中的 tryGetProperty（未导出），此处通过 range 直接访问 Value2
     const raw = (range as unknown as { Value2?: unknown }).Value2
@@ -121,14 +142,14 @@ export function cacheGet<T>(key: string, factory: () => T): T {
 
 export function findHeaderRow(ws: WpsWorksheet | null | undefined, startRow?: number): number {
   const sheetName = ws?.Name || ''
-  const cacheKey = `${sheetName}:headerRow:${startRow || 1}`
+  const cacheKey = `${sheetName}:headerRow:${String(startRow || 1)}`
   return cacheGet(cacheKey, () => {
     const sRow = startRow || 1
     for (let row = sRow; row <= PANEL_CONFIG.MAX_SCAN_ROWS; row++) {
       let matchCount = 0
       for (let col = 1; col <= PANEL_CONFIG.MAX_SCAN_COLUMNS; col++) {
         try {
-          const cellVal = String(getCellValue(ws, row, col)).toLowerCase()
+          const cellVal = getCellValue(ws, row, col).toLowerCase()
           if (!cellVal) continue
           for (const header of HEADER_KEYWORDS) {
             if (cellVal.indexOf(header.toLowerCase()) >= 0) {
@@ -158,14 +179,14 @@ export function getColumnMap(
   headerRow: number,
 ): Map<string, number> {
   const sheetName = ws?.Name || ''
-  const cacheKey = `${sheetName}:columnMap:${headerRow}`
+  const cacheKey = `${sheetName}:columnMap:${String(headerRow)}`
   return cacheGet(cacheKey, () => {
     const colMap = new Map<string, number>()
     let firstNonEmptyCol: number | undefined
 
     const lastCol = 50
     for (let i = 1; i <= lastCol; i++) {
-      const colName = trim(String(getCellValue(ws, headerRow, i)))
+      const colName = trim(getCellValue(ws, headerRow, i))
       // 记录第一个非空列作为序列号列候选
       if (!firstNonEmptyCol && colName) {
         firstNonEmptyCol = i
@@ -194,7 +215,7 @@ export function getColumnMap(
         // 第一个非空列已被占用，向后查找第一个未被占用的非空列
         for (let i = 1; i <= lastCol; i++) {
           if (!mappedCols.has(i)) {
-            const v = trim(String(getCellValue(ws, headerRow, i)))
+            const v = trim(getCellValue(ws, headerRow, i))
             if (v) {
               seqCol = i
               break
@@ -206,7 +227,7 @@ export function getColumnMap(
         colMap.set('序列号', seqCol)
         bgmLog(
           LOG_LEVELS.INFO,
-          `[getColumnMap] 序列号列未匹配到表头，使用列 ${seqCol} 作为序列号列`,
+          `[getColumnMap] 序列号列未匹配到表头，使用列 ${String(seqCol)} 作为序列号列`,
         )
       }
     }
@@ -260,7 +281,7 @@ function findAnchorColumn(ws: WpsWorksheet, headerRow: number): number | undefin
   const maxCols = 50
 
   for (let c = 1; c <= maxCols; c++) {
-    const val = ws.Range(`${colNumToLetter(c)}${headerRow}`).Value2
+    const val = ws.Range(`${colNumToLetter(c)}${String(headerRow)}`).Value2
     if (val == null) continue
     const text = String(val).trim().toLowerCase()
     if (keywords.some((kw) => text === kw || text.includes(kw))) {
@@ -289,7 +310,7 @@ export function getLastRow(
   }
 
   const sheetName = ws.Name || ''
-  const cacheKey = `${sheetName}:lastRow${headerRow ? `:hr${headerRow}` : ''}`
+  const cacheKey = `${sheetName}:lastRow${headerRow ? `:hr${String(headerRow)}` : ''}`
 
   if (forceRefresh) {
     clearSheetCache(ws)
@@ -309,27 +330,30 @@ export function getLastRow(
         try {
           // ✅ 修复点：使用 col 拼地址，而不是硬编码 D
           const colLetter = colNumToLetter(col)
-          const cell = ws.Range(`${colLetter}${ws.Rows.Count}`)
+          const cell = ws.Range(`${colLetter}${String(ws.Rows.Count)}`)
           const endCell = cell.End(-4162)
-          if (endCell && endCell.Row > 0) {
+          if (endCell.Row > 0) {
             bgmLog(
               LOG_LEVELS.INFO,
-              `根据表头找到锚定列 ${col}(${colLetter})，最后行: ${endCell.Row}`,
+              `根据表头找到锚定列 ${String(col)}(${colLetter})，最后行: ${String(endCell.Row)}`,
             )
             return endCell.Row
           }
         } catch (e) {
-          bgmLog(LOG_LEVELS.WARN, `锚定列 ${col} 定位失败: ${(e as Error).message}，回退到原有逻辑`)
+          bgmLog(
+            LOG_LEVELS.WARN,
+            `锚定列 ${String(col)} 定位失败: ${(e as Error).message}，回退到原有逻辑`,
+          )
         }
       }
     }
 
     // 2. 优先 D 列（常见序号列）
     try {
-      const cell = ws.Range(`D${ws.Rows.Count}`)
+      const cell = ws.Range(`D${String(ws.Rows.Count)}`)
       const endCell = cell.End(-4162)
-      if (endCell && endCell.Row > 0) {
-        bgmLog(LOG_LEVELS.INFO, `D列向上定位成功，最后行: ${endCell.Row}`)
+      if (endCell.Row > 0) {
+        bgmLog(LOG_LEVELS.INFO, `D列向上定位成功，最后行: ${String(endCell.Row)}`)
         return endCell.Row
       }
     } catch (e) {
@@ -338,10 +362,10 @@ export function getLastRow(
 
     // 3. 尝试 A 列
     try {
-      const cell = ws.Range(`A${ws.Rows.Count}`)
+      const cell = ws.Range(`A${String(ws.Rows.Count)}`)
       const endCell = cell.End(-4162)
-      if (endCell && endCell.Row > 0) {
-        bgmLog(LOG_LEVELS.INFO, `A列向上定位成功，最后行: ${endCell.Row}`)
+      if (endCell.Row > 0) {
+        bgmLog(LOG_LEVELS.INFO, `A列向上定位成功，最后行: ${String(endCell.Row)}`)
         return endCell.Row
       }
     } catch (e) {
@@ -354,7 +378,7 @@ export function getLastRow(
       if (usedRange) {
         const last = usedRange.Row + usedRange.Rows.Count - 1
         if (last > 0) {
-          bgmLog(LOG_LEVELS.INFO, `UsedRange 估算最后行: ${last}`)
+          bgmLog(LOG_LEVELS.INFO, `UsedRange 估算最后行: ${String(last)}`)
           return last
         }
       }
@@ -369,7 +393,7 @@ export function getLastRow(
 
   bgmLog(
     LOG_LEVELS.INFO,
-    `工作表 "${sheetName}" 最后数据行: ${cached}${sheetCache.has(cacheKey) ? ' (来自缓存)' : ' (首次计算)'}`,
+    `工作表 "${sheetName}" 最后数据行: ${String(cached)}${sheetCache.has(cacheKey) ? ' (来自缓存)' : ' (首次计算)'}`,
   )
   return cached
 }
@@ -445,7 +469,7 @@ export function ensureSheetHeaders(ws: WpsWorksheet | null | undefined): boolean
 
   const headerRow = findHeaderRow(ws)
   if (headerRow > 0) {
-    bgmLog(LOG_LEVELS.INFO, `[ensureSheetHeaders] 已有表头行 ${headerRow}，无需填充`)
+    bgmLog(LOG_LEVELS.INFO, `[ensureSheetHeaders] 已有表头行 ${String(headerRow)}，无需填充`)
     return false
   }
 
@@ -469,7 +493,7 @@ export function ensureSheetHeaders(ws: WpsWorksheet | null | undefined): boolean
   }
   bgmLog(
     LOG_LEVELS.INFO,
-    `[ensureSheetHeaders] 写入完成：成功 ${writeCount} 列，失败 ${failCount} 列`,
+    `[ensureSheetHeaders] 写入完成：成功 ${String(writeCount)} 列，失败 ${String(failCount)} 列`,
   )
 
   if (failCount > 0) {
@@ -498,12 +522,12 @@ export function ensureSheetHeaders(ws: WpsWorksheet | null | undefined): boolean
   const newHeaderRow = findHeaderRow(ws)
   bgmLog(
     LOG_LEVELS.INFO,
-    `[ensureSheetHeaders] 缓存已清除，findHeaderRow 重新检测: ${newHeaderRow}`,
+    `[ensureSheetHeaders] 缓存已清除，findHeaderRow 重新检测: ${String(newHeaderRow)}`,
   )
   if (newHeaderRow !== 1) {
     bgmLog(
       LOG_LEVELS.WARN,
-      `[ensureSheetHeaders] findHeaderRow 返回 ${newHeaderRow}（预期 1），表头关键字匹配可能失败`,
+      `[ensureSheetHeaders] findHeaderRow 返回 ${String(newHeaderRow)}（预期 1），表头关键字匹配可能失败`,
     )
   }
   bgmLog(LOG_LEVELS.INFO, '[ensureSheetHeaders] 标准表头写入完成')
@@ -525,80 +549,73 @@ export function ensureSheetHeaders(ws: WpsWorksheet | null | undefined): boolean
  * @returns true 写入成功，false 写入失败
  */
 function setCellValueDirect(ws: WpsWorksheet, row: number, col: number, value: string): boolean {
-  const address = colNumToLetter(col) + row
+  const address = colNumToLetter(col) + String(row)
 
   // 方案 1: Cells.Item(row, col) + FormulaR1C1
   // 完全不同的 COM 路径（Cells.Item 而非 Range）+ 不同属性（FormulaR1C1 而非 Formula/Value/Value2），
   // 最大概率绕过 WPS COM 桥接层 Proxy 拦截。
   try {
     const cell = ws.Cells.Item(row, col)
-    if (cell) {
-      cell.FormulaR1C1 = value
-      return true
-    }
+    cell.FormulaR1C1 = value
+    return true
   } catch (e: unknown) {
     bgmLog(
       LOG_LEVELS.WARN,
-      `[setCellValueDirect] Cells.FormulaR1C1 (${row},${col}) 失败: ${(e as Error).message}`,
+      `[setCellValueDirect] Cells.FormulaR1C1 (${String(row)},${String(col)}) 失败: ${(e as Error).message}`,
     )
   }
 
   // 方案 2: Range + Formula（不同属性路径，不受 Value/Value2 拦截影响）
   try {
     const cell = ws.Range(address)
-    if (cell) {
-      cell.Formula = value
-      return true
-    }
+    cell.Formula = value
+    return true
   } catch (e: unknown) {
     bgmLog(
       LOG_LEVELS.WARN,
-      `[setCellValueDirect] Range.Formula (${row},${col}) 失败: ${(e as Error).message}`,
+      `[setCellValueDirect] Range.Formula (${String(row)},${String(col)}) 失败: ${(e as Error).message}`,
     )
   }
 
   // 方案 3: Range + FormulaR1C1（不同属性路径）
   try {
     const cell = ws.Range(address)
-    if (cell) {
-      cell.FormulaR1C1 = value
-      return true
-    }
+    cell.FormulaR1C1 = value
+    return true
   } catch (e: unknown) {
     bgmLog(
       LOG_LEVELS.WARN,
-      `[setCellValueDirect] Range.FormulaR1C1 (${row},${col}) 失败: ${(e as Error).message}`,
+      `[setCellValueDirect] Range.FormulaR1C1 (${String(row)},${String(col)}) 失败: ${(e as Error).message}`,
     )
   }
 
   // 方案 4: Range + Value2（回退）
   try {
     const cell = ws.Range(address)
-    if (cell) {
-      cell.Value2 = value as WpsCellValue
-      return true
-    }
+    cell.Value2 = value
+    return true
   } catch (e: unknown) {
     bgmLog(
       LOG_LEVELS.WARN,
-      `[setCellValueDirect] Range.Value2 (${row},${col}) 失败: ${(e as Error).message}`,
+      `[setCellValueDirect] Range.Value2 (${String(row)},${String(col)}) 失败: ${(e as Error).message}`,
     )
   }
 
   // 方案 5: Range + Value（最终回退）
   try {
     const cell = ws.Range(address)
-    if (cell) {
-      cell.Value = value as WpsCellValue
-      return true
-    }
+    cell.Value = value
+    return true
   } catch (e: unknown) {
     bgmLog(
       LOG_LEVELS.WARN,
-      `[setCellValueDirect] Range.Value (${row},${col}) 失败: ${(e as Error).message}`,
+      `[setCellValueDirect] Range.Value (${String(row)},${String(col)}) 失败: ${(e as Error).message}`,
     )
   }
 
-  bgmLog(LOG_LEVELS.ERROR, `[setCellValueDirect] 所有写入方式均失败 (${row},${col})`)
+  bgmLog(
+    LOG_LEVELS.ERROR,
+    `[setCellValueDirect] 所有写入方式均失败 (${String(row)},${String(col)})`,
+  )
   return false
 }

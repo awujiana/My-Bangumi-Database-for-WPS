@@ -59,5 +59,5 @@ export function escapeHtml(text: string | null | undefined): string {
  */
 export function trim(str: string | null | undefined): string {
   if (!str) return ''
-  return String(str).replace(/^\s+|\s+$/g, '')
+  return str.replace(/^\s+|\s+$/g, '')
 }

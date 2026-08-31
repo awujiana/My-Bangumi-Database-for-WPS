@@ -96,7 +96,6 @@ import {
   openUserCollection,
   testTokenValidity,
   testDebugConnection,
-  renewToken,
 } from './token.js'
 
 // 子模块 re-export（保持原 handlers.ts 的对外 API）
@@ -110,6 +109,8 @@ export {
   testDebugConnection,
   showUserProfile,
   hideUserProfile,
+  // renewToken 已标记 @deprecated（内部委托给 testTokenValidity），此处为保持对外 API 而必须保留 re-export
+  // eslint-disable-next-line @typescript-eslint/no-deprecated
   renewToken,
 } from './token.js'
 export { syncFromPanel, syncCollectionFromBgm, syncFromBgmByAPI } from './sync.js'
@@ -203,7 +204,7 @@ function trackedEventBusOn<T = unknown>(eventName: string, handler: EventHandler
 export function onAction(action: string): void {
   switch (action) {
     case 'sync':
-      syncFromPanel()
+      void syncFromPanel()
       break
     case 'clear':
       showConfirm(_T.confirmClearMarks, (confirmed) => {
@@ -216,7 +217,7 @@ export function onAction(action: string): void {
       showTokenDialog(loadBgToken() || '')
       break
     case 'preview':
-      if (typeof previewSyncContent === 'function') previewSyncContent()
+      if (typeof previewSyncContent === 'function') void previewSyncContent()
       break
     case 'showUserIdDialog':
       showUserIdDialog()
@@ -294,9 +295,7 @@ const handleThemeChange = (): void => {
 }
 
 const handleThemePreviewClick = (event: Event): void => {
-  const card = (event.currentTarget as HTMLElement).closest(
-    '[data-theme-card]',
-  ) as HTMLElement | null
+  const card = (event.currentTarget as HTMLElement).closest<HTMLElement>('[data-theme-card]')
   const mode = card?.dataset.themeCard
   if (!mode) return
   const select = document.getElementById('themeSelect') as HTMLSelectElement | null
@@ -356,7 +355,10 @@ const handleRefreshIntervalChange = (): void => {
   const ok = setRefreshInterval(minutes)
   if (ok) {
     const value = Math.round(minutes)
-    showToast(`自动刷新间隔已设为 ${value} 分钟${value === 0 ? '（已关闭）' : ''}`, 'success')
+    showToast(
+      `自动刷新间隔已设为 ${String(value)} 分钟${value === 0 ? '（已关闭）' : ''}`,
+      'success',
+    )
   } else {
     showToast('刷新间隔保存失败', 'error')
   }
@@ -380,8 +382,8 @@ const debouncedSaveGithubConfig = debounce((): void => {
     const owner = (ownerInput?.value ?? '').trim()
     const repo = (repoInput?.value ?? '').trim()
     const branch = (branchInput?.value ?? '').trim() || 'main'
-    const strategy = (strategySelect?.value as SyncStrategy) || 'add-update'
-    const sourceType = (sourceTypeSelect?.value as SyncSourceType) || 'github'
+    const strategy = (strategySelect?.value as SyncStrategy | undefined) || 'add-update'
+    const sourceType = (sourceTypeSelect?.value as SyncSourceType | undefined) || 'github'
 
     // 按数据源类型读取对应字段值
     // - local: 复用 githubConfig.path 字段存储本地文件路径（与远程源 path 字段互斥复用）
@@ -517,7 +519,7 @@ export function setupButtonListeners(): void {
     if (sourceTypeSelect) {
       // sourceType 切换时：1) 触发字段显示/隐藏；2) 触发防抖保存
       trackedAddEventListener(sourceTypeSelect, 'change', () => {
-        const newSourceType = (sourceTypeSelect.value as SyncSourceType) || 'github'
+        const newSourceType = (sourceTypeSelect.value as SyncSourceType | undefined) || 'github'
         toggleSourceFields(newSourceType)
         debouncedSaveGithubConfig()
       })
@@ -622,20 +624,20 @@ const ACTION_HANDLERS: Record<string, ActionHandler> = {
   // 核心操作
   sync: (ctx) => {
     bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 开始执行同步操作')
-    syncFromPanel()
+    void syncFromPanel()
     bgmLog(
       LOG_LEVELS.INFO,
-      `[handleActionClick] 同步操作已触发，耗时: ${Date.now() - ctx.startTime}ms`,
+      `[handleActionClick] 同步操作已触发，耗时: ${String(Date.now() - ctx.startTime)}ms`,
     )
   },
 
   testSelected: (ctx) => {
     bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 开始执行选中行同步')
     if (typeof syncSelectedRows === 'function') {
-      syncSelectedRows()
+      void syncSelectedRows()
       bgmLog(
         LOG_LEVELS.INFO,
-        `[handleActionClick] 选中行同步已触发，耗时: ${Date.now() - ctx.startTime}ms`,
+        `[handleActionClick] 选中行同步已触发，耗时: ${String(Date.now() - ctx.startTime)}ms`,
       )
     } else {
       bgmLog(LOG_LEVELS.WARN, '[handleActionClick] syncSelectedRows 函数未定义')
@@ -651,7 +653,7 @@ const ACTION_HANDLERS: Record<string, ActionHandler> = {
         if (typeof refreshData === 'function') refreshData()
         bgmLog(
           LOG_LEVELS.INFO,
-          `[handleActionClick] 刷新数据完成，耗时: ${Date.now() - ctx.startTime}ms`,
+          `[handleActionClick] 刷新数据完成，耗时: ${String(Date.now() - ctx.startTime)}ms`,
         )
       } else {
         bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 用户取消刷新数据')
@@ -662,10 +664,10 @@ const ACTION_HANDLERS: Record<string, ActionHandler> = {
   previewSyncContent: (ctx) => {
     bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 开始执行预览同步内容')
     if (typeof previewSyncContent === 'function') {
-      previewSyncContent()
+      void previewSyncContent()
       bgmLog(
         LOG_LEVELS.INFO,
-        `[handleActionClick] 预览同步内容已触发，耗时: ${Date.now() - ctx.startTime}ms`,
+        `[handleActionClick] 预览同步内容已触发，耗时: ${String(Date.now() - ctx.startTime)}ms`,
       )
     } else {
       bgmLog(LOG_LEVELS.WARN, '[handleActionClick] previewSyncContent 函数未定义')
@@ -687,7 +689,7 @@ const ACTION_HANDLERS: Record<string, ActionHandler> = {
     showTokenDialog(loadBgToken() || '')
     bgmLog(
       LOG_LEVELS.INFO,
-      `[handleActionClick] Token 设置对话框已打开，耗时: ${Date.now() - ctx.startTime}ms`,
+      `[handleActionClick] Token 设置对话框已打开，耗时: ${String(Date.now() - ctx.startTime)}ms`,
     )
   },
 
@@ -697,7 +699,7 @@ const ACTION_HANDLERS: Record<string, ActionHandler> = {
     showTokenDialog(loadBgToken() || '')
     bgmLog(
       LOG_LEVELS.INFO,
-      `[handleActionClick] Token 设置对话框已显示，耗时: ${Date.now() - ctx.startTime}ms`,
+      `[handleActionClick] Token 设置对话框已显示，耗时: ${String(Date.now() - ctx.startTime)}ms`,
     )
   },
 
@@ -721,7 +723,7 @@ const ACTION_HANDLERS: Record<string, ActionHandler> = {
     }
     bgmLog(
       LOG_LEVELS.INFO,
-      `[handleActionClick] 清除 Token 操作完成，耗时: ${Date.now() - ctx.startTime}ms`,
+      `[handleActionClick] 清除 Token 操作完成，耗时: ${String(Date.now() - ctx.startTime)}ms`,
     )
   },
 
@@ -739,7 +741,7 @@ const ACTION_HANDLERS: Record<string, ActionHandler> = {
     }
     bgmLog(
       LOG_LEVELS.INFO,
-      `[handleActionClick] 复制 Token 操作完成，耗时: ${Date.now() - ctx.startTime}ms`,
+      `[handleActionClick] 复制 Token 操作完成，耗时: ${String(Date.now() - ctx.startTime)}ms`,
     )
   },
 
@@ -748,17 +750,18 @@ const ACTION_HANDLERS: Record<string, ActionHandler> = {
     testTokenValidity()
     bgmLog(
       LOG_LEVELS.INFO,
-      `[handleActionClick] Token 测试已触发，耗时: ${Date.now() - ctx.startTime}ms`,
+      `[handleActionClick] Token 测试已触发，耗时: ${String(Date.now() - ctx.startTime)}ms`,
     )
   },
 
   // Token 续约：刷新用户信息和头像
   renewToken: (ctx) => {
     bgmLog(LOG_LEVELS.INFO, '[handleActionClick] Token 续约')
-    renewToken()
+    // renewToken 已废弃，其内部仅委托给 testTokenValidity，直接调用等价流程
+    testTokenValidity()
     bgmLog(
       LOG_LEVELS.INFO,
-      `[handleActionClick] Token 续约已触发，耗时: ${Date.now() - ctx.startTime}ms`,
+      `[handleActionClick] Token 续约已触发，耗时: ${String(Date.now() - ctx.startTime)}ms`,
     )
   },
 
@@ -773,7 +776,7 @@ const ACTION_HANDLERS: Record<string, ActionHandler> = {
     showUserIdDialog()
     bgmLog(
       LOG_LEVELS.INFO,
-      `[handleActionClick] 用户ID设置对话框已显示，耗时: ${Date.now() - ctx.startTime}ms`,
+      `[handleActionClick] 用户ID设置对话框已显示，耗时: ${String(Date.now() - ctx.startTime)}ms`,
     )
   },
 
@@ -782,7 +785,7 @@ const ACTION_HANDLERS: Record<string, ActionHandler> = {
     openUserCollection()
     bgmLog(
       LOG_LEVELS.INFO,
-      `[handleActionClick] 收藏页面打开操作已触发，耗时: ${Date.now() - ctx.startTime}ms`,
+      `[handleActionClick] 收藏页面打开操作已触发，耗时: ${String(Date.now() - ctx.startTime)}ms`,
     )
   },
 
@@ -791,7 +794,7 @@ const ACTION_HANDLERS: Record<string, ActionHandler> = {
     openBangumiTokenPage()
     bgmLog(
       LOG_LEVELS.INFO,
-      `[handleActionClick] Token 申请页面已触发，耗时: ${Date.now() - ctx.startTime}ms`,
+      `[handleActionClick] Token 申请页面已触发，耗时: ${String(Date.now() - ctx.startTime)}ms`,
     )
   },
 
@@ -800,7 +803,7 @@ const ACTION_HANDLERS: Record<string, ActionHandler> = {
     syncCollectionFromBgm()
     bgmLog(
       LOG_LEVELS.INFO,
-      `[handleActionClick] 收藏同步已触发，耗时: ${Date.now() - ctx.startTime}ms`,
+      `[handleActionClick] 收藏同步已触发，耗时: ${String(Date.now() - ctx.startTime)}ms`,
     )
   },
 
@@ -809,7 +812,7 @@ const ACTION_HANDLERS: Record<string, ActionHandler> = {
     refreshSheets({ autoSelectActive: true })
     bgmLog(
       LOG_LEVELS.INFO,
-      `[handleActionClick] 工作表刷新已触发，耗时: ${Date.now() - ctx.startTime}ms`,
+      `[handleActionClick] 工作表刷新已触发，耗时: ${String(Date.now() - ctx.startTime)}ms`,
     )
   },
 
@@ -819,7 +822,7 @@ const ACTION_HANDLERS: Record<string, ActionHandler> = {
     refreshSheets({ autoSelectActive: true })
     bgmLog(
       LOG_LEVELS.INFO,
-      `[handleActionClick] 工作簿刷新已触发，耗时: ${Date.now() - ctx.startTime}ms`,
+      `[handleActionClick] 工作簿刷新已触发，耗时: ${String(Date.now() - ctx.startTime)}ms`,
     )
   },
 
@@ -828,7 +831,7 @@ const ACTION_HANDLERS: Record<string, ActionHandler> = {
     refreshData()
     bgmLog(
       LOG_LEVELS.INFO,
-      `[handleActionClick] 数据刷新已触发，耗时: ${Date.now() - ctx.startTime}ms`,
+      `[handleActionClick] 数据刷新已触发，耗时: ${String(Date.now() - ctx.startTime)}ms`,
     )
   },
 
@@ -837,7 +840,7 @@ const ACTION_HANDLERS: Record<string, ActionHandler> = {
     toggleSheetLock()
     bgmLog(
       LOG_LEVELS.INFO,
-      `[handleActionClick] 工作表锁定状态已切换，耗时: ${Date.now() - ctx.startTime}ms`,
+      `[handleActionClick] 工作表锁定状态已切换，耗时: ${String(Date.now() - ctx.startTime)}ms`,
     )
   },
 
@@ -846,7 +849,7 @@ const ACTION_HANDLERS: Record<string, ActionHandler> = {
     clearSyncRecords()
     bgmLog(
       LOG_LEVELS.INFO,
-      `[handleActionClick] 同步记录清除已触发，耗时: ${Date.now() - ctx.startTime}ms`,
+      `[handleActionClick] 同步记录清除已触发，耗时: ${String(Date.now() - ctx.startTime)}ms`,
     )
   },
 
@@ -856,7 +859,7 @@ const ACTION_HANDLERS: Record<string, ActionHandler> = {
     showToast('去重完成', 'success')
     bgmLog(
       LOG_LEVELS.INFO,
-      `[handleActionClick] 同步记录去重已触发，耗时: ${Date.now() - ctx.startTime}ms`,
+      `[handleActionClick] 同步记录去重已触发，耗时: ${String(Date.now() - ctx.startTime)}ms`,
     )
   },
 
@@ -866,7 +869,7 @@ const ACTION_HANDLERS: Record<string, ActionHandler> = {
     showToast('格式设置完成', 'success')
     bgmLog(
       LOG_LEVELS.INFO,
-      `[handleActionClick] 同步记录表格式设置已触发，耗时: ${Date.now() - ctx.startTime}ms`,
+      `[handleActionClick] 同步记录表格式设置已触发，耗时: ${String(Date.now() - ctx.startTime)}ms`,
     )
   },
 
@@ -875,7 +878,7 @@ const ACTION_HANDLERS: Record<string, ActionHandler> = {
     cleanLockedDataSheet()
     bgmLog(
       LOG_LEVELS.INFO,
-      `[handleActionClick] 数据清洗完成，耗时: ${Date.now() - ctx.startTime}ms`,
+      `[handleActionClick] 数据清洗完成，耗时: ${String(Date.now() - ctx.startTime)}ms`,
     )
   },
 
@@ -884,7 +887,7 @@ const ACTION_HANDLERS: Record<string, ActionHandler> = {
     openSyncRecordSheet()
     bgmLog(
       LOG_LEVELS.INFO,
-      `[handleActionClick] 同步记录工作表已打开，耗时: ${Date.now() - ctx.startTime}ms`,
+      `[handleActionClick] 同步记录工作表已打开，耗时: ${String(Date.now() - ctx.startTime)}ms`,
     )
   },
 
@@ -893,7 +896,7 @@ const ACTION_HANDLERS: Record<string, ActionHandler> = {
     testDebugConnection()
     bgmLog(
       LOG_LEVELS.INFO,
-      `[handleActionClick] 调试连接测试已完成，耗时: ${Date.now() - ctx.startTime}ms`,
+      `[handleActionClick] 调试连接测试已完成，耗时: ${String(Date.now() - ctx.startTime)}ms`,
     )
   },
 
@@ -903,7 +906,7 @@ const ACTION_HANDLERS: Record<string, ActionHandler> = {
     closeDetailModal()
     bgmLog(
       LOG_LEVELS.INFO,
-      `[handleActionClick] 详情模态框已关闭，耗时: ${Date.now() - ctx.startTime}ms`,
+      `[handleActionClick] 详情模态框已关闭，耗时: ${String(Date.now() - ctx.startTime)}ms`,
     )
   },
 
@@ -913,7 +916,7 @@ const ACTION_HANDLERS: Record<string, ActionHandler> = {
     showToast(ctx.args[0] ?? '', ctx.args[1] ?? '')
     bgmLog(
       LOG_LEVELS.INFO,
-      `[handleActionClick] Toast 已显示，耗时: ${Date.now() - ctx.startTime}ms`,
+      `[handleActionClick] Toast 已显示，耗时: ${String(Date.now() - ctx.startTime)}ms`,
     )
   },
 
@@ -922,7 +925,7 @@ const ACTION_HANDLERS: Record<string, ActionHandler> = {
     showAlert(ctx.args[0] ?? '', ctx.args[1] ?? '')
     bgmLog(
       LOG_LEVELS.INFO,
-      `[handleActionClick] 警告框已显示，耗时: ${Date.now() - ctx.startTime}ms`,
+      `[handleActionClick] 警告框已显示，耗时: ${String(Date.now() - ctx.startTime)}ms`,
     )
   },
 
@@ -931,7 +934,7 @@ const ACTION_HANDLERS: Record<string, ActionHandler> = {
     BGM.sync.requestStop()
     bgmLog(
       LOG_LEVELS.INFO,
-      `[handleActionClick] 停止同步请求已发送，耗时: ${Date.now() - ctx.startTime}ms`,
+      `[handleActionClick] 停止同步请求已发送，耗时: ${String(Date.now() - ctx.startTime)}ms`,
     )
   },
 
@@ -940,7 +943,7 @@ const ACTION_HANDLERS: Record<string, ActionHandler> = {
     BGM.sync.pause()
     bgmLog(
       LOG_LEVELS.INFO,
-      `[handleActionClick] 暂停同步请求已发送，耗时: ${Date.now() - ctx.startTime}ms`,
+      `[handleActionClick] 暂停同步请求已发送，耗时: ${String(Date.now() - ctx.startTime)}ms`,
     )
   },
 
@@ -949,7 +952,7 @@ const ACTION_HANDLERS: Record<string, ActionHandler> = {
     BGM.sync.resume()
     bgmLog(
       LOG_LEVELS.INFO,
-      `[handleActionClick] 恢复同步请求已发送，耗时: ${Date.now() - ctx.startTime}ms`,
+      `[handleActionClick] 恢复同步请求已发送，耗时: ${String(Date.now() - ctx.startTime)}ms`,
     )
   },
 
@@ -968,7 +971,7 @@ const ACTION_HANDLERS: Record<string, ActionHandler> = {
       showToast('UI 元素缺失', 'error')
       return
     }
-    const sourceType = (sourceTypeSelect?.value as SyncSourceType) || 'github'
+    const sourceType = (sourceTypeSelect?.value as SyncSourceType | undefined) || 'github'
 
     // 按数据源类型读取对应字段
     let path: string
@@ -1007,7 +1010,7 @@ const ACTION_HANDLERS: Record<string, ActionHandler> = {
         return
       }
     }
-    const strategy = (strategySelect?.value as SyncStrategy) || 'add-update'
+    const strategy = (strategySelect?.value as SyncStrategy | undefined) || 'add-update'
     const okConfig = setGithubConfig(config)
     const okStrategy = setSyncStrategy(strategy)
     const okSourceType = setSyncSourceType(sourceType)
@@ -1022,7 +1025,7 @@ const ACTION_HANDLERS: Record<string, ActionHandler> = {
     }
     bgmLog(
       LOG_LEVELS.INFO,
-      `[handleActionClick] 保存 GitHub 配置完成，耗时: ${Date.now() - ctx.startTime}ms`,
+      `[handleActionClick] 保存 GitHub 配置完成，耗时: ${String(Date.now() - ctx.startTime)}ms`,
     )
   },
 
@@ -1032,7 +1035,7 @@ const ACTION_HANDLERS: Record<string, ActionHandler> = {
     // 读取同步源类型：优先用下拉框当前值，兜底用已保存的值
     const sourceTypeSelect = document.getElementById('syncSourceType') as HTMLSelectElement | null
     const currentSourceType: SyncSourceType =
-      (sourceTypeSelect?.value as SyncSourceType) || getSyncSourceType()
+      (sourceTypeSelect?.value as SyncSourceType | undefined) || getSyncSourceType()
     // 读取「仅同步选中行」开关
     const chkSelectedOnly = document.getElementById(
       'chkSyncSelectedOnly',
@@ -1049,7 +1052,8 @@ const ACTION_HANDLERS: Record<string, ActionHandler> = {
       const quarterSelect = document.getElementById('timeFilterQuarter') as HTMLSelectElement | null
       const monthSelect = document.getElementById('timeFilterMonth') as HTMLSelectElement | null
       const year = parseInt(yearSelect?.value || '2026', 10)
-      const range = (rangeSelect?.value as 'year' | 'quarter' | 'month' | 'future') || 'year'
+      const range =
+        (rangeSelect?.value as 'year' | 'quarter' | 'month' | 'future' | undefined) || 'year'
       timeFilter = {
         enabled: true,
         year,
@@ -1074,7 +1078,7 @@ const ACTION_HANDLERS: Record<string, ActionHandler> = {
     }
     // 读取策略：优先用下拉框当前值（未保存也能即时生效），兜底用已保存的策略
     const strategySelect = document.getElementById('githubStrategy') as HTMLSelectElement | null
-    const strategy = (strategySelect?.value as SyncStrategy) || getSyncStrategy()
+    const strategy = (strategySelect?.value as SyncStrategy | undefined) || getSyncStrategy()
     const strategyLabel = (
       {
         'add-update': '新增+更新（不删除）',
@@ -1093,10 +1097,10 @@ const ACTION_HANDLERS: Record<string, ActionHandler> = {
         timeFilter.range === 'future'
           ? `\n🔮 时间筛选：预告/未来动漫（无开播日期）`
           : timeFilter.range === 'year'
-            ? `\n📅 时间筛选：${timeFilter.year}年全年`
+            ? `\n📅 时间筛选：${String(timeFilter.year)}年全年`
             : timeFilter.range === 'quarter'
-              ? `\n📅 时间筛选：${timeFilter.year}年${timeFilter.quarter}月新番`
-              : `\n📅 时间筛选：${timeFilter.year}年${timeFilter.month}月`
+              ? `\n📅 时间筛选：${String(timeFilter.year)}年${String(timeFilter.quarter ?? '')}月新番`
+              : `\n📅 时间筛选：${String(timeFilter.year)}年${String(timeFilter.month ?? '')}月`
     }
     showConfirm(
       `将从${sourceLabel}下载数据并按策略【${strategyLabel}】合并到当前工作表。\n（远程仓库 → Excel，与上传同步方向相反）${selectedRowsOnly ? '\n⚠️ 仅同步选中行' : ''}${timeFilterDesc}\n是否继续？`,
@@ -1159,7 +1163,7 @@ const ACTION_HANDLERS: Record<string, ActionHandler> = {
             updateSyncProgressDialog(current, total, message, message, eta)
             if (app?.StatusBar !== undefined) {
               const statusMsg = eta ? `${message} | ${eta}` : message
-              app.StatusBar = `[${current}/${total}] ${statusMsg}`
+              app.StatusBar = `[${String(current)}/${String(total)}] ${statusMsg}`
             }
           },
           strategy,
@@ -1185,20 +1189,20 @@ const ACTION_HANDLERS: Record<string, ActionHandler> = {
                 ? Math.round(((result.remoteTotal - totalProcessed) / avgSpeed) * 1000)
                 : 0
 
-            const summary = `远程 ${result.remoteTotal} 条 → ✅${result.added} 🔄${result.updated} ❌${result.deleted} ⏭️${result.unchanged} ⚠️${result.failed} | 耗时 ${formatDuration(totalElapsed)} | ${avgSpeed > 0 ? avgSpeed : '?'} 行/秒 | 效率 ${efficiency}%`
+            const summary = `远程 ${String(result.remoteTotal)} 条 → ✅${String(result.added)} 🔄${String(result.updated)} ❌${String(result.deleted)} ⏭️${String(result.unchanged)} ⚠️${String(result.failed)} | 耗时 ${formatDuration(totalElapsed)} | ${String(avgSpeed > 0 ? avgSpeed : '?')} 行/秒 | 效率 ${String(efficiency)}%`
             const details = [
-              `📥 远程数据总量: ${result.remoteTotal}`,
-              `➕ 新增: ${result.added}`,
-              `✏️ 更新: ${result.updated}`,
-              `🗑️ 删除: ${result.deleted}`,
-              `⏭️ 无变更: ${result.unchanged}`,
-              `❌ 失败: ${result.failed}`,
-              `🔍 跳过: ${result.skipped}`,
-              `📊 实际处理: ${totalProcessed} 条`,
+              `📥 远程数据总量: ${String(result.remoteTotal)}`,
+              `➕ 新增: ${String(result.added)}`,
+              `✏️ 更新: ${String(result.updated)}`,
+              `🗑️ 删除: ${String(result.deleted)}`,
+              `⏭️ 无变更: ${String(result.unchanged)}`,
+              `❌ 失败: ${String(result.failed)}`,
+              `🔍 跳过: ${String(result.skipped)}`,
+              `📊 实际处理: ${String(totalProcessed)} 条`,
               `⏱️ 总耗时: ${formatDuration(totalElapsed)}`,
-              `⚡ 平均速度: ${avgSpeed > 0 ? avgSpeed + ' 行/秒' : '--'}`,
-              `📈 处理效率: ${efficiency}%`,
-              `${etaMs > 0 ? `🔮 预计剩余: ${formatDuration(etaMs)}` : '✅ 全部完成'}`,
+              `⚡ 平均速度: ${avgSpeed > 0 ? String(avgSpeed) + ' 行/秒' : '--'}`,
+              `📈 处理效率: ${String(efficiency)}%`,
+              etaMs > 0 ? `🔮 预计剩余: ${formatDuration(etaMs)}` : '✅ 全部完成',
             ]
 
             const stats: SyncProgressStats = {
@@ -1211,7 +1215,7 @@ const ACTION_HANDLERS: Record<string, ActionHandler> = {
               remoteTotal: result.remoteTotal,
               elapsedMs: totalElapsed,
               avgSpeed,
-              strategyLabel: strategyLabel ?? '未知策略',
+              strategyLabel,
             }
 
             const detailItems: GithubSyncDetailItem[] | undefined =
@@ -1234,7 +1238,7 @@ const ACTION_HANDLERS: Record<string, ActionHandler> = {
                   result,
                   elapsedMs: totalElapsed,
                   avgSpeed,
-                  strategyLabel: strategyLabel ?? '未知策略',
+                  strategyLabel,
                   stopped: false,
                 }
                 if (scrollToRow !== undefined) {
@@ -1248,7 +1252,7 @@ const ACTION_HANDLERS: Record<string, ActionHandler> = {
 
             bgmLog(
               LOG_LEVELS.INFO,
-              `[handleActionClick] 同步完成 | 远程:${result.remoteTotal} ✅:${result.added} 🔄:${result.updated} ❌:${result.deleted} ⏭️:${result.unchanged} ⚠️:${result.failed} 🔍:${result.skipped} | 耗时:${formatDuration(totalElapsed)} | 速度:${avgSpeed > 0 ? avgSpeed + '/s' : '?'} | 效率:${efficiency}%`,
+              `[handleActionClick] 同步完成 | 远程:${String(result.remoteTotal)} ✅:${String(result.added)} 🔄:${String(result.updated)} ❌:${String(result.deleted)} ⏭️:${String(result.unchanged)} ⚠️:${String(result.failed)} 🔍:${String(result.skipped)} | 耗时:${formatDuration(totalElapsed)} | 速度:${avgSpeed > 0 ? String(avgSpeed) + '/s' : '?'} | 效率:${String(efficiency)}%`,
             )
             if (app?.StatusBar !== undefined) app.StatusBar = false
           })
@@ -1267,7 +1271,7 @@ const ACTION_HANDLERS: Record<string, ActionHandler> = {
                 } as GithubSyncResult,
                 elapsedMs: Date.now() - syncStartTime,
                 avgSpeed: 0,
-                strategyLabel: strategyLabel ?? '未知策略',
+                strategyLabel,
                 stopped: true,
               })
               bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 数据同步被用户停止')
@@ -1282,7 +1286,7 @@ const ACTION_HANDLERS: Record<string, ActionHandler> = {
     )
     bgmLog(
       LOG_LEVELS.INFO,
-      `[handleActionClick] 数据同步已触发（策略: ${strategy}），耗时: ${Date.now() - ctx.startTime}ms`,
+      `[handleActionClick] 数据同步已触发（策略: ${strategy}），耗时: ${String(Date.now() - ctx.startTime)}ms`,
     )
   },
 
@@ -1329,7 +1333,7 @@ const ACTION_HANDLERS: Record<string, ActionHandler> = {
 
       bgmLog(
         LOG_LEVELS.INFO,
-        `[handleActionClick] 连接测试完成: status=${statusCode}, time=${responseTime}ms, url=${url}`,
+        `[handleActionClick] 连接测试完成: status=${String(statusCode)}, time=${String(responseTime)}ms, url=${url}`,
       )
 
       showConnectionTestDialog({
@@ -1338,7 +1342,7 @@ const ACTION_HANDLERS: Record<string, ActionHandler> = {
         responseTime,
         url,
         sourceType,
-        errorMessage: !success ? `HTTP ${statusCode}` : undefined,
+        errorMessage: !success ? `HTTP ${String(statusCode)}` : undefined,
       })
     }
 
@@ -1374,7 +1378,7 @@ const ACTION_HANDLERS: Record<string, ActionHandler> = {
 
     bgmLog(
       LOG_LEVELS.INFO,
-      `[handleActionClick] 测试 GitHub 配置已发起，耗时: ${Date.now() - ctx.startTime}ms`,
+      `[handleActionClick] 测试 GitHub 配置已发起，耗时: ${String(Date.now() - ctx.startTime)}ms`,
     )
   },
 
@@ -1422,7 +1426,7 @@ const ACTION_HANDLERS: Record<string, ActionHandler> = {
     }
     bgmLog(
       LOG_LEVELS.INFO,
-      `[handleActionClick] 选择本地文件完成，耗时: ${Date.now() - ctx.startTime}ms`,
+      `[handleActionClick] 选择本地文件完成，耗时: ${String(Date.now() - ctx.startTime)}ms`,
     )
   },
 
@@ -1436,7 +1440,7 @@ const ACTION_HANDLERS: Record<string, ActionHandler> = {
     })
     bgmLog(
       LOG_LEVELS.INFO,
-      `[handleActionClick] 撤销同步已触发，耗时: ${Date.now() - ctx.startTime}ms`,
+      `[handleActionClick] 撤销同步已触发，耗时: ${String(Date.now() - ctx.startTime)}ms`,
     )
   },
 
@@ -1450,7 +1454,7 @@ const ACTION_HANDLERS: Record<string, ActionHandler> = {
     }
     bgmLog(
       LOG_LEVELS.INFO,
-      `[handleActionClick] 系统日志面板已打开，耗时: ${Date.now() - ctx.startTime}ms`,
+      `[handleActionClick] 系统日志面板已打开，耗时: ${String(Date.now() - ctx.startTime)}ms`,
     )
   },
 
@@ -1461,7 +1465,7 @@ const ACTION_HANDLERS: Record<string, ActionHandler> = {
     if (modal) modal.style.display = 'none'
     bgmLog(
       LOG_LEVELS.INFO,
-      `[handleActionClick] 系统日志面板已关闭，耗时: ${Date.now() - ctx.startTime}ms`,
+      `[handleActionClick] 系统日志面板已关闭，耗时: ${String(Date.now() - ctx.startTime)}ms`,
     )
   },
 
@@ -1478,7 +1482,7 @@ const ACTION_HANDLERS: Record<string, ActionHandler> = {
     }
     bgmLog(
       LOG_LEVELS.INFO,
-      `[handleActionClick] 日志导出完成，耗时: ${Date.now() - ctx.startTime}ms`,
+      `[handleActionClick] 日志导出完成，耗时: ${String(Date.now() - ctx.startTime)}ms`,
     )
   },
 
@@ -1490,7 +1494,7 @@ const ACTION_HANDLERS: Record<string, ActionHandler> = {
     showToast('日志已清空', 'info')
     bgmLog(
       LOG_LEVELS.INFO,
-      `[handleActionClick] 系统日志已清空，耗时: ${Date.now() - ctx.startTime}ms`,
+      `[handleActionClick] 系统日志已清空，耗时: ${String(Date.now() - ctx.startTime)}ms`,
     )
   },
 
@@ -1524,7 +1528,7 @@ const ACTION_HANDLERS: Record<string, ActionHandler> = {
     }
     bgmLog(
       LOG_LEVELS.INFO,
-      `[handleActionClick] 同步策略引导已打开，耗时: ${Date.now() - ctx.startTime}ms`,
+      `[handleActionClick] 同步策略引导已打开，耗时: ${String(Date.now() - ctx.startTime)}ms`,
     )
   },
 
@@ -1540,7 +1544,7 @@ const ACTION_HANDLERS: Record<string, ActionHandler> = {
     }
     bgmLog(
       LOG_LEVELS.INFO,
-      `[handleActionClick] 使用引导已${detail?.style.display === 'none' ? '隐藏' : '显示'}，耗时: ${Date.now() - ctx.startTime}ms`,
+      `[handleActionClick] 使用引导已${detail?.style.display === 'none' ? '隐藏' : '显示'}，耗时: ${String(Date.now() - ctx.startTime)}ms`,
     )
   },
 
@@ -1597,7 +1601,7 @@ const ACTION_HANDLERS: Record<string, ActionHandler> = {
     }
     bgmLog(
       LOG_LEVELS.INFO,
-      `[handleActionClick] 保存配置操作完成，耗时: ${Date.now() - ctx.startTime}ms`,
+      `[handleActionClick] 保存配置操作完成，耗时: ${String(Date.now() - ctx.startTime)}ms`,
     )
   },
 
@@ -1627,7 +1631,7 @@ const ACTION_HANDLERS: Record<string, ActionHandler> = {
     }
     bgmLog(
       LOG_LEVELS.INFO,
-      `[handleActionClick] 导出配置操作完成，耗时: ${Date.now() - ctx.startTime}ms`,
+      `[handleActionClick] 导出配置操作完成，耗时: ${String(Date.now() - ctx.startTime)}ms`,
     )
   },
 
@@ -1660,7 +1664,7 @@ const ACTION_HANDLERS: Record<string, ActionHandler> = {
     )
     bgmLog(
       LOG_LEVELS.INFO,
-      `[handleActionClick] 导入配置对话框已显示，耗时: ${Date.now() - ctx.startTime}ms`,
+      `[handleActionClick] 导入配置对话框已显示，耗时: ${String(Date.now() - ctx.startTime)}ms`,
     )
   },
 
@@ -1670,7 +1674,7 @@ const ACTION_HANDLERS: Record<string, ActionHandler> = {
     const app = getApp() as {
       PluginStorage?: { getItem: (k: string) => string | null }
       GetTaskPane?: (id: string) => { Visible: boolean }
-    }
+    } | null
     if (!app) {
       bgmLog(LOG_LEVELS.WARN, '[handleActionClick] 无法获取 Application 对象')
       return
@@ -1688,7 +1692,7 @@ const ACTION_HANDLERS: Record<string, ActionHandler> = {
     }
     bgmLog(
       LOG_LEVELS.INFO,
-      `[handleActionClick] 关闭主面板操作完成，耗时: ${Date.now() - ctx.startTime}ms`,
+      `[handleActionClick] 关闭主面板操作完成，耗时: ${String(Date.now() - ctx.startTime)}ms`,
     )
   },
 
@@ -1698,7 +1702,7 @@ const ACTION_HANDLERS: Record<string, ActionHandler> = {
     showSettingsPanel()
     bgmLog(
       LOG_LEVELS.INFO,
-      `[handleActionClick] 设置面板操作已触发，耗时: ${Date.now() - ctx.startTime}ms`,
+      `[handleActionClick] 设置面板操作已触发，耗时: ${String(Date.now() - ctx.startTime)}ms`,
     )
   },
 
@@ -1772,7 +1776,7 @@ function handleActionClick(event: Event): void {
   let args: string[] = []
   if (target.dataset.args) {
     try {
-      args = JSON.parse(target.dataset.args)
+      args = JSON.parse(target.dataset.args) as string[]
     } catch (e: unknown) {
       BGM.handleError(e, {
         showAlert: false,
@@ -1832,7 +1836,9 @@ export function initHandlers(): void {
 
   if (typeof document !== 'undefined') {
     if (document.readyState === 'loading') {
-      document.addEventListener('DOMContentLoaded', () => start())
+      document.addEventListener('DOMContentLoaded', () => {
+        start()
+      })
     } else {
       start()
     }
@@ -1859,6 +1865,8 @@ function _copyTextToClipboard(text: string): boolean {
     textarea.style.pointerEvents = 'none'
     document.body.appendChild(textarea)
     textarea.select()
+    // execCommand 已废弃但仍是 WebView/Office 环境中最可靠的剪贴板回退方案（navigator.clipboard 需安全上下文，不可用）
+    // eslint-disable-next-line @typescript-eslint/no-deprecated
     const ok = document.execCommand('copy')
     document.body.removeChild(textarea)
     return ok
@@ -1921,22 +1929,27 @@ function setupMessageListener(): void {
         bgmLog(LOG_LEVELS.WARN, `[message] 拒绝非预期 origin: ${event.origin}`)
         return
       }
-      const data = event.data
-      if (!data || typeof data !== 'object') return
+      const data: unknown = event.data
+      if (typeof data !== 'object' || data === null) return
+      const msg = data as {
+        type?: string
+        userId?: string
+        username?: string
+      }
 
-      bgmLog(LOG_LEVELS.INFO, '[handlers] 收到消息: ' + JSON.stringify(data))
+      bgmLog(LOG_LEVELS.INFO, '[handlers] 收到消息: ' + JSON.stringify(msg))
 
-      switch (data.type) {
+      switch (msg.type) {
         case 'BGM:tokenUpdated':
           bgmLog(LOG_LEVELS.INFO, '[handlers] 收到 Token 更新通知')
           updateTokenStatus()
           updateUserIdStatus()
           break
         case 'BGM:userIdUpdated':
-          bgmLog(LOG_LEVELS.INFO, `[handlers] 收到用户ID更新通知: ${data.userId}`)
-          if (data.userId) {
-            BGM.cache.userId = data.userId
-            _setBgmUserId(data.userId)
+          bgmLog(LOG_LEVELS.INFO, `[handlers] 收到用户ID更新通知: ${String(msg.userId)}`)
+          if (msg.userId) {
+            BGM.cache.userId = msg.userId
+            _setBgmUserId(msg.userId)
             bgmLog(LOG_LEVELS.INFO, `[handlers] 已更新 BGM.cache.userId: ${BGM.cache.userId}`)
           }
           updateUserIdStatus()
@@ -1944,16 +1957,16 @@ function setupMessageListener(): void {
         case 'BGM:userInfoUpdated':
           bgmLog(
             LOG_LEVELS.INFO,
-            `[handlers] 收到用户信息更新通知: 用户名=${data.username}, 用户ID=${data.userId}`,
+            `[handlers] 收到用户信息更新通知: 用户名=${String(msg.username)}, 用户ID=${String(msg.userId)}`,
           )
-          if (data.username) {
-            BGM.cache.username = data.username
-            _setBgmUsername(data.username)
+          if (msg.username) {
+            BGM.cache.username = msg.username
+            _setBgmUsername(msg.username)
             bgmLog(LOG_LEVELS.INFO, `[handlers] 已更新 BGM.cache.username: ${BGM.cache.username}`)
           }
-          if (data.userId) {
-            BGM.cache.userId = data.userId
-            _setBgmUserId(data.userId)
+          if (msg.userId) {
+            BGM.cache.userId = msg.userId
+            _setBgmUserId(msg.userId)
             bgmLog(
               LOG_LEVELS.INFO,
               `[handlers] 已更新 BGM.cache.userId 和用户ID配置: ${BGM.cache.userId}`,
@@ -1964,9 +1977,9 @@ function setupMessageListener(): void {
         case 'tokenUpdated':
         case 'userIdUpdated':
           // 兼容旧格式
-          if (data.type === 'tokenUpdated') {
+          if (msg.type === 'tokenUpdated') {
             updateTokenStatus()
-          } else if (data.type === 'userIdUpdated') {
+          } else {
             updateUserIdStatus()
           }
           break
@@ -2038,7 +2051,7 @@ const handleSyncProgressEvent = (data: {
 const handleSyncStateChangedEvent = (payload: { state: string; row?: number }): void => {
   bgmLog(
     LOG_LEVELS.INFO,
-    `[handlers] 同步状态变更: ${payload.state}${payload.row ? `, 行: ${payload.row}` : ''}`,
+    `[handlers] 同步状态变更: ${payload.state}${payload.row ? `, 行: ${String(payload.row)}` : ''}`,
   )
   const syncButtons = document.querySelectorAll(
     'button[data-action="sync"], button[data-action="syncCollectionFromBgm"], button[data-action="previewSyncContent"], button[data-action="enlargePreview"]',
@@ -2055,7 +2068,7 @@ const handleSyncCompletedEvent = (
   bgmLog(LOG_LEVELS.INFO, `[handlers] 同步完成事件触发`)
   const stats = results ?? {}
   showToast(
-    `同步完成: 成功 ${stats.success ?? 0}, 失败 ${stats.fail ?? 0}, 跳过 ${stats.skip ?? 0}`,
+    `同步完成: 成功 ${String(stats.success ?? 0)}, 失败 ${String(stats.fail ?? 0)}, 跳过 ${String(stats.skip ?? 0)}`,
     'success',
   )
 }
@@ -2103,7 +2116,7 @@ function setupEventListeners(): void {
 function tryUpdateIncrementalCheckbox(checked: boolean, attempts: number = 0): void {
   if (!isPanelContext()) return
 
-  const chkIncremental = document.getElementById('chkIncremental') as HTMLInputElement
+  const chkIncremental = document.getElementById('chkIncremental') as HTMLInputElement | null
 
   if (chkIncremental) {
     bgmLog(LOG_LEVELS.INFO, `[handlers] 找到 chkIncremental 元素`)
@@ -2116,9 +2129,11 @@ function tryUpdateIncrementalCheckbox(checked: boolean, attempts: number = 0): v
     // 最多重试3次
     bgmLog(
       LOG_LEVELS.WARN,
-      `[handlers] 未找到 chkIncremental 元素，延迟重试 (${attempts + 1}/3)...`,
+      `[handlers] 未找到 chkIncremental 元素，延迟重试 (${String(attempts + 1)}/3)...`,
     )
-    trackedSetTimeout(() => tryUpdateIncrementalCheckbox(checked, attempts + 1), 100)
+    trackedSetTimeout(() => {
+      tryUpdateIncrementalCheckbox(checked, attempts + 1)
+    }, 100)
   } else {
     bgmLog(LOG_LEVELS.ERROR, `[handlers] 重试3次后仍未找到 chkIncremental 元素，放弃更新`)
   }
@@ -2130,7 +2145,9 @@ function tryUpdateSkipConflictsUI(skipConflicts: boolean, attempts: number = 0):
 
   bgmLog(LOG_LEVELS.INFO, `[handlers] 目标状态: ${skipConflicts ? '跳过冲突' : 'Excel覆盖'}`)
 
-  const conflictStrategySelect = document.getElementById('conflictStrategy') as HTMLSelectElement
+  const conflictStrategySelect = document.getElementById(
+    'conflictStrategy',
+  ) as HTMLSelectElement | null
 
   if (conflictStrategySelect) {
     bgmLog(LOG_LEVELS.INFO, `[handlers] 找到 conflictStrategy select 元素`)
@@ -2144,9 +2161,11 @@ function tryUpdateSkipConflictsUI(skipConflicts: boolean, attempts: number = 0):
     // 最多重试3次
     bgmLog(
       LOG_LEVELS.WARN,
-      `[handlers] 未找到 conflictStrategy select 元素，延迟重试 (${attempts + 1}/3)...`,
+      `[handlers] 未找到 conflictStrategy select 元素，延迟重试 (${String(attempts + 1)}/3)...`,
     )
-    trackedSetTimeout(() => tryUpdateSkipConflictsUI(skipConflicts, attempts + 1), 100)
+    trackedSetTimeout(() => {
+      tryUpdateSkipConflictsUI(skipConflicts, attempts + 1)
+    }, 100)
     return
   }
 
@@ -2157,12 +2176,12 @@ function tryUpdateSkipConflictsUI(skipConflicts: boolean, attempts: number = 0):
 
   // 如果找不到，尝试查找其他类型的控件
   // 备用：查找 radio 按钮
-  const skipRadio = document.querySelector(
+  const skipRadio = document.querySelector<HTMLInputElement>(
     'input[name="conflictStrategy"][value="skip"]',
-  ) as HTMLInputElement
-  const overwriteRadio = document.querySelector(
+  )
+  const overwriteRadio = document.querySelector<HTMLInputElement>(
     'input[name="conflictStrategy"][value="overwrite"]',
-  ) as HTMLInputElement
+  )
 
   if (skipRadio && overwriteRadio) {
     skipRadio.checked = skipConflicts
@@ -2172,7 +2191,7 @@ function tryUpdateSkipConflictsUI(skipConflicts: boolean, attempts: number = 0):
   }
 
   // 备用：如果是 checkbox
-  const chkSkipConflicts = document.getElementById('chkSkipConflicts') as HTMLInputElement
+  const chkSkipConflicts = document.getElementById('chkSkipConflicts') as HTMLInputElement | null
   if (chkSkipConflicts) {
     chkSkipConflicts.checked = skipConflicts
     bgmLog(LOG_LEVELS.INFO, `[handlers] 跳过冲突复选框已更新`)
@@ -2183,7 +2202,9 @@ function tryUpdateSkipConflictsUI(skipConflicts: boolean, attempts: number = 0):
 function tryUpdateEnableSyncRecordUI(enabled: boolean, attempts: number = 0): void {
   if (!isPanelContext()) return
 
-  const chkEnableSyncRecord = document.getElementById('chkEnableSyncRecord') as HTMLInputElement
+  const chkEnableSyncRecord = document.getElementById(
+    'chkEnableSyncRecord',
+  ) as HTMLInputElement | null
 
   if (chkEnableSyncRecord) {
     bgmLog(LOG_LEVELS.INFO, `[handlers] 找到 chkEnableSyncRecord 元素`)
@@ -2196,9 +2217,11 @@ function tryUpdateEnableSyncRecordUI(enabled: boolean, attempts: number = 0): vo
   } else if (attempts < 3) {
     bgmLog(
       LOG_LEVELS.WARN,
-      `[handlers] 未找到 chkEnableSyncRecord 元素，延迟重试 (${attempts + 1}/3)...`,
+      `[handlers] 未找到 chkEnableSyncRecord 元素，延迟重试 (${String(attempts + 1)}/3)...`,
     )
-    trackedSetTimeout(() => tryUpdateEnableSyncRecordUI(enabled, attempts + 1), 100)
+    trackedSetTimeout(() => {
+      tryUpdateEnableSyncRecordUI(enabled, attempts + 1)
+    }, 100)
   } else {
     bgmLog(LOG_LEVELS.ERROR, `[handlers] 重试3次后仍未找到 chkEnableSyncRecord 元素，放弃更新`)
   }
@@ -2250,9 +2273,9 @@ const handleConflictStrategyChange = (): void => {
 }
 
 const handleSkipRadioChange = (): void => {
-  const skipRadio = document.querySelector(
+  const skipRadio = document.querySelector<HTMLInputElement>(
     'input[name="conflictStrategy"][value="skip"]',
-  ) as HTMLInputElement | null
+  )
   if (skipRadio?.checked) {
     setSkipConflicts(true)
     bgmLog(LOG_LEVELS.INFO, `[handlers] 冲突策略已更新: 跳过冲突`)
@@ -2260,9 +2283,9 @@ const handleSkipRadioChange = (): void => {
 }
 
 const handleOverwriteRadioChange = (): void => {
-  const overwriteRadio = document.querySelector(
+  const overwriteRadio = document.querySelector<HTMLInputElement>(
     'input[name="conflictStrategy"][value="overwrite"]',
-  ) as HTMLInputElement | null
+  )
   if (overwriteRadio?.checked) {
     setSkipConflicts(false)
     bgmLog(LOG_LEVELS.INFO, `[handlers] 冲突策略已更新: Excel覆盖`)
@@ -2285,7 +2308,7 @@ const handleChkSkipConflictsChange = (): void => {
 function initIncrementalSyncFromRibbon(): void {
   if (!isPanelContext()) return
 
-  const chkIncremental = document.getElementById('chkIncremental') as HTMLInputElement
+  const chkIncremental = document.getElementById('chkIncremental') as HTMLInputElement | null
   if (!chkIncremental) return
 
   try {
@@ -2323,7 +2346,9 @@ function initSkipConflictsFromRibbon(): void {
   }
 
   // 监听冲突策略 select 的变化（侧边栏使用的是 select 下拉框）
-  const conflictStrategySelect = document.getElementById('conflictStrategy') as HTMLSelectElement
+  const conflictStrategySelect = document.getElementById(
+    'conflictStrategy',
+  ) as HTMLSelectElement | null
 
   if (conflictStrategySelect) {
     trackedAddEventListener(conflictStrategySelect, 'change', handleConflictStrategyChange)
@@ -2332,12 +2357,12 @@ function initSkipConflictsFromRibbon(): void {
   }
 
   // 备用：查找并监听 radio 按钮
-  const skipRadio = document.querySelector(
+  const skipRadio = document.querySelector<HTMLInputElement>(
     'input[name="conflictStrategy"][value="skip"]',
-  ) as HTMLInputElement
-  const overwriteRadio = document.querySelector(
+  )
+  const overwriteRadio = document.querySelector<HTMLInputElement>(
     'input[name="conflictStrategy"][value="overwrite"]',
-  ) as HTMLInputElement
+  )
 
   if (skipRadio && overwriteRadio) {
     trackedAddEventListener(skipRadio, 'change', handleSkipRadioChange)
@@ -2346,7 +2371,7 @@ function initSkipConflictsFromRibbon(): void {
   }
 
   // 备用：如果是 checkbox
-  const chkSkipConflicts = document.getElementById('chkSkipConflicts') as HTMLInputElement
+  const chkSkipConflicts = document.getElementById('chkSkipConflicts') as HTMLInputElement | null
   if (chkSkipConflicts) {
     trackedAddEventListener(chkSkipConflicts, 'change', handleChkSkipConflictsChange)
   }

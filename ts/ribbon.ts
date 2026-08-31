@@ -84,7 +84,7 @@ function initRibbonMessageListener(): void {
       bgmLog(LOG_LEVELS.WARN, `[message] 拒绝非预期 origin: ${event.origin}`)
       return
     }
-    const data = event.data
+    const data = event.data as { type?: string; data?: { key?: string } } | null | undefined
     if (data?.type === 'BGM:configUpdated') {
       const key = data.data?.key
       const controlIdMap: Record<string, string> = {
@@ -100,7 +100,7 @@ function initRibbonMessageListener(): void {
           ribbonUI.InvalidateControl(controlId)
           bgmLog(
             LOG_LEVELS.INFO,
-            `[ribbon-message] 已 InvalidateControl ${controlId} (config key=${key})`,
+            `[ribbon-message] 已 InvalidateControl ${controlId} (config key=${String(key)})`,
           )
         } else {
           bgmLog(LOG_LEVELS.WARN, `[ribbon-message] ribbonUI 不可用，无法刷新 ${controlId}`)
@@ -216,7 +216,7 @@ export function removeRibbonMessageListener(): void {
  */
 export function GetSkipConflictsPressed(_control: WpsRibbonControl): boolean {
   const result = getSkipConflicts()
-  bgmLog(LOG_LEVELS.INFO, `[Ribbon] GetSkipConflictsPressed: ${result}`)
+  bgmLog(LOG_LEVELS.INFO, `[Ribbon] GetSkipConflictsPressed: ${String(result)}`)
   return result
 }
 
@@ -225,7 +225,10 @@ export function GetSkipConflictsPressed(_control: WpsRibbonControl): boolean {
  */
 export function OnSkipConflictsChange(control: WpsRibbonControl): boolean {
   const newValue = control.Pressed
-  bgmLog(LOG_LEVELS.INFO, `[Ribbon] OnSkipConflictsChange: control.Pressed = ${newValue}`)
+  bgmLog(
+    LOG_LEVELS.INFO,
+    `[Ribbon] OnSkipConflictsChange: control.Pressed = ${String(newValue ?? '')}`,
+  )
 
   // 如果 control.Pressed 是 undefined，则切换当前状态
   let finalValue: boolean
@@ -233,12 +236,12 @@ export function OnSkipConflictsChange(control: WpsRibbonControl): boolean {
     finalValue = newValue
   } else {
     finalValue = !getSkipConflicts()
-    bgmLog(LOG_LEVELS.INFO, `[Ribbon] control.Pressed 不可用，切换状态为: ${finalValue}`)
+    bgmLog(LOG_LEVELS.INFO, `[Ribbon] control.Pressed 不可用，切换状态为: ${String(finalValue)}`)
   }
 
   // 保存到 PluginStorage
   setSkipConflicts(finalValue)
-  bgmLog(LOG_LEVELS.INFO, `[Ribbon] 跳过冲突状态已保存到 PluginStorage: ${finalValue}`)
+  bgmLog(LOG_LEVELS.INFO, `[Ribbon] 跳过冲突状态已保存到 PluginStorage: ${String(finalValue)}`)
   return true // 必须返回 boolean
 }
 
@@ -248,7 +251,7 @@ export function OnSkipConflictsChange(control: WpsRibbonControl): boolean {
  */
 export function GetEnableSyncRecordPressed(_control: WpsRibbonControl): boolean {
   const result = getSyncRecordEnabled()
-  bgmLog(LOG_LEVELS.INFO, `[Ribbon] GetEnableSyncRecordPressed: ${result}`)
+  bgmLog(LOG_LEVELS.INFO, `[Ribbon] GetEnableSyncRecordPressed: ${String(result)}`)
   return result
 }
 
@@ -257,16 +260,19 @@ export function GetEnableSyncRecordPressed(_control: WpsRibbonControl): boolean 
  */
 export function OnEnableSyncRecordChange(control: WpsRibbonControl): boolean {
   const newValue = control.Pressed
-  bgmLog(LOG_LEVELS.INFO, `[Ribbon] OnEnableSyncRecordChange: control.Pressed = ${newValue}`)
+  bgmLog(
+    LOG_LEVELS.INFO,
+    `[Ribbon] OnEnableSyncRecordChange: control.Pressed = ${String(newValue ?? '')}`,
+  )
   let finalValue: boolean
   if (typeof newValue === 'boolean') {
     finalValue = newValue
   } else {
     finalValue = !getSyncRecordEnabled()
-    bgmLog(LOG_LEVELS.INFO, `[Ribbon] control.Pressed 不可用，切换状态为: ${finalValue}`)
+    bgmLog(LOG_LEVELS.INFO, `[Ribbon] control.Pressed 不可用，切换状态为: ${String(finalValue)}`)
   }
   setSyncRecordEnabled(finalValue)
-  bgmLog(LOG_LEVELS.INFO, `[Ribbon] 启用同步记录状态已保存到 PluginStorage: ${finalValue}`)
+  bgmLog(LOG_LEVELS.INFO, `[Ribbon] 启用同步记录状态已保存到 PluginStorage: ${String(finalValue)}`)
   return true
 }
 
@@ -276,7 +282,7 @@ export function OnEnableSyncRecordChange(control: WpsRibbonControl): boolean {
  */
 export function GetIncrementalSyncPressed(_control: WpsRibbonControl): boolean {
   const result = getIncrementalSync()
-  bgmLog(LOG_LEVELS.INFO, `[Ribbon] GetIncrementalSyncPressed: ${result}`)
+  bgmLog(LOG_LEVELS.INFO, `[Ribbon] GetIncrementalSyncPressed: ${String(result)}`)
   return result
 }
 
@@ -290,10 +296,10 @@ export function OnIncrementalSyncChange(control: WpsRibbonControl): boolean {
     finalValue = newValue
   } else {
     finalValue = !getIncrementalSync()
-    bgmLog(LOG_LEVELS.INFO, `[Ribbon] control.Pressed 不可用，切换状态为: ${finalValue}`)
+    bgmLog(LOG_LEVELS.INFO, `[Ribbon] control.Pressed 不可用，切换状态为: ${String(finalValue)}`)
   }
   setIncrementalSync(finalValue)
-  bgmLog(LOG_LEVELS.INFO, `[Ribbon] 增量同步状态已保存到 PluginStorage: ${finalValue}`)
+  bgmLog(LOG_LEVELS.INFO, `[Ribbon] 增量同步状态已保存到 PluginStorage: ${String(finalValue)}`)
   return true
 }
 
@@ -330,7 +336,7 @@ export function OnAction(control: { Id: string }): boolean {
         RibbonService.syncWithConfirmation().catch((e: unknown) => {
           bgmLog(
             LOG_LEVELS.ERROR,
-            `[OnAction] syncWithConfirmation 异常: ${(e as Error)?.message || String(e)}`,
+            `[OnAction] syncWithConfirmation 异常: ${e instanceof Error && e.message ? e.message : String(e)}`,
           )
           BGM.handleError(e, {
             showAlert: true,
@@ -348,7 +354,7 @@ export function OnAction(control: { Id: string }): boolean {
         RibbonService.testTokenForRibbon().catch((e: unknown) => {
           bgmLog(
             LOG_LEVELS.ERROR,
-            `[OnAction] testTokenForRibbon 异常: ${(e as Error)?.message || String(e)}`,
+            `[OnAction] testTokenForRibbon 异常: ${e instanceof Error && e.message ? e.message : String(e)}`,
           )
           BGM.handleError(e, {
             showAlert: true,
@@ -363,7 +369,7 @@ export function OnAction(control: { Id: string }): boolean {
         RibbonService.copyTokenForRibbon().catch((e: unknown) => {
           bgmLog(
             LOG_LEVELS.ERROR,
-            `[OnAction] copyTokenForRibbon 异常: ${(e as Error)?.message || String(e)}`,
+            `[OnAction] copyTokenForRibbon 异常: ${e instanceof Error && e.message ? e.message : String(e)}`,
           )
           BGM.handleError(e, {
             showAlert: true,
@@ -384,7 +390,7 @@ export function OnAction(control: { Id: string }): boolean {
         RibbonService.syncFromGithubForRibbon().catch((e: unknown) => {
           bgmLog(
             LOG_LEVELS.ERROR,
-            `[OnAction] syncFromGithubForRibbon 异常: ${(e as Error)?.message || String(e)}`,
+            `[OnAction] syncFromGithubForRibbon 异常: ${e instanceof Error && e.message ? e.message : String(e)}`,
           )
           BGM.handleError(e, {
             showAlert: true,
@@ -399,7 +405,7 @@ export function OnAction(control: { Id: string }): boolean {
         RibbonService.undoLastSyncForRibbon().catch((e: unknown) => {
           bgmLog(
             LOG_LEVELS.ERROR,
-            `[OnAction] undoLastSyncForRibbon 异常: ${(e as Error)?.message || String(e)}`,
+            `[OnAction] undoLastSyncForRibbon 异常: ${e instanceof Error && e.message ? e.message : String(e)}`,
           )
           BGM.handleError(e, {
             showAlert: true,

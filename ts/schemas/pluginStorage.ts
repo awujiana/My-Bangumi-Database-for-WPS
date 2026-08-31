@@ -1,4 +1,4 @@
-import { z, type infer as zInfer } from '../tools/zodCompat.js'
+import { z, type infer as zInfer, type ZodSchema } from '../tools/zodCompat.js'
 
 /** 同步策略 Schema */
 export const SyncStrategySchema = z.enum([
@@ -16,8 +16,11 @@ export const GithubConfigSchema = z.object({
   repo: z.string().min(1),
   branch: z.string().min(1),
   path: z.string().min(1),
-  strategy: SyncStrategySchema.optional().default('add-update'),
-  sourceType: z.enum(['github', 'gitlab', 'gitee', 'local', 'gist']).optional().default('github'),
+  strategy: SyncStrategySchema.optional().default('add-update') as ZodSchema<SyncStrategy>,
+  sourceType: z
+    .enum(['github', 'gitlab', 'gitee', 'local', 'gist'])
+    .optional()
+    .default('github') as ZodSchema<'github' | 'gitlab' | 'gitee' | 'local' | 'gist'>,
 })
 
 export type GithubConfig = zInfer<typeof GithubConfigSchema>

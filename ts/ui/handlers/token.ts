@@ -147,7 +147,10 @@ export function updateUserIdStatus(): void {
   if (_lastUserIdSnapshot === snapshot) return
   _lastUserIdSnapshot = snapshot
 
-  bgmLog(LOG_LEVELS.INFO, `[updateUserIdStatus] userId: ${userId}, username: ${username}`)
+  bgmLog(
+    LOG_LEVELS.INFO,
+    `[updateUserIdStatus] userId: ${userId ?? ''}, username: ${username ?? ''}`,
+  )
 
   if (userId) {
     const display = username ? username + ' (' + userId + ')' : userId
@@ -183,7 +186,7 @@ export function openUserCollection(): void {
   window.open(collectionUrl, '_blank')
   bgmLog(
     LOG_LEVELS.INFO,
-    `[openUserCollection] 收藏页面已在新标签页打开，耗时: ${Date.now() - startTime}ms`,
+    `[openUserCollection] 收藏页面已在新标签页打开，耗时: ${String(Date.now() - startTime)}ms`,
   )
 }
 
@@ -217,8 +220,11 @@ export function testTokenValidity(): void {
     const duration = requestEndTime - requestStartTime
 
     bgmLog(LOG_LEVELS.INFO, `[testTokenValidity] ========== 请求完成 ==========`)
-    bgmLog(LOG_LEVELS.INFO, `[testTokenValidity] HTTP 状态码: ${xhr.status} (${xhr.statusText})`)
-    bgmLog(LOG_LEVELS.INFO, `[testTokenValidity] 请求耗时: ${duration}ms`)
+    bgmLog(
+      LOG_LEVELS.INFO,
+      `[testTokenValidity] HTTP 状态码: ${String(xhr.status)} (${xhr.statusText})`,
+    )
+    bgmLog(LOG_LEVELS.INFO, `[testTokenValidity] 请求耗时: ${String(duration)}ms`)
 
     if (xhr.getAllResponseHeaders()) {
       bgmLog(LOG_LEVELS.INFO, `[testTokenValidity] 响应头: ${xhr.getAllResponseHeaders()}`)
@@ -296,9 +302,12 @@ export function testTokenValidity(): void {
       showError(_T.tokenInvalid, _T.tokenExpired)
       hideUserProfile()
     } else {
-      bgmLog(LOG_LEVELS.ERROR, `[testTokenValidity] Token 验证失败，HTTP 状态码: ${xhr.status}`)
+      bgmLog(
+        LOG_LEVELS.ERROR,
+        `[testTokenValidity] Token 验证失败，HTTP 状态码: ${String(xhr.status)}`,
+      )
       bgmLog(LOG_LEVELS.INFO, `[testTokenValidity] 响应内容: ${xhr.responseText}`)
-      showError('错误', `Token验证失败 (HTTP ${xhr.status})`)
+      showError('错误', `Token验证失败 (HTTP ${String(xhr.status)})`)
     }
   }
 
@@ -306,15 +315,15 @@ export function testTokenValidity(): void {
     const requestEndTime = Date.now()
     const duration = requestEndTime - requestStartTime
 
-    bgmLog(LOG_LEVELS.ERROR, `[testTokenValidity] 请求发生网络错误，耗时: ${duration}ms`)
-    bgmLog(LOG_LEVELS.INFO, `[testTokenValidity] XHR 状态: ${xhr.readyState}`)
+    bgmLog(LOG_LEVELS.ERROR, `[testTokenValidity] 请求发生网络错误，耗时: ${String(duration)}ms`)
+    bgmLog(LOG_LEVELS.INFO, `[testTokenValidity] XHR 状态: ${String(xhr.readyState)}`)
     showError(_T.networkError, _T.cannotConnectBgm)
   }
 
   xhr.ontimeout = () => {
     const requestEndTime = Date.now()
     const duration = requestEndTime - requestStartTime
-    bgmLog(LOG_LEVELS.WARN, `[testTokenValidity] 请求超时（15s），耗时: ${duration}ms`)
+    bgmLog(LOG_LEVELS.WARN, `[testTokenValidity] 请求超时（15s），耗时: ${String(duration)}ms`)
     showError('网络超时，请重试', '超时')
   }
 
@@ -359,7 +368,10 @@ export function queryTokenStatus(token: string): Promise<{ expires: number; user
 
     xhr.onload = () => {
       const duration = Date.now() - startTime
-      bgmLog(LOG_LEVELS.INFO, `[queryTokenStatus] HTTP 状态码: ${xhr.status}，耗时: ${duration}ms`)
+      bgmLog(
+        LOG_LEVELS.INFO,
+        `[queryTokenStatus] HTTP 状态码: ${String(xhr.status)}，耗时: ${String(duration)}ms`,
+      )
 
       if (xhr.status === 200) {
         try {
@@ -401,18 +413,18 @@ export function queryTokenStatus(token: string): Promise<{ expires: number; user
       } else if (xhr.status === 400 || xhr.status === 401) {
         bgmLog(
           LOG_LEVELS.WARN,
-          `[queryTokenStatus] Token 状态查询失败，HTTP ${xhr.status}（Token 可能已失效）`,
+          `[queryTokenStatus] Token 状态查询失败，HTTP ${String(xhr.status)}（Token 可能已失效）`,
         )
-        reject(new Error(`Token invalid or expired (HTTP ${xhr.status})`))
+        reject(new Error(`Token invalid or expired (HTTP ${String(xhr.status)})`))
       } else {
-        bgmLog(LOG_LEVELS.ERROR, `[queryTokenStatus] 请求失败，HTTP ${xhr.status}`)
-        reject(new Error(`HTTP ${xhr.status}`))
+        bgmLog(LOG_LEVELS.ERROR, `[queryTokenStatus] 请求失败，HTTP ${String(xhr.status)}`)
+        reject(new Error(`HTTP ${String(xhr.status)}`))
       }
     }
 
     xhr.onerror = () => {
       const duration = Date.now() - startTime
-      bgmLog(LOG_LEVELS.ERROR, `[queryTokenStatus] 网络错误，耗时: ${duration}ms`)
+      bgmLog(LOG_LEVELS.ERROR, `[queryTokenStatus] 网络错误，耗时: ${String(duration)}ms`)
       reject(new Error('Network error'))
     }
 

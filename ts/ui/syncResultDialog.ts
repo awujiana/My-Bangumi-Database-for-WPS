@@ -85,7 +85,7 @@ function getSeasonFromDate(dateStr: string): string | null {
   }
   const season = seasonMap[month]
   if (!season) return null
-  return `${year}年${month}月新番`
+  return `${year}年${String(month)}月新番`
 }
 
 /**
@@ -178,10 +178,10 @@ export function formatDuration(ms: number): string {
     return `${seconds.toFixed(2)}秒`
   }
   const seconds = Math.floor(ms / 1000)
-  if (seconds < 60) return `${seconds}秒`
+  if (seconds < 60) return `${String(seconds)}秒`
   const minutes = Math.floor(seconds / 60)
   const secs = seconds % 60
-  return `${minutes}分${secs.toString().padStart(2, '0')}秒`
+  return `${String(minutes)}分${secs.toString().padStart(2, '0')}秒`
 }
 
 /**
@@ -248,7 +248,7 @@ function buildSyncChartSection(
     {
       label: '远程总条目',
       value: result.remoteTotal,
-      sub: `本地 ${totalAll} 条`,
+      sub: `本地 ${String(totalAll)} 条`,
       icon: '📥',
       cls: 'bgm-overview-card-primary',
     },
@@ -281,7 +281,7 @@ function buildSyncChartSection(
               <span class="bgm-overview-icon">${c.icon}</span>
               <span class="bgm-overview-label">${c.label}</span>
             </div>
-            <div class="bgm-overview-value">${c.value}</div>
+            <div class="bgm-overview-value">${String(c.value)}</div>
             <div class="bgm-overview-sub">${c.sub}</div>
           </div>
         `,
@@ -296,14 +296,14 @@ function buildSyncChartSection(
           <circle cx="60" cy="60" r="50" fill="none"
             stroke="${completionPct >= 90 ? 'var(--green, #a6e3a1)' : completionPct >= 50 ? 'var(--yellow, #f9e2af)' : 'var(--red, #f38ba8)'}"
             stroke-width="10"
-            stroke-dasharray="${(completionPct / 100) * 2 * Math.PI * 50} ${2 * Math.PI * 50}"
-            stroke-dashoffset="${2 * Math.PI * 50 * 0.25}"
+            stroke-dasharray="${String((completionPct / 100) * 2 * Math.PI * 50)} ${String(2 * Math.PI * 50)}"
+            stroke-dashoffset="${String(2 * Math.PI * 50 * 0.25)}"
             stroke-linecap="round"
             transform="rotate(-90 60 60)"
             class="bgm-progress-ring" />
         </svg>
         <div class="bgm-progress-center">
-          <div class="bgm-progress-value">${completionPct}%</div>
+          <div class="bgm-progress-value">${String(completionPct)}%</div>
           <div class="bgm-progress-label">完成度</div>
         </div>
       </div>
@@ -315,47 +315,47 @@ function buildSyncChartSection(
       <div class="bgm-chart-left">
         <div class="bgm-donut-chart">
           <svg viewBox="0 0 140 140" class="bgm-donut-svg">
-            <circle cx="70" cy="70" r="${radius}" fill="none" stroke="var(--surface0, #313244)" stroke-width="14" />
+            <circle cx="70" cy="70" r="${String(radius)}" fill="none" stroke="var(--surface0, #313244)" stroke-width="14" />
             ${
               totalAll > 0
                 ? `
-              <circle cx="70" cy="70" r="${radius}" fill="none"
+              <circle cx="70" cy="70" r="${String(radius)}" fill="none"
                 stroke="var(--green, #a6e3a1)" stroke-width="14"
-                stroke-dasharray="${seg(addedPct)} ${circumference}"
+                stroke-dasharray="${String(seg(addedPct))} ${String(circumference)}"
                 stroke-dashoffset="0"
                 transform="rotate(-90 70 70)" stroke-linecap="butt" />
-              <circle cx="70" cy="70" r="${radius}" fill="none"
+              <circle cx="70" cy="70" r="${String(radius)}" fill="none"
                 stroke="var(--yellow, #f9e2af)" stroke-width="14"
-                stroke-dasharray="${seg(updatedPct)} ${circumference}"
-                stroke-dashoffset="${-seg(addedPct)}"
+                stroke-dasharray="${String(seg(updatedPct))} ${String(circumference)}"
+                stroke-dashoffset="${String(-seg(addedPct))}"
                 transform="rotate(-90 70 70)" stroke-linecap="butt" />
-              <circle cx="70" cy="70" r="${radius}" fill="none"
+              <circle cx="70" cy="70" r="${String(radius)}" fill="none"
                 stroke="var(--red, #f38ba8)" stroke-width="14"
-                stroke-dasharray="${seg(deletedPct)} ${circumference}"
-                stroke-dashoffset="${-(seg(addedPct) + seg(updatedPct))}"
+                stroke-dasharray="${String(seg(deletedPct))} ${String(circumference)}"
+                stroke-dashoffset="${String(-(seg(addedPct) + seg(updatedPct)))}"
                 transform="rotate(-90 70 70)" stroke-linecap="butt" />
-              <circle cx="70" cy="70" r="${radius}" fill="none"
+              <circle cx="70" cy="70" r="${String(radius)}" fill="none"
                 stroke="var(--overlay1, #7f849c)" stroke-width="14"
-                stroke-dasharray="${seg(unchangedPct)} ${circumference}"
-                stroke-dashoffset="${-(seg(addedPct) + seg(updatedPct) + seg(deletedPct))}"
+                stroke-dasharray="${String(seg(unchangedPct))} ${String(circumference)}"
+                stroke-dashoffset="${String(-(seg(addedPct) + seg(updatedPct) + seg(deletedPct)))}"
                 transform="rotate(-90 70 70)" stroke-linecap="butt" />
               ${
                 result.failed > 0
                   ? `
-              <circle cx="70" cy="70" r="${radius}" fill="none"
+              <circle cx="70" cy="70" r="${String(radius)}" fill="none"
                 stroke="var(--peach, #fab387)" stroke-width="14"
-                stroke-dasharray="${seg(failedPct)} ${circumference}"
-                stroke-dashoffset="${-(seg(addedPct) + seg(updatedPct) + seg(deletedPct) + seg(unchangedPct))}"
+                stroke-dasharray="${String(seg(failedPct))} ${String(circumference)}"
+                stroke-dashoffset="${String(-(seg(addedPct) + seg(updatedPct) + seg(deletedPct) + seg(unchangedPct)))}"
                 transform="rotate(-90 70 70)" stroke-linecap="butt" />`
                   : ''
               }
               ${
                 result.skipped > 0
                   ? `
-              <circle cx="70" cy="70" r="${radius}" fill="none"
+              <circle cx="70" cy="70" r="${String(radius)}" fill="none"
                 stroke="var(--lavender, #b4befe)" stroke-width="14"
-                stroke-dasharray="${seg(skippedPct)} ${circumference}"
-                stroke-dashoffset="${-(seg(addedPct) + seg(updatedPct) + seg(deletedPct) + seg(unchangedPct) + seg(failedPct))}"
+                stroke-dasharray="${String(seg(skippedPct))} ${String(circumference)}"
+                stroke-dashoffset="${String(-(seg(addedPct) + seg(updatedPct) + seg(deletedPct) + seg(unchangedPct) + seg(failedPct)))}"
                 transform="rotate(-90 70 70)" stroke-linecap="butt" />`
                   : ''
               }
@@ -364,17 +364,17 @@ function buildSyncChartSection(
             }
           </svg>
           <div class="bgm-donut-center">
-            <div class="bgm-donut-center-value">${totalProcessed}</div>
+            <div class="bgm-donut-center-value">${String(totalProcessed)}</div>
             <div class="bgm-donut-center-label">已处理</div>
           </div>
         </div>
         <div class="bgm-chart-legend">
-          <div class="bgm-legend-item"><span class="bgm-legend-dot" style="background:var(--green, #a6e3a1)"></span>新增 ${result.added}</div>
-          <div class="bgm-legend-item"><span class="bgm-legend-dot" style="background:var(--yellow, #f9e2af)"></span>更新 ${result.updated}</div>
-          <div class="bgm-legend-item"><span class="bgm-legend-dot" style="background:var(--red, #f38ba8)"></span>删除 ${result.deleted}</div>
-          <div class="bgm-legend-item"><span class="bgm-legend-dot" style="background:var(--overlay1, #7f849c)"></span>无变更 ${result.unchanged}</div>
-          ${result.failed > 0 ? `<div class="bgm-legend-item"><span class="bgm-legend-dot" style="background:var(--peach, #fab387)"></span>失败 ${result.failed}</div>` : ''}
-          ${result.skipped > 0 ? `<div class="bgm-legend-item"><span class="bgm-legend-dot" style="background:var(--lavender, #b4befe)"></span>跳过 ${result.skipped}</div>` : ''}
+          <div class="bgm-legend-item"><span class="bgm-legend-dot" style="background:var(--green, #a6e3a1)"></span>新增 ${String(result.added)}</div>
+          <div class="bgm-legend-item"><span class="bgm-legend-dot" style="background:var(--yellow, #f9e2af)"></span>更新 ${String(result.updated)}</div>
+          <div class="bgm-legend-item"><span class="bgm-legend-dot" style="background:var(--red, #f38ba8)"></span>删除 ${String(result.deleted)}</div>
+          <div class="bgm-legend-item"><span class="bgm-legend-dot" style="background:var(--overlay1, #7f849c)"></span>无变更 ${String(result.unchanged)}</div>
+          ${result.failed > 0 ? `<div class="bgm-legend-item"><span class="bgm-legend-dot" style="background:var(--peach, #fab387)"></span>失败 ${String(result.failed)}</div>` : ''}
+          ${result.skipped > 0 ? `<div class="bgm-legend-item"><span class="bgm-legend-dot" style="background:var(--lavender, #b4befe)"></span>跳过 ${String(result.skipped)}</div>` : ''}
         </div>
       </div>
 
@@ -383,31 +383,31 @@ function buildSyncChartSection(
         <div class="bgm-bar-chart">
           <div class="bgm-bar-row">
             <span class="bgm-bar-label">✅ 新增</span>
-            <div class="bgm-bar-track"><div class="bgm-bar-fill bgm-bar-add" style="width:${addedPct}%"></div></div>
-            <span class="bgm-bar-value">${result.added}<span class="bgm-bar-pct">(${addedPct.toFixed(0)}%)</span></span>
+            <div class="bgm-bar-track"><div class="bgm-bar-fill bgm-bar-add" style="width:${String(addedPct)}%"></div></div>
+            <span class="bgm-bar-value">${String(result.added)}<span class="bgm-bar-pct">(${addedPct.toFixed(0)}%)</span></span>
           </div>
           <div class="bgm-bar-row">
             <span class="bgm-bar-label">🔄 更新</span>
-            <div class="bgm-bar-track"><div class="bgm-bar-fill bgm-bar-update" style="width:${updatedPct}%"></div></div>
-            <span class="bgm-bar-value">${result.updated}<span class="bgm-bar-pct">(${updatedPct.toFixed(0)}%)</span></span>
+            <div class="bgm-bar-track"><div class="bgm-bar-fill bgm-bar-update" style="width:${String(updatedPct)}%"></div></div>
+            <span class="bgm-bar-value">${String(result.updated)}<span class="bgm-bar-pct">(${updatedPct.toFixed(0)}%)</span></span>
           </div>
           <div class="bgm-bar-row">
             <span class="bgm-bar-label">❌ 删除</span>
-            <div class="bgm-bar-track"><div class="bgm-bar-fill bgm-bar-delete" style="width:${deletedPct}%"></div></div>
-            <span class="bgm-bar-value">${result.deleted}<span class="bgm-bar-pct">(${deletedPct.toFixed(0)}%)</span></span>
+            <div class="bgm-bar-track"><div class="bgm-bar-fill bgm-bar-delete" style="width:${String(deletedPct)}%"></div></div>
+            <span class="bgm-bar-value">${String(result.deleted)}<span class="bgm-bar-pct">(${deletedPct.toFixed(0)}%)</span></span>
           </div>
           <div class="bgm-bar-row">
             <span class="bgm-bar-label">⏭️ 无变更</span>
-            <div class="bgm-bar-track"><div class="bgm-bar-fill bgm-bar-unchanged" style="width:${unchangedPct}%"></div></div>
-            <span class="bgm-bar-value">${result.unchanged}<span class="bgm-bar-pct">(${unchangedPct.toFixed(0)}%)</span></span>
+            <div class="bgm-bar-track"><div class="bgm-bar-fill bgm-bar-unchanged" style="width:${String(unchangedPct)}%"></div></div>
+            <span class="bgm-bar-value">${String(result.unchanged)}<span class="bgm-bar-pct">(${unchangedPct.toFixed(0)}%)</span></span>
           </div>
           ${
             result.failed > 0
               ? `
           <div class="bgm-bar-row">
             <span class="bgm-bar-label">⚠️ 失败</span>
-            <div class="bgm-bar-track"><div class="bgm-bar-fill bgm-bar-fail" style="width:${failedPct}%"></div></div>
-            <span class="bgm-bar-value">${result.failed}<span class="bgm-bar-pct">(${failedPct.toFixed(0)}%)</span></span>
+            <div class="bgm-bar-track"><div class="bgm-bar-fill bgm-bar-fail" style="width:${String(failedPct)}%"></div></div>
+            <span class="bgm-bar-value">${String(result.failed)}<span class="bgm-bar-pct">(${failedPct.toFixed(0)}%)</span></span>
           </div>`
               : ''
           }
@@ -416,8 +416,8 @@ function buildSyncChartSection(
               ? `
           <div class="bgm-bar-row">
             <span class="bgm-bar-label">🔍 跳过</span>
-            <div class="bgm-bar-track"><div class="bgm-bar-fill bgm-bar-skip" style="width:${skippedPct}%"></div></div>
-            <span class="bgm-bar-value">${result.skipped}<span class="bgm-bar-pct">(${skippedPct.toFixed(0)}%)</span></span>
+            <div class="bgm-bar-track"><div class="bgm-bar-fill bgm-bar-skip" style="width:${String(skippedPct)}%"></div></div>
+            <span class="bgm-bar-value">${String(result.skipped)}<span class="bgm-bar-pct">(${skippedPct.toFixed(0)}%)</span></span>
           </div>`
               : ''
           }
@@ -433,8 +433,8 @@ function buildSyncChartSection(
             <circle cx="40" cy="40" r="32" fill="none" stroke="var(--surface0, #313244)" stroke-width="6" />
             <circle cx="40" cy="40" r="32" fill="none"
               stroke="var(--blue, #89b4fa)" stroke-width="6"
-              stroke-dasharray="${(completionPct / 100) * 2 * Math.PI * 32} ${2 * Math.PI * 32}"
-              stroke-dashoffset="${2 * Math.PI * 32 * 0.25}"
+              stroke-dasharray="${String((completionPct / 100) * 2 * Math.PI * 32)} ${String(2 * Math.PI * 32)}"
+              stroke-dashoffset="${String(2 * Math.PI * 32 * 0.25)}"
               stroke-linecap="round"
               transform="rotate(-90 40 40)" />
           </svg>
@@ -451,8 +451,8 @@ function buildSyncChartSection(
             <circle cx="40" cy="40" r="32" fill="none" stroke="var(--surface0, #313244)" stroke-width="6" />
             <circle cx="40" cy="40" r="32" fill="none"
               stroke="var(--green, #a6e3a1)" stroke-width="6"
-              stroke-dasharray="${Math.min(avgSpeed / 50, 1) * 2 * Math.PI * 32} ${2 * Math.PI * 32}"
-              stroke-dashoffset="${2 * Math.PI * 32 * 0.25}"
+              stroke-dasharray="${String(Math.min(avgSpeed / 50, 1) * 2 * Math.PI * 32)} ${String(2 * Math.PI * 32)}"
+              stroke-dashoffset="${String(2 * Math.PI * 32 * 0.25)}"
               stroke-linecap="round"
               transform="rotate(-90 40 40)" />
           </svg>
@@ -469,15 +469,15 @@ function buildSyncChartSection(
             <circle cx="40" cy="40" r="32" fill="none" stroke="var(--surface0, #313244)" stroke-width="6" />
             <circle cx="40" cy="40" r="32" fill="none"
               stroke="var(--peach, #fab387)" stroke-width="6"
-              stroke-dasharray="${(efficiencyPct / 100) * 2 * Math.PI * 32} ${2 * Math.PI * 32}"
-              stroke-dashoffset="${2 * Math.PI * 32 * 0.25}"
+              stroke-dasharray="${String((efficiencyPct / 100) * 2 * Math.PI * 32)} ${String(2 * Math.PI * 32)}"
+              stroke-dashoffset="${String(2 * Math.PI * 32 * 0.25)}"
               stroke-linecap="round"
               transform="rotate(-90 40 40)" />
           </svg>
           <div class="bgm-perg-center"><span>📈</span></div>
         </div>
         <div class="bgm-perg-info">
-          <div class="bgm-perg-value">${efficiencyPct}%</div>
+          <div class="bgm-perg-value">${String(efficiencyPct)}%</div>
           <div class="bgm-perg-label">处理效率</div>
         </div>
       </div>
@@ -487,8 +487,8 @@ function buildSyncChartSection(
             <circle cx="40" cy="40" r="32" fill="none" stroke="var(--surface0, #313244)" stroke-width="6" />
             <circle cx="40" cy="40" r="32" fill="none"
               stroke="var(--sapphire, #74c7ec)" stroke-width="6"
-              stroke-dasharray="${Math.min(totalProcessed / Math.max(elapsedMs / 1000, 1) / 50, 1) * 2 * Math.PI * 32} ${2 * Math.PI * 32}"
-              stroke-dashoffset="${2 * Math.PI * 32 * 0.25}"
+              stroke-dasharray="${String(Math.min(totalProcessed / Math.max(elapsedMs / 1000, 1) / 50, 1) * 2 * Math.PI * 32)} ${String(2 * Math.PI * 32)}"
+              stroke-dashoffset="${String(2 * Math.PI * 32 * 0.25)}"
               stroke-linecap="round"
               transform="rotate(-90 40 40)" />
           </svg>
@@ -504,10 +504,10 @@ function buildSyncChartSection(
     <!-- ===== 元信息栏 ===== -->
     <div class="bgm-meta-bar">
       <span class="bgm-meta-tag">🎯 ${escapeHtml(strategyLabel)}</span>
-      <span class="bgm-meta-tag">📥 远程 ${result.remoteTotal}</span>
-      <span class="bgm-meta-tag">✅ 完成 ${completionPct}%</span>
-      ${result.skipped > 0 ? `<span class="bgm-meta-tag">🔍 跳过 ${result.skipped}</span>` : ''}
-      ${result.failed > 0 ? `<span class="bgm-meta-tag bgm-meta-tag-warn">⚠️ 失败 ${result.failed}</span>` : ''}
+      <span class="bgm-meta-tag">📥 远程 ${String(result.remoteTotal)}</span>
+      <span class="bgm-meta-tag">✅ 完成 ${String(completionPct)}%</span>
+      ${result.skipped > 0 ? `<span class="bgm-meta-tag">🔍 跳过 ${String(result.skipped)}</span>` : ''}
+      ${result.failed > 0 ? `<span class="bgm-meta-tag bgm-meta-tag-warn">⚠️ 失败 ${String(result.failed)}</span>` : ''}
     </div>
   `
 }
@@ -565,7 +565,7 @@ export function showSyncResultDialog(options: SyncResultDialogOptions): void {
           </div>
           <div class="bgm-result-date-item">
             <span class="bgm-result-date-label">有日期条目</span>
-            <span class="bgm-result-date-value">${dateStats.datedCount}/${dateStats.totalCount}</span>
+            <span class="bgm-result-date-value">${String(dateStats.datedCount)}/${String(dateStats.totalCount)}</span>
           </div>
         </div>
       </div>`
@@ -602,31 +602,31 @@ export function showSyncResultDialog(options: SyncResultDialogOptions): void {
 
   // ── 绑定事件 ──
   // 关闭按钮
-  const closeBtn = modal.querySelector('#bgmResultCloseBtn') as HTMLButtonElement | null
+  const closeBtn = modal.querySelector<HTMLElement>('#bgmResultCloseBtn')
   closeBtn?.addEventListener('click', () => {
     hideSyncResultDialog()
   })
 
   // 导出 JSONL
-  const exportBtn = modal.querySelector('#bgmResultExportBtn') as HTMLButtonElement | null
+  const exportBtn = modal.querySelector('#bgmResultExportBtn')
   exportBtn?.addEventListener('click', () => {
     const originalText = exportBtn.textContent
     const success = exportSheetToJsonlFile()
     if (success) {
       exportBtn.textContent = '✅ 已导出'
       setTimeout(() => {
-        if (exportBtn) exportBtn.textContent = originalText
+        exportBtn.textContent = originalText
       }, 2000)
     } else {
       exportBtn.textContent = '❌ 导出失败'
       setTimeout(() => {
-        if (exportBtn) exportBtn.textContent = originalText
+        exportBtn.textContent = originalText
       }, 2000)
     }
   })
 
   // 查看详情（打开同步记录表，或弹窗预览）
-  const viewDetailsBtn = modal.querySelector('#bgmResultViewDetailsBtn') as HTMLButtonElement | null
+  const viewDetailsBtn = modal.querySelector('#bgmResultViewDetailsBtn')
   viewDetailsBtn?.addEventListener('click', () => {
     Promise.all([import('../sync/syncRecord.js'), import('../tools/config.js')])
       .then(([syncRecordMod, configMod]) => {
@@ -713,7 +713,7 @@ function renderDetailSection(details: GithubSyncDetailItem[] | undefined): strin
   if (!details || details.length === 0) return ''
   return `
     <div class="bgm-preview-detail-table">
-      <div class="bgm-preview-detail-table-title">📑 同步明细（${details.length} 条）</div>
+      <div class="bgm-preview-detail-table-title">📑 同步明细（${String(details.length)} 条）</div>
       ${renderSyncDetailTable(details)}
     </div>
   `
@@ -775,18 +775,18 @@ function showSyncDetailPreviewDialog(options: SyncDetailPreviewOptions): void {
           <div class="bgm-preview-detail-list">
             <div class="bgm-preview-detail-item">
               <span class="bgm-preview-detail-label">远程总条目</span>
-              <span class="bgm-preview-detail-value">${result.remoteTotal}</span>
+              <span class="bgm-preview-detail-value">${String(result.remoteTotal)}</span>
             </div>
             <div class="bgm-preview-detail-item">
               <span class="bgm-preview-detail-label">跳过条目</span>
-              <span class="bgm-preview-detail-value">${result.skipped}</span>
+              <span class="bgm-preview-detail-value">${String(result.skipped)}</span>
             </div>
             ${
               scrollToRow !== undefined
                 ? `
             <div class="bgm-preview-detail-item">
               <span class="bgm-preview-detail-label">起始行号</span>
-              <span class="bgm-preview-detail-value">第 ${scrollToRow} 行</span>
+              <span class="bgm-preview-detail-value">第 ${String(scrollToRow)} 行</span>
             </div>`
                 : ''
             }
@@ -824,7 +824,7 @@ function showSyncDetailPreviewDialog(options: SyncDetailPreviewOptions): void {
   _previewDialog = modal
 
   // 关闭按钮
-  const closeBtn = modal.querySelector('#bgmPreviewCloseBtn') as HTMLButtonElement | null
+  const closeBtn = modal.querySelector<HTMLElement>('#bgmPreviewCloseBtn')
   closeBtn?.addEventListener('click', () => {
     hideSyncDetailPreviewDialog()
   })

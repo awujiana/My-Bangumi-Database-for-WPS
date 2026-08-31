@@ -71,7 +71,7 @@ function updateStickyOffsets(): void {
   const root = document.documentElement
   const topbar = document.querySelector('.topbar')
   const topbarH = topbar ? (topbar as HTMLElement).offsetHeight : 0
-  root.style.setProperty('--topbar-h', topbarH + 'px')
+  root.style.setProperty('--topbar-h', String(topbarH) + 'px')
   const narrow =
     typeof window !== 'undefined' &&
     typeof window.matchMedia === 'function' &&
@@ -81,7 +81,7 @@ function updateStickyOffsets(): void {
     const sb = document.querySelector('.sidebar')
     navH = sb ? (sb as HTMLElement).offsetHeight : 0
   }
-  root.style.setProperty('--nav-h', navH + 'px')
+  root.style.setProperty('--nav-h', String(navH) + 'px')
 }
 
 if (typeof window !== 'undefined') {

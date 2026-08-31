@@ -49,7 +49,7 @@ export function calcChecksum(input: string): number {
  */
 export function buildPayload(token: string): string {
   const checksum = calcChecksum(token)
-  return `${TOKEN_CONFIG.VERSION}:${checksum}:${token}`
+  return `${TOKEN_CONFIG.VERSION}:${String(checksum)}:${token}`
 }
 
 /**
@@ -81,7 +81,7 @@ export function extractToken(encrypted: string): string | null {
     const checksum = parseInt(checksumStr!, 10)
 
     if (version !== TOKEN_CONFIG.VERSION) {
-      bgmLog(LOG_LEVELS.WARN, `[crypto] Token版本不匹配: ${version}`)
+      bgmLog(LOG_LEVELS.WARN, `[crypto] Token版本不匹配: ${version ?? ''}`)
       return null
     }
 

@@ -267,7 +267,7 @@ function migrateSyncRecordSchema(sheet: WpsWorksheet): void {
   }
 
   if (lastRow > 1) {
-    sheet.Range(`2:${lastRow}`).Delete()
+    sheet.Range(`2:${String(lastRow)}`).Delete()
   }
 
   for (let i = 0; i < SYNC_RECORD_COLUMNS.length; i++) {
@@ -288,7 +288,7 @@ function migrateSyncRecordSchema(sheet: WpsWorksheet): void {
     }
   }
 
-  bgmLog(LOG_LEVELS.INFO, `数据迁移完成：${rows.length} 条记录已重组到 12 列结构`)
+  bgmLog(LOG_LEVELS.INFO, `数据迁移完成：${String(rows.length)} 条记录已重组到 12 列结构`)
 }
 
 function buildCache(sheet: WpsWorksheet): void {
@@ -303,7 +303,7 @@ function buildCache(sheet: WpsWorksheet): void {
   }
 
   const allData = readRangeValues(sheet, 2, lastRow, 1, SYNC_RECORD_COLUMNS.length)
-  if (!allData || allData.length === 0) {
+  if (allData.length === 0) {
     _syncRecordCacheValid = true
     return
   }
@@ -312,25 +312,25 @@ function buildCache(sheet: WpsWorksheet): void {
     try {
       const rowData = allData[i]
       if (!rowData) continue
-      const sid = String(rowData[SYNC_RECORD_COL.SID - 1] ?? '').trim()
-      const url = String(rowData[SYNC_RECORD_COL.URL - 1] ?? '').trim()
+      const sid = (rowData[SYNC_RECORD_COL.SID - 1] ?? '').trim()
+      const url = (rowData[SYNC_RECORD_COL.URL - 1] ?? '').trim()
       if (!url && !sid) continue
 
       const row = i + 2
       _syncRecordSidCache.set(sid, row)
       _syncRecordListCache.push({
-        time: String(rowData[SYNC_RECORD_COL.TIME - 1] ?? ''),
-        name: String(rowData[SYNC_RECORD_COL.NAME - 1] ?? ''),
+        time: rowData[SYNC_RECORD_COL.TIME - 1] ?? '',
+        name: rowData[SYNC_RECORD_COL.NAME - 1] ?? '',
         url: url,
         sid: sid,
-        type: String(rowData[SYNC_RECORD_COL.TYPE - 1] ?? ''),
-        source: String(rowData[SYNC_RECORD_COL.SOURCE - 1] ?? ''),
-        count: parseInt(String(rowData[SYNC_RECORD_COL.COUNT - 1] ?? '')) || 1,
-        content: String(rowData[SYNC_RECORD_COL.CONTENT - 1] ?? ''),
-        status: String(rowData[SYNC_RECORD_COL.STATUS - 1] ?? '') || SYNC_STATUS.SUCCESS,
-        message: String(rowData[SYNC_RECORD_COL.MESSAGE - 1] ?? ''),
-        fingerprint: String(rowData[SYNC_RECORD_COL.FINGERPRINT - 1] ?? ''),
-        collType: String(rowData[SYNC_RECORD_COL.COLL_TYPE - 1] ?? ''),
+        type: rowData[SYNC_RECORD_COL.TYPE - 1] ?? '',
+        source: rowData[SYNC_RECORD_COL.SOURCE - 1] ?? '',
+        count: parseInt(rowData[SYNC_RECORD_COL.COUNT - 1] ?? '') || 1,
+        content: rowData[SYNC_RECORD_COL.CONTENT - 1] ?? '',
+        status: (rowData[SYNC_RECORD_COL.STATUS - 1] ?? '') || SYNC_STATUS.SUCCESS,
+        message: rowData[SYNC_RECORD_COL.MESSAGE - 1] ?? '',
+        fingerprint: rowData[SYNC_RECORD_COL.FINGERPRINT - 1] ?? '',
+        collType: rowData[SYNC_RECORD_COL.COLL_TYPE - 1] ?? '',
         row: row,
       })
     } catch (e: unknown) {
@@ -354,8 +354,8 @@ function setSyncRecordColors(
   count: number,
 ): void {
   const setColor = (colIdx: number, color: number): void => {
-    const cell = sheet.Range(`${colNumToLetter(colIdx)}${row}`)
-    if (cell?.Interior) cell.Interior.Color = color
+    const cell = sheet.Range(`${colNumToLetter(colIdx)}${String(row)}`)
+    if (cell.Interior) cell.Interior.Color = color
   }
 
   // SID列（A列）- 根据同步次数或状态设置颜色
@@ -372,9 +372,9 @@ function setSyncRecordColors(
   setColor(SYNC_RECORD_COL.STATUS, getStatusColor(status))
 
   // 类型列（F列）- 根据类型设置颜色
-  const typeCell = sheet.Range(`${colNumToLetter(SYNC_RECORD_COL.TYPE)}${row}`)
-  if (typeCell?.Interior) {
-    const typeName = String(getCellValue(sheet, row, SYNC_RECORD_COL.TYPE) || '')
+  const typeCell = sheet.Range(`${colNumToLetter(SYNC_RECORD_COL.TYPE)}${String(row)}`)
+  if (typeCell.Interior) {
+    const typeName = getCellValue(sheet, row, SYNC_RECORD_COL.TYPE) || ''
     typeCell.Interior.Color = SYNC_RECORD_TYPE_COLOR[typeName] || BGM_COLOR.GRAY
   }
 }
@@ -395,8 +395,8 @@ export function addSyncRecord(params: UpdateRecordParams): boolean {
     const sid = params.sid || ''
     const now = new Date().toLocaleString('zh-CN')
 
-    if (sid && _syncRecordSidCache.has(sid)) {
-      const existingRow = _syncRecordSidCache.get(sid)!
+    const existingRow = sid ? _syncRecordSidCache.get(sid) : undefined
+    if (existingRow !== undefined) {
       const existingCount = parseInt(getCellValue(sheet, existingRow, SYNC_RECORD_COL.COUNT)) || 0
       const newCount = existingCount + (params.count || 1)
       const finalStatus = params.status || SYNC_STATUS.SUCCESS
@@ -517,8 +517,8 @@ export function addSyncRecords(records: UpdateRecordParams[]): boolean {
 
     for (const params of records) {
       const sid = params.sid || ''
-      if (sid && _syncRecordSidCache.has(sid)) {
-        const existingRow = _syncRecordSidCache.get(sid)!
+      const existingRow = sid ? _syncRecordSidCache.get(sid) : undefined
+      if (existingRow !== undefined) {
         const existingCount = parseInt(getCellValue(sheet, existingRow, SYNC_RECORD_COL.COUNT)) || 0
         const existing = sidToUpdate.get(sid)
         const totalCount = (existing?.newCount ?? existingCount) + (params.count || 1)
@@ -557,7 +557,9 @@ export function addSyncRecords(records: UpdateRecordParams[]): boolean {
       const endRow = startRow + newRows.length - 1
       const startColLetter = colNumToLetter(1)
       const endColLetter = colNumToLetter(SYNC_RECORD_COLUMNS.length)
-      const range = sheet.Range(`${startColLetter}${startRow}:${endColLetter}${endRow}`)
+      const range = sheet.Range(
+        `${startColLetter}${String(startRow)}:${endColLetter}${String(endRow)}`,
+      )
       range.Value2 = newRows
 
       // 设置新增行的颜色
@@ -592,7 +594,7 @@ export function addSyncRecords(records: UpdateRecordParams[]): boolean {
     invalidateCache()
     bgmLog(
       LOG_LEVELS.INFO,
-      `[addSyncRecords] 批量写入完成：新增 ${newRows.length} 条，更新 ${sidToUpdate.size} 条`,
+      `[addSyncRecords] 批量写入完成：新增 ${String(newRows.length)} 条，更新 ${String(sidToUpdate.size)} 条`,
     )
     return true
   } catch (e: unknown) {
@@ -668,7 +670,7 @@ export function deduplicateSyncRecords(): boolean {
       for (const delRow of rowsToDelete) {
         const delCount = parseInt(getCellValue(sheet, delRow, SYNC_RECORD_COL.COUNT)) || 1
         totalCount += delCount
-        sheet.Range(`${delRow}:${delRow}`).Delete()
+        sheet.Range(`${String(delRow)}:${String(delRow)}`).Delete()
         removedCount++
       }
 
@@ -676,7 +678,7 @@ export function deduplicateSyncRecords(): boolean {
     }
 
     if (hasDuplicates) {
-      bgmLog(LOG_LEVELS.INFO, `去重完成：删除了 ${removedCount} 条重复记录`)
+      bgmLog(LOG_LEVELS.INFO, `去重完成：删除了 ${String(removedCount)} 条重复记录`)
       invalidateCache()
     }
 
@@ -705,8 +707,8 @@ export function formatSyncRecordSheet(sheet?: WpsWorksheet): void {
 
     const colCount = SYNC_RECORD_COLUMNS.length
     const lastColLetter = colNumToLetter(colCount)
-    const fullRange = target.Range(`A1:${lastColLetter}${lastRow}`)
-    const dataRange = lastRow >= 2 ? target.Range(`A2:${lastColLetter}${lastRow}`) : null
+    const fullRange = target.Range(`A1:${lastColLetter}${String(lastRow)}`)
+    const dataRange = lastRow >= 2 ? target.Range(`A2:${lastColLetter}${String(lastRow)}`) : null
 
     // 1. 字体
     try {
@@ -751,7 +753,7 @@ export function formatSyncRecordSheet(sheet?: WpsWorksheet): void {
     const nameColLetter = colNumToLetter(SYNC_RECORD_COL.NAME)
     if (dataRange) {
       try {
-        const nameRange = target.Range(`${nameColLetter}2:${nameColLetter}${lastRow}`)
+        const nameRange = target.Range(`${nameColLetter}2:${nameColLetter}${String(lastRow)}`)
         nameRange.Borders.LineStyle = 1
       } catch {
         // 忽略：此处无需处理错误
@@ -762,7 +764,9 @@ export function formatSyncRecordSheet(sheet?: WpsWorksheet): void {
     const collTypeColLetter = colNumToLetter(SYNC_RECORD_COL.COLL_TYPE)
     if (dataRange) {
       try {
-        const collRange = target.Range(`${collTypeColLetter}2:${collTypeColLetter}${lastRow}`)
+        const collRange = target.Range(
+          `${collTypeColLetter}2:${collTypeColLetter}${String(lastRow)}`,
+        )
         collRange.Borders.LineStyle = 1
       } catch {
         // 忽略：此处无需处理错误
@@ -788,7 +792,7 @@ export function clearSyncRecords(): boolean {
       ? sheet.UsedRange.Row + sheet.UsedRange.Rows.Count - 1
       : sheet.Rows.Count
     if (lastRow > 1) {
-      sheet.Range(`2:${lastRow}`).Delete()
+      sheet.Range(`2:${String(lastRow)}`).Delete()
     }
     _syncRecordSidCache.clear()
     _syncRecordListCache = []
@@ -814,9 +818,9 @@ export function openSyncRecordSheet(scrollToRow?: number): void {
     const targetRow = scrollToRow ?? getLastRow(sheet)
     if (targetRow > 1) {
       try {
-        const range = sheet.Range(`${targetRow}:${targetRow}`)
+        const range = sheet.Range(`${String(targetRow)}:${String(targetRow)}`)
         range.Select()
-        bgmLog(LOG_LEVELS.INFO, `已切换到同步记录工作表，定位到第 ${targetRow} 行`)
+        bgmLog(LOG_LEVELS.INFO, `已切换到同步记录工作表，定位到第 ${String(targetRow)} 行`)
       } catch {
         bgmLog(LOG_LEVELS.INFO, '已切换到同步记录工作表')
       }

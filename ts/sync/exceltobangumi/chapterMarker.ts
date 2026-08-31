@@ -19,7 +19,7 @@ export async function fetchEpisodeIds(
   token: string,
   signal?: AbortSignal,
 ): Promise<number[]> {
-  const url = `${BGM_CONFIG.API_BASE}/v0/episodes?subject_id=${sid}&limit=1000`
+  const url = `${BGM_CONFIG.API_BASE}/v0/episodes?subject_id=${String(sid)}&limit=1000`
   return new Promise((resolve, reject) => {
     // 如果 signal 已 aborted，立即 reject
     if (signal?.aborted) {
@@ -40,22 +40,26 @@ export async function fetchEpisodeIds(
     xhr.onload = function () {
       if (xhr.status >= 200 && xhr.status < 300) {
         try {
-          const data = JSON.parse(xhr.responseText)
-          const episodes: { id: number; sort: number }[] = data.data || []
+          const data = JSON.parse(xhr.responseText) as {
+            data?: Array<{ id: number; sort: number }>
+          }
+          const episodes = data.data || []
           episodes.sort((a, b) => (a.sort || 0) - (b.sort || 0))
           resolve(episodes.map((ep) => ep.id))
         } catch {
           reject(new Error('解析章节数据失败'))
         }
       } else {
-        reject(new Error(`HTTP ${xhr.status}: ${xhr.responseText}`))
+        reject(new Error(`HTTP ${String(xhr.status)}: ${xhr.responseText}`))
       }
     }
     xhr.onerror = () => {
       // 如果是 abort 导致的 onerror，归类为取消
       reject(new Error(signal?.aborted ? '请求被取消' : '网络错误'))
     }
-    xhr.ontimeout = () => reject(new Error('请求章节数据超时（30s），可能网络受限或被墙'))
+    xhr.ontimeout = () => {
+      reject(new Error('请求章节数据超时（30s），可能网络受限或被墙'))
+    }
     xhr.send()
   })
 }
@@ -85,13 +89,13 @@ export async function markEpisodesComplete(
     const body = JSON.stringify({ episode_id: targetIds, type: 2 })
     const result = await bgmRequestSync(
       'PATCH',
-      `/v0/users/-/collections/${sid}/episodes`,
+      `/v0/users/-/collections/${String(sid)}/episodes`,
       body,
       token,
       signal,
     )
     if (result.code >= 200 && result.code < 300) {
-      return { success: true, message: `已标记前 ${targetIds.length} 集为已完成` }
+      return { success: true, message: `已标记前 ${String(targetIds.length)} 集为已完成` }
     }
     return { success: false, message: result.message }
   } catch (e: unknown) {

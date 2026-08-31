@@ -29,7 +29,7 @@ export function showConnectionTestDialog(result: {
   // 构造结果详情 HTML
   const statusColor = success ? '#4CAF50' : '#f44336'
   const statusText = success ? '✅ 连接成功' : '❌ 连接失败'
-  const responseText = responseTime > 0 ? `${responseTime}ms` : '超时'
+  const responseText = responseTime > 0 ? `${String(responseTime)}ms` : '超时'
   const statusCodeText = statusCode !== null ? String(statusCode) : '无响应'
 
   const bodyHtml = `

@@ -154,7 +154,7 @@ export function getExcelAliases(jsonlField: string): readonly string[] {
  * @returns 字符串表示；undefined/null/空字符串 → ''
  */
 function toExtStringValue(value: string | number | undefined): string {
-  if (value === undefined || value === null) return ''
+  if (value === undefined) return ''
   if (typeof value === 'number') return String(value)
   return value
 }
@@ -231,10 +231,7 @@ export function tagsToString(tags: string[] | undefined): string {
  */
 export function isGithubRemoteEntry(value: unknown): value is GithubRemoteEntry {
   return (
-    typeof value === 'object' &&
-    value !== null &&
-    'sid' in value &&
-    typeof (value as { sid: unknown }).sid === 'string'
+    typeof value === 'object' && value !== null && 'sid' in value && typeof value.sid === 'string'
   )
 }
 
@@ -357,7 +354,7 @@ export function filterByTime(
     if (!entry.date || entry.date.trim() === '') return false
 
     // 解析日期：支持 YYYY-MM-DD、YYYY/MM/DD、YYYY.MM.DD 等格式
-    const match = String(entry.date).match(/^(\d{4})[-/.](\d{1,2})/)
+    const match = entry.date.match(/^(\d{4})[-/.](\d{1,2})/)
     if (!match) return false
 
     const yearStr = match[1]
@@ -410,7 +407,7 @@ function matchTimeFilter(dateStr: string, filter: SyncTimeFilter): boolean {
   if (filter.range === 'future') return true
 
   // 支持本地"YYYY年MM月DD日"格式和远程"YYYY-MM-DD"格式
-  const match = String(dateStr).match(/(\d{4})[-/.年](\d{1,2})/)
+  const match = dateStr.match(/(\d{4})[-/.年](\d{1,2})/)
   if (!match) return false
 
   const yearStr = match[1]
@@ -538,7 +535,7 @@ export function computeDiff(
     const comparedFields = new Set<string>()
     for (const [jsonlField] of EXTENDED_FIELD_MAP) {
       const remoteValue = remote[jsonlField as keyof GithubRemoteEntry]
-      if (remoteValue === undefined || remoteValue === null) continue
+      if (remoteValue === undefined) continue
       const remoteStr = toExtStringValue(remoteValue as string | number)
       const excelAliases = getExcelAliases(jsonlField)
       for (const excelField of excelAliases) {

@@ -207,7 +207,7 @@ function createLightweightFallback(): (d: string) => string {
 
       // 1) 删除危险标签（深度优先，用 querySelectorAll）
       const selector = Array.from(DANGEROUS_TAGS).join(',')
-      const badEls = host.querySelectorAll<Element>(selector)
+      const badEls = host.querySelectorAll(selector)
       // 从尾到头 remove 避免 live collection 踩坑（querySelectorAll 是非 live，保险起见逆序）
       for (let i = badEls.length - 1; i >= 0; i--) {
         const el = badEls[i]!

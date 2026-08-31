@@ -316,10 +316,10 @@ export function detectColumns(sheet: WpsWorksheet, headerRow: number): EnrichCol
 
   bgmLog(
     LOG_LEVELS.INFO,
-    `[detectColumns] 列映射: name=${mapping.nameCol}, tags=${mapping.tagsCol ?? 'N/A'}, ` +
-      `premiere=${mapping.premiereCol ?? 'N/A'}, episodes=${mapping.episodesCol ?? 'N/A'}, ` +
-      `weekday=${mapping.weekdayCol ?? 'N/A'}, platform=${mapping.platformCol ?? 'N/A'}, ` +
-      `exclusive=${mapping.exclusiveCol ?? 'N/A'}, special=${mapping.specialCol ?? 'N/A'}`,
+    `[detectColumns] 列映射: name=${String(mapping.nameCol)}, tags=${String(mapping.tagsCol ?? 'N/A')}, ` +
+      `premiere=${String(mapping.premiereCol ?? 'N/A')}, episodes=${String(mapping.episodesCol ?? 'N/A')}, ` +
+      `weekday=${String(mapping.weekdayCol ?? 'N/A')}, platform=${String(mapping.platformCol ?? 'N/A')}, ` +
+      `exclusive=${String(mapping.exclusiveCol ?? 'N/A')}, special=${String(mapping.specialCol ?? 'N/A')}`,
   )
 
   return mapping
@@ -426,7 +426,7 @@ function buildBangumiIndexes(
 
   bgmLog(
     LOG_LEVELS.INFO,
-    `[buildBangumiIndexes] 名称索引: ${nameIndex.size} 条, 别名索引: ${aliasIndex.size} 条`,
+    `[buildBangumiIndexes] 名称索引: ${String(nameIndex.size)} 条, 别名索引: ${String(aliasIndex.size)} 条`,
   )
 
   return [nameIndex, aliasIndex, rowNames]
@@ -523,9 +523,9 @@ export function matchEntries(
     const errorCount = results.filter((r) => r.matchType === 'error').length
     bgmLog(
       LOG_LEVELS.INFO,
-      `[matchEntries] 匹配完成：精确 ${results.filter((r) => r.matchType === 'exact').length} 条, ` +
-        `别名 ${results.filter((r) => r.matchType === 'alias').length} 条, ` +
-        `未匹配 ${unmatchedCount} 条, 错误 ${errorCount} 条, 共 ${results.length} 条`,
+      `[matchEntries] 匹配完成：精确 ${String(results.filter((r) => r.matchType === 'exact').length)} 条, ` +
+        `别名 ${String(results.filter((r) => r.matchType === 'alias').length)} 条, ` +
+        `未匹配 ${String(unmatchedCount)} 条, 错误 ${String(errorCount)} 条, 共 ${String(results.length)} 条`,
     )
   } catch (e: unknown) {
     BGM.handleError(e, { context: 'matchEntries', showAlert: false })
@@ -883,7 +883,7 @@ export function enrichEntries(
       stats.failed++
       bgmLog(
         LOG_LEVELS.ERROR,
-        `[enrichEntries] 富化 "${match.newAnimeName}" (行${bangumiRow}) 失败: ${errMsg}`,
+        `[enrichEntries] 富化 "${match.newAnimeName}" (行${String(bangumiRow)}) 失败: ${errMsg}`,
       )
       results.push({
         kind: 'error',
@@ -910,8 +910,8 @@ export function enrichEntries(
 
   bgmLog(
     LOG_LEVELS.INFO,
-    `[enrichEntries] 富化完成：匹配 ${stats.matched}, 富化 ${stats.enriched}, ` +
-      `跳过 ${stats.skipped}, 失败 ${stats.failed}, 耗时 ${Date.now() - startTime}ms`,
+    `[enrichEntries] 富化完成：匹配 ${String(stats.matched)}, 富化 ${String(stats.enriched)}, ` +
+      `跳过 ${String(stats.skipped)}, 失败 ${String(stats.failed)}, 耗时 ${String(Date.now() - startTime)}ms`,
   )
 
   return results
@@ -996,33 +996,14 @@ export function resolveConflictField(
     return
   }
 
-  if (resolution === 'append') {
-    if (oldValue.includes(' | ') || oldValue.includes('|')) {
-      const parts = oldValue
-        .split(/\s*\|\s*/)
-        .map((s) => s.trim())
-        .filter(Boolean)
-      if (!parts.includes(newValue)) {
-        const merged = parts.join(TAG_SEPARATOR) + TAG_SEPARATOR + newValue
-        setCellValue(sheet, bangumiRow, bangumiColumn, merged)
-        enriched.push({
-          fieldName,
-          bangumiColumn,
-          oldValue,
-          newValue: merged,
-          action: 'append',
-        })
-      } else {
-        enriched.push({
-          fieldName,
-          bangumiColumn,
-          oldValue,
-          newValue,
-          action: 'skip',
-        })
-      }
-    } else {
-      const merged = oldValue + TAG_SEPARATOR + newValue
+  // 此处 resolution 已被上方两个分支收窄为 'append'
+  if (oldValue.includes(' | ') || oldValue.includes('|')) {
+    const parts = oldValue
+      .split(/\s*\|\s*/)
+      .map((s) => s.trim())
+      .filter(Boolean)
+    if (!parts.includes(newValue)) {
+      const merged = parts.join(TAG_SEPARATOR) + TAG_SEPARATOR + newValue
       setCellValue(sheet, bangumiRow, bangumiColumn, merged)
       enriched.push({
         fieldName,
@@ -1031,7 +1012,25 @@ export function resolveConflictField(
         newValue: merged,
         action: 'append',
       })
+    } else {
+      enriched.push({
+        fieldName,
+        bangumiColumn,
+        oldValue,
+        newValue,
+        action: 'skip',
+      })
     }
+  } else {
+    const merged = oldValue + TAG_SEPARATOR + newValue
+    setCellValue(sheet, bangumiRow, bangumiColumn, merged)
+    enriched.push({
+      fieldName,
+      bangumiColumn,
+      oldValue,
+      newValue: merged,
+      action: 'append',
+    })
   }
 }
 
@@ -1134,7 +1133,7 @@ export function ensureBangumiColumns(
         updatedMap.set(field, newCol)
         bgmLog(
           LOG_LEVELS.INFO,
-          `[ensureBangumiColumns] 新增列: ${field} → 第 ${newCol} 列 (样式已跟随现有列)`,
+          `[ensureBangumiColumns] 新增列: ${field} → 第 ${String(newCol)} 列 (样式已跟随现有列)`,
         )
       }
     }
@@ -1159,7 +1158,7 @@ function WpsCellRef(row: number, col: number): string {
     colStr = String.fromCharCode(65 + (c % 26)) + colStr
     c = Math.floor(c / 26)
   }
-  return `${colStr}${row}`
+  return `${colStr}${String(row)}`
 }
 
 /**
@@ -1522,7 +1521,7 @@ export function searchSheet(
     }
   }
 
-  bgmLog(LOG_LEVELS.INFO, `[searchSheet] 搜索 "${keyword}" 找到 ${results.length} 条结果`)
+  bgmLog(LOG_LEVELS.INFO, `[searchSheet] 搜索 "${keyword}" 找到 ${String(results.length)} 条结果`)
   return results
 }
 
@@ -1551,11 +1550,11 @@ export async function fetchRemoteFile(config: RemoteRepoConfig): Promise<string 
 
     const response = await fetch(rawUrl)
     if (!response.ok) {
-      throw new Error(`HTTP ${response.status}: ${response.statusText}`)
+      throw new Error(`HTTP ${String(response.status)}: ${response.statusText}`)
     }
 
     const content = await response.text()
-    bgmLog(LOG_LEVELS.INFO, `[fetchRemoteFile] 下载成功: ${content.length} 字节`)
+    bgmLog(LOG_LEVELS.INFO, `[fetchRemoteFile] 下载成功: ${String(content.length)} 字节`)
     return content
   } catch (e) {
     const errMsg = e instanceof Error ? e.message : String(e)
@@ -1596,7 +1595,7 @@ export function parseRemoteContent(content: string): Array<Record<string, string
     records.push(record)
   }
 
-  bgmLog(LOG_LEVELS.INFO, `[parseRemoteContent] 解析 ${records.length} 条记录`)
+  bgmLog(LOG_LEVELS.INFO, `[parseRemoteContent] 解析 ${String(records.length)} 条记录`)
   return records
 }
 
@@ -1624,6 +1623,6 @@ export function writeRemoteDataToSheet(
     written++
   }
 
-  bgmLog(LOG_LEVELS.INFO, `[writeRemoteDataToSheet] 写入 ${written} 行数据`)
+  bgmLog(LOG_LEVELS.INFO, `[writeRemoteDataToSheet] 写入 ${String(written)} 行数据`)
   return written
 }

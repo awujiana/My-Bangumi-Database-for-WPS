@@ -79,7 +79,7 @@ async function getLogger(): Promise<LoggerModule | null> {
   if (_logger) return _logger
   try {
     const mod = await import('./tools/logger.js')
-    _logger = mod as unknown as LoggerModule
+    _logger = mod
     return _logger
   } catch {
     return null
@@ -380,11 +380,11 @@ function buildStatusBarHTML(modules: ModuleStatus[]): string {
   )
   if (failed.length > 0) {
     badges.push(
-      `<span class="bgm-dp-badge ${failedCritical.length > 0 ? 'bgm-dp-badge-err' : 'bgm-dp-badge-warn'}">${failed.length} 模块失败</span>`,
+      `<span class="bgm-dp-badge ${failedCritical.length > 0 ? 'bgm-dp-badge-err' : 'bgm-dp-badge-warn'}">${String(failed.length)} 模块失败</span>`,
     )
   }
   badges.push(
-    `<span class="bgm-dp-badge bgm-dp-badge-muted">${loaded}/${modules.length} 已加载</span>`,
+    `<span class="bgm-dp-badge bgm-dp-badge-muted">${String(loaded)}/${String(modules.length)} 已加载</span>`,
   )
 
   return `<div class="bgm-dp-statusbar">${badges.join('')}</div>`
@@ -394,9 +394,9 @@ function buildTabsHTML(logCount: number): string {
   const modules = getModuleStatuses()
   return `
     <div class="bgm-dp-tabs">
-      <button class="bgm-dp-tab active" data-tab="modules">模块状态<span class="bgm-dp-tab-count">${modules.length}</span></button>
-      <button class="bgm-dp-tab" data-tab="ribbon">Ribbon 测试<span class="bgm-dp-tab-count">${RIBBON_BUTTONS.length}</span></button>
-      <button class="bgm-dp-tab" data-tab="console">控制台日志<span class="bgm-dp-tab-count">${logCount}</span></button>
+      <button class="bgm-dp-tab active" data-tab="modules">模块状态<span class="bgm-dp-tab-count">${String(modules.length)}</span></button>
+      <button class="bgm-dp-tab" data-tab="ribbon">Ribbon 测试<span class="bgm-dp-tab-count">${String(RIBBON_BUTTONS.length)}</span></button>
+      <button class="bgm-dp-tab" data-tab="console">控制台日志<span class="bgm-dp-tab-count">${String(logCount)}</span></button>
       <button class="bgm-dp-tab" data-tab="env">环境信息</button>
     </div>
   `
@@ -568,11 +568,15 @@ function bindTabs(root: HTMLElement): void {
   const panels = root.querySelectorAll<HTMLElement>('.bgm-dp-panel')
   tabs.forEach((tab) => {
     tab.addEventListener('click', () => {
-      tabs.forEach((t) => t.classList.remove('active'))
-      panels.forEach((p) => p.classList.remove('active'))
+      tabs.forEach((t) => {
+        t.classList.remove('active')
+      })
+      panels.forEach((p) => {
+        p.classList.remove('active')
+      })
       tab.classList.add('active')
       const target = tab.dataset.tab
-      const panel = root.querySelector<HTMLElement>(`[data-panel="${target}"]`)
+      const panel = root.querySelector<HTMLElement>(`[data-panel="${target ?? ''}"]`)
       if (panel) panel.classList.add('active')
 
       // 启动/停止日志轮询
@@ -655,11 +659,13 @@ function bindLogFilters(root: HTMLElement): void {
   const filters = root.querySelectorAll<HTMLElement>('.bgm-dp-filter-btn')
   filters.forEach((btn) => {
     btn.addEventListener('click', () => {
-      filters.forEach((f) => f.classList.remove('active'))
+      filters.forEach((f) => {
+        f.classList.remove('active')
+      })
       btn.classList.add('active')
       const level = btn.dataset.level
       _currentLogLevel = level === 'all' ? undefined : level
-      refreshLogs(root)
+      void refreshLogs(root)
     })
   })
 }
@@ -667,20 +673,22 @@ function bindLogFilters(root: HTMLElement): void {
 /** 日志清空和导出 */
 function bindLogActions(root: HTMLElement): void {
   const clearBtn = root.querySelector<HTMLElement>('#bgm-dp-log-clear')
-  clearBtn?.addEventListener('click', async () => {
-    const logger = await getLogger()
-    if (logger) {
-      logger.clearLogs()
-      refreshLogs(root)
-    }
+  clearBtn?.addEventListener('click', () => {
+    void getLogger().then((logger) => {
+      if (logger) {
+        logger.clearLogs()
+        void refreshLogs(root)
+      }
+    })
   })
 
   const exportBtn = root.querySelector<HTMLElement>('#bgm-dp-log-export')
-  exportBtn?.addEventListener('click', async () => {
-    const logger = await getLogger()
-    if (logger) {
-      logger.exportLogsToFile()
-    }
+  exportBtn?.addEventListener('click', () => {
+    void getLogger().then((logger) => {
+      if (logger) {
+        logger.exportLogsToFile()
+      }
+    })
   })
 }
 
@@ -731,9 +739,9 @@ async function refreshLogs(root: HTMLElement): Promise<void> {
 /** 启动日志轮询 */
 function startLogPolling(root: HTMLElement): void {
   stopLogPolling()
-  refreshLogs(root)
+  void refreshLogs(root)
   _logInterval = setInterval(() => {
-    refreshLogs(root)
+    void refreshLogs(root)
   }, 2000)
 }
 
@@ -755,7 +763,8 @@ function bindEnvActions(root: HTMLElement): void {
   const clearCacheBtn = root.querySelector<HTMLElement>('#bgm-dp-clear-cache')
   clearCacheBtn?.addEventListener('click', () => {
     // 添加 cache-busting 参数强制刷新
-    window.location.href = window.location.origin + window.location.pathname + '?bust=' + Date.now()
+    window.location.href =
+      window.location.origin + window.location.pathname + '?bust=' + String(Date.now())
   })
 
   const exportReportBtn = root.querySelector<HTMLElement>('#bgm-dp-export-report')
@@ -806,7 +815,7 @@ function exportDiagnosticReport(): void {
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')
   a.href = url
-  a.download = `bgm-diagnostic-${Date.now()}.json`
+  a.download = `bgm-diagnostic-${String(Date.now())}.json`
   document.body.appendChild(a)
   a.click()
   document.body.removeChild(a)

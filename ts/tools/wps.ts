@@ -298,17 +298,25 @@ export interface BgmWindow {
 
 export function wpsPrompt(message: string, defaultValue?: string): Promise<string | null> {
   return new Promise((resolve) => {
-    const app = getApp() as {
-      InputBox?: (msg: string, title: string, defaultVal: string, type: number) => string | false
-    }
+    const app = getApp() as
+      | {
+          InputBox?: (
+            msg: string,
+            title: string,
+            defaultVal: string,
+            type: number,
+          ) => string | false
+        }
+      | null
+      | undefined
     if (app?.InputBox) {
       try {
         const result = app.InputBox(message, 'Bangumi 设置', defaultValue || '', 2)
-        if (result === false || result === null || result === undefined) {
+        if (result === false) {
           resolve(null)
           return
         }
-        resolve(String(result))
+        resolve(result)
         return
       } catch (e: unknown) {
         // 类型守卫：先缩窄类型再访问 message，符合 useUnknownInCatchVariables 规范
@@ -355,7 +363,8 @@ export function wpsPrompt(message: string, defaultValue?: string): Promise<strin
 
 export function wpsMsgBox(message: string, buttons?: number, icon?: number): Promise<number> {
   return new Promise((resolve) => {
-    const app = getApp() as { MessageBox?: (msg: string, type: number) => number }
+    const app = getApp() as
+      { MessageBox?: (msg: string, type: number) => number } | null | undefined
     if (app?.MessageBox) {
       try {
         const result = app.MessageBox(message, (buttons || 0) + (icon || 64))
@@ -424,13 +433,13 @@ export function wpsMsgBox(message: string, buttons?: number, icon?: number): Pro
  * @returns   该行对应的 WpsRange
  */
 export function getRowRange(ws: WpsWorksheet, row: number): WpsRange {
-  if (!ws || typeof ws.Range !== 'function') {
+  if (typeof ws.Range !== 'function') {
     throw new Error('Invalid worksheet object')
   }
   if (!Number.isFinite(row) || row < 1) {
-    throw new Error(`Row index must be a positive integer, got ${row}`)
+    throw new Error(`Row index must be a positive integer, got ${String(row)}`)
   }
-  return ws.Range(`${row}:${row}`)
+  return ws.Range(`${String(row)}:${String(row)}`)
 }
 
 /**
@@ -447,7 +456,7 @@ export function getRowRangeSafe(ws: WpsWorksheet, row: number): WpsRange {
       const item = ws.Rows.Item(row)
       return item as unknown as WpsRange
     } catch {
-      throw new Error(`Failed to access row ${row}`)
+      throw new Error(`Failed to access row ${String(row)}`)
     }
   }
 }

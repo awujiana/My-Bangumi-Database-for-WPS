@@ -80,12 +80,12 @@ export function readLocalFileContent(filePath: string): Promise<string> {
       if (xhr.status === 0 || xhr.status === 200) {
         bgmLog(
           LOG_LEVELS.INFO,
-          `[localFileSync] 文件读取成功: ${filePath}（${xhr.responseText.length} 字符）`,
+          `[localFileSync] 文件读取成功: ${filePath}（${String(xhr.responseText.length)} 字符）`,
         )
         resolve(xhr.responseText)
         return
       }
-      reject(new Error(`读取文件失败（HTTP ${xhr.status}）：${filePath}`))
+      reject(new Error(`读取文件失败（HTTP ${String(xhr.status)}）：${filePath}`))
     }
 
     xhr.onerror = (): void => {
@@ -93,7 +93,7 @@ export function readLocalFileContent(filePath: string): Promise<string> {
     }
 
     xhr.ontimeout = (): void => {
-      reject(new Error(`读取文件超时（${FILE_READ_TIMEOUT_MS}ms）：${filePath}`))
+      reject(new Error(`读取文件超时（${String(FILE_READ_TIMEOUT_MS)}ms）：${filePath}`))
     }
 
     xhr.send()
@@ -110,7 +110,7 @@ export function readLocalFileContent(filePath: string): Promise<string> {
  */
 export function getLocalFilePath(): string {
   const cfg = getGithubConfig()
-  return cfg.path ?? ''
+  return cfg.path
 }
 
 /**
@@ -183,19 +183,19 @@ export class LocalFileSyncSource implements SyncSource {
 
     if (entries.length === 0 && errors.length > 0) {
       throw new Error(
-        `JSONL 解析失败：${errors.length} 行全部非法。` +
-          `首行错误（第 ${errors[0]?.line} 行）：${errors[0]?.reason}`,
+        `JSONL 解析失败：${String(errors.length)} 行全部非法。` +
+          `首行错误（第 ${String(errors[0]?.line ?? '')} 行）：${errors[0]?.reason ?? ''}`,
       )
     }
 
     if (errors.length > 0) {
       bgmLog(
         LOG_LEVELS.WARN,
-        `[localFileSync] JSONL 解析完成：${entries.length} 条合法，${errors.length} 行非法（已跳过）。` +
-          `首行错误（第 ${errors[0]?.line} 行）：${errors[0]?.reason}`,
+        `[localFileSync] JSONL 解析完成：${String(entries.length)} 条合法，${String(errors.length)} 行非法（已跳过）。` +
+          `首行错误（第 ${String(errors[0]?.line ?? '')} 行）：${errors[0]?.reason ?? ''}`,
       )
     } else {
-      bgmLog(LOG_LEVELS.INFO, `[localFileSync] 解析成功：${entries.length} 条记录`)
+      bgmLog(LOG_LEVELS.INFO, `[localFileSync] 解析成功：${String(entries.length)} 条记录`)
     }
 
     return entries

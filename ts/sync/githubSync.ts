@@ -161,8 +161,8 @@ export function fetchGithubJson(signal?: AbortSignal): Promise<GithubRemoteEntry
           if (entries.length === 0 && errors.length > 0) {
             reject(
               new Error(
-                `JSONL 解析失败：${errors.length} 行全部非法。` +
-                  `首行错误（第 ${errors[0]?.line} 行）：${errors[0]?.reason}`,
+                `JSONL 解析失败：${String(errors.length)} 行全部非法。` +
+                  `首行错误（第 ${String(errors[0]?.line ?? '')} 行）：${errors[0]?.reason ?? ''}`,
               ),
             )
             return
@@ -170,11 +170,11 @@ export function fetchGithubJson(signal?: AbortSignal): Promise<GithubRemoteEntry
           if (errors.length > 0) {
             bgmLog(
               LOG_LEVELS.WARN,
-              `[githubSync] JSONL 解析完成：${entries.length} 条合法，${errors.length} 行非法（已跳过）。` +
-                `首行错误（第 ${errors[0]?.line} 行）：${errors[0]?.reason}`,
+              `[githubSync] JSONL 解析完成：${String(entries.length)} 条合法，${String(errors.length)} 行非法（已跳过）。` +
+                `首行错误（第 ${String(errors[0]?.line ?? '')} 行）：${errors[0]?.reason ?? ''}`,
             )
           } else {
-            bgmLog(LOG_LEVELS.INFO, `[githubSync] 下载成功：${entries.length} 条记录`)
+            bgmLog(LOG_LEVELS.INFO, `[githubSync] 下载成功：${String(entries.length)} 条记录`)
           }
           resolve(entries)
         } catch (e: unknown) {
@@ -187,7 +187,7 @@ export function fetchGithubJson(signal?: AbortSignal): Promise<GithubRemoteEntry
           new Error(`访问被拒（403）：可能是私有仓库或触发 GitHub 限流（未认证 60次/小时/IP）`),
         )
       } else {
-        reject(new Error(`HTTP 错误 ${xhr.status}: ${xhr.statusText}`))
+        reject(new Error(`HTTP 错误 ${String(xhr.status)}: ${xhr.statusText}`))
       }
     }
 
@@ -203,7 +203,7 @@ export function fetchGithubJson(signal?: AbortSignal): Promise<GithubRemoteEntry
 
     xhr.ontimeout = (): void => {
       removeAbortHandler()
-      reject(new Error(`请求超时（${REQUEST_TIMEOUT_MS}ms）：${url}`))
+      reject(new Error(`请求超时（${String(REQUEST_TIMEOUT_MS)}ms）：${url}`))
     }
 
     xhr.send()
@@ -318,13 +318,11 @@ function readLocalEntries(
   try {
     const startColLetter = colNumToLetter(minCol)
     const endColLetter = colNumToLetter(maxCol)
-    const rangeAddr = `${startColLetter}${startRow}:${endColLetter}${lastRow}`
+    const rangeAddr = `${startColLetter}${String(startRow)}:${endColLetter}${String(lastRow)}`
     const range = ws.Range(rangeAddr)
-    if (range) {
-      const raw = range.Value2 as unknown
-      if (Array.isArray(raw)) {
-        rawData = raw as unknown[][]
-      }
+    const raw = range.Value2 as unknown
+    if (Array.isArray(raw)) {
+      rawData = raw as unknown[][]
     }
   } catch (e: unknown) {
     bgmLog(LOG_LEVELS.WARN, `[githubSync] 批量读取失败，回退到逐单元格: ${(e as Error).message}`)
@@ -342,7 +340,7 @@ function readLocalEntries(
     if (idx === undefined) return ''
     const rowArr = rawData?.[rowOffset]
     if (!rowArr) return ''
-    const val = rowArr[idx]
+    const val = rowArr[idx] as string | number | boolean | null | undefined
     if (val === null || val === undefined) return ''
     return trim(String(val))
   }
@@ -391,7 +389,7 @@ function readLocalEntries(
 
   bgmLog(
     LOG_LEVELS.INFO,
-    `[githubSync] 本地读取完成：${result.size} 条有效记录（批量模式: ${rawData ? '是' : '否'}）`,
+    `[githubSync] 本地读取完成：${String(result.size)} 条有效记录（批量模式: ${rawData ? '是' : '否'}）`,
   )
   return result
 }
@@ -416,7 +414,7 @@ export function readLocalEntriesForSync(): {
   if (!colMap.has('Bangumi_URL')) {
     bgmLog(
       LOG_LEVELS.WARN,
-      `[githubSync] 未找到 Bangumi_URL 列（headerRow=${headerRow}），视为空文档，所有远程条目将作为新增`,
+      `[githubSync] 未找到 Bangumi_URL 列（headerRow=${String(headerRow)}），视为空文档，所有远程条目将作为新增`,
     )
     // 返回空 entries，让 computeDiff 将所有远程条目视为新增
     return { entries: new Map(), lastRow: headerRow }
@@ -443,12 +441,12 @@ const DATE_COLUMNS = new Set(['开播日期', '完播日'])
  */
 function formatDateToLocal(dateStr: string): string | null {
   if (!dateStr) return null
-  const match = String(dateStr).match(/^(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})/)
+  const match = dateStr.match(/^(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})/)
   if (!match) return null
   const year = match[1]
   const month = match[2]!.padStart(2, '0')
   const day = match[3]!.padStart(2, '0')
-  return `${year}年${month}月${day}日`
+  return `${year ?? ''}年${month}月${day}日`
 }
 
 /**
@@ -643,10 +641,10 @@ function formatDuration(ms: number): string {
     return `${seconds.toFixed(2)}秒`
   }
   const seconds = Math.floor(ms / 1000)
-  if (seconds < 60) return `${seconds}秒`
+  if (seconds < 60) return `${String(seconds)}秒`
   const minutes = Math.floor(seconds / 60)
   const secs = seconds % 60
-  return `${minutes}分${secs.toString().padStart(2, '0')}秒`
+  return `${String(minutes)}分${secs.toString().padStart(2, '0')}秒`
 }
 
 /**
@@ -757,14 +755,9 @@ function batchWriteNewRows(
   const endColLetter = colNumToLetter(maxCol)
   const endRow = startRow + rows.length - 1
   try {
-    const rangeAddr = `${startColLetter}${startRow}:${endColLetter}${endRow}`
+    const rangeAddr = `${startColLetter}${String(startRow)}:${endColLetter}${String(endRow)}`
     const range = ws.Range(rangeAddr)
-    if (range) {
-      range.Value2 = values as unknown as WpsCellValue
-    } else {
-      bgmLog(LOG_LEVELS.WARN, '[batchWriteNewRows] Range 对象无效，回退到逐行写入')
-      return 0
-    }
+    range.Value2 = values
   } catch (e: unknown) {
     bgmLog(
       LOG_LEVELS.WARN,
@@ -887,19 +880,17 @@ function batchUpdateRows(
     try {
       const startColLetter = colNumToLetter(minCol)
       const endColLetter = colNumToLetter(maxCol)
-      const rangeAddr = `${startColLetter}${row}:${endColLetter}${row}`
+      const rangeAddr = `${startColLetter}${String(row)}:${endColLetter}${String(row)}`
       range = ws.Range(rangeAddr)
 
       // 读取旧值
-      if (range) {
-        const oldValues = range.Value2 as unknown as (string | number | null)[] | null
-        oldArr = Array.isArray(oldValues)
-          ? ((oldValues[0] as (string | number | null)[] | undefined) ?? [])
-          : []
-      }
+      const oldValues = range.Value2 as unknown as (string | number | null)[] | null
+      oldArr = Array.isArray(oldValues)
+        ? ((oldValues[0] as (string | number | null)[] | undefined) ?? [])
+        : []
     } catch {
       // Range 访问失败时，oldArr 保持为空数组，将使用空字符串进行合并
-      bgmLog(LOG_LEVELS.WARN, `[batchUpdateRows] 行 ${row} 读取旧值失败，使用空值`)
+      bgmLog(LOG_LEVELS.WARN, `[batchUpdateRows] 行 ${String(row)} 读取旧值失败，使用空值`)
     }
 
     // 构建该行的值数组
@@ -1078,7 +1069,7 @@ function batchUpdateRows(
               })
             } else {
               // 尝试了写入但全部失败
-              bgmLog(LOG_LEVELS.ERROR, `[batchUpdateRows] 行 ${row} 回退逐字段写入全部失败`)
+              bgmLog(LOG_LEVELS.ERROR, `[batchUpdateRows] 行 ${String(row)} 回退逐字段写入全部失败`)
               details?.push({
                 kind: 'fail',
                 sid: u.sid,
@@ -1097,7 +1088,10 @@ function batchUpdateRows(
             }
           } catch (e: unknown) {
             const errMsg = e instanceof Error ? e.message : String(e)
-            bgmLog(LOG_LEVELS.ERROR, `[batchUpdateRows] 行 ${row} 回退逐字段写入异常: ${errMsg}`)
+            bgmLog(
+              LOG_LEVELS.ERROR,
+              `[batchUpdateRows] 行 ${String(row)} 回退逐字段写入异常: ${errMsg}`,
+            )
             details?.push({
               kind: 'fail',
               sid: u.sid,
@@ -1119,7 +1113,7 @@ function batchUpdateRows(
     } catch (e: unknown) {
       bgmLog(
         LOG_LEVELS.WARN,
-        `[batchUpdateRows] 行 ${row} 写入失败，回退到逐字段写入: ${(e as Error).message}`,
+        `[batchUpdateRows] 行 ${String(row)} 写入失败，回退到逐字段写入: ${(e as Error).message}`,
       )
       // 回退到逐字段写入
       try {
@@ -1165,7 +1159,7 @@ function batchUpdateRows(
         }
       } catch (e2: unknown) {
         const errMsg = e2 instanceof Error ? e2.message : String(e2)
-        bgmLog(LOG_LEVELS.ERROR, `[batchUpdateRows] 行 ${row} 逐字段写入也失败: ${errMsg}`)
+        bgmLog(LOG_LEVELS.ERROR, `[batchUpdateRows] 行 ${String(row)} 逐字段写入也失败: ${errMsg}`)
         details?.push({
           kind: 'fail',
           sid: u.sid,
@@ -1233,7 +1227,7 @@ export async function applyDiffToSheet(
   const total = diffs.length
   const addDiffs = sortedDiffs.filter((d) => d.kind === 'add' && d.remote)
   const addTotal = addDiffs.length
-  onProgress?.(0, total, `准备写入：新增 ${addTotal} 条，共 ${total} 条差异`)
+  onProgress?.(0, total, `准备写入：新增 ${String(addTotal)} 条，共 ${String(total)} 条差异`)
 
   // 让出事件循环，允许 DOM 渲染初始进度
   await yieldToEventLoop()
@@ -1378,7 +1372,7 @@ export async function applyDiffToSheet(
       onProgress?.(
         addProcessed,
         addTotal,
-        `新增 ${addProcessed}/${addTotal} 条 (${speed > 0 ? speed.toFixed(0) : '?'} 行/秒)`,
+        `新增 ${String(addProcessed)}/${String(addTotal)} 条 (${speed > 0 ? speed.toFixed(0) : '?'} 行/秒)`,
         formatEta(eta),
       )
       lastProgressTime = now
@@ -1438,7 +1432,7 @@ export async function applyDiffToSheet(
       onProgress?.(
         totalProcessed,
         total,
-        `更新 ${updateProcessed}/${updateTotal} 条 (${speed > 0 ? speed.toFixed(0) : '?'} 行/秒)`,
+        `更新 ${String(updateProcessed)}/${String(updateTotal)} 条 (${speed > 0 ? speed.toFixed(0) : '?'} 行/秒)`,
         formatEta(eta),
       )
       lastProgressTime = now
@@ -1463,25 +1457,28 @@ export async function applyDiffToSheet(
       }
       recordRowDeleteEntry({ row: diff.localRow!, values: rowValues })
       try {
-        ws.Range(`${diff.localRow}:${diff.localRow}`).Delete()
+        ws.Range(`${String(diff.localRow ?? '')}:${String(diff.localRow ?? '')}`).Delete()
         result.deleted++
         result.details!.push({
           kind: 'delete',
           sid: diff.sid,
           row: diff.localRow,
-          message: `删除行 ${diff.localRow}`,
+          message: `删除行 ${String(diff.localRow ?? '')}`,
         })
         syncRecords.push({
           sid: diff.sid,
           source,
           content: '仓库同步-删除',
           status: '成功',
-          message: `删除行 ${diff.localRow}`,
+          message: `删除行 ${String(diff.localRow ?? '')}`,
           count: 1,
         })
       } catch (e: unknown) {
         const errMsg = e instanceof Error ? e.message : String(e)
-        bgmLog(LOG_LEVELS.WARN, `[githubSync] 删除行 ${diff.localRow} 失败: ${errMsg}`)
+        bgmLog(
+          LOG_LEVELS.WARN,
+          `[githubSync] 删除行 ${String(diff.localRow ?? '')} 失败: ${errMsg}`,
+        )
         result.failed++
         result.details!.push({
           kind: 'fail',
@@ -1531,7 +1528,7 @@ export async function applyDiffToSheet(
       onProgress?.(
         totalProcessed,
         total,
-        `删除 ${deleteProcessed}/${deleteTotal} 条 (${deleteSpeed > 0 ? deleteSpeed.toFixed(0) : '?'} 行/秒)`,
+        `删除 ${String(deleteProcessed)}/${String(deleteTotal)} 条 (${deleteSpeed > 0 ? deleteSpeed.toFixed(0) : '?'} 行/秒)`,
         formatEta(eta),
       )
       lastProgressTime = now
@@ -1574,13 +1571,13 @@ export async function applyDiffToSheet(
     source,
     content: '仓库同步汇总',
     status: result.failed > 0 ? '失败' : '成功',
-    message: `远程 ${result.remoteTotal}，新增 ${result.added}，更新 ${result.updated}，删除 ${result.deleted}，无变更 ${result.unchanged}，失败 ${result.failed}，策略: ${strategy}`,
+    message: `远程 ${String(result.remoteTotal)}，新增 ${String(result.added)}，更新 ${String(result.updated)}，删除 ${String(result.deleted)}，无变更 ${String(result.unchanged)}，失败 ${String(result.failed)}，策略: ${strategy}`,
     count: 1,
   })
 
   bgmLog(
     LOG_LEVELS.INFO,
-    `[githubSync] 应用完成: 新增 ${result.added}，更新 ${result.updated}，删除 ${result.deleted}，失败 ${result.failed}，耗时 ${formatDuration(totalElapsed)}，平均 ${avgSpeed > 0 ? avgSpeed.toFixed(0) : '?'} 行/秒`,
+    `[githubSync] 应用完成: 新增 ${String(result.added)}，更新 ${String(result.updated)}，删除 ${String(result.deleted)}，失败 ${String(result.failed)}，耗时 ${formatDuration(totalElapsed)}，平均 ${avgSpeed > 0 ? avgSpeed.toFixed(0) : '?'} 行/秒`,
   )
   return result
 }
@@ -1606,7 +1603,7 @@ export function applyConflictResolutions(
   diffs: GithubSyncDiff[],
   resolutions: ConflictResolution[],
 ): GithubSyncDiff[] {
-  if (!resolutions || resolutions.length === 0) {
+  if (resolutions.length === 0) {
     return diffs
   }
 
@@ -1681,7 +1678,7 @@ export async function syncFromGithub(
   onProgress?.(
     1,
     3,
-    `下载完成：${remoteEntries.length} 条（耗时 ${formatDuration(downloadElapsed)}）`,
+    `下载完成：${String(remoteEntries.length)} 条（耗时 ${formatDuration(downloadElapsed)}）`,
   )
 
   // 关闭屏幕刷新，减少 COM 调用开销（ensureSheetHeaders / readLocalEntriesForSync 等 COM 操作）
@@ -1720,12 +1717,12 @@ export async function syncFromGithub(
       effectiveRemoteEntries = remoteEntries.filter((e) => selectedSids.has(e.sid))
       bgmLog(
         LOG_LEVELS.INFO,
-        `[syncFromGithub] 仅同步选中行：选中 ${selectedSids.size} 个 SID，匹配远程 ${effectiveRemoteEntries.length} 条`,
+        `[syncFromGithub] 仅同步选中行：选中 ${String(selectedSids.size)} 个 SID，匹配远程 ${String(effectiveRemoteEntries.length)} 条`,
       )
       onProgress?.(
         1,
         3,
-        `选中 ${selectedSids.size} 行，匹配远程 ${effectiveRemoteEntries.length} 条`,
+        `选中 ${String(selectedSids.size)} 行，匹配远程 ${String(effectiveRemoteEntries.length)} 条`,
       )
     }
 
@@ -1735,12 +1732,12 @@ export async function syncFromGithub(
       effectiveRemoteEntries = filterByTime(effectiveRemoteEntries, timeFilter)
       bgmLog(
         LOG_LEVELS.INFO,
-        `[syncFromGithub] 时间筛选（${timeFilter.range}）：${beforeCount} → ${effectiveRemoteEntries.length} 条`,
+        `[syncFromGithub] 时间筛选（${timeFilter.range}）：${String(beforeCount)} → ${String(effectiveRemoteEntries.length)} 条`,
       )
       onProgress?.(
         1,
         3,
-        `时间筛选：${timeFilter.range === 'year' ? `${timeFilter.year}年` : timeFilter.range === 'quarter' ? `${timeFilter.year}年${timeFilter.quarter}月新番` : `${timeFilter.year}年${timeFilter.month}月`}，匹配 ${effectiveRemoteEntries.length} 条`,
+        `时间筛选：${timeFilter.range === 'year' ? `${String(timeFilter.year)}年` : timeFilter.range === 'quarter' ? `${String(timeFilter.year)}年${String(timeFilter.quarter ?? '')}月新番` : `${String(timeFilter.year)}年${String(timeFilter.month ?? '')}月`}，匹配 ${String(effectiveRemoteEntries.length)} 条`,
       )
     }
 
@@ -1757,7 +1754,10 @@ export async function syncFromGithub(
     // 应用用户冲突解决决策：过滤掉用户选择「本地」的字段
     if (conflictResolution && conflictResolution.length > 0) {
       applyConflictResolutions(diffs, conflictResolution)
-      bgmLog(LOG_LEVELS.INFO, `[githubSync] 已应用 ${conflictResolution.length} 条冲突解决决策`)
+      bgmLog(
+        LOG_LEVELS.INFO,
+        `[githubSync] 已应用 ${String(conflictResolution.length)} 条冲突解决决策`,
+      )
     }
 
     const addCount = diffs.filter((d) => d.kind === 'add').length
@@ -1765,7 +1765,7 @@ export async function syncFromGithub(
     const deleteCount = diffs.filter((d) => d.kind === 'delete').length
     bgmLog(
       LOG_LEVELS.INFO,
-      `[githubSync] diff 完成（${strategy}）：新增 ${addCount}，更新 ${updateCount}，删除 ${deleteCount}，耗时 ${formatDuration(diffElapsed)}`,
+      `[githubSync] diff 完成（${strategy}）：新增 ${String(addCount)}，更新 ${String(updateCount)}，删除 ${String(deleteCount)}，耗时 ${formatDuration(diffElapsed)}`,
     )
 
     const result = await applyDiffToSheet(diffs, strategy, onProgress, source.getDisplayName())
@@ -1782,11 +1782,11 @@ export async function syncFromGithub(
     onProgress?.(
       3,
       3,
-      `完成：新增 ${result.added}，更新 ${result.updated}，删除 ${result.deleted}（总耗时 ${formatDuration(totalElapsed)}，${overallSpeed > 0 ? overallSpeed : '?'} 行/秒）`,
+      `完成：新增 ${String(result.added)}，更新 ${String(result.updated)}，删除 ${String(result.deleted)}（总耗时 ${formatDuration(totalElapsed)}，${String(overallSpeed > 0 ? overallSpeed : '?')} 行/秒）`,
     )
     bgmLog(
       LOG_LEVELS.INFO,
-      `[githubSync] 同步完成：下载 ${formatDuration(downloadElapsed)}，diff ${formatDuration(diffElapsed)}，应用耗时已计入，总耗时 ${formatDuration(totalElapsed)}，处理 ${totalProcessed} 条，平均 ${overallSpeed > 0 ? overallSpeed : '?'} 行/秒`,
+      `[githubSync] 同步完成：下载 ${formatDuration(downloadElapsed)}，diff ${formatDuration(diffElapsed)}，应用耗时已计入，总耗时 ${formatDuration(totalElapsed)}，处理 ${String(totalProcessed)} 条，平均 ${String(overallSpeed > 0 ? overallSpeed : '?')} 行/秒`,
     )
     return result
   } finally {
@@ -1821,7 +1821,10 @@ function getSelectedRowSids(): Set<string> {
 
     const firstRow = selection.Row
     const lastRow = selection.Row + selection.Rows.Count - 1
-    bgmLog(LOG_LEVELS.INFO, `[getSelectedRowSids] 选区行范围: ${firstRow}-${lastRow}`)
+    bgmLog(
+      LOG_LEVELS.INFO,
+      `[getSelectedRowSids] 选区行范围: ${String(firstRow)}-${String(lastRow)}`,
+    )
 
     const ws = app.ActiveSheet
     if (!ws) return sids
@@ -1843,7 +1846,7 @@ function getSelectedRowSids(): Set<string> {
       }
     }
 
-    bgmLog(LOG_LEVELS.INFO, `[getSelectedRowSids] 提取到 ${sids.size} 个 SID`)
+    bgmLog(LOG_LEVELS.INFO, `[getSelectedRowSids] 提取到 ${String(sids.size)} 个 SID`)
   } catch (e: unknown) {
     bgmLog(LOG_LEVELS.ERROR, `[getSelectedRowSids] 提取失败: ${(e as Error).message}`)
   }

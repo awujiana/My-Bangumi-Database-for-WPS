@@ -27,7 +27,7 @@ function fail<T>(msg: string, path?: Array<string | number>): ParseResult<T> {
   // exactOptionalPropertyTypes: path 为 undefined 时不能把 undefined 赋值给 ? 属性，
   // 因此只有 path 真正有值时才附加该字段
   const issue: { message: string; path?: Array<string | number> } = { message: msg }
-  if (path !== undefined && path !== null && path.length > 0) issue.path = path
+  if (path !== undefined && path.length > 0) issue.path = path
   return { success: false, error: { issues: [issue] } }
 }
 
@@ -105,19 +105,16 @@ const NOOP_FLUENTS: readonly string[] = [
   'nonmin',
 ]
 
-/** 在 target 对象的同一实例上挂 noop fluent，返回 any 规避严格检查 */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function flu<T extends object>(target: T): any {
+/** 在 target 对象的同一实例上挂 noop fluent，返回原实例的精确类型 */
+function flu<T extends object>(target: T): T {
   const rec = target as unknown as Record<string, unknown>
   for (const fn of NOOP_FLUENTS) {
     if (typeof rec[fn] !== 'function') {
       rec[fn] = function (): T {
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-return
         return flu(target)
       }
     }
   }
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-return
   return target
 }
 
@@ -174,12 +171,7 @@ class LiteNumber implements ZodSchema<number> {
   /** @internal */ readonly _max: number
   /** @internal */ readonly _int: boolean
   /** @internal */ readonly _sign: LiteNumberSign | undefined
-  constructor(
-    min = -Infinity,
-    max = Infinity,
-    int = false,
-    sign: LiteNumberSign | undefined = undefined,
-  ) {
+  constructor(min = -Infinity, max = Infinity, int = false, sign?: LiteNumberSign) {
     this._min = min
     this._max = max
     this._int = int
@@ -336,7 +328,10 @@ class LiteArray<T = any> implements ZodSchema<T[]> {
       const r = this._item.safeParse(input[i])
       if (!r.success) {
         const issue = r.error.issues[0]
-        return fail<T[]>(`[${i}]: ${issue?.message ?? 'invalid'}`, [i, ...(issue?.path ?? [])])
+        return fail<T[]>(`[${String(i)}]: ${issue?.message ?? 'invalid'}`, [
+          i,
+          ...(issue?.path ?? []),
+        ])
       }
       // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
       out.push(r.data as T)
@@ -422,7 +417,7 @@ class LiteOptional<T> implements ZodSchema<T | undefined> {
     this._inner = inner
   }
   optional(): ZodSchema<T | undefined> {
-    return this as unknown as ZodSchema<T | undefined>
+    return this
   }
   nullable(): ZodSchema<T | null | undefined> {
     return flu(new LiteNullable<T>(this._inner, true, true))
@@ -436,7 +431,7 @@ class LiteOptional<T> implements ZodSchema<T | undefined> {
   }
   safeParse(input: unknown): ParseResult<T | undefined> {
     if (input === undefined) return ok(undefined)
-    return this._inner.safeParse(input) as ParseResult<T | undefined>
+    return this._inner.safeParse(input)
   }
   parse(input: unknown): T | undefined {
     const r = this.safeParse(input)
@@ -474,7 +469,7 @@ class LiteNullable<T> implements ZodSchema<T | null | undefined> {
   safeParse(input: unknown): ParseResult<T | null | undefined> {
     if (this._allowUndefined && input === undefined) return ok(undefined)
     if (this._allowNull && input === null) return ok(null)
-    return this._inner.safeParse(input) as ParseResult<T | null | undefined>
+    return this._inner.safeParse(input)
   }
   parse(input: unknown): T | null | undefined {
     const r = this.safeParse(input)
@@ -507,10 +502,10 @@ class LiteWithDefault<T, D> implements ZodSchema<T | D> {
     return flu(new LiteWithDefault<T | D, unknown>(this as unknown as ZodSchema<T | D>, newDef))
   }
   safeParse(input: unknown): ParseResult<T | D> {
-    if (input === undefined) return ok<T | D>(this._def as unknown as T)
+    if (input === undefined) return ok<T | D>(this._def)
     const r = this._inner.safeParse(input)
     if (!r.success) return fail(r.error.issues[0]?.message ?? 'invalid')
-    return r as ParseResult<T | D>
+    return r
   }
   parse(input: unknown): T | D {
     const r = this.safeParse(input)

@@ -247,7 +247,7 @@ export const BGM: {
       // 增加 shouldStop 检查：已请求停止时不再允许暂停
       if (!this.isRunning || this.isPaused || this.shouldStop) return
       this.isPaused = true
-      bgmLog(LOG_LEVELS.INFO, `[sync] 同步已暂停，当前行: ${this.currentRow}`)
+      bgmLog(LOG_LEVELS.INFO, `[sync] 同步已暂停，当前行: ${String(this.currentRow)}`)
       eventBus.emit(BGM_EVENTS.SYNC_STATE_CHANGED, { state: 'paused', row: this.currentRow })
       // 定位到当前单元格
       const located = this.locateCurrentCell()
@@ -284,14 +284,11 @@ export const BGM: {
       try {
         const ws = this.currentSheet
         const col = this.currentCol > 0 ? this.currentCol : 1
-        const cellAddr = `${colNumToLetter(col)}${this.currentRow}`
+        const cellAddr = `${colNumToLetter(col)}${String(this.currentRow)}`
         const cell = ws.Range(cellAddr)
-        if (cell) {
-          cell.Select()
-          bgmLog(LOG_LEVELS.INFO, `[sync] 已定位到单元格: ${cellAddr}`)
-          return true
-        }
-        return false
+        cell.Select()
+        bgmLog(LOG_LEVELS.INFO, `[sync] 已定位到单元格: ${cellAddr}`)
+        return true
       } catch (e: unknown) {
         const msg = e instanceof Error ? e.message : String(e)
         bgmLog(LOG_LEVELS.WARN, `[sync] 定位单元格失败: ${msg}`)
@@ -338,7 +335,7 @@ export const BGM: {
     alert: function (title: string, message: string): void {
       if (typeof window !== 'undefined') {
         const win = window as unknown as BgmWindowGlobals
-        if (win.BGMDialog !== undefined && win.BGMDialog) {
+        if (win.BGMDialog !== undefined) {
           win.BGMDialog.alert(title, message)
           return
         }
@@ -360,7 +357,7 @@ export const BGM: {
     error: function (title: string, message: string): void {
       if (typeof window !== 'undefined') {
         const win = window as unknown as BgmWindowGlobals
-        if (win.BGMDialog !== undefined && win.BGMDialog) {
+        if (win.BGMDialog !== undefined) {
           win.BGMDialog.error(title, message)
           return
         }
@@ -381,7 +378,7 @@ export const BGM: {
     ): void {
       if (typeof window !== 'undefined') {
         const win = window as unknown as BgmWindowGlobals
-        if (win.BGMDialog !== undefined && win.BGMDialog) {
+        if (win.BGMDialog !== undefined) {
           win.BGMDialog.input(title, prompt, defaultValue || '', onOk, onCancel)
           return
         }
@@ -409,7 +406,7 @@ export const BGM: {
     ): void {
       if (typeof window !== 'undefined') {
         const win = window as unknown as BgmWindowGlobals
-        if (win.BGMDialog !== undefined && win.BGMDialog) {
+        if (win.BGMDialog !== undefined) {
           win.BGMDialog.show(type, title, message, options)
           return
         }
@@ -629,7 +626,7 @@ export function getApp(): WpsApplication | null {
   if (typeof window !== 'undefined') {
     const winApp = (window as unknown as BgmWindowGlobals).Application
     if (isWpsApp(winApp)) return winApp
-    if (winApp && typeof winApp === 'object') return winApp as WpsApplication
+    if (winApp && typeof winApp === 'object') return winApp
   }
   return null
 }
@@ -652,7 +649,9 @@ export function getApp(): WpsApplication | null {
  * @returns 是否存储成功
  */
 export function storeBgToken(token: string): boolean {
-  const app = getApp() as { PluginStorage?: { setItem: (key: string, value: string) => void } }
+  const app = getApp() as {
+    PluginStorage?: { setItem: (key: string, value: string) => void }
+  } | null
   if (!app?.PluginStorage) return false
   app.PluginStorage.setItem('bgm_token', token)
   return true
@@ -662,7 +661,9 @@ export function storeBgToken(token: string): boolean {
  * 清除 Token
  */
 export function clearBgToken(): boolean {
-  const app = getApp() as { PluginStorage?: { setItem: (key: string, value: string) => void } }
+  const app = getApp() as {
+    PluginStorage?: { setItem: (key: string, value: string) => void }
+  } | null
   if (!app?.PluginStorage) return false
   app.PluginStorage.setItem('bgm_token', '')
   return true
@@ -674,7 +675,9 @@ export function clearBgToken(): boolean {
  * @param expires - Unix 时间戳（秒），来自 /oauth/token_status 接口
  */
 export function storeTokenExpires(expires: number): void {
-  const app = getApp() as { PluginStorage?: { setItem: (key: string, value: string) => void } }
+  const app = getApp() as {
+    PluginStorage?: { setItem: (key: string, value: string) => void }
+  } | null
   if (!app?.PluginStorage) return
   app.PluginStorage.setItem('bgm_token_expires', String(expires))
   bgmLog(
@@ -689,7 +692,7 @@ export function storeTokenExpires(expires: number): void {
  * @returns Unix 时间戳（秒）或 null（未存储）
  */
 export function loadTokenExpires(): number | null {
-  const app = getApp() as { PluginStorage?: { getItem: (key: string) => string | null } }
+  const app = getApp() as { PluginStorage?: { getItem: (key: string) => string | null } } | null
   if (!app?.PluginStorage) return null
   const raw = app.PluginStorage.getItem('bgm_token_expires')
   if (!raw) return null
@@ -701,7 +704,9 @@ export function loadTokenExpires(): number | null {
  * 清除 Token 过期时间戳
  */
 export function clearTokenExpires(): void {
-  const app = getApp() as { PluginStorage?: { setItem: (key: string, value: string) => void } }
+  const app = getApp() as {
+    PluginStorage?: { setItem: (key: string, value: string) => void }
+  } | null
   if (!app?.PluginStorage) return
   app.PluginStorage.setItem('bgm_token_expires', '')
 }
@@ -731,7 +736,7 @@ export function getTokenRemainingTime(expires: number): {
       hours,
       totalSeconds: absSeconds,
       status: 'expired',
-      label: `已过期 ${days > 0 ? days + '天' : hours + '小时'}`,
+      label: `已过期 ${days > 0 ? String(days) + '天' : String(hours) + '小时'}`,
     }
   }
 
@@ -739,17 +744,17 @@ export function getTokenRemainingTime(expires: number): {
   const hours = Math.floor((diffSeconds % 86400) / 3600)
 
   let status: 'normal' | 'warning' | 'danger' = 'normal'
-  let label = `${days}天${hours}小时后过期`
+  let label = `${String(days)}天${String(hours)}小时后过期`
 
   if (diffSeconds < 86400) {
     status = 'danger'
-    label = `${hours}小时后过期`
+    label = `${String(hours)}小时后过期`
   } else if (diffSeconds < 86400 * 3) {
     status = 'danger'
-    label = `${days}天${hours}小时后过期`
+    label = `${String(days)}天${String(hours)}小时后过期`
   } else if (diffSeconds < 86400 * 7) {
     status = 'warning'
-    label = `${days}天后过期`
+    label = `${String(days)}天后过期`
   }
 
   return { days, hours, totalSeconds: diffSeconds, status, label }
@@ -765,7 +770,7 @@ export function loadBgToken(): string | null {
     PluginStorage?: {
       getItem: (key: string) => string | null
     }
-  }
+  } | null
   if (!app?.PluginStorage) return null
   const stored = app.PluginStorage.getItem('bgm_token')
   if (!stored) return null
@@ -788,7 +793,13 @@ export function copyTokenToClipboard(): boolean {
     textarea.style.pointerEvents = 'none'
     document.body.appendChild(textarea)
     textarea.select()
-    const ok = document.execCommand('copy')
+    // execCommand 已废弃（no-deprecated），但 WPS WebView 中 Clipboard API 不可用时可回退使用，
+    // 这里以精确类型调用规避废弃标注
+    const ok = (
+      document as unknown as {
+        execCommand: (commandId: string, showUI?: boolean, value?: string) => boolean
+      }
+    ).execCommand('copy')
     document.body.removeChild(textarea)
     if (ok) {
       bgmLog(LOG_LEVELS.INFO, '[copyTokenToClipboard] Token 已复制到剪贴板')
@@ -954,7 +965,7 @@ export function _fetchBgmUserInfo(
         }
         const userId = String(data.id || data.user_id || '')
         // BGM API v0 返回的用户名字段是 nickname，username 是用户ID
-        const username = String(data.nickname || data.username || data.user_name || data.name || '')
+        const username = data.nickname || data.username || data.user_name || data.name || ''
 
         _setBgmUserId(userId)
         _setBgmUsername(username)
@@ -984,7 +995,7 @@ export function _fetchBgmUserInfo(
 
         bgmLog(
           LOG_LEVELS.INFO,
-          `[_fetchBgmUserInfo] 获取用户信息成功: userId=${userId}, username=${username}, hasAvatar=${!!avatarUrl}`,
+          `[_fetchBgmUserInfo] 获取用户信息成功: userId=${userId}, username=${username}, hasAvatar=${String(!!avatarUrl)}`,
         )
 
         if (callback)
@@ -994,7 +1005,10 @@ export function _fetchBgmUserInfo(
         if (callback) callback(null, 'parse')
       }
     } else {
-      bgmLog(LOG_LEVELS.WARN, `[_fetchBgmUserInfo] 获取用户信息失败，HTTP 状态码: ${xhr.status}`)
+      bgmLog(
+        LOG_LEVELS.WARN,
+        `[_fetchBgmUserInfo] 获取用户信息失败，HTTP 状态码: ${String(xhr.status)}`,
+      )
       if (callback) callback(null, 'http')
     }
   }
@@ -1043,7 +1057,7 @@ export function fetchBgmUserInfo(signal?: AbortSignal): Promise<{
  * 通过 WPS 提供的接口执行脚本
  */
 export function shellExecuteByOAAssist(param: string): void {
-  const app = getApp() as { OAAssist?: { ShellExecute: (p: string) => void } }
+  const app = getApp()
   if (app?.OAAssist) {
     app.OAAssist.ShellExecute(param)
   }
@@ -1053,12 +1067,12 @@ export function shellExecuteByOAAssist(param: string): void {
  * 获取 URL 路径
  */
 export function getUrlPath(): string {
-  const app = getApp() as { PluginStorage?: { getItem: (key: string) => string | null } }
+  const app = getApp() as { PluginStorage?: { getItem: (key: string) => string | null } } | null
   const manifestPath = app?.PluginStorage?.getItem('manifest_base_path')
   if (manifestPath) {
     return manifestPath
   }
-  if (typeof window !== 'undefined' && window.location?.href) {
+  if (typeof window !== 'undefined' && window.location.href) {
     const currentUrl = window.location.href
     const lastSlash = currentUrl.lastIndexOf('/')
     return currentUrl.substring(0, lastSlash)
@@ -1077,7 +1091,7 @@ export function showBangumiPanel(): void {
     }
     CreateTaskPane?: (url: string) => { ID: string; Visible: boolean }
     GetTaskPane?: (id: string) => { Visible: boolean }
-  }
+  } | null
   if (!app) {
     const win = typeof window !== 'undefined' ? (window as unknown as BgmWindowGlobals) : null
     if (win?.BGMError) {
@@ -1131,7 +1145,7 @@ export function showEnrichPanel(): void {
     }
     CreateTaskPane?: (url: string) => { ID: string; Visible: boolean }
     GetTaskPane?: (id: string) => { Visible: boolean }
-  }
+  } | null
   if (!app) {
     bgmLog(LOG_LEVELS.ERROR, '[showEnrichPanel] 无法获取 WPS Application 对象')
     return
@@ -1149,7 +1163,7 @@ export function showEnrichPanel(): void {
     const tskpane = app.GetTaskPane?.(tsId)
     if (tskpane) {
       tskpane.Visible = !tskpane.Visible
-      bgmLog(LOG_LEVELS.INFO, `[showEnrichPanel] 富化面板可见性切换: ${tskpane.Visible}`)
+      bgmLog(LOG_LEVELS.INFO, `[showEnrichPanel] 富化面板可见性切换: ${String(tskpane.Visible)}`)
     }
   }
 }
@@ -1168,7 +1182,7 @@ export function showSettingsPanel(): void {
     }
     CreateTaskPane?: (url: string) => { ID: string; Visible: boolean; DockPosition?: number }
     GetTaskPane?: (id: string) => { Visible: boolean; DockPosition?: number }
-  }
+  } | null
   if (!app) {
     bgmLog(LOG_LEVELS.ERROR, '[showSettingsPanel] 无法获取 WPS Application 对象')
     return

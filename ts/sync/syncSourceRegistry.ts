@@ -125,7 +125,11 @@ export async function syncFromRemote(
   const downloadStartTs = Date.now()
   const remoteEntries = await source.fetchRemoteEntries(signal)
   const downloadElapsed = Date.now() - downloadStartTs
-  onProgress?.(1, 3, `下载完成：${remoteEntries.length} 条（耗时 ${downloadElapsed}ms）`)
+  onProgress?.(
+    1,
+    3,
+    `下载完成：${String(remoteEntries.length)} 条（耗时 ${String(downloadElapsed)}ms）`,
+  )
 
   // 关闭屏幕刷新，减少 COM 调用开销（ensureSheetHeaders / readLocalEntriesForSync 等 COM 操作）
   const app = getApp()
@@ -163,12 +167,12 @@ export async function syncFromRemote(
       effectiveRemoteEntries = remoteEntries.filter((e) => selectedSids.has(e.sid))
       bgmLog(
         LOG_LEVELS.INFO,
-        `[syncFromRemote] 仅同步选中行：选中 ${selectedSids.size} 个 SID，匹配远程 ${effectiveRemoteEntries.length} 条`,
+        `[syncFromRemote] 仅同步选中行：选中 ${String(selectedSids.size)} 个 SID，匹配远程 ${String(effectiveRemoteEntries.length)} 条`,
       )
       onProgress?.(
         1,
         3,
-        `选中 ${selectedSids.size} 行，匹配远程 ${effectiveRemoteEntries.length} 条`,
+        `选中 ${String(selectedSids.size)} 行，匹配远程 ${String(effectiveRemoteEntries.length)} 条`,
       )
     }
 
@@ -178,12 +182,12 @@ export async function syncFromRemote(
       effectiveRemoteEntries = filterByTime(effectiveRemoteEntries, timeFilter)
       bgmLog(
         LOG_LEVELS.INFO,
-        `[syncFromRemote] 时间筛选（${timeFilter.range}）：${beforeCount} → ${effectiveRemoteEntries.length} 条`,
+        `[syncFromRemote] 时间筛选（${timeFilter.range}）：${String(beforeCount)} → ${String(effectiveRemoteEntries.length)} 条`,
       )
       onProgress?.(
         1,
         3,
-        `时间筛选：${timeFilter.range === 'year' ? `${timeFilter.year}年` : timeFilter.range === 'quarter' ? `${timeFilter.year}年${timeFilter.quarter}月新番` : `${timeFilter.year}年${timeFilter.month}月`}，匹配 ${effectiveRemoteEntries.length} 条`,
+        `时间筛选：${timeFilter.range === 'year' ? `${String(timeFilter.year)}年` : timeFilter.range === 'quarter' ? `${String(timeFilter.year)}年${String(timeFilter.quarter ?? '')}月新番` : `${String(timeFilter.year)}年${String(timeFilter.month ?? '')}月`}，匹配 ${String(effectiveRemoteEntries.length)} 条`,
       )
     }
 
@@ -200,7 +204,10 @@ export async function syncFromRemote(
     // 应用用户冲突解决决策：过滤掉用户选择「本地」的字段
     if (conflictResolution && conflictResolution.length > 0) {
       applyConflictResolutions(diffs, conflictResolution)
-      bgmLog(LOG_LEVELS.INFO, `[syncFromRemote] 已应用 ${conflictResolution.length} 条冲突解决决策`)
+      bgmLog(
+        LOG_LEVELS.INFO,
+        `[syncFromRemote] 已应用 ${String(conflictResolution.length)} 条冲突解决决策`,
+      )
     }
 
     const addCount = diffs.filter((d) => d.kind === 'add').length
@@ -208,7 +215,7 @@ export async function syncFromRemote(
     const deleteCount = diffs.filter((d) => d.kind === 'delete').length
     bgmLog(
       LOG_LEVELS.INFO,
-      `[syncFromRemote] diff 完成（${strategy}）：新增 ${addCount}，更新 ${updateCount}，删除 ${deleteCount}，耗时 ${diffElapsed}ms`,
+      `[syncFromRemote] diff 完成（${strategy}）：新增 ${String(addCount)}，更新 ${String(updateCount)}，删除 ${String(deleteCount)}，耗时 ${String(diffElapsed)}ms`,
     )
 
     const result = await applyDiffToSheet(diffs, strategy, onProgress, source.getDisplayName())
@@ -225,11 +232,11 @@ export async function syncFromRemote(
     onProgress?.(
       3,
       3,
-      `完成：新增 ${result.added}，更新 ${result.updated}，删除 ${result.deleted}（总耗时 ${totalElapsed}ms，${overallSpeed > 0 ? overallSpeed : '?'} 行/秒）`,
+      `完成：新增 ${String(result.added)}，更新 ${String(result.updated)}，删除 ${String(result.deleted)}（总耗时 ${String(totalElapsed)}ms，${String(overallSpeed > 0 ? overallSpeed : '?')} 行/秒）`,
     )
     bgmLog(
       LOG_LEVELS.INFO,
-      `[syncFromRemote] 同步完成：下载 ${downloadElapsed}ms，diff ${diffElapsed}ms，应用耗时已计入，总耗时 ${totalElapsed}ms，处理 ${totalProcessed} 条，平均 ${overallSpeed > 0 ? overallSpeed : '?'} 行/秒`,
+      `[syncFromRemote] 同步完成：下载 ${String(downloadElapsed)}ms，diff ${String(diffElapsed)}ms，应用耗时已计入，总耗时 ${String(totalElapsed)}ms，处理 ${String(totalProcessed)} 条，平均 ${String(overallSpeed > 0 ? overallSpeed : '?')} 行/秒`,
     )
     return result
   } finally {
@@ -276,7 +283,10 @@ function getSelectedRowSids(): Set<string> {
     // 获取选区的行范围
     const firstRow = selection.Row
     const lastRow = selection.Row + selection.Rows.Count - 1
-    bgmLog(LOG_LEVELS.INFO, `[getSelectedRowSids] 选区行范围: ${firstRow}-${lastRow}`)
+    bgmLog(
+      LOG_LEVELS.INFO,
+      `[getSelectedRowSids] 选区行范围: ${String(firstRow)}-${String(lastRow)}`,
+    )
 
     // 获取工作表和列映射
     const ws = app.ActiveSheet
@@ -300,7 +310,7 @@ function getSelectedRowSids(): Set<string> {
       }
     }
 
-    bgmLog(LOG_LEVELS.INFO, `[getSelectedRowSids] 提取到 ${sids.size} 个 SID`)
+    bgmLog(LOG_LEVELS.INFO, `[getSelectedRowSids] 提取到 ${String(sids.size)} 个 SID`)
   } catch (e: unknown) {
     bgmLog(LOG_LEVELS.ERROR, `[getSelectedRowSids] 提取失败: ${(e as Error).message}`)
   }

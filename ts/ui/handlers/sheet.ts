@@ -46,7 +46,7 @@ export function cleanLockedDataSheet(): void {
   const sheetName = ws.Name || '未知'
   bgmLog(
     LOG_LEVELS.INFO,
-    `[cleanLockedDataSheet] 锁定工作表: "${sheetName}" (索引: ${BGM.sheet.lockedIndex})`,
+    `[cleanLockedDataSheet] 锁定工作表: "${sheetName}" (索引: ${String(BGM.sheet.lockedIndex)})`,
   )
 
   const headerRow = findHeaderRow(ws)
@@ -62,7 +62,7 @@ export function cleanLockedDataSheet(): void {
   const tagsCol = colMap.get('标签/分级')
   bgmLog(
     LOG_LEVELS.INFO,
-    `[cleanLockedDataSheet] 列映射: 名称列=${nameCol}, Bangumi_URL列=${urlCol}, 标签/分级列=${tagsCol}`,
+    `[cleanLockedDataSheet] 列映射: 名称列=${String(nameCol ?? '')}, Bangumi_URL列=${String(urlCol ?? '')}, 标签/分级列=${String(tagsCol ?? '')}`,
   )
 
   if (!nameCol) {
@@ -80,7 +80,7 @@ export function cleanLockedDataSheet(): void {
   const dataRows = lastRow - headerRow
   bgmLog(
     LOG_LEVELS.INFO,
-    `[cleanLockedDataSheet] 数据区间: headerRow=${headerRow}, lastRow=${lastRow}, 数据行数=${dataRows}`,
+    `[cleanLockedDataSheet] 数据区间: headerRow=${String(headerRow)}, lastRow=${String(lastRow)}, 数据行数=${String(dataRows)}`,
   )
 
   if (dataRows <= 0) {
@@ -91,7 +91,7 @@ export function cleanLockedDataSheet(): void {
 
   // ========== 1. 只读需要的 3 列（三次小范围 COM 调用，安全不卡死） ==========
   const nameData = readRangeValues(ws, headerRow + 1, lastRow, nameCol, nameCol)
-  if (!nameData || nameData.length === 0) {
+  if (nameData.length === 0) {
     bgmLog(LOG_LEVELS.WARN, '[cleanLockedDataSheet] 未读取到名称列数据，终止')
     showToast('未读取到数据', 'error')
     return
@@ -100,14 +100,14 @@ export function cleanLockedDataSheet(): void {
   const tagsData = tagsCol ? readRangeValues(ws, headerRow + 1, lastRow, tagsCol, tagsCol) : null
 
   const totalRows = nameData.length
-  bgmLog(LOG_LEVELS.INFO, `[cleanLockedDataSheet] 数据读取完成: ${totalRows} 行`)
+  bgmLog(LOG_LEVELS.INFO, `[cleanLockedDataSheet] 数据读取完成: ${String(totalRows)} 行`)
 
   // ========== 2. 按名称分组（纯内存操作） ==========
   const nameRows = new Map<string, number[]>()
   let emptyNameCount = 0
   for (let i = 0; i < totalRows; i++) {
     const row = headerRow + 1 + i
-    const name = String(nameData[i]?.[0] ?? '').trim()
+    const name = (nameData[i]?.[0] ?? '').trim()
     if (!name) {
       emptyNameCount++
       continue
@@ -118,7 +118,7 @@ export function cleanLockedDataSheet(): void {
   }
   bgmLog(
     LOG_LEVELS.INFO,
-    `[cleanLockedDataSheet] 名称扫描完成: 有效名称=${nameRows.size}个, 空名称行=${emptyNameCount}行`,
+    `[cleanLockedDataSheet] 名称扫描完成: 有效名称=${String(nameRows.size)}个, 空名称行=${String(emptyNameCount)}行`,
   )
 
   // ========== 3. 处理重复行 ==========
@@ -136,7 +136,7 @@ export function cleanLockedDataSheet(): void {
     const withoutUrl: number[] = []
     for (const row of rows) {
       const idx = row - headerRow - 1
-      const url = idx < urlData.length ? String(urlData[idx]?.[0] ?? '').trim() : ''
+      const url = idx < urlData.length ? (urlData[idx]?.[0] ?? '').trim() : ''
       ;(url ? withUrl : withoutUrl).push(row)
     }
 
@@ -153,7 +153,7 @@ export function cleanLockedDataSheet(): void {
     if (tagsData && withoutUrl.length > 0) {
       const keepIdx = keepRow - headerRow - 1
       const existingSet = new Set(
-        (keepIdx < tagsData.length ? String(tagsData[keepIdx]?.[0] ?? '') : '')
+        (keepIdx < tagsData.length ? (tagsData[keepIdx]?.[0] ?? '') : '')
           .split(/\s*\|\s*/)
           .map((t) => t.trim())
           .filter(Boolean),
@@ -161,7 +161,7 @@ export function cleanLockedDataSheet(): void {
 
       for (const delRow of withoutUrl) {
         const delIdx = delRow - headerRow - 1
-        const delTags = delIdx < tagsData.length ? String(tagsData[delIdx]?.[0] ?? '').trim() : ''
+        const delTags = delIdx < tagsData.length ? (tagsData[delIdx]?.[0] ?? '').trim() : ''
         if (!delTags) continue
 
         for (const t of delTags.split(/\s*\|\s*/)) {
@@ -188,13 +188,13 @@ export function cleanLockedDataSheet(): void {
 
   bgmLog(
     LOG_LEVELS.INFO,
-    `[cleanLockedDataSheet] 统计: 重复名称=${duplicateNameCount}个, 待删除行=${toDelete.length}, 合并标签组=${mergedTagsCount}`,
+    `[cleanLockedDataSheet] 统计: 重复名称=${String(duplicateNameCount)}个, 待删除行=${String(toDelete.length)}, 合并标签组=${String(mergedTagsCount)}`,
   )
 
   if (duplicateDetails.length > 0) {
     const lines = duplicateDetails.map(
       (d) =>
-        `  "${d.name}": ${d.keep.length}条含URL(行${d.keep.join(',')}), ${d.del.length}条无URL(行${d.del.join(',')})`,
+        `  "${d.name}": ${String(d.keep.length)}条含URL(行${d.keep.join(',')}), ${String(d.del.length)}条无URL(行${d.del.join(',')})`,
     )
     bgmLog(LOG_LEVELS.INFO, `[cleanLockedDataSheet] 重复名称详情:\n${lines.join('\n')}`)
   }
@@ -208,7 +208,7 @@ export function cleanLockedDataSheet(): void {
   if (toDelete.length === 0) {
     bgmLog(
       LOG_LEVELS.INFO,
-      `[cleanLockedDataSheet] 未发现需清洗的重复数据，耗时: ${Date.now() - startTime}ms`,
+      `[cleanLockedDataSheet] 未发现需清洗的重复数据，耗时: ${String(Date.now() - startTime)}ms`,
     )
     showToast('未发现需清洗的重复数据', 'info')
     return
@@ -216,7 +216,7 @@ export function cleanLockedDataSheet(): void {
 
   // ========== 4. 批量删除行（合并连续行为范围删除） ==========
   toDelete.sort((a, b) => b - a)
-  bgmLog(LOG_LEVELS.INFO, `[cleanLockedDataSheet] 开始删除 ${toDelete.length} 行...`)
+  bgmLog(LOG_LEVELS.INFO, `[cleanLockedDataSheet] 开始删除 ${String(toDelete.length)} 行...`)
   let deleteCallCount = 0
   let i = 0
   while (i < toDelete.length) {
@@ -225,27 +225,27 @@ export function cleanLockedDataSheet(): void {
       j++
     }
     if (i === j) {
-      ws.Range(`${toDelete[i]}:${toDelete[i]}`).Delete()
+      ws.Range(`${String(toDelete[i] ?? '')}:${String(toDelete[i] ?? '')}`).Delete()
     } else {
-      ws.Range(`${toDelete[j]}:${toDelete[i]}`).Delete()
+      ws.Range(`${String(toDelete[j] ?? '')}:${String(toDelete[i] ?? '')}`).Delete()
     }
     deleteCallCount++
     i = j + 1
   }
   bgmLog(
     LOG_LEVELS.INFO,
-    `[cleanLockedDataSheet] 删除行: ${toDelete.length}行, 实际COM调用: ${deleteCallCount}次`,
+    `[cleanLockedDataSheet] 删除行: ${String(toDelete.length)}行, 实际COM调用: ${String(deleteCallCount)}次`,
   )
 
   const mergedSummary = mergedTagEntries.length > 0 ? `\n  ${mergedTagEntries.join('\n  ')}` : ''
   bgmLog(
     LOG_LEVELS.INFO,
-    `[cleanLockedDataSheet] ======== 清洗完成: 删除 ${toDelete.length} 行${tagsCol ? `，合并 ${mergedTagsCount} 个名称组的标签` : ''}，耗时: ${Date.now() - startTime}ms ========`,
+    `[cleanLockedDataSheet] ======== 清洗完成: 删除 ${String(toDelete.length)} 行${tagsCol ? `，合并 ${String(mergedTagsCount)} 个名称组的标签` : ''}，耗时: ${String(Date.now() - startTime)}ms ========`,
   )
   if (mergedSummary)
     bgmLog(LOG_LEVELS.INFO, `[cleanLockedDataSheet] 实际合并的标签:\n${mergedSummary}`)
   showToast(
-    `清洗完成：删除 ${toDelete.length} 行${tagsCol ? `，合并 ${mergedTagsCount} 个名称组的标签` : ''}`,
+    `清洗完成：删除 ${String(toDelete.length)} 行${tagsCol ? `，合并 ${String(mergedTagsCount)} 个名称组的标签` : ''}`,
     'success',
   )
 }

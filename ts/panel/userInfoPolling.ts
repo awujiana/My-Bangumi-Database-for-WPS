@@ -86,7 +86,7 @@ export function startUserInfoPolling(): void {
       } else if (currentWorkbookCount !== lastWorkbookCount) {
         bgmLog(
           LOG_LEVELS.INFO,
-          `[startUserInfoPolling] 检测到工作簿数量变化: ${lastWorkbookCount} → ${currentWorkbookCount}（打开新工作簿或关闭）`,
+          `[startUserInfoPolling] 检测到工作簿数量变化: ${String(lastWorkbookCount)} → ${String(currentWorkbookCount)}（打开新工作簿或关闭）`,
         )
         lastWorkbookCount = currentWorkbookCount
         // 刷新工作簿和工作表列表
@@ -103,7 +103,7 @@ export function startUserInfoPolling(): void {
       } else if (activeWbName !== lastActiveWorkbookName) {
         bgmLog(
           LOG_LEVELS.INFO,
-          `[startUserInfoPolling] 检测到活动工作簿切换: ${lastActiveWorkbookName} → ${activeWbName}`,
+          `[startUserInfoPolling] 检测到活动工作簿切换: ${lastActiveWorkbookName} → ${activeWbName ?? ''}`,
         )
         lastActiveWorkbookName = activeWbName
         // 刷新工作簿和工作表列表
@@ -156,7 +156,7 @@ export function startUserInfoPolling(): void {
           `[startUserInfoPolling] 检测到增量同步配置变更: ${currentIncrementalSync ? '开启' : '关闭'}`,
         )
         lastIncrementalSync = currentIncrementalSync
-        const chkIncremental = document.getElementById('chkIncremental') as HTMLInputElement
+        const chkIncremental = document.getElementById('chkIncremental') as HTMLInputElement | null
         if (chkIncremental) {
           chkIncremental.checked = currentIncrementalSync
           bgmLog(
@@ -174,7 +174,7 @@ export function startUserInfoPolling(): void {
         lastSkipConflicts = currentSkipConflicts
         const conflictStrategySelect = document.getElementById(
           'conflictStrategy',
-        ) as HTMLSelectElement
+        ) as HTMLSelectElement | null
         if (conflictStrategySelect) {
           conflictStrategySelect.value = currentSkipConflicts ? 'skip' : 'excel'
           bgmLog(
@@ -193,7 +193,7 @@ export function startUserInfoPolling(): void {
         lastEnableSyncRecord = currentEnableSyncRecord
         const chkEnableSyncRecord = document.getElementById(
           'chkEnableSyncRecord',
-        ) as HTMLInputElement
+        ) as HTMLInputElement | null
         if (chkEnableSyncRecord) {
           chkEnableSyncRecord.checked = currentEnableSyncRecord
           bgmLog(

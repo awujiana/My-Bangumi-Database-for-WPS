@@ -82,7 +82,7 @@ function createConflictModal(
 
   const count = document.createElement('span')
   count.className = 'conflict-count'
-  count.textContent = `${conflicts.length} 个冲突`
+  count.textContent = `${String(conflicts.length)} 个冲突`
   toolbar.appendChild(count)
 
   const allLocalBtn = document.createElement('button')
@@ -181,7 +181,7 @@ function createConflictModal(
     const selectTd = document.createElement('td')
     selectTd.className = 'conflict-col-select'
 
-    const radioName = `conflict-${idx}`
+    const radioName = `conflict-${String(idx)}`
 
     const localRadio = document.createElement('input')
     localRadio.type = 'radio'

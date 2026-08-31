@@ -23,7 +23,6 @@ import {
   _setBgmUsername,
   testTokenValidityForRibbon,
   fetchAllUserCollections,
-  type WpsRange,
   type WpsWorksheet,
   getCell,
   trim,
@@ -169,7 +168,7 @@ export function getSyncPreview(
   bgmLog(LOG_LEVELS.INFO, `[getSyncPreview] ========== 数据预览统计开始 ==========`)
   bgmLog(
     LOG_LEVELS.INFO,
-    `[getSyncPreview] 起始行: ${startRow}, 最后行: ${lastRow}, 总行数: ${lastRow - startRow + 1}`,
+    `[getSyncPreview] 起始行: ${String(startRow)}, 最后行: ${String(lastRow)}, 总行数: ${String(lastRow - startRow + 1)}`,
   )
   bgmLog(LOG_LEVELS.INFO, `[getSyncPreview] 增量同步: ${isIncremental ? '开启' : '关闭'}`)
 
@@ -189,37 +188,35 @@ export function getSyncPreview(
   for (const key of neededKeys) {
     if (colMap.has(key)) maxCol = Math.max(maxCol, colMap.get(key)!)
   }
-  bgmLog(LOG_LEVELS.INFO, `[getSyncPreview] 最大列号: ${maxCol}`)
+  bgmLog(LOG_LEVELS.INFO, `[getSyncPreview] 最大列号: ${String(maxCol)}`)
 
   const allData = readRangeValues(ws, startRow, lastRow, 1, maxCol)
-  bgmLog(LOG_LEVELS.INFO, `[getSyncPreview] 批量读取数据: ${allData?.length || 0} 行`)
+  bgmLog(LOG_LEVELS.INFO, `[getSyncPreview] 批量读取数据: ${String(allData.length || 0)} 行`)
 
   // 获取可见行（与同步函数相同）
   const filterStatus = getFilterStatus(ws, lastRow, headerRow, true)
   bgmLog(
     LOG_LEVELS.INFO,
-    `[getSyncPreview] 筛选检测结果: hasFilter=${filterStatus.hasFilter}, visibleRows=${filterStatus.visibleRows.length}`,
+    `[getSyncPreview] 筛选检测结果: hasFilter=${String(filterStatus.hasFilter)}, visibleRows=${String(filterStatus.visibleRows.length)}`,
   )
 
   let rowsToProcess: number[] = []
   if (filterStatus.hasFilter && filterStatus.visibleRows.length > 0) {
     rowsToProcess = filterStatus.visibleRows.filter((r) => r >= startRow)
-    bgmLog(LOG_LEVELS.INFO, `[getSyncPreview] 筛选模式: ${rowsToProcess.length} 行可见`)
+    bgmLog(LOG_LEVELS.INFO, `[getSyncPreview] 筛选模式: ${String(rowsToProcess.length)} 行可见`)
   } else {
     for (let r = startRow; r <= lastRow; r++) rowsToProcess.push(r)
-    bgmLog(LOG_LEVELS.INFO, `[getSyncPreview] 全量模式: ${rowsToProcess.length} 行`)
+    bgmLog(LOG_LEVELS.INFO, `[getSyncPreview] 全量模式: ${String(rowsToProcess.length)} 行`)
   }
 
   const getField = (rowNum: number, key: string): string => {
-    if (allData) {
-      const col = colMap.get(key)
-      if (!col) return ''
-      const rowIdx = rowNum - startRow
-      if (rowIdx >= 0 && rowIdx < allData.length) {
-        const rowData = allData[rowIdx]
-        if (Array.isArray(rowData) && col - 1 < rowData.length) {
-          return trim(rowData[col - 1])
-        }
+    const col = colMap.get(key)
+    if (!col) return ''
+    const rowIdx = rowNum - startRow
+    if (rowIdx >= 0 && rowIdx < allData.length) {
+      const rowData = allData[rowIdx]
+      if (Array.isArray(rowData) && col - 1 < rowData.length) {
+        return trim(rowData[col - 1])
       }
     }
     return colMap.has(key) ? trim(getCellValue(ws, rowNum, colMap.get(key)!)) : ''
@@ -237,7 +234,7 @@ export function getSyncPreview(
 
     // 检查是否已上传（序列号列颜色）
     const seqCol = colMap.get('序列号') || 4
-    const seqCell = getCell(ws, rowNum, seqCol) as WpsRange | null
+    const seqCell = getCell(ws, rowNum, seqCol)
     const isUploaded =
       seqCell?.Interior &&
       (seqCell.Interior.Color === BGM_COLOR.SUCCESS ||
@@ -312,14 +309,14 @@ export function getSyncPreview(
   }
 
   bgmLog(LOG_LEVELS.INFO, `[getSyncPreview] ========== 数据预览统计结果 ==========`)
-  bgmLog(LOG_LEVELS.INFO, `[getSyncPreview] 总行数: ${total}`)
-  bgmLog(LOG_LEVELS.INFO, `[getSyncPreview] 有效行数: ${valid}`)
-  bgmLog(LOG_LEVELS.INFO, `[getSyncPreview] 待同步行数: ${willSync}`)
-  bgmLog(LOG_LEVELS.INFO, `[getSyncPreview] 跳过期数: ${willSkip}`)
-  bgmLog(LOG_LEVELS.INFO, `[getSyncPreview] 已上传行数: ${alreadyUploaded}`)
-  bgmLog(LOG_LEVELS.INFO, `[getSyncPreview] 无URL行数: ${noUrl}`)
-  bgmLog(LOG_LEVELS.INFO, `[getSyncPreview] 空状态行数: ${emptyStatus}`)
-  bgmLog(LOG_LEVELS.INFO, `[getSyncPreview] 增量跳过行数: ${incrementalSkipped}`)
+  bgmLog(LOG_LEVELS.INFO, `[getSyncPreview] 总行数: ${String(total)}`)
+  bgmLog(LOG_LEVELS.INFO, `[getSyncPreview] 有效行数: ${String(valid)}`)
+  bgmLog(LOG_LEVELS.INFO, `[getSyncPreview] 待同步行数: ${String(willSync)}`)
+  bgmLog(LOG_LEVELS.INFO, `[getSyncPreview] 跳过期数: ${String(willSkip)}`)
+  bgmLog(LOG_LEVELS.INFO, `[getSyncPreview] 已上传行数: ${String(alreadyUploaded)}`)
+  bgmLog(LOG_LEVELS.INFO, `[getSyncPreview] 无URL行数: ${String(noUrl)}`)
+  bgmLog(LOG_LEVELS.INFO, `[getSyncPreview] 空状态行数: ${String(emptyStatus)}`)
+  bgmLog(LOG_LEVELS.INFO, `[getSyncPreview] 增量跳过行数: ${String(incrementalSkipped)}`)
 
   return {
     total,
@@ -399,16 +396,16 @@ export async function detectConflicts(
   const filterStatus = getFilterStatus(ws, lastRow, headerRow, true)
   bgmLog(
     LOG_LEVELS.INFO,
-    `[detectConflicts] 筛选检测结果: hasFilter=${filterStatus.hasFilter}, visibleRows=${filterStatus.visibleRows.length}`,
+    `[detectConflicts] 筛选检测结果: hasFilter=${String(filterStatus.hasFilter)}, visibleRows=${String(filterStatus.visibleRows.length)}`,
   )
 
   let rowsToProcess: number[] = []
   if (filterStatus.hasFilter && filterStatus.visibleRows.length > 0) {
     rowsToProcess = filterStatus.visibleRows.filter((r) => r >= startRow)
-    bgmLog(LOG_LEVELS.INFO, `[detectConflicts] 筛选模式: ${rowsToProcess.length} 行可见`)
+    bgmLog(LOG_LEVELS.INFO, `[detectConflicts] 筛选模式: ${String(rowsToProcess.length)} 行可见`)
   } else {
     for (let r = startRow; r <= lastRow; r++) rowsToProcess.push(r)
-    bgmLog(LOG_LEVELS.INFO, `[detectConflicts] 全量模式: ${rowsToProcess.length} 行`)
+    bgmLog(LOG_LEVELS.INFO, `[detectConflicts] 全量模式: ${String(rowsToProcess.length)} 行`)
   }
 
   const getField = (row: number, key: string): string => {
@@ -430,12 +427,12 @@ export async function detectConflicts(
     if (excelType === 0) continue // 不上传，不参与冲突
 
     // 对比 type 字段
-    if (bgmEntry.type !== undefined && Number(bgmEntry.type) !== excelType) {
+    if (bgmEntry.type !== excelType) {
       conflicts.push({
         row: rowNum,
         sid,
         name: getField(rowNum, '名称') || '',
-        existingType: Number(bgmEntry.type),
+        existingType: bgmEntry.type,
         newType: excelType,
       })
       conflictCount++
@@ -454,16 +451,16 @@ export async function syncWithConfirmation(): Promise<void> {
   const app = getApp()
   const ws = getDataSheet()
   if (!ws) {
-    wpsMsgBox('未找到数据工作表', 0, 64)
+    void wpsMsgBox('未找到数据工作表', 0, 64)
     return
   }
   if (BGM.sync.isRunning) {
-    wpsMsgBox('同步正在进行中，请稍后再试', 0, 48)
+    void wpsMsgBox('同步正在进行中，请稍后再试', 0, 48)
     return
   }
   const token = loadBgToken()
   if (!token) {
-    wpsMsgBox('请先设置 Token', 0, 48)
+    void wpsMsgBox('请先设置 Token', 0, 48)
     return
   }
 
@@ -471,7 +468,7 @@ export async function syncWithConfirmation(): Promise<void> {
   const lastRow = getLastRow(ws)
   const colMap = getColumnMap(ws, headerRow)
   if (!colMap.has('Bangumi_URL')) {
-    wpsMsgBox('未找到 Bangumi URL 列', 0, 48)
+    void wpsMsgBox('未找到 Bangumi URL 列', 0, 48)
     return
   }
 
@@ -500,12 +497,12 @@ export async function syncWithConfirmation(): Promise<void> {
   const confirmMsg = `即将开始上传同步（Excel → Bangumi）
 
 数据预览：
-  总行数：${preview.total}
-  有效条目：${preview.valid}
-  已上传（跳过）：${preview.alreadyUploaded}
-  待同步：${preview.willSync}
-  不上传（状态跳过）：${preview.willSkip}
-  无效（无SID）：${preview.total - preview.valid}
+  总行数：${String(preview.total)}
+  有效条目：${String(preview.valid)}
+  已上传（跳过）：${String(preview.alreadyUploaded)}
+  待同步：${String(preview.willSync)}
+  不上传（状态跳过）：${String(preview.willSkip)}
+  无效（无SID）：${String(preview.total - preview.valid)}
 
 冲突策略：${conflictStrategy === 'skip' ? '跳过冲突' : 'Excel数据覆盖'}
 增量同步：${incremental ? '开启' : '关闭'}
@@ -530,18 +527,18 @@ export async function syncWithConfirmation(): Promise<void> {
         skipSids = new Set(conflicts.map((c) => c.sid))
       }
     }
-    bgmLog(LOG_LEVELS.INFO, `[syncWithConfirmation] 冲突检测完成: ${conflictCount} 条冲突`)
+    bgmLog(LOG_LEVELS.INFO, `[syncWithConfirmation] 冲突检测完成: ${String(conflictCount)} 条冲突`)
   } catch (e: unknown) {
     bgmLog(
       LOG_LEVELS.WARN,
-      `[syncWithConfirmation] 冲突检测失败（可能网络不通），已跳过: ${(e as Error)?.message}`,
+      `[syncWithConfirmation] 冲突检测失败（可能网络不通），已跳过: ${(e as Error).message}`,
     )
     BGM.handleError(e, { context: 'syncWithConfirmation:conflictDetection', showAlert: false })
   }
 
   // 5. 执行同步（传入跳过冲突集合和增量同步开关）
   if (!BGM.sync.enterRunningState()) {
-    wpsMsgBox('同步正在进行中，请稍后再试', 0, 48)
+    void wpsMsgBox('同步正在进行中，请稍后再试', 0, 48)
     return
   }
   try {
@@ -550,13 +547,14 @@ export async function syncWithConfirmation(): Promise<void> {
       ...(skipSids !== undefined && { skipSids }),
       incremental,
       onProgress: (current, total, message) => {
-        if (app?.StatusBar !== undefined) app.StatusBar = `[${current}/${total}] ${message}`
+        if (app?.StatusBar !== undefined)
+          app.StatusBar = `[${String(current)}/${String(total)}] ${message}`
       },
     })
     if (app) app.StatusBar = false
     BGM.sync.exitRunningState()
     app?.MessageBox?.(
-      `同步完成！\n成功: ${result.success} 条\n失败: ${result.fail} 条\n跳过: ${result.skip} 条`,
+      `同步完成！\n成功: ${String(result.success)} 条\n失败: ${String(result.fail)} 条\n跳过: ${String(result.skip)} 条`,
       0,
       64,
     )
@@ -568,7 +566,7 @@ export async function syncWithConfirmation(): Promise<void> {
 }
 
 /** 设置 Token（Ribbon 版本） */
-export async function setTokenForRibbon(): Promise<boolean> {
+export function setTokenForRibbon(): boolean {
   const currentToken = loadBgToken() || ''
   const app = getApp()
   const newToken = app?.InputBox?.('请输入 Access Token', '设置 Token', currentToken, 2)
@@ -654,8 +652,8 @@ export async function testTokenForRibbon(): Promise<void> {
         bgmLog(LOG_LEVELS.WARN, '[testTokenForRibbon] Token 无效或已过期')
         await wpsMsgBox('Token 无效或已过期，请重新设置', 0, 48)
       } else {
-        bgmLog(LOG_LEVELS.ERROR, `[testTokenForRibbon] HTTP ${xhr.status}`)
-        await wpsMsgBox(`Token 验证失败 (HTTP ${xhr.status})`, 0, 16)
+        bgmLog(LOG_LEVELS.ERROR, `[testTokenForRibbon] HTTP ${String(xhr.status)}`)
+        await wpsMsgBox(`Token 验证失败 (HTTP ${String(xhr.status)})`, 0, 16)
       }
       resolve()
     }
@@ -696,7 +694,13 @@ export async function copyTokenForRibbon(): Promise<void> {
     textarea.style.pointerEvents = 'none'
     document.body.appendChild(textarea)
     textarea.select()
-    const ok = document.execCommand('copy')
+    // execCommand 已废弃（no-deprecated），但 WPS WebView 中 Clipboard API 不可用时需回退使用，
+    // 这里以精确类型调用规避废弃标注
+    const ok = (
+      document as unknown as {
+        execCommand: (commandId: string, showUI?: boolean, value?: string) => boolean
+      }
+    ).execCommand('copy')
     document.body.removeChild(textarea)
     if (ok) {
       bgmLog(LOG_LEVELS.INFO, '[copyTokenForRibbon] Token 已复制到剪贴板')
@@ -717,7 +721,7 @@ export function setUserIdForRibbon(): void {
   const app = getApp()
   const userId = app?.InputBox?.('请输入用户 ID（数字）', '设置用户 ID', '', 2)
   if (userId && typeof userId === 'string') {
-    const userIdStr = String(userId).trim()
+    const userIdStr = userId.trim()
     BGM.setUserId(userIdStr)
     bgmLog(LOG_LEVELS.INFO, `[setUserIdForRibbon] 用户ID已设置: ${userIdStr}`)
 
@@ -748,7 +752,10 @@ export function openCollectionForRibbon(): void {
   const collectionUrl = `https://bgm.tv/user/${userId}/collection`
   bgmLog(LOG_LEVELS.INFO, `[openCollectionForRibbon] 打开收藏页面: ${collectionUrl}`)
   window.open(collectionUrl, '_blank')
-  bgmLog(LOG_LEVELS.INFO, `[openCollectionForRibbon] 完成，耗时: ${Date.now() - startTime}ms`)
+  bgmLog(
+    LOG_LEVELS.INFO,
+    `[openCollectionForRibbon] 完成，耗时: ${String(Date.now() - startTime)}ms`,
+  )
 }
 
 /**
@@ -813,13 +820,15 @@ function ensurePanelVisible(): void {
       }
       GetTaskPane?: (id: string) => { Visible: boolean }
       CreateTaskPane?: (url: string) => { ID: string; Visible: boolean }
-    }
+    } | null
     if (!app) return
 
     const tsId = app.PluginStorage?.getItem('panel_id')
     if (!tsId) {
       // 面板未创建，调用 showBangumiPanel 创建并显示
-      import('../index.js').then(({ showBangumiPanel }) => showBangumiPanel())
+      void import('../index.js').then(({ showBangumiPanel }) => {
+        showBangumiPanel()
+      })
       return
     }
 
@@ -854,7 +863,7 @@ export async function undoLastSyncForRibbon(): Promise<void> {
         getItem: (k: string) => string | null
         setItem: (k: string, v: string) => void
       }
-    }
+    } | null
     if (!app?.PluginStorage) {
       bgmLog(LOG_LEVELS.ERROR, '[undoLastSyncForRibbon] PluginStorage 不可用')
       await wpsMsgBox('无法连接到任务面板，请稍后重试', 0, 48)
@@ -908,8 +917,8 @@ export async function executeUndoLastSync(): Promise<number> {
 
   try {
     const restored = undoLastSync()
-    bgmLog(LOG_LEVELS.INFO, `[executeUndoLastSync] 已恢复 ${restored} 项变更`)
-    await wpsMsgBox(`已撤销 ${restored} 项变更`, 0, 64)
+    bgmLog(LOG_LEVELS.INFO, `[executeUndoLastSync] 已恢复 ${String(restored)} 项变更`)
+    await wpsMsgBox(`已撤销 ${String(restored)} 项变更`, 0, 64)
     return restored
   } catch (e: unknown) {
     const errMsg = e instanceof Error ? e.message : String(e)

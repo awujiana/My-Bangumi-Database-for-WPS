@@ -137,13 +137,13 @@ function safeGetSelect(id: string): HTMLSelectElement | null {
 function formatEta(etaMs: number): string {
   if (etaMs <= 0) return '-'
   const seconds = Math.ceil(etaMs / 1000)
-  if (seconds < 60) return `${seconds}秒`
+  if (seconds < 60) return `${String(seconds)}秒`
   const minutes = Math.floor(seconds / 60)
   const remainingSeconds = seconds % 60
-  if (minutes < 60) return `${minutes}分${remainingSeconds}秒`
+  if (minutes < 60) return `${String(minutes)}分${String(remainingSeconds)}秒`
   const hours = Math.floor(minutes / 60)
   const remainingMinutes = minutes % 60
-  return `${hours}时${remainingMinutes}分`
+  return `${String(hours)}时${String(remainingMinutes)}分`
 }
 
 // ========== 初始化 ==========
@@ -216,7 +216,7 @@ function bindTargetSheetControls(): void {
     })
   }
 
-  const refreshBtn = document.querySelector('[data-action="refreshSheets"]') as HTMLElement | null
+  const refreshBtn = document.querySelector('[data-action="refreshSheets"]')
   if (refreshBtn) {
     refreshBtn.addEventListener('click', () => {
       refreshWorkbookList()
@@ -243,7 +243,9 @@ function bindTabSwitches(): void {
       const tabName = tab.getAttribute('data-tab')
       if (!tabName) return
 
-      tabs.forEach((t) => t.classList.remove('active'))
+      tabs.forEach((t) => {
+        t.classList.remove('active')
+      })
       tab.classList.add('active')
 
       const sourceTable = safeGetElement('sourcePreviewTable')
@@ -269,18 +271,14 @@ function bindStartEnrichButton(): void {
 }
 
 function bindRecordControls(): void {
-  const openRecordBtn = document.querySelector(
-    '[data-action="openRecordSheet"]',
-  ) as HTMLElement | null
+  const openRecordBtn = document.querySelector('[data-action="openRecordSheet"]')
   if (openRecordBtn) {
     openRecordBtn.addEventListener('click', () => {
       openEnrichRecordSheet()
     })
   }
 
-  const clearRecordBtn = document.querySelector(
-    '[data-action="clearRecords"]',
-  ) as HTMLElement | null
+  const clearRecordBtn = document.querySelector('[data-action="clearRecords"]')
   if (clearRecordBtn) {
     clearRecordBtn.addEventListener('click', () => {
       clearRecords()
@@ -316,11 +314,10 @@ export function selectNewAnimeFile(): void {
     const fileFilter =
       'Excel 文件 (*.xlsx),*.xlsx,Excel 97-2003 文件 (*.xls),*.xls,CSV 文件 (*.csv),*.csv,所有文件 (*.*),*.*'
 
-    // eslint-disable-next-line no-constant-condition
-    while (true) {
+    for (;;) {
       const titleSuffix =
         state.batchFiles.length > 0
-          ? `（已选 ${state.batchFiles.length} 个，继续添加按"取消"结束）`
+          ? `（已选 ${String(state.batchFiles.length)} 个，继续添加按"取消"结束）`
           : ''
       const selected = app.GetOpenFilename(fileFilter, `选择新番表文件${titleSuffix}`)
 
@@ -346,16 +343,17 @@ export function selectNewAnimeFile(): void {
       }
       bgmLog(
         LOG_LEVELS.INFO,
-        `[enrich] 已选择文件: ${fileName}（共 ${state.batchFiles.length} 个）`,
+        `[enrich] 已选择文件: ${fileName}（共 ${String(state.batchFiles.length)} 个）`,
       )
 
       // 每次选完后同步刷新 UI（让用户看到当前已选列表）
       renderBatchFileList()
 
       // 询问是否继续添加（WPS 同步阻塞式 confirm：回调里改 shouldContinue，随后立即读取）
-      let shouldContinue = false
+      // `false as boolean`：避免 TS 将闭包赋值忽略后把变量静态收窄为 false 字面量
+      let shouldContinue = false as boolean
       BGM.Dialog.confirm(
-        `已添加 ${fileName}\n当前共 ${state.batchFiles.length} 个文件\n点击【确定】继续添加，点击【取消】完成选择`,
+        `已添加 ${fileName}\n当前共 ${String(state.batchFiles.length)} 个文件\n点击【确定】继续添加，点击【取消】完成选择`,
         (confirmed: boolean) => {
           shouldContinue = confirmed
         },
@@ -395,7 +393,7 @@ function renderBatchFileList(): void {
       pathEl.setAttribute('title', state.batchFiles[0]!)
     } else {
       const firstName = extractFileName(state.batchFiles[0]!)
-      pathEl.textContent = `已选 ${n} 个文件（首个：${firstName}）`
+      pathEl.textContent = `已选 ${String(n)} 个文件（首个：${firstName}）`
       pathEl.setAttribute('title', state.batchFiles.join('\n'))
     }
   }
@@ -415,9 +413,9 @@ function renderBatchFileList(): void {
         const fileName = extractFileName(filePath)
         return `
           <div style="display:flex;align-items:center;gap:6px;padding:4px 6px;border-bottom:1px solid #2a2a2a;font-size:12px;">
-            <span style="color:#888;flex-shrink:0;">#${index + 1}</span>
+            <span style="color:#888;flex-shrink:0;">#${String(index + 1)}</span>
             <span style="flex:1;color:#e0e0e0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${escapeHtml(filePath)}">${escapeHtml(fileName)}</span>
-            <button class="bgm-btn small" data-batch-remove="${index}" style="flex-shrink:0;padding:2px 6px;font-size:11px;">✕</button>
+            <button class="bgm-btn small" data-batch-remove="${String(index)}" style="flex-shrink:0;padding:2px 6px;font-size:11px;">✕</button>
           </div>
         `
       })
@@ -506,7 +504,7 @@ export function autoDetectHeader(): void {
 
     bgmLog(
       LOG_LEVELS.INFO,
-      `[enrich] 表头识别完成: headerRow=${headerRow}, nameCol=${mapping.nameCol}`,
+      `[enrich] 表头识别完成: headerRow=${String(headerRow)}, nameCol=${String(mapping.nameCol)}`,
     )
 
     renderSourcePreview(ws, mapping)
@@ -563,7 +561,7 @@ function renderColumnMappingEditor(ws: WpsWorksheet, mapping: EnrichColumnMappin
       colOptions
         .map(
           (o) =>
-            `<option value="${o.col}" ${String(o.col) === selectedValue ? 'selected' : ''}>${escapeHtml(o.header)} (列${o.col})</option>`,
+            `<option value="${String(o.col)}" ${String(o.col) === selectedValue ? 'selected' : ''}>${escapeHtml(o.header)} (列${String(o.col)})</option>`,
         )
         .join('')
 
@@ -606,7 +604,7 @@ function updateColumnMapping(field: keyof EnrichColumnMapping, value: number): v
 
   bgmLog(
     LOG_LEVELS.INFO,
-    `[enrich] 列映射更新: ${String(field)} → ${value > 0 ? '列' + value : '未映射'}`,
+    `[enrich] 列映射更新: ${field} → ${value > 0 ? '列' + String(value) : '未映射'}`,
   )
 }
 
@@ -673,7 +671,7 @@ function selectTargetSheet(): void {
   try {
     const ws = wb.Worksheets.Item(sheetIndex)
     state.bangumiSheet = ws
-    bgmLog(LOG_LEVELS.INFO, `[enrich] 已选择目标工作表: ${ws.Name} (索引: ${sheetIndex})`)
+    bgmLog(LOG_LEVELS.INFO, `[enrich] 已选择目标工作表: ${ws.Name} (索引: ${String(sheetIndex)})`)
 
     // 同步到 BGM.enrich 状态（未锁定时自动更新）
     if (!BGM.enrich.isLocked) {
@@ -744,13 +742,15 @@ function renderSourcePreview(ws: WpsWorksheet, _mapping: EnrichColumnMapping): v
       rowCells.push(escapeHtml(val))
     }
     if (hasData) {
-      rowsHtml.push(`<tr data-row="${row}">${rowCells.map((c) => `<td>${c}</td>`).join('')}</tr>`)
+      rowsHtml.push(
+        `<tr data-row="${String(row)}">${rowCells.map((c) => `<td>${c}</td>`).join('')}</tr>`,
+      )
     }
   }
 
   tbody.innerHTML = sanitizeHtml(rowsHtml.join(''))
 
-  bgmLog(LOG_LEVELS.INFO, `[enrich] 源数据预览已渲染: ${rowsHtml.length} 行`)
+  bgmLog(LOG_LEVELS.INFO, `[enrich] 源数据预览已渲染: ${String(rowsHtml.length)} 行`)
 }
 
 // ========== 匹配预览 ==========
@@ -784,7 +784,7 @@ export function previewMatch(): void {
     renderMatchStats(state.matches)
     renderMatchResultsToTable(state.matches)
 
-    bgmLog(LOG_LEVELS.INFO, `[enrich] 匹配预览完成: ${state.matches.length} 条结果`)
+    bgmLog(LOG_LEVELS.INFO, `[enrich] 匹配预览完成: ${String(state.matches.length)} 条结果`)
   } catch (e: unknown) {
     BGM.handleError(e, { showAlert: false, level: BGM.ErrorLevel.ERROR, context: 'previewMatch' })
     BGM.Dialog.error('错误', '匹配预览失败: ' + (e instanceof Error ? e.message : String(e)))
@@ -895,7 +895,9 @@ export function startEnrichment(): void {
 
   if (state.matches.length === 0) {
     previewMatch()
-    if (state.matches.length === 0) {
+    // 重新读取（previewMatch 可能已更新 state.matches）
+    const recheckedMatches = state.matches
+    if (recheckedMatches.length === 0) {
       BGM.Dialog.alert('提示', '未匹配到任何条目，无法开始富化')
       return
     }
@@ -921,7 +923,7 @@ export function startEnrichment(): void {
   }
 
   try {
-    bgmLog(LOG_LEVELS.INFO, `[enrich] 开始富化，共 ${state.matches.length} 条匹配`)
+    bgmLog(LOG_LEVELS.INFO, `[enrich] 开始富化，共 ${String(state.matches.length)} 条匹配`)
 
     const results = enrichEntries(
       state.newAnimeSheet,
@@ -944,7 +946,7 @@ export function startEnrichment(): void {
 
     bgmLog(
       LOG_LEVELS.INFO,
-      `[enrich] 富化完成: ${results.length} 条结果, 冲突 ${allConflicts.length} 条`,
+      `[enrich] 富化完成: ${String(results.length)} 条结果, 冲突 ${String(allConflicts.length)} 条`,
     )
   } catch (e: unknown) {
     BGM.handleError(e, {
@@ -983,8 +985,8 @@ function updateProgressUI(progress: EnrichProgress): void {
 
   const fillEl = safeGetElement('progressBarFill')
   if (fillEl) {
-    fillEl.style.width = `${percent}%`
-    fillEl.textContent = `${percent}%`
+    fillEl.style.width = `${String(percent)}%`
+    fillEl.textContent = `${String(percent)}%`
   }
 
   const currentEl = safeGetElement('currentItem')
@@ -1012,7 +1014,7 @@ function renderEnrichSummary(results: EnrichResultItem[]): void {
 
   bgmLog(
     LOG_LEVELS.INFO,
-    `[enrich] 富化摘要: 匹配 ${enriched}, 未匹配 ${unmatched}, 错误 ${errors}`,
+    `[enrich] 富化摘要: 匹配 ${String(enriched)}, 未匹配 ${String(unmatched)}, 错误 ${String(errors)}`,
   )
 
   try {
@@ -1033,7 +1035,7 @@ export function openEnrichRecordSheet(): void {
   try {
     const sheet = getOrCreateEnrichRecordSheet()
     const app = getApp()
-    if (app?.ActiveWorkbook && sheet) {
+    if (app?.ActiveWorkbook) {
       sheet.Activate()
       bgmLog(LOG_LEVELS.INFO, `[enrich] 已打开富化记录工作表: ${sheet.Name}`)
     }
@@ -1123,7 +1125,7 @@ function loadRecentRecords(): void {
 
     recordsContainer.innerHTML = sanitizeHtml(recordsHtml)
 
-    bgmLog(LOG_LEVELS.INFO, `[enrich] 最近记录已加载: ${records.length} 条`)
+    bgmLog(LOG_LEVELS.INFO, `[enrich] 最近记录已加载: ${String(records.length)} 条`)
   } catch (e: unknown) {
     BGM.handleError(e, {
       showAlert: false,
@@ -1264,9 +1266,9 @@ function showConflictDialog(): void {
 
   const html = `
     <div class="conflict-header">
-      <span class="conflict-title">⚡ 字段冲突确认 (${current}/${total})</span>
+      <span class="conflict-title">⚡ 字段冲突确认 (${String(current)}/${String(total)})</span>
       <div class="conflict-progress">
-        <div style="width:${percent}%;height:4px;background:#4a90d9;border-radius:2px;"></div>
+        <div style="width:${String(percent)}%;height:4px;background:#4a90d9;border-radius:2px;"></div>
       </div>
     </div>
     <div class="conflict-body">
@@ -1352,7 +1354,7 @@ function handleConflictResolution(resolution: ConflictInfo['resolution']): void 
   } else {
     hideConflictDialog()
     bgmLog(LOG_LEVELS.INFO, '[conflict] 所有冲突已解决')
-    BGM.Dialog.alert('冲突解决完成', `共处理 ${state.currentConflictIndex} 个字段冲突`)
+    BGM.Dialog.alert('冲突解决完成', `共处理 ${String(state.currentConflictIndex)} 个字段冲突`)
   }
 }
 
@@ -1414,14 +1416,14 @@ function updateBatchProgressUI(current: number, total: number, currentFileName: 
   const percent = total > 0 ? Math.round((current / total) * 100) : 0
 
   const fillEl = safeGetElement('batchProgressFill')
-  if (fillEl) fillEl.style.width = `${percent}%`
+  if (fillEl) fillEl.style.width = `${String(percent)}%`
 
   const percentEl = safeGetElement('batchPercent')
-  if (percentEl) percentEl.textContent = `${percent}%`
+  if (percentEl) percentEl.textContent = `${String(percent)}%`
 
   const currentEl = safeGetElement('batchCurrentFile')
   if (currentEl) {
-    currentEl.textContent = `[${current}/${total}] ${extractFileName(currentFileName)}`
+    currentEl.textContent = `[${String(current)}/${String(total)}] ${extractFileName(currentFileName)}`
   }
 }
 
@@ -1462,8 +1464,8 @@ function processSingleBatchFile(filePath: string, bangumiSheet: WpsWorksheet): B
       throw new Error('无法打开文件：WPS 返回了 null')
     }
 
-    // 获取第一个工作表
-    const ws = wb.Worksheets.Item(1) as WpsWorksheet
+    // 获取第一个工作表（WPS 运行时可能返回 null，但类型定义未包含）
+    const ws = wb.Worksheets.Item(1) as WpsWorksheet | null
     if (!ws) {
       throw new Error('文件中没有工作表')
     }
@@ -1517,7 +1519,7 @@ function processSingleBatchFile(filePath: string, bangumiSheet: WpsWorksheet): B
 
     bgmLog(
       LOG_LEVELS.INFO,
-      `[enrich-batch] ${fileName}: 匹配 ${matched}，未匹配 ${unmatched}，处理 ${updatedEntries}`,
+      `[enrich-batch] ${fileName}: 匹配 ${String(matched)}，未匹配 ${String(unmatched)}，处理 ${String(updatedEntries)}`,
     )
   } catch (e: unknown) {
     result.error = e instanceof Error ? e.message : String(e)
@@ -1587,16 +1589,17 @@ export function batchStartEnrichment(): void {
   if (startBtn) startBtn.disabled = true
 
   // 确认
-  let confirmed = false
+  // `false as boolean`：避免 TS 将闭包赋值忽略后把变量静态收窄为 false 字面量
+  let confirmed = false as boolean
   BGM.Dialog.confirm(
-    `将依次对 ${state.batchFiles.length} 个文件执行富化。\n目标工作表：${bangumiSheet.Name}\n是否继续？`,
+    `将依次对 ${String(state.batchFiles.length)} 个文件执行富化。\n目标工作表：${bangumiSheet.Name}\n是否继续？`,
     (ok: boolean) => {
       confirmed = ok
     },
     '开始批量富化',
   )
   if (confirmed) {
-    void runBatchEnrichment(bangumiSheet!)
+    void runBatchEnrichment(bangumiSheet)
   } else {
     state.isBatchEnriching = false
     if (startBtn) startBtn.disabled = false
@@ -1651,7 +1654,7 @@ async function runBatchEnrichment(bangumiSheet: WpsWorksheet): Promise<void> {
 
   bgmLog(
     LOG_LEVELS.INFO,
-    `[enrich-batch] 批量富化结束: ${state.batchResults.filter((r) => r.success).length}/${total} 成功`,
+    `[enrich-batch] 批量富化结束: ${String(state.batchResults.filter((r) => r.success).length)}/${String(total)} 成功`,
   )
 }
 
@@ -1672,11 +1675,11 @@ function renderBatchSummary(): void {
     .map((r, i) => {
       const statusIcon = r.success ? '✅' : '❌'
       const detail = r.success
-        ? `匹配 ${r.matched} / 更新 ${r.updatedEntries} / 未匹配 ${r.unmatched}`
+        ? `匹配 ${String(r.matched)} / 更新 ${String(r.updatedEntries)} / 未匹配 ${String(r.unmatched)}`
         : `失败：${escapeHtml(r.error || '未知错误')}`
       return `
         <div style="display:flex;justify-content:space-between;font-size:12px;padding:2px 0;border-bottom:1px dashed #333;">
-          <span style="color:#ddd;">${statusIcon} #${i + 1} ${escapeHtml(r.fileName)}</span>
+          <span style="color:#ddd;">${statusIcon} #${String(i + 1)} ${escapeHtml(r.fileName)}</span>
           <span style="color:${r.success ? '#a6e3a1' : '#f38ba8'};">${detail}</span>
         </div>
       `
@@ -1685,14 +1688,14 @@ function renderBatchSummary(): void {
 
   const html = `
     <div style="display:flex;gap:16px;margin-bottom:8px;font-size:13px;">
-      <span>📄 <b>${total}</b> 个文件</span>
-      <span style="color:#a6e3a1;">✅ ${successCount} 成功</span>
-      ${failCount > 0 ? `<span style="color:#f38ba8;">❌ ${failCount} 失败</span>` : ''}
+      <span>📄 <b>${String(total)}</b> 个文件</span>
+      <span style="color:#a6e3a1;">✅ ${String(successCount)} 成功</span>
+      ${failCount > 0 ? `<span style="color:#f38ba8;">❌ ${String(failCount)} 失败</span>` : ''}
     </div>
     <div style="display:flex;gap:16px;margin-bottom:10px;font-size:12px;color:#bac2de;">
-      <span>匹配总数 <b style="color:#a6e3a1;">${totalMatched}</b></span>
-      <span>已更新 <b style="color:#89b4fa;">${totalUpdated}</b></span>
-      <span>未匹配 <b style="color:#f9e2af;">${totalUnmatched}</b></span>
+      <span>匹配总数 <b style="color:#a6e3a1;">${String(totalMatched)}</b></span>
+      <span>已更新 <b style="color:#89b4fa;">${String(totalUpdated)}</b></span>
+      <span>未匹配 <b style="color:#f9e2af;">${String(totalUnmatched)}</b></span>
     </div>
     <div style="max-height:200px;overflow-y:auto;">${fileRows}</div>
   `

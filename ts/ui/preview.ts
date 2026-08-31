@@ -82,7 +82,7 @@ function safeAlert(message: string, title?: string): void {
   if (document.getElementById('bgmDialogContainer')) {
     showAlert(message, title)
   } else {
-    wpsMsgBox(message, 0, 64)
+    void wpsMsgBox(message, 0, 64)
   }
 }
 
@@ -118,7 +118,7 @@ function getRowData(
       const col = colMap.get(mapKey)!
       const value = trim(getCellValue(ws, rowNum, col))
       if (mapKey === 'Bangumi_URL') {
-        data.urlCell = getCell(ws, rowNum, col) as WpsRange | null
+        data.urlCell = getCell(ws, rowNum, col)
       }
       return value
     }
@@ -144,7 +144,7 @@ function getRowData(
 
   // 从列映射中读取序列号列，如果没有则使用默认值
   const actualSeqCol = colMap.get('序列号') || seqCol
-  const seqCell = getCell(ws, rowNum, actualSeqCol) as WpsRange | null
+  const seqCell = getCell(ws, rowNum, actualSeqCol)
   data.isUploaded = isUploadedByColor(seqCell)
   return data
 }
@@ -184,13 +184,13 @@ function renderDetailItemHtml(
 
   // 返回完整的HTML模板字符串
   return `
-    <div class="detail-item ${rowData.isUploaded ? 'uploaded' : 'pending'}" data-type="${rowData.typeNum}" data-row="${rowData.row}" data-sid="${rowData.sid}" data-status="${escapeHtml(rowData.status)}">
+    <div class="detail-item ${rowData.isUploaded ? 'uploaded' : 'pending'}" data-type="${String(rowData.typeNum)}" data-row="${String(rowData.row)}" data-sid="${rowData.sid}" data-status="${escapeHtml(rowData.status)}">
       <div class="detail-item-header">
         <div class="detail-item-title">
-          <span class="detail-item-row">行 ${rowData.row}</span>
+          <span class="detail-item-row">行 ${String(rowData.row)}</span>
           <span class="detail-item-name">${escapeHtml(rowData.name) || '(无名称)'}</span>
         </div>
-        <button class="upload-single-btn ${rowData.isUploaded ? 'reupload' : ''}" data-row="${rowData.row}">
+        <button class="upload-single-btn ${rowData.isUploaded ? 'reupload' : ''}" data-row="${String(rowData.row)}">
           ${rowData.isUploaded ? '重新上传' : '上传'}
         </button>
         ${rowData.isUploaded ? '<span class="uploaded-badge">✓ 已上传</span>' : ''}
@@ -202,7 +202,7 @@ function renderDetailItemHtml(
         </div>
         <div class="detail-row">
           <span class="detail-label">观看状态</span>
-          <span class="detail-value">${typeName} (type=${rowData.typeNum})</span>
+          <span class="detail-value">${typeName} (type=${String(rowData.typeNum)})</span>
         </div>
         <div class="detail-row">
           <span class="detail-label">完播日</span>
@@ -238,7 +238,7 @@ function handlePreviewBodyClick(e: Event): void {
   if (!(btn instanceof HTMLElement)) return
   const rowNum = parseInt(btn.dataset.row || '', 10)
   if (isNaN(rowNum)) return
-  uploadSingleRow(rowNum, btn as HTMLButtonElement)
+  void uploadSingleRow(rowNum, btn as HTMLButtonElement)
 }
 
 // 从映射表中提取标准中文状态列表（过滤数字和英文）
@@ -291,11 +291,11 @@ export async function previewSyncContent(): Promise<void> {
   const dataRows = Array.from(
     new Set(visibleRows.filter((r) => r !== headerRow && r >= dataStartRow)),
   ).sort((a, b) => a - b)
-  bgmLog(LOG_LEVELS.INFO, `[preview] 过滤后得到 ${dataRows.length} 条数据行`)
+  bgmLog(LOG_LEVELS.INFO, `[preview] 过滤后得到 ${String(dataRows.length)} 条数据行`)
   if (dataRows.length > 0) {
     bgmLog(
       LOG_LEVELS.INFO,
-      `[preview] 数据行范围: ${dataRows[0]} ~ ${dataRows[dataRows.length - 1]}`,
+      `[preview] 数据行范围: ${String(dataRows[0] ?? '')} ~ ${String(dataRows[dataRows.length - 1] ?? '')}`,
     )
   }
 
@@ -305,7 +305,7 @@ export async function previewSyncContent(): Promise<void> {
   }
 
   const colMap = getColumnMap(ws, headerRow)
-  if (!colMap || colMap.size === 0) {
+  if (colMap.size === 0) {
     showToast('无法读取列映射', 'error')
     return
   }
@@ -331,9 +331,15 @@ export async function previewSyncContent(): Promise<void> {
   showSyncProgressDialog(
     '正在同步 - 预览同步',
     {
-      onPause: () => BGM.sync.pause(),
-      onResume: () => BGM.sync.resume(),
-      onStop: () => BGM.sync.requestStop(),
+      onPause: () => {
+        BGM.sync.pause()
+      },
+      onResume: () => {
+        BGM.sync.resume()
+      },
+      onStop: () => {
+        BGM.sync.requestStop()
+      },
     },
     previewConfig,
   )
@@ -355,13 +361,16 @@ export async function previewSyncContent(): Promise<void> {
       if (BGM.sync.checkShouldStop()) {
         bgmLog(
           LOG_LEVELS.INFO,
-          `[preview] 检测到停止请求，提前终止预览生成（已完成 ${i}/${totalRows}）`,
+          `[preview] 检测到停止请求，提前终止预览生成（已完成 ${String(i)}/${String(totalRows)}）`,
         )
         break
       }
       // 暂停检查
       if (BGM.sync.checkPaused()) {
-        bgmLog(LOG_LEVELS.INFO, `[preview] 已暂停，进度 ${i}/${totalRows}，等待恢复...`)
+        bgmLog(
+          LOG_LEVELS.INFO,
+          `[preview] 已暂停，进度 ${String(i)}/${String(totalRows)}，等待恢复...`,
+        )
         await BGM.sync.waitForResume()
         if (BGM.sync.checkShouldStop()) {
           bgmLog(LOG_LEVELS.INFO, `[preview] 暂停期间收到停止请求，终止`)
@@ -382,25 +391,25 @@ export async function previewSyncContent(): Promise<void> {
 
         // 过滤无效行
         if (!rowData.bgmUrl || !rowData.sid) {
-          bgmLog(LOG_LEVELS.INFO, `[preview] 跳过行 ${rowNum} (无 Bangumi URL)`)
+          bgmLog(LOG_LEVELS.INFO, `[preview] 跳过行 ${String(rowNum)} (无 Bangumi URL)`)
           skippedCount++
           updateSyncProgressDialog(
             i + 1,
             totalRows,
-            `预览生成 ${i + 1}/${totalRows}（卡片 ${actualCardCount}）`,
-            `⊘ [${i + 1}/${totalRows}] 行${rowNum} 跳过: 无URL`,
+            `预览生成 ${String(i + 1)}/${String(totalRows)}（卡片 ${String(actualCardCount)}）`,
+            `⊘ [${String(i + 1)}/${String(totalRows)}] 行${String(rowNum)} 跳过: 无URL`,
           )
           continue
         }
         // 可选：过滤全空（名称、状态、标签全空）
         if (!rowData.name && !rowData.status && !rowData.tagsRaw) {
-          bgmLog(LOG_LEVELS.INFO, `[preview] 跳过行 ${rowNum} (空卡片)`)
+          bgmLog(LOG_LEVELS.INFO, `[preview] 跳过行 ${String(rowNum)} (空卡片)`)
           skippedCount++
           updateSyncProgressDialog(
             i + 1,
             totalRows,
-            `预览生成 ${i + 1}/${totalRows}（卡片 ${actualCardCount}）`,
-            `⊘ [${i + 1}/${totalRows}] 行${rowNum} 跳过: 空卡片`,
+            `预览生成 ${String(i + 1)}/${String(totalRows)}（卡片 ${String(actualCardCount)}）`,
+            `⊘ [${String(i + 1)}/${String(totalRows)}] 行${String(rowNum)} 跳过: 空卡片`,
           )
           continue
         }
@@ -428,8 +437,8 @@ export async function previewSyncContent(): Promise<void> {
         updateSyncProgressDialog(
           i + 1,
           totalRows,
-          `预览生成 ${i + 1}/${totalRows}（卡片 ${actualCardCount}）`,
-          `✓ [${i + 1}/${totalRows}] 行${rowNum} "${rowData.name || ''}" 已渲染`,
+          `预览生成 ${String(i + 1)}/${String(totalRows)}（卡片 ${String(actualCardCount)}）`,
+          `✓ [${String(i + 1)}/${String(totalRows)}] 行${String(rowNum)} "${rowData.name || ''}" 已渲染`,
         )
       } catch (e: unknown) {
         errorCount++
@@ -438,12 +447,12 @@ export async function previewSyncContent(): Promise<void> {
           level: BGM.ErrorLevel.WARN,
           context: 'previewSyncContent',
         })
-        cardsHtml += `<div class="detail-item error">行 ${rowNum} 处理出错: ${escapeHtml((e as Error).message)}</div>`
+        cardsHtml += `<div class="detail-item error">行 ${String(rowNum)} 处理出错: ${escapeHtml((e as Error).message)}</div>`
         updateSyncProgressDialog(
           i + 1,
           totalRows,
-          `预览生成 ${i + 1}/${totalRows}（卡片 ${actualCardCount}）`,
-          `✗ [${i + 1}/${totalRows}] 行${rowNum} 异常: ${(e as Error).message}`,
+          `预览生成 ${String(i + 1)}/${String(totalRows)}（卡片 ${String(actualCardCount)}）`,
+          `✗ [${String(i + 1)}/${String(totalRows)}] 行${String(rowNum)} 异常: ${(e as Error).message}`,
         )
       }
     }
@@ -453,12 +462,12 @@ export async function previewSyncContent(): Promise<void> {
     const wasStopped = BGM.sync.checkShouldStop()
 
     // 切换弹窗为完成状态
-    const summary = `📊 预览 ${totalRows} 行 | 卡片 ${actualCardCount}\n\n✅ 已渲染: ${actualCardCount}\n⏭️ 跳过: ${skippedCount}\n❌ 错误: ${errorCount}`
+    const summary = `📊 预览 ${String(totalRows)} 行 | 卡片 ${String(actualCardCount)}\n\n✅ 已渲染: ${String(actualCardCount)}\n⏭️ 跳过: ${String(skippedCount)}\n❌ 错误: ${String(errorCount)}`
     const detailsArr: string[] = [
-      `总行数: ${totalRows}`,
-      `渲染卡片: ${actualCardCount}`,
-      `跳过行数: ${skippedCount}`,
-      `错误行数: ${errorCount}`,
+      `总行数: ${String(totalRows)}`,
+      `渲染卡片: ${String(actualCardCount)}`,
+      `跳过行数: ${String(skippedCount)}`,
+      `错误行数: ${String(errorCount)}`,
     ]
     if (wasStopped) detailsArr.unshift('⚠️ 预览被用户停止')
     completeSyncProgressDialog(summary, detailsArr, wasStopped)
@@ -512,12 +521,12 @@ export async function previewSyncContent(): Promise<void> {
     // 使用 DOM API 创建 option，避免 innerHTML 拼接（XSS 防护）
     const allOption = document.createElement('option')
     allOption.value = 'all'
-    allOption.textContent = `全部 (${actualCardCount})`
+    allOption.textContent = `全部 (${String(actualCardCount)})`
     select.appendChild(allOption)
     for (const s of sortedStatus) {
       const opt = document.createElement('option')
       opt.value = s
-      opt.textContent = `${s} (${statusMap.get(s) ?? 0})`
+      opt.textContent = `${s} (${String(statusMap.get(s) ?? 0)})`
       select.appendChild(opt)
     }
 
@@ -596,7 +605,7 @@ export async function previewSyncContent(): Promise<void> {
     // 窗口大小变化时更新
     window.addEventListener('resize', updateScrollButtons)
 
-    bgmLog(LOG_LEVELS.INFO, `[preview] 模态框已显示（${actualCardCount} 条卡片，下拉全部）`)
+    bgmLog(LOG_LEVELS.INFO, `[preview] 模态框已显示（${String(actualCardCount)} 条卡片，下拉全部）`)
   } finally {
     // 退出运行状态，确保即使异常也能清理
     BGM.sync.exitRunningState()
@@ -614,15 +623,15 @@ function buildStatsHtml(totalRows: number): string {
     <div class="detail-stats">
       <div class="stat-cards stat-cards-centered">
         <div class="stat-card">
-          <div class="stat-value">${totalRows}</div>
+          <div class="stat-value">${String(totalRows)}</div>
           <div class="stat-label">总行数</div>
         </div>
         <div class="stat-card stat-card-pending">
-          <div class="stat-value" style="color:#f59e0b;">${pending}</div>
+          <div class="stat-value" style="color:#f59e0b;">${String(pending)}</div>
           <div class="stat-label">待上传</div>
         </div>
         <div class="stat-card stat-card-uploaded">
-          <div class="stat-value" style="color:#22c55e;">${d.totalUploaded}</div>
+          <div class="stat-value" style="color:#22c55e;">${String(d.totalUploaded)}</div>
           <div class="stat-label">已上传</div>
         </div>
       </div>
@@ -652,7 +661,7 @@ export async function uploadSingleRow(
     if (!app?.ActiveWorkbook) throw new Error('无法获取 Application')
 
     const select = document.getElementById('sheetSelect') as HTMLSelectElement
-    const sheetIndex = BGM.sheet.lockedIndex || parseInt(select?.value, 10) || 1
+    const sheetIndex = BGM.sheet.lockedIndex || parseInt(select.value, 10) || 1
     const ws = app.ActiveWorkbook.Worksheets.Item(sheetIndex)
 
     const headerRow = findHeaderRow(ws) || 1
@@ -674,10 +683,10 @@ export async function uploadSingleRow(
       jsonBody,
       token,
     )
-    const statusCode = result?.code || 0
+    const statusCode = result.code || 0
     // 从列映射中读取序列号列
     const actualSeqCol = colMap.get('序列号') || 9
-    const seqCell = getCell(ws, rowNum, actualSeqCol) as WpsRange | null
+    const seqCell = getCell(ws, rowNum, actualSeqCol)
 
     if ([200, 201, 202, 204].includes(statusCode)) {
       if (seqCell?.Interior) seqCell.Interior.Color = BGM_COLOR.SUCCESS
@@ -711,7 +720,7 @@ export async function uploadSingleRow(
         type: '',
         content: jsonBody,
         status: '成功',
-        message: '行 ' + rowNum,
+        message: '行 ' + String(rowNum),
         count: 1,
       })
     } else {
@@ -731,15 +740,15 @@ export async function uploadSingleRow(
         type: '',
         content: jsonBody,
         status: '失败',
-        message: result?.message || 'HTTP ' + statusCode,
+        message: result.message || 'HTTP ' + String(statusCode),
         count: 1,
       })
-      BGM.handleError(new Error('上传失败: ' + (result?.message || '未知错误')), {
+      BGM.handleError(new Error('上传失败: ' + (result.message || '未知错误')), {
         showAlert: false,
         level: BGM.ErrorLevel.WARN,
         context: 'UploadSingleRow',
       })
-      showToast('上传失败: ' + (result?.message || '未知错误').substring(0, 60), 'error')
+      showToast('上传失败: ' + (result.message || '未知错误').substring(0, 60), 'error')
     }
   } catch (e: unknown) {
     BGM.handleError(e, { showAlert: true, level: BGM.ErrorLevel.ERROR, context: 'UploadSingleRow' })
@@ -756,12 +765,12 @@ export async function uploadSingleRow(
 
 export function showDetailModal(): void {
   const modal = document.getElementById('detailModal')
-  if (modal) (modal as HTMLElement).style.display = 'flex'
+  if (modal) modal.style.display = 'flex'
 }
 
 export function closeDetailModal(): void {
   const modal = document.getElementById('detailModal')
-  if (modal) (modal as HTMLElement).style.display = 'none'
+  if (modal) modal.style.display = 'none'
 }
 
 export function viewSyncRecordDetail(sid: string): void {
@@ -770,7 +779,7 @@ export function viewSyncRecordDetail(sid: string): void {
     return
   }
   const records = getAllSyncRecords()
-  const record = records.find((r: SyncRecord) => String(r.sid) === String(sid))
+  const record = records.find((r: SyncRecord) => String(r.sid) === sid)
   if (!record) {
     safeAlert('未找到该同步记录')
     return
@@ -785,7 +794,7 @@ export function viewSyncRecordDetail(sid: string): void {
       context: 'ViewSyncRecordDetail',
     })
   }
-  const detail = `同步记录详情\n\n名称: ${record.name || ''}\nSID: ${record.sid || ''}\nURL: ${record.url || ''}\n时间: ${record.time || ''}\n状态: ${record.status || ''}\n同步次数: ${record.count || ''}\n备注: ${record.message || ''}\n\n同步内容:\n${content}`
+  const detail = `同步记录详情\n\n名称: ${record.name || ''}\nSID: ${record.sid || ''}\nURL: ${record.url || ''}\n时间: ${record.time || ''}\n状态: ${record.status || ''}\n同步次数: ${String(record.count || '')}\n备注: ${record.message || ''}\n\n同步内容:\n${content}`
   safeAlert(detail, '同步记录详情')
 }
 
@@ -842,7 +851,7 @@ export async function syncAllRows(): Promise<{ success: number; fail: number; sk
   }
 
   const colMap = getColumnMap(ws, headerRow)
-  if (!colMap || colMap.size === 0) {
+  if (colMap.size === 0) {
     showToast('无法读取列映射', 'error')
     return { success: 0, fail: 0, skip: 0 }
   }
@@ -852,16 +861,15 @@ export async function syncAllRows(): Promise<{ success: number; fail: number; sk
   // ---------- 1. 同步预览统计 ----------
 
   // ---------- 2. 冲突检测（可选，默认以 Excel 覆盖） ----------
-  const conflictSids: Set<string> | undefined = undefined
   let conflictInfo = ''
   try {
     const { conflictCount } = await detectConflicts(ws, colMap, lastRow, headerRow, token)
     if (conflictCount > 0) {
       // 使用 Ribbon 的统一策略：默认以 Excel 覆盖，所以只需记录，不跳过
-      conflictInfo = `检测到 ${conflictCount} 条冲突，将以 Excel 数据覆盖。`
+      conflictInfo = `检测到 ${String(conflictCount)} 条冲突，将以 Excel 数据覆盖。`
       bgmLog(LOG_LEVELS.WARN, conflictInfo)
-      // 如需跳过，可启用下行代码（需传入 skipSids 给 SyncToBangumiAsync）
-      // conflictSids = new Set(conflicts.map(c => c.sid));
+      // 如需跳过冲突，可在 detectConflicts 后收集冲突 sid 集合，
+      // 并通过 skipSids 选项传给 SyncToBangumiAsync
     }
   } catch (e: unknown) {
     const bgmErr = BGM.handleError(e, { showAlert: false })
@@ -902,15 +910,20 @@ export async function syncAllRows(): Promise<{ success: number; fail: number; sk
     showSyncProgressDialog(
       '正在上传同步',
       {
-        onPause: () => BGM.sync.pause(),
-        onResume: () => BGM.sync.resume(),
-        onStop: () => BGM.sync.requestStop(),
+        onPause: () => {
+          BGM.sync.pause()
+        },
+        onResume: () => {
+          BGM.sync.resume()
+        },
+        onStop: () => {
+          BGM.sync.requestStop()
+        },
       },
       uploadConfig,
     )
 
     const result = await SyncToBangumiAsync(ws, colMap, token, lastRow, headerRow, {
-      ...(conflictSids !== undefined && { skipSids: conflictSids }), // 跳过冲突的 sid 集合
       incremental, // 从 Ribbon 设置读取
       onProgress: (current, total, message) => {
         // 直接调用弹窗 API 更新进度，不再走事件总线
@@ -922,15 +935,19 @@ export async function syncAllRows(): Promise<{ success: number; fail: number; sk
     })
 
     // 切换弹窗为完成状态（而非 BGM.setSyncComplete）
-    const summary = `📊 同步 ${result.success + result.fail + result.skip} 条\n\n✅ 成功: ${result.success}\n❌ 失败: ${result.fail}\n⏭️ 跳过: ${result.skip}`
+    const summary = `📊 同步 ${String(result.success + result.fail + result.skip)} 条\n\n✅ 成功: ${String(result.success)}\n❌ 失败: ${String(result.fail)}\n⏭️ 跳过: ${String(result.skip)}`
     const details: string[] = result.stopped
       ? [
           '⚠️ 同步被用户停止',
-          `成功 ${result.success} 条`,
-          `失败 ${result.fail} 条`,
-          `跳过 ${result.skip} 条`,
+          `成功 ${String(result.success)} 条`,
+          `失败 ${String(result.fail)} 条`,
+          `跳过 ${String(result.skip)} 条`,
         ]
-      : [`成功 ${result.success} 条`, `失败 ${result.fail} 条`, `跳过 ${result.skip} 条`]
+      : [
+          `成功 ${String(result.success)} 条`,
+          `失败 ${String(result.fail)} 条`,
+          `跳过 ${String(result.skip)} 条`,
+        ]
     completeSyncProgressDialog(summary, details, result.stopped)
 
     return result

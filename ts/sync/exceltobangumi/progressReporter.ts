@@ -6,7 +6,7 @@
  */
 import { LOG_LEVELS, SYNC_STATUS, BGM_COLOR } from '../../core/constants.js'
 import { bgmLog, BGM, getCell } from '../../tools/util/index.js'
-import type { WpsWorksheet, WpsRange } from '../../tools/wps.js'
+import type { WpsWorksheet } from '../../tools/wps.js'
 import { addSyncRecord } from '../syncRecord.js'
 
 /**
@@ -54,7 +54,7 @@ export function markSyncResultColor(
   seqCol?: number,
 ): void {
   const col = seqCol || DEFAULT_SEQ_COL
-  const cell = getCell(ws, row, col) as WpsRange | null
+  const cell = getCell(ws, row, col)
   if (cell?.Interior) {
     cell.Interior.Color = isSuccess ? BGM_COLOR.SUCCESS : BGM_COLOR.FAIL
   }
@@ -83,7 +83,7 @@ export function applySyncSuccessResults(
       name: task.name || `SID:${task.sid}`,
       url: task.bgmUrl,
       sid: task.sid,
-      type: TYPE_NAMES[task.type] || `类型${task.type}`,
+      type: TYPE_NAMES[task.type] || `类型${String(task.type)}`,
       content: task.jsonBody,
       status: SYNC_STATUS.SUCCESS,
       message: '批量同步成功',
@@ -116,7 +116,7 @@ export function applySyncFailResults(
       name: task.name || `SID:${task.sid}`,
       url: task.bgmUrl,
       sid: task.sid,
-      type: TYPE_NAMES[task.type] || `类型${task.type}`,
+      type: TYPE_NAMES[task.type] || `类型${String(task.type)}`,
       content: task.jsonBody,
       status: SYNC_STATUS.FAIL,
       message: '批量同步失败',
@@ -148,7 +148,10 @@ export function handleStoppedRemainingTasks(
     result.skip++
     bgmLog(LOG_LEVELS.INFO, `[SyncToBangumiAsync] 任务被跳过（停止）: SID=${task.sid}`)
   }
-  bgmLog(LOG_LEVELS.INFO, `[SyncToBangumiAsync] 同步已停止，${remainingTasks.length} 条任务被跳过`)
+  bgmLog(
+    LOG_LEVELS.INFO,
+    `[SyncToBangumiAsync] 同步已停止，${String(remainingTasks.length)} 条任务被跳过`,
+  )
 }
 
 /**
@@ -195,6 +198,6 @@ export function finalizeSyncResults(
   BGM.setSyncComplete(result)
   bgmLog(
     LOG_LEVELS.INFO,
-    `[SyncToBangumiAsync] 同步完成: 成功=${result.success}, 失败=${result.fail}, 跳过=${result.skip}, 已停止=${result.stopped}, 总耗时=${totalTime}ms`,
+    `[SyncToBangumiAsync] 同步完成: 成功=${String(result.success)}, 失败=${String(result.fail)}, 跳过=${String(result.skip)}, 已停止=${String(result.stopped)}, 总耗时=${String(totalTime)}ms`,
   )
 }

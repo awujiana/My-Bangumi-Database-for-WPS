@@ -80,7 +80,6 @@ export function loadCache(url: string): GithubDataCache | null {
     const data = JSON.parse(raw) as GithubDataCache
     // 校验结构完整性
     if (
-      !data ||
       !Array.isArray(data.entries) ||
       typeof data.hash !== 'string' ||
       typeof data.fetchedAt !== 'number'
@@ -110,7 +109,7 @@ export function saveCache(data: GithubDataCache): void {
     localStorage.setItem(CACHE_KEY, JSON.stringify(data))
     bgmLog(
       LOG_LEVELS.INFO,
-      `[githubCache] 缓存已保存：${data.entries.length} 条，哈希=${data.hash}，大小=${data.textLength}B`,
+      `[githubCache] 缓存已保存：${String(data.entries.length)} 条，哈希=${data.hash}，大小=${String(data.textLength)}B`,
     )
   } catch (e: unknown) {
     const errMsg = e instanceof Error ? e.message : String(e)
@@ -166,7 +165,7 @@ export function buildCache(
 export function getCacheAge(cache: GithubDataCache): string {
   const diff = Date.now() - cache.fetchedAt
   if (diff < 60_000) return '刚刚'
-  if (diff < 3_600_000) return `${Math.floor(diff / 60_000)} 分钟前`
-  if (diff < 86_400_000) return `${Math.floor(diff / 3_600_000)} 小时前`
-  return `${Math.floor(diff / 86_400_000)} 天前`
+  if (diff < 3_600_000) return `${String(Math.floor(diff / 60_000))} 分钟前`
+  if (diff < 86_400_000) return `${String(Math.floor(diff / 3_600_000))} 小时前`
+  return `${String(Math.floor(diff / 86_400_000))} 天前`
 }

@@ -21,7 +21,7 @@ export class ServiceContainer {
     this.descriptors.set(key, { factory })
   }
 
-  resolve<T>(key: ServiceKey): T {
+  resolve(key: ServiceKey): unknown {
     const desc = this.descriptors.get(key)
     if (!desc) {
       throw new Error(`[ServiceContainer] Service not found: ${key}`)
@@ -29,7 +29,7 @@ export class ServiceContainer {
     if (desc.instance === undefined) {
       desc.instance = desc.factory()
     }
-    return desc.instance as T
+    return desc.instance
   }
 
   has(key: ServiceKey): boolean {

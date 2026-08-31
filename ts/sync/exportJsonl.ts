@@ -35,9 +35,8 @@ import { extractSubjectId } from './pureUtils.js'
  */
 function getCellText(ws: WpsWorksheet, row: number, col: number): string {
   try {
-    const address = colNumToLetter(col) + row
+    const address = colNumToLetter(col) + String(row)
     const cell = ws.Range(address)
-    if (!cell) return ''
     // 尝试读取 Text 属性（保留本地格式）
     const raw = (cell as unknown as { Text?: unknown }).Text
     if (raw != null && typeof raw === 'string' && raw.trim()) {
@@ -156,7 +155,7 @@ export function buildJsonlFromSheet(): string {
     lines.push(JSON.stringify(entry))
   }
 
-  bgmLog(LOG_LEVELS.INFO, `[exportJsonl] 构建完成：${lines.length} 条记录`)
+  bgmLog(LOG_LEVELS.INFO, `[exportJsonl] 构建完成：${String(lines.length)} 条记录`)
   return lines.join('\n')
 }
 
@@ -191,9 +190,14 @@ export function exportSheetToJsonlFile(): boolean {
     document.body.removeChild(a)
 
     // 释放 Blob URL
-    setTimeout(() => URL.revokeObjectURL(url), 10000)
+    setTimeout(() => {
+      URL.revokeObjectURL(url)
+    }, 10000)
 
-    bgmLog(LOG_LEVELS.INFO, `[exportJsonl] 已导出文件: ${filename} (${content.length} 字节)`)
+    bgmLog(
+      LOG_LEVELS.INFO,
+      `[exportJsonl] 已导出文件: ${filename} (${String(content.length)} 字节)`,
+    )
     return true
   } catch (e: unknown) {
     bgmLog(LOG_LEVELS.ERROR, `[exportJsonl] 导出失败: ${(e as Error).message}`)

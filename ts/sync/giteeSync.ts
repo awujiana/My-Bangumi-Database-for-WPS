@@ -103,8 +103,8 @@ export function fetchGiteeJson(signal?: AbortSignal): Promise<GithubRemoteEntry[
           if (entries.length === 0 && errors.length > 0) {
             reject(
               new Error(
-                `JSONL 解析失败：${errors.length} 行全部非法。` +
-                  `首行错误（第 ${errors[0]?.line} 行）：${errors[0]?.reason}`,
+                `JSONL 解析失败：${String(errors.length)} 行全部非法。` +
+                  `首行错误（第 ${String(errors[0]?.line ?? '')} 行）：${errors[0]?.reason ?? ''}`,
               ),
             )
             return
@@ -112,11 +112,11 @@ export function fetchGiteeJson(signal?: AbortSignal): Promise<GithubRemoteEntry[
           if (errors.length > 0) {
             bgmLog(
               LOG_LEVELS.WARN,
-              `[giteeSync] JSONL 解析完成：${entries.length} 条合法，${errors.length} 行非法（已跳过）。` +
-                `首行错误（第 ${errors[0]?.line} 行）：${errors[0]?.reason}`,
+              `[giteeSync] JSONL 解析完成：${String(entries.length)} 条合法，${String(errors.length)} 行非法（已跳过）。` +
+                `首行错误（第 ${String(errors[0]?.line ?? '')} 行）：${errors[0]?.reason ?? ''}`,
             )
           } else {
-            bgmLog(LOG_LEVELS.INFO, `[giteeSync] 下载成功：${entries.length} 条记录`)
+            bgmLog(LOG_LEVELS.INFO, `[giteeSync] 下载成功：${String(entries.length)} 条记录`)
           }
           resolve(entries)
         } catch (e: unknown) {
@@ -127,7 +127,7 @@ export function fetchGiteeJson(signal?: AbortSignal): Promise<GithubRemoteEntry[
       } else if (xhr.status === 403) {
         reject(new Error(`访问被拒（403）：可能是私有仓库或触发 Gitee 限流`))
       } else {
-        reject(new Error(`HTTP 错误 ${xhr.status}: ${xhr.statusText}`))
+        reject(new Error(`HTTP 错误 ${String(xhr.status)}: ${xhr.statusText}`))
       }
     }
 
@@ -141,7 +141,7 @@ export function fetchGiteeJson(signal?: AbortSignal): Promise<GithubRemoteEntry[
     }
 
     xhr.ontimeout = (): void => {
-      reject(new Error(`请求超时（${REQUEST_TIMEOUT_MS}ms）：${url}`))
+      reject(new Error(`请求超时（${String(REQUEST_TIMEOUT_MS)}ms）：${url}`))
     }
 
     xhr.send()

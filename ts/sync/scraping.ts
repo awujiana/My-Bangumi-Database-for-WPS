@@ -106,10 +106,10 @@ function requestPromise(
       const duration = Date.now() - startTime
       bgmLog(
         LOG_LEVELS.INFO,
-        `[scraping] HTTP ${xhr.status} (${xhr.statusText}), 耗时: ${duration}ms`,
+        `[scraping] HTTP ${String(xhr.status)} (${xhr.statusText}), 耗时: ${String(duration)}ms`,
       )
       try {
-        const responseData = xhr.responseText ? JSON.parse(xhr.responseText) : null
+        const responseData: unknown = xhr.responseText ? JSON.parse(xhr.responseText) : null
         resolve({ status: xhr.status, data: responseData, responseText: xhr.responseText })
       } catch {
         reject(new Error('解析响应失败'))
@@ -119,7 +119,9 @@ function requestPromise(
       // 如果是 abort 导致的 onerror，归类为取消
       reject(new Error(signal?.aborted ? '请求被取消' : '网络错误'))
     }
-    xhr.ontimeout = () => reject(new Error('请求超时'))
+    xhr.ontimeout = () => {
+      reject(new Error('请求超时'))
+    }
     xhr.send()
   })
 }
@@ -175,7 +177,7 @@ export async function verifyToken(token: string, signal?: AbortSignal): Promise<
       result.message = 'Token 有效'
       bgmLog(
         LOG_LEVELS.INFO,
-        `[scraping/verifyToken] Token 验证成功，用户ID: ${userData?.id || '未知'}`,
+        `[scraping/verifyToken] Token 验证成功，用户ID: ${String(userData?.id || '未知')}`,
       )
       if (userData) {
         result.userId = String(userData.id || '')
@@ -185,8 +187,8 @@ export async function verifyToken(token: string, signal?: AbortSignal): Promise<
       result.message = 'Token 无效或已过期'
       bgmLog(LOG_LEVELS.WARN, `[scraping/verifyToken] Token 无效或已过期`)
     } else {
-      result.message = `验证失败 (HTTP ${response.status})`
-      bgmLog(LOG_LEVELS.ERROR, `[scraping/verifyToken] 验证失败，HTTP ${response.status}`)
+      result.message = `验证失败 (HTTP ${String(response.status)})`
+      bgmLog(LOG_LEVELS.ERROR, `[scraping/verifyToken] 验证失败，HTTP ${String(response.status)}`)
     }
   } catch (e: unknown) {
     const errMsg = e instanceof Error ? e.message : ''
@@ -250,8 +252,8 @@ export async function fetchAllUserCollections(
 
   while (offset < maxTotal) {
     try {
-      const typeParam = typeNum !== null ? `&type=${typeNum}` : ''
-      const url = `${BGM_CONFIG.API_BASE}/v0/users/${userId}/collections?limit=${limit}&offset=${offset}${typeParam}`
+      const typeParam = typeNum !== null ? `&type=${String(typeNum ?? '')}` : ''
+      const url = `${BGM_CONFIG.API_BASE}/v0/users/${userId}/collections?limit=${String(limit)}&offset=${String(offset)}${typeParam}`
       const xhrResult = await xhrGet(url, token)
 
       if (xhrResult.status < 200 || xhrResult.status >= 300) {
@@ -261,14 +263,14 @@ export async function fetchAllUserCollections(
             const delayMs = BGM_CONFIG.RETRY_DELAY_BASE * Math.pow(2, retryCount - 1)
             bgmLog(
               LOG_LEVELS.WARN,
-              `[fetchAllUserCollections] API限流，第 ${retryCount} 次重试，等待 ${delayMs}ms...`,
+              `[fetchAllUserCollections] API限流，第 ${String(retryCount)} 次重试，等待 ${String(delayMs)}ms...`,
             )
             await new Promise((resolve) => setTimeout(resolve, delayMs))
             continue
           }
           throw new Error(`HTTP 429：请求过于频繁，已超过最大重试次数`)
         }
-        throw new Error(`HTTP ${xhrResult.status}`)
+        throw new Error(`HTTP ${String(xhrResult.status)}`)
       }
 
       // 成功请求后重置重试计数
@@ -278,7 +280,7 @@ export async function fetchAllUserCollections(
 
       if (total === 0 && data.total) {
         total = Math.min(data.total, maxTotal)
-        bgmLog(LOG_LEVELS.INFO, `[fetchAllUserCollections] 收藏总数: ${total}`)
+        bgmLog(LOG_LEVELS.INFO, `[fetchAllUserCollections] 收藏总数: ${String(total)}`)
       }
 
       if (data.data && Array.isArray(data.data)) {
@@ -299,12 +301,15 @@ export async function fetchAllUserCollections(
       await new Promise((resolve) => setTimeout(resolve, BGM_CONFIG.REQUEST_DELAY))
     } catch (e: unknown) {
       const errMsg = e instanceof Error ? e.message : undefined
-      bgmLog(LOG_LEVELS.ERROR, `[fetchAllUserCollections] 请求失败: ${errMsg}`)
+      bgmLog(LOG_LEVELS.ERROR, `[fetchAllUserCollections] 请求失败: ${errMsg ?? ''}`)
       break
     }
   }
 
-  bgmLog(LOG_LEVELS.INFO, `[fetchAllUserCollections] 获取完成，共 ${allCollections.length} 条`)
+  bgmLog(
+    LOG_LEVELS.INFO,
+    `[fetchAllUserCollections] 获取完成，共 ${String(allCollections.length)} 条`,
+  )
   return allCollections
 }
 
@@ -333,7 +338,7 @@ export async function fetchSubjectCollection(
       result.data = xhrResult.data
       result.message = 'success'
     } else {
-      result.message = `HTTP ${xhrResult.status}`
+      result.message = `HTTP ${String(xhrResult.status)}`
     }
   } catch (e: unknown) {
     const errMsg = e instanceof Error ? e.message : ''

@@ -78,7 +78,7 @@ export function setConfig(key: string, value: string): boolean {
     } as const
     try {
       // 通知所有可能的窗口（顶层和父级），兼顾 iframe 和顶层窗口场景
-      if (window.parent && window.parent !== window) {
+      if (window.parent !== window) {
         window.parent.postMessage(messagePayload, '*')
       }
       if (window.top && window.top !== window && window.top !== window.parent) {
@@ -88,10 +88,7 @@ export function setConfig(key: string, value: string): boolean {
       window.postMessage(messagePayload, '*')
       bgmLog(LOG_LEVELS.INFO, `[config] 已广播 BGM:configUpdated 跨文档消息: key=${key}`)
     } catch (e: unknown) {
-      bgmLog(
-        LOG_LEVELS.WARN,
-        `[config] postMessage 广播失败: ${(e as Error)?.message || String(e)}`,
-      )
+      bgmLog(LOG_LEVELS.WARN, `[config] postMessage 广播失败: ${(e as Error).message || String(e)}`)
     }
   }
 
@@ -278,7 +275,7 @@ const REFRESH_MAX = 1440
 
 export function setRefreshInterval(minutes: number): boolean {
   if (!Number.isFinite(minutes) || minutes < REFRESH_MIN || minutes > REFRESH_MAX) {
-    bgmLog(LOG_LEVELS.WARN, `[config] 无效刷新间隔: ${minutes}，已忽略`)
+    bgmLog(LOG_LEVELS.WARN, `[config] 无效刷新间隔: ${String(minutes)}，已忽略`)
     return false
   }
   const value = String(Math.round(minutes))
@@ -289,6 +286,6 @@ export function setRefreshInterval(minutes: number): boolean {
 export function getRefreshInterval(silent: boolean = false): number {
   const raw = parseInt(getConfig(CONFIG_KEYS.REFRESH_INTERVAL, '0', silent), 10)
   const result = Number.isFinite(raw) && raw >= REFRESH_MIN ? raw : 0
-  if (!silent) bgmLog(LOG_LEVELS.INFO, `[config] 获取自动刷新间隔: ${result} 分钟`)
+  if (!silent) bgmLog(LOG_LEVELS.INFO, `[config] 获取自动刷新间隔: ${String(result)} 分钟`)
   return result
 }

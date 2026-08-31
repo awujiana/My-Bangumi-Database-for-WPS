@@ -110,7 +110,7 @@ export function restoreLockedSheet(): boolean {
     const raw = app.PluginStorage.getItem('bgm_locked_sheet')
     if (raw) {
       try {
-        const info = JSON.parse(raw) as LockedSheetInfo
+        const info = JSON.parse(raw) as Partial<LockedSheetInfo>
         BGM.sheet.lockedIndex = info.index != null ? info.index : null
         BGM.sheet.lockedName = info.name || null
         BGM.sheet.lockedWorkbookName = info.workbookName || null
@@ -155,7 +155,7 @@ export function restoreLockedSheet(): boolean {
 
 export function updateLockButton(): void {
   const btn = document.getElementById('lockSheetBtn') as HTMLButtonElement | null
-  const status = document.getElementById('lockStatus') as HTMLElement | null
+  const status = document.getElementById('lockStatus')
 
   if (btn) {
     if (BGM.sheet.isLocked) {
@@ -170,7 +170,7 @@ export function updateLockButton(): void {
   if (status) {
     if (BGM.sheet.isLocked) {
       status.style.display = 'inline'
-      status.textContent = '已锁定: ' + BGM.sheet.lockedName
+      status.textContent = '已锁定: ' + String(BGM.sheet.lockedName)
     } else {
       status.style.display = 'none'
     }
@@ -208,12 +208,10 @@ export function refreshSheets(opts?: { autoSelectActive?: boolean }): void {
   let activeSheetIndex = 0
   try {
     const activeSheet = workbook.ActiveSheet
-    if (activeSheet) {
-      for (let i = 1; i <= sheets.Count; i++) {
-        if (sheets.Item(i) === activeSheet) {
-          activeSheetIndex = i
-          break
-        }
+    for (let i = 1; i <= sheets.Count; i++) {
+      if (sheets.Item(i) === activeSheet) {
+        activeSheetIndex = i
+        break
       }
     }
   } catch (e: unknown) {
@@ -254,11 +252,11 @@ export function refreshSheets(opts?: { autoSelectActive?: boolean }): void {
     select.value = String(selectedIndex)
     bgmLog(
       LOG_LEVELS.INFO,
-      `[refreshSheets] ${autoSelectActive ? '自动选中' : '已锁定'} 工作表索引: ${selectedIndex}`,
+      `[refreshSheets] ${autoSelectActive ? '自动选中' : '已锁定'} 工作表索引: ${String(selectedIndex)}`,
     )
   } else if (autoSelectActive && activeSheetIndex > 0) {
     select.value = String(activeSheetIndex)
-    bgmLog(LOG_LEVELS.INFO, `[refreshSheets] 自动选中当前活动工作表: ${activeSheetIndex}`)
+    bgmLog(LOG_LEVELS.INFO, `[refreshSheets] 自动选中当前活动工作表: ${String(activeSheetIndex)}`)
   } else {
     select.value = ''
   }
@@ -315,7 +313,7 @@ export function refreshWorkbooks(): void {
     select.value = ''
   }
 
-  bgmLog(LOG_LEVELS.INFO, `[refreshWorkbooks] 刷新工作簿列表: ${wbs.Count} 个`)
+  bgmLog(LOG_LEVELS.INFO, `[refreshWorkbooks] 刷新工作簿列表: ${String(wbs.Count)} 个`)
 }
 
 export function activateSheetIfNeeded(ws: WpsWorksheet): (() => void) | false {
@@ -324,7 +322,6 @@ export function activateSheetIfNeeded(ws: WpsWorksheet): (() => void) | false {
 
   try {
     const active = app.ActiveWorkbook.ActiveSheet
-    if (!active || !ws) return false // ✅ 防止 undefined
 
     const activeName = active.Name || ''
     if (activeName !== (ws.Name || '')) {
@@ -414,8 +411,9 @@ export function detectHeaderAndColumns(
 
   // 选列数最多、行号最小的作为表头
   candidates.sort((a, b) => b.colCount - a.colCount || a.row - b.row)
-  const headerRow = candidates[0]!.row
-  const headerMatchCount = candidates[0]!.matchCount
+  const bestCandidate = candidates[0]
+  const headerRow = bestCandidate?.row ?? 0
+  const headerMatchCount = bestCandidate?.matchCount ?? 0
 
   // 2. 读取表头名称
   const headerNames: string[] = []
@@ -529,18 +527,21 @@ export function autoDetectSheet(): {
     colCount: number
   } | null = null
 
-  bgmLog(LOG_LEVELS.INFO, `autoDetectSheet: 开始扫描 ${sheets.Count} 个工作表...`)
+  bgmLog(LOG_LEVELS.INFO, `autoDetectSheet: 开始扫描 ${String(sheets.Count)} 个工作表...`)
 
   for (let si = 1; si <= sheets.Count; si++) {
     let needRestore: (() => void) | false = false
     try {
       const ws: WpsWorksheet = sheets.Item(si)
-      if (!ws || typeof ws.Activate !== 'function') {
-        BGM.handleError(new Error(`autoDetectSheet: 工作表索引 ${si} 为 null 或无法访问，已跳过`), {
-          showAlert: false,
-          level: BGM.ErrorLevel.INFO,
-          context: 'autoDetectSheet',
-        })
+      if (typeof ws.Activate !== 'function') {
+        BGM.handleError(
+          new Error(`autoDetectSheet: 工作表索引 ${String(si)} 为 null 或无法访问，已跳过`),
+          {
+            showAlert: false,
+            level: BGM.ErrorLevel.INFO,
+            context: 'autoDetectSheet',
+          },
+        )
         continue
       }
 
@@ -584,18 +585,21 @@ export function autoDetectSheet(): {
 
       BGM.handleError(
         new Error(
-          `  => 工作表 "${sheetName}" 表头行 ${meta.headerRow}, 匹配关键词数 ${meta.headerMatchCount}, ` +
-            `数据列数 ${meta.lastCol}, 前10行含数据行数 ${dataRowCount}`,
+          `  => 工作表 "${sheetName}" 表头行 ${String(meta.headerRow)}, 匹配关键词数 ${String(meta.headerMatchCount)}, ` +
+            `数据列数 ${String(meta.lastCol)}, 前10行含数据行数 ${String(dataRowCount)}`,
         ),
         { showAlert: false, level: BGM.ErrorLevel.INFO, context: 'autoDetectSheet' },
       )
 
       if (dataRowCount < 2) {
-        BGM.handleError(new Error(`  => 数据行不足 (${dataRowCount} 行)，不视为有效数据表`), {
-          showAlert: false,
-          level: BGM.ErrorLevel.INFO,
-          context: 'autoDetectSheet',
-        })
+        BGM.handleError(
+          new Error(`  => 数据行不足 (${String(dataRowCount)} 行)，不视为有效数据表`),
+          {
+            showAlert: false,
+            level: BGM.ErrorLevel.INFO,
+            context: 'autoDetectSheet',
+          },
+        )
         continue
       }
 
@@ -607,7 +611,7 @@ export function autoDetectSheet(): {
 
       BGM.handleError(
         new Error(
-          `  => 是否为当前最优: ${isBetter ? '是' : '否'} (现有最优: ${bestMatch ? `${bestMatch.sheetName}(列${bestMatch.colCount})` : '无'})`,
+          `  => 是否为当前最优: ${isBetter ? '是' : '否'} (现有最优: ${bestMatch ? `${bestMatch.sheetName}(列${String(bestMatch.colCount)})` : '无'})`,
         ),
         { showAlert: false, level: BGM.ErrorLevel.INFO, context: 'autoDetectSheet' },
       )
@@ -635,7 +639,7 @@ export function autoDetectSheet(): {
   if (bestMatch) {
     bgmLog(
       LOG_LEVELS.INFO,
-      `autoDetectSheet: 最终选中工作表 "${bestMatch.sheetName}" (列${bestMatch.colCount}, 行${bestMatch.headerRow})`,
+      `autoDetectSheet: 最终选中工作表 "${bestMatch.sheetName}" (列${String(bestMatch.colCount)}, 行${String(bestMatch.headerRow)})`,
     )
   } else {
     bgmLog(
@@ -658,11 +662,7 @@ export function updateFilterStatus(targetWs?: WpsWorksheet): void {
     return
   }
   // 现在 sheet 被收窄为 WpsWorksheet
-  const ws: WpsWorksheet | null | undefined = sheet
-  if (!ws) {
-    el.textContent = '未连接到工作表'
-    return
-  }
+  const ws: WpsWorksheet = sheet
 
   let autoFilterMode = false
   try {
@@ -705,12 +705,12 @@ export function updateFilterStatus(targetWs?: WpsWorksheet): void {
     const activeCols: string[] = []
     for (let i = 1; i <= filters.Count; i++) {
       try {
-        const f = filters.Item ? filters.Item(i) : filters(i)
-        if (f?.On) {
+        const f = filters.Item(i)
+        if (f.On) {
           let colName = ''
           try {
             const headerCell = ws.Range(colNumToLetter(i) + '1')
-            if (headerCell) colName = String(headerCell.Value2 || '').substring(0, 12)
+            colName = String(headerCell.Value2 || '').substring(0, 12)
           } catch (e: unknown) {
             BGM.handleError(e, {
               showAlert: false,
@@ -728,7 +728,7 @@ export function updateFilterStatus(targetWs?: WpsWorksheet): void {
                   ? ' 或 ' + f.Criteria2
                   : ' / ' + f.Criteria2
           }
-          activeCols.push(colName ? `${colName}(${criteria})` : `列${i}`)
+          activeCols.push(colName ? `${colName}(${criteria})` : `列${String(i)}`)
         }
       } catch (e: unknown) {
         BGM.handleError(e, {
@@ -740,7 +740,7 @@ export function updateFilterStatus(targetWs?: WpsWorksheet): void {
     }
 
     if (activeCols.length > 0) {
-      const text = `✔ 筛选已开启（${activeCols.length} 列），将同步筛选后的可见数据\n${activeCols.join('、')}`
+      const text = `✔ 筛选已开启（${String(activeCols.length)} 列），将同步筛选后的可见数据\n${activeCols.join('、')}`
       el.textContent = text
       el.setAttribute('title', text)
     } else {
@@ -772,7 +772,7 @@ function renderPreviewTable(
   rows.forEach((item) => {
     const rowClass = item.isHeader ? 'preview-header-row' : ''
     html += `<tr class="${rowClass}">`
-    html += `<td class="preview-row-num">${item.isHeader ? 'H' : item.row}</td>`
+    html += `<td class="preview-row-num">${String(item.isHeader ? 'H' : item.row)}</td>`
     if (item.aligned) {
       const cols = item.cols as string[]
       // 使用统一列数，确保所有行列对齐
@@ -784,14 +784,14 @@ function renderPreviewTable(
           cls = 'preview-header'
           if (item.isImportant?.[i]) cls += ' preview-important-header'
         }
-        html += `<td class="${cls}">${escapeHtml(String(text))}</td>`
+        html += `<td class="${cls}">${escapeHtml(text)}</td>`
       }
     }
     html += '</tr>'
   })
   html += '</tbody></table>'
-  html += `<p class="hint">已选择工作表索引: ${sheetIndex} (${escapeHtml(sheetName)})`
-  if (headerRow) html += ` | 表头行: ${headerRow}`
+  html += `<p class="hint">已选择工作表索引: ${String(sheetIndex)} (${escapeHtml(sheetName)})`
+  if (headerRow) html += ` | 表头行: ${String(headerRow)}`
   html += '</p>'
   return html
 }
@@ -820,16 +820,20 @@ export function refreshData(): void {
     ws = app.ActiveWorkbook.Worksheets.Item(sheetIndex)
   } catch (e: unknown) {
     if (previewBox)
-      previewBox.innerHTML = sanitizeHtml(`<p class="hint">无法获取工作表: ${sheetIndex}</p>`)
+      previewBox.innerHTML = sanitizeHtml(
+        `<p class="hint">无法获取工作表: ${String(sheetIndex)}</p>`,
+      )
     BGM.handleError(e, { showAlert: false, level: BGM.ErrorLevel.INFO, context: 'refreshData' })
     updateFilterStatus()
     return
   }
-  // ✅ 增加判空，防止 Item 返回 null/undefined
-  if (!ws || typeof ws.Activate !== 'function') {
+  // 检查工作表可访问性（WPS 桥接层可能返回不可用的代理对象）
+  if (typeof ws.Activate !== 'function') {
     if (previewBox)
-      previewBox.innerHTML = sanitizeHtml(`<p class="hint">无法访问工作表 ${sheetIndex}</p>`)
-    BGM.handleError(new Error(`无法访问工作表 ${sheetIndex}`), {
+      previewBox.innerHTML = sanitizeHtml(
+        `<p class="hint">无法访问工作表 ${String(sheetIndex)}</p>`,
+      )
+    BGM.handleError(new Error(`无法访问工作表 ${String(sheetIndex)}`), {
       showAlert: false,
       level: BGM.ErrorLevel.INFO,
       context: 'refreshData',
@@ -847,16 +851,19 @@ export function refreshData(): void {
   try {
     // 获取最后数据行（强制刷新，不使用缓存）
     const lastRow = getLastRow(ws, true)
-    bgmLog(LOG_LEVELS.INFO, `工作表最后数据行: ${lastRow}`)
+    bgmLog(LOG_LEVELS.INFO, `工作表最后数据行: ${String(lastRow)}`)
 
     // 使用统一的筛选状态检测
     const filterStatus = getFilterStatus(ws, lastRow)
-    const isFiltered = filterStatus ? filterStatus.hasFilter : false
-    const visibleRows = filterStatus?.visibleRows || []
+    const isFiltered = filterStatus.hasFilter
+    const visibleRows = filterStatus.visibleRows
     const visibleRowSet = isFiltered ? new Set<number>(visibleRows) : null
 
     // 记录筛选状态详情
-    bgmLog(LOG_LEVELS.INFO, `筛选状态: isFiltered=${isFiltered}, 可见行数=${visibleRows.length}`)
+    bgmLog(
+      LOG_LEVELS.INFO,
+      `筛选状态: isFiltered=${String(isFiltered)}, 可见行数=${String(visibleRows.length)}`,
+    )
     if (isFiltered && visibleRows.length > 0) {
       bgmLog(LOG_LEVELS.INFO, `可见行列表(前10): ${visibleRows.slice(0, 10).join(',')}`)
     }
@@ -876,7 +883,7 @@ export function refreshData(): void {
     }
     bgmLog(
       LOG_LEVELS.INFO,
-      `表头检测: headerRow=${meta.headerRow}, dataStartRow=${meta.dataStartRow}, 列数=${meta.previewColEnd - meta.previewColStart}`,
+      `表头检测: headerRow=${String(meta.headerRow)}, dataStartRow=${String(meta.dataStartRow)}, 列数=${String(meta.previewColEnd - meta.previewColStart)}`,
     )
 
     const previewRows: PreviewRow[] = []
@@ -896,9 +903,7 @@ export function refreshData(): void {
       // 防御性排序 + 去重：确保行号严格升序且无重复（修复"190-201后跳到3"问题）
       const dataRows = Array.from(
         new Set(
-          (filterStatus?.visibleRows || []).filter(
-            (r) => r !== meta.headerRow && r >= meta.dataStartRow,
-          ),
+          filterStatus.visibleRows.filter((r) => r !== meta.headerRow && r >= meta.dataStartRow),
         ),
       ).sort((a, b) => a - b)
       const maxPreview = Math.min(dataRows.length, PANEL_CONFIG.PREVIEW_LIMIT)
@@ -908,8 +913,14 @@ export function refreshData(): void {
       while (i < maxPreview) {
         // 找到连续行段
         let j = i
-        while (j + 1 < maxPreview && dataRows[j + 1] === dataRows[j]! + 1) j++
-        const segStart = dataRows[i]!
+        while (j + 1 < maxPreview) {
+          const next = dataRows[j + 1]
+          const cur = dataRows[j]
+          if (next === undefined || cur === undefined || next !== cur + 1) break
+          j++
+        }
+        const segStart = dataRows[i]
+        if (segStart === undefined) break
         const segLen = j - i + 1
 
         try {
@@ -917,13 +928,14 @@ export function refreshData(): void {
           const startColLetter = colNumToLetter(meta.previewColStartAbsolute)
           const endColLetter = colNumToLetter(meta.previewColStartAbsolute + displayColCount - 1)
           const rangeAddr = ws.Range(
-            `${startColLetter}${segStart}:${endColLetter}${segStart + segLen - 1}`,
+            `${startColLetter}${String(segStart)}:${endColLetter}${String(segStart + segLen - 1)}`,
           )
           const raw = rangeAddr.Value2
           // WPS JS API 返回 0-based 二维数组（raw[0][0] 为第一行第一列）
           const is2D = Array.isArray(raw)
           for (let r = 0; r < segLen; r++) {
-            const dr = dataRows[i + r]!
+            const dr = dataRows[i + r]
+            if (dr === undefined) continue
             const rowCols: string[] = []
             let hasAny = false
             for (let ci = 0; ci < displayColCount; ci++) {
@@ -950,7 +962,8 @@ export function refreshData(): void {
         } catch {
           // 批量读取失败，回退到逐单元格
           for (let r = 0; r < segLen; r++) {
-            const dr = dataRows[i + r]!
+            const dr = dataRows[i + r]
+            if (dr === undefined) continue
             const rowCols: string[] = []
             let hasAny = false
             for (let ci = 0; ci < displayColCount; ci++) {
@@ -991,7 +1004,7 @@ export function refreshData(): void {
 
     bgmLog(
       LOG_LEVELS.INFO,
-      `生成预览行数: ${previewRows.length}, 其中数据行: ${previewRows.filter((p) => !p.isHeader).length}`,
+      `生成预览行数: ${String(previewRows.length)}, 其中数据行: ${String(previewRows.filter((p) => !p.isHeader).length)}`,
     )
 
     if (hasData && !BGM.sheet.isLocked) {
@@ -1009,14 +1022,14 @@ export function refreshData(): void {
       previewBox.innerHTML = sanitizeHtml(
         previewRows.length > 0
           ? renderPreviewTable(previewRows, sheetIndex, sheetName, meta.headerRow)
-          : `<p class="hint">已选择工作表索引: ${sheetIndex} (${escapeHtml(sheetName)})<br>未检测到数据</p>`,
+          : `<p class="hint">已选择工作表索引: ${String(sheetIndex)} (${escapeHtml(sheetName)})<br>未检测到数据</p>`,
       )
     }
     updateFilterStatus(ws)
   } finally {
     if (needRestore) needRestore()
   }
-  bgmLog(LOG_LEVELS.INFO, `refreshData 完成, hasData=${previewBox != null}`)
+  bgmLog(LOG_LEVELS.INFO, `refreshData 完成, hasData=${String(previewBox != null)}`)
 }
 
 export function onSelectModeChange(): void {

@@ -48,7 +48,6 @@ export function refreshEnrichWorkbooks(selectId: string = 'enrichWorkbookSelect'
   for (let i = 1; i <= wbs.Count; i++) {
     const option = document.createElement('option')
     const wb = wbs.Item(i)
-    if (!wb) continue
     option.value = wb.Name
     option.text = wb.Name
 
@@ -70,7 +69,7 @@ export function refreshEnrichWorkbooks(selectId: string = 'enrichWorkbookSelect'
     select.value = ''
   }
 
-  bgmLog(LOG_LEVELS.INFO, `[enrichLock] 刷新工作簿列表: ${wbs.Count} 个`)
+  bgmLog(LOG_LEVELS.INFO, `[enrichLock] 刷新工作簿列表: ${String(wbs.Count)} 个`)
 }
 
 // ========== 刷新工作表列表 ==========
@@ -134,7 +133,6 @@ export function refreshEnrichSheets(
   for (let i = 1; i <= sheets.Count; i++) {
     const option = document.createElement('option')
     const sheet = sheets.Item(i)
-    if (!sheet) continue
     option.value = String(i)
     option.text = sheet.Name
 
@@ -150,7 +148,10 @@ export function refreshEnrichSheets(
     BGM.enrich.lockedSheetIndex = parseInt(select.value, 10) || null
   }
 
-  bgmLog(LOG_LEVELS.INFO, `[enrichLock] 刷新工作表列表: ${wbName} 共 ${sheets.Count} 个工作表`)
+  bgmLog(
+    LOG_LEVELS.INFO,
+    `[enrichLock] 刷新工作表列表: ${wbName} 共 ${String(sheets.Count)} 个工作表`,
+  )
 }
 
 // ========== 切换锁定状态 ==========
@@ -228,7 +229,7 @@ export function updateEnrichLockButton(
   statusId: string = 'enrichLockStatus',
 ): void {
   const btn = document.getElementById(lockBtnId) as HTMLButtonElement | null
-  const status = document.getElementById(statusId) as HTMLElement | null
+  const status = document.getElementById(statusId)
 
   if (btn) {
     if (BGM.enrich.isLocked) {
@@ -243,7 +244,7 @@ export function updateEnrichLockButton(
   if (status) {
     if (BGM.enrich.isLocked) {
       status.style.display = 'inline'
-      status.textContent = `已锁定: ${BGM.enrich.lockedWorkbookName} → ${BGM.enrich.lockedSheetName}`
+      status.textContent = `已锁定: ${BGM.enrich.lockedWorkbookName ?? ''} → ${BGM.enrich.lockedSheetName ?? ''}`
     } else {
       status.style.display = 'none'
     }
@@ -312,7 +313,7 @@ export function restoreEnrichLockedWorkbook(): boolean {
     let sheetFound = false
     for (let i = 1; i <= wb.Worksheets.Count; i++) {
       const ws = wb.Worksheets.Item(i)
-      if (ws && ws.Name === info.sheetName) {
+      if (ws.Name === info.sheetName) {
         sheetFound = true
         break
       }
@@ -360,7 +361,7 @@ export function getLockedEnrichSheet(): [WpsWorkbook, WpsWorksheet] | null {
   if (!wb) {
     bgmLog(
       LOG_LEVELS.WARN,
-      `getLockedEnrichSheet: 锁定的工作簿 "${BGM.enrich.lockedWorkbookName}" 已不存在`,
+      `getLockedEnrichSheet: 锁定的工作簿 "${BGM.enrich.lockedWorkbookName ?? ''}" 已不存在`,
     )
     clearEnrichLock()
     return null
@@ -369,7 +370,7 @@ export function getLockedEnrichSheet(): [WpsWorkbook, WpsWorksheet] | null {
   let ws: WpsWorksheet | null = null
   for (let i = 1; i <= wb.Worksheets.Count; i++) {
     const sheet = wb.Worksheets.Item(i)
-    if (sheet && sheet.Name === BGM.enrich.lockedSheetName) {
+    if (sheet.Name === BGM.enrich.lockedSheetName) {
       ws = sheet
       break
     }
@@ -378,7 +379,7 @@ export function getLockedEnrichSheet(): [WpsWorkbook, WpsWorksheet] | null {
   if (!ws) {
     bgmLog(
       LOG_LEVELS.WARN,
-      `getLockedEnrichSheet: 锁定的工作表 "${BGM.enrich.lockedSheetName}" 已不存在`,
+      `getLockedEnrichSheet: 锁定的工作表 "${BGM.enrich.lockedSheetName ?? ''}" 已不存在`,
     )
     clearEnrichLock()
     return null
@@ -401,7 +402,7 @@ export function findWorkbookByName(name: string | null): WpsWorkbook | null {
 
   for (let i = 1; i <= app.Workbooks.Count; i++) {
     const wb = app.Workbooks.Item(i)
-    if (wb && wb.Name === name) return wb
+    if (wb.Name === name) return wb
   }
   return null
 }
@@ -418,7 +419,7 @@ export function findSheetInWorkbook(wbName: string, sheetName: string): WpsWorks
 
   for (let i = 1; i <= wb.Worksheets.Count; i++) {
     const ws = wb.Worksheets.Item(i)
-    if (ws && ws.Name === sheetName) return ws
+    if (ws.Name === sheetName) return ws
   }
   return null
 }

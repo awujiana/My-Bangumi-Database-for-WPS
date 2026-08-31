@@ -42,7 +42,7 @@ export function initMessageListener(): void {
     if (!ALLOWED_ORIGINS.includes(event.origin)) return
 
     const data = event.data
-    if (!data?.type) return
+    if (!data.type) return
 
     bgmLog(LOG_LEVELS.INFO, `[message] 收到消息: ${data.type}`)
 
@@ -67,7 +67,7 @@ export function initMessageListener(): void {
       case 'BGM:userInfoUpdated':
         bgmLog(
           LOG_LEVELS.INFO,
-          `[message] 收到用户信息更新: username=${data.username}, userId=${data.userId}`,
+          `[message] 收到用户信息更新: username=${data.username ?? ''}, userId=${data.userId ?? ''}`,
         )
         updateUserIdStatus()
         break

@@ -14,7 +14,8 @@ import { bgmLog, getApp } from './index.js'
  */
 export function sleep(ms: number): void {
   try {
-    const app = getApp() as { Wait?: (date: Date) => void; DoEvents?: () => void }
+    const app = getApp() as
+      { Wait?: (date: Date) => void; DoEvents?: () => void } | null | undefined
     if (app?.Wait) {
       const waitTime = new Date(Date.now() + ms)
       app.Wait(waitTime)
@@ -26,7 +27,7 @@ export function sleep(ms: number): void {
   const end = Date.now() + ms
   while (Date.now() < end) {
     try {
-      const app = getApp() as { DoEvents?: () => void }
+      const app = getApp() as { DoEvents?: () => void } | null | undefined
       if (app?.DoEvents) app.DoEvents()
     } catch (e) {
       if (typeof bgmLog === 'function') {

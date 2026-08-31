@@ -137,7 +137,9 @@ function applyAppearance(): void {
     },
     { rootMargin: '-20% 0px -70% 0px' },
   )
-  sections.forEach((section) => observer.observe(section))
+  sections.forEach((section) => {
+    observer.observe(section)
+  })
 }
 
 /**

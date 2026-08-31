@@ -19,7 +19,7 @@ export function getCell(
   col: number,
 ): WpsRange | null {
   if (!ws) return null
-  const address = colNumToLetter(col) + row
+  const address = colNumToLetter(col) + String(row)
   return ws.Range(address)
 }
 
@@ -93,11 +93,13 @@ export function getCellValue(
 ): string {
   if (!ws) return ''
   try {
-    const address = colNumToLetter(col) + row
+    const address = colNumToLetter(col) + String(row)
     const cell = ws.Range(address)
-    if (!cell) return ''
     const raw = getCellRawValue(cell)
-    return raw != null ? String(raw) : ''
+    if (raw == null) return ''
+    // 单元格原始值通常为 string/number/boolean；罕见对象值沿用 String() 的默认转换语义
+    const rawText = raw as string | number | boolean
+    return String(rawText)
   } catch {
     return ''
   }
@@ -115,7 +117,7 @@ export function setCellValue(
   try {
     const cell = getCell(ws, row, col)
     if (!cell) {
-      bgmLog(LOG_LEVELS.ERROR, `setCellValue - 无法获取单元格: (${row}, ${col})`)
+      bgmLog(LOG_LEVELS.ERROR, `setCellValue - 无法获取单元格: (${String(row)}, ${String(col)})`)
       return false
     }
     cell.Value2 = value as WpsCellValue
@@ -130,9 +132,12 @@ export function setCellValue(
  * 获取工作表对象
  */
 export function getSheetByIndex(sheetIndex: number): unknown {
-  const appObj = getApp() as {
-    ActiveWorkbook?: { Sheets?: { Count: number; Item: (i: number) => unknown } }
-  }
+  const appObj = getApp() as
+    | {
+        ActiveWorkbook?: { Sheets?: { Count: number; Item: (i: number) => unknown } }
+      }
+    | null
+    | undefined
   if (!appObj?.ActiveWorkbook?.Sheets) return null
   const sheets = appObj.ActiveWorkbook.Sheets
   if (sheets.Count === 0) return null

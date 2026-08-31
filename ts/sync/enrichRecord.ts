@@ -184,8 +184,8 @@ export function addEnrichRecord(params: AddEnrichRecordParams): void {
 
     const actionColor = getActionColor(params.action)
     const actionColLetter = colNumToLetter(ENRICH_RECORD_COL.ACTION)
-    const actionCell = sheet.Range(`${actionColLetter}${newRow}`)
-    if (actionCell?.Interior) {
+    const actionCell = sheet.Range(`${actionColLetter}${String(newRow)}`)
+    if (actionCell.Interior) {
       actionCell.Interior.Color = actionColor
     }
 
@@ -225,7 +225,9 @@ export function addEnrichRecords(records: AddEnrichRecordParams[]): void {
     const endRow = startRow + newRows.length - 1
     const startColLetter = colNumToLetter(1)
     const endColLetter = colNumToLetter(ENRICH_RECORD_COLUMNS.length)
-    const range = sheet.Range(`${startColLetter}${startRow}:${endColLetter}${endRow}`)
+    const range = sheet.Range(
+      `${startColLetter}${String(startRow)}:${endColLetter}${String(endRow)}`,
+    )
     range.Value2 = newRows
 
     for (let i = 0; i < newRows.length; i++) {
@@ -233,13 +235,13 @@ export function addEnrichRecords(records: AddEnrichRecordParams[]): void {
       const action = newRows[i]?.[ENRICH_RECORD_COL.ACTION - 1] ?? ''
       const color = getActionColor(action)
       const actionColLetter = colNumToLetter(ENRICH_RECORD_COL.ACTION)
-      const cell = sheet.Range(`${actionColLetter}${row}`)
-      if (cell?.Interior) {
+      const cell = sheet.Range(`${actionColLetter}${String(row)}`)
+      if (cell.Interior) {
         cell.Interior.Color = color
       }
     }
 
-    bgmLog(LOG_LEVELS.INFO, `[addEnrichRecords] 批量写入完成：${records.length} 条记录`)
+    bgmLog(LOG_LEVELS.INFO, `[addEnrichRecords] 批量写入完成：${String(records.length)} 条记录`)
   } catch (e: unknown) {
     BGM.handleError(e, { context: 'addEnrichRecords', showAlert: false })
   }
@@ -252,7 +254,7 @@ export function clearEnrichRecords(): void {
       ? sheet.UsedRange.Row + sheet.UsedRange.Rows.Count - 1
       : sheet.Rows.Count
     if (lastRow > 1) {
-      sheet.Range(`2:${lastRow}`).Delete()
+      sheet.Range(`2:${String(lastRow)}`).Delete()
     }
     bgmLog(LOG_LEVELS.INFO, '已清除所有富化记录')
   } catch (e: unknown) {
@@ -288,23 +290,21 @@ export function getAllEnrichRecords(): EnrichRecord[] {
     if (lastRow < 2) return []
 
     const allData = readRangeValues(sheet, 2, lastRow, 1, ENRICH_RECORD_COLUMNS.length)
-    if (!allData || allData.length === 0) return []
+    if (allData.length === 0) return []
 
     const records: EnrichRecord[] = []
     for (const rowData of allData) {
-      if (!rowData) continue
       const record: EnrichRecord = {
-        timestamp: String(rowData[ENRICH_RECORD_COL.TIMESTAMP - 1] ?? ''),
-        matchType: String(
-          rowData[ENRICH_RECORD_COL.MATCH_TYPE - 1] ?? '未匹配',
-        ) as EnrichRecord['matchType'],
-        name: String(rowData[ENRICH_RECORD_COL.NAME - 1] ?? ''),
-        row: parseInt(String(rowData[ENRICH_RECORD_COL.ROW - 1] ?? '0')) || 0,
-        enrichedField: String(rowData[ENRICH_RECORD_COL.ENRICHED_FIELD - 1] ?? ''),
-        oldValue: String(rowData[ENRICH_RECORD_COL.OLD_VALUE - 1] ?? ''),
-        newValue: String(rowData[ENRICH_RECORD_COL.NEW_VALUE - 1] ?? ''),
-        action: String(rowData[ENRICH_RECORD_COL.ACTION - 1] ?? 'skip') as EnrichRecord['action'],
-        note: String(rowData[ENRICH_RECORD_COL.NOTE - 1] ?? ''),
+        timestamp: rowData[ENRICH_RECORD_COL.TIMESTAMP - 1] ?? '',
+        matchType: (rowData[ENRICH_RECORD_COL.MATCH_TYPE - 1] ??
+          '未匹配') as EnrichRecord['matchType'],
+        name: rowData[ENRICH_RECORD_COL.NAME - 1] ?? '',
+        row: parseInt(rowData[ENRICH_RECORD_COL.ROW - 1] ?? '0') || 0,
+        enrichedField: rowData[ENRICH_RECORD_COL.ENRICHED_FIELD - 1] ?? '',
+        oldValue: rowData[ENRICH_RECORD_COL.OLD_VALUE - 1] ?? '',
+        newValue: rowData[ENRICH_RECORD_COL.NEW_VALUE - 1] ?? '',
+        action: (rowData[ENRICH_RECORD_COL.ACTION - 1] ?? 'skip') as EnrichRecord['action'],
+        note: rowData[ENRICH_RECORD_COL.NOTE - 1] ?? '',
       }
       records.push(record)
     }
@@ -327,10 +327,10 @@ export function getEnrichRecordSheetIfExists(): WpsWorksheet | null {
     const wb = app.ActiveWorkbook
     if (!wb) return null
     const sheets = wb.Worksheets
-    const count = sheets?.Count ?? 0
+    const count = sheets.Count
     for (let i = 1; i <= count; i++) {
-      const sheet = sheets?.Item(i)
-      if (sheet && sheet.Name === ENRICH_RECORD_SHEET_NAME) {
+      const sheet = sheets.Item(i)
+      if (sheet.Name === ENRICH_RECORD_SHEET_NAME) {
         return sheet
       }
     }
@@ -346,7 +346,7 @@ export function getEnrichRecordSheetIfExists(): WpsWorksheet | null {
 export function openEnrichRecordSheet(): void {
   try {
     const sheet = getOrCreateEnrichRecordSheet()
-    sheet?.Activate()
+    sheet.Activate()
   } catch (e: unknown) {
     BGM.handleError(e, { context: 'openEnrichRecordSheet', showAlert: true })
   }
@@ -358,7 +358,6 @@ export function openEnrichRecordSheet(): void {
 export function formatEnrichRecordSheet(): void {
   try {
     const sheet = getOrCreateEnrichRecordSheet()
-    if (!sheet) return
 
     const lastCol = ENRICH_RECORD_COLUMNS.length
     const lastRow = getLastRow(sheet)
@@ -368,39 +367,33 @@ export function formatEnrichRecordSheet(): void {
     }
 
     const headerRange = sheet.Range('1:1')
-    if (headerRange) {
-      if (headerRange.Font) {
-        headerRange.Font.Bold = true
-      }
-      if (headerRange.Interior) {
-        headerRange.Interior.Color = BGM_COLOR.GRAY
-      }
-      headerRange.HorizontalAlignment = -4108
+    if (headerRange.Font) {
+      headerRange.Font.Bold = true
     }
+    if (headerRange.Interior) {
+      headerRange.Interior.Color = BGM_COLOR.GRAY
+    }
+    headerRange.HorizontalAlignment = -4108
 
     if (lastRow >= 2) {
-      const dataRange = sheet.Range(`A${2}:${colNumToLetter(lastCol)}${lastRow}`)
-      if (dataRange) {
-        dataRange.Borders.LineStyle = 1
-      }
+      const dataRange = sheet.Range(`A${String(2)}:${colNumToLetter(lastCol)}${String(lastRow)}`)
+      dataRange.Borders.LineStyle = 1
     }
 
     for (let c = 1; c <= lastCol; c++) {
       const colLetter = colNumToLetter(c)
       const colRange = sheet.Range(`${colLetter}:${colLetter}`)
-      if (colRange) {
-        colRange.ColumnWidth = 15
-      }
+      colRange.ColumnWidth = 15
     }
 
     const nameCol = sheet.Range('C:C')
-    if (nameCol) nameCol.ColumnWidth = 25
+    nameCol.ColumnWidth = 25
     const oldValCol = sheet.Range('F:F')
-    if (oldValCol) oldValCol.ColumnWidth = 20
+    oldValCol.ColumnWidth = 20
     const newValCol = sheet.Range('G:G')
-    if (newValCol) newValCol.ColumnWidth = 40
+    newValCol.ColumnWidth = 40
     const noteCol = sheet.Range('I:I')
-    if (noteCol) noteCol.ColumnWidth = 20
+    noteCol.ColumnWidth = 20
   } catch (e: unknown) {
     BGM.handleError(e, { context: 'formatEnrichRecordSheet', showAlert: false })
   }

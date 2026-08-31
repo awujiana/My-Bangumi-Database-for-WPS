@@ -100,7 +100,7 @@ export function autoFillUrls(): AutoFillResult {
 
     bgmLog(
       LOG_LEVELS.INFO,
-      `[autoFillUrls] 表头行: ${headerRow}, 最后数据行: ${lastRow}, URL列: ${urlCol}, 名称列: ${nameCol}`,
+      `[autoFillUrls] 表头行: ${String(headerRow)}, 最后数据行: ${String(lastRow)}, URL列: ${String(urlCol)}, 名称列: ${String(nameCol)}`,
     )
 
     const nameUrlMap = _buildNameUrlMap(ws, headerRow, lastRow, colMap)
@@ -112,7 +112,7 @@ export function autoFillUrls(): AutoFillResult {
       return result
     }
 
-    bgmLog(LOG_LEVELS.INFO, `[autoFillUrls] 已建立 ${mappedKeys} 个名称/别名 → URL 映射`)
+    bgmLog(LOG_LEVELS.INFO, `[autoFillUrls] 已建立 ${String(mappedKeys)} 个名称/别名 → URL 映射`)
 
     for (let row = headerRow + 1; row <= lastRow; row++) {
       const currentUrl = trim(getCellValue(ws, row, urlCol))
@@ -128,7 +128,7 @@ export function autoFillUrls(): AutoFillResult {
       }
     }
 
-    bgmLog(LOG_LEVELS.INFO, `[autoFillUrls] 补全完成: ${result.filled} 行`)
+    bgmLog(LOG_LEVELS.INFO, `[autoFillUrls] 补全完成: ${String(result.filled)} 行`)
   } catch (e: unknown) {
     BGM.handleError(e, { context: 'autoFillUrls', showAlert: true })
   }
@@ -156,13 +156,13 @@ export function showAutoFillUrlDialog(): void {
   }
 
   BGM.Dialog.confirm(
-    `名称列: 第 ${nameCount} 列\nURL列: 第 ${urlCount} 列\n\n将根据已有 URL 的同名条目补全缺失的 URL（也支持别名匹配）。\n确定要继续吗？`,
+    `名称列: 第 ${String(nameCount ?? '')} 列\nURL列: 第 ${String(urlCount ?? '')} 列\n\n将根据已有 URL 的同名条目补全缺失的 URL（也支持别名匹配）。\n确定要继续吗？`,
     (confirmed: boolean) => {
       if (!confirmed) return
       const result = autoFillUrls()
       if (result.filled > 0) {
         BGM.Dialog.alert(
-          `补全完成！\n已建立 ${result.mappedNames} 个名称/别名映射\n补全了 ${result.filled} 行的缺失 URL`,
+          `补全完成！\n已建立 ${String(result.mappedNames)} 个名称/别名映射\n补全了 ${String(result.filled)} 行的缺失 URL`,
           '结果',
         )
       } else {
