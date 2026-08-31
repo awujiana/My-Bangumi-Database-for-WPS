@@ -25,7 +25,7 @@
 - **语言**：TypeScript（strict 模式，ES2022 目标）
 - **构建**：Vite 6（打包 `dist/`）+ `tsc`（编译 `dist-ts/`）
 - **运行环境**：WPS Office JSAPI（ET 加载项），通过 `wpsjs` CLI 调试
-- **代码质量**：ESLint 8 + Prettier 3 + Husky + lint-staged
+- **代码质量**：ESLint 8（含 `@typescript-eslint/strict-type-checked` 类型检查档，全量 0 error）+ Prettier 3 + Husky + lint-staged
 - **测试**：Vitest 4（含 `@vitest/coverage-v8`）
 - **运行时依赖**：`zod`（数据校验）、`dompurify`（HTML 净化）
 - **构建期依赖**：`@napi-rs/canvas` / `@resvg/resvg-js`（图像导出）
@@ -114,7 +114,7 @@ npm run build:ts                 # tsc --project tsconfig.build.json → dist-ts
 ```
 
 - **调试入口**：WPS 启动时加载 `index.html`，`main.js` 完成 Ribbon 早期占位；TypeScript 模块就绪后由 `ts/ribbon.ts` 通过 `window._bgmRibbonReady` 替换真实实现并 `Invalidate` 刷新图标。
-- 若仅需 Vite 开发服务器（`npm run dev`，端口 `3889`）：**生产构建与 WPS 加载仍使用 `npm run debug` / `npm run build`**，Vite dev server 仅用于前端资源调试，不代表最终加载行为。
+- 若仅需 Vite 开发服务器（`npm run dev`，端口 `5173`）：**生产构建与 WPS 加载仍使用 `npm run debug` / `npm run build`**，Vite dev server 仅用于前端资源调试，不代表最终加载行为。`dev` 端口已与 wpsjs 调试端口（`3889`）错开，避免冲突。
 
 ---
 
