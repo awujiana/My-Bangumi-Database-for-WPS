@@ -239,9 +239,9 @@ function handlePreviewBodyClick(e: Event): void {
 }
 
 // 从映射表中提取标准中文状态列表（过滤数字和英文）
-const VALID_STATUSES = Object.keys(WATCH_STATUS_MAP)
-  .filter((key) => /^[\u4e00-\u9fa5]+$/.test(key)) // 只保留纯中文
-  .filter((key, idx, arr) => arr.indexOf(key) === idx) // 去重
+const VALID_STATUSES = new Set(Object.keys(WATCH_STATUS_MAP)
+  .filter((key) => /^[\u4E00-\u9FA5]+$/.test(key)) // 只保留纯中文
+  .filter((key, idx, arr) => arr.indexOf(key) === idx)) // 去重
 
 /**
  * 将非标准状态文本标准化（如 "是" → "看过"）
@@ -497,7 +497,7 @@ export async function previewSyncContent(): Promise<void> {
     const statusMap = new Map<string, number>()
     body.querySelectorAll<HTMLElement>('.detail-item').forEach((item) => {
       const s = item.dataset.status
-      if (s && VALID_STATUSES.includes(s)) {
+      if (s && VALID_STATUSES.has(s)) {
         // 只统计有效标准状态
         statusMap.set(s, (statusMap.get(s) || 0) + 1)
       }
@@ -572,17 +572,9 @@ export async function previewSyncContent(): Promise<void> {
       }
 
       // 根据位置显示/隐藏按钮
-      if (scrollTop <= 10) {
-        scrollTopBtn?.classList.add('hidden')
-      } else {
-        scrollTopBtn?.classList.remove('hidden')
-      }
+      scrollTopBtn?.classList.toggle('hidden', scrollTop <= 10);
 
-      if (scrollTop >= maxScroll - 10) {
-        scrollBottomBtn?.classList.add('hidden')
-      } else {
-        scrollBottomBtn?.classList.remove('hidden')
-      }
+      scrollBottomBtn?.classList.toggle('hidden', scrollTop >= maxScroll - 10);
     }
 
     // 初始化按钮可见性

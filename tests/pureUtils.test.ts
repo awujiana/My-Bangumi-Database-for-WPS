@@ -140,7 +140,7 @@ describe('pureUtils', () => {
     })
 
     it('空白字符串返回空数组', () => {
-      expect(buildTagsArray('   ')).toEqual([])
+      expect(buildTagsArray(' '.repeat(3))).toEqual([])
     })
 
     it('标签包含空格时会被 trim', () => {

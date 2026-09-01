@@ -178,7 +178,7 @@ describe('parseRemoteContent 边界情况', () => {
   })
 
   it('纯空行返回空数组', () => {
-    expect(parseRemoteContent('\n\n\n')).toEqual([])
+    expect(parseRemoteContent('\n'.repeat(3))).toEqual([])
   })
 
   it('单行 CSV', () => {

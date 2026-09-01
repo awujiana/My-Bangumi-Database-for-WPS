@@ -83,12 +83,15 @@ function getCountColor(count: number): number {
  */
 function getStatusColor(status: string): number {
   switch (status) {
-    case SYNC_STATUS.FAIL:
+    case SYNC_STATUS.FAIL: {
       return BGM_COLOR.FAIL
-    case SYNC_STATUS.SKIP:
+    }
+    case SYNC_STATUS.SKIP: {
       return BGM_COLOR.SKIP
-    default:
+    }
+    default: {
       return BGM_COLOR.SUCCESS
+    }
   }
 }
 

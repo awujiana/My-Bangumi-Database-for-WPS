@@ -37,6 +37,34 @@ const SAFE_UNICORN_FIXERS = new Set([
     'catch-error-name',
     // \uXXXX → \u{XXXX} 转义规范化，码点值不变（surrogate pair 由 fixer 正确合并）
     'prefer-unicode-code-point-escapes',
+
+    // ===== 值保持的安全重写（fixer 自动清零，不改类型/引用/行为）=====
+    // 以下均为 unicorn 规则，在 --fix 模式（isFix）下从 UNSAFE_FIX_RULES 移出，
+    // 进入 allRulesAsError 展开 → 作为 error 带 fixer 参与自动修复；gate 模式仍 error 门禁。
+    // 每个规则的 autofix 都只做**等价重写**（返回类型与运行时行为均不变）。
+    // 已排除会引发行为/语义变化的规则：prefer-code-point（surrogate 码元差异）、
+    // no-useless-undefined（删除赋值会改变变量值）、prefer-number-is-safe-integer
+    // （≥2^53 时结果不同）、prefer-type-error（改变抛出错误子类）、throw-new-error
+    // （BGMError/BGMAlert 是普通函数非构造器，加 new 触发 TS7009）、prefer-export-from
+    // （会删除向后兼容 re-export 并剥离 import 名，破坏公共 API）、
+    // prefer-dom-node-html-methods（其 fixer 把 `.innerHTML` **读取**改成 `.getHTML()`，
+    // 而 getHTML 是 WPS webview Chromium 与 jsdom 均缺失的新 DOM API，实测 23 个测试
+    // TypeError: div.getHTML is not a function）。
+    'switch-case-braces',                     // case 体加 {}（值保持）
+    'prefer-string-repeat',                   // 'x'.repeat(n) 等价重写
+    'prefer-dom-node-replace-children',       // el.innerHTML = '' → el.replaceChildren()
+    'prefer-includes-over-repeated-comparisons', // x===a||x===b → [a,b].includes(x)
+    'prefer-set-has',                         // set.has 等价重写
+    'no-new-array',                           // new Array(n) → Array(n)
+    'prefer-regexp-test',                     // str.match(/re/) → /re/.test(str)
+    'no-base-to-string',                      // '' + x → String(x)
+    'no-typeof-undefined',                    // typeof x === 'undefined' → x === undefined
+    'prefer-classlist-toggle',                 // add/remove 分支 → classList.toggle(c, cond)
+    'prefer-location-assign',                 // location.href = x → location.assign(x)
+    'prefer-math-min-max',                    // Math.min(a,b) 合并
+    'prefer-array-from-map',                  // [...map].map(fn) → Array.from(map, fn)
+    'explicit-length-check',                  // arr.length > 0 → arr.length（truthy 等价）
+    'escape-case',                            // \xXX → \u00XX（码点等价）
 ])
 const UNSAFE_FIX_RULES = new Set([
     // unicorn 整组减去安全 fixer 子集：

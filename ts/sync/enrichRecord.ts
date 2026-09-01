@@ -71,16 +71,21 @@ export interface AddEnrichRecordParams {
 
 export function getActionColor(action: string): number {
   switch (action) {
-    case 'fill':
+    case 'fill': {
       return BGM_COLOR.SUCCESS
-    case 'append':
+    }
+    case 'append': {
       return 0xffff80
-    case 'skip':
+    }
+    case 'skip': {
       return BGM_COLOR.SKIP
-    case 'error':
+    }
+    case 'error': {
       return BGM_COLOR.FAIL
-    default:
+    }
+    default: {
       return BGM_COLOR.GRAY
+    }
   }
 }
 

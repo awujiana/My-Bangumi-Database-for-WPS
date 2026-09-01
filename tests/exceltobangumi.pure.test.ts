@@ -48,7 +48,7 @@ describe('isBangumiUrl', () => {
 
   it('应拒绝空字符串与纯空白', () => {
     expect(isBangumiUrl('')).toBe(false)
-    expect(isBangumiUrl('   ')).toBe(false)
+    expect(isBangumiUrl(' '.repeat(3))).toBe(false)
   })
 })
 
@@ -79,7 +79,7 @@ describe('extractSubjectId', () => {
 
   it('应处理空输入与空白', () => {
     expect(extractSubjectId('')).toBe(null)
-    expect(extractSubjectId('   ')).toBe(null)
+    expect(extractSubjectId(' '.repeat(3))).toBe(null)
     expect(extractSubjectId(null as unknown as string)).toBe(null)
     expect(extractSubjectId(undefined as unknown as string)).toBe(null)
   })

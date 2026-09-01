@@ -485,7 +485,7 @@ export function detectHeaderAndColumns(
     }
   }
   // 预览结束列为表头最大列，若实际数据超出表头范围则以表头为准
-  const previewColEnd = actualLastCol > headerLastCol ? headerLastCol : actualLastCol
+  const previewColEnd = Math.min(actualLastCol, headerLastCol)
 
   return {
     headerRow,

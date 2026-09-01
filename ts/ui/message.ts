@@ -47,32 +47,39 @@ export function initMessageListener(): void {
     bgmLog(LOG_LEVELS.INFO, `[message] 收到消息: ${data.type}`)
 
     switch (data.type) {
-      case 'showAlert':
+      case 'showAlert': {
         showAlert(data.message || '', data.title)
         break
-      case 'showConfirm':
+      }
+      case 'showConfirm': {
         showConfirm(data.message || '', (confirmed) => {
           if (confirmed) BGM.sync.startSync()
         })
         break
-      case 'updateToken':
+      }
+      case 'updateToken': {
         updateTokenStatus()
         break
-      case 'refreshSheets':
+      }
+      case 'refreshSheets': {
         refreshSheets()
         break
-      case 'refreshData':
+      }
+      case 'refreshData': {
         refreshData()
         break
-      case 'BGM:userInfoUpdated':
+      }
+      case 'BGM:userInfoUpdated': {
         bgmLog(
           LOG_LEVELS.INFO,
           `[message] 收到用户信息更新: username=${data.username ?? ''}, userId=${data.userId ?? ''}`,
         )
         updateUserIdStatus()
         break
-      default:
+      }
+      default: {
         bgmLog(LOG_LEVELS.WARN, `[message] 未知消息类型: ${data.type}`)
+      }
     }
   }
 

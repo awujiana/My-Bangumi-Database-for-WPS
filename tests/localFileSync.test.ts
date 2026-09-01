@@ -263,7 +263,7 @@ describe('LocalFileSyncSource.validateConfig', () => {
 describe('readLocalFileContent', () => {
   it('空路径抛出错误', async () => {
     await expect(readLocalFileContent('')).rejects.toThrow(/路径不能为空/)
-    await expect(readLocalFileContent('   ')).rejects.toThrow(/路径不能为空/)
+    await expect(readLocalFileContent(' '.repeat(3))).rejects.toThrow(/路径不能为空/)
   })
 
   it('成功读取文件内容（status=0）', async () => {

@@ -277,7 +277,7 @@ afterEach(() => {
   vi.clearAllTimers()
   vi.clearAllMocks()
   // 清理 DOM
-  document.body.innerHTML = ''
+  document.body.replaceChildren();
 })
 
 afterAll(() => {
@@ -595,7 +595,7 @@ describe('setupButtonListeners', () => {
   })
 
   it('空 DOM 不应抛错', () => {
-    document.body.innerHTML = ''
+    document.body.replaceChildren();
     expect(() => setupButtonListeners()).not.toThrow()
   })
 

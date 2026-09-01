@@ -365,9 +365,10 @@ export function filterByTime(
     if (isNaN(year) || isNaN(month)) return false
 
     switch (filter.range) {
-      case 'year':
+      case 'year': {
         // 按年份筛选：匹配给定年份的任意月份
         return year === filter.year
+      }
 
       case 'quarter': {
         // 按季度筛选
@@ -379,12 +380,14 @@ export function filterByTime(
         return year === filter.year
       }
 
-      case 'month':
+      case 'month': {
         // 按月份筛选
         return year === filter.year && month === (filter.month ?? 1)
+      }
 
-      default:
+      default: {
         return false
+      }
     }
   })
 }
@@ -418,8 +421,9 @@ function matchTimeFilter(dateStr: string, filter: SyncTimeFilter): boolean {
   if (isNaN(year) || isNaN(month)) return false
 
   switch (filter.range) {
-    case 'year':
+    case 'year': {
       return year === filter.year
+    }
     case 'quarter': {
       const qMonths = QUARTER_MONTH_RANGES[filter.quarter ?? 1]
       if (!qMonths) return false
@@ -427,10 +431,12 @@ function matchTimeFilter(dateStr: string, filter: SyncTimeFilter): boolean {
       if (month === 12) return year === filter.year - 1
       return year === filter.year
     }
-    case 'month':
+    case 'month': {
       return year === filter.year && month === (filter.month ?? 1)
-    default:
+    }
+    default: {
       return true
+    }
   }
 }
 

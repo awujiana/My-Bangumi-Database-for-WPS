@@ -232,11 +232,11 @@ describe('BroadcastChannel 跨 WebView 通信', () => {
 
     it('应接受同源消息', () => {
       const channel = new MockBroadcastChannel('BGM-config')
-      const allowedOrigins = [window.location.origin, 'null']
+      const allowedOrigins = new Set([window.location.origin, 'null'])
       let messageAccepted = false
 
       channel.onmessage = (event: MessageEvent) => {
-        if (allowedOrigins.includes(event.origin)) {
+        if (allowedOrigins.has(event.origin)) {
           messageAccepted = true
         }
       }
@@ -253,11 +253,11 @@ describe('BroadcastChannel 跨 WebView 通信', () => {
 
     it('应拒绝非法 origin 的消息', () => {
       const channel = new MockBroadcastChannel('BGM-config')
-      const allowedOrigins = [window.location.origin, 'null']
+      const allowedOrigins = new Set([window.location.origin, 'null'])
       let messageAccepted = false
 
       channel.onmessage = (event: MessageEvent) => {
-        if (allowedOrigins.includes(event.origin)) {
+        if (allowedOrigins.has(event.origin)) {
           messageAccepted = true
         }
       }

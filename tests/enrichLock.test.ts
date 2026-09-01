@@ -184,7 +184,7 @@ beforeEach(() => {
   }
 
   // 清理 DOM
-  document.body.innerHTML = ''
+  document.body.replaceChildren();
 })
 
 afterEach(() => {
@@ -312,7 +312,7 @@ describe('refreshEnrichSheets', () => {
   it('未指定工作簿名称时使用下拉框值', () => {
     setupBasicDom()
     const wbSelect = document.getElementById('workbookSelect') as HTMLSelectElement
-    wbSelect.innerHTML = ''
+    wbSelect.replaceChildren();
     const opt = document.createElement('option')
     opt.value = 'wb1.xlsx'
     opt.textContent = 'wb1.xlsx'
@@ -384,7 +384,7 @@ describe('toggleEnrichWorkbookLock', () => {
   it('选择工作表后锁定', () => {
     setupBasicDom()
     const wbSelect = document.getElementById('workbookSelect') as HTMLSelectElement
-    wbSelect.innerHTML = ''
+    wbSelect.replaceChildren();
     const wbOpt = document.createElement('option')
     wbOpt.value = 'wb1.xlsx'
     wbOpt.textContent = 'wb1.xlsx'
@@ -392,7 +392,7 @@ describe('toggleEnrichWorkbookLock', () => {
     wbSelect.value = 'wb1.xlsx'
 
     const sheetSelect = document.getElementById('sheetSelect') as HTMLSelectElement
-    sheetSelect.innerHTML = ''
+    sheetSelect.replaceChildren();
     const sheetOpt = document.createElement('option')
     sheetOpt.value = '2'
     sheetOpt.textContent = 'TargetSheet'

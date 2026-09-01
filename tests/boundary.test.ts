@@ -177,7 +177,7 @@ describe('空值边界', () => {
     })
 
     it('纯空白字符串返回空字符串', () => {
-      expect(trim('   ')).toBe('')
+      expect(trim(' '.repeat(3))).toBe('')
       expect(trim('\t\t')).toBe('')
       expect(trim('\n\n')).toBe('')
     })
@@ -204,7 +204,7 @@ describe('空值边界', () => {
     })
 
     it('纯空白返回 false', () => {
-      expect(isBangumiUrl('   ')).toBe(false)
+      expect(isBangumiUrl(' '.repeat(3))).toBe(false)
     })
 
     it('null 不抛错（类型断言后）', () => {
@@ -222,7 +222,7 @@ describe('空值边界', () => {
     })
 
     it('纯空白返回 null', () => {
-      expect(extractSubjectId('   ')).toBe(null)
+      expect(extractSubjectId(' '.repeat(3))).toBe(null)
     })
 
     it('null 不抛错（类型断言后）', () => {
@@ -240,7 +240,7 @@ describe('空值边界', () => {
     })
 
     it('纯空白返回 1（默认想看）', () => {
-      expect(mapWatchStatus('   ')).toBe(1)
+      expect(mapWatchStatus(' '.repeat(3))).toBe(1)
     })
   })
 

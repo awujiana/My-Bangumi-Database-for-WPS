@@ -1099,10 +1099,7 @@ export function ensureBangumiColumns(
     const headerRange = sheet.Range(
       `${WpsCellRef(headerRow, maxCol + 1)}:${WpsCellRef(headerRow, maxCol + missing.length)}`,
     )
-    const headers: string[][] = []
-    for (const m of missing) {
-      headers.push([m.field])
-    }
+    const headers: string[][] = Array.from(missing, m => [m.field]);
     headerRange.Value = headers
 
     // 应用样式到新列

@@ -337,9 +337,10 @@ export function OnAction(control: { Id: string }): boolean {
   bgmLog(LOG_LEVELS.INFO, `[BGM] OnAction: ${control.Id}`)
   try {
     switch (control.Id) {
-      case 'btnShowPanel':
+      case 'btnShowPanel': {
         showBangumiPanel()
         break
+      }
       case 'btnSyncBangumi': {
         // syncWithConfirmation 是 async 函数，需要 .catch() 防止未处理的 Promise rejection
         syncWithConfirmation().catch((error: unknown) => {
@@ -355,9 +356,10 @@ export function OnAction(control: { Id: string }): boolean {
         })
         break
       }
-      case 'btnSetToken':
+      case 'btnSetToken': {
         setTokenForRibbon()
         break
+      }
       case 'btnTestToken': {
         // testTokenForRibbon 是 async 函数，需 .catch() 防止未处理 rejection
         testTokenForRibbon().catch((error: unknown) => {
@@ -388,12 +390,14 @@ export function OnAction(control: { Id: string }): boolean {
         })
         break
       }
-      case 'btnSetUserId':
+      case 'btnSetUserId': {
         setUserIdForRibbon()
         break
-      case 'btnOpenCollection':
+      }
+      case 'btnOpenCollection': {
         openCollectionForRibbon()
         break
+      }
       case 'btnSyncFromGithub': {
         // syncFromGithubForRibbon 是 async 函数，需 .catch() 防止未处理 rejection
         syncFromGithubForRibbon().catch((error: unknown) => {
@@ -424,14 +428,17 @@ export function OnAction(control: { Id: string }): boolean {
         })
         break
       }
-      case 'btnOpenSettings':
+      case 'btnOpenSettings': {
         showSettingsPanel()
         break
-      case 'btnOpenEnrichPanel':
+      }
+      case 'btnOpenEnrichPanel': {
         showEnrichPanel()
         break
-      default:
+      }
+      default: {
         bgmLog(LOG_LEVELS.WARN, `[BGM] 未知按钮: ${control.Id}`)
+      }
     }
   } catch (error: unknown) {
     BGM.handleError(error, { showAlert: true, level: BGM.ErrorLevel.ERROR, context: 'Ribbon OnAction' })

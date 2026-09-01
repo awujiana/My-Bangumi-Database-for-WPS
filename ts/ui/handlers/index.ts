@@ -207,50 +207,61 @@ function trackedEventBusOn<T = unknown>(eventName: string, handler: EventHandler
 
 export function onAction(action: string): void {
   switch (action) {
-    case 'sync':
+    case 'sync': {
       void syncFromPanel()
       break
-    case 'clear':
+    }
+    case 'clear': {
       showConfirm(_T.confirmClearMarks, (confirmed) => {
         if (confirmed) {
           if (typeof refreshData === 'function') refreshData()
         }
       })
       break
-    case 'setToken':
+    }
+    case 'setToken': {
       showTokenDialog(loadBgToken() || '')
       break
-    case 'preview':
+    }
+    case 'preview': {
       if (typeof previewSyncContent === 'function') void previewSyncContent()
       break
-    case 'showUserIdDialog':
+    }
+    case 'showUserIdDialog': {
       showUserIdDialog()
       break
-    case 'showClearConfirm':
+    }
+    case 'showClearConfirm': {
       showConfirm(_T.confirmClearMarks, (confirmed) => {
         if (confirmed) {
           if (typeof refreshData === 'function') refreshData()
         }
       })
       break
-    case 'tokenUpdated':
+    }
+    case 'tokenUpdated': {
       updateTokenStatus()
       break
-    case 'userIdUpdated':
+    }
+    case 'userIdUpdated': {
       updateUserIdStatus()
       break
-    case 'requestStopSync':
+    }
+    case 'requestStopSync': {
       bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 用户请求停止同步')
       BGM.sync.requestStop()
       break
-    case 'pauseSync':
+    }
+    case 'pauseSync': {
       bgmLog(LOG_LEVELS.INFO, '用户请求暂停同步')
       BGM.sync.pause()
       break
-    case 'resumeSync':
+    }
+    case 'resumeSync': {
       bgmLog(LOG_LEVELS.INFO, '用户请求恢复同步')
       BGM.sync.resume()
       break
+    }
   }
 }
 
@@ -1752,7 +1763,7 @@ function renderLogEntries(): void {
   const filterSelect = document.getElementById('logLevelFilter') as HTMLSelectElement | null
   const level = filterSelect?.value || undefined
   const logs = getRecentLogs(level as LogLevel | undefined, 100)
-  body.innerHTML = ''
+  body.replaceChildren();
   if (logs.length === 0) {
     body.textContent = '暂无日志'
     return
@@ -1940,12 +1951,13 @@ function setupMessageListener(): void {
       bgmLog(LOG_LEVELS.INFO, `[handlers] 收到消息: ${JSON.stringify(msg)}`)
 
       switch (msg.type) {
-        case 'BGM:tokenUpdated':
+        case 'BGM:tokenUpdated': {
           bgmLog(LOG_LEVELS.INFO, '[handlers] 收到 Token 更新通知')
           updateTokenStatus()
           updateUserIdStatus()
           break
-        case 'BGM:userIdUpdated':
+        }
+        case 'BGM:userIdUpdated': {
           bgmLog(LOG_LEVELS.INFO, `[handlers] 收到用户ID更新通知: ${String(msg.userId)}`)
           if (msg.userId) {
             BGM.cache.userId = msg.userId
@@ -1954,7 +1966,8 @@ function setupMessageListener(): void {
           }
           updateUserIdStatus()
           break
-        case 'BGM:userInfoUpdated':
+        }
+        case 'BGM:userInfoUpdated': {
           bgmLog(
             LOG_LEVELS.INFO,
             `[handlers] 收到用户信息更新通知: 用户名=${String(msg.username)}, 用户ID=${String(msg.userId)}`,
@@ -1974,8 +1987,9 @@ function setupMessageListener(): void {
           }
           updateUserIdStatus()
           break
+        }
         case 'tokenUpdated':
-        case 'userIdUpdated':
+        case 'userIdUpdated': {
           // 兼容旧格式
           if (msg.type === 'tokenUpdated') {
             updateTokenStatus()
@@ -1983,6 +1997,7 @@ function setupMessageListener(): void {
             updateUserIdStatus()
           }
           break
+        }
       }
     }
     window.addEventListener('message', _messageHandler)

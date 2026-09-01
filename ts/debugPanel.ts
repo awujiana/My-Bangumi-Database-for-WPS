@@ -61,7 +61,7 @@ const LOG_FILTERS: readonly { label: string; level: string | undefined }[] = [
 
 /** 检测是否为调试环境（无 WpsInvoke 即为开发服务器） */
 function isDebugEnvironment(): boolean {
-  return typeof (window as unknown as { WpsInvoke?: unknown }).WpsInvoke === 'undefined'
+  return (window as unknown as { WpsInvoke?: unknown }).WpsInvoke === undefined
 }
 
 // ========== 状态读取 ==========
@@ -464,11 +464,11 @@ function buildEnvPanelHTML(): string {
     {
       label: 'WpsInvoke',
       value:
-        typeof (w as unknown as { WpsInvoke?: unknown }).WpsInvoke === 'undefined'
+        (w as unknown as { WpsInvoke?: unknown }).WpsInvoke === undefined
           ? 'undefined (开发模式)'
           : 'available',
       cls:
-        typeof (w as unknown as { WpsInvoke?: unknown }).WpsInvoke === 'undefined'
+        (w as unknown as { WpsInvoke?: unknown }).WpsInvoke === undefined
           ? 'bgm-dp-env-value-warn'
           : 'bgm-dp-env-value-ok',
     },
@@ -763,7 +763,7 @@ function bindEnvActions(root: HTMLElement): void {
   const clearCacheBtn = root.querySelector<HTMLElement>('#bgm-dp-clear-cache')
   clearCacheBtn?.addEventListener('click', () => {
     // 添加 cache-busting 参数强制刷新
-    window.location.href = `${window.location.origin + window.location.pathname}?bust=${String(Date.now())}`
+    window.location.assign(`${window.location.origin + window.location.pathname}?bust=${String(Date.now())}`)
   })
 
   const exportReportBtn = root.querySelector<HTMLElement>('#bgm-dp-export-report')

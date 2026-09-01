@@ -182,20 +182,27 @@ describe('buildJsonlFromSheet', () => {
     mockGetCellValue.mockImplementation((_ws: unknown, row: number, col: number) => {
       if (row === 2) {
         switch (col) {
-          case 1:
+          case 1: {
             return 'https://bgm.tv/subject/99999'
-          case 2:
+          }
+          case 2: {
             return '完整动漫'
-          case 3:
+          }
+          case 3: {
             return '治愈|日常'
-          case 4:
+          }
+          case 4: {
             return '24'
-          case 5:
+          }
+          case 5: {
             return '2024年01月01日'
-          case 6:
+          }
+          case 6: {
             return '2024年12月31日'
-          case 7:
+          }
+          case 7: {
             return '新海诚'
+          }
         }
       }
       return ''

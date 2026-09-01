@@ -137,7 +137,7 @@ let _lastUserIdSnapshot: string | null | undefined
 
 export function updateUserIdStatus(): void {
   const userIdStatusEls = document.querySelectorAll<HTMLElement>('#userIdStatus')
-  if (!userIdStatusEls.length) return
+  if (userIdStatusEls.length === 0) return
 
   const userId = _getBgmUserId()
   const username = _getBgmUsername()

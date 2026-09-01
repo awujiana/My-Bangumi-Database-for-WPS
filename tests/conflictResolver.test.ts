@@ -28,7 +28,7 @@ const SAMPLE_CONFLICTS: Conflict[] = [
 
 /** 每个测试前清理 body，避免上次测试残留 */
 beforeEach((): void => {
-  document.body.innerHTML = ''
+  document.body.replaceChildren();
 })
 
 // ========== 测试用例 ==========

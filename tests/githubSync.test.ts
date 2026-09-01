@@ -1356,7 +1356,7 @@ describe('applyDiffToSheet', () => {
     const mockRangeDelete = vi.fn()
     mockWs.Range = vi.fn((address: string) => {
       if (address.includes(':')) {
-        if (/^\d+:\d+$/.exec(address)) {
+        if (/^\d+:\d+$/.test(address)) {
           // 行地址（如 "3:3"）
           return { Value2: null, Delete: mockRangeDelete, Interior: { Color: 0 } }
         }
@@ -2989,7 +2989,7 @@ describe('applyDiffToSheet 删除操作处理 (lines 1118-1125)', () => {
     // 覆盖 Range mock，为行地址添加 Delete 方法
     const originalRange = mockWs.Range
     mockWs.Range = vi.fn((address: string) => {
-      if (/^\d+:\d+$/.exec(address)) {
+      if (/^\d+:\d+$/.test(address)) {
         return { Delete: vi.fn(), Value2: null, Interior: { Color: 0 } }
       }
       return originalRange(address)
@@ -3036,7 +3036,7 @@ describe('applyDiffToSheet 删除操作处理 (lines 1118-1125)', () => {
     const mockWs = createMockWorksheet()
     // 模拟 Delete 抛异常 — 行地址匹配时返回带 Delete 方法的对象，但 Delete 抛异常
     mockWs.Range = vi.fn((address: string) => {
-      if (/^\d+:\d+$/.exec(address)) {
+      if (/^\d+:\d+$/.test(address)) {
         // 行地址：返回带 Delete 的对象，但 Delete 抛异常
         return {
           Delete: vi.fn(() => {

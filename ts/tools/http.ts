@@ -13,7 +13,7 @@ import type { ZodSchema } from './zodCompat.js'
 export type HttpMethod = 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH'
 export type SyncProgressCallback = (current: number, total: number, message: string) => void
 
-const VALID_METHODS: HttpMethod[] = ['GET', 'POST', 'PUT', 'DELETE', 'PATCH']
+const VALID_METHODS = new Set<HttpMethod>(['GET', 'POST', 'PUT', 'DELETE', 'PATCH'])
 
 // ========== 内部工具函数 ==========
 
@@ -22,7 +22,7 @@ const VALID_METHODS: HttpMethod[] = ['GET', 'POST', 'PUT', 'DELETE', 'PATCH']
  */
 function validateMethod(method: string): HttpMethod {
   const upper = method.toUpperCase() as HttpMethod
-  if (!VALID_METHODS.includes(upper)) {
+  if (!VALID_METHODS.has(upper)) {
     throw new BgmError(`无效的 HTTP 方法: ${method}`, 'INVALID_METHOD')
   }
   return upper

@@ -407,10 +407,11 @@ export const BGM: {
       }
       {
         switch (type) {
-          case 'error':
+          case 'error': {
             this.error(title, message)
             break
-          case 'confirm':
+          }
+          case 'confirm': {
             this.confirm(
               message,
               (confirmed) => {
@@ -420,11 +421,14 @@ export const BGM: {
               title,
             )
             break
-          case 'input':
+          }
+          case 'input': {
             this.input(title, message, options?.defaultValue, options?.onOk, options?.onCancel)
             break
-          default:
+          }
+          default: {
             this.alert(title, message)
+          }
         }
       }
     },
@@ -477,20 +481,24 @@ export const BGM: {
     }
 
     switch (opts.level) {
-      case ErrorLevel.SILENT:
+      case ErrorLevel.SILENT: {
         break
-      case ErrorLevel.WARN:
+      }
+      case ErrorLevel.WARN: {
         bgmLog(LOG_LEVELS.WARN, bgmError.toString())
         break
-      case ErrorLevel.ERROR:
+      }
+      case ErrorLevel.ERROR: {
         bgmLog(LOG_LEVELS.ERROR, bgmError.toString())
         if (opts.showAlert) {
           BGM.showAlert('错误', bgmError.message)
         }
         break
-      case ErrorLevel.THROW:
+      }
+      case ErrorLevel.THROW: {
         bgmLog(LOG_LEVELS.ERROR, bgmError.toString())
         throw bgmError
+      }
     }
 
     return bgmError
@@ -558,20 +566,25 @@ export function bgmLog(level: number, message: string | null | undefined): void 
     // 0=DEBUG, 1=INFO, 2=WARN, 3=ERROR（与 LOG_LEVELS 保持一致）
     // 通过 logger 输出，message 会自动经过 maskSensitiveData 脱敏
     switch (level) {
-      case 0:
+      case 0: {
         logger.debug(msg)
         break
-      case 1:
+      }
+      case 1: {
         logger.info(msg)
         break
-      case 2:
+      }
+      case 2: {
         logger.warn(msg)
         break
-      case 3:
+      }
+      case 3: {
         logger.error(msg)
         break
-      default:
+      }
+      default: {
         logger.info(msg)
+      }
     }
   }
 }
@@ -584,13 +597,13 @@ function getCallerFunctionName(_skipAdditional = 0): string {
   const stack = e.stack || ''
   const lines = stack.split('\n')
   // 需要跳过的内部函数名列表
-  const internalFuncs = [
+  const internalFuncs = new Set([
     'getCallerFunctionName',
     'handleError',
     'safeExecute',
     'BGM.handleError',
     'BGM.safeExecute',
-  ]
+  ])
 
   for (let i = 2; i < lines.length; i += 1) {
     const rawLine = lines[i]
@@ -599,7 +612,7 @@ function getCallerFunctionName(_skipAdditional = 0): string {
     const match = /at\s+([^\s(]+)/.exec(line)
     if (match) {
       const name = match[1]
-      if (name !== undefined && !internalFuncs.includes(name)) {
+      if (name !== undefined && !internalFuncs.has(name)) {
         return name
       }
     }

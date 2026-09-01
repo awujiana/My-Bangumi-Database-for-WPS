@@ -685,7 +685,7 @@ export function showSyncProgressDialog(
       configEl.innerHTML = renderConfigSummary(config)
       configEl.style.display = ''
     } else {
-      configEl.innerHTML = ''
+      configEl.replaceChildren();
       configEl.style.display = 'none'
     }
   }

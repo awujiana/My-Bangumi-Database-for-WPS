@@ -409,7 +409,7 @@ function renderBatchFileList(): void {
   if (listEl) {
     if (n === 0) {
       listEl.style.display = 'none'
-      listEl.innerHTML = ''
+      listEl.replaceChildren();
     } else {
       const rows = state.batchFiles.map((filePath, index) => {
         const fileName = extractFileName(filePath)
@@ -820,22 +820,26 @@ function renderMatchResultsToTable(matches: MatchResult[]): void {
     let statusClass = 'match-status'
     let statusText = ''
     switch (m.matchType) {
-      case 'exact':
+      case 'exact': {
         statusClass += ' status-exact'
         statusText = '✅ 精确'
         break
-      case 'alias':
+      }
+      case 'alias': {
         statusClass += ' status-alias'
         statusText = '🔄 别名'
         break
-      case 'unmatched':
+      }
+      case 'unmatched': {
         statusClass += ' status-unmatched'
         statusText = '❌ 未匹配'
         break
-      case 'error':
+      }
+      case 'error': {
         statusClass += ' status-error'
         statusText = '⚠️ 错误'
         break
+      }
     }
 
     const bangumiRow = m.bangumiRow ? String(m.bangumiRow) : '-'
@@ -1190,22 +1194,26 @@ export function renderMatchResults(container: HTMLElement | null, matches: Match
     let statusClass = ''
     let statusText = ''
     switch (m.matchType) {
-      case 'exact':
+      case 'exact': {
         statusClass = 'status-exact'
         statusText = '✅ 精确'
         break
-      case 'alias':
+      }
+      case 'alias': {
         statusClass = 'status-alias'
         statusText = '🔄 别名'
         break
-      case 'unmatched':
+      }
+      case 'unmatched': {
         statusClass = 'status-unmatched'
         statusText = '❌ 未匹配'
         break
-      case 'error':
+      }
+      case 'error': {
         statusClass = 'status-error'
         statusText = '⚠️ 错误'
         break
+      }
     }
 
     const name = escapeHtml(m.newAnimeName)
@@ -1318,7 +1326,7 @@ function hideConflictDialog(): void {
   const dialogEl = safeGetElement('conflictDialog')
   if (dialogEl) {
     dialogEl.style.display = 'none'
-    dialogEl.innerHTML = ''
+    dialogEl.replaceChildren();
   }
 }
 
