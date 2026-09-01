@@ -35,6 +35,15 @@ const UNSAFE_FIX_RULES = new Set([
     'no-var',
 ])
 
+// 门禁(gate, 全量 error) vs --fix 安全模式 切换：
+// 当命令行含 --fix（npm run lint / lint-staged 的 `eslint --fix`）时，UNSAFE_FIX_RULES
+// 整组从 allRulesAsError 展开中排除（规则『缺席』而非 'off'——ESLint 10 的 --fix 会忽略
+// 配置中的 'off' 覆盖，但**缺席**的规则 --fix 不会重写），保证 --fix 不破坏可编译代码。
+// 当不含 --fix（npm run lint:check / CI 门禁）时，UNSAFE 规则照常作为 error 计入门禁，
+// 靠**手工/脚本**逐处清零（不改变类型/行为语义）。
+// 判定优先用 ESLINT_FIX 环境变量（跨 worker 可靠），并回退到 argv 检测（直接 `eslint --fix`）。
+const isFix = process.env.ESLINT_FIX === '1' || process.argv.includes('--fix')
+
 // 仅引入 airbnb-extended 的 base recommended 配置：
 // 直接引用 dist 子模块可绕过包主入口（主入口会加载 react/next/jsx-a11y 全家桶，
 // 在 Windows 上冷加载耗时 20s+，而 base 配置本身并不使用这些插件）
@@ -68,7 +77,7 @@ const allRulesAsError = (plugin, prefix) =>
                 ([rule, impl]) =>
                     !impl?.meta?.deprecated &&
                     !EXCLUDED_RULE_PATTERN.test(rule) &&
-                    !UNSAFE_FIX_RULES.has(rule),
+                    !(isFix && UNSAFE_FIX_RULES.has(rule)),
             )
             .map(([rule]) => [`${prefix}/${rule}`, 'error']),
     );
@@ -130,9 +139,15 @@ export default tseslint.config(
         },
         rules: {
             ...allRulesAsError(importPlugin, 'import-x'),
-            // ⚠️ unicorn 整组不进入 --fix 自动重放（见上方 UNSAFE_FIX_RULES 说明：
-            // ESLint 10 fix 阶段忽略 off 覆盖，其 fixer 会改写标识符/类型导致编译或运行期破坏）。
-            // unicorn 规则仍由 lint:check（无 --fix）强制 error 门禁，靠**手工/脚本**清零。
+            // ⚠️ unicorn 整组在 gate 模式（lint:check，无 ESLINT_FIX）作为 error 门禁强制 0；
+            // 在 --fix 模式（ESLINT_FIX=1）下整组被 UNSAFE_FIX_RULES 排除出 allRulesAsError
+            // （规则『缺席』而非 'off'，规避 ESLint 10 --fix 忽略 off 覆盖的 bug），--fix 不重写。
+            // 因此 unicorn 规则靠**手工/脚本**逐处清零，而非 --fix 自动重放。
+            ...allRulesAsError(unicornPlugin, 'unicorn'),
+            // --fix 模式下额外关闭构造型 mock 破坏规则（prefer-arrow-callback 会把
+            // function(){} 构造替身改成箭头函数导致无法 new；no-var 偶发作用域风险）。
+            // gate 模式不设该覆盖，规则照常 error（tests/ 下这俩已在 override 中关闭）。
+            ...(isFix ? { 'prefer-arrow-callback': 'off', 'no-var': 'off' } : {}),
             ...allRulesAsError(promisePlugin, 'promise'),
             ...allRulesAsError(securityPlugin, 'security'),
             ...allRulesAsError(nodePlugin, 'n'),
