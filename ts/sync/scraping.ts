@@ -191,8 +191,8 @@ export async function verifyToken(token: string, signal?: AbortSignal): Promise<
       bgmLog(LOG_LEVELS.ERROR, `[scraping/verifyToken] 验证失败，HTTP ${String(response.status)}`)
     }
   } catch (error: unknown) {
-    const errMsg = error instanceof Error ? error.message : ''
-    result.message = errMsg || '验证过程出错'
+    const errorMessage = error instanceof Error ? error.message : ''
+    result.message = errorMessage || '验证过程出错'
     bgmLog(LOG_LEVELS.ERROR, `[scraping/verifyToken] error: ${result.message}`)
   }
 
@@ -226,7 +226,7 @@ export async function fetchAllUserCollections(
   const maxTotal = options?.maxTotal || 1000
 
   const typeMap: Record<string, number> = { wish: 1, collect: 2, do: 3 }
-  const typeNum = options?.type ? typeMap[options.type] : null
+  const typeNumber = options?.type ? typeMap[options.type] : null
 
   if (!userId) {
     const verifyResult = await verifyToken(token)
@@ -252,8 +252,8 @@ export async function fetchAllUserCollections(
 
   while (offset < maxTotal) {
     try {
-      const typeParam = typeNum !== null ? `&type=${String(typeNum ?? '')}` : ''
-      const url = `${BGM_CONFIG.API_BASE}/v0/users/${userId}/collections?limit=${String(limit)}&offset=${String(offset)}${typeParam}`
+      const typeParameter = typeNumber !== null ? `&type=${String(typeNumber ?? '')}` : ''
+      const url = `${BGM_CONFIG.API_BASE}/v0/users/${userId}/collections?limit=${String(limit)}&offset=${String(offset)}${typeParameter}`
       const xhrResult = await xhrGet(url, token)
 
       if (xhrResult.status < 200 || xhrResult.status >= 300) {
@@ -300,8 +300,8 @@ export async function fetchAllUserCollections(
 
       await new Promise((resolve) => setTimeout(resolve, BGM_CONFIG.REQUEST_DELAY))
     } catch (error: unknown) {
-      const errMsg = error instanceof Error ? error.message : undefined
-      bgmLog(LOG_LEVELS.ERROR, `[fetchAllUserCollections] 请求失败: ${errMsg ?? ''}`)
+      const errorMessage = error instanceof Error ? error.message : undefined
+      bgmLog(LOG_LEVELS.ERROR, `[fetchAllUserCollections] 请求失败: ${errorMessage ?? ''}`)
       break
     }
   }
@@ -341,8 +341,8 @@ export async function fetchSubjectCollection(
       result.message = `HTTP ${String(xhrResult.status)}`
     }
   } catch (error: unknown) {
-    const errMsg = error instanceof Error ? error.message : ''
-    result.message = errMsg || '请求失败'
+    const errorMessage = error instanceof Error ? error.message : ''
+    result.message = errorMessage || '请求失败'
     bgmLog(LOG_LEVELS.ERROR, `[fetchSubjectCollection] 请求失败: ${result.message}`)
   }
 

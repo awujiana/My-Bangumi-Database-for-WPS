@@ -74,9 +74,9 @@ function getAnnotatedValue(sourceKey: string, targetColName: string, value: stri
   return `${value}(${sourceKey})`
 }
 
-function splitAliases(aliasesStr: string): string[] {
-  if (!aliasesStr) return []
-  return aliasesStr
+function splitAliases(aliasesString: string): string[] {
+  if (!aliasesString) return []
+  return aliasesString
     .split(/\s*(?:[|/;])\s*/)
     .map((s) => s.trim())
     .filter(Boolean)

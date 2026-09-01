@@ -125,11 +125,11 @@ vi.mock('../../ts/tools/util/index.js', () => ({
   trim: (s: unknown): string => String(s ?? '').trim(),
   colNumToLetter: (n: number): string => {
     let result = ''
-    let num = n
-    while (num > 0) {
-      const rem = (num - 1) % 26
+    let number_ = n
+    while (number_ > 0) {
+      const rem = (number_ - 1) % 26
       result = String.fromCharCode(65 + rem) + result
-      num = Math.floor((num - 1) / 26)
+      number_ = Math.floor((number_ - 1) / 26)
     }
     return result
   },
@@ -209,8 +209,8 @@ vi.mock('../../ts/sync/syncSourceRegistry.js', async () => {
 
       const validationResult = source.validateConfig()
       if (validationResult.isFail()) {
-        const errMsg = validationResult.error?.message ?? `同步源 ${sourceType} 配置校验失败`
-        throw new Error(errMsg)
+        const errorMessage = validationResult.error?.message ?? `同步源 ${sourceType} 配置校验失败`
+        throw new Error(errorMessage)
       }
 
       onProgress?.(0, 0, `开始下载远程数据（${String(source.getDisplayName())} - 策略：${strategy}）...`)
@@ -357,14 +357,14 @@ describe('Excel→Bangumi 完整同步流程', () => {
 
     // 验证 API 被调用（POST 到收藏接口）
     expect(mockState.bgmRequestSync).toHaveBeenCalled()
-    const callArgs = mockState.bgmRequestSync.mock.calls[0]
-    expect(callArgs?.[0]).toBe('POST')
-    expect(callArgs?.[1]).toContain('/collections/12345')
+    const callArguments = mockState.bgmRequestSync.mock.calls[0]
+    expect(callArguments?.[0]).toBe('POST')
+    expect(callArguments?.[1]).toContain('/collections/12345')
 
     // 验证章节标记被调用（type=2 看过 + epCount>0）
     expect(mockState.markEpisodesComplete).toHaveBeenCalled()
-    const epCallArgs = mockState.markEpisodesComplete.mock.calls[0]
-    expect(epCallArgs?.[0]).toBe('12345')
+    const epCallArguments = mockState.markEpisodesComplete.mock.calls[0]
+    expect(epCallArguments?.[0]).toBe('12345')
 
     // 验证 finalizeSyncResults 被调用（结果处理）
     expect(mockState.finalizeSyncResults).toHaveBeenCalled()

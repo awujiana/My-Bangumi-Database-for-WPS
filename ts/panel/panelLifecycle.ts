@@ -14,7 +14,7 @@ import {
   BGM,
   escapeHtml,
   getCellValue,
-  colNumToLetter,
+  colNumToLetter as colNumberToLetter,
   HEADER_KEYWORDS,
   IMPORTANT_COLS,
   showToast,
@@ -119,8 +119,8 @@ export function restoreLockedSheet(): boolean {
         // 验证锁定的工作簿是否仍然存在
         if (BGM.sheet.isLocked && info.workbookName && app.Workbooks) {
           let workbookFound = false
-          for (let i = 1; i <= app.Workbooks.Count; i += 1) {
-            if (app.Workbooks.Item(i).Name === info.workbookName) {
+          for (let index = 1; index <= app.Workbooks.Count; index += 1) {
+            if (app.Workbooks.Item(index).Name === info.workbookName) {
               workbookFound = true
               break
             }
@@ -154,16 +154,16 @@ export function restoreLockedSheet(): boolean {
 }
 
 export function updateLockButton(): void {
-  const btn = document.getElementById('lockSheetBtn') as HTMLButtonElement | null
+  const button = document.getElementById('lockSheetBtn') as HTMLButtonElement | null
   const status = document.getElementById('lockStatus')
 
-  if (btn) {
+  if (button) {
     if (BGM.sheet.isLocked) {
-      btn.textContent = '🔓 解锁'
-      btn.classList.add('locked')
+      button.textContent = '🔓 解锁'
+      button.classList.add('locked')
     } else {
-      btn.textContent = '🔒 锁定'
-      btn.classList.remove('locked')
+      button.textContent = '🔒 锁定'
+      button.classList.remove('locked')
     }
   }
 
@@ -177,7 +177,7 @@ export function updateLockButton(): void {
   }
 }
 
-export function refreshSheets(opts?: { autoSelectActive?: boolean }): void {
+export function refreshSheets(options?: { autoSelectActive?: boolean }): void {
   const select = document.getElementById('sheetSelect') as HTMLSelectElement | null
   if (!select) return
 
@@ -193,9 +193,9 @@ export function refreshSheets(opts?: { autoSelectActive?: boolean }): void {
   if (wbSelect?.value) {
     const wbs = app.Workbooks
     if (wbs) {
-      for (let i = 1; i <= wbs.Count; i += 1) {
-        if (wbs.Item(i).Name === wbSelect.value) {
-          workbook = wbs.Item(i)
+      for (let index = 1; index <= wbs.Count; index += 1) {
+        if (wbs.Item(index).Name === wbSelect.value) {
+          workbook = wbs.Item(index)
           break
         }
       }
@@ -208,9 +208,9 @@ export function refreshSheets(opts?: { autoSelectActive?: boolean }): void {
   let activeSheetIndex = 0
   try {
     const activeSheet = workbook.ActiveSheet
-    for (let i = 1; i <= sheets.Count; i += 1) {
-      if (sheets.Item(i) === activeSheet) {
-        activeSheetIndex = i
+    for (let index = 1; index <= sheets.Count; index += 1) {
+      if (sheets.Item(index) === activeSheet) {
+        activeSheetIndex = index
         break
       }
     }
@@ -229,19 +229,19 @@ export function refreshSheets(opts?: { autoSelectActive?: boolean }): void {
   defaultOption.textContent = '-- 请选择 --'
   select.appendChild(defaultOption)
 
-  const autoSelectActive = opts?.autoSelectActive === true
+  const autoSelectActive = options?.autoSelectActive === true
   let selectedIndex = 0
-  for (let i = 1; i <= sheets.Count; i += 1) {
+  for (let index = 1; index <= sheets.Count; index += 1) {
     const option = document.createElement('option')
-    option.value = String(i)
-    option.text = sheets.Item(i).Name
+    option.value = String(index)
+    option.text = sheets.Item(index).Name
 
-    if (BGM.sheet.isLocked && BGM.sheet.lockedIndex === i) {
+    if (BGM.sheet.isLocked && BGM.sheet.lockedIndex === index) {
       option.selected = true
-      selectedIndex = i
-    } else if (autoSelectActive && !BGM.sheet.isLocked && i === activeSheetIndex) {
+      selectedIndex = index
+    } else if (autoSelectActive && !BGM.sheet.isLocked && index === activeSheetIndex) {
       option.selected = true
-      selectedIndex = i
+      selectedIndex = index
     }
 
     select.appendChild(option)
@@ -292,9 +292,9 @@ export function refreshWorkbooks(): void {
   let hasActiveWorkbook = false
   const activeWbName = app.ActiveWorkbook?.Name || ''
 
-  for (let i = 1; i <= wbs.Count; i += 1) {
+  for (let index = 1; index <= wbs.Count; index += 1) {
     const option = document.createElement('option')
-    const wb = wbs.Item(i)
+    const wb = wbs.Item(index)
     option.value = wb.Name
     option.text = wb.Name
 
@@ -352,9 +352,9 @@ export function activateSheetIfNeeded(ws: WpsWorksheet): (() => void) | false {
 
 export function detectHeaderAndColumns(
   ws: WpsWorksheet | null | undefined,
-  opts: { visibleRowSet?: Set<number> | null; isFiltered?: boolean } = {},
+  options: { visibleRowSet?: Set<number> | null; isFiltered?: boolean } = {},
 ): HeaderMeta {
-  const { visibleRowSet = null, isFiltered = false } = opts
+  const { visibleRowSet = null, isFiltered = false } = options
 
   // 判断某行是否可见
   function isRowVisible(r: number, headerRow: number): boolean {
@@ -652,8 +652,8 @@ export function autoDetectSheet(): {
 // ========== 筛选状态 ==========
 
 export function updateFilterStatus(targetWs?: WpsWorksheet): void {
-  const el = document.getElementById('filterStatus')
-  if (!el) return
+  const element = document.getElementById('filterStatus')
+  if (!element) return
 
   const app = getApp()
   const sheet = targetWs || app?.ActiveWorkbook?.ActiveSheet
@@ -685,31 +685,31 @@ export function updateFilterStatus(targetWs?: WpsWorksheet): void {
   }
 
   if (!autoFilterMode) {
-    el.textContent = '未开启筛选，同步全部数据'
-    el.removeAttribute('title')
+    element.textContent = '未开启筛选，同步全部数据'
+    element.removeAttribute('title')
     return
   }
 
   try {
     const autoFilter = ws.AutoFilter
     if (!autoFilter) {
-      el.textContent = '筛选已开启但无活动筛选'
+      element.textContent = '筛选已开启但无活动筛选'
       return
     }
     const filters = autoFilter.Filters
     if (!filters?.Count) {
-      el.textContent = '筛选已开启但无活动筛选，同步全部数据'
+      element.textContent = '筛选已开启但无活动筛选，同步全部数据'
       return
     }
 
     const activeCols: string[] = []
-    for (let i = 1; i <= filters.Count; i += 1) {
+    for (let index = 1; index <= filters.Count; index += 1) {
       try {
-        const f = filters.Item(i)
+        const f = filters.Item(index)
         if (f.On) {
           let colName = ''
           try {
-            const headerCell = ws.Range(`${colNumToLetter(i)}1`)
+            const headerCell = ws.Range(`${colNumberToLetter(index)}1`)
             colName = String(headerCell.Value2 || '').substring(0, 12)
           } catch (error: unknown) {
             BGM.handleError(error, {
@@ -728,7 +728,7 @@ export function updateFilterStatus(targetWs?: WpsWorksheet): void {
                   ? ` 或 ${f.Criteria2}`
                   : ` / ${f.Criteria2}`
           }
-          activeCols.push(colName ? `${colName}(${criteria})` : `列${String(i)}`)
+          activeCols.push(colName ? `${colName}(${criteria})` : `列${String(index)}`)
         }
       } catch (error: unknown) {
         BGM.handleError(error, {
@@ -741,14 +741,14 @@ export function updateFilterStatus(targetWs?: WpsWorksheet): void {
 
     if (activeCols.length > 0) {
       const text = `✔ 筛选已开启（${String(activeCols.length)} 列），将同步筛选后的可见数据\n${activeCols.join('、')}`
-      el.textContent = text
-      el.setAttribute('title', text)
+      element.textContent = text
+      element.setAttribute('title', text)
     } else {
-      el.textContent = '筛选已开启但无活动筛选，同步全部数据'
-      el.removeAttribute('title')
+      element.textContent = '筛选已开启但无活动筛选，同步全部数据'
+      element.removeAttribute('title')
     }
   } catch (error: unknown) {
-    el.textContent = `检测筛选状态失败: ${(error as Error).message}`
+    element.textContent = `检测筛选状态失败: ${(error as Error).message}`
     BGM.handleError(error, {
       showAlert: false,
       level: BGM.ErrorLevel.INFO,
@@ -777,12 +777,12 @@ function renderPreviewTable(
       const cols = item.cols as string[]
       // 使用统一列数，确保所有行列对齐
       const colLimit = fixedColCount > 0 ? fixedColCount : cols.length
-      for (let i = 0; i < colLimit; i += 1) {
-        const text = cols[i] || ''
+      for (let index = 0; index < colLimit; index += 1) {
+        const text = cols[index] || ''
         let cls = ''
         if (item.isHeader) {
           cls = 'preview-header'
-          if (item.isImportant?.[i]) cls += ' preview-important-header'
+          if (item.isImportant?.[index]) cls += ' preview-important-header'
         }
         html += `<td class="${cls}">${escapeHtml(text)}</td>`
       }
@@ -909,32 +909,32 @@ export function refreshData(): void {
       const maxPreview = Math.min(dataRows.length, PANEL_CONFIG.PREVIEW_LIMIT)
 
       // 批量读取：按连续行段一次性读取 Range.Value2，减少 COM 调用次数
-      let i = 0
-      while (i < maxPreview) {
+      let index = 0
+      while (index < maxPreview) {
         // 找到连续行段
-        let j = i
-        while (j + 1 < maxPreview) {
-          const next = dataRows[j + 1]
-          const cur = dataRows[j]
-          if (next === undefined || cur === undefined || next !== cur + 1) break
-          j++
+        let index_ = index
+        while (index_ + 1 < maxPreview) {
+          const next = dataRows[index_ + 1]
+          const current = dataRows[index_]
+          if (next === undefined || current === undefined || next !== current + 1) break
+          index_++
         }
-        const segStart = dataRows[i]
+        const segStart = dataRows[index]
         if (segStart === undefined) break
-        const segLen = j - i + 1
+        const segLength = index_ - index + 1
 
         try {
           // 一次性读取整个矩形区域
-          const startColLetter = colNumToLetter(meta.previewColStartAbsolute)
-          const endColLetter = colNumToLetter(meta.previewColStartAbsolute + displayColCount - 1)
+          const startColLetter = colNumberToLetter(meta.previewColStartAbsolute)
+          const endColLetter = colNumberToLetter(meta.previewColStartAbsolute + displayColCount - 1)
           const rangeAddr = ws.Range(
-            `${startColLetter}${String(segStart)}:${endColLetter}${String(segStart + segLen - 1)}`,
+            `${startColLetter}${String(segStart)}:${endColLetter}${String(segStart + segLength - 1)}`,
           )
           const raw = rangeAddr.Value2
           // WPS JS API 返回 0-based 二维数组（raw[0][0] 为第一行第一列）
           const is2D = Array.isArray(raw)
-          for (let r = 0; r < segLen; r += 1) {
-            const dr = dataRows[i + r]
+          for (let r = 0; r < segLength; r += 1) {
+            const dr = dataRows[index + r]
             if (dr === undefined) continue
             const rowCols: string[] = []
             let hasAny = false
@@ -945,7 +945,7 @@ export function refreshData(): void {
                 v = cell == null ? '' : String(cell).trim()
               } else {
                 v =
-                  segLen === 1 && displayColCount === 1
+                  segLength === 1 && displayColCount === 1
                     ? raw == null
                       ? ''
                       : String(raw).trim()
@@ -961,8 +961,8 @@ export function refreshData(): void {
           }
         } catch {
           // 批量读取失败，回退到逐单元格
-          for (let r = 0; r < segLen; r += 1) {
-            const dr = dataRows[i + r]
+          for (let r = 0; r < segLength; r += 1) {
+            const dr = dataRows[index + r]
             if (dr === undefined) continue
             const rowCols: string[] = []
             let hasAny = false
@@ -978,7 +978,7 @@ export function refreshData(): void {
             }
           }
         }
-        i = j + 1
+        index = index_ + 1
       }
     } else {
       // 无表头时的回退逻辑
@@ -1108,8 +1108,8 @@ export function enlargePreview(): void {
     }
   }
 
-  modal.querySelectorAll('.enlarge-close-btn').forEach((btn) => {
-    btn.addEventListener('click', closeModal)
+  modal.querySelectorAll('.enlarge-close-btn').forEach((button) => {
+    button.addEventListener('click', closeModal)
   })
 
   modal.addEventListener('click', (e) => {

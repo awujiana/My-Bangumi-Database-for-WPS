@@ -32,11 +32,11 @@ if (typeof window !== 'undefined') {
     (e: Event) => {
       const target = e.target as HTMLElement | null
       if (target && (target.tagName === 'SCRIPT' || target.tagName === 'LINK')) {
-        const src =
+        const source =
           target.tagName === 'SCRIPT'
             ? (target as HTMLScriptElement).src
             : (target as HTMLLinkElement).href
-        console.error('[BGM Settings] Resource load failed:', src)
+        console.error('[BGM Settings] Resource load failed:', source)
       }
     },
     true,
@@ -49,15 +49,15 @@ if (typeof window !== 'undefined') {
 
 if (typeof document !== 'undefined') {
   // 模块就绪前禁用所有 data-action 按钮
-  document.querySelectorAll('button[data-action]').forEach((btn) => {
-    const b = btn as HTMLButtonElement
+  document.querySelectorAll('button[data-action]').forEach((button) => {
+    const b = button as HTMLButtonElement
     b.disabled = true
   })
 
   // 接收到 modulesReady 事件后启用按钮
   document.addEventListener('bgm:modulesReady', () => {
-    document.querySelectorAll('button[data-action]').forEach((btn) => {
-      const b = btn as HTMLButtonElement
+    document.querySelectorAll('button[data-action]').forEach((button) => {
+      const b = button as HTMLButtonElement
       b.disabled = false
     })
     console.log('[BGM Settings] 模块加载完成，按钮已启用')
@@ -74,8 +74,8 @@ if (typeof document !== 'undefined') {
       console.warn(
         `[BGM Settings] ${String(timeoutMs)}ms 内未收到 bgm:modulesReady 事件，强制启用按钮（兜底）`,
       )
-      document.querySelectorAll('button[data-action]').forEach((btn) => {
-        const b = btn as HTMLButtonElement
+      document.querySelectorAll('button[data-action]').forEach((button) => {
+        const b = button as HTMLButtonElement
         b.disabled = false
       })
     }

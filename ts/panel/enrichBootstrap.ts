@@ -33,15 +33,15 @@ if (typeof document !== 'undefined') {
   initTheme()
 
   // 模块就绪前禁用所有 data-action 按钮，避免误触发未初始化的处理逻辑
-  document.querySelectorAll('button[data-action]').forEach((btn) => {
-    const b = btn as HTMLButtonElement
+  document.querySelectorAll('button[data-action]').forEach((button) => {
+    const b = button as HTMLButtonElement
     b.disabled = true
   })
 
   // 接收到 modulesReady 事件后启用按钮
   document.addEventListener('bgm:modulesReady', () => {
-    document.querySelectorAll('button[data-action]').forEach((btn) => {
-      const b = btn as HTMLButtonElement
+    document.querySelectorAll('button[data-action]').forEach((button) => {
+      const b = button as HTMLButtonElement
       b.disabled = false
     })
     console.log('[BGM Enrich] 模块加载完成，按钮已启用')

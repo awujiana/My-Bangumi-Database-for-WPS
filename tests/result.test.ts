@@ -31,9 +31,9 @@ describe('Result.ok', () => {
   })
 
   it('data 字段持有成功值，error 字段为 null', () => {
-    const obj = { id: 1, name: 'test' }
-    const result = Result.ok(obj)
-    expect(result.data).toEqual(obj)
+    const object = { id: 1, name: 'test' }
+    const result = Result.ok(object)
+    expect(result.data).toEqual(object)
     expect(result.error).toBeNull()
   })
 })
@@ -41,8 +41,8 @@ describe('Result.ok', () => {
 // ========== Result.fail ==========
 describe('Result.fail', () => {
   it('包装错误并返回 Result 实例', () => {
-    const err = new BgmError('失败', 'FAIL_CODE')
-    const result = Result.fail<number>(err)
+    const error = new BgmError('失败', 'FAIL_CODE')
+    const result = Result.fail<number>(error)
     expect(result).toBeInstanceOf(Result)
     expect(result.isOk()).toBe(false)
     expect(result.isFail()).toBe(true)
@@ -50,15 +50,15 @@ describe('Result.fail', () => {
   })
 
   it('unwrap 抛出包含错误消息的异常', () => {
-    const err = new BgmError('失败原因', 'FAIL_CODE')
-    const result = Result.fail<number>(err)
+    const error = new BgmError('失败原因', 'FAIL_CODE')
+    const result = Result.fail<number>(error)
     expect(() => result.unwrap()).toThrow(/失败原因/)
   })
 
   it('error 字段持有 BgmError，data 字段为 null', () => {
-    const err = new BgmError('错误', 'CODE')
-    const result = Result.fail<number>(err)
-    expect(result.error).toBe(err)
+    const error = new BgmError('错误', 'CODE')
+    const result = Result.fail<number>(error)
+    expect(result.error).toBe(error)
     expect(result.data).toBeNull()
   })
 })
@@ -125,21 +125,21 @@ describe('Result.map', () => {
   })
 
   it('失败结果不调用 fn 且保持失败状态', () => {
-    const err = new BgmError('失败', 'CODE')
-    const r = Result.fail<number>(err)
-    const fn = vi.fn((x: number) => x * 2)
-    const mapped = r.map(fn)
+    const error = new BgmError('失败', 'CODE')
+    const r = Result.fail<number>(error)
+    const function_ = vi.fn((x: number) => x * 2)
+    const mapped = r.map(function_)
     expect(mapped.isFail()).toBe(true)
-    expect(fn).not.toHaveBeenCalled()
-    expect(mapped.error).toBe(err)
+    expect(function_).not.toHaveBeenCalled()
+    expect(mapped.error).toBe(error)
   })
 })
 
 // ========== Result.mapErr ==========
 describe('Result.mapErr', () => {
   it('对失败错误应用转换函数', () => {
-    const err = new BgmError('原始错误', 'ORIGINAL')
-    const r = Result.fail<number>(err)
+    const error = new BgmError('原始错误', 'ORIGINAL')
+    const r = Result.fail<number>(error)
     const mapped = r.mapErr((e) => new BgmError(`包装: ${e.message}`, `WRAPPED_${e.code}`))
     expect(mapped.isFail()).toBe(true)
     expect(mapped.error?.message).toBe('包装: 原始错误')
@@ -148,10 +148,10 @@ describe('Result.mapErr', () => {
 
   it('成功结果不调用 fn 且保持成功状态', () => {
     const r = Result.ok(42)
-    const fn = vi.fn((e: BgmError) => new BgmError(e.message, e.code))
-    const mapped = r.mapErr(fn)
+    const function_ = vi.fn((e: BgmError) => new BgmError(e.message, e.code))
+    const mapped = r.mapErr(function_)
     expect(mapped.isOk()).toBe(true)
-    expect(fn).not.toHaveBeenCalled()
+    expect(function_).not.toHaveBeenCalled()
     expect(mapped.unwrap()).toBe(42)
   })
 })
@@ -220,14 +220,14 @@ describe('Result 边界场景', () => {
   })
 
   it('链式 map 在失败时短路（不调用后续 fn）', () => {
-    const err = new BgmError('失败', 'CODE')
-    const fn1 = vi.fn((x: number) => x + 1)
-    const fn2 = vi.fn((x: number) => x * 2)
-    const r = Result.fail<number>(err).map(fn1).map(fn2)
+    const error = new BgmError('失败', 'CODE')
+    const function1 = vi.fn((x: number) => x + 1)
+    const function2 = vi.fn((x: number) => x * 2)
+    const r = Result.fail<number>(error).map(function1).map(function2)
     expect(r.isFail()).toBe(true)
-    expect(r.error).toBe(err)
-    expect(fn1).not.toHaveBeenCalled()
-    expect(fn2).not.toHaveBeenCalled()
+    expect(r.error).toBe(error)
+    expect(function1).not.toHaveBeenCalled()
+    expect(function2).not.toHaveBeenCalled()
   })
 
   it('mapErr 链式调用：fail → mapErr → mapErr', () => {
@@ -240,12 +240,12 @@ describe('Result 边界场景', () => {
   })
 
   it('unwrapOr 链式：失败后返回默认值（不调用后续 map fn）', () => {
-    const fn = vi.fn((x: number) => x * 2)
+    const function_ = vi.fn((x: number) => x * 2)
     const r = Result.fail<number>(new BgmError('失败', 'CODE'))
-      .map(fn)
+      .map(function_)
       .mapErr((e) => e)
     expect(r.unwrapOr(-1)).toBe(-1)
-    expect(fn).not.toHaveBeenCalled()
+    expect(function_).not.toHaveBeenCalled()
   })
 
   it('ok 与 fail 不可互换：isOk 与 isFail 互斥', () => {

@@ -35,7 +35,7 @@ const { PANEL_CONFIG, HEADER_KEYWORDS, COLUMN_RULES, STANDARD_HEADERS, colNumToL
       '完播日',
       '集数',
     ]
-    const colNumToLetter = (col: number): string => {
+    const colNumberToLetter = (col: number): string => {
       let result = ''
       let n = col
       while (n > 0) {
@@ -45,7 +45,7 @@ const { PANEL_CONFIG, HEADER_KEYWORDS, COLUMN_RULES, STANDARD_HEADERS, colNumToL
       }
       return result
     }
-    return { PANEL_CONFIG, HEADER_KEYWORDS, COLUMN_RULES, STANDARD_HEADERS, colNumToLetter }
+    return { PANEL_CONFIG, HEADER_KEYWORDS, COLUMN_RULES, STANDARD_HEADERS, colNumToLetter: colNumberToLetter }
   })
 
 vi.mock('../ts/core/constants.js', () => ({
@@ -101,7 +101,7 @@ function createMockCell(value: unknown = '') {
 }
 
 function createMockWorksheet(
-  opts: {
+  options: {
     name?: string
     rows?: number
     cellValues?: Record<string, unknown>
@@ -111,10 +111,10 @@ function createMockWorksheet(
     endRow?: number
   } = {},
 ) {
-  const name = opts.name || 'Sheet1'
-  const rows = opts.rows || 100
-  const cellValues = opts.cellValues || {}
-  const cellOverrides = opts.cellOverrides || {}
+  const name = options.name || 'Sheet1'
+  const rows = options.rows || 100
+  const cellValues = options.cellValues || {}
+  const cellOverrides = options.cellOverrides || {}
 
   const mockCell = (address: string): ReturnType<typeof createMockCell> => {
     if (address in cellOverrides) {
@@ -129,7 +129,7 @@ function createMockWorksheet(
   return {
     Name: name,
     Rows: { Count: rows },
-    UsedRange: opts.usedRange || { Row: 1, Rows: { Count: 10 } },
+    UsedRange: options.usedRange || { Row: 1, Rows: { Count: 10 } },
     Range: vi.fn((address: string) => {
       if (address.includes(':')) {
         return { Value2: null, Interior: { Color: 0 }, Font: { Bold: false } }
@@ -139,7 +139,7 @@ function createMockWorksheet(
     Activate: vi.fn(),
     Cells: { Item: vi.fn((r: number, c: number) => createMockCell('')) },
     // End mock for getLastRow
-    _endRow: opts.endRow ?? 0,
+    _endRow: options.endRow ?? 0,
   }
 }
 
@@ -278,17 +278,17 @@ describe('getDataSheet', () => {
 
   it('锁定模式下应返回锁定的工作表', () => {
     const lockedSheet = createMockWorksheet({ name: 'Locked' })
-    const itemFn = vi.fn().mockReturnValue(lockedSheet)
+    const itemFunction = vi.fn().mockReturnValue(lockedSheet)
     vi.mocked(getApp).mockReturnValue({
       ActiveWorkbook: {
         ActiveSheet: createMockWorksheet({ name: 'Active' }),
-        Worksheets: { Item: itemFn },
+        Worksheets: { Item: itemFunction },
       },
     })
     BGM.sheet.isLocked = true
     BGM.sheet.lockedIndex = 2
     const result = getDataSheet()
-    expect(itemFn).toHaveBeenCalledWith(2)
+    expect(itemFunction).toHaveBeenCalledWith(2)
   })
 
   it('锁定模式下应查找指定工作簿', () => {
@@ -303,7 +303,7 @@ describe('getDataSheet', () => {
       },
       Workbooks: {
         Count: 2,
-        Item: vi.fn((i: number) => (i === 2 ? targetWb : { Name: 'OtherWb' })),
+        Item: vi.fn((index: number) => (index === 2 ? targetWb : { Name: 'OtherWb' })),
       },
     })
     BGM.sheet.isLocked = true
@@ -320,7 +320,7 @@ describe('getDataSheet', () => {
     })
     BGM.sheet.isLocked = true
     BGM.sheet.lockedIndex = 10 // will fail
-    const mockErrWs = {
+    const mockErrorWs = {
       ...createMockWorksheet(),
       Worksheets: {
         Item: vi.fn(() => {
@@ -763,8 +763,8 @@ describe('ensureSheetHeaders', () => {
       }
       // First 5 columns fail
       const colLetter = address.replace(/[0-9]/g, '')
-      const colIdx = colLetter.charCodeAt(0) - 64
-      if (colIdx <= 5) {
+      const colIndex = colLetter.charCodeAt(0) - 64
+      if (colIndex <= 5) {
         return {
           Value2: '',
           Interior: { Color: 0 },
@@ -812,8 +812,8 @@ describe('ensureSheetHeaders', () => {
         return { Value2: null, Interior: { Color: 0 }, Font: { Bold: false } }
       }
       const colLetter = address.replace(/[0-9]/g, '')
-      const colIdx = colLetter.charCodeAt(0) - 64
-      if (colIdx > 5 && colIdx <= 7) {
+      const colIndex = colLetter.charCodeAt(0) - 64
+      if (colIndex > 5 && colIndex <= 7) {
         return {
           Value2: '',
           Interior: { Color: 0 },
@@ -856,12 +856,12 @@ describe('isNativeCode（间接测试 via safeCellValue/readRangeValues）', () 
   it('native code function 应被 safeCellValue 转为空字符串', () => {
     // 通过 readRangeValues 间接测试
     const ws = createMockWorksheet()
-    const nativeFn = function Value() {
+    const nativeFunction = function Value() {
       return 42
     }
-    nativeFn.toString = () => 'function Value() { [native code] }'
+    nativeFunction.toString = () => 'function Value() { [native code] }'
     const rangeMock = {
-      Value2: [[nativeFn]],
+      Value2: [[nativeFunction]],
       Interior: { Color: 0 },
     }
     ws.Range = vi.fn().mockReturnValue(rangeMock)
@@ -871,12 +871,12 @@ describe('isNativeCode（间接测试 via safeCellValue/readRangeValues）', () 
 
   it('function Value() 字符串模式应被识别为 native', () => {
     const ws = createMockWorksheet()
-    const valueFn = function Value() {
+    const valueFunction = function Value() {
       return 42
     }
-    valueFn.toString = () => 'function Value() {}'
+    valueFunction.toString = () => 'function Value() {}'
     const rangeMock = {
-      Value2: [[valueFn]],
+      Value2: [[valueFunction]],
       Interior: { Color: 0 },
     }
     ws.Range = vi.fn().mockReturnValue(rangeMock)
@@ -886,9 +886,9 @@ describe('isNativeCode（间接测试 via safeCellValue/readRangeValues）', () 
 
   it('普通对象的 toString() 返回 native code 时应被识别', () => {
     const ws = createMockWorksheet()
-    const nativeObj = { toString: () => 'function [native code]() {}' }
+    const nativeObject = { toString: () => 'function [native code]() {}' }
     const rangeMock = {
-      Value2: [[nativeObj]],
+      Value2: [[nativeObject]],
       Interior: { Color: 0 },
     }
     ws.Range = vi.fn().mockReturnValue(rangeMock)
@@ -898,15 +898,15 @@ describe('isNativeCode（间接测试 via safeCellValue/readRangeValues）', () 
 
   it('普通函数调用返回 native code 时应跳过', () => {
     const ws = createMockWorksheet()
-    const funcReturnsNative = () => {
-      const nativeFn = function Value() {
+    const functionReturnsNative = () => {
+      const nativeFunction = function Value() {
         return 42
       }
-      nativeFn.toString = () => 'function Value() { [native code] }'
-      return nativeFn
+      nativeFunction.toString = () => 'function Value() { [native code] }'
+      return nativeFunction
     }
     const rangeMock = {
-      Value2: [[funcReturnsNative]],
+      Value2: [[functionReturnsNative]],
       Interior: { Color: 0 },
     }
     ws.Range = vi.fn().mockReturnValue(rangeMock)
@@ -916,11 +916,11 @@ describe('isNativeCode（间接测试 via safeCellValue/readRangeValues）', () 
 
   it('函数调用抛异常时应返回空字符串', () => {
     const ws = createMockWorksheet()
-    const throwingFn = () => {
+    const throwingFunction = () => {
       throw new Error('Unexpected error')
     }
     const rangeMock = {
-      Value2: [[throwingFn]],
+      Value2: [[throwingFunction]],
       Interior: { Color: 0 },
     }
     ws.Range = vi.fn().mockReturnValue(rangeMock)

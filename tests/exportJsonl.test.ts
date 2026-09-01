@@ -66,15 +66,15 @@ vi.mock('../ts/sync/pureUtils.js', () => ({
 import { buildJsonlFromSheet, exportSheetToJsonlFile } from '../ts/sync/exportJsonl.js'
 
 function createMockWorksheet(
-  opts: {
+  options: {
     name?: string
     usedRange?: number
     cellValues?: Record<string, unknown>
     cellOverrides?: Record<string, Record<string, unknown>>
   } = {},
 ) {
-  const name = opts.name || 'Sheet1'
-  const usedRange = opts.usedRange || 10
+  const name = options.name || 'Sheet1'
+  const usedRange = options.usedRange || 10
   const cellCache = new Map<
     string,
     { Value2: unknown; Text?: unknown; Interior: { Color: number } }
@@ -91,9 +91,9 @@ function createMockWorksheet(
       if (cellCache.has(address)) {
         return cellCache.get(address)!
       }
-      const override = opts.cellOverrides?.[address]
+      const override = options.cellOverrides?.[address]
       const cell = {
-        Value2: opts.cellValues?.[address] ?? '',
+        Value2: options.cellValues?.[address] ?? '',
         Text: override?.Text ?? undefined,
         Interior: { Color: 0 },
         Font: { Bold: false },

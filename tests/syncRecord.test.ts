@@ -78,7 +78,7 @@ vi.mock('../ts/tools/config.js', () => ({
 const mockBgmLogn = vi.hoisted(() => vi.fn())
 const mockGetApp = vi.hoisted(() => vi.fn())
 const mockGetLastRow = vi.hoisted(() => vi.fn().mockReturnValue(10))
-const mockColNumToLetter = vi.hoisted(() =>
+const mockColNumberToLetter = vi.hoisted(() =>
   vi.fn((col: number) => {
     let result = ''
     let n = col
@@ -97,7 +97,7 @@ vi.mock('../ts/tools/util/index.js', () => ({
   bgmLog: mockBgmLogn,
   getApp: mockGetApp,
   getLastRow: mockGetLastRow,
-  colNumToLetter: mockColNumToLetter,
+  colNumToLetter: mockColNumberToLetter,
   getCellValue: mockGetCellValue,
   setCellValue: mockSetCellValue,
   readRangeValues: mockReadRangeValues,
@@ -134,10 +134,10 @@ function createMockCell(value: unknown = '') {
   }
 }
 
-function createMockSheet(opts: { name?: string; rowCount?: number } = {}) {
-  const rowCount = opts.rowCount || 50
+function createMockSheet(options: { name?: string; rowCount?: number } = {}) {
+  const rowCount = options.rowCount || 50
   return {
-    Name: opts.name || SYNC_RECORD_SHEET_NAME,
+    Name: options.name || SYNC_RECORD_SHEET_NAME,
     Rows: { Count: rowCount },
     UsedRange: { Row: 1, Rows: { Count: 10 } },
     Range: vi.fn((address: string) => {
@@ -166,12 +166,12 @@ function createMockWorkbook(sheets: { Name: string }[] = []) {
   return {
     Sheets: {
       Count: allSheets.length,
-      Item: vi.fn((i: number) => allSheets[i - 1] || allSheets[0]),
+      Item: vi.fn((index: number) => allSheets[index - 1] || allSheets[0]),
       Add: vi.fn(() => createMockSheet({ name: 'NewSheet' })),
     },
     Worksheets: {
       Count: allSheets.length,
-      Item: vi.fn((i: number) => allSheets[i - 1] || allSheets[0]),
+      Item: vi.fn((index: number) => allSheets[index - 1] || allSheets[0]),
     },
     ActiveSheet: createMockSheet({ name: 'Active' }),
   }
@@ -206,7 +206,7 @@ describe('syncRecord', () => {
       const sheetsWithNoSync = {
         Sheets: {
           Count: 2,
-          Item: vi.fn((i: number) => ({ Name: i === 1 ? 'Sheet1' : 'Sheet2' })),
+          Item: vi.fn((index: number) => ({ Name: index === 1 ? 'Sheet1' : 'Sheet2' })),
           Add: vi.fn(() => createMockSheet({ name: SYNC_RECORD_SHEET_NAME })),
         },
       }
@@ -234,7 +234,7 @@ describe('syncRecord', () => {
       const wb = {
         Sheets: {
           Count: 3,
-          Item: vi.fn((i: number) => (i === 1 ? legacySheet : createMockSheet())),
+          Item: vi.fn((index: number) => (index === 1 ? legacySheet : createMockSheet())),
         },
       }
       mockGetApp.mockReturnValue({ ActiveWorkbook: wb })
@@ -265,7 +265,7 @@ describe('syncRecord', () => {
       const wb = {
         Sheets: {
           Count: 3,
-          Item: vi.fn((i: number) => (i === 1 ? sheetWithBadData : createMockSheet())),
+          Item: vi.fn((index: number) => (index === 1 ? sheetWithBadData : createMockSheet())),
         },
       }
       mockGetApp.mockReturnValue({ ActiveWorkbook: wb })
@@ -287,7 +287,7 @@ describe('syncRecord', () => {
       const sheetsWithNoSync = {
         Sheets: {
           Count: 2,
-          Item: vi.fn((i: number) => ({ Name: i === 1 ? 'Sheet1' : 'Sheet2' })),
+          Item: vi.fn((index: number) => ({ Name: index === 1 ? 'Sheet1' : 'Sheet2' })),
         },
       }
       mockGetApp.mockReturnValue({ ActiveWorkbook: sheetsWithNoSync })
@@ -299,7 +299,7 @@ describe('syncRecord', () => {
       const wb = {
         Sheets: {
           Count: 2,
-          Item: vi.fn((i: number) => (i === 1 ? syncSheet : createMockSheet())),
+          Item: vi.fn((index: number) => (index === 1 ? syncSheet : createMockSheet())),
         },
       }
       mockGetApp.mockReturnValue({ ActiveWorkbook: wb })
@@ -497,7 +497,7 @@ describe('syncRecord', () => {
         ActiveWorkbook: {
           Sheets: {
             Count: 2,
-            Item: vi.fn((i: number) => ({ Name: i === 1 ? 'Sheet1' : 'Sheet2' })),
+            Item: vi.fn((index: number) => ({ Name: index === 1 ? 'Sheet1' : 'Sheet2' })),
           },
         },
       })
@@ -532,7 +532,7 @@ describe('syncRecord', () => {
         count: 1,
       })
       // Verify that Range was called for color cells
-      expect(mockColNumToLetter).toHaveBeenCalled()
+      expect(mockColNumberToLetter).toHaveBeenCalled()
     })
 
     it('失败状态应设置 FAIL 颜色', () => {
@@ -545,7 +545,7 @@ describe('syncRecord', () => {
         status: 'fail',
         count: 1,
       })
-      expect(mockColNumToLetter).toHaveBeenCalled()
+      expect(mockColNumberToLetter).toHaveBeenCalled()
     })
 
     it('跳过状态应设置 SKIP 颜色', () => {
@@ -558,7 +558,7 @@ describe('syncRecord', () => {
         status: 'skip',
         count: 1,
       })
-      expect(mockColNumToLetter).toHaveBeenCalled()
+      expect(mockColNumberToLetter).toHaveBeenCalled()
     })
 
     it('多次同步应设置更深颜色', () => {
@@ -571,7 +571,7 @@ describe('syncRecord', () => {
         status: 'success',
         count: 3,
       })
-      expect(mockColNumToLetter).toHaveBeenCalled()
+      expect(mockColNumberToLetter).toHaveBeenCalled()
     })
 
     it('类型颜色应根据类型名设置', () => {
@@ -583,7 +583,7 @@ describe('syncRecord', () => {
         type: '想',
         status: 'success',
       })
-      expect(mockColNumToLetter).toHaveBeenCalled()
+      expect(mockColNumberToLetter).toHaveBeenCalled()
     })
   })
 
@@ -637,7 +637,7 @@ describe('syncRecord', () => {
       const wb = {
         Sheets: {
           Count: 3,
-          Item: vi.fn((i: number) => (i === 1 ? legacySheet : createMockSheet())),
+          Item: vi.fn((index: number) => (index === 1 ? legacySheet : createMockSheet())),
         },
       }
       mockGetApp.mockReturnValue({ ActiveWorkbook: wb })
@@ -676,7 +676,7 @@ describe('syncRecord', () => {
       const wb = {
         Sheets: {
           Count: 3,
-          Item: vi.fn((i: number) => (i === 1 ? legacySheet : createMockSheet())),
+          Item: vi.fn((index: number) => (index === 1 ? legacySheet : createMockSheet())),
         },
       }
       mockGetApp.mockReturnValue({ ActiveWorkbook: wb })
@@ -709,7 +709,7 @@ describe('syncRecord', () => {
       const wb = {
         Sheets: {
           Count: 3,
-          Item: vi.fn((i: number) => (i === 1 ? legacySheet : createMockSheet())),
+          Item: vi.fn((index: number) => (index === 1 ? legacySheet : createMockSheet())),
         },
       }
       mockGetApp.mockReturnValue({ ActiveWorkbook: wb })
@@ -728,7 +728,7 @@ describe('syncRecord', () => {
       const wb = {
         Sheets: {
           Count: 3,
-          Item: vi.fn((i: number) => (i === 1 ? legacySheet : createMockSheet())),
+          Item: vi.fn((index: number) => (index === 1 ? legacySheet : createMockSheet())),
         },
       }
       mockGetApp.mockReturnValue({ ActiveWorkbook: wb })
@@ -748,7 +748,7 @@ describe('syncRecord', () => {
         ActiveWorkbook: {
           Sheets: {
             Count: 2,
-            Item: vi.fn((i: number) => ({ Name: i === 1 ? 'Sheet1' : 'Sheet2' })),
+            Item: vi.fn((index: number) => ({ Name: index === 1 ? 'Sheet1' : 'Sheet2' })),
           },
         },
       })
@@ -760,7 +760,7 @@ describe('syncRecord', () => {
       const wb = {
         Sheets: {
           Count: 1,
-          Item: vi.fn((i: number) => (i === 1 ? syncSheet : createMockSheet())),
+          Item: vi.fn((index: number) => (index === 1 ? syncSheet : createMockSheet())),
         },
       }
       mockGetApp.mockReturnValue({ ActiveWorkbook: wb })
@@ -774,7 +774,7 @@ describe('syncRecord', () => {
       const wb = {
         Sheets: {
           Count: 1,
-          Item: vi.fn((i: number) => (i === 1 ? syncSheet : createMockSheet())),
+          Item: vi.fn((index: number) => (index === 1 ? syncSheet : createMockSheet())),
         },
       }
       mockGetApp.mockReturnValue({ ActiveWorkbook: wb })
@@ -788,7 +788,7 @@ describe('syncRecord', () => {
       const wb = {
         Sheets: {
           Count: 1,
-          Item: vi.fn((i: number) => (i === 1 ? syncSheet : createMockSheet())),
+          Item: vi.fn((index: number) => (index === 1 ? syncSheet : createMockSheet())),
         },
       }
       mockGetApp.mockReturnValue({ ActiveWorkbook: wb })
@@ -817,7 +817,7 @@ describe('syncRecord', () => {
         ActiveWorkbook: {
           Sheets: {
             Count: 2,
-            Item: vi.fn((i: number) => ({ Name: i === 1 ? 'Sheet1' : 'Sheet2' })),
+            Item: vi.fn((index: number) => ({ Name: index === 1 ? 'Sheet1' : 'Sheet2' })),
           },
         },
       })
@@ -1105,7 +1105,7 @@ describe('syncRecord', () => {
         bgmLog: mockBgmLogn,
         getApp: mockGetApp,
         getLastRow: mockGetLastRow,
-        colNumToLetter: mockColNumToLetter,
+        colNumToLetter: mockColNumberToLetter,
         getCellValue: mockGetCellValue,
         setCellValue: mockSetCellValue,
         readRangeValues: mockReadRangeValues,
@@ -1771,9 +1771,9 @@ describe('buildCache 异常路径精确覆盖 (line 343)', () => {
     mockGetApp.mockReturnValue({ ActiveWorkbook: createMockWorkbook() })
     mockGetLastRow.mockReturnValue(10)
 
-    const mockErr = new Error('读取工作表范围失败')
+    const mockError = new Error('读取工作表范围失败')
     mockReadRangeValues.mockImplementation(() => {
-      throw mockErr
+      throw mockError
     })
 
     const result = addSyncRecord({
@@ -2258,8 +2258,8 @@ describe('buildCache 内层 catch 精确覆盖 (line 343)', () => {
   it('Proxy 抛出异常时应被内层 catch 捕获 (line 343)', async () => {
     // 创建一个 Proxy 对象，访问任意索引属性时抛出异常
     const throwingProxy = new Proxy([] as unknown[], {
-      get(_target, prop: string | symbol) {
-        if (typeof prop === 'string' && !isNaN(Number(prop))) {
+      get(_target, property: string | symbol) {
+        if (typeof property === 'string' && !isNaN(Number(property))) {
           throw new Error('模拟数据损坏：属性访问失败')
         }
         return undefined
@@ -2304,8 +2304,8 @@ describe('buildCache 内层 catch 精确覆盖 (line 343)', () => {
 
   it('多个 Proxy 行均抛异常时不影响后续行处理', async () => {
     const throwingProxy1 = new Proxy([] as unknown[], {
-      get(_target, prop: string | symbol) {
-        if (typeof prop === 'string' && !isNaN(Number(prop))) {
+      get(_target, property: string | symbol) {
+        if (typeof property === 'string' && !isNaN(Number(property))) {
           throw new Error('第一行数据损坏')
         }
         return undefined
@@ -2313,8 +2313,8 @@ describe('buildCache 内层 catch 精确覆盖 (line 343)', () => {
     })
 
     const throwingProxy2 = new Proxy([] as unknown[], {
-      get(_target, prop: string | symbol) {
-        if (typeof prop === 'string' && !isNaN(Number(prop))) {
+      get(_target, property: string | symbol) {
+        if (typeof property === 'string' && !isNaN(Number(property))) {
           throw new Error('第二行数据损坏')
         }
         return undefined

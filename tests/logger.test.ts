@@ -111,8 +111,8 @@ describe('logger', () => {
   })
 
   it('getRecentLogs 应按 limit 限制数量', () => {
-    for (let i = 0; i < 2000; i += 1) {
-      logger.info(`log-${String(i)}`)
+    for (let index = 0; index < 2000; index += 1) {
+      logger.info(`log-${String(index)}`)
     }
     const logs = getRecentLogs('INFO', 50)
     expect(logs.length).toBeLessThanOrEqual(50)
@@ -128,8 +128,8 @@ describe('logger', () => {
   it('应自动脱敏日志中的 token', () => {
     logger.info('使用 token=abcdefghijklmnop 进行认证')
     const logs = getRecentLogs('INFO')
-    const logMsg = logs[0]?.message || ''
-    expect(logMsg).not.toContain('abcdefghijklmnop')
+    const logMessage = logs[0]?.message || ''
+    expect(logMessage).not.toContain('abcdefghijklmnop')
   })
 
   it('日志条目应包含时间戳', () => {

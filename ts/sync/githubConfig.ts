@@ -207,8 +207,8 @@ export function setGithubConfig(config: GithubSyncConfig): boolean {
  * @returns 完整返回 true
  */
 export function isGithubConfigComplete(): boolean {
-  const cfg = getGithubConfig()
-  return cfg.owner.length > 0 && cfg.repo.length > 0 && cfg.path.length > 0
+  const config = getGithubConfig()
+  return config.owner.length > 0 && config.repo.length > 0 && config.path.length > 0
 }
 
 /**
@@ -218,11 +218,11 @@ export function isGithubConfigComplete(): boolean {
  * @throws 配置不完整时抛出 Error
  */
 export function buildRawUrl(): string {
-  const cfg = getGithubConfig()
+  const config = getGithubConfig()
   if (!isGithubConfigComplete()) {
     throw new Error('GitHub 仓库配置不完整，请在面板中设置 owner/repo/path')
   }
-  return `https://raw.githubusercontent.com/${cfg.owner}/${cfg.repo}/${cfg.branch || DEFAULT_BRANCH}/${cfg.path}`
+  return `https://raw.githubusercontent.com/${config.owner}/${config.repo}/${config.branch || DEFAULT_BRANCH}/${config.path}`
 }
 
 /**

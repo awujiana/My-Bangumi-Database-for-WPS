@@ -24,9 +24,9 @@
 export function colNumToLetter(col: number): string {
   let letter = ''
   while (col > 0) {
-    const mod = (col - 1) % 26
-    letter = String.fromCharCode(65 + mod) + letter
-    col = Math.floor((col - mod) / 26)
+    const module_ = (col - 1) % 26
+    letter = String.fromCharCode(65 + module_) + letter
+    col = Math.floor((col - module_) / 26)
   }
   return letter
 }

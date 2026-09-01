@@ -28,23 +28,23 @@ interface MockWorkbook {
   Index: number
   Worksheets: {
     Count: number
-    Item: (i: number) => MockWorksheet | null
+    Item: (index: number) => MockWorksheet | null
   }
 }
 
 function createMockWorksheets(names: string[]): MockWorksheet[] {
-  return names.map((name, i) => ({ Name: name, Index: i + 1 }))
+  return names.map((name, index) => ({ Name: name, Index: index + 1 }))
 }
 
 function createMockWorkbooks(workbooks: { Name: string; Sheets: string[] }[]): MockWorkbook[] {
-  return workbooks.map((wb, i) => {
+  return workbooks.map((wb, index) => {
     const sheets = createMockWorksheets(wb.Sheets)
     return {
       Name: wb.Name,
-      Index: i + 1,
+      Index: index + 1,
       Worksheets: {
         Count: sheets.length,
-        Item: (idx: number) => (idx >= 1 && idx <= sheets.length ? sheets[idx - 1] : null),
+        Item: (index: number) => (index >= 1 && index <= sheets.length ? sheets[index - 1] : null),
       },
     }
   })
@@ -70,7 +70,7 @@ function createMockApp(
   activeWbName = '',
   pluginStorage?: ReturnType<typeof createMockPluginStorage>,
 ): {
-  Workbooks: { Count: number; Item: (i: number) => MockWorkbook | null }
+  Workbooks: { Count: number; Item: (index: number) => MockWorkbook | null }
   ActiveWorkbook: { Name: string } | null
   PluginStorage: ReturnType<typeof createMockPluginStorage>
 } {
@@ -78,7 +78,7 @@ function createMockApp(
   return {
     Workbooks: {
       Count: workbooks.length,
-      Item: (i: number) => (i >= 1 && i <= workbooks.length ? workbooks[i - 1] : null),
+      Item: (index: number) => (index >= 1 && index <= workbooks.length ? workbooks[index - 1] : null),
     },
     ActiveWorkbook: activeWbName ? { Name: activeWbName } : null,
     PluginStorage: storage,
@@ -86,7 +86,7 @@ function createMockApp(
 }
 
 // ========== vi.hoisted 共享 mock 引用 ============
-const mockRefs = vi.hoisted(() => ({
+const mockReferences = vi.hoisted(() => ({
   mockBgmLog: vi.fn(),
   mockShowToast: vi.fn(),
   mockEnrichState: {
@@ -103,7 +103,7 @@ const mockRefs = vi.hoisted(() => ({
 vi.mock('../ts/tools/logger.js', () => ({
   logger: {
     debug: vi.fn(),
-    info: mockRefs.mockBgmLog,
+    info: mockReferences.mockBgmLog,
     warn: vi.fn(),
     error: vi.fn(),
   },
@@ -145,13 +145,13 @@ const mockBGMState = vi.hoisted(() => ({
 
 vi.mock('../ts/index.js', () => ({
   getApp: () => (window as Record<string, unknown>).Application || null,
-  bgmLog: mockRefs.mockBgmLog,
+  bgmLog: mockReferences.mockBgmLog,
   BGM: mockBGMState,
   LOG_LEVELS: { INFO: 'INFO', WARN: 'WARN', ERROR: 'ERROR', DEBUG: 'DEBUG' },
   CONFIG_KEYS: {
     ENRICH_LOCKED_WORKBOOK: 'bgm_enrich_locked_workbook',
   },
-  showToast: mockRefs.mockShowToast,
+  showToast: mockReferences.mockShowToast,
 }))
 
 // ========== 导入被测模块 ============
@@ -172,8 +172,8 @@ import {
 
 beforeEach(() => {
   vi.clearAllMocks()
-  mockRefs.mockBgmLog.mockClear()
-  mockRefs.mockShowToast.mockClear()
+  mockReferences.mockBgmLog.mockClear()
+  mockReferences.mockShowToast.mockClear()
 
   // 重置 BGM.enrich 状态
   mockBGMState.enrich = {
@@ -204,16 +204,16 @@ function setMockApp(app: unknown): void {
 function setupBasicDom(): void {
   const ids = ['workbookSelect', 'sheetSelect', 'lockSheetBtn', 'lockStatus']
   ids.forEach((id) => {
-    let el: HTMLElement
+    let element: HTMLElement
     if (id === 'workbookSelect' || id === 'sheetSelect') {
-      el = document.createElement('select')
+      element = document.createElement('select')
     } else if (id === 'lockSheetBtn') {
-      el = document.createElement('button')
+      element = document.createElement('button')
     } else {
-      el = document.createElement('div')
+      element = document.createElement('div')
     }
-    el.id = id
-    document.body.appendChild(el)
+    element.id = id
+    document.body.appendChild(element)
   })
 }
 
@@ -286,7 +286,7 @@ describe('refreshEnrichWorkbooks', () => {
 
     refreshEnrichWorkbooks('workbookSelect')
 
-    expect(mockRefs.mockBgmLog).toHaveBeenCalled()
+    expect(mockReferences.mockBgmLog).toHaveBeenCalled()
   })
 })
 
@@ -367,7 +367,7 @@ describe('refreshEnrichSheets', () => {
 
     refreshEnrichSheets('nonexistent.xlsx', 'sheetSelect', 'workbookSelect')
 
-    expect(mockRefs.mockBgmLog).toHaveBeenCalled()
+    expect(mockReferences.mockBgmLog).toHaveBeenCalled()
   })
 
   it('DOM 元素不存在时不报错', () => {
@@ -411,7 +411,7 @@ describe('toggleEnrichWorkbookLock', () => {
     expect(mockBGMState.enrich.lockedSheetName).toBe('TargetSheet')
     expect(mockBGMState.enrich.lockedSheetIndex).toBe(2)
     expect(storage._store.bgm_enrich_locked_workbook).toBeTruthy()
-    expect(mockRefs.mockShowToast).toHaveBeenCalled()
+    expect(mockReferences.mockShowToast).toHaveBeenCalled()
   })
 
   it('已锁定状态下点击解锁', () => {
@@ -443,7 +443,7 @@ describe('toggleEnrichWorkbookLock', () => {
     expect(mockBGMState.enrich.lockedWorkbookName).toBeNull()
     expect(mockBGMState.enrich.lockedSheetName).toBeNull()
     expect(mockBGMState.enrich.lockedSheetIndex).toBeNull()
-    expect(mockRefs.mockShowToast).toHaveBeenCalled()
+    expect(mockReferences.mockShowToast).toHaveBeenCalled()
   })
 
   it('未选择工作表时提示错误', () => {
@@ -457,7 +457,7 @@ describe('toggleEnrichWorkbookLock', () => {
 
     toggleEnrichWorkbookLock('sheetSelect', 'workbookSelect', 'lockSheetBtn', 'lockStatus')
 
-    expect(mockRefs.mockShowToast).toHaveBeenCalled()
+    expect(mockReferences.mockShowToast).toHaveBeenCalled()
     expect(mockBGMState.enrich.isLocked).toBe(false)
   })
 
@@ -476,7 +476,7 @@ describe('toggleEnrichWorkbookLock', () => {
 
     toggleEnrichWorkbookLock('sheetSelect', 'workbookSelect', 'lockSheetBtn', 'lockStatus')
 
-    expect(mockRefs.mockShowToast).toHaveBeenCalled()
+    expect(mockReferences.mockShowToast).toHaveBeenCalled()
   })
 
   it('DOM 元素不存在时不报错', () => {
@@ -499,10 +499,10 @@ describe('updateEnrichLockButton', () => {
 
     updateEnrichLockButton('lockSheetBtn', 'lockStatus')
 
-    const btn = document.getElementById('lockSheetBtn') as HTMLButtonElement
+    const button = document.getElementById('lockSheetBtn') as HTMLButtonElement
     const status = document.getElementById('lockStatus') as HTMLDivElement
-    expect(btn.textContent).toContain('解锁')
-    expect(btn.classList.contains('locked')).toBe(true)
+    expect(button.textContent).toContain('解锁')
+    expect(button.classList.contains('locked')).toBe(true)
     expect(status.style.display).not.toBe('none')
     expect(status.textContent).toContain('wb1.xlsx')
     expect(status.textContent).toContain('Sheet1')
@@ -514,10 +514,10 @@ describe('updateEnrichLockButton', () => {
 
     updateEnrichLockButton('lockSheetBtn', 'lockStatus')
 
-    const btn = document.getElementById('lockSheetBtn') as HTMLButtonElement
+    const button = document.getElementById('lockSheetBtn') as HTMLButtonElement
     const status = document.getElementById('lockStatus') as HTMLDivElement
-    expect(btn.textContent).toContain('锁定')
-    expect(btn.classList.contains('locked')).toBe(false)
+    expect(button.textContent).toContain('锁定')
+    expect(button.classList.contains('locked')).toBe(false)
     expect(status.style.display).toBe('none')
   })
 
@@ -543,7 +543,7 @@ describe('saveEnrichLockedWorkbook', () => {
     expect(storage._store.bgm_enrich_locked_workbook).toBe(
       JSON.stringify({ workbookName: 'wb1.xlsx', sheetName: 'Sheet1', sheetIndex: 1 }),
     )
-    expect(mockRefs.mockBgmLog).toHaveBeenCalled()
+    expect(mockReferences.mockBgmLog).toHaveBeenCalled()
   })
 
   it('传入 null 时清除持久化数据', () => {
@@ -557,7 +557,7 @@ describe('saveEnrichLockedWorkbook', () => {
     saveEnrichLockedWorkbook(null)
 
     expect(storage._store.bgm_enrich_locked_workbook).toBe('')
-    expect(mockRefs.mockBgmLog).toHaveBeenCalled()
+    expect(mockReferences.mockBgmLog).toHaveBeenCalled()
   })
 
   it('PluginStorage 不可用时记录警告', () => {
@@ -572,7 +572,7 @@ describe('saveEnrichLockedWorkbook', () => {
       sheetIndex: 1,
     })
 
-    expect(mockRefs.mockBgmLog).toHaveBeenCalled()
+    expect(mockReferences.mockBgmLog).toHaveBeenCalled()
   })
 })
 

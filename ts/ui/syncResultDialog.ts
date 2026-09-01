@@ -64,8 +64,8 @@ export interface SyncResultDialogOptions {
  * 从日期字符串推断季度
  * 1-3月 → 冬，4-6月 → 春，7-9月 → 夏，10-12月 → 秋
  */
-function getSeasonFromDate(dateStr: string): string | null {
-  const match = /^(\d{4})[-/.](\d{1,2})/.exec(dateStr)
+function getSeasonFromDate(dateString: string): string | null {
+  const match = /^(\d{4})[-/.](\d{1,2})/.exec(dateString)
   if (!match) return null
   const year = match[1]!
   const month = parseInt(match[2]!, 10)
@@ -131,12 +131,12 @@ export function computeDateStatsFromSheet(): DateStats {
     if (!sid) continue
     totalCount++
 
-    const dateStr = trim(getCellValue(ws, row, dateCol))
-    if (!dateStr) continue
+    const dateString = trim(getCellValue(ws, row, dateCol))
+    if (!dateString) continue
     datedCount++
 
     // 标准化日期：移除分隔符，用于比较
-    const normalized = dateStr.replace(/[/.]/g, '-')
+    const normalized = dateString.replace(/[/.]/g, '-')
     const dateMatch = /^\d{4}-\d{1,2}-\d{1,2}$/.exec(normalized)
     if (!dateMatch) continue
 
@@ -236,8 +236,8 @@ function buildSyncChartSection(
   const seg = (pct: number) => (pct / 100) * circumference
 
   // 耗时格式化
-  const elapsedStr = formatDuration(elapsedMs)
-  const speedStr = avgSpeed > 0 ? avgSpeed.toFixed(1) : '--'
+  const elapsedString = formatDuration(elapsedMs)
+  const speedString = avgSpeed > 0 ? avgSpeed.toFixed(1) : '--'
 
   // 预计剩余
   const remaining = totalActive - totalProcessed
@@ -441,7 +441,7 @@ function buildSyncChartSection(
           <div class="bgm-perg-center"><span>⏱</span></div>
         </div>
         <div class="bgm-perg-info">
-          <div class="bgm-perg-value">${elapsedStr}</div>
+          <div class="bgm-perg-value">${elapsedString}</div>
           <div class="bgm-perg-label">总耗时</div>
         </div>
       </div>
@@ -459,7 +459,7 @@ function buildSyncChartSection(
           <div class="bgm-perg-center"><span>⚡</span></div>
         </div>
         <div class="bgm-perg-info">
-          <div class="bgm-perg-value">${speedStr}</div>
+          <div class="bgm-perg-value">${speedString}</div>
           <div class="bgm-perg-label">行/秒</div>
         </div>
       </div>
@@ -602,36 +602,36 @@ export function showSyncResultDialog(options: SyncResultDialogOptions): void {
 
   // ── 绑定事件 ──
   // 关闭按钮
-  const closeBtn = modal.querySelector<HTMLElement>('#bgmResultCloseBtn')
-  closeBtn?.addEventListener('click', () => {
+  const closeButton = modal.querySelector<HTMLElement>('#bgmResultCloseBtn')
+  closeButton?.addEventListener('click', () => {
     hideSyncResultDialog()
   })
 
   // 导出 JSONL
-  const exportBtn = modal.querySelector('#bgmResultExportBtn')
-  exportBtn?.addEventListener('click', () => {
-    const originalText = exportBtn.textContent
+  const exportButton = modal.querySelector('#bgmResultExportBtn')
+  exportButton?.addEventListener('click', () => {
+    const originalText = exportButton.textContent
     const success = exportSheetToJsonlFile()
     if (success) {
-      exportBtn.textContent = '✅ 已导出'
+      exportButton.textContent = '✅ 已导出'
       setTimeout(() => {
-        exportBtn.textContent = originalText
+        exportButton.textContent = originalText
       }, 2000)
     } else {
-      exportBtn.textContent = '❌ 导出失败'
+      exportButton.textContent = '❌ 导出失败'
       setTimeout(() => {
-        exportBtn.textContent = originalText
+        exportButton.textContent = originalText
       }, 2000)
     }
   })
 
   // 查看详情（打开同步记录表，或弹窗预览）
-  const viewDetailsBtn = modal.querySelector('#bgmResultViewDetailsBtn')
-  viewDetailsBtn?.addEventListener('click', () => {
+  const viewDetailsButton = modal.querySelector('#bgmResultViewDetailsBtn')
+  viewDetailsButton?.addEventListener('click', () => {
     Promise.all([import('../sync/syncRecord.js'), import('../tools/config.js')])
-      .then(([syncRecordMod, configMod]) => {
-        const { getSyncRecordSheetIfExists, openSyncRecordSheet } = syncRecordMod
-        const { getSyncRecordEnabled } = configMod
+      .then(([syncRecordModule, configModule]) => {
+        const { getSyncRecordSheetIfExists, openSyncRecordSheet } = syncRecordModule
+        const { getSyncRecordEnabled } = configModule
 
         const syncEnabled = getSyncRecordEnabled()
         const sheetExists = getSyncRecordSheetIfExists() !== null
@@ -673,7 +673,7 @@ export function showSyncResultDialog(options: SyncResultDialogOptions): void {
   document.addEventListener('keydown', _resultDialogEscHandler)
 
   // 焦点管理
-  closeBtn?.focus()
+  closeButton?.focus()
 
   // 显示弹窗
   modal.style.display = 'flex'
@@ -824,8 +824,8 @@ function showSyncDetailPreviewDialog(options: SyncDetailPreviewOptions): void {
   _previewDialog = modal
 
   // 关闭按钮
-  const closeBtn = modal.querySelector<HTMLElement>('#bgmPreviewCloseBtn')
-  closeBtn?.addEventListener('click', () => {
+  const closeButton = modal.querySelector<HTMLElement>('#bgmPreviewCloseBtn')
+  closeButton?.addEventListener('click', () => {
     hideSyncDetailPreviewDialog()
   })
 
@@ -845,7 +845,7 @@ function showSyncDetailPreviewDialog(options: SyncDetailPreviewOptions): void {
   })
 
   // 焦点管理
-  closeBtn?.focus()
+  closeButton?.focus()
 
   // 显示弹窗
   modal.style.display = 'flex'

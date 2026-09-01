@@ -27,7 +27,7 @@ import { trim } from '../tools/stringUtilsPure.js'
 export type LoggerFn = (level: number, message: string) => void
 
 /** 当前注入的日志函数，默认 no-op */
-let loggerFn: LoggerFn = () => {}
+let loggerFunction: LoggerFn = () => {}
 
 /**
  * 注入日志函数（依赖注入入口）
@@ -38,7 +38,7 @@ let loggerFn: LoggerFn = () => {}
  * @param fn - 日志函数，签名为 (level: number, message: string) => void
  */
 export function setLogger(fn: LoggerFn): void {
-  loggerFn = fn
+  loggerFunction = fn
 }
 
 /**
@@ -105,9 +105,9 @@ export function extractSubjectId(input: string): string | null {
 
   // 尝试从文本中提取数字
   if (id === null) {
-    const numMatch = /\d+/.exec(trimmed)
-    if (numMatch && numMatch[0]) {
-      id = numMatch[0]
+    const numberMatch = /\d+/.exec(trimmed)
+    if (numberMatch && numberMatch[0]) {
+      id = numberMatch[0]
     }
   }
 
@@ -156,12 +156,12 @@ export function mapWatchStatus(status: string): number {
   if (normalized === 'false') return 0
 
   // 数字字符串转换
-  const num = parseInt(normalized, 10)
-  if (!isNaN(num) && num >= 0 && num <= 5) {
-    return num
+  const number_ = parseInt(normalized, 10)
+  if (!isNaN(number_) && number_ >= 0 && number_ <= 5) {
+    return number_
   }
 
   // 无法识别的状态，记录警告日志（通过注入的 loggerFn 调用）
-  loggerFn(LOG_LEVELS.WARN, `[mapWatchStatus] 无法识别的状态值: "${status}"，返回 0（无效）`)
+  loggerFunction(LOG_LEVELS.WARN, `[mapWatchStatus] 无法识别的状态值: "${status}"，返回 0（无效）`)
   return 0
 }

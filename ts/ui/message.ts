@@ -91,9 +91,9 @@ export function initMessageListener(): void {
 // ========== 状态显示 ==========
 
 export function setStatus(message: string, type?: string): void {
-  const statusEl = document.getElementById('statusBox') || document.getElementById('statusDisplay')
-  if (!statusEl) return
+  const statusElement = document.getElementById('statusBox') || document.getElementById('statusDisplay')
+  if (!statusElement) return
 
-  statusEl.textContent = message
-  statusEl.className = `status ${type || 'info'}`
+  statusElement.textContent = message
+  statusElement.className = `status ${type || 'info'}`
 }

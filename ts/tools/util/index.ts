@@ -36,13 +36,13 @@ import { syncAllRows } from '../../ui/preview.js'
 import { BGM_EVENTS, eventBus } from '../events.js'
 // 字符串工具已拆分到 stringUtils.ts，此处 import 供内部调用，并 re-export 保持向后兼容
 import { logger } from '../logger.js'
-import { colNumToLetter, trim, escapeHtml, calcFingerprint } from '../stringUtils.js'
+import { colNumToLetter as colNumberToLetter, trim, escapeHtml, calcFingerprint } from '../stringUtils.js'
 // 日志模块：bgmLog 内部通过 logger 输出，自动脱敏敏感信息，且不污染全局 console
 import { isWpsApp } from '../wps.js'
-import type { WpsApplication, WpsWorksheet } from '../wps.js'
+import type { WpsApplication as WpsApp, WpsWorksheet } from '../wps.js'
 
 // re-export 字符串工具保持向后兼容
-export { colNumToLetter, trim, escapeHtml, calcFingerprint }
+export { colNumberToLetter as colNumToLetter, trim, escapeHtml, calcFingerprint }
 // re-export 子模块
 export { getCell, getCellValue, setCellValue, getSheetByIndex } from './cell.js'
 export {
@@ -139,7 +139,7 @@ export const BGM: {
     onCancel?: () => void,
   ) => void
   handleError: (error: unknown, options?: ErrorOptions) => BgmError
-  safeExecute: <T>(fn: () => T, context?: string, options?: ErrorOptions) => T | BgmError
+  safeExecute: <T>(function_: () => T, context?: string, options?: ErrorOptions) => T | BgmError
 
   setUserId: (id: string | null) => void
   setUsername: (name: string | null) => void
@@ -282,15 +282,15 @@ export const BGM: {
       try {
         const ws = this.currentSheet
         const col = this.currentCol > 0 ? this.currentCol : 1
-        const cellAddr = `${colNumToLetter(col)}${String(this.currentRow)}`
+        const cellAddr = `${colNumberToLetter(col)}${String(this.currentRow)}`
         const cell = ws.Range(cellAddr)
         cell.Select()
         bgmLog(LOG_LEVELS.INFO, `[sync] 已定位到单元格: ${cellAddr}`)
         return true
       } catch (error: unknown) {
-        const msg = error instanceof Error ? error.message : String(error)
-        bgmLog(LOG_LEVELS.WARN, `[sync] 定位单元格失败: ${msg}`)
-        showToast(`定位单元格失败: ${msg}`, 'error')
+        const message = error instanceof Error ? error.message : String(error)
+        bgmLog(LOG_LEVELS.WARN, `[sync] 定位单元格失败: ${message}`)
+        showToast(`定位单元格失败: ${message}`, 'error')
         return false
       }
     },
@@ -454,15 +454,15 @@ export const BGM: {
 
   // 统一错误处理
   handleError(error: unknown, options?: ErrorOptions): BgmError {
-    const opts: ErrorOptions = {
+    const options_: ErrorOptions = {
       level: ErrorLevel.ERROR,
       showAlert: false,
       context: '',
       ...options,
     }
     // ✅ 自动获取调用函数名（如果 context 未手动指定）
-    if (!opts.context) {
-      opts.context = getCallerFunctionName()
+    if (!options_.context) {
+      options_.context = getCallerFunctionName()
     }
     let bgmError: BgmError
     if (error instanceof BgmError) {
@@ -476,11 +476,11 @@ export const BGM: {
       bgmError = new BgmError(String(error), 'UNKNOWN')
     }
 
-    if (opts.context) {
-      bgmError.details.context = opts.context
+    if (options_.context) {
+      bgmError.details.context = options_.context
     }
 
-    switch (opts.level) {
+    switch (options_.level) {
       case ErrorLevel.SILENT: {
         break
       }
@@ -490,7 +490,7 @@ export const BGM: {
       }
       case ErrorLevel.ERROR: {
         bgmLog(LOG_LEVELS.ERROR, bgmError.toString())
-        if (opts.showAlert) {
+        if (options_.showAlert) {
           BGM.showAlert('错误', bgmError.message)
         }
         break
@@ -505,9 +505,9 @@ export const BGM: {
   },
 
   // 安全执行函数
-  safeExecute<T>(fn: () => T, context?: string, options?: ErrorOptions): T | BgmError {
+  safeExecute<T>(function_: () => T, context?: string, options?: ErrorOptions): T | BgmError {
     try {
-      return fn()
+      return function_()
     } catch (error) {
       return BGM.handleError(error, { context, ...options } as ErrorOptions)
     }
@@ -562,28 +562,28 @@ export const BGM: {
 
 export function bgmLog(level: number, message: string | null | undefined): void {
   if (level >= BGM.LOG_LEVEL) {
-    const msg = message ?? ''
+    const message_ = message ?? ''
     // 0=DEBUG, 1=INFO, 2=WARN, 3=ERROR（与 LOG_LEVELS 保持一致）
     // 通过 logger 输出，message 会自动经过 maskSensitiveData 脱敏
     switch (level) {
       case 0: {
-        logger.debug(msg)
+        logger.debug(message_)
         break
       }
       case 1: {
-        logger.info(msg)
+        logger.info(message_)
         break
       }
       case 2: {
-        logger.warn(msg)
+        logger.warn(message_)
         break
       }
       case 3: {
-        logger.error(msg)
+        logger.error(message_)
         break
       }
       default: {
-        logger.info(msg)
+        logger.info(message_)
       }
     }
   }
@@ -605,8 +605,8 @@ function getCallerFunctionName(_skipAdditional = 0): string {
     'BGM.safeExecute',
   ])
 
-  for (let i = 2; i < lines.length; i += 1) {
-    const rawLine = lines[i]
+  for (let index = 2; index < lines.length; index += 1) {
+    const rawLine = lines[index]
     if (rawLine === undefined) continue
     const line = rawLine.trim()
     const match = /at\s+([^\s(]+)/.exec(line)
@@ -624,7 +624,7 @@ function getCallerFunctionName(_skipAdditional = 0): string {
 /**
  * 获取 Application 对象（使用类型守卫）
  */
-export function getApp(): WpsApplication | null {
+export function getApp(): WpsApp | null {
   if (typeof window !== 'undefined') {
     const winApp = (window as unknown as BgmWindowGlobals).Application
     if (isWpsApp(winApp)) return winApp
@@ -1057,10 +1057,10 @@ export function fetchBgmUserInfo(signal?: AbortSignal): Promise<{
 /**
  * 通过 WPS 提供的接口执行脚本
  */
-export function shellExecuteByOAAssist(param: string): void {
+export function shellExecuteByOAAssist(parameter: string): void {
   const app = getApp()
   if (app?.OAAssist) {
-    app.OAAssist.ShellExecute(param)
+    app.OAAssist.ShellExecute(parameter)
   }
 }
 

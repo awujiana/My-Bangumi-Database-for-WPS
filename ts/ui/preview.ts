@@ -11,7 +11,7 @@ import {
   getCellValue,
   trim,
   _getUserApiPath,
-  wpsMsgBox,
+  wpsMsgBox as wpsMessageBox,
   getCell,
   escapeHtml,
   showAlert,
@@ -26,7 +26,7 @@ import {
   buildJsonPayload,
   bgmRequestSync,
   addSyncRecord,
-  addTagsFromStr,
+  addTagsFromStr as addTagsFromString,
   WATCH_STATUS_MAP,
   SyncToBangumiAsync,
   showSyncProgressDialog,
@@ -79,7 +79,7 @@ function safeAlert(message: string, title?: string): void {
   if (document.getElementById('bgmDialogContainer')) {
     showAlert(message, title)
   } else {
-    void wpsMsgBox(message, 0, 64)
+    void wpsMessageBox(message, 0, 64)
   }
 }
 
@@ -91,13 +91,13 @@ function isUploadedByColor(seqCell: WpsRange | null): boolean {
 
 function getRowData(
   ws: WpsWorksheet | null | undefined,
-  rowNum: number,
+  rowNumber: number,
   colMap: ColumnMap,
   headerRow: number,
   seqCol = 9,
 ): DetailItem {
   const data: DetailItem = {
-    row: rowNum,
+    row: rowNumber,
     name: '',
     bgmUrl: '',
     sid: '',
@@ -113,9 +113,9 @@ function getRowData(
   const readCol = (mapKey: string): string => {
     if (colMap.has(mapKey)) {
       const col = colMap.get(mapKey)!
-      const value = trim(getCellValue(ws, rowNum, col))
+      const value = trim(getCellValue(ws, rowNumber, col))
       if (mapKey === 'Bangumi_URL') {
-        data.urlCell = getCell(ws, rowNum, col)
+        data.urlCell = getCell(ws, rowNumber, col)
       }
       return value
     }
@@ -141,7 +141,7 @@ function getRowData(
 
   // 从列映射中读取序列号列，如果没有则使用默认值
   const actualSeqCol = colMap.get('序列号') || seqCol
-  const seqCell = getCell(ws, rowNum, actualSeqCol)
+  const seqCell = getCell(ws, rowNumber, actualSeqCol)
   data.isUploaded = isUploadedByColor(seqCell)
   return data
 }
@@ -171,7 +171,7 @@ function renderDetailItemHtml(
 
   // 解析标签数据
   const tagSet = new Set<string>()
-  addTagsFromStr(tagSet, rowData.tagsRaw)
+  addTagsFromString(tagSet, rowData.tagsRaw)
   const tags = Array.from(tagSet)
   // 生成标签HTML
   const tagsHtml =
@@ -231,17 +231,17 @@ let detailPreviewData: DetailPreviewData = {
 
 function handlePreviewBodyClick(e: Event): void {
   const target = e.target as HTMLElement
-  const btn = target.closest('.upload-single-btn')
-  if (!(btn instanceof HTMLElement)) return
-  const rowNum = parseInt(btn.dataset.row || '', 10)
-  if (isNaN(rowNum)) return
-  void uploadSingleRow(rowNum, btn as HTMLButtonElement)
+  const button = target.closest('.upload-single-btn')
+  if (!(button instanceof HTMLElement)) return
+  const rowNumber = parseInt(button.dataset.row || '', 10)
+  if (isNaN(rowNumber)) return
+  void uploadSingleRow(rowNumber, button as HTMLButtonElement)
 }
 
 // 从映射表中提取标准中文状态列表（过滤数字和英文）
 const VALID_STATUSES = new Set(Object.keys(WATCH_STATUS_MAP)
   .filter((key) => /^[\u4E00-\u9FA5]+$/.test(key)) // 只保留纯中文
-  .filter((key, idx, arr) => arr.indexOf(key) === idx)) // 去重
+  .filter((key, index, array) => array.indexOf(key) === index)) // 去重
 
 /**
  * 将非标准状态文本标准化（如 "是" → "看过"）
@@ -353,12 +353,12 @@ export async function previewSyncContent(): Promise<void> {
   let errorCount = 0
 
   try {
-    for (let i = 0; i < dataRows.length; i += 1) {
+    for (let index = 0; index < dataRows.length; index += 1) {
       // 停止检查
       if (BGM.sync.checkShouldStop()) {
         bgmLog(
           LOG_LEVELS.INFO,
-          `[preview] 检测到停止请求，提前终止预览生成（已完成 ${String(i)}/${String(totalRows)}）`,
+          `[preview] 检测到停止请求，提前终止预览生成（已完成 ${String(index)}/${String(totalRows)}）`,
         )
         break
       }
@@ -366,7 +366,7 @@ export async function previewSyncContent(): Promise<void> {
       if (BGM.sync.checkPaused()) {
         bgmLog(
           LOG_LEVELS.INFO,
-          `[preview] 已暂停，进度 ${String(i)}/${String(totalRows)}，等待恢复...`,
+          `[preview] 已暂停，进度 ${String(index)}/${String(totalRows)}，等待恢复...`,
         )
         await BGM.sync.waitForResume()
         if (BGM.sync.checkShouldStop()) {
@@ -375,38 +375,38 @@ export async function previewSyncContent(): Promise<void> {
         }
       }
 
-      const rowNum = dataRows[i]
-      if (rowNum === undefined) continue
+      const rowNumber = dataRows[index]
+      if (rowNumber === undefined) continue
       // 更新当前位置（行号）以便暂停时定位
-      BGM.sync.updatePosition(undefined, rowNum)
+      BGM.sync.updatePosition(undefined, rowNumber)
 
       // 每行让出主线程，确保暂停按钮及时响应
       await new Promise((r) => setTimeout(r, 0))
 
       try {
-        const rowData = getRowData(ws, rowNum, colMap, headerRow, 9)
+        const rowData = getRowData(ws, rowNumber, colMap, headerRow, 9)
 
         // 过滤无效行
         if (!rowData.bgmUrl || !rowData.sid) {
-          bgmLog(LOG_LEVELS.INFO, `[preview] 跳过行 ${String(rowNum)} (无 Bangumi URL)`)
+          bgmLog(LOG_LEVELS.INFO, `[preview] 跳过行 ${String(rowNumber)} (无 Bangumi URL)`)
           skippedCount++
           updateSyncProgressDialog(
-            i + 1,
+            index + 1,
             totalRows,
-            `预览生成 ${String(i + 1)}/${String(totalRows)}（卡片 ${String(actualCardCount)}）`,
-            `⊘ [${String(i + 1)}/${String(totalRows)}] 行${String(rowNum)} 跳过: 无URL`,
+            `预览生成 ${String(index + 1)}/${String(totalRows)}（卡片 ${String(actualCardCount)}）`,
+            `⊘ [${String(index + 1)}/${String(totalRows)}] 行${String(rowNumber)} 跳过: 无URL`,
           )
           continue
         }
         // 可选：过滤全空（名称、状态、标签全空）
         if (!rowData.name && !rowData.status && !rowData.tagsRaw) {
-          bgmLog(LOG_LEVELS.INFO, `[preview] 跳过行 ${String(rowNum)} (空卡片)`)
+          bgmLog(LOG_LEVELS.INFO, `[preview] 跳过行 ${String(rowNumber)} (空卡片)`)
           skippedCount++
           updateSyncProgressDialog(
-            i + 1,
+            index + 1,
             totalRows,
-            `预览生成 ${String(i + 1)}/${String(totalRows)}（卡片 ${String(actualCardCount)}）`,
-            `⊘ [${String(i + 1)}/${String(totalRows)}] 行${String(rowNum)} 跳过: 空卡片`,
+            `预览生成 ${String(index + 1)}/${String(totalRows)}（卡片 ${String(actualCardCount)}）`,
+            `⊘ [${String(index + 1)}/${String(totalRows)}] 行${String(rowNumber)} 跳过: 空卡片`,
           )
           continue
         }
@@ -432,10 +432,10 @@ export async function previewSyncContent(): Promise<void> {
         cardsHtml += renderDetailItemHtml(rowData, colMap, ws)
         actualCardCount++
         updateSyncProgressDialog(
-          i + 1,
+          index + 1,
           totalRows,
-          `预览生成 ${String(i + 1)}/${String(totalRows)}（卡片 ${String(actualCardCount)}）`,
-          `✓ [${String(i + 1)}/${String(totalRows)}] 行${String(rowNum)} "${rowData.name || ''}" 已渲染`,
+          `预览生成 ${String(index + 1)}/${String(totalRows)}（卡片 ${String(actualCardCount)}）`,
+          `✓ [${String(index + 1)}/${String(totalRows)}] 行${String(rowNumber)} "${rowData.name || ''}" 已渲染`,
         )
       } catch (error: unknown) {
         errorCount++
@@ -444,12 +444,12 @@ export async function previewSyncContent(): Promise<void> {
           level: BGM.ErrorLevel.WARN,
           context: 'previewSyncContent',
         })
-        cardsHtml += `<div class="detail-item error">行 ${String(rowNum)} 处理出错: ${escapeHtml((error as Error).message)}</div>`
+        cardsHtml += `<div class="detail-item error">行 ${String(rowNumber)} 处理出错: ${escapeHtml((error as Error).message)}</div>`
         updateSyncProgressDialog(
-          i + 1,
+          index + 1,
           totalRows,
-          `预览生成 ${String(i + 1)}/${String(totalRows)}（卡片 ${String(actualCardCount)}）`,
-          `✗ [${String(i + 1)}/${String(totalRows)}] 行${String(rowNum)} 异常: ${(error as Error).message}`,
+          `预览生成 ${String(index + 1)}/${String(totalRows)}（卡片 ${String(actualCardCount)}）`,
+          `✗ [${String(index + 1)}/${String(totalRows)}] 行${String(rowNumber)} 异常: ${(error as Error).message}`,
         )
       }
     }
@@ -460,14 +460,14 @@ export async function previewSyncContent(): Promise<void> {
 
     // 切换弹窗为完成状态
     const summary = `📊 预览 ${String(totalRows)} 行 | 卡片 ${String(actualCardCount)}\n\n✅ 已渲染: ${String(actualCardCount)}\n⏭️ 跳过: ${String(skippedCount)}\n❌ 错误: ${String(errorCount)}`
-    const detailsArr: string[] = [
+    const detailsArray: string[] = [
       `总行数: ${String(totalRows)}`,
       `渲染卡片: ${String(actualCardCount)}`,
       `跳过行数: ${String(skippedCount)}`,
       `错误行数: ${String(errorCount)}`,
     ]
-    if (wasStopped) detailsArr.unshift('⚠️ 预览被用户停止')
-    completeSyncProgressDialog(summary, detailsArr, wasStopped)
+    if (wasStopped) detailsArray.unshift('⚠️ 预览被用户停止')
+    completeSyncProgressDialog(summary, detailsArray, wasStopped)
 
     // 生成统计卡片（使用 actualCardCount）
     const statsHtml = buildStatsHtml(actualCardCount)
@@ -527,9 +527,9 @@ export async function previewSyncContent(): Promise<void> {
       select.appendChild(opt)
     }
 
-    const syncAllBtn = document.getElementById('syncAllBtn')
-    if (syncAllBtn) {
-      syncAllBtn.insertAdjacentElement('afterend', select)
+    const syncAllButton = document.getElementById('syncAllBtn')
+    if (syncAllButton) {
+      syncAllButton.insertAdjacentElement('afterend', select)
     } else {
       header.appendChild(select)
     }
@@ -545,9 +545,9 @@ export async function previewSyncContent(): Promise<void> {
     select.dispatchEvent(new Event('change'))
 
     // ----- 绑定「全部同步」按钮点击事件 -----
-    const syncAllBtnEl = document.getElementById('syncAllBtn')
-    if (syncAllBtnEl) {
-      syncAllBtnEl.onclick = () => {
+    const syncAllButtonElement = document.getElementById('syncAllBtn')
+    if (syncAllButtonElement) {
+      syncAllButtonElement.onclick = () => {
         syncAllRows().catch((error: unknown) => {
           bgmLog(LOG_LEVELS.ERROR, `[preview] syncAllRows 异常: ${(error as Error).message}`)
         })
@@ -555,8 +555,8 @@ export async function previewSyncContent(): Promise<void> {
     }
 
     // ----- 绑定滚动按钮事件 -----
-    const scrollTopBtn = document.getElementById('scrollToTopBtn')
-    const scrollBottomBtn = document.getElementById('scrollToBottomBtn')
+    const scrollTopButton = document.getElementById('scrollToTopBtn')
+    const scrollBottomButton = document.getElementById('scrollToBottomBtn')
 
     const updateScrollButtons = () => {
       const { scrollTop } = body
@@ -566,15 +566,15 @@ export async function previewSyncContent(): Promise<void> {
 
       // 只有内容可滚动时才显示按钮
       if (maxScroll <= 0) {
-        scrollTopBtn?.classList.add('hidden')
-        scrollBottomBtn?.classList.add('hidden')
+        scrollTopButton?.classList.add('hidden')
+        scrollBottomButton?.classList.add('hidden')
         return
       }
 
       // 根据位置显示/隐藏按钮
-      scrollTopBtn?.classList.toggle('hidden', scrollTop <= 10);
+      scrollTopButton?.classList.toggle('hidden', scrollTop <= 10);
 
-      scrollBottomBtn?.classList.toggle('hidden', scrollTop >= maxScroll - 10);
+      scrollBottomButton?.classList.toggle('hidden', scrollTop >= maxScroll - 10);
     }
 
     // 初始化按钮可见性
@@ -584,10 +584,10 @@ export async function previewSyncContent(): Promise<void> {
     body.addEventListener('scroll', updateScrollButtons)
 
     // 按钮点击事件
-    scrollTopBtn?.addEventListener('click', () => {
+    scrollTopButton?.addEventListener('click', () => {
       body.scrollTo({ top: 0, behavior: 'smooth' })
     })
-    scrollBottomBtn?.addEventListener('click', () => {
+    scrollBottomButton?.addEventListener('click', () => {
       body.scrollTo({ top: body.scrollHeight, behavior: 'smooth' })
     })
 
@@ -630,8 +630,8 @@ function buildStatsHtml(totalRows: number): string {
 
 // ========== 单条上传 ==========
 export async function uploadSingleRow(
-  rowNum: number,
-  btnElement?: HTMLButtonElement,
+  rowNumber: number,
+  buttonElement?: HTMLButtonElement,
 ): Promise<void> {
   const token = loadBgToken()
   if (!token) {
@@ -639,10 +639,10 @@ export async function uploadSingleRow(
     return
   }
 
-  if (btnElement) {
-    btnElement.disabled = true
-    btnElement.classList.add('uploading')
-    btnElement.textContent = '上传中...'
+  if (buttonElement) {
+    buttonElement.disabled = true
+    buttonElement.classList.add('uploading')
+    buttonElement.textContent = '上传中...'
   }
 
   try {
@@ -657,11 +657,11 @@ export async function uploadSingleRow(
     const colMap: ColumnMap = getColumnMap(ws, headerRow)
     if (!colMap.has('Bangumi_URL')) throw new Error('未找到 Bangumi URL 列')
 
-    const rowData = getRowData(ws, rowNum, colMap, headerRow, 9)
+    const rowData = getRowData(ws, rowNumber, colMap, headerRow, 9)
     if (!rowData.sid) throw new Error('无法提取 Subject ID')
 
     const jsonBody = buildJsonPayload(
-      (key) => (colMap.has(key) ? trim(getCellValue(ws, rowNum, colMap.get(key)!)) : ''),
+      (key) => (colMap.has(key) ? trim(getCellValue(ws, rowNumber, colMap.get(key)!)) : ''),
       rowData.finishedDate,
     )
     if (!jsonBody) throw new Error('无法构建请求体')
@@ -675,19 +675,19 @@ export async function uploadSingleRow(
     const statusCode = result.code || 0
     // 从列映射中读取序列号列
     const actualSeqCol = colMap.get('序列号') || 9
-    const seqCell = getCell(ws, rowNum, actualSeqCol)
+    const seqCell = getCell(ws, rowNumber, actualSeqCol)
 
     if ([200, 201, 202, 204].includes(statusCode)) {
       if (seqCell?.Interior) seqCell.Interior.Color = BGM_COLOR.SUCCESS
 
-      if (btnElement) {
-        btnElement.classList.remove('uploading')
-        btnElement.classList.add('reupload')
-        btnElement.textContent = '重新上传'
-        btnElement.disabled = false
+      if (buttonElement) {
+        buttonElement.classList.remove('uploading')
+        buttonElement.classList.add('reupload')
+        buttonElement.textContent = '重新上传'
+        buttonElement.disabled = false
       }
 
-      const detailItem = btnElement?.closest('.detail-item') as HTMLElement | null
+      const detailItem = buttonElement?.closest('.detail-item') as HTMLElement | null
       if (detailItem) {
         detailItem.classList.remove('pending')
         detailItem.classList.add('uploaded')
@@ -709,17 +709,17 @@ export async function uploadSingleRow(
         type: '',
         content: jsonBody,
         status: '成功',
-        message: `行 ${String(rowNum)}`,
+        message: `行 ${String(rowNumber)}`,
         count: 1,
       })
     } else {
       if (seqCell?.Interior) seqCell.Interior.Color = BGM_COLOR.FAIL
 
-      if (btnElement) {
-        btnElement.classList.remove('uploading')
-        btnElement.classList.add('error')
-        btnElement.textContent = '✗ 失败'
-        btnElement.disabled = false
+      if (buttonElement) {
+        buttonElement.classList.remove('uploading')
+        buttonElement.classList.add('error')
+        buttonElement.textContent = '✗ 失败'
+        buttonElement.disabled = false
       }
 
       addSyncRecord({
@@ -741,11 +741,11 @@ export async function uploadSingleRow(
     }
   } catch (error: unknown) {
     BGM.handleError(error, { showAlert: true, level: BGM.ErrorLevel.ERROR, context: 'UploadSingleRow' })
-    if (btnElement) {
-      btnElement.disabled = false
-      btnElement.classList.remove('uploading')
-      btnElement.classList.add('error')
-      btnElement.textContent = '✗ 错误'
+    if (buttonElement) {
+      buttonElement.disabled = false
+      buttonElement.classList.remove('uploading')
+      buttonElement.classList.add('error')
+      buttonElement.textContent = '✗ 错误'
     }
     showToast(`上传出错: ${(error as Error).message.substring(0, 60)}`, 'error')
     BGM.handleError(error, { showAlert: true, level: BGM.ErrorLevel.ERROR, context: 'UploadSingleRow' })
@@ -861,8 +861,8 @@ export async function syncAllRows(): Promise<{ success: number; fail: number; sk
       // 并通过 skipSids 选项传给 SyncToBangumiAsync
     }
   } catch (error: unknown) {
-    const bgmErr = BGM.handleError(error, { showAlert: false })
-    bgmErr.message = `冲突检测失败，已跳过此步骤。原始错误: ${bgmErr.message}`
+    const bgmError = BGM.handleError(error, { showAlert: false })
+    bgmError.message = `冲突检测失败，已跳过此步骤。原始错误: ${bgmError.message}`
   }
 
   // ---------- 3. 读取增量同步设置 ----------

@@ -19,94 +19,94 @@ describe('buildSyncConfig', () => {
 
   describe('基础字段构造', () => {
     it('应正确构造 source 字段', () => {
-      const cfg = buildSyncConfig({ source: '远程仓库' })
-      expect(cfg.sourceLabel).toBe('远程仓库')
-      expect(cfg.strategyLabel).toBeUndefined()
-      expect(cfg.directionLabel).toBeUndefined()
+      const config = buildSyncConfig({ source: '远程仓库' })
+      expect(config.sourceLabel).toBe('远程仓库')
+      expect(config.strategyLabel).toBeUndefined()
+      expect(config.directionLabel).toBeUndefined()
     })
 
     it('应正确构造 strategy 字段', () => {
-      const cfg = buildSyncConfig({ strategy: '镜像同步' })
-      expect(cfg.strategyLabel).toBe('镜像同步')
-      expect(cfg.sourceLabel).toBeUndefined()
+      const config = buildSyncConfig({ strategy: '镜像同步' })
+      expect(config.strategyLabel).toBe('镜像同步')
+      expect(config.sourceLabel).toBeUndefined()
     })
 
     it('应正确构造 direction 字段', () => {
-      const cfg = buildSyncConfig({ direction: 'Excel → Bangumi' })
-      expect(cfg.directionLabel).toBe('Excel → Bangumi')
+      const config = buildSyncConfig({ direction: 'Excel → Bangumi' })
+      expect(config.directionLabel).toBe('Excel → Bangumi')
     })
 
     it('应正确构造 selectedRowsOnly 字段', () => {
-      const cfg = buildSyncConfig({ selectedRowsOnly: true })
-      expect(cfg.selectedRowsOnly).toBe(true)
+      const config = buildSyncConfig({ selectedRowsOnly: true })
+      expect(config.selectedRowsOnly).toBe(true)
     })
 
     it('selectedRowsOnly 为 false 时不应设置', () => {
-      const cfg = buildSyncConfig({ selectedRowsOnly: false })
-      expect(cfg.selectedRowsOnly).toBeUndefined()
+      const config = buildSyncConfig({ selectedRowsOnly: false })
+      expect(config.selectedRowsOnly).toBeUndefined()
     })
   })
 
   describe('时间筛选构造', () => {
     it('year 模式应生成正确标签', () => {
-      const cfg = buildSyncConfig({
+      const config = buildSyncConfig({
         timeFilter: { range: 'year', year: 2026 },
       })
-      expect(cfg.timeFilterLabel).toBe('2026年全年')
+      expect(config.timeFilterLabel).toBe('2026年全年')
     })
 
     it('quarter 模式应生成正确标签', () => {
-      const cfg = buildSyncConfig({
+      const config = buildSyncConfig({
         timeFilter: { range: 'quarter', year: 2026, quarter: 7 },
       })
-      expect(cfg.timeFilterLabel).toBe('2026年7月新番')
+      expect(config.timeFilterLabel).toBe('2026年7月新番')
     })
 
     it('month 模式应生成正确标签', () => {
-      const cfg = buildSyncConfig({
+      const config = buildSyncConfig({
         timeFilter: { range: 'month', year: 2026, month: 5 },
       })
-      expect(cfg.timeFilterLabel).toBe('2026年5月')
+      expect(config.timeFilterLabel).toBe('2026年5月')
     })
 
     it('缺少 quarter 时不应崩溃', () => {
-      const cfg = buildSyncConfig({
+      const config = buildSyncConfig({
         timeFilter: { range: 'quarter', year: 2026 },
       })
-      expect(cfg.timeFilterLabel).toBe('2026年undefined月新番')
+      expect(config.timeFilterLabel).toBe('2026年undefined月新番')
     })
 
     it('缺少 month 时不应崩溃', () => {
-      const cfg = buildSyncConfig({
+      const config = buildSyncConfig({
         timeFilter: { range: 'month', year: 2026 },
       })
-      expect(cfg.timeFilterLabel).toBe('2026年undefined月')
+      expect(config.timeFilterLabel).toBe('2026年undefined月')
     })
   })
 
   describe('额外字段构造', () => {
     it('应正确构造 extra 数组', () => {
-      const cfg = buildSyncConfig({
+      const config = buildSyncConfig({
         extra: [
           { label: '数据范围', value: '第2~100行' },
           { label: '增量', value: '开启' },
         ],
       })
-      expect(cfg.extra).toEqual([
+      expect(config.extra).toEqual([
         { label: '数据范围', value: '第2~100行' },
         { label: '增量', value: '开启' },
       ])
     })
 
     it('空 extra 数组不应设置', () => {
-      const cfg = buildSyncConfig({ extra: [] })
-      expect(cfg.extra).toBeUndefined()
+      const config = buildSyncConfig({ extra: [] })
+      expect(config.extra).toBeUndefined()
     })
   })
 
   describe('综合场景', () => {
     it('数据同步完整配置', () => {
-      const cfg = buildSyncConfig({
+      const config = buildSyncConfig({
         source: '远程仓库',
         strategy: '镜像同步',
         direction: '远程仓库 → Excel',
@@ -114,22 +114,22 @@ describe('buildSyncConfig', () => {
         timeFilter: { range: 'month', year: 2026, month: 8 },
         extra: [{ label: '版本', value: 'v2' }],
       })
-      expect(cfg.sourceLabel).toBe('远程仓库')
-      expect(cfg.strategyLabel).toBe('镜像同步')
-      expect(cfg.directionLabel).toBe('远程仓库 → Excel')
-      expect(cfg.selectedRowsOnly).toBe(true)
-      expect(cfg.timeFilterLabel).toBe('2026年8月')
-      expect(cfg.extra).toEqual([{ label: '版本', value: 'v2' }])
+      expect(config.sourceLabel).toBe('远程仓库')
+      expect(config.strategyLabel).toBe('镜像同步')
+      expect(config.directionLabel).toBe('远程仓库 → Excel')
+      expect(config.selectedRowsOnly).toBe(true)
+      expect(config.timeFilterLabel).toBe('2026年8月')
+      expect(config.extra).toEqual([{ label: '版本', value: 'v2' }])
     })
 
     it('空配置应返回空对象', () => {
-      const cfg = buildSyncConfig({})
-      expect(cfg.sourceLabel).toBeUndefined()
-      expect(cfg.strategyLabel).toBeUndefined()
-      expect(cfg.directionLabel).toBeUndefined()
-      expect(cfg.selectedRowsOnly).toBeUndefined()
-      expect(cfg.timeFilterLabel).toBeUndefined()
-      expect(cfg.extra).toBeUndefined()
+      const config = buildSyncConfig({})
+      expect(config.sourceLabel).toBeUndefined()
+      expect(config.strategyLabel).toBeUndefined()
+      expect(config.directionLabel).toBeUndefined()
+      expect(config.selectedRowsOnly).toBeUndefined()
+      expect(config.timeFilterLabel).toBeUndefined()
+      expect(config.extra).toBeUndefined()
     })
   })
 })

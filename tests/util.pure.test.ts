@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { colNumToLetter } from '../ts/tools/stringUtilsPure.js'
+import { colNumToLetter as colNumberToLetter } from '../ts/tools/stringUtilsPure.js'
 
 /**
  * 纯函数逻辑测试 - colNumToLetter
@@ -14,36 +14,36 @@ import { colNumToLetter } from '../ts/tools/stringUtilsPure.js'
 
 describe('colNumToLetter', () => {
   it('应正确转换 1-26 为 A-Z', () => {
-    expect(colNumToLetter(1)).toBe('A')
-    expect(colNumToLetter(2)).toBe('B')
-    expect(colNumToLetter(26)).toBe('Z')
+    expect(colNumberToLetter(1)).toBe('A')
+    expect(colNumberToLetter(2)).toBe('B')
+    expect(colNumberToLetter(26)).toBe('Z')
   })
 
   it('应正确转换 27-52 为 AA-AZ', () => {
-    expect(colNumToLetter(27)).toBe('AA')
-    expect(colNumToLetter(28)).toBe('AB')
-    expect(colNumToLetter(52)).toBe('AZ')
+    expect(colNumberToLetter(27)).toBe('AA')
+    expect(colNumberToLetter(28)).toBe('AB')
+    expect(colNumberToLetter(52)).toBe('AZ')
   })
 
   it('应正确转换 53 为 BA', () => {
-    expect(colNumToLetter(53)).toBe('BA')
+    expect(colNumberToLetter(53)).toBe('BA')
   })
 
   it('应正确转换 702 为 ZZ', () => {
-    expect(colNumToLetter(702)).toBe('ZZ')
+    expect(colNumberToLetter(702)).toBe('ZZ')
   })
 
   it('应正确转换 703 为 AAA', () => {
-    expect(colNumToLetter(703)).toBe('AAA')
+    expect(colNumberToLetter(703)).toBe('AAA')
   })
 
   it('应正确转换 731 为 ABC', () => {
-    expect(colNumToLetter(731)).toBe('ABC')
+    expect(colNumberToLetter(731)).toBe('ABC')
   })
 
   it('应返回空字符串当 col <= 0', () => {
-    expect(colNumToLetter(0)).toBe('')
-    expect(colNumToLetter(-1)).toBe('')
-    expect(colNumToLetter(-100)).toBe('')
+    expect(colNumberToLetter(0)).toBe('')
+    expect(colNumberToLetter(-1)).toBe('')
+    expect(colNumberToLetter(-100)).toBe('')
   })
 })

@@ -56,8 +56,8 @@ describe('showConflictResolver - 模态框渲染', () => {
     expect(modal).not.toBeNull()
 
     // 关闭模态框（避免悬挂 Promise）
-    const confirmBtn = document.querySelector<HTMLButtonElement>('.conflict-btn-confirm')
-    confirmBtn?.click()
+    const confirmButton = document.querySelector<HTMLButtonElement>('.conflict-btn-confirm')
+    confirmButton?.click()
     await promise
   })
 
@@ -68,8 +68,8 @@ describe('showConflictResolver - 模态框渲染', () => {
     expect(rows).toHaveLength(SAMPLE_CONFLICTS.length)
 
     // 清理
-    const confirmBtn = document.querySelector<HTMLButtonElement>('.conflict-btn-confirm')
-    confirmBtn?.click()
+    const confirmButton = document.querySelector<HTMLButtonElement>('.conflict-btn-confirm')
+    confirmButton?.click()
     await promise
   })
 
@@ -88,8 +88,8 @@ describe('showConflictResolver - 模态框渲染', () => {
     expect(cells?.[3]?.textContent).toBe('9')
 
     // 清理
-    const confirmBtn = document.querySelector<HTMLButtonElement>('.conflict-btn-confirm')
-    confirmBtn?.click()
+    const confirmButton = document.querySelector<HTMLButtonElement>('.conflict-btn-confirm')
+    confirmButton?.click()
     await promise
   })
 
@@ -100,8 +100,8 @@ describe('showConflictResolver - 模态框渲染', () => {
     expect(count?.textContent).toBe(`${String(SAMPLE_CONFLICTS.length)} 个冲突`)
 
     // 清理
-    const confirmBtn = document.querySelector<HTMLButtonElement>('.conflict-btn-confirm')
-    confirmBtn?.click()
+    const confirmButton = document.querySelector<HTMLButtonElement>('.conflict-btn-confirm')
+    confirmButton?.click()
     await promise
   })
 
@@ -126,8 +126,8 @@ describe('showConflictResolver - 模态框渲染', () => {
     expect(injectedImgs).toHaveLength(0)
 
     // 清理
-    const confirmBtn = document.querySelector<HTMLButtonElement>('.conflict-btn-confirm')
-    confirmBtn?.click()
+    const confirmButton = document.querySelector<HTMLButtonElement>('.conflict-btn-confirm')
+    confirmButton?.click()
     await promise
   })
 })
@@ -136,8 +136,8 @@ describe('showConflictResolver - 确认与取消', () => {
   it('点击确认按钮返回决策数组，默认全部 local', async (): Promise<void> => {
     const promise = showConflictResolver(SAMPLE_CONFLICTS)
 
-    const confirmBtn = document.querySelector<HTMLButtonElement>('.conflict-btn-confirm')
-    confirmBtn?.click()
+    const confirmButton = document.querySelector<HTMLButtonElement>('.conflict-btn-confirm')
+    confirmButton?.click()
 
     const result = await promise
     expect(result).not.toBeNull()
@@ -155,11 +155,11 @@ describe('showConflictResolver - 确认与取消', () => {
     const promise = showConflictResolver(SAMPLE_CONFLICTS)
 
     // 找到取消按钮（工具栏第 4 个 button：全部本地、全部远程、取消、确认）
-    const cancelBtn = document.querySelectorAll<HTMLButtonElement>(
+    const cancelButton = document.querySelectorAll<HTMLButtonElement>(
       '.conflict-toolbar .btn.small',
     )[2]
-    expect(cancelBtn?.textContent).toBe('取消')
-    cancelBtn?.click()
+    expect(cancelButton?.textContent).toBe('取消')
+    cancelButton?.click()
 
     const result = await promise
     expect(result).toBeNull()
@@ -168,8 +168,8 @@ describe('showConflictResolver - 确认与取消', () => {
   it('确认后模态框从 DOM 移除', async (): Promise<void> => {
     const promise = showConflictResolver(SAMPLE_CONFLICTS)
 
-    const confirmBtn = document.querySelector<HTMLButtonElement>('.conflict-btn-confirm')
-    confirmBtn?.click()
+    const confirmButton = document.querySelector<HTMLButtonElement>('.conflict-btn-confirm')
+    confirmButton?.click()
     await promise
 
     const modal = document.querySelector('.conflict-modal')
@@ -179,10 +179,10 @@ describe('showConflictResolver - 确认与取消', () => {
   it('取消后模态框从 DOM 移除', async (): Promise<void> => {
     const promise = showConflictResolver(SAMPLE_CONFLICTS)
 
-    const cancelBtn = document.querySelectorAll<HTMLButtonElement>(
+    const cancelButton = document.querySelectorAll<HTMLButtonElement>(
       '.conflict-toolbar .btn.small',
     )[2]
-    cancelBtn?.click()
+    cancelButton?.click()
     await promise
 
     const modal = document.querySelector('.conflict-modal')
@@ -203,15 +203,15 @@ describe('showConflictResolver - 批量选择', () => {
     })
 
     // 点击「全部使用本地」（工具栏第 1 个 button）
-    const allLocalBtn = document.querySelectorAll<HTMLButtonElement>(
+    const allLocalButton = document.querySelectorAll<HTMLButtonElement>(
       '.conflict-toolbar .btn.small',
     )[0]
-    expect(allLocalBtn?.textContent).toBe('全部使用本地')
-    allLocalBtn?.click()
+    expect(allLocalButton?.textContent).toBe('全部使用本地')
+    allLocalButton?.click()
 
     // 确认
-    const confirmBtn = document.querySelector<HTMLButtonElement>('.conflict-btn-confirm')
-    confirmBtn?.click()
+    const confirmButton = document.querySelector<HTMLButtonElement>('.conflict-btn-confirm')
+    confirmButton?.click()
 
     const result = await promise
     expect(result?.every((r) => r.chosenValue === 'local')).toBe(true)
@@ -221,15 +221,15 @@ describe('showConflictResolver - 批量选择', () => {
     const promise = showConflictResolver(SAMPLE_CONFLICTS)
 
     // 点击「全部使用远程」（工具栏第 2 个 button）
-    const allRemoteBtn = document.querySelectorAll<HTMLButtonElement>(
+    const allRemoteButton = document.querySelectorAll<HTMLButtonElement>(
       '.conflict-toolbar .btn.small',
     )[1]
-    expect(allRemoteBtn?.textContent).toBe('全部使用远程')
-    allRemoteBtn?.click()
+    expect(allRemoteButton?.textContent).toBe('全部使用远程')
+    allRemoteButton?.click()
 
     // 确认
-    const confirmBtn = document.querySelector<HTMLButtonElement>('.conflict-btn-confirm')
-    confirmBtn?.click()
+    const confirmButton = document.querySelector<HTMLButtonElement>('.conflict-btn-confirm')
+    confirmButton?.click()
 
     const result = await promise
     expect(result?.every((r) => r.chosenValue === 'remote')).toBe(true)
@@ -247,8 +247,8 @@ describe('showConflictResolver - 单条切换', () => {
     remoteRadio!.checked = true
 
     // 确认
-    const confirmBtn = document.querySelector<HTMLButtonElement>('.conflict-btn-confirm')
-    confirmBtn?.click()
+    const confirmButton = document.querySelector<HTMLButtonElement>('.conflict-btn-confirm')
+    confirmButton?.click()
 
     const result = await promise
     expect(result).toHaveLength(2)
@@ -266,8 +266,8 @@ describe('showConflictResolver - 单条切换', () => {
     expect(remoteRadio).toBeTruthy()
     remoteRadio!.checked = true
 
-    const confirmBtn = document.querySelector<HTMLButtonElement>('.conflict-btn-confirm')
-    confirmBtn?.click()
+    const confirmButton = document.querySelector<HTMLButtonElement>('.conflict-btn-confirm')
+    confirmButton?.click()
 
     const result = await promise
     expect(result).toHaveLength(1)

@@ -130,10 +130,10 @@ const _pendingTimeouts = new Set<ReturnType<typeof setTimeout>>()
  * 受追踪的 setTimeout：将 timeoutId 加入模块级 Set，便于统一清理。
  * 回调执行时自动从 Set 中移除。
  */
-function trackedSetTimeout(fn: () => void, delay: number): ReturnType<typeof setTimeout> {
+function trackedSetTimeout(function_: () => void, delay: number): ReturnType<typeof setTimeout> {
   const id = setTimeout(() => {
     _pendingTimeouts.delete(id)
-    fn()
+    function_()
   }, delay)
   _pendingTimeouts.add(id)
   return id
@@ -486,7 +486,7 @@ export function setupButtonListeners(): void {
 
   // GitHub 配置：面板加载时自动填充已保存的值（含策略与同步源类型）
   try {
-    const cfg = getGithubConfig()
+    const config = getGithubConfig()
     const ownerInput = document.getElementById('githubOwner') as HTMLInputElement | null
     const repoInput = document.getElementById('githubRepo') as HTMLInputElement | null
     const branchInput = document.getElementById('githubBranch') as HTMLInputElement | null
@@ -495,14 +495,14 @@ export function setupButtonListeners(): void {
     const gistIdInput = document.getElementById('gistId') as HTMLInputElement | null
     const strategySelect = document.getElementById('githubStrategy') as HTMLSelectElement | null
     const sourceTypeSelect = document.getElementById('syncSourceType') as HTMLSelectElement | null
-    if (ownerInput) ownerInput.value = cfg.owner
-    if (repoInput) repoInput.value = cfg.repo
-    if (branchInput) branchInput.value = cfg.branch
-    if (pathInput) pathInput.value = cfg.path
+    if (ownerInput) ownerInput.value = config.owner
+    if (repoInput) repoInput.value = config.repo
+    if (branchInput) branchInput.value = config.branch
+    if (pathInput) pathInput.value = config.path
     // 本地文件路径复用 githubConfig.path 字段，回填到独立输入框
-    if (localFilePathInput) localFilePathInput.value = cfg.path
+    if (localFilePathInput) localFilePathInput.value = config.path
     // Gist ID 回填
-    if (gistIdInput && cfg.gistId) gistIdInput.value = cfg.gistId
+    if (gistIdInput && config.gistId) gistIdInput.value = config.gistId
     // 回填策略
     const savedStrategy = getSyncStrategy()
     if (strategySelect) strategySelect.value = savedStrategy
@@ -510,10 +510,10 @@ export function setupButtonListeners(): void {
     const savedSourceType = getSyncSourceType()
     if (sourceTypeSelect) sourceTypeSelect.value = savedSourceType
     toggleSourceFields(savedSourceType)
-    if (cfg.owner || cfg.repo || cfg.path) {
+    if (config.owner || config.repo || config.path) {
       bgmLog(
         LOG_LEVELS.INFO,
-        `[handlers] GitHub 配置已加载: ${cfg.owner}/${cfg.repo}/${cfg.branch}/${cfg.path}, 策略: ${savedStrategy}, 同步源: ${savedSourceType}`,
+        `[handlers] GitHub 配置已加载: ${config.owner}/${config.repo}/${config.branch}/${config.path}, 策略: ${savedStrategy}, 同步源: ${savedSourceType}`,
       )
     }
 
@@ -631,33 +631,33 @@ interface ActionHandlerContext {
   startTime: number
 }
 
-type ActionHandler = (ctx: ActionHandlerContext) => void
+type ActionHandler = (context: ActionHandlerContext) => void
 
 const ACTION_HANDLERS: Record<string, ActionHandler> = {
   // 核心操作
-  sync: (ctx) => {
+  sync: (context) => {
     bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 开始执行同步操作')
     void syncFromPanel()
     bgmLog(
       LOG_LEVELS.INFO,
-      `[handleActionClick] 同步操作已触发，耗时: ${String(Date.now() - ctx.startTime)}ms`,
+      `[handleActionClick] 同步操作已触发，耗时: ${String(Date.now() - context.startTime)}ms`,
     )
   },
 
-  testSelected: (ctx) => {
+  testSelected: (context) => {
     bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 开始执行选中行同步')
     if (typeof syncSelectedRows === 'function') {
       void syncSelectedRows()
       bgmLog(
         LOG_LEVELS.INFO,
-        `[handleActionClick] 选中行同步已触发，耗时: ${String(Date.now() - ctx.startTime)}ms`,
+        `[handleActionClick] 选中行同步已触发，耗时: ${String(Date.now() - context.startTime)}ms`,
       )
     } else {
       bgmLog(LOG_LEVELS.WARN, '[handleActionClick] syncSelectedRows 函数未定义')
     }
   },
 
-  clear: (ctx) => {
+  clear: (context) => {
     bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 开始刷新数据')
     showConfirm(_T.confirmClearMarks, (confirmed) => {
       if (confirmed) {
@@ -666,7 +666,7 @@ const ACTION_HANDLERS: Record<string, ActionHandler> = {
         if (typeof refreshData === 'function') refreshData()
         bgmLog(
           LOG_LEVELS.INFO,
-          `[handleActionClick] 刷新数据完成，耗时: ${String(Date.now() - ctx.startTime)}ms`,
+          `[handleActionClick] 刷新数据完成，耗时: ${String(Date.now() - context.startTime)}ms`,
         )
       } else {
         bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 用户取消刷新数据')
@@ -674,13 +674,13 @@ const ACTION_HANDLERS: Record<string, ActionHandler> = {
     })
   },
 
-  previewSyncContent: (ctx) => {
+  previewSyncContent: (context) => {
     bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 开始执行预览同步内容')
     if (typeof previewSyncContent === 'function') {
       void previewSyncContent()
       bgmLog(
         LOG_LEVELS.INFO,
-        `[handleActionClick] 预览同步内容已触发，耗时: ${String(Date.now() - ctx.startTime)}ms`,
+        `[handleActionClick] 预览同步内容已触发，耗时: ${String(Date.now() - context.startTime)}ms`,
       )
     } else {
       bgmLog(LOG_LEVELS.WARN, '[handleActionClick] previewSyncContent 函数未定义')
@@ -696,27 +696,27 @@ const ACTION_HANDLERS: Record<string, ActionHandler> = {
     }
   },
 
-  setToken: (ctx) => {
+  setToken: (context) => {
     // 已废弃，由 showTokenDialog 替代，保留兼容
     bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 打开 Token 设置对话框')
     showTokenDialog(loadBgToken() || '')
     bgmLog(
       LOG_LEVELS.INFO,
-      `[handleActionClick] Token 设置对话框已打开，耗时: ${String(Date.now() - ctx.startTime)}ms`,
+      `[handleActionClick] Token 设置对话框已打开，耗时: ${String(Date.now() - context.startTime)}ms`,
     )
   },
 
   // 快捷按钮
-  showTokenDialog: (ctx) => {
+  showTokenDialog: (context) => {
     bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 显示 Token 设置对话框')
     showTokenDialog(loadBgToken() || '')
     bgmLog(
       LOG_LEVELS.INFO,
-      `[handleActionClick] Token 设置对话框已显示，耗时: ${String(Date.now() - ctx.startTime)}ms`,
+      `[handleActionClick] Token 设置对话框已显示，耗时: ${String(Date.now() - context.startTime)}ms`,
     )
   },
 
-  clearToken: (ctx) => {
+  clearToken: (context) => {
     bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 清除 Token 设置')
     try {
       clearBgToken()
@@ -736,11 +736,11 @@ const ACTION_HANDLERS: Record<string, ActionHandler> = {
     }
     bgmLog(
       LOG_LEVELS.INFO,
-      `[handleActionClick] 清除 Token 操作完成，耗时: ${String(Date.now() - ctx.startTime)}ms`,
+      `[handleActionClick] 清除 Token 操作完成，耗时: ${String(Date.now() - context.startTime)}ms`,
     )
   },
 
-  copyToken: (ctx) => {
+  copyToken: (context) => {
     bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 复制 Token 到剪贴板')
     try {
       const ok = copyTokenToClipboard()
@@ -754,27 +754,27 @@ const ACTION_HANDLERS: Record<string, ActionHandler> = {
     }
     bgmLog(
       LOG_LEVELS.INFO,
-      `[handleActionClick] 复制 Token 操作完成，耗时: ${String(Date.now() - ctx.startTime)}ms`,
+      `[handleActionClick] 复制 Token 操作完成，耗时: ${String(Date.now() - context.startTime)}ms`,
     )
   },
 
-  testToken: (ctx) => {
+  testToken: (context) => {
     bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 开始测试 Token 有效性')
     testTokenValidity()
     bgmLog(
       LOG_LEVELS.INFO,
-      `[handleActionClick] Token 测试已触发，耗时: ${String(Date.now() - ctx.startTime)}ms`,
+      `[handleActionClick] Token 测试已触发，耗时: ${String(Date.now() - context.startTime)}ms`,
     )
   },
 
   // Token 续约：刷新用户信息和头像
-  renewToken: (ctx) => {
+  renewToken: (context) => {
     bgmLog(LOG_LEVELS.INFO, '[handleActionClick] Token 续约')
     // renewToken 已废弃，其内部仅委托给 testTokenValidity，直接调用等价流程
     testTokenValidity()
     bgmLog(
       LOG_LEVELS.INFO,
-      `[handleActionClick] Token 续约已触发，耗时: ${String(Date.now() - ctx.startTime)}ms`,
+      `[handleActionClick] Token 续约已触发，耗时: ${String(Date.now() - context.startTime)}ms`,
     )
   },
 
@@ -784,193 +784,193 @@ const ACTION_HANDLERS: Record<string, ActionHandler> = {
     hideConnectionTestDialog()
   },
 
-  showUserIdDialog: (ctx) => {
+  showUserIdDialog: (context) => {
     bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 显示用户ID设置对话框')
     showUserIdDialog()
     bgmLog(
       LOG_LEVELS.INFO,
-      `[handleActionClick] 用户ID设置对话框已显示，耗时: ${String(Date.now() - ctx.startTime)}ms`,
+      `[handleActionClick] 用户ID设置对话框已显示，耗时: ${String(Date.now() - context.startTime)}ms`,
     )
   },
 
-  openUserCollection: (ctx) => {
+  openUserCollection: (context) => {
     bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 尝试打开收藏页面')
     openUserCollection()
     bgmLog(
       LOG_LEVELS.INFO,
-      `[handleActionClick] 收藏页面打开操作已触发，耗时: ${String(Date.now() - ctx.startTime)}ms`,
+      `[handleActionClick] 收藏页面打开操作已触发，耗时: ${String(Date.now() - context.startTime)}ms`,
     )
   },
 
-  openTokenPage: (ctx) => {
+  openTokenPage: (context) => {
     bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 打开 Token 申请页面')
     openBangumiTokenPage()
     bgmLog(
       LOG_LEVELS.INFO,
-      `[handleActionClick] Token 申请页面已触发，耗时: ${String(Date.now() - ctx.startTime)}ms`,
+      `[handleActionClick] Token 申请页面已触发，耗时: ${String(Date.now() - context.startTime)}ms`,
     )
   },
 
-  syncCollectionFromBgm: (ctx) => {
+  syncCollectionFromBgm: (context) => {
     bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 开始从 BGM 同步收藏')
     syncCollectionFromBgm()
     bgmLog(
       LOG_LEVELS.INFO,
-      `[handleActionClick] 收藏同步已触发，耗时: ${String(Date.now() - ctx.startTime)}ms`,
+      `[handleActionClick] 收藏同步已触发，耗时: ${String(Date.now() - context.startTime)}ms`,
     )
   },
 
-  refreshSheets: (ctx) => {
+  refreshSheets: (context) => {
     bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 开始刷新工作表（自动匹配当前活动工作表）')
     refreshSheets({ autoSelectActive: true })
     bgmLog(
       LOG_LEVELS.INFO,
-      `[handleActionClick] 工作表刷新已触发，耗时: ${String(Date.now() - ctx.startTime)}ms`,
+      `[handleActionClick] 工作表刷新已触发，耗时: ${String(Date.now() - context.startTime)}ms`,
     )
   },
 
-  refreshWorkbooks: (ctx) => {
+  refreshWorkbooks: (context) => {
     bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 开始刷新工作簿列表')
     refreshWorkbooks()
     refreshSheets({ autoSelectActive: true })
     bgmLog(
       LOG_LEVELS.INFO,
-      `[handleActionClick] 工作簿刷新已触发，耗时: ${String(Date.now() - ctx.startTime)}ms`,
+      `[handleActionClick] 工作簿刷新已触发，耗时: ${String(Date.now() - context.startTime)}ms`,
     )
   },
 
-  refreshData: (ctx) => {
+  refreshData: (context) => {
     bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 开始刷新数据')
     refreshData()
     bgmLog(
       LOG_LEVELS.INFO,
-      `[handleActionClick] 数据刷新已触发，耗时: ${String(Date.now() - ctx.startTime)}ms`,
+      `[handleActionClick] 数据刷新已触发，耗时: ${String(Date.now() - context.startTime)}ms`,
     )
   },
 
-  toggleSheetLock: (ctx) => {
+  toggleSheetLock: (context) => {
     bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 切换工作表锁定状态')
     toggleSheetLock()
     bgmLog(
       LOG_LEVELS.INFO,
-      `[handleActionClick] 工作表锁定状态已切换，耗时: ${String(Date.now() - ctx.startTime)}ms`,
+      `[handleActionClick] 工作表锁定状态已切换，耗时: ${String(Date.now() - context.startTime)}ms`,
     )
   },
 
-  clearSyncRecords: (ctx) => {
+  clearSyncRecords: (context) => {
     bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 开始清除同步记录')
     clearSyncRecords()
     bgmLog(
       LOG_LEVELS.INFO,
-      `[handleActionClick] 同步记录清除已触发，耗时: ${String(Date.now() - ctx.startTime)}ms`,
+      `[handleActionClick] 同步记录清除已触发，耗时: ${String(Date.now() - context.startTime)}ms`,
     )
   },
 
-  deduplicateSyncRecords: (ctx) => {
+  deduplicateSyncRecords: (context) => {
     bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 开始去重同步记录')
     deduplicateSyncRecords()
     showToast('去重完成', 'success')
     bgmLog(
       LOG_LEVELS.INFO,
-      `[handleActionClick] 同步记录去重已触发，耗时: ${String(Date.now() - ctx.startTime)}ms`,
+      `[handleActionClick] 同步记录去重已触发，耗时: ${String(Date.now() - context.startTime)}ms`,
     )
   },
 
-  formatSyncRecordSheet: (ctx) => {
+  formatSyncRecordSheet: (context) => {
     bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 开始设置同步记录表格式')
     formatSyncRecordSheet()
     showToast('格式设置完成', 'success')
     bgmLog(
       LOG_LEVELS.INFO,
-      `[handleActionClick] 同步记录表格式设置已触发，耗时: ${String(Date.now() - ctx.startTime)}ms`,
+      `[handleActionClick] 同步记录表格式设置已触发，耗时: ${String(Date.now() - context.startTime)}ms`,
     )
   },
 
-  cleanLockedDataSheet: (ctx) => {
+  cleanLockedDataSheet: (context) => {
     bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 开始清洗锁定数据表')
     cleanLockedDataSheet()
     bgmLog(
       LOG_LEVELS.INFO,
-      `[handleActionClick] 数据清洗完成，耗时: ${String(Date.now() - ctx.startTime)}ms`,
+      `[handleActionClick] 数据清洗完成，耗时: ${String(Date.now() - context.startTime)}ms`,
     )
   },
 
-  openSyncRecordSheet: (ctx) => {
+  openSyncRecordSheet: (context) => {
     bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 打开同步记录工作表')
     openSyncRecordSheet()
     bgmLog(
       LOG_LEVELS.INFO,
-      `[handleActionClick] 同步记录工作表已打开，耗时: ${String(Date.now() - ctx.startTime)}ms`,
+      `[handleActionClick] 同步记录工作表已打开，耗时: ${String(Date.now() - context.startTime)}ms`,
     )
   },
 
-  testDebugConnection: (ctx) => {
+  testDebugConnection: (context) => {
     bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 测试调试连接')
     testDebugConnection()
     bgmLog(
       LOG_LEVELS.INFO,
-      `[handleActionClick] 调试连接测试已完成，耗时: ${String(Date.now() - ctx.startTime)}ms`,
+      `[handleActionClick] 调试连接测试已完成，耗时: ${String(Date.now() - context.startTime)}ms`,
     )
   },
 
   // 模态框操作
-  closeDetailModal: (ctx) => {
+  closeDetailModal: (context) => {
     bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 关闭详情模态框')
     closeDetailModal()
     bgmLog(
       LOG_LEVELS.INFO,
-      `[handleActionClick] 详情模态框已关闭，耗时: ${String(Date.now() - ctx.startTime)}ms`,
+      `[handleActionClick] 详情模态框已关闭，耗时: ${String(Date.now() - context.startTime)}ms`,
     )
   },
 
   // 弹窗快捷调用（参数形式）
-  showToast: (ctx) => {
-    bgmLog(LOG_LEVELS.INFO, `[handleActionClick] 显示 Toast 消息: ${ctx.args[0] || ''}`)
-    showToast(ctx.args[0] ?? '', ctx.args[1] ?? '')
+  showToast: (context) => {
+    bgmLog(LOG_LEVELS.INFO, `[handleActionClick] 显示 Toast 消息: ${context.args[0] || ''}`)
+    showToast(context.args[0] ?? '', context.args[1] ?? '')
     bgmLog(
       LOG_LEVELS.INFO,
-      `[handleActionClick] Toast 已显示，耗时: ${String(Date.now() - ctx.startTime)}ms`,
+      `[handleActionClick] Toast 已显示，耗时: ${String(Date.now() - context.startTime)}ms`,
     )
   },
 
-  showAlert: (ctx) => {
-    bgmLog(LOG_LEVELS.INFO, `[handleActionClick] 显示警告框: ${ctx.args[0] || ''}`)
-    showAlert(ctx.args[0] ?? '', ctx.args[1] ?? '')
+  showAlert: (context) => {
+    bgmLog(LOG_LEVELS.INFO, `[handleActionClick] 显示警告框: ${context.args[0] || ''}`)
+    showAlert(context.args[0] ?? '', context.args[1] ?? '')
     bgmLog(
       LOG_LEVELS.INFO,
-      `[handleActionClick] 警告框已显示，耗时: ${String(Date.now() - ctx.startTime)}ms`,
+      `[handleActionClick] 警告框已显示，耗时: ${String(Date.now() - context.startTime)}ms`,
     )
   },
 
-  requestStopSync: (ctx) => {
+  requestStopSync: (context) => {
     bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 用户请求停止同步')
     BGM.sync.requestStop()
     bgmLog(
       LOG_LEVELS.INFO,
-      `[handleActionClick] 停止同步请求已发送，耗时: ${String(Date.now() - ctx.startTime)}ms`,
+      `[handleActionClick] 停止同步请求已发送，耗时: ${String(Date.now() - context.startTime)}ms`,
     )
   },
 
-  pauseSync: (ctx) => {
+  pauseSync: (context) => {
     bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 用户请求暂停同步')
     BGM.sync.pause()
     bgmLog(
       LOG_LEVELS.INFO,
-      `[handleActionClick] 暂停同步请求已发送，耗时: ${String(Date.now() - ctx.startTime)}ms`,
+      `[handleActionClick] 暂停同步请求已发送，耗时: ${String(Date.now() - context.startTime)}ms`,
     )
   },
 
-  resumeSync: (ctx) => {
+  resumeSync: (context) => {
     bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 用户请求恢复同步')
     BGM.sync.resume()
     bgmLog(
       LOG_LEVELS.INFO,
-      `[handleActionClick] 恢复同步请求已发送，耗时: ${String(Date.now() - ctx.startTime)}ms`,
+      `[handleActionClick] 恢复同步请求已发送，耗时: ${String(Date.now() - context.startTime)}ms`,
     )
   },
 
   // GitHub 仓库同步：保存配置（含策略与同步源类型）
-  saveGithubConfig: (ctx) => {
+  saveGithubConfig: (context) => {
     bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 保存 GitHub 配置')
     const ownerInput = document.getElementById('githubOwner') as HTMLInputElement | null
     const repoInput = document.getElementById('githubRepo') as HTMLInputElement | null
@@ -1036,12 +1036,12 @@ const ACTION_HANDLERS: Record<string, ActionHandler> = {
     }
     bgmLog(
       LOG_LEVELS.INFO,
-      `[handleActionClick] 保存 GitHub 配置完成，耗时: ${String(Date.now() - ctx.startTime)}ms`,
+      `[handleActionClick] 保存 GitHub 配置完成，耗时: ${String(Date.now() - context.startTime)}ms`,
     )
   },
 
   // GitHub 仓库同步：立即同步（异步，按当前策略）
-  syncFromGithub: (ctx) => {
+  syncFromGithub: (context) => {
     bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 开始数据同步（远程仓库 → Excel）')
     // 读取同步源类型：优先用下拉框当前值，兜底用已保存的值
     const sourceTypeSelect = document.getElementById('syncSourceType') as HTMLSelectElement | null
@@ -1125,14 +1125,14 @@ const ACTION_HANDLERS: Record<string, ActionHandler> = {
         const abortController = new AbortController()
 
         // 构建配置摘要，显示在同步进度弹窗顶部
-        const configCtx: BuildSyncConfigContext = {
+        const configContext: BuildSyncConfigContext = {
           source: sourceLabel,
           strategy: strategyLabel,
           direction: '远程仓库 → Excel',
           selectedRowsOnly,
         }
         if (timeFilter) {
-          const tfCtx: {
+          const tfContext: {
             range: 'year' | 'quarter' | 'month' | 'future'
             year: number
             quarter?: number
@@ -1141,11 +1141,11 @@ const ACTION_HANDLERS: Record<string, ActionHandler> = {
             range: timeFilter.range === 'all' ? 'year' : timeFilter.range,
             year: timeFilter.year,
           }
-          if (timeFilter.quarter !== undefined) tfCtx.quarter = timeFilter.quarter
-          if (timeFilter.month !== undefined) tfCtx.month = timeFilter.month
-          configCtx.timeFilter = tfCtx
+          if (timeFilter.quarter !== undefined) tfContext.quarter = timeFilter.quarter
+          if (timeFilter.month !== undefined) tfContext.month = timeFilter.month
+          configContext.timeFilter = tfContext
         }
-        const configSummary = buildSyncConfig(configCtx)
+        const configSummary = buildSyncConfig(configContext)
 
         showSyncProgressDialog(
           `正在同步 - 数据同步（${sourceLabel} → Excel）`,
@@ -1173,8 +1173,8 @@ const ACTION_HANDLERS: Record<string, ActionHandler> = {
             // message 写入日志区，eta 独立传入 ETA 区
             updateSyncProgressDialog(current, total, message, message, eta)
             if (app?.StatusBar !== undefined) {
-              const statusMsg = eta ? `${message} | ${eta}` : message
-              app.StatusBar = `[${String(current)}/${String(total)}] ${statusMsg}`
+              const statusMessage = eta ? `${message} | ${eta}` : message
+              app.StatusBar = `[${String(current)}/${String(total)}] ${statusMessage}`
             }
           },
           strategy,
@@ -1268,7 +1268,7 @@ const ACTION_HANDLERS: Record<string, ActionHandler> = {
             if (app?.StatusBar !== undefined) app.StatusBar = false
           })
           .catch((error: unknown) => {
-            const errMsg = error instanceof Error ? error.message : String(error)
+            const errorMessage = error instanceof Error ? error.message : String(error)
             const isAborted = abortController.signal.aborted
             if (isAborted) {
               showSyncResultDialog({
@@ -1288,8 +1288,8 @@ const ACTION_HANDLERS: Record<string, ActionHandler> = {
               bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 数据同步被用户停止')
             } else {
               hideSyncProgressDialog()
-              bgmLog(LOG_LEVELS.ERROR, `[handleActionClick] 数据同步失败: ${errMsg}`)
-              showToast(`数据同步失败：${errMsg}`, 'error')
+              bgmLog(LOG_LEVELS.ERROR, `[handleActionClick] 数据同步失败: ${errorMessage}`)
+              showToast(`数据同步失败：${errorMessage}`, 'error')
             }
             if (app?.StatusBar !== undefined) app.StatusBar = false
           })
@@ -1297,12 +1297,12 @@ const ACTION_HANDLERS: Record<string, ActionHandler> = {
     )
     bgmLog(
       LOG_LEVELS.INFO,
-      `[handleActionClick] 数据同步已触发（策略: ${strategy}），耗时: ${String(Date.now() - ctx.startTime)}ms`,
+      `[handleActionClick] 数据同步已触发（策略: ${strategy}），耗时: ${String(Date.now() - context.startTime)}ms`,
     )
   },
 
   // GitHub 仓库同步：测试配置（构造 URL 并提示）
-  testGithubConfig: (ctx) => {
+  testGithubConfig: (context) => {
     bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 测试 GitHub 配置')
     if (!isGithubConfigComplete()) {
       showToast('请先填写并保存 GitHub 配置', 'warn')
@@ -1312,15 +1312,15 @@ const ACTION_HANDLERS: Record<string, ActionHandler> = {
     try {
       url = buildRawUrl()
     } catch (error: unknown) {
-      const errMsg = error instanceof Error ? error.message : String(error)
-      showToast(`配置错误：${errMsg}`, 'error')
+      const errorMessage = error instanceof Error ? error.message : String(error)
+      showToast(`配置错误：${errorMessage}`, 'error')
       showConnectionTestDialog({
         success: false,
         statusCode: null,
         responseTime: 0,
         url: 'N/A',
         sourceType: getSyncSourceType(),
-        errorMessage: errMsg,
+        errorMessage,
       })
       return
     }
@@ -1389,12 +1389,12 @@ const ACTION_HANDLERS: Record<string, ActionHandler> = {
 
     bgmLog(
       LOG_LEVELS.INFO,
-      `[handleActionClick] 测试 GitHub 配置已发起，耗时: ${String(Date.now() - ctx.startTime)}ms`,
+      `[handleActionClick] 测试 GitHub 配置已发起，耗时: ${String(Date.now() - context.startTime)}ms`,
     )
   },
 
   // 本地文件源：选择本地 JSONL/JSON 文件
-  browseLocalFile: (ctx) => {
+  browseLocalFile: (context) => {
     bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 选择本地文件')
     try {
       // 通过 WPS Application.GetOpenFilename 弹出文件选择对话框
@@ -1431,32 +1431,32 @@ const ACTION_HANDLERS: Record<string, ActionHandler> = {
       showToast(`已选择：${filePath}`, 'success')
       bgmLog(LOG_LEVELS.INFO, `[handleActionClick] 已选择本地文件: ${filePath}`)
     } catch (error: unknown) {
-      const errMsg = error instanceof Error ? error.message : String(error)
-      showToast(`选择文件失败：${errMsg}`, 'error')
-      bgmLog(LOG_LEVELS.ERROR, `[handleActionClick] 选择本地文件失败: ${errMsg}`)
+      const errorMessage = error instanceof Error ? error.message : String(error)
+      showToast(`选择文件失败：${errorMessage}`, 'error')
+      bgmLog(LOG_LEVELS.ERROR, `[handleActionClick] 选择本地文件失败: ${errorMessage}`)
     }
     bgmLog(
       LOG_LEVELS.INFO,
-      `[handleActionClick] 选择本地文件完成，耗时: ${String(Date.now() - ctx.startTime)}ms`,
+      `[handleActionClick] 选择本地文件完成，耗时: ${String(Date.now() - context.startTime)}ms`,
     )
   },
 
   // GitHub 仓库同步：撤销最近一次同步（按单元格逆序恢复旧值）
-  undoLastSync: (ctx) => {
+  undoLastSync: (context) => {
     bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 撤销最近一次 GitHub 同步')
     executeUndoLastSync().catch((error: unknown) => {
-      const errMsg = error instanceof Error ? error.message : String(error)
-      bgmLog(LOG_LEVELS.ERROR, `[handleActionClick] 撤销同步失败: ${errMsg}`)
-      showToast(`撤销失败：${errMsg}`, 'error')
+      const errorMessage = error instanceof Error ? error.message : String(error)
+      bgmLog(LOG_LEVELS.ERROR, `[handleActionClick] 撤销同步失败: ${errorMessage}`)
+      showToast(`撤销失败：${errorMessage}`, 'error')
     })
     bgmLog(
       LOG_LEVELS.INFO,
-      `[handleActionClick] 撤销同步已触发，耗时: ${String(Date.now() - ctx.startTime)}ms`,
+      `[handleActionClick] 撤销同步已触发，耗时: ${String(Date.now() - context.startTime)}ms`,
     )
   },
 
   // 系统日志：打开日志面板
-  showLogPanel: (ctx) => {
+  showLogPanel: (context) => {
     bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 打开系统日志面板')
     const modal = document.getElementById('logModal')
     if (modal) {
@@ -1465,52 +1465,52 @@ const ACTION_HANDLERS: Record<string, ActionHandler> = {
     }
     bgmLog(
       LOG_LEVELS.INFO,
-      `[handleActionClick] 系统日志面板已打开，耗时: ${String(Date.now() - ctx.startTime)}ms`,
+      `[handleActionClick] 系统日志面板已打开，耗时: ${String(Date.now() - context.startTime)}ms`,
     )
   },
 
   // 系统日志：关闭日志面板
-  closeLogModal: (ctx) => {
+  closeLogModal: (context) => {
     bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 关闭系统日志面板')
     const modal = document.getElementById('logModal')
     if (modal) modal.style.display = 'none'
     bgmLog(
       LOG_LEVELS.INFO,
-      `[handleActionClick] 系统日志面板已关闭，耗时: ${String(Date.now() - ctx.startTime)}ms`,
+      `[handleActionClick] 系统日志面板已关闭，耗时: ${String(Date.now() - context.startTime)}ms`,
     )
   },
 
   // 系统日志：导出日志到文件
-  exportLogs: (ctx) => {
+  exportLogs: (context) => {
     bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 导出系统日志到文件')
     try {
       exportLogsToFile()
       showToast('日志已导出', 'success')
     } catch (error: unknown) {
-      const errMsg = error instanceof Error ? error.message : String(error)
-      bgmLog(LOG_LEVELS.ERROR, `[handleActionClick] 导出日志失败: ${errMsg}`)
-      showToast(`导出日志失败：${errMsg}`, 'error')
+      const errorMessage = error instanceof Error ? error.message : String(error)
+      bgmLog(LOG_LEVELS.ERROR, `[handleActionClick] 导出日志失败: ${errorMessage}`)
+      showToast(`导出日志失败：${errorMessage}`, 'error')
     }
     bgmLog(
       LOG_LEVELS.INFO,
-      `[handleActionClick] 日志导出完成，耗时: ${String(Date.now() - ctx.startTime)}ms`,
+      `[handleActionClick] 日志导出完成，耗时: ${String(Date.now() - context.startTime)}ms`,
     )
   },
 
   // 系统日志：清空日志缓冲区
-  clearLogs: (ctx) => {
+  clearLogs: (context) => {
     bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 清空系统日志')
     clearLogs()
     renderLogEntries()
     showToast('日志已清空', 'info')
     bgmLog(
       LOG_LEVELS.INFO,
-      `[handleActionClick] 系统日志已清空，耗时: ${String(Date.now() - ctx.startTime)}ms`,
+      `[handleActionClick] 系统日志已清空，耗时: ${String(Date.now() - context.startTime)}ms`,
     )
   },
 
   // 同步策略使用引导：显示/隐藏同步策略详细说明
-  showSyncGuide: (ctx) => {
+  showSyncGuide: (context) => {
     bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 打开同步策略使用引导')
     const note = document.getElementById('mirrorSyncNote')
     const strategySelect = document.getElementById('githubStrategy') as HTMLSelectElement | null
@@ -1539,28 +1539,28 @@ const ACTION_HANDLERS: Record<string, ActionHandler> = {
     }
     bgmLog(
       LOG_LEVELS.INFO,
-      `[handleActionClick] 同步策略引导已打开，耗时: ${String(Date.now() - ctx.startTime)}ms`,
+      `[handleActionClick] 同步策略引导已打开，耗时: ${String(Date.now() - context.startTime)}ms`,
     )
   },
 
   // 使用引导：显示/隐藏详细操作说明
-  toggleUsageGuide: (ctx) => {
+  toggleUsageGuide: (context) => {
     bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 切换使用引导详情')
     const detail = document.getElementById('usageGuideDetail')
-    const btn = document.getElementById('toggleUsageGuideBtn')
-    if (detail && btn) {
+    const button = document.getElementById('toggleUsageGuideBtn')
+    if (detail && button) {
       const isHidden = detail.style.display === 'none'
       detail.style.display = isHidden ? 'block' : 'none'
-      btn.textContent = isHidden ? '📖 收起详细操作' : '📖 显示详细操作'
+      button.textContent = isHidden ? '📖 收起详细操作' : '📖 显示详细操作'
     }
     bgmLog(
       LOG_LEVELS.INFO,
-      `[handleActionClick] 使用引导已${detail?.style.display === 'none' ? '隐藏' : '显示'}，耗时: ${String(Date.now() - ctx.startTime)}ms`,
+      `[handleActionClick] 使用引导已${detail?.style.display === 'none' ? '隐藏' : '显示'}，耗时: ${String(Date.now() - context.startTime)}ms`,
     )
   },
 
   // 保存所有配置：重新保存当前所有配置项到 PluginStorage
-  saveAllConfig: (ctx) => {
+  saveAllConfig: (context) => {
     bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 保存所有配置')
     try {
       const parts: string[] = []
@@ -1579,10 +1579,10 @@ const ACTION_HANDLERS: Record<string, ActionHandler> = {
       }
 
       // 3. GitHub 配置
-      const ghCfg = getGithubConfig()
-      if (ghCfg.owner && ghCfg.repo) {
-        setGithubConfig(ghCfg)
-        parts.push(`GitHub: ${ghCfg.owner}/${ghCfg.repo}`)
+      const ghConfig = getGithubConfig()
+      if (ghConfig.owner && ghConfig.repo) {
+        setGithubConfig(ghConfig)
+        parts.push(`GitHub: ${ghConfig.owner}/${ghConfig.repo}`)
       }
 
       // 4. 同步偏好（重新持久化）
@@ -1606,18 +1606,18 @@ const ACTION_HANDLERS: Record<string, ActionHandler> = {
       bgmLog(LOG_LEVELS.INFO, `[handleActionClick] 配置已保存: ${parts.join('; ')}`)
       showToast('所有配置已保存', 'success')
     } catch (error: unknown) {
-      const errMsg = error instanceof Error ? error.message : String(error)
-      bgmLog(LOG_LEVELS.ERROR, `[handleActionClick] 保存配置失败: ${errMsg}`)
-      showToast(`保存失败：${errMsg}`, 'error')
+      const errorMessage = error instanceof Error ? error.message : String(error)
+      bgmLog(LOG_LEVELS.ERROR, `[handleActionClick] 保存配置失败: ${errorMessage}`)
+      showToast(`保存失败：${errorMessage}`, 'error')
     }
     bgmLog(
       LOG_LEVELS.INFO,
-      `[handleActionClick] 保存配置操作完成，耗时: ${String(Date.now() - ctx.startTime)}ms`,
+      `[handleActionClick] 保存配置操作完成，耗时: ${String(Date.now() - context.startTime)}ms`,
     )
   },
 
   // 配置导入导出：导出全部配置为 JSON 文件并复制到剪贴板
-  exportConfig: (ctx) => {
+  exportConfig: (context) => {
     bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 导出配置')
     try {
       const json = exportConfig()
@@ -1636,18 +1636,18 @@ const ACTION_HANDLERS: Record<string, ActionHandler> = {
       showToast('配置已导出（已下载文件并复制到剪贴板）', 'success')
       bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 配置导出完成')
     } catch (error: unknown) {
-      const errMsg = error instanceof Error ? error.message : String(error)
-      bgmLog(LOG_LEVELS.ERROR, `[handleActionClick] 配置导出失败: ${errMsg}`)
-      showToast(`配置导出失败：${errMsg}`, 'error')
+      const errorMessage = error instanceof Error ? error.message : String(error)
+      bgmLog(LOG_LEVELS.ERROR, `[handleActionClick] 配置导出失败: ${errorMessage}`)
+      showToast(`配置导出失败：${errorMessage}`, 'error')
     }
     bgmLog(
       LOG_LEVELS.INFO,
-      `[handleActionClick] 导出配置操作完成，耗时: ${String(Date.now() - ctx.startTime)}ms`,
+      `[handleActionClick] 导出配置操作完成，耗时: ${String(Date.now() - context.startTime)}ms`,
     )
   },
 
   // 配置导入导出：从粘贴的 JSON 导入配置
-  importConfig: (ctx) => {
+  importConfig: (context) => {
     bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 导入配置')
     showInput(
       '导入配置',
@@ -1667,20 +1667,20 @@ const ACTION_HANDLERS: Record<string, ActionHandler> = {
           updateUserIdStatus()
           refreshGithubConfigInputs()
         } else {
-          const errMsg = result.error?.message ?? '未知错误'
-          bgmLog(LOG_LEVELS.ERROR, `[handleActionClick] 配置导入失败: ${errMsg}`)
-          showToast(`导入失败：${errMsg}`, 'error')
+          const errorMessage = result.error?.message ?? '未知错误'
+          bgmLog(LOG_LEVELS.ERROR, `[handleActionClick] 配置导入失败: ${errorMessage}`)
+          showToast(`导入失败：${errorMessage}`, 'error')
         }
       },
     )
     bgmLog(
       LOG_LEVELS.INFO,
-      `[handleActionClick] 导入配置对话框已显示，耗时: ${String(Date.now() - ctx.startTime)}ms`,
+      `[handleActionClick] 导入配置对话框已显示，耗时: ${String(Date.now() - context.startTime)}ms`,
     )
   },
 
   // 关闭主面板（panel）
-  closePanel: (ctx) => {
+  closePanel: (context) => {
     bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 关闭主面板')
     const app = getApp() as {
       PluginStorage?: { getItem: (k: string) => string | null }
@@ -1703,22 +1703,22 @@ const ACTION_HANDLERS: Record<string, ActionHandler> = {
     }
     bgmLog(
       LOG_LEVELS.INFO,
-      `[handleActionClick] 关闭主面板操作完成，耗时: ${String(Date.now() - ctx.startTime)}ms`,
+      `[handleActionClick] 关闭主面板操作完成，耗时: ${String(Date.now() - context.startTime)}ms`,
     )
   },
 
   // 打开/切换设置面板
-  openSettings: (ctx) => {
+  openSettings: (context) => {
     bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 打开设置面板')
     showSettingsPanel()
     bgmLog(
       LOG_LEVELS.INFO,
-      `[handleActionClick] 设置面板操作已触发，耗时: ${String(Date.now() - ctx.startTime)}ms`,
+      `[handleActionClick] 设置面板操作已触发，耗时: ${String(Date.now() - context.startTime)}ms`,
     )
   },
 
   // 设置页面：切换增量同步开关
-  toggleIncrementalSync: (_ctx) => {
+  toggleIncrementalSync: (_context) => {
     const checkbox = document.getElementById('chkIncrementalSync') as HTMLInputElement | null
     const enabled = checkbox?.checked ?? false
     setIncrementalSync(enabled)
@@ -1727,7 +1727,7 @@ const ACTION_HANDLERS: Record<string, ActionHandler> = {
   },
 
   // 设置页面：切换跳过冲突开关
-  toggleSkipConflicts: (_ctx) => {
+  toggleSkipConflicts: (_context) => {
     const checkbox = document.getElementById('chkSkipConflicts') as HTMLInputElement | null
     const enabled = checkbox?.checked ?? false
     setSkipConflicts(enabled)
@@ -1736,7 +1736,7 @@ const ACTION_HANDLERS: Record<string, ActionHandler> = {
   },
 
   // 设置页面：切换启用同步记录开关
-  toggleEnableSyncRecord: (_ctx) => {
+  toggleEnableSyncRecord: (_context) => {
     const checkbox = document.getElementById('chkEnableSyncRecord') as HTMLInputElement | null
     const enabled = checkbox?.checked ?? false
     setSyncRecordEnabled(enabled)
@@ -1744,7 +1744,7 @@ const ACTION_HANDLERS: Record<string, ActionHandler> = {
     bgmLog(LOG_LEVELS.INFO, `[handleActionClick] 启用同步记录: ${enabled ? '开启' : '关闭'}`)
   },
 
-  toggleNavIconsOnly: (_ctx) => {
+  toggleNavIconsOnly: (_context) => {
     const checkbox = document.getElementById('chkNavIconsOnly') as HTMLInputElement | null
     const enabled = checkbox?.checked ?? false
     setNavIconsOnly(enabled)
@@ -1784,10 +1784,10 @@ function handleActionClick(event: Event): void {
   const { action } = target.dataset
   if (!action) return
   // 解析可能的参数（如：<button data-action="markUploadedItems" data-args='["动画"]'>）
-  let args: string[] = []
+  let arguments_: string[] = []
   if (target.dataset.args) {
     try {
-      args = JSON.parse(target.dataset.args) as string[]
+      arguments_ = JSON.parse(target.dataset.args) as string[]
     } catch (error: unknown) {
       BGM.handleError(error, {
         showAlert: false,
@@ -1798,14 +1798,14 @@ function handleActionClick(event: Event): void {
   }
   bgmLog(LOG_LEVELS.INFO, `[handleActionClick] ========== 按钮点击事件 ==========`)
   bgmLog(LOG_LEVELS.INFO, `[handleActionClick] 操作类型: ${action}`)
-  if (args.length > 0) {
-    bgmLog(LOG_LEVELS.INFO, `[handleActionClick] 参数: ${JSON.stringify(args)}`)
+  if (arguments_.length > 0) {
+    bgmLog(LOG_LEVELS.INFO, `[handleActionClick] 参数: ${JSON.stringify(arguments_)}`)
   }
   const startTime = Date.now()
   try {
     const handler = ACTION_HANDLERS[action]
     if (handler) {
-      handler({ args, startTime })
+      handler({ args: arguments_, startTime })
     } else {
       bgmLog(LOG_LEVELS.WARN, `[handleActionClick] 未知操作类型: ${action}`)
     }
@@ -1893,7 +1893,7 @@ function _copyTextToClipboard(text: string): boolean {
  */
 function refreshGithubConfigInputs(): void {
   try {
-    const cfg = getGithubConfig()
+    const config = getGithubConfig()
     const ownerInput = document.getElementById('githubOwner') as HTMLInputElement | null
     const repoInput = document.getElementById('githubRepo') as HTMLInputElement | null
     const branchInput = document.getElementById('githubBranch') as HTMLInputElement | null
@@ -1902,19 +1902,19 @@ function refreshGithubConfigInputs(): void {
     const gistIdInput = document.getElementById('gistId') as HTMLInputElement | null
     const strategySelect = document.getElementById('githubStrategy') as HTMLSelectElement | null
     const sourceTypeSelect = document.getElementById('syncSourceType') as HTMLSelectElement | null
-    if (ownerInput) ownerInput.value = cfg.owner
-    if (repoInput) repoInput.value = cfg.repo
-    if (branchInput) branchInput.value = cfg.branch
-    if (pathInput) pathInput.value = cfg.path
-    if (localFilePathInput) localFilePathInput.value = cfg.path
-    if (gistIdInput && cfg.gistId) gistIdInput.value = cfg.gistId
+    if (ownerInput) ownerInput.value = config.owner
+    if (repoInput) repoInput.value = config.repo
+    if (branchInput) branchInput.value = config.branch
+    if (pathInput) pathInput.value = config.path
+    if (localFilePathInput) localFilePathInput.value = config.path
+    if (gistIdInput && config.gistId) gistIdInput.value = config.gistId
     if (strategySelect) strategySelect.value = getSyncStrategy()
     const sourceType = getSyncSourceType()
     if (sourceTypeSelect) sourceTypeSelect.value = sourceType
     toggleSourceFields(sourceType)
     bgmLog(
       LOG_LEVELS.INFO,
-      `[refreshGithubConfigInputs] 已刷新 GitHub 配置输入框: ${cfg.owner}/${cfg.repo}/${cfg.branch}/${cfg.path}`,
+      `[refreshGithubConfigInputs] 已刷新 GitHub 配置输入框: ${config.owner}/${config.repo}/${config.branch}/${config.path}`,
     )
   } catch (error: unknown) {
     bgmLog(
@@ -1942,15 +1942,15 @@ function setupMessageListener(): void {
       }
       const { data } = event
       if (typeof data !== 'object' || data === null) return
-      const msg = data as {
+      const message = data as {
         type?: string
         userId?: string
         username?: string
       }
 
-      bgmLog(LOG_LEVELS.INFO, `[handlers] 收到消息: ${JSON.stringify(msg)}`)
+      bgmLog(LOG_LEVELS.INFO, `[handlers] 收到消息: ${JSON.stringify(message)}`)
 
-      switch (msg.type) {
+      switch (message.type) {
         case 'BGM:tokenUpdated': {
           bgmLog(LOG_LEVELS.INFO, '[handlers] 收到 Token 更新通知')
           updateTokenStatus()
@@ -1958,10 +1958,10 @@ function setupMessageListener(): void {
           break
         }
         case 'BGM:userIdUpdated': {
-          bgmLog(LOG_LEVELS.INFO, `[handlers] 收到用户ID更新通知: ${String(msg.userId)}`)
-          if (msg.userId) {
-            BGM.cache.userId = msg.userId
-            _setBgmUserId(msg.userId)
+          bgmLog(LOG_LEVELS.INFO, `[handlers] 收到用户ID更新通知: ${String(message.userId)}`)
+          if (message.userId) {
+            BGM.cache.userId = message.userId
+            _setBgmUserId(message.userId)
             bgmLog(LOG_LEVELS.INFO, `[handlers] 已更新 BGM.cache.userId: ${BGM.cache.userId}`)
           }
           updateUserIdStatus()
@@ -1970,16 +1970,16 @@ function setupMessageListener(): void {
         case 'BGM:userInfoUpdated': {
           bgmLog(
             LOG_LEVELS.INFO,
-            `[handlers] 收到用户信息更新通知: 用户名=${String(msg.username)}, 用户ID=${String(msg.userId)}`,
+            `[handlers] 收到用户信息更新通知: 用户名=${String(message.username)}, 用户ID=${String(message.userId)}`,
           )
-          if (msg.username) {
-            BGM.cache.username = msg.username
-            _setBgmUsername(msg.username)
+          if (message.username) {
+            BGM.cache.username = message.username
+            _setBgmUsername(message.username)
             bgmLog(LOG_LEVELS.INFO, `[handlers] 已更新 BGM.cache.username: ${BGM.cache.username}`)
           }
-          if (msg.userId) {
-            BGM.cache.userId = msg.userId
-            _setBgmUserId(msg.userId)
+          if (message.userId) {
+            BGM.cache.userId = message.userId
+            _setBgmUserId(message.userId)
             bgmLog(
               LOG_LEVELS.INFO,
               `[handlers] 已更新 BGM.cache.userId 和用户ID配置: ${BGM.cache.userId}`,
@@ -1991,7 +1991,7 @@ function setupMessageListener(): void {
         case 'tokenUpdated':
         case 'userIdUpdated': {
           // 兼容旧格式
-          if (msg.type === 'tokenUpdated') {
+          if (message.type === 'tokenUpdated') {
             updateTokenStatus()
           } else {
             updateUserIdStatus()
@@ -2071,9 +2071,9 @@ const handleSyncStateChangedEvent = (payload: { state: string; row?: number }): 
   const syncButtons = document.querySelectorAll(
     'button[data-action="sync"], button[data-action="syncCollectionFromBgm"], button[data-action="previewSyncContent"], button[data-action="enlargePreview"]',
   )
-  syncButtons.forEach((btn) => {
-    const el = btn as HTMLButtonElement
-    el.disabled = payload.state === 'running' || payload.state === 'paused'
+  syncButtons.forEach((button) => {
+    const element = button as HTMLButtonElement
+    element.disabled = payload.state === 'running' || payload.state === 'paused'
   })
 }
 

@@ -105,9 +105,9 @@ export function cleanLockedDataSheet(): void {
   // ========== 2. 按名称分组（纯内存操作） ==========
   const nameRows = new Map<string, number[]>()
   let emptyNameCount = 0
-  for (let i = 0; i < totalRows; i += 1) {
-    const row = headerRow + 1 + i
-    const name = (nameData[i]?.[0] ?? '').trim()
+  for (let index = 0; index < totalRows; index += 1) {
+    const row = headerRow + 1 + index
+    const name = (nameData[index]?.[0] ?? '').trim()
     if (!name) {
       emptyNameCount++
       continue
@@ -135,8 +135,8 @@ export function cleanLockedDataSheet(): void {
     const withUrl: number[] = []
     const withoutUrl: number[] = []
     for (const row of rows) {
-      const idx = row - headerRow - 1
-      const url = idx < urlData.length ? (urlData[idx]?.[0] ?? '').trim() : ''
+      const index = row - headerRow - 1
+      const url = index < urlData.length ? (urlData[index]?.[0] ?? '').trim() : ''
       ;(url ? withUrl : withoutUrl).push(row)
     }
 
@@ -151,17 +151,17 @@ export function cleanLockedDataSheet(): void {
 
     const nameNewTags: string[] = []
     if (tagsData && withoutUrl.length > 0) {
-      const keepIdx = keepRow - headerRow - 1
+      const keepIndex = keepRow - headerRow - 1
       const existingSet = new Set(
-        (keepIdx < tagsData.length ? (tagsData[keepIdx]?.[0] ?? '') : '')
+        (keepIndex < tagsData.length ? (tagsData[keepIndex]?.[0] ?? '') : '')
           .split(/\s*\|\s*/)
           .map((t) => t.trim())
           .filter(Boolean),
       )
 
       for (const delRow of withoutUrl) {
-        const delIdx = delRow - headerRow - 1
-        const delTags = delIdx < tagsData.length ? (tagsData[delIdx]?.[0] ?? '').trim() : ''
+        const delIndex = delRow - headerRow - 1
+        const delTags = delIndex < tagsData.length ? (tagsData[delIndex]?.[0] ?? '').trim() : ''
         if (!delTags) continue
 
         for (const t of delTags.split(/\s*\|\s*/)) {
@@ -218,19 +218,19 @@ export function cleanLockedDataSheet(): void {
   toDelete.sort((a, b) => b - a)
   bgmLog(LOG_LEVELS.INFO, `[cleanLockedDataSheet] 开始删除 ${String(toDelete.length)} 行...`)
   let deleteCallCount = 0
-  let i = 0
-  while (i < toDelete.length) {
-    let j = i
-    while (j + 1 < toDelete.length && toDelete[j]! - toDelete[j + 1]! === 1) {
-      j++
+  let index = 0
+  while (index < toDelete.length) {
+    let index_ = index
+    while (index_ + 1 < toDelete.length && toDelete[index_]! - toDelete[index_ + 1]! === 1) {
+      index_++
     }
-    if (i === j) {
-      ws.Range(`${String(toDelete[i] ?? '')}:${String(toDelete[i] ?? '')}`).Delete()
+    if (index === index_) {
+      ws.Range(`${String(toDelete[index] ?? '')}:${String(toDelete[index] ?? '')}`).Delete()
     } else {
-      ws.Range(`${String(toDelete[j] ?? '')}:${String(toDelete[i] ?? '')}`).Delete()
+      ws.Range(`${String(toDelete[index_] ?? '')}:${String(toDelete[index] ?? '')}`).Delete()
     }
     deleteCallCount++
-    i = j + 1
+    index = index_ + 1
   }
   bgmLog(
     LOG_LEVELS.INFO,

@@ -29,7 +29,7 @@ const mockExtractSubjectId = vi.hoisted(() => vi.fn().mockReturnValue(null))
 const mockGetSyncSourceType = vi.hoisted(() => vi.fn().mockReturnValue('github'))
 
 // 创建可变的 mock source 引用
-const mockGithubSourceRef = vi.hoisted(() => ({
+const mockGithubSourceReference = vi.hoisted(() => ({
   getDisplayName: vi.fn().mockReturnValue('GitHub'),
   validateConfig: vi.fn().mockReturnValue({ isFail: () => false, error: null }),
   fetchRemoteEntries: vi.fn().mockResolvedValue([]),
@@ -83,7 +83,7 @@ vi.mock('../ts/sync/githubSync.js', () => ({
   applyDiffToSheet: mockApplyDiffToSheet,
   computeDiff: mockComputeDiff,
   GithubSyncSource: vi.fn().mockImplementation(function () {
-    return mockGithubSourceRef
+    return mockGithubSourceReference
   }),
   readLocalEntriesForSync: mockReadLocalEntriesForSync,
 }))
@@ -251,8 +251,8 @@ describe('syncFromRemote', () => {
   beforeEach(() => {
     vi.restoreAllMocks()
     mockGetSyncSourceType.mockReturnValue('github')
-    mockGithubSourceRef.validateConfig.mockReturnValue({ isFail: () => false, error: null })
-    mockGithubSourceRef.fetchRemoteEntries.mockResolvedValue([])
+    mockGithubSourceReference.validateConfig.mockReturnValue({ isFail: () => false, error: null })
+    mockGithubSourceReference.fetchRemoteEntries.mockResolvedValue([])
     mockReadLocalEntriesForSync.mockReturnValue({ entries: new Map(), lastRow: 1 })
     mockComputeDiff.mockReturnValue([])
     mockApplyDiffToSheet.mockResolvedValue({
@@ -268,7 +268,7 @@ describe('syncFromRemote', () => {
   })
 
   it('正常流程应返回同步结果', async () => {
-    mockGithubSourceRef.fetchRemoteEntries.mockResolvedValue([
+    mockGithubSourceReference.fetchRemoteEntries.mockResolvedValue([
       { sid: '1', name: 'A' },
       { sid: '2', name: 'B' },
     ])
@@ -276,7 +276,7 @@ describe('syncFromRemote', () => {
 
     const result = await syncFromRemote()
     expect(result).toBeDefined()
-    expect(mockGithubSourceRef.fetchRemoteEntries).toHaveBeenCalled()
+    expect(mockGithubSourceReference.fetchRemoteEntries).toHaveBeenCalled()
     expect(mockApplyDiffToSheet).toHaveBeenCalled()
   })
 
@@ -286,7 +286,7 @@ describe('syncFromRemote', () => {
   })
 
   it('配置校验失败应抛出错误', async () => {
-    mockGithubSourceRef.validateConfig.mockReturnValue({
+    mockGithubSourceReference.validateConfig.mockReturnValue({
       isFail: () => true,
       error: new Error('配置不完整'),
     })
@@ -294,7 +294,7 @@ describe('syncFromRemote', () => {
   })
 
   it('下载失败应抛出错误', async () => {
-    mockGithubSourceRef.fetchRemoteEntries.mockRejectedValue(new Error('网络错误'))
+    mockGithubSourceReference.fetchRemoteEntries.mockRejectedValue(new Error('网络错误'))
     await expect(syncFromRemote()).rejects.toThrow('网络错误')
   })
 
@@ -348,7 +348,7 @@ describe('syncFromRemote', () => {
     mockGetColumnMap.mockReturnValue(new Map([['Bangumi_URL', 5]]))
     mockGetCellValue.mockReturnValue('https://bgm.tv/subject/123')
     mockExtractSubjectId.mockReturnValue('123')
-    mockGithubSourceRef.fetchRemoteEntries.mockResolvedValue([
+    mockGithubSourceReference.fetchRemoteEntries.mockResolvedValue([
       { sid: '123', name: '匹配' },
       { sid: '456', name: '不匹配' },
     ])
@@ -358,7 +358,7 @@ describe('syncFromRemote', () => {
   })
 
   it('timeFilter 启用时应过滤远程条目', async () => {
-    mockGithubSourceRef.fetchRemoteEntries.mockResolvedValue([
+    mockGithubSourceReference.fetchRemoteEntries.mockResolvedValue([
       { sid: '1', name: 'A' },
       { sid: '2', name: 'B' },
     ])
@@ -381,8 +381,8 @@ describe('getSelectedRowSids（间接测试 via syncFromRemote）', () => {
   beforeEach(() => {
     vi.restoreAllMocks()
     mockGetSyncSourceType.mockReturnValue('github')
-    mockGithubSourceRef.validateConfig.mockReturnValue({ isFail: () => false, error: null })
-    mockGithubSourceRef.fetchRemoteEntries.mockResolvedValue([{ sid: '1', name: 'A' }])
+    mockGithubSourceReference.validateConfig.mockReturnValue({ isFail: () => false, error: null })
+    mockGithubSourceReference.fetchRemoteEntries.mockResolvedValue([{ sid: '1', name: 'A' }])
     mockReadLocalEntriesForSync.mockReturnValue({ entries: new Map(), lastRow: 1 })
     mockComputeDiff.mockReturnValue([])
     mockApplyDiffToSheet.mockResolvedValue({
@@ -475,12 +475,12 @@ describe('syncSourceRegistry 未覆盖分支', () => {
     mockApplyConflictResolutions.mockClear()
     mockFilterByTime.mockClear()
     mockGetSyncSourceType.mockClear()
-    mockGithubSourceRef.fetchRemoteEntries.mockClear()
-    mockGithubSourceRef.validateConfig.mockClear()
+    mockGithubSourceReference.fetchRemoteEntries.mockClear()
+    mockGithubSourceReference.validateConfig.mockClear()
 
     mockGetSyncSourceType.mockReturnValue('github')
-    mockGithubSourceRef.validateConfig.mockReturnValue({ isFail: () => false, error: null })
-    mockGithubSourceRef.fetchRemoteEntries.mockResolvedValue([{ sid: '1', name: 'A' }])
+    mockGithubSourceReference.validateConfig.mockReturnValue({ isFail: () => false, error: null })
+    mockGithubSourceReference.fetchRemoteEntries.mockResolvedValue([{ sid: '1', name: 'A' }])
     mockReadLocalEntriesForSync.mockReturnValue({ entries: new Map(), lastRow: 1 })
     mockComputeDiff.mockReturnValue([])
     mockApplyDiffToSheet.mockResolvedValue({
@@ -500,7 +500,7 @@ describe('syncSourceRegistry 未覆盖分支', () => {
     // 先设置 getDataSheet 返回非空 ws 和 ensureSheetHeaders 返回 true
     mockGetDataSheet.mockReturnValue({ Name: 'Sheet1' })
     mockEnsureSheetHeaders.mockReturnValue(true)
-    mockGithubSourceRef.fetchRemoteEntries.mockResolvedValue([])
+    mockGithubSourceReference.fetchRemoteEntries.mockResolvedValue([])
     mockReadLocalEntriesForSync.mockReturnValue({ entries: new Map(), lastRow: 0 })
 
     await syncFromRemote()
@@ -513,7 +513,7 @@ describe('syncSourceRegistry 未覆盖分支', () => {
   it('ensureSheetHeaders 返回 false 时不记录填充日志', async () => {
     mockGetDataSheet.mockReturnValue({ Name: 'Sheet1' })
     mockEnsureSheetHeaders.mockReturnValue(false)
-    mockGithubSourceRef.fetchRemoteEntries.mockResolvedValue([])
+    mockGithubSourceReference.fetchRemoteEntries.mockResolvedValue([])
     mockReadLocalEntriesForSync.mockReturnValue({ entries: new Map(), lastRow: 0 })
 
     await syncFromRemote()
@@ -532,7 +532,7 @@ describe('syncSourceRegistry 未覆盖分支', () => {
       .mockImplementationOnce(() => {
         throw new Error('WPS 运行时错误')
       })
-    mockGithubSourceRef.fetchRemoteEntries.mockResolvedValue([{ sid: '1', name: 'A' }])
+    mockGithubSourceReference.fetchRemoteEntries.mockResolvedValue([{ sid: '1', name: 'A' }])
     mockReadLocalEntriesForSync.mockReturnValue({ entries: new Map(), lastRow: 1 })
     mockComputeDiff.mockReturnValue([])
     // selectedRowsOnly=true 会触发 getSelectedRowSids，内部 getApp 抛错被 catch
@@ -542,7 +542,7 @@ describe('syncSourceRegistry 未覆盖分支', () => {
   })
 
   it('时间筛选 quarter 分支使用 10 月字符串 (line 186)', async () => {
-    mockGithubSourceRef.fetchRemoteEntries.mockResolvedValue([
+    mockGithubSourceReference.fetchRemoteEntries.mockResolvedValue([
       { sid: '1', name: 'A' },
       { sid: '2', name: 'B' },
     ])
@@ -553,7 +553,7 @@ describe('syncSourceRegistry 未覆盖分支', () => {
   })
 
   it('时间筛选 month 分支使用 10 月字符串 (line 186)', async () => {
-    mockGithubSourceRef.fetchRemoteEntries.mockResolvedValue([{ sid: '1', name: 'A' }])
+    mockGithubSourceReference.fetchRemoteEntries.mockResolvedValue([{ sid: '1', name: 'A' }])
     mockFilterByTime.mockReturnValue([{ sid: '1', name: 'A' }])
     const timeFilter = { enabled: true, range: 'month' as const, year: 2024, month: 6 }
     await syncFromRemote(undefined, 'add-update', undefined, false, undefined, timeFilter)
@@ -572,7 +572,7 @@ describe('syncSourceRegistry 未覆盖分支', () => {
   })
 
   it('applyDiffToSheet 返回结果后应设置 remoteTotal 和 unchanged', async () => {
-    mockGithubSourceRef.fetchRemoteEntries.mockResolvedValue([
+    mockGithubSourceReference.fetchRemoteEntries.mockResolvedValue([
       { sid: '1', name: 'A' },
       { sid: '2', name: 'B' },
       { sid: '3', name: 'C' },
@@ -602,7 +602,7 @@ describe('syncSourceRegistry 未覆盖分支', () => {
   })
 
   it('冲突解决列表为空数组时不应影响正常流程', async () => {
-    mockGithubSourceRef.fetchRemoteEntries.mockResolvedValue([{ sid: '1', name: 'A' }])
+    mockGithubSourceReference.fetchRemoteEntries.mockResolvedValue([{ sid: '1', name: 'A' }])
     mockComputeDiff.mockReturnValue([])
     // 空数组 conflictResolution 不应抛出，且流程正常
     const result = await syncFromRemote(undefined, 'add-update', undefined, false, [])
@@ -612,7 +612,7 @@ describe('syncSourceRegistry 未覆盖分支', () => {
   it('ensureSheetHeaders 返回 true 时应触发 onProgress 提示', async () => {
     mockGetDataSheet.mockReturnValue({ Name: 'Sheet1' })
     mockEnsureSheetHeaders.mockReturnValue(true)
-    mockGithubSourceRef.fetchRemoteEntries.mockResolvedValue([])
+    mockGithubSourceReference.fetchRemoteEntries.mockResolvedValue([])
     mockReadLocalEntriesForSync.mockReturnValue({ entries: new Map(), lastRow: 0 })
     const progress = vi.fn()
     await syncFromRemote(progress)
@@ -630,7 +630,7 @@ describe('syncSourceRegistry 未覆盖分支', () => {
     mockGetColumnMap.mockReturnValue(new Map([['Bangumi_URL', 5]]))
     mockGetCellValue.mockReturnValue('https://bgm.tv/subject/123')
     mockExtractSubjectId.mockReturnValue('123')
-    mockGithubSourceRef.fetchRemoteEntries.mockResolvedValue([
+    mockGithubSourceReference.fetchRemoteEntries.mockResolvedValue([
       { sid: '123', name: '匹配' },
       { sid: '456', name: '不匹配' },
     ])
@@ -640,7 +640,7 @@ describe('syncSourceRegistry 未覆盖分支', () => {
   })
 
   it('timeFilter.range === year 分支应使用年份字符串', async () => {
-    mockGithubSourceRef.fetchRemoteEntries.mockResolvedValue([
+    mockGithubSourceReference.fetchRemoteEntries.mockResolvedValue([
       { sid: '1', name: 'A' },
       { sid: '2', name: 'B' },
     ])
@@ -652,7 +652,7 @@ describe('syncSourceRegistry 未覆盖分支', () => {
   })
 
   it('timeFilter 使用无效 range 时回退到 month 分支', async () => {
-    mockGithubSourceRef.fetchRemoteEntries.mockResolvedValue([{ sid: '1', name: 'A' }])
+    mockGithubSourceReference.fetchRemoteEntries.mockResolvedValue([{ sid: '1', name: 'A' }])
     mockFilterByTime.mockReturnValue([{ sid: '1', name: 'A' }])
     const timeFilter = { enabled: true, range: 'invalid' as const, year: 2024, month: 8 }
     const progress = vi.fn()
@@ -661,7 +661,7 @@ describe('syncSourceRegistry 未覆盖分支', () => {
   })
 
   it('conflictResolution 为 undefined 时不应影响正常流程', async () => {
-    mockGithubSourceRef.fetchRemoteEntries.mockResolvedValue([{ sid: '1', name: 'A' }])
+    mockGithubSourceReference.fetchRemoteEntries.mockResolvedValue([{ sid: '1', name: 'A' }])
     mockComputeDiff.mockReturnValue([])
     // 不传 conflictResolution 参数，即为 undefined
     const result = await syncFromRemote()
@@ -683,7 +683,7 @@ describe('syncSourceRegistry 未覆盖分支', () => {
       Calculation: 1,
     }
     mockGetApp.mockReturnValue(mockAppWithSetterError)
-    mockGithubSourceRef.fetchRemoteEntries.mockResolvedValue([{ sid: '1', name: 'A' }])
+    mockGithubSourceReference.fetchRemoteEntries.mockResolvedValue([{ sid: '1', name: 'A' }])
     mockComputeDiff.mockReturnValue([])
     mockReadLocalEntriesForSync.mockReturnValue({ entries: new Map(), lastRow: 1 })
 
@@ -693,7 +693,7 @@ describe('syncSourceRegistry 未覆盖分支', () => {
 
   it('getApp 返回 null 时 finally 块跳过恢复', async () => {
     mockGetApp.mockReturnValue(null)
-    mockGithubSourceRef.fetchRemoteEntries.mockResolvedValue([{ sid: '1', name: 'A' }])
+    mockGithubSourceReference.fetchRemoteEntries.mockResolvedValue([{ sid: '1', name: 'A' }])
     mockComputeDiff.mockReturnValue([])
     mockReadLocalEntriesForSync.mockReturnValue({ entries: new Map(), lastRow: 1 })
 
@@ -707,7 +707,7 @@ describe('syncSourceRegistry 未覆盖分支', () => {
     // 实际上 getApp 在 try 之前调用，返回 null 时就会走跳过逻辑
     // 此测试验证 getApp 返回正常值，但后续流程不会触发 ScreenUpdating 变化的场景
     mockGetApp.mockReturnValue({ ScreenUpdating: true, Calculation: 1 })
-    mockGithubSourceRef.fetchRemoteEntries.mockResolvedValue([])
+    mockGithubSourceReference.fetchRemoteEntries.mockResolvedValue([])
     mockComputeDiff.mockReturnValue([])
     mockReadLocalEntriesForSync.mockReturnValue({ entries: new Map(), lastRow: 0 })
 
@@ -716,7 +716,7 @@ describe('syncSourceRegistry 未覆盖分支', () => {
   })
 
   it('timeFilter.enabled 为 false 时不进入时间筛选分支', async () => {
-    mockGithubSourceRef.fetchRemoteEntries.mockResolvedValue([{ sid: '1', name: 'A' }])
+    mockGithubSourceReference.fetchRemoteEntries.mockResolvedValue([{ sid: '1', name: 'A' }])
     mockComputeDiff.mockReturnValue([])
     const timeFilter = { enabled: false, range: 'year' as const, year: 2024 }
     await syncFromRemote(undefined, 'add-update', undefined, false, undefined, timeFilter)
@@ -724,7 +724,7 @@ describe('syncSourceRegistry 未覆盖分支', () => {
   })
 
   it('timeFilter.range 为 all 时不进入时间筛选分支', async () => {
-    mockGithubSourceRef.fetchRemoteEntries.mockResolvedValue([{ sid: '1', name: 'A' }])
+    mockGithubSourceReference.fetchRemoteEntries.mockResolvedValue([{ sid: '1', name: 'A' }])
     mockComputeDiff.mockReturnValue([])
     const timeFilter = { enabled: true, range: 'all' as const }
     await syncFromRemote(undefined, 'add-update', undefined, false, undefined, timeFilter)
@@ -760,7 +760,7 @@ describe('syncSourceRegistry 未覆盖分支', () => {
       if (url.includes('999')) return '999'
       return null
     })
-    mockGithubSourceRef.fetchRemoteEntries.mockResolvedValue([
+    mockGithubSourceReference.fetchRemoteEntries.mockResolvedValue([
       { sid: '999', name: '匹配' },
       { sid: '111', name: '不匹配' },
     ])
@@ -784,7 +784,7 @@ describe('syncSourceRegistry 未覆盖分支', () => {
     mockGetColumnMap.mockReturnValue(new Map([['Bangumi_URL', 5]]))
     mockGetCellValue.mockReturnValue('https://bgm.tv/subject/invalid')
     mockExtractSubjectId.mockReturnValue(null) // 无效 URL 返回 null
-    mockGithubSourceRef.fetchRemoteEntries.mockResolvedValue([{ sid: '123', name: '远程' }])
+    mockGithubSourceReference.fetchRemoteEntries.mockResolvedValue([{ sid: '123', name: '远程' }])
     mockComputeDiff.mockReturnValue([])
     mockReadLocalEntriesForSync.mockReturnValue({ entries: new Map(), lastRow: 2 })
 
@@ -803,7 +803,7 @@ describe('syncSourceRegistry 未覆盖分支', () => {
   })
 
   it('冲突解决列表非空数组时应应用决策', async () => {
-    mockGithubSourceRef.fetchRemoteEntries.mockResolvedValue([{ sid: '1', name: 'A' }])
+    mockGithubSourceReference.fetchRemoteEntries.mockResolvedValue([{ sid: '1', name: 'A' }])
     mockComputeDiff.mockReturnValue([
       {
         kind: 'update',
@@ -831,7 +831,7 @@ describe('syncSourceRegistry 未覆盖分支', () => {
     })
     mockFindHeaderRow.mockReturnValue(1)
     mockGetColumnMap.mockReturnValue(new Map([['Bangumi_URL', 5]]))
-    mockGithubSourceRef.fetchRemoteEntries.mockResolvedValue([{ sid: '1', name: 'A' }])
+    mockGithubSourceReference.fetchRemoteEntries.mockResolvedValue([{ sid: '1', name: 'A' }])
     mockComputeDiff.mockReturnValue([])
     mockReadLocalEntriesForSync.mockReturnValue({ entries: new Map(), lastRow: 5 })
 
@@ -840,7 +840,7 @@ describe('syncSourceRegistry 未覆盖分支', () => {
   })
 
   it('时间筛选 month 分支 with 二月份', async () => {
-    mockGithubSourceRef.fetchRemoteEntries.mockResolvedValue([{ sid: '1', name: 'A' }])
+    mockGithubSourceReference.fetchRemoteEntries.mockResolvedValue([{ sid: '1', name: 'A' }])
     mockFilterByTime.mockReturnValue([])
     const timeFilter = { enabled: true, range: 'month' as const, year: 2024, month: 2 }
     const progress = vi.fn()
@@ -849,7 +849,7 @@ describe('syncSourceRegistry 未覆盖分支', () => {
   })
 
   it('时间筛选 quarter 分支 with 第一季度', async () => {
-    mockGithubSourceRef.fetchRemoteEntries.mockResolvedValue([{ sid: '1', name: 'A' }])
+    mockGithubSourceReference.fetchRemoteEntries.mockResolvedValue([{ sid: '1', name: 'A' }])
     mockFilterByTime.mockReturnValue([{ sid: '1', name: 'A' }])
     const timeFilter = { enabled: true, range: 'quarter' as const, year: 2025, quarter: 1 }
     const progress = vi.fn()
@@ -858,7 +858,7 @@ describe('syncSourceRegistry 未覆盖分支', () => {
   })
 
   it('downloadElapsed 时间应大于等于 0', async () => {
-    mockGithubSourceRef.fetchRemoteEntries.mockResolvedValue([{ sid: '1', name: 'A' }])
+    mockGithubSourceReference.fetchRemoteEntries.mockResolvedValue([{ sid: '1', name: 'A' }])
     mockComputeDiff.mockReturnValue([])
     mockReadLocalEntriesForSync.mockReturnValue({ entries: new Map(), lastRow: 1 })
     const progress = vi.fn()
@@ -869,14 +869,14 @@ describe('syncSourceRegistry 未覆盖分支', () => {
     )
     expect(downloadCall).toBeDefined()
     if (downloadCall) {
-      const msg = downloadCall[2] as string
-      expect(msg).toContain('下载完成')
-      expect(msg).toMatch(/耗时 \d+ms/)
+      const message = downloadCall[2] as string
+      expect(message).toContain('下载完成')
+      expect(message).toMatch(/耗时 \d+ms/)
     }
   })
 
   it('diff 结果为 0 条时 overallSpeed 为 0 (line 228)', async () => {
-    mockGithubSourceRef.fetchRemoteEntries.mockResolvedValue([{ sid: '1', name: 'A' }])
+    mockGithubSourceReference.fetchRemoteEntries.mockResolvedValue([{ sid: '1', name: 'A' }])
     mockComputeDiff.mockReturnValue([]) // 无差异
     mockReadLocalEntriesForSync.mockReturnValue({ entries: new Map(), lastRow: 1 })
     mockApplyDiffToSheet.mockResolvedValue({
@@ -897,9 +897,9 @@ describe('syncSourceRegistry 未覆盖分支', () => {
     )
     expect(completeCalls.length).toBeGreaterThan(0)
     if (completeCalls.length > 0) {
-      const msg = completeCalls[completeCalls.length - 1][2] as string
+      const message = completeCalls[completeCalls.length - 1][2] as string
       // 当 totalProcessed=0 时，速度显示为 "?"
-      expect(msg).toContain('?')
+      expect(message).toContain('?')
     }
   })
 
@@ -909,7 +909,7 @@ describe('syncSourceRegistry 未覆盖分支', () => {
     // 我们需要设置 prevScreenUpdating 为 undefined 的场景
     // 这需要在 getApp 返回的对象中 ScreenUpdating 属性本身为 undefined
     mockGetApp.mockReturnValue({ ScreenUpdating: undefined, Calculation: undefined })
-    mockGithubSourceRef.fetchRemoteEntries.mockResolvedValue([{ sid: '1', name: 'A' }])
+    mockGithubSourceReference.fetchRemoteEntries.mockResolvedValue([{ sid: '1', name: 'A' }])
     mockComputeDiff.mockReturnValue([])
     mockReadLocalEntriesForSync.mockReturnValue({ entries: new Map(), lastRow: 1 })
 
@@ -919,7 +919,7 @@ describe('syncSourceRegistry 未覆盖分支', () => {
 
   it('finally 恢复时 prevCalculation 为 undefined 跳过分支 (line 240)', async () => {
     mockGetApp.mockReturnValue({ ScreenUpdating: true, Calculation: undefined })
-    mockGithubSourceRef.fetchRemoteEntries.mockResolvedValue([{ sid: '1', name: 'A' }])
+    mockGithubSourceReference.fetchRemoteEntries.mockResolvedValue([{ sid: '1', name: 'A' }])
     mockComputeDiff.mockReturnValue([])
     mockReadLocalEntriesForSync.mockReturnValue({ entries: new Map(), lastRow: 1 })
 
@@ -937,7 +937,7 @@ describe('syncSourceRegistry 未覆盖分支', () => {
     mockFindHeaderRow.mockReturnValue(1)
     // 空 Map，无 Bangumi_URL 列
     mockGetColumnMap.mockReturnValue(new Map())
-    mockGithubSourceRef.fetchRemoteEntries.mockResolvedValue([{ sid: '1', name: 'A' }])
+    mockGithubSourceReference.fetchRemoteEntries.mockResolvedValue([{ sid: '1', name: 'A' }])
     mockComputeDiff.mockReturnValue([])
     mockReadLocalEntriesForSync.mockReturnValue({ entries: new Map(), lastRow: 2 })
 
@@ -956,7 +956,7 @@ describe('syncSourceRegistry 未覆盖分支', () => {
     mockGetCellValue.mockImplementation((_ws: unknown, row: number, _col: number) =>
       row === 2 ? 'https://bgm.tv/subject/777' : '',)
     mockExtractSubjectId.mockImplementation((url: string) => (url.includes('777') ? '777' : null))
-    mockGithubSourceRef.fetchRemoteEntries.mockResolvedValue([{ sid: '777', name: '匹配' }])
+    mockGithubSourceReference.fetchRemoteEntries.mockResolvedValue([{ sid: '777', name: '匹配' }])
     mockComputeDiff.mockReturnValue([])
     mockReadLocalEntriesForSync.mockReturnValue({ entries: new Map(), lastRow: 3 })
 
@@ -986,7 +986,7 @@ describe('syncSourceRegistry 未覆盖分支', () => {
       if (url.includes('200')) return '200'
       return null
     })
-    mockGithubSourceRef.fetchRemoteEntries.mockResolvedValue([
+    mockGithubSourceReference.fetchRemoteEntries.mockResolvedValue([
       { sid: '100', name: 'A' },
       { sid: '200', name: 'B' },
     ])
@@ -998,7 +998,7 @@ describe('syncSourceRegistry 未覆盖分支', () => {
   })
 
   it('配置校验失败且 error.message 为 undefined 时使用默认消息 (line 117)', async () => {
-    mockGithubSourceRef.validateConfig.mockReturnValue({
+    mockGithubSourceReference.validateConfig.mockReturnValue({
       isFail: () => true,
       error: null, // error.message 为 undefined
     })
@@ -1009,7 +1009,7 @@ describe('syncSourceRegistry 未覆盖分支', () => {
     // 模拟时间流逝：Date.now() 返回不同值
     let timeValue = 1_000_000
     vi.spyOn(Date, 'now').mockImplementation(() => timeValue += 1)
-    mockGithubSourceRef.fetchRemoteEntries.mockResolvedValue([
+    mockGithubSourceReference.fetchRemoteEntries.mockResolvedValue([
       { sid: '1', name: 'A' },
       { sid: '2', name: 'B' },
     ])
@@ -1037,9 +1037,9 @@ describe('syncSourceRegistry 未覆盖分支', () => {
     )
     expect(completeCalls.length).toBeGreaterThan(0)
     if (completeCalls.length > 0) {
-      const msg = completeCalls[completeCalls.length - 1][2] as string
+      const message = completeCalls[completeCalls.length - 1][2] as string
       // 当 totalProcessed=2 且 totalElapsed>0 时，速度应为实际数字
-      expect(msg).toMatch(/\d+ 行\/秒/)
+      expect(message).toMatch(/\d+ 行\/秒/)
     }
   })
 })

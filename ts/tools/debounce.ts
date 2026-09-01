@@ -10,17 +10,17 @@
  * @param fn 要执行的函数
  * @param delay 延迟毫秒数，默认 300
  */
-export function debounce<T extends (...args: unknown[]) => unknown>(
+export function debounce<T extends (...arguments_: unknown[]) => unknown>(
   fn: T,
   delay = 300,
-): (...args: Parameters<T>) => void {
+): (...arguments_: Parameters<T>) => void {
   let timerId: ReturnType<typeof setTimeout> | null = null
-  return (...args: Parameters<T>): void => {
+  return (...arguments_: Parameters<T>): void => {
     if (timerId !== null) {
       clearTimeout(timerId)
     }
     timerId = setTimeout(() => {
-      fn(...args)
+      fn(...arguments_)
       timerId = null
     }, delay)
   }
@@ -31,13 +31,13 @@ export function debounce<T extends (...args: unknown[]) => unknown>(
  * @param fn 要执行的函数
  * @param interval 间隔毫秒数，默认 300
  */
-export function throttle<T extends (...args: unknown[]) => unknown>(
+export function throttle<T extends (...arguments_: unknown[]) => unknown>(
   fn: T,
   interval = 300,
-): (...args: Parameters<T>) => void {
+): (...arguments_: Parameters<T>) => void {
   let lastTime = 0
   let timerId: ReturnType<typeof setTimeout> | null = null
-  return (...args: Parameters<T>): void => {
+  return (...arguments_: Parameters<T>): void => {
     const now = Date.now()
     const remaining = interval - (now - lastTime)
     if (remaining <= 0) {
@@ -45,11 +45,11 @@ export function throttle<T extends (...args: unknown[]) => unknown>(
         clearTimeout(timerId)
         timerId = null
       }
-      fn(...args)
+      fn(...arguments_)
       lastTime = now
     } else if (timerId === null) {
       timerId = setTimeout(() => {
-        fn(...args)
+        fn(...arguments_)
         lastTime = Date.now()
         timerId = null
       }, remaining)
@@ -58,7 +58,7 @@ export function throttle<T extends (...args: unknown[]) => unknown>(
 }
 
 /** 取消防抖/节流的 timer（用于清理） */
-export function clearDebounceTimer(fn: (...args: unknown[]) => void): void {
+export function clearDebounceTimer(function_: (...arguments_: unknown[]) => void): void {
   // 这是一个简单的清理辅助，实际清理需要在调用点保存 timerId
-  void fn
+  void function_
 }

@@ -65,6 +65,10 @@ const SAFE_UNICORN_FIXERS = new Set([
     'prefer-array-from-map',                  // [...map].map(fn) → Array.from(map, fn)
     'explicit-length-check',                  // arr.length > 0 → arr.length（truthy 等价）
     'escape-case',                            // \xXX → \u00XX（码点等价）
+    // 缩写标识符 → 全拼（cfg→config / i→index / ctx→context / msg→message …）。
+    // 纯改名，无行为变化；eslint fixer 同步重命名绑定 + 作用域内所有引用（同 catch-error-name）。
+    // 项目内 234 种改名 / 799 处，是当前最大单块（2026-09-01 拍板全清零）。
+    'name-replacements',
 ])
 const UNSAFE_FIX_RULES = new Set([
     // unicorn 整组减去安全 fixer 子集：

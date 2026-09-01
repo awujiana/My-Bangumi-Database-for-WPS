@@ -114,8 +114,8 @@ export async function syncFromRemote(
   // 2. 调用 source.validateConfig() 校验配置完整性
   const validationResult = source.validateConfig()
   if (validationResult.isFail()) {
-    const errMsg = validationResult.error?.message ?? `同步源 ${sourceType} 配置校验失败`
-    throw new Error(errMsg)
+    const errorMessage = validationResult.error?.message ?? `同步源 ${sourceType} 配置校验失败`
+    throw new Error(errorMessage)
   }
 
   // 3. 调用 source.fetchRemoteEntries() 下载远程数据
@@ -133,12 +133,12 @@ export async function syncFromRemote(
 
   // 关闭屏幕刷新，减少 COM 调用开销（ensureSheetHeaders / readLocalEntriesForSync 等 COM 操作）
   const app = getApp()
-  let prevScreenUpdating: boolean | undefined
-  let prevCalculation: number | undefined
+  let previousScreenUpdating: boolean | undefined
+  let previousCalculation: number | undefined
   try {
     if (app) {
-      prevScreenUpdating = app.ScreenUpdating
-      prevCalculation = app.Calculation
+      previousScreenUpdating = app.ScreenUpdating
+      previousCalculation = app.Calculation
       app.ScreenUpdating = false
       app.Calculation = -4135 // xlCalculationManual
     }
@@ -243,8 +243,8 @@ export async function syncFromRemote(
     // 恢复屏幕刷新和自动计算
     try {
       if (app) {
-        if (prevScreenUpdating !== undefined) app.ScreenUpdating = prevScreenUpdating
-        if (prevCalculation !== undefined) app.Calculation = prevCalculation
+        if (previousScreenUpdating !== undefined) app.ScreenUpdating = previousScreenUpdating
+        if (previousCalculation !== undefined) app.Calculation = previousCalculation
       }
     } catch {
       // 忽略恢复失败

@@ -122,8 +122,8 @@ export async function httpRequest<T = unknown>(
     validateMethod(method)
   } catch (error: unknown) {
     BGM.handleError(error, { context: 'httpRequest', showAlert: false })
-    const err = error instanceof BgmError ? error : new BgmError(String(error), 'VALIDATION_ERROR')
-    return Result.fail(err)
+    const error_ = error instanceof BgmError ? error : new BgmError(String(error), 'VALIDATION_ERROR')
+    return Result.fail(error_)
   }
 
   // 如果 signal 已 aborted，立即失败，不进入重试循环
@@ -161,10 +161,10 @@ export async function httpRequest<T = unknown>(
             return Result.ok({ status: response.status, data: parsed })
           } catch (error: unknown) {
             BGM.handleError(error, { context: 'httpRequest', showAlert: false })
-            const errMsg = error instanceof Error ? error.message : String(error)
-            bgmLog(LOG_LEVELS.WARN, `[HTTP] 响应数据校验失败: ${errMsg}`)
+            const errorMessage_ = error instanceof Error ? error.message : String(error)
+            bgmLog(LOG_LEVELS.WARN, `[HTTP] 响应数据校验失败: ${errorMessage_}`)
             return Result.fail(
-              new BgmError(`响应数据校验失败: ${errMsg}`, 'SCHEMA_VALIDATION_ERROR', {
+              new BgmError(`响应数据校验失败: ${errorMessage_}`, 'SCHEMA_VALIDATION_ERROR', {
                 endpoint,
                 status: response.status,
               }),
@@ -203,8 +203,8 @@ export async function httpRequest<T = unknown>(
         continue
       }
 
-      const errMsg = error instanceof Error ? error.message : String(error)
-      return Result.fail(new BgmError(errMsg, 'NETWORK_ERROR'))
+      const errorMessage = error instanceof Error ? error.message : String(error)
+      return Result.fail(new BgmError(errorMessage, 'NETWORK_ERROR'))
     }
   }
 
@@ -350,9 +350,9 @@ function executeXhrRequest(
       xhr.send(options.body)
     } catch (error: unknown) {
       BGM.handleError(error, { context: 'executeXhrRequest', showAlert: false })
-      const errMsg = error instanceof Error ? error.message : String(error)
-      bgmLog(LOG_LEVELS.ERROR, `[HTTP] 发送请求失败: ${errMsg}`)
-      reject(new Error(`发送请求失败: ${errMsg}`))
+      const errorMessage = error instanceof Error ? error.message : String(error)
+      bgmLog(LOG_LEVELS.ERROR, `[HTTP] 发送请求失败: ${errorMessage}`)
+      reject(new Error(`发送请求失败: ${errorMessage}`))
     }
   })
 }

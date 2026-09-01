@@ -127,13 +127,13 @@ function safeGetElement(id: string): HTMLElement | null {
 }
 
 function safeGetButton(id: string): HTMLButtonElement | null {
-  const el = document.getElementById(id)
-  return el instanceof HTMLButtonElement ? el : null
+  const element = document.getElementById(id)
+  return element instanceof HTMLButtonElement ? element : null
 }
 
 function safeGetSelect(id: string): HTMLSelectElement | null {
-  const el = document.getElementById(id)
-  return el instanceof HTMLSelectElement ? el : null
+  const element = document.getElementById(id)
+  return element instanceof HTMLSelectElement ? element : null
 }
 
 function formatEta(etaMs: number): string {
@@ -182,18 +182,18 @@ export function initEnrichPage(): void {
 }
 
 function bindFileSelector(): void {
-  const btn = safeGetButton('selectFileBtn')
-  if (btn) {
-    btn.addEventListener('click', () => {
+  const button = safeGetButton('selectFileBtn')
+  if (button) {
+    button.addEventListener('click', () => {
       selectNewAnimeFile()
     })
   }
 }
 
 function bindDetectHeaderButton(): void {
-  const btn = safeGetButton('detectHeaderBtn')
-  if (btn) {
-    btn.addEventListener('click', () => {
+  const button = safeGetButton('detectHeaderBtn')
+  if (button) {
+    button.addEventListener('click', () => {
       autoDetectHeader()
     })
   }
@@ -218,18 +218,18 @@ function bindTargetSheetControls(): void {
     })
   }
 
-  const refreshBtn = document.querySelector('[data-action="refreshSheets"]')
-  if (refreshBtn) {
-    refreshBtn.addEventListener('click', () => {
+  const refreshButton = document.querySelector('[data-action="refreshSheets"]')
+  if (refreshButton) {
+    refreshButton.addEventListener('click', () => {
       refreshWorkbookList()
       refreshSheetList()
       updateEnrichLockButton('lockSheetBtn', 'lockStatus')
     })
   }
 
-  const lockBtn = safeGetButton('lockSheetBtn')
-  if (lockBtn) {
-    lockBtn.addEventListener('click', () => {
+  const lockButton = safeGetButton('lockSheetBtn')
+  if (lockButton) {
+    lockButton.addEventListener('click', () => {
       toggleSheetLock()
     })
   }
@@ -264,25 +264,25 @@ function bindTabSwitches(): void {
 }
 
 function bindStartEnrichButton(): void {
-  const btn = safeGetButton('startEnrichBtn')
-  if (btn) {
-    btn.addEventListener('click', () => {
+  const button = safeGetButton('startEnrichBtn')
+  if (button) {
+    button.addEventListener('click', () => {
       startEnrichment()
     })
   }
 }
 
 function bindRecordControls(): void {
-  const openRecordBtn = document.querySelector('[data-action="openRecordSheet"]')
-  if (openRecordBtn) {
-    openRecordBtn.addEventListener('click', () => {
+  const openRecordButton = document.querySelector('[data-action="openRecordSheet"]')
+  if (openRecordButton) {
+    openRecordButton.addEventListener('click', () => {
       openEnrichRecordSheet()
     })
   }
 
-  const clearRecordBtn = document.querySelector('[data-action="clearRecords"]')
-  if (clearRecordBtn) {
-    clearRecordBtn.addEventListener('click', () => {
+  const clearRecordButton = document.querySelector('[data-action="clearRecords"]')
+  if (clearRecordButton) {
+    clearRecordButton.addEventListener('click', () => {
       clearRecords()
     })
   }
@@ -374,42 +374,42 @@ export function selectNewAnimeFile(): void {
 
 /** 渲染文件选择区 UI：路径展示、文件列表、批量按钮可见性 */
 function renderBatchFileList(): void {
-  const pathEl = safeGetElement('filePathDisplay')
-  const listEl = safeGetElement('batchFileList')
-  const startBtn = safeGetButton('batchStartBtn')
-  const clearBtn = safeGetButton('batchClearBtn')
-  const progressEl = safeGetElement('batchProgress')
-  const summaryEl = safeGetElement('batchSummary')
-  const singleEnrichBtn = safeGetButton('startEnrichBtn')
+  const pathElement = safeGetElement('filePathDisplay')
+  const listElement = safeGetElement('batchFileList')
+  const startButton = safeGetButton('batchStartBtn')
+  const clearButton = safeGetButton('batchClearBtn')
+  const progressElement = safeGetElement('batchProgress')
+  const summaryElement = safeGetElement('batchSummary')
+  const singleEnrichButton = safeGetButton('startEnrichBtn')
 
   const n = state.batchFiles.length
 
   // 1) 路径展示
-  if (pathEl) {
+  if (pathElement) {
     if (n === 0) {
-      pathEl.textContent = ''
-      pathEl.setAttribute('placeholder', '未选择文件...')
-      pathEl.removeAttribute('title')
+      pathElement.textContent = ''
+      pathElement.setAttribute('placeholder', '未选择文件...')
+      pathElement.removeAttribute('title')
     } else if (n === 1) {
-      pathEl.textContent = state.batchFiles[0]!
-      pathEl.setAttribute('title', state.batchFiles[0]!)
+      pathElement.textContent = state.batchFiles[0]!
+      pathElement.setAttribute('title', state.batchFiles[0]!)
     } else {
       const firstName = extractFileName(state.batchFiles[0]!)
-      pathEl.textContent = `已选 ${String(n)} 个文件（首个：${firstName}）`
-      pathEl.setAttribute('title', state.batchFiles.join('\n'))
+      pathElement.textContent = `已选 ${String(n)} 个文件（首个：${firstName}）`
+      pathElement.setAttribute('title', state.batchFiles.join('\n'))
     }
   }
 
   // 2) 单文件"开始富化"按钮的启用状态
-  if (singleEnrichBtn) {
-    singleEnrichBtn.disabled = n === 0
+  if (singleEnrichButton) {
+    singleEnrichButton.disabled = n === 0
   }
 
   // 3) 文件列表（只在 N≥1 时显示）
-  if (listEl) {
+  if (listElement) {
     if (n === 0) {
-      listEl.style.display = 'none'
-      listEl.replaceChildren();
+      listElement.style.display = 'none'
+      listElement.replaceChildren();
     } else {
       const rows = state.batchFiles.map((filePath, index) => {
         const fileName = extractFileName(filePath)
@@ -421,13 +421,13 @@ function renderBatchFileList(): void {
           </div>
         `
       })
-      listEl.innerHTML = sanitizeHtml(rows.join(''))
-      listEl.style.display = ''
+      listElement.innerHTML = sanitizeHtml(rows.join(''))
+      listElement.style.display = ''
 
-      listEl.querySelectorAll('[data-batch-remove]').forEach((btn) => {
-        btn.addEventListener('click', () => {
-          const idx = parseInt((btn as HTMLElement).dataset.batchRemove || '-1', 10)
-          if (idx >= 0) batchRemoveFile(idx)
+      listElement.querySelectorAll('[data-batch-remove]').forEach((button) => {
+        button.addEventListener('click', () => {
+          const index = parseInt((button as HTMLElement).dataset.batchRemove || '-1', 10)
+          if (index >= 0) batchRemoveFile(index)
         })
       })
     }
@@ -436,13 +436,13 @@ function renderBatchFileList(): void {
   // 4) 批量按钮可见性
   //    - 批量富化：N≥2 才显示（单文件走"开始富化"）
   //    - 清空列表：N≥1 才显示
-  if (startBtn) startBtn.style.display = n >= 2 ? '' : 'none'
-  if (clearBtn) clearBtn.style.display = n >= 1 ? '' : 'none'
+  if (startButton) startButton.style.display = n >= 2 ? '' : 'none'
+  if (clearButton) clearButton.style.display = n >= 1 ? '' : 'none'
 
   // 5) 进行中/汇总进度区域重置（清空时一并隐藏）
   if (n === 0) {
-    if (progressEl) progressEl.style.display = 'none'
-    if (summaryEl) summaryEl.style.display = 'none'
+    if (progressElement) progressElement.style.display = 'none'
+    if (summaryElement) summaryElement.style.display = 'none'
     state.batchResults = []
     state.filePath = ''
   }
@@ -525,14 +525,14 @@ function renderDetectResult(ws: WpsWorksheet, _mapping: EnrichColumnMapping): vo
   if (!resultArea) return
 
   const sheetName = ws.Name || '未知'
-  const sheetNameEl = safeGetElement('detectSheetName')
-  if (sheetNameEl) sheetNameEl.textContent = sheetName
+  const sheetNameElement = safeGetElement('detectSheetName')
+  if (sheetNameElement) sheetNameElement.textContent = sheetName
 
-  const headerRowEl = safeGetElement('detectHeaderRow')
-  if (headerRowEl) headerRowEl.textContent = String(state.headerRow)
+  const headerRowElement = safeGetElement('detectHeaderRow')
+  if (headerRowElement) headerRowElement.textContent = String(state.headerRow)
 
-  const dataRowEl = safeGetElement('detectDataRow')
-  if (dataRowEl) dataRowEl.textContent = String(state.dataStartRow)
+  const dataRowElement = safeGetElement('detectDataRow')
+  if (dataRowElement) dataRowElement.textContent = String(state.dataStartRow)
 
   resultArea.style.display = ''
 }
@@ -622,8 +622,8 @@ function getSelectedWorkbook(): WpsWorkbook | null {
   const wbs = app.Workbooks
   if (!wbs) return app.ActiveWorkbook
 
-  for (let i = 1; i <= wbs.Count; i += 1) {
-    const wb = wbs.Item(i)
+  for (let index = 1; index <= wbs.Count; index += 1) {
+    const wb = wbs.Item(index)
     if (wb.Name === wbName) {
       return wb
     }
@@ -714,9 +714,9 @@ function renderSourcePreview(ws: WpsWorksheet, _mapping: EnrichColumnMapping): v
 
   const headerCells: string[] = []
   for (let col = 1; col <= maxCols; col += 1) {
-    const val = getCellValue(ws, headerRow, col).trim()
-    if (val) {
-      headerCells.push(escapeHtml(val))
+    const value = getCellValue(ws, headerRow, col).trim()
+    if (value) {
+      headerCells.push(escapeHtml(value))
     }
   }
 
@@ -735,9 +735,9 @@ function renderSourcePreview(ws: WpsWorksheet, _mapping: EnrichColumnMapping): v
     const rowCells: string[] = []
     let hasData = false
     for (let col = 1; col <= headerCells.length; col += 1) {
-      const val = getCellValue(ws, row, col).trim()
-      if (val) hasData = true
-      rowCells.push(escapeHtml(val))
+      const value = getCellValue(ws, row, col).trim()
+      if (value) hasData = true
+      rowCells.push(escapeHtml(value))
     }
     if (hasData) {
       rowsHtml.push(
@@ -797,21 +797,21 @@ function renderMatchStats(matches: MatchResult[]): void {
   const aliasCount = matches.filter((m) => m.matchType === 'alias').length
   const unmatchedCount = matches.filter((m) => m.matchType === 'unmatched').length
 
-  const exactEl = safeGetElement('exactMatchCount')
-  if (exactEl) exactEl.textContent = String(exactCount)
+  const exactElement = safeGetElement('exactMatchCount')
+  if (exactElement) exactElement.textContent = String(exactCount)
 
-  const aliasEl = safeGetElement('aliasMatchCount')
-  if (aliasEl) aliasEl.textContent = String(aliasCount)
+  const aliasElement = safeGetElement('aliasMatchCount')
+  if (aliasElement) aliasElement.textContent = String(aliasCount)
 
-  const unmatchedEl = safeGetElement('unmatchedCount')
-  if (unmatchedEl) unmatchedEl.textContent = String(unmatchedCount)
+  const unmatchedElement = safeGetElement('unmatchedCount')
+  if (unmatchedElement) unmatchedElement.textContent = String(unmatchedCount)
 
   statsArea.style.display = ''
 }
 
 function renderMatchResultsToTable(matches: MatchResult[]): void {
-  const tbodyEl = safeGetElement('matchTable')?.querySelector('tbody')
-  if (!tbodyEl) return
+  const tbodyElement = safeGetElement('matchTable')?.querySelector('tbody')
+  if (!tbodyElement) return
 
   const maxDisplay = 20
   const displayMatches = matches.slice(0, maxDisplay)
@@ -856,7 +856,7 @@ function renderMatchResultsToTable(matches: MatchResult[]): void {
     `
   })
 
-  tbodyEl.innerHTML = sanitizeHtml(rowsHtml.join(''))
+  tbodyElement.innerHTML = sanitizeHtml(rowsHtml.join(''))
 
   const matchTableContainer = safeGetElement('matchPreviewTable')
   if (matchTableContainer) {
@@ -975,38 +975,38 @@ function showProgressUI(visible: boolean): void {
     progressArea.style.display = visible ? '' : 'none'
   }
 
-  const startBtn = safeGetButton('startEnrichBtn')
-  if (startBtn) {
-    startBtn.disabled = visible
-    startBtn.textContent = visible ? '⏳ 富化中...' : '🚀 开始富化'
+  const startButton = safeGetButton('startEnrichBtn')
+  if (startButton) {
+    startButton.disabled = visible
+    startButton.textContent = visible ? '⏳ 富化中...' : '🚀 开始富化'
   }
 }
 
 function updateProgressUI(progress: EnrichProgress): void {
   const percent = progress.total > 0 ? Math.round((progress.current / progress.total) * 100) : 0
 
-  const fillEl = safeGetElement('progressBarFill')
-  if (fillEl) {
-    fillEl.style.width = `${String(percent)}%`
-    fillEl.textContent = `${String(percent)}%`
+  const fillElement = safeGetElement('progressBarFill')
+  if (fillElement) {
+    fillElement.style.width = `${String(percent)}%`
+    fillElement.textContent = `${String(percent)}%`
   }
 
-  const currentEl = safeGetElement('currentItem')
-  if (currentEl) {
-    currentEl.textContent = progress.currentName || '-'
+  const currentElement = safeGetElement('currentItem')
+  if (currentElement) {
+    currentElement.textContent = progress.currentName || '-'
   }
 
-  const enrichedEl = safeGetElement('enrichedCount')
-  if (enrichedEl) enrichedEl.textContent = String(progress.stats.enriched)
+  const enrichedElement = safeGetElement('enrichedCount')
+  if (enrichedElement) enrichedElement.textContent = String(progress.stats.enriched)
 
-  const skippedEl = safeGetElement('skippedCount')
-  if (skippedEl) skippedEl.textContent = String(progress.stats.skipped)
+  const skippedElement = safeGetElement('skippedCount')
+  if (skippedElement) skippedElement.textContent = String(progress.stats.skipped)
 
-  const failedEl = safeGetElement('failedCount')
-  if (failedEl) failedEl.textContent = String(progress.stats.failed)
+  const failedElement = safeGetElement('failedCount')
+  if (failedElement) failedElement.textContent = String(progress.stats.failed)
 
-  const etaEl = safeGetElement('etaTime')
-  if (etaEl) etaEl.textContent = formatEta(progress.etaMs)
+  const etaElement = safeGetElement('etaTime')
+  if (etaElement) etaElement.textContent = formatEta(progress.etaMs)
 }
 
 function renderEnrichSummary(results: EnrichResultItem[]): void {
@@ -1068,21 +1068,21 @@ function loadRecentRecords(): void {
   try {
     const records = getAllEnrichRecords()
 
-    const totalEl = safeGetElement('totalRecordCount')
-    if (totalEl) totalEl.textContent = String(records.length)
+    const totalElement = safeGetElement('totalRecordCount')
+    if (totalElement) totalElement.textContent = String(records.length)
 
     const successCount = records.filter((r) => r.action === 'fill' || r.action === 'append').length
     const skipCount = records.filter((r) => r.action === 'skip').length
     const errorCount = records.filter((r) => r.action === 'error').length
 
-    const successEl = safeGetElement('successRecordCount')
-    if (successEl) successEl.textContent = String(successCount)
+    const successElement = safeGetElement('successRecordCount')
+    if (successElement) successElement.textContent = String(successCount)
 
-    const skipEl = safeGetElement('skipRecordCount')
-    if (skipEl) skipEl.textContent = String(skipCount)
+    const skipElement = safeGetElement('skipRecordCount')
+    if (skipElement) skipElement.textContent = String(skipCount)
 
-    const errorEl = safeGetElement('errorRecordCount')
-    if (errorEl) errorEl.textContent = String(errorCount)
+    const errorElement = safeGetElement('errorRecordCount')
+    if (errorElement) errorElement.textContent = String(errorCount)
 
     const recordsContainer = safeGetElement('recentRecords')
     if (!recordsContainer) return
@@ -1153,8 +1153,8 @@ export function renderPreviewTable(
   const maxCols = 50
   const headerCells: string[] = []
   for (let col = 1; col <= maxCols; col += 1) {
-    const val = getCellValue(sheet, headerRow, col).trim()
-    if (val) headerCells.push(escapeHtml(val))
+    const value = getCellValue(sheet, headerRow, col).trim()
+    if (value) headerCells.push(escapeHtml(value))
   }
 
   const { dataStartRow } = state
@@ -1165,9 +1165,9 @@ export function renderPreviewTable(
     const cells: string[] = []
     let hasData = false
     for (let col = 1; col <= headerCells.length; col += 1) {
-      const val = getCellValue(sheet, row, col).trim()
-      if (val) hasData = true
-      cells.push(escapeHtml(val))
+      const value = getCellValue(sheet, row, col).trim()
+      if (value) hasData = true
+      cells.push(escapeHtml(value))
     }
     if (hasData) {
       bodyRows.push(`<tr>${cells.map((c) => `<td>${c}</td>`).join('')}</tr>`)
@@ -1257,8 +1257,8 @@ function collectAllConflicts(results: EnrichResultItem[]): ConflictInfo[] {
 }
 
 function showConflictDialog(): void {
-  const dialogEl = safeGetElement('conflictDialog')
-  if (!dialogEl) return
+  const dialogElement = safeGetElement('conflictDialog')
+  if (!dialogElement) return
 
   const conflict = state.pendingConflicts[state.currentConflictIndex]
   if (!conflict) {
@@ -1311,22 +1311,22 @@ function showConflictDialog(): void {
     </div>
   `
 
-  dialogEl.innerHTML = sanitizeHtml(html)
-  dialogEl.style.display = 'block'
+  dialogElement.innerHTML = sanitizeHtml(html)
+  dialogElement.style.display = 'block'
 
-  dialogEl.querySelectorAll('[data-resolution]').forEach((btn) => {
-    btn.addEventListener('click', () => {
-      const resolution = (btn as HTMLElement).dataset.resolution as ConflictInfo['resolution']
+  dialogElement.querySelectorAll('[data-resolution]').forEach((button) => {
+    button.addEventListener('click', () => {
+      const resolution = (button as HTMLElement).dataset.resolution as ConflictInfo['resolution']
       handleConflictResolution(resolution)
     })
   })
 }
 
 function hideConflictDialog(): void {
-  const dialogEl = safeGetElement('conflictDialog')
-  if (dialogEl) {
-    dialogEl.style.display = 'none'
-    dialogEl.replaceChildren();
+  const dialogElement = safeGetElement('conflictDialog')
+  if (dialogElement) {
+    dialogElement.style.display = 'none'
+    dialogElement.replaceChildren();
   }
 }
 
@@ -1374,14 +1374,14 @@ function extractFileName(filePath: string): string {
 
 /** 绑定批量控件事件（单/多选统一入口后，只剩开始富化 + 清空列表两个按钮） */
 function bindBatchControls(): void {
-  const batchStartBtn = safeGetButton('batchStartBtn')
-  if (batchStartBtn) {
-    batchStartBtn.addEventListener('click', batchStartEnrichment)
+  const batchStartButton = safeGetButton('batchStartBtn')
+  if (batchStartButton) {
+    batchStartButton.addEventListener('click', batchStartEnrichment)
   }
 
-  const batchClearBtn = safeGetButton('batchClearBtn')
-  if (batchClearBtn) {
-    batchClearBtn.addEventListener('click', () => {
+  const batchClearButton = safeGetButton('batchClearBtn')
+  if (batchClearButton) {
+    batchClearButton.addEventListener('click', () => {
       state.batchFiles = []
       state.batchResults = []
       state.filePath = ''
@@ -1413,23 +1413,23 @@ function batchRemoveFile(index: number): void {
 
 /** 展示/更新批量进度 UI */
 function showBatchProgress(visible: boolean): void {
-  const progressEl = safeGetElement('batchProgress')
-  if (progressEl) progressEl.style.display = visible ? '' : 'none'
+  const progressElement = safeGetElement('batchProgress')
+  if (progressElement) progressElement.style.display = visible ? '' : 'none'
 }
 
 /** 更新批量进度条 */
 function updateBatchProgressUI(current: number, total: number, currentFileName: string): void {
   const percent = total > 0 ? Math.round((current / total) * 100) : 0
 
-  const fillEl = safeGetElement('batchProgressFill')
-  if (fillEl) fillEl.style.width = `${String(percent)}%`
+  const fillElement = safeGetElement('batchProgressFill')
+  if (fillElement) fillElement.style.width = `${String(percent)}%`
 
-  const percentEl = safeGetElement('batchPercent')
-  if (percentEl) percentEl.textContent = `${String(percent)}%`
+  const percentElement = safeGetElement('batchPercent')
+  if (percentElement) percentElement.textContent = `${String(percent)}%`
 
-  const currentEl = safeGetElement('batchCurrentFile')
-  if (currentEl) {
-    currentEl.textContent = `[${String(current)}/${String(total)}] ${extractFileName(currentFileName)}`
+  const currentElement = safeGetElement('batchCurrentFile')
+  if (currentElement) {
+    currentElement.textContent = `[${String(current)}/${String(total)}] ${extractFileName(currentFileName)}`
   }
 }
 
@@ -1587,12 +1587,12 @@ export function batchStartEnrichment(): void {
   state.batchCancelRequested = false
 
   // 隐藏批量汇总
-  const summaryEl = safeGetElement('batchSummary')
-  if (summaryEl) summaryEl.style.display = 'none'
+  const summaryElement = safeGetElement('batchSummary')
+  if (summaryElement) summaryElement.style.display = 'none'
 
   // 禁用开始按钮
-  const startBtn = safeGetButton('batchStartBtn')
-  if (startBtn) startBtn.disabled = true
+  const startButton = safeGetButton('batchStartBtn')
+  if (startButton) startButton.disabled = true
 
   // 确认
   // `false as boolean`：避免 TS 将闭包赋值忽略后把变量静态收窄为 false 字面量
@@ -1608,7 +1608,7 @@ export function batchStartEnrichment(): void {
     void runBatchEnrichment(bangumiSheet)
   } else {
     state.isBatchEnriching = false
-    if (startBtn) startBtn.disabled = false
+    if (startButton) startButton.disabled = false
   }
 }
 
@@ -1618,14 +1618,14 @@ async function runBatchEnrichment(bangumiSheet: WpsWorksheet): Promise<void> {
 
   const total = state.batchFiles.length
 
-  for (let i = 0; i < total; i += 1) {
+  for (let index = 0; index < total; index += 1) {
     if (state.batchCancelRequested) {
       bgmLog(LOG_LEVELS.WARN, '[enrich-batch] 用户取消批量富化')
       break
     }
 
-    state.batchIndex = i + 1
-    const filePath = state.batchFiles[i]!
+    state.batchIndex = index + 1
+    const filePath = state.batchFiles[index]!
     const fileName = extractFileName(filePath)
 
     updateBatchProgressUI(state.batchIndex, total, fileName)
@@ -1644,8 +1644,8 @@ async function runBatchEnrichment(bangumiSheet: WpsWorksheet): Promise<void> {
 
   // 恢复 UI
   showBatchProgress(false)
-  const startBtn = safeGetButton('batchStartBtn')
-  if (startBtn) startBtn.disabled = false
+  const startButton = safeGetButton('batchStartBtn')
+  if (startButton) startButton.disabled = false
 
   // 显示汇总
   renderBatchSummary()
@@ -1666,9 +1666,9 @@ async function runBatchEnrichment(bangumiSheet: WpsWorksheet): Promise<void> {
 
 /** 渲染批量富化最终汇总 */
 function renderBatchSummary(): void {
-  const summaryEl = safeGetElement('batchSummary')
-  const contentEl = safeGetElement('batchSummaryContent')
-  if (!summaryEl || !contentEl) return
+  const summaryElement = safeGetElement('batchSummary')
+  const contentElement = safeGetElement('batchSummaryContent')
+  if (!summaryElement || !contentElement) return
 
   const total = state.batchResults.length
   const successCount = state.batchResults.filter((r) => r.success).length
@@ -1678,14 +1678,14 @@ function renderBatchSummary(): void {
   const totalUnmatched = state.batchResults.reduce((s, r) => s + r.unmatched, 0)
 
   const fileRows = state.batchResults
-    .map((r, i) => {
+    .map((r, index) => {
       const statusIcon = r.success ? '✅' : '❌'
       const detail = r.success
         ? `匹配 ${String(r.matched)} / 更新 ${String(r.updatedEntries)} / 未匹配 ${String(r.unmatched)}`
         : `失败：${escapeHtml(r.error || '未知错误')}`
       return `
         <div style="display:flex;justify-content:space-between;font-size:12px;padding:2px 0;border-bottom:1px dashed #333;">
-          <span style="color:#ddd;">${statusIcon} #${String(i + 1)} ${escapeHtml(r.fileName)}</span>
+          <span style="color:#ddd;">${statusIcon} #${String(index + 1)} ${escapeHtml(r.fileName)}</span>
           <span style="color:${r.success ? '#a6e3a1' : '#f38ba8'};">${detail}</span>
         </div>
       `
@@ -1706,8 +1706,8 @@ function renderBatchSummary(): void {
     <div style="max-height:200px;overflow-y:auto;">${fileRows}</div>
   `
 
-  contentEl.innerHTML = sanitizeHtml(html)
-  summaryEl.style.display = ''
+  contentElement.innerHTML = sanitizeHtml(html)
+  summaryElement.style.display = ''
 }
 
 // ========== 导出 ==========

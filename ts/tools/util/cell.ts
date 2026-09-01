@@ -6,7 +6,7 @@
  *              但仅在函数体内引用，运行时安全。
  */
 import { LOG_LEVELS } from '../../core/constants.js'
-import { colNumToLetter } from '../stringUtils.js'
+import { colNumToLetter as colNumberToLetter } from '../stringUtils.js'
 import type { WpsWorksheet, WpsRange, WpsCellValue } from '../wps.js'
 
 // 循环依赖：仅在函数体内使用 BGM.handleError / bgmLog / getApp，运行时安全
@@ -19,7 +19,7 @@ export function getCell(
   col: number,
 ): WpsRange | null {
   if (!ws) return null
-  const address = colNumToLetter(col) + String(row)
+  const address = colNumberToLetter(col) + String(row)
   return ws.Range(address)
 }
 
@@ -32,13 +32,13 @@ export function getCell(
  */
 function tryGetProperty(cell: unknown, prop: string): unknown {
   if (cell == null || typeof cell !== 'object') return undefined
-  const obj = cell as Record<string, unknown>
-  if (!(prop in obj)) return undefined
+  const object = cell as Record<string, unknown>
+  if (!(prop in object)) return undefined
   try {
-    const val = obj[prop]
-    if (typeof val === 'function') {
+    const value = object[prop]
+    if (typeof value === 'function') {
       try {
-        const result = (val as () => unknown)()
+        const result = (value as () => unknown)()
         if (typeof result === 'function' && result.toString().includes('[native code]')) {
           return undefined
         }
@@ -47,16 +47,16 @@ function tryGetProperty(cell: unknown, prop: string): unknown {
         return undefined
       }
     }
-    if (val && typeof val === 'object') {
-      const valObj = val as { toString?: () => string }
-      if (typeof valObj.toString === 'function') {
-        const str = valObj.toString()
-        if (str.includes('function') || str.includes('[native code]')) {
+    if (value && typeof value === 'object') {
+      const valueObject = value as { toString?: () => string }
+      if (typeof valueObject.toString === 'function') {
+        const string_ = valueObject.toString()
+        if (string_.includes('function') || string_.includes('[native code]')) {
           return undefined
         }
       }
     }
-    return val
+    return value
   } catch {
     return undefined
   }
@@ -70,10 +70,10 @@ function tryGetProperty(cell: unknown, prop: string): unknown {
  */
 function getCellRawValue(cell: WpsRange | null | undefined): unknown {
   if (!cell) return null
-  const val2 = tryGetProperty(cell, 'Value2')
-  if (val2 !== undefined && val2 !== null) return val2
-  const val = tryGetProperty(cell, 'Value')
-  if (val !== undefined && val !== null) return val
+  const value2 = tryGetProperty(cell, 'Value2')
+  if (value2 !== undefined && value2 !== null) return value2
+  const value = tryGetProperty(cell, 'Value')
+  if (value !== undefined && value !== null) return value
   const text = tryGetProperty(cell, 'Text')
   if (text !== undefined && text !== null) return text
   return null
@@ -93,7 +93,7 @@ export function getCellValue(
 ): string {
   if (!ws) return ''
   try {
-    const address = colNumToLetter(col) + String(row)
+    const address = colNumberToLetter(col) + String(row)
     const cell = ws.Range(address)
     const raw = getCellRawValue(cell)
     if (raw == null) return ''
@@ -132,14 +132,14 @@ export function setCellValue(
  * 获取工作表对象
  */
 export function getSheetByIndex(sheetIndex: number): unknown {
-  const appObj = getApp() as
+  const appObject = getApp() as
     | {
-        ActiveWorkbook?: { Sheets?: { Count: number; Item: (i: number) => unknown } }
+        ActiveWorkbook?: { Sheets?: { Count: number; Item: (index: number) => unknown } }
       }
     | null
     | undefined
-  if (!appObj?.ActiveWorkbook?.Sheets) return null
-  const sheets = appObj.ActiveWorkbook.Sheets
+  if (!appObject?.ActiveWorkbook?.Sheets) return null
+  const sheets = appObject.ActiveWorkbook.Sheets
   if (sheets.Count === 0) return null
   try {
     return sheets.Item(sheetIndex)

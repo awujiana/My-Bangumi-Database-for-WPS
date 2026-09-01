@@ -13,7 +13,7 @@ import {
   getColumnMap,
   getLastRow,
   getCellValue,
-  colNumToLetter,
+  colNumToLetter as colNumberToLetter,
   trim,
 } from '../tools/util/index.js'
 import { bgmLog } from '../tools/util.js'
@@ -35,7 +35,7 @@ import { extractSubjectId } from './pureUtils.js'
  */
 function getCellText(ws: WpsWorksheet, row: number, col: number): string {
   try {
-    const address = colNumToLetter(col) + String(row)
+    const address = colNumberToLetter(col) + String(row)
     const cell = ws.Range(address)
     // 尝试读取 Text 属性（保留本地格式）
     const raw = (cell as unknown as { Text?: unknown }).Text
@@ -146,9 +146,9 @@ export function buildJsonlFromSheet(): string {
     ] as const
 
     for (const [jsonlField, excelField] of EXTENDED_FIELD_MAP) {
-      const val = getField(excelField)
-      if (val) {
-        entry[jsonlField] = val
+      const value = getField(excelField)
+      if (value) {
+        entry[jsonlField] = value
       }
     }
 

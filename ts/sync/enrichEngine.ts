@@ -227,9 +227,9 @@ export function normalizeName(name: string): string {
  * 分割别名字符串
  * 按 |、/、;、， 等分隔符分割
  */
-export function splitAliases(aliasesStr: string): string[] {
-  if (!aliasesStr) return []
-  return aliasesStr
+export function splitAliases(aliasesString: string): string[] {
+  if (!aliasesString) return []
+  return aliasesString
     .split(/\s*\|\s*|\s*[;，、]\s*|\s*\/\s*/)
     .map((a) => a.trim())
     .filter((a) => a.length > 0)
@@ -298,10 +298,10 @@ export function detectColumns(sheet: WpsWorksheet, headerRow: number): EnrichCol
 
   const maxCols = 50
   for (let col = 1; col <= maxCols; col += 1) {
-    const headerVal = getCellValue(sheet, headerRow, col).trim()
-    if (!headerVal) continue
+    const headerValue = getCellValue(sheet, headerRow, col).trim()
+    if (!headerValue) continue
 
-    const normalizedHeader = headerVal.toLowerCase()
+    const normalizedHeader = headerValue.toLowerCase()
     for (const [keyword, field] of Object.entries(KNOWN_COLUMN_MAP)) {
       if (normalizedHeader.includes(keyword.toLowerCase())) {
         if (field === 'nameCol' && mapping.nameCol === 0) {
@@ -334,8 +334,8 @@ export function findAliasColumn(sheet: WpsWorksheet): number {
 
   const maxCols = 50
   for (let col = 1; col <= maxCols; col += 1) {
-    const headerVal = getCellValue(sheet, headerRow, col).trim().toLowerCase()
-    if (headerVal.includes('别名') || headerVal.includes('alias') || headerVal.includes('原名')) {
+    const headerValue = getCellValue(sheet, headerRow, col).trim().toLowerCase()
+    if (headerValue.includes('别名') || headerValue.includes('alias') || headerValue.includes('原名')) {
       return col
     }
   }
@@ -405,9 +405,9 @@ function buildBangumiIndexes(
     rowNames.set(row, name)
 
     if (aliasCol > 0) {
-      const aliasStr = getCellValue(bangumiSheet, row, aliasCol).trim()
-      if (aliasStr) {
-        const aliases = splitAliases(aliasStr)
+      const aliasString = getCellValue(bangumiSheet, row, aliasCol).trim()
+      if (aliasString) {
+        const aliases = splitAliases(aliasString)
         for (const alias of aliases) {
           const normalizedAlias = normalizeName(alias)
           if (!aliasIndex.has(normalizedAlias)) {
@@ -506,14 +506,14 @@ export function matchEntries(
           }
         }
       } catch (error: unknown) {
-        const errMsg = error instanceof Error ? error.message : String(error)
+        const errorMessage = error instanceof Error ? error.message : String(error)
         matchResult = {
           newAnimeRow: row,
           newAnimeName: rawName,
           matchType: 'error',
-          errorMessage: errMsg,
+          errorMessage,
         }
-        bgmLog(LOG_LEVELS.ERROR, `[matchEntries] 匹配 "${rawName}" 时出错: ${errMsg}`)
+        bgmLog(LOG_LEVELS.ERROR, `[matchEntries] 匹配 "${rawName}" 时出错: ${errorMessage}`)
       }
 
       results.push(matchResult)
@@ -765,10 +765,10 @@ export function enrichEntries(
     )
   }
 
-  for (let i = 0; i < matches.length; i += 1) {
-    const match = matches[i]
+  for (let index = 0; index < matches.length; index += 1) {
+    const match = matches[index]
     if (!match) continue
-    const current = i + 1
+    const current = index + 1
 
     if (match.matchType === 'unmatched') {
       results.push({
@@ -856,7 +856,7 @@ export function enrichEntries(
       }
 
       for (const field of enrichedFields) {
-        const record: AddEnrichRecordParams = {
+        const record: AddEnrichRecordParameters = {
           timestamp: new Date().toISOString(),
           matchType: match.matchType === 'exact' ? '精确' : '别名',
           name: match.newAnimeName,
@@ -879,11 +879,11 @@ export function enrichEntries(
         conflicts: fieldConflicts.length > 0 ? fieldConflicts : undefined,
       })
     } catch (error: unknown) {
-      const errMsg = error instanceof Error ? error.message : String(error)
+      const errorMessage = error instanceof Error ? error.message : String(error)
       stats.failed++
       bgmLog(
         LOG_LEVELS.ERROR,
-        `[enrichEntries] 富化 "${match.newAnimeName}" (行${String(bangumiRow)}) 失败: ${errMsg}`,
+        `[enrichEntries] 富化 "${match.newAnimeName}" (行${String(bangumiRow)}) 失败: ${errorMessage}`,
       )
       results.push({
         kind: 'error',
@@ -891,7 +891,7 @@ export function enrichEntries(
         name: match.newAnimeName,
         matchType: match.matchType,
         enrichedFields: [],
-        errorMessage: errMsg,
+        errorMessage,
       })
     }
 
@@ -924,7 +924,7 @@ export type { EnrichRecord } from './enrichRecord.js'
 /**
  * 富化记录参数（内部使用）
  */
-interface AddEnrichRecordParams {
+interface AddEnrichRecordParameters {
   timestamp: string
   matchType: '精确' | '别名' | '未匹配'
   name: string
@@ -1083,7 +1083,7 @@ export function ensureBangumiColumns(
     // 复制现有表头样式
     const existingStyleCol = maxCol > 0 ? 1 : maxCol + 1
     const styleSourceRange = sheet.Range(
-      `${WpsCellRef(headerRow, existingStyleCol)}:${WpsCellRef(headerRow, existingStyleCol)}`,
+      `${WpsCellReference(headerRow, existingStyleCol)}:${WpsCellReference(headerRow, existingStyleCol)}`,
     )
     let templateFont: typeof styleSourceRange.Font | null = null
     let templateInterior: typeof styleSourceRange.Interior | null = null
@@ -1097,7 +1097,7 @@ export function ensureBangumiColumns(
 
     // 创建新列表头
     const headerRange = sheet.Range(
-      `${WpsCellRef(headerRow, maxCol + 1)}:${WpsCellRef(headerRow, maxCol + missing.length)}`,
+      `${WpsCellReference(headerRow, maxCol + 1)}:${WpsCellReference(headerRow, maxCol + missing.length)}`,
     )
     const headers: string[][] = Array.from(missing, m => [m.field]);
     headerRange.Value = headers
@@ -1123,9 +1123,9 @@ export function ensureBangumiColumns(
       bgmLog(LOG_LEVELS.WARN, '[ensureBangumiColumns] 复制样式失败，使用默认样式')
     }
 
-    for (let i = 0; i < missing.length; i += 1) {
-      const newCol = maxCol + 1 + i
-      const field = missing[i]?.field
+    for (let index = 0; index < missing.length; index += 1) {
+      const newCol = maxCol + 1 + index
+      const field = missing[index]?.field
       if (field) {
         updatedMap.set(field, newCol)
         bgmLog(
@@ -1147,15 +1147,15 @@ export function ensureBangumiColumns(
 /**
  * WpsCellRef 辅助函数：生成单元格引用
  */
-function WpsCellRef(row: number, col: number): string {
-  let colStr = ''
+function WpsCellReference(row: number, col: number): string {
+  let colString = ''
   let c = col
   while (c > 0) {
     c--
-    colStr = String.fromCharCode(65 + (c % 26)) + colStr
+    colString = String.fromCharCode(65 + (c % 26)) + colString
     c = Math.floor(c / 26)
   }
-  return `${colStr}${String(row)}`
+  return `${colString}${String(row)}`
 }
 
 /**
@@ -1554,8 +1554,8 @@ export async function fetchRemoteFile(config: RemoteRepoConfig): Promise<string 
     bgmLog(LOG_LEVELS.INFO, `[fetchRemoteFile] 下载成功: ${String(content.length)} 字节`)
     return content
   } catch (error) {
-    const errMsg = error instanceof Error ? error.message : String(error)
-    bgmLog(LOG_LEVELS.ERROR, `[fetchRemoteFile] 下载失败: ${errMsg}`)
+    const errorMessage = error instanceof Error ? error.message : String(error)
+    bgmLog(LOG_LEVELS.ERROR, `[fetchRemoteFile] 下载失败: ${errorMessage}`)
     return null
   }
 }
@@ -1577,16 +1577,16 @@ export function parseRemoteContent(content: string): Record<string, string>[] {
   const delimiter = firstLine.includes('\t') ? '\t' : ','
   const headers = firstLine.split(delimiter).map((h) => h.trim())
 
-  for (let i = 1; i < lines.length; i += 1) {
-    const line = lines[i]
+  for (let index = 1; index < lines.length; index += 1) {
+    const line = lines[index]
     if (line === undefined) continue
     const values = line.split(delimiter)
     const record: Record<string, string> = {}
-    for (let j = 0; j < headers.length; j += 1) {
-      const key = headers[j]
-      const val = values[j]
+    for (let index = 0; index < headers.length; index += 1) {
+      const key = headers[index]
+      const value = values[index]
       if (key !== undefined) {
-        record[key] = val !== undefined ? val : ''
+        record[key] = value !== undefined ? value : ''
       }
     }
     records.push(record)

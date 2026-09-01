@@ -26,7 +26,7 @@ import {
   getColumnMap,
   getCellValue,
   setCellValue,
-  colNumToLetter,
+  colNumToLetter as colNumberToLetter,
   trim,
   ensureSheetHeaders,
   getApp,
@@ -53,7 +53,7 @@ import type {
 } from './githubSyncDiff.js'
 import { extractSubjectId } from './pureUtils.js'
 import { addSyncRecords, addSyncRecordSummary } from './syncRecord.js'
-import type { UpdateRecordParams } from './syncRecord.js'
+import type { UpdateRecordParams as UpdateRecordParameters } from './syncRecord.js'
 import type { SyncSource } from './SyncSource.js'
 import {
   beginUndoSession,
@@ -318,8 +318,8 @@ function readLocalEntries(
   // 一次性读取整个矩形区域
   let rawData: unknown[][] | null = null
   try {
-    const startColLetter = colNumToLetter(minCol)
-    const endColLetter = colNumToLetter(maxCol)
+    const startColLetter = colNumberToLetter(minCol)
+    const endColLetter = colNumberToLetter(maxCol)
     const rangeAddr = `${startColLetter}${String(startRow)}:${endColLetter}${String(lastRow)}`
     const range = ws.Range(rangeAddr)
     const raw = range.Value2 as unknown
@@ -338,13 +338,13 @@ function readLocalEntries(
 
   /** 从批量数据中读取字段值 */
   const getFieldFromBatch = (rowOffset: number, key: string): string => {
-    const idx = colIndexMap.get(key)
-    if (idx === undefined) return ''
-    const rowArr = rawData?.[rowOffset]
-    if (!rowArr) return ''
-    const val = rowArr[idx] as string | number | boolean | null | undefined
-    if (val === null || val === undefined) return ''
-    return trim(String(val))
+    const index = colIndexMap.get(key)
+    if (index === undefined) return ''
+    const rowArray = rawData?.[rowOffset]
+    if (!rowArray) return ''
+    const value = rowArray[index] as string | number | boolean | null | undefined
+    if (value === null || value === undefined) return ''
+    return trim(String(value))
   }
 
   /** 逐单元格读取（回退用） */
@@ -354,23 +354,23 @@ function readLocalEntries(
     return trim(getCellValue(ws, row, col))
   }
 
-  for (let i = 0; i < rowCount; i += 1) {
-    const row = startRow + i
+  for (let index = 0; index < rowCount; index += 1) {
+    const row = startRow + index
     const getField = (key: string): string =>
-      rawData ? getFieldFromBatch(i, key) : getFieldFromCell(row, key)
+      rawData ? getFieldFromBatch(index, key) : getFieldFromCell(row, key)
     const url = getField('Bangumi_URL')
     if (!url) continue
     const sid = extractSubjectId(url)
     if (!sid) continue
 
-    const extFields: Record<string, string> = {}
+    const extensionFields: Record<string, string> = {}
     for (const [, excelField] of EXTENDED_FIELD_MAP) {
-      extFields[excelField] = getField(excelField)
+      extensionFields[excelField] = getField(excelField)
     }
     // 同时写入「动画制作公司」的所有别名列到 extFields，便于 computeDiff 比对时使用
     for (const alias of getExcelAliases('动画制作公司')) {
-      if (!extFields[alias]) {
-        extFields[alias] = getField(alias)
+      if (!extensionFields[alias]) {
+        extensionFields[alias] = getField(alias)
       }
     }
 
@@ -384,7 +384,7 @@ function readLocalEntries(
         '标签/分级': getField('标签/分级'),
         集数: getField('集数'),
         集号: getField('集号'),
-        ...extFields,
+        ...extensionFields,
       },
     })
   }
@@ -605,10 +605,10 @@ function writeRemoteEntryToRow(
     if (!anyAliasMatched) continue
     const value = remote[jsonlField as keyof GithubRemoteEntry]
     if (typeof value !== 'string' && typeof value !== 'number') continue
-    const strValue = typeof value === 'number' ? String(value) : value
+    const stringValue = typeof value === 'number' ? String(value) : value
     for (const alias of excelAliases) {
       if (writeAll || fieldsToWrite.includes(alias)) {
-        safeSet(alias, strValue)
+        safeSet(alias, stringValue)
       }
     }
   }
@@ -676,7 +676,7 @@ function batchWriteNewRows(
   colMap: Map<string, number>,
   startRow: number,
   rows: { remote: GithubRemoteEntry; sid: string }[],
-  records: UpdateRecordParams[],
+  records: UpdateRecordParameters[],
 ): number {
   if (rows.length === 0) return 0
 
@@ -718,7 +718,7 @@ function batchWriteNewRows(
   for (const entry of rows) {
     const row = new Array<string | number | null>(colCount).fill(null)
     for (const wc of writeCols) {
-      const idx = wc.col - minCol
+      const index = wc.col - minCol
       let value: string | number | null = null
       if (wc.name === 'Bangumi_URL') {
         value = `https://bgm.tv/subject/${entry.remote.sid}`
@@ -747,14 +747,14 @@ function batchWriteNewRows(
           }
         }
       }
-      row[idx] = value
+      row[index] = value
     }
     values.push(row)
   }
 
   // 3. 批量写入 Range.Value2
-  const startColLetter = colNumToLetter(minCol)
-  const endColLetter = colNumToLetter(maxCol)
+  const startColLetter = colNumberToLetter(minCol)
+  const endColLetter = colNumberToLetter(maxCol)
   const endRow = startRow + rows.length - 1
   try {
     const rangeAddr = `${startColLetter}${String(startRow)}:${endColLetter}${String(endRow)}`
@@ -770,17 +770,17 @@ function batchWriteNewRows(
 
   // 4. 记录 undo 条目（一次性记录所有变更）
   // 注意：日期列的值可能是数值序列号，需转换为字符串存储 undo 记录
-  for (let i = 0; i < rows.length; i += 1) {
+  for (let index = 0; index < rows.length; index += 1) {
     for (const wc of writeCols) {
-      const row = startRow + i
-      const raw = values[i]![wc.col - minCol]
-      const val = raw != null ? String(raw) : ''
-      recordUndoEntry({ row, col: wc.col, oldValue: '', newValue: val })
+      const row = startRow + index
+      const raw = values[index]![wc.col - minCol]
+      const value = raw != null ? String(raw) : ''
+      recordUndoEntry({ row, col: wc.col, oldValue: '', newValue: value })
     }
     records.push({
-      sid: rows[i]!.sid,
-      name: rows[i]!.remote.name ?? '',
-      url: `https://bgm.tv/subject/${rows[i]!.sid}`,
+      sid: rows[index]!.sid,
+      name: rows[index]!.remote.name ?? '',
+      url: `https://bgm.tv/subject/${rows[index]!.sid}`,
       type: BGM_SUBJECT_TYPES[2] ?? '',
       source: 'repo',
       content: '仓库同步-新增',
@@ -812,7 +812,7 @@ function batchUpdateRows(
   colMap: Map<string, number>,
   updates: { row: number; remote: GithubRemoteEntry; sid: string; fields: string[] }[],
   forceOverwrite: boolean,
-  records: UpdateRecordParams[],
+  records: UpdateRecordParameters[],
   details?: GithubSyncDetailItem[],
 ): number {
   if (updates.length === 0) return 0
@@ -877,17 +877,17 @@ function batchUpdateRows(
     const writeAll = fields.includes('*')
 
     // 先读取当前行的值（用于合并逻辑和 undo 记录）
-    let oldArr: (string | number | null)[] = []
+    let oldArray: (string | number | null)[] = []
     let range: WpsRange | null = null
     try {
-      const startColLetter = colNumToLetter(minCol)
-      const endColLetter = colNumToLetter(maxCol)
+      const startColLetter = colNumberToLetter(minCol)
+      const endColLetter = colNumberToLetter(maxCol)
       const rangeAddr = `${startColLetter}${String(row)}:${endColLetter}${String(row)}`
       range = ws.Range(rangeAddr)
 
       // 读取旧值
       const oldValues = range.Value2 as unknown as (string | number | null)[] | null
-      oldArr = Array.isArray(oldValues)
+      oldArray = Array.isArray(oldValues)
         ? ((oldValues[0] as (string | number | null)[] | undefined) ?? [])
         : []
     } catch {
@@ -899,11 +899,11 @@ function batchUpdateRows(
     const rowValues = new Array<string | number | null>(colCount).fill(null)
 
     for (const wc of writeCols) {
-      const idx = wc.col - minCol
+      const index = wc.col - minCol
       let value: string | number | null = null
       let shouldWrite = false
       // 获取当前单元格的旧值（用于合并）
-      const oldCellValue = oldArr[idx] != null ? String(oldArr[idx]) : ''
+      const oldCellValue = oldArray[index] != null ? String(oldArray[index]) : ''
 
       if (wc.name === 'Bangumi_URL') {
         if (writeAll || fields.includes('Bangumi_URL')) {
@@ -988,7 +988,7 @@ function batchUpdateRows(
           const localDate = formatDateToLocal(value)
           if (localDate !== null) value = localDate
         }
-        rowValues[idx] = value
+        rowValues[index] = value
       }
     }
 
@@ -1000,11 +1000,11 @@ function batchUpdateRows(
         let hasChanges = false
         const finalValues = [...rowValues]
         for (let c = 0; c < colCount; c += 1) {
-          const newVal = finalValues[c]
-          if (newVal === null) continue
-          const oldVal = oldArr[c] != null ? String(oldArr[c]) : ''
-          const newValStr = String(newVal)
-          if (oldVal === newValStr) {
+          const newValue = finalValues[c]
+          if (newValue === null) continue
+          const oldValue = oldArray[c] != null ? String(oldArray[c]) : ''
+          const newValueString = String(newValue)
+          if (oldValue === newValueString) {
             finalValues[c] = null // 无变化，跳过
           } else {
             hasChanges = true
@@ -1012,8 +1012,8 @@ function batchUpdateRows(
             recordUndoEntry({
               row,
               col: minCol + c,
-              oldValue: oldVal,
-              newValue: newValStr,
+              oldValue,
+              newValue: newValueString,
             })
           }
         }
@@ -1089,24 +1089,24 @@ function batchUpdateRows(
               })
             }
           } catch (error: unknown) {
-            const errMsg = error instanceof Error ? error.message : String(error)
+            const errorMessage = error instanceof Error ? error.message : String(error)
             bgmLog(
               LOG_LEVELS.ERROR,
-              `[batchUpdateRows] 行 ${String(row)} 回退逐字段写入异常: ${errMsg}`,
+              `[batchUpdateRows] 行 ${String(row)} 回退逐字段写入异常: ${errorMessage}`,
             )
             details?.push({
               kind: 'fail',
               sid: u.sid,
               name: remote.name,
               row,
-              message: errMsg,
+              message: errorMessage,
             })
             records.push({
               sid: u.sid,
               source: 'repo',
               content: '仓库同步-更新失败',
               status: '失败',
-              message: errMsg,
+              message: errorMessage,
               count: 1,
             })
           }
@@ -1160,21 +1160,21 @@ function batchUpdateRows(
           })
         }
       } catch (error: unknown) {
-        const errMsg = error instanceof Error ? error.message : String(error)
-        bgmLog(LOG_LEVELS.ERROR, `[batchUpdateRows] 行 ${String(row)} 逐字段写入也失败: ${errMsg}`)
+        const errorMessage = error instanceof Error ? error.message : String(error)
+        bgmLog(LOG_LEVELS.ERROR, `[batchUpdateRows] 行 ${String(row)} 逐字段写入也失败: ${errorMessage}`)
         details?.push({
           kind: 'fail',
           sid: u.sid,
           name: remote.name,
           row,
-          message: errMsg,
+          message: errorMessage,
         })
         records.push({
           sid: u.sid,
           source: 'repo',
           content: '仓库同步-更新失败',
           status: '失败',
-          message: errMsg,
+          message: errorMessage,
           count: 1,
         })
       }
@@ -1236,12 +1236,12 @@ export async function applyDiffToSheet(
 
   // 性能优化：关闭屏幕刷新和自动计算，大幅减少 COM 调用开销
   const app = getApp()
-  let prevScreenUpdating: boolean | undefined
-  let prevCalculation: number | undefined
+  let previousScreenUpdating: boolean | undefined
+  let previousCalculation: number | undefined
   try {
     if (app) {
-      prevScreenUpdating = app.ScreenUpdating
-      prevCalculation = app.Calculation
+      previousScreenUpdating = app.ScreenUpdating
+      previousCalculation = app.Calculation
       app.ScreenUpdating = false
       app.Calculation = -4135 // xlCalculationManual
       bgmLog(LOG_LEVELS.INFO, '[githubSync] 已关闭屏幕刷新和自动计算')
@@ -1258,7 +1258,7 @@ export async function applyDiffToSheet(
   beginUndoSession(`${source ?? 'GitHub'} 同步 - 策略: ${strategy}`)
 
   // 收集本次同步记录
-  const syncRecords: UpdateRecordParams[] = []
+  const syncRecords: UpdateRecordParameters[] = []
 
   const nonAddDiffs = sortedDiffs.filter((d) => d.kind !== 'add')
 
@@ -1273,14 +1273,14 @@ export async function applyDiffToSheet(
 
     if (batchWritten > 0) {
       result.added += batchWritten
-      for (let i = 0; i < batchWritten; i += 1) {
-        const entry = batch[i]
+      for (let index = 0; index < batchWritten; index += 1) {
+        const entry = batch[index]
         if (!entry?.remote) continue
         result.details!.push({
           kind: 'add',
           sid: entry.sid,
           name: entry.remote.name,
-          row: nextAppendRow + i,
+          row: nextAppendRow + index,
           fields: ['全部字段'],
         })
       }
@@ -1340,21 +1340,21 @@ export async function applyDiffToSheet(
               })
             }
           } catch (error: unknown) {
-            const errMsg = error instanceof Error ? error.message : String(error)
+            const errorMessage = error instanceof Error ? error.message : String(error)
             result.failed++
-            bgmLog(LOG_LEVELS.ERROR, `[githubSync] 逐行写入失败 sid=${diff.sid}: ${errMsg}`)
+            bgmLog(LOG_LEVELS.ERROR, `[githubSync] 逐行写入失败 sid=${diff.sid}: ${errorMessage}`)
             result.details!.push({
               kind: 'fail',
               sid: diff.sid,
               name: diff.remote.name,
-              message: errMsg,
+              message: errorMessage,
             })
             syncRecords.push({
               sid: diff.sid,
               source,
               content: '仓库同步-新增失败',
               status: '失败',
-              message: errMsg,
+              message: errorMessage,
               count: 1,
             })
           }
@@ -1476,43 +1476,43 @@ export async function applyDiffToSheet(
           count: 1,
         })
       } catch (error: unknown) {
-        const errMsg = error instanceof Error ? error.message : String(error)
+        const errorMessage = error instanceof Error ? error.message : String(error)
         bgmLog(
           LOG_LEVELS.WARN,
-          `[githubSync] 删除行 ${String(diff.localRow ?? '')} 失败: ${errMsg}`,
+          `[githubSync] 删除行 ${String(diff.localRow ?? '')} 失败: ${errorMessage}`,
         )
         result.failed++
         result.details!.push({
           kind: 'fail',
           sid: diff.sid,
           row: diff.localRow,
-          message: errMsg,
+          message: errorMessage,
         })
         syncRecords.push({
           sid: diff.sid,
           source,
           content: '仓库同步-删除失败',
           status: '失败',
-          message: errMsg,
+          message: errorMessage,
           count: 1,
         })
       }
     } catch (error: unknown) {
-      const errMsg = error instanceof Error ? error.message : String(error)
+      const errorMessage = error instanceof Error ? error.message : String(error)
       result.failed++
-      bgmLog(LOG_LEVELS.ERROR, `[githubSync] 删除处理失败 sid=${diff.sid}: ${errMsg}`)
+      bgmLog(LOG_LEVELS.ERROR, `[githubSync] 删除处理失败 sid=${diff.sid}: ${errorMessage}`)
       result.details!.push({
         kind: 'fail',
         sid: diff.sid,
         row: diff.localRow,
-        message: errMsg,
+        message: errorMessage,
       })
       syncRecords.push({
         sid: diff.sid,
         source,
         content: '仓库同步-失败',
         status: '失败',
-        message: errMsg,
+        message: errorMessage,
         count: 1,
       })
     }
@@ -1557,8 +1557,8 @@ export async function applyDiffToSheet(
   // 恢复屏幕刷新和自动计算
   try {
     if (app) {
-      if (prevScreenUpdating !== undefined) app.ScreenUpdating = prevScreenUpdating
-      if (prevCalculation !== undefined) app.Calculation = prevCalculation
+      if (previousScreenUpdating !== undefined) app.ScreenUpdating = previousScreenUpdating
+      if (previousCalculation !== undefined) app.Calculation = previousCalculation
       bgmLog(LOG_LEVELS.INFO, '[githubSync] 已恢复屏幕刷新和自动计算')
     }
   } catch (error: unknown) {
@@ -1616,8 +1616,8 @@ export function applyConflictResolutions(
   }
 
   // 倒序遍历，便于安全移除元素
-  for (let i = diffs.length - 1; i >= 0; i -= 1) {
-    const diff = diffs[i]
+  for (let index = diffs.length - 1; index >= 0; index -= 1) {
+    const diff = diffs[index]
     if (!diff) continue
     // 仅处理字段级 update（changedFields 不为 ['*']）
     if (diff.kind !== 'update') continue
@@ -1633,7 +1633,7 @@ export function applyConflictResolutions(
 
     // 若所有字段都被移除，则该 diff 无需执行
     if (diff.changedFields.length === 0) {
-      diffs.splice(i, 1)
+      diffs.splice(index, 1)
     }
   }
 
@@ -1667,8 +1667,8 @@ export async function syncFromGithub(
 
   const validationResult = source.validateConfig()
   if (validationResult.isFail()) {
-    const errMsg = validationResult.error?.message ?? 'GitHub 同步源配置校验失败'
-    throw new Error(errMsg)
+    const errorMessage = validationResult.error?.message ?? 'GitHub 同步源配置校验失败'
+    throw new Error(errorMessage)
   }
 
   // 使用 total=1 避免进度条显示"0/0"带来的困惑
@@ -1685,12 +1685,12 @@ export async function syncFromGithub(
 
   // 关闭屏幕刷新，减少 COM 调用开销（ensureSheetHeaders / readLocalEntriesForSync 等 COM 操作）
   const app = getApp()
-  let prevScreenUpdating: boolean | undefined
-  let prevCalculation: number | undefined
+  let previousScreenUpdating: boolean | undefined
+  let previousCalculation: number | undefined
   try {
     if (app) {
-      prevScreenUpdating = app.ScreenUpdating
-      prevCalculation = app.Calculation
+      previousScreenUpdating = app.ScreenUpdating
+      previousCalculation = app.Calculation
       app.ScreenUpdating = false
       app.Calculation = -4135 // xlCalculationManual
     }
@@ -1795,8 +1795,8 @@ export async function syncFromGithub(
     // 恢复屏幕刷新和自动计算
     try {
       if (app) {
-        if (prevScreenUpdating !== undefined) app.ScreenUpdating = prevScreenUpdating
-        if (prevCalculation !== undefined) app.Calculation = prevCalculation
+        if (previousScreenUpdating !== undefined) app.ScreenUpdating = previousScreenUpdating
+        if (previousCalculation !== undefined) app.Calculation = previousCalculation
       }
     } catch {
       // 忽略恢复失败

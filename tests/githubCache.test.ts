@@ -42,8 +42,8 @@ describe('computeTextHash', () => {
   })
 
   it('长字符串应产生稳定哈希', () => {
-    const longStr = 'x'.repeat(10_000)
-    const hash = computeTextHash(longStr)
+    const longString = 'x'.repeat(10_000)
+    const hash = computeTextHash(longString)
     expect(hash).toMatch(/^[0-9a-f]{8}$/)
   })
 })

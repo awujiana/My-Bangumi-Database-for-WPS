@@ -113,27 +113,27 @@ interface MockWorksheetOptions {
   rowsCount?: number
 }
 
-function createMockWorksheet(opts: MockWorksheetOptions = {}): unknown {
+function createMockWorksheet(options: MockWorksheetOptions = {}): unknown {
   return {
-    Name: opts.name ?? 'Sheet1',
-    AutoFilterMode: opts.autoFilterMode ?? false,
-    AutoFilter: opts.autoFilter ?? null,
+    Name: options.name ?? 'Sheet1',
+    AutoFilterMode: options.autoFilterMode ?? false,
+    AutoFilter: options.autoFilter ?? null,
     Range: (address: string) => ({
-      Value2: opts.rangeValues?.[address] ?? null,
+      Value2: options.rangeValues?.[address] ?? null,
       End: (_direction: number) => {
-        const r = opts.rangeEndRow ? opts.rangeEndRow(address) : null
+        const r = options.rangeEndRow ? options.rangeEndRow(address) : null
         return r != null ? { Row: r } : null
       },
       Count: 1,
-      Rows: { Count: 1, Item: (i: number) => ({ Row: i }) },
+      Rows: { Count: 1, Item: (index: number) => ({ Row: index }) },
       SpecialCells: (_type: number) => null,
       Areas: {
         Count: 1,
-        Item: (i: number) => ({ Rows: { Count: 1, Item: (j: number) => ({ Row: i + j - 1 }) } }),
+        Item: (index: number) => ({ Rows: { Count: 1, Item: (index_: number) => ({ Row: index + index_ - 1 }) } }),
       },
     }),
-    Rows: { Count: opts.rowsCount ?? 100_000 },
-    UsedRange: opts.usedRange ?? null,
+    Rows: { Count: options.rowsCount ?? 100_000 },
+    UsedRange: options.usedRange ?? null,
   }
 }
 
@@ -824,11 +824,11 @@ describe('SyncToBangumiAsync', () => {
 
     expect(mockState.bgmRequestSync).toHaveBeenCalled()
     // 调用参数应包含正确的 endpoint、method 和 token
-    const callArgs = mockState.bgmRequestSync.mock.calls[0]
-    expect(callArgs?.[0]).toBe('POST') // method
-    expect(callArgs?.[3]).toBe('test-token') // token
+    const callArguments = mockState.bgmRequestSync.mock.calls[0]
+    expect(callArguments?.[0]).toBe('POST') // method
+    expect(callArguments?.[3]).toBe('test-token') // token
     // endpoint 应包含 sid
-    expect(callArgs?.[1]).toContain('12345')
+    expect(callArguments?.[1]).toContain('12345')
     // 应有成功计数（可能为 0 或 1，取决于 mock 设置）
     expect(result.success).toBeGreaterThanOrEqual(0)
   })

@@ -77,7 +77,7 @@ function createMockApp(): {
 }
 
 // ============ vi.hoisted 共享 mock 引用 ============
-const mockRefs = vi.hoisted(() => ({
+const mockReferences = vi.hoisted(() => ({
   mockBgmLog: vi.fn(),
   mockGetUrlPath: vi.fn(() => 'https://example.com/addin'),
   mockGetApp: vi.fn(),
@@ -91,7 +91,7 @@ const mockRefs = vi.hoisted(() => ({
 vi.mock('../ts/tools/logger.js', () => ({
   logger: {
     debug: vi.fn(),
-    info: mockRefs.mockBgmLog,
+    info: mockReferences.mockBgmLog,
     warn: vi.fn(),
     error: vi.fn(),
   },
@@ -99,7 +99,7 @@ vi.mock('../ts/tools/logger.js', () => ({
 }))
 
 vi.mock('../ts/core/constants.js', () => ({
-  WPS_ENUM: mockRefs.MOCK_WPS_ENUM,
+  WPS_ENUM: mockReferences.MOCK_WPS_ENUM,
   BGM_CONFIG: {},
   LOG_LEVELS: { INFO: 1, WARN: 2, ERROR: 3, DEBUG: 0 },
   ERROR_LEVELS: { SILENT: 0, WARN: 1, ERROR: 2, THROW: 3, INFO: 4 },
@@ -143,13 +143,13 @@ vi.mock('../ts/tools/events.js', () => ({
 
 // Mock the root index.js to prevent circular dependency chain
 vi.mock('../index.js', () => ({
-  getApp: mockRefs.mockGetApp,
+  getApp: mockReferences.mockGetApp,
   showToast: vi.fn(),
   confirm: vi.fn(),
   showConfirm: vi.fn(),
   showError: vi.fn(),
   showInfo: vi.fn(),
-  bgmLog: mockRefs.mockBgmLog,
+  bgmLog: mockReferences.mockBgmLog,
   LOG_LEVELS: { DEBUG: 'DEBUG', INFO: 'INFO', WARN: 'WARN', ERROR: 'ERROR' },
   loadBgToken: vi.fn(() => null),
   storeBgToken: vi.fn(),
@@ -208,7 +208,7 @@ vi.mock('../index.js', () => ({
   hideSyncProgressDialog: vi.fn(),
   showSyncResultDialog: vi.fn(),
   syncFromRemote: vi.fn(),
-  getUrlPath: mockRefs.mockGetUrlPath,
+  getUrlPath: mockReferences.mockGetUrlPath,
   BGM: {},
 }))
 
@@ -227,9 +227,9 @@ import { showSettingsPanel } from '../ts/tools/util/index.js'
 
 afterEach(() => {
   vi.clearAllMocks()
-  mockRefs.mockBgmLog.mockClear()
-  mockRefs.mockGetUrlPath.mockClear()
-  mockRefs.mockGetApp.mockClear()
+  mockReferences.mockBgmLog.mockClear()
+  mockReferences.mockGetUrlPath.mockClear()
+  mockReferences.mockGetApp.mockClear()
   getTaskPaneResults = {}
   createdPanes = []
   // 清理 window.Application
@@ -264,7 +264,7 @@ describe('showSettingsPanel — 主面板可见时停靠右侧', () => {
     expect(createdId).toBeDefined()
     if (createdId) {
       const pane = getTaskPaneResults[createdId]
-      expect(pane?.DockPosition).toBe(mockRefs.MOCK_WPS_ENUM.msoCTPDockPositionRight)
+      expect(pane?.DockPosition).toBe(mockReferences.MOCK_WPS_ENUM.msoCTPDockPositionRight)
       expect(pane?.Visible).toBe(true)
     }
 
@@ -283,7 +283,7 @@ describe('showSettingsPanel — 主面板可见时停靠右侧', () => {
     getTaskPaneResults['settings-pane-1'] = createMockTaskPane(
       'settings-pane-1',
       true,
-      mockRefs.MOCK_WPS_ENUM.msoCTPDockPositionLeft,
+      mockReferences.MOCK_WPS_ENUM.msoCTPDockPositionLeft,
     )
 
     setMockApp(app)
@@ -305,7 +305,7 @@ describe('showSettingsPanel — 主面板可见时停靠右侧', () => {
     getTaskPaneResults['settings-pane-1'] = createMockTaskPane(
       'settings-pane-1',
       false,
-      mockRefs.MOCK_WPS_ENUM.msoCTPDockPositionLeft,
+      mockReferences.MOCK_WPS_ENUM.msoCTPDockPositionLeft,
     )
 
     setMockApp(app)
@@ -315,7 +315,7 @@ describe('showSettingsPanel — 主面板可见时停靠右侧', () => {
     // 已存在且隐藏 → 应显示并调整到右侧
     const pane = getTaskPaneResults['settings-pane-1']
     expect(pane?.Visible).toBe(true)
-    expect(pane?.DockPosition).toBe(mockRefs.MOCK_WPS_ENUM.msoCTPDockPositionRight)
+    expect(pane?.DockPosition).toBe(mockReferences.MOCK_WPS_ENUM.msoCTPDockPositionRight)
   })
 })
 
@@ -339,7 +339,7 @@ describe('showSettingsPanel — 主面板隐藏时仍停靠右侧', () => {
     expect(createdId).toBeDefined()
     if (createdId) {
       const pane = getTaskPaneResults[createdId]
-      expect(pane?.DockPosition).toBe(mockRefs.MOCK_WPS_ENUM.msoCTPDockPositionRight)
+      expect(pane?.DockPosition).toBe(mockReferences.MOCK_WPS_ENUM.msoCTPDockPositionRight)
       expect(pane?.Visible).toBe(true)
     }
   })
@@ -357,7 +357,7 @@ describe('showSettingsPanel — 主面板隐藏时仍停靠右侧', () => {
     const createdId = Object.keys(getTaskPaneResults).find((k) => k.startsWith('settings-pane-'))
     if (createdId) {
       const pane = getTaskPaneResults[createdId]
-      expect(pane?.DockPosition).toBe(mockRefs.MOCK_WPS_ENUM.msoCTPDockPositionRight)
+      expect(pane?.DockPosition).toBe(mockReferences.MOCK_WPS_ENUM.msoCTPDockPositionRight)
       expect(pane?.Visible).toBe(true)
     }
   })
@@ -373,7 +373,7 @@ describe('showSettingsPanel — 主面板隐藏时仍停靠右侧', () => {
     getTaskPaneResults['settings-pane-1'] = createMockTaskPane(
       'settings-pane-1',
       false,
-      mockRefs.MOCK_WPS_ENUM.msoCTPDockPositionRight,
+      mockReferences.MOCK_WPS_ENUM.msoCTPDockPositionRight,
     )
 
     setMockApp(app)
@@ -383,7 +383,7 @@ describe('showSettingsPanel — 主面板隐藏时仍停靠右侧', () => {
     // 应显示并调整到右侧
     const pane = getTaskPaneResults['settings-pane-1']
     expect(pane?.Visible).toBe(true)
-    expect(pane?.DockPosition).toBe(mockRefs.MOCK_WPS_ENUM.msoCTPDockPositionRight)
+    expect(pane?.DockPosition).toBe(mockReferences.MOCK_WPS_ENUM.msoCTPDockPositionRight)
   })
 })
 
@@ -422,7 +422,7 @@ describe('showSettingsPanel — 边界情况', () => {
     const createdId = Object.keys(getTaskPaneResults).find((k) => k.startsWith('settings-pane-'))
     if (createdId) {
       const pane = getTaskPaneResults[createdId]
-      expect(pane?.DockPosition).toBe(mockRefs.MOCK_WPS_ENUM.msoCTPDockPositionRight)
+      expect(pane?.DockPosition).toBe(mockReferences.MOCK_WPS_ENUM.msoCTPDockPositionRight)
     }
   })
 
@@ -462,7 +462,7 @@ describe('showSettingsPanel — 边界情况', () => {
     showSettingsPanel()
 
     // mockBgmLog 是 logger.info，只接收 message 字符串
-    const statusCall = mockRefs.mockBgmLog.mock.calls.find((c: unknown[]) =>
+    const statusCall = mockReferences.mockBgmLog.mock.calls.find((c: unknown[]) =>
       String(c[0]).includes('主面板状态'),)
     expect(statusCall).toBeDefined()
     if (statusCall) {

@@ -91,18 +91,18 @@ function initSettingsPage(): void {
   // 3. 加载 GitHub 配置
   import('../index.js')
     .then(({ getGithubConfig }) => {
-      const cfg = getGithubConfig()
+      const config = getGithubConfig()
       const ownerInput = document.getElementById('githubOwner') as HTMLInputElement | null
-      if (ownerInput) ownerInput.value = cfg.owner || ''
+      if (ownerInput) ownerInput.value = config.owner || ''
 
       const repoInput = document.getElementById('githubRepo') as HTMLInputElement | null
-      if (repoInput) repoInput.value = cfg.repo || ''
+      if (repoInput) repoInput.value = config.repo || ''
 
       const branchInput = document.getElementById('githubBranch') as HTMLInputElement | null
-      if (branchInput) branchInput.value = cfg.branch || ''
+      if (branchInput) branchInput.value = config.branch || ''
 
       const pathInput = document.getElementById('githubPath') as HTMLInputElement | null
-      if (pathInput) pathInput.value = cfg.path || ''
+      if (pathInput) pathInput.value = config.path || ''
     })
     .catch(() => {
       // 静默处理

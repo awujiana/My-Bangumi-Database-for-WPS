@@ -41,7 +41,7 @@ export interface WpsApplication {
   ActiveCell?: WpsRange
   StatusBar?: string | boolean
   OAAssist?: WpsOAAssist
-  InputBox?: (message: string, title: string, defaultVal: string, type: number) => string | false
+  InputBox?: (message: string, title: string, defaultValue: string, type: number) => string | false
   MessageBox?: (message: string, type: number, icon?: number) => number
   Wait?: (date: Date) => void
   DoEvents?: () => void
@@ -230,7 +230,7 @@ export interface WpsPluginStorage {
 
 // ========== WPS 其他 ==========
 export interface WpsOAAssist {
-  ShellExecute(param: string): void
+  ShellExecute(parameter: string): void
 }
 
 export interface WpsTaskPane {
@@ -301,9 +301,9 @@ export function wpsPrompt(message: string, defaultValue?: string): Promise<strin
     const app = getApp() as
       | {
           InputBox?: (
-            msg: string,
+            message_: string,
             title: string,
-            defaultVal: string,
+            defaultValue_: string,
             type: number,
           ) => string | false
         }
@@ -320,8 +320,8 @@ export function wpsPrompt(message: string, defaultValue?: string): Promise<strin
         return
       } catch (error: unknown) {
         // 类型守卫：先缩窄类型再访问 message，符合 useUnknownInCatchVariables 规范
-        const errMsg = error instanceof Error ? error.message : String(error)
-        bgmLog(LOG_LEVELS.WARN, `WPS InputBox 不可用: ${errMsg}`)
+        const errorMessage = error instanceof Error ? error.message : String(error)
+        bgmLog(LOG_LEVELS.WARN, `WPS InputBox 不可用: ${errorMessage}`)
       }
     }
     if (
@@ -364,7 +364,7 @@ export function wpsPrompt(message: string, defaultValue?: string): Promise<strin
 export function wpsMsgBox(message: string, buttons?: number, icon?: number): Promise<number> {
   return new Promise((resolve) => {
     const app = getApp() as
-      { MessageBox?: (msg: string, type: number) => number } | null | undefined
+      { MessageBox?: (message_: string, type: number) => number } | null | undefined
     if (app?.MessageBox) {
       try {
         const result = app.MessageBox(message, (buttons || 0) + (icon || 64))
@@ -372,8 +372,8 @@ export function wpsMsgBox(message: string, buttons?: number, icon?: number): Pro
         return
       } catch (error: unknown) {
         // 类型守卫：先缩窄类型再访问 message，符合 useUnknownInCatchVariables 规范
-        const errMsg = error instanceof Error ? error.message : String(error)
-        bgmLog(LOG_LEVELS.WARN, `WPS MessageBox 不可用: ${errMsg}`)
+        const errorMessage = error instanceof Error ? error.message : String(error)
+        bgmLog(LOG_LEVELS.WARN, `WPS MessageBox 不可用: ${errorMessage}`)
       }
     }
 

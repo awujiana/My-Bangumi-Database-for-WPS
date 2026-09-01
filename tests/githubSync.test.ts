@@ -9,7 +9,7 @@ const mockGetLastRow = vi.hoisted(() => vi.fn().mockReturnValue(5))
 const mockGetColumnMap = vi.hoisted(() => vi.fn().mockReturnValue(new Map()))
 const mockGetCellValue = vi.hoisted(() => vi.fn().mockReturnValue(''))
 const mockSetCellValue = vi.hoisted(() => vi.fn())
-const mockColNumToLetter = vi.hoisted(() => vi.fn((c: number) => String.fromCharCode(64 + c)))
+const mockColNumberToLetter = vi.hoisted(() => vi.fn((c: number) => String.fromCharCode(64 + c)))
 const mockTrim = vi.hoisted(() => vi.fn((v: string) => v?.trim() ?? ''))
 const mockEnsureSheetHeaders = vi.hoisted(() => vi.fn().mockReturnValue(false))
 const mockGetApp = vi.hoisted(() => vi.fn())
@@ -31,18 +31,18 @@ const mockParseJsonl = vi.hoisted(() =>
     const entries: Record<string, unknown>[] = []
     const errors: { line: number; message: string }[] = []
     const lines = text.split(/\r?\n/)
-    for (let i = 0; i < lines.length; i += 1) {
-      const line = lines[i]!.trim()
+    for (let index = 0; index < lines.length; index += 1) {
+      const line = lines[index]!.trim()
       if (!line) continue
       try {
         const parsed = JSON.parse(line)
         if (typeof parsed.sid === 'string' && parsed.sid) {
           entries.push(parsed)
         } else {
-          errors.push({ line: i + 1, message: '缺少有效的 sid 字段' })
+          errors.push({ line: index + 1, message: '缺少有效的 sid 字段' })
         }
       } catch {
-        errors.push({ line: i + 1, message: '无效的 JSON' })
+        errors.push({ line: index + 1, message: '无效的 JSON' })
       }
     }
     return { entries, errors }
@@ -97,11 +97,11 @@ const mockXHR = vi.hoisted(() => {
 
     responseText = ''
 
-    onload: ((...args: unknown[]) => void) | null = null
+    onload: ((...arguments_: unknown[]) => void) | null = null
 
-    onerror: ((...args: unknown[]) => void) | null = null
+    onerror: ((...arguments_: unknown[]) => void) | null = null
 
-    ontimeout: ((...args: unknown[]) => void) | null = null
+    ontimeout: ((...arguments_: unknown[]) => void) | null = null
 
     open = vi.fn()
 
@@ -251,7 +251,7 @@ vi.mock('../ts/tools/util.js', () => ({
   getColumnMap: mockGetColumnMap,
   getCellValue: mockGetCellValue,
   setCellValue: mockSetCellValue,
-  colNumToLetter: mockColNumToLetter,
+  colNumToLetter: mockColNumberToLetter,
   trim: mockTrim,
   ensureSheetHeaders: mockEnsureSheetHeaders,
   getApp: mockGetApp,
@@ -267,8 +267,8 @@ vi.mock('../ts/core/result.js', () => ({
     okVoid: vi.fn(() => ({ isFail: () => false })),
     failVoid: vi.fn((e: Error) => ({ isFail: () => true, error: e })),
   },
-  BgmError: vi.fn().mockImplementation(function (msg: string, code?: string) {
-    return { message: msg, code }
+  BgmError: vi.fn().mockImplementation(function (message: string, code?: string) {
+    return { message, code }
   }),
 }))
 
@@ -324,17 +324,17 @@ function setupXHRResponse(status: number, responseText: string) {
 }
 
 function createMockWorksheet(
-  opts: {
+  options: {
     name?: string
     usedRange?: number
     cellValues?: Map<string, string>
     cellOverrides?: Record<string, { Value2?: unknown; Text?: unknown }>
   } = {},
 ) {
-  const name = opts.name || 'Sheet1'
-  const usedRange = opts.usedRange || 5
-  const cellValues = opts.cellValues || new Map()
-  const cellOverrides = opts.cellOverrides || {}
+  const name = options.name || 'Sheet1'
+  const usedRange = options.usedRange || 5
+  const cellValues = options.cellValues || new Map()
+  const cellOverrides = options.cellOverrides || {}
   const cellCache = new Map<
     string,
     { Value2: unknown; Text: unknown; Interior: { Color: number }; Font: { Bold: boolean } }
@@ -702,15 +702,15 @@ describe('isGithubRemoteEntry', () => {
 // ========== getSelectedRowSids 测试 ==========
 
 function createMockSheetForSelection(
-  opts: {
+  options: {
     name?: string
     rowCount?: number
     cellValues?: Map<string, string>
   } = {},
 ) {
-  const name = opts.name || 'Sheet1'
-  const rowCount = opts.rowCount || 10
-  const cellValues = opts.cellValues || new Map()
+  const name = options.name || 'Sheet1'
+  const rowCount = options.rowCount || 10
+  const cellValues = options.cellValues || new Map()
 
   return {
     Name: name,
@@ -720,8 +720,8 @@ function createMockSheetForSelection(
       if (address.includes(':')) {
         return { Value2: null, Interior: { Color: 0 } }
       }
-      const val = cellValues.get(address)
-      return { Value2: val ?? '', Text: val ?? '', Interior: { Color: 0 }, Font: { Bold: false } }
+      const value = cellValues.get(address)
+      return { Value2: value ?? '', Text: value ?? '', Interior: { Color: 0 }, Font: { Bold: false } }
     }),
     Activate: vi.fn(),
   }
@@ -2213,11 +2213,11 @@ describe('applyDiffToSheet 删除操作 yieldToEventLoop (line 1184)', () => {
 
     // 创建 11 个 delete diffs
     const deleteDiffs: GithubSyncDiff[] = []
-    for (let i = 0; i < 11; i += 1) {
+    for (let index = 0; index < 11; index += 1) {
       deleteDiffs.push({
         kind: 'delete',
-        sid: String(i + 1),
-        localRow: i + 2,
+        sid: String(index + 1),
+        localRow: index + 2,
         changedFields: ['*'],
       })
     }
@@ -2274,12 +2274,12 @@ describe('applyDiffToSheet 批量 add yieldToEventLoop (line 1060)', () => {
     mockGetApp.mockReturnValue(mockApp)
 
     // 生成 501 条 add diff（超过 BATCH_WRITE_SIZE=500）
-    const addDiffs: GithubSyncDiff[] = Array.from({ length: 501 }, (_, i) => ({
+    const addDiffs: GithubSyncDiff[] = Array.from({ length: 501 }, (_, index) => ({
       kind: 'add' as const,
-      sid: String(i + 1),
+      sid: String(index + 1),
       remote: {
-        sid: String(i + 1),
-        name: `测试条目${String(i + 1)}`,
+        sid: String(index + 1),
+        name: `测试条目${String(index + 1)}`,
         date: '2024-06-15',
       },
       changedFields: ['*'],
@@ -2327,13 +2327,13 @@ describe('applyDiffToSheet 批量 update yieldToEventLoop (line 1113)', () => {
     mockGetApp.mockReturnValue(mockApp)
 
     // 生成 51 条 update diff（超过 BATCH_UPDATE_SIZE=50）
-    const updateDiffs: GithubSyncDiff[] = Array.from({ length: 51 }, (_, i) => ({
+    const updateDiffs: GithubSyncDiff[] = Array.from({ length: 51 }, (_, index) => ({
       kind: 'update' as const,
-      sid: String(i + 1),
-      localRow: i + 2,
+      sid: String(index + 1),
+      localRow: index + 2,
       remote: {
-        sid: String(i + 1),
-        name: `更新条目${String(i + 1)}`,
+        sid: String(index + 1),
+        name: `更新条目${String(index + 1)}`,
         date: '2024-06-15',
       },
       changedFields: ['名称'],
@@ -3348,17 +3348,17 @@ describe('applyDiffToSheet formatEta 路径 (line 548)', () => {
         ['集数', 3],
       ]),
     )
-    mockColNumToLetter.mockImplementation((c: number) => String.fromCharCode(64 + c))
+    mockColNumberToLetter.mockImplementation((c: number) => String.fromCharCode(64 + c))
 
     // 创建 600 条 add diffs (超过 BATCH_WRITE_SIZE=500)，确保触发批量写入和事件循环让出
     const diffs: GithubSyncDiff[] = []
-    for (let i = 0; i < 600; i += 1) {
+    for (let index = 0; index < 600; index += 1) {
       diffs.push({
         kind: 'add',
-        sid: `eta-${String(i)}`,
+        sid: `eta-${String(index)}`,
         remote: {
-          sid: `eta-${String(i)}`,
-          name: `条目 ${String(i)}`,
+          sid: `eta-${String(index)}`,
+          name: `条目 ${String(index)}`,
           date: '2024-06-15',
         },
         changedFields: ['*'],
@@ -3387,7 +3387,7 @@ describe('batchWriteNewRows 扩展字段写入 (lines 632-635)', () => {
     mockFindHeaderRow.mockReturnValue(1)
     mockGetLastRow.mockReturnValue(5)
     mockSetCellValue.mockImplementation(() => {})
-    mockColNumToLetter.mockImplementation((c: number) => String.fromCharCode(64 + c))
+    mockColNumberToLetter.mockImplementation((c: number) => String.fromCharCode(64 + c))
 
     // 模拟 Range.Value2 可写
     const mockRange = {
@@ -3430,7 +3430,7 @@ describe('batchWriteNewRows 扩展字段写入 (lines 632-635)', () => {
     mockFindHeaderRow.mockReturnValue(1)
     mockGetLastRow.mockReturnValue(5)
     mockSetCellValue.mockImplementation(() => {})
-    mockColNumToLetter.mockImplementation((c: number) => String.fromCharCode(64 + c))
+    mockColNumberToLetter.mockImplementation((c: number) => String.fromCharCode(64 + c))
 
     const mockRange = {
       Value2: null as unknown,
@@ -3475,7 +3475,7 @@ describe('batchWriteNewRows 空列场景 (line 596)', () => {
     mockFindHeaderRow.mockReturnValue(1)
     mockGetLastRow.mockReturnValue(5)
     mockSetCellValue.mockImplementation(() => {})
-    mockColNumToLetter.mockImplementation((c: number) => String.fromCharCode(64 + c))
+    mockColNumberToLetter.mockImplementation((c: number) => String.fromCharCode(64 + c))
 
     // 空列映射，导致 writeCols 为空
     mockGetColumnMap.mockReturnValue(new Map<string, number>())
@@ -3515,7 +3515,7 @@ describe('applyDiffToSheet delete 异常路径', () => {
     mockGetLastRow.mockReturnValue(5)
     mockGetCellValue.mockReturnValue('')
     mockSetCellValue.mockImplementation(() => {})
-    mockColNumToLetter.mockImplementation((c: number) => String.fromCharCode(64 + c))
+    mockColNumberToLetter.mockImplementation((c: number) => String.fromCharCode(64 + c))
 
     // 模拟 Range.Delete 抛出异常
     mockWs.Range = vi.fn().mockImplementation(() => {
@@ -3550,7 +3550,7 @@ describe('applyDiffToSheet delete 异常路径', () => {
     mockGetCellValue.mockImplementation(() => {
       throw new Error('GetCellValue failed')
     })
-    mockColNumToLetter.mockImplementation((c: number) => String.fromCharCode(64 + c))
+    mockColNumberToLetter.mockImplementation((c: number) => String.fromCharCode(64 + c))
 
     mockGetColumnMap.mockReturnValue(
       new Map<string, number>([
@@ -3582,7 +3582,7 @@ describe('formatEta ms>0 精确路径 (line 548)', () => {
     mockGetLastRow.mockReturnValue(5)
     mockGetCellValue.mockReturnValue('')
     mockSetCellValue.mockImplementation(() => {})
-    mockColNumToLetter.mockImplementation((c: number) => String.fromCharCode(64 + c))
+    mockColNumberToLetter.mockImplementation((c: number) => String.fromCharCode(64 + c))
 
     const mockRange = { Value2: null as unknown }
     mockWs.Range = vi.fn().mockReturnValue(mockRange)
@@ -3596,11 +3596,11 @@ describe('formatEta ms>0 精确路径 (line 548)', () => {
     )
 
     const diffs: GithubSyncDiff[] = []
-    for (let i = 0; i < 501; i += 1) {
+    for (let index = 0; index < 501; index += 1) {
       diffs.push({
         kind: 'add',
-        sid: `eta-${String(i)}`,
-        remote: { sid: `eta-${String(i)}`, name: `条目 ${String(i)}`, date: '2024-06-15' },
+        sid: `eta-${String(index)}`,
+        remote: { sid: `eta-${String(index)}`, name: `条目 ${String(index)}`, date: '2024-06-15' },
         changedFields: ['*'],
       })
     }
@@ -3642,7 +3642,7 @@ describe('batchWriteNewRows 扩展字段精确覆盖 (lines 632, 635)', () => {
     mockFindHeaderRow.mockReturnValue(1)
     mockGetLastRow.mockReturnValue(5)
     mockSetCellValue.mockImplementation(() => {})
-    mockColNumToLetter.mockImplementation((c: number) => String.fromCharCode(64 + c))
+    mockColNumberToLetter.mockImplementation((c: number) => String.fromCharCode(64 + c))
 
     const mockRange = { Value2: null as unknown }
     mockWs.Range = vi.fn().mockReturnValue(mockRange)
@@ -3692,7 +3692,7 @@ describe('batchWriteNewRows 扩展字段精确覆盖 (lines 632, 635)', () => {
     mockFindHeaderRow.mockReturnValue(1)
     mockGetLastRow.mockReturnValue(5)
     mockSetCellValue.mockImplementation(() => {})
-    mockColNumToLetter.mockImplementation((c: number) => String.fromCharCode(64 + c))
+    mockColNumberToLetter.mockImplementation((c: number) => String.fromCharCode(64 + c))
 
     const mockRange = { Value2: null as unknown }
     mockWs.Range = vi.fn().mockReturnValue(mockRange)
@@ -3737,7 +3737,7 @@ describe('batchWriteNewRows 写入失败回退路径 (lines 655-664)', () => {
     mockFindHeaderRow.mockReturnValue(1)
     mockGetLastRow.mockReturnValue(5)
     mockSetCellValue.mockImplementation(() => {})
-    mockColNumToLetter.mockImplementation((c: number) => String.fromCharCode(64 + c))
+    mockColNumberToLetter.mockImplementation((c: number) => String.fromCharCode(64 + c))
 
     // Range 返回 null 触发 line 655 分支
     mockWs.Range = vi.fn().mockReturnValue(null)
@@ -3769,7 +3769,7 @@ describe('batchWriteNewRows 写入失败回退路径 (lines 655-664)', () => {
     mockFindHeaderRow.mockReturnValue(1)
     mockGetLastRow.mockReturnValue(5)
     mockSetCellValue.mockImplementation(() => {})
-    mockColNumToLetter.mockImplementation((c: number) => String.fromCharCode(64 + c))
+    mockColNumberToLetter.mockImplementation((c: number) => String.fromCharCode(64 + c))
 
     // Range 存在但写入时抛出异常
     mockWs.Range = vi.fn().mockImplementation(() => {
@@ -3805,7 +3805,7 @@ describe('batchUpdateRows 列写入判断分支 (lines 768-772)', () => {
     mockFindHeaderRow.mockReturnValue(1)
     mockGetLastRow.mockReturnValue(5)
     mockSetCellValue.mockImplementation(() => {})
-    mockColNumToLetter.mockImplementation((c: number) => String.fromCharCode(64 + c))
+    mockColNumberToLetter.mockImplementation((c: number) => String.fromCharCode(64 + c))
 
     const mockRange = {
       Value2: null as unknown,
@@ -3848,7 +3848,7 @@ describe('batchUpdateRows 列写入判断分支 (lines 768-772)', () => {
     mockFindHeaderRow.mockReturnValue(1)
     mockGetLastRow.mockReturnValue(5)
     mockSetCellValue.mockImplementation(() => {})
-    mockColNumToLetter.mockImplementation((c: number) => String.fromCharCode(64 + c))
+    mockColNumberToLetter.mockImplementation((c: number) => String.fromCharCode(64 + c))
 
     const mockRange = {
       Value2: null as unknown,
@@ -3889,7 +3889,7 @@ describe('formatDuration 全分支 (lines 534-540)', () => {
     mockFindHeaderRow.mockReturnValue(1)
     mockGetLastRow.mockReturnValue(5)
     mockSetCellValue.mockImplementation(() => {})
-    mockColNumToLetter.mockImplementation((c: number) => String.fromCharCode(64 + c))
+    mockColNumberToLetter.mockImplementation((c: number) => String.fromCharCode(64 + c))
 
     mockGetColumnMap.mockReturnValue(
       new Map<string, number>([
@@ -3900,17 +3900,17 @@ describe('formatDuration 全分支 (lines 534-540)', () => {
 
     // 使用少量条目让处理速度极快，eta 进入 <1000ms 分支
     const diffs: GithubSyncDiff[] = []
-    for (let i = 0; i < 3; i += 1) {
+    for (let index = 0; index < 3; index += 1) {
       diffs.push({
         kind: 'add',
-        sid: `dur-ms-${String(i)}`,
-        remote: { sid: `dur-ms-${String(i)}`, name: `快速处理${String(i)}`, date: '2024-06-15' },
+        sid: `dur-ms-${String(index)}`,
+        remote: { sid: `dur-ms-${String(index)}`, name: `快速处理${String(index)}`, date: '2024-06-15' },
         changedFields: ['*'],
       })
     }
 
     const etaValues: string[] = []
-    const onProgress = (_current: number, _total: number, _msg: string, eta?: string): void => {
+    const onProgress = (_current: number, _total: number, _message: string, eta?: string): void => {
       if (eta) etaValues.push(eta)
     }
 
@@ -3929,7 +3929,7 @@ describe('formatDuration 全分支 (lines 534-540)', () => {
     mockFindHeaderRow.mockReturnValue(1)
     mockGetLastRow.mockReturnValue(5)
     mockSetCellValue.mockImplementation(() => {})
-    mockColNumToLetter.mockImplementation((c: number) => String.fromCharCode(64 + c))
+    mockColNumberToLetter.mockImplementation((c: number) => String.fromCharCode(64 + c))
 
     mockGetColumnMap.mockReturnValue(
       new Map<string, number>([
@@ -3949,7 +3949,7 @@ describe('formatDuration 全分支 (lines 534-540)', () => {
     ]
 
     const etaValues: string[] = []
-    const onProgress = (_current: number, _total: number, _msg: string, eta?: string): void => {
+    const onProgress = (_current: number, _total: number, _message: string, eta?: string): void => {
       if (eta) etaValues.push(eta)
     }
 
@@ -3971,7 +3971,7 @@ describe('batchUpdateRows 扩展字段分支覆盖 (lines 788-807)', () => {
     mockFindHeaderRow.mockReturnValue(1)
     mockGetLastRow.mockReturnValue(5)
     mockSetCellValue.mockImplementation(() => {})
-    mockColNumToLetter.mockImplementation((c: number) => String.fromCharCode(64 + c))
+    mockColNumberToLetter.mockImplementation((c: number) => String.fromCharCode(64 + c))
 
     const mockRange = {
       Value2: null as unknown,
@@ -4013,7 +4013,7 @@ describe('batchUpdateRows 扩展字段分支覆盖 (lines 788-807)', () => {
     mockFindHeaderRow.mockReturnValue(1)
     mockGetLastRow.mockReturnValue(5)
     mockSetCellValue.mockImplementation(() => {})
-    mockColNumToLetter.mockImplementation((c: number) => String.fromCharCode(64 + c))
+    mockColNumberToLetter.mockImplementation((c: number) => String.fromCharCode(64 + c))
 
     const mockRange = {
       Value2: null as unknown,
@@ -4066,7 +4066,7 @@ describe('formatDuration 秒/分钟分支 (lines 536, 539)', () => {
     mockFindHeaderRow.mockReturnValue(1)
     mockGetLastRow.mockReturnValue(5)
     mockSetCellValue.mockImplementation(() => {})
-    mockColNumToLetter.mockImplementation((c: number) => String.fromCharCode(64 + c))
+    mockColNumberToLetter.mockImplementation((c: number) => String.fromCharCode(64 + c))
 
     const mockRange = {
       Value2: null as unknown,
@@ -4097,17 +4097,17 @@ describe('formatDuration 秒/分钟分支 (lines 536, 539)', () => {
     // 1100 条 add diffs: 分 3 批处理 (500+500+100)
     // 第二批是中间批: speed>0 且 remaining>0，且 now-lastProgressTime>500 触发更新
     const diffs: GithubSyncDiff[] = []
-    for (let i = 0; i < 1100; i += 1) {
+    for (let index = 0; index < 1100; index += 1) {
       diffs.push({
         kind: 'add',
-        sid: `sec-${String(i)}`,
-        remote: { sid: `sec-${String(i)}`, name: `秒分支${String(i)}`, date: '2024-06-15' },
+        sid: `sec-${String(index)}`,
+        remote: { sid: `sec-${String(index)}`, name: `秒分支${String(index)}`, date: '2024-06-15' },
         changedFields: ['*'],
       })
     }
 
     const etaValues: string[] = []
-    const onProgress = (_current: number, _total: number, _msg: string, eta?: string): void => {
+    const onProgress = (_current: number, _total: number, _message: string, eta?: string): void => {
       if (eta) etaValues.push(eta)
     }
 
@@ -4125,7 +4125,7 @@ describe('formatDuration 秒/分钟分支 (lines 536, 539)', () => {
     mockFindHeaderRow.mockReturnValue(1)
     mockGetLastRow.mockReturnValue(5)
     mockSetCellValue.mockImplementation(() => {})
-    mockColNumToLetter.mockImplementation((c: number) => String.fromCharCode(64 + c))
+    mockColNumberToLetter.mockImplementation((c: number) => String.fromCharCode(64 + c))
 
     const mockRange = {
       Value2: null as unknown,
@@ -4157,17 +4157,17 @@ describe('formatDuration 秒/分钟分支 (lines 536, 539)', () => {
 
     // 1500 条 add diffs: 分 3 批处理 (500+500+500)
     const diffs: GithubSyncDiff[] = []
-    for (let i = 0; i < 1500; i += 1) {
+    for (let index = 0; index < 1500; index += 1) {
       diffs.push({
         kind: 'add',
-        sid: `min-${String(i)}`,
-        remote: { sid: `min-${String(i)}`, name: `分分支${String(i)}`, date: '2024-06-15' },
+        sid: `min-${String(index)}`,
+        remote: { sid: `min-${String(index)}`, name: `分分支${String(index)}`, date: '2024-06-15' },
         changedFields: ['*'],
       })
     }
 
     const etaValues: string[] = []
-    const onProgress = (_current: number, _total: number, _msg: string, eta?: string): void => {
+    const onProgress = (_current: number, _total: number, _message: string, eta?: string): void => {
       if (eta) etaValues.push(eta)
     }
 
@@ -4185,7 +4185,7 @@ describe('formatDuration 秒/分钟分支 (lines 536, 539)', () => {
     mockFindHeaderRow.mockReturnValue(1)
     mockGetLastRow.mockReturnValue(5)
     mockSetCellValue.mockImplementation(() => {})
-    mockColNumToLetter.mockImplementation((c: number) => String.fromCharCode(64 + c))
+    mockColNumberToLetter.mockImplementation((c: number) => String.fromCharCode(64 + c))
 
     const mockRange = {
       Value2: null as unknown,
@@ -4206,17 +4206,17 @@ describe('formatDuration 秒/分钟分支 (lines 536, 539)', () => {
     dateNowSpy = vi.spyOn(Date, 'now').mockImplementation(() => startTime)
 
     const diffs: GithubSyncDiff[] = []
-    for (let i = 0; i < 3; i += 1) {
+    for (let index = 0; index < 3; index += 1) {
       diffs.push({
         kind: 'add',
-        sid: `ms-${String(i)}`,
-        remote: { sid: `ms-${String(i)}`, name: `毫秒${String(i)}`, date: '2024-06-15' },
+        sid: `ms-${String(index)}`,
+        remote: { sid: `ms-${String(index)}`, name: `毫秒${String(index)}`, date: '2024-06-15' },
         changedFields: ['*'],
       })
     }
 
     const etaValues: string[] = []
-    const onProgress = (_current: number, _total: number, _msg: string, eta?: string): void => {
+    const onProgress = (_current: number, _total: number, _message: string, eta?: string): void => {
       if (eta) etaValues.push(eta)
     }
 
@@ -4238,7 +4238,7 @@ describe('writeRemoteEntryToRow 数字类型扩展字段 (line 506)', () => {
     mockFindHeaderRow.mockReturnValue(1)
     mockGetLastRow.mockReturnValue(5)
     mockSetCellValue.mockImplementation(() => {})
-    mockColNumToLetter.mockImplementation((c: number) => String.fromCharCode(64 + c))
+    mockColNumberToLetter.mockImplementation((c: number) => String.fromCharCode(64 + c))
 
     // 模拟批量写入失败，让 Range.Value2 抛异常
     const mockRange = {
@@ -4282,7 +4282,7 @@ describe('writeRemoteEntryToRow 数字类型扩展字段 (line 506)', () => {
     mockFindHeaderRow.mockReturnValue(1)
     mockGetLastRow.mockReturnValue(5)
     mockSetCellValue.mockImplementation(() => {})
-    mockColNumToLetter.mockImplementation((c: number) => String.fromCharCode(64 + c))
+    mockColNumberToLetter.mockImplementation((c: number) => String.fromCharCode(64 + c))
 
     const mockRange = {
       Value2: null as unknown,
@@ -4354,7 +4354,7 @@ describe('getSelectedRowSids 无选区路径 (lines 1460-1461)', () => {
     mockFindHeaderRow.mockReturnValue(1)
     mockGetLastRow.mockReturnValue(5)
     mockGetColumnMap.mockReturnValue(new Map())
-    mockColNumToLetter.mockImplementation((c: number) => String.fromCharCode(64 + c))
+    mockColNumberToLetter.mockImplementation((c: number) => String.fromCharCode(64 + c))
     mockSetCellValue.mockImplementation(() => {})
   })
 
@@ -4418,7 +4418,7 @@ describe('safeSet 日期列分支 (lines 468-472) 通过 writeRemoteEntryToRow f
     mockFindHeaderRow.mockReturnValue(1)
     mockGetLastRow.mockReturnValue(10)
     mockSetCellValue.mockImplementation(() => true)
-    mockColNumToLetter.mockImplementation((c: number) => String.fromCharCode(64 + c))
+    mockColNumberToLetter.mockImplementation((c: number) => String.fromCharCode(64 + c))
 
     mockGetColumnMap.mockReturnValue(
       new Map<string, number>([
@@ -4463,7 +4463,7 @@ describe('safeSet 数字扩展字段 (line 506)', () => {
     mockFindHeaderRow.mockReturnValue(1)
     mockGetLastRow.mockReturnValue(10)
     mockSetCellValue.mockImplementation(() => true)
-    mockColNumToLetter.mockImplementation((c: number) => String.fromCharCode(64 + c))
+    mockColNumberToLetter.mockImplementation((c: number) => String.fromCharCode(64 + c))
 
     // '片长' 在 EXTENDED_FIELD_MAP 中映射到 jsonlField '片长'
     mockGetColumnMap.mockReturnValue(
@@ -4626,18 +4626,18 @@ describe('GithubSyncSource 方法', () => {
       const entries: Record<string, unknown>[] = []
       const errors: { line: number; message: string }[] = []
       const lines = text.split(/\r?\n/)
-      for (let i = 0; i < lines.length; i += 1) {
-        const line = lines[i]!.trim()
+      for (let index = 0; index < lines.length; index += 1) {
+        const line = lines[index]!.trim()
         if (!line) continue
         try {
           const parsed = JSON.parse(line) as Record<string, unknown>
           if (typeof parsed.sid === 'string' && parsed.sid) {
             entries.push(parsed)
           } else {
-            errors.push({ line: i + 1, message: '缺少有效的 sid 字段' })
+            errors.push({ line: index + 1, message: '缺少有效的 sid 字段' })
           }
         } catch {
-          errors.push({ line: i + 1, message: '无效的 JSON' })
+          errors.push({ line: index + 1, message: '无效的 JSON' })
         }
       }
       return { entries, errors }
@@ -4707,7 +4707,7 @@ describe('getSelectedRowSids ActiveSheet 为 null (line 1469)', () => {
     mockFindHeaderRow.mockReturnValue(1)
     mockGetLastRow.mockReturnValue(5)
     mockGetColumnMap.mockReturnValue(new Map())
-    mockColNumToLetter.mockImplementation((c: number) => String.fromCharCode(64 + c))
+    mockColNumberToLetter.mockImplementation((c: number) => String.fromCharCode(64 + c))
     mockSetCellValue.mockImplementation(() => {})
   })
 
@@ -4741,7 +4741,7 @@ describe('getSelectedRowSids row===headerRow continue (line 1479)', () => {
     mockComputeDiff.mockReturnValue([])
     mockFindHeaderRow.mockReturnValue(1)
     mockGetLastRow.mockReturnValue(5)
-    mockColNumToLetter.mockImplementation((c: number) => String.fromCharCode(64 + c))
+    mockColNumberToLetter.mockImplementation((c: number) => String.fromCharCode(64 + c))
     mockSetCellValue.mockImplementation(() => {})
   })
 
@@ -4865,13 +4865,13 @@ describe('applyDiffToSheet BATCH_WRITE_SIZE 边界 (501条 add)', () => {
     // 生成 501 条 add diff（刚好超过 BATCH_WRITE_SIZE=500）
     // 这将触发两批写入：第一批 500 条，第二批 1 条
     const diffs: GithubSyncDiff[] = []
-    for (let i = 0; i < 501; i += 1) {
+    for (let index = 0; index < 501; index += 1) {
       diffs.push({
         kind: 'add',
-        sid: `sid-${String(i)}`,
+        sid: `sid-${String(index)}`,
         remote: {
-          sid: `sid-${String(i)}`,
-          name: `条目${String(i)}`,
+          sid: `sid-${String(index)}`,
+          name: `条目${String(index)}`,
           date: '2024-06-15',
         },
       })
@@ -4927,13 +4927,13 @@ describe('applyDiffToSheet BATCH_WRITE_SIZE 边界 (501条 add)', () => {
     mockGetApp.mockReturnValue(mockApp)
 
     const diffs: GithubSyncDiff[] = []
-    for (let i = 0; i < 600; i += 1) {
+    for (let index = 0; index < 600; index += 1) {
       diffs.push({
         kind: 'add',
-        sid: `sid-${String(i)}`,
+        sid: `sid-${String(index)}`,
         remote: {
-          sid: `sid-${String(i)}`,
-          name: `条目${String(i)}`,
+          sid: `sid-${String(index)}`,
+          name: `条目${String(index)}`,
           date: '2024-06-15',
         },
       })

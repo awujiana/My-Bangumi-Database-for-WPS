@@ -10,7 +10,7 @@ const mockGetLastRow = vi.hoisted(() => vi.fn())
 const mockGetColumnMap = vi.hoisted(() => vi.fn())
 const mockGetCellValue = vi.hoisted(() => vi.fn())
 const mockSetCellValue = vi.hoisted(() => vi.fn())
-const mockColNumToLetter = vi.hoisted(() => vi.fn())
+const mockColNumberToLetter = vi.hoisted(() => vi.fn())
 const mockEnsureSheetHeaders = vi.hoisted(() => vi.fn())
 const mockGetApp = vi.hoisted(() => vi.fn())
 const mockBuildRawUrl = vi.hoisted(() => vi.fn())
@@ -35,9 +35,9 @@ const mockXHR = vi.hoisted(() => {
     setRequestHeader: vi.fn(),
     abort: vi.fn(),
     timeout: 0,
-    onload: null as ((...args: unknown[]) => void) | null,
-    onerror: null as ((...args: unknown[]) => void) | null,
-    ontimeout: null as ((...args: unknown[]) => void) | null,
+    onload: null as ((...arguments_: unknown[]) => void) | null,
+    onerror: null as ((...arguments_: unknown[]) => void) | null,
+    ontimeout: null as ((...arguments_: unknown[]) => void) | null,
     status: 200,
     statusText: 'OK',
     responseText: '',
@@ -98,7 +98,7 @@ vi.mock('../ts/tools/util.js', () => ({
   getColumnMap: mockGetColumnMap,
   getCellValue: mockGetCellValue,
   setCellValue: mockSetCellValue,
-  colNumToLetter: mockColNumToLetter,
+  colNumToLetter: mockColNumberToLetter,
   trim: vi.fn((v: string) => v?.trim() ?? ''),
   ensureSheetHeaders: mockEnsureSheetHeaders,
   getApp: mockGetApp,
@@ -112,8 +112,8 @@ vi.mock('../ts/core/result.js', () => ({
     okVoid: vi.fn(() => ({ isFail: () => false })),
     failVoid: vi.fn((e: Error) => ({ isFail: () => true, error: e })),
   },
-  BgmError: vi.fn().mockImplementation(function (msg: string) {
-    this.message = msg
+  BgmError: vi.fn().mockImplementation(function (message: string) {
+    this.message = message
   }),
 }))
 
@@ -194,9 +194,9 @@ import type {
 // ========== 辅助函数 ==========
 
 function createMockSheet(
-  opts: { rows?: { Value2: unknown[] }[]; colMap?: Map<string, number> } = {},
+  options: { rows?: { Value2: unknown[] }[]; colMap?: Map<string, number> } = {},
 ) {
-  const rows = opts.rows || []
+  const rows = options.rows || []
   return {
     Name: 'TestSheet',
     Range: vi.fn((addr: string) => {

@@ -25,10 +25,10 @@ type ParseResult<T> = _ZodLikeParseResult<T>
 function ok<T>(data: T): ParseResult<T> {
   return { success: true, data }
 }
-function fail<T>(msg: string, path?: (string | number)[]): ParseResult<T> {
+function fail<T>(message: string, path?: (string | number)[]): ParseResult<T> {
   // exactOptionalPropertyTypes: path 为 undefined 时不能把 undefined 赋值给 ? 属性，
   // 因此只有 path 真正有值时才附加该字段
-  const issue: { message: string; path?: (string | number)[] } = { message: msg }
+  const issue: { message: string; path?: (string | number)[] } = { message }
   if (path !== undefined && path.length > 0) issue.path = path
   return { success: false, error: { issues: [issue] } }
 }
@@ -110,9 +110,9 @@ const NOOP_FLUENTS: readonly string[] = [
 /** 在 target 对象的同一实例上挂 noop fluent，返回原实例的精确类型 */
 function flu<T extends object>(target: T): T {
   const rec = target as unknown as Record<string, unknown>
-  for (const fn of NOOP_FLUENTS) {
-    if (typeof rec[fn] !== 'function') {
-      rec[fn] = function (): T {
+  for (const function_ of NOOP_FLUENTS) {
+    if (typeof rec[function_] !== 'function') {
+      rec[function_] = function (): T {
         return flu(target)
       }
     }
@@ -292,8 +292,8 @@ class LiteLiteral<V extends string | number | boolean> implements ZodSchema<V> {
 
   /** @internal */ readonly _val: V
 
-  constructor(val: V) {
-    this._val = val
+  constructor(value: V) {
+    this._val = value
   }
 
   optional(): ZodSchema<V | undefined> {
@@ -379,12 +379,12 @@ class LiteArray<T = any> implements ZodSchema<T[]> {
   safeParse(input: unknown): ParseResult<T[]> {
     if (!Array.isArray(input)) return fail<T[]>('expected array')
     const out: T[] = []
-    for (let i = 0; i < input.length; i += 1) {
-      const r = this._item.safeParse(input[i])
+    for (let index = 0; index < input.length; index += 1) {
+      const r = this._item.safeParse(input[index])
       if (!r.success) {
         const issue = r.error.issues[0]
-        return fail<T[]>(`[${String(i)}]: ${issue?.message ?? 'invalid'}`, [
-          i,
+        return fail<T[]>(`[${String(index)}]: ${issue?.message ?? 'invalid'}`, [
+          index,
           ...(issue?.path ?? []),
         ])
       }
@@ -443,15 +443,15 @@ class LiteObject<T = any> implements ZodSchema<T> {
   safeParse(input: unknown): ParseResult<T> {
     if (typeof input !== 'object' || input === null || Array.isArray(input))
       return fail<T>('expected object')
-    const src = input as Record<string, unknown>
+    const source = input as Record<string, unknown>
     const out: Record<string, unknown> = {}
-    if (this._passthrough) for (const k of Object.keys(src)) out[k] = src[k]
+    if (this._passthrough) for (const k of Object.keys(source)) out[k] = source[k]
     for (const key of Object.keys(this._shape)) {
       const schema = this._shape[key]
       if (!schema) continue
-      const has = Object.hasOwn(src, key)
-      const rawVal = has ? src[key] : undefined
-      const r = schema.safeParse(rawVal)
+      const has = Object.hasOwn(source, key)
+      const rawValue = has ? source[key] : undefined
+      const r = schema.safeParse(rawValue)
       if (!r.success) {
         const issue = r.error.issues[0]
         return fail<T>(`key "${key}": ${issue?.message ?? 'invalid'}`, [

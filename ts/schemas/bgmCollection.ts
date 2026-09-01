@@ -8,18 +8,18 @@ import type { infer as zInfer, ZodSchema } from '../tools/zodCompat.js'
  */
 
 /** 可选字符串 schema（默认值 v） */
-function strWithDefault(v: string): ZodSchema<string> {
+function stringWithDefault(v: string): ZodSchema<string> {
   return z.string().optional().default(v) as ZodSchema<string>
 }
 
 /** 可选 URL 字符串 schema */
-function strUrl(): ZodSchema<string | undefined> {
+function stringUrl(): ZodSchema<string | undefined> {
   const urlSchema = z.string() as unknown as ZodSchema<string> & { url(): ZodSchema<string> }
   return urlSchema.url().optional() as ZodSchema<string | undefined>
 }
 
 /** 可选字符串数组 schema（默认空数组） */
-function strArrayDefault(): ZodSchema<string[]> {
+function stringArrayDefault(): ZodSchema<string[]> {
   return z.array(z.string()).optional().default([]) as ZodSchema<string[]>
 }
 
@@ -27,8 +27,8 @@ function strArrayDefault(): ZodSchema<string[]> {
 export const BgmCollectionSubjectSchema = z.object({
   id: z.number().int().positive(),
   name: z.string(),
-  name_cn: strWithDefault(''),
-  url: strUrl(),
+  name_cn: stringWithDefault(''),
+  url: stringUrl(),
   images: z
     .object({
       large: z.string().optional(),
@@ -48,8 +48,8 @@ export const BgmCollectionSchema = z.object({
   subject: BgmCollectionSubjectSchema,
   subject_id: z.number().int().positive(),
   private: z.boolean().optional(),
-  tags: strArrayDefault(),
-  comment: strWithDefault(''),
+  tags: stringArrayDefault(),
+  comment: stringWithDefault(''),
   ep_status: z.number().int().optional(),
 })
 

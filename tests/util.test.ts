@@ -81,31 +81,31 @@ interface MockWorksheetOptions {
   activate?: () => void
 }
 
-function createMockWorksheet(opts: MockWorksheetOptions): unknown {
+function createMockWorksheet(options: MockWorksheetOptions): unknown {
   return {
-    Name: opts.name,
+    Name: options.name,
     Range: (address: string) => ({
-      Value2: opts.rangeValue2 ? opts.rangeValue2(address) : null,
+      Value2: options.rangeValue2 ? options.rangeValue2(address) : null,
       End: (_direction: number) => {
-        const r = opts.rangeEndRow ? opts.rangeEndRow(address) : null
+        const r = options.rangeEndRow ? options.rangeEndRow(address) : null
         return r != null ? { Row: r } : null
       },
     }),
-    Rows: { Count: opts.rowsCount ?? 100_000 },
-    UsedRange: opts.usedRange ?? null,
-    Activate: opts.activate ?? vi.fn(),
+    Rows: { Count: options.rowsCount ?? 100_000 },
+    UsedRange: options.usedRange ?? null,
+    Activate: options.activate ?? vi.fn(),
   }
 }
 
-function createMockApp(opts: {
+function createMockApp(options: {
   activeSheet?: unknown
-  worksheets?: { Item: (i: number) => unknown }
-  activeWorkbook?: { ActiveSheet: unknown; Worksheets: { Item: (i: number) => unknown } } | null
+  worksheets?: { Item: (index: number) => unknown }
+  activeWorkbook?: { ActiveSheet: unknown; Worksheets: { Item: (index: number) => unknown } } | null
   pluginStorage?: { getItem: (k: string) => string; setItem: (k: string, v: string) => void }
 }): unknown {
   return {
-    ActiveWorkbook: opts.activeWorkbook ?? null,
-    PluginStorage: opts.pluginStorage ?? null,
+    ActiveWorkbook: options.activeWorkbook ?? null,
+    PluginStorage: options.pluginStorage ?? null,
   }
 }
 
@@ -225,12 +225,12 @@ describe('getDataSheet', () => {
 
   it('锁定时返回锁定索引对应的工作表', () => {
     const lockedSheet = createMockWorksheet({ name: 'LockedSheet' })
-    const itemFn = vi.fn(() => lockedSheet)
+    const itemFunction = vi.fn(() => lockedSheet)
     mockState.getApp.mockReturnValue(
       createMockApp({
         activeWorkbook: {
           ActiveSheet: createMockWorksheet({ name: 'OtherSheet' }),
-          Worksheets: { Item: itemFn },
+          Worksheets: { Item: itemFunction },
         },
       }),
     )
@@ -238,19 +238,19 @@ describe('getDataSheet', () => {
     mockState.BGM.sheet.lockedIndex = 2
     const result = getDataSheet()
     expect(result).toBe(lockedSheet)
-    expect(itemFn).toHaveBeenCalledWith(2)
+    expect(itemFunction).toHaveBeenCalledWith(2)
   })
 
   it('锁定但 Item 抛错时回退到 ActiveSheet', () => {
     const activeSheet = createMockWorksheet({ name: 'ActiveSheet' })
-    const itemFn = vi.fn(() => {
+    const itemFunction = vi.fn(() => {
       throw new Error('not found')
     })
     mockState.getApp.mockReturnValue(
       createMockApp({
         activeWorkbook: {
           ActiveSheet: activeSheet,
-          Worksheets: { Item: itemFn },
+          Worksheets: { Item: itemFunction },
         },
       }),
     )
@@ -575,10 +575,10 @@ describe('clearSheetCache', () => {
 // ========== safeActivate ==========
 describe('safeActivate', () => {
   it('调用 ws.Activate()', () => {
-    const activateFn = vi.fn()
-    const ws = createMockWorksheet({ name: 'Sheet-SA-1', activate: activateFn })
+    const activateFunction = vi.fn()
+    const ws = createMockWorksheet({ name: 'Sheet-SA-1', activate: activateFunction })
     safeActivate(ws as never)
-    expect(activateFn).toHaveBeenCalledTimes(1)
+    expect(activateFunction).toHaveBeenCalledTimes(1)
   })
 
   it('null ws 不抛错', () => {

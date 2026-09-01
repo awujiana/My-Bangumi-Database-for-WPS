@@ -3,7 +3,7 @@ import {
   getApp,
   bgmLog,
   BGM,
-  wpsMsgBox,
+  wpsMsgBox as wpsMessageBox,
   loadBgToken,
   storeBgToken,
   getDataSheet,
@@ -206,22 +206,22 @@ export function getSyncPreview(
     bgmLog(LOG_LEVELS.INFO, `[getSyncPreview] 全量模式: ${String(rowsToProcess.length)} 行`)
   }
 
-  const getField = (rowNum: number, key: string): string => {
+  const getField = (rowNumber: number, key: string): string => {
     const col = colMap.get(key)
     if (!col) return ''
-    const rowIdx = rowNum - startRow
-    if (rowIdx >= 0 && rowIdx < allData.length) {
-      const rowData = allData[rowIdx]
+    const rowIndex = rowNumber - startRow
+    if (rowIndex >= 0 && rowIndex < allData.length) {
+      const rowData = allData[rowIndex]
       if (Array.isArray(rowData) && col - 1 < rowData.length) {
         return trim(rowData[col - 1])
       }
     }
-    return colMap.has(key) ? trim(getCellValue(ws, rowNum, colMap.get(key)!)) : ''
+    return colMap.has(key) ? trim(getCellValue(ws, rowNumber, colMap.get(key)!)) : ''
   }
 
-  for (const rowNum of rowsToProcess) {
+  for (const rowNumber of rowsToProcess) {
     total++
-    const bgmUrl = getField(rowNum, 'Bangumi_URL')
+    const bgmUrl = getField(rowNumber, 'Bangumi_URL')
 
     if (!bgmUrl || !extractSubjectId(bgmUrl)) {
       noUrl++
@@ -231,7 +231,7 @@ export function getSyncPreview(
 
     // 检查是否已上传（序列号列颜色）
     const seqCol = colMap.get('序列号') || 4
-    const seqCell = getCell(ws, rowNum, seqCol)
+    const seqCell = getCell(ws, rowNumber, seqCol)
     const isUploaded =
       seqCell?.Interior &&
       (seqCell.Interior.Color === BGM_COLOR.SUCCESS ||
@@ -244,18 +244,18 @@ export function getSyncPreview(
         const sid = extractSubjectId(bgmUrl)
         if (sid && fingerprintMap) {
           const currentFingerprint = calcFingerprint([
-            getField(rowNum, '名称'),
+            getField(rowNumber, '名称'),
             mapWatchStatus(
-              getField(rowNum, '是否看完') ||
-                getField(rowNum, '状态') ||
-                getField(rowNum, '观看状态'),
+              getField(rowNumber, '是否看完') ||
+                getField(rowNumber, '状态') ||
+                getField(rowNumber, '观看状态'),
             ).toString(),
-            getField(rowNum, '打分'),
-            getField(rowNum, '标签/分级'),
-            getField(rowNum, '原作标签'),
-            getField(rowNum, '剧透/感言'),
-            getField(rowNum, '集数'),
-            getField(rowNum, '集号'),
+            getField(rowNumber, '打分'),
+            getField(rowNumber, '标签/分级'),
+            getField(rowNumber, '原作标签'),
+            getField(rowNumber, '剧透/感言'),
+            getField(rowNumber, '集数'),
+            getField(rowNumber, '集号'),
           ])
           if (fingerprintMap.get(sid) === currentFingerprint) {
             incrementalSkipped++
@@ -269,7 +269,7 @@ export function getSyncPreview(
 
     // 判断观看状态
     const watchStatus =
-      getField(rowNum, '是否看完') || getField(rowNum, '状态') || getField(rowNum, '观看状态')
+      getField(rowNumber, '是否看完') || getField(rowNumber, '状态') || getField(rowNumber, '观看状态')
 
     // 空状态不计入待同步，跳过该条目
     if (!watchStatus) {
@@ -286,14 +286,14 @@ export function getSyncPreview(
         const sid = extractSubjectId(bgmUrl)
         if (sid) {
           const currentFingerprint = calcFingerprint([
-            getField(rowNum, '名称'),
+            getField(rowNumber, '名称'),
             type.toString(),
-            getField(rowNum, '打分'),
-            getField(rowNum, '标签/分级'),
-            getField(rowNum, '原作标签'),
-            getField(rowNum, '剧透/感言'),
-            getField(rowNum, '集数'),
-            getField(rowNum, '集号'),
+            getField(rowNumber, '打分'),
+            getField(rowNumber, '标签/分级'),
+            getField(rowNumber, '原作标签'),
+            getField(rowNumber, '剧透/感言'),
+            getField(rowNumber, '集数'),
+            getField(rowNumber, '集号'),
           ])
           if (fingerprintMap.get(sid) === currentFingerprint) {
             incrementalSkipped++
@@ -410,8 +410,8 @@ export async function detectConflicts(
     return ''
   }
 
-  for (const rowNum of rowsToProcess) {
-    const bgmUrl = getField(rowNum, 'Bangumi_URL')
+  for (const rowNumber of rowsToProcess) {
+    const bgmUrl = getField(rowNumber, 'Bangumi_URL')
     if (!bgmUrl) continue
     const sid = extractSubjectId(bgmUrl)
     if (!sid) continue
@@ -420,15 +420,15 @@ export async function detectConflicts(
     if (!bgmEntry) continue // 无对应收藏，不视为冲突
 
     // 构建 Excel 的 payload
-    const excelType = mapWatchStatus(getField(rowNum, '是否看完'))
+    const excelType = mapWatchStatus(getField(rowNumber, '是否看完'))
     if (excelType === 0) continue // 不上传，不参与冲突
 
     // 对比 type 字段
     if (bgmEntry.type !== excelType) {
       conflicts.push({
-        row: rowNum,
+        row: rowNumber,
         sid,
-        name: getField(rowNum, '名称') || '',
+        name: getField(rowNumber, '名称') || '',
         existingType: bgmEntry.type,
         newType: excelType,
       })
@@ -448,16 +448,16 @@ export async function syncWithConfirmation(): Promise<void> {
   const app = getApp()
   const ws = getDataSheet()
   if (!ws) {
-    void wpsMsgBox('未找到数据工作表', 0, 64)
+    void wpsMessageBox('未找到数据工作表', 0, 64)
     return
   }
   if (BGM.sync.isRunning) {
-    void wpsMsgBox('同步正在进行中，请稍后再试', 0, 48)
+    void wpsMessageBox('同步正在进行中，请稍后再试', 0, 48)
     return
   }
   const token = loadBgToken()
   if (!token) {
-    void wpsMsgBox('请先设置 Token', 0, 48)
+    void wpsMessageBox('请先设置 Token', 0, 48)
     return
   }
 
@@ -465,7 +465,7 @@ export async function syncWithConfirmation(): Promise<void> {
   const lastRow = getLastRow(ws)
   const colMap = getColumnMap(ws, headerRow)
   if (!colMap.has('Bangumi_URL')) {
-    void wpsMsgBox('未找到 Bangumi URL 列', 0, 48)
+    void wpsMessageBox('未找到 Bangumi URL 列', 0, 48)
     return
   }
 
@@ -491,7 +491,7 @@ export async function syncWithConfirmation(): Promise<void> {
   }
 
   // 3. 先弹确认框（让用户立刻看到反馈，避免冲突检测网络等待期间"无反应"）
-  const confirmMsg = `即将开始上传同步（Excel → Bangumi）
+  const confirmMessage = `即将开始上传同步（Excel → Bangumi）
 
 数据预览：
   总行数：${String(preview.total)}
@@ -505,7 +505,7 @@ export async function syncWithConfirmation(): Promise<void> {
 增量同步：${incremental ? '开启' : '关闭'}
 
 点击"是"开始同步，点击"否"取消。`
-  const confirmResult = app?.MessageBox?.(confirmMsg, 4 + 32)
+  const confirmResult = app?.MessageBox?.(confirmMessage, 4 + 32)
   if (confirmResult !== 6) return
 
   // 4. 冲突检测（用户确认后执行，网络不通时会被 try/catch 捕获并跳过）
@@ -535,7 +535,7 @@ export async function syncWithConfirmation(): Promise<void> {
 
   // 5. 执行同步（传入跳过冲突集合和增量同步开关）
   if (!BGM.sync.enterRunningState()) {
-    void wpsMsgBox('同步正在进行中，请稍后再试', 0, 48)
+    void wpsMessageBox('同步正在进行中，请稍后再试', 0, 48)
     return
   }
   try {
@@ -610,7 +610,7 @@ function notifyPanelTokenUpdated(): void {
 export async function testTokenForRibbon(): Promise<void> {
   const token = loadBgToken()
   if (!token) {
-    await wpsMsgBox('请先设置 Token！', 0, 48)
+    await wpsMessageBox('请先设置 Token！', 0, 48)
     return
   }
 
@@ -639,30 +639,30 @@ export async function testTokenForRibbon(): Promise<void> {
           _setBgmUserId(userId)
           _setBgmUsername(nickname)
           BGM.notifyTokenUpdated()
-          await wpsMsgBox(`Token 有效！\n用户: ${nickname}\nID: ${userId}`, 0, 64)
+          await wpsMessageBox(`Token 有效！\n用户: ${nickname}\nID: ${userId}`, 0, 64)
         } catch (error: unknown) {
           bgmLog(LOG_LEVELS.ERROR, `[testTokenForRibbon] 解析响应失败: ${(error as Error).message}`)
-          await wpsMsgBox('解析响应失败，请重试', 0, 16)
+          await wpsMessageBox('解析响应失败，请重试', 0, 16)
         }
       } else if (xhr.status === 401) {
         bgmLog(LOG_LEVELS.WARN, '[testTokenForRibbon] Token 无效或已过期')
-        await wpsMsgBox('Token 无效或已过期，请重新设置', 0, 48)
+        await wpsMessageBox('Token 无效或已过期，请重新设置', 0, 48)
       } else {
         bgmLog(LOG_LEVELS.ERROR, `[testTokenForRibbon] HTTP ${String(xhr.status)}`)
-        await wpsMsgBox(`Token 验证失败 (HTTP ${String(xhr.status)})`, 0, 16)
+        await wpsMessageBox(`Token 验证失败 (HTTP ${String(xhr.status)})`, 0, 16)
       }
       resolve()
     }
 
     xhr.onerror = async () => {
       bgmLog(LOG_LEVELS.ERROR, '[testTokenForRibbon] 网络错误')
-      await wpsMsgBox('网络错误，无法连接到 Bangumi API\n可能原因：网络被墙或断网', 0, 16)
+      await wpsMessageBox('网络错误，无法连接到 Bangumi API\n可能原因：网络被墙或断网', 0, 16)
       resolve()
     }
 
     xhr.ontimeout = async () => {
       bgmLog(LOG_LEVELS.WARN, '[testTokenForRibbon] 请求超时（15s）')
-      await wpsMsgBox('网络超时，请重试', 0, 48)
+      await wpsMessageBox('网络超时，请重试', 0, 48)
       resolve()
     }
 
@@ -678,7 +678,7 @@ export async function testTokenForRibbon(): Promise<void> {
 export async function copyTokenForRibbon(): Promise<void> {
   const token = loadBgToken()
   if (!token) {
-    await wpsMsgBox('未设置 Token，请先设置！', 0, 48)
+    await wpsMessageBox('未设置 Token，请先设置！', 0, 48)
     return
   }
 
@@ -700,15 +700,15 @@ export async function copyTokenForRibbon(): Promise<void> {
     document.body.removeChild(textarea)
     if (ok) {
       bgmLog(LOG_LEVELS.INFO, '[copyTokenForRibbon] Token 已复制到剪贴板')
-      await wpsMsgBox('Token 已复制到剪贴板', 0, 64)
+      await wpsMessageBox('Token 已复制到剪贴板', 0, 64)
     } else {
       bgmLog(LOG_LEVELS.WARN, '[copyTokenForRibbon] execCommand copy 失败')
-      await wpsMsgBox('复制失败，浏览器不支持剪贴板操作', 0, 48)
+      await wpsMessageBox('复制失败，浏览器不支持剪贴板操作', 0, 48)
     }
   } catch (error: unknown) {
-    const errMsg = error instanceof Error ? error.message : String(error)
-    bgmLog(LOG_LEVELS.ERROR, `[copyTokenForRibbon] 复制失败: ${errMsg}`)
-    await wpsMsgBox(`复制失败: ${errMsg}`, 0, 16)
+    const errorMessage = error instanceof Error ? error.message : String(error)
+    bgmLog(LOG_LEVELS.ERROR, `[copyTokenForRibbon] 复制失败: ${errorMessage}`)
+    await wpsMessageBox(`复制失败: ${errorMessage}`, 0, 16)
   }
 }
 
@@ -717,9 +717,9 @@ export function setUserIdForRibbon(): void {
   const app = getApp()
   const userId = app?.InputBox?.('请输入用户 ID（数字）', '设置用户 ID', '', 2)
   if (userId && typeof userId === 'string') {
-    const userIdStr = userId.trim()
-    BGM.setUserId(userIdStr)
-    bgmLog(LOG_LEVELS.INFO, `[setUserIdForRibbon] 用户ID已设置: ${userIdStr}`)
+    const userIdString = userId.trim()
+    BGM.setUserId(userIdString)
+    bgmLog(LOG_LEVELS.INFO, `[setUserIdForRibbon] 用户ID已设置: ${userIdString}`)
 
     app?.MessageBox?.('用户 ID 已保存', 0, 64)
   }
@@ -777,7 +777,7 @@ export async function syncFromGithubForRibbon(): Promise<GithubSyncResult | null
   // 1. 配置校验
   if (!isGithubConfigComplete()) {
     bgmLog(LOG_LEVELS.ERROR, '[syncFromGithubForRibbon] GitHub 仓库配置不完整')
-    await wpsMsgBox('GitHub 仓库配置不完整，请先在面板中设置 owner/repo/path', 0, 48)
+    await wpsMessageBox('GitHub 仓库配置不完整，请先在面板中设置 owner/repo/path', 0, 48)
     return null
   }
 
@@ -792,7 +792,7 @@ export async function syncFromGithubForRibbon(): Promise<GithubSyncResult | null
       bgmLog(LOG_LEVELS.INFO, '[syncFromGithubForRibbon] 已写入数据同步请求信号到 PluginStorage')
     } else {
       bgmLog(LOG_LEVELS.ERROR, '[syncFromGithubForRibbon] PluginStorage 不可用，无法通知 panel')
-      await wpsMsgBox('无法通知任务面板执行同步，请手动在面板中点击「立即同步」', 0, 48)
+      await wpsMessageBox('无法通知任务面板执行同步，请手动在面板中点击「立即同步」', 0, 48)
     }
   } catch (error: unknown) {
     bgmLog(LOG_LEVELS.ERROR, `[syncFromGithubForRibbon] 写入信号失败: ${(error as Error).message}`)
@@ -862,16 +862,16 @@ export async function undoLastSyncForRibbon(): Promise<void> {
     } | null
     if (!app?.PluginStorage) {
       bgmLog(LOG_LEVELS.ERROR, '[undoLastSyncForRibbon] PluginStorage 不可用')
-      await wpsMsgBox('无法连接到任务面板，请稍后重试', 0, 48)
+      await wpsMessageBox('无法连接到任务面板，请稍后重试', 0, 48)
       return
     }
 
     app.PluginStorage.setItem('bgm_request_undo_sync', String(Date.now()))
     bgmLog(LOG_LEVELS.INFO, '[undoLastSyncForRibbon] 已写入撤销请求信号到 PluginStorage')
-    await wpsMsgBox('已发送撤销请求，请在任务面板中确认操作', 0, 64)
+    await wpsMessageBox('已发送撤销请求，请在任务面板中确认操作', 0, 64)
   } catch (error: unknown) {
     bgmLog(LOG_LEVELS.ERROR, `[undoLastSyncForRibbon] 写入撤销信号失败: ${(error as Error).message}`)
-    await wpsMsgBox('发送撤销请求失败，请稍后重试', 0, 16)
+    await wpsMessageBox('发送撤销请求失败，请稍后重试', 0, 16)
   }
 }
 
@@ -897,11 +897,11 @@ export async function executeUndoLastSync(): Promise<number> {
   const description = getLastSessionDescription()
   if (!description) {
     bgmLog(LOG_LEVELS.INFO, '[executeUndoLastSync] 没有可撤销的同步操作')
-    await wpsMsgBox('没有可撤销的同步操作', 0, 48)
+    await wpsMessageBox('没有可撤销的同步操作', 0, 48)
     return 0
   }
 
-  const confirmed = await wpsMsgBox(
+  const confirmed = await wpsMessageBox(
     `确认撤销最近一次同步操作？\n\n${description}\n\n将按单元格逆序恢复旧值。`,
     4, // MB_YESNO
     32, // MB_ICONQUESTION
@@ -914,12 +914,12 @@ export async function executeUndoLastSync(): Promise<number> {
   try {
     const restored = undoLastSync()
     bgmLog(LOG_LEVELS.INFO, `[executeUndoLastSync] 已恢复 ${String(restored)} 项变更`)
-    await wpsMsgBox(`已撤销 ${String(restored)} 项变更`, 0, 64)
+    await wpsMessageBox(`已撤销 ${String(restored)} 项变更`, 0, 64)
     return restored
   } catch (error: unknown) {
-    const errMsg = error instanceof Error ? error.message : String(error)
-    bgmLog(LOG_LEVELS.ERROR, `[executeUndoLastSync] 撤销失败: ${errMsg}`)
-    await wpsMsgBox(`撤销失败：${errMsg}`, 0, 16)
+    const errorMessage = error instanceof Error ? error.message : String(error)
+    bgmLog(LOG_LEVELS.ERROR, `[executeUndoLastSync] 撤销失败: ${errorMessage}`)
+    await wpsMessageBox(`撤销失败：${errorMessage}`, 0, 16)
     return 0
   }
 }

@@ -76,7 +76,7 @@ const mockState = vi.hoisted(() => ({
   exportLogsToFile: vi.fn(),
   clearLogs: vi.fn(),
   // tools/debounce.js
-  debounce: vi.fn((fn: () => void) => fn),
+  debounce: vi.fn((function_: () => void) => function_),
 }))
 
 vi.mock('../ts/ui/handlers/token.js', () => ({
@@ -600,19 +600,19 @@ describe('setupButtonListeners', () => {
   })
 
   it('多个 [data-action] 元素都应注册监听器', () => {
-    const btn1 = document.createElement('button')
-    btn1.dataset.action = 'sync'
-    const btn2 = document.createElement('button')
-    btn2.dataset.action = 'testToken'
-    document.body.appendChild(btn1)
-    document.body.appendChild(btn2)
+    const button1 = document.createElement('button')
+    button1.dataset.action = 'sync'
+    const button2 = document.createElement('button')
+    button2.dataset.action = 'testToken'
+    document.body.appendChild(button1)
+    document.body.appendChild(button2)
 
     setupButtonListeners()
 
-    btn1.click()
+    button1.click()
     expect(mockState.syncFromPanel).toHaveBeenCalled()
 
-    btn2.click()
+    button2.click()
     expect(mockState.testTokenValidity).toHaveBeenCalled()
   })
 

@@ -78,8 +78,8 @@ let _logger: LoggerModule | null = null
 async function getLogger(): Promise<LoggerModule | null> {
   if (_logger) return _logger
   try {
-    const mod = await import('./tools/logger.js')
-    _logger = mod
+    const module_ = await import('./tools/logger.js')
+    _logger = module_
     return _logger
   } catch {
     return null
@@ -423,13 +423,13 @@ function buildModulesPanelHTML(): string {
 
 function buildRibbonPanelHTML(): string {
   const cards = RIBBON_BUTTONS.map(
-    (btn) => `
-    <div class="bgm-dp-ribbon-card" data-btn="${btn.id}">
-      <div class="bgm-dp-ribbon-icon">${btn.icon}</div>
-      <div class="bgm-dp-ribbon-label">${btn.label}</div>
-      <div class="bgm-dp-ribbon-id">${btn.id}</div>
-      <div class="bgm-dp-ribbon-result" data-result="${btn.id}">—</div>
-      <div class="bgm-dp-ribbon-imgurl" data-imgurl="${btn.id}"></div>
+    (button) => `
+    <div class="bgm-dp-ribbon-card" data-btn="${button.id}">
+      <div class="bgm-dp-ribbon-icon">${button.icon}</div>
+      <div class="bgm-dp-ribbon-label">${button.label}</div>
+      <div class="bgm-dp-ribbon-id">${button.id}</div>
+      <div class="bgm-dp-ribbon-result" data-result="${button.id}">—</div>
+      <div class="bgm-dp-ribbon-imgurl" data-imgurl="${button.id}"></div>
     </div>
   `,
   ).join('')
@@ -438,8 +438,8 @@ function buildRibbonPanelHTML(): string {
 
 function buildConsolePanelHTML(): string {
   const filters = LOG_FILTERS.map(
-    (f, i) =>
-      `<button class="bgm-dp-filter-btn ${i === 0 ? 'active' : ''}" data-level="${f.level ?? 'all'}">${f.label}</button>`,
+    (f, index) =>
+      `<button class="bgm-dp-filter-btn ${index === 0 ? 'active' : ''}" data-level="${f.level ?? 'all'}">${f.label}</button>`,
   ).join('')
   return `
     <div class="bgm-dp-panel" data-panel="console">
@@ -457,9 +457,9 @@ function buildConsolePanelHTML(): string {
   `
 }
 
-function buildEnvPanelHTML(): string {
+function buildEnvironmentPanelHTML(): string {
   const w: typeof window = window
-  const envItems: { label: string; value: string; cls: string }[] = [
+  const environmentItems: { label: string; value: string; cls: string }[] = [
     { label: '页面 URL', value: w.location.href, cls: '' },
     {
       label: 'WpsInvoke',
@@ -531,7 +531,7 @@ function buildEnvPanelHTML(): string {
     },
   ]
 
-  const cards = envItems
+  const cards = environmentItems
     .map(
       (item) => `
       <div class="bgm-dp-env-card">
@@ -588,16 +588,16 @@ function bindTabs(root: HTMLElement): void {
 
       // 环境信息 Tab 切换时刷新内容（反映最新状态）
       if (target === 'env') {
-        const envPanel = root.querySelector<HTMLElement>('[data-panel="env"]')
-        if (envPanel) {
-          envPanel.outerHTML = buildEnvPanelHTML()
+        const environmentPanel = root.querySelector<HTMLElement>('[data-panel="env"]')
+        if (environmentPanel) {
+          environmentPanel.outerHTML = buildEnvironmentPanelHTML()
           // outerHTML 替换后重新获取元素并标记 active
-          const newEnvPanel = root.querySelector<HTMLElement>('[data-panel="env"]')
-          if (newEnvPanel) {
-            newEnvPanel.classList.add('active')
+          const newEnvironmentPanel = root.querySelector<HTMLElement>('[data-panel="env"]')
+          if (newEnvironmentPanel) {
+            newEnvironmentPanel.classList.add('active')
           }
           // 重新绑定环境信息按钮事件
-          bindEnvActions(root)
+          bindEnvironmentActions(root)
         }
       }
     })
@@ -609,23 +609,23 @@ function bindRibbonCards(root: HTMLElement): void {
   const cards = root.querySelectorAll<HTMLElement>('.bgm-dp-ribbon-card')
   cards.forEach((card) => {
     card.addEventListener('click', () => {
-      const btnId = card.dataset.btn
-      if (!btnId) return
-      const resultEl = root.querySelector<HTMLElement>(`[data-result="${btnId}"]`)
-      const imgUrlEl = root.querySelector<HTMLElement>(`[data-imgurl="${btnId}"]`)
-      if (!resultEl) return
+      const buttonId = card.dataset.btn
+      if (!buttonId) return
+      const resultElement = root.querySelector<HTMLElement>(`[data-result="${buttonId}"]`)
+      const imgUrlElement = root.querySelector<HTMLElement>(`[data-imgurl="${buttonId}"]`)
+      if (!resultElement) return
 
-      resultEl.textContent = '▶ 调用中...'
-      resultEl.style.color = '#64748b'
+      resultElement.textContent = '▶ 调用中...'
+      resultElement.style.color = '#64748b'
 
       // 测试 GetBangumiImage
       try {
         const w = window as unknown as { GetBangumiImage?: (control: { Id: string }) => string }
         if (typeof w.GetBangumiImage === 'function') {
-          const imgUrl = w.GetBangumiImage({ Id: btnId })
-          if (imgUrlEl) {
-            imgUrlEl.textContent = imgUrl
-            imgUrlEl.title = imgUrl
+          const imgUrl = w.GetBangumiImage({ Id: buttonId })
+          if (imgUrlElement) {
+            imgUrlElement.textContent = imgUrl
+            imgUrlElement.title = imgUrl
           }
         }
       } catch {
@@ -637,17 +637,17 @@ function bindRibbonCards(root: HTMLElement): void {
         const w2 = window as unknown as { OnAction?: (control: { Id: string }) => boolean }
         if (typeof w2.OnAction === 'function') {
           try {
-            w2.OnAction({ Id: btnId })
-            resultEl.textContent = '✅ 已调用'
-            resultEl.style.color = '#16a34a'
+            w2.OnAction({ Id: buttonId })
+            resultElement.textContent = '✅ 已调用'
+            resultElement.style.color = '#16a34a'
           } catch (error: unknown) {
-            const msg = error instanceof Error ? error.message : String(error)
-            resultEl.textContent = `❌ ${msg}`
-            resultEl.style.color = '#dc2626'
+            const message = error instanceof Error ? error.message : String(error)
+            resultElement.textContent = `❌ ${message}`
+            resultElement.style.color = '#dc2626'
           }
         } else {
-          resultEl.textContent = '⚠️ OnAction 未定义'
-          resultEl.style.color = '#d97706'
+          resultElement.textContent = '⚠️ OnAction 未定义'
+          resultElement.style.color = '#d97706'
         }
       }, 100)
     })
@@ -657,13 +657,13 @@ function bindRibbonCards(root: HTMLElement): void {
 /** 日志筛选 */
 function bindLogFilters(root: HTMLElement): void {
   const filters = root.querySelectorAll<HTMLElement>('.bgm-dp-filter-btn')
-  filters.forEach((btn) => {
-    btn.addEventListener('click', () => {
+  filters.forEach((button) => {
+    button.addEventListener('click', () => {
       filters.forEach((f) => {
         f.classList.remove('active')
       })
-      btn.classList.add('active')
-      const { level } = btn.dataset
+      button.classList.add('active')
+      const { level } = button.dataset
       _currentLogLevel = level === 'all' ? undefined : level
       void refreshLogs(root)
     })
@@ -672,8 +672,8 @@ function bindLogFilters(root: HTMLElement): void {
 
 /** 日志清空和导出 */
 function bindLogActions(root: HTMLElement): void {
-  const clearBtn = root.querySelector<HTMLElement>('#bgm-dp-log-clear')
-  clearBtn?.addEventListener('click', () => {
+  const clearButton = root.querySelector<HTMLElement>('#bgm-dp-log-clear')
+  clearButton?.addEventListener('click', () => {
     void getLogger().then((logger) => {
       if (logger) {
         logger.clearLogs()
@@ -682,8 +682,8 @@ function bindLogActions(root: HTMLElement): void {
     })
   })
 
-  const exportBtn = root.querySelector<HTMLElement>('#bgm-dp-log-export')
-  exportBtn?.addEventListener('click', () => {
+  const exportButton = root.querySelector<HTMLElement>('#bgm-dp-log-export')
+  exportButton?.addEventListener('click', () => {
     void getLogger().then((logger) => {
       if (logger) {
         logger.exportLogsToFile()
@@ -754,25 +754,25 @@ function stopLogPolling(): void {
 }
 
 /** 环境信息操作按钮 */
-function bindEnvActions(root: HTMLElement): void {
-  const refreshBtn = root.querySelector<HTMLElement>('#bgm-dp-refresh')
-  refreshBtn?.addEventListener('click', () => {
+function bindEnvironmentActions(root: HTMLElement): void {
+  const refreshButton = root.querySelector<HTMLElement>('#bgm-dp-refresh')
+  refreshButton?.addEventListener('click', () => {
     window.location.reload()
   })
 
-  const clearCacheBtn = root.querySelector<HTMLElement>('#bgm-dp-clear-cache')
-  clearCacheBtn?.addEventListener('click', () => {
+  const clearCacheButton = root.querySelector<HTMLElement>('#bgm-dp-clear-cache')
+  clearCacheButton?.addEventListener('click', () => {
     // 添加 cache-busting 参数强制刷新
     window.location.assign(`${window.location.origin + window.location.pathname}?bust=${String(Date.now())}`)
   })
 
-  const exportReportBtn = root.querySelector<HTMLElement>('#bgm-dp-export-report')
-  exportReportBtn?.addEventListener('click', () => {
+  const exportReportButton = root.querySelector<HTMLElement>('#bgm-dp-export-report')
+  exportReportButton?.addEventListener('click', () => {
     exportDiagnosticReport()
   })
 
-  const reloadBtn = root.querySelector<HTMLElement>('#bgm-dp-reload-modules')
-  reloadBtn?.addEventListener('click', () => {
+  const reloadButton = root.querySelector<HTMLElement>('#bgm-dp-reload-modules')
+  reloadButton?.addEventListener('click', () => {
     window.location.reload()
   })
 }
@@ -823,8 +823,8 @@ function exportDiagnosticReport(): void {
 
 /** 折叠/展开 */
 function bindCollapse(root: HTMLElement, fab: HTMLElement): void {
-  const collapseBtn = root.querySelector<HTMLElement>('#bgm-dp-collapse')
-  collapseBtn?.addEventListener('click', () => {
+  const collapseButton = root.querySelector<HTMLElement>('#bgm-dp-collapse')
+  collapseButton?.addEventListener('click', () => {
     root.classList.add('collapsed')
     fab.style.display = 'flex'
     stopLogPolling()
@@ -871,7 +871,7 @@ export function initDebugPanel(): void {
       ${buildModulesPanelHTML()}
       ${buildRibbonPanelHTML()}
       ${buildConsolePanelHTML()}
-      ${buildEnvPanelHTML()}
+      ${buildEnvironmentPanelHTML()}
     </div>
   `
   document.body.appendChild(root)
@@ -889,7 +889,7 @@ export function initDebugPanel(): void {
   bindRibbonCards(root)
   bindLogFilters(root)
   bindLogActions(root)
-  bindEnvActions(root)
+  bindEnvironmentActions(root)
   bindCollapse(root, fab)
 
   // 延迟刷新模块状态（等 main.js 写入状态）
@@ -899,16 +899,16 @@ export function initDebugPanel(): void {
     if (statusbar) {
       statusbar.outerHTML = buildStatusBarHTML(newModules)
     }
-    const modPanel = root.querySelector<HTMLElement>('[data-panel="modules"]')
-    if (modPanel) {
-      modPanel.outerHTML = buildModulesPanelHTML()
+    const modulePanel = root.querySelector<HTMLElement>('[data-panel="modules"]')
+    if (modulePanel) {
+      modulePanel.outerHTML = buildModulesPanelHTML()
     }
     // 更新 Tab 计数
-    const modTabCount = root.querySelector<HTMLElement>(
+    const moduleTabCount = root.querySelector<HTMLElement>(
       '.bgm-dp-tab[data-tab="modules"] .bgm-dp-tab-count',
     )
-    if (modTabCount) {
-      modTabCount.textContent = String(newModules.length)
+    if (moduleTabCount) {
+      moduleTabCount.textContent = String(newModules.length)
     }
   }, 500)
 
@@ -926,11 +926,11 @@ export function initDebugPanel(): void {
       newStatusbar.outerHTML = buildStatusBarHTML(newModules)
     }
     // 刷新模块面板（如果当前可见）
-    const modPanelActive = root.querySelector<HTMLElement>(
+    const modulePanelActive = root.querySelector<HTMLElement>(
       '.bgm-dp-panel.active[data-panel="modules"]',
     )
-    if (modPanelActive) {
-      modPanelActive.outerHTML = buildModulesPanelHTML()
+    if (modulePanelActive) {
+      modulePanelActive.outerHTML = buildModulesPanelHTML()
     }
   }, 3000)
 }

@@ -12,7 +12,7 @@ import {
   bgmLog,
   getApp,
   getLastRow,
-  colNumToLetter,
+  colNumToLetter as colNumberToLetter,
   setCellValue,
   readRangeValues,
   BGM,
@@ -98,8 +98,8 @@ export function getOrCreateEnrichRecordSheet(): WpsWorksheet {
 
   try {
     const sheets = wb.Sheets
-    for (let i = 1; i <= sheets.Count; i += 1) {
-      const sheet = sheets.Item(i)
+    for (let index = 1; index <= sheets.Count; index += 1) {
+      const sheet = sheets.Item(index)
       if (sheet.Name === ENRICH_RECORD_SHEET_NAME) {
         enrichSheet = sheet
         break
@@ -113,10 +113,10 @@ export function getOrCreateEnrichRecordSheet(): WpsWorksheet {
     enrichSheet = wb.Sheets.Add()
     enrichSheet.Name = ENRICH_RECORD_SHEET_NAME
 
-    for (let i = 0; i < ENRICH_RECORD_COLUMNS.length; i += 1) {
-      const colLetter = colNumToLetter(i + 1)
+    for (let index = 0; index < ENRICH_RECORD_COLUMNS.length; index += 1) {
+      const colLetter = colNumberToLetter(index + 1)
       const cell = enrichSheet.Range(`${colLetter}1`)
-      cell.Value2 = ENRICH_RECORD_COLUMNS[i] ?? ''
+      cell.Value2 = ENRICH_RECORD_COLUMNS[index] ?? ''
       if (cell.Interior) {
         cell.Interior.Color = BGM_COLOR.GRAY
       }
@@ -128,7 +128,7 @@ export function getOrCreateEnrichRecordSheet(): WpsWorksheet {
       BGM.handleError(moveError, { context: 'getOrCreateEnrichRecordSheet', showAlert: false })
     }
 
-    const lastColLetter = colNumToLetter(ENRICH_RECORD_COLUMNS.length)
+    const lastColLetter = colNumberToLetter(ENRICH_RECORD_COLUMNS.length)
     const fullRange = enrichSheet.Range(`A1:${lastColLetter}1`)
     try {
       if (fullRange.Font) fullRange.Font.Name = 'Maple Mono NF CN Medium'
@@ -144,11 +144,11 @@ export function getOrCreateEnrichRecordSheet(): WpsWorksheet {
     bgmLog(LOG_LEVELS.INFO, '已创建富化记录工作表')
   } else {
     const existingCols = ENRICH_RECORD_COLUMNS.length
-    for (let i = 0; i < existingCols; i += 1) {
-      const colLetter = colNumToLetter(i + 1)
+    for (let index = 0; index < existingCols; index += 1) {
+      const colLetter = colNumberToLetter(index + 1)
       const cell = enrichSheet.Range(`${colLetter}1`)
       const currentHeader = String(cell.Value2 ?? '').trim()
-      const expectedHeader = ENRICH_RECORD_COLUMNS[i] ?? ''
+      const expectedHeader = ENRICH_RECORD_COLUMNS[index] ?? ''
       if (currentHeader !== expectedHeader) {
         cell.Value2 = expectedHeader
         bgmLog(
@@ -162,7 +162,7 @@ export function getOrCreateEnrichRecordSheet(): WpsWorksheet {
   return enrichSheet
 }
 
-export function addEnrichRecord(params: AddEnrichRecordParams): void {
+export function addEnrichRecord(parameters: AddEnrichRecordParams): void {
   try {
     const sheet = getOrCreateEnrichRecordSheet()
 
@@ -175,20 +175,20 @@ export function addEnrichRecord(params: AddEnrichRecordParams): void {
       newRow = sheet.Rows.Count > 1 ? 2 : 1
     }
 
-    setCellValue(sheet, newRow, ENRICH_RECORD_COL.TIMESTAMP, params.timestamp)
-    setCellValue(sheet, newRow, ENRICH_RECORD_COL.MATCH_TYPE, params.matchType)
-    setCellValue(sheet, newRow, ENRICH_RECORD_COL.NAME, params.name)
-    setCellValue(sheet, newRow, ENRICH_RECORD_COL.ROW, params.row)
-    setCellValue(sheet, newRow, ENRICH_RECORD_COL.ENRICHED_FIELD, params.enrichedField)
-    setCellValue(sheet, newRow, ENRICH_RECORD_COL.OLD_VALUE, params.oldValue)
-    setCellValue(sheet, newRow, ENRICH_RECORD_COL.NEW_VALUE, params.newValue)
-    setCellValue(sheet, newRow, ENRICH_RECORD_COL.ACTION, params.action)
-    if (params.note !== undefined) {
-      setCellValue(sheet, newRow, ENRICH_RECORD_COL.NOTE, params.note)
+    setCellValue(sheet, newRow, ENRICH_RECORD_COL.TIMESTAMP, parameters.timestamp)
+    setCellValue(sheet, newRow, ENRICH_RECORD_COL.MATCH_TYPE, parameters.matchType)
+    setCellValue(sheet, newRow, ENRICH_RECORD_COL.NAME, parameters.name)
+    setCellValue(sheet, newRow, ENRICH_RECORD_COL.ROW, parameters.row)
+    setCellValue(sheet, newRow, ENRICH_RECORD_COL.ENRICHED_FIELD, parameters.enrichedField)
+    setCellValue(sheet, newRow, ENRICH_RECORD_COL.OLD_VALUE, parameters.oldValue)
+    setCellValue(sheet, newRow, ENRICH_RECORD_COL.NEW_VALUE, parameters.newValue)
+    setCellValue(sheet, newRow, ENRICH_RECORD_COL.ACTION, parameters.action)
+    if (parameters.note !== undefined) {
+      setCellValue(sheet, newRow, ENRICH_RECORD_COL.NOTE, parameters.note)
     }
 
-    const actionColor = getActionColor(params.action)
-    const actionColLetter = colNumToLetter(ENRICH_RECORD_COL.ACTION)
+    const actionColor = getActionColor(parameters.action)
+    const actionColLetter = colNumberToLetter(ENRICH_RECORD_COL.ACTION)
     const actionCell = sheet.Range(`${actionColLetter}${String(newRow)}`)
     if (actionCell.Interior) {
       actionCell.Interior.Color = actionColor
@@ -196,7 +196,7 @@ export function addEnrichRecord(params: AddEnrichRecordParams): void {
 
     bgmLog(
       LOG_LEVELS.INFO,
-      `[addEnrichRecord] ${params.name} (${params.enrichedField}): ${params.action}`,
+      `[addEnrichRecord] ${parameters.name} (${parameters.enrichedField}): ${parameters.action}`,
     )
   } catch (error: unknown) {
     BGM.handleError(error, { context: 'addEnrichRecord', showAlert: false })
@@ -228,18 +228,18 @@ export function addEnrichRecords(records: AddEnrichRecordParams[]): void {
     ])
 
     const endRow = startRow + newRows.length - 1
-    const startColLetter = colNumToLetter(1)
-    const endColLetter = colNumToLetter(ENRICH_RECORD_COLUMNS.length)
+    const startColLetter = colNumberToLetter(1)
+    const endColLetter = colNumberToLetter(ENRICH_RECORD_COLUMNS.length)
     const range = sheet.Range(
       `${startColLetter}${String(startRow)}:${endColLetter}${String(endRow)}`,
     )
     range.Value2 = newRows
 
-    for (let i = 0; i < newRows.length; i += 1) {
-      const row = startRow + i
-      const action = newRows[i]?.[ENRICH_RECORD_COL.ACTION - 1] ?? ''
+    for (let index = 0; index < newRows.length; index += 1) {
+      const row = startRow + index
+      const action = newRows[index]?.[ENRICH_RECORD_COL.ACTION - 1] ?? ''
       const color = getActionColor(action)
-      const actionColLetter = colNumToLetter(ENRICH_RECORD_COL.ACTION)
+      const actionColLetter = colNumberToLetter(ENRICH_RECORD_COL.ACTION)
       const cell = sheet.Range(`${actionColLetter}${String(row)}`)
       if (cell.Interior) {
         cell.Interior.Color = color
@@ -277,8 +277,8 @@ export function getAllEnrichRecords(): EnrichRecord[] {
 
     try {
       const sheets = wb.Sheets
-      for (let i = 1; i <= sheets.Count; i += 1) {
-        const s = sheets.Item(i)
+      for (let index = 1; index <= sheets.Count; index += 1) {
+        const s = sheets.Item(index)
         if (s.Name === ENRICH_RECORD_SHEET_NAME) {
           sheet = s
           break
@@ -333,8 +333,8 @@ export function getEnrichRecordSheetIfExists(): WpsWorksheet | null {
     if (!wb) return null
     const sheets = wb.Worksheets
     const count = sheets.Count
-    for (let i = 1; i <= count; i += 1) {
-      const sheet = sheets.Item(i)
+    for (let index = 1; index <= count; index += 1) {
+      const sheet = sheets.Item(index)
       if (sheet.Name === ENRICH_RECORD_SHEET_NAME) {
         return sheet
       }
@@ -381,22 +381,22 @@ export function formatEnrichRecordSheet(): void {
     headerRange.HorizontalAlignment = -4108
 
     if (lastRow >= 2) {
-      const dataRange = sheet.Range(`A${String(2)}:${colNumToLetter(lastCol)}${String(lastRow)}`)
+      const dataRange = sheet.Range(`A${String(2)}:${colNumberToLetter(lastCol)}${String(lastRow)}`)
       dataRange.Borders.LineStyle = 1
     }
 
     for (let c = 1; c <= lastCol; c += 1) {
-      const colLetter = colNumToLetter(c)
+      const colLetter = colNumberToLetter(c)
       const colRange = sheet.Range(`${colLetter}:${colLetter}`)
       colRange.ColumnWidth = 15
     }
 
     const nameCol = sheet.Range('C:C')
     nameCol.ColumnWidth = 25
-    const oldValCol = sheet.Range('F:F')
-    oldValCol.ColumnWidth = 20
-    const newValCol = sheet.Range('G:G')
-    newValCol.ColumnWidth = 40
+    const oldValueCol = sheet.Range('F:F')
+    oldValueCol.ColumnWidth = 20
+    const newValueCol = sheet.Range('G:G')
+    newValueCol.ColumnWidth = 40
     const noteCol = sheet.Range('I:I')
     noteCol.ColumnWidth = 20
   } catch (error: unknown) {

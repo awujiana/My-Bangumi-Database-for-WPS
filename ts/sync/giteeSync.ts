@@ -50,12 +50,12 @@ const DEFAULT_BRANCH = 'main'
  * @throws 配置不完整时抛出 Error
  */
 export function buildGiteeRawUrl(): string {
-  const cfg = getGithubConfig()
+  const config = getGithubConfig()
   if (!isGithubConfigComplete()) {
     throw new Error('Gitee 仓库配置不完整，请在面板中设置 owner/repo/path')
   }
-  const branch = cfg.branch || DEFAULT_BRANCH
-  return `https://gitee.com/${cfg.owner}/${cfg.repo}/raw/${branch}/${cfg.path}`
+  const branch = config.branch || DEFAULT_BRANCH
+  return `https://gitee.com/${config.owner}/${config.repo}/raw/${branch}/${config.path}`
 }
 
 /**

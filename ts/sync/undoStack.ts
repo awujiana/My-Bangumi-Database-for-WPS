@@ -126,8 +126,8 @@ export function undoLastSync(): number {
   }
 
   // 1. 逆序恢复单元格变更（与执行顺序相反）
-  for (let i = cellEntries.length - 1; i >= 0; i -= 1) {
-    const entry = cellEntries[i]
+  for (let index = cellEntries.length - 1; index >= 0; index -= 1) {
+    const entry = cellEntries[index]
     if (entry) {
       setCellValue(ws, entry.row, entry.col, entry.oldValue)
     }
@@ -177,14 +177,14 @@ function restoreDeletedRowWithWs(ws: WpsWorksheet, snapshot: RowSnapshot): void 
     // 在删除位置插入新行
     ws.Range(`${String(snapshot.row)}:${String(snapshot.row)}`).Insert()
   } catch (error: unknown) {
-    const errMsg = error instanceof Error ? error.message : String(error)
-    bgmLog(LOG_LEVELS.WARN, `[undoStack] 插入行 ${String(snapshot.row)} 失败: ${errMsg}`)
+    const errorMessage = error instanceof Error ? error.message : String(error)
+    bgmLog(LOG_LEVELS.WARN, `[undoStack] 插入行 ${String(snapshot.row)} 失败: ${errorMessage}`)
     return
   }
 
   // 恢复该行所有列的值
-  for (const [colStr, value] of Object.entries(snapshot.values)) {
-    const col = parseInt(colStr, 10)
+  for (const [colString, value] of Object.entries(snapshot.values)) {
+    const col = parseInt(colString, 10)
     if (Number.isNaN(col)) continue
     setCellValue(ws, snapshot.row, col, value)
   }

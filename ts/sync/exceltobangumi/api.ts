@@ -50,8 +50,8 @@ export function extractResponseMessage(data: unknown): string {
  */
 export function parseErrorResponse(xhr: XMLHttpRequest): string {
   try {
-    const errData = JSON.parse(xhr.responseText) as BgmApiResponse
-    return errData.error || errData.description || `HTTP ${String(xhr.status)}`
+    const errorData = JSON.parse(xhr.responseText) as BgmApiResponse
+    return errorData.error || errorData.description || `HTTP ${String(xhr.status)}`
   } catch {
     return xhr.statusText || `HTTP ${String(xhr.status)}`
   }

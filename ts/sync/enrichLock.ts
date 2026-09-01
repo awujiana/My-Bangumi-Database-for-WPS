@@ -45,9 +45,9 @@ export function refreshEnrichWorkbooks(selectId = 'enrichWorkbookSelect'): void 
   const activeWbName = app.ActiveWorkbook?.Name || ''
   let hasSelection = false
 
-  for (let i = 1; i <= wbs.Count; i += 1) {
+  for (let index = 1; index <= wbs.Count; index += 1) {
     const option = document.createElement('option')
-    const wb = wbs.Item(i)
+    const wb = wbs.Item(index)
     option.value = wb.Name
     option.text = wb.Name
 
@@ -107,8 +107,8 @@ export function refreshEnrichSheets(
   }
 
   let workbook: WpsWorkbook | null = null
-  for (let i = 1; i <= app.Workbooks.Count; i += 1) {
-    const wb = app.Workbooks.Item(i)
+  for (let index = 1; index <= app.Workbooks.Count; index += 1) {
+    const wb = app.Workbooks.Item(index)
     if (wb.Name === wbName) {
       workbook = wb
       break
@@ -130,10 +130,10 @@ export function refreshEnrichSheets(
   select.appendChild(defaultOpt)
 
   let lockedFound = false
-  for (let i = 1; i <= sheets.Count; i += 1) {
+  for (let index = 1; index <= sheets.Count; index += 1) {
     const option = document.createElement('option')
-    const sheet = sheets.Item(i)
-    option.value = String(i)
+    const sheet = sheets.Item(index)
+    option.value = String(index)
     option.text = sheet.Name
 
     if (currentLockedSheet === sheet.Name && BGM.enrich.isLocked) {
@@ -228,16 +228,16 @@ export function updateEnrichLockButton(
   lockBtnId = 'enrichLockBtn',
   statusId = 'enrichLockStatus',
 ): void {
-  const btn = document.getElementById(lockBtnId) as HTMLButtonElement | null
+  const button = document.getElementById(lockBtnId) as HTMLButtonElement | null
   const status = document.getElementById(statusId)
 
-  if (btn) {
+  if (button) {
     if (BGM.enrich.isLocked) {
-      btn.textContent = '🔓 解锁'
-      btn.classList.add('locked')
+      button.textContent = '🔓 解锁'
+      button.classList.add('locked')
     } else {
-      btn.textContent = '🔒 锁定'
-      btn.classList.remove('locked')
+      button.textContent = '🔒 锁定'
+      button.classList.remove('locked')
     }
   }
 
@@ -311,8 +311,8 @@ export function restoreEnrichLockedWorkbook(): boolean {
 
     // 校验工作表是否仍存在于工作簿中
     let sheetFound = false
-    for (let i = 1; i <= wb.Worksheets.Count; i += 1) {
-      const ws = wb.Worksheets.Item(i)
+    for (let index = 1; index <= wb.Worksheets.Count; index += 1) {
+      const ws = wb.Worksheets.Item(index)
       if (ws.Name === info.sheetName) {
         sheetFound = true
         break
@@ -368,8 +368,8 @@ export function getLockedEnrichSheet(): [WpsWorkbook, WpsWorksheet] | null {
   }
 
   let ws: WpsWorksheet | null = null
-  for (let i = 1; i <= wb.Worksheets.Count; i += 1) {
-    const sheet = wb.Worksheets.Item(i)
+  for (let index = 1; index <= wb.Worksheets.Count; index += 1) {
+    const sheet = wb.Worksheets.Item(index)
     if (sheet.Name === BGM.enrich.lockedSheetName) {
       ws = sheet
       break
@@ -400,8 +400,8 @@ export function findWorkbookByName(name: string | null): WpsWorkbook | null {
   const app = getApp()
   if (!app?.Workbooks) return null
 
-  for (let i = 1; i <= app.Workbooks.Count; i += 1) {
-    const wb = app.Workbooks.Item(i)
+  for (let index = 1; index <= app.Workbooks.Count; index += 1) {
+    const wb = app.Workbooks.Item(index)
     if (wb.Name === name) return wb
   }
   return null
@@ -417,8 +417,8 @@ export function findSheetInWorkbook(wbName: string, sheetName: string): WpsWorks
   const wb = findWorkbookByName(wbName)
   if (!wb) return null
 
-  for (let i = 1; i <= wb.Worksheets.Count; i += 1) {
-    const ws = wb.Worksheets.Item(i)
+  for (let index = 1; index <= wb.Worksheets.Count; index += 1) {
+    const ws = wb.Worksheets.Item(index)
     if (ws.Name === sheetName) return ws
   }
   return null

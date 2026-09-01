@@ -110,8 +110,8 @@ export function readLocalFileContent(filePath: string): Promise<string> {
  * @returns 文件路径字符串，未配置时返回空字符串
  */
 export function getLocalFilePath(): string {
-  const cfg = getGithubConfig()
-  return cfg.path
+  const config = getGithubConfig()
+  return config.path
 }
 
 /**

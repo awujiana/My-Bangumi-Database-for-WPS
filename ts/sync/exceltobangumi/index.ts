@@ -22,7 +22,7 @@ import {
   trim,
   getColumnMap,
   findHeaderRow,
-  colNumToLetter,
+  colNumToLetter as colNumberToLetter,
   getCellValue,
   loadBgToken,
   BGM,
@@ -32,8 +32,8 @@ import {
   calcFingerprint,
   clearSheetCache,
 } from '../../tools/util/index.js'
-import type { WpsApplication, WpsWorksheet, WpsRange } from '../../tools/wps.js'
-import { wpsMsgBox, isWpsWorksheet } from '../../tools/wps.js'
+import type { WpsApplication as WpsApp, WpsWorksheet, WpsRange } from '../../tools/wps.js'
+import { wpsMsgBox as wpsMessageBox, isWpsWorksheet } from '../../tools/wps.js'
 import {
   showConfirm,
   showSyncProgressDialog,
@@ -49,7 +49,7 @@ import {
   extractSubjectId,
   mapWatchStatus,
   getSeqColIndex,
-  addTagsFromStr,
+  addTagsFromStr as addTagsFromString,
 } from '../pureUtils.js'
 import { getAllSyncRecords, getOrCreateSyncRecordSheet } from '../syncRecord.js'
 
@@ -169,9 +169,9 @@ function createFieldGetter(
   return (row: number, key: string): string => {
     const col = colMap.get(key)
     if (!col) return ''
-    const rowIdx = row - startRow
-    if (rowIdx >= 0 && rowIdx < allData.length) {
-      const rowData = allData[rowIdx]
+    const rowIndex = row - startRow
+    if (rowIndex >= 0 && rowIndex < allData.length) {
+      const rowData = allData[rowIndex]
       if (Array.isArray(rowData) && col - 1 < rowData.length) {
         return trim(rowData[col - 1])
       }
@@ -379,12 +379,12 @@ export function getSequentialRowsBySeqCol(
     const seqCol = getSeqColIndex(colMap)
     for (let r = startRow; r <= endRow; r += 1) {
       try {
-        const val = getCellValue(ws, r, seqCol)
-        if (val !== '') {
-          const seqNum = val.trim()
-          if (/^\d+$/.test(seqNum)) {
+        const value = getCellValue(ws, r, seqCol)
+        if (value !== '') {
+          const seqNumber = value.trim()
+          if (/^\d+$/.test(seqNumber)) {
             result.validRows.push(r)
-            result.seqMap.set(seqNum, r)
+            result.seqMap.set(seqNumber, r)
           }
         }
       } catch (error: unknown) {
@@ -422,22 +422,22 @@ export function buildJsonPayload(getField: (key: string) => string, _finishedDat
     let statusFound = false
     let rawStatusValue = ''
     for (const key of statusKeys) {
-      const statusVal = trim(getField(key))
-      if (statusVal) {
-        rawStatusValue = statusVal
-        const mappedStatus = mapWatchStatus(statusVal)
+      const statusValue = trim(getField(key))
+      if (statusValue) {
+        rawStatusValue = statusValue
+        const mappedStatus = mapWatchStatus(statusValue)
         if (mappedStatus > 0) {
           payload.type = mappedStatus
           statusFound = true
           bgmLog(
             LOG_LEVELS.INFO,
-            `[buildJsonPayload] 从列 "${key}" 读取状态: "${statusVal}" -> ${String(mappedStatus)}`,
+            `[buildJsonPayload] 从列 "${key}" 读取状态: "${statusValue}" -> ${String(mappedStatus)}`,
           )
           break
         } else {
           bgmLog(
             LOG_LEVELS.WARN,
-            `[buildJsonPayload] 从列 "${key}" 读取状态: "${statusVal}" -> ${String(mappedStatus)} (无效)`,
+            `[buildJsonPayload] 从列 "${key}" 读取状态: "${statusValue}" -> ${String(mappedStatus)} (无效)`,
           )
         }
       }
@@ -457,9 +457,9 @@ export function buildJsonPayload(getField: (key: string) => string, _finishedDat
     }
 
     // 评分
-    const rateVal = trim(getField('打分'))
-    if (rateVal && rateVal !== 'true' && rateVal !== 'True') {
-      const rate = parseFloat(rateVal)
+    const rateValue = trim(getField('打分'))
+    if (rateValue && rateValue !== 'true' && rateValue !== 'True') {
+      const rate = parseFloat(rateValue)
       if (!isNaN(rate) && rate >= 0 && rate <= 10) {
         payload.rate = rate
       }
@@ -467,29 +467,29 @@ export function buildJsonPayload(getField: (key: string) => string, _finishedDat
 
     // 标签 - 合并 "标签/分级" 与 "原作标签" 两列
     const tagSet = new Set<string>()
-    const tagsGradeVal = trim(getField('标签/分级'))
-    const originalTagVal = trim(getField('原作标签'))
-    if (tagsGradeVal) addTagsFromStr(tagSet, tagsGradeVal)
-    if (originalTagVal) addTagsFromStr(tagSet, originalTagVal)
+    const tagsGradeValue = trim(getField('标签/分级'))
+    const originalTagValue = trim(getField('原作标签'))
+    if (tagsGradeValue) addTagsFromString(tagSet, tagsGradeValue)
+    if (originalTagValue) addTagsFromString(tagSet, originalTagValue)
     if (tagSet.size > 0) {
       payload.tags = Array.from(tagSet)
       bgmLog(
         LOG_LEVELS.INFO,
-        `[buildJsonPayload] 标签合并: 标签/分级="${tagsGradeVal || '(空)'}" + 原作标签="${originalTagVal || '(空)'}" -> ${JSON.stringify(payload.tags)}`,
+        `[buildJsonPayload] 标签合并: 标签/分级="${tagsGradeValue || '(空)'}" + 原作标签="${originalTagValue || '(空)'}" -> ${JSON.stringify(payload.tags)}`,
       )
     }
 
     // 感言（支持 emoji、中文、日文等 UTF-8 字符；过滤控制字符并截断到 1000 字符）
-    let commentVal = trim(getField('剧透/感言') || getField('感言'))
-    const nVal = trim(getField('特点/印象'))
-    bgmLog(LOG_LEVELS.INFO, `[buildJsonPayload] 剧透/感言="${commentVal}", 特点/印象="${nVal}"`)
-    if (nVal) {
-      commentVal = commentVal ? `${commentVal}\n${nVal}` : nVal
+    let commentValue = trim(getField('剧透/感言') || getField('感言'))
+    const nValue = trim(getField('特点/印象'))
+    bgmLog(LOG_LEVELS.INFO, `[buildJsonPayload] 剧透/感言="${commentValue}", 特点/印象="${nValue}"`)
+    if (nValue) {
+      commentValue = commentValue ? `${commentValue}\n${nValue}` : nValue
     }
-    if (commentVal) {
+    if (commentValue) {
       // 移除控制字符（保留换行符 \n 和制表符 \t）
       // eslint-disable-next-line no-control-regex -- 有意匹配控制字符以清洗文本
-      const cleaned = commentVal.replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, '')
+      const cleaned = commentValue.replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, '')
       // Bangumi API comment 字段长度限制约 1000 字符，超出截断
       const MAX_COMMENT_LEN = 1000
       const finalComment =
@@ -506,8 +506,8 @@ export function buildJsonPayload(getField: (key: string) => string, _finishedDat
     }
 
     // 隐私收藏
-    const privateVal = trim(getField('私密收藏')).toLowerCase()
-    if (privateVal === '是' || privateVal === '1' || privateVal === 'true') {
+    const privateValue = trim(getField('私密收藏')).toLowerCase()
+    if (privateValue === '是' || privateValue === '1' || privateValue === 'true') {
       payload.private = true
     }
 
@@ -665,7 +665,7 @@ function processRowToSyncTask(
     const jsonBody = buildJsonPayload((key) => getField(rowNum, key), finishedDate)
     const name = getField(rowNum, '名称')
     const epRaw = trim(getField(rowNum, '集数') || getField(rowNum, '集号') || '')
-    const epNum = parseInt(epRaw, 10)
+    const epNumber = parseInt(epRaw, 10)
 
     const task: _SyncTask = {
       rowNum,
@@ -675,7 +675,7 @@ function processRowToSyncTask(
       jsonBody,
       ...(currentFingerprint !== undefined ? { fingerprint: currentFingerprint } : {}),
       type: watchType,
-      ...(!isNaN(epNum) && epNum > 0 ? { epCount: epNum } : {}),
+      ...(!isNaN(epNumber) && epNumber > 0 ? { epCount: epNumber } : {}),
     }
 
     return { task, skipped: false, failed: false }
@@ -723,8 +723,8 @@ function prepareSyncTasks(
   const syncTasks: _SyncTask[] = []
   const skipSids = options?.skipSids
 
-  for (const rowNum of rowsToProcess) {
-    const outcome = processRowToSyncTask(ws, rowNum, getField, skipSids, fingerprintMap, seqCol)
+  for (const rowNumber of rowsToProcess) {
+    const outcome = processRowToSyncTask(ws, rowNumber, getField, skipSids, fingerprintMap, seqCol)
     if (outcome.failed) {
       fail++
     } else if (outcome.skipped) {
@@ -889,8 +889,8 @@ async function batchSyncRequests(
 
     if (executing.length > 0) {
       await Promise.race(executing.map((e) => e.promise))
-      for (let i = executing.length - 1; i >= 0; i -= 1) {
-        if (executing[i]!.done) executing.splice(i, 1)
+      for (let index = executing.length - 1; index >= 0; index -= 1) {
+        if (executing[index]!.done) executing.splice(index, 1)
       }
     }
   }
@@ -970,7 +970,7 @@ export async function SyncToBangumiAsync(
   bgmLog(LOG_LEVELS.INFO, `[SyncToBangumiAsync]   - 最后一行: ${String(lastRow)}`)
   bgmLog(
     LOG_LEVELS.INFO,
-    `[SyncToBangumiAsync]   - 序列号列: ${String(seqCol)} (列${colNumToLetter(seqCol)})`,
+    `[SyncToBangumiAsync]   - 序列号列: ${String(seqCol)} (列${colNumberToLetter(seqCol)})`,
   )
 
   // 步骤 1-4: 预处理（筛选可见行 + 数据缓存 + 指纹映射 + 任务收集）
@@ -1013,13 +1013,13 @@ export async function SyncToBangumiAsync(
  * @param app WPS Application 对象
  * @returns 原始行号数组；若未选中或异常则返回空数组（已提示用户）
  */
-function collectSelectedRows(app: WpsApplication): number[] {
+function collectSelectedRows(app: WpsApp): number[] {
   const rawRows: number[] = []
   try {
     const sel = app.Selection
     if (!sel) {
       bgmLog(LOG_LEVELS.WARN, '[syncSelectedRows] 未选中任何区域')
-      void wpsMsgBox('请先在Excel中选中要同步的数据行', 0, 48)
+      void wpsMessageBox('请先在Excel中选中要同步的数据行', 0, 48)
       return rawRows
     }
 
@@ -1065,7 +1065,7 @@ function collectSelectedRows(app: WpsApplication): number[] {
     )
   } catch (error: unknown) {
     BGM.handleError(error, { context: 'syncSelectedRows', showAlert: false })
-    void wpsMsgBox('获取选中区域失败，请检查是否选中了有效区域', 0, 48)
+    void wpsMessageBox('获取选中区域失败，请检查是否选中了有效区域', 0, 48)
     return []
   }
   return rawRows
@@ -1110,7 +1110,7 @@ async function validateSelectedRows(
     })
     if (!confirmed) {
       bgmLog(LOG_LEVELS.INFO, '[syncSelectedRows] 用户取消同步')
-      void wpsMsgBox('已取消同步', 0, 64)
+      void wpsMessageBox('已取消同步', 0, 64)
       return null
     }
   }
@@ -1125,14 +1125,14 @@ async function validateSelectedRows(
 
   if (!colMap.has('Bangumi_URL')) {
     bgmLog(LOG_LEVELS.WARN, '[syncSelectedRows] 未找到 Bangumi_URL 列')
-    void wpsMsgBox('未找到 Bangumi URL 列', 0, 48)
+    void wpsMessageBox('未找到 Bangumi URL 列', 0, 48)
     return null
   }
 
   const token = loadBgToken()
   if (!token) {
     bgmLog(LOG_LEVELS.WARN, '[syncSelectedRows] Token 未设置')
-    void wpsMsgBox('请先设置 Token', 0, 48)
+    void wpsMessageBox('请先设置 Token', 0, 48)
     return null
   }
   bgmLog(LOG_LEVELS.INFO, `[syncSelectedRows] Token 已设置（长度: ${String(token.length)}）`)
@@ -1207,7 +1207,7 @@ async function executeSelectedSync(
     // 设置同步状态机位置（用于暂停时定位到单元格）
     BGM.sync.updatePosition(ws, 0, urlCol)
 
-    for (let idx = 0; idx < rows.length; idx += 1) {
+    for (let index = 0; index < rows.length; index += 1) {
       // 检查停止
       if (BGM.sync.checkShouldStop()) {
         bgmLog(LOG_LEVELS.INFO, '[syncSelectedRows] 检测到停止请求，终止循环')
@@ -1217,7 +1217,7 @@ async function executeSelectedSync(
       if (BGM.sync.checkPaused()) {
         bgmLog(
           LOG_LEVELS.INFO,
-          `[syncSelectedRows] 同步已暂停，当前进度 ${String(idx)}/${String(rows.length)}，等待恢复...`,
+          `[syncSelectedRows] 同步已暂停，当前进度 ${String(index)}/${String(rows.length)}，等待恢复...`,
         )
         await BGM.sync.waitForResume()
         if (BGM.sync.checkShouldStop()) {
@@ -1227,83 +1227,83 @@ async function executeSelectedSync(
         bgmLog(LOG_LEVELS.INFO, '[syncSelectedRows] 同步已恢复，继续处理')
       }
 
-      const rowNum = rows[idx]!
-      const rowProgress = `[${String(idx + 1)}/${String(rows.length)}]`
+      const rowNumber = rows[index]!
+      const rowProgress = `[${String(index + 1)}/${String(rows.length)}]`
       // 更新当前位置（行号），供暂停时定位
-      BGM.sync.updatePosition(undefined, rowNum)
+      BGM.sync.updatePosition(undefined, rowNumber)
 
       try {
-        const bgmUrl = trim(getCellValue(ws, rowNum, urlCol) || '')
+        const bgmUrl = trim(getCellValue(ws, rowNumber, urlCol) || '')
         const name = nameCol
-          ? trim(getCellValue(ws, nameCol === urlCol ? rowNum : rowNum, nameCol) || '')
+          ? trim(getCellValue(ws, nameCol === urlCol ? rowNumber : rowNumber, nameCol) || '')
           : ''
 
         if (!bgmUrl) {
-          const msg = `行${String(rowNum)} "${name || '无名'}" URL为空，跳过`
-          bgmLog(LOG_LEVELS.WARN, `[syncSelectedRows] ${rowProgress} ${msg}`)
-          showToast(msg, 'warn')
-          details.push(`⊘ 行${String(rowNum)} ${name || '无名'} 跳过: URL为空`)
+          const message = `行${String(rowNumber)} "${name || '无名'}" URL为空，跳过`
+          bgmLog(LOG_LEVELS.WARN, `[syncSelectedRows] ${rowProgress} ${message}`)
+          showToast(message, 'warn')
+          details.push(`⊘ 行${String(rowNumber)} ${name || '无名'} 跳过: URL为空`)
           skipCount++
-          updateSyncProgressDialog(idx + 1, rows.length, msg, `⊘ ${rowProgress} ${msg}`)
+          updateSyncProgressDialog(index + 1, rows.length, message, `⊘ ${rowProgress} ${message}`)
           continue
         }
 
         // 检查是否为 BGM 链接（bgm.tv / bangumi.tv / chii.in 或纯数字 ID）
         if (!isBangumiUrl(bgmUrl)) {
-          const msg = `行${String(rowNum)} "${name || '无名'}" 非BGM链接，跳过`
-          bgmLog(LOG_LEVELS.WARN, `[syncSelectedRows] ${rowProgress} ${msg}`)
-          showToast(msg, 'warn')
+          const message = `行${String(rowNumber)} "${name || '无名'}" 非BGM链接，跳过`
+          bgmLog(LOG_LEVELS.WARN, `[syncSelectedRows] ${rowProgress} ${message}`)
+          showToast(message, 'warn')
           details.push(
-            `⊘ 行${String(rowNum)} ${name || '无名'} 跳过: 非BGM链接 (${bgmUrl.substring(0, 30)})`,
+            `⊘ 行${String(rowNumber)} ${name || '无名'} 跳过: 非BGM链接 (${bgmUrl.substring(0, 30)})`,
           )
           skipCount++
-          updateSyncProgressDialog(idx + 1, rows.length, msg, `⊘ ${rowProgress} ${msg}`)
+          updateSyncProgressDialog(index + 1, rows.length, message, `⊘ ${rowProgress} ${message}`)
           continue
         }
 
         const sid = extractSubjectId(bgmUrl)
         if (!sid) {
-          const msg = `行${String(rowNum)} "${name || '无名'}" 无法提取 Subject ID，跳过`
-          bgmLog(LOG_LEVELS.WARN, `[syncSelectedRows] ${rowProgress} ${msg}`)
-          showToast(msg, 'warn')
-          details.push(`⊘ 行${String(rowNum)} ${name || '无名'} 跳过: 无效ID`)
+          const message = `行${String(rowNumber)} "${name || '无名'}" 无法提取 Subject ID，跳过`
+          bgmLog(LOG_LEVELS.WARN, `[syncSelectedRows] ${rowProgress} ${message}`)
+          showToast(message, 'warn')
+          details.push(`⊘ 行${String(rowNumber)} ${name || '无名'} 跳过: 无效ID`)
           skipCount++
-          updateSyncProgressDialog(idx + 1, rows.length, msg, `⊘ ${rowProgress} ${msg}`)
+          updateSyncProgressDialog(index + 1, rows.length, message, `⊘ ${rowProgress} ${message}`)
           continue
         }
 
         bgmLog(
           LOG_LEVELS.INFO,
-          `[syncSelectedRows] ${rowProgress} 行${String(rowNum)} 开始同步: 名称="${name || '无名'}", SID=${sid}, URL=${bgmUrl}`,
+          `[syncSelectedRows] ${rowProgress} 行${String(rowNumber)} 开始同步: 名称="${name || '无名'}", SID=${sid}, URL=${bgmUrl}`,
         )
         updateSyncProgressDialog(
-          idx + 1,
+          index + 1,
           rows.length,
-          `${rowProgress} 行${String(rowNum)} "${name || sid}" 同步中...`,
-          `⏳ ${rowProgress} 行${String(rowNum)} "${name || sid}" SID=${sid} 开始同步`,
+          `${rowProgress} 行${String(rowNumber)} "${name || sid}" 同步中...`,
+          `⏳ ${rowProgress} 行${String(rowNumber)} "${name || sid}" SID=${sid} 开始同步`,
         )
 
         const finishedDate = colMap.has('完播日')
-          ? trim(getCellValue(ws, rowNum, colMap.get('完播日')!) || '')
+          ? trim(getCellValue(ws, rowNumber, colMap.get('完播日')!) || '')
           : ''
         const jsonBody = buildJsonPayload(
-          (key) => (colMap.has(key) ? trim(getCellValue(ws, rowNum, colMap.get(key)!)) : ''),
+          (key) => (colMap.has(key) ? trim(getCellValue(ws, rowNumber, colMap.get(key)!)) : ''),
           finishedDate,
         )
 
         if (jsonBody === '{}') {
-          const msg = `行${String(rowNum)} "${name || sid}" 请求体为空，跳过`
-          bgmLog(LOG_LEVELS.WARN, `[syncSelectedRows] ${rowProgress} ${msg}`)
-          showToast(msg, 'warn')
-          details.push(`⊘ 行${String(rowNum)} ${name || sid} 跳过: 请求体为空`)
+          const message = `行${String(rowNumber)} "${name || sid}" 请求体为空，跳过`
+          bgmLog(LOG_LEVELS.WARN, `[syncSelectedRows] ${rowProgress} ${message}`)
+          showToast(message, 'warn')
+          details.push(`⊘ 行${String(rowNumber)} ${name || sid} 跳过: 请求体为空`)
           skipCount++
-          updateSyncProgressDialog(idx + 1, rows.length, msg, `⊘ ${rowProgress} ${msg}`)
+          updateSyncProgressDialog(index + 1, rows.length, message, `⊘ ${rowProgress} ${message}`)
           continue
         }
 
         bgmLog(
           LOG_LEVELS.INFO,
-          `[syncSelectedRows] ${rowProgress} 行${String(rowNum)} 请求体: ${jsonBody.length > 300 ? `${jsonBody.substring(0, 300)}...` : jsonBody}`,
+          `[syncSelectedRows] ${rowProgress} 行${String(rowNumber)} 请求体: ${jsonBody.length > 300 ? `${jsonBody.substring(0, 300)}...` : jsonBody}`,
         )
 
         const endpoint = `/v0/users${userPath}/collections/${sid}`
@@ -1311,16 +1311,16 @@ async function executeSelectedSync(
 
         if (result.code >= 200 && result.code < 300) {
           successCount++
-          details.push(`✓ 行${String(rowNum)} ${name || sid} HTTP:${String(result.code)}`)
+          details.push(`✓ 行${String(rowNumber)} ${name || sid} HTTP:${String(result.code)}`)
           bgmLog(
             LOG_LEVELS.INFO,
-            `[syncSelectedRows] ${rowProgress} 行${String(rowNum)} "${name || sid}" 同步成功！HTTP: ${String(result.code)}`,
+            `[syncSelectedRows] ${rowProgress} 行${String(rowNumber)} "${name || sid}" 同步成功！HTTP: ${String(result.code)}`,
           )
           updateSyncProgressDialog(
-            idx + 1,
+            index + 1,
             rows.length,
-            `${rowProgress} 行${String(rowNum)} "${name || sid}" ✓ HTTP:${String(result.code)}`,
-            `✓ ${rowProgress} 行${String(rowNum)} "${name || sid}" 成功 HTTP:${String(result.code)}`,
+            `${rowProgress} 行${String(rowNumber)} "${name || sid}" ✓ HTTP:${String(result.code)}`,
+            `✓ ${rowProgress} 行${String(rowNumber)} "${name || sid}" 成功 HTTP:${String(result.code)}`,
           )
 
           // 标记章节为已完成（"看过" type=2 和 "在看" type=3 都需要标记）
@@ -1331,13 +1331,13 @@ async function executeSelectedSync(
           } catch (error: unknown) {
             bgmLog(
               LOG_LEVELS.WARN,
-              `[syncSelectedRows] 行${String(rowNum)} jsonBody 解析失败: ${error instanceof Error ? error.message : String(error)}`,
+              `[syncSelectedRows] 行${String(rowNumber)} jsonBody 解析失败: ${error instanceof Error ? error.message : String(error)}`,
             )
           }
           const epRaw = trim(
             getCellValue(
               ws,
-              rowNum,
+              rowNumber,
               colMap.has('集数') ? colMap.get('集数')! : colMap.get('集号')!,
             ),
           )
@@ -1345,46 +1345,46 @@ async function executeSelectedSync(
           if ((watchType === 2 || watchType === 3) && !isNaN(epCount) && epCount > 0) {
             bgmLog(
               LOG_LEVELS.INFO,
-              `[syncSelectedRows] ${rowProgress} 行${String(rowNum)} 状态${watchType === 2 ? '"看过"' : '"在看"'}(type=${String(watchType)})，集数: ${String(epCount)}，开始标记章节...`,
+              `[syncSelectedRows] ${rowProgress} 行${String(rowNumber)} 状态${watchType === 2 ? '"看过"' : '"在看"'}(type=${String(watchType)})，集数: ${String(epCount)}，开始标记章节...`,
             )
             const epResult = await _markEpisodesComplete(sid, epCount, token)
             episodeMarkCount++
             bgmLog(
               LOG_LEVELS.INFO,
-              `[syncSelectedRows] ${rowProgress} 行${String(rowNum)} 章节标记结果: ${epResult.message}`,
+              `[syncSelectedRows] ${rowProgress} 行${String(rowNumber)} 章节标记结果: ${epResult.message}`,
             )
           } else if (!isNaN(epCount) && epCount > 0) {
             bgmLog(
               LOG_LEVELS.INFO,
-              `[syncSelectedRows] ${rowProgress} 行${String(rowNum)} 状态非"看过/在看"(type=${String(watchType)})，跳过章节标记`,
+              `[syncSelectedRows] ${rowProgress} 行${String(rowNumber)} 状态非"看过/在看"(type=${String(watchType)})，跳过章节标记`,
             )
           }
         } else {
           failCount++
-          details.push(`✗ 行${String(rowNum)} ${name || sid} HTTP:${String(result.code)}`)
+          details.push(`✗ 行${String(rowNumber)} ${name || sid} HTTP:${String(result.code)}`)
           bgmLog(
             LOG_LEVELS.WARN,
-            `[syncSelectedRows] ${rowProgress} 行${String(rowNum)} "${name || sid}" 同步失败！HTTP: ${String(result.code)}, 消息: ${result.message}`,
+            `[syncSelectedRows] ${rowProgress} 行${String(rowNumber)} "${name || sid}" 同步失败！HTTP: ${String(result.code)}, 消息: ${result.message}`,
           )
           updateSyncProgressDialog(
-            idx + 1,
+            index + 1,
             rows.length,
-            `${rowProgress} 行${String(rowNum)} "${name || sid}" ✗ HTTP:${String(result.code)}`,
-            `✗ ${rowProgress} 行${String(rowNum)} "${name || sid}" 失败 HTTP:${String(result.code)} ${result.message}`,
+            `${rowProgress} 行${String(rowNumber)} "${name || sid}" ✗ HTTP:${String(result.code)}`,
+            `✗ ${rowProgress} 行${String(rowNumber)} "${name || sid}" 失败 HTTP:${String(result.code)} ${result.message}`,
           )
         }
       } catch (error: unknown) {
         failCount++
-        const errMsg = error instanceof Error ? error.message : String(error)
+        const errorMessage = error instanceof Error ? error.message : String(error)
         bgmLog(
           LOG_LEVELS.ERROR,
-          `[syncSelectedRows] ${rowProgress} 行${String(rowNum)} 处理异常: ${errMsg}`,
+          `[syncSelectedRows] ${rowProgress} 行${String(rowNumber)} 处理异常: ${errorMessage}`,
         )
         updateSyncProgressDialog(
-          idx + 1,
+          index + 1,
           rows.length,
-          `${rowProgress} 行${String(rowNum)} 异常: ${errMsg}`,
-          `✗ ${rowProgress} 行${String(rowNum)} 异常: ${errMsg}`,
+          `${rowProgress} 行${String(rowNumber)} 异常: ${errorMessage}`,
+          `✗ ${rowProgress} 行${String(rowNumber)} 异常: ${errorMessage}`,
         )
       }
     }
@@ -1405,9 +1405,9 @@ async function executeSelectedSync(
   } catch (error: unknown) {
     hideSyncProgressDialog()
     BGM.handleError(error, { context: 'syncSelectedRows', showAlert: false })
-    const errMsg = error instanceof Error ? error.message : String(error)
-    bgmLog(LOG_LEVELS.ERROR, `[syncSelectedRows] 同步异常: ${errMsg}`)
-    void wpsMsgBox(`选中行同步异常: ${errMsg}`, 0, 16)
+    const errorMessage = error instanceof Error ? error.message : String(error)
+    bgmLog(LOG_LEVELS.ERROR, `[syncSelectedRows] 同步异常: ${errorMessage}`)
+    void wpsMessageBox(`选中行同步异常: ${errorMessage}`, 0, 16)
   } finally {
     // 统一在 finally 中清理运行状态，避免 catch/success 路径重复调用 exitRunningState
     // 正常完成时 completeSyncProgressDialog 已切换弹窗状态；异常时 hideSyncProgressDialog 已隐藏弹窗
@@ -1434,7 +1434,7 @@ export async function syncSelectedRows(): Promise<void> {
     const app = getApp()
     if (!app?.ActiveWorkbook) {
       bgmLog(LOG_LEVELS.ERROR, '[syncSelectedRows] 无法获取 Application')
-      void wpsMsgBox('无法获取 Application', 0, 48)
+      void wpsMessageBox('无法获取 Application', 0, 48)
       return
     }
     const ws = app.ActiveWorkbook.ActiveSheet
@@ -1449,7 +1449,7 @@ export async function syncSelectedRows(): Promise<void> {
     bgmLog(LOG_LEVELS.INFO, `[syncSelectedRows] 表头行: ${String(headerRow)}`)
     if (headerRow === 0) {
       bgmLog(LOG_LEVELS.ERROR, '[syncSelectedRows] 未找到有效表头行，中止同步')
-      void wpsMsgBox(
+      void wpsMessageBox(
         '未在当前工作表中检测到有效表头行！\n请确保表头包含"名称"、"是否看完"、"Bangumi URL"等关键词。',
         0,
         48,
@@ -1473,9 +1473,9 @@ export async function syncSelectedRows(): Promise<void> {
   } catch (error: unknown) {
     hideSyncProgressDialog()
     BGM.handleError(error, { context: 'syncSelectedRows', showAlert: false })
-    const errMsg = error instanceof Error ? error.message : String(error)
-    bgmLog(LOG_LEVELS.ERROR, `[syncSelectedRows] 同步异常: ${errMsg}`)
-    void wpsMsgBox(`选中行同步异常: ${errMsg}`, 0, 16)
+    const errorMessage = error instanceof Error ? error.message : String(error)
+    bgmLog(LOG_LEVELS.ERROR, `[syncSelectedRows] 同步异常: ${errorMessage}`)
+    void wpsMessageBox(`选中行同步异常: ${errorMessage}`, 0, 16)
   }
   bgmLog(
     LOG_LEVELS.INFO,

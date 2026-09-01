@@ -31,8 +31,8 @@ import { _T } from './_constants.js'
 // ========== 业务对话框 ==========
 
 export function showTokenDialog(currentToken?: string): void {
-  const defaultVal = currentToken || loadBgToken() || ''
-  showInput(_T.setBgmToken, _T.inputToken, defaultVal, (value?: string) => {
+  const defaultValue = currentToken || loadBgToken() || ''
+  showInput(_T.setBgmToken, _T.inputToken, defaultValue, (value?: string) => {
     if (value) {
       storeBgToken(value)
       // 新 Token 保存时清除旧的过期信息，等待下次查询刷新
@@ -117,8 +117,8 @@ export function updateTokenStatus(): void {
           // errorType === 'parse' 或 'none'：保持原显示
         })
         .catch((error: unknown) => {
-          const errMsg = error instanceof Error ? error.message : String(error)
-          bgmLog(LOG_LEVELS.ERROR, `[handlers] updateTokenStatus 获取用户信息失败: ${errMsg}`)
+          const errorMessage = error instanceof Error ? error.message : String(error)
+          bgmLog(LOG_LEVELS.ERROR, `[handlers] updateTokenStatus 获取用户信息失败: ${errorMessage}`)
           BGM.handleError(error)
         })
     }
@@ -155,14 +155,14 @@ export function updateUserIdStatus(): void {
   if (userId) {
     const display = username ? `${username} (${userId})` : userId
     const text = `${_T.set}: ${display}`
-    userIdStatusEls.forEach((el) => {
-      el.textContent = text
-      el.style.color = '#4CAF50'
+    userIdStatusEls.forEach((element) => {
+      element.textContent = text
+      element.style.color = '#4CAF50'
     })
   } else {
-    userIdStatusEls.forEach((el) => {
-      el.textContent = _T.notSet
-      el.style.color = '#f44336'
+    userIdStatusEls.forEach((element) => {
+      element.textContent = _T.notSet
+      element.style.color = '#f44336'
     })
   }
 }
@@ -406,8 +406,8 @@ export function queryTokenStatus(token: string): Promise<{ expires: number; user
             reject(new Error('Invalid response: missing expires field'))
           }
         } catch (error: unknown) {
-          const errMsg = error instanceof Error ? error.message : String(error)
-          bgmLog(LOG_LEVELS.ERROR, `[queryTokenStatus] 解析响应失败: ${errMsg}`)
+          const errorMessage = error instanceof Error ? error.message : String(error)
+          bgmLog(LOG_LEVELS.ERROR, `[queryTokenStatus] 解析响应失败: ${errorMessage}`)
           reject(new Error('Failed to parse token status response'))
         }
       } else if (xhr.status === 400 || xhr.status === 401) {
@@ -448,13 +448,13 @@ export function queryTokenStatus(token: string): Promise<{ expires: number; user
  */
 export function showTokenExpiryInfo(expires: number): void {
   const remaining = getTokenRemainingTime(expires)
-  const expiresEl = document.getElementById('tokenExpiresDisplay')
-  const tokenStatusEl = document.getElementById('tokenStatus')
+  const expiresElement = document.getElementById('tokenExpiresDisplay')
+  const tokenStatusElement = document.getElementById('tokenStatus')
 
   // 更新过期信息显示元素
-  if (expiresEl) {
-    expiresEl.textContent = `${_T.tokenExpiresLabel}: ${remaining.label}`
-    expiresEl.style.display = ''
+  if (expiresElement) {
+    expiresElement.textContent = `${_T.tokenExpiresLabel}: ${remaining.label}`
+    expiresElement.style.display = ''
 
     // 根据状态设置颜色
     let color = '#4CAF50' // green
@@ -464,33 +464,33 @@ export function showTokenExpiryInfo(expires: number): void {
       color = '#ff9800' // orange
     else if (remaining.status === 'expired') color = '#f44336' // red
 
-    expiresEl.style.color = color
+    expiresElement.style.color = color
   }
 
   // 更新 tokenStatus 状态颜色
-  if (tokenStatusEl) {
+  if (tokenStatusElement) {
     let color = '#4CAF50'
     if (remaining.status === 'warning') color = '#ffc107'
     else if (remaining.status === 'danger') color = '#ff9800'
     else if (remaining.status === 'expired') color = '#f44336'
-    tokenStatusEl.style.color = color
+    tokenStatusElement.style.color = color
   }
 
   // 如果有用户头像区域，也在那里显示过期信息
-  const profileExpiresEl = document.getElementById('profileExpiresDisplay')
-  if (profileExpiresEl) {
+  const profileExpiresElement = document.getElementById('profileExpiresDisplay')
+  if (profileExpiresElement) {
     let icon = '✅'
     if (remaining.status === 'warning') icon = '⚠️'
     else if (remaining.status === 'danger') icon = '🔴'
     else if (remaining.status === 'expired') icon = '⛔'
-    profileExpiresEl.textContent = `${icon} ${remaining.label}`
-    profileExpiresEl.style.display = ''
+    profileExpiresElement.textContent = `${icon} ${remaining.label}`
+    profileExpiresElement.style.display = ''
 
     let color = '#4CAF50'
     if (remaining.status === 'warning') color = '#ffc107'
     else if (remaining.status === 'danger') color = '#ff9800'
     else if (remaining.status === 'expired') color = '#f44336'
-    profileExpiresEl.style.color = color
+    profileExpiresElement.style.color = color
   }
 }
 
@@ -510,13 +510,13 @@ export function checkTokenExpiryWarning(expires: number): void {
     showToast(_T.tokenExpiredWarning, 'error')
     bgmLog(LOG_LEVELS.ERROR, `[checkTokenExpiryWarning] ${_T.tokenExpiredWarning}`)
   } else if (remaining.status === 'danger') {
-    const msg = _T.tokenExpiringCritical.replace('{}', remaining.label)
-    showToast(msg, 'error')
-    bgmLog(LOG_LEVELS.WARN, `[checkTokenExpiryWarning] ${msg}`)
+    const message = _T.tokenExpiringCritical.replace('{}', remaining.label)
+    showToast(message, 'error')
+    bgmLog(LOG_LEVELS.WARN, `[checkTokenExpiryWarning] ${message}`)
   } else if (remaining.status === 'warning') {
-    const msg = _T.tokenExpiringSoon.replace('{}', remaining.label)
-    showToast(msg, 'warn')
-    bgmLog(LOG_LEVELS.WARN, `[checkTokenExpiryWarning] ${msg}`)
+    const message = _T.tokenExpiringSoon.replace('{}', remaining.label)
+    showToast(message, 'warn')
+    bgmLog(LOG_LEVELS.WARN, `[checkTokenExpiryWarning] ${message}`)
   }
 }
 
@@ -527,15 +527,15 @@ export function checkTokenExpiryWarning(expires: number): void {
  * 根据 BGM.cache 中的数据更新头像显示区域
  */
 export function showUserProfile(): void {
-  const profileEl = document.getElementById('userProfile')
+  const profileElement = document.getElementById('userProfile')
 
   const { avatarUrl } = BGM.cache
   const { username } = BGM.cache
   const { userId } = BGM.cache
 
   if (avatarUrl || username) {
-    if (profileEl) {
-      profileEl.style.display = 'flex'
+    if (profileElement) {
+      profileElement.style.display = 'flex'
     }
 
     const avatarImg = document.getElementById('userAvatar') as HTMLImageElement | null
@@ -554,17 +554,17 @@ export function showUserProfile(): void {
     }
 
     // 同步更新顶栏头像（窄页面时显示）
-    const topbarAvatarEl = document.getElementById('topbarAvatar')
+    const topbarAvatarElement = document.getElementById('topbarAvatar')
     const topbarAvatarImg = document.getElementById('topbarAvatarImg') as HTMLImageElement | null
-    if (topbarAvatarEl) {
-      topbarAvatarEl.style.display = '' // 让 CSS 媒体查询控制显示/隐藏
-      topbarAvatarEl.title = username || _T.avatarDefault
-      topbarAvatarEl.setAttribute('aria-label', username || _T.avatarDefault)
+    if (topbarAvatarElement) {
+      topbarAvatarElement.style.display = '' // 让 CSS 媒体查询控制显示/隐藏
+      topbarAvatarElement.title = username || _T.avatarDefault
+      topbarAvatarElement.setAttribute('aria-label', username || _T.avatarDefault)
       if (topbarAvatarImg && avatarUrl) {
         topbarAvatarImg.src = avatarUrl
         topbarAvatarImg.alt = username || _T.avatarDefault
         topbarAvatarImg.onerror = () => {
-          topbarAvatarEl.style.display = 'none'
+          topbarAvatarElement.style.display = 'none'
           bgmLog(LOG_LEVELS.WARN, '[showUserProfile] 顶栏头像加载失败')
         }
       }
@@ -572,17 +572,17 @@ export function showUserProfile(): void {
 
     // 同步更新 Token 区域右侧的用户信息和头像
     const tokenStatusRight = document.getElementById('tokenStatusRight')
-    const tokenUserNameEl = document.getElementById('tokenUserName')
-    const tokenUserIdEl = document.getElementById('tokenUserId')
+    const tokenUserNameElement = document.getElementById('tokenUserName')
+    const tokenUserIdElement = document.getElementById('tokenUserId')
     const tokenAvatarImg = document.getElementById('tokenAvatarImg') as HTMLImageElement | null
     if (tokenStatusRight) {
       if (username || userId || avatarUrl) {
         tokenStatusRight.style.display = 'flex'
-        if (tokenUserNameEl && username) {
-          tokenUserNameEl.textContent = username
+        if (tokenUserNameElement && username) {
+          tokenUserNameElement.textContent = username
         }
-        if (tokenUserIdEl && userId) {
-          tokenUserIdEl.textContent = `ID: ${userId}`
+        if (tokenUserIdElement && userId) {
+          tokenUserIdElement.textContent = `ID: ${userId}`
         }
         if (tokenAvatarImg) {
           if (avatarUrl) {
@@ -602,14 +602,14 @@ export function showUserProfile(): void {
       }
     }
 
-    const nameEl = document.getElementById('userNameDisplay')
-    if (nameEl && username) {
-      nameEl.textContent = username
+    const nameElement = document.getElementById('userNameDisplay')
+    if (nameElement && username) {
+      nameElement.textContent = username
     }
 
-    const idEl = document.getElementById('userIdDisplay')
-    if (idEl && userId) {
-      idEl.textContent = `ID: ${userId}`
+    const idElement = document.getElementById('userIdDisplay')
+    if (idElement && userId) {
+      idElement.textContent = `ID: ${userId}`
     }
 
     // 如果有缓存的过期信息，显示它
@@ -618,13 +618,13 @@ export function showUserProfile(): void {
       showTokenExpiryInfo(cachedExpires)
     }
   } else {
-    if (profileEl) {
-      profileEl.style.display = 'none'
+    if (profileElement) {
+      profileElement.style.display = 'none'
     }
     // 同时隐藏顶栏头像
-    const topbarAvatarEl = document.getElementById('topbarAvatar')
-    if (topbarAvatarEl) {
-      topbarAvatarEl.style.display = 'none'
+    const topbarAvatarElement = document.getElementById('topbarAvatar')
+    if (topbarAvatarElement) {
+      topbarAvatarElement.style.display = 'none'
     }
     // 同时隐藏 Token 区右侧用户信息
     const tokenStatusRight = document.getElementById('tokenStatusRight')
@@ -640,14 +640,14 @@ export function showUserProfile(): void {
  * 隐藏用户头像区域
  */
 export function hideUserProfile(): void {
-  const profileEl = document.getElementById('userProfile')
-  if (profileEl) {
-    profileEl.style.display = 'none'
+  const profileElement = document.getElementById('userProfile')
+  if (profileElement) {
+    profileElement.style.display = 'none'
   }
   // 隐藏顶栏头像
-  const topbarAvatarEl = document.getElementById('topbarAvatar')
-  if (topbarAvatarEl) {
-    topbarAvatarEl.style.display = 'none'
+  const topbarAvatarElement = document.getElementById('topbarAvatar')
+  if (topbarAvatarElement) {
+    topbarAvatarElement.style.display = 'none'
   }
   // 隐藏 Token 区右侧用户信息
   const tokenStatusRight = document.getElementById('tokenStatusRight')
@@ -657,15 +657,15 @@ export function hideUserProfile(): void {
   // 兜底：同步「收藏页面访问」区的用户 ID（内部有去重）
   updateUserIdStatus()
   // 隐藏过期信息显示
-  const expiresEl = document.getElementById('tokenExpiresDisplay')
-  if (expiresEl) {
-    expiresEl.style.display = 'none'
-    expiresEl.textContent = ''
+  const expiresElement = document.getElementById('tokenExpiresDisplay')
+  if (expiresElement) {
+    expiresElement.style.display = 'none'
+    expiresElement.textContent = ''
   }
-  const profileExpiresEl = document.getElementById('profileExpiresDisplay')
-  if (profileExpiresEl) {
-    profileExpiresEl.style.display = 'none'
-    profileExpiresEl.textContent = ''
+  const profileExpiresElement = document.getElementById('profileExpiresDisplay')
+  if (profileExpiresElement) {
+    profileExpiresElement.style.display = 'none'
+    profileExpiresElement.textContent = ''
   }
 }
 

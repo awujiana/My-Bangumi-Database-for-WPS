@@ -42,7 +42,7 @@ import {
 import type { SyncRecord, SyncProgressStats, SyncConfigSummary } from '../../index.js'
 import { getSyncPreview, detectConflicts } from '../../services/ribbonService.js'
 import { ensureSheetHeaders } from '../../tools/util/index.js'
-import type { WpsApplication, WpsWorksheet } from '../../tools/wps.js'
+import type { WpsApplication as WpsApp, WpsWorksheet } from '../../tools/wps.js'
 
 import { _T } from './_constants.js'
 import { showTokenDialog } from './token.js'
@@ -78,7 +78,7 @@ interface SyncPreparedData {
   fingerprintMap: Map<string, string> | undefined
   originalActiveSheet: WpsWorksheet | null
   syncSheet: WpsWorksheet | null
-  app: WpsApplication
+  app: WpsApp
   startTime: number
 }
 
@@ -96,11 +96,11 @@ async function _fillSheetWithCollections(
   let written = 0
   const total = collections.length
 
-  for (let i = 0; i < total; i += 1) {
-    const item = collections[i]
+  for (let index = 0; index < total; index += 1) {
+    const item = collections[index]
     if (!item?.subject_id) continue
 
-    const row = headerRow + 1 + i
+    const row = headerRow + 1 + index
     const { subject } = item
     const name = subject?.name_cn || subject?.name || ''
     const alias = subject?.name_cn && subject.name ? subject.name : ''
@@ -109,7 +109,7 @@ async function _fillSheetWithCollections(
     const writes: { col: number; value: unknown }[] = []
 
     const seqCol = colMap.get('序列号')
-    if (seqCol !== undefined) writes.push({ col: seqCol, value: i + 1 })
+    if (seqCol !== undefined) writes.push({ col: seqCol, value: index + 1 })
 
     const nameCol = colMap.get('名称')
     if (nameCol !== undefined && name) writes.push({ col: nameCol, value: name })
@@ -154,8 +154,8 @@ async function _fillSheetWithCollections(
     if (rowOk) written++
 
     // 每 50 行更新一次状态并让出事件循环，避免 UI 卡死
-    if ((i + 1) % 50 === 0) {
-      setStatus(`正在填充收藏数据：${String(i + 1)}/${String(total)}`, 'info')
+    if ((index + 1) % 50 === 0) {
+      setStatus(`正在填充收藏数据：${String(index + 1)}/${String(total)}`, 'info')
       await new Promise((resolve) => setTimeout(resolve, 0))
     }
   }
@@ -350,7 +350,7 @@ async function confirmAndExecuteSync(prepared: SyncPreparedData): Promise<boolea
   bgmLog(LOG_LEVELS.INFO, `[syncFromPanel] 冲突策略: ${conflictStrategy}`)
 
   let conflictSids: Set<string> | undefined
-  let conflictMsg = ''
+  let conflictMessage = ''
   try {
     bgmLog(LOG_LEVELS.INFO, '[syncFromPanel] 开始检测冲突...')
     const { conflicts, conflictCount } = await detectConflicts(
@@ -364,13 +364,13 @@ async function confirmAndExecuteSync(prepared: SyncPreparedData): Promise<boolea
       bgmLog(LOG_LEVELS.WARN, `[syncFromPanel] 检测到 ${String(conflictCount)} 条冲突`)
       if (conflictStrategy === 'skip') {
         conflictSids = new Set(conflicts.map((c) => c.sid))
-        conflictMsg = `检测到 ${String(conflictCount)} 条冲突，已选择【跳过冲突】。\n\n`
+        conflictMessage = `检测到 ${String(conflictCount)} 条冲突，已选择【跳过冲突】。\n\n`
         bgmLog(
           LOG_LEVELS.INFO,
           `[syncFromPanel] 冲突处理策略: 跳过 ${String(conflictCount)} 条冲突条目`,
         )
       } else {
-        conflictMsg = `检测到 ${String(conflictCount)} 条冲突，将使用【Excel数据覆盖】。\n\n`
+        conflictMessage = `检测到 ${String(conflictCount)} 条冲突，将使用【Excel数据覆盖】。\n\n`
         bgmLog(
           LOG_LEVELS.INFO,
           `[syncFromPanel] 冲突处理策略: 使用Excel数据覆盖 ${String(conflictCount)} 条冲突`,
@@ -386,7 +386,7 @@ async function confirmAndExecuteSync(prepared: SyncPreparedData): Promise<boolea
 
   // 9. 确认对话框
   bgmLog(LOG_LEVELS.INFO, '[syncFromPanel] 步骤9: 显示确认对话框')
-  const msg = `数据预览：
+  const message = `数据预览：
             总行数：${String(preview.total)}
             有效条目：${String(preview.valid)}
             已上传（跳过）：${String(preview.alreadyUploaded)}
@@ -394,10 +394,10 @@ async function confirmAndExecuteSync(prepared: SyncPreparedData): Promise<boolea
             不上传（状态跳过）：${String(preview.willSkip)}
             无URL：${String(preview.noUrl)}
             空状态：${String(preview.emptyStatus)}
-            ${incremental ? `增量跳过：${String(preview.incrementalSkipped)}\n` : ''}${conflictMsg}是否继续同步？\n\n同步开始后将切换到同步记录工作表查看进度。`
+            ${incremental ? `增量跳过：${String(preview.incrementalSkipped)}\n` : ''}${conflictMessage}是否继续同步？\n\n同步开始后将切换到同步记录工作表查看进度。`
 
   const confirmed = await new Promise<boolean>((resolve) => {
-    showConfirm(msg, (confirmed) => {
+    showConfirm(message, (confirmed) => {
       resolve(confirmed)
     })
   })
@@ -431,7 +431,7 @@ async function confirmAndExecuteSync(prepared: SyncPreparedData): Promise<boolea
       extra: [
         { label: '数据范围', value: `第${String(headerRow + 1)}~${String(lastRow)}行` },
         { label: '增量同步', value: incremental ? '开启' : '关闭' },
-        { label: '冲突数', value: conflictMsg ? String(conflictSids?.size ?? 0) : '0' },
+        { label: '冲突数', value: conflictMessage ? String(conflictSids?.size ?? 0) : '0' },
       ],
     })
     showSyncProgressDialog(
@@ -818,12 +818,12 @@ async function _doAPISync(
     let currentCombined = 0
 
     // 阶段1：写入收藏到同步记录表（显示进度，但不需要定位单元格）
-    for (let i = 0; i < userCollections.length; i += 1) {
+    for (let index = 0; index < userCollections.length; index += 1) {
       if (BGM.sync.checkShouldStop()) break
       if (BGM.sync.checkPaused()) await BGM.sync.waitForResume()
       if (BGM.sync.checkShouldStop()) break
 
-      const item = userCollections[i]
+      const item = userCollections[index]
       if (item === undefined) continue
       const itemName = item.subject?.name_cn || item.subject?.name || '(无名称)'
       if (typeof addSyncRecord === 'function') {
@@ -842,8 +842,8 @@ async function _doAPISync(
       updateSyncProgressDialog(
         currentCombined,
         totalCombined,
-        `阶段1: 收藏写入同步记录 ${String(i + 1)}/${String(totalCollect)}`,
-        `📥 [${String(i + 1)}/${String(totalCollect)}] ${itemName}`,
+        `阶段1: 收藏写入同步记录 ${String(index + 1)}/${String(totalCollect)}`,
+        `📥 [${String(index + 1)}/${String(totalCollect)}] ${itemName}`,
       )
     }
 
@@ -866,7 +866,7 @@ async function _doAPISync(
     BGM.sync.updatePosition(ws, 0, seqColForLocate)
 
     let matchedCount = 0
-    for (let i = 0; i < rowsToProcess.length; i += 1) {
+    for (let index = 0; index < rowsToProcess.length; index += 1) {
       if (BGM.sync.checkShouldStop()) {
         bgmLog(LOG_LEVELS.INFO, '[_doAPISync] 阶段2：检测到停止请求，终止')
         break
@@ -874,13 +874,13 @@ async function _doAPISync(
       if (BGM.sync.checkPaused()) {
         bgmLog(
           LOG_LEVELS.INFO,
-          `[_doAPISync] 阶段2：已暂停，进度 ${String(i)}/${String(totalRows)}，等待恢复...`,
+          `[_doAPISync] 阶段2：已暂停，进度 ${String(index)}/${String(totalRows)}，等待恢复...`,
         )
         await BGM.sync.waitForResume()
         if (BGM.sync.checkShouldStop()) break
       }
 
-      const row = rowsToProcess[i]
+      const row = rowsToProcess[index]
       if (row === undefined) continue
       // 更新当前位置（行号）以便暂停时定位
       BGM.sync.updatePosition(undefined, row)
@@ -908,10 +908,10 @@ async function _doAPISync(
       updateSyncProgressDialog(
         currentCombined,
         totalCombined,
-        `阶段2: 标记数据表 ${String(i + 1)}/${String(totalRows)}（匹配 ${String(matchedCount)}）`,
+        `阶段2: 标记数据表 ${String(index + 1)}/${String(totalRows)}（匹配 ${String(matchedCount)}）`,
         matched
-          ? `✓ [${String(i + 1)}/${String(totalRows)}] 行${String(row)} 匹配 SID=${sid ?? ''}`
-          : `· [${String(i + 1)}/${String(totalRows)}] 行${String(row)} 未匹配`,
+          ? `✓ [${String(index + 1)}/${String(totalRows)}] 行${String(row)} 匹配 SID=${sid ?? ''}`
+          : `· [${String(index + 1)}/${String(totalRows)}] 行${String(row)} 未匹配`,
       )
     }
 
@@ -933,7 +933,7 @@ async function _doAPISync(
         ? Math.round((totalProcessed / totalElapsed) * 1000)
         : 0
     const summary = `📊 BGM 收藏 ${String(totalCollections)} 条 | 数据表 ${String(rowsToProcess.length)} 行 | 耗时 ${formatDuration(totalElapsed)}\n\n✅ 匹配标记: ${String(matchedCount)}\n📝 同步记录: ${String(syncRecords.length)}`
-    const detailsArr: string[] = [
+    const detailsArray: string[] = [
       `BGM 收藏总数: ${String(totalCollections)}`,
       `数据表总行数: ${String(rowsToProcess.length)}`,
       `匹配标记数: ${String(matchedCount)}`,
@@ -941,7 +941,7 @@ async function _doAPISync(
       `⏱️ 耗时: ${formatDuration(totalElapsed)}`,
       `⚡ 平均速度: ${avgSpeed > 0 ? `${String(avgSpeed)} 行/秒` : '--'}`,
     ]
-    if (wasStopped) detailsArr.unshift('⚠️ 同步被用户停止')
+    if (wasStopped) detailsArray.unshift('⚠️ 同步被用户停止')
     const stats: SyncProgressStats = {
       added: matchedCount,
       updated: 0,
@@ -954,7 +954,7 @@ async function _doAPISync(
       avgSpeed,
       strategyLabel: 'BGM 收藏同步',
     }
-    completeSyncProgressDialog(summary, detailsArr, wasStopped, undefined, stats)
+    completeSyncProgressDialog(summary, detailsArray, wasStopped, undefined, stats)
 
     // 恢复原始工作表
     if (originalActiveSheet) {

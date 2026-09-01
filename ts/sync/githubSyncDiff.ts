@@ -153,7 +153,7 @@ export function getExcelAliases(jsonlField: string): readonly string[] {
  * @param value 远程字段值（string | number | undefined）
  * @returns 字符串表示；undefined/null/空字符串 → ''
  */
-function toExtStringValue(value: string | number | undefined): string {
+function toExtensionStringValue(value: string | number | undefined): string {
   if (value === undefined) return ''
   if (typeof value === 'number') return String(value)
   return value
@@ -256,23 +256,23 @@ export function parseJsonl(text: string): {
   }
 
   const lines = text.split(/\r\n|\r|\n/)
-  for (let i = 0; i < lines.length; i += 1) {
-    const lineNum = i + 1
-    const raw = lines[i]
+  for (let index = 0; index < lines.length; index += 1) {
+    const lineNumber = index + 1
+    const raw = lines[index]
     if (raw === undefined) continue
     const trimmed = raw.trim()
     if (!trimmed) continue // 空行跳过
 
     try {
-      const obj: unknown = JSON.parse(trimmed)
-      if (isGithubRemoteEntry(obj)) {
-        entries.push(obj)
+      const object: unknown = JSON.parse(trimmed)
+      if (isGithubRemoteEntry(object)) {
+        entries.push(object)
       } else {
-        errors.push({ line: lineNum, reason: '对象缺少 sid 字段或 sid 不是字符串' })
+        errors.push({ line: lineNumber, reason: '对象缺少 sid 字段或 sid 不是字符串' })
       }
     } catch (error: unknown) {
       const reason = error instanceof Error ? error.message : String(error)
-      errors.push({ line: lineNum, reason })
+      errors.push({ line: lineNumber, reason })
     }
   }
 
@@ -357,11 +357,11 @@ export function filterByTime(
     const match = /^(\d{4})[-/.](\d{1,2})/.exec(entry.date)
     if (!match) return false
 
-    const yearStr = match[1]
-    const monthStr = match[2]
-    if (!yearStr || !monthStr) return false
-    const year = parseInt(yearStr, 10)
-    const month = parseInt(monthStr, 10)
+    const yearString = match[1]
+    const monthString = match[2]
+    if (!yearString || !monthString) return false
+    const year = parseInt(yearString, 10)
+    const month = parseInt(monthString, 10)
     if (isNaN(year) || isNaN(month)) return false
 
     switch (filter.range) {
@@ -413,11 +413,11 @@ function matchTimeFilter(dateStr: string, filter: SyncTimeFilter): boolean {
   const match = /(\d{4})[-/.年](\d{1,2})/.exec(dateStr)
   if (!match) return false
 
-  const yearStr = match[1]
-  const monthStr = match[2]
-  if (!yearStr || !monthStr) return false
-  const year = parseInt(yearStr, 10)
-  const month = parseInt(monthStr, 10)
+  const yearString = match[1]
+  const monthString = match[2]
+  if (!yearString || !monthString) return false
+  const year = parseInt(yearString, 10)
+  const month = parseInt(monthString, 10)
   if (isNaN(year) || isNaN(month)) return false
 
   switch (filter.range) {
@@ -542,11 +542,11 @@ export function computeDiff(
     for (const [jsonlField] of EXTENDED_FIELD_MAP) {
       const remoteValue = remote[jsonlField as keyof GithubRemoteEntry]
       if (remoteValue === undefined) continue
-      const remoteStr = toExtStringValue(remoteValue as string | number)
+      const remoteString = toExtensionStringValue(remoteValue as string | number)
       const excelAliases = getExcelAliases(jsonlField)
       for (const excelField of excelAliases) {
         if (comparedFields.has(excelField)) continue
-        if (remoteStr && remoteStr !== (local.fields[excelField] ?? '')) {
+        if (remoteString && remoteString !== (local.fields[excelField] ?? '')) {
           changedFields.push(excelField)
           comparedFields.add(excelField)
         }

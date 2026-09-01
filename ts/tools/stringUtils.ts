@@ -17,10 +17,10 @@
 
 import { calcChecksum } from '../core/crypto.js'
 
-import { colNumToLetter, escapeHtml, trim } from './stringUtilsPure.js'
+import { colNumToLetter as colNumberToLetter, escapeHtml, trim } from './stringUtilsPure.js'
 
 // Re-export 纯函数，保持向后兼容（其他模块仍可从 stringUtils 导入）
-export { colNumToLetter, escapeHtml, trim }
+export { colNumberToLetter as colNumToLetter, escapeHtml, trim }
 
 /**
  * 计算 Excel 行数据的指纹（用于增量同步比较）

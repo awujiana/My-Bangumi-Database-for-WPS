@@ -230,9 +230,9 @@ describe('UndoStack', () => {
 
   describe('会话栈管理', () => {
     it('超过 MAX_SESSIONS(20) 时自动清理最旧的', (): void => {
-      for (let i = 0; i < 25; i += 1) {
-        beginUndoSession(`session ${String(i)}`)
-        recordUndoEntry({ row: i, col: 1, oldValue: 'old', newValue: 'new' })
+      for (let index = 0; index < 25; index += 1) {
+        beginUndoSession(`session ${String(index)}`)
+        recordUndoEntry({ row: index, col: 1, oldValue: 'old', newValue: 'new' })
         endUndoSession()
       }
       expect(getUndoSessionCount()).toBe(20)

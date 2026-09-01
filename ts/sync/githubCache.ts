@@ -57,9 +57,9 @@ export interface GithubDataCache {
  */
 export function computeTextHash(str: string): string {
   let hash = 5381
-  for (let i = 0; i < str.length; i += 1) {
+  for (let index = 0; index < str.length; index += 1) {
     // hash * 33 + charCode
-    hash = ((hash << 5) + hash + str.charCodeAt(i)) | 0
+    hash = ((hash << 5) + hash + str.charCodeAt(index)) | 0
   }
   // 转为无符号 32 位十六进制
   return (hash >>> 0).toString(16).padStart(8, '0')
@@ -112,8 +112,8 @@ export function saveCache(data: GithubDataCache): void {
       `[githubCache] 缓存已保存：${String(data.entries.length)} 条，哈希=${data.hash}，大小=${String(data.textLength)}B`,
     )
   } catch (error: unknown) {
-    const errMsg = error instanceof Error ? error.message : String(error)
-    bgmLog(LOG_LEVELS.WARN, `[githubCache] 缓存保存失败：${errMsg}`)
+    const errorMessage = error instanceof Error ? error.message : String(error)
+    bgmLog(LOG_LEVELS.WARN, `[githubCache] 缓存保存失败：${errorMessage}`)
   }
 }
 

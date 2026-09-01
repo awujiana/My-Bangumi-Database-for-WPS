@@ -158,13 +158,13 @@ describe('getCellValue', () => {
     it('Value2 为 native function（toString 含 [native code]）时应跳过并回退', () => {
       // 当前实现：调用函数得到 result，仅当 result 为 function 时检查 toString
       // 对于返回非 function 对象的 native code 标记，不会检测
-      const nativeFn = function Value2() {
+      const nativeFunction = function Value2() {
         return { toString: () => '42 [native code]' }
       }
       const ws = createMockWorksheet(
         {},
         {
-          A1: { Value2: nativeFn, Value: 'real_value', Text: 'real_value' },
+          A1: { Value2: nativeFunction, Value: 'real_value', Text: 'real_value' },
         },
       )
       // 实际行为：函数被调用返回对象，String() 转换得到 toString 值
@@ -179,9 +179,9 @@ describe('getCellValue', () => {
       const throwingCell = new Proxy(
         { Value: 'fallback_after_error', Text: 'fallback_after_error' },
         {
-          get(target, prop) {
-            if (prop === 'Value2') throw new Error('Property access error')
-            return target[prop]
+          get(target, property) {
+            if (property === 'Value2') throw new Error('Property access error')
+            return target[property]
           },
         },
       )
@@ -190,13 +190,13 @@ describe('getCellValue', () => {
     })
 
     it('Value 为 native function 时跳过，回退到 Text', () => {
-      const nativeFn = function Value() {
+      const nativeFunction = function Value() {
         return { toString: () => '42 [native code]' }
       }
       const ws = createMockWorksheet(
         {},
         {
-          A1: { Value2: undefined, Value: nativeFn, Text: 'text_final' },
+          A1: { Value2: undefined, Value: nativeFunction, Text: 'text_final' },
         },
       )
       expect(getCellValue(ws, 1, 1)).toBe('42 [native code]')
@@ -281,10 +281,10 @@ describe('setCellValue', () => {
 
   it('应将对象作为值写入', () => {
     const ws = createMockWorksheet()
-    const obj = { key: 'val' }
+    const object = { key: 'val' }
     const cell = ws.Range('A1')
-    setCellValue(ws, 1, 1, obj)
-    expect(cell.Value2).toBe(obj)
+    setCellValue(ws, 1, 1, object)
+    expect(cell.Value2).toBe(object)
   })
 
   it('应在 cell 为 null 时返回 false 并记录错误日志', () => {
@@ -349,21 +349,21 @@ describe('getSheetByIndex', () => {
 
   it('应按索引获取工作表', () => {
     const mockSheet = { Name: 'Sheet1' }
-    const itemFn = vi.fn().mockReturnValue(mockSheet)
+    const itemFunction = vi.fn().mockReturnValue(mockSheet)
     vi.mocked(getApp).mockReturnValue({
-      ActiveWorkbook: { Sheets: { Count: 3, Item: itemFn } },
+      ActiveWorkbook: { Sheets: { Count: 3, Item: itemFunction } },
     })
     const result = getSheetByIndex(2)
-    expect(itemFn).toHaveBeenCalledWith(2)
+    expect(itemFunction).toHaveBeenCalledWith(2)
     expect(result).toBe(mockSheet)
   })
 
   it('应在 Sheets.Item 抛异常时返回 undefined', () => {
-    const itemFn = vi.fn(() => {
+    const itemFunction = vi.fn(() => {
       throw new Error('Sheet not found')
     })
     vi.mocked(getApp).mockReturnValue({
-      ActiveWorkbook: { Sheets: { Count: 5, Item: itemFn } },
+      ActiveWorkbook: { Sheets: { Count: 5, Item: itemFunction } },
     })
     const result = getSheetByIndex(10)
     expect(result).toBeUndefined()

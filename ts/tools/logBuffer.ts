@@ -57,9 +57,9 @@ export class RingBuffer<T> {
     }
     // 已满，head 之后是最旧的
     const result: T[] = []
-    for (let i = 0; i < this.capacity; i += 1) {
-      const idx = (this.head + i) % this.capacity
-      const item = this.buffer[idx]
+    for (let index = 0; index < this.capacity; index += 1) {
+      const index_ = (this.head + index) % this.capacity
+      const item = this.buffer[index_]
       if (item !== undefined) {
         result.push(item)
       }

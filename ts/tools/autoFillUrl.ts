@@ -21,9 +21,9 @@ export interface AutoFillResult {
   mappedNames: number
 }
 
-function _splitAliases(aliasVal: string): string[] {
-  if (!aliasVal) return []
-  return aliasVal
+function _splitAliases(aliasValue: string): string[] {
+  if (!aliasValue) return []
+  return aliasValue
     .split(/[|｜/／]/)
     .map((a) => a.trim())
     .filter(Boolean)
@@ -43,20 +43,20 @@ function _buildNameUrlMap(
   if (!urlCol || !nameCol) return nameUrlMap
 
   for (let row = headerRow + 1; row <= lastRow; row += 1) {
-    const urlVal = trim(getCellValue(ws, row, urlCol))
-    if (!urlVal) continue
+    const urlValue = trim(getCellValue(ws, row, urlCol))
+    if (!urlValue) continue
 
-    const nameVal = trim(getCellValue(ws, row, nameCol))
-    if (nameVal && !(nameVal in nameUrlMap)) {
-      nameUrlMap[nameVal] = urlVal
+    const nameValue = trim(getCellValue(ws, row, nameCol))
+    if (nameValue && !(nameValue in nameUrlMap)) {
+      nameUrlMap[nameValue] = urlValue
     }
 
     if (aliasCol) {
-      const aliasVal = trim(getCellValue(ws, row, aliasCol))
-      const aliases = _splitAliases(aliasVal)
+      const aliasValue = trim(getCellValue(ws, row, aliasCol))
+      const aliases = _splitAliases(aliasValue)
       for (const a of aliases) {
         if (a && !(a in nameUrlMap)) {
-          nameUrlMap[a] = urlVal
+          nameUrlMap[a] = urlValue
         }
       }
     }
@@ -116,10 +116,10 @@ export function autoFillUrls(): AutoFillResult {
       const currentUrl = trim(getCellValue(ws, row, urlCol))
       if (currentUrl) continue
 
-      const nameVal = trim(getCellValue(ws, row, nameCol))
-      if (!nameVal) continue
+      const nameValue = trim(getCellValue(ws, row, nameCol))
+      if (!nameValue) continue
 
-      const fillUrl = nameUrlMap[nameVal]
+      const fillUrl = nameUrlMap[nameValue]
       if (fillUrl) {
         setCellValue(ws, row, urlCol, fillUrl)
         result.filled++

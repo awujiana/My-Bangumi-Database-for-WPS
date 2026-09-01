@@ -97,7 +97,7 @@ export function importConfig(json: string): Result<void> {
   const result = FullConfigSchema.safeParse(parsed)
   if (!result.success) {
     const errors = result.error.issues
-      .map((i) => `${(i.path ?? []).join('.')}: ${i.message}`)
+      .map((index) => `${(index.path ?? []).join('.')}: ${index.message}`)
       .join('; ')
     return Result.failVoid(new BgmError(`配置校验失败: ${errors}`, 'CONFIG_INVALID'))
   }

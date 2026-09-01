@@ -43,8 +43,8 @@ export function showConflictResolver(conflicts: Conflict[]): Promise<ConflictRes
     document.body.appendChild(modal)
 
     // 焦点管理：将焦点移至「确认」按钮，便于键盘操作
-    const confirmBtn = modal.querySelector<HTMLButtonElement>('.conflict-btn-confirm')
-    confirmBtn?.focus()
+    const confirmButton = modal.querySelector<HTMLButtonElement>('.conflict-btn-confirm')
+    confirmButton?.focus()
   })
 }
 
@@ -85,29 +85,29 @@ function createConflictModal(
   count.textContent = `${String(conflicts.length)} 个冲突`
   toolbar.appendChild(count)
 
-  const allLocalBtn = document.createElement('button')
-  allLocalBtn.type = 'button'
-  allLocalBtn.className = 'btn small'
-  allLocalBtn.textContent = '全部使用本地'
-  toolbar.appendChild(allLocalBtn)
+  const allLocalButton = document.createElement('button')
+  allLocalButton.type = 'button'
+  allLocalButton.className = 'btn small'
+  allLocalButton.textContent = '全部使用本地'
+  toolbar.appendChild(allLocalButton)
 
-  const allRemoteBtn = document.createElement('button')
-  allRemoteBtn.type = 'button'
-  allRemoteBtn.className = 'btn small'
-  allRemoteBtn.textContent = '全部使用远程'
-  toolbar.appendChild(allRemoteBtn)
+  const allRemoteButton = document.createElement('button')
+  allRemoteButton.type = 'button'
+  allRemoteButton.className = 'btn small'
+  allRemoteButton.textContent = '全部使用远程'
+  toolbar.appendChild(allRemoteButton)
 
-  const cancelBtn = document.createElement('button')
-  cancelBtn.type = 'button'
-  cancelBtn.className = 'btn small'
-  cancelBtn.textContent = '取消'
-  toolbar.appendChild(cancelBtn)
+  const cancelButton = document.createElement('button')
+  cancelButton.type = 'button'
+  cancelButton.className = 'btn small'
+  cancelButton.textContent = '取消'
+  toolbar.appendChild(cancelButton)
 
-  const confirmBtn = document.createElement('button')
-  confirmBtn.type = 'button'
-  confirmBtn.className = 'btn small primary conflict-btn-confirm'
-  confirmBtn.textContent = '确认'
-  toolbar.appendChild(confirmBtn)
+  const confirmButton = document.createElement('button')
+  confirmButton.type = 'button'
+  confirmButton.className = 'btn small primary conflict-btn-confirm'
+  confirmButton.textContent = '确认'
+  toolbar.appendChild(confirmButton)
 
   header.appendChild(toolbar)
   content.appendChild(header)
@@ -156,7 +156,7 @@ function createConflictModal(
   /** 每个 conflict 对应的「远程」radio 引用 */
   const remoteRadios: HTMLInputElement[] = []
 
-  conflicts.forEach((conflict, idx): void => {
+  conflicts.forEach((conflict, index): void => {
     const tr = document.createElement('tr')
     tr.className = 'conflict-row'
 
@@ -181,7 +181,7 @@ function createConflictModal(
     const selectTd = document.createElement('td')
     selectTd.className = 'conflict-col-select'
 
-    const radioName = `conflict-${String(idx)}`
+    const radioName = `conflict-${String(index)}`
 
     const localRadio = document.createElement('input')
     localRadio.type = 'radio'
@@ -224,10 +224,10 @@ function createConflictModal(
   /** 安全移除模态框：先解绑事件，再从 DOM 移除 */
   const closeModal = (): void => {
     // 移除事件监听器，避免内存泄漏
-    confirmBtn.onclick = null
-    cancelBtn.onclick = null
-    allLocalBtn.onclick = null
-    allRemoteBtn.onclick = null
+    confirmButton.onclick = null
+    cancelButton.onclick = null
+    allLocalButton.onclick = null
+    allRemoteButton.onclick = null
     if (modal.parentNode) {
       modal.parentNode.removeChild(modal)
     }
@@ -235,8 +235,8 @@ function createConflictModal(
 
   /** 收集当前所有冲突的解决决策 */
   const collectResolutions = (): ConflictResolution[] =>
-    conflicts.map((conflict, idx): ConflictResolution => {
-      const localRadio = localRadios[idx]
+    conflicts.map((conflict, index): ConflictResolution => {
+      const localRadio = localRadios[index]
       const chosenValue: 'local' | 'remote' = localRadio?.checked ? 'local' : 'remote'
       return {
         sid: conflict.sid,
@@ -245,24 +245,24 @@ function createConflictModal(
       }
     })
 
-  confirmBtn.onclick = (): void => {
+  confirmButton.onclick = (): void => {
     closeModal()
     onComplete(collectResolutions())
   }
 
-  cancelBtn.onclick = (): void => {
+  cancelButton.onclick = (): void => {
     closeModal()
     onComplete(null)
   }
 
-  allLocalBtn.onclick = (): void => {
+  allLocalButton.onclick = (): void => {
     for (const radio of localRadios) {
       radio.checked = true
     }
     // 单选互斥：远程 radio 由浏览器自动取消
   }
 
-  allRemoteBtn.onclick = (): void => {
+  allRemoteButton.onclick = (): void => {
     for (const radio of remoteRadios) {
       radio.checked = true
     }

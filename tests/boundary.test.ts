@@ -23,7 +23,7 @@ vi.hoisted(() => {
 })
 
 import { Result, BgmError } from '../ts/core/result.js'
-import { colNumToLetter, escapeHtml, trim } from '../ts/tools/stringUtilsPure.js'
+import { colNumToLetter as colNumberToLetter, escapeHtml, trim } from '../ts/tools/stringUtilsPure.js'
 import {
   isBangumiUrl,
   extractSubjectId,
@@ -95,33 +95,33 @@ describe('空值边界', () => {
 
   describe('colNumToLetter 处理边界列号', () => {
     it('列号 1 返回 "A"', () => {
-      expect(colNumToLetter(1)).toBe('A')
+      expect(colNumberToLetter(1)).toBe('A')
     })
 
     it('列号 0 返回空字符串或特定值（边界）', () => {
       // colNumToLetter(0) 的行为：可能返回空字符串或抛错，验证不崩溃
-      const result = colNumToLetter(0)
+      const result = colNumberToLetter(0)
       expect(typeof result).toBe('string')
     })
 
     it('列号 26 返回 "Z"', () => {
-      expect(colNumToLetter(26)).toBe('Z')
+      expect(colNumberToLetter(26)).toBe('Z')
     })
 
     it('列号 27 返回 "AA"', () => {
-      expect(colNumToLetter(27)).toBe('AA')
+      expect(colNumberToLetter(27)).toBe('AA')
     })
 
     it('列号 52 返回 "AZ"', () => {
-      expect(colNumToLetter(52)).toBe('AZ')
+      expect(colNumberToLetter(52)).toBe('AZ')
     })
 
     it('列号 702 返回 "ZZ"', () => {
-      expect(colNumToLetter(702)).toBe('ZZ')
+      expect(colNumberToLetter(702)).toBe('ZZ')
     })
 
     it('列号 703 返回 "AAA"', () => {
-      expect(colNumToLetter(703)).toBe('AAA')
+      expect(colNumberToLetter(703)).toBe('AAA')
     })
   })
 
@@ -288,28 +288,28 @@ describe('极值边界', () => {
 
   describe('colNumToLetter 处理极值列号', () => {
     it('列号 1000 应返回有效字符串', () => {
-      const result = colNumToLetter(1000)
+      const result = colNumberToLetter(1000)
       expect(typeof result).toBe('string')
       expect(result.length).toBeGreaterThan(0)
     })
 
     it('列号 10000 应返回有效字符串', () => {
-      const result = colNumToLetter(10_000)
+      const result = colNumberToLetter(10_000)
       expect(typeof result).toBe('string')
       expect(result.length).toBeGreaterThan(0)
     })
 
     it('列号 16384 (XFD, Excel 上限) 应返回 "XFD"', () => {
-      expect(colNumToLetter(16_384)).toBe('XFD')
+      expect(colNumberToLetter(16_384)).toBe('XFD')
     })
 
     it('负数列号应返回空字符串或特定值（不抛错）', () => {
-      const result = colNumToLetter(-1)
+      const result = colNumberToLetter(-1)
       expect(typeof result).toBe('string')
     })
 
     it('列号 NaN 应返回空字符串或特定值（不抛错）', () => {
-      const result = colNumToLetter(NaN)
+      const result = colNumberToLetter(NaN)
       expect(typeof result).toBe('string')
     })
   })
@@ -322,22 +322,22 @@ describe('极值边界', () => {
     })
 
     it('10000 字符字符串返回有效校验和（0-255）', () => {
-      const longStr = 'A'.repeat(10_000)
-      const cs = calcChecksum(longStr)
+      const longString = 'A'.repeat(10_000)
+      const cs = calcChecksum(longString)
       expect(cs).toBeGreaterThanOrEqual(0)
       expect(cs).toBeLessThan(256)
     })
 
     it('100000 字符字符串返回有效校验和（0-255）', () => {
-      const veryLongStr = 'XYZ'.repeat(33_334)
-      const cs = calcChecksum(veryLongStr)
+      const veryLongString = 'XYZ'.repeat(33_334)
+      const cs = calcChecksum(veryLongString)
       expect(cs).toBeGreaterThanOrEqual(0)
       expect(cs).toBeLessThan(256)
     })
 
     it('极大字符串不抛错（性能边界）', () => {
-      const hugeStr = 'A'.repeat(100_000)
-      expect(() => calcChecksum(hugeStr)).not.toThrow()
+      const hugeString = 'A'.repeat(100_000)
+      expect(() => calcChecksum(hugeString)).not.toThrow()
     })
   })
 
@@ -568,38 +568,38 @@ describe('特殊字符边界', () => {
 describe('超长字符串边界', () => {
   describe('Result 处理超长字符串', () => {
     it('10000 字符字符串作为成功值', () => {
-      const longStr = 'A'.repeat(10_000)
-      const r = Result.ok(longStr)
-      expect(r.unwrap()).toBe(longStr)
+      const longString = 'A'.repeat(10_000)
+      const r = Result.ok(longString)
+      expect(r.unwrap()).toBe(longString)
       expect(r.unwrap().length).toBe(10_000)
     })
 
     it('100000 字符字符串作为成功值', () => {
-      const veryLongStr = 'B'.repeat(100_000)
-      const r = Result.ok(veryLongStr)
-      expect(r.unwrap()).toBe(veryLongStr)
+      const veryLongString = 'B'.repeat(100_000)
+      const r = Result.ok(veryLongString)
+      expect(r.unwrap()).toBe(veryLongString)
       expect(r.unwrap().length).toBe(100_000)
     })
   })
 
   describe('escapeHtml 处理超长字符串', () => {
     it('10000 字符纯文本不抛错', () => {
-      const longStr = 'hello world '.repeat(834)
-      expect(() => escapeHtml(longStr)).not.toThrow()
+      const longString = 'hello world '.repeat(834)
+      expect(() => escapeHtml(longString)).not.toThrow()
     })
 
     it('10000 字符包含特殊字符不抛错', () => {
-      const longStr = '<script>alert(1)</script>'.repeat(385)
-      expect(() => escapeHtml(longStr)).not.toThrow()
-      const result = escapeHtml(longStr)
+      const longString = '<script>alert(1)</script>'.repeat(385)
+      expect(() => escapeHtml(longString)).not.toThrow()
+      const result = escapeHtml(longString)
       expect(result).not.toContain('<script>')
     })
   })
 
   describe('trim 处理超长字符串', () => {
     it('100000 字符不抛错', () => {
-      const veryLongStr = '  hello  '.repeat(11_112)
-      expect(() => trim(veryLongStr)).not.toThrow()
+      const veryLongString = '  hello  '.repeat(11_112)
+      expect(() => trim(veryLongString)).not.toThrow()
     })
 
     it('纯空白 10000 字符应返回空字符串', () => {
@@ -637,13 +637,13 @@ describe('超长字符串边界', () => {
 
   describe('calcChecksum 处理超长字符串', () => {
     it('100000 字符不抛错（性能边界）', () => {
-      const hugeStr = 'A'.repeat(100_000)
-      expect(() => calcChecksum(hugeStr)).not.toThrow()
+      const hugeString = 'A'.repeat(100_000)
+      expect(() => calcChecksum(hugeString)).not.toThrow()
     })
 
     it('1000000 字符不抛错（极端性能边界）', () => {
-      const extremeStr = 'A'.repeat(1_000_000)
-      expect(() => calcChecksum(extremeStr)).not.toThrow()
+      const extremeString = 'A'.repeat(1_000_000)
+      expect(() => calcChecksum(extremeString)).not.toThrow()
     })
   })
 })
@@ -653,8 +653,8 @@ describe('并发调用边界', () => {
   describe('Result 并发创建', () => {
     it('1000 个 Result.ok 并发创建不抛错', () => {
       const results: Result<number>[] = []
-      for (let i = 0; i < 1000; i += 1) {
-        results.push(Result.ok(i))
+      for (let index = 0; index < 1000; index += 1) {
+        results.push(Result.ok(index))
       }
       expect(results).toHaveLength(1000)
       expect(results[0]!.unwrap()).toBe(0)
@@ -663,8 +663,8 @@ describe('并发调用边界', () => {
 
     it('1000 个 Result.fail 并发创建不抛错', () => {
       const results: Result<number>[] = []
-      for (let i = 0; i < 1000; i += 1) {
-        results.push(Result.fail<number>(new BgmError(`err${String(i)}`, 'CODE')))
+      for (let index = 0; index < 1000; index += 1) {
+        results.push(Result.fail<number>(new BgmError(`err${String(index)}`, 'CODE')))
       }
       expect(results).toHaveLength(1000)
       expect(results[0]!.isFail()).toBe(true)
@@ -675,7 +675,7 @@ describe('并发调用边界', () => {
 
     it('1000 个 Result.map 链式调用不抛错', () => {
       let r: Result<number> = Result.ok(0)
-      for (let i = 0; i < 1000; i += 1) {
+      for (let index = 0; index < 1000; index += 1) {
         r = r.map((v: number): number => v + 1)
       }
       expect(r.unwrap()).toBe(1000)
@@ -683,8 +683,8 @@ describe('并发调用边界', () => {
 
     it('1000 个 unwrapOr 调用不抛错', () => {
       const results: Result<number>[] = []
-      for (let i = 0; i < 1000; i += 1) {
-        results.push(Result.ok(i))
+      for (let index = 0; index < 1000; index += 1) {
+        results.push(Result.ok(index))
       }
       const values = results.map((r) => r.unwrapOr(-1))
       expect(values).toHaveLength(1000)
@@ -694,11 +694,11 @@ describe('并发调用边界', () => {
 
     it('混合 ok/fail 并发创建不抛错', () => {
       const results: Result<number>[] = []
-      for (let i = 0; i < 1000; i += 1) {
-        if (i % 2 === 0) {
-          results.push(Result.ok(i))
+      for (let index = 0; index < 1000; index += 1) {
+        if (index % 2 === 0) {
+          results.push(Result.ok(index))
         } else {
-          results.push(Result.fail<number>(new BgmError(`err${String(i)}`, 'CODE')))
+          results.push(Result.fail<number>(new BgmError(`err${String(index)}`, 'CODE')))
         }
       }
       expect(results).toHaveLength(1000)
@@ -712,8 +712,8 @@ describe('并发调用边界', () => {
   describe('colNumToLetter 并发调用', () => {
     it('1000 次调用返回一致结果', () => {
       const results: string[] = []
-      for (let i = 0; i < 1000; i += 1) {
-        results.push(colNumToLetter(27)) // AA
+      for (let index = 0; index < 1000; index += 1) {
+        results.push(colNumberToLetter(27)) // AA
       }
       expect(results).toHaveLength(1000)
       expect(results.every((r) => r === 'AA')).toBe(true)
@@ -724,7 +724,7 @@ describe('并发调用边界', () => {
     it('1000 次调用相同输入返回一致结果', () => {
       const input = '<script>alert(1)</script>'
       const results: string[] = []
-      for (let i = 0; i < 1000; i += 1) {
+      for (let index = 0; index < 1000; index += 1) {
         results.push(escapeHtml(input))
       }
       expect(results).toHaveLength(1000)
@@ -737,7 +737,7 @@ describe('并发调用边界', () => {
     it('1000 次调用相同输入返回一致结果', () => {
       const input = 'hello world'
       const results: number[] = []
-      for (let i = 0; i < 1000; i += 1) {
+      for (let index = 0; index < 1000; index += 1) {
         results.push(calcChecksum(input))
       }
       expect(results).toHaveLength(1000)
@@ -749,7 +749,7 @@ describe('并发调用边界', () => {
     it('1000 次调用相同输入返回一致结果', () => {
       const input = 'https://bgm.tv/subject/12345'
       const results: (string | null)[] = []
-      for (let i = 0; i < 1000; i += 1) {
+      for (let index = 0; index < 1000; index += 1) {
         results.push(extractSubjectId(input))
       }
       expect(results).toHaveLength(1000)
@@ -760,7 +760,7 @@ describe('并发调用边界', () => {
   describe('mapWatchStatus 并发调用', () => {
     it('1000 次调用相同输入返回一致结果', () => {
       const results: number[] = []
-      for (let i = 0; i < 1000; i += 1) {
+      for (let index = 0; index < 1000; index += 1) {
         results.push(mapWatchStatus('看过'))
       }
       expect(results).toHaveLength(1000)

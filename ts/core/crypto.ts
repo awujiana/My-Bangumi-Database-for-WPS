@@ -25,8 +25,8 @@ import { LOG_LEVELS, TOKEN_CONFIG } from './constants.js'
  */
 export function calcChecksum(input: string): number {
   let sum = 0
-  for (let i = 0; i < input.length; i += 1) {
-    sum = ((sum << 5) - sum + input.charCodeAt(i)) & 0xff
+  for (let index = 0; index < input.length; index += 1) {
+    sum = ((sum << 5) - sum + input.charCodeAt(index)) & 0xff
   }
   return Math.abs(sum) % 256
 }
@@ -76,9 +76,9 @@ export function extractToken(encrypted: string): string | null {
       return null
     }
 
-    const [version, checksumStr, ...tokenParts] = parts
+    const [version, checksumString, ...tokenParts] = parts
     const token = tokenParts.join(':')
-    const checksum = parseInt(checksumStr!, 10)
+    const checksum = parseInt(checksumString!, 10)
 
     if (version !== TOKEN_CONFIG.VERSION) {
       bgmLog(LOG_LEVELS.WARN, `[crypto] Token版本不匹配: ${version ?? ''}`)

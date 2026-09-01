@@ -11,7 +11,7 @@ import {
   COLUMN_RULES,
   STANDARD_HEADERS,
 } from '../../core/constants.js'
-import { colNumToLetter, trim } from '../stringUtils.js'
+import { colNumToLetter as colNumberToLetter, trim } from '../stringUtils.js'
 import type { WpsWorksheet } from '../wps.js'
 
 // 循环依赖：仅在函数体内使用 BGM/bgmLog/getApp，运行时安全
@@ -32,14 +32,14 @@ import { BGM, bgmLog, getApp } from './index.js'
  */
 function isNativeCode(val: unknown): boolean {
   if (typeof val === 'function') {
-    const str = val.toString()
-    return str.includes('[native code]') || str.includes('function Value()')
+    const string_ = val.toString()
+    return string_.includes('[native code]') || string_.includes('function Value()')
   }
   if (val && typeof val === 'object') {
-    const obj = val as { toString?: () => string }
-    if (typeof obj.toString === 'function') {
-      const str = obj.toString()
-      return str.includes('[native code]') || str.includes('function Value()')
+    const object = val as { toString?: () => string }
+    if (typeof object.toString === 'function') {
+      const string_ = object.toString()
+      return string_.includes('[native code]') || string_.includes('function Value()')
     }
   }
   return false
@@ -66,11 +66,11 @@ function safeStringify(value: unknown): string {
     return String(value)
   }
   // 对象类型：仅当自带可调用 toString 时才序列化，否则返回空串
-  const obj = value as { toString?: () => string }
-  if (typeof obj.toString === 'function') {
-    const str = obj.toString()
-    if (isNativeCode(str)) return ''
-    return str
+  const object = value as { toString?: () => string }
+  if (typeof object.toString === 'function') {
+    const string_ = object.toString()
+    if (isNativeCode(string_)) return ''
+    return string_
   }
   return ''
 }
@@ -99,7 +99,7 @@ export function readRangeValues(
   if (!ws) return []
   try {
     const range = ws.Range(
-      `${colNumToLetter(startCol)}${String(startRow)}:${colNumToLetter(endCol)}${String(endRow)}`,
+      `${colNumberToLetter(startCol)}${String(startRow)}:${colNumberToLetter(endCol)}${String(endRow)}`,
     )
     // 复用 cell.ts 中的 tryGetProperty（未导出），此处通过 range 直接访问 Value2
     const raw = (range as unknown as { Value2?: unknown }).Value2
@@ -149,10 +149,10 @@ export function findHeaderRow(ws: WpsWorksheet | null | undefined, startRow?: nu
       let matchCount = 0
       for (let col = 1; col <= PANEL_CONFIG.MAX_SCAN_COLUMNS; col += 1) {
         try {
-          const cellVal = getCellValue(ws, row, col).toLowerCase()
-          if (!cellVal) continue
+          const cellValue = getCellValue(ws, row, col).toLowerCase()
+          if (!cellValue) continue
           for (const header of HEADER_KEYWORDS) {
-            if (cellVal.includes(header.toLowerCase())) {
+            if (cellValue.includes(header.toLowerCase())) {
               matchCount++
               break
             }
@@ -185,17 +185,17 @@ export function getColumnMap(
     let firstNonEmptyCol: number | undefined
 
     const lastCol = 50
-    for (let i = 1; i <= lastCol; i += 1) {
-      const colName = trim(getCellValue(ws, headerRow, i))
+    for (let index = 1; index <= lastCol; index += 1) {
+      const colName = trim(getCellValue(ws, headerRow, index))
       // 记录第一个非空列作为序列号列候选
       if (!firstNonEmptyCol && colName) {
-        firstNonEmptyCol = i
+        firstNonEmptyCol = index
       }
       if (!colName) continue
       for (const [pattern, key] of COLUMN_RULES) {
         if (pattern.test(colName)) {
           if (!colMap.has(key)) {
-            colMap.set(key, i)
+            colMap.set(key, index)
             break // 匹配到未映射的key，处理下一列
           }
           // 该key已被前面的列匹配，继续尝试其他规则
@@ -213,11 +213,11 @@ export function getColumnMap(
         seqCol = firstNonEmptyCol
       } else {
         // 第一个非空列已被占用，向后查找第一个未被占用的非空列
-        for (let i = 1; i <= lastCol; i += 1) {
-          if (!mappedCols.has(i)) {
-            const v = trim(getCellValue(ws, headerRow, i))
+        for (let index = 1; index <= lastCol; index += 1) {
+          if (!mappedCols.has(index)) {
+            const v = trim(getCellValue(ws, headerRow, index))
             if (v) {
-              seqCol = i
+              seqCol = index
               break
             }
           }
@@ -281,9 +281,9 @@ function findAnchorColumn(ws: WpsWorksheet, headerRow: number): number | undefin
   const maxCols = 50
 
   for (let c = 1; c <= maxCols; c += 1) {
-    const val = ws.Range(`${colNumToLetter(c)}${String(headerRow)}`).Value2
-    if (val == null) continue
-    const text = String(val).trim().toLowerCase()
+    const value = ws.Range(`${colNumberToLetter(c)}${String(headerRow)}`).Value2
+    if (value == null) continue
+    const text = String(value).trim().toLowerCase()
     if (keywords.some((kw) => text === kw || text.includes(kw))) {
       return c
     }
@@ -329,7 +329,7 @@ export function getLastRow(
       if (col) {
         try {
           // ✅ 修复点：使用 col 拼地址，而不是硬编码 D
-          const colLetter = colNumToLetter(col)
+          const colLetter = colNumberToLetter(col)
           const cell = ws.Range(`${colLetter}${String(ws.Rows.Count)}`)
           const endCell = cell.End(-4162)
           if (endCell.Row > 0) {
@@ -398,15 +398,15 @@ export function getLastRow(
   return cached
 }
 
-export function isEmptyValue(val: unknown): boolean {
+export function isEmptyValue(value: unknown): boolean {
   return (
-    val === null ||
-    val === undefined ||
-    val === '' ||
-    val === 'null' ||
-    val === 'NULL' ||
-    val === 'Null' ||
-    val === 'undefined'
+    value === null ||
+    value === undefined ||
+    value === '' ||
+    value === 'null' ||
+    value === 'NULL' ||
+    value === 'Null' ||
+    value === 'undefined'
   )
 }
 
@@ -422,8 +422,8 @@ export function getDataSheet(): WpsWorksheet | null | undefined {
       if (BGM.sheet.lockedWorkbookName) {
         const wbs = app.Workbooks
         if (wbs) {
-          for (let i = 1; i <= wbs.Count; i += 1) {
-            const wb = wbs.Item(i)
+          for (let index = 1; index <= wbs.Count; index += 1) {
+            const wb = wbs.Item(index)
             if (wb.Name === BGM.sheet.lockedWorkbookName) {
               targetWb = wb
               break
@@ -479,15 +479,15 @@ export function ensureSheetHeaders(ws: WpsWorksheet | null | undefined): boolean
   let writeCount = 0
   let failCount = 0
   const failCols: number[] = []
-  for (let i = 0; i < STANDARD_HEADERS.length; i += 1) {
-    const header = STANDARD_HEADERS[i]
+  for (let index = 0; index < STANDARD_HEADERS.length; index += 1) {
+    const header = STANDARD_HEADERS[index]
     if (header !== undefined) {
-      const ok = setCellValueDirect(ws, 1, i + 1, header)
+      const ok = setCellValueDirect(ws, 1, index + 1, header)
       if (ok) {
         writeCount++
       } else {
         failCount++
-        failCols.push(i + 1)
+        failCols.push(index + 1)
       }
     }
   }
@@ -510,9 +510,9 @@ export function ensureSheetHeaders(ws: WpsWorksheet | null | undefined): boolean
   }
 
   // 验证写入：读回第 25 列（Bangumi URL）确认写入成功
-  const verifyVal = getCellValue(ws, 1, 25)
-  bgmLog(LOG_LEVELS.INFO, `[ensureSheetHeaders] 验证第25列读回: "${verifyVal}"`)
-  if (!verifyVal) {
+  const verifyValue = getCellValue(ws, 1, 25)
+  bgmLog(LOG_LEVELS.INFO, `[ensureSheetHeaders] 验证第25列读回: "${verifyValue}"`)
+  if (!verifyValue) {
     bgmLog(LOG_LEVELS.ERROR, '[ensureSheetHeaders] 表头写入验证失败，第25列为空')
   }
 
@@ -549,7 +549,7 @@ export function ensureSheetHeaders(ws: WpsWorksheet | null | undefined): boolean
  * @returns true 写入成功，false 写入失败
  */
 function setCellValueDirect(ws: WpsWorksheet, row: number, col: number, value: string): boolean {
-  const address = colNumToLetter(col) + String(row)
+  const address = colNumberToLetter(col) + String(row)
 
   // 方案 1: Cells.Item(row, col) + FormulaR1C1
   // 完全不同的 COM 路径（Cells.Item 而非 Range）+ 不同属性（FormulaR1C1 而非 Formula/Value/Value2），

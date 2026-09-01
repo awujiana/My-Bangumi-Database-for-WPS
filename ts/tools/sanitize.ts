@@ -23,7 +23,7 @@ interface DomPurifyWindowExtension {
   DOMPurify?: {
     sanitize: (
       dirty: string,
-      opts?: { ALLOWED_TAGS?: string[]; ALLOWED_ATTR?: string[]; ALLOW_DATA_ATTR?: boolean },
+      options?: { ALLOWED_TAGS?: string[]; ALLOWED_ATTR?: string[]; ALLOW_DATA_ATTR?: boolean },
     ) => string
   }
 }
@@ -39,7 +39,7 @@ type ExtendedWindow = typeof globalThis & DomPurifyWindowExtension
 let _cachedDomPurifyFactory: {
   sanitize: (
     dirty: string,
-    opts: {
+    options: {
       ALLOWED_TAGS?: string[]
       ALLOWED_ATTR?: string[]
       ALLOW_DATA_ATTR?: boolean
@@ -209,33 +209,33 @@ function createLightweightFallback(): (d: string) => string {
       const selector = Array.from(DANGEROUS_TAGS).join(',')
       const badEls = host.querySelectorAll(selector)
       // 从尾到头 remove 避免 live collection 踩坑（querySelectorAll 是非 live，保险起见逆序）
-      for (let i = badEls.length - 1; i >= 0; i -= 1) {
-        const el = badEls[i]!
-        el.remove()
+      for (let index = badEls.length - 1; index >= 0; index -= 1) {
+        const element = badEls[index]!
+        element.remove()
       }
 
       // 2) 遍历所有元素，清 on* 事件属性 + 危险 URI
       const all = host.getElementsByTagName('*')
-      for (let i = 0; i < all.length; i += 1) {
-        const el = all[i]!
-        if (el.nodeType !== 1) continue
+      for (let index = 0; index < all.length; index += 1) {
+        const element = all[index]!
+        if (element.nodeType !== 1) continue
         // 清 on* 事件属性（先收集后删，避免 NamedNodeMap 遍历中修改错位）
-        const toRemoveAttrs: string[] = []
-        for (let a = 0; a < el.attributes.length; a += 1) {
-          const attr = el.attributes[a]!
-          const { name } = attr
+        const toRemoveAttributes: string[] = []
+        for (let a = 0; a < element.attributes.length; a += 1) {
+          const attribute = element.attributes[a]!
+          const { name } = attribute
           if (name.length > 2 && name.slice(0, 2).toLowerCase() === 'on') {
-            toRemoveAttrs.push(name)
+            toRemoveAttributes.push(name)
           }
         }
-        for (const name of toRemoveAttrs) el.removeAttribute(name)
+        for (const name of toRemoveAttributes) element.removeAttribute(name)
 
         // 清 href / src / action / formaction / poster / data-xxx 里含 JS 的 URI
-        const uriAttrs = ['href', 'src', 'action', 'formaction', 'poster', 'background']
-        for (const attr of uriAttrs) {
-          const v = el.getAttribute(attr)
+        const uriAttributes = ['href', 'src', 'action', 'formaction', 'poster', 'background']
+        for (const attribute of uriAttributes) {
+          const v = element.getAttribute(attribute)
           if (v != null && DANGEROUS_URI.test(v)) {
-            el.removeAttribute(attr)
+            element.removeAttribute(attribute)
           }
         }
         // xss 常见奇技淫巧：<img src=x onerror="..."> 已经被 on* 清理覆盖

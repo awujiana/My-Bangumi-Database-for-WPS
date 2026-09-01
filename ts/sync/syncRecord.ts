@@ -23,7 +23,7 @@ import {
   getApp,
   BGM,
   getLastRow,
-  colNumToLetter,
+  colNumToLetter as colNumberToLetter,
   getCellValue,
   setCellValue,
   readRangeValues,
@@ -108,8 +108,8 @@ export function getOrCreateSyncRecordSheet(): WpsWorksheet {
   // 查找现有工作表
   try {
     const sheets = wb.Sheets
-    for (let i = 1; i <= sheets.Count; i += 1) {
-      const sheet = sheets.Item(i)
+    for (let index = 1; index <= sheets.Count; index += 1) {
+      const sheet = sheets.Item(index)
       if (sheet.Name === SYNC_RECORD_SHEET_NAME) {
         syncSheet = sheet
         break
@@ -124,10 +124,10 @@ export function getOrCreateSyncRecordSheet(): WpsWorksheet {
     syncSheet.Name = SYNC_RECORD_SHEET_NAME
 
     // 写入表头
-    for (let i = 0; i < SYNC_RECORD_COLUMNS.length; i += 1) {
-      const colLetter = colNumToLetter(i + 1)
+    for (let index = 0; index < SYNC_RECORD_COLUMNS.length; index += 1) {
+      const colLetter = colNumberToLetter(index + 1)
       const cell = syncSheet.Range(`${colLetter}1`)
-      cell.Value2 = SYNC_RECORD_COLUMNS[i] ?? ''
+      cell.Value2 = SYNC_RECORD_COLUMNS[index] ?? ''
     }
 
     // 移到末尾
@@ -154,17 +154,17 @@ export function getOrCreateSyncRecordSheet(): WpsWorksheet {
       }
     } catch (error: unknown) {
       // 类型守卫：先缩窄类型再访问 message，符合 useUnknownInCatchVariables 规范
-      const errMsg = error instanceof Error ? error.message : String(error)
-      bgmLog(LOG_LEVELS.WARN, `同步记录表迁移失败: ${errMsg}`)
+      const errorMessage = error instanceof Error ? error.message : String(error)
+      bgmLog(LOG_LEVELS.WARN, `同步记录表迁移失败: ${errorMessage}`)
     }
 
     // 已有工作表，检查并补齐表头
     const existingCols = SYNC_RECORD_COLUMNS.length
-    for (let i = 0; i < existingCols; i += 1) {
-      const colLetter = colNumToLetter(i + 1)
+    for (let index = 0; index < existingCols; index += 1) {
+      const colLetter = colNumberToLetter(index + 1)
       const cell = syncSheet.Range(`${colLetter}1`)
       const currentHeader = String(cell.Value2 ?? '').trim()
-      const expectedHeader = SYNC_RECORD_COLUMNS[i] ?? ''
+      const expectedHeader = SYNC_RECORD_COLUMNS[index] ?? ''
       if (currentHeader !== expectedHeader) {
         cell.Value2 = expectedHeader
         bgmLog(
@@ -188,8 +188,8 @@ export function getSyncRecordSheetIfExists(): WpsWorksheet | null {
   if (!app?.ActiveWorkbook) return null
   try {
     const sheets = app.ActiveWorkbook.Sheets
-    for (let i = 1; i <= sheets.Count; i += 1) {
-      const sheet = sheets.Item(i)
+    for (let index = 1; index <= sheets.Count; index += 1) {
+      const sheet = sheets.Item(index)
       if (sheet.Name === SYNC_RECORD_SHEET_NAME) return sheet
     }
   } catch (error: unknown) {
@@ -273,18 +273,18 @@ function migrateSyncRecordSchema(sheet: WpsWorksheet): void {
     sheet.Range(`2:${String(lastRow)}`).Delete()
   }
 
-  for (let i = 0; i < SYNC_RECORD_COLUMNS.length; i += 1) {
-    const colLetter = colNumToLetter(i + 1)
+  for (let index = 0; index < SYNC_RECORD_COLUMNS.length; index += 1) {
+    const colLetter = colNumberToLetter(index + 1)
     const cell = sheet.Range(`${colLetter}1`)
-    cell.Value2 = SYNC_RECORD_COLUMNS[i] ?? ''
+    cell.Value2 = SYNC_RECORD_COLUMNS[index] ?? ''
     if (cell.Interior) {
       cell.Interior.Color = BGM_COLOR.GRAY
     }
   }
 
-  for (let i = 0; i < rows.length; i += 1) {
-    const newRow = i + 2
-    const data = rows[i]
+  for (let index = 0; index < rows.length; index += 1) {
+    const newRow = index + 2
+    const data = rows[index]
     if (!data) continue
     for (let col = 0; col < data.length; col += 1) {
       setCellValue(sheet, newRow, col + 1, data[col])
@@ -311,15 +311,15 @@ function buildCache(sheet: WpsWorksheet): void {
     return
   }
 
-  for (let i = 0; i < allData.length; i += 1) {
+  for (let index = 0; index < allData.length; index += 1) {
     try {
-      const rowData = allData[i]
+      const rowData = allData[index]
       if (!rowData) continue
       const sid = (rowData[SYNC_RECORD_COL.SID - 1] ?? '').trim()
       const url = (rowData[SYNC_RECORD_COL.URL - 1] ?? '').trim()
       if (!url && !sid) continue
 
-      const row = i + 2
+      const row = index + 2
       _syncRecordSidCache.set(sid, row)
       _syncRecordListCache.push({
         time: rowData[SYNC_RECORD_COL.TIME - 1] ?? '',
@@ -356,8 +356,8 @@ function setSyncRecordColors(
   status: string,
   count: number,
 ): void {
-  const setColor = (colIdx: number, color: number): void => {
-    const cell = sheet.Range(`${colNumToLetter(colIdx)}${String(row)}`)
+  const setColor = (colIndex: number, color: number): void => {
+    const cell = sheet.Range(`${colNumberToLetter(colIndex)}${String(row)}`)
     if (cell.Interior) cell.Interior.Color = color
   }
 
@@ -375,14 +375,14 @@ function setSyncRecordColors(
   setColor(SYNC_RECORD_COL.STATUS, getStatusColor(status))
 
   // 类型列（F列）- 根据类型设置颜色
-  const typeCell = sheet.Range(`${colNumToLetter(SYNC_RECORD_COL.TYPE)}${String(row)}`)
+  const typeCell = sheet.Range(`${colNumberToLetter(SYNC_RECORD_COL.TYPE)}${String(row)}`)
   if (typeCell.Interior) {
     const typeName = getCellValue(sheet, row, SYNC_RECORD_COL.TYPE) || ''
     typeCell.Interior.Color = SYNC_RECORD_TYPE_COLOR[typeName] || BGM_COLOR.GRAY
   }
 }
 
-export function addSyncRecord(params: UpdateRecordParams): boolean {
+export function addSyncRecord(parameters: UpdateRecordParams): boolean {
   if (!getSyncRecordEnabled()) {
     bgmLog(LOG_LEVELS.INFO, '[addSyncRecord] 同步记录功能未启用，跳过')
     return false
@@ -395,29 +395,29 @@ export function addSyncRecord(params: UpdateRecordParams): boolean {
 
     if (!_syncRecordCacheValid) buildCache(sheet)
 
-    const sid = params.sid || ''
+    const sid = parameters.sid || ''
     const now = new Date().toLocaleString('zh-CN')
 
     const existingRow = sid ? _syncRecordSidCache.get(sid) : undefined
     if (existingRow !== undefined) {
       const existingCount = parseInt(getCellValue(sheet, existingRow, SYNC_RECORD_COL.COUNT)) || 0
-      const newCount = existingCount + (params.count || 1)
-      const finalStatus = params.status || SYNC_STATUS.SUCCESS
+      const newCount = existingCount + (parameters.count || 1)
+      const finalStatus = parameters.status || SYNC_STATUS.SUCCESS
 
       // 更新时间戳
       setCellValue(sheet, existingRow, SYNC_RECORD_COL.TIME, now)
       setCellValue(sheet, existingRow, SYNC_RECORD_COL.COUNT, newCount)
-      if (params.status) setCellValue(sheet, existingRow, SYNC_RECORD_COL.STATUS, params.status)
-      if (params.message) setCellValue(sheet, existingRow, SYNC_RECORD_COL.MESSAGE, params.message)
-      if (params.fingerprint !== undefined)
-        setCellValue(sheet, existingRow, SYNC_RECORD_COL.FINGERPRINT, params.fingerprint)
-      if (params.name) setCellValue(sheet, existingRow, SYNC_RECORD_COL.NAME, params.name)
-      if (params.url) setCellValue(sheet, existingRow, SYNC_RECORD_COL.URL, params.url)
-      if (params.type) setCellValue(sheet, existingRow, SYNC_RECORD_COL.TYPE, params.type)
-      if (params.source) setCellValue(sheet, existingRow, SYNC_RECORD_COL.SOURCE, params.source)
-      if (params.content) setCellValue(sheet, existingRow, SYNC_RECORD_COL.CONTENT, params.content)
-      if (params.collType)
-        setCellValue(sheet, existingRow, SYNC_RECORD_COL.COLL_TYPE, params.collType)
+      if (parameters.status) setCellValue(sheet, existingRow, SYNC_RECORD_COL.STATUS, parameters.status)
+      if (parameters.message) setCellValue(sheet, existingRow, SYNC_RECORD_COL.MESSAGE, parameters.message)
+      if (parameters.fingerprint !== undefined)
+        setCellValue(sheet, existingRow, SYNC_RECORD_COL.FINGERPRINT, parameters.fingerprint)
+      if (parameters.name) setCellValue(sheet, existingRow, SYNC_RECORD_COL.NAME, parameters.name)
+      if (parameters.url) setCellValue(sheet, existingRow, SYNC_RECORD_COL.URL, parameters.url)
+      if (parameters.type) setCellValue(sheet, existingRow, SYNC_RECORD_COL.TYPE, parameters.type)
+      if (parameters.source) setCellValue(sheet, existingRow, SYNC_RECORD_COL.SOURCE, parameters.source)
+      if (parameters.content) setCellValue(sheet, existingRow, SYNC_RECORD_COL.CONTENT, parameters.content)
+      if (parameters.collType)
+        setCellValue(sheet, existingRow, SYNC_RECORD_COL.COLL_TYPE, parameters.collType)
 
       setSyncRecordColors(sheet, existingRow, finalStatus, newCount)
 
@@ -426,15 +426,15 @@ export function addSyncRecord(params: UpdateRecordParams): boolean {
       if (cacheItem) {
         cacheItem.time = now
         cacheItem.count = newCount
-        if (params.status) cacheItem.status = params.status
-        if (params.message) cacheItem.message = params.message
-        if (params.fingerprint !== undefined) cacheItem.fingerprint = params.fingerprint
-        if (params.name) cacheItem.name = params.name
-        if (params.url) cacheItem.url = params.url
-        if (params.type) cacheItem.type = params.type
-        if (params.source) cacheItem.source = params.source
-        if (params.content) cacheItem.content = params.content
-        if (params.collType) cacheItem.collType = params.collType
+        if (parameters.status) cacheItem.status = parameters.status
+        if (parameters.message) cacheItem.message = parameters.message
+        if (parameters.fingerprint !== undefined) cacheItem.fingerprint = parameters.fingerprint
+        if (parameters.name) cacheItem.name = parameters.name
+        if (parameters.url) cacheItem.url = parameters.url
+        if (parameters.type) cacheItem.type = parameters.type
+        if (parameters.source) cacheItem.source = parameters.source
+        if (parameters.content) cacheItem.content = parameters.content
+        if (parameters.collType) cacheItem.collType = parameters.collType
       }
     } else {
       let newRow = 1
@@ -446,22 +446,22 @@ export function addSyncRecord(params: UpdateRecordParams): boolean {
         newRow = sheet.Rows.Count > 1 ? 2 : 1
       }
 
-      const finalStatus = params.status || SYNC_STATUS.SUCCESS
-      const finalCount = params.count || 1
+      const finalStatus = parameters.status || SYNC_STATUS.SUCCESS
+      const finalCount = parameters.count || 1
 
       setCellValue(sheet, newRow, SYNC_RECORD_COL.TIME, now)
-      setCellValue(sheet, newRow, SYNC_RECORD_COL.NAME, params.name || '')
-      setCellValue(sheet, newRow, SYNC_RECORD_COL.URL, params.url || '')
+      setCellValue(sheet, newRow, SYNC_RECORD_COL.NAME, parameters.name || '')
+      setCellValue(sheet, newRow, SYNC_RECORD_COL.URL, parameters.url || '')
       setCellValue(sheet, newRow, SYNC_RECORD_COL.SID, sid)
-      setCellValue(sheet, newRow, SYNC_RECORD_COL.TYPE, params.type || '')
-      setCellValue(sheet, newRow, SYNC_RECORD_COL.SOURCE, params.source || '')
+      setCellValue(sheet, newRow, SYNC_RECORD_COL.TYPE, parameters.type || '')
+      setCellValue(sheet, newRow, SYNC_RECORD_COL.SOURCE, parameters.source || '')
       setCellValue(sheet, newRow, SYNC_RECORD_COL.COUNT, finalCount)
-      setCellValue(sheet, newRow, SYNC_RECORD_COL.CONTENT, params.content || '')
+      setCellValue(sheet, newRow, SYNC_RECORD_COL.CONTENT, parameters.content || '')
       setCellValue(sheet, newRow, SYNC_RECORD_COL.STATUS, finalStatus)
-      setCellValue(sheet, newRow, SYNC_RECORD_COL.MESSAGE, params.message || '')
-      if (params.fingerprint !== undefined)
-        setCellValue(sheet, newRow, SYNC_RECORD_COL.FINGERPRINT, params.fingerprint)
-      if (params.collType) setCellValue(sheet, newRow, SYNC_RECORD_COL.COLL_TYPE, params.collType)
+      setCellValue(sheet, newRow, SYNC_RECORD_COL.MESSAGE, parameters.message || '')
+      if (parameters.fingerprint !== undefined)
+        setCellValue(sheet, newRow, SYNC_RECORD_COL.FINGERPRINT, parameters.fingerprint)
+      if (parameters.collType) setCellValue(sheet, newRow, SYNC_RECORD_COL.COLL_TYPE, parameters.collType)
 
       setSyncRecordColors(sheet, newRow, finalStatus, finalCount)
 
@@ -472,14 +472,14 @@ export function addSyncRecord(params: UpdateRecordParams): boolean {
         sid,
         count: finalCount,
         status: finalStatus,
-        message: params.message || '',
-        ...(params.name ? { name: params.name } : {}),
-        ...(params.url ? { url: params.url } : {}),
-        ...(params.type ? { type: params.type } : {}),
-        ...(params.source ? { source: params.source } : {}),
-        ...(params.content ? { content: params.content } : {}),
-        ...(params.fingerprint !== undefined ? { fingerprint: params.fingerprint } : {}),
-        ...(params.collType ? { collType: params.collType } : {}),
+        message: parameters.message || '',
+        ...(parameters.name ? { name: parameters.name } : {}),
+        ...(parameters.url ? { url: parameters.url } : {}),
+        ...(parameters.type ? { type: parameters.type } : {}),
+        ...(parameters.source ? { source: parameters.source } : {}),
+        ...(parameters.content ? { content: parameters.content } : {}),
+        ...(parameters.fingerprint !== undefined ? { fingerprint: parameters.fingerprint } : {}),
+        ...(parameters.collType ? { collType: parameters.collType } : {}),
       })
     }
     return true
@@ -518,18 +518,18 @@ export function addSyncRecords(records: UpdateRecordParams[]): boolean {
       { row: number; newCount: number; status: string; params: UpdateRecordParams }
     >()
 
-    for (const params of records) {
-      const sid = params.sid || ''
+    for (const parameters of records) {
+      const sid = parameters.sid || ''
       const existingRow = sid ? _syncRecordSidCache.get(sid) : undefined
       if (existingRow !== undefined) {
         const existingCount = parseInt(getCellValue(sheet, existingRow, SYNC_RECORD_COL.COUNT)) || 0
         const existing = sidToUpdate.get(sid)
-        const totalCount = (existing?.newCount ?? existingCount) + (params.count || 1)
+        const totalCount = (existing?.newCount ?? existingCount) + (parameters.count || 1)
         sidToUpdate.set(sid, {
           row: existingRow,
           newCount: totalCount,
-          status: params.status || SYNC_STATUS.SUCCESS,
-          params,
+          status: parameters.status || SYNC_STATUS.SUCCESS,
+          params: parameters,
         })
         continue
       }
@@ -537,16 +537,16 @@ export function addSyncRecords(records: UpdateRecordParams[]): boolean {
       newRows.push([
         sid,
         now,
-        params.name || '',
-        params.url || '',
-        params.type || '',
-        params.source || '',
-        String(params.count || 1),
-        params.content || '',
-        params.status || SYNC_STATUS.SUCCESS,
-        params.collType || '',
-        params.message || '',
-        params.fingerprint !== undefined ? params.fingerprint : '',
+        parameters.name || '',
+        parameters.url || '',
+        parameters.type || '',
+        parameters.source || '',
+        String(parameters.count || 1),
+        parameters.content || '',
+        parameters.status || SYNC_STATUS.SUCCESS,
+        parameters.collType || '',
+        parameters.message || '',
+        parameters.fingerprint !== undefined ? parameters.fingerprint : '',
       ])
     }
 
@@ -558,17 +558,17 @@ export function addSyncRecords(records: UpdateRecordParams[]): boolean {
         startRow = usedRange.Row + usedRange.Rows.Count
       }
       const endRow = startRow + newRows.length - 1
-      const startColLetter = colNumToLetter(1)
-      const endColLetter = colNumToLetter(SYNC_RECORD_COLUMNS.length)
+      const startColLetter = colNumberToLetter(1)
+      const endColLetter = colNumberToLetter(SYNC_RECORD_COLUMNS.length)
       const range = sheet.Range(
         `${startColLetter}${String(startRow)}:${endColLetter}${String(endRow)}`,
       )
       range.Value2 = newRows
 
       // 设置新增行的颜色
-      for (let i = 0; i < newRows.length; i += 1) {
-        const row = startRow + i
-        const data = newRows[i]
+      for (let index = 0; index < newRows.length; index += 1) {
+        const row = startRow + index
+        const data = newRows[index]
         if (!data) continue
         const status = data[SYNC_RECORD_COL.STATUS - 1] ?? SYNC_STATUS.SUCCESS
         const count = parseInt(data[SYNC_RECORD_COL.COUNT - 1] ?? '') || 1
@@ -709,7 +709,7 @@ export function formatSyncRecordSheet(sheet?: WpsWorksheet): void {
     }
 
     const colCount = SYNC_RECORD_COLUMNS.length
-    const lastColLetter = colNumToLetter(colCount)
+    const lastColLetter = colNumberToLetter(colCount)
     const fullRange = target.Range(`A1:${lastColLetter}${String(lastRow)}`)
     const dataRange = lastRow >= 2 ? target.Range(`A2:${lastColLetter}${String(lastRow)}`) : null
 
@@ -744,7 +744,7 @@ export function formatSyncRecordSheet(sheet?: WpsWorksheet): void {
     }
 
     // 5. URL 列（D列）固定宽度，不撑宽也不撑高
-    const urlColLetter = colNumToLetter(SYNC_RECORD_COL.URL)
+    const urlColLetter = colNumberToLetter(SYNC_RECORD_COL.URL)
     try {
       const urlRange = target.Range(`${urlColLetter}:${urlColLetter}`)
       urlRange.ColumnWidth = 42
@@ -753,7 +753,7 @@ export function formatSyncRecordSheet(sheet?: WpsWorksheet): void {
     }
 
     // 6. 名称列边框（C列）
-    const nameColLetter = colNumToLetter(SYNC_RECORD_COL.NAME)
+    const nameColLetter = colNumberToLetter(SYNC_RECORD_COL.NAME)
     if (dataRange) {
       try {
         const nameRange = target.Range(`${nameColLetter}2:${nameColLetter}${String(lastRow)}`)
@@ -764,7 +764,7 @@ export function formatSyncRecordSheet(sheet?: WpsWorksheet): void {
     }
 
     // 7. 收藏状态列边框
-    const collTypeColLetter = colNumToLetter(SYNC_RECORD_COL.COLL_TYPE)
+    const collTypeColLetter = colNumberToLetter(SYNC_RECORD_COL.COLL_TYPE)
     if (dataRange) {
       try {
         const collRange = target.Range(
