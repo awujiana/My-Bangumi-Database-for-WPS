@@ -209,19 +209,19 @@ function createLightweightFallback(): (d: string) => string {
       const selector = Array.from(DANGEROUS_TAGS).join(',')
       const badEls = host.querySelectorAll(selector)
       // 从尾到头 remove 避免 live collection 踩坑（querySelectorAll 是非 live，保险起见逆序）
-      for (let i = badEls.length - 1; i >= 0; i--) {
+      for (let i = badEls.length - 1; i >= 0; i -= 1) {
         const el = badEls[i]!
         el.remove()
       }
 
       // 2) 遍历所有元素，清 on* 事件属性 + 危险 URI
       const all = host.getElementsByTagName('*')
-      for (let i = 0; i < all.length; i++) {
+      for (let i = 0; i < all.length; i += 1) {
         const el = all[i]!
         if (el.nodeType !== 1) continue
         // 清 on* 事件属性（先收集后删，避免 NamedNodeMap 遍历中修改错位）
         const toRemoveAttrs: string[] = []
-        for (let a = 0; a < el.attributes.length; a++) {
+        for (let a = 0; a < el.attributes.length; a += 1) {
           const attr = el.attributes[a]!
           const { name } = attr
           if (name.length > 2 && name.slice(0, 2).toLowerCase() === 'on') {

@@ -300,7 +300,7 @@ function getSelectedRowSids(): Set<string> {
     }
 
     // 遍历选区每行，提取 SID
-    for (let row = firstRow; row <= lastRow; row++) {
+    for (let row = firstRow; row <= lastRow; row += 1) {
       if (row === headerRow) continue // 跳过表头行
       const url = trim(getCellValue(ws, row, urlCol))
       if (!url) continue

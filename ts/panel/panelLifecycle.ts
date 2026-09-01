@@ -119,7 +119,7 @@ export function restoreLockedSheet(): boolean {
         // 验证锁定的工作簿是否仍然存在
         if (BGM.sheet.isLocked && info.workbookName && app.Workbooks) {
           let workbookFound = false
-          for (let i = 1; i <= app.Workbooks.Count; i++) {
+          for (let i = 1; i <= app.Workbooks.Count; i += 1) {
             if (app.Workbooks.Item(i).Name === info.workbookName) {
               workbookFound = true
               break
@@ -193,7 +193,7 @@ export function refreshSheets(opts?: { autoSelectActive?: boolean }): void {
   if (wbSelect?.value) {
     const wbs = app.Workbooks
     if (wbs) {
-      for (let i = 1; i <= wbs.Count; i++) {
+      for (let i = 1; i <= wbs.Count; i += 1) {
         if (wbs.Item(i).Name === wbSelect.value) {
           workbook = wbs.Item(i)
           break
@@ -208,7 +208,7 @@ export function refreshSheets(opts?: { autoSelectActive?: boolean }): void {
   let activeSheetIndex = 0
   try {
     const activeSheet = workbook.ActiveSheet
-    for (let i = 1; i <= sheets.Count; i++) {
+    for (let i = 1; i <= sheets.Count; i += 1) {
       if (sheets.Item(i) === activeSheet) {
         activeSheetIndex = i
         break
@@ -231,7 +231,7 @@ export function refreshSheets(opts?: { autoSelectActive?: boolean }): void {
 
   const autoSelectActive = opts?.autoSelectActive === true
   let selectedIndex = 0
-  for (let i = 1; i <= sheets.Count; i++) {
+  for (let i = 1; i <= sheets.Count; i += 1) {
     const option = document.createElement('option')
     option.value = String(i)
     option.text = sheets.Item(i).Name
@@ -292,7 +292,7 @@ export function refreshWorkbooks(): void {
   let hasActiveWorkbook = false
   const activeWbName = app.ActiveWorkbook?.Name || ''
 
-  for (let i = 1; i <= wbs.Count; i++) {
+  for (let i = 1; i <= wbs.Count; i += 1) {
     const option = document.createElement('option')
     const wb = wbs.Item(i)
     option.value = wb.Name
@@ -364,11 +364,11 @@ export function detectHeaderAndColumns(
 
   // 1. 扫描前 MAX_SCAN_ROWS 行，找出所有候选表头行
   const candidates: CandidateHeader[] = []
-  for (let r = 1; r <= PANEL_CONFIG.MAX_SCAN_ROWS; r++) {
+  for (let r = 1; r <= PANEL_CONFIG.MAX_SCAN_ROWS; r += 1) {
     if (!isFiltered || !visibleRowSet || visibleRowSet.has(r)) {
       let matchCount = 0
       let colCount = 0
-      for (let c = 1; c <= PANEL_CONFIG.MAX_SCAN_COLUMNS; c++) {
+      for (let c = 1; c <= PANEL_CONFIG.MAX_SCAN_COLUMNS; c += 1) {
         try {
           const v = getCellValue(ws, r, c).trim()
           if (v) {
@@ -418,7 +418,7 @@ export function detectHeaderAndColumns(
   // 2. 读取表头名称
   const headerNames: string[] = []
   const headerIsImportant: boolean[] = []
-  for (let c = 1; c <= PANEL_CONFIG.MAX_SCAN_COLUMNS; c++) {
+  for (let c = 1; c <= PANEL_CONFIG.MAX_SCAN_COLUMNS; c += 1) {
     const v = getCellValue(ws, headerRow, c).trim()
     headerNames.push(v)
     headerIsImportant.push(IMPORTANT_COLS[v.toLowerCase()] || false)
@@ -430,7 +430,7 @@ export function detectHeaderAndColumns(
   if (headerRow + 1 <= secondHeaderRowLimit) {
     let filled = 0
     let total = 0
-    for (let c = 1; c <= PANEL_CONFIG.MAX_SCAN_COLUMNS; c++) {
+    for (let c = 1; c <= PANEL_CONFIG.MAX_SCAN_COLUMNS; c += 1) {
       const nv = getCellValue(ws, headerRow + 1, c).trim()
       if (nv) {
         total++
@@ -439,7 +439,7 @@ export function detectHeaderAndColumns(
     }
     if (filled >= 3 && total >= 3) {
       dataStartRow = headerRow + 2
-      for (let c = 1; c <= PANEL_CONFIG.MAX_SCAN_COLUMNS; c++) {
+      for (let c = 1; c <= PANEL_CONFIG.MAX_SCAN_COLUMNS; c += 1) {
         if (!headerNames[c - 1]) {
           const nv = getCellValue(ws, headerRow + 1, c).trim()
           if (nv) {
@@ -455,10 +455,10 @@ export function detectHeaderAndColumns(
   let firstDataCol = -1
   let lastDataCol = 0
   let samples = 0
-  for (let dr = dataStartRow; dr <= dataStartRow + 20 && samples < 5; dr++) {
+  for (let dr = dataStartRow; dr <= dataStartRow + 20 && samples < 5; dr += 1) {
     if (!isRowVisible(dr, headerRow)) continue
     samples++
-    for (let c = 1; c <= PANEL_CONFIG.MAX_SCAN_COLUMNS; c++) {
+    for (let c = 1; c <= PANEL_CONFIG.MAX_SCAN_COLUMNS; c += 1) {
       const v = getCellValue(ws, dr, c).trim()
       if (v) {
         if (firstDataCol < 0) firstDataCol = c
@@ -470,7 +470,7 @@ export function detectHeaderAndColumns(
 
   // 表头结束列
   let headerLastCol = 0
-  for (let c = 1; c <= PANEL_CONFIG.MAX_SCAN_COLUMNS; c++) {
+  for (let c = 1; c <= PANEL_CONFIG.MAX_SCAN_COLUMNS; c += 1) {
     if (headerNames[c - 1]) headerLastCol = c
   }
 
@@ -478,7 +478,7 @@ export function detectHeaderAndColumns(
 
   // 预览显示的列范围：从第一个数据列左扩找到最左非空表头，但不能超过表头范围
   let previewColStart = Math.max(1, firstDataCol - 5)
-  for (let c = previewColStart; c <= firstDataCol; c++) {
+  for (let c = previewColStart; c <= firstDataCol; c += 1) {
     if (headerNames[c - 1]) {
       previewColStart = c
       break
@@ -529,7 +529,7 @@ export function autoDetectSheet(): {
 
   bgmLog(LOG_LEVELS.INFO, `autoDetectSheet: 开始扫描 ${String(sheets.Count)} 个工作表...`)
 
-  for (let si = 1; si <= sheets.Count; si++) {
+  for (let si = 1; si <= sheets.Count; si += 1) {
     let needRestore: (() => void) | false = false
     try {
       const ws: WpsWorksheet = sheets.Item(si)
@@ -569,9 +569,9 @@ export function autoDetectSheet(): {
       // 检查表头下方是否有足够的数据行
       let dataRowCount = 0
       let firstDataRow = -1
-      for (let dr = meta.dataStartRow; dr <= meta.dataStartRow + 10; dr++) {
+      for (let dr = meta.dataStartRow; dr <= meta.dataStartRow + 10; dr += 1) {
         let hasAny = false
-        for (let c = 1; c <= meta.lastCol; c++) {
+        for (let c = 1; c <= meta.lastCol; c += 1) {
           if (getCellValue(ws, dr, c).trim()) {
             hasAny = true
             break
@@ -703,7 +703,7 @@ export function updateFilterStatus(targetWs?: WpsWorksheet): void {
     }
 
     const activeCols: string[] = []
-    for (let i = 1; i <= filters.Count; i++) {
+    for (let i = 1; i <= filters.Count; i += 1) {
       try {
         const f = filters.Item(i)
         if (f.On) {
@@ -777,7 +777,7 @@ function renderPreviewTable(
       const cols = item.cols as string[]
       // 使用统一列数，确保所有行列对齐
       const colLimit = fixedColCount > 0 ? fixedColCount : cols.length
-      for (let i = 0; i < colLimit; i++) {
+      for (let i = 0; i < colLimit; i += 1) {
         const text = cols[i] || ''
         let cls = ''
         if (item.isHeader) {
@@ -933,12 +933,12 @@ export function refreshData(): void {
           const raw = rangeAddr.Value2
           // WPS JS API 返回 0-based 二维数组（raw[0][0] 为第一行第一列）
           const is2D = Array.isArray(raw)
-          for (let r = 0; r < segLen; r++) {
+          for (let r = 0; r < segLen; r += 1) {
             const dr = dataRows[i + r]
             if (dr === undefined) continue
             const rowCols: string[] = []
             let hasAny = false
-            for (let ci = 0; ci < displayColCount; ci++) {
+            for (let ci = 0; ci < displayColCount; ci += 1) {
               let v: string
               if (is2D && Array.isArray(raw)) {
                 const cell = raw[r]?.[ci]
@@ -961,12 +961,12 @@ export function refreshData(): void {
           }
         } catch {
           // 批量读取失败，回退到逐单元格
-          for (let r = 0; r < segLen; r++) {
+          for (let r = 0; r < segLen; r += 1) {
             const dr = dataRows[i + r]
             if (dr === undefined) continue
             const rowCols: string[] = []
             let hasAny = false
-            for (let ci = 0; ci < displayColCount; ci++) {
+            for (let ci = 0; ci < displayColCount; ci += 1) {
               const col = meta.previewColStartAbsolute + ci
               const v = getCellValue(ws, dr, col).trim()
               if (v) hasAny = true
@@ -983,11 +983,11 @@ export function refreshData(): void {
     } else {
       // 无表头时的回退逻辑
       let count = 0
-      for (let r = 1; r <= Math.min(lastRow, 100) && count < 5; r++) {
+      for (let r = 1; r <= Math.min(lastRow, 100) && count < 5; r += 1) {
         if (isFiltered && visibleRowSet && !visibleRowSet.has(r)) continue
         const cols: { text: string; important: boolean }[] = []
         let hasAny = false
-        for (let c = 1; c <= PANEL_CONFIG.MAX_SCAN_COLUMNS; c++) {
+        for (let c = 1; c <= PANEL_CONFIG.MAX_SCAN_COLUMNS; c += 1) {
           const v = getCellValue(ws, r, c).trim()
           if (v) {
             cols.push({ text: v, important: false })

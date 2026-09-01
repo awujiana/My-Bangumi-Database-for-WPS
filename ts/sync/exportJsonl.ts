@@ -78,7 +78,7 @@ export function buildJsonlFromSheet(): string {
   const lines: string[] = []
   const startRow = headerRow + 1
 
-  for (let row = startRow; row <= lastRow; row++) {
+  for (let row = startRow; row <= lastRow; row += 1) {
     const url = trim(getCellValue(ws, row, colMap.get('Bangumi_URL')!))
     if (!url) continue
     const sid = extractSubjectId(url)

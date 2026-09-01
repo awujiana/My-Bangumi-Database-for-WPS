@@ -64,7 +64,7 @@ function createMockApp(): {
     CreateTaskPane: (url: string) => {
       createdPaneCounter++
       const pane = {
-        ID: `settings-pane-${createdPaneCounter}`,
+        ID: `settings-pane-${String(createdPaneCounter)}`,
         Visible: false,
         DockPosition: 0,
       }

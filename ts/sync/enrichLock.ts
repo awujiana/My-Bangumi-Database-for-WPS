@@ -45,7 +45,7 @@ export function refreshEnrichWorkbooks(selectId = 'enrichWorkbookSelect'): void 
   const activeWbName = app.ActiveWorkbook?.Name || ''
   let hasSelection = false
 
-  for (let i = 1; i <= wbs.Count; i++) {
+  for (let i = 1; i <= wbs.Count; i += 1) {
     const option = document.createElement('option')
     const wb = wbs.Item(i)
     option.value = wb.Name
@@ -107,7 +107,7 @@ export function refreshEnrichSheets(
   }
 
   let workbook: WpsWorkbook | null = null
-  for (let i = 1; i <= app.Workbooks.Count; i++) {
+  for (let i = 1; i <= app.Workbooks.Count; i += 1) {
     const wb = app.Workbooks.Item(i)
     if (wb.Name === wbName) {
       workbook = wb
@@ -130,7 +130,7 @@ export function refreshEnrichSheets(
   select.appendChild(defaultOpt)
 
   let lockedFound = false
-  for (let i = 1; i <= sheets.Count; i++) {
+  for (let i = 1; i <= sheets.Count; i += 1) {
     const option = document.createElement('option')
     const sheet = sheets.Item(i)
     option.value = String(i)
@@ -311,7 +311,7 @@ export function restoreEnrichLockedWorkbook(): boolean {
 
     // 校验工作表是否仍存在于工作簿中
     let sheetFound = false
-    for (let i = 1; i <= wb.Worksheets.Count; i++) {
+    for (let i = 1; i <= wb.Worksheets.Count; i += 1) {
       const ws = wb.Worksheets.Item(i)
       if (ws.Name === info.sheetName) {
         sheetFound = true
@@ -368,7 +368,7 @@ export function getLockedEnrichSheet(): [WpsWorkbook, WpsWorksheet] | null {
   }
 
   let ws: WpsWorksheet | null = null
-  for (let i = 1; i <= wb.Worksheets.Count; i++) {
+  for (let i = 1; i <= wb.Worksheets.Count; i += 1) {
     const sheet = wb.Worksheets.Item(i)
     if (sheet.Name === BGM.enrich.lockedSheetName) {
       ws = sheet
@@ -400,7 +400,7 @@ export function findWorkbookByName(name: string | null): WpsWorkbook | null {
   const app = getApp()
   if (!app?.Workbooks) return null
 
-  for (let i = 1; i <= app.Workbooks.Count; i++) {
+  for (let i = 1; i <= app.Workbooks.Count; i += 1) {
     const wb = app.Workbooks.Item(i)
     if (wb.Name === name) return wb
   }
@@ -417,7 +417,7 @@ export function findSheetInWorkbook(wbName: string, sheetName: string): WpsWorks
   const wb = findWorkbookByName(wbName)
   if (!wb) return null
 
-  for (let i = 1; i <= wb.Worksheets.Count; i++) {
+  for (let i = 1; i <= wb.Worksheets.Count; i += 1) {
     const ws = wb.Worksheets.Item(i)
     if (ws.Name === sheetName) return ws
   }

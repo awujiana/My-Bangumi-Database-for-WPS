@@ -906,7 +906,7 @@ describe('syncRecord', () => {
       mockGetCellValue.mockImplementation((_sheet: unknown, row: unknown, col: unknown) => {
         const r = row as number
         const c = col as number
-        if (c === 1) return `unique-sid-${r}`
+        if (c === 1) return `unique-sid-${String(r)}`
         return ''
       })
       const result = deduplicateSyncRecords()
@@ -2815,7 +2815,7 @@ describe('deduplicateSyncRecords keepRow 为 undefined (line 670)', () => {
     mockGetCellValue.mockImplementation((_sheet: unknown, row: unknown, col: unknown) => {
       const r = row as number
       const c = col as number
-      if (c === 1) return `sid-${r}`
+      if (c === 1) return `sid-${String(r)}`
       if (c === 7) return '1'
       return ''
     })
@@ -2854,7 +2854,7 @@ describe('deduplicateSyncRecords 分支覆盖', () => {
     mockGetCellValue.mockImplementation((_sheet: unknown, row: unknown, col: unknown) => {
       const r = row as number
       const c = col as number
-      if (c === 1) return `sid-${r}`
+      if (c === 1) return `sid-${String(r)}`
       if (c === 7) return '1'
       return ''
     })

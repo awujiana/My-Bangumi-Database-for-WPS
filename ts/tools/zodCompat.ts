@@ -379,7 +379,7 @@ class LiteArray<T = any> implements ZodSchema<T[]> {
   safeParse(input: unknown): ParseResult<T[]> {
     if (!Array.isArray(input)) return fail<T[]>('expected array')
     const out: T[] = []
-    for (let i = 0; i < input.length; i++) {
+    for (let i = 0; i < input.length; i += 1) {
       const r = this._item.safeParse(input[i])
       if (!r.success) {
         const issue = r.error.issues[0]

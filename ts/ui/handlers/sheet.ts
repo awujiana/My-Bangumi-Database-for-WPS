@@ -105,7 +105,7 @@ export function cleanLockedDataSheet(): void {
   // ========== 2. 按名称分组（纯内存操作） ==========
   const nameRows = new Map<string, number[]>()
   let emptyNameCount = 0
-  for (let i = 0; i < totalRows; i++) {
+  for (let i = 0; i < totalRows; i += 1) {
     const row = headerRow + 1 + i
     const name = (nameData[i]?.[0] ?? '').trim()
     if (!name) {

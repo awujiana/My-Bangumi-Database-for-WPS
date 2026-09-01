@@ -20,11 +20,11 @@ import { describe, it, expect, vi } from 'vitest'
 const mockCellStore = new Map<string, string>()
 
 function getMockCellValue(row: number, col: number): string {
-  return mockCellStore.get(`${row}_${col}`) || ''
+  return mockCellStore.get(`${String(row)}_${String(col)}`) || ''
 }
 
 function setMockCellValue(row: number, col: number, value: string): void {
-  mockCellStore.set(`${row}_${col}`, value)
+  mockCellStore.set(`${String(row)}_${String(col)}`, value)
 }
 
 // 重置 mock

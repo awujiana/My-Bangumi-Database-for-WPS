@@ -653,7 +653,7 @@ describe('并发调用边界', () => {
   describe('Result 并发创建', () => {
     it('1000 个 Result.ok 并发创建不抛错', () => {
       const results: Result<number>[] = []
-      for (let i = 0; i < 1000; i++) {
+      for (let i = 0; i < 1000; i += 1) {
         results.push(Result.ok(i))
       }
       expect(results).toHaveLength(1000)
@@ -663,8 +663,8 @@ describe('并发调用边界', () => {
 
     it('1000 个 Result.fail 并发创建不抛错', () => {
       const results: Result<number>[] = []
-      for (let i = 0; i < 1000; i++) {
-        results.push(Result.fail<number>(new BgmError(`err${i}`, 'CODE')))
+      for (let i = 0; i < 1000; i += 1) {
+        results.push(Result.fail<number>(new BgmError(`err${String(i)}`, 'CODE')))
       }
       expect(results).toHaveLength(1000)
       expect(results[0]!.isFail()).toBe(true)
@@ -675,7 +675,7 @@ describe('并发调用边界', () => {
 
     it('1000 个 Result.map 链式调用不抛错', () => {
       let r: Result<number> = Result.ok(0)
-      for (let i = 0; i < 1000; i++) {
+      for (let i = 0; i < 1000; i += 1) {
         r = r.map((v: number): number => v + 1)
       }
       expect(r.unwrap()).toBe(1000)
@@ -683,7 +683,7 @@ describe('并发调用边界', () => {
 
     it('1000 个 unwrapOr 调用不抛错', () => {
       const results: Result<number>[] = []
-      for (let i = 0; i < 1000; i++) {
+      for (let i = 0; i < 1000; i += 1) {
         results.push(Result.ok(i))
       }
       const values = results.map((r) => r.unwrapOr(-1))
@@ -694,11 +694,11 @@ describe('并发调用边界', () => {
 
     it('混合 ok/fail 并发创建不抛错', () => {
       const results: Result<number>[] = []
-      for (let i = 0; i < 1000; i++) {
+      for (let i = 0; i < 1000; i += 1) {
         if (i % 2 === 0) {
           results.push(Result.ok(i))
         } else {
-          results.push(Result.fail<number>(new BgmError(`err${i}`, 'CODE')))
+          results.push(Result.fail<number>(new BgmError(`err${String(i)}`, 'CODE')))
         }
       }
       expect(results).toHaveLength(1000)
@@ -712,7 +712,7 @@ describe('并发调用边界', () => {
   describe('colNumToLetter 并发调用', () => {
     it('1000 次调用返回一致结果', () => {
       const results: string[] = []
-      for (let i = 0; i < 1000; i++) {
+      for (let i = 0; i < 1000; i += 1) {
         results.push(colNumToLetter(27)) // AA
       }
       expect(results).toHaveLength(1000)
@@ -724,7 +724,7 @@ describe('并发调用边界', () => {
     it('1000 次调用相同输入返回一致结果', () => {
       const input = '<script>alert(1)</script>'
       const results: string[] = []
-      for (let i = 0; i < 1000; i++) {
+      for (let i = 0; i < 1000; i += 1) {
         results.push(escapeHtml(input))
       }
       expect(results).toHaveLength(1000)
@@ -737,7 +737,7 @@ describe('并发调用边界', () => {
     it('1000 次调用相同输入返回一致结果', () => {
       const input = 'hello world'
       const results: number[] = []
-      for (let i = 0; i < 1000; i++) {
+      for (let i = 0; i < 1000; i += 1) {
         results.push(calcChecksum(input))
       }
       expect(results).toHaveLength(1000)
@@ -749,7 +749,7 @@ describe('并发调用边界', () => {
     it('1000 次调用相同输入返回一致结果', () => {
       const input = 'https://bgm.tv/subject/12345'
       const results: (string | null)[] = []
-      for (let i = 0; i < 1000; i++) {
+      for (let i = 0; i < 1000; i += 1) {
         results.push(extractSubjectId(input))
       }
       expect(results).toHaveLength(1000)
@@ -760,7 +760,7 @@ describe('并发调用边界', () => {
   describe('mapWatchStatus 并发调用', () => {
     it('1000 次调用相同输入返回一致结果', () => {
       const results: number[] = []
-      for (let i = 0; i < 1000; i++) {
+      for (let i = 0; i < 1000; i += 1) {
         results.push(mapWatchStatus('看过'))
       }
       expect(results).toHaveLength(1000)

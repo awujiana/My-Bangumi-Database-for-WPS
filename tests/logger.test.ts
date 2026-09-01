@@ -111,8 +111,8 @@ describe('logger', () => {
   })
 
   it('getRecentLogs 应按 limit 限制数量', () => {
-    for (let i = 0; i < 2000; i++) {
-      logger.info(`log-${i}`)
+    for (let i = 0; i < 2000; i += 1) {
+      logger.info(`log-${String(i)}`)
     }
     const logs = getRecentLogs('INFO', 50)
     expect(logs.length).toBeLessThanOrEqual(50)

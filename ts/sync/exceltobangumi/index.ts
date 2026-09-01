@@ -301,7 +301,7 @@ export function getFilterStatus(
     const areas: WpsRange[] = []
     try {
       if (visibleCells.Areas) {
-        for (let a = 1; a <= visibleCells.Areas.Count; a++) {
+        for (let a = 1; a <= visibleCells.Areas.Count; a += 1) {
           areas.push(visibleCells.Areas.Item(a))
         }
       } else {
@@ -314,7 +314,7 @@ export function getFilterStatus(
 
     for (const area of areas) {
       const rows = area.Rows
-      for (let r = 1; r <= rows.Count; r++) {
+      for (let r = 1; r <= rows.Count; r += 1) {
         rawRows.add(rows.Item(r).Row)
       }
     }
@@ -377,7 +377,7 @@ export function getSequentialRowsBySeqCol(
     const ws = app.ActiveWorkbook.ActiveSheet
 
     const seqCol = getSeqColIndex(colMap)
-    for (let r = startRow; r <= endRow; r++) {
+    for (let r = startRow; r <= endRow; r += 1) {
       try {
         const val = getCellValue(ws, r, seqCol)
         if (val !== '') {
@@ -566,7 +566,7 @@ function fetchVisibleRowsForSync(
     return rows
   }
   const rows: number[] = []
-  for (let r = startRow; r <= lastRow; r++) rows.push(r)
+  for (let r = startRow; r <= lastRow; r += 1) rows.push(r)
   bgmLog(LOG_LEVELS.INFO, `[SyncToBangumiAsync] 总行数: ${String(rows.length)}`)
   return rows
 }
@@ -889,7 +889,7 @@ async function batchSyncRequests(
 
     if (executing.length > 0) {
       await Promise.race(executing.map((e) => e.promise))
-      for (let i = executing.length - 1; i >= 0; i--) {
+      for (let i = executing.length - 1; i >= 0; i -= 1) {
         if (executing[i]!.done) executing.splice(i, 1)
       }
     }
@@ -1043,11 +1043,11 @@ function collectSelectedRows(app: WpsApplication): number[] {
     if (areaCount > 1 && areas) {
       // 非连续选择：遍历每个 Area 收集行号
       bgmLog(LOG_LEVELS.INFO, `[syncSelectedRows] 检测到非连续选择，共 ${String(areaCount)} 个区域`)
-      for (let ai = 1; ai <= areaCount; ai++) {
+      for (let ai = 1; ai <= areaCount; ai += 1) {
         const area = areas.Item(ai)
         const aStartRow = area.Row
         const aRowCount = area.Rows.Count
-        for (let r = aStartRow; r < aStartRow + aRowCount; r++) {
+        for (let r = aStartRow; r < aStartRow + aRowCount; r += 1) {
           if (!rawRows.includes(r)) rawRows.push(r)
         }
       }
@@ -1055,7 +1055,7 @@ function collectSelectedRows(app: WpsApplication): number[] {
       // 连续选择：直接读取
       const startRow = sel.Row
       const rowCount = sel.Rows.Count
-      for (let r = startRow; r < startRow + rowCount; r++) {
+      for (let r = startRow; r < startRow + rowCount; r += 1) {
         rawRows.push(r)
       }
     }
@@ -1207,7 +1207,7 @@ async function executeSelectedSync(
     // 设置同步状态机位置（用于暂停时定位到单元格）
     BGM.sync.updatePosition(ws, 0, urlCol)
 
-    for (let idx = 0; idx < rows.length; idx++) {
+    for (let idx = 0; idx < rows.length; idx += 1) {
       // 检查停止
       if (BGM.sync.checkShouldStop()) {
         bgmLog(LOG_LEVELS.INFO, '[syncSelectedRows] 检测到停止请求，终止循环')

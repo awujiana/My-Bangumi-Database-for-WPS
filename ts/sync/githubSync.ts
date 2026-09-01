@@ -354,7 +354,7 @@ function readLocalEntries(
     return trim(getCellValue(ws, row, col))
   }
 
-  for (let i = 0; i < rowCount; i++) {
+  for (let i = 0; i < rowCount; i += 1) {
     const row = startRow + i
     const getField = (key: string): string =>
       rawData ? getFieldFromBatch(i, key) : getFieldFromCell(row, key)
@@ -770,7 +770,7 @@ function batchWriteNewRows(
 
   // 4. 记录 undo 条目（一次性记录所有变更）
   // 注意：日期列的值可能是数值序列号，需转换为字符串存储 undo 记录
-  for (let i = 0; i < rows.length; i++) {
+  for (let i = 0; i < rows.length; i += 1) {
     for (const wc of writeCols) {
       const row = startRow + i
       const raw = values[i]![wc.col - minCol]
@@ -999,7 +999,7 @@ function batchUpdateRows(
         // 只写入有变化的单元格
         let hasChanges = false
         const finalValues = [...rowValues]
-        for (let c = 0; c < colCount; c++) {
+        for (let c = 0; c < colCount; c += 1) {
           const newVal = finalValues[c]
           if (newVal === null) continue
           const oldVal = oldArr[c] != null ? String(oldArr[c]) : ''
@@ -1273,7 +1273,7 @@ export async function applyDiffToSheet(
 
     if (batchWritten > 0) {
       result.added += batchWritten
-      for (let i = 0; i < batchWritten; i++) {
+      for (let i = 0; i < batchWritten; i += 1) {
         const entry = batch[i]
         if (!entry?.remote) continue
         result.details!.push({
@@ -1616,7 +1616,7 @@ export function applyConflictResolutions(
   }
 
   // 倒序遍历，便于安全移除元素
-  for (let i = diffs.length - 1; i >= 0; i--) {
+  for (let i = diffs.length - 1; i >= 0; i -= 1) {
     const diff = diffs[i]
     if (!diff) continue
     // 仅处理字段级 update（changedFields 不为 ['*']）
@@ -1838,7 +1838,7 @@ function getSelectedRowSids(): Set<string> {
       return sids
     }
 
-    for (let row = firstRow; row <= lastRow; row++) {
+    for (let row = firstRow; row <= lastRow; row += 1) {
       if (row === headerRow) continue
       const url = trim(getCellValue(ws, row, urlCol))
       if (!url) continue

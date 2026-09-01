@@ -119,7 +119,7 @@ describe('Result.map', () => {
 
   it('转换函数可改变值类型', () => {
     const r = Result.ok(42)
-    const mapped = r.map((x) => `数字是 ${x}`)
+    const mapped = r.map((x) => `数字是 ${String(x)}`)
     expect(mapped.isOk()).toBe(true)
     expect(mapped.unwrap()).toBe('数字是 42')
   })
@@ -215,7 +215,7 @@ describe('Result 边界场景', () => {
     const r = Result.ok(5)
       .map((x) => x + 1)
       .map((x) => x * 2)
-      .map((x) => `结果: ${x}`)
+      .map((x) => `结果: ${String(x)}`)
     expect(r.unwrap()).toBe('结果: 12')
   })
 

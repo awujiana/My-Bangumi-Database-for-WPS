@@ -545,7 +545,7 @@ function renderColumnMappingEditor(ws: WpsWorksheet, mapping: EnrichColumnMappin
   const { headerRow } = state
   const colOptions: { col: number; header: string }[] = []
 
-  for (let col = 1; col <= maxCols; col++) {
+  for (let col = 1; col <= maxCols; col += 1) {
     const header = getCellValue(ws, headerRow, col).trim()
     if (header) {
       colOptions.push({ col, header })
@@ -622,7 +622,7 @@ function getSelectedWorkbook(): WpsWorkbook | null {
   const wbs = app.Workbooks
   if (!wbs) return app.ActiveWorkbook
 
-  for (let i = 1; i <= wbs.Count; i++) {
+  for (let i = 1; i <= wbs.Count; i += 1) {
     const wb = wbs.Item(i)
     if (wb.Name === wbName) {
       return wb
@@ -713,7 +713,7 @@ function renderSourcePreview(ws: WpsWorksheet, _mapping: EnrichColumnMapping): v
   const { dataStartRow } = state
 
   const headerCells: string[] = []
-  for (let col = 1; col <= maxCols; col++) {
+  for (let col = 1; col <= maxCols; col += 1) {
     const val = getCellValue(ws, headerRow, col).trim()
     if (val) {
       headerCells.push(escapeHtml(val))
@@ -731,10 +731,10 @@ function renderSourcePreview(ws: WpsWorksheet, _mapping: EnrichColumnMapping): v
   const rowsHtml: string[] = []
   const lastRow = Math.min(getLastRow(ws), dataStartRow + maxRows - 1)
 
-  for (let row = dataStartRow; row <= lastRow; row++) {
+  for (let row = dataStartRow; row <= lastRow; row += 1) {
     const rowCells: string[] = []
     let hasData = false
-    for (let col = 1; col <= headerCells.length; col++) {
+    for (let col = 1; col <= headerCells.length; col += 1) {
       const val = getCellValue(ws, row, col).trim()
       if (val) hasData = true
       rowCells.push(escapeHtml(val))
@@ -1148,7 +1148,7 @@ export function renderPreviewTable(
 
   const maxCols = 50
   const headerCells: string[] = []
-  for (let col = 1; col <= maxCols; col++) {
+  for (let col = 1; col <= maxCols; col += 1) {
     const val = getCellValue(sheet, headerRow, col).trim()
     if (val) headerCells.push(escapeHtml(val))
   }
@@ -1157,10 +1157,10 @@ export function renderPreviewTable(
   const lastRow = Math.min(getLastRow(sheet), dataStartRow + maxRows - 1)
 
   const bodyRows: string[] = []
-  for (let row = dataStartRow; row <= lastRow; row++) {
+  for (let row = dataStartRow; row <= lastRow; row += 1) {
     const cells: string[] = []
     let hasData = false
-    for (let col = 1; col <= headerCells.length; col++) {
+    for (let col = 1; col <= headerCells.length; col += 1) {
       const val = getCellValue(sheet, row, col).trim()
       if (val) hasData = true
       cells.push(escapeHtml(val))
@@ -1610,7 +1610,7 @@ async function runBatchEnrichment(bangumiSheet: WpsWorksheet): Promise<void> {
 
   const total = state.batchFiles.length
 
-  for (let i = 0; i < total; i++) {
+  for (let i = 0; i < total; i += 1) {
     if (state.batchCancelRequested) {
       bgmLog(LOG_LEVELS.WARN, '[enrich-batch] 用户取消批量富化')
       break

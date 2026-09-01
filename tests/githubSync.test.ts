@@ -32,7 +32,7 @@ const mockParseJsonl = vi.hoisted(() =>
     const entries: Record<string, unknown>[] = []
     const errors: { line: number; message: string }[] = []
     const lines = text.split(/\r?\n/)
-    for (let i = 0; i < lines.length; i++) {
+    for (let i = 0; i < lines.length; i += 1) {
       const line = lines[i]!.trim()
       if (!line) continue
       try {
@@ -2201,8 +2201,8 @@ describe('applyDiffToSheet 删除操作 yieldToEventLoop (line 1184)', () => {
     mockGetLastRow.mockReturnValue(12)
     mockGetColumnMap.mockReturnValue(new Map([['Bangumi_URL', 1]]))
     mockGetCellValue.mockImplementation((_ws: unknown, row: number, col: number) => {
-      if (col === 1 && row >= 2 && row <= 12) return `https://bgm.tv/subject/${row - 1}`
-      if (col === 2 && row >= 2 && row <= 12) return `条目${row - 1}`
+      if (col === 1 && row >= 2 && row <= 12) return `https://bgm.tv/subject/${String(row - 1)}`
+      if (col === 2 && row >= 2 && row <= 12) return `条目${String(row - 1)}`
       return ''
     })
 
@@ -2216,7 +2216,7 @@ describe('applyDiffToSheet 删除操作 yieldToEventLoop (line 1184)', () => {
 
     // 创建 11 个 delete diffs
     const deleteDiffs: GithubSyncDiff[] = []
-    for (let i = 0; i < 11; i++) {
+    for (let i = 0; i < 11; i += 1) {
       deleteDiffs.push({
         kind: 'delete',
         sid: String(i + 1),
@@ -2282,7 +2282,7 @@ describe('applyDiffToSheet 批量 add yieldToEventLoop (line 1060)', () => {
       sid: String(i + 1),
       remote: {
         sid: String(i + 1),
-        name: `测试条目${i + 1}`,
+        name: `测试条目${String(i + 1)}`,
         date: '2024-06-15',
       },
       changedFields: ['*'],
@@ -2309,8 +2309,8 @@ describe('applyDiffToSheet 批量 update yieldToEventLoop (line 1113)', () => {
     )
     mockSetCellValue.mockImplementation(() => {})
     mockGetCellValue.mockImplementation((_ws: unknown, row: number, col: number) => {
-      if (col === 1) return `https://bgm.tv/subject/${row}`
-      if (col === 2) return `旧名称${row}`
+      if (col === 1) return `https://bgm.tv/subject/${String(row)}`
+      if (col === 2) return `旧名称${String(row)}`
       return ''
     })
   })
@@ -2336,7 +2336,7 @@ describe('applyDiffToSheet 批量 update yieldToEventLoop (line 1113)', () => {
       localRow: i + 2,
       remote: {
         sid: String(i + 1),
-        name: `更新条目${i + 1}`,
+        name: `更新条目${String(i + 1)}`,
         date: '2024-06-15',
       },
       changedFields: ['名称'],
@@ -3355,13 +3355,13 @@ describe('applyDiffToSheet formatEta 路径 (line 548)', () => {
 
     // 创建 600 条 add diffs (超过 BATCH_WRITE_SIZE=500)，确保触发批量写入和事件循环让出
     const diffs: GithubSyncDiff[] = []
-    for (let i = 0; i < 600; i++) {
+    for (let i = 0; i < 600; i += 1) {
       diffs.push({
         kind: 'add',
-        sid: `eta-${i}`,
+        sid: `eta-${String(i)}`,
         remote: {
-          sid: `eta-${i}`,
-          name: `条目 ${i}`,
+          sid: `eta-${String(i)}`,
+          name: `条目 ${String(i)}`,
           date: '2024-06-15',
         },
         changedFields: ['*'],
@@ -3599,11 +3599,11 @@ describe('formatEta ms>0 精确路径 (line 548)', () => {
     )
 
     const diffs: GithubSyncDiff[] = []
-    for (let i = 0; i < 501; i++) {
+    for (let i = 0; i < 501; i += 1) {
       diffs.push({
         kind: 'add',
-        sid: `eta-${i}`,
-        remote: { sid: `eta-${i}`, name: `条目 ${i}`, date: '2024-06-15' },
+        sid: `eta-${String(i)}`,
+        remote: { sid: `eta-${String(i)}`, name: `条目 ${String(i)}`, date: '2024-06-15' },
         changedFields: ['*'],
       })
     }
@@ -3903,11 +3903,11 @@ describe('formatDuration 全分支 (lines 534-540)', () => {
 
     // 使用少量条目让处理速度极快，eta 进入 <1000ms 分支
     const diffs: GithubSyncDiff[] = []
-    for (let i = 0; i < 3; i++) {
+    for (let i = 0; i < 3; i += 1) {
       diffs.push({
         kind: 'add',
-        sid: `dur-ms-${i}`,
-        remote: { sid: `dur-ms-${i}`, name: `快速处理${i}`, date: '2024-06-15' },
+        sid: `dur-ms-${String(i)}`,
+        remote: { sid: `dur-ms-${String(i)}`, name: `快速处理${String(i)}`, date: '2024-06-15' },
         changedFields: ['*'],
       })
     }
@@ -4100,11 +4100,11 @@ describe('formatDuration 秒/分钟分支 (lines 536, 539)', () => {
     // 1100 条 add diffs: 分 3 批处理 (500+500+100)
     // 第二批是中间批: speed>0 且 remaining>0，且 now-lastProgressTime>500 触发更新
     const diffs: GithubSyncDiff[] = []
-    for (let i = 0; i < 1100; i++) {
+    for (let i = 0; i < 1100; i += 1) {
       diffs.push({
         kind: 'add',
-        sid: `sec-${i}`,
-        remote: { sid: `sec-${i}`, name: `秒分支${i}`, date: '2024-06-15' },
+        sid: `sec-${String(i)}`,
+        remote: { sid: `sec-${String(i)}`, name: `秒分支${String(i)}`, date: '2024-06-15' },
         changedFields: ['*'],
       })
     }
@@ -4160,11 +4160,11 @@ describe('formatDuration 秒/分钟分支 (lines 536, 539)', () => {
 
     // 1500 条 add diffs: 分 3 批处理 (500+500+500)
     const diffs: GithubSyncDiff[] = []
-    for (let i = 0; i < 1500; i++) {
+    for (let i = 0; i < 1500; i += 1) {
       diffs.push({
         kind: 'add',
-        sid: `min-${i}`,
-        remote: { sid: `min-${i}`, name: `分分支${i}`, date: '2024-06-15' },
+        sid: `min-${String(i)}`,
+        remote: { sid: `min-${String(i)}`, name: `分分支${String(i)}`, date: '2024-06-15' },
         changedFields: ['*'],
       })
     }
@@ -4209,11 +4209,11 @@ describe('formatDuration 秒/分钟分支 (lines 536, 539)', () => {
     dateNowSpy = vi.spyOn(Date, 'now').mockImplementation(() => startTime)
 
     const diffs: GithubSyncDiff[] = []
-    for (let i = 0; i < 3; i++) {
+    for (let i = 0; i < 3; i += 1) {
       diffs.push({
         kind: 'add',
-        sid: `ms-${i}`,
-        remote: { sid: `ms-${i}`, name: `毫秒${i}`, date: '2024-06-15' },
+        sid: `ms-${String(i)}`,
+        remote: { sid: `ms-${String(i)}`, name: `毫秒${String(i)}`, date: '2024-06-15' },
         changedFields: ['*'],
       })
     }
@@ -4629,7 +4629,7 @@ describe('GithubSyncSource 方法', () => {
       const entries: Record<string, unknown>[] = []
       const errors: { line: number; message: string }[] = []
       const lines = text.split(/\r?\n/)
-      for (let i = 0; i < lines.length; i++) {
+      for (let i = 0; i < lines.length; i += 1) {
         const line = lines[i]!.trim()
         if (!line) continue
         try {
@@ -4868,13 +4868,13 @@ describe('applyDiffToSheet BATCH_WRITE_SIZE 边界 (501条 add)', () => {
     // 生成 501 条 add diff（刚好超过 BATCH_WRITE_SIZE=500）
     // 这将触发两批写入：第一批 500 条，第二批 1 条
     const diffs: GithubSyncDiff[] = []
-    for (let i = 0; i < 501; i++) {
+    for (let i = 0; i < 501; i += 1) {
       diffs.push({
         kind: 'add',
-        sid: `sid-${i}`,
+        sid: `sid-${String(i)}`,
         remote: {
-          sid: `sid-${i}`,
-          name: `条目${i}`,
+          sid: `sid-${String(i)}`,
+          name: `条目${String(i)}`,
           date: '2024-06-15',
         },
       })
@@ -4930,13 +4930,13 @@ describe('applyDiffToSheet BATCH_WRITE_SIZE 边界 (501条 add)', () => {
     mockGetApp.mockReturnValue(mockApp)
 
     const diffs: GithubSyncDiff[] = []
-    for (let i = 0; i < 600; i++) {
+    for (let i = 0; i < 600; i += 1) {
       diffs.push({
         kind: 'add',
-        sid: `sid-${i}`,
+        sid: `sid-${String(i)}`,
         remote: {
-          sid: `sid-${i}`,
-          name: `条目${i}`,
+          sid: `sid-${String(i)}`,
+          name: `条目${String(i)}`,
           date: '2024-06-15',
         },
       })

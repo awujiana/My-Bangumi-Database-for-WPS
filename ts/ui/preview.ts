@@ -353,7 +353,7 @@ export async function previewSyncContent(): Promise<void> {
   let errorCount = 0
 
   try {
-    for (let i = 0; i < dataRows.length; i++) {
+    for (let i = 0; i < dataRows.length; i += 1) {
       // 停止检查
       if (BGM.sync.checkShouldStop()) {
         bgmLog(

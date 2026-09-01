@@ -1011,7 +1011,7 @@ describe('syncSourceRegistry 未覆盖分支', () => {
   it('overallSpeed > 0 时显示实际速度 (lines 222-232)', async () => {
     // 模拟时间流逝：Date.now() 返回不同值
     let timeValue = 1_000_000
-    vi.spyOn(Date, 'now').mockImplementation(() => timeValue++)
+    vi.spyOn(Date, 'now').mockImplementation(() => timeValue += 1)
     mockGithubSourceRef.fetchRemoteEntries.mockResolvedValue([
       { sid: '1', name: 'A' },
       { sid: '2', name: 'B' },

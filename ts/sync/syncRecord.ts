@@ -105,7 +105,7 @@ export function getOrCreateSyncRecordSheet(): WpsWorksheet {
   // 查找现有工作表
   try {
     const sheets = wb.Sheets
-    for (let i = 1; i <= sheets.Count; i++) {
+    for (let i = 1; i <= sheets.Count; i += 1) {
       const sheet = sheets.Item(i)
       if (sheet.Name === SYNC_RECORD_SHEET_NAME) {
         syncSheet = sheet
@@ -121,7 +121,7 @@ export function getOrCreateSyncRecordSheet(): WpsWorksheet {
     syncSheet.Name = SYNC_RECORD_SHEET_NAME
 
     // 写入表头
-    for (let i = 0; i < SYNC_RECORD_COLUMNS.length; i++) {
+    for (let i = 0; i < SYNC_RECORD_COLUMNS.length; i += 1) {
       const colLetter = colNumToLetter(i + 1)
       const cell = syncSheet.Range(`${colLetter}1`)
       cell.Value2 = SYNC_RECORD_COLUMNS[i] ?? ''
@@ -157,7 +157,7 @@ export function getOrCreateSyncRecordSheet(): WpsWorksheet {
 
     // 已有工作表，检查并补齐表头
     const existingCols = SYNC_RECORD_COLUMNS.length
-    for (let i = 0; i < existingCols; i++) {
+    for (let i = 0; i < existingCols; i += 1) {
       const colLetter = colNumToLetter(i + 1)
       const cell = syncSheet.Range(`${colLetter}1`)
       const currentHeader = String(cell.Value2 ?? '').trim()
@@ -185,7 +185,7 @@ export function getSyncRecordSheetIfExists(): WpsWorksheet | null {
   if (!app?.ActiveWorkbook) return null
   try {
     const sheets = app.ActiveWorkbook.Sheets
-    for (let i = 1; i <= sheets.Count; i++) {
+    for (let i = 1; i <= sheets.Count; i += 1) {
       const sheet = sheets.Item(i)
       if (sheet.Name === SYNC_RECORD_SHEET_NAME) return sheet
     }
@@ -215,7 +215,7 @@ function migrateSyncRecordSchema(sheet: WpsWorksheet): void {
   if (lastRow <= 1) return
 
   const rows: string[][] = []
-  for (let row = 2; row <= lastRow; row++) {
+  for (let row = 2; row <= lastRow; row += 1) {
     let oldSid: string
     let oldUrl: string
     let oldType: string
@@ -270,7 +270,7 @@ function migrateSyncRecordSchema(sheet: WpsWorksheet): void {
     sheet.Range(`2:${String(lastRow)}`).Delete()
   }
 
-  for (let i = 0; i < SYNC_RECORD_COLUMNS.length; i++) {
+  for (let i = 0; i < SYNC_RECORD_COLUMNS.length; i += 1) {
     const colLetter = colNumToLetter(i + 1)
     const cell = sheet.Range(`${colLetter}1`)
     cell.Value2 = SYNC_RECORD_COLUMNS[i] ?? ''
@@ -279,11 +279,11 @@ function migrateSyncRecordSchema(sheet: WpsWorksheet): void {
     }
   }
 
-  for (let i = 0; i < rows.length; i++) {
+  for (let i = 0; i < rows.length; i += 1) {
     const newRow = i + 2
     const data = rows[i]
     if (!data) continue
-    for (let col = 0; col < data.length; col++) {
+    for (let col = 0; col < data.length; col += 1) {
       setCellValue(sheet, newRow, col + 1, data[col])
     }
   }
@@ -308,7 +308,7 @@ function buildCache(sheet: WpsWorksheet): void {
     return
   }
 
-  for (let i = 0; i < allData.length; i++) {
+  for (let i = 0; i < allData.length; i += 1) {
     try {
       const rowData = allData[i]
       if (!rowData) continue
@@ -563,7 +563,7 @@ export function addSyncRecords(records: UpdateRecordParams[]): boolean {
       range.Value2 = newRows
 
       // 设置新增行的颜色
-      for (let i = 0; i < newRows.length; i++) {
+      for (let i = 0; i < newRows.length; i += 1) {
         const row = startRow + i
         const data = newRows[i]
         if (!data) continue
@@ -647,7 +647,7 @@ export function deduplicateSyncRecords(): boolean {
 
     // 按 SID 分组
     const sidRows = new Map<string, number[]>()
-    for (let row = 2; row <= lastRow; row++) {
+    for (let row = 2; row <= lastRow; row += 1) {
       const sid = getCellValue(sheet, row, SYNC_RECORD_COL.SID).trim()
       if (!sid) continue
       const rows = sidRows.get(sid) || []

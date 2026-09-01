@@ -42,7 +42,7 @@ function _buildNameUrlMap(
   const aliasCol = colMap.get('别名')
   if (!urlCol || !nameCol) return nameUrlMap
 
-  for (let row = headerRow + 1; row <= lastRow; row++) {
+  for (let row = headerRow + 1; row <= lastRow; row += 1) {
     const urlVal = trim(getCellValue(ws, row, urlCol))
     if (!urlVal) continue
 
@@ -112,7 +112,7 @@ export function autoFillUrls(): AutoFillResult {
 
     bgmLog(LOG_LEVELS.INFO, `[autoFillUrls] 已建立 ${String(mappedKeys)} 个名称/别名 → URL 映射`)
 
-    for (let row = headerRow + 1; row <= lastRow; row++) {
+    for (let row = headerRow + 1; row <= lastRow; row += 1) {
       const currentUrl = trim(getCellValue(ws, row, urlCol))
       if (currentUrl) continue
 

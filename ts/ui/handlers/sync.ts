@@ -96,7 +96,7 @@ async function _fillSheetWithCollections(
   let written = 0
   const total = collections.length
 
-  for (let i = 0; i < total; i++) {
+  for (let i = 0; i < total; i += 1) {
     const item = collections[i]
     if (!item?.subject_id) continue
 
@@ -753,7 +753,7 @@ async function _doAPISync(
   }
 
   const rowsToProcess: number[] = []
-  for (let r = headerRow + 1; r <= lastRow; r++) rowsToProcess.push(r)
+  for (let r = headerRow + 1; r <= lastRow; r += 1) rowsToProcess.push(r)
 
   if (rowsToProcess.length === 0) {
     showAlert('没有需要处理的数据行！')
@@ -819,7 +819,7 @@ async function _doAPISync(
     let currentCombined = 0
 
     // 阶段1：写入收藏到同步记录表（显示进度，但不需要定位单元格）
-    for (let i = 0; i < userCollections.length; i++) {
+    for (let i = 0; i < userCollections.length; i += 1) {
       if (BGM.sync.checkShouldStop()) break
       if (BGM.sync.checkPaused()) await BGM.sync.waitForResume()
       if (BGM.sync.checkShouldStop()) break
@@ -868,7 +868,7 @@ async function _doAPISync(
     BGM.sync.updatePosition(ws, 0, seqColForLocate)
 
     let matchedCount = 0
-    for (let i = 0; i < rowsToProcess.length; i++) {
+    for (let i = 0; i < rowsToProcess.length; i += 1) {
       if (BGM.sync.checkShouldStop()) {
         bgmLog(LOG_LEVELS.INFO, '[_doAPISync] 阶段2：检测到停止请求，终止')
         break

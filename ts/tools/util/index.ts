@@ -592,7 +592,7 @@ function getCallerFunctionName(_skipAdditional = 0): string {
     'BGM.safeExecute',
   ]
 
-  for (let i = 2; i < lines.length; i++) {
+  for (let i = 2; i < lines.length; i += 1) {
     const rawLine = lines[i]
     if (rawLine === undefined) continue
     const line = rawLine.trim()

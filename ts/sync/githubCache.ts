@@ -57,7 +57,7 @@ export interface GithubDataCache {
  */
 export function computeTextHash(str: string): string {
   let hash = 5381
-  for (let i = 0; i < str.length; i++) {
+  for (let i = 0; i < str.length; i += 1) {
     // hash * 33 + charCode
     hash = ((hash << 5) + hash + str.charCodeAt(i)) | 0
   }

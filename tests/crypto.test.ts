@@ -98,7 +98,7 @@ describe('buildPayload', () => {
 
   it('空 token 也能构建 payload', () => {
     const payload = buildPayload('')
-    expect(payload).toBe(`${TOKEN_CONFIG.VERSION}:${calcChecksum('')}:`)
+    expect(payload).toBe(`${TOKEN_CONFIG.VERSION}:${String(calcChecksum(''))}:`)
   })
 
   it('含冒号的 token 保持完整', () => {
@@ -129,7 +129,7 @@ describe('extractToken', () => {
   })
 
   it('版本号不匹配返回 null', () => {
-    const payload = `99:${calcChecksum('token')}:token`
+    const payload = `99:${String(calcChecksum('token'))}:token`
     expect(extractToken(payload)).toBeNull()
   })
 
@@ -169,8 +169,8 @@ describe('crypto 综合场景', () => {
   })
 
   it('多次往返：buildPayload → extract 重复验证', () => {
-    const original = `token-${Date.now()}`
-    for (let i = 0; i < 5; i++) {
+    const original = `token-${String(Date.now())}`
+    for (let i = 0; i < 5; i += 1) {
       const payload = buildPayload(original)
       const extracted = extractToken(payload)
       expect(extracted).toBe(original)

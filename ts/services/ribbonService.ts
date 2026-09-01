@@ -202,7 +202,7 @@ export function getSyncPreview(
     rowsToProcess = filterStatus.visibleRows.filter((r) => r >= startRow)
     bgmLog(LOG_LEVELS.INFO, `[getSyncPreview] 筛选模式: ${String(rowsToProcess.length)} 行可见`)
   } else {
-    for (let r = startRow; r <= lastRow; r++) rowsToProcess.push(r)
+    for (let r = startRow; r <= lastRow; r += 1) rowsToProcess.push(r)
     bgmLog(LOG_LEVELS.INFO, `[getSyncPreview] 全量模式: ${String(rowsToProcess.length)} 行`)
   }
 
@@ -401,7 +401,7 @@ export async function detectConflicts(
     rowsToProcess = filterStatus.visibleRows.filter((r) => r >= startRow)
     bgmLog(LOG_LEVELS.INFO, `[detectConflicts] 筛选模式: ${String(rowsToProcess.length)} 行可见`)
   } else {
-    for (let r = startRow; r <= lastRow; r++) rowsToProcess.push(r)
+    for (let r = startRow; r <= lastRow; r += 1) rowsToProcess.push(r)
     bgmLog(LOG_LEVELS.INFO, `[detectConflicts] 全量模式: ${String(rowsToProcess.length)} 行`)
   }
 

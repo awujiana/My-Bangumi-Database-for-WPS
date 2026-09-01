@@ -256,7 +256,7 @@ export function parseJsonl(text: string): {
   }
 
   const lines = text.split(/\r\n|\r|\n/)
-  for (let i = 0; i < lines.length; i++) {
+  for (let i = 0; i < lines.length; i += 1) {
     const lineNum = i + 1
     const raw = lines[i]
     if (raw === undefined) continue

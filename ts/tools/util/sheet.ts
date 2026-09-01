@@ -145,9 +145,9 @@ export function findHeaderRow(ws: WpsWorksheet | null | undefined, startRow?: nu
   const cacheKey = `${sheetName}:headerRow:${String(startRow || 1)}`
   return cacheGet(cacheKey, () => {
     const sRow = startRow || 1
-    for (let row = sRow; row <= PANEL_CONFIG.MAX_SCAN_ROWS; row++) {
+    for (let row = sRow; row <= PANEL_CONFIG.MAX_SCAN_ROWS; row += 1) {
       let matchCount = 0
-      for (let col = 1; col <= PANEL_CONFIG.MAX_SCAN_COLUMNS; col++) {
+      for (let col = 1; col <= PANEL_CONFIG.MAX_SCAN_COLUMNS; col += 1) {
         try {
           const cellVal = getCellValue(ws, row, col).toLowerCase()
           if (!cellVal) continue
@@ -185,7 +185,7 @@ export function getColumnMap(
     let firstNonEmptyCol: number | undefined
 
     const lastCol = 50
-    for (let i = 1; i <= lastCol; i++) {
+    for (let i = 1; i <= lastCol; i += 1) {
       const colName = trim(getCellValue(ws, headerRow, i))
       // 记录第一个非空列作为序列号列候选
       if (!firstNonEmptyCol && colName) {
@@ -213,7 +213,7 @@ export function getColumnMap(
         seqCol = firstNonEmptyCol
       } else {
         // 第一个非空列已被占用，向后查找第一个未被占用的非空列
-        for (let i = 1; i <= lastCol; i++) {
+        for (let i = 1; i <= lastCol; i += 1) {
           if (!mappedCols.has(i)) {
             const v = trim(getCellValue(ws, headerRow, i))
             if (v) {
@@ -280,7 +280,7 @@ function findAnchorColumn(ws: WpsWorksheet, headerRow: number): number | undefin
   ]
   const maxCols = 50
 
-  for (let c = 1; c <= maxCols; c++) {
+  for (let c = 1; c <= maxCols; c += 1) {
     const val = ws.Range(`${colNumToLetter(c)}${String(headerRow)}`).Value2
     if (val == null) continue
     const text = String(val).trim().toLowerCase()
@@ -422,7 +422,7 @@ export function getDataSheet(): WpsWorksheet | null | undefined {
       if (BGM.sheet.lockedWorkbookName) {
         const wbs = app.Workbooks
         if (wbs) {
-          for (let i = 1; i <= wbs.Count; i++) {
+          for (let i = 1; i <= wbs.Count; i += 1) {
             const wb = wbs.Item(i)
             if (wb.Name === BGM.sheet.lockedWorkbookName) {
               targetWb = wb
@@ -479,7 +479,7 @@ export function ensureSheetHeaders(ws: WpsWorksheet | null | undefined): boolean
   let writeCount = 0
   let failCount = 0
   const failCols: number[] = []
-  for (let i = 0; i < STANDARD_HEADERS.length; i++) {
+  for (let i = 0; i < STANDARD_HEADERS.length; i += 1) {
     const header = STANDARD_HEADERS[i]
     if (header !== undefined) {
       const ok = setCellValueDirect(ws, 1, i + 1, header)

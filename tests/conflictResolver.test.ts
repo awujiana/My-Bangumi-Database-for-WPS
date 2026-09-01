@@ -97,7 +97,7 @@ describe('showConflictResolver - 模态框渲染', () => {
     const promise = showConflictResolver(SAMPLE_CONFLICTS)
 
     const count = document.querySelector('.conflict-count')
-    expect(count?.textContent).toBe(`${SAMPLE_CONFLICTS.length} 个冲突`)
+    expect(count?.textContent).toBe(`${String(SAMPLE_CONFLICTS.length)} 个冲突`)
 
     // 清理
     const confirmBtn = document.querySelector<HTMLButtonElement>('.conflict-btn-confirm')

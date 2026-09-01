@@ -126,7 +126,7 @@ export function undoLastSync(): number {
   }
 
   // 1. 逆序恢复单元格变更（与执行顺序相反）
-  for (let i = cellEntries.length - 1; i >= 0; i--) {
+  for (let i = cellEntries.length - 1; i >= 0; i -= 1) {
     const entry = cellEntries[i]
     if (entry) {
       setCellValue(ws, entry.row, entry.col, entry.oldValue)

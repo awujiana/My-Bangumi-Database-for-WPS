@@ -93,7 +93,7 @@ export function getOrCreateEnrichRecordSheet(): WpsWorksheet {
 
   try {
     const sheets = wb.Sheets
-    for (let i = 1; i <= sheets.Count; i++) {
+    for (let i = 1; i <= sheets.Count; i += 1) {
       const sheet = sheets.Item(i)
       if (sheet.Name === ENRICH_RECORD_SHEET_NAME) {
         enrichSheet = sheet
@@ -108,7 +108,7 @@ export function getOrCreateEnrichRecordSheet(): WpsWorksheet {
     enrichSheet = wb.Sheets.Add()
     enrichSheet.Name = ENRICH_RECORD_SHEET_NAME
 
-    for (let i = 0; i < ENRICH_RECORD_COLUMNS.length; i++) {
+    for (let i = 0; i < ENRICH_RECORD_COLUMNS.length; i += 1) {
       const colLetter = colNumToLetter(i + 1)
       const cell = enrichSheet.Range(`${colLetter}1`)
       cell.Value2 = ENRICH_RECORD_COLUMNS[i] ?? ''
@@ -139,7 +139,7 @@ export function getOrCreateEnrichRecordSheet(): WpsWorksheet {
     bgmLog(LOG_LEVELS.INFO, '已创建富化记录工作表')
   } else {
     const existingCols = ENRICH_RECORD_COLUMNS.length
-    for (let i = 0; i < existingCols; i++) {
+    for (let i = 0; i < existingCols; i += 1) {
       const colLetter = colNumToLetter(i + 1)
       const cell = enrichSheet.Range(`${colLetter}1`)
       const currentHeader = String(cell.Value2 ?? '').trim()
@@ -230,7 +230,7 @@ export function addEnrichRecords(records: AddEnrichRecordParams[]): void {
     )
     range.Value2 = newRows
 
-    for (let i = 0; i < newRows.length; i++) {
+    for (let i = 0; i < newRows.length; i += 1) {
       const row = startRow + i
       const action = newRows[i]?.[ENRICH_RECORD_COL.ACTION - 1] ?? ''
       const color = getActionColor(action)
@@ -272,7 +272,7 @@ export function getAllEnrichRecords(): EnrichRecord[] {
 
     try {
       const sheets = wb.Sheets
-      for (let i = 1; i <= sheets.Count; i++) {
+      for (let i = 1; i <= sheets.Count; i += 1) {
         const s = sheets.Item(i)
         if (s.Name === ENRICH_RECORD_SHEET_NAME) {
           sheet = s
@@ -328,7 +328,7 @@ export function getEnrichRecordSheetIfExists(): WpsWorksheet | null {
     if (!wb) return null
     const sheets = wb.Worksheets
     const count = sheets.Count
-    for (let i = 1; i <= count; i++) {
+    for (let i = 1; i <= count; i += 1) {
       const sheet = sheets.Item(i)
       if (sheet.Name === ENRICH_RECORD_SHEET_NAME) {
         return sheet
@@ -362,7 +362,7 @@ export function formatEnrichRecordSheet(): void {
     const lastCol = ENRICH_RECORD_COLUMNS.length
     const lastRow = getLastRow(sheet)
 
-    for (let c = 1; c <= lastCol; c++) {
+    for (let c = 1; c <= lastCol; c += 1) {
       setCellValue(sheet, 1, c, ENRICH_RECORD_COLUMNS[c - 1])
     }
 
@@ -380,7 +380,7 @@ export function formatEnrichRecordSheet(): void {
       dataRange.Borders.LineStyle = 1
     }
 
-    for (let c = 1; c <= lastCol; c++) {
+    for (let c = 1; c <= lastCol; c += 1) {
       const colLetter = colNumToLetter(c)
       const colRange = sheet.Range(`${colLetter}:${colLetter}`)
       colRange.ColumnWidth = 15

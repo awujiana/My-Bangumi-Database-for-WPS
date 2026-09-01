@@ -213,9 +213,9 @@ vi.mock('../../ts/sync/syncSourceRegistry.js', async () => {
         throw new Error(errMsg)
       }
 
-      onProgress?.(0, 0, `开始下载远程数据（${source.getDisplayName()} - 策略：${strategy}）...`)
+      onProgress?.(0, 0, `开始下载远程数据（${String(source.getDisplayName())} - 策略：${strategy}）...`)
       const remoteEntries = await source.fetchRemoteEntries(signal)
-      onProgress?.(1, 3, `下载完成：${remoteEntries.length} 条`)
+      onProgress?.(1, 3, `下载完成：${String(remoteEntries.length)} 条`)
 
       const local = githubSync.readLocalEntriesForSync()
       if (!local) {
@@ -239,7 +239,7 @@ vi.mock('../../ts/sync/syncSourceRegistry.js', async () => {
       onProgress?.(
         3,
         3,
-        `完成：新增 ${result.added}，更新 ${result.updated}，删除 ${result.deleted}`,
+        `完成：新增 ${String(result.added)}，更新 ${String(result.updated)}，删除 ${String(result.deleted)}`,
       )
       return result
     },

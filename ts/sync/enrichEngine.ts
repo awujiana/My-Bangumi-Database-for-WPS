@@ -297,7 +297,7 @@ export function detectColumns(sheet: WpsWorksheet, headerRow: number): EnrichCol
   const mapping: EnrichColumnMapping = { nameCol: 0 }
 
   const maxCols = 50
-  for (let col = 1; col <= maxCols; col++) {
+  for (let col = 1; col <= maxCols; col += 1) {
     const headerVal = getCellValue(sheet, headerRow, col).trim()
     if (!headerVal) continue
 
@@ -333,7 +333,7 @@ export function findAliasColumn(sheet: WpsWorksheet): number {
   if (headerRow === 0) return 0
 
   const maxCols = 50
-  for (let col = 1; col <= maxCols; col++) {
+  for (let col = 1; col <= maxCols; col += 1) {
     const headerVal = getCellValue(sheet, headerRow, col).trim().toLowerCase()
     if (headerVal.includes('别名') || headerVal.includes('alias') || headerVal.includes('原名')) {
       return col
@@ -396,7 +396,7 @@ function buildBangumiIndexes(
   const aliasCol = findAliasColumn(bangumiSheet)
   const lastRow = getLastRow(bangumiSheet)
 
-  for (let row = 2; row <= lastRow; row++) {
+  for (let row = 2; row <= lastRow; row += 1) {
     const name = getCellValue(bangumiSheet, row, nameCol).trim()
     if (!name) continue
 
@@ -455,7 +455,7 @@ export function matchEntries(
       return results
     }
 
-    for (let row = dataStartRow; row <= lastRow; row++) {
+    for (let row = dataStartRow; row <= lastRow; row += 1) {
       const rawName = getCellValue(newAnimeSheet, row, nameCol).trim()
       if (!rawName) continue
 
@@ -765,7 +765,7 @@ export function enrichEntries(
     )
   }
 
-  for (let i = 0; i < matches.length; i++) {
+  for (let i = 0; i < matches.length; i += 1) {
     const match = matches[i]
     if (!match) continue
     const current = i + 1
@@ -1126,7 +1126,7 @@ export function ensureBangumiColumns(
       bgmLog(LOG_LEVELS.WARN, '[ensureBangumiColumns] 复制样式失败，使用默认样式')
     }
 
-    for (let i = 0; i < missing.length; i++) {
+    for (let i = 0; i < missing.length; i += 1) {
       const newCol = maxCol + 1 + i
       const field = missing[i]?.field
       if (field) {
@@ -1497,7 +1497,7 @@ export function searchSheet(
   const lastRow = getLastRow(sheet)
   if (lastRow < dataStartRow) return results
 
-  for (let row = dataStartRow; row <= lastRow; row++) {
+  for (let row = dataStartRow; row <= lastRow; row += 1) {
     const nameValue = getCellValue(sheet, row, nameCol)
     if (!nameValue) continue
 
@@ -1580,12 +1580,12 @@ export function parseRemoteContent(content: string): Record<string, string>[] {
   const delimiter = firstLine.includes('\t') ? '\t' : ','
   const headers = firstLine.split(delimiter).map((h) => h.trim())
 
-  for (let i = 1; i < lines.length; i++) {
+  for (let i = 1; i < lines.length; i += 1) {
     const line = lines[i]
     if (line === undefined) continue
     const values = line.split(delimiter)
     const record: Record<string, string> = {}
-    for (let j = 0; j < headers.length; j++) {
+    for (let j = 0; j < headers.length; j += 1) {
       const key = headers[j]
       const val = values[j]
       if (key !== undefined) {
