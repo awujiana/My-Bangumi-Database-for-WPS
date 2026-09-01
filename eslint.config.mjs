@@ -49,7 +49,10 @@ const SAFE_UNICORN_FIXERS = new Set([
     // （会删除向后兼容 re-export 并剥离 import 名，破坏公共 API）、
     // prefer-dom-node-html-methods（其 fixer 把 `.innerHTML` **读取**改成 `.getHTML()`，
     // 而 getHTML 是 WPS webview Chromium 与 jsdom 均缺失的新 DOM API，实测 23 个测试
-    // TypeError: div.getHTML is not a function）。
+    // TypeError: div.getHTML is not a function）、
+    // prefer-add-event-listener（其 fixer 把 xhr.onload = fn 改成 addEventListener('load', fn)，
+    // 但测试的 XMLHttpRequest mock 只接线 .onload 属性赋值，不派发 addEventListener，
+    // 实测 151 测试失败 + 39 错误）。
     'switch-case-braces',                     // case 体加 {}（值保持）
     'prefer-string-repeat',                   // 'x'.repeat(n) 等价重写
     'prefer-dom-node-replace-children',       // el.innerHTML = '' → el.replaceChildren()
