@@ -232,20 +232,20 @@ export function getFilterStatus(
 
     if (!isWpsWorksheet(ws)) return result
 
-    let autoFilterMode = false
+    let isAutoFilterMode = false
     try {
-      autoFilterMode = !!ws.AutoFilterMode
+      isAutoFilterMode = !!ws.AutoFilterMode
     } catch (error: unknown) {
       BGM.handleError(error, { context: 'getFilterStatus', showAlert: false })
     }
     bgmLog(
       LOG_LEVELS.INFO,
-      `getFilterStatus: AutoFilterMode=${String(autoFilterMode)}, ws.Name=${ws.Name}, deepCheck=${String(deepCheck ?? '')}`,
+      `getFilterStatus: AutoFilterMode=${String(isAutoFilterMode)}, ws.Name=${ws.Name}, deepCheck=${String(deepCheck ?? '')}`,
     )
 
     // 2. 快速检测：仅在 deepCheck 时才扫描全范围
     //    旧用法（无 deepCheck）只查 AutoFilter，这是兼容的快速路径
-    if (!autoFilterMode && !deepCheck) {
+    if (!isAutoFilterMode && !deepCheck) {
       bgmLog(LOG_LEVELS.INFO, 'getFilterStatus: 快速路径：无 AutoFilter')
       return result
     }
@@ -257,7 +257,7 @@ export function getFilterStatus(
 
     // 4. 获取可见单元格来检测筛选/隐藏行
     let visibleCells: WpsRange | null = null
-    if (autoFilterMode) {
+    if (isAutoFilterMode) {
       try {
         if (ws.AutoFilter?.Range) {
           visibleCells = ws.AutoFilter.Range.SpecialCells(12)
@@ -281,7 +281,7 @@ export function getFilterStatus(
     }
 
     // 5. 快速判断：可见行数 ≈ 总行数 → 无隐藏行（仅对非 AutoFilter 的 deepCheck 模式）
-    if (!autoFilterMode) {
+    if (!isAutoFilterMode) {
       try {
         const totalCount = scanRange.Count
         const visibleCount = visibleCells.Count
@@ -419,7 +419,7 @@ export function buildJsonPayload(getField: (key: string) => string, _finishedDat
 
     // 观看状态 - 支持多种列名
     const statusKeys = ['是否看完', '状态', '观看状态', '收藏类型', 'type']
-    let statusFound = false
+    let isStatusFound = false
     let rawStatusValue = ''
     for (const key of statusKeys) {
       const statusValue = trim(getField(key))
@@ -428,7 +428,7 @@ export function buildJsonPayload(getField: (key: string) => string, _finishedDat
         const mappedStatus = mapWatchStatus(statusValue)
         if (mappedStatus > 0) {
           payload.type = mappedStatus
-          statusFound = true
+          isStatusFound = true
           bgmLog(
             LOG_LEVELS.INFO,
             `[buildJsonPayload] 从列 "${key}" 读取状态: "${statusValue}" -> ${String(mappedStatus)}`,
@@ -442,7 +442,7 @@ export function buildJsonPayload(getField: (key: string) => string, _finishedDat
         }
       }
     }
-    if (!statusFound) {
+    if (!isStatusFound) {
       if (!rawStatusValue) {
         // 所有状态字段为空 → 默认视为「想看」(status=1)
         payload.type = 1
@@ -762,7 +762,7 @@ async function batchSyncRequests(
   const success: _SyncTask[] = []
   const fail: _SyncTask[] = []
   let lastRequestTime = 0
-  let stopped = false
+  let isStopped = false
   const total = tasks.length
 
   const queue = [...tasks]
@@ -771,7 +771,7 @@ async function batchSyncRequests(
   while (queue.length > 0 || executing.length > 0) {
     if (BGM.sync.checkShouldStop()) {
       bgmLog(LOG_LEVELS.INFO, '[batchSyncRequests] 检测到停止请求，正在停止...')
-      stopped = true
+      isStopped = true
       if (executing.length > 0) {
         await Promise.all(executing.map((e) => e.promise))
       }
@@ -787,7 +787,7 @@ async function batchSyncRequests(
       await BGM.sync.waitForResume()
       if (BGM.sync.checkShouldStop()) {
         bgmLog(LOG_LEVELS.INFO, '[batchSyncRequests] 暂停期间收到停止请求，正在停止...')
-        stopped = true
+        isStopped = true
         if (executing.length > 0) {
           await Promise.all(executing.map((e) => e.promise))
         }
@@ -895,7 +895,7 @@ async function batchSyncRequests(
     }
   }
 
-  return { success, fail, stopped }
+  return { success, fail, stopped: isStopped }
 }
 
 /**
@@ -1099,7 +1099,7 @@ async function validateSelectedRows(
   // 选中行数超过阈值时弹出确认对话框
   if (rows.length > 10) {
     bgmLog(LOG_LEVELS.INFO, `[syncSelectedRows] 选中 ${String(rows.length)} 行，弹出确认对话框`)
-    const confirmed = await new Promise<boolean>((resolve) => {
+    const isConfirmed = await new Promise<boolean>((resolve) => {
       showConfirm(
         `选中了 ${String(rows.length)} 行数据，确认要同步全部吗？\n\n行号范围: ${String(Math.min(...rows))} - ${String(Math.max(...rows))}`,
         (result: boolean) => {
@@ -1108,7 +1108,7 @@ async function validateSelectedRows(
         '批量同步确认',
       )
     })
-    if (!confirmed) {
+    if (!isConfirmed) {
       bgmLog(LOG_LEVELS.INFO, '[syncSelectedRows] 用户取消同步')
       void wpsMessageBox('已取消同步', 0, 64)
       return null
@@ -1157,7 +1157,7 @@ async function executeSelectedSync(
   headerRow: number,
   startTime: number,
 ): Promise<void> {
-  let enteredRunning = false
+  let isEnteredRunning = false
   try {
     const urlCol = colMap.get('Bangumi_URL')!
     const nameCol = colMap.has('名称') ? colMap.get('名称')! : undefined
@@ -1171,7 +1171,7 @@ async function executeSelectedSync(
 
     // P2：进入运行状态（防重入 + 重置标志 + 置位）
     if (!BGM.sync.enterRunningState()) return
-    enteredRunning = true
+    isEnteredRunning = true
     const selectedRowsConfig: SyncConfigSummary = buildSyncConfig({
       source: '当前工作表',
       strategy: '选中行同步',
@@ -1411,7 +1411,7 @@ async function executeSelectedSync(
   } finally {
     // 统一在 finally 中清理运行状态，避免 catch/success 路径重复调用 exitRunningState
     // 正常完成时 completeSyncProgressDialog 已切换弹窗状态；异常时 hideSyncProgressDialog 已隐藏弹窗
-    if (enteredRunning) {
+    if (isEnteredRunning) {
       BGM.sync.exitRunningState()
     }
   }

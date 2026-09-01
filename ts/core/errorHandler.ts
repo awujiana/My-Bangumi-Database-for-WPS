@@ -5,15 +5,15 @@
  *              此处理只作为兜底，不能替代局部 try/catch 与 Promise.catch()。
  */
 
-let initialized = false
+let isInitialized = false
 
 /**
  * 初始化全局错误处理器
  * 幂等调用，重复执行不会重复注册监听器。
  */
 export function initGlobalErrorHandler(): void {
-  if (initialized) return
-  initialized = true
+  if (isInitialized) return
+  isInitialized = true
 
   if (typeof window !== 'undefined') {
     window.addEventListener('unhandledrejection', (event: PromiseRejectionEvent) => {
@@ -30,5 +30,5 @@ export function initGlobalErrorHandler(): void {
  * @internal
  */
 export function resetErrorHandlerState(): void {
-  initialized = false
+  isInitialized = false
 }

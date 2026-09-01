@@ -262,8 +262,8 @@ describe('setCellValue', () => {
 
   it('应设置单元格值并返回 true', () => {
     const ws = createMockWorksheet()
-    const result = setCellValue(ws, 1, 1, 'newValue')
-    expect(result).toBe(true)
+    const isResult = setCellValue(ws, 1, 1, 'newValue')
+    expect(isResult).toBe(true)
   })
 
   it('应通过 Range(A1) 地址写入', () => {
@@ -289,8 +289,8 @@ describe('setCellValue', () => {
 
   it('应在 cell 为 null 时返回 false 并记录错误日志', () => {
     const ws = { Range: vi.fn(() => null) }
-    const result = setCellValue(ws, 1, 1, 'test')
-    expect(result).toBe(false)
+    const isResult = setCellValue(ws, 1, 1, 'test')
+    expect(isResult).toBe(false)
     expect(bgmLog).toHaveBeenCalled()
   })
 
@@ -304,8 +304,8 @@ describe('setCellValue', () => {
       },
     }
     const ws = { Range: vi.fn(() => cell) }
-    const result = setCellValue(ws, 1, 1, 'test')
-    expect(result).toBe(false)
+    const isResult = setCellValue(ws, 1, 1, 'test')
+    expect(isResult).toBe(false)
     expect(BGM.handleError).toHaveBeenCalled()
   })
 })

@@ -296,8 +296,8 @@ const handleThemeChange = (): void => {
   const mode = select?.value || 'dark'
   // 乐观更新预览卡片，即使持久化失败也保持视觉一致
   updateThemePreview(mode)
-  const ok = saveTheme(mode)
-  if (ok) {
+  const isOk = saveTheme(mode)
+  if (isOk) {
     const labels: Record<string, string> = {
       dark: '深色模式',
       light: '浅色模式',
@@ -321,8 +321,8 @@ const handleThemePreviewClick = (event: Event): void => {
 const handleListTypeChange = (): void => {
   const select = document.getElementById('listTypeSelect') as HTMLSelectElement | null
   if (!select) return
-  const ok = setListType(select.value)
-  if (ok) {
+  const isOk = setListType(select.value)
+  if (isOk) {
     const labels: Record<string, string> = {
       all: '全部收藏',
       collect: '已看',
@@ -338,8 +338,8 @@ const handleListTypeChange = (): void => {
 const handleTimeFilterChange = (): void => {
   const select = document.getElementById('timeFilterSelect') as HTMLSelectElement | null
   if (!select) return
-  const ok = setTimeFilter(select.value)
-  if (ok) {
+  const isOk = setTimeFilter(select.value)
+  if (isOk) {
     const labels: Record<string, string> = {
       all: '全部时间',
       year: '全年',
@@ -367,8 +367,8 @@ const handleRefreshIntervalChange = (): void => {
     input.value = String(getRefreshInterval(true))
     return
   }
-  const ok = setRefreshInterval(minutes)
-  if (ok) {
+  const isOk = setRefreshInterval(minutes)
+  if (isOk) {
     const value = Math.round(minutes)
     showToast(
       `自动刷新间隔已设为 ${String(value)} 分钟${value === 0 ? '（已关闭）' : ''}`,
@@ -422,10 +422,10 @@ const debouncedSaveGithubConfig = debounce((): void => {
       if (!gistId) return
     } else if (!owner || !repo || !path) return
 
-    const okConfig = setGithubConfig({ owner, repo, branch, path, sourceType, gistId })
-    const okStrategy = setSyncStrategy(strategy)
-    const okSourceType = setSyncSourceType(sourceType)
-    if (okConfig && okStrategy && okSourceType) {
+    const isOkConfig = setGithubConfig({ owner, repo, branch, path, sourceType, gistId })
+    const isOkStrategy = setSyncStrategy(strategy)
+    const isOkSourceType = setSyncSourceType(sourceType)
+    if (isOkConfig && isOkStrategy && isOkSourceType) {
       bgmLog(
         LOG_LEVELS.INFO,
         `[handlers] GitHub 配置已自动保存: ${owner}/${repo}/${branch}/${path}, 策略: ${strategy}, 同步源: ${sourceType}${gistId ? `, gistId: ${gistId}` : ''}`,
@@ -474,9 +474,9 @@ export function setupButtonListeners(): void {
   if (chkEnableSyncRecord) {
     // 从 config 读取初始状态（与 chkIncremental/chkSkipConflicts 一致的双向同步机制）
     try {
-      const enabled = getSyncRecordEnabled()
-      chkEnableSyncRecord.checked = enabled
-      bgmLog(LOG_LEVELS.INFO, `[handlers] 从配置读取同步记录状态: ${enabled ? '开启' : '关闭'}`)
+      const isEnabled = getSyncRecordEnabled()
+      chkEnableSyncRecord.checked = isEnabled
+      bgmLog(LOG_LEVELS.INFO, `[handlers] 从配置读取同步记录状态: ${isEnabled ? '开启' : '关闭'}`)
     } catch (error: unknown) {
       bgmLog(LOG_LEVELS.WARN, `[handlers] 读取同步记录状态失败: ${(error as Error).message}`)
     }
@@ -743,8 +743,8 @@ const ACTION_HANDLERS: Record<string, ActionHandler> = {
   copyToken: (context) => {
     bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 复制 Token 到剪贴板')
     try {
-      const ok = copyTokenToClipboard()
-      if (ok) {
+      const isOk = copyTokenToClipboard()
+      if (isOk) {
         showToast('Token 已复制到剪贴板', 'success')
       } else {
         showToast('复制失败，可能未设置 Token 或浏览器不支持', 'error')
@@ -1022,10 +1022,10 @@ const ACTION_HANDLERS: Record<string, ActionHandler> = {
       return
     }
     const strategy = (strategySelect?.value as SyncStrategy | undefined) || 'add-update'
-    const okConfig = setGithubConfig(config)
-    const okStrategy = setSyncStrategy(strategy)
-    const okSourceType = setSyncSourceType(sourceType)
-    if (okConfig && okStrategy && okSourceType) {
+    const isOkConfig = setGithubConfig(config)
+    const isOkStrategy = setSyncStrategy(strategy)
+    const isOkSourceType = setSyncSourceType(sourceType)
+    if (isOkConfig && isOkStrategy && isOkSourceType) {
       showToast(`配置已保存（策略：${strategy}，同步源：${sourceType}）`, 'success')
       bgmLog(
         LOG_LEVELS.INFO,
@@ -1051,13 +1051,13 @@ const ACTION_HANDLERS: Record<string, ActionHandler> = {
     const chkSelectedOnly = document.getElementById(
       'chkSyncSelectedOnly',
     ) as HTMLInputElement | null
-    const selectedRowsOnly = chkSelectedOnly?.checked === true
+    const isSelectedRowsOnly = chkSelectedOnly?.checked === true
 
     // 读取时间筛选配置
     const chkTimeFilter = document.getElementById('chkTimeFilter') as HTMLInputElement | null
-    const timeFilterEnabled = chkTimeFilter?.checked === true
+    const isTimeFilterEnabled = chkTimeFilter?.checked === true
     let timeFilter: SyncTimeFilter | undefined
-    if (timeFilterEnabled) {
+    if (isTimeFilterEnabled) {
       const yearSelect = document.getElementById('timeFilterYear') as HTMLSelectElement | null
       const rangeSelect = document.getElementById('timeFilterRange') as HTMLSelectElement | null
       const quarterSelect = document.getElementById('timeFilterQuarter') as HTMLSelectElement | null
@@ -1114,7 +1114,7 @@ const ACTION_HANDLERS: Record<string, ActionHandler> = {
               : `\n📅 时间筛选：${String(timeFilter.year)}年${String(timeFilter.month ?? '')}月`
     }
     showConfirm(
-      `将从${sourceLabel}下载数据并按策略【${strategyLabel}】合并到当前工作表。\n（远程仓库 → Excel，与上传同步方向相反）${selectedRowsOnly ? '\n⚠️ 仅同步选中行' : ''}${timeFilterDesc}\n是否继续？`,
+      `将从${sourceLabel}下载数据并按策略【${strategyLabel}】合并到当前工作表。\n（远程仓库 → Excel，与上传同步方向相反）${isSelectedRowsOnly ? '\n⚠️ 仅同步选中行' : ''}${timeFilterDesc}\n是否继续？`,
       (confirmed) => {
         if (!confirmed) {
           bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 用户取消数据同步')
@@ -1129,7 +1129,7 @@ const ACTION_HANDLERS: Record<string, ActionHandler> = {
           source: sourceLabel,
           strategy: strategyLabel,
           direction: '远程仓库 → Excel',
-          selectedRowsOnly,
+          selectedRowsOnly: isSelectedRowsOnly,
         }
         if (timeFilter) {
           const tfContext: {
@@ -1179,7 +1179,7 @@ const ACTION_HANDLERS: Record<string, ActionHandler> = {
           },
           strategy,
           abortController.signal,
-          selectedRowsOnly,
+          isSelectedRowsOnly,
           undefined, // conflictResolution
           timeFilter,
         )
@@ -1340,7 +1340,7 @@ const ACTION_HANDLERS: Record<string, ActionHandler> = {
     xhr.onload = () => {
       const responseTime = Date.now() - testStartTs
       const statusCode = xhr.status
-      const success = statusCode >= 200 && statusCode < 400
+      const isSuccess = statusCode >= 200 && statusCode < 400
 
       bgmLog(
         LOG_LEVELS.INFO,
@@ -1348,12 +1348,12 @@ const ACTION_HANDLERS: Record<string, ActionHandler> = {
       )
 
       showConnectionTestDialog({
-        success,
+        success: isSuccess,
         statusCode,
         responseTime,
         url,
         sourceType,
-        errorMessage: !success ? `HTTP ${String(statusCode)}` : undefined,
+        errorMessage: !isSuccess ? `HTTP ${String(statusCode)}` : undefined,
       })
     }
 
@@ -1586,17 +1586,17 @@ const ACTION_HANDLERS: Record<string, ActionHandler> = {
       }
 
       // 4. 同步偏好（重新持久化）
-      const incremental = getIncrementalSync()
-      setIncrementalSync(incremental)
-      parts.push(`增量同步: ${incremental ? '开' : '关'}`)
+      const isIncremental = getIncrementalSync()
+      setIncrementalSync(isIncremental)
+      parts.push(`增量同步: ${isIncremental ? '开' : '关'}`)
 
-      const skipConflicts = getSkipConflicts()
-      setSkipConflicts(skipConflicts)
-      parts.push(`冲突策略: ${skipConflicts ? '跳过' : '覆盖'}`)
+      const isSkipConflicts = getSkipConflicts()
+      setSkipConflicts(isSkipConflicts)
+      parts.push(`冲突策略: ${isSkipConflicts ? '跳过' : '覆盖'}`)
 
-      const syncRecord = getSyncRecordEnabled()
-      setSyncRecordEnabled(syncRecord)
-      parts.push(`同步记录: ${syncRecord ? '开' : '关'}`)
+      const isSyncRecord = getSyncRecordEnabled()
+      setSyncRecordEnabled(isSyncRecord)
+      parts.push(`同步记录: ${isSyncRecord ? '开' : '关'}`)
 
       // 5. 同步策略
       const strategy = getSyncStrategy()
@@ -1720,39 +1720,39 @@ const ACTION_HANDLERS: Record<string, ActionHandler> = {
   // 设置页面：切换增量同步开关
   toggleIncrementalSync: (_context) => {
     const checkbox = document.getElementById('chkIncrementalSync') as HTMLInputElement | null
-    const enabled = checkbox?.checked ?? false
-    setIncrementalSync(enabled)
-    showToast(`增量同步已${enabled ? '开启' : '关闭'}`, 'success')
-    bgmLog(LOG_LEVELS.INFO, `[handleActionClick] 增量同步: ${enabled ? '开启' : '关闭'}`)
+    const isEnabled = checkbox?.checked ?? false
+    setIncrementalSync(isEnabled)
+    showToast(`增量同步已${isEnabled ? '开启' : '关闭'}`, 'success')
+    bgmLog(LOG_LEVELS.INFO, `[handleActionClick] 增量同步: ${isEnabled ? '开启' : '关闭'}`)
   },
 
   // 设置页面：切换跳过冲突开关
   toggleSkipConflicts: (_context) => {
     const checkbox = document.getElementById('chkSkipConflicts') as HTMLInputElement | null
-    const enabled = checkbox?.checked ?? false
-    setSkipConflicts(enabled)
-    showToast(`冲突处理: ${enabled ? '跳过冲突' : 'Excel覆盖'}`, 'success')
-    bgmLog(LOG_LEVELS.INFO, `[handleActionClick] 跳过冲突: ${enabled ? '开启' : '关闭'}`)
+    const isEnabled = checkbox?.checked ?? false
+    setSkipConflicts(isEnabled)
+    showToast(`冲突处理: ${isEnabled ? '跳过冲突' : 'Excel覆盖'}`, 'success')
+    bgmLog(LOG_LEVELS.INFO, `[handleActionClick] 跳过冲突: ${isEnabled ? '开启' : '关闭'}`)
   },
 
   // 设置页面：切换启用同步记录开关
   toggleEnableSyncRecord: (_context) => {
     const checkbox = document.getElementById('chkEnableSyncRecord') as HTMLInputElement | null
-    const enabled = checkbox?.checked ?? false
-    setSyncRecordEnabled(enabled)
-    showToast(`同步记录已${enabled ? '开启' : '关闭'}`, 'success')
-    bgmLog(LOG_LEVELS.INFO, `[handleActionClick] 启用同步记录: ${enabled ? '开启' : '关闭'}`)
+    const isEnabled = checkbox?.checked ?? false
+    setSyncRecordEnabled(isEnabled)
+    showToast(`同步记录已${isEnabled ? '开启' : '关闭'}`, 'success')
+    bgmLog(LOG_LEVELS.INFO, `[handleActionClick] 启用同步记录: ${isEnabled ? '开启' : '关闭'}`)
   },
 
   toggleNavIconsOnly: (_context) => {
     const checkbox = document.getElementById('chkNavIconsOnly') as HTMLInputElement | null
-    const enabled = checkbox?.checked ?? false
-    setNavIconsOnly(enabled)
-    showToast(`导航模式: ${enabled ? '仅图标' : '图标+文字'}`, 'success')
+    const isEnabled = checkbox?.checked ?? false
+    setNavIconsOnly(isEnabled)
+    showToast(`导航模式: ${isEnabled ? '仅图标' : '图标+文字'}`, 'success')
     if (typeof document !== 'undefined') {
-      document.body.classList.toggle('nav-icons-only', enabled)
+      document.body.classList.toggle('nav-icons-only', isEnabled)
     }
-    bgmLog(LOG_LEVELS.INFO, `[handleActionClick] 导航模式: ${enabled ? '仅图标' : '图标+文字'}`)
+    bgmLog(LOG_LEVELS.INFO, `[handleActionClick] 导航模式: ${isEnabled ? '仅图标' : '图标+文字'}`)
   },
 }
 
@@ -1878,9 +1878,9 @@ function _copyTextToClipboard(text: string): boolean {
     textarea.select()
     // execCommand 已废弃但仍是 WebView/Office 环境中最可靠的剪贴板回退方案（navigator.clipboard 需安全上下文，不可用）
     // eslint-disable-next-line @typescript-eslint/no-deprecated
-    const ok = document.execCommand('copy')
+    const isOk = document.execCommand('copy')
     document.body.removeChild(textarea)
-    return ok
+    return isOk
   } catch (error: unknown) {
     bgmLog(LOG_LEVELS.WARN, `[_copyTextToClipboard] 复制失败: ${(error as Error).message}`)
     return false
@@ -2252,9 +2252,9 @@ const handleIncrementalChange = (): void => {
   bgmLog(LOG_LEVELS.INFO, `[handlers] 新状态: ${checked ? '开启' : '关闭'}`)
 
   try {
-    const result = setIncrementalSync(checked)
+    const isResult = setIncrementalSync(checked)
 
-    if (result) {
+    if (isResult) {
       bgmLog(LOG_LEVELS.INFO, `[handlers] 增量同步状态已成功同步到配置和 Ribbon`)
     } else {
       bgmLog(LOG_LEVELS.WARN, `[handlers] 增量同步状态同步失败`)
@@ -2279,9 +2279,9 @@ const handleConflictStrategyChange = (): void => {
     `[handlers] 策略类型: ${isSkip ? '跳过冲突（保留Bangumi数据）' : 'Excel覆盖（用Excel数据覆盖）'}`,
   )
 
-  const result = setSkipConflicts(isSkip)
+  const isResult = setSkipConflicts(isSkip)
 
-  if (result) {
+  if (isResult) {
     bgmLog(LOG_LEVELS.INFO, `[handlers] 冲突策略已成功同步到配置和 Ribbon`)
   } else {
     bgmLog(LOG_LEVELS.WARN, `[handlers] 冲突策略同步失败`)
@@ -2347,11 +2347,11 @@ function initSkipConflictsFromRibbon(): void {
   if (!isPanelContext()) return
 
   try {
-    const skipConflicts = getSkipConflicts()
-    tryUpdateSkipConflictsUI(skipConflicts)
+    const isSkipConflicts = getSkipConflicts()
+    tryUpdateSkipConflictsUI(isSkipConflicts)
     bgmLog(
       LOG_LEVELS.INFO,
-      `[handlers] 从配置读取跳过冲突状态: ${skipConflicts ? '跳过冲突' : 'Excel覆盖'}`,
+      `[handlers] 从配置读取跳过冲突状态: ${isSkipConflicts ? '跳过冲突' : 'Excel覆盖'}`,
     )
   } catch (error: unknown) {
     BGM.handleError(error, {

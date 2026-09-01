@@ -57,7 +57,7 @@ function initPanelCore(): void {
   startUserInfoPolling()
 
   // 恢复上次锁定的工作表
-  const restored = restoreLockedSheet()
+  const isRestored = restoreLockedSheet()
   refreshSheets()
   refreshWorkbooks()
 
@@ -72,7 +72,7 @@ function initPanelCore(): void {
     saveLockedSheet({ index: detected.sheetIndex, name: detected.sheetName })
     updateLockButton()
     refreshData() // 立即刷新一次预览
-  } else if (restored && BGM.sheet.isLocked) {
+  } else if (isRestored && BGM.sheet.isLocked) {
     const select = document.getElementById('sheetSelect') as HTMLSelectElement | null
     if (select) select.value = String(BGM.sheet.lockedIndex)
     refreshData()

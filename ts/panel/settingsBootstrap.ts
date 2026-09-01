@@ -65,12 +65,12 @@ if (typeof document !== 'undefined') {
 
   // 超时兜底：如果 5 秒后仍未收到 bgm:modulesReady，输出 WARN 日志并强制启用按钮
   const timeoutMs = 5000
-  let forced = false
+  let isForced = false
   document.addEventListener('bgm:modulesReady', () => {
-    forced = true
+    isForced = true
   })
   setTimeout(() => {
-    if (!forced) {
+    if (!isForced) {
       console.warn(
         `[BGM Settings] ${String(timeoutMs)}ms 内未收到 bgm:modulesReady 事件，强制启用按钮（兜底）`,
       )

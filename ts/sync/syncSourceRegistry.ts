@@ -150,8 +150,8 @@ export async function syncFromRemote(
     // 3.5 空文档自动填充表头
     const ws = getDataSheet()
     if (ws) {
-      const filled = ensureSheetHeaders(ws)
-      if (filled) {
+      const isFilled = ensureSheetHeaders(ws)
+      if (isFilled) {
         bgmLog(LOG_LEVELS.INFO, '[syncFromRemote] 空文档已自动填充标准表头')
         onProgress?.(1, 3, '已自动填充表头，继续同步...')
       }

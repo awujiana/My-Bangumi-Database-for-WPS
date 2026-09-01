@@ -716,13 +716,13 @@ describe('ensureSheetHeaders', () => {
   })
 
   it('ws 为 null 时应返回 false', () => {
-    const result = ensureSheetHeaders(null)
-    expect(result).toBe(false)
+    const isResult = ensureSheetHeaders(null)
+    expect(isResult).toBe(false)
   })
 
   it('ws 为 undefined 时应返回 false', () => {
-    const result = ensureSheetHeaders(undefined)
-    expect(result).toBe(false)
+    const isResult = ensureSheetHeaders(undefined)
+    expect(isResult).toBe(false)
   })
 
   it('已有表头时应返回 false', () => {
@@ -734,8 +734,8 @@ describe('ensureSheetHeaders', () => {
       return ''
     })
     const ws = createMockWorksheet({ name: 'HasHeader' })
-    const result = ensureSheetHeaders(ws)
-    expect(result).toBe(false)
+    const isResult = ensureSheetHeaders(ws)
+    expect(isResult).toBe(false)
   })
 
   it('空工作表应写入表头并返回 true', () => {
@@ -750,8 +750,8 @@ describe('ensureSheetHeaders', () => {
     })
     // Mock Cells.Item to succeed
     ws.Cells.Item = vi.fn(() => createMockCell(''))
-    const result = ensureSheetHeaders(ws)
-    expect(result).toBe(true)
+    const isResult = ensureSheetHeaders(ws)
+    expect(isResult).toBe(true)
   })
 
   it('关键列写入失败时应返回 false', () => {
@@ -800,8 +800,8 @@ describe('ensureSheetHeaders', () => {
     ws.Cells.Item = vi.fn(() => {
       throw new Error('Cannot access')
     })
-    const result = ensureSheetHeaders(ws)
-    expect(result).toBe(false)
+    const isResult = ensureSheetHeaders(ws)
+    expect(isResult).toBe(false)
   })
 
   it('非关键列写入失败仍应返回 true', () => {
@@ -847,8 +847,8 @@ describe('ensureSheetHeaders', () => {
       return createMockCell('')
     })
     ws.Cells.Item = vi.fn(() => createMockCell(''))
-    const result = ensureSheetHeaders(ws)
-    expect(result).toBe(true)
+    const isResult = ensureSheetHeaders(ws)
+    expect(isResult).toBe(true)
   })
 })
 
@@ -1037,7 +1037,7 @@ describe('setCellValueDirect（间接测试 via ensureSheetHeaders）', () => {
   it('FormulaR1C1 路径成功时应写入', () => {
     vi.mocked(getCellValue).mockReturnValue('')
     const ws = createMockWorksheet({ name: 'FormulaR1C1' })
-    let formulaR1C1Written = false
+    let isFormulaR1C1Written = false
     const mockCell = {
       Value2: '',
       Value: '',
@@ -1045,7 +1045,7 @@ describe('setCellValueDirect（间接测试 via ensureSheetHeaders）', () => {
       Interior: { Color: 0 },
       Font: { Bold: false },
       set FormulaR1C1(v: string) {
-        formulaR1C1Written = true
+        isFormulaR1C1Written = true
       },
       get FormulaR1C1() {
         return ''
@@ -1093,8 +1093,8 @@ describe('setCellValueDirect（间接测试 via ensureSheetHeaders）', () => {
     }
     ws.Range = vi.fn(() => failCell)
     ws.Cells.Item = vi.fn(() => failCell)
-    const result = ensureSheetHeaders(ws)
+    const isResult = ensureSheetHeaders(ws)
     // 虽然所有列写入失败，但前5列全部失败 → 返回 false
-    expect(result).toBe(false)
+    expect(isResult).toBe(false)
   })
 })

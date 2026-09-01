@@ -146,15 +146,15 @@ const DIALOG_TYPES: Record<string, DialogConfig> = {
 }
 
 // ========== 模块内部状态 ==========
-let dialogInitialized = false
+let isDialogInitialized = false
 let _dialogCallback: DialogCallback | null = null
 let _toastTimer: number | null = null
 const dom: Record<string, HTMLElement | null> = {}
 
 // ========== 初始化 ==========
 function ensureDialogs(): void {
-  if (dialogInitialized) return
-  dialogInitialized = true
+  if (isDialogInitialized) return
+  isDialogInitialized = true
   createDialogs()
 }
 
@@ -380,9 +380,9 @@ function ensureSyncResultDialog(): HTMLElement {
   const toggleButton = modal.querySelector<HTMLElement>('#bgmSyncToggleDetails')!
 
   toggleButton.addEventListener('click', () => {
-    const expanded = detailsElement.style.display !== 'none'
-    detailsElement.style.display = expanded ? 'none' : 'block'
-    toggleButton.textContent = expanded ? '显示详情' : '收起详情'
+    const isExpanded = detailsElement.style.display !== 'none'
+    detailsElement.style.display = isExpanded ? 'none' : 'block'
+    toggleButton.textContent = isExpanded ? '显示详情' : '收起详情'
   })
 
   modal.querySelector<HTMLElement>('#bgmSyncResultOk')?.addEventListener('click', () => {
@@ -430,7 +430,7 @@ let _syncStopHandler: (() => void) | null = null
 let _syncNextHandler: (() => void) | null = null
 
 /** 当前是否处于暂停状态（统一监听器据此决定调用 pause 还是 resume） */
-let _syncPaused = false
+let _isSyncPaused = false
 
 /** 触发同步弹窗的元素（关闭后恢复焦点） */
 let _syncProgressTrigger: HTMLElement | null = null
@@ -447,7 +447,7 @@ function _setSyncPausedState(paused: boolean): void {
     _syncPausedDuration += Date.now() - _syncPauseStart
     _syncPauseStart = 0
   }
-  _syncPaused = paused
+  _isSyncPaused = paused
   const pauseButton = _syncProgressDialog?.querySelector(
     '#bgmSyncProgressPauseBtn',
   ) as HTMLButtonElement | null
@@ -469,7 +469,7 @@ function _clearSyncProgressHandlers(): void {
   _syncResumeHandler = null
   _syncStopHandler = null
   _syncNextHandler = null
-  _syncPaused = false
+  _isSyncPaused = false
   // 移除 ESC 监听器，避免泄漏
   if (_syncProgressEscHandler) {
     document.removeEventListener('keydown', _syncProgressEscHandler)
@@ -556,7 +556,7 @@ function ensureSyncProgressDialog(): HTMLElement {
   if (pauseButton) {
     pauseButton.addEventListener('click', (): void => {
       if (!_syncProgressDialog || _syncProgressDialog.style.display === 'none') return
-      if (_syncPaused) {
+      if (_isSyncPaused) {
         _syncResumeHandler?.()
         _setSyncPausedState(false)
       } else {
@@ -597,10 +597,10 @@ function ensureSyncProgressDialog(): HTMLElement {
     toggleDetailsButton.addEventListener('click', (): void => {
       const detailsElement = modal.querySelector<HTMLElement>('#bgmSyncProgressDetails')
       if (!detailsElement) return
-      const expanded = detailsElement.style.display !== 'none'
-      detailsElement.style.display = expanded ? 'none' : 'block'
-      toggleDetailsButton.textContent = expanded ? '显示详情' : '收起详情'
-      toggleDetailsButton.setAttribute('aria-label', expanded ? '显示详情' : '收起详情')
+      const isExpanded = detailsElement.style.display !== 'none'
+      detailsElement.style.display = isExpanded ? 'none' : 'block'
+      toggleDetailsButton.textContent = isExpanded ? '显示详情' : '收起详情'
+      toggleDetailsButton.setAttribute('aria-label', isExpanded ? '显示详情' : '收起详情')
     })
   }
 
@@ -647,7 +647,7 @@ export function showSyncProgressDialog(
   _syncPauseHandler = handlers.onPause
   _syncResumeHandler = handlers.onResume
   _syncStopHandler = handlers.onStop
-  _syncPaused = false
+  _isSyncPaused = false
   _syncProgressLogCount = 0
 
   // 初始化全局 ETA 追踪
@@ -800,7 +800,7 @@ export function updateSyncProgressDialog(
 
   // 将日志行追加到日志区（ETA 类型的 logLine 已在上方处理，不再重复追加）
   if (logLine && log && logLine !== etaText) {
-    const nearBottom = log.scrollHeight - log.scrollTop - log.clientHeight < 30
+    const isNearBottom = log.scrollHeight - log.scrollTop - log.clientHeight < 30
     log.appendChild(document.createTextNode(`${logLine}\n`))
     _syncProgressLogCount++
     while (_syncProgressLogCount > _SYNC_PROGRESS_LOG_MAX) {
@@ -811,7 +811,7 @@ export function updateSyncProgressDialog(
         break
       }
     }
-    if (nearBottom) {
+    if (isNearBottom) {
       log.scrollTop = log.scrollHeight
     }
   }

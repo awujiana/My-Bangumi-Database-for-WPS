@@ -1693,14 +1693,14 @@ describe('syncFromGithub finally 块恢复 ScreenUpdating/Calculation', () => {
     mockGetLastRow.mockReturnValue(5)
     mockGetColumnMap.mockReturnValue(new Map([['Bangumi_URL', 1]]))
 
-    let screenUpdatingValue = true
+    let isScreenUpdatingValue = true
     let calculationValue = 1
     const mockApp = {
       get ScreenUpdating() {
-        return screenUpdatingValue
+        return isScreenUpdatingValue
       },
       set ScreenUpdating(v: boolean) {
-        screenUpdatingValue = v
+        isScreenUpdatingValue = v
       },
       get Calculation() {
         return calculationValue
@@ -1717,12 +1717,12 @@ describe('syncFromGithub finally 块恢复 ScreenUpdating/Calculation', () => {
     setupXHRResponse(200, JSON.stringify(remoteEntries))
     mockParseJsonl.mockReturnValue({ entries: remoteEntries, errors: [] })
 
-    expect(screenUpdatingValue).toBe(true)
+    expect(isScreenUpdatingValue).toBe(true)
     expect(calculationValue).toBe(1)
 
     await syncFromGithub()
 
-    expect(screenUpdatingValue).toBe(true)
+    expect(isScreenUpdatingValue).toBe(true)
     expect(calculationValue).toBe(1)
   })
 
@@ -1733,14 +1733,14 @@ describe('syncFromGithub finally 块恢复 ScreenUpdating/Calculation', () => {
     mockGetLastRow.mockReturnValue(5)
     mockGetColumnMap.mockReturnValue(new Map([['Bangumi_URL', 1]]))
 
-    let screenUpdatingValue = true
+    let isScreenUpdatingValue = true
     let calculationValue = 1
     const mockApp = {
       get ScreenUpdating() {
-        return screenUpdatingValue
+        return isScreenUpdatingValue
       },
       set ScreenUpdating(v: boolean) {
-        screenUpdatingValue = v
+        isScreenUpdatingValue = v
       },
       get Calculation() {
         return calculationValue
@@ -1769,7 +1769,7 @@ describe('syncFromGithub finally 块恢复 ScreenUpdating/Calculation', () => {
     }
 
     // finally 块应恢复值
-    expect(screenUpdatingValue).toBe(true)
+    expect(isScreenUpdatingValue).toBe(true)
     expect(calculationValue).toBe(1)
   })
 

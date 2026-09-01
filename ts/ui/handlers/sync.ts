@@ -145,13 +145,13 @@ async function _fillSheetWithCollections(
       writes.push({ col: commentCol, value: item.comment })
     }
 
-    let rowOk = true
+    let isRowOk = true
     for (const { col, value } of writes) {
       if (!setCellValue(ws, row, col, value)) {
-        rowOk = false
+        isRowOk = false
       }
     }
-    if (rowOk) written++
+    if (isRowOk) written++
 
     // 每 50 行更新一次状态并让出事件循环，避免 UI 卡死
     if ((index + 1) % 50 === 0) {
@@ -279,13 +279,13 @@ function prepareSyncFromPanel(): SyncPreparedData | null {
 
   // 6. 增量同步开关（提前读取）
   bgmLog(LOG_LEVELS.INFO, '[syncFromPanel] 步骤6: 检查增量同步设置')
-  const incremental =
+  const isIncremental =
     (document.getElementById('chkIncremental') as HTMLInputElement | null)?.checked ?? false
-  bgmLog(LOG_LEVELS.INFO, `[syncFromPanel] 增量同步: ${incremental ? '开启' : '关闭'}`)
+  bgmLog(LOG_LEVELS.INFO, `[syncFromPanel] 增量同步: ${isIncremental ? '开启' : '关闭'}`)
 
   // 构建增量同步的指纹映射
   let fingerprintMap: Map<string, string> | undefined
-  if (incremental) {
+  if (isIncremental) {
     const allRecords = getAllSyncRecords()
     fingerprintMap = new Map()
     for (const r of allRecords) {
@@ -305,7 +305,7 @@ function prepareSyncFromPanel(): SyncPreparedData | null {
     token,
     lastRow,
     headerRow,
-    incremental,
+    incremental: isIncremental,
     fingerprintMap,
     originalActiveSheet,
     syncSheet,
@@ -396,12 +396,12 @@ async function confirmAndExecuteSync(prepared: SyncPreparedData): Promise<boolea
             空状态：${String(preview.emptyStatus)}
             ${incremental ? `增量跳过：${String(preview.incrementalSkipped)}\n` : ''}${conflictMessage}是否继续同步？\n\n同步开始后将切换到同步记录工作表查看进度。`
 
-  const confirmed = await new Promise<boolean>((resolve) => {
+  const isConfirmed = await new Promise<boolean>((resolve) => {
     showConfirm(message, (confirmed) => {
       resolve(confirmed)
     })
   })
-  if (!confirmed) {
+  if (!isConfirmed) {
     bgmLog(LOG_LEVELS.INFO, '[syncFromPanel] 用户取消同步')
     bgmLog(
       LOG_LEVELS.INFO,
@@ -539,9 +539,9 @@ export async function syncFromPanel(): Promise<void> {
     BGM.sync.exitRunningState()
     return
   }
-  let completed = false
+  let isCompleted = false
   try {
-    completed = await confirmAndExecuteSync(prepared)
+    isCompleted = await confirmAndExecuteSync(prepared)
   } finally {
     // 兜底释放运行锁（正常完成/异常路径已由 confirmAndExecuteSync 释放，此处仅处理用户取消的情况）
     if (BGM.sync.isRunning) {
@@ -560,7 +560,7 @@ export async function syncFromPanel(): Promise<void> {
       }
     }
   }
-  if (completed) {
+  if (isCompleted) {
     bgmLog(
       LOG_LEVELS.INFO,
       `[syncFromPanel] ========== 同步操作结束，总耗时: ${String(Date.now() - prepared.startTime)}ms ==========`,
@@ -700,7 +700,7 @@ async function _doAPISync(
       return
     }
 
-    const confirmed = await new Promise<boolean>((resolve) => {
+    const isConfirmed = await new Promise<boolean>((resolve) => {
       showConfirm(
         `当前工作表为空，是否从 Bangumi 收藏列表自动填充 ${String(userCollections.length)} 条条目？`,
         (confirmed) => {
@@ -708,7 +708,7 @@ async function _doAPISync(
         },
       )
     })
-    if (!confirmed) {
+    if (!isConfirmed) {
       bgmLog(LOG_LEVELS.INFO, '[_doAPISync] 用户取消空表填充')
       return
     }
@@ -888,7 +888,7 @@ async function _doAPISync(
       const bgmUrlCell = urlCol !== undefined ? getCell(ws, row, urlCol) : null
       const bgmUrl = bgmUrlCell ? trim(String(bgmUrlCell.Value ?? '')) : ''
       const sid = typeof extractSubjectId === 'function' ? extractSubjectId(bgmUrl) : ''
-      let matched = false
+      let isMatched = false
       if (sid && collectionMap.has(sid)) {
         const seqCol = colMap.get('序列号') || 9
         const seqCell = getCell(ws, row, seqCol)
@@ -902,14 +902,14 @@ async function _doAPISync(
                 : BGM_COLOR.DARK_GREEN
         }
         matchedCount++
-        matched = true
+        isMatched = true
       }
       currentCombined++
       updateSyncProgressDialog(
         currentCombined,
         totalCombined,
         `阶段2: 标记数据表 ${String(index + 1)}/${String(totalRows)}（匹配 ${String(matchedCount)}）`,
-        matched
+        isMatched
           ? `✓ [${String(index + 1)}/${String(totalRows)}] 行${String(row)} 匹配 SID=${sid ?? ''}`
           : `· [${String(index + 1)}/${String(totalRows)}] 行${String(row)} 未匹配`,
       )

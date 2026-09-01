@@ -117,10 +117,10 @@ export function startUserInfoPolling(): void {
       const currentUsername = _getBgmUsername()
       const currentToken = loadBgToken()
 
-      const userInfoChanged = currentUserId !== lastUserId || currentUsername !== lastUsername
-      const tokenChanged = currentToken !== lastToken
+      const isUserInfoChanged = currentUserId !== lastUserId || currentUsername !== lastUsername
+      const isTokenChanged = currentToken !== lastToken
 
-      if (userInfoChanged) {
+      if (isUserInfoChanged) {
         bgmLog(
           LOG_LEVELS.INFO,
           `[startUserInfoPolling] 检测到用户信息变更: userId=${currentUserId || '(无)'}, username=${currentUsername || '(无)'}`,
@@ -132,7 +132,7 @@ export function startUserInfoPolling(): void {
         updateUserIdStatus()
       }
 
-      if (tokenChanged) {
+      if (isTokenChanged) {
         bgmLog(
           LOG_LEVELS.INFO,
           `[startUserInfoPolling] 检测到 Token 变更: ${currentToken ? '已设置' : '已清除'}`,
@@ -147,36 +147,36 @@ export function startUserInfoPolling(): void {
       }
 
       // 同步 Ribbon 的配置变更到 Panel UI（增量同步 + 跳过冲突，静默读取避免日志刷屏）
-      const currentIncrementalSync = getIncrementalSync(true)
-      const currentSkipConflicts = getSkipConflicts(true)
+      const isCurrentIncrementalSync = getIncrementalSync(true)
+      const isCurrentSkipConflicts = getSkipConflicts(true)
 
-      if (currentIncrementalSync !== lastIncrementalSync) {
+      if (isCurrentIncrementalSync !== lastIncrementalSync) {
         bgmLog(
           LOG_LEVELS.INFO,
-          `[startUserInfoPolling] 检测到增量同步配置变更: ${currentIncrementalSync ? '开启' : '关闭'}`,
+          `[startUserInfoPolling] 检测到增量同步配置变更: ${isCurrentIncrementalSync ? '开启' : '关闭'}`,
         )
-        lastIncrementalSync = currentIncrementalSync
+        lastIncrementalSync = isCurrentIncrementalSync
         const chkIncremental = document.getElementById('chkIncremental') as HTMLInputElement | null
         if (chkIncremental) {
-          chkIncremental.checked = currentIncrementalSync
+          chkIncremental.checked = isCurrentIncrementalSync
           bgmLog(
             LOG_LEVELS.INFO,
-            `[startUserInfoPolling] 增量同步复选框已同步: ${currentIncrementalSync ? '开启' : '关闭'}`,
+            `[startUserInfoPolling] 增量同步复选框已同步: ${isCurrentIncrementalSync ? '开启' : '关闭'}`,
           )
         }
       }
 
-      if (currentSkipConflicts !== lastSkipConflicts) {
+      if (isCurrentSkipConflicts !== lastSkipConflicts) {
         bgmLog(
           LOG_LEVELS.INFO,
-          `[startUserInfoPolling] 检测到跳过冲突配置变更: ${currentSkipConflicts ? '跳过' : 'Excel覆盖'}`,
+          `[startUserInfoPolling] 检测到跳过冲突配置变更: ${isCurrentSkipConflicts ? '跳过' : 'Excel覆盖'}`,
         )
-        lastSkipConflicts = currentSkipConflicts
+        lastSkipConflicts = isCurrentSkipConflicts
         const conflictStrategySelect = document.getElementById(
           'conflictStrategy',
         ) as HTMLSelectElement | null
         if (conflictStrategySelect) {
-          conflictStrategySelect.value = currentSkipConflicts ? 'skip' : 'excel'
+          conflictStrategySelect.value = isCurrentSkipConflicts ? 'skip' : 'excel'
           bgmLog(
             LOG_LEVELS.INFO,
             `[startUserInfoPolling] 冲突策略 select 已同步: ${conflictStrategySelect.value}`,
@@ -184,21 +184,21 @@ export function startUserInfoPolling(): void {
         }
       }
 
-      const currentEnableSyncRecord = getSyncRecordEnabled(true)
-      if (currentEnableSyncRecord !== lastEnableSyncRecord) {
+      const isCurrentEnableSyncRecord = getSyncRecordEnabled(true)
+      if (isCurrentEnableSyncRecord !== lastEnableSyncRecord) {
         bgmLog(
           LOG_LEVELS.INFO,
-          `[startUserInfoPolling] 检测到同步记录开关变更: ${currentEnableSyncRecord ? '开启' : '关闭'}`,
+          `[startUserInfoPolling] 检测到同步记录开关变更: ${isCurrentEnableSyncRecord ? '开启' : '关闭'}`,
         )
-        lastEnableSyncRecord = currentEnableSyncRecord
+        lastEnableSyncRecord = isCurrentEnableSyncRecord
         const chkEnableSyncRecord = document.getElementById(
           'chkEnableSyncRecord',
         ) as HTMLInputElement | null
         if (chkEnableSyncRecord) {
-          chkEnableSyncRecord.checked = currentEnableSyncRecord
+          chkEnableSyncRecord.checked = isCurrentEnableSyncRecord
           bgmLog(
             LOG_LEVELS.INFO,
-            `[startUserInfoPolling] 启用同步记录 checkbox 已同步: ${currentEnableSyncRecord ? '开启' : '关闭'}`,
+            `[startUserInfoPolling] 启用同步记录 checkbox 已同步: ${isCurrentEnableSyncRecord ? '开启' : '关闭'}`,
           )
         }
       }

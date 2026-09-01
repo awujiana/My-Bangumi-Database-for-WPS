@@ -867,13 +867,13 @@ export async function syncAllRows(): Promise<{ success: number; fail: number; sk
 
   // ---------- 3. 读取增量同步设置 ----------
   const app = getApp()
-  let incremental = false
+  let isIncremental = false
   try {
-    incremental = app?.PluginStorage?.getItem('bgm_incremental_sync') === 'true'
+    isIncremental = app?.PluginStorage?.getItem('bgm_incremental_sync') === 'true'
   } catch (error: unknown) {
     bgmLog(LOG_LEVELS.WARN, `[syncAllRows] 读取增量同步设置失败: ${(error as Error).message}`)
   }
-  bgmLog(LOG_LEVELS.INFO, `[syncAllRows] 增量同步: ${incremental ? '开启' : '关闭'}`)
+  bgmLog(LOG_LEVELS.INFO, `[syncAllRows] 增量同步: ${isIncremental ? '开启' : '关闭'}`)
 
   // ---------- 4. 启动同步状态机 + 显示进度弹窗 ----------
   // 进入运行状态（防重入，统一入口）；失败则直接返回
@@ -892,7 +892,7 @@ export async function syncAllRows(): Promise<{ success: number; fail: number; sk
       direction: 'Excel → Bangumi',
       extra: [
         { label: '数据行', value: String(dataRows.length) },
-        { label: '增量同步', value: incremental ? '开启' : '关闭' },
+        { label: '增量同步', value: isIncremental ? '开启' : '关闭' },
       ],
     })
     // 显示同步进度弹窗（提供暂停/恢复/停止按钮）
@@ -913,7 +913,7 @@ export async function syncAllRows(): Promise<{ success: number; fail: number; sk
     )
 
     const result = await SyncToBangumiAsync(ws, colMap, token, lastRow, headerRow, {
-      incremental, // 从 Ribbon 设置读取
+      incremental: isIncremental, // 从 Ribbon 设置读取
       onProgress: (current, total, message) => {
         // 直接调用弹窗 API 更新进度，不再走事件总线
         updateSyncProgressDialog(current, total, message)

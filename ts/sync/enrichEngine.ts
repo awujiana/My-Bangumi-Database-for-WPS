@@ -1437,9 +1437,9 @@ export function enrichAlias(
   const aliasList = splitAliases(existingAliases)
 
   const normalizedNew = normalizeName(newAnimeName)
-  const alreadyExists = aliasList.some((a) => normalizeName(a) === normalizedNew)
+  const isAlreadyExists = aliasList.some((a) => normalizeName(a) === normalizedNew)
 
-  if (alreadyExists) {
+  if (isAlreadyExists) {
     enriched.push({
       fieldName: '别名',
       bangumiColumn: aliasCol,

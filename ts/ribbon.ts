@@ -144,38 +144,38 @@ function startRibbonConfigPolling(): void {
 
   _configPollingTimer = setInterval(() => {
     try {
-      const currentIncrementalSync = getIncrementalSync(true)
-      const currentSkipConflicts = getSkipConflicts(true)
-      const currentEnableSyncRecord = getSyncRecordEnabled(true)
+      const isCurrentIncrementalSync = getIncrementalSync(true)
+      const isCurrentSkipConflicts = getSkipConflicts(true)
+      const isCurrentEnableSyncRecord = getSyncRecordEnabled(true)
 
       const app = getApp()
       const ribbonUI = app?.ribbonUI as WpsRibbonUI | undefined
       if (!ribbonUI) return
 
-      if (currentIncrementalSync !== lastIncrementalSync) {
-        lastIncrementalSync = currentIncrementalSync
+      if (isCurrentIncrementalSync !== lastIncrementalSync) {
+        lastIncrementalSync = isCurrentIncrementalSync
         ribbonUI.InvalidateControl('chkIncrementalSync')
         bgmLog(
           LOG_LEVELS.INFO,
-          `[ribbon-polling] 增量同步配置变更: ${currentIncrementalSync ? '开启' : '关闭'}，已 InvalidateControl chkIncrementalSync`,
+          `[ribbon-polling] 增量同步配置变更: ${isCurrentIncrementalSync ? '开启' : '关闭'}，已 InvalidateControl chkIncrementalSync`,
         )
       }
 
-      if (currentSkipConflicts !== lastSkipConflicts) {
-        lastSkipConflicts = currentSkipConflicts
+      if (isCurrentSkipConflicts !== lastSkipConflicts) {
+        lastSkipConflicts = isCurrentSkipConflicts
         ribbonUI.InvalidateControl('chkSkipConflicts')
         bgmLog(
           LOG_LEVELS.INFO,
-          `[ribbon-polling] 跳过冲突配置变更: ${currentSkipConflicts ? '跳过' : 'Excel覆盖'}，已 InvalidateControl chkSkipConflicts`,
+          `[ribbon-polling] 跳过冲突配置变更: ${isCurrentSkipConflicts ? '跳过' : 'Excel覆盖'}，已 InvalidateControl chkSkipConflicts`,
         )
       }
 
-      if (currentEnableSyncRecord !== lastEnableSyncRecord) {
-        lastEnableSyncRecord = currentEnableSyncRecord
+      if (isCurrentEnableSyncRecord !== lastEnableSyncRecord) {
+        lastEnableSyncRecord = isCurrentEnableSyncRecord
         ribbonUI.InvalidateControl('chkEnableSyncRecord')
         bgmLog(
           LOG_LEVELS.INFO,
-          `[ribbon-polling] 同步记录开关变更: ${currentEnableSyncRecord ? '开启' : '关闭'}，已 InvalidateControl chkEnableSyncRecord`,
+          `[ribbon-polling] 同步记录开关变更: ${isCurrentEnableSyncRecord ? '开启' : '关闭'}，已 InvalidateControl chkEnableSyncRecord`,
         )
       }
     } catch {
@@ -224,9 +224,9 @@ export function removeRibbonMessageListener(): void {
  * 从配置读取上次保存的设置，默认未选中
  */
 export function GetSkipConflictsPressed(_control: WpsRibbonControl): boolean {
-  const result = getSkipConflicts()
-  bgmLog(LOG_LEVELS.INFO, `[Ribbon] GetSkipConflictsPressed: ${String(result)}`)
-  return result
+  const isResult = getSkipConflicts()
+  bgmLog(LOG_LEVELS.INFO, `[Ribbon] GetSkipConflictsPressed: ${String(isResult)}`)
+  return isResult
 }
 
 /**
@@ -240,17 +240,17 @@ export function OnSkipConflictsChange(control: WpsRibbonControl): boolean {
   )
 
   // 如果 control.Pressed 是 undefined，则切换当前状态
-  let finalValue: boolean
+  let isFinalValue: boolean
   if (typeof newValue === 'boolean') {
-    finalValue = newValue
+    isFinalValue = newValue
   } else {
-    finalValue = !getSkipConflicts()
-    bgmLog(LOG_LEVELS.INFO, `[Ribbon] control.Pressed 不可用，切换状态为: ${String(finalValue)}`)
+    isFinalValue = !getSkipConflicts()
+    bgmLog(LOG_LEVELS.INFO, `[Ribbon] control.Pressed 不可用，切换状态为: ${String(isFinalValue)}`)
   }
 
   // 保存到 PluginStorage
-  setSkipConflicts(finalValue)
-  bgmLog(LOG_LEVELS.INFO, `[Ribbon] 跳过冲突状态已保存到 PluginStorage: ${String(finalValue)}`)
+  setSkipConflicts(isFinalValue)
+  bgmLog(LOG_LEVELS.INFO, `[Ribbon] 跳过冲突状态已保存到 PluginStorage: ${String(isFinalValue)}`)
   return true // 必须返回 boolean
 }
 
@@ -259,9 +259,9 @@ export function OnSkipConflictsChange(control: WpsRibbonControl): boolean {
  * 从配置读取上次保存的设置，默认未选中
  */
 export function GetEnableSyncRecordPressed(_control: WpsRibbonControl): boolean {
-  const result = getSyncRecordEnabled()
-  bgmLog(LOG_LEVELS.INFO, `[Ribbon] GetEnableSyncRecordPressed: ${String(result)}`)
-  return result
+  const isResult = getSyncRecordEnabled()
+  bgmLog(LOG_LEVELS.INFO, `[Ribbon] GetEnableSyncRecordPressed: ${String(isResult)}`)
+  return isResult
 }
 
 /**
@@ -273,15 +273,15 @@ export function OnEnableSyncRecordChange(control: WpsRibbonControl): boolean {
     LOG_LEVELS.INFO,
     `[Ribbon] OnEnableSyncRecordChange: control.Pressed = ${String(newValue ?? '')}`,
   )
-  let finalValue: boolean
+  let isFinalValue: boolean
   if (typeof newValue === 'boolean') {
-    finalValue = newValue
+    isFinalValue = newValue
   } else {
-    finalValue = !getSyncRecordEnabled()
-    bgmLog(LOG_LEVELS.INFO, `[Ribbon] control.Pressed 不可用，切换状态为: ${String(finalValue)}`)
+    isFinalValue = !getSyncRecordEnabled()
+    bgmLog(LOG_LEVELS.INFO, `[Ribbon] control.Pressed 不可用，切换状态为: ${String(isFinalValue)}`)
   }
-  setSyncRecordEnabled(finalValue)
-  bgmLog(LOG_LEVELS.INFO, `[Ribbon] 启用同步记录状态已保存到 PluginStorage: ${String(finalValue)}`)
+  setSyncRecordEnabled(isFinalValue)
+  bgmLog(LOG_LEVELS.INFO, `[Ribbon] 启用同步记录状态已保存到 PluginStorage: ${String(isFinalValue)}`)
   return true
 }
 
@@ -290,9 +290,9 @@ export function OnEnableSyncRecordChange(control: WpsRibbonControl): boolean {
  * 从配置读取上次保存的设置，默认未选中
  */
 export function GetIncrementalSyncPressed(_control: WpsRibbonControl): boolean {
-  const result = getIncrementalSync()
-  bgmLog(LOG_LEVELS.INFO, `[Ribbon] GetIncrementalSyncPressed: ${String(result)}`)
-  return result
+  const isResult = getIncrementalSync()
+  bgmLog(LOG_LEVELS.INFO, `[Ribbon] GetIncrementalSyncPressed: ${String(isResult)}`)
+  return isResult
 }
 
 /**
@@ -300,15 +300,15 @@ export function GetIncrementalSyncPressed(_control: WpsRibbonControl): boolean {
  */
 export function OnIncrementalSyncChange(control: WpsRibbonControl): boolean {
   const newValue = control.Pressed
-  let finalValue: boolean
+  let isFinalValue: boolean
   if (typeof newValue === 'boolean') {
-    finalValue = newValue
+    isFinalValue = newValue
   } else {
-    finalValue = !getIncrementalSync()
-    bgmLog(LOG_LEVELS.INFO, `[Ribbon] control.Pressed 不可用，切换状态为: ${String(finalValue)}`)
+    isFinalValue = !getIncrementalSync()
+    bgmLog(LOG_LEVELS.INFO, `[Ribbon] control.Pressed 不可用，切换状态为: ${String(isFinalValue)}`)
   }
-  setIncrementalSync(finalValue)
-  bgmLog(LOG_LEVELS.INFO, `[Ribbon] 增量同步状态已保存到 PluginStorage: ${String(finalValue)}`)
+  setIncrementalSync(isFinalValue)
+  bgmLog(LOG_LEVELS.INFO, `[Ribbon] 增量同步状态已保存到 PluginStorage: ${String(isFinalValue)}`)
   return true
 }
 

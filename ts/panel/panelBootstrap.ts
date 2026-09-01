@@ -72,12 +72,12 @@ function updateStickyOffsets(): void {
   const topbar = document.querySelector('.topbar')
   const topbarH = topbar ? (topbar as HTMLElement).offsetHeight : 0
   root.style.setProperty('--topbar-h', `${String(topbarH)}px`)
-  const narrow =
+  const isNarrow =
     typeof window !== 'undefined' &&
     typeof window.matchMedia === 'function' &&
     window.matchMedia('(max-width: 880px)').matches
   let navH = 0
-  if (narrow) {
+  if (isNarrow) {
     const sb = document.querySelector('.sidebar')
     navH = sb ? (sb as HTMLElement).offsetHeight : 0
   }

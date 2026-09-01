@@ -482,8 +482,8 @@ export function ensureSheetHeaders(ws: WpsWorksheet | null | undefined): boolean
   for (let index = 0; index < STANDARD_HEADERS.length; index += 1) {
     const header = STANDARD_HEADERS[index]
     if (header !== undefined) {
-      const ok = setCellValueDirect(ws, 1, index + 1, header)
-      if (ok) {
+      const isOk = setCellValueDirect(ws, 1, index + 1, header)
+      if (isOk) {
         writeCount++
       } else {
         failCount++

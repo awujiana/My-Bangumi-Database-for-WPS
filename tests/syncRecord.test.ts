@@ -325,26 +325,26 @@ describe('syncRecord', () => {
     it('同步记录未启用时返回 false', () => {
       mockGetSyncRecordEnabled.mockReturnValue(false)
       mockGetApp.mockReturnValue({ ActiveWorkbook: createMockWorkbook() })
-      const result = addSyncRecord({
+      const isResult = addSyncRecord({
         sid: 'test-sid',
         name: '测试',
         url: 'https://bgm.tv/subject/123',
         type: '看',
         status: 'success',
       })
-      expect(result).toBe(false)
+      expect(isResult).toBe(false)
     })
 
     it('应添加新记录', () => {
       mockGetApp.mockReturnValue({ ActiveWorkbook: createMockWorkbook() })
-      const result = addSyncRecord({
+      const isResult = addSyncRecord({
         sid: 'test-sid',
         name: '测试',
         url: 'https://bgm.tv/subject/123',
         type: '看',
         status: 'success',
       })
-      expect(result).toBe(true)
+      expect(isResult).toBe(true)
     })
 
     it('应在已有 SID 时更新记录', () => {
@@ -359,7 +359,7 @@ describe('syncRecord', () => {
         status: 'success',
       })
       // Add second record with same SID → should update
-      const result = addSyncRecord({
+      const isResult = addSyncRecord({
         sid: 'update-sid',
         name: '第二次',
         url: 'http://example.com/2',
@@ -367,7 +367,7 @@ describe('syncRecord', () => {
         status: 'fail',
         count: 2,
       })
-      expect(result).toBe(true)
+      expect(isResult).toBe(true)
     })
 
     it('异常时应返回 false', () => {
@@ -379,42 +379,42 @@ describe('syncRecord', () => {
       // First add to build cache
       addSyncRecord({ sid: 'fail-sid', name: '测试', url: 'http://fail.com', type: '看' })
       // Second add → may update or add → could fail
-      const result = addSyncRecord({
+      const isResult = addSyncRecord({
         sid: 'fail-sid',
         name: '更新',
         url: 'http://fail.com/2',
         type: '看',
       })
-      expect(result).toBeDefined()
+      expect(isResult).toBeDefined()
     })
 
     it('空 SID 时仍应添加新记录', () => {
       mockGetApp.mockReturnValue({ ActiveWorkbook: createMockWorkbook() })
-      const result = addSyncRecord({
+      const isResult = addSyncRecord({
         sid: '',
         name: '无SID记录',
         url: 'http://example.com',
         type: '看',
       })
-      expect(result).toBe(true)
+      expect(isResult).toBe(true)
     })
   })
 
   describe('addSyncRecords', () => {
     it('空数组应返回 true', () => {
       mockGetApp.mockReturnValue({ ActiveWorkbook: createMockWorkbook() })
-      const result = addSyncRecords([])
-      expect(result).toBe(true)
+      const isResult = addSyncRecords([])
+      expect(isResult).toBe(true)
     })
 
     it('应批量添加记录', () => {
       mockGetApp.mockReturnValue({ ActiveWorkbook: createMockWorkbook() })
-      const result = addSyncRecords([
+      const isResult = addSyncRecords([
         { sid: '1', name: 'one', url: 'http://a.com' },
         { sid: '2', name: 'two', url: 'http://b.com' },
         { sid: '3', name: 'three', url: 'http://c.com' },
       ])
-      expect(result).toBe(true)
+      expect(isResult).toBe(true)
     })
 
     it('批量添加中某个记录失败应继续处理其他', () => {
@@ -422,22 +422,22 @@ describe('syncRecord', () => {
       mockSetCellValue.mockImplementation(
         (_ws: unknown, _r: unknown, c: unknown, _v: unknown) => true,
       )
-      const result = addSyncRecords([
+      const isResult = addSyncRecords([
         { sid: '1', name: 'one', url: 'http://a.com' },
         { sid: '2', name: 'two', url: 'http://b.com' },
       ])
-      expect(result).toBe(true)
+      expect(isResult).toBe(true)
     })
   })
 
   describe('addSyncRecordSummary', () => {
     it('应添加汇总记录', () => {
       mockGetApp.mockReturnValue({ ActiveWorkbook: createMockWorkbook() })
-      const result = addSyncRecordSummary({
+      const isResult = addSyncRecordSummary({
         content: '仓库同步汇总',
         message: '新增 5 条',
       })
-      expect(result).toBe(true)
+      expect(isResult).toBe(true)
     })
   })
 
@@ -501,22 +501,22 @@ describe('syncRecord', () => {
           },
         },
       })
-      const result = clearSyncRecords()
-      expect(result).toBe(false)
+      const isResult = clearSyncRecords()
+      expect(isResult).toBe(false)
     })
 
     it('工作表存在时应删除数据', () => {
       mockGetApp.mockReturnValue({ ActiveWorkbook: createMockWorkbook() })
-      const result = clearSyncRecords()
-      expect(result).toBe(true)
+      const isResult = clearSyncRecords()
+      expect(isResult).toBe(true)
     })
   })
 
   describe('deduplicateSyncRecords', () => {
     it('应执行去重', () => {
       mockGetApp.mockReturnValue({ ActiveWorkbook: createMockWorkbook() })
-      const result = deduplicateSyncRecords()
-      expect(result).toBe(true)
+      const isResult = deduplicateSyncRecords()
+      expect(isResult).toBe(true)
     })
   })
 
@@ -839,11 +839,11 @@ describe('syncRecord', () => {
   describe('addSyncRecords 批量写入', () => {
     it('新行应批量写入并设置颜色', () => {
       mockGetApp.mockReturnValue({ ActiveWorkbook: createMockWorkbook() })
-      const result = addSyncRecords([
+      const isResult = addSyncRecords([
         { sid: 'batch-1', name: '批量1', url: 'http://b1.com', type: '看', status: 'success' },
         { sid: 'batch-2', name: '批量2', url: 'http://b2.com', type: '想', status: 'success' },
       ])
-      expect(result).toBe(true)
+      expect(isResult).toBe(true)
     })
 
     it('SID 已存在时应合并次数', () => {
@@ -852,15 +852,15 @@ describe('syncRecord', () => {
       // 先添加一个记录建立缓存
       addSyncRecord({ sid: 'merge-sid', name: '初始', url: 'http://m.com', type: '看', count: 5 })
       // 批量添加相同 SID 应合并
-      const result = addSyncRecords([
+      const isResult = addSyncRecords([
         { sid: 'merge-sid', name: '更新', url: 'http://m2.com', type: '看', count: 3 },
       ])
-      expect(result).toBe(true)
+      expect(isResult).toBe(true)
     })
 
     it('空数组应直接返回 true', () => {
-      const result = addSyncRecords([])
-      expect(result).toBe(true)
+      const isResult = addSyncRecords([])
+      expect(isResult).toBe(true)
     })
 
     it('异常时应返回 false', () => {
@@ -888,10 +888,10 @@ describe('syncRecord', () => {
       })
       // 用相同 SID 批量添加，buildCache 会从 readRangeValues 中找到该 SID
       // 然后走更新路径时调用 setCellValue 抛出异常
-      const result = addSyncRecords([
+      const isResult = addSyncRecords([
         { sid: 'fail-batch', name: '更新', url: 'http://fail.com/2', type: '看', count: 2 },
       ])
-      expect(result).toBe(false)
+      expect(isResult).toBe(false)
     })
   })
 
@@ -907,8 +907,8 @@ describe('syncRecord', () => {
         if (c === 1) return `unique-sid-${String(r)}`
         return ''
       })
-      const result = deduplicateSyncRecords()
-      expect(result).toBe(true)
+      const isResult = deduplicateSyncRecords()
+      expect(isResult).toBe(true)
     })
 
     it('有重复 SID 时应合并并删除', () => {
@@ -921,15 +921,15 @@ describe('syncRecord', () => {
         if (c === 7) return '2' // count
         return ''
       })
-      const result = deduplicateSyncRecords()
-      expect(result).toBe(true)
+      const isResult = deduplicateSyncRecords()
+      expect(isResult).toBe(true)
     })
 
     it('lastRow <= 1 时应直接返回 true', () => {
       mockGetApp.mockReturnValue({ ActiveWorkbook: createMockWorkbook() })
       mockGetLastRow.mockReturnValue(1)
-      const result = deduplicateSyncRecords()
-      expect(result).toBe(true)
+      const isResult = deduplicateSyncRecords()
+      expect(isResult).toBe(true)
     })
 
     it('异常时应返回 false', () => {
@@ -943,8 +943,8 @@ describe('syncRecord', () => {
           },
         },
       })
-      const result = deduplicateSyncRecords()
-      expect(result).toBe(false)
+      const isResult = deduplicateSyncRecords()
+      expect(isResult).toBe(false)
     })
   })
 
@@ -954,13 +954,13 @@ describe('syncRecord', () => {
     it('getSyncRecordEnabled 返回 false 时应跳过', () => {
       mockGetSyncRecordEnabled.mockReturnValue(false)
       mockGetApp.mockReturnValue({ ActiveWorkbook: createMockWorkbook() })
-      const result = addSyncRecord({
+      const isResult = addSyncRecord({
         sid: 'disabled-sid',
         name: '禁用测试',
         url: 'http://disabled.com',
         type: '看',
       })
-      expect(result).toBe(false)
+      expect(isResult).toBe(false)
     })
   })
 
@@ -998,8 +998,8 @@ describe('syncRecord', () => {
       }
       mockGetApp.mockReturnValue({ ActiveWorkbook: mockWorkbook })
 
-      const result = clearSyncRecords()
-      expect(result).toBe(false)
+      const isResult = clearSyncRecords()
+      expect(isResult).toBe(false)
     })
   })
 
@@ -1176,7 +1176,7 @@ describe('syncRecord', () => {
         ],
       ])
 
-      const result = addSyncRecord({
+      const isResult = addSyncRecord({
         sid: 'existing-sid',
         status: 'success',
         count: 2,
@@ -1190,7 +1190,7 @@ describe('syncRecord', () => {
         collType: '想',
       })
 
-      expect(result).toBe(true)
+      expect(isResult).toBe(true)
       // 验证所有可选字段都被写入
       expect(mockSetCellValue).toHaveBeenCalled()
     })
@@ -1201,13 +1201,13 @@ describe('syncRecord', () => {
         ['2024-01-01T00:00:00', '', '', '', '', '1', '', 'success', '', '', ''],
       ])
 
-      const result = addSyncRecord({
+      const isResult = addSyncRecord({
         sid: 'minimal-sid',
         status: 'success',
         count: 1,
       })
 
-      expect(result).toBe(true)
+      expect(isResult).toBe(true)
       // 只更新必要字段，不调用可选字段的 setCellValue
     })
   })
@@ -1247,20 +1247,20 @@ describe('syncRecord', () => {
   describe('addSyncRecords 未启用场景 (lines 507-508)', () => {
     it('getSyncRecordEnabled 返回 false 时 addSyncRecords 应返回 false', () => {
       mockGetSyncRecordEnabled.mockReturnValue(false)
-      const result = addSyncRecords([
+      const isResult = addSyncRecords([
         { sid: 'disabled-1', name: '禁用测试1', url: 'http://d1.com' },
         { sid: 'disabled-2', name: '禁用测试2', url: 'http://d2.com' },
       ])
-      expect(result).toBe(false)
+      expect(isResult).toBe(false)
       // 不应调用任何 WPS 操作
       expect(mockSetCellValue).not.toHaveBeenCalled()
     })
 
     it('getSyncRecordEnabled 返回 false 且空数组时仍应返回 false', () => {
       mockGetSyncRecordEnabled.mockReturnValue(false)
-      const result = addSyncRecords([])
+      const isResult = addSyncRecords([])
       // 先检查 getSyncRecordEnabled，返回 false
-      expect(result).toBe(false)
+      expect(isResult).toBe(false)
     })
   })
 
@@ -1296,7 +1296,7 @@ describe('syncRecord', () => {
         },
       })
 
-      const result = addSyncRecord({
+      const isResult = addSyncRecord({
         sid: 'new-sid-fallback',
         name: '回退测试',
         url: 'http://fallback.com',
@@ -1304,7 +1304,7 @@ describe('syncRecord', () => {
         count: 1,
       })
 
-      expect(result).toBe(true)
+      expect(isResult).toBe(true)
       // 验证 newRow 使用了 2（Rows.Count > 1 ? 2 : 1）
       expect(mockSetCellValue).toHaveBeenCalled()
     })
@@ -1329,7 +1329,7 @@ describe('syncRecord', () => {
         },
       })
 
-      const result = addSyncRecord({
+      const isResult = addSyncRecord({
         sid: 'new-sid-row1',
         name: '单行测试',
         url: 'http://row1.com',
@@ -1337,7 +1337,7 @@ describe('syncRecord', () => {
         count: 1,
       })
 
-      expect(result).toBe(true)
+      expect(isResult).toBe(true)
     })
   })
 
@@ -1378,7 +1378,7 @@ describe('syncRecord', () => {
       })
 
       // 批量添加带全量可选字段的记录 → 走更新路径
-      const result = addSyncRecords([
+      const isResult = addSyncRecords([
         {
           sid: 'upd-sid',
           name: '新名称',
@@ -1394,7 +1394,7 @@ describe('syncRecord', () => {
         },
       ])
 
-      expect(result).toBe(true)
+      expect(isResult).toBe(true)
       // 更新路径：TIME, COUNT, STATUS, NAME, URL, TYPE, SOURCE, CONTENT, MESSAGE, FINGERPRINT, COLL_TYPE
       const setCellCalls = mockSetCellValue.mock.calls
       expect(setCellCalls.length).toBeGreaterThanOrEqual(10)
@@ -1424,7 +1424,7 @@ describe('syncRecord', () => {
       })
 
       // 只传部分可选字段
-      const result = addSyncRecords([
+      const isResult = addSyncRecords([
         {
           sid: 'partial-sid',
           url: 'http://new.com',
@@ -1433,7 +1433,7 @@ describe('syncRecord', () => {
         },
       ])
 
-      expect(result).toBe(true)
+      expect(isResult).toBe(true)
       // 至少有 TIME, COUNT, STATUS, URL 被写入
       const setCellCalls = mockSetCellValue.mock.calls
       expect(setCellCalls.length).toBeGreaterThanOrEqual(3)
@@ -1450,13 +1450,13 @@ describe('getStatusColor 默认分支 (line 93)', () => {
     mockReadRangeValues.mockReturnValue([])
     mockGetLastRow.mockReturnValue(10)
 
-    const result = addSyncRecord({
+    const isResult = addSyncRecord({
       sid: 'color-default',
       status: 'unknown-status',
       content: '测试默认颜色',
     })
 
-    expect(result).toBe(true)
+    expect(isResult).toBe(true)
     expect(mockSetCellValue.mock.calls.length).toBeGreaterThan(0)
   })
 
@@ -1467,13 +1467,13 @@ describe('getStatusColor 默认分支 (line 93)', () => {
     mockReadRangeValues.mockReturnValue([])
     mockGetLastRow.mockReturnValue(10)
 
-    const result = addSyncRecord({
+    const isResult = addSyncRecord({
       sid: 'color-success',
       status: 'success',
       content: '测试成功颜色',
     })
 
-    expect(result).toBe(true)
+    expect(isResult).toBe(true)
   })
 
   it('FAIL 状态应返回 FAIL 颜色', async () => {
@@ -1483,13 +1483,13 @@ describe('getStatusColor 默认分支 (line 93)', () => {
     mockReadRangeValues.mockReturnValue([])
     mockGetLastRow.mockReturnValue(10)
 
-    const result = addSyncRecord({
+    const isResult = addSyncRecord({
       sid: 'color-fail',
       status: 'fail',
       content: '测试失败颜色',
     })
 
-    expect(result).toBe(true)
+    expect(isResult).toBe(true)
   })
 
   it('SKIP 状态应返回 SKIP 颜色', async () => {
@@ -1499,13 +1499,13 @@ describe('getStatusColor 默认分支 (line 93)', () => {
     mockReadRangeValues.mockReturnValue([])
     mockGetLastRow.mockReturnValue(10)
 
-    const result = addSyncRecord({
+    const isResult = addSyncRecord({
       sid: 'color-skip',
       status: 'skip',
       content: '测试跳过颜色',
     })
 
-    expect(result).toBe(true)
+    expect(isResult).toBe(true)
   })
 })
 
@@ -1520,12 +1520,12 @@ describe('buildCache 异常路径 (line 343)', () => {
       throw new Error('读取范围失败')
     })
 
-    const result = addSyncRecord({
+    const isResult = addSyncRecord({
       sid: 'cache-err',
       content: '测试缓存异常',
     })
 
-    expect(typeof result).toBe('boolean')
+    expect(typeof isResult).toBe('boolean')
   })
 })
 
@@ -1568,7 +1568,7 @@ describe('addSyncRecord 更新路径 (lines 405-440)', () => {
       count: 2,
     })
 
-    const result = addSyncRecord({
+    const isResult = addSyncRecord({
       sid: 'update-sid',
       name: '新名称',
       url: 'http://new.com',
@@ -1582,7 +1582,7 @@ describe('addSyncRecord 更新路径 (lines 405-440)', () => {
       status: 'success',
     })
 
-    expect(result).toBe(true)
+    expect(isResult).toBe(true)
     const setCellCalls = mockSetCellValue.mock.calls
     expect(setCellCalls.length).toBeGreaterThanOrEqual(5)
   })
@@ -1611,14 +1611,14 @@ describe('addSyncRecord 更新路径 (lines 405-440)', () => {
       return ''
     })
 
-    const result = addSyncRecord({
+    const isResult = addSyncRecord({
       sid: 'partial-sid',
       url: 'http://new.com',
       count: 1,
       status: 'success',
     })
 
-    expect(result).toBe(true)
+    expect(isResult).toBe(true)
     const setCellCalls = mockSetCellValue.mock.calls
     expect(setCellCalls.length).toBeGreaterThanOrEqual(3)
   })
@@ -1647,13 +1647,13 @@ describe('addSyncRecord 更新路径 (lines 405-440)', () => {
       return ''
     })
 
-    const result = addSyncRecord({
+    const isResult = addSyncRecord({
       sid: 'coll-sid',
       count: 1,
       status: 'success',
     })
 
-    expect(result).toBe(true)
+    expect(isResult).toBe(true)
   })
 
   it('更新时 fingerprint 为 undefined 则跳过该分支', () => {
@@ -1680,13 +1680,13 @@ describe('addSyncRecord 更新路径 (lines 405-440)', () => {
       return ''
     })
 
-    const result = addSyncRecord({
+    const isResult = addSyncRecord({
       sid: 'fp-sid',
       count: 1,
       status: 'success',
     })
 
-    expect(result).toBe(true)
+    expect(isResult).toBe(true)
   })
 })
 
@@ -1699,7 +1699,7 @@ describe('addSyncRecord 新建路径 (lines 442-487)', () => {
     mockReadRangeValues.mockReturnValue([])
     mockSetCellValue.mockClear()
 
-    const result = addSyncRecord({
+    const isResult = addSyncRecord({
       sid: 'new-sid-1',
       name: '新条目',
       url: 'http://example.com',
@@ -1709,7 +1709,7 @@ describe('addSyncRecord 新建路径 (lines 442-487)', () => {
       content: '测试内容',
     })
 
-    expect(result).toBe(true)
+    expect(isResult).toBe(true)
     const setCellCalls = mockSetCellValue.mock.calls
     expect(setCellCalls.length).toBeGreaterThanOrEqual(8)
   })
@@ -1721,14 +1721,14 @@ describe('addSyncRecord 新建路径 (lines 442-487)', () => {
     mockReadRangeValues.mockReturnValue([])
     mockSetCellValue.mockClear()
 
-    const result = addSyncRecord({
+    const isResult = addSyncRecord({
       sid: 'new-fp-1',
       fingerprint: 'test-fingerprint',
       count: 1,
       status: 'success',
     })
 
-    expect(result).toBe(true)
+    expect(isResult).toBe(true)
   })
 
   it('新建路径 collType 不为空时应写入', async () => {
@@ -1738,28 +1738,28 @@ describe('addSyncRecord 新建路径 (lines 442-487)', () => {
     mockReadRangeValues.mockReturnValue([])
     mockSetCellValue.mockClear()
 
-    const result = addSyncRecord({
+    const isResult = addSyncRecord({
       sid: 'new-coll-1',
       collType: '想',
       count: 1,
       status: 'success',
     })
 
-    expect(result).toBe(true)
+    expect(isResult).toBe(true)
   })
 })
 
 // ========== 补充测试：addSyncRecords 批量写入异常路径 ==========
 describe('addSyncRecords 异常路径', () => {
   it('空记录数组应返回 true', () => {
-    const result = addSyncRecords([])
-    expect(result).toBe(true)
+    const isResult = addSyncRecords([])
+    expect(isResult).toBe(true)
   })
 
   it('同步记录未启用时应返回 false', () => {
     mockGetSyncRecordEnabled.mockReturnValue(false)
-    const result = addSyncRecords([{ sid: 'test' }])
-    expect(result).toBe(false)
+    const isResult = addSyncRecords([{ sid: 'test' }])
+    expect(isResult).toBe(false)
     mockGetSyncRecordEnabled.mockReturnValue(true)
   })
 })
@@ -1776,12 +1776,12 @@ describe('buildCache 异常路径精确覆盖 (line 343)', () => {
       throw mockError
     })
 
-    const result = addSyncRecord({
+    const isResult = addSyncRecord({
       sid: 'cache-err-343',
       content: '测试缓存异常路径',
     })
 
-    expect(typeof result).toBe('boolean')
+    expect(typeof isResult).toBe('boolean')
   })
 
   it('readRangeValues 返回格式错误数据时 buildCache 仍可正常处理', async () => {
@@ -1806,12 +1806,12 @@ describe('buildCache 异常路径精确覆盖 (line 343)', () => {
       ],
     ])
 
-    const result = addSyncRecord({
+    const isResult = addSyncRecord({
       sid: 'cache-valid',
       content: '有效缓存测试',
     })
 
-    expect(result).toBe(true)
+    expect(isResult).toBe(true)
   })
 })
 
@@ -1827,7 +1827,7 @@ describe('addSyncRecord 完整字段覆盖', () => {
   it('新建记录时写入所有可选字段', async () => {
     mockReadRangeValues.mockReturnValue([])
 
-    const result = addSyncRecord({
+    const isResult = addSyncRecord({
       sid: 'all-fields',
       name: '全字段',
       url: 'http://all.com',
@@ -1841,7 +1841,7 @@ describe('addSyncRecord 完整字段覆盖', () => {
       status: 'success',
     })
 
-    expect(result).toBe(true)
+    expect(isResult).toBe(true)
     const setCellCalls = mockSetCellValue.mock.calls
     expect(setCellCalls.length).toBeGreaterThanOrEqual(10)
   })
@@ -1872,7 +1872,7 @@ describe('addSyncRecord 完整字段覆盖', () => {
 
     addSyncRecord({ sid: 'upd-all', count: 2 })
 
-    const result = addSyncRecord({
+    const isResult = addSyncRecord({
       sid: 'upd-all',
       name: '新名称',
       url: 'http://new.com',
@@ -1886,7 +1886,7 @@ describe('addSyncRecord 完整字段覆盖', () => {
       status: 'success',
     })
 
-    expect(result).toBe(true)
+    expect(isResult).toBe(true)
   })
 })
 
@@ -1923,7 +1923,7 @@ describe('addSyncRecords 成功路径', () => {
       return ''
     })
 
-    const result = addSyncRecords([
+    const isResult = addSyncRecords([
       {
         sid: 'existing-sid',
         name: '更新条目',
@@ -1941,13 +1941,13 @@ describe('addSyncRecords 成功路径', () => {
       },
     ])
 
-    expect(result).toBe(true)
+    expect(isResult).toBe(true)
   })
 
   it('批量写入时 fingerprint 为 undefined 的字段使用空字符串', async () => {
     mockReadRangeValues.mockReturnValue([])
 
-    const result = addSyncRecords([
+    const isResult = addSyncRecords([
       {
         sid: 'no-fp',
         name: '无指纹',
@@ -1956,7 +1956,7 @@ describe('addSyncRecords 成功路径', () => {
       },
     ])
 
-    expect(result).toBe(true)
+    expect(isResult).toBe(true)
   })
 })
 
@@ -1978,14 +1978,14 @@ describe('buildCache 内层 catch 分支 (line 343)', () => {
       'invalid-string', // 非数组，访问 [SYNC_RECORD_COL.SID - 1] 会出错
     ])
 
-    const result = addSyncRecord({
+    const isResult = addSyncRecord({
       sid: 'inner-catch',
       content: '测试内层 catch',
       count: 1,
       status: 'success',
     })
 
-    expect(typeof result).toBe('boolean')
+    expect(typeof isResult).toBe('boolean')
   })
 
   it('行数据元素类型错误但未抛异常时不应中断', async () => {
@@ -2009,14 +2009,14 @@ describe('buildCache 内层 catch 分支 (line 343)', () => {
       ],
     ])
 
-    const result = addSyncRecord({
+    const isResult = addSyncRecord({
       sid: 'valid-sid',
       name: '正常名称',
       count: 1,
       status: 'success',
     })
 
-    expect(result).toBe(true)
+    expect(isResult).toBe(true)
   })
 })
 
@@ -2052,14 +2052,14 @@ describe('buildCache message 字段 (line 337)', () => {
       return ''
     })
 
-    const result = addSyncRecord({
+    const isResult = addSyncRecord({
       sid: 'msg-sid',
       name: '测试名称',
       count: 1,
       status: 'success',
     })
 
-    expect(result).toBe(true)
+    expect(isResult).toBe(true)
   })
 
   it('行数据中 message 字段为 undefined 时使用默认空字符串', async () => {
@@ -2086,14 +2086,14 @@ describe('buildCache message 字段 (line 337)', () => {
       return ''
     })
 
-    const result = addSyncRecord({
+    const isResult = addSyncRecord({
       sid: 'no-msg-sid',
       name: '测试名称',
       count: 1,
       status: 'success',
     })
 
-    expect(result).toBe(true)
+    expect(isResult).toBe(true)
   })
 })
 
@@ -2134,14 +2134,14 @@ describe('migrateSyncRecordSchema 数据行处理 (lines 289-293)', () => {
       },
     })
 
-    const result = addSyncRecord({
+    const isResult = addSyncRecord({
       sid: 'old-sid-1',
       name: '迁移测试',
       count: 1,
       status: 'success',
     })
 
-    expect(typeof result).toBe('boolean')
+    expect(typeof isResult).toBe('boolean')
   })
 })
 
@@ -2200,14 +2200,14 @@ describe('migrateSyncRecordSchema 数据行处理 (lines 289-293) - 带实际数
       },
     })
 
-    const result = addSyncRecord({
+    const isResult = addSyncRecord({
       sid: 'new-sid',
       name: '新记录',
       count: 1,
       status: 'success',
     })
 
-    expect(typeof result).toBe('boolean')
+    expect(typeof isResult).toBe('boolean')
     // 验证 setCellValue 被多次调用（包括迁移写入 + 新记录写入）
     expect(mockSetCellValue).toHaveBeenCalled()
   })
@@ -2236,14 +2236,14 @@ describe('migrateSyncRecordSchema 数据行处理 (lines 289-293) - 带实际数
       },
     })
 
-    const result = addSyncRecord({
+    const isResult = addSyncRecord({
       sid: 'empty-migrate',
       name: '空迁移',
       count: 1,
       status: 'success',
     })
 
-    expect(typeof result).toBe('boolean')
+    expect(typeof isResult).toBe('boolean')
   })
 })
 
@@ -2291,7 +2291,7 @@ describe('buildCache 内层 catch 精确覆盖 (line 343)', () => {
       return ''
     })
 
-    const result = addSyncRecord({
+    const isResult = addSyncRecord({
       sid: 'valid-sid-343',
       name: '正常名称',
       count: 1,
@@ -2299,7 +2299,7 @@ describe('buildCache 内层 catch 精确覆盖 (line 343)', () => {
     })
 
     // 即使某行数据处理异常，整体应继续执行
-    expect(result).toBe(true)
+    expect(isResult).toBe(true)
   })
 
   it('多个 Proxy 行均抛异常时不影响后续行处理', async () => {
@@ -2346,14 +2346,14 @@ describe('buildCache 内层 catch 精确覆盖 (line 343)', () => {
       return ''
     })
 
-    const result = addSyncRecord({
+    const isResult = addSyncRecord({
       sid: 'valid-sid-343b',
       name: '正常名称B',
       count: 1,
       status: 'success',
     })
 
-    expect(result).toBe(true)
+    expect(isResult).toBe(true)
   })
 })
 
@@ -2387,7 +2387,7 @@ describe('getOrCreateSyncRecordSheet 异常路径', () => {
     mockGetApp.mockReturnValue({ ActiveWorkbook: throwingWorkbook })
 
     // 即使查找工作表抛异常，getOrCreateSyncRecordSheet 应该继续尝试创建新表
-    const result = addSyncRecord({
+    const isResult = addSyncRecord({
       sid: 'catch-line-116',
       name: '异常捕获测试',
       count: 1,
@@ -2395,7 +2395,7 @@ describe('getOrCreateSyncRecordSheet 异常路径', () => {
     })
 
     // 函数应该继续执行并返回 true（创建新表成功）
-    expect(result).toBe(true)
+    expect(isResult).toBe(true)
   })
 
   it('sheet.Move 抛异常时应被 catch 捕获 (line 137)', async () => {
@@ -2420,7 +2420,7 @@ describe('getOrCreateSyncRecordSheet 异常路径', () => {
 
     mockGetApp.mockReturnValue({ ActiveWorkbook: wb })
 
-    const result = addSyncRecord({
+    const isResult = addSyncRecord({
       sid: 'catch-line-137',
       name: 'Move异常测试',
       count: 1,
@@ -2428,7 +2428,7 @@ describe('getOrCreateSyncRecordSheet 异常路径', () => {
     })
 
     // 即使 Move 失败，函数应继续执行
-    expect(typeof result).toBe('boolean')
+    expect(typeof isResult).toBe('boolean')
   })
 
   it('查找工作表抛异常但 Add 也失败时应能兜底', async () => {
@@ -2454,7 +2454,7 @@ describe('getOrCreateSyncRecordSheet 异常路径', () => {
     mockGetApp.mockReturnValue({ ActiveWorkbook: throwingWorkbook })
 
     // 即使 Add 也失败，addSyncRecord 应返回 false 而非崩溃
-    const result = addSyncRecord({
+    const isResult = addSyncRecord({
       sid: 'both-fail',
       name: '双重失败测试',
       count: 1,
@@ -2462,7 +2462,7 @@ describe('getOrCreateSyncRecordSheet 异常路径', () => {
     })
 
     // 应返回 false（无法创建工作表）
-    expect(result).toBe(false)
+    expect(isResult).toBe(false)
   })
 })
 
@@ -2511,8 +2511,8 @@ describe('clearSyncRecords UsedRange 回退路径 (line 799)', () => {
       },
     })
 
-    const result = clearSyncRecords()
-    expect(typeof result).toBe('boolean')
+    const isResult = clearSyncRecords()
+    expect(typeof isResult).toBe('boolean')
   })
 
   it('UsedRange 存在时使用 UsedRange 计算 lastRow', () => {
@@ -2541,8 +2541,8 @@ describe('clearSyncRecords UsedRange 回退路径 (line 799)', () => {
       },
     })
 
-    const result = clearSyncRecords()
-    expect(typeof result).toBe('boolean')
+    const isResult = clearSyncRecords()
+    expect(typeof isResult).toBe('boolean')
   })
 })
 
@@ -2612,8 +2612,8 @@ describe('deduplicateSyncRecords count 字段回退 (lines 670-675)', () => {
       if (c === 7) return '' // COUNT列为空
       return ''
     })
-    const result = deduplicateSyncRecords()
-    expect(result).toBe(true)
+    const isResult = deduplicateSyncRecords()
+    expect(isResult).toBe(true)
   })
 
   it('COUNT 列含非数字时合并回退到默认值 1', () => {
@@ -2626,8 +2626,8 @@ describe('deduplicateSyncRecords count 字段回退 (lines 670-675)', () => {
       if (c === 7) return 'N/A' // COUNT列非数字
       return ''
     })
-    const result = deduplicateSyncRecords()
-    expect(result).toBe(true)
+    const isResult = deduplicateSyncRecords()
+    expect(isResult).toBe(true)
   })
 
   it('COUNT 列混合有效数字与空值时正确累加', () => {
@@ -2645,8 +2645,8 @@ describe('deduplicateSyncRecords count 字段回退 (lines 670-675)', () => {
       }
       return ''
     })
-    const result = deduplicateSyncRecords()
-    expect(result).toBe(true)
+    const isResult = deduplicateSyncRecords()
+    expect(isResult).toBe(true)
   })
 })
 
@@ -2699,10 +2699,10 @@ describe('addSyncRecords UsedRange 为 null (line 560)', () => {
     wb.Sheets.Item = vi.fn().mockReturnValue(sheet)
     mockGetApp.mockReturnValue({ ActiveWorkbook: wb })
 
-    const result = addSyncRecords([
+    const isResult = addSyncRecords([
       { sid: 'null-range', name: '测试', url: 'http://test.com', type: '看', status: 'success' },
     ])
-    expect(result).toBe(true)
+    expect(isResult).toBe(true)
   })
 
   it('UsedRange 为 undefined 时应使用默认 startRow=2', () => {
@@ -2712,10 +2712,10 @@ describe('addSyncRecords UsedRange 为 null (line 560)', () => {
     wb.Sheets.Item = vi.fn().mockReturnValue(sheet)
     mockGetApp.mockReturnValue({ ActiveWorkbook: wb })
 
-    const result = addSyncRecords([
+    const isResult = addSyncRecords([
       { sid: 'undef-range', name: '测试', url: 'http://test.com', type: '看', status: 'success' },
     ])
-    expect(result).toBe(true)
+    expect(isResult).toBe(true)
   })
 })
 
@@ -2723,12 +2723,12 @@ describe('addSyncRecords UsedRange 为 null (line 560)', () => {
 describe('formatSyncRecordSheet _formattingInProgress 重入守卫 (line 697)', () => {
   it('重入调用时应被 _formattingInProgress 守卫拦截', () => {
     const sheet = createMockSheet({ name: SYNC_RECORD_SHEET_NAME })
-    let reentryTriggered = false
+    let isReentryTriggered = false
 
     // Mock getLastRow 在首次调用时触发重入
     mockGetLastRow.mockImplementation((_target: unknown) => {
-      if (!reentryTriggered) {
-        reentryTriggered = true
+      if (!isReentryTriggered) {
+        isReentryTriggered = true
         // 重入调用：此时 _formattingInProgress 应为 true，应直接返回
         formatSyncRecordSheet(sheet)
       }
@@ -2740,7 +2740,7 @@ describe('formatSyncRecordSheet _formattingInProgress 重入守卫 (line 697)', 
     formatSyncRecordSheet(sheet)
 
     // 验证重入确实发生
-    expect(reentryTriggered).toBe(true)
+    expect(isReentryTriggered).toBe(true)
   })
 })
 
@@ -2753,7 +2753,7 @@ describe('addSyncRecords fingerprint 未定义回退 (line 552)', () => {
     mockSetCellValue.mockClear()
 
     // 不传 fingerprint → 走 params.fingerprint !== undefined ? ... : ''
-    const result = addSyncRecord({
+    const isResult = addSyncRecord({
       sid: 'no-fingerprint',
       name: '无指纹测试',
       url: 'http://test.com',
@@ -2761,7 +2761,7 @@ describe('addSyncRecords fingerprint 未定义回退 (line 552)', () => {
       status: 'success',
     })
 
-    expect(result).toBe(true)
+    expect(isResult).toBe(true)
   })
 
   it('fingerprint 为 undefined 时批量添加应正常工作', async () => {
@@ -2771,12 +2771,12 @@ describe('addSyncRecords fingerprint 未定义回退 (line 552)', () => {
     mockSetCellValue.mockClear()
 
     // 批量添加，均不传 fingerprint
-    const result = addSyncRecords([
+    const isResult = addSyncRecords([
       { sid: 'batch-no-fp-1', name: '批量1', count: 1, status: 'success' },
       { sid: 'batch-no-fp-2', name: '批量2', count: 1, status: 'success' },
     ])
 
-    expect(result).toBe(true)
+    expect(isResult).toBe(true)
   })
 })
 
@@ -2790,7 +2790,7 @@ describe('addSyncRecords 批量写入 null 数据跳过 (line 573)', () => {
 
     // 使用 addSyncRecord 添加单条记录来触发批量写入路径
     // batchWriteNewRows 中若 newRows 含有 null 项，line 573 会跳过
-    const result = addSyncRecord({
+    const isResult = addSyncRecord({
       sid: 'null-data-test',
       name: 'null 数据测试',
       url: 'http://test.com',
@@ -2798,7 +2798,7 @@ describe('addSyncRecords 批量写入 null 数据跳过 (line 573)', () => {
       status: 'success',
     })
 
-    expect(result).toBe(true)
+    expect(isResult).toBe(true)
   })
 })
 
@@ -2818,8 +2818,8 @@ describe('deduplicateSyncRecords keepRow 为 undefined (line 670)', () => {
       return ''
     })
 
-    const result = deduplicateSyncRecords()
-    expect(typeof result).toBe('boolean')
+    const isResult = deduplicateSyncRecords()
+    expect(typeof isResult).toBe('boolean')
   })
 })
 
@@ -2827,23 +2827,23 @@ describe('deduplicateSyncRecords keepRow 为 undefined (line 670)', () => {
 describe('deduplicateSyncRecords 分支覆盖', () => {
   it('sheet 不存在时应返回 false', async () => {
     mockGetApp.mockReturnValue(null)
-    const result = deduplicateSyncRecords()
-    expect(result).toBe(false)
+    const isResult = deduplicateSyncRecords()
+    expect(isResult).toBe(false)
   })
 
   it('lastRow <= 1 时应返回 true 跳过去重 (line 650)', async () => {
     mockGetApp.mockReturnValue({ ActiveWorkbook: createMockWorkbook() })
     mockGetLastRow.mockReturnValue(1)
-    const result = deduplicateSyncRecords()
-    expect(result).toBe(true)
+    const isResult = deduplicateSyncRecords()
+    expect(isResult).toBe(true)
   })
 
   it('SID 全为空字符串时应跳过 (line 656)', async () => {
     mockGetApp.mockReturnValue({ ActiveWorkbook: createMockWorkbook() })
     mockGetLastRow.mockReturnValue(3)
     mockGetCellValue.mockImplementation(() => '')
-    const result = deduplicateSyncRecords()
-    expect(result).toBe(true)
+    const isResult = deduplicateSyncRecords()
+    expect(isResult).toBe(true)
   })
 
   it('无重复 SID 时不应触发去重日志 (line 666)', async () => {
@@ -2856,8 +2856,8 @@ describe('deduplicateSyncRecords 分支覆盖', () => {
       if (c === 7) return '1'
       return ''
     })
-    const result = deduplicateSyncRecords()
-    expect(result).toBe(true)
+    const isResult = deduplicateSyncRecords()
+    expect(isResult).toBe(true)
   })
 })
 
@@ -2885,13 +2885,13 @@ describe('addSyncRecordSummary 行为', () => {
     mockGetApp.mockReturnValue({ ActiveWorkbook: createMockWorkbook() })
     mockGetLastRow.mockReturnValue(5)
 
-    const result = addSyncRecordSummary({
+    const isResult = addSyncRecordSummary({
       name: '仓库同步汇总',
       content: '新增 5 条',
       status: 'success',
       count: 10, // 即使传入 count，也应被覆盖为 1
     })
 
-    expect(result).toBe(true)
+    expect(isResult).toBe(true)
   })
 })

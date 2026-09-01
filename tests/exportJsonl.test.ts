@@ -477,8 +477,8 @@ describe('exportSheetToJsonlFile', () => {
 
   it('无数据时应返回 false', () => {
     mockGetDataSheet.mockReturnValue(null)
-    const result = exportSheetToJsonlFile()
-    expect(result).toBe(false)
+    const isResult = exportSheetToJsonlFile()
+    expect(isResult).toBe(false)
   })
 
   it('有数据时应返回 true', () => {
@@ -510,8 +510,8 @@ describe('exportSheetToJsonlFile', () => {
     vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:test')
     vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => {})
 
-    const result = exportSheetToJsonlFile()
-    expect(result).toBe(true)
+    const isResult = exportSheetToJsonlFile()
+    expect(isResult).toBe(true)
   })
 
   it('buildJsonlFromSheet 返回空字符串时应返回 false', () => {
@@ -521,8 +521,8 @@ describe('exportSheetToJsonlFile', () => {
     mockGetLastRow.mockReturnValue(5)
     mockGetColumnMap.mockReturnValue(new Map())
 
-    const result = exportSheetToJsonlFile()
-    expect(result).toBe(false)
+    const isResult = exportSheetToJsonlFile()
+    expect(isResult).toBe(false)
   })
 
   it('document.createElement 抛出异常时应返回 false', () => {
@@ -545,8 +545,8 @@ describe('exportSheetToJsonlFile', () => {
       throw new Error('createElement 失败')
     })
 
-    const result = exportSheetToJsonlFile()
-    expect(result).toBe(false)
+    const isResult = exportSheetToJsonlFile()
+    expect(isResult).toBe(false)
     expect(mockBgmLog).toHaveBeenCalledWith('ERROR', expect.stringContaining('导出失败'))
   })
 
@@ -577,8 +577,8 @@ describe('exportSheetToJsonlFile', () => {
         writable: true,
       })
 
-      const result = exportSheetToJsonlFile()
-      expect(result).toBe(false)
+      const isResult = exportSheetToJsonlFile()
+      expect(isResult).toBe(false)
       expect(mockBgmLog).toHaveBeenCalledWith('ERROR', expect.stringContaining('导出失败'))
     } finally {
       Object.defineProperty(globalThis, 'Blob', {
@@ -617,8 +617,8 @@ describe('exportSheetToJsonlFile', () => {
     vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:test')
     const revokeSpy = vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => {})
 
-    const result = exportSheetToJsonlFile()
-    expect(result).toBe(true)
+    const isResult = exportSheetToJsonlFile()
+    expect(isResult).toBe(true)
 
     // 验证日志包含文件名
     const infoCalls = mockBgmLog.mock.calls.filter((c: unknown[]) => c[0] === 'INFO')

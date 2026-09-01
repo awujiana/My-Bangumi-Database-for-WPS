@@ -69,6 +69,10 @@ const SAFE_UNICORN_FIXERS = new Set([
     // 纯改名，无行为变化；eslint fixer 同步重命名绑定 + 作用域内所有引用（同 catch-error-name）。
     // 项目内 234 种改名 / 799 处，是当前最大单块（2026-09-01 拍板全清零）。
     'name-replacements',
+    // 布尔变量统一 is/has/should 等前缀（showUI→isShowUI）。纯改名，fixer 碰撞感知。
+    // 注意：no-keyword-prefix 无 fixer（fixable:undefined），无法 --fix，故**不放** SAFE，
+    // 留在 UNSAFE 组靠手工/codemod 逐处改名（325 处）。
+    'consistent-boolean-name',
 ])
 const UNSAFE_FIX_RULES = new Set([
     // unicorn 整组减去安全 fixer 子集：

@@ -497,8 +497,8 @@ function writeRemoteEntryToRow(
   fieldsToWrite: string[],
   forceOverwrite: boolean,
 ): { attempted: boolean; success: boolean } {
-  let anyAttempted = false
-  let anySucceeded = false
+  let isAnyAttempted = false
+  let isAnySucceeded = false
 
   /**
    * 安全写入字符串值：列存在时写入值（forceOverwrite=true 时空值也写入清空本地）
@@ -513,7 +513,7 @@ function writeRemoteEntryToRow(
     // 值无变化时跳过写入，避免空字符串重复写入并污染 undo 栈
     if (oldValue === value) return
 
-    anyAttempted = true
+    isAnyAttempted = true
 
     // 日期列：转换为本地"年月日"字符串格式
     if (DATE_COLUMNS.has(key)) {
@@ -521,7 +521,7 @@ function writeRemoteEntryToRow(
       if (localDate !== null) {
         recordUndoEntry({ row, col, oldValue, newValue: localDate })
         if (setCellValue(ws, row, col, localDate)) {
-          anySucceeded = true
+          isAnySucceeded = true
         }
         return
       }
@@ -530,7 +530,7 @@ function writeRemoteEntryToRow(
     // 非日期列或日期解析失败：写入字符串
     recordUndoEntry({ row, col, oldValue, newValue: value })
     if (setCellValue(ws, row, col, value)) {
-      anySucceeded = true
+      isAnySucceeded = true
     }
   }
 
@@ -549,23 +549,23 @@ function writeRemoteEntryToRow(
     const newValue = appendValueWithSeparator(oldValue, appendValue)
     if (newValue === oldValue) return
 
-    anyAttempted = true
+    isAnyAttempted = true
     recordUndoEntry({ row, col, oldValue, newValue })
     if (setCellValue(ws, row, col, newValue)) {
-      anySucceeded = true
+      isAnySucceeded = true
     }
   }
 
-  const writeAll = fieldsToWrite.includes('*')
+  const isWriteAll = fieldsToWrite.includes('*')
 
   // URL（从 sid 构造）
-  if (writeAll || fieldsToWrite.includes('Bangumi_URL')) {
+  if (isWriteAll || fieldsToWrite.includes('Bangumi_URL')) {
     safeSet('Bangumi_URL', `https://bgm.tv/subject/${remote.sid}`)
   }
   // 名称处理：
   // - 新增条目（writeAll）：直接写入「名称」列
   // - 更新条目（仅名称字段）：追加到「别名」列，保留本地名称不变
-  if (writeAll) {
+  if (isWriteAll) {
     safeSet('名称', remote.name ?? '')
   } else if (fieldsToWrite.includes('名称')) {
     const remoteName = remote.name ?? ''
@@ -576,10 +576,10 @@ function writeRemoteEntryToRow(
   // 标签处理：
   // - 新增条目（writeAll）：直接写入远程标签
   // - 更新条目（仅标签字段）：追加远程标签到本地后面，使用 ` | ` 分隔
-  if (writeAll || fieldsToWrite.includes('标签/分级')) {
+  if (isWriteAll || fieldsToWrite.includes('标签/分级')) {
     const remoteTags = tagsToString(remote.meta_tags)
     if (remoteTags) {
-      if (writeAll) {
+      if (isWriteAll) {
         safeSet('标签/分级', remoteTags)
       } else {
         // 更新模式：合并本地和远程标签
@@ -591,7 +591,7 @@ function writeRemoteEntryToRow(
     }
   }
   // 集数（使用 infobox 的「话数」）
-  if (writeAll || fieldsToWrite.includes('集数')) {
+  if (isWriteAll || fieldsToWrite.includes('集数')) {
     safeSet('集数', remote['话数'] ?? '')
   }
   // 扩展字段（EXTENDED_FIELD_MAP 中定义的 19 个字段）
@@ -601,19 +601,19 @@ function writeRemoteEntryToRow(
     if (handledJsonlFields.has(jsonlField)) continue
     handledJsonlFields.add(jsonlField)
     const excelAliases = getExcelAliases(jsonlField)
-    const anyAliasMatched = excelAliases.some((alias) => writeAll || fieldsToWrite.includes(alias))
-    if (!anyAliasMatched) continue
+    const isAnyAliasMatched = excelAliases.some((alias) => isWriteAll || fieldsToWrite.includes(alias))
+    if (!isAnyAliasMatched) continue
     const value = remote[jsonlField as keyof GithubRemoteEntry]
     if (typeof value !== 'string' && typeof value !== 'number') continue
     const stringValue = typeof value === 'number' ? String(value) : value
     for (const alias of excelAliases) {
-      if (writeAll || fieldsToWrite.includes(alias)) {
+      if (isWriteAll || fieldsToWrite.includes(alias)) {
         safeSet(alias, stringValue)
       }
     }
   }
 
-  return { attempted: anyAttempted, success: anySucceeded }
+  return { attempted: isAnyAttempted, success: isAnySucceeded }
 }
 
 // ========== 批量写入与性能追踪 ==========
@@ -836,21 +836,21 @@ function batchUpdateRows(
   // - forceOverwrite 或 writeAll：写入「名称」列
   // - 普通更新：追加到「别名」列
   for (const u of updates) {
-    const writeAll = u.fields.includes('*')
-    if (writeAll || u.fields.includes('Bangumi_URL')) tryAddCol('Bangumi_URL')
-    if (writeAll || u.fields.includes('名称')) {
+    const isWriteAll = u.fields.includes('*')
+    if (isWriteAll || u.fields.includes('Bangumi_URL')) tryAddCol('Bangumi_URL')
+    if (isWriteAll || u.fields.includes('名称')) {
       tryAddCol('名称') // 强制覆盖/新增时写入名称列
       tryAddCol('别名') // 普通更新时写入别名列
     }
-    if (writeAll || u.fields.includes('标签/分级')) tryAddCol('标签/分级')
-    if (writeAll || u.fields.includes('集数')) tryAddCol('集数')
+    if (isWriteAll || u.fields.includes('标签/分级')) tryAddCol('标签/分级')
+    if (isWriteAll || u.fields.includes('集数')) tryAddCol('集数')
     // 扩展字段：同时检查主映射和所有别名（如「动画制作公司」→「制作公司」/「动画制作公司」）
     const handled = new Set<string>()
     for (const [jsonlField] of EXTENDED_FIELD_MAP) {
       if (handled.has(jsonlField)) continue
       handled.add(jsonlField)
       const aliases = getExcelAliases(jsonlField)
-      if (writeAll || aliases.some((a) => u.fields.includes(a))) {
+      if (isWriteAll || aliases.some((a) => u.fields.includes(a))) {
         for (const a of aliases) tryAddCol(a)
       }
     }
@@ -874,7 +874,7 @@ function batchUpdateRows(
     const { row } = u
     const { remote } = u
     const { fields } = u
-    const writeAll = fields.includes('*')
+    const isWriteAll = fields.includes('*')
 
     // 先读取当前行的值（用于合并逻辑和 undo 记录）
     let oldArray: (string | number | null)[] = []
@@ -906,14 +906,14 @@ function batchUpdateRows(
       const oldCellValue = oldArray[index] != null ? String(oldArray[index]) : ''
 
       if (wc.name === 'Bangumi_URL') {
-        if (writeAll || fields.includes('Bangumi_URL')) {
+        if (isWriteAll || fields.includes('Bangumi_URL')) {
           value = `https://bgm.tv/subject/${remote.sid}`
           shouldWrite = true
         }
       } else if (wc.name === '别名') {
         // 名称追加到「别名」列（合并策略）
         // forceOverwrite 或 writeAll 时直接写入名称列（不合并）
-        if (!forceOverwrite && !writeAll && fields.includes('名称')) {
+        if (!forceOverwrite && !isWriteAll && fields.includes('名称')) {
           const remoteName = remote.name ?? ''
           if (remoteName) {
             value = appendValueWithSeparator(oldCellValue, remoteName)
@@ -925,15 +925,15 @@ function batchUpdateRows(
         // forceOverwrite 或 writeAll 时不处理别名（由名称列处理）
       } else if (wc.name === '名称') {
         // 名称列仅在 forceOverwrite 或 writeAll 时写入（新增或强制覆盖）
-        if (forceOverwrite || writeAll || fields.includes('名称')) {
+        if (forceOverwrite || isWriteAll || fields.includes('名称')) {
           value = remote.name ?? ''
           shouldWrite = true
         }
       } else if (wc.name === '标签/分级') {
-        if (writeAll || fields.includes('标签/分级')) {
+        if (isWriteAll || fields.includes('标签/分级')) {
           const remoteTags = tagsToString(remote.meta_tags)
           if (remoteTags) {
-            if (forceOverwrite || writeAll) {
+            if (forceOverwrite || isWriteAll) {
               // 强制覆盖或新增：直接写入
               value = remoteTags
               shouldWrite = true
@@ -947,7 +947,7 @@ function batchUpdateRows(
           }
         }
       } else if (wc.name === '集数') {
-        if (writeAll || fields.includes('集数')) {
+        if (isWriteAll || fields.includes('集数')) {
           value = remote['话数'] ?? ''
           shouldWrite = true
         }
@@ -963,7 +963,7 @@ function batchUpdateRows(
         }
         if (matchedJsonlField) {
           const aliases = getExcelAliases(matchedJsonlField)
-          if (writeAll || aliases.some((a) => fields.includes(a))) {
+          if (isWriteAll || aliases.some((a) => fields.includes(a))) {
             const v = remote[matchedJsonlField as keyof GithubRemoteEntry]
             if (typeof v === 'string') {
               if (DATE_COLUMNS.has(wc.name)) {
@@ -1220,7 +1220,7 @@ export async function applyDiffToSheet(
   const lastRow = getLastRow(ws)
   const colMap = getColumnMap(ws, headerRow)
   let nextAppendRow = lastRow + 1
-  const forceOverwrite = strategy === 'force-overwrite'
+  const isForceOverwrite = strategy === 'force-overwrite'
 
   // delete 操作需倒序执行（从大行号到小行号），避免行号错位
   const sortedDiffs = [...diffs]
@@ -1296,7 +1296,7 @@ export async function applyDiffToSheet(
               nextAppendRow,
               diff.remote,
               ['*'],
-              forceOverwrite,
+              isForceOverwrite,
             )
             if (writeResult.success || !writeResult.attempted) {
               // 写入成功 或 没有写入需要尝试（如空列映射）→ 视为成功
@@ -1416,7 +1416,7 @@ export async function applyDiffToSheet(
       ws,
       colMap,
       batchUpdates,
-      forceOverwrite,
+      isForceOverwrite,
       syncRecords,
       result.details,
     )
@@ -1702,8 +1702,8 @@ export async function syncFromGithub(
     // 空文档自动填充表头
     const ws = getDataSheet()
     if (ws) {
-      const filled = ensureSheetHeaders(ws)
-      if (filled) {
+      const isFilled = ensureSheetHeaders(ws)
+      if (isFilled) {
         bgmLog(LOG_LEVELS.INFO, '[syncFromGithub] 空文档已自动填充标准表头')
         onProgress?.(1, 3, '已自动填充表头，继续同步...')
       }

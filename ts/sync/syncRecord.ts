@@ -66,8 +66,8 @@ export interface UpdateRecordParams {
 // ========== 内存缓存 ==========
 const _syncRecordSidCache = new Map<string, number>()
 let _syncRecordListCache: SyncRecord[] = []
-let _syncRecordCacheValid = false
-let _formattingInProgress = false
+let _isSyncRecordCacheValid = false
+let _isFormattingInProgress = false
 
 /**
  * 根据同步次数获取颜色
@@ -199,7 +199,7 @@ export function getSyncRecordSheetIfExists(): WpsWorksheet | null {
 }
 
 function invalidateCache(): void {
-  _syncRecordCacheValid = false
+  _isSyncRecordCacheValid = false
 }
 
 /**
@@ -295,19 +295,19 @@ function migrateSyncRecordSchema(sheet: WpsWorksheet): void {
 }
 
 function buildCache(sheet: WpsWorksheet): void {
-  if (_syncRecordCacheValid) return
+  if (_isSyncRecordCacheValid) return
   _syncRecordSidCache.clear()
   _syncRecordListCache.length = 0
 
   const lastRow = getLastRow(sheet)
   if (lastRow < 2) {
-    _syncRecordCacheValid = true
+    _isSyncRecordCacheValid = true
     return
   }
 
   const allData = readRangeValues(sheet, 2, lastRow, 1, SYNC_RECORD_COLUMNS.length)
   if (allData.length === 0) {
-    _syncRecordCacheValid = true
+    _isSyncRecordCacheValid = true
     return
   }
 
@@ -340,7 +340,7 @@ function buildCache(sheet: WpsWorksheet): void {
       BGM.handleError(error, { context: 'buildCache', showAlert: false })
     }
   }
-  _syncRecordCacheValid = true
+  _isSyncRecordCacheValid = true
 }
 
 /**
@@ -393,7 +393,7 @@ export function addSyncRecord(parameters: UpdateRecordParams): boolean {
     // 写入数据前先去重，确保缓存数据干净
     deduplicateSyncRecords()
 
-    if (!_syncRecordCacheValid) buildCache(sheet)
+    if (!_isSyncRecordCacheValid) buildCache(sheet)
 
     const sid = parameters.sid || ''
     const now = new Date().toLocaleString('zh-CN')
@@ -509,7 +509,7 @@ export function addSyncRecords(records: UpdateRecordParams[]): boolean {
   try {
     const sheet = getOrCreateSyncRecordSheet()
     deduplicateSyncRecords()
-    if (!_syncRecordCacheValid) buildCache(sheet)
+    if (!_isSyncRecordCacheValid) buildCache(sheet)
 
     const now = new Date().toLocaleString('zh-CN')
     const newRows: string[][] = []
@@ -630,7 +630,7 @@ export function getAllSyncRecords(): SyncRecord[] {
       bgmLog(LOG_LEVELS.WARN, '[getAllSyncRecords] 同步记录表不存在，请先启用同步记录功能')
       return []
     }
-    if (!_syncRecordCacheValid) buildCache(sheet)
+    if (!_isSyncRecordCacheValid) buildCache(sheet)
     return [..._syncRecordListCache]
   } catch (error: unknown) {
     BGM.handleError(error, { context: 'getAllSyncRecords', showAlert: false })
@@ -693,18 +693,18 @@ export function deduplicateSyncRecords(): boolean {
 }
 
 export function formatSyncRecordSheet(sheet?: WpsWorksheet): void {
-  if (_formattingInProgress) return
-  _formattingInProgress = true
+  if (_isFormattingInProgress) return
+  _isFormattingInProgress = true
   try {
     const target = sheet || getSyncRecordSheetIfExists()
     if (!target) {
       bgmLog(LOG_LEVELS.WARN, '[formatSyncRecordSheet] 同步记录表不存在，请先启用同步记录功能')
-      _formattingInProgress = false
+      _isFormattingInProgress = false
       return
     }
     const lastRow = getLastRow(target)
     if (lastRow < 1) {
-      _formattingInProgress = false
+      _isFormattingInProgress = false
       return
     }
 
@@ -777,9 +777,9 @@ export function formatSyncRecordSheet(sheet?: WpsWorksheet): void {
     }
 
     bgmLog(LOG_LEVELS.INFO, '同步记录表格式已设置')
-    _formattingInProgress = false
+    _isFormattingInProgress = false
   } catch (error: unknown) {
-    _formattingInProgress = false
+    _isFormattingInProgress = false
     BGM.handleError(error, { context: 'formatSyncRecordSheet', showAlert: false })
   }
 }
@@ -799,7 +799,7 @@ export function clearSyncRecords(): boolean {
     }
     _syncRecordSidCache.clear()
     _syncRecordListCache = []
-    _syncRecordCacheValid = true
+    _isSyncRecordCacheValid = true
     bgmLog(LOG_LEVELS.INFO, '已清除所有同步记录')
     return true
   } catch (error: unknown) {
@@ -839,6 +839,6 @@ export function openSyncRecordSheet(scrollToRow?: number): void {
 export function __resetSyncRecordCache(): void {
   _syncRecordSidCache.clear()
   _syncRecordListCache = []
-  _syncRecordCacheValid = false
-  _formattingInProgress = false
+  _isSyncRecordCacheValid = false
+  _isFormattingInProgress = false
 }

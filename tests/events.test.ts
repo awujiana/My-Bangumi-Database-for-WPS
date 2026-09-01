@@ -10,12 +10,12 @@ describe('EventBus', () => {
 
   describe('on / emit', () => {
     it('应调用订阅的处理器', () => {
-      let called = false
+      let isCalled = false
       bus.on('test', () => {
-        called = true
+        isCalled = true
       })
       bus.emit('test')
-      expect(called).toBe(true)
+      expect(isCalled).toBe(true)
     })
 
     it('应传递数据给处理器', () => {
@@ -129,15 +129,15 @@ describe('EventBus', () => {
 
   describe('错误处理', () => {
     it('处理器异常不应中断其他处理器', () => {
-      let secondCalled = false
+      let isSecondCalled = false
       bus.on('err', () => {
         throw new Error('boom')
       })
       bus.on('err', () => {
-        secondCalled = true
+        isSecondCalled = true
       })
       bus.emit('err')
-      expect(secondCalled).toBe(true)
+      expect(isSecondCalled).toBe(true)
     })
   })
 })

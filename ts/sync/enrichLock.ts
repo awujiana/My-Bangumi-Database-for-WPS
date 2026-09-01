@@ -129,7 +129,7 @@ export function refreshEnrichSheets(
   defaultOpt.textContent = '-- 请选择工作表 --'
   select.appendChild(defaultOpt)
 
-  let lockedFound = false
+  let isLockedFound = false
   for (let index = 1; index <= sheets.Count; index += 1) {
     const option = document.createElement('option')
     const sheet = sheets.Item(index)
@@ -138,13 +138,13 @@ export function refreshEnrichSheets(
 
     if (currentLockedSheet === sheet.Name && BGM.enrich.isLocked) {
       option.selected = true
-      lockedFound = true
+      isLockedFound = true
     }
 
     select.appendChild(option)
   }
 
-  if (lockedFound) {
+  if (isLockedFound) {
     BGM.enrich.lockedSheetIndex = parseInt(select.value, 10) || null
   }
 
@@ -310,15 +310,15 @@ export function restoreEnrichLockedWorkbook(): boolean {
     }
 
     // 校验工作表是否仍存在于工作簿中
-    let sheetFound = false
+    let isSheetFound = false
     for (let index = 1; index <= wb.Worksheets.Count; index += 1) {
       const ws = wb.Worksheets.Item(index)
       if (ws.Name === info.sheetName) {
-        sheetFound = true
+        isSheetFound = true
         break
       }
     }
-    if (!sheetFound) {
+    if (!isSheetFound) {
       bgmLog(
         LOG_LEVELS.WARN,
         `[restoreEnrichLockedWorkbook] 锁定的工作表 "${info.sheetName}" 在工作簿 "${info.workbookName}" 中已不存在`,
@@ -450,8 +450,8 @@ export function initEnrichLock(
 ): void {
   refreshEnrichWorkbooks(wbSelectId)
 
-  const restored = restoreEnrichLockedWorkbook()
-  if (restored) {
+  const isRestored = restoreEnrichLockedWorkbook()
+  if (isRestored) {
     // 恢复成功：设置下拉框选中值
     const wbSelect = document.getElementById(wbSelectId) as HTMLSelectElement | null
     if (wbSelect && BGM.enrich.lockedWorkbookName) {

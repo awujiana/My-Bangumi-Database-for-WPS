@@ -611,8 +611,8 @@ export function showSyncResultDialog(options: SyncResultDialogOptions): void {
   const exportButton = modal.querySelector('#bgmResultExportBtn')
   exportButton?.addEventListener('click', () => {
     const originalText = exportButton.textContent
-    const success = exportSheetToJsonlFile()
-    if (success) {
+    const isSuccess = exportSheetToJsonlFile()
+    if (isSuccess) {
       exportButton.textContent = '✅ 已导出'
       setTimeout(() => {
         exportButton.textContent = originalText
@@ -633,10 +633,10 @@ export function showSyncResultDialog(options: SyncResultDialogOptions): void {
         const { getSyncRecordSheetIfExists, openSyncRecordSheet } = syncRecordModule
         const { getSyncRecordEnabled } = configModule
 
-        const syncEnabled = getSyncRecordEnabled()
-        const sheetExists = getSyncRecordSheetIfExists() !== null
+        const isSyncEnabled = getSyncRecordEnabled()
+        const isSheetExists = getSyncRecordSheetIfExists() !== null
 
-        if (syncEnabled && sheetExists) {
+        if (isSyncEnabled && isSheetExists) {
           openSyncRecordSheet(scrollToRow)
         } else {
           showSyncDetailPreviewDialog({
@@ -645,8 +645,8 @@ export function showSyncResultDialog(options: SyncResultDialogOptions): void {
             avgSpeed,
             strategyLabel,
             scrollToRow,
-            syncEnabled,
-            sheetExists,
+            syncEnabled: isSyncEnabled,
+            sheetExists: isSheetExists,
           })
         }
       })

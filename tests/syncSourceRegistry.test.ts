@@ -671,14 +671,14 @@ describe('syncSourceRegistry 未覆盖分支', () => {
 
   it('设置 ScreenUpdating 抛异常时应被 catch 且流程继续', async () => {
     // 创建带有 setter 的 mock app
-    let _screenUpdating = true
+    let _isScreenUpdating = true
     const mockAppWithSetterError = {
       get ScreenUpdating() {
-        return _screenUpdating
+        return _isScreenUpdating
       },
       set ScreenUpdating(v: boolean) {
         if (!v) throw new Error('COM 调用失败')
-        _screenUpdating = v
+        _isScreenUpdating = v
       },
       Calculation: 1,
     }

@@ -248,8 +248,8 @@ export const BGM: {
       bgmLog(LOG_LEVELS.INFO, `[sync] 同步已暂停，当前行: ${String(this.currentRow)}`)
       eventBus.emit(BGM_EVENTS.SYNC_STATE_CHANGED, { state: 'paused', row: this.currentRow })
       // 定位到当前单元格
-      const located = this.locateCurrentCell()
-      if (!located) {
+      const isLocated = this.locateCurrentCell()
+      if (!isLocated) {
         showToast('已暂停，但无法定位到当前单元格', 'warn')
       }
     },
@@ -797,18 +797,18 @@ export function copyTokenToClipboard(): boolean {
     textarea.select()
     // execCommand 已废弃（no-deprecated），但 WPS WebView 中 Clipboard API 不可用时可回退使用，
     // 这里以精确类型调用规避废弃标注
-    const ok = (
+    const isOk = (
       document as unknown as {
         execCommand: (commandId: string, showUI?: boolean, value?: string) => boolean
       }
     ).execCommand('copy')
     document.body.removeChild(textarea)
-    if (ok) {
+    if (isOk) {
       bgmLog(LOG_LEVELS.INFO, '[copyTokenToClipboard] Token 已复制到剪贴板')
     } else {
       bgmLog(LOG_LEVELS.WARN, '[copyTokenToClipboard] execCommand copy 失败')
     }
-    return ok
+    return isOk
   } catch (error: unknown) {
     bgmLog(LOG_LEVELS.ERROR, `[copyTokenToClipboard] 复制失败: ${(error as Error).message}`)
     return false
@@ -1104,27 +1104,27 @@ export function showBangumiPanel(): void {
     return
   }
   const tsId = app.PluginStorage?.getItem('panel_id')
-  let becameVisible = false
+  let isBecameVisible = false
   if (!tsId) {
     const tskpane = app.CreateTaskPane?.(`${getUrlPath()}/ui/panel.html`)
     if (tskpane) {
       const id = tskpane.ID
       app.PluginStorage?.setItem('panel_id', id)
       tskpane.Visible = true
-      becameVisible = true
+      isBecameVisible = true
     }
   } else {
     const tskpane = app.GetTaskPane?.(tsId)
     if (tskpane) {
       // 切换可见性：从隐藏→显示时才触发刷新信号
       if (!tskpane.Visible) {
-        becameVisible = true
+        isBecameVisible = true
       }
       tskpane.Visible = !tskpane.Visible
     }
   }
   // 写入"面板已显示"信号（时间戳），panel 轮询检测到变化后自动刷新工作表
-  if (becameVisible) {
+  if (isBecameVisible) {
     try {
       app.PluginStorage?.setItem('bgm_panel_shown_at', String(Date.now()))
       bgmLog(LOG_LEVELS.INFO, `[showBangumiPanel] 面板已显示，已写入刷新信号`)
@@ -1193,15 +1193,15 @@ export function showSettingsPanel(): void {
   const mainPanelId = app.PluginStorage?.getItem('panel_id')
 
   // 检查主面板当前可见性
-  let mainPanelVisible = false
+  let isMainPanelVisible = false
   if (mainPanelId) {
     const mainPanel = app.GetTaskPane?.(mainPanelId)
-    mainPanelVisible = mainPanel?.Visible ?? false
+    isMainPanelVisible = mainPanel?.Visible ?? false
   }
 
   bgmLog(
     LOG_LEVELS.INFO,
-    `[showSettingsPanel] 主面板状态: ${mainPanelVisible ? '可见' : '隐藏'}, settingsId: ${settingsId ?? '无'}`,
+    `[showSettingsPanel] 主面板状态: ${isMainPanelVisible ? '可见' : '隐藏'}, settingsId: ${settingsId ?? '无'}`,
   )
 
   // 始终停靠右侧

@@ -95,24 +95,24 @@ describe('setGithubConfig', () => {
 
   it('应保存配置', () => {
     vi.mocked(getApp).mockReturnValue(createMockApp({}))
-    const result = setGithubConfig({
+    const isResult = setGithubConfig({
       owner: 'testorg',
       repo: 'testrepo',
       branch: 'main',
       path: 'test.jsonl',
     })
-    expect(result).toBe(true)
+    expect(isResult).toBe(true)
   })
 
   it('无 PluginStorage 时应返回 false', () => {
     vi.mocked(getApp).mockReturnValue(null)
-    const result = setGithubConfig({
+    const isResult = setGithubConfig({
       owner: 'o',
       repo: 'r',
       branch: 'main',
       path: 'p',
     })
-    expect(result).toBe(false)
+    expect(isResult).toBe(false)
   })
 
   it('应保存 gistId', () => {
@@ -278,27 +278,27 @@ describe('githubConfig 异常与回退分支', () => {
   it('setSyncSourceType 正常场景应写入 storage 并返回 true', () => {
     const storage = createMockStorage({})
     vi.mocked(getApp).mockReturnValue({ PluginStorage: storage })
-    const result = setSyncSourceType('gitlab')
-    expect(result).toBe(true)
+    const isResult = setSyncSourceType('gitlab')
+    expect(isResult).toBe(true)
     expect(storage.getItem('github_sync_source_type')).toBe('gitlab')
   })
 
   it('PluginStorage 为 undefined 时 setSyncSourceType 返回 false (line 287-288)', () => {
     vi.mocked(getApp).mockReturnValue(null)
-    const result = setSyncSourceType('github')
-    expect(result).toBe(false)
+    const isResult = setSyncSourceType('github')
+    expect(isResult).toBe(false)
   })
 
   it('PluginStorage 为 undefined 时 setGistId 返回 false (line 329-330)', () => {
     vi.mocked(getApp).mockReturnValue(null)
-    const result = setGistId('gist-id')
-    expect(result).toBe(false)
+    const isResult = setGistId('gist-id')
+    expect(isResult).toBe(false)
   })
 
   it('PluginStorage 为 undefined 时 setSyncStrategy 返回 false', () => {
     vi.mocked(getApp).mockReturnValue(null)
-    const result = setSyncStrategy('add-update')
-    expect(result).toBe(false)
+    const isResult = setSyncStrategy('add-update')
+    expect(isResult).toBe(false)
   })
 
   it('getStorage 返回 storage 为 undefined 时 getGithubConfig 仍能返回默认值', () => {

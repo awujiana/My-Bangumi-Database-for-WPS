@@ -1596,15 +1596,15 @@ export function batchStartEnrichment(): void {
 
   // 确认
   // `false as boolean`：避免 TS 将闭包赋值忽略后把变量静态收窄为 false 字面量
-  let confirmed = false as boolean
+  let isConfirmed = false as boolean
   BGM.Dialog.confirm(
     `将依次对 ${String(state.batchFiles.length)} 个文件执行富化。\n目标工作表：${bangumiSheet.Name}\n是否继续？`,
     (ok: boolean) => {
-      confirmed = ok
+      isConfirmed = ok
     },
     '开始批量富化',
   )
-  if (confirmed) {
+  if (isConfirmed) {
     void runBatchEnrichment(bangumiSheet)
   } else {
     state.isBatchEnriching = false

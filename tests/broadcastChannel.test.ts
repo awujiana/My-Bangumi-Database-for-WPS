@@ -233,11 +233,11 @@ describe('BroadcastChannel 跨 WebView 通信', () => {
     it('应接受同源消息', () => {
       const channel = new MockBroadcastChannel('BGM-config')
       const allowedOrigins = new Set([window.location.origin, 'null'])
-      let messageAccepted = false
+      let isMessageAccepted = false
 
       channel.onmessage = (event: MessageEvent) => {
         if (allowedOrigins.has(event.origin)) {
-          messageAccepted = true
+          isMessageAccepted = true
         }
       }
 
@@ -248,17 +248,17 @@ describe('BroadcastChannel 跨 WebView 通信', () => {
       })
       channel.onmessage?.(event)
 
-      expect(messageAccepted).toBe(true)
+      expect(isMessageAccepted).toBe(true)
     })
 
     it('应拒绝非法 origin 的消息', () => {
       const channel = new MockBroadcastChannel('BGM-config')
       const allowedOrigins = new Set([window.location.origin, 'null'])
-      let messageAccepted = false
+      let isMessageAccepted = false
 
       channel.onmessage = (event: MessageEvent) => {
         if (allowedOrigins.has(event.origin)) {
-          messageAccepted = true
+          isMessageAccepted = true
         }
       }
 
@@ -269,7 +269,7 @@ describe('BroadcastChannel 跨 WebView 通信', () => {
       })
       channel.onmessage?.(event)
 
-      expect(messageAccepted).toBe(false)
+      expect(isMessageAccepted).toBe(false)
     })
   })
 

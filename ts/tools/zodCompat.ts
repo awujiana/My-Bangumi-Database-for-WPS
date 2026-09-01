@@ -449,8 +449,8 @@ class LiteObject<T = any> implements ZodSchema<T> {
     for (const key of Object.keys(this._shape)) {
       const schema = this._shape[key]
       if (!schema) continue
-      const has = Object.hasOwn(source, key)
-      const rawValue = has ? source[key] : undefined
+      const isHas = Object.hasOwn(source, key)
+      const rawValue = isHas ? source[key] : undefined
       const r = schema.safeParse(rawValue)
       if (!r.success) {
         const issue = r.error.issues[0]
@@ -459,7 +459,7 @@ class LiteObject<T = any> implements ZodSchema<T> {
           ...(issue?.path ?? []),
         ])
       }
-      if (r.data !== undefined || has) out[key] = r.data
+      if (r.data !== undefined || isHas) out[key] = r.data
     }
     return ok(out as T)
   }

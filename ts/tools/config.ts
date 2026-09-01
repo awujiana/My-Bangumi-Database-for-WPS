@@ -153,9 +153,9 @@ export function setIncrementalSync(enabled: boolean): boolean {
  * @param silent - 静默模式，不打印日志
  */
 export function getIncrementalSync(silent = false): boolean {
-  const result = getConfig(CONFIG_KEYS.INCREMENTAL_SYNC, '', silent) === 'true'
-  if (!silent) bgmLog(LOG_LEVELS.INFO, `[config] 获取增量同步状态: ${result ? '开启' : '关闭'}`)
-  return result
+  const isResult = getConfig(CONFIG_KEYS.INCREMENTAL_SYNC, '', silent) === 'true'
+  if (!silent) bgmLog(LOG_LEVELS.INFO, `[config] 获取增量同步状态: ${isResult ? '开启' : '关闭'}`)
+  return isResult
 }
 
 /**
@@ -171,9 +171,9 @@ export function setSkipConflicts(enabled: boolean): boolean {
  * @param silent - 静默模式，不打印日志
  */
 export function getSkipConflicts(silent = false): boolean {
-  const result = getConfig(CONFIG_KEYS.SKIP_CONFLICTS, '', silent) === 'true'
-  if (!silent) bgmLog(LOG_LEVELS.INFO, `[config] 获取跳过冲突状态: ${result ? '开启' : '关闭'}`)
-  return result
+  const isResult = getConfig(CONFIG_KEYS.SKIP_CONFLICTS, '', silent) === 'true'
+  if (!silent) bgmLog(LOG_LEVELS.INFO, `[config] 获取跳过冲突状态: ${isResult ? '开启' : '关闭'}`)
+  return isResult
 }
 
 /**
@@ -189,9 +189,9 @@ export function setSyncRecordEnabled(enabled: boolean): boolean {
  * @param silent - 静默模式，不打印日志
  */
 export function getSyncRecordEnabled(silent = false): boolean {
-  const result = getConfig(CONFIG_KEYS.ENABLE_SYNC_RECORD, '', silent) === 'true'
-  if (!silent) bgmLog(LOG_LEVELS.INFO, `[config] 获取同步记录状态: ${result ? '开启' : '关闭'}`)
-  return result
+  const isResult = getConfig(CONFIG_KEYS.ENABLE_SYNC_RECORD, '', silent) === 'true'
+  if (!silent) bgmLog(LOG_LEVELS.INFO, `[config] 获取同步记录状态: ${isResult ? '开启' : '关闭'}`)
+  return isResult
 }
 
 export function setNavIconsOnly(enabled: boolean): boolean {
@@ -200,9 +200,9 @@ export function setNavIconsOnly(enabled: boolean): boolean {
 }
 
 export function getNavIconsOnly(silent = false): boolean {
-  const result = getConfig(CONFIG_KEYS.NAV_ICONS_ONLY, '', silent) === 'true'
-  if (!silent) bgmLog(LOG_LEVELS.INFO, `[config] 获取导航仅图标状态: ${result ? '开启' : '关闭'}`)
-  return result
+  const isResult = getConfig(CONFIG_KEYS.NAV_ICONS_ONLY, '', silent) === 'true'
+  if (!silent) bgmLog(LOG_LEVELS.INFO, `[config] 获取导航仅图标状态: ${isResult ? '开启' : '关闭'}`)
+  return isResult
 }
 
 // ========== 外观主题 ==========

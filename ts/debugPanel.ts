@@ -372,11 +372,11 @@ function buildStatusBarHTML(modules: ModuleStatus[]): string {
   const failed = modules.filter((m) => !m.loaded)
   const failedCritical = failed.filter((m) => m.critical)
 
-  const ribbonReady =
+  const isRibbonReady =
     typeof (window as unknown as { _bgmRibbonReady?: unknown })._bgmRibbonReady === 'function'
   const badges: string[] = []
   badges.push(
-    `<span class="bgm-dp-badge ${ribbonReady ? 'bgm-dp-badge-ok' : 'bgm-dp-badge-err'}">${ribbonReady ? '● Ribbon 就绪' : '○ Ribbon 未就绪'}</span>`,
+    `<span class="bgm-dp-badge ${isRibbonReady ? 'bgm-dp-badge-ok' : 'bgm-dp-badge-err'}">${isRibbonReady ? '● Ribbon 就绪' : '○ Ribbon 未就绪'}</span>`,
   )
   if (failed.length > 0) {
     badges.push(
@@ -916,8 +916,8 @@ export function initDebugPanel(): void {
   const statusInterval = setInterval(() => {
     const newModules = getModuleStatuses()
     const loaded = newModules.filter((m) => m.loaded).length
-    const allLoaded = loaded === newModules.length && newModules.length > 0
-    if (allLoaded) {
+    const isAllLoaded = loaded === newModules.length && newModules.length > 0
+    if (isAllLoaded) {
       clearInterval(statusInterval)
     }
     // 刷新状态栏

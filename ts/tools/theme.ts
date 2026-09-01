@@ -52,7 +52,7 @@ export function initTheme(): void {
  */
 export function saveTheme(mode: string): boolean {
   if (mode !== 'dark' && mode !== 'light' && mode !== 'system') return false
-  const ok = setTheme(mode)
-  if (ok) applyTheme(mode)
-  return ok
+  const isOk = setTheme(mode)
+  if (isOk) applyTheme(mode)
+  return isOk
 }

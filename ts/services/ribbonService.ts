@@ -366,7 +366,7 @@ export async function detectConflicts(
     newType: number
   }[] = []
   let conflictCount = 0
-  let bgmCollectionReady = false
+  let isBgmCollectionReady = false
 
   // 1. 获取 Bangumi 收藏快照
   const bgmCollection = new Map<string, BgmCollectionEntry>()
@@ -382,11 +382,11 @@ export async function detectConflicts(
         subject_name: item.subject?.name || '',
       })
     }
-    bgmCollectionReady = true
+    isBgmCollectionReady = true
   } catch (error: unknown) {
     BGM.handleError(error, { context: 'detectConflicts', showAlert: false })
     // 获取失败时，返回空冲突信息
-    return { conflicts, conflictCount, bgmCollectionReady }
+    return { conflicts, conflictCount, bgmCollectionReady: isBgmCollectionReady }
   }
 
   // 2. 遍历 Excel 可见行，比对差异
@@ -437,7 +437,7 @@ export async function detectConflicts(
     // 可扩展对比 rate、tags、comment 等字段
   }
 
-  return { conflicts, conflictCount, bgmCollectionReady }
+  return { conflicts, conflictCount, bgmCollectionReady: isBgmCollectionReady }
 }
 
 /**
@@ -474,7 +474,7 @@ export async function syncWithConfirmation(): Promise<void> {
 
   // 2. 读取 Ribbon 复选框状态（冲突策略 + 增量同步）
   let conflictStrategy: 'excel' | 'skip' = 'excel'
-  let incremental = false
+  let isIncremental = false
   try {
     if (app?.PluginStorage) {
       const skipConflicts = app.PluginStorage.getItem('bgm_skip_conflicts')
@@ -483,7 +483,7 @@ export async function syncWithConfirmation(): Promise<void> {
       }
       const incr = app.PluginStorage.getItem('bgm_incremental_sync')
       if (incr === 'true') {
-        incremental = true
+        isIncremental = true
       }
     }
   } catch (error: unknown) {
@@ -502,7 +502,7 @@ export async function syncWithConfirmation(): Promise<void> {
   无效（无SID）：${String(preview.total - preview.valid)}
 
 冲突策略：${conflictStrategy === 'skip' ? '跳过冲突' : 'Excel数据覆盖'}
-增量同步：${incremental ? '开启' : '关闭'}
+增量同步：${isIncremental ? '开启' : '关闭'}
 
 点击"是"开始同步，点击"否"取消。`
   const confirmResult = app?.MessageBox?.(confirmMessage, 4 + 32)
@@ -542,7 +542,7 @@ export async function syncWithConfirmation(): Promise<void> {
     bgmLog(LOG_LEVELS.INFO, '[syncWithConfirmation] 开始执行同步...')
     const result = await SyncToBangumiAsync(ws, colMap, token, lastRow, headerRow, {
       ...(skipSids !== undefined && { skipSids }),
-      incremental,
+      incremental: isIncremental,
       onProgress: (current, total, message) => {
         if (app?.StatusBar !== undefined)
           app.StatusBar = `[${String(current)}/${String(total)}] ${message}`
@@ -568,8 +568,8 @@ export function setTokenForRibbon(): boolean {
   const app = getApp()
   const newToken = app?.InputBox?.('请输入 Access Token', '设置 Token', currentToken, 2)
   if (newToken && typeof newToken === 'string') {
-    const saved = storeBgToken(newToken)
-    if (saved) {
+    const isSaved = storeBgToken(newToken)
+    if (isSaved) {
       bgmLog(LOG_LEVELS.INFO, 'Token 已保存，通知面板更新...')
       BGM.notifyTokenUpdated()
 
@@ -692,13 +692,13 @@ export async function copyTokenForRibbon(): Promise<void> {
     textarea.select()
     // execCommand 已废弃（no-deprecated），但 WPS WebView 中 Clipboard API 不可用时需回退使用，
     // 这里以精确类型调用规避废弃标注
-    const ok = (
+    const isOk = (
       document as unknown as {
         execCommand: (commandId: string, showUI?: boolean, value?: string) => boolean
       }
     ).execCommand('copy')
     document.body.removeChild(textarea)
-    if (ok) {
+    if (isOk) {
       bgmLog(LOG_LEVELS.INFO, '[copyTokenForRibbon] Token 已复制到剪贴板')
       await wpsMessageBox('Token 已复制到剪贴板', 0, 64)
     } else {

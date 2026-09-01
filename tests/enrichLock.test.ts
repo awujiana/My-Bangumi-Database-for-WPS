@@ -586,9 +586,9 @@ describe('restoreEnrichLockedWorkbook', () => {
     const app = createMockApp(workbooks, 'wb1.xlsx', storage)
     setMockApp(app)
 
-    const result = restoreEnrichLockedWorkbook()
+    const isResult = restoreEnrichLockedWorkbook()
 
-    expect(result).toBe(true)
+    expect(isResult).toBe(true)
     expect(mockBGMState.enrich.isLocked).toBe(true)
     expect(mockBGMState.enrich.lockedWorkbookName).toBe('wb1.xlsx')
     expect(mockBGMState.enrich.lockedSheetName).toBe('Target')
@@ -601,9 +601,9 @@ describe('restoreEnrichLockedWorkbook', () => {
     const app = createMockApp(workbooks, 'wb1.xlsx', storage)
     setMockApp(app)
 
-    const result = restoreEnrichLockedWorkbook()
+    const isResult = restoreEnrichLockedWorkbook()
 
-    expect(result).toBe(false)
+    expect(isResult).toBe(false)
     expect(mockBGMState.enrich.isLocked).toBe(false)
   })
 
@@ -616,9 +616,9 @@ describe('restoreEnrichLockedWorkbook', () => {
     const app = createMockApp(workbooks, 'other.xlsx', storage)
     setMockApp(app)
 
-    const result = restoreEnrichLockedWorkbook()
+    const isResult = restoreEnrichLockedWorkbook()
 
-    expect(result).toBe(false)
+    expect(isResult).toBe(false)
     expect(mockBGMState.enrich.isLocked).toBe(false)
     expect(mockBGMState.enrich.lockedWorkbookName).toBeNull()
     expect(storage._store.bgm_enrich_locked_workbook).toBe('')
@@ -634,9 +634,9 @@ describe('restoreEnrichLockedWorkbook', () => {
     const app = createMockApp(workbooks, 'wb1.xlsx', storage)
     setMockApp(app)
 
-    const result = restoreEnrichLockedWorkbook()
+    const isResult = restoreEnrichLockedWorkbook()
 
-    expect(result).toBe(false)
+    expect(isResult).toBe(false)
     expect(mockBGMState.enrich.isLocked).toBe(false)
     expect(storage._store.bgm_enrich_locked_workbook).toBe('')
   })
@@ -649,9 +649,9 @@ describe('restoreEnrichLockedWorkbook', () => {
     const app = createMockApp(workbooks, 'wb1.xlsx', storage)
     setMockApp(app)
 
-    const result = restoreEnrichLockedWorkbook()
+    const isResult = restoreEnrichLockedWorkbook()
 
-    expect(result).toBe(false)
+    expect(isResult).toBe(false)
     expect(mockBGMState.enrich.isLocked).toBe(false)
     expect(storage._store.bgm_enrich_locked_workbook).toBe('')
   })
@@ -665,9 +665,9 @@ describe('restoreEnrichLockedWorkbook', () => {
     ;(app as unknown as { Workbooks: null }).Workbooks = null
     setMockApp(app)
 
-    const result = restoreEnrichLockedWorkbook()
+    const isResult = restoreEnrichLockedWorkbook()
 
-    expect(result).toBe(false)
+    expect(isResult).toBe(false)
     expect(mockBGMState.enrich.isLocked).toBe(false)
   })
 
@@ -677,9 +677,9 @@ describe('restoreEnrichLockedWorkbook', () => {
     app.PluginStorage = undefined as unknown as typeof app.PluginStorage
     setMockApp(app)
 
-    const result = restoreEnrichLockedWorkbook()
+    const isResult = restoreEnrichLockedWorkbook()
 
-    expect(result).toBe(false)
+    expect(isResult).toBe(false)
   })
 })
 

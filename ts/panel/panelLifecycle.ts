@@ -118,14 +118,14 @@ export function restoreLockedSheet(): boolean {
 
         // 验证锁定的工作簿是否仍然存在
         if (BGM.sheet.isLocked && info.workbookName && app.Workbooks) {
-          let workbookFound = false
+          let isWorkbookFound = false
           for (let index = 1; index <= app.Workbooks.Count; index += 1) {
             if (app.Workbooks.Item(index).Name === info.workbookName) {
-              workbookFound = true
+              isWorkbookFound = true
               break
             }
           }
-          if (!workbookFound) {
+          if (!isWorkbookFound) {
             bgmLog(
               LOG_LEVELS.WARN,
               `[restoreLockedSheet] 锁定的工作簿 "${info.workbookName}" 已不存在，清除锁信息`,
@@ -229,7 +229,7 @@ export function refreshSheets(options?: { autoSelectActive?: boolean }): void {
   defaultOption.textContent = '-- 请选择 --'
   select.appendChild(defaultOption)
 
-  const autoSelectActive = options?.autoSelectActive === true
+  const isAutoSelectActive = options?.autoSelectActive === true
   let selectedIndex = 0
   for (let index = 1; index <= sheets.Count; index += 1) {
     const option = document.createElement('option')
@@ -239,7 +239,7 @@ export function refreshSheets(options?: { autoSelectActive?: boolean }): void {
     if (BGM.sheet.isLocked && BGM.sheet.lockedIndex === index) {
       option.selected = true
       selectedIndex = index
-    } else if (autoSelectActive && !BGM.sheet.isLocked && index === activeSheetIndex) {
+    } else if (isAutoSelectActive && !BGM.sheet.isLocked && index === activeSheetIndex) {
       option.selected = true
       selectedIndex = index
     }
@@ -252,9 +252,9 @@ export function refreshSheets(options?: { autoSelectActive?: boolean }): void {
     select.value = String(selectedIndex)
     bgmLog(
       LOG_LEVELS.INFO,
-      `[refreshSheets] ${autoSelectActive ? '自动选中' : '已锁定'} 工作表索引: ${String(selectedIndex)}`,
+      `[refreshSheets] ${isAutoSelectActive ? '自动选中' : '已锁定'} 工作表索引: ${String(selectedIndex)}`,
     )
-  } else if (autoSelectActive && activeSheetIndex > 0) {
+  } else if (isAutoSelectActive && activeSheetIndex > 0) {
     select.value = String(activeSheetIndex)
     bgmLog(LOG_LEVELS.INFO, `[refreshSheets] 自动选中当前活动工作表: ${String(activeSheetIndex)}`)
   } else {
@@ -664,9 +664,9 @@ export function updateFilterStatus(targetWs?: WpsWorksheet): void {
   // 现在 sheet 被收窄为 WpsWorksheet
   const ws: WpsWorksheet = sheet
 
-  let autoFilterMode = false
+  let isAutoFilterMode = false
   try {
-    autoFilterMode = !!ws.AutoFilterMode
+    isAutoFilterMode = !!ws.AutoFilterMode
   } catch (error: unknown) {
     BGM.handleError(error, {
       showAlert: false,
@@ -675,7 +675,7 @@ export function updateFilterStatus(targetWs?: WpsWorksheet): void {
     })
   }
   try {
-    if (!autoFilterMode && ws.AutoFilter) autoFilterMode = !!ws.AutoFilter.Mode
+    if (!isAutoFilterMode && ws.AutoFilter) isAutoFilterMode = !!ws.AutoFilter.Mode
   } catch (error: unknown) {
     BGM.handleError(error, {
       showAlert: false,
@@ -684,7 +684,7 @@ export function updateFilterStatus(targetWs?: WpsWorksheet): void {
     })
   }
 
-  if (!autoFilterMode) {
+  if (!isAutoFilterMode) {
     element.textContent = '未开启筛选，同步全部数据'
     element.removeAttribute('title')
     return
