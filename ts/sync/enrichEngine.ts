@@ -505,8 +505,8 @@ export function matchEntries(
             }
           }
         }
-      } catch (e: unknown) {
-        const errMsg = e instanceof Error ? e.message : String(e)
+      } catch (error: unknown) {
+        const errMsg = error instanceof Error ? error.message : String(error)
         matchResult = {
           newAnimeRow: row,
           newAnimeName: rawName,
@@ -527,8 +527,8 @@ export function matchEntries(
         `别名 ${String(results.filter((r) => r.matchType === 'alias').length)} 条, ` +
         `未匹配 ${String(unmatchedCount)} 条, 错误 ${String(errorCount)} 条, 共 ${String(results.length)} 条`,
     )
-  } catch (e: unknown) {
-    BGM.handleError(e, { context: 'matchEntries', showAlert: false })
+  } catch (error: unknown) {
+    BGM.handleError(error, { context: 'matchEntries', showAlert: false })
   }
 
   return results
@@ -878,8 +878,8 @@ export function enrichEntries(
         enrichedFields,
         conflicts: fieldConflicts.length > 0 ? fieldConflicts : undefined,
       })
-    } catch (e: unknown) {
-      const errMsg = e instanceof Error ? e.message : String(e)
+    } catch (error: unknown) {
+      const errMsg = error instanceof Error ? error.message : String(error)
       stats.failed++
       bgmLog(
         LOG_LEVELS.ERROR,
@@ -1137,10 +1137,10 @@ export function ensureBangumiColumns(
         )
       }
     }
-  } catch (e) {
+  } catch (error) {
     bgmLog(
       LOG_LEVELS.ERROR,
-      `[ensureBangumiColumns] 添加列失败: ${e instanceof Error ? e.message : String(e)}`,
+      `[ensureBangumiColumns] 添加列失败: ${error instanceof Error ? error.message : String(error)}`,
     )
   }
 
@@ -1556,8 +1556,8 @@ export async function fetchRemoteFile(config: RemoteRepoConfig): Promise<string 
     const content = await response.text()
     bgmLog(LOG_LEVELS.INFO, `[fetchRemoteFile] 下载成功: ${String(content.length)} 字节`)
     return content
-  } catch (e) {
-    const errMsg = e instanceof Error ? e.message : String(e)
+  } catch (error) {
+    const errMsg = error instanceof Error ? error.message : String(error)
     bgmLog(LOG_LEVELS.ERROR, `[fetchRemoteFile] 下载失败: ${errMsg}`)
     return null
   }

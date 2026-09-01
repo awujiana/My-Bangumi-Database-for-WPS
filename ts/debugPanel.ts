@@ -640,8 +640,8 @@ function bindRibbonCards(root: HTMLElement): void {
             w2.OnAction({ Id: btnId })
             resultEl.textContent = '✅ 已调用'
             resultEl.style.color = '#16a34a'
-          } catch (e: unknown) {
-            const msg = e instanceof Error ? e.message : String(e)
+          } catch (error: unknown) {
+            const msg = error instanceof Error ? error.message : String(error)
             resultEl.textContent = `❌ ${msg}`
             resultEl.style.color = '#dc2626'
           }

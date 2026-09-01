@@ -294,8 +294,8 @@ function bindAllEvents(): void {
         } else if (eventType === 'cancel' && _dialogCallback.onCancel) {
           _dialogCallback.onCancel()
         }
-      } catch (e) {
-        console.error('[dialog] 回调执行失败:', e)
+      } catch (error) {
+        console.error('[dialog] 回调执行失败:', error)
       }
       _dialogCallback = null
     }

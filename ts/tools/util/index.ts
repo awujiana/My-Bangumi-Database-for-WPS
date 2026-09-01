@@ -225,9 +225,9 @@ export const BGM: {
             }
             this.exitRunningState()
           })
-          .catch((err: unknown) => {
+          .catch((error: unknown) => {
             this.exitRunningState()
-            BGM.handleError(err, { showAlert: true })
+            BGM.handleError(error, { showAlert: true })
           })
       })
     },
@@ -287,8 +287,8 @@ export const BGM: {
         cell.Select()
         bgmLog(LOG_LEVELS.INFO, `[sync] 已定位到单元格: ${cellAddr}`)
         return true
-      } catch (e: unknown) {
-        const msg = e instanceof Error ? e.message : String(e)
+      } catch (error: unknown) {
+        const msg = error instanceof Error ? error.message : String(error)
         bgmLog(LOG_LEVELS.WARN, `[sync] 定位单元格失败: ${msg}`)
         showToast(`定位单元格失败: ${msg}`, 'error')
         return false
@@ -796,8 +796,8 @@ export function copyTokenToClipboard(): boolean {
       bgmLog(LOG_LEVELS.WARN, '[copyTokenToClipboard] execCommand copy 失败')
     }
     return ok
-  } catch (e: unknown) {
-    bgmLog(LOG_LEVELS.ERROR, `[copyTokenToClipboard] 复制失败: ${(e as Error).message}`)
+  } catch (error: unknown) {
+    bgmLog(LOG_LEVELS.ERROR, `[copyTokenToClipboard] 复制失败: ${(error as Error).message}`)
     return false
   }
 }
@@ -988,8 +988,8 @@ export function _fetchBgmUserInfo(
         )
 
         if (callback) callback({ id: userId, username, avatarUrl: avatarUrl || undefined }, 'none')
-      } catch (e: unknown) {
-        bgmLog(LOG_LEVELS.ERROR, `[_fetchBgmUserInfo] 解析响应失败: ${(e as Error).message}`)
+      } catch (error: unknown) {
+        bgmLog(LOG_LEVELS.ERROR, `[_fetchBgmUserInfo] 解析响应失败: ${(error as Error).message}`)
         if (callback) callback(null, 'parse')
       }
     } else {
@@ -1115,8 +1115,8 @@ export function showBangumiPanel(): void {
     try {
       app.PluginStorage?.setItem('bgm_panel_shown_at', String(Date.now()))
       bgmLog(LOG_LEVELS.INFO, `[showBangumiPanel] 面板已显示，已写入刷新信号`)
-    } catch (e: unknown) {
-      bgmLog(LOG_LEVELS.WARN, `[showBangumiPanel] 写入面板显示信号失败: ${(e as Error).message}`)
+    } catch (error: unknown) {
+      bgmLog(LOG_LEVELS.WARN, `[showBangumiPanel] 写入面板显示信号失败: ${(error as Error).message}`)
     }
   }
 }

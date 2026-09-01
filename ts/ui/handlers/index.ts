@@ -420,8 +420,8 @@ const debouncedSaveGithubConfig = debounce((): void => {
         `[handlers] GitHub 配置已自动保存: ${owner}/${repo}/${branch}/${path}, 策略: ${strategy}, 同步源: ${sourceType}${gistId ? `, gistId: ${gistId}` : ''}`,
       )
     }
-  } catch (e: unknown) {
-    bgmLog(LOG_LEVELS.WARN, `[handlers] GitHub 配置自动保存失败: ${(e as Error).message}`)
+  } catch (error: unknown) {
+    bgmLog(LOG_LEVELS.WARN, `[handlers] GitHub 配置自动保存失败: ${(error as Error).message}`)
   }
 }, 300)
 
@@ -466,8 +466,8 @@ export function setupButtonListeners(): void {
       const enabled = getSyncRecordEnabled()
       chkEnableSyncRecord.checked = enabled
       bgmLog(LOG_LEVELS.INFO, `[handlers] 从配置读取同步记录状态: ${enabled ? '开启' : '关闭'}`)
-    } catch (e: unknown) {
-      bgmLog(LOG_LEVELS.WARN, `[handlers] 读取同步记录状态失败: ${(e as Error).message}`)
+    } catch (error: unknown) {
+      bgmLog(LOG_LEVELS.WARN, `[handlers] 读取同步记录状态失败: ${(error as Error).message}`)
     }
     trackedAddEventListener(chkEnableSyncRecord, 'change', handleEnableSyncRecordChange)
     bgmLog(LOG_LEVELS.INFO, '[handlers] 启用同步记录 checkbox 监听器已注册')
@@ -527,8 +527,8 @@ export function setupButtonListeners(): void {
       })
     }
     bgmLog(LOG_LEVELS.INFO, '[handlers] GitHub 配置输入框防抖自动保存监听器已注册')
-  } catch (e: unknown) {
-    bgmLog(LOG_LEVELS.WARN, `[handlers] 加载 GitHub 配置失败: ${(e as Error).message}`)
+  } catch (error: unknown) {
+    bgmLog(LOG_LEVELS.WARN, `[handlers] 加载 GitHub 配置失败: ${(error as Error).message}`)
   }
 
   // 系统日志：级别筛选下拉框变化时重新渲染日志列表
@@ -720,8 +720,8 @@ const ACTION_HANDLERS: Record<string, ActionHandler> = {
       updateUserIdStatus()
       showToast('Token 已清除', 'info')
       bgmLog(LOG_LEVELS.INFO, '[handleActionClick] Token 已清除')
-    } catch (e: unknown) {
-      BGM.handleError(e, { showAlert: true, level: BGM.ErrorLevel.WARN, context: 'clearToken' })
+    } catch (error: unknown) {
+      BGM.handleError(error, { showAlert: true, level: BGM.ErrorLevel.WARN, context: 'clearToken' })
     }
     bgmLog(
       LOG_LEVELS.INFO,
@@ -738,8 +738,8 @@ const ACTION_HANDLERS: Record<string, ActionHandler> = {
       } else {
         showToast('复制失败，可能未设置 Token 或浏览器不支持', 'error')
       }
-    } catch (e: unknown) {
-      BGM.handleError(e, { showAlert: true, level: BGM.ErrorLevel.WARN, context: 'copyToken' })
+    } catch (error: unknown) {
+      BGM.handleError(error, { showAlert: true, level: BGM.ErrorLevel.WARN, context: 'copyToken' })
     }
     bgmLog(
       LOG_LEVELS.INFO,
@@ -1256,8 +1256,8 @@ const ACTION_HANDLERS: Record<string, ActionHandler> = {
             )
             if (app?.StatusBar !== undefined) app.StatusBar = false
           })
-          .catch((e: unknown) => {
-            const errMsg = e instanceof Error ? e.message : String(e)
+          .catch((error: unknown) => {
+            const errMsg = error instanceof Error ? error.message : String(error)
             const isAborted = abortController.signal.aborted
             if (isAborted) {
               showSyncResultDialog({
@@ -1300,8 +1300,8 @@ const ACTION_HANDLERS: Record<string, ActionHandler> = {
     let url: string
     try {
       url = buildRawUrl()
-    } catch (e: unknown) {
-      const errMsg = e instanceof Error ? e.message : String(e)
+    } catch (error: unknown) {
+      const errMsg = error instanceof Error ? error.message : String(error)
       showToast(`配置错误：${errMsg}`, 'error')
       showConnectionTestDialog({
         success: false,
@@ -1419,8 +1419,8 @@ const ACTION_HANDLERS: Record<string, ActionHandler> = {
       }
       showToast(`已选择：${filePath}`, 'success')
       bgmLog(LOG_LEVELS.INFO, `[handleActionClick] 已选择本地文件: ${filePath}`)
-    } catch (e: unknown) {
-      const errMsg = e instanceof Error ? e.message : String(e)
+    } catch (error: unknown) {
+      const errMsg = error instanceof Error ? error.message : String(error)
       showToast(`选择文件失败：${errMsg}`, 'error')
       bgmLog(LOG_LEVELS.ERROR, `[handleActionClick] 选择本地文件失败: ${errMsg}`)
     }
@@ -1433,8 +1433,8 @@ const ACTION_HANDLERS: Record<string, ActionHandler> = {
   // GitHub 仓库同步：撤销最近一次同步（按单元格逆序恢复旧值）
   undoLastSync: (ctx) => {
     bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 撤销最近一次 GitHub 同步')
-    executeUndoLastSync().catch((e: unknown) => {
-      const errMsg = e instanceof Error ? e.message : String(e)
+    executeUndoLastSync().catch((error: unknown) => {
+      const errMsg = error instanceof Error ? error.message : String(error)
       bgmLog(LOG_LEVELS.ERROR, `[handleActionClick] 撤销同步失败: ${errMsg}`)
       showToast(`撤销失败：${errMsg}`, 'error')
     })
@@ -1475,8 +1475,8 @@ const ACTION_HANDLERS: Record<string, ActionHandler> = {
     try {
       exportLogsToFile()
       showToast('日志已导出', 'success')
-    } catch (e: unknown) {
-      const errMsg = e instanceof Error ? e.message : String(e)
+    } catch (error: unknown) {
+      const errMsg = error instanceof Error ? error.message : String(error)
       bgmLog(LOG_LEVELS.ERROR, `[handleActionClick] 导出日志失败: ${errMsg}`)
       showToast(`导出日志失败：${errMsg}`, 'error')
     }
@@ -1594,8 +1594,8 @@ const ACTION_HANDLERS: Record<string, ActionHandler> = {
 
       bgmLog(LOG_LEVELS.INFO, `[handleActionClick] 配置已保存: ${parts.join('; ')}`)
       showToast('所有配置已保存', 'success')
-    } catch (e: unknown) {
-      const errMsg = e instanceof Error ? e.message : String(e)
+    } catch (error: unknown) {
+      const errMsg = error instanceof Error ? error.message : String(error)
       bgmLog(LOG_LEVELS.ERROR, `[handleActionClick] 保存配置失败: ${errMsg}`)
       showToast(`保存失败：${errMsg}`, 'error')
     }
@@ -1624,8 +1624,8 @@ const ACTION_HANDLERS: Record<string, ActionHandler> = {
       _copyTextToClipboard(json)
       showToast('配置已导出（已下载文件并复制到剪贴板）', 'success')
       bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 配置导出完成')
-    } catch (e: unknown) {
-      const errMsg = e instanceof Error ? e.message : String(e)
+    } catch (error: unknown) {
+      const errMsg = error instanceof Error ? error.message : String(error)
       bgmLog(LOG_LEVELS.ERROR, `[handleActionClick] 配置导出失败: ${errMsg}`)
       showToast(`配置导出失败：${errMsg}`, 'error')
     }
@@ -1777,8 +1777,8 @@ function handleActionClick(event: Event): void {
   if (target.dataset.args) {
     try {
       args = JSON.parse(target.dataset.args) as string[]
-    } catch (e: unknown) {
-      BGM.handleError(e, {
+    } catch (error: unknown) {
+      BGM.handleError(error, {
         showAlert: false,
         level: BGM.ErrorLevel.WARN,
         context: 'handleActionClick',
@@ -1798,12 +1798,12 @@ function handleActionClick(event: Event): void {
     } else {
       bgmLog(LOG_LEVELS.WARN, `[handleActionClick] 未知操作类型: ${action}`)
     }
-  } catch (e: unknown) {
+  } catch (error: unknown) {
     bgmLog(
       LOG_LEVELS.ERROR,
-      `[handleActionClick] 操作执行失败: ${action}, 错误: ${(e as Error).message}`,
+      `[handleActionClick] 操作执行失败: ${action}, 错误: ${(error as Error).message}`,
     )
-    BGM.handleError(e, { context: `handleActionClick:${action}`, showAlert: true })
+    BGM.handleError(error, { context: `handleActionClick:${action}`, showAlert: true })
   }
 }
 
@@ -1870,8 +1870,8 @@ function _copyTextToClipboard(text: string): boolean {
     const ok = document.execCommand('copy')
     document.body.removeChild(textarea)
     return ok
-  } catch (e: unknown) {
-    bgmLog(LOG_LEVELS.WARN, `[_copyTextToClipboard] 复制失败: ${(e as Error).message}`)
+  } catch (error: unknown) {
+    bgmLog(LOG_LEVELS.WARN, `[_copyTextToClipboard] 复制失败: ${(error as Error).message}`)
     return false
   }
 }
@@ -1905,10 +1905,10 @@ function refreshGithubConfigInputs(): void {
       LOG_LEVELS.INFO,
       `[refreshGithubConfigInputs] 已刷新 GitHub 配置输入框: ${cfg.owner}/${cfg.repo}/${cfg.branch}/${cfg.path}`,
     )
-  } catch (e: unknown) {
+  } catch (error: unknown) {
     bgmLog(
       LOG_LEVELS.WARN,
-      `[refreshGithubConfigInputs] 刷新 GitHub 配置输入框失败: ${(e as Error).message}`,
+      `[refreshGithubConfigInputs] 刷新 GitHub 配置输入框失败: ${(error as Error).message}`,
     )
   }
 }
@@ -2244,8 +2244,8 @@ const handleIncrementalChange = (): void => {
     } else {
       bgmLog(LOG_LEVELS.WARN, `[handlers] 增量同步状态同步失败`)
     }
-  } catch (e: unknown) {
-    bgmLog(LOG_LEVELS.WARN, `[handlers] 更新增量同步状态失败: ${(e as Error).message}`)
+  } catch (error: unknown) {
+    bgmLog(LOG_LEVELS.WARN, `[handlers] 更新增量同步状态失败: ${(error as Error).message}`)
   }
 }
 
@@ -2300,8 +2300,8 @@ const handleChkSkipConflictsChange = (): void => {
   try {
     setSkipConflicts(checked)
     bgmLog(LOG_LEVELS.INFO, `[handlers] 跳过冲突状态已更新: ${checked ? '跳过冲突' : 'Excel覆盖'}`)
-  } catch (e: unknown) {
-    bgmLog(LOG_LEVELS.WARN, `[handlers] 更新跳过冲突状态失败: ${(e as Error).message}`)
+  } catch (error: unknown) {
+    bgmLog(LOG_LEVELS.WARN, `[handlers] 更新跳过冲突状态失败: ${(error as Error).message}`)
   }
 }
 
@@ -2316,8 +2316,8 @@ function initIncrementalSyncFromRibbon(): void {
     const isIncremental = getIncrementalSync()
     chkIncremental.checked = isIncremental
     bgmLog(LOG_LEVELS.INFO, `[handlers] 从配置读取增量同步状态: ${isIncremental ? '开启' : '关闭'}`)
-  } catch (e: unknown) {
-    bgmLog(LOG_LEVELS.WARN, `[handlers] 读取增量同步状态失败: ${(e as Error).message}`)
+  } catch (error: unknown) {
+    bgmLog(LOG_LEVELS.WARN, `[handlers] 读取增量同步状态失败: ${(error as Error).message}`)
   }
 
   // 监听 checkbox 变化，同步到配置
@@ -2338,8 +2338,8 @@ function initSkipConflictsFromRibbon(): void {
       LOG_LEVELS.INFO,
       `[handlers] 从配置读取跳过冲突状态: ${skipConflicts ? '跳过冲突' : 'Excel覆盖'}`,
     )
-  } catch (e: unknown) {
-    BGM.handleError(e, {
+  } catch (error: unknown) {
+    BGM.handleError(error, {
       showAlert: false,
       level: BGM.ErrorLevel.WARN,
       context: 'initSkipConflictsFromRibbon',

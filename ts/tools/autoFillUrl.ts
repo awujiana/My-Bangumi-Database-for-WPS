@@ -127,8 +127,8 @@ export function autoFillUrls(): AutoFillResult {
     }
 
     bgmLog(LOG_LEVELS.INFO, `[autoFillUrls] 补全完成: ${String(result.filled)} 行`)
-  } catch (e: unknown) {
-    BGM.handleError(e, { context: 'autoFillUrls', showAlert: true })
+  } catch (error: unknown) {
+    BGM.handleError(error, { context: 'autoFillUrls', showAlert: true })
   }
 
   return result

@@ -98,11 +98,11 @@ export async function markEpisodesComplete(
       return { success: true, message: `已标记前 ${String(targetIds.length)} 集为已完成` }
     }
     return { success: false, message: result.message }
-  } catch (e: unknown) {
+  } catch (error: unknown) {
     bgmLog(
       LOG_LEVELS.WARN,
-      `[chapterMarker] markEpisodesComplete 异常: ${e instanceof Error ? e.message : String(e)}`,
+      `[chapterMarker] markEpisodesComplete 异常: ${error instanceof Error ? error.message : String(error)}`,
     )
-    return { success: false, message: e instanceof Error ? e.message : '未知错误' }
+    return { success: false, message: error instanceof Error ? error.message : '未知错误' }
   }
 }

@@ -100,8 +100,8 @@ export function getOrCreateEnrichRecordSheet(): WpsWorksheet {
         break
       }
     }
-  } catch (e: unknown) {
-    BGM.handleError(e, { context: 'getOrCreateEnrichRecordSheet', showAlert: false })
+  } catch (error: unknown) {
+    BGM.handleError(error, { context: 'getOrCreateEnrichRecordSheet', showAlert: false })
   }
 
   if (!enrichSheet) {
@@ -193,8 +193,8 @@ export function addEnrichRecord(params: AddEnrichRecordParams): void {
       LOG_LEVELS.INFO,
       `[addEnrichRecord] ${params.name} (${params.enrichedField}): ${params.action}`,
     )
-  } catch (e: unknown) {
-    BGM.handleError(e, { context: 'addEnrichRecord', showAlert: false })
+  } catch (error: unknown) {
+    BGM.handleError(error, { context: 'addEnrichRecord', showAlert: false })
   }
 }
 
@@ -242,8 +242,8 @@ export function addEnrichRecords(records: AddEnrichRecordParams[]): void {
     }
 
     bgmLog(LOG_LEVELS.INFO, `[addEnrichRecords] 批量写入完成：${String(records.length)} 条记录`)
-  } catch (e: unknown) {
-    BGM.handleError(e, { context: 'addEnrichRecords', showAlert: false })
+  } catch (error: unknown) {
+    BGM.handleError(error, { context: 'addEnrichRecords', showAlert: false })
   }
 }
 
@@ -257,8 +257,8 @@ export function clearEnrichRecords(): void {
       sheet.Range(`2:${String(lastRow)}`).Delete()
     }
     bgmLog(LOG_LEVELS.INFO, '已清除所有富化记录')
-  } catch (e: unknown) {
-    BGM.handleError(e, { context: 'clearEnrichRecords', showAlert: false })
+  } catch (error: unknown) {
+    BGM.handleError(error, { context: 'clearEnrichRecords', showAlert: false })
   }
 }
 
@@ -279,8 +279,8 @@ export function getAllEnrichRecords(): EnrichRecord[] {
           break
         }
       }
-    } catch (e: unknown) {
-      BGM.handleError(e, { context: 'getAllEnrichRecords', showAlert: false })
+    } catch (error: unknown) {
+      BGM.handleError(error, { context: 'getAllEnrichRecords', showAlert: false })
       return []
     }
 
@@ -310,8 +310,8 @@ export function getAllEnrichRecords(): EnrichRecord[] {
     }
 
     return records
-  } catch (e: unknown) {
-    BGM.handleError(e, { context: 'getAllEnrichRecords', showAlert: false })
+  } catch (error: unknown) {
+    BGM.handleError(error, { context: 'getAllEnrichRecords', showAlert: false })
     return []
   }
 }
@@ -347,8 +347,8 @@ export function openEnrichRecordSheet(): void {
   try {
     const sheet = getOrCreateEnrichRecordSheet()
     sheet.Activate()
-  } catch (e: unknown) {
-    BGM.handleError(e, { context: 'openEnrichRecordSheet', showAlert: true })
+  } catch (error: unknown) {
+    BGM.handleError(error, { context: 'openEnrichRecordSheet', showAlert: true })
   }
 }
 
@@ -394,7 +394,7 @@ export function formatEnrichRecordSheet(): void {
     newValCol.ColumnWidth = 40
     const noteCol = sheet.Range('I:I')
     noteCol.ColumnWidth = 20
-  } catch (e: unknown) {
-    BGM.handleError(e, { context: 'formatEnrichRecordSheet', showAlert: false })
+  } catch (error: unknown) {
+    BGM.handleError(error, { context: 'formatEnrichRecordSheet', showAlert: false })
   }
 }

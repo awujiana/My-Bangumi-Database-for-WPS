@@ -342,12 +342,12 @@ export function OnAction(control: { Id: string }): boolean {
         break
       case 'btnSyncBangumi': {
         // syncWithConfirmation 是 async 函数，需要 .catch() 防止未处理的 Promise rejection
-        syncWithConfirmation().catch((e: unknown) => {
+        syncWithConfirmation().catch((error: unknown) => {
           bgmLog(
             LOG_LEVELS.ERROR,
-            `[OnAction] syncWithConfirmation 异常: ${e instanceof Error && e.message ? e.message : String(e)}`,
+            `[OnAction] syncWithConfirmation 异常: ${error instanceof Error && error.message ? error.message : String(error)}`,
           )
-          BGM.handleError(e, {
+          BGM.handleError(error, {
             showAlert: true,
             level: BGM.ErrorLevel.ERROR,
             context: 'Ribbon btnSyncBangumi',
@@ -360,12 +360,12 @@ export function OnAction(control: { Id: string }): boolean {
         break
       case 'btnTestToken': {
         // testTokenForRibbon 是 async 函数，需 .catch() 防止未处理 rejection
-        testTokenForRibbon().catch((e: unknown) => {
+        testTokenForRibbon().catch((error: unknown) => {
           bgmLog(
             LOG_LEVELS.ERROR,
-            `[OnAction] testTokenForRibbon 异常: ${e instanceof Error && e.message ? e.message : String(e)}`,
+            `[OnAction] testTokenForRibbon 异常: ${error instanceof Error && error.message ? error.message : String(error)}`,
           )
-          BGM.handleError(e, {
+          BGM.handleError(error, {
             showAlert: true,
             level: BGM.ErrorLevel.ERROR,
             context: 'Ribbon btnTestToken',
@@ -375,12 +375,12 @@ export function OnAction(control: { Id: string }): boolean {
       }
       case 'btnCopyToken': {
         // copyTokenForRibbon 是 async 函数，需 .catch() 防止未处理 rejection
-        copyTokenForRibbon().catch((e: unknown) => {
+        copyTokenForRibbon().catch((error: unknown) => {
           bgmLog(
             LOG_LEVELS.ERROR,
-            `[OnAction] copyTokenForRibbon 异常: ${e instanceof Error && e.message ? e.message : String(e)}`,
+            `[OnAction] copyTokenForRibbon 异常: ${error instanceof Error && error.message ? error.message : String(error)}`,
           )
-          BGM.handleError(e, {
+          BGM.handleError(error, {
             showAlert: true,
             level: BGM.ErrorLevel.ERROR,
             context: 'Ribbon btnCopyToken',
@@ -396,12 +396,12 @@ export function OnAction(control: { Id: string }): boolean {
         break
       case 'btnSyncFromGithub': {
         // syncFromGithubForRibbon 是 async 函数，需 .catch() 防止未处理 rejection
-        syncFromGithubForRibbon().catch((e: unknown) => {
+        syncFromGithubForRibbon().catch((error: unknown) => {
           bgmLog(
             LOG_LEVELS.ERROR,
-            `[OnAction] syncFromGithubForRibbon 异常: ${e instanceof Error && e.message ? e.message : String(e)}`,
+            `[OnAction] syncFromGithubForRibbon 异常: ${error instanceof Error && error.message ? error.message : String(error)}`,
           )
-          BGM.handleError(e, {
+          BGM.handleError(error, {
             showAlert: true,
             level: BGM.ErrorLevel.ERROR,
             context: 'Ribbon btnSyncFromGithub',
@@ -411,12 +411,12 @@ export function OnAction(control: { Id: string }): boolean {
       }
       case 'btnUndoLastSync': {
         // undoLastSyncForRibbon 是 async 函数，需 .catch() 防止未处理 rejection
-        undoLastSyncForRibbon().catch((e: unknown) => {
+        undoLastSyncForRibbon().catch((error: unknown) => {
           bgmLog(
             LOG_LEVELS.ERROR,
-            `[OnAction] undoLastSyncForRibbon 异常: ${e instanceof Error && e.message ? e.message : String(e)}`,
+            `[OnAction] undoLastSyncForRibbon 异常: ${error instanceof Error && error.message ? error.message : String(error)}`,
           )
-          BGM.handleError(e, {
+          BGM.handleError(error, {
             showAlert: true,
             level: BGM.ErrorLevel.ERROR,
             context: 'Ribbon btnUndoLastSync',
@@ -433,8 +433,8 @@ export function OnAction(control: { Id: string }): boolean {
       default:
         bgmLog(LOG_LEVELS.WARN, `[BGM] 未知按钮: ${control.Id}`)
     }
-  } catch (e: unknown) {
-    BGM.handleError(e, { showAlert: true, level: BGM.ErrorLevel.ERROR, context: 'Ribbon OnAction' })
+  } catch (error: unknown) {
+    BGM.handleError(error, { showAlert: true, level: BGM.ErrorLevel.ERROR, context: 'Ribbon OnAction' })
   }
   return true
 }

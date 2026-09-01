@@ -463,8 +463,7 @@ describe('showSettingsPanel — 边界情况', () => {
 
     // mockBgmLog 是 logger.info，只接收 message 字符串
     const statusCall = mockRefs.mockBgmLog.mock.calls.find((c: unknown[]) =>
-      String(c[0]).includes('主面板状态'),
-    )
+      String(c[0]).includes('主面板状态'),)
     expect(statusCall).toBeDefined()
     if (statusCall) {
       expect(String(statusCall[0])).toContain('可见')

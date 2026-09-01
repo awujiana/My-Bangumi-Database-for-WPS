@@ -190,8 +190,8 @@ export async function verifyToken(token: string, signal?: AbortSignal): Promise<
       result.message = `验证失败 (HTTP ${String(response.status)})`
       bgmLog(LOG_LEVELS.ERROR, `[scraping/verifyToken] 验证失败，HTTP ${String(response.status)}`)
     }
-  } catch (e: unknown) {
-    const errMsg = e instanceof Error ? e.message : ''
+  } catch (error: unknown) {
+    const errMsg = error instanceof Error ? error.message : ''
     result.message = errMsg || '验证过程出错'
     bgmLog(LOG_LEVELS.ERROR, `[scraping/verifyToken] error: ${result.message}`)
   }
@@ -299,8 +299,8 @@ export async function fetchAllUserCollections(
       }
 
       await new Promise((resolve) => setTimeout(resolve, BGM_CONFIG.REQUEST_DELAY))
-    } catch (e: unknown) {
-      const errMsg = e instanceof Error ? e.message : undefined
+    } catch (error: unknown) {
+      const errMsg = error instanceof Error ? error.message : undefined
       bgmLog(LOG_LEVELS.ERROR, `[fetchAllUserCollections] 请求失败: ${errMsg ?? ''}`)
       break
     }
@@ -340,8 +340,8 @@ export async function fetchSubjectCollection(
     } else {
       result.message = `HTTP ${String(xhrResult.status)}`
     }
-  } catch (e: unknown) {
-    const errMsg = e instanceof Error ? e.message : ''
+  } catch (error: unknown) {
+    const errMsg = error instanceof Error ? error.message : ''
     result.message = errMsg || '请求失败'
     bgmLog(LOG_LEVELS.ERROR, `[fetchSubjectCollection] 请求失败: ${result.message}`)
   }

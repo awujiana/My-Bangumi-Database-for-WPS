@@ -123,8 +123,8 @@ export function fetchGithubJson(signal?: AbortSignal): Promise<GithubRemoteEntry
         throw new Error('GitHub 仓库配置不完整')
       }
       url = buildRawUrl()
-    } catch (e: unknown) {
-      reject(e instanceof Error ? e : new Error(String(e)))
+    } catch (error: unknown) {
+      reject(error instanceof Error ? error : new Error(String(error)))
       return
     }
 
@@ -179,8 +179,8 @@ export function fetchGithubJson(signal?: AbortSignal): Promise<GithubRemoteEntry
             bgmLog(LOG_LEVELS.INFO, `[githubSync] 下载成功：${String(entries.length)} 条记录`)
           }
           resolve(entries)
-        } catch (e: unknown) {
-          reject(new Error(`JSONL 解析失败: ${e instanceof Error ? e.message : String(e)}`))
+        } catch (error: unknown) {
+          reject(new Error(`JSONL 解析失败: ${error instanceof Error ? error.message : String(error)}`))
         }
       } else if (xhr.status === 404) {
         reject(new Error(`文件不存在（404）：${url}，请检查 owner/repo/branch/path 配置`))
@@ -326,8 +326,8 @@ function readLocalEntries(
     if (Array.isArray(raw)) {
       rawData = raw as unknown[][]
     }
-  } catch (e: unknown) {
-    bgmLog(LOG_LEVELS.WARN, `[githubSync] 批量读取失败，回退到逐单元格: ${(e as Error).message}`)
+  } catch (error: unknown) {
+    bgmLog(LOG_LEVELS.WARN, `[githubSync] 批量读取失败，回退到逐单元格: ${(error as Error).message}`)
   }
 
   // 构建 col name → 数组索引 的映射
@@ -760,10 +760,10 @@ function batchWriteNewRows(
     const rangeAddr = `${startColLetter}${String(startRow)}:${endColLetter}${String(endRow)}`
     const range = ws.Range(rangeAddr)
     range.Value2 = values
-  } catch (e: unknown) {
+  } catch (error: unknown) {
     bgmLog(
       LOG_LEVELS.WARN,
-      `[batchWriteNewRows] 批量写入失败，回退到逐行写入: ${(e as Error).message}`,
+      `[batchWriteNewRows] 批量写入失败，回退到逐行写入: ${(error as Error).message}`,
     )
     return 0
   }
@@ -1088,8 +1088,8 @@ function batchUpdateRows(
                 count: 1,
               })
             }
-          } catch (e: unknown) {
-            const errMsg = e instanceof Error ? e.message : String(e)
+          } catch (error: unknown) {
+            const errMsg = error instanceof Error ? error.message : String(error)
             bgmLog(
               LOG_LEVELS.ERROR,
               `[batchUpdateRows] 行 ${String(row)} 回退逐字段写入异常: ${errMsg}`,
@@ -1112,10 +1112,10 @@ function batchUpdateRows(
           }
         }
       }
-    } catch (e: unknown) {
+    } catch (error: unknown) {
       bgmLog(
         LOG_LEVELS.WARN,
-        `[batchUpdateRows] 行 ${String(row)} 写入失败，回退到逐字段写入: ${(e as Error).message}`,
+        `[batchUpdateRows] 行 ${String(row)} 写入失败，回退到逐字段写入: ${(error as Error).message}`,
       )
       // 回退到逐字段写入
       try {
@@ -1159,8 +1159,8 @@ function batchUpdateRows(
             count: 1,
           })
         }
-      } catch (e2: unknown) {
-        const errMsg = e2 instanceof Error ? e2.message : String(e2)
+      } catch (error: unknown) {
+        const errMsg = error instanceof Error ? error.message : String(error)
         bgmLog(LOG_LEVELS.ERROR, `[batchUpdateRows] 行 ${String(row)} 逐字段写入也失败: ${errMsg}`)
         details?.push({
           kind: 'fail',
@@ -1246,8 +1246,8 @@ export async function applyDiffToSheet(
       app.Calculation = -4135 // xlCalculationManual
       bgmLog(LOG_LEVELS.INFO, '[githubSync] 已关闭屏幕刷新和自动计算')
     }
-  } catch (e: unknown) {
-    bgmLog(LOG_LEVELS.WARN, `[githubSync] 关闭屏幕刷新失败: ${(e as Error).message}`)
+  } catch (error: unknown) {
+    bgmLog(LOG_LEVELS.WARN, `[githubSync] 关闭屏幕刷新失败: ${(error as Error).message}`)
   }
 
   // 性能追踪：记录开始时间
@@ -1339,8 +1339,8 @@ export async function applyDiffToSheet(
                 count: 1,
               })
             }
-          } catch (e: unknown) {
-            const errMsg = e instanceof Error ? e.message : String(e)
+          } catch (error: unknown) {
+            const errMsg = error instanceof Error ? error.message : String(error)
             result.failed++
             bgmLog(LOG_LEVELS.ERROR, `[githubSync] 逐行写入失败 sid=${diff.sid}: ${errMsg}`)
             result.details!.push({
@@ -1475,8 +1475,8 @@ export async function applyDiffToSheet(
           message: `删除行 ${String(diff.localRow ?? '')}`,
           count: 1,
         })
-      } catch (e: unknown) {
-        const errMsg = e instanceof Error ? e.message : String(e)
+      } catch (error: unknown) {
+        const errMsg = error instanceof Error ? error.message : String(error)
         bgmLog(
           LOG_LEVELS.WARN,
           `[githubSync] 删除行 ${String(diff.localRow ?? '')} 失败: ${errMsg}`,
@@ -1497,8 +1497,8 @@ export async function applyDiffToSheet(
           count: 1,
         })
       }
-    } catch (e: unknown) {
-      const errMsg = e instanceof Error ? e.message : String(e)
+    } catch (error: unknown) {
+      const errMsg = error instanceof Error ? error.message : String(error)
       result.failed++
       bgmLog(LOG_LEVELS.ERROR, `[githubSync] 删除处理失败 sid=${diff.sid}: ${errMsg}`)
       result.details!.push({
@@ -1561,8 +1561,8 @@ export async function applyDiffToSheet(
       if (prevCalculation !== undefined) app.Calculation = prevCalculation
       bgmLog(LOG_LEVELS.INFO, '[githubSync] 已恢复屏幕刷新和自动计算')
     }
-  } catch (e: unknown) {
-    bgmLog(LOG_LEVELS.WARN, `[githubSync] 恢复屏幕刷新失败: ${(e as Error).message}`)
+  } catch (error: unknown) {
+    bgmLog(LOG_LEVELS.WARN, `[githubSync] 恢复屏幕刷新失败: ${(error as Error).message}`)
   }
 
   // 写入同步记录与汇总行
@@ -1612,7 +1612,7 @@ export function applyConflictResolutions(
   // 按 sid 索引 resolutions，便于 O(1) 查找
   const resolutionByKey = new Map<string, ConflictResolution>()
   for (const r of resolutions) {
-    resolutionByKey.set(`${r.sid}\u0000${r.field}`, r)
+    resolutionByKey.set(`${r.sid}\u{0}${r.field}`, r)
   }
 
   // 倒序遍历，便于安全移除元素
@@ -1625,7 +1625,7 @@ export function applyConflictResolutions(
 
     // 过滤掉用户选择「本地」的字段
     diff.changedFields = diff.changedFields.filter((field) => {
-      const key = `${diff.sid}\u0000${field}`
+      const key = `${diff.sid}\u{0}${field}`
       const r = resolutionByKey.get(key)
       // 若存在 resolution 且选择 local，则移除该字段；否则保留
       return !(r && r.chosenValue === 'local')
@@ -1849,8 +1849,8 @@ function getSelectedRowSids(): Set<string> {
     }
 
     bgmLog(LOG_LEVELS.INFO, `[getSelectedRowSids] 提取到 ${String(sids.size)} 个 SID`)
-  } catch (e: unknown) {
-    bgmLog(LOG_LEVELS.ERROR, `[getSelectedRowSids] 提取失败: ${(e as Error).message}`)
+  } catch (error: unknown) {
+    bgmLog(LOG_LEVELS.ERROR, `[getSelectedRowSids] 提取失败: ${(error as Error).message}`)
   }
   return sids
 }

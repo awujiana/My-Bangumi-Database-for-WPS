@@ -122,8 +122,8 @@ export function setCellValue(
     }
     cell.Value2 = value as WpsCellValue
     return true
-  } catch (e) {
-    BGM.handleError(e, { level: BGM.ErrorLevel.ERROR, context: 'setCellValue' })
+  } catch (error) {
+    BGM.handleError(error, { level: BGM.ErrorLevel.ERROR, context: 'setCellValue' })
   }
   return false
 }

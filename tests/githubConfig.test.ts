@@ -324,7 +324,6 @@ describe('githubConfig 异常与回退分支', () => {
         repo: 'r',
         branch: 'main',
         path: 'p',
-      }),
-    ).toThrow('Storage 写入异常')
+      }),).toThrow('Storage 写入异常')
   })
 })

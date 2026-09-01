@@ -116,10 +116,10 @@ export function updateTokenStatus(): void {
           }
           // errorType === 'parse' 或 'none'：保持原显示
         })
-        .catch((err: unknown) => {
-          const errMsg = err instanceof Error ? err.message : String(err)
+        .catch((error: unknown) => {
+          const errMsg = error instanceof Error ? error.message : String(error)
           bgmLog(LOG_LEVELS.ERROR, `[handlers] updateTokenStatus 获取用户信息失败: ${errMsg}`)
-          BGM.handleError(err)
+          BGM.handleError(error)
         })
     }
   } else {
@@ -288,10 +288,10 @@ export function testTokenValidity(): void {
             bgmLog(LOG_LEVELS.WARN, '[testTokenValidity] Token 状态查询失败，不影响主流程')
             showToast(`✅ Token 有效 | 用户: ${nickname}`, 'success')
           })
-      } catch (e: unknown) {
-        bgmLog(LOG_LEVELS.ERROR, `[testTokenValidity] 解析响应失败: ${(e as Error).message}`)
+      } catch (error: unknown) {
+        bgmLog(LOG_LEVELS.ERROR, `[testTokenValidity] 解析响应失败: ${(error as Error).message}`)
         showError(_T.parseFailed, _T.cannotParseResponse)
-        BGM.handleError(e, {
+        BGM.handleError(error, {
           showAlert: false,
           level: BGM.ErrorLevel.WARN,
           context: 'testTokenValidity',
@@ -405,8 +405,8 @@ export function queryTokenStatus(token: string): Promise<{ expires: number; user
             bgmLog(LOG_LEVELS.WARN, '[queryTokenStatus] 响应中缺少有效的 expires 字段')
             reject(new Error('Invalid response: missing expires field'))
           }
-        } catch (e: unknown) {
-          const errMsg = e instanceof Error ? e.message : String(e)
+        } catch (error: unknown) {
+          const errMsg = error instanceof Error ? error.message : String(error)
           bgmLog(LOG_LEVELS.ERROR, `[queryTokenStatus] 解析响应失败: ${errMsg}`)
           reject(new Error('Failed to parse token status response'))
         }

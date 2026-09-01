@@ -164,16 +164,16 @@ export {
   try {
     restoreUserInfoFromStorage()
     bgmLog(LOG_LEVELS.INFO, '[refreshPanelUI] UI 已刷新')
-  } catch (e: unknown) {
-    bgmLog(LOG_LEVELS.WARN, `[refreshPanelUI] 刷新失败: ${(e as Error).message}`)
+  } catch (error: unknown) {
+    bgmLog(LOG_LEVELS.WARN, `[refreshPanelUI] 刷新失败: ${(error as Error).message}`)
   }
 }
 
 function safeInitPanel(): void {
   try {
     initPanelCore()
-  } catch (e: unknown) {
-    BGM.handleError(e, { showAlert: false, level: BGM.ErrorLevel.INFO, context: 'initPanelCore' })
+  } catch (error: unknown) {
+    BGM.handleError(error, { showAlert: false, level: BGM.ErrorLevel.INFO, context: 'initPanelCore' })
     document.dispatchEvent(new CustomEvent('bgm:modulesReady'))
   }
 }

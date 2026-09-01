@@ -111,8 +111,8 @@ export function saveCache(data: GithubDataCache): void {
       LOG_LEVELS.INFO,
       `[githubCache] 缓存已保存：${String(data.entries.length)} 条，哈希=${data.hash}，大小=${String(data.textLength)}B`,
     )
-  } catch (e: unknown) {
-    const errMsg = e instanceof Error ? e.message : String(e)
+  } catch (error: unknown) {
+    const errMsg = error instanceof Error ? error.message : String(error)
     bgmLog(LOG_LEVELS.WARN, `[githubCache] 缓存保存失败：${errMsg}`)
   }
 }

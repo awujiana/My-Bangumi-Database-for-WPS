@@ -496,8 +496,7 @@ describe('getLastRow', () => {
     }
     ws.Range = vi.fn(() => anchorCell)
     vi.mocked(getCellValue).mockImplementation((_ws: unknown, _row: unknown, col: unknown) =>
-      col === 1 ? '序列号' : '',
-    )
+      col === 1 ? '序列号' : '',)
     const result = getLastRow(ws, false, 1)
     expect(result).toBeDefined()
   })

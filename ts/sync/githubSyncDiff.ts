@@ -270,8 +270,8 @@ export function parseJsonl(text: string): {
       } else {
         errors.push({ line: lineNum, reason: '对象缺少 sid 字段或 sid 不是字符串' })
       }
-    } catch (e: unknown) {
-      const reason = e instanceof Error ? e.message : String(e)
+    } catch (error: unknown) {
+      const reason = error instanceof Error ? error.message : String(error)
       errors.push({ line: lineNum, reason })
     }
   }

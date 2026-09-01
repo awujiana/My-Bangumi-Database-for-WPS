@@ -22,15 +22,25 @@ import { pathToFileURL } from 'node:url';
 // 以及把构造型 mock 的 function(){} 改成箭头函数后无法 new）。更糟的是 ESLint 10
 // 在 --fix 阶段会忽略配置中的 'off' 覆盖（fix/non-fix 报告不一致，已用 --print-config 与
 // 单文件 --fix 复现确认），即「写在 rules 里的 'off' 拦不住 --fix 的重写」。
-// 因此**从源头**把它们排除出 allRulesAsError 的自动展开——既不参与 --fix 重写，
-// 也不在 error 门禁里（门禁要求 0，但靠**手工/脚本**逐处清零这些规则，而非 --fix 自动重放，
-// 手工可确认每处的类型安全）。若日后 ESLint 修复该不一致，可移回此处、改为 'off'。
-// 范围：unicorn 插件整组（其 fixer 几乎都重写表达式/标识符，风险面过大，宁可手工清零）；
+// 因此**从源头**把它们排除出 allRulesAsError 的自动展开（isFix 时过滤，规则『缺席』）——既不参与
+// --fix 重写，也不在 error 门禁里（门禁要求 0，但靠**手工/脚本**逐处清零这些规则，而非 --fix
+// 自动重放，手工可确认每处的类型安全）。若日后 ESLint 修复该不一致，可移回此处、改为 'off'。
+// 范围：unicorn 插件中**类型/引用/行为不安全**的规则（改名类 name-replacements /
+// no-keyword-prefix / consistent-boolean-name / filename-case；类型改写类 global-this /
+// dom-node-* / keyword-prefix / object-spread 等；行为改写类 no-unsafe-dom-html /
+// prefer-add-event-listener / no-null 等）；
 // 加上 airbnb 的 prefer-arrow-callback（破坏构造型 mock）、no-var（偶发作用域风险）。
+// 注意：**安全重写**的 unicorn 规则（fixer 价值保持、不改类型/引用/行为）放 SAFE_UNICORN_FIXERS，
+// 从 UNSAFE 排除 → --fix 模式它们作为 error 带 fixer 参与自动修复（gate 模式仍 error 门禁）。
+const SAFE_UNICORN_FIXERS = new Set([
+    // 改名 catch 绑定（err→error），eslint fixer 同步更新块内引用，无碰撞风险
+    'catch-error-name',
+    // \uXXXX → \u{XXXX} 转义规范化，码点值不变（surrogate pair 由 fixer 正确合并）
+    'prefer-unicode-code-point-escapes',
+])
 const UNSAFE_FIX_RULES = new Set([
-    // unicorn 整组：fixer 重写表达式/标识符，类型不安全（global-this / dom-node-* /
-    // keyword-prefix / object-spread / array-flat / replace-all 等均已实测破坏）
-    ...Object.keys(unicornPlugin.rules).map((r) => r),
+    // unicorn 整组减去安全 fixer 子集：
+    ...Object.keys(unicornPlugin.rules).filter((r) => !SAFE_UNICORN_FIXERS.has(r)),
     'prefer-arrow-callback',
     'no-var',
 ])

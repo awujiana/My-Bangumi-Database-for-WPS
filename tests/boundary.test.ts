@@ -192,7 +192,7 @@ describe('空值边界', () => {
 
     it('全角空格应被移除（如果实现支持）', () => {
       // 全角空格 \u3000
-      const result = trim('\u3000hello\u3000')
+      const result = trim('\u{3000}hello\u{3000}')
       // 不同实现对全角空格处理不同，验证不崩溃
       expect(typeof result).toBe('string')
     })
@@ -421,11 +421,11 @@ describe('特殊字符边界', () => {
     })
 
     it('控制字符不转义（保持原样）', () => {
-      const control = 'hello\x00world\x07'
+      const control = 'hello\u{0}world\u{7}'
       // escapeHtml 不处理控制字符，仅处理 HTML 特殊字符
       const result = escapeHtml(control)
-      expect(result).toContain('\x00')
-      expect(result).toContain('\x07')
+      expect(result).toContain('\u{0}')
+      expect(result).toContain('\u{7}')
     })
 
     it('混合特殊字符与中文', () => {
@@ -455,16 +455,16 @@ describe('特殊字符边界', () => {
       expect(trim(' \t\n\rhello \t\n\r')).toBe('hello')
     })
 
-    it('Unicode 空白字符（如 \u00A0）', () => {
+    it('Unicode 空白字符（如 \u{A0}）', () => {
       // 不间断空格 \u00A0，不同 trim 实现行为不同
-      const result = trim('\u00A0hello\u00A0')
+      const result = trim('\u{A0}hello\u{A0}')
       expect(typeof result).toBe('string')
     })
 
     it('零宽字符不应被 trim', () => {
       // 零宽空格 \u200B 不应被 trim
-      const result = trim('\u200Bhello\u200B')
-      expect(result).toContain('\u200B')
+      const result = trim('\u{200B}hello\u{200B}')
+      expect(result).toContain('\u{200B}')
     })
   })
 
@@ -491,7 +491,7 @@ describe('特殊字符边界', () => {
     })
 
     it('包含控制字符的 URL', () => {
-      const url = 'https://bgm.tv/subject/\x0012345\x07'
+      const url = 'https://bgm.tv/subject/\u{0}12345\u{7}'
       // 控制字符不影响数字提取
       expect(extractSubjectId(url)).toBe('12345')
     })
@@ -506,7 +506,7 @@ describe('特殊字符边界', () => {
   describe('mapWatchStatus 处理特殊字符', () => {
     it('包含控制字符的状态', () => {
       // 控制字符不影响状态识别
-      expect(mapWatchStatus('想看\x00')).toBe(1)
+      expect(mapWatchStatus('想看\u{0}')).toBe(1)
     })
 
     it('包含 Emoji 的状态', () => {
@@ -543,7 +543,7 @@ describe('特殊字符边界', () => {
     })
 
     it('控制字符字符串返回有效校验和', () => {
-      const cs = calcChecksum('\x00\x01\x02\x03')
+      const cs = calcChecksum('\u{0}\u{1}\u{2}\u{3}')
       expect(cs).toBeGreaterThanOrEqual(0)
       expect(cs).toBeLessThan(256)
     })

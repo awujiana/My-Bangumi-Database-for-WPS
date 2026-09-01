@@ -53,8 +53,8 @@ export function restoreUserInfoFromStorage(): void {
     if (storedUserId || storedUsername) {
       updateUserIdStatus()
     }
-  } catch (e: unknown) {
-    bgmLog(LOG_LEVELS.WARN, `[restoreUserInfoFromStorage] 恢复失败: ${(e as Error).message}`)
+  } catch (error: unknown) {
+    bgmLog(LOG_LEVELS.WARN, `[restoreUserInfoFromStorage] 恢复失败: ${(error as Error).message}`)
   }
 }
 

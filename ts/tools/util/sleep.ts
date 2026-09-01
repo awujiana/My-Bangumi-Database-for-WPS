@@ -21,17 +21,17 @@ export function sleep(ms: number): void {
       app.Wait(waitTime)
       return
     }
-  } catch (e) {
-    bgmLog(LOG_LEVELS.WARN, `sleep app.Wait 失败: ${(e as Error).message}`)
+  } catch (error) {
+    bgmLog(LOG_LEVELS.WARN, `sleep app.Wait 失败: ${(error as Error).message}`)
   }
   const end = Date.now() + ms
   while (Date.now() < end) {
     try {
       const app = getApp() as { DoEvents?: () => void } | null | undefined
       if (app?.DoEvents) app.DoEvents()
-    } catch (e) {
+    } catch (error) {
       if (typeof bgmLog === 'function') {
-        bgmLog(LOG_LEVELS.INFO, `sleep DoEvents 失败: ${(e as Error).message}`)
+        bgmLog(LOG_LEVELS.INFO, `sleep DoEvents 失败: ${(error as Error).message}`)
       }
       break
     }

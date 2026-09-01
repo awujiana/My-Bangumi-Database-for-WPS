@@ -383,8 +383,8 @@ export async function detectConflicts(
       })
     }
     bgmCollectionReady = true
-  } catch (e: unknown) {
-    BGM.handleError(e, { context: 'detectConflicts', showAlert: false })
+  } catch (error: unknown) {
+    BGM.handleError(error, { context: 'detectConflicts', showAlert: false })
     // 获取失败时，返回空冲突信息
     return { conflicts, conflictCount, bgmCollectionReady }
   }
@@ -486,8 +486,8 @@ export async function syncWithConfirmation(): Promise<void> {
         incremental = true
       }
     }
-  } catch (e: unknown) {
-    BGM.handleError(e, { context: 'syncWithConfirmation:readRibbonOptions', showAlert: false })
+  } catch (error: unknown) {
+    BGM.handleError(error, { context: 'syncWithConfirmation:readRibbonOptions', showAlert: false })
   }
 
   // 3. 先弹确认框（让用户立刻看到反馈，避免冲突检测网络等待期间"无反应"）
@@ -525,12 +525,12 @@ export async function syncWithConfirmation(): Promise<void> {
       }
     }
     bgmLog(LOG_LEVELS.INFO, `[syncWithConfirmation] 冲突检测完成: ${String(conflictCount)} 条冲突`)
-  } catch (e: unknown) {
+  } catch (error: unknown) {
     bgmLog(
       LOG_LEVELS.WARN,
-      `[syncWithConfirmation] 冲突检测失败（可能网络不通），已跳过: ${(e as Error).message}`,
+      `[syncWithConfirmation] 冲突检测失败（可能网络不通），已跳过: ${(error as Error).message}`,
     )
-    BGM.handleError(e, { context: 'syncWithConfirmation:conflictDetection', showAlert: false })
+    BGM.handleError(error, { context: 'syncWithConfirmation:conflictDetection', showAlert: false })
   }
 
   // 5. 执行同步（传入跳过冲突集合和增量同步开关）
@@ -555,10 +555,10 @@ export async function syncWithConfirmation(): Promise<void> {
       0,
       64,
     )
-  } catch (err: unknown) {
+  } catch (error: unknown) {
     if (app) app.StatusBar = false
     BGM.sync.exitRunningState()
-    BGM.handleError(err, { context: 'Ribbon同步', showAlert: true })
+    BGM.handleError(error, { context: 'Ribbon同步', showAlert: true })
   }
 }
 
@@ -596,8 +596,8 @@ function notifyPanelTokenUpdated(): void {
     BGM.notifyTokenUpdated()
 
     bgmLog(LOG_LEVELS.INFO, '已发送 Token 更新通知')
-  } catch (e: unknown) {
-    BGM.handleError(new Error('通知面板失败', { cause: e }), { showAlert: false })
+  } catch (error: unknown) {
+    BGM.handleError(new Error('通知面板失败', { cause: error }), { showAlert: false })
   }
 }
 
@@ -640,8 +640,8 @@ export async function testTokenForRibbon(): Promise<void> {
           _setBgmUsername(nickname)
           BGM.notifyTokenUpdated()
           await wpsMsgBox(`Token 有效！\n用户: ${nickname}\nID: ${userId}`, 0, 64)
-        } catch (e: unknown) {
-          bgmLog(LOG_LEVELS.ERROR, `[testTokenForRibbon] 解析响应失败: ${(e as Error).message}`)
+        } catch (error: unknown) {
+          bgmLog(LOG_LEVELS.ERROR, `[testTokenForRibbon] 解析响应失败: ${(error as Error).message}`)
           await wpsMsgBox('解析响应失败，请重试', 0, 16)
         }
       } else if (xhr.status === 401) {
@@ -705,8 +705,8 @@ export async function copyTokenForRibbon(): Promise<void> {
       bgmLog(LOG_LEVELS.WARN, '[copyTokenForRibbon] execCommand copy 失败')
       await wpsMsgBox('复制失败，浏览器不支持剪贴板操作', 0, 48)
     }
-  } catch (e: unknown) {
-    const errMsg = e instanceof Error ? e.message : String(e)
+  } catch (error: unknown) {
+    const errMsg = error instanceof Error ? error.message : String(error)
     bgmLog(LOG_LEVELS.ERROR, `[copyTokenForRibbon] 复制失败: ${errMsg}`)
     await wpsMsgBox(`复制失败: ${errMsg}`, 0, 16)
   }
@@ -794,8 +794,8 @@ export async function syncFromGithubForRibbon(): Promise<GithubSyncResult | null
       bgmLog(LOG_LEVELS.ERROR, '[syncFromGithubForRibbon] PluginStorage 不可用，无法通知 panel')
       await wpsMsgBox('无法通知任务面板执行同步，请手动在面板中点击「立即同步」', 0, 48)
     }
-  } catch (e: unknown) {
-    bgmLog(LOG_LEVELS.ERROR, `[syncFromGithubForRibbon] 写入信号失败: ${(e as Error).message}`)
+  } catch (error: unknown) {
+    bgmLog(LOG_LEVELS.ERROR, `[syncFromGithubForRibbon] 写入信号失败: ${(error as Error).message}`)
   }
 
   return null
@@ -834,8 +834,8 @@ function ensurePanelVisible(): void {
       app.PluginStorage?.setItem('bgm_panel_shown_at', String(Date.now()))
       bgmLog(LOG_LEVELS.INFO, '[ensurePanelVisible] 面板已显示')
     }
-  } catch (e: unknown) {
-    bgmLog(LOG_LEVELS.WARN, `[ensurePanelVisible] 失败: ${(e as Error).message}`)
+  } catch (error: unknown) {
+    bgmLog(LOG_LEVELS.WARN, `[ensurePanelVisible] 失败: ${(error as Error).message}`)
   }
 }
 
@@ -869,8 +869,8 @@ export async function undoLastSyncForRibbon(): Promise<void> {
     app.PluginStorage.setItem('bgm_request_undo_sync', String(Date.now()))
     bgmLog(LOG_LEVELS.INFO, '[undoLastSyncForRibbon] 已写入撤销请求信号到 PluginStorage')
     await wpsMsgBox('已发送撤销请求，请在任务面板中确认操作', 0, 64)
-  } catch (e: unknown) {
-    bgmLog(LOG_LEVELS.ERROR, `[undoLastSyncForRibbon] 写入撤销信号失败: ${(e as Error).message}`)
+  } catch (error: unknown) {
+    bgmLog(LOG_LEVELS.ERROR, `[undoLastSyncForRibbon] 写入撤销信号失败: ${(error as Error).message}`)
     await wpsMsgBox('发送撤销请求失败，请稍后重试', 0, 16)
   }
 }
@@ -916,8 +916,8 @@ export async function executeUndoLastSync(): Promise<number> {
     bgmLog(LOG_LEVELS.INFO, `[executeUndoLastSync] 已恢复 ${String(restored)} 项变更`)
     await wpsMsgBox(`已撤销 ${String(restored)} 项变更`, 0, 64)
     return restored
-  } catch (e: unknown) {
-    const errMsg = e instanceof Error ? e.message : String(e)
+  } catch (error: unknown) {
+    const errMsg = error instanceof Error ? error.message : String(error)
     bgmLog(LOG_LEVELS.ERROR, `[executeUndoLastSync] 撤销失败: ${errMsg}`)
     await wpsMsgBox(`撤销失败：${errMsg}`, 0, 16)
     return 0

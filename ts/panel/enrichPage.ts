@@ -363,8 +363,8 @@ export function selectNewAnimeFile(): void {
       )
       if (!shouldContinue) break
     }
-  } catch (e: unknown) {
-    BGM.handleError(e, {
+  } catch (error: unknown) {
+    BGM.handleError(error, {
       showAlert: true,
       level: BGM.ErrorLevel.ERROR,
       context: 'selectNewAnimeFile',
@@ -466,8 +466,8 @@ export function autoDetectHeader(): void {
     if (wb && sheetIndex > 0) {
       try {
         ws = wb.Worksheets.Item(sheetIndex)
-      } catch (e: unknown) {
-        BGM.handleError(e, {
+      } catch (error: unknown) {
+        BGM.handleError(error, {
           showAlert: false,
           level: BGM.ErrorLevel.INFO,
           context: 'autoDetectHeader',
@@ -510,13 +510,13 @@ export function autoDetectHeader(): void {
     )
 
     renderSourcePreview(ws, mapping)
-  } catch (e: unknown) {
-    BGM.handleError(e, {
+  } catch (error: unknown) {
+    BGM.handleError(error, {
       showAlert: false,
       level: BGM.ErrorLevel.ERROR,
       context: 'autoDetectHeader',
     })
-    BGM.Dialog.error('错误', `识别表头失败: ${e instanceof Error ? e.message : String(e)}`)
+    BGM.Dialog.error('错误', `识别表头失败: ${error instanceof Error ? error.message : String(error)}`)
   }
 }
 
@@ -679,9 +679,9 @@ function selectTargetSheet(): void {
       BGM.enrich.lockedSheetName = ws.Name
       BGM.enrich.lockedSheetIndex = sheetIndex
     }
-  } catch (e: unknown) {
+  } catch (error: unknown) {
     state.bangumiSheet = null
-    BGM.handleError(e, {
+    BGM.handleError(error, {
       showAlert: false,
       level: BGM.ErrorLevel.INFO,
       context: 'selectTargetSheet',
@@ -783,9 +783,9 @@ export function previewMatch(): void {
     renderMatchResultsToTable(state.matches)
 
     bgmLog(LOG_LEVELS.INFO, `[enrich] 匹配预览完成: ${String(state.matches.length)} 条结果`)
-  } catch (e: unknown) {
-    BGM.handleError(e, { showAlert: false, level: BGM.ErrorLevel.ERROR, context: 'previewMatch' })
-    BGM.Dialog.error('错误', `匹配预览失败: ${e instanceof Error ? e.message : String(e)}`)
+  } catch (error: unknown) {
+    BGM.handleError(error, { showAlert: false, level: BGM.ErrorLevel.ERROR, context: 'previewMatch' })
+    BGM.Dialog.error('错误', `匹配预览失败: ${error instanceof Error ? error.message : String(error)}`)
   }
 }
 
@@ -946,13 +946,13 @@ export function startEnrichment(): void {
       LOG_LEVELS.INFO,
       `[enrich] 富化完成: ${String(results.length)} 条结果, 冲突 ${String(allConflicts.length)} 条`,
     )
-  } catch (e: unknown) {
-    BGM.handleError(e, {
+  } catch (error: unknown) {
+    BGM.handleError(error, {
       showAlert: false,
       level: BGM.ErrorLevel.ERROR,
       context: 'startEnrichment',
     })
-    BGM.Dialog.error('错误', `富化执行失败: ${e instanceof Error ? e.message : String(e)}`)
+    BGM.Dialog.error('错误', `富化执行失败: ${error instanceof Error ? error.message : String(error)}`)
   } finally {
     state.isEnriching = false
     state.cancelRequested = false
@@ -1018,8 +1018,8 @@ function renderEnrichSummary(results: EnrichResultItem[]): void {
   try {
     getOrCreateEnrichRecordSheet()
     loadRecentRecords()
-  } catch (e: unknown) {
-    BGM.handleError(e, {
+  } catch (error: unknown) {
+    BGM.handleError(error, {
       showAlert: false,
       level: BGM.ErrorLevel.INFO,
       context: 'renderEnrichSummary',
@@ -1037,8 +1037,8 @@ export function openEnrichRecordSheet(): void {
       sheet.Activate()
       bgmLog(LOG_LEVELS.INFO, `[enrich] 已打开富化记录工作表: ${sheet.Name}`)
     }
-  } catch (e: unknown) {
-    BGM.handleError(e, {
+  } catch (error: unknown) {
+    BGM.handleError(error, {
       showAlert: false,
       level: BGM.ErrorLevel.ERROR,
       context: 'openEnrichRecordSheet',
@@ -1054,8 +1054,8 @@ export function clearRecords(): void {
       clearEnrichRecords()
       loadRecentRecords()
       bgmLog(LOG_LEVELS.INFO, '[enrich] 富化记录已清除')
-    } catch (e: unknown) {
-      BGM.handleError(e, { showAlert: false, level: BGM.ErrorLevel.ERROR, context: 'clearRecords' })
+    } catch (error: unknown) {
+      BGM.handleError(error, { showAlert: false, level: BGM.ErrorLevel.ERROR, context: 'clearRecords' })
     }
   })
 }
@@ -1124,8 +1124,8 @@ function loadRecentRecords(): void {
     recordsContainer.innerHTML = sanitizeHtml(recordsHtml)
 
     bgmLog(LOG_LEVELS.INFO, `[enrich] 最近记录已加载: ${String(records.length)} 条`)
-  } catch (e: unknown) {
-    BGM.handleError(e, {
+  } catch (error: unknown) {
+    BGM.handleError(error, {
       showAlert: false,
       level: BGM.ErrorLevel.INFO,
       context: 'loadRecentRecords',
@@ -1338,10 +1338,10 @@ function handleConflictResolution(resolution: ConflictInfo['resolution']): void 
       LOG_LEVELS.INFO,
       `[conflict] 字段 "${conflict.fieldName}" (${conflict.newAnimeName}): ${resolution}`,
     )
-  } catch (e: unknown) {
+  } catch (error: unknown) {
     bgmLog(
       LOG_LEVELS.ERROR,
-      `[conflict] 解析冲突失败: ${e instanceof Error ? e.message : String(e)}`,
+      `[conflict] 解析冲突失败: ${error instanceof Error ? error.message : String(error)}`,
     )
   }
 
@@ -1519,8 +1519,8 @@ function processSingleBatchFile(filePath: string, bangumiSheet: WpsWorksheet): B
       LOG_LEVELS.INFO,
       `[enrich-batch] ${fileName}: 匹配 ${String(matched)}，未匹配 ${String(unmatched)}，处理 ${String(updatedEntries)}`,
     )
-  } catch (e: unknown) {
-    result.error = e instanceof Error ? e.message : String(e)
+  } catch (error: unknown) {
+    result.error = error instanceof Error ? error.message : String(error)
     bgmLog(LOG_LEVELS.ERROR, `[enrich-batch] ${fileName} 处理失败: ${result.error}`)
   } finally {
     // 关闭源文件，不保存
@@ -1532,10 +1532,10 @@ function processSingleBatchFile(filePath: string, bangumiSheet: WpsWorksheet): B
           void closeResult
         }
         bgmLog(LOG_LEVELS.INFO, `[enrich-batch] 已关闭文件: ${fileName}`)
-      } catch (closeErr: unknown) {
+      } catch (error: unknown) {
         bgmLog(
           LOG_LEVELS.WARN,
-          `[enrich-batch] 关闭文件时警告: ${closeErr instanceof Error ? closeErr.message : String(closeErr)}`,
+          `[enrich-batch] 关闭文件时警告: ${error instanceof Error ? error.message : String(error)}`,
         )
       }
     }

@@ -224,8 +224,8 @@ function prepareSyncFromPanel(): SyncPreparedData | null {
   try {
     originalActiveSheet = app.ActiveWorkbook.ActiveSheet
     bgmLog(LOG_LEVELS.INFO, `[syncFromPanel] 记住用户当前工作表: ${originalActiveSheet.Name}`)
-  } catch (e: unknown) {
-    bgmLog(LOG_LEVELS.WARN, `[syncFromPanel] 获取当前工作表失败: ${(e as Error).message}`)
+  } catch (error: unknown) {
+    bgmLog(LOG_LEVELS.WARN, `[syncFromPanel] 获取当前工作表失败: ${(error as Error).message}`)
   }
 
   // 3.2 确保同步记录工作表存在（不激活）
@@ -252,8 +252,8 @@ function prepareSyncFromPanel(): SyncPreparedData | null {
   try {
     ws.Activate()
     bgmLog(LOG_LEVELS.INFO, `[syncFromPanel] 已激活数据工作表: ${ws.Name}（用于筛选检测）`)
-  } catch (e: unknown) {
-    bgmLog(LOG_LEVELS.WARN, `[syncFromPanel] 激活数据工作表失败: ${(e as Error).message}`)
+  } catch (error: unknown) {
+    bgmLog(LOG_LEVELS.WARN, `[syncFromPanel] 激活数据工作表失败: ${(error as Error).message}`)
   }
 
   // 5. 解析表头和列映射
@@ -379,9 +379,9 @@ async function confirmAndExecuteSync(prepared: SyncPreparedData): Promise<boolea
     } else {
       bgmLog(LOG_LEVELS.INFO, '[syncFromPanel] 未检测到冲突')
     }
-  } catch (e: unknown) {
-    bgmLog(LOG_LEVELS.WARN, `[syncFromPanel] 冲突检测失败: ${(e as Error).message}`)
-    BGM.handleError(e, { showAlert: false, level: BGM.ErrorLevel.WARN, context: 'syncFromPanel' })
+  } catch (error: unknown) {
+    bgmLog(LOG_LEVELS.WARN, `[syncFromPanel] 冲突检测失败: ${(error as Error).message}`)
+    BGM.handleError(error, { showAlert: false, level: BGM.ErrorLevel.WARN, context: 'syncFromPanel' })
   }
 
   // 9. 确认对话框
@@ -416,8 +416,8 @@ async function confirmAndExecuteSync(prepared: SyncPreparedData): Promise<boolea
     try {
       syncSheet.Activate()
       bgmLog(LOG_LEVELS.INFO, `[syncFromPanel] 已激活同步记录工作表: ${syncSheet.Name}`)
-    } catch (e: unknown) {
-      bgmLog(LOG_LEVELS.WARN, `[syncFromPanel] 激活同步记录工作表失败: ${(e as Error).message}`)
+    } catch (error: unknown) {
+      bgmLog(LOG_LEVELS.WARN, `[syncFromPanel] 激活同步记录工作表失败: ${(error as Error).message}`)
     }
   }
 
@@ -515,11 +515,11 @@ async function confirmAndExecuteSync(prepared: SyncPreparedData): Promise<boolea
         `[syncFromPanel] 同步完成！成功: ${String(result.success)}, 失败: ${String(result.fail)}, 跳过: ${String(result.skip)}`,
       )
     }
-  } catch (err: unknown) {
+  } catch (error: unknown) {
     hideSyncProgressDialog()
     if (app.StatusBar !== undefined) app.StatusBar = false
-    bgmLog(LOG_LEVELS.ERROR, `[syncFromPanel] 同步失败: ${(err as Error).message}`)
-    BGM.handleError(err, { context: 'syncFromPanel', showAlert: true })
+    bgmLog(LOG_LEVELS.ERROR, `[syncFromPanel] 同步失败: ${(error as Error).message}`)
+    BGM.handleError(error, { context: 'syncFromPanel', showAlert: true })
   } finally {
     BGM.sync.exitRunningState()
   }
@@ -555,8 +555,8 @@ export async function syncFromPanel(): Promise<void> {
           LOG_LEVELS.INFO,
           `[syncFromPanel] 已恢复用户之前的工作表: ${prepared.originalActiveSheet.Name}`,
         )
-      } catch (e: unknown) {
-        bgmLog(LOG_LEVELS.WARN, `[syncFromPanel] 恢复工作表失败: ${(e as Error).message}`)
+      } catch (error: unknown) {
+        bgmLog(LOG_LEVELS.WARN, `[syncFromPanel] 恢复工作表失败: ${(error as Error).message}`)
       }
     }
   }
@@ -605,9 +605,9 @@ export function syncCollectionFromBgm(): void {
       LOG_LEVELS.INFO,
       `[syncCollectionFromBgm] 同步完成，耗时: ${String(Date.now() - startTime)}ms`,
     )
-  } catch (e: unknown) {
-    bgmLog(LOG_LEVELS.ERROR, `[syncCollectionFromBgm] 同步失败: ${(e as Error).message}`)
-    BGM.handleError(e, { context: 'syncCollectionFromBgm', showAlert: true })
+  } catch (error: unknown) {
+    bgmLog(LOG_LEVELS.ERROR, `[syncCollectionFromBgm] 同步失败: ${(error as Error).message}`)
+    BGM.handleError(error, { context: 'syncCollectionFromBgm', showAlert: true })
   }
 
   bgmLog(
@@ -655,8 +655,8 @@ async function _doAPISync(
   try {
     originalActiveSheet = app.ActiveWorkbook.ActiveSheet
     bgmLog(LOG_LEVELS.INFO, `[_doAPISync] 记住原始工作表: ${originalActiveSheet.Name}`)
-  } catch (e: unknown) {
-    bgmLog(LOG_LEVELS.WARN, `[_doAPISync] 获取原始工作表失败: ${(e as Error).message}`)
+  } catch (error: unknown) {
+    bgmLog(LOG_LEVELS.WARN, `[_doAPISync] 获取原始工作表失败: ${(error as Error).message}`)
   }
 
   // 获取同步记录工作表
@@ -768,16 +768,15 @@ async function _doAPISync(
     try {
       syncSheet.Activate()
       bgmLog(LOG_LEVELS.INFO, `[_doAPISync] 已激活同步记录工作表: ${syncSheet.Name}`)
-    } catch (e: unknown) {
-      bgmLog(LOG_LEVELS.WARN, `[_doAPISync] 激活同步记录工作表失败: ${(e as Error).message}`)
+    } catch (error: unknown) {
+      bgmLog(LOG_LEVELS.WARN, `[_doAPISync] 激活同步记录工作表失败: ${(error as Error).message}`)
     }
   }
 
   let syncRecords: SyncRecord[] = typeof getAllSyncRecords === 'function' ? getAllSyncRecords() : []
   const syncCountMap = new Map<string, number>()
   syncRecords.forEach((r) =>
-    syncCountMap.set(r.sid || '', (syncCountMap.get(r.sid || '') || 0) + 1),
-  )
+    syncCountMap.set(r.sid || '', (syncCountMap.get(r.sid || '') || 0) + 1),)
 
   // 使用从 ../index.js 导入的 BGM_SUBJECT_TYPES 常量（与 core/constants.ts 中定义一致）
   // 启动同步状态机：使用 enterRunningState 进行防重入检查
@@ -851,16 +850,15 @@ async function _doAPISync(
     syncRecords = typeof getAllSyncRecords === 'function' ? getAllSyncRecords() : []
     syncCountMap.clear()
     syncRecords.forEach((r) =>
-      syncCountMap.set(r.sid || '', (syncCountMap.get(r.sid || '') || 0) + 1),
-    )
+      syncCountMap.set(r.sid || '', (syncCountMap.get(r.sid || '') || 0) + 1),)
 
     // 阶段2：在 Excel 数据表上标记已收藏的行（需要定位单元格）
     // 切换回数据工作表，便于暂停时定位
     try {
       ws.Activate()
       bgmLog(LOG_LEVELS.INFO, `[_doAPISync] 阶段2：已切回数据工作表进行标记`)
-    } catch (e: unknown) {
-      bgmLog(LOG_LEVELS.WARN, `[_doAPISync] 切回数据工作表失败: ${(e as Error).message}`)
+    } catch (error: unknown) {
+      bgmLog(LOG_LEVELS.WARN, `[_doAPISync] 切回数据工作表失败: ${(error as Error).message}`)
     }
 
     const urlCol = colMap.get('Bangumi_URL')
@@ -963,14 +961,14 @@ async function _doAPISync(
       try {
         originalActiveSheet.Activate()
         bgmLog(LOG_LEVELS.INFO, `[_doAPISync] 已恢复原始工作表: ${originalActiveSheet.Name}`)
-      } catch (e: unknown) {
-        bgmLog(LOG_LEVELS.WARN, `[_doAPISync] 恢复原始工作表失败: ${(e as Error).message}`)
+      } catch (error: unknown) {
+        bgmLog(LOG_LEVELS.WARN, `[_doAPISync] 恢复原始工作表失败: ${(error as Error).message}`)
       }
     }
-  } catch (e: unknown) {
+  } catch (error: unknown) {
     hideSyncProgressDialog()
-    BGM.handleError(e, { showAlert: false, level: BGM.ErrorLevel.WARN, context: '_doAPISync' })
-    showAlert(_T.syncFailed + (e as Error).message, _T.syncFailed)
+    BGM.handleError(error, { showAlert: false, level: BGM.ErrorLevel.WARN, context: '_doAPISync' })
+    showAlert(_T.syncFailed + (error as Error).message, _T.syncFailed)
     setStatus(_T.syncFailed, 'error')
   } finally {
     BGM.sync.exitRunningState()

@@ -112,8 +112,8 @@ export function getOrCreateSyncRecordSheet(): WpsWorksheet {
         break
       }
     }
-  } catch (e: unknown) {
-    BGM.handleError(e, { context: 'getOrCreateSyncRecordSheet', showAlert: false })
+  } catch (error: unknown) {
+    BGM.handleError(error, { context: 'getOrCreateSyncRecordSheet', showAlert: false })
   }
 
   if (!syncSheet) {
@@ -149,9 +149,9 @@ export function getOrCreateSyncRecordSheet(): WpsWorksheet {
         bgmLog(LOG_LEVELS.INFO, '同步记录表迁移完成')
         invalidateCache()
       }
-    } catch (e: unknown) {
+    } catch (error: unknown) {
       // 类型守卫：先缩窄类型再访问 message，符合 useUnknownInCatchVariables 规范
-      const errMsg = e instanceof Error ? e.message : String(e)
+      const errMsg = error instanceof Error ? error.message : String(error)
       bgmLog(LOG_LEVELS.WARN, `同步记录表迁移失败: ${errMsg}`)
     }
 
@@ -189,8 +189,8 @@ export function getSyncRecordSheetIfExists(): WpsWorksheet | null {
       const sheet = sheets.Item(i)
       if (sheet.Name === SYNC_RECORD_SHEET_NAME) return sheet
     }
-  } catch (e: unknown) {
-    BGM.handleError(e, { context: 'getSyncRecordSheetIfExists', showAlert: false })
+  } catch (error: unknown) {
+    BGM.handleError(error, { context: 'getSyncRecordSheetIfExists', showAlert: false })
   }
   return null
 }
@@ -333,8 +333,8 @@ function buildCache(sheet: WpsWorksheet): void {
         collType: rowData[SYNC_RECORD_COL.COLL_TYPE - 1] ?? '',
         row,
       })
-    } catch (e: unknown) {
-      BGM.handleError(e, { context: 'buildCache', showAlert: false })
+    } catch (error: unknown) {
+      BGM.handleError(error, { context: 'buildCache', showAlert: false })
     }
   }
   _syncRecordCacheValid = true
@@ -480,8 +480,8 @@ export function addSyncRecord(params: UpdateRecordParams): boolean {
       })
     }
     return true
-  } catch (e: unknown) {
-    BGM.handleError(e, { context: 'addSyncRecord', showAlert: false })
+  } catch (error: unknown) {
+    BGM.handleError(error, { context: 'addSyncRecord', showAlert: false })
     return false
   }
 }
@@ -597,8 +597,8 @@ export function addSyncRecords(records: UpdateRecordParams[]): boolean {
       `[addSyncRecords] 批量写入完成：新增 ${String(newRows.length)} 条，更新 ${String(sidToUpdate.size)} 条`,
     )
     return true
-  } catch (e: unknown) {
-    BGM.handleError(e, { context: 'addSyncRecords', showAlert: false })
+  } catch (error: unknown) {
+    BGM.handleError(error, { context: 'addSyncRecords', showAlert: false })
     return false
   }
 }
@@ -629,8 +629,8 @@ export function getAllSyncRecords(): SyncRecord[] {
     }
     if (!_syncRecordCacheValid) buildCache(sheet)
     return [..._syncRecordListCache]
-  } catch (e: unknown) {
-    BGM.handleError(e, { context: 'getAllSyncRecords', showAlert: false })
+  } catch (error: unknown) {
+    BGM.handleError(error, { context: 'getAllSyncRecords', showAlert: false })
     return []
   }
 }
@@ -683,8 +683,8 @@ export function deduplicateSyncRecords(): boolean {
     }
 
     return true
-  } catch (e: unknown) {
-    BGM.handleError(e, { context: 'deduplicateSyncRecords', showAlert: false })
+  } catch (error: unknown) {
+    BGM.handleError(error, { context: 'deduplicateSyncRecords', showAlert: false })
     return false
   }
 }
@@ -775,9 +775,9 @@ export function formatSyncRecordSheet(sheet?: WpsWorksheet): void {
 
     bgmLog(LOG_LEVELS.INFO, '同步记录表格式已设置')
     _formattingInProgress = false
-  } catch (e: unknown) {
+  } catch (error: unknown) {
     _formattingInProgress = false
-    BGM.handleError(e, { context: 'formatSyncRecordSheet', showAlert: false })
+    BGM.handleError(error, { context: 'formatSyncRecordSheet', showAlert: false })
   }
 }
 
@@ -799,8 +799,8 @@ export function clearSyncRecords(): boolean {
     _syncRecordCacheValid = true
     bgmLog(LOG_LEVELS.INFO, '已清除所有同步记录')
     return true
-  } catch (e: unknown) {
-    BGM.handleError(e, { context: 'clearSyncRecords', showAlert: false })
+  } catch (error: unknown) {
+    BGM.handleError(error, { context: 'clearSyncRecords', showAlert: false })
     return false
   }
 }
@@ -827,8 +827,8 @@ export function openSyncRecordSheet(scrollToRow?: number): void {
     } else {
       bgmLog(LOG_LEVELS.INFO, '已切换到同步记录工作表（暂无数据）')
     }
-  } catch (e: unknown) {
-    BGM.handleError(e, { context: 'openSyncRecordSheet', showAlert: false })
+  } catch (error: unknown) {
+    BGM.handleError(error, { context: 'openSyncRecordSheet', showAlert: false })
   }
 }
 

@@ -89,8 +89,8 @@ export function importConfig(json: string): Result<void> {
   let parsed: unknown
   try {
     parsed = JSON.parse(json)
-  } catch (e: unknown) {
-    const message = e instanceof Error ? e.message : String(e)
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : String(error)
     return Result.failVoid(new BgmError(`JSON 解析失败: ${message}`, 'CONFIG_PARSE_ERROR'))
   }
 

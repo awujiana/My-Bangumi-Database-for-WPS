@@ -339,10 +339,10 @@ export function getLastRow(
             )
             return endCell.Row
           }
-        } catch (e) {
+        } catch (error) {
           bgmLog(
             LOG_LEVELS.WARN,
-            `锚定列 ${String(col)} 定位失败: ${(e as Error).message}，回退到原有逻辑`,
+            `锚定列 ${String(col)} 定位失败: ${(error as Error).message}，回退到原有逻辑`,
           )
         }
       }
@@ -356,8 +356,8 @@ export function getLastRow(
         bgmLog(LOG_LEVELS.INFO, `D列向上定位成功，最后行: ${String(endCell.Row)}`)
         return endCell.Row
       }
-    } catch (e) {
-      bgmLog(LOG_LEVELS.WARN, `D列定位失败: ${(e as Error).message}`)
+    } catch (error) {
+      bgmLog(LOG_LEVELS.WARN, `D列定位失败: ${(error as Error).message}`)
     }
 
     // 3. 尝试 A 列
@@ -368,8 +368,8 @@ export function getLastRow(
         bgmLog(LOG_LEVELS.INFO, `A列向上定位成功，最后行: ${String(endCell.Row)}`)
         return endCell.Row
       }
-    } catch (e) {
-      bgmLog(LOG_LEVELS.WARN, `A列定位失败: ${(e as Error).message}`)
+    } catch (error) {
+      bgmLog(LOG_LEVELS.WARN, `A列定位失败: ${(error as Error).message}`)
     }
 
     // 4. UsedRange 兜底
@@ -382,8 +382,8 @@ export function getLastRow(
           return last
         }
       }
-    } catch (e) {
-      bgmLog(LOG_LEVELS.WARN, `UsedRange 失败: ${(e as Error).message}`)
+    } catch (error) {
+      bgmLog(LOG_LEVELS.WARN, `UsedRange 失败: ${(error as Error).message}`)
     }
 
     // 5. 最终默认值
@@ -434,8 +434,8 @@ export function getDataSheet(): WpsWorksheet | null | undefined {
 
       const ws = targetWb.Worksheets.Item(BGM.sheet.lockedIndex)
       return ws
-    } catch (e: unknown) {
-      bgmLog(LOG_LEVELS.WARN, `getDataSheet 锁定工作表失败: ${(e as Error).message}`)
+    } catch (error: unknown) {
+      bgmLog(LOG_LEVELS.WARN, `getDataSheet 锁定工作表失败: ${(error as Error).message}`)
     }
   }
 
@@ -558,10 +558,10 @@ function setCellValueDirect(ws: WpsWorksheet, row: number, col: number, value: s
     const cell = ws.Cells.Item(row, col)
     cell.FormulaR1C1 = value
     return true
-  } catch (e: unknown) {
+  } catch (error: unknown) {
     bgmLog(
       LOG_LEVELS.WARN,
-      `[setCellValueDirect] Cells.FormulaR1C1 (${String(row)},${String(col)}) 失败: ${(e as Error).message}`,
+      `[setCellValueDirect] Cells.FormulaR1C1 (${String(row)},${String(col)}) 失败: ${(error as Error).message}`,
     )
   }
 
@@ -570,10 +570,10 @@ function setCellValueDirect(ws: WpsWorksheet, row: number, col: number, value: s
     const cell = ws.Range(address)
     cell.Formula = value
     return true
-  } catch (e: unknown) {
+  } catch (error: unknown) {
     bgmLog(
       LOG_LEVELS.WARN,
-      `[setCellValueDirect] Range.Formula (${String(row)},${String(col)}) 失败: ${(e as Error).message}`,
+      `[setCellValueDirect] Range.Formula (${String(row)},${String(col)}) 失败: ${(error as Error).message}`,
     )
   }
 
@@ -582,10 +582,10 @@ function setCellValueDirect(ws: WpsWorksheet, row: number, col: number, value: s
     const cell = ws.Range(address)
     cell.FormulaR1C1 = value
     return true
-  } catch (e: unknown) {
+  } catch (error: unknown) {
     bgmLog(
       LOG_LEVELS.WARN,
-      `[setCellValueDirect] Range.FormulaR1C1 (${String(row)},${String(col)}) 失败: ${(e as Error).message}`,
+      `[setCellValueDirect] Range.FormulaR1C1 (${String(row)},${String(col)}) 失败: ${(error as Error).message}`,
     )
   }
 
@@ -594,10 +594,10 @@ function setCellValueDirect(ws: WpsWorksheet, row: number, col: number, value: s
     const cell = ws.Range(address)
     cell.Value2 = value
     return true
-  } catch (e: unknown) {
+  } catch (error: unknown) {
     bgmLog(
       LOG_LEVELS.WARN,
-      `[setCellValueDirect] Range.Value2 (${String(row)},${String(col)}) 失败: ${(e as Error).message}`,
+      `[setCellValueDirect] Range.Value2 (${String(row)},${String(col)}) 失败: ${(error as Error).message}`,
     )
   }
 
@@ -606,10 +606,10 @@ function setCellValueDirect(ws: WpsWorksheet, row: number, col: number, value: s
     const cell = ws.Range(address)
     cell.Value = value
     return true
-  } catch (e: unknown) {
+  } catch (error: unknown) {
     bgmLog(
       LOG_LEVELS.WARN,
-      `[setCellValueDirect] Range.Value (${String(row)},${String(col)}) 失败: ${(e as Error).message}`,
+      `[setCellValueDirect] Range.Value (${String(row)},${String(col)}) 失败: ${(error as Error).message}`,
     )
   }
 

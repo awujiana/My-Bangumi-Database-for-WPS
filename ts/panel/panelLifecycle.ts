@@ -140,8 +140,8 @@ export function restoreLockedSheet(): boolean {
         }
 
         return true
-      } catch (e: unknown) {
-        BGM.handleError(e, {
+      } catch (error: unknown) {
+        BGM.handleError(error, {
           showAlert: false,
           level: BGM.ErrorLevel.INFO,
           context: 'restoreLockedSheet',
@@ -214,8 +214,8 @@ export function refreshSheets(opts?: { autoSelectActive?: boolean }): void {
         break
       }
     }
-  } catch (e: unknown) {
-    BGM.handleError(e, {
+  } catch (error: unknown) {
+    BGM.handleError(error, {
       showAlert: false,
       level: BGM.ErrorLevel.INFO,
       context: 'refreshSheets.getActiveSheet',
@@ -329,8 +329,8 @@ export function activateSheetIfNeeded(ws: WpsWorksheet): (() => void) | false {
       return function restore() {
         try {
           active.Activate()
-        } catch (e: unknown) {
-          BGM.handleError(e, {
+        } catch (error: unknown) {
+          BGM.handleError(error, {
             showAlert: false,
             level: BGM.ErrorLevel.INFO,
             context: 'activateSheetIfNeeded',
@@ -338,8 +338,8 @@ export function activateSheetIfNeeded(ws: WpsWorksheet): (() => void) | false {
         }
       }
     }
-  } catch (e: unknown) {
-    BGM.handleError(e, {
+  } catch (error: unknown) {
+    BGM.handleError(error, {
       showAlert: false,
       level: BGM.ErrorLevel.INFO,
       context: 'activateSheetIfNeeded',
@@ -625,8 +625,8 @@ export function autoDetectSheet(): {
           colCount: meta.lastCol,
         }
       }
-    } catch (e: unknown) {
-      BGM.handleError(e, {
+    } catch (error: unknown) {
+      BGM.handleError(error, {
         showAlert: false,
         level: BGM.ErrorLevel.INFO,
         context: 'autoDetectSheet',
@@ -667,8 +667,8 @@ export function updateFilterStatus(targetWs?: WpsWorksheet): void {
   let autoFilterMode = false
   try {
     autoFilterMode = !!ws.AutoFilterMode
-  } catch (e: unknown) {
-    BGM.handleError(e, {
+  } catch (error: unknown) {
+    BGM.handleError(error, {
       showAlert: false,
       level: BGM.ErrorLevel.INFO,
       context: 'updateFilterStatus',
@@ -676,8 +676,8 @@ export function updateFilterStatus(targetWs?: WpsWorksheet): void {
   }
   try {
     if (!autoFilterMode && ws.AutoFilter) autoFilterMode = !!ws.AutoFilter.Mode
-  } catch (e: unknown) {
-    BGM.handleError(e, {
+  } catch (error: unknown) {
+    BGM.handleError(error, {
       showAlert: false,
       level: BGM.ErrorLevel.INFO,
       context: 'updateFilterStatus',
@@ -711,8 +711,8 @@ export function updateFilterStatus(targetWs?: WpsWorksheet): void {
           try {
             const headerCell = ws.Range(`${colNumToLetter(i)}1`)
             colName = String(headerCell.Value2 || '').substring(0, 12)
-          } catch (e: unknown) {
-            BGM.handleError(e, {
+          } catch (error: unknown) {
+            BGM.handleError(error, {
               showAlert: false,
               level: BGM.ErrorLevel.INFO,
               context: 'updateFilterStatus',
@@ -730,8 +730,8 @@ export function updateFilterStatus(targetWs?: WpsWorksheet): void {
           }
           activeCols.push(colName ? `${colName}(${criteria})` : `列${String(i)}`)
         }
-      } catch (e: unknown) {
-        BGM.handleError(e, {
+      } catch (error: unknown) {
+        BGM.handleError(error, {
           showAlert: false,
           level: BGM.ErrorLevel.INFO,
           context: 'updateFilterStatus',
@@ -747,9 +747,9 @@ export function updateFilterStatus(targetWs?: WpsWorksheet): void {
       el.textContent = '筛选已开启但无活动筛选，同步全部数据'
       el.removeAttribute('title')
     }
-  } catch (e: unknown) {
-    el.textContent = `检测筛选状态失败: ${(e as Error).message}`
-    BGM.handleError(e, {
+  } catch (error: unknown) {
+    el.textContent = `检测筛选状态失败: ${(error as Error).message}`
+    BGM.handleError(error, {
       showAlert: false,
       level: BGM.ErrorLevel.INFO,
       context: 'updateFilterStatus',
@@ -818,12 +818,12 @@ export function refreshData(): void {
   let ws: WpsWorksheet | null | undefined = null
   try {
     ws = app.ActiveWorkbook.Worksheets.Item(sheetIndex)
-  } catch (e: unknown) {
+  } catch (error: unknown) {
     if (previewBox)
       previewBox.innerHTML = sanitizeHtml(
         `<p class="hint">无法获取工作表: ${String(sheetIndex)}</p>`,
       )
-    BGM.handleError(e, { showAlert: false, level: BGM.ErrorLevel.INFO, context: 'refreshData' })
+    BGM.handleError(error, { showAlert: false, level: BGM.ErrorLevel.INFO, context: 'refreshData' })
     updateFilterStatus()
     return
   }

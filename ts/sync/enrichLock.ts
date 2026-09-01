@@ -338,8 +338,8 @@ export function restoreEnrichLockedWorkbook(): boolean {
       `[restoreEnrichLockedWorkbook] 成功恢复锁定: ${info.workbookName} → ${info.sheetName}`,
     )
     return true
-  } catch (e: unknown) {
-    bgmLog(LOG_LEVELS.WARN, `restoreEnrichLockedWorkbook: 解析锁定数据失败: ${String(e)}`)
+  } catch (error: unknown) {
+    bgmLog(LOG_LEVELS.WARN, `restoreEnrichLockedWorkbook: 解析锁定数据失败: ${String(error)}`)
     clearEnrichLock()
     return false
   }

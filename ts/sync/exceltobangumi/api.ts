@@ -176,12 +176,12 @@ export function testTokenValidityForRibbon(token?: string, signal?: AbortSignal)
         showSuccess(`Token有效！\n\n用户名: ${nickname}\n用户ID: ${userId}`, '验证成功')
 
         notifyUserInfoUpdated(nickname, userId)
-      } catch (e: unknown) {
+      } catch (error: unknown) {
         bgmLog(
           LOG_LEVELS.ERROR,
-          `[exceltobangumi/testTokenValidityForRibbon] 解析响应失败: ${e instanceof Error ? e.message : String(e)}`,
+          `[exceltobangumi/testTokenValidityForRibbon] 解析响应失败: ${error instanceof Error ? error.message : String(error)}`,
         )
-        BGM.handleError(e, { context: 'testTokenValidityForRibbon', showAlert: false })
+        BGM.handleError(error, { context: 'testTokenValidityForRibbon', showAlert: false })
         showError('Token有效，但解析响应失败', '错误')
       }
     } else if (xhr.status === 401) {
@@ -259,16 +259,16 @@ export function notifyUserInfoUpdated(username: string, userId: string): void {
           bgmLog(LOG_LEVELS.INFO, `[notifyUserInfoUpdated] 已通过 GetTaskPane 通知 Panel 刷新`)
         }
       }
-    } catch (e: unknown) {
+    } catch (error: unknown) {
       bgmLog(
         LOG_LEVELS.WARN,
-        `[notifyUserInfoUpdated] GetTaskPane 通知失败（轮询兜底）: ${e instanceof Error ? e.message : String(e)}`,
+        `[notifyUserInfoUpdated] GetTaskPane 通知失败（轮询兜底）: ${error instanceof Error ? error.message : String(error)}`,
       )
     }
 
     bgmLog(LOG_LEVELS.INFO, `[notifyUserInfoUpdated] 通知完成`)
-  } catch (e: unknown) {
-    bgmLog(LOG_LEVELS.WARN, `通知用户信息更新失败: ${e instanceof Error ? e.message : String(e)}`)
+  } catch (error: unknown) {
+    bgmLog(LOG_LEVELS.WARN, `通知用户信息更新失败: ${error instanceof Error ? error.message : String(error)}`)
   }
 }
 
@@ -335,11 +335,11 @@ export async function bgmRequestSync(
             try {
               const data = JSON.parse(xhr.responseText) as BgmApiResponse
               result.message = extractResponseMessage(data)
-            } catch (e: unknown) {
+            } catch (error: unknown) {
               bgmLog(
                 LOG_LEVELS.WARN,
                 `[exceltobangumi] bgmRequestSync 解析响应 JSON 失败: ${
-                  e instanceof Error ? e.message : String(e)
+                  error instanceof Error ? error.message : String(error)
                 }`,
               )
             }
@@ -369,9 +369,9 @@ export async function bgmRequestSync(
 
       xhr.send(jsonBody)
     })
-  } catch (e: unknown) {
-    bgmLog(LOG_LEVELS.ERROR, `[bgmRequestSync] 异常: ${e instanceof Error ? e.message : String(e)}`)
-    return { code: 0, message: e instanceof Error ? e.message : 'Network error' }
+  } catch (error: unknown) {
+    bgmLog(LOG_LEVELS.ERROR, `[bgmRequestSync] 异常: ${error instanceof Error ? error.message : String(error)}`)
+    return { code: 0, message: error instanceof Error ? error.message : 'Network error' }
   }
 }
 
@@ -389,8 +389,8 @@ export function setBangumiToken(token: string): boolean {
     storeBgToken(token)
     bgmLog(LOG_LEVELS.INFO, 'Token已保存')
     return true
-  } catch (e: unknown) {
-    BGM.handleError(e, { context: 'setBangumiToken', showAlert: false })
+  } catch (error: unknown) {
+    BGM.handleError(error, { context: 'setBangumiToken', showAlert: false })
     return false
   }
 }

@@ -87,8 +87,8 @@ export function setConfig(key: string, value: string): boolean {
       // 同时通知当前窗口自身（防止 postMessage 只到父窗口时当前窗口的 ribbon 监听器漏掉）
       window.postMessage(messagePayload, '*')
       bgmLog(LOG_LEVELS.INFO, `[config] 已广播 BGM:configUpdated 跨文档消息: key=${key}`)
-    } catch (e: unknown) {
-      bgmLog(LOG_LEVELS.WARN, `[config] postMessage 广播失败: ${(e as Error).message || String(e)}`)
+    } catch (error: unknown) {
+      bgmLog(LOG_LEVELS.WARN, `[config] postMessage 广播失败: ${(error as Error).message || String(error)}`)
     }
   }
 

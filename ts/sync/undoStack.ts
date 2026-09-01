@@ -176,8 +176,8 @@ function restoreDeletedRowWithWs(ws: WpsWorksheet, snapshot: RowSnapshot): void 
   try {
     // 在删除位置插入新行
     ws.Range(`${String(snapshot.row)}:${String(snapshot.row)}`).Insert()
-  } catch (e: unknown) {
-    const errMsg = e instanceof Error ? e.message : String(e)
+  } catch (error: unknown) {
+    const errMsg = error instanceof Error ? error.message : String(error)
     bgmLog(LOG_LEVELS.WARN, `[undoStack] 插入行 ${String(snapshot.row)} 失败: ${errMsg}`)
     return
   }

@@ -73,8 +73,8 @@ export function fetchGiteeJson(signal?: AbortSignal): Promise<GithubRemoteEntry[
     let url: string
     try {
       url = buildGiteeRawUrl()
-    } catch (e: unknown) {
-      reject(e instanceof Error ? e : new Error(String(e)))
+    } catch (error: unknown) {
+      reject(error instanceof Error ? error : new Error(String(error)))
       return
     }
 
@@ -120,8 +120,8 @@ export function fetchGiteeJson(signal?: AbortSignal): Promise<GithubRemoteEntry[
             bgmLog(LOG_LEVELS.INFO, `[giteeSync] 下载成功：${String(entries.length)} 条记录`)
           }
           resolve(entries)
-        } catch (e: unknown) {
-          reject(new Error(`JSONL 解析失败: ${e instanceof Error ? e.message : String(e)}`))
+        } catch (error: unknown) {
+          reject(new Error(`JSONL 解析失败: ${error instanceof Error ? error.message : String(error)}`))
         }
       } else if (xhr.status === 404) {
         reject(new Error(`文件不存在（404）：${url}，请检查 owner/repo/branch/path 配置`))

@@ -92,8 +92,8 @@ export function extractToken(encrypted: string): string | null {
     }
 
     return token
-  } catch (e: unknown) {
-    bgmLog(LOG_LEVELS.ERROR, `[crypto] extractToken 异常: ${(e as Error).message}`)
+  } catch (error: unknown) {
+    bgmLog(LOG_LEVELS.ERROR, `[crypto] extractToken 异常: ${(error as Error).message}`)
     return null
   }
 }

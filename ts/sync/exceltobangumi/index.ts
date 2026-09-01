@@ -235,8 +235,8 @@ export function getFilterStatus(
     let autoFilterMode = false
     try {
       autoFilterMode = !!ws.AutoFilterMode
-    } catch (e: unknown) {
-      BGM.handleError(e, { context: 'getFilterStatus', showAlert: false })
+    } catch (error: unknown) {
+      BGM.handleError(error, { context: 'getFilterStatus', showAlert: false })
     }
     bgmLog(
       LOG_LEVELS.INFO,
@@ -263,8 +263,8 @@ export function getFilterStatus(
           visibleCells = ws.AutoFilter.Range.SpecialCells(12)
           bgmLog(LOG_LEVELS.INFO, `getFilterStatus: AutoFilter 模式`)
         }
-      } catch (e: unknown) {
-        BGM.handleError(e, { context: 'getFilterStatus', showAlert: false })
+      } catch (error: unknown) {
+        BGM.handleError(error, { context: 'getFilterStatus', showAlert: false })
       }
     } else {
       // deepCheck 模式：用全范围检测手动隐藏行
@@ -307,8 +307,8 @@ export function getFilterStatus(
       } else {
         areas.push(visibleCells)
       }
-    } catch (e: unknown) {
-      BGM.handleError(e, { context: 'getFilterStatus', showAlert: false })
+    } catch (error: unknown) {
+      BGM.handleError(error, { context: 'getFilterStatus', showAlert: false })
       areas.push(visibleCells)
     }
 
@@ -340,8 +340,8 @@ export function getFilterStatus(
     if (result.visibleRows.length > 0) {
       bgmLog(LOG_LEVELS.INFO, `可见行前10: ${result.visibleRows.slice(0, 10).join(',')}`)
     }
-  } catch (e: unknown) {
-    BGM.handleError(e, { context: 'getFilterStatus', showAlert: false })
+  } catch (error: unknown) {
+    BGM.handleError(error, { context: 'getFilterStatus', showAlert: false })
   }
 
   return result
@@ -387,12 +387,12 @@ export function getSequentialRowsBySeqCol(
             result.seqMap.set(seqNum, r)
           }
         }
-      } catch (e: unknown) {
-        BGM.handleError(e, { context: 'getSequentialRowsBySeqCol', showAlert: false })
+      } catch (error: unknown) {
+        BGM.handleError(error, { context: 'getSequentialRowsBySeqCol', showAlert: false })
       }
     }
-  } catch (e: unknown) {
-    BGM.handleError(e, { context: 'getSequentialRowsBySeqCol', showAlert: false })
+  } catch (error: unknown) {
+    BGM.handleError(error, { context: 'getSequentialRowsBySeqCol', showAlert: false })
   }
 
   return result
@@ -512,8 +512,8 @@ export function buildJsonPayload(getField: (key: string) => string, _finishedDat
     }
 
     return JSON.stringify(payload)
-  } catch (e: unknown) {
-    BGM.handleError(e, { context: 'buildJsonPayload', showAlert: false })
+  } catch (error: unknown) {
+    BGM.handleError(error, { context: 'buildJsonPayload', showAlert: false })
     return '{}'
   }
 }
@@ -679,8 +679,8 @@ function processRowToSyncTask(
     }
 
     return { task, skipped: false, failed: false }
-  } catch (e: unknown) {
-    BGM.handleError(e, { level: BGM.ErrorLevel.WARN, context: 'SyncToBangumiAsync:preprocess' })
+  } catch (error: unknown) {
+    BGM.handleError(error, { level: BGM.ErrorLevel.WARN, context: 'SyncToBangumiAsync:preprocess' })
     return { task: null, skipped: false, failed: true }
   }
 }
@@ -837,10 +837,10 @@ async function batchSyncRequests(
                   LOG_LEVELS.INFO,
                   `[batchSyncRequests] SID ${task.sid} 章节标记结果: ${epResult.message}`,
                 )
-              } catch (epErr: unknown) {
+              } catch (error: unknown) {
                 bgmLog(
                   LOG_LEVELS.WARN,
-                  `[batchSyncRequests] SID ${task.sid} 章节标记异常: ${epErr instanceof Error ? epErr.message : String(epErr)}`,
+                  `[batchSyncRequests] SID ${task.sid} 章节标记异常: ${error instanceof Error ? error.message : String(error)}`,
                 )
               }
             } else if (task.type === 3 && task.epCount && task.epCount > 0) {
@@ -861,11 +861,11 @@ async function batchSyncRequests(
               `[batchSyncRequests] SID ${task.sid} 同步失败，HTTP ${String(apiResult.code)}，消息: ${apiResult.message}`,
             )
           }
-        } catch (e: unknown) {
+        } catch (error: unknown) {
           fail.push(task)
           bgmLog(
             LOG_LEVELS.ERROR,
-            `[batchSyncRequests] SID ${task.sid} 同步异常: ${e instanceof Error ? e.message : String(e)}`,
+            `[batchSyncRequests] SID ${task.sid} 同步异常: ${error instanceof Error ? error.message : String(error)}`,
           )
         } finally {
           entry.done = true
@@ -874,10 +874,10 @@ async function batchSyncRequests(
             const completed = success.length + fail.length
             try {
               onProgress(completed, total, `同步中 ${String(completed)}/${String(total)}`)
-            } catch (e: unknown) {
+            } catch (error: unknown) {
               bgmLog(
                 LOG_LEVELS.WARN,
-                `[batchSyncRequests] onProgress 回调异常: ${e instanceof Error ? e.message : String(e)}`,
+                `[batchSyncRequests] onProgress 回调异常: ${error instanceof Error ? error.message : String(error)}`,
               )
             }
           }
@@ -921,8 +921,8 @@ async function executeBatchSync(
   // 尝试创建同步记录表
   try {
     getOrCreateSyncRecordSheet()
-  } catch (e: unknown) {
-    BGM.handleError(e, { level: BGM.ErrorLevel.WARN, context: 'SyncToBangumiAsync:createSheet' })
+  } catch (error: unknown) {
+    BGM.handleError(error, { level: BGM.ErrorLevel.WARN, context: 'SyncToBangumiAsync:createSheet' })
   }
 
   bgmLog(LOG_LEVELS.INFO, '[SyncToBangumiAsync] 步骤5: 开始批量同步请求')
@@ -1027,10 +1027,10 @@ function collectSelectedRows(app: WpsApplication): number[] {
     let selAddress = ''
     try {
       selAddress = sel.Address || ''
-    } catch (e: unknown) {
+    } catch (error: unknown) {
       bgmLog(
         LOG_LEVELS.WARN,
-        `[exceltobangumi] 获取地址失败: ${e instanceof Error ? e.message : String(e)}`,
+        `[exceltobangumi] 获取地址失败: ${error instanceof Error ? error.message : String(error)}`,
       )
       selAddress = '(无法获取)'
     }
@@ -1063,8 +1063,8 @@ function collectSelectedRows(app: WpsApplication): number[] {
       LOG_LEVELS.INFO,
       `[syncSelectedRows] 选中区域: ${String(rawRows.length)} 行，行号 ${String(Math.min(...rawRows))}-${String(Math.max(...rawRows))}`,
     )
-  } catch (e: unknown) {
-    BGM.handleError(e, { context: 'syncSelectedRows', showAlert: false })
+  } catch (error: unknown) {
+    BGM.handleError(error, { context: 'syncSelectedRows', showAlert: false })
     void wpsMsgBox('获取选中区域失败，请检查是否选中了有效区域', 0, 48)
     return []
   }
@@ -1328,10 +1328,10 @@ async function executeSelectedSync(
           try {
             const parsedBody = JSON.parse(jsonBody) as { type?: number }
             watchType = parsedBody.type ?? 0
-          } catch (parseErr: unknown) {
+          } catch (error: unknown) {
             bgmLog(
               LOG_LEVELS.WARN,
-              `[syncSelectedRows] 行${String(rowNum)} jsonBody 解析失败: ${parseErr instanceof Error ? parseErr.message : String(parseErr)}`,
+              `[syncSelectedRows] 行${String(rowNum)} jsonBody 解析失败: ${error instanceof Error ? error.message : String(error)}`,
             )
           }
           const epRaw = trim(
@@ -1373,9 +1373,9 @@ async function executeSelectedSync(
             `✗ ${rowProgress} 行${String(rowNum)} "${name || sid}" 失败 HTTP:${String(result.code)} ${result.message}`,
           )
         }
-      } catch (e: unknown) {
+      } catch (error: unknown) {
         failCount++
-        const errMsg = e instanceof Error ? e.message : String(e)
+        const errMsg = error instanceof Error ? error.message : String(error)
         bgmLog(
           LOG_LEVELS.ERROR,
           `[syncSelectedRows] ${rowProgress} 行${String(rowNum)} 处理异常: ${errMsg}`,
@@ -1402,10 +1402,10 @@ async function executeSelectedSync(
     const wasStopped = BGM.sync.checkShouldStop()
     const summary = `📊 选中 ${String(rows.length)} 行 | 耗时 ${(elapsed / 1000).toFixed(1)}s\n\n✅ 成功: ${String(successCount)}\n❌ 失败: ${String(failCount)}\n⏭️ 跳过: ${String(skipCount)}\n📺 标记章节: ${String(episodeMarkCount)}`
     completeSyncProgressDialog(summary, details, wasStopped)
-  } catch (e: unknown) {
+  } catch (error: unknown) {
     hideSyncProgressDialog()
-    BGM.handleError(e, { context: 'syncSelectedRows', showAlert: false })
-    const errMsg = e instanceof Error ? e.message : String(e)
+    BGM.handleError(error, { context: 'syncSelectedRows', showAlert: false })
+    const errMsg = error instanceof Error ? error.message : String(error)
     bgmLog(LOG_LEVELS.ERROR, `[syncSelectedRows] 同步异常: ${errMsg}`)
     void wpsMsgBox(`选中行同步异常: ${errMsg}`, 0, 16)
   } finally {
@@ -1470,10 +1470,10 @@ export async function syncSelectedRows(): Promise<void> {
       headerRow,
       startTime,
     )
-  } catch (e: unknown) {
+  } catch (error: unknown) {
     hideSyncProgressDialog()
-    BGM.handleError(e, { context: 'syncSelectedRows', showAlert: false })
-    const errMsg = e instanceof Error ? e.message : String(e)
+    BGM.handleError(error, { context: 'syncSelectedRows', showAlert: false })
+    const errMsg = error instanceof Error ? error.message : String(error)
     bgmLog(LOG_LEVELS.ERROR, `[syncSelectedRows] 同步异常: ${errMsg}`)
     void wpsMsgBox(`选中行同步异常: ${errMsg}`, 0, 16)
   }

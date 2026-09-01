@@ -311,8 +311,8 @@ function getSelectedRowSids(): Set<string> {
     }
 
     bgmLog(LOG_LEVELS.INFO, `[getSelectedRowSids] 提取到 ${String(sids.size)} 个 SID`)
-  } catch (e: unknown) {
-    bgmLog(LOG_LEVELS.ERROR, `[getSelectedRowSids] 提取失败: ${(e as Error).message}`)
+  } catch (error: unknown) {
+    bgmLog(LOG_LEVELS.ERROR, `[getSelectedRowSids] 提取失败: ${(error as Error).message}`)
   }
   return sids
 }

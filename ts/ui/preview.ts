@@ -437,19 +437,19 @@ export async function previewSyncContent(): Promise<void> {
           `预览生成 ${String(i + 1)}/${String(totalRows)}（卡片 ${String(actualCardCount)}）`,
           `✓ [${String(i + 1)}/${String(totalRows)}] 行${String(rowNum)} "${rowData.name || ''}" 已渲染`,
         )
-      } catch (e: unknown) {
+      } catch (error: unknown) {
         errorCount++
-        BGM.handleError(e, {
+        BGM.handleError(error, {
           showAlert: false,
           level: BGM.ErrorLevel.WARN,
           context: 'previewSyncContent',
         })
-        cardsHtml += `<div class="detail-item error">行 ${String(rowNum)} 处理出错: ${escapeHtml((e as Error).message)}</div>`
+        cardsHtml += `<div class="detail-item error">行 ${String(rowNum)} 处理出错: ${escapeHtml((error as Error).message)}</div>`
         updateSyncProgressDialog(
           i + 1,
           totalRows,
           `预览生成 ${String(i + 1)}/${String(totalRows)}（卡片 ${String(actualCardCount)}）`,
-          `✗ [${String(i + 1)}/${String(totalRows)}] 行${String(rowNum)} 异常: ${(e as Error).message}`,
+          `✗ [${String(i + 1)}/${String(totalRows)}] 行${String(rowNum)} 异常: ${(error as Error).message}`,
         )
       }
     }
@@ -548,8 +548,8 @@ export async function previewSyncContent(): Promise<void> {
     const syncAllBtnEl = document.getElementById('syncAllBtn')
     if (syncAllBtnEl) {
       syncAllBtnEl.onclick = () => {
-        syncAllRows().catch((e: unknown) => {
-          bgmLog(LOG_LEVELS.ERROR, `[preview] syncAllRows 异常: ${(e as Error).message}`)
+        syncAllRows().catch((error: unknown) => {
+          bgmLog(LOG_LEVELS.ERROR, `[preview] syncAllRows 异常: ${(error as Error).message}`)
         })
       }
     }
@@ -747,16 +747,16 @@ export async function uploadSingleRow(
       })
       showToast(`上传失败: ${(result.message || '未知错误').substring(0, 60)}`, 'error')
     }
-  } catch (e: unknown) {
-    BGM.handleError(e, { showAlert: true, level: BGM.ErrorLevel.ERROR, context: 'UploadSingleRow' })
+  } catch (error: unknown) {
+    BGM.handleError(error, { showAlert: true, level: BGM.ErrorLevel.ERROR, context: 'UploadSingleRow' })
     if (btnElement) {
       btnElement.disabled = false
       btnElement.classList.remove('uploading')
       btnElement.classList.add('error')
       btnElement.textContent = '✗ 错误'
     }
-    showToast(`上传出错: ${(e as Error).message.substring(0, 60)}`, 'error')
-    BGM.handleError(e, { showAlert: true, level: BGM.ErrorLevel.ERROR, context: 'UploadSingleRow' })
+    showToast(`上传出错: ${(error as Error).message.substring(0, 60)}`, 'error')
+    BGM.handleError(error, { showAlert: true, level: BGM.ErrorLevel.ERROR, context: 'UploadSingleRow' })
   }
 }
 
@@ -784,8 +784,8 @@ export function viewSyncRecordDetail(sid: string): void {
   let content = record.content || ''
   try {
     content = JSON.stringify(JSON.parse(content), null, 2)
-  } catch (e: unknown) {
-    BGM.handleError(e, {
+  } catch (error: unknown) {
+    BGM.handleError(error, {
       showAlert: false,
       level: BGM.ErrorLevel.WARN,
       context: 'ViewSyncRecordDetail',
@@ -868,8 +868,8 @@ export async function syncAllRows(): Promise<{ success: number; fail: number; sk
       // 如需跳过冲突，可在 detectConflicts 后收集冲突 sid 集合，
       // 并通过 skipSids 选项传给 SyncToBangumiAsync
     }
-  } catch (e: unknown) {
-    const bgmErr = BGM.handleError(e, { showAlert: false })
+  } catch (error: unknown) {
+    const bgmErr = BGM.handleError(error, { showAlert: false })
     bgmErr.message = `冲突检测失败，已跳过此步骤。原始错误: ${bgmErr.message}`
   }
 
@@ -878,8 +878,8 @@ export async function syncAllRows(): Promise<{ success: number; fail: number; sk
   let incremental = false
   try {
     incremental = app?.PluginStorage?.getItem('bgm_incremental_sync') === 'true'
-  } catch (e: unknown) {
-    bgmLog(LOG_LEVELS.WARN, `[syncAllRows] 读取增量同步设置失败: ${(e as Error).message}`)
+  } catch (error: unknown) {
+    bgmLog(LOG_LEVELS.WARN, `[syncAllRows] 读取增量同步设置失败: ${(error as Error).message}`)
   }
   bgmLog(LOG_LEVELS.INFO, `[syncAllRows] 增量同步: ${incremental ? '开启' : '关闭'}`)
 
@@ -948,10 +948,10 @@ export async function syncAllRows(): Promise<{ success: number; fail: number; sk
     completeSyncProgressDialog(summary, details, result.stopped)
 
     return result
-  } catch (err: unknown) {
+  } catch (error: unknown) {
     // 异常时隐藏弹窗，避免残留运行态 UI
     hideSyncProgressDialog()
-    BGM.handleError(err, { showAlert: true })
+    BGM.handleError(error, { showAlert: true })
     return { success: 0, fail: 0, skip: 0 }
   } finally {
     // 无论成功、失败还是停止，都退出运行状态

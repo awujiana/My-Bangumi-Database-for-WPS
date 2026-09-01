@@ -485,8 +485,7 @@ describe('toggleEnrichWorkbookLock', () => {
     setMockApp(app)
 
     expect(() =>
-      toggleEnrichWorkbookLock('nonexistent', 'workbookSelect', 'lockSheetBtn', 'lockStatus'),
-    ).not.toThrow()
+      toggleEnrichWorkbookLock('nonexistent', 'workbookSelect', 'lockSheetBtn', 'lockStatus'),).not.toThrow()
   })
 })
 

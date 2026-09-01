@@ -253,8 +253,8 @@ export function fetchGistJson(signal?: AbortSignal): Promise<GithubRemoteEntry[]
             bgmLog(LOG_LEVELS.INFO, `[gistSync] 下载成功：${String(entries.length)} 条记录`)
           }
           resolve(entries)
-        } catch (e: unknown) {
-          reject(new Error(`Gist 响应解析失败: ${e instanceof Error ? e.message : String(e)}`))
+        } catch (error: unknown) {
+          reject(new Error(`Gist 响应解析失败: ${error instanceof Error ? error.message : String(error)}`))
         }
       } else if (xhr.status === 404) {
         reject(new Error(`Gist 不存在（404）：${url}，请检查 gist_id 配置`))

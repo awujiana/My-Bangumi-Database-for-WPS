@@ -199,8 +199,8 @@ export function exportSheetToJsonlFile(): boolean {
       `[exportJsonl] 已导出文件: ${filename} (${String(content.length)} 字节)`,
     )
     return true
-  } catch (e: unknown) {
-    bgmLog(LOG_LEVELS.ERROR, `[exportJsonl] 导出失败: ${(e as Error).message}`)
+  } catch (error: unknown) {
+    bgmLog(LOG_LEVELS.ERROR, `[exportJsonl] 导出失败: ${(error as Error).message}`)
     return false
   }
 }

@@ -343,7 +343,7 @@ describe('buildJsonPayload', () => {
   it('应过滤控制字符（保留换行符 \\n）', () => {
     const getField = (key: string): string => {
       if (key === '是否看完') return '看过'
-      if (key === '剧透/感言') return '第一行\x07\x0B第二行'
+      if (key === '剧透/感言') return '第一行\u{7}\u{B}第二行'
       return ''
     }
     const json = buildJsonPayload(getField, '')
