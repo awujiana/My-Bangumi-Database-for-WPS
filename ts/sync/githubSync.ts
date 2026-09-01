@@ -41,13 +41,15 @@ import {
   EXTENDED_FIELD_MAP,
   getExcelAliases,
   filterByTime,
-  type ConflictResolution,
-  type GithubRemoteEntry,
-  type GithubSyncDiff,
-  type GithubSyncDetailItem,
-  type LocalRowEntry,
-  type SyncStrategy,
-  type SyncTimeFilter,
+} from './githubSyncDiff.js'
+import type {
+  ConflictResolution,
+  GithubRemoteEntry,
+  GithubSyncDiff,
+  GithubSyncDetailItem,
+  LocalRowEntry,
+  SyncStrategy,
+  SyncTimeFilter,
 } from './githubSyncDiff.js'
 import { extractSubjectId } from './pureUtils.js'
 import { addSyncRecords, addSyncRecordSummary } from './syncRecord.js'
@@ -101,7 +103,7 @@ export interface GithubSyncResult {
 }
 
 /** HTTP 请求超时（毫秒） */
-const REQUEST_TIMEOUT_MS = 30000
+const REQUEST_TIMEOUT_MS = 30_000
 
 /**
  * 从 GitHub Raw 下载 JSONL 文件
@@ -441,7 +443,7 @@ const DATE_COLUMNS = new Set(['开播日期', '完播日'])
  */
 function formatDateToLocal(dateStr: string): string | null {
   if (!dateStr) return null
-  const match = dateStr.match(/^(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})/)
+  const match = /^(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})/.exec(dateStr)
   if (!match) return null
   const year = match[1]
   const month = match[2]!.padStart(2, '0')
@@ -869,9 +871,9 @@ function batchUpdateRows(
   // 但仍然比逐字段 setCellValue 快，因为每行只 1 次 COM 调用而非 ~23 次
   let successCount = 0
   for (const u of updates) {
-    const row = u.row
-    const remote = u.remote
-    const fields = u.fields
+    const { row } = u
+    const { remote } = u
+    const { fields } = u
     const writeAll = fields.includes('*')
 
     // 先读取当前行的值（用于合并逻辑和 undo 记录）

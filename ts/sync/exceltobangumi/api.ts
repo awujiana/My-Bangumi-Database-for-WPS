@@ -115,8 +115,8 @@ export function testTokenValidityForRibbon(token?: string, signal?: AbortSignal)
 
   const xhr = new XMLHttpRequest()
   xhr.open('GET', apiUrl, true)
-  xhr.timeout = 30000
-  xhr.setRequestHeader('Authorization', 'Bearer ' + testToken)
+  xhr.timeout = 30_000
+  xhr.setRequestHeader('Authorization', `Bearer ${testToken}`)
   xhr.setRequestHeader('Content-Type', 'application/json')
 
   // AbortSignal 支持：监听 abort 事件触发 xhr.abort()，并在请求完成后移除监听器
@@ -163,7 +163,7 @@ export function testTokenValidityForRibbon(token?: string, signal?: AbortSignal)
         const data = JSON.parse(xhr.responseText) as BgmUserInfo
         bgmLog(
           LOG_LEVELS.INFO,
-          `[exceltobangumi/testTokenValidityForRibbon] 响应数据: ${JSON.stringify(data).length > 300 ? JSON.stringify(data).substring(0, 300) + '...' : JSON.stringify(data)}`,
+          `[exceltobangumi/testTokenValidityForRibbon] 响应数据: ${JSON.stringify(data).length > 300 ? `${JSON.stringify(data).substring(0, 300)}...` : JSON.stringify(data)}`,
         )
 
         const nickname = data.nickname || data.username || '未知用户'
@@ -268,7 +268,7 @@ export function notifyUserInfoUpdated(username: string, userId: string): void {
 
     bgmLog(LOG_LEVELS.INFO, `[notifyUserInfoUpdated] 通知完成`)
   } catch (e: unknown) {
-    bgmLog(LOG_LEVELS.WARN, '通知用户信息更新失败: ' + (e instanceof Error ? e.message : String(e)))
+    bgmLog(LOG_LEVELS.WARN, `通知用户信息更新失败: ${e instanceof Error ? e.message : String(e)}`)
   }
 }
 
@@ -307,7 +307,7 @@ export async function bgmRequestSync(
       const result = { code: 0, message: '' }
       const xhr = new XMLHttpRequest()
       xhr.open(method.toUpperCase(), fullUrl, true)
-      xhr.timeout = 30000
+      xhr.timeout = 30_000
       xhr.setRequestHeader('Authorization', `Bearer ${token}`)
       xhr.setRequestHeader('Content-Type', 'application/json')
 
@@ -338,8 +338,9 @@ export async function bgmRequestSync(
             } catch (e: unknown) {
               bgmLog(
                 LOG_LEVELS.WARN,
-                '[exceltobangumi] bgmRequestSync 解析响应 JSON 失败: ' +
-                  (e instanceof Error ? e.message : String(e)),
+                `[exceltobangumi] bgmRequestSync 解析响应 JSON 失败: ${
+                  e instanceof Error ? e.message : String(e)
+                }`,
               )
             }
           }

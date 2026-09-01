@@ -62,26 +62,30 @@ import {
   buildRawUrl,
   showSyncProgressDialog,
   buildSyncConfig,
-  type BuildSyncConfigContext,
   updateSyncProgressDialog,
   completeSyncProgressDialog,
-  type SyncProgressStats,
   hideSyncProgressDialog,
   showSyncResultDialog,
-  type SyncResultDialogOptions,
   formatDuration,
-  type SyncStrategy,
-  type SyncSourceType,
-  type GithubSyncResult,
-  type GithubSyncDetailItem,
-  type SyncTimeFilter,
   showSettingsPanel,
+} from '../../index.js'
+import type {
+  BuildSyncConfigContext,
+  SyncProgressStats,
+  SyncResultDialogOptions,
+  SyncStrategy,
+  SyncSourceType,
+  GithubSyncResult,
+  GithubSyncDetailItem,
+  SyncTimeFilter,
 } from '../../index.js'
 import { exportConfig, importConfig } from '../../services/configService.js'
 import { executeUndoLastSync } from '../../services/ribbonService.js'
 import { debounce } from '../../tools/debounce.js'
-import { BGM_EVENTS, eventBus, type EventHandler } from '../../tools/events.js'
-import { getRecentLogs, exportLogsToFile, clearLogs, type LogLevel } from '../../tools/logger.js'
+import { BGM_EVENTS, eventBus } from '../../tools/events.js'
+import type { EventHandler } from '../../tools/events.js'
+import { getRecentLogs, exportLogsToFile, clearLogs } from '../../tools/logger.js'
+import type { LogLevel } from '../../tools/logger.js'
 import { showConnectionTestDialog, hideConnectionTestDialog } from '../githubConfigDialog.js'
 
 // 子模块
@@ -147,14 +151,14 @@ export function clearAllPendingTimeouts(): void {
 
 // ========== 模块级 DOM / 事件总线监听器追踪（防止重复注册与内存泄漏） ==========
 
-type TrackedDomListener = {
+interface TrackedDomListener {
   kind: 'dom'
   element: EventTarget
   type: string
   handler: EventListenerOrEventListenerObject
 }
 
-type TrackedBusListener = {
+interface TrackedBusListener {
   kind: 'eventBus'
   eventName: string
   handler: EventHandler
@@ -257,7 +261,7 @@ const handleEnableSyncRecordChange = (): void => {
     'chkEnableSyncRecord',
   ) as HTMLInputElement | null
   if (!chkEnableSyncRecord) return
-  const checked = chkEnableSyncRecord.checked
+  const { checked } = chkEnableSyncRecord
   bgmLog(LOG_LEVELS.INFO, `[handlers] 启用同步记录开关切换: ${checked ? '开启' : '关闭'}`)
   setSyncRecordEnabled(checked)
   showToast(checked ? '已启用同步记录功能' : '已关闭同步记录功能', 'info')
@@ -405,9 +409,7 @@ const debouncedSaveGithubConfig = debounce((): void => {
       if (!path) return
     } else if (sourceType === 'gist') {
       if (!gistId) return
-    } else {
-      if (!owner || !repo || !path) return
-    }
+    } else if (!owner || !repo || !path) return
 
     const okConfig = setGithubConfig({ owner, repo, branch, path, sourceType, gistId })
     const okStrategy = setSyncStrategy(strategy)
@@ -1004,11 +1006,9 @@ const ACTION_HANDLERS: Record<string, ActionHandler> = {
         showToast('Gist ID 不能为空', 'warn')
         return
       }
-    } else {
-      if (!config.owner || !config.repo || !config.path) {
-        showToast('owner / repo / path 不能为空', 'warn')
-        return
-      }
+    } else if (!config.owner || !config.repo || !config.path) {
+      showToast('owner / repo / path 不能为空', 'warn')
+      return
     }
     const strategy = (strategySelect?.value as SyncStrategy | undefined) || 'add-update'
     const okConfig = setGithubConfig(config)
@@ -1200,7 +1200,7 @@ const ACTION_HANDLERS: Record<string, ActionHandler> = {
               `🔍 跳过: ${String(result.skipped)}`,
               `📊 实际处理: ${String(totalProcessed)} 条`,
               `⏱️ 总耗时: ${formatDuration(totalElapsed)}`,
-              `⚡ 平均速度: ${avgSpeed > 0 ? String(avgSpeed) + ' 行/秒' : '--'}`,
+              `⚡ 平均速度: ${avgSpeed > 0 ? `${String(avgSpeed)} 行/秒` : '--'}`,
               `📈 处理效率: ${String(efficiency)}%`,
               etaMs > 0 ? `🔮 预计剩余: ${formatDuration(etaMs)}` : '✅ 全部完成',
             ]
@@ -1252,7 +1252,7 @@ const ACTION_HANDLERS: Record<string, ActionHandler> = {
 
             bgmLog(
               LOG_LEVELS.INFO,
-              `[handleActionClick] 同步完成 | 远程:${String(result.remoteTotal)} ✅:${String(result.added)} 🔄:${String(result.updated)} ❌:${String(result.deleted)} ⏭️:${String(result.unchanged)} ⚠️:${String(result.failed)} 🔍:${String(result.skipped)} | 耗时:${formatDuration(totalElapsed)} | 速度:${avgSpeed > 0 ? String(avgSpeed) + '/s' : '?'} | 效率:${String(efficiency)}%`,
+              `[handleActionClick] 同步完成 | 远程:${String(result.remoteTotal)} ✅:${String(result.added)} 🔄:${String(result.updated)} ❌:${String(result.deleted)} ⏭️:${String(result.unchanged)} ⚠️:${String(result.failed)} 🔍:${String(result.skipped)} | 耗时:${formatDuration(totalElapsed)} | 速度:${avgSpeed > 0 ? `${String(avgSpeed)}/s` : '?'} | 效率:${String(efficiency)}%`,
             )
             if (app?.StatusBar !== undefined) app.StatusBar = false
           })
@@ -1324,7 +1324,7 @@ const ACTION_HANDLERS: Record<string, ActionHandler> = {
     const testStartTs = Date.now()
     const xhr = new XMLHttpRequest()
     xhr.open('HEAD', url, true)
-    xhr.timeout = 10000
+    xhr.timeout = 10_000
 
     xhr.onload = () => {
       const responseTime = Date.now() - testStartTs
@@ -1770,7 +1770,7 @@ function renderLogEntries(): void {
 
 function handleActionClick(event: Event): void {
   const target = event.currentTarget as HTMLElement
-  const action = target.dataset.action
+  const { action } = target.dataset
   if (!action) return
   // 解析可能的参数（如：<button data-action="markUploadedItems" data-args='["动画"]'>）
   let args: string[] = []
@@ -1929,7 +1929,7 @@ function setupMessageListener(): void {
         bgmLog(LOG_LEVELS.WARN, `[message] 拒绝非预期 origin: ${event.origin}`)
         return
       }
-      const data: unknown = event.data
+      const { data } = event
       if (typeof data !== 'object' || data === null) return
       const msg = data as {
         type?: string
@@ -1937,7 +1937,7 @@ function setupMessageListener(): void {
         username?: string
       }
 
-      bgmLog(LOG_LEVELS.INFO, '[handlers] 收到消息: ' + JSON.stringify(msg))
+      bgmLog(LOG_LEVELS.INFO, `[handlers] 收到消息: ${JSON.stringify(msg)}`)
 
       switch (msg.type) {
         case 'BGM:tokenUpdated':
@@ -2092,7 +2092,7 @@ function setupEventListeners(): void {
   // Ribbon 按钮触发数据同步：复用 panel handler，显示模块化进度弹窗
   trackedEventBusOn(BGM_EVENTS.REQUEST_GITHUB_SYNC, () => {
     bgmLog(LOG_LEVELS.INFO, '[handlers] 收到 Ribbon 数据同步请求，触发 syncFromGithub handler')
-    const handler = ACTION_HANDLERS['syncFromGithub']
+    const handler = ACTION_HANDLERS.syncFromGithub
     if (handler) {
       handler({ args: [], startTime: Date.now() })
     } else {
@@ -2103,7 +2103,7 @@ function setupEventListeners(): void {
   // 在 panel 环境中执行，可访问 undoStack 中的实际会话数据
   trackedEventBusOn(BGM_EVENTS.REQUEST_UNDO_LAST_SYNC, () => {
     bgmLog(LOG_LEVELS.INFO, '[handlers] 收到 Ribbon 撤销同步请求，触发 undoLastSync handler')
-    const handler = ACTION_HANDLERS['undoLastSync']
+    const handler = ACTION_HANDLERS.undoLastSync
     if (handler) {
       handler({ args: [], startTime: Date.now() })
     } else {
@@ -2113,7 +2113,7 @@ function setupEventListeners(): void {
 }
 
 // 尝试更新增量同步复选框（带重试机制）
-function tryUpdateIncrementalCheckbox(checked: boolean, attempts: number = 0): void {
+function tryUpdateIncrementalCheckbox(checked: boolean, attempts = 0): void {
   if (!isPanelContext()) return
 
   const chkIncremental = document.getElementById('chkIncremental') as HTMLInputElement | null
@@ -2140,7 +2140,7 @@ function tryUpdateIncrementalCheckbox(checked: boolean, attempts: number = 0): v
 }
 
 // 尝试更新跳过冲突 UI（带重试机制）
-function tryUpdateSkipConflictsUI(skipConflicts: boolean, attempts: number = 0): void {
+function tryUpdateSkipConflictsUI(skipConflicts: boolean, attempts = 0): void {
   if (!isPanelContext()) return
 
   bgmLog(LOG_LEVELS.INFO, `[handlers] 目标状态: ${skipConflicts ? '跳过冲突' : 'Excel覆盖'}`)
@@ -2157,7 +2157,8 @@ function tryUpdateSkipConflictsUI(skipConflicts: boolean, attempts: number = 0):
 
     bgmLog(LOG_LEVELS.INFO, `[handlers] 冲突策略 select 已更新: ${conflictStrategySelect.value}`)
     return
-  } else if (attempts < 3) {
+  }
+  if (attempts < 3) {
     // 最多重试3次
     bgmLog(
       LOG_LEVELS.WARN,
@@ -2199,7 +2200,7 @@ function tryUpdateSkipConflictsUI(skipConflicts: boolean, attempts: number = 0):
 }
 
 // 尝试更新启用同步记录复选框（带重试机制，与另外两个开关保持一致）
-function tryUpdateEnableSyncRecordUI(enabled: boolean, attempts: number = 0): void {
+function tryUpdateEnableSyncRecordUI(enabled: boolean, attempts = 0): void {
   if (!isPanelContext()) return
 
   const chkEnableSyncRecord = document.getElementById(
@@ -2230,7 +2231,7 @@ function tryUpdateEnableSyncRecordUI(enabled: boolean, attempts: number = 0): vo
 const handleIncrementalChange = (): void => {
   const chkIncremental = document.getElementById('chkIncremental') as HTMLInputElement | null
   if (!chkIncremental) return
-  const checked = chkIncremental.checked
+  const { checked } = chkIncremental
 
   bgmLog(LOG_LEVELS.INFO, `[handlers] ========== 增量同步状态变更 ==========`)
   bgmLog(LOG_LEVELS.INFO, `[handlers] 新状态: ${checked ? '开启' : '关闭'}`)
@@ -2295,7 +2296,7 @@ const handleOverwriteRadioChange = (): void => {
 const handleChkSkipConflictsChange = (): void => {
   const chkSkipConflicts = document.getElementById('chkSkipConflicts') as HTMLInputElement | null
   if (!chkSkipConflicts) return
-  const checked = chkSkipConflicts.checked
+  const { checked } = chkSkipConflicts
   try {
     setSkipConflicts(checked)
     bgmLog(LOG_LEVELS.INFO, `[handlers] 跳过冲突状态已更新: ${checked ? '跳过冲突' : 'Excel覆盖'}`)

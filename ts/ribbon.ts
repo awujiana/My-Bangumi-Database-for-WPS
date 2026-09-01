@@ -4,7 +4,16 @@
  * @description WPS Office 功能区按钮回调处理
  */
 
-import * as RibbonService from './services/ribbonService.js'
+import {
+  syncWithConfirmation,
+  setTokenForRibbon,
+  testTokenForRibbon,
+  copyTokenForRibbon,
+  setUserIdForRibbon,
+  openCollectionForRibbon,
+  syncFromGithubForRibbon,
+  undoLastSyncForRibbon,
+} from './services/ribbonService.js'
 
 import {
   WPS_ENUM,
@@ -92,7 +101,7 @@ function initRibbonMessageListener(): void {
         bgm_skip_conflicts: 'chkSkipConflicts',
         bgm_enable_sync_record: 'chkEnableSyncRecord',
       }
-      const controlId = controlIdMap[key as string]
+      const controlId = controlIdMap[key!]
       if (controlId) {
         const app = getApp()
         const ribbonUI = app?.ribbonUI as WpsRibbonUI | undefined
@@ -333,7 +342,7 @@ export function OnAction(control: { Id: string }): boolean {
         break
       case 'btnSyncBangumi': {
         // syncWithConfirmation 是 async 函数，需要 .catch() 防止未处理的 Promise rejection
-        RibbonService.syncWithConfirmation().catch((e: unknown) => {
+        syncWithConfirmation().catch((e: unknown) => {
           bgmLog(
             LOG_LEVELS.ERROR,
             `[OnAction] syncWithConfirmation 异常: ${e instanceof Error && e.message ? e.message : String(e)}`,
@@ -347,11 +356,11 @@ export function OnAction(control: { Id: string }): boolean {
         break
       }
       case 'btnSetToken':
-        RibbonService.setTokenForRibbon()
+        setTokenForRibbon()
         break
       case 'btnTestToken': {
         // testTokenForRibbon 是 async 函数，需 .catch() 防止未处理 rejection
-        RibbonService.testTokenForRibbon().catch((e: unknown) => {
+        testTokenForRibbon().catch((e: unknown) => {
           bgmLog(
             LOG_LEVELS.ERROR,
             `[OnAction] testTokenForRibbon 异常: ${e instanceof Error && e.message ? e.message : String(e)}`,
@@ -366,7 +375,7 @@ export function OnAction(control: { Id: string }): boolean {
       }
       case 'btnCopyToken': {
         // copyTokenForRibbon 是 async 函数，需 .catch() 防止未处理 rejection
-        RibbonService.copyTokenForRibbon().catch((e: unknown) => {
+        copyTokenForRibbon().catch((e: unknown) => {
           bgmLog(
             LOG_LEVELS.ERROR,
             `[OnAction] copyTokenForRibbon 异常: ${e instanceof Error && e.message ? e.message : String(e)}`,
@@ -380,14 +389,14 @@ export function OnAction(control: { Id: string }): boolean {
         break
       }
       case 'btnSetUserId':
-        RibbonService.setUserIdForRibbon()
+        setUserIdForRibbon()
         break
       case 'btnOpenCollection':
-        RibbonService.openCollectionForRibbon()
+        openCollectionForRibbon()
         break
       case 'btnSyncFromGithub': {
         // syncFromGithubForRibbon 是 async 函数，需 .catch() 防止未处理 rejection
-        RibbonService.syncFromGithubForRibbon().catch((e: unknown) => {
+        syncFromGithubForRibbon().catch((e: unknown) => {
           bgmLog(
             LOG_LEVELS.ERROR,
             `[OnAction] syncFromGithubForRibbon 异常: ${e instanceof Error && e.message ? e.message : String(e)}`,
@@ -402,7 +411,7 @@ export function OnAction(control: { Id: string }): boolean {
       }
       case 'btnUndoLastSync': {
         // undoLastSyncForRibbon 是 async 函数，需 .catch() 防止未处理 rejection
-        RibbonService.undoLastSyncForRibbon().catch((e: unknown) => {
+        undoLastSyncForRibbon().catch((e: unknown) => {
           bgmLog(
             LOG_LEVELS.ERROR,
             `[OnAction] undoLastSyncForRibbon 异常: ${e instanceof Error && e.message ? e.message : String(e)}`,

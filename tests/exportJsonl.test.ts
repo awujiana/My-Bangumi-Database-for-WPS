@@ -292,7 +292,7 @@ describe('buildJsonlFromSheet', () => {
     const ws = createMockWorksheet({
       usedRange: 5,
       cellOverrides: {
-        B2: { Value2: 45382, Text: '2024年01月01日' },
+        B2: { Value2: 45_382, Text: '2024年01月01日' },
       },
     })
     mockGetDataSheet.mockReturnValue(ws)
@@ -563,7 +563,7 @@ describe('exportSheetToJsonlFile', () => {
     const originalBlob = globalThis.Blob
     try {
       Object.defineProperty(globalThis, 'Blob', {
-        value: function () {
+        value() {
           throw new Error('Blob 不可用')
         },
         configurable: true,

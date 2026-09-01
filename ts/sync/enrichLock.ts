@@ -23,7 +23,7 @@ interface LockedWorkbookInfo {
  * 刷新所有打开的 Excel 工作簿列表到 UI 下拉框
  * @param selectId - 工作簿选择下拉框的 DOM ID
  */
-export function refreshEnrichWorkbooks(selectId: string = 'enrichWorkbookSelect'): void {
+export function refreshEnrichWorkbooks(selectId = 'enrichWorkbookSelect'): void {
   const select = document.getElementById(selectId) as HTMLSelectElement | null
   if (!select) return
 
@@ -82,8 +82,8 @@ export function refreshEnrichWorkbooks(selectId: string = 'enrichWorkbookSelect'
  */
 export function refreshEnrichSheets(
   workbookName?: string,
-  selectId: string = 'enrichSheetSelect',
-  wbSelectId: string = 'enrichWorkbookSelect',
+  selectId = 'enrichSheetSelect',
+  wbSelectId = 'enrichWorkbookSelect',
 ): void {
   const select = document.getElementById(selectId) as HTMLSelectElement | null
   if (!select) return
@@ -164,10 +164,10 @@ export function refreshEnrichSheets(
  * @param statusId - 锁定状态显示的 DOM ID
  */
 export function toggleEnrichWorkbookLock(
-  sheetSelectId: string = 'enrichSheetSelect',
-  wbSelectId: string = 'enrichWorkbookSelect',
-  lockBtnId: string = 'enrichLockBtn',
-  statusId: string = 'enrichLockStatus',
+  sheetSelectId = 'enrichSheetSelect',
+  wbSelectId = 'enrichWorkbookSelect',
+  lockBtnId = 'enrichLockBtn',
+  statusId = 'enrichLockStatus',
 ): void {
   const sheetSelect = document.getElementById(sheetSelectId) as HTMLSelectElement | null
   if (!sheetSelect) return
@@ -225,8 +225,8 @@ export function toggleEnrichWorkbookLock(
  * @param statusId - 锁定状态显示的 DOM ID
  */
 export function updateEnrichLockButton(
-  lockBtnId: string = 'enrichLockBtn',
-  statusId: string = 'enrichLockStatus',
+  lockBtnId = 'enrichLockBtn',
+  statusId = 'enrichLockStatus',
 ): void {
   const btn = document.getElementById(lockBtnId) as HTMLButtonElement | null
   const status = document.getElementById(statusId)
@@ -443,10 +443,10 @@ function clearEnrichLock(): void {
  * @param statusId - 锁定状态显示的 DOM ID
  */
 export function initEnrichLock(
-  wbSelectId: string = 'enrichWorkbookSelect',
-  sheetSelectId: string = 'enrichSheetSelect',
-  lockBtnId: string = 'enrichLockBtn',
-  statusId: string = 'enrichLockStatus',
+  wbSelectId = 'enrichWorkbookSelect',
+  sheetSelectId = 'enrichSheetSelect',
+  lockBtnId = 'enrichLockBtn',
+  statusId = 'enrichLockStatus',
 ): void {
   refreshEnrichWorkbooks(wbSelectId)
 

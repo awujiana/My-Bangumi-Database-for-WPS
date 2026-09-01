@@ -89,16 +89,27 @@ let mockXhrConstructor: typeof MockXHR | null = null
 
 class MockXHR {
   status = 0
+
   statusText = ''
+
   responseText = ''
+
   timeout = 0
+
   onload: (() => void) | null = null
+
   onerror: (() => void) | null = null
+
   ontimeout: (() => void) | null = null
+
   _aborted = false
+
   private method = ''
+
   private url = ''
+
   private async = true
+
   private headers: Record<string, string> = {}
 
   open(method: string, url: string, async: boolean): void {
@@ -323,7 +334,7 @@ describe('extractGistContent', () => {
   it('文件 content 类型非法（非字符串）：跳过该文件（类型守卫拒绝）', () => {
     const apiResponse = {
       files: {
-        'numeric.jsonl': { content: 12345 }, // 非法 content 类型
+        'numeric.jsonl': { content: 12_345 }, // 非法 content 类型
       },
     }
     // isGistFile 类型守卫拒绝 content 非 string 的文件，因此整个响应视为非法
@@ -337,7 +348,7 @@ describe('extractGistContent', () => {
       public: true,
       created_at: '2026-07-01T00:00:00Z',
       updated_at: '2026-07-21T00:00:00Z',
-      owner: { login: 'myuser', id: 12345 },
+      owner: { login: 'myuser', id: 12_345 },
       files: {
         'data.jsonl': {
           filename: 'data.jsonl',
@@ -545,7 +556,7 @@ describe('GistSyncSource.fetchRemoteEntries', () => {
     mockedGetGistId.mockReturnValue('headercheck')
     const source = new GistSyncSource()
     const promise = source.fetchRemoteEntries()
-    expect(lastXhrCall?.headers['Accept']).toBe('application/vnd.github+json')
+    expect(lastXhrCall?.headers.Accept).toBe('application/vnd.github+json')
     lastMockXhr!._respondOk(JSON.stringify({ files: {} }))
     await promise
   })
@@ -571,7 +582,7 @@ describe('fetchGistJson', () => {
   it('30 秒超时', async () => {
     mockedGetGistId.mockReturnValue('timeout30')
     const promise = fetchGistJson()
-    expect(lastXhrCall?.timeout).toBe(30000)
+    expect(lastXhrCall?.timeout).toBe(30_000)
     lastMockXhr!._respondOk(JSON.stringify({ files: {} }))
     await promise
   })

@@ -1,4 +1,5 @@
-import { z, type infer as zInfer, type ZodSchema } from '../tools/zodCompat.js'
+import { z } from '../tools/zodCompat.js'
+import type { infer as zInfer, ZodSchema } from '../tools/zodCompat.js'
 
 /**
  * 降级版 zodCompat 的 ZodSchema 带 `[k: string]: any` 索引签名，

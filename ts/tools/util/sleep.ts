@@ -22,7 +22,7 @@ export function sleep(ms: number): void {
       return
     }
   } catch (e) {
-    bgmLog(LOG_LEVELS.WARN, 'sleep app.Wait 失败: ' + (e as Error).message)
+    bgmLog(LOG_LEVELS.WARN, `sleep app.Wait 失败: ${(e as Error).message}`)
   }
   const end = Date.now() + ms
   while (Date.now() < end) {
@@ -31,7 +31,7 @@ export function sleep(ms: number): void {
       if (app?.DoEvents) app.DoEvents()
     } catch (e) {
       if (typeof bgmLog === 'function') {
-        bgmLog(LOG_LEVELS.INFO, 'sleep DoEvents 失败: ' + (e as Error).message)
+        bgmLog(LOG_LEVELS.INFO, `sleep DoEvents 失败: ${(e as Error).message}`)
       }
       break
     }

@@ -11,7 +11,7 @@ import {
 describe('BgmUserSchema', () => {
   it('合法用户对象通过', () => {
     const valid = {
-      id: 12345,
+      id: 12_345,
       username: 'sai',
       nickname: 'Sai',
       avatar: {
@@ -21,7 +21,7 @@ describe('BgmUserSchema', () => {
       },
     }
     const parsed = BgmUserSchema.parse(valid)
-    expect(parsed.id).toBe(12345)
+    expect(parsed.id).toBe(12_345)
     expect(parsed.username).toBe('sai')
     expect(parsed.nickname).toBe('Sai')
     expect(parsed.avatar?.large).toBe('https://example.com/large.png')

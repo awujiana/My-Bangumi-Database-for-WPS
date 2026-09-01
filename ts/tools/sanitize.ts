@@ -223,7 +223,7 @@ function createLightweightFallback(): (d: string) => string {
         const toRemoveAttrs: string[] = []
         for (let a = 0; a < el.attributes.length; a++) {
           const attr = el.attributes[a]!
-          const name = attr.name
+          const { name } = attr
           if (name.length > 2 && name.slice(0, 2).toLowerCase() === 'on') {
             toRemoveAttrs.push(name)
           }

@@ -159,7 +159,7 @@ function createMockSheet(opts: { name?: string; rowCount?: number } = {}) {
   }
 }
 
-function createMockWorkbook(sheets: Array<{ Name: string }> = []) {
+function createMockWorkbook(sheets: { Name: string }[] = []) {
   const allSheets = [
     ...sheets.map((s) => ({ ...createMockSheet({ name: s.Name }), Name: s.Name })),
     createMockSheet({ name: SYNC_RECORD_SHEET_NAME }),
@@ -420,9 +420,9 @@ describe('syncRecord', () => {
 
     it('批量添加中某个记录失败应继续处理其他', () => {
       mockGetApp.mockReturnValue({ ActiveWorkbook: createMockWorkbook() })
-      mockSetCellValue.mockImplementation((_ws: unknown, _r: unknown, c: unknown, _v: unknown) => {
-        return true
-      })
+      mockSetCellValue.mockImplementation(
+        (_ws: unknown, _r: unknown, c: unknown, _v: unknown) => true,
+      )
       const result = addSyncRecords([
         { sid: '1', name: 'one', url: 'http://a.com' },
         { sid: '2', name: 'two', url: 'http://b.com' },
@@ -2169,8 +2169,8 @@ describe('migrateSyncRecordSchema 数据行处理 (lines 289-293) - 带实际数
 
     // 设置旧数据行（lastRow=5，所以有4行数据从row 2-5）
     mockGetCellValue.mockImplementation((_sheet: unknown, row: number, col: number) => {
-      const r = row as number
-      const c = col as number
+      const r = row
+      const c = col
       if (r === 2) {
         if (c === 5) return 'migrate-sid-2'
         if (c === 4) return 'http://migrate2.com'

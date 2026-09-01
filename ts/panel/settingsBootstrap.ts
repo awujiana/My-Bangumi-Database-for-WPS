@@ -8,6 +8,24 @@
  *   <script type="module" src="./dist-ts/panel/settingsBootstrap.js"> 加载。
  */
 
+// 加载依赖模块（含 settings-entry，其导入时自动启动设置页）
+import '../index.js'
+import '../core/constants.js'
+import '../tools/config.js'
+import '../tools/util.js'
+import '../core/crypto.js'
+import '../tools/events.js'
+import '../core/result.js'
+import '../tools/wps.js'
+import '../tools/http.js'
+import '../ui/dialog.js'
+import '../ui/message.js'
+import '../ui/preview.js'
+import '../sync/syncRecord.js'
+import '../sync/scraping.js'
+import '../sync/exceltobangumi.js'
+import '../entry/settings-entry.js'
+
 if (typeof window !== 'undefined') {
   window.addEventListener(
     'error',
@@ -28,24 +46,6 @@ if (typeof window !== 'undefined') {
     console.error('[BGM Settings] Unhandled promise rejection:', e.reason)
   })
 }
-
-// 加载依赖模块（含 settings-entry，其导入时自动启动设置页）
-import '../index.js'
-import '../core/constants.js'
-import '../tools/config.js'
-import '../tools/util.js'
-import '../core/crypto.js'
-import '../tools/events.js'
-import '../core/result.js'
-import '../tools/wps.js'
-import '../tools/http.js'
-import '../ui/dialog.js'
-import '../ui/message.js'
-import '../ui/preview.js'
-import '../sync/syncRecord.js'
-import '../sync/scraping.js'
-import '../sync/exceltobangumi.js'
-import '../entry/settings-entry.js'
 
 if (typeof document !== 'undefined') {
   // 模块就绪前禁用所有 data-action 按钮

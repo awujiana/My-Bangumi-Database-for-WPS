@@ -61,7 +61,7 @@ export class BgmError extends Error {
    *     retryCount: 3
    * });
    */
-  constructor(message: string, code: string = 'UNKNOWN', details: Record<string, unknown> = {}) {
+  constructor(message: string, code = 'UNKNOWN', details: Record<string, unknown> = {}) {
     super(message)
     this.name = 'BgmError'
     this.code = code

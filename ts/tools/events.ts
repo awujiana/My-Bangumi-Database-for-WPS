@@ -41,7 +41,7 @@ export class EventBus {
    * @param {EventHandler<T>} handler - 事件处理器
    * @param {boolean} [once=false] - 是否只触发一次
    */
-  on<T = unknown>(eventName: string, handler: EventHandler<T>, once: boolean = false): void {
+  on<T = unknown>(eventName: string, handler: EventHandler<T>, once = false): void {
     if (!this.events.has(eventName)) {
       this.events.set(eventName, [])
     }

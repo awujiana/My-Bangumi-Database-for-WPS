@@ -91,7 +91,7 @@ export function toggleSheetLock(): void {
       sheetInfo.workbookName = wbName
     }
     saveLockedSheet(sheetInfo)
-    showToast('已锁定工作表: ' + sheetName + (wbName ? '（工作簿: ' + wbName + '）' : ''), 'info')
+    showToast(`已锁定工作表: ${sheetName}${wbName ? `（工作簿: ${wbName}）` : ''}`, 'info')
   }
   updateLockButton()
   refreshData()
@@ -170,7 +170,7 @@ export function updateLockButton(): void {
   if (status) {
     if (BGM.sheet.isLocked) {
       status.style.display = 'inline'
-      status.textContent = '已锁定: ' + String(BGM.sheet.lockedName)
+      status.textContent = `已锁定: ${String(BGM.sheet.lockedName)}`
     } else {
       status.style.display = 'none'
     }
@@ -428,8 +428,8 @@ export function detectHeaderAndColumns(
   let dataStartRow = headerRow + 1
   const secondHeaderRowLimit = Math.min(headerRow + 1, PANEL_CONFIG.MAX_SCAN_ROWS)
   if (headerRow + 1 <= secondHeaderRowLimit) {
-    let filled = 0,
-      total = 0
+    let filled = 0
+    let total = 0
     for (let c = 1; c <= PANEL_CONFIG.MAX_SCAN_COLUMNS; c++) {
       const nv = getCellValue(ws, headerRow + 1, c).trim()
       if (nv) {
@@ -619,7 +619,7 @@ export function autoDetectSheet(): {
       if (isBetter) {
         bestMatch = {
           sheetIndex: si,
-          sheetName: sheetName,
+          sheetName,
           headerRow: meta.headerRow,
           matchCount: meta.headerMatchCount,
           colCount: meta.lastCol,
@@ -697,7 +697,7 @@ export function updateFilterStatus(targetWs?: WpsWorksheet): void {
       return
     }
     const filters = autoFilter.Filters
-    if (!filters || !filters.Count) {
+    if (!filters?.Count) {
       el.textContent = '筛选已开启但无活动筛选，同步全部数据'
       return
     }
@@ -709,7 +709,7 @@ export function updateFilterStatus(targetWs?: WpsWorksheet): void {
         if (f.On) {
           let colName = ''
           try {
-            const headerCell = ws.Range(colNumToLetter(i) + '1')
+            const headerCell = ws.Range(`${colNumToLetter(i)}1`)
             colName = String(headerCell.Value2 || '').substring(0, 12)
           } catch (e: unknown) {
             BGM.handleError(e, {
@@ -723,10 +723,10 @@ export function updateFilterStatus(targetWs?: WpsWorksheet): void {
             const op = f.Operator
             criteria +=
               op === 1
-                ? ' 且 ' + f.Criteria2
+                ? ` 且 ${f.Criteria2}`
                 : op === 2
-                  ? ' 或 ' + f.Criteria2
-                  : ' / ' + f.Criteria2
+                  ? ` 或 ${f.Criteria2}`
+                  : ` / ${f.Criteria2}`
           }
           activeCols.push(colName ? `${colName}(${criteria})` : `列${String(i)}`)
         }
@@ -748,7 +748,7 @@ export function updateFilterStatus(targetWs?: WpsWorksheet): void {
       el.removeAttribute('title')
     }
   } catch (e: unknown) {
-    el.textContent = '检测筛选状态失败: ' + (e as Error).message
+    el.textContent = `检测筛选状态失败: ${(e as Error).message}`
     BGM.handleError(e, {
       showAlert: false,
       level: BGM.ErrorLevel.INFO,
@@ -768,7 +768,7 @@ function renderPreviewTable(
   let html = '<table class="preview-table"><tbody>'
   // 以表头行列数作为统一列数，避免不同行列数不同导致错位
   const headerItem = rows.find((r) => r.isHeader)
-  const fixedColCount = headerItem && headerItem.aligned ? (headerItem.cols as string[]).length : 0
+  const fixedColCount = headerItem?.aligned ? (headerItem.cols as string[]).length : 0
   rows.forEach((item) => {
     const rowClass = item.isHeader ? 'preview-header-row' : ''
     html += `<tr class="${rowClass}">`
@@ -856,7 +856,7 @@ export function refreshData(): void {
     // 使用统一的筛选状态检测
     const filterStatus = getFilterStatus(ws, lastRow)
     const isFiltered = filterStatus.hasFilter
-    const visibleRows = filterStatus.visibleRows
+    const { visibleRows } = filterStatus
     const visibleRowSet = isFiltered ? new Set<number>(visibleRows) : null
 
     // 记录筛选状态详情
@@ -1014,7 +1014,7 @@ export function refreshData(): void {
       saveLockedSheet({ index: sheetIndex, name: sheetName })
       updateLockButton()
       if (select) select.value = String(sheetIndex)
-      showToast('已自动锁定工作表: ' + sheetName, 'info')
+      showToast(`已自动锁定工作表: ${sheetName}`, 'info')
     }
 
     if (previewBox) {
@@ -1062,7 +1062,7 @@ export function enlargePreview(): void {
   }
 
   const content = previewBox.innerHTML.trim()
-  if (!content || !content.includes('<table')) {
+  if (!content?.includes('<table')) {
     showToast('请先刷新数据加载预览', 'info')
     return
   }
@@ -1150,7 +1150,7 @@ export function autoDetectAndLockSheet(): boolean {
     })
     updateLockButton()
     refreshData()
-    showToast('已自动检测表头: ' + detected.sheetName, 'info')
+    showToast(`已自动检测表头: ${detected.sheetName}`, 'info')
     return true
   }
   return false

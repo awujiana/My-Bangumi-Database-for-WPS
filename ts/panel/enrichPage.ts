@@ -10,14 +10,16 @@ import {
   matchEntries,
   enrichEntries,
   resolveConflictField,
-  type EnrichColumnMapping,
-  type EnrichConfig,
-  type MatchResult,
-  type EnrichResultItem,
-  type EnrichProgress,
-  type ProgressCallback,
-  type ConflictInfo,
-  type EnrichedField,
+} from '../sync/enrichEngine.js'
+import type {
+  EnrichColumnMapping,
+  EnrichConfig,
+  MatchResult,
+  EnrichResultItem,
+  EnrichProgress,
+  ProgressCallback,
+  ConflictInfo,
+  EnrichedField,
 } from '../sync/enrichEngine.js'
 import {
   refreshEnrichWorkbooks,
@@ -514,7 +516,7 @@ export function autoDetectHeader(): void {
       level: BGM.ErrorLevel.ERROR,
       context: 'autoDetectHeader',
     })
-    BGM.Dialog.error('错误', '识别表头失败: ' + (e instanceof Error ? e.message : String(e)))
+    BGM.Dialog.error('错误', `识别表头失败: ${e instanceof Error ? e.message : String(e)}`)
   }
 }
 
@@ -540,7 +542,7 @@ function renderColumnMappingEditor(ws: WpsWorksheet, mapping: EnrichColumnMappin
   if (!mappingList) return
 
   const maxCols = 50
-  const headerRow = state.headerRow
+  const { headerRow } = state
   const colOptions: { col: number; header: string }[] = []
 
   for (let col = 1; col <= maxCols; col++) {
@@ -556,14 +558,12 @@ function renderColumnMappingEditor(ws: WpsWorksheet, mapping: EnrichColumnMappin
     const currentCol = mapping[field.key]
     const selectedValue = currentCol ? String(currentCol) : ''
 
-    const optionsHtml =
-      '<option value="">-- 未映射 --</option>' +
-      colOptions
-        .map(
-          (o) =>
-            `<option value="${String(o.col)}" ${String(o.col) === selectedValue ? 'selected' : ''}>${escapeHtml(o.header)} (列${String(o.col)})</option>`,
-        )
-        .join('')
+    const optionsHtml = `<option value="">-- 未映射 --</option>${colOptions
+      .map(
+        (o) =>
+          `<option value="${String(o.col)}" ${String(o.col) === selectedValue ? 'selected' : ''}>${escapeHtml(o.header)} (列${String(o.col)})</option>`,
+      )
+      .join('')}`
 
     const requiredMark = field.required ? ' <span style="color:#ff6b6b;">*</span>' : ''
 
@@ -604,7 +604,7 @@ function updateColumnMapping(field: keyof EnrichColumnMapping, value: number): v
 
   bgmLog(
     LOG_LEVELS.INFO,
-    `[enrich] 列映射更新: ${field} → ${value > 0 ? '列' + String(value) : '未映射'}`,
+    `[enrich] 列映射更新: ${field} → ${value > 0 ? `列${String(value)}` : '未映射'}`,
   )
 }
 
@@ -709,8 +709,8 @@ function renderSourcePreview(ws: WpsWorksheet, _mapping: EnrichColumnMapping): v
 
   const maxRows = 20
   const maxCols = 50
-  const headerRow = state.headerRow
-  const dataStartRow = state.dataStartRow
+  const { headerRow } = state
+  const { dataStartRow } = state
 
   const headerCells: string[] = []
   for (let col = 1; col <= maxCols; col++) {
@@ -722,9 +722,7 @@ function renderSourcePreview(ws: WpsWorksheet, _mapping: EnrichColumnMapping): v
 
   const thead = tableContainer.querySelector('thead')
   if (thead) {
-    thead.innerHTML = sanitizeHtml(
-      '<tr>' + headerCells.map((h) => `<th>${h}</th>`).join('') + '</tr>',
-    )
+    thead.innerHTML = sanitizeHtml(`<tr>${headerCells.map((h) => `<th>${h}</th>`).join('')}</tr>`)
   }
 
   const tbody = tableContainer.querySelector('tbody')
@@ -787,7 +785,7 @@ export function previewMatch(): void {
     bgmLog(LOG_LEVELS.INFO, `[enrich] 匹配预览完成: ${String(state.matches.length)} 条结果`)
   } catch (e: unknown) {
     BGM.handleError(e, { showAlert: false, level: BGM.ErrorLevel.ERROR, context: 'previewMatch' })
-    BGM.Dialog.error('错误', '匹配预览失败: ' + (e instanceof Error ? e.message : String(e)))
+    BGM.Dialog.error('错误', `匹配预览失败: ${e instanceof Error ? e.message : String(e)}`)
   }
 }
 
@@ -954,7 +952,7 @@ export function startEnrichment(): void {
       level: BGM.ErrorLevel.ERROR,
       context: 'startEnrichment',
     })
-    BGM.Dialog.error('错误', '富化执行失败: ' + (e instanceof Error ? e.message : String(e)))
+    BGM.Dialog.error('错误', `富化执行失败: ${e instanceof Error ? e.message : String(e)}`)
   } finally {
     state.isEnriching = false
     state.cancelRequested = false
@@ -1141,11 +1139,11 @@ export function renderPreviewTable(
   container: HTMLElement | null,
   sheet: WpsWorksheet,
   _mapping: EnrichColumnMapping,
-  maxRows: number = 20,
+  maxRows = 20,
 ): void {
   if (!container) return
 
-  const headerRow = state.headerRow
+  const { headerRow } = state
   if (headerRow === 0) return
 
   const maxCols = 50
@@ -1155,7 +1153,7 @@ export function renderPreviewTable(
     if (val) headerCells.push(escapeHtml(val))
   }
 
-  const dataStartRow = state.dataStartRow
+  const { dataStartRow } = state
   const lastRow = Math.min(getLastRow(sheet), dataStartRow + maxRows - 1)
 
   const bodyRows: string[] = []
@@ -1559,7 +1557,7 @@ export function batchStartEnrichment(): void {
   }
 
   // 前置检查：目标 Bangumi 工作表已锁定
-  let bangumiSheet: WpsWorksheet | null = state.bangumiSheet
+  let { bangumiSheet } = state
   if (!bangumiSheet) {
     const locked = getLockedEnrichSheet()
     if (locked) {

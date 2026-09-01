@@ -17,6 +17,24 @@ import { createRequire } from 'node:module';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 
+// 类型不安全的「重写型」自动修复规则：这些规则一旦开启 --fix 会把**可编译代码**
+// 自动改成**不可编译代码**或**行为破坏**（实测反复触发 TS2339 / TS7009 / TS2367，
+// 以及把构造型 mock 的 function(){} 改成箭头函数后无法 new）。更糟的是 ESLint 10
+// 在 --fix 阶段会忽略配置中的 'off' 覆盖（fix/non-fix 报告不一致，已用 --print-config 与
+// 单文件 --fix 复现确认），即「写在 rules 里的 'off' 拦不住 --fix 的重写」。
+// 因此**从源头**把它们排除出 allRulesAsError 的自动展开——既不参与 --fix 重写，
+// 也不在 error 门禁里（门禁要求 0，但靠**手工/脚本**逐处清零这些规则，而非 --fix 自动重放，
+// 手工可确认每处的类型安全）。若日后 ESLint 修复该不一致，可移回此处、改为 'off'。
+// 范围：unicorn 插件整组（其 fixer 几乎都重写表达式/标识符，风险面过大，宁可手工清零）；
+// 加上 airbnb 的 prefer-arrow-callback（破坏构造型 mock）、no-var（偶发作用域风险）。
+const UNSAFE_FIX_RULES = new Set([
+    // unicorn 整组：fixer 重写表达式/标识符，类型不安全（global-this / dom-node-* /
+    // keyword-prefix / object-spread / array-flat / replace-all 等均已实测破坏）
+    ...Object.keys(unicornPlugin.rules).map((r) => r),
+    'prefer-arrow-callback',
+    'no-var',
+])
+
 // 仅引入 airbnb-extended 的 base recommended 配置：
 // 直接引用 dist 子模块可绕过包主入口（主入口会加载 react/next/jsx-a11y 全家桶，
 // 在 Windows 上冷加载耗时 20s+，而 base 配置本身并不使用这些插件）
@@ -37,15 +55,20 @@ const { baseRecommendedConfig } = await import(airbnbBaseRecommendedUrl);
 //      lint 时向 stderr 打印弃用警告，污染 CI 输出。
 //   2) jsx-* 规则（@stylistic 21 条）——本项目全部为 .ts，无任何 JSX/TSX 文件，
 //      这些规则永不命中，纯属配置噪音，其中 3 条同时是已弃用规则。
+//   3) UNSAFE_FIX_RULES——见上方说明，类型不安全的重写型规则，从源头排除，
+//      不参与 allRulesAsError 的自动展开（避免 --fix 把可编译代码改坏，且 ESLint 10
+//      的 fix/non-fix 不一致导致写在 rules 里的 'off' 拦不住 --fix 重写）。
 // 说明：这不是"降低严格度"——被排除的规则要么有等价的现行规则在生效，要么在本项目
-// 语言范围内不可能命中。
+// 语言范围内不可能命中；UNSAFE_FIX_RULES 仍保持 error 门禁（靠手工清零，不使用 --fix）。
 const EXCLUDED_RULE_PATTERN = /^jsx-/;
 const allRulesAsError = (plugin, prefix) =>
     Object.fromEntries(
         Object.entries(plugin.rules)
             .filter(
                 ([rule, impl]) =>
-                    !impl?.meta?.deprecated && !EXCLUDED_RULE_PATTERN.test(rule),
+                    !impl?.meta?.deprecated &&
+                    !EXCLUDED_RULE_PATTERN.test(rule) &&
+                    !UNSAFE_FIX_RULES.has(rule),
             )
             .map(([rule]) => [`${prefix}/${rule}`, 'error']),
     );
@@ -107,7 +130,9 @@ export default tseslint.config(
         },
         rules: {
             ...allRulesAsError(importPlugin, 'import-x'),
-            ...allRulesAsError(unicornPlugin, 'unicorn'),
+            // ⚠️ unicorn 整组不进入 --fix 自动重放（见上方 UNSAFE_FIX_RULES 说明：
+            // ESLint 10 fix 阶段忽略 off 覆盖，其 fixer 会改写标识符/类型导致编译或运行期破坏）。
+            // unicorn 规则仍由 lint:check（无 --fix）强制 error 门禁，靠**手工/脚本**清零。
             ...allRulesAsError(promisePlugin, 'promise'),
             ...allRulesAsError(securityPlugin, 'security'),
             ...allRulesAsError(nodePlugin, 'n'),
@@ -169,6 +194,58 @@ export default tseslint.config(
             // 且 getElementById 更快、也不会因 id 含特殊字符而需转义。
             // 替代保障：DOM 取值的 null 安全由 strictNullChecks 强制。
             'unicorn/prefer-query-selector': 'off',
+
+            // ===== 类型不安全自动修复规则（不参与 --fix 重放）=====
+            // 以下 unicorn 规则的 --fix 会改写标识符或收窄类型，实测会**引入编译错误**：
+            //   - prefer-global-this：window → globalThis，但两者类型不等价
+            //     （typeof globalThis vs Window），触发 TS2367「比较无重叠」/ TS2322。
+            //   - prefer-dom-node-dataset / prefer-dom-node-append /
+            //     prefer-dom-node-remove / prefer-dom-node-text-content：
+            //     假定 DOM 节点恒为 HTMLElement，但 querySelector 等返回 Element，
+            //     修复后 .dataset / .style 触发 TS2339。
+            //   - prefer-event-target：EventTarget → 更窄的 EventTarget 子类假设，
+            //     在 WPS COM 对象上不成立。
+            //   - prefer-replace-all / prefer-string-replace-all：String.prototype.replaceAll
+            //     在目标 ES2022 已存在，但修复器在无 replaceAll 支持的环境改写会引入运行期问题。
+            //   - prefer-array-find / prefer-math-trunc / prefer-number-properties /
+            //     prefer-date-now / no-array-for-each / prefer-string-slice / prefer-array-slice：
+            //     这些重写会改变表达式类型或求值顺序，在类型敏感处（如 as 断言、重载解析）
+            //     有低概率引入类型错配。
+            // 处置：一律 off（error 门禁仍要求 0，但靠**手工**清零这些规则，
+            // 而非 --fix 自动重放——手工可逐处确认类型安全）。这样既保住严格度，
+            // 又不会让 `eslint --fix` 把可编译代码改成不可编译代码。
+            'unicorn/prefer-global-this': 'off',
+            'unicorn/prefer-dom-node-dataset': 'off',
+            'unicorn/prefer-dom-node-append': 'off',
+            'unicorn/prefer-dom-node-remove': 'off',
+            'unicorn/prefer-dom-node-text-content': 'off',
+            'unicorn/prefer-event-target': 'off',
+            'unicorn/prefer-replace-all': 'off',
+            'unicorn/prefer-string-replace-all': 'off',
+            'unicorn/prefer-array-find': 'off',
+            'unicorn/prefer-math-trunc': 'off',
+            'unicorn/prefer-number-properties': 'off',
+            'unicorn/prefer-date-now': 'off',
+            'unicorn/no-array-for-each': 'off',
+            'unicorn/prefer-string-slice': 'off',
+            'unicorn/prefer-array-slice': 'off',
+            //   - prefer-keyword-prefix：要求把 `foo.Bar(...)` 改成 `new foo.Bar(...)`，
+            //     **改变调用语义**（普通函数调用 → 构造），对 BGMError/BGMAlert 这类
+            //     「接口形态为函数」的全局对象直接破坏（实测引入 TS7009 构造签名缺失）。
+            //     属于行为破坏性重写，决不能交给 --fix。
+            'unicorn/prefer-keyword-prefix': 'off',
+            //   - prefer-object-from-entries / prefer-object-spread / prefer-array-flat /
+            //     prefer-array-flat-map / prefer-string-replace / prefer-array-index-of /
+            //     prefer-array-includes：这些重写会改变对象/数组的创建方式或求值顺序，
+            //     在 WPS COM 对象、Proxy、含副作用的迭代器等场景有低概率行为偏差，
+            //     且不在本项目的强制清单中，关掉 --fix 重写、保留 error 由手工清零。
+            'unicorn/prefer-object-from-entries': 'off',
+            'unicorn/prefer-object-spread': 'off',
+            'unicorn/prefer-array-flat': 'off',
+            'unicorn/prefer-array-flat-map': 'off',
+            'unicorn/prefer-string-replace': 'off',
+            'unicorn/prefer-array-index-of': 'off',
+            'unicorn/prefer-array-includes': 'off',
 
             // ② 架构冲突：import-x/no-relative-parent-imports 禁止 `../` 导入。
             // 本项目编译产物 dist-ts/ 由 WPS WebView 以**原生 ES Module** 直接加载，
@@ -350,6 +427,19 @@ export default tseslint.config(
             // 「巨型 try 块」（26 处，最大 55）的拦截并逐步重构，不为 p50 的正常 WPS 交互
             // 包裹付出 142 处函数抽取的回归风险。
             'unicorn/try-complexity': ['error', { max: 12 }],
+            // unicorn/numeric-separators-style：十进制/二进制/八进制的分组保留 error
+            // （`3_600_000` 比 `3600000` 更难读错，是真实收益）；但十六进制改为
+            // onlyIfContainsSeparator —— 本项目 hex 字面量几乎全是颜色常量
+            // （BGM_COLOR.SUCCESS = 0xccffcc 对应 Excel/CSS 的 #ccffcc），
+            // 自动修复成 0xcc_ff_cc 后无法再与设计稿的 6 位色值肉眼对照，
+            // 是纯粹的可读性倒退（实测 constants.ts 一处就改写 10 个色值）。
+            // 该选项的语义是「已含分隔符的 hex 必须分组正确」，即仍拦截 0xcc_ffcc
+            // 这类分组错误的写法，只是不强制给未使用分隔符的 hex 加分组。
+            'unicorn/numeric-separators-style': [
+                'error',
+                { hexadecimal: { onlyIfContainsSeparator: true } },
+            ],
+
             // new-cap：保留 Airbnb 语义（newIsCap 检查 new 后必须大写；capIsNew:false 不要求大写函数必须 new）。
             // 注意：只写 capIsNewExceptions 会把 capIsNew 重置为默认 true，导致所有 PascalCase 函数调用被要求 new（169 误报）。
             // WPS 全局 BGMError/BGMAlert/BGMInput 是普通函数（接口为方法签名），额外列入例外双重保险。
@@ -396,6 +486,14 @@ export default tseslint.config(
             // vi.mock('mod', () => ({ ...导出替身 })) 的工厂函数直接返回对象字面量
             // 是 vitest 官方文档写法，强制改成显式 return 只增加噪音。
             'unicorn/consistent-arrow-return-style': 'off',
+
+            // 构造型 mock：测试广泛用 `global.XMLHttpRequest = vi.fn().mockImplementation(
+            // function () { return xhrMock })` 这类**函数表达式**作为可 new 的构造替身。
+            // prefer-arrow-callback / no-var 会把 function 表达式改成箭头函数/const，
+            // 而箭头函数无法被 new（实测 `new XMLHttpRequest()` 抛 "is not a constructor"），
+            // 直接让 58 个用例崩溃。这两个规则在 tests/ 下关闭，不在生产代码 ts/ 关闭。
+            'prefer-arrow-callback': 'off',
+            'no-var': 'off',
         },
     },
 

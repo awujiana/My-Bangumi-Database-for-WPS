@@ -5,8 +5,6 @@
  */
 
 import {
-  type WpsWorksheet,
-  type WpsRange,
   getApp,
   bgmLog,
   BGM,
@@ -20,7 +18,6 @@ import {
   showToast,
   LOG_LEVELS,
   BGM_COLOR,
-  type SyncRecord,
   findHeaderRow,
   getColumnMap,
   detectConflicts,
@@ -33,12 +30,12 @@ import {
   WATCH_STATUS_MAP,
   SyncToBangumiAsync,
   showSyncProgressDialog,
-  type SyncConfigSummary,
   buildSyncConfig,
   updateSyncProgressDialog,
   completeSyncProgressDialog,
   hideSyncProgressDialog,
 } from '../index.js'
+import type { WpsWorksheet, WpsRange, SyncRecord, SyncConfigSummary } from '../index.js'
 import { getAllSyncRecords } from '../sync/syncRecord.js'
 import { sanitizeHtml } from '../tools/sanitize.js'
 import { loadBgToken } from '../tools/util.js'
@@ -210,7 +207,7 @@ function renderDetailItemHtml(
         </div>
         <div class="detail-row">
           <span class="detail-label">评分</span>
-          <span class="detail-value" style="color:#f39c12;font-weight:600;">${rowData.rate && rowData.rate !== 'true' && rowData.rate !== 'True' ? '⭐ ' + rowData.rate : '(空)'}</span>
+          <span class="detail-value" style="color:#f39c12;font-weight:600;">${rowData.rate && rowData.rate !== 'true' && rowData.rate !== 'True' ? `⭐ ${rowData.rate}` : '(空)'}</span>
         </div>
         <div class="detail-row">
           <span class="detail-label">标签</span>
@@ -281,7 +278,7 @@ export async function previewSyncContent(): Promise<void> {
   }
 
   const dp = BGM.dataPreview
-  if (!dp || !dp.ws) {
+  if (!dp?.ws) {
     showToast('请先在预览面板中加载数据', 'warn')
     return
   }
@@ -481,10 +478,10 @@ export async function previewSyncContent(): Promise<void> {
     const body = modal.querySelector('.modal-body')
     if (!body) {
       return
-    } else {
-      body.removeEventListener('click', handlePreviewBodyClick)
-      body.addEventListener('click', handlePreviewBodyClick)
     }
+    body.removeEventListener('click', handlePreviewBodyClick)
+    body.addEventListener('click', handlePreviewBodyClick)
+
     body.textContent = ''
     body.insertAdjacentHTML('beforeend', sanitizeHtml(statsHtml + cardsHtml))
     modal.style.display = 'block'
@@ -562,9 +559,9 @@ export async function previewSyncContent(): Promise<void> {
     const scrollBottomBtn = document.getElementById('scrollToBottomBtn')
 
     const updateScrollButtons = () => {
-      const scrollTop = body.scrollTop
-      const scrollHeight = body.scrollHeight
-      const clientHeight = body.clientHeight
+      const { scrollTop } = body
+      const { scrollHeight } = body
+      const { clientHeight } = body
       const maxScroll = scrollHeight - clientHeight
 
       // 只有内容可滚动时才显示按钮
@@ -720,7 +717,7 @@ export async function uploadSingleRow(
         type: '',
         content: jsonBody,
         status: '成功',
-        message: '行 ' + String(rowNum),
+        message: `行 ${String(rowNum)}`,
         count: 1,
       })
     } else {
@@ -740,15 +737,15 @@ export async function uploadSingleRow(
         type: '',
         content: jsonBody,
         status: '失败',
-        message: result.message || 'HTTP ' + String(statusCode),
+        message: result.message || `HTTP ${String(statusCode)}`,
         count: 1,
       })
-      BGM.handleError(new Error('上传失败: ' + (result.message || '未知错误')), {
+      BGM.handleError(new Error(`上传失败: ${result.message || '未知错误'}`), {
         showAlert: false,
         level: BGM.ErrorLevel.WARN,
         context: 'UploadSingleRow',
       })
-      showToast('上传失败: ' + (result.message || '未知错误').substring(0, 60), 'error')
+      showToast(`上传失败: ${(result.message || '未知错误').substring(0, 60)}`, 'error')
     }
   } catch (e: unknown) {
     BGM.handleError(e, { showAlert: true, level: BGM.ErrorLevel.ERROR, context: 'UploadSingleRow' })
@@ -758,7 +755,7 @@ export async function uploadSingleRow(
       btnElement.classList.add('error')
       btnElement.textContent = '✗ 错误'
     }
-    showToast('上传出错: ' + (e as Error).message.substring(0, 60), 'error')
+    showToast(`上传出错: ${(e as Error).message.substring(0, 60)}`, 'error')
     BGM.handleError(e, { showAlert: true, level: BGM.ErrorLevel.ERROR, context: 'UploadSingleRow' })
   }
 }
@@ -873,7 +870,7 @@ export async function syncAllRows(): Promise<{ success: number; fail: number; sk
     }
   } catch (e: unknown) {
     const bgmErr = BGM.handleError(e, { showAlert: false })
-    bgmErr.message = '冲突检测失败，已跳过此步骤。原始错误: ' + bgmErr.message
+    bgmErr.message = `冲突检测失败，已跳过此步骤。原始错误: ${bgmErr.message}`
   }
 
   // ---------- 3. 读取增量同步设置 ----------

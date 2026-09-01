@@ -90,7 +90,7 @@ export interface ConflictResolution {
  * - 'meta_tags' 写入「标签/分级」列（有独立处理逻辑）
  * - 'nsfw' 无明确 Excel 列映射，暂不处理
  */
-export const EXTENDED_FIELD_MAP: ReadonlyArray<readonly [string, string]> = [
+export const EXTENDED_FIELD_MAP: readonly (readonly [string, string])[] = [
   ['date', '开播日期'],
   ['播放结束', '完播日'],
   ['动画制作公司', '制作公司'],
@@ -246,10 +246,10 @@ export function isGithubRemoteEntry(value: unknown): value is GithubRemoteEntry 
  */
 export function parseJsonl(text: string): {
   entries: GithubRemoteEntry[]
-  errors: Array<{ line: number; reason: string }>
+  errors: { line: number; reason: string }[]
 } {
   const entries: GithubRemoteEntry[] = []
-  const errors: Array<{ line: number; reason: string }> = []
+  const errors: { line: number; reason: string }[] = []
 
   if (!text || typeof text !== 'string') {
     return { entries, errors }
@@ -354,7 +354,7 @@ export function filterByTime(
     if (!entry.date || entry.date.trim() === '') return false
 
     // 解析日期：支持 YYYY-MM-DD、YYYY/MM/DD、YYYY.MM.DD 等格式
-    const match = entry.date.match(/^(\d{4})[-/.](\d{1,2})/)
+    const match = /^(\d{4})[-/.](\d{1,2})/.exec(entry.date)
     if (!match) return false
 
     const yearStr = match[1]
@@ -407,7 +407,7 @@ function matchTimeFilter(dateStr: string, filter: SyncTimeFilter): boolean {
   if (filter.range === 'future') return true
 
   // 支持本地"YYYY年MM月DD日"格式和远程"YYYY-MM-DD"格式
-  const match = dateStr.match(/(\d{4})[-/.年](\d{1,2})/)
+  const match = /(\d{4})[-/.年](\d{1,2})/.exec(dateStr)
   if (!match) return false
 
   const yearStr = match[1]
@@ -506,7 +506,7 @@ export function computeDiff(
     // 仅当本地存在 Bangumi_URL 字段时才比对（列映射中包含该列）
     const expectedUrl = `https://bgm.tv/subject/${remote.sid}`
     if ('Bangumi_URL' in local.fields) {
-      const localUrl = local.fields['Bangumi_URL']
+      const localUrl = local.fields.Bangumi_URL
       if (localUrl !== expectedUrl) {
         changedFields.push('Bangumi_URL')
       }

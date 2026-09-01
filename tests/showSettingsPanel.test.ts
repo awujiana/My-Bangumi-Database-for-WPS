@@ -40,13 +40,13 @@ function createMockPluginStorage(store: Record<string, string> = {}): {
 function createMockTaskPane(
   id: string,
   visible: boolean,
-  dockPosition: number = 0,
+  dockPosition = 0,
 ): { ID: string; Visible: boolean; DockPosition: number } {
   return { ID: id, Visible: visible, DockPosition: dockPosition }
 }
 
 // 记录 CreateTaskPane / GetTaskPane 调用
-let createdPanes: Array<{ url: string }> = []
+let createdPanes: { url: string }[] = []
 let getTaskPaneResults: Record<string, { Visible: boolean; DockPosition?: number } | null> = {}
 let createdPaneCounter = 0
 
@@ -72,9 +72,7 @@ function createMockApp(): {
       getTaskPaneResults[pane.ID] = pane
       return pane
     },
-    GetTaskPane: (id: string) => {
-      return getTaskPaneResults[id] ?? null
-    },
+    GetTaskPane: (id: string) => getTaskPaneResults[id] ?? null,
   }
 }
 

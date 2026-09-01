@@ -34,12 +34,13 @@ import { Result, BgmError } from '../core/result.js'
 import { bgmLog } from '../tools/util.js'
 
 import { getGistId, isGistConfigured } from './githubConfig.js'
-import { parseJsonl, type GithubRemoteEntry } from './githubSyncDiff.js'
+import { parseJsonl } from './githubSyncDiff.js'
+import type { GithubRemoteEntry } from './githubSyncDiff.js'
 import type { SyncSource } from './SyncSource.js'
 // 复用 githubSyncDiff.ts 的纯解析函数与类型（零依赖纯模块，可在 Node 测试环境直接运行）
 
 /** HTTP 请求超时（毫秒），与 githubSync 保持一致 */
-const REQUEST_TIMEOUT_MS = 30000
+const REQUEST_TIMEOUT_MS = 30_000
 
 /** Gist API 基础 URL（末尾含斜杠，便于与 gistId 拼接） */
 const GIST_API_BASE = 'https://api.github.com/gists/'
@@ -105,7 +106,7 @@ function isGistApiResponse(value: unknown): value is GistApiResponse {
   if (typeof value !== 'object' || value === null) return false
   const v = value as { files?: unknown }
   if (!('files' in v)) return false
-  const files = v.files
+  const { files } = v
   if (typeof files !== 'object' || files === null) return false
   // 遍历校验所有文件对象
   for (const fileValue of Object.values(files as Record<string, unknown>)) {

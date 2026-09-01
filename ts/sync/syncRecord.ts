@@ -152,7 +152,7 @@ export function getOrCreateSyncRecordSheet(): WpsWorksheet {
     } catch (e: unknown) {
       // 类型守卫：先缩窄类型再访问 message，符合 useUnknownInCatchVariables 规范
       const errMsg = e instanceof Error ? e.message : String(e)
-      bgmLog(LOG_LEVELS.WARN, '同步记录表迁移失败: ' + errMsg)
+      bgmLog(LOG_LEVELS.WARN, `同步记录表迁移失败: ${errMsg}`)
     }
 
     // 已有工作表，检查并补齐表头
@@ -321,8 +321,8 @@ function buildCache(sheet: WpsWorksheet): void {
       _syncRecordListCache.push({
         time: rowData[SYNC_RECORD_COL.TIME - 1] ?? '',
         name: rowData[SYNC_RECORD_COL.NAME - 1] ?? '',
-        url: url,
-        sid: sid,
+        url,
+        sid,
         type: rowData[SYNC_RECORD_COL.TYPE - 1] ?? '',
         source: rowData[SYNC_RECORD_COL.SOURCE - 1] ?? '',
         count: parseInt(rowData[SYNC_RECORD_COL.COUNT - 1] ?? '') || 1,
@@ -331,7 +331,7 @@ function buildCache(sheet: WpsWorksheet): void {
         message: rowData[SYNC_RECORD_COL.MESSAGE - 1] ?? '',
         fingerprint: rowData[SYNC_RECORD_COL.FINGERPRINT - 1] ?? '',
         collType: rowData[SYNC_RECORD_COL.COLL_TYPE - 1] ?? '',
-        row: row,
+        row,
       })
     } catch (e: unknown) {
       BGM.handleError(e, { context: 'buildCache', showAlert: false })
@@ -466,7 +466,7 @@ export function addSyncRecord(params: UpdateRecordParams): boolean {
       _syncRecordListCache.push({
         id: newRow,
         time: now,
-        sid: sid,
+        sid,
         count: finalCount,
         status: finalStatus,
         message: params.message || '',

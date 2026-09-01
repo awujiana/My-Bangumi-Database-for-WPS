@@ -83,15 +83,25 @@ let mockXhrConstructor: typeof MockXHR | null = null
 
 class MockXHR {
   status = 0
+
   statusText = ''
+
   responseText = ''
+
   timeout = 0
+
   onload: (() => void) | null = null
+
   onerror: (() => void) | null = null
+
   ontimeout: (() => void) | null = null
+
   private method = ''
+
   private url = ''
+
   private async = true
+
   private headers: Record<string, string> = {}
 
   open(method: string, url: string, async: boolean): void {

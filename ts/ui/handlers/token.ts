@@ -68,14 +68,14 @@ export function updateTokenStatus(): void {
 
     // 如果已经有用户名缓存，直接显示
     if (BGM.cache.username) {
-      tokenStatus.textContent = _T.set + ': ' + BGM.cache.username
+      tokenStatus.textContent = `${_T.set}: ${BGM.cache.username}`
       showUserProfile()
       // 后台静默查询 Token 状态
       void queryTokenStatus(token).catch(() => {
         // 静默失败，不影响主流程
       })
     } else {
-      tokenStatus.textContent = _T.set + ' (' + token.substring(0, 4) + '...)'
+      tokenStatus.textContent = `${_T.set} (${token.substring(0, 4)}...)`
 
       // 尝试获取用户信息（但不阻塞 UI 更新）
       // 注意：这里可能会因为 CORS 或网络问题失败
@@ -83,7 +83,7 @@ export function updateTokenStatus(): void {
         .then(({ userInfo, errorType }) => {
           if (userInfo?.username) {
             tokenStatus.style.color = '#4CAF50'
-            tokenStatus.textContent = _T.set + ': ' + userInfo.username
+            tokenStatus.textContent = `${_T.set}: ${userInfo.username}`
             updateUserIdStatus()
             showUserProfile()
             // 后台静默查询 Token 状态
@@ -94,7 +94,7 @@ export function updateTokenStatus(): void {
             // 网络错误：Token 本身可能有效，但无法连接到 BGM API
             // 常见原因：被 GFW 墙、断网、DNS 失败
             tokenStatus.style.color = '#ff9800' // 橙色警告
-            tokenStatus.textContent = _T.set + ' (' + token.substring(0, 4) + '...) ⚠ 网络无法连接'
+            tokenStatus.textContent = `${_T.set} (${token.substring(0, 4)}...) ⚠ 网络无法连接`
             bgmLog(
               LOG_LEVELS.WARN,
               '[updateTokenStatus] 网络错误：无法连接到 BGM API（可能被 GFW 墙）',
@@ -111,14 +111,14 @@ export function updateTokenStatus(): void {
           } else if (errorType === 'http') {
             // HTTP 错误（如 401）：Token 失效
             tokenStatus.style.color = '#f44336'
-            tokenStatus.textContent = _T.set + ' (Token 可能失效)'
+            tokenStatus.textContent = `${_T.set} (Token 可能失效)`
             bgmLog(LOG_LEVELS.WARN, '[updateTokenStatus] HTTP 错误：Token 可能已失效')
           }
           // errorType === 'parse' 或 'none'：保持原显示
         })
         .catch((err: unknown) => {
           const errMsg = err instanceof Error ? err.message : String(err)
-          bgmLog(LOG_LEVELS.ERROR, '[handlers] updateTokenStatus 获取用户信息失败: ' + errMsg)
+          bgmLog(LOG_LEVELS.ERROR, `[handlers] updateTokenStatus 获取用户信息失败: ${errMsg}`)
           BGM.handleError(err)
         })
     }
@@ -133,7 +133,7 @@ export function updateTokenStatus(): void {
 }
 
 // 缓存上次更新的状态，避免重复日志和 DOM 操作
-let _lastUserIdSnapshot: string | null | undefined = undefined
+let _lastUserIdSnapshot: string | null | undefined
 
 export function updateUserIdStatus(): void {
   const userIdStatusEls = document.querySelectorAll<HTMLElement>('#userIdStatus')
@@ -153,8 +153,8 @@ export function updateUserIdStatus(): void {
   )
 
   if (userId) {
-    const display = username ? username + ' (' + userId + ')' : userId
-    const text = _T.set + ': ' + display
+    const display = username ? `${username} (${userId})` : userId
+    const text = `${_T.set}: ${display}`
     userIdStatusEls.forEach((el) => {
       el.textContent = text
       el.style.color = '#4CAF50'
@@ -211,8 +211,8 @@ export function testTokenValidity(): void {
 
   const xhr = new XMLHttpRequest()
   xhr.open('GET', apiUrl, true)
-  xhr.timeout = 15000 // 15 秒超时，防止网络挂起导致 Token 测试按钮无限期等待
-  xhr.setRequestHeader('Authorization', 'Bearer ' + token)
+  xhr.timeout = 15_000 // 15 秒超时，防止网络挂起导致 Token 测试按钮无限期等待
+  xhr.setRequestHeader('Authorization', `Bearer ${token}`)
   xhr.setRequestHeader('Content-Type', 'application/json')
 
   xhr.onload = () => {
@@ -242,7 +242,7 @@ export function testTokenValidity(): void {
             small?: string
           }
         }
-        bgmLog(LOG_LEVELS.INFO, '[testTokenValidity] 响应数据: ' + JSON.stringify(data))
+        bgmLog(LOG_LEVELS.INFO, `[testTokenValidity] 响应数据: ${JSON.stringify(data)}`)
 
         const nickname = data.nickname || data.username || _T.unknownUser
         const userId = String(data.id || '')
@@ -363,7 +363,7 @@ export function queryTokenStatus(token: string): Promise<{ expires: number; user
 
     const xhr = new XMLHttpRequest()
     xhr.open('POST', apiUrl, true)
-    xhr.timeout = 15000
+    xhr.timeout = 15_000
     xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded')
 
     xhr.onload = () => {
@@ -384,7 +384,7 @@ export function queryTokenStatus(token: string): Promise<{ expires: number; user
           }
 
           if (typeof data.expires === 'number' && data.expires > 0) {
-            const expires = data.expires
+            const { expires } = data
             const userId = String(data.user_id ?? '')
             storeTokenExpires(expires)
 
@@ -529,9 +529,9 @@ export function checkTokenExpiryWarning(expires: number): void {
 export function showUserProfile(): void {
   const profileEl = document.getElementById('userProfile')
 
-  const avatarUrl = BGM.cache.avatarUrl
-  const username = BGM.cache.username
-  const userId = BGM.cache.userId
+  const { avatarUrl } = BGM.cache
+  const { username } = BGM.cache
+  const { userId } = BGM.cache
 
   if (avatarUrl || username) {
     if (profileEl) {

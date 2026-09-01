@@ -19,7 +19,7 @@ describe('EventBus', () => {
     })
 
     it('应传递数据给处理器', () => {
-      let received: unknown = undefined
+      let received: unknown
       bus.on('data', (data: unknown) => {
         received = data
       })
@@ -40,8 +40,8 @@ describe('EventBus', () => {
     })
 
     it('不同事件应互不影响', () => {
-      let a = 0,
-        b = 0
+      let a = 0
+      let b = 0
       bus.on('a', () => {
         a++
       })
@@ -81,8 +81,8 @@ describe('EventBus', () => {
     })
 
     it('不传处理器时应移除所有处理器', () => {
-      let a = 0,
-        b = 0
+      let a = 0
+      let b = 0
       bus.on('test', () => {
         a++
       })

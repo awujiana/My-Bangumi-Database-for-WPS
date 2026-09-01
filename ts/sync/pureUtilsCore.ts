@@ -96,7 +96,7 @@ export function extractSubjectId(input: string): string | null {
   if (id === null) {
     for (const pattern of URL_PATTERNS) {
       const match = trimmed.match(pattern)
-      if (match && match[1]) {
+      if (match?.[1]) {
         id = match[1]
         break
       }
@@ -105,7 +105,7 @@ export function extractSubjectId(input: string): string | null {
 
   // 尝试从文本中提取数字
   if (id === null) {
-    const numMatch = trimmed.match(/\d+/)
+    const numMatch = /\d+/.exec(trimmed)
     if (numMatch && numMatch[0]) {
       id = numMatch[0]
     }

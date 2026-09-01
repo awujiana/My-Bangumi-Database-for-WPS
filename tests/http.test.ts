@@ -27,7 +27,8 @@ vi.hoisted(() => {
   vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'setInterval', 'clearInterval'] })
 })
 
-import { httpRequest, type HttpMethod } from '../ts/tools/http.js'
+import { httpRequest } from '../ts/tools/http.js'
+import type { HttpMethod } from '../ts/tools/http.js'
 
 // 清空模块加载期间累积的 fake timers
 vi.clearAllTimers()
@@ -49,18 +50,29 @@ let xhrCallCount = 0
 
 class MockXHR {
   status = 0
+
   statusText = ''
+
   responseText = ''
+
   timeout = 0
+
   onload: (() => void) | null = null
+
   onerror: (() => void) | null = null
+
   ontimeout: (() => void) | null = null
+
   upload: {
     onprogress: ((e: { loaded: number; total: number; lengthComputable: boolean }) => void) | null
   } = { onprogress: null }
+
   private method = ''
+
   private url = ''
+
   private async = true
+
   private headers: Record<string, string> = {}
 
   open(method: string, url: string, async: boolean): void {
@@ -144,7 +156,7 @@ async function flushPromisesAndTimers(): Promise<void> {
   await Promise.resolve()
   await Promise.resolve()
   // 指数退避：1s, 2s, 4s = 7s，足够覆盖
-  vi.advanceTimersByTime(10000)
+  vi.advanceTimersByTime(10_000)
   await Promise.resolve()
   await Promise.resolve()
 }
@@ -165,7 +177,7 @@ describe('httpRequest - 成功路径', () => {
 
   it('默认 timeout=30000', async () => {
     const promise = httpRequest('/v0/x')
-    expect(lastXhrCall?.timeout).toBe(30000)
+    expect(lastXhrCall?.timeout).toBe(30_000)
     lastMockXhr!._respondOk('{}')
     await promise
   })
@@ -179,14 +191,14 @@ describe('httpRequest - 成功路径', () => {
 
   it('未提供 token 时不设置 Authorization 头', async () => {
     const promise = httpRequest('/v0/x')
-    expect(lastXhrCall?.headers['Authorization']).toBeUndefined()
+    expect(lastXhrCall?.headers.Authorization).toBeUndefined()
     lastMockXhr!._respondOk('{}')
     await promise
   })
 
   it('提供 token 时设置 Authorization: Bearer 头', async () => {
     const promise = httpRequest('/v0/x', { token: 'mytoken123' })
-    expect(lastXhrCall?.headers['Authorization']).toBe('Bearer mytoken123')
+    expect(lastXhrCall?.headers.Authorization).toBe('Bearer mytoken123')
     lastMockXhr!._respondOk('{}')
     await promise
   })

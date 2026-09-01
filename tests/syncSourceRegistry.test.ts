@@ -148,8 +148,8 @@ import {
   getSyncSource,
   getRegisteredSourceTypes,
   isSyncSourceRegistered,
+  syncFromRemote,
 } from '../ts/sync/syncSourceRegistry.js'
-import { syncFromRemote } from '../ts/sync/syncSourceRegistry.js'
 
 describe('SyncSource 类型', () => {
   it('应能创建和识别同步源类型', () => {
@@ -679,7 +679,7 @@ describe('syncSourceRegistry 未覆盖分支', () => {
         return _screenUpdating
       },
       set ScreenUpdating(v: boolean) {
-        if (v === false) throw new Error('COM 调用失败')
+        if (!v) throw new Error('COM 调用失败')
         _screenUpdating = v
       },
       Calculation: 1,
@@ -867,7 +867,7 @@ describe('syncSourceRegistry 未覆盖分支', () => {
     await syncFromRemote(progress)
     // 进度回调中 downloadElapsed 应为非负数字
     const downloadCall = progress.mock.calls.find(
-      (c: unknown[]) => typeof c[2] === 'string' && (c[2] as string).includes('下载完成'),
+      (c: unknown[]) => typeof c[2] === 'string' && c[2].includes('下载完成'),
     )
     expect(downloadCall).toBeDefined()
     if (downloadCall) {
@@ -895,7 +895,7 @@ describe('syncSourceRegistry 未覆盖分支', () => {
     // totalProcessed = 0, overallSpeed 应为 0
     // 查找最后一次进度回调（包含"完成"且不是"下载完成"）
     const completeCalls = progress.mock.calls.filter(
-      (c: unknown[]) => typeof c[2] === 'string' && (c[2] as string).startsWith('完成'),
+      (c: unknown[]) => typeof c[2] === 'string' && c[2].startsWith('完成'),
     )
     expect(completeCalls.length).toBeGreaterThan(0)
     if (completeCalls.length > 0) {
@@ -955,12 +955,10 @@ describe('syncSourceRegistry 未覆盖分支', () => {
     })
     mockFindHeaderRow.mockReturnValue(0) // findHeaderRow 返回 0
     mockGetColumnMap.mockReturnValue(new Map([['Bangumi_URL', 5]]))
-    mockGetCellValue.mockImplementation((_ws: unknown, row: number, _col: number) => {
-      return row === 2 ? 'https://bgm.tv/subject/777' : ''
-    })
-    mockExtractSubjectId.mockImplementation((url: string) => {
-      return url.includes('777') ? '777' : null
-    })
+    mockGetCellValue.mockImplementation((_ws: unknown, row: number, _col: number) =>
+      row === 2 ? 'https://bgm.tv/subject/777' : '',
+    )
+    mockExtractSubjectId.mockImplementation((url: string) => (url.includes('777') ? '777' : null))
     mockGithubSourceRef.fetchRemoteEntries.mockResolvedValue([{ sid: '777', name: '匹配' }])
     mockComputeDiff.mockReturnValue([])
     mockReadLocalEntriesForSync.mockReturnValue({ entries: new Map(), lastRow: 3 })
@@ -1012,7 +1010,7 @@ describe('syncSourceRegistry 未覆盖分支', () => {
 
   it('overallSpeed > 0 时显示实际速度 (lines 222-232)', async () => {
     // 模拟时间流逝：Date.now() 返回不同值
-    let timeValue = 1000000
+    let timeValue = 1_000_000
     vi.spyOn(Date, 'now').mockImplementation(() => timeValue++)
     mockGithubSourceRef.fetchRemoteEntries.mockResolvedValue([
       { sid: '1', name: 'A' },
@@ -1038,7 +1036,7 @@ describe('syncSourceRegistry 未覆盖分支', () => {
     vi.restoreAllMocks()
     // 查找最后一次进度回调
     const completeCalls = progress.mock.calls.filter(
-      (c: unknown[]) => typeof c[2] === 'string' && (c[2] as string).startsWith('完成'),
+      (c: unknown[]) => typeof c[2] === 'string' && c[2].startsWith('完成'),
     )
     expect(completeCalls.length).toBeGreaterThan(0)
     if (completeCalls.length > 0) {

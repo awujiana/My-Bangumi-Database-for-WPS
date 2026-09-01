@@ -8,6 +8,24 @@
  *   <script type="module" src="./dist-ts/panel/panelBootstrap.js"> 加载。
  */
 
+// 加载依赖模块（含 panel-entry，其导入时自动启动面板）
+import '../index.js'
+import '../core/constants.js'
+import '../tools/config.js'
+import '../tools/util.js'
+import '../core/crypto.js'
+import '../tools/events.js'
+import '../core/result.js'
+import '../tools/wps.js'
+import '../tools/http.js'
+import '../ui/dialog.js'
+import '../ui/message.js'
+import '../ui/preview.js'
+import '../sync/syncRecord.js'
+import '../sync/scraping.js'
+import '../sync/exceltobangumi.js'
+import '../entry/panel-entry.js'
+
 if (typeof window !== 'undefined') {
   window.addEventListener(
     'error',
@@ -28,24 +46,6 @@ if (typeof window !== 'undefined') {
     console.error('[BGM] Unhandled promise rejection:', e.reason)
   })
 }
-
-// 加载依赖模块（含 panel-entry，其导入时自动启动面板）
-import '../index.js'
-import '../core/constants.js'
-import '../tools/config.js'
-import '../tools/util.js'
-import '../core/crypto.js'
-import '../tools/events.js'
-import '../core/result.js'
-import '../tools/wps.js'
-import '../tools/http.js'
-import '../ui/dialog.js'
-import '../ui/message.js'
-import '../ui/preview.js'
-import '../sync/syncRecord.js'
-import '../sync/scraping.js'
-import '../sync/exceltobangumi.js'
-import '../entry/panel-entry.js'
 
 if (typeof document !== 'undefined') {
   // 模块就绪前禁用所有 data-action 按钮，避免误触发未初始化的处理逻辑
@@ -71,7 +71,7 @@ function updateStickyOffsets(): void {
   const root = document.documentElement
   const topbar = document.querySelector('.topbar')
   const topbarH = topbar ? (topbar as HTMLElement).offsetHeight : 0
-  root.style.setProperty('--topbar-h', String(topbarH) + 'px')
+  root.style.setProperty('--topbar-h', `${String(topbarH)}px`)
   const narrow =
     typeof window !== 'undefined' &&
     typeof window.matchMedia === 'function' &&
@@ -81,7 +81,7 @@ function updateStickyOffsets(): void {
     const sb = document.querySelector('.sidebar')
     navH = sb ? (sb as HTMLElement).offsetHeight : 0
   }
-  root.style.setProperty('--nav-h', String(navH) + 'px')
+  root.style.setProperty('--nav-h', `${String(navH)}px`)
 }
 
 if (typeof window !== 'undefined') {

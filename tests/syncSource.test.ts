@@ -47,12 +47,15 @@ class MockSource implements SyncSource {
   getSourceType(): string {
     return 'mock'
   }
+
   getDisplayName(): string {
     return 'Mock'
   }
+
   async fetchRemoteEntries(): Promise<never[]> {
     return []
   }
+
   validateConfig(): Result<void> {
     return Result.ok<void>(undefined)
   }

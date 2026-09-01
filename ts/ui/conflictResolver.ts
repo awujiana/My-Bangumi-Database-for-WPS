@@ -234,8 +234,8 @@ function createConflictModal(
   }
 
   /** 收集当前所有冲突的解决决策 */
-  const collectResolutions = (): ConflictResolution[] => {
-    return conflicts.map((conflict, idx): ConflictResolution => {
+  const collectResolutions = (): ConflictResolution[] =>
+    conflicts.map((conflict, idx): ConflictResolution => {
       const localRadio = localRadios[idx]
       const chosenValue: 'local' | 'remote' = localRadio?.checked ? 'local' : 'remote'
       return {
@@ -244,7 +244,6 @@ function createConflictModal(
         chosenValue,
       }
     })
-  }
 
   confirmBtn.onclick = (): void => {
     closeModal()

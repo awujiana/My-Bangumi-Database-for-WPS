@@ -18,8 +18,10 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 
 class MockBroadcastChannel {
   name: string
+
   onmessage: ((event: MessageEvent) => void) | null = null
-  private static instances: Map<string, MockBroadcastChannel> = new Map()
+
+  private static instances = new Map<string, MockBroadcastChannel>()
 
   constructor(name: string) {
     const existing = MockBroadcastChannel.instances.get(name)

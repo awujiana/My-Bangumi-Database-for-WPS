@@ -23,15 +23,12 @@ import {
   _setBgmUsername,
   testTokenValidityForRibbon,
   fetchAllUserCollections,
-  type WpsWorksheet,
   getCell,
   trim,
   calcFingerprint,
   isGithubConfigComplete,
-  type GithubSyncResult,
-  type GithubRemoteEntry,
-  type LocalRowEntry,
 } from '../index.js'
+import type { WpsWorksheet, GithubSyncResult, GithubRemoteEntry, LocalRowEntry } from '../index.js'
 import { undoLastSync, getLastSessionDescription } from '../sync/undoStack.js'
 
 // ========== GitHub 同步冲突解决类型 ==========
@@ -154,14 +151,14 @@ export function getSyncPreview(
   incrementalSkipped: number
 } {
   const startRow = headerRow + 1
-  let total = 0,
-    valid = 0,
-    willSync = 0,
-    willSkip = 0,
-    alreadyUploaded = 0,
-    noUrl = 0,
-    emptyStatus = 0,
-    incrementalSkipped = 0
+  let total = 0
+  let valid = 0
+  let willSync = 0
+  let willSkip = 0
+  let alreadyUploaded = 0
+  let noUrl = 0
+  let emptyStatus = 0
+  let incrementalSkipped = 0
   const isIncremental = options?.incremental
   const fingerprintMap = options?.fingerprintMap
 
@@ -350,24 +347,24 @@ export async function detectConflicts(
   headerRow: number,
   token: string,
 ): Promise<{
-  conflicts: Array<{
+  conflicts: {
     row: number
     sid: string
     name: string
     existingType?: number
     newType: number
-  }>
+  }[]
   conflictCount: number
   bgmCollectionReady: boolean
 }> {
   const startRow = headerRow + 1
-  const conflicts: Array<{
+  const conflicts: {
     row: number
     sid: string
     name: string
     existingType?: number
     newType: number
-  }> = []
+  }[] = []
   let conflictCount = 0
   let bgmCollectionReady = false
 
@@ -512,7 +509,7 @@ export async function syncWithConfirmation(): Promise<void> {
   if (confirmResult !== 6) return
 
   // 4. 冲突检测（用户确认后执行，网络不通时会被 try/catch 捕获并跳过）
-  let skipSids: Set<string> | undefined = undefined
+  let skipSids: Set<string> | undefined
   try {
     bgmLog(LOG_LEVELS.INFO, '[syncWithConfirmation] 开始冲突检测（需要请求 Bangumi API）...')
     const { conflicts, conflictCount } = await detectConflicts(
@@ -583,9 +580,8 @@ export function setTokenForRibbon(): boolean {
         testTokenValidityForRibbon(newToken)
       }
       return true
-    } else {
-      app?.MessageBox?.('Token 保存失败，请检查插件存储权限', 0, 16)
     }
+    app?.MessageBox?.('Token 保存失败，请检查插件存储权限', 0, 16)
   }
   return false
 }
@@ -625,8 +621,8 @@ export async function testTokenForRibbon(): Promise<void> {
   await new Promise<void>((resolve) => {
     const xhr = new XMLHttpRequest()
     xhr.open('GET', apiUrl, true)
-    xhr.timeout = 15000
-    xhr.setRequestHeader('Authorization', 'Bearer ' + token)
+    xhr.timeout = 15_000
+    xhr.setRequestHeader('Authorization', `Bearer ${token}`)
     xhr.setRequestHeader('Content-Type', 'application/json')
 
     xhr.onload = async () => {

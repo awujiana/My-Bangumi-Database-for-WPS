@@ -109,7 +109,7 @@ export async function httpRequest<T = unknown>(
     method = 'GET',
     body = null,
     token,
-    timeout = 30000,
+    timeout = 30_000,
     retries = BGM_CONFIG.MAX_RETRIES,
     onProgress,
     zodSchema,
@@ -178,7 +178,7 @@ export async function httpRequest<T = unknown>(
 
       if (response.status === 429 && attempt < retries) {
         attempt++
-        const delayMs = BGM_CONFIG.RETRY_DELAY_BASE * Math.pow(2, attempt - 1)
+        const delayMs = BGM_CONFIG.RETRY_DELAY_BASE * 2 ** (attempt - 1)
         bgmLog(
           LOG_LEVELS.WARN,
           `API 限流 (429)，第 ${String(attempt)} 次重试，等待 ${String(delayMs)}ms`,
@@ -197,7 +197,7 @@ export async function httpRequest<T = unknown>(
       BGM.handleError(error, { context: 'httpRequest', showAlert: false })
       if (attempt < retries) {
         attempt++
-        const delayMs = BGM_CONFIG.RETRY_DELAY_BASE * Math.pow(2, attempt - 1)
+        const delayMs = BGM_CONFIG.RETRY_DELAY_BASE * 2 ** (attempt - 1)
         bgmLog(LOG_LEVELS.WARN, `网络错误，第 ${String(attempt)} 次重试，等待 ${String(delayMs)}ms`)
         await sleep(delayMs)
         continue
@@ -246,7 +246,7 @@ function executeXhrRequest(
     if (options.body) {
       bgmLog(
         LOG_LEVELS.INFO,
-        `[HTTP] 请求体: ${options.body.length > 200 ? options.body.substring(0, 200) + '...' : options.body}`,
+        `[HTTP] 请求体: ${options.body.length > 200 ? `${options.body.substring(0, 200)}...` : options.body}`,
       )
     }
 
@@ -295,13 +295,13 @@ function executeXhrRequest(
           data = JSON.parse(xhr.responseText)
           bgmLog(
             LOG_LEVELS.INFO,
-            `[HTTP] 响应数据: ${JSON.stringify(data).length > 500 ? JSON.stringify(data).substring(0, 500) + '...' : JSON.stringify(data)}`,
+            `[HTTP] 响应数据: ${JSON.stringify(data).length > 500 ? `${JSON.stringify(data).substring(0, 500)}...` : JSON.stringify(data)}`,
           )
         } catch (error: unknown) {
           BGM.handleError(error, { context: 'executeXhrRequest', showAlert: false })
           bgmLog(
             LOG_LEVELS.WARN,
-            `[HTTP] 解析响应失败，返回原始文本: ${xhr.responseText.length > 200 ? xhr.responseText.substring(0, 200) + '...' : xhr.responseText}`,
+            `[HTTP] 解析响应失败，返回原始文本: ${xhr.responseText.length > 200 ? `${xhr.responseText.substring(0, 200)}...` : xhr.responseText}`,
           )
           // responseText 是 string，可直接赋值给 unknown，无需任何断言
           data = xhr.responseText

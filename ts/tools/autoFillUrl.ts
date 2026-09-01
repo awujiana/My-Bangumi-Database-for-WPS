@@ -12,9 +12,7 @@ import {
 } from '../index.js'
 import type { WpsWorksheet } from '../index.js'
 
-export interface NameUrlMap {
-  [nameOrAlias: string]: string
-}
+export type NameUrlMap = Record<string, string>
 
 export interface AutoFillResult {
   /** 补全的 URL 数量 */

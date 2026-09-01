@@ -28,7 +28,7 @@ export async function fetchEpisodeIds(
     }
     const xhr = new XMLHttpRequest()
     xhr.open('GET', url, true)
-    xhr.timeout = 30000
+    xhr.timeout = 30_000
     xhr.setRequestHeader('Authorization', `Bearer ${token}`)
 
     // AbortSignal 支持：监听 abort 事件触发 xhr.abort()
@@ -41,7 +41,7 @@ export async function fetchEpisodeIds(
       if (xhr.status >= 200 && xhr.status < 300) {
         try {
           const data = JSON.parse(xhr.responseText) as {
-            data?: Array<{ id: number; sort: number }>
+            data?: { id: number; sort: number }[]
           }
           const episodes = data.data || []
           episodes.sort((a, b) => (a.sort || 0) - (b.sort || 0))

@@ -31,10 +31,10 @@ import {
   computeDiff,
   GithubSyncSource,
   readLocalEntriesForSync,
-  type GithubSyncResult,
-  type SyncStrategy,
 } from './githubSync.js'
-import { filterByTime, type ConflictResolution, type SyncTimeFilter } from './githubSyncDiff.js'
+import type { GithubSyncResult, SyncStrategy } from './githubSync.js'
+import { filterByTime } from './githubSyncDiff.js'
+import type { ConflictResolution, SyncTimeFilter } from './githubSyncDiff.js'
 import { GitlabSyncSource } from './gitlabSync.js'
 import { LocalFileSyncSource } from './localFileSync.js'
 import { extractSubjectId } from './pureUtils.js'

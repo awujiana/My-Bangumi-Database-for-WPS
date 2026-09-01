@@ -412,7 +412,7 @@ function buildModulesPanelHTML(): string {
       (m) => `
       <div class="bgm-dp-mod-item">
         <span class="bgm-dp-mod-dot ${m.loaded ? 'bgm-dp-mod-dot-ok' : 'bgm-dp-mod-dot-err'}"></span>
-        <span class="bgm-dp-mod-name">${m.src}${m.error ? ' — ' + m.error : ''}</span>
+        <span class="bgm-dp-mod-name">${m.src}${m.error ? ` — ${m.error}` : ''}</span>
         ${m.critical ? '<span class="bgm-dp-mod-tag bgm-dp-mod-tag-critical">critical</span>' : ''}
       </div>
     `,
@@ -558,7 +558,7 @@ function buildEnvPanelHTML(): string {
 // ========== 交互逻辑 ==========
 
 /** 当前日志筛选级别 */
-let _currentLogLevel: string | undefined = undefined
+let _currentLogLevel: string | undefined
 /** 日志轮询定时器 */
 let _logInterval: ReturnType<typeof setInterval> | null = null
 
@@ -642,7 +642,7 @@ function bindRibbonCards(root: HTMLElement): void {
             resultEl.style.color = '#16a34a'
           } catch (e: unknown) {
             const msg = e instanceof Error ? e.message : String(e)
-            resultEl.textContent = '❌ ' + msg
+            resultEl.textContent = `❌ ${msg}`
             resultEl.style.color = '#dc2626'
           }
         } else {
@@ -663,7 +663,7 @@ function bindLogFilters(root: HTMLElement): void {
         f.classList.remove('active')
       })
       btn.classList.add('active')
-      const level = btn.dataset.level
+      const { level } = btn.dataset
       _currentLogLevel = level === 'all' ? undefined : level
       void refreshLogs(root)
     })
@@ -763,8 +763,7 @@ function bindEnvActions(root: HTMLElement): void {
   const clearCacheBtn = root.querySelector<HTMLElement>('#bgm-dp-clear-cache')
   clearCacheBtn?.addEventListener('click', () => {
     // 添加 cache-busting 参数强制刷新
-    window.location.href =
-      window.location.origin + window.location.pathname + '?bust=' + String(Date.now())
+    window.location.href = `${window.location.origin + window.location.pathname}?bust=${String(Date.now())}`
   })
 
   const exportReportBtn = root.querySelector<HTMLElement>('#bgm-dp-export-report')

@@ -294,13 +294,13 @@ describe('极值边界', () => {
     })
 
     it('列号 10000 应返回有效字符串', () => {
-      const result = colNumToLetter(10000)
+      const result = colNumToLetter(10_000)
       expect(typeof result).toBe('string')
       expect(result.length).toBeGreaterThan(0)
     })
 
     it('列号 16384 (XFD, Excel 上限) 应返回 "XFD"', () => {
-      expect(colNumToLetter(16384)).toBe('XFD')
+      expect(colNumToLetter(16_384)).toBe('XFD')
     })
 
     it('负数列号应返回空字符串或特定值（不抛错）', () => {
@@ -322,28 +322,28 @@ describe('极值边界', () => {
     })
 
     it('10000 字符字符串返回有效校验和（0-255）', () => {
-      const longStr = 'A'.repeat(10000)
+      const longStr = 'A'.repeat(10_000)
       const cs = calcChecksum(longStr)
       expect(cs).toBeGreaterThanOrEqual(0)
       expect(cs).toBeLessThan(256)
     })
 
     it('100000 字符字符串返回有效校验和（0-255）', () => {
-      const veryLongStr = 'XYZ'.repeat(33334)
+      const veryLongStr = 'XYZ'.repeat(33_334)
       const cs = calcChecksum(veryLongStr)
       expect(cs).toBeGreaterThanOrEqual(0)
       expect(cs).toBeLessThan(256)
     })
 
     it('极大字符串不抛错（性能边界）', () => {
-      const hugeStr = 'A'.repeat(100000)
+      const hugeStr = 'A'.repeat(100_000)
       expect(() => calcChecksum(hugeStr)).not.toThrow()
     })
   })
 
   describe('extractSubjectId 处理极值 URL', () => {
     it('极长 URL 不抛错', () => {
-      const longUrl = 'https://bgm.tv/subject/12345' + 'x'.repeat(10000)
+      const longUrl = `https://bgm.tv/subject/12345${'x'.repeat(10_000)}`
       expect(() => extractSubjectId(longUrl)).not.toThrow()
     })
 
@@ -366,7 +366,7 @@ describe('极值边界', () => {
 
   describe('mapWatchStatus 处理极值', () => {
     it('极长字符串不抛错', () => {
-      const longStatus = '想看'.repeat(10000)
+      const longStatus = '想看'.repeat(10_000)
       expect(() => mapWatchStatus(longStatus)).not.toThrow()
     })
 
@@ -568,17 +568,17 @@ describe('特殊字符边界', () => {
 describe('超长字符串边界', () => {
   describe('Result 处理超长字符串', () => {
     it('10000 字符字符串作为成功值', () => {
-      const longStr = 'A'.repeat(10000)
+      const longStr = 'A'.repeat(10_000)
       const r = Result.ok(longStr)
       expect(r.unwrap()).toBe(longStr)
-      expect(r.unwrap().length).toBe(10000)
+      expect(r.unwrap().length).toBe(10_000)
     })
 
     it('100000 字符字符串作为成功值', () => {
-      const veryLongStr = 'B'.repeat(100000)
+      const veryLongStr = 'B'.repeat(100_000)
       const r = Result.ok(veryLongStr)
       expect(r.unwrap()).toBe(veryLongStr)
-      expect(r.unwrap().length).toBe(100000)
+      expect(r.unwrap().length).toBe(100_000)
     })
   })
 
@@ -598,25 +598,25 @@ describe('超长字符串边界', () => {
 
   describe('trim 处理超长字符串', () => {
     it('100000 字符不抛错', () => {
-      const veryLongStr = '  hello  '.repeat(11112)
+      const veryLongStr = '  hello  '.repeat(11_112)
       expect(() => trim(veryLongStr)).not.toThrow()
     })
 
     it('纯空白 10000 字符应返回空字符串', () => {
-      const whitespace = ' '.repeat(10000)
+      const whitespace = ' '.repeat(10_000)
       expect(trim(whitespace)).toBe('')
     })
   })
 
   describe('extractSubjectId 处理超长 URL', () => {
     it('10000 字符 URL 不抛错', () => {
-      const longUrl = 'https://bgm.tv/subject/12345?' + 'x'.repeat(10000)
+      const longUrl = `https://bgm.tv/subject/12345?${'x'.repeat(10_000)}`
       expect(() => extractSubjectId(longUrl)).not.toThrow()
       expect(extractSubjectId(longUrl)).toBe('12345')
     })
 
     it('URL 路径中包含 10000 字符不抛错', () => {
-      const longPath = 'https://bgm.tv/' + 'a'.repeat(10000) + '/subject/12345'
+      const longPath = `https://bgm.tv/${'a'.repeat(10_000)}/subject/12345`
       expect(() => extractSubjectId(longPath)).not.toThrow()
     })
   })
@@ -630,19 +630,19 @@ describe('超长字符串边界', () => {
     })
 
     it('100000 字符状态不抛错', () => {
-      const veryLongStatus = 'x'.repeat(100000)
+      const veryLongStatus = 'x'.repeat(100_000)
       expect(() => mapWatchStatus(veryLongStatus)).not.toThrow()
     })
   })
 
   describe('calcChecksum 处理超长字符串', () => {
     it('100000 字符不抛错（性能边界）', () => {
-      const hugeStr = 'A'.repeat(100000)
+      const hugeStr = 'A'.repeat(100_000)
       expect(() => calcChecksum(hugeStr)).not.toThrow()
     })
 
     it('1000000 字符不抛错（极端性能边界）', () => {
-      const extremeStr = 'A'.repeat(1000000)
+      const extremeStr = 'A'.repeat(1_000_000)
       expect(() => calcChecksum(extremeStr)).not.toThrow()
     })
   })

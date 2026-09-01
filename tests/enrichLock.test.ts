@@ -36,7 +36,7 @@ function createMockWorksheets(names: string[]): MockWorksheet[] {
   return names.map((name, i) => ({ Name: name, Index: i + 1 }))
 }
 
-function createMockWorkbooks(workbooks: Array<{ Name: string; Sheets: string[] }>): MockWorkbook[] {
+function createMockWorkbooks(workbooks: { Name: string; Sheets: string[] }[]): MockWorkbook[] {
   return workbooks.map((wb, i) => {
     const sheets = createMockWorksheets(wb.Sheets)
     return {
@@ -67,7 +67,7 @@ function createMockPluginStorage(store: Record<string, string> = {}): {
 
 function createMockApp(
   workbooks: MockWorkbook[],
-  activeWbName: string = '',
+  activeWbName = '',
   pluginStorage?: ReturnType<typeof createMockPluginStorage>,
 ): {
   Workbooks: { Count: number; Item: (i: number) => MockWorkbook | null }
@@ -281,7 +281,7 @@ describe('refreshEnrichWorkbooks', () => {
   it('Workbooks 不可用时记录警告', () => {
     setupBasicDom()
     const app = createMockApp([])
-    ;(app as unknown as { Workbooks: null }).Workbooks = null as unknown as typeof app.Workbooks
+    ;(app as unknown as { Workbooks: null }).Workbooks = null
     setMockApp(app)
 
     refreshEnrichWorkbooks('workbookSelect')
@@ -410,7 +410,7 @@ describe('toggleEnrichWorkbookLock', () => {
     expect(mockBGMState.enrich.lockedWorkbookName).toBe('wb1.xlsx')
     expect(mockBGMState.enrich.lockedSheetName).toBe('TargetSheet')
     expect(mockBGMState.enrich.lockedSheetIndex).toBe(2)
-    expect(storage._store['bgm_enrich_locked_workbook']).toBeTruthy()
+    expect(storage._store.bgm_enrich_locked_workbook).toBeTruthy()
     expect(mockRefs.mockShowToast).toHaveBeenCalled()
   })
 
@@ -541,7 +541,7 @@ describe('saveEnrichLockedWorkbook', () => {
       sheetIndex: 1,
     })
 
-    expect(storage._store['bgm_enrich_locked_workbook']).toBe(
+    expect(storage._store.bgm_enrich_locked_workbook).toBe(
       JSON.stringify({ workbookName: 'wb1.xlsx', sheetName: 'Sheet1', sheetIndex: 1 }),
     )
     expect(mockRefs.mockBgmLog).toHaveBeenCalled()
@@ -557,7 +557,7 @@ describe('saveEnrichLockedWorkbook', () => {
 
     saveEnrichLockedWorkbook(null)
 
-    expect(storage._store['bgm_enrich_locked_workbook']).toBe('')
+    expect(storage._store.bgm_enrich_locked_workbook).toBe('')
     expect(mockRefs.mockBgmLog).toHaveBeenCalled()
   })
 
@@ -622,7 +622,7 @@ describe('restoreEnrichLockedWorkbook', () => {
     expect(result).toBe(false)
     expect(mockBGMState.enrich.isLocked).toBe(false)
     expect(mockBGMState.enrich.lockedWorkbookName).toBeNull()
-    expect(storage._store['bgm_enrich_locked_workbook']).toBe('')
+    expect(storage._store.bgm_enrich_locked_workbook).toBe('')
   })
 
   it('锁定的工作表不存在时清除状态', () => {
@@ -639,7 +639,7 @@ describe('restoreEnrichLockedWorkbook', () => {
 
     expect(result).toBe(false)
     expect(mockBGMState.enrich.isLocked).toBe(false)
-    expect(storage._store['bgm_enrich_locked_workbook']).toBe('')
+    expect(storage._store.bgm_enrich_locked_workbook).toBe('')
   })
 
   it('JSON 数据损坏时清除状态', () => {
@@ -654,7 +654,7 @@ describe('restoreEnrichLockedWorkbook', () => {
 
     expect(result).toBe(false)
     expect(mockBGMState.enrich.isLocked).toBe(false)
-    expect(storage._store['bgm_enrich_locked_workbook']).toBe('')
+    expect(storage._store.bgm_enrich_locked_workbook).toBe('')
   })
 
   it('Workbooks 不可用时清除状态', () => {
@@ -663,7 +663,7 @@ describe('restoreEnrichLockedWorkbook', () => {
       bgm_enrich_locked_workbook: '{"workbookName":"wb1.xlsx","sheetName":"Sheet1","sheetIndex":1}',
     })
     const app = createMockApp(workbooks, 'wb1.xlsx', storage)
-    ;(app as unknown as { Workbooks: null }).Workbooks = null as unknown as typeof app.Workbooks
+    ;(app as unknown as { Workbooks: null }).Workbooks = null
     setMockApp(app)
 
     const result = restoreEnrichLockedWorkbook()
@@ -721,7 +721,7 @@ describe('getLockedEnrichSheet', () => {
         '{"workbookName":"deleted.xlsx","sheetName":"Sheet1","sheetIndex":1}',
     })
     const app = createMockApp(workbooks)
-    app.PluginStorage = storage as unknown as typeof app.PluginStorage
+    app.PluginStorage = storage
     setMockApp(app)
 
     const result = getLockedEnrichSheet()
@@ -743,7 +743,7 @@ describe('getLockedEnrichSheet', () => {
         '{"workbookName":"wb1.xlsx","sheetName":"deletedSheet","sheetIndex":2}',
     })
     const app = createMockApp(workbooks)
-    app.PluginStorage = storage as unknown as typeof app.PluginStorage
+    app.PluginStorage = storage
     setMockApp(app)
 
     const result = getLockedEnrichSheet()
@@ -759,7 +759,7 @@ describe('getLockedEnrichSheet', () => {
 
     const workbooks = createMockWorkbooks([{ Name: 'wb1.xlsx', Sheets: ['Sheet1'] }])
     const app = createMockApp(workbooks)
-    ;(app as unknown as { Workbooks: null }).Workbooks = null as unknown as typeof app.Workbooks
+    ;(app as unknown as { Workbooks: null }).Workbooks = null
     setMockApp(app)
 
     const result = getLockedEnrichSheet()

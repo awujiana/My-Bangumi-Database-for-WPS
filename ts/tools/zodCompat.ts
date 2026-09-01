@@ -13,9 +13,11 @@
  *              真实 zod UMD 到 window.z。
  */
 
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-type _ZodIssue = { message: string; path?: Array<string | number> }
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
+interface _ZodIssue {
+  message: string
+  path?: (string | number)[]
+}
+
 type _ZodLikeParseResult<T> =
   { success: true; data: T } | { success: false; error: { issues: _ZodIssue[] } }
 type ParseResult<T> = _ZodLikeParseResult<T>
@@ -23,10 +25,10 @@ type ParseResult<T> = _ZodLikeParseResult<T>
 function ok<T>(data: T): ParseResult<T> {
   return { success: true, data }
 }
-function fail<T>(msg: string, path?: Array<string | number>): ParseResult<T> {
+function fail<T>(msg: string, path?: (string | number)[]): ParseResult<T> {
   // exactOptionalPropertyTypes: path 为 undefined 时不能把 undefined 赋值给 ? 属性，
   // 因此只有 path 真正有值时才附加该字段
-  const issue: { message: string; path?: Array<string | number> } = { message: msg }
+  const issue: { message: string; path?: (string | number)[] } = { message: msg }
   if (path !== undefined && path.length > 0) issue.path = path
   return { success: false, error: { issues: [issue] } }
 }
@@ -125,35 +127,46 @@ function flu<T extends object>(target: T): T {
 class LiteString implements ZodSchema<string> {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   [k: string]: any
+
   readonly __isZodLite = true as const
+
   /** @internal */ readonly _min: number
+
   /** @internal */ readonly _max: number
+
   constructor(min = 0, max = Infinity) {
     this._min = min
     this._max = max
   }
+
   min(n: number): LiteString {
     return flu(new LiteString(n, this._max))
   }
+
   max(n: number): LiteString {
     return flu(new LiteString(this._min, n))
   }
+
   length(n: number): LiteString {
     return flu(new LiteString(n, n))
   }
+
   optional(): ZodSchema<string | undefined> {
     return flu(new LiteOptional<string>(this))
   }
+
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   default(d: any): AnySchema {
     return flu(new LiteWithDefault<string, unknown>(this, d))
   }
+
   safeParse(input: unknown): ParseResult<string> {
     if (typeof input !== 'string') return fail<string>('expected string')
     if (input.length < this._min) return fail<string>('string shorter than min')
     if (input.length > this._max) return fail<string>('string longer than max')
     return ok(input)
   }
+
   parse(input: unknown): string {
     const r = this.safeParse(input)
     if (!r.success) throw new Error(r.error.issues[0]?.message ?? 'parse failed')
@@ -166,45 +179,61 @@ type LiteNumberSign = 'positive' | 'nonnegative' | 'negative' | 'nonpositive'
 class LiteNumber implements ZodSchema<number> {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   [k: string]: any
+
   readonly __isZodLite = true as const
+
   /** @internal */ readonly _min: number
+
   /** @internal */ readonly _max: number
+
   /** @internal */ readonly _int: boolean
+
   /** @internal */ readonly _sign: LiteNumberSign | undefined
+
   constructor(min = -Infinity, max = Infinity, int = false, sign?: LiteNumberSign) {
     this._min = min
     this._max = max
     this._int = int
     this._sign = sign
   }
+
   min(n: number): LiteNumber {
     return flu(new LiteNumber(Math.max(this._min, n), this._max, this._int, this._sign))
   }
+
   max(n: number): LiteNumber {
     return flu(new LiteNumber(this._min, Math.min(this._max, n), this._int, this._sign))
   }
+
   int(): LiteNumber {
     return flu(new LiteNumber(this._min, this._max, true, this._sign))
   }
+
   positive(): LiteNumber {
     return flu(new LiteNumber(this._min, this._max, this._int, 'positive'))
   }
+
   nonnegative(): LiteNumber {
     return flu(new LiteNumber(this._min, this._max, this._int, 'nonnegative'))
   }
+
   negative(): LiteNumber {
     return flu(new LiteNumber(this._min, this._max, this._int, 'negative'))
   }
+
   nonpositive(): LiteNumber {
     return flu(new LiteNumber(this._min, this._max, this._int, 'nonpositive'))
   }
+
   optional(): ZodSchema<number | undefined> {
     return flu(new LiteOptional<number>(this))
   }
+
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   default(d: any): AnySchema {
     return flu(new LiteWithDefault<number, unknown>(this, d))
   }
+
   safeParse(input: unknown): ParseResult<number> {
     if (typeof input === 'bigint') return fail<number>('unexpected bigint')
     if (typeof input !== 'number' || !Number.isFinite(input))
@@ -220,6 +249,7 @@ class LiteNumber implements ZodSchema<number> {
     if (input > this._max) return fail<number>('number above max')
     return ok(input)
   }
+
   parse(input: unknown): number {
     const r = this.safeParse(input)
     if (!r.success) throw new Error(r.error.issues[0]?.message ?? 'parse failed')
@@ -230,18 +260,23 @@ class LiteNumber implements ZodSchema<number> {
 class LiteBoolean implements ZodSchema<boolean> {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   [k: string]: any
+
   readonly __isZodLite = true as const
+
   optional(): ZodSchema<boolean | undefined> {
     return flu(new LiteOptional<boolean>(this))
   }
+
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   default(d: any): AnySchema {
     return flu(new LiteWithDefault<boolean, unknown>(this, d))
   }
+
   safeParse(input: unknown): ParseResult<boolean> {
     if (typeof input === 'boolean') return ok(input)
     return fail<boolean>('expected boolean')
   }
+
   parse(input: unknown): boolean {
     const r = this.safeParse(input)
     if (!r.success) throw new Error(r.error.issues[0]?.message ?? 'parse failed')
@@ -252,22 +287,29 @@ class LiteBoolean implements ZodSchema<boolean> {
 class LiteLiteral<V extends string | number | boolean> implements ZodSchema<V> {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   [k: string]: any
+
   readonly __isZodLite = true as const
+
   /** @internal */ readonly _val: V
+
   constructor(val: V) {
     this._val = val
   }
+
   optional(): ZodSchema<V | undefined> {
     return flu(new LiteOptional<V>(this))
   }
+
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   default(d: any): AnySchema {
     return flu(new LiteWithDefault<V, unknown>(this, d))
   }
+
   safeParse(input: unknown): ParseResult<V> {
     if (input === this._val) return ok(this._val)
     return fail<V>(`expected literal ${String(this._val)}`)
   }
+
   parse(input: unknown): V {
     const r = this.safeParse(input)
     if (!r.success) throw new Error(r.error.issues[0]?.message ?? 'parse failed')
@@ -278,23 +320,30 @@ class LiteLiteral<V extends string | number | boolean> implements ZodSchema<V> {
 class LiteEnum<V extends string> implements ZodSchema<V> {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   [k: string]: any
+
   readonly __isZodLite = true as const
+
   /** @internal */ readonly _vals: readonly string[]
+
   constructor(vals: readonly string[]) {
     this._vals = vals
   }
+
   optional(): ZodSchema<V | undefined> {
     return flu(new LiteOptional<V>(this))
   }
+
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   default(d: any): AnySchema {
     return flu(new LiteWithDefault<V, unknown>(this, d))
   }
+
   safeParse(input: unknown): ParseResult<V> {
     if (typeof input !== 'string') return fail<V>('enum value must be string')
     if (!this._vals.includes(input)) return fail<V>(`not in enum: ${input}`)
     return ok(input as V)
   }
+
   parse(input: unknown): V {
     const r = this.safeParse(input)
     if (!r.success) throw new Error(r.error.issues[0]?.message ?? 'parse failed')
@@ -306,21 +355,27 @@ class LiteEnum<V extends string> implements ZodSchema<V> {
 class LiteArray<T = any> implements ZodSchema<T[]> {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   [k: string]: any
+
   readonly __isZodLite = true as const
+
   /** @internal */
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   readonly _item: ZodSchema<any>
+
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   constructor(item: ZodSchema<any>) {
     this._item = item
   }
+
   optional(): ZodSchema<T[] | undefined> {
     return flu(new LiteOptional<T[]>(this))
   }
+
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   default(d: any): AnySchema {
     return flu(new LiteWithDefault<T[], unknown>(this, d))
   }
+
   safeParse(input: unknown): ParseResult<T[]> {
     if (!Array.isArray(input)) return fail<T[]>('expected array')
     const out: T[] = []
@@ -333,11 +388,12 @@ class LiteArray<T = any> implements ZodSchema<T[]> {
           ...(issue?.path ?? []),
         ])
       }
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+
       out.push(r.data as T)
     }
     return ok(out)
   }
+
   parse(input: unknown): T[] {
     const r = this.safeParse(input)
     if (!r.success) throw new Error(r.error.issues[0]?.message ?? 'parse failed')
@@ -349,11 +405,15 @@ class LiteArray<T = any> implements ZodSchema<T[]> {
 class LiteObject<T = any> implements ZodSchema<T> {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   [k: string]: any
+
   readonly __isZodLite = true as const
+
   /** @internal */
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   readonly _shape: Record<string, ZodSchema<any>>
+
   /** @internal */ readonly _passthrough: boolean
+
   constructor(
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     shape: Record<string, ZodSchema<any>>,
@@ -362,19 +422,24 @@ class LiteObject<T = any> implements ZodSchema<T> {
     this._shape = shape
     this._passthrough = passthrough
   }
+
   passthrough(): LiteObject<T> {
     return flu(new LiteObject<T>(this._shape, true))
   }
+
   strict(): LiteObject<T> {
     return flu(new LiteObject<T>(this._shape, false))
   }
+
   optional(): ZodSchema<T | undefined> {
     return flu(new LiteOptional<T>(this))
   }
+
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   default(d: any): AnySchema {
     return flu(new LiteWithDefault<T, unknown>(this, d))
   }
+
   safeParse(input: unknown): ParseResult<T> {
     if (typeof input !== 'object' || input === null || Array.isArray(input))
       return fail<T>('expected object')
@@ -384,7 +449,7 @@ class LiteObject<T = any> implements ZodSchema<T> {
     for (const key of Object.keys(this._shape)) {
       const schema = this._shape[key]
       if (!schema) continue
-      const has = Object.prototype.hasOwnProperty.call(src, key)
+      const has = Object.hasOwn(src, key)
       const rawVal = has ? src[key] : undefined
       const r = schema.safeParse(rawVal)
       if (!r.success) {
@@ -398,6 +463,7 @@ class LiteObject<T = any> implements ZodSchema<T> {
     }
     return ok(out as T)
   }
+
   parse(input: unknown): T {
     const r = this.safeParse(input)
     if (!r.success) throw new Error(r.error.issues[0]?.message ?? 'parse failed')
@@ -408,31 +474,40 @@ class LiteObject<T = any> implements ZodSchema<T> {
 class LiteOptional<T> implements ZodSchema<T | undefined> {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   [k: string]: any
+
   readonly __isZodLite = true as const
+
   /** @internal */
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   readonly _inner: ZodSchema<any>
+
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   constructor(inner: ZodSchema<any>) {
     this._inner = inner
   }
+
   optional(): ZodSchema<T | undefined> {
     return this
   }
+
   nullable(): ZodSchema<T | null | undefined> {
     return flu(new LiteNullable<T>(this._inner, true, true))
   }
+
   nullish(): ZodSchema<T | null | undefined> {
     return flu(new LiteNullable<T>(this._inner, true, true))
   }
+
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   default(d: any): AnySchema {
     return flu(new LiteWithDefault<T | undefined, unknown>(this, d))
   }
+
   safeParse(input: unknown): ParseResult<T | undefined> {
     if (input === undefined) return ok(undefined)
     return this._inner.safeParse(input)
   }
+
   parse(input: unknown): T | undefined {
     const r = this.safeParse(input)
     if (!r.success) throw new Error(r.error.issues[0]?.message ?? 'parse failed')
@@ -443,12 +518,17 @@ class LiteOptional<T> implements ZodSchema<T | undefined> {
 class LiteNullable<T> implements ZodSchema<T | null | undefined> {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   [k: string]: any
+
   readonly __isZodLite = true as const
+
   /** @internal */
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   readonly _inner: ZodSchema<any>
+
   /** @internal */ readonly _allowNull: boolean
+
   /** @internal */ readonly _allowUndefined: boolean
+
   constructor(
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     inner: ZodSchema<any>,
@@ -459,18 +539,22 @@ class LiteNullable<T> implements ZodSchema<T | null | undefined> {
     this._allowNull = allowNull
     this._allowUndefined = allowUndefined
   }
+
   optional(): ZodSchema<T | undefined | null> {
     return flu(new LiteNullable<T>(this._inner, this._allowNull, true))
   }
+
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   default(d: any): AnySchema {
     return flu(new LiteWithDefault<T | null | undefined, unknown>(this, d))
   }
+
   safeParse(input: unknown): ParseResult<T | null | undefined> {
     if (this._allowUndefined && input === undefined) return ok(undefined)
     if (this._allowNull && input === null) return ok(null)
     return this._inner.safeParse(input)
   }
+
   parse(input: unknown): T | null | undefined {
     const r = this.safeParse(input)
     if (!r.success) throw new Error(r.error.issues[0]?.message ?? 'parse failed')
@@ -481,11 +565,15 @@ class LiteNullable<T> implements ZodSchema<T | null | undefined> {
 class LiteWithDefault<T, D> implements ZodSchema<T | D> {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   [k: string]: any
+
   readonly __isZodLite = true as const
+
   /** @internal */
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   readonly _inner: ZodSchema<any>
+
   /** @internal */ readonly _def: D
+
   constructor(
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     inner: ZodSchema<any>,
@@ -494,19 +582,23 @@ class LiteWithDefault<T, D> implements ZodSchema<T | D> {
     this._inner = inner
     this._def = def
   }
+
   optional(): ZodSchema<(T | D) | undefined> {
     return flu(new LiteOptional<T | D>(this as unknown as ZodSchema<T | D>))
   }
+
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   default(newDef: any): AnySchema {
     return flu(new LiteWithDefault<T | D, unknown>(this as unknown as ZodSchema<T | D>, newDef))
   }
+
   safeParse(input: unknown): ParseResult<T | D> {
     if (input === undefined) return ok<T | D>(this._def)
     const r = this._inner.safeParse(input)
     if (!r.success) return fail(r.error.issues[0]?.message ?? 'invalid')
     return r
   }
+
   parse(input: unknown): T | D {
     const r = this.safeParse(input)
     if (!r.success) throw new Error(r.error.issues[0]?.message ?? 'parse failed')
@@ -564,7 +656,6 @@ function resolveZod(): LiteZod {
     typeof (cand as { string?: unknown }).string === 'function' &&
     typeof (cand as { object?: unknown }).object === 'function'
   ) {
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-return
     return cand as LiteZod
   }
   return LiteZodImpl

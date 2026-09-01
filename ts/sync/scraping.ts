@@ -87,7 +87,7 @@ function requestPromise(
   signal?: AbortSignal,
 ): Promise<{ status: number; data: unknown; responseText: string }> {
   const startTime = Date.now()
-  if (!xhr.timeout) xhr.timeout = 30000
+  if (!xhr.timeout) xhr.timeout = 30_000
   return new Promise((resolve, reject) => {
     // 如果 signal 已 aborted，立即 reject
     if (signal?.aborted) {
@@ -133,7 +133,7 @@ function xhrGet(
 ): Promise<{ status: number; data: unknown }> {
   const xhr = new XMLHttpRequest()
   xhr.open('GET', url, true)
-  xhr.timeout = 30000
+  xhr.timeout = 30_000
   xhr.setRequestHeader('Authorization', `Bearer ${token}`)
   xhr.setRequestHeader('Content-Type', 'application/json')
   return requestPromise(xhr, signal)
@@ -260,7 +260,7 @@ export async function fetchAllUserCollections(
         if (xhrResult.status === 429) {
           if (retryCount < MAX_RETRY_COUNT) {
             retryCount++
-            const delayMs = BGM_CONFIG.RETRY_DELAY_BASE * Math.pow(2, retryCount - 1)
+            const delayMs = BGM_CONFIG.RETRY_DELAY_BASE * 2 ** (retryCount - 1)
             bgmLog(
               LOG_LEVELS.WARN,
               `[fetchAllUserCollections] API限流，第 ${String(retryCount)} 次重试，等待 ${String(delayMs)}ms...`,

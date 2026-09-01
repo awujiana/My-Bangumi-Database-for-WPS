@@ -165,7 +165,7 @@ export {
     restoreUserInfoFromStorage()
     bgmLog(LOG_LEVELS.INFO, '[refreshPanelUI] UI 已刷新')
   } catch (e: unknown) {
-    bgmLog(LOG_LEVELS.WARN, '[refreshPanelUI] 刷新失败: ' + (e as Error).message)
+    bgmLog(LOG_LEVELS.WARN, `[refreshPanelUI] 刷新失败: ${(e as Error).message}`)
   }
 }
 

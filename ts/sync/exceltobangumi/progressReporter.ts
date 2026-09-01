@@ -26,7 +26,12 @@ export interface SyncTask {
 /**
  * 同步结果统计对象类型（成功/失败/跳过/停止计数，会被 UI 更新层直接修改）
  */
-export type SyncResultStats = { success: number; fail: number; skip: number; stopped: boolean }
+export interface SyncResultStats {
+  success: number
+  fail: number
+  skip: number
+  stopped: boolean
+}
 
 /** 观看状态类型名称映射 (优化点：提取常量) */
 export const TYPE_NAMES: Record<number, string> = {

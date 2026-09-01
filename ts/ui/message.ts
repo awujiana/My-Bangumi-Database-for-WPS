@@ -41,7 +41,7 @@ export function initMessageListener(): void {
     const ALLOWED_ORIGINS = ['https://bgm.tv', window.location.origin]
     if (!ALLOWED_ORIGINS.includes(event.origin)) return
 
-    const data = event.data
+    const { data } = event
     if (!data.type) return
 
     bgmLog(LOG_LEVELS.INFO, `[message] 收到消息: ${data.type}`)
@@ -88,5 +88,5 @@ export function setStatus(message: string, type?: string): void {
   if (!statusEl) return
 
   statusEl.textContent = message
-  statusEl.className = 'status ' + (type || 'info')
+  statusEl.className = `status ${type || 'info'}`
 }

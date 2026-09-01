@@ -17,7 +17,7 @@ export function initGlobalErrorHandler(): void {
 
   if (typeof window !== 'undefined') {
     window.addEventListener('unhandledrejection', (event: PromiseRejectionEvent) => {
-      const reason: unknown = event.reason
+      const { reason } = event
       const message = reason instanceof Error ? reason.message : String(reason)
       console.error('[unhandledrejection]', message)
       event.preventDefault()

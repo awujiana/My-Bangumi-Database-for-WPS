@@ -12,14 +12,8 @@
  *   - util/index.ts：BGM 命名空间、bgmLog、getApp、Token 存储、用户 ID/用户名、辅助函数（shellExecuteByOAAssist、getUrlPath、showBangumiPanel）
  */
 // 直接从源模块导入，打破 util.ts ↔ index.ts 的循环依赖
-import {
-  BGM_CONFIG,
-  LOG_LEVELS,
-  ERROR_LEVELS,
-  ErrorLevel,
-  type ErrorOptions,
-  WPS_ENUM,
-} from '../../core/constants.js'
+import { BGM_CONFIG, LOG_LEVELS, ERROR_LEVELS, ErrorLevel, WPS_ENUM } from '../../core/constants.js'
+import type { ErrorOptions } from '../../core/constants.js'
 import { BgmError } from '../../core/result.js'
 import type {
   BGMCache,
@@ -28,12 +22,15 @@ import type {
   BGMUserInfo,
   EnrichWorkbookState,
 } from '../../core/types.js'
-import { showConfirm, showToast, type DialogOptions } from '../../ui/dialog.js'
 import {
+  showConfirm,
+  showToast,
   showAlert as customShowAlert,
   showError as customShowError,
   showInput as customShowInput,
 } from '../../ui/dialog.js'
+import type { DialogOptions } from '../../ui/dialog.js'
+
 import { syncAllRows } from '../../ui/preview.js'
 // 类型只从 index.js 导入（type-only import 不会产生运行时循环依赖）
 import { BGM_EVENTS, eventBus } from '../events.js'
@@ -41,7 +38,8 @@ import { BGM_EVENTS, eventBus } from '../events.js'
 import { logger } from '../logger.js'
 import { colNumToLetter, trim, escapeHtml, calcFingerprint } from '../stringUtils.js'
 // 日志模块：bgmLog 内部通过 logger 输出，自动脱敏敏感信息，且不污染全局 console
-import { isWpsApp, type WpsApplication, type WpsWorksheet } from '../wps.js'
+import { isWpsApp } from '../wps.js'
+import type { WpsApplication, WpsWorksheet } from '../wps.js'
 
 // re-export 字符串工具保持向后兼容
 export { colNumToLetter, trim, escapeHtml, calcFingerprint }
@@ -319,20 +317,20 @@ export const BGM: {
   LOG_LEVEL: LOG_LEVELS.INFO,
 
   // 日志级别常量
-  LOG_LEVELS: LOG_LEVELS,
+  LOG_LEVELS,
 
   // 错误级别常量
-  ERROR_LEVELS: ERROR_LEVELS,
+  ERROR_LEVELS,
 
   // 错误级别枚举
-  ErrorLevel: ErrorLevel,
+  ErrorLevel,
 
   // BGM 错误类
-  BgmError: BgmError,
+  BgmError,
 
   // 统一对话框
   Dialog: {
-    alert: function (title: string, message: string): void {
+    alert(title: string, message: string): void {
       if (typeof window !== 'undefined') {
         const win = window as unknown as BgmWindowGlobals
         if (win.BGMDialog !== undefined) {
@@ -347,14 +345,10 @@ export const BGM: {
       // 使用自定义对话框
       customShowAlert(message, title)
     },
-    confirm: function (
-      message: string,
-      callback: (confirmed: boolean) => void,
-      title?: string,
-    ): void {
+    confirm(message: string, callback: (confirmed: boolean) => void, title?: string): void {
       showConfirm(message, callback, title)
     },
-    error: function (title: string, message: string): void {
+    error(title: string, message: string): void {
       if (typeof window !== 'undefined') {
         const win = window as unknown as BgmWindowGlobals
         if (win.BGMDialog !== undefined) {
@@ -369,7 +363,7 @@ export const BGM: {
       // 使用自定义对话框
       customShowError(message, title)
     },
-    input: function (
+    input(
       title: string,
       prompt: string,
       defaultValue?: string,
@@ -398,7 +392,7 @@ export const BGM: {
         onCancel,
       )
     },
-    show: function (
+    show(
       type: 'alert' | 'confirm' | 'error' | 'input',
       title: string,
       message: string,
@@ -436,16 +430,11 @@ export const BGM: {
     },
   },
 
-  showAlert: function (title: string, message: string): void {
+  showAlert(title: string, message: string): void {
     BGM.Dialog.alert(title, message)
   },
 
-  showConfirm: function (
-    title: string,
-    message: string,
-    onConfirm?: () => void,
-    onCancel?: () => void,
-  ): void {
+  showConfirm(title: string, message: string, onConfirm?: () => void, onCancel?: () => void): void {
     BGM.Dialog.confirm(
       message,
       (confirmed: boolean) => {
@@ -460,7 +449,7 @@ export const BGM: {
   },
 
   // 统一错误处理
-  handleError: function (error: unknown, options?: ErrorOptions): BgmError {
+  handleError(error: unknown, options?: ErrorOptions): BgmError {
     const opts: ErrorOptions = {
       level: ErrorLevel.ERROR,
       showAlert: false,
@@ -508,7 +497,7 @@ export const BGM: {
   },
 
   // 安全执行函数
-  safeExecute: function <T>(fn: () => T, context?: string, options?: ErrorOptions): T | BgmError {
+  safeExecute<T>(fn: () => T, context?: string, options?: ErrorOptions): T | BgmError {
     try {
       return fn()
     } catch (error) {
@@ -729,30 +718,30 @@ export function getTokenRemainingTime(expires: number): {
   const absSeconds = Math.abs(diffSeconds)
 
   if (diffSeconds <= 0) {
-    const days = Math.floor(absSeconds / 86400)
-    const hours = Math.floor((absSeconds % 86400) / 3600)
+    const days = Math.floor(absSeconds / 86_400)
+    const hours = Math.floor((absSeconds % 86_400) / 3600)
     return {
       days,
       hours,
       totalSeconds: absSeconds,
       status: 'expired',
-      label: `已过期 ${days > 0 ? String(days) + '天' : String(hours) + '小时'}`,
+      label: `已过期 ${days > 0 ? `${String(days)}天` : `${String(hours)}小时`}`,
     }
   }
 
-  const days = Math.floor(diffSeconds / 86400)
-  const hours = Math.floor((diffSeconds % 86400) / 3600)
+  const days = Math.floor(diffSeconds / 86_400)
+  const hours = Math.floor((diffSeconds % 86_400) / 3600)
 
   let status: 'normal' | 'warning' | 'danger' = 'normal'
   let label = `${String(days)}天${String(hours)}小时后过期`
 
-  if (diffSeconds < 86400) {
+  if (diffSeconds < 86_400) {
     status = 'danger'
     label = `${String(hours)}小时后过期`
-  } else if (diffSeconds < 86400 * 3) {
+  } else if (diffSeconds < 86_400 * 3) {
     status = 'danger'
     label = `${String(days)}天${String(hours)}小时后过期`
-  } else if (diffSeconds < 86400 * 7) {
+  } else if (diffSeconds < 86_400 * 7) {
     status = 'warning'
     label = `${String(days)}天后过期`
   }
@@ -931,14 +920,14 @@ export function _fetchBgmUserInfo(
     return
   }
 
-  const apiUrl = BGM_CONFIG.API_BASE + '/v0/me'
+  const apiUrl = `${BGM_CONFIG.API_BASE}/v0/me`
   bgmLog(LOG_LEVELS.INFO, `[_fetchBgmUserInfo] API 路由: ${apiUrl}`)
 
   const xhr = new XMLHttpRequest()
   xhr.open('GET', apiUrl, true)
-  xhr.setRequestHeader('Authorization', 'Bearer ' + token)
+  xhr.setRequestHeader('Authorization', `Bearer ${token}`)
   xhr.setRequestHeader('Content-Type', 'application/json')
-  xhr.timeout = 15000 // 15 秒超时，便于快速感知网络问题
+  xhr.timeout = 15_000 // 15 秒超时，便于快速感知网络问题
 
   // AbortSignal 支持：监听 abort 事件触发 xhr.abort()
   if (signal) {
@@ -998,8 +987,7 @@ export function _fetchBgmUserInfo(
           `[_fetchBgmUserInfo] 获取用户信息成功: userId=${userId}, username=${username}, hasAvatar=${String(!!avatarUrl)}`,
         )
 
-        if (callback)
-          callback({ id: userId, username: username, avatarUrl: avatarUrl || undefined }, 'none')
+        if (callback) callback({ id: userId, username, avatarUrl: avatarUrl || undefined }, 'none')
       } catch (e: unknown) {
         bgmLog(LOG_LEVELS.ERROR, `[_fetchBgmUserInfo] 解析响应失败: ${(e as Error).message}`)
         if (callback) callback(null, 'parse')
@@ -1105,7 +1093,7 @@ export function showBangumiPanel(): void {
   const tsId = app.PluginStorage?.getItem('panel_id')
   let becameVisible = false
   if (!tsId) {
-    const tskpane = app.CreateTaskPane?.(getUrlPath() + '/ui/panel.html')
+    const tskpane = app.CreateTaskPane?.(`${getUrlPath()}/ui/panel.html`)
     if (tskpane) {
       const id = tskpane.ID
       app.PluginStorage?.setItem('panel_id', id)
@@ -1152,7 +1140,7 @@ export function showEnrichPanel(): void {
   }
   const tsId = app.PluginStorage?.getItem('enrich_pane_id')
   if (!tsId) {
-    const tskpane = app.CreateTaskPane?.(getUrlPath() + '/ui/enrich.html')
+    const tskpane = app.CreateTaskPane?.(`${getUrlPath()}/ui/enrich.html`)
     if (tskpane) {
       const id = tskpane.ID
       app.PluginStorage?.setItem('enrich_pane_id', id)
@@ -1209,7 +1197,7 @@ export function showSettingsPanel(): void {
 
   if (!settingsId) {
     // 首次创建设置面板
-    const settingsPane = app.CreateTaskPane?.(getUrlPath() + '/ui/settings.html')
+    const settingsPane = app.CreateTaskPane?.(`${getUrlPath()}/ui/settings.html`)
     if (settingsPane) {
       settingsPane.DockPosition = targetPosition
       settingsPane.Visible = true

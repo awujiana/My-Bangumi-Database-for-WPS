@@ -365,7 +365,7 @@ export function readNewAnimeRow(
 ): Record<string, string> {
   const data: Record<string, string> = {}
   data['名称'] = getCellValue(sheet, row, mapping.nameCol) || ''
-  if (mapping.tagsCol) data['TAGS'] = getCellValue(sheet, row, mapping.tagsCol) || ''
+  if (mapping.tagsCol) data.TAGS = getCellValue(sheet, row, mapping.tagsCol) || ''
   if (mapping.premiereCol) data['首播'] = getCellValue(sheet, row, mapping.premiereCol) || ''
   if (mapping.episodesCol) data['集数'] = getCellValue(sheet, row, mapping.episodesCol) || ''
   if (mapping.weekdayCol) data['周更时间'] = getCellValue(sheet, row, mapping.weekdayCol) || ''
@@ -447,9 +447,9 @@ export function matchEntries(
     const [nameIndex, aliasIndex, rowNames] = buildBangumiIndexes(bangumiSheet, bangumiColMap)
 
     const lastRow = getLastRow(newAnimeSheet)
-    const dataStartRow = config.dataStartRow
+    const { dataStartRow } = config
 
-    const nameCol = config.columnMapping.nameCol
+    const { nameCol } = config.columnMapping
     if (nameCol === 0) {
       bgmLog(LOG_LEVELS.ERROR, '[matchEntries] 新番表未找到名称列，无法匹配')
       return results
@@ -548,7 +548,7 @@ export function enrichTags(
   const bangumiTagsCol = colMap.get('标签/分级') || colMap.get('标签')
   if (!bangumiTagsCol) return
 
-  const newTags = newData['TAGS'] || ''
+  const newTags = newData.TAGS || ''
   if (isEmptyValue(newTags)) return
 
   const oldTags = getCellValue(sheet, row, bangumiTagsCol)
@@ -795,7 +795,7 @@ export function enrichEntries(
       continue
     }
 
-    const bangumiRow = match.bangumiRow
+    const { bangumiRow } = match
     if (bangumiRow === undefined) {
       results.push({
         kind: 'error',
@@ -1070,7 +1070,7 @@ export function ensureBangumiColumns(
     if (col > maxCol) maxCol = col
   }
 
-  const missing: Array<{ field: string; sourceKey: string }> = []
+  const missing: { field: string; sourceKey: string }[] = []
   for (const [sourceKey, targetName] of Object.entries(requiredFields)) {
     if (!updatedMap.has(targetName)) {
       missing.push({ field: targetName, sourceKey })
@@ -1257,7 +1257,7 @@ export function enrichIntroData(
       const value = newData[key] || ''
       if (!isEmptyValue(value)) {
         const label = key === '简介' ? '简介' : key
-        const display = key === '简介' && value.length > 80 ? value.substring(0, 80) + '...' : value
+        const display = key === '简介' && value.length > 80 ? `${value.substring(0, 80)}...` : value
         featureParts.push(`${label}:${display}`)
       }
     }
@@ -1306,17 +1306,17 @@ export function enrichOpEdPv(
 
   const parts: string[] = []
 
-  const op = newData['OP'] || ''
+  const op = newData.OP || ''
   if (!isEmptyValue(op)) {
     parts.push(`OP:${op}`)
   }
 
-  const ed = newData['ED'] || ''
+  const ed = newData.ED || ''
   if (!isEmptyValue(ed)) {
     parts.push(`ED:${ed}`)
   }
 
-  const pv = newData['PV'] || ''
+  const pv = newData.PV || ''
   if (!isEmptyValue(pv)) {
     parts.push(`PV:${pv}`)
   }
@@ -1374,9 +1374,9 @@ export function readIntroSheetRow(
   if (mapping.directorCol) data['导演'] = getCellValue(sheet, row, mapping.directorCol) || ''
   if (mapping.musicCol) data['音乐'] = getCellValue(sheet, row, mapping.musicCol) || ''
   if (mapping.voiceCol) data['声优'] = getCellValue(sheet, row, mapping.voiceCol) || ''
-  if (mapping.opCol) data['OP'] = getCellValue(sheet, row, mapping.opCol) || ''
-  if (mapping.edCol) data['ED'] = getCellValue(sheet, row, mapping.edCol) || ''
-  if (mapping.pvCol) data['PV'] = getCellValue(sheet, row, mapping.pvCol) || ''
+  if (mapping.opCol) data.OP = getCellValue(sheet, row, mapping.opCol) || ''
+  if (mapping.edCol) data.ED = getCellValue(sheet, row, mapping.edCol) || ''
+  if (mapping.pvCol) data.PV = getCellValue(sheet, row, mapping.pvCol) || ''
   if (mapping.screenplayCol) data['编剧'] = getCellValue(sheet, row, mapping.screenplayCol) || ''
   if (mapping.characterDesignCol)
     data['人设'] = getCellValue(sheet, row, mapping.characterDesignCol) || ''
@@ -1473,7 +1473,7 @@ export function enrichAlias(
 export interface SearchResult {
   row: number
   name: string
-  fieldMatches: Array<{ column: string; value: string }>
+  fieldMatches: { column: string; value: string }[]
 }
 
 /**
@@ -1567,8 +1567,8 @@ export async function fetchRemoteFile(config: RemoteRepoConfig): Promise<string 
  * 解析远程文件内容为 Excel 可导入格式
  * 支持 CSV/TSV 纯文本格式，不受中间列干扰
  */
-export function parseRemoteContent(content: string): Array<Record<string, string>> {
-  const records: Array<Record<string, string>> = []
+export function parseRemoteContent(content: string): Record<string, string>[] {
+  const records: Record<string, string>[] = []
   if (!content) return records
   const lines = content.split(/\r?\n/).filter((line) => line.trim())
 
@@ -1605,7 +1605,7 @@ export function parseRemoteContent(content: string): Array<Record<string, string
  */
 export function writeRemoteDataToSheet(
   sheet: WpsWorksheet,
-  data: Array<Record<string, string>>,
+  data: Record<string, string>[],
   colMap: Map<string, number>,
   startRow: number,
 ): number {

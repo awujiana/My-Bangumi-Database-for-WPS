@@ -68,7 +68,7 @@ describe('calcChecksum', () => {
   })
 
   it('超长字符串（10000 字符）返回有效且稳定的校验和', () => {
-    const longStr = 'a'.repeat(10000)
+    const longStr = 'a'.repeat(10_000)
     const cs1 = calcChecksum(longStr)
     const cs2 = calcChecksum(longStr)
     expect(cs1).toBe(cs2)
@@ -169,7 +169,7 @@ describe('crypto 综合场景', () => {
   })
 
   it('多次往返：buildPayload → extract 重复验证', () => {
-    const original = 'token-' + Date.now()
+    const original = `token-${Date.now()}`
     for (let i = 0; i < 5; i++) {
       const payload = buildPayload(original)
       const extracted = extractToken(payload)

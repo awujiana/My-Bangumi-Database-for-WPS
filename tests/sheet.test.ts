@@ -14,7 +14,7 @@ const { PANEL_CONFIG, HEADER_KEYWORDS, COLUMN_RULES, STANDARD_HEADERS, colNumToL
       'name',
       'title',
     ]
-    const COLUMN_RULES: ReadonlyArray<readonly [RegExp, string]> = [
+    const COLUMN_RULES: readonly (readonly [RegExp, string])[] = [
       [/序列号|序号|编号/i, '序列号'],
       [/名称|标题|作品名/i, '名称'],
       [/bangumi.*url|url|链接|地址/i, 'Bangumi_URL'],
@@ -374,12 +374,12 @@ describe('getLastRow', () => {
 
   it('应在 ws 为 null 时返回默认值 50000', () => {
     const result = getLastRow(null)
-    expect(result).toBe(50000)
+    expect(result).toBe(50_000)
   })
 
   it('应在 ws 为 undefined 时返回默认值 50000', () => {
     const result = getLastRow(undefined)
-    expect(result).toBe(50000)
+    expect(result).toBe(50_000)
   })
 
   it('D 列 End 成功时返回正确行号', () => {
@@ -470,7 +470,7 @@ describe('getLastRow', () => {
     }
     ws.Range = vi.fn(() => failCell)
     const result = getLastRow(ws)
-    expect(result).toBe(50000)
+    expect(result).toBe(50_000)
   })
 
   it('forceRefresh 为 true 时应清除缓存', () => {
@@ -495,9 +495,9 @@ describe('getLastRow', () => {
       End: vi.fn().mockReturnValue({ Row: 40 }),
     }
     ws.Range = vi.fn(() => anchorCell)
-    vi.mocked(getCellValue).mockImplementation((_ws: unknown, _row: unknown, col: unknown) => {
-      return col === 1 ? '序列号' : ''
-    })
+    vi.mocked(getCellValue).mockImplementation((_ws: unknown, _row: unknown, col: unknown) =>
+      col === 1 ? '序列号' : '',
+    )
     const result = getLastRow(ws, false, 1)
     expect(result).toBeDefined()
   })

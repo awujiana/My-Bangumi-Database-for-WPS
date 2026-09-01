@@ -1,4 +1,5 @@
-import { z, type infer as zInfer } from '../tools/zodCompat.js'
+import { z } from '../tools/zodCompat.js'
+import type { infer as zInfer } from '../tools/zodCompat.js'
 
 /**
  * GitHub 同步条目 Schema（与 GithubRemoteEntry 接口保持一致）

@@ -1,4 +1,5 @@
-import { z, type infer as zInfer, type ZodSchema } from '../tools/zodCompat.js'
+import { z } from '../tools/zodCompat.js'
+import type { infer as zInfer, ZodSchema } from '../tools/zodCompat.js'
 
 /** Bangumi 用户信息 Schema */
 export const BgmUserSchema = z.object({

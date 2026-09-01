@@ -32,8 +32,8 @@ const mockState = vi.hoisted(() => ({
   bgmLog: vi.fn(),
   getCellValue: vi.fn(),
   BGM: {
-    sheet: { isLocked: false as boolean, lockedIndex: null as number | null },
-    cache: {} as Record<string, unknown>,
+    sheet: { isLocked: false, lockedIndex: null as number | null },
+    cache: {},
     handleError: vi.fn(),
     ErrorLevel: { SILENT: 0, WARN: 1, ERROR: 2, THROW: 3, INFO: 4 },
   },
@@ -91,7 +91,7 @@ function createMockWorksheet(opts: MockWorksheetOptions): unknown {
         return r != null ? { Row: r } : null
       },
     }),
-    Rows: { Count: opts.rowsCount ?? 100000 },
+    Rows: { Count: opts.rowsCount ?? 100_000 },
     UsedRange: opts.usedRange ?? null,
     Activate: opts.activate ?? vi.fn(),
   }
@@ -153,8 +153,8 @@ describe('isEmptyValue', () => {
   })
 
   it('数字与布尔值视为非空', () => {
-    expect(isEmptyValue(0 as unknown)).toBe(false)
-    expect(isEmptyValue(false as unknown)).toBe(false)
+    expect(isEmptyValue(0)).toBe(false)
+    expect(isEmptyValue(false)).toBe(false)
   })
 })
 
@@ -434,12 +434,12 @@ describe('getLastRow', () => {
       usedRange: null,
     })
     const lastRow = getLastRow(ws as never)
-    expect(lastRow).toBe(50000)
+    expect(lastRow).toBe(50_000)
   })
 
   it('ws 为 null 时返回默认值 50000', () => {
     const lastRow = getLastRow(null)
-    expect(lastRow).toBe(50000)
+    expect(lastRow).toBe(50_000)
   })
 
   it('提供 headerRow 时尝试自动选择锚定列', () => {

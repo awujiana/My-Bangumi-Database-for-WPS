@@ -1,11 +1,10 @@
-﻿/**
+/**
  * UI 事件处理模块 - 同步相关
  * @module ui/handlers/sync
  * @description 从面板同步到 Bangumi、从 BGM API 同步收藏标记等。
  */
 
 import {
-  type SyncRecord,
   LOG_LEVELS,
   bgmLog,
   BGM,
@@ -37,11 +36,10 @@ import {
   updateSyncProgressDialog,
   completeSyncProgressDialog,
   hideSyncProgressDialog,
-  type SyncProgressStats,
-  type SyncConfigSummary,
   buildSyncConfig,
   formatDuration,
 } from '../../index.js'
+import type { SyncRecord, SyncProgressStats, SyncConfigSummary } from '../../index.js'
 import { getSyncPreview, detectConflicts } from '../../services/ribbonService.js'
 import { ensureSheetHeaders } from '../../tools/util/index.js'
 import type { WpsApplication, WpsWorksheet } from '../../tools/wps.js'
@@ -70,7 +68,7 @@ interface BangumiCollectionItem {
 /**
  * 同步准备结果：包含执行同步所需的全部上下文。
  */
-type SyncPreparedData = {
+interface SyncPreparedData {
   ws: WpsWorksheet
   colMap: Map<string, number>
   token: string
@@ -100,10 +98,10 @@ async function _fillSheetWithCollections(
 
   for (let i = 0; i < total; i++) {
     const item = collections[i]
-    if (!item || !item.subject_id) continue
+    if (!item?.subject_id) continue
 
     const row = headerRow + 1 + i
-    const subject = item.subject
+    const { subject } = item
     const name = subject?.name_cn || subject?.name || ''
     const alias = subject?.name_cn && subject.name ? subject.name : ''
     const url = `https://bgm.tv/subject/${String(item.subject_id)}`
@@ -351,7 +349,7 @@ async function confirmAndExecuteSync(prepared: SyncPreparedData): Promise<boolea
   const conflictStrategy = conflictSelect?.value || 'skip'
   bgmLog(LOG_LEVELS.INFO, `[syncFromPanel] 冲突策略: ${conflictStrategy}`)
 
-  let conflictSids: Set<string> | undefined = undefined
+  let conflictSids: Set<string> | undefined
   let conflictMsg = ''
   try {
     bgmLog(LOG_LEVELS.INFO, '[syncFromPanel] 开始检测冲突...')
@@ -481,14 +479,14 @@ async function confirmAndExecuteSync(prepared: SyncPreparedData): Promise<boolea
           `失败 ${String(result.fail)} 条`,
           `跳过 ${String(result.skip)} 条`,
           `⏱️ 耗时: ${formatDuration(totalElapsed)}`,
-          `⚡ 平均速度: ${avgSpeed > 0 ? String(avgSpeed) + ' 行/秒' : '--'}`,
+          `⚡ 平均速度: ${avgSpeed > 0 ? `${String(avgSpeed)} 行/秒` : '--'}`,
         ]
       : [
           `成功 ${String(result.success)} 条`,
           `失败 ${String(result.fail)} 条`,
           `跳过 ${String(result.skip)} 条`,
           `⏱️ 耗时: ${formatDuration(totalElapsed)}`,
-          `⚡ 平均速度: ${avgSpeed > 0 ? String(avgSpeed) + ' 行/秒' : '--'}`,
+          `⚡ 平均速度: ${avgSpeed > 0 ? `${String(avgSpeed)} 行/秒` : '--'}`,
         ]
     // 构造 SyncProgressStats 用于图表渲染（将 Bangumi 同步的 success 映射为 added）
     const stats: SyncProgressStats = {
@@ -673,7 +671,7 @@ async function _doAPISync(
   setStatus('正在验证 Token...', 'info')
   const verifyResult = await verifyToken(token)
   if (!verifyResult.valid) {
-    showAlert('✘ ' + verifyResult.message)
+    showAlert(`✘ ${verifyResult.message}`)
     return
   }
   _setBgmUserId(verifyResult.userId || '')
@@ -832,7 +830,7 @@ async function _doAPISync(
       if (typeof addSyncRecord === 'function') {
         addSyncRecord({
           name: itemName,
-          url: 'https://bgm.tv/subject/' + String(item.subject_id),
+          url: `https://bgm.tv/subject/${String(item.subject_id)}`,
           sid: String(item.subject_id),
           type: BGM_SUBJECT_TYPES[item.subject_type || 2] ?? '',
           content: '标记同步',
@@ -896,7 +894,7 @@ async function _doAPISync(
       if (sid && collectionMap.has(sid)) {
         const seqCol = colMap.get('序列号') || 9
         const seqCell = getCell(ws, row, seqCol)
-        if (seqCell && seqCell.Interior) {
+        if (seqCell?.Interior) {
           const syncCount = syncCountMap.get(sid) || 0
           seqCell.Interior.Color =
             syncCount === 1
@@ -943,7 +941,7 @@ async function _doAPISync(
       `匹配标记数: ${String(matchedCount)}`,
       `同步记录条数: ${String(syncRecords.length)}`,
       `⏱️ 耗时: ${formatDuration(totalElapsed)}`,
-      `⚡ 平均速度: ${avgSpeed > 0 ? String(avgSpeed) + ' 行/秒' : '--'}`,
+      `⚡ 平均速度: ${avgSpeed > 0 ? `${String(avgSpeed)} 行/秒` : '--'}`,
     ]
     if (wasStopped) detailsArr.unshift('⚠️ 同步被用户停止')
     const stats: SyncProgressStats = {

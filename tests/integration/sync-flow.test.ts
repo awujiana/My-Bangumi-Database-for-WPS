@@ -250,12 +250,11 @@ vi.mock('../../ts/sync/syncSourceRegistry.js', async () => {
 import { SyncToBangumiAsync } from '../../ts/sync/exceltobangumi/index.js'
 import { syncFromGithub, applyDiffToSheet } from '../../ts/sync/githubSync.js'
 import { syncFromRemote } from '../../ts/sync/syncSourceRegistry.js'
-import {
-  computeDiff,
-  parseJsonl,
-  type GithubRemoteEntry,
-  type LocalRowEntry,
-  type SyncStrategy,
+import { computeDiff, parseJsonl } from '../../ts/sync/githubSyncDiff.js'
+import type {
+  GithubRemoteEntry,
+  LocalRowEntry,
+  SyncStrategy,
 } from '../../ts/sync/githubSyncDiff.js'
 import { clearUndoStack } from '../../ts/sync/undoStack.js'
 import type { SyncSource } from '../../ts/sync/SyncSource.js'
@@ -286,7 +285,7 @@ function createMockSyncSource(entries: GithubRemoteEntry[]): SyncSource {
 
 /** 构造本地行条目映射 */
 function createLocalEntries(
-  entries: Array<{ row: number; sid: string; fields: Record<string, string> }>,
+  entries: { row: number; sid: string; fields: Record<string, string> }[],
 ): Map<string, LocalRowEntry> {
   const map = new Map<string, LocalRowEntry>()
   for (const e of entries) {
@@ -655,17 +654,14 @@ describe('GitHub 同步流程：fetch JSONL → diff → apply → undo', () => 
 
   it('完整流程：fetch JSONL → computeDiff → applyDiffToSheet → undoLastSync', async () => {
     // 1. 构造远程 JSONL 数据（2 条：1 条新增，1 条更新）
-    const jsonlText =
-      JSON.stringify({
-        sid: '10001',
-        name: '新条目',
-        meta_tags: ['标签1'],
-      }) +
-      '\n' +
-      JSON.stringify({
-        sid: '10002',
-        name: '更新名称',
-      })
+    const jsonlText = `${JSON.stringify({
+      sid: '10001',
+      name: '新条目',
+      meta_tags: ['标签1'],
+    })}\n${JSON.stringify({
+      sid: '10002',
+      name: '更新名称',
+    })}`
 
     // 2. 解析 JSONL
     const { entries, errors } = parseJsonl(jsonlText)
@@ -713,7 +709,7 @@ describe('GitHub 同步流程：fetch JSONL → diff → apply → undo', () => 
 
     // 验证同步记录被批量写入：2 条差异（1 新增 + 1 更新）+ 1 条汇总
     expect(mockState.addSyncRecords).toHaveBeenCalled()
-    const records = mockState.addSyncRecords.mock.calls[0]?.[0] as Array<Record<string, unknown>>
+    const records = mockState.addSyncRecords.mock.calls[0]?.[0] as Record<string, unknown>[]
     expect(records).toHaveLength(2)
     expect(records?.some((r) => r.content === '仓库同步-新增' && r.sid === '10001')).toBe(true)
     expect(records?.some((r) => r.content === '仓库同步-更新' && r.sid === '10002')).toBe(true)

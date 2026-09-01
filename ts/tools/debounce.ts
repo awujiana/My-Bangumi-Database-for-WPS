@@ -12,7 +12,7 @@
  */
 export function debounce<T extends (...args: unknown[]) => unknown>(
   fn: T,
-  delay: number = 300,
+  delay = 300,
 ): (...args: Parameters<T>) => void {
   let timerId: ReturnType<typeof setTimeout> | null = null
   return (...args: Parameters<T>): void => {
@@ -33,7 +33,7 @@ export function debounce<T extends (...args: unknown[]) => unknown>(
  */
 export function throttle<T extends (...args: unknown[]) => unknown>(
   fn: T,
-  interval: number = 300,
+  interval = 300,
 ): (...args: Parameters<T>) => void {
   let lastTime = 0
   let timerId: ReturnType<typeof setTimeout> | null = null

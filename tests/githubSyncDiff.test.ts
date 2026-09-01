@@ -401,7 +401,7 @@ describe('SYNC_STRATEGY_LABELS', () => {
     expect(SYNC_STRATEGY_LABELS['add-update']).toBe('新增+更新（不删除）')
     expect(SYNC_STRATEGY_LABELS['add-only']).toBe('仅新增')
     expect(SYNC_STRATEGY_LABELS['update-only']).toBe('仅更新')
-    expect(SYNC_STRATEGY_LABELS['mirror']).toBe('镜像同步（含删除）')
+    expect(SYNC_STRATEGY_LABELS.mirror).toBe('镜像同步（含删除）')
     expect(SYNC_STRATEGY_LABELS['force-overwrite']).toBe('强制覆盖')
   })
 })

@@ -172,7 +172,7 @@ describe('isIntroSheet 判断逻辑', () => {
 // ========== INTRO_FIELD_TO_BANGUMI 映射完整性测试 ==========
 
 describe('INTRO_FIELD_TO_BANGUMI 映射完整性', () => {
-  const requiredMappings: Array<[string, string]> = [
+  const requiredMappings: [string, string][] = [
     ['导演', '导演'],
     ['编剧', '脚本'],
     ['人设', '人物设定'],
@@ -257,23 +257,23 @@ function simulateEnrichIntroData(
   newData: Record<string, string>,
   colMap: Map<string, number>,
 ): {
-  enriched: Array<{
+  enriched: {
     field: string
     col: number
     oldValue: string | null
     newValue: string
     action: 'fill' | 'append' | 'skip'
-  }>
-  conflicts: Array<{ field: string; col: number; oldValue: string; newValue: string }>
+  }[]
+  conflicts: { field: string; col: number; oldValue: string; newValue: string }[]
 } {
-  const enriched: Array<{
+  const enriched: {
     field: string
     col: number
     oldValue: string | null
     newValue: string
     action: 'fill' | 'append' | 'skip'
-  }> = []
-  const conflicts: Array<{ field: string; col: number; oldValue: string; newValue: string }> = []
+  }[] = []
+  const conflicts: { field: string; col: number; oldValue: string; newValue: string }[] = []
 
   const bangumiFeatureCol = colMap.get('特点/印象')
 
@@ -333,7 +333,7 @@ function simulateEnrichIntroData(
       const value = newData[key] || ''
       if (!isEmptyValue(value)) {
         const label = key === '简介' ? '简介' : key
-        const display = key === '简介' && value.length > 80 ? value.substring(0, 80) + '...' : value
+        const display = key === '简介' && value.length > 80 ? `${value.substring(0, 80)}...` : value
         featureParts.push(`${label}:${display}`)
       }
     }
@@ -563,29 +563,29 @@ function simulateEnrichOpEdPv(
   row: number,
   newData: Record<string, string>,
   colMap: Map<string, number>,
-): Array<{
+): {
   field: string
   col: number
   oldValue: string | null
   newValue: string
   action: 'fill' | 'append' | 'skip'
-}> {
-  const enriched: Array<{
+}[] {
+  const enriched: {
     field: string
     col: number
     oldValue: string | null
     newValue: string
     action: 'fill' | 'append' | 'skip'
-  }> = []
+  }[] = []
   const bangumiFeatureCol = colMap.get('特点/印象')
   if (!bangumiFeatureCol) return enriched
 
   const parts: string[] = []
-  const op = newData['OP'] || ''
+  const op = newData.OP || ''
   if (!isEmptyValue(op)) parts.push(`OP:${op}`)
-  const ed = newData['ED'] || ''
+  const ed = newData.ED || ''
   if (!isEmptyValue(ed)) parts.push(`ED:${ed}`)
-  const pv = newData['PV'] || ''
+  const pv = newData.PV || ''
   if (!isEmptyValue(pv)) parts.push(`PV:${pv}`)
 
   if (parts.length === 0) return enriched

@@ -14,11 +14,14 @@
  */
 export class RingBuffer<T> {
   private buffer: T[]
+
   private head = 0 // 下一个写入位置
+
   private _size = 0 // 当前元素数
+
   private readonly capacity: number
 
-  constructor(capacity: number = 1000) {
+  constructor(capacity = 1000) {
     this.capacity = Math.max(1, capacity)
     this.buffer = new Array<T>(this.capacity)
   }

@@ -29,8 +29,8 @@ const mockParseJsonl = vi.hoisted(() =>
     // 默认使用真实实现
     if (realImpls.parseJsonl) return realImpls.parseJsonl(text)
     // 回退：简单实现
-    const entries: Array<Record<string, unknown>> = []
-    const errors: Array<{ line: number; message: string }> = []
+    const entries: Record<string, unknown>[] = []
+    const errors: { line: number; message: string }[] = []
     const lines = text.split(/\r?\n/)
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i]!.trim()
@@ -52,7 +52,7 @@ const mockParseJsonl = vi.hoisted(() =>
 const mockComputeDiff = vi.hoisted(() =>
   vi.fn().mockImplementation(
     (
-      remote: Array<{
+      remote: {
         sid: string
         name?: string
         updatedAt?: string
@@ -60,14 +60,14 @@ const mockComputeDiff = vi.hoisted(() =>
         meta_tags?: string[]
         nsfw?: boolean
         [key: string]: unknown
-      }>,
+      }[],
       local: Map<string, { row: number; sid: string; fields: Record<string, string> }>,
       strategy?: string,
       timeFilter?: unknown,
     ) => {
       // 默认使用真实实现
       if (realImpls.computeDiff) {
-        return realImpls.computeDiff(remote as never, local, strategy as never, timeFilter as never)
+        return realImpls.computeDiff(remote, local, strategy as never, timeFilter as never)
       }
       return []
     },
@@ -95,12 +95,19 @@ const mockXHR = vi.hoisted(() => {
 
   class MockXhrInstance {
     status = 0
+
     statusText = ''
+
     responseText = ''
+
     onload: ((...args: unknown[]) => void) | null = null
+
     onerror: ((...args: unknown[]) => void) | null = null
+
     ontimeout: ((...args: unknown[]) => void) | null = null
+
     open = vi.fn()
+
     send = vi.fn(() => {
       this.status = sharedStatus
       this.responseText = sharedResponseText
@@ -112,20 +119,35 @@ const mockXHR = vi.hoisted(() => {
         queueMicrotask(() => this.onload?.())
       }
     })
+
     setRequestHeader = vi.fn()
+
     abort = vi.fn()
+
     timeout = 0
+
     addEventListener = vi.fn()
+
     removeEventListener = vi.fn()
+
     dispatchEvent = vi.fn()
+
     readyState = 0
+
     response = ''
+
     responseType = ''
+
     responseXML = null
+
     withCredentials = false
+
     upload = {} as XMLHttpRequestUpload
+
     getResponseHeader = vi.fn()
+
     getAllResponseHeaders = vi.fn(() => '')
+
     overrideMimeType = vi.fn()
   }
 
@@ -170,10 +192,8 @@ import {
   filterByTime,
   isGithubRemoteEntry,
   SYNC_STRATEGY_LABELS,
-  type GithubRemoteEntry,
-  type LocalRowEntry,
-  type SyncStrategy,
 } from '../ts/sync/githubSyncDiff.js'
+import type { GithubRemoteEntry, LocalRowEntry, SyncStrategy } from '../ts/sync/githubSyncDiff.js'
 
 import {
   applyConflictResolutions,
@@ -298,7 +318,7 @@ vi.mock('../ts/sync/syncRecord.js', () => ({
 }))
 
 // Mock XMLHttpRequest globally
-global.XMLHttpRequest = mockXHR.XHRConstructor as unknown as typeof XMLHttpRequest
+global.XMLHttpRequest = mockXHR.XHRConstructor
 
 // ========== 辅助函数 ==========
 
@@ -1075,7 +1095,7 @@ describe('readLocalEntries 批量读取路径', () => {
       ]),
     )
     mockExtractSubjectId.mockImplementation((url: string) => {
-      const match = url.match(/subject\/(\d+)/)
+      const match = /subject\/(\d+)/.exec(url)
       return match ? match[1] : null
     })
 
@@ -1339,7 +1359,7 @@ describe('applyDiffToSheet', () => {
     const mockRangeDelete = vi.fn()
     mockWs.Range = vi.fn((address: string) => {
       if (address.includes(':')) {
-        if (address.match(/^\d+:\d+$/)) {
+        if (/^\d+:\d+$/.exec(address)) {
           // 行地址（如 "3:3"）
           return { Value2: null, Delete: mockRangeDelete, Interior: { Color: 0 } }
         }
@@ -1898,7 +1918,7 @@ describe('getSelectedRowSids 分支覆盖', () => {
     mockParseJsonl.mockReturnValue({ entries: remoteEntries, errors: [] })
     setupXHRResponse(200, JSON.stringify(remoteEntries))
 
-    let progressCalls: Array<{ current: number; total: number; message: string }> = []
+    const progressCalls: { current: number; total: number; message: string }[] = []
     const onProgress = vi.fn((current: number, total: number, message: string) => {
       progressCalls.push({ current, total, message })
     })
@@ -2096,7 +2116,7 @@ describe('syncFromGithub ensureSheetHeaders 返回 true (lines 1350-1351)', () =
     setupXHRResponse(200, JSON.stringify(remoteEntries))
     mockParseJsonl.mockReturnValue({ entries: remoteEntries, errors: [] })
 
-    let progressMessages: string[] = []
+    const progressMessages: string[] = []
     const onProgress = vi.fn((_c: number, _t: number, message: string) => {
       progressMessages.push(message)
     })
@@ -2864,7 +2884,7 @@ describe('batchUpdateRows 未变化值跳过 (line 843)', () => {
         // 批量范围读取：返回旧值数组，与新值相同
         return {
           Value2: [['保持不变', 'same_value', '', '']],
-        } as unknown as { Value2: unknown }
+        }
       }
       return {
         Value2: '',
@@ -2972,7 +2992,7 @@ describe('applyDiffToSheet 删除操作处理 (lines 1118-1125)', () => {
     // 覆盖 Range mock，为行地址添加 Delete 方法
     const originalRange = mockWs.Range
     mockWs.Range = vi.fn((address: string) => {
-      if (address.match(/^\d+:\d+$/)) {
+      if (/^\d+:\d+$/.exec(address)) {
         return { Delete: vi.fn(), Value2: null, Interior: { Color: 0 } }
       }
       return originalRange(address)
@@ -3019,7 +3039,7 @@ describe('applyDiffToSheet 删除操作处理 (lines 1118-1125)', () => {
     const mockWs = createMockWorksheet()
     // 模拟 Delete 抛异常 — 行地址匹配时返回带 Delete 方法的对象，但 Delete 抛异常
     mockWs.Range = vi.fn((address: string) => {
-      if (address.match(/^\d+:\d+$/)) {
+      if (/^\d+:\d+$/.exec(address)) {
         // 行地址：返回带 Delete 的对象，但 Delete 抛异常
         return {
           Delete: vi.fn(() => {
@@ -3348,7 +3368,7 @@ describe('applyDiffToSheet formatEta 路径 (line 548)', () => {
       })
     }
 
-    let progressCalls: Array<{ current: number; total: number; message: string; eta?: string }> = []
+    const progressCalls: { current: number; total: number; message: string; eta?: string }[] = []
     const onProgress = (current: number, total: number, message: string, eta?: string): void => {
       progressCalls.push({ current, total, message, eta })
     }
@@ -3892,7 +3912,7 @@ describe('formatDuration 全分支 (lines 534-540)', () => {
       })
     }
 
-    let etaValues: string[] = []
+    const etaValues: string[] = []
     const onProgress = (_current: number, _total: number, _msg: string, eta?: string): void => {
       if (eta) etaValues.push(eta)
     }
@@ -3931,7 +3951,7 @@ describe('formatDuration 全分支 (lines 534-540)', () => {
       },
     ]
 
-    let etaValues: string[] = []
+    const etaValues: string[] = []
     const onProgress = (_current: number, _total: number, _msg: string, eta?: string): void => {
       if (eta) etaValues.push(eta)
     }
@@ -4069,12 +4089,12 @@ describe('formatDuration 秒/分钟分支 (lines 536, 539)', () => {
     // syncStartTime=startTime, 第一批 now=startTime(不触发), 第二批 now=startTime+30000
     // 第二批: addProcessed=1000, elapsed=30000ms, speed=33.33/s, remaining=100
     // eta=3000ms → formatDuration(3000) → "3秒" (seconds 分支)
-    const startTime = 1700000000000
+    const startTime = 1_700_000_000_000
     let callCount = 0
     dateNowSpy = vi.spyOn(Date, 'now').mockImplementation(() => {
       callCount++
       if (callCount <= 2) return startTime
-      return startTime + 30000
+      return startTime + 30_000
     })
 
     // 1100 条 add diffs: 分 3 批处理 (500+500+100)
@@ -4089,7 +4109,7 @@ describe('formatDuration 秒/分钟分支 (lines 536, 539)', () => {
       })
     }
 
-    let etaValues: string[] = []
+    const etaValues: string[] = []
     const onProgress = (_current: number, _total: number, _msg: string, eta?: string): void => {
       if (eta) etaValues.push(eta)
     }
@@ -4126,7 +4146,7 @@ describe('formatDuration 秒/分钟分支 (lines 536, 539)', () => {
 
     // Mock Date.now(): 每次调用递增，模拟真实时间流逝
     // 让每次 Date.now() 调用返回递增的值
-    const startTime = 1700000000000
+    const startTime = 1_700_000_000_000
     let callCount = 0
     dateNowSpy = vi.spyOn(Date, 'now').mockImplementation(() => {
       callCount++
@@ -4135,7 +4155,7 @@ describe('formatDuration 秒/分钟分支 (lines 536, 539)', () => {
       // 后续每次调用增加 60000ms (60秒)
       // 这样第二批时 elapsed=60000ms, speed=8.33/s, remaining=500
       // eta=60000ms → formatDuration(60000) → "1分0秒"
-      return startTime + callCount * 60000
+      return startTime + callCount * 60_000
     })
 
     // 1500 条 add diffs: 分 3 批处理 (500+500+500)
@@ -4149,7 +4169,7 @@ describe('formatDuration 秒/分钟分支 (lines 536, 539)', () => {
       })
     }
 
-    let etaValues: string[] = []
+    const etaValues: string[] = []
     const onProgress = (_current: number, _total: number, _msg: string, eta?: string): void => {
       if (eta) etaValues.push(eta)
     }
@@ -4185,7 +4205,7 @@ describe('formatDuration 秒/分钟分支 (lines 536, 539)', () => {
     )
 
     // Mock Date.now() 返回固定值，elapsed=0，走 ms<=0 分支
-    const startTime = 1700000000000
+    const startTime = 1_700_000_000_000
     dateNowSpy = vi.spyOn(Date, 'now').mockImplementation(() => startTime)
 
     const diffs: GithubSyncDiff[] = []
@@ -4198,7 +4218,7 @@ describe('formatDuration 秒/分钟分支 (lines 536, 539)', () => {
       })
     }
 
-    let etaValues: string[] = []
+    const etaValues: string[] = []
     const onProgress = (_current: number, _total: number, _msg: string, eta?: string): void => {
       if (eta) etaValues.push(eta)
     }
@@ -4511,7 +4531,7 @@ describe('readLocalEntries 批量读取异常回退 (line 316)', () => {
       return ''
     })
     mockExtractSubjectId.mockImplementation((url: string) => {
-      const match = url.match(/subject\/(\d+)/)
+      const match = /subject\/(\d+)/.exec(url)
       return match ? match[1] : null
     })
 
@@ -4548,7 +4568,7 @@ describe('readLocalEntries 无可读列边界 (lines 293-294)', () => {
     // 这使得外层守卫通过，但 readCols 为空，触发 lines 293-294
     const colMapWithUndefined = new Map<string, number | undefined>()
     colMapWithUndefined.set('Bangumi_URL', undefined)
-    mockGetColumnMap.mockReturnValue(colMapWithUndefined as unknown as Map<string, number>)
+    mockGetColumnMap.mockReturnValue(colMapWithUndefined)
 
     const result = readLocalEntriesForSync()
     expect(result).not.toBeNull()
@@ -4606,8 +4626,8 @@ describe('GithubSyncSource 方法', () => {
     mockXHR.reset()
     mockParseJsonl.mockImplementation((text: string) => {
       if (realImpls.parseJsonl) return realImpls.parseJsonl(text)
-      const entries: Array<Record<string, unknown>> = []
-      const errors: Array<{ line: number; message: string }> = []
+      const entries: Record<string, unknown>[] = []
+      const errors: { line: number; message: string }[] = []
       const lines = text.split(/\r?\n/)
       for (let i = 0; i < lines.length; i++) {
         const line = lines[i]!.trim()
@@ -4861,7 +4881,7 @@ describe('applyDiffToSheet BATCH_WRITE_SIZE 边界 (501条 add)', () => {
     }
 
     // 记录进度回调中的 eta 参数
-    const progressCalls: Array<{ current: number; total: number; eta: string }> = []
+    const progressCalls: { current: number; total: number; eta: string }[] = []
     const onProgressMock = vi.fn(
       (current: number, total: number, _message: string, eta: string) => {
         progressCalls.push({ current, total, eta })

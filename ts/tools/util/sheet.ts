@@ -152,7 +152,7 @@ export function findHeaderRow(ws: WpsWorksheet | null | undefined, startRow?: nu
           const cellVal = getCellValue(ws, row, col).toLowerCase()
           if (!cellVal) continue
           for (const header of HEADER_KEYWORDS) {
-            if (cellVal.indexOf(header.toLowerCase()) >= 0) {
+            if (cellVal.includes(header.toLowerCase())) {
               matchCount++
               break
             }
@@ -301,12 +301,12 @@ function findAnchorColumn(ws: WpsWorksheet, headerRow: number): number | undefin
  */
 export function getLastRow(
   ws: WpsWorksheet | null | undefined,
-  forceRefresh: boolean = false,
+  forceRefresh = false,
   headerRow?: number,
 ): number {
   if (!ws) {
     bgmLog(LOG_LEVELS.WARN, 'getLastRow: 工作表对象无效，返回默认值 50000')
-    return 50000
+    return 50_000
   }
 
   const sheetName = ws.Name || ''
@@ -388,7 +388,7 @@ export function getLastRow(
 
     // 5. 最终默认值
     bgmLog(LOG_LEVELS.WARN, `无法确定工作表 "${sheetName}" 的最后行，使用默认值 50000`)
-    return 50000
+    return 50_000
   })
 
   bgmLog(
@@ -413,7 +413,7 @@ export function isEmptyValue(val: unknown): boolean {
 // ========== 获取数据工作表 ==========
 export function getDataSheet(): WpsWorksheet | null | undefined {
   const app = getApp()
-  if (!app || !app.ActiveWorkbook) return null
+  if (!app?.ActiveWorkbook) return null
 
   if (BGM.sheet.isLocked && BGM.sheet.lockedIndex) {
     try {
@@ -435,7 +435,7 @@ export function getDataSheet(): WpsWorksheet | null | undefined {
       const ws = targetWb.Worksheets.Item(BGM.sheet.lockedIndex)
       return ws
     } catch (e: unknown) {
-      bgmLog(LOG_LEVELS.WARN, 'getDataSheet 锁定工作表失败: ' + (e as Error).message)
+      bgmLog(LOG_LEVELS.WARN, `getDataSheet 锁定工作表失败: ${(e as Error).message}`)
     }
   }
 

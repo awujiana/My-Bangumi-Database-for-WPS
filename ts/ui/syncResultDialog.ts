@@ -65,7 +65,7 @@ export interface SyncResultDialogOptions {
  * 1-3月 → 冬，4-6月 → 春，7-9月 → 夏，10-12月 → 秋
  */
 function getSeasonFromDate(dateStr: string): string | null {
-  const match = dateStr.match(/^(\d{4})[-/.](\d{1,2})/)
+  const match = /^(\d{4})[-/.](\d{1,2})/.exec(dateStr)
   if (!match) return null
   const year = match[1]!
   const month = parseInt(match[2]!, 10)
@@ -137,7 +137,7 @@ export function computeDateStatsFromSheet(): DateStats {
 
     // 标准化日期：移除分隔符，用于比较
     const normalized = dateStr.replace(/[/.]/g, '-')
-    const dateMatch = normalized.match(/^\d{4}-\d{1,2}-\d{1,2}$/)
+    const dateMatch = /^\d{4}-\d{1,2}-\d{1,2}$/.exec(normalized)
     if (!dateMatch) continue
 
     if (earliest === null || normalized < earliest) earliest = normalized

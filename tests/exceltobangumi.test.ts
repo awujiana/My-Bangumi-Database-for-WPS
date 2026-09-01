@@ -132,7 +132,7 @@ function createMockWorksheet(opts: MockWorksheetOptions = {}): unknown {
         Item: (i: number) => ({ Rows: { Count: 1, Item: (j: number) => ({ Row: i + j - 1 }) } }),
       },
     }),
-    Rows: { Count: opts.rowsCount ?? 100000 },
+    Rows: { Count: opts.rowsCount ?? 100_000 },
     UsedRange: opts.usedRange ?? null,
   }
 }

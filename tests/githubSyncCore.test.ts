@@ -171,7 +171,7 @@ vi.mock('../ts/sync/syncRecord.js', () => ({
 }))
 
 // 设置全局 XMLHttpRequest
-global.XMLHttpRequest = mockXHR.XHRConstructor as unknown as typeof XMLHttpRequest
+global.XMLHttpRequest = mockXHR.XHRConstructor
 
 // ========== 导入被测模块 ==========
 
@@ -194,7 +194,7 @@ import type {
 // ========== 辅助函数 ==========
 
 function createMockSheet(
-  opts: { rows?: Array<{ Value2: unknown[] }>; colMap?: Map<string, number> } = {},
+  opts: { rows?: { Value2: unknown[] }[]; colMap?: Map<string, number> } = {},
 ) {
   const rows = opts.rows || []
   return {
@@ -463,7 +463,7 @@ describe('readLocalEntriesForSync', () => {
       ]),
     )
     mockExtractSubjectId.mockImplementation((url: string) => {
-      const match = url.match(/subject\/(\d+)/)
+      const match = /subject\/(\d+)/.exec(url)
       return match ? match[1] : null
     })
     const result = readLocalEntriesForSync()

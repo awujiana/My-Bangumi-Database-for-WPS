@@ -28,12 +28,13 @@ import { Result, BgmError } from '../core/result.js'
 import { bgmLog } from '../tools/util.js'
 
 import { getGithubConfig, isGithubConfigComplete } from './githubConfig.js'
-import { parseJsonl, type GithubRemoteEntry } from './githubSyncDiff.js'
+import { parseJsonl } from './githubSyncDiff.js'
+import type { GithubRemoteEntry } from './githubSyncDiff.js'
 import type { SyncSource } from './SyncSource.js'
 // 复用 githubSyncDiff.ts 的纯解析函数与类型（零依赖纯模块，可在 Node 测试环境直接运行）
 
 /** HTTP 请求超时（毫秒），与 githubSync 保持一致 */
-const REQUEST_TIMEOUT_MS = 30000
+const REQUEST_TIMEOUT_MS = 30_000
 
 /** 默认分支名（与 githubConfig 默认值一致） */
 const DEFAULT_BRANCH = 'main'

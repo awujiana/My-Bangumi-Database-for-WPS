@@ -62,7 +62,7 @@ function tryGetProperty(cell: unknown, prop: string): unknown {
   }
 }
 
-//内部辅助函数，不导出
+// 内部辅助函数，不导出
 /**
  * 获取单元格的原始值，按优先级尝试 Value2、Value 和 Text 属性
  * @param cell - 单元格对象

@@ -6,7 +6,8 @@
  *              配置读写复用 tools/config.ts 的 getTheme / setTheme。
  */
 
-import { getTheme, setTheme, type ThemeMode } from './config.js'
+import { getTheme, setTheme } from './config.js'
+import type { ThemeMode } from './config.js'
 
 export type { ThemeMode }
 

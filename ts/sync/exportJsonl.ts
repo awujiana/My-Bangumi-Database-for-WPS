@@ -123,7 +123,7 @@ export function buildJsonlFromSheet(): string {
     }
 
     // 扩展字段
-    const EXTENDED_FIELD_MAP: ReadonlyArray<readonly [string, string]> = [
+    const EXTENDED_FIELD_MAP: readonly (readonly [string, string])[] = [
       ['date', '开播日期'],
       ['播放结束', '完播日'],
       ['动画制作公司', '制作公司'],
@@ -192,7 +192,7 @@ export function exportSheetToJsonlFile(): boolean {
     // 释放 Blob URL
     setTimeout(() => {
       URL.revokeObjectURL(url)
-    }, 10000)
+    }, 10_000)
 
     bgmLog(
       LOG_LEVELS.INFO,

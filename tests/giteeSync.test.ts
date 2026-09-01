@@ -79,17 +79,29 @@ let mockXhrConstructor: typeof MockXHR | null = null
 
 class MockXHR {
   status = 0
+
   statusText = ''
+
   responseText = ''
+
   timeout = 0
+
   onload: (() => void) | null = null
+
   onerror: (() => void) | null = null
+
   ontimeout: (() => void) | null = null
+
   onabort: (() => void) | null = null
+
   private method = ''
+
   private url = ''
+
   private async = true
+
   private headers: Record<string, string> = {}
+
   private _aborted = false
 
   open(method: string, url: string, async: boolean): void {
@@ -304,14 +316,14 @@ describe('fetchGiteeJson', () => {
     const promise = fetchGiteeJson()
     lastMockXhr!._respondOk('{"sid":"1"}')
     await promise
-    expect(lastXhrCall?.headers['Accept']).toBe('application/json')
+    expect(lastXhrCall?.headers.Accept).toBe('application/json')
   })
 
   it('设置 30 秒超时', async () => {
     const promise = fetchGiteeJson()
     lastMockXhr!._respondOk('{"sid":"1"}')
     await promise
-    expect(lastXhrCall?.timeout).toBe(30000)
+    expect(lastXhrCall?.timeout).toBe(30_000)
   })
 
   it('配置不完整时 reject', async () => {

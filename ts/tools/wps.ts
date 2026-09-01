@@ -407,21 +407,19 @@ export function wpsMsgBox(message: string, buttons?: number, icon?: number): Pro
           '确认',
         )
       }
+    } else if (
+      typeof window !== 'undefined' &&
+      typeof (window as unknown as Record<string, unknown>).BGMAlert === 'function'
+    ) {
+      ;(window as unknown as Record<string, (m: string, t: string, oc?: () => void) => void>)
+        .BGMAlert!(message, '提示', () => {
+        resolve(1)
+      })
     } else {
-      if (
-        typeof window !== 'undefined' &&
-        typeof (window as unknown as Record<string, unknown>).BGMAlert === 'function'
-      ) {
-        ;(window as unknown as Record<string, (m: string, t: string, oc?: () => void) => void>)
-          .BGMAlert!(message, '提示', () => {
-          resolve(1)
-        })
-      } else {
-        // 使用自定义警告对话框
-        customShowAlert(message, '提示', () => {
-          resolve(1)
-        })
-      }
+      // 使用自定义警告对话框
+      customShowAlert(message, '提示', () => {
+        resolve(1)
+      })
     }
   })
 }

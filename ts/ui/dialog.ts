@@ -49,7 +49,7 @@ export interface SyncConfigSummary {
   /** 同步方向描述（如 "远程仓库 → Excel"） */
   directionLabel?: string
   /** 额外的自定义配置行（key-value） */
-  extra?: Array<{ label: string; value: string }>
+  extra?: { label: string; value: string }[]
 }
 
 /** 构建同步配置摘要的上下文 */
@@ -70,7 +70,7 @@ export interface BuildSyncConfigContext {
     month?: number
   }
   /** 额外的 key-value 对 */
-  extra?: Array<{ label: string; value: string }>
+  extra?: { label: string; value: string }[]
 }
 
 /**
@@ -191,12 +191,12 @@ function createDialogs(): void {
     modal.setAttribute('aria-labelledby', cfg.titleId)
 
     const content = document.createElement('div')
-    content.className = 'bgm-modal-content ' + type
+    content.className = `bgm-modal-content ${type}`
 
     const header = document.createElement('div')
     header.className = 'bgm-dialog-header'
     const icon = document.createElement('span')
-    icon.className = 'bgm-dialog-icon ' + iconClass
+    icon.className = `bgm-dialog-icon ${iconClass}`
     icon.innerHTML = sanitizeHtml(iconChar)
     const title = document.createElement('span')
     title.id = cfg.titleId
@@ -219,7 +219,7 @@ function createDialogs(): void {
     cfg.buttons.forEach((btn: DialogButton) => {
       const button = document.createElement('button')
       button.id = btn.id
-      button.className = 'bgm-dialog-btn ' + btn.cls
+      button.className = `bgm-dialog-btn ${btn.cls}`
       button.textContent = btn.text
       button.dataset.event = btn.event
       footer.appendChild(button)
@@ -376,8 +376,8 @@ function ensureSyncResultDialog(): HTMLElement {
 
   document.body.appendChild(modal)
 
-  const detailsEl = modal.querySelector('#bgmSyncDetails') as HTMLElement
-  const toggleBtn = modal.querySelector('#bgmSyncToggleDetails') as HTMLElement
+  const detailsEl = modal.querySelector<HTMLElement>('#bgmSyncDetails')!
+  const toggleBtn = modal.querySelector<HTMLElement>('#bgmSyncToggleDetails')!
 
   toggleBtn.addEventListener('click', () => {
     const expanded = detailsEl.style.display !== 'none'
@@ -385,7 +385,7 @@ function ensureSyncResultDialog(): HTMLElement {
     toggleBtn.textContent = expanded ? '显示详情' : '收起详情'
   })
 
-  modal.querySelector('#bgmSyncResultOk')?.addEventListener('click', () => {
+  modal.querySelector<HTMLElement>('#bgmSyncResultOk')?.addEventListener('click', () => {
     modal.style.display = 'none'
   })
 
@@ -395,9 +395,9 @@ function ensureSyncResultDialog(): HTMLElement {
 
 export function showSyncResult(summary: string, details: string[]): void {
   const modal = ensureSyncResultDialog()
-  const summaryEl = modal.querySelector('#bgmSyncSummary') as HTMLElement
-  const detailsEl = modal.querySelector('#bgmSyncDetails') as HTMLElement
-  const toggleBtn = modal.querySelector('#bgmSyncToggleDetails') as HTMLElement
+  const summaryEl = modal.querySelector<HTMLElement>('#bgmSyncSummary')!
+  const detailsEl = modal.querySelector<HTMLElement>('#bgmSyncDetails')!
+  const toggleBtn = modal.querySelector<HTMLElement>('#bgmSyncToggleDetails')!
 
   summaryEl.textContent = summary
   detailsEl.textContent = details.length > 0 ? details.join('\n') : '无详情'
@@ -545,12 +545,12 @@ function ensureSyncProgressDialog(): HTMLElement {
   document.body.appendChild(modal)
 
   // 绑定按钮事件：统一使用 addEventListener，禁止 onclick 重绑定
-  const pauseBtn = modal.querySelector('#bgmSyncProgressPauseBtn')
-  const stopBtn = modal.querySelector('#bgmSyncProgressStop')
-  const closeBtn = modal.querySelector('#bgmSyncProgressClose')
-  const closeTopBtn = modal.querySelector('#bgmSyncProgressCloseTop')
-  const nextBtn = modal.querySelector('#bgmSyncProgressNext')
-  const toggleDetailsBtn = modal.querySelector('#bgmSyncProgressToggleDetails')
+  const pauseBtn = modal.querySelector<HTMLElement>('#bgmSyncProgressPauseBtn')
+  const stopBtn = modal.querySelector<HTMLElement>('#bgmSyncProgressStop')
+  const closeBtn = modal.querySelector<HTMLElement>('#bgmSyncProgressClose')
+  const closeTopBtn = modal.querySelector<HTMLElement>('#bgmSyncProgressCloseTop')
+  const nextBtn = modal.querySelector<HTMLElement>('#bgmSyncProgressNext')
+  const toggleDetailsBtn = modal.querySelector<HTMLElement>('#bgmSyncProgressToggleDetails')
 
   // 暂停/继续按钮：根据 _syncPaused 标志自行决定调用哪个处理器，并自行更新按钮文本
   if (pauseBtn) {
@@ -656,8 +656,8 @@ export function showSyncProgressDialog(
   _syncPauseStart = 0
 
   // 重置为运行中状态
-  const titleEl = modal.querySelector('#bgmSyncProgressTitle')
-  const iconEl = modal.querySelector('#bgmSyncProgressIcon')
+  const titleEl = modal.querySelector<HTMLElement>('#bgmSyncProgressTitle')
+  const iconEl = modal.querySelector<HTMLElement>('#bgmSyncProgressIcon')
   const progressSection = modal.querySelector<HTMLElement>('#bgmSyncProgressSection')
   const resultSection = modal.querySelector<HTMLElement>('#bgmSyncProgressResult')
   const runningBtns = modal.querySelector<HTMLElement>('#bgmSyncProgressRunningBtns')
@@ -692,10 +692,10 @@ export function showSyncProgressDialog(
 
   // 重置进度
   const bar = modal.querySelector<HTMLElement>('#bgmSyncProgressBar')
-  const label = modal.querySelector('#bgmSyncProgressLabel')
+  const label = modal.querySelector<HTMLElement>('#bgmSyncProgressLabel')
   const percent = modal.querySelector<HTMLElement>('#bgmSyncProgressPercent')
-  const current = modal.querySelector('#bgmSyncProgressCurrent')
-  const log = modal.querySelector('#bgmSyncProgressLog')
+  const current = modal.querySelector<HTMLElement>('#bgmSyncProgressCurrent')
+  const log = modal.querySelector<HTMLElement>('#bgmSyncProgressLog')
   const etaEl = modal.querySelector<HTMLElement>('#bgmSyncProgressEta')
   const globalEtaEl = modal.querySelector<HTMLElement>('#bgmSyncProgressGlobalEta')
   if (bar) {
@@ -743,21 +743,21 @@ export function updateSyncProgressDialog(
   if (!modal || modal.style.display === 'none') return
 
   const bar = modal.querySelector<HTMLElement>('#bgmSyncProgressBar')
-  const label = modal.querySelector('#bgmSyncProgressLabel')
-  const percent = modal.querySelector('#bgmSyncProgressPercent')
-  const currentEl = modal.querySelector('#bgmSyncProgressCurrent')
-  const log = modal.querySelector('#bgmSyncProgressLog')
+  const label = modal.querySelector<HTMLElement>('#bgmSyncProgressLabel')
+  const percent = modal.querySelector<HTMLElement>('#bgmSyncProgressPercent')
+  const currentEl = modal.querySelector<HTMLElement>('#bgmSyncProgressCurrent')
+  const log = modal.querySelector<HTMLElement>('#bgmSyncProgressLog')
   const etaEl = modal.querySelector<HTMLElement>('#bgmSyncProgressEta')
   const globalEtaEl = modal.querySelector<HTMLElement>('#bgmSyncProgressGlobalEta')
 
   const pct = total > 0 ? Math.round((current / total) * 100) : 0
   if (bar) {
-    bar.style.width = String(pct) + '%'
-    bar.textContent = String(pct) + '%'
+    bar.style.width = `${String(pct)}%`
+    bar.textContent = `${String(pct)}%`
     bar.setAttribute('aria-valuenow', String(pct))
   }
   if (label) label.textContent = `进度: ${String(current)}/${String(total)}`
-  if (percent) percent.textContent = String(pct) + '%'
+  if (percent) percent.textContent = `${String(pct)}%`
   if (currentEl && message) currentEl.textContent = message
 
   // 显示阶段 ETA：优先使用独立的 eta 参数，兼容旧版 logLine 以"预计剩余"/"剩余:"开头的情况
@@ -801,7 +801,7 @@ export function updateSyncProgressDialog(
   // 将日志行追加到日志区（ETA 类型的 logLine 已在上方处理，不再重复追加）
   if (logLine && log && logLine !== etaText) {
     const nearBottom = log.scrollHeight - log.scrollTop - log.clientHeight < 30
-    log.appendChild(document.createTextNode(logLine + '\n'))
+    log.appendChild(document.createTextNode(`${logLine}\n`))
     _syncProgressLogCount++
     while (_syncProgressLogCount > _SYNC_PROGRESS_LOG_MAX) {
       if (log.firstChild) {
@@ -1195,9 +1195,9 @@ export function renderSyncDetailTable(items: GithubSyncDetailItem[]): string {
 
   const rows = items
     .map((item) => {
-      const kind = item.kind
+      const { kind } = item
       const name = item.name ?? '--'
-      const sid = item.sid
+      const { sid } = item
       const row = item.row !== undefined ? String(item.row) : '--'
       const fields = item.fields && item.fields.length > 0 ? item.fields.join(', ') : '--'
       const message = item.message ?? ''
@@ -1248,7 +1248,7 @@ export function renderSyncDetailTable(items: GithubSyncDetailItem[]): string {
 export function completeSyncProgressDialog(
   summary: string,
   details: string[],
-  stopped: boolean = false,
+  stopped = false,
   onNext?: () => void,
   stats?: SyncProgressStats,
   detailItems?: GithubSyncDetailItem[],
@@ -1425,7 +1425,7 @@ export function showToast(message: string, type?: string): void {
 
   toast.textContent = message
   toast.className = 'bgm-toast bgm-toast-show'
-  if (type) toast.classList.add('bgm-toast-' + type)
+  if (type) toast.classList.add(`bgm-toast-${type}`)
 
   _toastTimer = window.setTimeout(() => {
     toast.className = 'bgm-toast'

@@ -29,7 +29,7 @@ function pushLog(entry: LogEntry): void {
 }
 
 /** 获取最近日志 */
-export function getRecentLogs(level?: LogLevel, limit: number = 100): LogEntry[] {
+export function getRecentLogs(level?: LogLevel, limit = 100): LogEntry[] {
   const all = logBuffer.toArray()
   const filtered = level ? all.filter((e) => e.level === level) : all
   return filtered.slice(-limit)

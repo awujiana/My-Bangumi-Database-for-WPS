@@ -37,13 +37,13 @@ import { wpsMsgBox, isWpsWorksheet } from '../../tools/wps.js'
 import {
   showConfirm,
   showSyncProgressDialog,
-  type SyncConfigSummary,
   buildSyncConfig,
   updateSyncProgressDialog,
   completeSyncProgressDialog,
   hideSyncProgressDialog,
   showToast,
 } from '../../ui/dialog.js'
+import type { SyncConfigSummary } from '../../ui/dialog.js'
 import {
   isBangumiUrl,
   extractSubjectId,
@@ -52,6 +52,18 @@ import {
   addTagsFromStr,
 } from '../pureUtils.js'
 import { getAllSyncRecords, getOrCreateSyncRecordSheet } from '../syncRecord.js'
+
+// 子模块内部依赖（不通过 re-export 暴露给外部）
+import { bgmRequestSync as _bgmRequestSync } from './api.js'
+import { markEpisodesComplete as _markEpisodesComplete } from './chapterMarker.js'
+import {
+  finalizeSyncResults as _finalizeSyncResults,
+  DEFAULT_SEQ_COL as _DEFAULT_SEQ_COL,
+} from './progressReporter.js'
+import type {
+  SyncTask as _SyncTask,
+  SyncResultStats as _SyncResultStats,
+} from './progressReporter.js'
 
 // Re-export 纯函数，保持模块对外 API 兼容
 export {
@@ -87,16 +99,6 @@ export {
   applySyncFailResults,
   handleStoppedRemainingTasks,
   finalizeSyncResults,
-} from './progressReporter.js'
-
-// 子模块内部依赖（不通过 re-export 暴露给外部）
-import { bgmRequestSync as _bgmRequestSync } from './api.js'
-import { markEpisodesComplete as _markEpisodesComplete } from './chapterMarker.js'
-import {
-  type SyncTask as _SyncTask,
-  type SyncResultStats as _SyncResultStats,
-  finalizeSyncResults as _finalizeSyncResults,
-  DEFAULT_SEQ_COL as _DEFAULT_SEQ_COL,
 } from './progressReporter.js'
 
 // ========== 常量定义 (优化点：集中管理) ==========
@@ -620,7 +622,7 @@ function processRowToSyncTask(
     if (!sid) return { task: null, skipped: true, failed: false }
 
     // 冲突跳过
-    if (skipSids && skipSids.has(sid)) {
+    if (skipSids?.has(sid)) {
       return { task: null, skipped: true, failed: false }
     }
 
@@ -1028,7 +1030,7 @@ function collectSelectedRows(app: WpsApplication): number[] {
     } catch (e: unknown) {
       bgmLog(
         LOG_LEVELS.WARN,
-        '[exceltobangumi] 获取地址失败: ' + (e instanceof Error ? e.message : String(e)),
+        `[exceltobangumi] 获取地址失败: ${e instanceof Error ? e.message : String(e)}`,
       )
       selAddress = '(无法获取)'
     }
@@ -1301,7 +1303,7 @@ async function executeSelectedSync(
 
         bgmLog(
           LOG_LEVELS.INFO,
-          `[syncSelectedRows] ${rowProgress} 行${String(rowNum)} 请求体: ${jsonBody.length > 300 ? jsonBody.substring(0, 300) + '...' : jsonBody}`,
+          `[syncSelectedRows] ${rowProgress} 行${String(rowNum)} 请求体: ${jsonBody.length > 300 ? `${jsonBody.substring(0, 300)}...` : jsonBody}`,
         )
 
         const endpoint = `/v0/users${userPath}/collections/${sid}`
@@ -1322,7 +1324,7 @@ async function executeSelectedSync(
           )
 
           // 标记章节为已完成（"看过" type=2 和 "在看" type=3 都需要标记）
-          let watchType: number = 0
+          let watchType = 0
           try {
             const parsedBody = JSON.parse(jsonBody) as { type?: number }
             watchType = parsedBody.type ?? 0
