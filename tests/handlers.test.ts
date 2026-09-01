@@ -123,6 +123,19 @@ vi.mock('../ts/tools/config.js', () => ({
   getConfig: mockState.getConfig,
   setConfig: mockState.setConfig,
   removeConfig: vi.fn(() => true),
+  // setupButtonListeners() 会同步调用以下 config 导出来初始化设置页控件。
+  // 这些名字经 barrel（ts/index.ts）转发给 ts/ui/handlers/index.ts，
+  // 一旦 mock 工厂遗漏，barrel 转发结果即为 undefined，
+  // 会抛出 `getTheme is not a function` 并连带使本文件全部用例失败。
+  // 返回值与 ts/tools/config.ts 中的真实默认值保持一致。
+  getTheme: vi.fn(() => 'dark'),
+  setNavIconsOnly: vi.fn(() => true),
+  getListType: vi.fn(() => 'all'),
+  setListType: vi.fn(() => true),
+  getTimeFilter: vi.fn(() => 'year'),
+  setTimeFilter: vi.fn(() => true),
+  getRefreshInterval: vi.fn(() => 0),
+  setRefreshInterval: vi.fn(() => true),
   CONFIG_KEYS: {
     INCREMENTAL_SYNC: 'bgm_incremental_sync',
     SKIP_CONFLICTS: 'bgm_skip_conflicts',
