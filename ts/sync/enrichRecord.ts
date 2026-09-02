@@ -215,7 +215,7 @@ export function addEnrichRecords(records: AddEnrichRecordParams[]): void {
       startRow = usedRange.Row + usedRange.Rows.Count
     }
 
-    const newRows: string[][] = records.map((r) => [
+    const rows: string[][] = records.map((r) => [
       r.timestamp,
       r.matchType,
       r.name,
@@ -227,17 +227,17 @@ export function addEnrichRecords(records: AddEnrichRecordParams[]): void {
       r.note ?? '',
     ])
 
-    const endRow = startRow + newRows.length - 1
+    const endRow = startRow + rows.length - 1
     const startColLetter = colNumberToLetter(1)
     const endColLetter = colNumberToLetter(ENRICH_RECORD_COLUMNS.length)
     const range = sheet.Range(
       `${startColLetter}${String(startRow)}:${endColLetter}${String(endRow)}`,
     )
-    range.Value2 = newRows
+    range.Value2 = rows
 
-    for (let index = 0; index < newRows.length; index += 1) {
+    for (let index = 0; index < rows.length; index += 1) {
       const row = startRow + index
-      const action = newRows[index]?.[ENRICH_RECORD_COL.ACTION - 1] ?? ''
+      const action = rows[index]?.[ENRICH_RECORD_COL.ACTION - 1] ?? ''
       const color = getActionColor(action)
       const actionColLetter = colNumberToLetter(ENRICH_RECORD_COL.ACTION)
       const cell = sheet.Range(`${actionColLetter}${String(row)}`)
@@ -395,8 +395,8 @@ export function formatEnrichRecordSheet(): void {
     nameCol.ColumnWidth = 25
     const oldValueCol = sheet.Range('F:F')
     oldValueCol.ColumnWidth = 20
-    const newValueCol = sheet.Range('G:G')
-    newValueCol.ColumnWidth = 40
+    const valueCol = sheet.Range('G:G')
+    valueCol.ColumnWidth = 40
     const noteCol = sheet.Range('I:I')
     noteCol.ColumnWidth = 20
   } catch (error: unknown) {

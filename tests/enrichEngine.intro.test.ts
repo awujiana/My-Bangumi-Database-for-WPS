@@ -87,10 +87,10 @@ function normalizeName(name: string): string {
   return name.replace(/\s+/g, '').toLowerCase()
 }
 
-function appendFeatures(oldFeature: string, newFeatures: string): string {
-  if (isEmptyValue(oldFeature)) return newFeatures
-  if (isEmptyValue(newFeatures)) return oldFeature
-  return `${oldFeature}${TAG_SEPARATOR}${newFeatures}`
+function appendFeatures(oldFeature: string, features: string): string {
+  if (isEmptyValue(oldFeature)) return features
+  if (isEmptyValue(features)) return oldFeature
+  return `${oldFeature}${TAG_SEPARATOR}${features}`
 }
 
 // ========== isIntroSheet 测试 ==========
@@ -254,7 +254,7 @@ describe('简介字段标注白名单机制', () => {
  */
 function simulateEnrichIntroData(
   row: number,
-  newData: Record<string, string>,
+  data: Record<string, string>,
   colMap: Map<string, number>,
 ): {
   enriched: {
@@ -278,7 +278,7 @@ function simulateEnrichIntroData(
   const bangumiFeatureCol = colMap.get('特点/印象')
 
   for (const [sourceKey, targetColName] of Object.entries(INTRO_FIELD_TO_BANGUMI)) {
-    const rawValue = newData[sourceKey] ?? ''
+    const rawValue = data[sourceKey] ?? ''
     if (isEmptyValue(rawValue)) continue
 
     const annotatedValue = getAnnotatedValue(sourceKey, targetColName, rawValue)
@@ -330,7 +330,7 @@ function simulateEnrichIntroData(
   if (bangumiFeatureCol !== undefined) {
     const featureParts: string[] = []
     for (const key of INTRO_FEATURE_FIELDS) {
-      const value = newData[key] ?? ''
+      const value = data[key] ?? ''
       if (!isEmptyValue(value)) {
         const label = key === '简介' ? '简介' : key
         const display = key === '简介' && value.length > 80 ? `${value.substring(0, 80)}...` : value
@@ -379,8 +379,8 @@ describe('enrichIntroData 逻辑', () => {
         ['导演', 3],
         ['特点/印象', 10],
       ])
-      const newData = { 导演: '新海诚' }
-      const result = simulateEnrichIntroData(5, newData, colMap)
+      const data = { 导演: '新海诚' }
+      const result = simulateEnrichIntroData(5, data, colMap)
 
       expect(result.enriched).toHaveLength(1)
       expect(result.enriched[0]?.action).toBe('fill')
@@ -394,8 +394,8 @@ describe('enrichIntroData 逻辑', () => {
         ['特点/印象', 10],
       ])
       setMockCellValue(5, 3, '宫崎骏')
-      const newData = { 导演: '新海诚' }
-      const result = simulateEnrichIntroData(5, newData, colMap)
+      const data = { 导演: '新海诚' }
+      const result = simulateEnrichIntroData(5, data, colMap)
 
       expect(result.conflicts).toHaveLength(1)
       expect(result.conflicts[0]?.oldValue).toBe('宫崎骏')
@@ -404,8 +404,8 @@ describe('enrichIntroData 逻辑', () => {
 
     it('目标列不存在时，回退到特点/印象', () => {
       const colMap = new Map<string, number>([['特点/印象', 10]])
-      const newData = { 系列构成: '虚渊玄' }
-      const result = simulateEnrichIntroData(5, newData, colMap)
+      const data = { 系列构成: '虚渊玄' }
+      const result = simulateEnrichIntroData(5, data, colMap)
 
       expect(result.enriched.length).toBeGreaterThan(0)
       expect(result.enriched[0]?.field).toContain('特点/印象')
@@ -417,8 +417,8 @@ describe('enrichIntroData 逻辑', () => {
         ['导演', 3],
         ['特点/印象', 10],
       ])
-      const newData = { 导演: '' }
-      const result = simulateEnrichIntroData(5, newData, colMap)
+      const data = { 导演: '' }
+      const result = simulateEnrichIntroData(5, data, colMap)
 
       expect(result.enriched).toHaveLength(0)
       expect(result.conflicts).toHaveLength(0)
@@ -431,8 +431,8 @@ describe('enrichIntroData 逻辑', () => {
         ['脚本', 4],
         ['特点/印象', 10],
       ])
-      const newData = { 编剧: '富野由悠季' }
-      simulateEnrichIntroData(5, newData, colMap)
+      const data = { 编剧: '富野由悠季' }
+      simulateEnrichIntroData(5, data, colMap)
 
       expect(getMockCellValue(5, 4)).toBe('富野由悠季(编剧)')
     })
@@ -442,8 +442,8 @@ describe('enrichIntroData 逻辑', () => {
         ['人物设定', 5],
         ['特点/印象', 10],
       ])
-      const newData = { 人设: '贞本义行' }
-      simulateEnrichIntroData(5, newData, colMap)
+      const data = { 人设: '贞本义行' }
+      simulateEnrichIntroData(5, data, colMap)
 
       expect(getMockCellValue(5, 5)).toBe('贞本义行(人设)')
     })
@@ -453,8 +453,8 @@ describe('enrichIntroData 逻辑', () => {
         ['演出', 6],
         ['特点/印象', 10],
       ])
-      const newData = { CG导演: '庵野秀明' }
-      simulateEnrichIntroData(5, newData, colMap)
+      const data = { CG导演: '庵野秀明' }
+      simulateEnrichIntroData(5, data, colMap)
 
       expect(getMockCellValue(5, 6)).toBe('庵野秀明(CG导演)')
     })
@@ -464,8 +464,8 @@ describe('enrichIntroData 逻辑', () => {
         ['动画制作公司', 7],
         ['特点/印象', 10],
       ])
-      const newData = { 动画制作: 'Gainax' }
-      simulateEnrichIntroData(5, newData, colMap)
+      const data = { 动画制作: 'Gainax' }
+      simulateEnrichIntroData(5, data, colMap)
 
       expect(getMockCellValue(5, 7)).toBe('Gainax')
       expect(getMockCellValue(5, 7)).not.toContain('(动画制作)')
@@ -476,8 +476,8 @@ describe('enrichIntroData 逻辑', () => {
         ['导演', 3],
         ['特点/印象', 10],
       ])
-      const newData = { 导演: '新海诚' }
-      simulateEnrichIntroData(5, newData, colMap)
+      const data = { 导演: '新海诚' }
+      simulateEnrichIntroData(5, data, colMap)
 
       expect(getMockCellValue(5, 3)).toBe('新海诚')
       expect(getMockCellValue(5, 3)).not.toContain('(导演)')
@@ -487,8 +487,8 @@ describe('enrichIntroData 逻辑', () => {
   describe('特点/印象追加', () => {
     it('简介内容追加到特点/印象', () => {
       const colMap = new Map<string, number>([['特点/印象', 10]])
-      const newData = { 简介: '这是一部非常精彩的动画作品' }
-      simulateEnrichIntroData(5, newData, colMap)
+      const data = { 简介: '这是一部非常精彩的动画作品' }
+      simulateEnrichIntroData(5, data, colMap)
 
       const feature = getMockCellValue(5, 10)
       expect(feature).toContain('简介:这是一部非常精彩的动画作品')
@@ -497,8 +497,8 @@ describe('enrichIntroData 逻辑', () => {
     it('简介超过80字时截断', () => {
       const colMap = new Map<string, number>([['特点/印象', 10]])
       const longIntro = 'A'.repeat(100)
-      const newData = { 简介: longIntro }
-      simulateEnrichIntroData(5, newData, colMap)
+      const data = { 简介: longIntro }
+      simulateEnrichIntroData(5, data, colMap)
 
       const feature = getMockCellValue(5, 10)
       expect(feature).toContain('简介:')
@@ -508,8 +508,8 @@ describe('enrichIntroData 逻辑', () => {
     it('已有特点/印象时追加而非替换', () => {
       const colMap = new Map<string, number>([['特点/印象', 10]])
       setMockCellValue(5, 10, '已有内容')
-      const newData = { 导演: '新海诚' }
-      simulateEnrichIntroData(5, newData, colMap)
+      const data = { 导演: '新海诚' }
+      simulateEnrichIntroData(5, data, colMap)
 
       const feature = getMockCellValue(5, 10)
       expect(feature).toContain('已有内容')
@@ -525,12 +525,12 @@ describe('enrichIntroData 逻辑', () => {
         ['音乐', 8],
         ['特点/印象', 10],
       ])
-      const newData = {
+      const data = {
         导演: '新海诚',
         编剧: '铃木贵昭',
         音乐: '天门',
       }
-      const result = simulateEnrichIntroData(5, newData, colMap)
+      const result = simulateEnrichIntroData(5, data, colMap)
 
       expect(result.enriched.filter((e) => e.action === 'fill')).toHaveLength(3)
       expect(getMockCellValue(5, 3)).toBe('新海诚')
@@ -545,11 +545,11 @@ describe('enrichIntroData 逻辑', () => {
         ['特点/印象', 10],
       ])
       setMockCellValue(5, 3, '宫崎骏')
-      const newData = {
+      const data = {
         导演: '新海诚',
         音乐: '天门',
       }
-      const result = simulateEnrichIntroData(5, newData, colMap)
+      const result = simulateEnrichIntroData(5, data, colMap)
 
       expect(result.conflicts).toHaveLength(1) // 导演冲突
       expect(result.enriched.filter((e) => e.action === 'fill')).toHaveLength(1) // 音乐填充
@@ -561,7 +561,7 @@ describe('enrichIntroData 逻辑', () => {
 
 function simulateEnrichOpEdPv(
   row: number,
-  newData: Record<string, string>,
+  data: Record<string, string>,
   colMap: Map<string, number>,
 ): {
   field: string
@@ -581,29 +581,29 @@ function simulateEnrichOpEdPv(
   if (!bangumiFeatureCol) return enriched
 
   const parts: string[] = []
-  const op = newData.OP ?? ''
+  const op = data.OP ?? ''
   if (!isEmptyValue(op)) parts.push(`OP:${op}`)
-  const ed = newData.ED ?? ''
+  const ed = data.ED ?? ''
   if (!isEmptyValue(ed)) parts.push(`ED:${ed}`)
-  const pv = newData.PV ?? ''
+  const pv = data.PV ?? ''
   if (!isEmptyValue(pv)) parts.push(`PV:${pv}`)
 
   if (parts.length === 0) return enriched
 
-  const newFeatureText = parts.join(TAG_SEPARATOR)
+  const featureText = parts.join(TAG_SEPARATOR)
   const oldFeature = getMockCellValue(row, bangumiFeatureCol)
 
   if (isEmptyValue(oldFeature)) {
-    setMockCellValue(row, bangumiFeatureCol, newFeatureText)
+    setMockCellValue(row, bangumiFeatureCol, featureText)
     enriched.push({
       field: '特点/印象',
       col: bangumiFeatureCol,
       oldValue: null,
-      newValue: newFeatureText,
+      newValue: featureText,
       action: 'fill',
     })
   } else {
-    const merged = appendFeatures(oldFeature, newFeatureText)
+    const merged = appendFeatures(oldFeature, featureText)
     if (merged !== oldFeature) {
       setMockCellValue(row, bangumiFeatureCol, merged)
       enriched.push({
@@ -626,8 +626,8 @@ describe('enrichOpEdPv 逻辑', () => {
 
   it('OP/ED/PV 追加到特点/印象', () => {
     const colMap = new Map<string, number>([['特点/印象', 10]])
-    const newData = { OP: 'OP1: 歌曲A', ED: 'ED1: 歌曲B' }
-    const enriched = simulateEnrichOpEdPv(5, newData, colMap)
+    const data = { OP: 'OP1: 歌曲A', ED: 'ED1: 歌曲B' }
+    const enriched = simulateEnrichOpEdPv(5, data, colMap)
 
     expect(enriched.length).toBeGreaterThan(0)
     expect(getMockCellValue(5, 10)).toContain('OP:OP1: 歌曲A')
@@ -636,8 +636,8 @@ describe('enrichOpEdPv 逻辑', () => {
 
   it('只有 OP 时只添加 OP', () => {
     const colMap = new Map<string, number>([['特点/印象', 10]])
-    const newData = { OP: 'OP1: 歌曲A' }
-    simulateEnrichOpEdPv(5, newData, colMap)
+    const data = { OP: 'OP1: 歌曲A' }
+    simulateEnrichOpEdPv(5, data, colMap)
 
     const feature = getMockCellValue(5, 10)
     expect(feature).toContain('OP:OP1: 歌曲A')
@@ -646,16 +646,16 @@ describe('enrichOpEdPv 逻辑', () => {
 
   it('没有 OP/ED/PV 时不添加', () => {
     const colMap = new Map<string, number>([['特点/印象', 10]])
-    const newData = {}
-    const enriched = simulateEnrichOpEdPv(5, newData, colMap)
+    const data = {}
+    const enriched = simulateEnrichOpEdPv(5, data, colMap)
 
     expect(enriched).toHaveLength(0)
   })
 
   it('特点/印象列不存在时跳过', () => {
     const colMap = new Map<string, number>([['导演', 3]])
-    const newData = { OP: 'OP1' }
-    const enriched = simulateEnrichOpEdPv(5, newData, colMap)
+    const data = { OP: 'OP1' }
+    const enriched = simulateEnrichOpEdPv(5, data, colMap)
 
     expect(enriched).toHaveLength(0)
   })
@@ -665,7 +665,7 @@ describe('enrichOpEdPv 逻辑', () => {
 
 function simulateEnrichAlias(
   row: number,
-  newAnimeName: string,
+  animeName: string,
   bangumiName: string | undefined,
   colMap: Map<string, number>,
   aliasCol: number,
@@ -673,21 +673,21 @@ function simulateEnrichAlias(
   const nameCol = colMap.get('名称')
   if (!nameCol) return null
 
-  if (newAnimeName === bangumiName) {
-    return { action: 'skip', newValue: newAnimeName }
+  if (animeName === bangumiName) {
+    return { action: 'skip', newValue: animeName }
   }
 
   const existingAliases = getMockCellValue(row, aliasCol)
   const aliasList = splitAliases(existingAliases)
 
-  const normalizedNew = normalizeName(newAnimeName)
+  const normalizedNew = normalizeName(animeName)
   const isAlreadyExists = aliasList.some((a) => normalizeName(a) === normalizedNew)
 
   if (isAlreadyExists) {
-    return { action: 'skip', newValue: newAnimeName }
+    return { action: 'skip', newValue: animeName }
   }
 
-  const merged = existingAliases ? existingAliases + TAG_SEPARATOR + newAnimeName : newAnimeName
+  const merged = existingAliases ? existingAliases + TAG_SEPARATOR + animeName : animeName
   setMockCellValue(row, aliasCol, merged)
   return { action: 'append', newValue: merged }
 }
@@ -806,14 +806,14 @@ describe('简介工作表富化综合场景', () => {
     setMockCellValue(5, 8, '') // 音乐为空（会填充）
 
     // 新番表数据
-    const newData = {
+    const data = {
       导演: '新海诚', // 会冲突
       编剧: '铃木贵昭', // 会填充（带标注）
       音乐: '天门', // 会填充
       简介: '精彩的动画', // 追加到特点/印象
     }
 
-    const result = simulateEnrichIntroData(5, newData, colMap)
+    const result = simulateEnrichIntroData(5, data, colMap)
 
     // 验证冲突
     expect(result.conflicts.filter((c) => c.field === '导演')).toHaveLength(1)

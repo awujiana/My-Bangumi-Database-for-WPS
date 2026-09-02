@@ -1530,12 +1530,12 @@ function processSingleBatchFile(filePath: string, bangumiSheet: WpsWorksheet): B
 
     // EnrichResultItem 没有 stats，通过 enrichedFields 判断
     const updatedEntries = enrichResults.filter((r) => r.kind === 'matched').length
-    const newEntries = enrichResults.filter(
+    const entries = enrichResults.filter(
       (r) => r.kind === 'matched' && r.enrichedFields.length > 0,
     ).length
 
     result.matched = matched
-    result.newEntries = newEntries
+    result.newEntries = entries
     result.updatedEntries = updatedEntries
     result.unmatched = unmatched
     result.success = true

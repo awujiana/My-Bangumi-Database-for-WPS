@@ -1003,8 +1003,8 @@ function batchUpdateRows(
           const newValue = finalValues[c]
           if (newValue === null) continue
           const oldValue = oldArray[c] != null ? String(oldArray[c]) : ''
-          const newValueString = String(newValue)
-          if (oldValue === newValueString) {
+          const valueString = String(newValue)
+          if (oldValue === valueString) {
             finalValues[c] = null // 无变化，跳过
           } else {
             hasChanges = true
@@ -1013,7 +1013,7 @@ function batchUpdateRows(
               row,
               col: minCol + c,
               oldValue,
-              newValue: newValueString,
+              newValue: valueString,
             })
           }
         }

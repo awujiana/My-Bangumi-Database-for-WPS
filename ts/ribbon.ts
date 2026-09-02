@@ -233,16 +233,16 @@ export function GetSkipConflictsPressed(_control: WpsRibbonControl): boolean {
  * 当"跳过冲突"复选框被点击时，保存状态
  */
 export function OnSkipConflictsChange(control: WpsRibbonControl): boolean {
-  const newValue = control.Pressed
+  const value = control.Pressed
   bgmLog(
     LOG_LEVELS.INFO,
-    `[Ribbon] OnSkipConflictsChange: control.Pressed = ${String(newValue ?? '')}`,
+    `[Ribbon] OnSkipConflictsChange: control.Pressed = ${String(value ?? '')}`,
   )
 
   // 如果 control.Pressed 是 undefined，则切换当前状态
   let isFinalValue: boolean
-  if (typeof newValue === 'boolean') {
-    isFinalValue = newValue
+  if (typeof value === 'boolean') {
+    isFinalValue = value
   } else {
     isFinalValue = !getSkipConflicts()
     bgmLog(LOG_LEVELS.INFO, `[Ribbon] control.Pressed 不可用，切换状态为: ${String(isFinalValue)}`)
@@ -268,14 +268,14 @@ export function GetEnableSyncRecordPressed(_control: WpsRibbonControl): boolean 
  * 当"启用同步记录"复选框被点击时，保存状态
  */
 export function OnEnableSyncRecordChange(control: WpsRibbonControl): boolean {
-  const newValue = control.Pressed
+  const value = control.Pressed
   bgmLog(
     LOG_LEVELS.INFO,
-    `[Ribbon] OnEnableSyncRecordChange: control.Pressed = ${String(newValue ?? '')}`,
+    `[Ribbon] OnEnableSyncRecordChange: control.Pressed = ${String(value ?? '')}`,
   )
   let isFinalValue: boolean
-  if (typeof newValue === 'boolean') {
-    isFinalValue = newValue
+  if (typeof value === 'boolean') {
+    isFinalValue = value
   } else {
     isFinalValue = !getSyncRecordEnabled()
     bgmLog(LOG_LEVELS.INFO, `[Ribbon] control.Pressed 不可用，切换状态为: ${String(isFinalValue)}`)
@@ -299,10 +299,10 @@ export function GetIncrementalSyncPressed(_control: WpsRibbonControl): boolean {
  * 当增量同步复选框被点击时，保存状态
  */
 export function OnIncrementalSyncChange(control: WpsRibbonControl): boolean {
-  const newValue = control.Pressed
+  const value = control.Pressed
   let isFinalValue: boolean
-  if (typeof newValue === 'boolean') {
-    isFinalValue = newValue
+  if (typeof value === 'boolean') {
+    isFinalValue = value
   } else {
     isFinalValue = !getIncrementalSync()
     bgmLog(LOG_LEVELS.INFO, `[Ribbon] control.Pressed 不可用，切换状态为: ${String(isFinalValue)}`)

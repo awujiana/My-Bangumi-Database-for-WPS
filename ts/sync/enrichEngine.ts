@@ -253,9 +253,9 @@ export function splitTags(tags: string): string[] {
  */
 export function mergeTags(oldTags: string, newTags: string): string {
   const oldList = splitTags(oldTags)
-  const newList = splitTags(newTags)
+  const list = splitTags(newTags)
   const merged = [...oldList]
-  for (const tag of newList) {
+  for (const tag of list) {
     if (!merged.includes(tag)) {
       merged.push(tag)
     }
@@ -267,19 +267,19 @@ export function mergeTags(oldTags: string, newTags: string): string {
  * 追加特点信息去重
  * 将新特点追加到旧特点后，以 FEATURE_SEPARATOR 分隔
  */
-export function appendFeatures(oldFeature: string, newFeatures: string): string {
-  if (!oldFeature) return newFeatures
-  if (!newFeatures) return oldFeature
+export function appendFeatures(oldFeature: string, features: string): string {
+  if (!oldFeature) return features
+  if (!features) return oldFeature
   const oldList = oldFeature
     .split(FEATURE_SEPARATOR)
     .map((f) => f.trim())
     .filter(Boolean)
-  const newList = newFeatures
+  const list = features
     .split(FEATURE_SEPARATOR)
     .map((f) => f.trim())
     .filter(Boolean)
   const merged = [...oldList]
-  for (const feat of newList) {
+  for (const feat of list) {
     if (!merged.includes(feat)) {
       merged.push(feat)
     }
@@ -440,7 +440,7 @@ function buildBangumiIndexes(
  * 匹配新番表与 Bangumi 追踪表条目
  */
 export function matchEntries(
-  newAnimeSheet: WpsWorksheet,
+  animeSheet: WpsWorksheet,
   bangumiSheet: WpsWorksheet,
   config: EnrichConfig,
 ): MatchResult[] {
@@ -450,7 +450,7 @@ export function matchEntries(
     const bangumiColMap = getBangumiColumnMap(bangumiSheet)
     const [nameIndex, aliasIndex, rowNames] = buildBangumiIndexes(bangumiSheet, bangumiColMap)
 
-    const lastRow = getLastRow(newAnimeSheet)
+    const lastRow = getLastRow(animeSheet)
     const { dataStartRow } = config
 
     const { nameCol } = config.columnMapping
@@ -460,7 +460,7 @@ export function matchEntries(
     }
 
     for (let row = dataStartRow; row <= lastRow; row += 1) {
-      const rawName = getCellValue(newAnimeSheet, row, nameCol).trim()
+      const rawName = getCellValue(animeSheet, row, nameCol).trim()
       if (!rawName) continue
 
       const normalizedName = normalizeName(rawName)
@@ -602,17 +602,17 @@ export function enrichDate(
   const bangumiDateCol = colMap.get('开播日期')
   if (!bangumiDateCol) return
 
-  const newDate = newData['首播'] ?? ''
-  if (isEmptyValue(newDate)) return
+  const date = newData['首播'] ?? ''
+  if (isEmptyValue(date)) return
 
   const oldDate = getCellValue(sheet, row, bangumiDateCol)
   if (isEmptyValue(oldDate)) {
-    setCellValue(sheet, row, bangumiDateCol, newDate)
+    setCellValue(sheet, row, bangumiDateCol, date)
     enriched.push({
       fieldName: '开播日期',
       bangumiColumn: bangumiDateCol,
       oldValue: null,
-      newValue: newDate,
+      newValue: date,
       action: 'fill',
     })
   } else {
@@ -620,7 +620,7 @@ export function enrichDate(
       fieldName: '开播日期',
       bangumiColumn: bangumiDateCol,
       oldValue: oldDate,
-      newValue: newDate,
+      newValue: date,
       action: 'skip',
     })
   }
@@ -702,20 +702,20 @@ export function enrichFeatures(
 
   if (featureParts.length === 0) return
 
-  const newFeatures = featureParts.join(FEATURE_SEPARATOR)
+  const features = featureParts.join(FEATURE_SEPARATOR)
   const oldFeature = getCellValue(sheet, row, bangumiFeatureCol)
 
   if (isEmptyValue(oldFeature)) {
-    setCellValue(sheet, row, bangumiFeatureCol, newFeatures)
+    setCellValue(sheet, row, bangumiFeatureCol, features)
     enriched.push({
       fieldName: '特点/印象',
       bangumiColumn: bangumiFeatureCol,
       oldValue: null,
-      newValue: newFeatures,
+      newValue: features,
       action: 'fill',
     })
   } else {
-    const merged = appendFeatures(oldFeature, newFeatures)
+    const merged = appendFeatures(oldFeature, features)
     if (merged !== oldFeature) {
       setCellValue(sheet, row, bangumiFeatureCol, merged)
       enriched.push({
@@ -742,7 +742,7 @@ export function enrichFeatures(
  * 对每个匹配结果执行富化，写入富化记录，调用进度回调
  */
 export function enrichEntries(
-  newAnimeSheet: WpsWorksheet,
+  animeSheet: WpsWorksheet,
   bangumiSheet: WpsWorksheet,
   matches: MatchResult[],
   config: EnrichConfig,
@@ -817,8 +817,8 @@ export function enrichEntries(
 
     const isIntro = isIntroSheet(config.columnMapping)
     const newData = isIntro
-      ? readIntroSheetRow(newAnimeSheet, match.newAnimeRow, config.columnMapping)
-      : readNewAnimeRow(newAnimeSheet, match.newAnimeRow, config.columnMapping)
+      ? readIntroSheetRow(animeSheet, match.newAnimeRow, config.columnMapping)
+      : readNewAnimeRow(animeSheet, match.newAnimeRow, config.columnMapping)
     const enrichedFields: EnrichedField[] = []
     const fieldConflicts: ConflictInfo[] = []
 
@@ -1109,18 +1109,18 @@ export function ensureBangumiColumns(
     // 应用样式到新列
     try {
       if (templateFont) {
-        const newFont = headerRange.Font
-        if (newFont) {
-          newFont.Name = templateFont.Name
-          newFont.Size = templateFont.Size
-          newFont.Bold = templateFont.Bold
-          newFont.Color = templateFont.Color
+        const font = headerRange.Font
+        if (font) {
+          font.Name = templateFont.Name
+          font.Size = templateFont.Size
+          font.Bold = templateFont.Bold
+          font.Color = templateFont.Color
         }
       }
       if (templateInterior) {
-        const newInterior = headerRange.Interior
-        if (newInterior) {
-          newInterior.Color = templateInterior.Color
+        const interior = headerRange.Interior
+        if (interior) {
+          interior.Color = templateInterior.Color
         }
       }
     } catch {
@@ -1324,20 +1324,20 @@ export function enrichOpEdPv(
 
   if (parts.length === 0) return
 
-  const newFeatureText = parts.join(FEATURE_SEPARATOR)
+  const featureText = parts.join(FEATURE_SEPARATOR)
   const oldFeature = getCellValue(sheet, row, bangumiFeatureCol)
 
   if (isEmptyValue(oldFeature)) {
-    setCellValue(sheet, row, bangumiFeatureCol, newFeatureText)
+    setCellValue(sheet, row, bangumiFeatureCol, featureText)
     enriched.push({
       fieldName: '特点/印象',
       bangumiColumn: bangumiFeatureCol,
       oldValue: null,
-      newValue: newFeatureText,
+      newValue: featureText,
       action: 'fill',
     })
   } else {
-    const merged = appendFeatures(oldFeature, newFeatureText)
+    const merged = appendFeatures(oldFeature, featureText)
     if (merged !== oldFeature) {
       setCellValue(sheet, row, bangumiFeatureCol, merged)
       enriched.push({
@@ -1415,7 +1415,7 @@ export function isIntroSheet(mapping: EnrichColumnMapping): boolean {
 export function enrichAlias(
   sheet: WpsWorksheet,
   row: number,
-  newAnimeName: string,
+  animeName: string,
   bangumiName: string | undefined,
   colMap: Map<string, number>,
   enriched: EnrichedField[],
@@ -1423,12 +1423,12 @@ export function enrichAlias(
   const nameCol = colMap.get('名称')
   if (!nameCol) return
 
-  if (newAnimeName === bangumiName) {
+  if (animeName === bangumiName) {
     enriched.push({
       fieldName: '别名',
       bangumiColumn: nameCol,
       oldValue: '',
-      newValue: newAnimeName,
+      newValue: animeName,
       action: 'skip',
     })
     return
@@ -1440,7 +1440,7 @@ export function enrichAlias(
   const existingAliases = getCellValue(sheet, row, aliasCol)
   const aliasList = splitAliases(existingAliases)
 
-  const normalizedNew = normalizeName(newAnimeName)
+  const normalizedNew = normalizeName(animeName)
   const isAlreadyExists = aliasList.some((a) => normalizeName(a) === normalizedNew)
 
   if (isAlreadyExists) {
@@ -1448,13 +1448,13 @@ export function enrichAlias(
       fieldName: '别名',
       bangumiColumn: aliasCol,
       oldValue: existingAliases,
-      newValue: newAnimeName,
+      newValue: animeName,
       action: 'skip',
     })
     return
   }
 
-  const merged = existingAliases ? existingAliases + TAG_SEPARATOR + newAnimeName : newAnimeName
+  const merged = existingAliases ? existingAliases + TAG_SEPARATOR + animeName : animeName
 
   setCellValue(sheet, row, aliasCol, merged)
   enriched.push({
