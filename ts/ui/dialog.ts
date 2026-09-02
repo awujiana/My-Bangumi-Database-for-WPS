@@ -806,11 +806,11 @@ export function updateSyncProgressDialog(
   if (logLine && log && logLine !== etaText) {
     const isNearBottom = log.scrollHeight - log.scrollTop - log.clientHeight < 30
     log.appendChild(document.createTextNode(`${logLine}\n`))
-    _syncProgressLogCount++
+    _syncProgressLogCount += 1
     while (_syncProgressLogCount > _SYNC_PROGRESS_LOG_MAX) {
       if (log.firstChild) {
         log.removeChild(log.firstChild)
-        _syncProgressLogCount--
+        _syncProgressLogCount -= 1
       } else {
         break
       }

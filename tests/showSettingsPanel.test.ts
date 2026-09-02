@@ -62,7 +62,7 @@ function createMockApp(): {
   return {
     PluginStorage: createMockPluginStorage(),
     CreateTaskPane: (url: string) => {
-      createdPaneCounter++
+      createdPaneCounter += 1
       const pane = {
         ID: `settings-pane-${String(createdPaneCounter)}`,
         Visible: false,

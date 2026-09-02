@@ -122,7 +122,7 @@ export function autoFillUrls(): AutoFillResult {
       const fillUrl = nameUrlMap[nameValue]
       if (fillUrl) {
         setCellValue(ws, row, urlCol, fillUrl)
-        result.filled++
+        result.filled += 1
       }
     }
 

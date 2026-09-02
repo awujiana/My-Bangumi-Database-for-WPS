@@ -177,7 +177,7 @@ export async function httpRequest<T = unknown>(
       }
 
       if (response.status === 429 && attempt < retries) {
-        attempt++
+        attempt += 1
         const delayMs = BGM_CONFIG.RETRY_DELAY_BASE * 2 ** (attempt - 1)
         bgmLog(
           LOG_LEVELS.WARN,
@@ -196,7 +196,7 @@ export async function httpRequest<T = unknown>(
       }
       BGM.handleError(error, { context: 'httpRequest', showAlert: false })
       if (attempt < retries) {
-        attempt++
+        attempt += 1
         const delayMs = BGM_CONFIG.RETRY_DELAY_BASE * 2 ** (attempt - 1)
         bgmLog(LOG_LEVELS.WARN, `网络错误，第 ${String(attempt)} 次重试，等待 ${String(delayMs)}ms`)
         await sleep(delayMs)

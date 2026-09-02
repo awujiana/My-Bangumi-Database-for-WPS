@@ -679,7 +679,7 @@ export function deduplicateSyncRecords(): boolean {
         const delCount = parseInt(getCellValue(sheet, delRow, SYNC_RECORD_COL.COUNT)) || 1
         totalCount += delCount
         sheet.Range(`${String(delRow)}:${String(delRow)}`).Delete()
-        removedCount++
+        removedCount += 1
       }
 
       setCellValue(sheet, keepRow, SYNC_RECORD_COL.COUNT, totalCount)

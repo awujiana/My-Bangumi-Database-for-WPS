@@ -3613,7 +3613,7 @@ describe('formatEta ms>0 精确路径 (line 548)', () => {
     // Mock Date.now() 使其返回递增的值，确保 elapsed > 0
     let dateNowCallCount = 0
     const dateNowSpy = vi.spyOn(globalThis.Date, 'now').mockImplementation(() => {
-      dateNowCallCount++
+      dateNowCallCount += 1
       return 1000 + dateNowCallCount * 100
     })
 
@@ -3621,7 +3621,7 @@ describe('formatEta ms>0 精确路径 (line 548)', () => {
     let secondEta = ''
     let callCount = 0
     const onProgress = (_current: number, _total: number, _message: string, eta?: string): void => {
-      callCount++
+      callCount += 1
       if (eta !== undefined) {
         if (callCount <= 3) firstEta = eta
         else secondEta = eta
@@ -4098,7 +4098,7 @@ describe('formatDuration 秒/分钟分支 (lines 536, 539)', () => {
     const startTime = 1_700_000_000_000
     let callCount = 0
     dateNowSpy = vi.spyOn(Date, 'now').mockImplementation(() => {
-      callCount++
+      callCount += 1
       if (callCount <= 2) return startTime
       return startTime + 30_000
     })
@@ -4155,7 +4155,7 @@ describe('formatDuration 秒/分钟分支 (lines 536, 539)', () => {
     const startTime = 1_700_000_000_000
     let callCount = 0
     dateNowSpy = vi.spyOn(Date, 'now').mockImplementation(() => {
-      callCount++
+      callCount += 1
       // 第一次返回起始时间，后续每次递增
       if (callCount === 1) return startTime
       // 后续每次调用增加 60000ms (60秒)

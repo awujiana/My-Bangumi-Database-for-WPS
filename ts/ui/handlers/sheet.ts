@@ -109,7 +109,7 @@ export function cleanLockedDataSheet(): void {
     const row = headerRow + 1 + index
     const name = (nameData[index]?.[0] ?? '').trim()
     if (!name) {
-      emptyNameCount++
+      emptyNameCount += 1
       continue
     }
     const rows = nameRows.get(name) ?? []
@@ -145,7 +145,7 @@ export function cleanLockedDataSheet(): void {
       continue
     }
 
-    duplicateNameCount++
+    duplicateNameCount += 1
     const keepRow = withUrl[0]!
     duplicateDetails.push({ name, rows, keep: withUrl, del: withoutUrl })
 
@@ -176,7 +176,7 @@ export function cleanLockedDataSheet(): void {
       if (nameNewTags.length > 0) {
         const mergedTags = [...existingSet].join(' | ')
         setCellValue(ws, keepRow, tagsCol!, mergedTags)
-        mergedTagsCount++
+        mergedTagsCount += 1
         mergedTagEntries.push(`${name}: ${nameNewTags.join(' | ')}`)
       }
     }
@@ -222,14 +222,14 @@ export function cleanLockedDataSheet(): void {
   while (index < toDelete.length) {
     let index_ = index
     while (index_ + 1 < toDelete.length && toDelete[index_]! - toDelete[index_ + 1]! === 1) {
-      index_++
+      index_ += 1
     }
     if (index === index_) {
       ws.Range(`${String(toDelete[index] ?? '')}:${String(toDelete[index] ?? '')}`).Delete()
     } else {
       ws.Range(`${String(toDelete[index_] ?? '')}:${String(toDelete[index] ?? '')}`).Delete()
     }
-    deleteCallCount++
+    deleteCallCount += 1
     index = index_ + 1
   }
   bgmLog(

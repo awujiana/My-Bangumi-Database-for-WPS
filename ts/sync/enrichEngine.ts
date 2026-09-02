@@ -782,7 +782,7 @@ export function enrichEntries(
         matchType: 'unmatched',
         enrichedFields: [],
       })
-      stats.skipped++
+      stats.skipped += 1
       continue
     }
 
@@ -795,7 +795,7 @@ export function enrichEntries(
         enrichedFields: [],
         ...(match.errorMessage !== undefined ? { errorMessage: match.errorMessage } : {}),
       })
-      stats.failed++
+      stats.failed += 1
       continue
     }
 
@@ -809,11 +809,11 @@ export function enrichEntries(
         enrichedFields: [],
         errorMessage: '匹配行号缺失',
       })
-      stats.failed++
+      stats.failed += 1
       continue
     }
 
-    stats.matched++
+    stats.matched += 1
 
     const isIntro = isIntroSheet(config.columnMapping)
     const newData = isIntro
@@ -854,9 +854,9 @@ export function enrichEntries(
 
       const hasEnrichment = enrichedFields.some((f) => f.action !== 'skip')
       if (hasEnrichment) {
-        stats.enriched++
+        stats.enriched += 1
       } else {
-        stats.skipped++
+        stats.skipped += 1
       }
 
       for (const field of enrichedFields) {
@@ -884,7 +884,7 @@ export function enrichEntries(
       })
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : String(error)
-      stats.failed++
+      stats.failed += 1
       bgmLog(
         LOG_LEVELS.ERROR,
         `[enrichEntries] 富化 "${match.newAnimeName}" (行${String(bangumiRow)}) 失败: ${errorMessage}`,
@@ -1155,7 +1155,7 @@ function WpsCellReference(row: number, col: number): string {
   let colString = ''
   let c = col
   while (c > 0) {
-    c--
+    c -= 1
     colString = String.fromCharCode(65 + (c % 26)) + colString
     c = Math.floor(c / 26)
   }
@@ -1620,8 +1620,8 @@ export function writeRemoteDataToSheet(
         setCellValue(sheet, row, col, value)
       }
     }
-    row++
-    written++
+    row += 1
+    written += 1
   }
 
   bgmLog(LOG_LEVELS.INFO, `[writeRemoteDataToSheet] 写入 ${String(written)} 行数据`)

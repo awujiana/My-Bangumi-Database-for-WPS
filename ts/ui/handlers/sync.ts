@@ -151,7 +151,7 @@ async function _fillSheetWithCollections(
         isRowOk = false
       }
     }
-    if (isRowOk) written++
+    if (isRowOk) written += 1
 
     // 每 50 行更新一次状态并让出事件循环，避免 UI 卡死
     if ((index + 1) % 50 === 0) {
@@ -842,7 +842,7 @@ async function _doAPISync(
           collType: COLLECTION_TYPE_NAMES[item.type] ?? '',
         })
       }
-      currentCombined++
+      currentCombined += 1
       updateSyncProgressDialog(
         currentCombined,
         totalCombined,
@@ -905,10 +905,10 @@ async function _doAPISync(
                 ? BGM_COLOR.LIGHT_GREEN
                 : BGM_COLOR.DARK_GREEN
         }
-        matchedCount++
+        matchedCount += 1
         isMatched = true
       }
-      currentCombined++
+      currentCombined += 1
       updateSyncProgressDialog(
         currentCombined,
         totalCombined,

@@ -372,10 +372,10 @@ export function detectHeaderAndColumns(
         try {
           const v = getCellValue(ws, r, c).trim()
           if (v) {
-            colCount++
+            colCount += 1
             const cv = v.toLowerCase()
             if (HEADER_KEYWORDS.some((kw) => cv === kw || cv.includes(kw))) {
-              matchCount++
+              matchCount += 1
             }
           }
         } catch (cellError) {
@@ -433,8 +433,8 @@ export function detectHeaderAndColumns(
     for (let c = 1; c <= PANEL_CONFIG.MAX_SCAN_COLUMNS; c += 1) {
       const nv = getCellValue(ws, headerRow + 1, c).trim()
       if (nv) {
-        total++
-        if (!headerNames[c - 1]) filled++
+        total += 1
+        if (!headerNames[c - 1]) filled += 1
       }
     }
     if (filled >= 3 && total >= 3) {
@@ -457,7 +457,7 @@ export function detectHeaderAndColumns(
   let samples = 0
   for (let dr = dataStartRow; dr <= dataStartRow + 20 && samples < 5; dr += 1) {
     if (!isRowVisible(dr, headerRow)) continue
-    samples++
+    samples += 1
     for (let c = 1; c <= PANEL_CONFIG.MAX_SCAN_COLUMNS; c += 1) {
       const v = getCellValue(ws, dr, c).trim()
       if (v) {
@@ -578,7 +578,7 @@ export function autoDetectSheet(): {
           }
         }
         if (hasAny) {
-          dataRowCount++
+          dataRowCount += 1
           if (firstDataRow < 0) firstDataRow = dr
         }
       }
@@ -917,7 +917,7 @@ export function refreshData(): void {
           const next = dataRows[index_ + 1]
           const current = dataRows[index_]
           if (next === undefined || current === undefined || next !== current + 1) break
-          index_++
+          index_ += 1
         }
         const segStart = dataRows[index]
         if (segStart === undefined) break
@@ -997,7 +997,7 @@ export function refreshData(): void {
         if (hasAny) {
           previewRows.push({ row: r, cols, isHeader: false, aligned: true })
           hasData = true
-          count++
+          count += 1
         }
       }
     }

@@ -726,9 +726,9 @@ function prepareSyncTasks(
   for (const rowNumber of rowsToProcess) {
     const outcome = processRowToSyncTask(ws, rowNumber, getField, skipSids, fingerprintMap, seqCol)
     if (outcome.failed) {
-      fail++
+      fail += 1
     } else if (outcome.skipped) {
-      skip++
+      skip += 1
     } else if (outcome.task) {
       syncTasks.push(outcome.task)
     }
@@ -1246,7 +1246,7 @@ async function executeSelectedSync(
           bgmLog(LOG_LEVELS.WARN, `[syncSelectedRows] ${rowProgress} ${message}`)
           showToast(message, 'warn')
           details.push(`⊘ 行${String(rowNumber)} ${name || '无名'} 跳过: URL为空`)
-          skipCount++
+          skipCount += 1
           updateSyncProgressDialog(index + 1, rows.length, message, `⊘ ${rowProgress} ${message}`)
           continue
         }
@@ -1259,7 +1259,7 @@ async function executeSelectedSync(
           details.push(
             `⊘ 行${String(rowNumber)} ${name || '无名'} 跳过: 非BGM链接 (${bgmUrl.substring(0, 30)})`,
           )
-          skipCount++
+          skipCount += 1
           updateSyncProgressDialog(index + 1, rows.length, message, `⊘ ${rowProgress} ${message}`)
           continue
         }
@@ -1270,7 +1270,7 @@ async function executeSelectedSync(
           bgmLog(LOG_LEVELS.WARN, `[syncSelectedRows] ${rowProgress} ${message}`)
           showToast(message, 'warn')
           details.push(`⊘ 行${String(rowNumber)} ${name || '无名'} 跳过: 无效ID`)
-          skipCount++
+          skipCount += 1
           updateSyncProgressDialog(index + 1, rows.length, message, `⊘ ${rowProgress} ${message}`)
           continue
         }
@@ -1299,7 +1299,7 @@ async function executeSelectedSync(
           bgmLog(LOG_LEVELS.WARN, `[syncSelectedRows] ${rowProgress} ${message}`)
           showToast(message, 'warn')
           details.push(`⊘ 行${String(rowNumber)} ${name || sid} 跳过: 请求体为空`)
-          skipCount++
+          skipCount += 1
           updateSyncProgressDialog(index + 1, rows.length, message, `⊘ ${rowProgress} ${message}`)
           continue
         }
@@ -1313,7 +1313,7 @@ async function executeSelectedSync(
         const result = await _bgmRequestSync('POST', endpoint, jsonBody, token)
 
         if (result.code >= 200 && result.code < 300) {
-          successCount++
+          successCount += 1
           details.push(`✓ 行${String(rowNumber)} ${name || sid} HTTP:${String(result.code)}`)
           bgmLog(
             LOG_LEVELS.INFO,
@@ -1351,7 +1351,7 @@ async function executeSelectedSync(
               `[syncSelectedRows] ${rowProgress} 行${String(rowNumber)} 状态${watchType === 2 ? '"看过"' : '"在看"'}(type=${String(watchType)})，集数: ${String(epCount)}，开始标记章节...`,
             )
             const epResult = await _markEpisodesComplete(sid, epCount, token)
-            episodeMarkCount++
+            episodeMarkCount += 1
             bgmLog(
               LOG_LEVELS.INFO,
               `[syncSelectedRows] ${rowProgress} 行${String(rowNumber)} 章节标记结果: ${epResult.message}`,
@@ -1363,7 +1363,7 @@ async function executeSelectedSync(
             )
           }
         } else {
-          failCount++
+          failCount += 1
           details.push(`✗ 行${String(rowNumber)} ${name || sid} HTTP:${String(result.code)}`)
           bgmLog(
             LOG_LEVELS.WARN,
@@ -1377,7 +1377,7 @@ async function executeSelectedSync(
           )
         }
       } catch (error: unknown) {
-        failCount++
+        failCount += 1
         const errorMessage = error instanceof Error ? error.message : String(error)
         bgmLog(
           LOG_LEVELS.ERROR,

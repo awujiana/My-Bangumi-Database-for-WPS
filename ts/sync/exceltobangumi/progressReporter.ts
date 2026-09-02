@@ -96,7 +96,7 @@ export function applySyncSuccessResults(
       ...(task.fingerprint !== undefined ? { fingerprint: task.fingerprint } : {}),
     })
 
-    result.success++
+    result.success += 1
   }
 }
 
@@ -128,7 +128,7 @@ export function applySyncFailResults(
       count: 1,
     })
 
-    result.fail++
+    result.fail += 1
   }
 }
 
@@ -150,7 +150,7 @@ export function handleStoppedRemainingTasks(
   const executedCount = successTasks.length + failTasks.length
   const remainingTasks = syncTasks.slice(executedCount)
   for (const task of remainingTasks) {
-    result.skip++
+    result.skip += 1
     bgmLog(LOG_LEVELS.INFO, `[SyncToBangumiAsync] 任务被跳过（停止）: SID=${task.sid}`)
   }
   bgmLog(

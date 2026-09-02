@@ -391,7 +391,7 @@ export async function previewSyncContent(): Promise<void> {
         // 过滤无效行
         if (!rowData.bgmUrl || !rowData.sid) {
           bgmLog(LOG_LEVELS.INFO, `[preview] 跳过行 ${String(rowNumber)} (无 Bangumi URL)`)
-          skippedCount++
+          skippedCount += 1
           updateSyncProgressDialog(
             index + 1,
             totalRows,
@@ -403,7 +403,7 @@ export async function previewSyncContent(): Promise<void> {
         // 可选：过滤全空（名称、状态、标签全空）
         if (!rowData.name && !rowData.status && !rowData.tagsRaw) {
           bgmLog(LOG_LEVELS.INFO, `[preview] 跳过行 ${String(rowNumber)} (空卡片)`)
-          skippedCount++
+          skippedCount += 1
           updateSyncProgressDialog(
             index + 1,
             totalRows,
@@ -420,11 +420,11 @@ export async function previewSyncContent(): Promise<void> {
 
         // 更新统计数据（仅当状态码在 1-5 范围内）
         if (rowData.typeNum >= 1 && rowData.typeNum <= 5) {
-          detailPreviewData.totalWithType++
+          detailPreviewData.totalWithType += 1
           detailPreviewData.typeCount[rowData.typeNum] =
             (detailPreviewData.typeCount[rowData.typeNum] || 0) + 1
           if (rowData.isUploaded) {
-            detailPreviewData.totalUploaded++
+            detailPreviewData.totalUploaded += 1
             detailPreviewData.uploadedCount[rowData.typeNum] =
               (detailPreviewData.uploadedCount[rowData.typeNum] || 0) + 1
           }
@@ -432,7 +432,7 @@ export async function previewSyncContent(): Promise<void> {
 
         // 生成卡片 HTML（渲染成功后才计数）
         cardsHtml += renderDetailItemHtml(rowData, colMap, ws)
-        actualCardCount++
+        actualCardCount += 1
         updateSyncProgressDialog(
           index + 1,
           totalRows,
@@ -440,7 +440,7 @@ export async function previewSyncContent(): Promise<void> {
           `✓ [${String(index + 1)}/${String(totalRows)}] 行${String(rowNumber)} "${rowData.name || ''}" 已渲染`,
         )
       } catch (error: unknown) {
-        errorCount++
+        errorCount += 1
         BGM.handleError(error, {
           showAlert: false,
           level: BGM.ErrorLevel.WARN,

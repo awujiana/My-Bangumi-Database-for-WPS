@@ -129,11 +129,11 @@ export function computeDateStatsFromSheet(): DateStats {
     if (!url) continue
     const sid = extractSubjectId(url)
     if (!sid) continue
-    totalCount++
+    totalCount += 1
 
     const dateString = trim(getCellValue(ws, row, dateCol))
     if (!dateString) continue
-    datedCount++
+    datedCount += 1
 
     // 标准化日期：移除分隔符，用于比较
     const normalized = dateString.replace(/[/.]/g, '-')

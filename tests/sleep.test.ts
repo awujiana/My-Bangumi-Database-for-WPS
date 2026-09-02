@@ -57,7 +57,7 @@ describe('sleep', () => {
     // 第一轮返回带 DoEvents 的 app，第二轮让 DoEvents 抛异常
     let callCount = 0
     const mockDoEvents = vi.fn(() => {
-      callCount++
+      callCount += 1
       if (callCount >= 1) {
         throw new Error('DoEvents 失败')
       }
@@ -73,7 +73,7 @@ describe('sleep', () => {
   it('busy-loop 中 app 为 null 时不应崩溃', () => {
     let callCount = 0
     mockGetApp.mockImplementation(() => {
-      callCount++
+      callCount += 1
       return null
     })
 

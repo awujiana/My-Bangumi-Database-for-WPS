@@ -1370,7 +1370,7 @@ function handleConflictResolution(resolution: ConflictInfo['resolution']): void 
     )
   }
 
-  state.currentConflictIndex++
+  state.currentConflictIndex += 1
 
   if (state.currentConflictIndex < state.pendingConflicts.length) {
     showConflictDialog()

@@ -259,7 +259,7 @@ export async function fetchAllUserCollections(
       if (xhrResult.status < 200 || xhrResult.status >= 300) {
         if (xhrResult.status === 429) {
           if (retryCount < MAX_RETRY_COUNT) {
-            retryCount++
+            retryCount += 1
             const delayMs = BGM_CONFIG.RETRY_DELAY_BASE * 2 ** (retryCount - 1)
             bgmLog(
               LOG_LEVELS.WARN,

@@ -1023,7 +1023,7 @@ function batchUpdateRows(
           // 简化处理：直接写入整行（一次 COM 调用）
           range.Value2 = finalValues as unknown as WpsCellValue
         }
-        successCount++
+        successCount += 1
         details?.push({
           kind: 'update',
           sid: u.sid,
@@ -1050,7 +1050,7 @@ function batchUpdateRows(
             const result = writeRemoteEntryToRow(ws, colMap, row, remote, fields, forceOverwrite)
             if (result.success || !result.attempted) {
               // 写入成功 或 没有写入需要尝试（如空列映射）→ 视为成功
-              successCount++
+              successCount += 1
               details?.push({
                 kind: 'update',
                 sid: u.sid,
@@ -1122,7 +1122,7 @@ function batchUpdateRows(
         const result = writeRemoteEntryToRow(ws, colMap, row, remote, fields, forceOverwrite)
         if (result.success || !result.attempted) {
           // 写入成功 或 没有写入需要尝试（如空列映射）→ 视为成功
-          successCount++
+          successCount += 1
           details?.push({
             kind: 'update',
             sid: u.sid,
@@ -1301,8 +1301,8 @@ export async function applyDiffToSheet(
             if (writeResult.success || !writeResult.attempted) {
               // 写入成功 或 没有写入需要尝试（如空列映射）→ 视为成功
               const writtenRow = nextAppendRow
-              nextAppendRow++
-              result.added++
+              nextAppendRow += 1
+              result.added += 1
               result.details!.push({
                 kind: 'add',
                 sid: diff.sid,
@@ -1322,7 +1322,7 @@ export async function applyDiffToSheet(
               })
             } else {
               // 尝试了写入但全部失败
-              result.failed++
+              result.failed += 1
               bgmLog(LOG_LEVELS.ERROR, `[githubSync] 逐行写入失败 sid=${diff.sid}: 写入全部失败`)
               result.details!.push({
                 kind: 'fail',
@@ -1341,7 +1341,7 @@ export async function applyDiffToSheet(
             }
           } catch (error: unknown) {
             const errorMessage = error instanceof Error ? error.message : String(error)
-            result.failed++
+            result.failed += 1
             bgmLog(LOG_LEVELS.ERROR, `[githubSync] 逐行写入失败 sid=${diff.sid}: ${errorMessage}`)
             result.details!.push({
               kind: 'fail',
@@ -1460,7 +1460,7 @@ export async function applyDiffToSheet(
       recordRowDeleteEntry({ row: diff.localRow!, values: rowValues })
       try {
         ws.Range(`${String(diff.localRow ?? '')}:${String(diff.localRow ?? '')}`).Delete()
-        result.deleted++
+        result.deleted += 1
         result.details!.push({
           kind: 'delete',
           sid: diff.sid,
@@ -1481,7 +1481,7 @@ export async function applyDiffToSheet(
           LOG_LEVELS.WARN,
           `[githubSync] 删除行 ${String(diff.localRow ?? '')} 失败: ${errorMessage}`,
         )
-        result.failed++
+        result.failed += 1
         result.details!.push({
           kind: 'fail',
           sid: diff.sid,
@@ -1499,7 +1499,7 @@ export async function applyDiffToSheet(
       }
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : String(error)
-      result.failed++
+      result.failed += 1
       bgmLog(LOG_LEVELS.ERROR, `[githubSync] 删除处理失败 sid=${diff.sid}: ${errorMessage}`)
       result.details!.push({
         kind: 'fail',
@@ -1517,7 +1517,7 @@ export async function applyDiffToSheet(
       })
     }
 
-    deleteProcessed++
+    deleteProcessed += 1
     const now = Date.now()
     if (now - lastProgressTime > 300 || deleteProcessed >= deleteTotal) {
       const totalProcessed = addTotal + updateTotal + deleteProcessed

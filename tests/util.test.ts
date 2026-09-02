@@ -299,7 +299,7 @@ describe('findHeaderRow', () => {
     const ws = createMockWorksheet({ name: 'Sheet-FHR-Cache' })
     let callCount = 0
     mockState.getCellValue.mockImplementation(() => {
-      callCount++
+      callCount += 1
       if (callCount <= 4) {
         // 第一次扫描，返回 4 个表头关键字
         const headers = ['序列号', '名称', 'Bangumi URL', '是否看完']
@@ -379,7 +379,7 @@ describe('getColumnMap', () => {
     const ws = createMockWorksheet({ name: 'Sheet-GCM-Cache' })
     let callCount = 0
     mockState.getCellValue.mockImplementation(() => {
-      callCount++
+      callCount += 1
       return ''
     })
     getColumnMap(ws as never, 1)

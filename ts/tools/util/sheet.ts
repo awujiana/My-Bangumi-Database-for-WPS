@@ -153,7 +153,7 @@ export function findHeaderRow(ws: WpsWorksheet | null | undefined, startRow?: nu
           if (!cellValue) continue
           for (const header of HEADER_KEYWORDS) {
             if (cellValue.includes(header.toLowerCase())) {
-              matchCount++
+              matchCount += 1
               break
             }
           }
@@ -484,9 +484,9 @@ export function ensureSheetHeaders(ws: WpsWorksheet | null | undefined): boolean
     if (header !== undefined) {
       const isOk = setCellValueDirect(ws, 1, index + 1, header)
       if (isOk) {
-        writeCount++
+        writeCount += 1
       } else {
-        failCount++
+        failCount += 1
         failCols.push(index + 1)
       }
     }

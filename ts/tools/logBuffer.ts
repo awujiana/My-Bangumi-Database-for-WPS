@@ -31,7 +31,7 @@ export class RingBuffer<T> {
     this.buffer[this.head] = item
     this.head = (this.head + 1) % this.capacity
     if (this._size < this.capacity) {
-      this._size++
+      this._size += 1
     }
   }
 

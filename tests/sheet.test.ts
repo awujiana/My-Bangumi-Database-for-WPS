@@ -541,7 +541,7 @@ describe('findHeaderRow', () => {
   it('应使用缓存加速重复调用', () => {
     const callCount = { count: 0 }
     vi.mocked(getCellValue).mockImplementation(() => {
-      callCount.count++
+      callCount.count += 1
       return ''
     })
     const ws = createMockWorksheet({ name: 'CacheTest' })
@@ -634,7 +634,7 @@ describe('getColumnMap', () => {
   it('应缓存列映射结果', () => {
     const callCount = { count: 0 }
     vi.mocked(getCellValue).mockImplementation(() => {
-      callCount.count++
+      callCount.count += 1
       return ''
     })
     const ws = createMockWorksheet({ name: 'CacheMap' })
@@ -649,7 +649,7 @@ describe('cacheGet / clearSheetCache', () => {
   it('应在首次调用时执行 factory', () => {
     let called = 0
     const result = cacheGet('test-key', () => {
-      called++
+      called += 1
       return 'value'
     })
     expect(result).toBe('value')
@@ -659,11 +659,11 @@ describe('cacheGet / clearSheetCache', () => {
   it('应在后续调用时返回缓存值', () => {
     let called = 0
     cacheGet('cache-key', () => {
-      called++
+      called += 1
       return 42
     })
     cacheGet('cache-key', () => {
-      called++
+      called += 1
       return 99
     })
     expect(called).toBe(1)
@@ -672,17 +672,17 @@ describe('cacheGet / clearSheetCache', () => {
   it('清除缓存后应重新执行 factory', () => {
     let called = 0
     cacheGet('clear-test', () => {
-      called++
+      called += 1
       return 1
     })
     cacheGet('clear-test', () => {
-      called++
+      called += 1
       return 2
     })
     const ws = createMockWorksheet({ name: 'clear-test' })
     clearSheetCache(ws)
     cacheGet('clear-test', () => {
-      called++
+      called += 1
       return 3
     })
     expect(called).toBe(2)
@@ -692,18 +692,18 @@ describe('cacheGet / clearSheetCache', () => {
     let aCalled = 0
     let bCalled = 0
     cacheGet('key-a', () => {
-      aCalled++
+      aCalled += 1
       return 'a'
     })
     cacheGet('key-b', () => {
-      bCalled++
+      bCalled += 1
       return 'b'
     })
     expect(aCalled).toBe(1)
     expect(bCalled).toBe(1)
     // 再次获取应命中缓存
     cacheGet('key-a', () => {
-      aCalled++
+      aCalled += 1
       return 'a-new'
     })
     expect(aCalled).toBe(1) // 未增加

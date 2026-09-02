@@ -86,7 +86,7 @@ class MockXHR {
   }
 
   send(body?: string | null): void {
-    xhrCallCount++
+    xhrCallCount += 1
     lastXhrCall = {
       method: this.method,
       url: this.url,

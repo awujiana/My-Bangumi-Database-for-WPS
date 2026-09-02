@@ -220,14 +220,14 @@ export function getSyncPreview(
   }
 
   for (const rowNumber of rowsToProcess) {
-    total++
+    total += 1
     const bgmUrl = getField(rowNumber, 'Bangumi_URL')
 
     if (!bgmUrl || !extractSubjectId(bgmUrl)) {
-      noUrl++
+      noUrl += 1
       continue // 无效行不计入 valid
     }
-    valid++
+    valid += 1
 
     // 检查是否已上传（序列号列颜色）
     const seqCol = colMap.get('序列号') || 4
@@ -238,7 +238,7 @@ export function getSyncPreview(
         seqCell.Interior.Color === BGM_COLOR.LIGHT_GREEN ||
         seqCell.Interior.Color === BGM_COLOR.DARK_GREEN)
     if (isUploaded) {
-      alreadyUploaded++
+      alreadyUploaded += 1
       if (isIncremental) {
         // 增量模式：已上传且指纹匹配则跳过
         const sid = extractSubjectId(bgmUrl)
@@ -258,7 +258,7 @@ export function getSyncPreview(
             getField(rowNumber, '集号'),
           ])
           if (fingerprintMap.get(sid) === currentFingerprint) {
-            incrementalSkipped++
+            incrementalSkipped += 1
             continue
           }
         }
@@ -275,13 +275,13 @@ export function getSyncPreview(
 
     // 空状态不计入待同步，跳过该条目
     if (!watchStatus) {
-      emptyStatus++
+      emptyStatus += 1
       continue
     }
 
     const type = mapWatchStatus(watchStatus)
     if (type === 0) {
-      willSkip++
+      willSkip += 1
     } else {
       // 增量模式：检查指纹是否匹配
       if (isIncremental && fingerprintMap) {
@@ -298,12 +298,12 @@ export function getSyncPreview(
             getField(rowNumber, '集号'),
           ])
           if (fingerprintMap.get(sid) === currentFingerprint) {
-            incrementalSkipped++
+            incrementalSkipped += 1
             continue
           }
         }
       }
-      willSync++
+      willSync += 1
     }
   }
 
@@ -434,7 +434,7 @@ export async function detectConflicts(
         existingType: bgmEntry.type,
         newType: excelType,
       })
-      conflictCount++
+      conflictCount += 1
     }
     // 可扩展对比 rate、tags、comment 等字段
   }

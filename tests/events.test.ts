@@ -30,10 +30,10 @@ describe('EventBus', () => {
     it('应支持多个处理器', () => {
       let count = 0
       bus.on('multi', () => {
-        count++
+        count += 1
       })
       bus.on('multi', () => {
-        count++
+        count += 1
       })
       bus.emit('multi')
       expect(count).toBe(2)
@@ -43,10 +43,10 @@ describe('EventBus', () => {
       let a = 0
       let b = 0
       bus.on('a', () => {
-        a++
+        a += 1
       })
       bus.on('b', () => {
-        b++
+        b += 1
       })
       bus.emit('a')
       expect(a).toBe(1)
@@ -58,7 +58,7 @@ describe('EventBus', () => {
     it('应只触发一次', () => {
       let count = 0
       bus.once('once', () => {
-        count++
+        count += 1
       })
       bus.emit('once')
       bus.emit('once')
@@ -70,7 +70,7 @@ describe('EventBus', () => {
     it('应移除指定处理器', () => {
       let count = 0
       const handler = () => {
-        count++
+        count += 1
       }
       bus.on('test', handler)
       bus.emit('test')
@@ -84,10 +84,10 @@ describe('EventBus', () => {
       let a = 0
       let b = 0
       bus.on('test', () => {
-        a++
+        a += 1
       })
       bus.on('test', () => {
-        b++
+        b += 1
       })
       bus.off('test')
       bus.emit('test')
