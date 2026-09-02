@@ -31,7 +31,7 @@ import { _T } from './_constants.js'
 // ========== 业务对话框 ==========
 
 export function showTokenDialog(currentToken?: string): void {
-  const defaultValue = currentToken || loadBgToken() || ''
+  const defaultValue = (currentToken || loadBgToken()) ?? ''
   showInput(_T.setBgmToken, _T.inputToken, defaultValue, (value?: string) => {
     if (value) {
       storeBgToken(value)
@@ -46,7 +46,7 @@ export function showTokenDialog(currentToken?: string): void {
 }
 
 export function showUserIdDialog(): void {
-  const currentId = _getBgmUserId() || ''
+  const currentId = _getBgmUserId() ?? ''
   showInput(_T.setBgmUserId, _T.inputUserId, currentId, (value?: string) => {
     if (value && value.trim() !== '') {
       _setBgmUserId(value.trim())
@@ -258,7 +258,7 @@ export function testTokenValidity(): void {
         updateUserIdStatus()
 
         // 处理头像 URL：移除可能存在的反引号包裹
-        const rawAvatarUrl = data.avatar?.large || data.avatar?.medium || data.avatar?.small || ''
+        const rawAvatarUrl = (data.avatar?.large || data.avatar?.medium || data.avatar?.small) ?? ''
         const cleanAvatarUrl = rawAvatarUrl.replace(/`/g, '').trim()
         if (cleanAvatarUrl) {
           BGM.cache.avatarUrl = cleanAvatarUrl

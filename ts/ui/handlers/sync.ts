@@ -102,7 +102,7 @@ async function _fillSheetWithCollections(
 
     const row = headerRow + 1 + index
     const { subject } = item
-    const name = subject?.name_cn || subject?.name || ''
+    const name = (subject?.name_cn || subject?.name) ?? ''
     const alias = subject?.name_cn && subject.name ? subject.name : ''
     const url = `https://bgm.tv/subject/${String(item.subject_id)}`
 
@@ -381,7 +381,11 @@ async function confirmAndExecuteSync(prepared: SyncPreparedData): Promise<boolea
     }
   } catch (error: unknown) {
     bgmLog(LOG_LEVELS.WARN, `[syncFromPanel] 冲突检测失败: ${(error as Error).message}`)
-    BGM.handleError(error, { showAlert: false, level: BGM.ErrorLevel.WARN, context: 'syncFromPanel' })
+    BGM.handleError(error, {
+      showAlert: false,
+      level: BGM.ErrorLevel.WARN,
+      context: 'syncFromPanel',
+    })
   }
 
   // 9. 确认对话框
@@ -575,7 +579,7 @@ export function syncCollectionFromBgm(): void {
   bgmLog(LOG_LEVELS.INFO, '[syncCollectionFromBgm] ========== 开始从 BGM 同步收藏标记 ==========')
 
   const select = document.getElementById('sheetSelect') as HTMLSelectElement | null
-  const sheetIndex = BGM.sheet.lockedIndex || parseInt(select?.value || '') || 1
+  const sheetIndex = BGM.sheet.lockedIndex || parseInt(select?.value ?? '') || 1
   bgmLog(LOG_LEVELS.INFO, `[syncCollectionFromBgm] 目标工作表索引: ${String(sheetIndex)}`)
 
   const listTypeSelect = document.getElementById('listTypeSelect') as HTMLSelectElement | null
@@ -674,7 +678,7 @@ async function _doAPISync(
     showAlert(`✘ ${verifyResult.message}`)
     return
   }
-  _setBgmUserId(verifyResult.userId || '')
+  _setBgmUserId(verifyResult.userId ?? '')
 
   setStatus('正在获取收藏列表...', 'info')
   const collectionOptions: {
@@ -776,7 +780,7 @@ async function _doAPISync(
   let syncRecords: SyncRecord[] = typeof getAllSyncRecords === 'function' ? getAllSyncRecords() : []
   const syncCountMap = new Map<string, number>()
   syncRecords.forEach((r) =>
-    syncCountMap.set(r.sid || '', (syncCountMap.get(r.sid || '') || 0) + 1),)
+    syncCountMap.set(r.sid ?? '', (syncCountMap.get(r.sid ?? '') || 0) + 1),)
 
   // 使用从 ../index.js 导入的 BGM_SUBJECT_TYPES 常量（与 core/constants.ts 中定义一致）
   // 启动同步状态机：使用 enterRunningState 进行防重入检查
@@ -835,7 +839,7 @@ async function _doAPISync(
           content: '标记同步',
           status: '成功',
           count: 1,
-          collType: COLLECTION_TYPE_NAMES[item.type] || '',
+          collType: COLLECTION_TYPE_NAMES[item.type] ?? '',
         })
       }
       currentCombined++
@@ -850,7 +854,7 @@ async function _doAPISync(
     syncRecords = typeof getAllSyncRecords === 'function' ? getAllSyncRecords() : []
     syncCountMap.clear()
     syncRecords.forEach((r) =>
-      syncCountMap.set(r.sid || '', (syncCountMap.get(r.sid || '') || 0) + 1),)
+      syncCountMap.set(r.sid ?? '', (syncCountMap.get(r.sid ?? '') || 0) + 1),)
 
     // 阶段2：在 Excel 数据表上标记已收藏的行（需要定位单元格）
     // 切换回数据工作表，便于暂停时定位

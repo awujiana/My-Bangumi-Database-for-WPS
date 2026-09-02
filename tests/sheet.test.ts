@@ -45,7 +45,13 @@ const { PANEL_CONFIG, HEADER_KEYWORDS, COLUMN_RULES, STANDARD_HEADERS, colNumToL
       }
       return result
     }
-    return { PANEL_CONFIG, HEADER_KEYWORDS, COLUMN_RULES, STANDARD_HEADERS, colNumToLetter: colNumberToLetter }
+    return {
+      PANEL_CONFIG,
+      HEADER_KEYWORDS,
+      COLUMN_RULES,
+      STANDARD_HEADERS,
+      colNumToLetter: colNumberToLetter,
+    }
   })
 
 vi.mock('../ts/core/constants.js', () => ({
@@ -113,8 +119,8 @@ function createMockWorksheet(
 ) {
   const name = options.name || 'Sheet1'
   const rows = options.rows || 100
-  const cellValues = options.cellValues || {}
-  const cellOverrides = options.cellOverrides || {}
+  const cellValues = options.cellValues ?? {}
+  const cellOverrides = options.cellOverrides ?? {}
 
   const mockCell = (address: string): ReturnType<typeof createMockCell> => {
     if (address in cellOverrides) {
@@ -129,7 +135,7 @@ function createMockWorksheet(
   return {
     Name: name,
     Rows: { Count: rows },
-    UsedRange: options.usedRange || { Row: 1, Rows: { Count: 10 } },
+    UsedRange: options.usedRange ?? { Row: 1, Rows: { Count: 10 } },
     Range: vi.fn((address: string) => {
       if (address.includes(':')) {
         return { Value2: null, Interior: { Color: 0 }, Font: { Bold: false } }

@@ -333,8 +333,8 @@ function createMockWorksheet(
 ) {
   const name = options.name || 'Sheet1'
   const usedRange = options.usedRange || 5
-  const cellValues = options.cellValues || new Map()
-  const cellOverrides = options.cellOverrides || {}
+  const cellValues = options.cellValues ?? new Map()
+  const cellOverrides = options.cellOverrides ?? {}
   const cellCache = new Map<
     string,
     { Value2: unknown; Text: unknown; Interior: { Color: number }; Font: { Bold: boolean } }
@@ -710,7 +710,7 @@ function createMockSheetForSelection(
 ) {
   const name = options.name || 'Sheet1'
   const rowCount = options.rowCount || 10
-  const cellValues = options.cellValues || new Map()
+  const cellValues = options.cellValues ?? new Map()
 
   return {
     Name: name,
@@ -721,7 +721,12 @@ function createMockSheetForSelection(
         return { Value2: null, Interior: { Color: 0 } }
       }
       const value = cellValues.get(address)
-      return { Value2: value ?? '', Text: value ?? '', Interior: { Color: 0 }, Font: { Bold: false } }
+      return {
+        Value2: value ?? '',
+        Text: value ?? '',
+        Interior: { Color: 0 },
+        Font: { Bold: false },
+      }
     }),
     Activate: vi.fn(),
   }
@@ -2354,7 +2359,7 @@ describe('filterByTime 未覆盖分支 (line 328)', () => {
     vi.clearAllMocks()
     // 使用真实 filterByTime 实现
     mockFilterByTime.mockImplementation(
-      realImpls.filterByTime || ((entries: GithubRemoteEntry[]) => entries),
+      realImpls.filterByTime ?? ((entries: GithubRemoteEntry[]) => entries),
     )
   })
 
@@ -2457,7 +2462,7 @@ describe('matchTimeFilter 未覆盖分支 (lines 359-368) 通过 computeDiff', (
     )
     // filterByTime 使用真实实现（让远程筛选也走真实逻辑）
     mockFilterByTime.mockImplementation(
-      realImpls.filterByTime || ((entries: GithubRemoteEntry[]) => entries),
+      realImpls.filterByTime ?? ((entries: GithubRemoteEntry[]) => entries),
     )
   })
 
@@ -3904,7 +3909,11 @@ describe('formatDuration 全分支 (lines 534-540)', () => {
       diffs.push({
         kind: 'add',
         sid: `dur-ms-${String(index)}`,
-        remote: { sid: `dur-ms-${String(index)}`, name: `快速处理${String(index)}`, date: '2024-06-15' },
+        remote: {
+          sid: `dur-ms-${String(index)}`,
+          name: `快速处理${String(index)}`,
+          date: '2024-06-15',
+        },
         changedFields: ['*'],
       })
     }

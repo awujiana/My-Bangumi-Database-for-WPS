@@ -42,7 +42,7 @@ export function refreshEnrichWorkbooks(selectId = 'enrichWorkbookSelect'): void 
   defaultOption.textContent = '-- 请选择 Bangumi 追踪表工作簿 --'
   select.appendChild(defaultOption)
 
-  const activeWbName = app.ActiveWorkbook?.Name || ''
+  const activeWbName = app.ActiveWorkbook?.Name ?? ''
   let hasSelection = false
 
   for (let index = 1; index <= wbs.Count; index += 1) {
@@ -179,7 +179,7 @@ export function toggleEnrichWorkbookLock(
   }
 
   const wbSelect = document.getElementById(wbSelectId) as HTMLSelectElement | null
-  const wbName = wbSelect?.value || ''
+  const wbName = wbSelect?.value ?? ''
   if (!wbName) {
     showToast('请先选择一个有效的工作簿', 'warn')
     return
@@ -199,7 +199,7 @@ export function toggleEnrichWorkbookLock(
     showToast('已解锁目标工作表', 'info')
   } else {
     // 锁定
-    const sheetName = sheetSelect.options[sheetSelect.selectedIndex]?.text || ''
+    const sheetName = sheetSelect.options[sheetSelect.selectedIndex]?.text ?? ''
     BGM.enrich.lockedWorkbookName = wbName
     BGM.enrich.lockedSheetName = sheetName
     BGM.enrich.lockedSheetIndex = sheetIndex

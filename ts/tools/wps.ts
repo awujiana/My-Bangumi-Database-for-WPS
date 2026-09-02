@@ -311,7 +311,7 @@ export function wpsPrompt(message: string, defaultValue?: string): Promise<strin
       | undefined
     if (app?.InputBox) {
       try {
-        const result = app.InputBox(message, 'Bangumi 设置', defaultValue || '', 2)
+        const result = app.InputBox(message, 'Bangumi 设置', defaultValue ?? '', 2)
         if (result === false) {
           resolve(null)
           return
@@ -336,7 +336,7 @@ export function wpsPrompt(message: string, defaultValue?: string): Promise<strin
       ).BGMInput!(
         '输入',
         message,
-        defaultValue || '',
+        defaultValue ?? '',
         (value) => {
           resolve(value)
         },

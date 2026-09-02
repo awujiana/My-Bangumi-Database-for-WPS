@@ -128,7 +128,7 @@ describe('logger', () => {
   it('应自动脱敏日志中的 token', () => {
     logger.info('使用 token=abcdefghijklmnop 进行认证')
     const logs = getRecentLogs('INFO')
-    const logMessage = logs[0]?.message || ''
+    const logMessage = logs[0]?.message ?? ''
     expect(logMessage).not.toContain('abcdefghijklmnop')
   })
 

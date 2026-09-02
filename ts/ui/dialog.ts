@@ -312,10 +312,13 @@ function _showDialog(type: string, options: DialogOptions = {}): void {
   const dialog = dom[config.id]
   if (!dialog) {
     if (type === 'confirm') {
-      if (window.confirm(options.message || '')) options.onOk?.()
+      if (window.confirm(options.message ?? '')) options.onOk?.()
       else options.onCancel?.()
     } else if (type === 'input') {
-      const result = window.prompt(options.prompt || options.message || '', options.defaultValue || '')
+      const result = window.prompt(
+        (options.prompt || options.message) ?? '',
+        options.defaultValue ?? '',
+      )
       if (result !== null) options.onOk?.(result)
       else options.onCancel?.()
     } else {
@@ -327,11 +330,11 @@ function _showDialog(type: string, options: DialogOptions = {}): void {
 
   const titleElement = dom[config.titleId]
   const messageElement = dom[config.msgId]
-  if (titleElement) titleElement.textContent = options.title || ''
-  if (messageElement) messageElement.textContent = options.prompt || options.message || ''
+  if (titleElement) titleElement.textContent = options.title ?? ''
+  if (messageElement) messageElement.textContent = (options.prompt || options.message) ?? ''
 
   if (type === 'input' && dom.bgmInputField) {
-    ;(dom.bgmInputField as HTMLInputElement).value = options.defaultValue || ''
+    ;(dom.bgmInputField as HTMLInputElement).value = options.defaultValue ?? ''
     dom.bgmInputField.focus()
   }
 
@@ -616,7 +619,8 @@ export function renderConfigSummary(config: SyncConfigSummary): string {
   if (config.sourceLabel) items.push(`<span class="cfg-item">📁 ${config.sourceLabel}</span>`)
   if (config.strategyLabel) items.push(`<span class="cfg-item">🔧 ${config.strategyLabel}</span>`)
   if (config.directionLabel) items.push(`<span class="cfg-item">📡 ${config.directionLabel}</span>`)
-  if (config.timeFilterLabel) items.push(`<span class="cfg-item">📅 ${config.timeFilterLabel}</span>`)
+  if (config.timeFilterLabel)
+    items.push(`<span class="cfg-item">📅 ${config.timeFilterLabel}</span>`)
   if (config.selectedRowsOnly) items.push(`<span class="cfg-item warn">⚠️ 仅选中行</span>`)
   if (config.extra) {
     for (const ex of config.extra) {
@@ -685,7 +689,7 @@ export function showSyncProgressDialog(
       configElement.innerHTML = renderConfigSummary(config)
       configElement.style.display = ''
     } else {
-      configElement.replaceChildren();
+      configElement.replaceChildren()
       configElement.style.display = 'none'
     }
   }

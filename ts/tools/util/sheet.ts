@@ -141,7 +141,7 @@ export function cacheGet<T>(key: string, factory: () => T): T {
 }
 
 export function findHeaderRow(ws: WpsWorksheet | null | undefined, startRow?: number): number {
-  const sheetName = ws?.Name || ''
+  const sheetName = ws?.Name ?? ''
   const cacheKey = `${sheetName}:headerRow:${String(startRow || 1)}`
   return cacheGet(cacheKey, () => {
     const sRow = startRow || 1
@@ -178,7 +178,7 @@ export function getColumnMap(
   ws: WpsWorksheet | null | undefined,
   headerRow: number,
 ): Map<string, number> {
-  const sheetName = ws?.Name || ''
+  const sheetName = ws?.Name ?? ''
   const cacheKey = `${sheetName}:columnMap:${String(headerRow)}`
   return cacheGet(cacheKey, () => {
     const colMap = new Map<string, number>()
@@ -238,7 +238,7 @@ export function getColumnMap(
 
 /** 清除指定工作表的所有缓存 */
 export function clearSheetCache(ws: WpsWorksheet | null | undefined): void {
-  const prefix = ws?.Name || ''
+  const prefix = ws?.Name ?? ''
   for (const key of sheetCache.keys()) {
     if (key.startsWith(prefix)) sheetCache.delete(key)
   }

@@ -196,7 +196,7 @@ import type {
 function createMockSheet(
   options: { rows?: { Value2: unknown[] }[]; colMap?: Map<string, number> } = {},
 ) {
-  const rows = options.rows || []
+  const rows = options.rows ?? []
   return {
     Name: 'TestSheet',
     Range: vi.fn((addr: string) => {

@@ -220,7 +220,7 @@ export function onAction(action: string): void {
       break
     }
     case 'setToken': {
-      showTokenDialog(loadBgToken() || '')
+      showTokenDialog(loadBgToken() ?? '')
       break
     }
     case 'preview': {
@@ -397,8 +397,8 @@ const debouncedSaveGithubConfig = debounce((): void => {
     const owner = (ownerInput?.value ?? '').trim()
     const repo = (repoInput?.value ?? '').trim()
     const branch = (branchInput?.value ?? '').trim() || 'main'
-    const strategy = (strategySelect?.value as SyncStrategy | undefined) || 'add-update'
-    const sourceType = (sourceTypeSelect?.value as SyncSourceType | undefined) || 'github'
+    const strategy = (strategySelect?.value as SyncStrategy | undefined) ?? 'add-update'
+    const sourceType = (sourceTypeSelect?.value as SyncSourceType | undefined) ?? 'github'
 
     // 按数据源类型读取对应字段值
     // - local: 复用 githubConfig.path 字段存储本地文件路径（与远程源 path 字段互斥复用）
@@ -532,7 +532,7 @@ export function setupButtonListeners(): void {
     if (sourceTypeSelect) {
       // sourceType 切换时：1) 触发字段显示/隐藏；2) 触发防抖保存
       trackedAddEventListener(sourceTypeSelect, 'change', () => {
-        const newSourceType = (sourceTypeSelect.value as SyncSourceType | undefined) || 'github'
+        const newSourceType = (sourceTypeSelect.value as SyncSourceType | undefined) ?? 'github'
         toggleSourceFields(newSourceType)
         debouncedSaveGithubConfig()
       })
@@ -699,7 +699,7 @@ const ACTION_HANDLERS: Record<string, ActionHandler> = {
   setToken: (context) => {
     // 已废弃，由 showTokenDialog 替代，保留兼容
     bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 打开 Token 设置对话框')
-    showTokenDialog(loadBgToken() || '')
+    showTokenDialog(loadBgToken() ?? '')
     bgmLog(
       LOG_LEVELS.INFO,
       `[handleActionClick] Token 设置对话框已打开，耗时: ${String(Date.now() - context.startTime)}ms`,
@@ -709,7 +709,7 @@ const ACTION_HANDLERS: Record<string, ActionHandler> = {
   // 快捷按钮
   showTokenDialog: (context) => {
     bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 显示 Token 设置对话框')
-    showTokenDialog(loadBgToken() || '')
+    showTokenDialog(loadBgToken() ?? '')
     bgmLog(
       LOG_LEVELS.INFO,
       `[handleActionClick] Token 设置对话框已显示，耗时: ${String(Date.now() - context.startTime)}ms`,
@@ -925,7 +925,7 @@ const ACTION_HANDLERS: Record<string, ActionHandler> = {
 
   // 弹窗快捷调用（参数形式）
   showToast: (context) => {
-    bgmLog(LOG_LEVELS.INFO, `[handleActionClick] 显示 Toast 消息: ${context.args[0] || ''}`)
+    bgmLog(LOG_LEVELS.INFO, `[handleActionClick] 显示 Toast 消息: ${context.args[0] ?? ''}`)
     showToast(context.args[0] ?? '', context.args[1] ?? '')
     bgmLog(
       LOG_LEVELS.INFO,
@@ -934,7 +934,7 @@ const ACTION_HANDLERS: Record<string, ActionHandler> = {
   },
 
   showAlert: (context) => {
-    bgmLog(LOG_LEVELS.INFO, `[handleActionClick] 显示警告框: ${context.args[0] || ''}`)
+    bgmLog(LOG_LEVELS.INFO, `[handleActionClick] 显示警告框: ${context.args[0] ?? ''}`)
     showAlert(context.args[0] ?? '', context.args[1] ?? '')
     bgmLog(
       LOG_LEVELS.INFO,
@@ -984,7 +984,7 @@ const ACTION_HANDLERS: Record<string, ActionHandler> = {
       showToast('UI 元素缺失', 'error')
       return
     }
-    const sourceType = (sourceTypeSelect?.value as SyncSourceType | undefined) || 'github'
+    const sourceType = (sourceTypeSelect?.value as SyncSourceType | undefined) ?? 'github'
 
     // 按数据源类型读取对应字段
     let path: string
@@ -1021,7 +1021,7 @@ const ACTION_HANDLERS: Record<string, ActionHandler> = {
       showToast('owner / repo / path 不能为空', 'warn')
       return
     }
-    const strategy = (strategySelect?.value as SyncStrategy | undefined) || 'add-update'
+    const strategy = (strategySelect?.value as SyncStrategy | undefined) ?? 'add-update'
     const isOkConfig = setGithubConfig(config)
     const isOkStrategy = setSyncStrategy(strategy)
     const isOkSourceType = setSyncSourceType(sourceType)
@@ -1046,7 +1046,7 @@ const ACTION_HANDLERS: Record<string, ActionHandler> = {
     // 读取同步源类型：优先用下拉框当前值，兜底用已保存的值
     const sourceTypeSelect = document.getElementById('syncSourceType') as HTMLSelectElement | null
     const currentSourceType: SyncSourceType =
-      (sourceTypeSelect?.value as SyncSourceType | undefined) || getSyncSourceType()
+      (sourceTypeSelect?.value as SyncSourceType | undefined) ?? getSyncSourceType()
     // 读取「仅同步选中行」开关
     const chkSelectedOnly = document.getElementById(
       'chkSyncSelectedOnly',
@@ -1064,7 +1064,7 @@ const ACTION_HANDLERS: Record<string, ActionHandler> = {
       const monthSelect = document.getElementById('timeFilterMonth') as HTMLSelectElement | null
       const year = parseInt(yearSelect?.value || '2026', 10)
       const range =
-        (rangeSelect?.value as 'year' | 'quarter' | 'month' | 'future' | undefined) || 'year'
+        (rangeSelect?.value as 'year' | 'quarter' | 'month' | 'future' | undefined) ?? 'year'
       timeFilter = {
         enabled: true,
         year,
@@ -1089,7 +1089,7 @@ const ACTION_HANDLERS: Record<string, ActionHandler> = {
     }
     // 读取策略：优先用下拉框当前值（未保存也能即时生效），兜底用已保存的策略
     const strategySelect = document.getElementById('githubStrategy') as HTMLSelectElement | null
-    const strategy = (strategySelect?.value as SyncStrategy | undefined) || getSyncStrategy()
+    const strategy = (strategySelect?.value as SyncStrategy | undefined) ?? getSyncStrategy()
     const strategyLabel = (
       {
         'add-update': '新增+更新（不删除）',
@@ -1763,7 +1763,7 @@ function renderLogEntries(): void {
   const filterSelect = document.getElementById('logLevelFilter') as HTMLSelectElement | null
   const level = filterSelect?.value || undefined
   const logs = getRecentLogs(level as LogLevel | undefined, 100)
-  body.replaceChildren();
+  body.replaceChildren()
   if (logs.length === 0) {
     body.textContent = '暂无日志'
     return

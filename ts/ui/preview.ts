@@ -133,7 +133,7 @@ function getRowData(
   data.finishedDate = readCol('完播日')
 
   if (data.bgmUrl) {
-    data.sid = extractSubjectId(data.bgmUrl) || ''
+    data.sid = extractSubjectId(data.bgmUrl) ?? ''
   }
   if (data.sid) {
     data.typeNum = mapWatchStatus(data.status)
@@ -233,15 +233,17 @@ function handlePreviewBodyClick(e: Event): void {
   const target = e.target as HTMLElement
   const button = target.closest('.upload-single-btn')
   if (!(button instanceof HTMLElement)) return
-  const rowNumber = parseInt(button.dataset.row || '', 10)
+  const rowNumber = parseInt(button.dataset.row ?? '', 10)
   if (isNaN(rowNumber)) return
   void uploadSingleRow(rowNumber, button as HTMLButtonElement)
 }
 
 // 从映射表中提取标准中文状态列表（过滤数字和英文）
-const VALID_STATUSES = new Set(Object.keys(WATCH_STATUS_MAP)
-  .filter((key) => /^[\u4E00-\u9FA5]+$/.test(key)) // 只保留纯中文
-  .filter((key, index, array) => array.indexOf(key) === index)) // 去重
+const VALID_STATUSES = new Set(
+  Object.keys(WATCH_STATUS_MAP)
+    .filter((key) => /^[\u4E00-\u9FA5]+$/.test(key)) // 只保留纯中文
+    .filter((key, index, array) => array.indexOf(key) === index),
+) // 去重
 
 /**
  * 将非标准状态文本标准化（如 "是" → "看过"）
@@ -572,9 +574,9 @@ export async function previewSyncContent(): Promise<void> {
       }
 
       // 根据位置显示/隐藏按钮
-      scrollTopButton?.classList.toggle('hidden', scrollTop <= 10);
+      scrollTopButton?.classList.toggle('hidden', scrollTop <= 10)
 
-      scrollBottomButton?.classList.toggle('hidden', scrollTop >= maxScroll - 10);
+      scrollBottomButton?.classList.toggle('hidden', scrollTop >= maxScroll - 10)
     }
 
     // 初始化按钮可见性
@@ -740,7 +742,11 @@ export async function uploadSingleRow(
       showToast(`上传失败: ${(result.message || '未知错误').substring(0, 60)}`, 'error')
     }
   } catch (error: unknown) {
-    BGM.handleError(error, { showAlert: true, level: BGM.ErrorLevel.ERROR, context: 'UploadSingleRow' })
+    BGM.handleError(error, {
+      showAlert: true,
+      level: BGM.ErrorLevel.ERROR,
+      context: 'UploadSingleRow',
+    })
     if (buttonElement) {
       buttonElement.disabled = false
       buttonElement.classList.remove('uploading')
@@ -748,7 +754,11 @@ export async function uploadSingleRow(
       buttonElement.textContent = '✗ 错误'
     }
     showToast(`上传出错: ${(error as Error).message.substring(0, 60)}`, 'error')
-    BGM.handleError(error, { showAlert: true, level: BGM.ErrorLevel.ERROR, context: 'UploadSingleRow' })
+    BGM.handleError(error, {
+      showAlert: true,
+      level: BGM.ErrorLevel.ERROR,
+      context: 'UploadSingleRow',
+    })
   }
 }
 
@@ -773,7 +783,7 @@ export function viewSyncRecordDetail(sid: string): void {
     safeAlert('未找到该同步记录')
     return
   }
-  let content = record.content || ''
+  let content = record.content ?? ''
   try {
     content = JSON.stringify(JSON.parse(content), null, 2)
   } catch (error: unknown) {
@@ -783,7 +793,7 @@ export function viewSyncRecordDetail(sid: string): void {
       context: 'ViewSyncRecordDetail',
     })
   }
-  const detail = `同步记录详情\n\n名称: ${record.name || ''}\nSID: ${record.sid || ''}\nURL: ${record.url || ''}\n时间: ${record.time || ''}\n状态: ${record.status || ''}\n同步次数: ${String(record.count || '')}\n备注: ${record.message || ''}\n\n同步内容:\n${content}`
+  const detail = `同步记录详情\n\n名称: ${record.name ?? ''}\nSID: ${record.sid ?? ''}\nURL: ${record.url ?? ''}\n时间: ${record.time ?? ''}\n状态: ${record.status ?? ''}\n同步次数: ${String(record.count || '')}\n备注: ${record.message ?? ''}\n\n同步内容:\n${content}`
   safeAlert(detail, '同步记录详情')
 }
 

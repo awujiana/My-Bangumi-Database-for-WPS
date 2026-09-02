@@ -269,7 +269,9 @@ export function getSyncPreview(
 
     // 判断观看状态
     const watchStatus =
-      getField(rowNumber, '是否看完') || getField(rowNumber, '状态') || getField(rowNumber, '观看状态')
+      getField(rowNumber, '是否看完') ||
+      getField(rowNumber, '状态') ||
+      getField(rowNumber, '观看状态')
 
     // 空状态不计入待同步，跳过该条目
     if (!watchStatus) {
@@ -377,9 +379,9 @@ export async function detectConflicts(
       bgmCollection.set(sid, {
         type: item.type,
         ...(item.rate !== undefined && { rate: item.rate }),
-        tags: item.tags || [],
-        comment: item.comment || '',
-        subject_name: item.subject?.name || '',
+        tags: item.tags ?? [],
+        comment: item.comment ?? '',
+        subject_name: item.subject?.name ?? '',
       })
     }
     isBgmCollectionReady = true
@@ -564,7 +566,7 @@ export async function syncWithConfirmation(): Promise<void> {
 
 /** 设置 Token（Ribbon 版本） */
 export function setTokenForRibbon(): boolean {
-  const currentToken = loadBgToken() || ''
+  const currentToken = loadBgToken() ?? ''
   const app = getApp()
   const newToken = app?.InputBox?.('请输入 Access Token', '设置 Token', currentToken, 2)
   if (newToken && typeof newToken === 'string') {
@@ -870,7 +872,10 @@ export async function undoLastSyncForRibbon(): Promise<void> {
     bgmLog(LOG_LEVELS.INFO, '[undoLastSyncForRibbon] 已写入撤销请求信号到 PluginStorage')
     await wpsMessageBox('已发送撤销请求，请在任务面板中确认操作', 0, 64)
   } catch (error: unknown) {
-    bgmLog(LOG_LEVELS.ERROR, `[undoLastSyncForRibbon] 写入撤销信号失败: ${(error as Error).message}`)
+    bgmLog(
+      LOG_LEVELS.ERROR,
+      `[undoLastSyncForRibbon] 写入撤销信号失败: ${(error as Error).message}`,
+    )
     await wpsMessageBox('发送撤销请求失败，请稍后重试', 0, 16)
   }
 }

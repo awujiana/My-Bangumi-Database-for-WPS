@@ -36,7 +36,12 @@ import { syncAllRows } from '../../ui/preview.js'
 import { BGM_EVENTS, eventBus } from '../events.js'
 // 字符串工具已拆分到 stringUtils.ts，此处 import 供内部调用，并 re-export 保持向后兼容
 import { logger } from '../logger.js'
-import { colNumToLetter as colNumberToLetter, trim, escapeHtml, calcFingerprint } from '../stringUtils.js'
+import {
+  colNumToLetter as colNumberToLetter,
+  trim,
+  escapeHtml,
+  calcFingerprint,
+} from '../stringUtils.js'
 // 日志模块：bgmLog 内部通过 logger 输出，自动脱敏敏感信息，且不污染全局 console
 import { isWpsApp } from '../wps.js'
 import type { WpsApplication as WpsApp, WpsWorksheet } from '../wps.js'
@@ -373,11 +378,11 @@ export const BGM: {
       if (typeof window !== 'undefined') {
         const win = window as unknown as BgmWindowGlobals
         if (win.BGMDialog !== undefined) {
-          win.BGMDialog.input(title, prompt, defaultValue || '', onOk, onCancel)
+          win.BGMDialog.input(title, prompt, defaultValue ?? '', onOk, onCancel)
           return
         }
         if (typeof win.BGMInput === 'function') {
-          win.BGMInput(title, prompt, defaultValue || '', onOk, onCancel)
+          win.BGMInput(title, prompt, defaultValue ?? '', onOk, onCancel)
           return
         }
       }
@@ -594,7 +599,7 @@ export function bgmLog(level: number, message: string | null | undefined): void 
  */
 function getCallerFunctionName(_skipAdditional = 0): string {
   const e = new Error()
-  const stack = e.stack || ''
+  const stack = e.stack ?? ''
   const lines = stack.split('\n')
   // 需要跳过的内部函数名列表
   const internalFuncs = new Set([
@@ -967,13 +972,13 @@ export function _fetchBgmUserInfo(
         }
         const userId = String(data.id || data.user_id || '')
         // BGM API v0 返回的用户名字段是 nickname，username 是用户ID
-        const username = data.nickname || data.username || data.user_name || data.name || ''
+        const username = (data.nickname || data.username || data.user_name || data.name) ?? ''
 
         _setBgmUserId(userId)
         _setBgmUsername(username)
 
         // 从 API 响应中提取头像 URL，并清理可能存在的反引号包裹
-        const rawAvatarUrl = data.avatar?.large || data.avatar?.medium || data.avatar?.small || ''
+        const rawAvatarUrl = (data.avatar?.large || data.avatar?.medium || data.avatar?.small) ?? ''
         const cleanAvatarUrl = rawAvatarUrl ? rawAvatarUrl.replace(/`/g, '').trim() : ''
 
         // 优先使用 API 返回的头像 URL，若不存在则回退到构造的 URL
@@ -989,7 +994,7 @@ export function _fetchBgmUserInfo(
         try {
           const app = getApp()
           if (app?.PluginStorage) {
-            app.PluginStorage.setItem('bgm_avatar_url', avatarUrl || '')
+            app.PluginStorage.setItem('bgm_avatar_url', avatarUrl ?? '')
           }
         } catch {
           // 静默处理
@@ -1048,7 +1053,7 @@ export function fetchBgmUserInfo(signal?: AbortSignal): Promise<{
 }> {
   return new Promise((resolve) => {
     _fetchBgmUserInfo((userInfo, errorType) => {
-      resolve({ userInfo, errorType: errorType || 'none' })
+      resolve({ userInfo, errorType: errorType ?? 'none' })
     }, signal)
   })
 }
@@ -1129,7 +1134,10 @@ export function showBangumiPanel(): void {
       app.PluginStorage?.setItem('bgm_panel_shown_at', String(Date.now()))
       bgmLog(LOG_LEVELS.INFO, `[showBangumiPanel] 面板已显示，已写入刷新信号`)
     } catch (error: unknown) {
-      bgmLog(LOG_LEVELS.WARN, `[showBangumiPanel] 写入面板显示信号失败: ${(error as Error).message}`)
+      bgmLog(
+        LOG_LEVELS.WARN,
+        `[showBangumiPanel] 写入面板显示信号失败: ${(error as Error).message}`,
+      )
     }
   }
 }

@@ -20,7 +20,7 @@ import { describe, it, expect, vi } from 'vitest'
 const mockCellStore = new Map<string, string>()
 
 function getMockCellValue(row: number, col: number): string {
-  return mockCellStore.get(`${String(row)}_${String(col)}`) || ''
+  return mockCellStore.get(`${String(row)}_${String(col)}`) ?? ''
 }
 
 function setMockCellValue(row: number, col: number, value: string): void {
@@ -278,7 +278,7 @@ function simulateEnrichIntroData(
   const bangumiFeatureCol = colMap.get('特点/印象')
 
   for (const [sourceKey, targetColName] of Object.entries(INTRO_FIELD_TO_BANGUMI)) {
-    const rawValue = newData[sourceKey] || ''
+    const rawValue = newData[sourceKey] ?? ''
     if (isEmptyValue(rawValue)) continue
 
     const annotatedValue = getAnnotatedValue(sourceKey, targetColName, rawValue)
@@ -330,7 +330,7 @@ function simulateEnrichIntroData(
   if (bangumiFeatureCol !== undefined) {
     const featureParts: string[] = []
     for (const key of INTRO_FEATURE_FIELDS) {
-      const value = newData[key] || ''
+      const value = newData[key] ?? ''
       if (!isEmptyValue(value)) {
         const label = key === '简介' ? '简介' : key
         const display = key === '简介' && value.length > 80 ? `${value.substring(0, 80)}...` : value
@@ -581,11 +581,11 @@ function simulateEnrichOpEdPv(
   if (!bangumiFeatureCol) return enriched
 
   const parts: string[] = []
-  const op = newData.OP || ''
+  const op = newData.OP ?? ''
   if (!isEmptyValue(op)) parts.push(`OP:${op}`)
-  const ed = newData.ED || ''
+  const ed = newData.ED ?? ''
   if (!isEmptyValue(ed)) parts.push(`ED:${ed}`)
-  const pv = newData.PV || ''
+  const pv = newData.PV ?? ''
   if (!isEmptyValue(pv)) parts.push(`PV:${pv}`)
 
   if (parts.length === 0) return enriched

@@ -922,7 +922,10 @@ async function executeBatchSync(
   try {
     getOrCreateSyncRecordSheet()
   } catch (error: unknown) {
-    BGM.handleError(error, { level: BGM.ErrorLevel.WARN, context: 'SyncToBangumiAsync:createSheet' })
+    BGM.handleError(error, {
+      level: BGM.ErrorLevel.WARN,
+      context: 'SyncToBangumiAsync:createSheet',
+    })
   }
 
   bgmLog(LOG_LEVELS.INFO, '[SyncToBangumiAsync] 步骤5: 开始批量同步请求')
@@ -1026,7 +1029,7 @@ function collectSelectedRows(app: WpsApp): number[] {
     // 记录选中区域地址用于调试
     let selAddress = ''
     try {
-      selAddress = sel.Address || ''
+      selAddress = sel.Address ?? ''
     } catch (error: unknown) {
       bgmLog(
         LOG_LEVELS.WARN,

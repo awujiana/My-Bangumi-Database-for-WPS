@@ -166,12 +166,12 @@ function createMockWorkbook(sheets: { Name: string }[] = []) {
   return {
     Sheets: {
       Count: allSheets.length,
-      Item: vi.fn((index: number) => allSheets[index - 1] || allSheets[0]),
+      Item: vi.fn((index: number) => allSheets[index - 1] ?? allSheets[0]),
       Add: vi.fn(() => createMockSheet({ name: 'NewSheet' })),
     },
     Worksheets: {
       Count: allSheets.length,
-      Item: vi.fn((index: number) => allSheets[index - 1] || allSheets[0]),
+      Item: vi.fn((index: number) => allSheets[index - 1] ?? allSheets[0]),
     },
     ActiveSheet: createMockSheet({ name: 'Active' }),
   }
@@ -991,7 +991,7 @@ describe('syncRecord', () => {
       const mockWorkbook = {
         Sheets: {
           Count: allSheets.length,
-          Item: vi.fn((index: number) => allSheets[index - 1] || allSheets[0]),
+          Item: vi.fn((index: number) => allSheets[index - 1] ?? allSheets[0]),
           Add: vi.fn(() => createMockSheet({ name: SYNC_RECORD_SHEET_NAME })),
         },
         ActiveSheet: errorSheet,
@@ -1049,7 +1049,7 @@ describe('syncRecord', () => {
       const mockWorkbook = {
         Sheets: {
           Count: allSheets.length,
-          Item: vi.fn((index: number) => allSheets[index - 1] || allSheets[0]),
+          Item: vi.fn((index: number) => allSheets[index - 1] ?? allSheets[0]),
         },
       }
       mockGetApp.mockReturnValue({ ActiveWorkbook: mockWorkbook })
@@ -1066,7 +1066,7 @@ describe('syncRecord', () => {
       const mockWorkbook = {
         Sheets: {
           Count: allSheets.length,
-          Item: vi.fn((index: number) => allSheets[index - 1] || allSheets[0]),
+          Item: vi.fn((index: number) => allSheets[index - 1] ?? allSheets[0]),
         },
       }
       mockGetApp.mockReturnValue({ ActiveWorkbook: mockWorkbook })

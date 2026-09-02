@@ -335,7 +335,11 @@ export function findAliasColumn(sheet: WpsWorksheet): number {
   const maxCols = 50
   for (let col = 1; col <= maxCols; col += 1) {
     const headerValue = getCellValue(sheet, headerRow, col).trim().toLowerCase()
-    if (headerValue.includes('别名') || headerValue.includes('alias') || headerValue.includes('原名')) {
+    if (
+      headerValue.includes('别名') ||
+      headerValue.includes('alias') ||
+      headerValue.includes('原名')
+    ) {
       return col
     }
   }
@@ -548,7 +552,7 @@ export function enrichTags(
   const bangumiTagsCol = colMap.get('标签/分级') || colMap.get('标签')
   if (!bangumiTagsCol) return
 
-  const newTags = newData.TAGS || ''
+  const newTags = newData.TAGS ?? ''
   if (isEmptyValue(newTags)) return
 
   const oldTags = getCellValue(sheet, row, bangumiTagsCol)
@@ -598,7 +602,7 @@ export function enrichDate(
   const bangumiDateCol = colMap.get('开播日期')
   if (!bangumiDateCol) return
 
-  const newDate = newData['首播'] || ''
+  const newDate = newData['首播'] ?? ''
   if (isEmptyValue(newDate)) return
 
   const oldDate = getCellValue(sheet, row, bangumiDateCol)
@@ -636,7 +640,7 @@ export function enrichEpisodes(
   const bangumiEpisodesCol = colMap.get('集数')
   if (!bangumiEpisodesCol) return
 
-  const newEpisodes = newData['集数'] || ''
+  const newEpisodes = newData['集数'] ?? ''
   if (isEmptyValue(newEpisodes)) return
 
   const oldEpisodes = getCellValue(sheet, row, bangumiEpisodesCol)
@@ -676,22 +680,22 @@ export function enrichFeatures(
 
   const featureParts: string[] = []
 
-  const weekday = newData['周更时间'] || ''
+  const weekday = newData['周更时间'] ?? ''
   if (!isEmptyValue(weekday)) {
     featureParts.push(`周更:${weekday}`)
   }
 
-  const platform = newData['播放平台'] || ''
+  const platform = newData['播放平台'] ?? ''
   if (!isEmptyValue(platform)) {
     featureParts.push(`平台:${platform}`)
   }
 
-  const exclusive = newData['独播'] || ''
+  const exclusive = newData['独播'] ?? ''
   if (!isEmptyValue(exclusive)) {
     featureParts.push(`独播:${exclusive}`)
   }
 
-  const special = newData['特殊'] || ''
+  const special = newData['特殊'] ?? ''
   if (!isEmptyValue(special)) {
     featureParts.push(`特殊:${special}`)
   }
@@ -1099,7 +1103,7 @@ export function ensureBangumiColumns(
     const headerRange = sheet.Range(
       `${WpsCellReference(headerRow, maxCol + 1)}:${WpsCellReference(headerRow, maxCol + missing.length)}`,
     )
-    const headers: string[][] = Array.from(missing, m => [m.field]);
+    const headers: string[][] = Array.from(missing, (m) => [m.field])
     headerRange.Value = headers
 
     // 应用样式到新列
@@ -1178,7 +1182,7 @@ export function enrichIntroData(
   const bangumiFeatureCol = colMap.get('特点/印象')
 
   for (const [sourceKey, targetColName] of Object.entries(INTRO_FIELD_TO_BANGUMI)) {
-    const rawValue = newData[sourceKey] || ''
+    const rawValue = newData[sourceKey] ?? ''
     if (isEmptyValue(rawValue)) continue
 
     const annotatedValue = getAnnotatedValue(sourceKey, targetColName, rawValue)
@@ -1251,7 +1255,7 @@ export function enrichIntroData(
   if (bangumiFeatureCol !== undefined) {
     const featureParts: string[] = []
     for (const key of INTRO_FEATURE_FIELDS) {
-      const value = newData[key] || ''
+      const value = newData[key] ?? ''
       if (!isEmptyValue(value)) {
         const label = key === '简介' ? '简介' : key
         const display = key === '简介' && value.length > 80 ? `${value.substring(0, 80)}...` : value
@@ -1303,17 +1307,17 @@ export function enrichOpEdPv(
 
   const parts: string[] = []
 
-  const op = newData.OP || ''
+  const op = newData.OP ?? ''
   if (!isEmptyValue(op)) {
     parts.push(`OP:${op}`)
   }
 
-  const ed = newData.ED || ''
+  const ed = newData.ED ?? ''
   if (!isEmptyValue(ed)) {
     parts.push(`ED:${ed}`)
   }
 
-  const pv = newData.PV || ''
+  const pv = newData.PV ?? ''
   if (!isEmptyValue(pv)) {
     parts.push(`PV:${pv}`)
   }

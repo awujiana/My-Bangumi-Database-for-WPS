@@ -181,7 +181,7 @@ export async function verifyToken(token: string, signal?: AbortSignal): Promise<
       )
       if (userData) {
         result.userId = String(userData.id || '')
-        result.username = userData.username || userData.nickname || ''
+        result.username = (userData.username || userData.nickname) ?? ''
       }
     } else if (response.status === 401) {
       result.message = 'Token 无效或已过期'

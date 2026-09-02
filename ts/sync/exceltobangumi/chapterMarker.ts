@@ -43,7 +43,7 @@ export async function fetchEpisodeIds(
           const data = JSON.parse(xhr.responseText) as {
             data?: { id: number; sort: number }[]
           }
-          const episodes = data.data || []
+          const episodes = data.data ?? []
           episodes.sort((a, b) => (a.sort || 0) - (b.sort || 0))
           resolve(episodes.map((ep) => ep.id))
         } catch {

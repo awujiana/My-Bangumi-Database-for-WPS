@@ -112,7 +112,7 @@ export function cleanLockedDataSheet(): void {
       emptyNameCount++
       continue
     }
-    const rows = nameRows.get(name) || []
+    const rows = nameRows.get(name) ?? []
     rows.push(row)
     nameRows.set(name, rows)
   }

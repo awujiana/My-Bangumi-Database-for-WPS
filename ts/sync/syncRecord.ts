@@ -395,7 +395,7 @@ export function addSyncRecord(parameters: UpdateRecordParams): boolean {
 
     if (!_isSyncRecordCacheValid) buildCache(sheet)
 
-    const sid = parameters.sid || ''
+    const sid = parameters.sid ?? ''
     const now = new Date().toLocaleString('zh-CN')
 
     const existingRow = sid ? _syncRecordSidCache.get(sid) : undefined
@@ -407,15 +407,19 @@ export function addSyncRecord(parameters: UpdateRecordParams): boolean {
       // 更新时间戳
       setCellValue(sheet, existingRow, SYNC_RECORD_COL.TIME, now)
       setCellValue(sheet, existingRow, SYNC_RECORD_COL.COUNT, newCount)
-      if (parameters.status) setCellValue(sheet, existingRow, SYNC_RECORD_COL.STATUS, parameters.status)
-      if (parameters.message) setCellValue(sheet, existingRow, SYNC_RECORD_COL.MESSAGE, parameters.message)
+      if (parameters.status)
+        setCellValue(sheet, existingRow, SYNC_RECORD_COL.STATUS, parameters.status)
+      if (parameters.message)
+        setCellValue(sheet, existingRow, SYNC_RECORD_COL.MESSAGE, parameters.message)
       if (parameters.fingerprint !== undefined)
         setCellValue(sheet, existingRow, SYNC_RECORD_COL.FINGERPRINT, parameters.fingerprint)
       if (parameters.name) setCellValue(sheet, existingRow, SYNC_RECORD_COL.NAME, parameters.name)
       if (parameters.url) setCellValue(sheet, existingRow, SYNC_RECORD_COL.URL, parameters.url)
       if (parameters.type) setCellValue(sheet, existingRow, SYNC_RECORD_COL.TYPE, parameters.type)
-      if (parameters.source) setCellValue(sheet, existingRow, SYNC_RECORD_COL.SOURCE, parameters.source)
-      if (parameters.content) setCellValue(sheet, existingRow, SYNC_RECORD_COL.CONTENT, parameters.content)
+      if (parameters.source)
+        setCellValue(sheet, existingRow, SYNC_RECORD_COL.SOURCE, parameters.source)
+      if (parameters.content)
+        setCellValue(sheet, existingRow, SYNC_RECORD_COL.CONTENT, parameters.content)
       if (parameters.collType)
         setCellValue(sheet, existingRow, SYNC_RECORD_COL.COLL_TYPE, parameters.collType)
 
@@ -450,18 +454,19 @@ export function addSyncRecord(parameters: UpdateRecordParams): boolean {
       const finalCount = parameters.count || 1
 
       setCellValue(sheet, newRow, SYNC_RECORD_COL.TIME, now)
-      setCellValue(sheet, newRow, SYNC_RECORD_COL.NAME, parameters.name || '')
-      setCellValue(sheet, newRow, SYNC_RECORD_COL.URL, parameters.url || '')
+      setCellValue(sheet, newRow, SYNC_RECORD_COL.NAME, parameters.name ?? '')
+      setCellValue(sheet, newRow, SYNC_RECORD_COL.URL, parameters.url ?? '')
       setCellValue(sheet, newRow, SYNC_RECORD_COL.SID, sid)
-      setCellValue(sheet, newRow, SYNC_RECORD_COL.TYPE, parameters.type || '')
-      setCellValue(sheet, newRow, SYNC_RECORD_COL.SOURCE, parameters.source || '')
+      setCellValue(sheet, newRow, SYNC_RECORD_COL.TYPE, parameters.type ?? '')
+      setCellValue(sheet, newRow, SYNC_RECORD_COL.SOURCE, parameters.source ?? '')
       setCellValue(sheet, newRow, SYNC_RECORD_COL.COUNT, finalCount)
-      setCellValue(sheet, newRow, SYNC_RECORD_COL.CONTENT, parameters.content || '')
+      setCellValue(sheet, newRow, SYNC_RECORD_COL.CONTENT, parameters.content ?? '')
       setCellValue(sheet, newRow, SYNC_RECORD_COL.STATUS, finalStatus)
-      setCellValue(sheet, newRow, SYNC_RECORD_COL.MESSAGE, parameters.message || '')
+      setCellValue(sheet, newRow, SYNC_RECORD_COL.MESSAGE, parameters.message ?? '')
       if (parameters.fingerprint !== undefined)
         setCellValue(sheet, newRow, SYNC_RECORD_COL.FINGERPRINT, parameters.fingerprint)
-      if (parameters.collType) setCellValue(sheet, newRow, SYNC_RECORD_COL.COLL_TYPE, parameters.collType)
+      if (parameters.collType)
+        setCellValue(sheet, newRow, SYNC_RECORD_COL.COLL_TYPE, parameters.collType)
 
       setSyncRecordColors(sheet, newRow, finalStatus, finalCount)
 
@@ -472,7 +477,7 @@ export function addSyncRecord(parameters: UpdateRecordParams): boolean {
         sid,
         count: finalCount,
         status: finalStatus,
-        message: parameters.message || '',
+        message: parameters.message ?? '',
         ...(parameters.name ? { name: parameters.name } : {}),
         ...(parameters.url ? { url: parameters.url } : {}),
         ...(parameters.type ? { type: parameters.type } : {}),
@@ -519,7 +524,7 @@ export function addSyncRecords(records: UpdateRecordParams[]): boolean {
     >()
 
     for (const parameters of records) {
-      const sid = parameters.sid || ''
+      const sid = parameters.sid ?? ''
       const existingRow = sid ? _syncRecordSidCache.get(sid) : undefined
       if (existingRow !== undefined) {
         const existingCount = parseInt(getCellValue(sheet, existingRow, SYNC_RECORD_COL.COUNT)) || 0
@@ -537,15 +542,15 @@ export function addSyncRecords(records: UpdateRecordParams[]): boolean {
       newRows.push([
         sid,
         now,
-        parameters.name || '',
-        parameters.url || '',
-        parameters.type || '',
-        parameters.source || '',
+        parameters.name ?? '',
+        parameters.url ?? '',
+        parameters.type ?? '',
+        parameters.source ?? '',
         String(parameters.count || 1),
-        parameters.content || '',
+        parameters.content ?? '',
         parameters.status || SYNC_STATUS.SUCCESS,
-        parameters.collType || '',
-        parameters.message || '',
+        parameters.collType ?? '',
+        parameters.message ?? '',
         parameters.fingerprint !== undefined ? parameters.fingerprint : '',
       ])
     }
@@ -653,7 +658,7 @@ export function deduplicateSyncRecords(): boolean {
     for (let row = 2; row <= lastRow; row += 1) {
       const sid = getCellValue(sheet, row, SYNC_RECORD_COL.SID).trim()
       if (!sid) continue
-      const rows = sidRows.get(sid) || []
+      const rows = sidRows.get(sid) ?? []
       rows.push(row)
       sidRows.set(sid, rows)
     }
@@ -696,7 +701,7 @@ export function formatSyncRecordSheet(sheet?: WpsWorksheet): void {
   if (_isFormattingInProgress) return
   _isFormattingInProgress = true
   try {
-    const target = sheet || getSyncRecordSheetIfExists()
+    const target = sheet ?? getSyncRecordSheetIfExists()
     if (!target) {
       bgmLog(LOG_LEVELS.WARN, '[formatSyncRecordSheet] 同步记录表不存在，请先启用同步记录功能')
       _isFormattingInProgress = false

@@ -48,11 +48,11 @@ export function initMessageListener(): void {
 
     switch (data.type) {
       case 'showAlert': {
-        showAlert(data.message || '', data.title)
+        showAlert(data.message ?? '', data.title)
         break
       }
       case 'showConfirm': {
-        showConfirm(data.message || '', (confirmed) => {
+        showConfirm(data.message ?? '', (confirmed) => {
           if (confirmed) BGM.sync.startSync()
         })
         break
@@ -91,7 +91,8 @@ export function initMessageListener(): void {
 // ========== 状态显示 ==========
 
 export function setStatus(message: string, type?: string): void {
-  const statusElement = document.getElementById('statusBox') || document.getElementById('statusDisplay')
+  const statusElement =
+    document.getElementById('statusBox') ?? document.getElementById('statusDisplay')
   if (!statusElement) return
 
   statusElement.textContent = message

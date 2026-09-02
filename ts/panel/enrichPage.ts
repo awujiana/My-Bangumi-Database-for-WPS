@@ -409,7 +409,7 @@ function renderBatchFileList(): void {
   if (listElement) {
     if (n === 0) {
       listElement.style.display = 'none'
-      listElement.replaceChildren();
+      listElement.replaceChildren()
     } else {
       const rows = state.batchFiles.map((filePath, index) => {
         const fileName = extractFileName(filePath)
@@ -516,7 +516,10 @@ export function autoDetectHeader(): void {
       level: BGM.ErrorLevel.ERROR,
       context: 'autoDetectHeader',
     })
-    BGM.Dialog.error('错误', `识别表头失败: ${error instanceof Error ? error.message : String(error)}`)
+    BGM.Dialog.error(
+      '错误',
+      `识别表头失败: ${error instanceof Error ? error.message : String(error)}`,
+    )
   }
 }
 
@@ -615,7 +618,7 @@ function getSelectedWorkbook(): WpsWorkbook | null {
   if (!app?.ActiveWorkbook) return null
 
   const wbSelect = safeGetSelect('workbookSelect')
-  const wbName = wbSelect?.value || ''
+  const wbName = wbSelect?.value ?? ''
 
   if (!wbName) return app.ActiveWorkbook
 
@@ -784,8 +787,15 @@ export function previewMatch(): void {
 
     bgmLog(LOG_LEVELS.INFO, `[enrich] 匹配预览完成: ${String(state.matches.length)} 条结果`)
   } catch (error: unknown) {
-    BGM.handleError(error, { showAlert: false, level: BGM.ErrorLevel.ERROR, context: 'previewMatch' })
-    BGM.Dialog.error('错误', `匹配预览失败: ${error instanceof Error ? error.message : String(error)}`)
+    BGM.handleError(error, {
+      showAlert: false,
+      level: BGM.ErrorLevel.ERROR,
+      context: 'previewMatch',
+    })
+    BGM.Dialog.error(
+      '错误',
+      `匹配预览失败: ${error instanceof Error ? error.message : String(error)}`,
+    )
   }
 }
 
@@ -956,7 +966,10 @@ export function startEnrichment(): void {
       level: BGM.ErrorLevel.ERROR,
       context: 'startEnrichment',
     })
-    BGM.Dialog.error('错误', `富化执行失败: ${error instanceof Error ? error.message : String(error)}`)
+    BGM.Dialog.error(
+      '错误',
+      `富化执行失败: ${error instanceof Error ? error.message : String(error)}`,
+    )
   } finally {
     state.isEnriching = false
     state.cancelRequested = false
@@ -1059,7 +1072,11 @@ export function clearRecords(): void {
       loadRecentRecords()
       bgmLog(LOG_LEVELS.INFO, '[enrich] 富化记录已清除')
     } catch (error: unknown) {
-      BGM.handleError(error, { showAlert: false, level: BGM.ErrorLevel.ERROR, context: 'clearRecords' })
+      BGM.handleError(error, {
+        showAlert: false,
+        level: BGM.ErrorLevel.ERROR,
+        context: 'clearRecords',
+      })
     }
   })
 }
@@ -1326,7 +1343,7 @@ function hideConflictDialog(): void {
   const dialogElement = safeGetElement('conflictDialog')
   if (dialogElement) {
     dialogElement.style.display = 'none'
-    dialogElement.replaceChildren();
+    dialogElement.replaceChildren()
   }
 }
 

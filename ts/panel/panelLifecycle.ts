@@ -78,10 +78,10 @@ export function toggleSheetLock(): void {
     saveLockedSheet(null)
     showToast('已解锁工作表', 'info')
   } else {
-    const sheetName = select.options[select.selectedIndex]?.text || ''
+    const sheetName = select.options[select.selectedIndex]?.text ?? ''
     // 获取选中的工作簿名称
     const wbSelect = document.getElementById('workbookSelect') as HTMLSelectElement | null
-    const wbName = wbSelect?.value || ''
+    const wbName = wbSelect?.value ?? ''
     BGM.sheet.lockedIndex = sheetIndex
     BGM.sheet.lockedName = sheetName
     BGM.sheet.lockedWorkbookName = wbName || null
@@ -290,7 +290,7 @@ export function refreshWorkbooks(): void {
   select.appendChild(defaultOption)
 
   let hasActiveWorkbook = false
-  const activeWbName = app.ActiveWorkbook?.Name || ''
+  const activeWbName = app.ActiveWorkbook?.Name ?? ''
 
   for (let index = 1; index <= wbs.Count; index += 1) {
     const option = document.createElement('option')
@@ -421,7 +421,7 @@ export function detectHeaderAndColumns(
   for (let c = 1; c <= PANEL_CONFIG.MAX_SCAN_COLUMNS; c += 1) {
     const v = getCellValue(ws, headerRow, c).trim()
     headerNames.push(v)
-    headerIsImportant.push(IMPORTANT_COLS[v.toLowerCase()] || false)
+    headerIsImportant.push(IMPORTANT_COLS[v.toLowerCase()] ?? false)
   }
 
   // 3. 检测多行表头（下一行是否填充了当前表头的空列）
@@ -444,7 +444,7 @@ export function detectHeaderAndColumns(
           const nv = getCellValue(ws, headerRow + 1, c).trim()
           if (nv) {
             headerNames[c - 1] = nv
-            headerIsImportant[c - 1] = IMPORTANT_COLS[nv.toLowerCase()] || false
+            headerIsImportant[c - 1] = IMPORTANT_COLS[nv.toLowerCase()] ?? false
           }
         }
       }
@@ -656,7 +656,7 @@ export function updateFilterStatus(targetWs?: WpsWorksheet): void {
   if (!element) return
 
   const app = getApp()
-  const sheet = targetWs || app?.ActiveWorkbook?.ActiveSheet
+  const sheet = targetWs ?? app?.ActiveWorkbook?.ActiveSheet
   if (!sheet) {
     // 处理：显示提示、返回等
     return
@@ -718,7 +718,7 @@ export function updateFilterStatus(targetWs?: WpsWorksheet): void {
               context: 'updateFilterStatus',
             })
           }
-          let criteria = f.Criteria1 || ''
+          let criteria = f.Criteria1 ?? ''
           if (f.Criteria2) {
             const op = f.Operator
             criteria +=
@@ -778,7 +778,7 @@ function renderPreviewTable(
       // 使用统一列数，确保所有行列对齐
       const colLimit = fixedColCount > 0 ? fixedColCount : cols.length
       for (let index = 0; index < colLimit; index += 1) {
-        const text = cols[index] || ''
+        const text = cols[index] ?? ''
         let cls = ''
         if (item.isHeader) {
           cls = 'preview-header'
@@ -800,7 +800,7 @@ export function refreshData(): void {
   bgmLog(LOG_LEVELS.INFO, 'refreshData 开始执行')
   const select = document.getElementById('sheetSelect') as HTMLSelectElement | null
   const previewBox = document.getElementById('previewBox')
-  const sheetIndex = BGM.sheet.lockedIndex || parseInt(select?.value || '') || 0
+  const sheetIndex = BGM.sheet.lockedIndex || parseInt(select?.value ?? '') || 0
 
   if (!sheetIndex) {
     if (previewBox) previewBox.innerHTML = sanitizeHtml('<p class="hint">请先选择工作表</p>')
@@ -1139,7 +1139,7 @@ export function autoDetectAndLockSheet(): boolean {
     BGM.sheet.lockedIndex = detected.sheetIndex
     BGM.sheet.lockedName = detected.sheetName
     BGM.sheet.isLocked = true
-    const activeWbName = app?.ActiveWorkbook?.Name || ''
+    const activeWbName = app?.ActiveWorkbook?.Name ?? ''
     if (activeWbName) {
       BGM.sheet.lockedWorkbookName = activeWbName
     }
