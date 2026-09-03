@@ -1,8 +1,8 @@
 /**
  * 工具模块 - re-export 入口
  * @module tools/util
- * @description 兼容入口：原 util.ts 已按职责拆分到 util/ 子目录，
- *              此文件仅做 re-export，保持外部 import 路径 `'./tools/util.js'` 不变。
+ * @description 兼容入口：原 utility.ts 已按职责拆分到 util/ 子目录，
+ *              此文件仅做 re-export，保持外部 import 路径 `'./tools/utility.js'` 不变。
  *
  * 拆分结构：
  *   - util/cell.ts：单元格读取/设置（getCell、getCellValue、setCellValue、getSheetByIndex）

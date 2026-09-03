@@ -11,7 +11,7 @@ import {
   getCellValue,
   trim,
   _getUserApiPath,
-  wpsMsgBox as wpsMessageBox,
+  wpsMessageBox,
   getCell,
   escapeHtml,
   showAlert,
@@ -26,7 +26,7 @@ import {
   buildJsonPayload,
   bgmRequestSync,
   addSyncRecord,
-  addTagsFromStr as addTagsFromString,
+  addTagsFromString,
   WATCH_STATUS_MAP,
   SyncToBangumiAsync,
   showSyncProgressDialog,
@@ -38,7 +38,7 @@ import {
 import type { WpsWorksheet, WpsRange, SyncRecord, SyncConfigSummary } from '../index.js'
 import { getAllSyncRecords } from '../sync/syncRecord.js'
 import { sanitizeHtml } from '../tools/sanitize.js'
-import { loadBgToken } from '../tools/util.js'
+import { loadBgToken } from '../tools/utility.js'
 
 // ========== 类型定义 ==========
 export interface DetailItem {
@@ -229,8 +229,8 @@ let detailPreviewData: DetailPreviewData = {
   uploadedCount: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 },
 }
 
-function handlePreviewBodyClick(e: Event): void {
-  const target = e.target as HTMLElement
+function handlePreviewBodyClick(event: Event): void {
+  const target = event.target as HTMLElement
   const button = target.closest('.upload-single-btn')
   if (!(button instanceof HTMLElement)) return
   const rowNumber = parseInt(button.dataset.row ?? '', 10)

@@ -6,8 +6,8 @@ vi.mock('../ts/tools/util/index.js', () => ({
   BGM: { handleError: vi.fn(), ErrorLevel: { ERROR: 'ERROR' } },
 }))
 
-vi.mock('../ts/tools/stringUtils.js', () => ({
-  colNumToLetter: (col: number) => {
+vi.mock('../ts/tools/string-utilities.js', () => ({
+  colNumberToLetter: (col: number) => {
     let result = ''
     let n = col
     while (n > 0) {

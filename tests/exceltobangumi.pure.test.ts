@@ -4,7 +4,7 @@ import {
   extractSubjectId,
   mapWatchStatus,
   setLogger,
-} from '../ts/sync/pureUtilsCore.js'
+} from '../ts/sync/pure-utilities-core.js'
 import { URL_PATTERNS, WATCH_STATUS_MAP, LOG_LEVELS } from '../ts/core/constants.js'
 
 /**
@@ -13,8 +13,8 @@ import { URL_PATTERNS, WATCH_STATUS_MAP, LOG_LEVELS } from '../ts/core/constants
  * 测试策略：直接 import 源码实现，避免复制实现导致源码修改后测试不失败的问题。
  *
  * 模块依赖说明：
- *   - isBangumiUrl / extractSubjectId / mapWatchStatus 来自 pureUtilsCore.ts
- *     （仅依赖 core/constants 与 tools/stringUtilsPure，无副作用链）
+ *   - isBangumiUrl / extractSubjectId / mapWatchStatus 来自 pure-utilities-core.ts
+ *     （仅依赖 core/constants 与 tools/string-utilities-pure，无副作用链）
  *   - URL_PATTERNS / WATCH_STATUS_MAP / LOG_LEVELS 来自 core/constants.ts（纯常量模块）
  *
  * 日志注入：mapWatchStatus 在状态无法识别时调用注入的日志函数。

@@ -578,10 +578,10 @@ class LiteWithDefault<T, D> implements ZodSchema<T | D> {
   constructor(
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     inner: ZodSchema<any>,
-    def: D,
+    definition: D,
   ) {
     this._inner = inner
-    this._def = def
+    this._def = definition
   }
 
   optional(): ZodSchema<(T | D) | undefined> {

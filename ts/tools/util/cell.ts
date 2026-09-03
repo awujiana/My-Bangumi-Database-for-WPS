@@ -6,7 +6,7 @@
  *              但仅在函数体内引用，运行时安全。
  */
 import { LOG_LEVELS } from '../../core/constants.js'
-import { colNumToLetter as colNumberToLetter } from '../stringUtils.js'
+import { colNumberToLetter } from '../string-utilities.js'
 import type { WpsWorksheet, WpsRange, WpsCellValue } from '../wps.js'
 
 // 循环依赖：仅在函数体内使用 BGM.handleError / bgmLog / getApp，运行时安全
@@ -27,15 +27,15 @@ export function getCell(
 /**
  * 安全地获取对象属性值，处理属性值为函数的情况
  * @param cell - 要获取属性的对象
- * @param prop - 属性名称
+ * @param property - 属性名称
  * @returns 属性的值；如果属性不存在或访问失败，则返回 undefined
  */
-function tryGetProperty(cell: unknown, prop: string): unknown {
+function tryGetProperty(cell: unknown, property: string): unknown {
   if (cell == null || typeof cell !== 'object') return undefined
   const object = cell as Record<string, unknown>
-  if (!(prop in object)) return undefined
+  if (!(property in object)) return undefined
   try {
-    const value = object[prop]
+    const value = object[property]
     if (typeof value === 'function') {
       try {
         const result = (value as () => unknown)()

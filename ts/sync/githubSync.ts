@@ -15,7 +15,7 @@
  */
 
 // 直接从子模块导入，避开 index.ts 的副作用链（index → handlers → document.readyState）
-// 注意：bgmLog 定义在 tools/util.ts（不在 core/constants.ts），与 BGM/getDataSheet 等同源导入
+// 注意：bgmLog 定义在 tools/utility.ts（不在 core/constants.ts），与 BGM/getDataSheet 等同源导入
 import { LOG_LEVELS, BGM_SUBJECT_TYPES } from '../core/constants.js'
 import { Result, BgmError } from '../core/result.js'
 import {
@@ -26,11 +26,11 @@ import {
   getColumnMap,
   getCellValue,
   setCellValue,
-  colNumToLetter as colNumberToLetter,
+  colNumberToLetter,
   trim,
   ensureSheetHeaders,
   getApp,
-} from '../tools/util.js'
+} from '../tools/utility.js'
 import type { WpsCellValue, WpsRange, WpsWorksheet } from '../tools/wps.js'
 
 import { buildRawUrl, isGithubConfigComplete } from './githubConfig.js'
@@ -51,9 +51,9 @@ import type {
   SyncStrategy,
   SyncTimeFilter,
 } from './githubSyncDiff.js'
-import { extractSubjectId } from './pureUtils.js'
+import { extractSubjectId } from './pure-utilities.js'
 import { addSyncRecords, addSyncRecordSummary } from './syncRecord.js'
-import type { UpdateRecordParams as UpdateRecordParameters } from './syncRecord.js'
+import type { UpdateRecordParameters } from './syncRecord.js'
 import type { SyncSource } from './SyncSource.js'
 import {
   beginUndoSession,
@@ -444,12 +444,12 @@ const DATE_COLUMNS = new Set(['开播日期', '完播日'])
  * 本地 Excel 的"开播日期""完播日"列使用"YYYY年MM月DD日"格式的字符串，
  * 远程仓库使用 YYYY-MM-DD 格式，同步时需转换为本地格式写入。
  *
- * @param dateStr 日期字符串，支持 YYYY-MM-DD、YYYY/MM/DD、YYYY.MM.DD 等格式
+ * @param dateString 日期字符串，支持 YYYY-MM-DD、YYYY/MM/DD、YYYY.MM.DD 等格式
  * @returns "年月日"格式字符串，如"2015年12月15日"，解析失败返回 null
  */
-function formatDateToLocal(dateStr: string): string | null {
-  if (!dateStr) return null
-  const match = /^(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})/.exec(dateStr)
+function formatDateToLocal(dateString: string): string | null {
+  if (!dateString) return null
+  const match = /^(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})/.exec(dateString)
   if (!match) return null
   const year = match[1]
   const month = match[2]!.padStart(2, '0')
@@ -1739,7 +1739,7 @@ export async function syncFromGithub(
       if (selectedSids.size === 0) {
         throw new Error('未选中任何行，或选中行中未找到 Bangumi URL')
       }
-      effectiveRemoteEntries = remoteEntries.filter((e) => selectedSids.has(e.sid))
+      effectiveRemoteEntries = remoteEntries.filter((entry) => selectedSids.has(entry.sid))
       bgmLog(
         LOG_LEVELS.INFO,
         `[syncFromGithub] 仅同步选中行：选中 ${String(selectedSids.size)} 个 SID，匹配远程 ${String(effectiveRemoteEntries.length)} 条`,

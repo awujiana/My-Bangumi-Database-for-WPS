@@ -3,7 +3,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest'
 
 const mockBgmLog = vi.hoisted(() => vi.fn())
 
-vi.mock('../ts/tools/util.js', () => ({
+vi.mock('../ts/tools/utility.js', () => ({
   bgmLog: mockBgmLog,
   LOG_LEVELS: { INFO: 'INFO', WARN: 'WARN', ERROR: 'ERROR', DEBUG: 'DEBUG' },
 }))

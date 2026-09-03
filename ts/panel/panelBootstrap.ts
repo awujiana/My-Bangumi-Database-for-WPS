@@ -12,7 +12,7 @@
 import '../index.js'
 import '../core/constants.js'
 import '../tools/config.js'
-import '../tools/util.js'
+import '../tools/utility.js'
 import '../core/crypto.js'
 import '../tools/events.js'
 import '../core/result.js'
@@ -29,8 +29,8 @@ import '../entry/panel-entry.js'
 if (typeof window !== 'undefined') {
   window.addEventListener(
     'error',
-    (e: Event) => {
-      const target = e.target as HTMLElement | null
+    (event: Event) => {
+      const target = event.target as HTMLElement | null
       if (target && (target.tagName === 'SCRIPT' || target.tagName === 'LINK')) {
         const source =
           target.tagName === 'SCRIPT'
@@ -42,8 +42,8 @@ if (typeof window !== 'undefined') {
     true,
   )
 
-  window.addEventListener('unhandledrejection', (e: PromiseRejectionEvent) => {
-    console.error('[BGM] Unhandled promise rejection:', e.reason)
+  window.addEventListener('unhandledrejection', (event: PromiseRejectionEvent) => {
+    console.error('[BGM] Unhandled promise rejection:', event.reason)
   })
 }
 

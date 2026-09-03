@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 
-const { PANEL_CONFIG, HEADER_KEYWORDS, COLUMN_RULES, STANDARD_HEADERS, colNumToLetter } =
+const { PANEL_CONFIG, HEADER_KEYWORDS, COLUMN_RULES, STANDARD_HEADERS, colNumberToLetter } =
   vi.hoisted(() => {
     const PANEL_CONFIG = { MAX_SCAN_ROWS: 50, MAX_SCAN_COLUMNS: 10 }
     const HEADER_KEYWORDS = [
@@ -50,7 +50,7 @@ const { PANEL_CONFIG, HEADER_KEYWORDS, COLUMN_RULES, STANDARD_HEADERS, colNumToL
       HEADER_KEYWORDS,
       COLUMN_RULES,
       STANDARD_HEADERS,
-      colNumToLetter: colNumberToLetter,
+      colNumberToLetter,
     }
   })
 
@@ -62,8 +62,8 @@ vi.mock('../ts/core/constants.js', () => ({
   STANDARD_HEADERS,
 }))
 
-vi.mock('../ts/tools/stringUtils.js', () => ({
-  colNumToLetter,
+vi.mock('../ts/tools/string-utilities.js', () => ({
+  colNumberToLetter,
   trim: (s: string) => s.trim(),
 }))
 

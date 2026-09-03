@@ -1,8 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
-// Mock 依赖：避开 util.ts 的副作用链（util → wps → index → handlers → document）
+// Mock 依赖：避开 utility.ts 的副作用链（util → wps → index → handlers → document）
 // 仅提供 configService.ts 实际使用的 4 个函数
-vi.mock('../ts/tools/util.js', () => ({
+vi.mock('../ts/tools/utility.js', () => ({
   loadBgToken: vi.fn(() => 'test-token'),
   storeBgToken: vi.fn(() => true),
   _getBgmUserId: vi.fn(() => 'test-user-123'),
@@ -24,7 +24,7 @@ vi.mock('../ts/sync/githubConfig.js', () => ({
 
 // 在 mock 注册之后导入被测模块
 import { exportConfig, importConfig } from '../ts/services/configService.js'
-import { loadBgToken, storeBgToken, _getBgmUserId, _setBgmUserId } from '../ts/tools/util.js'
+import { loadBgToken, storeBgToken, _getBgmUserId, _setBgmUserId } from '../ts/tools/utility.js'
 import {
   getGithubConfig,
   setGithubConfig,

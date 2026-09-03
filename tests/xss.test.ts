@@ -10,8 +10,8 @@
  * 测试环境：jsdom（escapeHtml 依赖 document.createElement，sanitizeHtml 依赖 DOMPurify）
  *
  * 模块依赖说明：
- *   - escapeHtml 直接 import 自 stringUtilsPure.ts（零依赖纯模块），避免触发
- *     stringUtils → crypto → index → handlers 的副作用链。
+ *   - escapeHtml 直接 import 自 string-utilities-pure.ts（零依赖纯模块），避免触发
+ *     string-utilities → crypto → index → handlers 的副作用链。
  *   - sanitizeHtml 直接 import 自 sanitize.ts，该模块仅依赖 dompurify，无项目副作用。
  */
 
@@ -19,7 +19,7 @@
 
 import { describe, it, expect } from 'vitest'
 import { sanitizeHtml } from '../ts/tools/sanitize.js'
-import { escapeHtml } from '../ts/tools/stringUtilsPure.js'
+import { escapeHtml } from '../ts/tools/string-utilities-pure.js'
 
 // ========== 测试用 XSS payload ==========
 const XSS_PAYLOADS = [

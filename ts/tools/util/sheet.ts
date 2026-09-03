@@ -11,7 +11,7 @@ import {
   COLUMN_RULES,
   STANDARD_HEADERS,
 } from '../../core/constants.js'
-import { colNumToLetter as colNumberToLetter, trim } from '../stringUtils.js'
+import { colNumberToLetter, trim } from '../string-utilities.js'
 import type { WpsWorksheet } from '../wps.js'
 
 // 循环依赖：仅在函数体内使用 BGM/bgmLog/getApp，运行时安全
@@ -30,13 +30,13 @@ import { BGM, bgmLog, getApp } from './index.js'
  * @param endCol 结束列
  * @returns 字符串二维数组
  */
-function isNativeCode(val: unknown): boolean {
-  if (typeof val === 'function') {
-    const string_ = val.toString()
+function isNativeCode(value: unknown): boolean {
+  if (typeof value === 'function') {
+    const string_ = value.toString()
     return string_.includes('[native code]') || string_.includes('function Value()')
   }
-  if (val && typeof val === 'object') {
-    const object = val as { toString?: () => string }
+  if (value && typeof value === 'object') {
+    const object = value as { toString?: () => string }
     if (typeof object.toString === 'function') {
       const string_ = object.toString()
       return string_.includes('[native code]') || string_.includes('function Value()')

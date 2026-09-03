@@ -9,7 +9,7 @@
  *   - 并发调用：1000 个 Result 实例并发创建
  *
  * 模块依赖说明：
- *   - 优先使用纯函数模块（pureUtilsCore / stringUtilsPure / core/result）避免副作用链。
+ *   - 优先使用纯函数模块（pure-utilities-core / string-utilities-pure / core/result）避免副作用链。
  *   - calcChecksum 来自 core/crypto.ts，触发 index → ui/handlers 副作用链，
  *     使用 vi.hoisted() + fake timers 兜底。
  *   - 需要 jsdom 环境以提供 document/window（handlers.ts 副作用访问 document.readyState）。
@@ -23,17 +23,13 @@ vi.hoisted(() => {
 })
 
 import { Result, BgmError } from '../ts/core/result.js'
-import {
-  colNumToLetter as colNumberToLetter,
-  escapeHtml,
-  trim,
-} from '../ts/tools/stringUtilsPure.js'
+import { colNumberToLetter, escapeHtml, trim } from '../ts/tools/string-utilities-pure.js'
 import {
   isBangumiUrl,
   extractSubjectId,
   mapWatchStatus,
   setLogger,
-} from '../ts/sync/pureUtilsCore.js'
+} from '../ts/sync/pure-utilities-core.js'
 import { calcChecksum } from '../ts/core/crypto.js'
 import { WATCH_STATUS_MAP } from '../ts/core/constants.js'
 
@@ -97,13 +93,13 @@ describe('空值边界', () => {
     })
   })
 
-  describe('colNumToLetter 处理边界列号', () => {
+  describe('colNumberToLetter 处理边界列号', () => {
     it('列号 1 返回 "A"', () => {
       expect(colNumberToLetter(1)).toBe('A')
     })
 
     it('列号 0 返回空字符串或特定值（边界）', () => {
-      // colNumToLetter(0) 的行为：可能返回空字符串或抛错，验证不崩溃
+      // colNumberToLetter(0) 的行为：可能返回空字符串或抛错，验证不崩溃
       const result = colNumberToLetter(0)
       expect(typeof result).toBe('string')
     })
@@ -290,7 +286,7 @@ describe('极值边界', () => {
     })
   })
 
-  describe('colNumToLetter 处理极值列号', () => {
+  describe('colNumberToLetter 处理极值列号', () => {
     it('列号 1000 应返回有效字符串', () => {
       const result = colNumberToLetter(1000)
       expect(typeof result).toBe('string')
@@ -713,7 +709,7 @@ describe('并发调用边界', () => {
     })
   })
 
-  describe('colNumToLetter 并发调用', () => {
+  describe('colNumberToLetter 并发调用', () => {
     it('1000 次调用返回一致结果', () => {
       const results: string[] = []
       for (let index = 0; index < 1000; index += 1) {

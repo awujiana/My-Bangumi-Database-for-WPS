@@ -31,7 +31,7 @@
 
 import { LOG_LEVELS } from '../core/constants.js'
 import { Result, BgmError } from '../core/result.js'
-import { bgmLog } from '../tools/util.js'
+import { bgmLog } from '../tools/utility.js'
 
 import { getGistId, isGistConfigured } from './githubConfig.js'
 import { parseJsonl } from './githubSyncDiff.js'

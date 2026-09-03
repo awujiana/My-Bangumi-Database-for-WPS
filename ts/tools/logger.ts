@@ -31,7 +31,7 @@ function pushLog(entry: LogEntry): void {
 /** 获取最近日志 */
 export function getRecentLogs(level?: LogLevel, limit = 100): LogEntry[] {
   const all = logBuffer.toArray()
-  const filtered = level ? all.filter((e) => e.level === level) : all
+  const filtered = level ? all.filter((log) => log.level === level) : all
   return filtered.slice(-limit)
 }
 
@@ -63,7 +63,7 @@ export function maskSensitiveData(input: string): string {
 export function exportLogsToFile(): void {
   const logs = getRecentLogs(undefined, 1000)
   const text = logs
-    .map((e) => `[${new Date(e.timestamp).toISOString()}] [${e.level}] ${e.message}`)
+    .map((log) => `[${new Date(log.timestamp).toISOString()}] [${log.level}] ${log.message}`)
     .join('\n')
   const blob = new Blob([text], { type: 'text/plain;charset=utf-8' })
   const url = URL.createObjectURL(blob)

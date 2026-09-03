@@ -407,16 +407,16 @@ export function filterByTime(
  * 对于 'future' 模式，所有本地条目都被视为在筛选范围内（保留不删除），
  * 因为预告/未来筛选仅影响远程数据下载，不影响本地已有数据。
  *
- * @param dateStr 日期字符串（本地格式如"2015年12月15日"或远程格式"2015-12-15"）
+ * @param dateString 日期字符串（本地格式如"2015年12月15日"或远程格式"2015-12-15"）
  * @param filter 时间筛选配置
  * @returns true 表示在筛选范围内
  */
-function matchTimeFilter(dateStr: string, filter: SyncTimeFilter): boolean {
+function matchTimeFilter(dateString: string, filter: SyncTimeFilter): boolean {
   // 预告/未来模式：所有本地条目都保留
   if (filter.range === 'future') return true
 
   // 支持本地"YYYY年MM月DD日"格式和远程"YYYY-MM-DD"格式
-  const match = /(\d{4})[-/.年](\d{1,2})/.exec(dateStr)
+  const match = /(\d{4})[-/.年](\d{1,2})/.exec(dateString)
   if (!match) return false
 
   const yearString = match[1]

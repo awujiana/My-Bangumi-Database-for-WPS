@@ -90,7 +90,7 @@ vi.mock('../ts/core/constants.js', () => ({
   ErrorLevel: { INFO: 0, WARN: 1, ERROR: 2, FATAL: 3 },
 }))
 
-vi.mock('../ts/tools/util.js', () => ({
+vi.mock('../ts/tools/utility.js', () => ({
   bgmLog: mockBgmLogn,
   getDataSheet: mockGetDataSheet,
   findHeaderRow: mockFindHeaderRow,
@@ -98,7 +98,7 @@ vi.mock('../ts/tools/util.js', () => ({
   getColumnMap: mockGetColumnMap,
   getCellValue: mockGetCellValue,
   setCellValue: mockSetCellValue,
-  colNumToLetter: mockColNumberToLetter,
+  colNumberToLetter: mockColNumberToLetter,
   trim: vi.fn((v: string) => v?.trim() ?? ''),
   ensureSheetHeaders: mockEnsureSheetHeaders,
   getApp: mockGetApp,
@@ -110,7 +110,7 @@ vi.mock('../ts/core/result.js', () => ({
   Result: {
     ok: vi.fn((v: unknown) => ({ isFail: () => false, value: v })),
     okVoid: vi.fn(() => ({ isFail: () => false })),
-    failVoid: vi.fn((e: Error) => ({ isFail: () => true, error: e })),
+    failVoid: vi.fn((error: Error) => ({ isFail: () => true, error })),
   },
   BgmError: vi.fn().mockImplementation(function (message: string) {
     this.message = message
@@ -152,7 +152,7 @@ vi.mock('../ts/sync/githubSyncDiff.js', () => ({
   }),
 }))
 
-vi.mock('../ts/sync/pureUtils.js', () => ({
+vi.mock('../ts/sync/pure-utilities.js', () => ({
   extractSubjectId: mockExtractSubjectId,
 }))
 

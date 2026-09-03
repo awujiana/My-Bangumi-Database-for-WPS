@@ -12,7 +12,7 @@
 import '../index.js'
 import '../core/constants.js'
 import '../tools/config.js'
-import '../tools/util.js'
+import '../tools/utility.js'
 import '../core/crypto.js'
 import '../tools/events.js'
 import '../core/result.js'

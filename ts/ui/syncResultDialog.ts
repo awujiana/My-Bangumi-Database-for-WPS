@@ -13,7 +13,7 @@ import { LOG_LEVELS } from '../core/constants.js'
 import { exportSheetToJsonlFile } from '../sync/exportJsonl.js'
 import type { GithubSyncResult } from '../sync/githubSync.js'
 import type { GithubSyncDetailItem } from '../sync/githubSyncDiff.js'
-import { extractSubjectId } from '../sync/pureUtils.js'
+import { extractSubjectId } from '../sync/pure-utilities.js'
 import {
   getDataSheet,
   findHeaderRow,
@@ -22,7 +22,7 @@ import {
   getCellValue,
   trim,
 } from '../tools/util/index.js'
-import { bgmLog } from '../tools/util.js'
+import { bgmLog } from '../tools/utility.js'
 
 import { renderSyncDetailTable } from './dialog.js'
 
@@ -162,7 +162,7 @@ export function computeDateStatsFromSheet(): DateStats {
 // ========== 增强结果弹窗 ==========
 
 let _resultDialog: HTMLElement | null = null
-let _resultDialogEscHandler: ((e: KeyboardEvent) => void) | null = null
+let _resultDialogEscHandler: ((event: KeyboardEvent) => void) | null = null
 
 /** 清理 ESC 监听器 */
 function _clearEscHandler(): void {
@@ -668,8 +668,8 @@ export function showSyncResultDialog(options: SyncResultDialogOptions): void {
   })
 
   // ESC 关闭
-  _resultDialogEscHandler = (e: KeyboardEvent): void => {
-    if (e.key === 'Escape') {
+  _resultDialogEscHandler = (event: KeyboardEvent): void => {
+    if (event.key === 'Escape') {
       hideSyncResultDialog()
     }
   }
@@ -705,7 +705,7 @@ interface SyncDetailPreviewOptions {
 }
 
 let _previewDialog: HTMLElement | null = null
-let _previewDialogEscHandler: ((e: KeyboardEvent) => void) | null = null
+let _previewDialogEscHandler: ((event: KeyboardEvent) => void) | null = null
 
 /**
  * 渲染同步明细折叠表格
@@ -833,16 +833,16 @@ function showSyncDetailPreviewDialog(options: SyncDetailPreviewOptions): void {
   })
 
   // ESC 关闭
-  _previewDialogEscHandler = (e: KeyboardEvent): void => {
-    if (e.key === 'Escape') {
+  _previewDialogEscHandler = (event: KeyboardEvent): void => {
+    if (event.key === 'Escape') {
       hideSyncDetailPreviewDialog()
     }
   }
   document.addEventListener('keydown', _previewDialogEscHandler)
 
   // 点击遮罩关闭
-  modal.addEventListener('click', (e: MouseEvent) => {
-    if (e.target === modal) {
+  modal.addEventListener('click', (event: MouseEvent) => {
+    if (event.target === modal) {
       hideSyncDetailPreviewDialog()
     }
   })

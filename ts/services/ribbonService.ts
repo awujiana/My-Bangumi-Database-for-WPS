@@ -3,7 +3,7 @@ import {
   getApp,
   bgmLog,
   BGM,
-  wpsMsgBox as wpsMessageBox,
+  wpsMessageBox,
   loadBgToken,
   storeBgToken,
   getDataSheet,

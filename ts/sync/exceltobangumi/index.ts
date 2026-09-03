@@ -22,7 +22,7 @@ import {
   trim,
   getColumnMap,
   findHeaderRow,
-  colNumToLetter as colNumberToLetter,
+  colNumberToLetter,
   getCellValue,
   loadBgToken,
   BGM,
@@ -32,8 +32,8 @@ import {
   calcFingerprint,
   clearSheetCache,
 } from '../../tools/util/index.js'
-import type { WpsApplication as WpsApp, WpsWorksheet, WpsRange } from '../../tools/wps.js'
-import { wpsMsgBox as wpsMessageBox, isWpsWorksheet } from '../../tools/wps.js'
+import type { WpsApp, WpsWorksheet, WpsRange } from '../../tools/wps.js'
+import { wpsMessageBox, isWpsWorksheet } from '../../tools/wps.js'
 import {
   showConfirm,
   showSyncProgressDialog,
@@ -49,8 +49,8 @@ import {
   extractSubjectId,
   mapWatchStatus,
   getSeqColIndex,
-  addTagsFromStr as addTagsFromString,
-} from '../pureUtils.js'
+  addTagsFromString,
+} from '../pure-utilities.js'
 import { getAllSyncRecords, getOrCreateSyncRecordSheet } from '../syncRecord.js'
 
 // 子模块内部依赖（不通过 re-export 暴露给外部）
@@ -71,9 +71,9 @@ export {
   extractSubjectId,
   mapWatchStatus,
   getSeqColIndex,
-  addTagsFromStr,
+  addTagsFromString,
   buildTagsArray,
-} from '../pureUtils.js'
+} from '../pure-utilities.js'
 
 // Re-export 子模块公开 API
 export {
@@ -181,8 +181,8 @@ function createFieldGetter(
   }
 }
 
-// 以下纯函数（extractSubjectId / mapWatchStatus / addTagsFromStr / buildTagsArray）
-// 已迁移至 ./pureUtils.js，通过顶部 import 与 re-export 引入。
+// 以下纯函数（extractSubjectId / mapWatchStatus / addTagsFromString / buildTagsArray）
+// 已迁移至 ./pure-utilities.js，通过顶部 import 与 re-export 引入。
 
 /**
  * 获取筛选状态（可见行）
@@ -404,10 +404,8 @@ export function getSequentialRowsBySeqCol(
  * 构建API请求的JSON Payload
  *
  * @function buildJsonPayload
- * @param {WpsWorksheet} ws - 工作表对象
- * @param {number} rowNum - 数据行号
- * @param {Map<string, number>} colMap - 列映射
- * @param {string} finishedDate - 完播日期
+ * @param getField - 按列名读取单元格值的取数函数
+ * @param _finishedDate - 完播日期（预留，当前未参与构建）
  * @returns {string} JSON格式的请求体
  *
  * @description
@@ -600,7 +598,7 @@ function buildFingerprintMap(incremental: boolean | undefined): Map<string, stri
  * 校验链：URL → SID → 冲突跳过 → 观看状态 → 状态类型 → 指纹对比 → 颜色标记 → 构建 SyncTask。
  * 任何校验失败均返回 skipped=true；异常返回 failed=true。
  * @param ws 工作表
- * @param rowNum 当前行号
+ * @param rowNumber 当前行号
  * @param getField 字段访问器（基于批量缓存）
  * @param skipSids 需跳过的 SID 集合（冲突处理）
  * @param fingerprintMap 历史指纹映射（增量同步用）
@@ -609,14 +607,14 @@ function buildFingerprintMap(incremental: boolean | undefined): Map<string, stri
  */
 function processRowToSyncTask(
   ws: WpsWorksheet,
-  rowNum: number,
+  rowNumber: number,
   getField: (row: number, key: string) => string,
   skipSids: Set<string> | undefined,
   fingerprintMap: Map<string, string> | undefined,
   seqCol: number,
 ): RowProcessOutcome {
   try {
-    const bgmUrl = getField(rowNum, 'Bangumi_URL')
+    const bgmUrl = getField(rowNumber, 'Bangumi_URL')
     if (!bgmUrl) return { task: null, skipped: true, failed: false }
 
     const sid = extractSubjectId(bgmUrl)
@@ -629,7 +627,9 @@ function processRowToSyncTask(
 
     // 读取观看状态（空状态视为「想看」，由 mapWatchStatus 返回 1）
     const watchStatusField =
-      getField(rowNum, '是否看完') || getField(rowNum, '状态') || getField(rowNum, '观看状态')
+      getField(rowNumber, '是否看完') ||
+      getField(rowNumber, '状态') ||
+      getField(rowNumber, '观看状态')
 
     // 获取观看状态类型（空值 → 1=想看，未识别 → 0 跳过）
     const watchType = mapWatchStatus(watchStatusField)
@@ -641,14 +641,14 @@ function processRowToSyncTask(
     let currentFingerprint: string | undefined
     if (fingerprintMap) {
       currentFingerprint = calcFingerprint([
-        getField(rowNum, '名称'),
+        getField(rowNumber, '名称'),
         watchType.toString(),
-        getField(rowNum, '打分'),
-        getField(rowNum, '标签/分级'),
-        getField(rowNum, '原作标签'),
-        getField(rowNum, '剧透/感言'),
-        getField(rowNum, '集数'),
-        getField(rowNum, '集号'),
+        getField(rowNumber, '打分'),
+        getField(rowNumber, '标签/分级'),
+        getField(rowNumber, '原作标签'),
+        getField(rowNumber, '剧透/感言'),
+        getField(rowNumber, '集数'),
+        getField(rowNumber, '集号'),
       ])
 
       const storedFingerprint = fingerprintMap.get(sid)
@@ -658,18 +658,18 @@ function processRowToSyncTask(
     }
 
     // 检查已上传颜色（非增量模式）
-    if (!fingerprintMap && isCellMarkedSuccess(ws, rowNum, seqCol)) {
+    if (!fingerprintMap && isCellMarkedSuccess(ws, rowNumber, seqCol)) {
       return { task: null, skipped: true, failed: false }
     }
 
-    const finishedDate = getField(rowNum, '完播日')
-    const jsonBody = buildJsonPayload((key) => getField(rowNum, key), finishedDate)
-    const name = getField(rowNum, '名称')
-    const epRaw = trim(getField(rowNum, '集数') || getField(rowNum, '集号') || '')
+    const finishedDate = getField(rowNumber, '完播日')
+    const jsonBody = buildJsonPayload((key) => getField(rowNumber, key), finishedDate)
+    const name = getField(rowNumber, '名称')
+    const epRaw = trim(getField(rowNumber, '集数') || getField(rowNumber, '集号') || '')
     const epNumber = parseInt(epRaw, 10)
 
     const task: _SyncTask = {
-      rowNum,
+      rowNum: rowNumber,
       sid,
       bgmUrl,
       name,
@@ -774,7 +774,7 @@ async function batchSyncRequests(
       bgmLog(LOG_LEVELS.INFO, '[batchSyncRequests] 检测到停止请求，正在停止...')
       isStopped = true
       if (executing.length > 0) {
-        await Promise.all(executing.map((e) => e.promise))
+        await Promise.all(executing.map((task) => task.promise))
       }
       break
     }
@@ -790,7 +790,7 @@ async function batchSyncRequests(
         bgmLog(LOG_LEVELS.INFO, '[batchSyncRequests] 暂停期间收到停止请求，正在停止...')
         isStopped = true
         if (executing.length > 0) {
-          await Promise.all(executing.map((e) => e.promise))
+          await Promise.all(executing.map((task) => task.promise))
         }
         break
       }
@@ -889,7 +889,7 @@ async function batchSyncRequests(
     }
 
     if (executing.length > 0) {
-      await Promise.race(executing.map((e) => e.promise))
+      await Promise.race(executing.map((task) => task.promise))
       for (let index = executing.length - 1; index >= 0; index -= 1) {
         if (executing[index]!.done) executing.splice(index, 1)
       }

@@ -377,13 +377,13 @@ describe('ACTION_HANDLERS 分发（通过 DOM click 触发）', () => {
   /**
    * 创建带 data-action 的按钮，注册监听后触发 click
    * @param action data-action 值
-   * @param args data-args 值（JSON 字符串或原生值）
+   * @param arguments_ data-args 值（JSON 字符串或原生值）
    */
-  function clickAction(action: string, args?: string): void {
+  function clickAction(action: string, arguments_?: string): void {
     const button = document.createElement('button')
     button.dataset.action = action
-    if (args !== undefined) {
-      button.dataset.args = args
+    if (arguments_ !== undefined) {
+      button.dataset.args = arguments_
     }
     document.body.appendChild(button)
     setupButtonListeners()

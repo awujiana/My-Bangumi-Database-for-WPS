@@ -40,7 +40,7 @@ vi.mock('../ts/core/constants.js', () => ({
   WATCH_STATUS_MAP: {},
 }))
 
-vi.mock('../ts/tools/util.js', () => ({
+vi.mock('../ts/tools/utility.js', () => ({
   bgmLog: mockBgmLog,
   getApp: vi.fn(),
 }))
@@ -48,7 +48,7 @@ vi.mock('../ts/tools/util.js', () => ({
 vi.mock('../ts/tools/util/index.js', () => ({
   bgmLog: mockBgmLog,
   getApp: vi.fn(),
-  colNumToLetter: mockColNumToLetter,
+  colNumberToLetter: mockColNumToLetter,
   getCellValue: mockGetCellValue,
   getLastRow: mockGetLastRow,
   findHeaderRow: mockFindHeaderRow,
@@ -59,7 +59,7 @@ vi.mock('../ts/tools/util/index.js', () => ({
   BGM: { handleError: vi.fn(), sheet: { isLocked: false } },
 }))
 
-vi.mock('../ts/sync/pureUtils.js', () => ({
+vi.mock('../ts/sync/pure-utilities.js', () => ({
   extractSubjectId: mockExtractSubjectId,
 }))
 

@@ -1,26 +1,26 @@
 /**
  * @fileoverview 字符串工具函数模块
- * @module tools/stringUtils
+ * @module tools/string-utilities
  * @description 提供 Excel 列号转换、字符串修剪、HTML 转义、指纹计算等函数。
  *
  * 模块拆分说明：
- *   - colNumToLetter / escapeHtml / trim 是无项目依赖的纯函数，已抽取到
- *     ./stringUtilsPure.js（零依赖模块）。本模块 re-export 以保持向后兼容。
+ *   - colNumberToLetter / escapeHtml / trim 是无项目依赖的纯函数，已抽取到
+ *     ./string-utilities-pure.js（零依赖模块）。本模块 re-export 以保持向后兼容。
  *   - calcFingerprint 依赖 core/crypto 中的 calcChecksum（纯算术函数），但
- *     crypto.ts 又 import 自 index.ts，会随 util.ts 一同进入已有的循环依赖链
+ *     crypto.ts 又 import 自 index.ts，会随 utility.ts 一同进入已有的循环依赖链
  *     （util → crypto → index → util），由于均为 hoisted 的 function 声明，
  *     运行时安全。
  *
- * 测试策略：单元测试应直接 import 自 stringUtilsPure.js，以避免触发
+ * 测试策略：单元测试应直接 import 自 string-utilities-pure.js，以避免触发
  * handlers.ts 的 setTimeout / addEventListener 副作用。
  */
 
 import { calcChecksum } from '../core/crypto.js'
 
-import { colNumToLetter as colNumberToLetter, escapeHtml, trim } from './stringUtilsPure.js'
+import { colNumberToLetter, escapeHtml, trim } from './string-utilities-pure.js'
 
-// Re-export 纯函数，保持向后兼容（其他模块仍可从 stringUtils 导入）
-export { colNumberToLetter as colNumToLetter, escapeHtml, trim }
+// Re-export 纯函数，保持向后兼容（其他模块仍可从 string-utilities 导入）
+export { colNumberToLetter, escapeHtml, trim }
 
 /**
  * 计算 Excel 行数据的指纹（用于增量同步比较）

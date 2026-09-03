@@ -46,7 +46,7 @@ interface SyncSource {
 
 vi.mock('../ts/index.js', () => ({}))
 
-vi.mock('../ts/tools/util.js', () => ({
+vi.mock('../ts/tools/utility.js', () => ({
   bgmLog: mockBgmLogn,
   getApp: mockGetApp,
   LOG_LEVELS: { INFO: 'INFO', WARN: 'WARN', ERROR: 'ERROR' },
@@ -137,7 +137,7 @@ vi.mock('../ts/sync/githubSyncDiff.js', () => ({
   filterByTime: mockFilterByTime,
 }))
 
-vi.mock('../ts/sync/pureUtils.js', () => ({
+vi.mock('../ts/sync/pure-utilities.js', () => ({
   extractSubjectId: mockExtractSubjectId,
 }))
 

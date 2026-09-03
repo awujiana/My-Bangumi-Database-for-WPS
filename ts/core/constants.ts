@@ -338,7 +338,7 @@ export const COLUMNS = {
  * @constant
  * @type {string[]}
  *
- * @see findHeaderRow - 在 util.ts 中使用此列表进行表头检测
+ * @see findHeaderRow - 在 utility.ts 中使用此列表进行表头检测
  */
 export const HEADER_KEYWORDS = [
   '序列号',

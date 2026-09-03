@@ -15,7 +15,7 @@ import {
   setSyncStrategy,
 } from '../sync/githubConfig.js'
 import type { SyncStrategy } from '../sync/githubSyncDiff.js'
-import { loadBgToken, storeBgToken, _getBgmUserId, _setBgmUserId } from '../tools/util.js'
+import { loadBgToken, storeBgToken, _getBgmUserId, _setBgmUserId } from '../tools/utility.js'
 
 /** 导出配置的当前版本号，与 FullConfigSchema.version 保持一致 */
 const CONFIG_VERSION = 1 as const

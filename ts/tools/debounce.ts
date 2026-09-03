@@ -7,11 +7,11 @@
 
 /**
  * 防抖：在延迟期内只触发最后一次
- * @param fn 要执行的函数
+ * @param function_ 要执行的函数
  * @param delay 延迟毫秒数，默认 300
  */
 export function debounce<T extends (...arguments_: unknown[]) => unknown>(
-  fn: T,
+  function_: T,
   delay = 300,
 ): (...arguments_: Parameters<T>) => void {
   let timerId: ReturnType<typeof setTimeout> | null = null
@@ -20,7 +20,7 @@ export function debounce<T extends (...arguments_: unknown[]) => unknown>(
       clearTimeout(timerId)
     }
     timerId = setTimeout(() => {
-      fn(...arguments_)
+      function_(...arguments_)
       timerId = null
     }, delay)
   }
@@ -28,11 +28,11 @@ export function debounce<T extends (...arguments_: unknown[]) => unknown>(
 
 /**
  * 节流：在固定间隔内最多触发一次
- * @param fn 要执行的函数
+ * @param function_ 要执行的函数
  * @param interval 间隔毫秒数，默认 300
  */
 export function throttle<T extends (...arguments_: unknown[]) => unknown>(
-  fn: T,
+  function_: T,
   interval = 300,
 ): (...arguments_: Parameters<T>) => void {
   let lastTime = 0
@@ -45,11 +45,11 @@ export function throttle<T extends (...arguments_: unknown[]) => unknown>(
         clearTimeout(timerId)
         timerId = null
       }
-      fn(...arguments_)
+      function_(...arguments_)
       lastTime = now
     } else if (timerId === null) {
       timerId = setTimeout(() => {
-        fn(...arguments_)
+        function_(...arguments_)
         lastTime = Date.now()
         timerId = null
       }, remaining)

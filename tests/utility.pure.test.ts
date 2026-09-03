@@ -1,18 +1,18 @@
 import { describe, it, expect } from 'vitest'
-import { colNumToLetter as colNumberToLetter } from '../ts/tools/stringUtilsPure.js'
+import { colNumberToLetter } from '../ts/tools/string-utilities-pure.js'
 
 /**
- * 纯函数逻辑测试 - colNumToLetter
+ * 纯函数逻辑测试 - colNumberToLetter
  *
- * 测试策略：直接 import 源码实现（来自 stringUtilsPure.ts 零依赖纯模块），
+ * 测试策略：直接 import 源码实现（来自 string-utilities-pure.ts 零依赖纯模块），
  * 避免复制实现导致源码修改后测试不失败的问题。
  *
- * stringUtilsPure.ts 是从 stringUtils.ts 抽取出的零依赖纯函数模块，
+ * string-utilities-pure.ts 是从 string-utilities.ts 抽取出的零依赖纯函数模块，
  * 不引入 core/crypto、tools/util、ui/handlers 等含副作用的模块，
  * 因此测试可以直接 import 而不触发副作用链。
  */
 
-describe('colNumToLetter', () => {
+describe('colNumberToLetter', () => {
   it('应正确转换 1-26 为 A-Z', () => {
     expect(colNumberToLetter(1)).toBe('A')
     expect(colNumberToLetter(2)).toBe('B')

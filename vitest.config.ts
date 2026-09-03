@@ -12,7 +12,7 @@ export default defineConfig({
       exclude: [
         // 入口聚合文件：仅 re-export，无独立逻辑
         'ts/index.ts',
-        'ts/tools/util.ts',
+        'ts/tools/utility.ts',
         'ts/sync/exceltobangumi.ts',
         // Ribbon / 入口文件：依赖 WPS 宿主，无法在 Node 测试环境执行
         'ts/ribbon.ts',
@@ -33,7 +33,7 @@ export default defineConfig({
         // ====================================================================
         // 目标（按模块类型，待逐步提升）：
         //   - 纯函数模块 ≥ 90%（已达标：crypto/result/logBuffer/sanitize/
-        //     stringUtils/stringUtilsPure/debounce/pureUtilsCore/githubSyncDiff）
+        //     string-utilities/string-utilities-pure/debounce/pure-utilities-core/githubSyncDiff）
         //   - 业务模块 ≥ 70%（部分达标：gistSync/localFileSync/undoStack/http/
         //     sheet/syncSourceRegistry；未达标见下方 TODO）
         //   - UI 模块 ≥ 50%（仅 conflictResolver/handlers/_constants 达标）

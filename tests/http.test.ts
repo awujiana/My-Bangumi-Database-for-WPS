@@ -64,7 +64,8 @@ class MockXHR {
   ontimeout: (() => void) | null = null
 
   upload: {
-    onprogress: ((e: { loaded: number; total: number; lengthComputable: boolean }) => void) | null
+    onprogress:
+      ((event: { loaded: number; total: number; lengthComputable: boolean }) => void) | null
   } = { onprogress: null }
 
   private method = ''

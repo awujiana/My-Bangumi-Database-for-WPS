@@ -538,7 +538,7 @@ describe('enrichIntroData 逻辑', () => {
       }
       const result = simulateEnrichIntroData(5, data, colMap)
 
-      expect(result.enriched.filter((e) => e.action === 'fill')).toHaveLength(3)
+      expect(result.enriched.filter((item) => item.action === 'fill')).toHaveLength(3)
       expect(getMockCellValue(5, 3)).toBe('新海诚')
       expect(getMockCellValue(5, 4)).toBe('铃木贵昭(编剧)')
       expect(getMockCellValue(5, 8)).toBe('天门')
@@ -560,7 +560,7 @@ describe('enrichIntroData 逻辑', () => {
       // 导演冲突
       expect(result.conflicts).toHaveLength(1)
       // 音乐填充
-      expect(result.enriched.filter((e) => e.action === 'fill')).toHaveLength(1)
+      expect(result.enriched.filter((item) => item.action === 'fill')).toHaveLength(1)
     })
   })
 })
@@ -833,7 +833,7 @@ describe('简介工作表富化综合场景', () => {
     expect(result.conflicts.filter((c) => c.field === '导演')).toHaveLength(1)
 
     // 验证填充
-    const fills = result.enriched.filter((e) => e.action === 'fill')
+    const fills = result.enriched.filter((item) => item.action === 'fill')
     // 编剧 + 音乐 + 简介
     expect(fills.length).toBeGreaterThanOrEqual(2)
 

@@ -1,14 +1,10 @@
 // @vitest-environment jsdom
 import { describe, it, expect } from 'vitest'
 
-// 直接从 pureUtils.ts 导入（避免副作用链）
-import {
-  getSeqColIndex,
-  addTagsFromStr as addTagsFromString,
-  buildTagsArray,
-} from '../ts/sync/pureUtils.js'
+// 直接从 pure-utilities.ts 导入（避免副作用链）
+import { getSeqColIndex, addTagsFromString, buildTagsArray } from '../ts/sync/pure-utilities.js'
 
-describe('pureUtils', () => {
+describe('pure-utilities', () => {
   // ========== getSeqColIndex 测试 ==========
   describe('getSeqColIndex', () => {
     it('无 colMap 时返回默认值 4', () => {
@@ -40,8 +36,8 @@ describe('pureUtils', () => {
     })
   })
 
-  // ========== addTagsFromStr 测试 ==========
-  describe('addTagsFromStr', () => {
+  // ========== addTagsFromString 测试 ==========
+  describe('addTagsFromString', () => {
     it('空字符串不添加任何标签', () => {
       const tagSet = new Set<string>()
       addTagsFromString(tagSet, '')

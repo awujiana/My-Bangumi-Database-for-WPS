@@ -42,7 +42,7 @@ import {
 import type { SyncRecord, SyncProgressStats, SyncConfigSummary } from '../../index.js'
 import { getSyncPreview, detectConflicts } from '../../services/ribbonService.js'
 import { ensureSheetHeaders } from '../../tools/util/index.js'
-import type { WpsApplication as WpsApp, WpsWorksheet } from '../../tools/wps.js'
+import type { WpsApp, WpsWorksheet } from '../../tools/wps.js'
 
 import { _T } from './_constants.js'
 import { showTokenDialog } from './token.js'

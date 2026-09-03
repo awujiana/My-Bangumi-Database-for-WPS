@@ -300,15 +300,15 @@ export class Result<T> {
    *
    * @method map
    * @template U - 转换后的数据类型
-   * @param {(data: T) => U} fn - 转换函数
+   * @param {(data: T) => U} function_ - 转换函数
    * @returns {Result<U>} 转换后的Result
    *
    * @example
    * const nameResult = userResult.map(user => user.name);
    */
-  map<U>(fn: (data: T) => U): Result<U> {
+  map<U>(function_: (data: T) => U): Result<U> {
     if (this.success) {
-      return Result.ok(fn(this.data as T))
+      return Result.ok(function_(this.data as T))
     }
     return Result.fail(this.error!)
   }
@@ -318,7 +318,7 @@ export class Result<T> {
    * 如果操作成功则保持原样返回成功的Result
    *
    * @method mapErr
-   * @param {(error: BgmError) => BgmError} fn - 错误转换函数
+   * @param {(error: BgmError) => BgmError} function_ - 错误转换函数
    * @returns {Result<T>} 转换后的Result
    *
    * @example
@@ -326,9 +326,9 @@ export class Result<T> {
    *     return new BgmError(err.message, 'WRAPPED_' + err.code);
    * });
    */
-  mapErr(fn: (error: BgmError) => BgmError): Result<T> {
+  mapErr(function_: (error: BgmError) => BgmError): Result<T> {
     if (!this.success) {
-      return Result.fail(fn(this.error!))
+      return Result.fail(function_(this.error!))
     }
     return this
   }

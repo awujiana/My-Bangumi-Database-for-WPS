@@ -20,7 +20,7 @@ import {
   trim,
   ensureSheetHeaders,
   getDataSheet,
-} from '../tools/util.js'
+} from '../tools/utility.js'
 
 import { GistSyncSource } from './gistSync.js'
 import { GiteeSyncSource } from './giteeSync.js'
@@ -37,7 +37,7 @@ import { filterByTime } from './githubSyncDiff.js'
 import type { ConflictResolution, SyncTimeFilter } from './githubSyncDiff.js'
 import { GitlabSyncSource } from './gitlabSync.js'
 import { LocalFileSyncSource } from './localFileSync.js'
-import { extractSubjectId } from './pureUtils.js'
+import { extractSubjectId } from './pure-utilities.js'
 import type { SyncSource } from './SyncSource.js'
 
 /** 同步源工厂函数：每次调用返回新实例，避免实例间状态共享 */
@@ -165,7 +165,7 @@ export async function syncFromRemote(
       if (selectedSids.size === 0) {
         throw new Error('未选中任何行，或选中行中未找到 Bangumi URL')
       }
-      effectiveRemoteEntries = remoteEntries.filter((e) => selectedSids.has(e.sid))
+      effectiveRemoteEntries = remoteEntries.filter((entry) => selectedSids.has(entry.sid))
       bgmLog(
         LOG_LEVELS.INFO,
         `[syncFromRemote] 仅同步选中行：选中 ${String(selectedSids.size)} 个 SID，匹配远程 ${String(effectiveRemoteEntries.length)} 条`,

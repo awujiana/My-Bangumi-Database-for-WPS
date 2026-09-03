@@ -9,7 +9,7 @@
  *   5. GitHub 同步流程：fetch JSONL → computeDiff → applyDiffToSheet → undoLastSync
  *
  * Mock 策略：
- *   - vi.mock HTTP 层（bgmRequestSync）与 WPS API（tools/util.js）
+ *   - vi.mock HTTP 层（bgmRequestSync）与 WPS API（tools/utility.js）
  *   - vi.mock 进度上报与同步记录子模块
  *   - vi.mock GitHub 同步依赖（undoStack、githubConfig、syncSourceRegistry）
  *   - 使用 vi.hoisted 在 import 之前启用 fake timers，避免 handlers.ts 副作用
@@ -36,7 +36,7 @@ const mockState = vi.hoisted(() => ({
   addSyncRecords: vi.fn(() => true),
   addSyncRecordSummary: vi.fn(() => true),
 
-  // tools/util.js mock（可按测试配置）
+  // tools/utility.js mock（可按测试配置）
   getDataSheet: vi.fn(() => null),
   findHeaderRow: vi.fn(() => 1),
   getLastRow: vi.fn(() => 1),
@@ -123,7 +123,7 @@ vi.mock('../../ts/tools/util/index.js', () => ({
   getCell: vi.fn(),
   getSheetByIndex: vi.fn(),
   trim: (s: unknown): string => String(s ?? '').trim(),
-  colNumToLetter: (n: number): string => {
+  colNumberToLetter: (n: number): string => {
     let result = ''
     let number_ = n
     while (number_ > 0) {
@@ -292,8 +292,8 @@ function createLocalEntries(
   entries: { row: number; sid: string; fields: Record<string, string> }[],
 ): Map<string, LocalRowEntry> {
   const map = new Map<string, LocalRowEntry>()
-  for (const e of entries) {
-    map.set(e.sid, { row: e.row, sid: e.sid, fields: e.fields })
+  for (const entry of entries) {
+    map.set(entry.sid, { row: entry.row, sid: entry.sid, fields: entry.fields })
   }
   return map
 }

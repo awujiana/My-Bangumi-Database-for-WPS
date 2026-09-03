@@ -22,7 +22,7 @@
  */
 
 import { LOG_LEVELS } from '../core/constants.js'
-import { bgmLog } from '../tools/util.js'
+import { bgmLog } from '../tools/utility.js'
 
 import type { GithubRemoteEntry } from './githubSyncDiff.js'
 
@@ -52,14 +52,14 @@ export interface GithubDataCache {
  * 性能：比 MD5/SHA 快 10-20 倍，足够用于内容一致性判断
  * 冲突率：对 JSONL 文本（每行不同 SID）而言可忽略
  *
- * @param str 要哈希的字符串
+ * @param string_ 要哈希的字符串
  * @returns 8 位十六进制哈希值
  */
-export function computeTextHash(str: string): string {
+export function computeTextHash(string_: string): string {
   let hash = 5381
-  for (let index = 0; index < str.length; index += 1) {
+  for (let index = 0; index < string_.length; index += 1) {
     // hash * 33 + charCode
-    hash = ((hash << 5) + hash + str.charCodeAt(index)) | 0
+    hash = ((hash << 5) + hash + string_.charCodeAt(index)) | 0
   }
   // 转为无符号 32 位十六进制
   return (hash >>> 0).toString(16).padStart(8, '0')

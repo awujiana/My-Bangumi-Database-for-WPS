@@ -160,13 +160,13 @@ export function refreshEnrichSheets(
  * 锁定/解锁富化目标 Bangumi 追踪表工作表
  * @param sheetSelectId - 工作表选择下拉框的 DOM ID
  * @param wbSelectId - 工作簿选择下拉框的 DOM ID
- * @param lockBtnId - 锁定按钮的 DOM ID
+ * @param lockButtonId - 锁定按钮的 DOM ID
  * @param statusId - 锁定状态显示的 DOM ID
  */
 export function toggleEnrichWorkbookLock(
   sheetSelectId = 'enrichSheetSelect',
   wbSelectId = 'enrichWorkbookSelect',
-  lockBtnId = 'enrichLockBtn',
+  lockButtonId = 'enrichLockBtn',
   statusId = 'enrichLockStatus',
 ): void {
   const sheetSelect = document.getElementById(sheetSelectId) as HTMLSelectElement | null
@@ -214,21 +214,21 @@ export function toggleEnrichWorkbookLock(
     showToast(`已锁定: ${wbName} → ${sheetName}`, 'info')
   }
 
-  updateEnrichLockButton(lockBtnId, statusId)
+  updateEnrichLockButton(lockButtonId, statusId)
 }
 
 // ========== 更新锁定按钮 UI ==========
 
 /**
  * 更新锁定按钮的文字和状态显示
- * @param lockBtnId - 锁定按钮的 DOM ID
+ * @param lockButtonId - 锁定按钮的 DOM ID
  * @param statusId - 锁定状态显示的 DOM ID
  */
 export function updateEnrichLockButton(
-  lockBtnId = 'enrichLockBtn',
+  lockButtonId = 'enrichLockBtn',
   statusId = 'enrichLockStatus',
 ): void {
-  const button = document.getElementById(lockBtnId) as HTMLButtonElement | null
+  const button = document.getElementById(lockButtonId) as HTMLButtonElement | null
   const status = document.getElementById(statusId)
 
   if (button) {
@@ -439,13 +439,13 @@ function clearEnrichLock(): void {
  * 初始化富化锁定模块（启动时调用）
  * @param wbSelectId - 工作簿选择下拉框的 DOM ID
  * @param sheetSelectId - 工作表选择下拉框的 DOM ID
- * @param lockBtnId - 锁定按钮的 DOM ID
+ * @param lockButtonId - 锁定按钮的 DOM ID
  * @param statusId - 锁定状态显示的 DOM ID
  */
 export function initEnrichLock(
   wbSelectId = 'enrichWorkbookSelect',
   sheetSelectId = 'enrichSheetSelect',
-  lockBtnId = 'enrichLockBtn',
+  lockButtonId = 'enrichLockBtn',
   statusId = 'enrichLockStatus',
 ): void {
   refreshEnrichWorkbooks(wbSelectId)
@@ -468,5 +468,5 @@ export function initEnrichLock(
     refreshEnrichSheets(undefined, sheetSelectId, wbSelectId)
   }
 
-  updateEnrichLockButton(lockBtnId, statusId)
+  updateEnrichLockButton(lockButtonId, statusId)
 }

@@ -118,8 +118,8 @@ function initPanelCore(): void {
     if (modal) modal.style.display = 'none'
   })
   // 按 Escape 键关闭详情模态框
-  const handleKeydown = (e: KeyboardEvent) => {
-    if (e.key === 'Escape') {
+  const handleKeydown = (event: KeyboardEvent) => {
+    if (event.key === 'Escape') {
       closeDetailModal()
     }
   }

@@ -23,7 +23,7 @@ import {
   getApp,
   BGM,
   getLastRow,
-  colNumToLetter as colNumberToLetter,
+  colNumberToLetter,
   getCellValue,
   setCellValue,
   readRangeValues,
@@ -48,7 +48,7 @@ export interface SyncRecord {
   row?: number
 }
 
-export interface UpdateRecordParams {
+export interface UpdateRecordParameters {
   name?: string
   url?: string
   sid?: string
@@ -385,7 +385,7 @@ function setSyncRecordColors(
   }
 }
 
-export function addSyncRecord(parameters: UpdateRecordParams): boolean {
+export function addSyncRecord(parameters: UpdateRecordParameters): boolean {
   if (!getSyncRecordEnabled()) {
     bgmLog(LOG_LEVELS.INFO, '[addSyncRecord] 同步记录功能未启用，跳过')
     return false
@@ -507,7 +507,7 @@ export function addSyncRecord(parameters: UpdateRecordParams): boolean {
  * @param records 待写入的记录数组
  * @returns 是否全部成功
  */
-export function addSyncRecords(records: UpdateRecordParams[]): boolean {
+export function addSyncRecords(records: UpdateRecordParameters[]): boolean {
   if (!getSyncRecordEnabled()) {
     bgmLog(LOG_LEVELS.INFO, '[addSyncRecords] 同步记录功能未启用，跳过')
     return false
@@ -523,7 +523,7 @@ export function addSyncRecords(records: UpdateRecordParams[]): boolean {
     const pendingRows: string[][] = []
     const sidToUpdate = new Map<
       string,
-      { row: number; updatedCount: number; status: string; params: UpdateRecordParams }
+      { row: number; updatedCount: number; status: string; params: UpdateRecordParameters }
     >()
 
     for (const parameters of records) {
@@ -620,12 +620,12 @@ export function addSyncRecords(records: UpdateRecordParams[]): boolean {
  * 用于记录一次批量同步的整体结果（如 GitHub 仓库同步结束后新增/更新/删除统计）。
  * 汇总行以 SID 为空标识，不参与按 SID 合并次数。
  *
- * @param params 汇总记录参数，建议 content 写"仓库同步汇总"，message 写统计信息
+ * @param parameters 汇总记录参数，建议 content 写"仓库同步汇总"，message 写统计信息
  * @returns 是否成功
  */
-export function addSyncRecordSummary(params: UpdateRecordParams): boolean {
+export function addSyncRecordSummary(parameters: UpdateRecordParameters): boolean {
   return addSyncRecord({
-    ...params,
+    ...parameters,
     sid: '',
     count: 1,
   })

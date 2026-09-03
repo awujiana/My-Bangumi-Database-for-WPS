@@ -13,13 +13,13 @@ import {
   getColumnMap,
   getLastRow,
   getCellValue,
-  colNumToLetter as colNumberToLetter,
+  colNumberToLetter,
   trim,
 } from '../tools/util/index.js'
-import { bgmLog } from '../tools/util.js'
+import { bgmLog } from '../tools/utility.js'
 import type { WpsWorksheet } from '../tools/wps.js'
 
-import { extractSubjectId } from './pureUtils.js'
+import { extractSubjectId } from './pure-utilities.js'
 
 /**
  * 读取单元格的显示文本（优先使用 Text 属性保留本地格式，回退到 getCellValue）

@@ -1,7 +1,7 @@
 /**
  * 工具模块 - 统一导出入口
  * @module tools/util
- * @description 原 util.ts 已按职责拆分到 util/ 子目录，此文件作为聚合入口，
+ * @description 原 utility.ts 已按职责拆分到 util/ 子目录，此文件作为聚合入口，
  *              保留 BGM 全局命名空间、bgmLog、getApp、Token 存储、用户信息、辅助函数等核心内容，
  *              并 re-export 子模块以保持外部 import 路径不变。
  *
@@ -11,7 +11,7 @@
  *   - util/sleep.ts：延时（sleep、delay）
  *   - util/index.ts：BGM 命名空间、bgmLog、getApp、Token 存储、用户 ID/用户名、辅助函数（shellExecuteByOAAssist、getUrlPath、showBangumiPanel）
  */
-// 直接从源模块导入，打破 util.ts ↔ index.ts 的循环依赖
+// 直接从源模块导入，打破 utility.ts ↔ index.ts 的循环依赖
 import { BGM_CONFIG, LOG_LEVELS, ERROR_LEVELS, ErrorLevel, WPS_ENUM } from '../../core/constants.js'
 import type { ErrorOptions } from '../../core/constants.js'
 import { BgmError } from '../../core/result.js'
@@ -34,20 +34,15 @@ import type { DialogOptions } from '../../ui/dialog.js'
 import { syncAllRows } from '../../ui/preview.js'
 // 类型只从 index.js 导入（type-only import 不会产生运行时循环依赖）
 import { BGM_EVENTS, eventBus } from '../events.js'
-// 字符串工具已拆分到 stringUtils.ts，此处 import 供内部调用，并 re-export 保持向后兼容
+// 字符串工具已拆分到 string-utilities.ts，此处 import 供内部调用，并 re-export 保持向后兼容
 import { logger } from '../logger.js'
-import {
-  colNumToLetter as colNumberToLetter,
-  trim,
-  escapeHtml,
-  calcFingerprint,
-} from '../stringUtils.js'
+import { colNumberToLetter, trim, escapeHtml, calcFingerprint } from '../string-utilities.js'
 // 日志模块：bgmLog 内部通过 logger 输出，自动脱敏敏感信息，且不污染全局 console
 import { isWpsApp } from '../wps.js'
-import type { WpsApplication as WpsApp, WpsWorksheet } from '../wps.js'
+import type { WpsApp, WpsWorksheet } from '../wps.js'
 
 // re-export 字符串工具保持向后兼容
-export { colNumberToLetter as colNumToLetter, trim, escapeHtml, calcFingerprint }
+export { colNumberToLetter, trim, escapeHtml, calcFingerprint }
 // re-export 子模块
 export { getCell, getCellValue, setCellValue, getSheetByIndex } from './cell.js'
 export {
@@ -598,8 +593,8 @@ export function bgmLog(level: number, message: string | null | undefined): void 
  * @param skipAdditional 额外跳过的帧数（备用，通常无需传）
  */
 function getCallerFunctionName(_skipAdditional = 0): string {
-  const e = new Error()
-  const stack = e.stack ?? ''
+  const error = new Error()
+  const stack = error.stack ?? ''
   const lines = stack.split('\n')
   // 需要跳过的内部函数名列表
   const internalFuncs = new Set([

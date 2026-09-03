@@ -331,13 +331,13 @@ function executeXhrRequest(
 
     // 上传进度
     if (options.onProgress) {
-      xhr.upload.onprogress = (e) => {
-        if (e.lengthComputable) {
-          options.onProgress!(e.loaded, e.total)
-          const progress = Math.round((e.loaded / e.total) * 100)
+      xhr.upload.onprogress = (event) => {
+        if (event.lengthComputable) {
+          options.onProgress!(event.loaded, event.total)
+          const progress = Math.round((event.loaded / event.total) * 100)
           bgmLog(
             LOG_LEVELS.INFO,
-            `[HTTP] 上传进度: ${String(progress)}% (${String(e.loaded)}/${String(e.total)})`,
+            `[HTTP] 上传进度: ${String(progress)}% (${String(event.loaded)}/${String(event.total)})`,
           )
         }
       }

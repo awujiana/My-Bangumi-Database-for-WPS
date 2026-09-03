@@ -168,7 +168,7 @@ export {
   formatSyncRecordSheet,
   openSyncRecordSheet,
   type SyncRecord,
-  type UpdateRecordParams,
+  type UpdateRecordParameters,
   clearSyncRecords,
 } from './sync/syncRecord.js'
 
@@ -193,7 +193,7 @@ export {
   openBangumiTokenPage,
   testTokenValidityForRibbon,
   buildTagsArray,
-  addTagsFromStr,
+  addTagsFromString,
 } from './sync/exceltobangumi.js'
 
 // ============================================================================
@@ -285,7 +285,7 @@ export {
 } from './sync/githubConfig.js'
 
 // ============================================================================
-// 12. 通用工具函数与全局状态（来自 tools/util.js）
+// 12. 通用工具函数与全局状态（来自 tools/utility.js）
 // ============================================================================
 export {
   // 日志函数
@@ -293,7 +293,7 @@ export {
   // 获取 WPS Application 对象
   getApp,
   // 列号转字母
-  colNumToLetter,
+  colNumberToLetter,
   // 安全获取单元格对象
   getCell,
   // 安全获取单元格值（单元格文本兼容多种取值方式）
@@ -370,7 +370,7 @@ export {
   getUrlPath,
   // 计算数据指纹（用于缓存）
   calcFingerprint,
-} from './tools/util.js'
+} from './tools/utility.js'
 
 // ============================================================================
 // 13. 配置管理模块（来自 tools/config.js）
@@ -474,14 +474,14 @@ export {
   isWpsWorksheet,
   // 判断对象是否为 WPS Range
   isWpsRange,
-  wpsMsgBox,
+  wpsMessageBox,
 } from './tools/wps.js'
 
 export type {
   // 扩展的 Window 接口（挂载了大量 BGM 函数）
   BgmWindow,
   // WPS Application 最小化接口
-  WpsApplication,
+  WpsApp,
   WpsWorkbook,
   WpsWorksheets,
   WpsSheets,
@@ -596,7 +596,7 @@ export {
   formatEnrichRecordSheet,
   // 富化记录表类型
   type EnrichRecord,
-  type AddEnrichRecordParams,
+  type AddEnrichRecordParameters,
   // 富化记录表常量
   ENRICH_RECORD_SHEET_NAME,
   ENRICH_RECORD_COLUMNS,

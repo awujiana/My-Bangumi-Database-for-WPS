@@ -1,44 +1,44 @@
 /**
  * @fileoverview Bangumi 同步纯函数核心模块（无副作用依赖）
- * @module sync/pureUtilsCore
+ * @module sync/pure-utilities-core
  * @description 提供 URL 识别、Subject ID 提取、观看状态映射等纯函数。
  *
- * 本模块仅依赖纯模块（core/constants 与 tools/stringUtilsPure），不引入
+ * 本模块仅依赖纯模块（core/constants 与 tools/string-utilities-pure），不引入
  * tools/util 或 ui/handlers 等含副作用的模块，以便单元测试可以直接 import
  * 而不触发 handlers.ts 中的 setTimeout / addEventListener 等副作用。
  *
  * 日志注入：mapWatchStatus 在状态无法识别时需要记录警告日志。为保持本模块
  * 零副作用依赖，采用依赖注入模式：调用方通过 setLogger 注入实际日志函数；
- * 默认使用 no-op。生产环境由 pureUtils.ts 在加载时注入 bgmLog；
+ * 默认使用 no-op。生产环境由 pure-utilities.ts 在加载时注入 bgmLog；
  * 测试环境由测试代码注入 vi.fn()。
  *
- * 历史背景：原 pureUtils.ts 同时导入 core/constants（纯）、tools/util.bgmLog
- * （含副作用）和 tools/stringUtils.trim（含副作用链）。为支持纯函数单元测试，
+ * 历史背景：原 pure-utilities.ts 同时导入 core/constants（纯）、tools/utility.bgmLog
+ * （含副作用）和 tools/string-utilities.trim（含副作用链）。为支持纯函数单元测试，
  * 将 isBangumiUrl / extractSubjectId / mapWatchStatus 三个无状态函数抽取到本模块。
  */
 
 import { URL_PATTERNS, WATCH_STATUS_MAP, LOG_LEVELS } from '../core/constants.js'
-import { trim } from '../tools/stringUtilsPure.js'
+import { trim } from '../tools/string-utilities-pure.js'
 
 /**
  * 日志函数类型
- * 与 tools/util.ts 中 bgmLog 的签名保持一致：(level, message) => void
+ * 与 tools/utility.ts 中 bgmLog 的签名保持一致：(level, message) => void
  */
-export type LoggerFn = (level: number, message: string) => void
+export type LoggerFunction = (level: number, message: string) => void
 
 /** 当前注入的日志函数，默认 no-op */
-let loggerFunction: LoggerFn = () => {}
+let loggerFunction: LoggerFunction = () => {}
 
 /**
  * 注入日志函数（依赖注入入口）
  *
- * 生产环境由 pureUtils.ts 调用 setLogger(bgmLog) 注入实际日志函数；
+ * 生产环境由 pure-utilities.ts 调用 setLogger(bgmLog) 注入实际日志函数；
  * 测试环境调用 setLogger(vi.fn()) 注入 mock 以便断言日志调用。
  *
- * @param fn - 日志函数，签名为 (level: number, message: string) => void
+ * @param function_ - 日志函数，签名为 (level: number, message: string) => void
  */
-export function setLogger(fn: LoggerFn): void {
-  loggerFunction = fn
+export function setLogger(function_: LoggerFunction): void {
+  loggerFunction = function_
 }
 
 /**

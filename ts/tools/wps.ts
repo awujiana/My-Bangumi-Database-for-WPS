@@ -33,7 +33,7 @@ export type WpsFormula = string | WpsCellValue[][] | null
 export type WpsSelection = WpsRange | null
 
 // ========== WPS Application ==========
-export interface WpsApplication {
+export interface WpsApp {
   ActiveWorkbook?: WpsWorkbook
   Workbooks?: WpsWorkbooks
   PluginStorage?: WpsPluginStorage
@@ -240,7 +240,7 @@ export interface WpsTaskPane {
 
 // ========== 类型守卫函数 ==========
 
-export function isWpsApp(value: unknown): value is WpsApplication {
+export function isWpsApp(value: unknown): value is WpsApp {
   return (
     typeof value === 'object' &&
     value !== null &&
@@ -361,7 +361,7 @@ export function wpsPrompt(message: string, defaultValue?: string): Promise<strin
   })
 }
 
-export function wpsMsgBox(message: string, buttons?: number, icon?: number): Promise<number> {
+export function wpsMessageBox(message: string, buttons?: number, icon?: number): Promise<number> {
   return new Promise((resolve) => {
     const app = getApp() as
       { MessageBox?: (message_: string, type: number) => number } | null | undefined

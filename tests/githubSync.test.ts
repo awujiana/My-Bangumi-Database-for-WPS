@@ -244,7 +244,7 @@ vi.mock('../ts/core/constants.js', () => ({
   ErrorLevel: { INFO: 0, WARN: 1, ERROR: 2, FATAL: 3 },
 }))
 
-vi.mock('../ts/tools/util.js', () => ({
+vi.mock('../ts/tools/utility.js', () => ({
   bgmLog: mockBgmLognnn,
   getDataSheet: mockGetDataSheet,
   findHeaderRow: mockFindHeaderRow,
@@ -252,7 +252,7 @@ vi.mock('../ts/tools/util.js', () => ({
   getColumnMap: mockGetColumnMap,
   getCellValue: mockGetCellValue,
   setCellValue: mockSetCellValue,
-  colNumToLetter: mockColNumberToLetter,
+  colNumberToLetter: mockColNumberToLetter,
   trim: mockTrim,
   ensureSheetHeaders: mockEnsureSheetHeaders,
   getApp: mockGetApp,
@@ -266,7 +266,7 @@ vi.mock('../ts/core/result.js', () => ({
   Result: {
     ok: vi.fn((v: unknown) => ({ isFail: () => false, value: v })),
     okVoid: vi.fn(() => ({ isFail: () => false })),
-    failVoid: vi.fn((e: Error) => ({ isFail: () => true, error: e })),
+    failVoid: vi.fn((error: Error) => ({ isFail: () => true, error })),
   },
   BgmError: vi.fn().mockImplementation(function (message: string, code?: string) {
     return { message, code }
@@ -297,7 +297,7 @@ vi.mock('../ts/sync/githubSyncDiff.js', async () => {
   }
 })
 
-vi.mock('../ts/sync/pureUtils.js', () => ({
+vi.mock('../ts/sync/pure-utilities.js', () => ({
   extractSubjectId: mockExtractSubjectId,
 }))
 
@@ -608,7 +608,7 @@ describe('parseJsonl', () => {
     ].join('\n')
     const { entries, errors } = parseJsonl(text)
     expect(entries).toHaveLength(3)
-    expect(entries.map((e) => e.sid)).toEqual(['1', '2', '3'])
+    expect(entries.map((entry) => entry.sid)).toEqual(['1', '2', '3'])
     expect(errors).toHaveLength(0)
   })
 
@@ -3952,7 +3952,7 @@ describe('formatDuration 全分支 (lines 534-540)', () => {
     const result = await applyDiffToSheet(diffs, 'add-update', onProgress)
     expect(result.added).toBeGreaterThan(0)
     // 验证 eta 返回值包含毫秒单位（formatDuration ms<1000 分支）
-    const hasMsUnit = etaValues.some((e) => e.includes('ms'))
+    const hasMsUnit = etaValues.some((eta) => eta.includes('ms'))
     // 在极快速度下，formatDuration 可能走 ms<1000 分支
     // 如果速度为 0 或 elapsed 为 0，则 formatEta 走 ms<=0 分支
     expect(etaValues.length).toBeGreaterThanOrEqual(0)
@@ -4153,7 +4153,7 @@ describe('formatDuration 秒/分钟分支 (lines 536, 539)', () => {
     expect(result.added).toBeGreaterThan(0)
 
     // 验证 eta 值包含"秒"单位（走了 seconds 分支）
-    const hasSecondsUnit = etaValues.some((e) => e.includes('秒'))
+    const hasSecondsUnit = etaValues.some((eta) => eta.includes('秒'))
     expect(hasSecondsUnit).toBe(true)
   })
 
@@ -4213,7 +4213,7 @@ describe('formatDuration 秒/分钟分支 (lines 536, 539)', () => {
     expect(result.added).toBeGreaterThan(0)
 
     // 验证至少有一个 eta 值包含"分"单位（走了 minutes 分支）
-    const hasMinutesUnit = etaValues.some((e) => e.includes('分'))
+    const hasMinutesUnit = etaValues.some((eta) => eta.includes('分'))
     expect(hasMinutesUnit).toBe(true)
   })
 

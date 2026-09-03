@@ -12,7 +12,7 @@ import {
   bgmLog,
   getApp,
   getLastRow,
-  colNumToLetter as colNumberToLetter,
+  colNumberToLetter,
   setCellValue,
   readRangeValues,
   BGM,
@@ -57,7 +57,7 @@ export interface EnrichRecord {
   note?: string
 }
 
-export interface AddEnrichRecordParams {
+export interface AddEnrichRecordParameters {
   timestamp: string
   matchType: '精确' | '别名' | '未匹配'
   name: string
@@ -162,7 +162,7 @@ export function getOrCreateEnrichRecordSheet(): WpsWorksheet {
   return enrichSheet
 }
 
-export function addEnrichRecord(parameters: AddEnrichRecordParams): void {
+export function addEnrichRecord(parameters: AddEnrichRecordParameters): void {
   try {
     const sheet = getOrCreateEnrichRecordSheet()
 
@@ -203,7 +203,7 @@ export function addEnrichRecord(parameters: AddEnrichRecordParams): void {
   }
 }
 
-export function addEnrichRecords(records: AddEnrichRecordParams[]): void {
+export function addEnrichRecords(records: AddEnrichRecordParameters[]): void {
   if (records.length === 0) return
 
   try {

@@ -75,17 +75,17 @@ export interface BuildSyncConfigContext {
 
 /**
  * 构造同步配置摘要的工厂函数，统一各入口的配置构造逻辑。
- * @param ctx 配置上下文
+ * @param context 配置上下文
  * @returns SyncConfigSummary 对象
  */
-export function buildSyncConfig(ctx: BuildSyncConfigContext): SyncConfigSummary {
+export function buildSyncConfig(context: BuildSyncConfigContext): SyncConfigSummary {
   const config: SyncConfigSummary = {}
-  if (ctx.source) config.sourceLabel = ctx.source
-  if (ctx.strategy) config.strategyLabel = ctx.strategy
-  if (ctx.direction) config.directionLabel = ctx.direction
-  if (ctx.selectedRowsOnly) config.selectedRowsOnly = true
-  if (ctx.timeFilter) {
-    const tf = ctx.timeFilter
+  if (context.source) config.sourceLabel = context.source
+  if (context.strategy) config.strategyLabel = context.strategy
+  if (context.direction) config.directionLabel = context.direction
+  if (context.selectedRowsOnly) config.selectedRowsOnly = true
+  if (context.timeFilter) {
+    const tf = context.timeFilter
     config.timeFilterLabel =
       tf.range === 'future'
         ? '预告/未来动漫'
@@ -95,7 +95,7 @@ export function buildSyncConfig(ctx: BuildSyncConfigContext): SyncConfigSummary 
             ? `${String(tf.year)}年${String(tf.quarter)}月新番`
             : `${String(tf.year)}年${String(tf.month)}月`
   }
-  if (ctx.extra && ctx.extra.length > 0) config.extra = ctx.extra
+  if (context.extra && context.extra.length > 0) config.extra = context.extra
   return config
 }
 
@@ -271,8 +271,8 @@ function bindAllEvents(): void {
   const container = document.getElementById('bgmDialogContainer')
   if (!container) return
 
-  container.addEventListener('click', (e: Event) => {
-    const button = (e.target as HTMLElement).closest('button')
+  container.addEventListener('click', (event: Event) => {
+    const button = (event.target as HTMLElement).closest('button')
     if (!button) return
     const eventType = button.dataset.event
     if (!eventType) return
@@ -302,8 +302,8 @@ function bindAllEvents(): void {
     }
   })
 
-  dom.bgmInputField?.addEventListener('keypress', (e: KeyboardEvent) => {
-    if (e.key === 'Enter') dom.bgmInputOk?.click()
+  dom.bgmInputField?.addEventListener('keypress', (event: KeyboardEvent) => {
+    if (event.key === 'Enter') dom.bgmInputOk?.click()
   })
 }
 
@@ -440,7 +440,7 @@ let _isSyncPaused = false
 let _syncProgressTrigger: HTMLElement | null = null
 
 /** ESC 键监听器引用（仅在完成状态下注册） */
-let _syncProgressEscHandler: ((e: KeyboardEvent) => void) | null = null
+let _syncProgressEscHandler: ((event: KeyboardEvent) => void) | null = null
 
 /** 内部：根据暂停状态更新按钮文本/样式/aria-label，并追踪暂停时间用于全局 ETA */
 function _setSyncPausedState(paused: boolean): void {
@@ -1332,8 +1332,8 @@ export function completeSyncProgressDialog(
   if (onNext) _syncNextHandler = onNext
 
   // 完成状态下支持 ESC 关闭
-  _syncProgressEscHandler = (e: KeyboardEvent): void => {
-    if (e.key === 'Escape') {
+  _syncProgressEscHandler = (event: KeyboardEvent): void => {
+    if (event.key === 'Escape') {
       hideSyncProgressDialog()
     }
   }

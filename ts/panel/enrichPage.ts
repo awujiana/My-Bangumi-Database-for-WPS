@@ -35,7 +35,7 @@ import {
   clearEnrichRecords,
 } from '../sync/enrichRecord.js'
 import { sanitizeHtml } from '../tools/sanitize.js'
-import { escapeHtml } from '../tools/stringUtils.js'
+import { escapeHtml } from '../tools/string-utilities.js'
 import {
   getCellValue,
   getLastRow,

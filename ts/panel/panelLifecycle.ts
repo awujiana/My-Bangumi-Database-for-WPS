@@ -14,7 +14,7 @@ import {
   BGM,
   escapeHtml,
   getCellValue,
-  colNumToLetter as colNumberToLetter,
+  colNumberToLetter,
   HEADER_KEYWORDS,
   IMPORTANT_COLS,
   showToast,
@@ -1064,7 +1064,7 @@ export function onSelectModeChange(): void {
 }
 
 let _enlargeModal: HTMLElement | null = null
-let _enlargeEscHandler: ((e: KeyboardEvent) => void) | null = null
+let _enlargeEscHandler: ((event: KeyboardEvent) => void) | null = null
 
 export function enlargePreview(): void {
   const previewBox = document.getElementById('previewBox')
@@ -1124,12 +1124,12 @@ export function enlargePreview(): void {
     button.addEventListener('click', closeModal)
   })
 
-  modal.addEventListener('click', (e) => {
-    if (e.target === modal) closeModal()
+  modal.addEventListener('click', (event) => {
+    if (event.target === modal) closeModal()
   })
 
-  _enlargeEscHandler = (e: KeyboardEvent) => {
-    if (e.key === 'Escape') closeModal()
+  _enlargeEscHandler = (event: KeyboardEvent) => {
+    if (event.key === 'Escape') closeModal()
   }
   document.addEventListener('keydown', _enlargeEscHandler)
 

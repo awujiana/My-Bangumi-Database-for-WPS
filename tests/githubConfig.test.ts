@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 
-vi.mock('../ts/tools/util.js', () => ({
+vi.mock('../ts/tools/utility.js', () => ({
   bgmLog: vi.fn(),
   getApp: vi.fn(),
   LOG_LEVELS: { INFO: 'INFO', WARN: 'WARN', ERROR: 'ERROR' },
@@ -34,7 +34,7 @@ import {
   isGistConfigured,
   DEFAULT_GITHUB_CONFIG,
 } from '../ts/sync/githubConfig.js'
-import { getApp } from '../ts/tools/util.js'
+import { getApp } from '../ts/tools/utility.js'
 
 function createMockStorage(initial: Record<string, string> = {}) {
   const store: Record<string, string> = { ...initial }
