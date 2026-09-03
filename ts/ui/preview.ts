@@ -381,81 +381,76 @@ export async function previewSyncContent(): Promise<void> {
       }
 
       const rowNumber = dataRows[index]
-      if (rowNumber === undefined) continue
-      // 更新当前位置（行号）以便暂停时定位
-      BGM.sync.updatePosition(undefined, rowNumber)
+      if (!(rowNumber === undefined)) {
+        BGM.sync.updatePosition(undefined, rowNumber)
 
-      // 每行让出主线程，确保暂停按钮及时响应
-      await new Promise((r) => setTimeout(r, 0))
+        // 每行让出主线程，确保暂停按钮及时响应
+        await new Promise((r) => setTimeout(r, 0))
 
-      try {
-        const rowData = getRowData(ws, rowNumber, colMap, headerRow, 9)
+        try {
+          const rowData = getRowData(ws, rowNumber, colMap, headerRow, 9)
 
-        // 过滤无效行
-        if (!rowData.bgmUrl || !rowData.sid) {
-          bgmLog(LOG_LEVELS.INFO, `[preview] 跳过行 ${String(rowNumber)} (无 Bangumi URL)`)
-          skippedCount += 1
-          updateSyncProgressDialog(
-            index + 1,
-            totalRows,
-            `预览生成 ${String(index + 1)}/${String(totalRows)}（卡片 ${String(actualCardCount)}）`,
-            `⊘ [${String(index + 1)}/${String(totalRows)}] 行${String(rowNumber)} 跳过: 无URL`,
-          )
-          continue
-        }
-        // 可选：过滤全空（名称、状态、标签全空）
-        if (!rowData.name && !rowData.status && !rowData.tagsRaw) {
-          bgmLog(LOG_LEVELS.INFO, `[preview] 跳过行 ${String(rowNumber)} (空卡片)`)
-          skippedCount += 1
-          updateSyncProgressDialog(
-            index + 1,
-            totalRows,
-            `预览生成 ${String(index + 1)}/${String(totalRows)}（卡片 ${String(actualCardCount)}）`,
-            `⊘ [${String(index + 1)}/${String(totalRows)}] 行${String(rowNumber)} 跳过: 空卡片`,
-          )
-          continue
-        }
+          // 过滤无效行
+          if (!rowData.bgmUrl || !rowData.sid) {
+            bgmLog(LOG_LEVELS.INFO, `[preview] 跳过行 ${String(rowNumber)} (无 Bangumi URL)`)
+            skippedCount += 1
+            updateSyncProgressDialog(
+              index + 1,
+              totalRows,
+              `预览生成 ${String(index + 1)}/${String(totalRows)}（卡片 ${String(actualCardCount)}）`,
+              `⊘ [${String(index + 1)}/${String(totalRows)}] 行${String(rowNumber)} 跳过: 无URL`,
+            )
+          } else if (!rowData.name && !rowData.status && !rowData.tagsRaw) {
+            bgmLog(LOG_LEVELS.INFO, `[preview] 跳过行 ${String(rowNumber)} (空卡片)`)
+            skippedCount += 1
+            updateSyncProgressDialog(
+              index + 1,
+              totalRows,
+              `预览生成 ${String(index + 1)}/${String(totalRows)}（卡片 ${String(actualCardCount)}）`,
+              `⊘ [${String(index + 1)}/${String(totalRows)}] 行${String(rowNumber)} 跳过: 空卡片`,
+            )
+          } else {
+            const normalizedStatus = normalizeStatus(rowData.status)
+            // 将标准化后的状态放回 rowData，便于后续统计和卡片渲染
+            rowData.status = normalizedStatus
 
-        // 标准化观看状态（用于 data-status 属性）
-        const normalizedStatus = normalizeStatus(rowData.status)
-        // 将标准化后的状态放回 rowData，便于后续统计和卡片渲染
-        rowData.status = normalizedStatus
+            // 更新统计数据（仅当状态码在 1-5 范围内）
+            if (rowData.typeNum >= 1 && rowData.typeNum <= 5) {
+              detailPreviewData.totalWithType += 1
+              detailPreviewData.typeCount[rowData.typeNum] =
+                (detailPreviewData.typeCount[rowData.typeNum] || 0) + 1
+              if (rowData.isUploaded) {
+                detailPreviewData.totalUploaded += 1
+                detailPreviewData.uploadedCount[rowData.typeNum] =
+                  (detailPreviewData.uploadedCount[rowData.typeNum] || 0) + 1
+              }
+            }
 
-        // 更新统计数据（仅当状态码在 1-5 范围内）
-        if (rowData.typeNum >= 1 && rowData.typeNum <= 5) {
-          detailPreviewData.totalWithType += 1
-          detailPreviewData.typeCount[rowData.typeNum] =
-            (detailPreviewData.typeCount[rowData.typeNum] || 0) + 1
-          if (rowData.isUploaded) {
-            detailPreviewData.totalUploaded += 1
-            detailPreviewData.uploadedCount[rowData.typeNum] =
-              (detailPreviewData.uploadedCount[rowData.typeNum] || 0) + 1
+            // 生成卡片 HTML（渲染成功后才计数）
+            cardsHtml += renderDetailItemHtml(rowData, colMap, ws)
+            actualCardCount += 1
+            updateSyncProgressDialog(
+              index + 1,
+              totalRows,
+              `预览生成 ${String(index + 1)}/${String(totalRows)}（卡片 ${String(actualCardCount)}）`,
+              `✓ [${String(index + 1)}/${String(totalRows)}] 行${String(rowNumber)} "${rowData.name || ''}" 已渲染`,
+            )
           }
+        } catch (error: unknown) {
+          errorCount += 1
+          BGM.handleError(error, {
+            showAlert: false,
+            level: BGM.ErrorLevel.WARN,
+            context: 'previewSyncContent',
+          })
+          cardsHtml += `<div class="detail-item error">行 ${String(rowNumber)} 处理出错: ${escapeHtml((error as Error).message)}</div>`
+          updateSyncProgressDialog(
+            index + 1,
+            totalRows,
+            `预览生成 ${String(index + 1)}/${String(totalRows)}（卡片 ${String(actualCardCount)}）`,
+            `✗ [${String(index + 1)}/${String(totalRows)}] 行${String(rowNumber)} 异常: ${(error as Error).message}`,
+          )
         }
-
-        // 生成卡片 HTML（渲染成功后才计数）
-        cardsHtml += renderDetailItemHtml(rowData, colMap, ws)
-        actualCardCount += 1
-        updateSyncProgressDialog(
-          index + 1,
-          totalRows,
-          `预览生成 ${String(index + 1)}/${String(totalRows)}（卡片 ${String(actualCardCount)}）`,
-          `✓ [${String(index + 1)}/${String(totalRows)}] 行${String(rowNumber)} "${rowData.name || ''}" 已渲染`,
-        )
-      } catch (error: unknown) {
-        errorCount += 1
-        BGM.handleError(error, {
-          showAlert: false,
-          level: BGM.ErrorLevel.WARN,
-          context: 'previewSyncContent',
-        })
-        cardsHtml += `<div class="detail-item error">行 ${String(rowNumber)} 处理出错: ${escapeHtml((error as Error).message)}</div>`
-        updateSyncProgressDialog(
-          index + 1,
-          totalRows,
-          `预览生成 ${String(index + 1)}/${String(totalRows)}（卡片 ${String(actualCardCount)}）`,
-          `✗ [${String(index + 1)}/${String(totalRows)}] 行${String(rowNumber)} 异常: ${(error as Error).message}`,
-        )
       }
     }
     cardsHtml += '</div>'

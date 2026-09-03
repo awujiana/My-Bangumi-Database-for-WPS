@@ -44,19 +44,19 @@ function _buildNameUrlMap(
 
   for (let row = headerRow + 1; row <= lastRow; row += 1) {
     const urlValue = trim(getCellValue(ws, row, urlCol))
-    if (!urlValue) continue
+    if (urlValue) {
+      const nameValue = trim(getCellValue(ws, row, nameCol))
+      if (nameValue && !(nameValue in nameUrlMap)) {
+        nameUrlMap[nameValue] = urlValue
+      }
 
-    const nameValue = trim(getCellValue(ws, row, nameCol))
-    if (nameValue && !(nameValue in nameUrlMap)) {
-      nameUrlMap[nameValue] = urlValue
-    }
-
-    if (aliasCol) {
-      const aliasValue = trim(getCellValue(ws, row, aliasCol))
-      const aliases = _splitAliases(aliasValue)
-      for (const a of aliases) {
-        if (a && !(a in nameUrlMap)) {
-          nameUrlMap[a] = urlValue
+      if (aliasCol) {
+        const aliasValue = trim(getCellValue(ws, row, aliasCol))
+        const aliases = _splitAliases(aliasValue)
+        for (const a of aliases) {
+          if (a && !(a in nameUrlMap)) {
+            nameUrlMap[a] = urlValue
+          }
         }
       }
     }
@@ -114,15 +114,15 @@ export function autoFillUrls(): AutoFillResult {
 
     for (let row = headerRow + 1; row <= lastRow; row += 1) {
       const currentUrl = trim(getCellValue(ws, row, urlCol))
-      if (currentUrl) continue
-
-      const nameValue = trim(getCellValue(ws, row, nameCol))
-      if (!nameValue) continue
-
-      const fillUrl = nameUrlMap[nameValue]
-      if (fillUrl) {
-        setCellValue(ws, row, urlCol, fillUrl)
-        result.filled += 1
+      if (!currentUrl) {
+        const nameValue = trim(getCellValue(ws, row, nameCol))
+        if (nameValue) {
+          const fillUrl = nameUrlMap[nameValue]
+          if (fillUrl) {
+            setCellValue(ws, row, urlCol, fillUrl)
+            result.filled += 1
+          }
+        }
       }
     }
 

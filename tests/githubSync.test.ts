@@ -33,16 +33,17 @@ const mockParseJsonl = vi.hoisted(() =>
     const lines = text.split(/\r?\n/)
     for (let index = 0; index < lines.length; index += 1) {
       const line = lines[index]!.trim()
-      if (!line) continue
-      try {
-        const parsed = JSON.parse(line)
-        if (typeof parsed.sid === 'string' && parsed.sid) {
-          entries.push(parsed)
-        } else {
-          errors.push({ line: index + 1, message: '缺少有效的 sid 字段' })
+      if (line) {
+        try {
+          const parsed = JSON.parse(line)
+          if (typeof parsed.sid === 'string' && parsed.sid) {
+            entries.push(parsed)
+          } else {
+            errors.push({ line: index + 1, message: '缺少有效的 sid 字段' })
+          }
+        } catch {
+          errors.push({ line: index + 1, message: '无效的 JSON' })
         }
-      } catch {
-        errors.push({ line: index + 1, message: '无效的 JSON' })
       }
     }
     return { entries, errors }
@@ -4670,16 +4671,17 @@ describe('GithubSyncSource 方法', () => {
       const lines = text.split(/\r?\n/)
       for (let index = 0; index < lines.length; index += 1) {
         const line = lines[index]!.trim()
-        if (!line) continue
-        try {
-          const parsed = JSON.parse(line) as Record<string, unknown>
-          if (typeof parsed.sid === 'string' && parsed.sid) {
-            entries.push(parsed)
-          } else {
-            errors.push({ line: index + 1, message: '缺少有效的 sid 字段' })
+        if (line) {
+          try {
+            const parsed = JSON.parse(line) as Record<string, unknown>
+            if (typeof parsed.sid === 'string' && parsed.sid) {
+              entries.push(parsed)
+            } else {
+              errors.push({ line: index + 1, message: '缺少有效的 sid 字段' })
+            }
+          } catch {
+            errors.push({ line: index + 1, message: '无效的 JSON' })
           }
-        } catch {
-          errors.push({ line: index + 1, message: '无效的 JSON' })
         }
       }
       return { entries, errors }

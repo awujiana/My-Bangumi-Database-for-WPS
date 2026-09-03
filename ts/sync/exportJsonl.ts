@@ -80,79 +80,79 @@ export function buildJsonlFromSheet(): string {
 
   for (let row = startRow; row <= lastRow; row += 1) {
     const url = trim(getCellValue(ws, row, colMap.get('Bangumi_URL')!))
-    if (!url) continue
-    const sid = extractSubjectId(url)
-    if (!sid) continue
+    if (url) {
+      const sid = extractSubjectId(url)
+      if (sid) {
+        const getField = (key: string): string => {
+          const col = colMap.get(key)
+          if (!col) return ''
+          return trim(getCellValue(ws, row, col))
+        }
 
-    // 读取字段：日期列优先使用本地格式（Text 属性），其他列使用默认 getCellValue
-    const getField = (key: string): string => {
-      const col = colMap.get(key)
-      if (!col) return ''
-      return trim(getCellValue(ws, row, col))
-    }
+        // 日期列优先使用本地格式（Text 属性），保留用户设置的日期格式
+        const getDateField = (key: string): string => {
+          const col = colMap.get(key)
+          if (!col) return ''
+          return getCellText(ws, row, col)
+        }
 
-    // 日期列优先使用本地格式（Text 属性），保留用户设置的日期格式
-    const getDateField = (key: string): string => {
-      const col = colMap.get(key)
-      if (!col) return ''
-      return getCellText(ws, row, col)
-    }
+        const name = getField('名称')
+        const tags = getField('标签/分级')
+        const episode = getField('集数')
+        const date = getDateField('开播日期')
+        const endDate = getDateField('完播日')
 
-    const name = getField('名称')
-    const tags = getField('标签/分级')
-    const episode = getField('集数')
-    const date = getDateField('开播日期')
-    const endDate = getDateField('完播日')
+        // 构建 JSON 对象
+        const entry: Record<string, unknown> = {
+          sid,
+          name: name || undefined,
+          updatedAt: new Date().toISOString().slice(0, 10),
+        }
 
-    // 构建 JSON 对象
-    const entry: Record<string, unknown> = {
-      sid,
-      name: name || undefined,
-      updatedAt: new Date().toISOString().slice(0, 10),
-    }
+        // 可选字段：有值才写入，保持 JSONL 简洁
+        if (date) entry.date = date
+        if (endDate) entry['播放结束'] = endDate
+        if (episode) entry['话数'] = episode
+        if (tags) {
+          entry.meta_tags = tags
+            .split('|')
+            .map((t) => t.trim())
+            .filter(Boolean)
+        }
 
-    // 可选字段：有值才写入，保持 JSONL 简洁
-    if (date) entry.date = date
-    if (endDate) entry['播放结束'] = endDate
-    if (episode) entry['话数'] = episode
-    if (tags) {
-      entry.meta_tags = tags
-        .split('|')
-        .map((t) => t.trim())
-        .filter(Boolean)
-    }
+        // 扩展字段
+        const EXTENDED_FIELD_MAP: readonly (readonly [string, string])[] = [
+          ['date', '开播日期'],
+          ['播放结束', '完播日'],
+          ['动画制作公司', '制作公司'],
+          ['片长', '时长'],
+          ['制片国家', '制片国家'],
+          ['语言', '语言'],
+          ['类型', '类型'],
+          ['导演', '导演'],
+          ['音乐', '音乐'],
+          ['人物设定', '人物设定'],
+          ['机械设定', '机械设定'],
+          ['原作', '原作'],
+          ['脚本', '脚本'],
+          ['分镜', '分镜'],
+          ['演出', '演出'],
+          ['原案', '原案'],
+          ['系列构成', '系列构成'],
+          ['在线播放平台', '在线播放平台'],
+          ['关联的动漫ID', '关联的动漫ID'],
+        ] as const
 
-    // 扩展字段
-    const EXTENDED_FIELD_MAP: readonly (readonly [string, string])[] = [
-      ['date', '开播日期'],
-      ['播放结束', '完播日'],
-      ['动画制作公司', '制作公司'],
-      ['片长', '时长'],
-      ['制片国家', '制片国家'],
-      ['语言', '语言'],
-      ['类型', '类型'],
-      ['导演', '导演'],
-      ['音乐', '音乐'],
-      ['人物设定', '人物设定'],
-      ['机械设定', '机械设定'],
-      ['原作', '原作'],
-      ['脚本', '脚本'],
-      ['分镜', '分镜'],
-      ['演出', '演出'],
-      ['原案', '原案'],
-      ['系列构成', '系列构成'],
-      ['在线播放平台', '在线播放平台'],
-      ['关联的动漫ID', '关联的动漫ID'],
-    ] as const
+        for (const [jsonlField, excelField] of EXTENDED_FIELD_MAP) {
+          const value = getField(excelField)
+          if (value) {
+            entry[jsonlField] = value
+          }
+        }
 
-    for (const [jsonlField, excelField] of EXTENDED_FIELD_MAP) {
-      const value = getField(excelField)
-      if (value) {
-        entry[jsonlField] = value
+        lines.push(JSON.stringify(entry))
       }
     }
-
-    lines.push(JSON.stringify(entry))
   }
 
   bgmLog(LOG_LEVELS.INFO, `[exportJsonl] 构建完成：${String(lines.length)} 条记录`)

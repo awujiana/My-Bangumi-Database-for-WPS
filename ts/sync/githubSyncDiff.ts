@@ -259,21 +259,22 @@ export function parseJsonl(text: string): {
   for (let index = 0; index < lines.length; index += 1) {
     const lineNumber = index + 1
     const raw = lines[index]
-    if (raw === undefined) continue
-    const trimmed = raw.trim()
-    // 空行跳过
-    if (!trimmed) continue
-
-    try {
-      const object: unknown = JSON.parse(trimmed)
-      if (isGithubRemoteEntry(object)) {
-        entries.push(object)
-      } else {
-        errors.push({ line: lineNumber, reason: '对象缺少 sid 字段或 sid 不是字符串' })
+    if (!(raw === undefined)) {
+      const trimmed = raw.trim()
+      // 空行跳过
+      if (trimmed) {
+        try {
+          const object: unknown = JSON.parse(trimmed)
+          if (isGithubRemoteEntry(object)) {
+            entries.push(object)
+          } else {
+            errors.push({ line: lineNumber, reason: '对象缺少 sid 字段或 sid 不是字符串' })
+          }
+        } catch (error: unknown) {
+          const reason = error instanceof Error ? error.message : String(error)
+          errors.push({ line: lineNumber, reason })
+        }
       }
-    } catch (error: unknown) {
-      const reason = error instanceof Error ? error.message : String(error)
-      errors.push({ line: lineNumber, reason })
     }
   }
 
@@ -478,94 +479,91 @@ export function computeDiff(
   const remoteSids = new Set<string>()
 
   for (const remote of remoteEntries) {
-    if (!remote.sid) continue
-    remoteSids.add(remote.sid)
-    const local = localEntries.get(remote.sid)
+    if (remote.sid) {
+      remoteSids.add(remote.sid)
+      const local = localEntries.get(remote.sid)
 
-    // 新增：本地无对应 SID
-    if (!local) {
-      // update-only 策略：跳过新增
-      if (strategy === 'update-only') continue
-      diffs.push({
-        kind: 'add',
-        sid: remote.sid,
-        remote,
-        changedFields: ['*'],
-      })
-      continue
-    }
+      // 新增：本地无对应 SID
+      if (!local) {
+        // update-only 策略：跳过新增
+        if (!(strategy === 'update-only')) {
+          diffs.push({
+            kind: 'add',
+            sid: remote.sid,
+            remote,
+            changedFields: ['*'],
+          })
+        }
+      } else if (!(strategy === 'add-only')) {
+        if (strategy === 'force-overwrite') {
+          diffs.push({
+            kind: 'update',
+            sid: remote.sid,
+            remote,
+            localRow: local.row,
+            changedFields: ['*'],
+          })
+        } else {
+          const changedFields: string[] = []
 
-    // add-only 策略：已存在的 SID 全部跳过
-    if (strategy === 'add-only') continue
+          // 比对 Bangumi_URL（从 sid 构造的派生字段，确保 URL 列总是被正确更新）
+          // 仅当本地存在 Bangumi_URL 字段时才比对（列映射中包含该列）
+          const expectedUrl = `https://bgm.tv/subject/${remote.sid}`
+          if ('Bangumi_URL' in local.fields) {
+            const localUrl = local.fields.Bangumi_URL
+            if (localUrl !== expectedUrl) {
+              changedFields.push('Bangumi_URL')
+            }
+          }
 
-    // force-overwrite 策略：无视字段比对，全部标记为 update
-    if (strategy === 'force-overwrite') {
-      diffs.push({
-        kind: 'update',
-        sid: remote.sid,
-        remote,
-        localRow: local.row,
-        changedFields: ['*'],
-      })
-      continue
-    }
+          // 比对名称
+          if (remote.name && remote.name !== local.fields['名称']) {
+            changedFields.push('名称')
+          }
 
-    // 比对字段差异（add-update / mirror 策略走此分支）
-    const changedFields: string[] = []
+          // 比对标签（使用 meta_tags）
+          const remoteTags = tagsToString(remote.meta_tags)
+          if (remoteTags && remoteTags !== local.fields['标签/分级']) {
+            changedFields.push('标签/分级')
+          }
 
-    // 比对 Bangumi_URL（从 sid 构造的派生字段，确保 URL 列总是被正确更新）
-    // 仅当本地存在 Bangumi_URL 字段时才比对（列映射中包含该列）
-    const expectedUrl = `https://bgm.tv/subject/${remote.sid}`
-    if ('Bangumi_URL' in local.fields) {
-      const localUrl = local.fields.Bangumi_URL
-      if (localUrl !== expectedUrl) {
-        changedFields.push('Bangumi_URL')
-      }
-    }
+          // 比对集数（使用 infobox 的「话数」）
+          const remoteEpisodeValue = remote['话数'] ?? ''
+          if (remoteEpisodeValue && remoteEpisodeValue !== local.fields['集数']) {
+            changedFields.push('集数')
+          }
 
-    // 比对名称
-    if (remote.name && remote.name !== local.fields['名称']) {
-      changedFields.push('名称')
-    }
+          // 比对扩展字段（EXTENDED_FIELD_MAP 中定义的 19 个字段）
+          // 对于有多个 Excel 列名的字段（如「动画制作公司」→「制作公司」/「动画制作公司」），
+          // 任一列存在且与远程值不同都视为差异。
+          const comparedFields = new Set<string>()
+          for (const [jsonlField] of EXTENDED_FIELD_MAP) {
+            const remoteValue = remote[jsonlField as keyof GithubRemoteEntry]
+            if (!(remoteValue === undefined)) {
+              const remoteString = toExtensionStringValue(remoteValue as string | number)
+              const excelAliases = getExcelAliases(jsonlField)
+              for (const excelField of excelAliases) {
+                if (!comparedFields.has(excelField)) {
+                  if (remoteString && remoteString !== (local.fields[excelField] ?? '')) {
+                    changedFields.push(excelField)
+                    comparedFields.add(excelField)
+                  }
+                }
+              }
+            }
+          }
 
-    // 比对标签（使用 meta_tags）
-    const remoteTags = tagsToString(remote.meta_tags)
-    if (remoteTags && remoteTags !== local.fields['标签/分级']) {
-      changedFields.push('标签/分级')
-    }
-
-    // 比对集数（使用 infobox 的「话数」）
-    const remoteEpisodeValue = remote['话数'] ?? ''
-    if (remoteEpisodeValue && remoteEpisodeValue !== local.fields['集数']) {
-      changedFields.push('集数')
-    }
-
-    // 比对扩展字段（EXTENDED_FIELD_MAP 中定义的 19 个字段）
-    // 对于有多个 Excel 列名的字段（如「动画制作公司」→「制作公司」/「动画制作公司」），
-    // 任一列存在且与远程值不同都视为差异。
-    const comparedFields = new Set<string>()
-    for (const [jsonlField] of EXTENDED_FIELD_MAP) {
-      const remoteValue = remote[jsonlField as keyof GithubRemoteEntry]
-      if (remoteValue === undefined) continue
-      const remoteString = toExtensionStringValue(remoteValue as string | number)
-      const excelAliases = getExcelAliases(jsonlField)
-      for (const excelField of excelAliases) {
-        if (comparedFields.has(excelField)) continue
-        if (remoteString && remoteString !== (local.fields[excelField] ?? '')) {
-          changedFields.push(excelField)
-          comparedFields.add(excelField)
+          if (changedFields.length > 0) {
+            diffs.push({
+              kind: 'update',
+              sid: remote.sid,
+              remote,
+              localRow: local.row,
+              changedFields,
+            })
+          }
         }
       }
-    }
-
-    if (changedFields.length > 0) {
-      diffs.push({
-        kind: 'update',
-        sid: remote.sid,
-        remote,
-        localRow: local.row,
-        changedFields,
-      })
     }
   }
 
@@ -575,16 +573,20 @@ export function computeDiff(
       if (!remoteSids.has(sid)) {
         // 时间筛选启用时：本地条目的开播日期不在筛选范围内的，跳过 delete
         // 避免因时间筛选过滤了远程数据，导致本地其他时间段的数据被误删
+        let isInTimeRange = true
         if (timeFilter?.enabled && timeFilter.range !== 'all') {
           const localDate = local.fields['开播日期']
-          if (!localDate || !matchTimeFilter(localDate, timeFilter)) continue
+          isInTimeRange =
+            localDate !== undefined && localDate !== '' && matchTimeFilter(localDate, timeFilter)
         }
-        diffs.push({
-          kind: 'delete',
-          sid,
-          localRow: local.row,
-          changedFields: ['*'],
-        })
+        if (isInTimeRange) {
+          diffs.push({
+            kind: 'delete',
+            sid,
+            localRow: local.row,
+            changedFields: ['*'],
+          })
+        }
       }
     }
   }

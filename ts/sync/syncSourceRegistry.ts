@@ -303,12 +303,14 @@ function getSelectedRowSids(): Set<string> {
     // 遍历选区每行，提取 SID
     for (let row = firstRow; row <= lastRow; row += 1) {
       // 跳过表头行
-      if (row === headerRow) continue
-      const url = trim(getCellValue(ws, row, urlCol))
-      if (!url) continue
-      const sid = extractSubjectId(url)
-      if (sid) {
-        sids.add(sid)
+      if (!(row === headerRow)) {
+        const url = trim(getCellValue(ws, row, urlCol))
+        if (url) {
+          const sid = extractSubjectId(url)
+          if (sid) {
+            sids.add(sid)
+          }
+        }
       }
     }
 

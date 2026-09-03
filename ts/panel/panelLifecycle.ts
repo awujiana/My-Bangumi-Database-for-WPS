@@ -388,8 +388,9 @@ export function detectHeaderAndColumns(
             level: BGM.ErrorLevel.INFO,
             context: 'detectHeaderAndColumns',
           })
-          // 单个单元格读取失败，不影响该行其他列
-          continue
+          // 单个单元格读取失败，不影响该行其他列。
+          // 此处原为 continue，但 try/catch 已构成整个内层循环体，
+          // catch 结束后本就进入下一列，continue 属冗余控制流，直接移除。
         }
       }
       if (matchCount >= 3) {
@@ -460,13 +461,14 @@ export function detectHeaderAndColumns(
   let lastDataCol = 0
   let samples = 0
   for (let dr = dataStartRow; dr <= dataStartRow + 20 && samples < 5; dr += 1) {
-    if (!isRowVisible(dr, headerRow)) continue
-    samples += 1
-    for (let c = 1; c <= PANEL_CONFIG.MAX_SCAN_COLUMNS; c += 1) {
-      const v = getCellValue(ws, dr, c).trim()
-      if (v) {
-        if (firstDataCol < 0) firstDataCol = c
-        if (c > lastDataCol) lastDataCol = c
+    if (isRowVisible(dr, headerRow)) {
+      samples += 1
+      for (let c = 1; c <= PANEL_CONFIG.MAX_SCAN_COLUMNS; c += 1) {
+        const v = getCellValue(ws, dr, c).trim()
+        if (v) {
+          if (firstDataCol < 0) firstDataCol = c
+          if (c > lastDataCol) lastDataCol = c
+        }
       }
     }
   }
@@ -548,87 +550,85 @@ export function autoDetectSheet(): {
             context: 'autoDetectSheet',
           },
         )
-        continue
-      }
-
-      const sheetName = ws.Name || ''
-      // 跳过特定系统表（例如同步记录等）
-      if (/^(同步记录|SyncRecord|模糊|搜索|SEARCH)/i.test(sheetName)) {
-        BGM.handleError(new Error(`autoDetectSheet: 跳过系统工作表 "${sheetName}"`), {
-          showAlert: false,
-          level: BGM.ErrorLevel.INFO,
-          context: 'autoDetectSheet',
-        })
-        continue
-      }
-
-      bgmLog(LOG_LEVELS.INFO, `autoDetectSheet: 正在分析工作表 "${sheetName}"`)
-
-      needRestore = activateSheetIfNeeded(ws)
-      const meta = detectHeaderAndColumns(ws)
-
-      if (meta.headerRow === 0) {
-        bgmLog(LOG_LEVELS.INFO, `  => 工作表 "${sheetName}" 未检测到有效表头 (headerRow=0), 已跳过`)
-        continue
-      }
-
-      // 检查表头下方是否有足够的数据行
-      let dataRowCount = 0
-      let firstDataRow = -1
-      for (let dr = meta.dataStartRow; dr <= meta.dataStartRow + 10; dr += 1) {
-        let hasAny = false
-        for (let c = 1; c <= meta.lastCol; c += 1) {
-          if (getCellValue(ws, dr, c).trim()) {
-            hasAny = true
-            break
-          }
-        }
-        if (hasAny) {
-          dataRowCount += 1
-          if (firstDataRow < 0) firstDataRow = dr
-        }
-      }
-
-      BGM.handleError(
-        new Error(
-          `  => 工作表 "${sheetName}" 表头行 ${String(meta.headerRow)}, 匹配关键词数 ${String(meta.headerMatchCount)}, ` +
-            `数据列数 ${String(meta.lastCol)}, 前10行含数据行数 ${String(dataRowCount)}`,
-        ),
-        { showAlert: false, level: BGM.ErrorLevel.INFO, context: 'autoDetectSheet' },
-      )
-
-      if (dataRowCount < 2) {
-        BGM.handleError(
-          new Error(`  => 数据行不足 (${String(dataRowCount)} 行)，不视为有效数据表`),
-          {
+      } else {
+        const sheetName = ws.Name || ''
+        // 跳过特定系统表（例如同步记录等）
+        if (/^(同步记录|SyncRecord|模糊|搜索|SEARCH)/i.test(sheetName)) {
+          BGM.handleError(new Error(`autoDetectSheet: 跳过系统工作表 "${sheetName}"`), {
             showAlert: false,
             level: BGM.ErrorLevel.INFO,
             context: 'autoDetectSheet',
-          },
-        )
-        continue
-      }
+          })
+        } else {
+          bgmLog(LOG_LEVELS.INFO, `autoDetectSheet: 正在分析工作表 "${sheetName}"`)
 
-      // 判断是否更优
-      const isBetter =
-        !bestMatch ||
-        meta.lastCol > bestMatch.colCount ||
-        (meta.lastCol === bestMatch.colCount && meta.headerMatchCount > bestMatch.matchCount)
+          needRestore = activateSheetIfNeeded(ws)
+          const meta = detectHeaderAndColumns(ws)
 
-      BGM.handleError(
-        new Error(
-          `  => 是否为当前最优: ${isBetter ? '是' : '否'} (现有最优: ${bestMatch ? `${bestMatch.sheetName}(列${String(bestMatch.colCount)})` : '无'})`,
-        ),
-        { showAlert: false, level: BGM.ErrorLevel.INFO, context: 'autoDetectSheet' },
-      )
+          if (meta.headerRow === 0) {
+            bgmLog(
+              LOG_LEVELS.INFO,
+              `  => 工作表 "${sheetName}" 未检测到有效表头 (headerRow=0), 已跳过`,
+            )
+          } else {
+            let dataRowCount = 0
+            let firstDataRow = -1
+            for (let dr = meta.dataStartRow; dr <= meta.dataStartRow + 10; dr += 1) {
+              let hasAny = false
+              for (let c = 1; c <= meta.lastCol; c += 1) {
+                if (getCellValue(ws, dr, c).trim()) {
+                  hasAny = true
+                  break
+                }
+              }
+              if (hasAny) {
+                dataRowCount += 1
+                if (firstDataRow < 0) firstDataRow = dr
+              }
+            }
 
-      if (isBetter) {
-        bestMatch = {
-          sheetIndex: si,
-          sheetName,
-          headerRow: meta.headerRow,
-          matchCount: meta.headerMatchCount,
-          colCount: meta.lastCol,
+            BGM.handleError(
+              new Error(
+                `  => 工作表 "${sheetName}" 表头行 ${String(meta.headerRow)}, 匹配关键词数 ${String(meta.headerMatchCount)}, ` +
+                  `数据列数 ${String(meta.lastCol)}, 前10行含数据行数 ${String(dataRowCount)}`,
+              ),
+              { showAlert: false, level: BGM.ErrorLevel.INFO, context: 'autoDetectSheet' },
+            )
+
+            if (dataRowCount < 2) {
+              BGM.handleError(
+                new Error(`  => 数据行不足 (${String(dataRowCount)} 行)，不视为有效数据表`),
+                {
+                  showAlert: false,
+                  level: BGM.ErrorLevel.INFO,
+                  context: 'autoDetectSheet',
+                },
+              )
+            } else {
+              const isBetter =
+                !bestMatch ||
+                meta.lastCol > bestMatch.colCount ||
+                (meta.lastCol === bestMatch.colCount &&
+                  meta.headerMatchCount > bestMatch.matchCount)
+
+              BGM.handleError(
+                new Error(
+                  `  => 是否为当前最优: ${isBetter ? '是' : '否'} (现有最优: ${bestMatch ? `${bestMatch.sheetName}(列${String(bestMatch.colCount)})` : '无'})`,
+                ),
+                { showAlert: false, level: BGM.ErrorLevel.INFO, context: 'autoDetectSheet' },
+              )
+
+              if (isBetter) {
+                bestMatch = {
+                  sheetIndex: si,
+                  sheetName,
+                  headerRow: meta.headerRow,
+                  matchCount: meta.headerMatchCount,
+                  colCount: meta.lastCol,
+                }
+              }
+            }
+          }
         }
       }
     } catch (error: unknown) {
@@ -944,46 +944,48 @@ export function refreshData(): void {
           const is2D = Array.isArray(raw)
           for (let r = 0; r < segLength; r += 1) {
             const dr = dataRows[index + r]
-            if (dr === undefined) continue
-            const rowCols: string[] = []
-            let hasAny = false
-            for (let ci = 0; ci < displayColCount; ci += 1) {
-              let v: string
-              if (is2D && Array.isArray(raw)) {
-                const cell = raw[r]?.[ci]
-                v = cell == null ? '' : String(cell).trim()
-              } else {
-                v =
-                  segLength === 1 && displayColCount === 1
-                    ? raw == null
-                      ? ''
-                      : String(raw).trim()
-                    : getCellValue(ws, dr, meta.previewColStartAbsolute + ci).trim()
+            if (!(dr === undefined)) {
+              const rowCols: string[] = []
+              let hasAny = false
+              for (let ci = 0; ci < displayColCount; ci += 1) {
+                let v: string
+                if (is2D && Array.isArray(raw)) {
+                  const cell = raw[r]?.[ci]
+                  v = cell == null ? '' : String(cell).trim()
+                } else {
+                  v =
+                    segLength === 1 && displayColCount === 1
+                      ? raw == null
+                        ? ''
+                        : String(raw).trim()
+                      : getCellValue(ws, dr, meta.previewColStartAbsolute + ci).trim()
+                }
+                if (v) hasAny = true
+                rowCols.push(v)
               }
-              if (v) hasAny = true
-              rowCols.push(v)
-            }
-            if (hasAny) {
-              previewRows.push({ row: dr, cols: rowCols, isHeader: false, aligned: true })
-              hasData = true
+              if (hasAny) {
+                previewRows.push({ row: dr, cols: rowCols, isHeader: false, aligned: true })
+                hasData = true
+              }
             }
           }
         } catch {
           // 批量读取失败，回退到逐单元格
           for (let r = 0; r < segLength; r += 1) {
             const dr = dataRows[index + r]
-            if (dr === undefined) continue
-            const rowCols: string[] = []
-            let hasAny = false
-            for (let ci = 0; ci < displayColCount; ci += 1) {
-              const col = meta.previewColStartAbsolute + ci
-              const v = getCellValue(ws, dr, col).trim()
-              if (v) hasAny = true
-              rowCols.push(v)
-            }
-            if (hasAny) {
-              previewRows.push({ row: dr, cols: rowCols, isHeader: false, aligned: true })
-              hasData = true
+            if (!(dr === undefined)) {
+              const rowCols: string[] = []
+              let hasAny = false
+              for (let ci = 0; ci < displayColCount; ci += 1) {
+                const col = meta.previewColStartAbsolute + ci
+                const v = getCellValue(ws, dr, col).trim()
+                if (v) hasAny = true
+                rowCols.push(v)
+              }
+              if (hasAny) {
+                previewRows.push({ row: dr, cols: rowCols, isHeader: false, aligned: true })
+                hasData = true
+              }
             }
           }
         }
@@ -993,20 +995,21 @@ export function refreshData(): void {
       // 无表头时的回退逻辑
       let count = 0
       for (let r = 1; r <= Math.min(lastRow, 100) && count < 5; r += 1) {
-        if (isFiltered && visibleRowSet && !visibleRowSet.has(r)) continue
-        const cols: { text: string; important: boolean }[] = []
-        let hasAny = false
-        for (let c = 1; c <= PANEL_CONFIG.MAX_SCAN_COLUMNS; c += 1) {
-          const v = getCellValue(ws, r, c).trim()
-          if (v) {
-            cols.push({ text: v, important: false })
-            hasAny = true
+        if (!(isFiltered && visibleRowSet && !visibleRowSet.has(r))) {
+          const cols: { text: string; important: boolean }[] = []
+          let hasAny = false
+          for (let c = 1; c <= PANEL_CONFIG.MAX_SCAN_COLUMNS; c += 1) {
+            const v = getCellValue(ws, r, c).trim()
+            if (v) {
+              cols.push({ text: v, important: false })
+              hasAny = true
+            }
           }
-        }
-        if (hasAny) {
-          previewRows.push({ row: r, cols, isHeader: false, aligned: true })
-          hasData = true
-          count += 1
+          if (hasAny) {
+            previewRows.push({ row: r, cols, isHeader: false, aligned: true })
+            hasData = true
+            count += 1
+          }
         }
       }
     }

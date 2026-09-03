@@ -612,13 +612,14 @@ function getCallerFunctionName(_skipAdditional = 0): string {
 
   for (let index = 2; index < lines.length; index += 1) {
     const rawLine = lines[index]
-    if (rawLine === undefined) continue
-    const line = rawLine.trim()
-    const match = /at\s+([^\s(]+)/.exec(line)
-    if (match) {
-      const name = match[1]
-      if (name !== undefined && !internalFuncs.has(name)) {
-        return name
+    if (!(rawLine === undefined)) {
+      const line = rawLine.trim()
+      const match = /at\s+([^\s(]+)/.exec(line)
+      if (match) {
+        const name = match[1]
+        if (name !== undefined && !internalFuncs.has(name)) {
+          return name
+        }
       }
     }
   }

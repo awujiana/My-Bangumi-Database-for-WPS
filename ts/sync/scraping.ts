@@ -256,49 +256,53 @@ export async function fetchAllUserCollections(
       const url = `${BGM_CONFIG.API_BASE}/v0/users/${userId}/collections?limit=${String(limit)}&offset=${String(offset)}${typeParameter}`
       const xhrResult = await xhrGet(url, token)
 
-      if (xhrResult.status < 200 || xhrResult.status >= 300) {
-        if (xhrResult.status === 429) {
-          if (retryCount < MAX_RETRY_COUNT) {
-            retryCount += 1
-            const delayMs = BGM_CONFIG.RETRY_DELAY_BASE * 2 ** (retryCount - 1)
-            bgmLog(
-              LOG_LEVELS.WARN,
-              `[fetchAllUserCollections] API限流，第 ${String(retryCount)} 次重试，等待 ${String(delayMs)}ms...`,
-            )
-            await new Promise((resolve) => setTimeout(resolve, delayMs))
-            continue
-          }
+      const isHttpError = xhrResult.status < 200 || xhrResult.status >= 300
+      const isRateLimited = xhrResult.status === 429
+
+      if (isHttpError) {
+        if (isRateLimited && retryCount < MAX_RETRY_COUNT) {
+          retryCount += 1
+          const delayMs = BGM_CONFIG.RETRY_DELAY_BASE * 2 ** (retryCount - 1)
+          bgmLog(
+            LOG_LEVELS.WARN,
+            `[fetchAllUserCollections] API限流，第 ${String(retryCount)} 次重试，等待 ${String(delayMs)}ms...`,
+          )
+          await new Promise((resolve) => setTimeout(resolve, delayMs))
+          // 限流重试：保持 offset 不变，直接进入下一轮重新请求同一分页，
+          // 且不走末尾的 REQUEST_DELAY（重试延时已单独等待）。原为 continue。
+        } else if (isRateLimited) {
           throw new Error(`HTTP 429：请求过于频繁，已超过最大重试次数`)
-        }
-        throw new Error(`HTTP ${String(xhrResult.status)}`)
-      }
-
-      // 成功请求后重置重试计数
-      retryCount = 0
-
-      const data = xhrResult.data as CollectionListResponse
-
-      if (total === 0 && data.total) {
-        total = Math.min(data.total, maxTotal)
-        bgmLog(LOG_LEVELS.INFO, `[fetchAllUserCollections] 收藏总数: ${String(total)}`)
-      }
-
-      if (data.data && Array.isArray(data.data)) {
-        allCollections.push(...data.data)
-        offset += data.data.length
-
-        if (options?.onProgress) {
-          options.onProgress(Math.ceil(offset / limit), Math.ceil(total / limit))
-        }
-
-        if (data.data.length < limit || offset >= total) {
-          break
+        } else {
+          throw new Error(`HTTP ${String(xhrResult.status)}`)
         }
       } else {
-        break
-      }
+        // 成功请求后重置重试计数
+        retryCount = 0
 
-      await new Promise((resolve) => setTimeout(resolve, BGM_CONFIG.REQUEST_DELAY))
+        const data = xhrResult.data as CollectionListResponse
+
+        if (total === 0 && data.total) {
+          total = Math.min(data.total, maxTotal)
+          bgmLog(LOG_LEVELS.INFO, `[fetchAllUserCollections] 收藏总数: ${String(total)}`)
+        }
+
+        if (data.data && Array.isArray(data.data)) {
+          allCollections.push(...data.data)
+          offset += data.data.length
+
+          if (options?.onProgress) {
+            options.onProgress(Math.ceil(offset / limit), Math.ceil(total / limit))
+          }
+
+          if (data.data.length < limit || offset >= total) {
+            break
+          }
+        } else {
+          break
+        }
+
+        await new Promise((resolve) => setTimeout(resolve, BGM_CONFIG.REQUEST_DELAY))
+      }
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : undefined
       bgmLog(LOG_LEVELS.ERROR, `[fetchAllUserCollections] 请求失败: ${errorMessage ?? ''}`)

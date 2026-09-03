@@ -98,65 +98,65 @@ async function _fillSheetWithCollections(
 
   for (let index = 0; index < total; index += 1) {
     const item = collections[index]
-    if (!item?.subject_id) continue
+    if (item?.subject_id) {
+      const row = headerRow + 1 + index
+      const { subject } = item
+      const name = (subject?.name_cn || subject?.name) ?? ''
+      const alias = subject?.name_cn && subject.name ? subject.name : ''
+      const url = `https://bgm.tv/subject/${String(item.subject_id)}`
 
-    const row = headerRow + 1 + index
-    const { subject } = item
-    const name = (subject?.name_cn || subject?.name) ?? ''
-    const alias = subject?.name_cn && subject.name ? subject.name : ''
-    const url = `https://bgm.tv/subject/${String(item.subject_id)}`
+      const writes: { col: number; value: unknown }[] = []
 
-    const writes: { col: number; value: unknown }[] = []
+      const seqCol = colMap.get('序列号')
+      if (seqCol !== undefined) writes.push({ col: seqCol, value: index + 1 })
 
-    const seqCol = colMap.get('序列号')
-    if (seqCol !== undefined) writes.push({ col: seqCol, value: index + 1 })
+      const nameCol = colMap.get('名称')
+      if (nameCol !== undefined && name) writes.push({ col: nameCol, value: name })
 
-    const nameCol = colMap.get('名称')
-    if (nameCol !== undefined && name) writes.push({ col: nameCol, value: name })
+      const aliasCol = colMap.get('别名')
+      if (aliasCol !== undefined && alias) writes.push({ col: aliasCol, value: alias })
 
-    const aliasCol = colMap.get('别名')
-    if (aliasCol !== undefined && alias) writes.push({ col: aliasCol, value: alias })
+      const urlCol = colMap.get('Bangumi_URL')
+      if (urlCol !== undefined) writes.push({ col: urlCol, value: url })
 
-    const urlCol = colMap.get('Bangumi_URL')
-    if (urlCol !== undefined) writes.push({ col: urlCol, value: url })
-
-    const categoryCol = colMap.get('类别')
-    if (categoryCol !== undefined) {
-      writes.push({ col: categoryCol, value: BGM_SUBJECT_TYPES[item.subject_type || 2] ?? '' })
-    }
-
-    const finishedCol = colMap.get('是否看完')
-    if (finishedCol !== undefined) {
-      // type 2 = 看过，视为已看完；其余状态视为未看完
-      writes.push({ col: finishedCol, value: item.type === 2 ? '是' : '否' })
-    }
-
-    const scoreCol = colMap.get('打分')
-    if (scoreCol !== undefined && item.rate != null)
-      writes.push({ col: scoreCol, value: item.rate })
-
-    const tagsCol = colMap.get('标签/分级')
-    if (tagsCol !== undefined && item.tags && item.tags.length > 0) {
-      writes.push({ col: tagsCol, value: item.tags.join(', ') })
-    }
-
-    const commentCol = colMap.get('剧透/感言')
-    if (commentCol !== undefined && item.comment) {
-      writes.push({ col: commentCol, value: item.comment })
-    }
-
-    let isRowOk = true
-    for (const { col, value } of writes) {
-      if (!setCellValue(ws, row, col, value)) {
-        isRowOk = false
+      const categoryCol = colMap.get('类别')
+      if (categoryCol !== undefined) {
+        writes.push({ col: categoryCol, value: BGM_SUBJECT_TYPES[item.subject_type || 2] ?? '' })
       }
-    }
-    if (isRowOk) written += 1
 
-    // 每 50 行更新一次状态并让出事件循环，避免 UI 卡死
-    if ((index + 1) % 50 === 0) {
-      setStatus(`正在填充收藏数据：${String(index + 1)}/${String(total)}`, 'info')
-      await new Promise((resolve) => setTimeout(resolve, 0))
+      const finishedCol = colMap.get('是否看完')
+      if (finishedCol !== undefined) {
+        // type 2 = 看过，视为已看完；其余状态视为未看完
+        writes.push({ col: finishedCol, value: item.type === 2 ? '是' : '否' })
+      }
+
+      const scoreCol = colMap.get('打分')
+      if (scoreCol !== undefined && item.rate != null)
+        writes.push({ col: scoreCol, value: item.rate })
+
+      const tagsCol = colMap.get('标签/分级')
+      if (tagsCol !== undefined && item.tags && item.tags.length > 0) {
+        writes.push({ col: tagsCol, value: item.tags.join(', ') })
+      }
+
+      const commentCol = colMap.get('剧透/感言')
+      if (commentCol !== undefined && item.comment) {
+        writes.push({ col: commentCol, value: item.comment })
+      }
+
+      let isRowOk = true
+      for (const { col, value } of writes) {
+        if (!setCellValue(ws, row, col, value)) {
+          isRowOk = false
+        }
+      }
+      if (isRowOk) written += 1
+
+      // 每 50 行更新一次状态并让出事件循环，避免 UI 卡死
+      if ((index + 1) % 50 === 0) {
+        setStatus(`正在填充收藏数据：${String(index + 1)}/${String(total)}`, 'info')
+        await new Promise((resolve) => setTimeout(resolve, 0))
+      }
     }
   }
 
@@ -828,27 +828,28 @@ async function _doAPISync(
       if (BGM.sync.checkShouldStop()) break
 
       const item = userCollections[index]
-      if (item === undefined) continue
-      const itemName = item.subject?.name_cn || item.subject?.name || '(无名称)'
-      if (typeof addSyncRecord === 'function') {
-        addSyncRecord({
-          name: itemName,
-          url: `https://bgm.tv/subject/${String(item.subject_id)}`,
-          sid: String(item.subject_id),
-          type: BGM_SUBJECT_TYPES[item.subject_type || 2] ?? '',
-          content: '标记同步',
-          status: '成功',
-          count: 1,
-          collType: COLLECTION_TYPE_NAMES[item.type] ?? '',
-        })
+      if (!(item === undefined)) {
+        const itemName = item.subject?.name_cn || item.subject?.name || '(无名称)'
+        if (typeof addSyncRecord === 'function') {
+          addSyncRecord({
+            name: itemName,
+            url: `https://bgm.tv/subject/${String(item.subject_id)}`,
+            sid: String(item.subject_id),
+            type: BGM_SUBJECT_TYPES[item.subject_type || 2] ?? '',
+            content: '标记同步',
+            status: '成功',
+            count: 1,
+            collType: COLLECTION_TYPE_NAMES[item.type] ?? '',
+          })
+        }
+        currentCombined += 1
+        updateSyncProgressDialog(
+          currentCombined,
+          totalCombined,
+          `阶段1: 收藏写入同步记录 ${String(index + 1)}/${String(totalCollect)}`,
+          `📥 [${String(index + 1)}/${String(totalCollect)}] ${itemName}`,
+        )
       }
-      currentCombined += 1
-      updateSyncProgressDialog(
-        currentCombined,
-        totalCombined,
-        `阶段1: 收藏写入同步记录 ${String(index + 1)}/${String(totalCollect)}`,
-        `📥 [${String(index + 1)}/${String(totalCollect)}] ${itemName}`,
-      )
     }
 
     syncRecords = typeof getAllSyncRecords === 'function' ? getAllSyncRecords() : []
@@ -885,38 +886,38 @@ async function _doAPISync(
       }
 
       const row = rowsToProcess[index]
-      if (row === undefined) continue
-      // 更新当前位置（行号）以便暂停时定位
-      BGM.sync.updatePosition(undefined, row)
+      if (!(row === undefined)) {
+        BGM.sync.updatePosition(undefined, row)
 
-      const bgmUrlCell = urlCol !== undefined ? getCell(ws, row, urlCol) : null
-      const bgmUrl = bgmUrlCell ? trim(String(bgmUrlCell.Value ?? '')) : ''
-      const sid = typeof extractSubjectId === 'function' ? extractSubjectId(bgmUrl) : ''
-      let isMatched = false
-      if (sid && collectionMap.has(sid)) {
-        const seqCol = colMap.get('序列号') || 9
-        const seqCell = getCell(ws, row, seqCol)
-        if (seqCell?.Interior) {
-          const syncCount = syncCountMap.get(sid) || 0
-          seqCell.Interior.Color =
-            syncCount === 1
-              ? BGM_COLOR.BGM_SYNC
-              : syncCount === 2
-                ? BGM_COLOR.LIGHT_GREEN
-                : BGM_COLOR.DARK_GREEN
+        const bgmUrlCell = urlCol !== undefined ? getCell(ws, row, urlCol) : null
+        const bgmUrl = bgmUrlCell ? trim(String(bgmUrlCell.Value ?? '')) : ''
+        const sid = typeof extractSubjectId === 'function' ? extractSubjectId(bgmUrl) : ''
+        let isMatched = false
+        if (sid && collectionMap.has(sid)) {
+          const seqCol = colMap.get('序列号') || 9
+          const seqCell = getCell(ws, row, seqCol)
+          if (seqCell?.Interior) {
+            const syncCount = syncCountMap.get(sid) || 0
+            seqCell.Interior.Color =
+              syncCount === 1
+                ? BGM_COLOR.BGM_SYNC
+                : syncCount === 2
+                  ? BGM_COLOR.LIGHT_GREEN
+                  : BGM_COLOR.DARK_GREEN
+          }
+          matchedCount += 1
+          isMatched = true
         }
-        matchedCount += 1
-        isMatched = true
+        currentCombined += 1
+        updateSyncProgressDialog(
+          currentCombined,
+          totalCombined,
+          `阶段2: 标记数据表 ${String(index + 1)}/${String(totalRows)}（匹配 ${String(matchedCount)}）`,
+          isMatched
+            ? `✓ [${String(index + 1)}/${String(totalRows)}] 行${String(row)} 匹配 SID=${sid ?? ''}`
+            : `· [${String(index + 1)}/${String(totalRows)}] 行${String(row)} 未匹配`,
+        )
       }
-      currentCombined += 1
-      updateSyncProgressDialog(
-        currentCombined,
-        totalCombined,
-        `阶段2: 标记数据表 ${String(index + 1)}/${String(totalRows)}（匹配 ${String(matchedCount)}）`,
-        isMatched
-          ? `✓ [${String(index + 1)}/${String(totalRows)}] 行${String(row)} 匹配 SID=${sid ?? ''}`
-          : `· [${String(index + 1)}/${String(totalRows)}] 行${String(row)} 未匹配`,
-      )
     }
 
     // 输出同步统计

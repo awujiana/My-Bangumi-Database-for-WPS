@@ -218,24 +218,24 @@ function createLightweightFallback(): (d: string) => string {
       const all = host.getElementsByTagName('*')
       for (let index = 0; index < all.length; index += 1) {
         const element = all[index]!
-        if (element.nodeType !== 1) continue
-        // 清 on* 事件属性（先收集后删，避免 NamedNodeMap 遍历中修改错位）
-        const toRemoveAttributes: string[] = []
-        for (let a = 0; a < element.attributes.length; a += 1) {
-          const attribute = element.attributes[a]!
-          const { name } = attribute
-          if (name.length > 2 && name.slice(0, 2).toLowerCase() === 'on') {
-            toRemoveAttributes.push(name)
+        if (!(element.nodeType !== 1)) {
+          const toRemoveAttributes: string[] = []
+          for (let a = 0; a < element.attributes.length; a += 1) {
+            const attribute = element.attributes[a]!
+            const { name } = attribute
+            if (name.length > 2 && name.slice(0, 2).toLowerCase() === 'on') {
+              toRemoveAttributes.push(name)
+            }
           }
-        }
-        for (const name of toRemoveAttributes) element.removeAttribute(name)
+          for (const name of toRemoveAttributes) element.removeAttribute(name)
 
-        // 清 href / src / action / formaction / poster / data-xxx 里含 JS 的 URI
-        const uriAttributes = ['href', 'src', 'action', 'formaction', 'poster', 'background']
-        for (const attribute of uriAttributes) {
-          const v = element.getAttribute(attribute)
-          if (v != null && DANGEROUS_URI.test(v)) {
-            element.removeAttribute(attribute)
+          // 清 href / src / action / formaction / poster / data-xxx 里含 JS 的 URI
+          const uriAttributes = ['href', 'src', 'action', 'formaction', 'poster', 'background']
+          for (const attribute of uriAttributes) {
+            const v = element.getAttribute(attribute)
+            if (v != null && DANGEROUS_URI.test(v)) {
+              element.removeAttribute(attribute)
+            }
           }
         }
         // xss 常见奇技淫巧：<img src=x onerror="..."> 已经被 on* 清理覆盖

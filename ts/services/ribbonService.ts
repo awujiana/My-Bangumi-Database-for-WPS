@@ -102,23 +102,25 @@ export function detectGithubConflicts(
   const conflicts: Conflict[] = []
 
   for (const entry of remote) {
-    if (!entry.sid) continue
-    const localEntry = local.get(entry.sid)
-    if (!localEntry) continue
-
-    for (const spec of GITHUB_CONFLICT_FIELDS) {
-      const remoteValue = spec.remoteToString(entry)
-      // 远程无值，不视为冲突
-      if (!remoteValue) continue
-      const localValue = localEntry.fields[spec.localField] ?? ''
-      if (remoteValue !== localValue) {
-        conflicts.push({
-          sid: entry.sid,
-          field: spec.localField,
-          localValue,
-          remoteValue,
-          localRow: localEntry.row,
-        })
+    if (entry.sid) {
+      const localEntry = local.get(entry.sid)
+      if (localEntry) {
+        for (const spec of GITHUB_CONFLICT_FIELDS) {
+          const remoteValue = spec.remoteToString(entry)
+          // 远程无值，不视为冲突
+          if (remoteValue) {
+            const localValue = localEntry.fields[spec.localField] ?? ''
+            if (remoteValue !== localValue) {
+              conflicts.push({
+                sid: entry.sid,
+                field: spec.localField,
+                localValue,
+                remoteValue,
+                localRow: localEntry.row,
+              })
+            }
+          }
+        }
       }
     }
   }
@@ -227,86 +229,91 @@ export function getSyncPreview(
     if (!bgmUrl || !extractSubjectId(bgmUrl)) {
       noUrl += 1
       // 无效行不计入 valid
-      continue
-    }
-    valid += 1
-
-    // 检查是否已上传（序列号列颜色）
-    const seqCol = colMap.get('序列号') || 4
-    const seqCell = getCell(ws, rowNumber, seqCol)
-    const isUploaded =
-      seqCell?.Interior &&
-      (seqCell.Interior.Color === BGM_COLOR.SUCCESS ||
-        seqCell.Interior.Color === BGM_COLOR.LIGHT_GREEN ||
-        seqCell.Interior.Color === BGM_COLOR.DARK_GREEN)
-    if (isUploaded) {
-      alreadyUploaded += 1
-      if (isIncremental) {
-        // 增量模式：已上传且指纹匹配则跳过
-        const sid = extractSubjectId(bgmUrl)
-        if (sid && fingerprintMap) {
-          const currentFingerprint = calcFingerprint([
-            getField(rowNumber, '名称'),
-            mapWatchStatus(
-              getField(rowNumber, '是否看完') ||
-                getField(rowNumber, '状态') ||
-                getField(rowNumber, '观看状态'),
-            ).toString(),
-            getField(rowNumber, '打分'),
-            getField(rowNumber, '标签/分级'),
-            getField(rowNumber, '原作标签'),
-            getField(rowNumber, '剧透/感言'),
-            getField(rowNumber, '集数'),
-            getField(rowNumber, '集号'),
-          ])
-          if (fingerprintMap.get(sid) === currentFingerprint) {
-            incrementalSkipped += 1
-            continue
-          }
-        }
-      } else {
-        // 非增量模式：已上传跳过
-        continue
-      }
-    }
-
-    // 判断观看状态
-    const watchStatus =
-      getField(rowNumber, '是否看完') ||
-      getField(rowNumber, '状态') ||
-      getField(rowNumber, '观看状态')
-
-    // 空状态不计入待同步，跳过该条目
-    if (!watchStatus) {
-      emptyStatus += 1
-      continue
-    }
-
-    const type = mapWatchStatus(watchStatus)
-    if (type === 0) {
-      willSkip += 1
     } else {
-      // 增量模式：检查指纹是否匹配
-      if (isIncremental && fingerprintMap) {
-        const sid = extractSubjectId(bgmUrl)
-        if (sid) {
-          const currentFingerprint = calcFingerprint([
-            getField(rowNumber, '名称'),
-            type.toString(),
-            getField(rowNumber, '打分'),
-            getField(rowNumber, '标签/分级'),
-            getField(rowNumber, '原作标签'),
-            getField(rowNumber, '剧透/感言'),
-            getField(rowNumber, '集数'),
-            getField(rowNumber, '集号'),
-          ])
-          if (fingerprintMap.get(sid) === currentFingerprint) {
-            incrementalSkipped += 1
-            continue
+      valid += 1
+
+      // 检查是否已上传（序列号列颜色）
+      const seqCol = colMap.get('序列号') || 4
+      const seqCell = getCell(ws, rowNumber, seqCol)
+      const isUploaded =
+        seqCell?.Interior &&
+        (seqCell.Interior.Color === BGM_COLOR.SUCCESS ||
+          seqCell.Interior.Color === BGM_COLOR.LIGHT_GREEN ||
+          seqCell.Interior.Color === BGM_COLOR.DARK_GREEN)
+      // 已上传条目：非增量模式直接跳过；增量模式仅当指纹未变化才跳过
+      let isUploadedSkipped = false
+      if (isUploaded) {
+        alreadyUploaded += 1
+        if (isIncremental) {
+          // 增量模式：已上传且指纹匹配则跳过
+          const sid = extractSubjectId(bgmUrl)
+          if (sid && fingerprintMap) {
+            const currentFingerprint = calcFingerprint([
+              getField(rowNumber, '名称'),
+              mapWatchStatus(
+                getField(rowNumber, '是否看完') ||
+                  getField(rowNumber, '状态') ||
+                  getField(rowNumber, '观看状态'),
+              ).toString(),
+              getField(rowNumber, '打分'),
+              getField(rowNumber, '标签/分级'),
+              getField(rowNumber, '原作标签'),
+              getField(rowNumber, '剧透/感言'),
+              getField(rowNumber, '集数'),
+              getField(rowNumber, '集号'),
+            ])
+            if (fingerprintMap.get(sid) === currentFingerprint) {
+              incrementalSkipped += 1
+              isUploadedSkipped = true
+            }
+          }
+        } else {
+          // 非增量模式：已上传跳过
+          isUploadedSkipped = true
+        }
+      }
+
+      if (!isUploadedSkipped) {
+        // 判断观看状态
+        const watchStatus =
+          getField(rowNumber, '是否看完') ||
+          getField(rowNumber, '状态') ||
+          getField(rowNumber, '观看状态')
+
+        // 空状态不计入待同步，跳过该条目
+        if (!watchStatus) {
+          emptyStatus += 1
+        } else {
+          const type = mapWatchStatus(watchStatus)
+          if (type === 0) {
+            willSkip += 1
+          } else {
+            // 增量模式：检查指纹是否匹配
+            let isFingerprintMatched = false
+            if (isIncremental && fingerprintMap) {
+              const sid = extractSubjectId(bgmUrl)
+              if (sid) {
+                const currentFingerprint = calcFingerprint([
+                  getField(rowNumber, '名称'),
+                  type.toString(),
+                  getField(rowNumber, '打分'),
+                  getField(rowNumber, '标签/分级'),
+                  getField(rowNumber, '原作标签'),
+                  getField(rowNumber, '剧透/感言'),
+                  getField(rowNumber, '集数'),
+                  getField(rowNumber, '集号'),
+                ])
+                isFingerprintMatched = fingerprintMap.get(sid) === currentFingerprint
+              }
+            }
+            if (isFingerprintMatched) {
+              incrementalSkipped += 1
+            } else {
+              willSync += 1
+            }
           }
         }
       }
-      willSync += 1
     }
   }
 
@@ -417,29 +424,28 @@ export async function detectConflicts(
 
   for (const rowNumber of rowsToProcess) {
     const bgmUrl = getField(rowNumber, 'Bangumi_URL')
-    if (!bgmUrl) continue
-    const sid = extractSubjectId(bgmUrl)
-    if (!sid) continue
-
-    const bgmEntry = bgmCollection.get(sid)
-    // 无对应收藏，不视为冲突
-    if (!bgmEntry) continue
-
-    // 构建 Excel 的 payload
-    const excelType = mapWatchStatus(getField(rowNumber, '是否看完'))
-    // 不上传，不参与冲突
-    if (excelType === 0) continue
-
-    // 对比 type 字段
-    if (bgmEntry.type !== excelType) {
-      conflicts.push({
-        row: rowNumber,
-        sid,
-        name: getField(rowNumber, '名称') || '',
-        existingType: bgmEntry.type,
-        incomingType: excelType,
-      })
-      conflictCount += 1
+    if (bgmUrl) {
+      const sid = extractSubjectId(bgmUrl)
+      if (sid) {
+        const bgmEntry = bgmCollection.get(sid)
+        // 无对应收藏，不视为冲突
+        if (bgmEntry) {
+          const excelType = mapWatchStatus(getField(rowNumber, '是否看完'))
+          // 不上传，不参与冲突
+          if (!(excelType === 0)) {
+            if (bgmEntry.type !== excelType) {
+              conflicts.push({
+                row: rowNumber,
+                sid,
+                name: getField(rowNumber, '名称') || '',
+                existingType: bgmEntry.type,
+                incomingType: excelType,
+              })
+              conflictCount += 1
+            }
+          }
+        }
+      }
     }
     // 可扩展对比 rate、tags、comment 等字段
   }

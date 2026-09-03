@@ -364,34 +364,35 @@ function readLocalEntries(
     const getField = (key: string): string =>
       rawData ? getFieldFromBatch(index, key) : getFieldFromCell(row, key)
     const url = getField('Bangumi_URL')
-    if (!url) continue
-    const sid = extractSubjectId(url)
-    if (!sid) continue
+    if (url) {
+      const sid = extractSubjectId(url)
+      if (sid) {
+        const extensionFields: Record<string, string> = {}
+        for (const [, excelField] of EXTENDED_FIELD_MAP) {
+          extensionFields[excelField] = getField(excelField)
+        }
+        // 同时写入「动画制作公司」的所有别名列到 extFields，便于 computeDiff 比对时使用
+        for (const alias of getExcelAliases('动画制作公司')) {
+          if (!extensionFields[alias]) {
+            extensionFields[alias] = getField(alias)
+          }
+        }
 
-    const extensionFields: Record<string, string> = {}
-    for (const [, excelField] of EXTENDED_FIELD_MAP) {
-      extensionFields[excelField] = getField(excelField)
-    }
-    // 同时写入「动画制作公司」的所有别名列到 extFields，便于 computeDiff 比对时使用
-    for (const alias of getExcelAliases('动画制作公司')) {
-      if (!extensionFields[alias]) {
-        extensionFields[alias] = getField(alias)
+        result.set(sid, {
+          row,
+          sid,
+          fields: {
+            Bangumi_URL: url,
+            名称: getField('名称'),
+            是否看完: getField('是否看完') || getField('状态') || getField('观看状态'),
+            '标签/分级': getField('标签/分级'),
+            集数: getField('集数'),
+            集号: getField('集号'),
+            ...extensionFields,
+          },
+        })
       }
     }
-
-    result.set(sid, {
-      row,
-      sid,
-      fields: {
-        Bangumi_URL: url,
-        名称: getField('名称'),
-        是否看完: getField('是否看完') || getField('状态') || getField('观看状态'),
-        '标签/分级': getField('标签/分级'),
-        集数: getField('集数'),
-        集号: getField('集号'),
-        ...extensionFields,
-      },
-    })
   }
 
   bgmLog(
@@ -603,19 +604,22 @@ function writeRemoteEntryToRow(
   // 对于有多个 Excel 列名的字段（如「动画制作公司」），所有别名列均写入相同的远程值
   const handledJsonlFields = new Set<string>()
   for (const [jsonlField] of EXTENDED_FIELD_MAP) {
-    if (handledJsonlFields.has(jsonlField)) continue
-    handledJsonlFields.add(jsonlField)
-    const excelAliases = getExcelAliases(jsonlField)
-    const isAnyAliasMatched = excelAliases.some(
-      (alias) => isWriteAll || fieldsToWrite.includes(alias),
-    )
-    if (!isAnyAliasMatched) continue
-    const value = remote[jsonlField as keyof GithubRemoteEntry]
-    if (typeof value !== 'string' && typeof value !== 'number') continue
-    const stringValue = typeof value === 'number' ? String(value) : value
-    for (const alias of excelAliases) {
-      if (isWriteAll || fieldsToWrite.includes(alias)) {
-        safeSet(alias, stringValue)
+    if (!handledJsonlFields.has(jsonlField)) {
+      handledJsonlFields.add(jsonlField)
+      const excelAliases = getExcelAliases(jsonlField)
+      const isAnyAliasMatched = excelAliases.some(
+        (alias) => isWriteAll || fieldsToWrite.includes(alias),
+      )
+      if (isAnyAliasMatched) {
+        const value = remote[jsonlField as keyof GithubRemoteEntry]
+        if (!(typeof value !== 'string' && typeof value !== 'number')) {
+          const stringValue = typeof value === 'number' ? String(value) : value
+          for (const alias of excelAliases) {
+            if (isWriteAll || fieldsToWrite.includes(alias)) {
+              safeSet(alias, stringValue)
+            }
+          }
+        }
       }
     }
   }
@@ -856,11 +860,12 @@ function batchUpdateRows(
     // 扩展字段：同时检查主映射和所有别名（如「动画制作公司」→「制作公司」/「动画制作公司」）
     const handled = new Set<string>()
     for (const [jsonlField] of EXTENDED_FIELD_MAP) {
-      if (handled.has(jsonlField)) continue
-      handled.add(jsonlField)
-      const aliases = getExcelAliases(jsonlField)
-      if (isWriteAll || aliases.some((a) => u.fields.includes(a))) {
-        for (const a of aliases) tryAddCol(a)
+      if (!handled.has(jsonlField)) {
+        handled.add(jsonlField)
+        const aliases = getExcelAliases(jsonlField)
+        if (isWriteAll || aliases.some((a) => u.fields.includes(a))) {
+          for (const a of aliases) tryAddCol(a)
+        }
       }
     }
   }
@@ -991,13 +996,14 @@ function batchUpdateRows(
 
       if (shouldWrite) {
         // 空值且非强制覆盖时跳过
-        if (!forceOverwrite && !value) continue
-        // 日期列特殊处理
-        if (DATE_COLUMNS.has(wc.name) && typeof value === 'string' && value) {
-          const localDate = formatDateToLocal(value)
-          if (localDate !== null) value = localDate
+        if (forceOverwrite || value) {
+          // 日期列特殊处理
+          if (DATE_COLUMNS.has(wc.name) && typeof value === 'string' && value) {
+            const localDate = formatDateToLocal(value)
+            if (localDate !== null) value = localDate
+          }
+          rowValues[index] = value
         }
-        rowValues[index] = value
       }
     }
 
@@ -1010,21 +1016,22 @@ function batchUpdateRows(
         const finalValues = [...rowValues]
         for (let c = 0; c < colCount; c += 1) {
           const updatedValue = finalValues[c]
-          if (updatedValue === null) continue
-          const oldValue = oldArray[c] != null ? String(oldArray[c]) : ''
-          const valueString = String(updatedValue)
-          if (oldValue === valueString) {
-            // 无变化，跳过
-            finalValues[c] = null
-          } else {
-            hasChanges = true
-            // 记录 undo
-            recordUndoEntry({
-              row,
-              col: minCol + c,
-              oldValue,
-              updatedValue: valueString,
-            })
+          if (!(updatedValue === null)) {
+            const oldValue = oldArray[c] != null ? String(oldArray[c]) : ''
+            const valueString = String(updatedValue)
+            if (oldValue === valueString) {
+              // 无变化，跳过
+              finalValues[c] = null
+            } else {
+              hasChanges = true
+              // 记录 undo
+              recordUndoEntry({
+                row,
+                col: minCol + c,
+                oldValue,
+                updatedValue: valueString,
+              })
+            }
           }
         }
 
@@ -1289,14 +1296,15 @@ export async function applyDiffToSheet(
       result.added += batchWritten
       for (let index = 0; index < batchWritten; index += 1) {
         const entry = batch[index]
-        if (!entry?.remote) continue
-        result.details!.push({
-          kind: 'add',
-          sid: entry.sid,
-          name: entry.remote.name,
-          row: nextAppendRow + index,
-          fields: ['全部字段'],
-        })
+        if (entry?.remote) {
+          result.details!.push({
+            kind: 'add',
+            sid: entry.sid,
+            name: entry.remote.name,
+            row: nextAppendRow + index,
+            fields: ['全部字段'],
+          })
+        }
       }
       nextAppendRow += batchWritten
     } else {
@@ -1632,22 +1640,22 @@ export function applyConflictResolutions(
   // 倒序遍历，便于安全移除元素
   for (let index = diffs.length - 1; index >= 0; index -= 1) {
     const diff = diffs[index]
-    if (!diff) continue
-    // 仅处理字段级 update（changedFields 不为 ['*']）
-    if (diff.kind !== 'update') continue
-    if (diff.changedFields.length === 1 && diff.changedFields[0] === '*') continue
+    if (diff) {
+      if (!(diff.kind !== 'update')) {
+        if (!(diff.changedFields.length === 1 && diff.changedFields[0] === '*')) {
+          diff.changedFields = diff.changedFields.filter((field) => {
+            const key = `${diff.sid}\u{0}${field}`
+            const r = resolutionByKey.get(key)
+            // 若存在 resolution 且选择 local，则移除该字段；否则保留
+            return !(r && r.chosenValue === 'local')
+          })
 
-    // 过滤掉用户选择「本地」的字段
-    diff.changedFields = diff.changedFields.filter((field) => {
-      const key = `${diff.sid}\u{0}${field}`
-      const r = resolutionByKey.get(key)
-      // 若存在 resolution 且选择 local，则移除该字段；否则保留
-      return !(r && r.chosenValue === 'local')
-    })
-
-    // 若所有字段都被移除，则该 diff 无需执行
-    if (diff.changedFields.length === 0) {
-      diffs.splice(index, 1)
+          // 若所有字段都被移除，则该 diff 无需执行
+          if (diff.changedFields.length === 0) {
+            diffs.splice(index, 1)
+          }
+        }
+      }
     }
   }
 
@@ -1854,12 +1862,14 @@ function getSelectedRowSids(): Set<string> {
     }
 
     for (let row = firstRow; row <= lastRow; row += 1) {
-      if (row === headerRow) continue
-      const url = trim(getCellValue(ws, row, urlCol))
-      if (!url) continue
-      const sid = extractSubjectId(url)
-      if (sid) {
-        sids.add(sid)
+      if (!(row === headerRow)) {
+        const url = trim(getCellValue(ws, row, urlCol))
+        if (url) {
+          const sid = extractSubjectId(url)
+          if (sid) {
+            sids.add(sid)
+          }
+        }
       }
     }
 

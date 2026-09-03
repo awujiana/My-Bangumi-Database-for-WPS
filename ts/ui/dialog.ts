@@ -256,13 +256,14 @@ function createDialogs(): void {
 function bindAllEvents(): void {
   for (const type in DIALOG_TYPES) {
     const config = DIALOG_TYPES[type]
-    if (!config) continue
-    dom[config.id] = document.getElementById(config.id)
-    dom[config.titleId] = document.getElementById(config.titleId)
-    dom[config.msgId] = document.getElementById(config.msgId)
-    config.buttons.forEach((button) => {
-      dom[button.id] = document.getElementById(button.id)
-    })
+    if (config) {
+      dom[config.id] = document.getElementById(config.id)
+      dom[config.titleId] = document.getElementById(config.titleId)
+      dom[config.msgId] = document.getElementById(config.msgId)
+      config.buttons.forEach((button) => {
+        dom[button.id] = document.getElementById(button.id)
+      })
+    }
   }
   dom.bgmToast = document.getElementById('bgmToast')
   dom.bgmInputField = document.getElementById('bgmInputField')

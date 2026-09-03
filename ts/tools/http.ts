@@ -185,11 +185,10 @@ export async function httpRequest<T = unknown>(
           `API 限流 (429)，第 ${String(attempt)} 次重试，等待 ${String(delayMs)}ms`,
         )
         await sleep(delayMs)
-        continue
+      } else {
+        const errorMessage = getErrorMessage(response.status)
+        return Result.fail(new BgmError(errorMessage, 'HTTP_ERROR', { status: response.status }))
       }
-
-      const errorMessage = getErrorMessage(response.status)
-      return Result.fail(new BgmError(errorMessage, 'HTTP_ERROR', { status: response.status }))
     } catch (error: unknown) {
       // 取消导致的失败不重试，直接返回
       if (signal?.aborted) {
@@ -201,11 +200,10 @@ export async function httpRequest<T = unknown>(
         const delayMs = BGM_CONFIG.RETRY_DELAY_BASE * 2 ** (attempt - 1)
         bgmLog(LOG_LEVELS.WARN, `网络错误，第 ${String(attempt)} 次重试，等待 ${String(delayMs)}ms`)
         await sleep(delayMs)
-        continue
+      } else {
+        const errorMessage = error instanceof Error ? error.message : String(error)
+        return Result.fail(new BgmError(errorMessage, 'NETWORK_ERROR'))
       }
-
-      const errorMessage = error instanceof Error ? error.message : String(error)
-      return Result.fail(new BgmError(errorMessage, 'NETWORK_ERROR'))
     }
   }
 

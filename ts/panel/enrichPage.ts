@@ -335,33 +335,32 @@ export function selectNewAnimeFile(): void {
       // 重复文件跳过
       if (state.batchFiles.includes(filePath)) {
         BGM.Dialog.alert('提示', `文件已在列表中：\n${fileName}`)
-        continue
+      } else {
+        state.batchFiles.push(filePath)
+        // 首个文件同时作为单文件富化目标
+        if (state.batchFiles.length === 1) {
+          state.filePath = filePath
+        }
+        bgmLog(
+          LOG_LEVELS.INFO,
+          `[enrich] 已选择文件: ${fileName}（共 ${String(state.batchFiles.length)} 个）`,
+        )
+
+        // 每次选完后同步刷新 UI（让用户看到当前已选列表）
+        renderBatchFileList()
+
+        // 询问是否继续添加（WPS 同步阻塞式 confirm：回调里改 shouldContinue，随后立即读取）
+        // `false as boolean`：避免 TS 将闭包赋值忽略后把变量静态收窄为 false 字面量
+        let shouldContinue = false as boolean
+        BGM.Dialog.confirm(
+          `已添加 ${fileName}\n当前共 ${String(state.batchFiles.length)} 个文件\n点击【确定】继续添加，点击【取消】完成选择`,
+          (confirmed: boolean) => {
+            shouldContinue = confirmed
+          },
+          '继续添加？',
+        )
+        if (!shouldContinue) break
       }
-
-      state.batchFiles.push(filePath)
-      // 首个文件同时作为单文件富化目标
-      if (state.batchFiles.length === 1) {
-        state.filePath = filePath
-      }
-      bgmLog(
-        LOG_LEVELS.INFO,
-        `[enrich] 已选择文件: ${fileName}（共 ${String(state.batchFiles.length)} 个）`,
-      )
-
-      // 每次选完后同步刷新 UI（让用户看到当前已选列表）
-      renderBatchFileList()
-
-      // 询问是否继续添加（WPS 同步阻塞式 confirm：回调里改 shouldContinue，随后立即读取）
-      // `false as boolean`：避免 TS 将闭包赋值忽略后把变量静态收窄为 false 字面量
-      let shouldContinue = false as boolean
-      BGM.Dialog.confirm(
-        `已添加 ${fileName}\n当前共 ${String(state.batchFiles.length)} 个文件\n点击【确定】继续添加，点击【取消】完成选择`,
-        (confirmed: boolean) => {
-          shouldContinue = confirmed
-        },
-        '继续添加？',
-      )
-      if (!shouldContinue) break
     }
   } catch (error: unknown) {
     BGM.handleError(error, {

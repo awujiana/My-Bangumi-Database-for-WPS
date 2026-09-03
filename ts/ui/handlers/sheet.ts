@@ -110,11 +110,11 @@ export function cleanLockedDataSheet(): void {
     const name = (nameData[index]?.[0] ?? '').trim()
     if (!name) {
       emptyNameCount += 1
-      continue
+    } else {
+      const rows = nameRows.get(name) ?? []
+      rows.push(row)
+      nameRows.set(name, rows)
     }
-    const rows = nameRows.get(name) ?? []
-    rows.push(row)
-    nameRows.set(name, rows)
   }
   bgmLog(
     LOG_LEVELS.INFO,
@@ -130,59 +130,58 @@ export function cleanLockedDataSheet(): void {
   const skippedNoUrl: string[] = []
 
   for (const [name, rows] of nameRows) {
-    if (rows.length <= 1) continue
+    if (!(rows.length <= 1)) {
+      const withUrl: number[] = []
+      const withoutUrl: number[] = []
+      for (const row of rows) {
+        const index = row - headerRow - 1
+        const url = index < urlData.length ? (urlData[index]?.[0] ?? '').trim() : ''
+        ;(url ? withUrl : withoutUrl).push(row)
+      }
 
-    const withUrl: number[] = []
-    const withoutUrl: number[] = []
-    for (const row of rows) {
-      const index = row - headerRow - 1
-      const url = index < urlData.length ? (urlData[index]?.[0] ?? '').trim() : ''
-      ;(url ? withUrl : withoutUrl).push(row)
-    }
+      if (withUrl.length === 0) {
+        skippedNoUrl.push(name)
+      } else {
+        duplicateNameCount += 1
+        const keepRow = withUrl[0]!
+        duplicateDetails.push({ name, rows, keep: withUrl, del: withoutUrl })
 
-    if (withUrl.length === 0) {
-      skippedNoUrl.push(name)
-      continue
-    }
+        const nameNewTags: string[] = []
+        if (tagsData && withoutUrl.length > 0) {
+          const keepIndex = keepRow - headerRow - 1
+          const existingSet = new Set(
+            (keepIndex < tagsData.length ? (tagsData[keepIndex]?.[0] ?? '') : '')
+              .split(/\s*\|\s*/)
+              .map((t) => t.trim())
+              .filter(Boolean),
+          )
 
-    duplicateNameCount += 1
-    const keepRow = withUrl[0]!
-    duplicateDetails.push({ name, rows, keep: withUrl, del: withoutUrl })
+          for (const delRow of withoutUrl) {
+            const delIndex = delRow - headerRow - 1
+            const delTags = delIndex < tagsData.length ? (tagsData[delIndex]?.[0] ?? '').trim() : ''
+            if (delTags) {
+              for (const t of delTags.split(/\s*\|\s*/)) {
+                const trimmed = t.trim()
+                if (trimmed && !existingSet.has(trimmed)) {
+                  nameNewTags.push(trimmed)
+                  existingSet.add(trimmed)
+                }
+              }
+            }
+          }
 
-    const nameNewTags: string[] = []
-    if (tagsData && withoutUrl.length > 0) {
-      const keepIndex = keepRow - headerRow - 1
-      const existingSet = new Set(
-        (keepIndex < tagsData.length ? (tagsData[keepIndex]?.[0] ?? '') : '')
-          .split(/\s*\|\s*/)
-          .map((t) => t.trim())
-          .filter(Boolean),
-      )
-
-      for (const delRow of withoutUrl) {
-        const delIndex = delRow - headerRow - 1
-        const delTags = delIndex < tagsData.length ? (tagsData[delIndex]?.[0] ?? '').trim() : ''
-        if (!delTags) continue
-
-        for (const t of delTags.split(/\s*\|\s*/)) {
-          const trimmed = t.trim()
-          if (trimmed && !existingSet.has(trimmed)) {
-            nameNewTags.push(trimmed)
-            existingSet.add(trimmed)
+          if (nameNewTags.length > 0) {
+            const mergedTags = [...existingSet].join(' | ')
+            setCellValue(ws, keepRow, tagsCol!, mergedTags)
+            mergedTagsCount += 1
+            mergedTagEntries.push(`${name}: ${nameNewTags.join(' | ')}`)
           }
         }
-      }
 
-      if (nameNewTags.length > 0) {
-        const mergedTags = [...existingSet].join(' | ')
-        setCellValue(ws, keepRow, tagsCol!, mergedTags)
-        mergedTagsCount += 1
-        mergedTagEntries.push(`${name}: ${nameNewTags.join(' | ')}`)
+        for (const delRow of withoutUrl) {
+          toDelete.push(delRow)
+        }
       }
-    }
-
-    for (const delRow of withoutUrl) {
-      toDelete.push(delRow)
     }
   }
 

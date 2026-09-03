@@ -251,23 +251,23 @@ function migrateSyncRecordSchema(sheet: WpsWorksheet): void {
       oldFingerprint = getCellValue(sheet, row, 11)
     }
 
-    if (!oldUrl && !oldSid) continue
-
-    rows.push([
-      oldSid,
-      getCellValue(sheet, row, 2),
-      getCellValue(sheet, row, 3),
-      oldUrl,
-      oldType,
-      // 来源：旧数据无此字段，默认空
-      '',
-      oldCount,
-      oldContent,
-      oldStatus,
-      oldCollType,
-      oldMessage,
-      oldFingerprint,
-    ])
+    if (!(!oldUrl && !oldSid)) {
+      rows.push([
+        oldSid,
+        getCellValue(sheet, row, 2),
+        getCellValue(sheet, row, 3),
+        oldUrl,
+        oldType,
+        // 来源：旧数据无此字段，默认空
+        '',
+        oldCount,
+        oldContent,
+        oldStatus,
+        oldCollType,
+        oldMessage,
+        oldFingerprint,
+      ])
+    }
   }
 
   if (lastRow > 1) {
@@ -286,9 +286,10 @@ function migrateSyncRecordSchema(sheet: WpsWorksheet): void {
   for (let index = 0; index < rows.length; index += 1) {
     const nextRow = index + 2
     const data = rows[index]
-    if (!data) continue
-    for (let col = 0; col < data.length; col += 1) {
-      setCellValue(sheet, nextRow, col + 1, data[col])
+    if (data) {
+      for (let col = 0; col < data.length; col += 1) {
+        setCellValue(sheet, nextRow, col + 1, data[col])
+      }
     }
   }
 
@@ -315,28 +316,29 @@ function buildCache(sheet: WpsWorksheet): void {
   for (let index = 0; index < allData.length; index += 1) {
     try {
       const rowData = allData[index]
-      if (!rowData) continue
-      const sid = (rowData[SYNC_RECORD_COL.SID - 1] ?? '').trim()
-      const url = (rowData[SYNC_RECORD_COL.URL - 1] ?? '').trim()
-      if (!url && !sid) continue
-
-      const row = index + 2
-      _syncRecordSidCache.set(sid, row)
-      _syncRecordListCache.push({
-        time: rowData[SYNC_RECORD_COL.TIME - 1] ?? '',
-        name: rowData[SYNC_RECORD_COL.NAME - 1] ?? '',
-        url,
-        sid,
-        type: rowData[SYNC_RECORD_COL.TYPE - 1] ?? '',
-        source: rowData[SYNC_RECORD_COL.SOURCE - 1] ?? '',
-        count: parseInt(rowData[SYNC_RECORD_COL.COUNT - 1] ?? '') || 1,
-        content: rowData[SYNC_RECORD_COL.CONTENT - 1] ?? '',
-        status: (rowData[SYNC_RECORD_COL.STATUS - 1] ?? '') || SYNC_STATUS.SUCCESS,
-        message: rowData[SYNC_RECORD_COL.MESSAGE - 1] ?? '',
-        fingerprint: rowData[SYNC_RECORD_COL.FINGERPRINT - 1] ?? '',
-        collType: rowData[SYNC_RECORD_COL.COLL_TYPE - 1] ?? '',
-        row,
-      })
+      if (rowData) {
+        const sid = (rowData[SYNC_RECORD_COL.SID - 1] ?? '').trim()
+        const url = (rowData[SYNC_RECORD_COL.URL - 1] ?? '').trim()
+        if (!(!url && !sid)) {
+          const row = index + 2
+          _syncRecordSidCache.set(sid, row)
+          _syncRecordListCache.push({
+            time: rowData[SYNC_RECORD_COL.TIME - 1] ?? '',
+            name: rowData[SYNC_RECORD_COL.NAME - 1] ?? '',
+            url,
+            sid,
+            type: rowData[SYNC_RECORD_COL.TYPE - 1] ?? '',
+            source: rowData[SYNC_RECORD_COL.SOURCE - 1] ?? '',
+            count: parseInt(rowData[SYNC_RECORD_COL.COUNT - 1] ?? '') || 1,
+            content: rowData[SYNC_RECORD_COL.CONTENT - 1] ?? '',
+            status: (rowData[SYNC_RECORD_COL.STATUS - 1] ?? '') || SYNC_STATUS.SUCCESS,
+            message: rowData[SYNC_RECORD_COL.MESSAGE - 1] ?? '',
+            fingerprint: rowData[SYNC_RECORD_COL.FINGERPRINT - 1] ?? '',
+            collType: rowData[SYNC_RECORD_COL.COLL_TYPE - 1] ?? '',
+            row,
+          })
+        }
+      }
     } catch (error: unknown) {
       BGM.handleError(error, { context: 'buildCache', showAlert: false })
     }
@@ -537,23 +539,22 @@ export function addSyncRecords(records: UpdateRecordParams[]): boolean {
           status: parameters.status || SYNC_STATUS.SUCCESS,
           params: parameters,
         })
-        continue
+      } else {
+        pendingRows.push([
+          sid,
+          now,
+          parameters.name ?? '',
+          parameters.url ?? '',
+          parameters.type ?? '',
+          parameters.source ?? '',
+          String(parameters.count || 1),
+          parameters.content ?? '',
+          parameters.status || SYNC_STATUS.SUCCESS,
+          parameters.collType ?? '',
+          parameters.message ?? '',
+          parameters.fingerprint !== undefined ? parameters.fingerprint : '',
+        ])
       }
-
-      pendingRows.push([
-        sid,
-        now,
-        parameters.name ?? '',
-        parameters.url ?? '',
-        parameters.type ?? '',
-        parameters.source ?? '',
-        String(parameters.count || 1),
-        parameters.content ?? '',
-        parameters.status || SYNC_STATUS.SUCCESS,
-        parameters.collType ?? '',
-        parameters.message ?? '',
-        parameters.fingerprint !== undefined ? parameters.fingerprint : '',
-      ])
     }
 
     // 批量写入新行：通过 Range.Value2 一次性写入二维数组
@@ -575,10 +576,11 @@ export function addSyncRecords(records: UpdateRecordParams[]): boolean {
       for (let index = 0; index < pendingRows.length; index += 1) {
         const row = startRow + index
         const data = pendingRows[index]
-        if (!data) continue
-        const status = data[SYNC_RECORD_COL.STATUS - 1] ?? SYNC_STATUS.SUCCESS
-        const count = parseInt(data[SYNC_RECORD_COL.COUNT - 1] ?? '') || 1
-        setSyncRecordColors(sheet, row, status, count)
+        if (data) {
+          const status = data[SYNC_RECORD_COL.STATUS - 1] ?? SYNC_STATUS.SUCCESS
+          const count = parseInt(data[SYNC_RECORD_COL.COUNT - 1] ?? '') || 1
+          setSyncRecordColors(sheet, row, status, count)
+        }
       }
     }
 
@@ -658,32 +660,35 @@ export function deduplicateSyncRecords(): boolean {
     const sidRows = new Map<string, number[]>()
     for (let row = 2; row <= lastRow; row += 1) {
       const sid = getCellValue(sheet, row, SYNC_RECORD_COL.SID).trim()
-      if (!sid) continue
-      const rows = sidRows.get(sid) ?? []
-      rows.push(row)
-      sidRows.set(sid, rows)
+      if (sid) {
+        const rows = sidRows.get(sid) ?? []
+        rows.push(row)
+        sidRows.set(sid, rows)
+      }
     }
 
     // 找出并合并重复 SID
     let removedCount = 0
     let hasDuplicates = false
     for (const [, rows] of sidRows) {
-      if (rows.length <= 1) continue
-      hasDuplicates = true
+      if (!(rows.length <= 1)) {
+        hasDuplicates = true
 
-      const keepRow = rows[0]
-      if (keepRow === undefined) continue
-      let totalCount = parseInt(getCellValue(sheet, keepRow, SYNC_RECORD_COL.COUNT)) || 1
+        const keepRow = rows[0]
+        if (!(keepRow === undefined)) {
+          let totalCount = parseInt(getCellValue(sheet, keepRow, SYNC_RECORD_COL.COUNT)) || 1
 
-      const rowsToDelete = [...rows.slice(1)].sort((a, b) => b - a)
-      for (const delRow of rowsToDelete) {
-        const delCount = parseInt(getCellValue(sheet, delRow, SYNC_RECORD_COL.COUNT)) || 1
-        totalCount += delCount
-        sheet.Range(`${String(delRow)}:${String(delRow)}`).Delete()
-        removedCount += 1
+          const rowsToDelete = [...rows.slice(1)].sort((a, b) => b - a)
+          for (const delRow of rowsToDelete) {
+            const delCount = parseInt(getCellValue(sheet, delRow, SYNC_RECORD_COL.COUNT)) || 1
+            totalCount += delCount
+            sheet.Range(`${String(delRow)}:${String(delRow)}`).Delete()
+            removedCount += 1
+          }
+
+          setCellValue(sheet, keepRow, SYNC_RECORD_COL.COUNT, totalCount)
+        }
       }
-
-      setCellValue(sheet, keepRow, SYNC_RECORD_COL.COUNT, totalCount)
     }
 
     if (hasDuplicates) {

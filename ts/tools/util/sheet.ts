@@ -150,14 +150,15 @@ export function findHeaderRow(ws: WpsWorksheet | null | undefined, startRow?: nu
       for (let col = 1; col <= PANEL_CONFIG.MAX_SCAN_COLUMNS; col += 1) {
         try {
           const cellValue = getCellValue(ws, row, col).toLowerCase()
-          if (!cellValue) continue
-          for (const header of HEADER_KEYWORDS) {
-            if (cellValue.includes(header.toLowerCase())) {
-              matchCount += 1
-              break
+          if (cellValue) {
+            for (const header of HEADER_KEYWORDS) {
+              if (cellValue.includes(header.toLowerCase())) {
+                matchCount += 1
+                break
+              }
             }
+            if (matchCount >= 3) break
           }
-          if (matchCount >= 3) break
         } catch {
           // 忽略：此处无需处理错误
         }
@@ -191,15 +192,16 @@ export function getColumnMap(
       if (!firstNonEmptyCol && colName) {
         firstNonEmptyCol = index
       }
-      if (!colName) continue
-      for (const [pattern, key] of COLUMN_RULES) {
-        if (pattern.test(colName)) {
-          if (!colMap.has(key)) {
-            colMap.set(key, index)
-            // 匹配到未映射的key，处理下一列
-            break
+      if (colName) {
+        for (const [pattern, key] of COLUMN_RULES) {
+          if (pattern.test(colName)) {
+            if (!colMap.has(key)) {
+              colMap.set(key, index)
+              // 匹配到未映射的key，处理下一列
+              break
+            }
+            // 该key已被前面的列匹配，继续尝试其他规则
           }
-          // 该key已被前面的列匹配，继续尝试其他规则
         }
       }
     }
@@ -283,10 +285,11 @@ function findAnchorColumn(ws: WpsWorksheet, headerRow: number): number | undefin
 
   for (let c = 1; c <= maxCols; c += 1) {
     const value = ws.Range(`${colNumberToLetter(c)}${String(headerRow)}`).Value2
-    if (value == null) continue
-    const text = String(value).trim().toLowerCase()
-    if (keywords.some((kw) => text === kw || text.includes(kw))) {
-      return c
+    if (!(value == null)) {
+      const text = String(value).trim().toLowerCase()
+      if (keywords.some((kw) => text === kw || text.includes(kw))) {
+        return c
+      }
     }
   }
   return undefined

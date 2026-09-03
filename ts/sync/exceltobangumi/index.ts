@@ -332,8 +332,9 @@ export function getFilterStatus(
 
     // 6. 生成最终可见行列表（排除表头行）
     for (const r of rawRows) {
-      if (effectiveHeaderRow != null && r === effectiveHeaderRow) continue
-      result.visibleRows.push(r)
+      if (!(effectiveHeaderRow != null && r === effectiveHeaderRow)) {
+        result.visibleRows.push(r)
+      }
     }
     result.visibleRows.sort((a, b) => a - b)
 
@@ -1249,11 +1250,7 @@ async function executeSelectedSync(
           details.push(`⊘ 行${String(rowNumber)} ${name || '无名'} 跳过: URL为空`)
           skipCount += 1
           updateSyncProgressDialog(index + 1, rows.length, message, `⊘ ${rowProgress} ${message}`)
-          continue
-        }
-
-        // 检查是否为 BGM 链接（bgm.tv / bangumi.tv / chii.in 或纯数字 ID）
-        if (!isBangumiUrl(bgmUrl)) {
+        } else if (!isBangumiUrl(bgmUrl)) {
           const message = `行${String(rowNumber)} "${name || '无名'}" 非BGM链接，跳过`
           bgmLog(LOG_LEVELS.WARN, `[syncSelectedRows] ${rowProgress} ${message}`)
           showToast(message, 'warn')
@@ -1262,120 +1259,122 @@ async function executeSelectedSync(
           )
           skipCount += 1
           updateSyncProgressDialog(index + 1, rows.length, message, `⊘ ${rowProgress} ${message}`)
-          continue
-        }
-
-        const sid = extractSubjectId(bgmUrl)
-        if (!sid) {
-          const message = `行${String(rowNumber)} "${name || '无名'}" 无法提取 Subject ID，跳过`
-          bgmLog(LOG_LEVELS.WARN, `[syncSelectedRows] ${rowProgress} ${message}`)
-          showToast(message, 'warn')
-          details.push(`⊘ 行${String(rowNumber)} ${name || '无名'} 跳过: 无效ID`)
-          skipCount += 1
-          updateSyncProgressDialog(index + 1, rows.length, message, `⊘ ${rowProgress} ${message}`)
-          continue
-        }
-
-        bgmLog(
-          LOG_LEVELS.INFO,
-          `[syncSelectedRows] ${rowProgress} 行${String(rowNumber)} 开始同步: 名称="${name || '无名'}", SID=${sid}, URL=${bgmUrl}`,
-        )
-        updateSyncProgressDialog(
-          index + 1,
-          rows.length,
-          `${rowProgress} 行${String(rowNumber)} "${name || sid}" 同步中...`,
-          `⏳ ${rowProgress} 行${String(rowNumber)} "${name || sid}" SID=${sid} 开始同步`,
-        )
-
-        const finishedDate = colMap.has('完播日')
-          ? trim(getCellValue(ws, rowNumber, colMap.get('完播日')!) || '')
-          : ''
-        const jsonBody = buildJsonPayload(
-          (key) => (colMap.has(key) ? trim(getCellValue(ws, rowNumber, colMap.get(key)!)) : ''),
-          finishedDate,
-        )
-
-        if (jsonBody === '{}') {
-          const message = `行${String(rowNumber)} "${name || sid}" 请求体为空，跳过`
-          bgmLog(LOG_LEVELS.WARN, `[syncSelectedRows] ${rowProgress} ${message}`)
-          showToast(message, 'warn')
-          details.push(`⊘ 行${String(rowNumber)} ${name || sid} 跳过: 请求体为空`)
-          skipCount += 1
-          updateSyncProgressDialog(index + 1, rows.length, message, `⊘ ${rowProgress} ${message}`)
-          continue
-        }
-
-        bgmLog(
-          LOG_LEVELS.INFO,
-          `[syncSelectedRows] ${rowProgress} 行${String(rowNumber)} 请求体: ${jsonBody.length > 300 ? `${jsonBody.substring(0, 300)}...` : jsonBody}`,
-        )
-
-        const endpoint = `/v0/users${userPath}/collections/${sid}`
-        const result = await _bgmRequestSync('POST', endpoint, jsonBody, token)
-
-        if (result.code >= 200 && result.code < 300) {
-          successCount += 1
-          details.push(`✓ 行${String(rowNumber)} ${name || sid} HTTP:${String(result.code)}`)
-          bgmLog(
-            LOG_LEVELS.INFO,
-            `[syncSelectedRows] ${rowProgress} 行${String(rowNumber)} "${name || sid}" 同步成功！HTTP: ${String(result.code)}`,
-          )
-          updateSyncProgressDialog(
-            index + 1,
-            rows.length,
-            `${rowProgress} 行${String(rowNumber)} "${name || sid}" ✓ HTTP:${String(result.code)}`,
-            `✓ ${rowProgress} 行${String(rowNumber)} "${name || sid}" 成功 HTTP:${String(result.code)}`,
-          )
-
-          // 标记章节为已完成（"看过" type=2 和 "在看" type=3 都需要标记）
-          let watchType = 0
-          try {
-            const parsedBody = JSON.parse(jsonBody) as { type?: number }
-            watchType = parsedBody.type ?? 0
-          } catch (error: unknown) {
-            bgmLog(
-              LOG_LEVELS.WARN,
-              `[syncSelectedRows] 行${String(rowNumber)} jsonBody 解析失败: ${error instanceof Error ? error.message : String(error)}`,
-            )
-          }
-          const epRaw = trim(
-            getCellValue(
-              ws,
-              rowNumber,
-              colMap.has('集数') ? colMap.get('集数')! : colMap.get('集号')!,
-            ),
-          )
-          const epCount = parseInt(epRaw, 10)
-          if ((watchType === 2 || watchType === 3) && !isNaN(epCount) && epCount > 0) {
-            bgmLog(
-              LOG_LEVELS.INFO,
-              `[syncSelectedRows] ${rowProgress} 行${String(rowNumber)} 状态${watchType === 2 ? '"看过"' : '"在看"'}(type=${String(watchType)})，集数: ${String(epCount)}，开始标记章节...`,
-            )
-            const epResult = await _markEpisodesComplete(sid, epCount, token)
-            episodeMarkCount += 1
-            bgmLog(
-              LOG_LEVELS.INFO,
-              `[syncSelectedRows] ${rowProgress} 行${String(rowNumber)} 章节标记结果: ${epResult.message}`,
-            )
-          } else if (!isNaN(epCount) && epCount > 0) {
-            bgmLog(
-              LOG_LEVELS.INFO,
-              `[syncSelectedRows] ${rowProgress} 行${String(rowNumber)} 状态非"看过/在看"(type=${String(watchType)})，跳过章节标记`,
-            )
-          }
         } else {
-          failCount += 1
-          details.push(`✗ 行${String(rowNumber)} ${name || sid} HTTP:${String(result.code)}`)
-          bgmLog(
-            LOG_LEVELS.WARN,
-            `[syncSelectedRows] ${rowProgress} 行${String(rowNumber)} "${name || sid}" 同步失败！HTTP: ${String(result.code)}, 消息: ${result.message}`,
-          )
-          updateSyncProgressDialog(
-            index + 1,
-            rows.length,
-            `${rowProgress} 行${String(rowNumber)} "${name || sid}" ✗ HTTP:${String(result.code)}`,
-            `✗ ${rowProgress} 行${String(rowNumber)} "${name || sid}" 失败 HTTP:${String(result.code)} ${result.message}`,
-          )
+          const sid = extractSubjectId(bgmUrl)
+          if (!sid) {
+            const message = `行${String(rowNumber)} "${name || '无名'}" 无法提取 Subject ID，跳过`
+            bgmLog(LOG_LEVELS.WARN, `[syncSelectedRows] ${rowProgress} ${message}`)
+            showToast(message, 'warn')
+            details.push(`⊘ 行${String(rowNumber)} ${name || '无名'} 跳过: 无效ID`)
+            skipCount += 1
+            updateSyncProgressDialog(index + 1, rows.length, message, `⊘ ${rowProgress} ${message}`)
+          } else {
+            bgmLog(
+              LOG_LEVELS.INFO,
+              `[syncSelectedRows] ${rowProgress} 行${String(rowNumber)} 开始同步: 名称="${name || '无名'}", SID=${sid}, URL=${bgmUrl}`,
+            )
+            updateSyncProgressDialog(
+              index + 1,
+              rows.length,
+              `${rowProgress} 行${String(rowNumber)} "${name || sid}" 同步中...`,
+              `⏳ ${rowProgress} 行${String(rowNumber)} "${name || sid}" SID=${sid} 开始同步`,
+            )
+
+            const finishedDate = colMap.has('完播日')
+              ? trim(getCellValue(ws, rowNumber, colMap.get('完播日')!) || '')
+              : ''
+            const jsonBody = buildJsonPayload(
+              (key) => (colMap.has(key) ? trim(getCellValue(ws, rowNumber, colMap.get(key)!)) : ''),
+              finishedDate,
+            )
+
+            if (jsonBody === '{}') {
+              const message = `行${String(rowNumber)} "${name || sid}" 请求体为空，跳过`
+              bgmLog(LOG_LEVELS.WARN, `[syncSelectedRows] ${rowProgress} ${message}`)
+              showToast(message, 'warn')
+              details.push(`⊘ 行${String(rowNumber)} ${name || sid} 跳过: 请求体为空`)
+              skipCount += 1
+              updateSyncProgressDialog(
+                index + 1,
+                rows.length,
+                message,
+                `⊘ ${rowProgress} ${message}`,
+              )
+            } else {
+              bgmLog(
+                LOG_LEVELS.INFO,
+                `[syncSelectedRows] ${rowProgress} 行${String(rowNumber)} 请求体: ${jsonBody.length > 300 ? `${jsonBody.substring(0, 300)}...` : jsonBody}`,
+              )
+
+              const endpoint = `/v0/users${userPath}/collections/${sid}`
+              const result = await _bgmRequestSync('POST', endpoint, jsonBody, token)
+
+              if (result.code >= 200 && result.code < 300) {
+                successCount += 1
+                details.push(`✓ 行${String(rowNumber)} ${name || sid} HTTP:${String(result.code)}`)
+                bgmLog(
+                  LOG_LEVELS.INFO,
+                  `[syncSelectedRows] ${rowProgress} 行${String(rowNumber)} "${name || sid}" 同步成功！HTTP: ${String(result.code)}`,
+                )
+                updateSyncProgressDialog(
+                  index + 1,
+                  rows.length,
+                  `${rowProgress} 行${String(rowNumber)} "${name || sid}" ✓ HTTP:${String(result.code)}`,
+                  `✓ ${rowProgress} 行${String(rowNumber)} "${name || sid}" 成功 HTTP:${String(result.code)}`,
+                )
+
+                // 标记章节为已完成（"看过" type=2 和 "在看" type=3 都需要标记）
+                let watchType = 0
+                try {
+                  const parsedBody = JSON.parse(jsonBody) as { type?: number }
+                  watchType = parsedBody.type ?? 0
+                } catch (error: unknown) {
+                  bgmLog(
+                    LOG_LEVELS.WARN,
+                    `[syncSelectedRows] 行${String(rowNumber)} jsonBody 解析失败: ${error instanceof Error ? error.message : String(error)}`,
+                  )
+                }
+                const epRaw = trim(
+                  getCellValue(
+                    ws,
+                    rowNumber,
+                    colMap.has('集数') ? colMap.get('集数')! : colMap.get('集号')!,
+                  ),
+                )
+                const epCount = parseInt(epRaw, 10)
+                if ((watchType === 2 || watchType === 3) && !isNaN(epCount) && epCount > 0) {
+                  bgmLog(
+                    LOG_LEVELS.INFO,
+                    `[syncSelectedRows] ${rowProgress} 行${String(rowNumber)} 状态${watchType === 2 ? '"看过"' : '"在看"'}(type=${String(watchType)})，集数: ${String(epCount)}，开始标记章节...`,
+                  )
+                  const epResult = await _markEpisodesComplete(sid, epCount, token)
+                  episodeMarkCount += 1
+                  bgmLog(
+                    LOG_LEVELS.INFO,
+                    `[syncSelectedRows] ${rowProgress} 行${String(rowNumber)} 章节标记结果: ${epResult.message}`,
+                  )
+                } else if (!isNaN(epCount) && epCount > 0) {
+                  bgmLog(
+                    LOG_LEVELS.INFO,
+                    `[syncSelectedRows] ${rowProgress} 行${String(rowNumber)} 状态非"看过/在看"(type=${String(watchType)})，跳过章节标记`,
+                  )
+                }
+              } else {
+                failCount += 1
+                details.push(`✗ 行${String(rowNumber)} ${name || sid} HTTP:${String(result.code)}`)
+                bgmLog(
+                  LOG_LEVELS.WARN,
+                  `[syncSelectedRows] ${rowProgress} 行${String(rowNumber)} "${name || sid}" 同步失败！HTTP: ${String(result.code)}, 消息: ${result.message}`,
+                )
+                updateSyncProgressDialog(
+                  index + 1,
+                  rows.length,
+                  `${rowProgress} 行${String(rowNumber)} "${name || sid}" ✗ HTTP:${String(result.code)}`,
+                  `✗ ${rowProgress} 行${String(rowNumber)} "${name || sid}" 失败 HTTP:${String(result.code)} ${result.message}`,
+                )
+              }
+            }
+          }
         }
       } catch (error: unknown) {
         failCount += 1

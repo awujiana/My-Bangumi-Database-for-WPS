@@ -279,53 +279,53 @@ function simulateEnrichIntroData(
 
   for (const [sourceKey, targetColName] of Object.entries(INTRO_FIELD_TO_BANGUMI)) {
     const rawValue = data[sourceKey] ?? ''
-    if (isEmptyValue(rawValue)) continue
+    if (!isEmptyValue(rawValue)) {
+      const annotatedValue = getAnnotatedValue(sourceKey, targetColName, rawValue)
+      const targetCol = colMap.get(targetColName)
 
-    const annotatedValue = getAnnotatedValue(sourceKey, targetColName, rawValue)
-    const targetCol = colMap.get(targetColName)
-
-    if (targetCol !== undefined) {
-      const oldValue = getMockCellValue(row, targetCol)
-      if (isEmptyValue(oldValue)) {
-        setMockCellValue(row, targetCol, annotatedValue)
-        enriched.push({
-          field: targetColName,
-          col: targetCol,
-          oldValue: null,
-          updatedValue: annotatedValue,
-          action: 'fill',
-        })
-      } else {
-        conflicts.push({
-          field: targetColName,
-          col: targetCol,
-          oldValue,
-          updatedValue: annotatedValue,
-        })
-      }
-    } else if (bangumiFeatureCol !== undefined) {
-      const oldFeature = getMockCellValue(row, bangumiFeatureCol)
-      const featureEntry = `${sourceKey}:${annotatedValue}`
-      if (isEmptyValue(oldFeature)) {
-        setMockCellValue(row, bangumiFeatureCol, featureEntry)
-        enriched.push({
-          field: `特点/印象(${sourceKey})`,
-          col: bangumiFeatureCol,
-          oldValue: null,
-          updatedValue: featureEntry,
-          action: 'fill',
-        })
-      } else {
-        const merged = appendFeatures(oldFeature, featureEntry)
-        if (merged !== oldFeature) {
-          setMockCellValue(row, bangumiFeatureCol, merged)
+      if (targetCol !== undefined) {
+        const oldValue = getMockCellValue(row, targetCol)
+        if (isEmptyValue(oldValue)) {
+          setMockCellValue(row, targetCol, annotatedValue)
+          enriched.push({
+            field: targetColName,
+            col: targetCol,
+            oldValue: null,
+            updatedValue: annotatedValue,
+            action: 'fill',
+          })
+        } else {
+          conflicts.push({
+            field: targetColName,
+            col: targetCol,
+            oldValue,
+            updatedValue: annotatedValue,
+          })
+        }
+      } else if (bangumiFeatureCol !== undefined) {
+        const oldFeature = getMockCellValue(row, bangumiFeatureCol)
+        const featureEntry = `${sourceKey}:${annotatedValue}`
+        if (isEmptyValue(oldFeature)) {
+          setMockCellValue(row, bangumiFeatureCol, featureEntry)
           enriched.push({
             field: `特点/印象(${sourceKey})`,
             col: bangumiFeatureCol,
-            oldValue: oldFeature,
-            updatedValue: merged,
-            action: 'append',
+            oldValue: null,
+            updatedValue: featureEntry,
+            action: 'fill',
           })
+        } else {
+          const merged = appendFeatures(oldFeature, featureEntry)
+          if (merged !== oldFeature) {
+            setMockCellValue(row, bangumiFeatureCol, merged)
+            enriched.push({
+              field: `特点/印象(${sourceKey})`,
+              col: bangumiFeatureCol,
+              oldValue: oldFeature,
+              updatedValue: merged,
+              action: 'append',
+            })
+          }
         }
       }
     }

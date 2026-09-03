@@ -185,7 +185,8 @@ function restoreDeletedRowWithWs(ws: WpsWorksheet, snapshot: RowSnapshot): void 
   // 恢复该行所有列的值
   for (const [colString, value] of Object.entries(snapshot.values)) {
     const col = parseInt(colString, 10)
-    if (Number.isNaN(col)) continue
-    setCellValue(ws, snapshot.row, col, value)
+    if (!Number.isNaN(col)) {
+      setCellValue(ws, snapshot.row, col, value)
+    }
   }
 }

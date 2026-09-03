@@ -126,22 +126,25 @@ export function computeDateStatsFromSheet(): DateStats {
 
   for (let row = startRow; row <= lastRow; row += 1) {
     const url = trim(getCellValue(ws, row, colMap.get('Bangumi_URL')!))
-    if (!url) continue
-    const sid = extractSubjectId(url)
-    if (!sid) continue
-    totalCount += 1
+    if (url) {
+      const sid = extractSubjectId(url)
+      if (sid) {
+        totalCount += 1
 
-    const dateString = trim(getCellValue(ws, row, dateCol))
-    if (!dateString) continue
-    datedCount += 1
+        const dateString = trim(getCellValue(ws, row, dateCol))
+        if (dateString) {
+          datedCount += 1
 
-    // 标准化日期：移除分隔符，用于比较
-    const normalized = dateString.replace(/[/.]/g, '-')
-    const dateMatch = /^\d{4}-\d{1,2}-\d{1,2}$/.exec(normalized)
-    if (!dateMatch) continue
-
-    if (earliest === null || normalized < earliest) earliest = normalized
-    if (latest === null || normalized > latest) latest = normalized
+          // 标准化日期：移除分隔符，用于比较
+          const normalized = dateString.replace(/[/.]/g, '-')
+          const dateMatch = /^\d{4}-\d{1,2}-\d{1,2}$/.exec(normalized)
+          if (dateMatch) {
+            if (earliest === null || normalized < earliest) earliest = normalized
+            if (latest === null || normalized > latest) latest = normalized
+          }
+        }
+      }
+    }
   }
 
   stats.earliestDate = earliest

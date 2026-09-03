@@ -149,12 +149,12 @@ export function extractGistContent(apiResponse: unknown): string {
   const fileNames = Object.keys(apiResponse.files).sort()
   for (const fileName of fileNames) {
     const file = apiResponse.files[fileName]
-    if (!file) continue
-    // content 缺失或空字符串 → 跳过
-    if (file.content === undefined || file.content.length === 0) {
-      continue
+    if (file) {
+      if (file.content === undefined || file.content.length === 0) {
+      } else {
+        contents.push(file.content)
+      }
     }
-    contents.push(file.content)
   }
 
   if (contents.length === 0) {
