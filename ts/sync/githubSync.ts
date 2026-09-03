@@ -180,7 +180,9 @@ export function fetchGithubJson(signal?: AbortSignal): Promise<GithubRemoteEntry
           }
           resolve(entries)
         } catch (error: unknown) {
-          reject(new Error(`JSONL 解析失败: ${error instanceof Error ? error.message : String(error)}`))
+          reject(
+            new Error(`JSONL 解析失败: ${error instanceof Error ? error.message : String(error)}`),
+          )
         }
       } else if (xhr.status === 404) {
         reject(new Error(`文件不存在（404）：${url}，请检查 owner/repo/branch/path 配置`))
@@ -327,7 +329,10 @@ function readLocalEntries(
       rawData = raw as unknown[][]
     }
   } catch (error: unknown) {
-    bgmLog(LOG_LEVELS.WARN, `[githubSync] 批量读取失败，回退到逐单元格: ${(error as Error).message}`)
+    bgmLog(
+      LOG_LEVELS.WARN,
+      `[githubSync] 批量读取失败，回退到逐单元格: ${(error as Error).message}`,
+    )
   }
 
   // 构建 col name → 数组索引 的映射
@@ -601,7 +606,9 @@ function writeRemoteEntryToRow(
     if (handledJsonlFields.has(jsonlField)) continue
     handledJsonlFields.add(jsonlField)
     const excelAliases = getExcelAliases(jsonlField)
-    const isAnyAliasMatched = excelAliases.some((alias) => isWriteAll || fieldsToWrite.includes(alias))
+    const isAnyAliasMatched = excelAliases.some(
+      (alias) => isWriteAll || fieldsToWrite.includes(alias),
+    )
     if (!isAnyAliasMatched) continue
     const value = remote[jsonlField as keyof GithubRemoteEntry]
     if (typeof value !== 'string' && typeof value !== 'number') continue
@@ -839,8 +846,10 @@ function batchUpdateRows(
     const isWriteAll = u.fields.includes('*')
     if (isWriteAll || u.fields.includes('Bangumi_URL')) tryAddCol('Bangumi_URL')
     if (isWriteAll || u.fields.includes('名称')) {
-      tryAddCol('名称') // 强制覆盖/新增时写入名称列
-      tryAddCol('别名') // 普通更新时写入别名列
+      // 强制覆盖/新增时写入名称列
+      tryAddCol('名称')
+      // 普通更新时写入别名列
+      tryAddCol('别名')
     }
     if (isWriteAll || u.fields.includes('标签/分级')) tryAddCol('标签/分级')
     if (isWriteAll || u.fields.includes('集数')) tryAddCol('集数')
@@ -1005,7 +1014,8 @@ function batchUpdateRows(
           const oldValue = oldArray[c] != null ? String(oldArray[c]) : ''
           const valueString = String(newValue)
           if (oldValue === valueString) {
-            finalValues[c] = null // 无变化，跳过
+            // 无变化，跳过
+            finalValues[c] = null
           } else {
             hasChanges = true
             // 记录 undo
@@ -1161,7 +1171,10 @@ function batchUpdateRows(
         }
       } catch (error: unknown) {
         const errorMessage = error instanceof Error ? error.message : String(error)
-        bgmLog(LOG_LEVELS.ERROR, `[batchUpdateRows] 行 ${String(row)} 逐字段写入也失败: ${errorMessage}`)
+        bgmLog(
+          LOG_LEVELS.ERROR,
+          `[batchUpdateRows] 行 ${String(row)} 逐字段写入也失败: ${errorMessage}`,
+        )
         details?.push({
           kind: 'fail',
           sid: u.sid,
@@ -1243,7 +1256,8 @@ export async function applyDiffToSheet(
       previousScreenUpdating = app.ScreenUpdating
       previousCalculation = app.Calculation
       app.ScreenUpdating = false
-      app.Calculation = -4135 // xlCalculationManual
+      // xlCalculationManual
+      app.Calculation = -4135
       bgmLog(LOG_LEVELS.INFO, '[githubSync] 已关闭屏幕刷新和自动计算')
     }
   } catch (error: unknown) {
@@ -1692,7 +1706,8 @@ export async function syncFromGithub(
       previousScreenUpdating = app.ScreenUpdating
       previousCalculation = app.Calculation
       app.ScreenUpdating = false
-      app.Calculation = -4135 // xlCalculationManual
+      // xlCalculationManual
+      app.Calculation = -4135
     }
   } catch {
     // 忽略关闭失败

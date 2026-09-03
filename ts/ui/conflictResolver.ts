@@ -187,7 +187,8 @@ function createConflictModal(
     localRadio.type = 'radio'
     localRadio.name = radioName
     localRadio.value = CHOICE_LOCAL
-    localRadio.checked = true // 默认保留本地
+    // 默认保留本地
+    localRadio.checked = true
     localRadio.id = `${radioName}-local`
     localRadios.push(localRadio)
 

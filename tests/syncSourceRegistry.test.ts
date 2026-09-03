@@ -414,7 +414,8 @@ describe('getSelectedRowSids（间接测试 via syncFromRemote）', () => {
       ActiveSheet: { Name: 'Sheet1' },
     })
     mockFindHeaderRow.mockReturnValue(1)
-    mockGetColumnMap.mockReturnValue(new Map()) // 无 Bangumi_URL 列
+    // 无 Bangumi_URL 列
+    mockGetColumnMap.mockReturnValue(new Map())
 
     await expect(syncFromRemote(undefined, 'add-update', undefined, true)).rejects.toThrow()
   })
@@ -444,7 +445,8 @@ describe('getSelectedRowSids（间接测试 via syncFromRemote）', () => {
     })
     mockFindHeaderRow.mockReturnValue(1)
     mockGetColumnMap.mockReturnValue(new Map([['Bangumi_URL', 5]]))
-    mockGetCellValue.mockReturnValue('') // 空 URL
+    // 空 URL
+    mockGetCellValue.mockReturnValue('')
     mockExtractSubjectId.mockReturnValue(null)
 
     await expect(syncFromRemote(undefined, 'add-update', undefined, true)).rejects.toThrow()
@@ -752,7 +754,8 @@ describe('syncSourceRegistry 未覆盖分支', () => {
     // 行 1 (header): 空值 → 被跳过
     // 行 2: 有效 URL
     mockGetCellValue.mockImplementation((_ws: unknown, row: number, _col: number) => {
-      if (row === 1) return '' // 表头行，无 URL
+      // 表头行，无 URL
+      if (row === 1) return ''
       if (row === 2) return 'https://bgm.tv/subject/999'
       return ''
     })
@@ -783,7 +786,8 @@ describe('syncSourceRegistry 未覆盖分支', () => {
     mockFindHeaderRow.mockReturnValue(1)
     mockGetColumnMap.mockReturnValue(new Map([['Bangumi_URL', 5]]))
     mockGetCellValue.mockReturnValue('https://bgm.tv/subject/invalid')
-    mockExtractSubjectId.mockReturnValue(null) // 无效 URL 返回 null
+    // 无效 URL 返回 null
+    mockExtractSubjectId.mockReturnValue(null)
     mockGithubSourceReference.fetchRemoteEntries.mockResolvedValue([{ sid: '123', name: '远程' }])
     mockComputeDiff.mockReturnValue([])
     mockReadLocalEntriesForSync.mockReturnValue({ entries: new Map(), lastRow: 2 })
@@ -797,7 +801,8 @@ describe('syncSourceRegistry 未覆盖分支', () => {
       ScreenUpdating: true,
       Calculation: 1,
       Selection: { Row: 2, Rows: { Count: 2 } },
-      ActiveSheet: null, // 无活动工作表
+      // 无活动工作表
+      ActiveSheet: null,
     })
     await expect(syncFromRemote(undefined, 'add-update', undefined, true)).rejects.toThrow()
   })
@@ -877,7 +882,8 @@ describe('syncSourceRegistry 未覆盖分支', () => {
 
   it('diff 结果为 0 条时 overallSpeed 为 0 (line 228)', async () => {
     mockGithubSourceReference.fetchRemoteEntries.mockResolvedValue([{ sid: '1', name: 'A' }])
-    mockComputeDiff.mockReturnValue([]) // 无差异
+    // 无差异
+    mockComputeDiff.mockReturnValue([])
     mockReadLocalEntriesForSync.mockReturnValue({ entries: new Map(), lastRow: 1 })
     mockApplyDiffToSheet.mockResolvedValue({
       added: 0,
@@ -951,7 +957,8 @@ describe('syncSourceRegistry 未覆盖分支', () => {
       Selection: { Row: 1, Rows: { Count: 3 } },
       ActiveSheet: { Name: 'Sheet1' },
     })
-    mockFindHeaderRow.mockReturnValue(0) // findHeaderRow 返回 0
+    // findHeaderRow 返回 0
+    mockFindHeaderRow.mockReturnValue(0)
     mockGetColumnMap.mockReturnValue(new Map([['Bangumi_URL', 5]]))
     mockGetCellValue.mockImplementation((_ws: unknown, row: number, _col: number) =>
       row === 2 ? 'https://bgm.tv/subject/777' : '',)
@@ -968,7 +975,8 @@ describe('syncSourceRegistry 未覆盖分支', () => {
     mockGetApp.mockReturnValue({
       ScreenUpdating: true,
       Calculation: 1,
-      Selection: { Row: 2, Rows: { Count: 3 } }, // 行 2, 3, 4
+      // 行 2, 3, 4
+      Selection: { Row: 2, Rows: { Count: 3 } },
       ActiveSheet: { Name: 'Sheet1' },
     })
     mockFindHeaderRow.mockReturnValue(1)
@@ -976,7 +984,8 @@ describe('syncSourceRegistry 未覆盖分支', () => {
     mockGetCellValue.mockImplementation((_ws: unknown, row: number, _col: number) => {
       const urls: Record<number, string> = {
         2: 'https://bgm.tv/subject/100',
-        3: '', // 空行
+        // 空行
+        3: '',
         4: 'https://bgm.tv/subject/200',
       }
       return urls[row] ?? ''
@@ -1000,7 +1009,8 @@ describe('syncSourceRegistry 未覆盖分支', () => {
   it('配置校验失败且 error.message 为 undefined 时使用默认消息 (line 117)', async () => {
     mockGithubSourceReference.validateConfig.mockReturnValue({
       isFail: () => true,
-      error: null, // error.message 为 undefined
+      // error.message 为 undefined
+      error: null,
     })
     await expect(syncFromRemote()).rejects.toThrow('同步源 github 配置校验失败')
   })
@@ -1008,7 +1018,7 @@ describe('syncSourceRegistry 未覆盖分支', () => {
   it('overallSpeed > 0 时显示实际速度 (lines 222-232)', async () => {
     // 模拟时间流逝：Date.now() 返回不同值
     let timeValue = 1_000_000
-    vi.spyOn(Date, 'now').mockImplementation(() => timeValue += 1)
+    vi.spyOn(Date, 'now').mockImplementation(() => (timeValue += 1))
     mockGithubSourceReference.fetchRemoteEntries.mockResolvedValue([
       { sid: '1', name: 'A' },
       { sid: '2', name: 'B' },

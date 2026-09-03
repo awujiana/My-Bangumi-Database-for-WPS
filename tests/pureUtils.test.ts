@@ -2,7 +2,11 @@
 import { describe, it, expect } from 'vitest'
 
 // 直接从 pureUtils.ts 导入（避免副作用链）
-import { getSeqColIndex, addTagsFromStr as addTagsFromString, buildTagsArray } from '../ts/sync/pureUtils.js'
+import {
+  getSeqColIndex,
+  addTagsFromStr as addTagsFromString,
+  buildTagsArray,
+} from '../ts/sync/pureUtils.js'
 
 describe('pureUtils', () => {
   // ========== getSeqColIndex 测试 ==========

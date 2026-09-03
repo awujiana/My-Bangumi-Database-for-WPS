@@ -88,7 +88,10 @@ export function setConfig(key: string, value: string): boolean {
       window.postMessage(messagePayload, '*')
       bgmLog(LOG_LEVELS.INFO, `[config] 已广播 BGM:configUpdated 跨文档消息: key=${key}`)
     } catch (error: unknown) {
-      bgmLog(LOG_LEVELS.WARN, `[config] postMessage 广播失败: ${(error as Error).message || String(error)}`)
+      bgmLog(
+        LOG_LEVELS.WARN,
+        `[config] postMessage 广播失败: ${(error as Error).message || String(error)}`,
+      )
     }
   }
 

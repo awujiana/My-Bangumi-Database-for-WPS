@@ -261,7 +261,8 @@ export function parseJsonl(text: string): {
     const raw = lines[index]
     if (raw === undefined) continue
     const trimmed = raw.trim()
-    if (!trimmed) continue // 空行跳过
+    // 空行跳过
+    if (!trimmed) continue
 
     try {
       const object: unknown = JSON.parse(trimmed)
@@ -313,10 +314,14 @@ export interface SyncTimeFilter {
  * - 10月新番：9月 — 11月
  */
 const QUARTER_MONTH_RANGES: Readonly<Record<number, readonly [number, number, number]>> = {
-  1: [12, 1, 2], // 1月新番：上年12月、本年1月、本年2月
-  4: [3, 4, 5], // 4月新番：3月、4月、5月
-  7: [6, 7, 8], // 7月新番：6月、7月、8月
-  10: [9, 10, 11], // 10月新番：9月、10月、11月
+  // 1月新番：上年12月、本年1月、本年2月
+  1: [12, 1, 2],
+  // 4月新番：3月、4月、5月
+  4: [3, 4, 5],
+  // 7月新番：6月、7月、8月
+  7: [6, 7, 8],
+  // 10月新番：9月、10月、11月
+  10: [9, 10, 11],
 } as const
 
 /**

@@ -140,7 +140,8 @@ export async function syncFromRemote(
       previousScreenUpdating = app.ScreenUpdating
       previousCalculation = app.Calculation
       app.ScreenUpdating = false
-      app.Calculation = -4135 // xlCalculationManual
+      // xlCalculationManual
+      app.Calculation = -4135
     }
   } catch {
     // 忽略关闭失败
@@ -301,7 +302,8 @@ function getSelectedRowSids(): Set<string> {
 
     // 遍历选区每行，提取 SID
     for (let row = firstRow; row <= lastRow; row += 1) {
-      if (row === headerRow) continue // 跳过表头行
+      // 跳过表头行
+      if (row === headerRow) continue
       const url = trim(getCellValue(ws, row, urlCol))
       if (!url) continue
       const sid = extractSubjectId(url)

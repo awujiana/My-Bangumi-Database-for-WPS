@@ -498,8 +498,10 @@ describe('filterByTime isNaN 边界 (line 306)', () => {
     // 注意：match[1] 和 match[2] 是字符串，parseInt 对任何数字字符串都有效
     // 这里测试 match 存在但解析出的 year/month 不在有效范围
     const entries: GithubRemoteEntry[] = [
-      { sid: 'nan-1', name: '测试1', date: '0000-13-01' }, // 月份 13 无效
-      { sid: 'nan-2', name: '测试2', date: 'abc-01-01' }, // 无法匹配正则
+      // 月份 13 无效
+      { sid: 'nan-1', name: '测试1', date: '0000-13-01' },
+      // 无法匹配正则
+      { sid: 'nan-2', name: '测试2', date: 'abc-01-01' },
     ]
     const filter: SyncTimeFilter = { enabled: true, range: 'month', year: 2024, month: 1 }
     const result = filterByTime(entries, filter)
@@ -695,7 +697,8 @@ describe('matchTimeFilter 默认值路径 (lines 315, 325)', () => {
       ],
     ])
     const diffs = computeDiff(remote, local, 'mirror', {
-      enabled: false, // 时间筛选未启用
+      // 时间筛选未启用
+      enabled: false,
       range: 'all',
       year: 2024,
     })
@@ -714,7 +717,8 @@ describe('matchTimeFilter 默认值路径 (lines 315, 325)', () => {
     ])
     const diffs = computeDiff(remote, local, 'mirror', {
       enabled: true,
-      range: 'all', // range=all
+      // range=all
+      range: 'all',
       year: 2024,
     })
     const deletes = diffs.filter((d) => d.kind === 'delete')
@@ -751,7 +755,8 @@ describe('computeDiff 更多策略分支', () => {
       enabled: true,
       range: 'quarter',
       year: 2024,
-      quarter: 1, // 1月新番: [12, 1, 2]
+      // 1月新番: [12, 1, 2]
+      quarter: 1,
     })
     const deletes = diffs.filter((d) => d.kind === 'delete')
     // 12月 → 归属 filter.year-1 = 2023，实际 year=2023 → 匹配 → 被删除
@@ -769,8 +774,10 @@ describe('computeDiff 更多策略分支', () => {
     const diffs = computeDiff(remote, local, 'mirror', {
       enabled: true,
       range: 'quarter',
-      year: 2023, // 错误年份：12月归属 filter.year-1=2022，但实际 year=2023
-      quarter: 1, // 1月新番: [12, 1, 2]
+      // 错误年份：12月归属 filter.year-1=2022，但实际 year=2023
+      year: 2023,
+      // 1月新番: [12, 1, 2]
+      quarter: 1,
     })
     const deletes = diffs.filter((d) => d.kind === 'delete')
     // matchTimeFilter: month===12 → year === filter.year-1 → 2023 === 2022 → false
@@ -789,7 +796,8 @@ describe('computeDiff 更多策略分支', () => {
       enabled: true,
       range: 'quarter',
       year: 2024,
-      quarter: 4, // Q4: 10,11,12月，但1月不属于Q4
+      // Q4: 10,11,12月，但1月不属于Q4
+      quarter: 4,
     })
     const deletes = diffs.filter((d) => d.kind === 'delete')
     // 1月不在 Q4 范围 → 不删除

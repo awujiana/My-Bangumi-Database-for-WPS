@@ -245,7 +245,8 @@ export function startUserInfoPolling(): void {
     } catch {
       // 静默处理轮询错误
     }
-  }, 2000) // 每2秒轮询一次
+    // 每2秒轮询一次
+  }, 2000)
 
   // 面板关闭时清理定时器
   window.addEventListener('beforeunload', () => {

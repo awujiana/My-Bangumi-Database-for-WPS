@@ -1525,7 +1525,8 @@ function processSingleBatchFile(filePath: string, bangumiSheet: WpsWorksheet): B
       bangumiSheet,
       matches,
       config,
-      () => {}, // 批量模式不回调进度（已由外层控制）
+      // 批量模式不回调进度（已由外层控制）
+      () => {},
     )
 
     // EnrichResultItem 没有 stats，通过 enrichedFields 判断

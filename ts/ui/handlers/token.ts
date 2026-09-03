@@ -93,7 +93,8 @@ export function updateTokenStatus(): void {
           } else if (errorType === 'network') {
             // 网络错误：Token 本身可能有效，但无法连接到 BGM API
             // 常见原因：被 GFW 墙、断网、DNS 失败
-            tokenStatus.style.color = '#ff9800' // 橙色警告
+            // 橙色警告
+            tokenStatus.style.color = '#ff9800'
             tokenStatus.textContent = `${_T.set} (${token.substring(0, 4)}...) ⚠ 网络无法连接`
             bgmLog(
               LOG_LEVELS.WARN,
@@ -211,7 +212,8 @@ export function testTokenValidity(): void {
 
   const xhr = new XMLHttpRequest()
   xhr.open('GET', apiUrl, true)
-  xhr.timeout = 15_000 // 15 秒超时，防止网络挂起导致 Token 测试按钮无限期等待
+  // 15 秒超时，防止网络挂起导致 Token 测试按钮无限期等待
+  xhr.timeout = 15_000
   xhr.setRequestHeader('Authorization', `Bearer ${token}`)
   xhr.setRequestHeader('Content-Type', 'application/json')
 
@@ -457,12 +459,16 @@ export function showTokenExpiryInfo(expires: number): void {
     expiresElement.style.display = ''
 
     // 根据状态设置颜色
-    let color = '#4CAF50' // green
+    // green
+    let color = '#4CAF50'
     if (remaining.status === 'warning')
-      color = '#ffc107' // yellow
+      // yellow
+      color = '#ffc107'
     else if (remaining.status === 'danger')
-      color = '#ff9800' // orange
-    else if (remaining.status === 'expired') color = '#f44336' // red
+      // orange
+      color = '#ff9800'
+    // red
+    else if (remaining.status === 'expired') color = '#f44336'
 
     expiresElement.style.color = color
   }
@@ -557,7 +563,8 @@ export function showUserProfile(): void {
     const topbarAvatarElement = document.getElementById('topbarAvatar')
     const topbarAvatarImg = document.getElementById('topbarAvatarImg') as HTMLImageElement | null
     if (topbarAvatarElement) {
-      topbarAvatarElement.style.display = '' // 让 CSS 媒体查询控制显示/隐藏
+      // 让 CSS 媒体查询控制显示/隐藏
+      topbarAvatarElement.style.display = ''
       topbarAvatarElement.title = username || _T.avatarDefault
       topbarAvatarElement.setAttribute('aria-label', username || _T.avatarDefault)
       if (topbarAvatarImg && avatarUrl) {

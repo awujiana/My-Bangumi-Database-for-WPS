@@ -172,7 +172,8 @@ describe('cacheGet', () => {
     const result1 = cacheGet('test-key-2', factory)
     const result2 = cacheGet('test-key-2', factory)
     expect(factory).toHaveBeenCalledTimes(1)
-    expect(result2).toBe(result1) // 同一引用
+    // 同一引用
+    expect(result2).toBe(result1)
   })
 
   it('不同 key 互不影响', () => {
@@ -409,7 +410,8 @@ describe('getLastRow', () => {
       name: 'Sheet-GLR-2',
       rangeEndRow: (address: string) => {
         if (address.startsWith('A')) return 50
-        return null // D 列失败
+        // D 列失败
+        return null
       },
     })
     const lastRow = getLastRow(ws as never)
@@ -486,7 +488,8 @@ describe('getLastRow', () => {
     expect(first).toBe(80)
     // 即使修改 mock，缓存也应返回原值；forceRefresh=true 时才会重新计算
     const second = getLastRow(ws as never, true)
-    expect(second).toBe(80) // 重新计算后仍是 80（mock 未变）
+    // 重新计算后仍是 80（mock 未变）
+    expect(second).toBe(80)
   })
 })
 
@@ -590,7 +593,8 @@ describe('safeActivate', () => {
   })
 
   it('ws 无 Activate 方法时不抛错', () => {
-    const ws = { Name: 'Sheet-SA-2' } // 无 Activate 方法
+    // 无 Activate 方法
+    const ws = { Name: 'Sheet-SA-2' }
     expect(() => safeActivate(ws as never)).not.toThrow()
   })
 })

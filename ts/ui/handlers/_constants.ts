@@ -27,10 +27,13 @@ export const _T = {
   cannotConnectBgm: '\u{65E0}\u{6CD5}\u{8FDE}\u{63A5}\u{5230} Bangumi API',
   debugConnOk: '\u{8C03}\u{8BD5}\u{8FDE}\u{63A5}\u{6B63}\u{5E38}',
   debugConnFail: '\u{8C03}\u{8BD5}\u{8FDE}\u{63A5}\u{5931}\u{8D25}',
-  confirmClearMarks: '\u{786E}\u{5B9A}\u{8981}\u{6E05}\u{9664}\u{6240}\u{6709}\u{6807}\u{8BB0}\u{5417}\u{FF1F}',
-  loadingWait: '\u{6B63}\u{5728}\u{52A0}\u{8F7D}\u{811A}\u{672C}\u{FF0C}\u{8BF7}\u{7A0D}\u{540E}\u{91CD}\u{8BD5}...',
+  confirmClearMarks:
+    '\u{786E}\u{5B9A}\u{8981}\u{6E05}\u{9664}\u{6240}\u{6709}\u{6807}\u{8BB0}\u{5417}\u{FF1F}',
+  loadingWait:
+    '\u{6B63}\u{5728}\u{52A0}\u{8F7D}\u{811A}\u{672C}\u{FF0C}\u{8BF7}\u{7A0D}\u{540E}\u{91CD}\u{8BD5}...',
   pleaseSetBgmToken: '\u{8BF7}\u{5148}\u{8BBE}\u{7F6E} Bangumi Token\u{FF01}',
-  cannotActivateSyncSheet: '\u{65E0}\u{6CD5}\u{6FC0}\u{6D3B}\u{540C}\u{6B65}\u{8BB0}\u{5F55}\u{8868}: ',
+  cannotActivateSyncSheet:
+    '\u{65E0}\u{6CD5}\u{6FC0}\u{6D3B}\u{540C}\u{6B65}\u{8BB0}\u{5F55}\u{8868}: ',
   syncToBgmError: 'SyncToBangumiAsync \u{51FA}\u{9519}: ',
   execError: '\u{6267}\u{884C}\u{51FA}\u{9519}',
   syncBgmMarksStart:

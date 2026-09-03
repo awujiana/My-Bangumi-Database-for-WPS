@@ -1180,7 +1180,8 @@ const ACTION_HANDLERS: Record<string, ActionHandler> = {
           strategy,
           abortController.signal,
           isSelectedRowsOnly,
-          undefined, // conflictResolution
+          // conflictResolution
+          undefined,
           timeFilter,
         )
           .then((result) => {

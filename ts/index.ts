@@ -91,13 +91,20 @@ export {
 // 5. UI 对话框（对话框函数与类型）
 // ============================================================================
 export {
-  showAlert, // 提示
-  showConfirm, // 确认
-  showError, // 错误
-  showSuccess, // 成功
-  showInput, // 输入
-  showToast, // Toast 通知
-  showSyncResult, // 同步结果（可展开详情）
+  // 提示
+  showAlert,
+  // 确认
+  showConfirm,
+  // 错误
+  showError,
+  // 成功
+  showSuccess,
+  // 输入
+  showInput,
+  // Toast 通知
+  showToast,
+  // 同步结果（可展开详情）
+  showSyncResult,
   showSyncProgressDialog,
   updateSyncProgressDialog,
   completeSyncProgressDialog,

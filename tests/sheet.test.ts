@@ -325,7 +325,8 @@ describe('getDataSheet', () => {
       ActiveWorkbook: { ActiveSheet: activeSheet },
     })
     BGM.sheet.isLocked = true
-    BGM.sheet.lockedIndex = 10 // will fail
+    // will fail
+    BGM.sheet.lockedIndex = 10
     const mockErrorWs = {
       ...createMockWorksheet(),
       Worksheets: {
@@ -598,7 +599,8 @@ describe('getColumnMap', () => {
   it('序列号列回退：第一个非空列未被占用时使用', () => {
     vi.mocked(getCellValue).mockImplementation((_ws: unknown, _row: unknown, col: unknown) => {
       const c = col as number
-      if (c === 1) return '自定义ID' // 非标准序列号名，但非空
+      // 非标准序列号名，但非空
+      if (c === 1) return '自定义ID'
       if (c === 2) return '名称'
       if (c === 3) return 'Bangumi URL'
       return ''
@@ -612,8 +614,10 @@ describe('getColumnMap', () => {
   it('序列号列回退：第一个非空列被占用时使用下一个未被占用的列', () => {
     vi.mocked(getCellValue).mockImplementation((_ws: unknown, _row: unknown, col: unknown) => {
       const c = col as number
-      if (c === 1) return '名称' // 第一个非空列已被'名称'映射占用
-      if (c === 2) return '标题' // 不匹配任何规则，成为序列号回退候选
+      // 第一个非空列已被'名称'映射占用
+      if (c === 1) return '名称'
+      // 不匹配任何规则，成为序列号回退候选
+      if (c === 2) return '标题'
       if (c === 3) return 'Bangumi URL'
       if (c === 4) return '自定义字段'
       return ''
@@ -706,7 +710,8 @@ describe('cacheGet / clearSheetCache', () => {
       aCalled += 1
       return 'a-new'
     })
-    expect(aCalled).toBe(1) // 未增加
+    // 未增加
+    expect(aCalled).toBe(1)
   })
 
   it('清除不存在的 key 不应报错', () => {
@@ -990,7 +995,8 @@ describe('findAnchorColumn（间接测试 via getLastRow with headerRow）', () 
 
   it('未找到锚定列时应回退到 D 列查找', () => {
     const ws = createMockWorksheet({ name: 'NoAnchor' })
-    vi.mocked(getCellValue).mockReturnValue('') // No header keywords found
+    // No header keywords found
+    vi.mocked(getCellValue).mockReturnValue('')
     const dCell = {
       Value2: 'data',
       Value: 'data',

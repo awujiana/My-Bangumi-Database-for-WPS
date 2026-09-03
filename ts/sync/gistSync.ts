@@ -254,7 +254,11 @@ export function fetchGistJson(signal?: AbortSignal): Promise<GithubRemoteEntry[]
           }
           resolve(entries)
         } catch (error: unknown) {
-          reject(new Error(`Gist 响应解析失败: ${error instanceof Error ? error.message : String(error)}`))
+          reject(
+            new Error(
+              `Gist 响应解析失败: ${error instanceof Error ? error.message : String(error)}`,
+            ),
+          )
         }
       } else if (xhr.status === 404) {
         reject(new Error(`Gist 不存在（404）：${url}，请检查 gist_id 配置`))

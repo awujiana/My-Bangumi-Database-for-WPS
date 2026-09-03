@@ -19,8 +19,10 @@ export interface SyncTask {
   name: string
   jsonBody: string
   fingerprint?: string
-  type: number // 观看状态类型 1-5
-  epCount?: number // 要标记为已完成的集数
+  // 观看状态类型 1-5
+  type: number
+  // 要标记为已完成的集数
+  epCount?: number
 }
 
 /**

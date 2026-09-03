@@ -15,9 +15,11 @@
 export class RingBuffer<T> {
   private buffer: T[]
 
-  private head = 0 // 下一个写入位置
+  // 下一个写入位置
+  private head = 0
 
-  private _size = 0 // 当前元素数
+  // 当前元素数
+  private _size = 0
 
   private readonly capacity: number
 

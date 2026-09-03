@@ -251,7 +251,8 @@ export function OnSkipConflictsChange(control: WpsRibbonControl): boolean {
   // 保存到 PluginStorage
   setSkipConflicts(isFinalValue)
   bgmLog(LOG_LEVELS.INFO, `[Ribbon] 跳过冲突状态已保存到 PluginStorage: ${String(isFinalValue)}`)
-  return true // 必须返回 boolean
+  // 必须返回 boolean
+  return true
 }
 
 /**
@@ -281,7 +282,10 @@ export function OnEnableSyncRecordChange(control: WpsRibbonControl): boolean {
     bgmLog(LOG_LEVELS.INFO, `[Ribbon] control.Pressed 不可用，切换状态为: ${String(isFinalValue)}`)
   }
   setSyncRecordEnabled(isFinalValue)
-  bgmLog(LOG_LEVELS.INFO, `[Ribbon] 启用同步记录状态已保存到 PluginStorage: ${String(isFinalValue)}`)
+  bgmLog(
+    LOG_LEVELS.INFO,
+    `[Ribbon] 启用同步记录状态已保存到 PluginStorage: ${String(isFinalValue)}`,
+  )
   return true
 }
 
@@ -441,7 +445,11 @@ export function OnAction(control: { Id: string }): boolean {
       }
     }
   } catch (error: unknown) {
-    BGM.handleError(error, { showAlert: true, level: BGM.ErrorLevel.ERROR, context: 'Ribbon OnAction' })
+    BGM.handleError(error, {
+      showAlert: true,
+      level: BGM.ErrorLevel.ERROR,
+      context: 'Ribbon OnAction',
+    })
   }
   return true
 }

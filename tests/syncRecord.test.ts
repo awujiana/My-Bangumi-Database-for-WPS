@@ -349,7 +349,8 @@ describe('syncRecord', () => {
 
     it('应在已有 SID 时更新记录', () => {
       mockGetApp.mockReturnValue({ ActiveWorkbook: createMockWorkbook() })
-      mockGetCellValue.mockReturnValue('3') // existing count
+      // existing count
+      mockGetCellValue.mockReturnValue('3')
       // Add first record
       addSyncRecord({
         sid: 'update-sid',
@@ -647,12 +648,18 @@ describe('syncRecord', () => {
         const r = row as number
         const c = col as number
         if (r === 2) {
-          if (c === 5) return 'migrate-sid-1' // 旧结构 SID 在第5列
-          if (c === 4) return 'http://migrate1.com' // URL 在第4列
-          if (c === 6) return '动漫' // 条目类型
-          if (c === 7) return '3' // 次数
-          if (c === 8) return '内容1' // 内容
-          if (c === 9) return 'success' // 状态
+          // 旧结构 SID 在第5列
+          if (c === 5) return 'migrate-sid-1'
+          // URL 在第4列
+          if (c === 4) return 'http://migrate1.com'
+          // 条目类型
+          if (c === 6) return '动漫'
+          // 次数
+          if (c === 7) return '3'
+          // 内容
+          if (c === 8) return '内容1'
+          // 状态
+          if (c === 9) return 'success'
         }
         return ''
       })
@@ -665,7 +672,8 @@ describe('syncRecord', () => {
       // 设置旧表头：A1='SID', F1='次数'（无"来源"列）
       legacySheet.Range = vi.fn((address: string) => {
         if (address === 'A1') return createMockCell('SID')
-        if (address === 'F1') return createMockCell('次数') // 第6列是次数，不是来源
+        // 第6列是次数，不是来源
+        if (address === 'F1') return createMockCell('次数')
         if (address === 'B1') return createMockCell('同步时间')
         if (address === 'C1') return createMockCell('名称')
         if (address === 'D1') return createMockCell('URL')
@@ -686,12 +694,18 @@ describe('syncRecord', () => {
         const r = row as number
         const c = col as number
         if (r === 2) {
-          if (c === 1) return 'migrate-sid-2' // SID 在第1列
-          if (c === 4) return 'http://migrate2.com' // URL 在第4列
-          if (c === 5) return '游戏' // 条目类型
-          if (c === 6) return '1' // 次数
-          if (c === 7) return '内容2' // 内容
-          if (c === 8) return 'fail' // 状态
+          // SID 在第1列
+          if (c === 1) return 'migrate-sid-2'
+          // URL 在第4列
+          if (c === 4) return 'http://migrate2.com'
+          // 条目类型
+          if (c === 5) return '游戏'
+          // 次数
+          if (c === 6) return '1'
+          // 内容
+          if (c === 7) return '内容2'
+          // 状态
+          if (c === 8) return 'fail'
         }
         return ''
       })
@@ -713,7 +727,8 @@ describe('syncRecord', () => {
         },
       }
       mockGetApp.mockReturnValue({ ActiveWorkbook: wb })
-      mockGetLastRow.mockReturnValue(1) // 只有表头行
+      // 只有表头行
+      mockGetLastRow.mockReturnValue(1)
       const result = getOrCreateSyncRecordSheet()
       expect(result).toBeDefined()
     })
@@ -848,7 +863,8 @@ describe('syncRecord', () => {
 
     it('SID 已存在时应合并次数', () => {
       mockGetApp.mockReturnValue({ ActiveWorkbook: createMockWorkbook() })
-      mockGetCellValue.mockReturnValue('5') // 现有 count=5
+      // 现有 count=5
+      mockGetCellValue.mockReturnValue('5')
       // 先添加一个记录建立缓存
       addSyncRecord({ sid: 'merge-sid', name: '初始', url: 'http://m.com', type: '看', count: 5 })
       // 批量添加相同 SID 应合并
@@ -917,8 +933,10 @@ describe('syncRecord', () => {
       mockGetCellValue.mockImplementation((_sheet: unknown, row: unknown, col: unknown) => {
         const r = row as number
         const c = col as number
-        if (c === 1) return 'dup-sid' // 所有行都是相同 SID
-        if (c === 7) return '2' // count
+        // 所有行都是相同 SID
+        if (c === 1) return 'dup-sid'
+        // count
+        if (c === 7) return '2'
         return ''
       })
       const isResult = deduplicateSyncRecords()
@@ -1279,7 +1297,8 @@ describe('syncRecord', () => {
       // 创建 UsedRange 为 null 的工作表
       const sheet = {
         Name: SYNC_RECORD_SHEET_NAME,
-        UsedRange: null, // 关键：UsedRange 为 null
+        // 关键：UsedRange 为 null
+        UsedRange: null,
         Rows: { Count: 100 },
         Range: vi.fn(() => ({
           Value2: null,
@@ -1313,7 +1332,8 @@ describe('syncRecord', () => {
       const sheet = {
         Name: SYNC_RECORD_SHEET_NAME,
         UsedRange: null,
-        Rows: { Count: 1 }, // 关键：Rows.Count = 1
+        // 关键：Rows.Count = 1
+        Rows: { Count: 1 },
         Range: vi.fn(() => ({
           Value2: null,
           Interior: { Color: 0 },
@@ -1356,24 +1376,38 @@ describe('syncRecord', () => {
       // SID(0), TIME(1), NAME(2), URL(3), TYPE(4), SOURCE(5), COUNT(6), CONTENT(7), STATUS(8), COLL_TYPE(9), MESSAGE(10), FINGERPRINT(11)
       mockReadRangeValues.mockReturnValue([
         [
-          'upd-sid', // SID (index 0)
-          '2024-01-01T00:00:00', // TIME (index 1)
-          '测试名称', // NAME (index 2)
-          'http://old.com', // URL (index 3)
-          'TV', // TYPE (index 4)
-          'github', // SOURCE (index 5)
-          '5', // COUNT (index 6)
-          '旧内容', // CONTENT (index 7)
-          'success', // STATUS (index 8)
-          '看', // COLL_TYPE (index 9)
-          '旧备注', // MESSAGE (index 10)
-          'old-fp', // FINGERPRINT (index 11)
+          // SID (index 0)
+          'upd-sid',
+          // TIME (index 1)
+          '2024-01-01T00:00:00',
+          // NAME (index 2)
+          '测试名称',
+          // URL (index 3)
+          'http://old.com',
+          // TYPE (index 4)
+          'TV',
+          // SOURCE (index 5)
+          'github',
+          // COUNT (index 6)
+          '5',
+          // CONTENT (index 7)
+          '旧内容',
+          // STATUS (index 8)
+          'success',
+          // COLL_TYPE (index 9)
+          '看',
+          // MESSAGE (index 10)
+          '旧备注',
+          // FINGERPRINT (index 11)
+          'old-fp',
         ],
       ])
       // getCellValue 按列返回不同值，避免 deduplicateSyncRecords 误判重复
       mockGetCellValue.mockImplementation((_sheet: unknown, _row: number, col: number) => {
-        if (col === 1) return 'upd-sid' // SID 列
-        if (col === 7) return '5' // COUNT 列
+        // SID 列
+        if (col === 1) return 'upd-sid'
+        // COUNT 列
+        if (col === 7) return '5'
         return ''
       })
 
@@ -1403,18 +1437,30 @@ describe('syncRecord', () => {
     it('更新时部分可选字段为空则跳过对应分支', () => {
       mockReadRangeValues.mockReturnValue([
         [
-          'partial-sid', // SID (index 0)
-          '2024-01-01T00:00:00', // TIME (index 1)
-          '旧名称', // NAME (index 2)
-          'http://old.com', // URL (index 3)
-          'TV', // TYPE (index 4)
-          'github', // SOURCE (index 5)
-          '2', // COUNT (index 6)
-          '', // CONTENT (index 7)
-          'success', // STATUS (index 8)
-          '', // COLL_TYPE (index 9)
-          '', // MESSAGE (index 10)
-          '', // FINGERPRINT (index 11)
+          // SID (index 0)
+          'partial-sid',
+          // TIME (index 1)
+          '2024-01-01T00:00:00',
+          // NAME (index 2)
+          '旧名称',
+          // URL (index 3)
+          'http://old.com',
+          // TYPE (index 4)
+          'TV',
+          // SOURCE (index 5)
+          'github',
+          // COUNT (index 6)
+          '2',
+          // CONTENT (index 7)
+          '',
+          // STATUS (index 8)
+          'success',
+          // COLL_TYPE (index 9)
+          '',
+          // MESSAGE (index 10)
+          '',
+          // FINGERPRINT (index 11)
+          '',
         ],
       ])
       mockGetCellValue.mockImplementation((_sheet: unknown, _row: number, col: number) => {
@@ -1975,7 +2021,8 @@ describe('buildCache 内层 catch 分支 (line 343)', () => {
       // @ts-expect-error - 故意传入非数组元素触发异常
       null,
       undefined,
-      'invalid-string', // 非数组，访问 [SYNC_RECORD_COL.SID - 1] 会出错
+      // 非数组，访问 [SYNC_RECORD_COL.SID - 1] 会出错
+      'invalid-string',
     ])
 
     const isResult = addSyncRecord({
@@ -2041,7 +2088,8 @@ describe('buildCache message 字段 (line 337)', () => {
         '测试内容',
         'success',
         '看',
-        '这是一条测试备注信息', // MESSAGE 字段 (col 11)
+        // MESSAGE 字段 (col 11)
+        '这是一条测试备注信息',
         'fp-msg-001',
       ],
     ])
@@ -2109,8 +2157,10 @@ describe('migrateSyncRecordSchema 数据行处理 (lines 289-293)', () => {
     // 创建一个旧 schema 工作表（A1='序号' 表示旧 schema）
     const legacySheet = createMockSheet({ name: SYNC_RECORD_SHEET_NAME })
     legacySheet.Range = vi.fn((address: string) => {
-      if (address === 'A1') return createMockCell('序号') // 旧 schema 标识
-      if (address === 'F1') return createMockCell('次数') // 旧 schema 列头
+      // 旧 schema 标识
+      if (address === 'A1') return createMockCell('序号')
+      // 旧 schema 列头
+      if (address === 'F1') return createMockCell('次数')
       if (address.includes(':')) return { Value2: null, Interior: { Color: 0 } }
       return createMockCell('')
     })
@@ -2609,7 +2659,8 @@ describe('deduplicateSyncRecords count 字段回退 (lines 670-675)', () => {
       const r = row as number
       const c = col as number
       if (c === 1) return 'dup-count-sid'
-      if (c === 7) return '' // COUNT列为空
+      // COUNT列为空
+      if (c === 7) return ''
       return ''
     })
     const isResult = deduplicateSyncRecords()
@@ -2623,7 +2674,8 @@ describe('deduplicateSyncRecords count 字段回退 (lines 670-675)', () => {
       const r = row as number
       const c = col as number
       if (c === 1) return 'dup-numeric-sid'
-      if (c === 7) return 'N/A' // COUNT列非数字
+      // COUNT列非数字
+      if (c === 7) return 'N/A'
       return ''
     })
     const isResult = deduplicateSyncRecords()
@@ -2640,7 +2692,8 @@ describe('deduplicateSyncRecords count 字段回退 (lines 670-675)', () => {
       if (c === 7) {
         // 不同行不同count值
         if (r === 2) return '3'
-        if (r === 3) return '' // 空值回退到1
+        // 空值回退到1
+        if (r === 3) return ''
         return '5'
       }
       return ''
@@ -2889,7 +2942,8 @@ describe('addSyncRecordSummary 行为', () => {
       name: '仓库同步汇总',
       content: '新增 5 条',
       status: 'success',
-      count: 10, // 即使传入 count，也应被覆盖为 1
+      // 即使传入 count，也应被覆盖为 1
+      count: 10,
     })
 
     expect(isResult).toBe(true)

@@ -277,7 +277,8 @@ describe('extractGistContent', () => {
   it('文件缺失 content 字段：跳过该文件', () => {
     const apiResponse = {
       files: {
-        'no-content.jsonl': {}, // 缺失 content
+        // 缺失 content
+        'no-content.jsonl': {},
         'has-content.jsonl': { content: 'PRESENT' },
       },
     }
@@ -334,7 +335,8 @@ describe('extractGistContent', () => {
   it('文件 content 类型非法（非字符串）：跳过该文件（类型守卫拒绝）', () => {
     const apiResponse = {
       files: {
-        'numeric.jsonl': { content: 12_345 }, // 非法 content 类型
+        // 非法 content 类型
+        'numeric.jsonl': { content: 12_345 },
       },
     }
     // isGistFile 类型守卫拒绝 content 非 string 的文件，因此整个响应视为非法

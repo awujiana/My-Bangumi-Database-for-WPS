@@ -195,7 +195,8 @@ export function getFilterStatus(
   wsOrLastRow?: WpsWorksheet | number,
   lastRow?: number,
   headerRow?: number,
-  deepCheck?: boolean, // true: 也检测非 AutoFilter 的隐藏行（性能开销）
+  // true: 也检测非 AutoFilter 的隐藏行（性能开销）
+  deepCheck?: boolean,
 ): {
   hasFilter: boolean
   visibleRows: number[]

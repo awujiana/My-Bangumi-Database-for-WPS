@@ -945,7 +945,8 @@ export function _fetchBgmUserInfo(
   xhr.open('GET', apiUrl, true)
   xhr.setRequestHeader('Authorization', `Bearer ${token}`)
   xhr.setRequestHeader('Content-Type', 'application/json')
-  xhr.timeout = 15_000 // 15 秒超时，便于快速感知网络问题
+  // 15 秒超时，便于快速感知网络问题
+  xhr.timeout = 15_000
 
   // AbortSignal 支持：监听 abort 事件触发 xhr.abort()
   if (signal) {

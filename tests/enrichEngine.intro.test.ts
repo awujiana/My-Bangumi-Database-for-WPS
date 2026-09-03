@@ -502,7 +502,8 @@ describe('enrichIntroData 逻辑', () => {
 
       const feature = getMockCellValue(5, 10)
       expect(feature).toContain('简介:')
-      expect(feature.length).toBeLessThanOrEqual(80 + 10) // "简介:" + 80 chars + "..."
+      // "简介:" + 80 chars + "..."
+      expect(feature.length).toBeLessThanOrEqual(80 + 10)
     })
 
     it('已有特点/印象时追加而非替换', () => {
@@ -551,8 +552,10 @@ describe('enrichIntroData 逻辑', () => {
       }
       const result = simulateEnrichIntroData(5, data, colMap)
 
-      expect(result.conflicts).toHaveLength(1) // 导演冲突
-      expect(result.enriched.filter((e) => e.action === 'fill')).toHaveLength(1) // 音乐填充
+      // 导演冲突
+      expect(result.conflicts).toHaveLength(1)
+      // 音乐填充
+      expect(result.enriched.filter((e) => e.action === 'fill')).toHaveLength(1)
     })
   })
 })
@@ -802,15 +805,21 @@ describe('简介工作表富化综合场景', () => {
     ])
 
     // 设置一些已有数据
-    setMockCellValue(5, 3, '宫崎骏') // 导演已有值（会冲突）
-    setMockCellValue(5, 8, '') // 音乐为空（会填充）
+    // 导演已有值（会冲突）
+    setMockCellValue(5, 3, '宫崎骏')
+    // 音乐为空（会填充）
+    setMockCellValue(5, 8, '')
 
     // 新番表数据
     const data = {
-      导演: '新海诚', // 会冲突
-      编剧: '铃木贵昭', // 会填充（带标注）
-      音乐: '天门', // 会填充
-      简介: '精彩的动画', // 追加到特点/印象
+      // 会冲突
+      导演: '新海诚',
+      // 会填充（带标注）
+      编剧: '铃木贵昭',
+      // 会填充
+      音乐: '天门',
+      // 追加到特点/印象
+      简介: '精彩的动画',
     }
 
     const result = simulateEnrichIntroData(5, data, colMap)
@@ -820,7 +829,8 @@ describe('简介工作表富化综合场景', () => {
 
     // 验证填充
     const fills = result.enriched.filter((e) => e.action === 'fill')
-    expect(fills.length).toBeGreaterThanOrEqual(2) // 编剧 + 音乐 + 简介
+    // 编剧 + 音乐 + 简介
+    expect(fills.length).toBeGreaterThanOrEqual(2)
 
     // 验证标注
     expect(getMockCellValue(5, 4)).toContain('(编剧)')

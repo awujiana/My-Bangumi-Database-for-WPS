@@ -196,7 +196,8 @@ export function getColumnMap(
         if (pattern.test(colName)) {
           if (!colMap.has(key)) {
             colMap.set(key, index)
-            break // 匹配到未映射的key，处理下一列
+            // 匹配到未映射的key，处理下一列
+            break
           }
           // 该key已被前面的列匹配，继续尝试其他规则
         }

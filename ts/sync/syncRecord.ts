@@ -259,7 +259,8 @@ function migrateSyncRecordSchema(sheet: WpsWorksheet): void {
       getCellValue(sheet, row, 3),
       oldUrl,
       oldType,
-      '', // 来源：旧数据无此字段，默认空
+      // 来源：旧数据无此字段，默认空
+      '',
       oldCount,
       oldContent,
       oldStatus,

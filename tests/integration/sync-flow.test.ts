@@ -213,7 +213,11 @@ vi.mock('../../ts/sync/syncSourceRegistry.js', async () => {
         throw new Error(errorMessage)
       }
 
-      onProgress?.(0, 0, `开始下载远程数据（${String(source.getDisplayName())} - 策略：${strategy}）...`)
+      onProgress?.(
+        0,
+        0,
+        `开始下载远程数据（${String(source.getDisplayName())} - 策略：${strategy}）...`,
+      )
       const remoteEntries = await source.fetchRemoteEntries(signal)
       onProgress?.(1, 3, `下载完成：${String(remoteEntries.length)} 条`)
 
@@ -351,8 +355,10 @@ describe('Excel→Bangumi 完整同步流程', () => {
       mockWs as never,
       colMap,
       'test-token',
-      2, // lastRow
-      1, // headerRow
+      // lastRow
+      2,
+      // headerRow
+      1,
     )
 
     // 验证 API 被调用（POST 到收藏接口）
@@ -558,8 +564,10 @@ describe('空 Excel 数据场景', () => {
       mockWs as never,
       colMap,
       'test-token',
-      1, // lastRow=1（只有表头，无数据行）
-      1, // headerRow
+      // lastRow=1（只有表头，无数据行）
+      1,
+      // headerRow
+      1,
     )
 
     // 无数据行时不应调用 API
@@ -777,7 +785,8 @@ describe('GitHub 同步流程：fetch JSONL → diff → apply → undo', () => 
     // 配置本地数据为空（所有远程条目都是新增）
     mockState.getDataSheet.mockReturnValue({ Name: 'Sheet1' })
     mockState.findHeaderRow.mockReturnValue(1)
-    mockState.getLastRow.mockReturnValue(1) // 无数据行
+    // 无数据行
+    mockState.getLastRow.mockReturnValue(1)
     mockState.getColumnMap.mockReturnValue(
       new Map<string, number>([
         ['Bangumi_URL', 2],
@@ -835,7 +844,8 @@ describe('parseJsonl 集成解析', () => {
     const text = [
       JSON.stringify({ sid: '1', name: 'A', meta_tags: ['标签'] }),
       JSON.stringify({ sid: '2', name: 'B', 话数: '12' }),
-      '', // 空行应跳过
+      // 空行应跳过
+      '',
       JSON.stringify({ sid: '3', name: 'C' }),
     ].join('\n')
 
@@ -852,7 +862,8 @@ describe('parseJsonl 集成解析', () => {
       JSON.stringify({ sid: '1', name: 'A' }),
       '{ invalid json',
       JSON.stringify({ sid: '2', name: 'B' }),
-      JSON.stringify({ notSid: 'x' }), // 缺少 sid
+      // 缺少 sid
+      JSON.stringify({ notSid: 'x' }),
     ].join('\n')
 
     const { entries, errors } = parseJsonl(text)

@@ -483,8 +483,10 @@ describe('computeDiff 策略修饰', () => {
   // 公共测试数据：远程 3 条（sid=1 新增，sid=2 需更新，sid=3 无变化），本地 3 条（sid=2、3、4，sid=4 远程不存在）
   const remote: GithubRemoteEntry[] = [
     { sid: '1', name: '远程新增' },
-    { sid: '2', name: '远程改名' }, // 本地 sid=2 名称不同
-    { sid: '3', name: '一致' }, // 本地 sid=3 完全一致
+    // 本地 sid=2 名称不同
+    { sid: '2', name: '远程改名' },
+    // 本地 sid=3 完全一致
+    { sid: '3', name: '一致' },
   ]
   const local = new Map<string, LocalRowEntry>([
     ['2', { row: 10, sid: '2', fields: { 名称: '本地名', 是否看完: '在看' } }],
@@ -983,7 +985,8 @@ describe('readLocalEntries 批量读取路径', () => {
     const mockWs = createMockWorksheet()
     mockWs.Range = vi.fn((address: string) => {
       if (address.includes(':')) {
-        return { Value2: null, Interior: { Color: 0 } } // 非数组
+        // 非数组
+        return { Value2: null, Interior: { Color: 0 } }
       }
       return {
         Value2: 'https://bgm.tv/subject/1',
@@ -1049,7 +1052,8 @@ describe('readLocalEntries 批量读取路径', () => {
     mockGetDataSheet.mockReturnValue(mockWs)
     mockFindHeaderRow.mockReturnValue(1)
     mockGetLastRow.mockReturnValue(5)
-    mockGetColumnMap.mockReturnValue(new Map()) // 无 Bangumi_URL 列
+    // 无 Bangumi_URL 列
+    mockGetColumnMap.mockReturnValue(new Map())
 
     // 验证列映射为空
     const colMap = mockGetColumnMap()
@@ -2418,7 +2422,8 @@ describe('filterByTime 未覆盖分支 (line 328)', () => {
       year: 2025,
       quarter: 1,
     })
-    expect(result).toHaveLength(1) // 12月属于2025 Q1
+    // 12月属于2025 Q1
+    expect(result).toHaveLength(1)
   })
 
   it('quarter 策略: quarter 超出范围返回空', () => {
@@ -2570,7 +2575,8 @@ describe('matchTimeFilter 未覆盖分支 (lines 359-368) 通过 computeDiff', (
       enabled: true,
       range: 'quarter',
       year: 2024,
-      quarter: 7, // 7月新番：6月、7月、8月
+      // 7月新番：6月、7月、8月
+      quarter: 7,
     })
     // 6月在 7月新番 范围内，年份匹配2024 → matchTimeFilter line 363 返回 true → 执行 delete
     const deletes = diffs.filter((d) => d.kind === 'delete')
@@ -2721,7 +2727,8 @@ describe('matchTimeFilter 分支: 月份不在季度范围内 (line 361)', () =>
       enabled: true,
       range: 'quarter',
       year: 2024,
-      quarter: 7, // 7月新番：6月、7月、8月 — 1月不在范围内
+      // 7月新番：6月、7月、8月 — 1月不在范围内
+      quarter: 7,
     })
     // 1月不在 7月新番 范围内 → matchTimeFilter line 361 返回 false → 跳过 delete
     const deletes = diffs.filter((d) => d.kind === 'delete')
@@ -2739,7 +2746,8 @@ describe('matchTimeFilter 分支: 月份不在季度范围内 (line 361)', () =>
       enabled: true,
       range: 'quarter',
       year: 2024,
-      quarter: 1, // Q1: [12,1,2] — 3月不在范围内
+      // Q1: [12,1,2] — 3月不在范围内
+      quarter: 1,
     })
     const deletes = diffs.filter((d) => d.kind === 'delete')
     expect(deletes.length).toBe(0)
@@ -2783,7 +2791,8 @@ describe('computeDiff 扩展字段差异比较 (line 463)', () => {
           sid: 'ext-1',
           fields: {
             名称: '扩展条目',
-            完播日: '2024-06-20', // 不同的完播日
+            // 不同的完播日
+            完播日: '2024-06-20',
           },
         },
       ],
@@ -2811,7 +2820,8 @@ describe('computeDiff 扩展字段差异比较 (line 463)', () => {
           sid: 'ext-2',
           fields: {
             名称: '条目2',
-            开播日期: '2024-06-15', // 与 remote.date 匹配
+            // 与 remote.date 匹配
+            开播日期: '2024-06-15',
             完播日: '',
           },
         },
@@ -3114,7 +3124,8 @@ describe('batchUpdateRows 扩展字段处理 (lines 790-804)', () => {
       new Map<string, number>([
         ['Bangumi_URL', 1],
         ['名称', 2],
-        ['完播日', 3], // 对应 EXTENDED_FIELD_MAP 中的 '播放结束'
+        // 对应 EXTENDED_FIELD_MAP 中的 '播放结束'
+        ['完播日', 3],
       ]),
     )
 
@@ -3135,7 +3146,8 @@ describe('batchUpdateRows 扩展字段处理 (lines 790-804)', () => {
           sid: 'ext-upd-1',
           name: '扩展条目',
           date: '2024-06-15',
-          播放结束: '2024-12-25', // 扩展字段
+          // 扩展字段
+          播放结束: '2024-12-25',
         },
         localRow: 2,
         changedFields: ['完播日'],
@@ -3160,7 +3172,8 @@ describe('batchUpdateRows 扩展字段处理 (lines 790-804)', () => {
         ['Bangumi_URL', 1],
         ['名称', 2],
         ['集数', 3],
-        ['时长', 4], // EXTENDED_FIELD_MAP: JSONL '片长' → Excel '时长'
+        // EXTENDED_FIELD_MAP: JSONL '片长' → Excel '时长'
+        ['时长', 4],
       ]),
     )
 
@@ -3180,10 +3193,12 @@ describe('batchUpdateRows 扩展字段处理 (lines 790-804)', () => {
           sid: 'ext-num-1',
           name: '数字扩展',
           date: '2024-06-15',
-          片长: 120, // JSONL 字段 '片长'，对应 Excel 列 '时长'
+          // JSONL 字段 '片长'，对应 Excel 列 '时长'
+          片长: 120,
         },
         localRow: 2,
-        changedFields: ['时长'], // changedFields 使用 Excel 列名
+        // changedFields 使用 Excel 列名
+        changedFields: ['时长'],
       },
     ]
 
@@ -3206,7 +3221,8 @@ describe('batchUpdateRows 日期列格式化 (lines 814-815)', () => {
       new Map<string, number>([
         ['Bangumi_URL', 1],
         ['名称', 2],
-        ['开播日期', 3], // 日期列，在 DATE_COLUMNS 中
+        // 日期列，在 DATE_COLUMNS 中
+        ['开播日期', 3],
       ]),
     )
 
@@ -3255,7 +3271,8 @@ describe('batchUpdateRows 非日期字符串扩展字段 (line 797)', () => {
       new Map<string, number>([
         ['Bangumi_URL', 1],
         ['名称', 2],
-        ['制作公司', 3], // Excel 列名，对应 EXTENDED_FIELD_MAP ['动画制作公司', '制作公司']
+        // Excel 列名，对应 EXTENDED_FIELD_MAP ['动画制作公司', '制作公司']
+        ['制作公司', 3],
       ]),
     )
 
@@ -3275,7 +3292,8 @@ describe('batchUpdateRows 非日期字符串扩展字段 (line 797)', () => {
           sid: 'non-date-1',
           name: '非日期测试',
           date: '2024-06-15',
-          动画制作公司: 'Test Studio', // JSONL 字段 → Excel '制作公司'
+          // JSONL 字段 → Excel '制作公司'
+          动画制作公司: 'Test Studio',
         },
         localRow: 2,
         changedFields: ['制作公司'],
@@ -3326,7 +3344,8 @@ describe('batchUpdateRows 空列场景 (lines 741-742)', () => {
           date: '2024-06-15',
         },
         localRow: 2,
-        changedFields: ['不存在的列'], // 不匹配任何列
+        // 不匹配任何列
+        changedFields: ['不存在的列'],
       },
     ]
 
@@ -3405,7 +3424,8 @@ describe('batchWriteNewRows 扩展字段写入 (lines 632-635)', () => {
         ['Bangumi_URL', 1],
         ['名称', 2],
         ['集数', 3],
-        ['动画制作公司', 4], // 扩展字段 - 非日期列
+        // 扩展字段 - 非日期列
+        ['动画制作公司', 4],
       ]),
     )
 
@@ -3417,7 +3437,8 @@ describe('batchWriteNewRows 扩展字段写入 (lines 632-635)', () => {
           sid: 'ext-str-1',
           name: '扩展字符串测试',
           date: '2024-06-15',
-          动画制作公司: 'Test Studio', // 非日期字符串扩展字段
+          // 非日期字符串扩展字段
+          动画制作公司: 'Test Studio',
         },
         changedFields: ['*'],
       },
@@ -3447,7 +3468,8 @@ describe('batchWriteNewRows 扩展字段写入 (lines 632-635)', () => {
         ['Bangumi_URL', 1],
         ['名称', 2],
         ['集数', 3],
-        ['话数', 4], // 数字扩展字段
+        // 数字扩展字段
+        ['话数', 4],
       ]),
     )
 
@@ -3459,7 +3481,8 @@ describe('batchWriteNewRows 扩展字段写入 (lines 632-635)', () => {
           sid: 'ext-num-1',
           name: '扩展数字测试',
           date: '2024-06-15',
-          话数: 12, // 数字类型扩展字段
+          // 数字类型扩展字段
+          话数: 12,
         },
         changedFields: ['*'],
       },
@@ -3836,7 +3859,8 @@ describe('batchUpdateRows 列写入判断分支 (lines 768-772)', () => {
         sid: 'update-url-skip',
         localRow: 3,
         remote: { sid: 'update-url-skip', name: '名称更新', date: '2024-06-15' },
-        changedFields: ['名称'], // 不包含 Bangumi_URL
+        // 不包含 Bangumi_URL
+        changedFields: ['名称'],
       },
     ]
 
@@ -3877,7 +3901,8 @@ describe('batchUpdateRows 列写入判断分支 (lines 768-772)', () => {
         sid: 'name-skip',
         localRow: 3,
         remote: { sid: 'name-skip', name: '名称更新', date: '2024-06-15', meta_tags: ['Tag'] },
-        changedFields: ['Bangumi_URL'], // 不包含名称
+        // 不包含名称
+        changedFields: ['Bangumi_URL'],
       },
     ]
 
@@ -3993,7 +4018,8 @@ describe('batchUpdateRows 扩展字段分支覆盖 (lines 788-807)', () => {
       new Map<string, number>([
         ['Bangumi_URL', 1],
         ['名称', 2],
-        ['动画制作公司', 3], // 扩展字段 - 非日期列
+        // 扩展字段 - 非日期列
+        ['动画制作公司', 3],
       ]),
     )
 
@@ -4035,7 +4061,8 @@ describe('batchUpdateRows 扩展字段分支覆盖 (lines 788-807)', () => {
       new Map<string, number>([
         ['Bangumi_URL', 1],
         ['名称', 2],
-        ['话数', 3], // 数字扩展字段
+        // 数字扩展字段
+        ['话数', 3],
       ]),
     )
 
@@ -4048,7 +4075,8 @@ describe('batchUpdateRows 扩展字段分支覆盖 (lines 788-807)', () => {
           sid: 'ext-num-update',
           name: '数字测试',
           date: '2024-06-15',
-          话数: 24, // 数字类型
+          // 数字类型
+          话数: 24,
         },
         changedFields: ['话数'],
       },
@@ -4433,7 +4461,8 @@ describe('safeSet 日期列分支 (lines 468-472) 通过 writeRemoteEntryToRow f
       new Map<string, number>([
         ['Bangumi_URL', 1],
         ['名称', 2],
-        ['开播日期', 3], // DATE_COLUMNS 中的列
+        // DATE_COLUMNS 中的列
+        ['开播日期', 3],
       ]),
     )
 
@@ -4447,7 +4476,8 @@ describe('safeSet 日期列分支 (lines 468-472) 通过 writeRemoteEntryToRow f
         remote: {
           sid: 'date-fallback-1',
           name: '日期回退测试',
-          date: '2024-06-15', // ISO 日期字符串，formatDateToLocal 可解析
+          // ISO 日期字符串，formatDateToLocal 可解析
+          date: '2024-06-15',
         },
         changedFields: ['*'],
       },
@@ -4479,7 +4509,8 @@ describe('safeSet 数字扩展字段 (line 506)', () => {
       new Map<string, number>([
         ['Bangumi_URL', 1],
         ['名称', 2],
-        ['时长', 3], // 对应 '片长'
+        // 对应 '片长'
+        ['时长', 3],
       ]),
     )
 
@@ -4492,7 +4523,8 @@ describe('safeSet 数字扩展字段 (line 506)', () => {
         remote: {
           sid: 'num-field-1',
           name: '数字字段测试',
-          片长: 24, // 数字类型，触发 line 506
+          // 数字类型，触发 line 506
+          片长: 24,
         },
         changedFields: ['*'],
       },
@@ -4504,7 +4536,8 @@ describe('safeSet 数字扩展字段 (line 506)', () => {
     // 验证 setCellValue 被调用来写入数字转字符串的值
     const setCellCalls = mockSetCellValue.mock.calls
     const hasDurationString = setCellCalls.some(
-      (_call: unknown[]) => true, // 简化验证，只要写入发生即可
+      // 简化验证，只要写入发生即可
+      (_call: unknown[]) => true,
     )
     expect(hasDurationString).toBe(true)
   })

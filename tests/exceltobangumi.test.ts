@@ -129,7 +129,9 @@ function createMockWorksheet(options: MockWorksheetOptions = {}): unknown {
       SpecialCells: (_type: number) => null,
       Areas: {
         Count: 1,
-        Item: (index: number) => ({ Rows: { Count: 1, Item: (index_: number) => ({ Row: index + index_ - 1 }) } }),
+        Item: (index: number) => ({
+          Rows: { Count: 1, Item: (index_: number) => ({ Row: index + index_ - 1 }) },
+        }),
       },
     }),
     Rows: { Count: options.rowsCount ?? 100_000 },
@@ -181,7 +183,8 @@ describe('buildJsonPayload', () => {
 
   it('应支持"type"列名（英文）', () => {
     const getField = (key: string): string => {
-      if (key === 'type') return '5' // 抛弃
+      // 抛弃
+      if (key === 'type') return '5'
       return ''
     }
     const json = buildJsonPayload(getField, '')
@@ -477,7 +480,8 @@ describe('getFilterStatus', () => {
   })
 
   it('window.Application 无 ActiveWorkbook 时返回空结果', () => {
-    setMockApp({}) // 无 ActiveWorkbook
+    // 无 ActiveWorkbook
+    setMockApp({})
     const result = getFilterStatus()
     expect(result.hasFilter).toBe(false)
     expect(result.visibleRows).toEqual([])
@@ -546,8 +550,10 @@ describe('getSequentialRowsBySeqCol', () => {
         I2: '1',
         I3: '2',
         I4: '3',
-        I5: '', // 空 → 跳过
-        I6: 'abc', // 非数字 → 跳过
+        // 空 → 跳过
+        I5: '',
+        // 非数字 → 跳过
+        I6: 'abc',
       },
     })
     setMockApp({
@@ -566,8 +572,10 @@ describe('getSequentialRowsBySeqCol', () => {
     const mockWs = createMockWorksheet({
       rangeValues: {
         I2: '100',
-        I3: null, // null → 跳过
-        I4: 'undefined', // 非数字 → 跳过
+        // null → 跳过
+        I3: null,
+        // 非数字 → 跳过
+        I4: 'undefined',
         I5: '200',
       },
     })
@@ -583,9 +591,12 @@ describe('getSequentialRowsBySeqCol', () => {
   it('应跳过带空白的序列号（trim 后非数字）', () => {
     const mockWs = createMockWorksheet({
       rangeValues: {
-        I2: '  1  ', // trim 后为 "1" → 数字 → 接受
-        I3: '1a', // 非纯数字 → 跳过
-        I4: '2', // 数字 → 接受
+        // trim 后为 "1" → 数字 → 接受
+        I2: '  1  ',
+        // 非纯数字 → 跳过
+        I3: '1a',
+        // 数字 → 接受
+        I4: '2',
       },
     })
     setMockApp({
@@ -655,7 +666,8 @@ describe('SyncToBangumiAsync', () => {
   it('应返回包含 success/fail/skip/stopped 字段的结果对象', async () => {
     const mockWs = createMockWorksheet({
       autoFilterMode: false,
-      rangeValues: {}, // 无数据行
+      // 无数据行
+      rangeValues: {},
     })
     setMockApp({
       ActiveWorkbook: { ActiveSheet: mockWs },
@@ -671,8 +683,10 @@ describe('SyncToBangumiAsync', () => {
       mockWs as never,
       colMap,
       'test-token',
-      5, // lastRow
-      1, // headerRow
+      // lastRow
+      5,
+      // headerRow
+      1,
     )
 
     expect(result).toHaveProperty('success')
@@ -688,7 +702,8 @@ describe('SyncToBangumiAsync', () => {
   it('无数据行时返回 success=0/fail=0/skip=0', async () => {
     const mockWs = createMockWorksheet({
       autoFilterMode: false,
-      rangeValues: {}, // 无 Bangumi_URL 数据
+      // 无 Bangumi_URL 数据
+      rangeValues: {},
     })
     setMockApp({
       ActiveWorkbook: { ActiveSheet: mockWs },
@@ -790,8 +805,10 @@ describe('SyncToBangumiAsync', () => {
       mockWs as never,
       colMap,
       'test-token',
-      2, // lastRow
-      1, // headerRow
+      // lastRow
+      2,
+      // headerRow
+      1,
     )
 
     // bgmRequestSync 应被调用（至少一次）
@@ -825,8 +842,10 @@ describe('SyncToBangumiAsync', () => {
     expect(mockState.bgmRequestSync).toHaveBeenCalled()
     // 调用参数应包含正确的 endpoint、method 和 token
     const callArguments = mockState.bgmRequestSync.mock.calls[0]
-    expect(callArguments?.[0]).toBe('POST') // method
-    expect(callArguments?.[3]).toBe('test-token') // token
+    // method
+    expect(callArguments?.[0]).toBe('POST')
+    // token
+    expect(callArguments?.[3]).toBe('test-token')
     // endpoint 应包含 sid
     expect(callArguments?.[1]).toContain('12345')
     // 应有成功计数（可能为 0 或 1，取决于 mock 设置）
@@ -841,9 +860,11 @@ describe('SyncToBangumiAsync', () => {
       autoFilterMode: false,
       rangeValues: {
         B2: 'https://bgm.tv/subject/12345',
-        C2: '看过', // type=2
+        // type=2
+        C2: '看过',
         A2: '测试条目',
-        I2: '12', // 集数=12
+        // 集数=12
+        I2: '12',
       },
     })
     setMockApp({
@@ -874,7 +895,8 @@ describe('SyncToBangumiAsync', () => {
       autoFilterMode: false,
       rangeValues: {
         B2: 'https://bgm.tv/subject/12345',
-        C2: '在看', // type=3
+        // type=3
+        C2: '在看',
         A2: '测试条目',
         I2: '12',
       },
@@ -904,7 +926,8 @@ describe('SyncToBangumiAsync', () => {
     const mockWs = createMockWorksheet({
       autoFilterMode: false,
       rangeValues: {
-        B2: '', // URL 为空 → 跳过
+        // URL 为空 → 跳过
+        B2: '',
         C2: '看过',
       },
     })
@@ -931,7 +954,8 @@ describe('SyncToBangumiAsync', () => {
       autoFilterMode: false,
       rangeValues: {
         B2: 'https://bgm.tv/subject/12345',
-        C2: '', // 状态为空 → 默认 type=1，仍同步
+        // 状态为空 → 默认 type=1，仍同步
+        C2: '',
       },
     })
     setMockApp({
@@ -957,7 +981,8 @@ describe('SyncToBangumiAsync', () => {
       autoFilterMode: false,
       rangeValues: {
         B2: 'https://bgm.tv/subject/12345',
-        C2: '忽略', // type=0 → 跳过
+        // type=0 → 跳过
+        C2: '忽略',
       },
     })
     setMockApp({
@@ -980,7 +1005,8 @@ describe('SyncToBangumiAsync', () => {
     const mockWs = createMockWorksheet({
       autoFilterMode: false,
       rangeValues: {
-        B2: 'https://example.com/not-bgm', // 非 BGM URL
+        // 非 BGM URL
+        B2: 'https://example.com/not-bgm',
         C2: '看过',
       },
     })
@@ -1031,7 +1057,8 @@ describe('SyncToBangumiAsync', () => {
     const mockWs = createMockWorksheet({
       autoFilterMode: false,
       rangeValues: {
-        B2: 'https://bgm.tv/subject/12345', // SID=12345 在跳过集合中
+        // SID=12345 在跳过集合中
+        B2: 'https://bgm.tv/subject/12345',
         C2: '看过',
       },
     })

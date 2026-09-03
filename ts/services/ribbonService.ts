@@ -108,7 +108,8 @@ export function detectGithubConflicts(
 
     for (const spec of GITHUB_CONFLICT_FIELDS) {
       const remoteValue = spec.remoteToString(entry)
-      if (!remoteValue) continue // 远程无值，不视为冲突
+      // 远程无值，不视为冲突
+      if (!remoteValue) continue
       const localValue = localEntry.fields[spec.localField] ?? ''
       if (remoteValue !== localValue) {
         conflicts.push({
@@ -225,7 +226,8 @@ export function getSyncPreview(
 
     if (!bgmUrl || !extractSubjectId(bgmUrl)) {
       noUrl += 1
-      continue // 无效行不计入 valid
+      // 无效行不计入 valid
+      continue
     }
     valid += 1
 
@@ -263,7 +265,8 @@ export function getSyncPreview(
           }
         }
       } else {
-        continue // 非增量模式：已上传跳过
+        // 非增量模式：已上传跳过
+        continue
       }
     }
 
@@ -419,11 +422,13 @@ export async function detectConflicts(
     if (!sid) continue
 
     const bgmEntry = bgmCollection.get(sid)
-    if (!bgmEntry) continue // 无对应收藏，不视为冲突
+    // 无对应收藏，不视为冲突
+    if (!bgmEntry) continue
 
     // 构建 Excel 的 payload
     const excelType = mapWatchStatus(getField(rowNumber, '是否看完'))
-    if (excelType === 0) continue // 不上传，不参与冲突
+    // 不上传，不参与冲突
+    if (excelType === 0) continue
 
     // 对比 type 字段
     if (bgmEntry.type !== excelType) {
@@ -908,8 +913,10 @@ export async function executeUndoLastSync(): Promise<number> {
 
   const confirmed = await wpsMessageBox(
     `确认撤销最近一次同步操作？\n\n${description}\n\n将按单元格逆序恢复旧值。`,
-    4, // MB_YESNO
-    32, // MB_ICONQUESTION
+    // MB_YESNO
+    4,
+    // MB_ICONQUESTION
+    32,
   )
   if (confirmed !== 6) {
     bgmLog(LOG_LEVELS.INFO, '[executeUndoLastSync] 用户取消撤销')

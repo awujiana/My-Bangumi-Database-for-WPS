@@ -224,7 +224,8 @@ describe('UndoStack', () => {
       recordRowDeleteEntry({ row: 5, values: { '1': 'deleted' } })
       endUndoSession()
       const count = undoLastSync()
-      expect(count).toBe(2) // 1 cell + 1 row-delete
+      // 1 cell + 1 row-delete
+      expect(count).toBe(2)
     })
   })
 

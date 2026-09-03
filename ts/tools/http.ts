@@ -122,7 +122,8 @@ export async function httpRequest<T = unknown>(
     validateMethod(method)
   } catch (error: unknown) {
     BGM.handleError(error, { context: 'httpRequest', showAlert: false })
-    const error_ = error instanceof BgmError ? error : new BgmError(String(error), 'VALIDATION_ERROR')
+    const error_ =
+      error instanceof BgmError ? error : new BgmError(String(error), 'VALIDATION_ERROR')
     return Result.fail(error_)
   }
 

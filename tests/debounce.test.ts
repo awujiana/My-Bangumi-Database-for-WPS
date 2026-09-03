@@ -45,7 +45,8 @@ describe('debounce', () => {
     debounced()
     vi.advanceTimersByTime(200)
     expect(function_).not.toHaveBeenCalled()
-    debounced() // 重置计时器
+    // 重置计时器
+    debounced()
     vi.advanceTimersByTime(200)
     expect(function_).not.toHaveBeenCalled()
     vi.advanceTimersByTime(100)
@@ -75,9 +76,11 @@ describe('throttle', () => {
   it('固定间隔内最多触发一次', () => {
     const function_ = vi.fn()
     const throttled = throttle(function_, 300)
-    throttled() // 立即触发
+    // 立即触发
+    throttled()
     expect(function_).toHaveBeenCalledTimes(1)
-    throttled() // 被节流
+    // 被节流
+    throttled()
     expect(function_).toHaveBeenCalledTimes(1)
     vi.advanceTimersByTime(300)
     expect(function_).toHaveBeenCalledTimes(2)
@@ -86,9 +89,11 @@ describe('throttle', () => {
   it('默认间隔 300ms', () => {
     const function_ = vi.fn()
     const throttled = throttle(function_)
-    throttled() // 立即触发
+    // 立即触发
+    throttled()
     expect(function_).toHaveBeenCalledTimes(1)
-    throttled() // 被节流
+    // 被节流
+    throttled()
     expect(function_).toHaveBeenCalledTimes(1)
     vi.advanceTimersByTime(300)
     expect(function_).toHaveBeenCalledTimes(2)
@@ -97,9 +102,11 @@ describe('throttle', () => {
   it('间隔到期后下一次调用立即触发', () => {
     const function_ = vi.fn()
     const throttled = throttle(function_, 200)
-    throttled() // 立即触发 #1
+    // 立即触发 #1
+    throttled()
     vi.advanceTimersByTime(200)
-    throttled() // 立即触发 #2
+    // 立即触发 #2
+    throttled()
     expect(function_).toHaveBeenCalledTimes(2)
   })
 })

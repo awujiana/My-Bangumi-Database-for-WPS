@@ -44,9 +44,12 @@ interface HeaderMeta {
   dataStartRow: number
   lastCol: number
   firstDataCol: number
-  previewColStart: number // 切片后的数组起始索引（0）
-  previewColEnd: number // 切片后的列数
-  previewColStartAbsolute: number // 新增：预览第一列的实际列号（1‑based）
+  // 切片后的数组起始索引（0）
+  previewColStart: number
+  // 切片后的列数
+  previewColEnd: number
+  // 新增：预览第一列的实际列号（1‑based）
+  previewColStartAbsolute: number
   headerMatchCount: number
 }
 
@@ -318,7 +321,8 @@ export function refreshWorkbooks(): void {
 
 export function activateSheetIfNeeded(ws: WpsWorksheet): (() => void) | false {
   const app = getApp()
-  if (!app?.ActiveWorkbook) return false // 确保工作簿存在
+  // 确保工作簿存在
+  if (!app?.ActiveWorkbook) return false
 
   try {
     const active = app.ActiveWorkbook.ActiveSheet
@@ -494,9 +498,11 @@ export function detectHeaderAndColumns(
     dataStartRow,
     lastCol: actualLastCol,
     firstDataCol,
-    previewColStart: 0, // 保留，但不用于数据读取
+    // 保留，但不用于数据读取
+    previewColStart: 0,
     previewColEnd: previewColEnd - previewColStart + 1,
-    previewColStartAbsolute: previewColStart, // 新增，实际列号
+    // 新增，实际列号
+    previewColStartAbsolute: previewColStart,
     headerMatchCount,
   }
 }
@@ -871,11 +877,14 @@ export function refreshData(): void {
     const meta = detectHeaderAndColumns(ws, { visibleRowSet, isFiltered })
     // ✅ 保存供 previewSyncContent 使用
     BGM.dataPreview = {
-      ws, // 工作表引用
-      visibleRows: filterStatus.visibleRows, // 筛选后可见行（含表头）
+      // 工作表引用
+      ws,
+      // 筛选后可见行（含表头）
+      visibleRows: filterStatus.visibleRows,
       headerRow: meta.headerRow,
       dataStartRow: meta.dataStartRow,
-      previewColStart: meta.previewColStartAbsolute, // 实际起始列号
+      // 实际起始列号
+      previewColStart: meta.previewColStartAbsolute,
       previewColEnd: meta.previewColStartAbsolute + (meta.previewColEnd - meta.previewColStart) - 1,
       columnCount: meta.previewColEnd - meta.previewColStart,
       headerNames: meta.headerNames.slice(meta.previewColStart, meta.previewColEnd),

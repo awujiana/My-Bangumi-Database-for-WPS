@@ -23,7 +23,11 @@ vi.hoisted(() => {
 })
 
 import { Result, BgmError } from '../ts/core/result.js'
-import { colNumToLetter as colNumberToLetter, escapeHtml, trim } from '../ts/tools/stringUtilsPure.js'
+import {
+  colNumToLetter as colNumberToLetter,
+  escapeHtml,
+  trim,
+} from '../ts/tools/stringUtilsPure.js'
 import {
   isBangumiUrl,
   extractSubjectId,
@@ -713,7 +717,8 @@ describe('并发调用边界', () => {
     it('1000 次调用返回一致结果', () => {
       const results: string[] = []
       for (let index = 0; index < 1000; index += 1) {
-        results.push(colNumberToLetter(27)) // AA
+        // AA
+        results.push(colNumberToLetter(27))
       }
       expect(results).toHaveLength(1000)
       expect(results.every((r) => r === 'AA')).toBe(true)

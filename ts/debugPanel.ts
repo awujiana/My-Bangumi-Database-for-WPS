@@ -763,7 +763,9 @@ function bindEnvironmentActions(root: HTMLElement): void {
   const clearCacheButton = root.querySelector<HTMLElement>('#bgm-dp-clear-cache')
   clearCacheButton?.addEventListener('click', () => {
     // 添加 cache-busting 参数强制刷新
-    window.location.assign(`${window.location.origin + window.location.pathname}?bust=${String(Date.now())}`)
+    window.location.assign(
+      `${window.location.origin + window.location.pathname}?bust=${String(Date.now())}`,
+    )
   })
 
   const exportReportButton = root.querySelector<HTMLElement>('#bgm-dp-export-report')

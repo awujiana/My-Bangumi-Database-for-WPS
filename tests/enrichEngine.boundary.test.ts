@@ -45,7 +45,8 @@ describe('normalizeName 边界情况', () => {
   })
 
   it('全角转半角', () => {
-    expect(normalizeName('テスト')).toBe('テスト') // 日文假名字符不受影响
+    // 日文假名字符不受影响
+    expect(normalizeName('テスト')).toBe('テスト')
   })
 
   it('完整示例', () => {

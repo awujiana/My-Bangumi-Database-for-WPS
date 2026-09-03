@@ -71,7 +71,8 @@ function initPanelCore(): void {
     BGM.sheet.isLocked = true
     saveLockedSheet({ index: detected.sheetIndex, name: detected.sheetName })
     updateLockButton()
-    refreshData() // 立即刷新一次预览
+    // 立即刷新一次预览
+    refreshData()
   } else if (isRestored && BGM.sheet.isLocked) {
     const select = document.getElementById('sheetSelect') as HTMLSelectElement | null
     if (select) select.value = String(BGM.sheet.lockedIndex)
@@ -91,7 +92,8 @@ function initPanelCore(): void {
       BGM.sheet.isLocked = false
       saveLockedSheet(null)
       updateLockButton()
-      refreshData() // 切换工作表时刷新预览
+      // 切换工作表时刷新预览
+      refreshData()
     })
   }
 
@@ -173,7 +175,11 @@ function safeInitPanel(): void {
   try {
     initPanelCore()
   } catch (error: unknown) {
-    BGM.handleError(error, { showAlert: false, level: BGM.ErrorLevel.INFO, context: 'initPanelCore' })
+    BGM.handleError(error, {
+      showAlert: false,
+      level: BGM.ErrorLevel.INFO,
+      context: 'initPanelCore',
+    })
     document.dispatchEvent(new CustomEvent('bgm:modulesReady'))
   }
 }

@@ -440,7 +440,8 @@ describe('readLocalEntriesForSync', () => {
     mockGetDataSheet.mockReturnValue(sheet)
     mockFindHeaderRow.mockReturnValue(1)
     mockGetLastRow.mockReturnValue(10)
-    mockGetColumnMap.mockReturnValue(new Map()) // 无 Bangumi_URL 列
+    // 无 Bangumi_URL 列
+    mockGetColumnMap.mockReturnValue(new Map())
     const result = readLocalEntriesForSync()
     expect(result).not.toBeNull()
     expect(result?.entries).toBeInstanceOf(Map)

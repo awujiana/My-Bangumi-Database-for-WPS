@@ -241,9 +241,11 @@ function handlePreviewBodyClick(e: Event): void {
 // 从映射表中提取标准中文状态列表（过滤数字和英文）
 const VALID_STATUSES = new Set(
   Object.keys(WATCH_STATUS_MAP)
-    .filter((key) => /^[\u4E00-\u9FA5]+$/.test(key)) // 只保留纯中文
+    // 只保留纯中文
+    .filter((key) => /^[\u4E00-\u9FA5]+$/.test(key))
     .filter((key, index, array) => array.indexOf(key) === index),
-) // 去重
+  // 去重
+)
 
 /**
  * 将非标准状态文本标准化（如 "是" → "看过"）
@@ -266,7 +268,8 @@ function normalizeStatus(rawStatus: string): string {
     }
     return reverseMap[code] || trimmed
   }
-  return trimmed // 未识别的保持原样
+  // 未识别的保持原样
+  return trimmed
 }
 // ========== 公有函数 ==========
 
@@ -855,7 +858,8 @@ export async function syncAllRows(): Promise<{ success: number; fail: number; sk
     return { success: 0, fail: 0, skip: 0 }
   }
 
-  const lastRow = Math.max(...dataRows) // 使用可见行最大行号作为数据范围
+  // 使用可见行最大行号作为数据范围
+  const lastRow = Math.max(...dataRows)
 
   // ---------- 1. 同步预览统计 ----------
 
@@ -923,7 +927,8 @@ export async function syncAllRows(): Promise<{ success: number; fail: number; sk
     )
 
     const result = await SyncToBangumiAsync(ws, colMap, token, lastRow, headerRow, {
-      incremental: isIncremental, // 从 Ribbon 设置读取
+      // 从 Ribbon 设置读取
+      incremental: isIncremental,
       onProgress: (current, total, message) => {
         // 直接调用弹窗 API 更新进度，不再走事件总线
         updateSyncProgressDialog(current, total, message)

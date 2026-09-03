@@ -277,7 +277,7 @@ afterEach(() => {
   vi.clearAllTimers()
   vi.clearAllMocks()
   // 清理 DOM
-  document.body.replaceChildren();
+  document.body.replaceChildren()
 })
 
 afterAll(() => {
@@ -595,7 +595,7 @@ describe('setupButtonListeners', () => {
   })
 
   it('空 DOM 不应抛错', () => {
-    document.body.replaceChildren();
+    document.body.replaceChildren()
     expect(() => setupButtonListeners()).not.toThrow()
   })
 
@@ -622,7 +622,8 @@ describe('setupButtonListeners', () => {
     document.body.appendChild(button)
 
     setupButtonListeners()
-    setupButtonListeners() // 再次调用
+    // 再次调用
+    setupButtonListeners()
 
     button.click()
     // 应只触发一次（先 removeEventListener 再 addEventListener）

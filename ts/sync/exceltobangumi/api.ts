@@ -268,7 +268,10 @@ export function notifyUserInfoUpdated(username: string, userId: string): void {
 
     bgmLog(LOG_LEVELS.INFO, `[notifyUserInfoUpdated] 通知完成`)
   } catch (error: unknown) {
-    bgmLog(LOG_LEVELS.WARN, `通知用户信息更新失败: ${error instanceof Error ? error.message : String(error)}`)
+    bgmLog(
+      LOG_LEVELS.WARN,
+      `通知用户信息更新失败: ${error instanceof Error ? error.message : String(error)}`,
+    )
   }
 }
 
@@ -370,7 +373,10 @@ export async function bgmRequestSync(
       xhr.send(jsonBody)
     })
   } catch (error: unknown) {
-    bgmLog(LOG_LEVELS.ERROR, `[bgmRequestSync] 异常: ${error instanceof Error ? error.message : String(error)}`)
+    bgmLog(
+      LOG_LEVELS.ERROR,
+      `[bgmRequestSync] 异常: ${error instanceof Error ? error.message : String(error)}`,
+    )
     return { code: 0, message: error instanceof Error ? error.message : 'Network error' }
   }
 }

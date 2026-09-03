@@ -78,7 +78,8 @@ function createMockApp(
   return {
     Workbooks: {
       Count: workbooks.length,
-      Item: (index: number) => (index >= 1 && index <= workbooks.length ? workbooks[index - 1] : null),
+      Item: (index: number) =>
+        index >= 1 && index <= workbooks.length ? workbooks[index - 1] : null,
     },
     ActiveWorkbook: activeWbName ? { Name: activeWbName } : null,
     PluginStorage: storage,
@@ -184,7 +185,7 @@ beforeEach(() => {
   }
 
   // 清理 DOM
-  document.body.replaceChildren();
+  document.body.replaceChildren()
 })
 
 afterEach(() => {
@@ -231,7 +232,8 @@ describe('refreshEnrichWorkbooks', () => {
     refreshEnrichWorkbooks('workbookSelect')
 
     const select = document.getElementById('workbookSelect') as HTMLSelectElement
-    expect(select.options.length).toBe(3) // 默认 + 2 个工作簿
+    // 默认 + 2 个工作簿
+    expect(select.options.length).toBe(3)
     expect(select.options[0].textContent).toContain('请选择')
     expect(select.options[1].value).toBe('wb1.xlsx')
     expect(select.options[2].value).toBe('wb2.xlsx')
@@ -303,7 +305,8 @@ describe('refreshEnrichSheets', () => {
     refreshEnrichSheets('wb1.xlsx', 'sheetSelect', 'workbookSelect')
 
     const select = document.getElementById('sheetSelect') as HTMLSelectElement
-    expect(select.options.length).toBe(4) // 默认 + 3 个工作表
+    // 默认 + 3 个工作表
+    expect(select.options.length).toBe(4)
     expect(select.options[1].textContent).toBe('Sheet1')
     expect(select.options[2].textContent).toBe('Sheet2')
     expect(select.options[3].textContent).toBe('Data')
@@ -312,7 +315,7 @@ describe('refreshEnrichSheets', () => {
   it('未指定工作簿名称时使用下拉框值', () => {
     setupBasicDom()
     const wbSelect = document.getElementById('workbookSelect') as HTMLSelectElement
-    wbSelect.replaceChildren();
+    wbSelect.replaceChildren()
     const opt = document.createElement('option')
     opt.value = 'wb1.xlsx'
     opt.textContent = 'wb1.xlsx'
@@ -326,7 +329,8 @@ describe('refreshEnrichSheets', () => {
     refreshEnrichSheets(undefined, 'sheetSelect', 'workbookSelect')
 
     const select = document.getElementById('sheetSelect') as HTMLSelectElement
-    expect(select.options.length).toBe(2) // 默认 + 1
+    // 默认 + 1
+    expect(select.options.length).toBe(2)
   })
 
   it('工作簿名称为空时显示提示', () => {
@@ -356,7 +360,8 @@ describe('refreshEnrichSheets', () => {
     refreshEnrichSheets('wb1.xlsx', 'sheetSelect', 'workbookSelect')
 
     const select = document.getElementById('sheetSelect') as HTMLSelectElement
-    expect(select.value).toBe('2') // Sheet2 的索引
+    // Sheet2 的索引
+    expect(select.value).toBe('2')
   })
 
   it('工作簿不存在时记录警告', () => {
@@ -384,7 +389,7 @@ describe('toggleEnrichWorkbookLock', () => {
   it('选择工作表后锁定', () => {
     setupBasicDom()
     const wbSelect = document.getElementById('workbookSelect') as HTMLSelectElement
-    wbSelect.replaceChildren();
+    wbSelect.replaceChildren()
     const wbOpt = document.createElement('option')
     wbOpt.value = 'wb1.xlsx'
     wbOpt.textContent = 'wb1.xlsx'
@@ -392,7 +397,7 @@ describe('toggleEnrichWorkbookLock', () => {
     wbSelect.value = 'wb1.xlsx'
 
     const sheetSelect = document.getElementById('sheetSelect') as HTMLSelectElement
-    sheetSelect.replaceChildren();
+    sheetSelect.replaceChildren()
     const sheetOpt = document.createElement('option')
     sheetOpt.value = '2'
     sheetOpt.textContent = 'TargetSheet'
@@ -626,7 +631,8 @@ describe('restoreEnrichLockedWorkbook', () => {
 
   it('锁定的工作表不存在时清除状态', () => {
     const workbooks = createMockWorkbooks([
-      { Name: 'wb1.xlsx', Sheets: ['Sheet1'] }, // 只有 Sheet1，没有 Target
+      // 只有 Sheet1，没有 Target
+      { Name: 'wb1.xlsx', Sheets: ['Sheet1'] },
     ])
     const storage = createMockPluginStorage({
       bgm_enrich_locked_workbook: '{"workbookName":"wb1.xlsx","sheetName":"Target","sheetIndex":2}',
@@ -735,7 +741,8 @@ describe('getLockedEnrichSheet', () => {
     mockBGMState.enrich.lockedSheetName = 'deletedSheet'
 
     const workbooks = createMockWorkbooks([
-      { Name: 'wb1.xlsx', Sheets: ['Sheet1'] }, // 没有 deletedSheet
+      // 没有 deletedSheet
+      { Name: 'wb1.xlsx', Sheets: ['Sheet1'] },
     ])
     const storage = createMockPluginStorage({
       bgm_enrich_locked_workbook:
@@ -850,8 +857,10 @@ describe('initEnrichLock', () => {
 
     const wbSelect = document.getElementById('workbookSelect') as HTMLSelectElement
     const sheetSelect = document.getElementById('sheetSelect') as HTMLSelectElement
-    expect(wbSelect.options.length).toBe(3) // 默认 + 2 个工作簿
-    expect(sheetSelect.options.length).toBeGreaterThan(1) // 至少有默认
+    // 默认 + 2 个工作簿
+    expect(wbSelect.options.length).toBe(3)
+    // 至少有默认
+    expect(sheetSelect.options.length).toBeGreaterThan(1)
     expect(mockBGMState.enrich.isLocked).toBe(false)
   })
 
