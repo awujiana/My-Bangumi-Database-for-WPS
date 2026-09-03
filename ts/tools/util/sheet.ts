@@ -298,14 +298,14 @@ function findAnchorColumn(ws: WpsWorksheet, headerRow: number): number | undefin
 /**
  * 获取工作表的最后有效数据行
  * @param ws            工作表对象（WpsWorksheet）
- * @param forceRefresh  是否强制刷新（跳过缓存）
+ * @param shouldForceRefresh  是否强制刷新（跳过缓存）
  * @param headerRow     可选：表头行号。若提供，则自动检测“序号/ID”列并用该列定位最后行；
  *                      若未找到或未提供，回退到原有逻辑（D列 → A列 → UsedRange）。
  * @returns 最后数据行号（1‑based），至少返回 1
  */
 export function getLastRow(
   ws: WpsWorksheet | null | undefined,
-  forceRefresh = false,
+  shouldForceRefresh = false,
   headerRow?: number,
 ): number {
   if (!ws) {
@@ -316,7 +316,7 @@ export function getLastRow(
   const sheetName = ws.Name || ''
   const cacheKey = `${sheetName}:lastRow${headerRow ? `:hr${String(headerRow)}` : ''}`
 
-  if (forceRefresh) {
+  if (shouldForceRefresh) {
     clearSheetCache(ws)
     bgmLog(LOG_LEVELS.INFO, '缓存已清除，重新计算最后行')
   }

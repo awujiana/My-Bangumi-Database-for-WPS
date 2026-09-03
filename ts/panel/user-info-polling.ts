@@ -15,9 +15,9 @@ import {
   _getBgmUsername,
   updateTokenStatus,
   updateUserIdStatus,
-  getIncrementalSync,
-  getSkipConflicts,
-  getSyncRecordEnabled,
+  isIncrementalSyncEnabled,
+  isSkipConflictsEnabled,
+  isSyncRecordEnabled,
 } from '../index.js'
 import { eventBus, BGM_EVENTS } from '../tools/events.js'
 
@@ -147,8 +147,8 @@ export function startUserInfoPolling(): void {
       }
 
       // 同步 Ribbon 的配置变更到 Panel UI（增量同步 + 跳过冲突，静默读取避免日志刷屏）
-      const isCurrentIncrementalSync = getIncrementalSync(true)
-      const isCurrentSkipConflicts = getSkipConflicts(true)
+      const isCurrentIncrementalSync = isIncrementalSyncEnabled(true)
+      const isCurrentSkipConflicts = isSkipConflictsEnabled(true)
 
       if (isCurrentIncrementalSync !== lastIncrementalSync) {
         bgmLog(
@@ -184,7 +184,7 @@ export function startUserInfoPolling(): void {
         }
       }
 
-      const isCurrentEnableSyncRecord = getSyncRecordEnabled(true)
+      const isCurrentEnableSyncRecord = isSyncRecordEnabled(true)
       if (isCurrentEnableSyncRecord !== lastEnableSyncRecord) {
         bgmLog(
           LOG_LEVELS.INFO,

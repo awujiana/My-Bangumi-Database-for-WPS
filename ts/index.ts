@@ -384,16 +384,16 @@ export {
   removeConfig,
   // 增量同步配置
   setIncrementalSync,
-  getIncrementalSync,
+  isIncrementalSyncEnabled,
   // 跳过冲突配置
   setSkipConflicts,
-  getSkipConflicts,
+  isSkipConflictsEnabled,
   // 同步记录开关
   setSyncRecordEnabled,
-  getSyncRecordEnabled,
+  isSyncRecordEnabled,
   // 导航显示模式
   setNavIconsOnly,
-  getNavIconsOnly,
+  areNavIconsOnly,
   // 外观主题
   setTheme,
   getTheme,

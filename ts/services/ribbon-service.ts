@@ -135,7 +135,7 @@ export function detectGithubConflicts(
  * @param lastRow 数据最后一行
  * @param headerRow 表头行
  * @param options 可选参数 { incremental: boolean }
- * @returns 统计信息 { total, valid, willSync, willSkip, alreadyUploaded, noUrl, emptyStatus }
+ * @returns 统计信息 { total, valid, plannedSyncCount, plannedSkipCount, alreadyUploaded, noUrl, emptyStatus }
  */
 export function getSyncPreview(
   ws: WpsWorksheet,
@@ -146,8 +146,8 @@ export function getSyncPreview(
 ): {
   total: number
   valid: number
-  willSync: number
-  willSkip: number
+  plannedSyncCount: number
+  plannedSkipCount: number
   alreadyUploaded: number
   noUrl: number
   emptyStatus: number
@@ -156,8 +156,8 @@ export function getSyncPreview(
   const startRow = headerRow + 1
   let total = 0
   let valid = 0
-  let willSync = 0
-  let willSkip = 0
+  let plannedSyncCount = 0
+  let plannedSkipCount = 0
   let alreadyUploaded = 0
   let noUrl = 0
   let emptyStatus = 0
@@ -284,7 +284,7 @@ export function getSyncPreview(
         if (watchStatus) {
           const type = mapWatchStatus(watchStatus)
           if (type === 0) {
-            willSkip += 1
+            plannedSkipCount += 1
           } else {
             // 增量模式：检查指纹是否匹配
             let isFingerprintMatched = false
@@ -307,7 +307,7 @@ export function getSyncPreview(
             if (isFingerprintMatched) {
               incrementalSkipped += 1
             } else {
-              willSync += 1
+              plannedSyncCount += 1
             }
           }
         } else {
@@ -320,8 +320,8 @@ export function getSyncPreview(
   bgmLog(LOG_LEVELS.INFO, `[getSyncPreview] ========== 数据预览统计结果 ==========`)
   bgmLog(LOG_LEVELS.INFO, `[getSyncPreview] 总行数: ${String(total)}`)
   bgmLog(LOG_LEVELS.INFO, `[getSyncPreview] 有效行数: ${String(valid)}`)
-  bgmLog(LOG_LEVELS.INFO, `[getSyncPreview] 待同步行数: ${String(willSync)}`)
-  bgmLog(LOG_LEVELS.INFO, `[getSyncPreview] 跳过期数: ${String(willSkip)}`)
+  bgmLog(LOG_LEVELS.INFO, `[getSyncPreview] 待同步行数: ${String(plannedSyncCount)}`)
+  bgmLog(LOG_LEVELS.INFO, `[getSyncPreview] 跳过期数: ${String(plannedSkipCount)}`)
   bgmLog(LOG_LEVELS.INFO, `[getSyncPreview] 已上传行数: ${String(alreadyUploaded)}`)
   bgmLog(LOG_LEVELS.INFO, `[getSyncPreview] 无URL行数: ${String(noUrl)}`)
   bgmLog(LOG_LEVELS.INFO, `[getSyncPreview] 空状态行数: ${String(emptyStatus)}`)
@@ -330,8 +330,8 @@ export function getSyncPreview(
   return {
     total,
     valid,
-    willSync,
-    willSkip,
+    plannedSyncCount,
+    plannedSkipCount,
     alreadyUploaded,
     noUrl,
     emptyStatus,
@@ -510,8 +510,8 @@ export async function syncWithConfirmation(): Promise<void> {
   总行数：${String(preview.total)}
   有效条目：${String(preview.valid)}
   已上传（跳过）：${String(preview.alreadyUploaded)}
-  待同步：${String(preview.willSync)}
-  不上传（状态跳过）：${String(preview.willSkip)}
+  待同步：${String(preview.plannedSyncCount)}
+  不上传（状态跳过）：${String(preview.plannedSkipCount)}
   无效（无SID）：${String(preview.total - preview.valid)}
 
 冲突策略：${conflictStrategy === 'skip' ? '跳过冲突' : 'Excel数据覆盖'}
@@ -707,7 +707,7 @@ export async function copyTokenForRibbon(): Promise<void> {
     // 这里以精确类型调用规避废弃标注
     const isOk = (
       document as unknown as {
-        execCommand: (commandId: string, showUI?: boolean, value?: string) => boolean
+        execCommand: (commandId: string, shouldShowUI?: boolean, value?: string) => boolean
       }
     ).execCommand('copy')
     document.body.removeChild(textarea)

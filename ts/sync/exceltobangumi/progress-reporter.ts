@@ -140,7 +140,7 @@ export function applySyncFailResults(
  * @param syncTasks 全部待同步任务列表
  * @param successTasks 已成功的任务列表
  * @param failTasks 已失败的任务列表
- * @param result 结果统计对象（会被修改：累加 skip、置 stopped=true）
+ * @param result 结果统计对象（会被修改：累加 skip、置 isStopped=true）
  */
 export function handleStoppedRemainingTasks(
   syncTasks: SyncTask[],
@@ -170,7 +170,7 @@ export function handleStoppedRemainingTasks(
  * @param successTasks 成功任务列表
  * @param failTasks 失败任务列表
  * @param syncTasks 全部待同步任务列表
- * @param stopped 是否被停止
+ * @param isStopped 是否被停止
  * @param result 同步结果统计对象（会被直接修改）
  * @param startTime 开始时间戳
  * @param reportProgress 进度回调
@@ -181,7 +181,7 @@ export function finalizeSyncResults(
   successTasks: SyncTask[],
   failTasks: SyncTask[],
   syncTasks: SyncTask[],
-  stopped: boolean,
+  isStopped: boolean,
   result: SyncResultStats,
   startTime: number,
   reportProgress: (current: number, message: string) => void,
@@ -195,13 +195,13 @@ export function finalizeSyncResults(
   applySyncFailResults(ws, seqCol, failTasks, result)
 
   // 处理被停止时的剩余任务
-  if (stopped) {
+  if (isStopped) {
     handleStoppedRemainingTasks(syncTasks, successTasks, failTasks, result)
   }
 
   // 汇总报告
   const totalTime = Date.now() - startTime
-  reportProgress(syncTasks.length, stopped ? '同步已停止' : '同步完成')
+  reportProgress(syncTasks.length, isStopped ? '同步已停止' : '同步完成')
   BGM.setSyncComplete(result)
   bgmLog(
     LOG_LEVELS.INFO,

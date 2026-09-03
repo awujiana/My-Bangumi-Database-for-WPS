@@ -37,10 +37,10 @@ import {
   syncSelectedRows,
   openBangumiTokenPage,
   setSyncRecordEnabled,
-  getSyncRecordEnabled,
-  getIncrementalSync,
+  isSyncRecordEnabled,
+  isIncrementalSyncEnabled,
   setIncrementalSync,
-  getSkipConflicts,
+  isSkipConflictsEnabled,
   setSkipConflicts,
   setNavIconsOnly,
   getTheme,
@@ -474,7 +474,7 @@ export function setupButtonListeners(): void {
   if (chkEnableSyncRecord) {
     // 从 config 读取初始状态（与 chkIncremental/chkSkipConflicts 一致的双向同步机制）
     try {
-      const isEnabled = getSyncRecordEnabled()
+      const isEnabled = isSyncRecordEnabled()
       chkEnableSyncRecord.checked = isEnabled
       bgmLog(LOG_LEVELS.INFO, `[handlers] 从配置读取同步记录状态: ${isEnabled ? '开启' : '关闭'}`)
     } catch (error: unknown) {
@@ -1588,15 +1588,15 @@ const ACTION_HANDLERS: Record<string, ActionHandler> = {
       }
 
       // 4. 同步偏好（重新持久化）
-      const isIncremental = getIncrementalSync()
+      const isIncremental = isIncrementalSyncEnabled()
       setIncrementalSync(isIncremental)
       parts.push(`增量同步: ${isIncremental ? '开' : '关'}`)
 
-      const isSkipConflicts = getSkipConflicts()
+      const isSkipConflicts = isSkipConflictsEnabled()
       setSkipConflicts(isSkipConflicts)
       parts.push(`冲突策略: ${isSkipConflicts ? '跳过' : '覆盖'}`)
 
-      const isSyncRecord = getSyncRecordEnabled()
+      const isSyncRecord = isSyncRecordEnabled()
       setSyncRecordEnabled(isSyncRecord)
       parts.push(`同步记录: ${isSyncRecord ? '开' : '关'}`)
 
@@ -2128,7 +2128,7 @@ function setupEventListeners(): void {
 }
 
 // 尝试更新增量同步复选框（带重试机制）
-function tryUpdateIncrementalCheckbox(checked: boolean, attempts = 0): void {
+function tryUpdateIncrementalCheckbox(isChecked: boolean, attempts = 0): void {
   if (!isPanelContext()) return
 
   const chkIncremental = document.getElementById('chkIncremental') as HTMLInputElement | null
@@ -2137,9 +2137,9 @@ function tryUpdateIncrementalCheckbox(checked: boolean, attempts = 0): void {
     bgmLog(LOG_LEVELS.INFO, `[handlers] 找到 chkIncremental 元素`)
     bgmLog(LOG_LEVELS.INFO, `[handlers] 当前状态: ${chkIncremental.checked ? '开启' : '关闭'}`)
 
-    chkIncremental.checked = checked
+    chkIncremental.checked = isChecked
 
-    bgmLog(LOG_LEVELS.INFO, `[handlers] 增量同步复选框已更新: ${checked ? '开启' : '关闭'}`)
+    bgmLog(LOG_LEVELS.INFO, `[handlers] 增量同步复选框已更新: ${isChecked ? '开启' : '关闭'}`)
   } else if (attempts < 3) {
     // 最多重试3次
     bgmLog(
@@ -2147,7 +2147,7 @@ function tryUpdateIncrementalCheckbox(checked: boolean, attempts = 0): void {
       `[handlers] 未找到 chkIncremental 元素，延迟重试 (${String(attempts + 1)}/3)...`,
     )
     trackedSetTimeout(() => {
-      tryUpdateIncrementalCheckbox(checked, attempts + 1)
+      tryUpdateIncrementalCheckbox(isChecked, attempts + 1)
     }, 100)
   } else {
     bgmLog(LOG_LEVELS.ERROR, `[handlers] 重试3次后仍未找到 chkIncremental 元素，放弃更新`)
@@ -2155,10 +2155,10 @@ function tryUpdateIncrementalCheckbox(checked: boolean, attempts = 0): void {
 }
 
 // 尝试更新跳过冲突 UI（带重试机制）
-function tryUpdateSkipConflictsUI(skipConflicts: boolean, attempts = 0): void {
+function tryUpdateSkipConflictsUI(shouldSkipConflicts: boolean, attempts = 0): void {
   if (!isPanelContext()) return
 
-  bgmLog(LOG_LEVELS.INFO, `[handlers] 目标状态: ${skipConflicts ? '跳过冲突' : 'Excel覆盖'}`)
+  bgmLog(LOG_LEVELS.INFO, `[handlers] 目标状态: ${shouldSkipConflicts ? '跳过冲突' : 'Excel覆盖'}`)
 
   const conflictStrategySelect = document.getElementById(
     'conflictStrategy',
@@ -2168,7 +2168,7 @@ function tryUpdateSkipConflictsUI(skipConflicts: boolean, attempts = 0): void {
     bgmLog(LOG_LEVELS.INFO, `[handlers] 找到 conflictStrategy select 元素`)
     bgmLog(LOG_LEVELS.INFO, `[handlers] 当前值: ${conflictStrategySelect.value}`)
 
-    conflictStrategySelect.value = skipConflicts ? 'skip' : 'excel'
+    conflictStrategySelect.value = shouldSkipConflicts ? 'skip' : 'excel'
 
     bgmLog(LOG_LEVELS.INFO, `[handlers] 冲突策略 select 已更新: ${conflictStrategySelect.value}`)
     return
@@ -2180,7 +2180,7 @@ function tryUpdateSkipConflictsUI(skipConflicts: boolean, attempts = 0): void {
       `[handlers] 未找到 conflictStrategy select 元素，延迟重试 (${String(attempts + 1)}/3)...`,
     )
     trackedSetTimeout(() => {
-      tryUpdateSkipConflictsUI(skipConflicts, attempts + 1)
+      tryUpdateSkipConflictsUI(shouldSkipConflicts, attempts + 1)
     }, 100)
     return
   }
@@ -2200,8 +2200,8 @@ function tryUpdateSkipConflictsUI(skipConflicts: boolean, attempts = 0): void {
   )
 
   if (skipRadio && overwriteRadio) {
-    skipRadio.checked = skipConflicts
-    overwriteRadio.checked = !skipConflicts
+    skipRadio.checked = shouldSkipConflicts
+    overwriteRadio.checked = !shouldSkipConflicts
     bgmLog(LOG_LEVELS.INFO, `[handlers] 冲突策略 radio 已更新`)
     return
   }
@@ -2209,13 +2209,13 @@ function tryUpdateSkipConflictsUI(skipConflicts: boolean, attempts = 0): void {
   // 备用：如果是 checkbox
   const chkSkipConflicts = document.getElementById('chkSkipConflicts') as HTMLInputElement | null
   if (chkSkipConflicts) {
-    chkSkipConflicts.checked = skipConflicts
+    chkSkipConflicts.checked = shouldSkipConflicts
     bgmLog(LOG_LEVELS.INFO, `[handlers] 跳过冲突复选框已更新`)
   }
 }
 
 // 尝试更新启用同步记录复选框（带重试机制，与另外两个开关保持一致）
-function tryUpdateEnableSyncRecordUI(enabled: boolean, attempts = 0): void {
+function tryUpdateEnableSyncRecordUI(isEnabled: boolean, attempts = 0): void {
   if (!isPanelContext()) return
 
   const chkEnableSyncRecord = document.getElementById(
@@ -2226,17 +2226,17 @@ function tryUpdateEnableSyncRecordUI(enabled: boolean, attempts = 0): void {
     bgmLog(LOG_LEVELS.INFO, `[handlers] 找到 chkEnableSyncRecord 元素`)
     bgmLog(
       LOG_LEVELS.INFO,
-      `[handlers] 当前状态: ${chkEnableSyncRecord.checked ? '开启' : '关闭'}，目标状态: ${enabled ? '开启' : '关闭'}`,
+      `[handlers] 当前状态: ${chkEnableSyncRecord.checked ? '开启' : '关闭'}，目标状态: ${isEnabled ? '开启' : '关闭'}`,
     )
-    chkEnableSyncRecord.checked = enabled
-    bgmLog(LOG_LEVELS.INFO, `[handlers] 启用同步记录复选框已更新: ${enabled ? '开启' : '关闭'}`)
+    chkEnableSyncRecord.checked = isEnabled
+    bgmLog(LOG_LEVELS.INFO, `[handlers] 启用同步记录复选框已更新: ${isEnabled ? '开启' : '关闭'}`)
   } else if (attempts < 3) {
     bgmLog(
       LOG_LEVELS.WARN,
       `[handlers] 未找到 chkEnableSyncRecord 元素，延迟重试 (${String(attempts + 1)}/3)...`,
     )
     trackedSetTimeout(() => {
-      tryUpdateEnableSyncRecordUI(enabled, attempts + 1)
+      tryUpdateEnableSyncRecordUI(isEnabled, attempts + 1)
     }, 100)
   } else {
     bgmLog(LOG_LEVELS.ERROR, `[handlers] 重试3次后仍未找到 chkEnableSyncRecord 元素，放弃更新`)
@@ -2328,7 +2328,7 @@ function initIncrementalSyncFromRibbon(): void {
   if (!chkIncremental) return
 
   try {
-    const isIncremental = getIncrementalSync()
+    const isIncremental = isIncrementalSyncEnabled()
     chkIncremental.checked = isIncremental
     bgmLog(LOG_LEVELS.INFO, `[handlers] 从配置读取增量同步状态: ${isIncremental ? '开启' : '关闭'}`)
   } catch (error: unknown) {
@@ -2347,7 +2347,7 @@ function initSkipConflictsFromRibbon(): void {
   if (!isPanelContext()) return
 
   try {
-    const isSkipConflicts = getSkipConflicts()
+    const isSkipConflicts = isSkipConflictsEnabled()
     tryUpdateSkipConflictsUI(isSkipConflicts)
     bgmLog(
       LOG_LEVELS.INFO,

@@ -155,8 +155,8 @@ export function showAutoFillUrlDialog(): void {
 
   BGM.Dialog.confirm(
     `名称列: 第 ${String(nameCount ?? '')} 列\nURL列: 第 ${String(urlCount ?? '')} 列\n\n将根据已有 URL 的同名条目补全缺失的 URL（也支持别名匹配）。\n确定要继续吗？`,
-    (confirmed: boolean) => {
-      if (!confirmed) return
+    (isConfirmed: boolean) => {
+      if (!isConfirmed) return
       const result = autoFillUrls()
       if (result.filled > 0) {
         BGM.Dialog.alert(

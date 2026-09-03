@@ -167,7 +167,7 @@ vi.mock('../ts/sync/sync-record.js', () => ({
   addSyncRecord: vi.fn().mockReturnValue(true),
   addSyncRecords: mockAddSyncRecords,
   addSyncRecordSummary: mockAddSyncRecordSummary,
-  getSyncRecordEnabled: vi.fn().mockReturnValue(true),
+  isSyncRecordEnabled: vi.fn().mockReturnValue(true),
 }))
 
 // 设置全局 XMLHttpRequest

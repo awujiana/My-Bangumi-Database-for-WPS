@@ -16,13 +16,13 @@
  */
 
 import { initPanel } from '../panel/panel-page.js'
-import { getNavIconsOnly } from '../tools/config.js'
+import { areNavIconsOnly } from '../tools/config.js'
 import { initTheme } from '../tools/theme.js'
 import { initHandlers } from '../ui/handlers/index.js'
 
 function applyNavMode(): void {
   if (typeof document === 'undefined') return
-  if (getNavIconsOnly(true)) {
+  if (areNavIconsOnly(true)) {
     document.body.classList.add('nav-icons-only')
   }
 }

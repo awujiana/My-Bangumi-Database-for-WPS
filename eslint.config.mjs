@@ -273,6 +273,33 @@ export default tseslint.config(
             // 替代保障：属性名一致性由 TypeScript 结构化类型 + tsc 强制（少字段/错字段即报错）。
             'unicorn/no-keyword-prefix': ['error', { checkProperties: false }],
 
+            // ⑤ 调选项：consistent-boolean-name 豁免两类**外部所有/动作语义**的名字。
+            //    其余 60 处（async/silent/confirmed 等参数、getIncrementalSync 等真谓词
+            //    getter、willSync 计数器误用 will 前缀）已用类型感知 codemod 改名清零。
+            //    豁免依据：
+            //    a) WPS Ribbon 宿主回调契约名 —— ribbon.xml 按名引用回调
+            //       （onLoad="OnAddinLoad"、onAction="OnAction"、getPressed="GetXxxPressed"、
+            //       onAction="OnXxxChange"），改名即断链，宿主找不到回调。
+            //    b) 动作动词命名的函数（setConfig/addSyncRecord/clearSyncRecords/
+            //       restoreLockedSheet/ensureSheetHeaders 等）—— 函数名表达"做一个动作"，
+            //       返回 boolean 仅表示执行成败，不是谓词；强行改成 didSetXxx/isXxx
+            //       反而破坏调用点可读性。真谓词（getXxx→isXxxEnabled）已另行改名，
+            //       该豁免不影响未来新写的谓词函数被规则把关。
+            'unicorn/consistent-boolean-name': [
+              'error',
+              {
+                ignore: [
+                  // a) Ribbon 契约回调（OnAction/OnAddinLoad/GetXxxPressed/OnXxxChange/onAction 类型位）
+                  '^[oO]n[A-Z]',
+                  '^Get[A-Z]',
+                  // b) 动作动词开头返回执行成败的函数（setXxx/addXxx/clearXxx/...）
+                  '^(?:set|add|remove|clear|store|copy|save|ensure|export|deduplicate|restore|autoDetect|confirmAndExecute)[A-Z]',
+                  // b') 下划线私有动作函数（_copyTextToClipboard）
+                  '^_copy',
+                ],
+              },
+            ],
+
             // ===== 类型不安全自动修复规则（不参与 --fix 重放）=====
             // 以下 unicorn 规则的 --fix 会改写标识符或收窄类型，实测会**引入编译错误**：
             //   - prefer-global-this：window → globalThis，但两者类型不等价

@@ -443,22 +443,22 @@ let _syncProgressTrigger: HTMLElement | null = null
 let _syncProgressEscHandler: ((event: KeyboardEvent) => void) | null = null
 
 /** 内部：根据暂停状态更新按钮文本/样式/aria-label，并追踪暂停时间用于全局 ETA */
-function _setSyncPausedState(paused: boolean): void {
+function _setSyncPausedState(isPaused: boolean): void {
   // 追踪暂停时间，用于全局 ETA 扣除
-  if (paused) {
+  if (isPaused) {
     _syncPauseStart = Date.now()
   } else if (_syncPauseStart > 0) {
     _syncPausedDuration += Date.now() - _syncPauseStart
     _syncPauseStart = 0
   }
-  _isSyncPaused = paused
+  _isSyncPaused = isPaused
   const pauseButton = _syncProgressDialog?.querySelector(
     '#bgmSyncProgressPauseBtn',
   ) as HTMLButtonElement | null
   if (!pauseButton) return
-  pauseButton.textContent = paused ? '▶️ 继续' : '⏸️ 暂停'
-  pauseButton.setAttribute('aria-label', paused ? '继续同步' : '暂停同步')
-  if (paused) {
+  pauseButton.textContent = isPaused ? '▶️ 继续' : '⏸️ 暂停'
+  pauseButton.setAttribute('aria-label', isPaused ? '继续同步' : '暂停同步')
+  if (isPaused) {
     pauseButton.classList.remove('bgm-dialog-btn-default')
     pauseButton.classList.add('bgm-dialog-btn-success')
   } else {
@@ -1245,7 +1245,7 @@ export function renderSyncDetailTable(items: GithubSyncDetailItem[]): string {
  * 切换弹窗为完成状态，显示统计结果
  * @param summary 统计摘要文本
  * @param details 详情文本数组（无明细对象时的兼容显示）
- * @param stopped 是否被用户停止
+ * @param isStopped 是否被用户停止
  * @param onNext 点击"下一步"时的回调（用于打开同步完成详情弹窗）
  * @param stats 同步统计数据（用于渲染图表）
  * @param detailItems 同步明细数据（用于渲染详情表格）
@@ -1253,7 +1253,7 @@ export function renderSyncDetailTable(items: GithubSyncDetailItem[]): string {
 export function completeSyncProgressDialog(
   summary: string,
   details: string[],
-  stopped = false,
+  isStopped = false,
   onNext?: () => void,
   stats?: SyncProgressStats,
   detailItems?: GithubSyncDetailItem[],
@@ -1271,8 +1271,8 @@ export function completeSyncProgressDialog(
   const runningBtns = modal.querySelector<HTMLElement>('#bgmSyncProgressRunningBtns')
   const doneBtns = modal.querySelector<HTMLElement>('#bgmSyncProgressDoneBtns')
 
-  if (titleElement) titleElement.textContent = stopped ? '同步已停止' : '同步完成'
-  if (iconElement) iconElement.textContent = stopped ? '⏹️' : '✅'
+  if (titleElement) titleElement.textContent = isStopped ? '同步已停止' : '同步完成'
+  if (iconElement) iconElement.textContent = isStopped ? '⏹️' : '✅'
   if (progressSection) progressSection.style.display = 'none'
   if (resultSection) resultSection.style.display = ''
   if (runningBtns) runningBtns.style.display = 'none'
@@ -1370,12 +1370,12 @@ export function showAlert(message: string, title?: string, onOk?: () => void): v
 /*
  * 显示确认对话框（新签名）
  * @param message  提示内容
- * @param callback 回调函数，参数 confirmed 为 true 表示用户点击了确定
+ * @param callback 回调函数，参数 isConfirmed 为 true 表示用户点击了确定
  * @param title    可选标题
  */
 export function showConfirm(
   message: string,
-  callback: (confirmed: boolean) => void,
+  callback: (isConfirmed: boolean) => void,
   title?: string,
 ): void {
   _showDialog('confirm', {

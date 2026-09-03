@@ -340,7 +340,7 @@ async function confirmAndExecuteSync(prepared: SyncPreparedData): Promise<boolea
   })
   bgmLog(
     LOG_LEVELS.INFO,
-    `[syncFromPanel] 数据预览 - 总行数: ${String(preview.total)}, 有效: ${String(preview.valid)}, 已上传: ${String(preview.alreadyUploaded)}, 待同步: ${String(preview.willSync)}, 跳过: ${String(preview.willSkip)}, 无URL: ${String(preview.noUrl)}, 空状态: ${String(preview.emptyStatus)}, 增量跳过: ${String(preview.incrementalSkipped)}`,
+    `[syncFromPanel] 数据预览 - 总行数: ${String(preview.total)}, 有效: ${String(preview.valid)}, 已上传: ${String(preview.alreadyUploaded)}, 待同步: ${String(preview.plannedSyncCount)}, 跳过: ${String(preview.plannedSkipCount)}, 无URL: ${String(preview.noUrl)}, 空状态: ${String(preview.emptyStatus)}, 增量跳过: ${String(preview.incrementalSkipped)}`,
   )
 
   // 8. 冲突检测与策略
@@ -394,8 +394,8 @@ async function confirmAndExecuteSync(prepared: SyncPreparedData): Promise<boolea
             总行数：${String(preview.total)}
             有效条目：${String(preview.valid)}
             已上传（跳过）：${String(preview.alreadyUploaded)}
-            待同步：${String(preview.willSync)}
-            不上传（状态跳过）：${String(preview.willSkip)}
+            待同步：${String(preview.plannedSyncCount)}
+            不上传（状态跳过）：${String(preview.plannedSkipCount)}
             无URL：${String(preview.noUrl)}
             空状态：${String(preview.emptyStatus)}
             ${incremental ? `增量跳过：${String(preview.incrementalSkipped)}\n` : ''}${conflictMessage}是否继续同步？\n\n同步开始后将切换到同步记录工作表查看进度。`

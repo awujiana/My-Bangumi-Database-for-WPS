@@ -21,11 +21,11 @@ import {
   showEnrichPanel,
   showSettingsPanel,
   BGM,
-  getIncrementalSync,
-  getSkipConflicts,
+  isIncrementalSyncEnabled,
+  isSkipConflictsEnabled,
   setIncrementalSync,
   setSkipConflicts,
-  getSyncRecordEnabled,
+  isSyncRecordEnabled,
   setSyncRecordEnabled,
   bgmLog,
   LOG_LEVELS,
@@ -144,9 +144,9 @@ function startRibbonConfigPolling(): void {
 
   _configPollingTimer = setInterval(() => {
     try {
-      const isCurrentIncrementalSync = getIncrementalSync(true)
-      const isCurrentSkipConflicts = getSkipConflicts(true)
-      const isCurrentEnableSyncRecord = getSyncRecordEnabled(true)
+      const isCurrentIncrementalSync = isIncrementalSyncEnabled(true)
+      const isCurrentSkipConflicts = isSkipConflictsEnabled(true)
+      const isCurrentEnableSyncRecord = isSyncRecordEnabled(true)
 
       const app = getApp()
       const ribbonUI = app?.ribbonUI as WpsRibbonUI | undefined
@@ -224,7 +224,7 @@ export function removeRibbonMessageListener(): void {
  * 从配置读取上次保存的设置，默认未选中
  */
 export function GetSkipConflictsPressed(_control: WpsRibbonControl): boolean {
-  const isResult = getSkipConflicts()
+  const isResult = isSkipConflictsEnabled()
   bgmLog(LOG_LEVELS.INFO, `[Ribbon] GetSkipConflictsPressed: ${String(isResult)}`)
   return isResult
 }
@@ -244,7 +244,7 @@ export function OnSkipConflictsChange(control: WpsRibbonControl): boolean {
   if (typeof value === 'boolean') {
     isFinalValue = value
   } else {
-    isFinalValue = !getSkipConflicts()
+    isFinalValue = !isSkipConflictsEnabled()
     bgmLog(LOG_LEVELS.INFO, `[Ribbon] control.Pressed 不可用，切换状态为: ${String(isFinalValue)}`)
   }
 
@@ -260,7 +260,7 @@ export function OnSkipConflictsChange(control: WpsRibbonControl): boolean {
  * 从配置读取上次保存的设置，默认未选中
  */
 export function GetEnableSyncRecordPressed(_control: WpsRibbonControl): boolean {
-  const isResult = getSyncRecordEnabled()
+  const isResult = isSyncRecordEnabled()
   bgmLog(LOG_LEVELS.INFO, `[Ribbon] GetEnableSyncRecordPressed: ${String(isResult)}`)
   return isResult
 }
@@ -278,7 +278,7 @@ export function OnEnableSyncRecordChange(control: WpsRibbonControl): boolean {
   if (typeof value === 'boolean') {
     isFinalValue = value
   } else {
-    isFinalValue = !getSyncRecordEnabled()
+    isFinalValue = !isSyncRecordEnabled()
     bgmLog(LOG_LEVELS.INFO, `[Ribbon] control.Pressed 不可用，切换状态为: ${String(isFinalValue)}`)
   }
   setSyncRecordEnabled(isFinalValue)
@@ -294,7 +294,7 @@ export function OnEnableSyncRecordChange(control: WpsRibbonControl): boolean {
  * 从配置读取上次保存的设置，默认未选中
  */
 export function GetIncrementalSyncPressed(_control: WpsRibbonControl): boolean {
-  const isResult = getIncrementalSync()
+  const isResult = isIncrementalSyncEnabled()
   bgmLog(LOG_LEVELS.INFO, `[Ribbon] GetIncrementalSyncPressed: ${String(isResult)}`)
   return isResult
 }
@@ -308,7 +308,7 @@ export function OnIncrementalSyncChange(control: WpsRibbonControl): boolean {
   if (typeof value === 'boolean') {
     isFinalValue = value
   } else {
-    isFinalValue = !getIncrementalSync()
+    isFinalValue = !isIncrementalSyncEnabled()
     bgmLog(LOG_LEVELS.INFO, `[Ribbon] control.Pressed 不可用，切换状态为: ${String(isFinalValue)}`)
   }
   setIncrementalSync(isFinalValue)

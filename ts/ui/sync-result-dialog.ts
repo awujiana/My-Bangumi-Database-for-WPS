@@ -634,9 +634,9 @@ export function showSyncResultDialog(options: SyncResultDialogOptions): void {
     Promise.all([import('../sync/sync-record.js'), import('../tools/config.js')])
       .then(([syncRecordModule, configModule]) => {
         const { getSyncRecordSheetIfExists, openSyncRecordSheet } = syncRecordModule
-        const { getSyncRecordEnabled } = configModule
+        const { isSyncRecordEnabled } = configModule
 
-        const isSyncEnabled = getSyncRecordEnabled()
+        const isSyncEnabled = isSyncRecordEnabled()
         const isSheetExists = getSyncRecordSheetIfExists() !== null
 
         if (isSyncEnabled && isSheetExists) {

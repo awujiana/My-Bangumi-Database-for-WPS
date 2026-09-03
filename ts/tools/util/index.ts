@@ -114,7 +114,7 @@ export const BGM: {
   }
   Dialog: {
     alert: (title: string, message: string) => void
-    confirm: (message: string, callback: (confirmed: boolean) => void, title?: string) => void
+    confirm: (message: string, callback: (isConfirmed: boolean) => void, title?: string) => void
     error: (title: string, message: string) => void
     input: (
       title: string,
@@ -212,8 +212,8 @@ export const BGM: {
         return
       }
       this.resetStopFlag()
-      BGM.Dialog.confirm('确定要开始上传同步吗？', (confirmed: boolean) => {
-        if (!confirmed) return
+      BGM.Dialog.confirm('确定要开始上传同步吗？', (isConfirmed: boolean) => {
+        if (!isConfirmed) return
         // 复用统一入口，确保状态一致
         if (!this.enterRunningState()) return
         bgmLog(LOG_LEVELS.INFO, '开始执行同步...')
@@ -345,7 +345,7 @@ export const BGM: {
       // 使用自定义对话框
       customShowAlert(message, title)
     },
-    confirm(message: string, callback: (confirmed: boolean) => void, title?: string): void {
+    confirm(message: string, callback: (isConfirmed: boolean) => void, title?: string): void {
       showConfirm(message, callback, title)
     },
     error(title: string, message: string): void {
@@ -441,8 +441,8 @@ export const BGM: {
   showConfirm(title: string, message: string, onConfirm?: () => void, onCancel?: () => void): void {
     BGM.Dialog.confirm(
       message,
-      (confirmed: boolean) => {
-        if (confirmed) {
+      (isConfirmed: boolean) => {
+        if (isConfirmed) {
           onConfirm?.()
         } else {
           onCancel?.()
@@ -800,7 +800,7 @@ export function copyTokenToClipboard(): boolean {
     // 这里以精确类型调用规避废弃标注
     const isOk = (
       document as unknown as {
-        execCommand: (commandId: string, showUI?: boolean, value?: string) => boolean
+        execCommand: (commandId: string, shouldShowUI?: boolean, value?: string) => boolean
       }
     ).execCommand('copy')
     document.body.removeChild(textarea)

@@ -411,7 +411,7 @@ export function filterByTime(
  * @param filter 时间筛选配置
  * @returns true 表示在筛选范围内
  */
-function matchTimeFilter(dateString: string, filter: SyncTimeFilter): boolean {
+function isWithinTimeFilter(dateString: string, filter: SyncTimeFilter): boolean {
   // 预告/未来模式：所有本地条目都保留
   if (filter.range === 'future') return true
 
@@ -577,7 +577,7 @@ export function computeDiff(
         if (timeFilter?.enabled && timeFilter.range !== 'all') {
           const localDate = local.fields['开播日期']
           isInTimeRange =
-            localDate !== undefined && localDate !== '' && matchTimeFilter(localDate, timeFilter)
+            localDate !== undefined && localDate !== '' && isWithinTimeFilter(localDate, timeFilter)
         }
         if (isInTimeRange) {
           diffs.push({

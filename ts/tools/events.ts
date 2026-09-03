@@ -21,7 +21,7 @@ export type EventHandler<T = unknown> = (data: T) => void
  */
 interface EventEntry {
   handler: EventHandler
-  once?: boolean
+  isOnce?: boolean
 }
 
 /**
@@ -39,15 +39,15 @@ export class EventBus {
    * 订阅事件
    * @param {string} eventName - 事件名称
    * @param {EventHandler<T>} handler - 事件处理器
-   * @param {boolean} [once=false] - 是否只触发一次
+   * @param {boolean} [isOnce=false] - 是否只触发一次
    */
-  on<T = unknown>(eventName: string, handler: EventHandler<T>, once = false): void {
+  on<T = unknown>(eventName: string, handler: EventHandler<T>, isOnce = false): void {
     if (!this.events.has(eventName)) {
       this.events.set(eventName, [])
     }
     // 内部以 EventHandler<unknown> 存储，调用方传入的 EventHandler<T> 在运行时
     // 接收 emit 推送的实际 T 类型数据，此处断言是安全的（contravariance 限制仅类型层面）。
-    this.events.get(eventName)!.push({ handler: handler as EventHandler, once })
+    this.events.get(eventName)!.push({ handler: handler as EventHandler, isOnce })
   }
 
   /**
@@ -96,7 +96,7 @@ export class EventBus {
         // 不依赖 BGM.handleError，避免循环依赖；直接输出到控制台
         console.error('[EventBus]', error)
       }
-      if (entry.once) {
+      if (entry.isOnce) {
         this.off(eventName, entry.handler)
       }
     }

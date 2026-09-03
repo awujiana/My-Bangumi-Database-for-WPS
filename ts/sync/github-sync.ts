@@ -493,7 +493,7 @@ function appendValueWithSeparator(localValue: string, remoteValue: string): stri
  * @param row 行号
  * @param remote 远程条目
  * @param fieldsToWrite 要写入的字段列表（含 '*' 表示写入所有字段）
- * @param forceOverwrite 是否强制覆盖（true 时远程空值也清空本地；false 时远程空值跳过）
+ * @param shouldForceOverwrite 是否强制覆盖（true 时远程空值也清空本地；false 时远程空值跳过）
  */
 function writeRemoteEntryToRow(
   ws: WpsWorksheet,
@@ -501,7 +501,7 @@ function writeRemoteEntryToRow(
   row: number,
   remote: GithubRemoteEntry,
   fieldsToWrite: string[],
-  forceOverwrite: boolean,
+  shouldForceOverwrite: boolean,
 ): { attempted: boolean; success: boolean } {
   let isAnyAttempted = false
   let isAnySucceeded = false
@@ -513,7 +513,7 @@ function writeRemoteEntryToRow(
   const safeSet = (key: string, value: string): void => {
     const col = colMap.get(key)
     if (!col) return
-    if (!forceOverwrite && !value) return
+    if (!shouldForceOverwrite && !value) return
     // 记录 undo 条目（旧值 → 新值），便于撤销时恢复
     const oldValue = getCellValue(ws, row, col)
     // 值无变化时跳过写入，避免空字符串重复写入并污染 undo 栈
@@ -813,7 +813,7 @@ function batchWriteNewRows(
  * @param ws 工作表
  * @param colMap 列映射
  * @param updates 要更新的行列表（row=行号, remote=远程数据, fields=要更新的字段）
- * @param forceOverwrite 是否强制覆盖
+ * @param shouldForceOverwrite 是否强制覆盖
  * @param records 同步记录收集器
  * @param details 同步明细收集器（用于详情表格展示）
  * @returns 成功更新的行数
@@ -822,7 +822,7 @@ function batchUpdateRows(
   ws: WpsWorksheet,
   colMap: Map<string, number>,
   updates: { row: number; remote: GithubRemoteEntry; sid: string; fields: string[] }[],
-  forceOverwrite: boolean,
+  shouldForceOverwrite: boolean,
   records: UpdateRecordParameters[],
   details?: GithubSyncDetailItem[],
 ): number {
@@ -927,7 +927,7 @@ function batchUpdateRows(
       } else if (wc.name === '别名') {
         // 名称追加到「别名」列（合并策略）
         // forceOverwrite 或 writeAll 时直接写入名称列（不合并）
-        if (!forceOverwrite && !isWriteAll && fields.includes('名称')) {
+        if (!shouldForceOverwrite && !isWriteAll && fields.includes('名称')) {
           const remoteName = remote.name ?? ''
           if (remoteName) {
             value = appendValueWithSeparator(oldCellValue, remoteName)
@@ -939,7 +939,7 @@ function batchUpdateRows(
         // forceOverwrite 或 writeAll 时不处理别名（由名称列处理）
       } else if (wc.name === '名称') {
         // 名称列仅在 forceOverwrite 或 writeAll 时写入（新增或强制覆盖）
-        if (forceOverwrite || isWriteAll || fields.includes('名称')) {
+        if (shouldForceOverwrite || isWriteAll || fields.includes('名称')) {
           value = remote.name ?? ''
           shouldWrite = true
         }
@@ -947,7 +947,7 @@ function batchUpdateRows(
         if (isWriteAll || fields.includes('标签/分级')) {
           const remoteTags = tagsToString(remote.meta_tags)
           if (remoteTags) {
-            if (forceOverwrite || isWriteAll) {
+            if (shouldForceOverwrite || isWriteAll) {
               // 强制覆盖或新增：直接写入
               value = remoteTags
               shouldWrite = true
@@ -996,7 +996,7 @@ function batchUpdateRows(
 
       if (shouldWrite) {
         // 空值且非强制覆盖时跳过
-        if (forceOverwrite || value) {
+        if (shouldForceOverwrite || value) {
           // 日期列特殊处理
           if (DATE_COLUMNS.has(wc.name) && typeof value === 'string' && value) {
             const localDate = formatDateToLocal(value)
@@ -1064,7 +1064,14 @@ function batchUpdateRows(
         const hasValuesToWrite = rowValues.some((v) => v !== null)
         if (hasValuesToWrite) {
           try {
-            const result = writeRemoteEntryToRow(ws, colMap, row, remote, fields, forceOverwrite)
+            const result = writeRemoteEntryToRow(
+              ws,
+              colMap,
+              row,
+              remote,
+              fields,
+              shouldForceOverwrite,
+            )
             if (result.success || !result.attempted) {
               // 写入成功 或 没有写入需要尝试（如空列映射）→ 视为成功
               successCount += 1
@@ -1136,7 +1143,7 @@ function batchUpdateRows(
       )
       // 回退到逐字段写入
       try {
-        const result = writeRemoteEntryToRow(ws, colMap, row, remote, fields, forceOverwrite)
+        const result = writeRemoteEntryToRow(ws, colMap, row, remote, fields, shouldForceOverwrite)
         if (result.success || !result.attempted) {
           // 写入成功 或 没有写入需要尝试（如空列映射）→ 视为成功
           successCount += 1
@@ -1682,7 +1689,7 @@ export async function syncFromGithub(
   strategy: SyncStrategy = 'add-update',
   signal?: AbortSignal,
   conflictResolution?: ConflictResolution[],
-  selectedRowsOnly?: boolean,
+  shouldUseSelectedRowsOnly?: boolean,
   timeFilter?: SyncTimeFilter,
 ): Promise<GithubSyncResult> {
   const source: SyncSource = new GithubSyncSource()
@@ -1734,7 +1741,7 @@ export async function syncFromGithub(
 
     // 仅同步选中行：过滤远程条目
     let effectiveRemoteEntries = remoteEntries
-    if (selectedRowsOnly) {
+    if (shouldUseSelectedRowsOnly) {
       const selectedSids = getSelectedRowSids()
       if (selectedSids.size === 0) {
         throw new Error('未选中任何行，或选中行中未找到 Bangumi URL')

@@ -196,7 +196,7 @@ export function getFilterStatus(
   lastRow?: number,
   headerRow?: number,
   // true: 也检测非 AutoFilter 的隐藏行（性能开销）
-  deepCheck?: boolean,
+  shouldDeepCheck?: boolean,
 ): {
   hasFilter: boolean
   visibleRows: number[]
@@ -241,12 +241,12 @@ export function getFilterStatus(
     }
     bgmLog(
       LOG_LEVELS.INFO,
-      `getFilterStatus: AutoFilterMode=${String(isAutoFilterMode)}, ws.Name=${ws.Name}, deepCheck=${String(deepCheck ?? '')}`,
+      `getFilterStatus: AutoFilterMode=${String(isAutoFilterMode)}, ws.Name=${ws.Name}, deepCheck=${String(shouldDeepCheck ?? '')}`,
     )
 
     // 2. 快速检测：仅在 deepCheck 时才扫描全范围
     //    旧用法（无 deepCheck）只查 AutoFilter，这是兼容的快速路径
-    if (!isAutoFilterMode && !deepCheck) {
+    if (!isAutoFilterMode && !shouldDeepCheck) {
       bgmLog(LOG_LEVELS.INFO, 'getFilterStatus: 快速路径：无 AutoFilter')
       return result
     }
@@ -526,7 +526,7 @@ export interface SyncOptions {
   /** 单条完成回调 */
   onItemComplete?: (
     row: number,
-    success: boolean,
+    isSuccess: boolean,
     result: { code: number; message: string },
   ) => void
   /** 需要跳过的SID集合（冲突处理） */
@@ -1106,8 +1106,8 @@ async function validateSelectedRows(
     const isConfirmed = await new Promise<boolean>((resolve) => {
       showConfirm(
         `选中了 ${String(rows.length)} 行数据，确认要同步全部吗？\n\n行号范围: ${String(Math.min(...rows))} - ${String(Math.max(...rows))}`,
-        (result: boolean) => {
-          resolve(result)
+        (isConfirmed: boolean) => {
+          resolve(isConfirmed)
         },
         '批量同步确认',
       )

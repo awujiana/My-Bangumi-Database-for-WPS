@@ -102,12 +102,12 @@ export function setConfig(key: string, value: string): boolean {
  * 获取配置值
  * @param key - 配置键名
  * @param defaultValue - 默认值
- * @param silent - 静默模式，不打印日志（用于轮询等高频读取）
+ * @param isSilent - 静默模式，不打印日志（用于轮询等高频读取）
  */
-export function getConfig(key: string, defaultValue = '', silent = false): string {
+export function getConfig(key: string, defaultValue = '', isSilent = false): string {
   const storage = getStorage()
   if (!storage) {
-    if (!silent)
+    if (!isSilent)
       bgmLog(
         LOG_LEVELS.WARN,
         `[config] 无法获取 PluginStorage，使用默认值: ${key} = ${defaultValue}`,
@@ -117,7 +117,7 @@ export function getConfig(key: string, defaultValue = '', silent = false): strin
 
   const value = storage.getItem(key)
   const result = value === null ? defaultValue : value
-  if (!silent) bgmLog(LOG_LEVELS.INFO, `[config] 获取配置: ${key} = ${result}`)
+  if (!isSilent) bgmLog(LOG_LEVELS.INFO, `[config] 获取配置: ${key} = ${result}`)
   return result
 }
 
@@ -146,65 +146,66 @@ export function removeConfig(key: string): boolean {
 /**
  * 设置增量同步开关
  */
-export function setIncrementalSync(enabled: boolean): boolean {
-  bgmLog(LOG_LEVELS.INFO, `[config] 设置增量同步: ${enabled ? '开启' : '关闭'}`)
-  return setConfig(CONFIG_KEYS.INCREMENTAL_SYNC, enabled ? 'true' : 'false')
+export function setIncrementalSync(isEnabled: boolean): boolean {
+  bgmLog(LOG_LEVELS.INFO, `[config] 设置增量同步: ${isEnabled ? '开启' : '关闭'}`)
+  return setConfig(CONFIG_KEYS.INCREMENTAL_SYNC, isEnabled ? 'true' : 'false')
 }
 
 /**
  * 获取增量同步开关状态
- * @param silent - 静默模式，不打印日志
+ * @param isSilent - 静默模式，不打印日志
  */
-export function getIncrementalSync(silent = false): boolean {
-  const isResult = getConfig(CONFIG_KEYS.INCREMENTAL_SYNC, '', silent) === 'true'
-  if (!silent) bgmLog(LOG_LEVELS.INFO, `[config] 获取增量同步状态: ${isResult ? '开启' : '关闭'}`)
+export function isIncrementalSyncEnabled(isSilent = false): boolean {
+  const isResult = getConfig(CONFIG_KEYS.INCREMENTAL_SYNC, '', isSilent) === 'true'
+  if (!isSilent) bgmLog(LOG_LEVELS.INFO, `[config] 获取增量同步状态: ${isResult ? '开启' : '关闭'}`)
   return isResult
 }
 
 /**
  * 设置跳过冲突开关
  */
-export function setSkipConflicts(enabled: boolean): boolean {
-  bgmLog(LOG_LEVELS.INFO, `[config] 设置跳过冲突: ${enabled ? '开启' : '关闭'}`)
-  return setConfig(CONFIG_KEYS.SKIP_CONFLICTS, enabled ? 'true' : 'false')
+export function setSkipConflicts(isEnabled: boolean): boolean {
+  bgmLog(LOG_LEVELS.INFO, `[config] 设置跳过冲突: ${isEnabled ? '开启' : '关闭'}`)
+  return setConfig(CONFIG_KEYS.SKIP_CONFLICTS, isEnabled ? 'true' : 'false')
 }
 
 /**
  * 获取跳过冲突开关状态
- * @param silent - 静默模式，不打印日志
+ * @param isSilent - 静默模式，不打印日志
  */
-export function getSkipConflicts(silent = false): boolean {
-  const isResult = getConfig(CONFIG_KEYS.SKIP_CONFLICTS, '', silent) === 'true'
-  if (!silent) bgmLog(LOG_LEVELS.INFO, `[config] 获取跳过冲突状态: ${isResult ? '开启' : '关闭'}`)
+export function isSkipConflictsEnabled(isSilent = false): boolean {
+  const isResult = getConfig(CONFIG_KEYS.SKIP_CONFLICTS, '', isSilent) === 'true'
+  if (!isSilent) bgmLog(LOG_LEVELS.INFO, `[config] 获取跳过冲突状态: ${isResult ? '开启' : '关闭'}`)
   return isResult
 }
 
 /**
  * 设置同步记录开关
  */
-export function setSyncRecordEnabled(enabled: boolean): boolean {
-  bgmLog(LOG_LEVELS.INFO, `[config] 设置同步记录: ${enabled ? '开启' : '关闭'}`)
-  return setConfig(CONFIG_KEYS.ENABLE_SYNC_RECORD, enabled ? 'true' : 'false')
+export function setSyncRecordEnabled(isEnabled: boolean): boolean {
+  bgmLog(LOG_LEVELS.INFO, `[config] 设置同步记录: ${isEnabled ? '开启' : '关闭'}`)
+  return setConfig(CONFIG_KEYS.ENABLE_SYNC_RECORD, isEnabled ? 'true' : 'false')
 }
 
 /**
  * 获取同步记录开关状态
- * @param silent - 静默模式，不打印日志
+ * @param isSilent - 静默模式，不打印日志
  */
-export function getSyncRecordEnabled(silent = false): boolean {
-  const isResult = getConfig(CONFIG_KEYS.ENABLE_SYNC_RECORD, '', silent) === 'true'
-  if (!silent) bgmLog(LOG_LEVELS.INFO, `[config] 获取同步记录状态: ${isResult ? '开启' : '关闭'}`)
+export function isSyncRecordEnabled(isSilent = false): boolean {
+  const isResult = getConfig(CONFIG_KEYS.ENABLE_SYNC_RECORD, '', isSilent) === 'true'
+  if (!isSilent) bgmLog(LOG_LEVELS.INFO, `[config] 获取同步记录状态: ${isResult ? '开启' : '关闭'}`)
   return isResult
 }
 
-export function setNavIconsOnly(enabled: boolean): boolean {
-  bgmLog(LOG_LEVELS.INFO, `[config] 设置导航仅图标模式: ${enabled ? '开启' : '关闭'}`)
-  return setConfig(CONFIG_KEYS.NAV_ICONS_ONLY, enabled ? 'true' : 'false')
+export function setNavIconsOnly(isEnabled: boolean): boolean {
+  bgmLog(LOG_LEVELS.INFO, `[config] 设置导航仅图标模式: ${isEnabled ? '开启' : '关闭'}`)
+  return setConfig(CONFIG_KEYS.NAV_ICONS_ONLY, isEnabled ? 'true' : 'false')
 }
 
-export function getNavIconsOnly(silent = false): boolean {
-  const isResult = getConfig(CONFIG_KEYS.NAV_ICONS_ONLY, '', silent) === 'true'
-  if (!silent) bgmLog(LOG_LEVELS.INFO, `[config] 获取导航仅图标状态: ${isResult ? '开启' : '关闭'}`)
+export function areNavIconsOnly(isSilent = false): boolean {
+  const isResult = getConfig(CONFIG_KEYS.NAV_ICONS_ONLY, '', isSilent) === 'true'
+  if (!isSilent)
+    bgmLog(LOG_LEVELS.INFO, `[config] 获取导航仅图标状态: ${isResult ? '开启' : '关闭'}`)
   return isResult
 }
 
@@ -222,10 +223,10 @@ export function setTheme(mode: string): boolean {
   return setConfig(CONFIG_KEYS.THEME, mode)
 }
 
-export function getTheme(silent = false): ThemeMode {
-  const v = getConfig(CONFIG_KEYS.THEME, 'dark', silent)
+export function getTheme(isSilent = false): ThemeMode {
+  const v = getConfig(CONFIG_KEYS.THEME, 'dark', isSilent)
   const result = THEME_MODES.includes(v as ThemeMode) ? (v as ThemeMode) : 'dark'
-  if (!silent) bgmLog(LOG_LEVELS.INFO, `[config] 获取主题模式: ${result}`)
+  if (!isSilent) bgmLog(LOG_LEVELS.INFO, `[config] 获取主题模式: ${result}`)
   return result
 }
 
@@ -243,10 +244,10 @@ export function setListType(type: string): boolean {
   return setConfig(CONFIG_KEYS.LIST_TYPE, type)
 }
 
-export function getListType(silent = false): ListType {
-  const v = getConfig(CONFIG_KEYS.LIST_TYPE, 'all', silent)
+export function getListType(isSilent = false): ListType {
+  const v = getConfig(CONFIG_KEYS.LIST_TYPE, 'all', isSilent)
   const result = LIST_TYPES.includes(v as ListType) ? (v as ListType) : 'all'
-  if (!silent) bgmLog(LOG_LEVELS.INFO, `[config] 获取默认收藏列表类型: ${result}`)
+  if (!isSilent) bgmLog(LOG_LEVELS.INFO, `[config] 获取默认收藏列表类型: ${result}`)
   return result
 }
 
@@ -264,10 +265,10 @@ export function setTimeFilter(range: string): boolean {
   return setConfig(CONFIG_KEYS.TIME_FILTER, range)
 }
 
-export function getTimeFilter(silent = false): TimeFilterRange {
-  const v = getConfig(CONFIG_KEYS.TIME_FILTER, 'year', silent)
+export function getTimeFilter(isSilent = false): TimeFilterRange {
+  const v = getConfig(CONFIG_KEYS.TIME_FILTER, 'year', isSilent)
   const result = TIME_FILTERS.includes(v as TimeFilterRange) ? (v as TimeFilterRange) : 'year'
-  if (!silent) bgmLog(LOG_LEVELS.INFO, `[config] 获取默认时间筛选范围: ${result}`)
+  if (!isSilent) bgmLog(LOG_LEVELS.INFO, `[config] 获取默认时间筛选范围: ${result}`)
   return result
 }
 
@@ -286,9 +287,9 @@ export function setRefreshInterval(minutes: number): boolean {
   return setConfig(CONFIG_KEYS.REFRESH_INTERVAL, value)
 }
 
-export function getRefreshInterval(silent = false): number {
-  const raw = parseInt(getConfig(CONFIG_KEYS.REFRESH_INTERVAL, '0', silent), 10)
+export function getRefreshInterval(isSilent = false): number {
+  const raw = parseInt(getConfig(CONFIG_KEYS.REFRESH_INTERVAL, '0', isSilent), 10)
   const result = Number.isFinite(raw) && raw >= REFRESH_MIN ? raw : 0
-  if (!silent) bgmLog(LOG_LEVELS.INFO, `[config] 获取自动刷新间隔: ${String(result)} 分钟`)
+  if (!isSilent) bgmLog(LOG_LEVELS.INFO, `[config] 获取自动刷新间隔: ${String(result)} 分钟`)
   return result
 }

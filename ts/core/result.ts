@@ -136,12 +136,12 @@ export class Result<T> {
    *
    * @private
    * @constructor
-   * @param {boolean} success - 是否成功
+   * @param {boolean} isSuccess - 是否成功
    * @param {T | null} data - 成功时的数据
    * @param {BgmError | null} error - 失败时的错误
    */
-  private constructor(success: boolean, data: T | null, error: BgmError | null) {
-    this.success = success
+  private constructor(isSuccess: boolean, data: T | null, error: BgmError | null) {
+    this.success = isSuccess
     this.data = data
     this.error = error
   }

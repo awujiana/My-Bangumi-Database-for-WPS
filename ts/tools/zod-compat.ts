@@ -190,10 +190,10 @@ class LiteNumber implements ZodSchema<number> {
 
   /** @internal */ readonly _sign: LiteNumberSign | undefined
 
-  constructor(min = -Infinity, max = Infinity, int = false, sign?: LiteNumberSign) {
+  constructor(min = -Infinity, max = Infinity, isInt = false, sign?: LiteNumberSign) {
     this._min = min
     this._max = max
-    this._int = int
+    this._int = isInt
     this._sign = sign
   }
 
@@ -417,10 +417,10 @@ class LiteObject<T = any> implements ZodSchema<T> {
   constructor(
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     shape: Record<string, ZodSchema<any>>,
-    passthrough = false,
+    shouldPassthrough = false,
   ) {
     this._shape = shape
-    this._passthrough = passthrough
+    this._passthrough = shouldPassthrough
   }
 
   passthrough(): LiteObject<T> {
@@ -533,12 +533,12 @@ class LiteNullable<T> implements ZodSchema<T | null | undefined> {
   constructor(
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     inner: ZodSchema<any>,
-    allowNull = true,
-    allowUndefined = true,
+    shouldAllowNull = true,
+    shouldAllowUndefined = true,
   ) {
     this._inner = inner
-    this._allowNull = allowNull
-    this._allowUndefined = allowUndefined
+    this._allowNull = shouldAllowNull
+    this._allowUndefined = shouldAllowUndefined
   }
 
   optional(): ZodSchema<T | undefined | null> {

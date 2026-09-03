@@ -71,7 +71,7 @@ vi.mock('../ts/core/constants.js', () => ({
 const mockGetSyncRecordEnabled = vi.hoisted(() => vi.fn().mockReturnValue(true))
 
 vi.mock('../ts/tools/config.js', () => ({
-  getSyncRecordEnabled: mockGetSyncRecordEnabled,
+  isSyncRecordEnabled: mockGetSyncRecordEnabled,
 }))
 
 // 单个 hoisted 变量声明模式
@@ -966,10 +966,10 @@ describe('syncRecord', () => {
     })
   })
 
-  // ========== getSyncRecordEnabled 测试 ==========
+  // ========== isSyncRecordEnabled 测试 ==========
 
   describe('addSyncRecord 未启用场景', () => {
-    it('getSyncRecordEnabled 返回 false 时应跳过', () => {
+    it('isSyncRecordEnabled 返回 false 时应跳过', () => {
       mockGetSyncRecordEnabled.mockReturnValue(false)
       mockGetApp.mockReturnValue({ ActiveWorkbook: createMockWorkbook() })
       const isResult = addSyncRecord({
@@ -1263,7 +1263,7 @@ describe('syncRecord', () => {
   // ============ 补充: addSyncRecords 未启用场景 (lines 507-508) ============
 
   describe('addSyncRecords 未启用场景 (lines 507-508)', () => {
-    it('getSyncRecordEnabled 返回 false 时 addSyncRecords 应返回 false', () => {
+    it('isSyncRecordEnabled 返回 false 时 addSyncRecords 应返回 false', () => {
       mockGetSyncRecordEnabled.mockReturnValue(false)
       const isResult = addSyncRecords([
         { sid: 'disabled-1', name: '禁用测试1', url: 'http://d1.com' },
@@ -1274,10 +1274,10 @@ describe('syncRecord', () => {
       expect(mockSetCellValue).not.toHaveBeenCalled()
     })
 
-    it('getSyncRecordEnabled 返回 false 且空数组时仍应返回 false', () => {
+    it('isSyncRecordEnabled 返回 false 且空数组时仍应返回 false', () => {
       mockGetSyncRecordEnabled.mockReturnValue(false)
       const isResult = addSyncRecords([])
-      // 先检查 getSyncRecordEnabled，返回 false
+      // 先检查 isSyncRecordEnabled，返回 false
       expect(isResult).toBe(false)
     })
   })

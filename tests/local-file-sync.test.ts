@@ -104,10 +104,10 @@ class MockXHR {
 
   private headers: Record<string, string> = {}
 
-  open(method: string, url: string, async: boolean): void {
+  open(method: string, url: string, isAsync: boolean): void {
     this.method = method
     this.url = url
-    this.async = async
+    this.async = isAsync
   }
 
   setRequestHeader(key: string, value: string): void {

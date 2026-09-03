@@ -312,7 +312,7 @@ vi.mock('../ts/sync/sync-record.js', () => ({
   addSyncRecord: vi.fn().mockReturnValue(true),
   addSyncRecords: mockAddSyncRecords,
   addSyncRecordSummary: mockAddSyncRecordSummary,
-  getSyncRecordEnabled: vi.fn().mockReturnValue(true),
+  isSyncRecordEnabled: vi.fn().mockReturnValue(true),
 }))
 
 // Mock XMLHttpRequest globally
@@ -2449,7 +2449,7 @@ describe('filterByTime 未覆盖分支 (line 328)', () => {
   })
 })
 
-describe('matchTimeFilter 未覆盖分支 (lines 359-368) 通过 computeDiff', () => {
+describe('matchesTimeFilter 未覆盖分支 (lines 359-368) 通过 computeDiff', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     // 确保使用真实 computeDiff 实现
@@ -2500,7 +2500,7 @@ describe('matchTimeFilter 未覆盖分支 (lines 359-368) 通过 computeDiff', (
       year: 2024,
       quarter: 99,
     })
-    // quarter=99 无效 → matchTimeFilter 返回 false → 跳过 delete
+    // quarter=99 无效 → matchesTimeFilter 返回 false → 跳过 delete
     const deletes = diffs.filter((d) => d.kind === 'delete')
     expect(deletes.length).toBe(0)
   })
@@ -2532,7 +2532,7 @@ describe('matchTimeFilter 未覆盖分支 (lines 359-368) 通过 computeDiff', (
       year: 2024,
       month: 6,
     })
-    // 月份不匹配 → matchTimeFilter 返回 false → 跳过 delete
+    // 月份不匹配 → matchesTimeFilter 返回 false → 跳过 delete
     const deletes = diffs.filter((d) => d.kind === 'delete')
     expect(deletes.length).toBe(0)
   })
@@ -2547,12 +2547,12 @@ describe('matchTimeFilter 未覆盖分支 (lines 359-368) 通过 computeDiff', (
       range: 'year',
       year: 2024,
     })
-    // 2023 ≠ 2024 → matchTimeFilter 返回 false → 跳过 delete
+    // 2023 ≠ 2024 → matchesTimeFilter 返回 false → 跳过 delete
     const deletes = diffs.filter((d) => d.kind === 'delete')
     expect(deletes.length).toBe(0)
   })
 
-  it('matchTimeFilter default 分支: 未知 range 返回 true (line 367-368)', () => {
+  it('matchesTimeFilter default 分支: 未知 range 返回 true (line 367-368)', () => {
     const remote: GithubRemoteEntry[] = []
     const local = new Map<string, LocalRowEntry>([
       ['sid-1', { row: 2, sid: 'sid-1', fields: { 开播日期: '2024年06月15日', 名称: '条目' } }],
@@ -2562,7 +2562,7 @@ describe('matchTimeFilter 未覆盖分支 (lines 359-368) 通过 computeDiff', (
       range: 'week' as never,
       year: 2024,
     })
-    // 未知 range → matchTimeFilter default 返回 true → 执行 delete
+    // 未知 range → matchesTimeFilter default 返回 true → 执行 delete
     const deletes = diffs.filter((d) => d.kind === 'delete')
     expect(deletes.length).toBe(1)
   })
@@ -2579,7 +2579,7 @@ describe('matchTimeFilter 未覆盖分支 (lines 359-368) 通过 computeDiff', (
       // 7月新番：6月、7月、8月
       quarter: 7,
     })
-    // 6月在 7月新番 范围内，年份匹配2024 → matchTimeFilter line 363 返回 true → 执行 delete
+    // 6月在 7月新番 范围内，年份匹配2024 → matchesTimeFilter line 363 返回 true → 执行 delete
     const deletes = diffs.filter((d) => d.kind === 'delete')
     expect(deletes.length).toBe(1)
   })
@@ -2700,7 +2700,7 @@ describe('applyDiffToSheet 批量写入失败回退逐行写入 (lines 1022-1027
 
 // ========== 补充: githubSyncDiff.ts line 361 月份不在季度范围内 ==========
 
-describe('matchTimeFilter 分支: 月份不在季度范围内 (line 361)', () => {
+describe('matchesTimeFilter 分支: 月份不在季度范围内 (line 361)', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     mockComputeDiff.mockImplementation(
@@ -2731,7 +2731,7 @@ describe('matchTimeFilter 分支: 月份不在季度范围内 (line 361)', () =>
       // 7月新番：6月、7月、8月 — 1月不在范围内
       quarter: 7,
     })
-    // 1月不在 7月新番 范围内 → matchTimeFilter line 361 返回 false → 跳过 delete
+    // 1月不在 7月新番 范围内 → matchesTimeFilter line 361 返回 false → 跳过 delete
     const deletes = diffs.filter((d) => d.kind === 'delete')
     expect(deletes.length).toBe(0)
   })

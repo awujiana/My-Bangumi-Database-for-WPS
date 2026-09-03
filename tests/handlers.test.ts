@@ -56,11 +56,11 @@ const mockState = vi.hoisted(() => ({
   exportConfig: vi.fn(() => '{}'),
   importConfig: vi.fn(() => ({ isOk: () => true, isFail: () => false })),
   // tools/config.js
-  getIncrementalSync: vi.fn(() => false),
+  isIncrementalSyncEnabled: vi.fn(() => false),
   setIncrementalSync: vi.fn(),
-  getSkipConflicts: vi.fn(() => false),
+  isSkipConflictsEnabled: vi.fn(() => false),
   setSkipConflicts: vi.fn(),
-  getSyncRecordEnabled: vi.fn(() => false),
+  isSyncRecordEnabled: vi.fn(() => false),
   setSyncRecordEnabled: vi.fn(),
   getConfig: vi.fn(() => ''),
   setConfig: vi.fn(() => true),
@@ -114,11 +114,11 @@ vi.mock('../ts/services/config-service.js', () => ({
 }))
 
 vi.mock('../ts/tools/config.js', () => ({
-  getIncrementalSync: mockState.getIncrementalSync,
+  isIncrementalSyncEnabled: mockState.isIncrementalSyncEnabled,
   setIncrementalSync: mockState.setIncrementalSync,
-  getSkipConflicts: mockState.getSkipConflicts,
+  isSkipConflictsEnabled: mockState.isSkipConflictsEnabled,
   setSkipConflicts: mockState.setSkipConflicts,
-  getSyncRecordEnabled: mockState.getSyncRecordEnabled,
+  isSyncRecordEnabled: mockState.isSyncRecordEnabled,
   setSyncRecordEnabled: mockState.setSyncRecordEnabled,
   getConfig: mockState.getConfig,
   setConfig: mockState.setConfig,
@@ -216,11 +216,11 @@ vi.mock('../index.js', () => ({
   clearLogs: mockState.clearLogs,
 
   // ---- 配置相关（saveAllConfig 使用） ----
-  getIncrementalSync: mockState.getIncrementalSync,
+  isIncrementalSyncEnabled: mockState.isIncrementalSyncEnabled,
   setIncrementalSync: mockState.setIncrementalSync,
-  getSkipConflicts: mockState.getSkipConflicts,
+  isSkipConflictsEnabled: mockState.isSkipConflictsEnabled,
   setSkipConflicts: mockState.setSkipConflicts,
-  getSyncRecordEnabled: mockState.getSyncRecordEnabled,
+  isSyncRecordEnabled: mockState.isSyncRecordEnabled,
   setSyncRecordEnabled: mockState.setSyncRecordEnabled,
   getGithubConfig: mockState.getGithubConfig,
   setGithubConfig: mockState.setGithubConfig,
@@ -529,9 +529,9 @@ describe('ACTION_HANDLERS 分发（通过 DOM click 触发）', () => {
 
   it('点击 [data-action="saveAllConfig"] 触发配置保存流程', () => {
     // 模拟有配置需要保存（返回非默认值）
-    mockState.getIncrementalSync.mockImplementation(() => true)
-    mockState.getSkipConflicts.mockImplementation(() => true)
-    mockState.getSyncRecordEnabled.mockImplementation(() => true)
+    mockState.isIncrementalSyncEnabled.mockImplementation(() => true)
+    mockState.isSkipConflictsEnabled.mockImplementation(() => true)
+    mockState.isSyncRecordEnabled.mockImplementation(() => true)
     mockState.getSyncStrategy.mockImplementation(() => 'skip-existing')
     mockState.getGithubConfig.mockImplementation(() => ({
       owner: 'test-owner',
@@ -557,9 +557,9 @@ describe('ACTION_HANDLERS 分发（通过 DOM click 触发）', () => {
 
   it('点击 [data-action="saveAllConfig"] 配置为默认值时不抛错', () => {
     // 默认返回值（false、空对象等）
-    mockState.getIncrementalSync.mockImplementation(() => false)
-    mockState.getSkipConflicts.mockImplementation(() => false)
-    mockState.getSyncRecordEnabled.mockImplementation(() => false)
+    mockState.isIncrementalSyncEnabled.mockImplementation(() => false)
+    mockState.isSkipConflictsEnabled.mockImplementation(() => false)
+    mockState.isSyncRecordEnabled.mockImplementation(() => false)
     mockState.getGithubConfig.mockImplementation(() => ({
       owner: '',
       repo: '',

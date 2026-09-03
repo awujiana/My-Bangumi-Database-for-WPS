@@ -9,7 +9,7 @@
  *  3. 仅在浏览器上下文且当前页面为 settings.html 时自动启动。
  */
 
-import { getNavIconsOnly } from '../tools/config.js'
+import { areNavIconsOnly } from '../tools/config.js'
 import { initTheme } from '../tools/theme.js'
 import { initHandlers } from '../ui/handlers/index.js'
 
@@ -53,28 +53,28 @@ function initSettingsPage(): void {
   import('../tools/config.js')
     .then(
       ({
-        getIncrementalSync,
-        getSkipConflicts,
-        getSyncRecordEnabled,
+        isIncrementalSyncEnabled,
+        isSkipConflictsEnabled,
+        isSyncRecordEnabled,
         getConfig,
-        getNavIconsOnly,
+        areNavIconsOnly,
       }) => {
         // 设置复选框
         const chkIncremental = document.getElementById(
           'chkIncrementalSync',
         ) as HTMLInputElement | null
-        if (chkIncremental) chkIncremental.checked = getIncrementalSync(true)
+        if (chkIncremental) chkIncremental.checked = isIncrementalSyncEnabled(true)
 
         const chkSkip = document.getElementById('chkSkipConflicts') as HTMLInputElement | null
-        if (chkSkip) chkSkip.checked = getSkipConflicts(true)
+        if (chkSkip) chkSkip.checked = isSkipConflictsEnabled(true)
 
         const chkSyncRecord = document.getElementById(
           'chkEnableSyncRecord',
         ) as HTMLInputElement | null
-        if (chkSyncRecord) chkSyncRecord.checked = getSyncRecordEnabled(true)
+        if (chkSyncRecord) chkSyncRecord.checked = isSyncRecordEnabled(true)
 
         const chkNavIcons = document.getElementById('chkNavIconsOnly') as HTMLInputElement | null
-        if (chkNavIcons) chkNavIcons.checked = getNavIconsOnly(true)
+        if (chkNavIcons) chkNavIcons.checked = areNavIconsOnly(true)
 
         // 设置冲突策略下拉
         const strategySelect = document.getElementById('githubStrategy') as HTMLSelectElement | null
@@ -117,7 +117,7 @@ function applyAppearance(): void {
   // 主题：从配置读取并应用（含跟随系统监听）
   initTheme()
   // 导航仅图标模式
-  if (getNavIconsOnly(true)) {
+  if (areNavIconsOnly(true)) {
     document.body.classList.add('nav-icons-only')
   }
   // 滚动高亮：当前可视区段对应的导航项高亮

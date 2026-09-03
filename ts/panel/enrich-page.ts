@@ -354,8 +354,8 @@ export function selectNewAnimeFile(): void {
         let shouldContinue = false as boolean
         BGM.Dialog.confirm(
           `已添加 ${fileName}\n当前共 ${String(state.batchFiles.length)} 个文件\n点击【确定】继续添加，点击【取消】完成选择`,
-          (confirmed: boolean) => {
-            shouldContinue = confirmed
+          (isConfirmed: boolean) => {
+            shouldContinue = isConfirmed
           },
           '继续添加？',
         )
@@ -981,16 +981,16 @@ function cancelEnrichment(): void {
   bgmLog(LOG_LEVELS.INFO, '[enrich] 用户请求取消富化')
 }
 
-function showProgressUI(visible: boolean): void {
+function showProgressUI(isVisible: boolean): void {
   const progressArea = safeGetElement('enrichProgress')
   if (progressArea) {
-    progressArea.style.display = visible ? '' : 'none'
+    progressArea.style.display = isVisible ? '' : 'none'
   }
 
   const startButton = safeGetButton('startEnrichBtn')
   if (startButton) {
-    startButton.disabled = visible
-    startButton.textContent = visible ? '⏳ 富化中...' : '🚀 开始富化'
+    startButton.disabled = isVisible
+    startButton.textContent = isVisible ? '⏳ 富化中...' : '🚀 开始富化'
   }
 }
 
@@ -1064,8 +1064,8 @@ export function openEnrichRecordSheet(): void {
 }
 
 export function clearRecords(): void {
-  BGM.Dialog.confirm('确定要清除所有富化记录吗？此操作不可撤销。', (confirmed: boolean) => {
-    if (!confirmed) return
+  BGM.Dialog.confirm('确定要清除所有富化记录吗？此操作不可撤销。', (isConfirmed: boolean) => {
+    if (!isConfirmed) return
     try {
       clearEnrichRecords()
       loadRecentRecords()
@@ -1428,9 +1428,9 @@ function batchRemoveFile(index: number): void {
 }
 
 /** 展示/更新批量进度 UI */
-function showBatchProgress(visible: boolean): void {
+function showBatchProgress(isVisible: boolean): void {
   const progressElement = safeGetElement('batchProgress')
-  if (progressElement) progressElement.style.display = visible ? '' : 'none'
+  if (progressElement) progressElement.style.display = isVisible ? '' : 'none'
 }
 
 /** 更新批量进度条 */
@@ -1551,7 +1551,7 @@ function processSingleBatchFile(filePath: string, bangumiSheet: WpsWorksheet): B
     // 关闭源文件，不保存
     if (wb) {
       try {
-        const wbWithClose = wb as unknown as { Close?: (saveChanges?: boolean) => unknown }
+        const wbWithClose = wb as unknown as { Close?: (shouldSaveChanges?: boolean) => unknown }
         if (typeof wbWithClose.Close === 'function') {
           const closeResult = wbWithClose.Close(false)
           void closeResult
@@ -1616,8 +1616,8 @@ export function batchStartEnrichment(): void {
   let isConfirmed = false as boolean
   BGM.Dialog.confirm(
     `将依次对 ${String(state.batchFiles.length)} 个文件执行富化。\n目标工作表：${bangumiSheet.Name}\n是否继续？`,
-    (ok: boolean) => {
-      isConfirmed = ok
+    (isOk: boolean) => {
+      isConfirmed = isOk
     },
     '开始批量富化',
   )

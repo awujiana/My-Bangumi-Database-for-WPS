@@ -100,7 +100,7 @@ export async function syncFromRemote(
   onProgress?: (current: number, total: number, message: string, eta?: string) => void,
   strategy: SyncStrategy = 'add-update',
   signal?: AbortSignal,
-  selectedRowsOnly?: boolean,
+  shouldUseSelectedRowsOnly?: boolean,
   conflictResolution?: ConflictResolution[],
   timeFilter?: SyncTimeFilter,
 ): Promise<GithubSyncResult> {
@@ -160,7 +160,7 @@ export async function syncFromRemote(
 
     // 3.6 仅同步选中行：从 WPS Selection 提取 SID 集合，过滤远程条目
     let effectiveRemoteEntries = remoteEntries
-    if (selectedRowsOnly) {
+    if (shouldUseSelectedRowsOnly) {
       const selectedSids = getSelectedRowSids()
       if (selectedSids.size === 0) {
         throw new Error('未选中任何行，或选中行中未找到 Bangumi URL')

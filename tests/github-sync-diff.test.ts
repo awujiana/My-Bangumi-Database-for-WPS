@@ -406,12 +406,12 @@ describe('SYNC_STRATEGY_LABELS', () => {
   })
 })
 
-// ============ 补充: matchTimeFilter 默认值分支 (lines 359, 366) ============
+// ============ 补充: isWithinTimeFilter 默认值分支 (lines 359, 366) ============
 
-describe('matchTimeFilter 默认 quarter/month 值', () => {
-  // 通过 computeDiff 的 mirror 策略触发 matchTimeFilter
-  // matchTimeFilter 返回 true → 日期在范围内 → 条目应被删除
-  // matchTimeFilter 返回 false → 日期不在范围内 → 条目保留（不删除）
+describe('isWithinTimeFilter 默认 quarter/month 值', () => {
+  // 通过 computeDiff 的 mirror 策略触发 isWithinTimeFilter
+  // isWithinTimeFilter 返回 true → 日期在范围内 → 条目应被删除
+  // isWithinTimeFilter 返回 false → 日期不在范围内 → 条目保留（不删除）
 
   it('quarter 未指定时默认使用 quarter=1，匹配的条目应被删除 (line 359)', () => {
     const remote: GithubRemoteEntry[] = []
@@ -429,7 +429,7 @@ describe('matchTimeFilter 默认 quarter/month 值', () => {
       // quarter 缺失 → 默认 quarter=1
     })
     const deletes = diffs.filter((d) => d.kind === 'delete')
-    // 2月条目在 Q1 范围内 → matchTimeFilter 返回 true → 应被删除
+    // 2月条目在 Q1 范围内 → isWithinTimeFilter 返回 true → 应被删除
     expect(deletes.length).toBe(1)
   })
 
@@ -448,7 +448,7 @@ describe('matchTimeFilter 默认 quarter/month 值', () => {
       // quarter 缺失 → 默认 quarter=1，但 7月不在 Q1 范围内
     })
     const deletes = diffs.filter((d) => d.kind === 'delete')
-    // 7月不在 Q1 范围内 → matchTimeFilter 返回 false → 不删除
+    // 7月不在 Q1 范围内 → isWithinTimeFilter 返回 false → 不删除
     expect(deletes.length).toBe(0)
   })
 
@@ -467,7 +467,7 @@ describe('matchTimeFilter 默认 quarter/month 值', () => {
       // month 缺失 → 默认 month=1
     })
     const deletes = diffs.filter((d) => d.kind === 'delete')
-    // 1月条目匹配默认 month=1 → matchTimeFilter 返回 true → 应被删除
+    // 1月条目匹配默认 month=1 → isWithinTimeFilter 返回 true → 应被删除
     expect(deletes.length).toBe(1)
   })
 
@@ -486,7 +486,7 @@ describe('matchTimeFilter 默认 quarter/month 值', () => {
       // month 缺失 → 默认 month=1，但条目是 6月
     })
     const deletes = diffs.filter((d) => d.kind === 'delete')
-    // 6月 != 默认 1月 → matchTimeFilter 返回 false → 不删除
+    // 6月 != 默认 1月 → isWithinTimeFilter 返回 false → 不删除
     expect(deletes.length).toBe(0)
   })
 })
@@ -563,9 +563,9 @@ describe('filterByTime isNaN 边界 (line 306)', () => {
   })
 })
 
-// ========== 补充测试：matchTimeFilter 默认 quarter/month 值 (lines 315, 325) ==========
-describe('matchTimeFilter 默认值路径 (lines 315, 325)', () => {
-  // 通过 computeDiff mirror 策略触发 matchTimeFilter
+// ========== 补充测试：isWithinTimeFilter 默认 quarter/month 值 (lines 315, 325) ==========
+describe('isWithinTimeFilter 默认值路径 (lines 315, 325)', () => {
+  // 通过 computeDiff mirror 策略触发 isWithinTimeFilter
 
   it('quarter 默认值 1 时，1月条目在 mirror 策略下被删除 (line 315)', () => {
     const remote: GithubRemoteEntry[] = []
@@ -641,7 +641,7 @@ describe('matchTimeFilter 默认值路径 (lines 315, 325)', () => {
     expect(deletes.length).toBe(0)
   })
 
-  it('matchTimeFilter dateStr 为空字符串时返回 false', () => {
+  it('isWithinTimeFilter dateStr 为空字符串时返回 false', () => {
     const remote: GithubRemoteEntry[] = []
     const local = new Map<string, LocalRowEntry>([
       ['sid-empty', { row: 2, sid: 'sid-empty', fields: { 开播日期: '', 名称: '空日期' } }],
@@ -652,11 +652,11 @@ describe('matchTimeFilter 默认值路径 (lines 315, 325)', () => {
       year: 2024,
     })
     const deletes = diffs.filter((d) => d.kind === 'delete')
-    // 空日期 → matchTimeFilter 返回 false → 不删除
+    // 空日期 → isWithinTimeFilter 返回 false → 不删除
     expect(deletes.length).toBe(0)
   })
 
-  it('matchTimeFilter dateStr 格式不匹配时返回 false', () => {
+  it('isWithinTimeFilter dateStr 格式不匹配时返回 false', () => {
     const remote: GithubRemoteEntry[] = []
     const local = new Map<string, LocalRowEntry>([
       ['sid-bad', { row: 2, sid: 'sid-bad', fields: { 开播日期: 'invalid-date', 名称: '坏日期' } }],
@@ -670,7 +670,7 @@ describe('matchTimeFilter 默认值路径 (lines 315, 325)', () => {
     expect(deletes.length).toBe(0)
   })
 
-  it('matchTimeFilter year 不匹配时返回 false', () => {
+  it('isWithinTimeFilter year 不匹配时返回 false', () => {
     const remote: GithubRemoteEntry[] = []
     const local = new Map<string, LocalRowEntry>([
       [
@@ -684,7 +684,7 @@ describe('matchTimeFilter 默认值路径 (lines 315, 325)', () => {
       year: 2024,
     })
     const deletes = diffs.filter((d) => d.kind === 'delete')
-    // 年份不匹配 → matchTimeFilter 返回 false → 不删除
+    // 年份不匹配 → isWithinTimeFilter 返回 false → 不删除
     expect(deletes.length).toBe(0)
   })
 
@@ -780,7 +780,7 @@ describe('computeDiff 更多策略分支', () => {
       quarter: 1,
     })
     const deletes = diffs.filter((d) => d.kind === 'delete')
-    // matchTimeFilter: month===12 → year === filter.year-1 → 2023 === 2022 → false
+    // isWithinTimeFilter: month===12 → year === filter.year-1 → 2023 === 2022 → false
     expect(deletes.length).toBe(0)
   })
 
@@ -896,9 +896,9 @@ describe('filterByTime quarter 分支完整路径', () => {
   })
 })
 
-// ========== 补充测试：matchTimeFilter 完整分支覆盖 ==========
-describe('matchTimeFilter 完整分支 (通过 computeDiff mirror 策略)', () => {
-  it('matchTimeFilter dateStr 格式不含分隔符时返回 false', () => {
+// ========== 补充测试：isWithinTimeFilter 完整分支覆盖 ==========
+describe('isWithinTimeFilter 完整分支 (通过 computeDiff mirror 策略)', () => {
+  it('isWithinTimeFilter dateStr 格式不含分隔符时返回 false', () => {
     const remote: GithubRemoteEntry[] = []
     const local = new Map<string, LocalRowEntry>([
       [
@@ -915,7 +915,7 @@ describe('matchTimeFilter 完整分支 (通过 computeDiff mirror 策略)', () =
     expect(deletes.length).toBe(0)
   })
 
-  it('matchTimeFilter 本地"年月日"格式正确匹配', () => {
+  it('isWithinTimeFilter 本地"年月日"格式正确匹配', () => {
     const remote: GithubRemoteEntry[] = []
     const local = new Map<string, LocalRowEntry>([
       [
@@ -932,7 +932,7 @@ describe('matchTimeFilter 完整分支 (通过 computeDiff mirror 策略)', () =
     expect(deletes.length).toBe(1)
   })
 
-  it('matchTimeFilter quarter 默认值通过 mirror 策略触发', () => {
+  it('isWithinTimeFilter quarter 默认值通过 mirror 策略触发', () => {
     const remote: GithubRemoteEntry[] = []
     const local = new Map<string, LocalRowEntry>([
       [
@@ -949,7 +949,7 @@ describe('matchTimeFilter 完整分支 (通过 computeDiff mirror 策略)', () =
     expect(deletes.length).toBe(0)
   })
 
-  it('matchTimeFilter month 默认值通过 mirror 策略触发', () => {
+  it('isWithinTimeFilter month 默认值通过 mirror 策略触发', () => {
     const remote: GithubRemoteEntry[] = []
     const local = new Map<string, LocalRowEntry>([
       [
@@ -966,7 +966,7 @@ describe('matchTimeFilter 完整分支 (通过 computeDiff mirror 策略)', () =
     expect(deletes.length).toBe(1)
   })
 
-  it('matchTimeFilter default 分支 (range 无效时返回 true)', () => {
+  it('isWithinTimeFilter default 分支 (range 无效时返回 true)', () => {
     const remote: GithubRemoteEntry[] = []
     const local = new Map<string, LocalRowEntry>([
       [
@@ -985,8 +985,8 @@ describe('matchTimeFilter 完整分支 (通过 computeDiff mirror 策略)', () =
   })
 })
 
-// ========== 补充测试：matchTimeFilter quarter 无效值 (line 360) ==========
-describe('matchTimeFilter quarter 无效值 (line 360)', () => {
+// ========== 补充测试：isWithinTimeFilter quarter 无效值 (line 360) ==========
+describe('isWithinTimeFilter quarter 无效值 (line 360)', () => {
   it('quarter 不在 QUARTER_MONTH_RANGES 中时应返回 false (line 360)', () => {
     const remote: GithubRemoteEntry[] = []
     const local = new Map<string, LocalRowEntry>([
@@ -1003,7 +1003,7 @@ describe('matchTimeFilter quarter 无效值 (line 360)', () => {
       year: 2024,
     }
     const diffs = computeDiff(remote, local, 'mirror', invalidQuarterFilter)
-    // 因 matchTimeFilter 返回 false，本地条目不会被删除
+    // 因 isWithinTimeFilter 返回 false，本地条目不会被删除
     const deletes = diffs.filter((d) => d.kind === 'delete')
     expect(deletes.length).toBe(0)
   })
@@ -1046,10 +1046,10 @@ describe('computeDiff 扩展字段空字符串 (line 463)', () => {
   })
 })
 
-// ========== 补充测试：matchTimeFilter isNaN 分支 (line 353) ==========
-describe('matchTimeFilter isNaN 分支 (line 353)', () => {
+// ========== 补充测试：isWithinTimeFilter isNaN 分支 (line 353) ==========
+describe('isWithinTimeFilter isNaN 分支 (line 353)', () => {
   it('dateStr 匹配正则但 parseInt 结果为 NaN 时返回 false', () => {
-    // 直接调用 matchTimeFilter 测试 isNaN 分支
+    // 直接调用 isWithinTimeFilter 测试 isNaN 分支
     // 使用无效日期格式触发 isNaN 检查
     const remote: GithubRemoteEntry[] = []
     const local = new Map<string, LocalRowEntry>([

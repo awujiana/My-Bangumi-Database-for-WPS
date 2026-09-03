@@ -17,7 +17,7 @@ import {
   SYNC_RECORD_COL,
   SYNC_RECORD_TYPE_COLOR,
 } from '../core/constants.js'
-import { getSyncRecordEnabled } from '../tools/config.js'
+import { isSyncRecordEnabled } from '../tools/config.js'
 import {
   bgmLog,
   getApp,
@@ -386,7 +386,7 @@ function setSyncRecordColors(
 }
 
 export function addSyncRecord(parameters: UpdateRecordParameters): boolean {
-  if (!getSyncRecordEnabled()) {
+  if (!isSyncRecordEnabled()) {
     bgmLog(LOG_LEVELS.INFO, '[addSyncRecord] 同步记录功能未启用，跳过')
     return false
   }
@@ -508,7 +508,7 @@ export function addSyncRecord(parameters: UpdateRecordParameters): boolean {
  * @returns 是否全部成功
  */
 export function addSyncRecords(records: UpdateRecordParameters[]): boolean {
-  if (!getSyncRecordEnabled()) {
+  if (!isSyncRecordEnabled()) {
     bgmLog(LOG_LEVELS.INFO, '[addSyncRecords] 同步记录功能未启用，跳过')
     return false
   }

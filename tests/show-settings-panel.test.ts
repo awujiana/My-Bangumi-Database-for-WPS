@@ -39,10 +39,10 @@ function createMockPluginStorage(store: Record<string, string> = {}): {
 // 模拟 TaskPane 对象
 function createMockTaskPane(
   id: string,
-  visible: boolean,
+  isVisible: boolean,
   dockPosition = 0,
 ): { ID: string; Visible: boolean; DockPosition: number } {
-  return { ID: id, Visible: visible, DockPosition: dockPosition }
+  return { ID: id, Visible: isVisible, DockPosition: dockPosition }
 }
 
 // 记录 CreateTaskPane / GetTaskPane 调用
@@ -175,11 +175,11 @@ vi.mock('../index.js', () => ({
   getRecentLogs: vi.fn(() => []),
   exportLogsToFile: vi.fn(),
   clearLogs: vi.fn(),
-  getIncrementalSync: vi.fn(() => false),
+  isIncrementalSyncEnabled: vi.fn(() => false),
   setIncrementalSync: vi.fn(),
-  getSkipConflicts: vi.fn(() => false),
+  isSkipConflictsEnabled: vi.fn(() => false),
   setSkipConflicts: vi.fn(),
-  getSyncRecordEnabled: vi.fn(() => false),
+  isSyncRecordEnabled: vi.fn(() => false),
   setSyncRecordEnabled: vi.fn(),
   getGithubConfig: vi.fn(() => ({ owner: '', repo: '', branch: '', path: '' })),
   setGithubConfig: vi.fn(),
