@@ -4,7 +4,7 @@
  * @description 自定义对话框、确认对话框、Toast 通知
  */
 
-import type { GithubSyncDetailItem } from '../sync/githubSyncDiff.js'
+import type { GithubSyncDetailItem } from '../sync/github-sync-diff.js'
 import { sanitizeHtml } from '../tools/sanitize.js'
 
 // ========== 类型定义 ==========

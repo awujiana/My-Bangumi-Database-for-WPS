@@ -8,7 +8,7 @@
  *   - 不污染全局 console，由调用方主动调用 logger 方法
  */
 
-import { RingBuffer } from './logBuffer.js'
+import { RingBuffer } from './log-buffer.js'
 
 /** 日志级别 */
 export type LogLevel = 'INFO' | 'WARN' | 'ERROR' | 'DEBUG'

@@ -8,7 +8,7 @@ import { BGM_CONFIG, LOG_LEVELS } from '../core/constants.js'
 import { Result, BgmError } from '../core/result.js'
 
 import { bgmLog, BGM } from './util/index.js'
-import type { ZodSchema } from './zodCompat.js'
+import type { ZodSchema } from './zod-compat.js'
 
 export type HttpMethod = 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH'
 export type SyncProgressCallback = (current: number, total: number, message: string) => void

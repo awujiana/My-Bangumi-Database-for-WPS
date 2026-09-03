@@ -40,7 +40,7 @@ import {
   formatDuration,
 } from '../../index.js'
 import type { SyncRecord, SyncProgressStats, SyncConfigSummary } from '../../index.js'
-import { getSyncPreview, detectConflicts } from '../../services/ribbonService.js'
+import { getSyncPreview, detectConflicts } from '../../services/ribbon-service.js'
 import { ensureSheetHeaders } from '../../tools/util/index.js'
 import type { WpsApp, WpsWorksheet } from '../../tools/wps.js'
 

@@ -79,14 +79,14 @@ import type {
   GithubSyncDetailItem,
   SyncTimeFilter,
 } from '../../index.js'
-import { exportConfig, importConfig } from '../../services/configService.js'
-import { executeUndoLastSync } from '../../services/ribbonService.js'
+import { exportConfig, importConfig } from '../../services/config-service.js'
+import { executeUndoLastSync } from '../../services/ribbon-service.js'
 import { debounce } from '../../tools/debounce.js'
 import { BGM_EVENTS, eventBus } from '../../tools/events.js'
 import type { EventHandler } from '../../tools/events.js'
 import { getRecentLogs, exportLogsToFile, clearLogs } from '../../tools/logger.js'
 import type { LogLevel } from '../../tools/logger.js'
-import { showConnectionTestDialog, hideConnectionTestDialog } from '../githubConfigDialog.js'
+import { showConnectionTestDialog, hideConnectionTestDialog } from '../github-config-dialog.js'
 
 // 子模块
 import { _T } from './_constants.js'

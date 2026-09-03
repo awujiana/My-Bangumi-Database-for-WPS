@@ -15,9 +15,9 @@
  *
  * 子模块 mock 策略：
  *   - vi.mock('./api.js')：控制 bgmRequestSync 返回值，测试 5xx 重试/4xx 失败
- *   - vi.mock('./chapterMarker.js')：控制 markEpisodesComplete，验证章节标记调用条件
- *   - vi.mock('./progressReporter.js')：控制 finalizeSyncResults，避免实际 UI 操作
- *   - vi.mock('../syncRecord.js')：避免创建实际同步记录工作表
+ *   - vi.mock('./chapter-marker.js')：控制 markEpisodesComplete，验证章节标记调用条件
+ *   - vi.mock('./progress-reporter.js')：控制 finalizeSyncResults，避免实际 UI 操作
+ *   - vi.mock('../sync-record.js')：避免创建实际同步记录工作表
  *
  * 未覆盖（依赖 BGM.sync 状态机与 WPS COM 深度交互，建议在集成测试中覆盖）：
  *   - syncSelectedRows 完整流程（涉及进度弹窗、暂停/恢复、停止信号）
@@ -54,12 +54,12 @@ vi.mock('../ts/sync/exceltobangumi/api.js', () => ({
   parseErrorResponse: vi.fn(() => ({ code: 0, message: '' })),
 }))
 
-vi.mock('../ts/sync/exceltobangumi/chapterMarker.js', () => ({
+vi.mock('../ts/sync/exceltobangumi/chapter-marker.js', () => ({
   markEpisodesComplete: mockState.markEpisodesComplete,
   fetchEpisodeIds: vi.fn(),
 }))
 
-vi.mock('../ts/sync/exceltobangumi/progressReporter.js', () => ({
+vi.mock('../ts/sync/exceltobangumi/progress-reporter.js', () => ({
   applySyncSuccessResults: mockState.applySyncSuccessResults,
   applySyncFailResults: mockState.applySyncFailResults,
   handleStoppedRemainingTasks: mockState.handleStoppedRemainingTasks,
@@ -69,7 +69,7 @@ vi.mock('../ts/sync/exceltobangumi/progressReporter.js', () => ({
   TYPE_NAMES: ['', '想看', '看过', '在看', '搁置', '抛弃'],
 }))
 
-vi.mock('../ts/sync/syncRecord.js', () => ({
+vi.mock('../ts/sync/sync-record.js', () => ({
   getOrCreateSyncRecordSheet: mockState.getOrCreateSyncRecordSheet,
   // index.ts re-exports getAllSyncRecords，exceltobangumi 通过 ../../index.js 间接引用
   getAllSyncRecords: mockState.getAllSyncRecords,

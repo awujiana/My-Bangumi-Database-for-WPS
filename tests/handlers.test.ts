@@ -16,7 +16,7 @@
  *
  * Mock 策略：
  *   - vi.mock handler 子模块（token.js / sync.js / sheet.js / _constants.js）控制实际实现
- *   - vi.mock services/ribbonService.js / configService.js
+ *   - vi.mock services/ribbon-service.js / configService.js
  *   - vi.mock tools/logger.js / tools/events.js / tools/debounce.js
  *   - 通过 vi.hoisted 共享 vi.fn 引用，测试代码可断言调用情况
  *
@@ -49,10 +49,10 @@ const mockState = vi.hoisted(() => ({
   testDebugConnection: vi.fn(),
   // handlers/sheet.js
   cleanLockedDataSheet: vi.fn(),
-  // services/ribbonService.js
+  // services/ribbon-service.js
   undoLastSyncForRibbon: vi.fn(),
   executeUndoLastSync: vi.fn(() => Promise.resolve(0)),
-  // services/configService.js
+  // services/config-service.js
   exportConfig: vi.fn(() => '{}'),
   importConfig: vi.fn(() => ({ isOk: () => true, isFail: () => false })),
   // tools/config.js
@@ -64,7 +64,7 @@ const mockState = vi.hoisted(() => ({
   setSyncRecordEnabled: vi.fn(),
   getConfig: vi.fn(() => ''),
   setConfig: vi.fn(() => true),
-  // sync/githubConfig.js
+  // sync/github-config.js
   getGithubConfig: vi.fn(() => ({ owner: '', repo: '', branch: '', path: '' })),
   setGithubConfig: vi.fn(),
   getSyncStrategy: vi.fn(() => 'add-update'),
@@ -103,12 +103,12 @@ vi.mock('../ts/ui/handlers/_constants.js', () => ({
   _T: { confirmClearMarks: '确认清除标记？' },
 }))
 
-vi.mock('../ts/services/ribbonService.js', () => ({
+vi.mock('../ts/services/ribbon-service.js', () => ({
   undoLastSyncForRibbon: mockState.undoLastSyncForRibbon,
   executeUndoLastSync: mockState.executeUndoLastSync,
 }))
 
-vi.mock('../ts/services/configService.js', () => ({
+vi.mock('../ts/services/config-service.js', () => ({
   exportConfig: mockState.exportConfig,
   importConfig: mockState.importConfig,
 }))
@@ -143,7 +143,7 @@ vi.mock('../ts/tools/config.js', () => ({
   },
 }))
 
-vi.mock('../ts/sync/githubConfig.js', () => ({
+vi.mock('../ts/sync/github-config.js', () => ({
   getGithubConfig: mockState.getGithubConfig,
   setGithubConfig: mockState.setGithubConfig,
   isGithubConfigComplete: vi.fn(() => true),

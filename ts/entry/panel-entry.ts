@@ -10,12 +10,12 @@
  *     被 vitest 等测试环境导入时不会触发副作用。
  *
  * 引入此入口后：
- *  - `import { initPanel } from '../panel/panelPage.js'` 不再产生 DOM 操作副作用
+ *  - `import { initPanel } from '../panel/panel-page.js'` 不再产生 DOM 操作副作用
  *  - `import { initHandlers } from '../ui/handlers/index.js'` 不再触发 trackedSetTimeout
  *  - 测试可在不污染 DOM / 全局状态的前提下导入源码
  */
 
-import { initPanel } from '../panel/panelPage.js'
+import { initPanel } from '../panel/panel-page.js'
 import { getNavIconsOnly } from '../tools/config.js'
 import { initTheme } from '../tools/theme.js'
 import { initHandlers } from '../ui/handlers/index.js'

@@ -13,7 +13,7 @@ import {
   openCollectionForRibbon,
   syncFromGithubForRibbon,
   undoLastSyncForRibbon,
-} from './services/ribbonService.js'
+} from './services/ribbon-service.js'
 
 import {
   WPS_ENUM,

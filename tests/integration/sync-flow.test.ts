@@ -69,12 +69,12 @@ vi.mock('../../ts/sync/exceltobangumi/api.js', () => ({
   parseErrorResponse: vi.fn(() => ({ code: 0, message: '' })),
 }))
 
-vi.mock('../../ts/sync/exceltobangumi/chapterMarker.js', () => ({
+vi.mock('../../ts/sync/exceltobangumi/chapter-marker.js', () => ({
   markEpisodesComplete: mockState.markEpisodesComplete,
   fetchEpisodeIds: vi.fn(),
 }))
 
-vi.mock('../../ts/sync/exceltobangumi/progressReporter.js', () => ({
+vi.mock('../../ts/sync/exceltobangumi/progress-reporter.js', () => ({
   applySyncSuccessResults: mockState.applySyncSuccessResults,
   applySyncFailResults: mockState.applySyncFailResults,
   handleStoppedRemainingTasks: mockState.handleStoppedRemainingTasks,
@@ -84,7 +84,7 @@ vi.mock('../../ts/sync/exceltobangumi/progressReporter.js', () => ({
   TYPE_NAMES: ['', '想看', '看过', '在看', '搁置', '抛弃'],
 }))
 
-vi.mock('../../ts/sync/syncRecord.js', () => ({
+vi.mock('../../ts/sync/sync-record.js', () => ({
   getOrCreateSyncRecordSheet: mockState.getOrCreateSyncRecordSheet,
   getAllSyncRecords: mockState.getAllSyncRecords,
   addSyncRecords: mockState.addSyncRecords,
@@ -161,7 +161,7 @@ vi.mock('../../ts/tools/util/index.js', () => ({
 }))
 
 // ========== Mock: undoStack ==========
-vi.mock('../../ts/sync/undoStack.js', () => ({
+vi.mock('../../ts/sync/undo-stack.js', () => ({
   beginUndoSession: mockState.beginUndoSession,
   endUndoSession: mockState.endUndoSession,
   recordUndoEntry: mockState.recordUndoEntry,
@@ -172,7 +172,7 @@ vi.mock('../../ts/sync/undoStack.js', () => ({
 }))
 
 // ========== Mock: githubConfig ==========
-vi.mock('../../ts/sync/githubConfig.js', () => ({
+vi.mock('../../ts/sync/github-config.js', () => ({
   isGithubConfigComplete: mockState.isGithubConfigComplete,
   buildRawUrl: mockState.buildRawUrl,
   getSyncSourceType: mockState.getSyncSourceType,
@@ -189,9 +189,9 @@ vi.mock('../../ts/sync/githubConfig.js', () => ({
 // ========== Mock: syncSourceRegistry ==========
 // 由于 syncFromRemote 内部闭包引用了模块的 getSyncSource，仅覆盖导出无法影响其实现，
 // 因此在此提供使用 mockState.getSyncSource 的简化版 syncFromRemote，便于测试端到端流程。
-vi.mock('../../ts/sync/syncSourceRegistry.js', async () => {
-  const actual = await import('../../ts/sync/syncSourceRegistry.js')
-  const githubSync = await import('../../ts/sync/githubSync.js')
+vi.mock('../../ts/sync/sync-source-registry.js', async () => {
+  const actual = await import('../../ts/sync/sync-source-registry.js')
+  const githubSync = await import('../../ts/sync/github-sync.js')
   return {
     ...actual,
     getSyncSource: mockState.getSyncSource,
@@ -252,16 +252,16 @@ vi.mock('../../ts/sync/syncSourceRegistry.js', async () => {
 
 // ========== 导入被测模块 ==========
 import { SyncToBangumiAsync } from '../../ts/sync/exceltobangumi/index.js'
-import { syncFromGithub, applyDiffToSheet } from '../../ts/sync/githubSync.js'
-import { syncFromRemote } from '../../ts/sync/syncSourceRegistry.js'
-import { computeDiff, parseJsonl } from '../../ts/sync/githubSyncDiff.js'
+import { syncFromGithub, applyDiffToSheet } from '../../ts/sync/github-sync.js'
+import { syncFromRemote } from '../../ts/sync/sync-source-registry.js'
+import { computeDiff, parseJsonl } from '../../ts/sync/github-sync-diff.js'
 import type {
   GithubRemoteEntry,
   LocalRowEntry,
   SyncStrategy,
-} from '../../ts/sync/githubSyncDiff.js'
-import { clearUndoStack } from '../../ts/sync/undoStack.js'
-import type { SyncSource } from '../../ts/sync/SyncSource.js'
+} from '../../ts/sync/github-sync-diff.js'
+import { clearUndoStack } from '../../ts/sync/undo-stack.js'
+import type { SyncSource } from '../../ts/sync/sync-source.js'
 import type { Result } from '../../ts/core/result.js'
 
 vi.clearAllTimers()

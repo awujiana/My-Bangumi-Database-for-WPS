@@ -51,19 +51,19 @@ import {
   getSeqColIndex,
   addTagsFromString,
 } from '../pure-utilities.js'
-import { getAllSyncRecords, getOrCreateSyncRecordSheet } from '../syncRecord.js'
+import { getAllSyncRecords, getOrCreateSyncRecordSheet } from '../sync-record.js'
 
 // 子模块内部依赖（不通过 re-export 暴露给外部）
 import { bgmRequestSync as _bgmRequestSync } from './api.js'
-import { markEpisodesComplete as _markEpisodesComplete } from './chapterMarker.js'
+import { markEpisodesComplete as _markEpisodesComplete } from './chapter-marker.js'
 import {
   finalizeSyncResults as _finalizeSyncResults,
   DEFAULT_SEQ_COL as _DEFAULT_SEQ_COL,
-} from './progressReporter.js'
+} from './progress-reporter.js'
 import type {
   SyncTask as _SyncTask,
   SyncResultStats as _SyncResultStats,
-} from './progressReporter.js'
+} from './progress-reporter.js'
 
 // Re-export 纯函数，保持模块对外 API 兼容
 export {
@@ -87,7 +87,7 @@ export {
   parseErrorResponse,
 } from './api.js'
 
-export { fetchEpisodeIds, markEpisodesComplete } from './chapterMarker.js'
+export { fetchEpisodeIds, markEpisodesComplete } from './chapter-marker.js'
 
 export {
   type SyncTask,
@@ -99,7 +99,7 @@ export {
   applySyncFailResults,
   handleStoppedRemainingTasks,
   finalizeSyncResults,
-} from './progressReporter.js'
+} from './progress-reporter.js'
 
 // ========== 常量定义 (优化点：集中管理) ==========
 /** 批量读取时需要获取的列名 */

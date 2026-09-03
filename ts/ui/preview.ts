@@ -36,7 +36,7 @@ import {
   hideSyncProgressDialog,
 } from '../index.js'
 import type { WpsWorksheet, WpsRange, SyncRecord, SyncConfigSummary } from '../index.js'
-import { getAllSyncRecords } from '../sync/syncRecord.js'
+import { getAllSyncRecords } from '../sync/sync-record.js'
 import { sanitizeHtml } from '../tools/sanitize.js'
 import { loadBgToken } from '../tools/utility.js'
 

@@ -7,14 +7,14 @@
  */
 
 // ========== 全局错误处理初始化 ==========
-import { initGlobalErrorHandler } from './core/errorHandler.js'
+import { initGlobalErrorHandler } from './core/error-handler.js'
 
 initGlobalErrorHandler()
 
 // ============================================================================
-// 0. 全局初始化（来自 core/errorHandler.js）
+// 0. 全局初始化（来自 core/error-handler.js）
 // ============================================================================
-export { initGlobalErrorHandler } from './core/errorHandler.js'
+export { initGlobalErrorHandler } from './core/error-handler.js'
 
 // ============================================================================
 // 1. 核心常量与枚举（来自 core/constants.js）
@@ -154,7 +154,7 @@ export {
 } from './ui/handlers.js'
 
 // ============================================================================
-// 8. 同步记录工作表（来自 sync/syncRecord.js）
+// 8. 同步记录工作表（来自 sync/sync-record.js）
 // ============================================================================
 export {
   // 导入同步记录模块的函数
@@ -170,7 +170,7 @@ export {
   type SyncRecord,
   type UpdateRecordParameters,
   clearSyncRecords,
-} from './sync/syncRecord.js'
+} from './sync/sync-record.js'
 
 // ============================================================================
 // 9. 同步引擎（来自 sync/exceltobangumi.js）
@@ -213,7 +213,7 @@ export {
 } from './sync/scraping.js'
 
 // ============================================================================
-// 11. GitHub 仓库增量同步（来自 sync/githubSync.js + sync/githubConfig.js）
+// 11. GitHub 仓库增量同步（来自 sync/github-sync.js + sync/github-config.js）
 // ============================================================================
 export {
   // GitHub 源专用入口
@@ -228,7 +228,7 @@ export {
   applyConflictResolutions,
   // 同步结果统计类型
   type GithubSyncResult,
-} from './sync/githubSync.js'
+} from './sync/github-sync.js'
 
 export {
   // 多源统一调度入口（按 sourceType 选择 GitHub/GitLab/Gitee/本地/Gist）
@@ -238,7 +238,7 @@ export {
   getSyncSource,
   getRegisteredSourceTypes,
   isSyncSourceRegistered,
-} from './sync/syncSourceRegistry.js'
+} from './sync/sync-source-registry.js'
 
 export {
   // 纯函数：差异计算（零依赖，可在 Node 测试环境运行）
@@ -257,7 +257,7 @@ export {
   type SyncStrategy,
   // 同步时间筛选类型
   type SyncTimeFilter,
-} from './sync/githubSyncDiff.js'
+} from './sync/github-sync-diff.js'
 
 export {
   // 读取 GitHub 仓库配置
@@ -282,7 +282,7 @@ export {
   type GithubSyncConfig,
   // 同步源类型
   type SyncSourceType,
-} from './sync/githubConfig.js'
+} from './sync/github-config.js'
 
 // ============================================================================
 // 12. 通用工具函数与全局状态（来自 tools/utility.js）
@@ -417,7 +417,7 @@ export {
 export { applyTheme, initTheme, saveTheme, resolveTheme } from './tools/theme.js'
 
 // ============================================================================
-// 14. URL 自动补全（来自 tools/autoFillUrl.js）
+// 14. URL 自动补全（来自 tools/auto-fill-url.js）
 // ============================================================================
 export {
   // 执行 URL 自动补全
@@ -426,13 +426,13 @@ export {
   showAutoFillUrlDialog,
   type AutoFillResult,
   type NameUrlMap,
-} from './tools/autoFillUrl.js'
+} from './tools/auto-fill-url.js'
 
 // ========== 核心类型（从 core/types.ts re-export） ==========
 export type { BGMCache, BGMSheet, BGMSync, BGMUserInfo, EnrichWorkbookState } from './core/types.js'
 
 // ============================================================================
-// 15. 页面逻辑（来自 panel/panelPage.js）
+// 15. 页面逻辑（来自 panel/panel-page.js）
 // ============================================================================
 
 export {
@@ -443,7 +443,7 @@ export {
   refreshData,
   // 放大预览表格
   enlargePreview,
-} from './panel/panelPage.js'
+} from './panel/panel-page.js'
 // ============================================================================
 // 16. 预览模块（类型部分）
 // ============================================================================
@@ -502,7 +502,7 @@ export type {
 } from './tools/wps.js'
 
 // ============================================================================
-// 18. 服务层（来自 services/ribbonService.js）
+// 18. 服务层（来自 services/ribbon-service.js）
 // ============================================================================
 export {
   detectConflicts,
@@ -510,15 +510,15 @@ export {
   detectGithubConflicts,
   type Conflict,
   type ConflictResolution,
-} from './services/ribbonService.js'
+} from './services/ribbon-service.js'
 
 // ============================================================================
-// 19. 冲突解决 UI（来自 ui/conflictResolver.js）
+// 19. 冲突解决 UI（来自 ui/conflict-resolver.js）
 // ============================================================================
-export { showConflictResolver } from './ui/conflictResolver.js'
+export { showConflictResolver } from './ui/conflict-resolver.js'
 
 // ============================================================================
-// 20. 同步结果增强弹窗（来自 ui/syncResultDialog.js）
+// 20. 同步结果增强弹窗（来自 ui/sync-result-dialog.js）
 // ============================================================================
 export {
   showSyncResultDialog,
@@ -527,15 +527,15 @@ export {
   formatDuration,
   type DateStats,
   type SyncResultDialogOptions,
-} from './ui/syncResultDialog.js'
+} from './ui/sync-result-dialog.js'
 
 // ============================================================================
-// 21. JSONL 导出（来自 sync/exportJsonl.js）
+// 21. JSONL 导出（来自 sync/export-jsonl.js）
 // ============================================================================
-export { exportSheetToJsonlFile, buildJsonlFromSheet } from './sync/exportJsonl.js'
+export { exportSheetToJsonlFile, buildJsonlFromSheet } from './sync/export-jsonl.js'
 
 // ============================================================================
-// 22. 新番表富化引擎（来自 sync/enrichEngine.js + sync/enrichRecord.js）
+// 22. 新番表富化引擎（来自 sync/enrich-engine.js + sync/enrich-record.js）
 // ============================================================================
 export {
   // 富化引擎核心函数
@@ -582,7 +582,7 @@ export {
   type RemoteRepoConfig,
   type EnrichProgress,
   type ProgressCallback,
-} from './sync/enrichEngine.js'
+} from './sync/enrich-engine.js'
 
 export {
   // 富化记录表函数
@@ -601,10 +601,10 @@ export {
   ENRICH_RECORD_SHEET_NAME,
   ENRICH_RECORD_COLUMNS,
   ENRICH_RECORD_COL,
-} from './sync/enrichRecord.js'
+} from './sync/enrich-record.js'
 
 // ============================================================================
-// 23. 富化页面 UI 控制器（来自 panel/enrichPage.js）
+// 23. 富化页面 UI 控制器（来自 panel/enrich-page.js）
 // ============================================================================
 export {
   initEnrichPage,
@@ -615,10 +615,10 @@ export {
   cancelEnrichment,
   openEnrichRecordSheet as openEnrichRecordSheetFromPage,
   clearRecords,
-} from './panel/enrichPage.js'
+} from './panel/enrich-page.js'
 
 // ============================================================================
-// 24. 富化工作簿锁定（来自 sync/enrichLock.js）
+// 24. 富化工作簿锁定（来自 sync/enrich-lock.js）
 // ============================================================================
 export {
   refreshEnrichWorkbooks,
@@ -631,4 +631,4 @@ export {
   findWorkbookByName,
   findSheetInWorkbook,
   initEnrichLock,
-} from './sync/enrichLock.js'
+} from './sync/enrich-lock.js'
