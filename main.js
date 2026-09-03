@@ -7,7 +7,7 @@
 const MODULES = [
     { src: 'dist-ts/index.js', type: 'module', critical: true },     // 先加载类型/枚举
     { src: 'dist-ts/tools/config.js', type: 'module', critical: true },
-    { src: 'dist-ts/tools/util.js', type: 'module', critical: true },
+    { src: 'dist-ts/tools/utility.js', type: 'module', critical: true },
     { src: 'dist-ts/core/result.js', type: 'module', critical: true },     // BgmError + Result
     { src: 'dist-ts/core/constants.js', type: 'module', critical: true },
     { src: 'dist-ts/core/crypto.js', type: 'module', critical: true },
@@ -17,19 +17,19 @@ const MODULES = [
     { src: 'dist-ts/ui/dialog.js', type: 'module' },
     { src: 'dist-ts/ui/message.js', type: 'module' },
     { src: 'dist-ts/ui/preview.js', type: 'module' },
-    { src: 'dist-ts/sync/syncRecord.js', type: 'module' },
+    { src: 'dist-ts/sync/sync-record.js', type: 'module' },
     { src: 'dist-ts/sync/scraping.js', type: 'module' },
     { src: 'dist-ts/sync/exceltobangumi.js', type: 'module' },
-    { src: 'dist-ts/sync/githubSyncDiff.js', type: 'module' },   // GitHub 同步纯函数（零依赖）
-    { src: 'dist-ts/sync/githubConfig.js', type: 'module' },     // GitHub 仓库配置管理
-    { src: 'dist-ts/sync/githubSync.js', type: 'module' },       // GitHub 仓库增量同步主模块
-    { src:'dist-ts/services/ribbonService.js', type:'module'},
+    { src: 'dist-ts/sync/github-sync-diff.js', type: 'module' },   // GitHub 同步纯函数（零依赖）
+    { src: 'dist-ts/sync/github-config.js', type: 'module' },     // GitHub 仓库配置管理
+    { src: 'dist-ts/sync/github-sync.js', type: 'module' },       // GitHub 仓库增量同步主模块
+    { src:'dist-ts/services/ribbon-service.js', type:'module'},
     // 自 Task 13 重构后，ribbon.ts 不再在模块加载时自动注册 message 监听器。
     // 改为通过 entry/ribbon-entry.ts 显式调用 initRibbon() 启动（入口模块内部
     // 含 typeof window !== 'undefined' 守卫，确保 Node 测试环境导入不会触发副作用）。
     { src: 'dist-ts/entry/ribbon-entry.js', type: 'module', critical: true },
     { src: 'dist-ts/ui/handlers.js', type: 'module', critical: true },
-    { src: 'dist-ts/panel/panelPage.js', type: 'module', critical: true }
+    { src: 'dist-ts/panel/panel-page.js', type: 'module', critical: true }
 ];
 
 // 暴露模块加载状态给调试面板（debugPanel.ts 读取）
