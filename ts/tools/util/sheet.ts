@@ -520,15 +520,15 @@ export function ensureSheetHeaders(ws: WpsWorksheet | null | undefined): boolean
   // 清除缓存，确保后续读取能拿到新表头
   clearSheetCache(ws)
   // 验证 findHeaderRow 是否能识别新表头
-  const newHeaderRow = findHeaderRow(ws)
+  const detectedHeaderRow = findHeaderRow(ws)
   bgmLog(
     LOG_LEVELS.INFO,
-    `[ensureSheetHeaders] 缓存已清除，findHeaderRow 重新检测: ${String(newHeaderRow)}`,
+    `[ensureSheetHeaders] 缓存已清除，findHeaderRow 重新检测: ${String(detectedHeaderRow)}`,
   )
-  if (newHeaderRow !== 1) {
+  if (detectedHeaderRow !== 1) {
     bgmLog(
       LOG_LEVELS.WARN,
-      `[ensureSheetHeaders] findHeaderRow 返回 ${String(newHeaderRow)}（预期 1），表头关键字匹配可能失败`,
+      `[ensureSheetHeaders] findHeaderRow 返回 ${String(detectedHeaderRow)}（预期 1），表头关键字匹配可能失败`,
     )
   }
   bgmLog(LOG_LEVELS.INFO, '[ensureSheetHeaders] 标准表头写入完成')

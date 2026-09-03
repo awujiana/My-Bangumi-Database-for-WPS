@@ -49,7 +49,7 @@ describe('UndoStack', () => {
   describe('基础会话管理', () => {
     it('beginUndoSession 后可记录条目', (): void => {
       beginUndoSession('test')
-      recordUndoEntry({ row: 1, col: 1, oldValue: 'a', newValue: 'b' })
+      recordUndoEntry({ row: 1, col: 1, oldValue: 'a', updatedValue: 'b' })
       endUndoSession()
       expect(getUndoSessionCount()).toBe(1)
     })
@@ -57,7 +57,7 @@ describe('UndoStack', () => {
     it('endUndoSession 后 currentSession 被清空', (): void => {
       beginUndoSession('test')
       endUndoSession()
-      recordUndoEntry({ row: 1, col: 1, oldValue: 'a', newValue: 'b' })
+      recordUndoEntry({ row: 1, col: 1, oldValue: 'a', updatedValue: 'b' })
       expect(getUndoSessionCount()).toBe(0)
     })
 
@@ -68,7 +68,7 @@ describe('UndoStack', () => {
     })
 
     it('无会话时 recordUndoEntry 不记录', (): void => {
-      recordUndoEntry({ row: 1, col: 1, oldValue: 'a', newValue: 'b' })
+      recordUndoEntry({ row: 1, col: 1, oldValue: 'a', updatedValue: 'b' })
       expect(getUndoSessionCount()).toBe(0)
     })
 
@@ -81,7 +81,7 @@ describe('UndoStack', () => {
   describe('undoLastSync - 单元格恢复', () => {
     it('恢复最近会话的单元格变更', (): void => {
       beginUndoSession('test')
-      recordUndoEntry({ row: 1, col: 1, oldValue: 'old', newValue: 'new' })
+      recordUndoEntry({ row: 1, col: 1, oldValue: 'old', updatedValue: 'new' })
       endUndoSession()
       const restored = undoLastSync()
       expect(restored).toBe(1)
@@ -95,15 +95,15 @@ describe('UndoStack', () => {
     it('getDataSheet 返回 null 时返回 0', (): void => {
       mockGetDataSheet.mockReturnValue(null)
       beginUndoSession('test')
-      recordUndoEntry({ row: 1, col: 1, oldValue: 'old', newValue: 'new' })
+      recordUndoEntry({ row: 1, col: 1, oldValue: 'old', updatedValue: 'new' })
       endUndoSession()
       expect(undoLastSync()).toBe(0)
     })
 
     it('逆序恢复多条单元格变更', (): void => {
       beginUndoSession('test')
-      recordUndoEntry({ row: 1, col: 1, oldValue: 'a', newValue: 'b' })
-      recordUndoEntry({ row: 2, col: 1, oldValue: 'c', newValue: 'd' })
+      recordUndoEntry({ row: 1, col: 1, oldValue: 'a', updatedValue: 'b' })
+      recordUndoEntry({ row: 2, col: 1, oldValue: 'c', updatedValue: 'd' })
       endUndoSession()
       undoLastSync()
       // 应逆序调用：先 row=2，再 row=1
@@ -114,9 +114,9 @@ describe('UndoStack', () => {
 
     it('返回恢复的条目总数', (): void => {
       beginUndoSession('test')
-      recordUndoEntry({ row: 1, col: 1, oldValue: 'a', newValue: 'b' })
-      recordUndoEntry({ row: 2, col: 1, oldValue: 'c', newValue: 'd' })
-      recordUndoEntry({ row: 3, col: 1, oldValue: 'e', newValue: 'f' })
+      recordUndoEntry({ row: 1, col: 1, oldValue: 'a', updatedValue: 'b' })
+      recordUndoEntry({ row: 2, col: 1, oldValue: 'c', updatedValue: 'd' })
+      recordUndoEntry({ row: 3, col: 1, oldValue: 'e', updatedValue: 'f' })
       endUndoSession()
       expect(undoLastSync()).toBe(3)
     })
@@ -220,7 +220,7 @@ describe('UndoStack', () => {
       const ws = createMockWs()
       mockGetDataSheet.mockReturnValue(ws)
       beginUndoSession('mixed')
-      recordUndoEntry({ row: 10, col: 1, oldValue: 'old', newValue: 'new' })
+      recordUndoEntry({ row: 10, col: 1, oldValue: 'old', updatedValue: 'new' })
       recordRowDeleteEntry({ row: 5, values: { '1': 'deleted' } })
       endUndoSession()
       const count = undoLastSync()
@@ -233,7 +233,7 @@ describe('UndoStack', () => {
     it('超过 MAX_SESSIONS(20) 时自动清理最旧的', (): void => {
       for (let index = 0; index < 25; index += 1) {
         beginUndoSession(`session ${String(index)}`)
-        recordUndoEntry({ row: index, col: 1, oldValue: 'old', newValue: 'new' })
+        recordUndoEntry({ row: index, col: 1, oldValue: 'old', updatedValue: 'new' })
         endUndoSession()
       }
       expect(getUndoSessionCount()).toBe(20)
@@ -241,10 +241,10 @@ describe('UndoStack', () => {
 
     it('多次 undoLastSync 按栈序逐个撤销', (): void => {
       beginUndoSession('first')
-      recordUndoEntry({ row: 1, col: 1, oldValue: 'a1', newValue: 'b1' })
+      recordUndoEntry({ row: 1, col: 1, oldValue: 'a1', updatedValue: 'b1' })
       endUndoSession()
       beginUndoSession('second')
-      recordUndoEntry({ row: 2, col: 1, oldValue: 'a2', newValue: 'b2' })
+      recordUndoEntry({ row: 2, col: 1, oldValue: 'a2', updatedValue: 'b2' })
       endUndoSession()
       expect(getUndoSessionCount()).toBe(2)
       expect(undoLastSync()).toBe(1)
@@ -256,7 +256,7 @@ describe('UndoStack', () => {
 
     it('getLastSessionDescription 返回最近会话描述', (): void => {
       beginUndoSession('GitHub 同步')
-      recordUndoEntry({ row: 1, col: 1, oldValue: 'a', newValue: 'b' })
+      recordUndoEntry({ row: 1, col: 1, oldValue: 'a', updatedValue: 'b' })
       endUndoSession()
       expect(getLastSessionDescription()).toBe('GitHub 同步')
     })
@@ -267,10 +267,10 @@ describe('UndoStack', () => {
 
     it('clearUndoStack 清空所有会话', (): void => {
       beginUndoSession('a')
-      recordUndoEntry({ row: 1, col: 1, oldValue: 'a', newValue: 'b' })
+      recordUndoEntry({ row: 1, col: 1, oldValue: 'a', updatedValue: 'b' })
       endUndoSession()
       beginUndoSession('b')
-      recordUndoEntry({ row: 2, col: 1, oldValue: 'c', newValue: 'd' })
+      recordUndoEntry({ row: 2, col: 1, oldValue: 'c', updatedValue: 'd' })
       endUndoSession()
       expect(getUndoSessionCount()).toBe(2)
       clearUndoStack()
@@ -280,7 +280,7 @@ describe('UndoStack', () => {
 
     it('undoLastSync 后会话被弹出，栈长度减少', (): void => {
       beginUndoSession('test')
-      recordUndoEntry({ row: 1, col: 1, oldValue: 'old', newValue: 'new' })
+      recordUndoEntry({ row: 1, col: 1, oldValue: 'old', updatedValue: 'new' })
       endUndoSession()
       expect(getUndoSessionCount()).toBe(1)
       undoLastSync()

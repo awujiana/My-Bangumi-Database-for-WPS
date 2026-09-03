@@ -588,8 +588,8 @@ class LiteWithDefault<T, D> implements ZodSchema<T | D> {
   }
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  default(newDef: any): AnySchema {
-    return flu(new LiteWithDefault<T | D, unknown>(this as unknown as ZodSchema<T | D>, newDef))
+  default(definition: any): AnySchema {
+    return flu(new LiteWithDefault<T | D, unknown>(this as unknown as ZodSchema<T | D>, definition))
   }
 
   safeParse(input: unknown): ParseResult<T | D> {

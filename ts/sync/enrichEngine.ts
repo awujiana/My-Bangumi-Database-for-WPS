@@ -138,8 +138,8 @@ export interface EnrichConfig {
  * 匹配结果
  */
 export interface MatchResult {
-  newAnimeRow: number
-  newAnimeName: string
+  animeRow: number
+  matchedAnimeName: string
   matchType: 'exact' | 'alias' | 'unmatched' | 'error'
   bangumiRow?: number
   bangumiName?: string
@@ -154,7 +154,7 @@ export interface EnrichedField {
   fieldName: string
   bangumiColumn: number
   oldValue: string | null
-  newValue: string
+  updatedValue: string
   action: 'fill' | 'append' | 'skip'
 }
 
@@ -166,9 +166,9 @@ export interface ConflictInfo {
   bangumiColumn: number
   bangumiRow: number
   oldValue: string
-  newValue: string
-  newAnimeRow: number
-  newAnimeName: string
+  updatedValue: string
+  animeRow: number
+  matchedAnimeName: string
   resolution: 'append' | 'keep' | 'overwrite'
   note?: string
 }
@@ -178,7 +178,7 @@ export interface ConflictInfo {
  */
 export interface EnrichResultItem {
   kind: 'matched' | 'unmatched' | 'error'
-  newAnimeRow: number
+  animeRow: number
   name: string
   matchType?: 'exact' | 'alias' | 'unmatched' | 'error'
   enrichedFields: EnrichedField[]
@@ -251,9 +251,9 @@ export function splitTags(tags: string): string[] {
  * 合并标签去重
  * 现有标签 + 新标签，去重后以 TAG_SEPARATOR 连接
  */
-export function mergeTags(oldTags: string, newTags: string): string {
+export function mergeTags(oldTags: string, incomingTags: string): string {
   const oldList = splitTags(oldTags)
-  const list = splitTags(newTags)
+  const list = splitTags(incomingTags)
   const merged = [...oldList]
   for (const tag of list) {
     if (!merged.includes(tag)) {
@@ -465,8 +465,8 @@ export function matchEntries(
 
       const normalizedName = normalizeName(rawName)
       let matchResult: MatchResult = {
-        newAnimeRow: row,
-        newAnimeName: rawName,
+        animeRow: row,
+        matchedAnimeName: rawName,
         matchType: 'unmatched',
       }
 
@@ -477,8 +477,8 @@ export function matchEntries(
           if (bangumiRow !== undefined) {
             const matchedName = rowNames.get(bangumiRow)
             matchResult = {
-              newAnimeRow: row,
-              newAnimeName: rawName,
+              animeRow: row,
+              matchedAnimeName: rawName,
               matchType: 'exact',
               bangumiRow,
               ...(matchedName !== undefined ? { bangumiName: matchedName } : {}),
@@ -500,8 +500,8 @@ export function matchEntries(
             }
             const matchedName = rowNames.get(bangumiRow)
             matchResult = {
-              newAnimeRow: row,
-              newAnimeName: rawName,
+              animeRow: row,
+              matchedAnimeName: rawName,
               matchType: 'alias',
               bangumiRow,
               ...(matchedName !== undefined ? { bangumiName: matchedName } : {}),
@@ -512,8 +512,8 @@ export function matchEntries(
       } catch (error: unknown) {
         const errorMessage = error instanceof Error ? error.message : String(error)
         matchResult = {
-          newAnimeRow: row,
-          newAnimeName: rawName,
+          animeRow: row,
+          matchedAnimeName: rawName,
           matchType: 'error',
           errorMessage,
         }
@@ -545,35 +545,35 @@ export function matchEntries(
 export function enrichTags(
   sheet: WpsWorksheet,
   row: number,
-  newData: Record<string, string>,
+  incomingData: Record<string, string>,
   colMap: Map<string, number>,
   enriched: EnrichedField[],
 ): void {
   const bangumiTagsCol = colMap.get('标签/分级') || colMap.get('标签')
   if (!bangumiTagsCol) return
 
-  const newTags = newData.TAGS ?? ''
-  if (isEmptyValue(newTags)) return
+  const incomingTags = incomingData.TAGS ?? ''
+  if (isEmptyValue(incomingTags)) return
 
   const oldTags = getCellValue(sheet, row, bangumiTagsCol)
   if (isEmptyValue(oldTags)) {
-    setCellValue(sheet, row, bangumiTagsCol, newTags)
+    setCellValue(sheet, row, bangumiTagsCol, incomingTags)
     enriched.push({
       fieldName: '标签/分级',
       bangumiColumn: bangumiTagsCol,
       oldValue: null,
-      newValue: newTags,
+      updatedValue: incomingTags,
       action: 'fill',
     })
   } else {
-    const merged = mergeTags(oldTags, newTags)
+    const merged = mergeTags(oldTags, incomingTags)
     if (merged !== oldTags) {
       setCellValue(sheet, row, bangumiTagsCol, merged)
       enriched.push({
         fieldName: '标签/分级',
         bangumiColumn: bangumiTagsCol,
         oldValue: oldTags,
-        newValue: merged,
+        updatedValue: merged,
         action: 'append',
       })
     } else {
@@ -581,7 +581,7 @@ export function enrichTags(
         fieldName: '标签/分级',
         bangumiColumn: bangumiTagsCol,
         oldValue: oldTags,
-        newValue: merged,
+        updatedValue: merged,
         action: 'skip',
       })
     }
@@ -595,14 +595,14 @@ export function enrichTags(
 export function enrichDate(
   sheet: WpsWorksheet,
   row: number,
-  newData: Record<string, string>,
+  incomingData: Record<string, string>,
   colMap: Map<string, number>,
   enriched: EnrichedField[],
 ): void {
   const bangumiDateCol = colMap.get('开播日期')
   if (!bangumiDateCol) return
 
-  const date = newData['首播'] ?? ''
+  const date = incomingData['首播'] ?? ''
   if (isEmptyValue(date)) return
 
   const oldDate = getCellValue(sheet, row, bangumiDateCol)
@@ -612,7 +612,7 @@ export function enrichDate(
       fieldName: '开播日期',
       bangumiColumn: bangumiDateCol,
       oldValue: null,
-      newValue: date,
+      updatedValue: date,
       action: 'fill',
     })
   } else {
@@ -620,7 +620,7 @@ export function enrichDate(
       fieldName: '开播日期',
       bangumiColumn: bangumiDateCol,
       oldValue: oldDate,
-      newValue: date,
+      updatedValue: date,
       action: 'skip',
     })
   }
@@ -633,24 +633,24 @@ export function enrichDate(
 export function enrichEpisodes(
   sheet: WpsWorksheet,
   row: number,
-  newData: Record<string, string>,
+  incomingData: Record<string, string>,
   colMap: Map<string, number>,
   enriched: EnrichedField[],
 ): void {
   const bangumiEpisodesCol = colMap.get('集数')
   if (!bangumiEpisodesCol) return
 
-  const newEpisodes = newData['集数'] ?? ''
-  if (isEmptyValue(newEpisodes)) return
+  const incomingEpisodes = incomingData['集数'] ?? ''
+  if (isEmptyValue(incomingEpisodes)) return
 
   const oldEpisodes = getCellValue(sheet, row, bangumiEpisodesCol)
   if (isEmptyValue(oldEpisodes)) {
-    setCellValue(sheet, row, bangumiEpisodesCol, newEpisodes)
+    setCellValue(sheet, row, bangumiEpisodesCol, incomingEpisodes)
     enriched.push({
       fieldName: '集数',
       bangumiColumn: bangumiEpisodesCol,
       oldValue: null,
-      newValue: newEpisodes,
+      updatedValue: incomingEpisodes,
       action: 'fill',
     })
   } else {
@@ -658,7 +658,7 @@ export function enrichEpisodes(
       fieldName: '集数',
       bangumiColumn: bangumiEpisodesCol,
       oldValue: oldEpisodes,
-      newValue: newEpisodes,
+      updatedValue: incomingEpisodes,
       action: 'skip',
     })
   }
@@ -671,7 +671,7 @@ export function enrichEpisodes(
 export function enrichFeatures(
   sheet: WpsWorksheet,
   row: number,
-  newData: Record<string, string>,
+  incomingData: Record<string, string>,
   colMap: Map<string, number>,
   enriched: EnrichedField[],
 ): void {
@@ -680,22 +680,22 @@ export function enrichFeatures(
 
   const featureParts: string[] = []
 
-  const weekday = newData['周更时间'] ?? ''
+  const weekday = incomingData['周更时间'] ?? ''
   if (!isEmptyValue(weekday)) {
     featureParts.push(`周更:${weekday}`)
   }
 
-  const platform = newData['播放平台'] ?? ''
+  const platform = incomingData['播放平台'] ?? ''
   if (!isEmptyValue(platform)) {
     featureParts.push(`平台:${platform}`)
   }
 
-  const exclusive = newData['独播'] ?? ''
+  const exclusive = incomingData['独播'] ?? ''
   if (!isEmptyValue(exclusive)) {
     featureParts.push(`独播:${exclusive}`)
   }
 
-  const special = newData['特殊'] ?? ''
+  const special = incomingData['特殊'] ?? ''
   if (!isEmptyValue(special)) {
     featureParts.push(`特殊:${special}`)
   }
@@ -711,7 +711,7 @@ export function enrichFeatures(
       fieldName: '特点/印象',
       bangumiColumn: bangumiFeatureCol,
       oldValue: null,
-      newValue: features,
+      updatedValue: features,
       action: 'fill',
     })
   } else {
@@ -722,7 +722,7 @@ export function enrichFeatures(
         fieldName: '特点/印象',
         bangumiColumn: bangumiFeatureCol,
         oldValue: oldFeature,
-        newValue: merged,
+        updatedValue: merged,
         action: 'append',
       })
     } else {
@@ -730,7 +730,7 @@ export function enrichFeatures(
         fieldName: '特点/印象',
         bangumiColumn: bangumiFeatureCol,
         oldValue: oldFeature,
-        newValue: merged,
+        updatedValue: merged,
         action: 'skip',
       })
     }
@@ -777,8 +777,8 @@ export function enrichEntries(
     if (match.matchType === 'unmatched') {
       results.push({
         kind: 'unmatched',
-        newAnimeRow: match.newAnimeRow,
-        name: match.newAnimeName,
+        animeRow: match.animeRow,
+        name: match.matchedAnimeName,
         matchType: 'unmatched',
         enrichedFields: [],
       })
@@ -789,8 +789,8 @@ export function enrichEntries(
     if (match.matchType === 'error') {
       results.push({
         kind: 'error',
-        newAnimeRow: match.newAnimeRow,
-        name: match.newAnimeName,
+        animeRow: match.animeRow,
+        name: match.matchedAnimeName,
         matchType: 'error',
         enrichedFields: [],
         ...(match.errorMessage !== undefined ? { errorMessage: match.errorMessage } : {}),
@@ -803,8 +803,8 @@ export function enrichEntries(
     if (bangumiRow === undefined) {
       results.push({
         kind: 'error',
-        newAnimeRow: match.newAnimeRow,
-        name: match.newAnimeName,
+        animeRow: match.animeRow,
+        name: match.matchedAnimeName,
         matchType: 'error',
         enrichedFields: [],
         errorMessage: '匹配行号缺失',
@@ -816,9 +816,9 @@ export function enrichEntries(
     stats.matched += 1
 
     const isIntro = isIntroSheet(config.columnMapping)
-    const newData = isIntro
-      ? readIntroSheetRow(animeSheet, match.newAnimeRow, config.columnMapping)
-      : readNewAnimeRow(animeSheet, match.newAnimeRow, config.columnMapping)
+    const incomingData = isIntro
+      ? readIntroSheetRow(animeSheet, match.animeRow, config.columnMapping)
+      : readNewAnimeRow(animeSheet, match.animeRow, config.columnMapping)
     const enrichedFields: EnrichedField[] = []
     const fieldConflicts: ConflictInfo[] = []
 
@@ -827,26 +827,26 @@ export function enrichEntries(
         enrichIntroData(
           bangumiSheet,
           bangumiRow,
-          newData,
+          incomingData,
           bangumiColMap,
           enrichedFields,
           fieldConflicts,
-          match.newAnimeRow,
-          match.newAnimeName,
+          match.animeRow,
+          match.matchedAnimeName,
         )
-        enrichOpEdPv(bangumiSheet, bangumiRow, newData, bangumiColMap, enrichedFields)
+        enrichOpEdPv(bangumiSheet, bangumiRow, incomingData, bangumiColMap, enrichedFields)
       } else {
-        enrichTags(bangumiSheet, bangumiRow, newData, bangumiColMap, enrichedFields)
-        enrichDate(bangumiSheet, bangumiRow, newData, bangumiColMap, enrichedFields)
-        enrichEpisodes(bangumiSheet, bangumiRow, newData, bangumiColMap, enrichedFields)
-        enrichFeatures(bangumiSheet, bangumiRow, newData, bangumiColMap, enrichedFields)
+        enrichTags(bangumiSheet, bangumiRow, incomingData, bangumiColMap, enrichedFields)
+        enrichDate(bangumiSheet, bangumiRow, incomingData, bangumiColMap, enrichedFields)
+        enrichEpisodes(bangumiSheet, bangumiRow, incomingData, bangumiColMap, enrichedFields)
+        enrichFeatures(bangumiSheet, bangumiRow, incomingData, bangumiColMap, enrichedFields)
       }
 
       // 别名富化：新番表名称与 Bangumi 追踪表不一致时补全
       enrichAlias(
         bangumiSheet,
         bangumiRow,
-        match.newAnimeName,
+        match.matchedAnimeName,
         match.bangumiName,
         bangumiColMap,
         enrichedFields,
@@ -863,11 +863,11 @@ export function enrichEntries(
         const record: AddEnrichRecordParameters = {
           timestamp: new Date().toISOString(),
           matchType: match.matchType === 'exact' ? '精确' : '别名',
-          name: match.newAnimeName,
+          name: match.matchedAnimeName,
           row: bangumiRow,
           enrichedField: field.fieldName,
           oldValue: field.oldValue ?? '',
-          newValue: field.newValue,
+          updatedValue: field.updatedValue,
           action: field.action,
           ...(field.action === 'skip' ? { note: '已有值，跳过' } : {}),
         }
@@ -876,8 +876,8 @@ export function enrichEntries(
 
       results.push({
         kind: 'matched',
-        newAnimeRow: match.newAnimeRow,
-        name: match.newAnimeName,
+        animeRow: match.animeRow,
+        name: match.matchedAnimeName,
         matchType: match.matchType,
         enrichedFields,
         conflicts: fieldConflicts.length > 0 ? fieldConflicts : undefined,
@@ -887,12 +887,12 @@ export function enrichEntries(
       stats.failed += 1
       bgmLog(
         LOG_LEVELS.ERROR,
-        `[enrichEntries] 富化 "${match.newAnimeName}" (行${String(bangumiRow)}) 失败: ${errorMessage}`,
+        `[enrichEntries] 富化 "${match.matchedAnimeName}" (行${String(bangumiRow)}) 失败: ${errorMessage}`,
       )
       results.push({
         kind: 'error',
-        newAnimeRow: match.newAnimeRow,
-        name: match.newAnimeName,
+        animeRow: match.animeRow,
+        name: match.matchedAnimeName,
         matchType: match.matchType,
         enrichedFields: [],
         errorMessage,
@@ -905,7 +905,7 @@ export function enrichEntries(
       progressCallback({
         current,
         total,
-        currentName: match.newAnimeName,
+        currentName: match.matchedAnimeName,
         stats: { ...stats },
         etaMs,
       })
@@ -935,7 +935,7 @@ interface AddEnrichRecordParameters {
   row: number
   enrichedField: string
   oldValue: string
-  newValue: string
+  updatedValue: string
   action: 'fill' | 'append' | 'skip' | 'error'
   note?: string
 }
@@ -975,26 +975,26 @@ export function resolveConflictField(
   conflict: ConflictInfo,
   enriched: EnrichedField[],
 ): void {
-  const { fieldName, bangumiColumn, bangumiRow, oldValue, newValue, resolution } = conflict
+  const { fieldName, bangumiColumn, bangumiRow, oldValue, updatedValue, resolution } = conflict
 
   if (resolution === 'keep') {
     enriched.push({
       fieldName,
       bangumiColumn,
       oldValue,
-      newValue,
+      updatedValue,
       action: 'skip',
     })
     return
   }
 
   if (resolution === 'overwrite') {
-    setCellValue(sheet, bangumiRow, bangumiColumn, newValue)
+    setCellValue(sheet, bangumiRow, bangumiColumn, updatedValue)
     enriched.push({
       fieldName,
       bangumiColumn,
       oldValue,
-      newValue,
+      updatedValue,
       action: 'fill',
     })
     return
@@ -1006,14 +1006,14 @@ export function resolveConflictField(
       .split(/\s*\|\s*/)
       .map((s) => s.trim())
       .filter(Boolean)
-    if (!parts.includes(newValue)) {
-      const merged = parts.join(TAG_SEPARATOR) + TAG_SEPARATOR + newValue
+    if (!parts.includes(updatedValue)) {
+      const merged = parts.join(TAG_SEPARATOR) + TAG_SEPARATOR + updatedValue
       setCellValue(sheet, bangumiRow, bangumiColumn, merged)
       enriched.push({
         fieldName,
         bangumiColumn,
         oldValue,
-        newValue: merged,
+        updatedValue: merged,
         action: 'append',
       })
     } else {
@@ -1021,18 +1021,18 @@ export function resolveConflictField(
         fieldName,
         bangumiColumn,
         oldValue,
-        newValue,
+        updatedValue,
         action: 'skip',
       })
     }
   } else {
-    const merged = oldValue + TAG_SEPARATOR + newValue
+    const merged = oldValue + TAG_SEPARATOR + updatedValue
     setCellValue(sheet, bangumiRow, bangumiColumn, merged)
     enriched.push({
       fieldName,
       bangumiColumn,
       oldValue,
-      newValue: merged,
+      updatedValue: merged,
       action: 'append',
     })
   }
@@ -1128,13 +1128,13 @@ export function ensureBangumiColumns(
     }
 
     for (let index = 0; index < missing.length; index += 1) {
-      const newCol = maxCol + 1 + index
+      const insertCol = maxCol + 1 + index
       const field = missing[index]?.field
       if (field) {
-        updatedMap.set(field, newCol)
+        updatedMap.set(field, insertCol)
         bgmLog(
           LOG_LEVELS.INFO,
-          `[ensureBangumiColumns] 新增列: ${field} → 第 ${String(newCol)} 列 (样式已跟随现有列)`,
+          `[ensureBangumiColumns] 新增列: ${field} → 第 ${String(insertCol)} 列 (样式已跟随现有列)`,
         )
       }
     }
@@ -1172,17 +1172,17 @@ function WpsCellReference(row: number, col: number): string {
 export function enrichIntroData(
   sheet: WpsWorksheet,
   row: number,
-  newData: Record<string, string>,
+  incomingData: Record<string, string>,
   colMap: Map<string, number>,
   enriched: EnrichedField[],
   conflicts: ConflictInfo[],
-  newAnimeRow: number,
-  newAnimeName: string,
+  animeRow: number,
+  matchedAnimeName: string,
 ): void {
   const bangumiFeatureCol = colMap.get('特点/印象')
 
   for (const [sourceKey, targetColName] of Object.entries(INTRO_FIELD_TO_BANGUMI)) {
-    const rawValue = newData[sourceKey] ?? ''
+    const rawValue = incomingData[sourceKey] ?? ''
     if (isEmptyValue(rawValue)) continue
 
     const annotatedValue = getAnnotatedValue(sourceKey, targetColName, rawValue)
@@ -1195,7 +1195,7 @@ export function enrichIntroData(
           fieldName: targetColName,
           bangumiColumn: targetCol,
           oldValue: null,
-          newValue: annotatedValue,
+          updatedValue: annotatedValue,
           action: 'fill',
           ...(sourceKey !== targetColName
             ? { note: `字段名差异: ${sourceKey} → ${targetColName}` }
@@ -1207,9 +1207,9 @@ export function enrichIntroData(
           bangumiColumn: targetCol,
           bangumiRow: row,
           oldValue,
-          newValue: annotatedValue,
-          newAnimeRow,
-          newAnimeName,
+          updatedValue: annotatedValue,
+          animeRow,
+          matchedAnimeName,
           resolution: 'append',
           ...(sourceKey !== targetColName
             ? { note: `字段名差异: ${sourceKey} → ${targetColName}` }
@@ -1225,7 +1225,7 @@ export function enrichIntroData(
           fieldName: `特点/印象(${sourceKey})`,
           bangumiColumn: bangumiFeatureCol,
           oldValue: null,
-          newValue: featureEntry,
+          updatedValue: featureEntry,
           action: 'fill',
         })
       } else {
@@ -1236,7 +1236,7 @@ export function enrichIntroData(
             fieldName: `特点/印象(${sourceKey})`,
             bangumiColumn: bangumiFeatureCol,
             oldValue: oldFeature,
-            newValue: merged,
+            updatedValue: merged,
             action: 'append',
           })
         } else {
@@ -1244,7 +1244,7 @@ export function enrichIntroData(
             fieldName: `特点/印象(${sourceKey})`,
             bangumiColumn: bangumiFeatureCol,
             oldValue: oldFeature,
-            newValue: merged,
+            updatedValue: merged,
             action: 'skip',
           })
         }
@@ -1255,7 +1255,7 @@ export function enrichIntroData(
   if (bangumiFeatureCol !== undefined) {
     const featureParts: string[] = []
     for (const key of INTRO_FEATURE_FIELDS) {
-      const value = newData[key] ?? ''
+      const value = incomingData[key] ?? ''
       if (!isEmptyValue(value)) {
         const label = key === '简介' ? '简介' : key
         const display = key === '简介' && value.length > 80 ? `${value.substring(0, 80)}...` : value
@@ -1271,7 +1271,7 @@ export function enrichIntroData(
           fieldName: '特点/印象(简介补充)',
           bangumiColumn: bangumiFeatureCol,
           oldValue: null,
-          newValue: merged,
+          updatedValue: merged,
           action: 'fill',
         })
       } else {
@@ -1282,7 +1282,7 @@ export function enrichIntroData(
             fieldName: '特点/印象(简介补充)',
             bangumiColumn: bangumiFeatureCol,
             oldValue: oldFeature,
-            newValue: combined,
+            updatedValue: combined,
             action: 'append',
           })
         }
@@ -1298,7 +1298,7 @@ export function enrichIntroData(
 export function enrichOpEdPv(
   sheet: WpsWorksheet,
   row: number,
-  newData: Record<string, string>,
+  incomingData: Record<string, string>,
   colMap: Map<string, number>,
   enriched: EnrichedField[],
 ): void {
@@ -1307,17 +1307,17 @@ export function enrichOpEdPv(
 
   const parts: string[] = []
 
-  const op = newData.OP ?? ''
+  const op = incomingData.OP ?? ''
   if (!isEmptyValue(op)) {
     parts.push(`OP:${op}`)
   }
 
-  const ed = newData.ED ?? ''
+  const ed = incomingData.ED ?? ''
   if (!isEmptyValue(ed)) {
     parts.push(`ED:${ed}`)
   }
 
-  const pv = newData.PV ?? ''
+  const pv = incomingData.PV ?? ''
   if (!isEmptyValue(pv)) {
     parts.push(`PV:${pv}`)
   }
@@ -1333,7 +1333,7 @@ export function enrichOpEdPv(
       fieldName: '特点/印象',
       bangumiColumn: bangumiFeatureCol,
       oldValue: null,
-      newValue: featureText,
+      updatedValue: featureText,
       action: 'fill',
     })
   } else {
@@ -1344,7 +1344,7 @@ export function enrichOpEdPv(
         fieldName: '特点/印象',
         bangumiColumn: bangumiFeatureCol,
         oldValue: oldFeature,
-        newValue: merged,
+        updatedValue: merged,
         action: 'append',
       })
     } else {
@@ -1352,7 +1352,7 @@ export function enrichOpEdPv(
         fieldName: '特点/印象',
         bangumiColumn: bangumiFeatureCol,
         oldValue: oldFeature,
-        newValue: merged,
+        updatedValue: merged,
         action: 'skip',
       })
     }
@@ -1428,7 +1428,7 @@ export function enrichAlias(
       fieldName: '别名',
       bangumiColumn: nameCol,
       oldValue: '',
-      newValue: animeName,
+      updatedValue: animeName,
       action: 'skip',
     })
     return
@@ -1448,7 +1448,7 @@ export function enrichAlias(
       fieldName: '别名',
       bangumiColumn: aliasCol,
       oldValue: existingAliases,
-      newValue: animeName,
+      updatedValue: animeName,
       action: 'skip',
     })
     return
@@ -1461,7 +1461,7 @@ export function enrichAlias(
     fieldName: '别名',
     bangumiColumn: aliasCol,
     oldValue: existingAliases || null,
-    newValue: merged,
+    updatedValue: merged,
     action: 'append',
   })
 }

@@ -532,8 +532,9 @@ export function setupButtonListeners(): void {
     if (sourceTypeSelect) {
       // sourceType 切换时：1) 触发字段显示/隐藏；2) 触发防抖保存
       trackedAddEventListener(sourceTypeSelect, 'change', () => {
-        const newSourceType = (sourceTypeSelect.value as SyncSourceType | undefined) ?? 'github'
-        toggleSourceFields(newSourceType)
+        const selectedSourceType =
+          (sourceTypeSelect.value as SyncSourceType | undefined) ?? 'github'
+        toggleSourceFields(selectedSourceType)
         debouncedSaveGithubConfig()
       })
     }

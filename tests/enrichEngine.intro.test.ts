@@ -261,19 +261,19 @@ function simulateEnrichIntroData(
     field: string
     col: number
     oldValue: string | null
-    newValue: string
+    updatedValue: string
     action: 'fill' | 'append' | 'skip'
   }[]
-  conflicts: { field: string; col: number; oldValue: string; newValue: string }[]
+  conflicts: { field: string; col: number; oldValue: string; updatedValue: string }[]
 } {
   const enriched: {
     field: string
     col: number
     oldValue: string | null
-    newValue: string
+    updatedValue: string
     action: 'fill' | 'append' | 'skip'
   }[] = []
-  const conflicts: { field: string; col: number; oldValue: string; newValue: string }[] = []
+  const conflicts: { field: string; col: number; oldValue: string; updatedValue: string }[] = []
 
   const bangumiFeatureCol = colMap.get('特点/印象')
 
@@ -292,11 +292,16 @@ function simulateEnrichIntroData(
           field: targetColName,
           col: targetCol,
           oldValue: null,
-          newValue: annotatedValue,
+          updatedValue: annotatedValue,
           action: 'fill',
         })
       } else {
-        conflicts.push({ field: targetColName, col: targetCol, oldValue, newValue: annotatedValue })
+        conflicts.push({
+          field: targetColName,
+          col: targetCol,
+          oldValue,
+          updatedValue: annotatedValue,
+        })
       }
     } else if (bangumiFeatureCol !== undefined) {
       const oldFeature = getMockCellValue(row, bangumiFeatureCol)
@@ -307,7 +312,7 @@ function simulateEnrichIntroData(
           field: `特点/印象(${sourceKey})`,
           col: bangumiFeatureCol,
           oldValue: null,
-          newValue: featureEntry,
+          updatedValue: featureEntry,
           action: 'fill',
         })
       } else {
@@ -318,7 +323,7 @@ function simulateEnrichIntroData(
             field: `特点/印象(${sourceKey})`,
             col: bangumiFeatureCol,
             oldValue: oldFeature,
-            newValue: merged,
+            updatedValue: merged,
             action: 'append',
           })
         }
@@ -346,7 +351,7 @@ function simulateEnrichIntroData(
           field: '特点/印象(简介补充)',
           col: bangumiFeatureCol,
           oldValue: null,
-          newValue: merged,
+          updatedValue: merged,
           action: 'fill',
         })
       } else {
@@ -357,7 +362,7 @@ function simulateEnrichIntroData(
             field: '特点/印象(简介补充)',
             col: bangumiFeatureCol,
             oldValue: oldFeature,
-            newValue: combined,
+            updatedValue: combined,
             action: 'append',
           })
         }
@@ -384,7 +389,7 @@ describe('enrichIntroData 逻辑', () => {
 
       expect(result.enriched).toHaveLength(1)
       expect(result.enriched[0]?.action).toBe('fill')
-      expect(result.enriched[0]?.newValue).toBe('新海诚')
+      expect(result.enriched[0]?.updatedValue).toBe('新海诚')
       expect(getMockCellValue(5, 3)).toBe('新海诚')
     })
 
@@ -399,7 +404,7 @@ describe('enrichIntroData 逻辑', () => {
 
       expect(result.conflicts).toHaveLength(1)
       expect(result.conflicts[0]?.oldValue).toBe('宫崎骏')
-      expect(result.conflicts[0]?.newValue).toBe('新海诚')
+      expect(result.conflicts[0]?.updatedValue).toBe('新海诚')
     })
 
     it('目标列不存在时，回退到特点/印象', () => {
@@ -570,14 +575,14 @@ function simulateEnrichOpEdPv(
   field: string
   col: number
   oldValue: string | null
-  newValue: string
+  updatedValue: string
   action: 'fill' | 'append' | 'skip'
 }[] {
   const enriched: {
     field: string
     col: number
     oldValue: string | null
-    newValue: string
+    updatedValue: string
     action: 'fill' | 'append' | 'skip'
   }[] = []
   const bangumiFeatureCol = colMap.get('特点/印象')
@@ -602,7 +607,7 @@ function simulateEnrichOpEdPv(
       field: '特点/印象',
       col: bangumiFeatureCol,
       oldValue: null,
-      newValue: featureText,
+      updatedValue: featureText,
       action: 'fill',
     })
   } else {
@@ -613,7 +618,7 @@ function simulateEnrichOpEdPv(
         field: '特点/印象',
         col: bangumiFeatureCol,
         oldValue: oldFeature,
-        newValue: merged,
+        updatedValue: merged,
         action: 'append',
       })
     }
@@ -672,12 +677,12 @@ function simulateEnrichAlias(
   bangumiName: string | undefined,
   colMap: Map<string, number>,
   aliasCol: number,
-): { action: 'fill' | 'append' | 'skip'; newValue: string } | null {
+): { action: 'fill' | 'append' | 'skip'; updatedValue: string } | null {
   const nameCol = colMap.get('名称')
   if (!nameCol) return null
 
   if (animeName === bangumiName) {
-    return { action: 'skip', newValue: animeName }
+    return { action: 'skip', updatedValue: animeName }
   }
 
   const existingAliases = getMockCellValue(row, aliasCol)
@@ -687,12 +692,12 @@ function simulateEnrichAlias(
   const isAlreadyExists = aliasList.some((a) => normalizeName(a) === normalizedNew)
 
   if (isAlreadyExists) {
-    return { action: 'skip', newValue: animeName }
+    return { action: 'skip', updatedValue: animeName }
   }
 
   const merged = existingAliases ? existingAliases + TAG_SEPARATOR + animeName : animeName
   setMockCellValue(row, aliasCol, merged)
-  return { action: 'append', newValue: merged }
+  return { action: 'append', updatedValue: merged }
 }
 
 describe('enrichAlias 逻辑', () => {
@@ -750,38 +755,38 @@ describe('冲突解决逻辑', () => {
 
   it('append 模式：追加分隔符', () => {
     const oldValue = '宫崎骏'
-    const newValue = '新海诚'
+    const updatedValue = '新海诚'
     const parts = oldValue
       .split(/\s*\|\s*/)
       .map((s) => s.trim())
       .filter(Boolean)
-    if (!parts.includes(newValue)) {
-      const merged = parts.join(TAG_SEPARATOR) + TAG_SEPARATOR + newValue
+    if (!parts.includes(updatedValue)) {
+      const merged = parts.join(TAG_SEPARATOR) + TAG_SEPARATOR + updatedValue
       expect(merged).toBe('宫崎骏 | 新海诚')
     }
   })
 
   it('keep 模式：保留原名', () => {
     const oldValue = '宫崎骏'
-    const newValue = '新海诚'
+    const updatedValue = '新海诚'
     // keep 模式下不修改
     expect(oldValue).toBe('宫崎骏')
   })
 
   it('overwrite 模式：使用新值', () => {
-    const newValue = '新海诚'
+    const updatedValue = '新海诚'
     // overwrite 模式下直接使用新值
-    expect(newValue).toBe('新海诚')
+    expect(updatedValue).toBe('新海诚')
   })
 
   it('append 模式：新值已存在时不重复添加', () => {
     const oldValue = '宫崎骏 | 新海诚'
-    const newValue = '新海诚'
+    const updatedValue = '新海诚'
     const parts = oldValue
       .split(/\s*\|\s*/)
       .map((s) => s.trim())
       .filter(Boolean)
-    expect(parts.includes(newValue)).toBe(true)
+    expect(parts.includes(updatedValue)).toBe(true)
     // 不添加重复项
     const merged = parts.join(TAG_SEPARATOR)
     expect(merged).toBe('宫崎骏 | 新海诚')

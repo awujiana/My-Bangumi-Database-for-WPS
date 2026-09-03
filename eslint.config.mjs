@@ -259,6 +259,20 @@ export default tseslint.config(
             // 替代保障：DOM 取值的 null 安全由 strictNullChecks 强制。
             'unicorn/prefer-query-selector': 'off',
 
+            // ④ 调选项：no-keyword-prefix **关闭属性名检查**，变量/参数/函数仍保持 error。
+            // 依据（AST 实测 233 处 = 164 属性 + 69 变量）：
+            //   - 39 处 className + 1 处 classList 是 **DOM 标准属性**，由浏览器/W3C 定义，
+            //     项目无权改名，改了就是 TS2339（el.className 不存在）。
+            //   - 100 余处 newValue 是**跨持久化边界的数据契约**：同步记录字段
+            //     （ts/sync/syncRecord.ts）、冲突解决结构（ts/ui/conflictResolver.ts）、
+            //     JSONL 导出与 GitHub Gist 同步载荷的键名。改名会造成新旧数据格式不兼容
+            //     ——已落盘/已推送的 Gist 记录反序列化后字段丢失，属不可逆的数据事故。
+            // 关闭 checkProperties 只是把"名字的所有权"还给外部契约（DOM 规范 + 持久化格式），
+            // 规则想防的"开发者自己起的 newXxx/classXxx 命名"由 checkVariables/checkFunctions
+            // 等继续把关，那 69 处真实标识符另行用 codemod 改名清零，不降级。
+            // 替代保障：属性名一致性由 TypeScript 结构化类型 + tsc 强制（少字段/错字段即报错）。
+            'unicorn/no-keyword-prefix': ['error', { checkProperties: false }],
+
             // ===== 类型不安全自动修复规则（不参与 --fix 重放）=====
             // 以下 unicorn 规则的 --fix 会改写标识符或收窄类型，实测会**引入编译错误**：
             //   - prefer-global-this：window → globalThis，但两者类型不等价

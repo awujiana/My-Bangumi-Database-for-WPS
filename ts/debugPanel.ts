@@ -592,9 +592,9 @@ function bindTabs(root: HTMLElement): void {
         if (environmentPanel) {
           environmentPanel.outerHTML = buildEnvironmentPanelHTML()
           // outerHTML 替换后重新获取元素并标记 active
-          const newEnvironmentPanel = root.querySelector<HTMLElement>('[data-panel="env"]')
-          if (newEnvironmentPanel) {
-            newEnvironmentPanel.classList.add('active')
+          const environmentPanel_ = root.querySelector<HTMLElement>('[data-panel="env"]')
+          if (environmentPanel_) {
+            environmentPanel_.classList.add('active')
           }
           // 重新绑定环境信息按钮事件
           bindEnvironmentActions(root)
@@ -896,10 +896,10 @@ export function initDebugPanel(): void {
 
   // 延迟刷新模块状态（等 main.js 写入状态）
   setTimeout(() => {
-    const newModules = getModuleStatuses()
+    const currentModules = getModuleStatuses()
     const statusbar = root.querySelector<HTMLElement>('.bgm-dp-statusbar')
     if (statusbar) {
-      statusbar.outerHTML = buildStatusBarHTML(newModules)
+      statusbar.outerHTML = buildStatusBarHTML(currentModules)
     }
     const modulePanel = root.querySelector<HTMLElement>('[data-panel="modules"]')
     if (modulePanel) {
@@ -910,22 +910,22 @@ export function initDebugPanel(): void {
       '.bgm-dp-tab[data-tab="modules"] .bgm-dp-tab-count',
     )
     if (moduleTabCount) {
-      moduleTabCount.textContent = String(newModules.length)
+      moduleTabCount.textContent = String(currentModules.length)
     }
   }, 500)
 
   // 定期刷新状态栏（每 3 秒，反映模块加载进度）
   const statusInterval = setInterval(() => {
-    const newModules = getModuleStatuses()
-    const loaded = newModules.filter((m) => m.loaded).length
-    const isAllLoaded = loaded === newModules.length && newModules.length > 0
+    const currentModules = getModuleStatuses()
+    const loaded = currentModules.filter((m) => m.loaded).length
+    const isAllLoaded = loaded === currentModules.length && currentModules.length > 0
     if (isAllLoaded) {
       clearInterval(statusInterval)
     }
     // 刷新状态栏
-    const newStatusbar = root.querySelector<HTMLElement>('.bgm-dp-statusbar')
-    if (newStatusbar) {
-      newStatusbar.outerHTML = buildStatusBarHTML(newModules)
+    const statusbarElement = root.querySelector<HTMLElement>('.bgm-dp-statusbar')
+    if (statusbarElement) {
+      statusbarElement.outerHTML = buildStatusBarHTML(currentModules)
     }
     // 刷新模块面板（如果当前可见）
     const modulePanelActive = root.querySelector<HTMLElement>(

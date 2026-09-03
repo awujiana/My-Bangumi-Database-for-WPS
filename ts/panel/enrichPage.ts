@@ -53,7 +53,7 @@ interface BatchFileResult {
   filePath: string
   fileName: string
   matched: number
-  newEntries: number
+  addedEntries: number
   updatedEntries: number
   unmatched: number
   success: boolean
@@ -62,7 +62,7 @@ interface BatchFileResult {
 
 interface EnrichPageState {
   filePath: string
-  newAnimeSheet: WpsWorksheet | null
+  animeSourceSheet: WpsWorksheet | null
   bangumiSheet: WpsWorksheet | null
   columnMapping: EnrichColumnMapping | null
   headerRow: number
@@ -85,7 +85,7 @@ interface EnrichPageState {
 
 const state: EnrichPageState = {
   filePath: '',
-  newAnimeSheet: null,
+  animeSourceSheet: null,
   bangumiSheet: null,
   columnMapping: null,
   headerRow: 0,
@@ -486,7 +486,7 @@ export function autoDetectHeader(): void {
     }
   }
 
-  state.newAnimeSheet = ws
+  state.animeSourceSheet = ws
 
   try {
     const headerRow = findHeaderRow(ws)
@@ -757,7 +757,7 @@ function renderSourcePreview(ws: WpsWorksheet, _mapping: EnrichColumnMapping): v
 // ========== 匹配预览 ==========
 
 export function previewMatch(): void {
-  if (!state.newAnimeSheet) {
+  if (!state.animeSourceSheet) {
     BGM.Dialog.alert('提示', '请先选择新番表文件并识别表头')
     return
   }
@@ -773,14 +773,14 @@ export function previewMatch(): void {
   try {
     const config: EnrichConfig = {
       filePath: state.filePath,
-      sheetName: state.newAnimeSheet.Name || '',
+      sheetName: state.animeSourceSheet.Name || '',
       headerRow: state.headerRow,
       dataStartRow: state.dataStartRow,
       columnMapping: state.columnMapping,
       targetSheetName: state.bangumiSheet.Name || '',
     }
 
-    state.matches = matchEntries(state.newAnimeSheet, state.bangumiSheet, config)
+    state.matches = matchEntries(state.animeSourceSheet, state.bangumiSheet, config)
 
     renderMatchStats(state.matches)
     renderMatchResultsToTable(state.matches)
@@ -853,7 +853,7 @@ function renderMatchResultsToTable(matches: MatchResult[]): void {
     }
 
     const bangumiRow = m.bangumiRow ? String(m.bangumiRow) : '-'
-    const name = escapeHtml(m.newAnimeName)
+    const name = escapeHtml(m.matchedAnimeName)
     const bangumiName = m.bangumiName ? escapeHtml(m.bangumiName) : '-'
 
     return `
@@ -882,7 +882,7 @@ export function startEnrichment(): void {
     return
   }
 
-  if (!state.newAnimeSheet) {
+  if (!state.animeSourceSheet) {
     BGM.Dialog.alert('提示', '请先选择新番表文件并识别表头')
     return
   }
@@ -922,7 +922,7 @@ export function startEnrichment(): void {
 
   const config: EnrichConfig = {
     filePath: state.filePath,
-    sheetName: state.newAnimeSheet.Name || '',
+    sheetName: state.animeSourceSheet.Name || '',
     headerRow: state.headerRow,
     dataStartRow: state.dataStartRow,
     columnMapping: state.columnMapping,
@@ -938,7 +938,7 @@ export function startEnrichment(): void {
     bgmLog(LOG_LEVELS.INFO, `[enrich] 开始富化，共 ${String(state.matches.length)} 条匹配`)
 
     const results = enrichEntries(
-      state.newAnimeSheet,
+      state.animeSourceSheet,
       state.bangumiSheet,
       state.matches,
       config,
@@ -1123,7 +1123,7 @@ function loadRecentRecords(): void {
                 : '错误'
         const name = escapeHtml(r.name)
         const field = escapeHtml(r.enrichedField)
-        const newValue = escapeHtml(r.newValue)
+        const updatedValue = escapeHtml(r.updatedValue)
         const time = escapeHtml(r.timestamp ? new Date(r.timestamp).toLocaleString('zh-CN') : '')
 
         return `
@@ -1134,7 +1134,7 @@ function loadRecentRecords(): void {
             </div>
             <div class="record-detail">
               <span class="record-field">${field}</span>
-              <span class="record-value">${newValue}</span>
+              <span class="record-value">${updatedValue}</span>
             </div>
             <div class="record-time">${time}</div>
           </div>
@@ -1233,7 +1233,7 @@ export function renderMatchResults(container: HTMLElement | null, matches: Match
       }
     }
 
-    const name = escapeHtml(m.newAnimeName)
+    const name = escapeHtml(m.matchedAnimeName)
     const bangumiRow = m.bangumiRow ? String(m.bangumiRow) : '-'
     const bangumiName = m.bangumiName ? escapeHtml(m.bangumiName) : '-'
 
@@ -1298,7 +1298,7 @@ function showConflictDialog(): void {
       <div class="conflict-item">
         <div class="conflict-row">
           <span class="conflict-label">条目：</span>
-          <span class="conflict-name">${escapeHtml(conflict.newAnimeName)}</span>
+          <span class="conflict-name">${escapeHtml(conflict.matchedAnimeName)}</span>
         </div>
         <div class="conflict-row">
           <span class="conflict-label">字段：</span>
@@ -1310,7 +1310,7 @@ function showConflictDialog(): void {
         </div>
         <div class="conflict-row">
           <span class="conflict-label">新番表值：</span>
-          <span class="conflict-new">${escapeHtml(conflict.newValue)}</span>
+          <span class="conflict-new">${escapeHtml(conflict.updatedValue)}</span>
         </div>
       </div>
       <div class="conflict-hint">💡 选择如何处理此冲突</div>
@@ -1361,7 +1361,7 @@ function handleConflictResolution(resolution: ConflictInfo['resolution']): void 
 
     bgmLog(
       LOG_LEVELS.INFO,
-      `[conflict] 字段 "${conflict.fieldName}" (${conflict.newAnimeName}): ${resolution}`,
+      `[conflict] 字段 "${conflict.fieldName}" (${conflict.matchedAnimeName}): ${resolution}`,
     )
   } catch (error: unknown) {
     bgmLog(
@@ -1460,7 +1460,7 @@ function processSingleBatchFile(filePath: string, bangumiSheet: WpsWorksheet): B
     filePath,
     fileName,
     matched: 0,
-    newEntries: 0,
+    addedEntries: 0,
     updatedEntries: 0,
     unmatched: 0,
     success: false,
@@ -1536,7 +1536,7 @@ function processSingleBatchFile(filePath: string, bangumiSheet: WpsWorksheet): B
     ).length
 
     result.matched = matched
-    result.newEntries = entries
+    result.addedEntries = entries
     result.updatedEntries = updatedEntries
     result.unmatched = unmatched
     result.success = true

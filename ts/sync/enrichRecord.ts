@@ -52,7 +52,7 @@ export interface EnrichRecord {
   row: number
   enrichedField: string
   oldValue: string
-  newValue: string
+  updatedValue: string
   action: 'fill' | 'append' | 'skip' | 'error'
   note?: string
 }
@@ -64,7 +64,7 @@ export interface AddEnrichRecordParams {
   row: number
   enrichedField: string
   oldValue: string
-  newValue: string
+  updatedValue: string
   action: 'fill' | 'append' | 'skip' | 'error'
   note?: string
 }
@@ -166,30 +166,30 @@ export function addEnrichRecord(parameters: AddEnrichRecordParams): void {
   try {
     const sheet = getOrCreateEnrichRecordSheet()
 
-    let newRow = 1
+    let nextRow = 1
     const usedRange = sheet.UsedRange
     if (usedRange) {
       const lastUsedRow = usedRange.Row + usedRange.Rows.Count - 1
-      newRow = lastUsedRow + 1
+      nextRow = lastUsedRow + 1
     } else {
-      newRow = sheet.Rows.Count > 1 ? 2 : 1
+      nextRow = sheet.Rows.Count > 1 ? 2 : 1
     }
 
-    setCellValue(sheet, newRow, ENRICH_RECORD_COL.TIMESTAMP, parameters.timestamp)
-    setCellValue(sheet, newRow, ENRICH_RECORD_COL.MATCH_TYPE, parameters.matchType)
-    setCellValue(sheet, newRow, ENRICH_RECORD_COL.NAME, parameters.name)
-    setCellValue(sheet, newRow, ENRICH_RECORD_COL.ROW, parameters.row)
-    setCellValue(sheet, newRow, ENRICH_RECORD_COL.ENRICHED_FIELD, parameters.enrichedField)
-    setCellValue(sheet, newRow, ENRICH_RECORD_COL.OLD_VALUE, parameters.oldValue)
-    setCellValue(sheet, newRow, ENRICH_RECORD_COL.NEW_VALUE, parameters.newValue)
-    setCellValue(sheet, newRow, ENRICH_RECORD_COL.ACTION, parameters.action)
+    setCellValue(sheet, nextRow, ENRICH_RECORD_COL.TIMESTAMP, parameters.timestamp)
+    setCellValue(sheet, nextRow, ENRICH_RECORD_COL.MATCH_TYPE, parameters.matchType)
+    setCellValue(sheet, nextRow, ENRICH_RECORD_COL.NAME, parameters.name)
+    setCellValue(sheet, nextRow, ENRICH_RECORD_COL.ROW, parameters.row)
+    setCellValue(sheet, nextRow, ENRICH_RECORD_COL.ENRICHED_FIELD, parameters.enrichedField)
+    setCellValue(sheet, nextRow, ENRICH_RECORD_COL.OLD_VALUE, parameters.oldValue)
+    setCellValue(sheet, nextRow, ENRICH_RECORD_COL.NEW_VALUE, parameters.updatedValue)
+    setCellValue(sheet, nextRow, ENRICH_RECORD_COL.ACTION, parameters.action)
     if (parameters.note !== undefined) {
-      setCellValue(sheet, newRow, ENRICH_RECORD_COL.NOTE, parameters.note)
+      setCellValue(sheet, nextRow, ENRICH_RECORD_COL.NOTE, parameters.note)
     }
 
     const actionColor = getActionColor(parameters.action)
     const actionColLetter = colNumberToLetter(ENRICH_RECORD_COL.ACTION)
-    const actionCell = sheet.Range(`${actionColLetter}${String(newRow)}`)
+    const actionCell = sheet.Range(`${actionColLetter}${String(nextRow)}`)
     if (actionCell.Interior) {
       actionCell.Interior.Color = actionColor
     }
@@ -222,7 +222,7 @@ export function addEnrichRecords(records: AddEnrichRecordParams[]): void {
       String(r.row),
       r.enrichedField,
       r.oldValue,
-      r.newValue,
+      r.updatedValue,
       r.action,
       r.note ?? '',
     ])
@@ -307,7 +307,7 @@ export function getAllEnrichRecords(): EnrichRecord[] {
         row: parseInt(rowData[ENRICH_RECORD_COL.ROW - 1] ?? '0') || 0,
         enrichedField: rowData[ENRICH_RECORD_COL.ENRICHED_FIELD - 1] ?? '',
         oldValue: rowData[ENRICH_RECORD_COL.OLD_VALUE - 1] ?? '',
-        newValue: rowData[ENRICH_RECORD_COL.NEW_VALUE - 1] ?? '',
+        updatedValue: rowData[ENRICH_RECORD_COL.NEW_VALUE - 1] ?? '',
         action: (rowData[ENRICH_RECORD_COL.ACTION - 1] ?? 'skip') as EnrichRecord['action'],
         note: rowData[ENRICH_RECORD_COL.NOTE - 1] ?? '',
       }

@@ -357,7 +357,7 @@ export async function detectConflicts(
     sid: string
     name: string
     existingType?: number
-    newType: number
+    incomingType: number
   }[]
   conflictCount: number
   bgmCollectionReady: boolean
@@ -368,7 +368,7 @@ export async function detectConflicts(
     sid: string
     name: string
     existingType?: number
-    newType: number
+    incomingType: number
   }[] = []
   let conflictCount = 0
   let isBgmCollectionReady = false
@@ -437,7 +437,7 @@ export async function detectConflicts(
         sid,
         name: getField(rowNumber, '名称') || '',
         existingType: bgmEntry.type,
-        newType: excelType,
+        incomingType: excelType,
       })
       conflictCount += 1
     }
@@ -573,9 +573,9 @@ export async function syncWithConfirmation(): Promise<void> {
 export function setTokenForRibbon(): boolean {
   const currentToken = loadBgToken() ?? ''
   const app = getApp()
-  const newToken = app?.InputBox?.('请输入 Access Token', '设置 Token', currentToken, 2)
-  if (newToken && typeof newToken === 'string') {
-    const isSaved = storeBgToken(newToken)
+  const submittedToken = app?.InputBox?.('请输入 Access Token', '设置 Token', currentToken, 2)
+  if (submittedToken && typeof submittedToken === 'string') {
+    const isSaved = storeBgToken(submittedToken)
     if (isSaved) {
       bgmLog(LOG_LEVELS.INFO, 'Token 已保存，通知面板更新...')
       BGM.notifyTokenUpdated()
@@ -584,7 +584,7 @@ export function setTokenForRibbon(): boolean {
       notifyPanelTokenUpdated()
 
       if (typeof testTokenValidityForRibbon === 'function') {
-        testTokenValidityForRibbon(newToken)
+        testTokenValidityForRibbon(submittedToken)
       }
       return true
     }

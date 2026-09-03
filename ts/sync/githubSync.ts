@@ -524,7 +524,7 @@ function writeRemoteEntryToRow(
     if (DATE_COLUMNS.has(key)) {
       const localDate = formatDateToLocal(value)
       if (localDate !== null) {
-        recordUndoEntry({ row, col, oldValue, newValue: localDate })
+        recordUndoEntry({ row, col, oldValue, updatedValue: localDate })
         if (setCellValue(ws, row, col, localDate)) {
           isAnySucceeded = true
         }
@@ -533,7 +533,7 @@ function writeRemoteEntryToRow(
     }
 
     // 非日期列或日期解析失败：写入字符串
-    recordUndoEntry({ row, col, oldValue, newValue: value })
+    recordUndoEntry({ row, col, oldValue, updatedValue: value })
     if (setCellValue(ws, row, col, value)) {
       isAnySucceeded = true
     }
@@ -551,12 +551,12 @@ function writeRemoteEntryToRow(
     if (!appendValue) return
 
     const oldValue = getCellValue(ws, row, col)
-    const newValue = appendValueWithSeparator(oldValue, appendValue)
-    if (newValue === oldValue) return
+    const updatedValue = appendValueWithSeparator(oldValue, appendValue)
+    if (updatedValue === oldValue) return
 
     isAnyAttempted = true
-    recordUndoEntry({ row, col, oldValue, newValue })
-    if (setCellValue(ws, row, col, newValue)) {
+    recordUndoEntry({ row, col, oldValue, updatedValue })
+    if (setCellValue(ws, row, col, updatedValue)) {
       isAnySucceeded = true
     }
   }
@@ -782,7 +782,7 @@ function batchWriteNewRows(
       const row = startRow + index
       const raw = values[index]![wc.col - minCol]
       const value = raw != null ? String(raw) : ''
-      recordUndoEntry({ row, col: wc.col, oldValue: '', newValue: value })
+      recordUndoEntry({ row, col: wc.col, oldValue: '', updatedValue: value })
     }
     records.push({
       sid: rows[index]!.sid,
@@ -1009,10 +1009,10 @@ function batchUpdateRows(
         let hasChanges = false
         const finalValues = [...rowValues]
         for (let c = 0; c < colCount; c += 1) {
-          const newValue = finalValues[c]
-          if (newValue === null) continue
+          const updatedValue = finalValues[c]
+          if (updatedValue === null) continue
           const oldValue = oldArray[c] != null ? String(oldArray[c]) : ''
-          const valueString = String(newValue)
+          const valueString = String(updatedValue)
           if (oldValue === valueString) {
             // 无变化，跳过
             finalValues[c] = null
@@ -1023,7 +1023,7 @@ function batchUpdateRows(
               row,
               col: minCol + c,
               oldValue,
-              newValue: valueString,
+              updatedValue: valueString,
             })
           }
         }

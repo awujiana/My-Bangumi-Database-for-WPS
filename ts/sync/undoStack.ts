@@ -22,7 +22,7 @@ export type UndoEntry =
       row: number
       col: number
       oldValue: string
-      newValue: string
+      updatedValue: string
     }
   | {
       type: 'row-delete'

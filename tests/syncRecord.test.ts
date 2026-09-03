@@ -1293,7 +1293,7 @@ describe('syncRecord', () => {
       mockSetCellValue.mockReturnValue(true)
     })
 
-    it('UsedRange 为 null 且 Rows.Count > 1 时 newRow 为 2', () => {
+    it('UsedRange 为 null 且 Rows.Count > 1 时 nextRow 为 2', () => {
       // 创建 UsedRange 为 null 的工作表
       const sheet = {
         Name: SYNC_RECORD_SHEET_NAME,
@@ -1328,7 +1328,7 @@ describe('syncRecord', () => {
       expect(mockSetCellValue).toHaveBeenCalled()
     })
 
-    it('UsedRange 为 null 且 Rows.Count <= 1 时 newRow 为 1', () => {
+    it('UsedRange 为 null 且 Rows.Count <= 1 时 nextRow 为 1', () => {
       const sheet = {
         Name: SYNC_RECORD_SHEET_NAME,
         UsedRange: null,
