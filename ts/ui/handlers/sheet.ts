@@ -108,12 +108,12 @@ export function cleanLockedDataSheet(): void {
   for (let index = 0; index < totalRows; index += 1) {
     const row = headerRow + 1 + index
     const name = (nameData[index]?.[0] ?? '').trim()
-    if (!name) {
-      emptyNameCount += 1
-    } else {
+    if (name) {
       const rows = nameRows.get(name) ?? []
       rows.push(row)
       nameRows.set(name, rows)
+    } else {
+      emptyNameCount += 1
     }
   }
   bgmLog(

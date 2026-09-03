@@ -785,7 +785,7 @@ function batchWriteNewRows(
     for (const wc of writeCols) {
       const row = startRow + index
       const raw = values[index]![wc.col - minCol]
-      const value = raw != null ? String(raw) : ''
+      const value = raw == null ? '' : String(raw)
       recordUndoEntry({ row, col: wc.col, oldValue: '', updatedValue: value })
     }
     records.push({
@@ -917,7 +917,7 @@ function batchUpdateRows(
       let value: string | number | null = null
       let shouldWrite = false
       // 获取当前单元格的旧值（用于合并）
-      const oldCellValue = oldArray[index] != null ? String(oldArray[index]) : ''
+      const oldCellValue = oldArray[index] == null ? '' : String(oldArray[index])
 
       if (wc.name === 'Bangumi_URL') {
         if (isWriteAll || fields.includes('Bangumi_URL')) {
@@ -1017,7 +1017,7 @@ function batchUpdateRows(
         for (let c = 0; c < colCount; c += 1) {
           const updatedValue = finalValues[c]
           if (!(updatedValue === null)) {
-            const oldValue = oldArray[c] != null ? String(oldArray[c]) : ''
+            const oldValue = oldArray[c] == null ? '' : String(oldArray[c])
             const valueString = String(updatedValue)
             if (oldValue === valueString) {
               // 无变化，跳过

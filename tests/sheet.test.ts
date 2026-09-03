@@ -100,7 +100,7 @@ function createMockCell(value: unknown = '') {
   return {
     Value2: value,
     Value: value,
-    Text: value != null ? String(value) : '',
+    Text: value == null ? '' : String(value),
     Interior: { Color: 0 },
     Font: { Bold: false, Name: '' },
   }

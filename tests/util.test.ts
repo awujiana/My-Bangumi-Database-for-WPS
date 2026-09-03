@@ -88,7 +88,7 @@ function createMockWorksheet(options: MockWorksheetOptions): unknown {
       Value2: options.rangeValue2 ? options.rangeValue2(address) : null,
       End: (_direction: number) => {
         const r = options.rangeEndRow ? options.rangeEndRow(address) : null
-        return r != null ? { Row: r } : null
+        return r == null ? null : { Row: r }
       },
     }),
     Rows: { Count: options.rowsCount ?? 100_000 },

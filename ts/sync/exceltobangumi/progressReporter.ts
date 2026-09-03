@@ -95,7 +95,7 @@ export function applySyncSuccessResults(
       status: SYNC_STATUS.SUCCESS,
       message: '批量同步成功',
       count: 1,
-      ...(task.fingerprint !== undefined ? { fingerprint: task.fingerprint } : {}),
+      ...(task.fingerprint === undefined ? {} : { fingerprint: task.fingerprint }),
     })
 
     result.success += 1

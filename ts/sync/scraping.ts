@@ -252,7 +252,7 @@ export async function fetchAllUserCollections(
 
   while (offset < maxTotal) {
     try {
-      const typeParameter = typeNumber !== null ? `&type=${String(typeNumber ?? '')}` : ''
+      const typeParameter = typeNumber === null ? '' : `&type=${String(typeNumber ?? '')}`
       const url = `${BGM_CONFIG.API_BASE}/v0/users/${userId}/collections?limit=${String(limit)}&offset=${String(offset)}${typeParameter}`
       const xhrResult = await xhrGet(url, token)
 

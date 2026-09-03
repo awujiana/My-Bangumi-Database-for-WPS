@@ -110,10 +110,10 @@ export function readRangeValues(
     }
     const result: string[][] = []
     for (const row of raw) {
-      if (!Array.isArray(row)) {
-        result.push([safeCellValue(row)])
-      } else {
+      if (Array.isArray(row)) {
         result.push(row.map((cell: unknown) => safeCellValue(cell)))
+      } else {
+        result.push([safeCellValue(row)])
       }
     }
     return result

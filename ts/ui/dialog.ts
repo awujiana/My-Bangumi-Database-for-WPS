@@ -320,8 +320,8 @@ function _showDialog(type: string, options: DialogOptions = {}): void {
         (options.prompt || options.message) ?? '',
         options.defaultValue ?? '',
       )
-      if (result !== null) options.onOk?.(result)
-      else options.onCancel?.()
+      if (result === null) options.onCancel?.()
+      else options.onOk?.(result)
     } else {
       window.alert(options.message)
       options.onOk?.()
@@ -1203,7 +1203,7 @@ export function renderSyncDetailTable(items: GithubSyncDetailItem[]): string {
       const { kind } = item
       const name = item.name ?? '--'
       const { sid } = item
-      const row = item.row !== undefined ? String(item.row) : '--'
+      const row = item.row === undefined ? '--' : String(item.row)
       const fields = item.fields && item.fields.length > 0 ? item.fields.join(', ') : '--'
       const message = item.message ?? ''
       return `
@@ -1414,7 +1414,7 @@ export function showInput(
     message: prompt,
     ...(onOk ? { onOk } : {}),
     ...(onCancel ? { onCancel } : {}),
-    ...(defaultValue !== undefined ? { defaultValue } : {}),
+    ...(defaultValue === undefined ? {} : { defaultValue }),
   })
 }
 

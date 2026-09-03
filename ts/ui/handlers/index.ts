@@ -1355,7 +1355,7 @@ const ACTION_HANDLERS: Record<string, ActionHandler> = {
         responseTime,
         url,
         sourceType,
-        errorMessage: !isSuccess ? `HTTP ${String(statusCode)}` : undefined,
+        errorMessage: isSuccess ? undefined : `HTTP ${String(statusCode)}`,
       })
     }
 
@@ -1847,16 +1847,14 @@ export function initHandlers(): void {
     bgmLog(LOG_LEVELS.INFO, '[handlers] initHandlers 完成')
   }
 
-  if (typeof document !== 'undefined') {
-    if (document.readyState === 'loading') {
-      document.addEventListener('DOMContentLoaded', () => {
-        start()
-      })
-    } else {
-      start()
-    }
-  } else {
+  if (typeof document === 'undefined') {
     // 无 DOM 环境（如 Node 测试环境）下同步执行
+    start()
+  } else if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', () => {
+      start()
+    })
+  } else {
     start()
   }
 }

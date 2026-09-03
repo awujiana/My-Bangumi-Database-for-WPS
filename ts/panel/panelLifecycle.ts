@@ -114,7 +114,7 @@ export function restoreLockedSheet(): boolean {
     if (raw) {
       try {
         const info = JSON.parse(raw) as Partial<LockedSheetInfo>
-        BGM.sheet.lockedIndex = info.index != null ? info.index : null
+        BGM.sheet.lockedIndex = info.index == null ? null : info.index
         BGM.sheet.lockedName = info.name || null
         BGM.sheet.lockedWorkbookName = info.workbookName || null
         BGM.sheet.isLocked = !!(info.index != null && info.name)
@@ -541,16 +541,7 @@ export function autoDetectSheet(): {
     let needRestore: (() => void) | false = false
     try {
       const ws: WpsWorksheet = sheets.Item(si)
-      if (typeof ws.Activate !== 'function') {
-        BGM.handleError(
-          new Error(`autoDetectSheet: 工作表索引 ${String(si)} 为 null 或无法访问，已跳过`),
-          {
-            showAlert: false,
-            level: BGM.ErrorLevel.INFO,
-            context: 'autoDetectSheet',
-          },
-        )
-      } else {
+      if (typeof ws.Activate === 'function') {
         const sheetName = ws.Name || ''
         // 跳过特定系统表（例如同步记录等）
         if (/^(同步记录|SyncRecord|模糊|搜索|SEARCH)/i.test(sheetName)) {
@@ -630,6 +621,15 @@ export function autoDetectSheet(): {
             }
           }
         }
+      } else {
+        BGM.handleError(
+          new Error(`autoDetectSheet: 工作表索引 ${String(si)} 为 null 或无法访问，已跳过`),
+          {
+            showAlert: false,
+            level: BGM.ErrorLevel.INFO,
+            context: 'autoDetectSheet',
+          },
+        )
       }
     } catch (error: unknown) {
       BGM.handleError(error, {

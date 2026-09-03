@@ -109,7 +109,22 @@ export function getOrCreateEnrichRecordSheet(): WpsWorksheet {
     BGM.handleError(error, { context: 'getOrCreateEnrichRecordSheet', showAlert: false })
   }
 
-  if (!enrichSheet) {
+  if (enrichSheet) {
+    const existingCols = ENRICH_RECORD_COLUMNS.length
+    for (let index = 0; index < existingCols; index += 1) {
+      const colLetter = colNumberToLetter(index + 1)
+      const cell = enrichSheet.Range(`${colLetter}1`)
+      const currentHeader = String(cell.Value2 ?? '').trim()
+      const expectedHeader = ENRICH_RECORD_COLUMNS[index] ?? ''
+      if (currentHeader !== expectedHeader) {
+        cell.Value2 = expectedHeader
+        bgmLog(
+          LOG_LEVELS.INFO,
+          `修复表头: ${colLetter}1 从 "${currentHeader}" → "${expectedHeader}"`,
+        )
+      }
+    }
+  } else {
     enrichSheet = wb.Sheets.Add()
     enrichSheet.Name = ENRICH_RECORD_SHEET_NAME
 
@@ -142,21 +157,6 @@ export function getOrCreateEnrichRecordSheet(): WpsWorksheet {
     }
 
     bgmLog(LOG_LEVELS.INFO, '已创建富化记录工作表')
-  } else {
-    const existingCols = ENRICH_RECORD_COLUMNS.length
-    for (let index = 0; index < existingCols; index += 1) {
-      const colLetter = colNumberToLetter(index + 1)
-      const cell = enrichSheet.Range(`${colLetter}1`)
-      const currentHeader = String(cell.Value2 ?? '').trim()
-      const expectedHeader = ENRICH_RECORD_COLUMNS[index] ?? ''
-      if (currentHeader !== expectedHeader) {
-        cell.Value2 = expectedHeader
-        bgmLog(
-          LOG_LEVELS.INFO,
-          `修复表头: ${colLetter}1 从 "${currentHeader}" → "${expectedHeader}"`,
-        )
-      }
-    }
   }
 
   return enrichSheet

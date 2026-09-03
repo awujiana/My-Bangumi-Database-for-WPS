@@ -55,12 +55,12 @@ export function setConfig(key: string, value: string): boolean {
   const oldValue = storage.getItem(key)
   storage.setItem(key, value)
 
-  if (oldValue !== value) {
+  if (oldValue === value) {
+    bgmLog(LOG_LEVELS.INFO, `[config] 配置值未变化: ${key} = ${value}`)
+  } else {
     bgmLog(LOG_LEVELS.INFO, `[config] 配置已更新: ${key}`)
     bgmLog(LOG_LEVELS.INFO, `[config]   旧值: ${oldValue || '(空)'}`)
     bgmLog(LOG_LEVELS.INFO, `[config]   新值: ${value}`)
-  } else {
-    bgmLog(LOG_LEVELS.INFO, `[config] 配置值未变化: ${key} = ${value}`)
   }
 
   // 触发内部事件
@@ -116,7 +116,7 @@ export function getConfig(key: string, defaultValue = '', silent = false): strin
   }
 
   const value = storage.getItem(key)
-  const result = value !== null ? value : defaultValue
+  const result = value === null ? defaultValue : value
   if (!silent) bgmLog(LOG_LEVELS.INFO, `[config] 获取配置: ${key} = ${result}`)
   return result
 }

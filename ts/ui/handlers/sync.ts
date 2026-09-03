@@ -889,7 +889,7 @@ async function _doAPISync(
       if (!(row === undefined)) {
         BGM.sync.updatePosition(undefined, row)
 
-        const bgmUrlCell = urlCol !== undefined ? getCell(ws, row, urlCol) : null
+        const bgmUrlCell = urlCol === undefined ? null : getCell(ws, row, urlCol)
         const bgmUrl = bgmUrlCell ? trim(String(bgmUrlCell.Value ?? '')) : ''
         const sid = typeof extractSubjectId === 'function' ? extractSubjectId(bgmUrl) : ''
         let isMatched = false

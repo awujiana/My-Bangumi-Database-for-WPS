@@ -335,10 +335,10 @@ export function testTokenValidity(): void {
 
 export function testDebugConnection(): void {
   // 通过统一的 getApp() 获取 WPS Application 对象，避免直接访问 window 全局
-  if (getApp() !== null) {
-    showToast(_T.debugConnOk, 'success')
-  } else {
+  if (getApp() === null) {
     showToast(_T.debugConnFail, 'error')
+  } else {
+    showToast(_T.debugConnOk, 'success')
   }
 }
 

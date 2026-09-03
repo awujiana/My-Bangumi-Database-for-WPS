@@ -1101,7 +1101,7 @@ export function showBangumiPanel(): void {
     GetTaskPane?: (id: string) => { Visible: boolean }
   } | null
   if (!app) {
-    const win = typeof window !== 'undefined' ? (window as unknown as BgmWindowGlobals) : null
+    const win = typeof window === 'undefined' ? null : (window as unknown as BgmWindowGlobals)
     if (win?.BGMError) {
       win.BGMError('无法获取 WPS Application 对象！', '错误')
     } else {
@@ -1112,15 +1112,7 @@ export function showBangumiPanel(): void {
   }
   const tsId = app.PluginStorage?.getItem('panel_id')
   let isBecameVisible = false
-  if (!tsId) {
-    const tskpane = app.CreateTaskPane?.(`${getUrlPath()}/ui/panel.html`)
-    if (tskpane) {
-      const id = tskpane.ID
-      app.PluginStorage?.setItem('panel_id', id)
-      tskpane.Visible = true
-      isBecameVisible = true
-    }
-  } else {
+  if (tsId) {
     const tskpane = app.GetTaskPane?.(tsId)
     if (tskpane) {
       // 切换可见性：从隐藏→显示时才触发刷新信号
@@ -1128,6 +1120,14 @@ export function showBangumiPanel(): void {
         isBecameVisible = true
       }
       tskpane.Visible = !tskpane.Visible
+    }
+  } else {
+    const tskpane = app.CreateTaskPane?.(`${getUrlPath()}/ui/panel.html`)
+    if (tskpane) {
+      const id = tskpane.ID
+      app.PluginStorage?.setItem('panel_id', id)
+      tskpane.Visible = true
+      isBecameVisible = true
     }
   }
   // 写入"面板已显示"信号（时间戳），panel 轮询检测到变化后自动刷新工作表
@@ -1162,19 +1162,19 @@ export function showEnrichPanel(): void {
     return
   }
   const tsId = app.PluginStorage?.getItem('enrich_pane_id')
-  if (!tsId) {
+  if (tsId) {
+    const tskpane = app.GetTaskPane?.(tsId)
+    if (tskpane) {
+      tskpane.Visible = !tskpane.Visible
+      bgmLog(LOG_LEVELS.INFO, `[showEnrichPanel] 富化面板可见性切换: ${String(tskpane.Visible)}`)
+    }
+  } else {
     const tskpane = app.CreateTaskPane?.(`${getUrlPath()}/ui/enrich.html`)
     if (tskpane) {
       const id = tskpane.ID
       app.PluginStorage?.setItem('enrich_pane_id', id)
       tskpane.Visible = true
       bgmLog(LOG_LEVELS.INFO, '[showEnrichPanel] 富化面板已创建并显示')
-    }
-  } else {
-    const tskpane = app.GetTaskPane?.(tsId)
-    if (tskpane) {
-      tskpane.Visible = !tskpane.Visible
-      bgmLog(LOG_LEVELS.INFO, `[showEnrichPanel] 富化面板可见性切换: ${String(tskpane.Visible)}`)
     }
   }
 }
@@ -1218,21 +1218,7 @@ export function showSettingsPanel(): void {
   const targetPosition = WPS_ENUM.msoCTPDockPositionRight
   const positionLabel = '右侧'
 
-  if (!settingsId) {
-    // 首次创建设置面板
-    const settingsPane = app.CreateTaskPane?.(`${getUrlPath()}/ui/settings.html`)
-    if (settingsPane) {
-      settingsPane.DockPosition = targetPosition
-      settingsPane.Visible = true
-      app.PluginStorage?.setItem('settings_pane_id', settingsPane.ID)
-      bgmLog(
-        LOG_LEVELS.INFO,
-        `[showSettingsPanel] 设置面板已创建(ID:${settingsPane.ID}, 停靠:${positionLabel})`,
-      )
-    } else {
-      bgmLog(LOG_LEVELS.ERROR, '[showSettingsPanel] 创建设置面板失败')
-    }
-  } else {
+  if (settingsId) {
     // 已存在：显示并更新停靠位置
     const settingsPane = app.GetTaskPane?.(settingsId)
     if (settingsPane) {
@@ -1248,6 +1234,20 @@ export function showSettingsPanel(): void {
       // 面板ID失效（可能被用户手动关闭），清除存储以便下次重新创建
       app.PluginStorage?.setItem('settings_pane_id', '')
       bgmLog(LOG_LEVELS.WARN, '[showSettingsPanel] 设置面板ID失效，已清除存储')
+    }
+  } else {
+    // 首次创建设置面板
+    const settingsPane = app.CreateTaskPane?.(`${getUrlPath()}/ui/settings.html`)
+    if (settingsPane) {
+      settingsPane.DockPosition = targetPosition
+      settingsPane.Visible = true
+      app.PluginStorage?.setItem('settings_pane_id', settingsPane.ID)
+      bgmLog(
+        LOG_LEVELS.INFO,
+        `[showSettingsPanel] 设置面板已创建(ID:${settingsPane.ID}, 停靠:${positionLabel})`,
+      )
+    } else {
+      bgmLog(LOG_LEVELS.ERROR, '[showSettingsPanel] 创建设置面板失败')
     }
   }
 }

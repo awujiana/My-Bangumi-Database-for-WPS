@@ -480,7 +480,7 @@ export function matchEntries(
                 matchedAnimeName: rawName,
                 matchType: 'exact',
                 bangumiRow,
-                ...(matchedName !== undefined ? { bangumiName: matchedName } : {}),
+                ...(matchedName === undefined ? {} : { bangumiName: matchedName }),
               }
             }
           }
@@ -503,7 +503,7 @@ export function matchEntries(
                   matchedAnimeName: rawName,
                   matchType: 'alias',
                   bangumiRow,
-                  ...(matchedName !== undefined ? { bangumiName: matchedName } : {}),
+                  ...(matchedName === undefined ? {} : { bangumiName: matchedName }),
                   aliases,
                 }
               }
@@ -568,7 +568,15 @@ export function enrichTags(
     })
   } else {
     const merged = mergeTags(oldTags, incomingTags)
-    if (merged !== oldTags) {
+    if (merged === oldTags) {
+      enriched.push({
+        fieldName: '标签/分级',
+        bangumiColumn: bangumiTagsCol,
+        oldValue: oldTags,
+        updatedValue: merged,
+        action: 'skip',
+      })
+    } else {
       setCellValue(sheet, row, bangumiTagsCol, merged)
       enriched.push({
         fieldName: '标签/分级',
@@ -576,14 +584,6 @@ export function enrichTags(
         oldValue: oldTags,
         updatedValue: merged,
         action: 'append',
-      })
-    } else {
-      enriched.push({
-        fieldName: '标签/分级',
-        bangumiColumn: bangumiTagsCol,
-        oldValue: oldTags,
-        updatedValue: merged,
-        action: 'skip',
       })
     }
   }
@@ -717,7 +717,15 @@ export function enrichFeatures(
     })
   } else {
     const merged = appendFeatures(oldFeature, features)
-    if (merged !== oldFeature) {
+    if (merged === oldFeature) {
+      enriched.push({
+        fieldName: '特点/印象',
+        bangumiColumn: bangumiFeatureCol,
+        oldValue: oldFeature,
+        updatedValue: merged,
+        action: 'skip',
+      })
+    } else {
       setCellValue(sheet, row, bangumiFeatureCol, merged)
       enriched.push({
         fieldName: '特点/印象',
@@ -725,14 +733,6 @@ export function enrichFeatures(
         oldValue: oldFeature,
         updatedValue: merged,
         action: 'append',
-      })
-    } else {
-      enriched.push({
-        fieldName: '特点/印象',
-        bangumiColumn: bangumiFeatureCol,
-        oldValue: oldFeature,
-        updatedValue: merged,
-        action: 'skip',
       })
     }
   }
@@ -791,7 +791,7 @@ export function enrichEntries(
           name: match.matchedAnimeName,
           matchType: 'error',
           enrichedFields: [],
-          ...(match.errorMessage !== undefined ? { errorMessage: match.errorMessage } : {}),
+          ...(match.errorMessage === undefined ? {} : { errorMessage: match.errorMessage }),
         })
         stats.failed += 1
       } else {
@@ -1003,7 +1003,15 @@ export function resolveConflictField(
       .split(/\s*\|\s*/)
       .map((s) => s.trim())
       .filter(Boolean)
-    if (!parts.includes(updatedValue)) {
+    if (parts.includes(updatedValue)) {
+      enriched.push({
+        fieldName,
+        bangumiColumn,
+        oldValue,
+        updatedValue,
+        action: 'skip',
+      })
+    } else {
       const merged = parts.join(TAG_SEPARATOR) + TAG_SEPARATOR + updatedValue
       setCellValue(sheet, bangumiRow, bangumiColumn, merged)
       enriched.push({
@@ -1012,14 +1020,6 @@ export function resolveConflictField(
         oldValue,
         updatedValue: merged,
         action: 'append',
-      })
-    } else {
-      enriched.push({
-        fieldName,
-        bangumiColumn,
-        oldValue,
-        updatedValue,
-        action: 'skip',
       })
     }
   } else {
@@ -1193,9 +1193,9 @@ export function enrichIntroData(
             oldValue: null,
             updatedValue: annotatedValue,
             action: 'fill',
-            ...(sourceKey !== targetColName
-              ? { note: `字段名差异: ${sourceKey} → ${targetColName}` }
-              : {}),
+            ...(sourceKey === targetColName
+              ? {}
+              : { note: `字段名差异: ${sourceKey} → ${targetColName}` }),
           })
         } else {
           conflicts.push({
@@ -1207,9 +1207,9 @@ export function enrichIntroData(
             animeRow,
             matchedAnimeName,
             resolution: 'append',
-            ...(sourceKey !== targetColName
-              ? { note: `字段名差异: ${sourceKey} → ${targetColName}` }
-              : {}),
+            ...(sourceKey === targetColName
+              ? {}
+              : { note: `字段名差异: ${sourceKey} → ${targetColName}` }),
           })
         }
       } else if (bangumiFeatureCol !== undefined) {
@@ -1226,7 +1226,15 @@ export function enrichIntroData(
           })
         } else {
           const merged = appendFeatures(oldFeature, featureEntry)
-          if (merged !== oldFeature) {
+          if (merged === oldFeature) {
+            enriched.push({
+              fieldName: `特点/印象(${sourceKey})`,
+              bangumiColumn: bangumiFeatureCol,
+              oldValue: oldFeature,
+              updatedValue: merged,
+              action: 'skip',
+            })
+          } else {
             setCellValue(sheet, row, bangumiFeatureCol, merged)
             enriched.push({
               fieldName: `特点/印象(${sourceKey})`,
@@ -1234,14 +1242,6 @@ export function enrichIntroData(
               oldValue: oldFeature,
               updatedValue: merged,
               action: 'append',
-            })
-          } else {
-            enriched.push({
-              fieldName: `特点/印象(${sourceKey})`,
-              bangumiColumn: bangumiFeatureCol,
-              oldValue: oldFeature,
-              updatedValue: merged,
-              action: 'skip',
             })
           }
         }
@@ -1335,7 +1335,15 @@ export function enrichOpEdPv(
     })
   } else {
     const merged = appendFeatures(oldFeature, featureText)
-    if (merged !== oldFeature) {
+    if (merged === oldFeature) {
+      enriched.push({
+        fieldName: '特点/印象',
+        bangumiColumn: bangumiFeatureCol,
+        oldValue: oldFeature,
+        updatedValue: merged,
+        action: 'skip',
+      })
+    } else {
       setCellValue(sheet, row, bangumiFeatureCol, merged)
       enriched.push({
         fieldName: '特点/印象',
@@ -1343,14 +1351,6 @@ export function enrichOpEdPv(
         oldValue: oldFeature,
         updatedValue: merged,
         action: 'append',
-      })
-    } else {
-      enriched.push({
-        fieldName: '特点/印象',
-        bangumiColumn: bangumiFeatureCol,
-        oldValue: oldFeature,
-        updatedValue: merged,
-        action: 'skip',
       })
     }
   }
@@ -1588,7 +1588,7 @@ export function parseRemoteContent(content: string): Record<string, string>[] {
         const key = headers[index]
         const value = values[index]
         if (key !== undefined) {
-          record[key] = value !== undefined ? value : ''
+          record[key] = value === undefined ? '' : value
         }
       }
       records.push(record)

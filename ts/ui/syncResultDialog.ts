@@ -785,13 +785,13 @@ function showSyncDetailPreviewDialog(options: SyncDetailPreviewOptions): void {
               <span class="bgm-preview-detail-value">${String(result.skipped)}</span>
             </div>
             ${
-              scrollToRow !== undefined
-                ? `
+              scrollToRow === undefined
+                ? ''
+                : `
             <div class="bgm-preview-detail-item">
               <span class="bgm-preview-detail-label">起始行号</span>
               <span class="bgm-preview-detail-value">第 ${String(scrollToRow)} 行</span>
             </div>`
-                : ''
             }
           </div>
           ${renderDetailSection(result.details)}
@@ -800,10 +800,10 @@ function showSyncDetailPreviewDialog(options: SyncDetailPreviewOptions): void {
           <div class="bgm-result-section-title">💡 操作建议</div>
           <div class="bgm-preview-suggestions">
             ${
-              !syncEnabled
-                ? `
+              syncEnabled
+                ? ''
+                : `
               <p>• 启用同步记录功能，可在 Excel 中查看每次同步的详细历史，支持按 SID 去重和颜色标记。</p>`
-                : ''
             }
             ${
               !sheetExists && syncEnabled

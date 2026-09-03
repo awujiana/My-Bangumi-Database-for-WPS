@@ -281,9 +281,7 @@ export function getSyncPreview(
           getField(rowNumber, '观看状态')
 
         // 空状态不计入待同步，跳过该条目
-        if (!watchStatus) {
-          emptyStatus += 1
-        } else {
+        if (watchStatus) {
           const type = mapWatchStatus(watchStatus)
           if (type === 0) {
             willSkip += 1
@@ -312,6 +310,8 @@ export function getSyncPreview(
               willSync += 1
             }
           }
+        } else {
+          emptyStatus += 1
         }
       }
     }

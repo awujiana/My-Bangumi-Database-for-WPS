@@ -122,7 +122,7 @@ function createMockWorksheet(options: MockWorksheetOptions = {}): unknown {
       Value2: options.rangeValues?.[address] ?? null,
       End: (_direction: number) => {
         const r = options.rangeEndRow ? options.rangeEndRow(address) : null
-        return r != null ? { Row: r } : null
+        return r == null ? null : { Row: r }
       },
       Count: 1,
       Rows: { Count: 1, Item: (index: number) => ({ Row: index }) },

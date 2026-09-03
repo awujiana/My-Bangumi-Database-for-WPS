@@ -119,29 +119,7 @@ export function getOrCreateSyncRecordSheet(): WpsWorksheet {
     BGM.handleError(error, { context: 'getOrCreateSyncRecordSheet', showAlert: false })
   }
 
-  if (!syncSheet) {
-    syncSheet = wb.Sheets.Add()
-    syncSheet.Name = SYNC_RECORD_SHEET_NAME
-
-    // 写入表头
-    for (let index = 0; index < SYNC_RECORD_COLUMNS.length; index += 1) {
-      const colLetter = colNumberToLetter(index + 1)
-      const cell = syncSheet.Range(`${colLetter}1`)
-      cell.Value2 = SYNC_RECORD_COLUMNS[index] ?? ''
-    }
-
-    // 移到末尾
-    try {
-      syncSheet.Move(null, wb.Sheets.Item(wb.Sheets.Count))
-    } catch (moveError: unknown) {
-      BGM.handleError(moveError, { context: 'getOrCreateSyncRecordSheet', showAlert: false })
-    }
-
-    bgmLog(LOG_LEVELS.INFO, '已创建同步记录工作表')
-
-    // 新表设置格式（列宽、行高、字体、居中、边框等）
-    formatSyncRecordSheet(syncSheet)
-  } else {
+  if (syncSheet) {
     // 检测并迁移旧 schema（旧版无"来源"列 → 当前 12 列结构）
     try {
       const firstHeader = String(syncSheet.Range('A1').Value2 ?? '').trim()
@@ -173,6 +151,28 @@ export function getOrCreateSyncRecordSheet(): WpsWorksheet {
         )
       }
     }
+  } else {
+    syncSheet = wb.Sheets.Add()
+    syncSheet.Name = SYNC_RECORD_SHEET_NAME
+
+    // 写入表头
+    for (let index = 0; index < SYNC_RECORD_COLUMNS.length; index += 1) {
+      const colLetter = colNumberToLetter(index + 1)
+      const cell = syncSheet.Range(`${colLetter}1`)
+      cell.Value2 = SYNC_RECORD_COLUMNS[index] ?? ''
+    }
+
+    // 移到末尾
+    try {
+      syncSheet.Move(null, wb.Sheets.Item(wb.Sheets.Count))
+    } catch (moveError: unknown) {
+      BGM.handleError(moveError, { context: 'getOrCreateSyncRecordSheet', showAlert: false })
+    }
+
+    bgmLog(LOG_LEVELS.INFO, '已创建同步记录工作表')
+
+    // 新表设置格式（列宽、行高、字体、居中、边框等）
+    formatSyncRecordSheet(syncSheet)
   }
 
   invalidateCache()
@@ -402,48 +402,7 @@ export function addSyncRecord(parameters: UpdateRecordParams): boolean {
     const now = new Date().toLocaleString('zh-CN')
 
     const existingRow = sid ? _syncRecordSidCache.get(sid) : undefined
-    if (existingRow !== undefined) {
-      const existingCount = parseInt(getCellValue(sheet, existingRow, SYNC_RECORD_COL.COUNT)) || 0
-      const updatedCount = existingCount + (parameters.count || 1)
-      const finalStatus = parameters.status || SYNC_STATUS.SUCCESS
-
-      // 更新时间戳
-      setCellValue(sheet, existingRow, SYNC_RECORD_COL.TIME, now)
-      setCellValue(sheet, existingRow, SYNC_RECORD_COL.COUNT, updatedCount)
-      if (parameters.status)
-        setCellValue(sheet, existingRow, SYNC_RECORD_COL.STATUS, parameters.status)
-      if (parameters.message)
-        setCellValue(sheet, existingRow, SYNC_RECORD_COL.MESSAGE, parameters.message)
-      if (parameters.fingerprint !== undefined)
-        setCellValue(sheet, existingRow, SYNC_RECORD_COL.FINGERPRINT, parameters.fingerprint)
-      if (parameters.name) setCellValue(sheet, existingRow, SYNC_RECORD_COL.NAME, parameters.name)
-      if (parameters.url) setCellValue(sheet, existingRow, SYNC_RECORD_COL.URL, parameters.url)
-      if (parameters.type) setCellValue(sheet, existingRow, SYNC_RECORD_COL.TYPE, parameters.type)
-      if (parameters.source)
-        setCellValue(sheet, existingRow, SYNC_RECORD_COL.SOURCE, parameters.source)
-      if (parameters.content)
-        setCellValue(sheet, existingRow, SYNC_RECORD_COL.CONTENT, parameters.content)
-      if (parameters.collType)
-        setCellValue(sheet, existingRow, SYNC_RECORD_COL.COLL_TYPE, parameters.collType)
-
-      setSyncRecordColors(sheet, existingRow, finalStatus, updatedCount)
-
-      // 更新缓存
-      const cacheItem = _syncRecordListCache.find((item) => item.sid === sid)
-      if (cacheItem) {
-        cacheItem.time = now
-        cacheItem.count = updatedCount
-        if (parameters.status) cacheItem.status = parameters.status
-        if (parameters.message) cacheItem.message = parameters.message
-        if (parameters.fingerprint !== undefined) cacheItem.fingerprint = parameters.fingerprint
-        if (parameters.name) cacheItem.name = parameters.name
-        if (parameters.url) cacheItem.url = parameters.url
-        if (parameters.type) cacheItem.type = parameters.type
-        if (parameters.source) cacheItem.source = parameters.source
-        if (parameters.content) cacheItem.content = parameters.content
-        if (parameters.collType) cacheItem.collType = parameters.collType
-      }
-    } else {
+    if (existingRow === undefined) {
       let nextRow = 1
       const usedRange = sheet.UsedRange
       if (usedRange) {
@@ -486,9 +445,50 @@ export function addSyncRecord(parameters: UpdateRecordParams): boolean {
         ...(parameters.type ? { type: parameters.type } : {}),
         ...(parameters.source ? { source: parameters.source } : {}),
         ...(parameters.content ? { content: parameters.content } : {}),
-        ...(parameters.fingerprint !== undefined ? { fingerprint: parameters.fingerprint } : {}),
+        ...(parameters.fingerprint === undefined ? {} : { fingerprint: parameters.fingerprint }),
         ...(parameters.collType ? { collType: parameters.collType } : {}),
       })
+    } else {
+      const existingCount = parseInt(getCellValue(sheet, existingRow, SYNC_RECORD_COL.COUNT)) || 0
+      const updatedCount = existingCount + (parameters.count || 1)
+      const finalStatus = parameters.status || SYNC_STATUS.SUCCESS
+
+      // 更新时间戳
+      setCellValue(sheet, existingRow, SYNC_RECORD_COL.TIME, now)
+      setCellValue(sheet, existingRow, SYNC_RECORD_COL.COUNT, updatedCount)
+      if (parameters.status)
+        setCellValue(sheet, existingRow, SYNC_RECORD_COL.STATUS, parameters.status)
+      if (parameters.message)
+        setCellValue(sheet, existingRow, SYNC_RECORD_COL.MESSAGE, parameters.message)
+      if (parameters.fingerprint !== undefined)
+        setCellValue(sheet, existingRow, SYNC_RECORD_COL.FINGERPRINT, parameters.fingerprint)
+      if (parameters.name) setCellValue(sheet, existingRow, SYNC_RECORD_COL.NAME, parameters.name)
+      if (parameters.url) setCellValue(sheet, existingRow, SYNC_RECORD_COL.URL, parameters.url)
+      if (parameters.type) setCellValue(sheet, existingRow, SYNC_RECORD_COL.TYPE, parameters.type)
+      if (parameters.source)
+        setCellValue(sheet, existingRow, SYNC_RECORD_COL.SOURCE, parameters.source)
+      if (parameters.content)
+        setCellValue(sheet, existingRow, SYNC_RECORD_COL.CONTENT, parameters.content)
+      if (parameters.collType)
+        setCellValue(sheet, existingRow, SYNC_RECORD_COL.COLL_TYPE, parameters.collType)
+
+      setSyncRecordColors(sheet, existingRow, finalStatus, updatedCount)
+
+      // 更新缓存
+      const cacheItem = _syncRecordListCache.find((item) => item.sid === sid)
+      if (cacheItem) {
+        cacheItem.time = now
+        cacheItem.count = updatedCount
+        if (parameters.status) cacheItem.status = parameters.status
+        if (parameters.message) cacheItem.message = parameters.message
+        if (parameters.fingerprint !== undefined) cacheItem.fingerprint = parameters.fingerprint
+        if (parameters.name) cacheItem.name = parameters.name
+        if (parameters.url) cacheItem.url = parameters.url
+        if (parameters.type) cacheItem.type = parameters.type
+        if (parameters.source) cacheItem.source = parameters.source
+        if (parameters.content) cacheItem.content = parameters.content
+        if (parameters.collType) cacheItem.collType = parameters.collType
+      }
     }
     return true
   } catch (error: unknown) {
@@ -529,17 +529,7 @@ export function addSyncRecords(records: UpdateRecordParams[]): boolean {
     for (const parameters of records) {
       const sid = parameters.sid ?? ''
       const existingRow = sid ? _syncRecordSidCache.get(sid) : undefined
-      if (existingRow !== undefined) {
-        const existingCount = parseInt(getCellValue(sheet, existingRow, SYNC_RECORD_COL.COUNT)) || 0
-        const existing = sidToUpdate.get(sid)
-        const totalCount = (existing?.updatedCount ?? existingCount) + (parameters.count || 1)
-        sidToUpdate.set(sid, {
-          row: existingRow,
-          updatedCount: totalCount,
-          status: parameters.status || SYNC_STATUS.SUCCESS,
-          params: parameters,
-        })
-      } else {
+      if (existingRow === undefined) {
         pendingRows.push([
           sid,
           now,
@@ -552,8 +542,18 @@ export function addSyncRecords(records: UpdateRecordParams[]): boolean {
           parameters.status || SYNC_STATUS.SUCCESS,
           parameters.collType ?? '',
           parameters.message ?? '',
-          parameters.fingerprint !== undefined ? parameters.fingerprint : '',
+          parameters.fingerprint === undefined ? '' : parameters.fingerprint,
         ])
+      } else {
+        const existingCount = parseInt(getCellValue(sheet, existingRow, SYNC_RECORD_COL.COUNT)) || 0
+        const existing = sidToUpdate.get(sid)
+        const totalCount = (existing?.updatedCount ?? existingCount) + (parameters.count || 1)
+        sidToUpdate.set(sid, {
+          row: existingRow,
+          updatedCount: totalCount,
+          status: parameters.status || SYNC_STATUS.SUCCESS,
+          params: parameters,
+        })
       }
     }
 
