@@ -117,8 +117,8 @@ function createMockWorksheet(
     endRow?: number
   } = {},
 ) {
-  const name = options.name || 'Sheet1'
-  const rows = options.rows || 100
+  const name = options.name ?? 'Sheet1'
+  const rows = options.rows ?? 100
   const cellValues = options.cellValues ?? {}
   const cellOverrides = options.cellOverrides ?? {}
 

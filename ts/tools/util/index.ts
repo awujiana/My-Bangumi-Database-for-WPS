@@ -461,9 +461,7 @@ export const BGM: {
       ...options,
     }
     // ✅ 自动获取调用函数名（如果 context 未手动指定）
-    if (!options_.context) {
-      options_.context = getCallerFunctionName()
-    }
+    options_.context ??= getCallerFunctionName()
     let bgmError: BgmError
     if (error instanceof BgmError) {
       bgmError = error
@@ -967,15 +965,15 @@ export function _fetchBgmUserInfo(
             small?: string
           }
         }
-        const userId = String(data.id || data.user_id || '')
+        const userId = String(data.id ?? data.user_id ?? '')
         // BGM API v0 返回的用户名字段是 nickname，username 是用户ID
-        const username = (data.nickname || data.username || data.user_name || data.name) ?? ''
+        const username = (data.nickname || data.username || data.user_name || data.name) ?? '' // eslint-disable-line @typescript-eslint/prefer-nullish-coalescing -- API 字段空串需退到备用字段（`??` 会保留空串）
 
         _setBgmUserId(userId)
         _setBgmUsername(username)
 
         // 从 API 响应中提取头像 URL，并清理可能存在的反引号包裹
-        const rawAvatarUrl = (data.avatar?.large || data.avatar?.medium || data.avatar?.small) ?? ''
+        const rawAvatarUrl = (data.avatar?.large || data.avatar?.medium || data.avatar?.small) ?? '' // eslint-disable-line @typescript-eslint/prefer-nullish-coalescing -- API 字段空串需退到备用字段（`??` 会保留空串）
         const cleanAvatarUrl = rawAvatarUrl ? rawAvatarUrl.replace(/`/g, '').trim() : ''
 
         // 优先使用 API 返回的头像 URL，若不存在则回退到构造的 URL
@@ -1002,7 +1000,7 @@ export function _fetchBgmUserInfo(
           `[_fetchBgmUserInfo] 获取用户信息成功: userId=${userId}, username=${username}, hasAvatar=${String(!!avatarUrl)}`,
         )
 
-        if (callback) callback({ id: userId, username, avatarUrl: avatarUrl || undefined }, 'none')
+        if (callback) callback({ id: userId, username, avatarUrl: avatarUrl ?? undefined }, 'none')
       } catch (error: unknown) {
         bgmLog(LOG_LEVELS.ERROR, `[_fetchBgmUserInfo] 解析响应失败: ${(error as Error).message}`)
         if (callback) callback(null, 'parse')

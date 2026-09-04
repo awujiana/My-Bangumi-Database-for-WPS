@@ -293,7 +293,7 @@ function updateThemePreview(mode: string): void {
 
 const handleThemeChange = (): void => {
   const select = document.getElementById('themeSelect') as HTMLSelectElement | null
-  const mode = select?.value || 'dark'
+  const mode = select?.value || 'dark' // eslint-disable-line @typescript-eslint/prefer-nullish-coalescing -- 空串表示未选择/未填写，须回退默认（`??` 会保留空串）
   // 乐观更新预览卡片，即使持久化失败也保持视觉一致
   updateThemePreview(mode)
   const isOk = saveTheme(mode)
@@ -303,7 +303,7 @@ const handleThemeChange = (): void => {
       light: '浅色模式',
       system: '跟随系统',
     }
-    showToast(`主题已切换为「${labels[mode] || mode}」`, 'success')
+    showToast(`主题已切换为「${labels[mode] || mode}」`, 'success') // eslint-disable-line @typescript-eslint/prefer-nullish-coalescing -- 空串表示未选择/未填写，须回退默认（`??` 会保留空串）
   } else {
     showToast('主题保存失败', 'error')
   }
@@ -329,7 +329,7 @@ const handleListTypeChange = (): void => {
       wish: '想看',
       do: '在看',
     }
-    showToast(`默认收藏列表类型：${labels[select.value] || select.value}`, 'success')
+    showToast(`默认收藏列表类型：${labels[select.value] || select.value}`, 'success') // eslint-disable-line @typescript-eslint/prefer-nullish-coalescing -- 空串表示未选择/未填写，须回退默认（`??` 会保留空串）
   } else {
     showToast('收藏列表类型保存失败', 'error')
   }
@@ -347,7 +347,7 @@ const handleTimeFilterChange = (): void => {
       month: '月份',
       future: '预告 / 未来',
     }
-    showToast(`默认时间筛选范围：${labels[select.value] || select.value}`, 'success')
+    showToast(`默认时间筛选范围：${labels[select.value] || select.value}`, 'success') // eslint-disable-line @typescript-eslint/prefer-nullish-coalescing -- 空串表示未选择/未填写，须回退默认（`??` 会保留空串）
   } else {
     showToast('时间筛选范围保存失败', 'error')
   }
@@ -1002,7 +1002,7 @@ const ACTION_HANDLERS: Record<string, ActionHandler> = {
     const config = {
       owner: ownerInput.value.trim(),
       repo: repoInput.value.trim(),
-      branch: branchInput?.value.trim() || 'main',
+      branch: branchInput?.value.trim() || 'main', // eslint-disable-line @typescript-eslint/prefer-nullish-coalescing -- 空串表示未选择/未填写，须回退默认（`??` 会保留空串）
       path,
       sourceType,
       gistId,
@@ -1063,7 +1063,7 @@ const ACTION_HANDLERS: Record<string, ActionHandler> = {
       const rangeSelect = document.getElementById('timeFilterRange') as HTMLSelectElement | null
       const quarterSelect = document.getElementById('timeFilterQuarter') as HTMLSelectElement | null
       const monthSelect = document.getElementById('timeFilterMonth') as HTMLSelectElement | null
-      const year = parseInt(yearSelect?.value || '2026', 10)
+      const year = parseInt(yearSelect?.value || '2026', 10) // eslint-disable-line @typescript-eslint/prefer-nullish-coalescing -- 空串表示未选择/未填写，须回退默认（`??` 会保留空串）
       const range =
         (rangeSelect?.value as 'year' | 'quarter' | 'month' | 'future' | undefined) ?? 'year'
       timeFilter = {
@@ -1071,9 +1071,9 @@ const ACTION_HANDLERS: Record<string, ActionHandler> = {
         year,
         range,
         ...(range === 'quarter'
-          ? { quarter: parseInt(quarterSelect?.value || '1', 10) as 1 | 4 | 7 | 10 }
+          ? { quarter: parseInt(quarterSelect?.value || '1', 10) as 1 | 4 | 7 | 10 } // eslint-disable-line @typescript-eslint/prefer-nullish-coalescing -- 空串表示未选择/未填写，须回退默认（`??` 会保留空串）
           : {}),
-        ...(range === 'month' ? { month: parseInt(monthSelect?.value || '1', 10) } : {}),
+        ...(range === 'month' ? { month: parseInt(monthSelect?.value || '1', 10) } : {}), // eslint-disable-line @typescript-eslint/prefer-nullish-coalescing -- 空串表示未选择/未填写，须回退默认（`??` 会保留空串）
       }
     }
     // 本地文件源仅需 path 字段；远程源（github/gitlab/gitee）要求 owner/repo/path
@@ -1763,7 +1763,7 @@ function renderLogEntries(): void {
   const body = document.getElementById('logModalBody')
   if (!body) return
   const filterSelect = document.getElementById('logLevelFilter') as HTMLSelectElement | null
-  const level = filterSelect?.value || undefined
+  const level = filterSelect?.value || undefined // eslint-disable-line @typescript-eslint/prefer-nullish-coalescing -- 空串表示未选择/未填写，须回退默认（`??` 会保留空串）
   const logs = getRecentLogs(level as LogLevel | undefined, 100)
   body.replaceChildren()
   if (logs.length === 0) {

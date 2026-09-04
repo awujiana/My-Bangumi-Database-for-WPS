@@ -373,6 +373,7 @@ function readLocalEntries(
         }
         // 同时写入「动画制作公司」的所有别名列到 extFields，便于 computeDiff 比对时使用
         for (const alias of getExcelAliases('动画制作公司')) {
+          // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing -- 别名列：主列为空串时也要用别名列补齐（供 computeDiff 比对），`??=` 会保留空串
           if (!extensionFields[alias]) {
             extensionFields[alias] = getField(alias)
           }

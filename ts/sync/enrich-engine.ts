@@ -391,7 +391,7 @@ function buildBangumiIndexes(
   const aliasIndex = new Map<string, number[]>()
   const rowNames = new Map<number, string>()
 
-  const nameCol = columnMap.get('名称') || 0
+  const nameCol = columnMap.get('名称') ?? 0
   if (nameCol === 0) {
     bgmLog(LOG_LEVELS.WARN, '[buildBangumiIndexes] Bangumi表中未找到名称列')
     return [nameIndex, aliasIndex, rowNames]
@@ -550,7 +550,7 @@ export function enrichTags(
   colMap: Map<string, number>,
   enriched: EnrichedField[],
 ): void {
-  const bangumiTagsCol = colMap.get('标签/分级') || colMap.get('标签')
+  const bangumiTagsCol = colMap.get('标签/分级') ?? colMap.get('标签')
   if (!bangumiTagsCol) return
 
   const incomingTags = incomingData.TAGS ?? ''
@@ -1488,7 +1488,7 @@ export function searchSheet(
 
   const results: SearchResult[] = []
   const normalizedKeyword = normalizeName(keyword)
-  const nameCol = colMap.get('名称') || colMap.get('动漫名称') || colMap.get('番组名') || 0
+  const nameCol = colMap.get('名称') ?? colMap.get('动漫名称') ?? colMap.get('番组名') ?? 0
 
   if (nameCol === 0) return results
 
@@ -1588,7 +1588,7 @@ export function parseRemoteContent(content: string): Record<string, string>[] {
         const key = headers[index]
         const value = values[index]
         if (key !== undefined) {
-          record[key] = value === undefined ? '' : value
+          record[key] = value ?? ''
         }
       }
       records.push(record)

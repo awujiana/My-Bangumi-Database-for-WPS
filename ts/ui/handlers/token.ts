@@ -31,7 +31,7 @@ import { _T } from './_constants.js'
 // ========== 业务对话框 ==========
 
 export function showTokenDialog(currentToken?: string): void {
-  const defaultValue = (currentToken || loadBgToken()) ?? ''
+  const defaultValue = (currentToken || loadBgToken()) ?? '' // eslint-disable-line @typescript-eslint/prefer-nullish-coalescing -- 空串等价于未设置，须回退到已存令牌
   showInput(_T.setBgmToken, _T.inputToken, defaultValue, (value?: string) => {
     if (value) {
       storeBgToken(value)
@@ -173,7 +173,7 @@ export function openUserCollection(): void {
   bgmLog(LOG_LEVELS.INFO, '[openUserCollection] ========== 打开用户收藏页面 ==========')
 
   const userId = _getBgmUserId()
-  bgmLog(LOG_LEVELS.INFO, `[openUserCollection] 获取用户ID: ${userId || '(未设置)'}`)
+  bgmLog(LOG_LEVELS.INFO, `[openUserCollection] 获取用户ID: ${userId || '(未设置)'}`) // eslint-disable-line @typescript-eslint/prefer-nullish-coalescing -- 空值须显示占位文案（`??` 会显示空串）
 
   if (!userId) {
     bgmLog(LOG_LEVELS.ERROR, '[openUserCollection] 用户ID未设置，无法打开收藏页面')
@@ -246,8 +246,8 @@ export function testTokenValidity(): void {
         }
         bgmLog(LOG_LEVELS.INFO, `[testTokenValidity] 响应数据: ${JSON.stringify(data)}`)
 
-        const nickname = data.nickname || data.username || _T.unknownUser
-        const userId = String(data.id || '')
+        const nickname = data.nickname || data.username || _T.unknownUser // eslint-disable-line @typescript-eslint/prefer-nullish-coalescing -- API 字段空串需退到备用字段（`??` 会保留空串）
+        const userId = String(data.id ?? '')
 
         bgmLog(
           LOG_LEVELS.INFO,
@@ -260,7 +260,7 @@ export function testTokenValidity(): void {
         updateUserIdStatus()
 
         // 处理头像 URL：移除可能存在的反引号包裹
-        const rawAvatarUrl = (data.avatar?.large || data.avatar?.medium || data.avatar?.small) ?? ''
+        const rawAvatarUrl = (data.avatar?.large || data.avatar?.medium || data.avatar?.small) ?? '' // eslint-disable-line @typescript-eslint/prefer-nullish-coalescing -- API 字段空串需退到备用字段（`??` 会保留空串）
         const cleanAvatarUrl = rawAvatarUrl.replace(/`/g, '').trim()
         if (cleanAvatarUrl) {
           BGM.cache.avatarUrl = cleanAvatarUrl
@@ -548,7 +548,7 @@ export function showUserProfile(): void {
     if (avatarImg) {
       if (avatarUrl) {
         avatarImg.src = avatarUrl
-        avatarImg.alt = username || _T.avatarDefault
+        avatarImg.alt = username || _T.avatarDefault // eslint-disable-line @typescript-eslint/prefer-nullish-coalescing -- 空值须显示占位文案（`??` 会显示空串）
         avatarImg.onerror = () => {
           avatarImg.style.display = 'none'
           bgmLog(LOG_LEVELS.WARN, '[showUserProfile] 头像加载失败')
@@ -565,11 +565,11 @@ export function showUserProfile(): void {
     if (topbarAvatarElement) {
       // 让 CSS 媒体查询控制显示/隐藏
       topbarAvatarElement.style.display = ''
-      topbarAvatarElement.title = username || _T.avatarDefault
-      topbarAvatarElement.setAttribute('aria-label', username || _T.avatarDefault)
+      topbarAvatarElement.title = username || _T.avatarDefault // eslint-disable-line @typescript-eslint/prefer-nullish-coalescing -- 空值须显示占位文案（`??` 会显示空串）
+      topbarAvatarElement.setAttribute('aria-label', username || _T.avatarDefault) // eslint-disable-line @typescript-eslint/prefer-nullish-coalescing -- 空值须显示占位文案（`??` 会显示空串）
       if (topbarAvatarImg && avatarUrl) {
         topbarAvatarImg.src = avatarUrl
-        topbarAvatarImg.alt = username || _T.avatarDefault
+        topbarAvatarImg.alt = username || _T.avatarDefault // eslint-disable-line @typescript-eslint/prefer-nullish-coalescing -- 空值须显示占位文案（`??` 会显示空串）
         topbarAvatarImg.onerror = () => {
           topbarAvatarElement.style.display = 'none'
           bgmLog(LOG_LEVELS.WARN, '[showUserProfile] 顶栏头像加载失败')
@@ -594,7 +594,7 @@ export function showUserProfile(): void {
         if (tokenAvatarImg) {
           if (avatarUrl) {
             tokenAvatarImg.src = avatarUrl
-            tokenAvatarImg.alt = username || _T.avatarDefault
+            tokenAvatarImg.alt = username || _T.avatarDefault // eslint-disable-line @typescript-eslint/prefer-nullish-coalescing -- 空值须显示占位文案（`??` 会显示空串）
             tokenAvatarImg.onerror = () => {
               tokenAvatarImg.style.display = 'none'
               bgmLog(LOG_LEVELS.WARN, '[showUserProfile] Token 区头像加载失败')

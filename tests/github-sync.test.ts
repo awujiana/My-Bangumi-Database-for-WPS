@@ -332,8 +332,8 @@ function createMockWorksheet(
     cellOverrides?: Record<string, { Value2?: unknown; Text?: unknown }>
   } = {},
 ) {
-  const name = options.name || 'Sheet1'
-  const usedRange = options.usedRange || 5
+  const name = options.name ?? 'Sheet1'
+  const usedRange = options.usedRange ?? 5
   const cellValues = options.cellValues ?? new Map()
   const cellOverrides = options.cellOverrides ?? {}
   const cellCache = new Map<
@@ -711,8 +711,8 @@ function createMockSheetForSelection(
     cellValues?: Map<string, string>
   } = {},
 ) {
-  const name = options.name || 'Sheet1'
-  const rowCount = options.rowCount || 10
+  const name = options.name ?? 'Sheet1'
+  const rowCount = options.rowCount ?? 10
   const cellValues = options.cellValues ?? new Map()
 
   return {

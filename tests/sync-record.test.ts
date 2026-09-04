@@ -135,9 +135,9 @@ function createMockCell(value: unknown = '') {
 }
 
 function createMockSheet(options: { name?: string; rowCount?: number } = {}) {
-  const rowCount = options.rowCount || 50
+  const rowCount = options.rowCount ?? 50
   return {
-    Name: options.name || SYNC_RECORD_SHEET_NAME,
+    Name: options.name ?? SYNC_RECORD_SHEET_NAME,
     Rows: { Count: rowCount },
     UsedRange: { Row: 1, Rows: { Count: 10 } },
     Range: vi.fn((address: string) => {

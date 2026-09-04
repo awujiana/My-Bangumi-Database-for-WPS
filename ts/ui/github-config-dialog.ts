@@ -24,7 +24,7 @@ export function showConnectionTestDialog(result: {
     gist: 'Gist',
     local: '本地文件',
   }
-  const sourceLabel = sourceTypeNames[sourceType] || sourceType
+  const sourceLabel = sourceTypeNames[sourceType] ?? sourceType
 
   // 构造结果详情 HTML
   const statusColor = success ? '#4CAF50' : '#f44336'

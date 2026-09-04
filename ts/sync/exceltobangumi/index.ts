@@ -135,7 +135,7 @@ const MIN_REQUEST_INTERVAL = 100
  */
 function isCellMarkedSuccess(ws: WpsWorksheet, row: number, seqCol?: number): boolean {
   try {
-    const col = seqCol || _DEFAULT_SEQ_COL
+    const col = seqCol ?? _DEFAULT_SEQ_COL
     const cell = getCell(ws, row, col)
     if (!cell?.Interior) return false
     const color = cell.Interior.Color
@@ -968,7 +968,7 @@ export async function SyncToBangumiAsync(
   )
   bgmLog(
     LOG_LEVELS.INFO,
-    `[SyncToBangumiAsync]   - 跳过冲突数量: ${String(options?.skipSids?.size || 0)}`,
+    `[SyncToBangumiAsync]   - 跳过冲突数量: ${String(options?.skipSids?.size ?? 0)}`,
   )
   bgmLog(LOG_LEVELS.INFO, `[SyncToBangumiAsync]   - 表头行: ${String(headerRow)}`)
   bgmLog(LOG_LEVELS.INFO, `[SyncToBangumiAsync]   - 最后一行: ${String(lastRow)}`)

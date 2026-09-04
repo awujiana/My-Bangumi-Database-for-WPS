@@ -62,7 +62,7 @@ function getErrorMessage(status: number): string {
     502: '网关错误',
     503: '服务暂时不可用',
   }
-  return statusMessages[status] || `HTTP 错误 (${String(status)})`
+  return statusMessages[status] ?? `HTTP 错误 (${String(status)})`
 }
 
 // ========== 异步 HTTP 请求（带进度） ==========

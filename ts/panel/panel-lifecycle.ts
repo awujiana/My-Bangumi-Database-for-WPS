@@ -114,9 +114,9 @@ export function restoreLockedSheet(): boolean {
     if (raw) {
       try {
         const info = JSON.parse(raw) as Partial<LockedSheetInfo>
-        BGM.sheet.lockedIndex = info.index == null ? null : info.index
-        BGM.sheet.lockedName = info.name || null
-        BGM.sheet.lockedWorkbookName = info.workbookName || null
+        BGM.sheet.lockedIndex = info.index ?? null
+        BGM.sheet.lockedName = info.name ?? null
+        BGM.sheet.lockedWorkbookName = info.workbookName ?? null
         BGM.sheet.isLocked = !!(info.index != null && info.name)
 
         // 验证锁定的工作簿是否仍然存在
@@ -716,7 +716,7 @@ export function updateFilterStatus(targetWs?: WpsWorksheet): void {
           let colName = ''
           try {
             const headerCell = ws.Range(`${colNumberToLetter(index)}1`)
-            colName = String(headerCell.Value2 || '').substring(0, 12)
+            colName = String(headerCell.Value2 || '').substring(0, 12) // eslint-disable-line @typescript-eslint/prefer-nullish-coalescing -- WPS 单元格值域不可控（空串/0/NaN），空值须回退
           } catch (error: unknown) {
             BGM.handleError(error, {
               showAlert: false,
@@ -806,7 +806,9 @@ export function refreshData(): void {
   bgmLog(LOG_LEVELS.INFO, 'refreshData 开始执行')
   const select = document.getElementById('sheetSelect') as HTMLSelectElement | null
   const previewBox = document.getElementById('previewBox')
-  const sheetIndex = BGM.sheet.lockedIndex || parseInt(select?.value ?? '') || 0
+  // parseInt 失败返回 NaN（非 nullish），`??` 兜不住，须显式 isFinite 兜底
+  const parsedSheetIndex = BGM.sheet.lockedIndex ?? parseInt(select?.value ?? '')
+  const sheetIndex = Number.isFinite(parsedSheetIndex) ? parsedSheetIndex : 0
 
   if (!sheetIndex) {
     if (previewBox) previewBox.innerHTML = sanitizeHtml('<p class="hint">请先选择工作表</p>')

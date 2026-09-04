@@ -119,7 +119,7 @@ export class EventBus {
    */
   listenerCount(eventName: string): number {
     const handlers = this.events.get(eventName)
-    return handlers?.length || 0
+    return handlers?.length ?? 0
   }
 
   /**

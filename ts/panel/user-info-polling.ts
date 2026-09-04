@@ -64,8 +64,8 @@ export function restoreUserInfoFromStorage(): void {
  * 因此 Panel 需要定期从 PluginStorage 读取最新数据并更新 UI。
  */
 export function startUserInfoPolling(): void {
-  let lastUserId = BGM.cache.userId || null
-  let lastUsername = BGM.cache.username || null
+  let lastUserId = BGM.cache.userId ?? null
+  let lastUsername = BGM.cache.username ?? null
   let lastToken = loadBgToken()
   let lastIncrementalSync: boolean | null = null
   let lastSkipConflicts: boolean | null = null
@@ -97,7 +97,7 @@ export function startUserInfoPolling(): void {
       }
 
       // 检测活动工作簿切换（用户直接在 WPS 中切换不同工作簿）
-      const activeWbName = app?.ActiveWorkbook?.Name || null
+      const activeWbName = app?.ActiveWorkbook?.Name ?? null
       if (lastActiveWorkbookName === null) {
         lastActiveWorkbookName = activeWbName
       } else if (activeWbName !== lastActiveWorkbookName) {
@@ -123,7 +123,7 @@ export function startUserInfoPolling(): void {
       if (isUserInfoChanged) {
         bgmLog(
           LOG_LEVELS.INFO,
-          `[startUserInfoPolling] 检测到用户信息变更: userId=${currentUserId || '(无)'}, username=${currentUsername || '(无)'}`,
+          `[startUserInfoPolling] 检测到用户信息变更: userId=${currentUserId || '(无)'}, username=${currentUsername || '(无)'}`, // eslint-disable-line @typescript-eslint/prefer-nullish-coalescing -- 空值须显示占位文案（`??` 会显示空串） // eslint-disable-line @typescript-eslint/prefer-nullish-coalescing -- 空值须显示占位文案（`??` 会显示空串）
         )
         lastUserId = currentUserId
         lastUsername = currentUsername
@@ -204,7 +204,7 @@ export function startUserInfoPolling(): void {
       }
 
       // 检测面板显示信号：Ribbon 点击"打开同步面板"时会写入 bgm_panel_shown_at 时间戳
-      const currentPanelShownAt = app?.PluginStorage?.getItem('bgm_panel_shown_at') || null
+      const currentPanelShownAt = app?.PluginStorage?.getItem('bgm_panel_shown_at') ?? null
       if (currentPanelShownAt && currentPanelShownAt !== lastPanelShownAt) {
         bgmLog(LOG_LEVELS.INFO, `[startUserInfoPolling] 检测到面板显示信号: ${currentPanelShownAt}`)
         lastPanelShownAt = currentPanelShownAt
@@ -217,7 +217,7 @@ export function startUserInfoPolling(): void {
       // 检测数据同步请求信号：Ribbon 点击"btnSyncFromGithub"时写入 bgm_request_github_sync 时间戳
       // panel 检测到后通过内部 eventBus 触发 syncFromGithub handler（显示模块化进度弹窗）
       const currentRequestGithubSync =
-        app?.PluginStorage?.getItem('bgm_request_github_sync') || null
+        app?.PluginStorage?.getItem('bgm_request_github_sync') ?? null
       if (currentRequestGithubSync && currentRequestGithubSync !== lastRequestGithubSync) {
         bgmLog(
           LOG_LEVELS.INFO,
@@ -231,7 +231,7 @@ export function startUserInfoPolling(): void {
 
       // 检测撤销同步请求信号：Ribbon 点击"btnUndoLastSync"时写入 bgm_request_undo_sync 时间戳
       // panel 检测到后通过内部 eventBus 触发 undoLastSync handler（包含确认对话框和恢复操作）
-      const currentRequestUndoSync = app?.PluginStorage?.getItem('bgm_request_undo_sync') || null
+      const currentRequestUndoSync = app?.PluginStorage?.getItem('bgm_request_undo_sync') ?? null
       if (currentRequestUndoSync && currentRequestUndoSync !== lastRequestUndoSync) {
         bgmLog(
           LOG_LEVELS.INFO,

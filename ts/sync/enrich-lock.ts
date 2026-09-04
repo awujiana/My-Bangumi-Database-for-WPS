@@ -457,7 +457,7 @@ export function initEnrichLock(
     if (wbSelect && BGM.enrich.lockedWorkbookName) {
       wbSelect.value = BGM.enrich.lockedWorkbookName
     }
-    refreshEnrichSheets(BGM.enrich.lockedWorkbookName || undefined, sheetSelectId, wbSelectId)
+    refreshEnrichSheets(BGM.enrich.lockedWorkbookName ?? undefined, sheetSelectId, wbSelectId)
     const sheetSelect = document.getElementById(sheetSelectId) as HTMLSelectElement | null
     if (sheetSelect && BGM.enrich.lockedSheetIndex) {
       sheetSelect.value = String(BGM.enrich.lockedSheetIndex)

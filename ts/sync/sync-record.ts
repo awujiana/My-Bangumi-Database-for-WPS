@@ -381,7 +381,7 @@ function setSyncRecordColors(
   const typeCell = sheet.Range(`${colNumberToLetter(SYNC_RECORD_COL.TYPE)}${String(row)}`)
   if (typeCell.Interior) {
     const typeName = getCellValue(sheet, row, SYNC_RECORD_COL.TYPE) || ''
-    typeCell.Interior.Color = SYNC_RECORD_TYPE_COLOR[typeName] || BGM_COLOR.GRAY
+    typeCell.Interior.Color = SYNC_RECORD_TYPE_COLOR[typeName] ?? BGM_COLOR.GRAY
   }
 }
 
@@ -412,8 +412,8 @@ export function addSyncRecord(parameters: UpdateRecordParameters): boolean {
         nextRow = sheet.Rows.Count > 1 ? 2 : 1
       }
 
-      const finalStatus = parameters.status || SYNC_STATUS.SUCCESS
-      const finalCount = parameters.count || 1
+      const finalStatus = parameters.status ?? SYNC_STATUS.SUCCESS
+      const finalCount = parameters.count ?? 1
 
       setCellValue(sheet, nextRow, SYNC_RECORD_COL.TIME, now)
       setCellValue(sheet, nextRow, SYNC_RECORD_COL.NAME, parameters.name ?? '')
@@ -450,8 +450,8 @@ export function addSyncRecord(parameters: UpdateRecordParameters): boolean {
       })
     } else {
       const existingCount = parseInt(getCellValue(sheet, existingRow, SYNC_RECORD_COL.COUNT)) || 0
-      const updatedCount = existingCount + (parameters.count || 1)
-      const finalStatus = parameters.status || SYNC_STATUS.SUCCESS
+      const updatedCount = existingCount + (parameters.count ?? 1)
+      const finalStatus = parameters.status ?? SYNC_STATUS.SUCCESS
 
       // 更新时间戳
       setCellValue(sheet, existingRow, SYNC_RECORD_COL.TIME, now)
@@ -537,21 +537,21 @@ export function addSyncRecords(records: UpdateRecordParameters[]): boolean {
           parameters.url ?? '',
           parameters.type ?? '',
           parameters.source ?? '',
-          String(parameters.count || 1),
+          String(parameters.count ?? 1),
           parameters.content ?? '',
-          parameters.status || SYNC_STATUS.SUCCESS,
+          parameters.status ?? SYNC_STATUS.SUCCESS,
           parameters.collType ?? '',
           parameters.message ?? '',
-          parameters.fingerprint === undefined ? '' : parameters.fingerprint,
+          parameters.fingerprint ?? '',
         ])
       } else {
         const existingCount = parseInt(getCellValue(sheet, existingRow, SYNC_RECORD_COL.COUNT)) || 0
         const existing = sidToUpdate.get(sid)
-        const totalCount = (existing?.updatedCount ?? existingCount) + (parameters.count || 1)
+        const totalCount = (existing?.updatedCount ?? existingCount) + (parameters.count ?? 1)
         sidToUpdate.set(sid, {
           row: existingRow,
           updatedCount: totalCount,
-          status: parameters.status || SYNC_STATUS.SUCCESS,
+          status: parameters.status ?? SYNC_STATUS.SUCCESS,
           params: parameters,
         })
       }

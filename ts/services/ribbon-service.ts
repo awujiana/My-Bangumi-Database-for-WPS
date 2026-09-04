@@ -233,7 +233,7 @@ export function getSyncPreview(
       valid += 1
 
       // 检查是否已上传（序列号列颜色）
-      const seqCol = colMap.get('序列号') || 4
+      const seqCol = colMap.get('序列号') ?? 4
       const seqCell = getCell(ws, rowNumber, seqCol)
       const isUploaded =
         seqCell?.Interior &&
@@ -646,8 +646,8 @@ export async function testTokenForRibbon(): Promise<void> {
             username?: string
             id?: number
           }
-          const nickname = data.nickname || data.username || '未知用户'
-          const userId = String(data.id || '')
+          const nickname = data.nickname || data.username || '未知用户' // eslint-disable-line @typescript-eslint/prefer-nullish-coalescing -- API 字段空串需退到备用字段（`??` 会保留空串）
+          const userId = String(data.id ?? '')
           bgmLog(LOG_LEVELS.INFO, `[testTokenForRibbon] Token 有效，用户: ${nickname} (${userId})`)
           _setBgmUserId(userId)
           _setBgmUsername(nickname)
@@ -750,7 +750,7 @@ export function openCollectionForRibbon(): void {
   }
 
   const userId = _getBgmUserId()
-  bgmLog(LOG_LEVELS.INFO, `[openCollectionForRibbon] 获取用户ID: ${userId || '(未设置)'}`)
+  bgmLog(LOG_LEVELS.INFO, `[openCollectionForRibbon] 获取用户ID: ${userId || '(未设置)'}`) // eslint-disable-line @typescript-eslint/prefer-nullish-coalescing -- 空值须显示占位文案（`??` 会显示空串）
 
   if (!userId) {
     bgmLog(LOG_LEVELS.ERROR, '[openCollectionForRibbon] 用户ID未设置')

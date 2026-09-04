@@ -473,7 +473,7 @@ const ICON_PATHS: Record<string, string> = {
 }
 
 export function GetBangumiImage(control: { Id: string }): string {
-  return ICON_PATHS[control.Id] || 'images/newFromTemp.svg'
+  return ICON_PATHS[control.Id] ?? 'images/newFromTemp.svg'
 }
 
 // 通知 index.html 早期占位：真实实现已就绪

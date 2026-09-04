@@ -140,7 +140,7 @@ function getRowData(
   }
 
   // 从列映射中读取序列号列，如果没有则使用默认值
-  const actualSeqCol = colMap.get('序列号') || seqCol
+  const actualSeqCol = colMap.get('序列号') ?? seqCol
   const seqCell = getCell(ws, rowNumber, actualSeqCol)
   data.isUploaded = isUploadedByColor(seqCell)
   return data
@@ -167,7 +167,7 @@ function renderDetailItemHtml(
     4: '搁置',
     5: '抛弃',
   }
-  const typeName = typeNames[rowData.typeNum] || '未知'
+  const typeName = typeNames[rowData.typeNum] ?? '未知'
 
   // 解析标签数据
   const tagSet = new Set<string>()
@@ -266,7 +266,7 @@ function normalizeStatus(rawStatus: string): string {
       5: '抛弃',
       0: '忽略',
     }
-    return reverseMap[code] || trimmed
+    return reverseMap[code] ?? trimmed
   }
   // 未识别的保持原样
   return trimmed
@@ -348,7 +348,7 @@ export async function previewSyncContent(): Promise<void> {
 
   // 进入运行状态（防重入，统一入口）
   if (!BGM.sync.enterRunningState()) return
-  const urlColForLocate = colMap.get('Bangumi_URL') || 1
+  const urlColForLocate = colMap.get('Bangumi_URL') ?? 1
   BGM.sync.updatePosition(ws, 0, urlColForLocate)
 
   let cardsHtml = '<div class="detail-list">'
@@ -418,11 +418,11 @@ export async function previewSyncContent(): Promise<void> {
             if (rowData.typeNum >= 1 && rowData.typeNum <= 5) {
               detailPreviewData.totalWithType += 1
               detailPreviewData.typeCount[rowData.typeNum] =
-                (detailPreviewData.typeCount[rowData.typeNum] || 0) + 1
+                (detailPreviewData.typeCount[rowData.typeNum] ?? 0) + 1
               if (rowData.isUploaded) {
                 detailPreviewData.totalUploaded += 1
                 detailPreviewData.uploadedCount[rowData.typeNum] =
-                  (detailPreviewData.uploadedCount[rowData.typeNum] || 0) + 1
+                  (detailPreviewData.uploadedCount[rowData.typeNum] ?? 0) + 1
               }
             }
 
@@ -499,7 +499,7 @@ export async function previewSyncContent(): Promise<void> {
       const s = item.dataset.status
       if (s && VALID_STATUSES.has(s)) {
         // 只统计有效标准状态
-        statusMap.set(s, (statusMap.get(s) || 0) + 1)
+        statusMap.set(s, (statusMap.get(s) ?? 0) + 1)
       }
     })
 
@@ -650,7 +650,9 @@ export async function uploadSingleRow(
     if (!app?.ActiveWorkbook) throw new Error('无法获取 Application')
 
     const select = document.getElementById('sheetSelect') as HTMLSelectElement
-    const sheetIndex = BGM.sheet.lockedIndex || parseInt(select.value, 10) || 1
+    // parseInt 失败返回 NaN（非 nullish），`??` 兜不住，须显式 isFinite 兜底
+    const parsedSheetIndex = BGM.sheet.lockedIndex ?? parseInt(select.value, 10)
+    const sheetIndex = Number.isFinite(parsedSheetIndex) ? parsedSheetIndex : 1
     const ws = app.ActiveWorkbook.Worksheets.Item(sheetIndex)
 
     const headerRow = findHeaderRow(ws) || 1
@@ -674,7 +676,7 @@ export async function uploadSingleRow(
     )
     const statusCode = result.code || 0
     // 从列映射中读取序列号列
-    const actualSeqCol = colMap.get('序列号') || 9
+    const actualSeqCol = colMap.get('序列号') ?? 9
     const seqCell = getCell(ws, rowNumber, actualSeqCol)
 
     if ([200, 201, 202, 204].includes(statusCode)) {
@@ -791,7 +793,7 @@ export function viewSyncRecordDetail(sid: string): void {
       context: 'ViewSyncRecordDetail',
     })
   }
-  const detail = `同步记录详情\n\n名称: ${record.name ?? ''}\nSID: ${record.sid ?? ''}\nURL: ${record.url ?? ''}\n时间: ${record.time ?? ''}\n状态: ${record.status ?? ''}\n同步次数: ${String(record.count || '')}\n备注: ${record.message ?? ''}\n\n同步内容:\n${content}`
+  const detail = `同步记录详情\n\n名称: ${record.name ?? ''}\nSID: ${record.sid ?? ''}\nURL: ${record.url ?? ''}\n时间: ${record.time ?? ''}\n状态: ${record.status ?? ''}\n同步次数: ${String(record.count || '')}\n备注: ${record.message ?? ''}\n\n同步内容:\n${content}` // eslint-disable-line @typescript-eslint/prefer-nullish-coalescing -- 空值须显示占位文案（`??` 会显示空串）
   safeAlert(detail, '同步记录详情')
 }
 
@@ -893,7 +895,7 @@ export async function syncAllRows(): Promise<{ success: number; fail: number; sk
 
   try {
     // 更新当前位置（便于暂停时定位到表头）
-    BGM.sync.updatePosition(ws, headerRow, colMap.get('序列号') || 9)
+    BGM.sync.updatePosition(ws, headerRow, colMap.get('序列号') ?? 9)
 
     const uploadConfig: SyncConfigSummary = buildSyncConfig({
       source: '当前工作表',

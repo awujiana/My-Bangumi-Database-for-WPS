@@ -142,9 +142,9 @@ export function cacheGet<T>(key: string, factory: () => T): T {
 
 export function findHeaderRow(ws: WpsWorksheet | null | undefined, startRow?: number): number {
   const sheetName = ws?.Name ?? ''
-  const cacheKey = `${sheetName}:headerRow:${String(startRow || 1)}`
+  const cacheKey = `${sheetName}:headerRow:${String(startRow ?? 1)}`
   return cacheGet(cacheKey, () => {
-    const sRow = startRow || 1
+    const sRow = startRow ?? 1
     for (let row = sRow; row <= PANEL_CONFIG.MAX_SCAN_ROWS; row += 1) {
       let matchCount = 0
       for (let col = 1; col <= PANEL_CONFIG.MAX_SCAN_COLUMNS; col += 1) {

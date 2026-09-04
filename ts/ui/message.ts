@@ -96,5 +96,5 @@ export function setStatus(message: string, type?: string): void {
   if (!statusElement) return
 
   statusElement.textContent = message
-  statusElement.className = `status ${type || 'info'}`
+  statusElement.className = `status ${type ?? 'info'}`
 }

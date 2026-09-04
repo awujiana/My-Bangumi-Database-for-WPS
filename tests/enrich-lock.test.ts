@@ -145,7 +145,7 @@ const mockBGMState = vi.hoisted(() => ({
 }))
 
 vi.mock('../ts/index.js', () => ({
-  getApp: () => (window as Record<string, unknown>).Application || null,
+  getApp: () => (window as Record<string, unknown>).Application ?? null,
   bgmLog: mockReferences.mockBgmLog,
   BGM: mockBGMState,
   LOG_LEVELS: { INFO: 'INFO', WARN: 'WARN', ERROR: 'ERROR', DEBUG: 'DEBUG' },

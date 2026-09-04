@@ -47,8 +47,8 @@ export function throttle<T extends (...arguments_: unknown[]) => unknown>(
       }
       function_(...arguments_)
       lastTime = now
-    } else if (timerId === null) {
-      timerId = setTimeout(() => {
+    } else {
+      timerId ??= setTimeout(() => {
         function_(...arguments_)
         lastTime = Date.now()
         timerId = null

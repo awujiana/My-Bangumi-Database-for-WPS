@@ -317,7 +317,7 @@ function _showDialog(type: string, options: DialogOptions = {}): void {
       else options.onCancel?.()
     } else if (type === 'input') {
       const result = window.prompt(
-        (options.prompt || options.message) ?? '',
+        (options.prompt || options.message) ?? '', // eslint-disable-line @typescript-eslint/prefer-nullish-coalescing -- 空值须显示占位文案（`??` 会显示空串）
         options.defaultValue ?? '',
       )
       if (result === null) options.onCancel?.()
@@ -332,7 +332,7 @@ function _showDialog(type: string, options: DialogOptions = {}): void {
   const titleElement = dom[config.titleId]
   const messageElement = dom[config.msgId]
   if (titleElement) titleElement.textContent = options.title ?? ''
-  if (messageElement) messageElement.textContent = (options.prompt || options.message) ?? ''
+  if (messageElement) messageElement.textContent = (options.prompt || options.message) ?? '' // eslint-disable-line @typescript-eslint/prefer-nullish-coalescing -- 空值须显示占位文案（`??` 会显示空串）
 
   if (type === 'input' && dom.bgmInputField) {
     ;(dom.bgmInputField as HTMLInputElement).value = options.defaultValue ?? ''
@@ -1364,7 +1364,7 @@ export function hideSyncProgressDialog(): void {
 
 // ========== 公共 API ==========
 export function showAlert(message: string, title?: string, onOk?: () => void): void {
-  _showDialog('alert', { message, title: title || '提示', ...(onOk ? { onOk } : {}) })
+  _showDialog('alert', { message, title: title ?? '提示', ...(onOk ? { onOk } : {}) })
 }
 
 /*
@@ -1380,7 +1380,7 @@ export function showConfirm(
 ): void {
   _showDialog('confirm', {
     message,
-    title: title || '确认',
+    title: title ?? '确认',
     onOk: () => {
       callback(true)
     },
@@ -1391,15 +1391,15 @@ export function showConfirm(
 }
 
 export function showError(message: string, title?: string, onOk?: () => void): void {
-  _showDialog('error', { message, title: title || '错误', ...(onOk ? { onOk } : {}) })
+  _showDialog('error', { message, title: title ?? '错误', ...(onOk ? { onOk } : {}) })
 }
 
 export function showWarning(message: string, title?: string, onOk?: () => void): void {
-  _showDialog('warning', { message, title: title || '警告', ...(onOk ? { onOk } : {}) })
+  _showDialog('warning', { message, title: title ?? '警告', ...(onOk ? { onOk } : {}) })
 }
 
 export function showSuccess(message: string, title?: string, onOk?: () => void): void {
-  _showDialog('success', { message, title: title || '成功', ...(onOk ? { onOk } : {}) })
+  _showDialog('success', { message, title: title ?? '成功', ...(onOk ? { onOk } : {}) })
 }
 
 export function showInput(

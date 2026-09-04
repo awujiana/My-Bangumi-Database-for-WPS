@@ -143,7 +143,7 @@ export function getGithubConfig(): GithubSyncConfig {
   const storage = getStorage()
   const owner = storage?.getItem(CONFIG_KEYS.OWNER) ?? ''
   const repo = storage?.getItem(CONFIG_KEYS.REPO) ?? ''
-  const branch = storage?.getItem(CONFIG_KEYS.BRANCH) || DEFAULT_BRANCH
+  const branch = storage?.getItem(CONFIG_KEYS.BRANCH) ?? DEFAULT_BRANCH
   const path = storage?.getItem(CONFIG_KEYS.PATH) ?? ''
   const sourceTypeRaw = storage?.getItem(CONFIG_KEYS.SOURCE_TYPE)
   const sourceType: SyncSourceType = isSyncSourceType(sourceTypeRaw) ? sourceTypeRaw : 'github'

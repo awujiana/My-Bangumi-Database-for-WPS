@@ -177,7 +177,7 @@ export async function verifyToken(token: string, signal?: AbortSignal): Promise<
       result.message = 'Token 有效'
       bgmLog(
         LOG_LEVELS.INFO,
-        `[scraping/verifyToken] Token 验证成功，用户ID: ${String(userData?.id || '未知')}`,
+        `[scraping/verifyToken] Token 验证成功，用户ID: ${String(userData?.id ?? '未知')}`,
       )
       if (userData) {
         result.userId = String(userData.id || '')
@@ -222,8 +222,8 @@ export async function fetchAllUserCollections(
     onProgress?: (page: number, total: number) => void
   },
 ): Promise<CollectionItem[]> {
-  const limit = options?.limit || 30
-  const maxTotal = options?.maxTotal || 1000
+  const limit = options?.limit ?? 30
+  const maxTotal = options?.maxTotal ?? 1000
 
   const typeMap: Record<string, number> = { wish: 1, collect: 2, do: 3 }
   const typeNumber = options?.type ? typeMap[options.type] : null

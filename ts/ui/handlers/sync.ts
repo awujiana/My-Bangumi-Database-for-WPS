@@ -101,7 +101,7 @@ async function _fillSheetWithCollections(
     if (item?.subject_id) {
       const row = headerRow + 1 + index
       const { subject } = item
-      const name = (subject?.name_cn || subject?.name) ?? ''
+      const name = (subject?.name_cn || subject?.name) ?? '' // eslint-disable-line @typescript-eslint/prefer-nullish-coalescing -- API 字段空串需退到备用字段（`??` 会保留空串）
       const alias = subject?.name_cn && subject.name ? subject.name : ''
       const url = `https://bgm.tv/subject/${String(item.subject_id)}`
 
@@ -121,7 +121,7 @@ async function _fillSheetWithCollections(
 
       const categoryCol = colMap.get('类别')
       if (categoryCol !== undefined) {
-        writes.push({ col: categoryCol, value: BGM_SUBJECT_TYPES[item.subject_type || 2] ?? '' })
+        writes.push({ col: categoryCol, value: BGM_SUBJECT_TYPES[item.subject_type ?? 2] ?? '' })
       }
 
       const finishedCol = colMap.get('是否看完')
@@ -346,7 +346,7 @@ async function confirmAndExecuteSync(prepared: SyncPreparedData): Promise<boolea
   // 8. 冲突检测与策略
   bgmLog(LOG_LEVELS.INFO, '[syncFromPanel] 步骤8: 冲突检测')
   const conflictSelect = document.getElementById('conflictStrategy') as HTMLSelectElement | null
-  const conflictStrategy = conflictSelect?.value || 'skip'
+  const conflictStrategy = conflictSelect?.value || 'skip' // eslint-disable-line @typescript-eslint/prefer-nullish-coalescing -- 空串表示未选择/未填写，须回退默认（`??` 会保留空串）
   bgmLog(LOG_LEVELS.INFO, `[syncFromPanel] 冲突策略: ${conflictStrategy}`)
 
   let conflictSids: Set<string> | undefined
@@ -579,7 +579,9 @@ export function syncCollectionFromBgm(): void {
   bgmLog(LOG_LEVELS.INFO, '[syncCollectionFromBgm] ========== 开始从 BGM 同步收藏标记 ==========')
 
   const select = document.getElementById('sheetSelect') as HTMLSelectElement | null
-  const sheetIndex = BGM.sheet.lockedIndex || parseInt(select?.value ?? '') || 1
+  // parseInt 失败返回 NaN（非 nullish），`??` 兜不住，须显式 isFinite 兜底
+  const parsedSheetIndex = BGM.sheet.lockedIndex ?? parseInt(select?.value ?? '')
+  const sheetIndex = Number.isFinite(parsedSheetIndex) ? parsedSheetIndex : 1
   bgmLog(LOG_LEVELS.INFO, `[syncCollectionFromBgm] 目标工作表索引: ${String(sheetIndex)}`)
 
   const listTypeSelect = document.getElementById('listTypeSelect') as HTMLSelectElement | null
@@ -780,7 +782,7 @@ async function _doAPISync(
   let syncRecords: SyncRecord[] = typeof getAllSyncRecords === 'function' ? getAllSyncRecords() : []
   const syncCountMap = new Map<string, number>()
   syncRecords.forEach((r) =>
-    syncCountMap.set(r.sid ?? '', (syncCountMap.get(r.sid ?? '') || 0) + 1),)
+    syncCountMap.set(r.sid ?? '', (syncCountMap.get(r.sid ?? '') ?? 0) + 1),)
 
   // 使用从 ../index.js 导入的 BGM_SUBJECT_TYPES 常量（与 core/constants.ts 中定义一致）
   // 启动同步状态机：使用 enterRunningState 进行防重入检查
@@ -829,13 +831,13 @@ async function _doAPISync(
 
       const item = userCollections[index]
       if (!(item === undefined)) {
-        const itemName = item.subject?.name_cn || item.subject?.name || '(无名称)'
+        const itemName = item.subject?.name_cn || item.subject?.name || '(无名称)' // eslint-disable-line @typescript-eslint/prefer-nullish-coalescing -- API 字段空串需退到备用字段（`??` 会保留空串）
         if (typeof addSyncRecord === 'function') {
           addSyncRecord({
             name: itemName,
             url: `https://bgm.tv/subject/${String(item.subject_id)}`,
             sid: String(item.subject_id),
-            type: BGM_SUBJECT_TYPES[item.subject_type || 2] ?? '',
+            type: BGM_SUBJECT_TYPES[item.subject_type ?? 2] ?? '',
             content: '标记同步',
             status: '成功',
             count: 1,
@@ -855,7 +857,7 @@ async function _doAPISync(
     syncRecords = typeof getAllSyncRecords === 'function' ? getAllSyncRecords() : []
     syncCountMap.clear()
     syncRecords.forEach((r) =>
-      syncCountMap.set(r.sid ?? '', (syncCountMap.get(r.sid ?? '') || 0) + 1),)
+      syncCountMap.set(r.sid ?? '', (syncCountMap.get(r.sid ?? '') ?? 0) + 1),)
 
     // 阶段2：在 Excel 数据表上标记已收藏的行（需要定位单元格）
     // 切换回数据工作表，便于暂停时定位
@@ -867,7 +869,7 @@ async function _doAPISync(
     }
 
     const urlCol = colMap.get('Bangumi_URL')
-    const seqColForLocate = colMap.get('序列号') || 9
+    const seqColForLocate = colMap.get('序列号') ?? 9
     BGM.sync.updatePosition(ws, 0, seqColForLocate)
 
     let matchedCount = 0
@@ -894,10 +896,10 @@ async function _doAPISync(
         const sid = typeof extractSubjectId === 'function' ? extractSubjectId(bgmUrl) : ''
         let isMatched = false
         if (sid && collectionMap.has(sid)) {
-          const seqCol = colMap.get('序列号') || 9
+          const seqCol = colMap.get('序列号') ?? 9
           const seqCell = getCell(ws, row, seqCol)
           if (seqCell?.Interior) {
-            const syncCount = syncCountMap.get(sid) || 0
+            const syncCount = syncCountMap.get(sid) ?? 0
             seqCell.Interior.Color =
               syncCount === 1
                 ? BGM_COLOR.BGM_SYNC

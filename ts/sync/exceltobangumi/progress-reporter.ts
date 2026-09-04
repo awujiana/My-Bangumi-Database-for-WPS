@@ -60,7 +60,7 @@ export function markSyncResultColor(
   isSuccess: boolean,
   seqCol?: number,
 ): void {
-  const col = seqCol || DEFAULT_SEQ_COL
+  const col = seqCol ?? DEFAULT_SEQ_COL
   const cell = getCell(ws, row, col)
   if (cell?.Interior) {
     cell.Interior.Color = isSuccess ? BGM_COLOR.SUCCESS : BGM_COLOR.FAIL
@@ -90,7 +90,7 @@ export function applySyncSuccessResults(
       name: task.name || `SID:${task.sid}`,
       url: task.bgmUrl,
       sid: task.sid,
-      type: TYPE_NAMES[task.type] || `类型${String(task.type)}`,
+      type: TYPE_NAMES[task.type] ?? `类型${String(task.type)}`,
       content: task.jsonBody,
       status: SYNC_STATUS.SUCCESS,
       message: '批量同步成功',
@@ -123,7 +123,7 @@ export function applySyncFailResults(
       name: task.name || `SID:${task.sid}`,
       url: task.bgmUrl,
       sid: task.sid,
-      type: TYPE_NAMES[task.type] || `类型${String(task.type)}`,
+      type: TYPE_NAMES[task.type] ?? `类型${String(task.type)}`,
       content: task.jsonBody,
       status: SYNC_STATUS.FAIL,
       message: '批量同步失败',

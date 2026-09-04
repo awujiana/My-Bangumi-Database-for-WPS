@@ -73,8 +73,8 @@ function createMockWorksheet(
     cellOverrides?: Record<string, Record<string, unknown>>
   } = {},
 ) {
-  const name = options.name || 'Sheet1'
-  const usedRange = options.usedRange || 10
+  const name = options.name ?? 'Sheet1'
+  const usedRange = options.usedRange ?? 10
   const cellCache = new Map<
     string,
     { Value2: unknown; Text?: unknown; Interior: { Color: number } }

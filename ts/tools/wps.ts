@@ -351,7 +351,7 @@ export function wpsPrompt(message: string, defaultValue?: string): Promise<strin
         message,
         defaultValue,
         (value) => {
-          resolve(value || null)
+          resolve(value ?? null)
         },
         () => {
           resolve(null)
@@ -367,7 +367,7 @@ export function wpsMessageBox(message: string, buttons?: number, icon?: number):
       { MessageBox?: (message_: string, type: number) => number } | null | undefined
     if (app?.MessageBox) {
       try {
-        const result = app.MessageBox(message, (buttons || 0) + (icon || 64))
+        const result = app.MessageBox(message, (buttons ?? 0) + (icon ?? 64))
         resolve(result)
         return
       } catch (error: unknown) {

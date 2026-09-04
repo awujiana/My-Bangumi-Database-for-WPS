@@ -40,7 +40,7 @@ interface BgmUserInfo {
 export function extractResponseMessage(data: unknown): string {
   if (data && typeof data === 'object') {
     const d = data as BgmApiResponse
-    return d.msg || d.message || d.error || d.description || 'success'
+    return d.msg || d.message || d.error || d.description || 'success' // eslint-disable-line @typescript-eslint/prefer-nullish-coalescing -- API 字段空串需退到备用字段（`??` 会保留空串）
   }
   return 'success'
 }
@@ -51,7 +51,7 @@ export function extractResponseMessage(data: unknown): string {
 export function parseErrorResponse(xhr: XMLHttpRequest): string {
   try {
     const errorData = JSON.parse(xhr.responseText) as BgmApiResponse
-    return errorData.error || errorData.description || `HTTP ${String(xhr.status)}`
+    return errorData.error || errorData.description || `HTTP ${String(xhr.status)}` // eslint-disable-line @typescript-eslint/prefer-nullish-coalescing -- API 字段空串需退到备用字段（`??` 会保留空串）
   } catch {
     return xhr.statusText || `HTTP ${String(xhr.status)}`
   }
@@ -80,7 +80,7 @@ export function openBangumiTokenPage(): void {
  * @param {AbortSignal} [signal] - 可选 AbortSignal，用于取消请求
  */
 export function testTokenValidityForRibbon(token?: string, signal?: AbortSignal): void {
-  const testToken = token || loadBgToken()
+  const testToken = token || loadBgToken() // eslint-disable-line @typescript-eslint/prefer-nullish-coalescing -- 空串等价于未设置，须回退到已存令牌
   if (!testToken) {
     showAlert('请先设置 Token！', '提示')
     return
@@ -166,8 +166,8 @@ export function testTokenValidityForRibbon(token?: string, signal?: AbortSignal)
           `[exceltobangumi/testTokenValidityForRibbon] 响应数据: ${JSON.stringify(data).length > 300 ? `${JSON.stringify(data).substring(0, 300)}...` : JSON.stringify(data)}`,
         )
 
-        const nickname = data.nickname || data.username || '未知用户'
-        const userId = String(data.id || '未知ID')
+        const nickname = data.nickname || data.username || '未知用户' // eslint-disable-line @typescript-eslint/prefer-nullish-coalescing -- API 字段空串需退到备用字段（`??` 会保留空串）
+        const userId = String(data.id ?? '未知ID')
 
         bgmLog(
           LOG_LEVELS.INFO,
