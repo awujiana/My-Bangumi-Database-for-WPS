@@ -67,8 +67,8 @@ export interface SyncResultDialogOptions {
 function getSeasonFromDate(dateString: string): string | null {
   const match = /^(\d{4})[-/.](\d{1,2})/.exec(dateString)
   if (!match) return null
-  const year = match[1]!
-  const month = parseInt(match[2]!, 10)
+  const year = match[1] ?? ''
+  const month = parseInt(match[2] ?? '', 10)
   const seasonMap: Record<number, string> = {
     1: '冬',
     2: '冬',
@@ -112,11 +112,11 @@ export function computeDateStatsFromSheet(): DateStats {
   const lastRow = getLastRow(ws)
   const colMap = getColumnMap(ws, headerRow)
 
-  if (!colMap.has('Bangumi_URL') || !colMap.has('开播日期')) {
+  const dateCol = colMap.get('开播日期')
+  const urlCol = colMap.get('Bangumi_URL')
+  if (dateCol === undefined || urlCol === undefined) {
     return stats
   }
-
-  const dateCol = colMap.get('开播日期')!
   const startRow = headerRow + 1
 
   let earliest: string | null = null
@@ -125,7 +125,7 @@ export function computeDateStatsFromSheet(): DateStats {
   let totalCount = 0
 
   for (let row = startRow; row <= lastRow; row += 1) {
-    const url = trim(getCellValue(ws, row, colMap.get('Bangumi_URL')!))
+    const url = trim(getCellValue(ws, row, urlCol))
     if (url) {
       const sid = extractSubjectId(url)
       if (sid) {

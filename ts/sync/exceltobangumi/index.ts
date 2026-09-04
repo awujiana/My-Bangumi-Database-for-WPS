@@ -162,7 +162,8 @@ function createFieldGetter(
   // 批量读取所有需要的数据列
   let maxCol = 1
   for (const key of BATCH_READ_COLUMNS) {
-    if (colMap.has(key)) maxCol = Math.max(maxCol, colMap.get(key)!)
+    const col = colMap.get(key)
+    if (col !== undefined) maxCol = Math.max(maxCol, col)
   }
   const allData = readRangeValues(ws, startRow, lastRow, 1, maxCol)
 
@@ -177,7 +178,8 @@ function createFieldGetter(
       }
     }
     // 回退到逐单元格读取
-    return colMap.has(key) ? trim(getCellValue(ws, row, colMap.get(key)!)) : ''
+    const fallbackCol = colMap.get(key)
+    return fallbackCol === undefined ? '' : trim(getCellValue(ws, row, fallbackCol))
   }
 }
 
@@ -797,8 +799,10 @@ async function batchSyncRequests(
       bgmLog(LOG_LEVELS.INFO, '[batchSyncRequests] 同步已恢复，继续处理')
     }
 
-    while (executing.length < concurrency && queue.length > 0) {
-      const task = queue.shift()!
+    // 一次性取出本轮并发窗口内的任务（每轮 executing 同步 +1，
+    // 取出数量恰为 concurrency - executing.length，与原逐个 shift 等价）
+    const batchTasks = queue.splice(0, concurrency - executing.length)
+    for (const task of batchTasks) {
       // 更新当前行号（工作表和列在调用方 SyncToBangumiAsync 中已通过 updatePosition 设置）
       BGM.sync.updatePosition(undefined, task.rowNum)
       const entry = { promise: null as unknown as Promise<void>, task, done: false }
@@ -891,7 +895,7 @@ async function batchSyncRequests(
     if (executing.length > 0) {
       await Promise.race(executing.map((task) => task.promise))
       for (let index = executing.length - 1; index >= 0; index -= 1) {
-        if (executing[index]!.done) executing.splice(index, 1)
+        if (executing[index]?.done) executing.splice(index, 1)
       }
     }
   }
@@ -1162,9 +1166,10 @@ async function executeSelectedSync(
   startTime: number,
 ): Promise<void> {
   let isEnteredRunning = false
+  // 上游 prepareSelectedSync 已校验列存在；?? 0 仅为类型层兜底（列号 1-based，0 不合法）
+  const urlCol = colMap.get('Bangumi_URL') ?? 0
+  const nameCol = colMap.get('名称')
   try {
-    const urlCol = colMap.get('Bangumi_URL')!
-    const nameCol = colMap.has('名称') ? colMap.get('名称')! : undefined
     const userPath = _getUserApiPath()
 
     let successCount = 0
@@ -1211,7 +1216,7 @@ async function executeSelectedSync(
     // 设置同步状态机位置（用于暂停时定位到单元格）
     BGM.sync.updatePosition(ws, 0, urlCol)
 
-    for (let index = 0; index < rows.length; index += 1) {
+    for (const [index, rowNumber] of rows.entries()) {
       // 检查停止
       if (BGM.sync.checkShouldStop()) {
         bgmLog(LOG_LEVELS.INFO, '[syncSelectedRows] 检测到停止请求，终止循环')
@@ -1231,7 +1236,6 @@ async function executeSelectedSync(
         bgmLog(LOG_LEVELS.INFO, '[syncSelectedRows] 同步已恢复，继续处理')
       }
 
-      const rowNumber = rows[index]!
       const rowProgress = `[${String(index + 1)}/${String(rows.length)}]`
       // 更新当前位置（行号），供暂停时定位
       BGM.sync.updatePosition(undefined, rowNumber)
@@ -1257,14 +1261,13 @@ async function executeSelectedSync(
                 `⏳ ${rowProgress} 行${String(rowNumber)} "${name || sid}" SID=${sid} 开始同步`,
               )
 
-              const finishedDate = colMap.has('完播日')
-                ? trim(getCellValue(ws, rowNumber, colMap.get('完播日')!) || '')
-                : ''
-              const jsonBody = buildJsonPayload(
-                (key) =>
-                  colMap.has(key) ? trim(getCellValue(ws, rowNumber, colMap.get(key)!)) : '',
-                finishedDate,
-              )
+              const finishCol = colMap.get('完播日')
+              const finishedDate =
+                finishCol === undefined ? '' : trim(getCellValue(ws, rowNumber, finishCol) || '')
+              const jsonBody = buildJsonPayload((key) => {
+                const col = colMap.get(key)
+                return col === undefined ? '' : trim(getCellValue(ws, rowNumber, col))
+              }, finishedDate)
 
               if (jsonBody === '{}') {
                 const message = `行${String(rowNumber)} "${name || sid}" 请求体为空，跳过`
@@ -1314,13 +1317,8 @@ async function executeSelectedSync(
                       `[syncSelectedRows] 行${String(rowNumber)} jsonBody 解析失败: ${error instanceof Error ? error.message : String(error)}`,
                     )
                   }
-                  const epRaw = trim(
-                    getCellValue(
-                      ws,
-                      rowNumber,
-                      colMap.has('集数') ? colMap.get('集数')! : colMap.get('集号')!,
-                    ),
-                  )
+                  const epCol = Number(colMap.get('集数') ?? colMap.get('集号'))
+                  const epRaw = trim(getCellValue(ws, rowNumber, epCol))
                   const epCount = parseInt(epRaw, 10)
                   if ((watchType === 2 || watchType === 3) && !isNaN(epCount) && epCount > 0) {
                     bgmLog(

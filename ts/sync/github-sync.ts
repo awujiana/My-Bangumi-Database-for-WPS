@@ -313,8 +313,9 @@ function readLocalEntries(
   }
 
   readCols.sort((a, b) => a.col - b.col)
-  const minCol = readCols[0]!.col
-  const maxCol = readCols[readCols.length - 1]!.col
+  // 上方已守卫 readCols 非空，?? 分支仅为类型层兜底
+  const minCol = readCols[0]?.col ?? 1
+  const maxCol = readCols.at(-1)?.col ?? minCol
   const rowCount = lastRow - startRow + 1
 
   // 一次性读取整个矩形区域
@@ -452,10 +453,10 @@ function formatDateToLocal(dateString: string): string | null {
   if (!dateString) return null
   const match = /^(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})/.exec(dateString)
   if (!match) return null
-  const year = match[1]
-  const month = match[2]!.padStart(2, '0')
-  const day = match[3]!.padStart(2, '0')
-  return `${year ?? ''}年${month}月${day}日`
+  const year = match[1] ?? ''
+  const month = (match[2] ?? '').padStart(2, '0')
+  const day = (match[3] ?? '').padStart(2, '0')
+  return `${year}年${month}月${day}日`
 }
 
 /**
@@ -720,8 +721,9 @@ function batchWriteNewRows(
   }
 
   writeCols.sort((a, b) => a.col - b.col)
-  const minCol = writeCols[0]!.col
-  const maxCol = writeCols[writeCols.length - 1]!.col
+  // 上方已守卫 writeCols 非空，?? 分支仅为类型层兜底
+  const minCol = writeCols[0]?.col ?? 1
+  const maxCol = writeCols.at(-1)?.col ?? minCol
   const colCount = maxCol - minCol + 1
 
   // 2. 构建二维值数组（列对齐到 minCol 偏移）
@@ -785,20 +787,23 @@ function batchWriteNewRows(
   for (let index = 0; index < rows.length; index += 1) {
     for (const wc of writeCols) {
       const row = startRow + index
-      const raw = values[index]![wc.col - minCol]
+      const raw = values[index]?.[wc.col - minCol]
       const value = raw == null ? '' : String(raw)
       recordUndoEntry({ row, col: wc.col, oldValue: '', updatedValue: value })
     }
-    records.push({
-      sid: rows[index]!.sid,
-      name: rows[index]!.remote.name ?? '',
-      url: `https://bgm.tv/subject/${rows[index]!.sid}`,
-      type: BGM_SUBJECT_TYPES[2] ?? '',
-      source: 'repo',
-      content: '仓库同步-新增',
-      status: '成功',
-      count: 1,
-    })
+    const rowRecord = rows[index]
+    if (rowRecord !== undefined) {
+      records.push({
+        sid: rowRecord.sid,
+        name: rowRecord.remote.name ?? '',
+        url: `https://bgm.tv/subject/${rowRecord.sid}`,
+        type: BGM_SUBJECT_TYPES[2] ?? '',
+        source: 'repo',
+        content: '仓库同步-新增',
+        status: '成功',
+        count: 1,
+      })
+    }
   }
 
   return rows.length
@@ -877,8 +882,9 @@ function batchUpdateRows(
   }
 
   writeCols.sort((a, b) => a.col - b.col)
-  const minCol = writeCols[0]!.col
-  const maxCol = writeCols[writeCols.length - 1]!.col
+  // 上方已守卫 writeCols 非空，?? 分支仅为类型层兜底
+  const minCol = writeCols[0]?.col ?? 1
+  const maxCol = writeCols.at(-1)?.col ?? minCol
   const colCount = maxCol - minCol + 1
 
   // 2. 逐行计算新值，并记录 undo 条目
@@ -1226,6 +1232,8 @@ export async function applyDiffToSheet(
   onProgress?: (current: number, total: number, message: string, eta?: string) => void,
   source?: string,
 ): Promise<GithubSyncResult> {
+  // 明细收集器：result.details 与本地 details 引用同一数组，push 直接走局部变量
+  const details: GithubSyncDetailItem[] = []
   const result: GithubSyncResult = {
     remoteTotal: 0,
     added: 0,
@@ -1234,7 +1242,7 @@ export async function applyDiffToSheet(
     unchanged: 0,
     skipped: 0,
     failed: 0,
-    details: [],
+    details,
   }
 
   const ws = getDataSheet()
@@ -1255,7 +1263,10 @@ export async function applyDiffToSheet(
 
   // 在开始前先发送初始进度：显示总条目数，避免进度条停留在"0/0"
   const total = diffs.length
-  const addDiffs = sortedDiffs.filter((d) => d.kind === 'add' && d.remote)
+  const addDiffs = sortedDiffs.filter(
+    (d): d is typeof d & { remote: NonNullable<typeof d.remote> } =>
+      d.kind === 'add' && d.remote !== undefined,
+  )
   const addTotal = addDiffs.length
   onProgress?.(0, total, `准备写入：新增 ${String(addTotal)} 条，共 ${String(total)} 条差异`)
 
@@ -1295,7 +1306,7 @@ export async function applyDiffToSheet(
   let addProcessed = 0
   for (let batchStart = 0; batchStart < addTotal; batchStart += BATCH_WRITE_SIZE) {
     const batch = addDiffs.slice(batchStart, batchStart + BATCH_WRITE_SIZE)
-    const batchEntries = batch.map((d) => ({ remote: d.remote!, sid: d.sid }))
+    const batchEntries = batch.map((d) => ({ remote: d.remote, sid: d.sid }))
 
     // 尝试批量写入
     const batchWritten = batchWriteNewRows(ws, colMap, nextAppendRow, batchEntries, syncRecords)
@@ -1305,7 +1316,7 @@ export async function applyDiffToSheet(
       for (let index = 0; index < batchWritten; index += 1) {
         const entry = batch[index]
         if (entry?.remote) {
-          result.details!.push({
+          details.push({
             kind: 'add',
             sid: entry.sid,
             name: entry.remote.name,
@@ -1318,76 +1329,74 @@ export async function applyDiffToSheet(
     } else {
       // 批量写入失败，回退到逐行写入
       for (const diff of batch) {
-        if (diff.remote) {
-          try {
-            const writeResult = writeRemoteEntryToRow(
-              ws,
-              colMap,
-              nextAppendRow,
-              diff.remote,
-              ['*'],
-              isForceOverwrite,
-            )
-            if (writeResult.success || !writeResult.attempted) {
-              // 写入成功 或 没有写入需要尝试（如空列映射）→ 视为成功
-              const writtenRow = nextAppendRow
-              nextAppendRow += 1
-              result.added += 1
-              result.details!.push({
-                kind: 'add',
-                sid: diff.sid,
-                name: diff.remote.name,
-                row: writtenRow,
-                fields: ['全部字段'],
-              })
-              syncRecords.push({
-                sid: diff.sid,
-                name: diff.remote.name ?? '',
-                url: `https://bgm.tv/subject/${diff.sid}`,
-                type: BGM_SUBJECT_TYPES[2] ?? '',
-                source,
-                content: '仓库同步-新增',
-                status: '成功',
-                count: 1,
-              })
-            } else {
-              // 尝试了写入但全部失败
-              result.failed += 1
-              bgmLog(LOG_LEVELS.ERROR, `[githubSync] 逐行写入失败 sid=${diff.sid}: 写入全部失败`)
-              result.details!.push({
-                kind: 'fail',
-                sid: diff.sid,
-                name: diff.remote.name,
-                message: '逐字段写入失败',
-              })
-              syncRecords.push({
-                sid: diff.sid,
-                source,
-                content: '仓库同步-新增失败',
-                status: '失败',
-                message: '逐字段写入失败',
-                count: 1,
-              })
-            }
-          } catch (error: unknown) {
-            const errorMessage = error instanceof Error ? error.message : String(error)
+        try {
+          const writeResult = writeRemoteEntryToRow(
+            ws,
+            colMap,
+            nextAppendRow,
+            diff.remote,
+            ['*'],
+            isForceOverwrite,
+          )
+          if (writeResult.success || !writeResult.attempted) {
+            // 写入成功 或 没有写入需要尝试（如空列映射）→ 视为成功
+            const writtenRow = nextAppendRow
+            nextAppendRow += 1
+            result.added += 1
+            details.push({
+              kind: 'add',
+              sid: diff.sid,
+              name: diff.remote.name,
+              row: writtenRow,
+              fields: ['全部字段'],
+            })
+            syncRecords.push({
+              sid: diff.sid,
+              name: diff.remote.name ?? '',
+              url: `https://bgm.tv/subject/${diff.sid}`,
+              type: BGM_SUBJECT_TYPES[2] ?? '',
+              source,
+              content: '仓库同步-新增',
+              status: '成功',
+              count: 1,
+            })
+          } else {
+            // 尝试了写入但全部失败
             result.failed += 1
-            bgmLog(LOG_LEVELS.ERROR, `[githubSync] 逐行写入失败 sid=${diff.sid}: ${errorMessage}`)
-            result.details!.push({
+            bgmLog(LOG_LEVELS.ERROR, `[githubSync] 逐行写入失败 sid=${diff.sid}: 写入全部失败`)
+            details.push({
               kind: 'fail',
               sid: diff.sid,
               name: diff.remote.name,
-              message: errorMessage,
+              message: '逐字段写入失败',
             })
             syncRecords.push({
               sid: diff.sid,
               source,
               content: '仓库同步-新增失败',
               status: '失败',
-              message: errorMessage,
+              message: '逐字段写入失败',
               count: 1,
             })
           }
+        } catch (error: unknown) {
+          const errorMessage = error instanceof Error ? error.message : String(error)
+          result.failed += 1
+          bgmLog(LOG_LEVELS.ERROR, `[githubSync] 逐行写入失败 sid=${diff.sid}: ${errorMessage}`)
+          details.push({
+            kind: 'fail',
+            sid: diff.sid,
+            name: diff.remote.name,
+            message: errorMessage,
+          })
+          syncRecords.push({
+            sid: diff.sid,
+            source,
+            content: '仓库同步-新增失败',
+            status: '失败',
+            message: errorMessage,
+            count: 1,
+          })
         }
       }
     }
@@ -1426,9 +1435,12 @@ export async function applyDiffToSheet(
 
   // 分离 update 和 delete diffs
   const updateDiffs = nonAddDiffs.filter(
-    (d) => d.kind === 'update' && d.localRow !== undefined && d.remote,
+    (d): d is typeof d & { localRow: number; remote: NonNullable<typeof d.remote> } =>
+      d.kind === 'update' && d.localRow !== undefined && d.remote !== undefined,
   )
-  const deleteDiffs = nonAddDiffs.filter((d) => d.kind === 'delete' && d.localRow !== undefined)
+  const deleteDiffs = nonAddDiffs.filter(
+    (d): d is typeof d & { localRow: number } => d.kind === 'delete' && d.localRow !== undefined,
+  )
 
   // ---- 阶段 2a: 批量处理 update diffs ----
   let updateProcessed = 0
@@ -1436,8 +1448,8 @@ export async function applyDiffToSheet(
   for (let batchStart = 0; batchStart < updateTotal; batchStart += BATCH_UPDATE_SIZE) {
     const batch = updateDiffs.slice(batchStart, batchStart + BATCH_UPDATE_SIZE)
     const batchUpdates = batch.map((d) => ({
-      row: d.localRow!,
-      remote: d.remote!,
+      row: d.localRow,
+      remote: d.remote,
       sid: d.sid,
       fields: d.changedFields,
     }))
@@ -1485,34 +1497,34 @@ export async function applyDiffToSheet(
     try {
       const rowValues: Record<number, string> = {}
       for (const col of colMap.values()) {
-        rowValues[col] = getCellValue(ws, diff.localRow!, col)
+        rowValues[col] = getCellValue(ws, diff.localRow, col)
       }
-      recordRowDeleteEntry({ row: diff.localRow!, values: rowValues })
+      recordRowDeleteEntry({ row: diff.localRow, values: rowValues })
       try {
-        ws.Range(`${String(diff.localRow ?? '')}:${String(diff.localRow ?? '')}`).Delete()
+        ws.Range(`${String(diff.localRow)}:${String(diff.localRow)}`).Delete()
         result.deleted += 1
-        result.details!.push({
+        details.push({
           kind: 'delete',
           sid: diff.sid,
           row: diff.localRow,
-          message: `删除行 ${String(diff.localRow ?? '')}`,
+          message: `删除行 ${String(diff.localRow)}`,
         })
         syncRecords.push({
           sid: diff.sid,
           source,
           content: '仓库同步-删除',
           status: '成功',
-          message: `删除行 ${String(diff.localRow ?? '')}`,
+          message: `删除行 ${String(diff.localRow)}`,
           count: 1,
         })
       } catch (error: unknown) {
         const errorMessage = error instanceof Error ? error.message : String(error)
         bgmLog(
           LOG_LEVELS.WARN,
-          `[githubSync] 删除行 ${String(diff.localRow ?? '')} 失败: ${errorMessage}`,
+          `[githubSync] 删除行 ${String(diff.localRow)} 失败: ${errorMessage}`,
         )
         result.failed += 1
-        result.details!.push({
+        details.push({
           kind: 'fail',
           sid: diff.sid,
           row: diff.localRow,
@@ -1531,7 +1543,7 @@ export async function applyDiffToSheet(
       const errorMessage = error instanceof Error ? error.message : String(error)
       result.failed += 1
       bgmLog(LOG_LEVELS.ERROR, `[githubSync] 删除处理失败 sid=${diff.sid}: ${errorMessage}`)
-      result.details!.push({
+      details.push({
         kind: 'fail',
         sid: diff.sid,
         row: diff.localRow,

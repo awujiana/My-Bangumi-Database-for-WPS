@@ -42,12 +42,11 @@ export class EventBus {
    * @param {boolean} [isOnce=false] - 是否只触发一次
    */
   on<T = unknown>(eventName: string, handler: EventHandler<T>, isOnce = false): void {
-    if (!this.events.has(eventName)) {
-      this.events.set(eventName, [])
-    }
     // 内部以 EventHandler<unknown> 存储，调用方传入的 EventHandler<T> 在运行时
     // 接收 emit 推送的实际 T 类型数据，此处断言是安全的（contravariance 限制仅类型层面）。
-    this.events.get(eventName)!.push({ handler: handler as EventHandler, isOnce })
+    const handlers = this.events.get(eventName) ?? []
+    handlers.push({ handler: handler as EventHandler, isOnce })
+    this.events.set(eventName, handlers)
   }
 
   /**

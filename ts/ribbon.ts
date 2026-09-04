@@ -101,7 +101,7 @@ function initRibbonMessageListener(): void {
         bgm_skip_conflicts: 'chkSkipConflicts',
         bgm_enable_sync_record: 'chkEnableSyncRecord',
       }
-      const controlId = controlIdMap[key!]
+      const controlId = key === undefined ? undefined : controlIdMap[key]
       if (controlId) {
         const app = getApp()
         const ribbonUI = app?.ribbonUI as WpsRibbonUI | undefined

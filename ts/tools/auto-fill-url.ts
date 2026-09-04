@@ -82,7 +82,9 @@ export function autoFillUrls(): AutoFillResult {
     }
 
     const colMap = getColumnMap(ws, headerRow)
-    if (!colMap.has('Bangumi_URL') || !colMap.has('名称')) {
+    const urlCol = colMap.get('Bangumi_URL')
+    const nameCol = colMap.get('名称')
+    if (urlCol === undefined || nameCol === undefined) {
       BGM.Dialog.alert('未找到 "Bangumi_URL" 或 "名称" 列', '提示')
       return result
     }
@@ -92,9 +94,6 @@ export function autoFillUrls(): AutoFillResult {
       BGM.Dialog.alert('没有数据行需要补全', '提示')
       return result
     }
-
-    const urlCol = colMap.get('Bangumi_URL')!
-    const nameCol = colMap.get('名称')!
 
     bgmLog(
       LOG_LEVELS.INFO,

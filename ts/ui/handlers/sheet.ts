@@ -139,11 +139,11 @@ export function cleanLockedDataSheet(): void {
         ;(url ? withUrl : withoutUrl).push(row)
       }
 
-      if (withUrl.length === 0) {
+      const keepRow = withUrl[0]
+      if (keepRow === undefined) {
         skippedNoUrl.push(name)
       } else {
         duplicateNameCount += 1
-        const keepRow = withUrl[0]!
         duplicateDetails.push({ name, rows, keep: withUrl, del: withoutUrl })
 
         const nameNewTags: string[] = []
@@ -170,9 +170,9 @@ export function cleanLockedDataSheet(): void {
             }
           }
 
-          if (nameNewTags.length > 0) {
+          if (tagsCol !== undefined && nameNewTags.length > 0) {
             const mergedTags = [...existingSet].join(' | ')
-            setCellValue(ws, keepRow, tagsCol!, mergedTags)
+            setCellValue(ws, keepRow, tagsCol, mergedTags)
             mergedTagsCount += 1
             mergedTagEntries.push(`${name}: ${nameNewTags.join(' | ')}`)
           }
@@ -220,7 +220,10 @@ export function cleanLockedDataSheet(): void {
   let index = 0
   while (index < toDelete.length) {
     let index_ = index
-    while (index_ + 1 < toDelete.length && toDelete[index_]! - toDelete[index_ + 1]! === 1) {
+    while (
+      index_ + 1 < toDelete.length &&
+      (toDelete[index_] ?? 0) - (toDelete[index_ + 1] ?? 0) === 1
+    ) {
       index_ += 1
     }
     if (index === index_) {

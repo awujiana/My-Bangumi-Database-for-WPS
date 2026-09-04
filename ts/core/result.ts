@@ -310,7 +310,7 @@ export class Result<T> {
     if (this.success) {
       return Result.ok(function_(this.data as T))
     }
-    return Result.fail(this.error!)
+    return Result.fail(this.error ?? new BgmError('Result 失败但缺少错误信息', 'UNKNOWN'))
   }
 
   /**
@@ -327,8 +327,9 @@ export class Result<T> {
    * });
    */
   mapErr(function_: (error: BgmError) => BgmError): Result<T> {
-    if (!this.success) {
-      return Result.fail(function_(this.error!))
+    const { error } = this
+    if (error !== null && !this.success) {
+      return Result.fail(function_(error))
     }
     return this
   }

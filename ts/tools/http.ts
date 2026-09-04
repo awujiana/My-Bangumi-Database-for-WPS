@@ -330,10 +330,11 @@ function executeXhrRequest(
     }
 
     // 上传进度
-    if (options.onProgress) {
+    const { onProgress } = options
+    if (onProgress) {
       xhr.upload.onprogress = (event) => {
         if (event.lengthComputable) {
-          options.onProgress!(event.loaded, event.total)
+          onProgress(event.loaded, event.total)
           const progress = Math.round((event.loaded / event.total) * 100)
           bgmLog(
             LOG_LEVELS.INFO,

@@ -48,6 +48,16 @@ let _cachedDomPurifyFactory: {
 } | null = null
 let _cachedFallback: ((d: string) => string) | null = null
 
+/** 安全移除元素（索引越界/缺失时静默跳过） */
+function removeElement(element: Element | undefined | null): void {
+  element?.remove()
+}
+
+/** 元素节点类型守卫（optional chain 收敛到非空 Element） */
+function isElementNode(element: Element | undefined): element is Element {
+  return element?.nodeType === 1
+}
+
 function getPurify(): (d: string) => string {
   const w = globalThis as ExtendedWindow
   // 先尝试拿 DOMPurify（即便之前走了降级，现在也可能加载好了）
@@ -210,19 +220,16 @@ function createLightweightFallback(): (d: string) => string {
       const badEls = host.querySelectorAll(selector)
       // 从尾到头 remove 避免 live collection 踩坑（querySelectorAll 是非 live，保险起见逆序）
       for (let index = badEls.length - 1; index >= 0; index -= 1) {
-        const element = badEls[index]!
-        element.remove()
+        removeElement(badEls[index])
       }
 
       // 2) 遍历所有元素，清 on* 事件属性 + 危险 URI
       const all = host.getElementsByTagName('*')
       for (let index = 0; index < all.length; index += 1) {
-        const element = all[index]!
-        if (!(element.nodeType !== 1)) {
+        const element = all[index]
+        if (isElementNode(element)) {
           const toRemoveAttributes: string[] = []
-          for (let a = 0; a < element.attributes.length; a += 1) {
-            const attribute = element.attributes[a]!
-            const { name } = attribute
+          for (const name of element.getAttributeNames()) {
             if (name.length > 2 && name.slice(0, 2).toLowerCase() === 'on') {
               toRemoveAttributes.push(name)
             }

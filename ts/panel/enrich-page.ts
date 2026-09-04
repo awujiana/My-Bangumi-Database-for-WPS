@@ -389,13 +389,16 @@ function renderBatchFileList(): void {
       pathElement.textContent = ''
       pathElement.setAttribute('placeholder', '未选择文件...')
       pathElement.removeAttribute('title')
-    } else if (n === 1) {
-      pathElement.textContent = state.batchFiles[0]!
-      pathElement.setAttribute('title', state.batchFiles[0]!)
     } else {
-      const firstName = extractFileName(state.batchFiles[0]!)
-      pathElement.textContent = `已选 ${String(n)} 个文件（首个：${firstName}）`
-      pathElement.setAttribute('title', state.batchFiles.join('\n'))
+      const firstFile = state.batchFiles[0]
+      if (n === 1 && firstFile !== undefined) {
+        pathElement.textContent = firstFile
+        pathElement.setAttribute('title', firstFile)
+      } else if (firstFile !== undefined) {
+        const firstName = extractFileName(firstFile)
+        pathElement.textContent = `已选 ${String(n)} 个文件（首个：${firstName}）`
+        pathElement.setAttribute('title', state.batchFiles.join('\n'))
+      }
     }
   }
 
@@ -1419,7 +1422,8 @@ export function batchSelectFiles(): void {
 /** 从列表中移除某个文件 */
 function batchRemoveFile(index: number): void {
   if (index < 0 || index >= state.batchFiles.length) return
-  const removed = state.batchFiles[index]!
+  const removed = state.batchFiles[index]
+  if (removed === undefined) return
   state.batchFiles.splice(index, 1)
   // 单/多选统一入口：移除后保持 state.filePath 始终指向 batchFiles 的首位
   state.filePath = state.batchFiles[0] ?? ''
@@ -1642,7 +1646,8 @@ async function runBatchEnrichment(bangumiSheet: WpsWorksheet): Promise<void> {
     }
 
     state.batchIndex = index + 1
-    const filePath = state.batchFiles[index]!
+    const filePath = state.batchFiles[index]
+    if (filePath === undefined) break
     const fileName = extractFileName(filePath)
 
     updateBatchProgressUI(state.batchIndex, total, fileName)

@@ -111,8 +111,8 @@ function getRowData(
   }
 
   const readCol = (mapKey: string): string => {
-    if (colMap.has(mapKey)) {
-      const col = colMap.get(mapKey)!
+    const col = colMap.get(mapKey)
+    if (col !== undefined) {
       const value = trim(getCellValue(ws, rowNumber, col))
       if (mapKey === 'Bangumi_URL') {
         data.urlCell = getCell(ws, rowNumber, col)
@@ -662,10 +662,10 @@ export async function uploadSingleRow(
     const rowData = getRowData(ws, rowNumber, colMap, headerRow, 9)
     if (!rowData.sid) throw new Error('无法提取 Subject ID')
 
-    const jsonBody = buildJsonPayload(
-      (key) => (colMap.has(key) ? trim(getCellValue(ws, rowNumber, colMap.get(key)!)) : ''),
-      rowData.finishedDate,
-    )
+    const jsonBody = buildJsonPayload((key) => {
+      const col = colMap.get(key)
+      return col === undefined ? '' : trim(getCellValue(ws, rowNumber, col))
+    }, rowData.finishedDate)
     if (!jsonBody) throw new Error('无法构建请求体')
 
     const result = await bgmRequestSync(

@@ -70,7 +70,8 @@ export function buildJsonlFromSheet(): string {
   const lastRow = getLastRow(ws)
   const colMap = getColumnMap(ws, headerRow)
 
-  if (!colMap.has('Bangumi_URL')) {
+  const urlCol = colMap.get('Bangumi_URL')
+  if (urlCol === undefined) {
     bgmLog(LOG_LEVELS.WARN, '[exportJsonl] 未找到 Bangumi_URL 列，无法导出')
     return ''
   }
@@ -79,7 +80,7 @@ export function buildJsonlFromSheet(): string {
   const startRow = headerRow + 1
 
   for (let row = startRow; row <= lastRow; row += 1) {
-    const url = trim(getCellValue(ws, row, colMap.get('Bangumi_URL')!))
+    const url = trim(getCellValue(ws, row, urlCol))
     if (url) {
       const sid = extractSubjectId(url)
       if (sid) {

@@ -349,6 +349,15 @@ function _showDialog(type: string, options: DialogOptions = {}): void {
 // ========== 同步结果对话框 ==========
 let _syncResultDialog: HTMLElement | null = null
 
+/**
+ * 从弹窗根节点查询必需元素（模板保证存在，缺失时快速失败并给出明确错误）
+ */
+function queryRequiredElement(root: ParentNode, selector: string): HTMLElement {
+  const element = root.querySelector<HTMLElement>(selector)
+  if (element === null) throw new Error(`弹窗缺少必需元素: ${selector}`)
+  return element
+}
+
 function ensureSyncResultDialog(): HTMLElement {
   if (_syncResultDialog) return _syncResultDialog
 
@@ -380,8 +389,8 @@ function ensureSyncResultDialog(): HTMLElement {
 
   document.body.appendChild(modal)
 
-  const detailsElement = modal.querySelector<HTMLElement>('#bgmSyncDetails')!
-  const toggleButton = modal.querySelector<HTMLElement>('#bgmSyncToggleDetails')!
+  const detailsElement = queryRequiredElement(modal, '#bgmSyncDetails')
+  const toggleButton = queryRequiredElement(modal, '#bgmSyncToggleDetails')
 
   toggleButton.addEventListener('click', () => {
     const isExpanded = detailsElement.style.display !== 'none'
@@ -399,9 +408,9 @@ function ensureSyncResultDialog(): HTMLElement {
 
 export function showSyncResult(summary: string, details: string[]): void {
   const modal = ensureSyncResultDialog()
-  const summaryElement = modal.querySelector<HTMLElement>('#bgmSyncSummary')!
-  const detailsElement = modal.querySelector<HTMLElement>('#bgmSyncDetails')!
-  const toggleButton = modal.querySelector<HTMLElement>('#bgmSyncToggleDetails')!
+  const summaryElement = queryRequiredElement(modal, '#bgmSyncSummary')
+  const detailsElement = queryRequiredElement(modal, '#bgmSyncDetails')
+  const toggleButton = queryRequiredElement(modal, '#bgmSyncToggleDetails')
 
   summaryElement.textContent = summary
   detailsElement.textContent = details.length > 0 ? details.join('\n') : '无详情'

@@ -324,16 +324,24 @@ export function wpsPrompt(message: string, defaultValue?: string): Promise<strin
         bgmLog(LOG_LEVELS.WARN, `WPS InputBox 不可用: ${errorMessage}`)
       }
     }
-    if (
-      typeof window !== 'undefined' &&
-      typeof (window as unknown as Record<string, unknown>).BGMInput === 'function'
-    ) {
-      ;(
-        window as unknown as Record<
-          string,
-          (t: string, m: string, d: string, oc: (v: string) => void, oc2: () => void) => void
-        >
-      ).BGMInput!(
+    const bgmInput =
+      typeof window === 'undefined'
+        ? undefined
+        : (
+            window as unknown as Record<
+              string,
+              | ((
+                  t: string,
+                  m: string,
+                  d: string,
+                  oc: (v: string) => void,
+                  oc2: () => void,
+                ) => void)
+              | undefined
+            >
+          ).BGMInput
+    if (typeof bgmInput === 'function') {
+      bgmInput(
         '输入',
         message,
         defaultValue ?? '',
@@ -377,17 +385,27 @@ export function wpsMessageBox(message: string, buttons?: number, icon?: number):
       }
     }
 
+    const bgmAlert =
+      typeof window === 'undefined'
+        ? undefined
+        : (
+            window as unknown as Record<
+              string,
+              ((m: string, t: string, oc?: () => void) => void) | undefined
+            >
+          ).BGMAlert
     if (buttons === 4) {
-      if (
-        typeof window !== 'undefined' &&
-        typeof (window as unknown as Record<string, unknown>).BGMConfirm === 'function'
-      ) {
-        ;(
-          window as unknown as Record<
-            string,
-            (m: string, t: string, oc: () => void, oc2: () => void) => void
-          >
-        ).BGMConfirm!(
+      const bgmConfirm =
+        typeof window === 'undefined'
+          ? undefined
+          : (
+              window as unknown as Record<
+                string,
+                ((m: string, t: string, oc: () => void, oc2: () => void) => void) | undefined
+              >
+            ).BGMConfirm
+      if (typeof bgmConfirm === 'function') {
+        bgmConfirm(
           message,
           '确认',
           () => {
@@ -407,12 +425,8 @@ export function wpsMessageBox(message: string, buttons?: number, icon?: number):
           '确认',
         )
       }
-    } else if (
-      typeof window !== 'undefined' &&
-      typeof (window as unknown as Record<string, unknown>).BGMAlert === 'function'
-    ) {
-      ;(window as unknown as Record<string, (m: string, t: string, oc?: () => void) => void>)
-        .BGMAlert!(message, '提示', () => {
+    } else if (typeof bgmAlert === 'function') {
+      bgmAlert(message, '提示', () => {
         resolve(1)
       })
     } else {

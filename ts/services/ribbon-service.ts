@@ -186,7 +186,8 @@ export function getSyncPreview(
   ]
   let maxCol = 1
   for (const key of neededKeys) {
-    if (colMap.has(key)) maxCol = Math.max(maxCol, colMap.get(key)!)
+    const col = colMap.get(key)
+    if (col !== undefined) maxCol = Math.max(maxCol, col)
   }
   bgmLog(LOG_LEVELS.INFO, `[getSyncPreview] 最大列号: ${String(maxCol)}`)
 
@@ -219,7 +220,8 @@ export function getSyncPreview(
         return trim(rowData[col - 1])
       }
     }
-    return colMap.has(key) ? trim(getCellValue(ws, rowNumber, colMap.get(key)!)) : ''
+    const fallbackCol = colMap.get(key)
+    return fallbackCol === undefined ? '' : trim(getCellValue(ws, rowNumber, fallbackCol))
   }
 
   for (const rowNumber of rowsToProcess) {
@@ -418,7 +420,8 @@ export async function detectConflicts(
   }
 
   const getField = (row: number, key: string): string => {
-    if (colMap.has(key)) return trim(getCellValue(ws, row, colMap.get(key)!))
+    const col = colMap.get(key)
+    if (col !== undefined) return trim(getCellValue(ws, row, col))
     return ''
   }
 

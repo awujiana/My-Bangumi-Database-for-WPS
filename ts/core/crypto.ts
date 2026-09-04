@@ -78,7 +78,7 @@ export function extractToken(encrypted: string): string | null {
 
     const [version, checksumString, ...tokenParts] = parts
     const token = tokenParts.join(':')
-    const checksum = parseInt(checksumString!, 10)
+    const checksum = parseInt(checksumString ?? '', 10)
 
     if (version !== TOKEN_CONFIG.VERSION) {
       bgmLog(LOG_LEVELS.WARN, `[crypto] Token版本不匹配: ${version ?? ''}`)
