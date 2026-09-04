@@ -1339,7 +1339,7 @@ const ACTION_HANDLERS: Record<string, ActionHandler> = {
     xhr.open('HEAD', url, true)
     xhr.timeout = 10_000
 
-    xhr.onload = () => {
+    xhr.addEventListener('load', () => {
       const responseTime = Date.now() - testStartTs
       const statusCode = xhr.status
       const isSuccess = statusCode >= 200 && statusCode < 400
@@ -1357,9 +1357,9 @@ const ACTION_HANDLERS: Record<string, ActionHandler> = {
         sourceType,
         errorMessage: isSuccess ? undefined : `HTTP ${String(statusCode)}`,
       })
-    }
+    })
 
-    xhr.onerror = () => {
+    xhr.addEventListener('error', () => {
       const responseTime = Date.now() - testStartTs
       bgmLog(LOG_LEVELS.ERROR, `[handleActionClick] 连接测试失败: ${url}`)
 
@@ -1371,7 +1371,7 @@ const ACTION_HANDLERS: Record<string, ActionHandler> = {
         sourceType,
         errorMessage: '网络错误：无法连接到服务器',
       })
-    }
+    })
 
     xhr.ontimeout = () => {
       const responseTime = Date.now() - testStartTs

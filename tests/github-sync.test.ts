@@ -124,7 +124,15 @@ const mockXHR = vi.hoisted(() => {
 
     timeout = 0
 
-    addEventListener = vi.fn()
+    // 生产代码经 addEventListener('load'/'error', fn) 注册：映射回 onXXX 属性，
+    // 测试仍可手动触发 onload/onerror
+    addEventListener = (type: string, handler: (...arguments_: unknown[]) => void): void => {
+      if (type === 'load') {
+        this.onload = handler
+      } else if (type === 'error') {
+        this.onerror = handler
+      }
+    }
 
     removeEventListener = vi.fn()
 

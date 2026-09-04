@@ -76,7 +76,7 @@ export function readLocalFileContent(filePath: string): Promise<string> {
     xhr.timeout = FILE_READ_TIMEOUT_MS
     xhr.setRequestHeader('Accept', 'application/json,text/plain,*/*')
 
-    xhr.onload = (): void => {
+    xhr.addEventListener('load', (): void => {
       // file:// 协议下 status 通常为 0（成功）或 200
       if (xhr.status === 0 || xhr.status === 200) {
         bgmLog(
@@ -87,11 +87,11 @@ export function readLocalFileContent(filePath: string): Promise<string> {
         return
       }
       reject(new Error(`读取文件失败（HTTP ${String(xhr.status)}）：${filePath}`))
-    }
+    })
 
-    xhr.onerror = (): void => {
+    xhr.addEventListener('error', (): void => {
       reject(new Error(`无法读取文件：${filePath}（路径错误或权限不足）`))
-    }
+    })
 
     xhr.ontimeout = (): void => {
       reject(new Error(`读取文件超时（${String(FILE_READ_TIMEOUT_MS)}ms）：${filePath}`))

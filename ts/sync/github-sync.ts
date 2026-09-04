@@ -155,7 +155,7 @@ export function fetchGithubJson(signal?: AbortSignal): Promise<GithubRemoteEntry
       signal.addEventListener('abort', abortHandler)
     }
 
-    xhr.onload = (): void => {
+    xhr.addEventListener('load', (): void => {
       removeAbortHandler()
       if (xhr.status === 200) {
         try {
@@ -193,9 +193,9 @@ export function fetchGithubJson(signal?: AbortSignal): Promise<GithubRemoteEntry
       } else {
         reject(new Error(`HTTP 错误 ${String(xhr.status)}: ${xhr.statusText}`))
       }
-    }
+    })
 
-    xhr.onerror = (): void => {
+    xhr.addEventListener('error', (): void => {
       removeAbortHandler()
       // 如果是 abort 导致的 onerror，归类为取消
       if (signal?.aborted) {
@@ -203,7 +203,7 @@ export function fetchGithubJson(signal?: AbortSignal): Promise<GithubRemoteEntry
         return
       }
       reject(new Error(`网络请求失败：${url}（可能是 CORS 或网络不通）`))
-    }
+    })
 
     xhr.ontimeout = (): void => {
       removeAbortHandler()

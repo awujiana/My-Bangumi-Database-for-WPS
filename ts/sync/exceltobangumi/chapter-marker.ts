@@ -37,7 +37,7 @@ export async function fetchEpisodeIds(
         xhr.abort()
       })
     }
-    xhr.onload = function () {
+    xhr.addEventListener('load', () => {
       if (xhr.status >= 200 && xhr.status < 300) {
         try {
           const data = JSON.parse(xhr.responseText) as {
@@ -52,11 +52,11 @@ export async function fetchEpisodeIds(
       } else {
         reject(new Error(`HTTP ${String(xhr.status)}: ${xhr.responseText}`))
       }
-    }
-    xhr.onerror = () => {
+    })
+    xhr.addEventListener('error', () => {
       // 如果是 abort 导致的 onerror，归类为取消
       reject(new Error(signal?.aborted ? '请求被取消' : '网络错误'))
-    }
+    })
     xhr.ontimeout = () => {
       reject(new Error('请求章节数据超时（30s），可能网络受限或被墙'))
     }

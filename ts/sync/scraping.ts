@@ -102,7 +102,7 @@ function requestPromise(
       })
     }
 
-    xhr.onload = () => {
+    xhr.addEventListener('load', () => {
       const duration = Date.now() - startTime
       bgmLog(
         LOG_LEVELS.INFO,
@@ -114,11 +114,11 @@ function requestPromise(
       } catch {
         reject(new Error('解析响应失败'))
       }
-    }
-    xhr.onerror = () => {
+    })
+    xhr.addEventListener('error', () => {
       // 如果是 abort 导致的 onerror，归类为取消
       reject(new Error(signal?.aborted ? '请求被取消' : '网络错误'))
-    }
+    })
     xhr.ontimeout = () => {
       reject(new Error('请求超时'))
     }

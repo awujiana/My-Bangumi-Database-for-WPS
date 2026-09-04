@@ -225,10 +225,10 @@ function createConflictModal(
   /** 安全移除模态框：先解绑事件，再从 DOM 移除 */
   const closeModal = (): void => {
     // 移除事件监听器，避免内存泄漏
-    confirmButton.onclick = null
-    cancelButton.onclick = null
-    allLocalButton.onclick = null
-    allRemoteButton.onclick = null
+    confirmButton.removeEventListener('click', onConfirm)
+    cancelButton.removeEventListener('click', onCancel)
+    allLocalButton.removeEventListener('click', onAllLocal)
+    allRemoteButton.removeEventListener('click', onAllRemote)
     if (modal.parentNode) {
       modal.parentNode.removeChild(modal)
     }
@@ -246,28 +246,34 @@ function createConflictModal(
       }
     })
 
-  confirmButton.onclick = (): void => {
+  // 函数声明具名化以便 closeModal 按引用解绑（removeEventListener 需同一函数引用）
+  function onConfirm(): void {
     closeModal()
     onComplete(collectResolutions())
   }
 
-  cancelButton.onclick = (): void => {
+  function onCancel(): void {
     closeModal()
     onComplete(null)
   }
 
-  allLocalButton.onclick = (): void => {
+  function onAllLocal(): void {
     for (const radio of localRadios) {
       radio.checked = true
     }
     // 单选互斥：远程 radio 由浏览器自动取消
   }
 
-  allRemoteButton.onclick = (): void => {
+  function onAllRemote(): void {
     for (const radio of remoteRadios) {
       radio.checked = true
     }
   }
+
+  confirmButton.addEventListener('click', onConfirm)
+  cancelButton.addEventListener('click', onCancel)
+  allLocalButton.addEventListener('click', onAllLocal)
+  allRemoteButton.addEventListener('click', onAllRemote)
 
   return modal
 }

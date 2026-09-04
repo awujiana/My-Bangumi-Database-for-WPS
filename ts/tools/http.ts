@@ -274,7 +274,7 @@ function executeXhrRequest(
     }
 
     // 响应处理
-    xhr.onload = () => {
+    xhr.addEventListener('load', () => {
       const duration = Date.now() - startTime
 
       bgmLog(LOG_LEVELS.INFO, `[HTTP] ========== 请求完成 ==========`)
@@ -314,14 +314,14 @@ function executeXhrRequest(
       }
 
       resolve({ status: xhr.status, xhr, data })
-    }
+    })
 
     // 错误处理
-    xhr.onerror = () => {
+    xhr.addEventListener('error', () => {
       const duration = Date.now() - startTime
       bgmLog(LOG_LEVELS.ERROR, `[HTTP] 请求发生网络错误，URL: ${url}，耗时: ${String(duration)}ms`)
       reject(new Error(`网络请求失败: ${url}`))
-    }
+    })
 
     xhr.ontimeout = () => {
       const duration = Date.now() - startTime
@@ -332,7 +332,7 @@ function executeXhrRequest(
     // 上传进度
     const { onProgress } = options
     if (onProgress) {
-      xhr.upload.onprogress = (event) => {
+      xhr.upload.addEventListener('progress', (event) => {
         if (event.lengthComputable) {
           onProgress(event.loaded, event.total)
           const progress = Math.round((event.loaded / event.total) * 100)
@@ -341,7 +341,7 @@ function executeXhrRequest(
             `[HTTP] 上传进度: ${String(progress)}% (${String(event.loaded)}/${String(event.total)})`,
           )
         }
-      }
+      })
     }
 
     // 发送请求

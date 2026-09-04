@@ -949,7 +949,7 @@ export function _fetchBgmUserInfo(
     })
   }
 
-  xhr.onload = function (): void {
+  xhr.addEventListener('load', (): void => {
     if (xhr.status === 200) {
       try {
         const data = JSON.parse(xhr.responseText) as {
@@ -1012,9 +1012,9 @@ export function _fetchBgmUserInfo(
       )
       if (callback) callback(null, 'http')
     }
-  }
+  })
 
-  xhr.onerror = function (): void {
+  xhr.addEventListener('error', (): void => {
     // 如果是 abort 导致的 onerror，归类为 aborted
     if (signal?.aborted) {
       bgmLog(LOG_LEVELS.INFO, `[_fetchBgmUserInfo] 请求被取消`)
@@ -1023,7 +1023,7 @@ export function _fetchBgmUserInfo(
     }
     bgmLog(LOG_LEVELS.WARN, `[_fetchBgmUserInfo] 网络错误：无法连接到 ${apiUrl}（可能被 GFW 墙）`)
     if (callback) callback(null, 'network')
-  }
+  })
 
   xhr.ontimeout = function (): void {
     bgmLog(LOG_LEVELS.WARN, `[_fetchBgmUserInfo] 请求超时（15s）：可能网络受限或被墙`)

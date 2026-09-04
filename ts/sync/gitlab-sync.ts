@@ -97,7 +97,7 @@ export function fetchGitlabJson(signal?: AbortSignal): Promise<GithubRemoteEntry
       })
     }
 
-    xhr.onload = (): void => {
+    xhr.addEventListener('load', (): void => {
       if (xhr.status === 200) {
         try {
           const { entries, errors } = parseJsonl(xhr.responseText)
@@ -132,16 +132,16 @@ export function fetchGitlabJson(signal?: AbortSignal): Promise<GithubRemoteEntry
       } else {
         reject(new Error(`HTTP 错误 ${String(xhr.status)}: ${xhr.statusText}`))
       }
-    }
+    })
 
-    xhr.onerror = (): void => {
+    xhr.addEventListener('error', (): void => {
       // 如果是 abort 导致的 onerror，归类为取消
       if (signal?.aborted) {
         reject(new Error('请求被取消'))
         return
       }
       reject(new Error(`网络请求失败：${url}（可能是 CORS 或网络不通）`))
-    }
+    })
 
     xhr.ontimeout = (): void => {
       reject(new Error(`请求超时（${String(REQUEST_TIMEOUT_MS)}ms）：${url}`))

@@ -641,40 +641,65 @@ export async function testTokenForRibbon(): Promise<void> {
     xhr.setRequestHeader('Authorization', `Bearer ${token}`)
     xhr.setRequestHeader('Content-Type', 'application/json')
 
-    xhr.onload = async () => {
-      if (xhr.status === 200) {
+    xhr.addEventListener('load', () => {
+      // addEventListener 回调须返回 void：用 IIFE 承载 async 流程；
+      // 全量 try/catch 保证外层 Promise 永不 reject（无未处理 rejection）
+      // void 标注「有意丢弃」返回的 Promise（no-floating-promises 要求；内部 try/catch 已保证不 reject）
+      void (async () => {
         try {
-          const data = JSON.parse(xhr.responseText) as {
-            nickname?: string
-            username?: string
-            id?: number
+          if (xhr.status === 200) {
+            try {
+              const data = JSON.parse(xhr.responseText) as {
+                nickname?: string
+                username?: string
+                id?: number
+              }
+              const nickname = data.nickname || data.username || '未知用户' // eslint-disable-line @typescript-eslint/prefer-nullish-coalescing -- API 字段空串需退到备用字段（`??` 会保留空串）
+              const userId = String(data.id ?? '')
+              bgmLog(
+                LOG_LEVELS.INFO,
+                `[testTokenForRibbon] Token 有效，用户: ${nickname} (${userId})`,
+              )
+              _setBgmUserId(userId)
+              _setBgmUsername(nickname)
+              BGM.notifyTokenUpdated()
+              await wpsMessageBox(`Token 有效！\n用户: ${nickname}\nID: ${userId}`, 0, 64)
+            } catch (error: unknown) {
+              bgmLog(
+                LOG_LEVELS.ERROR,
+                `[testTokenForRibbon] 解析响应失败: ${(error as Error).message}`,
+              )
+              await wpsMessageBox('解析响应失败，请重试', 0, 16)
+            }
+          } else if (xhr.status === 401) {
+            bgmLog(LOG_LEVELS.WARN, '[testTokenForRibbon] Token 无效或已过期')
+            await wpsMessageBox('Token 无效或已过期，请重新设置', 0, 48)
+          } else {
+            bgmLog(LOG_LEVELS.ERROR, `[testTokenForRibbon] HTTP ${String(xhr.status)}`)
+            await wpsMessageBox(`Token 验证失败 (HTTP ${String(xhr.status)})`, 0, 16)
           }
-          const nickname = data.nickname || data.username || '未知用户' // eslint-disable-line @typescript-eslint/prefer-nullish-coalescing -- API 字段空串需退到备用字段（`??` 会保留空串）
-          const userId = String(data.id ?? '')
-          bgmLog(LOG_LEVELS.INFO, `[testTokenForRibbon] Token 有效，用户: ${nickname} (${userId})`)
-          _setBgmUserId(userId)
-          _setBgmUsername(nickname)
-          BGM.notifyTokenUpdated()
-          await wpsMessageBox(`Token 有效！\n用户: ${nickname}\nID: ${userId}`, 0, 64)
+          resolve()
         } catch (error: unknown) {
-          bgmLog(LOG_LEVELS.ERROR, `[testTokenForRibbon] 解析响应失败: ${(error as Error).message}`)
-          await wpsMessageBox('解析响应失败，请重试', 0, 16)
+          bgmLog(LOG_LEVELS.ERROR, `[testTokenForRibbon] 处理响应异常: ${(error as Error).message}`)
         }
-      } else if (xhr.status === 401) {
-        bgmLog(LOG_LEVELS.WARN, '[testTokenForRibbon] Token 无效或已过期')
-        await wpsMessageBox('Token 无效或已过期，请重新设置', 0, 48)
-      } else {
-        bgmLog(LOG_LEVELS.ERROR, `[testTokenForRibbon] HTTP ${String(xhr.status)}`)
-        await wpsMessageBox(`Token 验证失败 (HTTP ${String(xhr.status)})`, 0, 16)
-      }
-      resolve()
-    }
+      })()
+    })
 
-    xhr.onerror = async () => {
-      bgmLog(LOG_LEVELS.ERROR, '[testTokenForRibbon] 网络错误')
-      await wpsMessageBox('网络错误，无法连接到 Bangumi API\n可能原因：网络被墙或断网', 0, 16)
-      resolve()
-    }
+    xhr.addEventListener('error', () => {
+      // void 标注「有意丢弃」返回的 Promise（no-floating-promises 要求；内部 try/catch 已保证不 reject）
+      void (async () => {
+        try {
+          bgmLog(LOG_LEVELS.ERROR, '[testTokenForRibbon] 网络错误')
+          await wpsMessageBox('网络错误，无法连接到 Bangumi API\n可能原因：网络被墙或断网', 0, 16)
+          resolve()
+        } catch (error: unknown) {
+          bgmLog(
+            LOG_LEVELS.ERROR,
+            `[testTokenForRibbon] 处理错误事件异常: ${(error as Error).message}`,
+          )
+        }
+      })()
+    })
 
     xhr.ontimeout = async () => {
       bgmLog(LOG_LEVELS.WARN, '[testTokenForRibbon] 请求超时（15s）')

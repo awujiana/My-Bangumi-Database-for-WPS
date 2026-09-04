@@ -547,11 +547,11 @@ export async function previewSyncContent(): Promise<void> {
     // ----- 绑定「全部同步」按钮点击事件 -----
     const syncAllButtonElement = document.getElementById('syncAllBtn')
     if (syncAllButtonElement) {
-      syncAllButtonElement.onclick = () => {
+      syncAllButtonElement.addEventListener('click', () => {
         syncAllRows().catch((error: unknown) => {
           bgmLog(LOG_LEVELS.ERROR, `[preview] syncAllRows 异常: ${(error as Error).message}`)
         })
-      }
+      })
     }
 
     // ----- 绑定滚动按钮事件 -----

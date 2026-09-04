@@ -41,7 +41,23 @@ const mockXHR = vi.hoisted(() => {
     status: 200,
     statusText: 'OK',
     responseText: '',
-    addEventListener: vi.fn(),
+    // 生产代码经 addEventListener('load'/'error', fn) 注册：映射回 onXXX 属性，
+    // 测试仍以 `xhrMock.onload?.()` 手动触发
+    addEventListener: (type: string, handler: (...arguments_: unknown[]) => void): void => {
+      switch (type) {
+        case 'load': {
+          xhrMock.onload = handler
+          break
+        }
+        case 'error': {
+          xhrMock.onerror = handler
+          break
+        }
+        default: {
+          break
+        }
+      }
+    },
     removeEventListener: vi.fn(),
   }
   const XHRConstructor = vi.fn().mockImplementation(function () {
@@ -349,10 +365,22 @@ describe('fetchGithubJson', () => {
 
   it('AbortSignal 触发时应 abort XHR', async () => {
     const controller = new AbortController()
-    // 模拟 abort 事件监听
+    // 模拟 abort 事件监听；load/error 需照常映射回 onXXX（生产代码经 addEventListener 注册），
+    // 否则会污染共享 xhrMock 的后续用例
     mockXHR.xhrMock.addEventListener = vi.fn((event: string, handler: EventListener) => {
-      if (event === 'abort') {
-        // 不立即触发，等待 abort() 调用
+      switch (event) {
+        case 'load': {
+          mockXHR.xhrMock.onload = handler as (...arguments_: unknown[]) => void
+          break
+        }
+        case 'error': {
+          mockXHR.xhrMock.onerror = handler as (...arguments_: unknown[]) => void
+          break
+        }
+        // 'abort' 不立即触发，等待 abort() 调用
+        default: {
+          break
+        }
       }
     })
     const fetchPromise = fetchGithubJson(controller.signal)

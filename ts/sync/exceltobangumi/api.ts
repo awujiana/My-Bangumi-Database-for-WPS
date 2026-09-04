@@ -134,7 +134,7 @@ export function testTokenValidityForRibbon(token?: string, signal?: AbortSignal)
     signal.addEventListener('abort', abortHandler)
   }
 
-  xhr.onload = () => {
+  xhr.addEventListener('load', () => {
     removeAbortHandler()
     const duration = Date.now() - startTime
 
@@ -198,9 +198,9 @@ export function testTokenValidityForRibbon(token?: string, signal?: AbortSignal)
       )
       showError(`Token验证失败 (HTTP ${String(xhr.status)})`, '错误')
     }
-  }
+  })
 
-  xhr.onerror = () => {
+  xhr.addEventListener('error', () => {
     removeAbortHandler()
     const duration = Date.now() - startTime
     bgmLog(
@@ -211,7 +211,7 @@ export function testTokenValidityForRibbon(token?: string, signal?: AbortSignal)
       '网络错误，无法连接到 Bangumi API\n\n可能原因：\n• 网络被墙（GFW）\n• 断网或 DNS 失败\n• API 服务器不可达\n\nToken 本身可能有效，请在网络恢复后重试',
       '网络错误',
     )
-  }
+  })
 
   xhr.ontimeout = () => {
     removeAbortHandler()
@@ -329,7 +329,7 @@ export async function bgmRequestSync(
         signal.addEventListener('abort', abortHandler)
       }
 
-      xhr.onload = function () {
+      xhr.addEventListener('load', () => {
         removeAbortHandler()
         result.code = xhr.status
         if (xhr.status >= 200 && xhr.status < 300) {
@@ -353,15 +353,15 @@ export async function bgmRequestSync(
           result.message = parseErrorResponse(xhr)
         }
         resolve(result)
-      }
+      })
 
-      xhr.onerror = function () {
+      xhr.addEventListener('error', () => {
         removeAbortHandler()
         result.code = 0
         // 如果是 abort 导致的 onerror，归类为取消
         result.message = signal?.aborted ? '请求被取消' : 'Network error'
         resolve(result)
-      }
+      })
 
       xhr.ontimeout = function () {
         removeAbortHandler()

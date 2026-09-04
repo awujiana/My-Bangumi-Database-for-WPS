@@ -521,6 +521,11 @@ export default tseslint.config(
                 },
             ],
 
+            // no-void：放开「语句位 void」——这是消费 floating promise 的标准形态
+            // （no-floating-promises 要求显式 void 标注「有意丢弃」；两者默认配置互斥）。
+            // `void 0` 之外的 void 表达式（非语句位）仍保持 error。
+            'no-void': ['error', { allowAsStatement: true }],
+
             // no-await-in-loop：对 Bangumi API 的串行请求是刻意设计（避免触发上游限流被封），
             // 并发化会直接违反接口约定。
             // 替代保障：批量场景已在 sync/ 层用显式并发上限封装。
@@ -599,6 +604,13 @@ export default tseslint.config(
             // 直接让 58 个用例崩溃。这两个规则在 tests/ 下关闭，不在生产代码 ts/ 关闭。
             'prefer-arrow-callback': 'off',
             'no-var': 'off',
+
+            // mock 事件契约：测试以 `xhrMock.onload = fn` / `mockXHR.xhrMock.onload?.()`
+            // 属性赋值 + 手动调用为 XHR/BroadcastChannel 替身的**触发机制**
+            // （addEventListener 注册的监听器无法被测试手动触发）。
+            // 生产代码 ts/ 下 43 处已全部改为 addEventListener/removeEventListener，
+            // 真实约束力完整保留。
+            'unicorn/prefer-add-event-listener': 'off',
         },
     },
 

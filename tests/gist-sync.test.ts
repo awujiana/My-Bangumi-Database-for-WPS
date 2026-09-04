@@ -102,6 +102,15 @@ class MockXHR {
 
   ontimeout: (() => void) | null = null
 
+  /** 生产代码经 addEventListener 注册：映射到 onXXX 属性，保留测试手动触发机制 */
+  addEventListener(type: 'load' | 'error', handler: () => void): void {
+    if (type === 'load') {
+      this.onload = handler
+    } else {
+      this.onerror = handler
+    }
+  }
+
   _aborted = false
 
   private method = ''

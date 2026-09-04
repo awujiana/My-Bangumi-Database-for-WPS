@@ -115,8 +115,22 @@ class MockXHR {
   }
 
   addEventListener(event: string, handler: () => void): void {
-    if (event === 'abort') {
-      this.onabort = handler
+    switch (event) {
+      case 'abort': {
+        this.onabort = handler
+        break
+      }
+      case 'load': {
+        this.onload = handler
+        break
+      }
+      case 'error': {
+        this.onerror = handler
+        break
+      }
+      default: {
+        break
+      }
     }
   }
 

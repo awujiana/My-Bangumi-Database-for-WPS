@@ -63,10 +63,32 @@ class MockXHR {
 
   ontimeout: (() => void) | null = null
 
+  /** 生产代码经 addEventListener 注册：映射到 onXXX 属性，保留测试手动触发机制 */
+  addEventListener(type: 'load' | 'error', handler: () => void): void {
+    if (type === 'load') {
+      this.onload = handler
+    } else {
+      this.onerror = handler
+    }
+  }
+
   upload: {
     onprogress:
       ((event: { loaded: number; total: number; lengthComputable: boolean }) => void) | null
-  } = { onprogress: null }
+    addEventListener(
+      type: 'progress',
+      handler: (event: { loaded: number; total: number; lengthComputable: boolean }) => void,
+    ): void
+  } = {
+    onprogress: null,
+    /** 生产代码经 upload.addEventListener('progress', ...) 注册 */
+    addEventListener(
+      type: 'progress',
+      handler: (event: { loaded: number; total: number; lengthComputable: boolean }) => void,
+    ): void {
+      this.onprogress = handler
+    },
+  }
 
   private method = ''
 

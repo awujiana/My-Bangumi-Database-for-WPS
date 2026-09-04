@@ -217,7 +217,7 @@ export function testTokenValidity(): void {
   xhr.setRequestHeader('Authorization', `Bearer ${token}`)
   xhr.setRequestHeader('Content-Type', 'application/json')
 
-  xhr.onload = () => {
+  xhr.addEventListener('load', () => {
     const requestEndTime = Date.now()
     const duration = requestEndTime - requestStartTime
 
@@ -311,16 +311,16 @@ export function testTokenValidity(): void {
       bgmLog(LOG_LEVELS.INFO, `[testTokenValidity] 响应内容: ${xhr.responseText}`)
       showError('错误', `Token验证失败 (HTTP ${String(xhr.status)})`)
     }
-  }
+  })
 
-  xhr.onerror = () => {
+  xhr.addEventListener('error', () => {
     const requestEndTime = Date.now()
     const duration = requestEndTime - requestStartTime
 
     bgmLog(LOG_LEVELS.ERROR, `[testTokenValidity] 请求发生网络错误，耗时: ${String(duration)}ms`)
     bgmLog(LOG_LEVELS.INFO, `[testTokenValidity] XHR 状态: ${String(xhr.readyState)}`)
     showError(_T.networkError, _T.cannotConnectBgm)
-  }
+  })
 
   xhr.ontimeout = () => {
     const requestEndTime = Date.now()
@@ -368,7 +368,7 @@ export function queryTokenStatus(token: string): Promise<{ expires: number; user
     xhr.timeout = 15_000
     xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded')
 
-    xhr.onload = () => {
+    xhr.addEventListener('load', () => {
       const duration = Date.now() - startTime
       bgmLog(
         LOG_LEVELS.INFO,
@@ -422,13 +422,13 @@ export function queryTokenStatus(token: string): Promise<{ expires: number; user
         bgmLog(LOG_LEVELS.ERROR, `[queryTokenStatus] 请求失败，HTTP ${String(xhr.status)}`)
         reject(new Error(`HTTP ${String(xhr.status)}`))
       }
-    }
+    })
 
-    xhr.onerror = () => {
+    xhr.addEventListener('error', () => {
       const duration = Date.now() - startTime
       bgmLog(LOG_LEVELS.ERROR, `[queryTokenStatus] 网络错误，耗时: ${String(duration)}ms`)
       reject(new Error('Network error'))
-    }
+    })
 
     xhr.ontimeout = () => {
       bgmLog(LOG_LEVELS.WARN, '[queryTokenStatus] 请求超时（15s）')
@@ -549,10 +549,10 @@ export function showUserProfile(): void {
       if (avatarUrl) {
         avatarImg.src = avatarUrl
         avatarImg.alt = username || _T.avatarDefault // eslint-disable-line @typescript-eslint/prefer-nullish-coalescing -- 空值须显示占位文案（`??` 会显示空串）
-        avatarImg.onerror = () => {
+        avatarImg.addEventListener('error', () => {
           avatarImg.style.display = 'none'
           bgmLog(LOG_LEVELS.WARN, '[showUserProfile] 头像加载失败')
-        }
+        })
         avatarImg.style.display = ''
       } else {
         avatarImg.style.display = 'none'
@@ -570,10 +570,10 @@ export function showUserProfile(): void {
       if (topbarAvatarImg && avatarUrl) {
         topbarAvatarImg.src = avatarUrl
         topbarAvatarImg.alt = username || _T.avatarDefault // eslint-disable-line @typescript-eslint/prefer-nullish-coalescing -- 空值须显示占位文案（`??` 会显示空串）
-        topbarAvatarImg.onerror = () => {
+        topbarAvatarImg.addEventListener('error', () => {
           topbarAvatarElement.style.display = 'none'
           bgmLog(LOG_LEVELS.WARN, '[showUserProfile] 顶栏头像加载失败')
-        }
+        })
       }
     }
 
@@ -595,10 +595,10 @@ export function showUserProfile(): void {
           if (avatarUrl) {
             tokenAvatarImg.src = avatarUrl
             tokenAvatarImg.alt = username || _T.avatarDefault // eslint-disable-line @typescript-eslint/prefer-nullish-coalescing -- 空值须显示占位文案（`??` 会显示空串）
-            tokenAvatarImg.onerror = () => {
+            tokenAvatarImg.addEventListener('error', () => {
               tokenAvatarImg.style.display = 'none'
               bgmLog(LOG_LEVELS.WARN, '[showUserProfile] Token 区头像加载失败')
-            }
+            })
             tokenAvatarImg.style.display = ''
           } else {
             tokenAvatarImg.style.display = 'none'
