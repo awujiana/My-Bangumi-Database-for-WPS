@@ -1384,7 +1384,9 @@ export function showAlert(message: string, title?: string, onOk?: () => void): v
  */
 export function showConfirm(
   message: string,
-  callback: (isConfirmed: boolean) => void,
+  // 允许 async 回调：返回的 Promise 由调用方消费（通常忽略），
+  // onOk/onCancel 只触发不等待，语义与同步回调一致
+  callback: (isConfirmed: boolean) => void | Promise<void>,
   title?: string,
 ): void {
   _showDialog('confirm', {

@@ -123,6 +123,32 @@ export { cleanLockedDataSheet } from './sheet.js'
 // 连接测试弹窗
 export { showConnectionTestDialog, hideConnectionTestDialog }
 
+/** 同步指标计算（纯函数）：从 handleActionClick 的 try 块抽出，降低 try-complexity */
+function computeSyncMetrics(
+  result: GithubSyncResult,
+  syncStartTime: number,
+): {
+  totalElapsed: number
+  totalProcessed: number
+  avgSpeed: number
+  efficiency: number
+  etaMs: number
+} {
+  const totalElapsed = Date.now() - syncStartTime
+  const totalProcessed = result.added + result.updated + result.deleted
+  const avgSpeed =
+    totalProcessed > 0 && totalElapsed > 0 ? Math.round((totalProcessed / totalElapsed) * 1000) : 0
+  const efficiency =
+    totalProcessed > 0 || result.unchanged > 0
+      ? Math.round((totalProcessed / (totalProcessed + result.unchanged)) * 100)
+      : 0
+  const etaMs =
+    avgSpeed > 0 && result.remoteTotal > totalProcessed
+      ? Math.round(((result.remoteTotal - totalProcessed) / avgSpeed) * 1000)
+      : 0
+  return { totalElapsed, totalProcessed, avgSpeed, efficiency, etaMs }
+}
+
 // ========== 模块级资源追踪（防止事件监听器与定时器泄漏） ==========
 const _pendingTimeouts = new Set<ReturnType<typeof setTimeout>>()
 
@@ -1186,21 +1212,10 @@ const ACTION_HANDLERS: Record<string, ActionHandler> = {
             undefined,
             timeFilter,
           )
-          const totalElapsed = Date.now() - syncStartTime
-          const totalProcessed = result.added + result.updated + result.deleted
-          const avgSpeed =
-            totalProcessed > 0 && totalElapsed > 0
-              ? Math.round((totalProcessed / totalElapsed) * 1000)
-              : 0
-
-          const efficiency =
-            totalProcessed > 0 || result.unchanged > 0
-              ? Math.round((totalProcessed / (totalProcessed + result.unchanged)) * 100)
-              : 0
-          const etaMs =
-            avgSpeed > 0 && result.remoteTotal > totalProcessed
-              ? Math.round(((result.remoteTotal - totalProcessed) / avgSpeed) * 1000)
-              : 0
+          const { totalElapsed, totalProcessed, avgSpeed, efficiency, etaMs } = computeSyncMetrics(
+            result,
+            syncStartTime,
+          )
 
           const summary = `远程 ${String(result.remoteTotal)} 条 → ✅${String(result.added)} 🔄${String(result.updated)} ❌${String(result.deleted)} ⏭️${String(result.unchanged)} ⚠️${String(result.failed)} | 耗时 ${formatDuration(totalElapsed)} | ${String(avgSpeed > 0 ? avgSpeed : '?')} 行/秒 | 效率 ${String(efficiency)}%`
           const details = [
