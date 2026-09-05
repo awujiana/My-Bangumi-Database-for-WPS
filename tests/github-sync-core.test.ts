@@ -287,7 +287,7 @@ describe('fetchGithubJson', () => {
 
   it('HTTP 403 应抛出访问被拒错误', async () => {
     mockXHR.xhrMock.status = 403
-    mockXHR.xhrMock.onload = function () {}
+    mockXHR.xhrMock.onload = () => {}
     setTimeout(() => mockXHR.xhrMock.onload?.(), 0)
     await expect(fetchGithubJson()).rejects.toThrow(/访问被拒/)
   })
@@ -295,7 +295,7 @@ describe('fetchGithubJson', () => {
   it('HTTP 其他错误应抛出通用错误', async () => {
     mockXHR.xhrMock.status = 500
     mockXHR.xhrMock.statusText = 'Internal Server Error'
-    mockXHR.xhrMock.onload = function () {}
+    mockXHR.xhrMock.onload = () => {}
     setTimeout(() => mockXHR.xhrMock.onload?.(), 0)
     await expect(fetchGithubJson()).rejects.toThrow(/HTTP 错误/)
   })
@@ -308,7 +308,7 @@ describe('fetchGithubJson', () => {
     mockParseJsonl.mockReturnValue({ entries, errors: [] })
     mockXHR.xhrMock.status = 200
     mockXHR.xhrMock.responseText = '{"sid":"1"}\n{"sid":"2"}'
-    mockXHR.xhrMock.onload = function () {}
+    mockXHR.xhrMock.onload = () => {}
     setTimeout(() => mockXHR.xhrMock.onload?.(), 0)
     const result = await fetchGithubJson()
     expect(result).toHaveLength(2)
@@ -321,25 +321,25 @@ describe('fetchGithubJson', () => {
     })
     mockXHR.xhrMock.status = 200
     mockXHR.xhrMock.responseText = '{"no_sid"}'
-    mockXHR.xhrMock.onload = function () {}
+    mockXHR.xhrMock.onload = () => {}
     setTimeout(() => mockXHR.xhrMock.onload?.(), 0)
     await expect(fetchGithubJson()).rejects.toThrow(/JSONL 解析失败/)
   })
 
   it('网络错误应抛出网络失败错误', async () => {
-    mockXHR.xhrMock.onerror = function () {}
+    mockXHR.xhrMock.onerror = () => {}
     setTimeout(() => mockXHR.xhrMock.onerror?.(), 0)
     await expect(fetchGithubJson()).rejects.toThrow(/网络请求失败/)
   })
 
   it('超时应抛出超时错误', async () => {
-    mockXHR.xhrMock.ontimeout = function () {}
+    mockXHR.xhrMock.ontimeout = () => {}
     setTimeout(() => mockXHR.xhrMock.ontimeout?.(), 0)
     await expect(fetchGithubJson()).rejects.toThrow(/请求超时/)
   })
 
   it('应设置 Accept 请求头', async () => {
-    mockXHR.xhrMock.onload = function () {}
+    mockXHR.xhrMock.onload = () => {}
     setTimeout(() => mockXHR.xhrMock.onload?.(), 0)
     await fetchGithubJson()
     expect(mockXHR.xhrMock.setRequestHeader).toHaveBeenCalledWith('Accept', 'application/json')
@@ -424,7 +424,7 @@ describe('GithubSyncSource', () => {
 
   it('fetchRemoteEntries 应调用 fetchGithubJson', async () => {
     mockParseJsonl.mockReturnValue({ entries: [{ sid: '1', name: 'Test' }], errors: [] })
-    mockXHR.xhrMock.onload = function () {}
+    mockXHR.xhrMock.onload = () => {}
     setTimeout(() => mockXHR.xhrMock.onload?.(), 0)
     const source = new GithubSyncSource()
     const result = await source.fetchRemoteEntries()
@@ -780,7 +780,7 @@ describe('syncFromGithub', () => {
   })
 
   it('下载成功但无数据时应返回零结果', async () => {
-    mockXHR.xhrMock.onload = function () {}
+    mockXHR.xhrMock.onload = () => {}
     setTimeout(() => mockXHR.xhrMock.onload?.(), 0)
     const result = await syncFromGithub()
     expect(result).toBeDefined()
@@ -788,7 +788,7 @@ describe('syncFromGithub', () => {
   })
 
   it('应调用进度回调', async () => {
-    mockXHR.xhrMock.onload = function () {}
+    mockXHR.xhrMock.onload = () => {}
     setTimeout(() => mockXHR.xhrMock.onload?.(), 0)
     const progress = vi.fn()
     await syncFromGithub(progress)
@@ -796,7 +796,7 @@ describe('syncFromGithub', () => {
   })
 
   it('selectedRowsOnly 无选区应抛出错误', async () => {
-    mockXHR.xhrMock.onload = function () {}
+    mockXHR.xhrMock.onload = () => {}
     setTimeout(() => mockXHR.xhrMock.onload?.(), 0)
     mockGetApp.mockReturnValue({
       ScreenUpdating: true,
@@ -811,7 +811,7 @@ describe('syncFromGithub', () => {
   })
 
   it('时间筛选应调用 filterByTime', async () => {
-    mockXHR.xhrMock.onload = function () {}
+    mockXHR.xhrMock.onload = () => {}
     setTimeout(() => mockXHR.xhrMock.onload?.(), 0)
     mockFilterByTime.mockReturnValue([])
     const timeFilter = { enabled: true, range: 'year' as const, year: 2024 }
@@ -820,7 +820,7 @@ describe('syncFromGithub', () => {
   })
 
   it('应在 finally 块恢复屏幕刷新', async () => {
-    mockXHR.xhrMock.onload = function () {}
+    mockXHR.xhrMock.onload = () => {}
     setTimeout(() => mockXHR.xhrMock.onload?.(), 0)
     mockGetApp.mockReturnValue({ ScreenUpdating: true, Calculation: 1 })
     await syncFromGithub()
