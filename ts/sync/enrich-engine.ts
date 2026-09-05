@@ -447,96 +447,108 @@ export function matchEntries(
   const results: MatchResult[] = []
 
   try {
-    const bangumiColMap = getBangumiColumnMap(bangumiSheet)
-    const [nameIndex, aliasIndex, rowNames] = buildBangumiIndexes(bangumiSheet, bangumiColMap)
-
-    const lastRow = getLastRow(animeSheet)
-    const { dataStartRow } = config
-
-    const { nameCol } = config.columnMapping
-    if (nameCol === 0) {
-      bgmLog(LOG_LEVELS.ERROR, '[matchEntries] 新番表未找到名称列，无法匹配')
-      return results
-    }
-
-    for (let row = dataStartRow; row <= lastRow; row += 1) {
-      const rawName = getCellValue(animeSheet, row, nameCol).trim()
-      if (rawName) {
-        const normalizedName = normalizeName(rawName)
-        let matchResult: MatchResult = {
-          animeRow: row,
-          matchedAnimeName: rawName,
-          matchType: 'unmatched',
-        }
-
-        try {
-          // 精确匹配
-          if (nameIndex.has(normalizedName)) {
-            const bangumiRow = nameIndex.get(normalizedName)
-            if (bangumiRow !== undefined) {
-              const matchedName = rowNames.get(bangumiRow)
-              matchResult = {
-                animeRow: row,
-                matchedAnimeName: rawName,
-                matchType: 'exact',
-                bangumiRow,
-                ...(matchedName === undefined ? {} : { bangumiName: matchedName }),
-              }
-            }
-          }
-
-          // 别名匹配
-          if (matchResult.matchType === 'unmatched') {
-            const aliasRows = aliasIndex.get(normalizedName)
-            if (aliasRows && aliasRows.length > 0) {
-              const bangumiRow = aliasRows[0]
-              if (bangumiRow !== undefined) {
-                const aliases: string[] = []
-                for (const [alias, rows] of aliasIndex) {
-                  if (rows.includes(bangumiRow)) {
-                    aliases.push(alias)
-                  }
-                }
-                const matchedName = rowNames.get(bangumiRow)
-                matchResult = {
-                  animeRow: row,
-                  matchedAnimeName: rawName,
-                  matchType: 'alias',
-                  bangumiRow,
-                  ...(matchedName === undefined ? {} : { bangumiName: matchedName }),
-                  aliases,
-                }
-              }
-            }
-          }
-        } catch (error: unknown) {
-          const errorMessage = error instanceof Error ? error.message : String(error)
-          matchResult = {
-            animeRow: row,
-            matchedAnimeName: rawName,
-            matchType: 'error',
-            errorMessage,
-          }
-          bgmLog(LOG_LEVELS.ERROR, `[matchEntries] 匹配 "${rawName}" 时出错: ${errorMessage}`)
-        }
-
-        results.push(matchResult)
-      }
-    }
-
-    const unmatchedCount = results.filter((r) => r.matchType === 'unmatched').length
-    const errorCount = results.filter((r) => r.matchType === 'error').length
-    bgmLog(
-      LOG_LEVELS.INFO,
-      `[matchEntries] 匹配完成：精确 ${String(results.filter((r) => r.matchType === 'exact').length)} 条, ` +
-        `别名 ${String(results.filter((r) => r.matchType === 'alias').length)} 条, ` +
-        `未匹配 ${String(unmatchedCount)} 条, 错误 ${String(errorCount)} 条, 共 ${String(results.length)} 条`,
-    )
+    matchEntriesInner(animeSheet, bangumiSheet, config, results)
   } catch (error: unknown) {
     BGM.handleError(error, { context: 'matchEntries', showAlert: false })
   }
 
   return results
+}
+
+/**
+ * matchEntries 主体（自 try 块抽离，降低 unicorn/try-complexity 计数）
+ */
+function matchEntriesInner(
+  animeSheet: WpsWorksheet,
+  bangumiSheet: WpsWorksheet,
+  config: EnrichConfig,
+  results: MatchResult[],
+): void {
+  const bangumiColMap = getBangumiColumnMap(bangumiSheet)
+  const [nameIndex, aliasIndex, rowNames] = buildBangumiIndexes(bangumiSheet, bangumiColMap)
+
+  const lastRow = getLastRow(animeSheet)
+  const { dataStartRow } = config
+
+  const { nameCol } = config.columnMapping
+  if (nameCol === 0) {
+    bgmLog(LOG_LEVELS.ERROR, '[matchEntries] 新番表未找到名称列，无法匹配')
+    return
+  }
+
+  for (let row = dataStartRow; row <= lastRow; row += 1) {
+    const rawName = getCellValue(animeSheet, row, nameCol).trim()
+    if (rawName) {
+      const normalizedName = normalizeName(rawName)
+      let matchResult: MatchResult = {
+        animeRow: row,
+        matchedAnimeName: rawName,
+        matchType: 'unmatched',
+      }
+
+      try {
+        // 精确匹配
+        if (nameIndex.has(normalizedName)) {
+          const bangumiRow = nameIndex.get(normalizedName)
+          if (bangumiRow !== undefined) {
+            const matchedName = rowNames.get(bangumiRow)
+            matchResult = {
+              animeRow: row,
+              matchedAnimeName: rawName,
+              matchType: 'exact',
+              bangumiRow,
+              ...(matchedName === undefined ? {} : { bangumiName: matchedName }),
+            }
+          }
+        }
+
+        // 别名匹配
+        if (matchResult.matchType === 'unmatched') {
+          const aliasRows = aliasIndex.get(normalizedName)
+          if (aliasRows && aliasRows.length > 0) {
+            const bangumiRow = aliasRows[0]
+            if (bangumiRow !== undefined) {
+              const aliases: string[] = []
+              for (const [alias, rows] of aliasIndex) {
+                if (rows.includes(bangumiRow)) {
+                  aliases.push(alias)
+                }
+              }
+              const matchedName = rowNames.get(bangumiRow)
+              matchResult = {
+                animeRow: row,
+                matchedAnimeName: rawName,
+                matchType: 'alias',
+                bangumiRow,
+                ...(matchedName === undefined ? {} : { bangumiName: matchedName }),
+                aliases,
+              }
+            }
+          }
+        }
+      } catch (error: unknown) {
+        const errorMessage = error instanceof Error ? error.message : String(error)
+        matchResult = {
+          animeRow: row,
+          matchedAnimeName: rawName,
+          matchType: 'error',
+          errorMessage,
+        }
+        bgmLog(LOG_LEVELS.ERROR, `[matchEntries] 匹配 "${rawName}" 时出错: ${errorMessage}`)
+      }
+
+      results.push(matchResult)
+    }
+  }
+
+  const unmatchedCount = results.filter((r) => r.matchType === 'unmatched').length
+  const errorCount = results.filter((r) => r.matchType === 'error').length
+  bgmLog(
+    LOG_LEVELS.INFO,
+    `[matchEntries] 匹配完成：精确 ${String(results.filter((r) => r.matchType === 'exact').length)} 条, ` +
+      `别名 ${String(results.filter((r) => r.matchType === 'alias').length)} 条, ` +
+      `未匹配 ${String(unmatchedCount)} 条, 错误 ${String(errorCount)} 条, 共 ${String(results.length)} 条`,
+  )
 }
 
 /**
@@ -1508,7 +1520,8 @@ export function searchSheet(
           if (aliasValue) {
             const aliases = splitAliases(aliasValue)
             const matchedAliases = aliases.filter((a) =>
-              normalizeName(a).includes(normalizedKeyword),)
+              normalizeName(a).includes(normalizedKeyword),
+            )
             for (const alias of matchedAliases) {
               fieldMatches.push({ column: '别名', value: alias })
             }

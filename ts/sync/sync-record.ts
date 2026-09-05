@@ -732,80 +732,85 @@ export function formatSyncRecordSheet(sheet?: WpsWorksheet): void {
       return
     }
 
-    const colCount = SYNC_RECORD_COLUMNS.length
-    const lastColLetter = colNumberToLetter(colCount)
-    const fullRange = target.Range(`A1:${lastColLetter}${String(lastRow)}`)
-    const dataRange = lastRow >= 2 ? target.Range(`A2:${lastColLetter}${String(lastRow)}`) : null
-
-    // 1. 字体
-    try {
-      if (fullRange.Font) fullRange.Font.Name = 'Maple Mono NF CN Medium'
-    } catch {
-      // 忽略：此处无需处理错误
-    }
-
-    // 2. 自动行高
-    try {
-      fullRange.EntireRow.AutoFit()
-    } catch {
-      // 忽略：此处无需处理错误
-    }
-
-    // 3. 水平居中
-    if (dataRange) {
-      try {
-        dataRange.HorizontalAlignment = -4108
-      } catch {
-        // 忽略：此处无需处理错误
-      }
-    }
-
-    // 4. 自动列宽（全列）
-    try {
-      fullRange.EntireColumn.AutoFit()
-    } catch {
-      // 忽略：此处无需处理错误
-    }
-
-    // 5. URL 列（D列）固定宽度，不撑宽也不撑高
-    const urlColLetter = colNumberToLetter(SYNC_RECORD_COL.URL)
-    try {
-      const urlRange = target.Range(`${urlColLetter}:${urlColLetter}`)
-      urlRange.ColumnWidth = 42
-    } catch {
-      // 忽略：此处无需处理错误
-    }
-
-    // 6. 名称列边框（C列）
-    const nameColLetter = colNumberToLetter(SYNC_RECORD_COL.NAME)
-    if (dataRange) {
-      try {
-        const nameRange = target.Range(`${nameColLetter}2:${nameColLetter}${String(lastRow)}`)
-        nameRange.Borders.LineStyle = 1
-      } catch {
-        // 忽略：此处无需处理错误
-      }
-    }
-
-    // 7. 收藏状态列边框
-    const collTypeColLetter = colNumberToLetter(SYNC_RECORD_COL.COLL_TYPE)
-    if (dataRange) {
-      try {
-        const collRange = target.Range(
-          `${collTypeColLetter}2:${collTypeColLetter}${String(lastRow)}`,
-        )
-        collRange.Borders.LineStyle = 1
-      } catch {
-        // 忽略：此处无需处理错误
-      }
-    }
-
-    bgmLog(LOG_LEVELS.INFO, '同步记录表格式已设置')
+    applySyncRecordFormatting(target, lastRow)
     _isFormattingInProgress = false
   } catch (error: unknown) {
     _isFormattingInProgress = false
     BGM.handleError(error, { context: 'formatSyncRecordSheet', showAlert: false })
   }
+}
+
+/**
+ * 格式化步骤 1-7（自 formatSyncRecordSheet 的 try 块抽离，降低 unicorn/try-complexity 计数）
+ */
+function applySyncRecordFormatting(target: WpsWorksheet, lastRow: number): void {
+  const colCount = SYNC_RECORD_COLUMNS.length
+  const lastColLetter = colNumberToLetter(colCount)
+  const fullRange = target.Range(`A1:${lastColLetter}${String(lastRow)}`)
+  const dataRange = lastRow >= 2 ? target.Range(`A2:${lastColLetter}${String(lastRow)}`) : null
+
+  // 1. 字体
+  try {
+    if (fullRange.Font) fullRange.Font.Name = 'Maple Mono NF CN Medium'
+  } catch {
+    // 忽略：此处无需处理错误
+  }
+
+  // 2. 自动行高
+  try {
+    fullRange.EntireRow.AutoFit()
+  } catch {
+    // 忽略：此处无需处理错误
+  }
+
+  // 3. 水平居中
+  if (dataRange) {
+    try {
+      dataRange.HorizontalAlignment = -4108
+    } catch {
+      // 忽略：此处无需处理错误
+    }
+  }
+
+  // 4. 自动列宽（全列）
+  try {
+    fullRange.EntireColumn.AutoFit()
+  } catch {
+    // 忽略：此处无需处理错误
+  }
+
+  // 5. URL 列（D列）固定宽度，不撑宽也不撑高
+  const urlColLetter = colNumberToLetter(SYNC_RECORD_COL.URL)
+  try {
+    const urlRange = target.Range(`${urlColLetter}:${urlColLetter}`)
+    urlRange.ColumnWidth = 42
+  } catch {
+    // 忽略：此处无需处理错误
+  }
+
+  // 6. 名称列边框（C列）
+  const nameColLetter = colNumberToLetter(SYNC_RECORD_COL.NAME)
+  if (dataRange) {
+    try {
+      const nameRange = target.Range(`${nameColLetter}2:${nameColLetter}${String(lastRow)}`)
+      nameRange.Borders.LineStyle = 1
+    } catch {
+      // 忽略：此处无需处理错误
+    }
+  }
+
+  // 7. 收藏状态列边框
+  const collTypeColLetter = colNumberToLetter(SYNC_RECORD_COL.COLL_TYPE)
+  if (dataRange) {
+    try {
+      const collRange = target.Range(`${collTypeColLetter}2:${collTypeColLetter}${String(lastRow)}`)
+      collRange.Borders.LineStyle = 1
+    } catch {
+      // 忽略：此处无需处理错误
+    }
+  }
+
+  bgmLog(LOG_LEVELS.INFO, '同步记录表格式已设置')
 }
 
 export function clearSyncRecords(): boolean {
