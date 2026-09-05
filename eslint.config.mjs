@@ -230,7 +230,7 @@ export default tseslint.config(
       'no-console': 'error',
       'no-debugger': 'error',
       'no-warning-comments': ['error', { terms: ['todo', 'fixme', 'xxx'], location: 'start' }],
-      eqeqeq: ['error', 'always'],
+      eqeqeq: ['error', 'always', { null: 'ignore' }], // == null/!= null 是同时判 null+undefined 的合法惯用法
       curly: ['error', 'all'],
       // ESLint 10 语言限制：该规则不支持 js/js（无法启用，非降级）
       'unicorn/prefer-explicit-viewport-units': 'off',

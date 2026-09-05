@@ -658,8 +658,8 @@ export function autoDetectSheet(): {
         context: 'autoDetectSheet',
       })
     } finally {
-      const restoreFn = needRestore as (() => void) | false
-      if (typeof restoreFn === 'function') restoreFn()
+      const restoreFunction = needRestore as (() => void) | false
+      if (typeof restoreFunction === 'function') restoreFunction()
     }
   }
 
@@ -1015,7 +1015,7 @@ export function refreshData(): void {
         const segLength = index_ - index + 1
 
         try {
-          const batchHasData = readPreviewSegmentBatch(
+          const isBatchHasData = readPreviewSegmentBatch(
             ws,
             meta,
             segStart,
@@ -1025,7 +1025,7 @@ export function refreshData(): void {
             displayColCount,
             previewRows,
           )
-          if (batchHasData) hasData = true
+          if (isBatchHasData) hasData = true
         } catch {
           // 批量读取失败，回退到逐单元格
           for (let r = 0; r < segLength; r += 1) {
@@ -1097,7 +1097,7 @@ export function refreshData(): void {
     updateFilterStatus(ws)
   }
   try {
-  refreshDataCore()
+    refreshDataCore()
   } finally {
     if (needRestore) needRestore()
   }
