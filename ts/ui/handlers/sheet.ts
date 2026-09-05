@@ -216,7 +216,7 @@ export function cleanLockedDataSheet(): void {
   // ========== 4. 批量删除行（合并连续行为范围删除） ==========
   toDelete.sort((a, b) => b - a)
   bgmLog(LOG_LEVELS.INFO, `[cleanLockedDataSheet] 开始删除 ${String(toDelete.length)} 行...`)
-  let deleteCallCount = 0
+  let removalCallCount = 0
   let index = 0
   while (index < toDelete.length) {
     let index_ = index
@@ -231,12 +231,12 @@ export function cleanLockedDataSheet(): void {
     } else {
       ws.Range(`${String(toDelete[index_] ?? '')}:${String(toDelete[index] ?? '')}`).Delete()
     }
-    deleteCallCount += 1
+    removalCallCount += 1
     index = index_ + 1
   }
   bgmLog(
     LOG_LEVELS.INFO,
-    `[cleanLockedDataSheet] 删除行: ${String(toDelete.length)}行, 实际COM调用: ${String(deleteCallCount)}次`,
+    `[cleanLockedDataSheet] 删除行: ${String(toDelete.length)}行, 实际COM调用: ${String(removalCallCount)}次`,
   )
 
   const mergedSummary = mergedTagEntries.length > 0 ? `\n  ${mergedTagEntries.join('\n  ')}` : ''

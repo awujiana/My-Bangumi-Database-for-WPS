@@ -211,21 +211,21 @@ export async function syncFromRemote(
       )
     }
 
-    const addCount = diffs.filter((d) => d.kind === 'add').length
+    const addedCount = diffs.filter((d) => d.kind === 'add').length
     const updateCount = diffs.filter((d) => d.kind === 'update').length
-    const deleteCount = diffs.filter((d) => d.kind === 'delete').length
+    const deletedCount = diffs.filter((d) => d.kind === 'delete').length
     bgmLog(
       LOG_LEVELS.INFO,
-      `[syncFromRemote] diff 完成（${strategy}）：新增 ${String(addCount)}，更新 ${String(updateCount)}，删除 ${String(deleteCount)}，耗时 ${String(diffElapsed)}ms`,
+      `[syncFromRemote] diff 完成（${strategy}）：新增 ${String(addedCount)}，更新 ${String(updateCount)}，删除 ${String(deletedCount)}，耗时 ${String(diffElapsed)}ms`,
     )
 
     const result = await applyDiffToSheet(diffs, strategy, onProgress, source.getDisplayName())
     result.remoteTotal = effectiveRemoteEntries.length
     // unchanged = 远程总数 - (新增+更新)（delete 不计入 unchanged）
-    result.unchanged = Math.max(0, effectiveRemoteEntries.length - addCount - updateCount)
+    result.unchanged = Math.max(0, effectiveRemoteEntries.length - addedCount - updateCount)
 
     const totalElapsed = Date.now() - syncStartTs
-    const totalProcessed = addCount + updateCount + deleteCount
+    const totalProcessed = addedCount + updateCount + deletedCount
     const overallSpeed =
       totalProcessed > 0 && totalElapsed > 0
         ? Math.round((totalProcessed / totalElapsed) * 1000)

@@ -88,8 +88,7 @@ const mockColNumberToLetter = vi.hoisted(() =>
       n = Math.floor((n - 1) / 26)
     }
     return result
-  }),
-)
+  }),)
 const mockGetCellValue = vi.hoisted(() => vi.fn().mockReturnValue(''))
 const mockSetCellValue = vi.hoisted(() => vi.fn().mockReturnValue(true))
 const mockReadRangeValues = vi.hoisted(() => vi.fn().mockReturnValue([]))
@@ -604,8 +603,7 @@ describe('syncRecord', () => {
       mockReadRangeValues.mockReturnValue([])
       // Should not throw
       expect(() =>
-        addSyncRecord({ sid: 'empty-cache', name: '空缓存', url: 'http://c.com' }),
-      ).not.toThrow()
+        addSyncRecord({ sid: 'empty-cache', name: '空缓存', url: 'http://c.com' }),).not.toThrow()
     })
 
     it('空数据不应中断缓存构建', () => {
@@ -1430,8 +1428,8 @@ describe('syncRecord', () => {
 
       expect(isResult).toBe(true)
       // 更新路径：TIME, COUNT, STATUS, NAME, URL, TYPE, SOURCE, CONTENT, MESSAGE, FINGERPRINT, COLL_TYPE
-      const setCellCalls = mockSetCellValue.mock.calls
-      expect(setCellCalls.length).toBeGreaterThanOrEqual(10)
+      const cellWriteCalls = mockSetCellValue.mock.calls
+      expect(cellWriteCalls.length).toBeGreaterThanOrEqual(10)
     })
 
     it('更新时部分可选字段为空则跳过对应分支', () => {
@@ -1481,8 +1479,8 @@ describe('syncRecord', () => {
 
       expect(isResult).toBe(true)
       // 至少有 TIME, COUNT, STATUS, URL 被写入
-      const setCellCalls = mockSetCellValue.mock.calls
-      expect(setCellCalls.length).toBeGreaterThanOrEqual(3)
+      const cellWriteCalls = mockSetCellValue.mock.calls
+      expect(cellWriteCalls.length).toBeGreaterThanOrEqual(3)
     })
   })
 })
@@ -1629,8 +1627,8 @@ describe('addSyncRecord 更新路径 (lines 405-440)', () => {
     })
 
     expect(isResult).toBe(true)
-    const setCellCalls = mockSetCellValue.mock.calls
-    expect(setCellCalls.length).toBeGreaterThanOrEqual(5)
+    const cellWriteCalls = mockSetCellValue.mock.calls
+    expect(cellWriteCalls.length).toBeGreaterThanOrEqual(5)
   })
 
   it('更新时 name 字段为空则跳过该分支', () => {
@@ -1665,8 +1663,8 @@ describe('addSyncRecord 更新路径 (lines 405-440)', () => {
     })
 
     expect(isResult).toBe(true)
-    const setCellCalls = mockSetCellValue.mock.calls
-    expect(setCellCalls.length).toBeGreaterThanOrEqual(3)
+    const cellWriteCalls = mockSetCellValue.mock.calls
+    expect(cellWriteCalls.length).toBeGreaterThanOrEqual(3)
   })
 
   it('更新时 collType 字段为空则跳过该分支', () => {
@@ -1756,8 +1754,8 @@ describe('addSyncRecord 新建路径 (lines 442-487)', () => {
     })
 
     expect(isResult).toBe(true)
-    const setCellCalls = mockSetCellValue.mock.calls
-    expect(setCellCalls.length).toBeGreaterThanOrEqual(8)
+    const cellWriteCalls = mockSetCellValue.mock.calls
+    expect(cellWriteCalls.length).toBeGreaterThanOrEqual(8)
   })
 
   it('新建路径 fingerprint 不为 undefined 时应写入', () => {
@@ -1888,8 +1886,8 @@ describe('addSyncRecord 完整字段覆盖', () => {
     })
 
     expect(isResult).toBe(true)
-    const setCellCalls = mockSetCellValue.mock.calls
-    expect(setCellCalls.length).toBeGreaterThanOrEqual(10)
+    const cellWriteCalls = mockSetCellValue.mock.calls
+    expect(cellWriteCalls.length).toBeGreaterThanOrEqual(10)
   })
 
   it('更新记录时所有字段都被更新', () => {

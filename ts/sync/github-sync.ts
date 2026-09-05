@@ -1263,12 +1263,12 @@ export async function applyDiffToSheet(
 
   // 在开始前先发送初始进度：显示总条目数，避免进度条停留在"0/0"
   const total = diffs.length
-  const addDiffs = sortedDiffs.filter(
+  const addedDiffs = sortedDiffs.filter(
     (d): d is typeof d & { remote: NonNullable<typeof d.remote> } =>
       d.kind === 'add' && d.remote !== undefined,
   )
-  const addTotal = addDiffs.length
-  onProgress?.(0, total, `准备写入：新增 ${String(addTotal)} 条，共 ${String(total)} 条差异`)
+  const totalAdds = addedDiffs.length
+  onProgress?.(0, total, `准备写入：新增 ${String(totalAdds)} 条，共 ${String(total)} 条差异`)
 
   // 让出事件循环，允许 DOM 渲染初始进度
   await yieldToEventLoop()
@@ -1303,9 +1303,9 @@ export async function applyDiffToSheet(
   const nonAddDiffs = sortedDiffs.filter((d) => d.kind !== 'add')
 
   // 将 add diffs 分批写入（每批 BATCH_WRITE_SIZE 行）
-  let addProcessed = 0
-  for (let batchStart = 0; batchStart < addTotal; batchStart += BATCH_WRITE_SIZE) {
-    const batch = addDiffs.slice(batchStart, batchStart + BATCH_WRITE_SIZE)
+  let processedAdds = 0
+  for (let batchStart = 0; batchStart < totalAdds; batchStart += BATCH_WRITE_SIZE) {
+    const batch = addedDiffs.slice(batchStart, batchStart + BATCH_WRITE_SIZE)
     const batchEntries = batch.map((d) => ({ remote: d.remote, sid: d.sid }))
 
     // 尝试批量写入
@@ -1401,26 +1401,26 @@ export async function applyDiffToSheet(
       }
     }
 
-    addProcessed += batch.length
+    processedAdds += batch.length
     const now = Date.now()
     const elapsed = now - syncStartTime
-    const speed = addProcessed > 0 && elapsed > 0 ? (addProcessed / elapsed) * 1000 : 0
-    const remaining = addTotal - addProcessed
+    const speed = processedAdds > 0 && elapsed > 0 ? (processedAdds / elapsed) * 1000 : 0
+    const remaining = totalAdds - processedAdds
     const eta = speed > 0 ? (remaining / speed) * 1000 : 0
 
     // 每批或每 500ms 更新一次进度（避免高频回调）
-    if (now - lastProgressTime > 500 || addProcessed >= addTotal) {
+    if (now - lastProgressTime > 500 || processedAdds >= totalAdds) {
       onProgress?.(
-        addProcessed,
-        addTotal,
-        `新增 ${String(addProcessed)}/${String(addTotal)} 条 (${speed > 0 ? speed.toFixed(0) : '?'} 行/秒)`,
+        processedAdds,
+        totalAdds,
+        `新增 ${String(processedAdds)}/${String(totalAdds)} 条 (${speed > 0 ? speed.toFixed(0) : '?'} 行/秒)`,
         formatEta(eta),
       )
       lastProgressTime = now
     }
 
     // 让出事件循环，允许 DOM 渲染进度更新，避免 UI 卡顿
-    if (addProcessed < addTotal) {
+    if (processedAdds < totalAdds) {
       await yieldToEventLoop()
     }
   }
@@ -1438,7 +1438,7 @@ export async function applyDiffToSheet(
     (d): d is typeof d & { localRow: number; remote: NonNullable<typeof d.remote> } =>
       d.kind === 'update' && d.localRow !== undefined && d.remote !== undefined,
   )
-  const deleteDiffs = nonAddDiffs.filter(
+  const deletedDiffs = nonAddDiffs.filter(
     (d): d is typeof d & { localRow: number } => d.kind === 'delete' && d.localRow !== undefined,
   )
 
@@ -1468,10 +1468,10 @@ export async function applyDiffToSheet(
     updateProcessed += batch.length
     const now = Date.now()
     if (now - lastProgressTime > 300 || updateProcessed >= updateTotal) {
-      const totalProcessed = addTotal + updateProcessed
+      const totalProcessed = totalAdds + updateProcessed
       const elapsed = now - syncStartTime
       const speed = totalProcessed > 0 && elapsed > 0 ? (totalProcessed / elapsed) * 1000 : 0
-      const remaining = updateTotal - updateProcessed + deleteDiffs.length
+      const remaining = updateTotal - updateProcessed + deletedDiffs.length
       const eta = speed > 0 ? (remaining / speed) * 1000 : 0
       onProgress?.(
         totalProcessed,
@@ -1489,11 +1489,11 @@ export async function applyDiffToSheet(
   }
 
   // ---- 阶段 2b: 逐行处理 delete diffs（需倒序执行）----
-  let deleteProcessed = 0
-  const deleteTotal = deleteDiffs.length
+  let processedDeletes = 0
+  const totalDeletes = deletedDiffs.length
   // 记录删除阶段开始时间，用于计算删除阶段专用速度（更准确地估算剩余时间）
-  const deleteStartTime = Date.now()
-  for (const diff of deleteDiffs) {
+  const removalStartTime = Date.now()
+  for (const diff of deletedDiffs) {
     try {
       const rowValues: Record<number, string> = {}
       for (const col of colMap.values()) {
@@ -1559,40 +1559,40 @@ export async function applyDiffToSheet(
       })
     }
 
-    deleteProcessed += 1
+    processedDeletes += 1
     const now = Date.now()
-    if (now - lastProgressTime > 300 || deleteProcessed >= deleteTotal) {
-      const totalProcessed = addTotal + updateTotal + deleteProcessed
-      // 使用删除阶段专用速度（基于 deleteStartTime），避免被前面快速的 add/update 拉高平均速度
-      const deleteElapsed = now - deleteStartTime
-      const deleteSpeed =
-        deleteProcessed > 0 && deleteElapsed > 0 ? (deleteProcessed / deleteElapsed) * 1000 : 0
-      const remaining = deleteTotal - deleteProcessed
-      const eta = deleteSpeed > 0 ? (remaining / deleteSpeed) * 1000 : 0
+    if (now - lastProgressTime > 300 || processedDeletes >= totalDeletes) {
+      const totalProcessed = totalAdds + updateTotal + processedDeletes
+      // 使用删除阶段专用速度（基于 removalStartTime），避免被前面快速的 add/update 拉高平均速度
+      const removalElapsed = now - removalStartTime
+      const removalSpeed =
+        processedDeletes > 0 && removalElapsed > 0 ? (processedDeletes / removalElapsed) * 1000 : 0
+      const remaining = totalDeletes - processedDeletes
+      const eta = removalSpeed > 0 ? (remaining / removalSpeed) * 1000 : 0
       onProgress?.(
         totalProcessed,
         total,
-        `删除 ${String(deleteProcessed)}/${String(deleteTotal)} 条 (${deleteSpeed > 0 ? deleteSpeed.toFixed(0) : '?'} 行/秒)`,
+        `删除 ${String(processedDeletes)}/${String(totalDeletes)} 条 (${removalSpeed > 0 ? removalSpeed.toFixed(0) : '?'} 行/秒)`,
         formatEta(eta),
       )
       lastProgressTime = now
     }
 
     // 每 10 条让出事件循环（delete 比 update 轻量，但仍需频繁让出）
-    if (deleteProcessed % 10 === 0 && deleteProcessed < deleteTotal) {
+    if (processedDeletes % 10 === 0 && processedDeletes < totalDeletes) {
       await yieldToEventLoop()
     }
   }
 
   // 统计 skip 数量（nonAddDiffs 中 kind='skip' 的条目）
-  result.skipped = nonAddDiffs.length - updateDiffs.length - deleteDiffs.length
+  result.skipped = nonAddDiffs.length - updateDiffs.length - deletedDiffs.length
 
   // 结束 undo 会话（空会话不入栈）
   endUndoSession()
 
   // 计算总耗时
   const totalElapsed = Date.now() - syncStartTime
-  const totalProcessed = addTotal + nonAddDiffs.length
+  const totalProcessed = totalAdds + nonAddDiffs.length
   const avgSpeed =
     totalProcessed > 0 && totalElapsed > 0 ? (totalProcessed / totalElapsed) * 1000 : 0
 
@@ -1805,21 +1805,21 @@ export async function syncFromGithub(
       )
     }
 
-    const addCount = diffs.filter((d) => d.kind === 'add').length
+    const addedCount = diffs.filter((d) => d.kind === 'add').length
     const updateCount = diffs.filter((d) => d.kind === 'update').length
-    const deleteCount = diffs.filter((d) => d.kind === 'delete').length
+    const deletedCount = diffs.filter((d) => d.kind === 'delete').length
     bgmLog(
       LOG_LEVELS.INFO,
-      `[githubSync] diff 完成（${strategy}）：新增 ${String(addCount)}，更新 ${String(updateCount)}，删除 ${String(deleteCount)}，耗时 ${formatDuration(diffElapsed)}`,
+      `[githubSync] diff 完成（${strategy}）：新增 ${String(addedCount)}，更新 ${String(updateCount)}，删除 ${String(deletedCount)}，耗时 ${formatDuration(diffElapsed)}`,
     )
 
     const result = await applyDiffToSheet(diffs, strategy, onProgress, source.getDisplayName())
     result.remoteTotal = effectiveRemoteEntries.length
     // unchanged = 远程总数 - (新增+更新)（delete 不计入 unchanged）
-    result.unchanged = Math.max(0, effectiveRemoteEntries.length - addCount - updateCount)
+    result.unchanged = Math.max(0, effectiveRemoteEntries.length - addedCount - updateCount)
 
     const totalElapsed = Date.now() - syncStartTs
-    const totalProcessed = addCount + updateCount + deleteCount
+    const totalProcessed = addedCount + updateCount + deletedCount
     const overallSpeed =
       totalProcessed > 0 && totalElapsed > 0
         ? Math.round((totalProcessed / totalElapsed) * 1000)

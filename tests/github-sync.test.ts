@@ -515,13 +515,13 @@ describe('computeDiff 策略修饰', () => {
 
   it('默认策略 add-update：add + update，无 delete', () => {
     const diffs = computeDiff(remote, local)
-    const addCount = diffs.filter((d) => d.kind === 'add').length
+    const addedCount = diffs.filter((d) => d.kind === 'add').length
     const updateCount = diffs.filter((d) => d.kind === 'update').length
-    const deleteCount = diffs.filter((d) => d.kind === 'delete').length
+    const deletedCount = diffs.filter((d) => d.kind === 'delete').length
     // sid=1 新增，sid=2 更新（名称），sid=3 无变化，sid=4 不处理
-    expect(addCount).toBe(1)
+    expect(addedCount).toBe(1)
     expect(updateCount).toBe(1)
-    expect(deleteCount).toBe(0)
+    expect(deletedCount).toBe(0)
   })
 
   it('策略 add-only：仅 add，已存在 SID 全跳过', () => {
@@ -2230,9 +2230,9 @@ describe('applyDiffToSheet 删除操作 yieldToEventLoop (line 1184)', () => {
     mockGetApp.mockReturnValue(mockApp)
 
     // 创建 11 个 delete diffs
-    const deleteDiffs: GithubSyncDiff[] = []
+    const deletedDiffs: GithubSyncDiff[] = []
     for (let index = 0; index < 11; index += 1) {
-      deleteDiffs.push({
+      deletedDiffs.push({
         kind: 'delete',
         sid: String(index + 1),
         localRow: index + 2,
@@ -2240,7 +2240,7 @@ describe('applyDiffToSheet 删除操作 yieldToEventLoop (line 1184)', () => {
       })
     }
 
-    mockComputeDiff.mockReturnValue(deleteDiffs)
+    mockComputeDiff.mockReturnValue(deletedDiffs)
 
     const remoteEntries: GithubRemoteEntry[] = []
     setupXHRResponse(200, JSON.stringify(remoteEntries))
@@ -2292,7 +2292,7 @@ describe('applyDiffToSheet 批量 add yieldToEventLoop (line 1060)', () => {
     mockGetApp.mockReturnValue(mockApp)
 
     // 生成 501 条 add diff（超过 BATCH_WRITE_SIZE=500）
-    const addDiffs: GithubSyncDiff[] = Array.from({ length: 501 }, (_, index) => ({
+    const addedDiffs: GithubSyncDiff[] = Array.from({ length: 501 }, (_, index) => ({
       kind: 'add' as const,
       sid: String(index + 1),
       remote: {
@@ -2303,7 +2303,7 @@ describe('applyDiffToSheet 批量 add yieldToEventLoop (line 1060)', () => {
       changedFields: ['*'],
     }))
 
-    const result = await applyDiffToSheet(addDiffs, 'add-update')
+    const result = await applyDiffToSheet(addedDiffs, 'add-update')
 
     expect(result.added).toBeGreaterThan(0)
     expect(mockBgmLognnn).toHaveBeenCalledWith('INFO', expect.stringContaining('应用完成'))
@@ -4129,7 +4129,7 @@ describe('formatDuration 秒/分钟分支 (lines 536, 539)', () => {
 
     // Mock Date.now(): 第一批后 elapsed 才变为非零
     // syncStartTime=startTime, 第一批 now=startTime(不触发), 第二批 now=startTime+30000
-    // 第二批: addProcessed=1000, elapsed=30000ms, speed=33.33/s, remaining=100
+    // 第二批: processedAdds=1000, elapsed=30000ms, speed=33.33/s, remaining=100
     // eta=3000ms → formatDuration(3000) → "3秒" (seconds 分支)
     const startTime = 1_700_000_000_000
     let callCount = 0
@@ -4542,8 +4542,8 @@ describe('safeSet 数字扩展字段 (line 506)', () => {
     expect(result.added).toBe(1)
 
     // 验证 setCellValue 被调用来写入数字转字符串的值
-    const setCellCalls = mockSetCellValue.mock.calls
-    const hasDurationString = setCellCalls.some(
+    const cellWriteCalls = mockSetCellValue.mock.calls
+    const hasDurationString = cellWriteCalls.some(
       // 简化验证，只要写入发生即可
       (_call: unknown[]) => true,
     )

@@ -47,7 +47,7 @@ function createMockTaskPane(
 
 // 记录 CreateTaskPane / GetTaskPane 调用
 let createdPanes: { url: string }[] = []
-let getTaskPaneResults: Record<string, { Visible: boolean; DockPosition?: number } | null> = {}
+let taskPaneResults: Record<string, { Visible: boolean; DockPosition?: number } | null> = {}
 let createdPaneCounter = 0
 
 function createMockApp(): {
@@ -56,7 +56,7 @@ function createMockApp(): {
   GetTaskPane: (id: string) => { Visible: boolean; DockPosition?: number } | null
 } {
   createdPanes = []
-  getTaskPaneResults = {}
+  taskPaneResults = {}
   createdPaneCounter = 0
 
   return {
@@ -69,10 +69,10 @@ function createMockApp(): {
         DockPosition: 0,
       }
       createdPanes.push({ url })
-      getTaskPaneResults[pane.ID] = pane
+      taskPaneResults[pane.ID] = pane
       return pane
     },
-    GetTaskPane: (id: string) => getTaskPaneResults[id] ?? null,
+    GetTaskPane: (id: string) => taskPaneResults[id] ?? null,
   }
 }
 
@@ -230,7 +230,7 @@ afterEach(() => {
   mockReferences.mockBgmLog.mockClear()
   mockReferences.mockGetUrlPath.mockClear()
   mockReferences.mockGetApp.mockClear()
-  getTaskPaneResults = {}
+  taskPaneResults = {}
   createdPanes = []
   // 清理 window.Application
   if ('Application' in window) {
@@ -249,7 +249,7 @@ describe('showSettingsPanel — 主面板可见时停靠右侧', () => {
     const app = createMockApp()
     // 主面板已存在且可见
     app.PluginStorage.setItem('panel_id', 'main-pane-1')
-    getTaskPaneResults['main-pane-1'] = createMockTaskPane('main-pane-1', true)
+    taskPaneResults['main-pane-1'] = createMockTaskPane('main-pane-1', true)
 
     setMockApp(app)
 
@@ -260,10 +260,10 @@ describe('showSettingsPanel — 主面板可见时停靠右侧', () => {
     expect(createdPanes[0].url).toContain('/ui/settings.html')
 
     // 创建的面板应停靠右侧且可见
-    const createdId = Object.keys(getTaskPaneResults).find((k) => k.startsWith('settings-pane-'))
+    const createdId = Object.keys(taskPaneResults).find((k) => k.startsWith('settings-pane-'))
     expect(createdId).toBeDefined()
     if (createdId) {
-      const pane = getTaskPaneResults[createdId]
+      const pane = taskPaneResults[createdId]
       expect(pane?.DockPosition).toBe(mockReferences.MOCK_WPS_ENUM.msoCTPDockPositionRight)
       expect(pane?.Visible).toBe(true)
     }
@@ -276,11 +276,11 @@ describe('showSettingsPanel — 主面板可见时停靠右侧', () => {
     const app = createMockApp()
     // 主面板可见
     app.PluginStorage.setItem('panel_id', 'main-pane-1')
-    getTaskPaneResults['main-pane-1'] = createMockTaskPane('main-pane-1', true)
+    taskPaneResults['main-pane-1'] = createMockTaskPane('main-pane-1', true)
 
     // 设置面板已存在且当前可见
     app.PluginStorage.setItem('settings_pane_id', 'settings-pane-1')
-    getTaskPaneResults['settings-pane-1'] = createMockTaskPane(
+    taskPaneResults['settings-pane-1'] = createMockTaskPane(
       'settings-pane-1',
       true,
       mockReferences.MOCK_WPS_ENUM.msoCTPDockPositionLeft,
@@ -291,18 +291,18 @@ describe('showSettingsPanel — 主面板可见时停靠右侧', () => {
     showSettingsPanel()
 
     // 已存在且可见 → 应切换为隐藏
-    expect(getTaskPaneResults['settings-pane-1']?.Visible).toBe(false)
+    expect(taskPaneResults['settings-pane-1']?.Visible).toBe(false)
   })
 
   it('已存在但隐藏：主面板可见 → 设置面板停靠右侧并显示', () => {
     const app = createMockApp()
     // 主面板可见
     app.PluginStorage.setItem('panel_id', 'main-pane-1')
-    getTaskPaneResults['main-pane-1'] = createMockTaskPane('main-pane-1', true)
+    taskPaneResults['main-pane-1'] = createMockTaskPane('main-pane-1', true)
 
     // 设置面板已存在但当前隐藏
     app.PluginStorage.setItem('settings_pane_id', 'settings-pane-1')
-    getTaskPaneResults['settings-pane-1'] = createMockTaskPane(
+    taskPaneResults['settings-pane-1'] = createMockTaskPane(
       'settings-pane-1',
       false,
       mockReferences.MOCK_WPS_ENUM.msoCTPDockPositionLeft,
@@ -313,7 +313,7 @@ describe('showSettingsPanel — 主面板可见时停靠右侧', () => {
     showSettingsPanel()
 
     // 已存在且隐藏 → 应显示并调整到右侧
-    const pane = getTaskPaneResults['settings-pane-1']
+    const pane = taskPaneResults['settings-pane-1']
     expect(pane?.Visible).toBe(true)
     expect(pane?.DockPosition).toBe(mockReferences.MOCK_WPS_ENUM.msoCTPDockPositionRight)
   })
@@ -325,7 +325,7 @@ describe('showSettingsPanel — 主面板隐藏时仍停靠右侧', () => {
     const app = createMockApp()
     // 主面板存在但隐藏
     app.PluginStorage.setItem('panel_id', 'main-pane-1')
-    getTaskPaneResults['main-pane-1'] = createMockTaskPane('main-pane-1', false)
+    taskPaneResults['main-pane-1'] = createMockTaskPane('main-pane-1', false)
 
     setMockApp(app)
 
@@ -335,10 +335,10 @@ describe('showSettingsPanel — 主面板隐藏时仍停靠右侧', () => {
     expect(createdPanes).toHaveLength(1)
 
     // 创建的面板应停靠右侧且可见
-    const createdId = Object.keys(getTaskPaneResults).find((k) => k.startsWith('settings-pane-'))
+    const createdId = Object.keys(taskPaneResults).find((k) => k.startsWith('settings-pane-'))
     expect(createdId).toBeDefined()
     if (createdId) {
-      const pane = getTaskPaneResults[createdId]
+      const pane = taskPaneResults[createdId]
       expect(pane?.DockPosition).toBe(mockReferences.MOCK_WPS_ENUM.msoCTPDockPositionRight)
       expect(pane?.Visible).toBe(true)
     }
@@ -354,9 +354,9 @@ describe('showSettingsPanel — 主面板隐藏时仍停靠右侧', () => {
 
     // 应创建新面板，停靠右侧
     expect(createdPanes).toHaveLength(1)
-    const createdId = Object.keys(getTaskPaneResults).find((k) => k.startsWith('settings-pane-'))
+    const createdId = Object.keys(taskPaneResults).find((k) => k.startsWith('settings-pane-'))
     if (createdId) {
-      const pane = getTaskPaneResults[createdId]
+      const pane = taskPaneResults[createdId]
       expect(pane?.DockPosition).toBe(mockReferences.MOCK_WPS_ENUM.msoCTPDockPositionRight)
       expect(pane?.Visible).toBe(true)
     }
@@ -366,11 +366,11 @@ describe('showSettingsPanel — 主面板隐藏时仍停靠右侧', () => {
     const app = createMockApp()
     // 主面板隐藏
     app.PluginStorage.setItem('panel_id', 'main-pane-1')
-    getTaskPaneResults['main-pane-1'] = createMockTaskPane('main-pane-1', false)
+    taskPaneResults['main-pane-1'] = createMockTaskPane('main-pane-1', false)
 
     // 设置面板已存在但隐藏，且当前停靠在右侧
     app.PluginStorage.setItem('settings_pane_id', 'settings-pane-1')
-    getTaskPaneResults['settings-pane-1'] = createMockTaskPane(
+    taskPaneResults['settings-pane-1'] = createMockTaskPane(
       'settings-pane-1',
       false,
       mockReferences.MOCK_WPS_ENUM.msoCTPDockPositionRight,
@@ -381,7 +381,7 @@ describe('showSettingsPanel — 主面板隐藏时仍停靠右侧', () => {
     showSettingsPanel()
 
     // 应显示并调整到右侧
-    const pane = getTaskPaneResults['settings-pane-1']
+    const pane = taskPaneResults['settings-pane-1']
     expect(pane?.Visible).toBe(true)
     expect(pane?.DockPosition).toBe(mockReferences.MOCK_WPS_ENUM.msoCTPDockPositionRight)
   })
@@ -419,9 +419,9 @@ describe('showSettingsPanel — 边界情况', () => {
 
     // 主面板不可见 → 设置面板停靠右侧
     expect(createdPanes).toHaveLength(1)
-    const createdId = Object.keys(getTaskPaneResults).find((k) => k.startsWith('settings-pane-'))
+    const createdId = Object.keys(taskPaneResults).find((k) => k.startsWith('settings-pane-'))
     if (createdId) {
-      const pane = getTaskPaneResults[createdId]
+      const pane = taskPaneResults[createdId]
       expect(pane?.DockPosition).toBe(mockReferences.MOCK_WPS_ENUM.msoCTPDockPositionRight)
     }
   })
@@ -429,7 +429,7 @@ describe('showSettingsPanel — 边界情况', () => {
   it('设置面板 ID 失效（GetTaskPane 返回 null）→ 清除存储', () => {
     const app = createMockApp()
     app.PluginStorage.setItem('settings_pane_id', 'invalid-settings-id')
-    // 该 ID 不在 getTaskPaneResults 中 → GetTaskPane 返回 null
+    // 该 ID 不在 taskPaneResults 中 → GetTaskPane 返回 null
 
     setMockApp(app)
 
@@ -455,7 +455,7 @@ describe('showSettingsPanel — 边界情况', () => {
   it('日志应输出主面板状态和目标停靠位置', () => {
     const app = createMockApp()
     app.PluginStorage.setItem('panel_id', 'main-pane-1')
-    getTaskPaneResults['main-pane-1'] = createMockTaskPane('main-pane-1', true)
+    taskPaneResults['main-pane-1'] = createMockTaskPane('main-pane-1', true)
 
     setMockApp(app)
 

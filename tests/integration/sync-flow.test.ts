@@ -236,9 +236,9 @@ vi.mock('../../ts/sync/sync-source-registry.js', async () => {
         source.getDisplayName(),
       )
       result.remoteTotal = remoteEntries.length
-      const addCount = diffs.filter((d) => d.kind === 'add').length
+      const addedCount = diffs.filter((d) => d.kind === 'add').length
       const updateCount = diffs.filter((d) => d.kind === 'update').length
-      result.unchanged = Math.max(0, remoteEntries.length - addCount - updateCount)
+      result.unchanged = Math.max(0, remoteEntries.length - addedCount - updateCount)
 
       onProgress?.(
         3,
@@ -255,10 +255,7 @@ import { SyncToBangumiAsync } from '../../ts/sync/exceltobangumi/index.js'
 import { syncFromGithub, applyDiffToSheet } from '../../ts/sync/github-sync.js'
 import { syncFromRemote } from '../../ts/sync/sync-source-registry.js'
 import { computeDiff, parseJsonl } from '../../ts/sync/github-sync-diff.js'
-import type {
-  GithubRemoteEntry,
-  LocalRowEntry,
-} from '../../ts/sync/github-sync-diff.js'
+import type { GithubRemoteEntry, LocalRowEntry } from '../../ts/sync/github-sync-diff.js'
 import { clearUndoStack } from '../../ts/sync/undo-stack.js'
 import type { SyncSource } from '../../ts/sync/sync-source.js'
 import type { Result } from '../../ts/core/result.js'
@@ -691,10 +688,10 @@ describe('GitHub 同步流程：fetch JSONL → diff → apply → undo', () => 
     // 4. computeDiff（add-update 策略）
     const diffs = computeDiff(entries, localEntries, 'add-update')
     expect(diffs).toHaveLength(2)
-    const addDiff = diffs.find((d) => d.kind === 'add')
+    const addedDiff = diffs.find((d) => d.kind === 'add')
     const updateDiff = diffs.find((d) => d.kind === 'update')
-    expect(addDiff).toBeDefined()
-    expect(addDiff?.sid).toBe('10001')
+    expect(addedDiff).toBeDefined()
+    expect(addedDiff?.sid).toBe('10001')
     expect(updateDiff).toBeDefined()
     expect(updateDiff?.sid).toBe('10002')
     expect(updateDiff?.changedFields).toContain('名称')
@@ -742,10 +739,10 @@ describe('GitHub 同步流程：fetch JSONL → diff → apply → undo', () => 
     ])
 
     const diffs = computeDiff(remote, local, 'mirror')
-    const deleteDiff = diffs.find((d) => d.kind === 'delete')
-    expect(deleteDiff).toBeDefined()
-    expect(deleteDiff?.sid).toBe('20002')
-    expect(deleteDiff?.localRow).toBe(3)
+    const deletedDiff = diffs.find((d) => d.kind === 'delete')
+    expect(deletedDiff).toBeDefined()
+    expect(deletedDiff?.sid).toBe('20002')
+    expect(deletedDiff?.localRow).toBe(3)
 
     // applyDiffToSheet 处理 delete
     // 配置 getCellValue 返回值（用于 delete 时记录 undo）
