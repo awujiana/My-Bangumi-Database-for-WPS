@@ -200,6 +200,51 @@ export function openUserCollection(): void {
   )
 }
 
+/** 验证结果数据结构 */
+interface TokenVerifyData {
+  nickname?: string
+  username?: string
+  id?: string | number
+  avatar?: {
+    large?: string
+    medium?: string
+    small?: string
+  }
+}
+
+/**
+ * 应用 Token 验证成功结果：写入缓存、刷新用户 ID 状态、处理头像 URL
+ * （从 testTokenValidity 的 try 块抽出，降低 try-complexity）
+ */
+function applyVerifiedUserInfo(data: TokenVerifyData): { nickname: string; userId: string } {
+  const nickname = data.nickname || data.username || _T.unknownUser // eslint-disable-line @typescript-eslint/prefer-nullish-coalescing -- API 字段空串需退到备用字段（`??` 会保留空串）
+  const userId = String(data.id ?? '')
+
+  _setBgmUserId(userId)
+  _setBgmUsername(nickname)
+  // Token 验证成功后自动刷新「收藏页面访问」区的用户 ID
+  updateUserIdStatus()
+
+  // 处理头像 URL：移除可能存在的反引号包裹
+  const rawAvatarUrl = (data.avatar?.large || data.avatar?.medium || data.avatar?.small) ?? '' // eslint-disable-line @typescript-eslint/prefer-nullish-coalescing -- API 字段空串需退到备用字段（`??` 会保留空串）
+  const cleanAvatarUrl = rawAvatarUrl.replace(/`/g, '').trim()
+  if (cleanAvatarUrl) {
+    BGM.cache.avatarUrl = cleanAvatarUrl
+    // 持久化头像 URL
+    try {
+      const app = getApp()
+      if (app?.PluginStorage) {
+        app.PluginStorage.setItem('bgm_avatar_url', cleanAvatarUrl)
+      }
+    } catch {
+      // 静默处理
+    }
+    showUserProfile()
+  }
+
+  return { nickname, userId }
+}
+
 export function testTokenValidity(): void {
   const token = loadBgToken()
   if (!token) {
@@ -255,35 +300,11 @@ export function testTokenValidity(): void {
         }
         bgmLog(LOG_LEVELS.INFO, `[testTokenValidity] 响应数据: ${JSON.stringify(data)}`)
 
-        const nickname = data.nickname || data.username || _T.unknownUser // eslint-disable-line @typescript-eslint/prefer-nullish-coalescing -- API 字段空串需退到备用字段（`??` 会保留空串）
-        const userId = String(data.id ?? '')
-
+        const { nickname, userId } = applyVerifiedUserInfo(data)
         bgmLog(
           LOG_LEVELS.INFO,
           `[testTokenValidity] Token 验证成功！用户名: ${nickname}, 用户ID: ${userId}`,
         )
-
-        _setBgmUserId(userId)
-        _setBgmUsername(nickname)
-        // Token 验证成功后自动刷新「收藏页面访问」区的用户 ID
-        updateUserIdStatus()
-
-        // 处理头像 URL：移除可能存在的反引号包裹
-        const rawAvatarUrl = (data.avatar?.large || data.avatar?.medium || data.avatar?.small) ?? '' // eslint-disable-line @typescript-eslint/prefer-nullish-coalescing -- API 字段空串需退到备用字段（`??` 会保留空串）
-        const cleanAvatarUrl = rawAvatarUrl.replace(/`/g, '').trim()
-        if (cleanAvatarUrl) {
-          BGM.cache.avatarUrl = cleanAvatarUrl
-          // 持久化头像 URL
-          try {
-            const app = getApp()
-            if (app?.PluginStorage) {
-              app.PluginStorage.setItem('bgm_avatar_url', cleanAvatarUrl)
-            }
-          } catch {
-            // 静默处理
-          }
-          showUserProfile()
-        }
 
         // 查询 Token 有效期，完成后显示剩余天数
         void (async () => {

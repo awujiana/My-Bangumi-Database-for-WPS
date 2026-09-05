@@ -186,6 +186,41 @@ export function extractGistContent(apiResponse: unknown): string {
  * @returns 解析后的条目数组
  * @throws 网络错误、配置错误、解析失败时抛出 Error
  */
+
+/**
+ * 解析 Gist 响应体：JSON.parse → extractGistContent → parseJsonl
+ * @returns entries 数组；响应中无文件内容时返回 null
+ * @throws JSONL 全部非法时抛出 Error
+ */
+function parseGistResponseBody(responseText: string): GithubRemoteEntry[] | null {
+  const apiResponse: unknown = JSON.parse(responseText)
+  const content = extractGistContent(apiResponse)
+  if (!content) {
+    bgmLog(
+      LOG_LEVELS.WARN,
+      `[gistSync] Gist 响应中未提取到任何文件内容（files 为空或 content 缺失）`,
+    )
+    return null
+  }
+  const { entries, errors } = parseJsonl(content)
+  if (entries.length === 0 && errors.length > 0) {
+    throw new Error(
+      `JSONL 解析失败：${String(errors.length)} 行全部非法。` +
+        `首行错误（第 ${String(errors[0]?.line ?? '')} 行）：${errors[0]?.reason ?? ''}`,
+    )
+  }
+  if (errors.length > 0) {
+    bgmLog(
+      LOG_LEVELS.WARN,
+      `[gistSync] JSONL 解析完成：${String(entries.length)} 条合法，${String(errors.length)} 行非法（已跳过）。` +
+        `首行错误（第 ${String(errors[0]?.line ?? '')} 行）：${errors[0]?.reason ?? ''}`,
+    )
+  } else {
+    bgmLog(LOG_LEVELS.INFO, `[gistSync] 下载成功：${String(entries.length)} 条记录`)
+  }
+  return entries
+}
+
 export function fetchGistJson(signal?: AbortSignal): Promise<GithubRemoteEntry[]> {
   return new Promise<GithubRemoteEntry[]>((resolve, reject) => {
     // 1. 读取并校验 gist_id 配置
@@ -220,37 +255,12 @@ export function fetchGistJson(signal?: AbortSignal): Promise<GithubRemoteEntry[]
     xhr.addEventListener('load', (): void => {
       if (xhr.status === 200) {
         try {
-          // 4. JSON.parse 响应文本得到 unknown
-          const apiResponse: unknown = JSON.parse(xhr.responseText)
-          // 5. 通过 extractGistContent 提取并拼接 files[*].content
-          const content = extractGistContent(apiResponse)
-          if (!content) {
-            bgmLog(
-              LOG_LEVELS.WARN,
-              `[gistSync] Gist 响应中未提取到任何文件内容（files 为空或 content 缺失）`,
-            )
+          // 4-6. 解析响应：JSON.parse → extractGistContent → parseJsonl
+          const entries = parseGistResponseBody(xhr.responseText)
+          if (entries === null) {
+            // 未提取到任何文件内容
             resolve([])
             return
-          }
-          // 6. 复用 parseJsonl 解析拼接后的 JSONL 文本
-          const { entries, errors } = parseJsonl(content)
-          if (entries.length === 0 && errors.length > 0) {
-            reject(
-              new Error(
-                `JSONL 解析失败：${String(errors.length)} 行全部非法。` +
-                  `首行错误（第 ${String(errors[0]?.line ?? '')} 行）：${errors[0]?.reason ?? ''}`,
-              ),
-            )
-            return
-          }
-          if (errors.length > 0) {
-            bgmLog(
-              LOG_LEVELS.WARN,
-              `[gistSync] JSONL 解析完成：${String(entries.length)} 条合法，${String(errors.length)} 行非法（已跳过）。` +
-                `首行错误（第 ${String(errors[0]?.line ?? '')} 行）：${errors[0]?.reason ?? ''}`,
-            )
-          } else {
-            bgmLog(LOG_LEVELS.INFO, `[gistSync] 下载成功：${String(entries.length)} 条记录`)
           }
           resolve(entries)
         } catch (error: unknown) {

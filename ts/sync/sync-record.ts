@@ -646,6 +646,50 @@ export function getAllSyncRecords(): SyncRecord[] {
   }
 }
 
+/** 按 SID 对数据行分组（row 从 2 起跳过表头） */
+function groupRowsBySid(sheet: WpsWorksheet, lastRow: number): Map<string, number[]> {
+  const sidRows = new Map<string, number[]>()
+  for (let row = 2; row <= lastRow; row += 1) {
+    const sid = getCellValue(sheet, row, SYNC_RECORD_COL.SID).trim()
+    if (sid) {
+      const rows = sidRows.get(sid) ?? []
+      rows.push(row)
+      sidRows.set(sid, rows)
+    }
+  }
+  return sidRows
+}
+
+/** 合并重复 SID 组：COUNT 求和写入首行，其余行逆序删除；返回删除行数与是否发生重复 */
+function mergeDuplicateSidGroups(
+  sheet: WpsWorksheet,
+  sidRows: Map<string, number[]>,
+): { removedCount: number; hasDuplicates: boolean } {
+  let removedCount = 0
+  let hasDuplicates = false
+  for (const [, rows] of sidRows) {
+    if (!(rows.length <= 1)) {
+      hasDuplicates = true
+
+      const keepRow = rows[0]
+      if (!(keepRow === undefined)) {
+        let totalCount = parseInt(getCellValue(sheet, keepRow, SYNC_RECORD_COL.COUNT)) || 1
+
+        const rowsToDelete = [...rows.slice(1)].sort((a, b) => b - a)
+        for (const delRow of rowsToDelete) {
+          const delCount = parseInt(getCellValue(sheet, delRow, SYNC_RECORD_COL.COUNT)) || 1
+          totalCount += delCount
+          sheet.Range(`${String(delRow)}:${String(delRow)}`).Delete()
+          removedCount += 1
+        }
+
+        setCellValue(sheet, keepRow, SYNC_RECORD_COL.COUNT, totalCount)
+      }
+    }
+  }
+  return { removedCount, hasDuplicates }
+}
+
 export function deduplicateSyncRecords(): boolean {
   try {
     const sheet = getSyncRecordSheetIfExists()
@@ -656,40 +700,9 @@ export function deduplicateSyncRecords(): boolean {
     const lastRow = getLastRow(sheet)
     if (lastRow <= 1) return true
 
-    // 按 SID 分组
-    const sidRows = new Map<string, number[]>()
-    for (let row = 2; row <= lastRow; row += 1) {
-      const sid = getCellValue(sheet, row, SYNC_RECORD_COL.SID).trim()
-      if (sid) {
-        const rows = sidRows.get(sid) ?? []
-        rows.push(row)
-        sidRows.set(sid, rows)
-      }
-    }
-
-    // 找出并合并重复 SID
-    let removedCount = 0
-    let hasDuplicates = false
-    for (const [, rows] of sidRows) {
-      if (!(rows.length <= 1)) {
-        hasDuplicates = true
-
-        const keepRow = rows[0]
-        if (!(keepRow === undefined)) {
-          let totalCount = parseInt(getCellValue(sheet, keepRow, SYNC_RECORD_COL.COUNT)) || 1
-
-          const rowsToDelete = [...rows.slice(1)].sort((a, b) => b - a)
-          for (const delRow of rowsToDelete) {
-            const delCount = parseInt(getCellValue(sheet, delRow, SYNC_RECORD_COL.COUNT)) || 1
-            totalCount += delCount
-            sheet.Range(`${String(delRow)}:${String(delRow)}`).Delete()
-            removedCount += 1
-          }
-
-          setCellValue(sheet, keepRow, SYNC_RECORD_COL.COUNT, totalCount)
-        }
-      }
-    }
+    // 按 SID 分组，找出并合并重复 SID
+    const sidRows = groupRowsBySid(sheet, lastRow)
+    const { removedCount, hasDuplicates } = mergeDuplicateSidGroups(sheet, sidRows)
 
     if (hasDuplicates) {
       bgmLog(LOG_LEVELS.INFO, `去重完成：删除了 ${String(removedCount)} 条重复记录`)

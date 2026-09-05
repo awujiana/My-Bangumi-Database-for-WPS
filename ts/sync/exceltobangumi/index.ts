@@ -755,6 +755,39 @@ function prepareSyncTasks(
  * @param onProgress 进度回调（current=已完成数, total=总数, message=描述）
  * @returns 成功和失败的任务列表以及是否停止
  */
+
+/**
+ * 按收藏类型处理章节标记：仅"看过"(type=2) 需要标记章节；标记失败仅警告不中断。
+ * （从 batchSyncRequests 并发任务的 try 块抽出，降低 try-complexity）
+ */
+async function markEpisodesByType(task: _SyncTask, token: string): Promise<void> {
+  if (task.type === 2 && task.epCount && task.epCount > 0) {
+    try {
+      bgmLog(
+        LOG_LEVELS.INFO,
+        `[batchSyncRequests] SID ${task.sid} 状态"看过"(type=2)，集数: ${String(task.epCount)}，开始标记章节...`,
+      )
+      const epResult = await _markEpisodesComplete(task.sid, task.epCount, token)
+      bgmLog(
+        LOG_LEVELS.INFO,
+        `[batchSyncRequests] SID ${task.sid} 章节标记结果: ${epResult.message}`,
+      )
+    } catch (error: unknown) {
+      bgmLog(
+        LOG_LEVELS.WARN,
+        `[batchSyncRequests] SID ${task.sid} 章节标记异常: ${error instanceof Error ? error.message : String(error)}`,
+      )
+    }
+  } else if (task.type === 3 && task.epCount && task.epCount > 0) {
+    bgmLog(LOG_LEVELS.INFO, `[batchSyncRequests] SID ${task.sid} 状态"在看"(type=3)，跳过章节标记`)
+  } else if (task.epCount && task.epCount > 0) {
+    bgmLog(
+      LOG_LEVELS.INFO,
+      `[batchSyncRequests] SID ${task.sid} 状态非"看过"(type=${String(task.type)})，跳过章节标记`,
+    )
+  }
+}
+
 async function batchSyncRequests(
   tasks: _SyncTask[],
   token: string,
@@ -830,35 +863,8 @@ async function batchSyncRequests(
               `[batchSyncRequests] SID ${task.sid} 同步成功，HTTP ${String(apiResult.code)}`,
             )
 
-            // 标记章节为已完成（仅"看过" type=2 需要标记章节；"在看" ）
-            if (task.type === 2 && task.epCount && task.epCount > 0) {
-              try {
-                bgmLog(
-                  LOG_LEVELS.INFO,
-                  `[batchSyncRequests] SID ${task.sid} 状态"看过"(type=2)，集数: ${String(task.epCount)}，开始标记章节...`,
-                )
-                const epResult = await _markEpisodesComplete(task.sid, task.epCount, token)
-                bgmLog(
-                  LOG_LEVELS.INFO,
-                  `[batchSyncRequests] SID ${task.sid} 章节标记结果: ${epResult.message}`,
-                )
-              } catch (error: unknown) {
-                bgmLog(
-                  LOG_LEVELS.WARN,
-                  `[batchSyncRequests] SID ${task.sid} 章节标记异常: ${error instanceof Error ? error.message : String(error)}`,
-                )
-              }
-            } else if (task.type === 3 && task.epCount && task.epCount > 0) {
-              bgmLog(
-                LOG_LEVELS.INFO,
-                `[batchSyncRequests] SID ${task.sid} 状态"在看"(type=3)，跳过章节标记`,
-              )
-            } else if (task.epCount && task.epCount > 0) {
-              bgmLog(
-                LOG_LEVELS.INFO,
-                `[batchSyncRequests] SID ${task.sid} 状态非"看过"(type=${String(task.type)})，跳过章节标记`,
-              )
-            }
+            // 按收藏类型处理章节标记（仅"看过" type=2 需要标记）
+            await markEpisodesByType(task, token)
           } else {
             fail.push(task)
             bgmLog(
@@ -1017,6 +1023,49 @@ export async function SyncToBangumiAsync(
 }
 
 /**
+ * 从 Selection 收集行号（处理非连续多区域 / 连续单区域两种形态）
+ * （从 collectSelectedRows 的 try 块抽出，降低 try-complexity）
+ */
+function collectRowNumbersFromSelection(sel: WpsRange, rawRows: number[]): void {
+  // 记录选中区域地址用于调试
+  let selAddress = ''
+  try {
+    selAddress = sel.Address ?? ''
+  } catch (error: unknown) {
+    bgmLog(
+      LOG_LEVELS.WARN,
+      `[exceltobangumi] 获取地址失败: ${error instanceof Error ? error.message : String(error)}`,
+    )
+    selAddress = '(无法获取)'
+  }
+  bgmLog(LOG_LEVELS.INFO, `[syncSelectedRows] Selection.Address: ${selAddress}`)
+
+  // 处理非连续选择（多区域）
+  const areas = sel.Areas
+  const areaCount = areas?.Count ?? 1
+
+  if (areaCount > 1 && areas) {
+    // 非连续选择：遍历每个 Area 收集行号
+    bgmLog(LOG_LEVELS.INFO, `[syncSelectedRows] 检测到非连续选择，共 ${String(areaCount)} 个区域`)
+    for (let ai = 1; ai <= areaCount; ai += 1) {
+      const area = areas.Item(ai)
+      const aStartRow = area.Row
+      const aRowCount = area.Rows.Count
+      for (let r = aStartRow; r < aStartRow + aRowCount; r += 1) {
+        if (!rawRows.includes(r)) rawRows.push(r)
+      }
+    }
+  } else {
+    // 连续选择：直接读取
+    const startRow = sel.Row
+    const rowCount = sel.Rows.Count
+    for (let r = startRow; r < startRow + rowCount; r += 1) {
+      rawRows.push(r)
+    }
+  }
+}
+
+/**
  * 从当前选中区域收集行号（含非连续区域 Areas 处理）
  * @param app WPS Application 对象
  * @returns 原始行号数组；若未选中或异常则返回空数组（已提示用户）
@@ -1031,42 +1080,8 @@ function collectSelectedRows(app: WpsApp): number[] {
       return rawRows
     }
 
-    // 记录选中区域地址用于调试
-    let selAddress = ''
-    try {
-      selAddress = sel.Address ?? ''
-    } catch (error: unknown) {
-      bgmLog(
-        LOG_LEVELS.WARN,
-        `[exceltobangumi] 获取地址失败: ${error instanceof Error ? error.message : String(error)}`,
-      )
-      selAddress = '(无法获取)'
-    }
-    bgmLog(LOG_LEVELS.INFO, `[syncSelectedRows] Selection.Address: ${selAddress}`)
+    collectRowNumbersFromSelection(sel, rawRows)
 
-    // 处理非连续选择（多区域）
-    const areas = sel.Areas
-    const areaCount = areas?.Count ?? 1
-
-    if (areaCount > 1 && areas) {
-      // 非连续选择：遍历每个 Area 收集行号
-      bgmLog(LOG_LEVELS.INFO, `[syncSelectedRows] 检测到非连续选择，共 ${String(areaCount)} 个区域`)
-      for (let ai = 1; ai <= areaCount; ai += 1) {
-        const area = areas.Item(ai)
-        const aStartRow = area.Row
-        const aRowCount = area.Rows.Count
-        for (let r = aStartRow; r < aStartRow + aRowCount; r += 1) {
-          if (!rawRows.includes(r)) rawRows.push(r)
-        }
-      }
-    } else {
-      // 连续选择：直接读取
-      const startRow = sel.Row
-      const rowCount = sel.Rows.Count
-      for (let r = startRow; r < startRow + rowCount; r += 1) {
-        rawRows.push(r)
-      }
-    }
     bgmLog(
       LOG_LEVELS.INFO,
       `[syncSelectedRows] 选中区域: ${String(rawRows.length)} 行，行号 ${String(Math.min(...rawRows))}-${String(Math.max(...rawRows))}`,

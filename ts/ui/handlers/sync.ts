@@ -50,6 +50,50 @@ import { showTokenDialog } from './token.js'
 // ========== 本地类型定义 ==========
 
 /**
+ * 构造并展示上传同步结果弹窗（从 syncFromPanel 步骤11 的 try 块抽出，降低 try-complexity）
+ */
+function presentUploadResult(
+  result: Awaited<ReturnType<typeof SyncToBangumiAsync>>,
+  startTime: number,
+): void {
+  const totalElapsed = Date.now() - startTime
+  const totalProcessed = result.success + result.fail
+  const avgSpeed =
+    totalProcessed > 0 && totalElapsed > 0 ? Math.round((totalProcessed / totalElapsed) * 1000) : 0
+  const summary = `📊 同步 ${String(result.success + result.fail + result.skip)} 条 | 耗时 ${formatDuration(totalElapsed)}\n\n✅ 成功: ${String(result.success)}\n❌ 失败: ${String(result.fail)}\n⏭️ 跳过: ${String(result.skip)}`
+  const details: string[] = result.stopped
+    ? [
+        '⚠️ 同步被用户停止',
+        `成功 ${String(result.success)} 条`,
+        `失败 ${String(result.fail)} 条`,
+        `跳过 ${String(result.skip)} 条`,
+        `⏱️ 耗时: ${formatDuration(totalElapsed)}`,
+        `⚡ 平均速度: ${avgSpeed > 0 ? `${String(avgSpeed)} 行/秒` : '--'}`,
+      ]
+    : [
+        `成功 ${String(result.success)} 条`,
+        `失败 ${String(result.fail)} 条`,
+        `跳过 ${String(result.skip)} 条`,
+        `⏱️ 耗时: ${formatDuration(totalElapsed)}`,
+        `⚡ 平均速度: ${avgSpeed > 0 ? `${String(avgSpeed)} 行/秒` : '--'}`,
+      ]
+  // 构造 SyncProgressStats 用于图表渲染（将 Bangumi 同步的 success 映射为 added）
+  const stats: SyncProgressStats = {
+    added: result.success,
+    updated: 0,
+    deleted: 0,
+    unchanged: 0,
+    failed: result.fail,
+    skipped: result.skip,
+    remoteTotal: result.success + result.fail + result.skip,
+    elapsedMs: totalElapsed,
+    avgSpeed,
+    strategyLabel: '同步到 Bangumi',
+  }
+  completeSyncProgressDialog(summary, details, result.stopped, undefined, stats)
+}
+
+/**
  * Bangumi 收藏条目结构（仅用到的字段）
  */
 interface BangumiCollectionItem {
@@ -468,44 +512,8 @@ async function confirmAndExecuteSync(prepared: SyncPreparedData): Promise<boolea
         )
       },
     })
-    // 切换弹窗为完成状态
-    const totalElapsed = Date.now() - startTime
-    const totalProcessed = result.success + result.fail
-    const avgSpeed =
-      totalProcessed > 0 && totalElapsed > 0
-        ? Math.round((totalProcessed / totalElapsed) * 1000)
-        : 0
-    const summary = `📊 同步 ${String(result.success + result.fail + result.skip)} 条 | 耗时 ${formatDuration(totalElapsed)}\n\n✅ 成功: ${String(result.success)}\n❌ 失败: ${String(result.fail)}\n⏭️ 跳过: ${String(result.skip)}`
-    const details: string[] = result.stopped
-      ? [
-          '⚠️ 同步被用户停止',
-          `成功 ${String(result.success)} 条`,
-          `失败 ${String(result.fail)} 条`,
-          `跳过 ${String(result.skip)} 条`,
-          `⏱️ 耗时: ${formatDuration(totalElapsed)}`,
-          `⚡ 平均速度: ${avgSpeed > 0 ? `${String(avgSpeed)} 行/秒` : '--'}`,
-        ]
-      : [
-          `成功 ${String(result.success)} 条`,
-          `失败 ${String(result.fail)} 条`,
-          `跳过 ${String(result.skip)} 条`,
-          `⏱️ 耗时: ${formatDuration(totalElapsed)}`,
-          `⚡ 平均速度: ${avgSpeed > 0 ? `${String(avgSpeed)} 行/秒` : '--'}`,
-        ]
-    // 构造 SyncProgressStats 用于图表渲染（将 Bangumi 同步的 success 映射为 added）
-    const stats: SyncProgressStats = {
-      added: result.success,
-      updated: 0,
-      deleted: 0,
-      unchanged: 0,
-      failed: result.fail,
-      skipped: result.skip,
-      remoteTotal: result.success + result.fail + result.skip,
-      elapsedMs: totalElapsed,
-      avgSpeed,
-      strategyLabel: '同步到 Bangumi',
-    }
-    completeSyncProgressDialog(summary, details, result.stopped, undefined, stats)
+    // 切换弹窗为完成状态并展示统计
+    presentUploadResult(result, startTime)
     if (app.StatusBar !== undefined) app.StatusBar = false
 
     if (result.stopped) {
@@ -782,7 +790,8 @@ async function _doAPISync(
   let syncRecords: SyncRecord[] = typeof getAllSyncRecords === 'function' ? getAllSyncRecords() : []
   const syncCountMap = new Map<string, number>()
   syncRecords.forEach((r) =>
-    syncCountMap.set(r.sid ?? '', (syncCountMap.get(r.sid ?? '') ?? 0) + 1),)
+    syncCountMap.set(r.sid ?? '', (syncCountMap.get(r.sid ?? '') ?? 0) + 1),
+  )
 
   // 使用从 ../index.js 导入的 BGM_SUBJECT_TYPES 常量（与 core/constants.ts 中定义一致）
   // 启动同步状态机：使用 enterRunningState 进行防重入检查
@@ -857,7 +866,8 @@ async function _doAPISync(
     syncRecords = typeof getAllSyncRecords === 'function' ? getAllSyncRecords() : []
     syncCountMap.clear()
     syncRecords.forEach((r) =>
-      syncCountMap.set(r.sid ?? '', (syncCountMap.get(r.sid ?? '') ?? 0) + 1),)
+      syncCountMap.set(r.sid ?? '', (syncCountMap.get(r.sid ?? '') ?? 0) + 1),
+    )
 
     // 阶段2：在 Excel 数据表上标记已收藏的行（需要定位单元格）
     // 切换回数据工作表，便于暂停时定位
