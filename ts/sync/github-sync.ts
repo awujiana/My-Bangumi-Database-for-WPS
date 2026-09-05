@@ -1015,7 +1015,7 @@ function batchUpdateRows(
     }
 
     // 3. 写入该行（一次 COM 调用写入整行）
-    try {
+    const writeRowValuesWithUndo = (): void => {
       if (range) {
         // 使用已读取的旧值（oldArr 在循环开始前已读取）
         // 只写入有变化的单元格
@@ -1143,6 +1143,9 @@ function batchUpdateRows(
           }
         }
       }
+    }
+    try {
+      writeRowValuesWithUndo()
     } catch (error: unknown) {
       bgmLog(
         LOG_LEVELS.WARN,

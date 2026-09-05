@@ -317,27 +317,7 @@ function buildCache(sheet: WpsWorksheet): void {
     try {
       const rowData = allData[index]
       if (rowData) {
-        const sid = (rowData[SYNC_RECORD_COL.SID - 1] ?? '').trim()
-        const url = (rowData[SYNC_RECORD_COL.URL - 1] ?? '').trim()
-        if (!(!url && !sid)) {
-          const row = index + 2
-          _syncRecordSidCache.set(sid, row)
-          _syncRecordListCache.push({
-            time: rowData[SYNC_RECORD_COL.TIME - 1] ?? '',
-            name: rowData[SYNC_RECORD_COL.NAME - 1] ?? '',
-            url,
-            sid,
-            type: rowData[SYNC_RECORD_COL.TYPE - 1] ?? '',
-            source: rowData[SYNC_RECORD_COL.SOURCE - 1] ?? '',
-            count: parseInt(rowData[SYNC_RECORD_COL.COUNT - 1] ?? '') || 1,
-            content: rowData[SYNC_RECORD_COL.CONTENT - 1] ?? '',
-            status: (rowData[SYNC_RECORD_COL.STATUS - 1] ?? '') || SYNC_STATUS.SUCCESS,
-            message: rowData[SYNC_RECORD_COL.MESSAGE - 1] ?? '',
-            fingerprint: rowData[SYNC_RECORD_COL.FINGERPRINT - 1] ?? '',
-            collType: rowData[SYNC_RECORD_COL.COLL_TYPE - 1] ?? '',
-            row,
-          })
-        }
+        cacheRecordRow(rowData, index + 2)
       }
     } catch (error: unknown) {
       BGM.handleError(error, { context: 'buildCache', showAlert: false })
@@ -353,6 +333,32 @@ function buildCache(sheet: WpsWorksheet): void {
  * @param status 同步状态 (SUCCESS/FAIL/SKIP)
  * @param count 同步次数
  */
+/**
+ * 缓存单行同步记录（自 buildCache 的 try 块抽离，降低 unicorn/try-complexity 计数）
+ */
+function cacheRecordRow(rowData: string[], row: number): void {
+  const sid = (rowData[SYNC_RECORD_COL.SID - 1] ?? '').trim()
+  const url = (rowData[SYNC_RECORD_COL.URL - 1] ?? '').trim()
+  if (!(!url && !sid)) {
+    _syncRecordSidCache.set(sid, row)
+    _syncRecordListCache.push({
+      time: rowData[SYNC_RECORD_COL.TIME - 1] ?? '',
+      name: rowData[SYNC_RECORD_COL.NAME - 1] ?? '',
+      url,
+      sid,
+      type: rowData[SYNC_RECORD_COL.TYPE - 1] ?? '',
+      source: rowData[SYNC_RECORD_COL.SOURCE - 1] ?? '',
+      count: parseInt(rowData[SYNC_RECORD_COL.COUNT - 1] ?? '') || 1,
+      content: rowData[SYNC_RECORD_COL.CONTENT - 1] ?? '',
+      status: (rowData[SYNC_RECORD_COL.STATUS - 1] ?? '') || SYNC_STATUS.SUCCESS,
+      message: rowData[SYNC_RECORD_COL.MESSAGE - 1] ?? '',
+      fingerprint: rowData[SYNC_RECORD_COL.FINGERPRINT - 1] ?? '',
+      collType: rowData[SYNC_RECORD_COL.COLL_TYPE - 1] ?? '',
+      row,
+    })
+  }
+}
+
 function setSyncRecordColors(
   sheet: WpsWorksheet,
   row: number,
@@ -391,106 +397,7 @@ export function addSyncRecord(parameters: UpdateRecordParameters): boolean {
     return false
   }
   try {
-    const sheet = getOrCreateSyncRecordSheet()
-
-    // 写入数据前先去重，确保缓存数据干净
-    deduplicateSyncRecords()
-
-    if (!_isSyncRecordCacheValid) buildCache(sheet)
-
-    const sid = parameters.sid ?? ''
-    const now = new Date().toLocaleString('zh-CN')
-
-    const existingRow = sid ? _syncRecordSidCache.get(sid) : undefined
-    if (existingRow === undefined) {
-      let nextRow = 1
-      const usedRange = sheet.UsedRange
-      if (usedRange) {
-        const lastUsedRow = usedRange.Row + usedRange.Rows.Count - 1
-        nextRow = lastUsedRow + 1
-      } else {
-        nextRow = sheet.Rows.Count > 1 ? 2 : 1
-      }
-
-      const finalStatus = parameters.status ?? SYNC_STATUS.SUCCESS
-      const finalCount = parameters.count ?? 1
-
-      setCellValue(sheet, nextRow, SYNC_RECORD_COL.TIME, now)
-      setCellValue(sheet, nextRow, SYNC_RECORD_COL.NAME, parameters.name ?? '')
-      setCellValue(sheet, nextRow, SYNC_RECORD_COL.URL, parameters.url ?? '')
-      setCellValue(sheet, nextRow, SYNC_RECORD_COL.SID, sid)
-      setCellValue(sheet, nextRow, SYNC_RECORD_COL.TYPE, parameters.type ?? '')
-      setCellValue(sheet, nextRow, SYNC_RECORD_COL.SOURCE, parameters.source ?? '')
-      setCellValue(sheet, nextRow, SYNC_RECORD_COL.COUNT, finalCount)
-      setCellValue(sheet, nextRow, SYNC_RECORD_COL.CONTENT, parameters.content ?? '')
-      setCellValue(sheet, nextRow, SYNC_RECORD_COL.STATUS, finalStatus)
-      setCellValue(sheet, nextRow, SYNC_RECORD_COL.MESSAGE, parameters.message ?? '')
-      if (parameters.fingerprint !== undefined)
-        setCellValue(sheet, nextRow, SYNC_RECORD_COL.FINGERPRINT, parameters.fingerprint)
-      if (parameters.collType)
-        setCellValue(sheet, nextRow, SYNC_RECORD_COL.COLL_TYPE, parameters.collType)
-
-      setSyncRecordColors(sheet, nextRow, finalStatus, finalCount)
-
-      _syncRecordSidCache.set(sid, nextRow)
-      _syncRecordListCache.push({
-        id: nextRow,
-        time: now,
-        sid,
-        count: finalCount,
-        status: finalStatus,
-        message: parameters.message ?? '',
-        ...(parameters.name ? { name: parameters.name } : {}),
-        ...(parameters.url ? { url: parameters.url } : {}),
-        ...(parameters.type ? { type: parameters.type } : {}),
-        ...(parameters.source ? { source: parameters.source } : {}),
-        ...(parameters.content ? { content: parameters.content } : {}),
-        ...(parameters.fingerprint === undefined ? {} : { fingerprint: parameters.fingerprint }),
-        ...(parameters.collType ? { collType: parameters.collType } : {}),
-      })
-    } else {
-      const existingCount = parseInt(getCellValue(sheet, existingRow, SYNC_RECORD_COL.COUNT)) || 0
-      const updatedCount = existingCount + (parameters.count ?? 1)
-      const finalStatus = parameters.status ?? SYNC_STATUS.SUCCESS
-
-      // 更新时间戳
-      setCellValue(sheet, existingRow, SYNC_RECORD_COL.TIME, now)
-      setCellValue(sheet, existingRow, SYNC_RECORD_COL.COUNT, updatedCount)
-      if (parameters.status)
-        setCellValue(sheet, existingRow, SYNC_RECORD_COL.STATUS, parameters.status)
-      if (parameters.message)
-        setCellValue(sheet, existingRow, SYNC_RECORD_COL.MESSAGE, parameters.message)
-      if (parameters.fingerprint !== undefined)
-        setCellValue(sheet, existingRow, SYNC_RECORD_COL.FINGERPRINT, parameters.fingerprint)
-      if (parameters.name) setCellValue(sheet, existingRow, SYNC_RECORD_COL.NAME, parameters.name)
-      if (parameters.url) setCellValue(sheet, existingRow, SYNC_RECORD_COL.URL, parameters.url)
-      if (parameters.type) setCellValue(sheet, existingRow, SYNC_RECORD_COL.TYPE, parameters.type)
-      if (parameters.source)
-        setCellValue(sheet, existingRow, SYNC_RECORD_COL.SOURCE, parameters.source)
-      if (parameters.content)
-        setCellValue(sheet, existingRow, SYNC_RECORD_COL.CONTENT, parameters.content)
-      if (parameters.collType)
-        setCellValue(sheet, existingRow, SYNC_RECORD_COL.COLL_TYPE, parameters.collType)
-
-      setSyncRecordColors(sheet, existingRow, finalStatus, updatedCount)
-
-      // 更新缓存
-      const cacheItem = _syncRecordListCache.find((item) => item.sid === sid)
-      if (cacheItem) {
-        cacheItem.time = now
-        cacheItem.count = updatedCount
-        if (parameters.status) cacheItem.status = parameters.status
-        if (parameters.message) cacheItem.message = parameters.message
-        if (parameters.fingerprint !== undefined) cacheItem.fingerprint = parameters.fingerprint
-        if (parameters.name) cacheItem.name = parameters.name
-        if (parameters.url) cacheItem.url = parameters.url
-        if (parameters.type) cacheItem.type = parameters.type
-        if (parameters.source) cacheItem.source = parameters.source
-        if (parameters.content) cacheItem.content = parameters.content
-        if (parameters.collType) cacheItem.collType = parameters.collType
-      }
-    }
-    return true
+    return appendOrUpdateSyncRecord(parameters)
   } catch (error: unknown) {
     BGM.handleError(error, { context: 'addSyncRecord', showAlert: false })
     return false
@@ -515,99 +422,7 @@ export function addSyncRecords(records: UpdateRecordParameters[]): boolean {
   if (records.length === 0) return true
 
   try {
-    const sheet = getOrCreateSyncRecordSheet()
-    deduplicateSyncRecords()
-    if (!_isSyncRecordCacheValid) buildCache(sheet)
-
-    const now = new Date().toLocaleString('zh-CN')
-    const pendingRows: string[][] = []
-    const sidToUpdate = new Map<
-      string,
-      { row: number; updatedCount: number; status: string; params: UpdateRecordParameters }
-    >()
-
-    for (const parameters of records) {
-      const sid = parameters.sid ?? ''
-      const existingRow = sid ? _syncRecordSidCache.get(sid) : undefined
-      if (existingRow === undefined) {
-        pendingRows.push([
-          sid,
-          now,
-          parameters.name ?? '',
-          parameters.url ?? '',
-          parameters.type ?? '',
-          parameters.source ?? '',
-          String(parameters.count ?? 1),
-          parameters.content ?? '',
-          parameters.status ?? SYNC_STATUS.SUCCESS,
-          parameters.collType ?? '',
-          parameters.message ?? '',
-          parameters.fingerprint ?? '',
-        ])
-      } else {
-        const existingCount = parseInt(getCellValue(sheet, existingRow, SYNC_RECORD_COL.COUNT)) || 0
-        const existing = sidToUpdate.get(sid)
-        const totalCount = (existing?.updatedCount ?? existingCount) + (parameters.count ?? 1)
-        sidToUpdate.set(sid, {
-          row: existingRow,
-          updatedCount: totalCount,
-          status: parameters.status ?? SYNC_STATUS.SUCCESS,
-          params: parameters,
-        })
-      }
-    }
-
-    // 批量写入新行：通过 Range.Value2 一次性写入二维数组
-    if (pendingRows.length > 0) {
-      const usedRange = sheet.UsedRange
-      let startRow = 2
-      if (usedRange) {
-        startRow = usedRange.Row + usedRange.Rows.Count
-      }
-      const endRow = startRow + pendingRows.length - 1
-      const startColLetter = colNumberToLetter(1)
-      const endColLetter = colNumberToLetter(SYNC_RECORD_COLUMNS.length)
-      const range = sheet.Range(
-        `${startColLetter}${String(startRow)}:${endColLetter}${String(endRow)}`,
-      )
-      range.Value2 = pendingRows
-
-      // 设置新增行的颜色
-      for (let index = 0; index < pendingRows.length; index += 1) {
-        const row = startRow + index
-        const data = pendingRows[index]
-        if (data) {
-          const status = data[SYNC_RECORD_COL.STATUS - 1] ?? SYNC_STATUS.SUCCESS
-          const count = parseInt(data[SYNC_RECORD_COL.COUNT - 1] ?? '') || 1
-          setSyncRecordColors(sheet, row, status, count)
-        }
-      }
-    }
-
-    // 更新已有 SID 的时间、次数、状态及其他字段
-    for (const [sid, { row, updatedCount, status, params }] of sidToUpdate) {
-      setCellValue(sheet, row, SYNC_RECORD_COL.TIME, now)
-      setCellValue(sheet, row, SYNC_RECORD_COL.COUNT, updatedCount)
-      setCellValue(sheet, row, SYNC_RECORD_COL.STATUS, status)
-      if (params.name) setCellValue(sheet, row, SYNC_RECORD_COL.NAME, params.name)
-      if (params.url) setCellValue(sheet, row, SYNC_RECORD_COL.URL, params.url)
-      if (params.type) setCellValue(sheet, row, SYNC_RECORD_COL.TYPE, params.type)
-      if (params.source) setCellValue(sheet, row, SYNC_RECORD_COL.SOURCE, params.source)
-      if (params.content) setCellValue(sheet, row, SYNC_RECORD_COL.CONTENT, params.content)
-      if (params.message) setCellValue(sheet, row, SYNC_RECORD_COL.MESSAGE, params.message)
-      if (params.fingerprint !== undefined)
-        setCellValue(sheet, row, SYNC_RECORD_COL.FINGERPRINT, params.fingerprint)
-      if (params.collType) setCellValue(sheet, row, SYNC_RECORD_COL.COLL_TYPE, params.collType)
-      setSyncRecordColors(sheet, row, status, updatedCount)
-      _syncRecordSidCache.set(sid, row)
-    }
-
-    invalidateCache()
-    bgmLog(
-      LOG_LEVELS.INFO,
-      `[addSyncRecords] 批量写入完成：新增 ${String(pendingRows.length)} 条，更新 ${String(sidToUpdate.size)} 条`,
-    )
-    return true
+    return appendOrUpdateSyncRecords(records)
   } catch (error: unknown) {
     BGM.handleError(error, { context: 'addSyncRecords', showAlert: false })
     return false
@@ -870,4 +685,209 @@ export function __resetSyncRecordCache(): void {
   _syncRecordListCache = []
   _isSyncRecordCacheValid = false
   _isFormattingInProgress = false
+}
+
+/**
+ * appendOrUpdateSyncRecord（自 try 块抽离，降低 unicorn/try-complexity 计数）
+ */
+function appendOrUpdateSyncRecord(parameters: UpdateRecordParameters) {
+  const sheet = getOrCreateSyncRecordSheet()
+
+  // 写入数据前先去重，确保缓存数据干净
+  deduplicateSyncRecords()
+
+  if (!_isSyncRecordCacheValid) buildCache(sheet)
+
+  const sid = parameters.sid ?? ''
+  const now = new Date().toLocaleString('zh-CN')
+
+  const existingRow = sid ? _syncRecordSidCache.get(sid) : undefined
+  if (existingRow === undefined) {
+    let nextRow = 1
+    const usedRange = sheet.UsedRange
+    if (usedRange) {
+      const lastUsedRow = usedRange.Row + usedRange.Rows.Count - 1
+      nextRow = lastUsedRow + 1
+    } else {
+      nextRow = sheet.Rows.Count > 1 ? 2 : 1
+    }
+
+    const finalStatus = parameters.status ?? SYNC_STATUS.SUCCESS
+    const finalCount = parameters.count ?? 1
+
+    setCellValue(sheet, nextRow, SYNC_RECORD_COL.TIME, now)
+    setCellValue(sheet, nextRow, SYNC_RECORD_COL.NAME, parameters.name ?? '')
+    setCellValue(sheet, nextRow, SYNC_RECORD_COL.URL, parameters.url ?? '')
+    setCellValue(sheet, nextRow, SYNC_RECORD_COL.SID, sid)
+    setCellValue(sheet, nextRow, SYNC_RECORD_COL.TYPE, parameters.type ?? '')
+    setCellValue(sheet, nextRow, SYNC_RECORD_COL.SOURCE, parameters.source ?? '')
+    setCellValue(sheet, nextRow, SYNC_RECORD_COL.COUNT, finalCount)
+    setCellValue(sheet, nextRow, SYNC_RECORD_COL.CONTENT, parameters.content ?? '')
+    setCellValue(sheet, nextRow, SYNC_RECORD_COL.STATUS, finalStatus)
+    setCellValue(sheet, nextRow, SYNC_RECORD_COL.MESSAGE, parameters.message ?? '')
+    if (parameters.fingerprint !== undefined)
+      setCellValue(sheet, nextRow, SYNC_RECORD_COL.FINGERPRINT, parameters.fingerprint)
+    if (parameters.collType)
+      setCellValue(sheet, nextRow, SYNC_RECORD_COL.COLL_TYPE, parameters.collType)
+
+    setSyncRecordColors(sheet, nextRow, finalStatus, finalCount)
+
+    _syncRecordSidCache.set(sid, nextRow)
+    _syncRecordListCache.push({
+      id: nextRow,
+      time: now,
+      sid,
+      count: finalCount,
+      status: finalStatus,
+      message: parameters.message ?? '',
+      ...(parameters.name ? { name: parameters.name } : {}),
+      ...(parameters.url ? { url: parameters.url } : {}),
+      ...(parameters.type ? { type: parameters.type } : {}),
+      ...(parameters.source ? { source: parameters.source } : {}),
+      ...(parameters.content ? { content: parameters.content } : {}),
+      ...(parameters.fingerprint === undefined ? {} : { fingerprint: parameters.fingerprint }),
+      ...(parameters.collType ? { collType: parameters.collType } : {}),
+    })
+  } else {
+    const existingCount = parseInt(getCellValue(sheet, existingRow, SYNC_RECORD_COL.COUNT)) || 0
+    const updatedCount = existingCount + (parameters.count ?? 1)
+    const finalStatus = parameters.status ?? SYNC_STATUS.SUCCESS
+
+    // 更新时间戳
+    setCellValue(sheet, existingRow, SYNC_RECORD_COL.TIME, now)
+    setCellValue(sheet, existingRow, SYNC_RECORD_COL.COUNT, updatedCount)
+    if (parameters.status)
+      setCellValue(sheet, existingRow, SYNC_RECORD_COL.STATUS, parameters.status)
+    if (parameters.message)
+      setCellValue(sheet, existingRow, SYNC_RECORD_COL.MESSAGE, parameters.message)
+    if (parameters.fingerprint !== undefined)
+      setCellValue(sheet, existingRow, SYNC_RECORD_COL.FINGERPRINT, parameters.fingerprint)
+    if (parameters.name) setCellValue(sheet, existingRow, SYNC_RECORD_COL.NAME, parameters.name)
+    if (parameters.url) setCellValue(sheet, existingRow, SYNC_RECORD_COL.URL, parameters.url)
+    if (parameters.type) setCellValue(sheet, existingRow, SYNC_RECORD_COL.TYPE, parameters.type)
+    if (parameters.source)
+      setCellValue(sheet, existingRow, SYNC_RECORD_COL.SOURCE, parameters.source)
+    if (parameters.content)
+      setCellValue(sheet, existingRow, SYNC_RECORD_COL.CONTENT, parameters.content)
+    if (parameters.collType)
+      setCellValue(sheet, existingRow, SYNC_RECORD_COL.COLL_TYPE, parameters.collType)
+
+    setSyncRecordColors(sheet, existingRow, finalStatus, updatedCount)
+
+    // 更新缓存
+    const cacheItem = _syncRecordListCache.find((item) => item.sid === sid)
+    if (cacheItem) {
+      cacheItem.time = now
+      cacheItem.count = updatedCount
+      if (parameters.status) cacheItem.status = parameters.status
+      if (parameters.message) cacheItem.message = parameters.message
+      if (parameters.fingerprint !== undefined) cacheItem.fingerprint = parameters.fingerprint
+      if (parameters.name) cacheItem.name = parameters.name
+      if (parameters.url) cacheItem.url = parameters.url
+      if (parameters.type) cacheItem.type = parameters.type
+      if (parameters.source) cacheItem.source = parameters.source
+      if (parameters.content) cacheItem.content = parameters.content
+      if (parameters.collType) cacheItem.collType = parameters.collType
+    }
+  }
+  return true
+}
+
+/**
+ * appendOrUpdateSyncRecords（自 try 块抽离，降低 unicorn/try-complexity 计数）
+ */
+function appendOrUpdateSyncRecords(records: UpdateRecordParameters[]) {
+  const sheet = getOrCreateSyncRecordSheet()
+  deduplicateSyncRecords()
+  if (!_isSyncRecordCacheValid) buildCache(sheet)
+
+  const now = new Date().toLocaleString('zh-CN')
+  const pendingRows: string[][] = []
+  const sidToUpdate = new Map<
+    string,
+    { row: number; updatedCount: number; status: string; params: UpdateRecordParameters }
+  >()
+
+  for (const parameters of records) {
+    const sid = parameters.sid ?? ''
+    const existingRow = sid ? _syncRecordSidCache.get(sid) : undefined
+    if (existingRow === undefined) {
+      pendingRows.push([
+        sid,
+        now,
+        parameters.name ?? '',
+        parameters.url ?? '',
+        parameters.type ?? '',
+        parameters.source ?? '',
+        String(parameters.count ?? 1),
+        parameters.content ?? '',
+        parameters.status ?? SYNC_STATUS.SUCCESS,
+        parameters.collType ?? '',
+        parameters.message ?? '',
+        parameters.fingerprint ?? '',
+      ])
+    } else {
+      const existingCount = parseInt(getCellValue(sheet, existingRow, SYNC_RECORD_COL.COUNT)) || 0
+      const existing = sidToUpdate.get(sid)
+      const totalCount = (existing?.updatedCount ?? existingCount) + (parameters.count ?? 1)
+      sidToUpdate.set(sid, {
+        row: existingRow,
+        updatedCount: totalCount,
+        status: parameters.status ?? SYNC_STATUS.SUCCESS,
+        params: parameters,
+      })
+    }
+  }
+
+  // 批量写入新行：通过 Range.Value2 一次性写入二维数组
+  if (pendingRows.length > 0) {
+    const usedRange = sheet.UsedRange
+    let startRow = 2
+    if (usedRange) {
+      startRow = usedRange.Row + usedRange.Rows.Count
+    }
+    const endRow = startRow + pendingRows.length - 1
+    const startColLetter = colNumberToLetter(1)
+    const endColLetter = colNumberToLetter(SYNC_RECORD_COLUMNS.length)
+    const range = sheet.Range(
+      `${startColLetter}${String(startRow)}:${endColLetter}${String(endRow)}`,
+    )
+    range.Value2 = pendingRows
+
+    // 设置新增行的颜色
+    for (let index = 0; index < pendingRows.length; index += 1) {
+      const row = startRow + index
+      const data = pendingRows[index]
+      if (data) {
+        const status = data[SYNC_RECORD_COL.STATUS - 1] ?? SYNC_STATUS.SUCCESS
+        const count = parseInt(data[SYNC_RECORD_COL.COUNT - 1] ?? '') || 1
+        setSyncRecordColors(sheet, row, status, count)
+      }
+    }
+  }
+
+  // 更新已有 SID 的时间、次数、状态及其他字段
+  for (const [sid, { row, updatedCount, status, params }] of sidToUpdate) {
+    setCellValue(sheet, row, SYNC_RECORD_COL.TIME, now)
+    setCellValue(sheet, row, SYNC_RECORD_COL.COUNT, updatedCount)
+    setCellValue(sheet, row, SYNC_RECORD_COL.STATUS, status)
+    if (params.name) setCellValue(sheet, row, SYNC_RECORD_COL.NAME, params.name)
+    if (params.url) setCellValue(sheet, row, SYNC_RECORD_COL.URL, params.url)
+    if (params.type) setCellValue(sheet, row, SYNC_RECORD_COL.TYPE, params.type)
+    if (params.source) setCellValue(sheet, row, SYNC_RECORD_COL.SOURCE, params.source)
+    if (params.content) setCellValue(sheet, row, SYNC_RECORD_COL.CONTENT, params.content)
+    if (params.message) setCellValue(sheet, row, SYNC_RECORD_COL.MESSAGE, params.message)
+    if (params.fingerprint !== undefined)
+      setCellValue(sheet, row, SYNC_RECORD_COL.FINGERPRINT, params.fingerprint)
+    if (params.collType) setCellValue(sheet, row, SYNC_RECORD_COL.COLL_TYPE, params.collType)
+    setSyncRecordColors(sheet, row, status, updatedCount)
+    _syncRecordSidCache.set(sid, row)
+  }
+
+  invalidateCache()
+  bgmLog(
+    LOG_LEVELS.INFO,
+    `[addSyncRecords] 批量写入完成：新增 ${String(pendingRows.length)} 条，更新 ${String(sidToUpdate.size)} 条`,
+  )
+  return true
 }

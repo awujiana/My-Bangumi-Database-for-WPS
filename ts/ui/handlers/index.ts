@@ -411,52 +411,7 @@ const handleRefreshIntervalChange = (): void => {
  */
 const debouncedSaveGithubConfig = debounce((): void => {
   try {
-    const ownerInput = document.getElementById('githubOwner') as HTMLInputElement | null
-    const repoInput = document.getElementById('githubRepo') as HTMLInputElement | null
-    const branchInput = document.getElementById('githubBranch') as HTMLInputElement | null
-    const pathInput = document.getElementById('githubPath') as HTMLInputElement | null
-    const localFilePathInput = document.getElementById('localFilePath') as HTMLInputElement | null
-    const gistIdInput = document.getElementById('gistId') as HTMLInputElement | null
-    const strategySelect = document.getElementById('githubStrategy') as HTMLSelectElement | null
-    const sourceTypeSelect = document.getElementById('syncSourceType') as HTMLSelectElement | null
-
-    const owner = (ownerInput?.value ?? '').trim()
-    const repo = (repoInput?.value ?? '').trim()
-    const branch = (branchInput?.value ?? '').trim() || 'main'
-    const strategy = (strategySelect?.value as SyncStrategy | undefined) ?? 'add-update'
-    const sourceType = (sourceTypeSelect?.value as SyncSourceType | undefined) ?? 'github'
-
-    // 按数据源类型读取对应字段值
-    // - local: 复用 githubConfig.path 字段存储本地文件路径（与远程源 path 字段互斥复用）
-    // - gist: 使用独立的 gistId 字段
-    // - github/gitlab/gitee: 使用 owner/repo/branch/path
-    let path: string
-    let gistId: string | undefined
-    if (sourceType === 'local') {
-      path = (localFilePathInput?.value ?? '').trim()
-    } else {
-      path = (pathInput?.value ?? '').trim()
-    }
-    if (sourceType === 'gist') {
-      gistId = (gistIdInput?.value ?? '').trim() || undefined
-    }
-
-    // 必填项校验：用户可能正在输入，未完成时跳过自动保存
-    if (sourceType === 'local') {
-      if (!path) return
-    } else if (sourceType === 'gist') {
-      if (!gistId) return
-    } else if (!owner || !repo || !path) return
-
-    const isOkConfig = setGithubConfig({ owner, repo, branch, path, sourceType, gistId })
-    const isOkStrategy = setSyncStrategy(strategy)
-    const isOkSourceType = setSyncSourceType(sourceType)
-    if (isOkConfig && isOkStrategy && isOkSourceType) {
-      bgmLog(
-        LOG_LEVELS.INFO,
-        `[handlers] GitHub 配置已自动保存: ${owner}/${repo}/${branch}/${path}, 策略: ${strategy}, 同步源: ${sourceType}${gistId ? `, gistId: ${gistId}` : ''}`,
-      )
-    }
+    saveGithubConfigFromDom()
   } catch (error: unknown) {
     bgmLog(LOG_LEVELS.WARN, `[handlers] GitHub 配置自动保存失败: ${(error as Error).message}`)
   }
@@ -2408,5 +2363,57 @@ function initSkipConflictsFromRibbon(): void {
   const chkSkipConflicts = document.getElementById('chkSkipConflicts') as HTMLInputElement | null
   if (chkSkipConflicts) {
     trackedAddEventListener(chkSkipConflicts, 'change', handleChkSkipConflictsChange)
+  }
+}
+
+/**
+ * saveGithubConfigFromDom（自 try 块抽离，降低 unicorn/try-complexity 计数）
+ */
+function saveGithubConfigFromDom() {
+  const ownerInput = document.getElementById('githubOwner') as HTMLInputElement | null
+  const repoInput = document.getElementById('githubRepo') as HTMLInputElement | null
+  const branchInput = document.getElementById('githubBranch') as HTMLInputElement | null
+  const pathInput = document.getElementById('githubPath') as HTMLInputElement | null
+  const localFilePathInput = document.getElementById('localFilePath') as HTMLInputElement | null
+  const gistIdInput = document.getElementById('gistId') as HTMLInputElement | null
+  const strategySelect = document.getElementById('githubStrategy') as HTMLSelectElement | null
+  const sourceTypeSelect = document.getElementById('syncSourceType') as HTMLSelectElement | null
+
+  const owner = (ownerInput?.value ?? '').trim()
+  const repo = (repoInput?.value ?? '').trim()
+  const branch = (branchInput?.value ?? '').trim() || 'main'
+  const strategy = (strategySelect?.value as SyncStrategy | undefined) ?? 'add-update'
+  const sourceType = (sourceTypeSelect?.value as SyncSourceType | undefined) ?? 'github'
+
+  // 按数据源类型读取对应字段值
+  // - local: 复用 githubConfig.path 字段存储本地文件路径（与远程源 path 字段互斥复用）
+  // - gist: 使用独立的 gistId 字段
+  // - github/gitlab/gitee: 使用 owner/repo/branch/path
+  let path: string
+  let gistId: string | undefined
+  if (sourceType === 'local') {
+    path = (localFilePathInput?.value ?? '').trim()
+  } else {
+    path = (pathInput?.value ?? '').trim()
+  }
+  if (sourceType === 'gist') {
+    gistId = (gistIdInput?.value ?? '').trim() || undefined
+  }
+
+  // 必填项校验：用户可能正在输入，未完成时跳过自动保存
+  if (sourceType === 'local') {
+    if (!path) return
+  } else if (sourceType === 'gist') {
+    if (!gistId) return
+  } else if (!owner || !repo || !path) return
+
+  const isOkConfig = setGithubConfig({ owner, repo, branch, path, sourceType, gistId })
+  const isOkStrategy = setSyncStrategy(strategy)
+  const isOkSourceType = setSyncSourceType(sourceType)
+  if (isOkConfig && isOkStrategy && isOkSourceType) {
+    bgmLog(
+      LOG_LEVELS.INFO,
+      `[handlers] GitHub 配置已自动保存: ${owner}/${repo}/${branch}/${path}, 策略: ${strategy}, 同步源: ${sourceType}${gistId ? `, gistId: ${gistId}` : ''}`,
+    )
   }
 }

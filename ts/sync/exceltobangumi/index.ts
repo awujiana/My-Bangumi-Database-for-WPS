@@ -616,76 +616,90 @@ function processRowToSyncTask(
   seqCol: number,
 ): RowProcessOutcome {
   try {
-    const bgmUrl = getField(rowNumber, 'Bangumi_URL')
-    if (!bgmUrl) return { task: null, skipped: true, failed: false }
-
-    const sid = extractSubjectId(bgmUrl)
-    if (!sid) return { task: null, skipped: true, failed: false }
-
-    // 冲突跳过
-    if (skipSids?.has(sid)) {
-      return { task: null, skipped: true, failed: false }
-    }
-
-    // 读取观看状态（空状态视为「想看」，由 mapWatchStatus 返回 1）
-    const watchStatusField =
-      getField(rowNumber, '是否看完') ||
-      getField(rowNumber, '状态') ||
-      getField(rowNumber, '观看状态')
-
-    // 获取观看状态类型（空值 → 1=想看，未识别 → 0 跳过）
-    const watchType = mapWatchStatus(watchStatusField)
-    if (watchType === 0) {
-      return { task: null, skipped: true, failed: false }
-    }
-
-    // 增量同步指纹检查（标签包含 标签/分级 + 原作标签，与 buildJsonPayload 保持一致）
-    let currentFingerprint: string | undefined
-    if (fingerprintMap) {
-      currentFingerprint = calcFingerprint([
-        getField(rowNumber, '名称'),
-        watchType.toString(),
-        getField(rowNumber, '打分'),
-        getField(rowNumber, '标签/分级'),
-        getField(rowNumber, '原作标签'),
-        getField(rowNumber, '剧透/感言'),
-        getField(rowNumber, '集数'),
-        getField(rowNumber, '集号'),
-      ])
-
-      const storedFingerprint = fingerprintMap.get(sid)
-      if (storedFingerprint === currentFingerprint) {
-        return { task: null, skipped: true, failed: false }
-      }
-    }
-
-    // 检查已上传颜色（非增量模式）
-    if (!fingerprintMap && isCellMarkedSuccess(ws, rowNumber, seqCol)) {
-      return { task: null, skipped: true, failed: false }
-    }
-
-    const finishedDate = getField(rowNumber, '完播日')
-    const jsonBody = buildJsonPayload((key) => getField(rowNumber, key), finishedDate)
-    const name = getField(rowNumber, '名称')
-    const epRaw = trim(getField(rowNumber, '集数') || getField(rowNumber, '集号') || '')
-    const epNumber = parseInt(epRaw, 10)
-
-    const task: _SyncTask = {
-      rowNum: rowNumber,
-      sid,
-      bgmUrl,
-      name,
-      jsonBody,
-      ...(currentFingerprint === undefined ? {} : { fingerprint: currentFingerprint }),
-      type: watchType,
-      ...(!isNaN(epNumber) && epNumber > 0 ? { epCount: epNumber } : {}),
-    }
-
-    return { task, skipped: false, failed: false }
+    return processRowToSyncTaskInner(ws, rowNumber, getField, skipSids, fingerprintMap, seqCol)
   } catch (error: unknown) {
     BGM.handleError(error, { level: BGM.ErrorLevel.WARN, context: 'SyncToBangumiAsync:preprocess' })
     return { task: null, skipped: false, failed: true }
   }
+}
+
+/**
+ * processRowToSyncTask 主体（自 try 块抽离，降低 unicorn/try-complexity 计数）
+ */
+function processRowToSyncTaskInner(
+  ws: WpsWorksheet,
+  rowNumber: number,
+  getField: (row: number, key: string) => string,
+  skipSids: Set<string> | undefined,
+  fingerprintMap: Map<string, string> | undefined,
+  seqCol: number,
+): RowProcessOutcome {
+  const bgmUrl = getField(rowNumber, 'Bangumi_URL')
+  if (!bgmUrl) return { task: null, skipped: true, failed: false }
+
+  const sid = extractSubjectId(bgmUrl)
+  if (!sid) return { task: null, skipped: true, failed: false }
+
+  // 冲突跳过
+  if (skipSids?.has(sid)) {
+    return { task: null, skipped: true, failed: false }
+  }
+
+  // 读取观看状态（空状态视为「想看」，由 mapWatchStatus 返回 1）
+  const watchStatusField =
+    getField(rowNumber, '是否看完') ||
+    getField(rowNumber, '状态') ||
+    getField(rowNumber, '观看状态')
+
+  // 获取观看状态类型（空值 → 1=想看，未识别 → 0 跳过）
+  const watchType = mapWatchStatus(watchStatusField)
+  if (watchType === 0) {
+    return { task: null, skipped: true, failed: false }
+  }
+
+  // 增量同步指纹检查（标签包含 标签/分级 + 原作标签，与 buildJsonPayload 保持一致）
+  let currentFingerprint: string | undefined
+  if (fingerprintMap) {
+    currentFingerprint = calcFingerprint([
+      getField(rowNumber, '名称'),
+      watchType.toString(),
+      getField(rowNumber, '打分'),
+      getField(rowNumber, '标签/分级'),
+      getField(rowNumber, '原作标签'),
+      getField(rowNumber, '剧透/感言'),
+      getField(rowNumber, '集数'),
+      getField(rowNumber, '集号'),
+    ])
+
+    const storedFingerprint = fingerprintMap.get(sid)
+    if (storedFingerprint === currentFingerprint) {
+      return { task: null, skipped: true, failed: false }
+    }
+  }
+
+  // 检查已上传颜色（非增量模式）
+  if (!fingerprintMap && isCellMarkedSuccess(ws, rowNumber, seqCol)) {
+    return { task: null, skipped: true, failed: false }
+  }
+
+  const finishedDate = getField(rowNumber, '完播日')
+  const jsonBody = buildJsonPayload((key) => getField(rowNumber, key), finishedDate)
+  const name = getField(rowNumber, '名称')
+  const epRaw = trim(getField(rowNumber, '集数') || getField(rowNumber, '集号') || '')
+  const epNumber = parseInt(epRaw, 10)
+
+  const task: _SyncTask = {
+    rowNum: rowNumber,
+    sid,
+    bgmUrl,
+    name,
+    jsonBody,
+    ...(currentFingerprint === undefined ? {} : { fingerprint: currentFingerprint }),
+    type: watchType,
+    ...(!isNaN(epNumber) && epNumber > 0 ? { epCount: epNumber } : {}),
+  }
+
+  return { task, skipped: false, failed: false }
 }
 
 /**
