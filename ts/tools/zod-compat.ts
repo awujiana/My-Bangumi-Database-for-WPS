@@ -13,7 +13,9 @@
  *              真实 zod UMD 到 window.z。
  */
 
-interface _ZodIssue {
+// 必须导出：schemas/*.ts 导出的 Schema 变量类型签名经由 ParseResult 传递引用到本类型，
+// declaration emit（.d.ts）需要按名字引用它，未导出会报 TS4023 "cannot be named"。
+export interface _ZodIssue {
   message: string
   path?: (string | number)[]
 }
