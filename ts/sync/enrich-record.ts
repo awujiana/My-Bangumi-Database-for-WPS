@@ -269,52 +269,7 @@ export function clearEnrichRecords(): void {
 
 export function getAllEnrichRecords(): EnrichRecord[] {
   try {
-    const app = getApp()
-    if (!app?.ActiveWorkbook) return []
-
-    const wb = app.ActiveWorkbook
-    let sheet: WpsWorksheet | null = null
-
-    try {
-      const sheets = wb.Sheets
-      for (let index = 1; index <= sheets.Count; index += 1) {
-        const s = sheets.Item(index)
-        if (s.Name === ENRICH_RECORD_SHEET_NAME) {
-          sheet = s
-          break
-        }
-      }
-    } catch (error: unknown) {
-      BGM.handleError(error, { context: 'getAllEnrichRecords', showAlert: false })
-      return []
-    }
-
-    if (!sheet) return []
-
-    const lastRow = getLastRow(sheet)
-    if (lastRow < 2) return []
-
-    const allData = readRangeValues(sheet, 2, lastRow, 1, ENRICH_RECORD_COLUMNS.length)
-    if (allData.length === 0) return []
-
-    const records: EnrichRecord[] = []
-    for (const rowData of allData) {
-      const record: EnrichRecord = {
-        timestamp: rowData[ENRICH_RECORD_COL.TIMESTAMP - 1] ?? '',
-        matchType: (rowData[ENRICH_RECORD_COL.MATCH_TYPE - 1] ??
-          '未匹配') as EnrichRecord['matchType'],
-        name: rowData[ENRICH_RECORD_COL.NAME - 1] ?? '',
-        row: parseInt(rowData[ENRICH_RECORD_COL.ROW - 1] ?? '0') || 0,
-        enrichedField: rowData[ENRICH_RECORD_COL.ENRICHED_FIELD - 1] ?? '',
-        oldValue: rowData[ENRICH_RECORD_COL.OLD_VALUE - 1] ?? '',
-        updatedValue: rowData[ENRICH_RECORD_COL.NEW_VALUE - 1] ?? '',
-        action: (rowData[ENRICH_RECORD_COL.ACTION - 1] ?? 'skip') as EnrichRecord['action'],
-        note: rowData[ENRICH_RECORD_COL.NOTE - 1] ?? '',
-      }
-      records.push(record)
-    }
-
-    return records
+    return getAllEnrichRecordsInner()
   } catch (error: unknown) {
     BGM.handleError(error, { context: 'getAllEnrichRecords', showAlert: false })
     return []
@@ -402,4 +357,56 @@ export function formatEnrichRecordSheet(): void {
   } catch (error: unknown) {
     BGM.handleError(error, { context: 'formatEnrichRecordSheet', showAlert: false })
   }
+}
+
+/**
+ * getAllEnrichRecordsInner（自 try 块抽离，降低 unicorn/try-complexity 计数）
+ */
+function getAllEnrichRecordsInner() {
+  const app = getApp()
+  if (!app?.ActiveWorkbook) return []
+
+  const wb = app.ActiveWorkbook
+  let sheet: WpsWorksheet | null = null
+
+  try {
+    const sheets = wb.Sheets
+    for (let index = 1; index <= sheets.Count; index += 1) {
+      const s = sheets.Item(index)
+      if (s.Name === ENRICH_RECORD_SHEET_NAME) {
+        sheet = s
+        break
+      }
+    }
+  } catch (error: unknown) {
+    BGM.handleError(error, { context: 'getAllEnrichRecords', showAlert: false })
+    return []
+  }
+
+  if (!sheet) return []
+
+  const lastRow = getLastRow(sheet)
+  if (lastRow < 2) return []
+
+  const allData = readRangeValues(sheet, 2, lastRow, 1, ENRICH_RECORD_COLUMNS.length)
+  if (allData.length === 0) return []
+
+  const records: EnrichRecord[] = []
+  for (const rowData of allData) {
+    const record: EnrichRecord = {
+      timestamp: rowData[ENRICH_RECORD_COL.TIMESTAMP - 1] ?? '',
+      matchType: (rowData[ENRICH_RECORD_COL.MATCH_TYPE - 1] ??
+        '未匹配') as EnrichRecord['matchType'],
+      name: rowData[ENRICH_RECORD_COL.NAME - 1] ?? '',
+      row: parseInt(rowData[ENRICH_RECORD_COL.ROW - 1] ?? '0') || 0,
+      enrichedField: rowData[ENRICH_RECORD_COL.ENRICHED_FIELD - 1] ?? '',
+      oldValue: rowData[ENRICH_RECORD_COL.OLD_VALUE - 1] ?? '',
+      updatedValue: rowData[ENRICH_RECORD_COL.NEW_VALUE - 1] ?? '',
+      action: (rowData[ENRICH_RECORD_COL.ACTION - 1] ?? 'skip') as EnrichRecord['action'],
+      note: rowData[ENRICH_RECORD_COL.NOTE - 1] ?? '',
+    }
+    records.push(record)
+  }
+
+  return records
 }

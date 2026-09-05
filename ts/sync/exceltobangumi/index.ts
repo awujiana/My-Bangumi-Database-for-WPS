@@ -211,139 +211,7 @@ export function getFilterStatus(
   }
 
   try {
-    const app = getApp()
-    if (!app?.ActiveWorkbook) return result
-
-    let ws: WpsWorksheet | null = null
-    let effectiveLastRow: number | undefined
-    let effectiveHeaderRow: number | undefined
-
-    if (typeof wsOrLastRow === 'number') {
-      effectiveLastRow = wsOrLastRow
-      effectiveHeaderRow = lastRow
-      ws = app.ActiveWorkbook.ActiveSheet
-      bgmLog(LOG_LEVELS.INFO, `getFilterStatus: 使用 ActiveSheet（兼容模式）`)
-    } else if (wsOrLastRow) {
-      ws = wsOrLastRow
-      effectiveLastRow = lastRow
-      effectiveHeaderRow = headerRow
-      bgmLog(LOG_LEVELS.INFO, `getFilterStatus: 使用传入的工作表: ${ws.Name}`)
-    } else {
-      ws = app.ActiveWorkbook.ActiveSheet
-      bgmLog(LOG_LEVELS.INFO, `getFilterStatus: 使用 ActiveSheet（无参数）`)
-    }
-
-    if (!isWpsWorksheet(ws)) return result
-
-    let isAutoFilterMode = false
-    try {
-      isAutoFilterMode = !!ws.AutoFilterMode
-    } catch (error: unknown) {
-      BGM.handleError(error, { context: 'getFilterStatus', showAlert: false })
-    }
-    bgmLog(
-      LOG_LEVELS.INFO,
-      `getFilterStatus: AutoFilterMode=${String(isAutoFilterMode)}, ws.Name=${ws.Name}, deepCheck=${String(shouldDeepCheck ?? '')}`,
-    )
-
-    // 2. 快速检测：仅在 deepCheck 时才扫描全范围
-    //    旧用法（无 deepCheck）只查 AutoFilter，这是兼容的快速路径
-    if (!isAutoFilterMode && !shouldDeepCheck) {
-      bgmLog(LOG_LEVELS.INFO, 'getFilterStatus: 快速路径：无 AutoFilter')
-      return result
-    }
-
-    // 3. 确定扫描范围（非 AutoFilter 模式需要全范围扫描隐藏行）
-    const maxRow = effectiveLastRow && effectiveLastRow > 0 ? effectiveLastRow : ws.Rows.Count
-    const scanRange = ws.Range(`A1:A${String(maxRow)}`)
-    bgmLog(LOG_LEVELS.INFO, `getFilterStatus: 扫描范围 A1:A${String(maxRow)}`)
-
-    // 4. 获取可见单元格来检测筛选/隐藏行
-    let visibleCells: WpsRange | null = null
-    if (isAutoFilterMode) {
-      try {
-        if (ws.AutoFilter?.Range) {
-          visibleCells = ws.AutoFilter.Range.SpecialCells(12)
-          bgmLog(LOG_LEVELS.INFO, `getFilterStatus: AutoFilter 模式`)
-        }
-      } catch (error: unknown) {
-        BGM.handleError(error, { context: 'getFilterStatus', showAlert: false })
-      }
-    } else {
-      // deepCheck 模式：用全范围检测手动隐藏行
-      try {
-        visibleCells = scanRange.SpecialCells(12)
-      } catch {
-        /* 所有行可见时抛出异常，忽略 */
-      }
-    }
-
-    if (!visibleCells) {
-      bgmLog(LOG_LEVELS.INFO, 'getFilterStatus: 无筛选')
-      return result
-    }
-
-    // 5. 快速判断：可见行数 ≈ 总行数 → 无隐藏行（仅对非 AutoFilter 的 deepCheck 模式）
-    if (!isAutoFilterMode) {
-      try {
-        const totalCount = scanRange.Count
-        const visibleCount = visibleCells.Count
-        if (visibleCount >= totalCount) {
-          bgmLog(LOG_LEVELS.INFO, `getFilterStatus: 所有 ${String(maxRow)} 行均可见，无筛选`)
-          return result
-        }
-      } catch {
-        /* Count 异常则继续走完整检测 */
-      }
-    }
-
-    result.hasFilter = true
-
-    // 6. 提取所有可见行号（去重）
-    const rawRows = new Set<number>()
-    const areas: WpsRange[] = []
-    try {
-      if (visibleCells.Areas) {
-        for (let a = 1; a <= visibleCells.Areas.Count; a += 1) {
-          areas.push(visibleCells.Areas.Item(a))
-        }
-      } else {
-        areas.push(visibleCells)
-      }
-    } catch (error: unknown) {
-      BGM.handleError(error, { context: 'getFilterStatus', showAlert: false })
-      areas.push(visibleCells)
-    }
-
-    for (const area of areas) {
-      const rows = area.Rows
-      for (let r = 1; r <= rows.Count; r += 1) {
-        rawRows.add(rows.Item(r).Row)
-      }
-    }
-    bgmLog(LOG_LEVELS.INFO, `SpecialCells 收集到 ${String(rawRows.size)} 个原始行号`)
-    const rowList = Array.from(rawRows).sort((a, b) => a - b)
-    // 仅打印行号摘要，不逐行读取单元格值（避免大量 COM 调用导致卡顿）
-    bgmLog(
-      LOG_LEVELS.INFO,
-      `  前 ${String(Math.min(rowList.length, 10))} 行: ${rowList.slice(0, 10).join(', ')}`,
-    )
-    if (rowList.length > 10) {
-      bgmLog(LOG_LEVELS.INFO, `  ... 剩余 ${String(rowList.length - 10)} 行省略`)
-    }
-
-    // 6. 生成最终可见行列表（排除表头行）
-    for (const r of rawRows) {
-      if (!(effectiveHeaderRow != null && r === effectiveHeaderRow)) {
-        result.visibleRows.push(r)
-      }
-    }
-    result.visibleRows.sort((a, b) => a - b)
-
-    bgmLog(LOG_LEVELS.INFO, `有效可见数据行: ${String(result.visibleRows.length)} 行`)
-    if (result.visibleRows.length > 0) {
-      bgmLog(LOG_LEVELS.INFO, `可见行前10: ${result.visibleRows.slice(0, 10).join(',')}`)
-    }
+    return getFilterStatusCore(result, wsOrLastRow, lastRow, headerRow, shouldDeepCheck)
   } catch (error: unknown) {
     BGM.handleError(error, { context: 'getFilterStatus', showAlert: false })
   }
@@ -1522,4 +1390,150 @@ export async function syncSelectedRows(): Promise<void> {
     LOG_LEVELS.INFO,
     `[syncSelectedRows] ========== 选中行同步结束，总耗时: ${String(Date.now() - startTime)}ms ==========`,
   )
+}
+
+/**
+ * getFilterStatusCore（自 try 块抽离，降低 unicorn/try-complexity 计数）
+ */
+function getFilterStatusCore(
+  result: { hasFilter: boolean; visibleRows: number[]; hiddenRows: number[] },
+  wsOrLastRow?: WpsWorksheet | number,
+  lastRow?: number,
+  headerRow?: number,
+  shouldDeepCheck?: boolean,
+): { hasFilter: boolean; visibleRows: number[]; hiddenRows: number[] } {
+  const app = getApp()
+  if (!app?.ActiveWorkbook) return result
+
+  let ws: WpsWorksheet | null = null
+  let effectiveLastRow: number | undefined
+  let effectiveHeaderRow: number | undefined
+
+  if (typeof wsOrLastRow === 'number') {
+    effectiveLastRow = wsOrLastRow
+    effectiveHeaderRow = lastRow
+    ws = app.ActiveWorkbook.ActiveSheet
+    bgmLog(LOG_LEVELS.INFO, `getFilterStatus: 使用 ActiveSheet（兼容模式）`)
+  } else if (wsOrLastRow) {
+    ws = wsOrLastRow
+    effectiveLastRow = lastRow
+    effectiveHeaderRow = headerRow
+    bgmLog(LOG_LEVELS.INFO, `getFilterStatus: 使用传入的工作表: ${ws.Name}`)
+  } else {
+    ws = app.ActiveWorkbook.ActiveSheet
+    bgmLog(LOG_LEVELS.INFO, `getFilterStatus: 使用 ActiveSheet（无参数）`)
+  }
+
+  if (!isWpsWorksheet(ws)) return result
+
+  let isAutoFilterMode = false
+  try {
+    isAutoFilterMode = !!ws.AutoFilterMode
+  } catch (error: unknown) {
+    BGM.handleError(error, { context: 'getFilterStatus', showAlert: false })
+  }
+  bgmLog(
+    LOG_LEVELS.INFO,
+    `getFilterStatus: AutoFilterMode=${String(isAutoFilterMode)}, ws.Name=${ws.Name}, deepCheck=${String(shouldDeepCheck ?? '')}`,
+  )
+
+  // 2. 快速检测：仅在 deepCheck 时才扫描全范围
+  //    旧用法（无 deepCheck）只查 AutoFilter，这是兼容的快速路径
+  if (!isAutoFilterMode && !shouldDeepCheck) {
+    bgmLog(LOG_LEVELS.INFO, 'getFilterStatus: 快速路径：无 AutoFilter')
+    return result
+  }
+
+  // 3. 确定扫描范围（非 AutoFilter 模式需要全范围扫描隐藏行）
+  const maxRow = effectiveLastRow && effectiveLastRow > 0 ? effectiveLastRow : ws.Rows.Count
+  const scanRange = ws.Range(`A1:A${String(maxRow)}`)
+  bgmLog(LOG_LEVELS.INFO, `getFilterStatus: 扫描范围 A1:A${String(maxRow)}`)
+
+  // 4. 获取可见单元格来检测筛选/隐藏行
+  let visibleCells: WpsRange | null = null
+  if (isAutoFilterMode) {
+    try {
+      if (ws.AutoFilter?.Range) {
+        visibleCells = ws.AutoFilter.Range.SpecialCells(12)
+        bgmLog(LOG_LEVELS.INFO, `getFilterStatus: AutoFilter 模式`)
+      }
+    } catch (error: unknown) {
+      BGM.handleError(error, { context: 'getFilterStatus', showAlert: false })
+    }
+  } else {
+    // deepCheck 模式：用全范围检测手动隐藏行
+    try {
+      visibleCells = scanRange.SpecialCells(12)
+    } catch {
+      /* 所有行可见时抛出异常，忽略 */
+    }
+  }
+
+  if (!visibleCells) {
+    bgmLog(LOG_LEVELS.INFO, 'getFilterStatus: 无筛选')
+    return result
+  }
+
+  // 5. 快速判断：可见行数 ≈ 总行数 → 无隐藏行（仅对非 AutoFilter 的 deepCheck 模式）
+  if (!isAutoFilterMode) {
+    try {
+      const totalCount = scanRange.Count
+      const visibleCount = visibleCells.Count
+      if (visibleCount >= totalCount) {
+        bgmLog(LOG_LEVELS.INFO, `getFilterStatus: 所有 ${String(maxRow)} 行均可见，无筛选`)
+        return result
+      }
+    } catch {
+      /* Count 异常则继续走完整检测 */
+    }
+  }
+
+  result.hasFilter = true
+
+  // 6. 提取所有可见行号（去重）
+  const rawRows = new Set<number>()
+  const areas: WpsRange[] = []
+  try {
+    if (visibleCells.Areas) {
+      for (let a = 1; a <= visibleCells.Areas.Count; a += 1) {
+        areas.push(visibleCells.Areas.Item(a))
+      }
+    } else {
+      areas.push(visibleCells)
+    }
+  } catch (error: unknown) {
+    BGM.handleError(error, { context: 'getFilterStatus', showAlert: false })
+    areas.push(visibleCells)
+  }
+
+  for (const area of areas) {
+    const rows = area.Rows
+    for (let r = 1; r <= rows.Count; r += 1) {
+      rawRows.add(rows.Item(r).Row)
+    }
+  }
+  bgmLog(LOG_LEVELS.INFO, `SpecialCells 收集到 ${String(rawRows.size)} 个原始行号`)
+  const rowList = Array.from(rawRows).sort((a, b) => a - b)
+  // 仅打印行号摘要，不逐行读取单元格值（避免大量 COM 调用导致卡顿）
+  bgmLog(
+    LOG_LEVELS.INFO,
+    `  前 ${String(Math.min(rowList.length, 10))} 行: ${rowList.slice(0, 10).join(', ')}`,
+  )
+  if (rowList.length > 10) {
+    bgmLog(LOG_LEVELS.INFO, `  ... 剩余 ${String(rowList.length - 10)} 行省略`)
+  }
+
+  // 6. 生成最终可见行列表（排除表头行）
+  for (const r of rawRows) {
+    if (!(effectiveHeaderRow != null && r === effectiveHeaderRow)) {
+      result.visibleRows.push(r)
+    }
+  }
+  result.visibleRows.sort((a, b) => a - b)
+
+  bgmLog(LOG_LEVELS.INFO, `有效可见数据行: ${String(result.visibleRows.length)} 行`)
+  if (result.visibleRows.length > 0) {
+    bgmLog(LOG_LEVELS.INFO, `可见行前10: ${result.visibleRows.slice(0, 10).join(',')}`)
+  }
+  return result
 }

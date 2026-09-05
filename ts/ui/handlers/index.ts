@@ -467,59 +467,7 @@ export function setupButtonListeners(): void {
 
   // GitHub 配置：面板加载时自动填充已保存的值（含策略与同步源类型）
   try {
-    const config = getGithubConfig()
-    const ownerInput = document.getElementById('githubOwner') as HTMLInputElement | null
-    const repoInput = document.getElementById('githubRepo') as HTMLInputElement | null
-    const branchInput = document.getElementById('githubBranch') as HTMLInputElement | null
-    const pathInput = document.getElementById('githubPath') as HTMLInputElement | null
-    const localFilePathInput = document.getElementById('localFilePath') as HTMLInputElement | null
-    const gistIdInput = document.getElementById('gistId') as HTMLInputElement | null
-    const strategySelect = document.getElementById('githubStrategy') as HTMLSelectElement | null
-    const sourceTypeSelect = document.getElementById('syncSourceType') as HTMLSelectElement | null
-    if (ownerInput) ownerInput.value = config.owner
-    if (repoInput) repoInput.value = config.repo
-    if (branchInput) branchInput.value = config.branch
-    if (pathInput) pathInput.value = config.path
-    // 本地文件路径复用 githubConfig.path 字段，回填到独立输入框
-    if (localFilePathInput) localFilePathInput.value = config.path
-    // Gist ID 回填
-    if (gistIdInput && config.gistId) gistIdInput.value = config.gistId
-    // 回填策略
-    const savedStrategy = getSyncStrategy()
-    if (strategySelect) strategySelect.value = savedStrategy
-    // 回填同步源类型，并触发字段显示/隐藏切换
-    const savedSourceType = getSyncSourceType()
-    if (sourceTypeSelect) sourceTypeSelect.value = savedSourceType
-    toggleSourceFields(savedSourceType)
-    if (config.owner || config.repo || config.path) {
-      bgmLog(
-        LOG_LEVELS.INFO,
-        `[handlers] GitHub 配置已加载: ${config.owner}/${config.repo}/${config.branch}/${config.path}, 策略: ${savedStrategy}, 同步源: ${savedSourceType}`,
-      )
-    }
-
-    // 为 GitHub 配置输入框添加防抖自动保存（300ms），
-    // 用户输入时静默保存，避免每次按键都触发 PluginStorage 写入。
-    // 注意：按钮点击 "保存配置"（saveGithubConfig action）不走此路径，
-    // 仍保留同步保存 + Toast 反馈，确保用户主动保存的即时确认体验。
-    if (ownerInput) trackedAddEventListener(ownerInput, 'input', debouncedSaveGithubConfig)
-    if (repoInput) trackedAddEventListener(repoInput, 'input', debouncedSaveGithubConfig)
-    if (branchInput) trackedAddEventListener(branchInput, 'input', debouncedSaveGithubConfig)
-    if (pathInput) trackedAddEventListener(pathInput, 'input', debouncedSaveGithubConfig)
-    if (localFilePathInput)
-      trackedAddEventListener(localFilePathInput, 'input', debouncedSaveGithubConfig)
-    if (gistIdInput) trackedAddEventListener(gistIdInput, 'input', debouncedSaveGithubConfig)
-    if (strategySelect) trackedAddEventListener(strategySelect, 'change', debouncedSaveGithubConfig)
-    if (sourceTypeSelect) {
-      // sourceType 切换时：1) 触发字段显示/隐藏；2) 触发防抖保存
-      trackedAddEventListener(sourceTypeSelect, 'change', () => {
-        const selectedSourceType =
-          (sourceTypeSelect.value as SyncSourceType | undefined) ?? 'github'
-        toggleSourceFields(selectedSourceType)
-        debouncedSaveGithubConfig()
-      })
-    }
-    bgmLog(LOG_LEVELS.INFO, '[handlers] GitHub 配置输入框防抖自动保存监听器已注册')
+    loadGithubConfigIntoForm()
   } catch (error: unknown) {
     bgmLog(LOG_LEVELS.WARN, `[handlers] 加载 GitHub 配置失败: ${(error as Error).message}`)
   }
@@ -2416,4 +2364,62 @@ function saveGithubConfigFromDom() {
       `[handlers] GitHub 配置已自动保存: ${owner}/${repo}/${branch}/${path}, 策略: ${strategy}, 同步源: ${sourceType}${gistId ? `, gistId: ${gistId}` : ''}`,
     )
   }
+}
+
+/**
+ * loadGithubConfigIntoForm（自 try 块抽离，降低 unicorn/try-complexity 计数）
+ */
+function loadGithubConfigIntoForm() {
+  const config = getGithubConfig()
+  const ownerInput = document.getElementById('githubOwner') as HTMLInputElement | null
+  const repoInput = document.getElementById('githubRepo') as HTMLInputElement | null
+  const branchInput = document.getElementById('githubBranch') as HTMLInputElement | null
+  const pathInput = document.getElementById('githubPath') as HTMLInputElement | null
+  const localFilePathInput = document.getElementById('localFilePath') as HTMLInputElement | null
+  const gistIdInput = document.getElementById('gistId') as HTMLInputElement | null
+  const strategySelect = document.getElementById('githubStrategy') as HTMLSelectElement | null
+  const sourceTypeSelect = document.getElementById('syncSourceType') as HTMLSelectElement | null
+  if (ownerInput) ownerInput.value = config.owner
+  if (repoInput) repoInput.value = config.repo
+  if (branchInput) branchInput.value = config.branch
+  if (pathInput) pathInput.value = config.path
+  // 本地文件路径复用 githubConfig.path 字段，回填到独立输入框
+  if (localFilePathInput) localFilePathInput.value = config.path
+  // Gist ID 回填
+  if (gistIdInput && config.gistId) gistIdInput.value = config.gistId
+  // 回填策略
+  const savedStrategy = getSyncStrategy()
+  if (strategySelect) strategySelect.value = savedStrategy
+  // 回填同步源类型，并触发字段显示/隐藏切换
+  const savedSourceType = getSyncSourceType()
+  if (sourceTypeSelect) sourceTypeSelect.value = savedSourceType
+  toggleSourceFields(savedSourceType)
+  if (config.owner || config.repo || config.path) {
+    bgmLog(
+      LOG_LEVELS.INFO,
+      `[handlers] GitHub 配置已加载: ${config.owner}/${config.repo}/${config.branch}/${config.path}, 策略: ${savedStrategy}, 同步源: ${savedSourceType}`,
+    )
+  }
+
+  // 为 GitHub 配置输入框添加防抖自动保存（300ms），
+  // 用户输入时静默保存，避免每次按键都触发 PluginStorage 写入。
+  // 注意：按钮点击 "保存配置"（saveGithubConfig action）不走此路径，
+  // 仍保留同步保存 + Toast 反馈，确保用户主动保存的即时确认体验。
+  if (ownerInput) trackedAddEventListener(ownerInput, 'input', debouncedSaveGithubConfig)
+  if (repoInput) trackedAddEventListener(repoInput, 'input', debouncedSaveGithubConfig)
+  if (branchInput) trackedAddEventListener(branchInput, 'input', debouncedSaveGithubConfig)
+  if (pathInput) trackedAddEventListener(pathInput, 'input', debouncedSaveGithubConfig)
+  if (localFilePathInput)
+    trackedAddEventListener(localFilePathInput, 'input', debouncedSaveGithubConfig)
+  if (gistIdInput) trackedAddEventListener(gistIdInput, 'input', debouncedSaveGithubConfig)
+  if (strategySelect) trackedAddEventListener(strategySelect, 'change', debouncedSaveGithubConfig)
+  if (sourceTypeSelect) {
+    // sourceType 切换时：1) 触发字段显示/隐藏；2) 触发防抖保存
+    trackedAddEventListener(sourceTypeSelect, 'change', () => {
+      const selectedSourceType = (sourceTypeSelect.value as SyncSourceType | undefined) ?? 'github'
+      toggleSourceFields(selectedSourceType)
+      debouncedSaveGithubConfig()
+    })
+  }
+  bgmLog(LOG_LEVELS.INFO, '[handlers] GitHub 配置输入框防抖自动保存监听器已注册')
 }

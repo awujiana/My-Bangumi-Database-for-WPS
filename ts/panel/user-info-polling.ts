@@ -77,7 +77,7 @@ export function startUserInfoPolling(): void {
   let lastActiveWorkbookName: string | null = null
 
   const pollingInterval = setInterval(() => {
-    try {
+    const pollOnce = (): void => {
       const app = getApp()
       // 检测工作簿数量变化：打开/关闭新工作簿时自动刷新列表并检测表头
       const currentWorkbookCount = app?.Workbooks?.Count ?? 0
@@ -242,6 +242,9 @@ export function startUserInfoPolling(): void {
         // handlers 监听器会调用 ACTION_HANDLERS['undoLastSync'] 弹出确认对话框并执行撤销
         eventBus.emit(BGM_EVENTS.REQUEST_UNDO_LAST_SYNC, undefined)
       }
+    }
+    try {
+      pollOnce()
     } catch {
       // 静默处理轮询错误
     }
