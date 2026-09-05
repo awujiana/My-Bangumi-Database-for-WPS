@@ -539,7 +539,24 @@ export function autoDetectSheet(): {
 
   for (let si = 1; si <= sheets.Count; si += 1) {
     let needRestore: (() => void) | false = false
-    try {
+    const analyzeSheetCandidate = (
+      current: {
+        sheetIndex: number
+        sheetName: string
+        headerRow: number
+        matchCount: number
+        colCount: number
+      } | null,
+    ):
+      | {
+          sheetIndex: number
+          sheetName: string
+          headerRow: number
+          matchCount: number
+          colCount: number
+        }
+      | null
+      | undefined => {
       const ws: WpsWorksheet = sheets.Item(si)
       if (typeof ws.Activate === 'function') {
         const sheetName = ws.Name || ''
@@ -597,20 +614,19 @@ export function autoDetectSheet(): {
               )
             } else {
               const isBetter =
-                !bestMatch ||
-                meta.lastCol > bestMatch.colCount ||
-                (meta.lastCol === bestMatch.colCount &&
-                  meta.headerMatchCount > bestMatch.matchCount)
+                !current ||
+                meta.lastCol > current.colCount ||
+                (meta.lastCol === current.colCount && meta.headerMatchCount > current.matchCount)
 
               BGM.handleError(
                 new Error(
-                  `  => 是否为当前最优: ${isBetter ? '是' : '否'} (现有最优: ${bestMatch ? `${bestMatch.sheetName}(列${String(bestMatch.colCount)})` : '无'})`,
+                  `  => 是否为当前最优: ${isBetter ? '是' : '否'} (现有最优: ${current ? `${current.sheetName}(列${String(current.colCount)})` : '无'})`,
                 ),
                 { showAlert: false, level: BGM.ErrorLevel.INFO, context: 'autoDetectSheet' },
               )
 
               if (isBetter) {
-                bestMatch = {
+                return {
                   sheetIndex: si,
                   sheetName,
                   headerRow: meta.headerRow,
@@ -631,6 +647,10 @@ export function autoDetectSheet(): {
           },
         )
       }
+      return current
+    }
+    try {
+      bestMatch = analyzeSheetCandidate(bestMatch) ?? bestMatch
     } catch (error: unknown) {
       BGM.handleError(error, {
         showAlert: false,
@@ -638,7 +658,8 @@ export function autoDetectSheet(): {
         context: 'autoDetectSheet',
       })
     } finally {
-      if (typeof needRestore === 'function') needRestore()
+      const restoreFn = needRestore as (() => void) | false
+      if (typeof restoreFn === 'function') restoreFn()
     }
   }
 
