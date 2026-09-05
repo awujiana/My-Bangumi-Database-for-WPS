@@ -5,7 +5,7 @@
  *              从原 panel 模块拆分而来，保持函数签名与行为不变。
  */
 
-import type { WpsWorksheet } from '../index.js'
+import type { WpsFilters, WpsWorksheet } from '../index.js'
 import {
   PANEL_CONFIG,
   LOG_LEVELS,
@@ -657,6 +657,46 @@ export function autoDetectSheet(): {
 }
 // ========== 筛选状态 ==========
 
+/**
+ * 收集活动筛选列描述（"列名(criteria)" 形式）；单列读取失败仅记录不中断。
+ * （从 updateFilterStatus 的 try 块抽出，降低 try-complexity）
+ */
+function collectActiveFilterCols(ws: WpsWorksheet, filters: WpsFilters): string[] {
+  const activeCols: string[] = []
+  for (let index = 1; index <= filters.Count; index += 1) {
+    try {
+      const f = filters.Item(index)
+      if (f.On) {
+        let colName = ''
+        try {
+          const headerCell = ws.Range(`${colNumberToLetter(index)}1`)
+          colName = String(headerCell.Value2 || '').substring(0, 12) // eslint-disable-line @typescript-eslint/prefer-nullish-coalescing -- WPS 单元格值域不可控（空串/0/NaN），空值须回退
+        } catch (error: unknown) {
+          BGM.handleError(error, {
+            showAlert: false,
+            level: BGM.ErrorLevel.INFO,
+            context: 'updateFilterStatus',
+          })
+        }
+        let criteria = f.Criteria1 ?? ''
+        if (f.Criteria2) {
+          const op = f.Operator
+          criteria +=
+            op === 1 ? ` 且 ${f.Criteria2}` : op === 2 ? ` 或 ${f.Criteria2}` : ` / ${f.Criteria2}`
+        }
+        activeCols.push(colName ? `${colName}(${criteria})` : `列${String(index)}`)
+      }
+    } catch (error: unknown) {
+      BGM.handleError(error, {
+        showAlert: false,
+        level: BGM.ErrorLevel.INFO,
+        context: 'updateFilterStatus',
+      })
+    }
+  }
+  return activeCols
+}
+
 export function updateFilterStatus(targetWs?: WpsWorksheet): void {
   const element = document.getElementById('filterStatus')
   if (!element) return
@@ -708,42 +748,7 @@ export function updateFilterStatus(targetWs?: WpsWorksheet): void {
       return
     }
 
-    const activeCols: string[] = []
-    for (let index = 1; index <= filters.Count; index += 1) {
-      try {
-        const f = filters.Item(index)
-        if (f.On) {
-          let colName = ''
-          try {
-            const headerCell = ws.Range(`${colNumberToLetter(index)}1`)
-            colName = String(headerCell.Value2 || '').substring(0, 12) // eslint-disable-line @typescript-eslint/prefer-nullish-coalescing -- WPS 单元格值域不可控（空串/0/NaN），空值须回退
-          } catch (error: unknown) {
-            BGM.handleError(error, {
-              showAlert: false,
-              level: BGM.ErrorLevel.INFO,
-              context: 'updateFilterStatus',
-            })
-          }
-          let criteria = f.Criteria1 ?? ''
-          if (f.Criteria2) {
-            const op = f.Operator
-            criteria +=
-              op === 1
-                ? ` 且 ${f.Criteria2}`
-                : op === 2
-                  ? ` 或 ${f.Criteria2}`
-                  : ` / ${f.Criteria2}`
-          }
-          activeCols.push(colName ? `${colName}(${criteria})` : `列${String(index)}`)
-        }
-      } catch (error: unknown) {
-        BGM.handleError(error, {
-          showAlert: false,
-          level: BGM.ErrorLevel.INFO,
-          context: 'updateFilterStatus',
-        })
-      }
-    }
+    const activeCols: string[] = collectActiveFilterCols(ws, filters)
 
     if (activeCols.length > 0) {
       const text = `✔ 筛选已开启（${String(activeCols.length)} 列），将同步筛选后的可见数据\n${activeCols.join('、')}`
@@ -764,6 +769,60 @@ export function updateFilterStatus(targetWs?: WpsWorksheet): void {
 }
 
 // ========== 预览渲染 ==========
+
+/**
+ * 批量读取一个连续行段（矩形 Range.Value2）并追加预览行；
+ * 返回是否有非空数据。（从预览构建的 try 块抽出，降低 try-complexity）
+ */
+function readPreviewSegmentBatch(
+  ws: WpsWorksheet,
+  meta: HeaderMeta,
+  segStart: number,
+  segLength: number,
+  dataRows: number[],
+  index: number,
+  displayColCount: number,
+  previewRows: PreviewRow[],
+): boolean {
+  // 一次性读取整个矩形区域
+  const startColLetter = colNumberToLetter(meta.previewColStartAbsolute)
+  const endColLetter = colNumberToLetter(meta.previewColStartAbsolute + displayColCount - 1)
+  const rangeAddr = ws.Range(
+    `${startColLetter}${String(segStart)}:${endColLetter}${String(segStart + segLength - 1)}`,
+  )
+  const raw = rangeAddr.Value2
+  // WPS JS API 返回 0-based 二维数组（raw[0][0] 为第一行第一列）
+  const is2D = Array.isArray(raw)
+  let hasData = false
+  for (let r = 0; r < segLength; r += 1) {
+    const dr = dataRows[index + r]
+    if (!(dr === undefined)) {
+      const rowCols: string[] = []
+      let hasAny = false
+      for (let ci = 0; ci < displayColCount; ci += 1) {
+        let v: string
+        if (is2D && Array.isArray(raw)) {
+          const cell = raw[r]?.[ci]
+          v = cell == null ? '' : String(cell).trim()
+        } else {
+          v =
+            segLength === 1 && displayColCount === 1
+              ? raw == null
+                ? ''
+                : String(raw).trim()
+              : getCellValue(ws, dr, meta.previewColStartAbsolute + ci).trim()
+        }
+        if (v) hasAny = true
+        rowCols.push(v)
+      }
+      if (hasAny) {
+        previewRows.push({ row: dr, cols: rowCols, isHeader: false, aligned: true })
+        hasData = true
+      }
+    }
+  }
+  return hasData
+}
 
 function renderPreviewTable(
   rows: PreviewRow[],
@@ -935,42 +994,17 @@ export function refreshData(): void {
         const segLength = index_ - index + 1
 
         try {
-          // 一次性读取整个矩形区域
-          const startColLetter = colNumberToLetter(meta.previewColStartAbsolute)
-          const endColLetter = colNumberToLetter(meta.previewColStartAbsolute + displayColCount - 1)
-          const rangeAddr = ws.Range(
-            `${startColLetter}${String(segStart)}:${endColLetter}${String(segStart + segLength - 1)}`,
+          const batchHasData = readPreviewSegmentBatch(
+            ws,
+            meta,
+            segStart,
+            segLength,
+            dataRows,
+            index,
+            displayColCount,
+            previewRows,
           )
-          const raw = rangeAddr.Value2
-          // WPS JS API 返回 0-based 二维数组（raw[0][0] 为第一行第一列）
-          const is2D = Array.isArray(raw)
-          for (let r = 0; r < segLength; r += 1) {
-            const dr = dataRows[index + r]
-            if (!(dr === undefined)) {
-              const rowCols: string[] = []
-              let hasAny = false
-              for (let ci = 0; ci < displayColCount; ci += 1) {
-                let v: string
-                if (is2D && Array.isArray(raw)) {
-                  const cell = raw[r]?.[ci]
-                  v = cell == null ? '' : String(cell).trim()
-                } else {
-                  v =
-                    segLength === 1 && displayColCount === 1
-                      ? raw == null
-                        ? ''
-                        : String(raw).trim()
-                      : getCellValue(ws, dr, meta.previewColStartAbsolute + ci).trim()
-                }
-                if (v) hasAny = true
-                rowCols.push(v)
-              }
-              if (hasAny) {
-                previewRows.push({ row: dr, cols: rowCols, isHeader: false, aligned: true })
-                hasData = true
-              }
-            }
-          }
+          if (batchHasData) hasData = true
         } catch {
           // 批量读取失败，回退到逐单元格
           for (let r = 0; r < segLength; r += 1) {
