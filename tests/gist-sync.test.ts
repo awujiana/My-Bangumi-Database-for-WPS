@@ -723,7 +723,6 @@ describe('fetchGistJson', () => {
 
     it('catch 分支中 Error 实例使用 e.message (line 259-260)', async () => {
       mockedGetGistId.mockReturnValue('parse-error')
-      const origParse = JSON.parse
       const parseSpy = vi.spyOn(JSON, 'parse').mockImplementation((_text: string) => {
         throw new Error('模拟解析错误')
       })

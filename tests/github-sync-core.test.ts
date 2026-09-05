@@ -201,9 +201,6 @@ import {
 } from '../ts/sync/github-sync.js'
 import type {
   GithubSyncDiff,
-  GithubRemoteEntry,
-  LocalRowEntry,
-  SyncStrategy,
   ConflictResolution,
 } from '../ts/sync/github-sync-diff.js'
 
@@ -238,19 +235,6 @@ function createMockSheet(
     Select: vi.fn(),
     Delete: vi.fn(),
     Move: vi.fn(),
-  }
-}
-
-function createMockApp(sheet: unknown) {
-  return {
-    ScreenUpdating: true,
-    Calculation: 1,
-    ActiveSheet: sheet,
-    ActiveWorkbook: {
-      ActiveSheet: sheet,
-      Sheets: { Count: 1, Item: vi.fn(() => sheet) },
-    },
-    Selection: null,
   }
 }
 

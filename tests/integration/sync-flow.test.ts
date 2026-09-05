@@ -258,7 +258,6 @@ import { computeDiff, parseJsonl } from '../../ts/sync/github-sync-diff.js'
 import type {
   GithubRemoteEntry,
   LocalRowEntry,
-  SyncStrategy,
 } from '../../ts/sync/github-sync-diff.js'
 import { clearUndoStack } from '../../ts/sync/undo-stack.js'
 import type { SyncSource } from '../../ts/sync/sync-source.js'

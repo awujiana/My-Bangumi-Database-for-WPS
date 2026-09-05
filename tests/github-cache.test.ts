@@ -170,7 +170,6 @@ describe('Cache 操作', () => {
 
     it('捕获非 Error 实例异常时应使用 String(e) 格式化 (line 116)', () => {
       mockBgmLog.mockClear()
-      const origStringify = JSON.stringify
       vi.spyOn(JSON, 'stringify').mockImplementation(() => {
         throw '一个字符串异常，不是 Error 实例'
       })

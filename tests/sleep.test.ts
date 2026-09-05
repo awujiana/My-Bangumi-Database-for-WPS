@@ -71,11 +71,7 @@ describe('sleep', () => {
   })
 
   it('busy-loop 中 app 为 null 时不应崩溃', () => {
-    let callCount = 0
-    mockGetApp.mockImplementation(() => {
-      callCount += 1
-      return null
-    })
+    mockGetApp.mockImplementation(() => null)
 
     const start = Date.now()
     sleep(20)

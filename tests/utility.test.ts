@@ -470,7 +470,7 @@ describe('getLastRow', () => {
     })
     const first = getLastRow(ws as never)
     // 修改 mock 使其返回不同值
-    const rangeEndRow = ws as {
+    const _rangeEndRow = ws as {
       Range: (a: string) => { End: (d: number) => { Row: number } | null }
     }
     // mock 不会改变已缓存的结果
@@ -552,7 +552,7 @@ describe('readRangeValues', () => {
 describe('clearSheetCache', () => {
   it('清除指定工作表名的缓存条目', () => {
     const ws1 = createMockWorksheet({ name: 'Sheet-CC-1' })
-    const ws2 = createMockWorksheet({ name: 'Sheet-CC-2' })
+    const _ws2 = createMockWorksheet({ name: 'Sheet-CC-2' })
     // 写入缓存
     cacheGet('Sheet-CC-1:headerRow:1', () => 5)
     cacheGet('Sheet-CC-2:headerRow:1', () => 10)

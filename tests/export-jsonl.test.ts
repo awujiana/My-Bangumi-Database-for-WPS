@@ -615,7 +615,7 @@ describe('exportSheetToJsonlFile', () => {
     vi.spyOn(document.body, 'appendChild').mockImplementation(() => mockAnchor as unknown as Node)
     vi.spyOn(document.body, 'removeChild').mockImplementation(() => mockAnchor as unknown as Node)
     vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:test')
-    const revokeSpy = vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => {})
+    vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => {})
 
     const isResult = exportSheetToJsonlFile()
     expect(isResult).toBe(true)

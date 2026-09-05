@@ -35,15 +35,6 @@ const mockGithubSourceReference = vi.hoisted(() => ({
   fetchRemoteEntries: vi.fn().mockResolvedValue([]),
 }))
 
-// SyncSource type for testing
-interface SyncSource {
-  getDisplayName: () => string
-  validateConfig: () => { isFail: () => boolean; error: Error | null }
-  fetchRemoteEntries: (signal?: AbortSignal) => Promise<unknown[]>
-  type: string
-  name: string
-}
-
 vi.mock('../ts/index.js', () => ({}))
 
 vi.mock('../ts/tools/utility.js', () => ({

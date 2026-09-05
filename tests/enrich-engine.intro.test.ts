@@ -12,7 +12,7 @@
  */
 
 // @vitest-environment jsdom
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect } from 'vitest'
 
 // ========== Mock 设置 ==========
 
@@ -768,7 +768,6 @@ describe('冲突解决逻辑', () => {
 
   it('keep 模式：保留原名', () => {
     const oldValue = '宫崎骏'
-    const updatedValue = '新海诚'
     // keep 模式下不修改
     expect(oldValue).toBe('宫崎骏')
   })

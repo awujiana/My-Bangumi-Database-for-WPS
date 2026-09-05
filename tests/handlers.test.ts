@@ -27,7 +27,7 @@
  */
 
 // @vitest-environment jsdom
-import { describe, it, expect, vi, afterEach, afterAll, beforeEach } from 'vitest'
+import { describe, it, expect, vi, afterEach, afterAll } from 'vitest'
 
 vi.hoisted(() => {
   vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'setInterval', 'clearInterval'] })

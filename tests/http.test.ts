@@ -45,7 +45,6 @@ interface MockXHRCall {
 
 let lastXhrCall: MockXHRCall | null = null
 let lastMockXhr: MockXHR | null = null
-let mockXhrConstructor: typeof MockXHR | null = null
 let xhrCallCount = 0
 
 class MockXHR {
@@ -154,7 +153,6 @@ class MockXHR {
 }
 
 beforeEach(() => {
-  mockXhrConstructor = MockXHR
   ;(globalThis as { XMLHttpRequest: typeof MockXHR }).XMLHttpRequest = MockXHR
   lastXhrCall = null
   lastMockXhr = null

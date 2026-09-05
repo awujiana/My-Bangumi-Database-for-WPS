@@ -94,7 +94,7 @@ import {
   ensureSheetHeaders,
 } from '../ts/tools/util/sheet.js'
 import { getApp, bgmLog, BGM } from '../ts/tools/util/index.js'
-import { getCellValue, getCell } from '../ts/tools/util/cell.js'
+import { getCellValue } from '../ts/tools/util/cell.js'
 
 function createMockCell(value: unknown = '') {
   return {
@@ -143,7 +143,7 @@ function createMockWorksheet(
       return mockCell(address)
     }),
     Activate: vi.fn(),
-    Cells: { Item: vi.fn((r: number, c: number) => createMockCell('')) },
+    Cells: { Item: vi.fn((_r: number, _c: number) => createMockCell('')) },
     // End mock for getLastRow
     _endRow: options.endRow ?? 0,
   }
@@ -293,7 +293,7 @@ describe('getDataSheet', () => {
     })
     BGM.sheet.isLocked = true
     BGM.sheet.lockedIndex = 2
-    const result = getDataSheet()
+    getDataSheet()
     expect(itemFunction).toHaveBeenCalledWith(2)
   })
 
@@ -327,7 +327,7 @@ describe('getDataSheet', () => {
     BGM.sheet.isLocked = true
     // will fail
     BGM.sheet.lockedIndex = 10
-    const mockErrorWs = {
+    const _mockErrorWs = {
       ...createMockWorksheet(),
       Worksheets: {
         Item: vi.fn(() => {
@@ -482,7 +482,7 @@ describe('getLastRow', () => {
 
   it('forceRefresh 为 true 时应清除缓存', () => {
     const ws = createMockWorksheet({ name: 'RefreshTest' })
-    const result1 = getLastRow(ws, true)
+    getLastRow(ws, true)
     const result2 = getLastRow(ws, true)
     expect(result2).toBeDefined()
   })
@@ -503,7 +503,8 @@ describe('getLastRow', () => {
     }
     ws.Range = vi.fn(() => anchorCell)
     vi.mocked(getCellValue).mockImplementation((_ws: unknown, _row: unknown, col: unknown) =>
-      col === 1 ? '序列号' : '',)
+      col === 1 ? '序列号' : '',
+    )
     const result = getLastRow(ws, false, 1)
     expect(result).toBeDefined()
   })
@@ -1049,16 +1050,13 @@ describe('setCellValueDirect（间接测试 via ensureSheetHeaders）', () => {
   it('FormulaR1C1 路径成功时应写入', () => {
     vi.mocked(getCellValue).mockReturnValue('')
     const ws = createMockWorksheet({ name: 'FormulaR1C1' })
-    let isFormulaR1C1Written = false
     const mockCell = {
       Value2: '',
       Value: '',
       Text: '',
       Interior: { Color: 0 },
       Font: { Bold: false },
-      set FormulaR1C1(v: string) {
-        isFormulaR1C1Written = true
-      },
+      set FormulaR1C1(_v: string) {},
       get FormulaR1C1() {
         return ''
       },

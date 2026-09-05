@@ -3960,7 +3960,6 @@ describe('formatDuration 全分支 (lines 534-540)', () => {
     const result = await applyDiffToSheet(diffs, 'add-update', onProgress)
     expect(result.added).toBeGreaterThan(0)
     // 验证 eta 返回值包含毫秒单位（formatDuration ms<1000 分支）
-    const hasMsUnit = etaValues.some((eta) => eta.includes('ms'))
     // 在极快速度下，formatDuration 可能走 ms<1000 分支
     // 如果速度为 0 或 elapsed 为 0，则 formatEta 走 ms<=0 分支
     expect(etaValues.length).toBeGreaterThanOrEqual(0)

@@ -88,7 +88,8 @@ const mockColNumberToLetter = vi.hoisted(() =>
       n = Math.floor((n - 1) / 26)
     }
     return result
-  }),)
+  }),
+)
 const mockGetCellValue = vi.hoisted(() => vi.fn().mockReturnValue(''))
 const mockSetCellValue = vi.hoisted(() => vi.fn().mockReturnValue(true))
 const mockReadRangeValues = vi.hoisted(() => vi.fn().mockReturnValue([]))
@@ -120,7 +121,6 @@ import {
   formatSyncRecordSheet,
   __resetSyncRecordCache,
 } from '../ts/sync/sync-record.js'
-import { getApp } from '../ts/tools/util/index.js'
 
 function createMockCell(value: unknown = '') {
   return {
@@ -421,7 +421,7 @@ describe('syncRecord', () => {
     it('批量添加中某个记录失败应继续处理其他', () => {
       mockGetApp.mockReturnValue({ ActiveWorkbook: createMockWorkbook() })
       mockSetCellValue.mockImplementation(
-        (_ws: unknown, _r: unknown, c: unknown, _v: unknown) => true,
+        (_ws: unknown, _r: unknown, _c: unknown, _v: unknown) => true,
       )
       const isResult = addSyncRecords([
         { sid: '1', name: 'one', url: 'http://a.com' },
@@ -604,7 +604,8 @@ describe('syncRecord', () => {
       mockReadRangeValues.mockReturnValue([])
       // Should not throw
       expect(() =>
-        addSyncRecord({ sid: 'empty-cache', name: '空缓存', url: 'http://c.com' }),).not.toThrow()
+        addSyncRecord({ sid: 'empty-cache', name: '空缓存', url: 'http://c.com' }),
+      ).not.toThrow()
     })
 
     it('空数据不应中断缓存构建', () => {
@@ -931,7 +932,6 @@ describe('syncRecord', () => {
       mockGetApp.mockReturnValue({ ActiveWorkbook: createMockWorkbook() })
       mockGetLastRow.mockReturnValue(5)
       mockGetCellValue.mockImplementation((_sheet: unknown, row: unknown, col: unknown) => {
-        const r = row as number
         const c = col as number
         // 所有行都是相同 SID
         if (c === 1) return 'dup-sid'
@@ -1035,7 +1035,7 @@ describe('syncRecord', () => {
       const noSyncSheetWb = {
         Sheets: {
           Count: 1,
-          Item: vi.fn((index: number) => createMockSheet({ name: 'Sheet1' })),
+          Item: vi.fn((_index: number) => createMockSheet({ name: 'Sheet1' })),
         },
       }
       mockGetApp.mockReturnValue({ ActiveWorkbook: noSyncSheetWb })
@@ -1177,7 +1177,7 @@ describe('syncRecord', () => {
 
     it('更新已有记录时所有可选字段都被写入 (lines 586-593)', () => {
       const sheet = createMockSheet({ name: SYNC_RECORD_SHEET_NAME })
-      const mockRange = sheet.Range('A1:L1')
+      const _mockRange = sheet.Range('A1:L1')
       mockReadRangeValues.mockReturnValue([
         [
           '2024-01-01T00:00:00',
@@ -1214,7 +1214,7 @@ describe('syncRecord', () => {
     })
 
     it('更新时可选字段为空则跳过对应分支', () => {
-      const sheet = createMockSheet({ name: SYNC_RECORD_SHEET_NAME })
+      const _sheet = createMockSheet({ name: SYNC_RECORD_SHEET_NAME })
       mockReadRangeValues.mockReturnValue([
         ['2024-01-01T00:00:00', '', '', '', '', '1', '', 'success', '', '', ''],
       ])
@@ -1490,7 +1490,7 @@ describe('syncRecord', () => {
 // ========== 补充测试：getStatusColor 默认分支 (line 93) ==========
 describe('getStatusColor 默认分支 (line 93)', () => {
   it('未知状态应返回 SUCCESS 颜色 (line 93)', () => {
-    const mockWs = createMockSheet()
+    const _mockWs = createMockSheet()
     mockGetApp.mockReturnValue({ ActiveWorkbook: createMockWorkbook() })
 
     mockReadRangeValues.mockReturnValue([])
@@ -1507,7 +1507,7 @@ describe('getStatusColor 默认分支 (line 93)', () => {
   })
 
   it('SUCCESS 状态应返回 SUCCESS 颜色', () => {
-    const mockWs = createMockSheet()
+    const _mockWs = createMockSheet()
     mockGetApp.mockReturnValue({ ActiveWorkbook: createMockWorkbook() })
 
     mockReadRangeValues.mockReturnValue([])
@@ -1523,7 +1523,7 @@ describe('getStatusColor 默认分支 (line 93)', () => {
   })
 
   it('FAIL 状态应返回 FAIL 颜色', () => {
-    const mockWs = createMockSheet()
+    const _mockWs = createMockSheet()
     mockGetApp.mockReturnValue({ ActiveWorkbook: createMockWorkbook() })
 
     mockReadRangeValues.mockReturnValue([])
@@ -1539,7 +1539,7 @@ describe('getStatusColor 默认分支 (line 93)', () => {
   })
 
   it('SKIP 状态应返回 SKIP 颜色', () => {
-    const mockWs = createMockSheet()
+    const _mockWs = createMockSheet()
     mockGetApp.mockReturnValue({ ActiveWorkbook: createMockWorkbook() })
 
     mockReadRangeValues.mockReturnValue([])
@@ -1558,7 +1558,7 @@ describe('getStatusColor 默认分支 (line 93)', () => {
 // ========== 补充测试：buildCache 异常路径 (line 343) ==========
 describe('buildCache 异常路径 (line 343)', () => {
   it('readRangeValues 抛出异常时 buildCache 应捕获', () => {
-    const mockWs = createMockSheet()
+    const _mockWs = createMockSheet()
     mockGetApp.mockReturnValue({ ActiveWorkbook: createMockWorkbook() })
     mockGetLastRow.mockReturnValue(10)
 
@@ -1739,7 +1739,7 @@ describe('addSyncRecord 更新路径 (lines 405-440)', () => {
 // ========== 补充测试：addSyncRecord 新建路径 (lines 442-487) ==========
 describe('addSyncRecord 新建路径 (lines 442-487)', () => {
   it('新 SID 应走新建路径', () => {
-    const mockWs = createMockSheet()
+    const _mockWs = createMockSheet()
     mockGetApp.mockReturnValue({ ActiveWorkbook: createMockWorkbook() })
     mockGetLastRow.mockReturnValue(10)
     mockReadRangeValues.mockReturnValue([])
@@ -1761,7 +1761,7 @@ describe('addSyncRecord 新建路径 (lines 442-487)', () => {
   })
 
   it('新建路径 fingerprint 不为 undefined 时应写入', () => {
-    const mockWs = createMockSheet()
+    const _mockWs = createMockSheet()
     mockGetApp.mockReturnValue({ ActiveWorkbook: createMockWorkbook() })
     mockGetLastRow.mockReturnValue(10)
     mockReadRangeValues.mockReturnValue([])
@@ -1778,7 +1778,7 @@ describe('addSyncRecord 新建路径 (lines 442-487)', () => {
   })
 
   it('新建路径 collType 不为空时应写入', () => {
-    const mockWs = createMockSheet()
+    const _mockWs = createMockSheet()
     mockGetApp.mockReturnValue({ ActiveWorkbook: createMockWorkbook() })
     mockGetLastRow.mockReturnValue(10)
     mockReadRangeValues.mockReturnValue([])
@@ -2656,7 +2656,6 @@ describe('deduplicateSyncRecords count 字段回退 (lines 670-675)', () => {
     mockGetLastRow.mockReturnValue(4)
     // 两行相同SID但COUNT列为空 → parseInt('') || 1 = 1
     mockGetCellValue.mockImplementation((_sheet: unknown, row: unknown, col: unknown) => {
-      const r = row as number
       const c = col as number
       if (c === 1) return 'dup-count-sid'
       // COUNT列为空
@@ -2671,7 +2670,6 @@ describe('deduplicateSyncRecords count 字段回退 (lines 670-675)', () => {
     mockGetApp.mockReturnValue({ ActiveWorkbook: createMockWorkbook() })
     mockGetLastRow.mockReturnValue(4)
     mockGetCellValue.mockImplementation((_sheet: unknown, row: unknown, col: unknown) => {
-      const r = row as number
       const c = col as number
       if (c === 1) return 'dup-numeric-sid'
       // COUNT列非数字

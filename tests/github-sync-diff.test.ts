@@ -11,9 +11,7 @@ import {
 } from '../ts/sync/github-sync-diff.js'
 import type {
   GithubRemoteEntry,
-  SyncStrategy,
   SyncTimeFilter,
-  GithubSyncDiff,
   LocalRowEntry,
 } from '../ts/sync/github-sync-diff.js'
 
