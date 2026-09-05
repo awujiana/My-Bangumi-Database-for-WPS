@@ -2,6 +2,7 @@
   "name": "test",
   "addonType": "et",
   "version": "1.0.0",
+  "private": true,
   "scripts": {
     "dev": "npm run build:ts && vite --port 5173",
     "build": "vite build",
