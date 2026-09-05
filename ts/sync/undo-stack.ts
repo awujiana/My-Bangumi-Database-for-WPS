@@ -86,7 +86,7 @@ export function endUndoSession(): void {
   if (currentSession.entries.length > 0) {
     sessions.push(currentSession)
     if (sessions.length > MAX_SESSIONS) {
-      sessions.splice(0, 1)
+      sessions.shift()
     }
   }
   currentSession = null

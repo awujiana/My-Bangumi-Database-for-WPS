@@ -474,7 +474,8 @@ function mergeDuplicateSidGroups(
   let removedCount = 0
   let hasDuplicates = false
   for (const [, rows] of sidRows) {
-    if (rows.length > 1) {
+    const hasDuplicateRows = rows.length > 1
+    if (hasDuplicateRows) {
       hasDuplicates = true
 
       const keepRow = rows[0]

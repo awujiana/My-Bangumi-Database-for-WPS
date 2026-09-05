@@ -664,7 +664,7 @@ describe('并发调用边界', () => {
     it('1000 个 Result.fail 并发创建不抛错', () => {
       const results: Result<number>[] = []
       for (let index = 0; index < 1000; index += 1) {
-        results.push(Result.fail<number>(new BgmError(`err${String(index)}`, 'CODE')))
+        results.push(Result.fail<number>(new BgmError(`err${String(index)}`, { code: 'CODE' })))
       }
       expect(results).toHaveLength(1000)
       expect(results[0]!.isFail()).toBe(true)
@@ -698,7 +698,7 @@ describe('并发调用边界', () => {
         if (index % 2 === 0) {
           results.push(Result.ok(index))
         } else {
-          results.push(Result.fail<number>(new BgmError(`err${String(index)}`, 'CODE')))
+          results.push(Result.fail<number>(new BgmError(`err${String(index)}`, { code: 'CODE' })))
         }
       }
       expect(results).toHaveLength(1000)

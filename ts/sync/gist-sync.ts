@@ -355,10 +355,9 @@ export class GistSyncSource implements SyncSource {
   validateConfig(): Result<void> {
     if (!isGistConfigured()) {
       return Result.failVoid(
-        new BgmError(
-          'Gist ID 未配置，请在面板的 Gist ID 字段填写 GitHub Gist ID',
-          'CONFIG_INCOMPLETE',
-        ),
+        new BgmError('Gist ID 未配置，请在面板的 Gist ID 字段填写 GitHub Gist ID', {
+          code: 'CONFIG_INCOMPLETE',
+        }),
       )
     }
     return Result.okVoid()

@@ -201,7 +201,9 @@ export class GitlabSyncSource implements SyncSource {
   validateConfig(): Result<void> {
     if (!isGithubConfigComplete()) {
       return Result.failVoid(
-        new BgmError('GitLab 仓库配置不完整，请填写 owner/repo/branch/path', 'CONFIG_INCOMPLETE'),
+        new BgmError('GitLab 仓库配置不完整，请填写 owner/repo/branch/path', {
+          code: 'CONFIG_INCOMPLETE',
+        }),
       )
     }
     return Result.okVoid()

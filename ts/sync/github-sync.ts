@@ -265,7 +265,9 @@ export class GithubSyncSource implements SyncSource {
   validateConfig(): Result<void> {
     if (!isGithubConfigComplete()) {
       return Result.failVoid(
-        new BgmError('GitHub 仓库配置不完整，请填写 owner/repo/branch/path', 'CONFIG_INCOMPLETE'),
+        new BgmError('GitHub 仓库配置不完整，请填写 owner/repo/branch/path', {
+          code: 'CONFIG_INCOMPLETE',
+        }),
       )
     }
     return Result.okVoid()
@@ -620,7 +622,8 @@ function writeRemoteEntryToRow(
   // 对于有多个 Excel 列名的字段（如「动画制作公司」），所有别名列均写入相同的远程值
   const handledJsonlFields = new Set<string>()
   for (const [jsonlField] of EXTENDED_FIELD_MAP) {
-    if (!handledJsonlFields.has(jsonlField)) {
+    const isUnhandledJsonlField = !handledJsonlFields.has(jsonlField)
+    if (isUnhandledJsonlField) {
       handledJsonlFields.add(jsonlField)
       const excelAliases = getExcelAliases(jsonlField)
       const isAnyAliasMatched = excelAliases.some(
@@ -1148,7 +1151,8 @@ function batchUpdateRows(
     // 扩展字段：同时检查主映射和所有别名（如「动画制作公司」→「制作公司」/「动画制作公司」）
     const handled = new Set<string>()
     for (const [jsonlField] of EXTENDED_FIELD_MAP) {
-      if (!handled.has(jsonlField)) {
+      const isUnhandledJsonlField = !handled.has(jsonlField)
+      if (isUnhandledJsonlField) {
         handled.add(jsonlField)
         const aliases = getExcelAliases(jsonlField)
         if (isWriteAll || aliases.some((a) => u.fields.includes(a))) {
@@ -1983,7 +1987,8 @@ function getSelectedRowSids(): Set<string> {
     }
 
     for (let row = firstRow; row <= lastRow; row += 1) {
-      if (row !== headerRow) {
+      const isNotHeaderRow = row !== headerRow
+      if (isNotHeaderRow) {
         const url = trim(getCellValue(ws, row, urlCol))
         if (url) {
           const sid = extractSubjectId(url)

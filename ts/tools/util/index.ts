@@ -469,12 +469,15 @@ export const BGM: {
     if (error instanceof BgmError) {
       bgmError = error
     } else if (error instanceof Error) {
-      bgmError = new BgmError(error.message, 'JS_ERROR', {
-        name: error.name,
-        stack: error.stack,
+      bgmError = new BgmError(error.message, {
+        code: 'JS_ERROR',
+        details: {
+          name: error.name,
+          stack: error.stack,
+        },
       })
     } else {
-      bgmError = new BgmError(String(error), 'UNKNOWN')
+      bgmError = new BgmError(String(error), { code: 'UNKNOWN' })
     }
 
     if (options_.context) {

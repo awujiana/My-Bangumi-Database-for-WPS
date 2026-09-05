@@ -140,7 +140,8 @@ export function getExcelAliases(jsonlField: string): readonly string[] {
   const seen = new Set<string>()
   const result: string[] = []
   for (const name of [...primary, ...aliases]) {
-    if (!seen.has(name)) {
+    const isNewName = !seen.has(name)
+    if (isNewName) {
       seen.add(name)
       result.push(name)
     }
@@ -476,7 +477,8 @@ export function computeDiff(
   const remoteSids = new Set<string>()
 
   for (const remote of remoteEntries) {
-    if (remote.sid) {
+    const hasRemoteSid = Boolean(remote.sid)
+    if (hasRemoteSid) {
       remoteSids.add(remote.sid)
       const local = localEntries.get(remote.sid)
 
@@ -540,13 +542,13 @@ export function computeDiff(
               const remoteString = toExtensionStringValue(remoteValue as string | number)
               const excelAliases = getExcelAliases(jsonlField)
               for (const excelField of excelAliases) {
-                // 取反条件包裹，同时消除 no-continue 与 unicorn/no-break-in-nested-loop（嵌套循环内不再有 continue）
-
-                if (
+                // 提取条件变量使循环体含多条语句，消除 no-continue 与 unicorn/prefer-continue 的规则冲突
+                const isChangedField = Boolean(
                   remoteString &&
                   !comparedFields.has(excelField) &&
-                  remoteString !== (local.fields[excelField] ?? '')
-                ) {
+                  remoteString !== (local.fields[excelField] ?? ''),
+                )
+                if (isChangedField) {
                   changedFields.push(excelField)
                   comparedFields.add(excelField)
                 }
@@ -571,7 +573,8 @@ export function computeDiff(
   // mirror 策略：本地存在但远程不存在的 SID 标记为 delete
   if (strategy === 'mirror') {
     for (const [sid, local] of localEntries) {
-      if (!remoteSids.has(sid)) {
+      const isMissingRemote = !remoteSids.has(sid)
+      if (isMissingRemote) {
         // 时间筛选启用时：本地条目的开播日期不在筛选范围内的，跳过 delete
         // 避免因时间筛选过滤了远程数据，导致本地其他时间段的数据被误删
         let isInTimeRange = true

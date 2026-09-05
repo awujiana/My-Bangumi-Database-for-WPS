@@ -41,7 +41,7 @@ describe('Result.ok', () => {
 // ========== Result.fail ==========
 describe('Result.fail', () => {
   it('包装错误并返回 Result 实例', () => {
-    const error = new BgmError('失败', 'FAIL_CODE')
+    const error = new BgmError('失败', { code: 'FAIL_CODE' })
     const result = Result.fail<number>(error)
     expect(result).toBeInstanceOf(Result)
     expect(result.isOk()).toBe(false)
@@ -50,13 +50,13 @@ describe('Result.fail', () => {
   })
 
   it('unwrap 抛出包含错误消息的异常', () => {
-    const error = new BgmError('失败原因', 'FAIL_CODE')
+    const error = new BgmError('失败原因', { code: 'FAIL_CODE' })
     const result = Result.fail<number>(error)
     expect(() => result.unwrap()).toThrow(/失败原因/)
   })
 
   it('error 字段持有 BgmError，data 字段为 null', () => {
-    const error = new BgmError('错误', 'CODE')
+    const error = new BgmError('错误', { code: 'CODE' })
     const result = Result.fail<number>(error)
     expect(result.error).toBe(error)
     expect(result.data).toBeNull()
@@ -125,7 +125,7 @@ describe('Result.map', () => {
   })
 
   it('失败结果不调用 fn 且保持失败状态', () => {
-    const error = new BgmError('失败', 'CODE')
+    const error = new BgmError('失败', { code: 'CODE' })
     const r = Result.fail<number>(error)
     const function_ = vi.fn((x: number) => x * 2)
     const mapped = r.map(function_)
@@ -138,10 +138,10 @@ describe('Result.map', () => {
 // ========== Result.mapErr ==========
 describe('Result.mapErr', () => {
   it('对失败错误应用转换函数', () => {
-    const error = new BgmError('原始错误', 'ORIGINAL')
+    const error = new BgmError('原始错误', { code: 'ORIGINAL' })
     const r = Result.fail<number>(error)
     const mapped = r.mapErr(
-      (error_) => new BgmError(`包装: ${error_.message}`, `WRAPPED_${error_.code}`),
+      (error_) => new BgmError(`包装: ${error_.message}`, { code: `WRAPPED_${error_.code}` }),
     )
     expect(mapped.isFail()).toBe(true)
     expect(mapped.error?.message).toBe('包装: 原始错误')
@@ -150,7 +150,7 @@ describe('Result.mapErr', () => {
 
   it('成功结果不调用 fn 且保持成功状态', () => {
     const r = Result.ok(42)
-    const function_ = vi.fn((error: BgmError) => new BgmError(error.message, error.code))
+    const function_ = vi.fn((error: BgmError) => new BgmError(error.message, { code: error.code }))
     const mapped = r.mapErr(function_)
     expect(mapped.isOk()).toBe(true)
     expect(function_).not.toHaveBeenCalled()
@@ -166,17 +166,17 @@ describe('Result.unwrapOr', () => {
   })
 
   it('失败时返回默认值', () => {
-    const r = Result.fail<string>(new BgmError('失败', 'CODE'))
+    const r = Result.fail<string>(new BgmError('失败', { code: 'CODE' }))
     expect(r.unwrapOr('default')).toBe('default')
   })
 
   it('默认值可以是复杂对象', () => {
-    const r = Result.fail<{ id: number }>(new BgmError('失败', 'CODE'))
+    const r = Result.fail<{ id: number }>(new BgmError('失败', { code: 'CODE' }))
     expect(r.unwrapOr({ id: 0 })).toEqual({ id: 0 })
   })
 
   it('默认值 null 也可被返回', () => {
-    const r = Result.fail<null>(new BgmError('失败', 'CODE'))
+    const r = Result.fail<null>(new BgmError('失败', { code: 'CODE' }))
     expect(r.unwrapOr(null)).toBeNull()
   })
 })
@@ -222,7 +222,7 @@ describe('Result 边界场景', () => {
   })
 
   it('链式 map 在失败时短路（不调用后续 fn）', () => {
-    const error = new BgmError('失败', 'CODE')
+    const error = new BgmError('失败', { code: 'CODE' })
     const function1 = vi.fn((x: number) => x + 1)
     const function2 = vi.fn((x: number) => x * 2)
     const r = Result.fail<number>(error).map(function1).map(function2)
@@ -233,9 +233,9 @@ describe('Result 边界场景', () => {
   })
 
   it('mapErr 链式调用：fail → mapErr → mapErr', () => {
-    const r = Result.fail<number>(new BgmError('原始', 'A'))
-      .mapErr((error) => new BgmError(`${error.message}-1`, `${error.code}B`))
-      .mapErr((error) => new BgmError(`${error.message}-2`, `${error.code}C`))
+    const r = Result.fail<number>(new BgmError('原始', { code: 'A' }))
+      .mapErr((error) => new BgmError(`${error.message}-1`, { code: `${error.code}B` }))
+      .mapErr((error) => new BgmError(`${error.message}-2`, { code: `${error.code}C` }))
     expect(r.isFail()).toBe(true)
     expect(r.error?.message).toBe('原始-1-2')
     expect(r.error?.code).toBe('ABC')
@@ -243,7 +243,7 @@ describe('Result 边界场景', () => {
 
   it('unwrapOr 链式：失败后返回默认值（不调用后续 map fn）', () => {
     const function_ = vi.fn((x: number) => x * 2)
-    const r = Result.fail<number>(new BgmError('失败', 'CODE'))
+    const r = Result.fail<number>(new BgmError('失败', { code: 'CODE' }))
       .map(function_)
       .mapErr((error) => error)
     expect(r.unwrapOr(-1)).toBe(-1)
@@ -252,7 +252,7 @@ describe('Result 边界场景', () => {
 
   it('ok 与 fail 不可互换：isOk 与 isFail 互斥', () => {
     const ok = Result.ok(1)
-    const fail = Result.fail<number>(new BgmError('e', 'C'))
+    const fail = Result.fail<number>(new BgmError('e', { code: 'C' }))
     expect(ok.isOk()).not.toBe(ok.isFail())
     expect(fail.isOk()).not.toBe(fail.isFail())
   })
@@ -269,29 +269,29 @@ describe('BgmError', () => {
   })
 
   it('details 默认为空对象', () => {
-    const error = new BgmError('消息', 'CODE')
+    const error = new BgmError('消息', { code: 'CODE' })
     expect(error.details).toEqual({})
   })
 
   it('timestamp 为合法 ISO 格式字符串', () => {
-    const error = new BgmError('消息', 'CODE')
+    const error = new BgmError('消息', { code: 'CODE' })
     expect(typeof error.timestamp).toBe('string')
     expect(() => new Date(error.timestamp).toISOString()).not.toThrow()
   })
 
   it('toString 输出 [code] message 格式', () => {
-    const error = new BgmError('出错了', 'MY_CODE')
+    const error = new BgmError('出错了', { code: 'MY_CODE' })
     expect(error.toString()).toBe('[MY_CODE] 出错了')
   })
 
   it('可携带 details 上下文', () => {
-    const error = new BgmError('失败', 'CODE', { userId: 123, endpoint: '/api' })
+    const error = new BgmError('失败', { code: 'CODE', details: { userId: 123, endpoint: '/api' } })
     expect(error.details.userId).toBe(123)
     expect(error.details.endpoint).toBe('/api')
   })
 
   it('BgmError 可被 instanceof Error 识别', () => {
-    const error = new BgmError('msg', 'CODE')
+    const error = new BgmError('msg', { code: 'CODE' })
     expect(error instanceof Error).toBe(true)
     expect(error instanceof BgmError).toBe(true)
   })
@@ -300,7 +300,7 @@ describe('BgmError', () => {
     function isBgmError(value: unknown): value is BgmError {
       return value instanceof BgmError
     }
-    const error: unknown = new BgmError('msg', 'CODE')
+    const error: unknown = new BgmError('msg', { code: 'CODE' })
     expect(isBgmError(error)).toBe(true)
     expect(isBgmError(new Error('plain'))).toBe(false)
     expect(isBgmError('string')).toBe(false)

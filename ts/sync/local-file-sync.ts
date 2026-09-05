@@ -212,10 +212,9 @@ export class LocalFileSyncSource implements SyncSource {
   validateConfig(): Result<void> {
     if (!isLocalFileConfigured()) {
       return Result.failVoid(
-        new BgmError(
-          '本地文件路径未配置，请在"文件路径"字段填写本地 .jsonl/.json 文件的绝对路径',
-          'CONFIG_INCOMPLETE',
-        ),
+        new BgmError('本地文件路径未配置，请在"文件路径"字段填写本地 .jsonl/.json 文件的绝对路径', {
+          code: 'CONFIG_INCOMPLETE',
+        }),
       )
     }
     return Result.okVoid()

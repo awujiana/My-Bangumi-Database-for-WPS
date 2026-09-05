@@ -92,7 +92,9 @@ export function importConfig(json: string): Result<void> {
     parsed = JSON.parse(json)
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : String(error)
-    return Result.failVoid(new BgmError(`JSON 解析失败: ${message}`, 'CONFIG_PARSE_ERROR'))
+    return Result.failVoid(
+      new BgmError(`JSON 解析失败: ${message}`, { code: 'CONFIG_PARSE_ERROR' }),
+    )
   }
 
   const result = FullConfigSchema.safeParse(parsed)
@@ -100,7 +102,7 @@ export function importConfig(json: string): Result<void> {
     const errors = result.error.issues
       .map((index) => `${(index.path ?? []).join('.')}: ${index.message}`)
       .join('; ')
-    return Result.failVoid(new BgmError(`配置校验失败: ${errors}`, 'CONFIG_INVALID'))
+    return Result.failVoid(new BgmError(`配置校验失败: ${errors}`, { code: 'CONFIG_INVALID' }))
   }
 
   const config = result.data

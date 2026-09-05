@@ -319,9 +319,9 @@ function getSelectedRowSids(): Set<string> {
 
     // 遍历选区每行，提取 SID
     for (let row = firstRow; row <= lastRow; row += 1) {
-      // 跳过表头行（取反条件包裹，满足 no-continue）
-
-      if (row !== headerRow) {
+      // 跳过表头行：提取条件变量使循环体含多条语句，消除 no-continue 与 prefer-continue 冲突
+      const isNotHeaderRow = row !== headerRow
+      if (isNotHeaderRow) {
         const url = trim(getCellValue(ws, row, urlCol))
         if (url) {
           const sid = extractSubjectId(url)

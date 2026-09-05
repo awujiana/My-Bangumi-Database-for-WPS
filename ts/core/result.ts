@@ -16,8 +16,19 @@
  * @class BgmError
  * @extends Error
  * @example
- * throw new BgmError('Token已过期', 'TOKEN_EXPIRED', { expiredAt: '2024-01-01' });
+ * throw new BgmError('Token已过期', { code: 'TOKEN_EXPIRED', details: { expiredAt: '2024-01-01' } });
  */
+
+/** BgmError 构造选项 */
+export interface BgmErrorOptions {
+  /** 错误码，用于程序化识别错误类型，默认 'UNKNOWN' */
+  code?: string
+  /** 额外的错误详情，默认 {} */
+  details?: Record<string, unknown>
+  /** 原始错误原因（与原生 ErrorOptions.cause 对齐，供 super() 透传） */
+  cause?: unknown
+}
+
 export class BgmError extends Error {
   /**
    * 错误码
@@ -47,26 +58,28 @@ export class BgmError extends Error {
    *
    * @constructor
    * @param {string} message - 人类可读的错误消息
-   * @param {string} [code='UNKNOWN'] - 错误代码，用于程序化处理
-   * @param {Record<string, unknown>} [details={}] - 额外的错误详情
+   * @param {BgmErrorOptions} [options={}] - 错误选项（code 默认 'UNKNOWN'）
    *
    * @example
    * // 基本用法
-   * const err = new BgmError('网络请求失败', 'NETWORK_ERROR');
+   * const err = new BgmError('网络请求失败', { code: 'NETWORK_ERROR' });
    *
    * // 带详细信息的用法
-   * const err = new BgmError('API调用失败', 'API_ERROR', {
-   *     endpoint: '/v0/me',
-   *     statusCode: 401,
-   *     retryCount: 3
+   * const err = new BgmError('API调用失败', {
+   *     code: 'API_ERROR',
+   *     details: {
+   *         endpoint: '/v0/me',
+   *         statusCode: 401,
+   *         retryCount: 3
+   *     }
    * });
    */
 
-  constructor(message: string, code = 'UNKNOWN', details: Record<string, unknown> = {}) {
-    super(message)
+  constructor(message: string, options: BgmErrorOptions = {}) {
+    super(message, options)
     this.name = 'BgmError'
-    this.code = code
-    this.details = details
+    this.code = options.code ?? 'UNKNOWN'
+    this.details = options.details ?? {}
     this.timestamp = new Date().toISOString()
   }
 
@@ -78,7 +91,7 @@ export class BgmError extends Error {
    * @returns {string} 格式化的错误字符串
    *
    * @example
-   * const err = new BgmError('Token无效', 'TOKEN_INVALID');
+   * const err = new BgmError('Token无效', { code: 'TOKEN_INVALID' });
    * console.log(err.toString()); // '[TOKEN_INVALID] Token无效'
    */
   toString(): string {
@@ -99,7 +112,7 @@ export class BgmError extends Error {
  * async function fetchUser(id: number): Promise<Result<User>> {
  *     const response = await fetch(`/api/users/${id}`);
  *     if (!response.ok) {
- *         return Result.fail(new BgmError('用户不存在', 'USER_NOT_FOUND'));
+ *         return Result.fail(new BgmError('用户不存在', { code: 'USER_NOT_FOUND' }));
  *     }
  *     const user = await response.json();
  *     return Result.ok(user);
@@ -138,7 +151,7 @@ export class Result<T> {
    * @returns {Result<T>} 包装了错误的Result实例
    *
    * @example
-   * return Result.fail(new BgmError('网络错误', 'NETWORK_ERROR'));
+   * return Result.fail(new BgmError('网络错误', { code: 'NETWORK_ERROR' }));
    */
   static fail<T>(error: BgmError): Result<T> {
     return new Result<T>(false, null, error)
@@ -169,7 +182,7 @@ export class Result<T> {
    * @returns {Result<void>} 包装了错误的 Result<void> 实例
    *
    * @example
-   * return Result.failVoid(new BgmError('配置不完整', 'CONFIG_INCOMPLETE'));
+   * return Result.failVoid(new BgmError('配置不完整', { code: 'CONFIG_INCOMPLETE' }));
    */
   static failVoid(error: BgmError): Result<void> {
     return new Result<void>(false, null, error)
@@ -192,7 +205,7 @@ export class Result<T> {
     if (code >= 200 && code < 300) {
       return this.ok(data ?? (null as T))
     }
-    return this.fail(new BgmError('API Error', String(code)))
+    return this.fail(new BgmError('API Error', { code: String(code) }))
   }
 
   /**
@@ -311,7 +324,7 @@ export class Result<T> {
     if (this.success) {
       return Result.ok(function_(this.data as T))
     }
-    return Result.fail(this.error ?? new BgmError('Result 失败但缺少错误信息', 'UNKNOWN'))
+    return Result.fail(this.error ?? new BgmError('Result 失败但缺少错误信息', { code: 'UNKNOWN' }))
   }
 
   /**

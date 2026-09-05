@@ -23,7 +23,7 @@ const VALID_METHODS = new Set<HttpMethod>(['GET', 'POST', 'PUT', 'DELETE', 'PATC
 function validateMethod(method: string): HttpMethod {
   const upper = method.toUpperCase() as HttpMethod
   if (!VALID_METHODS.has(upper)) {
-    throw new BgmError(`无效的 HTTP 方法: ${method}`, 'INVALID_METHOD')
+    throw new BgmError(`无效的 HTTP 方法: ${method}`, { code: 'INVALID_METHOD' })
   }
   return upper
 }
@@ -34,10 +34,10 @@ function validateMethod(method: string): HttpMethod {
 
 function validateEndpoint(endpoint: string): void {
   if (!endpoint || typeof endpoint !== 'string') {
-    throw new BgmError('endpoint 无效', 'INVALID_ENDPOINT')
+    throw new BgmError('endpoint 无效', { code: 'INVALID_ENDPOINT' })
   }
   if (endpoint.includes('..') || endpoint.startsWith('http')) {
-    throw new BgmError('endpoint 包含非法字符', 'INVALID_ENDPOINT')
+    throw new BgmError('endpoint 包含非法字符', { code: 'INVALID_ENDPOINT' })
   }
 }
 
@@ -125,13 +125,13 @@ export async function httpRequest<T = unknown>(
   } catch (error: unknown) {
     BGM.handleError(error, { context: 'httpRequest', showAlert: false })
     const error_ =
-      error instanceof BgmError ? error : new BgmError(String(error), 'VALIDATION_ERROR')
+      error instanceof BgmError ? error : new BgmError(String(error), { code: 'VALIDATION_ERROR' })
     return Result.fail(error_)
   }
 
   // 如果 signal 已 aborted，立即失败，不进入重试循环
   if (signal?.aborted) {
-    return Result.fail(new BgmError('请求被取消', 'ABORTED'))
+    return Result.fail(new BgmError('请求被取消', { code: 'ABORTED' }))
   }
 
   const validMethod = validateMethod(method)
@@ -140,7 +140,7 @@ export async function httpRequest<T = unknown>(
   while (attempt <= retries) {
     // 每次重试前再次检查 signal 是否已 aborted
     if (signal?.aborted) {
-      return Result.fail(new BgmError('请求被取消', 'ABORTED'))
+      return Result.fail(new BgmError('请求被取消', { code: 'ABORTED' }))
     }
     try {
       const response = await executeXhrRequest(BGM_CONFIG.API_BASE + endpoint, {
@@ -167,9 +167,12 @@ export async function httpRequest<T = unknown>(
             const errorMessage_ = error instanceof Error ? error.message : String(error)
             bgmLog(LOG_LEVELS.WARN, `[HTTP] 响应数据校验失败: ${errorMessage_}`)
             return Result.fail(
-              new BgmError(`响应数据校验失败: ${errorMessage_}`, 'SCHEMA_VALIDATION_ERROR', {
-                endpoint,
-                status: response.status,
+              new BgmError(`响应数据校验失败: ${errorMessage_}`, {
+                code: 'SCHEMA_VALIDATION_ERROR',
+                details: {
+                  endpoint,
+                  status: response.status,
+                },
               }),
             )
           }
@@ -189,12 +192,14 @@ export async function httpRequest<T = unknown>(
         await sleep(delayMs)
       } else {
         const errorMessage = getErrorMessage(response.status)
-        return Result.fail(new BgmError(errorMessage, 'HTTP_ERROR', { status: response.status }))
+        return Result.fail(
+          new BgmError(errorMessage, { code: 'HTTP_ERROR', details: { status: response.status } }),
+        )
       }
     } catch (error: unknown) {
       // 取消导致的失败不重试，直接返回
       if (signal?.aborted) {
-        return Result.fail(new BgmError('请求被取消', 'ABORTED'))
+        return Result.fail(new BgmError('请求被取消', { code: 'ABORTED' }))
       }
       BGM.handleError(error, { context: 'httpRequest', showAlert: false })
       if (attempt < retries) {
@@ -204,13 +209,16 @@ export async function httpRequest<T = unknown>(
         await sleep(delayMs)
       } else {
         const errorMessage = error instanceof Error ? error.message : String(error)
-        return Result.fail(new BgmError(errorMessage, 'NETWORK_ERROR'))
+        return Result.fail(new BgmError(errorMessage, { code: 'NETWORK_ERROR' }))
       }
     }
   }
 
   return Result.fail(
-    new BgmError('超过最大重试次数', 'MAX_RETRIES_EXCEEDED', { retries, endpoint }),
+    new BgmError('超过最大重试次数', {
+      code: 'MAX_RETRIES_EXCEEDED',
+      details: { retries, endpoint },
+    }),
   )
 }
 /**
