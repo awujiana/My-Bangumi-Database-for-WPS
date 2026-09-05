@@ -199,10 +199,7 @@ import {
   GithubSyncSource,
   applyConflictResolutions,
 } from '../ts/sync/github-sync.js'
-import type {
-  GithubSyncDiff,
-  ConflictResolution,
-} from '../ts/sync/github-sync-diff.js'
+import type { GithubSyncDiff, ConflictResolution } from '../ts/sync/github-sync-diff.js'
 
 // ========== 辅助函数 ==========
 
@@ -269,8 +266,9 @@ describe('fetchGithubJson', () => {
     mockXHR.xhrMock.onload = function (this: typeof mockXHR.xhrMock) {
       // 注意：onload 被调用时 this 指向 xhrMock
     }
-    // 直接触发 onload
-    Promise.resolve().then(() => {
+    // 直接触发 onload（微任务时序与 Promise.resolve().then 等价：
+    // 在 fetchGithubJson 内部挂起后才执行，确保 onload 已挂载）
+    queueMicrotask(() => {
       mockXHR.xhrMock.onload?.()
     })
     const result = await fetchGithubJson()

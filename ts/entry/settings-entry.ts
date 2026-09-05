@@ -40,57 +40,58 @@ function isSettingsContext(): boolean {
 function initSettingsPage(): void {
   // 1. 加载 Token 和用户信息状态
   // 这些函数使用 DOM ID 查找元素，settings.html 已使用与 panel.html 相同的 ID
-  import('../ui/handlers/token.js')
-    .then(({ updateTokenStatus, updateUserIdStatus }) => {
+  void (async () => {
+    try {
+      const { updateTokenStatus, updateUserIdStatus } = await import('../ui/handlers/token.js')
       updateTokenStatus()
       updateUserIdStatus()
-    })
-    .catch(() => {
+    } catch {
       // 静默处理，token 状态在 initHandlers 中也会初始化
-    })
+    }
+  })()
 
   // 2. 加载同步偏好设置
-  import('../tools/config.js')
-    .then(
-      ({
+  void (async () => {
+    try {
+      const {
         isIncrementalSyncEnabled,
         isSkipConflictsEnabled,
         isSyncRecordEnabled,
         getConfig,
         areNavIconsOnly,
-      }) => {
-        // 设置复选框
-        const chkIncremental = document.getElementById(
-          'chkIncrementalSync',
-        ) as HTMLInputElement | null
-        if (chkIncremental) chkIncremental.checked = isIncrementalSyncEnabled(true)
+      } = await import('../tools/config.js')
+      // 设置复选框
+      const chkIncremental = document.getElementById(
+        'chkIncrementalSync',
+      ) as HTMLInputElement | null
+      if (chkIncremental) chkIncremental.checked = isIncrementalSyncEnabled(true)
 
-        const chkSkip = document.getElementById('chkSkipConflicts') as HTMLInputElement | null
-        if (chkSkip) chkSkip.checked = isSkipConflictsEnabled(true)
+      const chkSkip = document.getElementById('chkSkipConflicts') as HTMLInputElement | null
+      if (chkSkip) chkSkip.checked = isSkipConflictsEnabled(true)
 
-        const chkSyncRecord = document.getElementById(
-          'chkEnableSyncRecord',
-        ) as HTMLInputElement | null
-        if (chkSyncRecord) chkSyncRecord.checked = isSyncRecordEnabled(true)
+      const chkSyncRecord = document.getElementById(
+        'chkEnableSyncRecord',
+      ) as HTMLInputElement | null
+      if (chkSyncRecord) chkSyncRecord.checked = isSyncRecordEnabled(true)
 
-        const chkNavIcons = document.getElementById('chkNavIconsOnly') as HTMLInputElement | null
-        if (chkNavIcons) chkNavIcons.checked = areNavIconsOnly(true)
+      const chkNavIcons = document.getElementById('chkNavIconsOnly') as HTMLInputElement | null
+      if (chkNavIcons) chkNavIcons.checked = areNavIconsOnly(true)
 
-        // 设置冲突策略下拉
-        const strategySelect = document.getElementById('githubStrategy') as HTMLSelectElement | null
-        if (strategySelect) {
-          const savedStrategy = getConfig('bgm_conflict_strategy', 'skip', true)
-          strategySelect.value = savedStrategy
-        }
-      },
-    )
-    .catch(() => {
+      // 设置冲突策略下拉
+      const strategySelect = document.getElementById('githubStrategy') as HTMLSelectElement | null
+      if (strategySelect) {
+        const savedStrategy = getConfig('bgm_conflict_strategy', 'skip', true)
+        strategySelect.value = savedStrategy
+      }
+    } catch {
       // 静默处理
-    })
+    }
+  })()
 
   // 3. 加载 GitHub 配置
-  import('../index.js')
-    .then(({ getGithubConfig }) => {
+  void (async () => {
+    try {
+      const { getGithubConfig } = await import('../index.js')
       const config = getGithubConfig()
       const ownerInput = document.getElementById('githubOwner') as HTMLInputElement | null
       if (ownerInput) ownerInput.value = config.owner || ''
@@ -103,10 +104,10 @@ function initSettingsPage(): void {
 
       const pathInput = document.getElementById('githubPath') as HTMLInputElement | null
       if (pathInput) pathInput.value = config.path || ''
-    })
-    .catch(() => {
+    } catch {
       // 静默处理
-    })
+    }
+  })()
 }
 
 /**

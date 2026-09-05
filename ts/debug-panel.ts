@@ -674,21 +674,23 @@ function bindLogFilters(root: HTMLElement): void {
 function bindLogActions(root: HTMLElement): void {
   const clearButton = root.querySelector<HTMLElement>('#bgm-dp-log-clear')
   clearButton?.addEventListener('click', () => {
-    void getLogger().then((logger) => {
+    void (async () => {
+      const logger = await getLogger()
       if (logger) {
         logger.clearLogs()
         void refreshLogs(root)
       }
-    })
+    })()
   })
 
   const exportButton = root.querySelector<HTMLElement>('#bgm-dp-log-export')
   exportButton?.addEventListener('click', () => {
-    void getLogger().then((logger) => {
+    void (async () => {
+      const logger = await getLogger()
       if (logger) {
         logger.exportLogsToFile()
       }
-    })
+    })()
   })
 }
 

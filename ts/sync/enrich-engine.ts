@@ -1508,7 +1508,8 @@ export function searchSheet(
           if (aliasValue) {
             const aliases = splitAliases(aliasValue)
             const matchedAliases = aliases.filter((a) =>
-              normalizeName(a).includes(normalizedKeyword),)
+              normalizeName(a).includes(normalizedKeyword),
+            )
             for (const alias of matchedAliases) {
               fieldMatches.push({ column: '别名', value: alias })
             }

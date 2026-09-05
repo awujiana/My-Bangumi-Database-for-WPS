@@ -1116,7 +1116,7 @@ const ACTION_HANDLERS: Record<string, ActionHandler> = {
     }
     showConfirm(
       `将从${sourceLabel}下载数据并按策略【${strategyLabel}】合并到当前工作表。\n（远程仓库 → Excel，与上传同步方向相反）${isSelectedRowsOnly ? '\n⚠️ 仅同步选中行' : ''}${timeFilterDesc}\n是否继续？`,
-      (confirmed) => {
+      async (confirmed) => {
         if (!confirmed) {
           bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 用户取消数据同步')
           return
@@ -1169,132 +1169,131 @@ const ACTION_HANDLERS: Record<string, ActionHandler> = {
         const app = getApp()
         // 性能追踪：记录同步开始时间，用于计算总耗时
         const syncStartTime = Date.now()
-        syncFromRemote(
-          (current, total, message, eta) => {
-            // message 写入日志区，eta 独立传入 ETA 区
-            updateSyncProgressDialog(current, total, message, message, eta)
-            if (app?.StatusBar !== undefined) {
-              const statusMessage = eta ? `${message} | ${eta}` : message
-              app.StatusBar = `[${String(current)}/${String(total)}] ${statusMessage}`
-            }
-          },
-          strategy,
-          abortController.signal,
-          isSelectedRowsOnly,
-          // conflictResolution
-          undefined,
-          timeFilter,
-        )
-          .then((result) => {
-            const totalElapsed = Date.now() - syncStartTime
-            const totalProcessed = result.added + result.updated + result.deleted
-            const avgSpeed =
-              totalProcessed > 0 && totalElapsed > 0
-                ? Math.round((totalProcessed / totalElapsed) * 1000)
-                : 0
+        try {
+          const result = await syncFromRemote(
+            (current, total, message, eta) => {
+              // message 写入日志区，eta 独立传入 ETA 区
+              updateSyncProgressDialog(current, total, message, message, eta)
+              if (app?.StatusBar !== undefined) {
+                const statusMessage = eta ? `${message} | ${eta}` : message
+                app.StatusBar = `[${String(current)}/${String(total)}] ${statusMessage}`
+              }
+            },
+            strategy,
+            abortController.signal,
+            isSelectedRowsOnly,
+            // conflictResolution
+            undefined,
+            timeFilter,
+          )
+          const totalElapsed = Date.now() - syncStartTime
+          const totalProcessed = result.added + result.updated + result.deleted
+          const avgSpeed =
+            totalProcessed > 0 && totalElapsed > 0
+              ? Math.round((totalProcessed / totalElapsed) * 1000)
+              : 0
 
-            const efficiency =
-              totalProcessed > 0 || result.unchanged > 0
-                ? Math.round((totalProcessed / (totalProcessed + result.unchanged)) * 100)
-                : 0
-            const etaMs =
-              avgSpeed > 0 && result.remoteTotal > totalProcessed
-                ? Math.round(((result.remoteTotal - totalProcessed) / avgSpeed) * 1000)
-                : 0
+          const efficiency =
+            totalProcessed > 0 || result.unchanged > 0
+              ? Math.round((totalProcessed / (totalProcessed + result.unchanged)) * 100)
+              : 0
+          const etaMs =
+            avgSpeed > 0 && result.remoteTotal > totalProcessed
+              ? Math.round(((result.remoteTotal - totalProcessed) / avgSpeed) * 1000)
+              : 0
 
-            const summary = `远程 ${String(result.remoteTotal)} 条 → ✅${String(result.added)} 🔄${String(result.updated)} ❌${String(result.deleted)} ⏭️${String(result.unchanged)} ⚠️${String(result.failed)} | 耗时 ${formatDuration(totalElapsed)} | ${String(avgSpeed > 0 ? avgSpeed : '?')} 行/秒 | 效率 ${String(efficiency)}%`
-            const details = [
-              `📥 远程数据总量: ${String(result.remoteTotal)}`,
-              `➕ 新增: ${String(result.added)}`,
-              `✏️ 更新: ${String(result.updated)}`,
-              `🗑️ 删除: ${String(result.deleted)}`,
-              `⏭️ 无变更: ${String(result.unchanged)}`,
-              `❌ 失败: ${String(result.failed)}`,
-              `🔍 跳过: ${String(result.skipped)}`,
-              `📊 实际处理: ${String(totalProcessed)} 条`,
-              `⏱️ 总耗时: ${formatDuration(totalElapsed)}`,
-              `⚡ 平均速度: ${avgSpeed > 0 ? `${String(avgSpeed)} 行/秒` : '--'}`,
-              `📈 处理效率: ${String(efficiency)}%`,
-              etaMs > 0 ? `🔮 预计剩余: ${formatDuration(etaMs)}` : '✅ 全部完成',
-            ]
+          const summary = `远程 ${String(result.remoteTotal)} 条 → ✅${String(result.added)} 🔄${String(result.updated)} ❌${String(result.deleted)} ⏭️${String(result.unchanged)} ⚠️${String(result.failed)} | 耗时 ${formatDuration(totalElapsed)} | ${String(avgSpeed > 0 ? avgSpeed : '?')} 行/秒 | 效率 ${String(efficiency)}%`
+          const details = [
+            `📥 远程数据总量: ${String(result.remoteTotal)}`,
+            `➕ 新增: ${String(result.added)}`,
+            `✏️ 更新: ${String(result.updated)}`,
+            `🗑️ 删除: ${String(result.deleted)}`,
+            `⏭️ 无变更: ${String(result.unchanged)}`,
+            `❌ 失败: ${String(result.failed)}`,
+            `🔍 跳过: ${String(result.skipped)}`,
+            `📊 实际处理: ${String(totalProcessed)} 条`,
+            `⏱️ 总耗时: ${formatDuration(totalElapsed)}`,
+            `⚡ 平均速度: ${avgSpeed > 0 ? `${String(avgSpeed)} 行/秒` : '--'}`,
+            `📈 处理效率: ${String(efficiency)}%`,
+            etaMs > 0 ? `🔮 预计剩余: ${formatDuration(etaMs)}` : '✅ 全部完成',
+          ]
 
-            const stats: SyncProgressStats = {
-              added: result.added,
-              updated: result.updated,
-              deleted: result.deleted,
-              unchanged: result.unchanged,
-              failed: result.failed,
-              skipped: result.skipped,
-              remoteTotal: result.remoteTotal,
-              elapsedMs: totalElapsed,
-              avgSpeed,
-              strategyLabel,
-            }
+          const stats: SyncProgressStats = {
+            added: result.added,
+            updated: result.updated,
+            deleted: result.deleted,
+            unchanged: result.unchanged,
+            failed: result.failed,
+            skipped: result.skipped,
+            remoteTotal: result.remoteTotal,
+            elapsedMs: totalElapsed,
+            avgSpeed,
+            strategyLabel,
+          }
 
-            const detailItems: GithubSyncDetailItem[] | undefined =
-              result.details && result.details.length > 0 ? result.details : undefined
-            completeSyncProgressDialog(
-              summary,
-              details,
-              false,
-              () => {
-                let scrollToRow: number | undefined
-                try {
-                  const recordSheet = getSyncRecordSheetIfExists()
-                  if (recordSheet) {
-                    scrollToRow = getLastRow(recordSheet)
-                  }
-                } catch {
-                  // ignore
+          const detailItems: GithubSyncDetailItem[] | undefined =
+            result.details && result.details.length > 0 ? result.details : undefined
+          completeSyncProgressDialog(
+            summary,
+            details,
+            false,
+            () => {
+              let scrollToRow: number | undefined
+              try {
+                const recordSheet = getSyncRecordSheetIfExists()
+                if (recordSheet) {
+                  scrollToRow = getLastRow(recordSheet)
                 }
-                const options: SyncResultDialogOptions = {
-                  result,
-                  elapsedMs: totalElapsed,
-                  avgSpeed,
-                  strategyLabel,
-                  stopped: false,
-                }
-                if (scrollToRow !== undefined) {
-                  options.scrollToRow = scrollToRow
-                }
-                showSyncResultDialog(options)
-              },
-              stats,
-              detailItems,
-            )
-
-            bgmLog(
-              LOG_LEVELS.INFO,
-              `[handleActionClick] 同步完成 | 远程:${String(result.remoteTotal)} ✅:${String(result.added)} 🔄:${String(result.updated)} ❌:${String(result.deleted)} ⏭️:${String(result.unchanged)} ⚠️:${String(result.failed)} 🔍:${String(result.skipped)} | 耗时:${formatDuration(totalElapsed)} | 速度:${avgSpeed > 0 ? `${String(avgSpeed)}/s` : '?'} | 效率:${String(efficiency)}%`,
-            )
-            if (app?.StatusBar !== undefined) app.StatusBar = false
-          })
-          .catch((error: unknown) => {
-            const errorMessage = error instanceof Error ? error.message : String(error)
-            const isAborted = abortController.signal.aborted
-            if (isAborted) {
-              showSyncResultDialog({
-                result: {
-                  remoteTotal: 0,
-                  added: 0,
-                  updated: 0,
-                  deleted: 0,
-                  unchanged: 0,
-                  failed: 0,
-                } as GithubSyncResult,
-                elapsedMs: Date.now() - syncStartTime,
-                avgSpeed: 0,
+              } catch {
+                // ignore
+              }
+              const options: SyncResultDialogOptions = {
+                result,
+                elapsedMs: totalElapsed,
+                avgSpeed,
                 strategyLabel,
-                stopped: true,
-              })
-              bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 数据同步被用户停止')
-            } else {
-              hideSyncProgressDialog()
-              bgmLog(LOG_LEVELS.ERROR, `[handleActionClick] 数据同步失败: ${errorMessage}`)
-              showToast(`数据同步失败：${errorMessage}`, 'error')
-            }
-            if (app?.StatusBar !== undefined) app.StatusBar = false
-          })
+                stopped: false,
+              }
+              if (scrollToRow !== undefined) {
+                options.scrollToRow = scrollToRow
+              }
+              showSyncResultDialog(options)
+            },
+            stats,
+            detailItems,
+          )
+
+          bgmLog(
+            LOG_LEVELS.INFO,
+            `[handleActionClick] 同步完成 | 远程:${String(result.remoteTotal)} ✅:${String(result.added)} 🔄:${String(result.updated)} ❌:${String(result.deleted)} ⏭️:${String(result.unchanged)} ⚠️:${String(result.failed)} 🔍:${String(result.skipped)} | 耗时:${formatDuration(totalElapsed)} | 速度:${avgSpeed > 0 ? `${String(avgSpeed)}/s` : '?'} | 效率:${String(efficiency)}%`,
+          )
+          if (app?.StatusBar !== undefined) app.StatusBar = false
+        } catch (error: unknown) {
+          const errorMessage = error instanceof Error ? error.message : String(error)
+          const isAborted = abortController.signal.aborted
+          if (isAborted) {
+            showSyncResultDialog({
+              result: {
+                remoteTotal: 0,
+                added: 0,
+                updated: 0,
+                deleted: 0,
+                unchanged: 0,
+                failed: 0,
+              } as GithubSyncResult,
+              elapsedMs: Date.now() - syncStartTime,
+              avgSpeed: 0,
+              strategyLabel,
+              stopped: true,
+            })
+            bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 数据同步被用户停止')
+          } else {
+            hideSyncProgressDialog()
+            bgmLog(LOG_LEVELS.ERROR, `[handleActionClick] 数据同步失败: ${errorMessage}`)
+            showToast(`数据同步失败：${errorMessage}`, 'error')
+          }
+          if (app?.StatusBar !== undefined) app.StatusBar = false
+        }
       },
     )
     bgmLog(
@@ -1446,11 +1445,15 @@ const ACTION_HANDLERS: Record<string, ActionHandler> = {
   // GitHub 仓库同步：撤销最近一次同步（按单元格逆序恢复旧值）
   undoLastSync: (context) => {
     bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 撤销最近一次 GitHub 同步')
-    executeUndoLastSync().catch((error: unknown) => {
-      const errorMessage = error instanceof Error ? error.message : String(error)
-      bgmLog(LOG_LEVELS.ERROR, `[handleActionClick] 撤销同步失败: ${errorMessage}`)
-      showToast(`撤销失败：${errorMessage}`, 'error')
-    })
+    void (async () => {
+      try {
+        await executeUndoLastSync()
+      } catch (error: unknown) {
+        const errorMessage = error instanceof Error ? error.message : String(error)
+        bgmLog(LOG_LEVELS.ERROR, `[handleActionClick] 撤销同步失败: ${errorMessage}`)
+        showToast(`撤销失败：${errorMessage}`, 'error')
+      }
+    })()
     bgmLog(
       LOG_LEVELS.INFO,
       `[handleActionClick] 撤销同步已触发，耗时: ${String(Date.now() - context.startTime)}ms`,

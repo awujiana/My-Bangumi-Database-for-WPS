@@ -346,18 +346,23 @@ export function OnAction(control: { Id: string }): boolean {
         break
       }
       case 'btnSyncBangumi': {
-        // syncWithConfirmation 是 async 函数，需要 .catch() 防止未处理的 Promise rejection
-        syncWithConfirmation().catch((error: unknown) => {
-          bgmLog(
-            LOG_LEVELS.ERROR,
-            `[OnAction] syncWithConfirmation 异常: ${error instanceof Error && error.message ? error.message : String(error)}`,
-          )
-          BGM.handleError(error, {
-            showAlert: true,
-            level: BGM.ErrorLevel.ERROR,
-            context: 'Ribbon btnSyncBangumi',
-          })
-        })
+        // syncWithConfirmation 是 async 函数；OnAction 是同步回调无法 await，
+        // 用 async IIFE + 全量 try/catch 消费（连同步抛错一并捕获）
+        void (async () => {
+          try {
+            await syncWithConfirmation()
+          } catch (error: unknown) {
+            bgmLog(
+              LOG_LEVELS.ERROR,
+              `[OnAction] syncWithConfirmation 异常: ${error instanceof Error && error.message ? error.message : String(error)}`,
+            )
+            BGM.handleError(error, {
+              showAlert: true,
+              level: BGM.ErrorLevel.ERROR,
+              context: 'Ribbon btnSyncBangumi',
+            })
+          }
+        })()
         break
       }
       case 'btnSetToken': {
@@ -365,33 +370,41 @@ export function OnAction(control: { Id: string }): boolean {
         break
       }
       case 'btnTestToken': {
-        // testTokenForRibbon 是 async 函数，需 .catch() 防止未处理 rejection
-        testTokenForRibbon().catch((error: unknown) => {
-          bgmLog(
-            LOG_LEVELS.ERROR,
-            `[OnAction] testTokenForRibbon 异常: ${error instanceof Error && error.message ? error.message : String(error)}`,
-          )
-          BGM.handleError(error, {
-            showAlert: true,
-            level: BGM.ErrorLevel.ERROR,
-            context: 'Ribbon btnTestToken',
-          })
-        })
+        // testTokenForRibbon 是 async 函数；OnAction 是同步回调，async IIFE 消费
+        void (async () => {
+          try {
+            await testTokenForRibbon()
+          } catch (error: unknown) {
+            bgmLog(
+              LOG_LEVELS.ERROR,
+              `[OnAction] testTokenForRibbon 异常: ${error instanceof Error && error.message ? error.message : String(error)}`,
+            )
+            BGM.handleError(error, {
+              showAlert: true,
+              level: BGM.ErrorLevel.ERROR,
+              context: 'Ribbon btnTestToken',
+            })
+          }
+        })()
         break
       }
       case 'btnCopyToken': {
-        // copyTokenForRibbon 是 async 函数，需 .catch() 防止未处理 rejection
-        copyTokenForRibbon().catch((error: unknown) => {
-          bgmLog(
-            LOG_LEVELS.ERROR,
-            `[OnAction] copyTokenForRibbon 异常: ${error instanceof Error && error.message ? error.message : String(error)}`,
-          )
-          BGM.handleError(error, {
-            showAlert: true,
-            level: BGM.ErrorLevel.ERROR,
-            context: 'Ribbon btnCopyToken',
-          })
-        })
+        // copyTokenForRibbon 是 async 函数；OnAction 是同步回调，async IIFE 消费
+        void (async () => {
+          try {
+            await copyTokenForRibbon()
+          } catch (error: unknown) {
+            bgmLog(
+              LOG_LEVELS.ERROR,
+              `[OnAction] copyTokenForRibbon 异常: ${error instanceof Error && error.message ? error.message : String(error)}`,
+            )
+            BGM.handleError(error, {
+              showAlert: true,
+              level: BGM.ErrorLevel.ERROR,
+              context: 'Ribbon btnCopyToken',
+            })
+          }
+        })()
         break
       }
       case 'btnSetUserId': {
@@ -403,33 +416,41 @@ export function OnAction(control: { Id: string }): boolean {
         break
       }
       case 'btnSyncFromGithub': {
-        // syncFromGithubForRibbon 是 async 函数，需 .catch() 防止未处理 rejection
-        syncFromGithubForRibbon().catch((error: unknown) => {
-          bgmLog(
-            LOG_LEVELS.ERROR,
-            `[OnAction] syncFromGithubForRibbon 异常: ${error instanceof Error && error.message ? error.message : String(error)}`,
-          )
-          BGM.handleError(error, {
-            showAlert: true,
-            level: BGM.ErrorLevel.ERROR,
-            context: 'Ribbon btnSyncFromGithub',
-          })
-        })
+        // syncFromGithubForRibbon 是 async 函数；OnAction 是同步回调，async IIFE 消费
+        void (async () => {
+          try {
+            await syncFromGithubForRibbon()
+          } catch (error: unknown) {
+            bgmLog(
+              LOG_LEVELS.ERROR,
+              `[OnAction] syncFromGithubForRibbon 异常: ${error instanceof Error && error.message ? error.message : String(error)}`,
+            )
+            BGM.handleError(error, {
+              showAlert: true,
+              level: BGM.ErrorLevel.ERROR,
+              context: 'Ribbon btnSyncFromGithub',
+            })
+          }
+        })()
         break
       }
       case 'btnUndoLastSync': {
-        // undoLastSyncForRibbon 是 async 函数，需 .catch() 防止未处理 rejection
-        undoLastSyncForRibbon().catch((error: unknown) => {
-          bgmLog(
-            LOG_LEVELS.ERROR,
-            `[OnAction] undoLastSyncForRibbon 异常: ${error instanceof Error && error.message ? error.message : String(error)}`,
-          )
-          BGM.handleError(error, {
-            showAlert: true,
-            level: BGM.ErrorLevel.ERROR,
-            context: 'Ribbon btnUndoLastSync',
-          })
-        })
+        // undoLastSyncForRibbon 是 async 函数；OnAction 是同步回调，async IIFE 消费
+        void (async () => {
+          try {
+            await undoLastSyncForRibbon()
+          } catch (error: unknown) {
+            bgmLog(
+              LOG_LEVELS.ERROR,
+              `[OnAction] undoLastSyncForRibbon 异常: ${error instanceof Error && error.message ? error.message : String(error)}`,
+            )
+            BGM.handleError(error, {
+              showAlert: true,
+              level: BGM.ErrorLevel.ERROR,
+              context: 'Ribbon btnUndoLastSync',
+            })
+          }
+        })()
         break
       }
       case 'btnOpenSettings': {

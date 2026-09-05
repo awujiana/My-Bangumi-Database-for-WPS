@@ -14,7 +14,8 @@ const mockTrim = vi.hoisted(() => vi.fn((v: string) => v?.trim() ?? ''))
 const mockEnsureSheetHeaders = vi.hoisted(() => vi.fn().mockReturnValue(false))
 const mockGetApp = vi.hoisted(() => vi.fn())
 const mockBuildRawUrl = vi.hoisted(() =>
-  vi.fn().mockReturnValue('https://raw.githubusercontent.com/test/repo/main/data.jsonl'),)
+  vi.fn().mockReturnValue('https://raw.githubusercontent.com/test/repo/main/data.jsonl'),
+)
 const mockIsGithubConfigComplete = vi.hoisted(() => vi.fn().mockReturnValue(true))
 // 这些 mock 仅用于其他测试，在 computeDiff/parseJsonl/isGithubRemoteEntry 测试中会被覆盖
 const realImpls = vi.hoisted(() => ({
@@ -47,7 +48,8 @@ const mockParseJsonl = vi.hoisted(() =>
       }
     }
     return { entries, errors }
-  }),)
+  }),
+)
 const mockComputeDiff = vi.hoisted(() =>
   vi.fn().mockImplementation(
     (
@@ -70,7 +72,8 @@ const mockComputeDiff = vi.hoisted(() =>
       }
       return []
     },
-  ),)
+  ),
+)
 const mockTagsToString = vi.hoisted(() => vi.fn().mockReturnValue(''))
 const mockExtractSubjectId = vi.hoisted(() => vi.fn().mockReturnValue(null))
 const mockBeginUndoSession = vi.hoisted(() => vi.fn())

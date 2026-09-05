@@ -217,18 +217,19 @@ export const BGM: {
         // 复用统一入口，确保状态一致
         if (!this.enterRunningState()) return
         bgmLog(LOG_LEVELS.INFO, '开始执行同步...')
-        syncAllRows()
-          .then(() => {
+        void (async () => {
+          try {
+            await syncAllRows()
             // 成功路径也清理状态，与 catch 分支对称
             if (this.shouldStop) {
               BGM.Dialog.alert('同步已停止', '提示')
             }
             this.exitRunningState()
-          })
-          .catch((error: unknown) => {
+          } catch (error: unknown) {
             this.exitRunningState()
             BGM.handleError(error, { showAlert: true })
-          })
+          }
+        })()
       })
     },
 

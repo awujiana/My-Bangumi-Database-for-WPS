@@ -20,10 +20,12 @@ const mockApplyDiffToSheet = vi.hoisted(() =>
     remoteTotal: 0,
     unchanged: 0,
     skipped: 0,
-  }),)
+  }),
+)
 const mockComputeDiff = vi.hoisted(() => vi.fn().mockReturnValue([]))
 const mockReadLocalEntriesForSync = vi.hoisted(() =>
-  vi.fn().mockReturnValue({ entries: new Map(), lastRow: 1 }),)
+  vi.fn().mockReturnValue({ entries: new Map(), lastRow: 1 }),
+)
 const mockFilterByTime = vi.hoisted(() => vi.fn().mockReturnValue([]))
 const mockExtractSubjectId = vi.hoisted(() => vi.fn().mockReturnValue(null))
 const mockGetSyncSourceType = vi.hoisted(() => vi.fn().mockReturnValue('github'))
@@ -952,7 +954,8 @@ describe('syncSourceRegistry 未覆盖分支', () => {
     mockFindHeaderRow.mockReturnValue(0)
     mockGetColumnMap.mockReturnValue(new Map([['Bangumi_URL', 5]]))
     mockGetCellValue.mockImplementation((_ws: unknown, row: number, _col: number) =>
-      row === 2 ? 'https://bgm.tv/subject/777' : '',)
+      row === 2 ? 'https://bgm.tv/subject/777' : '',
+    )
     mockExtractSubjectId.mockImplementation((url: string) => (url.includes('777') ? '777' : null))
     mockGithubSourceReference.fetchRemoteEntries.mockResolvedValue([{ sid: '777', name: '匹配' }])
     mockComputeDiff.mockReturnValue([])

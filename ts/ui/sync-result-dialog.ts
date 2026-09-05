@@ -631,8 +631,12 @@ export function showSyncResultDialog(options: SyncResultDialogOptions): void {
   // 查看详情（打开同步记录表，或弹窗预览）
   const viewDetailsButton = modal.querySelector('#bgmResultViewDetailsBtn')
   viewDetailsButton?.addEventListener('click', () => {
-    Promise.all([import('../sync/sync-record.js'), import('../tools/config.js')])
-      .then(([syncRecordModule, configModule]) => {
+    void (async () => {
+      try {
+        const [syncRecordModule, configModule] = await Promise.all([
+          import('../sync/sync-record.js'),
+          import('../tools/config.js'),
+        ])
         const { getSyncRecordSheetIfExists, openSyncRecordSheet } = syncRecordModule
         const { isSyncRecordEnabled } = configModule
 
@@ -652,8 +656,7 @@ export function showSyncResultDialog(options: SyncResultDialogOptions): void {
             sheetExists: isSheetExists,
           })
         }
-      })
-      .catch(() => {
+      } catch {
         bgmLog(LOG_LEVELS.WARN, '[syncResultDialog] 无法加载同步记录模块')
         showSyncDetailPreviewDialog({
           result,
@@ -664,7 +667,8 @@ export function showSyncResultDialog(options: SyncResultDialogOptions): void {
           syncEnabled: false,
           sheetExists: false,
         })
-      })
+      }
+    })()
   })
 
   // ESC 关闭

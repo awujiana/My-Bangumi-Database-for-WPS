@@ -71,25 +71,34 @@ export function updateTokenStatus(): void {
       tokenStatus.textContent = `${_T.set}: ${BGM.cache.username}`
       showUserProfile()
       // 后台静默查询 Token 状态
-      void queryTokenStatus(token).catch(() => {
-        // 静默失败，不影响主流程
-      })
+      void (async () => {
+        try {
+          await queryTokenStatus(token)
+        } catch {
+          // 静默失败，不影响主流程
+        }
+      })()
     } else {
       tokenStatus.textContent = `${_T.set} (${token.substring(0, 4)}...)`
 
       // 尝试获取用户信息（但不阻塞 UI 更新）
       // 注意：这里可能会因为 CORS 或网络问题失败
-      fetchBgmUserInfo()
-        .then(({ userInfo, errorType }) => {
+      void (async () => {
+        try {
+          const { userInfo, errorType } = await fetchBgmUserInfo()
           if (userInfo?.username) {
             tokenStatus.style.color = '#4CAF50'
             tokenStatus.textContent = `${_T.set}: ${userInfo.username}`
             updateUserIdStatus()
             showUserProfile()
             // 后台静默查询 Token 状态
-            void queryTokenStatus(token).catch(() => {
-              // 静默失败
-            })
+            void (async () => {
+              try {
+                await queryTokenStatus(token)
+              } catch {
+                // 静默失败
+              }
+            })()
           } else if (errorType === 'network') {
             // 网络错误：Token 本身可能有效，但无法连接到 BGM API
             // 常见原因：被 GFW 墙、断网、DNS 失败
@@ -116,12 +125,12 @@ export function updateTokenStatus(): void {
             bgmLog(LOG_LEVELS.WARN, '[updateTokenStatus] HTTP 错误：Token 可能已失效')
           }
           // errorType === 'parse' 或 'none'：保持原显示
-        })
-        .catch((error: unknown) => {
+        } catch (error: unknown) {
           const errorMessage = error instanceof Error ? error.message : String(error)
           bgmLog(LOG_LEVELS.ERROR, `[handlers] updateTokenStatus 获取用户信息失败: ${errorMessage}`)
           BGM.handleError(error)
-        })
+        }
+      })()
     }
   } else {
     tokenStatus.textContent = _T.notSet
@@ -277,19 +286,20 @@ export function testTokenValidity(): void {
         }
 
         // 查询 Token 有效期，完成后显示剩余天数
-        void queryTokenStatus(token)
-          .then(({ expires }) => {
+        void (async () => {
+          try {
+            const { expires } = await queryTokenStatus(token)
             const remaining = getTokenRemainingTime(expires)
             bgmLog(
               LOG_LEVELS.INFO,
               `[testTokenValidity] 📅 Token 剩余时间: ${remaining.label} | 过期时间: ${new Date(expires * 1000).toLocaleString('zh-CN')}`,
             )
             showToast(`✅ Token 有效 | 用户: ${nickname} | ${remaining.label}`, 'success')
-          })
-          .catch(() => {
+          } catch {
             bgmLog(LOG_LEVELS.WARN, '[testTokenValidity] Token 状态查询失败，不影响主流程')
             showToast(`✅ Token 有效 | 用户: ${nickname}`, 'success')
-          })
+          }
+        })()
       } catch (error: unknown) {
         bgmLog(LOG_LEVELS.ERROR, `[testTokenValidity] 解析响应失败: ${(error as Error).message}`)
         showError(_T.parseFailed, _T.cannotParseResponse)

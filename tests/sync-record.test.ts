@@ -88,7 +88,8 @@ const mockColNumberToLetter = vi.hoisted(() =>
       n = Math.floor((n - 1) / 26)
     }
     return result
-  }),)
+  }),
+)
 const mockGetCellValue = vi.hoisted(() => vi.fn().mockReturnValue(''))
 const mockSetCellValue = vi.hoisted(() => vi.fn().mockReturnValue(true))
 const mockReadRangeValues = vi.hoisted(() => vi.fn().mockReturnValue([]))
@@ -603,7 +604,8 @@ describe('syncRecord', () => {
       mockReadRangeValues.mockReturnValue([])
       // Should not throw
       expect(() =>
-        addSyncRecord({ sid: 'empty-cache', name: '空缓存', url: 'http://c.com' }),).not.toThrow()
+        addSyncRecord({ sid: 'empty-cache', name: '空缓存', url: 'http://c.com' }),
+      ).not.toThrow()
     })
 
     it('空数据不应中断缓存构建', () => {

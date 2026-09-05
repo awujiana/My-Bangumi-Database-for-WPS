@@ -548,9 +548,13 @@ export async function previewSyncContent(): Promise<void> {
     const syncAllButtonElement = document.getElementById('syncAllBtn')
     if (syncAllButtonElement) {
       syncAllButtonElement.addEventListener('click', () => {
-        syncAllRows().catch((error: unknown) => {
-          bgmLog(LOG_LEVELS.ERROR, `[preview] syncAllRows 异常: ${(error as Error).message}`)
-        })
+        void (async () => {
+          try {
+            await syncAllRows()
+          } catch (error: unknown) {
+            bgmLog(LOG_LEVELS.ERROR, `[preview] syncAllRows 异常: ${(error as Error).message}`)
+          }
+        })()
       })
     }
 

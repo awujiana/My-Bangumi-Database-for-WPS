@@ -863,9 +863,10 @@ function ensurePanelVisible(): void {
     const tsId = app.PluginStorage?.getItem('panel_id')
     if (!tsId) {
       // 面板未创建，调用 showBangumiPanel 创建并显示
-      void import('../index.js').then(({ showBangumiPanel }) => {
+      void (async () => {
+        const { showBangumiPanel } = await import('../index.js')
         showBangumiPanel()
-      })
+      })()
       return
     }
 
