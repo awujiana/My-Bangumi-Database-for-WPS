@@ -40,7 +40,7 @@ const { PANEL_CONFIG, HEADER_KEYWORDS, COLUMN_RULES, STANDARD_HEADERS, colNumber
       let n = col
       while (n > 0) {
         const remainder = (n - 1) % 26
-        result = String.fromCharCode(65 + remainder) + result
+        result = String.fromCodePoint(65 + remainder) + result
         n = Math.floor((n - 1) / 26)
       }
       return result
@@ -774,7 +774,7 @@ describe('ensureSheetHeaders', () => {
       }
       // First 5 columns fail
       const colLetter = address.replace(/[0-9]/g, '')
-      const colIndex = colLetter.charCodeAt(0) - 64
+      const colIndex = (colLetter.codePointAt(0) ?? 0) - 64
       if (colIndex <= 5) {
         return {
           Value2: '',
@@ -823,7 +823,7 @@ describe('ensureSheetHeaders', () => {
         return { Value2: null, Interior: { Color: 0 }, Font: { Bold: false } }
       }
       const colLetter = address.replace(/[0-9]/g, '')
-      const colIndex = colLetter.charCodeAt(0) - 64
+      const colIndex = (colLetter.codePointAt(0) ?? 0) - 64
       if (colIndex > 5 && colIndex <= 7) {
         return {
           Value2: '',

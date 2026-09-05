@@ -218,8 +218,8 @@ export function normalizeName(name: string): string {
     .replace(/\s+/g, '')
     .toLowerCase()
     .replace(/[！-～]/g, (char) => {
-      const code = char.charCodeAt(0)
-      return String.fromCharCode(code - 0xfee0)
+      const code = char.codePointAt(0) ?? 0
+      return String.fromCodePoint(code - 0xfee0)
     })
 }
 
@@ -1153,7 +1153,7 @@ function WpsCellReference(row: number, col: number): string {
   let c = col
   while (c > 0) {
     c -= 1
-    colString = String.fromCharCode(65 + (c % 26)) + colString
+    colString = String.fromCodePoint(65 + (c % 26)) + colString
     c = Math.floor(c / 26)
   }
   return `${colString}${String(row)}`

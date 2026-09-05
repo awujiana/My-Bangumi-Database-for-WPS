@@ -9,7 +9,7 @@ const mockGetLastRow = vi.hoisted(() => vi.fn().mockReturnValue(5))
 const mockGetColumnMap = vi.hoisted(() => vi.fn().mockReturnValue(new Map()))
 const mockGetCellValue = vi.hoisted(() => vi.fn().mockReturnValue(''))
 const mockSetCellValue = vi.hoisted(() => vi.fn())
-const mockColNumberToLetter = vi.hoisted(() => vi.fn((c: number) => String.fromCharCode(64 + c)))
+const mockColNumberToLetter = vi.hoisted(() => vi.fn((c: number) => String.fromCodePoint(64 + c)))
 const mockTrim = vi.hoisted(() => vi.fn((v: string) => v?.trim() ?? ''))
 const mockEnsureSheetHeaders = vi.hoisted(() => vi.fn().mockReturnValue(false))
 const mockGetApp = vi.hoisted(() => vi.fn())
@@ -751,7 +751,7 @@ describe('getSelectedRowSids (通过 syncFromGithub selectedRowsOnly)', () => {
     mockBuildRawUrl.mockReturnValue('https://raw.githubusercontent.com/test/repo/main/data.jsonl')
   })
 
-  it('getApp 返回 null 时 selectedRowsOnly 应抛错', async () => {
+  it('getApp 返回 null 时 selectedRowsOnly 应抛错', () => {
     mockGetApp.mockReturnValue(null)
 
     // 需要在调用 syncFromGithub 之前设置好 mock
@@ -3381,7 +3381,7 @@ describe('applyDiffToSheet formatEta 路径 (line 548)', () => {
         ['集数', 3],
       ]),
     )
-    mockColNumberToLetter.mockImplementation((c: number) => String.fromCharCode(64 + c))
+    mockColNumberToLetter.mockImplementation((c: number) => String.fromCodePoint(64 + c))
 
     // 创建 600 条 add diffs (超过 BATCH_WRITE_SIZE=500)，确保触发批量写入和事件循环让出
     const diffs: GithubSyncDiff[] = []
@@ -3420,7 +3420,7 @@ describe('batchWriteNewRows 扩展字段写入 (lines 632-635)', () => {
     mockFindHeaderRow.mockReturnValue(1)
     mockGetLastRow.mockReturnValue(5)
     mockSetCellValue.mockImplementation(() => {})
-    mockColNumberToLetter.mockImplementation((c: number) => String.fromCharCode(64 + c))
+    mockColNumberToLetter.mockImplementation((c: number) => String.fromCodePoint(64 + c))
 
     // 模拟 Range.Value2 可写
     const mockRange = {
@@ -3465,7 +3465,7 @@ describe('batchWriteNewRows 扩展字段写入 (lines 632-635)', () => {
     mockFindHeaderRow.mockReturnValue(1)
     mockGetLastRow.mockReturnValue(5)
     mockSetCellValue.mockImplementation(() => {})
-    mockColNumberToLetter.mockImplementation((c: number) => String.fromCharCode(64 + c))
+    mockColNumberToLetter.mockImplementation((c: number) => String.fromCodePoint(64 + c))
 
     const mockRange = {
       Value2: null as unknown,
@@ -3512,7 +3512,7 @@ describe('batchWriteNewRows 空列场景 (line 596)', () => {
     mockFindHeaderRow.mockReturnValue(1)
     mockGetLastRow.mockReturnValue(5)
     mockSetCellValue.mockImplementation(() => {})
-    mockColNumberToLetter.mockImplementation((c: number) => String.fromCharCode(64 + c))
+    mockColNumberToLetter.mockImplementation((c: number) => String.fromCodePoint(64 + c))
 
     // 空列映射，导致 writeCols 为空
     mockGetColumnMap.mockReturnValue(new Map<string, number>())
@@ -3552,7 +3552,7 @@ describe('applyDiffToSheet delete 异常路径', () => {
     mockGetLastRow.mockReturnValue(5)
     mockGetCellValue.mockReturnValue('')
     mockSetCellValue.mockImplementation(() => {})
-    mockColNumberToLetter.mockImplementation((c: number) => String.fromCharCode(64 + c))
+    mockColNumberToLetter.mockImplementation((c: number) => String.fromCodePoint(64 + c))
 
     // 模拟 Range.Delete 抛出异常
     mockWs.Range = vi.fn().mockImplementation(() => {
@@ -3587,7 +3587,7 @@ describe('applyDiffToSheet delete 异常路径', () => {
     mockGetCellValue.mockImplementation(() => {
       throw new Error('GetCellValue failed')
     })
-    mockColNumberToLetter.mockImplementation((c: number) => String.fromCharCode(64 + c))
+    mockColNumberToLetter.mockImplementation((c: number) => String.fromCodePoint(64 + c))
 
     mockGetColumnMap.mockReturnValue(
       new Map<string, number>([
@@ -3619,7 +3619,7 @@ describe('formatEta ms>0 精确路径 (line 548)', () => {
     mockGetLastRow.mockReturnValue(5)
     mockGetCellValue.mockReturnValue('')
     mockSetCellValue.mockImplementation(() => {})
-    mockColNumberToLetter.mockImplementation((c: number) => String.fromCharCode(64 + c))
+    mockColNumberToLetter.mockImplementation((c: number) => String.fromCodePoint(64 + c))
 
     const mockRange = { Value2: null as unknown }
     mockWs.Range = vi.fn().mockReturnValue(mockRange)
@@ -3679,7 +3679,7 @@ describe('batchWriteNewRows 扩展字段精确覆盖 (lines 632, 635)', () => {
     mockFindHeaderRow.mockReturnValue(1)
     mockGetLastRow.mockReturnValue(5)
     mockSetCellValue.mockImplementation(() => {})
-    mockColNumberToLetter.mockImplementation((c: number) => String.fromCharCode(64 + c))
+    mockColNumberToLetter.mockImplementation((c: number) => String.fromCodePoint(64 + c))
 
     const mockRange = { Value2: null as unknown }
     mockWs.Range = vi.fn().mockReturnValue(mockRange)
@@ -3729,7 +3729,7 @@ describe('batchWriteNewRows 扩展字段精确覆盖 (lines 632, 635)', () => {
     mockFindHeaderRow.mockReturnValue(1)
     mockGetLastRow.mockReturnValue(5)
     mockSetCellValue.mockImplementation(() => {})
-    mockColNumberToLetter.mockImplementation((c: number) => String.fromCharCode(64 + c))
+    mockColNumberToLetter.mockImplementation((c: number) => String.fromCodePoint(64 + c))
 
     const mockRange = { Value2: null as unknown }
     mockWs.Range = vi.fn().mockReturnValue(mockRange)
@@ -3774,7 +3774,7 @@ describe('batchWriteNewRows 写入失败回退路径 (lines 655-664)', () => {
     mockFindHeaderRow.mockReturnValue(1)
     mockGetLastRow.mockReturnValue(5)
     mockSetCellValue.mockImplementation(() => {})
-    mockColNumberToLetter.mockImplementation((c: number) => String.fromCharCode(64 + c))
+    mockColNumberToLetter.mockImplementation((c: number) => String.fromCodePoint(64 + c))
 
     // Range 返回 null 触发 line 655 分支
     mockWs.Range = vi.fn().mockReturnValue(null)
@@ -3806,7 +3806,7 @@ describe('batchWriteNewRows 写入失败回退路径 (lines 655-664)', () => {
     mockFindHeaderRow.mockReturnValue(1)
     mockGetLastRow.mockReturnValue(5)
     mockSetCellValue.mockImplementation(() => {})
-    mockColNumberToLetter.mockImplementation((c: number) => String.fromCharCode(64 + c))
+    mockColNumberToLetter.mockImplementation((c: number) => String.fromCodePoint(64 + c))
 
     // Range 存在但写入时抛出异常
     mockWs.Range = vi.fn().mockImplementation(() => {
@@ -3842,7 +3842,7 @@ describe('batchUpdateRows 列写入判断分支 (lines 768-772)', () => {
     mockFindHeaderRow.mockReturnValue(1)
     mockGetLastRow.mockReturnValue(5)
     mockSetCellValue.mockImplementation(() => {})
-    mockColNumberToLetter.mockImplementation((c: number) => String.fromCharCode(64 + c))
+    mockColNumberToLetter.mockImplementation((c: number) => String.fromCodePoint(64 + c))
 
     const mockRange = {
       Value2: null as unknown,
@@ -3886,7 +3886,7 @@ describe('batchUpdateRows 列写入判断分支 (lines 768-772)', () => {
     mockFindHeaderRow.mockReturnValue(1)
     mockGetLastRow.mockReturnValue(5)
     mockSetCellValue.mockImplementation(() => {})
-    mockColNumberToLetter.mockImplementation((c: number) => String.fromCharCode(64 + c))
+    mockColNumberToLetter.mockImplementation((c: number) => String.fromCodePoint(64 + c))
 
     const mockRange = {
       Value2: null as unknown,
@@ -3928,7 +3928,7 @@ describe('formatDuration 全分支 (lines 534-540)', () => {
     mockFindHeaderRow.mockReturnValue(1)
     mockGetLastRow.mockReturnValue(5)
     mockSetCellValue.mockImplementation(() => {})
-    mockColNumberToLetter.mockImplementation((c: number) => String.fromCharCode(64 + c))
+    mockColNumberToLetter.mockImplementation((c: number) => String.fromCodePoint(64 + c))
 
     mockGetColumnMap.mockReturnValue(
       new Map<string, number>([
@@ -3972,7 +3972,7 @@ describe('formatDuration 全分支 (lines 534-540)', () => {
     mockFindHeaderRow.mockReturnValue(1)
     mockGetLastRow.mockReturnValue(5)
     mockSetCellValue.mockImplementation(() => {})
-    mockColNumberToLetter.mockImplementation((c: number) => String.fromCharCode(64 + c))
+    mockColNumberToLetter.mockImplementation((c: number) => String.fromCodePoint(64 + c))
 
     mockGetColumnMap.mockReturnValue(
       new Map<string, number>([
@@ -4014,7 +4014,7 @@ describe('batchUpdateRows 扩展字段分支覆盖 (lines 788-807)', () => {
     mockFindHeaderRow.mockReturnValue(1)
     mockGetLastRow.mockReturnValue(5)
     mockSetCellValue.mockImplementation(() => {})
-    mockColNumberToLetter.mockImplementation((c: number) => String.fromCharCode(64 + c))
+    mockColNumberToLetter.mockImplementation((c: number) => String.fromCodePoint(64 + c))
 
     const mockRange = {
       Value2: null as unknown,
@@ -4057,7 +4057,7 @@ describe('batchUpdateRows 扩展字段分支覆盖 (lines 788-807)', () => {
     mockFindHeaderRow.mockReturnValue(1)
     mockGetLastRow.mockReturnValue(5)
     mockSetCellValue.mockImplementation(() => {})
-    mockColNumberToLetter.mockImplementation((c: number) => String.fromCharCode(64 + c))
+    mockColNumberToLetter.mockImplementation((c: number) => String.fromCodePoint(64 + c))
 
     const mockRange = {
       Value2: null as unknown,
@@ -4112,7 +4112,7 @@ describe('formatDuration 秒/分钟分支 (lines 536, 539)', () => {
     mockFindHeaderRow.mockReturnValue(1)
     mockGetLastRow.mockReturnValue(5)
     mockSetCellValue.mockImplementation(() => {})
-    mockColNumberToLetter.mockImplementation((c: number) => String.fromCharCode(64 + c))
+    mockColNumberToLetter.mockImplementation((c: number) => String.fromCodePoint(64 + c))
 
     const mockRange = {
       Value2: null as unknown,
@@ -4171,7 +4171,7 @@ describe('formatDuration 秒/分钟分支 (lines 536, 539)', () => {
     mockFindHeaderRow.mockReturnValue(1)
     mockGetLastRow.mockReturnValue(5)
     mockSetCellValue.mockImplementation(() => {})
-    mockColNumberToLetter.mockImplementation((c: number) => String.fromCharCode(64 + c))
+    mockColNumberToLetter.mockImplementation((c: number) => String.fromCodePoint(64 + c))
 
     const mockRange = {
       Value2: null as unknown,
@@ -4231,7 +4231,7 @@ describe('formatDuration 秒/分钟分支 (lines 536, 539)', () => {
     mockFindHeaderRow.mockReturnValue(1)
     mockGetLastRow.mockReturnValue(5)
     mockSetCellValue.mockImplementation(() => {})
-    mockColNumberToLetter.mockImplementation((c: number) => String.fromCharCode(64 + c))
+    mockColNumberToLetter.mockImplementation((c: number) => String.fromCodePoint(64 + c))
 
     const mockRange = {
       Value2: null as unknown,
@@ -4284,7 +4284,7 @@ describe('writeRemoteEntryToRow 数字类型扩展字段 (line 506)', () => {
     mockFindHeaderRow.mockReturnValue(1)
     mockGetLastRow.mockReturnValue(5)
     mockSetCellValue.mockImplementation(() => {})
-    mockColNumberToLetter.mockImplementation((c: number) => String.fromCharCode(64 + c))
+    mockColNumberToLetter.mockImplementation((c: number) => String.fromCodePoint(64 + c))
 
     // 模拟批量写入失败，让 Range.Value2 抛异常
     const mockRange = {
@@ -4328,7 +4328,7 @@ describe('writeRemoteEntryToRow 数字类型扩展字段 (line 506)', () => {
     mockFindHeaderRow.mockReturnValue(1)
     mockGetLastRow.mockReturnValue(5)
     mockSetCellValue.mockImplementation(() => {})
-    mockColNumberToLetter.mockImplementation((c: number) => String.fromCharCode(64 + c))
+    mockColNumberToLetter.mockImplementation((c: number) => String.fromCodePoint(64 + c))
 
     const mockRange = {
       Value2: null as unknown,
@@ -4400,7 +4400,7 @@ describe('getSelectedRowSids 无选区路径 (lines 1460-1461)', () => {
     mockFindHeaderRow.mockReturnValue(1)
     mockGetLastRow.mockReturnValue(5)
     mockGetColumnMap.mockReturnValue(new Map())
-    mockColNumberToLetter.mockImplementation((c: number) => String.fromCharCode(64 + c))
+    mockColNumberToLetter.mockImplementation((c: number) => String.fromCodePoint(64 + c))
     mockSetCellValue.mockImplementation(() => {})
   })
 
@@ -4464,7 +4464,7 @@ describe('safeSet 日期列分支 (lines 468-472) 通过 writeRemoteEntryToRow f
     mockFindHeaderRow.mockReturnValue(1)
     mockGetLastRow.mockReturnValue(10)
     mockSetCellValue.mockImplementation(() => true)
-    mockColNumberToLetter.mockImplementation((c: number) => String.fromCharCode(64 + c))
+    mockColNumberToLetter.mockImplementation((c: number) => String.fromCodePoint(64 + c))
 
     mockGetColumnMap.mockReturnValue(
       new Map<string, number>([
@@ -4511,7 +4511,7 @@ describe('safeSet 数字扩展字段 (line 506)', () => {
     mockFindHeaderRow.mockReturnValue(1)
     mockGetLastRow.mockReturnValue(10)
     mockSetCellValue.mockImplementation(() => true)
-    mockColNumberToLetter.mockImplementation((c: number) => String.fromCharCode(64 + c))
+    mockColNumberToLetter.mockImplementation((c: number) => String.fromCodePoint(64 + c))
 
     // '片长' 在 EXTENDED_FIELD_MAP 中映射到 jsonlField '片长'
     mockGetColumnMap.mockReturnValue(
@@ -4554,7 +4554,7 @@ describe('safeSet 数字扩展字段 (line 506)', () => {
 
 // ========== 补充测试：readLocalEntries 批量读取失败回退逐单元格 (line 316) ==========
 describe('readLocalEntries 批量读取异常回退 (line 316)', () => {
-  it('Range.Value2 抛异常时应回退到逐单元格读取 (line 316)', async () => {
+  it('Range.Value2 抛异常时应回退到逐单元格读取 (line 316)', () => {
     const normalSheet = createMockWorksheet()
     normalSheet.Range = vi.fn((address: string) => {
       if (address.includes(':')) {
@@ -4594,7 +4594,7 @@ describe('readLocalEntries 批量读取异常回退 (line 316)', () => {
 
 // ========== 补充测试：readLocalEntries 无可读列/无 Bangumi_URL 列 (lines 293-294) ==========
 describe('readLocalEntries 无可读列边界 (lines 293-294)', () => {
-  it('colMap 无 Bangumi_URL 时 readLocalEntriesForSync 返回空 (line 396 外层守卫)', async () => {
+  it('colMap 无 Bangumi_URL 时 readLocalEntriesForSync 返回空 (line 396 外层守卫)', () => {
     const mockWs = createMockWorksheet({ name: 'DataSheet' })
     mockGetDataSheet.mockReturnValue(mockWs)
     mockFindHeaderRow.mockReturnValue(1)
@@ -4759,7 +4759,7 @@ describe('getSelectedRowSids ActiveSheet 为 null (line 1469)', () => {
     mockFindHeaderRow.mockReturnValue(1)
     mockGetLastRow.mockReturnValue(5)
     mockGetColumnMap.mockReturnValue(new Map())
-    mockColNumberToLetter.mockImplementation((c: number) => String.fromCharCode(64 + c))
+    mockColNumberToLetter.mockImplementation((c: number) => String.fromCodePoint(64 + c))
     mockSetCellValue.mockImplementation(() => {})
   })
 
@@ -4793,7 +4793,7 @@ describe('getSelectedRowSids row===headerRow continue (line 1479)', () => {
     mockComputeDiff.mockReturnValue([])
     mockFindHeaderRow.mockReturnValue(1)
     mockGetLastRow.mockReturnValue(5)
-    mockColNumberToLetter.mockImplementation((c: number) => String.fromCharCode(64 + c))
+    mockColNumberToLetter.mockImplementation((c: number) => String.fromCodePoint(64 + c))
     mockSetCellValue.mockImplementation(() => {})
   })
 

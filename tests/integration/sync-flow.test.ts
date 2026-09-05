@@ -128,7 +128,7 @@ vi.mock('../../ts/tools/util/index.js', () => ({
     let number_ = n
     while (number_ > 0) {
       const rem = (number_ - 1) % 26
-      result = String.fromCharCode(65 + rem) + result
+      result = String.fromCodePoint(65 + rem) + result
       number_ = Math.floor((number_ - 1) / 26)
     }
     return result

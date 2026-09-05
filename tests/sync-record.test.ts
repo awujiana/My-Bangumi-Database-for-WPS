@@ -84,7 +84,7 @@ const mockColNumberToLetter = vi.hoisted(() =>
     let n = col
     while (n > 0) {
       const remainder = (n - 1) % 26
-      result = String.fromCharCode(65 + remainder) + result
+      result = String.fromCodePoint(65 + remainder) + result
       n = Math.floor((n - 1) / 26)
     }
     return result
@@ -1489,7 +1489,7 @@ describe('syncRecord', () => {
 
 // ========== 补充测试：getStatusColor 默认分支 (line 93) ==========
 describe('getStatusColor 默认分支 (line 93)', () => {
-  it('未知状态应返回 SUCCESS 颜色 (line 93)', async () => {
+  it('未知状态应返回 SUCCESS 颜色 (line 93)', () => {
     const mockWs = createMockSheet()
     mockGetApp.mockReturnValue({ ActiveWorkbook: createMockWorkbook() })
 
@@ -1506,7 +1506,7 @@ describe('getStatusColor 默认分支 (line 93)', () => {
     expect(mockSetCellValue.mock.calls.length).toBeGreaterThan(0)
   })
 
-  it('SUCCESS 状态应返回 SUCCESS 颜色', async () => {
+  it('SUCCESS 状态应返回 SUCCESS 颜色', () => {
     const mockWs = createMockSheet()
     mockGetApp.mockReturnValue({ ActiveWorkbook: createMockWorkbook() })
 
@@ -1522,7 +1522,7 @@ describe('getStatusColor 默认分支 (line 93)', () => {
     expect(isResult).toBe(true)
   })
 
-  it('FAIL 状态应返回 FAIL 颜色', async () => {
+  it('FAIL 状态应返回 FAIL 颜色', () => {
     const mockWs = createMockSheet()
     mockGetApp.mockReturnValue({ ActiveWorkbook: createMockWorkbook() })
 
@@ -1538,7 +1538,7 @@ describe('getStatusColor 默认分支 (line 93)', () => {
     expect(isResult).toBe(true)
   })
 
-  it('SKIP 状态应返回 SKIP 颜色', async () => {
+  it('SKIP 状态应返回 SKIP 颜色', () => {
     const mockWs = createMockSheet()
     mockGetApp.mockReturnValue({ ActiveWorkbook: createMockWorkbook() })
 
@@ -1557,7 +1557,7 @@ describe('getStatusColor 默认分支 (line 93)', () => {
 
 // ========== 补充测试：buildCache 异常路径 (line 343) ==========
 describe('buildCache 异常路径 (line 343)', () => {
-  it('readRangeValues 抛出异常时 buildCache 应捕获', async () => {
+  it('readRangeValues 抛出异常时 buildCache 应捕获', () => {
     const mockWs = createMockSheet()
     mockGetApp.mockReturnValue({ ActiveWorkbook: createMockWorkbook() })
     mockGetLastRow.mockReturnValue(10)
@@ -1738,7 +1738,7 @@ describe('addSyncRecord 更新路径 (lines 405-440)', () => {
 
 // ========== 补充测试：addSyncRecord 新建路径 (lines 442-487) ==========
 describe('addSyncRecord 新建路径 (lines 442-487)', () => {
-  it('新 SID 应走新建路径', async () => {
+  it('新 SID 应走新建路径', () => {
     const mockWs = createMockSheet()
     mockGetApp.mockReturnValue({ ActiveWorkbook: createMockWorkbook() })
     mockGetLastRow.mockReturnValue(10)
@@ -1760,7 +1760,7 @@ describe('addSyncRecord 新建路径 (lines 442-487)', () => {
     expect(setCellCalls.length).toBeGreaterThanOrEqual(8)
   })
 
-  it('新建路径 fingerprint 不为 undefined 时应写入', async () => {
+  it('新建路径 fingerprint 不为 undefined 时应写入', () => {
     const mockWs = createMockSheet()
     mockGetApp.mockReturnValue({ ActiveWorkbook: createMockWorkbook() })
     mockGetLastRow.mockReturnValue(10)
@@ -1777,7 +1777,7 @@ describe('addSyncRecord 新建路径 (lines 442-487)', () => {
     expect(isResult).toBe(true)
   })
 
-  it('新建路径 collType 不为空时应写入', async () => {
+  it('新建路径 collType 不为空时应写入', () => {
     const mockWs = createMockSheet()
     mockGetApp.mockReturnValue({ ActiveWorkbook: createMockWorkbook() })
     mockGetLastRow.mockReturnValue(10)
@@ -1812,7 +1812,7 @@ describe('addSyncRecords 异常路径', () => {
 
 // ========== 补充测试：buildCache 异常路径精确触发 (line 343) ==========
 describe('buildCache 异常路径精确覆盖 (line 343)', () => {
-  it('readRangeValues 抛出异常时 buildCache 应捕获并记录', async () => {
+  it('readRangeValues 抛出异常时 buildCache 应捕获并记录', () => {
     __resetSyncRecordCache()
     mockGetApp.mockReturnValue({ ActiveWorkbook: createMockWorkbook() })
     mockGetLastRow.mockReturnValue(10)
@@ -1830,7 +1830,7 @@ describe('buildCache 异常路径精确覆盖 (line 343)', () => {
     expect(typeof isResult).toBe('boolean')
   })
 
-  it('readRangeValues 返回格式错误数据时 buildCache 仍可正常处理', async () => {
+  it('readRangeValues 返回格式错误数据时 buildCache 仍可正常处理', () => {
     __resetSyncRecordCache()
     mockGetApp.mockReturnValue({ ActiveWorkbook: createMockWorkbook() })
     mockGetLastRow.mockReturnValue(10)
@@ -1870,7 +1870,7 @@ describe('addSyncRecord 完整字段覆盖', () => {
     mockSetCellValue.mockClear()
   })
 
-  it('新建记录时写入所有可选字段', async () => {
+  it('新建记录时写入所有可选字段', () => {
     mockReadRangeValues.mockReturnValue([])
 
     const isResult = addSyncRecord({
@@ -1892,7 +1892,7 @@ describe('addSyncRecord 完整字段覆盖', () => {
     expect(setCellCalls.length).toBeGreaterThanOrEqual(10)
   })
 
-  it('更新记录时所有字段都被更新', async () => {
+  it('更新记录时所有字段都被更新', () => {
     mockReadRangeValues.mockReturnValue([
       [
         'upd-all',
@@ -1945,7 +1945,7 @@ describe('addSyncRecords 成功路径', () => {
     mockSetCellValue.mockClear()
   })
 
-  it('批量写入包含新建和更新的混合记录', async () => {
+  it('批量写入包含新建和更新的混合记录', () => {
     mockReadRangeValues.mockReturnValue([
       [
         'existing-sid',
@@ -1990,7 +1990,7 @@ describe('addSyncRecords 成功路径', () => {
     expect(isResult).toBe(true)
   })
 
-  it('批量写入时 fingerprint 为 undefined 的字段使用空字符串', async () => {
+  it('批量写入时 fingerprint 为 undefined 的字段使用空字符串', () => {
     mockReadRangeValues.mockReturnValue([])
 
     const isResult = addSyncRecords([
@@ -2014,7 +2014,7 @@ describe('buildCache 内层 catch 分支 (line 343)', () => {
     mockGetLastRow.mockReturnValue(10)
   })
 
-  it('行数据内元素访问异常时应被内层 catch 捕获 (line 343)', async () => {
+  it('行数据内元素访问异常时应被内层 catch 捕获 (line 343)', () => {
     // 提供格式异常的数据，使得 rowData 处理过程中抛出异常
     // 例如 rowData 不是数组，访问数组索引会出错
     mockReadRangeValues.mockReturnValue([
@@ -2035,7 +2035,7 @@ describe('buildCache 内层 catch 分支 (line 343)', () => {
     expect(typeof isResult).toBe('boolean')
   })
 
-  it('行数据元素类型错误但未抛异常时不应中断', async () => {
+  it('行数据元素类型错误但未抛异常时不应中断', () => {
     mockReadRangeValues.mockReturnValue([
       // 空数组 - 访问不存在的索引返回 undefined，String(undefined) = 'undefined'
       [],
@@ -2075,7 +2075,7 @@ describe('buildCache message 字段 (line 337)', () => {
     mockGetLastRow.mockReturnValue(10)
   })
 
-  it('行数据中包含 message 字段时应正确读取 (line 337)', async () => {
+  it('行数据中包含 message 字段时应正确读取 (line 337)', () => {
     mockReadRangeValues.mockReturnValue([
       [
         'msg-sid',
@@ -2110,7 +2110,7 @@ describe('buildCache message 字段 (line 337)', () => {
     expect(isResult).toBe(true)
   })
 
-  it('行数据中 message 字段为 undefined 时使用默认空字符串', async () => {
+  it('行数据中 message 字段为 undefined 时使用默认空字符串', () => {
     mockReadRangeValues.mockReturnValue([
       [
         'no-msg-sid',
@@ -2153,7 +2153,7 @@ describe('migrateSyncRecordSchema 数据行处理 (lines 289-293)', () => {
     mockSetCellValue.mockClear()
   })
 
-  it('旧 schema 应触发迁移并处理数据行 (lines 289-293)', async () => {
+  it('旧 schema 应触发迁移并处理数据行 (lines 289-293)', () => {
     // 创建一个旧 schema 工作表（A1='序号' 表示旧 schema）
     const legacySheet = createMockSheet({ name: SYNC_RECORD_SHEET_NAME })
     legacySheet.Range = vi.fn((address: string) => {
@@ -2203,7 +2203,7 @@ describe('migrateSyncRecordSchema 数据行处理 (lines 289-293) - 带实际数
     mockSetCellValue.mockClear()
   })
 
-  it('旧 schema 迁移应处理数据行并写入新表 (lines 289-293)', async () => {
+  it('旧 schema 迁移应处理数据行并写入新表 (lines 289-293)', () => {
     const legacySheet = createMockSheet({ name: SYNC_RECORD_SHEET_NAME })
     legacySheet.Range = vi.fn((address: string) => {
       if (address === 'A1') return createMockCell('序号')
@@ -2262,7 +2262,7 @@ describe('migrateSyncRecordSchema 数据行处理 (lines 289-293) - 带实际数
     expect(mockSetCellValue).toHaveBeenCalled()
   })
 
-  it('迁移时空数据行应被跳过 (lines 291 检查)', async () => {
+  it('迁移时空数据行应被跳过 (lines 291 检查)', () => {
     const legacySheet = createMockSheet({ name: SYNC_RECORD_SHEET_NAME })
     legacySheet.Range = vi.fn((address: string) => {
       if (address === 'A1') return createMockCell('序号')
@@ -2305,7 +2305,7 @@ describe('buildCache 内层 catch 精确覆盖 (line 343)', () => {
     mockGetLastRow.mockReturnValue(10)
   })
 
-  it('Proxy 抛出异常时应被内层 catch 捕获 (line 343)', async () => {
+  it('Proxy 抛出异常时应被内层 catch 捕获 (line 343)', () => {
     // 创建一个 Proxy 对象，访问任意索引属性时抛出异常
     const throwingProxy = new Proxy([] as unknown[], {
       get(_target, property: string | symbol) {
@@ -2352,7 +2352,7 @@ describe('buildCache 内层 catch 精确覆盖 (line 343)', () => {
     expect(isResult).toBe(true)
   })
 
-  it('多个 Proxy 行均抛异常时不影响后续行处理', async () => {
+  it('多个 Proxy 行均抛异常时不影响后续行处理', () => {
     const throwingProxy1 = new Proxy([] as unknown[], {
       get(_target, property: string | symbol) {
         if (typeof property === 'string' && !isNaN(Number(property))) {
@@ -2415,7 +2415,7 @@ describe('getOrCreateSyncRecordSheet 异常路径', () => {
     mockSetCellValue.mockClear()
   })
 
-  it('sheets.Item 抛异常时应被外层 catch 捕获 (line 116)', async () => {
+  it('sheets.Item 抛异常时应被外层 catch 捕获 (line 116)', () => {
     // 创建一个 workbook，其 Sheets.Item 会抛异常
     const throwingWorkbook = {
       Sheets: {
@@ -2448,7 +2448,7 @@ describe('getOrCreateSyncRecordSheet 异常路径', () => {
     expect(isResult).toBe(true)
   })
 
-  it('sheet.Move 抛异常时应被 catch 捕获 (line 137)', async () => {
+  it('sheet.Move 抛异常时应被 catch 捕获 (line 137)', () => {
     // 创建一个 workbook，能正常找到工作表，但 Move 会抛异常
     const moveThrowingSheet = createMockSheet({ name: SYNC_RECORD_SHEET_NAME })
     moveThrowingSheet.Move = vi.fn(() => {
@@ -2481,7 +2481,7 @@ describe('getOrCreateSyncRecordSheet 异常路径', () => {
     expect(typeof isResult).toBe('boolean')
   })
 
-  it('查找工作表抛异常但 Add 也失败时应能兜底', async () => {
+  it('查找工作表抛异常但 Add 也失败时应能兜底', () => {
     const throwingWorkbook = {
       Sheets: {
         Count: 3,
@@ -2799,7 +2799,7 @@ describe('formatSyncRecordSheet _formattingInProgress 重入守卫 (line 697)', 
 
 // ========== 补充测试：addSyncRecords fingerprint 未定义回退 (line 552) ==========
 describe('addSyncRecords fingerprint 未定义回退 (line 552)', () => {
-  it('fingerprint 为 undefined 时应使用空字符串', async () => {
+  it('fingerprint 为 undefined 时应使用空字符串', () => {
     __resetSyncRecordCache()
     mockGetApp.mockReturnValue({ ActiveWorkbook: createMockWorkbook() })
     mockGetLastRow.mockReturnValue(5)
@@ -2817,7 +2817,7 @@ describe('addSyncRecords fingerprint 未定义回退 (line 552)', () => {
     expect(isResult).toBe(true)
   })
 
-  it('fingerprint 为 undefined 时批量添加应正常工作', async () => {
+  it('fingerprint 为 undefined 时批量添加应正常工作', () => {
     __resetSyncRecordCache()
     mockGetApp.mockReturnValue({ ActiveWorkbook: createMockWorkbook() })
     mockGetLastRow.mockReturnValue(5)
@@ -2835,7 +2835,7 @@ describe('addSyncRecords fingerprint 未定义回退 (line 552)', () => {
 
 // ========== 补充测试：addSyncRecords 批量写入 null 数据跳过 (line 573) ==========
 describe('addSyncRecords 批量写入 null 数据跳过 (line 573)', () => {
-  it('批量写入循环中 null 数据应被跳过', async () => {
+  it('批量写入循环中 null 数据应被跳过', () => {
     __resetSyncRecordCache()
     mockGetApp.mockReturnValue({ ActiveWorkbook: createMockWorkbook() })
     mockGetLastRow.mockReturnValue(10)
@@ -2857,7 +2857,7 @@ describe('addSyncRecords 批量写入 null 数据跳过 (line 573)', () => {
 
 // ========== 补充测试：deduplicateSyncRecords keepRow 为 undefined (line 670) ==========
 describe('deduplicateSyncRecords keepRow 为 undefined (line 670)', () => {
-  it('SID 分组中 rows[0] 为 undefined 时应跳过', async () => {
+  it('SID 分组中 rows[0] 为 undefined 时应跳过', () => {
     mockGetApp.mockReturnValue({ ActiveWorkbook: createMockWorkbook() })
     mockGetLastRow.mockReturnValue(3)
 
@@ -2878,20 +2878,20 @@ describe('deduplicateSyncRecords keepRow 为 undefined (line 670)', () => {
 
 // ========== 补充测试：deduplicateSyncRecords 其他分支 ==========
 describe('deduplicateSyncRecords 分支覆盖', () => {
-  it('sheet 不存在时应返回 false', async () => {
+  it('sheet 不存在时应返回 false', () => {
     mockGetApp.mockReturnValue(null)
     const isResult = deduplicateSyncRecords()
     expect(isResult).toBe(false)
   })
 
-  it('lastRow <= 1 时应返回 true 跳过去重 (line 650)', async () => {
+  it('lastRow <= 1 时应返回 true 跳过去重 (line 650)', () => {
     mockGetApp.mockReturnValue({ ActiveWorkbook: createMockWorkbook() })
     mockGetLastRow.mockReturnValue(1)
     const isResult = deduplicateSyncRecords()
     expect(isResult).toBe(true)
   })
 
-  it('SID 全为空字符串时应跳过 (line 656)', async () => {
+  it('SID 全为空字符串时应跳过 (line 656)', () => {
     mockGetApp.mockReturnValue({ ActiveWorkbook: createMockWorkbook() })
     mockGetLastRow.mockReturnValue(3)
     mockGetCellValue.mockImplementation(() => '')
@@ -2899,7 +2899,7 @@ describe('deduplicateSyncRecords 分支覆盖', () => {
     expect(isResult).toBe(true)
   })
 
-  it('无重复 SID 时不应触发去重日志 (line 666)', async () => {
+  it('无重复 SID 时不应触发去重日志 (line 666)', () => {
     mockGetApp.mockReturnValue({ ActiveWorkbook: createMockWorkbook() })
     mockGetLastRow.mockReturnValue(3)
     mockGetCellValue.mockImplementation((_sheet: unknown, row: unknown, col: unknown) => {
@@ -2916,13 +2916,13 @@ describe('deduplicateSyncRecords 分支覆盖', () => {
 
 // ========== 补充测试：getAllSyncRecords 异常路径 ==========
 describe('getAllSyncRecords 异常路径', () => {
-  it('sheet 不存在时返回空数组', async () => {
+  it('sheet 不存在时返回空数组', () => {
     mockGetApp.mockReturnValue(null)
     const result = getAllSyncRecords()
     expect(result).toEqual([])
   })
 
-  it('内部抛异常时应返回空数组', async () => {
+  it('内部抛异常时应返回空数组', () => {
     mockGetApp.mockImplementation(() => {
       throw new Error('宿主异常')
     })
@@ -2933,7 +2933,7 @@ describe('getAllSyncRecords 异常路径', () => {
 
 // ========== 补充测试：addSyncRecordSummary ==========
 describe('addSyncRecordSummary 行为', () => {
-  it('应委托给 addSyncRecord 并强制 sid 为空、count 为 1', async () => {
+  it('应委托给 addSyncRecord 并强制 sid 为空、count 为 1', () => {
     __resetSyncRecordCache()
     mockGetApp.mockReturnValue({ ActiveWorkbook: createMockWorkbook() })
     mockGetLastRow.mockReturnValue(5)

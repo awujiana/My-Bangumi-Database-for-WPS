@@ -52,8 +52,8 @@ class MockSource implements SyncSource {
     return 'Mock'
   }
 
-  async fetchRemoteEntries(): Promise<never[]> {
-    return []
+  fetchRemoteEntries(): Promise<never[]> {
+    return Promise.resolve([])
   }
 
   validateConfig(): Result<void> {

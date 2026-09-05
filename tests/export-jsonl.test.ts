@@ -19,7 +19,7 @@ const {
     let n = col
     while (n > 0) {
       const remainder = (n - 1) % 26
-      result = String.fromCharCode(65 + remainder) + result
+      result = String.fromCodePoint(65 + remainder) + result
       n = Math.floor((n - 1) / 26)
     }
     return result

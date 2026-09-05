@@ -59,7 +59,7 @@ export function computeTextHash(string_: string): string {
   let hash = 5381
   for (let index = 0; index < string_.length; index += 1) {
     // hash * 33 + charCode
-    hash = ((hash << 5) + hash + string_.charCodeAt(index)) | 0
+    hash = ((hash << 5) + hash + (string_.codePointAt(index) ?? 0)) | 0
   }
   // 转为无符号 32 位十六进制
   return (hash >>> 0).toString(16).padStart(8, '0')

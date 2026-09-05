@@ -126,7 +126,7 @@ describe('delay', () => {
     vi.restoreAllMocks()
   })
 
-  it('应返回 Promise', async () => {
+  it('应返回 Promise', () => {
     const result = delay(10)
     expect(result).toBeInstanceOf(Promise)
   })

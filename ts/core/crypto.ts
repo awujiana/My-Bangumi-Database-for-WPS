@@ -26,7 +26,7 @@ import { LOG_LEVELS, TOKEN_CONFIG } from './constants.js'
 export function calcChecksum(input: string): number {
   let sum = 0
   for (let index = 0; index < input.length; index += 1) {
-    sum = ((sum << 5) - sum + input.charCodeAt(index)) & 0xff
+    sum = ((sum << 5) - sum + (input.codePointAt(index) ?? 0)) & 0xff
   }
   return Math.abs(sum) % 256
 }
