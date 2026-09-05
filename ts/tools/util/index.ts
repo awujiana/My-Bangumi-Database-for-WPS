@@ -952,7 +952,7 @@ export function _fetchBgmUserInfo(
 
   xhr.addEventListener('load', (): void => {
     if (xhr.status === 200) {
-      try {
+      const applyUserInfoPayload = (): void => {
         const data = JSON.parse(xhr.responseText) as {
           id?: string | number
           user_id?: string | number
@@ -1002,6 +1002,9 @@ export function _fetchBgmUserInfo(
         )
 
         if (callback) callback({ id: userId, username, avatarUrl: avatarUrl ?? undefined }, 'none')
+      }
+      try {
+        applyUserInfoPayload()
       } catch (error: unknown) {
         bgmLog(LOG_LEVELS.ERROR, `[_fetchBgmUserInfo] 解析响应失败: ${(error as Error).message}`)
         if (callback) callback(null, 'parse')

@@ -252,7 +252,7 @@ export async function fetchAllUserCollections(
   bgmLog(LOG_LEVELS.INFO, `[fetchAllUserCollections] 开始获取用户 ${resolvedUserId} 的收藏列表`)
 
   while (offset < maxTotal) {
-    try {
+    const fetchCollectionsPage = async (): Promise<'break' | undefined> => {
       const typeParameter = typeNumber === null ? '' : `&type=${String(typeNumber ?? '')}`
       const url = `${BGM_CONFIG.API_BASE}/v0/users/${resolvedUserId}/collections?limit=${String(limit)}&offset=${String(offset)}${typeParameter}`
       const xhrResult = await xhrGet(url, token)
@@ -296,14 +296,18 @@ export async function fetchAllUserCollections(
           }
 
           if (data.data.length < limit || offset >= total) {
-            break
+            return 'break'
           }
         } else {
-          break
+          return 'break'
         }
 
         await new Promise((resolve) => setTimeout(resolve, BGM_CONFIG.REQUEST_DELAY))
       }
+      return undefined
+    }
+    try {
+      if ((await fetchCollectionsPage()) === 'break') break
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : undefined
       bgmLog(LOG_LEVELS.ERROR, `[fetchAllUserCollections] 请求失败: ${errorMessage ?? ''}`)

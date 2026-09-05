@@ -800,7 +800,7 @@ async function _doAPISync(
     showAlert('同步正在进行中，请稍后再试', '提示')
     return
   }
-  try {
+  const runApiSyncFlow = async (): Promise<void> => {
     const collectionConfig: SyncConfigSummary = buildSyncConfig({
       source: 'Bangumi 收藏列表',
       strategy: '收藏下载',
@@ -982,6 +982,9 @@ async function _doAPISync(
         bgmLog(LOG_LEVELS.WARN, `[_doAPISync] 恢复原始工作表失败: ${(error as Error).message}`)
       }
     }
+  }
+  try {
+    await runApiSyncFlow()
   } catch (error: unknown) {
     hideSyncProgressDialog()
     BGM.handleError(error, { showAlert: false, level: BGM.ErrorLevel.WARN, context: '_doAPISync' })

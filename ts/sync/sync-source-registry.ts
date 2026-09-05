@@ -147,7 +147,7 @@ export async function syncFromRemote(
     // 忽略关闭失败
   }
 
-  try {
+  const applyRemoteEntries = async (): Promise<GithubSyncResult> => {
     // 3.5 空文档自动填充表头
     const ws = getDataSheet()
     if (ws) {
@@ -240,6 +240,9 @@ export async function syncFromRemote(
       `[syncFromRemote] 同步完成：下载 ${String(downloadElapsed)}ms，diff ${String(diffElapsed)}ms，应用耗时已计入，总耗时 ${String(totalElapsed)}ms，处理 ${String(totalProcessed)} 条，平均 ${String(overallSpeed > 0 ? overallSpeed : '?')} 行/秒`,
     )
     return result
+  }
+  try {
+    return await applyRemoteEntries()
   } finally {
     // 恢复屏幕刷新和自动计算
     try {

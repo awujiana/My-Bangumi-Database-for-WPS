@@ -1744,7 +1744,7 @@ export async function syncFromGithub(
     // 忽略关闭失败
   }
 
-  try {
+  const applyGithubEntries = async (): Promise<GithubSyncResult> => {
     // 空文档自动填充表头
     const ws = getDataSheet()
     if (ws) {
@@ -1837,6 +1837,9 @@ export async function syncFromGithub(
       `[githubSync] 同步完成：下载 ${formatDuration(downloadElapsed)}，diff ${formatDuration(diffElapsed)}，应用耗时已计入，总耗时 ${formatDuration(totalElapsed)}，处理 ${String(totalProcessed)} 条，平均 ${String(overallSpeed > 0 ? overallSpeed : '?')} 行/秒`,
     )
     return result
+  }
+  try {
+    return await applyGithubEntries()
   } finally {
     // 恢复屏幕刷新和自动计算
     try {

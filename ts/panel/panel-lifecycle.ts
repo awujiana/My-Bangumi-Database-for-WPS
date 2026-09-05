@@ -936,7 +936,7 @@ export function refreshData(): void {
     clearSheetCache(ws)
   }
   const needRestore = activateSheetIfNeeded(ws)
-  try {
+  const refreshDataCore = (): void => {
     // 获取最后数据行（强制刷新，不使用缓存）
     const lastRow = getLastRow(ws, true)
     bgmLog(LOG_LEVELS.INFO, `工作表最后数据行: ${String(lastRow)}`)
@@ -1095,6 +1095,9 @@ export function refreshData(): void {
       )
     }
     updateFilterStatus(ws)
+  }
+  try {
+  refreshDataCore()
   } finally {
     if (needRestore) needRestore()
   }

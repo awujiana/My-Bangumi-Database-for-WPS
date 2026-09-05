@@ -285,102 +285,7 @@ export function getSequentialRowsBySeqCol(
  */
 export function buildJsonPayload(getField: (key: string) => string, _finishedDate: string): string {
   try {
-    const payload: Record<string, unknown> = {}
-
-    // 观看状态 - 支持多种列名
-    const statusKeys = ['是否看完', '状态', '观看状态', '收藏类型', 'type']
-    let isStatusFound = false
-    let rawStatusValue = ''
-    for (const key of statusKeys) {
-      const statusValue = trim(getField(key))
-      if (statusValue) {
-        rawStatusValue = statusValue
-        const mappedStatus = mapWatchStatus(statusValue)
-        if (mappedStatus > 0) {
-          payload.type = mappedStatus
-          isStatusFound = true
-          bgmLog(
-            LOG_LEVELS.INFO,
-            `[buildJsonPayload] 从列 "${key}" 读取状态: "${statusValue}" -> ${String(mappedStatus)}`,
-          )
-          break
-        } else {
-          bgmLog(
-            LOG_LEVELS.WARN,
-            `[buildJsonPayload] 从列 "${key}" 读取状态: "${statusValue}" -> ${String(mappedStatus)} (无效)`,
-          )
-        }
-      }
-    }
-    if (!isStatusFound) {
-      if (rawStatusValue) {
-        bgmLog(
-          LOG_LEVELS.ERROR,
-          `[buildJsonPayload] 未找到有效的观看状态，返回空对象，原始值: "${rawStatusValue}"`,
-        )
-        return '{}'
-      }
-      // 所有状态字段为空 → 默认视为「想看」(status=1)
-      payload.type = 1
-      bgmLog(LOG_LEVELS.INFO, `[buildJsonPayload] 未找到观看状态，默认设为「想看」(type=1)`)
-    }
-
-    // 评分
-    const rateValue = trim(getField('打分'))
-    if (rateValue && rateValue !== 'true' && rateValue !== 'True') {
-      const rate = parseFloat(rateValue)
-      if (!isNaN(rate) && rate >= 0 && rate <= 10) {
-        payload.rate = rate
-      }
-    }
-
-    // 标签 - 合并 "标签/分级" 与 "原作标签" 两列
-    const tagSet = new Set<string>()
-    const tagsGradeValue = trim(getField('标签/分级'))
-    const originalTagValue = trim(getField('原作标签'))
-    if (tagsGradeValue) addTagsFromString(tagSet, tagsGradeValue)
-    if (originalTagValue) addTagsFromString(tagSet, originalTagValue)
-    if (tagSet.size > 0) {
-      payload.tags = Array.from(tagSet)
-      bgmLog(
-        LOG_LEVELS.INFO,
-        `[buildJsonPayload] 标签合并: 标签/分级="${tagsGradeValue || '(空)'}" + 原作标签="${originalTagValue || '(空)'}" -> ${JSON.stringify(payload.tags)}`,
-      )
-    }
-
-    // 感言（支持 emoji、中文、日文等 UTF-8 字符；过滤控制字符并截断到 1000 字符）
-    let commentValue = trim(getField('剧透/感言') || getField('感言'))
-    const nValue = trim(getField('特点/印象'))
-    bgmLog(LOG_LEVELS.INFO, `[buildJsonPayload] 剧透/感言="${commentValue}", 特点/印象="${nValue}"`)
-    if (nValue) {
-      commentValue = commentValue ? `${commentValue}\n${nValue}` : nValue
-    }
-    if (commentValue) {
-      // 移除控制字符（保留换行符 \n 和制表符 \t）
-      // eslint-disable-next-line no-control-regex -- 有意匹配控制字符以清洗文本
-      const cleaned = commentValue.replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, '')
-      // Bangumi API comment 字段长度限制约 1000 字符，超出截断
-      const MAX_COMMENT_LEN = 1000
-      const finalComment =
-        cleaned.length > MAX_COMMENT_LEN ? cleaned.slice(0, MAX_COMMENT_LEN) : cleaned
-      if (finalComment) {
-        payload.comment = finalComment
-        if (cleaned.length > MAX_COMMENT_LEN) {
-          bgmLog(
-            LOG_LEVELS.WARN,
-            `[buildJsonPayload] 感言长度 ${String(cleaned.length)} 超过 ${String(MAX_COMMENT_LEN)}，已截断`,
-          )
-        }
-      }
-    }
-
-    // 隐私收藏
-    const privateValue = trim(getField('私密收藏')).toLowerCase()
-    if (privateValue === '是' || privateValue === '1' || privateValue === 'true') {
-      payload.private = true
-    }
-
-    return JSON.stringify(payload)
+    return buildJsonPayloadInner(getField, _finishedDate)
   } catch (error: unknown) {
     BGM.handleError(error, { context: 'buildJsonPayload', showAlert: false })
     return '{}'
@@ -1066,7 +971,7 @@ async function executeSelectedSync(
   // 上游 prepareSelectedSync 已校验列存在；?? 0 仅为类型层兜底（列号 1-based，0 不合法）
   const urlCol = colMap.get('Bangumi_URL') ?? 0
   const nameCol = colMap.get('名称')
-  try {
+  const runSelectedRowsLoop = async (): Promise<void> => {
     const userPath = _getUserApiPath()
 
     let successCount = 0
@@ -1137,7 +1042,7 @@ async function executeSelectedSync(
       // 更新当前位置（行号），供暂停时定位
       BGM.sync.updatePosition(undefined, rowNumber)
 
-      try {
+      const syncSingleRowTask = async (): Promise<void> => {
         const bgmUrl = trim(getCellValue(ws, rowNumber, urlCol) || '')
         const name = nameCol
           ? trim(getCellValue(ws, nameCol === urlCol ? rowNumber : rowNumber, nameCol) || '')
@@ -1282,6 +1187,9 @@ async function executeSelectedSync(
           skipCount += 1
           updateSyncProgressDialog(index + 1, rows.length, message, `⊘ ${rowProgress} ${message}`)
         }
+      }
+      try {
+        await syncSingleRowTask()
       } catch (error: unknown) {
         failCount += 1
         const errorMessage = error instanceof Error ? error.message : String(error)
@@ -1311,6 +1219,9 @@ async function executeSelectedSync(
     const wasStopped = BGM.sync.checkShouldStop()
     const summary = `📊 选中 ${String(rows.length)} 行 | 耗时 ${(elapsed / 1000).toFixed(1)}s\n\n✅ 成功: ${String(successCount)}\n❌ 失败: ${String(failCount)}\n⏭️ 跳过: ${String(skipCount)}\n📺 标记章节: ${String(episodeMarkCount)}`
     completeSyncProgressDialog(summary, details, wasStopped)
+  }
+  try {
+    await runSelectedRowsLoop()
   } catch (error: unknown) {
     hideSyncProgressDialog()
     BGM.handleError(error, { context: 'syncSelectedRows', showAlert: false })
@@ -1536,4 +1447,106 @@ function getFilterStatusCore(
     bgmLog(LOG_LEVELS.INFO, `可见行前10: ${result.visibleRows.slice(0, 10).join(',')}`)
   }
   return result
+}
+
+/**
+ * buildJsonPayloadInner（自 try 块抽离，降低 unicorn/try-complexity 计数）
+ */
+function buildJsonPayloadInner(getField: (key: string) => string, _finishedDate: string) {
+  const payload: Record<string, unknown> = {}
+
+  // 观看状态 - 支持多种列名
+  const statusKeys = ['是否看完', '状态', '观看状态', '收藏类型', 'type']
+  let isStatusFound = false
+  let rawStatusValue = ''
+  for (const key of statusKeys) {
+    const statusValue = trim(getField(key))
+    if (statusValue) {
+      rawStatusValue = statusValue
+      const mappedStatus = mapWatchStatus(statusValue)
+      if (mappedStatus > 0) {
+        payload.type = mappedStatus
+        isStatusFound = true
+        bgmLog(
+          LOG_LEVELS.INFO,
+          `[buildJsonPayload] 从列 "${key}" 读取状态: "${statusValue}" -> ${String(mappedStatus)}`,
+        )
+        break
+      } else {
+        bgmLog(
+          LOG_LEVELS.WARN,
+          `[buildJsonPayload] 从列 "${key}" 读取状态: "${statusValue}" -> ${String(mappedStatus)} (无效)`,
+        )
+      }
+    }
+  }
+  if (!isStatusFound) {
+    if (rawStatusValue) {
+      bgmLog(
+        LOG_LEVELS.ERROR,
+        `[buildJsonPayload] 未找到有效的观看状态，返回空对象，原始值: "${rawStatusValue}"`,
+      )
+      return '{}'
+    }
+    // 所有状态字段为空 → 默认视为「想看」(status=1)
+    payload.type = 1
+    bgmLog(LOG_LEVELS.INFO, `[buildJsonPayload] 未找到观看状态，默认设为「想看」(type=1)`)
+  }
+
+  // 评分
+  const rateValue = trim(getField('打分'))
+  if (rateValue && rateValue !== 'true' && rateValue !== 'True') {
+    const rate = parseFloat(rateValue)
+    if (!isNaN(rate) && rate >= 0 && rate <= 10) {
+      payload.rate = rate
+    }
+  }
+
+  // 标签 - 合并 "标签/分级" 与 "原作标签" 两列
+  const tagSet = new Set<string>()
+  const tagsGradeValue = trim(getField('标签/分级'))
+  const originalTagValue = trim(getField('原作标签'))
+  if (tagsGradeValue) addTagsFromString(tagSet, tagsGradeValue)
+  if (originalTagValue) addTagsFromString(tagSet, originalTagValue)
+  if (tagSet.size > 0) {
+    payload.tags = Array.from(tagSet)
+    bgmLog(
+      LOG_LEVELS.INFO,
+      `[buildJsonPayload] 标签合并: 标签/分级="${tagsGradeValue || '(空)'}" + 原作标签="${originalTagValue || '(空)'}" -> ${JSON.stringify(payload.tags)}`,
+    )
+  }
+
+  // 感言（支持 emoji、中文、日文等 UTF-8 字符；过滤控制字符并截断到 1000 字符）
+  let commentValue = trim(getField('剧透/感言') || getField('感言'))
+  const nValue = trim(getField('特点/印象'))
+  bgmLog(LOG_LEVELS.INFO, `[buildJsonPayload] 剧透/感言="${commentValue}", 特点/印象="${nValue}"`)
+  if (nValue) {
+    commentValue = commentValue ? `${commentValue}\n${nValue}` : nValue
+  }
+  if (commentValue) {
+    // 移除控制字符（保留换行符 \n 和制表符 \t）
+    // eslint-disable-next-line no-control-regex -- 有意匹配控制字符以清洗文本
+    const cleaned = commentValue.replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, '')
+    // Bangumi API comment 字段长度限制约 1000 字符，超出截断
+    const MAX_COMMENT_LEN = 1000
+    const finalComment =
+      cleaned.length > MAX_COMMENT_LEN ? cleaned.slice(0, MAX_COMMENT_LEN) : cleaned
+    if (finalComment) {
+      payload.comment = finalComment
+      if (cleaned.length > MAX_COMMENT_LEN) {
+        bgmLog(
+          LOG_LEVELS.WARN,
+          `[buildJsonPayload] 感言长度 ${String(cleaned.length)} 超过 ${String(MAX_COMMENT_LEN)}，已截断`,
+        )
+      }
+    }
+  }
+
+  // 隐私收藏
+  const privateValue = trim(getField('私密收藏')).toLowerCase()
+  if (privateValue === '是' || privateValue === '1' || privateValue === 'true') {
+    payload.private = true
+  }
+
+  return JSON.stringify(payload)
 }

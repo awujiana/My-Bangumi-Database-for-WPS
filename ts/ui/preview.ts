@@ -357,7 +357,7 @@ export async function previewSyncContent(): Promise<void> {
   let skippedCount = 0
   let errorCount = 0
 
-  try {
+  const renderPreviewCards = async (): Promise<void> => {
     for (let index = 0; index < dataRows.length; index += 1) {
       // 停止检查
       if (BGM.sync.checkShouldStop()) {
@@ -599,6 +599,9 @@ export async function previewSyncContent(): Promise<void> {
     window.addEventListener('resize', updateScrollButtons)
 
     bgmLog(LOG_LEVELS.INFO, `[preview] 模态框已显示（${String(actualCardCount)} 条卡片，下拉全部）`)
+  }
+  try {
+    await renderPreviewCards()
   } finally {
     // 退出运行状态，确保即使异常也能清理
     BGM.sync.exitRunningState()
@@ -649,7 +652,7 @@ export async function uploadSingleRow(
     buttonElement.textContent = '上传中...'
   }
 
-  try {
+  const uploadSingleRowCore = async (): Promise<void> => {
     const app = getApp()
     if (!app?.ActiveWorkbook) throw new Error('无法获取 Application')
 
@@ -745,6 +748,9 @@ export async function uploadSingleRow(
       })
       showToast(`上传失败: ${(result.message || '未知错误').substring(0, 60)}`, 'error')
     }
+  }
+  try {
+    await uploadSingleRowCore()
   } catch (error: unknown) {
     BGM.handleError(error, {
       showAlert: true,
