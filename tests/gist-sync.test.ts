@@ -56,6 +56,8 @@ const mockedIsGistConfigured = vi.mocked(isGistConfigured)
 // 清空模块加载期间累积的 fake timers，避免它们在测试中被意外触发
 vi.clearAllTimers()
 
+let mockXhrConstructor: typeof MockXHR | null = null
+
 afterEach(() => {
   vi.clearAllTimers()
   vi.clearAllMocks()
@@ -85,8 +87,6 @@ interface MockXHRCall {
 
 let lastXhrCall: MockXHRCall | null = null
 let lastMockXhr: MockXHR | null = null
-let mockXhrConstructor: typeof MockXHR | null = null
-
 class MockXHR {
   status = 0
 

@@ -739,6 +739,25 @@ export function enrichFeatures(
 }
 
 /**
+ * 简介字段 → Bangumi追踪表列名映射
+ * 键：新番表中的字段名；值：Bangumi追踪表中的列名
+ */
+const INTRO_FIELD_TO_BANGUMI: Record<string, string> = {
+  导演: '导演',
+  编剧: '脚本',
+  人设: '人物设定',
+  CG导演: '演出',
+  音乐: '音乐',
+  动画制作: '动画制作公司',
+  系列构成: '系列构成',
+  分镜: '分镜',
+  原作: '原作',
+  语言: '语言',
+  制片国家: '制片国家',
+  声优: '声优',
+}
+
+/**
  * 执行富化操作
  * 对每个匹配结果执行富化，写入富化记录，调用进度回调
  */
@@ -938,25 +957,6 @@ interface AddEnrichRecordParameters {
 }
 
 // ========== 简介工作表富化函数 ==========
-
-/**
- * 简介字段 → Bangumi追踪表列名映射
- * 键：新番表中的字段名；值：Bangumi追踪表中的列名
- */
-const INTRO_FIELD_TO_BANGUMI: Record<string, string> = {
-  导演: '导演',
-  编剧: '脚本',
-  人设: '人物设定',
-  CG导演: '演出',
-  音乐: '音乐',
-  动画制作: '动画制作公司',
-  系列构成: '系列构成',
-  分镜: '分镜',
-  原作: '原作',
-  语言: '语言',
-  制片国家: '制片国家',
-  声优: '声优',
-}
 
 /** 简介字段中需追加到特点/印象的键 */
 const INTRO_FEATURE_FIELDS = new Set(['简介', 'OP', 'ED', 'PV'])
@@ -1508,7 +1508,8 @@ export function searchSheet(
           if (aliasValue) {
             const aliases = splitAliases(aliasValue)
             const matchedAliases = aliases.filter((a) =>
-              normalizeName(a).includes(normalizedKeyword),)
+              normalizeName(a).includes(normalizedKeyword),
+            )
             for (const alias of matchedAliases) {
               fieldMatches.push({ column: '别名', value: alias })
             }

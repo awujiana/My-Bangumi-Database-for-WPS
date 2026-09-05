@@ -197,6 +197,30 @@ export default tseslint.config(
       // function(){} 构造替身改成箭头函数导致无法 new；no-var 偶发作用域风险）。
       // gate 模式不设该覆盖，规则照常 error（tests/ 下这俩已在 override 中关闭）。
       ...(isFix ? { 'prefer-arrow-callback': 'off', 'no-var': 'off' } : {}),
+      // 属性级 mutation 豁免：DOM 容器/替身对象的属性写（element.style.display、
+      // container.innerHTML、xhr.timeout、累加器 result.success、mock 单元格 r.checked）
+      // 是这些函数的本职——参数引用未变，仅操作其指向的对象，报错属误报形态。
+      // 参数**重赋值**（重绑定，如 userId = ...）仍照常 error（2 处已局部变量化清零）。
+      'no-param-reassign': [
+        'error',
+        {
+          props: true,
+          ignorePropertyModificationsFor: [
+            'element',
+            'container',
+            'buttonElement',
+            'fab',
+            'item',
+            'xhr',
+            'result',
+            'r',
+          ],
+        },
+      ],
+      // core 版与 @typescript-eslint 版对同一位置双报——tseslint 官方建议仅用
+      // @typescript-eslint 版。但 core 版在下方「④ 调选项优于关规则」块已有
+      // functions:false 调参（handlers 层函数提升惯例），故此处**不重复设置**，
+      // 两版并行且口径一致；zod-compat 的类循环惰性引用按文件级 disable 豁免。
       ...allRulesAsError(promisePlugin, 'promise'),
       ...allRulesAsError(securityPlugin, 'security'),
       ...allRulesAsError(nodePlugin, 'n'),
@@ -615,12 +639,12 @@ export default tseslint.config(
       // 真实约束力完整保留。
       'unicorn/prefer-add-event-listener': 'off',
 
-            // 测试回调的 async 是历史遗留（早前重构移除了 await 但保留了 async 标记），
-            // 由 codemod 逐处删除（commit 同批）：直接删 `it('…', async () => …)` 的 async
-            // 无副作用；mock 实现（mockImplementation(async () => …)）的返回契约已逐处核对。
-            // 无法用 allowForArrowFunctions 调参——本项目 typescript-eslint 版本的
-            // require-await schema 为空（不支持任何选项）。生产代码 ts/ 下报错为 0。
-            '@typescript-eslint/require-await': 'off',
+      // 测试回调的 async 是历史遗留（早前重构移除了 await 但保留了 async 标记），
+      // 由 codemod 逐处删除（commit 同批）：直接删 `it('…', async () => …)` 的 async
+      // 无副作用；mock 实现（mockImplementation(async () => …)）的返回契约已逐处核对。
+      // 无法用 allowForArrowFunctions 调参——本项目 typescript-eslint 版本的
+      // require-await schema 为空（不支持任何选项）。生产代码 ts/ 下报错为 0。
+      '@typescript-eslint/require-await': 'off',
     },
   },
 

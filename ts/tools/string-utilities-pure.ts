@@ -23,10 +23,11 @@
  */
 export function colNumberToLetter(col: number): string {
   let letter = ''
-  while (col > 0) {
-    const module_ = (col - 1) % 26
+  let remaining = col
+  while (remaining > 0) {
+    const module_ = (remaining - 1) % 26
     letter = String.fromCodePoint(65 + module_) + letter
-    col = Math.floor((col - module_) / 26)
+    remaining = Math.floor((remaining - module_) / 26)
   }
   return letter
 }

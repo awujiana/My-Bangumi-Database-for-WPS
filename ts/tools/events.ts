@@ -25,6 +25,49 @@ interface EventEntry {
 }
 
 /**
+ * 事件名称常量定义
+ *
+ * 事件命名规范：
+ * - state: 前缀 → 应用状态变更（Token、用户信息、同步状态等）
+ * - sync: 前缀 → 同步进度与结果
+ * - sheet: 前缀 → 工作表操作
+ * - config: 前缀 → 配置变更
+ * - request: 前缀 → 组件间请求（Ribbon ↔ Panel）
+ */
+export const BGM_EVENTS = {
+  // —— 通用状态变更（携带状态名和值） ——
+  /** 任意应用状态变更，payload: { key: string, value: unknown } */
+  STATE_CHANGED: 'state:changed',
+  /** 应用配置变更，payload: { key: string, value: unknown } */
+  CONFIG_CHANGED: 'config:changed',
+
+  // —— 具体状态事件 ——
+  TOKEN_UPDATED: 'state:tokenUpdated',
+  USER_ID_UPDATED: 'state:userIdUpdated',
+  USER_NAME_UPDATED: 'state:userNameUpdated',
+
+  // —— 同步事件 ——
+  SYNC_PROGRESS: 'sync:progress',
+  SYNC_COMPLETED: 'sync:completed',
+  SYNC_ERROR: 'sync:error',
+  /** 同步状态变更（开始/暂停/恢复/停止/空闲） */
+  SYNC_STATE_CHANGED: 'sync:stateChanged',
+
+  // —— 工作表事件 ——
+  SHEET_LOCKED: 'sheet:locked',
+  SHEET_UNLOCKED: 'sheet:unlocked',
+
+  // —— 配置事件 ——
+  CONFIG_UPDATED: 'config:updated',
+
+  // —— 跨组件请求 ——
+  /** Ribbon 请求执行数据同步（远程仓库 → Excel） */
+  REQUEST_GITHUB_SYNC: 'request:githubSync',
+  /** Ribbon 请求撤销最近一次同步 */
+  REQUEST_UNDO_LAST_SYNC: 'request:undoLastSync',
+} as const
+
+/**
  * 事件总线类
  * @class
  */
@@ -146,49 +189,6 @@ export class EventBus {
     this.emit(BGM_EVENTS.CONFIG_CHANGED, { key, value })
   }
 }
-
-/**
- * 事件名称常量定义
- *
- * 事件命名规范：
- * - state: 前缀 → 应用状态变更（Token、用户信息、同步状态等）
- * - sync: 前缀 → 同步进度与结果
- * - sheet: 前缀 → 工作表操作
- * - config: 前缀 → 配置变更
- * - request: 前缀 → 组件间请求（Ribbon ↔ Panel）
- */
-export const BGM_EVENTS = {
-  // —— 通用状态变更（携带状态名和值） ——
-  /** 任意应用状态变更，payload: { key: string, value: unknown } */
-  STATE_CHANGED: 'state:changed',
-  /** 应用配置变更，payload: { key: string, value: unknown } */
-  CONFIG_CHANGED: 'config:changed',
-
-  // —— 具体状态事件 ——
-  TOKEN_UPDATED: 'state:tokenUpdated',
-  USER_ID_UPDATED: 'state:userIdUpdated',
-  USER_NAME_UPDATED: 'state:userNameUpdated',
-
-  // —— 同步事件 ——
-  SYNC_PROGRESS: 'sync:progress',
-  SYNC_COMPLETED: 'sync:completed',
-  SYNC_ERROR: 'sync:error',
-  /** 同步状态变更（开始/暂停/恢复/停止/空闲） */
-  SYNC_STATE_CHANGED: 'sync:stateChanged',
-
-  // —— 工作表事件 ——
-  SHEET_LOCKED: 'sheet:locked',
-  SHEET_UNLOCKED: 'sheet:unlocked',
-
-  // —— 配置事件 ——
-  CONFIG_UPDATED: 'config:updated',
-
-  // —— 跨组件请求 ——
-  /** Ribbon 请求执行数据同步（远程仓库 → Excel） */
-  REQUEST_GITHUB_SYNC: 'request:githubSync',
-  /** Ribbon 请求撤销最近一次同步 */
-  REQUEST_UNDO_LAST_SYNC: 'request:undoLastSync',
-} as const
 
 // 创建全局事件总线实例
 export const eventBus = new EventBus()

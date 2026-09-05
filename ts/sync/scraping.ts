@@ -228,16 +228,17 @@ export async function fetchAllUserCollections(
   const typeMap: Record<string, number> = { wish: 1, collect: 2, do: 3 }
   const typeNumber = options?.type ? typeMap[options.type] : null
 
-  if (!userId) {
+  let resolvedUserId = userId
+  if (!resolvedUserId) {
     const verifyResult = await verifyToken(token)
     if (!verifyResult.valid) {
       bgmLog(LOG_LEVELS.ERROR, '[fetchAllUserCollections] Token无效')
       return []
     }
-    userId = verifyResult.userId
+    resolvedUserId = verifyResult.userId
   }
 
-  if (!userId) {
+  if (!resolvedUserId) {
     bgmLog(LOG_LEVELS.ERROR, '[fetchAllUserCollections] 无法获取用户ID')
     return []
   }
@@ -248,12 +249,12 @@ export async function fetchAllUserCollections(
   let retryCount = 0
   const MAX_RETRY_COUNT = BGM_CONFIG.MAX_RETRIES
 
-  bgmLog(LOG_LEVELS.INFO, `[fetchAllUserCollections] 开始获取用户 ${userId} 的收藏列表`)
+  bgmLog(LOG_LEVELS.INFO, `[fetchAllUserCollections] 开始获取用户 ${resolvedUserId} 的收藏列表`)
 
   while (offset < maxTotal) {
     try {
       const typeParameter = typeNumber === null ? '' : `&type=${String(typeNumber ?? '')}`
-      const url = `${BGM_CONFIG.API_BASE}/v0/users/${userId}/collections?limit=${String(limit)}&offset=${String(offset)}${typeParameter}`
+      const url = `${BGM_CONFIG.API_BASE}/v0/users/${resolvedUserId}/collections?limit=${String(limit)}&offset=${String(offset)}${typeParameter}`
       const xhrResult = await xhrGet(url, token)
 
       const isHttpError = xhrResult.status < 200 || xhrResult.status >= 300

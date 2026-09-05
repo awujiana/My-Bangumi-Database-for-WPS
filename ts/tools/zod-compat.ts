@@ -13,6 +13,15 @@
  *              真实 zod UMD 到 window.z。
  */
 
+// 类间**双向惰性引用**是该兼容层的固有结构：
+// 前组 schema 类（LiteString/LiteNumber/…/LiteArray）的 fluent 方法
+// （optional()/nullable()/default()）引用后组的 LiteOptional/LiteNullable/LiteWithDefault，
+// 而后组类的辅助字段（array() 等）又回引前组 —— 静态上互为 use-before-define。
+// 运行时安全论证：所有引用都位于方法体/字段初始化器内**惰性求值**，
+// 实例化仅发生在文件尾部的 resolveZod()（此时全部类已完成定义），TDZ 不可能触发。
+// 移动类定义无法解环（双向引用），故按文件级豁免处理。
+/* eslint-disable no-use-before-define, @typescript-eslint/no-use-before-define */
+
 // 必须导出：schemas/*.ts 导出的 Schema 变量类型签名经由 ParseResult 传递引用到本类型，
 // declaration emit（.d.ts）需要按名字引用它，未导出会报 TS4023 "cannot be named"。
 export interface _ZodIssue {
