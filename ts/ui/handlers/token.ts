@@ -146,9 +146,9 @@ export function updateTokenStatus(): void {
 let _lastUserIdSnapshot: string | null | undefined
 
 export function updateUserIdStatus(): void {
-  // panel.html 中「顶栏」与「用户区」各有一个 id=userIdStatus 元素，须全部更新，不能改用 querySelector
-
-  const userIdStatusEls = document.querySelectorAll<HTMLElement>('#userIdStatus')
+  // panel.html 中「顶栏」与「用户区」各有一个 id=userIdStatus 元素，须全部更新；
+  // 用属性选择器命中全部同名 id 元素（querySelector 只能命中第一个）
+  const userIdStatusEls = document.querySelectorAll<HTMLElement>('[id="userIdStatus"]')
   if (userIdStatusEls.length === 0) return
 
   const userId = _getBgmUserId()

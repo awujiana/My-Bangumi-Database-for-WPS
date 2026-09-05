@@ -275,12 +275,12 @@ export function getSyncSourceType(): SyncSourceType {
 
 /**
  * 保存同步源类型
- * @param sourceType 同步源类型
+ * @param sourceType 同步源类型（运行时可能为任意字符串，由守卫校验）
  * @returns 成功返回 true
  */
-export function setSyncSourceType(sourceType: SyncSourceType): boolean {
+export function setSyncSourceType(sourceType: string): boolean {
   if (!isSyncSourceType(sourceType)) {
-    bgmLog(LOG_LEVELS.ERROR, `[githubConfig] 非法同步源类型: ${String(sourceType)}`)
+    bgmLog(LOG_LEVELS.ERROR, `[githubConfig] 非法同步源类型: ${sourceType}`)
     return false
   }
   const storage = getStorage()

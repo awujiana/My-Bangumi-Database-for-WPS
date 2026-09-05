@@ -233,7 +233,7 @@ describe('getSyncSourceType / setSyncSourceType', () => {
 
   it('非法源类型应返回 false', () => {
     vi.mocked(getApp).mockReturnValue(createMockApp({}))
-    expect(setSyncSourceType('invalid' as never)).toBe(false)
+    expect(setSyncSourceType('invalid')).toBe(false)
   })
 })
 
@@ -272,7 +272,7 @@ describe('getGistId / setGistId / isGistConfigured', () => {
 describe('githubConfig 异常与回退分支', () => {
   it('非法 sourceType 参数时 setSyncSourceType 返回 false', () => {
     vi.mocked(getApp).mockReturnValue(createMockApp({}))
-    expect(setSyncSourceType('invalid' as never)).toBe(false)
+    expect(setSyncSourceType('invalid')).toBe(false)
   })
 
   it('setSyncSourceType 正常场景应写入 storage 并返回 true', () => {

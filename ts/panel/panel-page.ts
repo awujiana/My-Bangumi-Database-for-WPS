@@ -143,27 +143,27 @@ function initPanelCore(): void {
 export { initPanelCore }
 
 // ========== 挂载到 window ==========
-// WPS 宿主（Ribbon）通过 GetTaskPane().initPanelCore 直接调用面板入口，
-// 这是宿主桥接协议的一部分，必须有意的全局属性赋值。
-
-;(window as unknown as { initPanelCore: () => void }).initPanelCore = initPanelCore
-
-/**
- * 全局函数：供 Ribbon 通过 GetTaskPane 直接调用，
- * 从 PluginStorage 刷新所有 UI 状态（用户信息、配置等）
- * 如果 GetTaskPane 不可用，轮询也请购底机制。）
- */
-// refreshPanelUI 是 Ribbon 宿主桥接入口，同上必须有意的全局属性赋值。
-
-;(window as unknown as { refreshPanelUI: () => void }).refreshPanelUI =
-  function refreshPanelUI(): void {
-    try {
-      restoreUserInfoFromStorage()
-      bgmLog(LOG_LEVELS.INFO, '[refreshPanelUI] UI 已刷新')
-    } catch (error: unknown) {
-      bgmLog(LOG_LEVELS.WARN, `[refreshPanelUI] 刷新失败: ${(error as Error).message}`)
-    }
-  }
+// WPS 宿主（Ribbon）通过 GetTaskPane().initPanelCore / refreshPanelUI 直接调用面板入口，
+// 宿主桥接协议要求属性可写可配置，defineProperties 显式声明挂载契约
+Object.defineProperties(window, {
+  initPanelCore: {
+    value: initPanelCore,
+    writable: true,
+    configurable: true,
+  },
+  refreshPanelUI: {
+    value: function refreshPanelUI(): void {
+      try {
+        restoreUserInfoFromStorage()
+        bgmLog(LOG_LEVELS.INFO, '[refreshPanelUI] UI 已刷新')
+      } catch (error: unknown) {
+        bgmLog(LOG_LEVELS.WARN, `[refreshPanelUI] 刷新失败: ${(error as Error).message}`)
+      }
+    },
+    writable: true,
+    configurable: true,
+  },
+})
 
 function safeInitPanel(): void {
   try {
