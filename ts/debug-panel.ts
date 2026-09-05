@@ -374,10 +374,9 @@ function buildStatusBarHTML(modules: ModuleStatus[]): string {
 
   const isRibbonReady =
     typeof (window as unknown as { _bgmRibbonReady?: unknown })._bgmRibbonReady === 'function'
-  const badges: string[] = []
-  badges.push(
+  const badges: string[] = [
     `<span class="bgm-dp-badge ${isRibbonReady ? 'bgm-dp-badge-ok' : 'bgm-dp-badge-err'}">${isRibbonReady ? '● Ribbon 就绪' : '○ Ribbon 未就绪'}</span>`,
-  )
+  ]
   if (failed.length > 0) {
     badges.push(
       `<span class="bgm-dp-badge ${failedCritical.length > 0 ? 'bgm-dp-badge-err' : 'bgm-dp-badge-warn'}">${String(failed.length)} 模块失败</span>`,
@@ -576,7 +575,7 @@ function bindTabs(root: HTMLElement): void {
       })
       tab.classList.add('active')
       const target = tab.dataset.tab
-      const panel = root.querySelector<HTMLElement>(`[data-panel="${target ?? ''}"]`)
+      const panel = root.querySelector<HTMLElement>(`[data-panel="${CSS.escape(target ?? '')}"]`)
       if (panel) panel.classList.add('active')
 
       // 启动/停止日志轮询
@@ -611,9 +610,14 @@ function bindRibbonCards(root: HTMLElement): void {
     card.addEventListener('click', () => {
       const buttonId = card.dataset.btn
       if (!buttonId) return
-      const resultElement = root.querySelector<HTMLElement>(`[data-result="${buttonId}"]`)
-      const imgUrlElement = root.querySelector<HTMLElement>(`[data-imgurl="${buttonId}"]`)
+      const resultElement = root.querySelector<HTMLElement>(
+        `[data-result="${CSS.escape(buttonId)}"]`,
+      )
       if (!resultElement) return
+
+      const imgUrlElement = root.querySelector<HTMLElement>(
+        `[data-imgurl="${CSS.escape(buttonId)}"]`,
+      )
 
       resultElement.textContent = '▶ 调用中...'
       resultElement.style.color = '#64748b'
@@ -730,7 +734,7 @@ async function refreshLogs(root: HTMLElement): Promise<void> {
 
   // 更新 Tab 计数
   const tabCount = root.querySelector<HTMLElement>(
-    '.bgm-dp-tab[data-tab="console"] .bgm-dp-tab-count',
+    ':scope .bgm-dp-tab[data-tab="console"] .bgm-dp-tab-count',
   )
   if (tabCount) {
     const allLogs = logger.getRecentLogs(undefined, 1000)
@@ -749,10 +753,12 @@ function startLogPolling(root: HTMLElement): void {
 
 /** 停止日志轮询 */
 function stopLogPolling(): void {
-  if (_logInterval) {
-    clearInterval(_logInterval)
-    _logInterval = null
+  if (!_logInterval) {
+    return
   }
+
+  clearInterval(_logInterval)
+  _logInterval = null
 }
 
 /** 环境信息操作按钮 */
@@ -909,7 +915,7 @@ export function initDebugPanel(): void {
     }
     // 更新 Tab 计数
     const moduleTabCount = root.querySelector<HTMLElement>(
-      '.bgm-dp-tab[data-tab="modules"] .bgm-dp-tab-count',
+      ':scope .bgm-dp-tab[data-tab="modules"] .bgm-dp-tab-count',
     )
     if (moduleTabCount) {
       moduleTabCount.textContent = String(currentModules.length)

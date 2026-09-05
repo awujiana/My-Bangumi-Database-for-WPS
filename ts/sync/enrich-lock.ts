@@ -51,13 +51,11 @@ export function refreshEnrichWorkbooks(selectId = 'enrichWorkbookSelect'): void 
     option.value = wb.Name
     option.text = wb.Name
 
-    if (BGM.enrich.isLocked && BGM.enrich.lockedWorkbookName === wb.Name) {
-      option.selected = true
-      hasSelection = true
-    } else if (currentValue && currentValue === wb.Name) {
-      option.selected = true
-      hasSelection = true
-    } else if (!currentValue && !BGM.enrich.isLocked && wb.Name === activeWbName) {
+    if (
+      (BGM.enrich.isLocked && BGM.enrich.lockedWorkbookName === wb.Name) ||
+      (currentValue && currentValue === wb.Name) ||
+      (!currentValue && !BGM.enrich.isLocked && wb.Name === activeWbName)
+    ) {
       option.selected = true
       hasSelection = true
     }
@@ -145,7 +143,7 @@ export function refreshEnrichSheets(
   }
 
   if (isLockedFound) {
-    BGM.enrich.lockedSheetIndex = parseInt(select.value, 10) || null
+    BGM.enrich.lockedSheetIndex = Number(select.value) || null
   }
 
   bgmLog(
@@ -172,8 +170,8 @@ export function toggleEnrichWorkbookLock(
   const sheetSelect = document.getElementById(sheetSelectId) as HTMLSelectElement | null
   if (!sheetSelect) return
 
-  const sheetIndex = parseInt(sheetSelect.value, 10)
-  if (isNaN(sheetIndex) || sheetIndex <= 0) {
+  const sheetIndex = Number(sheetSelect.value)
+  if (Number.isNaN(sheetIndex) || sheetIndex <= 0) {
     showToast('请先选择一个有效的 Bangumi 追踪表工作表', 'warn')
     return
   }
@@ -290,14 +288,15 @@ export function restoreEnrichLockedWorkbook(): boolean {
   if (!raw) return false
 
   try {
-    const info = JSON.parse(raw) as LockedWorkbookInfo
-
     // 校验工作簿是否仍存在
     if (!app.Workbooks) {
       bgmLog(LOG_LEVELS.WARN, 'restoreEnrichLockedWorkbook: Workbooks 不可用')
       clearEnrichLock()
       return false
     }
+
+    // info 声明移到第一个 early exit 之后（满足 unicorn/no-declarations-before-early-exit）
+    const info = JSON.parse(raw) as LockedWorkbookInfo
 
     const wb = findWorkbookByName(info.workbookName)
     if (!wb) {

@@ -30,9 +30,9 @@ describe('normalizeName 边界情况', () => {
   })
 
   it('null/undefined 处理（虽然类型不允许，但防止运行时崩溃）', () => {
-    // @ts-expect-error 测试运行时边界
+    // @ts-expect-error 测试运行时边界：类型不允许 null/undefined，此处验证运行时容错行为
     expect(() => normalizeName(null)).toThrow()
-    // @ts-expect-error 测试运行时边界
+    // @ts-expect-error 测试运行时边界：类型不允许 null/undefined，此处验证运行时容错行为
     expect(() => normalizeName(undefined)).toThrow()
   })
 
@@ -61,9 +61,9 @@ describe('splitAliases 边界情况', () => {
   })
 
   it('null/undefined 返回空数组', () => {
-    // @ts-expect-error 测试边界
+    // @ts-expect-error 测试边界：类型不允许 null/undefined，此处验证运行时容错行为
     expect(splitAliases(null)).toEqual([])
-    // @ts-expect-error 测试边界
+    // @ts-expect-error 测试边界：类型不允许 null/undefined，此处验证运行时容错行为
     expect(splitAliases(undefined)).toEqual([])
   })
 
@@ -100,9 +100,9 @@ describe('splitTags 边界情况', () => {
   })
 
   it('null/undefined 返回空数组', () => {
-    // @ts-expect-error 测试边界
+    // @ts-expect-error 测试边界：类型不允许 null/undefined，此处验证运行时容错行为
     expect(splitTags(null)).toEqual([])
-    // @ts-expect-error 测试边界
+    // @ts-expect-error 测试边界：类型不允许 null/undefined，此处验证运行时容错行为
     expect(splitTags(undefined)).toEqual([])
   })
 
@@ -172,9 +172,9 @@ describe('parseRemoteContent 边界情况', () => {
   })
 
   it('null/undefined 返回空数组', () => {
-    // @ts-expect-error 测试边界
+    // @ts-expect-error 测试边界：类型不允许 null/undefined，此处验证运行时容错行为
     expect(parseRemoteContent(null)).toEqual([])
-    // @ts-expect-error 测试边界
+    // @ts-expect-error 测试边界：类型不允许 null/undefined，此处验证运行时容错行为
     expect(parseRemoteContent(undefined)).toEqual([])
   })
 

@@ -446,7 +446,7 @@ export function wpsMessageBox(message: string, buttons?: number, icon?: number):
  */
 export function getRowRange(ws: WpsWorksheet, row: number): WpsRange {
   if (typeof ws.Range !== 'function') {
-    throw new Error('Invalid worksheet object')
+    throw new TypeError('Invalid worksheet object')
   }
   if (!Number.isFinite(row) || row < 1) {
     throw new Error(`Row index must be a positive integer, got ${String(row)}`)

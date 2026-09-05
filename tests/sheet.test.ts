@@ -1,9 +1,20 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 
+function colToLetter(col: number): string {
+  let result = ''
+  let n = col
+  while (n > 0) {
+    const remainder = (n - 1) % 26
+    result = String.fromCodePoint(65 + remainder) + result
+    n = Math.floor((n - 1) / 26)
+  }
+  return result
+}
+
 const { PANEL_CONFIG, HEADER_KEYWORDS, COLUMN_RULES, STANDARD_HEADERS, colNumberToLetter } =
   vi.hoisted(() => {
-    const PANEL_CONFIG = { MAX_SCAN_ROWS: 50, MAX_SCAN_COLUMNS: 10 }
-    const HEADER_KEYWORDS = [
+    const panelConfig = { MAX_SCAN_ROWS: 50, MAX_SCAN_COLUMNS: 10 }
+    const headerKeywords = [
       '名称',
       '标题',
       'bangumi',
@@ -14,7 +25,7 @@ const { PANEL_CONFIG, HEADER_KEYWORDS, COLUMN_RULES, STANDARD_HEADERS, colNumber
       'name',
       'title',
     ]
-    const COLUMN_RULES: readonly (readonly [RegExp, string])[] = [
+    const columnRules: readonly (readonly [RegExp, string])[] = [
       [/序列号|序号|编号/i, '序列号'],
       [/名称|标题|作品名/i, '名称'],
       [/bangumi.*url|url|链接|地址/i, 'Bangumi_URL'],
@@ -23,7 +34,7 @@ const { PANEL_CONFIG, HEADER_KEYWORDS, COLUMN_RULES, STANDARD_HEADERS, colNumber
       [/评分/i, '评分'],
       [/标签/i, '标签'],
     ] as const
-    const STANDARD_HEADERS = [
+    const standardHeaders = [
       '序列号',
       '名称',
       'Bangumi URL',
@@ -35,22 +46,12 @@ const { PANEL_CONFIG, HEADER_KEYWORDS, COLUMN_RULES, STANDARD_HEADERS, colNumber
       '完播日',
       '集数',
     ]
-    const colNumberToLetter = (col: number): string => {
-      let result = ''
-      let n = col
-      while (n > 0) {
-        const remainder = (n - 1) % 26
-        result = String.fromCodePoint(65 + remainder) + result
-        n = Math.floor((n - 1) / 26)
-      }
-      return result
-    }
     return {
-      PANEL_CONFIG,
-      HEADER_KEYWORDS,
-      COLUMN_RULES,
-      STANDARD_HEADERS,
-      colNumberToLetter,
+      PANEL_CONFIG: panelConfig,
+      HEADER_KEYWORDS: headerKeywords,
+      COLUMN_RULES: columnRules,
+      STANDARD_HEADERS: standardHeaders,
+      colNumberToLetter: colToLetter,
     }
   })
 
@@ -97,10 +98,22 @@ import { getApp, bgmLog, BGM } from '../ts/tools/util/index.js'
 import { getCellValue } from '../ts/tools/util/cell.js'
 
 function createMockCell(value: unknown = '') {
+  let text: string
+  if (value == null) {
+    text = ''
+  } else if (typeof value === 'object') {
+    // JSON.stringify 对含 toJSON 且返回 undefined 的对象会返回 undefined，需保留兜底
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- 运行时 JSON.stringify 可能返回 undefined
+    text = JSON.stringify(value) ?? ''
+  } else {
+    // 排除 object 后剩余为原始类型/函数，String() 转换与原来一致
+    // eslint-disable-next-line @typescript-eslint/no-base-to-string -- 原实现即 String(value)，保持等价语义
+    text = String(value)
+  }
   return {
     Value2: value,
     Value: value,
-    Text: value == null ? '' : String(value),
+    Text: text,
     Interior: { Color: 0 },
     Font: { Bold: false, Name: '' },
   }
@@ -113,6 +126,7 @@ function createMockWorksheet(
     cellValues?: Record<string, unknown>
     cellOverrides?: Record<string, Record<string, unknown>>
     usedRange?: { Row: number; Rows: { Count: number } }
+    // eslint-disable-next-line unicorn/no-unused-properties -- 预留测试选项，当前用例未使用
     hasEnd?: boolean
     endRow?: number
   } = {},
@@ -123,10 +137,10 @@ function createMockWorksheet(
   const cellOverrides = options.cellOverrides ?? {}
 
   const mockCell = (address: string): ReturnType<typeof createMockCell> => {
-    if (address in cellOverrides) {
+    if (Object.hasOwn(cellOverrides, address)) {
       return createMockCell(cellOverrides[address])
     }
-    if (address in cellValues) {
+    if (Object.hasOwn(cellValues, address)) {
       return createMockCell(cellValues[address])
     }
     return createMockCell('')
@@ -778,7 +792,6 @@ describe('ensureSheetHeaders', () => {
       const colIndex = (colLetter.codePointAt(0) ?? 0) - 64
       if (colIndex <= 5) {
         return {
-          Value2: '',
           Interior: { Color: 0 },
           Font: { Bold: false },
           get FormulaR1C1() {
@@ -827,7 +840,6 @@ describe('ensureSheetHeaders', () => {
       const colIndex = (colLetter.codePointAt(0) ?? 0) - 64
       if (colIndex > 5 && colIndex <= 7) {
         return {
-          Value2: '',
           Interior: { Color: 0 },
           Font: { Bold: false },
           get FormulaR1C1() {
@@ -864,14 +876,30 @@ describe('ensureSheetHeaders', () => {
   })
 })
 
+function createNativeValueFunction(toStringValue: string): () => number {
+  // fixture 工厂：每次调用须返回新实例并覆写其 toString，外提会破坏 fixture 身份；
+  // 函数体不依赖外层作用域，规则静态判定可外提，按测试意图豁免。
+  // eslint-disable-next-line unicorn/consistent-function-scoping -- 保持函数本地作用域以维护 fixture 身份
+  const function_ = function Value(): number {
+    return 42
+  }
+  function_.toString = () => toStringValue
+  return function_
+}
+
+function functionReturnsNative(): () => number {
+  return createNativeValueFunction('function Value() { [native code] }')
+}
+
+function throwingFunction(): never {
+  throw new Error('Unexpected error')
+}
+
 describe('isNativeCode（间接测试 via safeCellValue/readRangeValues）', () => {
   it('native code function 应被 safeCellValue 转为空字符串', () => {
     // 通过 readRangeValues 间接测试
     const ws = createMockWorksheet()
-    const nativeFunction = function Value() {
-      return 42
-    }
-    nativeFunction.toString = () => 'function Value() { [native code] }'
+    const nativeFunction = createNativeValueFunction('function Value() { [native code] }')
     const rangeMock = {
       Value2: [[nativeFunction]],
       Interior: { Color: 0 },
@@ -883,10 +911,7 @@ describe('isNativeCode（间接测试 via safeCellValue/readRangeValues）', () 
 
   it('function Value() 字符串模式应被识别为 native', () => {
     const ws = createMockWorksheet()
-    const valueFunction = function Value() {
-      return 42
-    }
-    valueFunction.toString = () => 'function Value() {}'
+    const valueFunction = createNativeValueFunction('function Value() {}')
     const rangeMock = {
       Value2: [[valueFunction]],
       Interior: { Color: 0 },
@@ -910,15 +935,8 @@ describe('isNativeCode（间接测试 via safeCellValue/readRangeValues）', () 
 
   it('普通函数调用返回 native code 时应跳过', () => {
     const ws = createMockWorksheet()
-    const functionReturnsNative = () => {
-      const nativeFunction = function Value() {
-        return 42
-      }
-      nativeFunction.toString = () => 'function Value() { [native code] }'
-      return nativeFunction
-    }
     const rangeMock = {
-      Value2: [[functionReturnsNative]],
+      Value2: [[functionReturnsNative()]],
       Interior: { Color: 0 },
     }
     ws.Range = vi.fn().mockReturnValue(rangeMock)
@@ -928,9 +946,6 @@ describe('isNativeCode（间接测试 via safeCellValue/readRangeValues）', () 
 
   it('函数调用抛异常时应返回空字符串', () => {
     const ws = createMockWorksheet()
-    const throwingFunction = () => {
-      throw new Error('Unexpected error')
-    }
     const rangeMock = {
       Value2: [[throwingFunction]],
       Interior: { Color: 0 },
@@ -1051,18 +1066,24 @@ describe('setCellValueDirect（间接测试 via ensureSheetHeaders）', () => {
     vi.mocked(getCellValue).mockReturnValue('')
     const ws = createMockWorksheet({ name: 'FormulaR1C1' })
     const mockCell = {
-      Value2: '',
-      Value: '',
       Text: '',
       Interior: { Color: 0 },
       Font: { Bold: false },
-      set FormulaR1C1(_v: string) {},
+      set FormulaR1C1(_v: string) {
+        /* empty */
+      },
       get FormulaR1C1() {
         return ''
       },
-      set Formula(_v: string) {},
-      set Value2(_v: string) {},
-      set Value(_v: string) {},
+      set Formula(_v: string) {
+        /* empty */
+      },
+      set Value2(_v: string) {
+        /* empty */
+      },
+      set Value(_v: string) {
+        /* empty */
+      },
     }
     ws.Range = vi.fn(() => mockCell)
     ws.Cells.Item = vi.fn(() => mockCell)

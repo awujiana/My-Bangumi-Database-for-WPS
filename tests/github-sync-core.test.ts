@@ -60,7 +60,7 @@ const mockXHR = vi.hoisted(() => {
     },
     removeEventListener: vi.fn(),
   }
-  const XHRConstructor = vi.fn().mockImplementation(function () {
+  const XHRConstructor = vi.fn().mockImplementation(function createMockXhr() {
     return xhrMock
   })
   return { xhrMock, XHRConstructor }
@@ -115,7 +115,7 @@ vi.mock('../ts/tools/utility.js', () => ({
   getCellValue: mockGetCellValue,
   setCellValue: mockSetCellValue,
   colNumberToLetter: mockColNumberToLetter,
-  trim: vi.fn((v: string) => v?.trim() ?? ''),
+  trim: vi.fn((v: string) => v.trim()),
   ensureSheetHeaders: mockEnsureSheetHeaders,
   getApp: mockGetApp,
   BGM: { handleError: vi.fn() },
@@ -128,7 +128,10 @@ vi.mock('../ts/core/result.js', () => ({
     okVoid: vi.fn(() => ({ isFail: () => false })),
     failVoid: vi.fn((error: Error) => ({ isFail: () => true, error })),
   },
-  BgmError: vi.fn().mockImplementation(function (message: string) {
+  BgmError: vi.fn().mockImplementation(function mockBgmError(
+    this: { message: string },
+    message: string,
+  ) {
     this.message = message
   }),
 }))
@@ -187,7 +190,7 @@ vi.mock('../ts/sync/sync-record.js', () => ({
 }))
 
 // 设置全局 XMLHttpRequest
-global.XMLHttpRequest = mockXHR.XHRConstructor
+;(globalThis as unknown as Record<string, unknown>).XMLHttpRequest = mockXHR.XHRConstructor
 
 // ========== 导入被测模块 ==========
 
@@ -204,7 +207,11 @@ import type { GithubSyncDiff, ConflictResolution } from '../ts/sync/github-sync-
 // ========== 辅助函数 ==========
 
 function createMockSheet(
-  options: { rows?: { Value2: unknown[] }[]; colMap?: Map<string, number> } = {},
+  options: {
+    rows?: { Value2: unknown[] }[]
+    // eslint-disable-next-line unicorn/no-unused-properties -- 预留测试选项，当前用例未使用
+    colMap?: Map<string, number>
+  } = {},
 ) {
   const rows = options.rows ?? []
   return {
@@ -263,7 +270,7 @@ describe('fetchGithubJson', () => {
 
   it('HTTP 200 且无解析错误应返回空数组', async () => {
     mockParseJsonl.mockReturnValue({ entries: [], errors: [] })
-    mockXHR.xhrMock.onload = function (this: typeof mockXHR.xhrMock) {
+    mockXHR.xhrMock.onload = function handleOnload(this: typeof mockXHR.xhrMock) {
       // 注意：onload 被调用时 this 指向 xhrMock
     }
     // 直接触发 onload（微任务时序与 Promise.resolve().then 等价：
@@ -277,7 +284,7 @@ describe('fetchGithubJson', () => {
 
   it('HTTP 404 应抛出文件不存在错误', async () => {
     mockXHR.xhrMock.status = 404
-    mockXHR.xhrMock.onload = function () {
+    mockXHR.xhrMock.onload = function handleOnload404() {
       // 异步触发
     }
     // 需要手动触发 onload

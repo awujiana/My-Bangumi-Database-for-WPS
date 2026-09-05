@@ -33,7 +33,7 @@ export function getCell(
 function tryGetProperty(cell: unknown, property: string): unknown {
   if (cell == null || typeof cell !== 'object') return undefined
   const object = cell as Record<string, unknown>
-  if (!(property in object)) return undefined
+  if (!Object.hasOwn(object, property)) return undefined
   try {
     const value = object[property]
     if (typeof value === 'function') {

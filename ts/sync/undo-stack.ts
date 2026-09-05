@@ -86,7 +86,7 @@ export function endUndoSession(): void {
   if (currentSession.entries.length > 0) {
     sessions.push(currentSession)
     if (sessions.length > MAX_SESSIONS) {
-      sessions.shift()
+      sessions.splice(0, 1)
     }
   }
   currentSession = null
@@ -154,7 +154,7 @@ export function getUndoSessionCount(): number {
  */
 export function getLastSessionDescription(): string | null {
   if (sessions.length === 0) return null
-  return sessions[sessions.length - 1]?.description ?? null
+  return sessions.at(-1)?.description ?? null
 }
 
 /**
@@ -184,7 +184,7 @@ function restoreDeletedRowWithWs(ws: WpsWorksheet, snapshot: RowSnapshot): void 
 
   // 恢复该行所有列的值
   for (const [colString, value] of Object.entries(snapshot.values)) {
-    const col = parseInt(colString, 10)
+    const col = Number(colString)
     if (!Number.isNaN(col)) {
       setCellValue(ws, snapshot.row, col, value)
     }

@@ -44,6 +44,7 @@ if (typeof document !== 'undefined') {
       const b = button as HTMLButtonElement
       b.disabled = false
     })
+    // eslint-disable-next-line no-console -- console 是日志后端/启动兜底的唯一输出通道（启动日志，logger 初始化前可能执行）
     console.log('[BGM Enrich] 模块加载完成，按钮已启用')
   })
 

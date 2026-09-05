@@ -67,9 +67,7 @@ afterAll(() => {
   vi.useRealTimers()
 })
 
-// ========== XHR Mock 工具 ==========
-// 提供可控制的 XMLHttpRequest mock，支持 onload/onerror/ontimeout 触发。
-// 每个 MockXHR 实例捕获 open/send 调用，测试通过 mockXhrSetResponse 注入响应。
+// ========== XHR Mock 工具 ========== 提供可控制的 XMLHttpRequest mock，支持 onload/onerror/ontimeout 触发。 每个 MockXHR 实例捕获 open/send 调用，测试通过 mockXhrSetResponse 注入响应。
 
 interface MockXHRCall {
   method: string
@@ -81,7 +79,21 @@ interface MockXHRCall {
 
 let lastXhrCall: MockXHRCall | null = null
 let lastMockXhr: MockXHR | null = null
+
+/** 记录最近一次 send() 创建的 MockXHR 实例（避免将 this 直接赋给模块变量触发 no-this-assignment） */
+function recordLastMockXhr(xhr: MockXHR): void {
+  lastMockXhr = xhr
+}
+
 class MockXHR {
+  private method = ''
+
+  private url = ''
+
+  private async = true
+
+  private headers: Record<string, string> = {}
+
   status = 0
 
   statusText = ''
@@ -105,14 +117,6 @@ class MockXHR {
     }
   }
 
-  private method = ''
-
-  private url = ''
-
-  private async = true
-
-  private headers: Record<string, string> = {}
-
   open(method: string, url: string, isAsync: boolean): void {
     this.method = method
     this.url = url
@@ -131,7 +135,7 @@ class MockXHR {
       timeout: this.timeout,
       headers: { ...this.headers },
     }
-    lastMockXhr = this
+    recordLastMockXhr(this)
   }
 
   // 测试辅助方法：模拟成功响应
@@ -193,10 +197,10 @@ describe('getLocalFilePath / isLocalFileConfigured', () => {
       owner: '',
       repo: '',
       branch: 'main',
-      path: 'C:\\data\\test.jsonl',
+      path: String.raw`C:\data\test.jsonl`,
       sourceType: 'local',
     })
-    expect(getLocalFilePath()).toBe('C:\\data\\test.jsonl')
+    expect(getLocalFilePath()).toBe(String.raw`C:\data\test.jsonl`)
   })
 
   it('isLocalFileConfigured 在 path 非空时返回 true', () => {
@@ -229,7 +233,7 @@ describe('LocalFileSyncSource.validateConfig', () => {
       owner: '',
       repo: '',
       branch: 'main',
-      path: 'C:\\data\\test.jsonl',
+      path: String.raw`C:\data\test.jsonl`,
       sourceType: 'local',
     })
     const source = new LocalFileSyncSource()
@@ -276,7 +280,7 @@ describe('readLocalFileContent', () => {
   })
 
   it('成功读取文件内容（status=0）', async () => {
-    const promise = readLocalFileContent('C:\\data\\test.jsonl')
+    const promise = readLocalFileContent(String.raw`C:\data\test.jsonl`)
     expect(lastXhrCall).not.toBeNull()
     // 验证 file:// URL 转换：C:\data\test.jsonl → file:///C:/data/test.jsonl
     expect(lastXhrCall?.url).toBe('file:///C:/data/test.jsonl')
@@ -301,19 +305,19 @@ describe('readLocalFileContent', () => {
   })
 
   it('网络错误（onerror）时 reject', async () => {
-    const promise = readLocalFileContent('C:\\nonexistent.jsonl')
+    const promise = readLocalFileContent(String.raw`C:\nonexistent.jsonl`)
     lastMockXhr!._triggerError()
     await expect(promise).rejects.toThrow(/无法读取文件/)
   })
 
   it('HTTP 错误（如 404）时 reject', async () => {
-    const promise = readLocalFileContent('C:\\missing.jsonl')
+    const promise = readLocalFileContent(String.raw`C:\missing.jsonl`)
     lastMockXhr!._respondError(404, 'Not Found')
     await expect(promise).rejects.toThrow(/HTTP 404/)
   })
 
   it('超时时 reject', async () => {
-    const promise = readLocalFileContent('C:\\slow.jsonl')
+    const promise = readLocalFileContent(String.raw`C:\slow.jsonl`)
     lastMockXhr!._triggerTimeout()
     await expect(promise).rejects.toThrow(/读取文件超时/)
   })
@@ -330,7 +334,7 @@ describe('LocalFileSyncSource.fetchRemoteEntries', () => {
       owner: '',
       repo: '',
       branch: '',
-      path: 'C:\\data\\test.jsonl',
+      path: String.raw`C:\data\test.jsonl`,
       sourceType: 'local',
     })
     const source = new LocalFileSyncSource()
@@ -348,7 +352,7 @@ describe('LocalFileSyncSource.fetchRemoteEntries', () => {
       owner: '',
       repo: '',
       branch: '',
-      path: 'C:\\empty.jsonl',
+      path: String.raw`C:\empty.jsonl`,
       sourceType: 'local',
     })
     const source = new LocalFileSyncSource()
@@ -371,7 +375,7 @@ describe('LocalFileSyncSource.fetchRemoteEntries', () => {
       owner: '',
       repo: '',
       branch: '',
-      path: 'C:\\data.jsonl',
+      path: String.raw`C:\data.jsonl`,
       sourceType: 'local',
     })
     const source = new LocalFileSyncSource()
@@ -392,7 +396,7 @@ describe('LocalFileSyncSource.fetchRemoteEntries', () => {
       owner: '',
       repo: '',
       branch: '',
-      path: 'C:\\mixed.jsonl',
+      path: String.raw`C:\mixed.jsonl`,
       sourceType: 'local',
     })
     const source = new LocalFileSyncSource()
@@ -410,7 +414,7 @@ describe('LocalFileSyncSource.fetchRemoteEntries', () => {
       owner: '',
       repo: '',
       branch: '',
-      path: 'C:\\bad.jsonl',
+      path: String.raw`C:\bad.jsonl`,
       sourceType: 'local',
     })
     const source = new LocalFileSyncSource()
@@ -436,7 +440,7 @@ describe('LocalFileSyncSource.fetchRemoteEntries', () => {
       owner: '',
       repo: '',
       branch: '',
-      path: 'C:\\nonexistent.jsonl',
+      path: String.raw`C:\nonexistent.jsonl`,
       sourceType: 'local',
     })
     const source = new LocalFileSyncSource()
@@ -450,7 +454,7 @@ describe('LocalFileSyncSource.fetchRemoteEntries', () => {
       owner: '',
       repo: '',
       branch: '',
-      path: 'C:\\data.jsonl',
+      path: String.raw`C:\data.jsonl`,
       sourceType: 'local',
     })
     const controller = new AbortController()
@@ -464,7 +468,7 @@ describe('LocalFileSyncSource.fetchRemoteEntries', () => {
       owner: '',
       repo: '',
       branch: '',
-      path: 'C:\\data.jsonl',
+      path: String.raw`C:\data.jsonl`,
       sourceType: 'local',
     })
     const controller = new AbortController()

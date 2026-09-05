@@ -121,7 +121,6 @@ export { syncFromPanel, syncCollectionFromBgm, syncFromBgmByAPI } from './sync.j
 export { cleanLockedDataSheet } from './sheet.js'
 
 // 连接测试弹窗
-export { showConnectionTestDialog, hideConnectionTestDialog }
 
 /** 同步指标计算（纯函数）：从 handleActionClick 的 try 块抽出，降低 try-complexity */
 function computeSyncMetrics(
@@ -239,9 +238,7 @@ export function onAction(action: string): void {
     }
     case 'clear': {
       showConfirm(_T.confirmClearMarks, (confirmed) => {
-        if (confirmed) {
-          if (typeof refreshData === 'function') refreshData()
-        }
+        if (confirmed && typeof refreshData === 'function') refreshData()
       })
       break
     }
@@ -259,9 +256,7 @@ export function onAction(action: string): void {
     }
     case 'showClearConfirm': {
       showConfirm(_T.confirmClearMarks, (confirmed) => {
-        if (confirmed) {
-          if (typeof refreshData === 'function') refreshData()
-        }
+        if (confirmed && typeof refreshData === 'function') refreshData()
       })
       break
     }
@@ -286,6 +281,10 @@ export function onAction(action: string): void {
     case 'resumeSync': {
       bgmLog(LOG_LEVELS.INFO, '用户请求恢复同步')
       BGM.sync.resume()
+      break
+    }
+    default: {
+      // 未知 action 不处理（与旧逻辑一致：无默认分支即什么都不做）
       break
     }
   }
@@ -420,7 +419,7 @@ const debouncedSaveGithubConfig = debounce((): void => {
 /**
  * 按同步源类型切换 UI 字段显示/隐藏
  *
- * - github/gitlab/gitee: 显示 owner/repo/branch/path（#remoteSourceFields）
+ * - GitHub/GitLab/Gitee: 显示 owner/repo/branch/path（#remoteSourceFields）
  * - local: 显示本地文件路径输入框 + 选择按钮（#localFileFields）
  * - gist: 显示 gistId 输入框（#gistFields）
  *
@@ -529,13 +528,14 @@ export function setupButtonListeners(): void {
 function setupTimeFilterControls(): void {
   const chkTimeFilter = document.getElementById('chkTimeFilter') as HTMLInputElement | null
   const timeFilterControls = document.getElementById('timeFilterControls')
+  if (!chkTimeFilter || !timeFilterControls) return
+
+  // 仅在通过校验后声明后续变量（符合 unicorn/no-declarations-before-early-exit）
   const rangeSelect = document.getElementById('timeFilterRange') as HTMLSelectElement | null
   const yearRow = document.getElementById('yearRow')
   const quarterRow = document.getElementById('quarterRow')
   const monthRow = document.getElementById('monthRow')
   const futureHintRow = document.getElementById('futureHintRow')
-
-  if (!chkTimeFilter || !timeFilterControls) return
 
   // 复选框切换：显示/隐藏筛选控件
   chkTimeFilter.addEventListener('change', () => {
@@ -904,26 +904,23 @@ const ACTION_HANDLERS: Record<string, ActionHandler> = {
     bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 保存 GitHub 配置')
     const ownerInput = document.getElementById('githubOwner') as HTMLInputElement | null
     const repoInput = document.getElementById('githubRepo') as HTMLInputElement | null
-    const branchInput = document.getElementById('githubBranch') as HTMLInputElement | null
     const pathInput = document.getElementById('githubPath') as HTMLInputElement | null
-    const localFilePathInput = document.getElementById('localFilePath') as HTMLInputElement | null
-    const gistIdInput = document.getElementById('gistId') as HTMLInputElement | null
-    const strategySelect = document.getElementById('githubStrategy') as HTMLSelectElement | null
-    const sourceTypeSelect = document.getElementById('syncSourceType') as HTMLSelectElement | null
     if (!ownerInput || !repoInput || !pathInput) {
       showToast('UI 元素缺失', 'error')
       return
     }
+    // 仅在通过必填项校验后才需要读取其余输入框，故在 early exit 之后声明
+    const branchInput = document.getElementById('githubBranch') as HTMLInputElement | null
+    const localFilePathInput = document.getElementById('localFilePath') as HTMLInputElement | null
+    const gistIdInput = document.getElementById('gistId') as HTMLInputElement | null
+    const strategySelect = document.getElementById('githubStrategy') as HTMLSelectElement | null
+    const sourceTypeSelect = document.getElementById('syncSourceType') as HTMLSelectElement | null
     const sourceType = (sourceTypeSelect?.value as SyncSourceType | undefined) ?? 'github'
 
     // 按数据源类型读取对应字段
-    let path: string
+    const path =
+      sourceType === 'local' ? (localFilePathInput?.value ?? '').trim() : pathInput.value.trim()
     let gistId: string | undefined
-    if (sourceType === 'local') {
-      path = (localFilePathInput?.value ?? '').trim()
-    } else {
-      path = pathInput.value.trim()
-    }
     if (sourceType === 'gist') {
       gistId = (gistIdInput?.value ?? '').trim() || undefined
     }
@@ -992,20 +989,20 @@ const ACTION_HANDLERS: Record<string, ActionHandler> = {
       const rangeSelect = document.getElementById('timeFilterRange') as HTMLSelectElement | null
       const quarterSelect = document.getElementById('timeFilterQuarter') as HTMLSelectElement | null
       const monthSelect = document.getElementById('timeFilterMonth') as HTMLSelectElement | null
-      const year = parseInt(yearSelect?.value || '2026', 10) // eslint-disable-line @typescript-eslint/prefer-nullish-coalescing -- 空串表示未选择/未填写，须回退默认（`??` 会保留空串）
+      const year = Number(yearSelect?.value || '2026') // eslint-disable-line @typescript-eslint/prefer-nullish-coalescing -- 空串表示未选择/未填写，须回退默认（`??` 会保留空串）
       const range =
         (rangeSelect?.value as 'year' | 'quarter' | 'month' | 'future' | undefined) ?? 'year'
       timeFilter = {
         enabled: true,
         year,
         range,
-        ...(range === 'quarter'
-          ? { quarter: parseInt(quarterSelect?.value || '1', 10) as 1 | 4 | 7 | 10 } // eslint-disable-line @typescript-eslint/prefer-nullish-coalescing -- 空串表示未选择/未填写，须回退默认（`??` 会保留空串）
-          : {}),
-        ...(range === 'month' ? { month: parseInt(monthSelect?.value || '1', 10) } : {}), // eslint-disable-line @typescript-eslint/prefer-nullish-coalescing -- 空串表示未选择/未填写，须回退默认（`??` 会保留空串）
+        ...(range === 'quarter' && {
+          quarter: Number(quarterSelect?.value || '1') as 1 | 4 | 7 | 10, // eslint-disable-line @typescript-eslint/prefer-nullish-coalescing -- 空串表示未选择/未填写，须回退默认（`??` 会保留空串）
+        }),
+        ...(range === 'month' && { month: Number(monthSelect?.value || '1') }), // eslint-disable-line @typescript-eslint/prefer-nullish-coalescing -- 空串表示未选择/未填写，须回退默认（`??` 会保留空串）
       }
     }
-    // 本地文件源仅需 path 字段；远程源（github/gitlab/gitee）要求 owner/repo/path
+    // 本地文件源仅需 path 字段；远程源（GitHub/GitLab/Gitee）要求 owner/repo/path
     // 本地文件路径复用 #githubPath 输入框（用户可手动粘贴绝对路径，UI 后续可扩展文件选择对话框）
     if (currentSourceType === 'local') {
       const pathInput = document.getElementById('githubPath') as HTMLInputElement | null
@@ -1034,14 +1031,25 @@ const ACTION_HANDLERS: Record<string, ActionHandler> = {
     // 构建时间筛选描述
     let timeFilterDesc = ''
     if (timeFilter) {
-      timeFilterDesc =
-        timeFilter.range === 'future'
-          ? `\n🔮 时间筛选：预告/未来动漫（无开播日期）`
-          : timeFilter.range === 'year'
-            ? `\n📅 时间筛选：${String(timeFilter.year)}年全年`
-            : timeFilter.range === 'quarter'
-              ? `\n📅 时间筛选：${String(timeFilter.year)}年${String(timeFilter.quarter ?? '')}月新番`
-              : `\n📅 时间筛选：${String(timeFilter.year)}年${String(timeFilter.month ?? '')}月`
+      switch (timeFilter.range) {
+        case 'future': {
+          timeFilterDesc = `\n🔮 时间筛选：预告/未来动漫（无开播日期）`
+          break
+        }
+        case 'year': {
+          timeFilterDesc = `\n📅 时间筛选：${String(timeFilter.year)}年全年`
+          break
+        }
+        case 'quarter': {
+          timeFilterDesc = `\n📅 时间筛选：${String(timeFilter.year)}年${String(timeFilter.quarter ?? '')}月新番`
+          break
+        }
+        default: {
+          // month（默认，与旧 else 分支一致）
+          timeFilterDesc = `\n📅 时间筛选：${String(timeFilter.year)}年${String(timeFilter.month ?? '')}月`
+          break
+        }
+      }
     }
     showConfirm(
       `将从${sourceLabel}下载数据并按策略【${strategyLabel}】合并到当前工作表。\n（远程仓库 → Excel，与上传同步方向相反）${isSelectedRowsOnly ? '\n⚠️ 仅同步选中行' : ''}${timeFilterDesc}\n是否继续？`,
@@ -1590,7 +1598,18 @@ const ACTION_HANDLERS: Record<string, ActionHandler> = {
           updateUserIdStatus()
           refreshGithubConfigInputs()
         } else {
-          const errorMessage = result.error?.message ?? '未知错误'
+          const rawError: unknown = result.error
+          let errorMessage: string
+          if (rawError instanceof Error) {
+            errorMessage = rawError.message
+          } else if (typeof rawError === 'string') {
+            errorMessage = rawError
+          } else if (rawError == null) {
+            errorMessage = '未知错误'
+          } else {
+            // 非 Error 非字符串的其余值：JSON 序列化展示（避免默认的 [object Object]）
+            errorMessage = JSON.stringify(rawError)
+          }
           bgmLog(LOG_LEVELS.ERROR, `[handleActionClick] 配置导入失败: ${errorMessage}`)
           showToast(`导入失败：${errorMessage}`, 'error')
         }
@@ -1691,13 +1710,13 @@ function renderLogEntries(): void {
     body.textContent = '暂无日志'
     return
   }
-  logs.forEach((entry) => {
+  for (const entry of logs) {
     const div = document.createElement('div')
     div.className = `log-entry log-${entry.level.toLowerCase()}`
     const time = new Date(entry.timestamp).toLocaleString()
     div.textContent = `[${time}] [${entry.level}] ${entry.message}`
     body.appendChild(div)
-  })
+  }
   // 滚动到底部，展示最新日志
   body.scrollTop = body.scrollHeight
 }
@@ -1741,6 +1760,17 @@ function handleActionClick(event: Event): void {
   }
 }
 
+function startHandlers(): void {
+  // 先清理旧监听器，防止面板重新初始化时重复注册
+  clearTrackedListeners()
+  setupButtonListeners()
+  setupTimeFilterControls()
+  setupMessageListener()
+  setupEventListeners()
+  initIncrementalSyncFromRibbon()
+  bgmLog(LOG_LEVELS.INFO, '[handlers] initHandlers 完成')
+}
+
 /**
  * 初始化 UI 事件处理模块。
  *
@@ -1757,26 +1787,15 @@ function handleActionClick(event: Event): void {
  *  - 从配置恢复增量同步、跳过冲突 UI 状态
  */
 export function initHandlers(): void {
-  const start = (): void => {
-    // 先清理旧监听器，防止面板重新初始化时重复注册
-    clearTrackedListeners()
-    setupButtonListeners()
-    setupTimeFilterControls()
-    setupMessageListener()
-    setupEventListeners()
-    initIncrementalSyncFromRibbon()
-    bgmLog(LOG_LEVELS.INFO, '[handlers] initHandlers 完成')
-  }
-
   if (typeof document === 'undefined') {
     // 无 DOM 环境（如 Node 测试环境）下同步执行
-    start()
+    startHandlers()
   } else if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', () => {
-      start()
+      startHandlers()
     })
   } else {
-    start()
+    startHandlers()
   }
 }
 
@@ -1849,93 +1868,102 @@ function refreshGithubConfigInputs(): void {
 let _messageHandler: ((event: MessageEvent) => void) | null = null
 
 function setupMessageListener(): void {
-  if (typeof window !== 'undefined') {
-    // 防止重复注册：先移除旧监听器
-    if (_messageHandler) {
-      window.removeEventListener('message', _messageHandler)
+  if (typeof window === 'undefined') {
+    return
+  }
+
+  // 防止重复注册：先移除旧监听器
+  if (_messageHandler) {
+    window.removeEventListener('message', _messageHandler)
+  }
+  _messageHandler = (event: MessageEvent) => {
+    // origin 白名单校验（防止跨域消息注入）
+    const allowedOrigins = ['null', '', window.location.origin]
+    if (!allowedOrigins.includes(event.origin)) {
+      bgmLog(LOG_LEVELS.WARN, `[message] 拒绝非预期 origin: ${event.origin}`)
+      return
     }
-    _messageHandler = (event: MessageEvent) => {
-      // origin 白名单校验（防止跨域消息注入）
-      const allowedOrigins = ['null', '', window.location.origin]
-      if (!allowedOrigins.includes(event.origin)) {
-        bgmLog(LOG_LEVELS.WARN, `[message] 拒绝非预期 origin: ${event.origin}`)
-        return
-      }
-      const { data } = event
-      if (typeof data !== 'object' || data === null) return
-      const message = data as {
-        type?: string
-        userId?: string
-        username?: string
-      }
+    // 用类型断言保留 unknown 注解，避免解构 any（event.data 为 any，直接解构会触发 no-unsafe-assignment）
+    const { data } = event as { data: unknown }
+    if (typeof data !== 'object' || data === null) return
+    const message = data as {
+      type?: string
+      userId?: string
+      username?: string
+    }
 
-      bgmLog(LOG_LEVELS.INFO, `[handlers] 收到消息: ${JSON.stringify(message)}`)
+    bgmLog(LOG_LEVELS.INFO, `[handlers] 收到消息: ${JSON.stringify(message)}`)
 
-      switch (message.type) {
-        case 'BGM:tokenUpdated': {
-          bgmLog(LOG_LEVELS.INFO, '[handlers] 收到 Token 更新通知')
-          updateTokenStatus()
-          updateUserIdStatus()
-          break
+    switch (message.type) {
+      case 'BGM:tokenUpdated': {
+        bgmLog(LOG_LEVELS.INFO, '[handlers] 收到 Token 更新通知')
+        updateTokenStatus()
+        updateUserIdStatus()
+        break
+      }
+      case 'BGM:userIdUpdated': {
+        bgmLog(LOG_LEVELS.INFO, `[handlers] 收到用户ID更新通知: ${String(message.userId)}`)
+        if (message.userId) {
+          BGM.cache.userId = message.userId
+          _setBgmUserId(message.userId)
+          bgmLog(LOG_LEVELS.INFO, `[handlers] 已更新 BGM.cache.userId: ${BGM.cache.userId}`)
         }
-        case 'BGM:userIdUpdated': {
-          bgmLog(LOG_LEVELS.INFO, `[handlers] 收到用户ID更新通知: ${String(message.userId)}`)
-          if (message.userId) {
-            BGM.cache.userId = message.userId
-            _setBgmUserId(message.userId)
-            bgmLog(LOG_LEVELS.INFO, `[handlers] 已更新 BGM.cache.userId: ${BGM.cache.userId}`)
-          }
-          updateUserIdStatus()
-          break
+        updateUserIdStatus()
+        break
+      }
+      case 'BGM:userInfoUpdated': {
+        bgmLog(
+          LOG_LEVELS.INFO,
+          `[handlers] 收到用户信息更新通知: 用户名=${String(message.username)}, 用户ID=${String(message.userId)}`,
+        )
+        if (message.username) {
+          BGM.cache.username = message.username
+          _setBgmUsername(message.username)
+          bgmLog(LOG_LEVELS.INFO, `[handlers] 已更新 BGM.cache.username: ${BGM.cache.username}`)
         }
-        case 'BGM:userInfoUpdated': {
+        if (message.userId) {
+          BGM.cache.userId = message.userId
+          _setBgmUserId(message.userId)
           bgmLog(
             LOG_LEVELS.INFO,
-            `[handlers] 收到用户信息更新通知: 用户名=${String(message.username)}, 用户ID=${String(message.userId)}`,
+            `[handlers] 已更新 BGM.cache.userId 和用户ID配置: ${BGM.cache.userId}`,
           )
-          if (message.username) {
-            BGM.cache.username = message.username
-            _setBgmUsername(message.username)
-            bgmLog(LOG_LEVELS.INFO, `[handlers] 已更新 BGM.cache.username: ${BGM.cache.username}`)
-          }
-          if (message.userId) {
-            BGM.cache.userId = message.userId
-            _setBgmUserId(message.userId)
-            bgmLog(
-              LOG_LEVELS.INFO,
-              `[handlers] 已更新 BGM.cache.userId 和用户ID配置: ${BGM.cache.userId}`,
-            )
-          }
+        }
+        updateUserIdStatus()
+        break
+      }
+      case 'tokenUpdated':
+      case 'userIdUpdated': {
+        // 兼容旧格式
+        if (message.type === 'tokenUpdated') {
+          updateTokenStatus()
+        } else {
           updateUserIdStatus()
-          break
         }
-        case 'tokenUpdated':
-        case 'userIdUpdated': {
-          // 兼容旧格式
-          if (message.type === 'tokenUpdated') {
-            updateTokenStatus()
-          } else {
-            updateUserIdStatus()
-          }
-          break
-        }
+        break
+      }
+      default: {
+        // 未知消息类型：忽略
+        break
       }
     }
-    window.addEventListener('message', _messageHandler)
-
-    bgmLog(LOG_LEVELS.INFO, '[handlers] 消息监听器已注册')
   }
+  window.addEventListener('message', _messageHandler)
+
+  bgmLog(LOG_LEVELS.INFO, '[handlers] 消息监听器已注册')
 }
 
 /**
  * 移除消息监听器，防止面板关闭后内存泄漏
  */
 export function removeMessageListener(): void {
-  if (_messageHandler) {
-    window.removeEventListener('message', _messageHandler)
-    _messageHandler = null
-    bgmLog(LOG_LEVELS.INFO, '[handlers] 消息监听器已移除')
+  if (!_messageHandler) {
+    return
   }
+
+  window.removeEventListener('message', _messageHandler)
+  _messageHandler = null
+  bgmLog(LOG_LEVELS.INFO, '[handlers] 消息监听器已移除')
 }
 
 // ========== 事件总线处理器（模块级，便于追踪与去重） ==========
@@ -1951,7 +1979,7 @@ const handleUserIdUpdatedEvent = (): void => {
   updateUserIdStatus()
 }
 
-const handleUserNameUpdatedEvent = (): void => {
+const handleUsernameUpdatedEvent = (): void => {
   bgmLog(LOG_LEVELS.INFO, '[handlers] 收到 USER_NAME_UPDATED 事件')
   updateUserIdStatus()
 }
@@ -1964,15 +1992,29 @@ const handleConfigUpdatedEvent = (data: { key: string; value: string }): void =>
     `[handlers] 收到 CONFIG_UPDATED 事件: key=${data.key}, value=${data.value}`,
   )
 
-  if (data.key === 'bgm_incremental_sync') {
-    bgmLog(LOG_LEVELS.INFO, `[handlers] ========== 更新增量同步复选框 ==========`)
-    tryUpdateIncrementalCheckbox(data.value === 'true')
-  } else if (data.key === 'bgm_skip_conflicts') {
-    bgmLog(LOG_LEVELS.INFO, `[handlers] ========== 更新跳过冲突 UI ==========`)
-    tryUpdateSkipConflictsUI(data.value === 'true')
-  } else if (data.key === 'bgm_enable_sync_record') {
-    bgmLog(LOG_LEVELS.INFO, `[handlers] ========== 更新启用同步记录复选框 ==========`)
-    tryUpdateEnableSyncRecordUI(data.value === 'true')
+  switch (data.key) {
+    case 'bgm_incremental_sync': {
+      bgmLog(LOG_LEVELS.INFO, `[handlers] ========== 更新增量同步复选框 ==========`)
+      tryUpdateIncrementalCheckbox(data.value === 'true')
+
+      break
+    }
+    case 'bgm_skip_conflicts': {
+      bgmLog(LOG_LEVELS.INFO, `[handlers] ========== 更新跳过冲突 UI ==========`)
+      tryUpdateSkipConflictsUI(data.value === 'true')
+
+      break
+    }
+    case 'bgm_enable_sync_record': {
+      bgmLog(LOG_LEVELS.INFO, `[handlers] ========== 更新启用同步记录复选框 ==========`)
+      tryUpdateEnableSyncRecordUI(data.value === 'true')
+
+      break
+    }
+    default: {
+      // 未知配置键：忽略（与旧逻辑一致，原注释即 No default）
+      break
+    }
   }
 }
 
@@ -2019,7 +2061,7 @@ const handleSyncErrorEvent = (error: unknown): void => {
 function setupEventListeners(): void {
   trackedEventBusOn(BGM_EVENTS.TOKEN_UPDATED, handleTokenUpdatedEvent)
   trackedEventBusOn(BGM_EVENTS.USER_ID_UPDATED, handleUserIdUpdatedEvent)
-  trackedEventBusOn(BGM_EVENTS.USER_NAME_UPDATED, handleUserNameUpdatedEvent)
+  trackedEventBusOn(BGM_EVENTS.USER_NAME_UPDATED, handleUsernameUpdatedEvent)
   trackedEventBusOn(BGM_EVENTS.CONFIG_UPDATED, handleConfigUpdatedEvent)
   trackedEventBusOn(BGM_EVENTS.SYNC_PROGRESS, handleSyncProgressEvent)
   trackedEventBusOn(BGM_EVENTS.SYNC_STATE_CHANGED, handleSyncStateChangedEvent)
@@ -2336,14 +2378,12 @@ function saveGithubConfigFromDom() {
   // 按数据源类型读取对应字段值
   // - local: 复用 githubConfig.path 字段存储本地文件路径（与远程源 path 字段互斥复用）
   // - gist: 使用独立的 gistId 字段
-  // - github/gitlab/gitee: 使用 owner/repo/branch/path
-  let path: string
+  // - GitHub/GitLab/Gitee: 使用 owner/repo/branch/path
+  const path =
+    sourceType === 'local'
+      ? (localFilePathInput?.value ?? '').trim()
+      : (pathInput?.value ?? '').trim()
   let gistId: string | undefined
-  if (sourceType === 'local') {
-    path = (localFilePathInput?.value ?? '').trim()
-  } else {
-    path = (pathInput?.value ?? '').trim()
-  }
   if (sourceType === 'gist') {
     gistId = (gistIdInput?.value ?? '').trim() || undefined
   }
@@ -2423,3 +2463,5 @@ function loadGithubConfigIntoForm() {
   }
   bgmLog(LOG_LEVELS.INFO, '[handlers] GitHub 配置输入框防抖自动保存监听器已注册')
 }
+
+export { showConnectionTestDialog, hideConnectionTestDialog } from '../github-config-dialog.js'

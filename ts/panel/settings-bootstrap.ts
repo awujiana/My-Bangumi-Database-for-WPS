@@ -36,13 +36,15 @@ if (typeof window !== 'undefined') {
           target.tagName === 'SCRIPT'
             ? (target as HTMLScriptElement).src
             : (target as HTMLLinkElement).href
+        // eslint-disable-next-line no-console -- console 是日志后端/启动兜底的唯一输出通道（资源加载失败兜底日志）
         console.error('[BGM Settings] Resource load failed:', source)
       }
     },
-    true,
+    { capture: true },
   )
 
   window.addEventListener('unhandledrejection', (event: PromiseRejectionEvent) => {
+    // eslint-disable-next-line no-console -- 启动兜底阶段日志后端未必就绪，console 是唯一输出通道（与上方资源加载失败日志一致）
     console.error('[BGM Settings] Unhandled promise rejection:', event.reason)
   })
 }
@@ -58,8 +60,10 @@ if (typeof document !== 'undefined') {
   document.addEventListener('bgm:modulesReady', () => {
     document.querySelectorAll('button[data-action]').forEach((button) => {
       const b = button as HTMLButtonElement
+
       b.disabled = false
     })
+    // eslint-disable-next-line no-console -- 启动兜底阶段日志后端未必就绪，console 是唯一输出通道（与上方资源加载失败日志一致）
     console.log('[BGM Settings] 模块加载完成，按钮已启用')
   })
 
@@ -70,14 +74,17 @@ if (typeof document !== 'undefined') {
     isForced = true
   })
   setTimeout(() => {
-    if (!isForced) {
-      console.warn(
-        `[BGM Settings] ${String(timeoutMs)}ms 内未收到 bgm:modulesReady 事件，强制启用按钮（兜底）`,
-      )
-      document.querySelectorAll('button[data-action]').forEach((button) => {
-        const b = button as HTMLButtonElement
-        b.disabled = false
-      })
+    if (isForced) {
+      return
     }
+
+    // eslint-disable-next-line no-console -- 启动兜底阶段日志后端未必就绪，console 是唯一输出通道（与上方资源加载失败日志一致）
+    console.warn(
+      `[BGM Settings] ${String(timeoutMs)}ms 内未收到 bgm:modulesReady 事件，强制启用按钮（兜底）`,
+    )
+    document.querySelectorAll('button[data-action]').forEach((button) => {
+      const b = button as HTMLButtonElement
+      b.disabled = false
+    })
   }, timeoutMs)
 }

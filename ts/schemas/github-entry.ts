@@ -10,7 +10,7 @@ import type { infer as zInfer } from '../tools/zod-compat.js'
  * 产生重复维护与漂移风险。
  *
  * 已移除的字段（不再从 JSONL 输出，BGM 插件内部处理）：
- * - url：从 sid 构造（https://bgm.tv/subject/{sid}）
+ * - URL：从 sid 构造（https://bgm.tv/subject/{sid}）
  * - type：默认为 2（动漫）
  * - tags：与 meta_tags 冗余，仅使用 meta_tags
  * - episode：恒为 0，使用 infobox.话数 替代

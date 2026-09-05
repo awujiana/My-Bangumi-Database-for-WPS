@@ -24,7 +24,7 @@ describe('parseJsonl', () => {
   })
 
   it('无效输入类型应返回空结果', () => {
-    // @ts-expect-error 测试无效输入
+    // @ts-expect-error 测试无效输入：类型不允许但需验证运行时返回空结果
     const result = parseJsonl(null)
     expect(result.entries).toEqual([])
   })
@@ -126,9 +126,9 @@ describe('filterByTime', () => {
     const filter: SyncTimeFilter = { enabled: true, year: 2026, range: 'year' }
     const result = filterByTime(testEntries, filter)
     expect(result.length).toBeGreaterThan(0)
-    result.forEach((entry) => {
+    for (const entry of result) {
       expect(entry.date?.startsWith('2026')).toBe(true)
-    })
+    }
   })
 
   it('按月份筛选应返回匹配月份的条目', () => {
@@ -153,9 +153,9 @@ describe('filterByTime', () => {
   it('无 date 字段的条目应被过滤掉', () => {
     const filter: SyncTimeFilter = { enabled: true, year: 2026, range: 'year' }
     const result = filterByTime(testEntries, filter)
-    result.forEach((entry) => {
+    for (const entry of result) {
       expect(entry.date).toBeTruthy()
-    })
+    }
   })
 
   it('日期格式 YYYY/MM/DD 应正确解析', () => {
@@ -180,21 +180,23 @@ describe('filterByTime', () => {
 })
 
 // ========== computeDiff 测试 ==========
-describe('computeDiff', () => {
-  const createRemoteEntry = (
-    sid: string,
-    overrides: Partial<GithubRemoteEntry> = {},
-  ): GithubRemoteEntry => ({
+function createRemoteEntry(
+  sid: string,
+  overrides: Partial<GithubRemoteEntry> = {},
+): GithubRemoteEntry {
+  return {
     sid,
     name: `条目${sid}`,
     ...overrides,
-  })
+  }
+}
 
-  const createLocalEntry = (
-    sid: string,
-    row: number,
-    fields: Record<string, string> = {},
-  ): LocalRowEntry => ({
+function createLocalEntry(
+  sid: string,
+  row: number,
+  fields: Record<string, string> = {},
+): LocalRowEntry {
+  return {
     row,
     sid,
     fields: {
@@ -204,8 +206,10 @@ describe('computeDiff', () => {
       开播日期: '',
       ...fields,
     },
-  })
+  }
+}
 
+describe('computeDiff', () => {
   describe('基础策略 (add-update)', () => {
     it('远程有、本地无应返回 add', () => {
       const remote = [createRemoteEntry('1')]
@@ -297,7 +301,7 @@ describe('computeDiff', () => {
 
   describe('mirror 策略', () => {
     it('远程不存在的本地 SID 应标记为 delete', () => {
-      const remote = []
+      const remote: GithubRemoteEntry[] = []
       const local = new Map<string, LocalRowEntry>([['1', createLocalEntry('1', 2)]])
       const diffs = computeDiff(remote, local, 'mirror')
       expect(diffs.length).toBe(1)
@@ -1056,7 +1060,7 @@ describe('isWithinTimeFilter isNaN 分支 (line 353)', () => {
     const filter: SyncTimeFilter = { enabled: true, range: 'year', year: 2024 }
     const diffs = computeDiff(remote, local, 'mirror', filter)
     const deletes = diffs.filter((d) => d.kind === 'delete')
-    // parse 后 year=0, month=0, isNaN(0)? false... 但 month 为 0 时不在 year 范围内
+    // parse 后 year=0, month=0, Number.isNaN(0)? false... 但 month 为 0 时不在 year 范围内
     expect(deletes.length).toBe(0)
   })
 })

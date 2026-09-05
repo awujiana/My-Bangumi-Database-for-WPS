@@ -27,7 +27,9 @@ import { trim } from '../tools/string-utilities-pure.js'
 export type LoggerFunction = (level: number, message: string) => void
 
 /** 当前注入的日志函数，默认 no-op */
-let loggerFunction: LoggerFunction = () => {}
+let loggerFunction: LoggerFunction = () => {
+  /* empty */
+}
 
 /**
  * 注入日志函数（依赖注入入口）
@@ -85,19 +87,17 @@ export function extractSubjectId(input: string): string | null {
   const trimmed = trim(input)
   if (!trimmed) return null
 
-  let id: string | null = null
-
-  // 如果是纯数字，直接作为候选
-  if (/^\d+$/.test(trimmed)) {
-    id = trimmed
-  }
+  // 如果是纯数字，直接作为候选（ternary 等价改写，满足 unicorn/prefer-ternary）
+  let id: string | null = /^\d+$/.test(trimmed) ? trimmed : null
 
   // 尝试匹配URL模式
   if (id === null) {
     for (const pattern of URL_PATTERNS) {
       const match = trimmed.match(pattern)
       if (match?.[1]) {
-        id = match[1]
+        // 数组解构替代索引访问（满足 prefer-destructuring）
+        const [, capturedId] = match
+        id = capturedId
         break
       }
     }
@@ -106,8 +106,10 @@ export function extractSubjectId(input: string): string | null {
   // 尝试从文本中提取数字
   if (id === null) {
     const numberMatch = /\d+/.exec(trimmed)
-    if (numberMatch && numberMatch[0]) {
-      id = numberMatch[0]
+    if (numberMatch?.[0]) {
+      // 数组解构替代索引访问（满足 prefer-destructuring）
+      const [firstMatch] = numberMatch
+      id = firstMatch
     }
   }
 
@@ -156,8 +158,8 @@ export function mapWatchStatus(status: string): number {
   if (normalized === 'false') return 0
 
   // 数字字符串转换
-  const number_ = parseInt(normalized, 10)
-  if (!isNaN(number_) && number_ >= 0 && number_ <= 5) {
+  const number_ = Number(normalized)
+  if (!Number.isNaN(number_) && number_ >= 0 && number_ <= 5) {
     return number_
   }
 

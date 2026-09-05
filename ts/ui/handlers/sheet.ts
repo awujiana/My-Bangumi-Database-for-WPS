@@ -130,7 +130,8 @@ export function cleanLockedDataSheet(): void {
   const skippedNoUrl: string[] = []
 
   for (const [name, rows] of nameRows) {
-    if (!(rows.length <= 1)) {
+    const hasDuplicates = rows.length > 1
+    if (hasDuplicates) {
       const withUrl: number[] = []
       const withoutUrl: number[] = []
       for (const row of rows) {

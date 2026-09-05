@@ -57,7 +57,7 @@ class MockSource implements SyncSource {
   }
 
   validateConfig(): Result<void> {
-    return Result.ok<void>(undefined)
+    return Result.ok(undefined)
   }
 }
 

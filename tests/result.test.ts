@@ -141,7 +141,7 @@ describe('Result.mapErr', () => {
     const error = new BgmError('原始错误', 'ORIGINAL')
     const r = Result.fail<number>(error)
     const mapped = r.mapErr(
-      (error) => new BgmError(`包装: ${error.message}`, `WRAPPED_${error.code}`),
+      (error_) => new BgmError(`包装: ${error_.message}`, `WRAPPED_${error_.code}`),
     )
     expect(mapped.isFail()).toBe(true)
     expect(mapped.error?.message).toBe('包装: 原始错误')

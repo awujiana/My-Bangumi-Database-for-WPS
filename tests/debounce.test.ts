@@ -111,11 +111,12 @@ describe('throttle', () => {
   })
 })
 
+function noopTimerFunction(): void {
+  /* noop */
+}
+
 describe('clearDebounceTimer', () => {
   it('调用不抛错（占位辅助函数）', () => {
-    const function_ = (): void => {
-      /* noop */
-    }
-    expect(() => clearDebounceTimer(function_)).not.toThrow()
+    expect(() => clearDebounceTimer(noopTimerFunction)).not.toThrow()
   })
 })

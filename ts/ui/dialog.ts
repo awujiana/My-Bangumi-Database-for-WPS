@@ -86,14 +86,24 @@ export function buildSyncConfig(context: BuildSyncConfigContext): SyncConfigSumm
   if (context.selectedRowsOnly) config.selectedRowsOnly = true
   if (context.timeFilter) {
     const tf = context.timeFilter
-    config.timeFilterLabel =
-      tf.range === 'future'
-        ? '预告/未来动漫'
-        : tf.range === 'year'
-          ? `${String(tf.year)}年全年`
-          : tf.range === 'quarter'
-            ? `${String(tf.year)}年${String(tf.quarter)}月新番`
-            : `${String(tf.year)}年${String(tf.month)}月`
+    switch (tf.range) {
+      case 'future': {
+        config.timeFilterLabel = '预告/未来动漫'
+        break
+      }
+      case 'year': {
+        config.timeFilterLabel = `${String(tf.year)}年全年`
+        break
+      }
+      case 'quarter': {
+        config.timeFilterLabel = `${String(tf.year)}年${String(tf.quarter)}月新番`
+        break
+      }
+      default: {
+        config.timeFilterLabel = `${String(tf.year)}年${String(tf.month)}月`
+        break
+      }
+    }
   }
   if (context.extra && context.extra.length > 0) config.extra = context.extra
   return config
@@ -216,14 +226,14 @@ function createDialogs(): void {
 
     const footer = document.createElement('div')
     footer.className = 'bgm-dialog-footer'
-    config.buttons.forEach((button_: DialogButton) => {
+    for (const button_ of config.buttons) {
       const button = document.createElement('button')
       button.id = button_.id
       button.className = `bgm-dialog-btn ${button_.cls}`
       button.textContent = button_.text
       button.dataset.event = button_.event
       footer.appendChild(button)
-    })
+    }
     content.appendChild(footer)
     modal.appendChild(content)
     return modal
@@ -254,15 +264,12 @@ function createDialogs(): void {
 }
 
 function bindAllEvents(): void {
-  for (const type in DIALOG_TYPES) {
-    const config = DIALOG_TYPES[type]
-    if (config) {
-      dom[config.id] = document.getElementById(config.id)
-      dom[config.titleId] = document.getElementById(config.titleId)
-      dom[config.msgId] = document.getElementById(config.msgId)
-      config.buttons.forEach((button) => {
-        dom[button.id] = document.getElementById(button.id)
-      })
+  for (const config of Object.values(DIALOG_TYPES)) {
+    dom[config.id] = document.getElementById(config.id)
+    dom[config.titleId] = document.getElementById(config.titleId)
+    dom[config.msgId] = document.getElementById(config.msgId)
+    for (const button of config.buttons) {
+      dom[button.id] = document.getElementById(button.id)
     }
   }
   dom.bgmToast = document.getElementById('bgmToast')
@@ -296,6 +303,7 @@ function bindAllEvents(): void {
           _dialogCallback.onCancel()
         }
       } catch (error) {
+        // eslint-disable-next-line no-console -- console 是日志后端/启动兜底的唯一输出通道（回调异常兜底日志）
         console.error('[dialog] 回调执行失败:', error)
       }
       _dialogCallback = null
@@ -313,9 +321,11 @@ function _showDialog(type: string, options: DialogOptions = {}): void {
   const dialog = dom[config.id]
   if (!dialog) {
     if (type === 'confirm') {
+      // eslint-disable-next-line no-alert -- 对话框 DOM 未初始化时的原生 confirm 兜底；改用 BGM.Dialog 会在此无限递归
       if (window.confirm(options.message ?? '')) options.onOk?.()
       else options.onCancel?.()
     } else if (type === 'input') {
+      // eslint-disable-next-line no-alert -- 对话框 DOM 未初始化时的原生 prompt 兜底；改用 BGM.Dialog 会在此无限递归
       const result = window.prompt(
         (options.prompt || options.message) ?? '', // eslint-disable-line @typescript-eslint/prefer-nullish-coalescing -- 空值须显示占位文案（`??` 会显示空串）
         options.defaultValue ?? '',
@@ -323,6 +333,7 @@ function _showDialog(type: string, options: DialogOptions = {}): void {
       if (result === null) options.onCancel?.()
       else options.onOk?.(result)
     } else {
+      // eslint-disable-next-line no-alert -- 对话框 DOM 未初始化时的原生 alert 兜底；改用 BGM.Dialog 会在此无限递归
       window.alert(options.message)
       options.onOk?.()
     }
@@ -905,6 +916,16 @@ function renderSyncStatsChart(container: HTMLElement, stats: SyncProgressStats):
   // 完成度（已处理/总计，不含跳过）
   const completionPct = totalActive > 0 ? Math.round((totalProcessed / totalActive) * 100) : 0
 
+  // 环形图颜色：≥90 绿、≥50 黄、否则红
+  let ringColor: string
+  if (completionPct >= 90) {
+    ringColor = 'var(--green, #a6e3a1)'
+  } else if (completionPct >= 50) {
+    ringColor = 'var(--yellow, #f9e2af)'
+  } else {
+    ringColor = 'var(--red, #f38ba8)'
+  }
+
   // 效率（处理数/活跃总数）
   const efficiencyPct = totalActive > 0 ? Math.round((totalProcessed / totalActive) * 100) : 0
 
@@ -970,7 +991,7 @@ function renderSyncStatsChart(container: HTMLElement, stats: SyncProgressStats):
         <svg viewBox="0 0 120 120" class="bgm-progress-svg">
           <circle cx="60" cy="60" r="50" fill="none" stroke="var(--surface0, #313244)" stroke-width="10" />
           <circle cx="60" cy="60" r="50" fill="none"
-            stroke="${completionPct >= 90 ? 'var(--green, #a6e3a1)' : completionPct >= 50 ? 'var(--yellow, #f9e2af)' : 'var(--red, #f38ba8)'}"
+            stroke="${ringColor}"
             stroke-width="10"
             stroke-dasharray="${String((completionPct / 100) * 2 * Math.PI * 50)} ${String(2 * Math.PI * 50)}"
             stroke-dashoffset="${String(2 * Math.PI * 50 * 0.25)}"
@@ -1373,7 +1394,7 @@ export function hideSyncProgressDialog(): void {
 
 // ========== 公共 API ==========
 export function showAlert(message: string, title?: string, onOk?: () => void): void {
-  _showDialog('alert', { message, title: title ?? '提示', ...(onOk ? { onOk } : {}) })
+  _showDialog('alert', { message, title: title ?? '提示', ...(onOk && { onOk }) })
 }
 
 /*
@@ -1393,24 +1414,24 @@ export function showConfirm(
     message,
     title: title ?? '确认',
     onOk: () => {
-      callback(true)
+      void callback(true)
     },
     onCancel: () => {
-      callback(false)
+      void callback(false)
     },
   })
 }
 
 export function showError(message: string, title?: string, onOk?: () => void): void {
-  _showDialog('error', { message, title: title ?? '错误', ...(onOk ? { onOk } : {}) })
+  _showDialog('error', { message, title: title ?? '错误', ...(onOk && { onOk }) })
 }
 
 export function showWarning(message: string, title?: string, onOk?: () => void): void {
-  _showDialog('warning', { message, title: title ?? '警告', ...(onOk ? { onOk } : {}) })
+  _showDialog('warning', { message, title: title ?? '警告', ...(onOk && { onOk }) })
 }
 
 export function showSuccess(message: string, title?: string, onOk?: () => void): void {
-  _showDialog('success', { message, title: title ?? '成功', ...(onOk ? { onOk } : {}) })
+  _showDialog('success', { message, title: title ?? '成功', ...(onOk && { onOk }) })
 }
 
 export function showInput(
@@ -1423,9 +1444,9 @@ export function showInput(
   _showDialog('input', {
     title,
     message: prompt,
-    ...(onOk ? { onOk } : {}),
-    ...(onCancel ? { onCancel } : {}),
-    ...(defaultValue === undefined ? {} : { defaultValue }),
+    ...(onOk && { onOk }),
+    ...(onCancel && { onCancel }),
+    ...(defaultValue !== undefined && { defaultValue }),
   })
 }
 

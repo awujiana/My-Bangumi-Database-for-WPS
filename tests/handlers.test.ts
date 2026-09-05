@@ -77,6 +77,41 @@ const mockState = vi.hoisted(() => ({
   clearLogs: vi.fn(),
   // tools/debounce.js
   debounce: vi.fn((function_: () => void) => function_),
+  // handlers/index.js（barrel 转发入口，vi.mock('../index.js') 工厂逐名引用）
+  getApp: vi.fn(),
+  showToast: vi.fn(),
+  confirm: vi.fn(),
+  showConfirm: vi.fn(),
+  showError: vi.fn(),
+  showInfo: vi.fn(),
+  bgmLog: vi.fn(),
+  loadBgToken: vi.fn(),
+  storeBgToken: vi.fn(),
+  clearBgToken: vi.fn(),
+  getBgToken: vi.fn(),
+  getCurrentUser: vi.fn(),
+  _setBgmUserId: vi.fn(),
+  _getBgmUserId: vi.fn(),
+  _setBgmUsername: vi.fn(),
+  _getBgmUsername: vi.fn(),
+  copyTokenToClipboard: vi.fn(),
+  getBangumiToken: vi.fn(),
+  setBangumiToken: vi.fn(),
+  previewSyncContent: vi.fn(),
+  showClearConfirm: vi.fn(),
+  requestStop: vi.fn(),
+  pauseSync: vi.fn(),
+  resumeSync: vi.fn(),
+  openSyncRecordSheet: vi.fn(),
+  showSettingsPanel: vi.fn(),
+  refreshData: vi.fn(),
+  refreshSheets: vi.fn(),
+  refreshWorkbooks: vi.fn(),
+  toggleSheetLock: vi.fn(),
+  clearSyncRecords: vi.fn(),
+  deduplicateSyncRecords: vi.fn(),
+  formatSyncRecordSheet: vi.fn(),
+  closeDetailModal: vi.fn(),
 }))
 
 vi.mock('../ts/ui/handlers/token.js', () => ({
@@ -373,23 +408,24 @@ describe('onAction', () => {
 // ========== ACTION_HANDLERS 分发（通过 DOM click 触发） ==========
 // handleActionClick 是模块内部函数（未导出），通过 setupButtonListeners + button.click()
 // 间接测试分发逻辑，更贴近真实使用场景。
-describe('ACTION_HANDLERS 分发（通过 DOM click 触发）', () => {
-  /**
-   * 创建带 data-action 的按钮，注册监听后触发 click
-   * @param action data-action 值
-   * @param arguments_ data-args 值（JSON 字符串或原生值）
-   */
-  function clickAction(action: string, arguments_?: string): void {
-    const button = document.createElement('button')
-    button.dataset.action = action
-    if (arguments_ !== undefined) {
-      button.dataset.args = arguments_
-    }
-    document.body.appendChild(button)
-    setupButtonListeners()
-    button.click()
-  }
 
+/**
+ * 创建带 data-action 的按钮，注册监听后触发 click
+ * @param action data-action 值
+ * @param arguments_ data-args 值（JSON 字符串或原生值）
+ */
+function clickAction(action: string, arguments_?: string): void {
+  const button = document.createElement('button')
+  button.dataset.action = action
+  if (arguments_ !== undefined) {
+    button.dataset.args = arguments_
+  }
+  document.body.appendChild(button)
+  setupButtonListeners()
+  button.click()
+}
+
+describe('ACTION_HANDLERS 分发（通过 DOM click 触发）', () => {
   it('点击 [data-action="sync"] 触发 syncFromPanel', () => {
     clickAction('sync')
     expect(mockState.syncFromPanel).toHaveBeenCalled()

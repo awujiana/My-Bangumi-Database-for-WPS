@@ -16,7 +16,7 @@ import type { SyncStrategy } from './github-sync-diff.js'
 
 /**
  * 同步源类型枚举
- * - github: GitHub 公开仓库（默认）
+ * - GitHub: GitHub 公开仓库（默认）
  * - gitlab: GitLab 仓库（Task 22 实现）
  * - gitee: Gitee 仓库（Task 23 实现）
  * - local: 本地文件（Task 24 实现）
@@ -218,10 +218,11 @@ export function isGithubConfigComplete(): boolean {
  * @throws 配置不完整时抛出 Error
  */
 export function buildRawUrl(): string {
-  const config = getGithubConfig()
   if (!isGithubConfigComplete()) {
     throw new Error('GitHub 仓库配置不完整，请在面板中设置 owner/repo/path')
   }
+  // config 声明移到 early throw 之后（满足 unicorn/no-declarations-before-early-exit）
+  const config = getGithubConfig()
   return `https://raw.githubusercontent.com/${config.owner}/${config.repo}/${config.branch || DEFAULT_BRANCH}/${config.path}`
 }
 

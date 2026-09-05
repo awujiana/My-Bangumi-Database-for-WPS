@@ -1,4 +1,5 @@
 // vite.config.js
+/* global URL */
 // 说明：Vite 构建配置，仅用于 `npm run build` 打包时使用
 // 开发调试请用 `npm run debug`（wpsjs），不使用 Vite 服务器
 import { fileURLToPath } from 'node:url'

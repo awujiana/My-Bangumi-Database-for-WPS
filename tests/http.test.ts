@@ -47,7 +47,20 @@ let lastXhrCall: MockXHRCall | null = null
 let lastMockXhr: MockXHR | null = null
 let xhrCallCount = 0
 
+/** 记录最近一次 send() 创建的 MockXHR 实例（避免将 this 直接赋给模块变量触发 no-this-assignment） */
+function recordLastMockXhr(xhr: MockXHR): void {
+  lastMockXhr = xhr
+}
+
 class MockXHR {
+  private method = ''
+
+  private url = ''
+
+  private async = true
+
+  private headers: Record<string, string> = {}
+
   status = 0
 
   statusText = ''
@@ -61,15 +74,6 @@ class MockXHR {
   onerror: (() => void) | null = null
 
   ontimeout: (() => void) | null = null
-
-  /** 生产代码经 addEventListener 注册：映射到 onXXX 属性，保留测试手动触发机制 */
-  addEventListener(type: 'load' | 'error', handler: () => void): void {
-    if (type === 'load') {
-      this.onload = handler
-    } else {
-      this.onerror = handler
-    }
-  }
 
   upload: {
     onprogress:
@@ -89,13 +93,14 @@ class MockXHR {
     },
   }
 
-  private method = ''
-
-  private url = ''
-
-  private async = true
-
-  private headers: Record<string, string> = {}
+  /** 生产代码经 addEventListener 注册：映射到 onXXX 属性，保留测试手动触发机制 */
+  addEventListener(type: 'load' | 'error', handler: () => void): void {
+    if (type === 'load') {
+      this.onload = handler
+    } else {
+      this.onerror = handler
+    }
+  }
 
   open(method: string, url: string, isAsync: boolean): void {
     this.method = method
@@ -117,7 +122,7 @@ class MockXHR {
       headers: { ...this.headers },
       body: body ?? null,
     }
-    lastMockXhr = this
+    recordLastMockXhr(this)
   }
 
   _respondOk(body: string, status = 200): void {
@@ -580,7 +585,9 @@ describe('httpRequest - 输入校验', () => {
 // ========== 便捷方法 ==========
 describe('httpGet / httpPost / httpPut / httpDelete', () => {
   it('httpGet 默认 GET 方法', async () => {
+    // eslint-disable-next-line @typescript-eslint/no-deprecated -- 本用例专门测试已弃用便捷方法 httpGet 的兼容性
     const { httpGet } = await import('../ts/tools/http.js')
+    // eslint-disable-next-line @typescript-eslint/no-deprecated -- 同上：测试 httpGet 仍可用
     const promise = httpGet('/v0/x')
     expect(lastXhrCall?.method).toBe('GET')
     lastMockXhr!._respondOk('{}')
@@ -588,7 +595,9 @@ describe('httpGet / httpPost / httpPut / httpDelete', () => {
   })
 
   it('httpPost 发送 POST 与 body', async () => {
+    // eslint-disable-next-line @typescript-eslint/no-deprecated -- 本用例专门测试已弃用便捷方法 httpPost 的兼容性
     const { httpPost } = await import('../ts/tools/http.js')
+    // eslint-disable-next-line @typescript-eslint/no-deprecated -- 同上：测试 httpPost 仍可用
     const promise = httpPost('/v0/x', '{"k":1}')
     expect(lastXhrCall?.method).toBe('POST')
     expect(lastXhrCall?.body).toBe('{"k":1}')
@@ -597,7 +606,9 @@ describe('httpGet / httpPost / httpPut / httpDelete', () => {
   })
 
   it('httpPut 发送 PUT 与 body', async () => {
+    // eslint-disable-next-line @typescript-eslint/no-deprecated -- 本用例专门测试已弃用便捷方法 httpPut 的兼容性
     const { httpPut } = await import('../ts/tools/http.js')
+    // eslint-disable-next-line @typescript-eslint/no-deprecated -- 同上：测试 httpPut 仍可用
     const promise = httpPut('/v0/x', '{"v":2}')
     expect(lastXhrCall?.method).toBe('PUT')
     lastMockXhr!._respondOk('{}')
@@ -605,7 +616,9 @@ describe('httpGet / httpPost / httpPut / httpDelete', () => {
   })
 
   it('httpDelete 发送 DELETE', async () => {
+    // eslint-disable-next-line @typescript-eslint/no-deprecated -- 本用例专门测试已弃用便捷方法 httpDelete 的兼容性
     const { httpDelete } = await import('../ts/tools/http.js')
+    // eslint-disable-next-line @typescript-eslint/no-deprecated -- 同上：测试 httpDelete 仍可用
     const promise = httpDelete('/v0/x')
     expect(lastXhrCall?.method).toBe('DELETE')
     lastMockXhr!._respondOk('{}')

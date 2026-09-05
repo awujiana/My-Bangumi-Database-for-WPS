@@ -290,6 +290,19 @@ export function appendFeatures(oldFeature: string, features: string): string {
 // ========== 核心函数 ==========
 
 /**
+ * 匹配表头对应的首个字段名（独立辅助函数，用 return 替代嵌套循环内 break，且不改写参数避免 no-param-reassign）
+ * @returns 命中的字段名；无匹配返回 null
+ */
+function findKeywordField(normalizedHeader: string): keyof EnrichColumnMapping | null {
+  for (const [keyword, field] of Object.entries(KNOWN_COLUMN_MAP)) {
+    if (normalizedHeader.includes(keyword.toLowerCase())) {
+      return field
+    }
+  }
+  return null
+}
+
+/**
  * 检测新番表的列映射
  * 读取表头行，用 KNOWN_COLUMN_MAP 匹配列名
  */
@@ -301,15 +314,11 @@ export function detectColumns(sheet: WpsWorksheet, headerRow: number): EnrichCol
     const headerValue = getCellValue(sheet, headerRow, col).trim()
     if (headerValue) {
       const normalizedHeader = headerValue.toLowerCase()
-      for (const [keyword, field] of Object.entries(KNOWN_COLUMN_MAP)) {
-        if (normalizedHeader.includes(keyword.toLowerCase())) {
-          if (field === 'nameCol' && mapping.nameCol === 0) {
-            mapping.nameCol = col
-          } else if (field !== 'nameCol' && mapping[field] === undefined) {
-            mapping[field] = col
-          }
-          break
-        }
+      const field = findKeywordField(normalizedHeader)
+      if (field === 'nameCol' && mapping.nameCol === 0) {
+        mapping.nameCol = col
+      } else if (field !== null && field !== 'nameCol' && mapping[field] === undefined) {
+        mapping[field] = col
       }
     }
   }
@@ -367,8 +376,7 @@ export function readNewAnimeRow(
   row: number,
   mapping: EnrichColumnMapping,
 ): Record<string, string> {
-  const data: Record<string, string> = {}
-  data['名称'] = getCellValue(sheet, row, mapping.nameCol) || ''
+  const data: Record<string, string> = { 名称: getCellValue(sheet, row, mapping.nameCol) || '' }
   if (mapping.tagsCol) data.TAGS = getCellValue(sheet, row, mapping.tagsCol) || ''
   if (mapping.premiereCol) data['首播'] = getCellValue(sheet, row, mapping.premiereCol) || ''
   if (mapping.episodesCol) data['集数'] = getCellValue(sheet, row, mapping.episodesCol) || ''
@@ -417,10 +425,8 @@ function buildBangumiIndexes(
               aliasIndex.set(normalizedAlias, [])
             }
             const rows = aliasIndex.get(normalizedAlias)
-            if (rows) {
-              if (!rows.includes(row)) {
-                rows.push(row)
-              }
+            if (rows && !rows.includes(row)) {
+              rows.push(row)
             }
           }
         }
@@ -497,7 +503,7 @@ function matchEntriesInner(
               matchedAnimeName: rawName,
               matchType: 'exact',
               bangumiRow,
-              ...(matchedName === undefined ? {} : { bangumiName: matchedName }),
+              ...(matchedName !== undefined && { bangumiName: matchedName }),
             }
           }
         }
@@ -520,7 +526,7 @@ function matchEntriesInner(
                 matchedAnimeName: rawName,
                 matchType: 'alias',
                 bangumiRow,
-                ...(matchedName === undefined ? {} : { bangumiName: matchedName }),
+                ...(matchedName !== undefined && { bangumiName: matchedName }),
                 aliases,
               }
             }
@@ -783,12 +789,14 @@ export function enrichEntries(
   const results: EnrichResultItem[] = []
   const stats = { matched: 0, enriched: 0, skipped: 0, failed: 0 }
   const total = matches.length
-  const startTime = Date.now()
 
   if (total === 0) {
     bgmLog(LOG_LEVELS.INFO, '[enrichEntries] 无匹配结果，跳过富化')
     return results
   }
+
+  // startTime 声明移到 early return 之后（满足 unicorn/no-declarations-before-early-exit）
+  const startTime = Date.now()
 
   let bangumiColMap = getBangumiColumnMap(bangumiSheet)
 
@@ -801,140 +809,137 @@ export function enrichEntries(
     )
   }
 
-  for (let index = 0; index < matches.length; index += 1) {
-    const match = matches[index]
-    if (match) {
-      const current = index + 1
+  for (const [index, match] of matches.entries()) {
+    const current = index + 1
 
-      if (match.matchType === 'unmatched') {
-        results.push({
-          kind: 'unmatched',
-          animeRow: match.animeRow,
-          name: match.matchedAnimeName,
-          matchType: 'unmatched',
-          enrichedFields: [],
-        })
-        stats.skipped += 1
-      } else if (match.matchType === 'error') {
+    if (match.matchType === 'unmatched') {
+      results.push({
+        kind: 'unmatched',
+        animeRow: match.animeRow,
+        name: match.matchedAnimeName,
+        matchType: 'unmatched',
+        enrichedFields: [],
+      })
+      stats.skipped += 1
+    } else if (match.matchType === 'error') {
+      results.push({
+        kind: 'error',
+        animeRow: match.animeRow,
+        name: match.matchedAnimeName,
+        matchType: 'error',
+        enrichedFields: [],
+        ...(match.errorMessage !== undefined && { errorMessage: match.errorMessage }),
+      })
+      stats.failed += 1
+    } else {
+      const { bangumiRow } = match
+      if (bangumiRow === undefined) {
         results.push({
           kind: 'error',
           animeRow: match.animeRow,
           name: match.matchedAnimeName,
           matchType: 'error',
           enrichedFields: [],
-          ...(match.errorMessage === undefined ? {} : { errorMessage: match.errorMessage }),
+          errorMessage: '匹配行号缺失',
         })
         stats.failed += 1
       } else {
-        const { bangumiRow } = match
-        if (bangumiRow === undefined) {
+        stats.matched += 1
+
+        const isIntro = isIntroSheet(config.columnMapping)
+        const incomingData = isIntro
+          ? readIntroSheetRow(animeSheet, match.animeRow, config.columnMapping)
+          : readNewAnimeRow(animeSheet, match.animeRow, config.columnMapping)
+        const enrichedFields: EnrichedField[] = []
+        const fieldConflicts: ConflictInfo[] = []
+
+        try {
+          if (isIntro) {
+            enrichIntroData(
+              bangumiSheet,
+              bangumiRow,
+              incomingData,
+              bangumiColMap,
+              enrichedFields,
+              fieldConflicts,
+              match.animeRow,
+              match.matchedAnimeName,
+            )
+            enrichOpEdPv(bangumiSheet, bangumiRow, incomingData, bangumiColMap, enrichedFields)
+          } else {
+            enrichTags(bangumiSheet, bangumiRow, incomingData, bangumiColMap, enrichedFields)
+            enrichDate(bangumiSheet, bangumiRow, incomingData, bangumiColMap, enrichedFields)
+            enrichEpisodes(bangumiSheet, bangumiRow, incomingData, bangumiColMap, enrichedFields)
+            enrichFeatures(bangumiSheet, bangumiRow, incomingData, bangumiColMap, enrichedFields)
+          }
+
+          // 别名富化：新番表名称与 Bangumi 追踪表不一致时补全
+          enrichAlias(
+            bangumiSheet,
+            bangumiRow,
+            match.matchedAnimeName,
+            match.bangumiName,
+            bangumiColMap,
+            enrichedFields,
+          )
+
+          const hasEnrichment = enrichedFields.some((f) => f.action !== 'skip')
+          if (hasEnrichment) {
+            stats.enriched += 1
+          } else {
+            stats.skipped += 1
+          }
+
+          for (const field of enrichedFields) {
+            const record: AddEnrichRecordParameters = {
+              timestamp: new Date().toISOString(),
+              matchType: match.matchType === 'exact' ? '精确' : '别名',
+              name: match.matchedAnimeName,
+              row: bangumiRow,
+              enrichedField: field.fieldName,
+              oldValue: field.oldValue ?? '',
+              updatedValue: field.updatedValue,
+              action: field.action,
+              ...(field.action === 'skip' && { note: '已有值，跳过' }),
+            }
+            addEnrichRecord(record)
+          }
+
+          results.push({
+            kind: 'matched',
+            animeRow: match.animeRow,
+            name: match.matchedAnimeName,
+            matchType: match.matchType,
+            enrichedFields,
+            conflicts: fieldConflicts.length > 0 ? fieldConflicts : undefined,
+          })
+        } catch (error: unknown) {
+          const errorMessage = error instanceof Error ? error.message : String(error)
+          stats.failed += 1
+          bgmLog(
+            LOG_LEVELS.ERROR,
+            `[enrichEntries] 富化 "${match.matchedAnimeName}" (行${String(bangumiRow)}) 失败: ${errorMessage}`,
+          )
           results.push({
             kind: 'error',
             animeRow: match.animeRow,
             name: match.matchedAnimeName,
-            matchType: 'error',
+            matchType: match.matchType,
             enrichedFields: [],
-            errorMessage: '匹配行号缺失',
+            errorMessage,
           })
-          stats.failed += 1
-        } else {
-          stats.matched += 1
+        }
 
-          const isIntro = isIntroSheet(config.columnMapping)
-          const incomingData = isIntro
-            ? readIntroSheetRow(animeSheet, match.animeRow, config.columnMapping)
-            : readNewAnimeRow(animeSheet, match.animeRow, config.columnMapping)
-          const enrichedFields: EnrichedField[] = []
-          const fieldConflicts: ConflictInfo[] = []
-
-          try {
-            if (isIntro) {
-              enrichIntroData(
-                bangumiSheet,
-                bangumiRow,
-                incomingData,
-                bangumiColMap,
-                enrichedFields,
-                fieldConflicts,
-                match.animeRow,
-                match.matchedAnimeName,
-              )
-              enrichOpEdPv(bangumiSheet, bangumiRow, incomingData, bangumiColMap, enrichedFields)
-            } else {
-              enrichTags(bangumiSheet, bangumiRow, incomingData, bangumiColMap, enrichedFields)
-              enrichDate(bangumiSheet, bangumiRow, incomingData, bangumiColMap, enrichedFields)
-              enrichEpisodes(bangumiSheet, bangumiRow, incomingData, bangumiColMap, enrichedFields)
-              enrichFeatures(bangumiSheet, bangumiRow, incomingData, bangumiColMap, enrichedFields)
-            }
-
-            // 别名富化：新番表名称与 Bangumi 追踪表不一致时补全
-            enrichAlias(
-              bangumiSheet,
-              bangumiRow,
-              match.matchedAnimeName,
-              match.bangumiName,
-              bangumiColMap,
-              enrichedFields,
-            )
-
-            const hasEnrichment = enrichedFields.some((f) => f.action !== 'skip')
-            if (hasEnrichment) {
-              stats.enriched += 1
-            } else {
-              stats.skipped += 1
-            }
-
-            for (const field of enrichedFields) {
-              const record: AddEnrichRecordParameters = {
-                timestamp: new Date().toISOString(),
-                matchType: match.matchType === 'exact' ? '精确' : '别名',
-                name: match.matchedAnimeName,
-                row: bangumiRow,
-                enrichedField: field.fieldName,
-                oldValue: field.oldValue ?? '',
-                updatedValue: field.updatedValue,
-                action: field.action,
-                ...(field.action === 'skip' ? { note: '已有值，跳过' } : {}),
-              }
-              addEnrichRecord(record)
-            }
-
-            results.push({
-              kind: 'matched',
-              animeRow: match.animeRow,
-              name: match.matchedAnimeName,
-              matchType: match.matchType,
-              enrichedFields,
-              conflicts: fieldConflicts.length > 0 ? fieldConflicts : undefined,
-            })
-          } catch (error: unknown) {
-            const errorMessage = error instanceof Error ? error.message : String(error)
-            stats.failed += 1
-            bgmLog(
-              LOG_LEVELS.ERROR,
-              `[enrichEntries] 富化 "${match.matchedAnimeName}" (行${String(bangumiRow)}) 失败: ${errorMessage}`,
-            )
-            results.push({
-              kind: 'error',
-              animeRow: match.animeRow,
-              name: match.matchedAnimeName,
-              matchType: match.matchType,
-              enrichedFields: [],
-              errorMessage,
-            })
-          }
-
-          if (progressCallback) {
-            const elapsed = Date.now() - startTime
-            const etaMs = total > 0 ? Math.round((elapsed / current) * (total - current)) : 0
-            progressCallback({
-              current,
-              total,
-              currentName: match.matchedAnimeName,
-              stats: { ...stats },
-              etaMs,
-            })
-          }
+        if (progressCallback) {
+          const elapsed = Date.now() - startTime
+          const etaMs = total > 0 ? Math.round((elapsed / current) * (total - current)) : 0
+          progressCallback({
+            current,
+            total,
+            currentName: match.matchedAnimeName,
+            stats: { ...stats },
+            etaMs,
+          })
         }
       }
     }
@@ -1079,7 +1084,7 @@ export function ensureBangumiColumns(
   const updatedMap = new Map(colMap)
   let maxCol = 0
 
-  for (const col of Array.from(updatedMap.values())) {
+  for (const col of updatedMap.values()) {
     if (col > maxCol) maxCol = col
   }
 
@@ -1136,9 +1141,9 @@ export function ensureBangumiColumns(
       bgmLog(LOG_LEVELS.WARN, '[ensureBangumiColumns] 复制样式失败，使用默认样式')
     }
 
-    for (let index = 0; index < missing.length; index += 1) {
+    for (const [index, missingField] of missing.entries()) {
       const insertCol = maxCol + 1 + index
-      const field = missing[index]?.field
+      const { field } = missingField
       if (field) {
         updatedMap.set(field, insertCol)
         bgmLog(
@@ -1205,9 +1210,9 @@ export function enrichIntroData(
             oldValue: null,
             updatedValue: annotatedValue,
             action: 'fill',
-            ...(sourceKey === targetColName
-              ? {}
-              : { note: `字段名差异: ${sourceKey} → ${targetColName}` }),
+            ...(sourceKey !== targetColName && {
+              note: `字段名差异: ${sourceKey} → ${targetColName}`,
+            }),
           })
         } else {
           conflicts.push({
@@ -1219,9 +1224,9 @@ export function enrichIntroData(
             animeRow,
             matchedAnimeName,
             resolution: 'append',
-            ...(sourceKey === targetColName
-              ? {}
-              : { note: `字段名差异: ${sourceKey} → ${targetColName}` }),
+            ...(sourceKey !== targetColName && {
+              note: `字段名差异: ${sourceKey} → ${targetColName}`,
+            }),
           })
         }
       } else if (bangumiFeatureCol !== undefined) {
@@ -1377,8 +1382,7 @@ export function readIntroSheetRow(
   row: number,
   mapping: EnrichColumnMapping,
 ): Record<string, string> {
-  const data: Record<string, string> = {}
-  data['名称'] = getCellValue(sheet, row, mapping.nameCol) || ''
+  const data: Record<string, string> = { 名称: getCellValue(sheet, row, mapping.nameCol) || '' }
   if (mapping.introCol) data['简介'] = getCellValue(sheet, row, mapping.introCol) || ''
   if (mapping.studioCol) data['动画制作'] = getCellValue(sheet, row, mapping.studioCol) || ''
   if (mapping.directorCol) data['导演'] = getCellValue(sheet, row, mapping.directorCol) || ''
@@ -1594,15 +1598,12 @@ export function parseRemoteContent(content: string): Record<string, string>[] {
 
   for (let index = 1; index < lines.length; index += 1) {
     const line = lines[index]
-    if (!(line === undefined)) {
+    if (line !== undefined) {
       const values = line.split(delimiter)
       const record: Record<string, string> = {}
-      for (let index = 0; index < headers.length; index += 1) {
-        const key = headers[index]
-        const value = values[index]
-        if (key !== undefined) {
-          record[key] = value ?? ''
-        }
+      for (const [colIndex, key] of headers.entries()) {
+        const value = values[colIndex]
+        record[key] = value ?? ''
       }
       records.push(record)
     }

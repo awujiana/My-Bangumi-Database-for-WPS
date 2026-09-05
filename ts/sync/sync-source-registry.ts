@@ -71,7 +71,7 @@ export function getSyncSource(type: string): SyncSource | null {
  * @returns 类型标识数组
  */
 export function getRegisteredSourceTypes(): string[] {
-  return Array.from(registry.keys())
+  return [...registry.keys()]
 }
 
 /**
@@ -147,6 +147,20 @@ export async function syncFromRemote(
     // 忽略关闭失败
   }
 
+  /**
+   * 格式化时间筛选标签（year/quarter/month，future 归入 month 分支，与原三元逻辑一致）
+   * 独立辅助函数：消除 onProgress 回调内的嵌套三元（no-nested-ternary）
+   */
+  function formatTimeFilterLabel(filter: SyncTimeFilter): string {
+    if (filter.range === 'year') {
+      return `${String(filter.year)}年`
+    }
+    if (filter.range === 'quarter') {
+      return `${String(filter.year)}年${String(filter.quarter ?? '')}月新番`
+    }
+    return `${String(filter.year)}年${String(filter.month ?? '')}月`
+  }
+
   const applyRemoteEntries = async (): Promise<GithubSyncResult> => {
     // 3.5 空文档自动填充表头
     const ws = getDataSheet()
@@ -188,7 +202,7 @@ export async function syncFromRemote(
       onProgress?.(
         1,
         3,
-        `时间筛选：${timeFilter.range === 'year' ? `${String(timeFilter.year)}年` : timeFilter.range === 'quarter' ? `${String(timeFilter.year)}年${String(timeFilter.quarter ?? '')}月新番` : `${String(timeFilter.year)}年${String(timeFilter.month ?? '')}月`}，匹配 ${String(effectiveRemoteEntries.length)} 条`,
+        `时间筛选：${formatTimeFilterLabel(timeFilter)}，匹配 ${String(effectiveRemoteEntries.length)} 条`,
       )
     }
 
@@ -305,8 +319,9 @@ function getSelectedRowSids(): Set<string> {
 
     // 遍历选区每行，提取 SID
     for (let row = firstRow; row <= lastRow; row += 1) {
-      // 跳过表头行
-      if (!(row === headerRow)) {
+      // 跳过表头行（取反条件包裹，满足 no-continue）
+
+      if (row !== headerRow) {
         const url = trim(getCellValue(ws, row, urlCol))
         if (url) {
           const sid = extractSubjectId(url)

@@ -15,7 +15,7 @@
  * {
  *   entries: GithubRemoteEntry[],   // 解析后的条目数组
  *   hash: string,                    // 原始 JSONL 文本哈希
- *   url: string,                     // 数据源 URL（用于验证）
+ *   URL: string,                     // 数据源 URL（用于验证）
  *   fetchedAt: number,               // 下载时间戳（ms）
  *   textLength: number               // 原始文本长度（辅助校验）
  * }

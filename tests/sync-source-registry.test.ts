@@ -7,7 +7,7 @@ const mockGetApp = vi.hoisted(() => vi.fn())
 const mockGetCellValue = vi.hoisted(() => vi.fn().mockReturnValue(''))
 const mockFindHeaderRow = vi.hoisted(() => vi.fn().mockReturnValue(1))
 const mockGetColumnMap = vi.hoisted(() => vi.fn().mockReturnValue(new Map()))
-const mockTrim = vi.hoisted(() => vi.fn((v: string) => v?.trim() ?? ''))
+const mockTrim = vi.hoisted(() => vi.fn((v: string) => v.trim()))
 const mockEnsureSheetHeaders = vi.hoisted(() => vi.fn().mockReturnValue(false))
 const mockGetDataSheet = vi.hoisted(() => vi.fn().mockReturnValue(null))
 const mockApplyConflictResolutions = vi.hoisted(() => vi.fn())
@@ -75,7 +75,7 @@ vi.mock('../ts/sync/github-sync.js', () => ({
   applyConflictResolutions: mockApplyConflictResolutions,
   applyDiffToSheet: mockApplyDiffToSheet,
   computeDiff: mockComputeDiff,
-  GithubSyncSource: vi.fn().mockImplementation(function () {
+  GithubSyncSource: vi.fn().mockImplementation(function createGithubSyncSource() {
     return mockGithubSourceReference
   }),
   readLocalEntriesForSync: mockReadLocalEntriesForSync,
@@ -151,16 +151,13 @@ describe('SyncSource 类型', () => {
 
 describe('registerSyncSource', () => {
   it('应注册同步源', () => {
-    const factory = () => createMockSource('test', 'Test Source')
-    registerSyncSource('test-source', factory)
+    registerSyncSource('test-source', () => createMockSource('test', 'Test Source'))
     expect(isSyncSourceRegistered('test-source')).toBe(true)
   })
 
   it('覆盖注册应更新已注册的源', () => {
-    const factory1 = () => createMockSource('v1', 'V1')
-    const factory2 = () => createMockSource('v2', 'V2')
-    registerSyncSource('overwrite-test', factory1)
-    registerSyncSource('overwrite-test', factory2)
+    registerSyncSource('overwrite-test', () => createMockSource('v1', 'V1'))
+    registerSyncSource('overwrite-test', () => createMockSource('v2', 'V2'))
     const source = getSyncSource('overwrite-test')
     expect(source).not.toBeNull()
   })
@@ -896,7 +893,7 @@ describe('syncSourceRegistry 未覆盖分支', () => {
     )
     expect(completeCalls.length).toBeGreaterThan(0)
     if (completeCalls.length > 0) {
-      const message = completeCalls[completeCalls.length - 1][2] as string
+      const message = completeCalls.at(-1)?.[2] as string
       // 当 totalProcessed=0 时，速度显示为 "?"
       expect(message).toContain('?')
     }
@@ -1012,7 +1009,10 @@ describe('syncSourceRegistry 未覆盖分支', () => {
   it('overallSpeed > 0 时显示实际速度 (lines 222-232)', async () => {
     // 模拟时间流逝：Date.now() 返回不同值
     let timeValue = 1_000_000
-    vi.spyOn(Date, 'now').mockImplementation(() => (timeValue += 1))
+    vi.spyOn(Date, 'now').mockImplementation(() => {
+      timeValue += 1
+      return timeValue
+    })
     mockGithubSourceReference.fetchRemoteEntries.mockResolvedValue([
       { sid: '1', name: 'A' },
       { sid: '2', name: 'B' },
@@ -1041,7 +1041,7 @@ describe('syncSourceRegistry 未覆盖分支', () => {
     )
     expect(completeCalls.length).toBeGreaterThan(0)
     if (completeCalls.length > 0) {
-      const message = completeCalls[completeCalls.length - 1][2] as string
+      const message = completeCalls.at(-1)?.[2] as string
       // 当 totalProcessed=2 且 totalElapsed>0 时，速度应为实际数字
       expect(message).toMatch(/\d+ 行\/秒/)
     }

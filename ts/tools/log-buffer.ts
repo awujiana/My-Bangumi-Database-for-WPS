@@ -25,7 +25,7 @@ export class RingBuffer<T> {
 
   constructor(capacity = 1000) {
     this.capacity = Math.max(1, capacity)
-    this.buffer = new Array<T>(this.capacity)
+    this.buffer = Array.from<T>({ length: this.capacity })
   }
 
   /** 写入一个元素 */
@@ -77,7 +77,7 @@ export class RingBuffer<T> {
 
   /** 清空 */
   clear(): void {
-    this.buffer = new Array<T>(this.capacity)
+    this.buffer = Array.from<T>({ length: this.capacity })
     this.head = 0
     this._size = 0
   }

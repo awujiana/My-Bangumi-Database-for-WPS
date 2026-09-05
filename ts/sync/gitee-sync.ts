@@ -18,7 +18,7 @@
  *     "date": "2024-01-01", "meta_tags": ["标签1","标签2"], "nsfw": false,
  *     "话数": "12", "播放结束": "...", "动画制作公司": "...", ... }
  *
- * url 字段从 sid 构造：https://bgm.tv/subject/{sid}
+ * URL 字段从 sid 构造：https://bgm.tv/subject/{sid}
  * type 字段默认为 2（动漫），用于同步记录显示。
  * updatedAt 为 YYYY-MM-DD 格式（仅日期，不含时间，节省空间）。
  */
@@ -50,10 +50,11 @@ const DEFAULT_BRANCH = 'main'
  * @throws 配置不完整时抛出 Error
  */
 export function buildGiteeRawUrl(): string {
-  const config = getGithubConfig()
   if (!isGithubConfigComplete()) {
     throw new Error('Gitee 仓库配置不完整，请在面板中设置 owner/repo/path')
   }
+  // config 声明移到 early throw 之后（满足 unicorn/no-declarations-before-early-exit）
+  const config = getGithubConfig()
   const branch = config.branch || DEFAULT_BRANCH
   return `https://gitee.com/${config.owner}/${config.repo}/raw/${branch}/${config.path}`
 }
@@ -98,39 +99,52 @@ export function fetchGiteeJson(signal?: AbortSignal): Promise<GithubRemoteEntry[
     }
 
     xhr.addEventListener('load', (): void => {
-      if (xhr.status === 200) {
-        try {
-          const { entries, errors } = parseJsonl(xhr.responseText)
-          if (entries.length === 0 && errors.length > 0) {
+      switch (xhr.status) {
+        case 200: {
+          try {
+            const { entries, errors } = parseJsonl(xhr.responseText)
+            if (entries.length === 0 && errors.length > 0) {
+              reject(
+                new Error(
+                  `JSONL 解析失败：${String(errors.length)} 行全部非法。` +
+                    `首行错误（第 ${String(errors[0]?.line ?? '')} 行）：${errors[0]?.reason ?? ''}`,
+                ),
+              )
+              return
+            }
+            if (errors.length > 0) {
+              bgmLog(
+                LOG_LEVELS.WARN,
+                `[giteeSync] JSONL 解析完成：${String(entries.length)} 条合法，${String(errors.length)} 行非法（已跳过）。` +
+                  `首行错误（第 ${String(errors[0]?.line ?? '')} 行）：${errors[0]?.reason ?? ''}`,
+              )
+            } else {
+              bgmLog(LOG_LEVELS.INFO, `[giteeSync] 下载成功：${String(entries.length)} 条记录`)
+            }
+            resolve(entries)
+          } catch (error: unknown) {
             reject(
               new Error(
-                `JSONL 解析失败：${String(errors.length)} 行全部非法。` +
-                  `首行错误（第 ${String(errors[0]?.line ?? '')} 行）：${errors[0]?.reason ?? ''}`,
+                `JSONL 解析失败: ${error instanceof Error ? error.message : String(error)}`,
               ),
             )
-            return
           }
-          if (errors.length > 0) {
-            bgmLog(
-              LOG_LEVELS.WARN,
-              `[giteeSync] JSONL 解析完成：${String(entries.length)} 条合法，${String(errors.length)} 行非法（已跳过）。` +
-                `首行错误（第 ${String(errors[0]?.line ?? '')} 行）：${errors[0]?.reason ?? ''}`,
-            )
-          } else {
-            bgmLog(LOG_LEVELS.INFO, `[giteeSync] 下载成功：${String(entries.length)} 条记录`)
-          }
-          resolve(entries)
-        } catch (error: unknown) {
-          reject(
-            new Error(`JSONL 解析失败: ${error instanceof Error ? error.message : String(error)}`),
-          )
+
+          break
         }
-      } else if (xhr.status === 404) {
-        reject(new Error(`文件不存在（404）：${url}，请检查 owner/repo/branch/path 配置`))
-      } else if (xhr.status === 403) {
-        reject(new Error(`访问被拒（403）：可能是私有仓库或触发 Gitee 限流`))
-      } else {
-        reject(new Error(`HTTP 错误 ${String(xhr.status)}: ${xhr.statusText}`))
+        case 404: {
+          reject(new Error(`文件不存在（404）：${url}，请检查 owner/repo/branch/path 配置`))
+
+          break
+        }
+        case 403: {
+          reject(new Error(`访问被拒（403）：可能是私有仓库或触发 Gitee 限流`))
+
+          break
+        }
+        default: {
+          reject(new Error(`HTTP 错误 ${String(xhr.status)}: ${xhr.statusText}`))
+        }
       }
     })
 

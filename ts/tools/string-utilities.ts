@@ -17,10 +17,7 @@
 
 import { calcChecksum } from '../core/crypto.js'
 
-import { colNumberToLetter, escapeHtml, trim } from './string-utilities-pure.js'
-
 // Re-export 纯函数，保持向后兼容（其他模块仍可从 string-utilities 导入）
-export { colNumberToLetter, escapeHtml, trim }
 
 /**
  * 计算 Excel 行数据的指纹（用于增量同步比较）
@@ -33,3 +30,5 @@ export function calcFingerprint(fields: string[]): string {
   // 复用已有的 calcChecksum 生成简短校验和，或直接返回原始字符串前 50 字符
   return calcChecksum(raw).toString(16).padStart(4, '0')
 }
+
+export { colNumberToLetter, escapeHtml, trim } from './string-utilities-pure.js'

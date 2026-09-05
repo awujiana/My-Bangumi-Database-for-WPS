@@ -256,24 +256,21 @@ export function parseJsonl(text: string): {
   }
 
   const lines = text.split(/\r\n|\r|\n/)
-  for (let index = 0; index < lines.length; index += 1) {
+  for (const [index, raw] of lines.entries()) {
     const lineNumber = index + 1
-    const raw = lines[index]
-    if (!(raw === undefined)) {
-      const trimmed = raw.trim()
-      // 空行跳过
-      if (trimmed) {
-        try {
-          const object: unknown = JSON.parse(trimmed)
-          if (isGithubRemoteEntry(object)) {
-            entries.push(object)
-          } else {
-            errors.push({ line: lineNumber, reason: '对象缺少 sid 字段或 sid 不是字符串' })
-          }
-        } catch (error: unknown) {
-          const reason = error instanceof Error ? error.message : String(error)
-          errors.push({ line: lineNumber, reason })
+    const trimmed = raw.trim()
+    // 空行跳过
+    if (trimmed) {
+      try {
+        const object: unknown = JSON.parse(trimmed)
+        if (isGithubRemoteEntry(object)) {
+          entries.push(object)
+        } else {
+          errors.push({ line: lineNumber, reason: '对象缺少 sid 字段或 sid 不是字符串' })
         }
+      } catch (error: unknown) {
+        const reason = error instanceof Error ? error.message : String(error)
+        errors.push({ line: lineNumber, reason })
       }
     }
   }
@@ -366,9 +363,9 @@ export function filterByTime(
     const yearString = match[1]
     const monthString = match[2]
     if (!yearString || !monthString) return false
-    const year = parseInt(yearString, 10)
-    const month = parseInt(monthString, 10)
-    if (isNaN(year) || isNaN(month)) return false
+    const year = Number(yearString)
+    const month = Number(monthString)
+    if (Number.isNaN(year) || Number.isNaN(month)) return false
 
     switch (filter.range) {
       case 'year': {
@@ -422,9 +419,9 @@ function isWithinTimeFilter(dateString: string, filter: SyncTimeFilter): boolean
   const yearString = match[1]
   const monthString = match[2]
   if (!yearString || !monthString) return false
-  const year = parseInt(yearString, 10)
-  const month = parseInt(monthString, 10)
-  if (isNaN(year) || isNaN(month)) return false
+  const year = Number(yearString)
+  const month = Number(monthString)
+  if (Number.isNaN(year) || Number.isNaN(month)) return false
 
   switch (filter.range) {
     case 'year': {
@@ -486,7 +483,7 @@ export function computeDiff(
       // 新增：本地无对应 SID
       if (!local) {
         // update-only 策略：跳过新增
-        if (!(strategy === 'update-only')) {
+        if (strategy !== 'update-only') {
           diffs.push({
             kind: 'add',
             sid: remote.sid,
@@ -494,7 +491,7 @@ export function computeDiff(
             changedFields: ['*'],
           })
         }
-      } else if (!(strategy === 'add-only')) {
+      } else if (strategy !== 'add-only') {
         if (strategy === 'force-overwrite') {
           diffs.push({
             kind: 'update',
@@ -539,15 +536,19 @@ export function computeDiff(
           const comparedFields = new Set<string>()
           for (const [jsonlField] of EXTENDED_FIELD_MAP) {
             const remoteValue = remote[jsonlField as keyof GithubRemoteEntry]
-            if (!(remoteValue === undefined)) {
+            if (remoteValue !== undefined) {
               const remoteString = toExtensionStringValue(remoteValue as string | number)
               const excelAliases = getExcelAliases(jsonlField)
               for (const excelField of excelAliases) {
-                if (!comparedFields.has(excelField)) {
-                  if (remoteString && remoteString !== (local.fields[excelField] ?? '')) {
-                    changedFields.push(excelField)
-                    comparedFields.add(excelField)
-                  }
+                // 取反条件包裹，同时消除 no-continue 与 unicorn/no-break-in-nested-loop（嵌套循环内不再有 continue）
+
+                if (
+                  remoteString &&
+                  !comparedFields.has(excelField) &&
+                  remoteString !== (local.fields[excelField] ?? '')
+                ) {
+                  changedFields.push(excelField)
+                  comparedFields.add(excelField)
                 }
               }
             }

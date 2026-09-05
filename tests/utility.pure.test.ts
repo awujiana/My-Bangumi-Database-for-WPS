@@ -8,7 +8,7 @@ import { colNumberToLetter } from '../ts/tools/string-utilities-pure.js'
  * 避免复制实现导致源码修改后测试不失败的问题。
  *
  * string-utilities-pure.ts 是从 string-utilities.ts 抽取出的零依赖纯函数模块，
- * 不引入 core/crypto、tools/util、ui/handlers 等含副作用的模块，
+ * 不引入 core/crypto、tools/util、UI/handlers 等含副作用的模块，
  * 因此测试可以直接 import 而不触发副作用链。
  */
 

@@ -39,14 +39,14 @@ function _buildNameUrlMap(
 
   const urlCol = colMap.get('Bangumi_URL')
   const nameCol = colMap.get('名称')
-  const aliasCol = colMap.get('别名')
   if (!urlCol || !nameCol) return nameUrlMap
+  const aliasCol = colMap.get('别名')
 
   for (let row = headerRow + 1; row <= lastRow; row += 1) {
     const urlValue = trim(getCellValue(ws, row, urlCol))
     if (urlValue) {
       const nameValue = trim(getCellValue(ws, row, nameCol))
-      if (nameValue && !(nameValue in nameUrlMap)) {
+      if (nameValue && !Object.hasOwn(nameUrlMap, nameValue)) {
         nameUrlMap[nameValue] = urlValue
       }
 
@@ -54,7 +54,7 @@ function _buildNameUrlMap(
         const aliasValue = trim(getCellValue(ws, row, aliasCol))
         const aliases = _splitAliases(aliasValue)
         for (const a of aliases) {
-          if (a && !(a in nameUrlMap)) {
+          if (a && !Object.hasOwn(nameUrlMap, a)) {
             nameUrlMap[a] = urlValue
           }
         }

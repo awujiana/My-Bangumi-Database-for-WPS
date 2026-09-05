@@ -67,8 +67,8 @@ export function toggleSheetLock(): void {
   const select = document.getElementById('sheetSelect') as HTMLSelectElement | null
   if (!select) return
 
-  const sheetIndex = parseInt(select.value, 10)
-  if (isNaN(sheetIndex) || sheetIndex <= 0) {
+  const sheetIndex = Number(select.value)
+  if (Number.isNaN(sheetIndex) || sheetIndex <= 0) {
     showToast('请先选择一个有效的工作表', 'warn')
     return
   }
@@ -239,10 +239,11 @@ export function refreshSheets(options?: { autoSelectActive?: boolean }): void {
     option.value = String(index)
     option.text = sheets.Item(index).Name
 
-    if (BGM.sheet.isLocked && BGM.sheet.lockedIndex === index) {
-      option.selected = true
-      selectedIndex = index
-    } else if (isAutoSelectActive && !BGM.sheet.isLocked && index === activeSheetIndex) {
+    // 合并两个「选中」分支为单一条件（原 else-if 与 if 分支体完全相同）
+    if (
+      (BGM.sheet.isLocked && BGM.sheet.lockedIndex === index) ||
+      (isAutoSelectActive && index === activeSheetIndex && !BGM.sheet.isLocked)
+    ) {
       option.selected = true
       selectedIndex = index
     }
@@ -363,13 +364,14 @@ export function detectHeaderAndColumns(
   // 判断某行是否可见
   function isRowVisible(r: number, headerRow: number): boolean {
     if (r === headerRow) return true
-    return !isFiltered || (visibleRowSet !== null && visibleRowSet.has(r))
+    return !isFiltered || (visibleRowSet?.has(r) ?? false)
   }
 
   // 1. 扫描前 MAX_SCAN_ROWS 行，找出所有候选表头行
   const candidates: CandidateHeader[] = []
   for (let r = 1; r <= PANEL_CONFIG.MAX_SCAN_ROWS; r += 1) {
-    if (!isFiltered || !visibleRowSet || visibleRowSet.has(r)) {
+    const shouldScanRow = !isFiltered || !visibleRowSet || visibleRowSet.has(r)
+    if (shouldScanRow) {
       let matchCount = 0
       let colCount = 0
       for (let c = 1; c <= PANEL_CONFIG.MAX_SCAN_COLUMNS; c += 1) {
@@ -439,13 +441,14 @@ export function detectHeaderAndColumns(
       const nv = getCellValue(ws, headerRow + 1, c).trim()
       if (nv) {
         total += 1
-        if (!headerNames[c - 1]) filled += 1
+        if (!Object.hasOwn(headerNames, c - 1)) filled += 1
       }
     }
     if (filled >= 3 && total >= 3) {
       dataStartRow = headerRow + 2
       for (let c = 1; c <= PANEL_CONFIG.MAX_SCAN_COLUMNS; c += 1) {
-        if (!headerNames[c - 1]) {
+        const isExistingHeader = Object.hasOwn(headerNames, c - 1)
+        if (!isExistingHeader) {
           const nv = getCellValue(ws, headerRow + 1, c).trim()
           if (nv) {
             headerNames[c - 1] = nv
@@ -461,7 +464,8 @@ export function detectHeaderAndColumns(
   let lastDataCol = 0
   let samples = 0
   for (let dr = dataStartRow; dr <= dataStartRow + 20 && samples < 5; dr += 1) {
-    if (isRowVisible(dr, headerRow)) {
+    const isDataRowVisible = isRowVisible(dr, headerRow)
+    if (isDataRowVisible) {
       samples += 1
       for (let c = 1; c <= PANEL_CONFIG.MAX_SCAN_COLUMNS; c += 1) {
         const v = getCellValue(ws, dr, c).trim()
@@ -477,7 +481,7 @@ export function detectHeaderAndColumns(
   // 表头结束列
   let headerLastCol = 0
   for (let c = 1; c <= PANEL_CONFIG.MAX_SCAN_COLUMNS; c += 1) {
-    if (headerNames[c - 1]) headerLastCol = c
+    if (Object.hasOwn(headerNames, c - 1)) headerLastCol = c
   }
 
   const actualLastCol = Math.max(lastDataCol, headerLastCol)
@@ -485,7 +489,7 @@ export function detectHeaderAndColumns(
   // 预览显示的列范围：从第一个数据列左扩找到最左非空表头，但不能超过表头范围
   let previewColStart = Math.max(1, firstDataCol - 5)
   for (let c = previewColStart; c <= firstDataCol; c += 1) {
-    if (headerNames[c - 1]) {
+    if (Object.hasOwn(headerNames, c - 1)) {
       previewColStart = c
       break
     }
@@ -507,6 +511,17 @@ export function detectHeaderAndColumns(
     previewColStartAbsolute: previewColStart,
     headerMatchCount,
   }
+}
+
+// 判断指定行的前 colCount 列中是否有任一非空单元格
+// （从 autoDetectSheet 的内层循环抽出为独立函数，用 return 替代内层 break）
+function hasAnyCellValueInRow(target: WpsWorksheet, row: number, colCount: number): boolean {
+  for (let c = 1; c <= colCount; c += 1) {
+    if (getCellValue(target, row, c).trim()) {
+      return true
+    }
+  }
+  return false
 }
 
 export function autoDetectSheet(): {
@@ -582,14 +597,8 @@ export function autoDetectSheet(): {
             let dataRowCount = 0
             let firstDataRow = -1
             for (let dr = meta.dataStartRow; dr <= meta.dataStartRow + 10; dr += 1) {
-              let hasAny = false
-              for (let c = 1; c <= meta.lastCol; c += 1) {
-                if (getCellValue(ws, dr, c).trim()) {
-                  hasAny = true
-                  break
-                }
-              }
-              if (hasAny) {
+              const hasDataInRow = hasAnyCellValueInRow(ws, dr, meta.lastCol)
+              if (hasDataInRow) {
                 dataRowCount += 1
                 if (firstDataRow < 0) firstDataRow = dr
               }
@@ -702,8 +711,13 @@ function collectActiveFilterCols(ws: WpsWorksheet, filters: WpsFilters): string[
         let criteria = f.Criteria1 ?? ''
         if (f.Criteria2) {
           const op = f.Operator
-          criteria +=
-            op === 1 ? ` 且 ${f.Criteria2}` : op === 2 ? ` 或 ${f.Criteria2}` : ` / ${f.Criteria2}`
+          if (op === 1) {
+            criteria += ` 且 ${f.Criteria2}`
+          } else if (op === 2) {
+            criteria += ` 或 ${f.Criteria2}`
+          } else {
+            criteria += ` / ${f.Criteria2}`
+          }
         }
         activeCols.push(colName ? `${colName}(${criteria})` : `列${String(index)}`)
       }
@@ -795,7 +809,7 @@ export function updateFilterStatus(targetWs?: WpsWorksheet): void {
  * 批量读取一个连续行段（矩形 Range.Value2）并追加预览行；
  * 返回是否有非空数据。（从预览构建的 try 块抽出，降低 try-complexity）
  */
-function readPreviewSegmentBatch(
+function isReadPreviewSegmentBatch(
   ws: WpsWorksheet,
   meta: HeaderMeta,
   segStart: number,
@@ -817,7 +831,7 @@ function readPreviewSegmentBatch(
   let hasData = false
   for (let r = 0; r < segLength; r += 1) {
     const dr = dataRows[index + r]
-    if (!(dr === undefined)) {
+    if (dr !== undefined) {
       const rowCols: string[] = []
       let hasAny = false
       for (let ci = 0; ci < displayColCount; ci += 1) {
@@ -825,13 +839,10 @@ function readPreviewSegmentBatch(
         if (is2D && Array.isArray(raw)) {
           const cell = raw[r]?.[ci]
           v = cell == null ? '' : String(cell).trim()
+        } else if (segLength === 1 && displayColCount === 1) {
+          v = raw == null ? '' : String(raw).trim()
         } else {
-          v =
-            segLength === 1 && displayColCount === 1
-              ? raw == null
-                ? ''
-                : String(raw).trim()
-              : getCellValue(ws, dr, meta.previewColStartAbsolute + ci).trim()
+          v = getCellValue(ws, dr, meta.previewColStartAbsolute + ci).trim()
         }
         if (v) hasAny = true
         rowCols.push(v)
@@ -855,7 +866,7 @@ function renderPreviewTable(
   // 以表头行列数作为统一列数，避免不同行列数不同导致错位
   const headerItem = rows.find((r) => r.isHeader)
   const fixedColCount = headerItem?.aligned ? (headerItem.cols as string[]).length : 0
-  rows.forEach((item) => {
+  for (const item of rows) {
     const rowClass = item.isHeader ? 'preview-header-row' : ''
     html += `<tr class="${rowClass}">`
     html += `<td class="preview-row-num">${String(item.isHeader ? 'H' : item.row)}</td>`
@@ -868,13 +879,13 @@ function renderPreviewTable(
         let cls = ''
         if (item.isHeader) {
           cls = 'preview-header'
-          if (item.isImportant?.[index]) cls += ' preview-important-header'
+          if (item.isImportant?.[index] === true) cls += ' preview-important-header'
         }
         html += `<td class="${cls}">${escapeHtml(text)}</td>`
       }
     }
     html += '</tr>'
-  })
+  }
   html += '</tbody></table>'
   html += `<p class="hint">已选择工作表索引: ${String(sheetIndex)} (${escapeHtml(sheetName)})`
   if (headerRow) html += ` | 表头行: ${String(headerRow)}`
@@ -887,7 +898,7 @@ export function refreshData(): void {
   const select = document.getElementById('sheetSelect') as HTMLSelectElement | null
   const previewBox = document.getElementById('previewBox')
   // parseInt 失败返回 NaN（非 nullish），`??` 兜不住，须显式 isFinite 兜底
-  const parsedSheetIndex = BGM.sheet.lockedIndex ?? parseInt(select?.value ?? '')
+  const parsedSheetIndex = BGM.sheet.lockedIndex ?? Math.trunc(Number(select?.value ?? ''))
   const sheetIndex = Number.isFinite(parsedSheetIndex) ? parsedSheetIndex : 0
 
   if (!sheetIndex) {
@@ -962,7 +973,7 @@ export function refreshData(): void {
       // 工作表引用
       ws,
       // 筛选后可见行（含表头）
-      visibleRows: filterStatus.visibleRows,
+      visibleRows,
       headerRow: meta.headerRow,
       dataStartRow: meta.dataStartRow,
       // 实际起始列号
@@ -992,30 +1003,33 @@ export function refreshData(): void {
       const displayColCount = meta.previewColEnd - meta.previewColStart
       // 使用 visibleRows 过滤，而不是遍历整个范围
       // 防御性排序 + 去重：确保行号严格升序且无重复（修复"190-201后跳到3"问题）
-      const dataRows = Array.from(
-        new Set(
-          filterStatus.visibleRows.filter((r) => r !== meta.headerRow && r >= meta.dataStartRow),
-        ),
-      ).sort((a, b) => a - b)
+      const dataRows = [
+        ...new Set(visibleRows.filter((r) => r !== meta.headerRow && r >= meta.dataStartRow)),
+      ].sort((a, b) => a - b)
       const maxPreview = Math.min(dataRows.length, PANEL_CONFIG.PREVIEW_LIMIT)
+
+      // 找到从 start 开始的连续行段终点（从内层循环抽出，用 return 替代内层 break）
+      const findSegmentEnd = (start: number, max: number): number => {
+        let end = start
+        while (end + 1 < max) {
+          const next = dataRows[end + 1]
+          const current = dataRows[end]
+          if (next === undefined || current === undefined || next !== current + 1) break
+          end += 1
+        }
+        return end
+      }
 
       // 批量读取：按连续行段一次性读取 Range.Value2，减少 COM 调用次数
       let index = 0
       while (index < maxPreview) {
-        // 找到连续行段
-        let index_ = index
-        while (index_ + 1 < maxPreview) {
-          const next = dataRows[index_ + 1]
-          const current = dataRows[index_]
-          if (next === undefined || current === undefined || next !== current + 1) break
-          index_ += 1
-        }
+        const index_ = findSegmentEnd(index, maxPreview)
         const segStart = dataRows[index]
         if (segStart === undefined) break
         const segLength = index_ - index + 1
 
         try {
-          const isBatchHasData = readPreviewSegmentBatch(
+          const isBatchHasData = isReadPreviewSegmentBatch(
             ws,
             meta,
             segStart,
@@ -1030,7 +1044,7 @@ export function refreshData(): void {
           // 批量读取失败，回退到逐单元格
           for (let r = 0; r < segLength; r += 1) {
             const dr = dataRows[index + r]
-            if (!(dr === undefined)) {
+            if (dr !== undefined) {
               const rowCols: string[] = []
               let hasAny = false
               for (let ci = 0; ci < displayColCount; ci += 1) {
@@ -1052,7 +1066,8 @@ export function refreshData(): void {
       // 无表头时的回退逻辑
       let count = 0
       for (let r = 1; r <= Math.min(lastRow, 100) && count < 5; r += 1) {
-        if (!(isFiltered && visibleRowSet && !visibleRowSet.has(r))) {
+        const isRowIncluded = !isFiltered || !visibleRowSet || visibleRowSet.has(r)
+        if (isRowIncluded) {
           const cols: { text: string; important: boolean }[] = []
           let hasAny = false
           for (let c = 1; c <= PANEL_CONFIG.MAX_SCAN_COLUMNS; c += 1) {
@@ -1134,7 +1149,7 @@ export function enlargePreview(): void {
   }
 
   const content = previewBox.innerHTML.trim()
-  if (!content?.includes('<table')) {
+  if (!content.includes('<table')) {
     showToast('请先刷新数据加载预览', 'info')
     return
   }
@@ -1218,7 +1233,7 @@ export function autoDetectAndLockSheet(): boolean {
     saveLockedSheet({
       index: detected.sheetIndex,
       name: detected.sheetName,
-      ...(activeWbName ? { workbookName: activeWbName } : {}),
+      ...(activeWbName && { workbookName: activeWbName }),
     })
     updateLockButton()
     refreshData()

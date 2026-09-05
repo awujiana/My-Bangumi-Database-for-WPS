@@ -59,12 +59,12 @@ export function addTagsFromString(tagSet: Set<string>, raw: string) {
   if (!raw) return
   // 按 | 或 , 或 ; 分割，并过滤掉纯符号和空白
   const parts = raw.split(/[|,;，；]/)
-  parts.forEach((part) => {
+  for (const part of parts) {
     const tag = part.trim()
     if (tag && !['|', ',', ';', '，', '；'].includes(tag)) {
       tagSet.add(tag)
     }
-  })
+  }
 }
 
 /**
@@ -80,5 +80,5 @@ export function addTagsFromString(tagSet: Set<string>, raw: string) {
 export function buildTagsArray(tagsRaw: string): string[] {
   const tagSet = new Set<string>()
   addTagsFromString(tagSet, tagsRaw)
-  return Array.from(tagSet)
+  return [...tagSet]
 }

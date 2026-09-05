@@ -102,30 +102,51 @@ export function detectGithubConflicts(
   const conflicts: Conflict[] = []
 
   for (const entry of remote) {
-    if (entry.sid) {
-      const localEntry = local.get(entry.sid)
-      if (localEntry) {
-        for (const spec of GITHUB_CONFLICT_FIELDS) {
-          const remoteValue = spec.remoteToString(entry)
-          // 远程无值，不视为冲突
-          if (remoteValue) {
-            const localValue = localEntry.fields[spec.localField] ?? ''
-            if (remoteValue !== localValue) {
-              conflicts.push({
-                sid: entry.sid,
-                field: spec.localField,
-                localValue,
-                remoteValue,
-                localRow: localEntry.row,
-              })
-            }
-          }
-        }
-      }
-    }
+    collectEntryConflicts(entry, local, conflicts)
   }
 
   return conflicts
+}
+
+/**
+ * 收集单条远程条目与本地行之间的字段级冲突
+ *
+ * 仅当 SID 同时存在于远程与本地时才可能产生冲突。
+ *
+ * @param entry 远程条目
+ * @param local 本地条目映射（SID → 行）
+ * @param conflicts 冲突列表（按远程数组顺序与字段比对表顺序）
+ */
+function collectEntryConflicts(
+  entry: GithubRemoteEntry,
+  local: Map<string, LocalRowEntry>,
+  conflicts: Conflict[],
+): void {
+  if (!entry.sid) {
+    return
+  }
+
+  const localEntry = local.get(entry.sid)
+  if (!localEntry) {
+    return
+  }
+
+  for (const spec of GITHUB_CONFLICT_FIELDS) {
+    const remoteValue = spec.remoteToString(entry)
+    // 远程无值，不视为冲突
+    if (remoteValue) {
+      const localValue = localEntry.fields[spec.localField] ?? ''
+      if (remoteValue !== localValue) {
+        conflicts.push({
+          sid: entry.sid,
+          field: spec.localField,
+          localValue,
+          remoteValue,
+          localRow: localEntry.row,
+        })
+      }
+    }
+  }
 }
 
 /**
@@ -239,9 +260,9 @@ export function getSyncPreview(
       const seqCell = getCell(ws, rowNumber, seqCol)
       const isUploaded =
         seqCell?.Interior &&
-        (seqCell.Interior.Color === BGM_COLOR.SUCCESS ||
-          seqCell.Interior.Color === BGM_COLOR.LIGHT_GREEN ||
-          seqCell.Interior.Color === BGM_COLOR.DARK_GREEN)
+        [BGM_COLOR.SUCCESS, BGM_COLOR.LIGHT_GREEN, BGM_COLOR.DARK_GREEN].includes(
+          seqCell.Interior.Color,
+        )
       // 已上传条目：非增量模式直接跳过；增量模式仅当指纹未变化才跳过
       let isUploadedSkipped = false
       if (isUploaded) {
@@ -435,17 +456,15 @@ export async function detectConflicts(
         if (bgmEntry) {
           const excelType = mapWatchStatus(getField(rowNumber, '是否看完'))
           // 不上传，不参与冲突
-          if (!(excelType === 0)) {
-            if (bgmEntry.type !== excelType) {
-              conflicts.push({
-                row: rowNumber,
-                sid,
-                name: getField(rowNumber, '名称') || '',
-                existingType: bgmEntry.type,
-                incomingType: excelType,
-              })
-              conflictCount += 1
-            }
+          if (excelType !== 0 && bgmEntry.type !== excelType) {
+            conflicts.push({
+              row: rowNumber,
+              sid,
+              name: getField(rowNumber, '名称') || '',
+              existingType: bgmEntry.type,
+              incomingType: excelType,
+            })
+            conflictCount += 1
           }
         }
       }
@@ -535,10 +554,8 @@ export async function syncWithConfirmation(): Promise<void> {
       headerRow,
       token,
     )
-    if (conflictCount > 0) {
-      if (conflictStrategy === 'skip') {
-        skipSids = new Set(conflicts.map((c) => c.sid))
-      }
+    if (conflictStrategy === 'skip' && conflictCount > 0) {
+      skipSids = new Set(conflicts.map((c) => c.sid))
     }
     bgmLog(LOG_LEVELS.INFO, `[syncWithConfirmation] 冲突检测完成: ${String(conflictCount)} 条冲突`)
   } catch (error: unknown) {

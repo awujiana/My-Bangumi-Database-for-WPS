@@ -12,7 +12,7 @@
  */
 
 // @vitest-environment jsdom
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, beforeEach } from 'vitest'
 
 // ========== Mock 设置 ==========
 
@@ -199,7 +199,7 @@ describe('INTRO_FIELD_TO_BANGUMI 映射完整性', () => {
   })
 
   it('所有映射值都是非空字符串', () => {
-    for (const [, target] of Object.entries(INTRO_FIELD_TO_BANGUMI)) {
+    for (const target of Object.values(INTRO_FIELD_TO_BANGUMI)) {
       expect(target).toBeTruthy()
       expect(typeof target).toBe('string')
     }

@@ -9,8 +9,6 @@
 import { getTheme, setTheme } from './config.js'
 import type { ThemeMode } from './config.js'
 
-export type { ThemeMode }
-
 const systemMedia =
   typeof window !== 'undefined' && typeof window.matchMedia === 'function'
     ? window.matchMedia('(prefers-color-scheme: light)')
@@ -30,7 +28,7 @@ export function resolveTheme(mode: ThemeMode): 'dark' | 'light' {
 export function applyTheme(mode: ThemeMode): void {
   if (typeof document === 'undefined') return
   const resolved = resolveTheme(mode)
-  document.documentElement.setAttribute('data-theme', resolved)
+  document.documentElement.dataset.theme = resolved
   document.documentElement.style.colorScheme = resolved
 }
 
@@ -56,3 +54,5 @@ export function saveTheme(mode: string): boolean {
   if (isOk) applyTheme(mode)
   return isOk
 }
+
+export { type ThemeMode } from './config.js'

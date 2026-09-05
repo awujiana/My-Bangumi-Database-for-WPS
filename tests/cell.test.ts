@@ -32,6 +32,10 @@ function createMockCell(overrides: Record<string, unknown> = {}) {
   return { ...base, ...overrides }
 }
 
+function nativeCodeValue(): { toString: () => string } {
+  return { toString: () => '42 [native code]' }
+}
+
 function createMockWorksheet(
   cellValues: Record<string, unknown> = {},
   cellOverrides: Record<string, Record<string, unknown>> = {},
@@ -43,9 +47,9 @@ function createMockWorksheet(
         return cellCache.get(address)!
       }
       let cell: ReturnType<typeof createMockCell>
-      if (address in cellOverrides) {
+      if (Object.hasOwn(cellOverrides, address)) {
         cell = createMockCell(cellOverrides[address])
-      } else if (address in cellValues) {
+      } else if (Object.hasOwn(cellValues, address)) {
         cell = createMockCell({
           Value2: cellValues[address],
           Value: cellValues[address],
@@ -158,9 +162,7 @@ describe('getCellValue', () => {
     it('Value2 为 native function（toString 含 [native code]）时应跳过并回退', () => {
       // 当前实现：调用函数得到 result，仅当 result 为 function 时检查 toString
       // 对于返回非 function 对象的 native code 标记，不会检测
-      const nativeFunction = function Value2() {
-        return { toString: () => '42 [native code]' }
-      }
+      const nativeFunction = nativeCodeValue
       const ws = createMockWorksheet(
         {},
         {
@@ -181,7 +183,7 @@ describe('getCellValue', () => {
         {
           get(target, property) {
             if (property === 'Value2') throw new Error('Property access error')
-            return target[property]
+            return Reflect.get(target, property) as unknown
           },
         },
       )
@@ -190,9 +192,7 @@ describe('getCellValue', () => {
     })
 
     it('Value 为 native function 时跳过，回退到 Text', () => {
-      const nativeFunction = function Value() {
-        return { toString: () => '42 [native code]' }
-      }
+      const nativeFunction = nativeCodeValue
       const ws = createMockWorksheet(
         {},
         {
@@ -222,7 +222,7 @@ describe('getCellValue', () => {
 
     it('返回的 cell 为 undefined 时返回空字符串', () => {
       const ws = {
-        Range: vi.fn(() => undefined),
+        Range: vi.fn(() => {}),
       }
       expect(getCellValue(ws, 1, 1)).toBe('')
     })
@@ -297,7 +297,7 @@ describe('setCellValue', () => {
   it('应在写入异常时调用 BGM.handleError 并返回 false', () => {
     const cell = {
       get Value2() {
-        return undefined
+        return ''
       },
       set Value2(_v) {
         throw new Error('Cannot redefine property')

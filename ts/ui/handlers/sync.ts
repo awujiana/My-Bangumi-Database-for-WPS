@@ -199,7 +199,9 @@ async function _fillSheetWithCollections(
       // 每 50 行更新一次状态并让出事件循环，避免 UI 卡死
       if ((index + 1) % 50 === 0) {
         setStatus(`正在填充收藏数据：${String(index + 1)}/${String(total)}`, 'info')
-        await new Promise((resolve) => setTimeout(resolve, 0))
+        await new Promise((resolve) => {
+          setTimeout(resolve, 0)
+        })
       }
     }
   }
@@ -501,14 +503,14 @@ async function confirmAndExecuteSync(prepared: SyncPreparedData): Promise<boolea
     const result = await SyncToBangumiAsync(ws, colMap, token, lastRow, headerRow, {
       ...(conflictSids !== undefined && { skipSids: conflictSids }),
       incremental,
-      onProgress: (current: number, total: number, message: string) => {
-        updateSyncProgressDialog(current, total, message)
+      onProgress: (current: number, total: number, statusMessage: string) => {
+        updateSyncProgressDialog(current, total, statusMessage)
         if (app.StatusBar !== undefined) {
-          app.StatusBar = `[${String(current)}/${String(total)}] ${message}`
+          app.StatusBar = `[${String(current)}/${String(total)}] ${statusMessage}`
         }
         bgmLog(
           LOG_LEVELS.INFO,
-          `[syncFromPanel] 同步进度: ${String(current)}/${String(total)} - ${message}`,
+          `[syncFromPanel] 同步进度: ${String(current)}/${String(total)} - ${statusMessage}`,
         )
       },
     })
@@ -551,27 +553,28 @@ export async function syncFromPanel(): Promise<void> {
     BGM.sync.exitRunningState()
     return
   }
-  let isCompleted = false
-  try {
-    isCompleted = await confirmAndExecuteSync(prepared)
-  } finally {
-    // 兜底释放运行锁（正常完成/异常路径已由 confirmAndExecuteSync 释放，此处仅处理用户取消的情况）
-    if (BGM.sync.isRunning) {
-      BGM.sync.exitRunningState()
-    }
-    // 无论成功失败或取消，最后都尝试恢复用户之前的工作表
-    if (prepared.originalActiveSheet) {
-      try {
-        prepared.originalActiveSheet.Activate()
-        bgmLog(
-          LOG_LEVELS.INFO,
-          `[syncFromPanel] 已恢复用户之前的工作表: ${prepared.originalActiveSheet.Name}`,
-        )
-      } catch (error: unknown) {
-        bgmLog(LOG_LEVELS.WARN, `[syncFromPanel] 恢复工作表失败: ${(error as Error).message}`)
+  const isCompleted = await (async (): Promise<boolean> => {
+    try {
+      return await confirmAndExecuteSync(prepared)
+    } finally {
+      // 兜底释放运行锁（正常完成/异常路径已由 confirmAndExecuteSync 释放，此处仅处理用户取消的情况）
+      if (BGM.sync.isRunning) {
+        BGM.sync.exitRunningState()
+      }
+      // 无论成功失败或取消，最后都尝试恢复用户之前的工作表
+      if (prepared.originalActiveSheet) {
+        try {
+          prepared.originalActiveSheet.Activate()
+          bgmLog(
+            LOG_LEVELS.INFO,
+            `[syncFromPanel] 已恢复用户之前的工作表: ${prepared.originalActiveSheet.Name}`,
+          )
+        } catch (error: unknown) {
+          bgmLog(LOG_LEVELS.WARN, `[syncFromPanel] 恢复工作表失败: ${(error as Error).message}`)
+        }
       }
     }
-  }
+  })()
   if (isCompleted) {
     bgmLog(
       LOG_LEVELS.INFO,
@@ -588,7 +591,7 @@ export function syncCollectionFromBgm(): void {
 
   const select = document.getElementById('sheetSelect') as HTMLSelectElement | null
   // parseInt 失败返回 NaN（非 nullish），`??` 兜不住，须显式 isFinite 兜底
-  const parsedSheetIndex = BGM.sheet.lockedIndex ?? parseInt(select?.value ?? '')
+  const parsedSheetIndex = BGM.sheet.lockedIndex ?? Math.trunc(Number(select?.value ?? ''))
   const sheetIndex = Number.isFinite(parsedSheetIndex) ? parsedSheetIndex : 1
   bgmLog(LOG_LEVELS.INFO, `[syncCollectionFromBgm] 目标工作表索引: ${String(sheetIndex)}`)
 
@@ -674,10 +677,8 @@ async function _doAPISync(
   }
 
   // 获取同步记录工作表
-  let syncSheet: WpsWorksheet | null = null
-  if (typeof getOrCreateSyncRecordSheet === 'function') {
-    syncSheet = getOrCreateSyncRecordSheet()
-  }
+  const syncSheet: WpsWorksheet | null =
+    typeof getOrCreateSyncRecordSheet === 'function' ? getOrCreateSyncRecordSheet() : null
 
   const ws = app.ActiveWorkbook.Worksheets.Item(sheetIndex)
 
@@ -707,7 +708,7 @@ async function _doAPISync(
   let lastRow = typeof getLastRow === 'function' ? getLastRow(ws) : 200
 
   // 空表时提供从 Bangumi API 自动填充
-  if (lastRow <= headerRow || headerRow === 0) {
+  if (headerRow === 0 || lastRow <= headerRow) {
     if (userCollections.length === 0) {
       bgmLog(LOG_LEVELS.INFO, '[_doAPISync] 工作表为空且 Bangumi 账号无收藏数据')
       showAlert('当前工作表为空，且 Bangumi 账号暂无收藏数据，无法填充。')
@@ -775,7 +776,9 @@ async function _doAPISync(
   }
 
   const collectionMap = new Map<string, BangumiCollectionItem>()
-  userCollections.forEach((c) => collectionMap.set(String(c.subject_id), c))
+  for (const c of userCollections) {
+    collectionMap.set(String(c.subject_id), c)
+  }
 
   // 切换到同步记录工作表，让用户能看到实时写入
   if (syncSheet) {
@@ -789,9 +792,8 @@ async function _doAPISync(
 
   let syncRecords: SyncRecord[] = typeof getAllSyncRecords === 'function' ? getAllSyncRecords() : []
   const syncCountMap = new Map<string, number>()
-  syncRecords.forEach((r) =>
-    syncCountMap.set(r.sid ?? '', (syncCountMap.get(r.sid ?? '') ?? 0) + 1),
-  )
+  for (const r of syncRecords)
+    syncCountMap.set(r.sid ?? '', (syncCountMap.get(r.sid ?? '') ?? 0) + 1)
 
   // 使用从 ../index.js 导入的 BGM_SUBJECT_TYPES 常量（与 core/constants.ts 中定义一致）
   // 启动同步状态机：使用 enterRunningState 进行防重入检查
@@ -833,41 +835,37 @@ async function _doAPISync(
     let currentCombined = 0
 
     // 阶段1：写入收藏到同步记录表（显示进度，但不需要定位单元格）
-    for (let index = 0; index < userCollections.length; index += 1) {
+    for (const [index, item] of userCollections.entries()) {
       if (BGM.sync.checkShouldStop()) break
       if (BGM.sync.checkPaused()) await BGM.sync.waitForResume()
       if (BGM.sync.checkShouldStop()) break
 
-      const item = userCollections[index]
-      if (!(item === undefined)) {
-        const itemName = item.subject?.name_cn || item.subject?.name || '(无名称)' // eslint-disable-line @typescript-eslint/prefer-nullish-coalescing -- API 字段空串需退到备用字段（`??` 会保留空串）
-        if (typeof addSyncRecord === 'function') {
-          addSyncRecord({
-            name: itemName,
-            url: `https://bgm.tv/subject/${String(item.subject_id)}`,
-            sid: String(item.subject_id),
-            type: BGM_SUBJECT_TYPES[item.subject_type ?? 2] ?? '',
-            content: '标记同步',
-            status: '成功',
-            count: 1,
-            collType: COLLECTION_TYPE_NAMES[item.type] ?? '',
-          })
-        }
-        currentCombined += 1
-        updateSyncProgressDialog(
-          currentCombined,
-          totalCombined,
-          `阶段1: 收藏写入同步记录 ${String(index + 1)}/${String(totalCollect)}`,
-          `📥 [${String(index + 1)}/${String(totalCollect)}] ${itemName}`,
-        )
+      const itemName = item.subject?.name_cn || item.subject?.name || '(无名称)' // eslint-disable-line @typescript-eslint/prefer-nullish-coalescing -- API 字段空串需退到备用字段（`??` 会保留空串）
+      if (typeof addSyncRecord === 'function') {
+        addSyncRecord({
+          name: itemName,
+          url: `https://bgm.tv/subject/${String(item.subject_id)}`,
+          sid: String(item.subject_id),
+          type: BGM_SUBJECT_TYPES[item.subject_type ?? 2] ?? '',
+          content: '标记同步',
+          status: '成功',
+          count: 1,
+          collType: COLLECTION_TYPE_NAMES[item.type] ?? '',
+        })
       }
+      currentCombined += 1
+      updateSyncProgressDialog(
+        currentCombined,
+        totalCombined,
+        `阶段1: 收藏写入同步记录 ${String(index + 1)}/${String(totalCollect)}`,
+        `📥 [${String(index + 1)}/${String(totalCollect)}] ${itemName}`,
+      )
     }
 
     syncRecords = typeof getAllSyncRecords === 'function' ? getAllSyncRecords() : []
     syncCountMap.clear()
-    syncRecords.forEach((r) =>
-      syncCountMap.set(r.sid ?? '', (syncCountMap.get(r.sid ?? '') ?? 0) + 1),
-    )
+    for (const r of syncRecords)
+      syncCountMap.set(r.sid ?? '', (syncCountMap.get(r.sid ?? '') ?? 0) + 1)
 
     // 阶段2：在 Excel 数据表上标记已收藏的行（需要定位单元格）
     // 切换回数据工作表，便于暂停时定位
@@ -883,7 +881,7 @@ async function _doAPISync(
     BGM.sync.updatePosition(ws, 0, seqColForLocate)
 
     let matchedCount = 0
-    for (let index = 0; index < rowsToProcess.length; index += 1) {
+    for (const [index, row] of rowsToProcess.entries()) {
       if (BGM.sync.checkShouldStop()) {
         bgmLog(LOG_LEVELS.INFO, '[_doAPISync] 阶段2：检测到停止请求，终止')
         break
@@ -897,39 +895,37 @@ async function _doAPISync(
         if (BGM.sync.checkShouldStop()) break
       }
 
-      const row = rowsToProcess[index]
-      if (!(row === undefined)) {
-        BGM.sync.updatePosition(undefined, row)
+      BGM.sync.updatePosition(undefined, row)
 
-        const bgmUrlCell = urlCol === undefined ? null : getCell(ws, row, urlCol)
-        const bgmUrl = bgmUrlCell ? trim(String(bgmUrlCell.Value ?? '')) : ''
-        const sid = typeof extractSubjectId === 'function' ? extractSubjectId(bgmUrl) : ''
-        let isMatched = false
-        if (sid && collectionMap.has(sid)) {
-          const seqCol = colMap.get('序列号') ?? 9
-          const seqCell = getCell(ws, row, seqCol)
-          if (seqCell?.Interior) {
-            const syncCount = syncCountMap.get(sid) ?? 0
-            seqCell.Interior.Color =
-              syncCount === 1
-                ? BGM_COLOR.BGM_SYNC
-                : syncCount === 2
-                  ? BGM_COLOR.LIGHT_GREEN
-                  : BGM_COLOR.DARK_GREEN
+      const bgmUrlCell = urlCol === undefined ? null : getCell(ws, row, urlCol)
+      const bgmUrl = bgmUrlCell ? trim(String(bgmUrlCell.Value ?? '')) : ''
+      const sid = typeof extractSubjectId === 'function' ? extractSubjectId(bgmUrl) : ''
+      let isMatched = false
+      if (sid && collectionMap.has(sid)) {
+        const seqCol = colMap.get('序列号') ?? 9
+        const seqCell = getCell(ws, row, seqCol)
+        if (seqCell?.Interior) {
+          const syncCount = syncCountMap.get(sid) ?? 0
+          if (syncCount === 1) {
+            seqCell.Interior.Color = BGM_COLOR.BGM_SYNC
+          } else if (syncCount === 2) {
+            seqCell.Interior.Color = BGM_COLOR.LIGHT_GREEN
+          } else {
+            seqCell.Interior.Color = BGM_COLOR.DARK_GREEN
           }
-          matchedCount += 1
-          isMatched = true
         }
-        currentCombined += 1
-        updateSyncProgressDialog(
-          currentCombined,
-          totalCombined,
-          `阶段2: 标记数据表 ${String(index + 1)}/${String(totalRows)}（匹配 ${String(matchedCount)}）`,
-          isMatched
-            ? `✓ [${String(index + 1)}/${String(totalRows)}] 行${String(row)} 匹配 SID=${sid ?? ''}`
-            : `· [${String(index + 1)}/${String(totalRows)}] 行${String(row)} 未匹配`,
-        )
+        matchedCount += 1
+        isMatched = true
       }
+      currentCombined += 1
+      updateSyncProgressDialog(
+        currentCombined,
+        totalCombined,
+        `阶段2: 标记数据表 ${String(index + 1)}/${String(totalRows)}（匹配 ${String(matchedCount)}）`,
+        isMatched
+          ? `✓ [${String(index + 1)}/${String(totalRows)}] 行${String(row)} 匹配 SID=${sid ?? ''}`
+          : `· [${String(index + 1)}/${String(totalRows)}] 行${String(row)} 未匹配`,
+      )
     }
 
     // 输出同步统计
@@ -951,6 +947,7 @@ async function _doAPISync(
         : 0
     const summary = `📊 BGM 收藏 ${String(totalCollections)} 条 | 数据表 ${String(rowsToProcess.length)} 行 | 耗时 ${formatDuration(totalElapsed)}\n\n✅ 匹配标记: ${String(matchedCount)}\n📝 同步记录: ${String(syncRecords.length)}`
     const detailsArray: string[] = [
+      ...(wasStopped ? ['⚠️ 同步被用户停止'] : []),
       `BGM 收藏总数: ${String(totalCollections)}`,
       `数据表总行数: ${String(rowsToProcess.length)}`,
       `匹配标记数: ${String(matchedCount)}`,
@@ -958,7 +955,6 @@ async function _doAPISync(
       `⏱️ 耗时: ${formatDuration(totalElapsed)}`,
       `⚡ 平均速度: ${avgSpeed > 0 ? `${String(avgSpeed)} 行/秒` : '--'}`,
     ]
-    if (wasStopped) detailsArray.unshift('⚠️ 同步被用户停止')
     const stats: SyncProgressStats = {
       added: matchedCount,
       updated: 0,

@@ -146,27 +146,42 @@ export function findHeaderRow(ws: WpsWorksheet | null | undefined, startRow?: nu
   return cacheGet(cacheKey, () => {
     const sRow = startRow ?? 1
     for (let row = sRow; row <= PANEL_CONFIG.MAX_SCAN_ROWS; row += 1) {
-      let matchCount = 0
-      for (let col = 1; col <= PANEL_CONFIG.MAX_SCAN_COLUMNS; col += 1) {
-        try {
-          const cellValue = getCellValue(ws, row, col).toLowerCase()
-          if (cellValue) {
-            for (const header of HEADER_KEYWORDS) {
-              if (cellValue.includes(header.toLowerCase())) {
-                matchCount += 1
-                break
-              }
-            }
-            if (matchCount >= 3) break
-          }
-        } catch {
-          // 忽略：此处无需处理错误
-        }
-      }
-      if (matchCount >= 3) return row
+      if (isRowHeaderMatch(ws, row)) return row
     }
     return 0
   })
+}
+
+/** 扫描单行是否命中 ≥3 个表头关键字（提取自 findHeaderRow，用 return 代替嵌套 break） */
+function isRowHeaderMatch(ws: WpsWorksheet | null | undefined, row: number): boolean {
+  let matchCount = 0
+  for (let col = 1; col <= PANEL_CONFIG.MAX_SCAN_COLUMNS; col += 1) {
+    try {
+      const cellValue = getCellValue(ws, row, col).toLowerCase()
+      if (cellValue) {
+        const isMatched = HEADER_KEYWORDS.some((header) => cellValue.includes(header.toLowerCase()))
+        if (isMatched) matchCount += 1
+        if (matchCount >= 3) return true
+      }
+    } catch {
+      // 忽略：此处无需处理错误
+    }
+  }
+  return false
+}
+
+/**
+ * 按 COLUMN_RULES 规则将表头列名匹配为列映射 key
+ * 首个命中的未占用 key 优先，已占用则继续尝试后续规则
+ */
+function applyColumnRules(colMap: Map<string, number>, colName: string, index: number): void {
+  for (const [pattern, key] of COLUMN_RULES) {
+    if (pattern.test(colName) && !colMap.has(key)) {
+      colMap.set(key, index)
+      // 匹配到未映射的 key，处理下一列
+      break
+    }
+  }
 }
 
 /**
@@ -193,16 +208,7 @@ export function getColumnMap(
         firstNonEmptyCol = index
       }
       if (colName) {
-        for (const [pattern, key] of COLUMN_RULES) {
-          if (pattern.test(colName)) {
-            if (!colMap.has(key)) {
-              colMap.set(key, index)
-              // 匹配到未映射的key，处理下一列
-              break
-            }
-            // 该key已被前面的列匹配，继续尝试其他规则
-          }
-        }
+        applyColumnRules(colMap, colName, index)
       }
     }
 
@@ -217,12 +223,10 @@ export function getColumnMap(
       } else {
         // 第一个非空列已被占用，向后查找第一个未被占用的非空列
         for (let index = 1; index <= lastCol; index += 1) {
-          if (!mappedCols.has(index)) {
-            const v = trim(getCellValue(ws, headerRow, index))
-            if (v) {
-              seqCol = index
-              break
-            }
+          const v = mappedCols.has(index) ? '' : trim(getCellValue(ws, headerRow, index))
+          if (v) {
+            seqCol = index
+            break
           }
         }
       }
@@ -285,7 +289,7 @@ function findAnchorColumn(ws: WpsWorksheet, headerRow: number): number | undefin
 
   for (let c = 1; c <= maxCols; c += 1) {
     const value = ws.Range(`${colNumberToLetter(c)}${String(headerRow)}`).Value2
-    if (!(value == null)) {
+    if (value != null) {
       const text = String(value).trim().toLowerCase()
       if (keywords.some((kw) => text === kw || text.includes(kw))) {
         return c
@@ -403,15 +407,9 @@ export function getLastRow(
 }
 
 export function isEmptyValue(value: unknown): boolean {
-  return (
-    value === null ||
-    value === undefined ||
-    value === '' ||
-    value === 'null' ||
-    value === 'NULL' ||
-    value === 'Null' ||
-    value === 'undefined'
-  )
+  if (value === null || value === undefined) return true
+  // 先收窄为 string 再比对，保持与原来 value === '...' 全等比较一致的语义
+  return typeof value === 'string' && ['', 'null', 'NULL', 'Null', 'undefined'].includes(value)
 }
 
 // ========== 获取数据工作表 ==========
@@ -483,16 +481,13 @@ export function ensureSheetHeaders(ws: WpsWorksheet | null | undefined): boolean
   let writeCount = 0
   let failCount = 0
   const failCols: number[] = []
-  for (let index = 0; index < STANDARD_HEADERS.length; index += 1) {
-    const header = STANDARD_HEADERS[index]
-    if (header !== undefined) {
-      const isOk = setCellValueDirect(ws, 1, index + 1, header)
-      if (isOk) {
-        writeCount += 1
-      } else {
-        failCount += 1
-        failCols.push(index + 1)
-      }
+  for (const [index, header] of STANDARD_HEADERS.entries()) {
+    const isOk = setCellValueDirect(ws, 1, index + 1, header)
+    if (isOk) {
+      writeCount += 1
+    } else {
+      failCount += 1
+      failCols.push(index + 1)
     }
   }
   bgmLog(

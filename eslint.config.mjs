@@ -93,6 +93,20 @@ const UNSAFE_FIX_RULES = new Set([
 // 判定优先用 ESLINT_FIX 环境变量（跨 worker 可靠），并回退到 argv 检测（直接 `eslint --fix`）。
 const isFix = process.env.ESLINT_FIX === '1' || process.argv.includes('--fix')
 
+// typescript-eslint 的 strictTypeChecked / stylisticTypeChecked 各含 3 块配置：
+// 第 1、3 块为 rules 块且**无 files 限制**，若直接展开会把 @typescript-eslint/* 类型感知
+// 规则（await-thenable / no-unsafe-* 等）套到 .js/.mjs 上，而这些文件没有 parserOptions
+// 类型信息，ESLint 加载规则时直接崩溃（实测 eslint.config.mjs、vite.config.js 先后中招）。
+// 这里给这类 rules 块补上 TS 文件限制：TS 文件照常获得类型感知检查，.js/.mjs 只受
+// core 规则 + airbnb + prettier 约束（vite.config.js 保留在 ignores 白名单内可被 lint）。
+const TS_FILES = ['**/*.ts', '**/*.tsx', '**/*.mts', '**/*.cts']
+const constrainToTsFiles = (configs) =>
+  configs.map((config) =>
+    config.files === undefined && Object.keys(config.rules ?? {}).length > 0
+      ? { ...config, files: TS_FILES }
+      : config,
+  )
+
 // 仅引入 airbnb-extended 的 base recommended 配置：
 // 直接引用 dist 子模块可绕过包主入口（主入口会加载 react/next/jsx-a11y 全家桶，
 // 在 Windows 上冷加载耗时 20s+，而 base 配置本身并不使用这些插件）
@@ -104,6 +118,22 @@ const airbnbBaseRecommendedUrl = pathToFileURL(
   path.join(airbnbPkgRoot, 'dist/configs/base/recommended.mjs'),
 ).href
 const { baseRecommendedConfig } = await import(airbnbBaseRecommendedUrl)
+// airbnb-extended 的 base 配置部分对象引用 import-x / @stylistic 规则却未在同一对象
+// 声明插件（ESLint 10 flat config 要求规则与插件同对象，否则报 "could not find plugin"）。
+// 此处按需补上插件声明，不改动规则本身。
+const patchedBaseRecommendedConfig = baseRecommendedConfig.map((config) => {
+  const rules = Object.keys(config.rules ?? {})
+  const plugins = { ...(config.plugins ?? {}) }
+  if (rules.some((rule) => rule.startsWith('import-x/')) && plugins['import-x'] === undefined) {
+    plugins['import-x'] = importPlugin
+  }
+  if (rules.some((rule) => rule.startsWith('@stylistic/')) && plugins['@stylistic'] === undefined) {
+    plugins['@stylistic'] = stylistic
+  }
+  return Object.keys(plugins).length === Object.keys(config.plugins ?? {}).length
+    ? config
+    : { ...config, plugins }
+})
 
 // 将插件的所有规则设为 error，但排除两类**不应启用**的规则：
 //   1) meta.deprecated 已弃用规则（共 14 条）——上游已声明由新规则取代。
@@ -142,16 +172,34 @@ export default tseslint.config(
       'coverage/**',
       '**/*.js',
       '!vite.config.js',
+      // ESLint 严格化迁移期 codemod 的临时输出目录（.gitignore 同步排除，不入库）
+      '.fix_out/**',
+      // 配置文件自身：tseslint 的 strictTypeChecked rules 块无 files 限制会套用它，
+      // 但 .mjs 无 parserOptions 类型信息，@typescript-eslint/* 类型感知规则直接崩溃
+      'eslint.config.mjs',
+      // 构建/测试配置文件：vitest.config.ts 未被任何 tsconfig 纳入 projectService
+      // 范围，类型感知规则会因找不到类型信息而崩溃（解析错误），配置文件无需参与 lint
+      'vitest.config.ts',
+      // 工具/备份/交付目录：不属于 lint 范围
+      '.backup_before_recovery/**',
+      '.archify-delivery-*/**',
+      '.uploads/**',
+      '.workbuddy/**',
+      '.trae/**',
+      '.vscode/**',
+      '__pycache__/**',
     ],
   },
 
   // 2. 基础规则：ESLint 官方推荐 + TypeScript 严格类型检查
+  //    （类型感知 rules 块经 constrainToTsFiles 限定只作用于 TS 文件，
+  //     否则 await-thenable 等规则在 .js/.mjs 上无类型信息直接崩溃）
   js.configs.recommended,
-  ...tseslint.configs.strictTypeChecked,
-  ...tseslint.configs.stylisticTypeChecked,
+  ...constrainToTsFiles(tseslint.configs.strictTypeChecked),
+  ...constrainToTsFiles(tseslint.configs.stylisticTypeChecked),
 
   // 3. Airbnb 严格规则集（airbnb-extended base，仅 recommended 部分，flat config 数组直接展开）
-  ...baseRecommendedConfig,
+  ...patchedBaseRecommendedConfig,
 
   // 4. 插件规则全部设为 error
   {
@@ -245,6 +293,14 @@ export default tseslint.config(
       // 仍强制 `// ` / `/* ` 后置空格；文档必须用 JSDoc 为项目约定，由 review 把关。
       '@stylistic/multiline-comment-style': 'off',
 
+      // ③ prettier 循环冲突：@stylistic/exp-list-style 要求表达式列表
+      // （三元条件列表、vi.fn 链、对象展开项等）按 'exp' 风格逐项断行。
+      // prettier 的格式化会把这些列表重新合并/换行，修复后 prettier 再次
+      // 运行又触发规则——实测形成永不收敛的循环（--fix 清 0 后 prettier
+      // 重排立即回归，单文件复现确认）。格式归属 prettier 统一负责。
+      // 替代保障：无（纯格式规则，prettier 是唯一格式权威）。
+      '@stylistic/exp-list-style': 'off',
+
       // ② 同一条破坏链的上游：unicorn/no-asterisk-prefix-in-documentation-comments
       // 剥掉 JSDoc 每行的 ` * ` 前缀 → 注释失去 JSDoc 的 `*` 行特征 →
       // multiline-comment-style 的 JSDoc 识别失效 → 整块降级为 `//`。
@@ -271,6 +327,53 @@ export default tseslint.config(
       // 替代保障：`instanceof Error` 已由 useUnknownInCatchVariables +
       // @typescript-eslint/no-unsafe-* 保证收窄前必须做类型判定。
       'unicorn/prefer-error-is-error': 'off',
+
+      // ① 规则前提在本项目不成立（纯误报）：unicorn/no-unsafe-dom-html 一刀切
+      // 禁止 innerHTML/outerHTML/insertAdjacentHTML 赋值，schema 无任何选项可豁免
+      // 「先经消毒层」的调用形态。本项目在**所有** HTML 边界强制经 sanitizeHtml()
+      // 消毒（ts/tools/sanitize.ts，44 处命中中 38 处生产代码全部为 sanitizeHtml()
+      // 包裹或内部常量 HTML，6 处测试是 XSS 测试本身对被消毒产物的断言），
+      // 规则的静态检查无法识别消毒包装，命中率 100% 误报。
+      // 替代保障：XSS 防御由 sanitizeHtml 实现 + xss.test.ts 用例 + tsc 类型强制
+      // （ts/tools/sanitize.ts 内的宿主赋值是本规则无法绕过的自检用例，若取消消毒
+      // 该用例立即失败）。
+      'unicorn/no-unsafe-dom-html': 'off',
+
+      // ① 纯误报：unicorn/throw-new-error 要求 `throw err` 处用 `new Error(...)`。
+      // 本项目命中 2 处均为 `win.BGMError(message, title)` 的**普通函数调用**——
+      // BGMError 是 WPS 宿主注入的展示函数（接口为方法签名，非构造函数），
+      // 规则将其静态误判为「未用 new 的 Error 构造调用」；加 new 会触发 TS7009
+      // （构造签名缺失）。且 isFix 模式下该规则缺席导致行内 disable 注释被
+      // ESLint 当作「未使用的 disable 指令」删除（fix/non-fix 不一致 bug），
+      // disable 注释方案不可行，只能配置级关闭。
+      // 替代保障：new-cap 的 capIsNewExceptions 已列 BGMError/BGMAlert/BGMInput，
+      // 类型系统强制这些名字按函数调用。
+      'unicorn/throw-new-error': 'off',
+
+      // ① 规则互斥循环冲突：unicorn/consistent-arrow-return-style 要求多行箭头
+      // 函数显式 return（块体），airbnb 的 arrow-body-style 要求简单箭头用
+      // 表达式体——两者 fix 互相改写永不收敛（实测：consistent-arrow-return-style
+      // fix 生成块体 → arrow-body-style 报错 → 其 fix 生成表达式体 →
+      // consistent-arrow-return-style 又报错）。airbnb 主规则集保留，
+      // unicorn 侧关闭。
+      // 替代保障：airbnb arrow-body-style（error）继续强制箭头体简洁性。
+      'unicorn/consistent-arrow-return-style': 'off',
+
+      // ① 纯误报：unicorn/no-unreadable-new-expression 只允许 `new Foo()` 单独成句
+      // 或赋值，禁止 `new Date().toISOString()` 这类**链式调用**。但无参构造 +
+      // 立即调用的 Date 工厂链（toISOString/toLocaleString/getFullYear）是全项目
+      // 19 处的标准惯用法，拆分变量（`const d = new Date(); d.toISOString()`）
+      // 是纯噪音且不改变任何语义；规则针对的「new Foo().bar() 不可读」场景
+      // 在 Date 上不成立（Date 构造本身无状态需要引用）。此为 unicorn
+      // configs.all 级纯风格规则，项目无一处真实可读性问题。
+      'unicorn/no-unreadable-new-expression': 'off',
+
+      // ① 架构前提不存在：import-x/dynamic-import-chunkname 要求动态 import 附带
+      // `/* webpackChunkName: 'x' */` 注释，该注释只被 webpack/rollup 等打包器
+      // 消费。本项目编译产物由 WPS WebView 以原生 ES Module 直接加载（无打包器），
+      // chunk 概念不存在，注释是纯噪音且会被 lint 自身标记为注释内容问题。
+      // 替代保障：无——该项目构建模型本身没有代码分割能力。
+      'import-x/dynamic-import-chunkname': 'off',
 
       // ① 与类型系统冲突：unicorn/prefer-query-selector 要求
       // getElementById(id) → querySelector('#id')，但两者返回类型不同：
@@ -588,6 +691,93 @@ export default tseslint.config(
           capIsNewExceptions: ['BGMError', 'BGMAlert', 'BGMInput'],
         },
       ],
+
+      // ④ 调选项：class-methods-use-this 豁免**接口契约方法**。
+      // 这些方法名全部来自外部接口（SyncSource / ZodSchema / XHR mock），
+      // 实现类必须提供实例方法才能满足 implements，加 static 会破坏接口契约
+      // （TS 报 "Property is missing in type"），且方法本身是静态语义的
+      // 查询/动作（返回常量、委托模块函数），本就不需要实例状态。
+      // 规则要防的「方法内该用 this 却没用」在这 7 个名字上不成立——
+      // 全项目同名方法均无真实实例依赖（已逐一核对该方法名的所有定义处）。
+      'class-methods-use-this': [
+        'error',
+        {
+          exceptMethods: [
+            'getSourceType',
+            'getDisplayName',
+            'fetchRemoteEntries',
+            'validateConfig',
+            'getAllResponseHeaders',
+            'length',
+            'safeParse',
+          ],
+        },
+      ],
+
+      // ===== 2026-09-05 批量清零（ES2023+ API 不可用 / 架构性误报）=====
+
+      // ① 目标环境 API 缺失（硬性不可用）：以下规则要求 ES2023+ 的数组/迭代器/DOM
+      // 新 API（toSorted / toReversed / Iterator#toArray / Iterator.concat / getHTML）。
+      // 本项目 tsconfig lib 为 ES2022，宿主 WPS WebView 的 Chromium 与 jsdom 均不保证
+      // 提供这些 API；实测 toReversed 曾致 enrich-page 兼容性故障、getHTML 曾致
+      // 23 个测试 TypeError（见上方 prefer-dom-node-html-methods 排除理由）。
+      // 替代保障：tsconfig lib 已精确约束可用 API 面（lib: ES2022），tso 编译期
+      // 直接拦截新 API 的使用（TS2550），比 lint 字面量建议更可靠。
+      'unicorn/no-array-sort': 'off',
+      'unicorn/no-array-reverse': 'off',
+      'unicorn/prefer-iterator-to-array': 'off',
+      'unicorn/prefer-iterator-concat': 'off',
+      'unicorn/prefer-dom-node-html-methods': 'off',
+
+      // ② 性能建议类规则（非正确性问题）：prefer-observer-apis 建议用
+      // IntersectionObserver/ResizeObserver 取代 scroll/resize 监听 + 布局读取。
+      // 本项目 3 处均为面板滚动容器/窗口 resize 的边缘场景，重构为观察者需
+      // 引入生命周期管理（断开连接/重连），收益仅是微优化，风险是面板行为回归。
+      // 替代保障：面板交互测试覆盖滚动/尺寸变化行为。
+      'unicorn/prefer-observer-apis': 'off',
+
+      // ② 位运算误报：no-bitwise 一刀切禁止 & | << >>。本项目 5 处全部是
+      // 校验和计算（crypto.ts checksum 的 FNV 哈希）与标志位掩码
+      // （github-cache.ts 的状态位组合），位运算是这些算法的唯一正确实现，
+      // 规则想防的「位运算混淆逻辑」场景不存在（无按位取巧的可读性替代）。
+      // 替代保障：算法代码集中、带注释，tsc 类型检查保证数值语义。
+      'no-bitwise': 'off',
+
+      // ② 架构设计冲突：unicorn/no-barrel-files 禁止聚合导出文件。本项目
+      // schemas/index.ts / tools/utility.ts / ui/handlers.ts / sync/exceltobangumi.ts
+      // 是**有意的公共 API 收口面**（上层统一从 index 导入，配合
+      // import-x/exports-last 关闭后的导出约定），拆散会破坏模块边界。
+      // 替代保障：barrel 文件仅 re-export，无隐藏副作用（no-top-level-side-effects 把关）。
+      'unicorn/no-barrel-files': 'off',
+
+      // ② 架构设计冲突：max-classes-per-file 限制每文件 1 个类。
+      // zod-compat.ts 的 10 个小类是一个**内聚的 Zod 兼容层**（LiteOptional/
+      // LiteWithDefault 等互相引用、共享同一 Schema 契约），拆分为 10 个文件
+      // 会破坏内聚性并制造 10 倍导入噪音；result.ts 的 2 个类是 Result 与其
+      // 私有迭代器（内部实现细节，不应暴露为独立模块）。
+      // 替代保障：类内聚边界由 tsc 类型与模块契约把关。
+      'max-classes-per-file': 'off',
+
+      // ② 架构建议类：import-x/max-dependencies 限制单模块依赖数 ≤10。
+      // 本项目 7 处超限模块全是**聚合枢纽**（index.ts / handlers/index.ts /
+      // bootstrap 系列 / sync-source-registry），它们的职责就是编排众多子模块，
+      // 拆小反而增加间接层。该规则是架构建议（非正确性），与项目分层模型冲突。
+      // 替代保障：依赖方向由 import-x/no-cycle 与分层 review 把关。
+      'import-x/max-dependencies': 'off',
+
+      // ② 项目导出风格冲突：import-x/prefer-default-export 要求单导出文件用
+      // default export。本项目公共模块一贯使用**命名导出**（显式 API 面、便于
+      // 静态分析树摇与重命名），9 处单导出文件均为这一约定的自然形态，
+      // 改 default 会牵动全部导入方且不带来正确性收益。
+      // 替代保障：公共 API 面由各 index.ts re-export 收口（同 no-barrel-files）。
+      'import-x/prefer-default-export': 'off',
+
+      // ② 加载项模型必需：unicorn/no-top-level-side-effects 禁止模块顶层副作用。
+      // 本项目 4 处顶层副作用全是 WPS 加载项的**注册/初始化**（ribbon 命令注册、
+      // 全局状态播种、模块状态上报），必须发生在模块加载期（宿主要求副作用
+      // 在 import 时生效），无法推迟到函数内。
+      // 替代保障：副作用集中在少量模块顶部且幂等，由 entry 层编排。
+      'unicorn/no-top-level-side-effects': 'off',
     },
   },
 
@@ -639,12 +829,51 @@ export default tseslint.config(
       // 真实约束力完整保留。
       'unicorn/prefer-add-event-listener': 'off',
 
+      // 构造型 mock 的**触发方法**（_respondOk/_triggerError/_aborted 等）由测试
+      // 在外部手动调用（`lastMockXhr!._respondOk(...)`），是替身注入响应的入口。
+      // 改成 # 私有字段后这些调用全部编译失败，破坏 mock 触发机制；
+      // 下划线命名是 mock 类与调用点之间的既定契约。生产代码 ts/ 下该规则
+      // 报错为 0，真实约束力完整保留。
+      'unicorn/prefer-private-class-fields': 'off',
+
       // 测试回调的 async 是历史遗留（早前重构移除了 await 但保留了 async 标记），
       // 由 codemod 逐处删除（commit 同批）：直接删 `it('…', async () => …)` 的 async
       // 无副作用；mock 实现（mockImplementation(async () => …)）的返回契约已逐处核对。
       // 无法用 allowForArrowFunctions 调参——本项目 typescript-eslint 版本的
       // require-await schema 为空（不支持任何选项）。生产代码 ts/ 下报错为 0。
       '@typescript-eslint/require-await': 'off',
+
+      // 测试 mock 全局注入：vitest 测试以 `globalThis.X = mock` / `globalThis[klass] = fn`
+      // 替换宿主全局（XMLHttpRequest / BroadcastChannel / fetch 等）是框架标准做法，
+      // 生产代码 ts/ 下仅 1 处（panel-page.ts，另案手工修复），真实约束力已保留。
+      'unicorn/no-global-object-property-assignment': 'off',
+
+      // 构造型 mock：MockBroadcastChannel 等替身构造函数内 `return 实例` 是
+      // 「可 new 且返回替身」的标准 mock 形态（保证 new 结果与单例一致）。
+      'no-constructor-return': 'off',
+
+      // XSS 防护测试：冲突解决测试故意构造 javascript: 伪协议 URL 断言消毒逻辑，
+      // 不产生真实执行。
+      'no-script-url': 'off',
+
+      // 动态删除测试：github-config 测试用 delete config[key] 断言「动态键删除后
+      // 序列化结果」，是数据契约测试的一部分。
+      '@typescript-eslint/no-dynamic-delete': 'off',
+
+      // 边界矩阵断言：boundary.test.ts 的深层嵌套 expect 链是矩阵式断言的惯用形态，
+      // 提取辅助函数会破坏「一行一断言」的对照可读性。
+      'unicorn/max-nested-calls': 'off',
+
+      // mock 方法引用断言：vitest 以 `expect(mockSource.fetchRemoteEntries).toHaveBeenCalled()`
+      // 断言方法被调用，取出方法引用本身就是测试意图（不调用它），
+      // 该引用不会脱离 mock 对象执行，无 this 逃逸风险。
+      '@typescript-eslint/unbound-method': 'off',
+
+      // 非 Error 抛出测试：多处 mock 故意 `throw '字符串'` 以覆盖生产代码
+      // `e instanceof Error` 的 false 分支（String(e) 格式化路径），
+      // 改成 throw new Error 会直接破坏被测分支，属测试意图本身。
+      'no-throw-literal': 'off',
+      '@typescript-eslint/only-throw-error': 'off',
     },
   },
 

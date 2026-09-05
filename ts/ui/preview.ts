@@ -86,7 +86,7 @@ function safeAlert(message: string, title?: string): void {
 function isUploadedByColor(seqCell: WpsRange | null): boolean {
   if (!seqCell?.Interior) return false
   const c = seqCell.Interior.Color
-  return c === BGM_COLOR.SUCCESS || c === BGM_COLOR.LIGHT_GREEN || c === BGM_COLOR.DARK_GREEN
+  return [BGM_COLOR.SUCCESS, BGM_COLOR.LIGHT_GREEN, BGM_COLOR.DARK_GREEN].includes(c)
 }
 
 function getRowData(
@@ -172,7 +172,7 @@ function renderDetailItemHtml(
   // 解析标签数据
   const tagSet = new Set<string>()
   addTagsFromString(tagSet, rowData.tagsRaw)
-  const tags = Array.from(tagSet)
+  const tags = [...tagSet]
   // 生成标签HTML
   const tagsHtml =
     tags.length > 0
@@ -233,16 +233,26 @@ function handlePreviewBodyClick(event: Event): void {
   const target = event.target as HTMLElement
   const button = target.closest('.upload-single-btn')
   if (!(button instanceof HTMLElement)) return
-  const rowNumber = parseInt(button.dataset.row ?? '', 10)
-  if (isNaN(rowNumber)) return
+  const rowNumber = Number(button.dataset.row)
+  if (Number.isNaN(rowNumber)) return
   void uploadSingleRow(rowNumber, button as HTMLButtonElement)
+}
+
+/** 判断字符串是否全部由 CJK 统一表意文字（U+4E00–U+9FA5）组成（等价于 /^[\u{4E00}-\u{9FA5}]+$/u） */
+function isPureChinese(text: string): boolean {
+  if (!text) return false
+  for (const ch of text) {
+    const code = ch.codePointAt(0)
+    if (code === undefined || code < 0x4e00 || code > 0x9fa5) return false
+  }
+  return true
 }
 
 // 从映射表中提取标准中文状态列表（过滤数字和英文）
 const VALID_STATUSES = new Set(
   Object.keys(WATCH_STATUS_MAP)
     // 只保留纯中文
-    .filter((key) => /^[\u4E00-\u9FA5]+$/.test(key))
+    .filter((key) => isPureChinese(key))
     .filter((key, index, array) => array.indexOf(key) === index),
   // 去重
 )
@@ -290,14 +300,14 @@ export async function previewSyncContent(): Promise<void> {
 
   const { ws, visibleRows, headerRow, dataStartRow } = dp
   // 防御性排序 + 去重：确保行号严格升序且无重复（修复"190-201后跳到3"问题）
-  const dataRows = Array.from(
-    new Set(visibleRows.filter((r) => r !== headerRow && r >= dataStartRow)),
-  ).sort((a, b) => a - b)
+  const dataRows = [
+    ...new Set(visibleRows.filter((r) => r !== headerRow && r >= dataStartRow)),
+  ].sort((a, b) => a - b)
   bgmLog(LOG_LEVELS.INFO, `[preview] 过滤后得到 ${String(dataRows.length)} 条数据行`)
   if (dataRows.length > 0) {
     bgmLog(
       LOG_LEVELS.INFO,
-      `[preview] 数据行范围: ${String(dataRows[0] ?? '')} ~ ${String(dataRows[dataRows.length - 1] ?? '')}`,
+      `[preview] 数据行范围: ${String(dataRows[0] ?? '')} ~ ${String(dataRows.at(-1) ?? '')}`,
     )
   }
 
@@ -358,7 +368,7 @@ export async function previewSyncContent(): Promise<void> {
   let errorCount = 0
 
   const renderPreviewCards = async (): Promise<void> => {
-    for (let index = 0; index < dataRows.length; index += 1) {
+    for (const [index, rowNumber] of dataRows.entries()) {
       // 停止检查
       if (BGM.sync.checkShouldStop()) {
         bgmLog(
@@ -380,77 +390,76 @@ export async function previewSyncContent(): Promise<void> {
         }
       }
 
-      const rowNumber = dataRows[index]
-      if (!(rowNumber === undefined)) {
-        BGM.sync.updatePosition(undefined, rowNumber)
+      BGM.sync.updatePosition(undefined, rowNumber)
 
-        // 每行让出主线程，确保暂停按钮及时响应
-        await new Promise((r) => setTimeout(r, 0))
+      // 每行让出主线程，确保暂停按钮及时响应
+      await new Promise((resolve) => {
+        setTimeout(resolve, 0)
+      })
 
-        try {
-          const rowData = getRowData(ws, rowNumber, colMap, headerRow, 9)
+      try {
+        const rowData = getRowData(ws, rowNumber, colMap, headerRow, 9)
 
-          // 过滤无效行
-          if (!rowData.bgmUrl || !rowData.sid) {
-            bgmLog(LOG_LEVELS.INFO, `[preview] 跳过行 ${String(rowNumber)} (无 Bangumi URL)`)
-            skippedCount += 1
-            updateSyncProgressDialog(
-              index + 1,
-              totalRows,
-              `预览生成 ${String(index + 1)}/${String(totalRows)}（卡片 ${String(actualCardCount)}）`,
-              `⊘ [${String(index + 1)}/${String(totalRows)}] 行${String(rowNumber)} 跳过: 无URL`,
-            )
-          } else if (!rowData.name && !rowData.status && !rowData.tagsRaw) {
-            bgmLog(LOG_LEVELS.INFO, `[preview] 跳过行 ${String(rowNumber)} (空卡片)`)
-            skippedCount += 1
-            updateSyncProgressDialog(
-              index + 1,
-              totalRows,
-              `预览生成 ${String(index + 1)}/${String(totalRows)}（卡片 ${String(actualCardCount)}）`,
-              `⊘ [${String(index + 1)}/${String(totalRows)}] 行${String(rowNumber)} 跳过: 空卡片`,
-            )
-          } else {
-            const normalizedStatus = normalizeStatus(rowData.status)
-            // 将标准化后的状态放回 rowData，便于后续统计和卡片渲染
-            rowData.status = normalizedStatus
-
-            // 更新统计数据（仅当状态码在 1-5 范围内）
-            if (rowData.typeNum >= 1 && rowData.typeNum <= 5) {
-              detailPreviewData.totalWithType += 1
-              detailPreviewData.typeCount[rowData.typeNum] =
-                (detailPreviewData.typeCount[rowData.typeNum] ?? 0) + 1
-              if (rowData.isUploaded) {
-                detailPreviewData.totalUploaded += 1
-                detailPreviewData.uploadedCount[rowData.typeNum] =
-                  (detailPreviewData.uploadedCount[rowData.typeNum] ?? 0) + 1
-              }
-            }
-
-            // 生成卡片 HTML（渲染成功后才计数）
-            cardsHtml += renderDetailItemHtml(rowData, colMap, ws)
-            actualCardCount += 1
-            updateSyncProgressDialog(
-              index + 1,
-              totalRows,
-              `预览生成 ${String(index + 1)}/${String(totalRows)}（卡片 ${String(actualCardCount)}）`,
-              `✓ [${String(index + 1)}/${String(totalRows)}] 行${String(rowNumber)} "${rowData.name || ''}" 已渲染`,
-            )
-          }
-        } catch (error: unknown) {
-          errorCount += 1
-          BGM.handleError(error, {
-            showAlert: false,
-            level: BGM.ErrorLevel.WARN,
-            context: 'previewSyncContent',
-          })
-          cardsHtml += `<div class="detail-item error">行 ${String(rowNumber)} 处理出错: ${escapeHtml((error as Error).message)}</div>`
+        // 过滤无效行
+        if (!rowData.bgmUrl || !rowData.sid) {
+          bgmLog(LOG_LEVELS.INFO, `[preview] 跳过行 ${String(rowNumber)} (无 Bangumi URL)`)
+          skippedCount += 1
           updateSyncProgressDialog(
             index + 1,
             totalRows,
             `预览生成 ${String(index + 1)}/${String(totalRows)}（卡片 ${String(actualCardCount)}）`,
-            `✗ [${String(index + 1)}/${String(totalRows)}] 行${String(rowNumber)} 异常: ${(error as Error).message}`,
+            `⊘ [${String(index + 1)}/${String(totalRows)}] 行${String(rowNumber)} 跳过: 无URL`,
+          )
+        } else if (!rowData.name && !rowData.status && !rowData.tagsRaw) {
+          bgmLog(LOG_LEVELS.INFO, `[preview] 跳过行 ${String(rowNumber)} (空卡片)`)
+          skippedCount += 1
+          updateSyncProgressDialog(
+            index + 1,
+            totalRows,
+            `预览生成 ${String(index + 1)}/${String(totalRows)}（卡片 ${String(actualCardCount)}）`,
+            `⊘ [${String(index + 1)}/${String(totalRows)}] 行${String(rowNumber)} 跳过: 空卡片`,
+          )
+        } else {
+          const normalizedStatus = normalizeStatus(rowData.status)
+          // 将标准化后的状态放回 rowData，便于后续统计和卡片渲染
+          rowData.status = normalizedStatus
+
+          // 更新统计数据（仅当状态码在 1-5 范围内）
+          if (rowData.typeNum >= 1 && rowData.typeNum <= 5) {
+            detailPreviewData.totalWithType += 1
+            detailPreviewData.typeCount[rowData.typeNum] =
+              (detailPreviewData.typeCount[rowData.typeNum] ?? 0) + 1
+            if (rowData.isUploaded) {
+              detailPreviewData.totalUploaded += 1
+              detailPreviewData.uploadedCount[rowData.typeNum] =
+                (detailPreviewData.uploadedCount[rowData.typeNum] ?? 0) + 1
+            }
+          }
+
+          // 生成卡片 HTML（渲染成功后才计数）
+          cardsHtml += renderDetailItemHtml(rowData, colMap, ws)
+          actualCardCount += 1
+          updateSyncProgressDialog(
+            index + 1,
+            totalRows,
+            `预览生成 ${String(index + 1)}/${String(totalRows)}（卡片 ${String(actualCardCount)}）`,
+            `✓ [${String(index + 1)}/${String(totalRows)}] 行${String(rowNumber)} "${rowData.name || ''}" 已渲染`,
           )
         }
+      } catch (error: unknown) {
+        errorCount += 1
+        BGM.handleError(error, {
+          showAlert: false,
+          level: BGM.ErrorLevel.WARN,
+          context: 'previewSyncContent',
+        })
+        cardsHtml += `<div class="detail-item error">行 ${String(rowNumber)} 处理出错: ${escapeHtml((error as Error).message)}</div>`
+        updateSyncProgressDialog(
+          index + 1,
+          totalRows,
+          `预览生成 ${String(index + 1)}/${String(totalRows)}（卡片 ${String(actualCardCount)}）`,
+          `✗ [${String(index + 1)}/${String(totalRows)}] 行${String(rowNumber)} 异常: ${(error as Error).message}`,
+        )
       }
     }
     cardsHtml += '</div>'
@@ -461,12 +470,12 @@ export async function previewSyncContent(): Promise<void> {
     // 切换弹窗为完成状态
     const summary = `📊 预览 ${String(totalRows)} 行 | 卡片 ${String(actualCardCount)}\n\n✅ 已渲染: ${String(actualCardCount)}\n⏭️ 跳过: ${String(skippedCount)}\n❌ 错误: ${String(errorCount)}`
     const detailsArray: string[] = [
+      ...(wasStopped ? ['⚠️ 预览被用户停止'] : []),
       `总行数: ${String(totalRows)}`,
       `渲染卡片: ${String(actualCardCount)}`,
       `跳过行数: ${String(skippedCount)}`,
       `错误行数: ${String(errorCount)}`,
     ]
-    if (wasStopped) detailsArray.unshift('⚠️ 预览被用户停止')
     completeSyncProgressDialog(summary, detailsArray, wasStopped)
 
     // 生成统计卡片（使用 actualCardCount）
@@ -507,9 +516,9 @@ export async function previewSyncContent(): Promise<void> {
     const priorityStatus = ['想看', '在看', '看过', '搁置', '抛弃']
     const sortedStatus = [
       ...priorityStatus.filter((s) => statusMap.has(s)),
-      ...Array.from(statusMap.keys())
+      ...[...statusMap.keys()]
         .filter((s) => !priorityStatus.includes(s))
-        .sort(),
+        .sort((a, b) => Number(a > b) - Number(a < b)),
     ]
 
     const select = document.createElement('select')
@@ -529,7 +538,7 @@ export async function previewSyncContent(): Promise<void> {
 
     const syncAllButton = document.getElementById('syncAllBtn')
     if (syncAllButton) {
-      syncAllButton.insertAdjacentElement('afterend', select)
+      syncAllButton.after(select)
     } else {
       header.appendChild(select)
     }
@@ -563,9 +572,7 @@ export async function previewSyncContent(): Promise<void> {
     const scrollBottomButton = document.getElementById('scrollToBottomBtn')
 
     const updateScrollButtons = () => {
-      const { scrollTop } = body
-      const { scrollHeight } = body
-      const { clientHeight } = body
+      const { scrollTop, scrollHeight, clientHeight } = body
       const maxScroll = scrollHeight - clientHeight
 
       // 只有内容可滚动时才显示按钮
@@ -657,8 +664,9 @@ export async function uploadSingleRow(
     if (!app?.ActiveWorkbook) throw new Error('无法获取 Application')
 
     const select = document.getElementById('sheetSelect') as HTMLSelectElement
-    // parseInt 失败返回 NaN（非 nullish），`??` 兜不住，须显式 isFinite 兜底
-    const parsedSheetIndex = BGM.sheet.lockedIndex ?? parseInt(select.value, 10)
+    // Number('') 为 0 会绕过 isFinite 兜底，空串须显式转 NaN
+    const parsedSheetIndex =
+      BGM.sheet.lockedIndex ?? (select.value === '' ? NaN : Number(select.value))
     const sheetIndex = Number.isFinite(parsedSheetIndex) ? parsedSheetIndex : 1
     const ws = app.ActiveWorkbook.Worksheets.Item(sheetIndex)
 
@@ -832,9 +840,15 @@ export async function syncAllRows(): Promise<{ success: number; fail: number; sk
   if (!token) {
     // 无 token 流程：显示进度弹窗提示用户，不退出页面
     showSyncProgressDialog('Bangumi Token 未设置', {
-      onPause: () => {},
-      onResume: () => {},
-      onStop: () => {},
+      onPause: () => {
+        /* empty */
+      },
+      onResume: () => {
+        /* empty */
+      },
+      onStop: () => {
+        /* empty */
+      },
     })
     completeSyncProgressDialog(
       '⚠️ 无法同步：缺少 Bangumi Token',
@@ -851,9 +865,9 @@ export async function syncAllRows(): Promise<{ success: number; fail: number; sk
 
   const { ws, visibleRows, headerRow, dataStartRow } = dp
   // 防御性排序 + 去重：确保行号严格升序且无重复
-  const dataRows = Array.from(
-    new Set(visibleRows.filter((r) => r !== headerRow && r >= dataStartRow)),
-  ).sort((a, b) => a - b)
+  const dataRows = [
+    ...new Set(visibleRows.filter((r) => r !== headerRow && r >= dataStartRow)),
+  ].sort((a, b) => a - b)
   if (dataRows.length === 0) {
     showToast('没有可同步的数据行', 'info')
     return { success: 0, fail: 0, skip: 0 }

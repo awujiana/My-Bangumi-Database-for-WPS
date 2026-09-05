@@ -72,10 +72,7 @@ afterAll(() => {
   vi.useRealTimers()
 })
 
-// ========== XHR Mock 工具 ==========
-// 与 tests/localFileSync.test.ts 一致：提供可控制的 XMLHttpRequest mock，
-// 支持 onload/onerror/ontimeout 触发。每个 MockXHR 实例捕获 open/send 调用，
-// 测试通过 _respondOk / _respondError / _triggerError / _triggerTimeout 注入响应。
+// ========== XHR Mock 工具 ========== 与 tests/localFileSync.test.ts 一致：提供可控制的 XMLHttpRequest mock， 支持 onload/onerror/ontimeout 触发。每个 MockXHR 实例捕获 open/send 调用， 测试通过 _respondOk / _respondError / _triggerError / _triggerTimeout 注入响应。
 
 interface MockXHRCall {
   method: string
@@ -87,7 +84,21 @@ interface MockXHRCall {
 
 let lastXhrCall: MockXHRCall | null = null
 let lastMockXhr: MockXHR | null = null
+
+/** 记录最近一次 send() 创建的 MockXHR 实例（避免将 this 直接赋给模块变量触发 no-this-assignment） */
+function recordLastMockXhr(xhr: MockXHR): void {
+  lastMockXhr = xhr
+}
+
 class MockXHR {
+  private method = ''
+
+  private url = ''
+
+  private async = true
+
+  private headers: Record<string, string> = {}
+
   status = 0
 
   statusText = ''
@@ -102,6 +113,8 @@ class MockXHR {
 
   ontimeout: (() => void) | null = null
 
+  _aborted = false
+
   /** 生产代码经 addEventListener 注册：映射到 onXXX 属性，保留测试手动触发机制 */
   addEventListener(type: 'load' | 'error', handler: () => void): void {
     if (type === 'load') {
@@ -110,16 +123,6 @@ class MockXHR {
       this.onerror = handler
     }
   }
-
-  _aborted = false
-
-  private method = ''
-
-  private url = ''
-
-  private async = true
-
-  private headers: Record<string, string> = {}
 
   open(method: string, url: string, isAsync: boolean): void {
     this.method = method
@@ -143,7 +146,7 @@ class MockXHR {
       timeout: this.timeout,
       headers: { ...this.headers },
     }
-    lastMockXhr = this
+    recordLastMockXhr(this)
   }
 
   // 测试辅助方法：模拟成功响应（默认 200）

@@ -77,14 +77,14 @@ export function extractToken(encrypted: string): string | null {
     }
 
     const [version, checksumString, ...tokenParts] = parts
-    const token = tokenParts.join(':')
-    const checksum = parseInt(checksumString ?? '', 10)
 
     if (version !== TOKEN_CONFIG.VERSION) {
       bgmLog(LOG_LEVELS.WARN, `[crypto] Token版本不匹配: ${version ?? ''}`)
       return null
     }
 
+    const token = tokenParts.join(':')
+    const checksum = checksumString ? Number(checksumString) : NaN
     const expectedChecksum = calcChecksum(token)
     if (checksum !== expectedChecksum) {
       bgmLog(LOG_LEVELS.WARN, '[crypto] Token校验和不匹配，可能已被篡改')

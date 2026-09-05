@@ -36,13 +36,13 @@ import { syncAllRows } from '../../ui/preview.js'
 import { BGM_EVENTS, eventBus } from '../events.js'
 // 字符串工具已拆分到 string-utilities.ts，此处 import 供内部调用，并 re-export 保持向后兼容
 import { logger } from '../logger.js'
-import { colNumberToLetter, trim, escapeHtml, calcFingerprint } from '../string-utilities.js'
+import { colNumberToLetter } from '../string-utilities.js'
 // 日志模块：bgmLog 内部通过 logger 输出，自动脱敏敏感信息，且不污染全局 console
 import { isWpsApp } from '../wps.js'
 import type { WpsApp, WpsWorksheet } from '../wps.js'
 
 // re-export 字符串工具保持向后兼容
-export { colNumberToLetter, trim, escapeHtml, calcFingerprint }
+
 // re-export 子模块
 export { getCell, getCellValue, setCellValue, getSheetByIndex } from './cell.js'
 export {
@@ -273,7 +273,9 @@ export const BGM: {
     /** 暂停时等待恢复，每 50ms 轮询一次 */
     async waitForResume(): Promise<void> {
       while (this.isPaused && !this.shouldStop) {
-        await new Promise((r) => setTimeout(r, 50))
+        await new Promise((resolve) => {
+          setTimeout(resolve, 50)
+        })
       }
     },
 
@@ -299,7 +301,7 @@ export const BGM: {
     /** 更新当前位置（供同步循环调用，传 undefined 保留原值） */
     updatePosition(ws: WpsWorksheet | null | undefined, row: number, col?: number): void {
       // 行号范围校验：必须为非负整数
-      if (!Number.isInteger(row) || row < 0) return
+      if (!Number.isSafeInteger(row) || row < 0) return
       if (ws !== undefined) this.currentSheet = ws
       this.currentRow = row
       if (col !== undefined && col > 0) this.currentCol = col
@@ -357,6 +359,8 @@ export const BGM: {
           return
         }
         if (typeof win.BGMError === 'function') {
+          // BGMError 是宿主注入的展示函数，非构造函数，勿用 new
+
           win.BGMError(message, title)
           return
         }
@@ -406,30 +410,28 @@ export const BGM: {
           return
         }
       }
-      {
-        switch (type) {
-          case 'error': {
-            this.error(title, message)
-            break
-          }
-          case 'confirm': {
-            this.confirm(
-              message,
-              (confirmed) => {
-                if (confirmed) options?.onOk?.()
-                else options?.onCancel?.()
-              },
-              title,
-            )
-            break
-          }
-          case 'input': {
-            this.input(title, message, options?.defaultValue, options?.onOk, options?.onCancel)
-            break
-          }
-          default: {
-            this.alert(title, message)
-          }
+      switch (type) {
+        case 'error': {
+          this.error(title, message)
+          break
+        }
+        case 'confirm': {
+          this.confirm(
+            message,
+            (confirmed) => {
+              if (confirmed) options?.onOk?.()
+              else options?.onCancel?.()
+            },
+            title,
+          )
+          break
+        }
+        case 'input': {
+          this.input(title, message, options?.defaultValue, options?.onOk, options?.onCancel)
+          break
+        }
+        default: {
+          this.alert(title, message)
         }
       }
     },
@@ -498,6 +500,10 @@ export const BGM: {
         bgmLog(LOG_LEVELS.ERROR, bgmError.toString())
         throw bgmError
       }
+      default: {
+        // 未匹配的 level（如 INFO=4 或非法值）：与原有 fall-through 行为一致，不输出错误日志
+        break
+      }
     }
 
     return bgmError
@@ -559,31 +565,32 @@ export const BGM: {
  * @param message - 日志消息
  */
 
-export function bgmLog(level: number, message: string | null | undefined): void {
-  if (level >= BGM.LOG_LEVEL) {
-    const message_ = message ?? ''
-    // 0=DEBUG, 1=INFO, 2=WARN, 3=ERROR（与 LOG_LEVELS 保持一致）
-    // 通过 logger 输出，message 会自动经过 maskSensitiveData 脱敏
-    switch (level) {
-      case 0: {
-        logger.debug(message_)
-        break
-      }
-      case 1: {
-        logger.info(message_)
-        break
-      }
-      case 2: {
-        logger.warn(message_)
-        break
-      }
-      case 3: {
-        logger.error(message_)
-        break
-      }
-      default: {
-        logger.info(message_)
-      }
+export function bgmLog(level: number, message_ = ''): void {
+  if (!(level >= BGM.LOG_LEVEL)) {
+    return
+  }
+
+  // 0=DEBUG, 1=INFO, 2=WARN, 3=ERROR（与 LOG_LEVELS 保持一致）
+  // 通过 logger 输出，message 会自动经过 maskSensitiveData 脱敏
+  switch (level) {
+    case 0: {
+      logger.debug(message_)
+      break
+    }
+    case 1: {
+      logger.info(message_)
+      break
+    }
+    case 2: {
+      logger.warn(message_)
+      break
+    }
+    case 3: {
+      logger.error(message_)
+      break
+    }
+    default: {
+      logger.info(message_)
     }
   }
 }
@@ -592,7 +599,7 @@ export function bgmLog(level: number, message: string | null | undefined): void 
  * @param skipAdditional 额外跳过的帧数（备用，通常无需传）
  */
 function getCallerFunctionName(_skipAdditional = 0): string {
-  const error = new Error()
+  const error = new Error('getCallerFunctionName')
   const stack = error.stack ?? ''
   const lines = stack.split('\n')
   // 需要跳过的内部函数名列表
@@ -606,7 +613,7 @@ function getCallerFunctionName(_skipAdditional = 0): string {
 
   for (let index = 2; index < lines.length; index += 1) {
     const rawLine = lines[index]
-    if (!(rawLine === undefined)) {
+    if (rawLine !== undefined) {
       const line = rawLine.trim()
       const match = /at\s+([^\s(]+)/.exec(line)
       if (match) {
@@ -1029,7 +1036,7 @@ export function _fetchBgmUserInfo(
     if (callback) callback(null, 'network')
   })
 
-  xhr.ontimeout = function (): void {
+  xhr.ontimeout = function handleTimeout(): void {
     bgmLog(LOG_LEVELS.WARN, `[_fetchBgmUserInfo] 请求超时（15s）：可能网络受限或被墙`)
     if (callback) callback(null, 'network')
   }
@@ -1100,6 +1107,8 @@ export function showBangumiPanel(): void {
   if (!app) {
     const win = typeof window === 'undefined' ? null : (window as unknown as BgmWindowGlobals)
     if (win?.BGMError) {
+      // BGMError 是宿主注入的展示函数，非构造函数，勿用 new
+
       win.BGMError('无法获取 WPS Application 对象！', '错误')
     } else {
       // 使用自定义错误对话框
@@ -1248,3 +1257,5 @@ export function showSettingsPanel(): void {
     }
   }
 }
+
+export { trim, escapeHtml, calcFingerprint, colNumberToLetter } from '../string-utilities.js'

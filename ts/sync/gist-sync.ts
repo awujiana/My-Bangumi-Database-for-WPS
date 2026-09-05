@@ -146,11 +146,13 @@ export function extractGistContent(apiResponse: unknown): string {
   // 收集所有非空 content
   const contents: string[] = []
   // 按文件名字典序遍历，保证拼接顺序确定（便于测试与可重现性）
-  const fileNames = Object.keys(apiResponse.files).sort()
+  // localeCompare 简单比较函数（满足 unicorn/require-array-sort-compare 与 prefer-simple-sort-comparator）
+  const fileNames = Object.keys(apiResponse.files).sort((a, b) => a.localeCompare(b))
   for (const fileName of fileNames) {
     const file = apiResponse.files[fileName]
     if (file) {
       if (file.content === undefined || file.content.length === 0) {
+        /* empty */
       } else {
         contents.push(file.content)
       }
@@ -230,14 +232,14 @@ export function fetchGistJson(signal?: AbortSignal): Promise<GithubRemoteEntry[]
       return
     }
 
-    // 2. 构造 URL
-    const url = buildGistApiUrl(gistId)
-
-    // 3. 如果 signal 已 aborted，立即 reject
+    // 2. 如果 signal 已 aborted，立即 reject
     if (signal?.aborted) {
       reject(new Error('请求被取消'))
       return
     }
+
+    // 3. 构造 URL（声明移到 early reject 之后，满足 unicorn/no-declarations-before-early-exit）
+    const url = buildGistApiUrl(gistId)
 
     bgmLog(LOG_LEVELS.INFO, `[gistSync] 开始下载: ${url}`)
     const xhr = new XMLHttpRequest()
@@ -253,33 +255,44 @@ export function fetchGistJson(signal?: AbortSignal): Promise<GithubRemoteEntry[]
     }
 
     xhr.addEventListener('load', (): void => {
-      if (xhr.status === 200) {
-        try {
-          // 4-6. 解析响应：JSON.parse → extractGistContent → parseJsonl
-          const entries = parseGistResponseBody(xhr.responseText)
-          if (entries === null) {
-            // 未提取到任何文件内容
-            resolve([])
-            return
+      switch (xhr.status) {
+        case 200: {
+          try {
+            // 4-6. 解析响应：JSON.parse → extractGistContent → parseJsonl
+            const entries = parseGistResponseBody(xhr.responseText)
+            if (entries === null) {
+              // 未提取到任何文件内容
+              resolve([])
+              return
+            }
+            resolve(entries)
+          } catch (error: unknown) {
+            reject(
+              new Error(
+                `Gist 响应解析失败: ${error instanceof Error ? error.message : String(error)}`,
+              ),
+            )
           }
-          resolve(entries)
-        } catch (error: unknown) {
+
+          break
+        }
+        case 404: {
+          reject(new Error(`Gist 不存在（404）：${url}，请检查 gist_id 配置`))
+
+          break
+        }
+        case 403: {
           reject(
             new Error(
-              `Gist 响应解析失败: ${error instanceof Error ? error.message : String(error)}`,
+              `访问被拒（403）：可能是私有 Gist 或触发 GitHub API 限流（未认证 60次/小时/IP）`,
             ),
           )
+
+          break
         }
-      } else if (xhr.status === 404) {
-        reject(new Error(`Gist 不存在（404）：${url}，请检查 gist_id 配置`))
-      } else if (xhr.status === 403) {
-        reject(
-          new Error(
-            `访问被拒（403）：可能是私有 Gist 或触发 GitHub API 限流（未认证 60次/小时/IP）`,
-          ),
-        )
-      } else {
-        reject(new Error(`HTTP 错误 ${String(xhr.status)}: ${xhr.statusText}`))
+        default: {
+          reject(new Error(`HTTP 错误 ${String(xhr.status)}: ${xhr.statusText}`))
+        }
       }
     })
 

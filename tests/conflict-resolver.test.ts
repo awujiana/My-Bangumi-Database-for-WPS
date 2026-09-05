@@ -203,9 +203,7 @@ describe('showConflictResolver - 批量选择', () => {
     })
 
     // 点击「全部使用本地」（工具栏第 1 个 button）
-    const allLocalButton = document.querySelectorAll<HTMLButtonElement>(
-      '.conflict-toolbar .btn.small',
-    )[0]
+    const allLocalButton = document.querySelector<HTMLButtonElement>('.conflict-toolbar .btn.small')
     expect(allLocalButton?.textContent).toBe('全部使用本地')
     allLocalButton?.click()
 
@@ -241,7 +239,7 @@ describe('showConflictResolver - 单条切换', () => {
     const promise = showConflictResolver(SAMPLE_CONFLICTS)
 
     // 找到第一行的 remote radio 并选中
-    const firstRow = document.querySelectorAll<HTMLTableRowElement>('.conflict-row')[0]
+    const firstRow = document.querySelector<HTMLTableRowElement>('.conflict-row')
     const remoteRadio = firstRow?.querySelector<HTMLInputElement>('input[value="remote"]')
     expect(remoteRadio).toBeTruthy()
     remoteRadio!.checked = true

@@ -54,7 +54,7 @@ const mockState = vi.hoisted(() => ({
   isGithubConfigComplete: vi.fn(() => true),
   buildRawUrl: vi.fn(() => 'https://raw.githubusercontent.com/test/test/main/data.jsonl'),
   getSyncSourceType: vi.fn(() => 'github'),
-  getSyncSource: vi.fn(() => null),
+  getSyncSource: vi.fn<(type: string) => SyncSource | null>(() => null),
   getSyncStrategy: vi.fn(() => 'add-update' as const),
 }))
 
@@ -122,7 +122,18 @@ vi.mock('../../ts/tools/util/index.js', () => ({
   setCellValue: mockState.setCellValue,
   getCell: vi.fn(),
   getSheetByIndex: vi.fn(),
-  trim: (s: unknown): string => String(s ?? '').trim(),
+  trim: (s: unknown): string => {
+    let text: string
+    if (s == null) {
+      text = ''
+    } else if (typeof s === 'object') {
+      text = JSON.stringify(s)
+    } else {
+      // eslint-disable-next-line @typescript-eslint/no-base-to-string -- 原实现即 String(s)，保持等价语义
+      text = String(s)
+    }
+    return text.trim()
+  },
   colNumberToLetter: (n: number): string => {
     let result = ''
     let number_ = n
@@ -213,11 +224,7 @@ vi.mock('../../ts/sync/sync-source-registry.js', async () => {
         throw new Error(errorMessage)
       }
 
-      onProgress?.(
-        0,
-        0,
-        `开始下载远程数据（${String(source.getDisplayName())} - 策略：${strategy}）...`,
-      )
+      onProgress?.(0, 0, `开始下载远程数据（${source.getDisplayName()} - 策略：${strategy}）...`)
       const remoteEntries = await source.fetchRemoteEntries(signal)
       onProgress?.(1, 3, `下载完成：${String(remoteEntries.length)} 条`)
 
@@ -275,10 +282,10 @@ function createMockSyncSource(entries: GithubRemoteEntry[]): SyncSource {
         isFail: () => false,
         map: () => ({ isOk: () => true, isFail: () => false }),
         mapErr: () => ({ isOk: () => true, isFail: () => false }),
-        unwrap: () => undefined,
-        unwrapOr: () => undefined,
-        unwrapOrElse: () => undefined,
-        match: () => undefined,
+        unwrap: () => {},
+        unwrapOr: () => {},
+        unwrapOrElse: () => {},
+        match: () => {},
       }) as unknown as Result<void>,
   }
 }
@@ -715,15 +722,15 @@ describe('GitHub 同步流程：fetch JSONL → diff → apply → undo', () => 
     expect(mockState.addSyncRecords).toHaveBeenCalled()
     const records = mockState.addSyncRecords.mock.calls[0]?.[0] as Record<string, unknown>[]
     expect(records).toHaveLength(2)
-    expect(records?.some((r) => r.content === '仓库同步-新增' && r.sid === '10001')).toBe(true)
-    expect(records?.some((r) => r.content === '仓库同步-更新' && r.sid === '10002')).toBe(true)
+    expect(records.some((r) => r.content === '仓库同步-新增' && r.sid === '10001')).toBe(true)
+    expect(records.some((r) => r.content === '仓库同步-更新' && r.sid === '10002')).toBe(true)
 
     // 验证汇总行
     expect(mockState.addSyncRecordSummary).toHaveBeenCalled()
     const summary = mockState.addSyncRecordSummary.mock.calls[0]?.[0] as Record<string, unknown>
-    expect(summary?.content).toBe('仓库同步汇总')
-    expect(summary?.message).toContain('新增 1')
-    expect(summary?.message).toContain('更新 1')
+    expect(summary.content).toBe('仓库同步汇总')
+    expect(summary.message).toContain('新增 1')
+    expect(summary.message).toContain('更新 1')
 
     // 6. undoLastSync（撤销上次同步）
     mockState.undoLastSync.mockReturnValue(2)

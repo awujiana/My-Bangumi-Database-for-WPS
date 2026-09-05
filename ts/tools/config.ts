@@ -288,7 +288,7 @@ export function setRefreshInterval(minutes: number): boolean {
 }
 
 export function getRefreshInterval(isSilent = false): number {
-  const raw = parseInt(getConfig(CONFIG_KEYS.REFRESH_INTERVAL, '0', isSilent), 10)
+  const raw = Number(getConfig(CONFIG_KEYS.REFRESH_INTERVAL, '0', isSilent))
   const result = Number.isFinite(raw) && raw >= REFRESH_MIN ? raw : 0
   if (!isSilent) bgmLog(LOG_LEVELS.INFO, `[config] 获取自动刷新间隔: ${String(result)} 分钟`)
   return result

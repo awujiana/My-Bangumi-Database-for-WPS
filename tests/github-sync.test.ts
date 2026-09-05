@@ -6,11 +6,13 @@ const mockBgmLognnn = vi.hoisted(() => vi.fn())
 const mockGetDataSheet = vi.hoisted(() => vi.fn().mockReturnValue(null))
 const mockFindHeaderRow = vi.hoisted(() => vi.fn().mockReturnValue(1))
 const mockGetLastRow = vi.hoisted(() => vi.fn().mockReturnValue(5))
-const mockGetColumnMap = vi.hoisted(() => vi.fn().mockReturnValue(new Map()))
+const mockGetColumnMap = vi.hoisted(() =>
+  vi.fn<(ws?: unknown, headerRow?: number) => Map<string, number>>().mockReturnValue(new Map()),
+)
 const mockGetCellValue = vi.hoisted(() => vi.fn().mockReturnValue(''))
 const mockSetCellValue = vi.hoisted(() => vi.fn())
 const mockColNumberToLetter = vi.hoisted(() => vi.fn((c: number) => String.fromCodePoint(64 + c)))
-const mockTrim = vi.hoisted(() => vi.fn((v: string) => v?.trim() ?? ''))
+const mockTrim = vi.hoisted(() => vi.fn((v: string) => v.trim()))
 const mockEnsureSheetHeaders = vi.hoisted(() => vi.fn().mockReturnValue(false))
 const mockGetApp = vi.hoisted(() => vi.fn())
 const mockBuildRawUrl = vi.hoisted(() =>
@@ -32,13 +34,17 @@ const mockParseJsonl = vi.hoisted(() =>
     const entries: Record<string, unknown>[] = []
     const errors: { line: number; message: string }[] = []
     const lines = text.split(/\r?\n/)
-    for (let index = 0; index < lines.length; index += 1) {
-      const line = lines[index]!.trim()
+    for (const [index, rawLine] of lines.entries()) {
+      const line = rawLine.trim()
       if (line) {
         try {
-          const parsed = JSON.parse(line)
-          if (typeof parsed.sid === 'string' && parsed.sid) {
-            entries.push(parsed)
+          const parsed: unknown = JSON.parse(line)
+          const record =
+            typeof parsed === 'object' && parsed !== null
+              ? (parsed as Record<string, unknown>)
+              : null
+          if (record && typeof record.sid === 'string' && record.sid) {
+            entries.push(record)
           } else {
             errors.push({ line: index + 1, message: '缺少有效的 sid 字段' })
           }
@@ -83,6 +89,10 @@ const mockRecordRowDeleteEntry = vi.hoisted(() => vi.fn())
 const mockAddSyncRecords = vi.hoisted(() => vi.fn().mockReturnValue(true))
 const mockAddSyncRecordSummary = vi.hoisted(() => vi.fn().mockReturnValue(true))
 const mockFilterByTime = vi.hoisted(() => vi.fn())
+
+function emptyResponseHeaders(): string {
+  return ''
+}
 
 // Mock XMLHttpRequest - 使用共享状态，让 setupXHRResponse 能预配置响应
 const mockXHR = vi.hoisted(() => {
@@ -155,7 +165,7 @@ const mockXHR = vi.hoisted(() => {
 
     getResponseHeader = vi.fn()
 
-    getAllResponseHeaders = vi.fn(() => '')
+    getAllResponseHeaders = vi.fn(emptyResponseHeaders)
 
     overrideMimeType = vi.fn()
   }
@@ -202,7 +212,12 @@ import {
   isGithubRemoteEntry,
   SYNC_STRATEGY_LABELS,
 } from '../ts/sync/github-sync-diff.js'
-import type { GithubRemoteEntry, LocalRowEntry, SyncStrategy } from '../ts/sync/github-sync-diff.js'
+import type {
+  GithubRemoteEntry,
+  GithubSyncDiff,
+  LocalRowEntry,
+  SyncStrategy,
+} from '../ts/sync/github-sync-diff.js'
 
 import {
   applyConflictResolutions,
@@ -212,9 +227,6 @@ import {
   readLocalEntriesForSync,
   GithubSyncSource,
 } from '../ts/sync/github-sync.js'
-
-// 导入类型
-import type { GithubSyncDiff } from '../ts/sync/github-sync-diff.js'
 
 // Mock 依赖模块
 vi.mock('../ts/core/constants.js', () => ({
@@ -279,7 +291,7 @@ vi.mock('../ts/core/result.js', () => ({
     okVoid: vi.fn(() => ({ isFail: () => false })),
     failVoid: vi.fn((error: Error) => ({ isFail: () => true, error })),
   },
-  BgmError: vi.fn().mockImplementation(function (message: string, code?: string) {
+  BgmError: vi.fn().mockImplementation(function mockBgmError(message: string, code?: string) {
     return { message, code }
   }),
 }))
@@ -327,7 +339,7 @@ vi.mock('../ts/sync/sync-record.js', () => ({
 }))
 
 // Mock XMLHttpRequest globally
-global.XMLHttpRequest = mockXHR.XHRConstructor
+;(globalThis as unknown as Record<string, unknown>).XMLHttpRequest = mockXHR.XHRConstructor
 
 // ========== 辅助函数 ==========
 
@@ -345,7 +357,7 @@ function createMockWorksheet(
 ) {
   const name = options.name ?? 'Sheet1'
   const usedRange = options.usedRange ?? 5
-  const cellValues = options.cellValues ?? new Map()
+  const cellValues = options.cellValues ?? new Map<string, string>()
   const cellOverrides = options.cellOverrides ?? {}
   const cellCache = new Map<
     string,
@@ -724,7 +736,7 @@ function createMockSheetForSelection(
 ) {
   const name = options.name ?? 'Sheet1'
   const rowCount = options.rowCount ?? 10
-  const cellValues = options.cellValues ?? new Map()
+  const cellValues = options.cellValues ?? new Map<string, string>()
 
   return {
     Name: name,
@@ -766,7 +778,7 @@ describe('getSelectedRowSids (通过 syncFromGithub selectedRowsOnly)', () => {
     // 返回一些远程条目
     const mockEntries = [{ sid: '1', name: 'Test' }]
     const xhrMock = (
-      global.XMLHttpRequest as unknown as { mock?: { responseText: string; status: number } }
+      XMLHttpRequest as unknown as { mock?: { responseText: string; status: number } }
     ).mock
     if (xhrMock) {
       xhrMock.responseText = JSON.stringify(mockEntries)
@@ -787,15 +799,18 @@ describe('getSelectedRowSids (通过 syncFromGithub selectedRowsOnly)', () => {
     mockParseJsonl.mockImplementation(() => ({ entries: [], errors: [] }))
     mockComputeDiff.mockReturnValue([])
 
-    // 直接测试：getApp 返回 null 时 getSelectedRowSids 返回空集合
-    // 我们可以通过导入内部函数或通过 syncFromGithub 来测试
-    // 由于 getSelectedRowSids 是私有的，我们测试 syncFromGithub 的 selectedRowsOnly 分支
+    // 直接测试：getApp 返回 null 时 getSelectedRowSids 返回空集合 我们可以通过导入内部函数或通过 syncFromGithub 来测试 由于 getSelectedRowSids 是私有的，我们测试 syncFromGithub 的 selectedRowsOnly 分支
 
     // 首先确保 fetchGithubJson 正常返回数据
     const remoteEntries: GithubRemoteEntry[] = [{ sid: '1', name: 'Test' }]
 
     // 让 XMLHttpRequest 正常工作
-    const XHRConstructor = global.XMLHttpRequest as unknown as ReturnType<typeof vi.fn>
+    interface XhrLike {
+      status: number
+      responseText: string
+      onload?: () => void
+    }
+    const XHRConstructor = XMLHttpRequest as unknown as () => XhrLike
     const xhrInstance = XHRConstructor()
     xhrInstance.status = 200
     xhrInstance.responseText = JSON.stringify(remoteEntries)
@@ -804,9 +819,7 @@ describe('getSelectedRowSids (通过 syncFromGithub selectedRowsOnly)', () => {
     // @ts-expect-error - accessing private for test
     xhrInstance.onload?.()
 
-    // 现在 getApp 返回 null 时，syncFromGithub 在 selectedRowsOnly 路径上会失败
-    // 因为无法获取 Selection
-    // 实际上这个测试需要更复杂的 mock 设置，我们改用直接测试内部逻辑
+    // 现在 getApp 返回 null 时，syncFromGithub 在 selectedRowsOnly 路径上会失败 因为无法获取 Selection 实际上这个测试需要更复杂的 mock 设置，我们改用直接测试内部逻辑
 
     // 简化方案：直接测试核心逻辑
     // 当没有选区时 selectedRowsOnly 会抛错
@@ -1068,7 +1081,7 @@ describe('readLocalEntries 批量读取路径', () => {
     mockGetColumnMap.mockReturnValue(new Map())
 
     // 验证列映射为空
-    const colMap = mockGetColumnMap()
+    const colMap: Map<string, number> = mockGetColumnMap()
     expect(colMap.has('Bangumi_URL')).toBe(false)
   })
 
@@ -3647,7 +3660,7 @@ describe('formatEta ms>0 精确路径 (line 548)', () => {
 
     // Mock Date.now() 使其返回递增的值，确保 elapsed > 0
     let dateNowCallCount = 0
-    const dateNowSpy = vi.spyOn(globalThis.Date, 'now').mockImplementation(() => {
+    const dateNowSpy = vi.spyOn(Date, 'now').mockImplementation(() => {
       dateNowCallCount += 1
       return 1000 + dateNowCallCount * 100
     })
@@ -4100,7 +4113,7 @@ describe('batchUpdateRows 扩展字段分支覆盖 (lines 788-807)', () => {
 
 // ========== 补充测试：formatDuration 秒/分钟分支 (lines 536, 539) 通过 Mock Date.now() ==========
 describe('formatDuration 秒/分钟分支 (lines 536, 539)', () => {
-  let dateNowSpy: ReturnType<typeof vi.spyOn>
+  let dateNowSpy: { mockRestore: () => void } | undefined
 
   afterEach(() => {
     if (dateNowSpy) {
@@ -4546,10 +4559,8 @@ describe('safeSet 数字扩展字段 (line 506)', () => {
 
     // 验证 setCellValue 被调用来写入数字转字符串的值
     const cellWriteCalls = mockSetCellValue.mock.calls
-    const hasDurationString = cellWriteCalls.some(
-      // 简化验证，只要写入发生即可
-      (_call: unknown[]) => true,
-    )
+    // 简化验证，只要写入发生即可
+    const hasDurationString = cellWriteCalls.length > 0
     expect(hasDurationString).toBe(true)
   })
 })
@@ -4616,8 +4627,7 @@ describe('readLocalEntries 无可读列边界 (lines 293-294)', () => {
     mockGetLastRow.mockReturnValue(5)
     // colMap.has('Bangumi_URL') 为 true，但 get('Bangumi_URL') 返回 undefined
     // 这使得外层守卫通过，但 readCols 为空，触发 lines 293-294
-    const colMapWithUndefined = new Map<string, number | undefined>()
-    colMapWithUndefined.set('Bangumi_URL', undefined)
+    const colMapWithUndefined = new Map<string, number | undefined>([['Bangumi_URL', undefined]])
     mockGetColumnMap.mockReturnValue(colMapWithUndefined)
 
     const result = readLocalEntriesForSync()
@@ -4679,8 +4689,8 @@ describe('GithubSyncSource 方法', () => {
       const entries: Record<string, unknown>[] = []
       const errors: { line: number; message: string }[] = []
       const lines = text.split(/\r?\n/)
-      for (let index = 0; index < lines.length; index += 1) {
-        const line = lines[index]!.trim()
+      for (const [index, rawLine] of lines.entries()) {
+        const line = rawLine.trim()
         if (line) {
           try {
             const parsed = JSON.parse(line) as Record<string, unknown>
@@ -4819,7 +4829,7 @@ describe('getSelectedRowSids row===headerRow continue (line 1479)', () => {
       return ''
     })
     mockExtractSubjectId.mockImplementation((url: string | null) => {
-      if (url && url.includes('999')) return '999'
+      if (url?.includes('999')) return '999'
       return null
     })
     mockParseJsonl.mockReturnValue({
@@ -4875,7 +4885,7 @@ describe('getSelectedRowSids row===headerRow continue (line 1479)', () => {
     mockGetColumnMap.mockReturnValue(new Map([['Bangumi_URL', 1]]))
     mockGetCellValue.mockReturnValue('https://bgm.tv/subject/12345')
     mockExtractSubjectId.mockImplementation((url: string | null) => {
-      if (url && url.includes('12345')) return '12345'
+      if (url?.includes('12345')) return '12345'
       return null
     })
     mockParseJsonl.mockReturnValue({
@@ -4952,7 +4962,7 @@ describe('applyDiffToSheet BATCH_WRITE_SIZE 边界 (501条 add)', () => {
     expect(progressCalls.length).toBeGreaterThanOrEqual(2)
 
     // 验证最后一次进度回调是完成状态
-    const lastCall = progressCalls[progressCalls.length - 1]
+    const lastCall = progressCalls.at(-1)
     expect(lastCall).toBeDefined()
     expect(lastCall!.eta).toBeDefined()
 

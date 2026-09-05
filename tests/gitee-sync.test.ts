@@ -77,7 +77,22 @@ let lastXhrCall: MockXHRCall | null = null
 let lastMockXhr: MockXHR | null = null
 let mockXhrConstructor: typeof MockXHR | null = null
 
+/** 记录最近一次 send() 创建的 MockXHR 实例（避免将 this 直接赋给模块变量触发 no-this-assignment） */
+function recordLastMockXhr(xhr: MockXHR): void {
+  lastMockXhr = xhr
+}
+
 class MockXHR {
+  private method = ''
+
+  private url = ''
+
+  private async = true
+
+  private headers: Record<string, string> = {}
+
+  private _aborted = false
+
   status = 0
 
   statusText = ''
@@ -93,16 +108,6 @@ class MockXHR {
   ontimeout: (() => void) | null = null
 
   onabort: (() => void) | null = null
-
-  private method = ''
-
-  private url = ''
-
-  private async = true
-
-  private headers: Record<string, string> = {}
-
-  private _aborted = false
 
   open(method: string, url: string, isAsync: boolean): void {
     this.method = method
@@ -146,7 +151,7 @@ class MockXHR {
       timeout: this.timeout,
       headers: { ...this.headers },
     }
-    lastMockXhr = this
+    recordLastMockXhr(this)
   }
 
   _respondOk(body: string, status = 200): void {

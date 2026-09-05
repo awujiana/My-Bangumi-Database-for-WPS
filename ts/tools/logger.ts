@@ -95,6 +95,7 @@ export const logger = {
       timestamp: Date.now(),
     }
     pushLog(entry)
+    // eslint-disable-next-line no-console -- console 是日志后端/启动兜底的唯一输出通道（console 是日志后端输出目标本身）
     console.warn(`[WARN] ${entry.message}`)
   },
   error(message: string): void {
@@ -103,7 +104,9 @@ export const logger = {
       message: maskSensitiveData(message),
       timestamp: Date.now(),
     }
+
     pushLog(entry)
+    // eslint-disable-next-line no-console -- logger 模块是 console 输出的唯一入口
     console.error(`[ERROR] ${entry.message}`)
   },
   debug(message: string): void {

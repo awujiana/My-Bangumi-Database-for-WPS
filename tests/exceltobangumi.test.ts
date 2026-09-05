@@ -139,80 +139,62 @@ function createMockWorksheet(options: MockWorksheetOptions = {}): unknown {
   }
 }
 
+/** 构造字段访问器 mock：按列名返回预设值，未命中返回空串 */
+function fieldGetter(values: Record<string, string>): (key: string) => string {
+  return (key: string): string => values[key] ?? ''
+}
+
 // ========== buildJsonPayload ==========
 describe('buildJsonPayload', () => {
   it('应构建包含 type 的基本 payload（"看过" → type=2）', () => {
-    const getField = (key: string): string => {
-      if (key === '是否看完' || key === '状态' || key === '观看状态') return '看过'
-      return ''
-    }
+    const getField = fieldGetter({ 是否看完: '看过', 状态: '看过', 观看状态: '看过' })
     const json = buildJsonPayload(getField, '')
     const payload = JSON.parse(json) as { type: number }
     expect(payload.type).toBe(2)
   })
 
   it('应支持多种状态列名（"状态"列）', () => {
-    const getField = (key: string): string => {
-      if (key === '状态') return '在看'
-      return ''
-    }
+    const getField = fieldGetter({ 状态: '在看' })
     const json = buildJsonPayload(getField, '')
     const payload = JSON.parse(json) as { type: number }
     expect(payload.type).toBe(3)
   })
 
   it('应支持"观看状态"列名', () => {
-    const getField = (key: string): string => {
-      if (key === '观看状态') return '想看'
-      return ''
-    }
+    const getField = fieldGetter({ 观看状态: '想看' })
     const json = buildJsonPayload(getField, '')
     const payload = JSON.parse(json) as { type: number }
     expect(payload.type).toBe(1)
   })
 
   it('应支持"收藏类型"列名', () => {
-    const getField = (key: string): string => {
-      if (key === '收藏类型') return '搁置'
-      return ''
-    }
+    const getField = fieldGetter({ 收藏类型: '搁置' })
     const json = buildJsonPayload(getField, '')
     const payload = JSON.parse(json) as { type: number }
     expect(payload.type).toBe(4)
   })
 
   it('应支持"type"列名（英文）', () => {
-    const getField = (key: string): string => {
-      // 抛弃
-      if (key === 'type') return '5'
-      return ''
-    }
+    const getField = fieldGetter({ type: '5' })
     const json = buildJsonPayload(getField, '')
     const payload = JSON.parse(json) as { type: number }
     expect(payload.type).toBe(5)
   })
 
   it('无有效观看状态时默认设为 type=1（想看）', () => {
-    const getField = (_key: string): string => ''
+    const getField = fieldGetter({})
     const json = buildJsonPayload(getField, '')
     expect(json).toBe('{"type":1}')
   })
 
   it('观看状态为"忽略"时返回 "{}"（mapWatchStatus 返回 0）', () => {
-    const getField = (key: string): string => {
-      if (key === '是否看完') return '忽略'
-      return ''
-    }
+    const getField = fieldGetter({ 是否看完: '忽略' })
     const json = buildJsonPayload(getField, '')
     expect(json).toBe('{}')
   })
 
   it('应解析评分（0-10 范围）', () => {
-    const getField = (key: string): string => {
-      if (key === '是否看完') return '看过'
-      if (key === '打分') return '8'
-      return ''
-    }
+    const getField = fieldGetter({ 是否看完: '看过', 打分: '8' })
     const json = buildJsonPayload(getField, '')
     const payload = JSON.parse(json) as { type: number; rate: number }
     expect(payload.type).toBe(2)
@@ -220,11 +202,7 @@ describe('buildJsonPayload', () => {
   })
 
   it('应拒绝超出范围的评分（>10）', () => {
-    const getField = (key: string): string => {
-      if (key === '是否看完') return '看过'
-      if (key === '打分') return '11'
-      return ''
-    }
+    const getField = fieldGetter({ 是否看完: '看过', 打分: '11' })
     const json = buildJsonPayload(getField, '')
     const payload = JSON.parse(json) as { type: number; rate?: number }
     expect(payload.type).toBe(2)
@@ -232,56 +210,35 @@ describe('buildJsonPayload', () => {
   })
 
   it('应拒绝负数评分', () => {
-    const getField = (key: string): string => {
-      if (key === '是否看完') return '看过'
-      if (key === '打分') return '-1'
-      return ''
-    }
+    const getField = fieldGetter({ 是否看完: '看过', 打分: '-1' })
     const json = buildJsonPayload(getField, '')
     const payload = JSON.parse(json) as { rate?: number }
     expect(payload.rate).toBeUndefined()
   })
 
   it('应支持小数评分（如 7.5）', () => {
-    const getField = (key: string): string => {
-      if (key === '是否看完') return '看过'
-      if (key === '打分') return '7.5'
-      return ''
-    }
+    const getField = fieldGetter({ 是否看完: '看过', 打分: '7.5' })
     const json = buildJsonPayload(getField, '')
     const payload = JSON.parse(json) as { rate: number }
     expect(payload.rate).toBe(7.5)
   })
 
   it('应跳过非数字评分', () => {
-    const getField = (key: string): string => {
-      if (key === '是否看完') return '看过'
-      if (key === '打分') return 'N/A'
-      return ''
-    }
+    const getField = fieldGetter({ 是否看完: '看过', 打分: 'N/A' })
     const json = buildJsonPayload(getField, '')
     const payload = JSON.parse(json) as { rate?: number }
     expect(payload.rate).toBeUndefined()
   })
 
   it('应跳过值为"true"的评分（兼容是否看完列的布尔值）', () => {
-    const getField = (key: string): string => {
-      if (key === '是否看完') return '看过'
-      if (key === '打分') return 'true'
-      return ''
-    }
+    const getField = fieldGetter({ 是否看完: '看过', 打分: 'true' })
     const json = buildJsonPayload(getField, '')
     const payload = JSON.parse(json) as { rate?: number }
     expect(payload.rate).toBeUndefined()
   })
 
   it('应合并"标签/分级"和"原作标签"两列', () => {
-    const getField = (key: string): string => {
-      if (key === '是否看完') return '看过'
-      if (key === '标签/分级') return '标签1,标签2'
-      if (key === '原作标签') return '原作'
-      return ''
-    }
+    const getField = fieldGetter({ 是否看完: '看过', '标签/分级': '标签1,标签2', 原作标签: '原作' })
     const json = buildJsonPayload(getField, '')
     const payload = JSON.parse(json) as { tags: string[] }
     expect(payload.tags).toEqual(expect.arrayContaining(['标签1', '标签2', '原作']))
@@ -289,66 +246,46 @@ describe('buildJsonPayload', () => {
   })
 
   it('仅有"标签/分级"时也应包含 tags', () => {
-    const getField = (key: string): string => {
-      if (key === '是否看完') return '看过'
-      if (key === '标签/分级') return '单标签'
-      return ''
-    }
+    const getField = fieldGetter({ 是否看完: '看过', '标签/分级': '单标签' })
     const json = buildJsonPayload(getField, '')
     const payload = JSON.parse(json) as { tags: string[] }
     expect(payload.tags).toEqual(['单标签'])
   })
 
   it('标签为空时不应包含 tags 字段', () => {
-    const getField = (key: string): string => {
-      if (key === '是否看完') return '看过'
-      return ''
-    }
+    const getField = fieldGetter({ 是否看完: '看过' })
     const json = buildJsonPayload(getField, '')
     const payload = JSON.parse(json) as { tags?: string[] }
     expect(payload.tags).toBeUndefined()
   })
 
   it('应合并"剧透/感言"和"特点/印象"（感言在前，印象在后，以换行分隔）', () => {
-    const getField = (key: string): string => {
-      if (key === '是否看完') return '看过'
-      if (key === '剧透/感言') return '很好看'
-      if (key === '特点/印象') return '作画优秀'
-      return ''
-    }
+    const getField = fieldGetter({
+      是否看完: '看过',
+      '剧透/感言': '很好看',
+      '特点/印象': '作画优秀',
+    })
     const json = buildJsonPayload(getField, '')
     const payload = JSON.parse(json) as { comment: string }
     expect(payload.comment).toBe('很好看\n作画优秀')
   })
 
   it('仅有"特点/印象"时也应作为 comment', () => {
-    const getField = (key: string): string => {
-      if (key === '是否看完') return '看过'
-      if (key === '特点/印象') return '作画优秀'
-      return ''
-    }
+    const getField = fieldGetter({ 是否看完: '看过', '特点/印象': '作画优秀' })
     const json = buildJsonPayload(getField, '')
     const payload = JSON.parse(json) as { comment: string }
     expect(payload.comment).toBe('作画优秀')
   })
 
   it('应支持"感言"列名（兼容旧模板）', () => {
-    const getField = (key: string): string => {
-      if (key === '是否看完') return '看过'
-      if (key === '感言') return '不错的作品'
-      return ''
-    }
+    const getField = fieldGetter({ 是否看完: '看过', 感言: '不错的作品' })
     const json = buildJsonPayload(getField, '')
     const payload = JSON.parse(json) as { comment: string }
     expect(payload.comment).toBe('不错的作品')
   })
 
-  it('应过滤控制字符（保留换行符 \\n）', () => {
-    const getField = (key: string): string => {
-      if (key === '是否看完') return '看过'
-      if (key === '剧透/感言') return '第一行\u{7}\u{B}第二行'
-      return ''
-    }
+  it(String.raw`应过滤控制字符（保留换行符 \n）`, () => {
+    const getField = fieldGetter({ 是否看完: '看过', '剧透/感言': '第一行\u{7}\u{B}第二行' })
     const json = buildJsonPayload(getField, '')
     const payload = JSON.parse(json) as { comment: string }
     // \x07 (BEL) 和 \x0B (VT) 应被移除；\n 保留
@@ -369,57 +306,41 @@ describe('buildJsonPayload', () => {
   })
 
   it('应支持私密收藏标记（值为"是"）', () => {
-    const getField = (key: string): string => {
-      if (key === '是否看完') return '看过'
-      if (key === '私密收藏') return '是'
-      return ''
-    }
+    const getField = fieldGetter({ 是否看完: '看过', 私密收藏: '是' })
     const json = buildJsonPayload(getField, '')
     const payload = JSON.parse(json) as { private: boolean }
     expect(payload.private).toBe(true)
   })
 
   it('应支持私密收藏标记（值为"1"）', () => {
-    const getField = (key: string): string => {
-      if (key === '是否看完') return '看过'
-      if (key === '私密收藏') return '1'
-      return ''
-    }
+    const getField = fieldGetter({ 是否看完: '看过', 私密收藏: '1' })
     const json = buildJsonPayload(getField, '')
     const payload = JSON.parse(json) as { private: boolean }
     expect(payload.private).toBe(true)
   })
 
   it('应支持私密收藏标记（值为"true"）', () => {
-    const getField = (key: string): string => {
-      if (key === '是否看完') return '看过'
-      if (key === '私密收藏') return 'true'
-      return ''
-    }
+    const getField = fieldGetter({ 是否看完: '看过', 私密收藏: 'true' })
     const json = buildJsonPayload(getField, '')
     const payload = JSON.parse(json) as { private: boolean }
     expect(payload.private).toBe(true)
   })
 
   it('私密收藏为空时不应包含 private 字段', () => {
-    const getField = (key: string): string => {
-      if (key === '是否看完') return '看过'
-      return ''
-    }
+    const getField = fieldGetter({ 是否看完: '看过' })
     const json = buildJsonPayload(getField, '')
     const payload = JSON.parse(json) as { private?: boolean }
     expect(payload.private).toBeUndefined()
   })
 
   it('应构建完整 payload（type + rate + tags + comment + private）', () => {
-    const getField = (key: string): string => {
-      if (key === '是否看完') return '看过'
-      if (key === '打分') return '9'
-      if (key === '标签/分级') return '神作,治愈'
-      if (key === '剧透/感言') return '非常感动'
-      if (key === '私密收藏') return '是'
-      return ''
-    }
+    const getField = fieldGetter({
+      是否看完: '看过',
+      打分: '9',
+      '标签/分级': '神作,治愈',
+      '剧透/感言': '非常感动',
+      私密收藏: '是',
+    })
     const json = buildJsonPayload(getField, '')
     const payload = JSON.parse(json) as {
       type: number
@@ -431,25 +352,21 @@ describe('buildJsonPayload', () => {
     expect(payload).toEqual({
       type: 2,
       rate: 9,
-      tags: expect.arrayContaining(['神作', '治愈']),
+      tags: expect.arrayContaining(['神作', '治愈']) as unknown[],
       comment: '非常感动',
       private: true,
     })
   })
 
   it(' getField 抛出异常时返回 "{}"（异常被捕获）', () => {
-    const getField = (): string => {
+    const json = buildJsonPayload(() => {
       throw new Error('field access error')
-    }
-    const json = buildJsonPayload(getField, '')
+    }, '')
     expect(json).toBe('{}')
   })
 
   it('应支持"是"映射为看过（type=2，是否看完列的肯定标记）', () => {
-    const getField = (key: string): string => {
-      if (key === '是否看完') return '是'
-      return ''
-    }
+    const getField = fieldGetter({ 是否看完: '是' })
     const json = buildJsonPayload(getField, '')
     const payload = JSON.parse(json) as { type: number }
     // WATCH_STATUS_MAP['是'] = 2
@@ -458,10 +375,7 @@ describe('buildJsonPayload', () => {
   })
 
   it('应支持"否"映射为想看（type=1，是否看完列的否定标记）', () => {
-    const getField = (key: string): string => {
-      if (key === '是否看完') return '否'
-      return ''
-    }
+    const getField = fieldGetter({ 是否看完: '否' })
     const json = buildJsonPayload(getField, '')
     const payload = JSON.parse(json) as { type: number }
     expect(WATCH_STATUS_MAP['否']).toBe(1)

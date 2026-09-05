@@ -23,22 +23,26 @@ import {
 } from '../index.js'
 
 import {
-  toggleSheetLock,
   saveLockedSheet,
   restoreLockedSheet,
   updateLockButton,
   refreshSheets,
   refreshWorkbooks,
   autoDetectSheet,
-  updateFilterStatus,
   refreshData,
   onSelectModeChange,
-  enlargePreview,
   autoDetectAndLockSheet,
 } from './panel-lifecycle.js'
 import { restoreUserInfoFromStorage, startUserInfoPolling } from './user-info-polling.js'
 
 // ========== 初始化 ==========
+
+/** Escape 键关闭详情模态框 */
+function handleKeydown(event: KeyboardEvent): void {
+  if (event.key === 'Escape') {
+    closeDetailModal()
+  }
+}
 
 function initPanelCore(): void {
   bgmLog(LOG_LEVELS.INFO, 'initPanelCore 开始')
@@ -118,11 +122,6 @@ function initPanelCore(): void {
     if (modal) modal.style.display = 'none'
   })
   // 按 Escape 键关闭详情模态框
-  const handleKeydown = (event: KeyboardEvent) => {
-    if (event.key === 'Escape') {
-      closeDetailModal()
-    }
-  }
   document.addEventListener('keydown', handleKeydown)
   // 面板关闭时移除键盘监听
   window.addEventListener('beforeunload', () => {
@@ -141,20 +140,12 @@ function initPanelCore(): void {
 }
 
 // ========== 导出 ==========
-export {
-  initPanelCore,
-  refreshSheets,
-  refreshWorkbooks,
-  refreshData,
-  toggleSheetLock,
-  onSelectModeChange,
-  enlargePreview,
-  autoDetectSheet,
-  autoDetectAndLockSheet,
-  updateFilterStatus,
-}
+export { initPanelCore }
 
 // ========== 挂载到 window ==========
+// WPS 宿主（Ribbon）通过 GetTaskPane().initPanelCore 直接调用面板入口，
+// 这是宿主桥接协议的一部分，必须有意的全局属性赋值。
+
 ;(window as unknown as { initPanelCore: () => void }).initPanelCore = initPanelCore
 
 /**
@@ -162,14 +153,17 @@ export {
  * 从 PluginStorage 刷新所有 UI 状态（用户信息、配置等）
  * 如果 GetTaskPane 不可用，轮询也请购底机制。）
  */
-;(window as unknown as { refreshPanelUI: () => void }).refreshPanelUI = function (): void {
-  try {
-    restoreUserInfoFromStorage()
-    bgmLog(LOG_LEVELS.INFO, '[refreshPanelUI] UI 已刷新')
-  } catch (error: unknown) {
-    bgmLog(LOG_LEVELS.WARN, `[refreshPanelUI] 刷新失败: ${(error as Error).message}`)
+// refreshPanelUI 是 Ribbon 宿主桥接入口，同上必须有意的全局属性赋值。
+
+;(window as unknown as { refreshPanelUI: () => void }).refreshPanelUI =
+  function refreshPanelUI(): void {
+    try {
+      restoreUserInfoFromStorage()
+      bgmLog(LOG_LEVELS.INFO, '[refreshPanelUI] UI 已刷新')
+    } catch (error: unknown) {
+      bgmLog(LOG_LEVELS.WARN, `[refreshPanelUI] 刷新失败: ${(error as Error).message}`)
+    }
   }
-}
 
 function safeInitPanel(): void {
   try {
@@ -206,3 +200,15 @@ export function initPanel(): void {
     window.addEventListener('load', safeInitPanel)
   }
 }
+
+export {
+  toggleSheetLock,
+  updateFilterStatus,
+  enlargePreview,
+  refreshSheets,
+  refreshWorkbooks,
+  refreshData,
+  onSelectModeChange,
+  autoDetectSheet,
+  autoDetectAndLockSheet,
+} from './panel-lifecycle.js'

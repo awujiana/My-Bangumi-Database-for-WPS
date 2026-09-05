@@ -17,11 +17,21 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 // ========== Mock BroadcastChannel ==========
 
 class MockBroadcastChannel {
+  private static instances = new Map<string, MockBroadcastChannel>()
+
+  static getInstance(name: string): MockBroadcastChannel | undefined {
+    return this.instances.get(name)
+  }
+
+  static clearAll(): void {
+    this.instances.clear()
+  }
+
   name: string
 
-  onmessage: ((event: MessageEvent) => void) | null = null
+  location: { origin: string } = { origin: 'mock-origin' }
 
-  private static instances = new Map<string, MockBroadcastChannel>()
+  onmessage: ((event: MessageEvent) => void) | null = null
 
   constructor(name: string) {
     const existing = MockBroadcastChannel.instances.get(name)
@@ -35,24 +45,18 @@ class MockBroadcastChannel {
   postMessage(data: unknown): void {
     // Simulate async message delivery
     setTimeout(() => {
-      if (this.onmessage) {
-        const event = new MessageEvent('message', { data, origin: window.location.origin })
-        this.onmessage(event)
+      if (!this.onmessage) {
+        return
       }
+
+      const event = new MessageEvent('message', { data, origin: window.location.origin })
+      this.onmessage(event)
     }, 0)
   }
 
   close(): void {
     MockBroadcastChannel.instances.delete(this.name)
     this.onmessage = null
-  }
-
-  static getInstance(name: string): MockBroadcastChannel | undefined {
-    return MockBroadcastChannel.instances.get(name)
-  }
-
-  static clearAll(): void {
-    MockBroadcastChannel.instances.clear()
   }
 }
 
@@ -98,7 +102,7 @@ describe('BroadcastChannel 跨 WebView 通信', () => {
         data: { key: 'bgm_token', value: 'test-token-123' },
       }
 
-      channel.postMessage(payload)
+      channel.postMessage(payload, channel.location.origin)
 
       return new Promise<void>((resolve) => {
         setTimeout(() => {
@@ -121,9 +125,18 @@ describe('BroadcastChannel 跨 WebView 通信', () => {
         received.push(data.data.key)
       }
 
-      channel.postMessage({ type: 'BGM:configUpdated', data: { key: 'token', value: 'v1' } })
-      channel.postMessage({ type: 'BGM:configUpdated', data: { key: 'user', value: 'v2' } })
-      channel.postMessage({ type: 'BGM:configUpdated', data: { key: 'theme', value: 'v3' } })
+      channel.postMessage(
+        { type: 'BGM:configUpdated', data: { key: 'token', value: 'v1' } },
+        channel.location.origin,
+      )
+      channel.postMessage(
+        { type: 'BGM:configUpdated', data: { key: 'user', value: 'v2' } },
+        channel.location.origin,
+      )
+      channel.postMessage(
+        { type: 'BGM:configUpdated', data: { key: 'theme', value: 'v3' } },
+        channel.location.origin,
+      )
 
       return new Promise<void>((resolve) => {
         setTimeout(() => {
@@ -147,7 +160,7 @@ describe('BroadcastChannel 跨 WebView 通信', () => {
 
       // channelA 发送
       const payload = { type: 'BGM:configUpdated', data: { key: 'test', value: 'value' } }
-      channelA.postMessage(payload)
+      channelA.postMessage(payload, channelA.location.origin)
 
       return new Promise<void>((resolve) => {
         setTimeout(() => {
@@ -172,7 +185,7 @@ describe('BroadcastChannel 跨 WebView 通信', () => {
       })
 
       expect(() => {
-        channel.postMessage({ type: 'test' })
+        channel.postMessage({ type: 'test' }, channel.location.origin)
       }).toThrow('Channel closed')
 
       // Restore
@@ -180,7 +193,7 @@ describe('BroadcastChannel 跨 WebView 通信', () => {
     })
 
     it('BroadcastChannel 不可用时应安全降级', () => {
-      const originalBC = globalThis.BroadcastChannel
+      const originalBC = BroadcastChannel
       // Temporarily remove BroadcastChannel
       delete (globalThis as Record<string, unknown>).BroadcastChannel
 
@@ -200,7 +213,7 @@ describe('BroadcastChannel 跨 WebView 通信', () => {
 
       channel.close()
 
-      channel.postMessage({ type: 'test', data: 'should-not-receive' })
+      channel.postMessage({ type: 'test', data: 'should-not-receive' }, channel.location.origin)
 
       return new Promise<void>((resolve) => {
         setTimeout(() => {
@@ -220,7 +233,7 @@ describe('BroadcastChannel 跨 WebView 通信', () => {
         receivedOrigin = event.origin
       }
 
-      channel.postMessage({ type: 'test' })
+      channel.postMessage({ type: 'test' }, channel.location.origin)
 
       return new Promise<void>((resolve) => {
         setTimeout(() => {
@@ -246,7 +259,7 @@ describe('BroadcastChannel 跨 WebView 通信', () => {
         data: { type: 'test' },
         origin: window.location.origin,
       })
-      channel.onmessage?.(event)
+      channel.onmessage(event)
 
       expect(isMessageAccepted).toBe(true)
     })
@@ -267,7 +280,7 @@ describe('BroadcastChannel 跨 WebView 通信', () => {
         data: { type: 'test' },
         origin: 'https://evil.example.com',
       })
-      channel.onmessage?.(event)
+      channel.onmessage(event)
 
       expect(isMessageAccepted).toBe(false)
     })

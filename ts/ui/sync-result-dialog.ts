@@ -68,7 +68,7 @@ function getSeasonFromDate(dateString: string): string | null {
   const match = /^(\d{4})[-/.](\d{1,2})/.exec(dateString)
   if (!match) return null
   const year = match[1] ?? ''
-  const month = parseInt(match[2] ?? '', 10)
+  const month = Number(match[2] ?? '')
   const seasonMap: Record<number, string> = {
     1: '冬',
     2: '冬',
@@ -166,10 +166,12 @@ let _resultDialogEscHandler: ((event: KeyboardEvent) => void) | null = null
 
 /** 清理 ESC 监听器 */
 function _clearEscHandler(): void {
-  if (_resultDialogEscHandler) {
-    document.removeEventListener('keydown', _resultDialogEscHandler)
-    _resultDialogEscHandler = null
+  if (!_resultDialogEscHandler) {
+    return
   }
+
+  document.removeEventListener('keydown', _resultDialogEscHandler)
+  _resultDialogEscHandler = null
 }
 
 /**
@@ -238,6 +240,16 @@ function buildSyncChartSection(
   const circumference = 2 * Math.PI * radius
   const seg = (pct: number) => (pct / 100) * circumference
 
+  // 完成度环颜色（≥90% 绿 / ≥50% 黄 / 其余红）
+  let ringColor: string
+  if (completionPct >= 90) {
+    ringColor = 'var(--green, #a6e3a1)'
+  } else if (completionPct >= 50) {
+    ringColor = 'var(--yellow, #f9e2af)'
+  } else {
+    ringColor = 'var(--red, #f38ba8)'
+  }
+
   // 耗时格式化
   const elapsedString = formatDuration(elapsedMs)
   const speedString = avgSpeed > 0 ? avgSpeed.toFixed(1) : '--'
@@ -297,7 +309,7 @@ function buildSyncChartSection(
         <svg viewBox="0 0 120 120" class="bgm-progress-svg">
           <circle cx="60" cy="60" r="50" fill="none" stroke="var(--surface0, #313244)" stroke-width="10" />
           <circle cx="60" cy="60" r="50" fill="none"
-            stroke="${completionPct >= 90 ? 'var(--green, #a6e3a1)' : completionPct >= 50 ? 'var(--yellow, #f9e2af)' : 'var(--red, #f38ba8)'}"
+            stroke="${ringColor}"
             stroke-width="10"
             stroke-dasharray="${String((completionPct / 100) * 2 * Math.PI * 50)} ${String(2 * Math.PI * 50)}"
             stroke-dashoffset="${String(2 * Math.PI * 50 * 0.25)}"
@@ -548,9 +560,9 @@ export function showSyncResultDialog(options: SyncResultDialogOptions): void {
   const chartSection = buildSyncChartSection(result, elapsedMs, avgSpeed, strategyLabel)
 
   // 日期统计
-  let dateHtml = ''
-  if (dateStats.datedCount > 0) {
-    dateHtml = `
+  const dateHtml =
+    dateStats.datedCount > 0
+      ? `
       <div class="bgm-result-section">
         <div class="bgm-result-section-title">📅 开播日期统计</div>
         <div class="bgm-result-date-grid">
@@ -572,7 +584,7 @@ export function showSyncResultDialog(options: SyncResultDialogOptions): void {
           </div>
         </div>
       </div>`
-  }
+      : ''
 
   const content = `
     <div class="bgm-modal-content">
@@ -615,17 +627,10 @@ export function showSyncResultDialog(options: SyncResultDialogOptions): void {
   exportButton?.addEventListener('click', () => {
     const originalText = exportButton.textContent
     const isSuccess = exportSheetToJsonlFile()
-    if (isSuccess) {
-      exportButton.textContent = '✅ 已导出'
-      setTimeout(() => {
-        exportButton.textContent = originalText
-      }, 2000)
-    } else {
-      exportButton.textContent = '❌ 导出失败'
-      setTimeout(() => {
-        exportButton.textContent = originalText
-      }, 2000)
-    }
+    exportButton.textContent = isSuccess ? '✅ 已导出' : '❌ 导出失败'
+    setTimeout(() => {
+      exportButton.textContent = originalText
+    }, 2000)
   })
 
   // 查看详情（打开同步记录表，或弹窗预览）
@@ -859,10 +864,12 @@ function showSyncDetailPreviewDialog(options: SyncDetailPreviewOptions): void {
 }
 
 function _clearPreviewEscHandler(): void {
-  if (_previewDialogEscHandler) {
-    document.removeEventListener('keydown', _previewDialogEscHandler)
-    _previewDialogEscHandler = null
+  if (!_previewDialogEscHandler) {
+    return
   }
+
+  document.removeEventListener('keydown', _previewDialogEscHandler)
+  _previewDialogEscHandler = null
 }
 
 /** 隐藏同步详情预览弹窗 */

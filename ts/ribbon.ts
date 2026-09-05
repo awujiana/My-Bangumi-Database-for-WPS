@@ -120,10 +120,7 @@ function initRibbonMessageListener(): void {
   window.addEventListener('message', _ribbonMessageHandler)
 }
 
-// ========== PluginStorage 配置轮询（Ribbon ↔ Panel 跨 WebView 同步）==========
-// WPS 中 Ribbon 和 Panel 是独立 WebView，postMessage 无法跨上下文通信。
-// Panel 侧通过 userInfoPolling 轮询 PluginStorage 同步 Ribbon 的变更，
-// Ribbon 侧也需要同等轮询机制，定期检查 Panel 写入的配置变更并刷新按钮状态。
+// ========== PluginStorage 配置轮询（Ribbon ↔ Panel 跨 WebView 同步）========== WPS 中 Ribbon 和 Panel 是独立 WebView，postMessage 无法跨上下文通信。 Panel 侧通过 userInfoPolling 轮询 PluginStorage 同步 Ribbon 的变更， Ribbon 侧也需要同等轮询机制，定期检查 Panel 写入的配置变更并刷新按钮状态。
 
 let _configPollingTimer: ReturnType<typeof setInterval> | null = null
 
@@ -188,10 +185,12 @@ function startRibbonConfigPolling(): void {
  * 停止 Ribbon 配置轮询，防止内存泄漏
  */
 function stopRibbonConfigPolling(): void {
-  if (_configPollingTimer !== null) {
-    clearInterval(_configPollingTimer)
-    _configPollingTimer = null
+  if (_configPollingTimer === null) {
+    return
   }
+
+  clearInterval(_configPollingTimer)
+  _configPollingTimer = null
 }
 
 /**

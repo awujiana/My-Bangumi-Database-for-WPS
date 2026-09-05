@@ -169,8 +169,9 @@ export function initEnrichPage(): void {
   if (BGM.enrich.isLocked && BGM.enrich.lockedSheetIndex) {
     const locked = getLockedEnrichSheet()
     if (locked) {
-      state.bangumiSheet = locked[1]
-      bgmLog(LOG_LEVELS.INFO, `[enrich] 已恢复锁定的目标工作表: ${locked[1].Name}`)
+      const [, lockedSheet] = locked
+      state.bangumiSheet = lockedSheet
+      bgmLog(LOG_LEVELS.INFO, `[enrich] 已恢复锁定的目标工作表: ${lockedSheet.Name}`)
     }
   }
 
@@ -239,10 +240,10 @@ function bindTargetSheetControls(): void {
 }
 
 function bindTabSwitches(): void {
-  const tabs = document.querySelectorAll('.preview-tab')
+  const tabs = document.querySelectorAll<HTMLElement>('.preview-tab')
   tabs.forEach((tab) => {
     tab.addEventListener('click', () => {
-      const tabName = tab.getAttribute('data-tab')
+      const tabName = tab.dataset.tab
       if (!tabName) return
 
       tabs.forEach((t) => {
@@ -428,7 +429,7 @@ function renderBatchFileList(): void {
 
       listElement.querySelectorAll('[data-batch-remove]').forEach((button) => {
         button.addEventListener('click', () => {
-          const index = parseInt((button as HTMLElement).dataset.batchRemove || '-1', 10) // eslint-disable-line @typescript-eslint/prefer-nullish-coalescing -- dataset 属性为空时须回退到哨兵值
+          const index = Number((button as HTMLElement).dataset.batchRemove || '-1') // eslint-disable-line @typescript-eslint/prefer-nullish-coalescing -- dataset 属性为空时须回退到哨兵值
           if (index >= 0) batchRemoveFile(index)
         })
       })
@@ -463,7 +464,7 @@ export function autoDetectHeader(): void {
   let ws: WpsWorksheet | null = null
 
   if (sheetSelect?.value) {
-    const sheetIndex = parseInt(sheetSelect.value, 10)
+    const sheetIndex = Number(sheetSelect.value)
     const wb = getSelectedWorkbook()
     if (wb && sheetIndex > 0) {
       try {
@@ -586,13 +587,13 @@ function renderColumnMappingEditor(ws: WpsWorksheet, mapping: EnrichColumnMappin
 
   const selects = mappingList.querySelectorAll<HTMLSelectElement>('.mapping-select')
   selects.forEach((select) => {
-    const fieldKey = select.getAttribute('data-field') as keyof EnrichColumnMapping | null
+    const fieldKey = select.dataset.field as keyof EnrichColumnMapping | null
     if (!fieldKey) return
 
     select.addEventListener('change', () => {
-      const value = parseInt(select.value, 10)
+      const value = Number(select.value)
       if (state.columnMapping) {
-        updateColumnMapping(fieldKey, isNaN(value) ? 0 : value)
+        updateColumnMapping(fieldKey, Number.isNaN(value) ? 0 : value)
       }
     })
   })
@@ -601,11 +602,7 @@ function renderColumnMappingEditor(ws: WpsWorksheet, mapping: EnrichColumnMappin
 function updateColumnMapping(field: keyof EnrichColumnMapping, value: number): void {
   if (!state.columnMapping) return
 
-  if (value === 0) {
-    state.columnMapping[field] = undefined as never
-  } else {
-    state.columnMapping[field] = value
-  }
+  state.columnMapping[field] = value === 0 ? (undefined as never) : value
 
   bgmLog(
     LOG_LEVELS.INFO,
@@ -666,7 +663,7 @@ function selectTargetSheet(): void {
     return
   }
 
-  const sheetIndex = parseInt(sheetSelect.value, 10)
+  const sheetIndex = Number(sheetSelect.value)
   const wb = getSelectedWorkbook()
   if (!wb || sheetIndex <= 0) {
     state.bangumiSheet = null
@@ -712,10 +709,8 @@ function renderSourcePreview(ws: WpsWorksheet, _mapping: EnrichColumnMapping): v
   const tableContainer = safeGetElement('sourceTable')
   if (!tableContainer) return
 
-  const maxRows = 20
   const maxCols = 50
-  const { headerRow } = state
-  const { dataStartRow } = state
+  const { headerRow, dataStartRow } = state
 
   const headerCells: string[] = []
   for (let col = 1; col <= maxCols; col += 1) {
@@ -733,6 +728,8 @@ function renderSourcePreview(ws: WpsWorksheet, _mapping: EnrichColumnMapping): v
   const tbody = tableContainer.querySelector('tbody')
   if (!tbody) return
 
+  // 仅在通过 tbody 校验后才需要 maxRows，故在 early exit 之后声明
+  const maxRows = 20
   const rowsHtml: string[] = []
   const lastRow = Math.min(getLastRow(ws), dataStartRow + maxRows - 1)
 
@@ -852,6 +849,10 @@ function renderMatchResultsToTable(matches: MatchResult[]): void {
         statusText = '⚠️ 错误'
         break
       }
+      default: {
+        // 未知匹配类型：保持默认样式，不额外处理
+        break
+      }
     }
 
     const bangumiRow = m.bangumiRow ? String(m.bangumiRow) : '-'
@@ -893,8 +894,9 @@ export function startEnrichment(): void {
   if (!state.bangumiSheet) {
     const locked = getLockedEnrichSheet()
     if (locked) {
-      state.bangumiSheet = locked[1]
-      bgmLog(LOG_LEVELS.INFO, `[enrich] 使用锁定的目标工作表: ${locked[1].Name}`)
+      const [, lockedSheet] = locked
+      state.bangumiSheet = lockedSheet
+      bgmLog(LOG_LEVELS.INFO, `[enrich] 使用锁定的目标工作表: ${lockedSheet.Name}`)
     }
   }
 
@@ -1115,14 +1117,25 @@ function loadRecentRecords(): void {
     const recordsHtml = recentRecords
       .map((r) => {
         const actionClass = `record-action-${r.action}`
-        const actionText =
-          r.action === 'fill'
-            ? '填充'
-            : r.action === 'append'
-              ? '追加'
-              : r.action === 'skip'
-                ? '跳过'
-                : '错误'
+        let actionText: string
+        switch (r.action) {
+          case 'fill': {
+            actionText = '填充'
+            break
+          }
+          case 'append': {
+            actionText = '追加'
+            break
+          }
+          case 'skip': {
+            actionText = '跳过'
+            break
+          }
+          default: {
+            actionText = '错误'
+            break
+          }
+        }
         const name = escapeHtml(r.name)
         const field = escapeHtml(r.enrichedField)
         const updatedValue = escapeHtml(r.updatedValue)
@@ -1231,6 +1244,10 @@ export function renderMatchResults(container: HTMLElement | null, matches: Match
       case 'error': {
         statusClass = 'status-error'
         statusText = '⚠️ 错误'
+        break
+      }
+      default: {
+        // 未知匹配类型：保持默认样式，不额外处理
         break
       }
     }
@@ -1483,7 +1500,7 @@ function processSingleBatchFile(filePath: string, bangumiSheet: WpsWorksheet): B
 
     bgmLog(LOG_LEVELS.INFO, `[enrich-batch] 打开文件: ${fileName}`)
     if (typeof workbooks.Open !== 'function') {
-      throw new Error('WPS Workbooks.Open 不可用')
+      throw new TypeError('WPS Workbooks.Open 不可用')
     }
     wb = workbooks.Open(filePath)
     if (!wb) {
@@ -1529,7 +1546,9 @@ function processSingleBatchFile(filePath: string, bangumiSheet: WpsWorksheet): B
       matches,
       config,
       // 批量模式不回调进度（已由外层控制）
-      () => {},
+      () => {
+        /* empty */
+      },
     )
 
     // EnrichResultItem 没有 stats，通过 enrichedFields 判断
@@ -1590,9 +1609,10 @@ export function batchStartEnrichment(): void {
   if (!bangumiSheet) {
     const locked = getLockedEnrichSheet()
     if (locked) {
-      bangumiSheet = locked[1]
-      state.bangumiSheet = locked[1]
-      bgmLog(LOG_LEVELS.INFO, `[enrich-batch] 使用锁定的目标工作表: ${locked[1].Name}`)
+      const [, lockedSheet] = locked
+      bangumiSheet = lockedSheet
+      state.bangumiSheet = lockedSheet
+      bgmLog(LOG_LEVELS.INFO, `[enrich-batch] 使用锁定的目标工作表: ${lockedSheet.Name}`)
     }
   }
 
@@ -1653,13 +1673,17 @@ async function runBatchEnrichment(bangumiSheet: WpsWorksheet): Promise<void> {
     updateBatchProgressUI(state.batchIndex, total, fileName)
 
     // 让出主线程，给 UI 更新机会
-    await new Promise<void>((resolve) => setTimeout(resolve, 30))
+    await new Promise<void>((resolve) => {
+      setTimeout(resolve, 30)
+    })
 
     const result = processSingleBatchFile(filePath, bangumiSheet)
     state.batchResults.push(result)
 
     // 让出主线程，给 WPS 资源释放机会
-    await new Promise<void>((resolve) => setTimeout(resolve, 50))
+    await new Promise<void>((resolve) => {
+      setTimeout(resolve, 50)
+    })
   }
 
   state.isBatchEnriching = false

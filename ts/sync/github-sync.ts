@@ -9,7 +9,7 @@
  *     "date": "2024-01-01", "meta_tags": ["标签1","标签2"], "nsfw": false,
  *     "话数": "12", "播放结束": "...", "动画制作公司": "...", ... }
  *
- * url 字段从 sid 构造：https://bgm.tv/subject/{sid}
+ * URL 字段从 sid 构造：https://bgm.tv/subject/{sid}
  * type 字段默认为 2（动漫），用于同步记录显示。
  * updatedAt 为 YYYY-MM-DD 格式（仅日期，不含时间，节省空间）。
  */
@@ -143,10 +143,12 @@ export function fetchGithubJson(signal?: AbortSignal): Promise<GithubRemoteEntry
     // AbortSignal 支持：监听 abort 事件触发 xhr.abort()，并在请求完成后移除监听器
     let abortHandler: (() => void) | null = null
     const removeAbortHandler = (): void => {
-      if (abortHandler && signal) {
-        signal.removeEventListener('abort', abortHandler)
-        abortHandler = null
+      if (!(abortHandler && signal)) {
+        return
       }
+
+      signal.removeEventListener('abort', abortHandler)
+      abortHandler = null
     }
     if (signal) {
       abortHandler = () => {
@@ -157,41 +159,54 @@ export function fetchGithubJson(signal?: AbortSignal): Promise<GithubRemoteEntry
 
     xhr.addEventListener('load', (): void => {
       removeAbortHandler()
-      if (xhr.status === 200) {
-        try {
-          const { entries, errors } = parseJsonl(xhr.responseText)
-          if (entries.length === 0 && errors.length > 0) {
+      switch (xhr.status) {
+        case 200: {
+          try {
+            const { entries, errors } = parseJsonl(xhr.responseText)
+            if (entries.length === 0 && errors.length > 0) {
+              reject(
+                new Error(
+                  `JSONL 解析失败：${String(errors.length)} 行全部非法。` +
+                    `首行错误（第 ${String(errors[0]?.line ?? '')} 行）：${errors[0]?.reason ?? ''}`,
+                ),
+              )
+              return
+            }
+            if (errors.length > 0) {
+              bgmLog(
+                LOG_LEVELS.WARN,
+                `[githubSync] JSONL 解析完成：${String(entries.length)} 条合法，${String(errors.length)} 行非法（已跳过）。` +
+                  `首行错误（第 ${String(errors[0]?.line ?? '')} 行）：${errors[0]?.reason ?? ''}`,
+              )
+            } else {
+              bgmLog(LOG_LEVELS.INFO, `[githubSync] 下载成功：${String(entries.length)} 条记录`)
+            }
+            resolve(entries)
+          } catch (error: unknown) {
             reject(
               new Error(
-                `JSONL 解析失败：${String(errors.length)} 行全部非法。` +
-                  `首行错误（第 ${String(errors[0]?.line ?? '')} 行）：${errors[0]?.reason ?? ''}`,
+                `JSONL 解析失败: ${error instanceof Error ? error.message : String(error)}`,
               ),
             )
-            return
           }
-          if (errors.length > 0) {
-            bgmLog(
-              LOG_LEVELS.WARN,
-              `[githubSync] JSONL 解析完成：${String(entries.length)} 条合法，${String(errors.length)} 行非法（已跳过）。` +
-                `首行错误（第 ${String(errors[0]?.line ?? '')} 行）：${errors[0]?.reason ?? ''}`,
-            )
-          } else {
-            bgmLog(LOG_LEVELS.INFO, `[githubSync] 下载成功：${String(entries.length)} 条记录`)
-          }
-          resolve(entries)
-        } catch (error: unknown) {
-          reject(
-            new Error(`JSONL 解析失败: ${error instanceof Error ? error.message : String(error)}`),
-          )
+
+          break
         }
-      } else if (xhr.status === 404) {
-        reject(new Error(`文件不存在（404）：${url}，请检查 owner/repo/branch/path 配置`))
-      } else if (xhr.status === 403) {
-        reject(
-          new Error(`访问被拒（403）：可能是私有仓库或触发 GitHub 限流（未认证 60次/小时/IP）`),
-        )
-      } else {
-        reject(new Error(`HTTP 错误 ${String(xhr.status)}: ${xhr.statusText}`))
+        case 404: {
+          reject(new Error(`文件不存在（404）：${url}，请检查 owner/repo/branch/path 配置`))
+
+          break
+        }
+        case 403: {
+          reject(
+            new Error(`访问被拒（403）：可能是私有仓库或触发 GitHub 限流（未认证 60次/小时/IP）`),
+          )
+
+          break
+        }
+        default: {
+          reject(new Error(`HTTP 错误 ${String(xhr.status)}: ${xhr.statusText}`))
+        }
       }
     })
 
@@ -374,8 +389,7 @@ function readLocalEntries(
         }
         // 同时写入「动画制作公司」的所有别名列到 extFields，便于 computeDiff 比对时使用
         for (const alias of getExcelAliases('动画制作公司')) {
-          // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing -- 别名列：主列为空串时也要用别名列补齐（供 computeDiff 比对），`??=` 会保留空串
-          if (!extensionFields[alias]) {
+          if (!Object.hasOwn(extensionFields, alias)) {
             extensionFields[alias] = getField(alias)
           }
         }
@@ -614,7 +628,7 @@ function writeRemoteEntryToRow(
       )
       if (isAnyAliasMatched) {
         const value = remote[jsonlField as keyof GithubRemoteEntry]
-        if (!(typeof value !== 'string' && typeof value !== 'number')) {
+        if (typeof value === 'string' || typeof value === 'number') {
           const stringValue = typeof value === 'number' ? String(value) : value
           for (const alias of excelAliases) {
             if (isWriteAll || fieldsToWrite.includes(alias)) {
@@ -644,7 +658,9 @@ const BATCH_UPDATE_SIZE = 50
 function yieldToEventLoop(): Promise<void> {
   // 使用 10ms 延迟替代 0ms，确保 WPS 浏览器控件有足够时间处理 DOM 渲染
   // 在 WPS 内嵌浏览器中，setTimeout(0) 可能被合并到当前渲染批次而无法触发重绘
-  return new Promise<void>((resolve) => setTimeout(resolve, 10))
+  return new Promise<void>((resolve) => {
+    setTimeout(resolve, 10)
+  })
 }
 
 /**
@@ -668,6 +684,303 @@ function formatDuration(ms: number): string {
 function formatEta(ms: number): string {
   if (ms <= 0) return '剩余: 计算中...'
   return `预计剩余: ${formatDuration(ms)}`
+}
+
+/**
+ * 格式化时间筛选标签（year/quarter/month，future 归入 month 分支，与原有三元逻辑一致）
+ */
+function formatTimeFilterLabel(timeFilter: SyncTimeFilter): string {
+  if (timeFilter.range === 'year') {
+    return `${String(timeFilter.year)}年`
+  }
+  if (timeFilter.range === 'quarter') {
+    return `${String(timeFilter.year)}年${String(timeFilter.quarter ?? '')}月新番`
+  }
+  return `${String(timeFilter.year)}年${String(timeFilter.month ?? '')}月`
+}
+
+/**
+ * 解析新增行的单个单元格写入值（扩展字段支持别名列映射）
+ *
+ * 独立辅助函数：避免批量写入循环内的嵌套 switch/loop break
+ */
+function resolveNewRowCellValue(
+  wc: { name: string },
+  entry: { remote: GithubRemoteEntry },
+): string | number | null {
+  switch (wc.name) {
+    case 'Bangumi_URL': {
+      return `https://bgm.tv/subject/${entry.remote.sid}`
+    }
+    case '名称': {
+      return entry.remote.name ?? null
+    }
+    case '标签/分级': {
+      return tagsToString(entry.remote.meta_tags) || null
+    }
+    case '集数': {
+      return entry.remote['话数'] ?? null
+    }
+    default: {
+      // 扩展字段：遍历 EXTENDED_FIELD_MAP 匹配（支持别名列映射）
+      for (const [jsonlField] of EXTENDED_FIELD_MAP) {
+        const aliases = getExcelAliases(jsonlField)
+        if (aliases.includes(wc.name)) {
+          const v = entry.remote[jsonlField as keyof GithubRemoteEntry]
+          if (typeof v === 'string') {
+            return DATE_COLUMNS.has(wc.name) ? (formatDateToLocal(v) ?? v) : v
+          }
+          if (typeof v === 'number') {
+            return String(v)
+          }
+          return null
+        }
+      }
+      return null
+    }
+  }
+}
+
+/**
+ * 解析更新行的单个单元格新值与写入标记（支持别名列映射与合并策略）
+ *
+ * 独立辅助函数：避免批量更新循环内的嵌套 switch/loop break
+ */
+function resolveUpdateCellValue(
+  wc: { name: string },
+  remote: GithubRemoteEntry,
+  fields: string[],
+  isWriteAll: boolean,
+  shouldForceOverwrite: boolean,
+  oldCellValue: string,
+): { value: string | number | null; shouldWrite: boolean } {
+  switch (wc.name) {
+    case 'Bangumi_URL': {
+      if (isWriteAll || fields.includes('Bangumi_URL')) {
+        return { value: `https://bgm.tv/subject/${remote.sid}`, shouldWrite: true }
+      }
+      return { value: null, shouldWrite: false }
+    }
+    case '别名': {
+      // 名称追加到「别名」列（合并策略）
+      // forceOverwrite 或 writeAll 时直接写入名称列（不合并）
+      if (!shouldForceOverwrite && !isWriteAll && fields.includes('名称')) {
+        const remoteName = remote.name ?? ''
+        if (remoteName) {
+          const value = appendValueWithSeparator(oldCellValue, remoteName)
+          if (value !== oldCellValue) {
+            return { value, shouldWrite: true }
+          }
+        }
+      }
+      // forceOverwrite 或 writeAll 时不处理别名（由名称列处理）
+      return { value: null, shouldWrite: false }
+    }
+    case '名称': {
+      // 名称列仅在 forceOverwrite 或 writeAll 时写入（新增或强制覆盖）
+      if (shouldForceOverwrite || isWriteAll || fields.includes('名称')) {
+        return { value: remote.name ?? '', shouldWrite: true }
+      }
+      return { value: null, shouldWrite: false }
+    }
+    case '标签/分级': {
+      if (isWriteAll || fields.includes('标签/分级')) {
+        const remoteTags = tagsToString(remote.meta_tags)
+        if (remoteTags) {
+          if (shouldForceOverwrite || isWriteAll) {
+            // 强制覆盖或新增：直接写入
+            return { value: remoteTags, shouldWrite: true }
+          }
+          // 普通更新：合并本地和远程标签
+          const value = appendValueWithSeparator(oldCellValue, remoteTags)
+          if (value !== oldCellValue) {
+            return { value, shouldWrite: true }
+          }
+        }
+      }
+      return { value: null, shouldWrite: false }
+    }
+    case '集数': {
+      if (isWriteAll || fields.includes('集数')) {
+        return { value: remote['话数'] ?? '', shouldWrite: true }
+      }
+      return { value: null, shouldWrite: false }
+    }
+    default: {
+      // 扩展字段：根据列名查找对应的 JSONL 字段（支持别名列映射，如「制作公司」/「动画制作公司」）
+      for (const [jsonlField] of EXTENDED_FIELD_MAP) {
+        const aliases = getExcelAliases(jsonlField)
+        if (aliases.includes(wc.name)) {
+          if (isWriteAll || aliases.some((a) => fields.includes(a))) {
+            const v = remote[jsonlField as keyof GithubRemoteEntry]
+            if (typeof v === 'string') {
+              return {
+                value: DATE_COLUMNS.has(wc.name) ? (formatDateToLocal(v) ?? v) : v,
+                shouldWrite: true,
+              }
+            }
+            if (typeof v === 'number') {
+              return { value: String(v), shouldWrite: true }
+            }
+          }
+          return { value: null, shouldWrite: false }
+        }
+      }
+      return { value: null, shouldWrite: false }
+    }
+  }
+}
+
+/**
+ * 写入单行更新值并记录 undo（一次 COM 调用写入整行）
+ *
+ * 独立辅助函数：避免在循环内定义闭包捕获外部可变变量（no-loop-func），
+ * 通过返回值累加成功数。
+ *
+ * @returns 1 表示该行写入成功（计入 successCount），0 表示失败或无需写入
+ */
+function writeRowValuesWithUndo(
+  ws: WpsWorksheet,
+  colMap: Map<string, number>,
+  u: { sid: string },
+  row: number,
+  remote: GithubRemoteEntry,
+  fields: string[],
+  minCol: number,
+  colCount: number,
+  oldArray: (string | number | null)[],
+  rowValues: (string | number | null)[],
+  range: WpsRange | null,
+  shouldForceOverwrite: boolean,
+  details: GithubSyncDetailItem[] | undefined,
+  records: UpdateRecordParameters[],
+): number {
+  if (range) {
+    // 使用已读取的旧值（oldArr 在循环开始前已读取）
+    // 只写入有变化的单元格
+    let hasChanges = false
+    const finalValues = [...rowValues]
+    for (let c = 0; c < colCount; c += 1) {
+      const updatedValue = finalValues[c]
+      if (updatedValue !== null) {
+        const oldValue = oldArray[c] == null ? '' : String(oldArray[c])
+        const valueString = String(updatedValue)
+        if (oldValue === valueString) {
+          // 无变化，跳过
+          finalValues[c] = null
+        } else {
+          hasChanges = true
+          // 记录 undo
+          recordUndoEntry({
+            row,
+            col: minCol + c,
+            oldValue,
+            updatedValue: valueString,
+          })
+        }
+      }
+    }
+
+    if (hasChanges) {
+      // 只写入有变化的列：构建最小写入范围
+      // 简化处理：直接写入整行（一次 COM 调用）
+      // 局部别名：避免对函数参数 range 的属性赋值（no-param-reassign）
+      const targetRange = range
+      targetRange.Value2 = finalValues as unknown as WpsCellValue
+    }
+    details?.push({
+      kind: 'update',
+      sid: u.sid,
+      name: remote.name,
+      row,
+      fields: fields.includes('*') ? ['全部字段'] : [...fields],
+    })
+    records.push({
+      sid: u.sid,
+      name: remote.name ?? '',
+      url: `https://bgm.tv/subject/${u.sid}`,
+      type: BGM_SUBJECT_TYPES[2] ?? '',
+      source: 'repo',
+      content: '仓库同步-更新',
+      status: '成功',
+      message: fields.join(', '),
+      count: 1,
+    })
+    return 1
+  }
+
+  // range 为 null（读取旧值失败），回退到逐字段写入
+  const hasValuesToWrite = rowValues.some((v) => v !== null)
+  if (!hasValuesToWrite) {
+    return 0
+  }
+
+  try {
+    const result = writeRemoteEntryToRow(ws, colMap, row, remote, fields, shouldForceOverwrite)
+    if (result.success || !result.attempted) {
+      // 写入成功 或 没有写入需要尝试（如空列映射）→ 视为成功
+      details?.push({
+        kind: 'update',
+        sid: u.sid,
+        name: remote.name,
+        row,
+        fields: fields.includes('*') ? ['全部字段'] : [...fields],
+      })
+      records.push({
+        sid: u.sid,
+        name: remote.name ?? '',
+        url: `https://bgm.tv/subject/${u.sid}`,
+        type: BGM_SUBJECT_TYPES[2] ?? '',
+        source: 'repo',
+        content: '仓库同步-更新',
+        status: '成功',
+        message: `${fields.join(', ')} (回退逐字段写入)`,
+        count: 1,
+      })
+      return 1
+    }
+
+    // 尝试了写入但全部失败
+    bgmLog(LOG_LEVELS.ERROR, `[batchUpdateRows] 行 ${String(row)} 回退逐字段写入全部失败`)
+    details?.push({
+      kind: 'fail',
+      sid: u.sid,
+      name: remote.name,
+      row,
+      message: '逐字段写入失败',
+    })
+    records.push({
+      sid: u.sid,
+      source: 'repo',
+      content: '仓库同步-更新失败',
+      status: '失败',
+      message: '逐字段写入失败',
+      count: 1,
+    })
+    return 0
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : String(error)
+    bgmLog(
+      LOG_LEVELS.ERROR,
+      `[batchUpdateRows] 行 ${String(row)} 回退逐字段写入异常: ${errorMessage}`,
+    )
+    details?.push({
+      kind: 'fail',
+      sid: u.sid,
+      name: remote.name,
+      row,
+      message: errorMessage,
+    })
+    records.push({
+      sid: u.sid,
+      source: 'repo',
+      content: '仓库同步-更新失败',
+      status: '失败',
+      message: errorMessage,
+      count: 1,
+    })
+    return 0
+  }
 }
 
 /**
@@ -730,38 +1043,10 @@ function batchWriteNewRows(
   // 日期列（开播日期、完播日）写入数值序列号以保留本地列格式
   const values: (string | number | null)[][] = []
   for (const entry of rows) {
-    const row = new Array<string | number | null>(colCount).fill(null)
+    const row = Array.from<unknown, string | number | null>({ length: colCount }, () => null)
     for (const wc of writeCols) {
       const index = wc.col - minCol
-      let value: string | number | null = null
-      if (wc.name === 'Bangumi_URL') {
-        value = `https://bgm.tv/subject/${entry.remote.sid}`
-      } else if (wc.name === '名称') {
-        value = entry.remote.name ?? null
-      } else if (wc.name === '标签/分级') {
-        value = tagsToString(entry.remote.meta_tags) || null
-      } else if (wc.name === '集数') {
-        value = entry.remote['话数'] ?? null
-      } else {
-        // 扩展字段：遍历 EXTENDED_FIELD_MAP 匹配（支持别名列映射）
-        for (const [jsonlField] of EXTENDED_FIELD_MAP) {
-          const aliases = getExcelAliases(jsonlField)
-          if (aliases.includes(wc.name)) {
-            const v = entry.remote[jsonlField as keyof GithubRemoteEntry]
-            if (typeof v === 'string') {
-              if (DATE_COLUMNS.has(wc.name)) {
-                value = formatDateToLocal(v) ?? v
-              } else {
-                value = v
-              }
-            } else if (typeof v === 'number') {
-              value = String(v)
-            }
-            break
-          }
-        }
-      }
-      row[index] = value
+      row[index] = resolveNewRowCellValue(wc, entry)
     }
     values.push(row)
   }
@@ -784,26 +1069,23 @@ function batchWriteNewRows(
 
   // 4. 记录 undo 条目（一次性记录所有变更）
   // 注意：日期列的值可能是数值序列号，需转换为字符串存储 undo 记录
-  for (let index = 0; index < rows.length; index += 1) {
+  for (const [index, rowRecord] of rows.entries()) {
     for (const wc of writeCols) {
       const row = startRow + index
       const raw = values[index]?.[wc.col - minCol]
       const value = raw == null ? '' : String(raw)
       recordUndoEntry({ row, col: wc.col, oldValue: '', updatedValue: value })
     }
-    const rowRecord = rows[index]
-    if (rowRecord !== undefined) {
-      records.push({
-        sid: rowRecord.sid,
-        name: rowRecord.remote.name ?? '',
-        url: `https://bgm.tv/subject/${rowRecord.sid}`,
-        type: BGM_SUBJECT_TYPES[2] ?? '',
-        source: 'repo',
-        content: '仓库同步-新增',
-        status: '成功',
-        count: 1,
-      })
-    }
+    records.push({
+      sid: rowRecord.sid,
+      name: rowRecord.remote.name ?? '',
+      url: `https://bgm.tv/subject/${rowRecord.sid}`,
+      type: BGM_SUBJECT_TYPES[2] ?? '',
+      source: 'repo',
+      content: '仓库同步-新增',
+      status: '成功',
+      count: 1,
+    })
   }
 
   return rows.length
@@ -892,9 +1174,7 @@ function batchUpdateRows(
   // 但仍然比逐字段 setCellValue 快，因为每行只 1 次 COM 调用而非 ~23 次
   let successCount = 0
   for (const u of updates) {
-    const { row } = u
-    const { remote } = u
-    const { fields } = u
+    const { row, remote, fields } = u
     const isWriteAll = fields.includes('*')
 
     // 先读取当前行的值（用于合并逻辑和 undo 记录）
@@ -917,235 +1197,51 @@ function batchUpdateRows(
     }
 
     // 构建该行的值数组
-    const rowValues = new Array<string | number | null>(colCount).fill(null)
+    const rowValues = Array.from<unknown, string | number | null>({ length: colCount }, () => null)
 
     for (const wc of writeCols) {
       const index = wc.col - minCol
-      let value: string | number | null = null
-      let shouldWrite = false
       // 获取当前单元格的旧值（用于合并）
       const oldCellValue = oldArray[index] == null ? '' : String(oldArray[index])
+      const { value: initialValue, shouldWrite } = resolveUpdateCellValue(
+        wc,
+        remote,
+        fields,
+        isWriteAll,
+        shouldForceOverwrite,
+        oldCellValue,
+      )
+      let value = initialValue
 
-      if (wc.name === 'Bangumi_URL') {
-        if (isWriteAll || fields.includes('Bangumi_URL')) {
-          value = `https://bgm.tv/subject/${remote.sid}`
-          shouldWrite = true
+      // 空值且非强制覆盖时跳过
+      if (shouldWrite && (shouldForceOverwrite || value)) {
+        // 日期列特殊处理
+        if (typeof value === 'string' && value && DATE_COLUMNS.has(wc.name)) {
+          const localDate = formatDateToLocal(value)
+          if (localDate !== null) value = localDate
         }
-      } else if (wc.name === '别名') {
-        // 名称追加到「别名」列（合并策略）
-        // forceOverwrite 或 writeAll 时直接写入名称列（不合并）
-        if (!shouldForceOverwrite && !isWriteAll && fields.includes('名称')) {
-          const remoteName = remote.name ?? ''
-          if (remoteName) {
-            value = appendValueWithSeparator(oldCellValue, remoteName)
-            if (value !== oldCellValue) {
-              shouldWrite = true
-            }
-          }
-        }
-        // forceOverwrite 或 writeAll 时不处理别名（由名称列处理）
-      } else if (wc.name === '名称') {
-        // 名称列仅在 forceOverwrite 或 writeAll 时写入（新增或强制覆盖）
-        if (shouldForceOverwrite || isWriteAll || fields.includes('名称')) {
-          value = remote.name ?? ''
-          shouldWrite = true
-        }
-      } else if (wc.name === '标签/分级') {
-        if (isWriteAll || fields.includes('标签/分级')) {
-          const remoteTags = tagsToString(remote.meta_tags)
-          if (remoteTags) {
-            if (shouldForceOverwrite || isWriteAll) {
-              // 强制覆盖或新增：直接写入
-              value = remoteTags
-              shouldWrite = true
-            } else {
-              // 普通更新：合并本地和远程标签
-              value = appendValueWithSeparator(oldCellValue, remoteTags)
-              if (value !== oldCellValue) {
-                shouldWrite = true
-              }
-            }
-          }
-        }
-      } else if (wc.name === '集数') {
-        if (isWriteAll || fields.includes('集数')) {
-          value = remote['话数'] ?? ''
-          shouldWrite = true
-        }
-      } else {
-        // 扩展字段：根据列名查找对应的 JSONL 字段（支持别名列映射，如「制作公司」/「动画制作公司」）
-        let matchedJsonlField: string | null = null
-        for (const [jsonlField] of EXTENDED_FIELD_MAP) {
-          const aliases = getExcelAliases(jsonlField)
-          if (aliases.includes(wc.name)) {
-            matchedJsonlField = jsonlField
-            break
-          }
-        }
-        if (matchedJsonlField) {
-          const aliases = getExcelAliases(matchedJsonlField)
-          if (isWriteAll || aliases.some((a) => fields.includes(a))) {
-            const v = remote[matchedJsonlField as keyof GithubRemoteEntry]
-            if (typeof v === 'string') {
-              if (DATE_COLUMNS.has(wc.name)) {
-                value = formatDateToLocal(v) ?? v
-              } else {
-                value = v
-              }
-              shouldWrite = true
-            } else if (typeof v === 'number') {
-              value = String(v)
-              shouldWrite = true
-            }
-          }
-        }
-      }
-
-      if (shouldWrite) {
-        // 空值且非强制覆盖时跳过
-        if (shouldForceOverwrite || value) {
-          // 日期列特殊处理
-          if (DATE_COLUMNS.has(wc.name) && typeof value === 'string' && value) {
-            const localDate = formatDateToLocal(value)
-            if (localDate !== null) value = localDate
-          }
-          rowValues[index] = value
-        }
+        rowValues[index] = value
       }
     }
 
     // 3. 写入该行（一次 COM 调用写入整行）
-    const writeRowValuesWithUndo = (): void => {
-      if (range) {
-        // 使用已读取的旧值（oldArr 在循环开始前已读取）
-        // 只写入有变化的单元格
-        let hasChanges = false
-        const finalValues = [...rowValues]
-        for (let c = 0; c < colCount; c += 1) {
-          const updatedValue = finalValues[c]
-          if (!(updatedValue === null)) {
-            const oldValue = oldArray[c] == null ? '' : String(oldArray[c])
-            const valueString = String(updatedValue)
-            if (oldValue === valueString) {
-              // 无变化，跳过
-              finalValues[c] = null
-            } else {
-              hasChanges = true
-              // 记录 undo
-              recordUndoEntry({
-                row,
-                col: minCol + c,
-                oldValue,
-                updatedValue: valueString,
-              })
-            }
-          }
-        }
-
-        if (hasChanges) {
-          // 只写入有变化的列：构建最小写入范围
-          // 简化处理：直接写入整行（一次 COM 调用）
-          range.Value2 = finalValues as unknown as WpsCellValue
-        }
-        successCount += 1
-        details?.push({
-          kind: 'update',
-          sid: u.sid,
-          name: remote.name,
-          row,
-          fields: u.fields.includes('*') ? ['全部字段'] : [...u.fields],
-        })
-        records.push({
-          sid: u.sid,
-          name: remote.name ?? '',
-          url: `https://bgm.tv/subject/${u.sid}`,
-          type: BGM_SUBJECT_TYPES[2] ?? '',
-          source: 'repo',
-          content: '仓库同步-更新',
-          status: '成功',
-          message: u.fields.join(', '),
-          count: 1,
-        })
-      } else {
-        // range 为 null（读取旧值失败），回退到逐字段写入
-        const hasValuesToWrite = rowValues.some((v) => v !== null)
-        if (hasValuesToWrite) {
-          try {
-            const result = writeRemoteEntryToRow(
-              ws,
-              colMap,
-              row,
-              remote,
-              fields,
-              shouldForceOverwrite,
-            )
-            if (result.success || !result.attempted) {
-              // 写入成功 或 没有写入需要尝试（如空列映射）→ 视为成功
-              successCount += 1
-              details?.push({
-                kind: 'update',
-                sid: u.sid,
-                name: remote.name,
-                row,
-                fields: u.fields.includes('*') ? ['全部字段'] : [...u.fields],
-              })
-              records.push({
-                sid: u.sid,
-                name: remote.name ?? '',
-                url: `https://bgm.tv/subject/${u.sid}`,
-                type: BGM_SUBJECT_TYPES[2] ?? '',
-                source: 'repo',
-                content: '仓库同步-更新',
-                status: '成功',
-                message: `${u.fields.join(', ')} (回退逐字段写入)`,
-                count: 1,
-              })
-            } else {
-              // 尝试了写入但全部失败
-              bgmLog(LOG_LEVELS.ERROR, `[batchUpdateRows] 行 ${String(row)} 回退逐字段写入全部失败`)
-              details?.push({
-                kind: 'fail',
-                sid: u.sid,
-                name: remote.name,
-                row,
-                message: '逐字段写入失败',
-              })
-              records.push({
-                sid: u.sid,
-                source: 'repo',
-                content: '仓库同步-更新失败',
-                status: '失败',
-                message: '逐字段写入失败',
-                count: 1,
-              })
-            }
-          } catch (error: unknown) {
-            const errorMessage = error instanceof Error ? error.message : String(error)
-            bgmLog(
-              LOG_LEVELS.ERROR,
-              `[batchUpdateRows] 行 ${String(row)} 回退逐字段写入异常: ${errorMessage}`,
-            )
-            details?.push({
-              kind: 'fail',
-              sid: u.sid,
-              name: remote.name,
-              row,
-              message: errorMessage,
-            })
-            records.push({
-              sid: u.sid,
-              source: 'repo',
-              content: '仓库同步-更新失败',
-              status: '失败',
-              message: errorMessage,
-              count: 1,
-            })
-          }
-        }
-      }
-    }
     try {
-      writeRowValuesWithUndo()
+      successCount += writeRowValuesWithUndo(
+        ws,
+        colMap,
+        u,
+        row,
+        remote,
+        fields,
+        minCol,
+        colCount,
+        oldArray,
+        rowValues,
+        range,
+        shouldForceOverwrite,
+        details,
+        records,
+      )
     } catch (error: unknown) {
       bgmLog(
         LOG_LEVELS.WARN,
@@ -1162,7 +1258,7 @@ function batchUpdateRows(
             sid: u.sid,
             name: remote.name,
             row,
-            fields: u.fields.includes('*') ? ['全部字段'] : [...u.fields],
+            fields: fields.includes('*') ? ['全部字段'] : [...fields],
           })
           records.push({
             sid: u.sid,
@@ -1172,7 +1268,7 @@ function batchUpdateRows(
             source: 'repo',
             content: '仓库同步-更新',
             status: '成功',
-            message: u.fields.join(', '),
+            message: fields.join(', '),
             count: 1,
           })
         } else {
@@ -1193,8 +1289,8 @@ function batchUpdateRows(
             count: 1,
           })
         }
-      } catch (error: unknown) {
-        const errorMessage = error instanceof Error ? error.message : String(error)
+      } catch (error_: unknown) {
+        const errorMessage = error_ instanceof Error ? error_.message : String(error_)
         bgmLog(
           LOG_LEVELS.ERROR,
           `[batchUpdateRows] 行 ${String(row)} 逐字段写入也失败: ${errorMessage}`,
@@ -1663,21 +1759,20 @@ export function applyConflictResolutions(
   // 倒序遍历，便于安全移除元素
   for (let index = diffs.length - 1; index >= 0; index -= 1) {
     const diff = diffs[index]
-    if (diff) {
-      if (!(diff.kind !== 'update')) {
-        if (!(diff.changedFields.length === 1 && diff.changedFields[0] === '*')) {
-          diff.changedFields = diff.changedFields.filter((field) => {
-            const key = `${diff.sid}\u{0}${field}`
-            const r = resolutionByKey.get(key)
-            // 若存在 resolution 且选择 local，则移除该字段；否则保留
-            return !(r && r.chosenValue === 'local')
-          })
+    if (
+      diff?.kind === 'update' &&
+      !(diff.changedFields.length === 1 && diff.changedFields[0] === '*')
+    ) {
+      diff.changedFields = diff.changedFields.filter((field) => {
+        const key = `${diff.sid}\u{0}${field}`
+        const r = resolutionByKey.get(key)
+        // 若存在 resolution 且选择 local，则移除该字段；否则保留
+        return r?.chosenValue !== 'local'
+      })
 
-          // 若所有字段都被移除，则该 diff 无需执行
-          if (diff.changedFields.length === 0) {
-            diffs.splice(index, 1)
-          }
-        }
+      // 若所有字段都被移除，则该 diff 无需执行
+      if (diff.changedFields.length === 0) {
+        diffs.splice(index, 1)
       }
     }
   }
@@ -1785,7 +1880,7 @@ export async function syncFromGithub(
       onProgress?.(
         1,
         3,
-        `时间筛选：${timeFilter.range === 'year' ? `${String(timeFilter.year)}年` : timeFilter.range === 'quarter' ? `${String(timeFilter.year)}年${String(timeFilter.quarter ?? '')}月新番` : `${String(timeFilter.year)}年${String(timeFilter.month ?? '')}月`}，匹配 ${String(effectiveRemoteEntries.length)} 条`,
+        `时间筛选：${formatTimeFilterLabel(timeFilter)}，匹配 ${String(effectiveRemoteEntries.length)} 条`,
       )
     }
 
@@ -1888,7 +1983,7 @@ function getSelectedRowSids(): Set<string> {
     }
 
     for (let row = firstRow; row <= lastRow; row += 1) {
-      if (!(row === headerRow)) {
+      if (row !== headerRow) {
         const url = trim(getCellValue(ws, row, urlCol))
         if (url) {
           const sid = extractSubjectId(url)

@@ -44,7 +44,8 @@ function createMockWorkbooks(workbooks: { Name: string; Sheets: string[] }[]): M
       Index: index + 1,
       Worksheets: {
         Count: sheets.length,
-        Item: (index: number) => (index >= 1 && index <= sheets.length ? sheets[index - 1] : null),
+        Item: (sheetIndex: number) =>
+          sheetIndex >= 1 && sheetIndex <= sheets.length ? sheets[sheetIndex - 1] : null,
       },
     }
   })
@@ -57,7 +58,7 @@ function createMockPluginStorage(store: Record<string, string> = {}): {
 } {
   const s = { ...store }
   return {
-    getItem: (k: string) => (k in s ? s[k] : null),
+    getItem: (k: string) => (Object.hasOwn(s, k) ? s[k] : null),
     setItem: (k: string, v: string) => {
       s[k] = v
     },
@@ -204,7 +205,7 @@ function setMockApp(app: unknown): void {
 
 function setupBasicDom(): void {
   const ids = ['workbookSelect', 'sheetSelect', 'lockSheetBtn', 'lockStatus']
-  ids.forEach((id) => {
+  for (const id of ids) {
     let element: HTMLElement
     if (id === 'workbookSelect' || id === 'sheetSelect') {
       element = document.createElement('select')
@@ -215,7 +216,7 @@ function setupBasicDom(): void {
     }
     element.id = id
     document.body.appendChild(element)
-  })
+  }
 }
 
 // ============ 场景 1: refreshEnrichWorkbooks ============

@@ -56,6 +56,7 @@ export function exportConfig(): string {
   }
 
   // 仅在已设置时包含 token / userId，避免导出 null 值
+  // eslint-disable-next-line security/detect-possible-timing-attacks -- 与 null 做恒等比较，不涉及秘密值间的字符串比对，规则静态误报
   if (token !== null) {
     config.token = token
   }

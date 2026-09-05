@@ -53,13 +53,8 @@ function initSettingsPage(): void {
   // 2. 加载同步偏好设置
   void (async () => {
     try {
-      const {
-        isIncrementalSyncEnabled,
-        isSkipConflictsEnabled,
-        isSyncRecordEnabled,
-        getConfig,
-        areNavIconsOnly,
-      } = await import('../tools/config.js')
+      const { isIncrementalSyncEnabled, isSkipConflictsEnabled, isSyncRecordEnabled, getConfig } =
+        await import('../tools/config.js')
       // 设置复选框
       const chkIncremental = document.getElementById(
         'chkIncrementalSync',
@@ -122,25 +117,25 @@ function applyAppearance(): void {
     document.body.classList.add('nav-icons-only')
   }
   // 滚动高亮：当前可视区段对应的导航项高亮
-  const sections = Array.from(document.querySelectorAll<HTMLElement>('main .section[id]'))
-  const navLinks = Array.from(document.querySelectorAll<HTMLAnchorElement>('.nav a[href^="#"]'))
+  const sections = [...document.querySelectorAll<HTMLElement>('main .section[id]')]
+  const navLinks = [...document.querySelectorAll<HTMLAnchorElement>('.nav a[href^="#"]')]
   if (sections.length === 0 || navLinks.length === 0) return
   if (typeof IntersectionObserver === 'undefined') return
   const observer = new IntersectionObserver(
     (entries) => {
-      entries.forEach((entry) => {
+      for (const entry of entries) {
         if (entry.isIntersecting) {
-          navLinks.forEach((link) => {
+          for (const link of navLinks) {
             link.classList.toggle('active', link.getAttribute('href') === `#${entry.target.id}`)
-          })
+          }
         }
-      })
+      }
     },
     { rootMargin: '-20% 0px -70% 0px' },
   )
-  sections.forEach((section) => {
+  for (const section of sections) {
     observer.observe(section)
-  })
+  }
 }
 
 /**
@@ -159,6 +154,7 @@ export function startSettings(): void {
   if (typeof document !== 'undefined') {
     queueMicrotask(() => {
       document.dispatchEvent(new CustomEvent('bgm:modulesReady'))
+      // eslint-disable-next-line no-console -- console 是日志后端/启动兜底的唯一输出通道（启动日志，logger 初始化前可能执行）
       console.log('[BGM Settings] startSettings() 完成，bgm:modulesReady 已触发')
     })
   }

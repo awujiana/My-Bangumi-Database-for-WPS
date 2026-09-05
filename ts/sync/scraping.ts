@@ -251,61 +251,67 @@ export async function fetchAllUserCollections(
 
   bgmLog(LOG_LEVELS.INFO, `[fetchAllUserCollections] 开始获取用户 ${resolvedUserId} 的收藏列表`)
 
-  while (offset < maxTotal) {
-    const fetchCollectionsPage = async (): Promise<'break' | undefined> => {
-      const typeParameter = typeNumber === null ? '' : `&type=${String(typeNumber ?? '')}`
-      const url = `${BGM_CONFIG.API_BASE}/v0/users/${resolvedUserId}/collections?limit=${String(limit)}&offset=${String(offset)}${typeParameter}`
-      const xhrResult = await xhrGet(url, token)
+  // 单页请求逻辑（从 while 循环中上提，避免每次迭代重建闭包）
+  const fetchCollectionsPage = async (): Promise<'break' | undefined> => {
+    const typeParameter = typeNumber === null ? '' : `&type=${String(typeNumber ?? '')}`
+    const url = `${BGM_CONFIG.API_BASE}/v0/users/${resolvedUserId}/collections?limit=${String(limit)}&offset=${String(offset)}${typeParameter}`
+    const xhrResult = await xhrGet(url, token)
 
-      const isHttpError = xhrResult.status < 200 || xhrResult.status >= 300
-      const isRateLimited = xhrResult.status === 429
+    const isHttpError = xhrResult.status < 200 || xhrResult.status >= 300
+    const isRateLimited = xhrResult.status === 429
 
-      if (isHttpError) {
-        if (isRateLimited && retryCount < MAX_RETRY_COUNT) {
-          retryCount += 1
-          const delayMs = BGM_CONFIG.RETRY_DELAY_BASE * 2 ** (retryCount - 1)
-          bgmLog(
-            LOG_LEVELS.WARN,
-            `[fetchAllUserCollections] API限流，第 ${String(retryCount)} 次重试，等待 ${String(delayMs)}ms...`,
-          )
-          await new Promise((resolve) => setTimeout(resolve, delayMs))
-          // 限流重试：保持 offset 不变，直接进入下一轮重新请求同一分页，
-          // 且不走末尾的 REQUEST_DELAY（重试延时已单独等待）。原为 continue。
-        } else if (isRateLimited) {
-          throw new Error(`HTTP 429：请求过于频繁，已超过最大重试次数`)
-        } else {
-          throw new Error(`HTTP ${String(xhrResult.status)}`)
-        }
+    if (isHttpError) {
+      if (isRateLimited && retryCount < MAX_RETRY_COUNT) {
+        retryCount += 1
+        const delayMs = BGM_CONFIG.RETRY_DELAY_BASE * 2 ** (retryCount - 1)
+        bgmLog(
+          LOG_LEVELS.WARN,
+          `[fetchAllUserCollections] API限流，第 ${String(retryCount)} 次重试，等待 ${String(delayMs)}ms...`,
+        )
+        await new Promise((resolve) => {
+          setTimeout(resolve, delayMs)
+        })
+        // 限流重试：保持 offset 不变，直接进入下一轮重新请求同一分页，
+        // 且不走末尾的 REQUEST_DELAY（重试延时已单独等待）。原为 continue。
+      } else if (isRateLimited) {
+        throw new Error(`HTTP 429：请求过于频繁，已超过最大重试次数`)
       } else {
-        // 成功请求后重置重试计数
-        retryCount = 0
+        throw new Error(`HTTP ${String(xhrResult.status)}`)
+      }
+    } else {
+      // 成功请求后重置重试计数
+      retryCount = 0
 
-        const data = xhrResult.data as CollectionListResponse
+      const data = xhrResult.data as CollectionListResponse
 
-        if (total === 0 && data.total) {
-          total = Math.min(data.total, maxTotal)
-          bgmLog(LOG_LEVELS.INFO, `[fetchAllUserCollections] 收藏总数: ${String(total)}`)
+      if (total === 0 && data.total) {
+        total = Math.min(data.total, maxTotal)
+        bgmLog(LOG_LEVELS.INFO, `[fetchAllUserCollections] 收藏总数: ${String(total)}`)
+      }
+
+      if (data.data && Array.isArray(data.data)) {
+        allCollections.push(...data.data)
+        offset += data.data.length
+
+        if (options?.onProgress) {
+          options.onProgress(Math.ceil(offset / limit), Math.ceil(total / limit))
         }
 
-        if (data.data && Array.isArray(data.data)) {
-          allCollections.push(...data.data)
-          offset += data.data.length
-
-          if (options?.onProgress) {
-            options.onProgress(Math.ceil(offset / limit), Math.ceil(total / limit))
-          }
-
-          if (data.data.length < limit || offset >= total) {
-            return 'break'
-          }
-        } else {
+        if (data.data.length < limit || offset >= total) {
           return 'break'
         }
-
-        await new Promise((resolve) => setTimeout(resolve, BGM_CONFIG.REQUEST_DELAY))
+      } else {
+        return 'break'
       }
-      return undefined
+
+      await new Promise((resolve) => {
+        setTimeout(resolve, BGM_CONFIG.REQUEST_DELAY)
+      })
     }
+    return undefined
+  }
+
+  while (offset < maxTotal) {
     try {
       if ((await fetchCollectionsPage()) === 'break') break
     } catch (error: unknown) {

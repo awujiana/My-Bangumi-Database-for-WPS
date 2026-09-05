@@ -136,6 +136,7 @@ export class EventBus {
         entry.handler(data)
       } catch (error) {
         // 不依赖 BGM.handleError，避免循环依赖；直接输出到控制台
+        // eslint-disable-next-line no-console -- console 是日志后端/启动兜底的唯一输出通道（事件总线异常兜底日志）
         console.error('[EventBus]', error)
       }
       if (entry.isOnce) {

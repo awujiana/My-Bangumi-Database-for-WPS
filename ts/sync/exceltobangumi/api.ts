@@ -122,10 +122,12 @@ export function testTokenValidityForRibbon(token?: string, signal?: AbortSignal)
   // AbortSignal 支持：监听 abort 事件触发 xhr.abort()，并在请求完成后移除监听器
   let abortHandler: (() => void) | null = null
   const removeAbortHandler = (): void => {
-    if (abortHandler && signal) {
-      signal.removeEventListener('abort', abortHandler)
-      abortHandler = null
+    if (!(abortHandler && signal)) {
+      return
     }
+
+    signal.removeEventListener('abort', abortHandler)
+    abortHandler = null
   }
   if (signal) {
     abortHandler = () => {
@@ -317,10 +319,12 @@ export async function bgmRequestSync(
       // AbortSignal 支持：监听 abort 事件触发 xhr.abort()，并在请求完成后移除监听器
       let abortHandler: (() => void) | null = null
       const removeAbortHandler = (): void => {
-        if (abortHandler && signal) {
-          signal.removeEventListener('abort', abortHandler)
-          abortHandler = null
+        if (!(abortHandler && signal)) {
+          return
         }
+
+        signal.removeEventListener('abort', abortHandler)
+        abortHandler = null
       }
       if (signal) {
         abortHandler = () => {
@@ -363,7 +367,7 @@ export async function bgmRequestSync(
         resolve(result)
       })
 
-      xhr.ontimeout = function () {
+      xhr.ontimeout = function handleTimeout() {
         removeAbortHandler()
         result.code = 0
         result.message = 'Request timeout'

@@ -146,6 +146,8 @@ export function updateTokenStatus(): void {
 let _lastUserIdSnapshot: string | null | undefined
 
 export function updateUserIdStatus(): void {
+  // panel.html 中「顶栏」与「用户区」各有一个 id=userIdStatus 元素，须全部更新，不能改用 querySelector
+
   const userIdStatusEls = document.querySelectorAll<HTMLElement>('#userIdStatus')
   if (userIdStatusEls.length === 0) return
 
@@ -492,14 +494,24 @@ export function showTokenExpiryInfo(expires: number): void {
     // 根据状态设置颜色
     // green
     let color = '#4CAF50'
-    if (remaining.status === 'warning')
-      // yellow
-      color = '#ffc107'
-    else if (remaining.status === 'danger')
-      // orange
-      color = '#ff9800'
-    // red
-    else if (remaining.status === 'expired') color = '#f44336'
+    switch (remaining.status) {
+      case 'warning': {
+        color = '#ffc107'
+        break
+      }
+      case 'danger': {
+        color = '#ff9800'
+        break
+      }
+      case 'expired': {
+        color = '#f44336'
+        break
+      }
+      default: {
+        // 其余状态（normal）保持默认绿色
+        break
+      }
+    }
 
     expiresElement.style.color = color
   }
@@ -507,9 +519,24 @@ export function showTokenExpiryInfo(expires: number): void {
   // 更新 tokenStatus 状态颜色
   if (tokenStatusElement) {
     let color = '#4CAF50'
-    if (remaining.status === 'warning') color = '#ffc107'
-    else if (remaining.status === 'danger') color = '#ff9800'
-    else if (remaining.status === 'expired') color = '#f44336'
+    switch (remaining.status) {
+      case 'warning': {
+        color = '#ffc107'
+        break
+      }
+      case 'danger': {
+        color = '#ff9800'
+        break
+      }
+      case 'expired': {
+        color = '#f44336'
+        break
+      }
+      default: {
+        // 其余状态（normal）保持默认绿色
+        break
+      }
+    }
     tokenStatusElement.style.color = color
   }
 
@@ -517,16 +544,46 @@ export function showTokenExpiryInfo(expires: number): void {
   const profileExpiresElement = document.getElementById('profileExpiresDisplay')
   if (profileExpiresElement) {
     let icon = '✅'
-    if (remaining.status === 'warning') icon = '⚠️'
-    else if (remaining.status === 'danger') icon = '🔴'
-    else if (remaining.status === 'expired') icon = '⛔'
+    switch (remaining.status) {
+      case 'warning': {
+        icon = '⚠️'
+        break
+      }
+      case 'danger': {
+        icon = '🔴'
+        break
+      }
+      case 'expired': {
+        icon = '⛔'
+        break
+      }
+      default: {
+        // 其余状态（normal）保持默认图标
+        break
+      }
+    }
     profileExpiresElement.textContent = `${icon} ${remaining.label}`
     profileExpiresElement.style.display = ''
 
     let color = '#4CAF50'
-    if (remaining.status === 'warning') color = '#ffc107'
-    else if (remaining.status === 'danger') color = '#ff9800'
-    else if (remaining.status === 'expired') color = '#f44336'
+    switch (remaining.status) {
+      case 'warning': {
+        color = '#ffc107'
+        break
+      }
+      case 'danger': {
+        color = '#ff9800'
+        break
+      }
+      case 'expired': {
+        color = '#f44336'
+        break
+      }
+      default: {
+        // 其余状态（normal）保持默认绿色
+        break
+      }
+    }
     profileExpiresElement.style.color = color
   }
 }
@@ -543,17 +600,31 @@ export function showTokenExpiryInfo(expires: number): void {
 export function checkTokenExpiryWarning(expires: number): void {
   const remaining = getTokenRemainingTime(expires)
 
-  if (remaining.status === 'expired') {
-    showToast(_T.tokenExpiredWarning, 'error')
-    bgmLog(LOG_LEVELS.ERROR, `[checkTokenExpiryWarning] ${_T.tokenExpiredWarning}`)
-  } else if (remaining.status === 'danger') {
-    const message = _T.tokenExpiringCritical.replace('{}', remaining.label)
-    showToast(message, 'error')
-    bgmLog(LOG_LEVELS.WARN, `[checkTokenExpiryWarning] ${message}`)
-  } else if (remaining.status === 'warning') {
-    const message = _T.tokenExpiringSoon.replace('{}', remaining.label)
-    showToast(message, 'warn')
-    bgmLog(LOG_LEVELS.WARN, `[checkTokenExpiryWarning] ${message}`)
+  switch (remaining.status) {
+    case 'expired': {
+      showToast(_T.tokenExpiredWarning, 'error')
+      bgmLog(LOG_LEVELS.ERROR, `[checkTokenExpiryWarning] ${_T.tokenExpiredWarning}`)
+
+      break
+    }
+    case 'danger': {
+      const message = _T.tokenExpiringCritical.split('{}').join(remaining.label)
+      showToast(message, 'error')
+      bgmLog(LOG_LEVELS.WARN, `[checkTokenExpiryWarning] ${message}`)
+
+      break
+    }
+    case 'warning': {
+      const message = _T.tokenExpiringSoon.split('{}').join(remaining.label)
+      showToast(message, 'warn')
+      bgmLog(LOG_LEVELS.WARN, `[checkTokenExpiryWarning] ${message}`)
+
+      break
+    }
+    default: {
+      // 其余状态（normal/expired 已在上方分支处理）不发送提醒
+      break
+    }
   }
 }
 
@@ -610,14 +681,14 @@ export function showUserProfile(): void {
 
     // 同步更新 Token 区域右侧的用户信息和头像
     const tokenStatusRight = document.getElementById('tokenStatusRight')
-    const tokenUserNameElement = document.getElementById('tokenUserName')
+    const tokenUsernameElement = document.getElementById('tokenUserName')
     const tokenUserIdElement = document.getElementById('tokenUserId')
     const tokenAvatarImg = document.getElementById('tokenAvatarImg') as HTMLImageElement | null
     if (tokenStatusRight) {
       if (username || userId || avatarUrl) {
         tokenStatusRight.style.display = 'flex'
-        if (tokenUserNameElement && username) {
-          tokenUserNameElement.textContent = username
+        if (tokenUsernameElement && username) {
+          tokenUsernameElement.textContent = username
         }
         if (tokenUserIdElement && userId) {
           tokenUserIdElement.textContent = `ID: ${userId}`

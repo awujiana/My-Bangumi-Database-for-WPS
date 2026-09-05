@@ -139,11 +139,7 @@ function isCellMarkedSuccess(ws: WpsWorksheet, row: number, seqCol?: number): bo
     const cell = getCell(ws, row, col)
     if (!cell?.Interior) return false
     const color = cell.Interior.Color
-    return (
-      color === BGM_COLOR.SUCCESS ||
-      color === BGM_COLOR.LIGHT_GREEN ||
-      color === BGM_COLOR.DARK_GREEN
-    )
+    return [BGM_COLOR.SUCCESS, BGM_COLOR.LIGHT_GREEN, BGM_COLOR.DARK_GREEN].includes(color)
   } catch {
     return false
   }
@@ -183,8 +179,7 @@ function createFieldGetter(
   }
 }
 
-// 以下纯函数（extractSubjectId / mapWatchStatus / addTagsFromString / buildTagsArray）
-// 已迁移至 ./pure-utilities.js，通过顶部 import 与 re-export 引入。
+// 以下纯函数（extractSubjectId / mapWatchStatus / addTagsFromString / buildTagsArray） 已迁移至 ./pure-utilities.js，通过顶部 import 与 re-export 引入。
 
 /**
  * 获取筛选状态（可见行）
@@ -459,7 +454,7 @@ function processRowToSyncTaskInner(
   const jsonBody = buildJsonPayload((key) => getField(rowNumber, key), finishedDate)
   const name = getField(rowNumber, '名称')
   const epRaw = trim(getField(rowNumber, '集数') || getField(rowNumber, '集号') || '')
-  const epNumber = parseInt(epRaw, 10)
+  const epNumber = Number(epRaw)
 
   const task: _SyncTask = {
     rowNum: rowNumber,
@@ -467,9 +462,9 @@ function processRowToSyncTaskInner(
     bgmUrl,
     name,
     jsonBody,
-    ...(currentFingerprint === undefined ? {} : { fingerprint: currentFingerprint }),
+    ...(currentFingerprint !== undefined && { fingerprint: currentFingerprint }),
     type: watchType,
-    ...(!isNaN(epNumber) && epNumber > 0 ? { epCount: epNumber } : {}),
+    ...(!Number.isNaN(epNumber) && epNumber > 0 && { epCount: epNumber }),
   }
 
   return { task, skipped: false, failed: false }
@@ -584,7 +579,8 @@ async function batchSyncRequests(
 ): Promise<{ success: _SyncTask[]; fail: _SyncTask[]; stopped: boolean }> {
   const success: _SyncTask[] = []
   const fail: _SyncTask[] = []
-  let lastRequestTime = 0
+  // 用对象包裹上次请求时间：闭包内通过属性赋值更新，避免 no-loop-func 捕获循环外可变 let 变量
+  const requestThrottle = { lastRequestTime: 0 }
   let isStopped = false
   const total = tasks.length
 
@@ -630,7 +626,7 @@ async function batchSyncRequests(
       entry.promise = (async () => {
         try {
           const now = Date.now()
-          const elapsed = now - lastRequestTime
+          const elapsed = now - requestThrottle.lastRequestTime
           if (elapsed < MIN_REQUEST_INTERVAL) {
             await delay(MIN_REQUEST_INTERVAL - elapsed)
           }
@@ -641,7 +637,7 @@ async function batchSyncRequests(
             task.jsonBody,
             token,
           )
-          lastRequestTime = Date.now()
+          requestThrottle.lastRequestTime = Date.now()
 
           if (apiResult.code >= 200 && apiResult.code < 300) {
             success.push(task)
@@ -815,7 +811,7 @@ export async function SyncToBangumiAsync(
  */
 function collectRowNumbersFromSelection(sel: WpsRange, rawRows: number[]): void {
   // 记录选中区域地址用于调试
-  let selAddress = ''
+  let selAddress: string
   try {
     selAddress = sel.Address ?? ''
   } catch (error: unknown) {
@@ -831,7 +827,7 @@ function collectRowNumbersFromSelection(sel: WpsRange, rawRows: number[]): void 
   const areas = sel.Areas
   const areaCount = areas?.Count ?? 1
 
-  if (areaCount > 1 && areas) {
+  if (areas && areaCount > 1) {
     // 非连续选择：遍历每个 Area 收集行号
     bgmLog(LOG_LEVELS.INFO, `[syncSelectedRows] 检测到非连续选择，共 ${String(areaCount)} 个区域`)
     for (let ai = 1; ai <= areaCount; ai += 1) {
@@ -909,7 +905,7 @@ async function validateSelectedRows(
   // 选中行数超过阈值时弹出确认对话框
   if (rows.length > 10) {
     bgmLog(LOG_LEVELS.INFO, `[syncSelectedRows] 选中 ${String(rows.length)} 行，弹出确认对话框`)
-    const isConfirmed = await new Promise<boolean>((resolve) => {
+    const shouldSync = await new Promise<boolean>((resolve) => {
       showConfirm(
         `选中了 ${String(rows.length)} 行数据，确认要同步全部吗？\n\n行号范围: ${String(Math.min(...rows))} - ${String(Math.max(...rows))}`,
         (isConfirmed: boolean) => {
@@ -918,7 +914,7 @@ async function validateSelectedRows(
         '批量同步确认',
       )
     })
-    if (!isConfirmed) {
+    if (!shouldSync) {
       bgmLog(LOG_LEVELS.INFO, '[syncSelectedRows] 用户取消同步')
       void wpsMessageBox('已取消同步', 0, 64)
       return null
@@ -967,22 +963,23 @@ async function executeSelectedSync(
   headerRow: number,
   startTime: number,
 ): Promise<void> {
-  let isEnteredRunning = false
+  // 用对象包裹运行态标志，避免闭包内赋值不被类型收窄识别（ESLint no-unnecessary-condition 误报恒为 false）
+  const runState: { entered: boolean } = { entered: false }
   // 上游 prepareSelectedSync 已校验列存在；?? 0 仅为类型层兜底（列号 1-based，0 不合法）
   const urlCol = colMap.get('Bangumi_URL') ?? 0
   const nameCol = colMap.get('名称')
   const runSelectedRowsLoop = async (): Promise<void> => {
-    const userPath = _getUserApiPath()
-
-    let successCount = 0
-    let failCount = 0
-    let skipCount = 0
-    let episodeMarkCount = 0
-    const details: string[] = []
-
     // P2：进入运行状态（防重入 + 重置标志 + 置位）
     if (!BGM.sync.enterRunningState()) return
-    isEnteredRunning = true
+    runState.entered = true
+
+    // 用户 API 路径（声明移到 early return 之后，满足 unicorn/no-declarations-before-early-exit）
+    const userPath = _getUserApiPath()
+
+    // 计数器与明细（声明移到 early return 之后；用对象包裹计数器，
+    // 供循环内异步闭包通过属性更新，避免 no-loop-func 捕获循环外可变 let 变量）
+    const counters = { success: 0, fail: 0, skip: 0, episodeMark: 0 }
+    const details: string[] = []
     const selectedRowsConfig: SyncConfigSummary = buildSyncConfig({
       source: '当前工作表',
       strategy: '选中行同步',
@@ -992,10 +989,7 @@ async function executeSelectedSync(
         { label: '选中行数', value: String(rows.length) },
         {
           label: '行号范围',
-          value:
-            rows.length > 0
-              ? `${String(rows[0] ?? '')}~${String(rows[rows.length - 1] ?? '')}`
-              : '-',
+          value: rows.length > 0 ? `${String(rows[0] ?? '')}~${String(rows.at(-1) ?? '')}` : '-',
         },
       ],
     })
@@ -1076,7 +1070,7 @@ async function executeSelectedSync(
                 bgmLog(LOG_LEVELS.WARN, `[syncSelectedRows] ${rowProgress} ${message}`)
                 showToast(message, 'warn')
                 details.push(`⊘ 行${String(rowNumber)} ${name || sid} 跳过: 请求体为空`)
-                skipCount += 1
+                counters.skip += 1
                 updateSyncProgressDialog(
                   index + 1,
                   rows.length,
@@ -1093,7 +1087,7 @@ async function executeSelectedSync(
                 const result = await _bgmRequestSync('POST', endpoint, jsonBody, token)
 
                 if (result.code >= 200 && result.code < 300) {
-                  successCount += 1
+                  counters.success += 1
                   details.push(
                     `✓ 行${String(rowNumber)} ${name || sid} HTTP:${String(result.code)}`,
                   )
@@ -1121,26 +1115,30 @@ async function executeSelectedSync(
                   }
                   const epCol = Number(colMap.get('集数') ?? colMap.get('集号'))
                   const epRaw = trim(getCellValue(ws, rowNumber, epCol))
-                  const epCount = parseInt(epRaw, 10)
-                  if ((watchType === 2 || watchType === 3) && !isNaN(epCount) && epCount > 0) {
+                  const epCount = Number(epRaw)
+                  if (
+                    (watchType === 2 || watchType === 3) &&
+                    !Number.isNaN(epCount) &&
+                    epCount > 0
+                  ) {
                     bgmLog(
                       LOG_LEVELS.INFO,
                       `[syncSelectedRows] ${rowProgress} 行${String(rowNumber)} 状态${watchType === 2 ? '"看过"' : '"在看"'}(type=${String(watchType)})，集数: ${String(epCount)}，开始标记章节...`,
                     )
                     const epResult = await _markEpisodesComplete(sid, epCount, token)
-                    episodeMarkCount += 1
+                    counters.episodeMark += 1
                     bgmLog(
                       LOG_LEVELS.INFO,
                       `[syncSelectedRows] ${rowProgress} 行${String(rowNumber)} 章节标记结果: ${epResult.message}`,
                     )
-                  } else if (!isNaN(epCount) && epCount > 0) {
+                  } else if (!Number.isNaN(epCount) && epCount > 0) {
                     bgmLog(
                       LOG_LEVELS.INFO,
                       `[syncSelectedRows] ${rowProgress} 行${String(rowNumber)} 状态非"看过/在看"(type=${String(watchType)})，跳过章节标记`,
                     )
                   }
                 } else {
-                  failCount += 1
+                  counters.fail += 1
                   details.push(
                     `✗ 行${String(rowNumber)} ${name || sid} HTTP:${String(result.code)}`,
                   )
@@ -1161,7 +1159,7 @@ async function executeSelectedSync(
               bgmLog(LOG_LEVELS.WARN, `[syncSelectedRows] ${rowProgress} ${message}`)
               showToast(message, 'warn')
               details.push(`⊘ 行${String(rowNumber)} ${name || '无名'} 跳过: 无效ID`)
-              skipCount += 1
+              counters.skip += 1
               updateSyncProgressDialog(
                 index + 1,
                 rows.length,
@@ -1176,7 +1174,7 @@ async function executeSelectedSync(
             details.push(
               `⊘ 行${String(rowNumber)} ${name || '无名'} 跳过: 非BGM链接 (${bgmUrl.substring(0, 30)})`,
             )
-            skipCount += 1
+            counters.skip += 1
             updateSyncProgressDialog(index + 1, rows.length, message, `⊘ ${rowProgress} ${message}`)
           }
         else {
@@ -1184,14 +1182,14 @@ async function executeSelectedSync(
           bgmLog(LOG_LEVELS.WARN, `[syncSelectedRows] ${rowProgress} ${message}`)
           showToast(message, 'warn')
           details.push(`⊘ 行${String(rowNumber)} ${name || '无名'} 跳过: URL为空`)
-          skipCount += 1
+          counters.skip += 1
           updateSyncProgressDialog(index + 1, rows.length, message, `⊘ ${rowProgress} ${message}`)
         }
       }
       try {
         await syncSingleRowTask()
       } catch (error: unknown) {
-        failCount += 1
+        counters.fail += 1
         const errorMessage = error instanceof Error ? error.message : String(error)
         bgmLog(
           LOG_LEVELS.ERROR,
@@ -1211,13 +1209,13 @@ async function executeSelectedSync(
     bgmLog(LOG_LEVELS.INFO, `[syncSelectedRows] ========== 汇总 ==========`)
     bgmLog(
       LOG_LEVELS.INFO,
-      `[syncSelectedRows] 总行数: ${String(rows.length)}  |  成功: ${String(successCount)}  |  失败: ${String(failCount)}  |  跳过: ${String(skipCount)}  |  标记章节: ${String(episodeMarkCount)}  |  耗时: ${String(elapsed)}ms`,
+      `[syncSelectedRows] 总行数: ${String(rows.length)}  |  成功: ${String(counters.success)}  |  失败: ${String(counters.fail)}  |  跳过: ${String(counters.skip)}  |  标记章节: ${String(counters.episodeMark)}  |  耗时: ${String(elapsed)}ms`,
     )
     bgmLog(LOG_LEVELS.INFO, `[syncSelectedRows] 详情: ${details.join('  |  ')}`)
 
     // 切换弹窗为完成状态（保留弹窗，显示统计 + 详情）
     const wasStopped = BGM.sync.checkShouldStop()
-    const summary = `📊 选中 ${String(rows.length)} 行 | 耗时 ${(elapsed / 1000).toFixed(1)}s\n\n✅ 成功: ${String(successCount)}\n❌ 失败: ${String(failCount)}\n⏭️ 跳过: ${String(skipCount)}\n📺 标记章节: ${String(episodeMarkCount)}`
+    const summary = `📊 选中 ${String(rows.length)} 行 | 耗时 ${(elapsed / 1000).toFixed(1)}s\n\n✅ 成功: ${String(counters.success)}\n❌ 失败: ${String(counters.fail)}\n⏭️ 跳过: ${String(counters.skip)}\n📺 标记章节: ${String(counters.episodeMark)}`
     completeSyncProgressDialog(summary, details, wasStopped)
   }
   try {
@@ -1231,7 +1229,7 @@ async function executeSelectedSync(
   } finally {
     // 统一在 finally 中清理运行状态，避免 catch/success 路径重复调用 exitRunningState
     // 正常完成时 completeSyncProgressDialog 已切换弹窗状态；异常时 hideSyncProgressDialog 已隐藏弹窗
-    if (isEnteredRunning) {
+    if (runState.entered) {
       BGM.sync.exitRunningState()
     }
   }
@@ -1316,7 +1314,8 @@ function getFilterStatusCore(
   const app = getApp()
   if (!app?.ActiveWorkbook) return result
 
-  let ws: WpsWorksheet | null = null
+  // 三个分支均会赋值 ws，无需初始化为 null（消除 no-useless-assignment）
+  let ws: WpsWorksheet | null
   let effectiveLastRow: number | undefined
   let effectiveHeaderRow: number | undefined
 
@@ -1424,7 +1423,7 @@ function getFilterStatusCore(
     }
   }
   bgmLog(LOG_LEVELS.INFO, `SpecialCells 收集到 ${String(rawRows.size)} 个原始行号`)
-  const rowList = Array.from(rawRows).sort((a, b) => a - b)
+  const rowList = [...rawRows].sort((a, b) => a - b)
   // 仅打印行号摘要，不逐行读取单元格值（避免大量 COM 调用导致卡顿）
   bgmLog(
     LOG_LEVELS.INFO,
@@ -1436,7 +1435,7 @@ function getFilterStatusCore(
 
   // 6. 生成最终可见行列表（排除表头行）
   for (const r of rawRows) {
-    if (!(effectiveHeaderRow != null && r === effectiveHeaderRow)) {
+    if (effectiveHeaderRow == null || r !== effectiveHeaderRow) {
       result.visibleRows.push(r)
     }
   }
@@ -1472,12 +1471,11 @@ function buildJsonPayloadInner(getField: (key: string) => string, _finishedDate:
           `[buildJsonPayload] 从列 "${key}" 读取状态: "${statusValue}" -> ${String(mappedStatus)}`,
         )
         break
-      } else {
-        bgmLog(
-          LOG_LEVELS.WARN,
-          `[buildJsonPayload] 从列 "${key}" 读取状态: "${statusValue}" -> ${String(mappedStatus)} (无效)`,
-        )
       }
+      bgmLog(
+        LOG_LEVELS.WARN,
+        `[buildJsonPayload] 从列 "${key}" 读取状态: "${statusValue}" -> ${String(mappedStatus)} (无效)`,
+      )
     }
   }
   if (!isStatusFound) {
@@ -1496,8 +1494,8 @@ function buildJsonPayloadInner(getField: (key: string) => string, _finishedDate:
   // 评分
   const rateValue = trim(getField('打分'))
   if (rateValue && rateValue !== 'true' && rateValue !== 'True') {
-    const rate = parseFloat(rateValue)
-    if (!isNaN(rate) && rate >= 0 && rate <= 10) {
+    const rate = Number(rateValue)
+    if (!Number.isNaN(rate) && rate >= 0 && rate <= 10) {
       payload.rate = rate
     }
   }
@@ -1509,7 +1507,7 @@ function buildJsonPayloadInner(getField: (key: string) => string, _finishedDate:
   if (tagsGradeValue) addTagsFromString(tagSet, tagsGradeValue)
   if (originalTagValue) addTagsFromString(tagSet, originalTagValue)
   if (tagSet.size > 0) {
-    payload.tags = Array.from(tagSet)
+    payload.tags = [...tagSet]
     bgmLog(
       LOG_LEVELS.INFO,
       `[buildJsonPayload] 标签合并: 标签/分级="${tagsGradeValue || '(空)'}" + 原作标签="${originalTagValue || '(空)'}" -> ${JSON.stringify(payload.tags)}`,
@@ -1525,8 +1523,8 @@ function buildJsonPayloadInner(getField: (key: string) => string, _finishedDate:
   }
   if (commentValue) {
     // 移除控制字符（保留换行符 \n 和制表符 \t）
-    // eslint-disable-next-line no-control-regex -- 有意匹配控制字符以清洗文本
-    const cleaned = commentValue.replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, '')
+    // eslint-disable-next-line no-control-regex, unicorn/prefer-unicode-code-point-escapes -- 有意匹配控制字符以清洗文本；\u{...} 码点转义会被 security/detect-unsafe-regex 误报为 unsafe（safe-regex 不识别），必须用 \x 转义，故同时豁免 unicorn 码点转义规则
+    const cleaned = commentValue.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/gu, '')
     // Bangumi API comment 字段长度限制约 1000 字符，超出截断
     const MAX_COMMENT_LEN = 1000
     const finalComment =
@@ -1544,7 +1542,7 @@ function buildJsonPayloadInner(getField: (key: string) => string, _finishedDate:
 
   // 隐私收藏
   const privateValue = trim(getField('私密收藏')).toLowerCase()
-  if (privateValue === '是' || privateValue === '1' || privateValue === 'true') {
+  if (['是', '1', 'true'].includes(privateValue)) {
     payload.private = true
   }
 

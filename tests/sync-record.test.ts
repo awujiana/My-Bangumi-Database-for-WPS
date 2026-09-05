@@ -8,7 +8,7 @@ const {
   BGM_COLOR,
   SYNC_RECORD_TYPE_COLOR,
 } = vi.hoisted(() => {
-  const SYNC_RECORD_COLUMNS = [
+  const syncRecordColumns = [
     'SID',
     '同步时间',
     '名称',
@@ -22,9 +22,9 @@ const {
     '备注',
     '数据指纹',
   ]
-  const SYNC_RECORD_SHEET_NAME = 'Bangumi 同步记录'
-  const SYNC_STATUS = { SUCCESS: 'success', FAIL: 'fail', SKIP: 'skip' }
-  const SYNC_RECORD_COL = {
+  const syncRecordSheetName = 'Bangumi 同步记录'
+  const syncStatus = { SUCCESS: 'success', FAIL: 'fail', SKIP: 'skip' }
+  const syncRecordCol = {
     SID: 1,
     TIME: 2,
     NAME: 3,
@@ -38,7 +38,7 @@ const {
     MESSAGE: 11,
     FINGERPRINT: 12,
   }
-  const BGM_COLOR = {
+  const bgmColor = {
     BGM_SYNC: 0,
     LIGHT_GREEN: 1,
     DARK_GREEN: 2,
@@ -47,14 +47,14 @@ const {
     SUCCESS: 5,
     GRAY: 6,
   }
-  const SYNC_RECORD_TYPE_COLOR: Record<string, number> = { 看: 10, 想: 11 }
+  const syncRecordTypeColor: Record<string, number> = { 看: 10, 想: 11 }
   return {
-    SYNC_RECORD_COLUMNS,
-    SYNC_RECORD_SHEET_NAME,
-    SYNC_STATUS,
-    SYNC_RECORD_COL,
-    BGM_COLOR,
-    SYNC_RECORD_TYPE_COLOR,
+    SYNC_RECORD_COLUMNS: syncRecordColumns,
+    SYNC_RECORD_SHEET_NAME: syncRecordSheetName,
+    SYNC_STATUS: syncStatus,
+    SYNC_RECORD_COL: syncRecordCol,
+    BGM_COLOR: bgmColor,
+    SYNC_RECORD_TYPE_COLOR: syncRecordTypeColor,
   }
 })
 
@@ -123,10 +123,22 @@ import {
 } from '../ts/sync/sync-record.js'
 
 function createMockCell(value: unknown = '') {
+  let text: string
+  if (value == null) {
+    text = ''
+  } else if (typeof value === 'object') {
+    // JSON.stringify 对含 toJSON 且返回 undefined 的对象会返回 undefined，需保留兜底
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- 运行时 JSON.stringify 可能返回 undefined
+    text = JSON.stringify(value) ?? ''
+  } else {
+    // 排除 object 后剩余为原始类型/函数，String() 转换与原来一致
+    // eslint-disable-next-line @typescript-eslint/no-base-to-string -- 原实现即 String(value)，保持等价语义
+    text = String(value)
+  }
   return {
     Value2: value,
     Value: value,
-    Text: value == null ? '' : String(value),
+    Text: text,
     Interior: { Color: 0 },
     Font: { Bold: false, Name: '' },
     Borders: { LineStyle: 0 },
@@ -2228,8 +2240,7 @@ describe('migrateSyncRecordSchema 数据行处理 (lines 289-293) - 带实际数
         if (c === 9) return 'success'
         if (c === 10) return '备注2'
         if (c === 11) return 'fp-2'
-      }
-      if (r === 3) {
+      } else if (r === 3) {
         if (c === 5) return 'migrate-sid-3'
         if (c === 4) return 'http://migrate3.com'
         if (c === 6) return '电影'
@@ -2237,7 +2248,7 @@ describe('migrateSyncRecordSchema 数据行处理 (lines 289-293) - 带实际数
         if (c === 8) return '内容3'
         if (c === 9) return 'fail'
       }
-      // row 4 和 5 为空（sid 和 url 都为空，会被跳过）
+      // row 4 和 5 为空（sid 和 URL 都为空，会被跳过）
       return ''
     })
 
@@ -2309,10 +2320,9 @@ describe('buildCache 内层 catch 精确覆盖 (line 343)', () => {
     // 创建一个 Proxy 对象，访问任意索引属性时抛出异常
     const throwingProxy = new Proxy([] as unknown[], {
       get(_target, property: string | symbol) {
-        if (typeof property === 'string' && !isNaN(Number(property))) {
-          throw new Error('模拟数据损坏：属性访问失败')
+        if (typeof property === 'string' && !Number.isNaN(Number(property))) {
+          throw new TypeError('模拟数据损坏：属性访问失败')
         }
-        return undefined
       },
     })
 
@@ -2355,19 +2365,17 @@ describe('buildCache 内层 catch 精确覆盖 (line 343)', () => {
   it('多个 Proxy 行均抛异常时不影响后续行处理', () => {
     const throwingProxy1 = new Proxy([] as unknown[], {
       get(_target, property: string | symbol) {
-        if (typeof property === 'string' && !isNaN(Number(property))) {
-          throw new Error('第一行数据损坏')
+        if (typeof property === 'string' && !Number.isNaN(Number(property))) {
+          throw new TypeError('第一行数据损坏')
         }
-        return undefined
       },
     })
 
     const throwingProxy2 = new Proxy([] as unknown[], {
       get(_target, property: string | symbol) {
-        if (typeof property === 'string' && !isNaN(Number(property))) {
-          throw new Error('第二行数据损坏')
+        if (typeof property === 'string' && !Number.isNaN(Number(property))) {
+          throw new TypeError('第二行数据损坏')
         }
-        return undefined
       },
     })
 

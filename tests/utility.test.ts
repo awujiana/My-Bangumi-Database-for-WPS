@@ -98,7 +98,9 @@ function createMockWorksheet(options: MockWorksheetOptions): unknown {
 }
 
 function createMockApp(options: {
+  // eslint-disable-next-line unicorn/no-unused-properties -- 预留测试选项，当前用例未使用
   activeSheet?: unknown
+  // eslint-disable-next-line unicorn/no-unused-properties -- 预留测试选项，当前用例未使用
   worksheets?: { Item: (index: number) => unknown }
   activeWorkbook?: { ActiveSheet: unknown; Worksheets: { Item: (index: number) => unknown } } | null
   pluginStorage?: { getItem: (k: string) => string; setItem: (k: string, v: string) => void }
@@ -186,7 +188,7 @@ describe('cacheGet', () => {
   })
 
   it('factory 返回 undefined 也被缓存', () => {
-    const factory = vi.fn(() => undefined)
+    const factory = vi.fn(() => {})
     const result1 = cacheGet('test-key-undef', factory)
     const result2 = cacheGet('test-key-undef', factory)
     expect(result1).toBeUndefined()

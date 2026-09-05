@@ -28,7 +28,7 @@ function createMockPluginStorage(store: Record<string, string> = {}): {
 } {
   const s = { ...store }
   return {
-    getItem: (k: string) => (k in s ? s[k] : null),
+    getItem: (k: string) => (Object.hasOwn(s, k) ? s[k] : null),
     setItem: (k: string, v: string) => {
       s[k] = v
     },
@@ -291,7 +291,7 @@ describe('showSettingsPanel — 主面板可见时停靠右侧', () => {
     showSettingsPanel()
 
     // 已存在且可见 → 应切换为隐藏
-    expect(taskPaneResults['settings-pane-1']?.Visible).toBe(false)
+    expect(taskPaneResults['settings-pane-1'].Visible).toBe(false)
   })
 
   it('已存在但隐藏：主面板可见 → 设置面板停靠右侧并显示', () => {
@@ -314,8 +314,8 @@ describe('showSettingsPanel — 主面板可见时停靠右侧', () => {
 
     // 已存在且隐藏 → 应显示并调整到右侧
     const pane = taskPaneResults['settings-pane-1']
-    expect(pane?.Visible).toBe(true)
-    expect(pane?.DockPosition).toBe(mockReferences.MOCK_WPS_ENUM.msoCTPDockPositionRight)
+    expect(pane.Visible).toBe(true)
+    expect(pane.DockPosition).toBe(mockReferences.MOCK_WPS_ENUM.msoCTPDockPositionRight)
   })
 })
 
@@ -382,8 +382,8 @@ describe('showSettingsPanel — 主面板隐藏时仍停靠右侧', () => {
 
     // 应显示并调整到右侧
     const pane = taskPaneResults['settings-pane-1']
-    expect(pane?.Visible).toBe(true)
-    expect(pane?.DockPosition).toBe(mockReferences.MOCK_WPS_ENUM.msoCTPDockPositionRight)
+    expect(pane.Visible).toBe(true)
+    expect(pane.DockPosition).toBe(mockReferences.MOCK_WPS_ENUM.msoCTPDockPositionRight)
   })
 })
 

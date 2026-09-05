@@ -45,7 +45,9 @@ function validateEndpoint(endpoint: string): void {
  * 异步延迟
  */
 function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms))
+  return new Promise((resolve) => {
+    setTimeout(resolve, ms)
+  })
 }
 
 /**
@@ -172,7 +174,7 @@ export async function httpRequest<T = unknown>(
             )
           }
         }
-        // TODO: 此处 unknown -> T 的单层断言仅为兼容未提供 zodSchema 的调用方。
+        // 说明：此处 unknown -> T 的单层断言仅为兼容未提供 zodSchema 的调用方。
         //       后续应要求所有调用方提供 zodSchema，从而完全移除此断言。
         return Result.ok({ status: response.status, data: response.data as T })
       }
@@ -333,14 +335,16 @@ function executeXhrRequest(
     const { onProgress } = options
     if (onProgress) {
       xhr.upload.addEventListener('progress', (event) => {
-        if (event.lengthComputable) {
-          onProgress(event.loaded, event.total)
-          const progress = Math.round((event.loaded / event.total) * 100)
-          bgmLog(
-            LOG_LEVELS.INFO,
-            `[HTTP] 上传进度: ${String(progress)}% (${String(event.loaded)}/${String(event.total)})`,
-          )
+        if (!event.lengthComputable) {
+          return
         }
+
+        onProgress(event.loaded, event.total)
+        const progress = Math.round((event.loaded / event.total) * 100)
+        bgmLog(
+          LOG_LEVELS.INFO,
+          `[HTTP] 上传进度: ${String(progress)}% (${String(event.loaded)}/${String(event.total)})`,
+        )
       })
     }
 

@@ -28,7 +28,7 @@ const {
   mockFindHeaderRow: vi.fn().mockReturnValue(1),
   mockGetColumnMap: vi.fn().mockReturnValue(new Map()),
   mockGetDataSheet: vi.fn().mockReturnValue(null),
-  mockTrim: vi.fn((v: string) => v?.trim() ?? ''),
+  mockTrim: vi.fn((v: string) => v.trim()),
   mockExtractSubjectId: vi.fn().mockReturnValue(null),
 }))
 
@@ -130,9 +130,10 @@ describe('buildJsonlFromSheet', () => {
     mockFindHeaderRow.mockReturnValue(1)
     mockGetLastRow.mockReturnValue(3)
 
-    const colMap = new Map<string, number>()
-    colMap.set('Bangumi_URL', 1)
-    colMap.set('名称', 2)
+    const colMap = new Map<string, number>([
+      ['Bangumi_URL', 1],
+      ['名称', 2],
+    ])
     mockGetColumnMap.mockReturnValue(colMap)
 
     mockGetCellValue.mockImplementation((_ws: unknown, row: number, col: number) => {
@@ -153,8 +154,7 @@ describe('buildJsonlFromSheet', () => {
     mockFindHeaderRow.mockReturnValue(1)
     mockGetLastRow.mockReturnValue(5)
 
-    const colMap = new Map<string, number>()
-    colMap.set('Bangumi_URL', 1)
+    const colMap = new Map<string, number>([['Bangumi_URL', 1]])
     mockGetColumnMap.mockReturnValue(colMap)
 
     mockGetCellValue.mockReturnValue('')
@@ -169,14 +169,15 @@ describe('buildJsonlFromSheet', () => {
     mockFindHeaderRow.mockReturnValue(1)
     mockGetLastRow.mockReturnValue(5)
 
-    const colMap = new Map<string, number>()
-    colMap.set('Bangumi_URL', 1)
-    colMap.set('名称', 2)
-    colMap.set('标签/分级', 3)
-    colMap.set('集数', 4)
-    colMap.set('开播日期', 5)
-    colMap.set('完播日', 6)
-    colMap.set('导演', 7)
+    const colMap = new Map<string, number>([
+      ['Bangumi_URL', 1],
+      ['名称', 2],
+      ['标签/分级', 3],
+      ['集数', 4],
+      ['开播日期', 5],
+      ['完播日', 6],
+      ['导演', 7],
+    ])
     mockGetColumnMap.mockReturnValue(colMap)
 
     mockGetCellValue.mockImplementation((_ws: unknown, row: number, col: number) => {
@@ -203,6 +204,9 @@ describe('buildJsonlFromSheet', () => {
           case 7: {
             return '新海诚'
           }
+          default: {
+            return ''
+          }
         }
       }
       return ''
@@ -214,7 +218,7 @@ describe('buildJsonlFromSheet', () => {
     expect(result).not.toBe('')
     const lines = result.split('\n')
     expect(lines.length).toBeGreaterThanOrEqual(1)
-    const parsed = JSON.parse(lines[0]!)
+    const parsed = JSON.parse(lines[0]!) as Record<string, unknown>
     expect(parsed.sid).toBe('99999')
     expect(parsed.name).toBe('完整动漫')
     expect(parsed['话数']).toBe('24')
@@ -229,9 +233,10 @@ describe('buildJsonlFromSheet', () => {
     mockFindHeaderRow.mockReturnValue(1)
     mockGetLastRow.mockReturnValue(3)
 
-    const colMap = new Map<string, number>()
-    colMap.set('Bangumi_URL', 1)
-    colMap.set('标签/分级', 2)
+    const colMap = new Map<string, number>([
+      ['Bangumi_URL', 1],
+      ['标签/分级', 2],
+    ])
     mockGetColumnMap.mockReturnValue(colMap)
 
     mockGetCellValue.mockImplementation((_ws: unknown, row: number, col: number) => {
@@ -243,7 +248,7 @@ describe('buildJsonlFromSheet', () => {
     mockExtractSubjectId.mockReturnValue('111')
 
     const result = buildJsonlFromSheet()
-    const parsed = JSON.parse(result)
+    const parsed = JSON.parse(result) as Record<string, unknown>
     expect(parsed.meta_tags).toEqual(['热血', '奇幻'])
   })
 
@@ -253,9 +258,10 @@ describe('buildJsonlFromSheet', () => {
     mockFindHeaderRow.mockReturnValue(1)
     mockGetLastRow.mockReturnValue(3)
 
-    const colMap = new Map<string, number>()
-    colMap.set('Bangumi_URL', 1)
-    colMap.set('名称', 2)
+    const colMap = new Map<string, number>([
+      ['Bangumi_URL', 1],
+      ['名称', 2],
+    ])
     mockGetColumnMap.mockReturnValue(colMap)
 
     mockGetCellValue.mockImplementation((_ws: unknown, row: number, col: number) => {
@@ -267,7 +273,7 @@ describe('buildJsonlFromSheet', () => {
     mockExtractSubjectId.mockReturnValue('222')
 
     const result = buildJsonlFromSheet()
-    const parsed = JSON.parse(result)
+    const parsed = JSON.parse(result) as Record<string, unknown>
     expect(parsed.name).toBeUndefined()
   })
 
@@ -277,9 +283,10 @@ describe('buildJsonlFromSheet', () => {
     mockFindHeaderRow.mockReturnValue(1)
     mockGetLastRow.mockReturnValue(3)
 
-    const colMap = new Map<string, number>()
-    colMap.set('Bangumi_URL', 1)
-    colMap.set('开播日期', 2)
+    const colMap = new Map<string, number>([
+      ['Bangumi_URL', 1],
+      ['开播日期', 2],
+    ])
     mockGetColumnMap.mockReturnValue(colMap)
 
     mockGetCellValue.mockImplementation((_ws: unknown, row: number, col: number) => {
@@ -291,7 +298,7 @@ describe('buildJsonlFromSheet', () => {
     mockExtractSubjectId.mockReturnValue('333')
 
     const result = buildJsonlFromSheet()
-    const parsed = JSON.parse(result)
+    const parsed = JSON.parse(result) as Record<string, unknown>
     expect(parsed.date).toBeUndefined()
   })
 
@@ -306,9 +313,10 @@ describe('buildJsonlFromSheet', () => {
     mockFindHeaderRow.mockReturnValue(1)
     mockGetLastRow.mockReturnValue(3)
 
-    const colMap = new Map<string, number>()
-    colMap.set('Bangumi_URL', 1)
-    colMap.set('开播日期', 2)
+    const colMap = new Map<string, number>([
+      ['Bangumi_URL', 1],
+      ['开播日期', 2],
+    ])
     mockGetColumnMap.mockReturnValue(colMap)
 
     mockGetCellValue.mockImplementation((_ws: unknown, row: number, col: number) => {
@@ -319,7 +327,7 @@ describe('buildJsonlFromSheet', () => {
     mockExtractSubjectId.mockReturnValue('444')
 
     const result = buildJsonlFromSheet()
-    const parsed = JSON.parse(result)
+    const parsed = JSON.parse(result) as Record<string, unknown>
     expect(parsed.date).toBe('2024年01月01日')
   })
 
@@ -331,9 +339,10 @@ describe('buildJsonlFromSheet', () => {
     mockFindHeaderRow.mockReturnValue(1)
     mockGetLastRow.mockReturnValue(3)
 
-    const colMap = new Map<string, number>()
-    colMap.set('Bangumi_URL', 1)
-    colMap.set('开播日期', 2)
+    const colMap = new Map<string, number>([
+      ['Bangumi_URL', 1],
+      ['开播日期', 2],
+    ])
     mockGetColumnMap.mockReturnValue(colMap)
 
     mockGetCellValue.mockImplementation((_ws: unknown, row: number, col: number) => {
@@ -345,7 +354,7 @@ describe('buildJsonlFromSheet', () => {
     mockExtractSubjectId.mockReturnValue('555')
 
     const result = buildJsonlFromSheet()
-    const parsed = JSON.parse(result)
+    const parsed = JSON.parse(result) as Record<string, unknown>
     expect(parsed.date).toBe('2024/06/15')
   })
 
@@ -364,9 +373,10 @@ describe('buildJsonlFromSheet', () => {
     mockFindHeaderRow.mockReturnValue(1)
     mockGetLastRow.mockReturnValue(3)
 
-    const colMap = new Map<string, number>()
-    colMap.set('Bangumi_URL', 1)
-    colMap.set('开播日期', 2)
+    const colMap = new Map<string, number>([
+      ['Bangumi_URL', 1],
+      ['开播日期', 2],
+    ])
     mockGetColumnMap.mockReturnValue(colMap)
 
     mockGetCellValue.mockImplementation((_ws: unknown, row: number, col: number) => {
@@ -378,7 +388,7 @@ describe('buildJsonlFromSheet', () => {
     mockExtractSubjectId.mockReturnValue('666')
 
     const result = buildJsonlFromSheet()
-    const parsed = JSON.parse(result)
+    const parsed = JSON.parse(result) as Record<string, unknown>
     expect(parsed.date).toBe('回退日期')
   })
 
@@ -396,9 +406,10 @@ describe('buildJsonlFromSheet', () => {
     mockFindHeaderRow.mockReturnValue(1)
     mockGetLastRow.mockReturnValue(3)
 
-    const colMap = new Map<string, number>()
-    colMap.set('Bangumi_URL', 1)
-    colMap.set('开播日期', 2)
+    const colMap = new Map<string, number>([
+      ['Bangumi_URL', 1],
+      ['开播日期', 2],
+    ])
     mockGetColumnMap.mockReturnValue(colMap)
 
     mockGetCellValue.mockImplementation((_ws: unknown, row: number, col: number) => {
@@ -410,7 +421,7 @@ describe('buildJsonlFromSheet', () => {
     mockExtractSubjectId.mockReturnValue('777')
 
     const result = buildJsonlFromSheet()
-    const parsed = JSON.parse(result)
+    const parsed = JSON.parse(result) as Record<string, unknown>
     // Range 返回 null → getCellText 返回 '' → 回退到 getCellValue
     expect(parsed.date).toBe('回退值')
   })
@@ -423,9 +434,10 @@ describe('buildJsonlFromSheet', () => {
     mockGetDataSheet.mockReturnValue(ws)
     mockGetLastRow.mockReturnValue(5)
 
-    const colMap = new Map<string, number>()
-    colMap.set('Bangumi_URL', 1)
-    colMap.set('名称', 2)
+    const colMap = new Map<string, number>([
+      ['Bangumi_URL', 1],
+      ['名称', 2],
+    ])
     mockGetColumnMap.mockReturnValue(colMap)
 
     mockGetCellValue.mockImplementation((_ws: unknown, row: number, col: number) => {
@@ -439,7 +451,7 @@ describe('buildJsonlFromSheet', () => {
     // headerRow = 0 || 1 → 1，从第 2 行开始读取
     const result = buildJsonlFromSheet()
     expect(result).not.toBe('')
-    const parsed = JSON.parse(result)
+    const parsed = JSON.parse(result) as Record<string, unknown>
     expect(parsed.sid).toBe('888')
   })
 
@@ -450,9 +462,10 @@ describe('buildJsonlFromSheet', () => {
     mockFindHeaderRow.mockReturnValue(1)
     mockGetLastRow.mockReturnValue(5)
 
-    const colMap = new Map<string, number>()
-    colMap.set('Bangumi_URL', 1)
-    colMap.set('名称', 2)
+    const colMap = new Map<string, number>([
+      ['Bangumi_URL', 1],
+      ['名称', 2],
+    ])
     mockGetColumnMap.mockReturnValue(colMap)
 
     mockGetCellValue.mockImplementation((_ws: unknown, row: number, col: number) => {
@@ -487,8 +500,7 @@ describe('exportSheetToJsonlFile', () => {
     mockFindHeaderRow.mockReturnValue(1)
     mockGetLastRow.mockReturnValue(3)
 
-    const colMap = new Map<string, number>()
-    colMap.set('Bangumi_URL', 1)
+    const colMap = new Map<string, number>([['Bangumi_URL', 1]])
     mockGetColumnMap.mockReturnValue(colMap)
 
     mockGetCellValue.mockImplementation((_ws: unknown, row: number, col: number) => {
@@ -531,8 +543,7 @@ describe('exportSheetToJsonlFile', () => {
     mockFindHeaderRow.mockReturnValue(1)
     mockGetLastRow.mockReturnValue(3)
 
-    const colMap = new Map<string, number>()
-    colMap.set('Bangumi_URL', 1)
+    const colMap = new Map<string, number>([['Bangumi_URL', 1]])
     mockGetColumnMap.mockReturnValue(colMap)
 
     mockGetCellValue.mockImplementation((_ws: unknown, row: number, col: number) => {
@@ -556,8 +567,7 @@ describe('exportSheetToJsonlFile', () => {
     mockFindHeaderRow.mockReturnValue(1)
     mockGetLastRow.mockReturnValue(3)
 
-    const colMap = new Map<string, number>()
-    colMap.set('Bangumi_URL', 1)
+    const colMap = new Map<string, number>([['Bangumi_URL', 1]])
     mockGetColumnMap.mockReturnValue(colMap)
 
     mockGetCellValue.mockImplementation((_ws: unknown, row: number, col: number) => {
@@ -567,7 +577,7 @@ describe('exportSheetToJsonlFile', () => {
     mockExtractSubjectId.mockReturnValue('12345')
 
     // 使用 mockReturnValue 包装来模拟 Blob 错误
-    const originalBlob = globalThis.Blob
+    const originalBlob = Blob
     try {
       Object.defineProperty(globalThis, 'Blob', {
         value() {
@@ -595,8 +605,7 @@ describe('exportSheetToJsonlFile', () => {
     mockFindHeaderRow.mockReturnValue(1)
     mockGetLastRow.mockReturnValue(3)
 
-    const colMap = new Map<string, number>()
-    colMap.set('Bangumi_URL', 1)
+    const colMap = new Map<string, number>([['Bangumi_URL', 1]])
     mockGetColumnMap.mockReturnValue(colMap)
 
     mockGetCellValue.mockImplementation((_ws: unknown, row: number, col: number) => {
@@ -622,7 +631,7 @@ describe('exportSheetToJsonlFile', () => {
 
     // 验证日志包含文件名
     const infoCalls = mockBgmLog.mock.calls.filter((c: unknown[]) => c[0] === 'INFO')
-    const lastInfoCall = infoCalls[infoCalls.length - 1]
+    const lastInfoCall = infoCalls.at(-1)
     expect(lastInfoCall?.[1]).toContain('bgm_sync_export_')
     expect(lastInfoCall?.[1]).toContain('.jsonl')
   })

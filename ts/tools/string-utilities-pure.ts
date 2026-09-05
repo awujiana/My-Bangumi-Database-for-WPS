@@ -3,7 +3,7 @@
  * @module tools/string-utilities-pure
  * @description 提供 Excel 列号转换、字符串修剪、HTML 转义等纯函数。
  *
- * 本模块刻意保持零项目依赖（不引入 core/crypto、tools/util、ui/handlers 等模块），
+ * 本模块刻意保持零项目依赖（不引入 core/crypto、tools/util、UI/handlers 等模块），
  * 以便单元测试可以直接 import 而不触发 handlers.ts 中的 setTimeout / addEventListener
  * 等副作用（副作用链：string-utilities → crypto → index → handlers）。
  *

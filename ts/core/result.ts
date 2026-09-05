@@ -61,6 +61,7 @@ export class BgmError extends Error {
    *     retryCount: 3
    * });
    */
+
   constructor(message: string, code = 'UNKNOWN', details: Record<string, unknown> = {}) {
     super(message)
     this.name = 'BgmError'
@@ -113,39 +114,6 @@ export class BgmError extends Error {
  * }
  */
 export class Result<T> {
-  /**
-   * 操作是否成功
-   * @type {boolean}
-   */
-  readonly success: boolean
-
-  /**
-   * 成功时的数据，失败时为null
-   * @type {T | null}
-   */
-  readonly data: T | null
-
-  /**
-   * 失败时的错误信息，成功时为null
-   * @type {BgmError | null}
-   */
-  readonly error: BgmError | null
-
-  /**
-   * 私有构造函数，通过静态工厂方法创建实例
-   *
-   * @private
-   * @constructor
-   * @param {boolean} isSuccess - 是否成功
-   * @param {T | null} data - 成功时的数据
-   * @param {BgmError | null} error - 失败时的错误
-   */
-  private constructor(isSuccess: boolean, data: T | null, error: BgmError | null) {
-    this.success = isSuccess
-    this.data = data
-    this.error = error
-  }
-
   /**
    * 创建表示成功的结果
    *
@@ -222,9 +190,42 @@ export class Result<T> {
    */
   static fromCode<T>(code: number, data?: T | null): Result<T> {
     if (code >= 200 && code < 300) {
-      return Result.ok(data ?? (null as T))
+      return this.ok(data ?? (null as T))
     }
-    return Result.fail(new BgmError('API Error', String(code)))
+    return this.fail(new BgmError('API Error', String(code)))
+  }
+
+  /**
+   * 操作是否成功
+   * @type {boolean}
+   */
+  readonly success: boolean
+
+  /**
+   * 成功时的数据，失败时为null
+   * @type {T | null}
+   */
+  readonly data: T | null
+
+  /**
+   * 失败时的错误信息，成功时为null
+   * @type {BgmError | null}
+   */
+  readonly error: BgmError | null
+
+  /**
+   * 私有构造函数，通过静态工厂方法创建实例
+   *
+   * @private
+   * @constructor
+   * @param {boolean} isSuccess - 是否成功
+   * @param {T | null} data - 成功时的数据
+   * @param {BgmError | null} error - 失败时的错误
+   */
+  private constructor(isSuccess: boolean, data: T | null, error: BgmError | null) {
+    this.success = isSuccess
+    this.data = data
+    this.error = error
   }
 
   /**

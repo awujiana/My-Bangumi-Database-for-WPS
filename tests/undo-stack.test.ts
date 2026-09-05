@@ -25,8 +25,15 @@ import {
   clearUndoStack,
 } from '../ts/sync/undo-stack.js'
 
-function createMockWs(): any {
-  const ws: any = {
+interface MockWsRange {
+  Insert: ReturnType<typeof vi.fn>
+}
+interface MockWs {
+  Range: (addr: string) => MockWsRange | Record<string, never>
+}
+
+function createMockWs(): MockWs {
+  const ws: MockWs = {
     Range: vi.fn((addr: string) => {
       if (addr.includes(':')) {
         return { Insert: vi.fn() }

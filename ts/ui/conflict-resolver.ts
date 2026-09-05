@@ -156,7 +156,7 @@ function createConflictModal(
   /** 每个 conflict 对应的「远程」radio 引用 */
   const remoteRadios: HTMLInputElement[] = []
 
-  conflicts.forEach((conflict, index): void => {
+  for (const [index, conflict] of conflicts.entries()) {
     const tr = document.createElement('tr')
     tr.className = 'conflict-row'
 
@@ -213,7 +213,7 @@ function createConflictModal(
     selectTd.appendChild(remoteLabel)
     tr.appendChild(selectTd)
     tbody.appendChild(tr)
-  })
+  }
 
   table.appendChild(tbody)
   body.appendChild(table)

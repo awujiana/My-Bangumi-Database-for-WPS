@@ -17,8 +17,8 @@ export function initGlobalErrorHandler(): void {
 
   if (typeof window !== 'undefined') {
     window.addEventListener('unhandledrejection', (event: PromiseRejectionEvent) => {
-      const { reason } = event
-      const message = reason instanceof Error ? reason.message : String(reason)
+      const message = event.reason instanceof Error ? event.reason.message : String(event.reason)
+      // eslint-disable-next-line no-console -- console 是日志后端/启动兜底的唯一输出通道（未捕获异常兜底日志）
       console.error('[unhandledrejection]', message)
       event.preventDefault()
     })

@@ -110,12 +110,10 @@ export function getOrCreateEnrichRecordSheet(): WpsWorksheet {
   }
 
   if (enrichSheet) {
-    const existingCols = ENRICH_RECORD_COLUMNS.length
-    for (let index = 0; index < existingCols; index += 1) {
+    for (const [index, expectedHeader] of ENRICH_RECORD_COLUMNS.entries()) {
       const colLetter = colNumberToLetter(index + 1)
       const cell = enrichSheet.Range(`${colLetter}1`)
       const currentHeader = String(cell.Value2 ?? '').trim()
-      const expectedHeader = ENRICH_RECORD_COLUMNS[index] ?? ''
       if (currentHeader !== expectedHeader) {
         cell.Value2 = expectedHeader
         bgmLog(
@@ -128,10 +126,10 @@ export function getOrCreateEnrichRecordSheet(): WpsWorksheet {
     enrichSheet = wb.Sheets.Add()
     enrichSheet.Name = ENRICH_RECORD_SHEET_NAME
 
-    for (let index = 0; index < ENRICH_RECORD_COLUMNS.length; index += 1) {
+    for (const [index, column] of ENRICH_RECORD_COLUMNS.entries()) {
       const colLetter = colNumberToLetter(index + 1)
       const cell = enrichSheet.Range(`${colLetter}1`)
-      cell.Value2 = ENRICH_RECORD_COLUMNS[index] ?? ''
+      cell.Value2 = column
       if (cell.Interior) {
         cell.Interior.Color = BGM_COLOR.GRAY
       }
@@ -235,9 +233,9 @@ export function addEnrichRecords(records: AddEnrichRecordParameters[]): void {
     )
     range.Value2 = rows
 
-    for (let index = 0; index < rows.length; index += 1) {
+    for (const [index, rowValues] of rows.entries()) {
       const row = startRow + index
-      const action = rows[index]?.[ENRICH_RECORD_COL.ACTION - 1] ?? ''
+      const action = rowValues[ENRICH_RECORD_COL.ACTION - 1] ?? ''
       const color = getActionColor(action)
       const actionColLetter = colNumberToLetter(ENRICH_RECORD_COL.ACTION)
       const cell = sheet.Range(`${actionColLetter}${String(row)}`)
@@ -398,7 +396,7 @@ function getAllEnrichRecordsInner() {
       matchType: (rowData[ENRICH_RECORD_COL.MATCH_TYPE - 1] ??
         '未匹配') as EnrichRecord['matchType'],
       name: rowData[ENRICH_RECORD_COL.NAME - 1] ?? '',
-      row: parseInt(rowData[ENRICH_RECORD_COL.ROW - 1] ?? '0') || 0,
+      row: Math.trunc(Number(rowData[ENRICH_RECORD_COL.ROW - 1] ?? '0')) || 0,
       enrichedField: rowData[ENRICH_RECORD_COL.ENRICHED_FIELD - 1] ?? '',
       oldValue: rowData[ENRICH_RECORD_COL.OLD_VALUE - 1] ?? '',
       updatedValue: rowData[ENRICH_RECORD_COL.NEW_VALUE - 1] ?? '',

@@ -158,12 +158,12 @@ function getPurify(): (d: string) => string {
  * New strategy (only applies when DOMPurify truly cannot load):
  *   - Parse the dirty string into DOM via innerHTML.
  *   - Remove known-dangerous tags AND their contents: script / style /
- *     iframe / object / embed / svg / math / form / base / link / meta /
+ *     iframe / object / embed / SVG / math / form / base / link / meta /
  *     title / template / frameset / frame / noframes / noscript / xmp /
  *     plaintext.
  *   - Walk every element: strip ALL on* event attributes, and strip href /
  *     src / action / formaction / poster / background attributes whose value
- *     matches javascript: / vbscript: / data:text*: / dangerous base64 data.
+ *     matches `javascript:` / `vbscript:` / `data:text*:` / dangerous base64 data.
  *   - Keep all structural tags (table / tr / td / div / span / button /
  *     select / p / a / etc) and safe cosmetic attributes (class / id / style
  *     / title / data-* / aria-* / role) intact.
@@ -205,6 +205,30 @@ function createLightweightFallback(): (d: string) => string {
   const DANGEROUS_URI =
     /^\s*(javascript:|vbscript:|data:text\S*:|data:;base64,\s*PHN2Zy|data:;base64,\s*PHNjcmlwdA)/i
 
+  /**
+   * 清理单个元素的 on* 事件属性与危险 URI 属性
+   * （提取自遍历循环，避免循环体内 continue/整段 if 包裹）
+   */
+  const cleanElementAttributes = (element: Element): void => {
+    if (!isElementNode(element)) return
+    const toRemoveAttributes: string[] = []
+    for (const name of element.getAttributeNames()) {
+      if (name.length > 2 && name.slice(0, 2).toLowerCase() === 'on') {
+        toRemoveAttributes.push(name)
+      }
+    }
+    for (const name of toRemoveAttributes) element.removeAttribute(name)
+
+    // 清 href / src / action / formaction / poster / data-xxx 里含 JS 的 URI
+    const uriAttributes = ['href', 'src', 'action', 'formaction', 'poster', 'background']
+    for (const attribute of uriAttributes) {
+      const v = element.getAttribute(attribute)
+      if (v != null && DANGEROUS_URI.test(v)) {
+        element.removeAttribute(attribute)
+      }
+    }
+  }
+
   return (dirty: string): string => {
     if (typeof dirty !== 'string' || !dirty) return ''
     if (typeof document === 'undefined') {
@@ -216,7 +240,7 @@ function createLightweightFallback(): (d: string) => string {
       host.innerHTML = dirty
 
       // 1) 删除危险标签（深度优先，用 querySelectorAll）
-      const selector = Array.from(DANGEROUS_TAGS).join(',')
+      const selector = [...DANGEROUS_TAGS].join(',')
       const badEls = host.querySelectorAll(selector)
       // 从尾到头 remove 避免 live collection 踩坑（querySelectorAll 是非 live，保险起见逆序）
       for (let index = badEls.length - 1; index >= 0; index -= 1) {
@@ -225,28 +249,10 @@ function createLightweightFallback(): (d: string) => string {
 
       // 2) 遍历所有元素，清 on* 事件属性 + 危险 URI
       const all = host.getElementsByTagName('*')
-      for (let index = 0; index < all.length; index += 1) {
-        const element = all[index]
-        if (isElementNode(element)) {
-          const toRemoveAttributes: string[] = []
-          for (const name of element.getAttributeNames()) {
-            if (name.length > 2 && name.slice(0, 2).toLowerCase() === 'on') {
-              toRemoveAttributes.push(name)
-            }
-          }
-          for (const name of toRemoveAttributes) element.removeAttribute(name)
-
-          // 清 href / src / action / formaction / poster / data-xxx 里含 JS 的 URI
-          const uriAttributes = ['href', 'src', 'action', 'formaction', 'poster', 'background']
-          for (const attribute of uriAttributes) {
-            const v = element.getAttribute(attribute)
-            if (v != null && DANGEROUS_URI.test(v)) {
-              element.removeAttribute(attribute)
-            }
-          }
-        }
-        // xss 常见奇技淫巧：<img src=x onerror="..."> 已经被 on* 清理覆盖
+      for (const element of all) {
+        // XSS 常见奇技淫巧：<img src=x onerror="..."> 已经被 on* 清理覆盖
         // <a href="jAvAsCrIpT:...">  已被 DANGEROUS_URI 大小写不敏感匹配覆盖
+        cleanElementAttributes(element)
       }
 
       // 3) 再次兜底：如果根级别本身挂了事件属性或危险标签名，也清掉（innerHTML 自身不会）
@@ -290,7 +296,7 @@ function regexStripDanger(dirty: string): string {
  * Primary path: use window.DOMPurify.sanitize with a strict allowlist (secure).
  * Fallback (used ONLY when DOMPurify is unavailable): run a lightweight XSS
  * filter that removes dangerous tags (script/iframe/...), all on* event
- * attributes, and javascript:/vbscript: URIs, but PRESERVES the structural
+ * attributes, and JavaScript:/VBScript: URIs, but PRESERVES the structural
  * tags that this codebase generates for UI (table/tr/td/button/div/span/...).
  * This prevents the 2026-08 "data preview looks like <table ...> raw text" bug,
  * caused by the old fallback doing both:
