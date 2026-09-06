@@ -8,6 +8,7 @@
     <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; connect-src 'self' https://api.bgm.tv https://bangumi.tv https://raw.githubusercontent.com https://api.github.com https://gitlab.com https://gitee.com">
     <link rel="stylesheet" href="../css/tokens.css">
     <link rel="stylesheet" href="../css/styles.css">
+    <link rel="stylesheet" href="../css/panel-theme.css">
     <link rel="stylesheet" href="../css/enrich.css">
 </head>
 <body>
@@ -16,16 +17,32 @@
     <script src="../wpsjsrpcsdk.js"></script>
 
     <div class="global">
-        <div class="enrich-header">
-            <div class="header-inner">
-                <div class="header-text">
-                    <h2>新番表富化工具</h2>
-                    <p class="subtitle">将新番表数据富化到 Bangumi 追踪表</p>
+        <!-- ===================== 顶栏 ===================== -->
+        <header class="topbar">
+            <div class="brand">
+                <div class="brand-text">
+                    <span class="brand-title">✨ 新番表富化工具</span>
+                    <span class="brand-sub">将新番表数据富化到 Bangumi 追踪表</span>
                 </div>
             </div>
-        </div>
+        </header>
 
-        <div class="enrich-section">
+        <!-- ===================== 侧栏（功能导航） ===================== -->
+        <aside class="sidebar">
+            <nav class="nav" aria-label="功能导航">
+                <div class="nav-label">功能导航</div>
+                <a href="#sec-file" title="新番表文件"><span class="nav-ico">📁</span><span class="nav-text">新番表文件</span></a>
+                <a href="#sec-target" title="目标工作表"><span class="nav-ico">🎯</span><span class="nav-text">目标工作表</span></a>
+                <a href="#sec-preview" title="数据预览"><span class="nav-ico">👁️</span><span class="nav-text">数据预览</span></a>
+                <a href="#sec-enrich" title="富化执行"><span class="nav-ico">⚡</span><span class="nav-text">富化执行</span></a>
+                <a href="#sec-records" title="富化记录"><span class="nav-ico">📋</span><span class="nav-text">富化记录</span></a>
+                <a href="#sec-tips" title="使用提示"><span class="nav-ico">💡</span><span class="nav-text">使用提示</span></a>
+            </nav>
+        </aside>
+
+        <!-- ===================== 主区 ===================== -->
+        <main class="main">
+        <div class="enrich-section" id="sec-file">
             <h3>📁 新番表文件</h3>
             <div class="file-selector">
                 <div class="file-path-display" id="filePathDisplay" readonly placeholder="未选择文件..."></div>
@@ -75,7 +92,7 @@
             </div>
         </div>
 
-        <div class="enrich-section">
+        <div class="enrich-section" id="sec-target">
             <h3>🎯 目标工作表</h3>
             <div class="form-group">
                 <label>选择工作簿：</label>
@@ -98,7 +115,7 @@
             <div id="lockStatus" style="display:none;margin-top:6px;padding:4px 8px;background:var(--green);color:var(--text-1);border-radius:4px;font-size:12px;"></div>
         </div>
 
-        <div class="enrich-section">
+        <div class="enrich-section" id="sec-preview">
             <h3>👁️ 数据预览</h3>
             <div class="preview-tabs">
                 <button class="preview-tab active" data-tab="source">新番表数据</button>
@@ -139,7 +156,7 @@
             </div>
         </div>
 
-        <div class="enrich-section">
+        <div class="enrich-section" id="sec-enrich">
             <h3>⚡ 富化执行</h3>
             <div class="strategy-desc">
                 <div class="strategy-item">🏷️ <strong>标签追加</strong>：将新番表标签追加到目标表</div>
@@ -190,7 +207,7 @@
             </div>
         </div>
 
-        <div class="enrich-section">
+        <div class="enrich-section" id="sec-records">
             <h3>📋 富化记录</h3>
             <div class="record-summary">
                 <div class="record-stat-card">
@@ -219,7 +236,7 @@
             </div>
         </div>
 
-        <div class="enrich-section tips-section">
+        <div class="enrich-section tips-section" id="sec-tips">
             <h3>💡 使用提示</h3>
             <div class="tips-list">
                 <div class="tip-item">
@@ -252,6 +269,7 @@
         <!-- 冲突对话框 -->
         <div id="conflictDialog" class="conflict-dialog" style="display:none;"></div>
 
-        </div>
+        </main>
+    </div>
 </body>
 </html>
