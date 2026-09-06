@@ -11,7 +11,7 @@
 
 import '../index.js'
 import '../core/constants.js'
-import '../tools/config.js'
+import { areNavIconsOnly } from '../tools/config.js'
 import '../tools/utility.js'
 import '../core/crypto.js'
 import '../tools/events.js'
@@ -25,12 +25,21 @@ import '../sync/sync-record.js'
 import '../sync/scraping.js'
 import '../sync/exceltobangumi.js'
 import { initTheme } from '../tools/theme.js'
+import { initShellNav } from './shell-nav.js'
 
 import { initEnrichPage } from './enrich-page.js'
 
 if (typeof document !== 'undefined') {
   // 应用外观主题（深色 / 浅色 / 跟随系统）
   initTheme()
+
+  // 导航仅图标模式（与 panel / settings 页一致，CSS 由 panel-theme.css 提供）
+  if (areNavIconsOnly(true)) {
+    document.body.classList.add('nav-icons-only')
+  }
+
+  // 外壳导航：吸顶偏移测量（--topbar-h / --nav-h）+ 侧栏滚动高亮
+  initShellNav()
 
   // 模块就绪前禁用所有 data-action 按钮，避免误触发未初始化的处理逻辑
   document.querySelectorAll('button[data-action]').forEach((button) => {

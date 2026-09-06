@@ -13,6 +13,7 @@ import { areNavIconsOnly } from '../tools/config.js'
 import { initTheme } from '../tools/theme.js'
 import { initHandlers } from '../ui/handlers/index.js'
 import { markSettingsPaneLoaded } from '../tools/util/index.js'
+import { initShellNav } from '../panel/shell-nav.js'
 
 /**
  * 判断当前是否为设置页面上下文（宽松匹配）。
@@ -107,7 +108,8 @@ function initSettingsPage(): void {
 }
 
 /**
- * 应用外观主题与导航显示模式，并初始化滚动高亮（scrollspy）。
+ * 应用外观主题与导航显示模式，并初始化外壳导航（吸顶偏移 + 滚动高亮）。
+ * 滚动高亮逻辑已抽到 panel/shell-nav.ts 由三页面共享。
  */
 function applyAppearance(): void {
   if (typeof document === 'undefined') return
@@ -117,26 +119,8 @@ function applyAppearance(): void {
   if (areNavIconsOnly(true)) {
     document.body.classList.add('nav-icons-only')
   }
-  // 滚动高亮：当前可视区段对应的导航项高亮
-  const sections = [...document.querySelectorAll<HTMLElement>('main .section[id]')]
-  const navLinks = [...document.querySelectorAll<HTMLAnchorElement>('.nav a[href^="#"]')]
-  if (sections.length === 0 || navLinks.length === 0) return
-  if (typeof IntersectionObserver === 'undefined') return
-  const observer = new IntersectionObserver(
-    (entries) => {
-      for (const entry of entries) {
-        if (entry.isIntersecting) {
-          for (const link of navLinks) {
-            link.classList.toggle('active', link.getAttribute('href') === `#${entry.target.id}`)
-          }
-        }
-      }
-    },
-    { rootMargin: '-20% 0px -70% 0px' },
-  )
-  for (const section of sections) {
-    observer.observe(section)
-  }
+  // 吸顶偏移测量 + 滚动高亮（共享模块，修复侧栏被顶栏遮挡 / 锚点跳转错位）
+  initShellNav()
 }
 
 /**

@@ -25,6 +25,7 @@ import '../sync/sync-record.js'
 import '../sync/scraping.js'
 import '../sync/exceltobangumi.js'
 import '../entry/panel-entry.js'
+import { initShellNav } from './shell-nav.js'
 
 if (typeof window !== 'undefined') {
   window.addEventListener(
@@ -68,28 +69,8 @@ if (typeof document !== 'undefined') {
   })
 }
 
-// ========== 吸顶偏移测量 ==========
-// 将顶栏实际高度写入 --topbar-h，窄态整个吸顶导航块高度写入 --nav-h，
-// 供 CSS 控制 sidebar 吸顶位置与锚点 scroll-padding 偏移补偿。
-function updateStickyOffsets(): void {
-  const root = document.documentElement
-  const topbar = document.querySelector('.topbar')
-  const topbarH = topbar ? (topbar as HTMLElement).offsetHeight : 0
-  root.style.setProperty('--topbar-h', `${String(topbarH)}px`)
-  const isNarrow =
-    typeof window !== 'undefined' &&
-    typeof window.matchMedia === 'function' &&
-    window.matchMedia('(max-width: 880px)').matches
-  let navH = 0
-  if (isNarrow) {
-    const sb = document.querySelector('.sidebar')
-    navH = sb ? (sb as HTMLElement).offsetHeight : 0
-  }
-  root.style.setProperty('--nav-h', `${String(navH)}px`)
-}
-
+// ========== 外壳导航（吸顶偏移测量 + 滚动高亮） ==========
+// 逻辑已抽到 shell-nav.ts 由三页面共享；此处调用统一初始化。
 if (typeof window !== 'undefined') {
-  updateStickyOffsets()
-  window.addEventListener('load', updateStickyOffsets)
-  window.addEventListener('resize', updateStickyOffsets)
+  initShellNav()
 }
