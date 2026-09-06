@@ -12,6 +12,7 @@
 import { areNavIconsOnly } from '../tools/config.js'
 import { initTheme } from '../tools/theme.js'
 import { initHandlers } from '../ui/handlers/index.js'
+import { markSettingsPaneLoaded } from '../tools/util/index.js'
 
 /**
  * 判断当前是否为设置页面上下文（宽松匹配）。
@@ -144,6 +145,8 @@ function applyAppearance(): void {
  */
 export function startSettings(): void {
   applyAppearance()
+  // 记录设置页已成功加载，供 showSettingsPanel 判断缓存的面板 ID 是否有效
+  markSettingsPaneLoaded()
   initHandlers()
   initSettingsPage()
   // 通知模块就绪，启用按钮（与 panelPage.ts 的 initPanelCore 对齐）。

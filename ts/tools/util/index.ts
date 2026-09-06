@@ -1096,6 +1096,18 @@ export function getUrlPath(): string {
 }
 
 /**
+ * 标记设置面板已成功加载
+ *
+ * showSettingsPanel 依据该标记判断已缓存的面板 ID 是否可用：
+ * 页面若加载失败（URL 错误等），标记不会被写入，下次点击时直接重建面板。
+ */
+export function markSettingsPaneLoaded(): void {
+  if (typeof window === 'undefined') return
+  const app = getApp() as { PluginStorage?: { setItem: (k: string, v: string) => void } } | null
+  app?.PluginStorage?.setItem('settings_pane_url', window.location.href)
+}
+
+/**
  * 构造任务窗格页面 URL
  *
  * 背景：getUrlPath() 在面板页面内（如 .../ui/panel.html）执行时返回的是页面所在目录
@@ -1223,7 +1235,21 @@ export function showSettingsPanel(): void {
     return
   }
 
-  const settingsId = app.PluginStorage?.getItem('settings_pane_id')
+  let settingsId = app.PluginStorage?.getItem('settings_pane_id')
+  const storedPaneUrl = app.PluginStorage?.getItem('settings_pane_url')
+
+  // 自愈：若上次创建的面板从未成功加载设置页（例如旧版本拼出的 .../ui/ui/settings.html，
+  // 页面加载失败因此从未写入 settings_pane_url），该 ID 永远打不开内容。
+  // 这里隐藏旧面板并清空 ID，本次点击直接重建。
+  if (settingsId && !storedPaneUrl?.includes('settings.html')) {
+    const stalePane = app.GetTaskPane?.(settingsId)
+    if (stalePane) stalePane.Visible = false
+    app.PluginStorage?.setItem('settings_pane_id', '')
+    app.PluginStorage?.setItem('settings_pane_url', '')
+    settingsId = null
+    bgmLog(LOG_LEVELS.WARN, '[showSettingsPanel] 检测到加载失败的旧设置面板，已重建')
+  }
+
   const mainPanelId = app.PluginStorage?.getItem('panel_id')
 
   // 检查主面板当前可见性
@@ -1257,6 +1283,7 @@ export function showSettingsPanel(): void {
     } else {
       // 面板ID失效（可能被用户手动关闭），清除存储以便下次重新创建
       app.PluginStorage?.setItem('settings_pane_id', '')
+      app.PluginStorage?.setItem('settings_pane_url', '')
       bgmLog(LOG_LEVELS.WARN, '[showSettingsPanel] 设置面板ID失效，已清除存储')
     }
   } else {

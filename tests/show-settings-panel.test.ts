@@ -280,6 +280,7 @@ describe('showSettingsPanel — 主面板可见时停靠右侧', () => {
 
     // 设置面板已存在且当前可见
     app.PluginStorage.setItem('settings_pane_id', 'settings-pane-1')
+    app.PluginStorage.setItem('settings_pane_url', 'http://localhost:3889/ui/settings.html')
     taskPaneResults['settings-pane-1'] = createMockTaskPane(
       'settings-pane-1',
       true,
@@ -302,6 +303,7 @@ describe('showSettingsPanel — 主面板可见时停靠右侧', () => {
 
     // 设置面板已存在但当前隐藏
     app.PluginStorage.setItem('settings_pane_id', 'settings-pane-1')
+    app.PluginStorage.setItem('settings_pane_url', 'http://localhost:3889/ui/settings.html')
     taskPaneResults['settings-pane-1'] = createMockTaskPane(
       'settings-pane-1',
       false,
@@ -370,6 +372,7 @@ describe('showSettingsPanel — 主面板隐藏时仍停靠右侧', () => {
 
     // 设置面板已存在但隐藏，且当前停靠在右侧
     app.PluginStorage.setItem('settings_pane_id', 'settings-pane-1')
+    app.PluginStorage.setItem('settings_pane_url', 'http://localhost:3889/ui/settings.html')
     taskPaneResults['settings-pane-1'] = createMockTaskPane(
       'settings-pane-1',
       false,
@@ -426,6 +429,26 @@ describe('showSettingsPanel — 任务窗格 URL 归一化', () => {
   })
 })
 
+describe('showSettingsPanel — 失效面板自愈', () => {
+  it('旧面板从未成功加载（无 settings_pane_url）→ 隐藏旧面板并重建', () => {
+    const app = createMockApp()
+    // 使用不会与新建面板 ID 冲突的旧 ID
+    app.PluginStorage.setItem('settings_pane_id', 'stale-pane-1')
+    // 未写入 settings_pane_url：说明上次创建的面板页面加载失败
+    taskPaneResults['stale-pane-1'] = createMockTaskPane('stale-pane-1', true)
+
+    setMockApp(app)
+
+    showSettingsPanel()
+
+    // 旧面板应被隐藏，并新建一个面板
+    expect(taskPaneResults['stale-pane-1'].Visible).toBe(false)
+    expect(createdPanes).toHaveLength(1)
+    expect(createdPanes[0].url).toBeTruthy()
+    expect(app.PluginStorage.getItem('settings_pane_id')).not.toBe('stale-pane-1')
+  })
+})
+
 // ============ 场景 3: 边界情况 ============
 describe('showSettingsPanel — 边界情况', () => {
   it('app 为 null 时不应抛错', () => {
@@ -468,6 +491,8 @@ describe('showSettingsPanel — 边界情况', () => {
   it('设置面板 ID 失效（GetTaskPane 返回 null）→ 清除存储', () => {
     const app = createMockApp()
     app.PluginStorage.setItem('settings_pane_id', 'invalid-settings-id')
+    // 标记为已成功加载过，确保走「ID 失效」分支而非自愈重建分支
+    app.PluginStorage.setItem('settings_pane_url', 'http://localhost:3889/ui/settings.html')
     // 该 ID 不在 taskPaneResults 中 → GetTaskPane 返回 null
 
     setMockApp(app)
