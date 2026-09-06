@@ -387,6 +387,45 @@ describe('showSettingsPanel — 主面板隐藏时仍停靠右侧', () => {
   })
 })
 
+// ============ 场景 4: 任务窗格 URL 归一化 ============
+// 回归：从面板页面（.../ui/panel.html）内打开设置面板时，
+// getUrlPath() 会返回 ".../ui"，若直接拼接会产生 ".../ui/ui/settings.html"。
+describe('showSettingsPanel — 任务窗格 URL 归一化', () => {
+  it('manifest_base_path 已带 /ui 时不得重复拼接', () => {
+    const app = createMockApp()
+    app.PluginStorage.setItem('manifest_base_path', 'http://localhost:3889/ui')
+
+    setMockApp(app)
+
+    showSettingsPanel()
+
+    expect(createdPanes).toHaveLength(1)
+    expect(createdPanes[0].url).toBe('http://localhost:3889/ui/settings.html')
+  })
+
+  it('manifest_base_path 为根目录时正常拼接', () => {
+    const app = createMockApp()
+    app.PluginStorage.setItem('manifest_base_path', 'http://localhost:3889')
+
+    setMockApp(app)
+
+    showSettingsPanel()
+
+    expect(createdPanes[0].url).toBe('http://localhost:3889/ui/settings.html')
+  })
+
+  it('manifest_base_path 带尾斜杠时不得出现双斜杠', () => {
+    const app = createMockApp()
+    app.PluginStorage.setItem('manifest_base_path', 'http://localhost:3889/ui/')
+
+    setMockApp(app)
+
+    showSettingsPanel()
+
+    expect(createdPanes[0].url).toBe('http://localhost:3889/ui/settings.html')
+  })
+})
+
 // ============ 场景 3: 边界情况 ============
 describe('showSettingsPanel — 边界情况', () => {
   it('app 为 null 时不应抛错', () => {

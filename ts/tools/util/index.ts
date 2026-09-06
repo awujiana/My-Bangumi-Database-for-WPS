@@ -1096,6 +1096,21 @@ export function getUrlPath(): string {
 }
 
 /**
+ * 构造任务窗格页面 URL
+ *
+ * 背景：getUrlPath() 在面板页面内（如 .../ui/panel.html）执行时返回的是页面所在目录
+ * `.../ui`，此时若直接拼接 `/ui/settings.html` 会得到错误的 `.../ui/ui/settings.html`。
+ * 这里统一把末尾的 `/ui` 归一化掉后再拼接，保证任何调用上下文都得到 `.../ui/<page>`。
+ *
+ * @param page 页面文件名，如 `settings.html`
+ * @returns 归一化后的完整页面 URL
+ */
+export function buildTaskPaneUrl(page: string): string {
+  const base = getUrlPath().replace(/\/+$/u, '').replace(/\/ui$/u, '')
+  return `${base}/ui/${page}`
+}
+
+/**
  * 显示同步面板
  */
 export function showBangumiPanel(): void {
@@ -1246,7 +1261,7 @@ export function showSettingsPanel(): void {
     }
   } else {
     // 首次创建设置面板
-    const settingsPane = app.CreateTaskPane?.(`${getUrlPath()}/ui/settings.html`)
+    const settingsPane = app.CreateTaskPane?.(buildTaskPaneUrl('settings.html'))
     if (settingsPane) {
       settingsPane.DockPosition = targetPosition
       settingsPane.Visible = true
