@@ -291,78 +291,190 @@ function bindRecordControls(): void {
 
 // ========== 文件选择（单/多选统一入口） ==========
 //
-// WPS 不支持原生多选文件对话框，这里采用"循环单选 + 询问是否继续"的模式：
-//   1. 首次进入循环：弹出 GetOpenFilename 让用户选一个文件
-//   2. 选中后：自动加入 state.batchFiles
-//   3. 弹 confirm"继续添加？"，确定 → 回到步骤 1，取消 → 退出循环
-//   4. 第一次选中的文件同时作为 state.filePath（单文件"开始富化"的目标）
-// 这样不管是单文件富化还是批量富化，都只走这一个入口。
+// 优先使用 WPS Application.FileDialog(msoFileDialogFilePicker) + AllowMultiSelect=true
+// 实现真正的多选文件对话框；该 API 调用的是 Windows 系统原生文件管理器（支持 Ctrl/Shift
+// 多选），而非 GetOpenFilename 的单选包装。运行时若 FileDialog 不可用，自动回退到
+// "循环单选 + 询问是否继续"的兼容方案。
 //
 // state.batchFiles 与 state.filePath 的关系：
 //   - state.batchFiles = []              → 还没选过文件
 //   - state.batchFiles = [f1]            → 只选了 f1（单文件）
 //   - state.batchFiles = [f1, f2, ...]   → 批量（f1 = state.filePath 是首个）
 
-export function selectNewAnimeFile(): void {
+/** WPS FileDialog 对象的能力子集（仅用到的成员） */
+interface WpsFileDialog {
+  AllowMultiSelect: boolean
+  Title: string
+  Filters: {
+    Clear(): void
+    Add(description: string, extensions: string, position?: number): unknown
+  }
+  Show(): number
+  SelectedItems: {
+    Count: number
+    Item(index: number): string
+  }
+}
+
+/**
+ * 调用 WPS 原生多选文件对话框
+ * @returns 选中的文件路径数组（用户取消返回空数组）；FileDialog 不可用或异常时返回 null（触发回退）
+ */
+function pickFilesWithMultiSelect(): string[] | null {
+  // 整个调用包在大 try 里：WPS 部分版本可能声明了 FileDialog 但实际抛错，
+  // 任何环节出错都安全回退到 GetOpenFilename 循环
   try {
     const app = getApp() as {
-      GetOpenFilename?: (fileFilter: string, title: string) => unknown
+      FileDialog?: (dialogType: number) => WpsFileDialog | null
+      msoFileDialogFilePicker?: number
     } | null
+    if (!app || typeof app.FileDialog !== 'function') return null
 
-    if (!app || typeof app.GetOpenFilename !== 'function') {
-      BGM.Dialog.alert('提示', 'WPS 文件对话框不可用，请直接在 WPS 中打开文件')
+    // msoFileDialogFilePicker = 3；优先用 Application 上的常量，缺失则用字面量
+    const dialogType =
+      typeof app.msoFileDialogFilePicker === 'number' ? app.msoFileDialogFilePicker : 3
+
+    const dialog = app.FileDialog(dialogType)
+    if (!dialog) return null
+
+    dialog.AllowMultiSelect = true
+    dialog.Title = '选择新番表文件（可多选，按住 Ctrl/Shift 批量选择）'
+    try {
+      dialog.Filters.Clear()
+    } catch {
+      // 部分实现不支持 Clear，直接 Add 即可（Add 会追加）
+    }
+    dialog.Filters.Add('Excel 文件 (*.xlsx)', '*.xlsx', 1)
+    dialog.Filters.Add('Excel 97-2003 文件 (*.xls)', '*.xls', 2)
+    dialog.Filters.Add('CSV 文件 (*.csv)', '*.csv', 3)
+    dialog.Filters.Add('所有文件 (*.*)', '*.*', 4)
+
+    // Show() 返回 -1 = 确定，0 = 取消
+    const result = dialog.Show()
+    if (result !== -1) return []
+
+    const paths: string[] = []
+    const count = dialog.SelectedItems.Count
+    for (let index = 1; index <= count; index += 1) {
+      const item = dialog.SelectedItems.Item(index)
+      if (item) paths.push(item)
+    }
+    return paths
+  } catch {
+    return null
+  }
+}
+
+/**
+ * 将一批路径合并入 state.batchFiles，跳过重复项，刷新 UI。
+ * 返回本次新增数量。
+ */
+function mergeSelectedPaths(paths: string[]): number {
+  let added = 0
+  for (const filePath of paths) {
+    if (state.batchFiles.includes(filePath)) {
+      bgmLog(LOG_LEVELS.INFO, `[enrich] 跳过重复文件: ${extractFileName(filePath)}`)
+    } else {
+      state.batchFiles.push(filePath)
+      // 首个文件同时作为单文件富化目标
+      if (state.batchFiles.length === 1) {
+        state.filePath = filePath
+      }
+      added += 1
+    }
+  }
+  if (added > 0) {
+    bgmLog(
+      LOG_LEVELS.INFO,
+      `[enrich] 批量选择: 新增 ${String(added)} 个，累计 ${String(state.batchFiles.length)} 个`,
+    )
+    renderBatchFileList()
+  }
+  return added
+}
+
+/**
+ * 回退方案：GetOpenFilename 循环单选 + 询问是否继续
+ * 用于 FileDialog 在当前 WPS 版本不可用时
+ */
+function selectNewAnimeFileLoop(): void {
+  const app = getApp() as {
+    GetOpenFilename?: (fileFilter: string, title: string) => unknown
+  } | null
+
+  if (!app || typeof app.GetOpenFilename !== 'function') {
+    BGM.Dialog.alert('提示', 'WPS 文件对话框不可用，请直接在 WPS 中打开文件')
+    return
+  }
+
+  const fileFilter =
+    'Excel 文件 (*.xlsx),*.xlsx,Excel 97-2003 文件 (*.xls),*.xls,CSV 文件 (*.csv),*.csv,所有文件 (*.*),*.*'
+
+  for (;;) {
+    const titleSuffix =
+      state.batchFiles.length > 0
+        ? `（已选 ${String(state.batchFiles.length)} 个，继续添加按"取消"结束）`
+        : ''
+    const selected = app.GetOpenFilename(fileFilter, `选择新番表文件${titleSuffix}`)
+
+    // 用户取消
+    if (typeof selected === 'boolean' || selected === false) {
+      bgmLog(LOG_LEVELS.INFO, '[enrich] 用户取消文件选择')
+      break
+    }
+
+    const filePath = String(selected)
+    const fileName = extractFileName(filePath)
+
+    // 重复文件跳过
+    if (state.batchFiles.includes(filePath)) {
+      BGM.Dialog.alert('提示', `文件已在列表中：\n${fileName}`)
+    } else {
+      state.batchFiles.push(filePath)
+      // 首个文件同时作为单文件富化目标
+      if (state.batchFiles.length === 1) {
+        state.filePath = filePath
+      }
+      bgmLog(
+        LOG_LEVELS.INFO,
+        `[enrich] 已选择文件: ${fileName}（共 ${String(state.batchFiles.length)} 个）`,
+      )
+
+      // 每次选完后同步刷新 UI（让用户看到当前已选列表）
+      renderBatchFileList()
+
+      // 询问是否继续添加（WPS 同步阻塞式 confirm：回调里改 shouldContinue，随后立即读取）
+      // `false as boolean`：避免 TS 将闭包赋值忽略后把变量静态收窄为 false 字面量
+      let shouldContinue = false as boolean
+      BGM.Dialog.confirm(
+        `已添加 ${fileName}\n当前共 ${String(state.batchFiles.length)} 个文件\n点击【确定】继续添加，点击【取消】完成选择`,
+        (isConfirmed: boolean) => {
+          shouldContinue = isConfirmed
+        },
+        '继续添加？',
+      )
+      if (!shouldContinue) break
+    }
+  }
+}
+
+export function selectNewAnimeFile(): void {
+  try {
+    // 1) 优先尝试 FileDialog（真正的多选）
+    const multiResult = pickFilesWithMultiSelect()
+    if (multiResult !== null) {
+      // FileDialog 可用；空数组代表用户取消
+      if (multiResult.length > 0) {
+        mergeSelectedPaths(multiResult)
+      } else {
+        bgmLog(LOG_LEVELS.INFO, '[enrich] 用户取消文件选择')
+      }
       return
     }
 
-    const fileFilter =
-      'Excel 文件 (*.xlsx),*.xlsx,Excel 97-2003 文件 (*.xls),*.xls,CSV 文件 (*.csv),*.csv,所有文件 (*.*),*.*'
-
-    for (;;) {
-      const titleSuffix =
-        state.batchFiles.length > 0
-          ? `（已选 ${String(state.batchFiles.length)} 个，继续添加按"取消"结束）`
-          : ''
-      const selected = app.GetOpenFilename(fileFilter, `选择新番表文件${titleSuffix}`)
-
-      // 用户取消
-      if (typeof selected === 'boolean' || selected === false) {
-        bgmLog(LOG_LEVELS.INFO, '[enrich] 用户取消文件选择')
-        break
-      }
-
-      const filePath = String(selected)
-      const fileName = extractFileName(filePath)
-
-      // 重复文件跳过
-      if (state.batchFiles.includes(filePath)) {
-        BGM.Dialog.alert('提示', `文件已在列表中：\n${fileName}`)
-      } else {
-        state.batchFiles.push(filePath)
-        // 首个文件同时作为单文件富化目标
-        if (state.batchFiles.length === 1) {
-          state.filePath = filePath
-        }
-        bgmLog(
-          LOG_LEVELS.INFO,
-          `[enrich] 已选择文件: ${fileName}（共 ${String(state.batchFiles.length)} 个）`,
-        )
-
-        // 每次选完后同步刷新 UI（让用户看到当前已选列表）
-        renderBatchFileList()
-
-        // 询问是否继续添加（WPS 同步阻塞式 confirm：回调里改 shouldContinue，随后立即读取）
-        // `false as boolean`：避免 TS 将闭包赋值忽略后把变量静态收窄为 false 字面量
-        let shouldContinue = false as boolean
-        BGM.Dialog.confirm(
-          `已添加 ${fileName}\n当前共 ${String(state.batchFiles.length)} 个文件\n点击【确定】继续添加，点击【取消】完成选择`,
-          (isConfirmed: boolean) => {
-            shouldContinue = isConfirmed
-          },
-          '继续添加？',
-        )
-        if (!shouldContinue) break
-      }
-    }
+    // 2) 回退：GetOpenFilename 循环
+    bgmLog(LOG_LEVELS.INFO, '[enrich] FileDialog 不可用，回退到 GetOpenFilename 循环单选')
+    selectNewAnimeFileLoop()
   } catch (error: unknown) {
     BGM.handleError(error, {
       showAlert: true,
