@@ -7,6 +7,7 @@
 import { LOG_LEVELS } from '../core/constants.js'
 import {
   detectColumns,
+  detectAnimeSourceLayout,
   matchEntries,
   enrichEntries,
   resolveConflictField,
@@ -626,18 +627,19 @@ function renderBatchFileList(): void {
  */
 function detectHeaderOnSheet(ws: WpsWorksheet, label: string): EnrichColumnMapping | null {
   try {
-    const headerRow = findHeaderRow(ws)
+    const sourceLayout = detectAnimeSourceLayout(ws)
+    const headerRow = sourceLayout?.headerRow ?? findHeaderRow(ws)
     if (headerRow === 0) {
       BGM.Dialog.alert('提示', '未检测到有效的表头行，请检查表头是否在前 10 行内')
       bgmLog(LOG_LEVELS.ERROR, `[enrich] 表头识别失败: ${label} 未检测到有效的表头行`)
       return null
     }
 
-    const mapping = detectColumns(ws, headerRow)
+    const mapping = sourceLayout?.columnMapping ?? detectColumns(ws, headerRow)
 
     state.animeSourceSheet = ws
     state.headerRow = headerRow
-    state.dataStartRow = headerRow + 1
+    state.dataStartRow = sourceLayout?.dataStartRow ?? headerRow + 1
     state.columnMapping = mapping
 
     renderDetectResult(ws, mapping)
@@ -1837,6 +1839,107 @@ function updateBatchProgressUI(current: number, total: number, currentFileName: 
   }
 }
 
+/** 打开批量源文件并取得首个工作表。失败时抛出，由调用方统一记录结果。 */
+function openBatchSourceWorkbook(
+  filePath: string,
+  fileName: string,
+): { wb: WpsWorkbook; ws: WpsWorksheet } {
+  const app = getApp()
+  if (!app?.Workbooks) throw new Error('WPS 应用不可用')
+
+  const workbooks = app.Workbooks as unknown as {
+    Open?: (path: string) => WpsWorkbook | null
+  }
+  bgmLog(LOG_LEVELS.INFO, `[enrich-batch] 打开文件: ${fileName}`)
+  if (typeof workbooks.Open !== 'function') throw new TypeError('WPS Workbooks.Open 不可用')
+
+  const wb = workbooks.Open(filePath)
+  if (!wb) throw new Error('无法打开文件：WPS 返回了 null')
+
+  const ws = wb.Worksheets.Item(1) as WpsWorksheet | null
+  if (!ws) throw new Error('文件中没有工作表')
+  return { wb, ws }
+}
+
+/** 对已打开的批量源表执行布局识别、匹配和富化。 */
+function enrichSingleBatchSource(
+  filePath: string,
+  fileName: string,
+  ws: WpsWorksheet,
+  bangumiSheet: WpsWorksheet,
+  result: BatchFileResult,
+): void {
+  const sourceLayout = detectAnimeSourceLayout(ws)
+  const headerRow = sourceLayout?.headerRow ?? findHeaderRow(ws)
+  if (headerRow === 0) {
+    result.error = '未检测到有效的表头行'
+    bgmLog(
+      LOG_LEVELS.ERROR,
+      `[enrich-batch] ${fileName}: 表头识别失败 - 未检测到有效的表头行（请确认表头在前 10 行内）`,
+    )
+    return
+  }
+
+  const dataStartRow = sourceLayout?.dataStartRow ?? headerRow + 1
+  const columnMapping = sourceLayout?.columnMapping ?? detectColumns(ws, headerRow)
+  if (columnMapping.nameCol === 0) {
+    result.error = '已找到字段行，但未找到名称列'
+    bgmLog(LOG_LEVELS.ERROR, `[enrich-batch] ${fileName}: 表头识别失败 - 未找到名称列`)
+    return
+  }
+  result.headerRow = headerRow
+
+  bgmLog(
+    LOG_LEVELS.INFO,
+    `[enrich-batch] ${fileName}: 表头识别成功 - 工作表=${ws.Name || '未知'} / 表头行=${String(headerRow)} / 名称列=${String(columnMapping.nameCol)}`,
+  )
+
+  const config: EnrichConfig = {
+    filePath,
+    sheetName: ws.Name || '',
+    headerRow,
+    dataStartRow,
+    columnMapping,
+    targetSheetName: bangumiSheet.Name || '',
+  }
+  const matches = matchEntries(ws, bangumiSheet, config)
+  const matched = matches.filter(
+    (m) => m.matchType !== 'unmatched' && m.matchType !== 'error',
+  ).length
+  const unmatched = matches.length - matched
+  const enrichResults = enrichEntries(ws, bangumiSheet, matches, config, () => {
+    /* 批量模式不回调进度（已由外层控制） */
+  })
+  const updatedEntries = enrichResults.filter((r) => r.kind === 'matched').length
+  const entries = enrichResults.filter(
+    (r) => r.kind === 'matched' && r.enrichedFields.length > 0,
+  ).length
+
+  result.matched = matched
+  result.addedEntries = entries
+  result.updatedEntries = updatedEntries
+  result.unmatched = unmatched
+  result.success = true
+  bgmLog(
+    LOG_LEVELS.INFO,
+    `[enrich-batch] ${fileName}: 匹配 ${String(matched)}，未匹配 ${String(unmatched)}，处理 ${String(updatedEntries)}`,
+  )
+}
+
+/** 关闭批量源文件，不保存。 */
+function closeBatchSourceWorkbook(wb: WpsWorkbook, fileName: string): void {
+  try {
+    const wbWithClose = wb as unknown as { Close?: (shouldSaveChanges?: boolean) => unknown }
+    if (typeof wbWithClose.Close === 'function') wbWithClose.Close(false)
+    bgmLog(LOG_LEVELS.INFO, `[enrich-batch] 已关闭文件: ${fileName}`)
+  } catch (error: unknown) {
+    bgmLog(
+      LOG_LEVELS.WARN,
+      `[enrich-batch] 关闭文件时警告: ${error instanceof Error ? error.message : String(error)}`,
+    )
+  }
+}
+
 /**
  * 对单个文件执行表头识别 + 匹配 + 富化
  * @returns 包含 matched/newEntries/updatedEntries/unmatched 的统计对象
@@ -1856,115 +1959,14 @@ function processSingleBatchFile(filePath: string, bangumiSheet: WpsWorksheet): B
 
   let wb: WpsWorkbook | null = null
   try {
-    const app = getApp()
-    if (!app?.Workbooks) {
-      throw new Error('WPS 应用不可用')
-    }
-
-    // WPS Workbooks.Open 是运行时扩展，不在类型定义中
-    const workbooks = app.Workbooks as unknown as {
-      Open?: (path: string) => WpsWorkbook | null
-    }
-
-    bgmLog(LOG_LEVELS.INFO, `[enrich-batch] 打开文件: ${fileName}`)
-    if (typeof workbooks.Open !== 'function') {
-      throw new TypeError('WPS Workbooks.Open 不可用')
-    }
-    wb = workbooks.Open(filePath)
-    if (!wb) {
-      throw new Error('无法打开文件：WPS 返回了 null')
-    }
-
-    // 获取第一个工作表（WPS 运行时可能返回 null，但类型定义未包含）
-    const ws = wb.Worksheets.Item(1) as WpsWorksheet | null
-    if (!ws) {
-      throw new Error('文件中没有工作表')
-    }
-
-    // 自动识别表头
-    const headerRow = findHeaderRow(ws)
-    if (headerRow === 0) {
-      result.error = '未检测到有效的表头行'
-      bgmLog(
-        LOG_LEVELS.ERROR,
-        `[enrich-batch] ${fileName}: 表头识别失败 - 未检测到有效的表头行（请确认表头在前 10 行内）`,
-      )
-      return result
-    }
-
-    const dataStartRow = headerRow + 1
-    const columnMapping = detectColumns(ws, headerRow)
-    result.headerRow = headerRow
-
-    bgmLog(
-      LOG_LEVELS.INFO,
-      `[enrich-batch] ${fileName}: 表头识别成功 - 工作表=${ws.Name || '未知'} / 表头行=${String(headerRow)} / 名称列=${String(columnMapping.nameCol)}`,
-    )
-
-    // 匹配
-    const config: EnrichConfig = {
-      filePath,
-      sheetName: ws.Name || '',
-      headerRow,
-      dataStartRow,
-      columnMapping,
-      targetSheetName: bangumiSheet.Name || '',
-    }
-
-    const matches = matchEntries(ws, bangumiSheet, config)
-    const matched = matches.filter(
-      (m) => m.matchType !== 'unmatched' && m.matchType !== 'error',
-    ).length
-    const unmatched = matches.length - matched
-
-    // 富化
-    const enrichResults = enrichEntries(
-      ws,
-      bangumiSheet,
-      matches,
-      config,
-      // 批量模式不回调进度（已由外层控制）
-      () => {
-        /* empty */
-      },
-    )
-
-    // EnrichResultItem 没有 stats，通过 enrichedFields 判断
-    const updatedEntries = enrichResults.filter((r) => r.kind === 'matched').length
-    const entries = enrichResults.filter(
-      (r) => r.kind === 'matched' && r.enrichedFields.length > 0,
-    ).length
-
-    result.matched = matched
-    result.addedEntries = entries
-    result.updatedEntries = updatedEntries
-    result.unmatched = unmatched
-    result.success = true
-
-    bgmLog(
-      LOG_LEVELS.INFO,
-      `[enrich-batch] ${fileName}: 匹配 ${String(matched)}，未匹配 ${String(unmatched)}，处理 ${String(updatedEntries)}`,
-    )
+    const opened = openBatchSourceWorkbook(filePath, fileName)
+    wb = opened.wb
+    enrichSingleBatchSource(filePath, fileName, opened.ws, bangumiSheet, result)
   } catch (error: unknown) {
     result.error = error instanceof Error ? error.message : String(error)
     bgmLog(LOG_LEVELS.ERROR, `[enrich-batch] ${fileName} 处理失败: ${result.error}`)
   } finally {
-    // 关闭源文件，不保存
-    if (wb) {
-      try {
-        const wbWithClose = wb as unknown as { Close?: (shouldSaveChanges?: boolean) => unknown }
-        if (typeof wbWithClose.Close === 'function') {
-          const closeResult = wbWithClose.Close(false)
-          void closeResult
-        }
-        bgmLog(LOG_LEVELS.INFO, `[enrich-batch] 已关闭文件: ${fileName}`)
-      } catch (error: unknown) {
-        bgmLog(
-          LOG_LEVELS.WARN,
-          `[enrich-batch] 关闭文件时警告: ${error instanceof Error ? error.message : String(error)}`,
-        )
-      }
-    }
+    if (wb) closeBatchSourceWorkbook(wb, fileName)
   }
 
   return result

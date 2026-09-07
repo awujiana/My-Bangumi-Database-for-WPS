@@ -10,7 +10,7 @@
  * @version 1.0.0
  */
 
-import { LOG_LEVELS } from '../core/constants.js'
+import { LOG_LEVELS, PANEL_CONFIG } from '../core/constants.js'
 import {
   bgmLog,
   getCellValue,
@@ -84,6 +84,23 @@ const KNOWN_COLUMN_MAP: Record<string, keyof EnrichColumnMapping> = {
 
 /** 标签分隔符 */
 const TAG_SEPARATOR = ' | '
+
+/**
+ * 新番来源表的横向表头关键字。
+ *
+ * 这类表格（例如「2026年4月新番表 v2.13」）不是标准数据库表：
+ * 名称列 C 没有写「名称」表头，D:N 才从第 2 行开始写周更时间、首播、集数等字段，
+ * 因此不能只依赖通用 Bangumi 表头关键字（否则会误判为没有表头）。
+ */
+const ANIME_SOURCE_HEADER_KEYWORDS = [
+  '周更时间',
+  '播放平台',
+  '独播',
+  '首播',
+  '集数',
+  '特殊',
+  'tags',
+] as const
 
 /** 特点/印象分隔符 */
 const FEATURE_SEPARATOR = ' | '
@@ -332,6 +349,64 @@ export function detectColumns(sheet: WpsWorksheet, headerRow: number): EnrichCol
   )
 
   return mapping
+}
+
+export interface AnimeSourceLayout {
+  headerRow: number
+  dataStartRow: number
+  columnMapping: EnrichColumnMapping
+}
+
+/**
+ * 识别 Hazx 新番表这类「标题/分组行 + 横向字段行 + 数据」布局。
+ * 通用 findHeaderRow 只认识 Bangumi 追踪表字段，无法识别该文件第 2 行的周更时间/播放平台等字段。
+ */
+export function detectAnimeSourceLayout(sheet: WpsWorksheet): AnimeSourceLayout | null {
+  let headerRow = 0
+  let firstFieldCol = 0
+
+  for (let row = 1; row <= PANEL_CONFIG.MAX_SCAN_ROWS; row += 1) {
+    let matchedFields = 0
+    let rowFirstFieldCol = 0
+    for (let col = 1; col <= 50; col += 1) {
+      const value = getCellValue(sheet, row, col).trim().toLowerCase()
+      if (
+        value &&
+        ANIME_SOURCE_HEADER_KEYWORDS.some((keyword) => value === keyword.toLowerCase())
+      ) {
+        matchedFields += 1
+        if (rowFirstFieldCol === 0) rowFirstFieldCol = col
+      }
+    }
+    if (matchedFields >= 3) {
+      headerRow = row
+      firstFieldCol = rowFirstFieldCol
+      break
+    }
+  }
+
+  if (headerRow === 0 || firstFieldCol <= 1) return null
+
+  const columnMapping = detectColumns(sheet, headerRow)
+  if (columnMapping.nameCol === 0) {
+    // 该模板的名称列紧邻第一个字段列左侧（C 列在 D 列「周更时间」之前）。
+    columnMapping.nameCol = firstFieldCol - 1
+  }
+
+  let dataStartRow = headerRow + 1
+  for (let row = headerRow + 1; row <= PANEL_CONFIG.MAX_SCAN_ROWS + 10; row += 1) {
+    const name = getCellValue(sheet, row, columnMapping.nameCol).trim()
+    if (name && !name.includes('新番表') && !name.includes('番组表')) {
+      dataStartRow = row
+      break
+    }
+  }
+
+  bgmLog(
+    LOG_LEVELS.INFO,
+    `[detectAnimeSourceLayout] 新番表布局识别成功: 表头行=${String(headerRow)} / 数据起始行=${String(dataStartRow)} / 名称列=${String(columnMapping.nameCol)}`,
+  )
+  return { headerRow, dataStartRow, columnMapping }
 }
 
 /**
