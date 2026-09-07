@@ -71,7 +71,7 @@ body {
   justify-content: space-between;
   gap: var(--gap);
   padding: clamp(10px, 0.9vw, 16px) clamp(16px, 1.4vw, 28px);
-  background: rgba(12,12,12,0.85);
+  background: var(--bg-topbar);
   backdrop-filter: blur(10px);
   border-bottom: 1px solid var(--border);
 }
@@ -152,8 +152,9 @@ body {
   text-transform: uppercase; color: var(--text-3);
   margin: 4px 2px 8px;
 }
-.nav { display: flex; flex-direction: column; gap: 4px; }
+.nav { position: relative; display: flex; flex-direction: column; gap: 4px; }
 .nav a {
+  position: relative; z-index: 1;   /* 高于滑动胶囊，保证文字/图标不被其背景覆盖 */
   display: flex; align-items: center; gap: 10px;
   padding: 9px 12px; border-radius: var(--r-md);
   color: var(--text-2); text-decoration: none;
@@ -163,6 +164,26 @@ body {
 }
 .nav a .nav-ico { width: 18px; text-align: center; flex-shrink: 0; opacity: .9; }
 .nav a .nav-text { transition: opacity var(--dur); }
+
+/* ---- 滚动高亮滑动胶囊（scrollspy 指示器）---- */
+/* 由 shell-nav 的 initScrollspy 注入并随当前高亮项平移；高亮底色与边框
+   由胶囊提供，.nav a.active 只保留文字强调色（避免双重底色/边框叠加）。 */
+.nav-indicator {
+  position: absolute;
+  left: 0; top: 0;
+  border-radius: var(--r-md);
+  background: rgba(255,255,255,0.10);
+  border: 1px solid rgba(255,255,255,0.20);
+  box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+  pointer-events: none;
+  opacity: 0;
+  transition:
+    transform var(--dur) var(--ease),
+    width var(--dur) var(--ease),
+    height var(--dur) var(--ease),
+    opacity var(--dur);
+}
+.nav-indicator.on { opacity: 1; }
 
 /* ---- 图标仅模式（通过 body.nav-icons-only 切换） ---- */
 /* 注意：本块仅在面板宽度 ≥ 880px 时生效。窄窗口下由下方媒体查询接管，
@@ -206,10 +227,9 @@ body.nav-icons-only .nav a::after {
 }
 body.nav-icons-only .nav a:hover::after { opacity: 1; }
 .nav a:hover { background: var(--bg-surface); color: var(--text-1); transform: translateX(2px); }
+/* 高亮项仅保留文字强调色：底色与边框由滑动胶囊提供，避免指示器滑动期间双重高亮 */
 .nav a.active {
-  background: rgba(255,255,255,0.10);
   color: var(--primary);
-  border-color: rgba(255,255,255,0.20);
 }
 
 /* ---- 主区 ---- */
@@ -223,7 +243,7 @@ body.nav-icons-only .nav a:hover::after { opacity: 1; }
 /* ============================ 4. 核心操作指令中心 ======================== */
 /* 置于视觉焦点：顶部通栏，承载 4 个主操作 + Token 状态 */
 .command-center {
-  background: linear-gradient(135deg, rgba(31,31,31,0.9), rgba(20,20,20,0.95));
+  background: var(--bg-hero);
   border: 1px solid var(--border-strong);
   border-radius: var(--r-lg);
   padding: clamp(16px, 1.4vw, 24px);
@@ -246,6 +266,7 @@ body.nav-icons-only .nav a:hover::after { opacity: 1; }
   font-size: var(--fs-ctrl);
   min-width: 132px;
   justify-content: flex-start;
+  border-color: var(--border-strong);  /* 浅色模式下焦点卡为浅底，按钮需描边保持辨识度 */
 }
 
 /* ============================ 5. 自适应卡片网格 ========================== */
@@ -316,12 +337,12 @@ body.nav-icons-only .nav a:hover::after { opacity: 1; }
   background: var(--bg-surface-2); color: var(--text-1);
   border-color: var(--border-strong);
 }
-.bgm-btn.primary:hover { background: #363636; border-color: rgba(255,255,255,0.28); }
+.bgm-btn.primary:hover { background: var(--bg-btn-hover); border-color: var(--border-btn-hover); }
 
 .bgm-btn.success { background: var(--bg-surface-2); color: var(--success); border-color: var(--border-strong); }
-.bgm-btn.success:hover { background: #363636; border-color: rgba(166,227,161,0.45); }
+.bgm-btn.success:hover { background: var(--bg-btn-hover); border-color: var(--border-btn-hover); }
 .bgm-btn.warning { background: var(--bg-surface-2); color: var(--warning); border-color: var(--border-strong); }
-.bgm-btn.warning:hover { background: #363636; border-color: rgba(249,226,175,0.45); }
+.bgm-btn.warning:hover { background: var(--bg-btn-hover); border-color: var(--border-btn-hover); }
 
 .bgm-btn.small { padding: 7px 12px; font-size: var(--fs-sm); }
 .bgm-btn.tiny { padding: 5px 9px; font-size: 11px; }
@@ -371,6 +392,14 @@ select.input, .form-row select { cursor: pointer; }
 select.input option, .form-row select option { background: var(--bg-surface); color: var(--text-1); }
 
 .sheet-select-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
+
+/* 路径选择行：只读输入框 + 选择/清除按钮，输入框弹性占据剩余宽度 */
+.path-row { display: flex; align-items: center; gap: 8px; }
+.path-row input[type="text"] {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.path-row .bgm-btn { flex: 0 0 auto; white-space: nowrap; }
 
 /* 单选 / 复选 容器 */
 .mode-selector { display: flex; flex-direction: column; gap: 8px; }
@@ -506,7 +535,7 @@ select.input option, .form-row select option { background: var(--bg-surface); co
 }
 .step-num {
   width: 28px; height: 28px; border-radius: 50%; flex-shrink: 0;
-  background: var(--primary-grad); color: #0a0a0a;
+  background: var(--primary-grad); color: var(--text-on-accent);
   display: grid; place-items: center; font-weight: 700; font-size: 13px;
 }
 
@@ -608,11 +637,14 @@ select.input option, .form-row select option { background: var(--bg-surface); co
   body.nav-icons-only .nav a {
     white-space: nowrap; padding: 8px 12px;
     justify-content: flex-start;
-    position: static;
+    position: relative; z-index: 1;   /* 窄态同样需置于滑动胶囊之上 */
   }
   .nav a:hover { transform: none; }
-  body.nav-icons-only .nav a .nav-text { display: inline; }
-  body.nav-icons-only .nav a:hover::after { display: none; }  /* 窄态不用 tooltip，太拥挤 */
+  /* 窄态图标仅模式同样隐藏文字，图标居中；悬停名称由原生 title 提示提供
+     （样式化 ::after 定位于条目右侧，横排换行时会被侧栏 overflow 裁剪，故窄态不启用） */
+  body.nav-icons-only .nav a { justify-content: center; padding: 8px 10px; }
+  body.nav-icons-only .nav a .nav-text { display: none; }
+  body.nav-icons-only .nav a:hover::after { display: none; }
   .content-grid { grid-template-columns: 1fr; }
   .command-actions { flex-direction: column; }
 }
@@ -629,4 +661,23 @@ select.input option, .form-row select option { background: var(--bg-surface); co
 /* ============================ 14. 降低动效偏好 ========================== */
 @media (prefers-reduced-motion: reduce) {
   * { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
+}
+
+/* ============================================================================
+ * 浅色主题 · 语义色覆盖
+ * ----------------------------------------------------------------------------
+ * 语义色（--success/--warning/--danger/--info/--teal/--amber）默认取深色
+ * Catppuccin 淡色系，仅适合深底；浅色主题下改用深色系保证 WCAG AA 对比度。
+ * 必须放在本文件末尾（tokens.css / styles.css 之后），
+ * 否则会被 styles.css :root 中同名 Catppuccin 变量（--green/--yellow/--red）覆盖。
+ * 说明：--green/--yellow/--red 用于 legacy 深色组件（进度对话框/结果统计），
+ * 在浅色主题下仍保持深色风格，故不在此覆盖。
+ * ==========================================================================*/
+[data-theme="light"] {
+  --success: #2e7d32;   /* 成功：深绿 */
+  --warning: #8a5a00;   /* 警告：深琥珀 */
+  --danger:  #c62828;   /* 危险：深红 */
+  --info:    #1565c0;   /* 信息：深蓝 */
+  --teal:    #0d9488;   /* 匹配/精确命中：深青 */
+  --amber:   #b45309;   /* 别名匹配/警告：深琥珀 */
 }

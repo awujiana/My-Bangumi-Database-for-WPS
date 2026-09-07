@@ -1,275 +1,413 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="zh-CN">
-<head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="color-scheme" content="dark light">
-    <meta name="theme-color" content="#1e1e2e">
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; connect-src 'self' https://api.bgm.tv https://bangumi.tv https://raw.githubusercontent.com https://api.github.com https://gitlab.com https://gitee.com">
-    <link rel="stylesheet" href="../css/tokens.css">
-    <link rel="stylesheet" href="../css/styles.css">
-    <link rel="stylesheet" href="../css/panel-theme.css">
-    <link rel="stylesheet" href="../css/enrich.css">
-</head>
-<body>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="dark light" />
+    <meta name="theme-color" content="#1e1e2e" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; connect-src 'self' https://api.bgm.tv https://bangumi.tv https://raw.githubusercontent.com https://api.github.com https://gitlab.com https://gitee.com"
+    />
+    <link rel="stylesheet" href="../css/tokens.css" />
+    <link rel="stylesheet" href="../css/styles.css" />
+    <link rel="stylesheet" href="../css/panel-theme.css" />
+    <link rel="stylesheet" href="../css/enrich.css" />
+  </head>
+  <body>
     <script type="text/javascript" src="../libs/purify.js"></script>
     <script type="module" src="../dist-ts/panel/enrich-bootstrap.js"></script>
     <script src="../wpsjsrpcsdk.js"></script>
 
     <div class="global">
-        <!-- ===================== 顶栏 ===================== -->
-        <header class="topbar">
-            <div class="brand">
-                <div class="brand-text">
-                    <span class="brand-title">✨ 新番表富化工具</span>
-                    <span class="brand-sub">将新番表数据富化到 Bangumi 追踪表</span>
-                </div>
-            </div>
-        </header>
+      <!-- ===================== 顶栏 ===================== -->
+      <header class="topbar">
+        <div class="brand">
+          <div class="brand-text">
+            <span class="brand-title">✨ 新番表富化工具</span>
+            <span class="brand-sub">将新番表数据富化到 Bangumi 追踪表</span>
+          </div>
+        </div>
+      </header>
 
-        <!-- ===================== 侧栏（功能导航） ===================== -->
-        <aside class="sidebar">
-            <nav class="nav" aria-label="功能导航">
-                <div class="nav-label">功能导航</div>
-                <a href="#sec-file" title="新番表文件"><span class="nav-ico">📁</span><span class="nav-text">新番表文件</span></a>
-                <a href="#sec-target" title="目标工作表"><span class="nav-ico">🎯</span><span class="nav-text">目标工作表</span></a>
-                <a href="#sec-preview" title="数据预览"><span class="nav-ico">👁️</span><span class="nav-text">数据预览</span></a>
-                <a href="#sec-enrich" title="富化执行"><span class="nav-ico">⚡</span><span class="nav-text">富化执行</span></a>
-                <a href="#sec-records" title="富化记录"><span class="nav-ico">📋</span><span class="nav-text">富化记录</span></a>
-                <a href="#sec-tips" title="使用提示"><span class="nav-ico">💡</span><span class="nav-text">使用提示</span></a>
-            </nav>
-        </aside>
+      <!-- ===================== 侧栏（功能导航） ===================== -->
+      <aside class="sidebar">
+        <nav class="nav" aria-label="功能导航">
+          <div class="nav-label">功能导航</div>
+          <a href="#sec-file" title="新番表文件"
+            ><span class="nav-ico">📁</span><span class="nav-text">新番表文件</span></a
+          >
+          <a href="#sec-target" title="目标工作表"
+            ><span class="nav-ico">🎯</span><span class="nav-text">目标工作表</span></a
+          >
+          <a href="#sec-preview" title="数据预览"
+            ><span class="nav-ico">👁️</span><span class="nav-text">数据预览</span></a
+          >
+          <a href="#sec-enrich" title="富化执行"
+            ><span class="nav-ico">⚡️</span><span class="nav-text">富化执行</span></a
+          >
+          <a href="#sec-records" title="富化记录"
+            ><span class="nav-ico">📊</span><span class="nav-text">富化记录</span></a
+          >
+          <a href="#sec-tips" title="使用提示"
+            ><span class="nav-ico">💡</span><span class="nav-text">使用提示</span></a
+          >
+        </nav>
+      </aside>
 
-        <!-- ===================== 主区 ===================== -->
-        <main class="main">
+      <!-- ===================== 主区 ===================== -->
+      <main class="main">
         <div class="enrich-section" id="sec-file">
-            <h3>📁 新番表文件</h3>
-            <div class="file-selector">
-                <div class="file-path-display" id="filePathDisplay" readonly placeholder="未选择文件..."></div>
-                <div class="bgm-btn-group bgm-btn-row">
-                    <button class="bgm-btn small primary" id="selectFileBtn" data-action="selectFile" style="flex:1;">📂 选择文件</button>
-                    <button class="bgm-btn small" id="detectHeaderBtn" data-action="detectHeader" style="flex:1;">🔍 自动识别表头</button>
-                </div>
-                <!-- 批量行内控件：选择文件后显示；
+          <h3>📁 新番表文件</h3>
+          <div class="file-selector">
+            <div
+              class="file-path-display"
+              id="filePathDisplay"
+              readonly
+              placeholder="未选择文件..."
+            ></div>
+            <div class="bgm-btn-group bgm-btn-row">
+              <button
+                class="bgm-btn small primary"
+                id="selectFileBtn"
+                data-action="selectFile"
+                style="flex: 1"
+              >
+                📂 选择文件
+              </button>
+              <button
+                class="bgm-btn small"
+                id="detectHeaderBtn"
+                data-action="detectHeader"
+                style="flex: 1"
+              >
+                🔍 自动识别表头
+              </button>
+            </div>
+            <!-- 批量行内控件：选择文件后显示；
                      「🚀 批量富化」在 N≥2 时显示，「🗑️ 清空列表」在 N≥1 时显示。
                      文件选择/批量/单文件富化统一由「📂 选择文件」入口触发。 -->
-                <div class="bgm-btn-group bgm-btn-row" style="margin-top:6px;">
-                    <button class="bgm-btn small primary" id="batchStartBtn" data-action="batchStartEnrich" style="flex:1;display:none;">🚀 批量富化</button>
-                    <button class="bgm-btn small" id="batchClearBtn" data-action="batchClear" style="flex:1;display:none;">🗑️ 清空列表</button>
-                </div>
-
-                <!-- 已选文件列表（多选时显示） -->
-                <div id="batchFileList" style="display:none;max-height:180px;overflow-y:auto;background:var(--bg-mantle);border:1px solid var(--bg-surface);border-radius:6px;padding:6px;"></div>
-
-                <!-- 批量进度 -->
-                <div id="batchProgress" style="display:none;margin-top:8px;">
-                    <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px;">
-                        <span id="batchCurrentFile"></span>
-                        <span id="batchPercent">0%</span>
-                    </div>
-                    <div style="background:var(--bg-surface);border-radius:4px;height:6px;overflow:hidden;">
-                        <div id="batchProgressFill" style="height:100%;background:linear-gradient(90deg,var(--accent-blue),var(--accent-blue-strong));width:0%;transition:width 0.2s;"></div>
-                    </div>
-                </div>
-
-                <!-- 最终汇总 -->
-                <div id="batchSummary" style="display:none;margin-top:8px;background:var(--bg-mantle);border:1px solid var(--border-strong);border-radius:6px;padding:10px;">
-                    <div style="font-weight:600;margin-bottom:8px;color:var(--success);">📊 批量富化汇总</div>
-                    <div id="batchSummaryContent"></div>
-                </div>
+            <div class="bgm-btn-group bgm-btn-row" style="margin-top: 6px">
+              <button
+                class="bgm-btn small primary"
+                id="batchStartBtn"
+                data-action="batchStartEnrich"
+                style="flex: 1; display: none"
+              >
+                🚀 批量富化
+              </button>
+              <button
+                class="bgm-btn small"
+                id="batchClearBtn"
+                data-action="batchClear"
+                style="flex: 1; display: none"
+              >
+                🗑️ 清空列表
+              </button>
             </div>
-            <div class="detect-result" id="detectResult" style="display:none;">
-                <div class="result-info">
-                    <div class="result-item"><span class="result-label">工作表：</span><span id="detectSheetName">-</span></div>
-                    <div class="result-item"><span class="result-label">表头行号：</span><span id="detectHeaderRow">-</span></div>
-                    <div class="result-item"><span class="result-label">数据起始行：</span><span id="detectDataRow">-</span></div>
-                </div>
-                <div class="column-mapping" id="columnMapping">
-                    <div class="mapping-header">列映射（可修正）</div>
-                    <div class="mapping-list" id="mappingList">
-                    </div>
-                </div>
+
+            <!-- 已选文件列表（多选时显示） -->
+            <div
+              id="batchFileList"
+              style="
+                display: none;
+                max-height: 180px;
+                overflow-y: auto;
+                background: var(--bg-mantle);
+                border: 1px solid var(--bg-surface);
+                border-radius: 6px;
+                padding: 6px;
+              "
+            ></div>
+
+            <!-- 批量进度 -->
+            <div id="batchProgress" style="display: none; margin-top: 8px">
+              <div
+                style="
+                  display: flex;
+                  justify-content: space-between;
+                  font-size: 12px;
+                  margin-bottom: 4px;
+                "
+              >
+                <span id="batchCurrentFile"></span>
+                <span id="batchPercent">0%</span>
+              </div>
+              <div
+                style="
+                  background: var(--bg-surface);
+                  border-radius: 4px;
+                  height: 6px;
+                  overflow: hidden;
+                "
+              >
+                <div
+                  id="batchProgressFill"
+                  style="
+                    height: 100%;
+                    background: linear-gradient(
+                      90deg,
+                      var(--accent-blue),
+                      var(--accent-blue-strong)
+                    );
+                    width: 0%;
+                    transition: width 0.2s;
+                  "
+                ></div>
+              </div>
             </div>
+
+            <!-- 最终汇总 -->
+            <div
+              id="batchSummary"
+              style="
+                display: none;
+                margin-top: 8px;
+                background: var(--bg-mantle);
+                border: 1px solid var(--border-strong);
+                border-radius: 6px;
+                padding: 10px;
+              "
+            >
+              <div style="font-weight: 600; margin-bottom: 8px; color: var(--success)">
+                📊 批量富化汇总
+              </div>
+              <div id="batchSummaryContent"></div>
+            </div>
+          </div>
+          <div class="detect-result" id="detectResult" style="display: none">
+            <div class="result-info">
+              <div class="result-item">
+                <span class="result-label">工作表：</span><span id="detectSheetName">-</span>
+              </div>
+              <div class="result-item">
+                <span class="result-label">表头行号：</span><span id="detectHeaderRow">-</span>
+              </div>
+              <div class="result-item">
+                <span class="result-label">数据起始行：</span><span id="detectDataRow">-</span>
+              </div>
+            </div>
+            <div class="column-mapping" id="columnMapping">
+              <div class="mapping-header">列映射（可修正）</div>
+              <div class="mapping-list" id="mappingList"></div>
+            </div>
+          </div>
         </div>
 
         <div class="enrich-section" id="sec-target">
-            <h3>🎯 目标工作表</h3>
-            <div class="form-group">
-                <label>选择工作簿：</label>
-                <select id="workbookSelect" class="input">
-                    <option value="">-- 当前活动工作簿 --</option>
-                </select>
+          <h3>🎯 目标工作表</h3>
+          <div class="form-group">
+            <label>选择工作簿：</label>
+            <select id="workbookSelect" class="input">
+              <option value="">-- 当前活动工作簿 --</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>选择工作表：</label>
+            <div style="display: flex; gap: 6px">
+              <select id="sheetSelect" class="input" style="flex: 1">
+                <option value="">-- 请选择 --</option>
+              </select>
             </div>
-            <div class="form-group">
-                <label>选择工作表：</label>
-                <div style="display:flex;gap:6px;">
-                    <select id="sheetSelect" class="input" style="flex:1;">
-                        <option value="">-- 请选择 --</option>
-                    </select>
-                </div>
-            </div>
-            <div class="bgm-btn-group bgm-btn-row">
-                <button class="bgm-btn small" data-action="refreshSheets" style="flex:1;">🔄 刷新</button>
-                <button class="bgm-btn small" id="lockSheetBtn" data-action="toggleSheetLock" style="flex:1;">🔒 锁定</button>
-            </div>
-            <div id="lockStatus" style="display:none;margin-top:6px;padding:4px 8px;background:var(--green);color:var(--text-1);border-radius:4px;font-size:12px;"></div>
+          </div>
+          <div class="bgm-btn-group bgm-btn-row">
+            <button class="bgm-btn small" data-action="refreshSheets" style="flex: 1">
+              🔄 刷新
+            </button>
+            <button
+              class="bgm-btn small"
+              id="lockSheetBtn"
+              data-action="toggleSheetLock"
+              style="flex: 1"
+            >
+              🔒 锁定
+            </button>
+          </div>
+          <div
+            id="lockStatus"
+            style="
+              display: none;
+              margin-top: 6px;
+              padding: 4px 8px;
+              background: var(--green);
+              color: var(--text-1);
+              border-radius: 4px;
+              font-size: 12px;
+            "
+          ></div>
         </div>
 
         <div class="enrich-section" id="sec-preview">
-            <h3>👁️ 数据预览</h3>
-            <div class="preview-tabs">
-                <button class="preview-tab active" data-tab="source">新番表数据</button>
-                <button class="preview-tab" data-tab="match">匹配结果</button>
+          <h3>👁️ 数据预览</h3>
+          <div class="preview-tabs">
+            <button class="preview-tab active" data-tab="source">新番表数据</button>
+            <button class="preview-tab" data-tab="match">匹配结果</button>
+          </div>
+          <div class="preview-table" id="sourcePreviewTable">
+            <table id="sourceTable">
+              <thead></thead>
+              <tbody></tbody>
+            </table>
+          </div>
+          <div class="match-stats" id="matchStats" style="display: none">
+            <div class="match-stat-card">
+              <div class="stat-value" id="exactMatchCount">0</div>
+              <div class="stat-label">精确匹配</div>
             </div>
-            <div class="preview-table" id="sourcePreviewTable">
-                <table id="sourceTable">
-                    <thead></thead>
-                    <tbody></tbody>
-                </table>
+            <div class="match-stat-card">
+              <div class="stat-value" id="aliasMatchCount">0</div>
+              <div class="stat-label">别名匹配</div>
             </div>
-            <div class="match-stats" id="matchStats" style="display:none;">
-                <div class="match-stat-card">
-                    <div class="stat-value" id="exactMatchCount">0</div>
-                    <div class="stat-label">精确匹配</div>
-                </div>
-                <div class="match-stat-card">
-                    <div class="stat-value" id="aliasMatchCount">0</div>
-                    <div class="stat-label">别名匹配</div>
-                </div>
-                <div class="match-stat-card">
-                    <div class="stat-value" id="unmatchedCount">0</div>
-                    <div class="stat-label">未匹配</div>
-                </div>
+            <div class="match-stat-card">
+              <div class="stat-value" id="unmatchedCount">0</div>
+              <div class="stat-label">未匹配</div>
             </div>
-            <div class="preview-table" id="matchPreviewTable" style="display:none;">
-                <table id="matchTable">
-                    <thead>
-                        <tr>
-                            <th>动漫名</th>
-                            <th>匹配方式</th>
-                            <th>Bangumi行号</th>
-                            <th>状态</th>
-                        </tr>
-                    </thead>
-                    <tbody></tbody>
-                </table>
-            </div>
+          </div>
+          <div class="preview-table" id="matchPreviewTable" style="display: none">
+            <table id="matchTable">
+              <thead>
+                <tr>
+                  <th>动漫名</th>
+                  <th>匹配方式</th>
+                  <th>Bangumi行号</th>
+                  <th>状态</th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
         </div>
 
         <div class="enrich-section" id="sec-enrich">
-            <h3>⚡ 富化执行</h3>
-            <div class="strategy-desc">
-                <div class="strategy-item">🏷️ <strong>标签追加</strong>：将新番表标签追加到目标表</div>
-                <div class="strategy-item">📅 <strong>首播填充</strong>：填充/更新首播日期</div>
-                <div class="strategy-item">📺 <strong>集数填充</strong>：填充/更新集数信息</div>
-                <div class="strategy-item">✨ <strong>特点追加</strong>：追加播放平台、独播等信息</div>
-                <div class="strategy-item">🔗 <strong>别名富化</strong>：新番表名称与 Bangumi 不一致时补充到别名列</div>
+          <h3>⚡️ 富化执行</h3>
+          <div class="strategy-desc">
+            <div class="strategy-item">🏷️ <strong>标签追加</strong>：将新番表标签追加到目标表</div>
+            <div class="strategy-item">📅 <strong>首播填充</strong>：填充/更新首播日期</div>
+            <div class="strategy-item">📺 <strong>集数填充</strong>：填充/更新集数信息</div>
+            <div class="strategy-item">✨ <strong>特点追加</strong>：追加播放平台、独播等信息</div>
+            <div class="strategy-item">
+              🔗 <strong>别名富化</strong>：新番表名称与 Bangumi 不一致时补充到别名列
             </div>
-            <div class="strategy-desc" style="margin-top:8px;padding-top:8px;border-top:1px dashed var(--text-1);">
-                <div class="strategy-item" style="color:var(--text-3);font-size:12px;">📖 <strong>简介工作表映射</strong>：
-                    导演→导演 | 编剧→脚本 | 人设→人物设定 | CG导演→演出 | 音乐→音乐 | 动画制作→动画制作公司 | 系列构成→系列构成 | 分镜→分镜 | 原作→原作
-                </div>
-                <div class="strategy-item" style="color:var(--text-3);font-size:11px;margin-top:4px;">⚡ <strong>冲突处理</strong>：当 Bangumi 追踪表已有字段值时，弹出确认对话框：
-                    <span style="color:var(--accent-blue);">🔗 全部增量更新</span>（追加 | 分隔符）|
-                    <span style="color:var(--text-3);">📋 保留原名</span>（跳过）|
-                    <span style="color:var(--red-strong);">✏️ 使用新番表名</span>（覆盖）
-                </div>
+          </div>
+          <div
+            class="strategy-desc"
+            style="margin-top: 8px; padding-top: 8px; border-top: 1px dashed var(--text-1)"
+          >
+            <div class="strategy-item" style="color: var(--text-3); font-size: 12px">
+              📖 <strong>简介工作表映射</strong>： 导演→导演 | 编剧→脚本 | 人设→人物设定 |
+              CG导演→演出 | 音乐→音乐 | 动画制作→动画制作公司 | 系列构成→系列构成 | 分镜→分镜 |
+              原作→原作
             </div>
-            <button class="bgm-btn primary" id="startEnrichBtn" data-action="startEnrich">🚀 开始富化</button>
-            <div class="enrich-progress" id="enrichProgress" style="display:none;">
-                <div class="progress-bar">
-                    <div class="progress-bar-fill" id="progressBarFill" style="width:0%;">0%</div>
-                </div>
-                <div class="enrich-stats">
-                    <div class="enrich-stat-row">
-                        <span class="enrich-stat-label">当前处理：</span>
-                        <span class="enrich-stat-value" id="currentItem">-</span>
-                    </div>
-                    <div class="enrich-stat-grid">
-                        <div class="enrich-stat-item">
-                            <span class="enrich-stat-num" id="enrichedCount">0</span>
-                            <span class="enrich-stat-text">已富化</span>
-                        </div>
-                        <div class="enrich-stat-item">
-                            <span class="enrich-stat-num" id="skippedCount">0</span>
-                            <span class="enrich-stat-text">跳过</span>
-                        </div>
-                        <div class="enrich-stat-item">
-                            <span class="enrich-stat-num" id="failedCount">0</span>
-                            <span class="enrich-stat-text">失败</span>
-                        </div>
-                    </div>
-                    <div class="enrich-stat-row">
-                        <span class="enrich-stat-label">预计剩余：</span>
-                        <span class="enrich-stat-value" id="etaTime">-</span>
-                    </div>
-                </div>
+            <div
+              class="strategy-item"
+              style="color: var(--text-3); font-size: 11px; margin-top: 4px"
+            >
+              ⚡️ <strong>冲突处理</strong>：当 Bangumi 追踪表已有字段值时，弹出确认对话框：
+              <span style="color: var(--accent-blue)">🔗 全部增量更新</span>（追加 | 分隔符）|
+              <span style="color: var(--text-3)">🛡️ 保留原名</span>（跳过）|
+              <span style="color: var(--red-strong)">✏️ 使用新番表名</span>（覆盖）
             </div>
+          </div>
+          <button class="bgm-btn primary" id="startEnrichBtn" data-action="startEnrich">
+            🚀 开始富化
+          </button>
+          <div class="enrich-progress" id="enrichProgress" style="display: none">
+            <div class="progress-bar">
+              <div class="progress-bar-fill" id="progressBarFill" style="width: 0%">0%</div>
+            </div>
+            <div class="enrich-stats">
+              <div class="enrich-stat-row">
+                <span class="enrich-stat-label">当前处理：</span>
+                <span class="enrich-stat-value" id="currentItem">-</span>
+              </div>
+              <div class="enrich-stat-grid">
+                <div class="enrich-stat-item">
+                  <span class="enrich-stat-num" id="enrichedCount">0</span>
+                  <span class="enrich-stat-text">已富化</span>
+                </div>
+                <div class="enrich-stat-item">
+                  <span class="enrich-stat-num" id="skippedCount">0</span>
+                  <span class="enrich-stat-text">跳过</span>
+                </div>
+                <div class="enrich-stat-item">
+                  <span class="enrich-stat-num" id="failedCount">0</span>
+                  <span class="enrich-stat-text">失败</span>
+                </div>
+              </div>
+              <div class="enrich-stat-row">
+                <span class="enrich-stat-label">预计剩余：</span>
+                <span class="enrich-stat-value" id="etaTime">-</span>
+              </div>
+            </div>
+          </div>
         </div>
 
         <div class="enrich-section" id="sec-records">
-            <h3>📋 富化记录</h3>
-            <div class="record-summary">
-                <div class="record-stat-card">
-                    <div class="stat-value" id="totalRecordCount">0</div>
-                    <div class="stat-label">总记录</div>
-                </div>
-                <div class="record-stat-card success">
-                    <div class="stat-value" id="successRecordCount">0</div>
-                    <div class="stat-label">成功</div>
-                </div>
-                <div class="record-stat-card warning">
-                    <div class="stat-value" id="skipRecordCount">0</div>
-                    <div class="stat-label">跳过</div>
-                </div>
-                <div class="record-stat-card error">
-                    <div class="stat-value" id="errorRecordCount">0</div>
-                    <div class="stat-label">错误</div>
-                </div>
+          <h3>📊 富化记录</h3>
+          <div class="record-summary">
+            <div class="record-stat-card">
+              <div class="stat-value" id="totalRecordCount">0</div>
+              <div class="stat-label">总记录</div>
             </div>
-            <div class="bgm-btn-group bgm-btn-row">
-                <button class="bgm-btn small" data-action="openRecordSheet" style="flex:1;">📋 打开记录表</button>
-                <button class="bgm-btn small" data-action="clearRecords" style="flex:1;">🗑️ 清除记录</button>
+            <div class="record-stat-card success">
+              <div class="stat-value" id="successRecordCount">0</div>
+              <div class="stat-label">成功</div>
             </div>
-            <div class="record-list" id="recentRecords">
-                <div class="record-empty">暂无记录</div>
+            <div class="record-stat-card warning">
+              <div class="stat-value" id="skipRecordCount">0</div>
+              <div class="stat-label">跳过</div>
             </div>
+            <div class="record-stat-card error">
+              <div class="stat-value" id="errorRecordCount">0</div>
+              <div class="stat-label">错误</div>
+            </div>
+          </div>
+          <div class="bgm-btn-group bgm-btn-row">
+            <button class="bgm-btn small" data-action="openRecordSheet" style="flex: 1">
+              📊 打开记录表
+            </button>
+            <button class="bgm-btn small" data-action="clearRecords" style="flex: 1">
+              🗑️ 清除记录
+            </button>
+          </div>
+          <div class="record-list" id="recentRecords">
+            <div class="record-empty">暂无记录</div>
+          </div>
         </div>
 
         <div class="enrich-section tips-section" id="sec-tips">
-            <h3>💡 使用提示</h3>
-            <div class="tips-list">
-                <div class="tip-item">
-                    <span class="tip-num">1</span>
-                    <span>选择新番表文件（支持 .xlsx / .xls / .csv 格式）</span>
-                </div>
-                <div class="tip-item">
-                    <span class="tip-num">2</span>
-                    <span>点击"自动识别表头"，检查并修正列映射</span>
-                </div>
-                <div class="tip-item">
-                    <span class="tip-num">3</span>
-                    <span>选择目标 Bangumi 追踪表工作表</span>
-                </div>
-                <div class="tip-item">
-                    <span class="tip-num">4</span>
-                    <span>预览匹配结果，确认无误后点击"开始富化"</span>
-                </div>
-                <div class="tip-item">
-                    <span class="tip-num">5</span>
-                    <span>简介工作表富化时，字段冲突会弹出确认对话框</span>
-                </div>
-                <div class="tip-item">
-                    <span class="tip-num">6</span>
-                    <span>富化完成后查看记录，验证数据正确性</span>
-                </div>
+          <h3>💡 使用提示</h3>
+          <div class="tips-list">
+            <div class="tip-item">
+              <span class="tip-num">1</span>
+              <span>选择新番表文件（支持 .xlsx / .xls / .csv 格式）</span>
             </div>
+            <div class="tip-item">
+              <span class="tip-num">2</span>
+              <span>点击"自动识别表头"，检查并修正列映射</span>
+            </div>
+            <div class="tip-item">
+              <span class="tip-num">3</span>
+              <span>选择目标 Bangumi 追踪表工作表</span>
+            </div>
+            <div class="tip-item">
+              <span class="tip-num">4</span>
+              <span>预览匹配结果，确认无误后点击"开始富化"</span>
+            </div>
+            <div class="tip-item">
+              <span class="tip-num">5</span>
+              <span>简介工作表富化时，字段冲突会弹出确认对话框</span>
+            </div>
+            <div class="tip-item">
+              <span class="tip-num">6</span>
+              <span>富化完成后查看记录，验证数据正确性</span>
+            </div>
+          </div>
         </div>
 
         <!-- 冲突对话框 -->
-        <div id="conflictDialog" class="conflict-dialog" style="display:none;"></div>
-
-        </main>
+        <div id="conflictDialog" class="conflict-dialog" style="display: none"></div>
+      </main>
     </div>
-</body>
+  </body>
 </html>
