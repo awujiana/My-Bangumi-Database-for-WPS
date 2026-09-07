@@ -41,7 +41,6 @@ import {
   getCellValue,
   getLastRow,
   findHeaderRow,
-  getDataSheet,
   bgmLog,
   BGM,
   getApp,
@@ -53,6 +52,8 @@ import type { WpsWorksheet, WpsWorkbook } from '../tools/wps.js'
 interface BatchFileResult {
   filePath: string
   fileName: string
+  /** 识别到的表头行；0 表示未识别成功 */
+  headerRow: number
   matched: number
   addedEntries: number
   updatedEntries: number
@@ -80,6 +81,10 @@ interface EnrichPageState {
   batchIndex: number
   isBatchEnriching: boolean
   batchCancelRequested: boolean
+
+  // 单文件自动识别表头时打开的源工作簿（重新选择文件/清空列表时安全回收）
+  sourceWorkbook: WpsWorkbook | null
+  isSourceWorkbookOpenedByUs: boolean
 }
 
 // ========== 状态 ==========
@@ -102,6 +107,9 @@ const state: EnrichPageState = {
   batchIndex: 0,
   isBatchEnriching: false,
   batchCancelRequested: false,
+
+  sourceWorkbook: null,
+  isSourceWorkbookOpenedByUs: false,
 }
 
 // ========== 列映射字段元数据 ==========
@@ -475,6 +483,8 @@ export function selectNewAnimeFile(): void {
       // FileDialog 可用；空数组代表用户取消
       if (multiResult.length > 0) {
         mergeSelectedPaths(multiResult)
+        // 单文件：选完立即自动识别表头（多文件由批量流程逐文件识别）
+        maybeAutoDetectSingleFile()
       } else {
         bgmLog(LOG_LEVELS.INFO, '[enrich] 用户取消文件选择')
       }
@@ -484,6 +494,8 @@ export function selectNewAnimeFile(): void {
     // 2) 回退：GetOpenFilename 循环
     bgmLog(LOG_LEVELS.INFO, '[enrich] FileDialog 不可用，回退到 GetOpenFilename 循环单选')
     selectNewAnimeFileLoop()
+    // 回退路径同样支持单文件自动识别
+    maybeAutoDetectSingleFile()
   } catch (error: unknown) {
     BGM.handleError(error, {
       showAlert: true,
@@ -504,6 +516,11 @@ function renderBatchFileList(): void {
   const singleEnrichButton = safeGetButton('startEnrichBtn')
 
   const n = state.batchFiles.length
+
+  // 0) 单文件自动识别接管的源工作簿仅在 N===1 时保持打开
+  if (n !== 1) {
+    closeOpenedSourceWorkbook()
+  }
 
   // 1) 路径展示
   if (pathElement) {
@@ -574,77 +591,193 @@ function renderBatchFileList(): void {
 
 // ========== 表头自动识别 ==========
 
+/**
+ * 在指定工作表上识别表头并写入 state（不负责工作簿的打开/关闭）。
+ * @returns 识别成功返回列映射；失败返回 null
+ */
+function detectHeaderOnSheet(ws: WpsWorksheet, label: string): EnrichColumnMapping | null {
+  try {
+    const headerRow = findHeaderRow(ws)
+    if (headerRow === 0) {
+      BGM.Dialog.alert('提示', '未检测到有效的表头行，请检查表头是否在前 10 行内')
+      bgmLog(LOG_LEVELS.ERROR, `[enrich] 表头识别失败: ${label} 未检测到有效的表头行`)
+      return null
+    }
+
+    const mapping = detectColumns(ws, headerRow)
+
+    state.animeSourceSheet = ws
+    state.headerRow = headerRow
+    state.dataStartRow = headerRow + 1
+    state.columnMapping = mapping
+
+    renderDetectResult(ws, mapping)
+    renderColumnMappingEditor(ws, mapping)
+    renderSourcePreview(ws, mapping)
+
+    bgmLog(
+      LOG_LEVELS.INFO,
+      `[enrich] 表头识别成功: ${label} / 工作表=${ws.Name || '未知'} / 表头行=${String(headerRow)} / 名称列=${String(mapping.nameCol)}`,
+    )
+    return mapping
+  } catch (error: unknown) {
+    BGM.handleError(error, {
+      showAlert: false,
+      level: BGM.ErrorLevel.ERROR,
+      context: 'detectHeaderOnSheet',
+    })
+    BGM.Dialog.error(
+      '错误',
+      `识别表头失败: ${error instanceof Error ? error.message : String(error)}`,
+    )
+    return null
+  }
+}
+
+/**
+ * 打开新番表文件并在其首个工作表上识别表头。
+ * - 文件已在 WPS 中打开时直接复用，避免重复打开、更避免误关用户文件
+ * - 识别成功后工作簿保持打开供富化使用，由 closeOpenedSourceWorkbook() 统一回收
+ * @returns 是否识别成功
+ */
+function autoDetectHeaderFromFile(filePath: string): boolean {
+  const fileName = extractFileName(filePath)
+
+  try {
+    const opened = openSourceWorkbook(filePath)
+    if (!opened) {
+      throw new Error('WPS 应用不可用，无法打开新番表文件')
+    }
+
+    const { wb, isOpenedByUs } = opened
+
+    // 先回收上一个源工作簿再识别：回收会清空源表状态，必须早于写入新状态
+    if (state.sourceWorkbook && state.sourceWorkbook !== wb) {
+      closeOpenedSourceWorkbook()
+    }
+
+    const ws = wb.Worksheets.Item(1) as WpsWorksheet | null
+    if (!ws) {
+      if (isOpenedByUs) closeWorkbook(wb)
+      throw new Error('文件中没有工作表')
+    }
+
+    const mapping = detectHeaderOnSheet(ws, fileName)
+    if (!mapping) {
+      // 识别失败：本次为识别而打开的工作簿立即回收，不接管到 state
+      if (isOpenedByUs) closeWorkbook(wb)
+      return false
+    }
+
+    // 识别成功：接管当前工作簿
+    state.sourceWorkbook = wb
+    state.isSourceWorkbookOpenedByUs = isOpenedByUs
+    return true
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : String(error)
+    bgmLog(LOG_LEVELS.ERROR, `[enrich] 自动识别表头失败: ${fileName} - ${message}`)
+    BGM.Dialog.alert('提示', `自动识别表头失败：${message}\n可手动点击「🔍 自动识别表头」重试`)
+    return false
+  }
+}
+
+/** 打开新番表文件；已在 WPS 中打开时直接复用，返回是否由本函数打开 */
+function openSourceWorkbook(filePath: string): { wb: WpsWorkbook; isOpenedByUs: boolean } | null {
+  const app = getApp()
+  if (!app?.Workbooks) return null
+
+  const fileName = extractFileName(filePath)
+
+  // 已打开则复用：优先按 FullName 精确匹配，回落按文件名匹配
+  const wbs = app.Workbooks
+  for (let index = 1; index <= wbs.Count; index += 1) {
+    const existing = wbs.Item(index) as WpsWorkbook | null
+    // 运行时可能返回 null，先判空再取属性
+    if (existing && (existing.FullName === filePath || existing.Name === fileName)) {
+      bgmLog(LOG_LEVELS.INFO, `[enrich] 复用已打开的工作簿: ${existing.Name}`)
+      return { wb: existing, isOpenedByUs: false }
+    }
+  }
+
+  // WPS Workbooks.Open 是运行时扩展，不在类型定义中
+  const workbooks = wbs as unknown as { Open?: (path: string) => WpsWorkbook | null }
+  if (typeof workbooks.Open !== 'function') return null
+
+  const wb = workbooks.Open(filePath)
+  if (!wb) return null
+
+  bgmLog(LOG_LEVELS.INFO, `[enrich] 已打开新番表文件: ${fileName}`)
+  return { wb, isOpenedByUs: true }
+}
+
+/** 关闭工作簿且不保存修改 */
+function closeWorkbook(wb: WpsWorkbook): void {
+  try {
+    const wbWithClose = wb as unknown as { Close?: (shouldSaveChanges?: boolean) => unknown }
+    if (typeof wbWithClose.Close === 'function') {
+      wbWithClose.Close(false)
+    }
+  } catch (error: unknown) {
+    bgmLog(
+      LOG_LEVELS.WARN,
+      `[enrich] 关闭工作簿警告: ${error instanceof Error ? error.message : String(error)}`,
+    )
+  }
+}
+
+/** 回收单文件自动识别时接管的源工作簿（仅关闭本插件打开的，用户已打开的保持不动） */
+function closeOpenedSourceWorkbook(): void {
+  const wb = state.sourceWorkbook
+  if (!wb) return
+
+  if (state.isSourceWorkbookOpenedByUs) {
+    closeWorkbook(wb)
+    bgmLog(LOG_LEVELS.INFO, `[enrich] 已关闭自动打开的源工作簿: ${wb.Name}`)
+    // 工作簿已关闭：清空源表相关状态，避免「开始富化」引用失效的工作表
+    state.animeSourceSheet = null
+    state.columnMapping = null
+    state.headerRow = 0
+    state.dataStartRow = 0
+    state.matches = []
+  }
+
+  state.sourceWorkbook = null
+  state.isSourceWorkbookOpenedByUs = false
+}
+
+/** 单文件场景下选完文件立即自动识别表头（多文件由 processSingleBatchFile 逐文件识别） */
+function maybeAutoDetectSingleFile(): void {
+  if (state.batchFiles.length !== 1) return
+
+  const filePath = state.batchFiles[0]
+  if (filePath === undefined) return
+
+  bgmLog(LOG_LEVELS.INFO, '[enrich] 单文件选择完成，自动识别表头')
+  autoDetectHeaderFromFile(filePath)
+}
+
 export function autoDetectHeader(): void {
+  // 已选择新番表文件时：以「所选文件」为源表识别。
+  // 注意：不可取「🎯 目标工作表」的 sheetSelect —— 那是目标 Bangumi 表，会导致源表=目标表。
+  if (state.filePath) {
+    autoDetectHeaderFromFile(state.filePath)
+    return
+  }
+
+  // 未选择文件时：回落到当前活动工作表
   const app = getApp()
   if (!app?.ActiveWorkbook) {
     BGM.Dialog.alert('提示', '未连接到 Excel，请先打开包含新番表的工作簿')
     return
   }
 
-  const sheetSelect = safeGetSelect('sheetSelect')
-  let ws: WpsWorksheet | null = null
-
-  if (sheetSelect?.value) {
-    const sheetIndex = Number(sheetSelect.value)
-    const wb = getSelectedWorkbook()
-    if (wb && sheetIndex > 0) {
-      try {
-        ws = wb.Worksheets.Item(sheetIndex)
-      } catch (error: unknown) {
-        BGM.handleError(error, {
-          showAlert: false,
-          level: BGM.ErrorLevel.INFO,
-          context: 'autoDetectHeader',
-        })
-      }
-    }
-  }
-
+  const ws = app.ActiveWorkbook.ActiveSheet as WpsWorksheet | null
   if (!ws) {
-    const dataSheet = getDataSheet()
-    if (dataSheet) {
-      ws = dataSheet
-    } else {
-      BGM.Dialog.alert('提示', '请先选择新番表所在的工作表')
-      return
-    }
+    BGM.Dialog.alert('提示', '请先打开新番表文件并激活其工作表')
+    return
   }
 
-  state.animeSourceSheet = ws
-
-  try {
-    const headerRow = findHeaderRow(ws)
-    if (headerRow === 0) {
-      BGM.Dialog.alert('提示', '未检测到有效的表头行，请检查表头是否在前 10 行内')
-      return
-    }
-
-    state.headerRow = headerRow
-    state.dataStartRow = headerRow + 1
-
-    const mapping = detectColumns(ws, headerRow)
-    state.columnMapping = mapping
-
-    renderDetectResult(ws, mapping)
-    renderColumnMappingEditor(ws, mapping)
-
-    bgmLog(
-      LOG_LEVELS.INFO,
-      `[enrich] 表头识别完成: headerRow=${String(headerRow)}, nameCol=${String(mapping.nameCol)}`,
-    )
-
-    renderSourcePreview(ws, mapping)
-  } catch (error: unknown) {
-    BGM.handleError(error, {
-      showAlert: false,
-      level: BGM.ErrorLevel.ERROR,
-      context: 'autoDetectHeader',
-    })
-    BGM.Dialog.error(
-      '错误',
-      `识别表头失败: ${error instanceof Error ? error.message : String(error)}`,
-    )
-  }
+  detectHeaderOnSheet(ws, '活动工作表')
 }
 
 function renderDetectResult(ws: WpsWorksheet, _mapping: EnrichColumnMapping): void {
@@ -1594,6 +1727,7 @@ function processSingleBatchFile(filePath: string, bangumiSheet: WpsWorksheet): B
   const result: BatchFileResult = {
     filePath,
     fileName,
+    headerRow: 0,
     matched: 0,
     addedEntries: 0,
     updatedEntries: 0,
@@ -1632,11 +1766,21 @@ function processSingleBatchFile(filePath: string, bangumiSheet: WpsWorksheet): B
     const headerRow = findHeaderRow(ws)
     if (headerRow === 0) {
       result.error = '未检测到有效的表头行'
+      bgmLog(
+        LOG_LEVELS.ERROR,
+        `[enrich-batch] ${fileName}: 表头识别失败 - 未检测到有效的表头行（请确认表头在前 10 行内）`,
+      )
       return result
     }
 
     const dataStartRow = headerRow + 1
     const columnMapping = detectColumns(ws, headerRow)
+    result.headerRow = headerRow
+
+    bgmLog(
+      LOG_LEVELS.INFO,
+      `[enrich-batch] ${fileName}: 表头识别成功 - 工作表=${ws.Name || '未知'} / 表头行=${String(headerRow)} / 名称列=${String(columnMapping.nameCol)}`,
+    )
 
     // 匹配
     const config: EnrichConfig = {
@@ -1842,7 +1986,7 @@ function renderBatchSummary(): void {
     .map((r, index) => {
       const statusIcon = r.success ? '✅' : '❌'
       const detail = r.success
-        ? `匹配 ${String(r.matched)} / 更新 ${String(r.updatedEntries)} / 未匹配 ${String(r.unmatched)}`
+        ? `表头行 ${String(r.headerRow)} · 匹配 ${String(r.matched)} / 更新 ${String(r.updatedEntries)} / 未匹配 ${String(r.unmatched)}`
         : `失败：${escapeHtml(r.error || '未知错误')}` // eslint-disable-line @typescript-eslint/prefer-nullish-coalescing -- 空值须显示占位文案（`??` 会显示空串）
       return `
         <div style="display:flex;justify-content:space-between;font-size:12px;padding:2px 0;border-bottom:1px dashed #333;">
