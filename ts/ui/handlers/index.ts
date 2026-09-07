@@ -68,6 +68,10 @@ import {
   showSyncResultDialog,
   formatDuration,
   showSettingsPanel,
+  setExportPath,
+  getExportPath,
+  setImportPath,
+  getImportPath,
 } from '../../index.js'
 import type {
   BuildSyncConfigContext,
@@ -81,6 +85,7 @@ import type {
 } from '../../index.js'
 import { exportConfig, importConfig } from '../../services/config-service.js'
 import { executeUndoLastSync } from '../../services/ribbon-service.js'
+import { readLocalFileContent } from '../../sync/local-file-sync.js'
 import { debounce } from '../../tools/debounce.js'
 import { BGM_EVENTS, eventBus } from '../../tools/events.js'
 import type { EventHandler } from '../../tools/events.js'
@@ -490,6 +495,9 @@ export function setupButtonListeners(): void {
   })
   updateThemePreview(getTheme(true))
 
+  // 设置页：默认导出位置 / 默认导入文件夹（回填已记忆的路径）
+  initConfigPathControls()
+
   // 设置页：默认收藏列表类型
   const listTypeSelect = document.getElementById('listTypeSelect') as HTMLSelectElement | null
   if (listTypeSelect) {
@@ -562,6 +570,74 @@ interface ActionHandlerContext {
 }
 
 type ActionHandler = (context: ActionHandlerContext) => void
+
+// ========== 默认路径记忆（导出位置 / 导入文件夹） ==========
+
+/** WPS FileDialog 对象的能力子集（仅用到的成员） */
+interface WpsPathDialog {
+  Title: string
+  Show(): number
+  SelectedItems: { Count: number; Item(index: number): string }
+}
+
+/**
+ * 弹出文件夹选择对话框并返回选中的文件夹绝对路径。
+ * 优先使用 WPS Application.FileDialog(msoFileDialogFolderPicker=2)，
+ * 不可用时回退到 GetOpenFilename 单选（由用户选取文件后取目录）。
+ * 用户取消返回 null。
+ */
+function selectDefaultFolder(title: string): string | null {
+  try {
+    const app = getApp() as {
+      FileDialog?: (dialogType: number) => WpsPathDialog | null
+      msoFileDialogFolderPicker?: number
+      GetOpenFilename?: (fileFilter: string, dialogTitle: string) => unknown
+    } | null
+    if (!app) return null
+
+    if (typeof app.FileDialog === 'function') {
+      const dialogType =
+        typeof app.msoFileDialogFolderPicker === 'number' ? app.msoFileDialogFolderPicker : 2
+      const dialog = app.FileDialog(dialogType)
+      if (dialog) {
+        dialog.Title = title
+        const result = dialog.Show()
+        if (result === -1 && dialog.SelectedItems.Count > 0) {
+          return dialog.SelectedItems.Item(1)
+        }
+        // 取消（result === 0）
+        return null
+      }
+    }
+
+    // 回退：GetOpenFilename 选择文件后取其所在目录作为默认文件夹
+    if (typeof app.GetOpenFilename === 'function') {
+      const selected = app.GetOpenFilename('所有文件 (*.*),*.*', title)
+      if (typeof selected === 'boolean' || selected === false) return null
+      const filePath = String(selected)
+      const normalized = filePath.replace(/\\+/g, '/')
+      const lastSlash = normalized.lastIndexOf('/')
+      if (lastSlash !== -1) return normalized.slice(0, lastSlash)
+      return null
+    }
+    return null
+  } catch {
+    return null
+  }
+}
+
+/** 设置设置页中的路径只读输入框显示值 */
+function updatePathDisplay(inputId: string, value: string): void {
+  const input = document.getElementById(inputId) as HTMLInputElement | null
+  if (input) input.value = value
+}
+
+/** 从 PluginStorage 读取已保存的默认路径并回填到设置页输入框 */
+function initConfigPathControls(): void {
+  if (typeof document === 'undefined') return
+  updatePathDisplay('exportPathDisplay', getExportPath(true))
+  updatePathDisplay('importPathDisplay', getImportPath(true))
+}
 
 const ACTION_HANDLERS: Record<string, ActionHandler> = {
   // 核心操作
@@ -1139,7 +1215,7 @@ const ACTION_HANDLERS: Record<string, ActionHandler> = {
             `🔍 跳过: ${String(result.skipped)}`,
             `📊 实际处理: ${String(totalProcessed)} 条`,
             `⏱️ 总耗时: ${formatDuration(totalElapsed)}`,
-            `⚡ 平均速度: ${avgSpeed > 0 ? `${String(avgSpeed)} 行/秒` : '--'}`,
+            `⚡️ 平均速度: ${avgSpeed > 0 ? `${String(avgSpeed)} 行/秒` : '--'}`,
             `📈 处理效率: ${String(efficiency)}%`,
             etaMs > 0 ? `🔮 预计剩余: ${formatDuration(etaMs)}` : '✅ 全部完成',
           ]
@@ -1547,10 +1623,80 @@ const ACTION_HANDLERS: Record<string, ActionHandler> = {
     )
   },
 
+  // ===== 默认路径记忆：导出位置 / 导入文件夹 =====
+
+  selectExportPath: (context) => {
+    bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 选择默认导出位置')
+    const path = selectDefaultFolder('选择默认导出位置（文件夹）')
+    if (path) {
+      const isOk = setExportPath(path)
+      updatePathDisplay('exportPathDisplay', path)
+      if (isOk) {
+        showToast('已设置默认导出位置', 'success')
+        bgmLog(LOG_LEVELS.INFO, `[handleActionClick] 已设置默认导出位置: ${path}`)
+      }
+    } else {
+      showToast('已取消选择导出位置', 'info')
+    }
+    bgmLog(
+      LOG_LEVELS.INFO,
+      `[handleActionClick] 选择导出位置操作完成，耗时: ${String(Date.now() - context.startTime)}ms`,
+    )
+  },
+
+  clearExportPath: (context) => {
+    bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 清除默认导出位置')
+    if (getExportPath(true)) {
+      setExportPath('')
+      bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 已清除默认导出位置')
+    }
+    updatePathDisplay('exportPathDisplay', '')
+    showToast('已清除默认导出位置', 'info')
+    bgmLog(
+      LOG_LEVELS.INFO,
+      `[handleActionClick] 清除导出位置操作完成，耗时: ${String(Date.now() - context.startTime)}ms`,
+    )
+  },
+
+  selectImportPath: (context) => {
+    bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 选择默认导入文件夹')
+    const path = selectDefaultFolder('选择默认导入文件夹')
+    if (path) {
+      const isOk = setImportPath(path)
+      updatePathDisplay('importPathDisplay', path)
+      if (isOk) {
+        showToast('已设置默认导入文件夹', 'success')
+        bgmLog(LOG_LEVELS.INFO, `[handleActionClick] 已设置默认导入文件夹: ${path}`)
+      }
+    } else {
+      showToast('已取消选择导入文件夹', 'info')
+    }
+    bgmLog(
+      LOG_LEVELS.INFO,
+      `[handleActionClick] 选择导入文件夹操作完成，耗时: ${String(Date.now() - context.startTime)}ms`,
+    )
+  },
+
+  clearImportPath: (context) => {
+    bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 清除默认导入文件夹')
+    if (getImportPath(true)) {
+      setImportPath('')
+      bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 已清除默认导入文件夹')
+    }
+    updatePathDisplay('importPathDisplay', '')
+    showToast('已清除默认导入文件夹', 'info')
+    bgmLog(
+      LOG_LEVELS.INFO,
+      `[handleActionClick] 清除导入文件夹操作完成，耗时: ${String(Date.now() - context.startTime)}ms`,
+    )
+  },
+
   // 配置导入导出：导出全部配置为 JSON 文件并复制到剪贴板
   exportConfig: (context) => {
     bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 导出配置')
     try {
+      // 读取记忆的默认导出位置（仅作提示与记录，WPS 浏览器下载无法指定保存目录）
+      const defaultExportPath = getExportPath(true)
       const json = exportConfig()
       // 下载为 JSON 文件
       const blob = new Blob([json], { type: 'application/json;charset=utf-8' })
@@ -1564,8 +1710,9 @@ const ACTION_HANDLERS: Record<string, ActionHandler> = {
       URL.revokeObjectURL(url)
       // 同时复制到剪贴板，便于直接粘贴到其他环境
       _copyTextToClipboard(json)
-      showToast('配置已导出（已下载文件并复制到剪贴板）', 'success')
-      bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 配置导出完成')
+      const suffix = defaultExportPath ? `（默认位置：${defaultExportPath}）` : '（未设置默认位置）'
+      showToast(`配置已导出，请将文件手动保存到默认位置 ${suffix}`.replace('  ', ' '), 'success')
+      bgmLog(LOG_LEVELS.INFO, `[handleActionClick] 配置导出完成${suffix}`)
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : String(error)
       bgmLog(LOG_LEVELS.ERROR, `[handleActionClick] 配置导出失败: ${errorMessage}`)
@@ -1577,9 +1724,71 @@ const ACTION_HANDLERS: Record<string, ActionHandler> = {
     )
   },
 
-  // 配置导入导出：从粘贴的 JSON 导入配置
+  // 配置导入导出：从默认导入文件夹选择配置文件或粘贴 JSON 导入
   importConfig: (context) => {
     bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 导入配置')
+    const defaultImportPath = getImportPath(true)
+    const performImport = (json: string): void => {
+      const result = importConfig(json)
+      if (result.isOk()) {
+        showToast('配置导入成功', 'success')
+        bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 配置导入成功')
+        // 刷新 UI 以反映新配置
+        updateTokenStatus()
+        updateUserIdStatus()
+        refreshGithubConfigInputs()
+      } else {
+        const rawError: unknown = result.error
+        let errorMessage: string
+        if (rawError instanceof Error) {
+          errorMessage = rawError.message
+        } else if (typeof rawError === 'string') {
+          errorMessage = rawError
+        } else if (rawError == null) {
+          errorMessage = '未知错误'
+        } else {
+          // 非 Error 非字符串的其余值：JSON 序列化展示（避免默认的 [object Object]）
+          errorMessage = JSON.stringify(rawError)
+        }
+        bgmLog(LOG_LEVELS.ERROR, `[handleActionClick] 配置导入失败: ${errorMessage}`)
+        showToast(`导入失败：${errorMessage}`, 'error')
+      }
+    }
+
+    // 优先通过 WPS 对话框从文件导入（JSON 过滤器）；用户取消则回退到粘贴
+    const app = (window as unknown as { wps?: { Application?: unknown } }).wps
+    const wpsApp = app?.Application as
+      | {
+          GetOpenFilename?: (fileFilter: string, title: string) => unknown
+        }
+      | undefined
+    if (wpsApp && typeof wpsApp.GetOpenFilename === 'function') {
+      const title = defaultImportPath
+        ? `从默认导入文件夹选择配置文件（${defaultImportPath}）`
+        : '选择配置文件 JSON'
+      const selected = wpsApp.GetOpenFilename('JSON 文件 (*.json),*.json,所有文件 (*.*),*.*', title)
+      if (typeof selected === 'string' && selected !== '') {
+        const filePath = selected
+        bgmLog(LOG_LEVELS.INFO, `[handleActionClick] 从文件导入配置: ${filePath}`)
+        void (async () => {
+          try {
+            const content = await readLocalFileContent(filePath)
+            performImport(content)
+          } catch (error: unknown) {
+            const errorMessage = error instanceof Error ? error.message : String(error)
+            bgmLog(LOG_LEVELS.ERROR, `[handleActionClick] 读取配置文件失败: ${errorMessage}`)
+            showToast(`读取配置文件失败：${errorMessage}`, 'error')
+          }
+        })()
+        bgmLog(
+          LOG_LEVELS.INFO,
+          `[handleActionClick] 已选择配置文件，读取中，耗时: ${String(Date.now() - context.startTime)}ms`,
+        )
+        return
+      }
+      bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 用户取消文件选择，回退到粘贴')
+    }
+
     showInput(
       '导入配置',
       '请粘贴配置 JSON（可从导出的 bgm-config.json 文件中复制）',
@@ -1589,30 +1798,7 @@ const ACTION_HANDLERS: Record<string, ActionHandler> = {
           showToast('未提供配置 JSON，已取消导入', 'info')
           return
         }
-        const result = importConfig(value.trim())
-        if (result.isOk()) {
-          showToast('配置导入成功', 'success')
-          bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 配置导入成功')
-          // 刷新 UI 以反映新配置
-          updateTokenStatus()
-          updateUserIdStatus()
-          refreshGithubConfigInputs()
-        } else {
-          const rawError: unknown = result.error
-          let errorMessage: string
-          if (rawError instanceof Error) {
-            errorMessage = rawError.message
-          } else if (typeof rawError === 'string') {
-            errorMessage = rawError
-          } else if (rawError == null) {
-            errorMessage = '未知错误'
-          } else {
-            // 非 Error 非字符串的其余值：JSON 序列化展示（避免默认的 [object Object]）
-            errorMessage = JSON.stringify(rawError)
-          }
-          bgmLog(LOG_LEVELS.ERROR, `[handleActionClick] 配置导入失败: ${errorMessage}`)
-          showToast(`导入失败：${errorMessage}`, 'error')
-        }
+        performImport(value.trim())
       },
     )
     bgmLog(

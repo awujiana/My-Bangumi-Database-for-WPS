@@ -1107,7 +1107,7 @@ function showProgressUI(isVisible: boolean): void {
   const startButton = safeGetButton('startEnrichBtn')
   if (startButton) {
     startButton.disabled = isVisible
-    startButton.textContent = isVisible ? '⏳ 富化中...' : '🚀 开始富化'
+    startButton.textContent = isVisible ? '⏳️ 富化中...' : '🚀 开始富化'
   }
 }
 
@@ -1420,7 +1420,7 @@ function showConflictDialog(): void {
 
   const html = `
     <div class="conflict-header">
-      <span class="conflict-title">⚡ 字段冲突确认 (${String(current)}/${String(total)})</span>
+      <span class="conflict-title">⚡️ 字段冲突确认 (${String(current)}/${String(total)})</span>
       <div class="conflict-progress">
         <div style="width:${String(percent)}%;height:4px;background:#4a90d9;border-radius:2px;"></div>
       </div>
@@ -1451,7 +1451,7 @@ function showConflictDialog(): void {
         🔗 全部增量更新
       </button>
       <button class="btn conflict-btn-keep" id="conflictKeep" data-resolution="keep">
-        📋 保留原名
+        🛡️ 保留原名
       </button>
       <button class="btn conflict-btn-overwrite" id="conflictOverwrite" data-resolution="overwrite">
         ✏️ 使用新番表名

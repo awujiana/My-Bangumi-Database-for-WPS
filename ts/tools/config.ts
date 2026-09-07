@@ -26,6 +26,8 @@ export const CONFIG_KEYS = {
   LIST_TYPE: 'bgm_list_type',
   TIME_FILTER: 'bgm_time_filter',
   REFRESH_INTERVAL: 'bgm_refresh_interval',
+  EXPORT_PATH: 'bgm_export_path',
+  IMPORT_PATH: 'bgm_import_path',
 } as const
 
 /**
@@ -292,4 +294,38 @@ export function getRefreshInterval(isSilent = false): number {
   const result = Number.isFinite(raw) && raw >= REFRESH_MIN ? raw : 0
   if (!isSilent) bgmLog(LOG_LEVELS.INFO, `[config] 获取自动刷新间隔: ${String(result)} 分钟`)
   return result
+}
+
+// ========== 默认导出位置 / 默认导入文件夹 ==========
+
+/**
+ * 设置默认导出位置（文件夹路径）
+ */
+export function setExportPath(path: string): boolean {
+  bgmLog(LOG_LEVELS.INFO, `[config] 设置默认导出位置: ${path}`)
+  return setConfig(CONFIG_KEYS.EXPORT_PATH, path)
+}
+
+/**
+ * 获取默认导出位置（文件夹路径），未设置时返回空字符串
+ * @param isSilent - 静默模式，不打印日志
+ */
+export function getExportPath(isSilent = false): string {
+  return getConfig(CONFIG_KEYS.EXPORT_PATH, '', isSilent)
+}
+
+/**
+ * 设置默认导入文件夹
+ */
+export function setImportPath(path: string): boolean {
+  bgmLog(LOG_LEVELS.INFO, `[config] 设置默认导入文件夹: ${path}`)
+  return setConfig(CONFIG_KEYS.IMPORT_PATH, path)
+}
+
+/**
+ * 获取默认导入文件夹，未设置时返回空字符串
+ * @param isSilent - 静默模式，不打印日志
+ */
+export function getImportPath(isSilent = false): string {
+  return getConfig(CONFIG_KEYS.IMPORT_PATH, '', isSilent)
 }

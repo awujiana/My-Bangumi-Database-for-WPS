@@ -893,7 +893,7 @@ function formatDuration(ms: number): string {
  * │                    └──────────────────────────┘      │
  * └──────────────────────────────────────────────────────┘
  * ┌─ 性能仪表盘 ────────────────────────────────────────┐
- * │  ⏱ 1分30秒  │  ⚡ 15/s  │  📈 44%  │  🔮 预计剩余  │
+ * │  ⏱ 1分30秒  │  ⚡️ 15/s  │  📈 44%  │  🔮 预计剩余  │
  * └──────────────────────────────────────────────────────┘
  * ┌─ 元信息栏 ──────────────────────────────────────────┐
  * │  🎯 策略  📥 远程  ✅ 完成  🔍 跳过  ⚠️ 失败        │
@@ -1151,7 +1151,7 @@ function renderSyncStatsChart(container: HTMLElement, stats: SyncProgressStats):
               stroke-linecap="round"
               transform="rotate(-90 40 40)" />
           </svg>
-          <div class="bgm-perg-center"><span>⚡</span></div>
+          <div class="bgm-perg-center"><span>⚡️</span></div>
         </div>
         <div class="bgm-perg-info">
           <div class="bgm-perg-value">${speedString}</div>

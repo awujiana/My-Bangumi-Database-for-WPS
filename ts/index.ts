@@ -409,12 +409,22 @@ export {
   // 自动刷新间隔
   setRefreshInterval,
   getRefreshInterval,
+  // 默认导出位置 / 默认导入文件夹
+  setExportPath,
+  getExportPath,
+  setImportPath,
+  getImportPath,
 } from './tools/config.js'
 
 // ============================================================================
 // 13.1 外观主题应用（来自 tools/theme.js）
 // ============================================================================
-export { applyTheme, initTheme, saveTheme, resolveTheme } from './tools/theme.js'
+export { applyTheme, initTheme, saveTheme, resolveTheme, startThemeSync } from './tools/theme.js'
+
+// ============================================================================
+// 13.2 导航显示模式跨页同步（来自 tools/nav-mode.js）
+// ============================================================================
+export { startNavModeSync } from './tools/nav-mode.js'
 
 // ============================================================================
 // 14. URL 自动补全（来自 tools/auto-fill-url.js）

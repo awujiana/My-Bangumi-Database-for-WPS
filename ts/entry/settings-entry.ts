@@ -9,8 +9,8 @@
  *  3. 仅在浏览器上下文且当前页面为 settings.html 时自动启动。
  */
 
-import { areNavIconsOnly } from '../tools/config.js'
-import { initTheme } from '../tools/theme.js'
+import { initTheme, startThemeSync } from '../tools/theme.js'
+import { startNavModeSync } from '../tools/nav-mode.js'
 import { initHandlers } from '../ui/handlers/index.js'
 import { markSettingsPaneLoaded } from '../tools/util/index.js'
 import { initShellNav } from '../panel/shell-nav.js'
@@ -72,7 +72,10 @@ function initSettingsPage(): void {
       if (chkSyncRecord) chkSyncRecord.checked = isSyncRecordEnabled(true)
 
       const chkNavIcons = document.getElementById('chkNavIconsOnly') as HTMLInputElement | null
-      if (chkNavIcons) chkNavIcons.checked = areNavIconsOnly(true)
+      if (chkNavIcons) {
+        const navConfig = await import('../tools/config.js')
+        chkNavIcons.checked = navConfig.areNavIconsOnly(true)
+      }
 
       // 设置冲突策略下拉
       const strategySelect = document.getElementById('githubStrategy') as HTMLSelectElement | null
@@ -115,10 +118,10 @@ function applyAppearance(): void {
   if (typeof document === 'undefined') return
   // 主题：从配置读取并应用（含跟随系统监听）
   initTheme()
-  // 导航仅图标模式
-  if (areNavIconsOnly(true)) {
-    document.body.classList.add('nav-icons-only')
-  }
+  // 跨页主题同步：监听其他页面（panel / enrich）的主题变更并重应用
+  startThemeSync()
+  // 跨页导航模式同步：监听「导航仅显示图标」配置变更并切换布局
+  startNavModeSync()
   // 吸顶偏移测量 + 滚动高亮（共享模块，修复侧栏被顶栏遮挡 / 锚点跳转错位）
   initShellNav()
 }

@@ -1054,7 +1054,7 @@ async function executeSelectedSync(
                 index + 1,
                 rows.length,
                 `${rowProgress} 行${String(rowNumber)} "${name || sid}" 同步中...`,
-                `⏳ ${rowProgress} 行${String(rowNumber)} "${name || sid}" SID=${sid} 开始同步`,
+                `⏳️ ${rowProgress} 行${String(rowNumber)} "${name || sid}" SID=${sid} 开始同步`,
               )
 
               const finishCol = colMap.get('完播日')

@@ -64,6 +64,10 @@ const mockState = vi.hoisted(() => ({
   setSyncRecordEnabled: vi.fn(),
   getConfig: vi.fn(() => ''),
   setConfig: vi.fn(() => true),
+  setExportPath: vi.fn(() => true),
+  getExportPath: vi.fn(() => ''),
+  setImportPath: vi.fn(() => true),
+  getImportPath: vi.fn(() => ''),
   // sync/github-config.js
   getGithubConfig: vi.fn(() => ({ owner: '', repo: '', branch: '', path: '' })),
   setGithubConfig: vi.fn(),
@@ -171,6 +175,10 @@ vi.mock('../ts/tools/config.js', () => ({
   setTimeFilter: vi.fn(() => true),
   getRefreshInterval: vi.fn(() => 0),
   setRefreshInterval: vi.fn(() => true),
+  setExportPath: mockState.setExportPath,
+  getExportPath: mockState.getExportPath,
+  setImportPath: mockState.setImportPath,
+  getImportPath: mockState.getImportPath,
   CONFIG_KEYS: {
     INCREMENTAL_SYNC: 'bgm_incremental_sync',
     SKIP_CONFLICTS: 'bgm_skip_conflicts',
@@ -265,6 +273,11 @@ vi.mock('../index.js', () => ({
   setSyncSourceType: mockState.setSyncSourceType,
   isGithubConfigComplete: vi.fn(() => true),
   buildRawUrl: vi.fn(() => ''),
+  // 默认导出位置 / 默认导入文件夹（initConfigPathControls 使用，缺失会导致 getExportPath is not a function）
+  setExportPath: mockState.setExportPath,
+  getExportPath: mockState.getExportPath,
+  setImportPath: mockState.setImportPath,
+  getImportPath: mockState.getImportPath,
 
   // ---- 其它 ----
   showSettingsPanel: mockState.showSettingsPanel,

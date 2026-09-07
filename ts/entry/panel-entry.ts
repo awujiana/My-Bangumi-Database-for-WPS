@@ -16,16 +16,9 @@
  */
 
 import { initPanel } from '../panel/panel-page.js'
-import { areNavIconsOnly } from '../tools/config.js'
-import { initTheme } from '../tools/theme.js'
+import { initTheme, startThemeSync } from '../tools/theme.js'
+import { startNavModeSync } from '../tools/nav-mode.js'
 import { initHandlers } from '../ui/handlers/index.js'
-
-function applyNavMode(): void {
-  if (typeof document === 'undefined') return
-  if (areNavIconsOnly(true)) {
-    document.body.classList.add('nav-icons-only')
-  }
-}
 
 /**
  * 启动面板：依次执行面板初始化与 UI 事件处理初始化。
@@ -35,6 +28,10 @@ function applyNavMode(): void {
  */
 export function startPanel(): void {
   initTheme()
+  // 跨页主题同步：监听其他页面（settings / enrich）的主题变更并重应用
+  startThemeSync()
+  // 跨页导航模式同步：监听「导航仅显示图标」配置变更并切换布局
+  startNavModeSync()
   initPanel()
   initHandlers()
 }
@@ -42,6 +39,5 @@ export function startPanel(): void {
 // 仅在浏览器上下文且当前页面为 panel.html 时自动启动；
 // 通过 typeof window !== 'undefined' 守卫，确保 Node 环境（如部分单元测试）导入此模块不会触发副作用。
 if (typeof window !== 'undefined' && window.location.pathname.includes('panel.html')) {
-  applyNavMode()
   startPanel()
 }

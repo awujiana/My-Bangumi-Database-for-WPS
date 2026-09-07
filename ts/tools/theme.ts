@@ -55,4 +55,37 @@ export function saveTheme(mode: string): boolean {
   return isOk
 }
 
+/**
+ * 跨页主题同步：轮询 PluginStorage 中的主题配置，变化时重新应用。
+ *
+ * WPS 中每个任务窗格是独立 WebView，postMessage 无法跨上下文广播，
+ * 因此在 settings 页切换主题后，panel / enrich 页需定期从 PluginStorage
+ * 读取最新主题并 `applyTheme`，实现「所有页面同时变色」。
+ * 各页面入口（panel / settings / enrich）在启动时调用一次。
+ */
+export function startThemeSync(): void {
+  if (typeof window === 'undefined' || typeof setInterval !== 'function') return
+  let lastApplied = resolveTheme(getTheme(true))
+  const timer = setInterval(() => {
+    try {
+      // system 模式下 resolveTheme 会随系统外观变化，因此比较解析值即可同时捕获
+      // 配置变更与系统外观切换，变化时才重应用样式。
+      const resolved = resolveTheme(getTheme(true))
+      if (resolved !== lastApplied) {
+        lastApplied = resolved
+        applyTheme(getTheme(true))
+      }
+    } catch {
+      // 静默处理偶发读取异常，轮询继续
+    }
+  }, 2000)
+  window.addEventListener(
+    'beforeunload',
+    () => {
+      clearInterval(timer)
+    },
+    { once: true },
+  )
+}
+
 export { type ThemeMode } from './config.js'

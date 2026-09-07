@@ -68,14 +68,14 @@ function presentUploadResult(
         `失败 ${String(result.fail)} 条`,
         `跳过 ${String(result.skip)} 条`,
         `⏱️ 耗时: ${formatDuration(totalElapsed)}`,
-        `⚡ 平均速度: ${avgSpeed > 0 ? `${String(avgSpeed)} 行/秒` : '--'}`,
+        `⚡️ 平均速度: ${avgSpeed > 0 ? `${String(avgSpeed)} 行/秒` : '--'}`,
       ]
     : [
         `成功 ${String(result.success)} 条`,
         `失败 ${String(result.fail)} 条`,
         `跳过 ${String(result.skip)} 条`,
         `⏱️ 耗时: ${formatDuration(totalElapsed)}`,
-        `⚡ 平均速度: ${avgSpeed > 0 ? `${String(avgSpeed)} 行/秒` : '--'}`,
+        `⚡️ 平均速度: ${avgSpeed > 0 ? `${String(avgSpeed)} 行/秒` : '--'}`,
       ]
   // 构造 SyncProgressStats 用于图表渲染（将 Bangumi 同步的 success 映射为 added）
   const stats: SyncProgressStats = {
@@ -953,7 +953,7 @@ async function _doAPISync(
       `匹配标记数: ${String(matchedCount)}`,
       `同步记录条数: ${String(syncRecords.length)}`,
       `⏱️ 耗时: ${formatDuration(totalElapsed)}`,
-      `⚡ 平均速度: ${avgSpeed > 0 ? `${String(avgSpeed)} 行/秒` : '--'}`,
+      `⚡️ 平均速度: ${avgSpeed > 0 ? `${String(avgSpeed)} 行/秒` : '--'}`,
     ]
     const stats: SyncProgressStats = {
       added: matchedCount,

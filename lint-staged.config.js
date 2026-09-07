@@ -4,4 +4,7 @@ module.exports = {
     'ts/**/*.ts': ['eslint --fix', 'prettier --write'],
     'tests/**/*.ts': ['prettier --write'],
     '*.{json,md}': ['prettier --write'],
+    // 页面源文件（ui/ 下任务窗格页面 + 根入口页），外部参考文档（文档/）不纳入
+    'ui/*.html': ['prettier --write'],
+    'index.html': ['prettier --write'],
 };

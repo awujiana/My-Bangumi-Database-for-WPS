@@ -11,7 +11,7 @@
 
 import '../index.js'
 import '../core/constants.js'
-import { areNavIconsOnly } from '../tools/config.js'
+import { startNavModeSync } from '../tools/nav-mode.js'
 import '../tools/utility.js'
 import '../core/crypto.js'
 import '../tools/events.js'
@@ -24,7 +24,7 @@ import '../ui/preview.js'
 import '../sync/sync-record.js'
 import '../sync/scraping.js'
 import '../sync/exceltobangumi.js'
-import { initTheme } from '../tools/theme.js'
+import { initTheme, startThemeSync } from '../tools/theme.js'
 import { initShellNav } from './shell-nav.js'
 
 import { initEnrichPage } from './enrich-page.js'
@@ -32,11 +32,10 @@ import { initEnrichPage } from './enrich-page.js'
 if (typeof document !== 'undefined') {
   // 应用外观主题（深色 / 浅色 / 跟随系统）
   initTheme()
-
-  // 导航仅图标模式（与 panel / settings 页一致，CSS 由 panel-theme.css 提供）
-  if (areNavIconsOnly(true)) {
-    document.body.classList.add('nav-icons-only')
-  }
+  // 跨页主题同步：监听其他页面（panel / settings）的主题变更并重应用
+  startThemeSync()
+  // 跨页导航模式同步：监听「导航仅显示图标」配置变更并切换布局
+  startNavModeSync()
 
   // 外壳导航：吸顶偏移测量（--topbar-h / --nav-h）+ 侧栏滚动高亮
   initShellNav()

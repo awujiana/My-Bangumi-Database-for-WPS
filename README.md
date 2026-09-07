@@ -231,6 +231,7 @@ npm run test:coverage    # 生成覆盖率报告
 | [`文档/ARCHITECTURE.md`](文档/ARCHITECTURE.md)                         | 架构与项目知识：分层模型、模块详解、配置体系、数据流、构建发布  |
 | [`文档/USER_OPERATIONS.md`](文档/USER_OPERATIONS.md)                   | 用户操作手册：每个按钮 / 面板 / 模态框的操作流程与边界          |
 | [`文档/ui-and-interaction.md`](文档/ui-and-interaction.md)             | UI 架构、面板交互、事件机制、Processor 清单                     |
+| [`文档/图标规范.md`](文档/图标规范.md)                                 | 图标规范：SVG / emoji 双体系、语义→图标映射表、VS16 规则        |
 | [`文档/github-data-distribution.md`](文档/github-data-distribution.md) | 远程数据下发机制、JSONL 格式、同步策略                          |
 | [`文档/README.data-distribution.md`](文档/README.data-distribution.md) | 数据源仓库（Bangumi-Archive-Anime-Excel）说明（参考）           |
 | [`文档/项目文档.md`](文档/项目文档.md)                                 | 数据源仓库项目文档：仓库级架构、转换脚本、CI 流程（参考）       |

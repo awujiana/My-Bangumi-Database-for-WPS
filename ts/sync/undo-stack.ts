@@ -42,8 +42,9 @@ export interface UndoSession {
 /** Undo 会话栈保留上限（最近 N 次同步） */
 const MAX_SESSIONS = 20
 
-/** Undo 会话栈 */
-const sessions: UndoSession[] = []
+/** Undo 会话栈（超限时重建为新数组丢弃最旧项；no-array-front-mutation 禁
+    shift() 与 no-unnecessary-splice 禁 splice(0,1) 互斥，故用 slice 重建） */
+let sessions: UndoSession[] = []
 
 /** 当前正在进行的会话（null 表示无活动会话） */
 let currentSession: UndoSession | null = null
@@ -86,7 +87,7 @@ export function endUndoSession(): void {
   if (currentSession.entries.length > 0) {
     sessions.push(currentSession)
     if (sessions.length > MAX_SESSIONS) {
-      sessions.shift()
+      sessions = sessions.slice(1)
     }
   }
   currentSession = null
