@@ -239,10 +239,11 @@
 }
 
 /* ========== 预览表格 ========== */
+/* 与 panel-theme.css .preview-box 收敛：中性表头 + 细分隔线，去除蓝色渐变 */
 .preview-table {
     background: var(--bg-surface);
     border-radius: 8px;
-    overflow-x: auto;
+    overflow: auto;
     max-height: 280px;
     border: 1px solid var(--border-strong);
 }
@@ -254,8 +255,8 @@
 }
 
 .preview-table th {
-    background: linear-gradient(135deg, var(--accent-blue) 0%, var(--accent-blue-strong) 100%);
-    color: white;
+    background: var(--bg-surface-2);
+    color: var(--text-1);
     padding: 10px 8px;
     text-align: left;
     font-weight: 600;
@@ -268,8 +269,8 @@
 
 .preview-table td {
     padding: 8px;
-    border-bottom: 1px solid var(--bg-surface-2);
-    color: var(--text-1);
+    border-bottom: 1px solid var(--border);
+    color: var(--text-2);
     font-size: 12px;
     vertical-align: middle;
     white-space: nowrap;
@@ -287,34 +288,52 @@
 }
 
 .preview-table tbody tr:hover {
-    background: rgba(74, 158, 255, 0.1);
+    background: rgba(255, 255, 255, 0.06);
 }
 
 .preview-table tbody tr:last-child td {
     border-bottom: none;
 }
 
+/* 行号列（与 .preview-box .row-num 收敛） */
+.preview-table .row-num {
+    font-weight: 600;
+    color: var(--text-3);
+    font-size: 11px;
+}
+
+/* 匹配状态：纯文字色徽标（与 record-item-status 收敛，去掉色块背景） */
 .preview-table .match-status {
     display: inline-block;
-    padding: 2px 8px;
-    border-radius: 10px;
     font-size: 11px;
     font-weight: 600;
 }
 
-.preview-table .match-status.exact {
-    background: rgba(78, 205, 196, 0.15);
+.preview-table .match-status.status-exact,
+.preview-table .status-exact {
     color: var(--teal);
 }
 
-.preview-table .match-status.alias {
-    background: rgba(240, 160, 32, 0.15);
+.preview-table .match-status.status-alias,
+.preview-table .status-alias {
     color: var(--amber);
 }
 
-.preview-table .match-status.unmatched {
-    background: rgba(255, 107, 107, 0.15);
+.preview-table .match-status.status-unmatched,
+.preview-table .status-unmatched {
     color: var(--red);
+}
+
+.preview-table .match-status.status-error,
+.preview-table .status-error {
+    color: var(--red-strong);
+}
+
+/* 预览提示（如"仅显示前 N 行"） */
+.preview-hint {
+    margin-top: 6px;
+    font-size: 11px;
+    color: var(--text-3);
 }
 
 /* ========== 匹配统计卡片 ========== */
@@ -843,6 +862,15 @@
     background: var(--bg-surface);
     border-radius: 2px;
     overflow: hidden;
+    height: 4px;
+}
+
+.conflict-progress-fill {
+    height: 100%;
+    background: var(--accent-blue);
+    border-radius: 2px;
+    width: 0;
+    transition: width 0.25s ease;
 }
 
 .conflict-body {
@@ -930,15 +958,28 @@
 }
 
 /* ========== 锁定状态 ========== */
-.locked-indicator {
+/* 与设计系统收敛：中性表面 + 细分隔线，替换原内联 var(--green) 背景 */
+#lockStatus {
+    display: none;
+    margin-top: 6px;
+    padding: 6px 10px;
+    background: var(--bg-surface);
+    color: var(--text-2);
+    border: 1px solid var(--border-strong);
+    border-left: 3px solid var(--success);
+    border-radius: var(--r-sm);
+    font-size: 12px;
+    line-height: 1.5;
+    word-break: break-all;
+}
+
+#lockStatus.show {
     display: inline-flex;
     align-items: center;
-    gap: 4px;
-    padding: 4px 10px;
-    background: rgba(74, 158, 255, 0.15);
-    color: var(--accent-blue);
-    border-radius: 12px;
-    font-size: 12px;
-    font-weight: 600;
-    margin-left: auto;
+    gap: 6px;
+}
+
+#lockStatus.show::before {
+    content: '🔒';
+    flex-shrink: 0;
 }

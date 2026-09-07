@@ -15,13 +15,7 @@
 import { BGM_CONFIG, LOG_LEVELS, ERROR_LEVELS, ErrorLevel, WPS_ENUM } from '../../core/constants.js'
 import type { ErrorOptions } from '../../core/constants.js'
 import { BgmError } from '../../core/result.js'
-import type {
-  BGMCache,
-  BGMSheet,
-  BGMSync,
-  BGMUserInfo,
-  EnrichWorkbookState,
-} from '../../core/types.js'
+import type { BGMCache, BGMSheet, BGMSync, BGMUserInfo } from '../../core/types.js'
 import {
   showConfirm,
   showToast,
@@ -95,7 +89,6 @@ export const BGM: {
   cache: BGMCache
   sheet: BGMSheet
   sync: BGMSync
-  enrich: EnrichWorkbookState
   LOG_LEVEL: number
   LOG_LEVELS: typeof LOG_LEVELS
   ERROR_LEVELS: typeof ERROR_LEVELS
@@ -168,13 +161,6 @@ export const BGM: {
     lockedName: null,
     isLocked: false,
     lockedWorkbookName: null,
-  },
-  // 富化工作簿锁定状态（与 BGM.sheet 独立）
-  enrich: {
-    lockedWorkbookName: null,
-    lockedSheetName: null,
-    lockedSheetIndex: null,
-    isLocked: false,
   },
   // 同步状态
   sync: {

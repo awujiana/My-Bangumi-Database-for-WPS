@@ -86,15 +86,3 @@ export interface BGMUserInfo {
   /** 头像 URL */
   avatarUrl?: string | undefined
 }
-
-// ========== BGM 富化工作簿锁定状态 ==========
-export interface EnrichWorkbookState {
-  /** 锁定的工作簿名称 */
-  lockedWorkbookName: string | null
-  /** 锁定的工作表名称 */
-  lockedSheetName: string | null
-  /** 锁定的工作表索引（1-based） */
-  lockedSheetIndex: number | null
-  /** 是否已锁定 */
-  isLocked: boolean
-}

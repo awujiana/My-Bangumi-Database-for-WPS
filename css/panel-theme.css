@@ -162,8 +162,15 @@ body {
   border: 1px solid transparent;
   transition: background var(--dur), color var(--dur), border-color var(--dur), transform var(--dur) var(--ease);
 }
-.nav a .nav-ico { width: 18px; text-align: center; flex-shrink: 0; opacity: .9; }
+/* 图标统一置灰（emoji 彩色字形经 grayscale 收敛为中性），颜色只由文字承载 */
+.nav a .nav-ico {
+  width: 18px; text-align: center; flex-shrink: 0;
+  filter: grayscale(1); opacity: .65;
+  transition: opacity var(--dur);
+}
 .nav a .nav-text { transition: opacity var(--dur); }
+.nav a:hover .nav-ico { opacity: .9; }
+.nav a.active .nav-ico { opacity: .9; }
 
 /* ---- 滚动高亮滑动胶囊（scrollspy 指示器）---- */
 /* 由 shell-nav 的 initScrollspy 注入并随当前高亮项平移；高亮底色与边框

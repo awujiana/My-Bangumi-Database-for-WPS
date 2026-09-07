@@ -439,7 +439,7 @@ export {
 } from './tools/auto-fill-url.js'
 
 // ========== 核心类型（从 core/types.ts re-export） ==========
-export type { BGMCache, BGMSheet, BGMSync, BGMUserInfo, EnrichWorkbookState } from './core/types.js'
+export type { BGMCache, BGMSheet, BGMSync, BGMUserInfo } from './core/types.js'
 
 // ============================================================================
 // 15. 页面逻辑（来自 panel/panel-page.js）
@@ -628,17 +628,17 @@ export {
 } from './panel/enrich-page.js'
 
 // ============================================================================
-// 24. 富化工作簿锁定（来自 sync/enrich-lock.js）
+// 24. 富化工作簿锁定（来自 sync/enrich-lock.js，底层委托 tools/locked-sheet.js）
 // ============================================================================
 export {
   refreshEnrichWorkbooks,
   refreshEnrichSheets,
   toggleEnrichWorkbookLock,
   updateEnrichLockButton,
-  saveEnrichLockedWorkbook,
-  restoreEnrichLockedWorkbook,
   getLockedEnrichSheet,
   findWorkbookByName,
-  findSheetInWorkbook,
   initEnrichLock,
+  findBangumiTargetSheets,
+  lockEnrichWorkbookByName,
+  autoSelectEnrichTarget,
 } from './sync/enrich-lock.js'

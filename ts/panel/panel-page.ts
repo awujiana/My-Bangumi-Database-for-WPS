@@ -23,8 +23,6 @@ import {
 } from '../index.js'
 
 import {
-  saveLockedSheet,
-  restoreLockedSheet,
   updateLockButton,
   refreshSheets,
   refreshWorkbooks,
@@ -33,6 +31,7 @@ import {
   onSelectModeChange,
   autoDetectAndLockSheet,
 } from './panel-lifecycle.js'
+import { saveLockedSheet, restoreLockedSheet } from '../tools/locked-sheet.js'
 import { restoreUserInfoFromStorage, startUserInfoPolling } from './user-info-polling.js'
 
 // ========== 初始化 ==========
@@ -68,12 +67,20 @@ function initPanelCore(): void {
   // 自动检测最佳工作表并锁定
   const detected = autoDetectSheet()
   if (detected) {
-    const select = document.getElementById('sheetSelect') as HTMLSelectElement | null
-    if (select) select.value = String(detected.sheetIndex)
+    const wbSelect = document.getElementById('workbookSelect') as HTMLSelectElement | null
+    if (wbSelect && detected.workbookName) wbSelect.value = detected.workbookName
     BGM.sheet.lockedIndex = detected.sheetIndex
     BGM.sheet.lockedName = detected.sheetName
+    BGM.sheet.lockedWorkbookName = detected.workbookName || null
     BGM.sheet.isLocked = true
-    saveLockedSheet({ index: detected.sheetIndex, name: detected.sheetName })
+    saveLockedSheet({
+      index: detected.sheetIndex,
+      name: detected.sheetName,
+      ...(detected.workbookName && { workbookName: detected.workbookName }),
+    })
+    refreshSheets()
+    const select = document.getElementById('sheetSelect') as HTMLSelectElement | null
+    if (select) select.value = String(detected.sheetIndex)
     updateLockButton()
     // 立即刷新一次预览
     refreshData()

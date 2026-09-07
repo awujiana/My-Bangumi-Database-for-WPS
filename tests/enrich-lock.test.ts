@@ -1,16 +1,14 @@
 /**
- * @fileoverview enrichLock 单元测试
+ * @fileoverview 共享锁定 + 富化锁定 UI 适配层单元测试
  *
- * 测试目标：
- *   - refreshEnrichWorkbooks 工作簿列表刷新
- *   - refreshEnrichSheets 工作表列表刷新
- *   - toggleEnrichWorkbookLock 锁定/解锁切换
- *   - updateEnrichLockButton 按钮状态更新
- *   - saveEnrichLockedWorkbook 持久化存储
- *   - restoreEnrichLockedWorkbook 启动恢复与校验
- *   - getLockedEnrichSheet 获取锁定工作表引用
- *   - findWorkbookByName / findSheetInWorkbook 辅助函数
- *   - initEnrichLock 初始化流程
+ * 覆盖（方案一：统一 BGM.sheet + bgm_locked_sheet，跨所有已打开工作簿扫描）：
+ *   - locked-sheet：saveLockedSheet / clearLockedSheet / restoreLockedSheet
+ *   - locked-sheet：getLockedSheet（getLockedEnrichSheet 委托）
+ *   - locked-sheet：findWorkbookByName / findSheetInWorkbook
+ *   - locked-sheet：findBangumiTargetSheets（表头 + 数据行数 + 名称关键词，跨工作簿，优先活动工作簿/工作表）
+ *   - enrich-lock：refreshEnrichWorkbooks / refreshEnrichSheets
+ *   - enrich-lock：toggleEnrichWorkbookLock / updateEnrichLockButton
+ *   - enrich-lock：lockEnrichWorkbookByName / autoSelectEnrichTarget / initEnrichLock
  */
 
 // @vitest-environment jsdom
@@ -44,8 +42,11 @@ function createMockWorkbooks(workbooks: { Name: string; Sheets: string[] }[]): M
       Index: index + 1,
       Worksheets: {
         Count: sheets.length,
-        Item: (sheetIndex: number) =>
-          sheetIndex >= 1 && sheetIndex <= sheets.length ? sheets[sheetIndex - 1] : null,
+        Item: (sheetIndex: number) => {
+          // 模拟 WPS：索引越界时抛错
+          if (sheetIndex < 1 || sheetIndex > sheets.length) throw new RangeError('下标越界')
+          return sheets[sheetIndex - 1]
+        },
       },
     }
   })
@@ -66,14 +67,17 @@ function createMockPluginStorage(store: Record<string, string> = {}): {
   }
 }
 
+type MockPluginStorage = ReturnType<typeof createMockPluginStorage>
+
 function createMockApp(
   workbooks: MockWorkbook[],
   activeWbName = '',
-  pluginStorage?: ReturnType<typeof createMockPluginStorage>,
+  pluginStorage?: MockPluginStorage,
+  activeSheetName = '',
 ): {
   Workbooks: { Count: number; Item: (index: number) => MockWorkbook | null }
-  ActiveWorkbook: { Name: string } | null
-  PluginStorage: ReturnType<typeof createMockPluginStorage>
+  ActiveWorkbook: { Name: string; ActiveSheet?: { Name: string } | null } | null
+  PluginStorage: MockPluginStorage
 } {
   const storage = pluginStorage ?? createMockPluginStorage()
   return {
@@ -82,26 +86,75 @@ function createMockApp(
       Item: (index: number) =>
         index >= 1 && index <= workbooks.length ? workbooks[index - 1] : null,
     },
-    ActiveWorkbook: activeWbName ? { Name: activeWbName } : null,
+    ActiveWorkbook: activeWbName
+      ? { Name: activeWbName, ActiveSheet: activeSheetName ? { Name: activeSheetName } : null }
+      : null,
     PluginStorage: storage,
   }
+}
+
+// ========== 跨工作簿扫描专用 mock ==========
+
+interface ScanConfig {
+  headerRow: number
+  headerKeyCount: number
+  dataCount: number
+}
+
+interface ScanSheet extends MockWorksheet {
+  _scan: ScanConfig | null
+}
+
+type ScanWorkbookMap = Record<string, ScanSheet[]>
+
+function createScanSheet(name: string, scan: ScanConfig | null): ScanSheet {
+  return { Name: name, Index: 1, _scan: scan }
+}
+
+/** 按“工作簿名 -> 工作表数组”构建 mock 应用 */
+function createScanApp(
+  map: ScanWorkbookMap,
+  activeWbName = '',
+  activeSheetName = '',
+  storage?: MockPluginStorage,
+): ReturnType<typeof createMockApp> {
+  const entries = Object.entries(map)
+  const wbs: MockWorkbook[] = entries.map(([name, sheets], index) => ({
+    Name: name,
+    Index: index + 1,
+    Worksheets: {
+      Count: sheets.length,
+      Item: (sheetIndex: number) =>
+        sheetIndex >= 1 && sheetIndex <= sheets.length ? sheets[sheetIndex - 1] : null,
+    },
+  }))
+  return createMockApp(wbs, activeWbName, storage, activeSheetName)
 }
 
 // ========== vi.hoisted 共享 mock 引用 ============
 const mockReferences = vi.hoisted(() => ({
   mockBgmLog: vi.fn(),
   mockShowToast: vi.fn(),
-  mockEnrichState: {
-    lockedWorkbookName: null as string | null,
-    lockedSheetName: null as string | null,
-    lockedSheetIndex: null as number | null,
+}))
+
+/** 共享的 BGM 状态：主面板与富化页面的 util/index、ts/index mock 必须指向同一对象 */
+const sharedBGM = vi.hoisted(() => ({
+  cache: {},
+  sync: {},
+  LOG_LEVEL: 0,
+  sheet: {
     isLocked: false,
+    lockedIndex: null as number | null,
+    lockedName: null as string | null,
+    lockedWorkbookName: null as string | null,
   },
 }))
 
-// ========== vi.mock 声明 ============
+const mockGetCellValue = vi.hoisted(() => vi.fn())
+const mockFindHeaderRow = vi.hoisted(() => vi.fn())
 
-// 必须先 mock logger，因为 index.js 依赖它
+// ========== vi.mock 声明 ==========
+
 vi.mock('../ts/tools/logger.js', () => ({
   logger: {
     debug: vi.fn(),
@@ -116,6 +169,8 @@ vi.mock('../ts/core/constants.js', () => ({
   WPS_ENUM: { msoCTPDockPositionLeft: 0, msoCTPDockPositionRight: 2 },
   BGM_CONFIG: {},
   LOG_LEVELS: { INFO: 'INFO', WARN: 'WARN', ERROR: 'ERROR', DEBUG: 'DEBUG' },
+  PANEL_CONFIG: { MAX_SCAN_ROWS: 50, MAX_SCAN_COLUMNS: 10 },
+  HEADER_KEYWORDS: ['名称', '标题', 'bangumi', 'url', 'sid', '编号', '序号', 'name', 'title'],
   ERROR_LEVELS: { SILENT: 0, WARN: 1, ERROR: 2, THROW: 3, INFO: 4 },
   ErrorLevel: { SILENT: 0, WARN: 1, ERROR: 2, THROW: 3, INFO: 4 },
 }))
@@ -134,64 +189,67 @@ vi.mock('../ts/ui/handlers/index.js', () => ({
   ACTION_HANDLERS: {},
 }))
 
-// mock ts/index.js — enrichLock.ts 从 '../index.js'（即 ts/index.js）导入
-// mockBGMState 必须用 vi.hoisted，因为 vi.mock 工厂被提升到文件顶部
-const mockBGMState = vi.hoisted(() => ({
-  enrich: {
-    lockedWorkbookName: null as string | null,
-    lockedSheetName: null as string | null,
-    lockedSheetIndex: null as number | null,
-    isLocked: false,
-  },
-}))
-
+// 主面板/富化 UI 层依赖 ts/index.js（仅取 getApp/bgmLog/BGM/LOG_LEVELS/showToast）
 vi.mock('../ts/index.js', () => ({
   getApp: () => (window as Record<string, unknown>).Application ?? null,
   bgmLog: mockReferences.mockBgmLog,
-  BGM: mockBGMState,
+  BGM: sharedBGM,
   LOG_LEVELS: { INFO: 'INFO', WARN: 'WARN', ERROR: 'ERROR', DEBUG: 'DEBUG' },
-  CONFIG_KEYS: {
-    ENRICH_LOCKED_WORKBOOK: 'bgm_enrich_locked_workbook',
-  },
   showToast: mockReferences.mockShowToast,
 }))
 
+// locked-sheet 依赖 tools/util；getApp 必须与 ts/index 返回同一个 Application
+vi.mock('../ts/tools/util/index.js', () => ({
+  getApp: () => (window as Record<string, unknown>).Application ?? null,
+  bgmLog: mockReferences.mockBgmLog,
+  BGM: sharedBGM,
+  getCellValue: mockGetCellValue,
+  findHeaderRow: mockFindHeaderRow,
+}))
+
 // ========== 导入被测模块 ============
+import {
+  saveLockedSheet,
+  clearLockedSheet,
+  restoreLockedSheet,
+  getLockedSheet,
+  findWorkbookByName,
+  findSheetInWorkbook,
+  findBangumiTargetSheets,
+  LOCKED_SHEET_KEY,
+} from '../ts/tools/locked-sheet.js'
 import {
   refreshEnrichWorkbooks,
   refreshEnrichSheets,
   toggleEnrichWorkbookLock,
   updateEnrichLockButton,
-  saveEnrichLockedWorkbook,
-  restoreEnrichLockedWorkbook,
   getLockedEnrichSheet,
-  findWorkbookByName,
-  findSheetInWorkbook,
+  lockEnrichWorkbookByName,
+  autoSelectEnrichTarget,
   initEnrichLock,
 } from '../ts/sync/enrich-lock.js'
 
-// ========== 测试套件 ============
+// ========== 测试套件 ==========
+
+function resetBGM(): void {
+  sharedBGM.sheet.isLocked = false
+  sharedBGM.sheet.lockedIndex = null
+  sharedBGM.sheet.lockedName = null
+  sharedBGM.sheet.lockedWorkbookName = null
+}
 
 beforeEach(() => {
   vi.clearAllMocks()
   mockReferences.mockBgmLog.mockClear()
   mockReferences.mockShowToast.mockClear()
-
-  // 重置 BGM.enrich 状态
-  mockBGMState.enrich = {
-    lockedWorkbookName: null,
-    lockedSheetName: null,
-    lockedSheetIndex: null,
-    isLocked: false,
-  }
-
-  // 清理 DOM
+  resetBGM()
+  mockGetCellValue.mockImplementation(() => '')
+  mockFindHeaderRow.mockImplementation(() => 0)
   document.body.replaceChildren()
 })
 
 afterEach(() => {
   vi.clearAllMocks()
-  // 清理 window.Application
   if ('Application' in window) {
     delete (window as Record<string, unknown>).Application
   }
@@ -219,7 +277,361 @@ function setupBasicDom(): void {
   }
 }
 
-// ============ 场景 1: refreshEnrichWorkbooks ============
+/** 配置跨工作簿扫描的 getCellValue / findHeaderRow mock（基于 ws._scan） */
+function setupScanMocks(): void {
+  mockFindHeaderRow.mockImplementation((ws: ScanSheet) => ws._scan?.headerRow ?? 0)
+  mockGetCellValue.mockImplementation((ws: ScanSheet, row: number, col: number) => {
+    const scan = ws._scan
+    if (!scan) return ''
+    if (row === scan.headerRow) return col <= scan.headerKeyCount ? '名称' : ''
+    if (row > scan.headerRow && row <= scan.headerRow + scan.dataCount) return '追踪数据'
+    return ''
+  })
+}
+
+// ============ 场景 1: saveLockedSheet / clearLockedSheet ============
+describe('saveLockedSheet / clearLockedSheet', () => {
+  it('保存锁定信息到 PluginStorage（统一 key）', () => {
+    const workbooks = createMockWorkbooks([{ Name: 'wb1.xlsx', Sheets: ['Sheet1'] }])
+    const storage = createMockPluginStorage()
+    setMockApp(createMockApp(workbooks, 'wb1.xlsx', storage))
+
+    saveLockedSheet({ index: 1, name: 'Sheet1', workbookName: 'wb1.xlsx' })
+
+    expect(storage._store[LOCKED_SHEET_KEY]).toBe(
+      JSON.stringify({ index: 1, name: 'Sheet1', workbookName: 'wb1.xlsx' }),
+    )
+  })
+
+  it('传入 null 时清除持久化数据', () => {
+    const workbooks = createMockWorkbooks([{ Name: 'wb1.xlsx', Sheets: ['Sheet1'] }])
+    const storage = createMockPluginStorage({
+      [LOCKED_SHEET_KEY]: '{"index":1,"name":"Sheet1","workbookName":"wb1.xlsx"}',
+    })
+    setMockApp(createMockApp(workbooks, 'wb1.xlsx', storage))
+
+    saveLockedSheet(null)
+
+    expect(storage._store[LOCKED_SHEET_KEY]).toBe('')
+  })
+
+  it('clearLockedSheet 重置 BGM.sheet 并清除持久化', () => {
+    const workbooks = createMockWorkbooks([{ Name: 'wb1.xlsx', Sheets: ['Sheet1'] }])
+    const storage = createMockPluginStorage({
+      [LOCKED_SHEET_KEY]: '{"index":1,"name":"Sheet1","workbookName":"wb1.xlsx"}',
+    })
+    setMockApp(createMockApp(workbooks, 'wb1.xlsx', storage))
+    sharedBGM.sheet.isLocked = true
+    sharedBGM.sheet.lockedIndex = 1
+    sharedBGM.sheet.lockedName = 'Sheet1'
+    sharedBGM.sheet.lockedWorkbookName = 'wb1.xlsx'
+
+    clearLockedSheet()
+
+    expect(sharedBGM.sheet.isLocked).toBe(false)
+    expect(sharedBGM.sheet.lockedIndex).toBeNull()
+    expect(sharedBGM.sheet.lockedName).toBeNull()
+    expect(sharedBGM.sheet.lockedWorkbookName).toBeNull()
+    expect(storage._store[LOCKED_SHEET_KEY]).toBe('')
+  })
+
+  it('PluginStorage 不可用时记录警告且不抛错', () => {
+    const workbooks = createMockWorkbooks([{ Name: 'wb1.xlsx', Sheets: ['Sheet1'] }])
+    const app = createMockApp(workbooks)
+    app.PluginStorage = undefined as unknown as MockPluginStorage
+    setMockApp(app)
+
+    expect(() => saveLockedSheet({ index: 1, name: 'Sheet1' })).not.toThrow()
+    expect(mockReferences.mockBgmLog).toHaveBeenCalled()
+  })
+})
+
+// ============ 场景 2: restoreLockedSheet ============
+describe('restoreLockedSheet', () => {
+  it('成功恢复锁定状态到 BGM.sheet', () => {
+    const workbooks = createMockWorkbooks([{ Name: 'wb1.xlsx', Sheets: ['Sheet1', 'Target'] }])
+    const storage = createMockPluginStorage({
+      [LOCKED_SHEET_KEY]: '{"index":2,"name":"Target","workbookName":"wb1.xlsx"}',
+    })
+    setMockApp(createMockApp(workbooks, 'wb1.xlsx', storage))
+
+    const isRestored = restoreLockedSheet()
+
+    expect(isRestored).toBe(true)
+    expect(sharedBGM.sheet.isLocked).toBe(true)
+    expect(sharedBGM.sheet.lockedWorkbookName).toBe('wb1.xlsx')
+    expect(sharedBGM.sheet.lockedName).toBe('Target')
+    expect(sharedBGM.sheet.lockedIndex).toBe(2)
+  })
+
+  it('无持久化数据时返回 false', () => {
+    setMockApp(createMockApp(createMockWorkbooks([{ Name: 'wb1.xlsx', Sheets: ['Sheet1'] }])))
+
+    const isRestored = restoreLockedSheet()
+
+    expect(isRestored).toBe(false)
+    expect(sharedBGM.sheet.isLocked).toBe(false)
+  })
+
+  it('锁定的工作簿不存在时清除状态', () => {
+    const workbooks = createMockWorkbooks([{ Name: 'other.xlsx', Sheets: ['Sheet1'] }])
+    const storage = createMockPluginStorage({
+      [LOCKED_SHEET_KEY]: '{"index":1,"name":"Sheet1","workbookName":"deleted.xlsx"}',
+    })
+    setMockApp(createMockApp(workbooks, 'other.xlsx', storage))
+
+    const isRestored = restoreLockedSheet()
+
+    expect(isRestored).toBe(false)
+    expect(sharedBGM.sheet.isLocked).toBe(false)
+    expect(storage._store[LOCKED_SHEET_KEY]).toBe('')
+  })
+
+  it('JSON 数据损坏时清除状态', () => {
+    const workbooks = createMockWorkbooks([{ Name: 'wb1.xlsx', Sheets: ['Sheet1'] }])
+    const storage = createMockPluginStorage({ [LOCKED_SHEET_KEY]: 'invalid-json{{{' })
+    setMockApp(createMockApp(workbooks, 'wb1.xlsx', storage))
+
+    const isRestored = restoreLockedSheet()
+
+    expect(isRestored).toBe(false)
+    expect(sharedBGM.sheet.isLocked).toBe(false)
+    expect(storage._store[LOCKED_SHEET_KEY]).toBe('')
+  })
+
+  it('PluginStorage 不可用时返回 false', () => {
+    const workbooks = createMockWorkbooks([{ Name: 'wb1.xlsx', Sheets: ['Sheet1'] }])
+    const app = createMockApp(workbooks)
+    app.PluginStorage = undefined as unknown as MockPluginStorage
+    setMockApp(app)
+
+    expect(restoreLockedSheet()).toBe(false)
+  })
+})
+
+// ============ 场景 3: getLockedSheet / getLockedEnrichSheet ============
+describe('getLockedSheet / getLockedEnrichSheet', () => {
+  it('返回锁定的工作簿和工作表引用', () => {
+    sharedBGM.sheet.isLocked = true
+    sharedBGM.sheet.lockedWorkbookName = 'wb1.xlsx'
+    sharedBGM.sheet.lockedName = 'Sheet1'
+
+    setMockApp(
+      createMockApp(createMockWorkbooks([{ Name: 'wb1.xlsx', Sheets: ['Sheet1', 'Sheet2'] }])),
+    )
+
+    const result = getLockedEnrichSheet()
+
+    expect(result).not.toBeNull()
+    expect(result![0].Name).toBe('wb1.xlsx')
+    expect(result![1].Name).toBe('Sheet1')
+  })
+
+  it('未锁定时返回 null', () => {
+    setMockApp(createMockApp(createMockWorkbooks([{ Name: 'wb1.xlsx', Sheets: ['Sheet1'] }])))
+
+    expect(getLockedSheet()).toBeNull()
+  })
+
+  it('锁定的工作簿不存在时清除锁状态', () => {
+    sharedBGM.sheet.isLocked = true
+    sharedBGM.sheet.lockedWorkbookName = 'deleted.xlsx'
+    sharedBGM.sheet.lockedName = 'Sheet1'
+    const storage = createMockPluginStorage()
+    setMockApp(
+      createMockApp(createMockWorkbooks([{ Name: 'wb1.xlsx', Sheets: ['Sheet1'] }]), '', storage),
+    )
+
+    const result = getLockedEnrichSheet()
+
+    expect(result).toBeNull()
+    expect(sharedBGM.sheet.isLocked).toBe(false)
+    expect(storage._store[LOCKED_SHEET_KEY]).toBe('')
+  })
+
+  it('锁定的工作表不存在时清除锁状态', () => {
+    sharedBGM.sheet.isLocked = true
+    sharedBGM.sheet.lockedWorkbookName = 'wb1.xlsx'
+    sharedBGM.sheet.lockedName = 'deletedSheet'
+    const storage = createMockPluginStorage()
+    setMockApp(
+      createMockApp(createMockWorkbooks([{ Name: 'wb1.xlsx', Sheets: ['Sheet1'] }]), '', storage),
+    )
+
+    const result = getLockedEnrichSheet()
+
+    expect(result).toBeNull()
+    expect(sharedBGM.sheet.isLocked).toBe(false)
+  })
+})
+
+// ============ 场景 4: findWorkbookByName / findSheetInWorkbook ============
+describe('findWorkbookByName / findSheetInWorkbook', () => {
+  it('findWorkbookByName 找到工作簿', () => {
+    setMockApp(
+      createMockApp(
+        createMockWorkbooks([
+          { Name: 'wb1.xlsx', Sheets: ['Sheet1'] },
+          { Name: 'wb2.xlsx', Sheets: ['Data'] },
+        ]),
+      ),
+    )
+
+    const result = findWorkbookByName('wb2.xlsx')
+
+    expect(result).not.toBeNull()
+    expect(result!.Name).toBe('wb2.xlsx')
+  })
+
+  it('findWorkbookByName 未找到 / 空名返回 null', () => {
+    setMockApp(createMockApp(createMockWorkbooks([{ Name: 'wb1.xlsx', Sheets: ['Sheet1'] }])))
+
+    expect(findWorkbookByName('nonexistent.xlsx')).toBeNull()
+    expect(findWorkbookByName(null)).toBeNull()
+    expect(findWorkbookByName('')).toBeNull()
+  })
+
+  it('findSheetInWorkbook 找到工作表 / 未找到 / 工作簿不存在', () => {
+    setMockApp(
+      createMockApp(createMockWorkbooks([{ Name: 'wb1.xlsx', Sheets: ['Sheet1', 'Target'] }])),
+    )
+
+    const found = findSheetInWorkbook('wb1.xlsx', 'Target')
+    expect(found).not.toBeNull()
+    expect(found!.Name).toBe('Target')
+    expect(findSheetInWorkbook('wb1.xlsx', 'Nonexistent')).toBeNull()
+    expect(findSheetInWorkbook('nonexistent.xlsx', 'Sheet1')).toBeNull()
+  })
+})
+
+// ============ 场景 5: findBangumiTargetSheets ============
+describe('findBangumiTargetSheets', () => {
+  it('没有任何有效候选时返回空数组', () => {
+    setupScanMocks()
+    // 表头行=0，不满足表头校验
+    setMockApp(createScanApp({ wb1: [createScanSheet('bangumi 表', null)] }, 'wb1'))
+
+    expect(findBangumiTargetSheets()).toEqual([])
+  })
+
+  it('数据行数不足（<2）时跳过', () => {
+    setupScanMocks()
+    // 表头命中 3 个关键词，但仅 1 行数据
+    const sheet = createScanSheet('bangumi 追踪', {
+      headerRow: 1,
+      headerKeyCount: 3,
+      dataCount: 1,
+    })
+    setMockApp(createScanApp({ wb1: [sheet] }, 'wb1'))
+
+    expect(findBangumiTargetSheets()).toEqual([])
+  })
+
+  it('跳过系统工作表（同步记录 / SEARCH 等）', () => {
+    setupScanMocks()
+    const systemSheet = createScanSheet('同步记录', {
+      headerRow: 1,
+      headerKeyCount: 3,
+      dataCount: 3,
+    })
+    setMockApp(createScanApp({ wb1: [systemSheet] }, 'wb1', '同步记录'))
+
+    expect(findBangumiTargetSheets()).toEqual([])
+  })
+
+  it('名称关键词命中时生成候选并填充字段', () => {
+    setupScanMocks()
+    const sheet = createScanSheet('bangumi 追踪', {
+      headerRow: 2,
+      headerKeyCount: 3,
+      dataCount: 4,
+    })
+    setMockApp(createScanApp({ wb1: [sheet] }, 'wb1'))
+
+    const result = findBangumiTargetSheets()
+
+    expect(result).toHaveLength(1)
+    expect(result[0]).toMatchObject({
+      workbookName: 'wb1',
+      sheetIndex: 1,
+      sheetName: 'bangumi 追踪',
+      headerRow: 2,
+      headerMatchCount: 3,
+      dataRowCount: 4,
+      isNameHit: true,
+    })
+  })
+
+  it('无名称命中时回退扫描全部通过表头+数据校验的工作表，并标记 isNameHit=false', () => {
+    setupScanMocks()
+    const plainSheet = createScanSheet('Sheet数据', {
+      headerRow: 1,
+      headerKeyCount: 4,
+      dataCount: 3,
+    })
+    setMockApp(createScanApp({ wb1: [plainSheet] }, 'wb1'))
+
+    const result = findBangumiTargetSheets()
+
+    expect(result).toHaveLength(1)
+    expect(result[0].sheetName).toBe('Sheet数据')
+    expect(result[0].isNameHit).toBe(false)
+  })
+
+  it('优先当前活动工作簿 + 活动工作表的候选', () => {
+    setupScanMocks()
+    const activeHit = createScanSheet('bangumi A', {
+      headerRow: 1,
+      headerKeyCount: 3,
+      dataCount: 3,
+    })
+    const activeTarget = createScanSheet('bangumi B', {
+      headerRow: 1,
+      headerKeyCount: 3,
+      dataCount: 3,
+    })
+    setMockApp(createScanApp({ active: [activeHit, activeTarget] }, 'active', 'bangumi B'))
+
+    const result = findBangumiTargetSheets()
+
+    expect(result).toHaveLength(2)
+    expect(result[0].sheetName).toBe('bangumi B')
+    expect(result[1].sheetName).toBe('bangumi A')
+  })
+
+  it('当前活动工作簿的候选优先于非活动工作簿的名称命中候选', () => {
+    setupScanMocks()
+    const activeSheet = createScanSheet('bangumi 主表', {
+      headerRow: 1,
+      headerKeyCount: 3,
+      dataCount: 3,
+    })
+    const otherSheet = createScanSheet('bangumi 副表', {
+      headerRow: 1,
+      headerKeyCount: 3,
+      dataCount: 3,
+    })
+    setMockApp(createScanApp({ active: [activeSheet], other: [otherSheet] }, 'active'))
+
+    const result = findBangumiTargetSheets()
+
+    expect(result).toHaveLength(2)
+    expect(result[0].workbookName).toBe('active')
+    expect(result[1].workbookName).toBe('other')
+  })
+
+  it('Workbooks 不可用时记录警告并返回空数组', () => {
+    setupScanMocks()
+    const app = createScanApp({})
+    app.Workbooks = null as unknown as ReturnType<typeof createMockApp>['Workbooks']
+    setMockApp(app)
+
+    expect(findBangumiTargetSheets()).toEqual([])
+    expect(mockReferences.mockBgmLog).toHaveBeenCalled()
+  })
+})
+
+// ============ 场景 6: refreshEnrichWorkbooks ============
 describe('refreshEnrichWorkbooks', () => {
   it('刷新工作簿列表到下拉框', () => {
     setupBasicDom()
@@ -227,13 +639,11 @@ describe('refreshEnrichWorkbooks', () => {
       { Name: 'wb1.xlsx', Sheets: ['Sheet1', 'Sheet2'] },
       { Name: 'wb2.xlsx', Sheets: ['Data'] },
     ])
-    const app = createMockApp(workbooks, 'wb1.xlsx')
-    setMockApp(app)
+    setMockApp(createMockApp(workbooks, 'wb1.xlsx'))
 
     refreshEnrichWorkbooks('workbookSelect')
 
     const select = document.getElementById('workbookSelect') as HTMLSelectElement
-    // 默认 + 2 个工作簿
     expect(select.options.length).toBe(3)
     expect(select.options[0].textContent).toContain('请选择')
     expect(select.options[1].value).toBe('wb1.xlsx')
@@ -242,15 +652,13 @@ describe('refreshEnrichWorkbooks', () => {
 
   it('锁定状态时选中锁定的工作簿', () => {
     setupBasicDom()
-    mockBGMState.enrich.isLocked = true
-    mockBGMState.enrich.lockedWorkbookName = 'wb2.xlsx'
-
+    sharedBGM.sheet.isLocked = true
+    sharedBGM.sheet.lockedWorkbookName = 'wb2.xlsx'
     const workbooks = createMockWorkbooks([
       { Name: 'wb1.xlsx', Sheets: ['Sheet1'] },
       { Name: 'wb2.xlsx', Sheets: ['Data'] },
     ])
-    const app = createMockApp(workbooks, 'wb1.xlsx')
-    setMockApp(app)
+    setMockApp(createMockApp(workbooks, 'wb1.xlsx'))
 
     refreshEnrichWorkbooks('workbookSelect')
 
@@ -264,8 +672,7 @@ describe('refreshEnrichWorkbooks', () => {
       { Name: 'wb1.xlsx', Sheets: ['Sheet1'] },
       { Name: 'wb2.xlsx', Sheets: ['Data'] },
     ])
-    const app = createMockApp(workbooks, 'wb1.xlsx')
-    setMockApp(app)
+    setMockApp(createMockApp(workbooks, 'wb1.xlsx'))
 
     refreshEnrichWorkbooks('workbookSelect')
 
@@ -273,47 +680,38 @@ describe('refreshEnrichWorkbooks', () => {
     expect(select.value).toBe('wb1.xlsx')
   })
 
-  it('DOM 元素不存在时不报错', () => {
-    const workbooks = createMockWorkbooks([{ Name: 'wb1.xlsx', Sheets: ['Sheet1'] }])
-    const app = createMockApp(workbooks)
+  it('DOM 不存在 / Workbooks 不可用时记录警告且不抛错', () => {
+    const app = createMockApp(createMockWorkbooks([{ Name: 'wb1.xlsx', Sheets: ['Sheet1'] }]))
     setMockApp(app)
 
     expect(() => refreshEnrichWorkbooks('nonexistent')).not.toThrow()
-  })
 
-  it('Workbooks 不可用时记录警告', () => {
     setupBasicDom()
-    const app = createMockApp([])
     ;(app as unknown as { Workbooks: null }).Workbooks = null
     setMockApp(app)
-
     refreshEnrichWorkbooks('workbookSelect')
-
     expect(mockReferences.mockBgmLog).toHaveBeenCalled()
   })
 })
 
-// ============ 场景 2: refreshEnrichSheets ============
+// ============ 场景 7: refreshEnrichSheets ============
 describe('refreshEnrichSheets', () => {
   it('刷新指定工作簿的工作表列表', () => {
     setupBasicDom()
     const workbooks = createMockWorkbooks([
       { Name: 'wb1.xlsx', Sheets: ['Sheet1', 'Sheet2', 'Data'] },
     ])
-    const app = createMockApp(workbooks)
-    setMockApp(app)
+    setMockApp(createMockApp(workbooks))
 
     refreshEnrichSheets('wb1.xlsx', 'sheetSelect', 'workbookSelect')
 
     const select = document.getElementById('sheetSelect') as HTMLSelectElement
-    // 默认 + 3 个工作表
     expect(select.options.length).toBe(4)
     expect(select.options[1].textContent).toBe('Sheet1')
-    expect(select.options[2].textContent).toBe('Sheet2')
     expect(select.options[3].textContent).toBe('Data')
   })
 
-  it('未指定工作簿名称时使用下拉框值', () => {
+  it('未指定工作簿名称时使用下拉框当前值', () => {
     setupBasicDom()
     const wbSelect = document.getElementById('workbookSelect') as HTMLSelectElement
     wbSelect.replaceChildren()
@@ -322,23 +720,17 @@ describe('refreshEnrichSheets', () => {
     opt.textContent = 'wb1.xlsx'
     wbSelect.appendChild(opt)
     wbSelect.value = 'wb1.xlsx'
-
-    const workbooks = createMockWorkbooks([{ Name: 'wb1.xlsx', Sheets: ['Sheet1'] }])
-    const app = createMockApp(workbooks)
-    setMockApp(app)
+    setMockApp(createMockApp(createMockWorkbooks([{ Name: 'wb1.xlsx', Sheets: ['Sheet1'] }])))
 
     refreshEnrichSheets(undefined, 'sheetSelect', 'workbookSelect')
 
     const select = document.getElementById('sheetSelect') as HTMLSelectElement
-    // 默认 + 1
     expect(select.options.length).toBe(2)
   })
 
-  it('工作簿名称为空时显示提示', () => {
+  it('工作簿名为空时显示提示', () => {
     setupBasicDom()
-    const workbooks = createMockWorkbooks([{ Name: 'wb1.xlsx', Sheets: ['Sheet1'] }])
-    const app = createMockApp(workbooks)
-    setMockApp(app)
+    setMockApp(createMockApp(createMockWorkbooks([{ Name: 'wb1.xlsx', Sheets: ['Sheet1'] }])))
 
     refreshEnrichSheets('', 'sheetSelect', 'workbookSelect')
 
@@ -349,146 +741,127 @@ describe('refreshEnrichSheets', () => {
 
   it('锁定状态时选中锁定的工作表', () => {
     setupBasicDom()
-    mockBGMState.enrich.isLocked = true
-    mockBGMState.enrich.lockedSheetName = 'Sheet2'
-
-    const workbooks = createMockWorkbooks([
-      { Name: 'wb1.xlsx', Sheets: ['Sheet1', 'Sheet2', 'Data'] },
-    ])
-    const app = createMockApp(workbooks)
-    setMockApp(app)
+    sharedBGM.sheet.isLocked = true
+    sharedBGM.sheet.lockedName = 'Sheet2'
+    setMockApp(
+      createMockApp(
+        createMockWorkbooks([{ Name: 'wb1.xlsx', Sheets: ['Sheet1', 'Sheet2', 'Data'] }]),
+      ),
+    )
 
     refreshEnrichSheets('wb1.xlsx', 'sheetSelect', 'workbookSelect')
 
     const select = document.getElementById('sheetSelect') as HTMLSelectElement
-    // Sheet2 的索引
     expect(select.value).toBe('2')
   })
 
-  it('工作簿不存在时记录警告', () => {
+  it('工作簿不存在 / DOM 不存在时不抛错', () => {
     setupBasicDom()
-    const workbooks = createMockWorkbooks([{ Name: 'wb1.xlsx', Sheets: ['Sheet1'] }])
-    const app = createMockApp(workbooks)
-    setMockApp(app)
+    setMockApp(createMockApp(createMockWorkbooks([{ Name: 'wb1.xlsx', Sheets: ['Sheet1'] }])))
 
     refreshEnrichSheets('nonexistent.xlsx', 'sheetSelect', 'workbookSelect')
-
     expect(mockReferences.mockBgmLog).toHaveBeenCalled()
-  })
-
-  it('DOM 元素不存在时不报错', () => {
-    const workbooks = createMockWorkbooks([{ Name: 'wb1.xlsx', Sheets: ['Sheet1'] }])
-    const app = createMockApp(workbooks)
-    setMockApp(app)
-
     expect(() => refreshEnrichSheets('wb1.xlsx', 'nonexistent', 'workbookSelect')).not.toThrow()
   })
 })
 
-// ============ 场景 3: toggleEnrichWorkbookLock ============
+// ============ 场景 8: toggleEnrichWorkbookLock ============
+
+function prepareToggle(): {
+  storage: MockPluginStorage
+} {
+  setupBasicDom()
+  const wbSelect = document.getElementById('workbookSelect') as HTMLSelectElement
+  wbSelect.replaceChildren()
+  const wbOpt = document.createElement('option')
+  wbOpt.value = 'wb1.xlsx'
+  wbOpt.textContent = 'wb1.xlsx'
+  wbSelect.appendChild(wbOpt)
+  wbSelect.value = 'wb1.xlsx'
+
+  const sheetSelect = document.getElementById('sheetSelect') as HTMLSelectElement
+  sheetSelect.replaceChildren()
+  const sheetOpt = document.createElement('option')
+  sheetOpt.value = '2'
+  sheetOpt.textContent = 'TargetSheet'
+  sheetSelect.appendChild(sheetOpt)
+  sheetSelect.value = '2'
+
+  const storage = createMockPluginStorage()
+  setMockApp(
+    createMockApp(
+      createMockWorkbooks([{ Name: 'wb1.xlsx', Sheets: ['Sheet1', 'TargetSheet'] }]),
+      'wb1.xlsx',
+      storage,
+    ),
+  )
+  return { storage }
+}
+
 describe('toggleEnrichWorkbookLock', () => {
-  it('选择工作表后锁定', () => {
-    setupBasicDom()
-    const wbSelect = document.getElementById('workbookSelect') as HTMLSelectElement
-    wbSelect.replaceChildren()
-    const wbOpt = document.createElement('option')
-    wbOpt.value = 'wb1.xlsx'
-    wbOpt.textContent = 'wb1.xlsx'
-    wbSelect.appendChild(wbOpt)
-    wbSelect.value = 'wb1.xlsx'
-
-    const sheetSelect = document.getElementById('sheetSelect') as HTMLSelectElement
-    sheetSelect.replaceChildren()
-    const sheetOpt = document.createElement('option')
-    sheetOpt.value = '2'
-    sheetOpt.textContent = 'TargetSheet'
-    sheetSelect.appendChild(sheetOpt)
-    sheetSelect.value = '2'
-
-    const workbooks = createMockWorkbooks([{ Name: 'wb1.xlsx', Sheets: ['Sheet1', 'TargetSheet'] }])
-    const storage = createMockPluginStorage()
-    const app = createMockApp(workbooks, 'wb1.xlsx', storage)
-    setMockApp(app)
+  it('选择工作表后写入共享 BGM.sheet 并持久化', () => {
+    const { storage } = prepareToggle()
 
     toggleEnrichWorkbookLock('sheetSelect', 'workbookSelect', 'lockSheetBtn', 'lockStatus')
 
-    expect(mockBGMState.enrich.isLocked).toBe(true)
-    expect(mockBGMState.enrich.lockedWorkbookName).toBe('wb1.xlsx')
-    expect(mockBGMState.enrich.lockedSheetName).toBe('TargetSheet')
-    expect(mockBGMState.enrich.lockedSheetIndex).toBe(2)
-    expect(storage._store.bgm_enrich_locked_workbook).toBeTruthy()
+    expect(sharedBGM.sheet.isLocked).toBe(true)
+    expect(sharedBGM.sheet.lockedWorkbookName).toBe('wb1.xlsx')
+    expect(sharedBGM.sheet.lockedName).toBe('TargetSheet')
+    expect(sharedBGM.sheet.lockedIndex).toBe(2)
+    expect(storage._store[LOCKED_SHEET_KEY]).toBeTruthy()
     expect(mockReferences.mockShowToast).toHaveBeenCalled()
   })
 
-  it('已锁定状态下点击解锁', () => {
+  it('已锁定相同目标时点击解锁并清除状态', () => {
+    sharedBGM.sheet.isLocked = true
+    sharedBGM.sheet.lockedWorkbookName = 'wb1.xlsx'
+    sharedBGM.sheet.lockedName = 'TargetSheet'
+    sharedBGM.sheet.lockedIndex = 2
+    const storage = createMockPluginStorage({
+      [LOCKED_SHEET_KEY]: '{"index":2,"name":"TargetSheet","workbookName":"wb1.xlsx"}',
+    })
     setupBasicDom()
-    mockBGMState.enrich.isLocked = true
-    mockBGMState.enrich.lockedWorkbookName = 'wb1.xlsx'
-    mockBGMState.enrich.lockedSheetName = 'TargetSheet'
-    mockBGMState.enrich.lockedSheetIndex = 2
-
     const wbSelect = document.getElementById('workbookSelect') as HTMLSelectElement
     wbSelect.innerHTML = '<option value="wb1.xlsx">wb1.xlsx</option>'
     wbSelect.value = 'wb1.xlsx'
-
     const sheetSelect = document.getElementById('sheetSelect') as HTMLSelectElement
     sheetSelect.innerHTML = '<option value="2">TargetSheet</option>'
     sheetSelect.value = '2'
-
-    const workbooks = createMockWorkbooks([{ Name: 'wb1.xlsx', Sheets: ['Sheet1', 'TargetSheet'] }])
-    const storage = createMockPluginStorage({
-      bgm_enrich_locked_workbook:
-        '{"workbookName":"wb1.xlsx","sheetName":"TargetSheet","sheetIndex":2}',
-    })
-    const app = createMockApp(workbooks, 'wb1.xlsx', storage)
-    setMockApp(app)
+    setMockApp(
+      createMockApp(
+        createMockWorkbooks([{ Name: 'wb1.xlsx', Sheets: ['Sheet1', 'TargetSheet'] }]),
+        'wb1.xlsx',
+        storage,
+      ),
+    )
 
     toggleEnrichWorkbookLock('sheetSelect', 'workbookSelect', 'lockSheetBtn', 'lockStatus')
 
-    expect(mockBGMState.enrich.isLocked).toBe(false)
-    expect(mockBGMState.enrich.lockedWorkbookName).toBeNull()
-    expect(mockBGMState.enrich.lockedSheetName).toBeNull()
-    expect(mockBGMState.enrich.lockedSheetIndex).toBeNull()
+    expect(sharedBGM.sheet.isLocked).toBe(false)
+    expect(sharedBGM.sheet.lockedWorkbookName).toBeNull()
+    expect(sharedBGM.sheet.lockedIndex).toBeNull()
+    expect(storage._store[LOCKED_SHEET_KEY]).toBe('')
     expect(mockReferences.mockShowToast).toHaveBeenCalled()
   })
 
-  it('未选择工作表时提示错误', () => {
-    setupBasicDom()
+  it('未选择工作表 / 未选择工作簿时提示错误', () => {
+    const { storage } = prepareToggle()
     const sheetSelect = document.getElementById('sheetSelect') as HTMLSelectElement
+
     sheetSelect.value = ''
-
-    const workbooks = createMockWorkbooks([{ Name: 'wb1.xlsx', Sheets: ['Sheet1'] }])
-    const app = createMockApp(workbooks)
-    setMockApp(app)
-
     toggleEnrichWorkbookLock('sheetSelect', 'workbookSelect', 'lockSheetBtn', 'lockStatus')
-
+    expect(sharedBGM.sheet.isLocked).toBe(false)
     expect(mockReferences.mockShowToast).toHaveBeenCalled()
-    expect(mockBGMState.enrich.isLocked).toBe(false)
-  })
 
-  it('未选择工作簿时提示错误', () => {
-    setupBasicDom()
+    sheetSelect.value = '2'
     const wbSelect = document.getElementById('workbookSelect') as HTMLSelectElement
     wbSelect.value = ''
-
-    const sheetSelect = document.getElementById('sheetSelect') as HTMLSelectElement
-    sheetSelect.innerHTML = '<option value="1">Sheet1</option>'
-    sheetSelect.value = '1'
-
-    const workbooks = createMockWorkbooks([{ Name: 'wb1.xlsx', Sheets: ['Sheet1'] }])
-    const app = createMockApp(workbooks)
-    setMockApp(app)
-
     toggleEnrichWorkbookLock('sheetSelect', 'workbookSelect', 'lockSheetBtn', 'lockStatus')
-
-    expect(mockReferences.mockShowToast).toHaveBeenCalled()
+    expect(storage._store[LOCKED_SHEET_KEY]).toBeUndefined()
   })
 
-  it('DOM 元素不存在时不报错', () => {
-    const workbooks = createMockWorkbooks([{ Name: 'wb1.xlsx', Sheets: ['Sheet1'] }])
-    const app = createMockApp(workbooks)
-    setMockApp(app)
+  it('DOM 元素不存在时不抛错', () => {
+    setMockApp(createMockApp(createMockWorkbooks([{ Name: 'wb1.xlsx', Sheets: ['Sheet1'] }])))
 
     expect(() =>
       toggleEnrichWorkbookLock('nonexistent', 'workbookSelect', 'lockSheetBtn', 'lockStatus'),
@@ -496,13 +869,13 @@ describe('toggleEnrichWorkbookLock', () => {
   })
 })
 
-// ============ 场景 4: updateEnrichLockButton ============
+// ============ 场景 9: updateEnrichLockButton ============
 describe('updateEnrichLockButton', () => {
   it('锁定状态下更新按钮文字和状态显示', () => {
     setupBasicDom()
-    mockBGMState.enrich.isLocked = true
-    mockBGMState.enrich.lockedWorkbookName = 'wb1.xlsx'
-    mockBGMState.enrich.lockedSheetName = 'Sheet1'
+    sharedBGM.sheet.isLocked = true
+    sharedBGM.sheet.lockedWorkbookName = 'wb1.xlsx'
+    sharedBGM.sheet.lockedName = 'Sheet1'
 
     updateEnrichLockButton('lockSheetBtn', 'lockStatus')
 
@@ -510,14 +883,13 @@ describe('updateEnrichLockButton', () => {
     const status = document.getElementById('lockStatus') as HTMLDivElement
     expect(button.textContent).toContain('解锁')
     expect(button.classList.contains('locked')).toBe(true)
-    expect(status.style.display).not.toBe('none')
+    expect(status.classList.contains('show')).toBe(true)
     expect(status.textContent).toContain('wb1.xlsx')
     expect(status.textContent).toContain('Sheet1')
   })
 
   it('未锁定状态下更新按钮文字', () => {
     setupBasicDom()
-    mockBGMState.enrich.isLocked = false
 
     updateEnrichLockButton('lockSheetBtn', 'lockStatus')
 
@@ -525,382 +897,167 @@ describe('updateEnrichLockButton', () => {
     const status = document.getElementById('lockStatus') as HTMLDivElement
     expect(button.textContent).toContain('锁定')
     expect(button.classList.contains('locked')).toBe(false)
-    expect(status.style.display).toBe('none')
+    expect(status.classList.contains('show')).toBe(false)
   })
 
-  it('DOM 元素不存在时不报错', () => {
+  it('DOM 元素不存在时不抛错', () => {
     expect(() => updateEnrichLockButton('nonexistentBtn', 'nonexistentStatus')).not.toThrow()
   })
 })
 
-// ============ 场景 5: saveEnrichLockedWorkbook ============
-describe('saveEnrichLockedWorkbook', () => {
-  it('保存锁定信息到 PluginStorage', () => {
-    const workbooks = createMockWorkbooks([{ Name: 'wb1.xlsx', Sheets: ['Sheet1'] }])
+// ============ 场景 10: lockEnrichWorkbookByName ============
+describe('lockEnrichWorkbookByName', () => {
+  it('按工作簿 + 索引锁定并写入共享状态', () => {
     const storage = createMockPluginStorage()
-    const app = createMockApp(workbooks, 'wb1.xlsx', storage)
-    setMockApp(app)
-
-    saveEnrichLockedWorkbook({
-      workbookName: 'wb1.xlsx',
-      sheetName: 'Sheet1',
-      sheetIndex: 1,
-    })
-
-    expect(storage._store.bgm_enrich_locked_workbook).toBe(
-      JSON.stringify({ workbookName: 'wb1.xlsx', sheetName: 'Sheet1', sheetIndex: 1 }),
+    setMockApp(
+      createMockApp(
+        createMockWorkbooks([{ Name: 'wb1.xlsx', Sheets: ['Sheet1', 'Target'] }]),
+        'wb1.xlsx',
+        storage,
+      ),
     )
-    expect(mockReferences.mockBgmLog).toHaveBeenCalled()
+
+    const isLocked = lockEnrichWorkbookByName('wb1.xlsx', 2)
+
+    expect(isLocked).toBe(true)
+    expect(sharedBGM.sheet.isLocked).toBe(true)
+    expect(sharedBGM.sheet.lockedWorkbookName).toBe('wb1.xlsx')
+    expect(sharedBGM.sheet.lockedName).toBe('Target')
+    expect(sharedBGM.sheet.lockedIndex).toBe(2)
+    expect(storage._store[LOCKED_SHEET_KEY]).toBeTruthy()
   })
 
-  it('传入 null 时清除持久化数据', () => {
-    const workbooks = createMockWorkbooks([{ Name: 'wb1.xlsx', Sheets: ['Sheet1'] }])
-    const storage = createMockPluginStorage({
-      bgm_enrich_locked_workbook: '{"workbookName":"wb1.xlsx","sheetName":"Sheet1","sheetIndex":1}',
-    })
-    const app = createMockApp(workbooks, 'wb1.xlsx', storage)
-    setMockApp(app)
+  it('工作簿不存在 / 索引越界返回 false', () => {
+    setMockApp(createMockApp(createMockWorkbooks([{ Name: 'wb1.xlsx', Sheets: ['Sheet1'] }])))
 
-    saveEnrichLockedWorkbook(null)
-
-    expect(storage._store.bgm_enrich_locked_workbook).toBe('')
-    expect(mockReferences.mockBgmLog).toHaveBeenCalled()
-  })
-
-  it('PluginStorage 不可用时记录警告', () => {
-    const workbooks = createMockWorkbooks([{ Name: 'wb1.xlsx', Sheets: ['Sheet1'] }])
-    const app = createMockApp(workbooks)
-    app.PluginStorage = undefined as unknown as typeof app.PluginStorage
-    setMockApp(app)
-
-    saveEnrichLockedWorkbook({
-      workbookName: 'wb1.xlsx',
-      sheetName: 'Sheet1',
-      sheetIndex: 1,
-    })
-
-    expect(mockReferences.mockBgmLog).toHaveBeenCalled()
+    expect(lockEnrichWorkbookByName('deleted.xlsx', 1)).toBe(false)
+    expect(lockEnrichWorkbookByName('wb1.xlsx', 99)).toBe(false)
+    expect(sharedBGM.sheet.isLocked).toBe(false)
   })
 })
 
-// ============ 场景 6: restoreEnrichLockedWorkbook ============
-describe('restoreEnrichLockedWorkbook', () => {
-  it('成功恢复锁定状态', () => {
-    const workbooks = createMockWorkbooks([{ Name: 'wb1.xlsx', Sheets: ['Sheet1', 'Target'] }])
-    const storage = createMockPluginStorage({
-      bgm_enrich_locked_workbook: '{"workbookName":"wb1.xlsx","sheetName":"Target","sheetIndex":2}',
-    })
-    const app = createMockApp(workbooks, 'wb1.xlsx', storage)
-    setMockApp(app)
-
-    const isResult = restoreEnrichLockedWorkbook()
-
-    expect(isResult).toBe(true)
-    expect(mockBGMState.enrich.isLocked).toBe(true)
-    expect(mockBGMState.enrich.lockedWorkbookName).toBe('wb1.xlsx')
-    expect(mockBGMState.enrich.lockedSheetName).toBe('Target')
-    expect(mockBGMState.enrich.lockedSheetIndex).toBe(2)
-  })
-
-  it('无持久化数据时返回 false', () => {
-    const workbooks = createMockWorkbooks([{ Name: 'wb1.xlsx', Sheets: ['Sheet1'] }])
-    const storage = createMockPluginStorage()
-    const app = createMockApp(workbooks, 'wb1.xlsx', storage)
-    setMockApp(app)
-
-    const isResult = restoreEnrichLockedWorkbook()
-
-    expect(isResult).toBe(false)
-    expect(mockBGMState.enrich.isLocked).toBe(false)
-  })
-
-  it('锁定的工作簿不存在时清除状态', () => {
-    const workbooks = createMockWorkbooks([{ Name: 'other.xlsx', Sheets: ['Sheet1'] }])
-    const storage = createMockPluginStorage({
-      bgm_enrich_locked_workbook:
-        '{"workbookName":"deleted.xlsx","sheetName":"Sheet1","sheetIndex":1}',
-    })
-    const app = createMockApp(workbooks, 'other.xlsx', storage)
-    setMockApp(app)
-
-    const isResult = restoreEnrichLockedWorkbook()
-
-    expect(isResult).toBe(false)
-    expect(mockBGMState.enrich.isLocked).toBe(false)
-    expect(mockBGMState.enrich.lockedWorkbookName).toBeNull()
-    expect(storage._store.bgm_enrich_locked_workbook).toBe('')
-  })
-
-  it('锁定的工作表不存在时清除状态', () => {
-    const workbooks = createMockWorkbooks([
-      // 只有 Sheet1，没有 Target
-      { Name: 'wb1.xlsx', Sheets: ['Sheet1'] },
-    ])
-    const storage = createMockPluginStorage({
-      bgm_enrich_locked_workbook: '{"workbookName":"wb1.xlsx","sheetName":"Target","sheetIndex":2}',
-    })
-    const app = createMockApp(workbooks, 'wb1.xlsx', storage)
-    setMockApp(app)
-
-    const isResult = restoreEnrichLockedWorkbook()
-
-    expect(isResult).toBe(false)
-    expect(mockBGMState.enrich.isLocked).toBe(false)
-    expect(storage._store.bgm_enrich_locked_workbook).toBe('')
-  })
-
-  it('JSON 数据损坏时清除状态', () => {
-    const workbooks = createMockWorkbooks([{ Name: 'wb1.xlsx', Sheets: ['Sheet1'] }])
-    const storage = createMockPluginStorage({
-      bgm_enrich_locked_workbook: 'invalid-json{{{',
-    })
-    const app = createMockApp(workbooks, 'wb1.xlsx', storage)
-    setMockApp(app)
-
-    const isResult = restoreEnrichLockedWorkbook()
-
-    expect(isResult).toBe(false)
-    expect(mockBGMState.enrich.isLocked).toBe(false)
-    expect(storage._store.bgm_enrich_locked_workbook).toBe('')
-  })
-
-  it('Workbooks 不可用时清除状态', () => {
-    const workbooks = createMockWorkbooks([{ Name: 'wb1.xlsx', Sheets: ['Sheet1'] }])
-    const storage = createMockPluginStorage({
-      bgm_enrich_locked_workbook: '{"workbookName":"wb1.xlsx","sheetName":"Sheet1","sheetIndex":1}',
-    })
-    const app = createMockApp(workbooks, 'wb1.xlsx', storage)
-    ;(app as unknown as { Workbooks: null }).Workbooks = null
-    setMockApp(app)
-
-    const isResult = restoreEnrichLockedWorkbook()
-
-    expect(isResult).toBe(false)
-    expect(mockBGMState.enrich.isLocked).toBe(false)
-  })
-
-  it('PluginStorage 不可用时返回 false', () => {
-    const workbooks = createMockWorkbooks([{ Name: 'wb1.xlsx', Sheets: ['Sheet1'] }])
-    const app = createMockApp(workbooks, 'wb1.xlsx')
-    app.PluginStorage = undefined as unknown as typeof app.PluginStorage
-    setMockApp(app)
-
-    const isResult = restoreEnrichLockedWorkbook()
-
-    expect(isResult).toBe(false)
-  })
-})
-
-// ============ 场景 7: getLockedEnrichSheet ============
-describe('getLockedEnrichSheet', () => {
-  it('返回锁定的工作簿和工作表引用', () => {
-    mockBGMState.enrich.isLocked = true
-    mockBGMState.enrich.lockedWorkbookName = 'wb1.xlsx'
-    mockBGMState.enrich.lockedSheetName = 'Sheet1'
-
-    const workbooks = createMockWorkbooks([{ Name: 'wb1.xlsx', Sheets: ['Sheet1', 'Sheet2'] }])
-    const app = createMockApp(workbooks)
-    setMockApp(app)
-
-    const result = getLockedEnrichSheet()
-
-    expect(result).not.toBeNull()
-    expect(result![0].Name).toBe('wb1.xlsx')
-    expect(result![1].Name).toBe('Sheet1')
-  })
-
-  it('未锁定时返回 null', () => {
-    mockBGMState.enrich.isLocked = false
-
-    const result = getLockedEnrichSheet()
-
-    expect(result).toBeNull()
-  })
-
-  it('锁定的工作簿不存在时返回 null 并清除状态', () => {
-    mockBGMState.enrich.isLocked = true
-    mockBGMState.enrich.lockedWorkbookName = 'deleted.xlsx'
-    mockBGMState.enrich.lockedSheetName = 'Sheet1'
-
-    const workbooks = createMockWorkbooks([{ Name: 'wb1.xlsx', Sheets: ['Sheet1'] }])
-    const storage = createMockPluginStorage({
-      bgm_enrich_locked_workbook:
-        '{"workbookName":"deleted.xlsx","sheetName":"Sheet1","sheetIndex":1}',
-    })
-    const app = createMockApp(workbooks)
-    app.PluginStorage = storage
-    setMockApp(app)
-
-    const result = getLockedEnrichSheet()
-
-    expect(result).toBeNull()
-    expect(mockBGMState.enrich.isLocked).toBe(false)
-  })
-
-  it('锁定的工作表不存在时返回 null 并清除状态', () => {
-    mockBGMState.enrich.isLocked = true
-    mockBGMState.enrich.lockedWorkbookName = 'wb1.xlsx'
-    mockBGMState.enrich.lockedSheetName = 'deletedSheet'
-
-    const workbooks = createMockWorkbooks([
-      // 没有 deletedSheet
-      { Name: 'wb1.xlsx', Sheets: ['Sheet1'] },
-    ])
-    const storage = createMockPluginStorage({
-      bgm_enrich_locked_workbook:
-        '{"workbookName":"wb1.xlsx","sheetName":"deletedSheet","sheetIndex":2}',
-    })
-    const app = createMockApp(workbooks)
-    app.PluginStorage = storage
-    setMockApp(app)
-
-    const result = getLockedEnrichSheet()
-
-    expect(result).toBeNull()
-    expect(mockBGMState.enrich.isLocked).toBe(false)
-  })
-
-  it('Workbooks 不可用时返回 null', () => {
-    mockBGMState.enrich.isLocked = true
-    mockBGMState.enrich.lockedWorkbookName = 'wb1.xlsx'
-    mockBGMState.enrich.lockedSheetName = 'Sheet1'
-
-    const workbooks = createMockWorkbooks([{ Name: 'wb1.xlsx', Sheets: ['Sheet1'] }])
-    const app = createMockApp(workbooks)
-    ;(app as unknown as { Workbooks: null }).Workbooks = null
-    setMockApp(app)
-
-    const result = getLockedEnrichSheet()
-
-    expect(result).toBeNull()
-  })
-})
-
-// ============ 场景 8: findWorkbookByName / findSheetInWorkbook ============
-describe('findWorkbookByName / findSheetInWorkbook', () => {
-  it('findWorkbookByName 找到工作簿', () => {
-    const workbooks = createMockWorkbooks([
-      { Name: 'wb1.xlsx', Sheets: ['Sheet1'] },
-      { Name: 'wb2.xlsx', Sheets: ['Data'] },
-    ])
-    const app = createMockApp(workbooks)
-    setMockApp(app)
-
-    const result = findWorkbookByName('wb2.xlsx')
-
-    expect(result).not.toBeNull()
-    expect(result!.Name).toBe('wb2.xlsx')
-  })
-
-  it('findWorkbookByName 未找到返回 null', () => {
-    const workbooks = createMockWorkbooks([{ Name: 'wb1.xlsx', Sheets: ['Sheet1'] }])
-    const app = createMockApp(workbooks)
-    setMockApp(app)
-
-    const result = findWorkbookByName('nonexistent.xlsx')
-
-    expect(result).toBeNull()
-  })
-
-  it('findWorkbookByName 名称为 null/空返回 null', () => {
-    const workbooks = createMockWorkbooks([{ Name: 'wb1.xlsx', Sheets: ['Sheet1'] }])
-    const app = createMockApp(workbooks)
-    setMockApp(app)
-
-    expect(findWorkbookByName(null)).toBeNull()
-    expect(findWorkbookByName('')).toBeNull()
-  })
-
-  it('findSheetInWorkbook 找到工作表', () => {
-    const workbooks = createMockWorkbooks([{ Name: 'wb1.xlsx', Sheets: ['Sheet1', 'Target'] }])
-    const app = createMockApp(workbooks)
-    setMockApp(app)
-
-    const result = findSheetInWorkbook('wb1.xlsx', 'Target')
-
-    expect(result).not.toBeNull()
-    expect(result!.Name).toBe('Target')
-  })
-
-  it('findSheetInWorkbook 未找到工作表返回 null', () => {
-    const workbooks = createMockWorkbooks([{ Name: 'wb1.xlsx', Sheets: ['Sheet1'] }])
-    const app = createMockApp(workbooks)
-    setMockApp(app)
-
-    const result = findSheetInWorkbook('wb1.xlsx', 'Nonexistent')
-
-    expect(result).toBeNull()
-  })
-
-  it('findSheetInWorkbook 工作簿不存在返回 null', () => {
-    const workbooks = createMockWorkbooks([{ Name: 'wb1.xlsx', Sheets: ['Sheet1'] }])
-    const app = createMockApp(workbooks)
-    setMockApp(app)
-
-    const result = findSheetInWorkbook('nonexistent.xlsx', 'Sheet1')
-
-    expect(result).toBeNull()
-  })
-})
-
-// ============ 场景 9: initEnrichLock 初始化流程 ============
-describe('initEnrichLock', () => {
-  it('无锁定状态时初始化下拉框', () => {
+// ============ 场景 11: autoSelectEnrichTarget ============
+describe('autoSelectEnrichTarget', () => {
+  it('唯一候选时自动锁定并返回 locked', () => {
     setupBasicDom()
-    const workbooks = createMockWorkbooks([
-      { Name: 'wb1.xlsx', Sheets: ['Sheet1', 'Sheet2'] },
-      { Name: 'wb2.xlsx', Sheets: ['Data'] },
-    ])
+    setupScanMocks()
+    const sheet = createScanSheet('bangumi 追踪', {
+      headerRow: 1,
+      headerKeyCount: 3,
+      dataCount: 3,
+    })
     const storage = createMockPluginStorage()
-    const app = createMockApp(workbooks, 'wb1.xlsx', storage)
-    setMockApp(app)
+    setMockApp(createScanApp({ wb1: [sheet] }, 'wb1', '', storage))
+
+    const result = autoSelectEnrichTarget(
+      'workbookSelect',
+      'sheetSelect',
+      'lockSheetBtn',
+      'lockStatus',
+    )
+
+    expect(result).toBe('locked')
+    expect(sharedBGM.sheet.isLocked).toBe(true)
+    expect(sharedBGM.sheet.lockedWorkbookName).toBe('wb1')
+    expect(sharedBGM.sheet.lockedName).toBe('bangumi 追踪')
+    expect(storage._store[LOCKED_SHEET_KEY]).toBeTruthy()
+  })
+
+  it('多个候选时预选首个并返回 preselected（不锁定）', () => {
+    setupBasicDom()
+    setupScanMocks()
+    const sheetA = createScanSheet('bangumi A', { headerRow: 1, headerKeyCount: 3, dataCount: 3 })
+    const sheetB = createScanSheet('bangumi B', { headerRow: 1, headerKeyCount: 3, dataCount: 3 })
+    const storage = createMockPluginStorage()
+    setMockApp(createScanApp({ wb1: [sheetA, sheetB] }, 'wb1', '', storage))
+    // 先刷新工作簿下拉框（真实流程中 initEnrichLock 会先调用 refreshEnrichWorkbooks）
+    refreshEnrichWorkbooks('workbookSelect')
+
+    const result = autoSelectEnrichTarget(
+      'workbookSelect',
+      'sheetSelect',
+      'lockSheetBtn',
+      'lockStatus',
+    )
+
+    expect(result).toBe('preselected')
+    expect(sharedBGM.sheet.isLocked).toBe(false)
+    const wbSelect = document.getElementById('workbookSelect') as HTMLSelectElement
+    expect(wbSelect.value).toBe('wb1')
+    const sheetSelect = document.getElementById('sheetSelect') as HTMLSelectElement
+    expect(sheetSelect.value).toBe('1')
+  })
+
+  it('已锁定状态时直接返回 locked', () => {
+    sharedBGM.sheet.isLocked = true
+    expect(autoSelectEnrichTarget()).toBe('locked')
+  })
+
+  it('无候选时返回 none', () => {
+    setupBasicDom()
+    setupScanMocks()
+    setMockApp(createScanApp({ wb1: [createScanSheet('Sheet数据', null)] }, 'wb1'))
+
+    expect(
+      autoSelectEnrichTarget('workbookSelect', 'sheetSelect', 'lockSheetBtn', 'lockStatus'),
+    ).toBe('none')
+  })
+})
+
+// ============ 场景 12: initEnrichLock ============
+describe('initEnrichLock', () => {
+  it('无锁定状态时初始化下拉框（扫描无候选）', () => {
+    setupBasicDom()
+    setupScanMocks()
+    setMockApp(createScanApp({ wb1: [createScanSheet('Sheet数据', null)] }, 'wb1'))
 
     initEnrichLock('workbookSelect', 'sheetSelect', 'lockSheetBtn', 'lockStatus')
 
     const wbSelect = document.getElementById('workbookSelect') as HTMLSelectElement
     const sheetSelect = document.getElementById('sheetSelect') as HTMLSelectElement
-    // 默认 + 2 个工作簿
-    expect(wbSelect.options.length).toBe(3)
-    // 至少有默认
-    expect(sheetSelect.options.length).toBeGreaterThan(1)
-    expect(mockBGMState.enrich.isLocked).toBe(false)
+    // 活动工作簿（wb1）自动选中，其工作表已填充
+    expect(wbSelect.options.length).toBe(2)
+    expect(wbSelect.value).toBe('wb1')
+    expect(sheetSelect.options.length).toBe(2)
+    expect(sharedBGM.sheet.isLocked).toBe(false)
   })
 
   it('有锁定状态时恢复选中值', () => {
     setupBasicDom()
-    const workbooks = createMockWorkbooks([
-      { Name: 'wb1.xlsx', Sheets: ['Sheet1', 'Target'] },
-      { Name: 'wb2.xlsx', Sheets: ['Data'] },
-    ])
     const storage = createMockPluginStorage({
-      bgm_enrich_locked_workbook: '{"workbookName":"wb1.xlsx","sheetName":"Target","sheetIndex":2}',
+      [LOCKED_SHEET_KEY]: '{"index":2,"name":"Target","workbookName":"wb1.xlsx"}',
     })
-    const app = createMockApp(workbooks, 'wb1.xlsx', storage)
-    setMockApp(app)
+    setMockApp(
+      createMockApp(
+        createMockWorkbooks([
+          { Name: 'wb1.xlsx', Sheets: ['Sheet1', 'Target'] },
+          { Name: 'wb2.xlsx', Sheets: ['Data'] },
+        ]),
+        'wb1.xlsx',
+        storage,
+      ),
+    )
 
     initEnrichLock('workbookSelect', 'sheetSelect', 'lockSheetBtn', 'lockStatus')
 
-    expect(mockBGMState.enrich.isLocked).toBe(true)
-    expect(mockBGMState.enrich.lockedWorkbookName).toBe('wb1.xlsx')
-
+    expect(sharedBGM.sheet.isLocked).toBe(true)
+    expect(sharedBGM.sheet.lockedWorkbookName).toBe('wb1.xlsx')
     const wbSelect = document.getElementById('workbookSelect') as HTMLSelectElement
     const sheetSelect = document.getElementById('sheetSelect') as HTMLSelectElement
     expect(wbSelect.value).toBe('wb1.xlsx')
     expect(sheetSelect.value).toBe('2')
   })
 
-  it('锁定的工作簿不存在时降级为未锁定状态', () => {
+  it('锁定的工作簿不存在时降级为扫描/未锁定', () => {
     setupBasicDom()
-    const workbooks = createMockWorkbooks([{ Name: 'other.xlsx', Sheets: ['Sheet1'] }])
+    setupScanMocks()
     const storage = createMockPluginStorage({
-      bgm_enrich_locked_workbook:
-        '{"workbookName":"deleted.xlsx","sheetName":"Sheet1","sheetIndex":1}',
+      [LOCKED_SHEET_KEY]: '{"index":1,"name":"Sheet1","workbookName":"deleted.xlsx"}',
     })
-    const app = createMockApp(workbooks, 'other.xlsx', storage)
-    setMockApp(app)
+    setMockApp(createScanApp({ other: [createScanSheet('Sheet数据', null)] }, 'other', '', storage))
 
     initEnrichLock('workbookSelect', 'sheetSelect', 'lockSheetBtn', 'lockStatus')
 
-    expect(mockBGMState.enrich.isLocked).toBe(false)
+    expect(sharedBGM.sheet.isLocked).toBe(false)
   })
 })

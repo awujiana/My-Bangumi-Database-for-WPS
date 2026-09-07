@@ -100,12 +100,15 @@ export function initScrollspy(): void {
    * 由当前滚动位置反推当前区块并高亮。
    *
    * 规则：
-   *  1. 滚到底（视口底部贴文档底部）→ 高亮最后一个区块：末段区块顶部常因
-   *     页面总高不足而永远进不了上部判定带，需在此兜底。
-   *  2. 否则 → 取「起点已进入视口上部判定带」的区块中位置最靠下的那个：
-   *     判定带取小值（顶部 ~96px / 1/4 视口高），使区块上划进入视口顶部附近即成为
-   *     当前主导；若判定带为空（区块过矮/过长/首个被排除），退回最靠上的
-   *     可见区块，保证任何滚动位置都有明确高亮。
+   *  1. 页面可滚动且已滚到底（视口底部贴文档底部）→ 高亮最后一个区块：
+   *     末段区块高度常不足半屏，按可见面积永远赢不过前段，需在此兜底。
+   *  2. 页面不可滚动（内容不足一屏）→ 高亮首个区块（页面入口模块）。
+   *  3. 否则 → 取「视口内可见面积最大」的区块，直接对应"页面当前主要功能模块"：
+   *     可见面积排除吸顶顶栏遮挡区（顶栏之下才是真实可视带），面积相同时
+   *     取文档序靠上者，保证任意滚动位置有且只有一个高亮。
+   *     相比旧算法（高亮「起点已进入顶部 ~96px 判定带」的区块——实为刚划出
+   *     视口顶部的上一个模块），新算法高亮正在占屏的模块，避免错位一档
+   *     （实测：显示「记录与日志」却高亮「数据预览」）。
    */
   const resolveActiveByScroll = (): void => {
     const { innerHeight, scrollY } = window
@@ -120,32 +123,35 @@ export function initScrollspy(): void {
       if (last) setActive(last.id)
       return
     }
-    // 规则 2：起点已进入视口上部判定带的区块中取最靠下的。
-    // 判定带用 min(96px, 1/4 视口高) 而非 1/3 视口：对连续矮区块可让每个区块
-    // "上划进入视口顶部附近"即成为当前主导，避免下一个区块顶部刚进入视口就被
-    // 抢先高亮（滚动错位/滞后——滚到目标区块却高亮其下方区块）。
-    const detectTop = scrollY + Math.min(96, innerHeight * 0.25)
-    let current: HTMLElement | null = null
-    for (const section of sections) {
-      const { top } = section.getBoundingClientRect()
-      const sectionTop = top + scrollY
-      if (sectionTop > detectTop) break
-      // 判定带内最后一个（起点仍 ≤ detectTop）即当前区块
-      current = section
+    // 规则 2：不可滚动页面 → 首个区块
+    if (documentElement.scrollHeight <= innerHeight) {
+      const first = sections[0]
+      if (first) setActive(first.id)
+      return
     }
-    // 规则 2 兜底：判定带为空时取当前视口内最靠上的可见区块
-    if (!current) {
-      const { scrollY: scrollYNow } = window
-      for (const section of sections) {
-        const { bottom, top } = section.getBoundingClientRect()
-        const sectionTop = top + scrollYNow
-        if (sectionTop <= viewportBottom && bottom > 0) {
-          current = section
-          break
-        }
+    // 规则 3：可见面积最大者（排除吸顶顶栏遮挡区）
+    const topbar = document.querySelector('.topbar')
+    const bandTop = topbar instanceof HTMLElement ? topbar.offsetHeight : 0
+    let current: HTMLElement | null = null
+    let maxVisible = 0
+    for (const section of sections) {
+      const rect = section.getBoundingClientRect()
+      const visibleTop = Math.max(rect.top, bandTop)
+      const visibleBottom = Math.min(rect.bottom, innerHeight)
+      const visible = visibleBottom - visibleTop
+      // 严格大于：面积相等时保留文档序靠前（靠上）者
+      if (visible > maxVisible) {
+        maxVisible = visible
+        current = section
       }
     }
-    if (current) setActive(current.id)
+    // 兜底：视口内无任何可见区块（极端布局）时取首个
+    if (!current) {
+      const first = sections[0]
+      if (first) setActive(first.id)
+      return
+    }
+    setActive(current.id)
   }
 
   // 布局变化（窗口缩放 / 字体加载）后重测胶囊位置，并重算当前区块

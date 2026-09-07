@@ -420,7 +420,7 @@ export default tseslint.config(
             '^[oO]n[A-Z]',
             '^Get[A-Z]',
             // b) 动作动词开头返回执行成败的函数（setXxx/addXxx/clearXxx/...）
-            '^(?:set|add|remove|clear|store|copy|save|ensure|export|deduplicate|restore|autoDetect|confirmAndExecute)[A-Z]',
+            '^(?:set|add|remove|clear|store|copy|save|ensure|export|deduplicate|restore|autoDetect|confirmAndExecute|lock)[A-Z]',
             // b') 下划线私有动作函数（_copyTextToClipboard）
             '^_copy',
           ],

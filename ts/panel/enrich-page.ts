@@ -28,6 +28,7 @@ import {
   updateEnrichLockButton,
   getLockedEnrichSheet,
   initEnrichLock,
+  autoSelectEnrichTarget,
 } from '../sync/enrich-lock.js'
 import {
   getAllEnrichRecords,
@@ -163,10 +164,11 @@ export function initEnrichPage(): void {
   bindStartEnrichButton()
   bindRecordControls()
   bindBatchControls()
+  bindConflictDialogButtons()
   loadRecentRecords()
 
   // 如果有锁定的工作表，自动填充到 state
-  if (BGM.enrich.isLocked && BGM.enrich.lockedSheetIndex) {
+  if (BGM.sheet.isLocked && BGM.sheet.lockedIndex) {
     const locked = getLockedEnrichSheet()
     if (locked) {
       const [, lockedSheet] = locked
@@ -223,7 +225,14 @@ function bindTargetSheetControls(): void {
   if (refreshButton) {
     refreshButton.addEventListener('click', () => {
       refreshWorkbookList()
-      refreshSheetList()
+      if (BGM.sheet.isLocked) {
+        refreshSheetList()
+      } else {
+        // 未锁定时重新尝试自动选择目标工作表
+        autoSelectEnrichTarget('workbookSelect', 'sheetSelect', 'lockSheetBtn', 'lockStatus')
+        refreshSheetList()
+        selectTargetSheet()
+      }
       updateEnrichLockButton('lockSheetBtn', 'lockStatus')
     })
   }
@@ -749,9 +758,9 @@ function refreshWorkbookList(): void {
   refreshEnrichWorkbooks('workbookSelect')
 
   // 如果已锁定，选中锁定的工作簿
-  if (BGM.enrich.isLocked && BGM.enrich.lockedWorkbookName) {
+  if (BGM.sheet.isLocked && BGM.sheet.lockedWorkbookName) {
     const wbSelect = safeGetSelect('workbookSelect')
-    if (wbSelect) wbSelect.value = BGM.enrich.lockedWorkbookName
+    if (wbSelect) wbSelect.value = BGM.sheet.lockedWorkbookName
   }
 }
 
@@ -762,9 +771,9 @@ function refreshSheetList(): void {
   refreshEnrichSheets(wbName, 'sheetSelect', 'workbookSelect')
 
   // 如果已锁定，选中锁定的工作表
-  if (BGM.enrich.isLocked && BGM.enrich.lockedSheetIndex) {
+  if (BGM.sheet.isLocked && BGM.sheet.lockedIndex) {
     const sheetSelect = safeGetSelect('sheetSelect')
-    if (sheetSelect) sheetSelect.value = String(BGM.enrich.lockedSheetIndex)
+    if (sheetSelect) sheetSelect.value = String(BGM.sheet.lockedIndex)
   }
 }
 
@@ -786,13 +795,6 @@ function selectTargetSheet(): void {
     const ws = wb.Worksheets.Item(sheetIndex)
     state.bangumiSheet = ws
     bgmLog(LOG_LEVELS.INFO, `[enrich] 已选择目标工作表: ${ws.Name} (索引: ${String(sheetIndex)})`)
-
-    // 同步到 BGM.enrich 状态（未锁定时自动更新）
-    if (!BGM.enrich.isLocked) {
-      BGM.enrich.lockedWorkbookName = wb.Name
-      BGM.enrich.lockedSheetName = ws.Name
-      BGM.enrich.lockedSheetIndex = sheetIndex
-    }
   } catch (error: unknown) {
     state.bangumiSheet = null
     BGM.handleError(error, {
@@ -808,9 +810,14 @@ function toggleSheetLock(): void {
 
   const sheetSelect = safeGetSelect('sheetSelect')
   if (!sheetSelect) return
-  sheetSelect.disabled = BGM.enrich.isLocked
 
-  if (!BGM.enrich.isLocked) {
+  const isNowLocked = BGM.sheet.isLocked
+  sheetSelect.disabled = isNowLocked
+
+  if (isNowLocked) {
+    // 锁定成功后同步目标工作表引用（自动预选场景下不触发 change 事件）
+    selectTargetSheet()
+  } else {
     state.bangumiSheet = null
   }
 }
@@ -834,7 +841,9 @@ function renderSourcePreview(ws: WpsWorksheet, _mapping: EnrichColumnMapping): v
 
   const thead = tableContainer.querySelector('thead')
   if (thead) {
-    thead.innerHTML = sanitizeHtml(`<tr>${headerCells.map((h) => `<th>${h}</th>`).join('')}</tr>`)
+    thead.innerHTML = sanitizeHtml(
+      `<tr><th></th>${headerCells.map((h) => `<th>${h}</th>`).join('')}</tr>`,
+    )
   }
 
   const tbody = tableContainer.querySelector('tbody')
@@ -851,16 +860,28 @@ function renderSourcePreview(ws: WpsWorksheet, _mapping: EnrichColumnMapping): v
     for (let col = 1; col <= headerCells.length; col += 1) {
       const value = getCellValue(ws, row, col).trim()
       if (value) hasData = true
-      rowCells.push(escapeHtml(value))
+      rowCells.push(`<td title="${escapeHtml(value)}">${escapeHtml(value)}</td>`)
     }
     if (hasData) {
       rowsHtml.push(
-        `<tr data-row="${String(row)}">${rowCells.map((c) => `<td>${c}</td>`).join('')}</tr>`,
+        `<tr data-row="${String(row)}"><td class="row-num">${String(row)}</td>${rowCells.join('')}</tr>`,
       )
     }
   }
 
   tbody.innerHTML = sanitizeHtml(rowsHtml.join(''))
+
+  // 预览提示：仅展示前 maxRows 行
+  const hintElement = safeGetElement('sourcePreviewHint')
+  if (hintElement) {
+    if (rowsHtml.length >= maxRows) {
+      hintElement.textContent = `仅显示前 ${String(maxRows)} 行，完整数据请打开源文件查看`
+      hintElement.style.display = ''
+    } else {
+      hintElement.textContent = ''
+      hintElement.style.display = 'none'
+    }
+  }
 
   bgmLog(LOG_LEVELS.INFO, `[enrich] 源数据预览已渲染: ${String(rowsHtml.length)} 行`)
 }
@@ -1404,6 +1425,18 @@ function collectAllConflicts(results: EnrichResultItem[]): ConflictInfo[] {
   return all
 }
 
+/** 静态对话框按钮只需绑定一次（不再随每次展示重建 DOM） */
+function bindConflictDialogButtons(): void {
+  const dialogElement = safeGetElement('conflictDialog')
+  if (!dialogElement) return
+  dialogElement.querySelectorAll('[data-resolution]').forEach((button) => {
+    button.addEventListener('click', () => {
+      const resolution = (button as HTMLElement).dataset.resolution as ConflictInfo['resolution']
+      handleConflictResolution(resolution)
+    })
+  })
+}
+
 function showConflictDialog(): void {
   const dialogElement = safeGetElement('conflictDialog')
   if (!dialogElement) return
@@ -1418,63 +1451,33 @@ function showConflictDialog(): void {
   const current = state.currentConflictIndex + 1
   const percent = Math.round((current / total) * 100)
 
-  const html = `
-    <div class="conflict-header">
-      <span class="conflict-title">⚡️ 字段冲突确认 (${String(current)}/${String(total)})</span>
-      <div class="conflict-progress">
-        <div style="width:${String(percent)}%;height:4px;background:#4a90d9;border-radius:2px;"></div>
-      </div>
-    </div>
-    <div class="conflict-body">
-      <div class="conflict-item">
-        <div class="conflict-row">
-          <span class="conflict-label">条目：</span>
-          <span class="conflict-name">${escapeHtml(conflict.matchedAnimeName)}</span>
-        </div>
-        <div class="conflict-row">
-          <span class="conflict-label">字段：</span>
-          <span class="conflict-field">${escapeHtml(conflict.fieldName)}</span>
-        </div>
-        <div class="conflict-row">
-          <span class="conflict-label">现有值：</span>
-          <span class="conflict-old">${escapeHtml(conflict.oldValue)}</span>
-        </div>
-        <div class="conflict-row">
-          <span class="conflict-label">新番表值：</span>
-          <span class="conflict-new">${escapeHtml(conflict.updatedValue)}</span>
-        </div>
-      </div>
-      <div class="conflict-hint">💡 选择如何处理此冲突</div>
-    </div>
-    <div class="conflict-footer">
-      <button class="btn conflict-btn-btn" id="conflictAppend" data-resolution="append">
-        🔗 全部增量更新
-      </button>
-      <button class="btn conflict-btn-keep" id="conflictKeep" data-resolution="keep">
-        🛡️ 保留原名
-      </button>
-      <button class="btn conflict-btn-overwrite" id="conflictOverwrite" data-resolution="overwrite">
-        ✏️ 使用新番表名
-      </button>
-    </div>
-  `
+  // 静态模板只更新文本值，避免运行时拼接 HTML
+  const titleElement = safeGetElement('conflictTitle')
+  if (titleElement)
+    titleElement.textContent = `⚡️ 字段冲突确认 (${String(current)}/${String(total)})`
 
-  dialogElement.innerHTML = sanitizeHtml(html)
+  const fillElement = safeGetElement('conflictProgressFill')
+  if (fillElement) fillElement.style.width = `${String(percent)}%`
+
+  const nameElement = safeGetElement('conflictName')
+  if (nameElement) nameElement.textContent = conflict.matchedAnimeName
+
+  const fieldElement = safeGetElement('conflictField')
+  if (fieldElement) fieldElement.textContent = conflict.fieldName
+
+  const oldElement = safeGetElement('conflictOld')
+  if (oldElement) oldElement.textContent = conflict.oldValue
+
+  const updatedElement = safeGetElement('conflictNew')
+  if (updatedElement) updatedElement.textContent = conflict.updatedValue
+
   dialogElement.style.display = 'block'
-
-  dialogElement.querySelectorAll('[data-resolution]').forEach((button) => {
-    button.addEventListener('click', () => {
-      const resolution = (button as HTMLElement).dataset.resolution as ConflictInfo['resolution']
-      handleConflictResolution(resolution)
-    })
-  })
 }
 
 function hideConflictDialog(): void {
   const dialogElement = safeGetElement('conflictDialog')
   if (dialogElement) {
     dialogElement.style.display = 'none'
-    dialogElement.replaceChildren()
   }
 }
 

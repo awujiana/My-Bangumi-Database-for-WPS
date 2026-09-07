@@ -5,7 +5,7 @@
  *              从原 panel 模块拆分而来，保持函数签名与行为不变。
  */
 
-import type { WpsFilters, WpsWorksheet } from '../index.js'
+import type { WpsFilters, WpsWorksheet, WpsWorkbook } from '../index.js'
 import {
   PANEL_CONFIG,
   LOG_LEVELS,
@@ -23,6 +23,11 @@ import {
   clearSheetCache,
 } from '../index.js'
 import { sanitizeHtml } from '../tools/sanitize.js'
+import {
+  saveLockedSheet,
+  findWorkbookByName,
+  findBangumiTargetSheets,
+} from '../tools/locked-sheet.js'
 
 // ========== 类型定义 ==========
 interface LockedSheetInfo {
@@ -98,62 +103,6 @@ export function toggleSheetLock(): void {
   }
   updateLockButton()
   refreshData()
-}
-
-export function saveLockedSheet(info: LockedSheetInfo | null): void {
-  const app = getApp()
-  if (app?.PluginStorage) {
-    app.PluginStorage.setItem('bgm_locked_sheet', info ? JSON.stringify(info) : '')
-  }
-}
-
-export function restoreLockedSheet(): boolean {
-  const app = getApp()
-  if (app?.PluginStorage) {
-    const raw = app.PluginStorage.getItem('bgm_locked_sheet')
-    if (raw) {
-      try {
-        const info = JSON.parse(raw) as Partial<LockedSheetInfo>
-        BGM.sheet.lockedIndex = info.index ?? null
-        BGM.sheet.lockedName = info.name ?? null
-        BGM.sheet.lockedWorkbookName = info.workbookName ?? null
-        BGM.sheet.isLocked = !!(info.index != null && info.name)
-
-        // 验证锁定的工作簿是否仍然存在
-        if (BGM.sheet.isLocked && info.workbookName && app.Workbooks) {
-          let isWorkbookFound = false
-          for (let index = 1; index <= app.Workbooks.Count; index += 1) {
-            if (app.Workbooks.Item(index).Name === info.workbookName) {
-              isWorkbookFound = true
-              break
-            }
-          }
-          if (!isWorkbookFound) {
-            bgmLog(
-              LOG_LEVELS.WARN,
-              `[restoreLockedSheet] 锁定的工作簿 "${info.workbookName}" 已不存在，清除锁信息`,
-            )
-            BGM.sheet.lockedIndex = null
-            BGM.sheet.lockedName = null
-            BGM.sheet.lockedWorkbookName = null
-            BGM.sheet.isLocked = false
-            saveLockedSheet(null)
-            return false
-          }
-        }
-
-        return true
-      } catch (error: unknown) {
-        BGM.handleError(error, {
-          showAlert: false,
-          level: BGM.ErrorLevel.INFO,
-          context: 'restoreLockedSheet',
-        })
-        saveLockedSheet(null)
-      }
-    }
-  }
-  return false
 }
 
 export function updateLockButton(): void {
@@ -513,177 +462,38 @@ export function detectHeaderAndColumns(
   }
 }
 
-// 判断指定行的前 colCount 列中是否有任一非空单元格
-// （从 autoDetectSheet 的内层循环抽出为独立函数，用 return 替代内层 break）
-function hasAnyCellValueInRow(target: WpsWorksheet, row: number, colCount: number): boolean {
-  for (let c = 1; c <= colCount; c += 1) {
-    if (getCellValue(target, row, c).trim()) {
-      return true
-    }
-  }
-  return false
-}
-
 export function autoDetectSheet(): {
+  workbookName: string
   sheetIndex: number
   sheetName: string
   headerRow: number
   matchCount: number
   colCount: number
 } | null {
-  const app = getApp()
-  if (!app?.ActiveWorkbook) {
-    BGM.handleError(new Error('Application 不可用'), {
-      showAlert: false,
-      level: BGM.ErrorLevel.INFO,
-      context: 'autoDetectSheet',
-    })
-    return null
-  }
-
-  const sheets = app.ActiveWorkbook.Worksheets
-  let bestMatch: {
-    sheetIndex: number
-    sheetName: string
-    headerRow: number
-    matchCount: number
-    colCount: number
-  } | null = null
-
-  bgmLog(LOG_LEVELS.INFO, `autoDetectSheet: 开始扫描 ${String(sheets.Count)} 个工作表...`)
-
-  for (let si = 1; si <= sheets.Count; si += 1) {
-    let needRestore: (() => void) | false = false
-    const analyzeSheetCandidate = (
-      current: {
-        sheetIndex: number
-        sheetName: string
-        headerRow: number
-        matchCount: number
-        colCount: number
-      } | null,
-    ):
-      | {
-          sheetIndex: number
-          sheetName: string
-          headerRow: number
-          matchCount: number
-          colCount: number
-        }
-      | null
-      | undefined => {
-      const ws: WpsWorksheet = sheets.Item(si)
-      if (typeof ws.Activate === 'function') {
-        const sheetName = ws.Name || ''
-        // 跳过特定系统表（例如同步记录等）
-        if (/^(同步记录|SyncRecord|模糊|搜索|SEARCH)/i.test(sheetName)) {
-          BGM.handleError(new Error(`autoDetectSheet: 跳过系统工作表 "${sheetName}"`), {
-            showAlert: false,
-            level: BGM.ErrorLevel.INFO,
-            context: 'autoDetectSheet',
-          })
-        } else {
-          bgmLog(LOG_LEVELS.INFO, `autoDetectSheet: 正在分析工作表 "${sheetName}"`)
-
-          needRestore = activateSheetIfNeeded(ws)
-          const meta = detectHeaderAndColumns(ws)
-
-          if (meta.headerRow === 0) {
-            bgmLog(
-              LOG_LEVELS.INFO,
-              `  => 工作表 "${sheetName}" 未检测到有效表头 (headerRow=0), 已跳过`,
-            )
-          } else {
-            let dataRowCount = 0
-            let firstDataRow = -1
-            for (let dr = meta.dataStartRow; dr <= meta.dataStartRow + 10; dr += 1) {
-              const hasDataInRow = hasAnyCellValueInRow(ws, dr, meta.lastCol)
-              if (hasDataInRow) {
-                dataRowCount += 1
-                if (firstDataRow < 0) firstDataRow = dr
-              }
-            }
-
-            BGM.handleError(
-              new Error(
-                `  => 工作表 "${sheetName}" 表头行 ${String(meta.headerRow)}, 匹配关键词数 ${String(meta.headerMatchCount)}, ` +
-                  `数据列数 ${String(meta.lastCol)}, 前10行含数据行数 ${String(dataRowCount)}`,
-              ),
-              { showAlert: false, level: BGM.ErrorLevel.INFO, context: 'autoDetectSheet' },
-            )
-
-            if (dataRowCount < 2) {
-              BGM.handleError(
-                new Error(`  => 数据行不足 (${String(dataRowCount)} 行)，不视为有效数据表`),
-                {
-                  showAlert: false,
-                  level: BGM.ErrorLevel.INFO,
-                  context: 'autoDetectSheet',
-                },
-              )
-            } else {
-              const isBetter =
-                !current ||
-                meta.lastCol > current.colCount ||
-                (meta.lastCol === current.colCount && meta.headerMatchCount > current.matchCount)
-
-              BGM.handleError(
-                new Error(
-                  `  => 是否为当前最优: ${isBetter ? '是' : '否'} (现有最优: ${current ? `${current.sheetName}(列${String(current.colCount)})` : '无'})`,
-                ),
-                { showAlert: false, level: BGM.ErrorLevel.INFO, context: 'autoDetectSheet' },
-              )
-
-              if (isBetter) {
-                return {
-                  sheetIndex: si,
-                  sheetName,
-                  headerRow: meta.headerRow,
-                  matchCount: meta.headerMatchCount,
-                  colCount: meta.lastCol,
-                }
-              }
-            }
-          }
-        }
-      } else {
-        BGM.handleError(
-          new Error(`autoDetectSheet: 工作表索引 ${String(si)} 为 null 或无法访问，已跳过`),
-          {
-            showAlert: false,
-            level: BGM.ErrorLevel.INFO,
-            context: 'autoDetectSheet',
-          },
-        )
-      }
-      return current
-    }
-    try {
-      bestMatch = analyzeSheetCandidate(bestMatch) ?? bestMatch
-    } catch (error: unknown) {
-      BGM.handleError(error, {
-        showAlert: false,
-        level: BGM.ErrorLevel.INFO,
-        context: 'autoDetectSheet',
-      })
-    } finally {
-      const restoreFunction = needRestore as (() => void) | false
-      if (typeof restoreFunction === 'function') restoreFunction()
-    }
-  }
-
-  if (bestMatch) {
-    bgmLog(
-      LOG_LEVELS.INFO,
-      `autoDetectSheet: 最终选中工作表 "${bestMatch.sheetName}" (列${String(bestMatch.colCount)}, 行${String(bestMatch.headerRow)})`,
-    )
-  } else {
+  // 跨所有已打开工作簿扫描（表头 + 数据行数 + 名称关键词，优先活动工作簿/工作表）
+  const candidates = findBangumiTargetSheets()
+  const best = candidates[0]
+  if (!best) {
     bgmLog(
       LOG_LEVELS.WARN,
-      'autoDetectSheet: 未在任何工作表中找到有效数据表头（可在切换工作表后手动选择）',
+      'autoDetectSheet: 未在任何工作簿中找到有效追踪表（可在切换工作簿/工作表后手动选择）',
     )
+    return null
   }
-  return bestMatch
+  bgmLog(
+    LOG_LEVELS.INFO,
+    `autoDetectSheet: 最终选中 "${best.workbookName} → ${best.sheetName}" (表头行 ${String(
+      best.headerRow,
+    )}, 关键词 ${String(best.headerMatchCount)}, 数据行 ${String(best.dataRowCount)})`,
+  )
+  return {
+    workbookName: best.workbookName,
+    sheetIndex: best.sheetIndex,
+    sheetName: best.sheetName,
+    headerRow: best.headerRow,
+    matchCount: best.headerMatchCount,
+    colCount: best.headerMatchCount,
+  }
 }
 // ========== 筛选状态 ==========
 
@@ -914,9 +724,16 @@ export function refreshData(): void {
     return
   }
 
+  // 解析目标工作簿：锁定到特定工作簿时跨所有已打开工作簿定位，否则使用活动工作簿
+  let workbook: WpsWorkbook = app.ActiveWorkbook
+  if (BGM.sheet.lockedWorkbookName) {
+    const lockedWorkbook = findWorkbookByName(BGM.sheet.lockedWorkbookName)
+    if (lockedWorkbook) workbook = lockedWorkbook
+  }
+
   let ws: WpsWorksheet | null | undefined = null
   try {
-    ws = app.ActiveWorkbook.Worksheets.Item(sheetIndex)
+    ws = workbook.Worksheets.Item(sheetIndex)
   } catch (error: unknown) {
     if (previewBox)
       previewBox.innerHTML = sanitizeHtml(
@@ -1214,27 +1031,26 @@ export function enlargePreview(): void {
 // ========== 自动检测并锁定工作表 ==========
 
 /**
- * 在当前活动工作簿中自动检测表头，找到后锁定该工作表并刷新预览
- * 返回 true 表示成功检测并锁定，false 表示未找到有效表头
+ * 跨所有已打开工作簿自动检测追踪表，找到后锁定该工作表并刷新预览
+ * 返回 true 表示成功检测并锁定，false 表示未找到有效追踪表
  */
 export function autoDetectAndLockSheet(): boolean {
-  const app = getApp()
   const detected = autoDetectSheet()
   if (detected) {
-    const select = document.getElementById('sheetSelect') as HTMLSelectElement | null
-    if (select) select.value = String(detected.sheetIndex)
+    const wbSelect = document.getElementById('workbookSelect') as HTMLSelectElement | null
+    if (wbSelect && detected.workbookName) wbSelect.value = detected.workbookName
     BGM.sheet.lockedIndex = detected.sheetIndex
     BGM.sheet.lockedName = detected.sheetName
     BGM.sheet.isLocked = true
-    const activeWbName = app?.ActiveWorkbook?.Name ?? ''
-    if (activeWbName) {
-      BGM.sheet.lockedWorkbookName = activeWbName
-    }
+    BGM.sheet.lockedWorkbookName = detected.workbookName || null
     saveLockedSheet({
       index: detected.sheetIndex,
       name: detected.sheetName,
-      ...(activeWbName && { workbookName: activeWbName }),
+      ...(detected.workbookName && { workbookName: detected.workbookName }),
     })
+    refreshSheets()
+    const select = document.getElementById('sheetSelect') as HTMLSelectElement | null
+    if (select) select.value = String(detected.sheetIndex)
     updateLockButton()
     refreshData()
     showToast(`已自动检测表头: ${detected.sheetName}`, 'info')

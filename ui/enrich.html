@@ -223,18 +223,7 @@
               🔒 锁定
             </button>
           </div>
-          <div
-            id="lockStatus"
-            style="
-              display: none;
-              margin-top: 6px;
-              padding: 4px 8px;
-              background: var(--green);
-              color: var(--text-1);
-              border-radius: 4px;
-              font-size: 12px;
-            "
-          ></div>
+          <div id="lockStatus"></div>
         </div>
 
         <div class="enrich-section" id="sec-preview">
@@ -249,6 +238,7 @@
               <tbody></tbody>
             </table>
           </div>
+          <div class="preview-hint" id="sourcePreviewHint"></div>
           <div class="match-stats" id="matchStats" style="display: none">
             <div class="match-stat-card">
               <div class="stat-value" id="exactMatchCount">0</div>
@@ -270,7 +260,7 @@
                   <th>动漫名</th>
                   <th>匹配方式</th>
                   <th>Bangumi行号</th>
-                  <th>状态</th>
+                  <th>Bangumi名称</th>
                 </tr>
               </thead>
               <tbody></tbody>
@@ -405,8 +395,41 @@
           </div>
         </div>
 
-        <!-- 冲突对话框 -->
-        <div id="conflictDialog" class="conflict-dialog" style="display: none"></div>
+        <!-- 冲突对话框（静态模板：JS 只更新文本值并切换显隐，避免运行时注入 HTML） -->
+        <div id="conflictDialog" class="conflict-dialog" style="display: none">
+          <div class="conflict-header">
+            <span class="conflict-title" id="conflictTitle">⚡️ 字段冲突确认</span>
+            <div class="conflict-progress">
+              <div class="conflict-progress-fill" id="conflictProgressFill"></div>
+            </div>
+          </div>
+          <div class="conflict-body">
+            <div class="conflict-row">
+              <span class="conflict-label">条目：</span>
+              <span class="conflict-name" id="conflictName"></span>
+            </div>
+            <div class="conflict-row">
+              <span class="conflict-label">字段：</span>
+              <span class="conflict-field" id="conflictField"></span>
+            </div>
+            <div class="conflict-row">
+              <span class="conflict-label">现有值：</span>
+              <span class="conflict-old" id="conflictOld"></span>
+            </div>
+            <div class="conflict-row">
+              <span class="conflict-label">新番表值：</span>
+              <span class="conflict-new" id="conflictNew"></span>
+            </div>
+            <div class="conflict-hint">💡 选择如何处理此冲突</div>
+          </div>
+          <div class="conflict-footer">
+            <button class="btn conflict-btn-btn" data-resolution="append">🔗 全部增量更新</button>
+            <button class="btn conflict-btn-keep" data-resolution="keep">🛡️ 保留原名</button>
+            <button class="btn conflict-btn-overwrite" data-resolution="overwrite">
+              ✏️ 使用新番表名
+            </button>
+          </div>
+        </div>
       </main>
     </div>
   </body>
