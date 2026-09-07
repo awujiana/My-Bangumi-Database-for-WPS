@@ -85,6 +85,9 @@ interface EnrichPageState {
   // 单文件自动识别表头时打开的源工作簿（重新选择文件/清空列表时安全回收）
   sourceWorkbook: WpsWorkbook | null
   isSourceWorkbookOpenedByUs: boolean
+
+  // 可选开关：单文件识别成功后即关闭源工作簿，开始富化时自动重开
+  closeSourceAfterDetect: boolean
 }
 
 // ========== 状态 ==========
@@ -110,6 +113,8 @@ const state: EnrichPageState = {
 
   sourceWorkbook: null,
   isSourceWorkbookOpenedByUs: false,
+
+  closeSourceAfterDetect: false,
 }
 
 // ========== 列映射字段元数据 ==========
@@ -143,6 +148,11 @@ function safeGetButton(id: string): HTMLButtonElement | null {
 function safeGetSelect(id: string): HTMLSelectElement | null {
   const element = document.getElementById(id)
   return element instanceof HTMLSelectElement ? element : null
+}
+
+function safeGetCheckbox(id: string): HTMLInputElement | null {
+  const element = document.getElementById(id)
+  return element instanceof HTMLInputElement ? element : null
 }
 
 function formatEta(etaMs: number): string {
@@ -207,6 +217,16 @@ function bindDetectHeaderButton(): void {
     button.addEventListener('click', () => {
       autoDetectHeader()
     })
+  }
+
+  // 可选开关：识别后关闭源文件，开始富化时再重开
+  const closeChk = safeGetCheckbox('closeSourceAfterDetectChk')
+  if (closeChk) {
+    closeChk.addEventListener('change', () => {
+      state.closeSourceAfterDetect = closeChk.checked
+      bgmLog(LOG_LEVELS.INFO, `[enrich] 源文件识别后关闭开关: ${closeChk.checked ? '开' : '关'}`)
+    })
+    state.closeSourceAfterDetect = closeChk.checked
   }
 }
 
@@ -672,6 +692,12 @@ function autoDetectHeaderFromFile(filePath: string): boolean {
     // 识别成功：接管当前工作簿
     state.sourceWorkbook = wb
     state.isSourceWorkbookOpenedByUs = isOpenedByUs
+
+    // 可选开关：识别后关闭源工作簿，开始富化时再重开（避免文件长期占用）
+    if (state.closeSourceAfterDetect) {
+      closeSourceWorkbookOnly()
+      bgmLog(LOG_LEVELS.INFO, '[enrich] 识别成功，按开关关闭源工作簿（开始富化时自动重开）')
+    }
     return true
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : String(error)
@@ -743,6 +769,56 @@ function closeOpenedSourceWorkbook(): void {
 
   state.sourceWorkbook = null
   state.isSourceWorkbookOpenedByUs = false
+}
+
+/** 仅关闭源工作簿并断开引用，保留已识别的表头行/列映射（closeSourceAfterDetect 模式用） */
+function closeSourceWorkbookOnly(): void {
+  const wb = state.sourceWorkbook
+  if (!wb) return
+
+  if (state.isSourceWorkbookOpenedByUs) {
+    closeWorkbook(wb)
+    bgmLog(LOG_LEVELS.INFO, `[enrich] 已关闭源工作簿: ${wb.Name}`)
+  }
+
+  // 仅断开引用；保留 headerRow / dataStartRow / columnMapping / matches，供重开时复用
+  state.animeSourceSheet = null
+  state.sourceWorkbook = null
+  state.isSourceWorkbookOpenedByUs = false
+}
+
+/**
+ * 确保开始富化/预览时的源表可用。
+ * closeSourceAfterDetect 模式下识别后工作簿已关闭，此处按需重开并恢复源表引用。
+ * @returns 可用的源工作表；不可用返回 null
+ */
+function ensureSourceSheet(): WpsWorksheet | null {
+  if (state.animeSourceSheet) return state.animeSourceSheet
+
+  // 未持有活动源表引用：若已识别过（有 filePath + 表头），则重开文件恢复
+  if (!state.filePath || state.headerRow === 0 || !state.columnMapping) return null
+
+  const opened = openSourceWorkbook(state.filePath)
+  if (!opened) {
+    bgmLog(LOG_LEVELS.ERROR, `[enrich] 重开源工作簿失败: ${extractFileName(state.filePath)}`)
+    return null
+  }
+
+  const ws = opened.wb.Worksheets.Item(1) as WpsWorksheet | null
+  if (!ws) {
+    if (opened.isOpenedByUs) closeWorkbook(opened.wb)
+    bgmLog(
+      LOG_LEVELS.ERROR,
+      `[enrich] 重开源工作簿失败: ${extractFileName(state.filePath)} 中没有工作表`,
+    )
+    return null
+  }
+
+  state.animeSourceSheet = ws
+  state.sourceWorkbook = opened.wb
+  state.isSourceWorkbookOpenedByUs = opened.isOpenedByUs
+  bgmLog(LOG_LEVELS.INFO, `[enrich] 已重开源工作簿: ${opened.wb.Name}`)
+  return ws
 }
 
 /** 单文件场景下选完文件立即自动识别表头（多文件由 processSingleBatchFile 逐文件识别） */
@@ -1022,7 +1098,8 @@ function renderSourcePreview(ws: WpsWorksheet, _mapping: EnrichColumnMapping): v
 // ========== 匹配预览 ==========
 
 export function previewMatch(): void {
-  if (!state.animeSourceSheet) {
+  const animeSourceSheet = ensureSourceSheet()
+  if (!animeSourceSheet) {
     BGM.Dialog.alert('提示', '请先选择新番表文件并识别表头')
     return
   }
@@ -1038,14 +1115,14 @@ export function previewMatch(): void {
   try {
     const config: EnrichConfig = {
       filePath: state.filePath,
-      sheetName: state.animeSourceSheet.Name || '',
+      sheetName: animeSourceSheet.Name || '',
       headerRow: state.headerRow,
       dataStartRow: state.dataStartRow,
       columnMapping: state.columnMapping,
       targetSheetName: state.bangumiSheet.Name || '',
     }
 
-    state.matches = matchEntries(state.animeSourceSheet, state.bangumiSheet, config)
+    state.matches = matchEntries(animeSourceSheet, state.bangumiSheet, config)
 
     renderMatchStats(state.matches)
     renderMatchResultsToTable(state.matches)
@@ -1061,6 +1138,11 @@ export function previewMatch(): void {
       '错误',
       `匹配预览失败: ${error instanceof Error ? error.message : String(error)}`,
     )
+  } finally {
+    // 可选开关：预览时重开了源工作簿，预览结束同样回收（仅关闭本插件打开的）
+    if (state.closeSourceAfterDetect && state.isSourceWorkbookOpenedByUs) {
+      closeSourceWorkbookOnly()
+    }
   }
 }
 
@@ -1151,7 +1233,8 @@ export function startEnrichment(): void {
     return
   }
 
-  if (!state.animeSourceSheet) {
+  const animeSourceSheet = ensureSourceSheet()
+  if (!animeSourceSheet) {
     BGM.Dialog.alert('提示', '请先选择新番表文件并识别表头')
     return
   }
@@ -1192,7 +1275,7 @@ export function startEnrichment(): void {
 
   const config: EnrichConfig = {
     filePath: state.filePath,
-    sheetName: state.animeSourceSheet.Name || '',
+    sheetName: animeSourceSheet.Name || '',
     headerRow: state.headerRow,
     dataStartRow: state.dataStartRow,
     columnMapping: state.columnMapping,
@@ -1208,7 +1291,7 @@ export function startEnrichment(): void {
     bgmLog(LOG_LEVELS.INFO, `[enrich] 开始富化，共 ${String(state.matches.length)} 条匹配`)
 
     const results = enrichEntries(
-      state.animeSourceSheet,
+      animeSourceSheet,
       state.bangumiSheet,
       state.matches,
       config,
@@ -1243,6 +1326,10 @@ export function startEnrichment(): void {
   } finally {
     state.isEnriching = false
     state.cancelRequested = false
+    // 可选开关：识别后已关闭源工作簿，富化结束再回收一次（仅关闭本插件打开的）
+    if (state.closeSourceAfterDetect && state.isSourceWorkbookOpenedByUs) {
+      closeSourceWorkbookOnly()
+    }
   }
 }
 
