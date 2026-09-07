@@ -562,8 +562,17 @@ function renderBatchFileList(): void {
   }
 
   // 2) 单文件"开始富化"按钮的启用状态
+  //    N>=2 时源表归批量流程所有（单文件源工作簿已被回收），必须禁用，
+  //    否则会拿着失效/错误的源表跑单文件富化。
   if (singleEnrichButton) {
-    singleEnrichButton.disabled = n === 0
+    singleEnrichButton.disabled = n !== 1
+    if (n >= 2) {
+      singleEnrichButton.title = '已选多个文件，请使用「🚀 批量富化」'
+    } else if (n === 0) {
+      singleEnrichButton.title = '请先选择新番表文件'
+    } else {
+      singleEnrichButton.title = ''
+    }
   }
 
   // 3) 文件列表（只在 N≥1 时显示）
@@ -1097,7 +1106,12 @@ function renderSourcePreview(ws: WpsWorksheet, _mapping: EnrichColumnMapping): v
 
 // ========== 匹配预览 ==========
 
-export function previewMatch(): void {
+/**
+ * 匹配预览。
+ * @param options.keepSourceOpen 为 true 时预览结束不回收源工作簿
+ *   （富化流程内部调用时使用：调用方还持有工作表引用，关闭会使其失效）
+ */
+export function previewMatch(options?: { keepSourceOpen?: boolean }): void {
   const animeSourceSheet = ensureSourceSheet()
   if (!animeSourceSheet) {
     BGM.Dialog.alert('提示', '请先选择新番表文件并识别表头')
@@ -1140,7 +1154,11 @@ export function previewMatch(): void {
     )
   } finally {
     // 可选开关：预览时重开了源工作簿，预览结束同样回收（仅关闭本插件打开的）
-    if (state.closeSourceAfterDetect && state.isSourceWorkbookOpenedByUs) {
+    if (
+      !options?.keepSourceOpen &&
+      state.closeSourceAfterDetect &&
+      state.isSourceWorkbookOpenedByUs
+    ) {
       closeSourceWorkbookOnly()
     }
   }
@@ -1233,6 +1251,12 @@ export function startEnrichment(): void {
     return
   }
 
+  // 多文件场景的源表归批量流程所有，单文件富化不可用
+  if (state.batchFiles.length >= 2) {
+    BGM.Dialog.alert('提示', '已选择多个文件，请使用「🚀 批量富化」')
+    return
+  }
+
   const animeSourceSheet = ensureSourceSheet()
   if (!animeSourceSheet) {
     BGM.Dialog.alert('提示', '请先选择新番表文件并识别表头')
@@ -1259,7 +1283,8 @@ export function startEnrichment(): void {
   }
 
   if (state.matches.length === 0) {
-    previewMatch()
+    // keepSourceOpen: 调用方仍持有 animeSourceSheet，预览结束时不能回收工作簿
+    previewMatch({ keepSourceOpen: true })
     // 重新读取（previewMatch 可能已更新 state.matches）
     const recheckedMatches = state.matches
     if (recheckedMatches.length === 0) {
@@ -1347,7 +1372,8 @@ function showProgressUI(isVisible: boolean): void {
 
   const startButton = safeGetButton('startEnrichBtn')
   if (startButton) {
-    startButton.disabled = isVisible
+    // 富化结束恢复时也要尊重"仅 N===1 可用"的约束（N>=2 走批量富化）
+    startButton.disabled = isVisible || state.batchFiles.length !== 1
     startButton.textContent = isVisible ? '⏳️ 富化中...' : '🚀 开始富化'
   }
 }
@@ -1781,6 +1807,12 @@ function batchRemoveFile(index: number): void {
   state.filePath = state.batchFiles[0] ?? ''
   bgmLog(LOG_LEVELS.INFO, `[enrich-batch] 移除文件: ${extractFileName(removed)}`)
   renderBatchFileList()
+
+  // 由多文件回到单文件时，源表状态在 renderBatchFileList() 中已被回收清空，
+  // 这里补一次自动识别，避免用户还要手动点「识别表头」。
+  if (state.batchFiles.length === 1 && state.headerRow === 0) {
+    maybeAutoDetectSingleFile()
+  }
 }
 
 /** 展示/更新批量进度 UI */
