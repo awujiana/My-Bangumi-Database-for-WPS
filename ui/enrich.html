@@ -248,7 +248,8 @@
             <button class="preview-tab active" data-tab="source">新番表数据</button>
             <button class="preview-tab" data-tab="match">匹配结果</button>
           </div>
-          <div class="preview-actions" id="matchPreviewAction">
+          <!-- 「预览匹配」按钮仅在切换到「匹配结果」页签时显示（见 applyPreviewTabVisibility） -->
+          <div class="preview-actions" id="matchPreviewAction" style="display: none">
             <button class="bgm-btn small" id="previewMatchBtn" data-action="previewMatch">
               🔍 预览匹配
             </button>
