@@ -357,6 +357,7 @@
 }
 
 /* 播放平台/独播：徽章式展示（贴合「版权平台标注示例」的表格习惯） */
+/* 默认统一色；按平台名着色（设置页可开关）时由内联 style 覆盖 */
 .preview-table .platform-chip {
   display: inline-block;
   margin: 1px 4px 1px 0;
@@ -368,6 +369,33 @@
   background: rgba(56, 189, 248, 0.1);
   border: 1px solid rgba(56, 189, 248, 0.3);
   color: var(--teal);
+}
+
+/* TAGS 标签徽章：每个标签独立颜色（内联 style 覆盖），不显示 / 分隔符 */
+.preview-table .tag-chip {
+  display: inline-block;
+  margin: 1px 4px 1px 0;
+  padding: 3px 8px;
+  border-radius: 10px;
+  font-size: 10.5px;
+  line-height: 1;
+  white-space: nowrap;
+  background: rgba(167, 139, 250, 0.1);
+  border: 1px solid rgba(167, 139, 250, 0.3);
+  color: var(--purple, #a78bfa);
+}
+
+/* 首播日期徽章：相同日期同色（内联 style 覆盖） */
+.preview-table .premiere-chip {
+  display: inline-block;
+  padding: 3px 8px;
+  border-radius: 10px;
+  font-size: 10.5px;
+  line-height: 1;
+  white-space: nowrap;
+  background: rgba(132, 204, 22, 0.1);
+  border: 1px solid rgba(132, 204, 22, 0.3);
+  color: #84cc16;
 }
 
 /* 周更时间（周一~周日）：基础样式；具体颜色由 .weekday-mon/.weekday-tue 等修饰类覆盖 */
