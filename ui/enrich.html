@@ -253,6 +253,11 @@
             </table>
           </div>
           <div class="preview-hint" id="sourcePreviewHint"></div>
+          <div class="preview-actions" id="sourceDetailAction" style="display: none">
+            <button class="bgm-btn small" id="viewSourceDetailBtn" data-action="viewSourceDetail">
+              📄 查看详细数据表格
+            </button>
+          </div>
           <div class="match-stats" id="matchStats" style="display: none">
             <div class="match-stat-card">
               <div class="stat-value" id="exactMatchCount">0</div>
@@ -267,6 +272,7 @@
               <div class="stat-label">未匹配</div>
             </div>
           </div>
+          <div class="preview-hint" id="matchEmptyHint" style="display: none"></div>
           <div class="preview-table" id="matchPreviewTable" style="display: none">
             <table id="matchTable">
               <thead>
@@ -275,6 +281,7 @@
                   <th>匹配方式</th>
                   <th>Bangumi行号</th>
                   <th>Bangumi名称</th>
+                  <th>详情</th>
                 </tr>
               </thead>
               <tbody></tbody>
@@ -344,6 +351,20 @@
               </div>
             </div>
           </div>
+          <div
+            class="bgm-btn-group bgm-btn-row"
+            id="enrichDetailAction"
+            style="display: none; margin-top: 10px"
+          >
+            <button
+              class="bgm-btn small primary"
+              id="viewEnrichDetailBtn"
+              data-action="viewEnrichDetail"
+              style="flex: 1"
+            >
+              📋 查看详细结果
+            </button>
+          </div>
         </div>
 
         <div class="enrich-section" id="sec-records">
@@ -405,6 +426,48 @@
             <div class="tip-item">
               <span class="tip-num">6</span>
               <span>富化完成后查看记录，验证数据正确性</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- 新番数据完整表格弹窗（静态模板：JS 只更新容器内容并切换显隐） -->
+        <div id="sourceDetailModal" class="modal" style="display: none">
+          <div class="modal-content source-detail-modal">
+            <div class="modal-header">
+              <h3>📄 新番数据完整表格</h3>
+              <button class="modal-close-btn" id="sourceDetailCloseBtn" aria-label="关闭">×</button>
+            </div>
+            <div class="modal-body" id="sourceDetailBody"></div>
+            <div class="modal-footer">
+              <button class="bgm-btn small primary" id="sourceDetailDoneBtn">关闭</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- 匹配详情弹窗（静态模板：JS 只更新文本值并切换显隐，避免运行时注入 HTML） -->
+        <div id="matchDetailModal" class="modal" style="display: none">
+          <div class="modal-content match-detail-modal">
+            <div class="modal-header">
+              <h3>🔍 匹配详情</h3>
+              <button class="modal-close-btn" id="matchDetailCloseBtn" aria-label="关闭">×</button>
+            </div>
+            <div class="modal-body" id="matchDetailBody"></div>
+            <div class="modal-footer">
+              <button class="bgm-btn small primary" id="matchDetailDoneBtn">关闭</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- 富化详细结果弹窗（静态模板：JS 只更新容器内容并切换显隐） -->
+        <div id="enrichDetailModal" class="modal" style="display: none">
+          <div class="modal-content enrich-detail-modal">
+            <div class="modal-header">
+              <h3>📋 富化详细结果</h3>
+              <button class="modal-close-btn" id="enrichDetailCloseBtn" aria-label="关闭">×</button>
+            </div>
+            <div class="modal-body" id="enrichDetailBody"></div>
+            <div class="modal-footer">
+              <button class="bgm-btn small primary" id="enrichDetailDoneBtn">关闭</button>
             </div>
           </div>
         </div>

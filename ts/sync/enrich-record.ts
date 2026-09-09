@@ -47,7 +47,7 @@ export const ENRICH_RECORD_COL = {
 
 export interface EnrichRecord {
   timestamp: string
-  matchType: '精确' | '别名' | '未匹配'
+  matchType: '精确' | '别名' | '新增' | '未匹配'
   name: string
   row: number
   enrichedField: string
@@ -59,7 +59,7 @@ export interface EnrichRecord {
 
 export interface AddEnrichRecordParameters {
   timestamp: string
-  matchType: '精确' | '别名' | '未匹配'
+  matchType: '精确' | '别名' | '新增' | '未匹配'
   name: string
   row: number
   enrichedField: string

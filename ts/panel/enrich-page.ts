@@ -11,6 +11,7 @@ import {
   matchEntries,
   enrichEntries,
   resolveConflictField,
+  isBangumiSheetEmpty,
 } from '../sync/enrich-engine.js'
 import type {
   EnrichColumnMapping,
@@ -63,6 +64,12 @@ interface BatchFileResult {
   error?: string
 }
 
+/** 详情弹窗中的一个文件分组（含该文件全部富化条目） */
+interface EnrichDetailGroup {
+  fileName: string
+  items: EnrichResultItem[]
+}
+
 interface EnrichPageState {
   filePath: string
   animeSourceSheet: WpsWorksheet | null
@@ -82,6 +89,9 @@ interface EnrichPageState {
   batchIndex: number
   isBatchEnriching: boolean
   batchCancelRequested: boolean
+
+  // 详情弹窗数据（最近一次富化各文件的条目明细，单文件为 1 组）
+  enrichDetailGroups: EnrichDetailGroup[]
 
   // 单文件自动识别表头时打开的源工作簿（重新选择文件/清空列表时安全回收）
   sourceWorkbook: WpsWorkbook | null
@@ -111,6 +121,8 @@ const state: EnrichPageState = {
   batchIndex: 0,
   isBatchEnriching: false,
   batchCancelRequested: false,
+
+  enrichDetailGroups: [],
 
   sourceWorkbook: null,
   isSourceWorkbookOpenedByUs: false,
@@ -182,6 +194,8 @@ export function initEnrichPage(): void {
   bindTabSwitches()
   bindStartEnrichButton()
   bindRecordControls()
+  bindEnrichDetailControls()
+  bindPreviewDetailControls()
   bindBatchControls()
   bindConflictDialogButtons()
   loadRecentRecords()
@@ -323,6 +337,54 @@ function bindRecordControls(): void {
   if (clearRecordButton) {
     clearRecordButton.addEventListener('click', () => {
       clearRecords()
+    })
+  }
+}
+
+function bindEnrichDetailControls(): void {
+  const viewButton = safeGetButton('viewEnrichDetailBtn')
+  if (viewButton) {
+    viewButton.addEventListener('click', () => {
+      showEnrichDetail()
+    })
+  }
+
+  const closeButtons = [
+    safeGetButton('enrichDetailCloseBtn'),
+    safeGetButton('enrichDetailDoneBtn'),
+  ].filter((button): button is HTMLButtonElement => button !== null)
+  for (const button of closeButtons) {
+    button.addEventListener('click', () => {
+      hideEnrichDetail()
+    })
+  }
+}
+
+function bindPreviewDetailControls(): void {
+  const viewSourceButton = safeGetButton('viewSourceDetailBtn')
+  if (viewSourceButton) {
+    viewSourceButton.addEventListener('click', () => {
+      showSourceDetail()
+    })
+  }
+
+  const sourceCloseButtons = [
+    safeGetButton('sourceDetailCloseBtn'),
+    safeGetButton('sourceDetailDoneBtn'),
+  ].filter((button): button is HTMLButtonElement => button !== null)
+  for (const button of sourceCloseButtons) {
+    button.addEventListener('click', () => {
+      hideSourceDetail()
+    })
+  }
+
+  const matchCloseButtons = [
+    safeGetButton('matchDetailCloseBtn'),
+    safeGetButton('matchDetailDoneBtn'),
+  ].filter((button): button is HTMLButtonElement => button !== null)
+  for (const button of matchCloseButtons) {
+    button.addEventListener('click', () => {
+      hideMatchDetail()
     })
   }
 }
@@ -892,11 +954,11 @@ function renderColumnMappingEditor(ws: WpsWorksheet, mapping: EnrichColumnMappin
   const { headerRow } = state
   const colOptions: { col: number; header: string }[] = []
 
+  // 覆盖全部列（含表头为空的列）：Hazx 模板的名称列 C 没有表头，
+  // 若只列有表头的列，自动识别的名称列将无法在下拉中回显
   for (let col = 1; col <= maxCols; col += 1) {
     const header = getCellValue(ws, headerRow, col).trim()
-    if (header) {
-      colOptions.push({ col, header })
-    }
+    colOptions.push({ col, header })
   }
 
   let html = ''
@@ -906,10 +968,12 @@ function renderColumnMappingEditor(ws: WpsWorksheet, mapping: EnrichColumnMappin
     const selectedValue = currentCol ? String(currentCol) : ''
 
     const optionsHtml = `<option value="">-- 未映射 --</option>${colOptions
-      .map(
-        (o) =>
-          `<option value="${String(o.col)}" ${String(o.col) === selectedValue ? 'selected' : ''}>${escapeHtml(o.header)} (列${String(o.col)})</option>`,
-      )
+      .map((o) => {
+        const optionLabel = o.header
+          ? `${escapeHtml(o.header)} (列${String(o.col)})`
+          : `(列${String(o.col)}，无表头)`
+        return `<option value="${String(o.col)}" ${String(o.col) === selectedValue ? 'selected' : ''}>${optionLabel}</option>`
+      })
       .join('')}`
 
     const requiredMark = field.required ? ' <span style="color:#ff6b6b;">*</span>' : ''
@@ -1044,25 +1108,45 @@ function toggleSheetLock(): void {
 
 // ========== 源数据预览 ==========
 
-function renderSourcePreview(ws: WpsWorksheet, _mapping: EnrichColumnMapping): void {
+/**
+ * 数据预览的「一栏一行」列顺序：按已映射字段渲染，避免 50 列全部挤压成文本流
+ */
+const PREVIEW_FIELD_COLS: { key: keyof EnrichColumnMapping; label: string }[] = [
+  { key: 'nameCol', label: '名称' },
+  { key: 'weekdayCol', label: '周更时间' },
+  { key: 'premiereCol', label: '首播' },
+  { key: 'episodesCol', label: '集数' },
+  { key: 'platformCol', label: '播放平台' },
+  { key: 'exclusiveCol', label: '独播' },
+  { key: 'specialCol', label: '特殊/备注' },
+  { key: 'tagsCol', label: 'TAGS/标签' },
+]
+
+function renderSourcePreview(ws: WpsWorksheet, mapping: EnrichColumnMapping): void {
   const tableContainer = safeGetElement('sourceTable')
   if (!tableContainer) return
 
-  const maxCols = 50
-  const { headerRow, dataStartRow } = state
+  const { dataStartRow } = state
 
-  const headerCells: string[] = []
-  for (let col = 1; col <= maxCols; col += 1) {
-    const value = getCellValue(ws, headerRow, col).trim()
-    if (value) {
-      headerCells.push(escapeHtml(value))
+  // 只取已映射的字段列，形成「一栏一行」的简洁预览
+  const fieldCols = PREVIEW_FIELD_COLS.filter((f) => (mapping[f.key] ?? 0) > 0)
+  if (fieldCols.length === 0) {
+    const emptyThead = tableContainer.querySelector('thead')
+    if (emptyThead) emptyThead.replaceChildren()
+    const emptyTbody = tableContainer.querySelector('tbody')
+    if (emptyTbody) emptyTbody.replaceChildren()
+    const hintElement = safeGetElement('sourcePreviewHint')
+    if (hintElement) {
+      hintElement.textContent = '尚未识别到映射列，请先在「新番表文件」中识别表头'
+      hintElement.style.display = ''
     }
+    return
   }
 
   const thead = tableContainer.querySelector('thead')
   if (thead) {
     thead.innerHTML = sanitizeHtml(
-      `<tr><th></th>${headerCells.map((h) => `<th>${h}</th>`).join('')}</tr>`,
+      `<tr><th></th>${fieldCols.map((f) => `<th>${escapeHtml(f.label)}</th>`).join('')}</tr>`,
     )
   }
 
@@ -1077,7 +1161,8 @@ function renderSourcePreview(ws: WpsWorksheet, _mapping: EnrichColumnMapping): v
   for (let row = dataStartRow; row <= lastRow; row += 1) {
     const rowCells: string[] = []
     let hasData = false
-    for (let col = 1; col <= headerCells.length; col += 1) {
+    for (const f of fieldCols) {
+      const col = mapping[f.key] ?? 0
       const value = getCellValue(ws, row, col).trim()
       if (value) hasData = true
       rowCells.push(`<td title="${escapeHtml(value)}">${escapeHtml(value)}</td>`)
@@ -1095,7 +1180,7 @@ function renderSourcePreview(ws: WpsWorksheet, _mapping: EnrichColumnMapping): v
   const hintElement = safeGetElement('sourcePreviewHint')
   if (hintElement) {
     if (rowsHtml.length >= maxRows) {
-      hintElement.textContent = `仅显示前 ${String(maxRows)} 行，完整数据请打开源文件查看`
+      hintElement.textContent = `仅显示前 ${String(maxRows)} 行，可点击「查看详细数据表格」查看完整数据`
       hintElement.style.display = ''
     } else {
       hintElement.textContent = ''
@@ -1103,7 +1188,75 @@ function renderSourcePreview(ws: WpsWorksheet, _mapping: EnrichColumnMapping): v
     }
   }
 
+  // 显示「查看详细数据表格」按钮
+  const detailAction = safeGetElement('sourceDetailAction')
+  if (detailAction) {
+    detailAction.style.display = ''
+  }
+
   bgmLog(LOG_LEVELS.INFO, `[enrich] 源数据预览已渲染: ${String(rowsHtml.length)} 行`)
+}
+
+// ========== 源数据完整表格弹窗 ==========
+
+function showSourceDetail(): void {
+  const modalElement = safeGetElement('sourceDetailModal')
+  const bodyElement = safeGetElement('sourceDetailBody')
+  const ws = state.animeSourceSheet
+  if (!modalElement || !bodyElement || !ws) return
+
+  bodyElement.innerHTML = renderSourceDetailTable(ws)
+  modalElement.style.display = 'flex'
+}
+
+function hideSourceDetail(): void {
+  const modalElement = safeGetElement('sourceDetailModal')
+  if (modalElement) {
+    modalElement.style.display = 'none'
+  }
+}
+
+/** 渲染源表完整表格（全部非空表头列 × 前 maxRows 行），供弹窗展示 */
+function renderSourceDetailTable(ws: WpsWorksheet): string {
+  const maxCols = 50
+  const { headerRow, dataStartRow } = state
+
+  const headerCells: { col: number; header: string }[] = []
+  for (let col = 1; col <= maxCols; col += 1) {
+    const value = getCellValue(ws, headerRow, col).trim()
+    if (value) {
+      headerCells.push({ col, header: escapeHtml(value) })
+    }
+  }
+
+  if (headerCells.length === 0) {
+    return '<div class="preview-hint">未找到表头列，无法展示完整表格</div>'
+  }
+
+  const maxRows = 100
+  const lastRow = Math.min(getLastRow(ws), dataStartRow + maxRows - 1)
+
+  const bodyRows: string[] = []
+  for (let row = dataStartRow; row <= lastRow; row += 1) {
+    const rowCells: string[] = []
+    let hasData = false
+    for (const h of headerCells) {
+      const value = getCellValue(ws, row, h.col).trim()
+      if (value) hasData = true
+      rowCells.push(`<td title="${escapeHtml(value)}">${escapeHtml(value)}</td>`)
+    }
+    if (hasData) {
+      bodyRows.push(
+        `<tr data-row="${String(row)}"><td class="row-num">${String(row)}</td>${rowCells.join('')}</tr>`,
+      )
+    }
+  }
+
+  return sanitizeHtml(
+    `<div class="preview-table"><table><thead><tr><th></th>${headerCells
+      .map((h) => `<th>${h.header}</th>`)
+      .join('')}</tr></thead><tbody>${bodyRows.join('')}</tbody></table></div>`,
+  )
 }
 
 // ========== 匹配预览 ==========
@@ -1142,6 +1295,7 @@ export function previewMatch(options?: { keepSourceOpen?: boolean }): void {
 
     renderMatchStats(state.matches)
     renderMatchResultsToTable(state.matches)
+    updateMatchEmptyHint()
 
     bgmLog(LOG_LEVELS.INFO, `[enrich] 匹配预览完成: ${String(state.matches.length)} 条结果`)
   } catch (error: unknown) {
@@ -1186,14 +1340,29 @@ function renderMatchStats(matches: MatchResult[]): void {
   statsArea.style.display = ''
 }
 
+/**
+ * 目标表为空时提示：富化将把未匹配条目作为新行追加写入
+ */
+function updateMatchEmptyHint(): void {
+  const hintElement = safeGetElement('matchEmptyHint')
+  if (!hintElement || !state.bangumiSheet) return
+
+  const pendingCount = state.matches.filter((m) => m.matchType === 'unmatched').length
+  if (isBangumiSheetEmpty(state.bangumiSheet) && pendingCount > 0) {
+    hintElement.textContent = `目标表暂无数据，富化时将新增 ${String(pendingCount)} 行`
+    hintElement.style.display = ''
+  } else {
+    hintElement.textContent = ''
+    hintElement.style.display = 'none'
+  }
+}
+
 function renderMatchResultsToTable(matches: MatchResult[]): void {
   const tbodyElement = safeGetElement('matchTable')?.querySelector('tbody')
   if (!tbodyElement) return
 
-  const maxDisplay = 20
-  const displayMatches = matches.slice(0, maxDisplay)
-
-  const rowsHtml = displayMatches.map((m) => {
+  // 显示全部匹配结果（表格自带纵向滚动，行数不受限）
+  const rowsHtml = matches.map((m, index) => {
     let statusClass = 'match-status'
     let statusText = ''
     switch (m.matchType) {
@@ -1233,16 +1402,113 @@ function renderMatchResultsToTable(matches: MatchResult[]): void {
         <td><span class="${statusClass}">${statusText}</span></td>
         <td>${bangumiRow}</td>
         <td>${bangumiName}</td>
+        <td><button class="bgm-btn small match-detail-btn" data-index="${String(index)}">🔍 详情</button></td>
       </tr>
     `
   })
 
   tbodyElement.innerHTML = sanitizeHtml(rowsHtml.join(''))
 
+  // 绑定每行详情按钮（行内按钮由预览刷新时重建，需按次绑定）
+  const detailButtons = tbodyElement.querySelectorAll<HTMLButtonElement>('.match-detail-btn')
+  for (const button of detailButtons) {
+    button.addEventListener('click', () => {
+      const matchIndex = Number(button.dataset.index)
+      const match = matches[matchIndex]
+      if (match) showMatchDetail(match)
+    })
+  }
+
   const matchTableContainer = safeGetElement('matchPreviewTable')
   if (matchTableContainer) {
     matchTableContainer.style.display = ''
   }
+}
+
+// ========== 匹配详情弹窗 ==========
+
+function showMatchDetail(match: MatchResult): void {
+  const modalElement = safeGetElement('matchDetailModal')
+  const bodyElement = safeGetElement('matchDetailBody')
+  if (!modalElement || !bodyElement) return
+
+  bodyElement.innerHTML = sanitizeHtml(renderMatchDetail(match))
+  modalElement.style.display = 'flex'
+}
+
+function hideMatchDetail(): void {
+  const modalElement = safeGetElement('matchDetailModal')
+  if (modalElement) {
+    modalElement.style.display = 'none'
+  }
+}
+
+/** 匹配详情的键值对列表渲染 */
+function renderMatchDetail(match: MatchResult): string {
+  let statusClass = 'match-status'
+  let statusText: string
+  switch (match.matchType) {
+    case 'exact': {
+      statusClass += ' status-exact'
+      statusText = '✅ 精确匹配'
+      break
+    }
+    case 'alias': {
+      statusClass += ' status-alias'
+      statusText = '🔄 别名匹配'
+      break
+    }
+    case 'unmatched': {
+      statusClass += ' status-unmatched'
+      statusText = '❌ 未匹配'
+      break
+    }
+    case 'error': {
+      statusClass += ' status-error'
+      statusText = '⚠️ 错误'
+      break
+    }
+    default: {
+      statusClass += ' status-unmatched'
+      statusText = '未知'
+      break
+    }
+  }
+
+  const items: { label: string; valueHtml: string }[] = [
+    { label: '新番名称', valueHtml: escapeHtml(match.matchedAnimeName) },
+    { label: '源表行号', valueHtml: String(match.animeRow) },
+    { label: '匹配方式', valueHtml: `<span class="${statusClass}">${statusText}</span>` },
+  ]
+
+  if (match.bangumiRow !== undefined) {
+    items.push({ label: 'Bangumi行号', valueHtml: String(match.bangumiRow) })
+  }
+  if (match.bangumiName !== undefined) {
+    items.push({ label: 'Bangumi名称', valueHtml: escapeHtml(match.bangumiName) })
+  }
+  if (match.aliases && match.aliases.length > 0) {
+    const aliasHtml = match.aliases
+      .map((a) => `<span class="match-detail-alias">${escapeHtml(a)}</span>`)
+      .join('')
+    items.push({ label: '别名', valueHtml: `<div class="match-detail-aliases">${aliasHtml}</div>` })
+  }
+  if (match.errorMessage) {
+    items.push({ label: '错误信息', valueHtml: escapeHtml(match.errorMessage) })
+  }
+
+  const listHtml = items
+    .map(
+      (item) => `
+        <div class="match-detail-item">
+          <span class="match-detail-label">${escapeHtml(item.label)}</span>
+          <span class="match-detail-value">${item.valueHtml}</span>
+        </div>
+      `,
+    )
+    .join('')
+
+  return `<div class="match-detail-list">${listHtml}</div>`
 }
 
 // ========== 富化执行 ==========
@@ -1326,6 +1592,10 @@ export function startEnrichment(): void {
     )
 
     showProgressUI(false)
+
+    // 保存本次富化详细条目并显示「查看详细结果」按钮（有无冲突均可查看）
+    state.enrichDetailGroups = [{ fileName: extractFileName(state.filePath), items: results }]
+    showEnrichDetailButton()
 
     const allConflicts = collectAllConflicts(results)
     if (allConflicts.length > 0) {
@@ -1417,6 +1687,7 @@ function renderEnrichSummary(results: EnrichResultItem[]): void {
     `[enrich] 富化摘要: 匹配 ${String(enriched)}, 未匹配 ${String(unmatched)}, 错误 ${String(errors)}`,
   )
 
+  // 详细条目已在 startEnrichment 统一保存并显示「查看详细结果」按钮
   try {
     getOrCreateEnrichRecordSheet()
     loadRecentRecords()
@@ -1427,6 +1698,209 @@ function renderEnrichSummary(results: EnrichResultItem[]): void {
       context: 'renderEnrichSummary',
     })
   }
+}
+
+// ========== 富化详细结果 ==========
+
+function showEnrichDetailButton(): void {
+  const actionElement = safeGetElement('enrichDetailAction')
+  if (actionElement) {
+    actionElement.style.display = ''
+  }
+}
+
+function showEnrichDetail(): void {
+  const modalElement = safeGetElement('enrichDetailModal')
+  const bodyElement = safeGetElement('enrichDetailBody')
+  if (!modalElement || !bodyElement) return
+
+  bodyElement.innerHTML = renderEnrichDetailHtml(state.enrichDetailGroups)
+  modalElement.style.display = 'flex'
+}
+
+function hideEnrichDetail(): void {
+  const modalElement = safeGetElement('enrichDetailModal')
+  if (modalElement) {
+    modalElement.style.display = 'none'
+  }
+}
+
+/** 把匹配方式枚举映射为用户可读的中文标记 */
+function matchTypeLabel(matchType: MatchResult['matchType']): { text: string; badge: string } {
+  switch (matchType) {
+    case 'exact': {
+      return { text: '精确命中', badge: 'exact' }
+    }
+    case 'alias': {
+      return { text: '别名匹配', badge: 'alias' }
+    }
+    case 'error': {
+      return { text: '错误', badge: 'error' }
+    }
+    default: {
+      return { text: '新增/未匹配', badge: 'unmatched' }
+    }
+  }
+}
+
+/** 把富化操作枚举映射为中文标记 */
+function fieldActionLabel(action: EnrichedField['action']): { text: string; cls: string } {
+  switch (action) {
+    case 'fill': {
+      return { text: '填充', cls: 'fill' }
+    }
+    case 'append': {
+      return { text: '追加', cls: 'append' }
+    }
+    default: {
+      return { text: '跳过', cls: 'skip' }
+    }
+  }
+}
+
+function renderEnrichDetailHtml(groups: EnrichDetailGroup[]): string {
+  if (groups.length === 0) {
+    return '暂无富化数据，请先执行富化'
+  }
+
+  const totalMatched = groups.reduce(
+    (sum, group) => sum + group.items.filter((r) => r.kind === 'matched').length,
+    0,
+  )
+  const totalUnmatched = groups.reduce(
+    (sum, group) => sum + group.items.filter((r) => r.kind === 'unmatched').length,
+    0,
+  )
+  const totalErrors = groups.reduce(
+    (sum, group) => sum + group.items.filter((r) => r.kind === 'error').length,
+    0,
+  )
+  const totalFields = groups.reduce(
+    (sum, group) =>
+      sum +
+      group.items.reduce(
+        (s, item) => s + item.enrichedFields.filter((f) => f.action !== 'skip').length,
+        0,
+      ),
+    0,
+  )
+
+  const summaryHtml = `
+    <div class="enrich-detail-summary">
+      <div class="enrich-detail-stat matched">
+        <div class="enrich-detail-stat-num">${String(totalMatched)}</div>
+        <div class="enrich-detail-stat-label">已匹配</div>
+      </div>
+      <div class="enrich-detail-stat unmatched">
+        <div class="enrich-detail-stat-num">${String(totalUnmatched)}</div>
+        <div class="enrich-detail-stat-label">未匹配</div>
+      </div>
+      <div class="enrich-detail-stat error">
+        <div class="enrich-detail-stat-num">${String(totalErrors)}</div>
+        <div class="enrich-detail-stat-label">错误</div>
+      </div>
+      <div class="enrich-detail-stat field">
+        <div class="enrich-detail-stat-num">${String(totalFields)}</div>
+        <div class="enrich-detail-stat-label">字段更新</div>
+      </div>
+    </div>
+  `
+
+  const entriesHtml = groups.map((group) => renderEnrichDetailGroup(group)).join('')
+
+  return sanitizeHtml(`${summaryHtml}${entriesHtml}`)
+}
+
+function renderEnrichDetailGroup(group: EnrichDetailGroup): string {
+  if (group.items.length === 0) {
+    return `<div class="enrich-detail-group empty">${escapeHtml(group.fileName)}：无条目</div>`
+  }
+
+  const entries = group.items.map((item) => renderEnrichDetailEntry(item)).join('')
+  return `
+    <div class="enrich-detail-group">
+      <div class="enrich-detail-group-title">📄 ${escapeHtml(group.fileName)}</div>
+      <div class="enrich-detail-entries">${entries}</div>
+    </div>
+  `
+}
+
+function renderEnrichDetailEntry(item: EnrichResultItem): string {
+  const name = escapeHtml(item.name)
+  const headBadge = item.matchType ? matchTypeLabel(item.matchType) : null
+
+  if (item.kind === 'error') {
+    const badge = headBadge ?? matchTypeLabel('error')
+    const errorMessage = escapeHtml(item.errorMessage ?? '未知错误')
+    return `
+      <div class="enrich-detail-entry">
+        <div class="enrich-detail-entry-head">
+          <span class="enrich-detail-entry-name">${name}</span>
+          <span class="enrich-detail-entry-badge ${badge.badge}">${badge.text}</span>
+        </div>
+        <div class="enrich-detail-entry-error">${errorMessage}</div>
+      </div>
+    `
+  }
+
+  if (item.kind === 'unmatched') {
+    const badge = headBadge ?? matchTypeLabel('unmatched')
+    return `
+      <div class="enrich-detail-entry">
+        <div class="enrich-detail-entry-head">
+          <span class="enrich-detail-entry-name">${name}</span>
+          <span class="enrich-detail-entry-badge ${badge.badge}">${badge.text}</span>
+        </div>
+      </div>
+    `
+  }
+
+  const badge = headBadge ?? matchTypeLabel('exact')
+  const hasFields = item.enrichedFields.length > 0
+  const fieldsHtml = hasFields
+    ? `
+      <table class="enrich-detail-fields">
+        <thead>
+          <tr>
+            <th>字段</th>
+            <th>原值</th>
+            <th></th>
+            <th>新值</th>
+            <th>操作</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${item.enrichedFields.map((field) => renderEnrichDetailField(field)).join('')}
+        </tbody>
+      </table>
+    `
+    : `<div class="enrich-detail-entry-error enrich-detail-empty">该条目无字段变更</div>`
+
+  return `
+    <div class="enrich-detail-entry">
+      <div class="enrich-detail-entry-head">
+        <span class="enrich-detail-entry-name">${name}</span>
+        <span class="enrich-detail-entry-badge ${badge.badge}">${badge.text}</span>
+      </div>
+      ${fieldsHtml}
+    </div>
+  `
+}
+
+function renderEnrichDetailField(field: EnrichedField): string {
+  const fieldName = escapeHtml(field.fieldName)
+  const oldValue = escapeHtml(field.oldValue ?? '（空）')
+  const updatedValue = escapeHtml(field.updatedValue || '（空）')
+  const action = fieldActionLabel(field.action)
+  return `
+    <tr>
+      <td class="field-name">${fieldName}</td>
+      <td class="field-old">${oldValue}</td>
+      <td class="field-arrow">→</td>
+      <td class="field-new">${updatedValue}</td>
+      <td class="field-action ${action.cls}">${action.text}</td>
+    </tr>
+  `
 }
 
 // ========== 富化记录 ==========
@@ -1920,6 +2394,10 @@ function enrichSingleBatchSource(
   result.updatedEntries = updatedEntries
   result.unmatched = unmatched
   result.success = true
+
+  // 累积到详情弹窗数据（批量结束时统一显示「查看详细结果」按钮）
+  state.enrichDetailGroups.push({ fileName, items: enrichResults })
+
   bgmLog(
     LOG_LEVELS.INFO,
     `[enrich-batch] ${fileName}: 匹配 ${String(matched)}，未匹配 ${String(unmatched)}，处理 ${String(updatedEntries)}`,
@@ -2003,11 +2481,12 @@ export function batchStartEnrichment(): void {
 
   // 清空之前的结果
   state.batchResults = []
+  state.enrichDetailGroups = []
   state.batchIndex = 0
   state.isBatchEnriching = true
   state.batchCancelRequested = false
 
-  // 隐藏批量汇总
+  // 隐藏批量汇总及上一轮详情按钮
   const summaryElement = safeGetElement('batchSummary')
   if (summaryElement) summaryElement.style.display = 'none'
 
@@ -2075,6 +2554,10 @@ async function runBatchEnrichment(bangumiSheet: WpsWorksheet): Promise<void> {
 
   // 显示汇总
   renderBatchSummary()
+  // 批量富化完成后显示「查看详细结果」按钮（数据已累积到 enrichDetailGroups）
+  if (state.enrichDetailGroups.length > 0) {
+    showEnrichDetailButton()
+  }
 
   // 刷新富化记录
   try {
