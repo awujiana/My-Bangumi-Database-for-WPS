@@ -92,6 +92,9 @@
           <a href="#sec-strategy" title="冲突处理策略"
             ><span class="nav-ico">⚖️</span><span class="nav-text">冲突处理策略</span></a
           >
+          <a href="#sec-enrich-preview" title="富化预览"
+            ><span class="nav-ico">🎨</span><span class="nav-text">富化预览</span></a
+          >
           <a href="#sec-remote" title="远程仓库配置"
             ><span class="nav-ico">🗄️</span><span class="nav-text">远程仓库配置</span></a
           >
@@ -255,6 +258,70 @@
               <option value="excel">Excel覆盖（用Excel数据覆盖）</option>
             </select>
             <p class="hint">当Excel条目与Bangumi收藏状态不一致时，自动按所选策略处理。</p>
+          </div>
+        </section>
+
+        <!-- 富化预览 -->
+        <section class="section" id="sec-enrich-preview">
+          <h3>🎨 富化预览</h3>
+          <p class="hint">
+            控制「新番表富化」页数据预览的视觉呈现：周几颜色、集数阈值徽章颜色，以及需要过滤的噪声关键词。
+          </p>
+          <div class="form-group">
+            <label for="enrichEpSingle">「单集」阈值</label>
+            <input
+              type="number"
+              id="enrichEpSingle"
+              class="input"
+              min="1"
+              max="999"
+              step="1"
+              style="width: 100px"
+            />
+            <p class="hint">集数等于此值时显示橙色徽章。默认 1。</p>
+          </div>
+          <div class="form-group">
+            <label for="enrichEpFull">「完结」阈值</label>
+            <input
+              type="number"
+              id="enrichEpFull"
+              class="input"
+              min="2"
+              max="999"
+              step="1"
+              style="width: 100px"
+            />
+            <p class="hint">
+              集数等于此值时<b>不显示颜色</b>；大于此值显示绿色徽章；小于此值（且不等于>单集阈值）显示黄色徽章。默认
+              12。
+            </p>
+          </div>
+          <div class="form-group">
+            <label for="enrichFilterKeywords">过滤噪声关键词</label>
+            <textarea
+              id="enrichFilterKeywords"
+              class="input"
+              rows="3"
+              placeholder="新番表 by Hazx.&#10;版权平台标注示例&#10;B站港澳台"
+              style="
+                resize: vertical;
+                min-height: 60px;
+                font-family: var(--font-mono, monospace);
+                font-size: 12px;
+              "
+            ></textarea>
+            <p class="hint">
+              包含任一关键词（子串匹配）的播放平台/标签将被过滤掉。多个关键词用换行或逗号分隔。已默认过滤「示例」「新番表
+              by Hazx」「版权平台标注示例」等噪声。
+            </p>
+          </div>
+          <div class="bgm-btn-group bgm-btn-row">
+            <button class="bgm-btn small primary" data-action="saveEnrichPreviewSettings">
+              💾 保存
+            </button>
+            <button class="bgm-btn small" data-action="reloadEnrichPreviewSettings">
+              ↩️ 放弃修改
+            </button>
           </div>
         </section>
 
