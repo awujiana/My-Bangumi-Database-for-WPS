@@ -299,6 +299,109 @@
   color: var(--danger);
 }
 
+/* ---- 选择清理的表格（用户显式勾选） ---- */
+.clean-sheet-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  margin-top: var(--sp-3);
+}
+
+.clean-sheet-group {
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  background: var(--bg-base);
+  overflow: hidden;
+}
+
+.clean-sheet-group-title {
+  padding: 6px var(--sp-3);
+  background: var(--bg-mantle);
+  border-bottom: 1px solid var(--border);
+  color: var(--text-3);
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-2);
+}
+
+.clean-sheet-group-title-name {
+  color: var(--text-2);
+  font-weight: 500;
+}
+
+.clean-sheet-item {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--sp-2);
+  padding: 8px var(--sp-3);
+  border-bottom: 1px solid var(--border);
+  cursor: pointer;
+  transition: background var(--dur) var(--ease);
+}
+
+.clean-sheet-item:last-child {
+  border-bottom: none;
+}
+
+.clean-sheet-item:hover {
+  background: var(--bg-surface);
+}
+
+.clean-sheet-item input[type='checkbox'] {
+  margin-top: 3px;
+  width: 15px;
+  height: 15px;
+  accent-color: var(--primary);
+  flex: 0 0 auto;
+}
+
+.clean-sheet-item-body {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+  flex: 1;
+}
+
+.clean-sheet-item-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.clean-sheet-item-name {
+  color: var(--text-1);
+  font-size: var(--fs-body);
+  font-weight: 500;
+}
+
+.clean-sheet-item-meta {
+  color: var(--text-3);
+  font-size: 11px;
+  line-height: 1.5;
+  word-break: break-all;
+}
+
+.clean-sheet-item-empty {
+  color: var(--text-3);
+  font-size: var(--fs-sm);
+  padding: var(--sp-2) 0;
+}
+
+.clean-sheet-disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.clean-sheet-disabled:hover {
+  background: transparent;
+}
+
 /* ---- 危险按钮 ---- */
 .bgm-btn.danger {
   color: var(--danger);
