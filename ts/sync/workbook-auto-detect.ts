@@ -21,6 +21,7 @@ import { detectAnimeSourceLayout } from './enrich-engine.js'
 import { bgmLog, getApp, getCellValue } from '../tools/util/index.js'
 import {
   findBangumiTargetSheetInWorkbook,
+  getOpenWorkbooks,
   TARGET_SHEET_NAME_KEYWORDS,
 } from '../tools/locked-sheet.js'
 import type { WpsWorkbook, WpsWorksheet } from '../tools/wps.js'
@@ -154,18 +155,6 @@ export function isMatchingWorkbook(detector: WorkbookDetector, wb: WpsWorkbook):
   return findFirstMatchingSheetSafely(detector, wb) !== null
 }
 
-/** 安全读取工作簿（读取失败返回 null，供扫描循环跳过异常项） */
-function readWorkbookSafely(
-  wbs: { Item(index: number): WpsWorkbook },
-  index: number,
-): WpsWorkbook | null {
-  try {
-    return wbs.Item(index)
-  } catch {
-    return null
-  }
-}
-
 /**
  * 扫描所有已打开工作簿，返回命中指定检测目标的工作簿列表。
  *
@@ -177,39 +166,42 @@ function readWorkbookSafely(
  */
 export function scanMatchingWorkbooks(detector: WorkbookDetector): WpsWorkbook[] {
   const app = getApp()
-  if (!app?.Workbooks) {
-    bgmLog(LOG_LEVELS.WARN, '[workbookDetect] 无法获取 Workbooks')
+  if (!app) {
+    bgmLog(LOG_LEVELS.WARN, '[workbookDetect] 无法获取 Application')
     return []
   }
 
-  const activeWbName = app.ActiveWorkbook?.Name ?? ''
+  let activeWbName = ''
+  try {
+    activeWbName = app.ActiveWorkbook?.Name ?? ''
+  } catch {
+    // 活动窗口切换中时不启用活动工作簿排序偏好
+  }
   const found: WpsWorkbook[] = []
   const seen = new Set<string>()
-  const wbs = app.Workbooks
+  const workbooks = getOpenWorkbooks()
 
-  const tryPush = (wb: WpsWorkbook | null, source: string): void => {
-    if (!wb) return
-    if (seen.has(wb.Name)) return
-    if (!isMatchingWorkbook(detector, wb)) return
-    seen.add(wb.Name)
-    found.push(wb)
-    if (source === 'active') {
-      bgmLog(LOG_LEVELS.INFO, `[workbookDetect] ${detector.label} 活动工作簿兜底命中: ${wb.Name}`)
+  for (const wb of workbooks) {
+    const name = (() => {
+      try {
+        return wb.Name
+      } catch {
+        return ''
+      }
+    })()
+    if (name && !seen.has(name)) {
+      const isMatch = (() => {
+        try {
+          return isMatchingWorkbook(detector, wb)
+        } catch {
+          return false
+        }
+      })()
+      if (isMatch) {
+        seen.add(name)
+        found.push(wb)
+      }
     }
-  }
-
-  for (let index = 1; index <= wbs.Count; index += 1) {
-    tryPush(readWorkbookSafely(wbs, index), 'workbooks')
-  }
-  // 兜底：活动工作簿未被 Workbooks 枚举覆盖时单独校验
-  let activeWb: WpsWorkbook | null
-  try {
-    activeWb = app.ActiveWorkbook ?? null
-  } catch {
-    activeWb = null
-  }
-  if (activeWb?.Name && !seen.has(activeWb.Name)) {
-    tryPush(activeWb, 'active')
   }
 
   found.sort((a, b) => {
@@ -223,20 +215,30 @@ export function scanMatchingWorkbooks(detector: WorkbookDetector): WpsWorkbook[]
 /** 描述当前 WPS 中已打开的工作簿（诊断日志用，读取失败不影响主流程） */
 export function describeOpenWorkbooks(): string {
   const app = getApp()
-  if (!app?.Workbooks) return 'Workbooks 不可用'
-  const wbs = app.Workbooks
-  const names: string[] = []
-  for (let index = 1; index <= wbs.Count; index += 1) {
-    const wb = readWorkbookSafely(wbs, index)
-    names.push(wb ? wb.Name : '(读取失败)')
-  }
+  if (!app) return 'Application 不可用'
+  if (!app.Workbooks) return 'Workbooks 不可用'
+  const workbooks = getOpenWorkbooks()
+  const rawWorkbookCount = (() => {
+    try {
+      return app.Workbooks.Count
+    } catch {
+      return 0
+    }
+  })()
+  const windowCount = (() => {
+    try {
+      return app.Windows?.Count ?? 0
+    } catch {
+      return 0
+    }
+  })()
   let activeName = '(无)'
   try {
     activeName = app.ActiveWorkbook?.Name ?? '(无)'
   } catch {
     // 读取活动工作簿失败时保留占位
   }
-  return `${String(wbs.Count)} 个 [${names.join(' | ')}]；活动工作簿 ${activeName}`
+  return `${String(workbooks.length)} 个 [${workbooks.map((wb) => wb.Name).join(' | ')}]；Workbooks.Count=${String(rawWorkbookCount)}；Windows.Count=${String(windowCount)}；活动工作簿 ${activeName}`
 }
 
 // ========== 持久化（Ribbon ↔ 富化页面跨 WebView 共享） ==========
@@ -267,13 +269,15 @@ export function persistDetectedPaths(detector: WorkbookDetector, paths: readonly
 
 /** 判断持久化路径对应的工作簿当前是否仍在 WPS 中打开（仅做名称比对，不读单元格） */
 export function isWorkbookOpen(path: string): boolean {
-  const app = getApp()
-  if (!app?.Workbooks) return false
-  const fileName = extractFileNameFromPath(path)
-  const wbs = app.Workbooks
-  for (let index = 1; index <= wbs.Count; index += 1) {
-    const wb = readWorkbookSafely(wbs, index)
-    if (wb && (wb.FullName === path || wb.Name === fileName)) return true
+  const fileName = extractFileNameFromPath(path).trim().toLowerCase()
+  const normalizedPath = path.trim().toLowerCase()
+  for (const wb of getOpenWorkbooks()) {
+    try {
+      if (wb.FullName.trim().toLowerCase() === normalizedPath) return true
+      if (wb.Name.trim().toLowerCase() === fileName) return true
+    } catch {
+      // 工作簿正在切换/关闭，跳过当前项
+    }
   }
   return false
 }

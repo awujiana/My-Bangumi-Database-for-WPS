@@ -36,6 +36,8 @@ export type WpsSelection = WpsRange | null
 export interface WpsApp {
   ActiveWorkbook?: WpsWorkbook
   Workbooks?: WpsWorkbooks
+  /** 同一 WPS 实例中的窗口集合；部分版本可通过 Window.ActiveSheet.Parent 补齐工作簿 */
+  Windows?: WpsWindows
   PluginStorage?: WpsPluginStorage
   ActiveSheet?: WpsWorksheet
   ActiveCell?: WpsRange
@@ -60,6 +62,19 @@ export interface WpsApp {
 export interface WpsWorkbooks {
   Count: number
   Item(index: number): WpsWorkbook
+}
+
+/** WPS 窗口集合的最小接口 */
+export interface WpsWindows {
+  Count?: number
+  Item(index: number): WpsWindow
+}
+
+/** WPS 窗口的最小接口，用于从 ActiveSheet.Parent 取得所属工作簿 */
+export interface WpsWindow {
+  ActiveSheet?: { Parent?: unknown }
+  Workbook?: unknown
+  Parent?: unknown
 }
 
 // ========== WPS 工作簿 ==========

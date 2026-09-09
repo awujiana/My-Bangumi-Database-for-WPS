@@ -55,6 +55,7 @@ import {
   BGM,
   getApp,
 } from '../tools/util/index.js'
+import { findWorkbookByName, getOpenWorkbooks } from '../tools/locked-sheet.js'
 import type { WpsWorksheet, WpsWorkbook } from '../tools/wps.js'
 
 // ========== 类型定义 ==========
@@ -873,19 +874,16 @@ function openSourceWorkbook(filePath: string): { wb: WpsWorkbook; isOpenedByUs: 
 
   const fileName = extractFileName(filePath)
 
-  // 已打开则复用：优先按 FullName 精确匹配，回落按文件名匹配
-  const wbs = app.Workbooks
-  for (let index = 1; index <= wbs.Count; index += 1) {
-    const existing = wbs.Item(index) as WpsWorkbook | null
-    // 运行时可能返回 null，先判空再取属性
-    if (existing && (existing.FullName === filePath || existing.Name === fileName)) {
+  // 已打开则复用：统一检查 Workbooks、Windows 和 ActiveWorkbook 可见的工作簿。
+  for (const existing of getOpenWorkbooks()) {
+    if (existing.FullName === filePath || existing.Name === fileName) {
       bgmLog(LOG_LEVELS.INFO, `[enrich] 复用已打开的工作簿: ${existing.Name}`)
       return { wb: existing, isOpenedByUs: false }
     }
   }
 
   // WPS Workbooks.Open 是运行时扩展，不在类型定义中
-  const workbooks = wbs as unknown as { Open?: (path: string) => WpsWorkbook | null }
+  const workbooks = app.Workbooks as unknown as { Open?: (path: string) => WpsWorkbook | null }
   if (typeof workbooks.Open !== 'function') return null
 
   const wb = workbooks.Open(filePath)
@@ -1295,23 +1293,15 @@ function updateColumnMapping(field: keyof EnrichColumnMapping, value: number): v
 
 function getSelectedWorkbook(): WpsWorkbook | null {
   const app = getApp()
-  if (!app?.ActiveWorkbook) return null
+  if (!app) return null
 
   const wbSelect = safeGetSelect('workbookSelect')
   const wbName = wbSelect?.value ?? ''
 
-  if (!wbName) return app.ActiveWorkbook
+  if (!wbName) return app.ActiveWorkbook ?? null
 
-  const wbs = app.Workbooks
-  if (!wbs) return app.ActiveWorkbook
-
-  for (let index = 1; index <= wbs.Count; index += 1) {
-    const wb = wbs.Item(index)
-    if (wb.Name === wbName) {
-      return wb
-    }
-  }
-  return app.ActiveWorkbook
+  const selected = findWorkbookByName(wbName)
+  return selected ?? app.ActiveWorkbook ?? null
 }
 
 function refreshWorkbookList(): void {

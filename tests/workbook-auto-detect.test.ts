@@ -179,7 +179,11 @@ const ANY_WORKBOOK_DETECTOR: WorkbookDetector = {
 }
 
 /** 构造 mock WPS Application（Workbooks 集合 + 可选活动工作簿 + 内存版 PluginStorage） */
-function makeMockApp(workbooks: WpsWorkbook[], activeWorkbook: WpsWorkbook | null = null): void {
+function makeMockApp(
+  workbooks: WpsWorkbook[],
+  activeWorkbook: WpsWorkbook | null = null,
+  windows: WpsWorkbook[] = [],
+): void {
   const storage = new Map<string, string>()
   ;(window as { Application?: unknown }).Application = {
     Workbooks: {
@@ -188,6 +192,14 @@ function makeMockApp(workbooks: WpsWorkbook[], activeWorkbook: WpsWorkbook | nul
         const wb = workbooks[index - 1]
         if (!wb) throw new RangeError('下标越界')
         return wb
+      },
+    },
+    Windows: {
+      Count: windows.length,
+      Item: (index: number): unknown => {
+        const wb = windows[index - 1]
+        if (!wb) throw new RangeError('窗口下标越界')
+        return { Workbook: wb, ActiveSheet: wb.ActiveSheet, Parent: wb }
       },
     },
     ActiveWorkbook: activeWorkbook,
@@ -227,10 +239,22 @@ describe('scanMatchingWorkbooks 边界', () => {
     const second = makeMockWorkbook(['数据'])
     second.Name = 'b.xlsx'
 
-    makeMockApp([first, second], second)
+    makeMockApp([first, second], second, [second])
     const found = scanMatchingWorkbooks(ANY_WORKBOOK_DETECTOR)
 
     expect(found.map((wb) => wb.Name)).toEqual(['b.xlsx', 'a.xlsx'])
+  })
+
+  it('Workbooks 仅返回一个时，从 Windows 集合补齐同一实例的其他工作簿', () => {
+    const listed = makeMockWorkbook(['数据'])
+    listed.Name = '工作簿1.xlsx'
+    const target = makeMockWorkbook(['数据'])
+    target.Name = '娱乐影视游戏记录.xlsx'
+
+    makeMockApp([listed], listed, [listed, target])
+    const found = scanMatchingWorkbooks(ANY_WORKBOOK_DETECTOR)
+
+    expect(found.map((wb) => wb.Name)).toEqual(['工作簿1.xlsx', '娱乐影视游戏记录.xlsx'])
   })
 
   it('活动工作簿不满足检测条件时不计入', () => {
@@ -271,9 +295,9 @@ describe('describeOpenWorkbooks', () => {
     expect(text).toContain('活动工作簿 b.xlsx')
   })
 
-  it('Workbooks 不可用时给出占位说明', () => {
+  it('Application 不可用时给出占位说明', () => {
     clearMockApp()
-    expect(describeOpenWorkbooks()).toBe('Workbooks 不可用')
+    expect(describeOpenWorkbooks()).toBe('Application 不可用')
   })
 })
 

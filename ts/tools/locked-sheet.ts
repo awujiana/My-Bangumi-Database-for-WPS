@@ -8,7 +8,7 @@
 
 import { getApp, bgmLog, BGM, getCellValue, findHeaderRow } from './util/index.js'
 import { PANEL_CONFIG, LOG_LEVELS, HEADER_KEYWORDS } from '../core/constants.js'
-import type { WpsWorkbook, WpsWorksheet } from './wps.js'
+import type { WpsWorkbook, WpsWorksheet, WpsWindow } from './wps.js'
 
 /** 锁定持久化键（主面板与富化页面共用） */
 export const LOCKED_SHEET_KEY = 'bgm_locked_sheet'
@@ -59,14 +59,8 @@ export function restoreLockedSheet(): boolean {
     BGM.sheet.lockedWorkbookName = info.workbookName ?? null
     BGM.sheet.isLocked = !!(info.index != null && info.name)
 
-    if (BGM.sheet.isLocked && info.workbookName && app.Workbooks) {
-      let isWorkbookFound = false
-      for (let index = 1; index <= app.Workbooks.Count; index += 1) {
-        if (app.Workbooks.Item(index).Name === info.workbookName) {
-          isWorkbookFound = true
-          break
-        }
-      }
+    if (BGM.sheet.isLocked && info.workbookName) {
+      const isWorkbookFound = findWorkbookByName(info.workbookName) !== null
       if (!isWorkbookFound) {
         bgmLog(
           LOG_LEVELS.WARN,
@@ -86,13 +80,109 @@ export function restoreLockedSheet(): boolean {
 
 // ========== 工作簿/工作表查找 ==========
 
+/**
+ * 获取当前 Application 实例中已打开的工作簿。
+ *
+ * WPS 边界：部分版本/窗口切换时 `Application.Workbooks` 的 Count/Item 枚举
+ * 暂时不包含活动工作簿；但 `Application.ActiveWorkbook` 仍可直接访问。因此所有
+ * 页面和扫描器都必须通过这个统一入口取工作簿，不能各自只遍历 Workbooks。
+ *
+ * 注意：这里的 Application 只代表当前 WPS 实例。若用户把文件分别打开在两个
+ * 独立的 WPS 进程中，当前加载项无法跨进程枚举另一个进程的工作簿，这是 WPS
+ * JS API 的边界，不应把「当前实例不可见」误报成「文件未打开」。
+ */
+export function getOpenWorkbooks(): WpsWorkbook[] {
+  const app = getApp()
+  if (!app) return []
+
+  const result: WpsWorkbook[] = []
+  const seen = new Set<string>()
+  const add = (wb: WpsWorkbook | null): void => {
+    if (!wb) return
+    const key = (() => {
+      try {
+        return wb.FullName || wb.Name
+      } catch {
+        return ''
+      }
+    })()
+    const name = (() => {
+      try {
+        return wb.Name
+      } catch {
+        return ''
+      }
+    })()
+    const identity = `${key}\u{0000}${name}`
+    if (!key || seen.has(identity)) return
+    seen.add(identity)
+    result.push(wb)
+  }
+
+  const workbooks = app.Workbooks
+  if (workbooks) {
+    const count = (() => {
+      try {
+        return Math.max(0, workbooks.Count || 0)
+      } catch {
+        return 0
+      }
+    })()
+    for (let index = 1; index <= count; index += 1) {
+      try {
+        add(workbooks.Item(index))
+      } catch {
+        // 集合在窗口切换期间可能瞬时失效，跳过本项，继续保留其他工作簿
+      }
+    }
+  }
+
+  // 某些 WPS 版本的 Workbooks 集合只返回当前窗口；再从 Windows.ActiveSheet.Parent
+  // 反查每个可见窗口的工作簿，补齐同一 Application 实例中的其他窗口。
+  const windows = app.Windows
+  if (windows) {
+    const windowCount = (() => {
+      try {
+        return Math.max(0, windows.Count ?? 0)
+      } catch {
+        return 0
+      }
+    })()
+    for (let index = 1; index <= windowCount; index += 1) {
+      try {
+        const windowObject: WpsWindow = windows.Item(index)
+        const activeSheetParent = windowObject.ActiveSheet?.Parent
+        const workbookFromWindow = windowObject.Workbook ?? activeSheetParent ?? windowObject.Parent
+        if (workbookFromWindow && typeof workbookFromWindow === 'object') {
+          const candidate = workbookFromWindow as WpsWorkbook
+          add(candidate)
+        }
+      } catch {
+        // 窗口正在切换或为非工作簿窗口时跳过
+      }
+    }
+  }
+
+  // 关键兜底：活动工作簿不在 Workbooks 枚举结果中时仍纳入列表.
+  try {
+    add(app.ActiveWorkbook ?? null)
+  } catch {
+    // 活动窗口正在切换时读取可能失败，下次刷新/轮询再尝试
+  }
+
+  return result
+}
+
 export function findWorkbookByName(name: string | null): WpsWorkbook | null {
   if (!name) return null
-  const app = getApp()
-  if (!app?.Workbooks) return null
-  for (let index = 1; index <= app.Workbooks.Count; index += 1) {
-    const wb = app.Workbooks.Item(index)
-    if (wb.Name === name) return wb
+  const normalizedName = name.trim().toLowerCase()
+  if (!normalizedName) return null
+  for (const wb of getOpenWorkbooks()) {
+    try {
+      if (wb.Name.trim().toLowerCase() === normalizedName) return wb
+    } catch {
+      // 工作簿正在切换/关闭，跳过当前项
+    }
   }
   return null
 }
@@ -219,6 +309,8 @@ function buildCandidate(wb: WpsWorkbook, wsIndex: number, isNameHitOnly: boolean
 
   const headerRow = findHeaderRow(ws)
   if (headerRow <= 0) return null
+  const headerMatchCount = countHeaderKeywordsInRow(ws, headerRow)
+  if (headerMatchCount < 3) return null
   const dataRowCount = countDataRowsAfter(ws, headerRow)
   if (dataRowCount < 2) return null
 
@@ -227,7 +319,7 @@ function buildCandidate(wb: WpsWorkbook, wsIndex: number, isNameHitOnly: boolean
     sheetIndex: wsIndex,
     sheetName,
     headerRow,
-    headerMatchCount: countHeaderKeywordsInRow(ws, headerRow),
+    headerMatchCount,
     dataRowCount,
     isNameHit,
   }
@@ -247,28 +339,38 @@ function buildCandidate(wb: WpsWorkbook, wsIndex: number, isNameHitOnly: boolean
  */
 export function findBangumiTargetSheets(): TargetSheetCandidate[] {
   const app = getApp()
-  if (!app?.Workbooks) {
-    bgmLog(LOG_LEVELS.WARN, 'findBangumiTargetSheets: 无法获取 Workbooks')
+  if (!app) {
+    bgmLog(LOG_LEVELS.WARN, 'findBangumiTargetSheets: 无法获取 Application')
     return []
   }
 
-  const workbookCount = app.Workbooks.Count
-  const workbooks = app.Workbooks
-  const activeWbName = app.ActiveWorkbook?.Name ?? ''
+  const workbooks = getOpenWorkbooks()
+  let activeWbName = ''
   let activeSheetName = ''
   try {
+    activeWbName = app.ActiveWorkbook?.Name ?? ''
     activeSheetName = app.ActiveWorkbook?.ActiveSheet.Name ?? ''
   } catch {
-    // 读取活动工作表失败时忽略，仅不启用活动工作表偏好
+    // 读取活动工作簿/工作表失败时忽略，仅不启用活动对象偏好
   }
 
   const collect = (isNameHitOnly: boolean): TargetSheetCandidate[] => {
     const collected: TargetSheetCandidate[] = []
-    for (let wbIndex = 1; wbIndex <= workbookCount; wbIndex += 1) {
-      const wb = workbooks.Item(wbIndex)
-      for (let wsIndex = 1; wsIndex <= wb.Worksheets.Count; wsIndex += 1) {
-        const candidate = buildCandidate(wb, wsIndex, isNameHitOnly)
-        if (candidate) collected.push(candidate)
+    for (const wb of workbooks) {
+      const sheetCount = (() => {
+        try {
+          return Math.max(0, wb.Worksheets.Count || 0)
+        } catch {
+          return 0
+        }
+      })()
+      for (let wsIndex = 1; wsIndex <= sheetCount; wsIndex += 1) {
+        try {
+          const candidate = buildCandidate(wb, wsIndex, isNameHitOnly)
+          if (candidate) collected.push(candidate)
+        } catch {
+          // 工作表在刷新期间失效时跳过当前项
+        }
       }
     }
     return collected

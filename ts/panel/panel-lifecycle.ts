@@ -27,6 +27,7 @@ import {
   saveLockedSheet,
   findWorkbookByName,
   findBangumiTargetSheets,
+  getOpenWorkbooks,
 } from '../tools/locked-sheet.js'
 
 // ========== 类型定义 ==========
@@ -139,21 +140,11 @@ export function refreshSheets(options?: { autoSelectActive?: boolean }): void {
     return
   }
 
-  // 获取选中的工作簿
+  // 获取选中的工作簿：统一检查 Workbooks、Windows 和 ActiveWorkbook 可见的工作簿。
   const wbSelect = document.getElementById('workbookSelect') as HTMLSelectElement | null
-  let workbook = app.ActiveWorkbook
-  if (wbSelect?.value) {
-    const wbs = app.Workbooks
-    if (wbs) {
-      for (let index = 1; index <= wbs.Count; index += 1) {
-        if (wbs.Item(index).Name === wbSelect.value) {
-          workbook = wbs.Item(index)
-          break
-        }
-      }
-    }
-  }
-
+  const workbook = wbSelect?.value
+    ? (findWorkbookByName(wbSelect.value) ?? app.ActiveWorkbook)
+    : app.ActiveWorkbook
   const sheets = workbook.Worksheets
 
   // 探测当前活动工作表索引（autoSelectActive 时用于自动选中）
@@ -230,7 +221,7 @@ export function refreshWorkbooks(): void {
     return
   }
 
-  const wbs = app.Workbooks
+  const workbooks = getOpenWorkbooks()
 
   // 保存当前选中值
   const currentValue = select.value
@@ -245,28 +236,36 @@ export function refreshWorkbooks(): void {
   let hasActiveWorkbook = false
   const activeWbName = app.ActiveWorkbook?.Name ?? ''
 
-  for (let index = 1; index <= wbs.Count; index += 1) {
-    const option = document.createElement('option')
-    const wb = wbs.Item(index)
-    option.value = wb.Name
-    option.text = wb.Name
+  for (const wb of workbooks) {
+    const name = (() => {
+      try {
+        return wb.Name
+      } catch {
+        return ''
+      }
+    })()
+    if (name) {
+      const option = document.createElement('option')
+      option.value = name
+      option.text = name
 
-    // 恢复之前选中值，或默认选中当前活动工作簿
-    if (currentValue && currentValue === wb.Name) {
-      option.selected = true
-    } else if (!currentValue && wb.Name === activeWbName) {
-      option.selected = true
-      hasActiveWorkbook = true
+      // 恢复之前选中值，或默认选中当前活动工作簿
+      if (currentValue && currentValue === name) {
+        option.selected = true
+      } else if (!currentValue && name === activeWbName) {
+        option.selected = true
+        hasActiveWorkbook = true
+      }
+
+      select.appendChild(option)
     }
-
-    select.appendChild(option)
   }
 
   if (!currentValue && !hasActiveWorkbook) {
     select.value = ''
   }
 
-  bgmLog(LOG_LEVELS.INFO, `[refreshWorkbooks] 刷新工作簿列表: ${String(wbs.Count)} 个`)
+  bgmLog(LOG_LEVELS.INFO, `[refreshWorkbooks] 刷新工作簿列表: ${String(workbooks.length)} 个`)
 }
 
 export function activateSheetIfNeeded(ws: WpsWorksheet): (() => void) | false {

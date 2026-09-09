@@ -15,6 +15,7 @@ import {
   restoreLockedSheet,
   findWorkbookByName,
   findBangumiTargetSheets,
+  getOpenWorkbooks,
 } from '../tools/locked-sheet.js'
 
 /** 富化页面的锁定工作表引用解析（委托共享实现，保持向后兼容） */
@@ -37,7 +38,7 @@ export function refreshEnrichWorkbooks(selectId = 'enrichWorkbookSelect'): void 
     return
   }
 
-  const wbs = app.Workbooks
+  const workbooks = getOpenWorkbooks()
   const currentValue = select.value
 
   select.textContent = ''
@@ -49,29 +50,37 @@ export function refreshEnrichWorkbooks(selectId = 'enrichWorkbookSelect'): void 
   const activeWbName = app.ActiveWorkbook?.Name ?? ''
   let hasSelection = false
 
-  for (let index = 1; index <= wbs.Count; index += 1) {
-    const option = document.createElement('option')
-    const wb = wbs.Item(index)
-    option.value = wb.Name
-    option.text = wb.Name
+  for (const wb of workbooks) {
+    const name = (() => {
+      try {
+        return wb.Name
+      } catch {
+        return ''
+      }
+    })()
+    if (name) {
+      const option = document.createElement('option')
+      option.value = name
+      option.text = name
 
-    if (
-      (BGM.sheet.isLocked && BGM.sheet.lockedWorkbookName === wb.Name) ||
-      (currentValue && currentValue === wb.Name) ||
-      (!currentValue && !BGM.sheet.isLocked && wb.Name === activeWbName)
-    ) {
-      option.selected = true
-      hasSelection = true
+      if (
+        name === BGM.sheet.lockedWorkbookName ||
+        (currentValue !== '' && currentValue === name) ||
+        (currentValue === '' && name === activeWbName && !BGM.sheet.isLocked)
+      ) {
+        option.selected = true
+        hasSelection = true
+      }
+
+      select.appendChild(option)
     }
-
-    select.appendChild(option)
   }
 
   if (!hasSelection) {
     select.value = ''
   }
 
-  bgmLog(LOG_LEVELS.INFO, `[enrichLock] 刷新工作簿列表: ${String(wbs.Count)} 个`)
+  bgmLog(LOG_LEVELS.INFO, `[enrichLock] 刷新工作簿列表: ${String(workbooks.length)} 个`)
 }
 
 // ========== 刷新工作表列表 ==========
