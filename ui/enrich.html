@@ -66,6 +66,8 @@
               readonly
               placeholder="未选择文件..."
             ></div>
+            <!-- 自动识别已打开新番表工作簿的提示（打开页面时检查发现后显示） -->
+            <div id="autoDetectNotice" class="auto-detect-notice" style="display: none"></div>
             <div class="bgm-btn-group bgm-btn-row">
               <button
                 class="bgm-btn small primary"
@@ -246,6 +248,11 @@
             <button class="preview-tab active" data-tab="source">新番表数据</button>
             <button class="preview-tab" data-tab="match">匹配结果</button>
           </div>
+          <div class="preview-actions" id="matchPreviewAction">
+            <button class="bgm-btn small" id="previewMatchBtn" data-action="previewMatch">
+              🔍 预览匹配
+            </button>
+          </div>
           <div class="preview-table" id="sourcePreviewTable">
             <table id="sourceTable">
               <thead></thead>
@@ -277,10 +284,9 @@
             <table id="matchTable">
               <thead>
                 <tr>
-                  <th>动漫名</th>
+                  <th>新番表源数据</th>
                   <th>匹配方式</th>
-                  <th>Bangumi行号</th>
-                  <th>Bangumi名称</th>
+                  <th>目标表数据</th>
                   <th>详情</th>
                 </tr>
               </thead>

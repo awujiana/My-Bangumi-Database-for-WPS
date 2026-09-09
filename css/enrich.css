@@ -112,6 +112,18 @@
   color: var(--text-3);
 }
 
+/* 自动识别已打开新番表工作簿的提示 */
+.auto-detect-notice {
+  padding: 8px 12px;
+  background: rgba(74, 158, 255, 0.08);
+  border: 1px solid rgba(74, 158, 255, 0.35);
+  border-radius: 8px;
+  color: var(--accent-blue);
+  font-size: 12px;
+  line-height: 1.5;
+  word-break: break-all;
+}
+
 /* ========== 识别结果 ========== */
 .detect-result {
   margin-top: 12px;
@@ -255,7 +267,7 @@
 }
 
 .preview-table th {
-  background: var(--bg-surface-2);
+  background: linear-gradient(180deg, var(--bg-surface-2), var(--bg-mantle));
   color: var(--text-1);
   padding: 10px 8px;
   text-align: left;
@@ -265,6 +277,8 @@
   z-index: 10;
   white-space: nowrap;
   font-size: 11px;
+  letter-spacing: 0.04em;
+  border-bottom: 1px solid var(--border-strong);
 }
 
 .preview-table td {
@@ -329,6 +343,112 @@
 .preview-table .match-status.status-error,
 .preview-table .status-error {
   color: var(--red-strong);
+}
+
+/* ========== 数据预览单元格美化 ========== */
+/* 名称列加粗，突出主字段 */
+.preview-table .col-name .preview-name {
+  font-weight: 600;
+  color: var(--text-1);
+}
+
+/* 播放平台/独播：徽章式展示（贴合「版权平台标注示例」的表格习惯） */
+.preview-table .platform-chip {
+  display: inline-block;
+  margin: 1px 4px 1px 0;
+  padding: 3px 8px;
+  border-radius: 10px;
+  font-size: 10.5px;
+  line-height: 1;
+  white-space: nowrap;
+  background: rgba(56, 189, 248, 0.1);
+  border: 1px solid rgba(56, 189, 248, 0.3);
+  color: var(--teal);
+}
+
+/* 周更时间（周一~周日）：琥珀色徽章 */
+.preview-table .weekday-chip {
+  display: inline-block;
+  padding: 3px 8px;
+  border-radius: 10px;
+  font-size: 10.5px;
+  line-height: 1;
+  white-space: nowrap;
+  background: rgba(245, 158, 11, 0.1);
+  border: 1px solid rgba(245, 158, 11, 0.3);
+  color: var(--amber);
+}
+
+/* ========== 匹配结果对比表格 ========== */
+/* 源/目标对比单元格：允许换行，取代默认的单行省略 */
+.preview-table .cmp-cell {
+  max-width: none;
+  min-width: 200px;
+  white-space: normal;
+  overflow: visible;
+  text-overflow: clip;
+  vertical-align: top;
+  padding: 10px 12px;
+}
+
+.preview-table .cmp-cell .cmp-name {
+  font-weight: 600;
+  color: var(--text-1);
+  font-size: 12.5px;
+  line-height: 1.4;
+  word-break: break-all;
+}
+
+.preview-table .cmp-cell .cmp-meta {
+  margin-top: 2px;
+  font-size: 10.5px;
+  color: var(--text-3);
+}
+
+.preview-table .cmp-cell .cmp-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 7px;
+}
+
+.preview-table .cmp-cell .cmp-tag {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 4px;
+  font-size: 10.5px;
+  line-height: 1;
+  padding: 3px 7px;
+  border-radius: 9px;
+  background: var(--bg-mantle);
+  border: 1px solid var(--border-strong);
+  color: var(--text-2);
+  white-space: nowrap;
+}
+
+.preview-table .cmp-cell .cmp-tag i {
+  font-style: normal;
+  color: var(--text-3);
+}
+
+.preview-table .cmp-cell .cmp-empty {
+  padding: 8px 0;
+  font-size: 11px;
+  color: var(--text-3);
+}
+
+/* 匹配方式与详情列：窄列居中 */
+.preview-table .cmp-status-cell,
+.preview-table .cmp-action {
+  white-space: nowrap;
+  vertical-align: middle;
+  text-align: center;
+  width: 84px;
+}
+
+/* 未匹配行的目标侧弱化，突出「无对应目标行」 */
+.preview-table .match-row.match-unmatched .cmp-target {
+  opacity: 0.72;
 }
 
 /* 预览提示（如"仅显示前 N 行"） */
