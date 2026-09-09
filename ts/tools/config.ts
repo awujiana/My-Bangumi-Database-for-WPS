@@ -30,6 +30,10 @@ export const CONFIG_KEYS = {
   ENRICH_EP_SINGLE: 'bgm_enrich_ep_single',
   ENRICH_EP_FULL: 'bgm_enrich_ep_full',
   ENRICH_FILTER_KEYWORDS: 'bgm_enrich_filter_keywords',
+  ENRICH_TAGS_COLOR: 'bgm_enrich_tags_color',
+  ENRICH_PREMIERE_COLOR: 'bgm_enrich_premiere_color',
+  ENRICH_PLATFORM_COLOR: 'bgm_enrich_platform_color',
+  ENRICH_AUTO_CLEAN: 'bgm_enrich_auto_clean',
 } as const
 
 /**

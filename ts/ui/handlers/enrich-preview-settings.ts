@@ -5,6 +5,10 @@
  *   - bgm_enrich_ep_single        「单集」阈值（默认 1，橙色徽章）
  *   - bgm_enrich_ep_full          「完结」阈值（默认 12；等于无色，大于绿色，之间黄色）
  *   - bgm_enrich_filter_keywords  自定义噪声关键词（换行/逗号分隔，子串匹配即过滤）
+ *   - bgm_enrich_tags_color       TAGS 标签彩色化开关（默认开）
+ *   - bgm_enrich_premiere_color   首播日期着色开关（默认开）
+ *   - bgm_enrich_platform_color   播放平台着色开关（默认开）
+ *   - bgm_enrich_auto_clean       富化后自动合并去重开关（默认开）
  *
  * 富化页在每次页面加载时懒读取配置，因此设置页保存后无需跨页通知。
  *
@@ -19,6 +23,17 @@ import { resetNoiseKeywordCache } from '../../sync/enrich-engine.js'
 const DEFAULT_EP_SINGLE = 1
 const DEFAULT_EP_FULL = 12
 
+/** 布尔开关（复选框）字段：仅显式 'false' 视为关闭，默认开启。
+ *  用函数延迟取 CONFIG_KEYS：模块初始化存在 barrel 循环，初始化期读取会拿到 undefined。 */
+function toggleFields(): { id: string; key: string }[] {
+  return [
+    { id: 'enrichTagsColor', key: CONFIG_KEYS.ENRICH_TAGS_COLOR },
+    { id: 'enrichPremiereColor', key: CONFIG_KEYS.ENRICH_PREMIERE_COLOR },
+    { id: 'enrichPlatformColor', key: CONFIG_KEYS.ENRICH_PLATFORM_COLOR },
+    { id: 'enrichAutoClean', key: CONFIG_KEYS.ENRICH_AUTO_CLEAN },
+  ]
+}
+
 function safeGetInput(id: string): HTMLInputElement | HTMLTextAreaElement | null {
   return document.getElementById(id) as HTMLInputElement | HTMLTextAreaElement | null
 }
@@ -28,7 +43,8 @@ export function loadEnrichPreviewSettingsIntoForm(): void {
   const singleInput = safeGetInput('enrichEpSingle')
   const fullInput = safeGetInput('enrichEpFull')
   const keywordsInput = safeGetInput('enrichFilterKeywords')
-  if (!singleInput && !fullInput && !keywordsInput) return
+  const hasToggles = toggleFields().some((f) => document.getElementById(f.id) !== null)
+  if (!singleInput && !fullInput && !keywordsInput && !hasToggles) return
 
   try {
     if (singleInput) {
@@ -39,6 +55,12 @@ export function loadEnrichPreviewSettingsIntoForm(): void {
     }
     if (keywordsInput) {
       keywordsInput.value = getConfig(CONFIG_KEYS.ENRICH_FILTER_KEYWORDS, '', true)
+    }
+    for (const field of toggleFields()) {
+      const checkbox = document.getElementById(field.id) as HTMLInputElement | null
+      if (checkbox) {
+        checkbox.checked = getConfig(field.key, 'true', true) !== 'false'
+      }
     }
   } catch {
     // 读取失败时保持表单默认值

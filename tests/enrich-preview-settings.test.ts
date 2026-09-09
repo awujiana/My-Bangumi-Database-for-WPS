@@ -18,6 +18,10 @@ vi.mock('../ts/tools/config.js', () => ({
     ENRICH_EP_SINGLE: 'bgm_enrich_ep_single',
     ENRICH_EP_FULL: 'bgm_enrich_ep_full',
     ENRICH_FILTER_KEYWORDS: 'bgm_enrich_filter_keywords',
+    ENRICH_TAGS_COLOR: 'bgm_enrich_tags_color',
+    ENRICH_PREMIERE_COLOR: 'bgm_enrich_premiere_color',
+    ENRICH_PLATFORM_COLOR: 'bgm_enrich_platform_color',
+    ENRICH_AUTO_CLEAN: 'bgm_enrich_auto_clean',
   },
   getConfig: mocks.getConfig,
   setConfig: mocks.setConfig,
@@ -35,6 +39,11 @@ const { setConfig, getConfig, alert } = mocks
 /** 极简表单元素桩：仅 value 属性 */
 function fakeInput(value = ''): HTMLInputElement {
   return { value } as unknown as HTMLInputElement
+}
+
+/** 极简复选框桩：仅 checked 属性 */
+function fakeCheckbox(isChecked = true): HTMLInputElement {
+  return { checked: isChecked } as unknown as HTMLInputElement
 }
 
 const inputs: Record<string, HTMLInputElement> = {}
@@ -84,6 +93,19 @@ describe('loadEnrichPreviewSettingsIntoForm', () => {
     loadEnrichPreviewSettingsIntoForm()
     expect(inputs.enrichEpSingle?.value).toBe('1')
     expect(inputs.enrichEpFull?.value).toBe('12')
+  })
+
+  it('开关复选框：配置 "false" 时回填未勾选，其余默认勾选', () => {
+    seedForm('', '', '')
+    inputs.enrichTagsColor = fakeCheckbox(true)
+    inputs.enrichAutoClean = fakeCheckbox(true)
+    getConfig.mockImplementation((key: string, defaultValue = '') => {
+      if (key === 'bgm_enrich_tags_color') return 'false'
+      return defaultValue
+    })
+    loadEnrichPreviewSettingsIntoForm()
+    expect(inputs.enrichTagsColor.checked).toBe(false)
+    expect(inputs.enrichAutoClean.checked).toBe(true)
   })
 })
 

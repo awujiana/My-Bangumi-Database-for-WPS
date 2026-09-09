@@ -55,6 +55,8 @@ import {
 } from '../sync/workbook-auto-detect.js'
 import { sanitizeHtml, sanitizeTableRows } from '../tools/sanitize.js'
 import { escapeHtml } from '../tools/string-utilities.js'
+import { cleanSheetDuplicates } from '../sync/sheet-cleaning.js'
+import { showToast } from '../ui/dialog.js'
 import {
   getCellValue,
   getLastRow,
@@ -1621,12 +1623,83 @@ const TARGET_CMP_FIELDS: { colKey: string; label: string; fallbackColKey?: strin
   { colKey: '别名', label: '别名' },
 ]
 
-/** 平台徽章单元格：parts 已去空去重（含噪声过滤），逐个渲染 platform-chip */
+// ========== 着色工具（TAGS / 首播 / 平台按内容稳定配色） ==========
+
+/** 徽章调色板：12 色相，深色主题下保证可读的半透明底 + 高亮文字 */
+const CHIP_COLOR_PALETTE: { bg: string; border: string; text: string }[] = [
+  { bg: 'rgba(248,113,113,0.14)', border: 'rgba(248,113,113,0.40)', text: '#f87171' },
+  { bg: 'rgba(251,146,60,0.14)', border: 'rgba(251,146,60,0.40)', text: '#fb923c' },
+  { bg: 'rgba(250,204,21,0.14)', border: 'rgba(250,204,21,0.45)', text: '#facc15' },
+  { bg: 'rgba(132,204,22,0.14)', border: 'rgba(132,204,22,0.40)', text: '#84cc16' },
+  { bg: 'rgba(34,197,94,0.14)', border: 'rgba(34,197,94,0.40)', text: '#22c55e' },
+  { bg: 'rgba(45,212,191,0.14)', border: 'rgba(45,212,191,0.40)', text: '#2dd4bf' },
+  { bg: 'rgba(56,189,248,0.14)', border: 'rgba(56,189,248,0.40)', text: '#38bdf8' },
+  { bg: 'rgba(96,165,250,0.14)', border: 'rgba(96,165,250,0.40)', text: '#60a5fa' },
+  { bg: 'rgba(167,139,250,0.14)', border: 'rgba(167,139,250,0.40)', text: '#a78bfa' },
+  { bg: 'rgba(192,132,252,0.14)', border: 'rgba(192,132,252,0.40)', text: '#c084fc' },
+  { bg: 'rgba(244,114,182,0.14)', border: 'rgba(244,114,182,0.40)', text: '#f472b6' },
+  { bg: 'rgba(251,113,133,0.14)', border: 'rgba(251,113,133,0.40)', text: '#fb7185' },
+]
+
+/**
+ * 文本到调色板索引的稳定哈希：同一文本（标签/日期/平台名）永远命中同一颜色，
+ * 跨预览、完整表格弹窗、匹配结果均一致。
+ */
+function stableColorIndex(text: string): number {
+  let hash = 0
+  for (let index = 0; index < text.length; index += 1) {
+    hash = (hash * 31 + (text.codePointAt(index) ?? 0)) >>> 0
+  }
+  return hash % CHIP_COLOR_PALETTE.length
+}
+
+/** 按文本稳定着色的徽章 HTML（颜色写入内联 style，DOMPurify 白名单允许 style 属性） */
+function coloredChipHtml(text: string, baseClass: string): string {
+  const palette = CHIP_COLOR_PALETTE[stableColorIndex(text)] ?? CHIP_COLOR_PALETTE[0]
+  const escaped = escapeHtml(text)
+  if (!palette) {
+    return `<span class="${baseClass}">${escaped}</span>`
+  }
+  return `<span class="${baseClass}" title="${escaped}" style="background:${palette.bg};border-color:${palette.border};color:${palette.text}">${escaped}</span>`
+}
+
+/** 按 `/`、`|`、逗号、顿号拆分为条目列表（去空 + 噪声过滤） */
+function splitListValues(value: string): string[] {
+  return value
+    .split(/\s*[/|,，、]\s*/)
+    .map((part) => part.trim())
+    .filter((part) => part !== '' && !shouldFilterNoise(part))
+}
+
+/** TAGS 标签单元格：每个标签独立彩色徽章，不显示 / 分隔符（可在设置页关闭） */
+function renderTagChipsCell(value: string): string {
+  if (!getEnrichPreviewConfig().tagsColor) {
+    const escaped = escapeHtml(value)
+    return `<td title="${escaped}">${escaped}</td>`
+  }
+  const chips = splitListValues(value)
+    .map((tag) => coloredChipHtml(tag, 'tag-chip'))
+    .join('')
+  return `<td class="col-tags">${chips}</td>`
+}
+
+/** 首播日期单元格：相同日期同色徽章（可在设置页关闭） */
+function renderPremiereCell(value: string): string {
+  const escaped = escapeHtml(value)
+  if (!getEnrichPreviewConfig().premiereColor) {
+    return `<td title="${escaped}">${escaped}</td>`
+  }
+  return `<td title="${escaped}">${coloredChipHtml(value, 'premiere-chip')}</td>`
+}
+
+/** 平台徽章单元格：parts 已去空去重（含噪声过滤），逐个渲染 platform-chip（可按名着色） */
 function renderPlatformChipsCell(parts: string[]): string {
+  const shouldColor = getEnrichPreviewConfig().platformColor
   const chips = parts
-    .map(
-      (part) =>
-        `<span class="platform-chip" title="${escapeHtml(part)}">${escapeHtml(part)}</span>`,
+    .map((part) =>
+      shouldColor
+        ? coloredChipHtml(part, 'platform-chip')
+        : `<span class="platform-chip" title="${escapeHtml(part)}">${escapeHtml(part)}</span>`,
     )
     .join('')
   return `<td class="col-platform">${chips}</td>`
@@ -1641,11 +1714,13 @@ function renderPreviewCell(fieldKey: ScalarMappingKey, rawValue: string): string
     return `<td class="col-name" title="${escaped}"><span class="preview-name">${escaped}</span></td>`
   }
   if (fieldKey === 'platformCol' || fieldKey === 'exclusiveCol') {
-    const parts = value
-      .split(/[,，、/|]/)
-      .map((part) => part.trim())
-      .filter((part) => part !== '' && !shouldFilterNoise(part))
-    return renderPlatformChipsCell(parts)
+    return renderPlatformChipsCell(splitListValues(value))
+  }
+  if (fieldKey === 'tagsCol') {
+    return renderTagChipsCell(value)
+  }
+  if (fieldKey === 'premiereCol') {
+    return renderPremiereCell(value)
   }
   if (fieldKey === 'weekdayCol' && /^周[一二三四五六日天]$/.test(value)) {
     const weekdayClass = weekdayChipClass(value)
@@ -1735,18 +1810,40 @@ interface EnrichPreviewConfig {
   epSingle: number
   /** 集数「完结」阈值（>= 该值用绿色） */
   epFull: number
+  /** TAGS 标签彩色化（每个标签一种颜色，相同标签同色，不显示 / 分隔符） */
+  tagsColor: boolean
+  /** 首播日期按日期着色（相同日期同色） */
+  premiereColor: boolean
+  /** 播放平台按平台名着色（相同平台同色） */
+  platformColor: boolean
+  /** 富化完成后自动执行合并去重清洗 */
+  autoCleanDuplicates: boolean
 }
 
 const DEFAULT_ENRICH_PREVIEW_CONFIG: EnrichPreviewConfig = {
   epSingle: 1,
   epFull: 12,
+  tagsColor: true,
+  premiereColor: true,
+  platformColor: true,
+  autoCleanDuplicates: true,
 }
 
 let _enrichPreviewConfig: EnrichPreviewConfig | null = null
 
+/** 布尔配置读取：仅显式 'false' 视为关闭，其余（空/异常）走默认开启 */
+function isToggleEnabled(key: string): boolean {
+  try {
+    return getConfig(key, 'true', true) !== 'false'
+  } catch {
+    return true
+  }
+}
+
 /**
  * 读取富化预览配置（懒加载 + 失败兜底默认）。
- * 配置键：bgm_enrich_ep_single / bgm_enrich_ep_full。
+ * 配置键：bgm_enrich_ep_single / bgm_enrich_ep_full / bgm_enrich_tags_color /
+ *         bgm_enrich_premiere_color / bgm_enrich_platform_color / bgm_enrich_auto_clean。
  * 噪声关键词过滤由引擎层 shouldFilterNoise 负责（预览与富化写入共用）。
  */
 function getEnrichPreviewConfig(): EnrichPreviewConfig {
@@ -1764,6 +1861,10 @@ function getEnrichPreviewConfig(): EnrichPreviewConfig {
   } catch {
     // 兜底默认
   }
+  next.tagsColor = isToggleEnabled(CONFIG_KEYS.ENRICH_TAGS_COLOR)
+  next.premiereColor = isToggleEnabled(CONFIG_KEYS.ENRICH_PREMIERE_COLOR)
+  next.platformColor = isToggleEnabled(CONFIG_KEYS.ENRICH_PLATFORM_COLOR)
+  next.autoCleanDuplicates = isToggleEnabled(CONFIG_KEYS.ENRICH_AUTO_CLEAN)
   _enrichPreviewConfig = next
   return next
 }
@@ -1900,20 +2001,50 @@ function hideSourceDetail(): void {
   }
 }
 
-/** 渲染源表完整表格（全部非空表头列 × 前 maxRows 行），供弹窗展示 */
+/**
+ * 渲染源表完整表格（弹窗展示）。
+ *
+ * 列集 = 有表头的列 ∪ 列映射命中的列（Hazx 模板的名称列没有表头，旧版按表头过滤会把它
+ * 整列丢掉，造成弹窗「列数不全」）。无表头的映射列用字段名兜底（如「名称」）。
+ * 单元格复用数据预览的渲染（周几七色 / 集数徽章 / TAGS 彩色标签 / 首播与平台着色），
+ * 保证弹窗与预览样式一致。
+ */
 function renderSourceDetailTable(ws: WpsWorksheet): string {
   const maxCols = 50
   const { headerRow, dataStartRow } = state
+  const mapping = state.columnMapping
 
-  const headerCells: { col: number; header: string }[] = []
+  // 列映射：列号 → 字段键（含 platformExtraCols 聚合列，也按平台徽章渲染）
+  const fieldByCol = new Map<number, ScalarMappingKey>()
+  if (mapping) {
+    for (const f of COLUMN_MAPPING_FIELDS) {
+      const col = mapping[f.key]
+      if (col && col > 0) fieldByCol.set(col, f.key)
+    }
+    const extraPlatformCols = mapping.platformExtraCols ?? []
+    for (const col of extraPlatformCols) {
+      fieldByCol.set(col, 'platformCol')
+    }
+  }
+  const labelByField = new Map(COLUMN_MAPPING_FIELDS.map((f) => [f.key, f.label]))
+
+  interface DetailColumn {
+    col: number
+    label: string
+    field?: ScalarMappingKey | undefined
+  }
+  const columns: DetailColumn[] = []
   for (let col = 1; col <= maxCols; col += 1) {
-    const value = getCellValue(ws, headerRow, col).trim()
-    if (value) {
-      headerCells.push({ col, header: escapeHtml(value) })
+    const header = getCellValue(ws, headerRow, col).trim()
+    const field = fieldByCol.get(col)
+    if (header || field) {
+      const label =
+        header || (field ? (labelByField.get(field) ?? '') : '') || `第${String(col)}列`
+      columns.push({ col, label, field })
     }
   }
 
-  if (headerCells.length === 0) {
+  if (columns.length === 0) {
     return '<div class="preview-hint">未找到表头列，无法展示完整表格</div>'
   }
 
@@ -1924,10 +2055,15 @@ function renderSourceDetailTable(ws: WpsWorksheet): string {
   for (let row = dataStartRow; row <= lastRow; row += 1) {
     const rowCells: string[] = []
     let hasData = false
-    for (const h of headerCells) {
-      const value = getCellValue(ws, row, h.col).trim()
+    for (const column of columns) {
+      const value = getCellValue(ws, row, column.col).trim()
       if (value) hasData = true
-      rowCells.push(`<td title="${escapeHtml(value)}">${escapeHtml(value)}</td>`)
+      if (column.field) {
+        // 已映射字段复用预览渲染（空值时 renderPreviewCell 自会输出空 td）
+        rowCells.push(renderPreviewCell(column.field, value))
+      } else {
+        rowCells.push(`<td title="${escapeHtml(value)}">${escapeHtml(value)}</td>`)
+      }
     }
     if (hasData) {
       bodyRows.push(
@@ -1937,8 +2073,8 @@ function renderSourceDetailTable(ws: WpsWorksheet): string {
   }
 
   return sanitizeHtml(
-    `<div class="preview-table"><table><thead><tr><th></th>${headerCells
-      .map((h) => `<th>${h.header}</th>`)
+    `<div class="preview-table"><table><thead><tr><th></th>${columns
+      .map((c) => `<th>${escapeHtml(c.label)}</th>`)
       .join('')}</tr></thead><tbody>${bodyRows.join('')}</tbody></table></div>`,
   )
 }
@@ -2621,6 +2757,38 @@ function renderEnrichSummary(results: EnrichResultItem[]): void {
       level: BGM.ErrorLevel.INFO,
       context: 'renderEnrichSummary',
     })
+  }
+}
+
+// ========== 富化后自动合并去重 ==========
+
+/**
+ * 富化完成后按设置自动执行「合并去重」清洗（设置页「富化预览」可关闭）。
+ * 只清洗目标 Bangumi 表：按名称分组保留含 URL 的行、合并标签、删除重复行。
+ * 失败仅记录日志与提示，不中断主流程。
+ */
+function maybeAutoCleanAfterEnrich(): void {
+  if (!getEnrichPreviewConfig().autoCleanDuplicates) return
+  const target = state.bangumiSheet
+  if (!target) return
+  try {
+    const result = cleanSheetDuplicates(target)
+    if (result.performed) {
+      showToast(
+        `富化后自动去重完成：删除 ${String(result.deletedRows)} 行重复数据，合并 ${String(result.mergedTagGroups)} 组标签`,
+        'success',
+      )
+    }
+  } catch (error: unknown) {
+    BGM.handleError(error, {
+      showAlert: false,
+      level: BGM.ErrorLevel.WARN,
+      context: 'maybeAutoCleanAfterEnrich',
+    })
+    bgmLog(
+      LOG_LEVELS.WARN,
+      `[enrich] 富化后自动去重失败: ${error instanceof Error ? error.message : String(error)}`,
+    )
   }
 }
 
@@ -3488,6 +3656,9 @@ async function runBatchEnrichment(bangumiSheet: WpsWorksheet): Promise<void> {
   showBatchProgress(false)
   const startButton = safeGetButton('batchStartBtn')
   if (startButton) startButton.disabled = false
+
+  // 全部文件富化完成后统一执行一次合并去重（避免逐文件清洗时行号漂移）
+  maybeAutoCleanAfterEnrich()
 
   // 显示汇总
   renderBatchSummary()

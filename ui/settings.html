@@ -265,8 +265,24 @@
         <section class="section" id="sec-enrich-preview">
           <h3>🎨 富化预览</h3>
           <p class="hint">
-            控制「新番表富化」页数据预览的视觉呈现：周几颜色、集数阈值徽章颜色，以及需要过滤的噪声关键词。
+            控制「新番表富化」页数据预览的视觉呈现：周几颜色、集数阈值徽章颜色、标签/首播/平台着色，以及需要过滤的噪声关键词。
           </p>
+          <label class="check-row">
+            <input type="checkbox" id="enrichTagsColor" checked />
+            <span>TAGS 标签彩色化（每个标签独立颜色，相同标签同色，不显示 / 分隔符）</span>
+          </label>
+          <label class="check-row">
+            <input type="checkbox" id="enrichPremiereColor" checked />
+            <span>首播日期着色（相同日期同色）</span>
+          </label>
+          <label class="check-row">
+            <input type="checkbox" id="enrichPlatformColor" checked />
+            <span>播放平台着色（相同平台同色）</span>
+          </label>
+          <label class="check-row">
+            <input type="checkbox" id="enrichAutoClean" checked />
+            <span>富化完成后自动执行合并去重（按名称保留含 URL 行、合并标签、删除重复行）</span>
+          </label>
           <div class="form-group">
             <label for="enrichEpSingle">「单集」阈值</label>
             <input
