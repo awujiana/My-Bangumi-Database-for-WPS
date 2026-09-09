@@ -27,6 +27,9 @@ export const CONFIG_KEYS = {
   REFRESH_INTERVAL: 'bgm_refresh_interval',
   EXPORT_PATH: 'bgm_export_path',
   IMPORT_PATH: 'bgm_import_path',
+  ENRICH_EP_SINGLE: 'bgm_enrich_ep_single',
+  ENRICH_EP_FULL: 'bgm_enrich_ep_full',
+  ENRICH_FILTER_KEYWORDS: 'bgm_enrich_filter_keywords',
 } as const
 
 /**

@@ -95,6 +95,11 @@ import { showConnectionTestDialog, hideConnectionTestDialog } from '../github-co
 
 // 子模块
 import { _T } from './_constants.js'
+import {
+  loadEnrichPreviewSettingsIntoForm,
+  saveEnrichPreviewSettings,
+  reloadEnrichPreviewSettings,
+} from './enrich-preview-settings.js'
 import { cleanLockedDataSheet } from './sheet.js'
 import { syncFromPanel, syncCollectionFromBgm } from './sync.js'
 import {
@@ -490,6 +495,9 @@ export function setupButtonListeners(): void {
     trackedAddEventListener(themeSelect, 'change', handleThemeChange)
     bgmLog(LOG_LEVELS.INFO, '[handlers] 主题选择 change 监听器已注册')
   }
+
+  // 设置页「🎨 富化预览」：表单回填（元素不存在时模块内部自动跳过，面板页无副作用）
+  loadEnrichPreviewSettingsIntoForm()
   document.querySelectorAll<HTMLElement>('[data-theme-card]').forEach((card) => {
     trackedAddEventListener(card, 'click', handleThemePreviewClick)
   })
@@ -1881,6 +1889,15 @@ const ACTION_HANDLERS: Record<string, ActionHandler> = {
       document.body.classList.toggle('nav-icons-only', isEnabled)
     }
     bgmLog(LOG_LEVELS.INFO, `[handleActionClick] 导航模式: ${isEnabled ? '仅图标' : '图标+文字'}`)
+  },
+
+  // 设置页「🎨 富化预览」：保存 / 放弃修改
+  saveEnrichPreviewSettings: () => {
+    saveEnrichPreviewSettings()
+  },
+
+  reloadEnrichPreviewSettings: () => {
+    reloadEnrichPreviewSettings()
   },
 }
 

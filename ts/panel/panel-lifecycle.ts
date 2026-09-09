@@ -981,18 +981,13 @@ export function enlargePreview(): void {
   modal.setAttribute('aria-modal', 'true')
 
   modal.innerHTML = sanitizeHtml(`
-    <div class="bgm-modal-content" style="max-width: 95vw; max-height: 95vh; display: flex; flex-direction: column; background: #2d2d2d; border-radius: 12px; width: 95vw;">
+    <div class="bgm-modal-content enlarge-preview-modal-content" style="max-width: 96vw; max-height: 96vh; display: flex; flex-direction: column; background: #1e1e1e; border-radius: 12px; width: 96vw;">
       <div class="bgm-dialog-header" style="display:flex;justify-content:space-between;align-items:center;padding:14px 20px;border-bottom:1px solid #444;">
         <span class="bgm-dialog-title" style="color:#fff;font-size:16px;font-weight:600;">🔍 数据预览（放大）</span>
         <button class="bgm-close-btn enlarge-close-btn" aria-label="关闭放大预览" style="background:none;border:none;color:#888;font-size:28px;cursor:pointer;padding:0;line-height:1;">×</button>
       </div>
-      <div class="enlarged-preview-body" style="flex:1;overflow:auto;padding:16px;">
-        <div class="preview-box enlarged-preview-box" style="max-height:none;overflow:auto;font-size:14px;transform-origin:top left;transform:scale(1.3);">
-          ${content}
-        </div>
-      </div>
-      <div class="bgm-dialog-footer" style="padding:10px 20px;border-top:1px solid #444;display:flex;justify-content:flex-end;gap:8px;">
-        <button class="btn enlarge-close-btn" type="button">关闭</button>
+      <div class="enlarged-preview-body" style="flex:1;overflow:auto;padding:18px;">
+        <div class="preview-box enlarged-preview-box" style="max-height:none;overflow:auto;font-size:15px;">${content}</div>
       </div>
     </div>
   `)

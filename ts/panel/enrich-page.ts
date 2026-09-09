@@ -57,6 +57,7 @@ import {
 } from '../tools/util/index.js'
 import { findWorkbookByName, getOpenWorkbooks } from '../tools/locked-sheet.js'
 import type { WpsWorksheet, WpsWorkbook } from '../tools/wps.js'
+import { getConfig, CONFIG_KEYS } from '../tools/config.js'
 
 // ========== 类型定义 ==========
 
@@ -306,6 +307,12 @@ function bindTargetSheetControls(): void {
         selectTargetSheet()
       }
       updateEnrichLockButton('lockSheetBtn', 'lockStatus')
+      // 刷新后若已锁定目标工作表，自动跑一次预览匹配（用户无需再点一次「预览匹配」即可看到匹配结果）
+      if (state.animeSourceSheet && state.bangumiSheet && state.columnMapping) {
+        queueMicrotask(() => {
+          previewMatch()
+        })
+      }
     })
   }
 
@@ -1439,7 +1446,7 @@ function renderPreviewCell(fieldKey: keyof EnrichColumnMapping, rawValue: string
     const parts = value
       .split(/[,，、/|]/)
       .map((part) => part.trim())
-      .filter((part) => part !== '')
+      .filter((part) => part !== '' && !shouldFilterNoise(part))
     const chips = parts
       .map(
         (part) =>
@@ -1449,9 +1456,175 @@ function renderPreviewCell(fieldKey: keyof EnrichColumnMapping, rawValue: string
     return `<td class="col-platform" title="${escaped}">${chips}</td>`
   }
   if (fieldKey === 'weekdayCol' && /^周[一二三四五六日天]$/.test(value)) {
-    return `<td title="${escaped}"><span class="weekday-chip">${escaped}</span></td>`
+    const weekdayClass = weekdayChipClass(value)
+    return `<td title="${escaped}"><span class="weekday-chip ${weekdayClass}">${escaped}</span></td>`
+  }
+  if (fieldKey === 'episodesCol') {
+    const epClass = episodeChipClass(value)
+    const chipClass = epClass ? `ep-chip ${epClass}` : ''
+    return `<td title="${escaped}"><span class="${chipClass}">${escaped}</span></td>`
   }
   return `<td title="${escaped}">${escaped}</td>`
+}
+
+/** 周几字符到 CSS 修饰类名（周一~周日各一色） */
+function weekdayChipClass(value: string): string {
+  const map: Record<string, string> = {
+    周一: 'weekday-mon',
+    周二: 'weekday-tue',
+    周三: 'weekday-wed',
+    周四: 'weekday-thu',
+    周五: 'weekday-fri',
+    周六: 'weekday-sat',
+    周日: 'weekday-sun',
+    周天: 'weekday-sun',
+  }
+  return map[value] ?? ''
+}
+
+/**
+ * 集数字符串解析为数值（支持"12集"或"12"等），无法解析时返回 NaN
+ * 保留整数语义：Number() 会把 "12.5" 变成 12.5（浮点），这里期望 12，故用 parseInt
+ */
+function parseEpisodeCount(value: string): number {
+  const match = /\d+/.exec(value)
+
+  return match && match[0] !== '' ? Number.parseInt(match[0], 10) : NaN
+}
+
+/**
+ * 集数徽章 CSS 类（默认阈值：1=橙、2~11=黄、12=无、>12=绿）。
+ * 阈值可通过配置覆盖（bgm_enrich_ep_single / bgm_enrich_ep_full）。
+ *
+ * 优先级：
+ *   count === epSingle       → ep-single（橙）
+ *   count > epSingle && count < epFull → ep-short（黄）
+ *   count === epFull         → 无（不显示颜色）
+ *   count > epFull          → ep-full（绿）
+ */
+function episodeChipClass(value: string): string {
+  const count = parseEpisodeCount(value)
+  if (!Number.isFinite(count) || count <= 0) return ''
+  const single = getEpisodeSingleThreshold()
+  const full = getEpisodeFullThreshold()
+  if (single >= full) {
+    // 配置错误：单集阈值 >= 完结阈值时退回「>=full=无、>full=绿、==single=橙」
+    if (count === single) return 'ep-single'
+    if (count > full) return 'ep-full'
+    return ''
+  }
+  if (count === single) return 'ep-single'
+  if (count > single && count < full) return 'ep-short'
+  if (count > full) return 'ep-full'
+  return ''
+}
+
+/** 集数「单集」阈值（默认 1，对应橙色） */
+function getEpisodeSingleThreshold(): number {
+  try {
+    return getEnrichPreviewConfig().epSingle
+  } catch {
+    return 1
+  }
+}
+
+/** 集数「完结」阈值（默认 12；== 该值无色，> 该值绿色） */
+function getEpisodeFullThreshold(): number {
+  try {
+    return getEnrichPreviewConfig().epFull
+  } catch {
+    return 12
+  }
+}
+
+/** 内存中缓存富化预览配置（启动时从 settings 读取） */
+interface EnrichPreviewConfig {
+  /** 集数「单集」阈值 */
+  epSingle: number
+  /** 集数「完结」阈值（>= 该值用绿色） */
+  epFull: number
+  /** 自定义噪声关键词（任一关键词出现即过滤） */
+  filterKeywords: string[]
+}
+
+const DEFAULT_ENRICH_PREVIEW_CONFIG: EnrichPreviewConfig = {
+  epSingle: 1,
+  epFull: 12,
+  filterKeywords: [],
+}
+
+let _enrichPreviewConfig: EnrichPreviewConfig | null = null
+
+/**
+ * 读取富化预览配置（懒加载 + 失败兜底默认）。
+ * 配置键：bgm_enrich_ep_single / bgm_enrich_ep_full / bgm_enrich_filter_keywords（逗号分隔）。
+ */
+function getEnrichPreviewConfig(): EnrichPreviewConfig {
+  if (_enrichPreviewConfig) return _enrichPreviewConfig
+  const next: EnrichPreviewConfig = { ...DEFAULT_ENRICH_PREVIEW_CONFIG }
+  try {
+    const singleRaw = Number(
+      getConfig(CONFIG_KEYS.ENRICH_EP_SINGLE, String(DEFAULT_ENRICH_PREVIEW_CONFIG.epSingle), true),
+    )
+    const fullRaw = Number(
+      getConfig(CONFIG_KEYS.ENRICH_EP_FULL, String(DEFAULT_ENRICH_PREVIEW_CONFIG.epFull), true),
+    )
+    if (Number.isFinite(singleRaw) && singleRaw > 0) next.epSingle = Math.trunc(singleRaw)
+    if (Number.isFinite(fullRaw) && fullRaw > 0) next.epFull = Math.trunc(fullRaw)
+    const kw = getConfig(CONFIG_KEYS.ENRICH_FILTER_KEYWORDS, '', true).trim()
+    if (kw) {
+      next.filterKeywords = kw
+        .split(/[\n,]/)
+        .map((s) => s.trim())
+        .filter((s) => s !== '')
+    }
+  } catch {
+    // 兜底默认
+  }
+  _enrichPreviewConfig = next
+  return next
+}
+
+/** 配置变更后清除缓存使下次读取重新加载（公开导出供设置页配置变更时调用） */
+export function resetEnrichPreviewConfig(): void {
+  _enrichPreviewConfig = null
+}
+
+/**
+ * 判断单段文本是否应当作为噪声过滤掉。
+ * 默认内置规则：
+ *   - 「新番表 by Hazx.」类署名行
+ *   - 「版权平台标注示例」「播放平台示例」等说明性文本
+ *   - 「bilibili bilibili bilibili」类重复占位
+ *   - 连续 3 次以上同一平台的「B站港澳台」类示例
+ * 用户可在设置页追加自定义关键词（任意子串匹配即过滤）。
+ */
+function shouldFilterNoise(part: string): boolean {
+  const trimmed = part.trim()
+  if (!trimmed) return true
+  const defaults = [
+    '新番表 by Hazx',
+    '版权平台标注示例',
+    '播放平台示例',
+    '标注示例',
+    '示例',
+    'placeholder',
+    '（示例）',
+    '(示例)',
+  ]
+  for (const kw of defaults) {
+    if (trimmed.includes(kw)) return true
+  }
+  // 用户自定义关键词
+  try {
+    const custom = getEnrichPreviewConfig().filterKeywords
+    for (const kw of custom) {
+      if (kw && trimmed.includes(kw)) return true
+    }
+  } catch {
+    // 静默
+  }
+  return false
 }
 
 function renderSourcePreview(ws: WpsWorksheet, mapping: EnrichColumnMapping): void {
@@ -1783,7 +1956,28 @@ function buildTargetCmpTags(
   return renderCmpTags(items)
 }
 
-/** 渲染匹配结果对比表格：源数据 / 匹配方式 / 目标数据 三栏对照 */
+// ========== 匹配详情弹窗 ==========
+
+function showMatchDetail(match: MatchResult): void {
+  const modalElement = safeGetElement('matchDetailModal')
+  const bodyElement = safeGetElement('matchDetailBody')
+  if (!modalElement || !bodyElement) return
+
+  bodyElement.innerHTML = sanitizeHtml(renderMatchDetail(match))
+  modalElement.style.display = 'flex'
+}
+
+function hideMatchDetail(): void {
+  const modalElement = safeGetElement('matchDetailModal')
+  if (modalElement) {
+    modalElement.style.display = 'none'
+  }
+}
+
+/**
+ * 渲染匹配结果对比表格：源数据 / 匹配方式 / 目标数据 三栏对照
+ * 表头增加「📋 查看所有详情」按钮，点击打开全部匹配的汇总弹窗（不用逐个点 🔍 详情）
+ */
 function renderMatchResultsToTable(matches: MatchResult[]): void {
   const tbodyElement = safeGetElement('matchTable')?.querySelector('tbody')
   if (!tbodyElement) return
@@ -1842,25 +2036,111 @@ function renderMatchResultsToTable(matches: MatchResult[]): void {
       if (match) showMatchDetail(match)
     })
   })
+
+  // 「📋 查看所有详情」按钮同步写入表头（避免内联按钮跟随 tbody 重建）
+  injectAllMatchesDetailButton(matches)
   // 表格的显示由 applyPreviewTabVisibility 统一控制（未预览 / 非匹配页签时保持隐藏）
 }
 
-// ========== 匹配详情弹窗 ==========
+/** 把「📋 查看所有详情」按钮塞进 matchTable 的表头（th 详情列）。只在表头尚未注入时写入。 */
+function injectAllMatchesDetailButton(matches: MatchResult[]): void {
+  const table = safeGetElement('matchTable')
+  if (!table) return
+  const thead = table.querySelector(':scope > thead > tr')
+  if (!thead) return
+  let detailTh = thead.querySelector<HTMLElement>(':scope > th.all-detail-cell')
+  if (detailTh) {
+    // 已有按钮则跳过
+    if (detailTh.querySelector('button')) return
+  } else {
+    // 最后一列（详情）表头加一个全详情按钮
+    detailTh = document.createElement('th')
+    detailTh.className = 'all-detail-cell'
+    detailTh.textContent = '详情'
+    thead.appendChild(detailTh)
+  }
+  const cell = detailTh
+  cell.replaceChildren()
+  const button = document.createElement('button')
+  button.className = 'bgm-btn small primary'
+  button.type = 'button'
+  button.textContent = `📋 查看全部 (${String(matches.length)})`
+  button.addEventListener('click', () => {
+    showAllMatchesDetail(matches)
+  })
+  cell.appendChild(button)
+}
 
-function showMatchDetail(match: MatchResult): void {
+/** 渲染全部匹配汇总（按匹配方式分组），用于一屏看清所有匹配项 */
+function showAllMatchesDetail(matches: MatchResult[]): void {
   const modalElement = safeGetElement('matchDetailModal')
   const bodyElement = safeGetElement('matchDetailBody')
   if (!modalElement || !bodyElement) return
-
-  bodyElement.innerHTML = sanitizeHtml(renderMatchDetail(match))
-  modalElement.style.display = 'flex'
-}
-
-function hideMatchDetail(): void {
-  const modalElement = safeGetElement('matchDetailModal')
-  if (modalElement) {
-    modalElement.style.display = 'none'
+  if (matches.length === 0) {
+    bodyElement.innerHTML = sanitizeHtml('<p class="hint">暂无匹配结果</p>')
+    modalElement.style.display = 'flex'
+    return
   }
+  const groups: Record<string, MatchResult[]> = {
+    exact: [],
+    alias: [],
+    unmatched: [],
+    error: [],
+  }
+  for (const m of matches) {
+    const bucket = groups[m.matchType] ?? groups.unmatched
+    if (bucket) bucket.push(m)
+  }
+  const groupHtml: string[] = []
+  const labels: [keyof typeof groups, string, string][] = [
+    ['exact', '✅ 精确匹配', 'status-exact'],
+    ['alias', '🔄 别名匹配', 'status-alias'],
+    ['error', '⚠️ 错误', 'status-error'],
+    ['unmatched', '❌ 未匹配', 'status-unmatched'],
+  ]
+  for (const label of labels) {
+    const [key, title, cls] = label
+    const items = groups[key]
+    if (items && items.length > 0) {
+      const listHtml = items
+        .map((m, index) => {
+          const bangumi = m.bangumiRow === undefined ? '—' : `目标行 ${String(m.bangumiRow)}`
+          const bangumiName = m.bangumiName ? ` · ${escapeHtml(m.bangumiName)}` : ''
+          const error = m.errorMessage
+            ? `<div class="match-detail-error">${escapeHtml(m.errorMessage)}</div>`
+            : ''
+          const index_ = matches.indexOf(m)
+          return `
+            <div class="match-all-item">
+              <span class="match-all-idx">#${String(index + 1)}</span>
+              <span class="match-all-name">${escapeHtml(m.matchedAnimeName)}</span>
+              <span class="match-all-meta">源表行 ${String(m.animeRow)} → ${bangumi}${bangumiName}</span>
+              <button class="bgm-btn xsmall match-all-jump" data-match-index="${String(index_)}">🔍</button>
+              ${error}
+            </div>
+          `
+        })
+        .join('')
+      groupHtml.push(`
+        <div class="match-all-group">
+          <div class="match-all-title"><span class="match-status ${cls}">${title}</span> <span class="match-all-count">${String(items.length)} 条</span></div>
+          <div class="match-all-list">${listHtml}</div>
+        </div>
+      `)
+    }
+  }
+  bodyElement.innerHTML = sanitizeHtml(groupHtml.join(''))
+  // 绑定每项「🔍」按钮：跳到该条的单条详情弹窗
+  bodyElement.querySelectorAll<HTMLButtonElement>('.match-all-jump').forEach((button) => {
+    button.addEventListener('click', () => {
+      const indexAttribute = button.dataset.matchIndex
+      if (!indexAttribute) return
+      const index = Number(indexAttribute)
+      const m = matches[index]
+      if (m) showMatchDetail(m)
+    })
+  })
+  modalElement.style.display = 'flex'
 }
 
 /** 匹配详情的键值对列表渲染 */
@@ -1915,6 +2195,25 @@ function renderMatchDetail(match: MatchResult): string {
   }
   if (match.errorMessage) {
     items.push({ label: '错误信息', valueHtml: escapeHtml(match.errorMessage) })
+  }
+
+  // 详情弹窗额外展示源/目标对比字段（与内联表格同源数据），方便用户在不滚动小表格的情况下看清
+  const sourceSheet = state.animeSourceSheet
+  const targetSheet = state.bangumiSheet
+  const targetHeaderRow = targetSheet ? findHeaderRow(targetSheet) : 0
+  const targetColMap =
+    targetSheet && targetHeaderRow > 0 ? getColumnMap(targetSheet, targetHeaderRow) : null
+  if (sourceSheet && state.columnMapping) {
+    items.push({
+      label: '源表对比字段',
+      valueHtml: buildSourceCmpTags(sourceSheet, match),
+    })
+  }
+  if (targetSheet && targetColMap && match.bangumiRow !== undefined) {
+    items.push({
+      label: '目标表对比字段',
+      valueHtml: buildTargetCmpTags(targetSheet, targetColMap, match),
+    })
   }
 
   const listHtml = items
