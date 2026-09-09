@@ -1,0 +1,311 @@
+/* ============================================================================
+ * BGM 加载项 · 通用清理页面样式（css/clean.css）
+ * ----------------------------------------------------------------------------
+ * 仅负责「清理页」的展示层：范围徽章、可清理项勾选列表、预览统计卡、
+ * 进度条与结果日志。配色 / 间距 / 圆角一律复用 css/tokens.css，
+ * 不引入任何新依赖。
+ * ==========================================================================*/
+
+/* ---- 清理范围（配置徽章） ---- */
+.clean-scope {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  margin-top: var(--sp-3);
+}
+
+.clean-scope-row {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--sp-3);
+  padding: 6px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.clean-scope-row:last-child {
+  border-bottom: none;
+}
+
+.clean-scope-label {
+  flex: 0 0 96px;
+  color: var(--text-3);
+  font-size: var(--fs-sm);
+  line-height: 1.9;
+}
+
+.clean-scope-value {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  min-width: 0;
+}
+
+.clean-chip {
+  display: inline-block;
+  padding: 2px 8px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--r-pill);
+  background: var(--bg-surface);
+  color: var(--text-2);
+  font-size: var(--fs-sm);
+  line-height: 1.7;
+  white-space: nowrap;
+}
+
+.clean-chip.muted {
+  color: var(--text-3);
+  border-style: dashed;
+}
+
+/* ---- 可清理项勾选列表 ---- */
+.clean-item-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+  margin-top: var(--sp-3);
+}
+
+.clean-group {
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  background: var(--bg-base);
+  overflow: hidden;
+}
+
+.clean-group-title {
+  padding: 6px var(--sp-3);
+  background: var(--bg-mantle);
+  border-bottom: 1px solid var(--border);
+  color: var(--text-3);
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
+
+.clean-item {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--sp-3);
+  padding: 10px var(--sp-3);
+  border-bottom: 1px solid var(--border);
+  cursor: pointer;
+  transition: background var(--dur) var(--ease);
+}
+
+.clean-item:last-child {
+  border-bottom: none;
+}
+
+.clean-item:hover {
+  background: var(--bg-surface);
+}
+
+.clean-item input[type='checkbox'] {
+  margin-top: 3px;
+  width: 15px;
+  height: 15px;
+  accent-color: var(--primary);
+  flex: 0 0 auto;
+}
+
+.clean-item-body {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.clean-item-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.clean-item-icon {
+  font-size: 14px;
+}
+
+.clean-item-name {
+  color: var(--text-1);
+  font-size: var(--fs-body);
+  font-weight: 600;
+}
+
+.clean-item-desc {
+  color: var(--text-3);
+  font-size: var(--fs-sm);
+  line-height: 1.6;
+}
+
+.clean-risk {
+  padding: 1px 7px;
+  border-radius: var(--r-pill);
+  font-size: 10.5px;
+  font-weight: 600;
+  line-height: 1.7;
+  border: 1px solid transparent;
+}
+
+.clean-risk-low {
+  color: var(--success);
+  background: rgba(166, 227, 161, 0.12);
+  border-color: rgba(166, 227, 161, 0.35);
+}
+
+.clean-risk-medium {
+  color: var(--warning);
+  background: rgba(249, 226, 175, 0.12);
+  border-color: rgba(249, 226, 175, 0.35);
+}
+
+.clean-risk-high {
+  color: var(--danger);
+  background: rgba(243, 139, 168, 0.12);
+  border-color: rgba(243, 139, 168, 0.35);
+}
+
+/* ---- 预览统计卡 ---- */
+.clean-stat-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: var(--sp-2);
+  margin-top: var(--sp-3);
+}
+
+.clean-stat-card {
+  padding: 10px var(--sp-3);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  background: var(--bg-base);
+  text-align: center;
+}
+
+.clean-stat-card.accent {
+  border-color: var(--border-strong);
+  background: var(--bg-surface);
+}
+
+.clean-stat-value {
+  color: var(--text-1);
+  font-size: var(--fs-h2);
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+.clean-stat-label {
+  color: var(--text-3);
+  font-size: var(--fs-sm);
+}
+
+/* ---- 预览明细表（横向滚动） ---- */
+.clean-table-wrap {
+  margin-top: var(--sp-3);
+  max-height: 320px;
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  scrollbar-gutter: stable;
+}
+
+.clean-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--fs-sm);
+}
+
+.clean-table th,
+.clean-table td {
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+  white-space: nowrap;
+}
+
+.clean-table th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--bg-mantle);
+  color: var(--text-2);
+  font-weight: 600;
+}
+
+.clean-table td.num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.clean-table tbody tr:hover {
+  background: var(--bg-surface);
+}
+
+/* ---- 进度条 ---- */
+.clean-progress {
+  margin-top: var(--sp-3);
+}
+
+.clean-progress-bar {
+  height: 6px;
+  border-radius: var(--r-pill);
+  background: var(--bg-surface);
+  overflow: hidden;
+}
+
+.clean-progress-fill {
+  height: 100%;
+  width: 0;
+  border-radius: var(--r-pill);
+  background: var(--primary-grad);
+  transition: width var(--dur) var(--ease);
+}
+
+.clean-progress-text {
+  margin-top: 6px;
+  color: var(--text-3);
+  font-size: var(--fs-sm);
+}
+
+/* ---- 结果日志 ---- */
+.clean-log {
+  margin-top: var(--sp-3);
+  max-height: 320px;
+  min-height: 120px;
+  overflow-y: auto;
+  padding: var(--sp-2) var(--sp-3);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  background: var(--bg-mantle);
+  font-family: var(--font-mono);
+  font-size: var(--fs-mono);
+  line-height: 1.7;
+  scrollbar-gutter: stable;
+}
+
+.clean-log-line {
+  color: var(--text-2);
+  word-break: break-all;
+}
+
+.clean-log-ok {
+  color: var(--success);
+}
+
+.clean-log-warn {
+  color: var(--warning);
+}
+
+.clean-log-error {
+  color: var(--danger);
+}
+
+/* ---- 危险按钮 ---- */
+.bgm-btn.danger {
+  color: var(--danger);
+  border-color: rgba(243, 139, 168, 0.4);
+}
+
+.bgm-btn.danger:hover:not(:disabled) {
+  background: rgba(243, 139, 168, 0.12);
+  border-color: rgba(243, 139, 168, 0.7);
+}

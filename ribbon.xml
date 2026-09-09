@@ -21,6 +21,9 @@
 				<group id="enrichGroup" label="新番表富化">
                     <button id="btnOpenEnrichPanel" label="新番表富化" onAction="OnAction" getImage="GetBangumiImage" size="large"/>
                 </group>
+				<group id="cleanGroup" label="数据清理">
+                    <button id="btnOpenCleanPanel" label="数据清理" onAction="OnAction" getImage="GetBangumiImage" size="large"/>
+                </group>
             </tab>
         </tabs>
     </ribbon>
