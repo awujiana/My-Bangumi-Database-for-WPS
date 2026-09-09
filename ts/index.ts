@@ -344,6 +344,10 @@ export {
   showSettingsPanel,
   // 显示新番表富化面板
   showEnrichPanel,
+  // 显示通用数据清理面板
+  showCleanPanel,
+  // 标记清理面板已成功加载（面板 ID 自愈）
+  markCleanPaneLoaded,
   // 等待指定毫秒数
   sleep,
   // 延迟执行（用于模拟异步操作）

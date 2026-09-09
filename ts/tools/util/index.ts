@@ -1094,6 +1094,74 @@ export function markSettingsPaneLoaded(): void {
 }
 
 /**
+ * 标记清理面板已成功加载
+ *
+ * 与 markSettingsPaneLoaded 同款自愈机制：页面若加载失败（URL 错误等），
+ * 标记不会被写入，下次点击「数据清理」时直接重建面板，避免坏 ID 被持久化卡死。
+ */
+export function markCleanPaneLoaded(): void {
+  if (typeof window === 'undefined') return
+  const app = getApp() as { PluginStorage?: { setItem: (k: string, v: string) => void } } | null
+  app?.PluginStorage?.setItem('clean_pane_url', window.location.href)
+}
+
+/**
+ * 显示 / 切换「数据清理」面板（独立面板，与设置 / 富化面板并列）
+ *
+ * 面板 ID 缓存于 `clean_pane_id`；配合 `clean_pane_url` 标记做自愈：
+ * 缓存 ID 存在但页面从未成功加载时，隐藏旧面板并重建。
+ */
+export function showCleanPanel(): void {
+  const app = getApp() as {
+    PluginStorage?: {
+      getItem: (k: string) => string | null
+      setItem: (k: string, v: string) => void
+    }
+    CreateTaskPane?: (url: string) => { ID: string; Visible: boolean }
+    GetTaskPane?: (id: string) => { Visible: boolean }
+  } | null
+  if (!app) {
+    bgmLog(LOG_LEVELS.ERROR, '[showCleanPanel] 无法获取 WPS Application 对象')
+    return
+  }
+
+  let cleanId = app.PluginStorage?.getItem('clean_pane_id')
+  const storedPaneUrl = app.PluginStorage?.getItem('clean_pane_url')
+
+  // 自愈：缓存 ID 存在但页面从未成功加载（URL 拼错 / 页面报错）→ 隐藏并重建
+  if (cleanId && !storedPaneUrl?.includes('clean.html')) {
+    const stalePane = app.GetTaskPane?.(cleanId)
+    if (stalePane) stalePane.Visible = false
+    app.PluginStorage?.setItem('clean_pane_id', '')
+    app.PluginStorage?.setItem('clean_pane_url', '')
+    cleanId = null
+    bgmLog(LOG_LEVELS.WARN, '[showCleanPanel] 检测到加载失败的旧清理面板，已重建')
+  }
+
+  if (cleanId) {
+    const pane = app.GetTaskPane?.(cleanId)
+    if (pane) {
+      pane.Visible = !pane.Visible
+      bgmLog(LOG_LEVELS.INFO, `[showCleanPanel] 清理面板可见性切换: ${String(pane.Visible)}`)
+      return
+    }
+    // 面板 ID 失效（用户手动关闭）→ 清空存储，本次直接重建
+    app.PluginStorage?.setItem('clean_pane_id', '')
+    app.PluginStorage?.setItem('clean_pane_url', '')
+    bgmLog(LOG_LEVELS.WARN, '[showCleanPanel] 清理面板ID失效，已清除存储')
+  }
+
+  const pane = app.CreateTaskPane?.(buildTaskPaneUrl('clean.html'))
+  if (pane) {
+    pane.Visible = true
+    app.PluginStorage?.setItem('clean_pane_id', pane.ID)
+    bgmLog(LOG_LEVELS.INFO, `[showCleanPanel] 清理面板已创建(ID:${pane.ID})`)
+  } else {
+    bgmLog(LOG_LEVELS.ERROR, '[showCleanPanel] 创建清理面板失败')
+  }
+}
+
+/**
  * 构造任务窗格页面 URL
  *
  * 背景：getUrlPath() 在面板页面内（如 .../ui/panel.html）执行时返回的是页面所在目录

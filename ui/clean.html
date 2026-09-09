@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="dark light" />
+    <meta name="theme-color" content="#1e1e2e" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; connect-src 'self' https://api.bgm.tv https://bangumi.tv https://raw.githubusercontent.com https://api.github.com https://gitlab.com https://gitee.com"
+    />
+    <link rel="stylesheet" href="../css/tokens.css" />
+    <link rel="stylesheet" href="../css/styles.css" />
+    <link rel="stylesheet" href="../css/panel-theme.css" />
+    <link rel="stylesheet" href="../css/clean.css" />
+  </head>
+  <body>
+    <script type="text/javascript" src="../libs/purify.js"></script>
+    <script type="module" src="../dist-ts/panel/clean-bootstrap.js"></script>
+    <script src="../wpsjsrpcsdk.js"></script>
+
+    <div class="global">
+      <!-- ===================== 顶栏 ===================== -->
+      <header class="topbar">
+        <div class="brand">
+          <div class="brand-text">
+            <span class="brand-title">🧽 数据清理工具</span>
+            <span class="brand-sub">清理 Bangumi 数据表中的重复与噪声数据</span>
+          </div>
+        </div>
+      </header>
+
+      <!-- ===================== 侧栏（功能导航） ===================== -->
+      <aside class="sidebar">
+        <nav class="nav" aria-label="功能导航">
+          <div class="nav-label">功能导航</div>
+          <a href="#sec-scope" title="清理范围"
+            ><span class="nav-ico">🗺️</span><span class="nav-text">清理范围</span></a
+          >
+          <a href="#sec-items" title="可清理项"
+            ><span class="nav-ico">☑️</span><span class="nav-text">可清理项</span></a
+          >
+          <a href="#sec-preview" title="执行前预览"
+            ><span class="nav-ico">🔍</span><span class="nav-text">执行前预览</span></a
+          >
+          <a href="#sec-run" title="执行清理"
+            ><span class="nav-ico">🧹</span><span class="nav-text">执行清理</span></a
+          >
+          <a href="#sec-log" title="结果日志"
+            ><span class="nav-ico">📜</span><span class="nav-text">结果日志</span></a
+          >
+        </nav>
+      </aside>
+
+      <!-- ===================== 主区 ===================== -->
+      <main class="main">
+        <!-- 清理范围（数据全部来自配置，页面不硬编码路径） -->
+        <section class="section" id="sec-scope">
+          <h3>🗺️ 清理范围</h3>
+          <p class="hint">
+            以下范围与排除规则来自配置（<code>ts/panel/clean-rules.ts</code>），页面不写死任何具体路径或工作表名。
+          </p>
+          <div id="cleanScopeBody" class="clean-scope"></div>
+        </section>
+
+        <!-- 可清理项（勾选列表，由 CLEAN_RULES 渲染） -->
+        <section class="section" id="sec-items">
+          <h3>☑️ 可清理项</h3>
+          <p class="hint">
+            勾选本次要执行的清理项。新增清理项只需在规则配置中追加，页面无需改动。
+          </p>
+          <div class="bgm-btn-group bgm-btn-row">
+            <button class="bgm-btn small" id="cleanSelectAllBtn">✅ 全选</button>
+            <button class="bgm-btn small" id="cleanSelectNoneBtn">⬜ 全不选</button>
+          </div>
+          <div id="cleanItemList" class="clean-item-list"></div>
+        </section>
+
+        <!-- 执行前预览 -->
+        <section class="section" id="sec-preview">
+          <h3>🔍 执行前预览</h3>
+          <div class="bgm-btn-group bgm-btn-row">
+            <button class="bgm-btn small primary" id="cleanScanBtn" style="flex: 1">
+              🔍 扫描预览
+            </button>
+          </div>
+          <div id="cleanPreviewSummary">
+            <p class="hint">勾选后点击「🔍 扫描预览」查看待清理条目。</p>
+          </div>
+          <div id="cleanPreviewDetail"></div>
+        </section>
+
+        <!-- 执行清理 -->
+        <section class="section" id="sec-run">
+          <h3>🧹 执行清理</h3>
+          <p class="hint">
+            执行前会二次确认。删除行不可撤销，建议先备份工作簿；执行顺序为「先更新单元格，再删除行」。
+          </p>
+          <div class="bgm-btn-group bgm-btn-row">
+            <button class="bgm-btn small danger" id="cleanRunBtn" disabled style="flex: 1">
+              🧹 执行清理
+            </button>
+          </div>
+          <div id="cleanProgress" class="clean-progress" style="display: none">
+            <div class="clean-progress-bar">
+              <div class="clean-progress-fill" id="cleanProgressFill"></div>
+            </div>
+            <div class="clean-progress-text" id="cleanProgressText">准备中…</div>
+          </div>
+        </section>
+
+        <!-- 结果日志 -->
+        <section class="section" id="sec-log">
+          <h3>📜 结果日志</h3>
+          <div class="bgm-btn-group bgm-btn-row">
+            <button class="bgm-btn small" id="cleanClearLogBtn">🗑️ 清空日志</button>
+          </div>
+          <div id="cleanLog" class="clean-log" aria-live="polite"></div>
+        </section>
+      </main>
+    </div>
+  </body>
+</html>

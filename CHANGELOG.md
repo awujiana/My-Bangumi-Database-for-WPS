@@ -8,6 +8,16 @@
 
 ## [未发布]
 
+### 新功能（通用数据清理页面）
+
+- **新增「数据清理」页面**（功能区新按钮 `btnOpenCleanPanel`，图标 `images/cleanPage.svg`，页面 `ui/clean.html` + `css/clean.css` + `ts/panel/clean-page.ts`）：对已打开工作簿中的 Bangumi 数据表执行可勾选的批量清理。
+- **规则与展示彻底分离**：清理项清单全部在 `ts/panel/clean-rules.ts` 的 `CLEAN_RULES` 配置数组（id / 名称 / 分组 / 风险等级 / 默认勾选 / 目标列关键词），**新增同类清理项只需追加一条配置**，页面勾选列表、预览统计、执行与日志自动适配；清理目标（`CLEAN_TARGETS`：工作簿路径包含/排除、表名过滤、必备表头关键词、最大行数护栏）与排除规则（`CLEAN_EXCLUDES`：排除表名、排除行文本、最小数据行数）同为配置，页面不硬编码任何路径。
+- **页面五区块**：清理范围（配置只读展示）→ 清理项勾选列表（按分组渲染，风险徽标，勾选状态持久化到 PluginStorage）→ 执行前预览（待清理条目数、预计释放空间、逐规则明细）→ 执行（进度条 + 结果日志）→ 结果日志。
+- **扫描 / 执行两阶段**：`scanCleanRules` 只读扫描产出计划（不写任何单元格），执行 `runCleanPlans` 先写单元格变更再批量删行（`aggregatePlans` 自动剔除落在待删除行上的写入并合并同格变更），逐目标异常隔离。
+- **内置清理项**：重复名称行（保留含 URL 行、合并标签）、同 URL 重复行、空白数据行（默认关闭）、噪声标签移除、标签格式统一、类别数字前缀、别名去重、原作标签归一化。规则常量移植自 `clean/` Python 子项目（`rules_loader.py` 噪声词表、`tag_normalize_rules.yaml` 归一化规则），单元格变换全部为纯函数（`ts/panel/clean-transforms.ts`），预览与执行共用同一份逻辑保证条数严格一致。
+- **`ts/sync/sheet-cleaning.ts` 重构**：拆出 `planDuplicateRows` / `planDuplicateUrlRows` / `planEmptyNameRows`（纯扫描，支持 `excludedRows`）与 `applyRowPlan`（批量删行），`cleanSheetDuplicates` 保持原 API 复用同一实现；行删除合并为范围删除减少 COM 调用。
+- 新增 66 条测试（`clean-transforms` / `clean-rules` / `clean-engine`），总计 1768 条全绿。
+
 ### 改进（富化预览着色 + 富化后自动去重）
 
 - **TAGS 标签彩色化**：数据预览 / 完整表格弹窗中 TAGS 列按 `/`、`|`、逗号、顿号拆分为独立彩色徽章，不再显示 `/` 分隔符；颜色由标签文本的稳定哈希决定（相同标签永远同色，跨预览 / 弹窗 / 匹配结果一致）。设置页「🎨 富化预览」新增开关，默认开启。

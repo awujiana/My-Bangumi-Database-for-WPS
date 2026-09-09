@@ -20,6 +20,7 @@ import {
   showBangumiPanel,
   showEnrichPanel,
   showSettingsPanel,
+  showCleanPanel,
   BGM,
   isIncrementalSyncEnabled,
   isSkipConflictsEnabled,
@@ -335,6 +336,17 @@ export function OnAddinLoad(ribbonUI: WpsRibbonUI): boolean {
 }
 
 /**
+ * 「打开面板」类按钮：按钮 ID → 打开函数。
+ * 抽成映射可避免 OnAction 的 switch 持续膨胀（unicorn/try-complexity 上限）。
+ */
+const PANEL_OPENERS: Record<string, () => void> = {
+  btnShowPanel: showBangumiPanel,
+  btnOpenSettings: showSettingsPanel,
+  btnOpenEnrichPanel: showEnrichPanel,
+  btnOpenCleanPanel: showCleanPanel,
+}
+
+/**
  * 统一的 Ribbon 按钮点击处理函数
  * 根据按钮 ID 分发到具体的处理函数
  */
@@ -342,11 +354,13 @@ export function OnAddinLoad(ribbonUI: WpsRibbonUI): boolean {
 export function OnAction(control: { Id: string }): boolean {
   bgmLog(LOG_LEVELS.INFO, `[BGM] OnAction: ${control.Id}`)
   try {
+    // 打开面板类按钮先走映射表，命中即返回
+    const openPanel = PANEL_OPENERS[control.Id]
+    if (openPanel) {
+      openPanel()
+      return true
+    }
     switch (control.Id) {
-      case 'btnShowPanel': {
-        showBangumiPanel()
-        break
-      }
       case 'btnSyncBangumi': {
         // syncWithConfirmation 是 async 函数；OnAction 是同步回调无法 await，
         // 用 async IIFE + 全量 try/catch 消费（连同步抛错一并捕获）
@@ -455,14 +469,6 @@ export function OnAction(control: { Id: string }): boolean {
         })()
         break
       }
-      case 'btnOpenSettings': {
-        showSettingsPanel()
-        break
-      }
-      case 'btnOpenEnrichPanel': {
-        showEnrichPanel()
-        break
-      }
       default: {
         bgmLog(LOG_LEVELS.WARN, `[BGM] 未知按钮: ${control.Id}`)
       }
@@ -493,6 +499,7 @@ const ICON_PATHS: Record<string, string> = {
   btnUndoLastSync: 'images/undo.svg',
   btnOpenSettings: 'images/settings.svg',
   btnOpenEnrichPanel: 'images/enrichPage.svg',
+  btnOpenCleanPanel: 'images/cleanPage.svg',
 }
 
 export function GetBangumiImage(control: { Id: string }): string {

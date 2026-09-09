@@ -68,6 +68,7 @@ import {
   showSyncResultDialog,
   formatDuration,
   showSettingsPanel,
+  showCleanPanel,
   setExportPath,
   getExportPath,
   setImportPath,
@@ -1850,6 +1851,16 @@ const ACTION_HANDLERS: Record<string, ActionHandler> = {
     bgmLog(
       LOG_LEVELS.INFO,
       `[handleActionClick] 设置面板操作已触发，耗时: ${String(Date.now() - context.startTime)}ms`,
+    )
+  },
+
+  // 打开/切换通用数据清理面板
+  openCleanPanel: (context) => {
+    bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 打开数据清理面板')
+    showCleanPanel()
+    bgmLog(
+      LOG_LEVELS.INFO,
+      `[handleActionClick] 数据清理面板操作已触发，耗时: ${String(Date.now() - context.startTime)}ms`,
     )
   },
 
