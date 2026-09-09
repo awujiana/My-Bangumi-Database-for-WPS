@@ -55,6 +55,20 @@ export function extractFileNameFromPath(filePath: string): string {
   return lastSlash >= 0 ? filePath.substring(lastSlash + 1) : filePath
 }
 
+/**
+ * 从工作簿名提取「yy年m月」月度标签（纯函数，可单测）。
+ * 例：「2026年4月新番表 v2.13.xlsx」→「26年4月」；无月份时返回去扩展名的文件名。
+ */
+export function monthLabelFromWorkbookName(name: string): string {
+  const match = /(\d{2,4})年(\d{1,2})月/.exec(name)
+  if (match?.[1] !== undefined && match[2] !== undefined) {
+    const year = match[1].length === 4 ? match[1].slice(-2) : match[1]
+    return `${year}年${String(Number(match[2]))}月`
+  }
+  const dot = name.lastIndexOf('.')
+  return dot > 0 ? name.substring(0, dot) : name
+}
+
 /** 判断某行「前 MAX_SCAN_COLUMNS 列中是否有任一列有值」（参考 locked-sheet.ts isRowPopulated） */
 function isRowPopulated(ws: WpsWorksheet, row: number): boolean {
   for (let col = 1; col <= PANEL_CONFIG.MAX_SCAN_COLUMNS; col += 1) {

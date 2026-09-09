@@ -12,6 +12,11 @@ import {
   enrichEntries,
   resolveConflictField,
   isBangumiSheetEmpty,
+  readPlatformValues,
+  findIntroSheetInWorkbook,
+  buildIntroSheetContext,
+  normalizeName,
+  shouldFilterNoise,
 } from '../sync/enrich-engine.js'
 import type {
   EnrichColumnMapping,
@@ -22,6 +27,7 @@ import type {
   ProgressCallback,
   ConflictInfo,
   EnrichedField,
+  IntroSheetContext,
 } from '../sync/enrich-engine.js'
 import {
   refreshEnrichWorkbooks,
@@ -42,7 +48,10 @@ import {
   BANGUMI_TARGET_DETECTOR,
   collectDetectedWorkbookPaths,
   describeOpenWorkbooks,
+  findAnimeSourceSheetInWorkbook,
   mergeDetectedPathsIntoStorage,
+  monthLabelFromWorkbookName,
+  scanMatchingWorkbooks,
 } from '../sync/workbook-auto-detect.js'
 import { sanitizeHtml, sanitizeTableRows } from '../tools/sanitize.js'
 import { escapeHtml } from '../tools/string-utilities.js'
@@ -111,6 +120,9 @@ interface EnrichPageState {
   sourceWorkbook: WpsWorkbook | null
   isSourceWorkbookOpenedByUs: boolean
 
+  // 关联的「新番简介」工作表上下文（按名称与主表关联，富化时补写导演/编剧等字段）
+  introContext: IntroSheetContext | null
+
   // 可选开关：单文件识别成功后即关闭源工作簿，开始富化时自动重开
   closeSourceAfterDetect: boolean
 }
@@ -143,13 +155,18 @@ const state: EnrichPageState = {
   sourceWorkbook: null,
   isSourceWorkbookOpenedByUs: false,
 
+  introContext: null,
+
   closeSourceAfterDetect: false,
 }
 
 // ========== 列映射字段元数据 ==========
 
+/** 标量（number）映射键：排除 platformExtraCols（number[]）这类聚合字段 */
+type ScalarMappingKey = Exclude<keyof EnrichColumnMapping, 'platformExtraCols'>
+
 const COLUMN_MAPPING_FIELDS: {
-  key: keyof EnrichColumnMapping
+  key: ScalarMappingKey
   label: string
   required: boolean
 }[] = [
@@ -798,6 +815,10 @@ function detectHeaderOnSheet(ws: WpsWorksheet, label: string): EnrichColumnMappi
     state.dataStartRow = sourceLayout?.dataStartRow ?? headerRow + 1
     state.columnMapping = mapping
 
+    // 关联简介表 + 刷新工作簿切换按钮条
+    discoverIntroContext()
+    renderWorkbookTabs()
+
     renderDetectResult(ws, mapping)
     renderColumnMappingEditor(ws, mapping)
     renderSourcePreview(ws, mapping)
@@ -934,6 +955,7 @@ function closeOpenedSourceWorkbook(): void {
 
   state.sourceWorkbook = null
   state.isSourceWorkbookOpenedByUs = false
+  state.introContext = null
 }
 
 /** 仅关闭源工作簿并断开引用，保留已识别的表头行/列映射（closeSourceAfterDetect 模式用） */
@@ -1273,7 +1295,7 @@ function renderColumnMappingEditor(ws: WpsWorksheet, mapping: EnrichColumnMappin
 
   const selects = mappingList.querySelectorAll<HTMLSelectElement>('.mapping-select')
   selects.forEach((select) => {
-    const fieldKey = select.dataset.field as keyof EnrichColumnMapping | null
+    const fieldKey = select.dataset.field as ScalarMappingKey | null
     if (!fieldKey) return
 
     select.addEventListener('change', () => {
@@ -1285,7 +1307,7 @@ function renderColumnMappingEditor(ws: WpsWorksheet, mapping: EnrichColumnMappin
   })
 }
 
-function updateColumnMapping(field: keyof EnrichColumnMapping, value: number): void {
+function updateColumnMapping(field: ScalarMappingKey, value: number): void {
   if (!state.columnMapping) return
 
   state.columnMapping[field] = value === 0 ? (undefined as never) : value
@@ -1401,7 +1423,7 @@ function toggleSheetLock(): void {
 /**
  * 数据预览的「一栏一行」列顺序：按已映射字段渲染，避免 50 列全部挤压成文本流
  */
-const PREVIEW_FIELD_COLS: { key: keyof EnrichColumnMapping; label: string }[] = [
+const PREVIEW_FIELD_COLS: { key: ScalarMappingKey; label: string }[] = [
   { key: 'nameCol', label: '名称' },
   { key: 'weekdayCol', label: '周更时间' },
   { key: 'premiereCol', label: '首播' },
@@ -1412,8 +1434,173 @@ const PREVIEW_FIELD_COLS: { key: keyof EnrichColumnMapping; label: string }[] = 
   { key: 'tagsCol', label: 'TAGS/标签' },
 ]
 
+/**
+ * 简介（2026年4月新番简介）字段在预览/匹配结果中的展示顺序与标签。
+ * 仅展示简介表映射命中的列；目标列名与源列名不同（编剧→脚本等）由富化引擎处理。
+ */
+const INTRO_PREVIEW_FIELDS: { key: ScalarMappingKey; label: string }[] = [
+  { key: 'directorCol', label: '导演' },
+  { key: 'screenplayCol', label: '编剧' },
+  { key: 'characterDesignCol', label: '人设' },
+  { key: 'cgDirectorCol', label: 'CG导演' },
+  { key: 'musicCol', label: '音乐' },
+  { key: 'studioCol', label: '动画制作' },
+  { key: 'seriesCompositionCol', label: '系列构成' },
+  { key: 'storyboardCol', label: '分镜' },
+  { key: 'originalWorkCol', label: '原作' },
+]
+
+// ========== 简介工作表关联 ==========
+
+/**
+ * 发现并缓存与当前源表关联的「新番简介」工作表：
+ * 1. 源工作簿内查找（表头命中 ≥2 个简介关键字且非主新番表布局）；
+ * 2. 兜底：其他已打开工作簿（如单独的「2026年4月新番简介」工作簿）。
+ * 找不到时清空缓存（源表切换后旧简介表失效）。
+ */
+function discoverIntroContext(): void {
+  state.introContext = null
+  const sourceName = state.animeSourceSheet?.Name ?? ''
+  const sourceWb =
+    state.sourceWorkbook ??
+    (state.animeSourceSheet as unknown as { Parent?: WpsWorkbook } | null)?.Parent ??
+    null
+
+  if (sourceWb) {
+    const sheet = findIntroSheetInWorkbook(sourceWb, sourceName)
+    if (sheet) {
+      state.introContext = buildIntroSheetContext(sheet)
+      if (state.introContext) return
+    }
+  }
+
+  for (const wb of getOpenWorkbooks()) {
+    const name = (() => {
+      try {
+        return wb.Name
+      } catch {
+        return ''
+      }
+    })()
+    if (sourceWb?.Name === name) {
+      // 源工作簿已在上方优先查找，跳过
+    } else {
+      const sheet = findIntroSheetInWorkbook(wb, sourceName)
+      if (sheet) {
+        state.introContext = buildIntroSheetContext(sheet)
+        if (state.introContext) {
+          bgmLog(LOG_LEVELS.INFO, `[enrich] 在工作簿 ${name} 中找到关联简介表`)
+          return
+        }
+      }
+    }
+  }
+}
+
+// ========== 多新番表工作簿切换（yy年m月按钮） ==========
+
+/** 收集可切换的新番表工作簿（当前源表优先，其次全部自动识别命中的已打开工作簿） */
+function collectWorkbookTabs(): WpsWorkbook[] {
+  const seen = new Set<string>()
+  const items: WpsWorkbook[] = []
+  const push = (wb: WpsWorkbook): void => {
+    try {
+      const name = wb.Name
+      if (name && !seen.has(name)) {
+        seen.add(name)
+        items.push(wb)
+      }
+    } catch {
+      // 工作簿切换中，跳过
+    }
+  }
+  if (state.sourceWorkbook) push(state.sourceWorkbook)
+  for (const wb of scanMatchingWorkbooks(ANIME_SOURCE_DETECTOR)) push(wb)
+  return items
+}
+
+/** 当前活动源工作簿名（无则空串） */
+function activeWorkbookName(): string {
+  return state.animeSourceSheet
+    ? (state.sourceWorkbook?.Name ??
+        (state.animeSourceSheet as unknown as { Parent?: WpsWorkbook } | null)?.Parent?.Name ??
+        '')
+    : ''
+}
+
+/** 渲染「26年4月」式切换按钮条；仅一个候选时隐藏 */
+function renderWorkbookTabs(): void {
+  const container = safeGetElement('workbookTabs')
+  if (!container) return
+
+  const items = collectWorkbookTabs()
+  if (items.length <= 1) {
+    container.style.display = 'none'
+    container.replaceChildren()
+    return
+  }
+
+  container.style.display = ''
+  container.replaceChildren()
+  const activeName = activeWorkbookName()
+  for (const wb of items) {
+    const button = document.createElement('button')
+    button.type = 'button'
+    const name = (() => {
+      try {
+        return wb.Name
+      } catch {
+        return ''
+      }
+    })()
+    button.className = `workbook-tab${name === activeName ? ' active' : ''}`
+    button.textContent = monthLabelFromWorkbookName(name)
+    button.title = name
+    button.addEventListener('click', () => {
+      if (name !== activeName) switchSourceWorkbook(wb)
+    })
+    container.appendChild(button)
+  }
+}
+
+/** 切换源工作簿：识别新番表布局并刷新预览与匹配结果 */
+function switchSourceWorkbook(wb: WpsWorkbook): void {
+  const sheet = findAnimeSourceSheetInWorkbook(wb)
+  if (!sheet) {
+    BGM.Dialog.alert('提示', `工作簿「${wb.Name}」中未识别到新番表布局`)
+    return
+  }
+
+  // 释放旧源工作簿（仅回收本插件自动打开的；closeOpenedSourceWorkbook 会清空源表状态）
+  if (state.sourceWorkbook && state.isSourceWorkbookOpenedByUs) {
+    try {
+      if (state.sourceWorkbook.Name !== wb.Name) closeOpenedSourceWorkbook()
+    } catch {
+      // 旧工作簿已关闭
+    }
+  }
+
+  state.filePath = (() => {
+    try {
+      return wb.FullName
+    } catch {
+      return state.filePath
+    }
+  })()
+
+  const mapping = detectHeaderOnSheet(sheet, wb.Name)
+  if (!mapping) return
+
+  state.sourceWorkbook = wb
+  state.isSourceWorkbookOpenedByUs = false
+
+  renderWorkbookTabs()
+  // 切换后自动刷新匹配结果（无需再点「预览匹配」）
+  if (state.bangumiSheet) previewMatch()
+}
+
 /** 匹配结果对比表格：新番表源侧展示的字段（名称列单独展示） */
-const SOURCE_CMP_FIELDS: { key: keyof EnrichColumnMapping; label: string }[] = [
+const SOURCE_CMP_FIELDS: { key: ScalarMappingKey; label: string }[] = [
   { key: 'weekdayCol', label: '周更' },
   { key: 'premiereCol', label: '首播' },
   { key: 'episodesCol', label: '集数' },
@@ -1434,8 +1621,19 @@ const TARGET_CMP_FIELDS: { colKey: string; label: string; fallbackColKey?: strin
   { colKey: '别名', label: '别名' },
 ]
 
+/** 平台徽章单元格：parts 已去空去重（含噪声过滤），逐个渲染 platform-chip */
+function renderPlatformChipsCell(parts: string[]): string {
+  const chips = parts
+    .map(
+      (part) =>
+        `<span class="platform-chip" title="${escapeHtml(part)}">${escapeHtml(part)}</span>`,
+    )
+    .join('')
+  return `<td class="col-platform">${chips}</td>`
+}
+
 /** 数据预览单元格渲染：名称加粗、周更/播放平台以徽章形式展示 */
-function renderPreviewCell(fieldKey: keyof EnrichColumnMapping, rawValue: string): string {
+function renderPreviewCell(fieldKey: ScalarMappingKey, rawValue: string): string {
   const value = rawValue.trim()
   if (!value) return '<td></td>'
   const escaped = escapeHtml(value)
@@ -1447,13 +1645,7 @@ function renderPreviewCell(fieldKey: keyof EnrichColumnMapping, rawValue: string
       .split(/[,，、/|]/)
       .map((part) => part.trim())
       .filter((part) => part !== '' && !shouldFilterNoise(part))
-    const chips = parts
-      .map(
-        (part) =>
-          `<span class="platform-chip" title="${escapeHtml(part)}">${escapeHtml(part)}</span>`,
-      )
-      .join('')
-    return `<td class="col-platform" title="${escaped}">${chips}</td>`
+    return renderPlatformChipsCell(parts)
   }
   if (fieldKey === 'weekdayCol' && /^周[一二三四五六日天]$/.test(value)) {
     const weekdayClass = weekdayChipClass(value)
@@ -1484,12 +1676,12 @@ function weekdayChipClass(value: string): string {
 
 /**
  * 集数字符串解析为数值（支持"12集"或"12"等），无法解析时返回 NaN
- * 保留整数语义：Number() 会把 "12.5" 变成 12.5（浮点），这里期望 12，故用 parseInt
+ * /\d+/ 只捕获纯数字段，Number() 转换即整数，无小数风险
  */
 function parseEpisodeCount(value: string): number {
   const match = /\d+/.exec(value)
 
-  return match && match[0] !== '' ? Number.parseInt(match[0], 10) : NaN
+  return match && match[0] !== '' ? Number(match[0]) : NaN
 }
 
 /**
@@ -1543,21 +1735,19 @@ interface EnrichPreviewConfig {
   epSingle: number
   /** 集数「完结」阈值（>= 该值用绿色） */
   epFull: number
-  /** 自定义噪声关键词（任一关键词出现即过滤） */
-  filterKeywords: string[]
 }
 
 const DEFAULT_ENRICH_PREVIEW_CONFIG: EnrichPreviewConfig = {
   epSingle: 1,
   epFull: 12,
-  filterKeywords: [],
 }
 
 let _enrichPreviewConfig: EnrichPreviewConfig | null = null
 
 /**
  * 读取富化预览配置（懒加载 + 失败兜底默认）。
- * 配置键：bgm_enrich_ep_single / bgm_enrich_ep_full / bgm_enrich_filter_keywords（逗号分隔）。
+ * 配置键：bgm_enrich_ep_single / bgm_enrich_ep_full。
+ * 噪声关键词过滤由引擎层 shouldFilterNoise 负责（预览与富化写入共用）。
  */
 function getEnrichPreviewConfig(): EnrichPreviewConfig {
   if (_enrichPreviewConfig) return _enrichPreviewConfig
@@ -1571,13 +1761,6 @@ function getEnrichPreviewConfig(): EnrichPreviewConfig {
     )
     if (Number.isFinite(singleRaw) && singleRaw > 0) next.epSingle = Math.trunc(singleRaw)
     if (Number.isFinite(fullRaw) && fullRaw > 0) next.epFull = Math.trunc(fullRaw)
-    const kw = getConfig(CONFIG_KEYS.ENRICH_FILTER_KEYWORDS, '', true).trim()
-    if (kw) {
-      next.filterKeywords = kw
-        .split(/[\n,]/)
-        .map((s) => s.trim())
-        .filter((s) => s !== '')
-    }
   } catch {
     // 兜底默认
   }
@@ -1590,51 +1773,23 @@ export function resetEnrichPreviewConfig(): void {
   _enrichPreviewConfig = null
 }
 
-/**
- * 判断单段文本是否应当作为噪声过滤掉。
- * 默认内置规则：
- *   - 「新番表 by Hazx.」类署名行
- *   - 「版权平台标注示例」「播放平台示例」等说明性文本
- *   - 「bilibili bilibili bilibili」类重复占位
- *   - 连续 3 次以上同一平台的「B站港澳台」类示例
- * 用户可在设置页追加自定义关键词（任意子串匹配即过滤）。
- */
-function shouldFilterNoise(part: string): boolean {
-  const trimmed = part.trim()
-  if (!trimmed) return true
-  const defaults = [
-    '新番表 by Hazx',
-    '版权平台标注示例',
-    '播放平台示例',
-    '标注示例',
-    '示例',
-    'placeholder',
-    '（示例）',
-    '(示例)',
-  ]
-  for (const kw of defaults) {
-    if (trimmed.includes(kw)) return true
-  }
-  // 用户自定义关键词
-  try {
-    const custom = getEnrichPreviewConfig().filterKeywords
-    for (const kw of custom) {
-      if (kw && trimmed.includes(kw)) return true
-    }
-  } catch {
-    // 静默
-  }
-  return false
-}
-
 function renderSourcePreview(ws: WpsWorksheet, mapping: EnrichColumnMapping): void {
   const tableContainer = safeGetElement('sourceTable')
   if (!tableContainer) return
 
   const { dataStartRow } = state
 
-  // 只取已映射的字段列，形成「一栏一行」的简洁预览
-  const fieldCols = PREVIEW_FIELD_COLS.filter((f) => (mapping[f.key] ?? 0) > 0)
+  // 只取已映射的字段列，形成「一栏一行」的简洁预览。
+  // 平台列聚合：有播放平台列时独播列并入「播放平台」一栏展示（F/G/H/I/J 聚合去重）。
+  const hasPlatformCol = (mapping.platformCol ?? 0) > 0
+  const fieldCols = PREVIEW_FIELD_COLS.filter(
+    (f) => (mapping[f.key] ?? 0) > 0 && (f.key !== 'exclusiveCol' || !hasPlatformCol),
+  )
+  // 简介表字段列（关联到「新番简介」工作表时展示）
+  const introSheet = state.introContext?.sheet ?? null
+  const introFields = state.introContext
+    ? INTRO_PREVIEW_FIELDS.filter((f) => (state.introContext?.mapping[f.key] ?? 0) > 0)
+    : []
   if (fieldCols.length === 0) {
     const emptyThead = tableContainer.querySelector('thead')
     if (emptyThead) emptyThead.replaceChildren()
@@ -1656,7 +1811,9 @@ function renderSourcePreview(ws: WpsWorksheet, mapping: EnrichColumnMapping): vo
   const thead = tableContainer.querySelector('thead')
   if (thead) {
     thead.innerHTML = sanitizeTableRows(
-      `<tr><th></th>${fieldCols.map((f) => `<th>${escapeHtml(f.label)}</th>`).join('')}</tr>`,
+      `<tr><th></th>${fieldCols.map((f) => `<th>${escapeHtml(f.label)}</th>`).join('')}${introFields
+        .map((f) => `<th class="col-intro">${escapeHtml(f.label)}</th>`)
+        .join('')}</tr>`,
     )
   }
 
@@ -1671,11 +1828,34 @@ function renderSourcePreview(ws: WpsWorksheet, mapping: EnrichColumnMapping): vo
   for (let row = dataStartRow; row <= lastRow; row += 1) {
     const rowCells: string[] = []
     let hasData = false
+
+    // 简介表按名称关联本行（无关联行时简介列留空）
+    const introRow = state.introContext
+      ? state.introContext.nameIndex.get(
+          normalizeName(getCellValue(ws, row, mapping.nameCol).trim()),
+        )
+      : undefined
+
     for (const f of fieldCols) {
-      const col = mapping[f.key] ?? 0
-      const value = getCellValue(ws, row, col)
+      if (hasPlatformCol && f.key === 'platformCol') {
+        // 播放平台聚合展示：platformCol + platformExtraCols + exclusiveCol 去重
+        const platforms = readPlatformValues(ws, row, mapping)
+        if (platforms.length > 0) hasData = true
+        rowCells.push(renderPlatformChipsCell(platforms))
+      } else {
+        const col = mapping[f.key] ?? 0
+        const value = getCellValue(ws, row, col)
+        if (value.trim()) hasData = true
+        rowCells.push(renderPreviewCell(f.key, value))
+      }
+    }
+    for (const f of introFields) {
+      const col = state.introContext?.mapping[f.key] ?? 0
+      const value = introRow !== undefined && col > 0 ? getCellValue(introSheet, introRow, col) : ''
       if (value.trim()) hasData = true
-      rowCells.push(renderPreviewCell(f.key, value))
+      rowCells.push(
+        `<td class="col-intro" title="${escapeHtml(value.trim())}">${escapeHtml(value.trim())}</td>`,
+      )
     }
     if (hasData) {
       rowsHtml.push(
@@ -1918,18 +2098,42 @@ function renderCmpTags(items: { label: string; value: string }[]): string {
   return `<div class="cmp-tags">${tagsHtml}</div>`
 }
 
-/** 读取新番表源行的对比字段（按列映射读取已识别列） */
+/** 读取新番表源行的对比字段（按列映射读取已识别列；平台聚合 + 关联简介表字段） */
 function buildSourceCmpTags(sourceSheet: WpsWorksheet | null, match: MatchResult): string {
   const mapping = state.columnMapping
   if (!sourceSheet || !mapping) return renderCmpTags([])
   const items: { label: string; value: string }[] = []
+  const hasPlatformCol = (mapping.platformCol ?? 0) > 0
   for (const field of SOURCE_CMP_FIELDS) {
-    const col = mapping[field.key] ?? 0
-    if (col > 0) {
-      const value = getCellValue(sourceSheet, match.animeRow, col).trim()
-      if (value) items.push({ label: field.label, value })
+    // 平台聚合时独播已并入平台项，不重复展示
+    const isMergedExclusive = hasPlatformCol && field.key === 'exclusiveCol'
+    if (!isMergedExclusive) {
+      const col = mapping[field.key] ?? 0
+      if (col > 0) {
+        const value =
+          hasPlatformCol && field.key === 'platformCol'
+            ? readPlatformValues(sourceSheet, match.animeRow, mapping).join(' | ')
+            : getCellValue(sourceSheet, match.animeRow, col).trim()
+        if (value) items.push({ label: field.label, value })
+      }
     }
   }
+
+  // 关联简介表：按名称读取导演/编剧/人设等字段
+  const intro = state.introContext
+  if (intro) {
+    const introRow = intro.nameIndex.get(normalizeName(match.matchedAnimeName))
+    if (introRow !== undefined) {
+      for (const field of INTRO_PREVIEW_FIELDS) {
+        const col = intro.mapping[field.key] ?? 0
+        if (col > 0) {
+          const value = getCellValue(intro.sheet, introRow, col).trim()
+          if (value) items.push({ label: field.label, value })
+        }
+      }
+    }
+  }
+
   return renderCmpTags(items)
 }
 
@@ -2308,6 +2512,7 @@ export function startEnrichment(): void {
       state.matches,
       config,
       progressCallback,
+      state.introContext ?? undefined,
     )
 
     showProgressUI(false)
@@ -3100,9 +3305,22 @@ function enrichSingleBatchSource(
     (m) => m.matchType !== 'unmatched' && m.matchType !== 'error',
   ).length
   const unmatched = matches.length - matched
-  const enrichResults = enrichEntries(ws, bangumiSheet, matches, config, () => {
-    /* 批量模式不回调进度（已由外层控制） */
-  })
+
+  // 批量模式同样关联简介工作表：在源工作簿内查找
+  const parentWb = (ws as unknown as { Parent?: WpsWorkbook } | null)?.Parent ?? null
+  const introSheet = parentWb ? findIntroSheetInWorkbook(parentWb, ws.Name) : null
+  const introContext = introSheet ? buildIntroSheetContext(introSheet) : undefined
+
+  const enrichResults = enrichEntries(
+    ws,
+    bangumiSheet,
+    matches,
+    config,
+    () => {
+      /* 批量模式不回调进度（已由外层控制） */
+    },
+    introContext ?? undefined,
+  )
   const updatedEntries = enrichResults.filter((r) => r.kind === 'matched').length
   const entries = enrichResults.filter(
     (r) => r.kind === 'matched' && r.enrichedFields.length > 0,

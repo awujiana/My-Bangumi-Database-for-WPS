@@ -419,6 +419,47 @@
   color: #22c55e;
 } /* >12 */
 
+/* ========== 多新番表工作簿切换按钮条 ========== */
+/* 横向排列 + 横向滚动条：工作簿较多时按钮不全挡住 */
+.workbook-tabs {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  padding: 2px 2px 6px;
+  scrollbar-gutter: stable;
+}
+.workbook-tab {
+  flex: 0 0 auto;
+  padding: 5px 12px;
+  border-radius: 12px;
+  border: 1px solid var(--border-strong);
+  background: var(--bg-surface);
+  color: var(--text-2);
+  font-size: 12px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+.workbook-tab:hover {
+  border-color: var(--primary);
+  color: var(--text-1);
+}
+.workbook-tab.active {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: #fff;
+}
+
+/* 简介表字段列：与主表列做视觉区分（弱化色） */
+.preview-table th.col-intro {
+  color: var(--text-3);
+  font-weight: 500;
+}
+.preview-table td.col-intro {
+  color: var(--text-3);
+  max-width: 180px;
+}
+
 /* ========== 匹配结果对比表格 ========== */
 /* 源/目标对比单元格：允许换行，取代默认的单行省略 */
 .preview-table .cmp-cell {

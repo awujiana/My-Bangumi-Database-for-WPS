@@ -11,6 +11,7 @@
  */
 
 import { LOG_LEVELS, PANEL_CONFIG } from '../core/constants.js'
+import { CONFIG_KEYS, getConfig } from '../tools/config.js'
 import {
   bgmLog,
   getCellValue,
@@ -21,7 +22,7 @@ import {
   getColumnMap,
   BGM,
 } from '../tools/util/index.js'
-import type { WpsWorksheet } from '../tools/wps.js'
+import type { WpsWorksheet, WpsWorkbook } from '../tools/wps.js'
 
 import { addEnrichRecord } from './enrich-record.js'
 
@@ -118,6 +119,11 @@ export interface EnrichColumnMapping {
   episodesCol?: number
   weekdayCol?: number
   platformCol?: number
+  /**
+   * 额外播放平台列：Hazx 新番表的「播放平台」横向占多列（如 F/G/H/I），
+   * 第一列进 platformCol，其余列（含表头为空或重复「播放平台」的列）进这里。
+   */
+  platformExtraCols?: number[]
   exclusiveCol?: number
   specialCol?: number
   introCol?: number
@@ -344,8 +350,30 @@ export function detectColumns(sheet: WpsWorksheet, headerRow: number): EnrichCol
       const field = findKeywordField(normalizedHeader)
       if (field === 'nameCol' && mapping.nameCol === 0) {
         mapping.nameCol = col
-      } else if (field !== null && field !== 'nameCol' && mapping[field] === undefined) {
+      } else if (field === 'platformCol' && mapping.platformCol !== undefined) {
+        // 重复的「播放平台」表头：横向多列平台，追加进额外平台列
+        mapping.platformExtraCols = [...(mapping.platformExtraCols ?? []), col]
+      } else if (
+        field !== null &&
+        field !== 'nameCol' &&
+        field !== 'platformExtraCols' &&
+        mapping[field] === undefined
+      ) {
         mapping[field] = col
+      }
+    }
+  }
+
+  // Hazx 新番表布局：「播放平台」F 列之后、独播 J 列之前的空表头列（G/H/I）也是平台列
+  // （播放平台表头常为合并单元格，仅首列有值）。独播列之前且表头为空的连续列视作平台列。
+  if (
+    mapping.platformCol &&
+    mapping.exclusiveCol &&
+    mapping.exclusiveCol > mapping.platformCol + 1
+  ) {
+    for (let col = mapping.platformCol + 1; col < mapping.exclusiveCol; col += 1) {
+      if (getCellValue(sheet, headerRow, col).trim() === '') {
+        mapping.platformExtraCols = [...(mapping.platformExtraCols ?? []), col]
       }
     }
   }
@@ -355,10 +383,93 @@ export function detectColumns(sheet: WpsWorksheet, headerRow: number): EnrichCol
     `[detectColumns] 列映射: name=${String(mapping.nameCol)}, tags=${String(mapping.tagsCol ?? 'N/A')}, ` +
       `premiere=${String(mapping.premiereCol ?? 'N/A')}, episodes=${String(mapping.episodesCol ?? 'N/A')}, ` +
       `weekday=${String(mapping.weekdayCol ?? 'N/A')}, platform=${String(mapping.platformCol ?? 'N/A')}, ` +
+      `platformExtra=${String(mapping.platformExtraCols?.length ?? 0)}列, ` +
       `exclusive=${String(mapping.exclusiveCol ?? 'N/A')}, special=${String(mapping.specialCol ?? 'N/A')}`,
   )
 
   return mapping
+}
+
+/**
+ * 聚合一行全部播放平台值：platformCol + platformExtraCols + exclusiveCol，去空去重保序。
+ * 署名/标注示例等噪声同时过滤（预览与富化写入共用口径）。
+ */
+export function readPlatformValues(
+  sheet: WpsWorksheet,
+  row: number,
+  mapping: EnrichColumnMapping,
+): string[] {
+  const cols = [
+    mapping.platformCol ?? 0,
+    ...(mapping.platformExtraCols ?? []),
+    mapping.exclusiveCol ?? 0,
+  ]
+  const values: string[] = []
+  for (const col of cols) {
+    if (col > 0) {
+      for (const part of getCellValue(sheet, row, col).split(/[,，、/|]/)) {
+        const value = part.trim()
+        if (value && !shouldFilterNoise(value) && !values.includes(value)) values.push(value)
+      }
+    }
+  }
+  return values
+}
+
+// ========== 噪声过滤（预览与富化写入共用） ==========
+
+/** 内置噪声关键词：署名行 / 标注示例 / 占位文本 */
+const NOISE_KEYWORDS_DEFAULT = [
+  '新番表 by Hazx',
+  '版权平台标注示例',
+  '播放平台示例',
+  '标注示例',
+  '示例',
+  'placeholder',
+  '（示例）',
+  '(示例)',
+] as const
+
+let customNoiseKeywordsCache: string[] | null = null
+
+/** 清空自定义噪声关键词缓存（设置页保存后调用） */
+export function resetNoiseKeywordCache(): void {
+  customNoiseKeywordsCache = null
+}
+
+/** 读取自定义噪声关键词（CONFIG_KEYS.ENRICH_FILTER_KEYWORDS，换行/逗号分隔，带缓存） */
+function getCustomNoiseKeywords(): string[] {
+  if (customNoiseKeywordsCache) return customNoiseKeywordsCache
+  let keywords: string[] = []
+  try {
+    const raw = getConfig(CONFIG_KEYS.ENRICH_FILTER_KEYWORDS, '', true).trim()
+    if (raw) {
+      keywords = raw
+        .split(/[\n,]/)
+        .map((keyword) => keyword.trim())
+        .filter((keyword) => keyword !== '')
+    }
+  } catch {
+    keywords = []
+  }
+  customNoiseKeywordsCache = keywords
+  return keywords
+}
+
+/**
+ * 判断单段文本是否应作为噪声过滤掉（子串匹配）：
+ * 内置规则 + 设置页自定义关键词。
+ */
+export function shouldFilterNoise(part: string): boolean {
+  const trimmed = part.trim()
+  if (!trimmed) return true
+  for (const keyword of NOISE_KEYWORDS_DEFAULT) {
+    if (trimmed.includes(keyword)) return true
+  }
+  for (const keyword of getCustomNoiseKeywords()) {
+    if (trimmed.includes(keyword)) return true
+  }
+  return false
 }
 
 export interface AnimeSourceLayout {
@@ -466,7 +577,8 @@ export function readNewAnimeRow(
   if (mapping.premiereCol) data['首播'] = getCellValue(sheet, row, mapping.premiereCol) || ''
   if (mapping.episodesCol) data['集数'] = getCellValue(sheet, row, mapping.episodesCol) || ''
   if (mapping.weekdayCol) data['周更时间'] = getCellValue(sheet, row, mapping.weekdayCol) || ''
-  if (mapping.platformCol) data['播放平台'] = getCellValue(sheet, row, mapping.platformCol) || ''
+  // 播放平台聚合：platformCol + platformExtraCols + exclusiveCol 去空去重（富化与预览共用口径）
+  data['播放平台'] = readPlatformValues(sheet, row, mapping).join(TAG_SEPARATOR)
   if (mapping.exclusiveCol) data['独播'] = getCellValue(sheet, row, mapping.exclusiveCol) || ''
   if (mapping.specialCol) data['特殊'] = getCellValue(sheet, row, mapping.specialCol) || ''
   return data
@@ -705,6 +817,56 @@ export function enrichTags(
 }
 
 /**
+ * 富化播放平台
+ * 写入 Bangumi 表「在线播放平台」列；目标单元格已有值时合并去重，不重复写入已有平台
+ */
+export function enrichPlatform(
+  sheet: WpsWorksheet,
+  row: number,
+  incomingData: Record<string, string>,
+  colMap: Map<string, number>,
+  enriched: EnrichedField[],
+): void {
+  const targetCol = colMap.get('在线播放平台') ?? colMap.get('播放平台')
+  if (!targetCol) return
+
+  const incomingPlatforms = incomingData['播放平台'] ?? ''
+  if (isEmptyValue(incomingPlatforms)) return
+
+  const oldPlatforms = getCellValue(sheet, row, targetCol)
+  if (isEmptyValue(oldPlatforms)) {
+    setCellValue(sheet, row, targetCol, incomingPlatforms)
+    enriched.push({
+      fieldName: '在线播放平台',
+      bangumiColumn: targetCol,
+      oldValue: null,
+      updatedValue: incomingPlatforms,
+      action: 'fill',
+    })
+  } else {
+    const merged = mergeTags(oldPlatforms, incomingPlatforms)
+    if (merged === oldPlatforms) {
+      enriched.push({
+        fieldName: '在线播放平台',
+        bangumiColumn: targetCol,
+        oldValue: oldPlatforms,
+        updatedValue: merged,
+        action: 'skip',
+      })
+    } else {
+      setCellValue(sheet, row, targetCol, merged)
+      enriched.push({
+        fieldName: '在线播放平台',
+        bangumiColumn: targetCol,
+        oldValue: oldPlatforms,
+        updatedValue: merged,
+        action: 'append',
+      })
+    }
+  }
+}
+
+/**
  * 富化首播日期
  * 仅在 Bangumi 列为空时填充
  */
@@ -882,6 +1044,7 @@ export function enrichEntries(
   matches: MatchResult[],
   config: EnrichConfig,
   progressCallback?: ProgressCallback,
+  intro?: IntroSheetContext,
 ): EnrichResultItem[] {
   const results: EnrichResultItem[] = []
   const stats = { matched: 0, enriched: 0, skipped: 0, failed: 0 }
@@ -897,7 +1060,7 @@ export function enrichEntries(
 
   let bangumiColMap = getBangumiColumnMap(bangumiSheet)
 
-  if (isIntroSheet(config.columnMapping)) {
+  if (intro || isIntroSheet(config.columnMapping)) {
     bangumiColMap = ensureBangumiColumns(
       bangumiSheet,
       bangumiColMap,
@@ -933,6 +1096,7 @@ export function enrichEntries(
         config,
         bangumiColMap,
         results,
+        intro,
       )
       didEnrich = true
     } else if (match.matchType === 'unmatched') {
@@ -977,6 +1141,7 @@ export function enrichEntries(
           config,
           bangumiColMap,
           results,
+          intro,
         )
         didEnrich = true
       }
@@ -1031,6 +1196,7 @@ function enrichIntoRow(
   config: EnrichConfig,
   bangumiColMap: Map<string, number>,
   results: EnrichResultItem[],
+  intro?: IntroSheetContext,
 ): EnrichRowOutcome {
   const isIntro = isIntroSheet(config.columnMapping)
   const incomingData = isIntro
@@ -1056,7 +1222,21 @@ function enrichIntoRow(
       enrichTags(bangumiSheet, bangumiRow, incomingData, bangumiColMap, enrichedFields)
       enrichDate(bangumiSheet, bangumiRow, incomingData, bangumiColMap, enrichedFields)
       enrichEpisodes(bangumiSheet, bangumiRow, incomingData, bangumiColMap, enrichedFields)
+      enrichPlatform(bangumiSheet, bangumiRow, incomingData, bangumiColMap, enrichedFields)
       enrichFeatures(bangumiSheet, bangumiRow, incomingData, bangumiColMap, enrichedFields)
+    }
+
+    // 关联简介工作表：按名称查简介行，补写导演/编剧/人设等字段（主表与简介表独立时）
+    if (intro) {
+      enrichIntroFromContext(
+        bangumiSheet,
+        bangumiRow,
+        intro,
+        match.matchedAnimeName,
+        bangumiColMap,
+        enrichedFields,
+        fieldConflicts,
+      )
     }
 
     // 别名富化：新番表名称与 Bangumi 追踪表不一致时补全
@@ -1576,6 +1756,138 @@ export function isIntroSheet(mapping: EnrichColumnMapping): boolean {
     mapping.screenplayCol !== undefined ||
     mapping.characterDesignCol !== undefined ||
     mapping.cgDirectorCol !== undefined
+  )
+}
+
+// ========== 新番简介工作表识别与关联富化 ==========
+
+/** 简介表头关键字：某行命中 ≥2 个即认为该工作表是「新番简介」表 */
+const INTRO_SHEET_HEADER_KEYWORDS = [
+  '导演',
+  '编剧',
+  '人设',
+  'CG导演',
+  '系列构成',
+  '分镜',
+  '原作',
+  '动画制作',
+] as const
+
+/** 统计某行命中简介表头关键字的次数 */
+function countIntroHeaderHits(sheet: WpsWorksheet, row: number): number {
+  let hits = 0
+  for (let col = 1; col <= 50; col += 1) {
+    const value = getCellValue(sheet, row, col).trim()
+    if (value && INTRO_SHEET_HEADER_KEYWORDS.some((keyword) => value.includes(keyword))) {
+      hits += 1
+    }
+  }
+  return hits
+}
+
+/**
+ * 简介工作表上下文：表头行、列映射与按名称的行索引。
+ * 简介表与主新番表行号不对应，必须按名称关联。
+ */
+export interface IntroSheetContext {
+  sheet: WpsWorksheet
+  headerRow: number
+  dataStartRow: number
+  mapping: EnrichColumnMapping
+  /** normalizeName(名称) → 简介表行号 */
+  nameIndex: Map<string, number>
+}
+
+/**
+ * 在工作簿中查找「新番简介」工作表：
+ * 某行命中 ≥2 个简介表头关键字、且不是主新番表布局（无周更时间/播放平台等横向字段）。
+ * @param excludeSheetName 排除的工作表名（当前主源表）
+ */
+export function findIntroSheetInWorkbook(
+  wb: WpsWorkbook,
+  excludeSheetName?: string,
+): WpsWorksheet | null {
+  const sheetCount = wb.Worksheets.Count
+  for (let index = 1; index <= sheetCount; index += 1) {
+    let ws: WpsWorksheet | null = null
+    try {
+      ws = wb.Worksheets.Item(index)
+    } catch {
+      ws = null
+    }
+    if (ws) {
+      const name = (() => {
+        try {
+          return ws.Name
+        } catch {
+          return ''
+        }
+      })()
+      // 排除当前主源表与主新番表布局的工作表，其余表头命中简介关键字的才算候选
+      if ((!name || name !== excludeSheetName) && !detectAnimeSourceLayout(ws)) {
+        for (let row = 1; row <= PANEL_CONFIG.MAX_SCAN_ROWS; row += 1) {
+          if (countIntroHeaderHits(ws, row) >= 2) return ws
+        }
+      }
+    }
+  }
+  return null
+}
+
+/** 构建简介工作表上下文（表头识别 + 名称行索引）；非简介表返回 null */
+export function buildIntroSheetContext(sheet: WpsWorksheet): IntroSheetContext | null {
+  let headerRow = 0
+  for (let row = 1; row <= PANEL_CONFIG.MAX_SCAN_ROWS; row += 1) {
+    if (countIntroHeaderHits(sheet, row) >= 2) {
+      headerRow = row
+      break
+    }
+  }
+  if (headerRow === 0) return null
+
+  const mapping = detectColumns(sheet, headerRow)
+  if (mapping.nameCol === 0) return null
+
+  const dataStartRow = headerRow + 1
+  const lastRow = getLastRow(sheet)
+  const nameIndex = new Map<string, number>()
+  for (let row = dataStartRow; row <= lastRow; row += 1) {
+    const name = getCellValue(sheet, row, mapping.nameCol).trim()
+    if (name) nameIndex.set(normalizeName(name), row)
+  }
+
+  bgmLog(
+    LOG_LEVELS.INFO,
+    `[buildIntroSheetContext] 简介表识别成功: ${sheet.Name || '未知'} 表头行=${String(headerRow)} 名称索引=${String(nameIndex.size)} 条`,
+  )
+  return { sheet, headerRow, dataStartRow, mapping, nameIndex }
+}
+
+/**
+ * 用简介表上下文富化单行：按名称关联简介行，写入导演/编剧/人设等字段。
+ * 简介表无该名称时静默跳过。
+ */
+export function enrichIntroFromContext(
+  bangumiSheet: WpsWorksheet,
+  bangumiRow: number,
+  intro: IntroSheetContext,
+  matchedAnimeName: string,
+  bangumiColMap: Map<string, number>,
+  enriched: EnrichedField[],
+  conflicts: ConflictInfo[],
+): void {
+  const introRow = intro.nameIndex.get(normalizeName(matchedAnimeName))
+  if (introRow === undefined) return
+  const incomingData = readIntroSheetRow(intro.sheet, introRow, intro.mapping)
+  enrichIntroData(
+    bangumiSheet,
+    bangumiRow,
+    incomingData,
+    bangumiColMap,
+    enriched,
+    conflicts,
+    introRow,
+    matchedAnimeName,
   )
 }
 

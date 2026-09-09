@@ -13,6 +13,7 @@
 
 import { CONFIG_KEYS, getConfig, setConfig } from '../../tools/config.js'
 import { BGM } from '../../tools/util/index.js'
+import { resetNoiseKeywordCache } from '../../sync/enrich-engine.js'
 
 /** 与 enrich-page 的 DEFAULT_ENRICH_PREVIEW_CONFIG 保持一致 */
 const DEFAULT_EP_SINGLE = 1
@@ -90,6 +91,8 @@ export function saveEnrichPreviewSettings(): void {
       ]
       setConfig(CONFIG_KEYS.ENRICH_FILTER_KEYWORDS, keywords.join('\n'))
       keywordsInput.value = keywords.join('\n')
+      // 富化页/引擎层的噪声关键词缓存立即失效
+      resetNoiseKeywordCache()
     }
 
     BGM.Dialog.alert('成功', '富化预览设置已保存，重新打开富化页预览即生效')
