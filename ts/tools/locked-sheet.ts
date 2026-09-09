@@ -295,3 +295,25 @@ export function findBangumiTargetSheets(): TargetSheetCandidate[] {
   )
   return effective
 }
+
+/**
+ * 在指定工作簿内查找最优 Bangumi 追踪表候选。
+ * 判定规则与 findBangumiTargetSheets 一致（表头 ≥3 关键词 + 数据行 ≥2），
+ * 排序偏好：工作表名命中关键词的强候选优先，否则取扫描顺序首个通过校验的工作表。
+ * 供自动识别模块对单个工作簿（事件时机）做实时校验。
+ */
+export function findBangumiTargetSheetInWorkbook(wb: WpsWorkbook): WpsWorksheet | null {
+  const sheetCount = wb.Worksheets.Count
+
+  for (let wsIndex = 1; wsIndex <= sheetCount; wsIndex += 1) {
+    const candidate = buildCandidate(wb, wsIndex, false)
+    if (candidate?.isNameHit) return wb.Worksheets.Item(candidate.sheetIndex)
+  }
+
+  for (let wsIndex = 1; wsIndex <= sheetCount; wsIndex += 1) {
+    const candidate = buildCandidate(wb, wsIndex, false)
+    if (candidate) return wb.Worksheets.Item(candidate.sheetIndex)
+  }
+
+  return null
+}

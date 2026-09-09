@@ -37,12 +37,18 @@ import {
   getOrCreateEnrichRecordSheet,
   clearEnrichRecords,
 } from '../sync/enrich-record.js'
+import {
+  ANIME_SOURCE_DETECTOR,
+  BANGUMI_TARGET_DETECTOR,
+  collectDetectedWorkbookPaths,
+} from '../sync/enrich-auto-detect.js'
 import { sanitizeHtml } from '../tools/sanitize.js'
 import { escapeHtml } from '../tools/string-utilities.js'
 import {
   getCellValue,
   getLastRow,
   findHeaderRow,
+  getColumnMap,
   bgmLog,
   BGM,
   getApp,
@@ -210,6 +216,11 @@ export function initEnrichPage(): void {
     }
   }
 
+  // 检查方式 B：打开富化工具页面时，自动添加并识别已打开的新番表工作簿
+  autoAddOpenAnimeWorkbooks()
+  // 页面打开时：若已识别到打开的 Bangumi 数据表且目标表未锁定，自动选择/锁定目标表
+  checkBangumiAutoDetectRecords()
+
   // 通知模块就绪，启用按钮（与 panelPage.initPanelCore / settings-entry.startSettings 对齐）
   if (typeof document !== 'undefined') {
     document.dispatchEvent(new CustomEvent('bgm:modulesReady'))
@@ -310,7 +321,10 @@ function bindTabSwitches(): void {
         if (matchTable) matchTable.style.display = 'none'
       } else if (tabName === 'match') {
         if (sourceTable) sourceTable.style.display = 'none'
-        if (matchTable) matchTable.style.display = ''
+        if (matchTable) {
+          // 尚无匹配结果时保持隐藏，避免展示只有表头的空表格
+          matchTable.style.display = state.matches.length > 0 ? '' : 'none'
+        }
       }
     })
   })
@@ -361,6 +375,13 @@ function bindEnrichDetailControls(): void {
 }
 
 function bindPreviewDetailControls(): void {
+  const previewMatchButton = safeGetButton('previewMatchBtn')
+  if (previewMatchButton) {
+    previewMatchButton.addEventListener('click', () => {
+      previewMatch()
+    })
+  }
+
   const viewSourceButton = safeGetButton('viewSourceDetailBtn')
   if (viewSourceButton) {
     viewSourceButton.addEventListener('click', () => {
@@ -678,6 +699,9 @@ function renderBatchFileList(): void {
     if (summaryElement) summaryElement.style.display = 'none'
     state.batchResults = []
     state.filePath = ''
+    // 列表清空时同步隐藏自动识别提示
+    const notice = safeGetElement('autoDetectNotice')
+    if (notice) notice.style.display = 'none'
   }
 }
 
@@ -905,6 +929,70 @@ function maybeAutoDetectSingleFile(): void {
   autoDetectHeaderFromFile(filePath)
 }
 
+// ========== 已打开工作簿自动识别（检查方式 B：打开页面时） ==========
+
+/** 在页面打开时自动检查：把 WPS 中已打开的新番表工作簿加入列表并识别表头 */
+function autoAddOpenAnimeWorkbooks(): void {
+  try {
+    const paths = collectDetectedWorkbookPaths(ANIME_SOURCE_DETECTOR)
+    if (paths.length === 0) {
+      bgmLog(LOG_LEVELS.INFO, '[enrich] 页面打开检查：未检测到已打开的新番表工作簿')
+      return
+    }
+
+    const added = mergeSelectedPaths(paths)
+    if (added === 0) return
+
+    bgmLog(
+      LOG_LEVELS.INFO,
+      `[enrich] 页面打开检查：自动添加 ${String(added)} 个已打开的新番表工作簿`,
+    )
+    showAutoDetectNotice(paths)
+    // 单文件：自动添加后立即识别表头（多文件由批量流程逐文件识别）
+    maybeAutoDetectSingleFile()
+  } catch (error: unknown) {
+    BGM.handleError(error, {
+      showAlert: false,
+      level: BGM.ErrorLevel.ERROR,
+      context: 'autoAddOpenAnimeWorkbooks',
+    })
+  }
+}
+
+/** 页面打开时检查 Bangumi 数据表识别记录：未锁定时交由 autoSelectEnrichTarget 自动选择/锁定目标表 */
+function checkBangumiAutoDetectRecords(): void {
+  try {
+    const paths = collectDetectedWorkbookPaths(BANGUMI_TARGET_DETECTOR)
+    if (paths.length === 0) {
+      bgmLog(LOG_LEVELS.INFO, '[enrich] 页面打开检查：未检测到已打开的 Bangumi 数据表')
+      return
+    }
+    const names = paths.map((path) => extractFileName(path)).join('、')
+    bgmLog(
+      LOG_LEVELS.INFO,
+      `[enrich] 页面打开检查：检测到 ${String(paths.length)} 个已打开的 Bangumi 数据表（${names}）`,
+    )
+    if (!BGM.sheet.isLocked) {
+      autoSelectEnrichTarget('workbookSelect', 'sheetSelect', 'lockSheetBtn', 'lockStatus')
+    }
+  } catch (error: unknown) {
+    BGM.handleError(error, {
+      showAlert: false,
+      level: BGM.ErrorLevel.ERROR,
+      context: 'checkBangumiAutoDetectRecords',
+    })
+  }
+}
+
+/** 显示自动识别提示（列出已添加的文件名） */
+function showAutoDetectNotice(paths: string[]): void {
+  const notice = safeGetElement('autoDetectNotice')
+  if (!notice) return
+  const names = paths.map((path) => extractFileName(path)).join('、')
+  notice.textContent = `🔄 已自动识别已打开的新番表工作簿（${String(paths.length)} 个）：${names}`
+  notice.style.display = ''
+}
+
 export function autoDetectHeader(): void {
   // 已选择新番表文件时：以「所选文件」为源表识别。
   // 注意：不可取「🎯 目标工作表」的 sheetSelect —— 那是目标 Bangumi 表，会导致源表=目标表。
@@ -1122,6 +1210,55 @@ const PREVIEW_FIELD_COLS: { key: keyof EnrichColumnMapping; label: string }[] = 
   { key: 'tagsCol', label: 'TAGS/标签' },
 ]
 
+/** 匹配结果对比表格：新番表源侧展示的字段（名称列单独展示） */
+const SOURCE_CMP_FIELDS: { key: keyof EnrichColumnMapping; label: string }[] = [
+  { key: 'weekdayCol', label: '周更' },
+  { key: 'premiereCol', label: '首播' },
+  { key: 'episodesCol', label: '集数' },
+  { key: 'platformCol', label: '平台' },
+  { key: 'exclusiveCol', label: '独播' },
+  { key: 'specialCol', label: '特殊' },
+  { key: 'tagsCol', label: '标签' },
+]
+
+/** 匹配结果对比表格：目标表侧展示的字段（按目标表表头动态读取） */
+const TARGET_CMP_FIELDS: { colKey: string; label: string; fallbackColKey?: string }[] = [
+  { colKey: '周更时间', label: '周更' },
+  { colKey: '开播日期', label: '首播' },
+  { colKey: '集数', label: '集数' },
+  { colKey: '在线播放平台', label: '平台' },
+  { colKey: '标签/分级', label: '标签', fallbackColKey: '标签' },
+  { colKey: '特点/印象', label: '特点' },
+  { colKey: '别名', label: '别名' },
+]
+
+/** 数据预览单元格渲染：名称加粗、周更/播放平台以徽章形式展示 */
+function renderPreviewCell(fieldKey: keyof EnrichColumnMapping, rawValue: string): string {
+  const value = rawValue.trim()
+  if (!value) return '<td></td>'
+  const escaped = escapeHtml(value)
+  if (fieldKey === 'nameCol') {
+    return `<td class="col-name" title="${escaped}"><span class="preview-name">${escaped}</span></td>`
+  }
+  if (fieldKey === 'platformCol' || fieldKey === 'exclusiveCol') {
+    const parts = value
+      .split(/[,，、/|]/)
+      .map((part) => part.trim())
+      .filter((part) => part !== '')
+    const chips = parts
+      .map(
+        (part) =>
+          `<span class="platform-chip" title="${escapeHtml(part)}">${escapeHtml(part)}</span>`,
+      )
+      .join('')
+    return `<td class="col-platform" title="${escaped}">${chips}</td>`
+  }
+  if (fieldKey === 'weekdayCol' && /^周[一二三四五六日天]$/.test(value)) {
+    return `<td title="${escaped}"><span class="weekday-chip">${escaped}</span></td>`
+  }
+  return `<td title="${escaped}">${escaped}</td>`
+}
+
 function renderSourcePreview(ws: WpsWorksheet, mapping: EnrichColumnMapping): void {
   const tableContainer = safeGetElement('sourceTable')
   if (!tableContainer) return
@@ -1163,9 +1300,9 @@ function renderSourcePreview(ws: WpsWorksheet, mapping: EnrichColumnMapping): vo
     let hasData = false
     for (const f of fieldCols) {
       const col = mapping[f.key] ?? 0
-      const value = getCellValue(ws, row, col).trim()
-      if (value) hasData = true
-      rowCells.push(`<td title="${escapeHtml(value)}">${escapeHtml(value)}</td>`)
+      const value = getCellValue(ws, row, col)
+      if (value.trim()) hasData = true
+      rowCells.push(renderPreviewCell(f.key, value))
     }
     if (hasData) {
       rowsHtml.push(
@@ -1357,67 +1494,151 @@ function updateMatchEmptyHint(): void {
   }
 }
 
+/** 匹配方式的徽标 class（与 .preview-table .match-status 配套） */
+function matchStatusClass(matchType: MatchResult['matchType']): string {
+  switch (matchType) {
+    case 'exact': {
+      return 'status-exact'
+    }
+    case 'alias': {
+      return 'status-alias'
+    }
+    case 'error': {
+      return 'status-error'
+    }
+    default: {
+      return 'status-unmatched'
+    }
+  }
+}
+
+/** 匹配方式的徽标文案 */
+function matchStatusText(matchType: MatchResult['matchType']): string {
+  switch (matchType) {
+    case 'exact': {
+      return '✅ 精确'
+    }
+    case 'alias': {
+      return '🔄 别名'
+    }
+    case 'error': {
+      return '⚠️ 错误'
+    }
+    default: {
+      return '❌ 未匹配'
+    }
+  }
+}
+
+/** 渲染「标签 值」对比标签列表 */
+function renderCmpTags(items: { label: string; value: string }[]): string {
+  if (items.length === 0) return '<div class="cmp-empty">—</div>'
+  const tagsHtml = items
+    .map(
+      (item) =>
+        `<span class="cmp-tag" title="${escapeHtml(`${item.label}：${item.value}`)}"><i>${escapeHtml(item.label)}</i>${escapeHtml(item.value)}</span>`,
+    )
+    .join('')
+  return `<div class="cmp-tags">${tagsHtml}</div>`
+}
+
+/** 读取新番表源行的对比字段（按列映射读取已识别列） */
+function buildSourceCmpTags(sourceSheet: WpsWorksheet | null, match: MatchResult): string {
+  const mapping = state.columnMapping
+  if (!sourceSheet || !mapping) return renderCmpTags([])
+  const items: { label: string; value: string }[] = []
+  for (const field of SOURCE_CMP_FIELDS) {
+    const col = mapping[field.key] ?? 0
+    if (col > 0) {
+      const value = getCellValue(sourceSheet, match.animeRow, col).trim()
+      if (value) items.push({ label: field.label, value })
+    }
+  }
+  return renderCmpTags(items)
+}
+
+/** 读取 Bangumi 目标行对比字段（按目标表表头动态读取） */
+function buildTargetCmpTags(
+  targetSheet: WpsWorksheet | null,
+  targetColMap: Map<string, number> | null,
+  match: MatchResult,
+): string {
+  if (!targetSheet || !targetColMap || match.bangumiRow === undefined) {
+    return '<div class="cmp-empty">未匹配到目标行</div>'
+  }
+  const items: { label: string; value: string }[] = []
+  for (const field of TARGET_CMP_FIELDS) {
+    const col =
+      targetColMap.get(field.colKey) ??
+      (field.fallbackColKey ? targetColMap.get(field.fallbackColKey) : undefined)
+    if (col && col > 0) {
+      const value = getCellValue(targetSheet, match.bangumiRow, col).trim()
+      if (value) items.push({ label: field.label, value })
+    }
+  }
+  if (items.length === 0) return '<div class="cmp-empty">目标行无对比数据</div>'
+  return renderCmpTags(items)
+}
+
+/** 渲染匹配结果对比表格：源数据 / 匹配方式 / 目标数据 三栏对照 */
 function renderMatchResultsToTable(matches: MatchResult[]): void {
   const tbodyElement = safeGetElement('matchTable')?.querySelector('tbody')
   if (!tbodyElement) return
 
-  // 显示全部匹配结果（表格自带纵向滚动，行数不受限）
-  const rowsHtml = matches.map((m, index) => {
-    let statusClass = 'match-status'
-    let statusText = ''
-    switch (m.matchType) {
-      case 'exact': {
-        statusClass += ' status-exact'
-        statusText = '✅ 精确'
-        break
-      }
-      case 'alias': {
-        statusClass += ' status-alias'
-        statusText = '🔄 别名'
-        break
-      }
-      case 'unmatched': {
-        statusClass += ' status-unmatched'
-        statusText = '❌ 未匹配'
-        break
-      }
-      case 'error': {
-        statusClass += ' status-error'
-        statusText = '⚠️ 错误'
-        break
-      }
-      default: {
-        // 未知匹配类型：保持默认样式，不额外处理
-        break
-      }
-    }
+  // 目标表列映射：按目标表表头动态读取对比字段
+  const sourceSheet = state.animeSourceSheet
+  const targetSheet = state.bangumiSheet
+  const targetHeaderRow = targetSheet ? findHeaderRow(targetSheet) : 0
+  const targetColMap =
+    targetSheet && targetHeaderRow > 0 ? getColumnMap(targetSheet, targetHeaderRow) : null
 
-    const bangumiRow = m.bangumiRow ? String(m.bangumiRow) : '-'
-    const name = escapeHtml(m.matchedAnimeName)
-    const bangumiName = m.bangumiName ? escapeHtml(m.bangumiName) : '-'
+  const rowsHtml = matches.map((match) => {
+    const statusClass = matchStatusClass(match.matchType)
+    const statusText = matchStatusText(match.matchType)
+
+    const sourceTags = buildSourceCmpTags(sourceSheet, match)
+    const targetNameHtml = match.bangumiName
+      ? `<div class="cmp-name">${escapeHtml(match.bangumiName)}</div>`
+      : ''
+    const targetMetaHtml =
+      match.bangumiRow === undefined
+        ? ''
+        : `<div class="cmp-meta">目标行 ${String(match.bangumiRow)}</div>`
+    const targetTags = buildTargetCmpTags(targetSheet, targetColMap, match)
 
     return `
-      <tr class="match-row match-${m.matchType}">
-        <td>${name}</td>
-        <td><span class="${statusClass}">${statusText}</span></td>
-        <td>${bangumiRow}</td>
-        <td>${bangumiName}</td>
-        <td><button class="bgm-btn small match-detail-btn" data-index="${String(index)}">🔍 详情</button></td>
+      <tr class="match-row match-${match.matchType}">
+        <td class="cmp-cell cmp-source">
+          <div class="cmp-name">${escapeHtml(match.matchedAnimeName)}</div>
+          <div class="cmp-meta">源表行 ${String(match.animeRow)}</div>
+          ${sourceTags}
+        </td>
+        <td class="cmp-status-cell">
+          <span class="match-status ${statusClass}">${statusText}</span>
+        </td>
+        <td class="cmp-cell cmp-target">
+          ${targetNameHtml}
+          ${targetMetaHtml}
+          ${targetTags}
+        </td>
+        <td class="cmp-action">
+          <button class="bgm-btn small match-detail-btn">🔍 详情</button>
+        </td>
       </tr>
     `
   })
 
   tbodyElement.innerHTML = sanitizeHtml(rowsHtml.join(''))
 
-  // 绑定每行详情按钮（行内按钮由预览刷新时重建，需按次绑定）
+  // 绑定每行详情按钮（行内按钮由预览刷新时重建，需按次绑定；
+  // 闭包按索引取值，避免依赖会被 sanitize 剥离的 data-* 属性）
   const detailButtons = tbodyElement.querySelectorAll<HTMLButtonElement>('.match-detail-btn')
-  for (const button of detailButtons) {
+  detailButtons.forEach((button, index) => {
     button.addEventListener('click', () => {
-      const matchIndex = Number(button.dataset.index)
-      const match = matches[matchIndex]
+      const match = matches[index]
       if (match) showMatchDetail(match)
     })
-  }
+  })
 
   const matchTableContainer = safeGetElement('matchPreviewTable')
   if (matchTableContainer) {
