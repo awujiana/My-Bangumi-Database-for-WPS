@@ -34,8 +34,8 @@
       <aside class="sidebar">
         <nav class="nav" aria-label="功能导航">
           <div class="nav-label">功能导航</div>
-          <a href="#sec-scope" title="清理范围"
-            ><span class="nav-ico">🗺️</span><span class="nav-text">清理范围</span></a
+          <a href="#sec-targets" title="选择清理的表格"
+            ><span class="nav-ico">🎯</span><span class="nav-text">选择清理的表格</span></a
           >
           <a href="#sec-items" title="可清理项"
             ><span class="nav-ico">☑️</span><span class="nav-text">可清理项</span></a
@@ -54,21 +54,27 @@
 
       <!-- ===================== 主区 ===================== -->
       <main class="main">
-        <!-- 清理范围（数据全部来自配置，页面不硬编码路径） -->
-        <section class="section" id="sec-scope">
-          <h3>🗺️ 清理范围</h3>
+        <!-- 选择清理的表格（用户显式勾选；选择持久化到 PluginStorage） -->
+        <section class="section" id="sec-targets">
+          <h3>🎯 选择清理的表格</h3>
           <p class="hint">
-            以下范围与排除规则来自配置（<code>ts/panel/clean-rules.ts</code>），页面不写死任何具体路径或工作表名。
+            点击「📋 加载工作表」枚举已打开工作簿中的全部工作表，勾选本次要清理的目标。WPS
+            临时锁文件与插件自身目录会被自动跳过。
           </p>
-          <div id="cleanScopeBody" class="clean-scope"></div>
+          <div class="bgm-btn-group bgm-btn-row">
+            <button class="bgm-btn small primary" id="cleanLoadSheetsBtn" style="flex: 1">
+              📋 加载工作表
+            </button>
+            <button class="bgm-btn small" id="cleanSelectAllSheetsBtn">✅ 全选</button>
+            <button class="bgm-btn small" id="cleanSelectNoneSheetsBtn">⬜ 全不选</button>
+          </div>
+          <div id="cleanSheetList" class="clean-sheet-list"></div>
         </section>
 
         <!-- 可清理项（勾选列表，由 CLEAN_RULES 渲染） -->
         <section class="section" id="sec-items">
           <h3>☑️ 可清理项</h3>
-          <p class="hint">
-            勾选本次要执行的清理项。新增清理项只需在规则配置中追加，页面无需改动。
-          </p>
+          <p class="hint">勾选本次要执行的清理项。新增清理项只需在规则配置中追加，页面无需改动。</p>
           <div class="bgm-btn-group bgm-btn-row">
             <button class="bgm-btn small" id="cleanSelectAllBtn">✅ 全选</button>
             <button class="bgm-btn small" id="cleanSelectNoneBtn">⬜ 全不选</button>

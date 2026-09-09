@@ -102,7 +102,9 @@ function stripNoiseTags(raw: string): TransformOutcome {
 
 /** 统一分隔符为 " | " 并去除重复标签 */
 function normalizeTagSeparator(raw: string): TransformOutcome {
-  const parts = splitTagValue(raw)
+  // 新番表 TAGS 列用「/」分隔（如「搞笑 / 抽象 / 涩涩」），先统一为「 | 」再按标准分隔符切分
+  const unified = raw.replace(/\s*\/\s*/gu, ' | ')
+  const parts = splitTagValue(unified)
   if (parts.length === 0) return unchanged(raw)
   const deduped = dedupe(parts)
   const value = joinTags(deduped)
@@ -192,20 +194,20 @@ function normalizeOriginalTag(raw: string): TransformOutcome {
       : [...countryTags, ...kept]
   const value = joinTags([...head, ...otherTags, ...(hasOriginal ? ['原创'] : [])])
   const removed = mapped.length - splitTagValue(value).length
-  return value === raw
-    ? unchanged(raw)
-    : { value, changed: true, removed: Math.max(0, removed) }
+  return value === raw ? unchanged(raw) : { value, changed: true, removed: Math.max(0, removed) }
 }
 
 /** 变换 ID → 变换函数 */
-const TRANSFORMS: Record<CellTransformId, (raw: string, context: TransformContext) => TransformOutcome> =
-  {
-    stripNoiseTags: (raw) => stripNoiseTags(raw),
-    normalizeTagSeparator: (raw) => normalizeTagSeparator(raw),
-    stripCategoryNumberPrefix: (raw) => stripCategoryNumberPrefix(raw),
-    dedupAliasAgainstName: (raw, context) => dedupAliasAgainstName(raw, context),
-    normalizeOriginalTag: (raw) => normalizeOriginalTag(raw),
-  }
+const TRANSFORMS: Record<
+  CellTransformId,
+  (raw: string, context: TransformContext) => TransformOutcome
+> = {
+  stripNoiseTags: (raw) => stripNoiseTags(raw),
+  normalizeTagSeparator: (raw) => normalizeTagSeparator(raw),
+  stripCategoryNumberPrefix: (raw) => stripCategoryNumberPrefix(raw),
+  dedupAliasAgainstName: (raw, context) => dedupAliasAgainstName(raw, context),
+  normalizeOriginalTag: (raw) => normalizeOriginalTag(raw),
+}
 
 /**
  * 按 ID 执行单元格变换。未知 ID 或空值均返回「未变更」，绝不抛错。

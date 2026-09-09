@@ -15,6 +15,7 @@ import { getOpenWorkbooks } from '../tools/locked-sheet.js'
 import {
   bgmLog,
   findHeaderRow,
+  getCellValue,
   getColumnMap,
   getLastRow,
   readRangeValues,
@@ -27,6 +28,7 @@ import {
   findCleanRule,
   ROW_BYTES_FALLBACK,
   ROW_BYTES_SAMPLE_LIMIT,
+  XINFAN_HEADER,
 } from './clean-rules.js'
 import type { CleanRule } from './clean-rules.js'
 import { estimateUtf8Bytes, transformCellValue } from './clean-transforms.js'
@@ -183,17 +185,77 @@ function isSheetAllowed(sheetName: string): boolean {
   return hasAnyKeyword(sheetName, CLEAN_TARGETS.includeSheetName)
 }
 
-/** 表头是否命中全部必备关键词 */
-function hasRequiredHeaders(colMap: Map<string, number>): boolean {
-  return CLEAN_TARGETS.requireHeaderKeywords.every((keyword) => hasAnyKeywordIn(colMap, keyword))
+/* ========== 新番表（月历式）表头识别 ========== */
+// 新番表无「名称」表头（番剧名列表头为空），不能走 requireHeaderKeywords，改用专属签名识别并构造「名称 + 标签/分级」最小列映射以复用现有标签规则。
+
+/** 扫描前若干行，返回首个命中新番表专属表头签名的行号（0 表示未识别） */
+function scanXinFanHeaderRow(ws: WpsWorksheet): number {
+  const keywords = XINFAN_HEADER.headerKeywords.map((keyword) => keyword.toLowerCase())
+  for (let row = 1; row <= 30; row += 1) {
+    let hits = 0
+    for (let col = 1; col <= 50; col += 1) {
+      const value = getCellValue(ws, row, col)
+      if (value && keywords.some((keyword) => value.toLowerCase().includes(keyword))) {
+        hits += 1
+      }
+    }
+    if (hits >= XINFAN_HEADER.minHeaderHits) return row
+  }
+  return 0
 }
 
-/** 列名集合中是否存在包含指定关键词的列 */
-function hasAnyKeywordIn(colMap: Map<string, number>, keyword: string): boolean {
-  for (const key of colMap.keys()) {
-    if (key.includes(keyword)) return true
+/** 查找锚点列（表头含 nameAnchorKeyword，默认「周更时间」）；找不到返回 0 */
+function findXinFanAnchorCol(ws: WpsWorksheet, headerRow: number): number {
+  const anchor = XINFAN_HEADER.nameAnchorKeyword.toLowerCase()
+  for (let col = 1; col <= 50; col += 1) {
+    const value = getCellValue(ws, headerRow, col).toLowerCase()
+    if (value.includes(anchor)) return col
   }
-  return false
+  return 0
+}
+
+/** 名称列候选（表头为空）在数据区前 nameProbeRows 行是否有非空值 */
+function hasNameProbeValue(ws: WpsWorksheet, headerRow: number, col: number): boolean {
+  const rows = readRangeValues(ws, headerRow + 1, headerRow + XINFAN_HEADER.nameProbeRows, col, col)
+  return rows.some((row) => (row[0] ?? '').trim() !== '')
+}
+
+/**
+ * 为新番表构造最小 colMap：
+ * - 名称列：锚点列（周更时间）左侧最近一个「表头为空 + 数据区有值」的列
+ *   （新番表布局中该列紧邻周更时间左侧，可稳定绕开同为空的播放时间列）；
+ * - 标签列：表头命中 tagHeaderKeywords 时映射为「标签/分级」，复用 tag-format / noise-tags 规则。
+ */
+function buildXinFanColumnMap(ws: WpsWorksheet, headerRow: number): Map<string, number> {
+  const colMap = new Map<string, number>()
+
+  const anchorCol = findXinFanAnchorCol(ws, headerRow)
+  let nameCol: number | undefined
+  if (anchorCol > 1) {
+    for (let col = anchorCol - 1; col >= 1; col -= 1) {
+      if (getCellValue(ws, headerRow, col).trim() !== '') break
+      if (hasNameProbeValue(ws, headerRow, col)) {
+        nameCol = col
+        break
+      }
+    }
+  }
+  if (nameCol) colMap.set('名称', nameCol)
+
+  for (let col = 1; col <= 50; col += 1) {
+    const value = getCellValue(ws, headerRow, col).trim()
+    if (
+      value &&
+      XINFAN_HEADER.tagHeaderKeywords.some((keyword) =>
+        value.toLowerCase().includes(keyword.toLowerCase()),
+      )
+    ) {
+      colMap.set('标签/分级', col)
+      break
+    }
+  }
+
+  return colMap
 }
 
 /** 枚举工作簿内的全部工作表（异常时返回空数组） */
@@ -214,16 +276,26 @@ function readWorksheets(wb: WpsWorkbook): WpsWorksheet[] {
   return sheets
 }
 
-/** 按配置校验并构造单个清理目标；不满足条件时返回 null */
+/**
+ * 按配置校验并构造单个清理目标；不满足条件时返回 null。
+ * 识别路径分两步：
+ *  1. 标准路径：表头含「名称」（Bangumi 归档表等）；
+ *  2. 新番表路径：表头无「名称」，但命中 {@link XINFAN_HEADER} 专属签名（月历式新番表）。
+ */
 function buildTarget(wb: WpsWorkbook, ws: WpsWorksheet, path: string): CleanTargetInfo | null {
   const sheetName = ws.Name
   if (!sheetName || !isSheetAllowed(sheetName)) return null
 
-  const headerRow = findHeaderRow(ws)
-  if (!headerRow) return null
-
-  const colMap = getColumnMap(ws, headerRow)
-  if (!hasRequiredHeaders(colMap)) return null
+  let headerRow = findHeaderRow(ws)
+  let colMap: Map<string, number> | undefined
+  if (headerRow) {
+    colMap = getColumnMap(ws, headerRow)
+  } else {
+    headerRow = scanXinFanHeaderRow(ws)
+    if (!headerRow) return null
+    colMap = buildXinFanColumnMap(ws, headerRow)
+  }
+  if (!colMap.has('名称')) return null
 
   const lastRow = getLastRow(ws)
   const dataRows = lastRow - headerRow
@@ -246,15 +318,28 @@ function buildTarget(wb: WpsWorkbook, ws: WpsWorksheet, path: string): CleanTarg
 /**
  * 解析全部待清理目标：遍历已打开工作簿 → 按配置过滤 → 校验表头与数据行数。
  * 无任何可用目标时返回空数组（调用方据此提示）。
+ *
+ * @param selectedSheets 用户显式勾选的工作表（按 `工作簿全路径 :: 表名` 匹配）。
+ *   非空时仅保留白名单命中；空数组表示「不限制」（保留旧行为，向后兼容）。
  */
-export function listCleanTargets(): CleanTargetInfo[] {
+export function listCleanTargets(
+  selectedSheets: readonly { workbookKey: string; sheetName: string }[] = [],
+): CleanTargetInfo[] {
+  const whitelist = new Set<string>(
+    selectedSheets.map((entry) => `${entry.workbookKey}\u{0000}${entry.sheetName}`),
+  )
   const targets: CleanTargetInfo[] = []
   for (const wb of getOpenWorkbooks()) {
     const path = readWorkbookPath(wb)
     if (isWorkbookAllowed(path)) {
       for (const ws of readWorksheets(wb)) {
         const target = buildTarget(wb, ws, path)
-        if (target) targets.push(target)
+        if (
+          target &&
+          (whitelist.size === 0 || whitelist.has(`${path}\u{0000}${target.sheetName}`))
+        ) {
+          targets.push(target)
+        }
       }
     }
   }
@@ -375,7 +460,10 @@ function scanCellTransform(
           oldValue,
           nextValue: outcome.value,
         })
-        estimatedBytes += Math.max(0, estimateUtf8Bytes(oldValue) - estimateUtf8Bytes(outcome.value))
+        estimatedBytes += Math.max(
+          0,
+          estimateUtf8Bytes(oldValue) - estimateUtf8Bytes(outcome.value),
+        )
       }
     }
   }
@@ -383,7 +471,39 @@ function scanCellTransform(
   return { ...base, deleteRows: [], changes, estimatedBytes }
 }
 
-/** 扫描行级规则（删除行） */
+/** 扫描噪声行：按 {@link CLEAN_EXCLUDES.noiseRowText} 命中的行整行删除（不遵守 excludedRows） */
+function planNoiseRows(ws: WpsWorksheet, headerRow: number, lastRow: number): RowPlan {
+  const keywords = CLEAN_EXCLUDES.noiseRowText
+  if (keywords.length === 0) {
+    return {
+      deleteRows: [],
+      changes: [],
+      groups: 0,
+      mergedGroups: 0,
+      skippedReason: '未配置噪声行词表',
+    }
+  }
+  const maxCol = Math.min(CLEAN_EXCLUDES.rowScanColumns, 50)
+  const rowsToDelete: number[] = []
+  const rows = readRangeValues(ws, headerRow + 1, lastRow, 1, maxCol)
+  for (const [index, rowValues] of rows.entries()) {
+    const joined = rowValues.join(' ')
+    if (keywords.some((keyword) => joined.includes(keyword))) {
+      rowsToDelete.push(headerRow + 1 + index)
+    }
+  }
+  if (rowsToDelete.length === 0) {
+    return {
+      deleteRows: [],
+      changes: [],
+      groups: 0,
+      mergedGroups: 0,
+      skippedReason: '未发现噪声行',
+    }
+  }
+  return { deleteRows: rowsToDelete, changes: [], groups: rowsToDelete.length, mergedGroups: 0 }
+}
+
 function scanRowRule(
   rule: CleanRule,
   target: CleanTargetInfo,
@@ -410,6 +530,11 @@ function scanRowRule(
       }
       case 'emptyNameRows': {
         plan = planEmptyNameRows(target.ws, { excludedRows })
+        break
+      }
+      case 'noiseRows': {
+        // 噪声行刻意不遵守 excludedRows：否则这些行会被 rowText 保护语义先行排除，永远删不掉
+        plan = planNoiseRows(target.ws, target.headerRow, target.lastRow)
         break
       }
       default: {
@@ -488,12 +613,24 @@ function scanTarget(
 /**
  * 扫描全部勾选规则（只读，不修改任何单元格）。
  * @param ruleIds 勾选的规则 ID
+ * @param options.selectedSheets 用户显式勾选的工作表白名单（按 `工作簿全路径 :: 表名` 形式）；
+ *   传空数组表示不限制（保留旧行为，向后兼容）。
+ *   命中时只清理白名单内的目标；未命中时整张表跳过。
  */
-export function scanCleanRules(ruleIds: readonly string[]): CleanScanResult {
+export function scanCleanRules(
+  ruleIds: readonly string[],
+  options: { selectedSheets?: readonly { workbookKey: string; sheetName: string }[] } = {},
+): CleanScanResult {
   const notes: string[] = []
-  const targets = listCleanTargets()
+  const targets = listCleanTargets(options.selectedSheets)
   if (targets.length === 0) {
-    notes.push('未找到符合目标配置的工作表（需含「名称」表头且未被排除规则命中）')
+    if (options.selectedSheets && options.selectedSheets.length > 0) {
+      notes.push(
+        '未在已勾选的工作表中找到符合目标配置的工作表（需含「名称」表头且未被排除规则命中）',
+      )
+    } else {
+      notes.push('未找到符合目标配置的工作表（需含「名称」表头且未被排除规则命中）')
+    }
   }
 
   const plans: RulePlan[] = []

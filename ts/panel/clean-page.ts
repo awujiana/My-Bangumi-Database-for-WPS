@@ -11,14 +11,15 @@
 import { LOG_LEVELS } from '../core/constants.js'
 import { showToast } from '../ui/dialog.js'
 import { BGM, bgmLog, getApp, markCleanPaneLoaded } from '../tools/util/index.js'
-import { CLEAN_RULES, RISK_LABELS } from './clean-rules.js'
-import type { CleanRule } from './clean-rules.js'
 import {
-  describeCleanScope,
-  formatBytes,
-  runCleanPlans,
-  scanCleanRules,
-} from './clean-engine.js'
+  CLEAN_EXCLUDES,
+  CLEAN_RULES,
+  CLEAN_TARGETS,
+  RISK_LABELS,
+  XINFAN_HEADER,
+} from './clean-rules.js'
+import type { CleanRule } from './clean-rules.js'
+import { formatBytes, runCleanPlans, scanCleanRules } from './clean-engine.js'
 import type { CleanScanResult } from './clean-engine.js'
 import { escapeHtml } from '../tools/string-utilities.js'
 import { sanitizeHtml } from '../tools/sanitize.js'
@@ -27,8 +28,339 @@ import { initTheme, startThemeSync } from '../tools/theme.js'
 
 // ========== 状态 ==========
 
+// ========== 选择清理的表格 ==========
+
 /** 配置项勾选状态持久化前缀（PluginStorage） */
 const CHECK_KEY_PREFIX = 'bgm_clean_on_'
+
+/** 工作表勾选状态持久化键前缀（按工作簿全路径区分） */
+const SHEET_KEY_PREFIX = 'bgm_clean_sheets:'
+
+/** 当前加载的工作表清单（来自用户加载后的缓存） */
+interface SheetCandidate {
+  /** 工作簿唯一标识：`FullName || Name` */
+  workbookKey: string
+  /** 工作簿名（仅展示用） */
+  workbookName: string
+  /** 工作簿全路径（仅展示用） */
+  workbookPath: string
+  /** 工作表名 */
+  sheetName: string
+  /** 是否命中「必备表头」要求（标准「名称」或新番表签名） */
+  hasRequiredHeader: boolean
+  /** 是否为月历式新番表（无「名称」表头，按专属签名识别） */
+  isXinFan: boolean
+  /** 命中的表头列表（仅前 8 项） */
+  headers: string[]
+  /** 估算的数据行数 */
+  estimatedRows: number
+}
+
+let sheetCandidates: SheetCandidate[] = []
+
+/** 读取某工作簿已勾选的工作表名集合（持久化） */
+function loadSelectedSheetNames(workbookKey: string): Set<string> {
+  const raw = getApp()?.PluginStorage?.getItem(SHEET_KEY_PREFIX + workbookKey) ?? ''
+  if (raw === '') return new Set()
+  try {
+    const parsed: unknown = JSON.parse(raw)
+    if (Array.isArray(parsed)) {
+      return new Set(parsed.filter((value): value is string => typeof value === 'string'))
+    }
+  } catch {
+    // 忽略损坏的持久化数据
+  }
+  return new Set()
+}
+
+/** 写入某工作簿已勾选的工作表名集合 */
+function saveSelectedSheetNames(workbookKey: string, names: ReadonlySet<string>): void {
+  getApp()?.PluginStorage?.setItem(SHEET_KEY_PREFIX + workbookKey, JSON.stringify([...names]))
+}
+
+/** 收集全部已勾选的工作表（用于引擎的 include 列表） */
+function getSelectedSheetKeys(): { workbookKey: string; sheetName: string }[] {
+  const result: { workbookKey: string; sheetName: string }[] = []
+  for (const candidate of sheetCandidates) {
+    const selected = loadSelectedSheetNames(candidate.workbookKey)
+    if (selected.has(candidate.sheetName)) {
+      result.push({ workbookKey: candidate.workbookKey, sheetName: candidate.sheetName })
+    }
+  }
+  return result
+}
+
+/** 渲染选择清理的表格区块 */
+function renderSheetList(): void {
+  const container = document.getElementById('cleanSheetList')
+  if (!container) return
+
+  if (sheetCandidates.length === 0) {
+    container.innerHTML = sanitizeHtml(
+      '<div class="hint">点击「📋 加载工作表」枚举已打开工作簿。</div>',
+    )
+    return
+  }
+
+  // 按工作簿分组（保持首次出现顺序）
+  const groups: { workbookKey: string; workbookName: string; items: SheetCandidate[] }[] = []
+  const groupIndex = new Map<string, number>()
+  for (const candidate of sheetCandidates) {
+    let index = groupIndex.get(candidate.workbookKey)
+    if (index === undefined) {
+      index = groups.length
+      groupIndex.set(candidate.workbookKey, index)
+      groups.push({
+        workbookKey: candidate.workbookKey,
+        workbookName: candidate.workbookName,
+        items: [],
+      })
+    }
+    const group = groups[index]
+    if (group) group.items.push(candidate)
+  }
+
+  const blocks = groups
+    .map((group) => {
+      const items = group.items
+        .map((candidate) => {
+          const selected = loadSelectedSheetNames(group.workbookKey)
+          const isChecked = selected.has(candidate.sheetName)
+          const id = `clean-sheet-${escapeHtml(group.workbookKey)}-${escapeHtml(candidate.sheetName)}`
+          const isEligible = candidate.hasRequiredHeader
+          const metaParts: string[] = [`约 ${String(candidate.estimatedRows)} 行`]
+          if (candidate.isXinFan) {
+            metaParts.push('🗓️ 新番表')
+          }
+          if (candidate.headers.length > 0) {
+            metaParts.push(`表头：${candidate.headers.join(' / ')}`)
+          }
+          if (!isEligible) {
+            metaParts.push('⚠️ 缺少必备表头「名称」')
+          }
+          const metaText = metaParts.join(' · ')
+          const disabledClass = isEligible ? '' : 'clean-sheet-disabled'
+          const disabledAttribute = isEligible ? '' : 'data-disabled="true"'
+          return `
+            <label class="clean-sheet-item ${disabledClass}" ${disabledAttribute}>
+              <input type="checkbox" id="${id}" data-workbook-key="${escapeHtml(group.workbookKey)}" data-sheet-name="${escapeHtml(candidate.sheetName)}" ${isChecked && isEligible ? 'checked' : ''} ${isEligible ? '' : 'disabled'} />
+              <span class="clean-sheet-item-body">
+                <span class="clean-sheet-item-title">
+                  <span class="clean-sheet-item-name">${escapeHtml(candidate.sheetName)}</span>
+                </span>
+                <span class="clean-sheet-item-meta">${escapeHtml(metaText)}</span>
+              </span>
+            </label>`
+        })
+        .join('')
+      return `
+        <div class="clean-sheet-group">
+          <div class="clean-sheet-group-title">
+            <span class="clean-sheet-group-title-name">${escapeHtml(group.workbookName)}</span>
+            <span class="clean-sheet-item-meta">${String(group.items.length)} 张工作表</span>
+          </div>
+          ${items}
+        </div>`
+    })
+    .join('')
+
+  container.innerHTML = sanitizeHtml(blocks)
+
+  // 绑定勾选变化：写入持久化 + 让预览失效
+  container.querySelectorAll<HTMLInputElement>('input[type="checkbox"]').forEach((box) => {
+    box.addEventListener('change', () => {
+      const workbookKey = box.dataset.workbookKey ?? ''
+      const sheetName = box.dataset.sheetName ?? ''
+      if (!workbookKey || !sheetName) return
+      const selected = loadSelectedSheetNames(workbookKey)
+      if (box.checked) {
+        selected.add(sheetName)
+      } else {
+        selected.delete(sheetName)
+      }
+      saveSelectedSheetNames(workbookKey, selected)
+      invalidatePreview()
+    })
+  })
+}
+
+/** 读取路径是否命中任一关键词（大小写不敏感） */
+function hasAnyKeyword(value: string, keywords: readonly string[]): boolean {
+  if (keywords.length === 0) return false
+  const lower = value.toLowerCase()
+  return keywords.some((keyword) => keyword !== '' && lower.includes(keyword.toLowerCase()))
+}
+
+/** 读取工作簿全路径 */
+function readWorkbookPath(wb: { FullName?: string; Name: string }): string {
+  try {
+    return wb.FullName ?? wb.Name
+  } catch {
+    return ''
+  }
+}
+
+/** 是否允许处理该工作簿（沿用 CLEAN_TARGETS.excludeWorkbookPath） */
+function isWorkbookAllowed(path: string): boolean {
+  return !hasAnyKeyword(path, CLEAN_TARGETS.excludeWorkbookPath)
+}
+
+/** 读取单元格文本（异常时返回空串） */
+function readCellText(cell: { Value?: unknown; Text?: string }): string {
+  try {
+    const value: unknown = cell.Text ?? cell.Value
+    if (value === null || value === undefined) return ''
+    if (typeof value === 'string') return value
+    if (typeof value === 'number' || typeof value === 'boolean') return String(value)
+    return ''
+  } catch {
+    return ''
+  }
+}
+
+/** 探测单个工作表的表头（用于 UI 展示 + 必备表头校验） */
+function probeSheetHeaders(
+  ws: { Cells: { Item(row: number, col: number): { Value?: unknown; Text?: string } } } | null,
+): { headerRow: number; headers: string[]; isXinFan: boolean } | null {
+  if (!ws) return null
+  try {
+    const maxProbeRow = 10
+    const xinFanKeywords = XINFAN_HEADER.headerKeywords.map((keyword) => keyword.toLowerCase())
+    for (let row = 1; row <= maxProbeRow; row += 1) {
+      const values: string[] = []
+      let xinFanHits = 0
+      for (let col = 1; col <= 30; col += 1) {
+        const text = readCellText(ws.Cells.Item(row, col)).trim()
+        if (text) {
+          values.push(text)
+          if (xinFanKeywords.some((keyword) => text.toLowerCase().includes(keyword))) {
+            xinFanHits += 1
+          }
+        }
+      }
+      if (values.some((value) => value.includes('名称'))) {
+        return { headerRow: row, headers: values.slice(0, 8), isXinFan: false }
+      }
+      // 新番表（月历式）无「名称」表头，按专属签名识别
+      if (xinFanHits >= XINFAN_HEADER.minHeaderHits) {
+        return { headerRow: row, headers: values.slice(0, 8), isXinFan: true }
+      }
+    }
+  } catch {
+    // 忽略探测异常
+  }
+  return null
+}
+
+interface WpsWorkbookLike {
+  Name: string
+  FullName?: string
+  Worksheets?: { Count: number; Item(index: number): unknown }
+}
+
+interface WpsSheetLike {
+  Name: string
+  Cells: { Item(row: number, col: number): { Value?: unknown; Text?: string } }
+}
+
+/** 探测单张工作表并构造勾选候选（已排除日志 / 记录表） */
+function buildSheetCandidate(
+  wb: WpsWorkbookLike,
+  path: string,
+  ws: WpsSheetLike,
+): SheetCandidate | null {
+  const sheetName = (() => {
+    try {
+      return ws.Name
+    } catch {
+      return ''
+    }
+  })()
+  if (!sheetName || hasAnyKeyword(sheetName, CLEAN_EXCLUDES.sheetName)) return null
+  const headerProbe = probeSheetHeaders(ws)
+  return {
+    workbookKey: path || wb.Name,
+    workbookName: wb.Name,
+    workbookPath: path,
+    sheetName,
+    hasRequiredHeader: headerProbe !== null,
+    isXinFan: headerProbe?.isXinFan ?? false,
+    headers: headerProbe?.headers ?? [],
+    estimatedRows: 0,
+  }
+}
+
+/** 枚举已打开工作簿中的全部可选工作表（异常由调用方 try 包裹） */
+function collectSheetCandidates(workbooks: {
+  Count: number
+  Item(index: number): unknown
+}): SheetCandidate[] {
+  const candidates: SheetCandidate[] = []
+  const count = workbooks.Count
+  for (let wbIndex = 1; wbIndex <= count; wbIndex += 1) {
+    const wb = workbooks.Item(wbIndex) as WpsWorkbookLike
+    const path = readWorkbookPath(wb)
+    if (isWorkbookAllowed(path)) {
+      const sheets = wb.Worksheets
+      if (sheets) {
+        const sheetCount = sheets.Count
+        for (let sheetIndex = 1; sheetIndex <= sheetCount; sheetIndex += 1) {
+          const candidate = buildSheetCandidate(wb, path, sheets.Item(sheetIndex) as WpsSheetLike)
+          if (candidate) candidates.push(candidate)
+        }
+      }
+    }
+  }
+  return candidates
+}
+
+/** 加载工作簿 → 工作表清单 */
+function handleLoadSheets(): void {
+  const app = getApp()
+  if (!app) {
+    BGM.Dialog.alert('提示', '未连接到 Excel / WPS，请打开工作簿后重试')
+    return
+  }
+  try {
+    const workbooks = (app as { Workbooks?: { Count: number; Item(index: number): unknown } })
+      .Workbooks
+    if (!workbooks) {
+      sheetCandidates = []
+      renderSheetList()
+      appendLog('未找到已打开的工作簿', 'warn')
+      return
+    }
+    sheetCandidates = collectSheetCandidates(workbooks)
+    renderSheetList()
+    appendLog(`已加载 ${String(sheetCandidates.length)} 张可选工作表`, 'info')
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : String(error)
+    appendLog(`加载工作表失败：${message}`, 'error')
+    showToast(`加载工作表失败：${message}`, 'error')
+  }
+}
+
+/** 全选 / 全不选工作表 */
+function handleSelectAllSheets(isAll: boolean): void {
+  for (const candidate of sheetCandidates) {
+    // 全选/全不选仅对具备必备表头的工作表生效；这里无副作用但需保持纯函数语义，
+    // 因此用块状 if 包裹（no-continue + prefer-continue 二者只能取其一）
+
+    if (candidate.hasRequiredHeader) {
+      const selected = loadSelectedSheetNames(candidate.workbookKey)
+      if (isAll) {
+        selected.add(candidate.sheetName)
+      } else {
+        selected.delete(candidate.sheetName)
+      }
+      saveSelectedSheetNames(candidate.workbookKey, selected)
+    }
+  }
+  renderSheetList()
+  invalidatePreview()
+}
+
+// ========== 勾选状态持久化（清理项） ==========
 
 /** 当前扫描结果（执行按钮依赖它） */
 let scanResult: CleanScanResult | null = null
@@ -149,51 +481,6 @@ function invalidatePreview(): void {
   if (runButton) runButton.disabled = true
 }
 
-// ========== 渲染：清理范围（配置驱动） ==========
-
-/** 把字符串数组渲染为徽章列表（空数组显示「不限制」） */
-function renderKeywords(keywords: readonly string[], emptyText: string): string {
-  if (keywords.length === 0) return `<span class="clean-chip muted">${escapeHtml(emptyText)}</span>`
-  return keywords.map((word) => `<span class="clean-chip">${escapeHtml(word)}</span>`).join('')
-}
-
-/** 渲染清理范围（数据全部来自配置，页面不硬编码） */
-function renderScope(): void {
-  const box = document.getElementById('cleanScopeBody')
-  if (!box) return
-  const scope = describeCleanScope()
-  box.innerHTML = sanitizeHtml(`
-    <div class="clean-scope-row">
-      <span class="clean-scope-label">工作簿包含</span>
-      <span class="clean-scope-value">${renderKeywords(scope.includeWorkbookPath, '不限制')}</span>
-    </div>
-    <div class="clean-scope-row">
-      <span class="clean-scope-label">工作簿排除</span>
-      <span class="clean-scope-value">${renderKeywords(scope.excludeWorkbookPath, '无')}</span>
-    </div>
-    <div class="clean-scope-row">
-      <span class="clean-scope-label">工作表包含</span>
-      <span class="clean-scope-value">${renderKeywords(scope.includeSheetName, '按表头自动识别')}</span>
-    </div>
-    <div class="clean-scope-row">
-      <span class="clean-scope-label">必备表头</span>
-      <span class="clean-scope-value">${renderKeywords(scope.requireHeaderKeywords, '无')}</span>
-    </div>
-    <div class="clean-scope-row">
-      <span class="clean-scope-label">排除工作表</span>
-      <span class="clean-scope-value">${renderKeywords(scope.excludeSheetName, '无')}</span>
-    </div>
-    <div class="clean-scope-row">
-      <span class="clean-scope-label">排除行文本</span>
-      <span class="clean-scope-value">${renderKeywords(scope.excludeRowText, '无')}</span>
-    </div>
-    <div class="clean-scope-row">
-      <span class="clean-scope-label">单表上限</span>
-      <span class="clean-scope-value"><span class="clean-chip">${String(scope.maxDataRows)} 行</span></span>
-    </div>
-  `)
-}
-
 // ========== 预览 ==========
 
 /** 渲染执行前预览 */
@@ -263,13 +550,20 @@ function handleScan(): void {
     showToast('请至少勾选一个清理项', 'warn')
     return
   }
+  const selectedSheets = getSelectedSheetKeys()
+  if (selectedSheets.length === 0) {
+    showToast('请先在「🎯 选择清理的表格」中加载并勾选至少一张工作表', 'warn')
+    return
+  }
   if (!getApp()) {
     BGM.Dialog.alert('提示', '未连接到 Excel / WPS，请打开工作簿后重试')
     return
   }
-  appendLog(`开始扫描，勾选 ${String(ruleIds.length)} 个清理项…`)
+  appendLog(
+    `开始扫描，勾选 ${String(ruleIds.length)} 个清理项 · ${String(selectedSheets.length)} 张工作表…`,
+  )
   try {
-    const result = scanCleanRules(ruleIds)
+    const result = scanCleanRules(ruleIds, { selectedSheets })
     scanResult = result
     renderPreview(result)
     for (const note of result.notes) appendLog(note, 'warn')
@@ -377,6 +671,13 @@ function bindButtons(): void {
   document.getElementById('cleanScanBtn')?.addEventListener('click', handleScan)
   document.getElementById('cleanRunBtn')?.addEventListener('click', handleRun)
   document.getElementById('cleanClearLogBtn')?.addEventListener('click', clearLog)
+  document.getElementById('cleanLoadSheetsBtn')?.addEventListener('click', handleLoadSheets)
+  document.getElementById('cleanSelectAllSheetsBtn')?.addEventListener('click', () => {
+    handleSelectAllSheets(true)
+  })
+  document.getElementById('cleanSelectNoneSheetsBtn')?.addEventListener('click', () => {
+    handleSelectAllSheets(false)
+  })
   document.getElementById('cleanSelectAllBtn')?.addEventListener('click', () => {
     for (const rule of CLEAN_RULES) {
       const box = document.getElementById(`clean-item-${rule.id}`) as HTMLInputElement | null
@@ -410,9 +711,9 @@ export function initCleanPage(): void {
   initTheme()
   startThemeSync()
   initShellNav()
-  renderScope()
+  renderSheetList()
   renderCleanItems()
   bindButtons()
   invalidatePreview()
-  appendLog('清理页已就绪：勾选清理项后点击「🔍 扫描预览」')
+  appendLog('清理页已就绪：点击「📋 加载工作表」选择要清理的表格')
 }

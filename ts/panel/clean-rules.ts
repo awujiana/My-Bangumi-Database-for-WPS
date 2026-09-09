@@ -32,6 +32,8 @@ export type CleanKind =
   | 'duplicateUrlRows'
   /** 名称为空的残留行 */
   | 'emptyNameRows'
+  /** 噪声行（水印 / 汇总 / 说明行，按关键词整行删除） */
+  | 'noiseRows'
   /** 单元格值变换（具体算法由 transform 指定） */
   | 'cellTransform'
 
@@ -76,6 +78,8 @@ export interface CleanExcludeConfig {
   sheetName: string[]
   /** 行内任一单元格文本包含这些关键词 → 该行不参与清理（保护汇总行 / 说明行） */
   rowText: string[]
+  /** 行内任一单元格文本包含这些关键词 → 由 `noiseRows` 规则整行**删除**（水印 / 汇总 / 说明行） */
+  noiseRowText: string[]
   /** 数据行数少于该值的表跳过 */
   minDataRows: number
   /** 行文本排除判定时读取的最大列数 */
@@ -97,10 +101,50 @@ export const CLEAN_TARGETS: CleanTargetConfig = {
 export const CLEAN_EXCLUDES: CleanExcludeConfig = {
   // 记录表 / 日志表不参与数据清理
   sheetName: ['同步记录', '富化记录', '日志', 'Log'],
-  // 汇总行、说明行、模板示例行不清理
+  // 汇总行、说明行、模板示例行不清理（保护语义）
   rowText: ['合计', '小计', '总计', '示例', '新番表 by Hazx', '版权平台标注'],
+  // 与 rowText 同词表，但语义为「整行删除」：由 noise-rows 规则执行。
+  // 注意：noiseRows 扫描刻意**不遵守** excludedRows，否则这些行会先被 rowText 保护而永远删不掉。
+  noiseRowText: ['合计', '小计', '总计', '示例', '新番表 by Hazx', '版权平台标注'],
   minDataRows: 1,
   rowScanColumns: 30,
+}
+
+// ========== 新番表（月历式）表头识别 ==========
+
+/**
+ * 新番表表头识别配置。
+ *
+ * 新番表是「月历式」布局，与 Bangumi 归档表结构完全不同：
+ * ```
+ *   A   B        C(番剧名)  D(周更时间) E(时间)  F(播放平台) … J(独播) K(首播) L(集数) M(特殊) N(TAGS)
+ *  (空) (空)     (空)       周更时间    (空)     播放平台       独播    首播     集数     特殊     TAGS
+ *               淫狱团地     周一      00:10                            4.6     12     多版本…  搞笑 / 抽象
+ * ```
+ * 特征：① 表头行**没有「名称」列**（番剧名列 C 表头为空）；
+ *      ② 表名 / 表头命中「周更时间 / 播放平台 / TAGS」等专属列。
+ * 因此不能套用 `requireHeaderKeywords: ['名称']`，需要独立签名识别。
+ */
+export interface XinFanHeaderConfig {
+  /** 新番表专属表头关键词（大小写不敏感） */
+  headerKeywords: string[]
+  /** 表头行至少命中多少个专属关键词才判定为新番表 */
+  minHeaderHits: number
+  /** 名称列锚点：名称列位于该列左侧（空表头且数据区有值的最近一列） */
+  nameAnchorKeyword: string
+  /** TAGS 列的候选表头名（映射为「标签/分级」以复用现有标签规则） */
+  tagHeaderKeywords: string[]
+  /** 名称列探测时扫描的数据行数上限 */
+  nameProbeRows: number
+}
+
+/** 生效的新番表表头识别配置 */
+export const XINFAN_HEADER: XinFanHeaderConfig = {
+  headerKeywords: ['周更时间', '播放平台', 'TAGS', '集数', '首播', '独播', '特殊'],
+  minHeaderHits: 2,
+  nameAnchorKeyword: '周更时间',
+  tagHeaderKeywords: ['TAGS', '标签', 'tags'],
+  nameProbeRows: 30,
 }
 
 // ========== 可复用规则常量（移植自 clean/ 子项目） ==========
@@ -226,7 +270,7 @@ export const ORIGINAL_TAG_RULES: OriginalTagRules = {
     漫画改: '漫画改',
     游改: '游戏改',
     游戏改: '游戏改',
-    'GAL改': 'GAL改',
+    GAL改: 'GAL改',
     轻改: '轻小说改',
     轻小说改: '轻小说改',
     日轻: '轻小说改',
@@ -240,16 +284,7 @@ export const ORIGINAL_TAG_RULES: OriginalTagRules = {
     游戏: '游戏改',
     网文: '网文改',
   },
-  baseGaiTypes: [
-    '漫画改',
-    '游戏改',
-    '轻小说改',
-    '小说改',
-    '手游改',
-    '网文改',
-    '宅文改',
-    'GAL改',
-  ],
+  baseGaiTypes: ['漫画改', '游戏改', '轻小说改', '小说改', '手游改', '网文改', '宅文改', 'GAL改'],
   priorityRules: [
     { higher: '手游改', lower: '游戏改' },
     { higher: '轻小说改', lower: '小说改' },
@@ -331,6 +366,16 @@ export const CLEAN_RULES: readonly CleanRule[] = [
     kind: 'emptyNameRows',
     risk: 'medium',
     defaultOn: false,
+  },
+  {
+    id: 'noise-rows',
+    name: '噪声行（水印 / 汇总 / 说明）',
+    desc: '整行删除命中噪声词表的行：合计、小计、总计、示例、「新番表 by Hazx」水印行、版权平台标注。',
+    group: '重复数据',
+    icon: '🚫',
+    kind: 'noiseRows',
+    risk: 'high',
+    defaultOn: true,
   },
 
   // ── 单元格清洗 ──

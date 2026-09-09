@@ -4,6 +4,7 @@ const mocks = vi.hoisted(() => ({
   getOpenWorkbooks: vi.fn(),
   findHeaderRow: vi.fn(),
   getColumnMap: vi.fn(),
+  getCellValue: vi.fn(),
   getLastRow: vi.fn(),
   readRangeValues: vi.fn(),
   setCellValue: vi.fn(),
@@ -26,6 +27,7 @@ vi.mock('../ts/tools/util/index.js', () => ({
   bgmLog: mocks.bgmLog,
   findHeaderRow: mocks.findHeaderRow,
   getColumnMap: mocks.getColumnMap,
+  getCellValue: mocks.getCellValue,
   getLastRow: mocks.getLastRow,
   readRangeValues: mocks.readRangeValues,
   setCellValue: mocks.setCellValue,
@@ -38,9 +40,7 @@ vi.mock('../ts/sync/sheet-cleaning.js', () => ({
   applyRowPlan: mocks.applyRowPlan,
 }))
 
-import {
-  CLEAN_EXCLUDES,
-} from '../ts/panel/clean-rules.js'
+import { CLEAN_EXCLUDES } from '../ts/panel/clean-rules.js'
 import {
   listCleanTargets,
   collectExcludedRows,
@@ -52,6 +52,7 @@ import {
   describeCleanScope,
 } from '../ts/panel/clean-engine.js'
 import type { CleanTargetInfo, CleanScanResult } from '../ts/panel/clean-engine.js'
+import { transformCellValue } from '../ts/panel/clean-transforms.js'
 
 // ========== 测试工具 ==========
 
@@ -69,6 +70,13 @@ function makeGrid(rows: Record<number, Record<number, string>>): void {
       }
       return out
     },
+  )
+}
+
+/** 设置 getCellValue 的单格网格（供新番表表头 / 名称列探测使用） */
+function setCellGrid(rows: Record<number, Record<number, string>>): void {
+  mocks.getCellValue.mockImplementation(
+    (_ws: unknown, row: number, col: number) => rows[row]?.[col] ?? '',
   )
 }
 
@@ -106,7 +114,10 @@ function fakeTarget(key: string, label: string, sheetName = '动画'): CleanTarg
   }
 }
 
-function fakeScanResult(plans: CleanScanResult['plans'], targets: CleanTargetInfo[]): CleanScanResult {
+function fakeScanResult(
+  plans: CleanScanResult['plans'],
+  targets: CleanTargetInfo[],
+): CleanScanResult {
   return {
     targets,
     plans,
@@ -162,6 +173,62 @@ describe('listCleanTargets · 配置过滤', () => {
     mocks.getOpenWorkbooks.mockReturnValue([])
     expect(listCleanTargets()).toHaveLength(0)
   })
+
+  it('用户显式勾选的工作表（selectedSheets）命中时入选', () => {
+    mockWorkbookSheet('动画')
+    makeGrid({ 2: { 1: 'A' } })
+    const targets = listCleanTargets([{ workbookKey: 'D:/books/数据表.xlsx', sheetName: '动画' }])
+    expect(targets).toHaveLength(1)
+    expect(targets[0]?.sheetName).toBe('动画')
+  })
+
+  it('用户未勾选该工作表时返回空数组', () => {
+    mockWorkbookSheet('动画')
+    makeGrid({ 2: { 1: 'A' } })
+    expect(
+      listCleanTargets([{ workbookKey: 'D:/books/数据表.xlsx', sheetName: '其他表' }]),
+    ).toHaveLength(0)
+  })
+
+  it('selectedSheets 为空数组时退化为不限制（保留旧行为）', () => {
+    mockWorkbookSheet('动画')
+    makeGrid({ 2: { 1: 'A' } })
+    expect(listCleanTargets([])).toHaveLength(1)
+  })
+
+  it('月历式新番表（无「名称」表头）按专属签名入选，并映射名称列与 TAGS 列', () => {
+    mockWorkbookSheet('2026年4月新番表')
+    mocks.findHeaderRow.mockReturnValue(0) // 标准路径失败 → 走新番表签名
+    // 表头行（行2）命中签名：周更时间(D4) / 播放平台(F6) / 集数(L12) / TAGS(N14)
+    setCellGrid({
+      2: {
+        4: '周更时间',
+        6: '播放平台',
+        10: '独播',
+        11: '首播',
+        12: '集数',
+        13: '特殊',
+        14: 'TAGS',
+      },
+      // 名称列候选（C3，表头为空）数据区有值 → 锚定「周更时间」左侧
+      3: { 3: '新番表 by Hazx.' },
+      5: { 3: '淫狱团地', 14: '搞笑 / 抽象 / 涩涩' },
+    })
+    mocks.getLastRow.mockReturnValue(5)
+    makeGrid({ 3: { 3: '新番表 by Hazx.' }, 5: { 3: '淫狱团地' } })
+    const targets = listCleanTargets()
+    expect(targets).toHaveLength(1)
+    const colMap = targets[0]?.colMap
+    expect(colMap?.get('名称')).toBe(3) // 名称列 = C 列
+    expect(colMap?.get('标签/分级')).toBe(14) // TAGS 列复用「标签/分级」键
+  })
+
+  it('新番表表头未命中签名时仍按标准「名称」要求跳过', () => {
+    mockWorkbookSheet('随机表')
+    mocks.findHeaderRow.mockReturnValue(0)
+    setCellGrid({ 2: { 3: '随便一列', 5: '又一列' } })
+    expect(listCleanTargets()).toHaveLength(0)
+  })
 })
 
 // ========== 排除行计算 ==========
@@ -184,6 +251,77 @@ describe('collectExcludedRows', () => {
     const target = fakeTarget('k', '数据表 / 动画')
     makeGrid({ 2: { 1: '作品A', 2: 'url' }, 3: { 1: '作品B' } })
     expect(collectExcludedRows(target).size).toBe(0)
+  })
+
+  it('新番表清理专用关键词：合计/小计/总计/示例/新番表 by Hazx/版权平台标注 全部命中', () => {
+    const target = fakeTarget('k', '新番表.xlsx / Sheet1')
+    // 行 2 为正常数据行（含「bilibili」平台信息但不在排除关键词中），不应被排除
+    makeGrid({
+      2: { 1: '周一日二 18:00 bilibili' },
+      3: { 1: '合计（共X行）' },
+      4: { 1: '小计' },
+      5: { 1: '总计' },
+      6: { 1: '示例：四格漫画格式' },
+      7: { 1: '新番表 by Hazx' },
+      8: { 1: '版权平台标注示例' },
+    })
+    // fakeTarget 默认 lastRow=5，扩展以覆盖 6/7/8 行
+    target.lastRow = 8
+    const excluded = collectExcludedRows(target)
+    expect(excluded.has(3)).toBe(true)
+    expect(excluded.has(4)).toBe(true)
+    expect(excluded.has(5)).toBe(true)
+    expect(excluded.has(6)).toBe(true)
+    expect(excluded.has(7)).toBe(true)
+    expect(excluded.has(8)).toBe(true)
+  })
+})
+
+// ========== 新番表 / 噪声行 ==========
+
+describe('scanCleanRules · 新番表噪声行', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  it('新番表水印行（新番表 by Hazx）/ 说明行（版权平台标注）被整行删除，正常行保留', () => {
+    mockWorkbookSheet('2026年4月新番表')
+    mocks.findHeaderRow.mockReturnValue(0)
+    setCellGrid({
+      2: { 4: '周更时间', 14: 'TAGS' },
+      3: { 3: '新番表 by Hazx.' },
+      4: { 3: '新番表 by Hazx.' },
+      5: { 3: '淫狱团地', 14: '搞笑 / 抽象 / 涩涩' },
+      102: { 3: '版权平台标注示例' },
+    })
+    mocks.getLastRow.mockReturnValue(102)
+    makeGrid({
+      3: { 3: '新番表 by Hazx.' },
+      4: { 3: '新番表 by Hazx.' },
+      5: { 3: '淫狱团地', 14: '搞笑 / 抽象 / 涩涩' },
+      102: { 3: '版权平台标注示例' },
+    })
+    const result = scanCleanRules(['noise-rows'])
+    const plans = result.plans.filter((plan) => plan.ruleId === 'noise-rows')
+    expect(plans.length).toBeGreaterThan(0)
+    const deleted = plans[0]?.deleteRows ?? []
+    expect(deleted).toContain(3)
+    expect(deleted).toContain(4)
+    expect(deleted).toContain(102)
+    expect(deleted).not.toContain(5) // 正常番剧行保留
+  })
+})
+
+describe('transformCellValue · 新番表 TAGS 斜杠归一化', () => {
+  it('「/」分隔统一为「 | 」', () => {
+    const out = transformCellValue('normalizeTagSeparator', '搞笑 / 抽象 / 涩涩', { name: '' })
+    expect(out.changed).toBe(true)
+    expect(out.value).toBe('搞笑 | 抽象 | 涩涩')
+  })
+
+  it('重复的「/」分隔标签去重', () => {
+    const out = transformCellValue('normalizeTagSeparator', '校园 / 恋爱 / 校园', { name: '' })
+    expect(out.value).toBe('校园 | 恋爱')
   })
 })
 
