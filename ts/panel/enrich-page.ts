@@ -41,8 +41,10 @@ import {
   ANIME_SOURCE_DETECTOR,
   BANGUMI_TARGET_DETECTOR,
   collectDetectedWorkbookPaths,
-} from '../sync/enrich-auto-detect.js'
-import { sanitizeHtml } from '../tools/sanitize.js'
+  describeOpenWorkbooks,
+  mergeDetectedPathsIntoStorage,
+} from '../sync/workbook-auto-detect.js'
+import { sanitizeHtml, sanitizeTableRows } from '../tools/sanitize.js'
 import { escapeHtml } from '../tools/string-utilities.js'
 import {
   getCellValue,
@@ -84,6 +86,10 @@ interface EnrichPageState {
   headerRow: number
   dataStartRow: number
   matches: MatchResult[]
+  /** 「数据预览」当前页签：source=新番表数据，match=匹配结果 */
+  activePreviewTab: 'source' | 'match'
+  /** 源数据预览是否已成功渲染（决定「查看详细数据表格」按钮是否可用） */
+  hasSourcePreview: boolean
   isEnriching: boolean
   cancelRequested: boolean
   pendingConflicts: ConflictInfo[]
@@ -117,6 +123,8 @@ const state: EnrichPageState = {
   headerRow: 0,
   dataStartRow: 0,
   matches: [],
+  activePreviewTab: 'source',
+  hasSourcePreview: false,
   isEnriching: false,
   cancelRequested: false,
   pendingConflicts: [],
@@ -221,6 +229,11 @@ export function initEnrichPage(): void {
   // 页面打开时：若已识别到打开的 Bangumi 数据表且目标表未锁定，自动选择/锁定目标表
   checkBangumiAutoDetectRecords()
 
+  // 初始化「数据预览」页签可见性（默认新番表数据页签，隐藏匹配相关按钮/统计）
+  refreshMatchHintText()
+  applyPreviewTabVisibility()
+  startEnrichWorkbookWatch()
+
   // 通知模块就绪，启用按钮（与 panelPage.initPanelCore / settings-entry.startSettings 对齐）
   if (typeof document !== 'undefined') {
     document.dispatchEvent(new CustomEvent('bgm:modulesReady'))
@@ -260,6 +273,8 @@ function bindTargetSheetControls(): void {
   const wbSelect = safeGetSelect('workbookSelect')
   if (wbSelect) {
     wbSelect.addEventListener('change', () => {
+      // 用户已手动选择：取消自动识别的兜底重试，避免覆盖用户选择
+      cancelEnrichWatchRetries()
       refreshSheetList()
       // 切换工作簿时同步锁定状态显示
       updateEnrichLockButton('lockSheetBtn', 'lockStatus')
@@ -269,6 +284,8 @@ function bindTargetSheetControls(): void {
   const sheetSelect = safeGetSelect('sheetSelect')
   if (sheetSelect) {
     sheetSelect.addEventListener('change', () => {
+      // 用户已手动选择：取消自动识别的兜底重试，避免覆盖用户选择
+      cancelEnrichWatchRetries()
       selectTargetSheet()
       // 切换工作表时同步锁定状态显示
       updateEnrichLockButton('lockSheetBtn', 'lockStatus')
@@ -307,27 +324,72 @@ function bindTabSwitches(): void {
   tabs.forEach((tab) => {
     tab.addEventListener('click', () => {
       const tabName = tab.dataset.tab
-      if (!tabName) return
+      if (tabName !== 'source' && tabName !== 'match') return
 
       tabs.forEach((t) => {
         t.classList.remove('active')
       })
       tab.classList.add('active')
 
-      const sourceTable = safeGetElement('sourcePreviewTable')
-      const matchTable = safeGetElement('matchPreviewTable')
-      if (tabName === 'source') {
-        if (sourceTable) sourceTable.style.display = ''
-        if (matchTable) matchTable.style.display = 'none'
-      } else if (tabName === 'match') {
-        if (sourceTable) sourceTable.style.display = 'none'
-        if (matchTable) {
-          // 尚无匹配结果时保持隐藏，避免展示只有表头的空表格
-          matchTable.style.display = state.matches.length > 0 ? '' : 'none'
-        }
-      }
+      setPreviewTab(tabName)
     })
   })
+}
+
+/** 切换「数据预览」页签（统一入口：同步 active 样式 + 各区块可见性） */
+function setPreviewTab(tab: 'source' | 'match'): void {
+  state.activePreviewTab = tab
+
+  const tabs = document.querySelectorAll<HTMLElement>('.preview-tab')
+  tabs.forEach((t) => {
+    t.classList.toggle('active', t.dataset.tab === tab)
+  })
+
+  // 切到匹配结果页时刷新空态提示文案（可能尚未预览 / 目标表未选）
+  refreshMatchHintText()
+  applyPreviewTabVisibility()
+}
+
+/**
+ * 按当前页签统一设置「数据预览」各区块可见性。
+ *
+ * 目的：修复切换页签后残留上一个页签的提示/按钮（如新番表页签仍显示匹配统计卡片，
+ * 或匹配结果页签仍显示「查看详细数据表格」），以及未预览时展示空白/仅表头表格的问题。
+ */
+function applyPreviewTabVisibility(): void {
+  const isMatchTab = state.activePreviewTab === 'match'
+  const hasMatches = state.matches.length > 0
+
+  setPreviewElementVisible('sourcePreviewTable', !isMatchTab)
+  setPreviewElementVisible('sourceDetailAction', !isMatchTab && state.hasSourcePreview)
+
+  // 提示类元素：仅在有文案时才显示，避免空白占位
+  setPreviewElementVisible('sourcePreviewHint', !isMatchTab, true)
+  setPreviewElementVisible('matchEmptyHint', isMatchTab, true)
+
+  // 「预览匹配」按钮仅在「匹配结果」页签显示
+  setPreviewElementVisible('matchPreviewAction', isMatchTab)
+
+  // 统计卡片与匹配表格：仅匹配结果页签且已有匹配结果时显示（未预览前不展示空表格）
+  setPreviewElementVisible('matchStats', isMatchTab && hasMatches)
+  setPreviewElementVisible('matchPreviewTable', isMatchTab && hasMatches)
+}
+
+/** 设置预览区元素的显示/隐藏；hasTextOnly=true 时文本为空则强制隐藏 */
+function setPreviewElementVisible(id: string, isVisible: boolean, hasTextOnly = false): void {
+  const element = safeGetElement(id)
+  if (!element) return
+  const hasText = element.textContent.trim().length > 0
+  element.style.display = isVisible && (!hasTextOnly || hasText) ? '' : 'none'
+}
+
+/** 清空匹配结果（切换源表/重新识别表头时调用，避免展示过期结果） */
+function resetMatchResults(): void {
+  state.matches = []
+  const tbody = safeGetElement('matchTable')?.querySelector('tbody')
+  if (tbody) tbody.replaceChildren()
+  refreshMatchHintText()
+  applyPreviewTabVisibility()
 }
 
 function bindStartEnrichButton(): void {
@@ -861,7 +923,8 @@ function closeOpenedSourceWorkbook(): void {
     state.columnMapping = null
     state.headerRow = 0
     state.dataStartRow = 0
-    state.matches = []
+    state.hasSourcePreview = false
+    resetMatchResults()
   }
 
   state.sourceWorkbook = null
@@ -959,22 +1022,39 @@ function autoAddOpenAnimeWorkbooks(): void {
   }
 }
 
-/** 页面打开时检查 Bangumi 数据表识别记录：未锁定时交由 autoSelectEnrichTarget 自动选择/锁定目标表 */
+/**
+ * 页面打开时检查 Bangumi 数据表识别情况：未锁定时交由 autoSelectEnrichTarget 自动选择/锁定目标表。
+ *
+ * 注意：不能因为「检测器结果为 0」就跳过自动选择。
+ * 检测器（BANGUMI_TARGET_DETECTOR）带名称预筛，工作表名不含 bangumi/追踪/动画 等关键词时会返回 0；
+ * 而 autoSelectEnrichTarget 内部使用的 findBangumiTargetSheets 具备「无名称命中时回退扫描全部工作表」
+ * 的兜底能力。二者判定口径不一致，跳过会导致明明可识别的目标表被漏掉。
+ */
 function checkBangumiAutoDetectRecords(): void {
   try {
     const paths = collectDetectedWorkbookPaths(BANGUMI_TARGET_DETECTOR)
-    if (paths.length === 0) {
-      bgmLog(LOG_LEVELS.INFO, '[enrich] 页面打开检查：未检测到已打开的 Bangumi 数据表')
-      return
-    }
-    const names = paths.map((path) => extractFileName(path)).join('、')
+    const names = paths.length > 0 ? paths.map((path) => extractFileName(path)).join('、') : '无'
     bgmLog(
       LOG_LEVELS.INFO,
-      `[enrich] 页面打开检查：检测到 ${String(paths.length)} 个已打开的 Bangumi 数据表（${names}）`,
+      `[enrich] 页面打开检查：Bangumi 数据表识别记录 ${String(paths.length)} 个（${names}）；当前打开工作簿 ${describeOpenWorkbooks()}`,
     )
-    if (!BGM.sheet.isLocked) {
-      autoSelectEnrichTarget('workbookSelect', 'sheetSelect', 'lockSheetBtn', 'lockStatus')
+
+    // 把本次实时扫描结果并入持久化记录（不覆盖历史记录），便于 Ribbon / 其他页面共享
+    mergeDetectedPathsIntoStorage()
+
+    if (BGM.sheet.isLocked) return
+
+    const result = autoSelectEnrichTarget(
+      'workbookSelect',
+      'sheetSelect',
+      'lockSheetBtn',
+      'lockStatus',
+    )
+    if (result !== 'none') {
+      // 自动选择/锁定不会触发 select 的 change 事件，需同步 state.bangumiSheet
+      selectTargetSheet()
     }
+    bgmLog(LOG_LEVELS.INFO, `[enrich] 页面打开检查：目标表自动识别结果=${result}`)
   } catch (error: unknown) {
     BGM.handleError(error, {
       showAlert: false,
@@ -982,6 +1062,114 @@ function checkBangumiAutoDetectRecords(): void {
       context: 'checkBangumiAutoDetectRecords',
     })
   }
+}
+
+// ========== 工作簿变化监听（自动识别目标工作簿） ==========
+//
+// 背景：页面打开时 WPS 的 Workbooks 集合可能尚未就绪，或目标工作簿在页面打开之后才被打开/激活，
+// 导致首轮扫描漏掉目标表（现象：工作簿下拉只列出部分工作簿、自动识别 0 个候选，必须手动点刷新或
+// 先切换到目标工作簿才找得到）。这里沿用主面板 userInfoPolling 的思路做低频轮询：
+//   1. 工作簿数量变化（打开/关闭工作簿）；
+//   2. 活动工作簿切换（用户在 WPS 中切换窗口）；
+//   3. 页面打开后若干次兜底重试（应对首轮扫描时集合未就绪）。
+// 命中任一项即刷新工作簿列表并重新识别目标表，无需用户手动点击「刷新」。
+
+const ENRICH_WATCH_INTERVAL_MS = 2000
+const ENRICH_WATCH_MAX_RETRY = 3
+
+let enrichWatchTimer: number | null = null
+/** 剩余兜底重试次数（用户手动选择/解锁后置 0，避免覆盖用户意图） */
+let enrichWatchRetriesLeft = ENRICH_WATCH_MAX_RETRY
+
+/** 取消自动识别的兜底重试（用户已手动选择目标或主动解锁时调用） */
+function cancelEnrichWatchRetries(): void {
+  enrichWatchRetriesLeft = 0
+}
+
+/** 刷新工作簿列表并重新自动识别目标表（已锁定时仅同步列表与引用） */
+function recheckEnrichTarget(reason: string): void {
+  bgmLog(LOG_LEVELS.INFO, `[enrich] ${reason}：刷新工作簿列表并重新识别目标表`)
+  refreshWorkbookList()
+
+  if (BGM.sheet.isLocked) {
+    refreshSheetList()
+    selectTargetSheet()
+    return
+  }
+
+  const result = autoSelectEnrichTarget(
+    'workbookSelect',
+    'sheetSelect',
+    'lockSheetBtn',
+    'lockStatus',
+  )
+  refreshSheetList()
+  selectTargetSheet()
+  bgmLog(
+    LOG_LEVELS.INFO,
+    `[enrich] ${reason}：目标表自动识别结果=${result}（${describeOpenWorkbooks()}）`,
+  )
+}
+
+/** 启动富化页面的工作簿变化监听（幂等，页面卸载时自动停止） */
+function startEnrichWorkbookWatch(): void {
+  if (typeof window === 'undefined') return
+  if (enrichWatchTimer !== null) return
+
+  const app = getApp()
+  let lastWorkbookCount = app?.Workbooks?.Count ?? 0
+  let lastActiveWorkbookName = app?.ActiveWorkbook?.Name ?? null
+
+  /**
+   * 判断本轮是否需要重新识别，返回用于日志的原因；无需处理返回 null。
+   * 会顺带更新基线（count / 活动工作簿名 / 剩余重试次数）。
+   */
+  const takeRecheckReason = (count: number, activeName: string | null): string | null => {
+    if (count !== lastWorkbookCount) {
+      lastWorkbookCount = count
+      lastActiveWorkbookName = activeName
+      return `检测到工作簿数量变化（${String(count)} 个）`
+    }
+
+    if (activeName !== lastActiveWorkbookName) {
+      lastActiveWorkbookName = activeName
+      return `检测到活动工作簿切换（${activeName ?? '无'}）`
+    }
+
+    // 兜底重试：页面刚打开时集合可能未就绪，未锁定且尚未识别到目标表时再扫几次
+    if (enrichWatchRetriesLeft > 0 && !BGM.sheet.isLocked && !state.bangumiSheet) {
+      enrichWatchRetriesLeft -= 1
+      return `目标表尚未识别，重试扫描（剩余 ${String(enrichWatchRetriesLeft)} 次）`
+    }
+
+    return null
+  }
+
+  const pollOnce = (): void => {
+    try {
+      const currentApp = getApp()
+      const reason = takeRecheckReason(
+        currentApp?.Workbooks?.Count ?? 0,
+        currentApp?.ActiveWorkbook?.Name ?? null,
+      )
+      if (reason) recheckEnrichTarget(reason)
+    } catch (error: unknown) {
+      bgmLog(
+        LOG_LEVELS.WARN,
+        `[enrich] 工作簿监听轮询失败: ${error instanceof Error ? error.message : String(error)}`,
+      )
+    }
+  }
+
+  enrichWatchTimer = window.setInterval(pollOnce, ENRICH_WATCH_INTERVAL_MS)
+  window.addEventListener('beforeunload', stopEnrichWorkbookWatch)
+}
+
+/** 停止富化页面的工作簿变化监听 */
+function stopEnrichWorkbookWatch(): void {
+  if (enrichWatchTimer === null) return
+  window.clearInterval(enrichWatchTimer)
+  enrichWatchTimer = null
 }
 
 /** 显示自动识别提示（列出已添加的文件名） */
@@ -1152,29 +1340,44 @@ function refreshSheetList(): void {
 function selectTargetSheet(): void {
   const sheetSelect = safeGetSelect('sheetSelect')
   if (!sheetSelect?.value) {
-    state.bangumiSheet = null
+    applyTargetSheet(null)
     return
   }
 
   const sheetIndex = Number(sheetSelect.value)
   const wb = getSelectedWorkbook()
   if (!wb || sheetIndex <= 0) {
-    state.bangumiSheet = null
+    applyTargetSheet(null)
     return
   }
 
   try {
     const ws = wb.Worksheets.Item(sheetIndex)
-    state.bangumiSheet = ws
+    applyTargetSheet(ws)
     bgmLog(LOG_LEVELS.INFO, `[enrich] 已选择目标工作表: ${ws.Name} (索引: ${String(sheetIndex)})`)
   } catch (error: unknown) {
-    state.bangumiSheet = null
+    applyTargetSheet(null)
     BGM.handleError(error, {
       showAlert: false,
       level: BGM.ErrorLevel.INFO,
       context: 'selectTargetSheet',
     })
   }
+}
+
+/**
+ * 更新目标工作表引用：目标表变化时清空已有的匹配结果（结果依赖目标表，失效结果不可继续展示）。
+ */
+function applyTargetSheet(ws: WpsWorksheet | null): void {
+  const previousName = state.bangumiSheet?.Name ?? null
+  state.bangumiSheet = ws
+
+  if ((ws?.Name ?? null) === previousName) {
+    refreshMatchHintText()
+    applyPreviewTabVisibility()
+    return
+  }
+  resetMatchResults()
 }
 
 function toggleSheetLock(): void {
@@ -1190,6 +1393,8 @@ function toggleSheetLock(): void {
     // 锁定成功后同步目标工作表引用（自动预选场景下不触发 change 事件）
     selectTargetSheet()
   } else {
+    // 用户主动解锁：取消自动识别的兜底重试，避免立刻又被自动锁定回去
+    cancelEnrichWatchRetries()
     state.bangumiSheet = null
   }
 }
@@ -1272,17 +1477,22 @@ function renderSourcePreview(ws: WpsWorksheet, mapping: EnrichColumnMapping): vo
     if (emptyThead) emptyThead.replaceChildren()
     const emptyTbody = tableContainer.querySelector('tbody')
     if (emptyTbody) emptyTbody.replaceChildren()
+    state.hasSourcePreview = false
     const hintElement = safeGetElement('sourcePreviewHint')
     if (hintElement) {
       hintElement.textContent = '尚未识别到映射列，请先在「新番表文件」中识别表头'
       hintElement.style.display = ''
     }
+    // 源表不可用：旧的匹配结果已失效
+    resetMatchResults()
     return
   }
 
+  state.hasSourcePreview = true
+
   const thead = tableContainer.querySelector('thead')
   if (thead) {
-    thead.innerHTML = sanitizeHtml(
+    thead.innerHTML = sanitizeTableRows(
       `<tr><th></th>${fieldCols.map((f) => `<th>${escapeHtml(f.label)}</th>`).join('')}</tr>`,
     )
   }
@@ -1311,25 +1521,19 @@ function renderSourcePreview(ws: WpsWorksheet, mapping: EnrichColumnMapping): vo
     }
   }
 
-  tbody.innerHTML = sanitizeHtml(rowsHtml.join(''))
+  tbody.innerHTML = sanitizeTableRows(rowsHtml.join(''))
 
   // 预览提示：仅展示前 maxRows 行
   const hintElement = safeGetElement('sourcePreviewHint')
   if (hintElement) {
-    if (rowsHtml.length >= maxRows) {
-      hintElement.textContent = `仅显示前 ${String(maxRows)} 行，可点击「查看详细数据表格」查看完整数据`
-      hintElement.style.display = ''
-    } else {
-      hintElement.textContent = ''
-      hintElement.style.display = 'none'
-    }
+    hintElement.textContent =
+      rowsHtml.length >= maxRows
+        ? `仅显示前 ${String(maxRows)} 行，可点击「查看详细数据表格」查看完整数据`
+        : ''
   }
 
-  // 显示「查看详细数据表格」按钮
-  const detailAction = safeGetElement('sourceDetailAction')
-  if (detailAction) {
-    detailAction.style.display = ''
-  }
+  // 「查看详细数据表格」按钮与提示的显示由 applyPreviewTabVisibility 统一控制
+  applyPreviewTabVisibility()
 
   bgmLog(LOG_LEVELS.INFO, `[enrich] 源数据预览已渲染: ${String(rowsHtml.length)} 行`)
 }
@@ -1432,7 +1636,9 @@ export function previewMatch(options?: { keepSourceOpen?: boolean }): void {
 
     renderMatchStats(state.matches)
     renderMatchResultsToTable(state.matches)
-    updateMatchEmptyHint()
+    refreshMatchHintText()
+    // 预览完成后确保停留在「匹配结果」页签并展示统计/表格
+    setPreviewTab('match')
 
     bgmLog(LOG_LEVELS.INFO, `[enrich] 匹配预览完成: ${String(state.matches.length)} 条结果`)
   } catch (error: unknown) {
@@ -1473,25 +1679,32 @@ function renderMatchStats(matches: MatchResult[]): void {
 
   const unmatchedElement = safeGetElement('unmatchedCount')
   if (unmatchedElement) unmatchedElement.textContent = String(unmatchedCount)
-
-  statsArea.style.display = ''
 }
 
 /**
- * 目标表为空时提示：富化将把未匹配条目作为新行追加写入
+ * 刷新匹配结果页签的提示文案（只写文案，显示与否由 applyPreviewTabVisibility 决定）。
+ *
+ * 三种状态：
+ *   1. 尚未预览：给出「点击预览匹配」的引导，避免页签空白；
+ *   2. 目标表为空且有未匹配条目：提示富化时将新增行数；
+ *   3. 其余：清空文案（自动隐藏）。
  */
-function updateMatchEmptyHint(): void {
+function refreshMatchHintText(): void {
   const hintElement = safeGetElement('matchEmptyHint')
-  if (!hintElement || !state.bangumiSheet) return
+  if (!hintElement) return
+
+  if (state.matches.length === 0) {
+    hintElement.textContent = state.bangumiSheet
+      ? '尚未预览匹配，点击「预览匹配」查看新番表与目标表的匹配结果'
+      : '请先选择目标 Bangumi 工作表，再点击「预览匹配」'
+    return
+  }
 
   const pendingCount = state.matches.filter((m) => m.matchType === 'unmatched').length
-  if (isBangumiSheetEmpty(state.bangumiSheet) && pendingCount > 0) {
-    hintElement.textContent = `目标表暂无数据，富化时将新增 ${String(pendingCount)} 行`
-    hintElement.style.display = ''
-  } else {
-    hintElement.textContent = ''
-    hintElement.style.display = 'none'
-  }
+  hintElement.textContent =
+    state.bangumiSheet && isBangumiSheetEmpty(state.bangumiSheet) && pendingCount > 0
+      ? `目标表暂无数据，富化时将新增 ${String(pendingCount)} 行`
+      : ''
 }
 
 /** 匹配方式的徽标 class（与 .preview-table .match-status 配套） */
@@ -1628,7 +1841,7 @@ function renderMatchResultsToTable(matches: MatchResult[]): void {
     `
   })
 
-  tbodyElement.innerHTML = sanitizeHtml(rowsHtml.join(''))
+  tbodyElement.innerHTML = sanitizeTableRows(rowsHtml.join(''))
 
   // 绑定每行详情按钮（行内按钮由预览刷新时重建，需按次绑定；
   // 闭包按索引取值，避免依赖会被 sanitize 剥离的 data-* 属性）
@@ -1639,11 +1852,7 @@ function renderMatchResultsToTable(matches: MatchResult[]): void {
       if (match) showMatchDetail(match)
     })
   })
-
-  const matchTableContainer = safeGetElement('matchPreviewTable')
-  if (matchTableContainer) {
-    matchTableContainer.style.display = ''
-  }
+  // 表格的显示由 applyPreviewTabVisibility 统一控制（未预览 / 非匹配页签时保持隐藏）
 }
 
 // ========== 匹配详情弹窗 ==========

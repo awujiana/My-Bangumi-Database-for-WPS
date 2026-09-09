@@ -1,7 +1,7 @@
 /**
- * @fileoverview 工作簿自动识别通用模块
- * @module sync/enrichAutoDetect
- * @description 自动识别 WPS 中已打开的目标工作簿（新番表 / Bangumi 数据表）。
+ * @fileoverview 已打开工作簿的自动识别模块
+ * @module sync/workbookAutoDetect
+ * @description 在 WPS 当前已打开的工作簿中自动识别「新番表源工作簿」与「Bangumi 目标工作簿」。
  *
  * 识别方式参考 Bangumi 同步工具（tools/locked-sheet.ts findBangumiTargetSheets）：
  *   1. 低成本名称预筛：文件名 / 工作表名包含目标关键词；
@@ -9,7 +9,7 @@
  *   3. 数据行校验：表头行后 ≥2 行有数据。
  *
  * 检查时机（多种，注册后统一生效）：
- *   A. 打开 WPS（加载项加载）时：initWorkbookAutoDetect 全量扫描 + 事件监听，结果持久化到 PluginStorage；
+ *   A. 打开 WPS（加载项加载）时：initWorkbookAutoDetection 全量扫描 + 事件监听，结果持久化到 PluginStorage；
  *   B. 打开富化工具页面时：collectDetectedWorkbookPaths 合并持久化结果与实时扫描，由页面自动添加并识别；
  *   C. 打开新工作簿时：WorkbookOpen 事件实时记录；
  *   D. 切换活动工作簿时：WorkbookActivate 事件实时记录；
@@ -36,16 +36,16 @@ export interface WorkbookDetector {
   /** 低成本名称级预筛：命中才做表头/数据行完整校验；未提供则跳过预筛 */
   isNameMatch?: (wb: WpsWorkbook) => boolean
   /** 完整校验：在指定工作簿中查找首个命中目标的工作表；未命中返回 null */
-  findDetectedSheet: (wb: WpsWorkbook) => WpsWorksheet | null
+  findFirstMatchingSheet: (wb: WpsWorkbook) => WpsWorksheet | null
 }
 
 /** 新番表文件名预筛关键词（低成本，命中后再做表头/数据行校验） */
-export const ANIME_FILENAME_KEYWORDS = ['新番', '番组', 'xinfan'] as const
+export const ANIME_SOURCE_FILENAME_KEYWORDS = ['新番', '番组', 'xinfan'] as const
 
 /** 文件名是否命中新番表关键词（纯函数，可单测） */
-export function isAnimeFilename(name: string): boolean {
+export function isAnimeSourceFilename(name: string): boolean {
   const normalized = name.trim().toLowerCase()
-  return ANIME_FILENAME_KEYWORDS.some((keyword) => normalized.includes(keyword))
+  return ANIME_SOURCE_FILENAME_KEYWORDS.some((keyword) => normalized.includes(keyword))
 }
 
 /** 从文件路径提取文件名（纯函数，可单测） */
@@ -72,7 +72,7 @@ function countDataRowsAfter(ws: WpsWorksheet, headerRow: number): number {
 }
 
 /** 读取并校验单个工作表是否为新番表布局（表头 ≥3 关键字 + ≥2 数据行）；不满足返回 null */
-function inspectWorksheet(wb: WpsWorkbook, index: number): WpsWorksheet | null {
+function inspectAnimeSourceWorksheet(wb: WpsWorkbook, index: number): WpsWorksheet | null {
   let ws: WpsWorksheet
   try {
     ws = wb.Worksheets.Item(index)
@@ -86,10 +86,10 @@ function inspectWorksheet(wb: WpsWorkbook, index: number): WpsWorksheet | null {
 }
 
 /** 在指定工作簿中查找首个满足「新番表布局 + ≥2 数据行」的工作表；未命中返回 null */
-export function findAnimeSourceSheet(wb: WpsWorkbook): WpsWorksheet | null {
+export function findAnimeSourceSheetInWorkbook(wb: WpsWorkbook): WpsWorksheet | null {
   const sheetCount = wb.Worksheets.Count
   for (let index = 1; index <= sheetCount; index += 1) {
-    const ws = inspectWorksheet(wb, index)
+    const ws = inspectAnimeSourceWorksheet(wb, index)
     if (ws) return ws
   }
   return null
@@ -99,8 +99,8 @@ export function findAnimeSourceSheet(wb: WpsWorkbook): WpsWorksheet | null {
 export const ANIME_SOURCE_DETECTOR: WorkbookDetector = {
   key: 'bgm_enrich_auto_detect',
   label: '新番表',
-  isNameMatch: (wb: WpsWorkbook) => isAnimeFilename(wb.Name),
-  findDetectedSheet: findAnimeSourceSheet,
+  isNameMatch: (wb: WpsWorkbook) => isAnimeSourceFilename(wb.Name),
+  findFirstMatchingSheet: findAnimeSourceSheetInWorkbook,
 }
 
 /** 工作簿内是否存在工作表名命中 Bangumi 追踪表关键词（仅读 Name，低成本预筛） */
@@ -122,7 +122,7 @@ export const BANGUMI_TARGET_DETECTOR: WorkbookDetector = {
   key: 'bgm_enrich_auto_detect_bangumi',
   label: 'Bangumi 数据表',
   isNameMatch: hasBangumiSheetName,
-  findDetectedSheet: findBangumiTargetSheetInWorkbook,
+  findFirstMatchingSheet: findBangumiTargetSheetInWorkbook,
 }
 
 /** 全部已注册检测器（事件与全量扫描统一遍历） */
@@ -134,9 +134,12 @@ export const ALL_DETECTORS: readonly WorkbookDetector[] = [
 // ========== 工作簿判定与扫描 ==========
 
 /** 安全执行目标表校验（校验异常按未命中处理，供扫描循环跳过异常项） */
-function findDetectedSheetSafely(detector: WorkbookDetector, wb: WpsWorkbook): WpsWorksheet | null {
+function findFirstMatchingSheetSafely(
+  detector: WorkbookDetector,
+  wb: WpsWorkbook,
+): WpsWorksheet | null {
   try {
-    return detector.findDetectedSheet(wb)
+    return detector.findFirstMatchingSheet(wb)
   } catch {
     return null
   }
@@ -146,9 +149,9 @@ function findDetectedSheetSafely(detector: WorkbookDetector, wb: WpsWorkbook): W
  * 判断工作簿是否命中检测目标：名称预筛 + 表头/数据行双重校验。
  * 仅命中名称不算数，必须同时存在可识别的目标表布局，避免误判普通表格。
  */
-export function isDetectedWorkbook(detector: WorkbookDetector, wb: WpsWorkbook): boolean {
+export function isMatchingWorkbook(detector: WorkbookDetector, wb: WpsWorkbook): boolean {
   if (detector.isNameMatch && !detector.isNameMatch(wb)) return false
-  return findDetectedSheetSafely(detector, wb) !== null
+  return findFirstMatchingSheetSafely(detector, wb) !== null
 }
 
 /** 安全读取工作簿（读取失败返回 null，供扫描循环跳过异常项） */
@@ -165,21 +168,48 @@ function readWorkbookSafely(
 
 /**
  * 扫描所有已打开工作簿，返回命中指定检测目标的工作簿列表。
+ *
+ * 边界处理：部分 WPS 环境下 `Application.Workbooks` 集合可能与当前活动工作簿不一致
+ * （活动工作簿未出现在枚举结果中），因此额外把 ActiveWorkbook 作为兜底候选纳入扫描，
+ * 避免「已打开目标工作簿却扫描不到」。
+ *
  * 排序偏好（参考 findBangumiTargetSheets）：当前活动工作簿优先，其余按扫描顺序。
  */
-export function scanDetectedWorkbooks(detector: WorkbookDetector): WpsWorkbook[] {
+export function scanMatchingWorkbooks(detector: WorkbookDetector): WpsWorkbook[] {
   const app = getApp()
   if (!app?.Workbooks) {
-    bgmLog(LOG_LEVELS.WARN, '[enrichAutoDetect] 无法获取 Workbooks')
+    bgmLog(LOG_LEVELS.WARN, '[workbookDetect] 无法获取 Workbooks')
     return []
   }
 
   const activeWbName = app.ActiveWorkbook?.Name ?? ''
   const found: WpsWorkbook[] = []
+  const seen = new Set<string>()
   const wbs = app.Workbooks
+
+  const tryPush = (wb: WpsWorkbook | null, source: string): void => {
+    if (!wb) return
+    if (seen.has(wb.Name)) return
+    if (!isMatchingWorkbook(detector, wb)) return
+    seen.add(wb.Name)
+    found.push(wb)
+    if (source === 'active') {
+      bgmLog(LOG_LEVELS.INFO, `[workbookDetect] ${detector.label} 活动工作簿兜底命中: ${wb.Name}`)
+    }
+  }
+
   for (let index = 1; index <= wbs.Count; index += 1) {
-    const wb = readWorkbookSafely(wbs, index)
-    if (wb && isDetectedWorkbook(detector, wb)) found.push(wb)
+    tryPush(readWorkbookSafely(wbs, index), 'workbooks')
+  }
+  // 兜底：活动工作簿未被 Workbooks 枚举覆盖时单独校验
+  let activeWb: WpsWorkbook | null
+  try {
+    activeWb = app.ActiveWorkbook ?? null
+  } catch {
+    activeWb = null
+  }
+  if (activeWb?.Name && !seen.has(activeWb.Name)) {
+    tryPush(activeWb, 'active')
   }
 
   found.sort((a, b) => {
@@ -190,10 +220,29 @@ export function scanDetectedWorkbooks(detector: WorkbookDetector): WpsWorkbook[]
   return found
 }
 
+/** 描述当前 WPS 中已打开的工作簿（诊断日志用，读取失败不影响主流程） */
+export function describeOpenWorkbooks(): string {
+  const app = getApp()
+  if (!app?.Workbooks) return 'Workbooks 不可用'
+  const wbs = app.Workbooks
+  const names: string[] = []
+  for (let index = 1; index <= wbs.Count; index += 1) {
+    const wb = readWorkbookSafely(wbs, index)
+    names.push(wb ? wb.Name : '(读取失败)')
+  }
+  let activeName = '(无)'
+  try {
+    activeName = app.ActiveWorkbook?.Name ?? '(无)'
+  } catch {
+    // 读取活动工作簿失败时保留占位
+  }
+  return `${String(wbs.Count)} 个 [${names.join(' | ')}]；活动工作簿 ${activeName}`
+}
+
 // ========== 持久化（Ribbon ↔ 富化页面跨 WebView 共享） ==========
 
 /** 读取指定检测目标的自动识别记录（可能包含已关闭的工作簿，调用方需二次校验） */
-export function loadDetectedWorkbooks(detector: WorkbookDetector): string[] {
+export function loadDetectedPaths(detector: WorkbookDetector): string[] {
   const app = getApp()
   const raw = app?.PluginStorage?.getItem(detector.key)
   if (!raw) return []
@@ -207,13 +256,10 @@ export function loadDetectedWorkbooks(detector: WorkbookDetector): string[] {
 }
 
 /** 持久化指定检测目标的自动识别结果（去重） */
-export function persistDetectedWorkbooks(
-  detector: WorkbookDetector,
-  paths: readonly string[],
-): void {
+export function persistDetectedPaths(detector: WorkbookDetector, paths: readonly string[]): void {
   const app = getApp()
   if (!app?.PluginStorage) {
-    bgmLog(LOG_LEVELS.WARN, '[enrichAutoDetect] PluginStorage 不可用，无法持久化')
+    bgmLog(LOG_LEVELS.WARN, '[workbookDetect] PluginStorage 不可用，无法持久化')
     return
   }
   app.PluginStorage.setItem(detector.key, JSON.stringify([...new Set(paths)]))
@@ -244,7 +290,7 @@ function appendIfNotSeen(result: string[], seen: Set<string>, path: string): voi
  * 1. 实时扫描结果优先（已验证、活动工作簿靠前）；
  * 2. 持久化记录中「仍打开」且未被实时扫描覆盖的作为兜底（应对实时校验瞬时失败）。
  */
-export function mergeDetectCandidates(
+export function mergeCandidatePaths(
   persisted: readonly string[],
   openPaths: readonly string[],
   isStillOpen: (path: string) => boolean,
@@ -262,9 +308,29 @@ export function mergeDetectCandidates(
 
 /** 汇总指定检测目标当前应自动添加的工作簿路径（持久化结果 ∩ 仍打开 ∪ 实时扫描） */
 export function collectDetectedWorkbookPaths(detector: WorkbookDetector): string[] {
-  const openPaths = scanDetectedWorkbooks(detector).map((wb) => wb.FullName)
-  const persisted = loadDetectedWorkbooks(detector)
-  return mergeDetectCandidates(persisted, openPaths, isWorkbookOpen)
+  const openPaths = scanMatchingWorkbooks(detector).map((wb) => wb.FullName)
+  const persisted = loadDetectedPaths(detector)
+  return mergeCandidatePaths(persisted, openPaths, isWorkbookOpen)
+}
+
+/**
+ * 把当前实时扫描结果**并入**持久化记录（仅追加/去重，不清空历史记录）。
+ *
+ * 与 overwriteDetectedPathsInStorage 的区别：后者在 WPS 启动时全量覆盖，适用于「以当前事实为准」；
+ * 本函数适用于页面打开等中途场景 —— 若此时 Workbooks 集合尚未就绪（例如只枚举到部分工作簿），
+ * 覆盖写会把已经识别到的目标工作簿记录抹掉，导致后续页面更扫不到。
+ */
+export function mergeDetectedPathsIntoStorage(): void {
+  for (const detector of ALL_DETECTORS) {
+    const openPaths = scanMatchingWorkbooks(detector).map((wb) => wb.FullName)
+    const persisted = loadDetectedPaths(detector)
+    const merged = mergeCandidatePaths(persisted, openPaths, isWorkbookOpen)
+    persistDetectedPaths(detector, merged)
+    bgmLog(
+      LOG_LEVELS.INFO,
+      `[workbookDetect] ${detector.label} 合并识别记录：${String(merged.length)} 个`,
+    )
+  }
 }
 
 // ========== WPS 启动检查（检查方式 A + 事件时机 C/D/E） ==========
@@ -272,45 +338,44 @@ export function collectDetectedWorkbookPaths(detector: WorkbookDetector): string
 let isEventsRegistered = false
 
 /** 记录单个工作簿到指定检测目标的持久化列表（已存在则跳过） */
-function recordWorkbookIfNew(detector: WorkbookDetector, wb: WpsWorkbook): void {
-  const current = loadDetectedWorkbooks(detector)
+function recordWorkbookPathIfNew(detector: WorkbookDetector, wb: WpsWorkbook): void {
+  const current = loadDetectedPaths(detector)
   if (!current.includes(wb.FullName)) {
-    persistDetectedWorkbooks(detector, [...current, wb.FullName])
-    bgmLog(LOG_LEVELS.INFO, `[enrichAutoDetect] ${detector.label} 已记录工作簿: ${wb.Name}`)
+    persistDetectedPaths(detector, [...current, wb.FullName])
+    bgmLog(LOG_LEVELS.INFO, `[workbookDetect] ${detector.label} 已记录工作簿: ${wb.Name}`)
   }
 }
 
-/** 对单个检测器执行名称预筛 + 完整校验，命中则记录；返回是否命中 */
-function shouldRecordForDetector(detector: WorkbookDetector, wb: WpsWorkbook): boolean {
-  if (detector.isNameMatch && !detector.isNameMatch(wb)) return false
+/** 对单个检测器执行名称预筛 + 完整校验，命中则记入持久化列表；未命中静默跳过 */
+function recordWorkbookIfMatched(detector: WorkbookDetector, wb: WpsWorkbook): void {
+  if (detector.isNameMatch && !detector.isNameMatch(wb)) return
   try {
-    if (!detector.findDetectedSheet(wb)) return false
+    if (!detector.findFirstMatchingSheet(wb)) return
   } catch (error: unknown) {
     bgmLog(
       LOG_LEVELS.WARN,
-      `[enrichAutoDetect] ${detector.label} 校验失败: ${error instanceof Error ? error.message : String(error)}`,
+      `[workbookDetect] ${detector.label} 校验失败: ${error instanceof Error ? error.message : String(error)}`,
     )
-    return false
+    return
   }
-  recordWorkbookIfNew(detector, wb)
-  return true
+  recordWorkbookPathIfNew(detector, wb)
 }
 
 /** 对全部检测器依次尝试记录（事件回调统一入口） */
-function recordWorkbookForDetectors(wb: WpsWorkbook): void {
+function recordWorkbookForAllDetectors(wb: WpsWorkbook): void {
   for (const detector of ALL_DETECTORS) {
-    shouldRecordForDetector(detector, wb)
+    recordWorkbookIfMatched(detector, wb)
   }
 }
 
 /** 重新扫描并覆盖全部检测器的持久化记录（WPS 启动时全量刷新） */
-function refreshAllPersistedScans(): void {
+function overwriteDetectedPathsInStorage(): void {
   for (const detector of ALL_DETECTORS) {
-    const paths = scanDetectedWorkbooks(detector).map((wb) => wb.FullName)
-    persistDetectedWorkbooks(detector, paths)
+    const paths = scanMatchingWorkbooks(detector).map((wb) => wb.FullName)
+    persistDetectedPaths(detector, paths)
     bgmLog(
       LOG_LEVELS.INFO,
-      `[enrichAutoDetect] WPS 启动检查：${detector.label} 识别到 ${String(paths.length)} 个工作簿`,
+      `[workbookDetect] WPS 启动检查：${detector.label} 识别到 ${String(paths.length)} 个工作簿`,
     )
   }
 }
@@ -321,8 +386,8 @@ function refreshAllPersistedScans(): void {
  * 2. 注册 WorkbookOpen / WorkbookActivate / SheetActivate 事件，实时维护识别记录。
  *    事件注册失败不影响功能：富化页面打开时仍会做实时扫描检查。
  */
-export function initWorkbookAutoDetect(): void {
-  refreshAllPersistedScans()
+export function initWorkbookAutoDetection(): void {
+  overwriteDetectedPathsInStorage()
   if (isEventsRegistered) return
   isEventsRegistered = true
 
@@ -336,18 +401,18 @@ export function initWorkbookAutoDetect(): void {
   try {
     app.WorkbookOpen = (wb: WpsWorkbook) => {
       try {
-        recordWorkbookForDetectors(wb)
+        recordWorkbookForAllDetectors(wb)
       } catch (error: unknown) {
         bgmLog(
           LOG_LEVELS.WARN,
-          `[enrichAutoDetect] WorkbookOpen 处理失败: ${error instanceof Error ? error.message : String(error)}`,
+          `[workbookDetect] WorkbookOpen 处理失败: ${error instanceof Error ? error.message : String(error)}`,
         )
       }
     }
   } catch (error: unknown) {
     bgmLog(
       LOG_LEVELS.WARN,
-      `[enrichAutoDetect] 注册 WorkbookOpen 失败（事件不可用，页面打开时检查不受影响）: ${error instanceof Error ? error.message : String(error)}`,
+      `[workbookDetect] 注册 WorkbookOpen 失败（事件不可用，页面打开时检查不受影响）: ${error instanceof Error ? error.message : String(error)}`,
     )
   }
 
@@ -355,18 +420,18 @@ export function initWorkbookAutoDetect(): void {
     // 激活/切换事件触发频繁：先做低成本名称预筛，命中才完整校验，避免频繁读单元格
     app.WorkbookActivate = (wb: WpsWorkbook) => {
       try {
-        recordWorkbookForDetectors(wb)
+        recordWorkbookForAllDetectors(wb)
       } catch (error: unknown) {
         bgmLog(
           LOG_LEVELS.WARN,
-          `[enrichAutoDetect] WorkbookActivate 处理失败: ${error instanceof Error ? error.message : String(error)}`,
+          `[workbookDetect] WorkbookActivate 处理失败: ${error instanceof Error ? error.message : String(error)}`,
         )
       }
     }
   } catch (error: unknown) {
     bgmLog(
       LOG_LEVELS.WARN,
-      `[enrichAutoDetect] 注册 WorkbookActivate 失败（事件不可用，页面打开时检查不受影响）: ${error instanceof Error ? error.message : String(error)}`,
+      `[workbookDetect] 注册 WorkbookActivate 失败（事件不可用，页面打开时检查不受影响）: ${error instanceof Error ? error.message : String(error)}`,
     )
   }
 
@@ -375,18 +440,18 @@ export function initWorkbookAutoDetect(): void {
     app.SheetActivate = () => {
       try {
         const activeWb = getApp()?.ActiveWorkbook
-        if (activeWb) recordWorkbookForDetectors(activeWb)
+        if (activeWb) recordWorkbookForAllDetectors(activeWb)
       } catch (error: unknown) {
         bgmLog(
           LOG_LEVELS.WARN,
-          `[enrichAutoDetect] SheetActivate 处理失败: ${error instanceof Error ? error.message : String(error)}`,
+          `[workbookDetect] SheetActivate 处理失败: ${error instanceof Error ? error.message : String(error)}`,
         )
       }
     }
   } catch (error: unknown) {
     bgmLog(
       LOG_LEVELS.WARN,
-      `[enrichAutoDetect] 注册 SheetActivate 失败（事件不可用，页面打开时检查不受影响）: ${error instanceof Error ? error.message : String(error)}`,
+      `[workbookDetect] 注册 SheetActivate 失败（事件不可用，页面打开时检查不受影响）: ${error instanceof Error ? error.message : String(error)}`,
     )
   }
 }

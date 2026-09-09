@@ -31,7 +31,7 @@ import {
   LOG_LEVELS,
   getApp,
 } from './index.js'
-import { initWorkbookAutoDetect } from './sync/enrich-auto-detect.js'
+import { initWorkbookAutoDetection } from './sync/workbook-auto-detect.js'
 
 /**
  * WPS Ribbon 控件回调参数最小接口
@@ -330,7 +330,7 @@ export function OnAddinLoad(ribbonUI: WpsRibbonUI): boolean {
   app.PluginStorage?.setItem('EnableFlag', 'false')
   app.PluginStorage?.setItem('ApiEventFlag', 'false')
   // 检查方式 A + 事件时机 C/D/E：打开 WPS（加载项加载）时，自动识别已打开的新番表/Bangumi 数据表工作簿并持久化
-  initWorkbookAutoDetect()
+  initWorkbookAutoDetection()
   return true
 }
 

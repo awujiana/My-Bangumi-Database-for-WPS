@@ -644,24 +644,26 @@ export {
 } from './sync/enrich-lock.js'
 
 // ============================================================================
-// 24.1 工作簿自动识别通用模块（来自 sync/enrich-auto-detect.js）
+// 24.1 工作簿自动识别通用模块（来自 sync/workbook-auto-detect.js）
 //      识别新番表 / Bangumi 数据表工作簿，识别方式参考 Bangumi 同步工具：
 //      名称预筛 + 表头/数据行校验
 // ============================================================================
 export {
-  initWorkbookAutoDetect,
-  scanDetectedWorkbooks,
-  isDetectedWorkbook,
-  isAnimeFilename,
+  initWorkbookAutoDetection,
+  scanMatchingWorkbooks,
+  isMatchingWorkbook,
+  isAnimeSourceFilename,
   extractFileNameFromPath,
-  findAnimeSourceSheet,
-  loadDetectedWorkbooks,
-  persistDetectedWorkbooks,
+  findAnimeSourceSheetInWorkbook,
+  loadDetectedPaths,
+  persistDetectedPaths,
   isWorkbookOpen,
-  mergeDetectCandidates,
+  mergeCandidatePaths,
   collectDetectedWorkbookPaths,
+  mergeDetectedPathsIntoStorage,
+  describeOpenWorkbooks,
   ANIME_SOURCE_DETECTOR,
   BANGUMI_TARGET_DETECTOR,
   ALL_DETECTORS,
-  ANIME_FILENAME_KEYWORDS,
-} from './sync/enrich-auto-detect.js'
+  ANIME_SOURCE_FILENAME_KEYWORDS,
+} from './sync/workbook-auto-detect.js'

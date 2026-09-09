@@ -311,3 +311,29 @@ export function sanitizeHtml(dirty: string): string {
   const purify = getPurify()
   return purify(dirty)
 }
+
+/**
+ * 清洗「表格行片段」（如 `<tr>...</tr>`）并保留 tr/td/th 结构。
+ *
+ * 背景（2026-09 匹配结果/新番表预览「样式不是表格」bug）：
+ *   DOMPurify 主路径用 DOMParser 以完整文档上下文解析，顶层裸 `<tr>`/`<td>`/`<th>`
+ *   会被 HTML 解析器按规范剥离标签只保留内容；fallback 路径用 `div.innerHTML`
+ *   同样剥离。`tbody.innerHTML = sanitizeHtml(rowsHtml)` 场景下表格结构全部丢失。
+ *
+ * 处理方式：把行片段包进 `<table><tbody>…</tbody></table>` 完整表格上下文清洗
+ * （tr/td/th 正常保留，动态内容仍全程消毒），再从清洗结果中提取 tbody 内部 HTML。
+ * 安全性与 sanitizeHtml 等价：输出取自消毒后 DOM 的序列化片段。
+ */
+export function sanitizeTableRows(dirty: string): string {
+  if (!dirty) return ''
+  const purify = getPurify()
+  const cleaned = purify(`<table><tbody>${dirty}</tbody></table>`)
+  if (typeof document === 'undefined') {
+    // 极端无 DOM 环境（纯 Node 单测）：字符串层面剥掉包装（清洗已消除注入向量）
+    return cleaned.replace(/^<table><tbody>/, '').replace(/<\/tbody><\/table>$/, '')
+  }
+  const host = document.createElement('div')
+  host.innerHTML = cleaned
+  const tbody = host.querySelector('tbody')
+  return tbody ? tbody.innerHTML : ''
+}

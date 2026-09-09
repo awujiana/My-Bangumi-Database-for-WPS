@@ -18,7 +18,7 @@
 // @vitest-environment jsdom
 
 import { describe, it, expect } from 'vitest'
-import { sanitizeHtml } from '../ts/tools/sanitize.js'
+import { sanitizeHtml, sanitizeTableRows } from '../ts/tools/sanitize.js'
 import { escapeHtml } from '../ts/tools/string-utilities-pure.js'
 
 // ========== 测试用 XSS payload ==========
@@ -180,5 +180,63 @@ describe('XSS 防护综合场景', () => {
     expect(cleaned).toContain('<button')
     expect(cleaned).toContain('id="okBtn"')
     expect(cleaned).toContain('确定')
+  })
+})
+
+// ========== sanitizeTableRows 测试 ==========
+//
+// 背景：DOMPurify 主路径用 DOMParser 以完整文档上下文解析，顶层裸 `<tr>`/`<td>`/`<th>`
+// 会被 HTML 解析器按规范剥离（只保留文本），导致 `tbody.innerHTML = sanitizeHtml(rows)`
+// 这类「表格行片段」场景结构全部丢失（表现为预览不是表格形式）。
+// sanitizeTableRows 用完整 `<table><tbody>` 上下文包裹清洗后再取回 tbody 内部。
+
+describe('sanitizeTableRows - 表格行片段', () => {
+  it('保留顶层裸 <tr>/<td> 结构', () => {
+    const cleaned = sanitizeTableRows('<tr><td>A</td><td>B</td></tr>')
+    expect(cleaned).toContain('<tr')
+    expect(cleaned).toContain('<td')
+    expect(cleaned).toContain('A')
+    expect(cleaned).toContain('B')
+  })
+
+  it('保留 <th> 表头行', () => {
+    const cleaned = sanitizeTableRows('<tr><th></th><th>名称</th></tr>')
+    expect(cleaned).toContain('<th')
+    expect(cleaned).toContain('名称')
+  })
+
+  it('保留行内 class / data-* 等属性', () => {
+    const cleaned = sanitizeTableRows(
+      '<tr class="match-row" data-row="3"><td class="row-num">3</td></tr>',
+    )
+    expect(cleaned).toContain('match-row')
+    expect(cleaned).toContain('data-row="3"')
+    expect(cleaned).toContain('row-num')
+  })
+
+  it('写入 tbody 后能形成真实的表格行结构（回归：曾退化为纯文本）', () => {
+    const table = document.createElement('table')
+    const tbody = document.createElement('tbody')
+    table.appendChild(tbody)
+    tbody.innerHTML = sanitizeTableRows('<tr><td>甲</td></tr><tr><td>乙</td></tr>')
+    expect(tbody.querySelectorAll('tr')).toHaveLength(2)
+    expect(tbody.querySelectorAll('td')).toHaveLength(2)
+    expect(tbody.textContent).toContain('甲')
+  })
+
+  it('剥离 <script> 等危险标签', () => {
+    const cleaned = sanitizeTableRows('<tr><td><script>alert(1)</script>x</td></tr>')
+    expect(cleaned).not.toMatch(/<script/i)
+    expect(cleaned).not.toContain('alert(1)')
+  })
+
+  it.each(XSS_PAYLOADS)('所有 payload 经 sanitizeTableRows 后均无可执行标签: %s', (payload) => {
+    const cleaned = sanitizeTableRows(`<tr><td>${payload}</td></tr>`)
+    expect(cleaned).not.toMatch(/<(img|script|svg|iframe|object|embed)\b/i)
+    expect(cleaned).not.toMatch(/<[^>]*\bon(error|load|click|mouseover|focus|blur|change)\s*=/i)
+  })
+
+  it('空字符串输入返回空字符串', () => {
+    expect(sanitizeTableRows('')).toBe('')
   })
 })
