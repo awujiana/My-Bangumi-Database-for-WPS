@@ -10,6 +10,8 @@
     "debug": "npm run build:ts && concurrently \"tsc --project tsconfig.build.json --watch\" \"wpsjs debug\"",
     "lint": "eslint ts tests --fix",
     "lint:check": "eslint ts tests",
+    "check:dompurify-version": "node scripts/check-dompurify-version.mjs",
+    "gate": "npm run lint:check && npm run check:dompurify-version && npm run test",
     "format": "prettier --write ts/ tests/",
     "format:check": "prettier --check ts/ tests/",
     "prepare": "husky",

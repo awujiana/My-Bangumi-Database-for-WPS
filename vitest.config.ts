@@ -5,6 +5,9 @@ export default defineConfig({
     globals: true,
     environment: 'node',
     include: ['tests/**/*.test.ts'],
+    // 测试环境保真：jsdom 环境下默认注入真实 DOMPurify，使单测走与生产一致的
+    // 严格白名单路径（背景见 tests/setup/dompurify.ts 与 文档/TS_AUDIT_2026_09_10.md P0-2）
+    setupFiles: ['tests/setup/dompurify.ts'],
     coverage: {
       provider: 'v8',
       reporter: ['text', 'html'],

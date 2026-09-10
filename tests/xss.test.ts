@@ -18,9 +18,9 @@
 // @vitest-environment jsdom
 
 import DOMPurify from 'dompurify'
-import { describe, it, expect } from 'vitest'
+import { afterEach, describe, expect, it } from 'vitest'
 
-import { sanitizeHtml, sanitizeTableRows } from '../ts/tools/sanitize.js'
+import { resetSanitizerCache, sanitizeHtml, sanitizeTableRows } from '../ts/tools/sanitize.js'
 import { escapeHtml } from '../ts/tools/string-utilities-pure.js'
 
 // ========== 测试用 XSS payload ==========
@@ -244,29 +244,21 @@ describe('sanitizeTableRows - 表格行片段', () => {
 })
 
 /**
- * 复现加载项运行时的清洗路径：所有任务窗格都会先加载 libs/purify.js
- * （DOMPurify 3.4.12 UMD，挂到 globalThis.DOMPurify），使 sanitizeHtml 走严格白名单。
- * node_modules 中的 dompurify 与之同版本，故直接引用即可。
- */
-function installRealDomPurify(): void {
-  const host = globalThis as { DOMPurify?: typeof DOMPurify }
-  host.DOMPurify = DOMPurify
-}
-
-/**
  * 真实 DOMPurify 路径：运行时拼装 HTML 的 data-* 必须保留。
  *
- * 背景（2026-09 发现的系统性问题）：所有任务窗格页面（ui/panel.html、clean.html、
- * enrich.html、settings.html）都先加载 libs/purify.js，因此运行时 sanitizeHtml 走
- * DOMPurify 严格白名单路径；而 jsdom 单测默认没有 DOMPurify，走的是「保留 data-*」
- * 的轻量降级路径。两条路径的属性行为不一致，且白名单只登记了 5 个 data-* 属性 ——
- * 导致 clean-page 的分组按钮/勾选键、enrich-page 的批量删除与列映射、progress 组件
- * 的 data-el 在真实环境下被静默剥离，表现为「点了没反应 / 勾选丢失 / 组件抛错」
- * 而单测全绿。此处显式注入真实 DOMPurify，锁死该类回归。
+ * 背景（2026-09 发现的系统性问题，见 文档/TS_AUDIT_2026_09_10.md 的 P0-1）：所有任务
+ * 窗格页面（ui/panel.html、clean.html、enrich.html、settings.html）都先加载
+ * libs/purify.js，因此运行时 sanitizeHtml 走 DOMPurify 严格白名单路径；而当时 jsdom
+ * 单测默认没有 DOMPurify，走的是「保留 data-*」的轻量降级路径。两条路径的属性行为不
+ * 一致，且白名单只登记了 5 个 data-* 属性 —— 导致 clean-page 的分组按钮/勾选键、
+ * enrich-page 的批量删除与列映射、progress 组件的 data-el 在真实环境下被静默剥离，
+ * 表现为「点了没反应 / 勾选丢失 / 组件抛错」而单测全绿。
+ *
+ * 现已由 tests/setup/dompurify.ts 在 jsdom 环境下**默认注入**真实 DOMPurify（P0-2），
+ * 本组用例即为该默认路径的回归锁，无需再在用例内手工注入。
  */
 describe('真实 DOMPurify 路径：运行时拼装 HTML 的 data-* 必须保留', () => {
   it('注入后 sanitizeHtml 确实切入 DOMPurify 严格白名单路径', () => {
-    installRealDomPurify()
     const host = globalThis as { DOMPurify?: { sanitize: unknown } }
     expect(typeof host.DOMPurify?.sanitize).toBe('function')
     // DOMPurify 路径会剥离白名单外的标签（img 不在 ALLOWED_TAGS）
@@ -274,7 +266,6 @@ describe('真实 DOMPurify 路径：运行时拼装 HTML 的 data-* 必须保留
   })
 
   it('clean-page 的工作簿分组/勾选属性可被 dataset 读取（回归：勾选丢失）', () => {
-    installRealDomPurify()
     const html = `
       <div class="clean-sheet-group">
         <div class="clean-sheet-group-head">
@@ -298,7 +289,6 @@ describe('真实 DOMPurify 路径：运行时拼装 HTML 的 data-* 必须保留
   })
 
   it('enrich-page 的批量删除/列映射/匹配跳转属性保留', () => {
-    installRealDomPurify()
     const container = document.createElement('div')
     container.innerHTML = sanitizeHtml(`
       <button data-batch-remove="3">✕</button>
@@ -312,7 +302,6 @@ describe('真实 DOMPurify 路径：运行时拼装 HTML 的 data-* 必须保留
   })
 
   it('进度组件模板的 data-el 引用在严格白名单下保留（回归：组件抛错）', () => {
-    installRealDomPurify()
     const container = document.createElement('div')
     container.innerHTML = sanitizeHtml('<div data-el="head"><span data-el="title"></span></div>')
     expect(container.querySelector('[data-el="head"]')).not.toBeNull()
@@ -320,7 +309,6 @@ describe('真实 DOMPurify 路径：运行时拼装 HTML 的 data-* 必须保留
   })
 
   it('放行 data-* 不放行事件处理器与危险 URI', () => {
-    installRealDomPurify()
     const cleaned = sanitizeHtml(
       '<div data-el="x" onclick="alert(1)"><a href="javascript:alert(2)">点</a></div>',
     )
@@ -330,7 +318,6 @@ describe('真实 DOMPurify 路径：运行时拼装 HTML 的 data-* 必须保留
   })
 
   it('data-* 值本身不能成为注入载体（经 escapeHtml 后写入）', () => {
-    installRealDomPurify()
     const evil = escapeHtml('" onmouseover="alert(1)')
     const container = document.createElement('div')
     container.innerHTML = sanitizeHtml(`<button data-group-all="${evil}">x</button>`)
@@ -338,5 +325,61 @@ describe('真实 DOMPurify 路径：运行时拼装 HTML 的 data-* 必须保留
     expect(container.querySelectorAll('button')).toHaveLength(1)
     expect(button?.hasAttribute('onmouseover')).toBe(false)
     expect(button?.dataset.groupAll).toBe('" onmouseover="alert(1)')
+  })
+})
+
+/**
+ * 测试环境保真（P0-2）：单测默认走生产路径，且降级路径必须可被**显式**验证。
+ *
+ * 存在的意义：P0-1 之所以能在 1835 条全绿的测试下出货，根因是「测试环境与生产环境
+ * 行为不一致且无人察觉」。本组用例把这个前提本身变成断言 —— 一旦有人移除 setup 注入、
+ * 或两条路径的行为再次分叉，这里会先失败。
+ */
+describe('测试环境保真：DOMPurify 默认注入与降级路径显式切换', () => {
+  /** 还原 setup 的默认注入状态，避免污染同文件后续用例 */
+  afterEach(() => {
+    ;(globalThis as { DOMPurify?: typeof DOMPurify }).DOMPurify = DOMPurify
+    resetSanitizerCache()
+  })
+
+  it('setup 已默认注入 DOMPurify，单测走与生产一致的严格白名单路径', () => {
+    const host = globalThis as { DOMPurify?: { sanitize: unknown } }
+    expect(typeof host.DOMPurify?.sanitize).toBe('function')
+    // h2 不在 ALLOWED_TAGS → 严格路径剥离标签只留文本；降级路径会保留 <h2>
+    expect(sanitizeHtml('<h2>标题</h2>')).not.toContain('<h2')
+  })
+
+  it('显式删全局 + 重置缓存后切回降级路径：保留结构标签，仍清危险内容', () => {
+    delete (globalThis as { DOMPurify?: unknown }).DOMPurify
+    // ⚠️ 必须重置缓存：工厂一旦缓存，仅删全局变量不会切回降级实现
+    resetSanitizerCache()
+
+    // 降级路径保留结构标签（历史 bug：曾把整串 HTML 转义成纯文本）
+    expect(sanitizeHtml('<h2>标题</h2>')).toContain('<h2')
+
+    // 但危险内容仍必须被清除
+    const cleaned = sanitizeHtml('<div onclick="alert(1)"><script>alert(2)</script>正文</div>')
+    expect(cleaned).not.toMatch(/\son\w+\s*=/i)
+    expect(cleaned).not.toContain('<script')
+    expect(cleaned).toContain('正文')
+  })
+
+  it('data-* 在两条路径下都必须保留（P0-1 的两路径差异点）', () => {
+    const dirty = '<button data-group-all="D:/a.xlsx" data-sheet-name="动画">x</button>'
+    for (const shouldUseFallback of [false, true]) {
+      if (shouldUseFallback) {
+        delete (globalThis as { DOMPurify?: unknown }).DOMPurify
+      } else {
+        ;(globalThis as { DOMPurify?: typeof DOMPurify }).DOMPurify = DOMPurify
+      }
+      resetSanitizerCache()
+
+      const container = document.createElement('div')
+      container.innerHTML = sanitizeHtml(dirty)
+      const button = container.querySelector<HTMLElement>('button')
+      const label = shouldUseFallback ? '降级路径' : '严格白名单路径'
+      expect(button?.dataset.groupAll, label).toBe('D:/a.xlsx')
+      expect(button?.dataset.sheetName, label).toBe('动画')
+    }
   })
 })

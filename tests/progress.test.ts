@@ -83,8 +83,10 @@ describe('formatDuration', () => {
     expect(formatDuration(500)).toBe('0.50秒')
   })
 
-  it('999ms 因四舍五入显示 1.00秒（边界：与 1000ms 的「1秒」文案不一致）', () => {
-    expect(formatDuration(999)).toBe('1.00秒')
+  it('999ms 截断显示 0.99秒（不再四舍五入成与 1000ms 冲突的「1.00秒」）', () => {
+    expect(formatDuration(999)).toBe('0.99秒')
+    expect(formatDuration(995)).toBe('0.99秒')
+    expect(formatDuration(999.9)).toBe('0.99秒')
   })
 
   it('1 秒至 59 秒取整秒', () => {
@@ -207,12 +209,24 @@ describe('update 进度更新边界', () => {
     expect(bar.textContent).toBe('0%')
   })
 
-  it('current 超过 total 时百分比会溢出 100%（当前无上限钳制）', () => {
+  it('current 超过 total 时百分比钳制到 100%（视觉与 ARIA 均不溢出）', () => {
     const controller = createProgress({ mode: 'inline', title: 'A', hostId: makeHost().id })
     controller?.update(15, 10)
     const bar = pickElement('[data-el="bar"]')
-    expect(bar.style.width).toBe('150%')
-    expect(bar.getAttribute('aria-valuenow')).toBe('150')
+    expect(bar.style.width).toBe('100%')
+    expect(bar.textContent).toBe('100%')
+    expect(bar.getAttribute('aria-valuenow')).toBe('100')
+  })
+
+  it('current 为负或 total 非法时百分比钳制到 0%', () => {
+    const controller = createProgress({ mode: 'inline', title: 'A', hostId: makeHost().id })
+    controller?.update(-5, 10)
+    const bar = pickElement('[data-el="bar"]')
+    expect(bar.style.width).toBe('0%')
+    expect(bar.getAttribute('aria-valuenow')).toBe('0')
+
+    controller?.update(3, Number.POSITIVE_INFINITY)
+    expect(bar.style.width).toBe('0%')
   })
 
   it('message 省略时保留上一次的当前步骤文案', () => {

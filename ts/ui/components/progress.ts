@@ -230,7 +230,9 @@ function collectElements(content: HTMLElement): ProgressElements {
 /** 格式化耗时为可读字符串（<1s 保留 2 位小数，≥60s 转为 x分yy秒） */
 export function formatDuration(ms: number): string {
   if (ms < 1000) {
-    const seconds = Math.max(0, ms / 1000)
+    // 截断而非四舍五入到 2 位：999ms 不能显示成「1.00秒」，
+    // 否则与 1000ms 的「1秒」在同一量级上出现两种写法（边界跨档）。
+    const seconds = Math.max(0, Math.floor(ms / 10) / 100)
     return `${seconds.toFixed(2)}秒`
   }
   const seconds = Math.floor(ms / 1000)
@@ -240,6 +242,12 @@ export function formatDuration(ms: number): string {
   return secs > 0
     ? `${String(minutes)}分${secs.toString().padStart(2, '0')}秒`
     : `${String(minutes)}分`
+}
+
+/** 把百分比钳制到 [0, 100]（进度条宽度与 aria-valuenow 共用同一取值口径） */
+function clampPercent(value: number): number {
+  if (!Number.isFinite(value)) return 0
+  return Math.min(100, Math.max(0, value))
 }
 
 /** 计算并渲染全局 ETA（基于整体速率外推剩余时间，扣除暂停时长） */
@@ -451,7 +459,9 @@ export function createProgress(options: ProgressShowOptions): ProgressController
     mode: options.mode,
     update(current: number, total: number, message?: string, eta?: string): void {
       if (!isVisible) return
-      const pct = total > 0 ? Math.round((current / total) * 100) : 0
+      // 钳制到 [0,100]：并发回报乱序或引擎重复回报时 current 可能超过 total，
+      // 不钳制会让进度条视觉溢出且 aria-valuenow 超过 aria-valuemax（非法 ARIA）
+      const pct = total > 0 ? clampPercent(Math.round((current / total) * 100)) : 0
       els.bar.style.width = `${String(pct)}%`
       els.bar.textContent = `${String(pct)}%`
       els.bar.setAttribute('aria-valuenow', String(pct))

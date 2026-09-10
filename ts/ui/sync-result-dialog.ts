@@ -23,6 +23,7 @@ import {
   trim,
 } from '../tools/util/index.js'
 import { bgmLog } from '../tools/utility.js'
+import { escapeHtml } from '../tools/string-utilities.js'
 
 import { renderSyncDetailTable } from './dialog.js'
 
@@ -568,15 +569,15 @@ export function showSyncResultDialog(options: SyncResultDialogOptions): void {
         <div class="bgm-result-date-grid">
           <div class="bgm-result-date-item">
             <span class="bgm-result-date-label">最早开播</span>
-            <span class="bgm-result-date-value">${dateStats.earliestDate ?? '--'}</span>
+            <span class="bgm-result-date-value">${escapeHtml(dateStats.earliestDate) || '--'}</span>
           </div>
           <div class="bgm-result-date-item">
             <span class="bgm-result-date-label">最晚开播</span>
-            <span class="bgm-result-date-value">${dateStats.latestDate ?? '--'}</span>
+            <span class="bgm-result-date-value">${escapeHtml(dateStats.latestDate) || '--'}</span>
           </div>
           <div class="bgm-result-date-item">
             <span class="bgm-result-date-label">最新季度</span>
-            <span class="bgm-result-date-value">${dateStats.latestSeason ?? '--'}</span>
+            <span class="bgm-result-date-value">${escapeHtml(dateStats.latestSeason) || '--'}</span>
           </div>
           <div class="bgm-result-date-item">
             <span class="bgm-result-date-label">有日期条目</span>
@@ -880,10 +881,4 @@ function hideSyncDetailPreviewDialog(): void {
     _previewDialog = null
   }
   _clearPreviewEscHandler()
-}
-
-function escapeHtml(text: string): string {
-  const div = document.createElement('div')
-  div.textContent = text
-  return div.innerHTML
 }

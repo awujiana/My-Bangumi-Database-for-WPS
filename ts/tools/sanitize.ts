@@ -320,6 +320,23 @@ export function sanitizeHtml(dirty: string): string {
 }
 
 /**
+ * 重置「DOMPurify 工厂 / 降级实现」的探测缓存。
+ *
+ * 生产环境无需调用：`getPurify()` 每次调用都会重新探测 `globalThis.DOMPurify`
+ * 是否就绪，迟加载的 DOMPurify 会自动接管。
+ *
+ * 存在的意义是**测试**：单测需要在「有 DOMPurify（生产路径）」与
+ * 「无 DOMPurify（降级路径）」之间切换，而工厂一旦缓存，仅删除全局变量
+ * 不会切回降级实现（`_cachedDomPurifyFactory` 仍然命中）。
+ *
+ * @see tests/setup/dompurify.ts 测试环境的默认注入与降级路径写法
+ */
+export function resetSanitizerCache(): void {
+  _cachedDomPurifyFactory = null
+  _cachedFallback = null
+}
+
+/**
  * 清洗「表格行片段」（如 `<tr>...</tr>`）并保留 tr/td/th 结构。
  *
  * 背景（2026-09 匹配结果/新番表预览「样式不是表格」bug）：
