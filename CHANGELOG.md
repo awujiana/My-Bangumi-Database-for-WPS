@@ -8,6 +8,16 @@
 
 ## [未发布]
 
+### 新增（工程化 · `tests/` 类型门禁 `npm run typecheck:tests`）
+
+- **问题**：`tests/tsconfig.json` 早已存在，但**没有任何脚本运行它** —— `tsc` 主门禁只覆盖 `ts/`，于是 `tests/` 里 **254 个类型错误**长期无人知晓。这些错误本身就是证据：mock 的形状与真实接口脱节、断言参数与签名不符，个别还指向生产代码的类型缺口（如 `GithubRemoteEntry` 缺 `desc`/`rating`、`SyncTimeFilter` 缺 `'week'`）。
+- **做法（带基线，而不是一次要求 0）**：新增 `scripts/check-tests-types.mjs`，判定规则是「某文件错误数超过基线 / 基线外文件出现错误」即失败，错误数下降只提示可 `--update` 下调基线。理由：一次性修完 254 个会把门禁与重构绑死、风险集中；先把闸门关上防新增，再逐批清账，进度是单调可度量的。
+- **实现坑**：脚本直接用本机 node 跑 `node_modules/typescript/bin/tsc`，不经 `npx`/shell —— Windows 下 `npx.cmd` 经 `execFileSync` 解析失败会抛错，若容错写成「拿不到输出就当 0 错误」，门禁会空转（实测踩到）。
+- **批次一：254 → 125**。清除的全部是「mock 只实现被测路径访问到的成员」这一类，手法是把形状不完整**收敛到单点**：每个测试文件的 mock 工厂声明一个 `MockWorksheet` 类型并在工厂内做一次 `as unknown as`，调用点仍按真实接口 `WpsWorksheet` 校验（`Mock<T>` 携带 `T` 的调用签名，因此交集类型可双向使用）；配套 `createRangeMock` / `createCellItemMock` / `createMockWorkbook` / `createMockApp` helper。效果：`sheet.test.ts` 79→0、`cell.test.ts` 32→0、`sync-record.test.ts` 18→0。
+  - 保留的逃逸点都写明理由：`asMalformedApp` / `malformedSheet`（用例本身就是验证「宿主返回 `null`/半成品」时的降级）、`{ ...createMockSheet(), Activate: undefined }` 这类刻意畸形构造。
+- 剩余 125 个已基线化，按「真实接口漂移 / 可空性 / 断言过窄 / 其他」四类写进审查报告 §3.2.1，逐批清账后下调基线。
+- `npm run gate` 现在是五道关：`lint:check` → DOMPurify 版本一致 → 导入图（分层 + 致命环）→ tests 类型 → 全量测试。
+
 ### 重构（架构 · 消除分层反向依赖，P1-5）
 
 - **问题**：`tools/`、`sync/` 等底层模块直接 `import` 上层的 `ui/dialog.ts` 来弹窗 / 报错 / 更新同步进度条，形成「底层 → 上层」的反向依赖，并在 barrel（`ts/index.ts`、`tools/util/index.ts`）参与下构成运行时循环。后果是模块初始化顺序敏感（本项目历史上踩过 barrel 顶层读到 `undefined` 的坑），底层模块也无法脱离 UI 独立测试。
