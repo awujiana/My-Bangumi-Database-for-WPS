@@ -45,7 +45,7 @@ function createMockWorkbooks(workbooks: { Name: string; Sheets: string[] }[]): M
         Item: (sheetIndex: number) => {
           // 模拟 WPS：索引越界时抛错
           if (sheetIndex < 1 || sheetIndex > sheets.length) throw new RangeError('下标越界')
-          return sheets[sheetIndex - 1]
+          return sheets[sheetIndex - 1] ?? null
         },
       },
     }
@@ -84,7 +84,7 @@ function createMockApp(
     Workbooks: {
       Count: workbooks.length,
       Item: (index: number) =>
-        index >= 1 && index <= workbooks.length ? workbooks[index - 1] : null,
+        index >= 1 && index <= workbooks.length ? (workbooks[index - 1] ?? null) : null,
     },
     ActiveWorkbook: activeWbName
       ? { Name: activeWbName, ActiveSheet: activeSheetName ? { Name: activeSheetName } : null }
@@ -125,7 +125,7 @@ function createScanApp(
     Worksheets: {
       Count: sheets.length,
       Item: (sheetIndex: number) =>
-        sheetIndex >= 1 && sheetIndex <= sheets.length ? sheets[sheetIndex - 1] : null,
+        sheetIndex >= 1 && sheetIndex <= sheets.length ? (sheets[sheetIndex - 1] ?? null) : null,
     },
   }))
   return createMockApp(wbs, activeWbName, storage, activeSheetName)
@@ -574,8 +574,8 @@ describe('findBangumiTargetSheets', () => {
     const result = findBangumiTargetSheets()
 
     expect(result).toHaveLength(1)
-    expect(result[0].sheetName).toBe('Sheet数据')
-    expect(result[0].isNameHit).toBe(false)
+    expect(result[0]?.sheetName).toBe('Sheet数据')
+    expect(result[0]?.isNameHit).toBe(false)
   })
 
   it('优先当前活动工作簿 + 活动工作表的候选', () => {
@@ -595,8 +595,8 @@ describe('findBangumiTargetSheets', () => {
     const result = findBangumiTargetSheets()
 
     expect(result).toHaveLength(2)
-    expect(result[0].sheetName).toBe('bangumi B')
-    expect(result[1].sheetName).toBe('bangumi A')
+    expect(result[0]?.sheetName).toBe('bangumi B')
+    expect(result[1]?.sheetName).toBe('bangumi A')
   })
 
   it('当前活动工作簿的候选优先于非活动工作簿的名称命中候选', () => {
@@ -616,8 +616,8 @@ describe('findBangumiTargetSheets', () => {
     const result = findBangumiTargetSheets()
 
     expect(result).toHaveLength(2)
-    expect(result[0].workbookName).toBe('active')
-    expect(result[1].workbookName).toBe('other')
+    expect(result[0]?.workbookName).toBe('active')
+    expect(result[1]?.workbookName).toBe('other')
   })
 
   it('Workbooks 不可用时记录警告并返回空数组', () => {
@@ -645,9 +645,9 @@ describe('refreshEnrichWorkbooks', () => {
 
     const select = document.getElementById('workbookSelect') as HTMLSelectElement
     expect(select.options.length).toBe(3)
-    expect(select.options[0].textContent).toContain('请选择')
-    expect(select.options[1].value).toBe('wb1.xlsx')
-    expect(select.options[2].value).toBe('wb2.xlsx')
+    expect(select.options[0]?.textContent).toContain('请选择')
+    expect(select.options[1]?.value).toBe('wb1.xlsx')
+    expect(select.options[2]?.value).toBe('wb2.xlsx')
   })
 
   it('锁定状态时选中锁定的工作簿', () => {
@@ -707,8 +707,8 @@ describe('refreshEnrichSheets', () => {
 
     const select = document.getElementById('sheetSelect') as HTMLSelectElement
     expect(select.options.length).toBe(4)
-    expect(select.options[1].textContent).toBe('Sheet1')
-    expect(select.options[3].textContent).toBe('Data')
+    expect(select.options[1]?.textContent).toBe('Sheet1')
+    expect(select.options[3]?.textContent).toBe('Data')
   })
 
   it('未指定工作簿名称时使用下拉框当前值', () => {
@@ -735,7 +735,7 @@ describe('refreshEnrichSheets', () => {
     refreshEnrichSheets('', 'sheetSelect', 'workbookSelect')
 
     const select = document.getElementById('sheetSelect') as HTMLSelectElement
-    expect(select.options[0].textContent).toContain('请先选择工作簿')
+    expect(select.options[0]?.textContent).toContain('请先选择工作簿')
     expect(select.options.length).toBe(1)
   })
 

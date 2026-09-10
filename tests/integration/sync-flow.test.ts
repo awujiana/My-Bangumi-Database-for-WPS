@@ -33,17 +33,18 @@ const mockState = vi.hoisted(() => ({
   handleStoppedRemainingTasks: vi.fn(),
   getOrCreateSyncRecordSheet: vi.fn(),
   getAllSyncRecords: vi.fn(() => []),
-  addSyncRecords: vi.fn(() => true),
-  addSyncRecordSummary: vi.fn(() => true),
+  addSyncRecords: vi.fn<(records: unknown[]) => boolean>(() => true),
+  addSyncRecordSummary: vi.fn<(summary: unknown) => boolean>(() => true),
 
   // tools/utility.js mock（可按测试配置）
-  getDataSheet: vi.fn(() => null),
+  getDataSheet: vi.fn<() => { Name: string } | null>(() => null),
   findHeaderRow: vi.fn(() => 1),
   getLastRow: vi.fn(() => 1),
   getColumnMap: vi.fn(() => new Map<string, number>()),
-  getCellValue: vi.fn(() => ''),
+  getCellValue: vi.fn<(ws: unknown, row: number, col: number) => string>(() => ''),
   setCellValue: vi.fn(() => true),
-  readRangeValues: vi.fn(() => []),
+  // 生产签名为 (ws, startRow, endRow, startCol, endCol)；测试只 mock 返回值，故用可变参数收
+  readRangeValues: vi.fn<(...arguments_: unknown[]) => string[][]>(() => []),
 
   // GitHub 同步依赖 mock
   beginUndoSession: vi.fn(),

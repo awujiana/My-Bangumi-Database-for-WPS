@@ -37,9 +37,7 @@ const realParseJsonlHolder = vi.hoisted(() => ({
   current: null as ((text: string) => { entries: unknown[]; errors: unknown[] }) | null,
 }))
 vi.mock('../ts/sync/github-sync-diff.js', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('../ts/sync/github-sync-diff.js')>(
-    '../ts/sync/github-sync-diff.js',
-  )
+  const actual = await importOriginal<typeof import('../ts/sync/github-sync-diff.js')>()
   realParseJsonlHolder.current = actual.parseJsonl
   mockParseJsonl.mockImplementation((text: string) => realParseJsonlHolder.current!(text))
   return {

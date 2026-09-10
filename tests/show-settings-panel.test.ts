@@ -257,7 +257,7 @@ describe('showSettingsPanel — 主面板可见时停靠右侧', () => {
 
     // 应创建新面板
     expect(createdPanes).toHaveLength(1)
-    expect(createdPanes[0].url).toContain('/ui/settings.html')
+    expect(createdPanes[0]?.url).toContain('/ui/settings.html')
 
     // 创建的面板应停靠右侧且可见
     const createdId = Object.keys(taskPaneResults).find((k) => k.startsWith('settings-pane-'))
@@ -403,7 +403,7 @@ describe('showSettingsPanel — 任务窗格 URL 归一化', () => {
     showSettingsPanel()
 
     expect(createdPanes).toHaveLength(1)
-    expect(createdPanes[0].url).toBe('http://localhost:3889/ui/settings.html')
+    expect(createdPanes[0]?.url).toBe('http://localhost:3889/ui/settings.html')
   })
 
   it('manifest_base_path 为根目录时正常拼接', () => {
@@ -414,7 +414,7 @@ describe('showSettingsPanel — 任务窗格 URL 归一化', () => {
 
     showSettingsPanel()
 
-    expect(createdPanes[0].url).toBe('http://localhost:3889/ui/settings.html')
+    expect(createdPanes[0]?.url).toBe('http://localhost:3889/ui/settings.html')
   })
 
   it('manifest_base_path 带尾斜杠时不得出现双斜杠', () => {
@@ -425,7 +425,7 @@ describe('showSettingsPanel — 任务窗格 URL 归一化', () => {
 
     showSettingsPanel()
 
-    expect(createdPanes[0].url).toBe('http://localhost:3889/ui/settings.html')
+    expect(createdPanes[0]?.url).toBe('http://localhost:3889/ui/settings.html')
   })
 })
 
@@ -444,7 +444,7 @@ describe('showSettingsPanel — 失效面板自愈', () => {
     // 旧面板应被隐藏，并新建一个面板
     expect(taskPaneResults['stale-pane-1'].Visible).toBe(false)
     expect(createdPanes).toHaveLength(1)
-    expect(createdPanes[0].url).toBeTruthy()
+    expect(createdPanes[0]?.url).toBeTruthy()
     expect(app.PluginStorage.getItem('settings_pane_id')).not.toBe('stale-pane-1')
   })
 })

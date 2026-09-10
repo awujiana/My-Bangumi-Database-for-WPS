@@ -163,7 +163,7 @@ const animeConfig: EnrichConfig = {
 
 function countEnrichRecords(matchType: string, fieldName: string): { updatedValue: string }[] {
   return mockReferences.mockAddEnrichRecord.mock.calls
-    .map((call) => call[0] as Record<string, string>)
+    .map((call) => call[0] as { matchType?: string; enrichedField?: string; updatedValue: string })
     .filter((record) => record.matchType === matchType && record.enrichedField === fieldName)
 }
 

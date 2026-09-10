@@ -85,7 +85,14 @@ export interface HttpRequestOptions<T> {
    * 若提供，则会以 schema.parse(data) 的结果作为 data 返回；
    * 若不提供，data 为 unknown，调用方需自行通过类型守卫或 schema 处理。
    */
-  zodSchema?: ZodSchema<T>
+  /**
+   * 运行时校验器；只要求 parse（httpRequest 仅调用它）。
+   *
+   * 不直接用 ZodSchema<T>：那是本地降级实现的形状（带 `[k: string]: any` 索引
+   * 签名），真实 zod 的 ZodObject 是类实例、没有索引签名，会被它拒之门外。
+   * 按最小契约收参可同时接纳真实 zod 与本地降级实现。
+   */
+  zodSchema?: Pick<ZodSchema<T>, 'parse'>
   /**
    * 可选 AbortSignal，用于取消请求。
    * 若已 aborted，则立即失败；否则监听 abort 事件触发 xhr.abort()。

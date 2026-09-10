@@ -401,6 +401,20 @@ function createMockWorksheet(
   }
 }
 
+/** createMockWorksheet 返回类型中 Range 的精确类型 */
+type MockRange = ReturnType<typeof createMockWorksheet>['Range']
+
+/**
+ * 构造 Range mock。
+ *
+ * 直接写 `vi.fn(impl)` 时 TS 会按 impl 的返回形状精确推断，而 vitest 的 Mock<T>
+ * 要求 mockReturnValue 收完整 T（参数逆变），于是「返回形状略有不同的另一处赋值」
+ * 会被判不兼容（TS2322）。各测试需要返回不同的单元格形状，故在此单点断言收敛。
+ */
+function asRangeMock(impl: (address: string) => unknown): MockRange {
+  return vi.fn(impl) as unknown as MockRange
+}
+
 describe('computeDiff', () => {
   it('远程有本地无 → 标记为 add', () => {
     const remote: GithubRemoteEntry[] = [{ sid: '111', name: '条目A' }]
@@ -991,7 +1005,7 @@ describe('readLocalEntries 批量读取路径', () => {
     ]
 
     const mockWs = createMockWorksheet()
-    mockWs.Range = vi.fn((address: string) => {
+    mockWs.Range = asRangeMock((address: string) => {
       if (address.includes(':')) {
         return { Value2: batchData, Interior: { Color: 0 } }
       }
@@ -1020,7 +1034,7 @@ describe('readLocalEntries 批量读取路径', () => {
 
   it('Range.Value2 返回非数组时应回退到逐单元格读取', () => {
     const mockWs = createMockWorksheet()
-    mockWs.Range = vi.fn((address: string) => {
+    mockWs.Range = asRangeMock((address: string) => {
       if (address.includes(':')) {
         // 非数组
         return { Value2: null, Interior: { Color: 0 } }
@@ -1057,7 +1071,7 @@ describe('readLocalEntries 批量读取路径', () => {
 
   it('批量读取抛出异常时应回退', () => {
     const mockWs = createMockWorksheet()
-    mockWs.Range = vi.fn((address: string) => {
+    mockWs.Range = asRangeMock((address: string) => {
       if (address.includes(':')) {
         throw new Error('COM 读取失败')
       }
@@ -1120,7 +1134,7 @@ describe('readLocalEntries 批量读取路径', () => {
     ]
 
     const mockWs = createMockWorksheet()
-    mockWs.Range = vi.fn((address: string) => {
+    mockWs.Range = asRangeMock((address: string) => {
       if (address.includes(':')) {
         return { Value2: batchData, Interior: { Color: 0 } }
       }
@@ -1152,7 +1166,7 @@ describe('readLocalEntries 批量读取路径', () => {
 
   it('readLocalEntriesForSync 空数据时应返回空结构', () => {
     const mockWs = createMockWorksheet()
-    mockWs.Range = vi.fn((address: string) => {
+    mockWs.Range = asRangeMock((address: string) => {
       if (address.includes(':')) {
         return { Value2: null, Interior: { Color: 0 } }
       }
@@ -1174,7 +1188,7 @@ describe('readLocalEntries 批量读取路径', () => {
 
   it('readLocalEntriesForSync 无 Bangumi_URL 列时应提前返回', () => {
     const mockWs = createMockWorksheet()
-    mockWs.Range = vi.fn((_address: string) => null)
+    mockWs.Range = asRangeMock((_address: string) => null)
     mockGetDataSheet.mockReturnValue(mockWs)
     mockFindHeaderRow.mockReturnValue(1)
     mockGetLastRow.mockReturnValue(5)
@@ -1399,7 +1413,7 @@ describe('applyDiffToSheet', () => {
 
     // 覆盖 Range mock 添加 Delete 方法和行地址支持
     const mockRangeDelete = vi.fn()
-    mockWs.Range = vi.fn((address: string) => {
+    mockWs.Range = asRangeMock((address: string) => {
       if (address.includes(':')) {
         if (/^\d+:\d+$/.test(address)) {
           // 行地址（如 "3:3"）
@@ -1914,7 +1928,7 @@ describe('getSelectedRowSids 分支覆盖', () => {
   it('getSelectedRowSids 中发生异常时应记录 ERROR', async () => {
     const ws = createMockWorksheet()
     // 让 Range 调用抛异常，在 getSelectedRowSids 的循环中触发 try-catch
-    ws.Range = vi.fn((address: string) => {
+    ws.Range = asRangeMock((address: string) => {
       if (address.includes(':')) {
         return { Value2: null, Interior: { Color: 0 } }
       }
@@ -2237,7 +2251,7 @@ describe('applyDiffToSheet 删除操作 yieldToEventLoop (line 1184)', () => {
     })
 
     // 模拟删除操作所需的方法
-    ws.Range = vi.fn((address: string) => {
+    ws.Range = asRangeMock((address: string) => {
       if (address.includes(':')) {
         return { Value2: null, Interior: { Color: 0 } }
       }
@@ -2656,9 +2670,9 @@ describe('applyDiffToSheet 批量写入失败回退逐行写入 (lines 1022-1027
     const mockWs = createMockWorksheet()
     // 覆盖 Range mock：当批量写入时（address 包含 ':'），返回 null
     // 这会导致 batchWriteNewRows 在 line 655-657 返回 0
-    mockWs.Range = vi.fn((address: string) => {
+    mockWs.Range = asRangeMock((address: string) => {
       if (address.includes(':')) {
-        return null as unknown as { Value2: unknown }
+        return null
       }
       return {
         Value2: '',
@@ -2943,7 +2957,7 @@ describe('batchUpdateRows 未变化值跳过 (line 843)', () => {
   it('单元格旧值与新值相同时跳过写入', async () => {
     const mockWs = createMockWorksheet()
     // 模拟 Range 返回旧值与新值相同
-    mockWs.Range = vi.fn((address: string) => {
+    mockWs.Range = asRangeMock((address: string) => {
       if (address.includes(':')) {
         // 批量范围读取：返回旧值数组，与新值相同
         return {
@@ -3001,7 +3015,7 @@ describe('batchUpdateRows 逐字段写入也失败 (lines 895-899)', () => {
   it('批量写入失败且逐字段写入也抛异常时进入 catch', async () => {
     const mockWs = createMockWorksheet()
     // 模拟 Range 访问抛异常 → 触发批量写入失败回退
-    mockWs.Range = vi.fn(() => {
+    mockWs.Range = asRangeMock(() => {
       throw new Error('Range 访问失败')
     })
 
@@ -3055,7 +3069,7 @@ describe('applyDiffToSheet 删除操作处理 (lines 1118-1125)', () => {
     const mockWs = createMockWorksheet()
     // 覆盖 Range mock，为行地址添加 Delete 方法
     const originalRange = mockWs.Range
-    mockWs.Range = vi.fn((address: string) => {
+    mockWs.Range = asRangeMock((address: string) => {
       if (/^\d+:\d+$/.test(address)) {
         return { Delete: vi.fn(), Value2: null, Interior: { Color: 0 } }
       }
@@ -3102,7 +3116,7 @@ describe('applyDiffToSheet 删除操作处理 (lines 1118-1125)', () => {
   it('delete diff 中删除失败时计入 failed', async () => {
     const mockWs = createMockWorksheet()
     // 模拟 Delete 抛异常 — 行地址匹配时返回带 Delete 方法的对象，但 Delete 抛异常
-    mockWs.Range = vi.fn((address: string) => {
+    mockWs.Range = asRangeMock((address: string) => {
       if (/^\d+:\d+$/.test(address)) {
         // 行地址：返回带 Delete 的对象，但 Delete 抛异常
         return {
@@ -3114,7 +3128,7 @@ describe('applyDiffToSheet 删除操作处理 (lines 1118-1125)', () => {
         }
       }
       if (address.includes(':')) {
-        return null as unknown as { Value2: unknown }
+        return null
       }
       return {
         Value2: '',
@@ -4505,7 +4519,7 @@ describe('safeSet 日期列分支 (lines 468-472) 通过 writeRemoteEntryToRow f
     const mockWs = createMockWorksheet()
 
     // Mock Range 返回 null，触发 batchWriteNewRows 的 fallback
-    mockWs.Range = vi.fn((_addr: string) => null)
+    mockWs.Range = asRangeMock((_addr: string) => null)
 
     mockGetDataSheet.mockReturnValue(mockWs)
     mockFindHeaderRow.mockReturnValue(1)
@@ -4552,7 +4566,7 @@ describe('safeSet 数字扩展字段 (line 506)', () => {
     const mockWs = createMockWorksheet()
 
     // Mock Range 返回 null，触发 fallback 到 writeRemoteEntryToRow
-    mockWs.Range = vi.fn((_addr: string) => null)
+    mockWs.Range = asRangeMock((_addr: string) => null)
 
     mockGetDataSheet.mockReturnValue(mockWs)
     mockFindHeaderRow.mockReturnValue(1)
@@ -4601,7 +4615,7 @@ describe('safeSet 数字扩展字段 (line 506)', () => {
 describe('readLocalEntries 批量读取异常回退 (line 316)', () => {
   it('Range.Value2 抛异常时应回退到逐单元格读取 (line 316)', () => {
     const normalSheet = createMockWorksheet()
-    normalSheet.Range = vi.fn((address: string) => {
+    normalSheet.Range = asRangeMock((address: string) => {
       if (address.includes(':')) {
         // 批量读取的矩形区域 → 抛异常
         throw new Error('COM 异常：无法读取批量区域')

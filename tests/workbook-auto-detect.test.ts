@@ -130,6 +130,10 @@ function makeMockWorkbook(sheetNames: string[]): WpsWorkbook {
       if (!sheet) throw new RangeError('下标越界')
       return sheet
     },
+    // 名称预筛路径不会调用 Add；显式声明以满足 WpsSheets 契约
+    Add: (): WpsWorksheet => {
+      throw new Error('mock 未实现 Add')
+    },
   }
   return {
     Name: 'mock.xlsx',

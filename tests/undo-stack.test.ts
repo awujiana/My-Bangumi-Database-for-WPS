@@ -173,7 +173,11 @@ describe('UndoStack', () => {
       mockGetDataSheet.mockReturnValue(ws)
       beginUndoSession('test')
       // 使用非数字字符串作为 key
-      recordRowDeleteEntry({ row: 1, values: { abc: 'val', '2': 'ok' } })
+      // 刻意传入非数字键（模拟运行时脏数据），验证 NaN 列索引被跳过
+      recordRowDeleteEntry({
+        row: 1,
+        values: { abc: 'val', '2': 'ok' } as unknown as Record<number, string>,
+      })
       endUndoSession()
       undoLastSync()
       // 只应恢复 col=2 的值

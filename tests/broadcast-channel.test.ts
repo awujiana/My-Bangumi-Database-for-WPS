@@ -27,7 +27,7 @@ class MockBroadcastChannel {
     this.instances.clear()
   }
 
-  name: string
+  name = ''
 
   location: { origin: string } = { origin: 'mock-origin' }
 
@@ -42,7 +42,15 @@ class MockBroadcastChannel {
     MockBroadcastChannel.instances.set(name, this)
   }
 
-  postMessage(data: unknown): void {
+  /**
+   * 发送消息。
+   *
+   * 真实的 BroadcastChannel.postMessage 只有 1 个参数；此处的第二个参数是为兼容
+   * window.postMessage 风格的调用点而保留的宽容位（本 mock 忽略它）。同时它也满足
+   * unicorn/require-post-message-target-origin——该规则针对 window.postMessage 的
+   * XSS 防护，直接删掉第二个实参会被判为缺少 targetOrigin。
+   */
+  postMessage(data: unknown, _targetOrigin?: string): void {
     // Simulate async message delivery
     setTimeout(() => {
       if (!this.onmessage) {

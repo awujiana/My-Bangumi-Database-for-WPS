@@ -185,11 +185,13 @@ function createRemoteEntry(
   // exactOptionalPropertyTypes 下 Partial<T> 不接受显式 undefined，故用映射类型放宽
   overrides: Partial<{ [K in keyof GithubRemoteEntry]: GithubRemoteEntry[K] | undefined }> = {},
 ): GithubRemoteEntry {
+  // overrides 允许显式 undefined（见上），展开后类型含 undefined，
+  // 但显式 undefined 与「字段缺失」在读侧等价，故在此断言收窄
   return {
     sid,
     name: `条目${sid}`,
     ...overrides,
-  }
+  } as GithubRemoteEntry
 }
 
 function createLocalEntry(

@@ -82,6 +82,7 @@ import {
   SyncToBangumiAsync,
 } from '../ts/sync/exceltobangumi/index.js'
 import { WATCH_STATUS_MAP } from '../ts/core/constants.js'
+import type { WpsWorksheet } from '../ts/tools/wps.js'
 
 vi.clearAllTimers()
 
@@ -113,7 +114,8 @@ interface MockWorksheetOptions {
   rowsCount?: number
 }
 
-function createMockWorksheet(options: MockWorksheetOptions = {}): unknown {
+function createMockWorksheet(options: MockWorksheetOptions = {}): WpsWorksheet {
+  // mock 仅实现被测路径用到的成员；形状逃逸收敛到此处单点
   return {
     Name: options.name ?? 'Sheet1',
     AutoFilterMode: options.autoFilterMode ?? false,
@@ -136,7 +138,7 @@ function createMockWorksheet(options: MockWorksheetOptions = {}): unknown {
     }),
     Rows: { Count: options.rowsCount ?? 100_000 },
     UsedRange: options.usedRange ?? null,
-  }
+  } as unknown as WpsWorksheet
 }
 
 /** 构造字段访问器 mock：按列名返回预设值，未命中返回空串 */
@@ -427,8 +429,8 @@ describe('getFilterStatus', () => {
     setMockApp({
       ActiveWorkbook: { ActiveSheet: mockWs },
     })
-    // wsOrLastRow 为数字 → 使用 ActiveSheet
-    const result = getFilterStatus(100, 1, false)
+    // wsOrLastRow 为数字 → 使用 ActiveSheet；后两参为 headerRow / shouldDeepCheck
+    const result = getFilterStatus(100, 1, 1, false)
     expect(result.hasFilter).toBe(false)
     expect(result.visibleRows).toEqual([])
   })
@@ -594,7 +596,7 @@ describe('SyncToBangumiAsync', () => {
     ])
 
     const result = await SyncToBangumiAsync(
-      mockWs as never,
+      mockWs,
       colMap,
       'test-token',
       // lastRow
@@ -627,7 +629,7 @@ describe('SyncToBangumiAsync', () => {
       ['是否看完', 3],
     ])
 
-    const result = await SyncToBangumiAsync(mockWs as never, colMap, 'test-token', 5, 1)
+    const result = await SyncToBangumiAsync(mockWs, colMap, 'test-token', 5, 1)
 
     expect(result.success).toBe(0)
     expect(result.fail).toBe(0)
@@ -648,7 +650,7 @@ describe('SyncToBangumiAsync', () => {
       ['是否看完', 3],
     ])
 
-    await SyncToBangumiAsync(mockWs as never, colMap, 'test-token', 3, 1)
+    await SyncToBangumiAsync(mockWs, colMap, 'test-token', 3, 1)
 
     // finalizeSyncResults 应被调用（在 _finalizeSyncResults 别名下）
     expect(mockState.finalizeSyncResults).toHaveBeenCalled()
@@ -667,7 +669,7 @@ describe('SyncToBangumiAsync', () => {
       ['是否看完', 3],
     ])
 
-    await SyncToBangumiAsync(mockWs as never, colMap, 'test-token', 3, 1)
+    await SyncToBangumiAsync(mockWs, colMap, 'test-token', 3, 1)
 
     expect(mockState.getOrCreateSyncRecordSheet).toHaveBeenCalled()
   })
@@ -686,7 +688,7 @@ describe('SyncToBangumiAsync', () => {
     ])
     const onProgress = vi.fn()
 
-    await SyncToBangumiAsync(mockWs as never, colMap, 'test-token', 3, 1, { onProgress })
+    await SyncToBangumiAsync(mockWs, colMap, 'test-token', 3, 1, { onProgress })
 
     // 无数据行时 syncTasks 为空，onProgress 可能不会被调用
     // 但函数应正常完成不抛错
@@ -716,7 +718,7 @@ describe('SyncToBangumiAsync', () => {
     ])
 
     const result = await SyncToBangumiAsync(
-      mockWs as never,
+      mockWs,
       colMap,
       'test-token',
       // lastRow
@@ -751,7 +753,7 @@ describe('SyncToBangumiAsync', () => {
       ['名称', 1],
     ])
 
-    const result = await SyncToBangumiAsync(mockWs as never, colMap, 'test-token', 2, 1)
+    const result = await SyncToBangumiAsync(mockWs, colMap, 'test-token', 2, 1)
 
     expect(mockState.bgmRequestSync).toHaveBeenCalled()
     // 调用参数应包含正确的 endpoint、method 和 token
@@ -791,7 +793,7 @@ describe('SyncToBangumiAsync', () => {
       ['集数', 9],
     ])
 
-    await SyncToBangumiAsync(mockWs as never, colMap, 'test-token', 2, 1)
+    await SyncToBangumiAsync(mockWs, colMap, 'test-token', 2, 1)
 
     // markEpisodesComplete 应被调用（type=2 且 epCount>0）
     // 注意：可能由于 mock 设置导致 batchSyncRequests 未实际执行，
@@ -825,7 +827,7 @@ describe('SyncToBangumiAsync', () => {
       ['集数', 9],
     ])
 
-    await SyncToBangumiAsync(mockWs as never, colMap, 'test-token', 2, 1)
+    await SyncToBangumiAsync(mockWs, colMap, 'test-token', 2, 1)
 
     // type=3 时不应调用 markEpisodesComplete
     // 注意：源码中 type=3 也会跳过章节标记
@@ -853,7 +855,7 @@ describe('SyncToBangumiAsync', () => {
       ['是否看完', 3],
     ])
 
-    const result = await SyncToBangumiAsync(mockWs as never, colMap, 'test-token', 2, 1)
+    const result = await SyncToBangumiAsync(mockWs, colMap, 'test-token', 2, 1)
 
     // bgmRequestSync 不应被调用（URL 为空 → 跳过）
     expect(mockState.bgmRequestSync).not.toHaveBeenCalled()
@@ -880,7 +882,7 @@ describe('SyncToBangumiAsync', () => {
       ['是否看完', 3],
     ])
 
-    const result = await SyncToBangumiAsync(mockWs as never, colMap, 'test-token', 2, 1)
+    const result = await SyncToBangumiAsync(mockWs, colMap, 'test-token', 2, 1)
 
     // 状态为空时默认设为 type=1，应发起同步请求
     expect(mockState.bgmRequestSync).toHaveBeenCalled()
@@ -907,7 +909,7 @@ describe('SyncToBangumiAsync', () => {
       ['是否看完', 3],
     ])
 
-    const result = await SyncToBangumiAsync(mockWs as never, colMap, 'test-token', 2, 1)
+    const result = await SyncToBangumiAsync(mockWs, colMap, 'test-token', 2, 1)
 
     expect(mockState.bgmRequestSync).not.toHaveBeenCalled()
     expect(result.skip).toBeGreaterThanOrEqual(1)
@@ -932,7 +934,7 @@ describe('SyncToBangumiAsync', () => {
       ['是否看完', 3],
     ])
 
-    const result = await SyncToBangumiAsync(mockWs as never, colMap, 'test-token', 2, 1)
+    const result = await SyncToBangumiAsync(mockWs, colMap, 'test-token', 2, 1)
 
     // extractSubjectId 无法从非 BGM URL 提取 ID → 跳过
     expect(mockState.bgmRequestSync).not.toHaveBeenCalled()
@@ -956,7 +958,7 @@ describe('SyncToBangumiAsync', () => {
     ])
 
     // 增量同步模式应正常完成不抛错
-    const result = await SyncToBangumiAsync(mockWs as never, colMap, 'test-token', 2, 1, {
+    const result = await SyncToBangumiAsync(mockWs, colMap, 'test-token', 2, 1, {
       incremental: true,
     })
 
@@ -985,7 +987,7 @@ describe('SyncToBangumiAsync', () => {
     ])
 
     const skipSids = new Set<string>(['12345'])
-    const result = await SyncToBangumiAsync(mockWs as never, colMap, 'test-token', 2, 1, {
+    const result = await SyncToBangumiAsync(mockWs, colMap, 'test-token', 2, 1, {
       skipSids,
     })
 

@@ -708,7 +708,7 @@ describe('fetchGistJson', () => {
       lastMockXhr!._respondOk(JSON.stringify(gistApiResponse))
       const entries = await promise
       expect(entries.length).toBe(1)
-      expect(entries[0].sid).toBe('s1')
+      expect(entries[0]?.sid).toBe('s1')
     })
 
     it('files 中有 null 值条目时 isGistApiResponse 提前返回空', async () => {
