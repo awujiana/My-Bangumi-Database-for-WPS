@@ -59,7 +59,7 @@
           <h3>🎯 选择清理的表格</h3>
           <p class="hint">
             点击「📋 加载工作表」枚举已打开工作簿中的全部工作表，勾选本次要清理的目标。WPS
-            临时锁文件与插件自身目录会被自动跳过。
+            临时锁文件与插件自身目录会被自动跳过；未识别到「名称」列的表仍可勾选，规则会按列缺失自动跳过。
           </p>
           <div class="bgm-btn-group bgm-btn-row">
             <button class="bgm-btn small primary" id="cleanLoadSheetsBtn" style="flex: 1">
@@ -68,6 +68,7 @@
             <button class="bgm-btn small" id="cleanSelectAllSheetsBtn">✅ 全选</button>
             <button class="bgm-btn small" id="cleanSelectNoneSheetsBtn">⬜ 全不选</button>
           </div>
+          <div id="cleanSheetSummary" class="clean-sheet-summary"></div>
           <div id="cleanSheetList" class="clean-sheet-list"></div>
         </section>
 

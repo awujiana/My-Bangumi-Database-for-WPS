@@ -300,11 +300,26 @@
 }
 
 /* ---- 选择清理的表格（用户显式勾选） ---- */
+.clean-sheet-summary {
+  margin-top: var(--sp-2);
+  color: var(--text-3);
+  font-size: 11px;
+  letter-spacing: 0.02em;
+}
+
+.clean-sheet-summary:empty {
+  display: none;
+}
+
 .clean-sheet-list {
   display: flex;
   flex-direction: column;
   gap: var(--sp-2);
-  margin-top: var(--sp-3);
+  margin-top: var(--sp-2);
+  /* 工作簿 / 工作表数量多时固定高度内滚动，避免把后续区块挤到看不见 */
+  max-height: 340px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
 
 .clean-sheet-group {
@@ -312,6 +327,41 @@
   border-radius: var(--r-md);
   background: var(--bg-base);
   overflow: hidden;
+}
+
+.clean-sheet-group-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px var(--sp-2) 5px var(--sp-2);
+  background: var(--bg-mantle);
+  border-bottom: 1px solid var(--border);
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+
+.clean-sheet-group-toggle {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex: 1;
+  min-width: 0;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--text-2);
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  cursor: pointer;
+  text-align: left;
+}
+
+.clean-sheet-caret {
+  color: var(--text-3);
+  font-size: 10px;
+  flex: 0 0 auto;
 }
 
 .clean-sheet-group-title {
@@ -331,6 +381,19 @@
 .clean-sheet-group-title-name {
   color: var(--text-2);
   font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.clean-sheet-tag-warn {
+  padding: 1px 5px;
+  border-radius: 6px;
+  font-size: 10px;
+  line-height: 1.4;
+  color: var(--warn, #f9e2af);
+  border: 1px solid color-mix(in srgb, var(--warn, #f9e2af) 40%, transparent);
+  background: color-mix(in srgb, var(--warn, #f9e2af) 12%, transparent);
 }
 
 .clean-sheet-item {
