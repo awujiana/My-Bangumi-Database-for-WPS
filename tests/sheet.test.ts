@@ -96,6 +96,80 @@ import {
 } from '../ts/tools/util/sheet.js'
 import { getApp, bgmLog, BGM } from '../ts/tools/util/index.js'
 import { getCellValue } from '../ts/tools/util/cell.js'
+import type { WpsApp, WpsCells, WpsRange, WpsWorkbook, WpsWorksheet } from '../ts/tools/wps.js'
+
+/**
+ * 测试用工作表 mock 的类型。
+ *
+ * 存在的理由（见 文档/TS_AUDIT_2026_09_10.md 的 P1-2）：
+ * 测试只需要实现被测代码实际访问到的成员，不可能（也不必）逐字复刻整个 WPS 接口；
+ * 但**调用点**必须是强类型的，否则 mock 与真实接口脱节不会被发现。
+ * 于是把「形状不完整」这一点收敛到本类型 + 工厂里的一次 `as unknown as`：
+ *   - 返回类型仍可赋给 `WpsWorksheet`（`Mock<T>` 携带 `T` 的调用签名）；
+ *   - `Range` 保留 Mock（便于 `mockReturnValue` 与断言）。
+ */
+type MockWorksheet = Omit<WpsWorksheet, 'Range' | 'Cells'> & {
+  Range: RangeMock
+  Cells: Omit<WpsCells, 'Item'> & { Item: CellItemMock }
+}
+
+/**
+ * 测试用 Range mock。
+ *
+ * 这里用自定义接口而不是 `Mock<(address: string) => WpsRange>`：
+ * 桩只实现被测路径访问到的成员，而 `Mock<T>` 会强制 `mockReturnValue` 收下完整的
+ * `WpsRange`，于是每个用例都要写一次 `as unknown as`。自定义接口把
+ * 「返回值可以是任意桩」这一点显式化，同时保留调用签名 `(address) => WpsRange`，
+ * 因此整体仍可赋给 `WpsWorksheet`（赋给真实接口时依然享受类型检查）。
+ */
+interface RangeMock {
+  (address: string): WpsRange
+  mockReturnValue(value: unknown): RangeMock
+}
+
+/** 构造 Range mock；`implementation` 省略时用 `mockReturnValue` 驱动 */
+function createRangeMock(implementation?: (address: string) => unknown): RangeMock {
+  return vi.fn(implementation) as unknown as RangeMock
+}
+
+/** 测试用 `Cells.Item` mock（理由同 RangeMock） */
+interface CellItemMock {
+  (row: number, col: number): WpsRange
+  mockReturnValue(value: unknown): CellItemMock
+}
+
+/** 构造 `Cells.Item` mock */
+function createCellItemMock(implementation?: () => unknown): CellItemMock {
+  return vi.fn(implementation) as unknown as CellItemMock
+}
+
+/**
+ * 构造工作簿桩。
+ *
+ * `WpsWorkbook` 有 5 个必需成员（Name/FullName/Worksheets/Sheets/ActiveSheet），
+ * 而测试通常只关心 `ActiveSheet`；这里补齐骨架后按需覆盖，避免每个用例手写样板。
+ */
+function createMockWorkbook(overrides: Partial<WpsWorkbook> = {}): WpsWorkbook {
+  return {
+    Name: 'Book1',
+    FullName: 'C:/Book1.xlsx',
+    Worksheets: { Count: 1, Item: vi.fn() },
+    Sheets: { Count: 1, Item: vi.fn(), Add: vi.fn() },
+    ActiveSheet: createMockWorksheet(),
+    ...overrides,
+  }
+}
+
+/**
+ * 构造 `getApp()` 返回值桩。
+ *
+ * 参数类型用 `Partial<WpsApp>` 而非 `Record<string, unknown>`：字面量仍按真实接口
+ * 逐成员校验（写错 `Workbooks` 的形状会被抓出来），只是允许省略不关心的成员。
+ */
+function createMockApp(overrides: Partial<WpsApp>): WpsApp {
+  // WpsApp 的成员全部可选，Partial<WpsApp> 与 WpsApp 同构，无需断言
+  return overrides
+}
 
 function createMockCell(value: unknown = '') {
   let text: string
@@ -130,7 +204,7 @@ function createMockWorksheet(
     hasEnd?: boolean
     endRow?: number
   } = {},
-) {
+): MockWorksheet {
   const name = options.name ?? 'Sheet1'
   const rows = options.rows ?? 100
   const cellValues = options.cellValues ?? {}
@@ -160,7 +234,8 @@ function createMockWorksheet(
     Cells: { Item: vi.fn((_r: number, _c: number) => createMockCell('')) },
     // End mock for getLastRow
     _endRow: options.endRow ?? 0,
-  }
+    // 单点类型逃逸：mock 只实现被测路径访问到的成员（详见 MockWorksheet 的说明）
+  } as unknown as MockWorksheet
 }
 
 describe('readRangeValues', () => {
@@ -175,7 +250,7 @@ describe('readRangeValues', () => {
   it('应读取单个值', () => {
     const ws = createMockWorksheet()
     const rangeMock = { Value2: 'single', Interior: { Color: 0 } }
-    ws.Range = vi.fn().mockReturnValue(rangeMock)
+    ws.Range = createRangeMock().mockReturnValue(rangeMock)
     const result = readRangeValues(ws, 1, 1, 1, 1)
     expect(result).toEqual([['single']])
   })
@@ -183,7 +258,7 @@ describe('readRangeValues', () => {
   it('Value2 为 null 时返回空数组', () => {
     const ws = createMockWorksheet()
     const rangeMock = { Value2: null, Interior: { Color: 0 } }
-    ws.Range = vi.fn().mockReturnValue(rangeMock)
+    ws.Range = createRangeMock().mockReturnValue(rangeMock)
     const result = readRangeValues(ws, 1, 5, 1, 3)
     expect(result).toEqual([])
   })
@@ -191,7 +266,7 @@ describe('readRangeValues', () => {
   it('Value2 为 undefined 时返回空数组', () => {
     const ws = createMockWorksheet()
     const rangeMock = { Value2: undefined, Interior: { Color: 0 } }
-    ws.Range = vi.fn().mockReturnValue(rangeMock)
+    ws.Range = createRangeMock().mockReturnValue(rangeMock)
     const result = readRangeValues(ws, 1, 5, 1, 3)
     expect(result).toEqual([])
   })
@@ -205,7 +280,7 @@ describe('readRangeValues', () => {
       ],
       Interior: { Color: 0 },
     }
-    ws.Range = vi.fn().mockReturnValue(rangeMock)
+    ws.Range = createRangeMock().mockReturnValue(rangeMock)
     const result = readRangeValues(ws, 1, 2, 1, 3)
     expect(result).toEqual([
       ['a1', 'b1', 'c1'],
@@ -219,7 +294,7 @@ describe('readRangeValues', () => {
       Value2: ['single_val', 'another_val'],
       Interior: { Color: 0 },
     }
-    ws.Range = vi.fn().mockReturnValue(rangeMock)
+    ws.Range = createRangeMock().mockReturnValue(rangeMock)
     const result = readRangeValues(ws, 1, 2, 1, 1)
     expect(result).toEqual([['single_val'], ['another_val']])
   })
@@ -240,7 +315,7 @@ describe('readRangeValues', () => {
       Value2: [[null, 'valid']],
       Interior: { Color: 0 },
     }
-    ws.Range = vi.fn().mockReturnValue(rangeMock)
+    ws.Range = createRangeMock().mockReturnValue(rangeMock)
     const result = readRangeValues(ws, 1, 1, 1, 2)
     expect(result).toEqual([['', 'valid']])
   })
@@ -290,21 +365,23 @@ describe('getDataSheet', () => {
 
   it('应返回 ActiveSheet', () => {
     const mockSheet = createMockWorksheet({ name: 'Data' })
-    vi.mocked(getApp).mockReturnValue({
-      ActiveWorkbook: { ActiveSheet: mockSheet },
-    })
+    vi.mocked(getApp).mockReturnValue(
+      createMockApp({ ActiveWorkbook: createMockWorkbook({ ActiveSheet: mockSheet }) }),
+    )
     expect(getDataSheet()).toBe(mockSheet)
   })
 
   it('锁定模式下应返回锁定的工作表', () => {
     const lockedSheet = createMockWorksheet({ name: 'Locked' })
     const itemFunction = vi.fn().mockReturnValue(lockedSheet)
-    vi.mocked(getApp).mockReturnValue({
-      ActiveWorkbook: {
-        ActiveSheet: createMockWorksheet({ name: 'Active' }),
-        Worksheets: { Item: itemFunction },
-      },
-    })
+    vi.mocked(getApp).mockReturnValue(
+      createMockApp({
+        ActiveWorkbook: createMockWorkbook({
+          ActiveSheet: createMockWorksheet({ name: 'Active' }),
+          Worksheets: { Count: 1, Item: itemFunction },
+        }),
+      }),
+    )
     BGM.sheet.isLocked = true
     BGM.sheet.lockedIndex = 2
     getDataSheet()
@@ -312,20 +389,27 @@ describe('getDataSheet', () => {
   })
 
   it('锁定模式下应查找指定工作簿', () => {
-    const targetWb = {
+    const targetWb = createMockWorkbook({
       Name: 'TargetWb',
-      Worksheets: { Item: vi.fn().mockReturnValue(createMockWorksheet({ name: 'TargetSheet' })) },
-    }
-    vi.mocked(getApp).mockReturnValue({
-      ActiveWorkbook: {
-        ActiveSheet: createMockWorksheet({ name: 'Active' }),
-        Worksheets: { Item: vi.fn() },
-      },
-      Workbooks: {
-        Count: 2,
-        Item: vi.fn((index: number) => (index === 2 ? targetWb : { Name: 'OtherWb' })),
+      Worksheets: {
+        Count: 1,
+        Item: vi.fn().mockReturnValue(createMockWorksheet({ name: 'TargetSheet' })),
       },
     })
+    vi.mocked(getApp).mockReturnValue(
+      createMockApp({
+        ActiveWorkbook: createMockWorkbook({
+          ActiveSheet: createMockWorksheet({ name: 'Active' }),
+          Worksheets: { Count: 1, Item: vi.fn() },
+        }),
+        Workbooks: {
+          Count: 2,
+          Item: vi.fn((index: number) =>
+            index === 2 ? targetWb : createMockWorkbook({ Name: 'OtherWb' }),
+          ),
+        },
+      }),
+    )
     BGM.sheet.isLocked = true
     BGM.sheet.lockedIndex = 1
     BGM.sheet.lockedWorkbookName = 'TargetWb'
@@ -335,30 +419,34 @@ describe('getDataSheet', () => {
 
   it('锁定模式查找失败时应回退到 ActiveSheet', () => {
     const activeSheet = createMockWorksheet({ name: 'Active' })
-    vi.mocked(getApp).mockReturnValue({
-      ActiveWorkbook: { ActiveSheet: activeSheet },
-    })
+    vi.mocked(getApp).mockReturnValue(
+      createMockApp({ ActiveWorkbook: createMockWorkbook({ ActiveSheet: activeSheet }) }),
+    )
     BGM.sheet.isLocked = true
     // will fail
     BGM.sheet.lockedIndex = 10
     const _mockErrorWs = {
       ...createMockWorksheet(),
       Worksheets: {
+        Count: 1,
         Item: vi.fn(() => {
           throw new Error('not found')
         }),
       },
     }
-    vi.mocked(getApp).mockReturnValue({
-      ActiveWorkbook: {
-        ActiveSheet: activeSheet,
-        Worksheets: {
-          Item: vi.fn(() => {
-            throw new Error('not found')
-          }),
-        },
-      },
-    })
+    vi.mocked(getApp).mockReturnValue(
+      createMockApp({
+        ActiveWorkbook: createMockWorkbook({
+          ActiveSheet: activeSheet,
+          Worksheets: {
+            Count: 1,
+            Item: vi.fn(() => {
+              throw new Error('not found')
+            }),
+          },
+        }),
+      }),
+    )
     const result = getDataSheet()
     expect(result).toBe(activeSheet)
   })
@@ -380,7 +468,9 @@ describe('safeActivate', () => {
   })
 
   it('Activate 不是函数时应记录警告', () => {
-    const ws = { ...createMockWorksheet(), Activate: undefined }
+    // 故意构造畸形 sheet（Activate 不是函数）以验证 safeActivate 的降级：
+    // 这里的 `as unknown as WpsWorksheet` 是刻意的——现实的畸形对象本就违反接口
+    const ws = { ...createMockWorksheet(), Activate: undefined } as unknown as WpsWorksheet
     safeActivate(ws)
     expect(bgmLog).toHaveBeenCalledWith('WARN', expect.stringContaining('safeActivate'))
   })
@@ -418,7 +508,7 @@ describe('getLastRow', () => {
       Text: 'data',
       End: vi.fn().mockReturnValue({ Row: 50 }),
     }
-    ws.Range = vi.fn(() => mockCell)
+    ws.Range = createRangeMock(() => mockCell)
     const result = getLastRow(ws)
     expect(result).toBe(50)
   })
@@ -442,7 +532,7 @@ describe('getLastRow', () => {
       Text: 'data',
       End: vi.fn().mockReturnValue({ Row: 30 }),
     }
-    ws.Range = vi.fn((addr: string) => (addr.startsWith('D') ? dCell : aCell))
+    ws.Range = createRangeMock((addr: string) => (addr.startsWith('D') ? dCell : aCell))
     const result = getLastRow(ws)
     expect(result).toBe(30)
   })
@@ -461,7 +551,7 @@ describe('getLastRow', () => {
         throw new Error('fail')
       }),
     }
-    ws.Range = vi.fn(() => failCell)
+    ws.Range = createRangeMock(() => failCell)
     const result = getLastRow(ws)
     expect(result).toBe(25)
   })
@@ -477,10 +567,11 @@ describe('getLastRow', () => {
   })
 
   it('UsedRange 失败时返回默认 50000', () => {
+    // 故意去掉 UsedRange 以验证兜底路径（exactOptionalPropertyTypes 下不能写 undefined）
     const ws = {
       ...createMockWorksheet({ name: 'Test' }),
       UsedRange: undefined,
-    }
+    } as unknown as WpsWorksheet
     const failCell = {
       Value2: '',
       Value: '',
@@ -489,7 +580,7 @@ describe('getLastRow', () => {
         throw new Error('fail')
       }),
     }
-    ws.Range = vi.fn(() => failCell)
+    ws.Range = createRangeMock(() => failCell)
     const result = getLastRow(ws)
     expect(result).toBe(50_000)
   })
@@ -515,7 +606,7 @@ describe('getLastRow', () => {
       Text: 'data',
       End: vi.fn().mockReturnValue({ Row: 40 }),
     }
-    ws.Range = vi.fn(() => anchorCell)
+    ws.Range = createRangeMock(() => anchorCell)
     vi.mocked(getCellValue).mockImplementation((_ws: unknown, _row: unknown, col: unknown) =>
       col === 1 ? '序列号' : '',
     )
@@ -768,14 +859,14 @@ describe('ensureSheetHeaders', () => {
     // findHeaderRow returns 0 (no header found)
     vi.mocked(getCellValue).mockReturnValue('')
     const ws = createMockWorksheet({ name: 'EmptySheet' })
-    ws.Range = vi.fn((address: string) => {
+    ws.Range = createRangeMock((address: string) => {
       if (address.includes(':')) {
         return { Value2: null, Interior: { Color: 0 }, Font: { Bold: false } }
       }
       return createMockCell('')
     })
     // Mock Cells.Item to succeed
-    ws.Cells.Item = vi.fn(() => createMockCell(''))
+    ws.Cells.Item = createCellItemMock(() => createMockCell(''))
     const isResult = ensureSheetHeaders(ws)
     expect(isResult).toBe(true)
   })
@@ -783,7 +874,7 @@ describe('ensureSheetHeaders', () => {
   it('关键列写入失败时应返回 false', () => {
     vi.mocked(getCellValue).mockReturnValue('')
     const ws = createMockWorksheet({ name: 'FailSheet' })
-    ws.Range = vi.fn((address: string) => {
+    ws.Range = createRangeMock((address: string) => {
       if (address.includes(':')) {
         return { Value2: null, Interior: { Color: 0 }, Font: { Bold: false } }
       }
@@ -822,7 +913,7 @@ describe('ensureSheetHeaders', () => {
       }
       return createMockCell('')
     })
-    ws.Cells.Item = vi.fn(() => {
+    ws.Cells.Item = createCellItemMock(() => {
       throw new Error('Cannot access')
     })
     const isResult = ensureSheetHeaders(ws)
@@ -832,7 +923,7 @@ describe('ensureSheetHeaders', () => {
   it('非关键列写入失败仍应返回 true', () => {
     vi.mocked(getCellValue).mockReturnValue('')
     const ws = createMockWorksheet({ name: 'PartialFail' })
-    ws.Range = vi.fn((address: string) => {
+    ws.Range = createRangeMock((address: string) => {
       if (address.includes(':')) {
         return { Value2: null, Interior: { Color: 0 }, Font: { Bold: false } }
       }
@@ -870,7 +961,7 @@ describe('ensureSheetHeaders', () => {
       }
       return createMockCell('')
     })
-    ws.Cells.Item = vi.fn(() => createMockCell(''))
+    ws.Cells.Item = createCellItemMock(() => createMockCell(''))
     const isResult = ensureSheetHeaders(ws)
     expect(isResult).toBe(true)
   })
@@ -904,7 +995,7 @@ describe('isNativeCode（间接测试 via safeCellValue/readRangeValues）', () 
       Value2: [[nativeFunction]],
       Interior: { Color: 0 },
     }
-    ws.Range = vi.fn().mockReturnValue(rangeMock)
+    ws.Range = createRangeMock().mockReturnValue(rangeMock)
     const result = readRangeValues(ws, 1, 1, 1, 1)
     expect(result).toEqual([['']])
   })
@@ -916,7 +1007,7 @@ describe('isNativeCode（间接测试 via safeCellValue/readRangeValues）', () 
       Value2: [[valueFunction]],
       Interior: { Color: 0 },
     }
-    ws.Range = vi.fn().mockReturnValue(rangeMock)
+    ws.Range = createRangeMock().mockReturnValue(rangeMock)
     const result = readRangeValues(ws, 1, 1, 1, 1)
     expect(result).toEqual([['']])
   })
@@ -928,7 +1019,7 @@ describe('isNativeCode（间接测试 via safeCellValue/readRangeValues）', () 
       Value2: [[nativeObject]],
       Interior: { Color: 0 },
     }
-    ws.Range = vi.fn().mockReturnValue(rangeMock)
+    ws.Range = createRangeMock().mockReturnValue(rangeMock)
     const result = readRangeValues(ws, 1, 1, 1, 1)
     expect(result).toEqual([['']])
   })
@@ -939,7 +1030,7 @@ describe('isNativeCode（间接测试 via safeCellValue/readRangeValues）', () 
       Value2: [[functionReturnsNative()]],
       Interior: { Color: 0 },
     }
-    ws.Range = vi.fn().mockReturnValue(rangeMock)
+    ws.Range = createRangeMock().mockReturnValue(rangeMock)
     const result = readRangeValues(ws, 1, 1, 1, 1)
     expect(result).toEqual([['']])
   })
@@ -950,7 +1041,7 @@ describe('isNativeCode（间接测试 via safeCellValue/readRangeValues）', () 
       Value2: [[throwingFunction]],
       Interior: { Color: 0 },
     }
-    ws.Range = vi.fn().mockReturnValue(rangeMock)
+    ws.Range = createRangeMock().mockReturnValue(rangeMock)
     const result = readRangeValues(ws, 1, 1, 1, 1)
     expect(result).toEqual([['']])
   })
@@ -981,7 +1072,7 @@ describe('findAnchorColumn（间接测试 via getLastRow with headerRow）', () 
       Text: 'data',
       End: vi.fn().mockReturnValue({ Row: 50 }),
     }
-    ws.Range = vi.fn(() => anchorCell)
+    ws.Range = createRangeMock(() => anchorCell)
     const result = getLastRow(ws, false, 1)
     expect(result).toBe(50)
   })
@@ -1004,7 +1095,7 @@ describe('findAnchorColumn（间接测试 via getLastRow with headerRow）', () 
       Text: 'data',
       End: vi.fn().mockReturnValue({ Row: 30 }),
     }
-    ws.Range = vi.fn(() => anchorCell)
+    ws.Range = createRangeMock(() => anchorCell)
     const result = getLastRow(ws, false, 1)
     expect(result).toBe(30)
   })
@@ -1019,7 +1110,7 @@ describe('findAnchorColumn（间接测试 via getLastRow with headerRow）', () 
       Text: 'data',
       End: vi.fn().mockReturnValue({ Row: 20 }),
     }
-    ws.Range = vi.fn(() => dCell)
+    ws.Range = createRangeMock(() => dCell)
     const result = getLastRow(ws, false, 1)
     expect(result).toBe(20)
   })
@@ -1046,7 +1137,7 @@ describe('findAnchorColumn（间接测试 via getLastRow with headerRow）', () 
       Text: 'data',
       End: vi.fn().mockReturnValue({ Row: 15 }),
     }
-    ws.Range = vi.fn((addr: string) => {
+    ws.Range = createRangeMock((addr: string) => {
       if (addr.startsWith('A')) return failCell
       if (addr.startsWith('D')) return dCell
       return failCell
@@ -1085,8 +1176,8 @@ describe('setCellValueDirect（间接测试 via ensureSheetHeaders）', () => {
         /* empty */
       },
     }
-    ws.Range = vi.fn(() => mockCell)
-    ws.Cells.Item = vi.fn(() => mockCell)
+    ws.Range = createRangeMock(() => mockCell)
+    ws.Cells.Item = createCellItemMock(() => mockCell)
     ensureSheetHeaders(ws)
     expect(ws.Cells.Item).toHaveBeenCalled()
   })
@@ -1122,8 +1213,8 @@ describe('setCellValueDirect（间接测试 via ensureSheetHeaders）', () => {
       Interior: { Color: 0 },
       Font: { Bold: false },
     }
-    ws.Range = vi.fn(() => failCell)
-    ws.Cells.Item = vi.fn(() => failCell)
+    ws.Range = createRangeMock(() => failCell)
+    ws.Cells.Item = createCellItemMock(() => failCell)
     const isResult = ensureSheetHeaders(ws)
     // 虽然所有列写入失败，但前5列全部失败 → 返回 false
     expect(isResult).toBe(false)

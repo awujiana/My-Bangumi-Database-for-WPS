@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
+import type { WpsRange, WpsWorksheet } from '../ts/tools/wps.js'
 
 const {
   SYNC_RECORD_COLUMNS,
@@ -146,7 +147,24 @@ function createMockCell(value: unknown = '') {
   }
 }
 
-function createMockSheet(options: { name?: string; rowCount?: number } = {}) {
+/**
+ * 测试用工作表 mock —— 桩只实现被测路径访问到的成员，
+ * 形状不完整这一点收敛到本类型 + 工厂里的一次逃逸（理由见 tests/sheet.test.ts，P1-2）。
+ */
+type MockSheet = Omit<WpsWorksheet, 'Range'> & { Range: RangeMock }
+
+/** 测试用 Range mock：返回值放宽为未知桩，同时保留真实调用签名 */
+interface RangeMock {
+  (address: string): WpsRange
+  mockReturnValue(value: unknown): RangeMock
+}
+
+/** 构造 Range mock；`implementation` 省略时用 `mockReturnValue` 驱动 */
+function createRangeMock(implementation?: (address: string) => unknown): RangeMock {
+  return vi.fn(implementation) as unknown as RangeMock
+}
+
+function createMockSheet(options: { name?: string; rowCount?: number } = {}): MockSheet {
   const rowCount = options.rowCount ?? 50
   return {
     Name: options.name ?? SYNC_RECORD_SHEET_NAME,
@@ -167,7 +185,8 @@ function createMockSheet(options: { name?: string; rowCount?: number } = {}) {
     Select: vi.fn(),
     Delete: vi.fn(),
     Move: vi.fn(),
-  }
+    // 单点类型逃逸：mock 只实现被测路径访问到的成员
+  } as unknown as MockSheet
 }
 
 function createMockWorkbook(sheets: { Name: string }[] = []) {
@@ -237,7 +256,7 @@ describe('syncRecord', () => {
     it('旧 schema 应触发迁移', () => {
       const legacySheet = createMockSheet({ name: SYNC_RECORD_SHEET_NAME })
       // A1='序号' indicates old schema
-      legacySheet.Range = vi.fn((address: string) => {
+      legacySheet.Range = createRangeMock((address: string) => {
         if (address === 'A1') return createMockCell('序号')
         if (address === 'F1') return createMockCell('次数')
         if (address.includes(':')) return { Value2: null, Interior: { Color: 0 } }
@@ -267,7 +286,7 @@ describe('syncRecord', () => {
 
     it('迁移异常时应记录警告但继续', () => {
       const sheetWithBadData = createMockSheet({ name: SYNC_RECORD_SHEET_NAME })
-      sheetWithBadData.Range = vi.fn((address: string) => {
+      sheetWithBadData.Range = createRangeMock((address: string) => {
         if (address === 'A1') return createMockCell('序号')
         if (address === 'F1') return createMockCell('次数')
         if (address.includes(':'))
@@ -638,7 +657,7 @@ describe('syncRecord', () => {
     it('旧 12 列（序号第一列）应迁移数据', () => {
       const legacySheet = createMockSheet({ name: SYNC_RECORD_SHEET_NAME })
       // 设置旧表头：A1='序号', F1='次数'
-      legacySheet.Range = vi.fn((address: string) => {
+      legacySheet.Range = createRangeMock((address: string) => {
         if (address === 'A1') return createMockCell('序号')
         if (address === 'F1') return createMockCell('次数')
         if (address === 'B1') return createMockCell('同步时间')
@@ -683,7 +702,7 @@ describe('syncRecord', () => {
     it('旧 11 列（SID 第一列无来源）应迁移数据', () => {
       const legacySheet = createMockSheet({ name: SYNC_RECORD_SHEET_NAME })
       // 设置旧表头：A1='SID', F1='次数'（无"来源"列）
-      legacySheet.Range = vi.fn((address: string) => {
+      legacySheet.Range = createRangeMock((address: string) => {
         if (address === 'A1') return createMockCell('SID')
         // 第6列是次数，不是来源
         if (address === 'F1') return createMockCell('次数')
@@ -728,7 +747,7 @@ describe('syncRecord', () => {
 
     it('lastRow <= 1 时不应执行迁移', () => {
       const legacySheet = createMockSheet({ name: SYNC_RECORD_SHEET_NAME })
-      legacySheet.Range = vi.fn((address: string) => {
+      legacySheet.Range = createRangeMock((address: string) => {
         if (address === 'A1') return createMockCell('序号')
         if (address === 'F1') return createMockCell('次数')
         return createMockCell('')
@@ -748,7 +767,7 @@ describe('syncRecord', () => {
 
     it('旧 URL 和 SID 都为空时应跳过该行', () => {
       const legacySheet = createMockSheet({ name: SYNC_RECORD_SHEET_NAME })
-      legacySheet.Range = vi.fn((address: string) => {
+      legacySheet.Range = createRangeMock((address: string) => {
         if (address === 'A1') return createMockCell('序号')
         if (address === 'F1') return createMockCell('次数')
         return createMockCell('')
@@ -1089,7 +1108,7 @@ describe('syncRecord', () => {
 
     it('定位行失败时应回退到普通切换', () => {
       const normalSheet = createMockSheet({ name: SYNC_RECORD_SHEET_NAME })
-      normalSheet.Range = vi.fn(() => {
+      normalSheet.Range = createRangeMock(() => {
         throw new Error('定位失败')
       })
       const allSheets = [createMockSheet({ name: 'Sheet1' }), normalSheet]
@@ -1150,13 +1169,14 @@ describe('syncRecord', () => {
         Name: SYNC_RECORD_SHEET_NAME,
         Rows: { Count: 10 },
         UsedRange: { Row: 1, Rows: { Count: 5 } },
-        Range: vi.fn(() => {
+        Range: createRangeMock(() => {
           throw new Error('Range 访问异常')
         }),
         Activate: vi.fn(),
         Select: vi.fn(),
         Delete: vi.fn(),
-      }
+        // 刻意的畸形 sheet：验证异常被内部 catch 处理，故绕过接口检查
+      } as unknown as MockSheet
       mockGetApp.mockReturnValue({ ActiveWorkbook: createMockWorkbook() })
       mockGetLastRow.mockReturnValue(5)
 
@@ -2030,7 +2050,7 @@ describe('buildCache 内层 catch 分支 (line 343)', () => {
     // 提供格式异常的数据，使得 rowData 处理过程中抛出异常
     // 例如 rowData 不是数组，访问数组索引会出错
     mockReadRangeValues.mockReturnValue([
-      // @ts-expect-error - 故意传入非数组元素触发异常
+      // 故意传入非数组元素触发异常（mock 已放宽类型，无需 ts-expect-error）
       null,
       undefined,
       // 非数组，访问 [SYNC_RECORD_COL.SID - 1] 会出错
@@ -2168,7 +2188,7 @@ describe('migrateSyncRecordSchema 数据行处理 (lines 289-293)', () => {
   it('旧 schema 应触发迁移并处理数据行 (lines 289-293)', () => {
     // 创建一个旧 schema 工作表（A1='序号' 表示旧 schema）
     const legacySheet = createMockSheet({ name: SYNC_RECORD_SHEET_NAME })
-    legacySheet.Range = vi.fn((address: string) => {
+    legacySheet.Range = createRangeMock((address: string) => {
       // 旧 schema 标识
       if (address === 'A1') return createMockCell('序号')
       // 旧 schema 列头
@@ -2217,7 +2237,7 @@ describe('migrateSyncRecordSchema 数据行处理 (lines 289-293) - 带实际数
 
   it('旧 schema 迁移应处理数据行并写入新表 (lines 289-293)', () => {
     const legacySheet = createMockSheet({ name: SYNC_RECORD_SHEET_NAME })
-    legacySheet.Range = vi.fn((address: string) => {
+    legacySheet.Range = createRangeMock((address: string) => {
       if (address === 'A1') return createMockCell('序号')
       if (address === 'F1') return createMockCell('次数')
       if (address.includes(':'))
@@ -2275,7 +2295,7 @@ describe('migrateSyncRecordSchema 数据行处理 (lines 289-293) - 带实际数
 
   it('迁移时空数据行应被跳过 (lines 291 检查)', () => {
     const legacySheet = createMockSheet({ name: SYNC_RECORD_SHEET_NAME })
-    legacySheet.Range = vi.fn((address: string) => {
+    legacySheet.Range = createRangeMock((address: string) => {
       if (address === 'A1') return createMockCell('序号')
       if (address === 'F1') return createMockCell('次数')
       if (address.includes(':'))

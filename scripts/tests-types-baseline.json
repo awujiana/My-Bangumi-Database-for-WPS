@@ -1,0 +1,23 @@
+{
+  "_comment": "tests/ 类型错误基线（P1-2）。只允许下降：修完后跑 `node scripts/check-tests-types.mjs --update` 下调。",
+  "total": 125,
+  "byFile": {
+    "tests/broadcast-channel.test.ts": 9,
+    "tests/enrich-engine.empty.test.ts": 1,
+    "tests/enrich-lock.test.ts": 19,
+    "tests/exceltobangumi.test.ts": 2,
+    "tests/gist-sync.test.ts": 3,
+    "tests/gitee-sync.test.ts": 4,
+    "tests/github-sync-core.test.ts": 4,
+    "tests/github-sync-diff.test.ts": 3,
+    "tests/github-sync.test.ts": 33,
+    "tests/gitlab-sync.test.ts": 4,
+    "tests/http.test.ts": 5,
+    "tests/integration/sync-flow.test.ts": 15,
+    "tests/local-file-sync.test.ts": 2,
+    "tests/show-settings-panel.test.ts": 7,
+    "tests/sync-source-registry.test.ts": 10,
+    "tests/undo-stack.test.ts": 1,
+    "tests/workbook-auto-detect.test.ts": 3
+  }
+}

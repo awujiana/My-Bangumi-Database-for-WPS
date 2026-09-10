@@ -22,6 +22,38 @@ vi.mock('../ts/tools/string-utilities.js', () => ({
 
 import { getCell, getCellValue, setCellValue, getSheetByIndex } from '../ts/tools/util/cell.js'
 import { getApp, bgmLog, BGM } from '../ts/tools/util/index.js'
+import type { WpsApp, WpsRange, WpsWorksheet } from '../ts/tools/wps.js'
+
+/**
+ * 测试用工作表 mock 的类型（理由见 tests/sheet.test.ts 的同类定义，P1-2）。
+ * 桩只实现被测路径访问到的成员，形状不完整这一点收敛到本类型 + 工厂里的一次逃逸，
+ * 调用点仍按 `WpsWorksheet` 校验。
+ */
+type MockWorksheet = Omit<WpsWorksheet, 'Range'> & { Range: RangeMock }
+
+/** 测试用 Range mock：返回值放宽为未知桩，同时保留真实调用签名 */
+interface RangeMock {
+  (address: string): WpsRange
+  mockReturnValue(value: unknown): RangeMock
+}
+
+/**
+ * 构造「宿主返回畸形对象」的桩。
+ *
+ * `getSheetByIndex` 等函数的职责就是在宿主返回 `null` / 半成品时降级，
+ * 这些用例的字面量必然违反 `WpsApp` 的成员类型，故集中一次类型逃逸。
+ */
+function asMalformedApp(app: unknown): WpsApp {
+  return app as WpsApp
+}
+
+/**
+ * 构造「`Range` 返回畸形值」的工作表桩（返回 null/undefined/抛错 等）。
+ * 这些用例专门验证调用方的降级路径，字面量必然违反 `WpsWorksheet`，故集中逃逸。
+ */
+function malformedSheet(rangeImplementation: () => unknown): WpsWorksheet {
+  return { Range: vi.fn(rangeImplementation) } as unknown as WpsWorksheet
+}
 
 function createMockCell(overrides: Record<string, unknown> = {}) {
   const base = {
@@ -39,7 +71,7 @@ function nativeCodeValue(): { toString: () => string } {
 function createMockWorksheet(
   cellValues: Record<string, unknown> = {},
   cellOverrides: Record<string, Record<string, unknown>> = {},
-) {
+): MockWorksheet {
   const cellCache = new Map<string, ReturnType<typeof createMockCell>>()
   return {
     Range: vi.fn((address: string) => {
@@ -56,12 +88,13 @@ function createMockWorksheet(
           Text: String(cellValues[address]),
         })
       } else {
-        cell = createMockCell('')
+        cell = createMockCell()
       }
       cellCache.set(address, cell)
       return cell
     }),
-  }
+    // 单点类型逃逸：mock 只实现被测路径访问到的成员
+  } as unknown as MockWorksheet
 }
 
 describe('getCell', () => {
@@ -187,7 +220,7 @@ describe('getCellValue', () => {
           },
         },
       )
-      const ws = { Range: vi.fn(() => throwingCell) }
+      const ws = malformedSheet(() => throwingCell)
       expect(getCellValue(ws, 1, 1)).toBe('fallback_after_error')
     })
 
@@ -205,25 +238,21 @@ describe('getCellValue', () => {
 
   describe('单元格异常处理', () => {
     it('Range 调用抛异常时返回空字符串', () => {
-      const ws = {
-        Range: vi.fn(() => {
-          throw new Error('COM error')
-        }),
-      }
+      const ws = malformedSheet(() => {
+        throw new Error('COM error')
+      })
       expect(getCellValue(ws, 1, 1)).toBe('')
     })
 
     it('返回的 cell 为 null 时返回空字符串', () => {
-      const ws = {
-        Range: vi.fn(() => null),
-      }
+      const ws = malformedSheet(() => null)
       expect(getCellValue(ws, 1, 1)).toBe('')
     })
 
     it('返回的 cell 为 undefined 时返回空字符串', () => {
-      const ws = {
-        Range: vi.fn(() => {}),
-      }
+      const ws = malformedSheet(() => {
+        // 返回 undefined，验证「Range 返回空」的降级
+      })
       expect(getCellValue(ws, 1, 1)).toBe('')
     })
 
@@ -288,7 +317,7 @@ describe('setCellValue', () => {
   })
 
   it('应在 cell 为 null 时返回 false 并记录错误日志', () => {
-    const ws = { Range: vi.fn(() => null) }
+    const ws = malformedSheet(() => null)
     const isResult = setCellValue(ws, 1, 1, 'test')
     expect(isResult).toBe(false)
     expect(bgmLog).toHaveBeenCalled()
@@ -303,7 +332,7 @@ describe('setCellValue', () => {
         throw new Error('Cannot redefine property')
       },
     }
-    const ws = { Range: vi.fn(() => cell) }
+    const ws = malformedSheet(() => cell)
     const isResult = setCellValue(ws, 1, 1, 'test')
     expect(isResult).toBe(false)
     expect(BGM.handleError).toHaveBeenCalled()
@@ -321,7 +350,7 @@ describe('getSheetByIndex', () => {
   })
 
   it('应在 Application 为 undefined 时返回 null', () => {
-    vi.mocked(getApp).mockReturnValue(undefined)
+    vi.mocked(getApp).mockReturnValue(asMalformedApp(undefined))
     expect(getSheetByIndex(1)).toBeNull()
   })
 
@@ -331,28 +360,28 @@ describe('getSheetByIndex', () => {
   })
 
   it('应在 ActiveWorkbook 为 null 时返回 null', () => {
-    vi.mocked(getApp).mockReturnValue({ ActiveWorkbook: null })
+    vi.mocked(getApp).mockReturnValue(asMalformedApp({ ActiveWorkbook: null }))
     expect(getSheetByIndex(1)).toBeNull()
   })
 
   it('应在 Sheets 为 null 时返回 null', () => {
-    vi.mocked(getApp).mockReturnValue({ ActiveWorkbook: { Sheets: null } })
+    vi.mocked(getApp).mockReturnValue(asMalformedApp({ ActiveWorkbook: { Sheets: null } }))
     expect(getSheetByIndex(1)).toBeNull()
   })
 
   it('应在 Sheets.Count 为 0 时返回 null', () => {
-    vi.mocked(getApp).mockReturnValue({
-      ActiveWorkbook: { Sheets: { Count: 0, Item: vi.fn() } },
-    })
+    vi.mocked(getApp).mockReturnValue(
+      asMalformedApp({ ActiveWorkbook: { Sheets: { Count: 0, Item: vi.fn() } } }),
+    )
     expect(getSheetByIndex(1)).toBeNull()
   })
 
   it('应按索引获取工作表', () => {
     const mockSheet = { Name: 'Sheet1' }
     const itemFunction = vi.fn().mockReturnValue(mockSheet)
-    vi.mocked(getApp).mockReturnValue({
-      ActiveWorkbook: { Sheets: { Count: 3, Item: itemFunction } },
-    })
+    vi.mocked(getApp).mockReturnValue(
+      asMalformedApp({ ActiveWorkbook: { Sheets: { Count: 3, Item: itemFunction } } }),
+    )
     const result = getSheetByIndex(2)
     expect(itemFunction).toHaveBeenCalledWith(2)
     expect(result).toBe(mockSheet)
@@ -362,9 +391,9 @@ describe('getSheetByIndex', () => {
     const itemFunction = vi.fn(() => {
       throw new Error('Sheet not found')
     })
-    vi.mocked(getApp).mockReturnValue({
-      ActiveWorkbook: { Sheets: { Count: 5, Item: itemFunction } },
-    })
+    vi.mocked(getApp).mockReturnValue(
+      asMalformedApp({ ActiveWorkbook: { Sheets: { Count: 5, Item: itemFunction } } }),
+    )
     const result = getSheetByIndex(10)
     expect(result).toBeUndefined()
   })
