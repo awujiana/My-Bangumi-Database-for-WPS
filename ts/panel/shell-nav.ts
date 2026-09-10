@@ -132,14 +132,13 @@ export function initScrollspy(): void {
    *
    * 规则：
    *  1. 页面可滚动且已滚到底（视口底部贴文档底部）→ 高亮最后一个区块：
-   *     末段区块高度常不足半屏，按可见面积永远赢不过前段，需在此兜底。
+   *     最后一个模块的标题可能已经离开视口，需在此兜底。
    *  2. 页面不可滚动（内容不足一屏）→ 高亮首个区块（页面入口模块）。
-   *  3. 否则 → 取「视口内可见面积最大」的区块，直接对应"页面当前主要功能模块"：
-   *     可见面积排除吸顶顶栏遮挡区（顶栏之下才是真实可视带），面积相同时
-   *     取文档序靠上者，保证任意滚动位置有且只有一个高亮。
-   *     相比旧算法（高亮「起点已进入顶部 ~96px 判定带」的区块——实为刚划出
-   *     视口顶部的上一个模块），新算法高亮正在占屏的模块，避免错位一档
-   *     （实测：显示「记录与日志」却高亮「数据预览」）。
+   *  3. 否则 → 从上到下查找第一个「完整显示模块标题」的区块：
+   *     标题顶部不被吸顶顶栏遮挡、标题底部仍在视口内；不再按 section 整体
+   *     可见面积判断，避免上一个「可清理项」内容很多时抢走当前模块高亮。
+   *  4. 如果当前滚动位置没有任何完整标题，取第一个标题与有效视口相交的区块，
+   *     作为滚动过渡阶段的稳定兜底。
    */
   const resolveActiveByScroll = (): void => {
     // 用户刚点击导航时，优先保持目标项高亮，直到目标区块进入吸顶定位带。
@@ -183,29 +182,32 @@ export function initScrollspy(): void {
       if (first) setActive(first.id)
       return
     }
-    // 规则 3：可见面积最大者（排除吸顶顶栏遮挡区）
+    // 规则 3/4：按「第一个完整显示的模块标题」判定，而不是按 section 可见面积判定。
+    // 这样上一个内容很多的模块即使仍占据大面积，也不会抢走当前模块的高亮。
     const topbar = document.querySelector('.topbar')
     const bandTop = topbar instanceof HTMLElement ? topbar.offsetHeight : 0
-    let current: HTMLElement | null = null
-    let maxVisible = 0
+    let firstIntersecting: HTMLElement | null = null
     for (const section of sections) {
-      const rect = section.getBoundingClientRect()
-      const visibleTop = Math.max(rect.top, bandTop)
-      const visibleBottom = Math.min(rect.bottom, innerHeight)
-      const visible = visibleBottom - visibleTop
-      // 严格大于：面积相等时保留文档序靠前（靠上）者
-      if (visible > maxVisible) {
-        maxVisible = visible
-        current = section
+      const heading = section.querySelector<HTMLElement>('h1, h2, h3, h4, h5, h6')
+      if (heading) {
+        const rect = heading.getBoundingClientRect()
+        const isIntersecting = rect.bottom > bandTop && rect.top < innerHeight
+        if (!firstIntersecting && isIntersecting) firstIntersecting = section
+        const isFullyVisible = rect.top >= bandTop && rect.bottom <= innerHeight
+        if (isFullyVisible) {
+          setActive(section.id)
+          return
+        }
       }
     }
-    // 兜底：视口内无任何可见区块（极端布局）时取首个
-    if (!current) {
-      const first = sections[0]
-      if (first) setActive(first.id)
+    // 过渡阶段没有完整标题时，取从上到下第一个可见标题。
+    if (firstIntersecting) {
+      setActive(firstIntersecting.id)
       return
     }
-    setActive(current.id)
+    // 极端布局：视口内没有标题时取首个区块。
+    const first = sections[0]
+    if (first) setActive(first.id)
   }
 
   // 布局变化（窗口缩放 / 字体加载）后重测胶囊位置，并重算当前区块
