@@ -133,7 +133,14 @@ function getPurify(): (d: string) => string {
           'data-row',
           'data-sid',
         ],
-        ALLOW_DATA_ATTR: false,
+        // ⚠️ 必须为 true（DOMPurify 默认值）。本项目大量使用 `data-*` 做事件委托与
+        // 元素定位（data-el / data-action / data-group-toggle / data-workbook-key /
+        // data-batch-remove / data-field …），而这些 HTML 是**运行时拼装后立即过
+        // sanitizeHtml** 的。data-* 不含可执行语义（非 URI、非事件、非脚本），
+        // 一旦按属性名逐个放行（历史值为 false + 5 个白名单项），任何未登记的
+        // 新属性都会被静默剥离，表现为「按钮点了没反应 / 勾选丢失 / 组件抛错」，
+        // 且因 jsdom 单测走的是无 DOMPurify 的降级路径而无法被发现。
+        ALLOW_DATA_ATTR: true,
       })
   }
   // DOMPurify 仍未加载 → 走降级

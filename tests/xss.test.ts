@@ -17,7 +17,9 @@
 
 // @vitest-environment jsdom
 
+import DOMPurify from 'dompurify'
 import { describe, it, expect } from 'vitest'
+
 import { sanitizeHtml, sanitizeTableRows } from '../ts/tools/sanitize.js'
 import { escapeHtml } from '../ts/tools/string-utilities-pure.js'
 
@@ -238,5 +240,103 @@ describe('sanitizeTableRows - 表格行片段', () => {
 
   it('空字符串输入返回空字符串', () => {
     expect(sanitizeTableRows('')).toBe('')
+  })
+})
+
+/**
+ * 复现加载项运行时的清洗路径：所有任务窗格都会先加载 libs/purify.js
+ * （DOMPurify 3.4.12 UMD，挂到 globalThis.DOMPurify），使 sanitizeHtml 走严格白名单。
+ * node_modules 中的 dompurify 与之同版本，故直接引用即可。
+ */
+function installRealDomPurify(): void {
+  const host = globalThis as { DOMPurify?: typeof DOMPurify }
+  host.DOMPurify = DOMPurify
+}
+
+/**
+ * 真实 DOMPurify 路径：运行时拼装 HTML 的 data-* 必须保留。
+ *
+ * 背景（2026-09 发现的系统性问题）：所有任务窗格页面（ui/panel.html、clean.html、
+ * enrich.html、settings.html）都先加载 libs/purify.js，因此运行时 sanitizeHtml 走
+ * DOMPurify 严格白名单路径；而 jsdom 单测默认没有 DOMPurify，走的是「保留 data-*」
+ * 的轻量降级路径。两条路径的属性行为不一致，且白名单只登记了 5 个 data-* 属性 ——
+ * 导致 clean-page 的分组按钮/勾选键、enrich-page 的批量删除与列映射、progress 组件
+ * 的 data-el 在真实环境下被静默剥离，表现为「点了没反应 / 勾选丢失 / 组件抛错」
+ * 而单测全绿。此处显式注入真实 DOMPurify，锁死该类回归。
+ */
+describe('真实 DOMPurify 路径：运行时拼装 HTML 的 data-* 必须保留', () => {
+  it('注入后 sanitizeHtml 确实切入 DOMPurify 严格白名单路径', () => {
+    installRealDomPurify()
+    const host = globalThis as { DOMPurify?: { sanitize: unknown } }
+    expect(typeof host.DOMPurify?.sanitize).toBe('function')
+    // DOMPurify 路径会剥离白名单外的标签（img 不在 ALLOWED_TAGS）
+    expect(sanitizeHtml('<img src=x onerror=alert(1)>')).not.toContain('<img')
+  })
+
+  it('clean-page 的工作簿分组/勾选属性可被 dataset 读取（回归：勾选丢失）', () => {
+    installRealDomPurify()
+    const html = `
+      <div class="clean-sheet-group">
+        <div class="clean-sheet-group-head">
+          <button data-group-toggle="D:/a.xlsx" title="展开/折叠">▾</button>
+          <button data-group-all="D:/a.xlsx">本簿全选</button>
+          <button data-group-none="D:/a.xlsx">清空</button>
+        </div>
+        <label class="clean-sheet-item">
+          <input type="checkbox" id="clean-sheet-x" data-workbook-key="D:/a.xlsx" data-sheet-name="动画" checked />
+        </label>
+      </div>`
+    const container = document.createElement('div')
+    container.innerHTML = sanitizeHtml(html)
+
+    const box = container.querySelector<HTMLInputElement>('input[type="checkbox"]')
+    expect(box?.dataset.workbookKey).toBe('D:/a.xlsx')
+    expect(box?.dataset.sheetName).toBe('动画')
+    expect(container.querySelector('[data-group-toggle]')).not.toBeNull()
+    expect(container.querySelector('[data-group-all]')).not.toBeNull()
+    expect(container.querySelector('[data-group-none]')).not.toBeNull()
+  })
+
+  it('enrich-page 的批量删除/列映射/匹配跳转属性保留', () => {
+    installRealDomPurify()
+    const container = document.createElement('div')
+    container.innerHTML = sanitizeHtml(`
+      <button data-batch-remove="3">✕</button>
+      <select data-field="tags"><option>1</option></select>
+      <button data-match-index="7">🔍</button>`)
+    expect(container.querySelector<HTMLElement>('[data-batch-remove]')?.dataset.batchRemove).toBe(
+      '3',
+    )
+    expect(container.querySelector<HTMLElement>('[data-field]')?.dataset.field).toBe('tags')
+    expect(container.querySelector<HTMLElement>('[data-match-index]')?.dataset.matchIndex).toBe('7')
+  })
+
+  it('进度组件模板的 data-el 引用在严格白名单下保留（回归：组件抛错）', () => {
+    installRealDomPurify()
+    const container = document.createElement('div')
+    container.innerHTML = sanitizeHtml('<div data-el="head"><span data-el="title"></span></div>')
+    expect(container.querySelector('[data-el="head"]')).not.toBeNull()
+    expect(container.querySelector('[data-el="title"]')).not.toBeNull()
+  })
+
+  it('放行 data-* 不放行事件处理器与危险 URI', () => {
+    installRealDomPurify()
+    const cleaned = sanitizeHtml(
+      '<div data-el="x" onclick="alert(1)"><a href="javascript:alert(2)">点</a></div>',
+    )
+    expect(cleaned).toContain('data-el="x"')
+    expect(cleaned).not.toMatch(/\son\w+\s*=/i)
+    expect(cleaned).not.toMatch(/javascript:/i)
+  })
+
+  it('data-* 值本身不能成为注入载体（经 escapeHtml 后写入）', () => {
+    installRealDomPurify()
+    const evil = escapeHtml('" onmouseover="alert(1)')
+    const container = document.createElement('div')
+    container.innerHTML = sanitizeHtml(`<button data-group-all="${evil}">x</button>`)
+    const button = container.querySelector<HTMLElement>('button')
+    expect(container.querySelectorAll('button')).toHaveLength(1)
+    expect(button?.hasAttribute('onmouseover')).toBe(false)
+    expect(button?.dataset.groupAll).toBe('" onmouseover="alert(1)')
   })
 })
