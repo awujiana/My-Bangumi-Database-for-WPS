@@ -23,6 +23,14 @@
 - 取舍口径（详见审查报告 §3.2.1）：**刻意的越界输入不改生产类型** —— `range: 'week'/'invalid'`、`quarter: 5/99`、数字型 `话数` 都是覆盖防御分支的健壮性测试（生产确实有 `default → false`、`toExtensionStringValue` 的 `String(value)` 等分支），加显式断言 + 注释即可；**`vi.hoisted` 内不能引用 import 绑定**（vitest 会报 `Cannot access '__vi_import_N__' before initialization`），该处只能保留最小形状并注明原因。
 - `npm run gate` 现在是五道关：`lint:check` → DOMPurify 版本一致 → 导入图（分层 + 致命环）→ tests 类型 → 全量测试。
 
+### 修复（性能 · 消除同步记录的 O(n²) COM 链路，P1-B）
+
+- **问题**：`sync-record.ts` 的写入入口在**每次写之前**都要先跑一次 `deduplicateSyncRecords()` 保证缓存干净，而它会遍历同步记录表 `2..lastRow` 的每一行读取 SID 列。于是「循环内逐条 `addSyncRecord`」把一次 O(n) 的全表扫描放大成 **N×N 次跨进程 COM 调用** —— 数千行的同步会让任务窗格实质长时间无响应。这是本次审查中唯一会导致「不可用」的性能缺陷。
+- **审查报告定位修正**：报告把热点写成 `ui/preview.ts:722`，但那是 `uploadSingleRow()` 内的单行按钮路径，每次点击只写 1 条，不构成 O(n²)。真实的批量循环是两处：`sync/exceltobangumi/progress-reporter.ts` 的 `applySyncSuccessResults` / `applySyncFailResults`（批量同步主链路，与数据行同阶），以及 `ui/handlers/sync.ts` 的 `_doAPISync` 阶段 1（逐条写入账号收藏，与收藏数同阶，可达数千）。
+- **改法**：两处都改为「循环内只累积 `UpdateRecordParameters[]`，循环外调用一次 `addSyncRecords()`」。该批量入口本就存在（内部一次去重 + 一次 `Range.Value2` 二维写入），此前仅 `github-sync.ts` 在用。写入次数由 N 降为 1，全表去重扫描由 N 次降为 1 次。
+- **语义保持**：`_doAPISync` 阶段 1 之后紧跟 `getAllSyncRecords()`，批量写回仍在其之前执行，顺序不变；循环中因用户停止而 `break` 时，已累积的记录照样落盘，与原逐条写入的可见性一致；保留原有的 `typeof addSyncRecords === 'function'` 守卫。
+- **回归锁**：新增 `tests/progress-reporter.test.ts`（17 条），核心断言是「**50 / 20 个任务时 `addSyncRecords` 只能被调用 1 次**」，改回逐条写入即失败。此前 `applySync*Results` 在两个测试文件里都被 `vi.mock` 掉了，无任何真实覆盖（该模块原覆盖率 6.66%）。全量 1873 条绿（52 文件）。
+
 ### 重构（架构 · 消除分层反向依赖，P1-5）
 
 - **问题**：`tools/`、`sync/` 等底层模块直接 `import` 上层的 `ui/dialog.ts` 来弹窗 / 报错 / 更新同步进度条，形成「底层 → 上层」的反向依赖，并在 barrel（`ts/index.ts`、`tools/util/index.ts`）参与下构成运行时循环。后果是模块初始化顺序敏感（本项目历史上踩过 barrel 顶层读到 `undefined` 的坑），底层模块也无法脱离 UI 独立测试。
