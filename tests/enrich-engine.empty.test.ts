@@ -18,6 +18,13 @@ const mockReferences = vi.hoisted(() => ({
   mockBgmLog: vi.fn(),
   mockHandleError: vi.fn(),
   mockAddEnrichRecord: vi.fn(),
+  /**
+   * 富化记录现在由 enrichEntries 在循环外**一次**批量写入（P1-C），
+   * 故断言改从本 mock 读取（每次调用的入参是整批记录数组）。
+   */
+  mockAddEnrichRecords: vi.fn<
+    (records: { matchType?: string; enrichedField?: string; updatedValue: string }[]) => boolean
+  >(() => true),
 }))
 
 const store = new Map<string, string>()
@@ -127,6 +134,7 @@ vi.mock('../ts/tools/util/index.js', () => ({
 
 vi.mock('../ts/sync/enrich-record.js', () => ({
   addEnrichRecord: mockReferences.mockAddEnrichRecord,
+  addEnrichRecords: mockReferences.mockAddEnrichRecords,
 }))
 
 // ========== 导入被测模块 ============
@@ -182,9 +190,10 @@ const animeConfig: EnrichConfig = {
   columnMapping: { nameCol: 1, tagsCol: 2, premiereCol: 3, episodesCol: 4 },
 }
 
+/** 从批量写入的实参中筛出指定匹配类型 + 字段名的记录 */
 function countEnrichRecords(matchType: string, fieldName: string): { updatedValue: string }[] {
-  return mockReferences.mockAddEnrichRecord.mock.calls
-    .map((call) => call[0] as { matchType?: string; enrichedField?: string; updatedValue: string })
+  return mockReferences.mockAddEnrichRecords.mock.calls
+    .flatMap((call) => call[0])
     .filter((record) => record.matchType === matchType && record.enrichedField === fieldName)
 }
 

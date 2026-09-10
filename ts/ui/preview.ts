@@ -32,7 +32,13 @@ import {
   completeSyncProgressDialog,
   hideSyncProgressDialog,
 } from '../index.js'
-import type { WpsWorksheet, WpsRange, SyncRecord, SyncConfigSummary } from '../index.js'
+import type {
+  WpsWorksheet,
+  WpsRange,
+  SyncRecord,
+  SyncConfigSummary,
+  UpdateRecordParameters,
+} from '../index.js'
 // 这三个常量在模块**顶层**被读取（VALID_STATUSES 的构造），若经 barrel 导入会形成
 // 「顶层读取 + 环」的组合 —— 初始化期可能拿到 undefined。故直接从定义处导入。
 import { BGM_COLOR, LOG_LEVELS, WATCH_STATUS_MAP } from '../core/constants.js'
@@ -644,6 +650,17 @@ function buildStatsHtml(totalRows: number): string {
 }
 
 // ========== 单条上传 ==========
+/**
+ * 写入同步记录，并在失败时提示用户
+ *
+ * P1-E：上传已成功（单元格已标记）但记录没落盘时，用户不能只看到"成功"。
+ */
+function writeSyncRecord(parameters: UpdateRecordParameters): void {
+  if (!addSyncRecord(parameters)) {
+    showToast('同步记录写入失败：本条记录未登记，请检查「同步记录」工作表', 'error')
+  }
+}
+
 export async function uploadSingleRow(
   rowNumber: number,
   buttonElement?: HTMLButtonElement,
@@ -720,7 +737,7 @@ export async function uploadSingleRow(
         }
       }
 
-      addSyncRecord({
+      writeSyncRecord({
         name: rowData.name || '(无名称)',
         url: rowData.bgmUrl,
         sid: rowData.sid,
@@ -740,7 +757,7 @@ export async function uploadSingleRow(
         buttonElement.disabled = false
       }
 
-      addSyncRecord({
+      writeSyncRecord({
         name: rowData.name || '(无名称)',
         url: rowData.bgmUrl,
         sid: rowData.sid,

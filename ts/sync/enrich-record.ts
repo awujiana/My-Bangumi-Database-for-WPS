@@ -160,7 +160,15 @@ export function getOrCreateEnrichRecordSheet(): WpsWorksheet {
   return enrichSheet
 }
 
-export function addEnrichRecord(parameters: AddEnrichRecordParameters): void {
+/**
+ * 写入单条富化记录
+ *
+ * 性能提示：批量场景请用 `addEnrichRecords()` —— 本函数每次调用都会重新获取表句柄
+ * 并逐单元格写入 9 次，循环调用会产生大量跨进程 COM 调用（P1-C）。
+ *
+ * @returns 是否写入成功（失败时已记录日志）
+ */
+export function addEnrichRecord(parameters: AddEnrichRecordParameters): boolean {
   try {
     const sheet = getOrCreateEnrichRecordSheet()
 
@@ -196,13 +204,22 @@ export function addEnrichRecord(parameters: AddEnrichRecordParameters): void {
       LOG_LEVELS.INFO,
       `[addEnrichRecord] ${parameters.name} (${parameters.enrichedField}): ${parameters.action}`,
     )
+    return true
   } catch (error: unknown) {
     BGM.handleError(error, { context: 'addEnrichRecord', showAlert: false })
+    return false
   }
 }
 
-export function addEnrichRecords(records: AddEnrichRecordParameters[]): void {
-  if (records.length === 0) return
+/**
+ * 批量写入富化记录（性能入口）
+ *
+ * 相比逐条 `addEnrichRecord`：只获取一次表句柄，并通过一次 `Range.Value2` 写入全部行。
+ *
+ * @returns 是否写入成功（失败时已记录日志）
+ */
+export function addEnrichRecords(records: AddEnrichRecordParameters[]): boolean {
+  if (records.length === 0) return true
 
   try {
     const sheet = getOrCreateEnrichRecordSheet()
@@ -245,8 +262,10 @@ export function addEnrichRecords(records: AddEnrichRecordParameters[]): void {
     }
 
     bgmLog(LOG_LEVELS.INFO, `[addEnrichRecords] 批量写入完成：${String(records.length)} 条记录`)
+    return true
   } catch (error: unknown) {
     BGM.handleError(error, { context: 'addEnrichRecords', showAlert: false })
+    return false
   }
 }
 

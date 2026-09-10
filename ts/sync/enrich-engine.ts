@@ -12,6 +12,7 @@
 
 import { LOG_LEVELS, PANEL_CONFIG } from '../core/constants.js'
 import { CONFIG_KEYS, getConfig } from '../tools/config.js'
+import { getNotifyApi } from '../core/ui-bridge.js'
 import {
   bgmLog,
   getCellValue,
@@ -25,7 +26,8 @@ import {
 } from '../tools/util/index.js'
 import type { WpsWorksheet, WpsWorkbook } from '../tools/wps.js'
 
-import { addEnrichRecord } from './enrich-record.js'
+import { addEnrichRecords } from './enrich-record.js'
+import type { AddEnrichRecordParameters } from './enrich-record.js'
 
 // ========== 常量定义 ==========
 
@@ -1057,6 +1059,8 @@ export function enrichEntries(
 ): EnrichResultItem[] {
   const results: EnrichResultItem[] = []
   const stats = { matched: 0, enriched: 0, skipped: 0, failed: 0 }
+  // 富化记录先累积、循环外一次性批量写入（逐条 addEnrichRecord 会重复取表句柄 + 9 次 COM 写入）
+  const enrichRecords: AddEnrichRecordParameters[] = []
   const total = matches.length
 
   if (total === 0) {
@@ -1114,6 +1118,7 @@ export function enrichEntries(
         config,
         bangumiColMap,
         results,
+        enrichRecords,
         intro,
       )
       didEnrich = true
@@ -1159,6 +1164,7 @@ export function enrichEntries(
           config,
           bangumiColMap,
           results,
+          enrichRecords,
           intro,
         )
         didEnrich = true
@@ -1188,6 +1194,15 @@ export function enrichEntries(
     }
   }
 
+  // 富化记录一次性批量写入（含用户取消时已累积的部分：对应单元格已写入，记录必须一致）
+  // 失败必须让用户看见：单元格已改但审计记录没落盘，等于静默丢数据（P1-E）
+  if (!addEnrichRecords(enrichRecords)) {
+    getNotifyApi().toast(
+      `富化记录写入失败：${String(enrichRecords.length)} 条记录未登记（单元格已修改）`,
+      'error',
+    )
+  }
+
   bgmLog(
     LOG_LEVELS.INFO,
     `[enrichEntries] 富化完成：匹配 ${String(stats.matched)}, 富化 ${String(stats.enriched)}, ` +
@@ -1202,6 +1217,7 @@ export function enrichEntries(
  * 供「已匹配行更新」与「空目标表追加新行」两种场景共用：
  * - 已匹配：bangumiName 传匹配到的名称，recordMatchType 按匹配类型记『精确/别名』
  * - 空表追加：bangumiName 传新番表名称（名称列已写入，避免别名重复），recordMatchType 记『新增』
+ * @param records 富化记录累积数组，由 `enrichEntries` 在循环外一次性批量写入（P1-C）
  * @returns 该行富化结果，由调用方累计统计
  */
 function enrichIntoRow(
@@ -1214,6 +1230,7 @@ function enrichIntoRow(
   config: EnrichConfig,
   bangumiColMap: Map<string, number>,
   results: EnrichResultItem[],
+  records: AddEnrichRecordParameters[],
   intro?: IntroSheetContext,
 ): EnrichRowOutcome {
   const isIntro = isIntroSheet(config.columnMapping)
@@ -1268,7 +1285,7 @@ function enrichIntoRow(
     )
 
     for (const field of enrichedFields) {
-      const record: AddEnrichRecordParameters = {
+      records.push({
         timestamp: new Date().toISOString(),
         matchType: recordMatchType,
         name: match.matchedAnimeName,
@@ -1278,8 +1295,7 @@ function enrichIntoRow(
         updatedValue: field.updatedValue,
         action: field.action,
         ...(field.action === 'skip' && { note: '已有值，跳过' }),
-      }
-      addEnrichRecord(record)
+      })
     }
 
     results.push({
@@ -1315,20 +1331,8 @@ function enrichIntoRow(
 
 export type { EnrichRecord } from './enrich-record.js'
 
-/**
- * 富化记录参数（内部使用）
- */
-interface AddEnrichRecordParameters {
-  timestamp: string
-  matchType: '精确' | '别名' | '新增' | '未匹配'
-  name: string
-  row: number
-  enrichedField: string
-  oldValue: string
-  updatedValue: string
-  action: 'fill' | 'append' | 'skip' | 'error'
-  note?: string
-}
+// 注：曾在此处重复定义一份 `AddEnrichRecordParameters`（与 enrich-record.ts 导出的一致）。
+// 重复定义会随字段演进静默漂移，已改为从 enrich-record.ts 导入唯一事实来源。
 
 // ========== 简介工作表富化函数 ==========
 

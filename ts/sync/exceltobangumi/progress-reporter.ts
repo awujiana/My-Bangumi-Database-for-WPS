@@ -5,6 +5,7 @@
  *              本模块定义共享类型 SyncTask / SyncResultStats，供 index.ts 使用。
  */
 import { LOG_LEVELS, SYNC_STATUS, BGM_COLOR } from '../../core/constants.js'
+import { getNotifyApi } from '../../core/ui-bridge.js'
 import { bgmLog, BGM, getCell } from '../../tools/util/index.js'
 import type { WpsWorksheet } from '../../tools/wps.js'
 import { addSyncRecords } from '../sync-record.js'
@@ -105,7 +106,13 @@ export function applySyncSuccessResults(
 
   // 性能：逐条 addSyncRecord 会在每次写入前触发一次全表去重扫描（O(n²) COM 调用），
   // 改为循环外单次批量写入 —— 一次去重 + 一次 Range.Value2。
-  addSyncRecords(records)
+  // 失败必须让用户看见：单元格已标记成功但记录没落盘，等于静默丢数据（P1-E）。
+  if (!addSyncRecords(records)) {
+    getNotifyApi().toast(
+      `同步记录写入失败：${String(records.length)} 条记录未登记，请检查「同步记录」工作表`,
+      'error',
+    )
+  }
 }
 
 /**
@@ -141,7 +148,12 @@ export function applySyncFailResults(
   }
 
   // 同 applySyncSuccessResults：批量写入，避免逐条触发全表去重
-  addSyncRecords(records)
+  if (!addSyncRecords(records)) {
+    getNotifyApi().toast(
+      `同步记录写入失败：${String(records.length)} 条失败记录未登记，请检查「同步记录」工作表`,
+      'error',
+    )
+  }
 }
 
 /**

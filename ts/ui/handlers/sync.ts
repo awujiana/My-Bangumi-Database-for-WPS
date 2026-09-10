@@ -15,6 +15,7 @@ import {
   trim,
   showAlert,
   showConfirm,
+  showToast,
   setStatus,
   verifyToken,
   fetchAllUserCollections,
@@ -867,7 +868,13 @@ async function _doAPISync(
       )
     }
 
-    if (typeof addSyncRecords === 'function') addSyncRecords(pendingSyncRecords)
+    if (typeof addSyncRecords === 'function' && !addSyncRecords(pendingSyncRecords)) {
+      // 失败必须让用户看见：收藏已同步到 Bangumi，但本地同步记录没落盘（P1-E）
+      showToast(
+        `同步记录写入失败：${String(pendingSyncRecords.length)} 条收藏未登记，请检查「同步记录」工作表`,
+        'error',
+      )
+    }
 
     syncRecords = typeof getAllSyncRecords === 'function' ? getAllSyncRecords() : []
     syncCountMap.clear()

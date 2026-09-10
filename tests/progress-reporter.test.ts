@@ -24,10 +24,16 @@ const mockState = vi.hoisted(() => ({
   ),
   handleError: vi.fn(),
   setSyncComplete: vi.fn(),
+  toast: vi.fn(),
 }))
 
 vi.mock('../ts/sync/sync-record.js', () => ({
   addSyncRecords: mockState.addSyncRecords,
+}))
+
+// 桥接口：P1-E 要求「批量写入失败必须让用户看见」，此处用 spy 断言提示确实发出
+vi.mock('../ts/core/ui-bridge.js', () => ({
+  getNotifyApi: () => ({ toast: mockState.toast }),
 }))
 
 vi.mock('../ts/tools/util/index.js', () => ({
@@ -212,6 +218,30 @@ describe('applySyncFailResults', () => {
     expect(
       (mockState.getCell.mock.results[0]?.value as { Interior: { Color: number } }).Interior.Color,
     ).toBe(BGM_COLOR.FAIL)
+  })
+})
+
+describe('写入失败必须让用户看见（P1-E）', () => {
+  it('成功结果批量写入失败时提示用户', () => {
+    mockState.addSyncRecords.mockReturnValueOnce(false)
+    applySyncSuccessResults(createStubWorksheet(), 9, [createTask()], createStats())
+
+    expect(mockState.toast).toHaveBeenCalledTimes(1)
+    expect(mockState.toast.mock.calls[0]?.[0]).toContain('同步记录写入失败')
+    expect(mockState.toast.mock.calls[0]?.[1]).toBe('error')
+  })
+
+  it('失败结果批量写入失败时提示用户', () => {
+    mockState.addSyncRecords.mockReturnValueOnce(false)
+    applySyncFailResults(createStubWorksheet(), 9, [createTask()], createStats())
+
+    expect(mockState.toast).toHaveBeenCalledTimes(1)
+    expect(mockState.toast.mock.calls[0]?.[0]).toContain('同步记录写入失败')
+  })
+
+  it('写入成功时不得打扰用户', () => {
+    applySyncSuccessResults(createStubWorksheet(), 9, [createTask()], createStats())
+    expect(mockState.toast).not.toHaveBeenCalled()
   })
 })
 

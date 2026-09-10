@@ -18,6 +18,7 @@
 // 注意：bgmLog 定义在 tools/utility.ts（不在 core/constants.ts），与 BGM/getDataSheet 等同源导入
 import { LOG_LEVELS, BGM_SUBJECT_TYPES } from '../core/constants.js'
 import { Result, BgmError } from '../core/result.js'
+import { getNotifyApi } from '../core/ui-bridge.js'
 import {
   bgmLog,
   getDataSheet,
@@ -1711,8 +1712,12 @@ export async function applyDiffToSheet(
   }
 
   // 写入同步记录与汇总行
-  if (syncRecords.length > 0) {
-    addSyncRecords(syncRecords)
+  if (syncRecords.length > 0 && !addSyncRecords(syncRecords)) {
+    // 失败必须让用户看见：工作簿已改但同步记录没落盘，等于静默丢数据（P1-E）
+    getNotifyApi().toast(
+      `同步记录写入失败：${String(syncRecords.length)} 条记录未登记，请检查「同步记录」工作表`,
+      'error',
+    )
   }
   addSyncRecordSummary({
     source,
