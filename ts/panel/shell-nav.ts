@@ -54,6 +54,7 @@ export function initScrollspy(): void {
   // 导航点击后的过渡锁：防止平滑滚动尚未结束时，旧区块的可见面积把高亮抢回去
   let navigationTarget: HTMLElement | null = null
   let navigationLockTimer = 0
+  let navigationReleaseTimer = 0
   const getIndicator = (): HTMLElement | null => {
     indicator ??= nav.querySelector<HTMLElement>('.nav-indicator')
     if (!indicator) {
@@ -98,6 +99,10 @@ export function initScrollspy(): void {
       window.clearTimeout(navigationLockTimer)
       navigationLockTimer = 0
     }
+    if (navigationReleaseTimer) {
+      window.clearTimeout(navigationReleaseTimer)
+      navigationReleaseTimer = 0
+    }
   }
 
   // 点击导航项：立即高亮，并锁定到锚点滚动完成，防止高亮在过渡中回跳
@@ -110,8 +115,11 @@ export function initScrollspy(): void {
     navigationTarget = target
     setActive(sectionId)
     if (navigationLockTimer) window.clearTimeout(navigationLockTimer)
-    // 锚点滚动异常中断时也必须自动释放，不影响后续手动滚动
-    navigationLockTimer = window.setTimeout(clearNavigationLock, 2000)
+    if (navigationReleaseTimer) window.clearTimeout(navigationReleaseTimer)
+    navigationReleaseTimer = 0
+    // 锚点滚动异常中断时也必须自动释放，不影响后续手动滚动；
+    // 底部区块无法真正滚到顶栏位置，给平滑滚动更充足的完成时间。
+    navigationLockTimer = window.setTimeout(clearNavigationLock, 5000)
   }
   for (const link of navLinks) {
     link.addEventListener('click', () => {
@@ -141,11 +149,20 @@ export function initScrollspy(): void {
       const bandTop = topbar instanceof HTMLElement ? topbar.offsetHeight : 0
       const targetTop = navigationTarget.getBoundingClientRect().top
       if (Math.abs(targetTop - bandTop) <= 12) {
-        clearNavigationLock()
-      } else {
+        // 目标已到位，但滚动动画最后几帧仍可能把第二个 section 判为可见面积最大。
+        // 保持目标高亮 600ms，等锚点滚动完全稳定后再恢复正常 scrollspy。
+        if (!navigationReleaseTimer) {
+          navigationReleaseTimer = window.setTimeout(clearNavigationLock, 600)
+        }
         setActive(navigationTarget.id)
         return
       }
+      if (navigationReleaseTimer) {
+        window.clearTimeout(navigationReleaseTimer)
+        navigationReleaseTimer = 0
+      }
+      setActive(navigationTarget.id)
+      return
     }
 
     const { innerHeight, scrollY } = window
