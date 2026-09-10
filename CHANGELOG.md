@@ -8,6 +8,22 @@
 
 ## [未发布]
 
+### 修复（安全 · 阻断级：运行时 HTML 的 data-* 属性被静默剥离）
+
+- **同步弹窗与清理页的进度条在真实环境中必然抛错**：所有任务窗格（`ui/*.html`、`index.html`）都会先加载 `libs/purify.js`（DOMPurify 3.4.12 UMD），使 `sanitizeHtml` 走**严格白名单**路径；而白名单 `ALLOW_DATA_ATTR` 曾设为 `false` 且 `ALLOWED_ATTR` 只登记 5 个 `data-*`（`data-event/status/type/row/sid`），导致其余 `data-*` 属性被**静默剥离**。影响面：① `progress.ts` 模板 `data-el` 全丢 → `collectElements` 抛「进度组件缺少必需元素」；② `clean-page` 的 `data-workbook-key`/`data-sheet-name`/`data-group-toggle`/`data-group-all`/`data-group-none` 全丢 → **勾选不持久化、分组折叠与本簿全选失效**；③ `enrich-page` 的 `data-batch-remove`/`data-field`/`data-match-index` 全丢 → **批量删除、列映射、匹配跳转失效**。
+- 根因修复：`ts/tools/sanitize.ts` 的 `ALLOW_DATA_ATTR` 改回 DOMPurify 默认值 `true`（`data-*` 不具可执行语义，非 URI、非事件、非脚本；标签白名单 / `on*` 清除 / `javascript:` 拦截等真正防线保持不变）。
+- **该缺陷在 1835 条全绿测试下 100% 隐身**：jsdom 默认无 DOMPurify，`sanitizeHtml` 走「保留 `data-*`」的轻量降级路径，与生产路径属性行为不一致，且此前无任何测试覆盖生产路径。新增 `tests/progress.test.ts`（43 条）与 `tests/xss.test.ts`（+6 条），**显式注入 `dompurify@3.4.12`**（与 `libs/purify.js` 同版本）复现生产路径并锁死该类回归。
+
+### 新增（UI 组件化 · 通用进度组件）
+
+- 新增 `ts/ui/components/progress.ts`：统一状态机 + 三渲染模式（`modal` 全屏阻塞 / `inline` 页面内嵌 / `detach` 角落浮层），API 为 `showProgress`/`updateProgress`/`appendProgressLog`/`setProgressPaused`/`completeProgress`/`hideProgress`/`getActiveProgress`；含日志行数上限 500、ETA（单步 + 全局，扣除暂停时长）、`aria-live`/`role="progressbar"`、ESC 关闭与焦点恢复。
+- 引擎侧 `onProgress(current, total, message)` 协议全库早已统一，**本次只替换渲染层，引擎零改动**。已接入：清理页（`inline` + 实时日志面板 + 完成态摘要）、同步弹窗（`modal`，`ts/ui/dialog.ts` 降级为兼容层，对外 API 与回调协议不变，`preview`/`handlers`/`ribbon-service` 零改动）。
+- CSS 类名收敛：`bgm-sync-progress__*` → `bgm-progress__*`。
+
+### 文档（项目审查）
+
+- 新增 [`文档/TS_AUDIT_2026_09_10.md`](文档/TS_AUDIT_2026_09_10.md)：TypeScript 项目开发规范全面审查报告（结构审查 / 8 维度核查 / 29 项问题清单 / 优化建议 / 边界情况梳理 / 可执行验证方案）。
+
 ### 修复（数据清理 · 识别口径对齐「有表头 + Bangumi_URL」）
 
 - **「剧集和小说」这类表被判为「非数据表」而无法默认清理**：此前清理页要求必须有归一化后的「名称」列（`colMap.has('名称')`），而同一份 Bangumi 数据在不同工作簿里列名并不统一（列名叫「剧集名 / 小说名」时不会归一化成「名称」）。现在判定改为**配置驱动的特征列**（`CLEAN_TARGETS.identityColumns = ['名称', 'Bangumi_URL']`，**命中任一即视为 Bangumi 数据表**），月历式新番表签名同样算命中；只要有表头行 + `Bangumi_URL` 列就能被识别与清理。缺列的规则不会硬跑，会返回跳过原因写入预览说明（如未找到「名称」列的行级规则）。
