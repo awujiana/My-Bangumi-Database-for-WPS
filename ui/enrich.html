@@ -138,41 +138,9 @@
               "
             ></div>
 
-            <!-- 批量进度 -->
+            <!-- 批量进度（宿主容器，内容由通用进度组件 inline 模式渲染） -->
             <div id="batchProgress" style="display: none; margin-top: 8px">
-              <div
-                style="
-                  display: flex;
-                  justify-content: space-between;
-                  font-size: 12px;
-                  margin-bottom: 4px;
-                "
-              >
-                <span id="batchCurrentFile"></span>
-                <span id="batchPercent">0%</span>
-              </div>
-              <div
-                style="
-                  background: var(--bg-surface);
-                  border-radius: 4px;
-                  height: 6px;
-                  overflow: hidden;
-                "
-              >
-                <div
-                  id="batchProgressFill"
-                  style="
-                    height: 100%;
-                    background: linear-gradient(
-                      90deg,
-                      var(--accent-blue),
-                      var(--accent-blue-strong)
-                    );
-                    width: 0%;
-                    transition: width 0.2s;
-                  "
-                ></div>
-              </div>
+              <div id="batchProgressHost"></div>
             </div>
 
             <!-- 最终汇总 -->
@@ -334,14 +302,9 @@
             🚀 开始富化
           </button>
           <div class="enrich-progress" id="enrichProgress" style="display: none">
-            <div class="progress-bar">
-              <div class="progress-bar-fill" id="progressBarFill" style="width: 0%">0%</div>
-            </div>
+            <!-- 进度条宿主：内容由通用进度组件 inline 模式渲染 -->
+            <div id="enrichProgressHost"></div>
             <div class="enrich-stats">
-              <div class="enrich-stat-row">
-                <span class="enrich-stat-label">当前处理：</span>
-                <span class="enrich-stat-value" id="currentItem">-</span>
-              </div>
               <div class="enrich-stat-grid">
                 <div class="enrich-stat-item">
                   <span class="enrich-stat-num" id="enrichedCount">0</span>
@@ -355,10 +318,6 @@
                   <span class="enrich-stat-num" id="failedCount">0</span>
                   <span class="enrich-stat-text">失败</span>
                 </div>
-              </div>
-              <div class="enrich-stat-row">
-                <span class="enrich-stat-label">预计剩余：</span>
-                <span class="enrich-stat-value" id="etaTime">-</span>
               </div>
             </div>
           </div>
@@ -487,9 +446,8 @@
         <div id="conflictDialog" class="conflict-dialog" style="display: none">
           <div class="conflict-header">
             <span class="conflict-title" id="conflictTitle">⚡️ 字段冲突确认</span>
-            <div class="conflict-progress">
-              <div class="conflict-progress-fill" id="conflictProgressFill"></div>
-            </div>
+            <!-- 冲突进度宿主：通用进度组件 inline 模式；由 .conflict-progress 压缩为细线 -->
+            <div class="conflict-progress" id="conflictProgressHost"></div>
           </div>
           <div class="conflict-body">
             <div class="conflict-row">

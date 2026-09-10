@@ -1045,6 +1045,7 @@ export function enrichEntries(
   config: EnrichConfig,
   progressCallback?: ProgressCallback,
   intro?: IntroSheetContext,
+  isCancelled?: () => boolean,
 ): EnrichResultItem[] {
   const results: EnrichResultItem[] = []
   const stats = { matched: 0, enriched: 0, skipped: 0, failed: 0 }
@@ -1077,6 +1078,15 @@ export function enrichEntries(
   const bangumiNameCol = bangumiColMap.get('名称') ?? 0
 
   for (const [index, match] of matches.entries()) {
+    // 取消检查放在条目边界：当前条目已写入的单元格保留（不回滚），避免半行脏数据
+    if (isCancelled?.() === true) {
+      bgmLog(
+        LOG_LEVELS.WARN,
+        `[enrichEntries] 用户取消富化：已完成 ${String(index)}/${String(total)} 条，已写入结果保留`,
+      )
+      break
+    }
+
     const current = index + 1
     let outcome: EnrichRowOutcome = 'skipped'
     let didEnrich = false

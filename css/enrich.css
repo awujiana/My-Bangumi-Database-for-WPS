@@ -794,7 +794,7 @@
   transform: none;
 }
 
-/* ========== 进度条 ========== */
+/* ========== 进度区（条本身由通用进度组件渲染，见 ts/ui/components/progress.ts） ========== */
 .enrich-progress {
   margin-top: 14px;
   padding: 14px;
@@ -803,27 +803,17 @@
   border: 1px solid var(--border-strong);
 }
 
-.progress-bar {
-  width: 100%;
-  height: 22px;
-  background: var(--bg-surface-2);
-  border-radius: 11px;
-  overflow: hidden;
-  margin-bottom: 12px;
-  border: 1px solid var(--border-strong);
+/* 富化页内嵌进度：去掉组件默认外边距，避免与外层 padding 叠加 */
+#enrichProgressHost .bgm-progress--inline,
+#batchProgressHost .bgm-progress--inline {
+  margin: 0;
+  padding: 0;
+  border: none;
+  background: transparent;
 }
 
-.progress-bar-fill {
-  height: 100%;
-  background: linear-gradient(90deg, var(--accent-blue) 0%, var(--teal) 100%);
-  transition: width 0.4s ease;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 12px;
-  color: var(--text-1);
-  font-weight: 600;
-  min-width: 40px;
+#enrichProgressHost .bgm-progress__section {
+  margin-top: 0;
 }
 
 .enrich-stats {
@@ -1230,19 +1220,43 @@
   color: var(--accent-blue);
 }
 
+/* 冲突进度：复用通用进度组件的状态机，宿主把渲染结果压缩为 4px 细线 */
 .conflict-progress {
   margin-top: 8px;
-  background: var(--bg-surface);
-  border-radius: 2px;
-  overflow: hidden;
-  height: 4px;
 }
 
-.conflict-progress-fill {
-  height: 100%;
-  background: var(--accent-blue);
+.conflict-progress .bgm-progress--inline {
+  margin: 0;
+  padding: 0;
+  border: none;
+  background: transparent;
+}
+
+/* 细线形态：隐藏标题/文案/页脚，仅保留轨道 */
+.conflict-progress .bgm-progress__head,
+.conflict-progress .bgm-progress__config,
+.conflict-progress .bgm-progress__meta,
+.conflict-progress .bgm-progress__current,
+.conflict-progress .bgm-progress__result,
+.conflict-progress .bgm-progress__footer {
+  display: none;
+}
+
+.conflict-progress .bgm-progress__section {
+  margin: 0;
+}
+
+.conflict-progress .bgm-progress__track {
+  height: 4px;
   border-radius: 2px;
-  width: 0;
+  background: var(--bg-surface);
+  overflow: hidden;
+}
+
+.conflict-progress .bgm-progress__bar {
+  height: 100%;
+  border-radius: 2px;
+  background: var(--accent-blue);
   transition: width 0.25s ease;
 }
 

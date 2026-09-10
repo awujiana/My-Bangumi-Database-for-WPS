@@ -24,7 +24,6 @@ import type {
   MatchResult,
   EnrichResultItem,
   EnrichProgress,
-  ProgressCallback,
   ConflictInfo,
   EnrichedField,
   IntroSheetContext,
@@ -54,6 +53,8 @@ import {
   scanMatchingWorkbooks,
 } from '../sync/workbook-auto-detect.js'
 import { sanitizeHtml, sanitizeTableRows } from '../tools/sanitize.js'
+import { createProgress } from '../ui/components/progress.js'
+import type { ProgressController, ProgressShowOptions } from '../ui/components/progress.js'
 import { escapeHtml } from '../tools/string-utilities.js'
 import { cleanSheetDuplicates } from '../sync/sheet-cleaning.js'
 import { showToast } from '../ui/dialog.js'
@@ -202,18 +203,6 @@ function safeGetSelect(id: string): HTMLSelectElement | null {
 function safeGetCheckbox(id: string): HTMLInputElement | null {
   const element = document.getElementById(id)
   return element instanceof HTMLInputElement ? element : null
-}
-
-function formatEta(etaMs: number): string {
-  if (etaMs <= 0) return '-'
-  const seconds = Math.ceil(etaMs / 1000)
-  if (seconds < 60) return `${String(seconds)}秒`
-  const minutes = Math.floor(seconds / 60)
-  const remainingSeconds = seconds % 60
-  if (minutes < 60) return `${String(minutes)}分${String(remainingSeconds)}秒`
-  const hours = Math.floor(minutes / 60)
-  const remainingMinutes = minutes % 60
-  return `${String(hours)}时${String(remainingMinutes)}分`
 }
 
 // ========== 初始化 ==========
@@ -2642,11 +2631,6 @@ export function startEnrichment(): void {
     targetSheetName: state.bangumiSheet.Name || '',
   }
 
-  const progressCallback: ProgressCallback = (progress: EnrichProgress) => {
-    if (state.cancelRequested) return
-    updateProgressUI(progress)
-  }
-
   try {
     bgmLog(LOG_LEVELS.INFO, `[enrich] 开始富化，共 ${String(state.matches.length)} 条匹配`)
 
@@ -2655,10 +2639,12 @@ export function startEnrichment(): void {
       state.bangumiSheet,
       state.matches,
       config,
-      progressCallback,
+      updateProgressUI,
       state.introContext ?? undefined,
+      isEnrichCancelled,
     )
 
+    const wasCancelled = isEnrichCancelled()
     showProgressUI(false)
 
     // 保存本次富化详细条目并显示「查看详细结果」按钮（有无冲突均可查看）
@@ -2666,7 +2652,15 @@ export function startEnrichment(): void {
     showEnrichDetailButton()
 
     const allConflicts = collectAllConflicts(results)
-    if (allConflicts.length > 0) {
+    if (wasCancelled) {
+      // 用户主动停止：不再弹出冲突确认（避免在"停止"之后继续要求交互），只给摘要
+      bgmLog(
+        LOG_LEVELS.WARN,
+        `[enrich] 已按用户请求停止，保留 ${String(results.length)} 条已完成结果`,
+      )
+      showToast(`已停止富化，保留已完成（含未解决冲突）的部分结果`, 'warning')
+      renderEnrichSummary(results)
+    } else if (allConflicts.length > 0) {
       state.pendingConflicts = allConflicts
       state.currentConflictIndex = 0
       showConflictDialog()
@@ -2698,16 +2692,70 @@ export function startEnrichment(): void {
   }
 }
 
+/** 单文件富化进度实例 */
+let enrichProgressCtrl: ProgressController | null = null
+/** 批量富化进度实例 */
+let batchProgressCtrl: ProgressController | null = null
+/** 冲突解决进度实例 */
+let conflictProgressCtrl: ProgressController | null = null
+
+/**
+ * 创建内嵌（inline）进度实例。
+ * 走 `createProgress` 而非全局单例 `showProgress`，使三处进度各自独立、互不干扰。
+ * @param hostId 宿主容器 ID（由页面静态模板提供）
+ * @param title 标题（inline 模式默认不渲染标题栏，仅作语义信息）
+ * @param icon 图标
+ * @param onStop 提供时渲染「停止」按钮并接管点击
+ */
+function createInlineProgress(
+  hostId: string,
+  title: string,
+  icon: string,
+  onStop?: () => void,
+): ProgressController | null {
+  const options: ProgressShowOptions = { mode: 'inline', hostId, title, icon }
+  if (onStop !== undefined) {
+    options.enableStop = true
+    options.onStop = onStop
+  }
+  return createProgress(options)
+}
+
+/**
+ * 富化是否已被用户请求取消。
+ * 经函数读取是刻意的：直接读 `state.cancelRequested` 会被 TS 的控制流分析收窄为
+ * `false` 字面量（`state` 初始化时该字段为 false 且中间赋值发生在别的函数里），
+ * 从而把 `if (wasCancelled)` 判成恒假。
+ */
+function isEnrichCancelled(): boolean {
+  return state.cancelRequested
+}
+
+/**
+ * 请求取消当前富化。
+ * 仅置位标记，真正停止由 `enrichEntries` 在条目循环边界检查后返回；已写入的部分保留（不回滚）。
+ */
 function cancelEnrichment(): void {
   if (!state.isEnriching) return
   state.cancelRequested = true
-  bgmLog(LOG_LEVELS.INFO, '[enrich] 用户请求取消富化')
+  bgmLog(LOG_LEVELS.WARN, '[enrich] 用户请求取消富化，将在当前条目处理完成后停止')
 }
 
 function showProgressUI(isVisible: boolean): void {
   const progressArea = safeGetElement('enrichProgress')
-  if (progressArea) {
-    progressArea.style.display = isVisible ? '' : 'none'
+
+  if (isVisible) {
+    enrichProgressCtrl = createInlineProgress(
+      'enrichProgressHost',
+      '富化进度',
+      '✨',
+      cancelEnrichment,
+    )
+    if (progressArea) progressArea.style.display = ''
+  } else {
+    enrichProgressCtrl?.hide()
+    enrichProgressCtrl = null
+    if (progressArea) progressArea.style.display = 'none'
   }
 
   const startButton = safeGetButton('startEnrichBtn')
@@ -2719,18 +2767,8 @@ function showProgressUI(isVisible: boolean): void {
 }
 
 function updateProgressUI(progress: EnrichProgress): void {
-  const percent = progress.total > 0 ? Math.round((progress.current / progress.total) * 100) : 0
-
-  const fillElement = safeGetElement('progressBarFill')
-  if (fillElement) {
-    fillElement.style.width = `${String(percent)}%`
-    fillElement.textContent = `${String(percent)}%`
-  }
-
-  const currentElement = safeGetElement('currentItem')
-  if (currentElement) {
-    currentElement.textContent = progress.currentName || '-'
-  }
+  // 百分比、当前条目与 ETA 统一由通用进度组件渲染（页面只维护富化专有统计）
+  enrichProgressCtrl?.update(progress.current, progress.total, progress.currentName || '-')
 
   const enrichedElement = safeGetElement('enrichedCount')
   if (enrichedElement) enrichedElement.textContent = String(progress.stats.enriched)
@@ -2740,9 +2778,6 @@ function updateProgressUI(progress: EnrichProgress): void {
 
   const failedElement = safeGetElement('failedCount')
   if (failedElement) failedElement.textContent = String(progress.stats.failed)
-
-  const etaElement = safeGetElement('etaTime')
-  if (etaElement) etaElement.textContent = formatEta(progress.etaMs)
 }
 
 function renderEnrichSummary(results: EnrichResultItem[]): void {
@@ -3271,15 +3306,15 @@ function showConflictDialog(): void {
 
   const total = state.pendingConflicts.length
   const current = state.currentConflictIndex + 1
-  const percent = Math.round((current / total) * 100)
 
   // 静态模板只更新文本值，避免运行时拼接 HTML
   const titleElement = safeGetElement('conflictTitle')
   if (titleElement)
     titleElement.textContent = `⚡️ 字段冲突确认 (${String(current)}/${String(total)})`
 
-  const fillElement = safeGetElement('conflictProgressFill')
-  if (fillElement) fillElement.style.width = `${String(percent)}%`
+  // 冲突进度：本函数每个冲突都会调用一次，故实例首次创建后复用
+  conflictProgressCtrl ??= createInlineProgress('conflictProgressHost', '冲突进度', '⚡️')
+  conflictProgressCtrl?.update(current, total)
 
   const nameElement = safeGetElement('conflictName')
   if (nameElement) nameElement.textContent = conflict.matchedAnimeName
@@ -3301,6 +3336,8 @@ function hideConflictDialog(): void {
   if (dialogElement) {
     dialogElement.style.display = 'none'
   }
+  conflictProgressCtrl?.hide()
+  conflictProgressCtrl = null
 }
 
 function handleConflictResolution(resolution: ConflictInfo['resolution']): void {
@@ -3394,23 +3431,24 @@ function batchRemoveFile(index: number): void {
 /** 展示/更新批量进度 UI */
 function showBatchProgress(isVisible: boolean): void {
   const progressElement = safeGetElement('batchProgress')
-  if (progressElement) progressElement.style.display = isVisible ? '' : 'none'
+
+  if (isVisible) {
+    // 「停止」按钮把此前不可达的批量取消路径接上（state.batchCancelRequested 原先无人置位）
+    batchProgressCtrl = createInlineProgress('batchProgressHost', '批量富化进度', '📦', () => {
+      state.batchCancelRequested = true
+      bgmLog(LOG_LEVELS.WARN, '[enrich-batch] 用户请求取消批量富化，将在当前文件处理完成后停止')
+    })
+    if (progressElement) progressElement.style.display = ''
+  } else {
+    batchProgressCtrl?.hide()
+    batchProgressCtrl = null
+    if (progressElement) progressElement.style.display = 'none'
+  }
 }
 
-/** 更新批量进度条 */
+/** 更新批量进度条（百分比与计数由通用进度组件渲染） */
 function updateBatchProgressUI(current: number, total: number, currentFileName: string): void {
-  const percent = total > 0 ? Math.round((current / total) * 100) : 0
-
-  const fillElement = safeGetElement('batchProgressFill')
-  if (fillElement) fillElement.style.width = `${String(percent)}%`
-
-  const percentElement = safeGetElement('batchPercent')
-  if (percentElement) percentElement.textContent = `${String(percent)}%`
-
-  const currentElement = safeGetElement('batchCurrentFile')
-  if (currentElement) {
-    currentElement.textContent = `[${String(current)}/${String(total)}] ${extractFileName(currentFileName)}`
-  }
+  batchProgressCtrl?.update(current, total, extractFileName(currentFileName))
 }
 
 /** 打开批量源文件并取得首个工作表。失败时抛出，由调用方统一记录结果。 */
@@ -3632,10 +3670,8 @@ async function runBatchEnrichment(bangumiSheet: WpsWorksheet): Promise<void> {
   const total = state.batchFiles.length
 
   for (let index = 0; index < total; index += 1) {
-    if (state.batchCancelRequested) {
-      bgmLog(LOG_LEVELS.WARN, '[enrich-batch] 用户取消批量富化')
-      break
-    }
+    // 取消在文件边界生效：当前文件已处理完的部分保留（统一在循环后提示）
+    if (state.batchCancelRequested) break
 
     state.batchIndex = index + 1
     const filePath = state.batchFiles[index]
@@ -3659,6 +3695,17 @@ async function runBatchEnrichment(bangumiSheet: WpsWorksheet): Promise<void> {
   }
 
   state.isBatchEnriching = false
+
+  if (state.batchCancelRequested) {
+    bgmLog(
+      LOG_LEVELS.WARN,
+      `[enrich-batch] 已按用户请求停止：完成 ${String(state.batchResults.length)}/${String(total)} 个文件`,
+    )
+    showToast(
+      `已停止批量富化，完成 ${String(state.batchResults.length)}/${String(total)} 个文件`,
+      'warning',
+    )
+  }
 
   // 恢复 UI
   showBatchProgress(false)
