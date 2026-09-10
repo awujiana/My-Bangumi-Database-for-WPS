@@ -21,7 +21,7 @@ vi.hoisted(() => {
   vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'setInterval', 'clearInterval'] })
 })
 
-import { calcChecksum, buildPayload, extractToken } from '../ts/core/crypto.js'
+import { calcChecksum, buildPayload, extractToken } from '../ts/core/token-payload.js'
 import { TOKEN_CONFIG } from '../ts/core/constants.js'
 
 // 清空模块加载期间累积的 fake timers，避免它们在测试中被意外触发

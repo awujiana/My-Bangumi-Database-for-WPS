@@ -58,6 +58,37 @@ describe('maskSensitiveData', () => {
     expect(result).not.toContain('abcdefghijklmn')
     expect(result).not.toContain('qrstuvwx12345678')
   })
+
+  // P1-8 加固：键名覆盖范围从「仅 token」放宽到常见凭据命名（原实现只匹配 token= / token: / Bearer，access_token / client_secret / password 这类同样常见的写法会原样进日志）
+
+  it.each([
+    ['下划线变体 access_token', '请求体 access_token=abcdefghijklmnop&scope=read'],
+    ['下划线变体 refresh_token', 'body refresh_token:zyxwvutsrqponml'],
+    ['连字符变体 api-key', '头 api-key=abcdefghijklmnop'],
+    ['client_secret', 'client_secret=abcdefghijklmnop'],
+    ['password', 'password=abcdefghijklmnop'],
+    ['passwd 简写', 'passwd=abcdefghijklmnop'],
+  ])('应脱敏 %s', (_label, input) => {
+    expect(maskSensitiveData(input)).not.toMatch(/abcdefghijklmnop|zyxwvutsrqponml/)
+  })
+
+  it('脱敏后仍保留可读的键名前缀（便于排查，不泄漏值）', () => {
+    const result = maskSensitiveData('access_token=abcdefghijklmnop')
+    expect(result.startsWith('access_token=')).toBe(true)
+    expect(result).not.toContain('abcdefghijklmnop')
+  })
+
+  it('不得因放宽键名而误伤普通日志文案', () => {
+    for (const message of [
+      '普通日志消息',
+      '[HTTP] 方法: POST',
+      '[config] Token 已设置（长度: 64）',
+      '[enrich] 富化完成: 12 条结果, 冲突 0 条',
+      '[clean] 共删除 3 行，更新 5 个单元格',
+    ]) {
+      expect(maskSensitiveData(message), message).toBe(message)
+    }
+  })
 })
 
 describe('logger', () => {

@@ -560,10 +560,12 @@ export const URL_PATTERNS = [
  * Token 版本配置（仅用于识别历史 XOR 加密数据）
  *
  * 当前 Token 已改为明文存储，XOR 加密仅保留用于读取历史数据并自动升级。
- * XOR_KEY 不再全局暴露，仅在 core/crypto.ts 内部保留以兼容旧数据。
+ * 历史上这里曾导出一个 XOR_KEY，但全库已无任何 XOR 加解密实现
+ * （core/token-payload.ts 只做 8 位校验和，不做加密），故一并删除该说明，
+ * 避免让维护者以为存在一个凭据加密层。
  */
 export const TOKEN_CONFIG = {
-  /** Token版本标识，用于识别历史 XOR 加密数据 */
+  /** Payload 版本标识（用于版本匹配；与加密无关，payload 为明文） */
   VERSION: '1',
 }
 

@@ -3,7 +3,7 @@
  * @module tools/string-utilities-pure
  * @description 提供 Excel 列号转换、字符串修剪、HTML 转义等纯函数。
  *
- * 本模块刻意保持零项目依赖（不引入 core/crypto、tools/util、UI/handlers 等模块），
+ * 本模块刻意保持零项目依赖（不引入 core/token-payload、tools/util、UI/handlers 等模块），
  * 以便单元测试可以直接 import 而不触发 handlers.ts 中的 setTimeout / addEventListener
  * 等副作用（副作用链：string-utilities → crypto → index → handlers）。
  *
@@ -11,7 +11,7 @@
  * 下运行；在纯 Node 环境下调用会抛 ReferenceError。colNumberToLetter 与 trim 无环境依赖。
  *
  * 历史背景：原 string-utilities.ts 同时导出 colNumberToLetter / escapeHtml / trim / calcFingerprint，
- * 其中 calcFingerprint 依赖 core/crypto.calcChecksum，而 crypto.ts 又 import 自 index.ts，
+ * 其中 calcFingerprint 依赖 core/token-payload.calcChecksum，而 crypto.ts 又 import 自 index.ts，
  * 触发整条副作用链。为支持纯函数单元测试，将无依赖的三个函数抽取到本模块。
  */
 

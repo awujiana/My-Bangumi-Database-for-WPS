@@ -6,7 +6,7 @@
  * 模块拆分说明：
  *   - colNumberToLetter / escapeHtml / trim 是无项目依赖的纯函数，已抽取到
  *     ./string-utilities-pure.js（零依赖模块）。本模块 re-export 以保持向后兼容。
- *   - calcFingerprint 依赖 core/crypto 中的 calcChecksum（纯算术函数），但
+ *   - calcFingerprint 依赖 core/token-payload 中的 calcChecksum（纯算术函数），但
  *     crypto.ts 又 import 自 index.ts，会随 utility.ts 一同进入已有的循环依赖链
  *     （util → crypto → index → util），由于均为 hoisted 的 function 声明，
  *     运行时安全。
@@ -15,7 +15,7 @@
  * handlers.ts 的 setTimeout / addEventListener 副作用。
  */
 
-import { calcChecksum } from '../core/crypto.js'
+import { calcChecksum } from '../core/token-payload.js'
 
 // Re-export 纯函数，保持向后兼容（其他模块仍可从 string-utilities 导入）
 

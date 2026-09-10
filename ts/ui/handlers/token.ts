@@ -394,8 +394,17 @@ export function queryTokenStatus(token: string): Promise<{ expires: number; user
     bgmLog(LOG_LEVELS.INFO, `[queryTokenStatus] ========== 查询 Token 状态 ==========`)
     bgmLog(LOG_LEVELS.INFO, `[queryTokenStatus] API 路由: ${apiUrl}`)
     bgmLog(LOG_LEVELS.INFO, `[queryTokenStatus] 请求方法: POST`)
-    bgmLog(LOG_LEVELS.INFO, `[queryTokenStatus] 请求体: access_token=${token.substring(0, 8)}...`)
+    // 安全：只打印长度，不打印凭据片段（日志会进环形缓冲并被调试面板展示/导出）
+    bgmLog(
+      LOG_LEVELS.INFO,
+      `[queryTokenStatus] 请求体: access_token=<已脱敏，长度 ${String(token.length)}>`,
+    )
 
+    // 说明（刻意保留裸 XHR，不迁到 tools/http.ts 的 httpRequest）：
+    //   token_status 是 OAuth 接口，要求 access_token 以 x-www-form-urlencoded
+    //   形式放在请求体里；而 httpRequest 的 XHR 路径在带 body 时会硬编码
+    //   Content-Type: application/json，迁移会改变请求编码、可能直接破坏该接口。
+    //   本函数的凭据安全由「不把 token 写入任何日志」保证（见上）。
     const xhr = new XMLHttpRequest()
     xhr.open('POST', apiUrl, true)
     xhr.timeout = 15_000

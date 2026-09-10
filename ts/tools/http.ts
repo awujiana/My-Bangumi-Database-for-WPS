@@ -247,9 +247,12 @@ function executeXhrRequest(
     bgmLog(LOG_LEVELS.INFO, `[HTTP] 超时: ${String(options.timeout)}ms`)
 
     if (options.token) {
+      // 安全：只打印长度，不打印任何凭据片段。
+      // 日志会进入环形缓冲并被调试面板展示/导出，即便 logger 层有脱敏，
+      // 也不应把凭据片段送进日志（脱敏一旦失效就是直接泄漏）。
       bgmLog(
         LOG_LEVELS.INFO,
-        `[HTTP] 请求头: Authorization: Bearer ${options.token.substring(0, 8)}...`,
+        `[HTTP] 请求头: Authorization: Bearer <已脱敏，长度 ${String(options.token.length)}>`,
       )
     }
     if (options.body) {

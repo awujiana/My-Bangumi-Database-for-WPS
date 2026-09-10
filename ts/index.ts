@@ -68,14 +68,14 @@ export {
 } from './core/result.js'
 
 // ============================================================================
-// 3. Token 加密/解密（来自 core/crypto.js）
+// 3. Token Payload 打包与完整性校验（来自 core/token-payload.js，**非加密**）
 // ============================================================================
 export {
   // 计算校验和
   calcChecksum,
-  // 从解密字符串提取 Token
+  // 从 Payload 字符串提取 Token
   extractToken,
-} from './core/crypto.js'
+} from './core/token-payload.js'
 
 // ============================================================================
 // 4. HTTP 请求模块（来自 tools/http.js）

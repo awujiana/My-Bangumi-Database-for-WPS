@@ -46,15 +46,29 @@ export function maskToken(token: string): string {
   return '*'.repeat(Math.min(token.length - 4, 24)) + token.slice(-4)
 }
 
-/** 脱敏字符串中的 token（检测形如 token=xxx / token:xxx / Bearer xxx 的模式） */
+/**
+ * 脱敏字符串中的凭据（键值对形式 + `Bearer xxx` 形式）。
+ *
+ * 键名覆盖范围刻意放宽到常见凭据命名：token / secret / password / API key，
+ * 以及带下划线或连字符的变体（access_token、refresh_token、client_secret、
+ * API-key…）。键名列表**不包含 `authorization`** —— 该键的值通常是 `Bearer xxx`，
+ * 若在此处先被掩码就会破坏按 `Bearer` 匹配的规则（先掩 `Bearer` 本身，真正的
+ * 凭据反而漏出）。
+ *
+ * 正则写成字面量而非 `new RegExp(拼接串)`：既满足 security/detect-non-literal-regexp，
+ * 也避免 `prefer-string-raw` 与反斜杠转义的来回。
+ *
+ * 这是日志的**最后一道防线**：调用方不应依赖它来避免泄漏，
+ * 而是本身就不要把凭据写进日志（见 ts/tools/http.ts 的 Authorization 日志）。
+ */
 export function maskSensitiveData(input: string): string {
   return input
     .replace(
-      /(token[=:]?\s*)([a-zA-Z0-9]{8,})/gi,
+      /((?:token|secret|password|passwd|pwd|API[_-]?KEY|ACCESS[_-]?KEY|PRIVATE[_-]?KEY)[\w-]*\s*[=:]\s*)(\S+)/gi,
       (_m: string, p1: string, p2: string) => p1 + maskToken(p2),
     )
     .replace(
-      /(Bearer\s+)([a-zA-Z0-9]{8,})/gi,
+      /(Bearer\s+)([a-zA-Z0-9._-]{8,})/gi,
       (_m: string, p1: string, p2: string) => p1 + maskToken(p2),
     )
 }

@@ -225,7 +225,7 @@ describe('update 进度更新边界', () => {
     expect(bar.style.width).toBe('0%')
     expect(bar.getAttribute('aria-valuenow')).toBe('0')
 
-    controller?.update(3, Number.POSITIVE_INFINITY)
+    controller?.update(3, Infinity)
     expect(bar.style.width).toBe('0%')
   })
 

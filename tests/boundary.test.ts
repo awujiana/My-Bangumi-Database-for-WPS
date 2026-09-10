@@ -10,7 +10,7 @@
  *
  * 模块依赖说明：
  *   - 优先使用纯函数模块（pure-utilities-core / string-utilities-pure / core/result）避免副作用链。
- *   - calcChecksum 来自 core/crypto.ts，触发 index → ui/handlers 副作用链，
+ *   - calcChecksum 来自 core/token-payload.ts，触发 index → ui/handlers 副作用链，
  *     使用 vi.hoisted() + fake timers 兜底。
  *   - 需要 jsdom 环境以提供 document/window（handlers.ts 副作用访问 document.readyState）。
  */
@@ -30,7 +30,7 @@ import {
   mapWatchStatus,
   setLogger,
 } from '../ts/sync/pure-utilities-core.js'
-import { calcChecksum } from '../ts/core/crypto.js'
+import { calcChecksum } from '../ts/core/token-payload.js'
 import { WATCH_STATUS_MAP } from '../ts/core/constants.js'
 
 vi.clearAllTimers()
