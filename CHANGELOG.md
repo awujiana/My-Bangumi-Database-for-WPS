@@ -8,6 +8,22 @@
 
 ## [未发布]
 
+### 重构（架构 · 消除分层反向依赖，P1-5）
+
+- **问题**：`tools/`、`sync/` 等底层模块直接 `import` 上层的 `ui/dialog.ts` 来弹窗 / 报错 / 更新同步进度条，形成「底层 → 上层」的反向依赖，并在 barrel（`ts/index.ts`、`tools/util/index.ts`）参与下构成运行时循环。后果是模块初始化顺序敏感（本项目历史上踩过 barrel 顶层读到 `undefined` 的坑），底层模块也无法脱离 UI 独立测试。
+- **做法（依赖反转）**：新增 `ts/core/ui-bridge.ts`，定义三个接口 —— `NotifyApi`（alert/confirm/error/success/toast/input）、`SyncProgressApi`（show/update/complete/hide）、`SyncRunner` —— 并提供 `registerXxx()` / `getXxx()`。**未注册时返回降级实现**（写一次告警日志后忽略，`confirm` 按「未确认」回调，避免调用方把默认值当作用户同意），而不是抛错或静默。
+- **改动点**：5 处反向依赖全部改为走桥 —— `tools/util/index.ts`（对话框 + `BGM.sync.startSync` 的 `syncAllRows`）、`tools/wps.ts`（输入 / 确认 / 提示框）、`sync/exceltobangumi/api.ts`、`sync/exceltobangumi/index.ts`（Toast / 确认框 / 进度弹窗四件套）。实现方 `ui/dialog.ts`、`ui/preview.ts` 在模块求值时调用 `registerNotifyApi()` / `registerSyncProgressApi()` / `registerSyncRunner()`。
+- **纯数据下沉**：`buildSyncConfig` / `SyncConfigSummary` / `BuildSyncConfigContext` → `ts/sync/sync-config-summary.ts`；`SyncProgressStats` → `ts/core/types.ts`。原位置保留 re-export，调用点零改动。
+- **顺带修掉一个真实的初始化陷阱**：`ui/preview.ts` 顶层 `const VALID_STATUSES = new Set(Object.keys(WATCH_STATUS_MAP)...)` 此前经 barrel 导入该常量，构成「运行时环 + 顶层读取」的组合（初始化期可能拿到 `undefined`）。现改为直接从 `core/constants.ts` 导入 `BGM_COLOR` / `LOG_LEVELS` / `WATCH_STATUS_MAP`。
+- 新增 `tests/ui-bridge.test.ts`（9 条）：未注册时的降级行为、注册后透传，以及**生产装配断言**（仅 `import ui/dialog.ts` / `ui/preview.ts` 即完成注册 —— 防止「忘了注册」导致通知与进度弹窗静默失效）。总计 1856 条全绿。
+
+### 新增（工程化 · 导入图门禁 `npm run check:cycles`）
+
+- 新增 `scripts/check-import-cycles.mjs`（基于 TypeScript AST，非正则），并纳入 `npm run gate`。核心是**两个区分**，否则满屏假阳性会淹没真问题：
+  1. **运行时边 vs 类型边**：`import type` / `export type` 编译后没有对应 import 语句，不产生运行时依赖 —— 把类型边算成环是「本项目环很多」的主因。
+  2. **致命环 vs 良性环**：ESM 的 import 是 live binding，环本身不必然出错；真正会炸的是**在模块顶层读取了环上另一模块的绑定**（对方 body 还没执行，拿到 `undefined`）。函数体内读取是安全的。
+- 判定为错误（退出码 1）：① 分层反向依赖（底层 runtime-import 上层）；② 致命环（环 + 顶层读取）。良性环仅提示。当前状态：分层反向依赖 **0 处**、致命环 **0 个**、良性环 17 个（待后续拆除 barrel 自引用，属 P1-6 范畴）。
+
 ### 修复（安全 · 阻断级：运行时 HTML 的 data-* 属性被静默剥离）
 
 - **同步弹窗与清理页的进度条在真实环境中必然抛错**：所有任务窗格（`ui/*.html`、`index.html`）都会先加载 `libs/purify.js`（DOMPurify 3.4.12 UMD），使 `sanitizeHtml` 走**严格白名单**路径；而白名单 `ALLOW_DATA_ATTR` 曾设为 `false` 且 `ALLOWED_ATTR` 只登记 5 个 `data-*`（`data-event/status/type/row/sid`），导致其余 `data-*` 属性被**静默剥离**。影响面：① `progress.ts` 模板 `data-el` 全丢 → `collectElements` 抛「进度组件缺少必需元素」；② `clean-page` 的 `data-workbook-key`/`data-sheet-name`/`data-group-toggle`/`data-group-all`/`data-group-none` 全丢 → **勾选不持久化、分组折叠与本簿全选失效**；③ `enrich-page` 的 `data-batch-remove`/`data-field`/`data-match-index` 全丢 → **批量删除、列映射、匹配跳转失效**。

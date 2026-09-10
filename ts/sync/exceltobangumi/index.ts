@@ -34,16 +34,12 @@ import {
 } from '../../tools/util/index.js'
 import type { WpsApp, WpsWorksheet, WpsRange } from '../../tools/wps.js'
 import { wpsMessageBox, isWpsWorksheet } from '../../tools/wps.js'
-import {
-  showConfirm,
-  showSyncProgressDialog,
-  buildSyncConfig,
-  updateSyncProgressDialog,
-  completeSyncProgressDialog,
-  hideSyncProgressDialog,
-  showToast,
-} from '../../ui/dialog.js'
-import type { SyncConfigSummary } from '../../ui/dialog.js'
+// 通知与同步进度弹窗走依赖反转桥：本模块属于底层（sync/），不得 runtime-import
+// 上层 UI 层（见 文档/TS_AUDIT_2026_09_10.md 的 P1-5）。实现由 ui/dialog.ts 注册。
+import { getNotifyApi, getSyncProgressApi } from '../../core/ui-bridge.js'
+// 同步配置摘要的构造是纯函数，已下沉到 sync 层（原先在 ui/dialog.ts 里）
+import { buildSyncConfig } from '../sync-config-summary.js'
+import type { SyncConfigSummary } from '../sync-config-summary.js'
 import {
   isBangumiUrl,
   extractSubjectId,
@@ -898,7 +894,7 @@ async function validateSelectedRows(
 
   if (rows.length === 0) {
     bgmLog(LOG_LEVELS.WARN, '[syncSelectedRows] 排除表头后没有有效数据行')
-    showToast('未选中任何数据行', 'warn')
+    getNotifyApi().toast('未选中任何数据行', 'warn')
     return null
   }
 
@@ -906,7 +902,7 @@ async function validateSelectedRows(
   if (rows.length > 10) {
     bgmLog(LOG_LEVELS.INFO, `[syncSelectedRows] 选中 ${String(rows.length)} 行，弹出确认对话框`)
     const shouldSync = await new Promise<boolean>((resolve) => {
-      showConfirm(
+      getNotifyApi().confirm(
         `选中了 ${String(rows.length)} 行数据，确认要同步全部吗？\n\n行号范围: ${String(Math.min(...rows))} - ${String(Math.max(...rows))}`,
         (isConfirmed: boolean) => {
           resolve(isConfirmed)
@@ -994,7 +990,7 @@ async function executeSelectedSync(
       ],
     })
     // P1：显示同步进度弹窗（新 API：handlers 对象，暂停状态由 dialog 内部管理）
-    showSyncProgressDialog(
+    getSyncProgressApi().show(
       '正在同步 - 选中行同步',
       {
         onPause: () => {
@@ -1050,7 +1046,7 @@ async function executeSelectedSync(
                 LOG_LEVELS.INFO,
                 `[syncSelectedRows] ${rowProgress} 行${String(rowNumber)} 开始同步: 名称="${name || '无名'}", SID=${sid}, URL=${bgmUrl}`,
               )
-              updateSyncProgressDialog(
+              getSyncProgressApi().update(
                 index + 1,
                 rows.length,
                 `${rowProgress} 行${String(rowNumber)} "${name || sid}" 同步中...`,
@@ -1068,10 +1064,10 @@ async function executeSelectedSync(
               if (jsonBody === '{}') {
                 const message = `行${String(rowNumber)} "${name || sid}" 请求体为空，跳过`
                 bgmLog(LOG_LEVELS.WARN, `[syncSelectedRows] ${rowProgress} ${message}`)
-                showToast(message, 'warn')
+                getNotifyApi().toast(message, 'warn')
                 details.push(`⊘ 行${String(rowNumber)} ${name || sid} 跳过: 请求体为空`)
                 counters.skip += 1
-                updateSyncProgressDialog(
+                getSyncProgressApi().update(
                   index + 1,
                   rows.length,
                   message,
@@ -1095,7 +1091,7 @@ async function executeSelectedSync(
                     LOG_LEVELS.INFO,
                     `[syncSelectedRows] ${rowProgress} 行${String(rowNumber)} "${name || sid}" 同步成功！HTTP: ${String(result.code)}`,
                   )
-                  updateSyncProgressDialog(
+                  getSyncProgressApi().update(
                     index + 1,
                     rows.length,
                     `${rowProgress} 行${String(rowNumber)} "${name || sid}" ✓ HTTP:${String(result.code)}`,
@@ -1146,7 +1142,7 @@ async function executeSelectedSync(
                     LOG_LEVELS.WARN,
                     `[syncSelectedRows] ${rowProgress} 行${String(rowNumber)} "${name || sid}" 同步失败！HTTP: ${String(result.code)}, 消息: ${result.message}`,
                   )
-                  updateSyncProgressDialog(
+                  getSyncProgressApi().update(
                     index + 1,
                     rows.length,
                     `${rowProgress} 行${String(rowNumber)} "${name || sid}" ✗ HTTP:${String(result.code)}`,
@@ -1157,10 +1153,10 @@ async function executeSelectedSync(
             } else {
               const message = `行${String(rowNumber)} "${name || '无名'}" 无法提取 Subject ID，跳过`
               bgmLog(LOG_LEVELS.WARN, `[syncSelectedRows] ${rowProgress} ${message}`)
-              showToast(message, 'warn')
+              getNotifyApi().toast(message, 'warn')
               details.push(`⊘ 行${String(rowNumber)} ${name || '无名'} 跳过: 无效ID`)
               counters.skip += 1
-              updateSyncProgressDialog(
+              getSyncProgressApi().update(
                 index + 1,
                 rows.length,
                 message,
@@ -1170,20 +1166,30 @@ async function executeSelectedSync(
           } else {
             const message = `行${String(rowNumber)} "${name || '无名'}" 非BGM链接，跳过`
             bgmLog(LOG_LEVELS.WARN, `[syncSelectedRows] ${rowProgress} ${message}`)
-            showToast(message, 'warn')
+            getNotifyApi().toast(message, 'warn')
             details.push(
               `⊘ 行${String(rowNumber)} ${name || '无名'} 跳过: 非BGM链接 (${bgmUrl.substring(0, 30)})`,
             )
             counters.skip += 1
-            updateSyncProgressDialog(index + 1, rows.length, message, `⊘ ${rowProgress} ${message}`)
+            getSyncProgressApi().update(
+              index + 1,
+              rows.length,
+              message,
+              `⊘ ${rowProgress} ${message}`,
+            )
           }
         else {
           const message = `行${String(rowNumber)} "${name || '无名'}" URL为空，跳过`
           bgmLog(LOG_LEVELS.WARN, `[syncSelectedRows] ${rowProgress} ${message}`)
-          showToast(message, 'warn')
+          getNotifyApi().toast(message, 'warn')
           details.push(`⊘ 行${String(rowNumber)} ${name || '无名'} 跳过: URL为空`)
           counters.skip += 1
-          updateSyncProgressDialog(index + 1, rows.length, message, `⊘ ${rowProgress} ${message}`)
+          getSyncProgressApi().update(
+            index + 1,
+            rows.length,
+            message,
+            `⊘ ${rowProgress} ${message}`,
+          )
         }
       }
       try {
@@ -1195,7 +1201,7 @@ async function executeSelectedSync(
           LOG_LEVELS.ERROR,
           `[syncSelectedRows] ${rowProgress} 行${String(rowNumber)} 处理异常: ${errorMessage}`,
         )
-        updateSyncProgressDialog(
+        getSyncProgressApi().update(
           index + 1,
           rows.length,
           `${rowProgress} 行${String(rowNumber)} 异常: ${errorMessage}`,
@@ -1216,12 +1222,12 @@ async function executeSelectedSync(
     // 切换弹窗为完成状态（保留弹窗，显示统计 + 详情）
     const wasStopped = BGM.sync.checkShouldStop()
     const summary = `📊 选中 ${String(rows.length)} 行 | 耗时 ${(elapsed / 1000).toFixed(1)}s\n\n✅ 成功: ${String(counters.success)}\n❌ 失败: ${String(counters.fail)}\n⏭️ 跳过: ${String(counters.skip)}\n📺 标记章节: ${String(counters.episodeMark)}`
-    completeSyncProgressDialog(summary, details, wasStopped)
+    getSyncProgressApi().complete(summary, details, wasStopped)
   }
   try {
     await runSelectedRowsLoop()
   } catch (error: unknown) {
-    hideSyncProgressDialog()
+    getSyncProgressApi().hide()
     BGM.handleError(error, { context: 'syncSelectedRows', showAlert: false })
     const errorMessage = error instanceof Error ? error.message : String(error)
     bgmLog(LOG_LEVELS.ERROR, `[syncSelectedRows] 同步异常: ${errorMessage}`)
@@ -1243,7 +1249,7 @@ async function executeSelectedSync(
 export async function syncSelectedRows(): Promise<void> {
   // P0：防重入预检，避免并发同步
   if (BGM.sync.isRunning) {
-    showToast('同步正在进行中，请稍后', 'warn')
+    getNotifyApi().toast('同步正在进行中，请稍后', 'warn')
     return
   }
   const startTime = Date.now()
@@ -1289,7 +1295,7 @@ export async function syncSelectedRows(): Promise<void> {
       startTime,
     )
   } catch (error: unknown) {
-    hideSyncProgressDialog()
+    getSyncProgressApi().hide()
     BGM.handleError(error, { context: 'syncSelectedRows', showAlert: false })
     const errorMessage = error instanceof Error ? error.message : String(error)
     bgmLog(LOG_LEVELS.ERROR, `[syncSelectedRows] 同步异常: ${errorMessage}`)

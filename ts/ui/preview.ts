@@ -16,8 +16,6 @@ import {
   escapeHtml,
   showAlert,
   showToast,
-  LOG_LEVELS,
-  BGM_COLOR,
   findHeaderRow,
   getColumnMap,
   detectConflicts,
@@ -27,7 +25,6 @@ import {
   bgmRequestSync,
   addSyncRecord,
   addTagsFromString,
-  WATCH_STATUS_MAP,
   SyncToBangumiAsync,
   showSyncProgressDialog,
   buildSyncConfig,
@@ -36,6 +33,10 @@ import {
   hideSyncProgressDialog,
 } from '../index.js'
 import type { WpsWorksheet, WpsRange, SyncRecord, SyncConfigSummary } from '../index.js'
+// 这三个常量在模块**顶层**被读取（VALID_STATUSES 的构造），若经 barrel 导入会形成
+// 「顶层读取 + 环」的组合 —— 初始化期可能拿到 undefined。故直接从定义处导入。
+import { BGM_COLOR, LOG_LEVELS, WATCH_STATUS_MAP } from '../core/constants.js'
+import { registerSyncRunner } from '../core/ui-bridge.js'
 import { getAllSyncRecords } from '../sync/sync-record.js'
 import { sanitizeHtml } from '../tools/sanitize.js'
 import { loadBgToken } from '../tools/utility.js'
@@ -986,3 +987,8 @@ export async function syncAllRows(): Promise<{ success: number; fail: number; sk
     BGM.sync.exitRunningState()
   }
 }
+
+// ========== 注册同步执行体到桥（依赖反转的收口点） ==========
+// 底层（tools/util/index.ts 的 BGM.sync.startSync）不再 import 本模块，而是调用
+// core/ui-bridge 的 getSyncRunner()。本模块作为实现方在模块求值时注册。
+registerSyncRunner(syncAllRows)

@@ -86,3 +86,24 @@ export interface BGMUserInfo {
   /** 头像 URL */
   avatarUrl?: string | undefined
 }
+
+// ========== 同步进度统计 ==========
+
+/**
+ * 同步统计数据（增强版，支持完整仪表盘渲染）。
+ *
+ * 原定义在 `ui/dialog.ts`，因被 `sync/`、`ui/handlers/` 与同步进度桥共同引用，
+ * 且本身是纯数据形状，故下沉到 core 层（见 文档/TS_AUDIT_2026_09_10.md 的 P1-5）。
+ */
+export interface SyncProgressStats {
+  added: number
+  updated: number
+  deleted: number
+  unchanged: number
+  failed: number
+  skipped: number
+  remoteTotal: number
+  elapsedMs: number
+  avgSpeed: number
+  strategyLabel: string
+}

@@ -13,7 +13,9 @@ import {
   _setBgmUsername,
   BGM,
 } from '../../tools/util/index.js'
-import { showAlert, showSuccess, showError } from '../../ui/dialog.js'
+// 对话框走依赖反转桥：本模块属于底层（sync/），不得 runtime-import 上层 UI 层
+// （见 文档/TS_AUDIT_2026_09_10.md 的 P1-5）。实现由 ui/dialog.ts 注册。
+import { getNotifyApi } from '../../core/ui-bridge.js'
 
 /**
  * Bangumi API 响应数据结构（消息字段可能出现在不同属性中）
@@ -82,7 +84,7 @@ export function openBangumiTokenPage(): void {
 export function testTokenValidityForRibbon(token?: string, signal?: AbortSignal): void {
   const testToken = token || loadBgToken() // eslint-disable-line @typescript-eslint/prefer-nullish-coalescing -- 空串等价于未设置，须回退到已存令牌
   if (!testToken) {
-    showAlert('请先设置 Token！', '提示')
+    getNotifyApi().alert('请先设置 Token！', '提示')
     return
   }
 
@@ -175,7 +177,7 @@ export function testTokenValidityForRibbon(token?: string, signal?: AbortSignal)
           LOG_LEVELS.INFO,
           `[exceltobangumi/testTokenValidityForRibbon] Token 验证成功！用户名: ${nickname}, 用户ID: ${userId}`,
         )
-        showSuccess(`Token有效！\n\n用户名: ${nickname}\n用户ID: ${userId}`, '验证成功')
+        getNotifyApi().success(`Token有效！\n\n用户名: ${nickname}\n用户ID: ${userId}`, '验证成功')
 
         notifyUserInfoUpdated(nickname, userId)
       } catch (error: unknown) {
@@ -184,11 +186,11 @@ export function testTokenValidityForRibbon(token?: string, signal?: AbortSignal)
           `[exceltobangumi/testTokenValidityForRibbon] 解析响应失败: ${error instanceof Error ? error.message : String(error)}`,
         )
         BGM.handleError(error, { context: 'testTokenValidityForRibbon', showAlert: false })
-        showError('Token有效，但解析响应失败', '错误')
+        getNotifyApi().error('Token有效，但解析响应失败', '错误')
       }
     } else if (xhr.status === 401) {
       bgmLog(LOG_LEVELS.WARN, `[exceltobangumi/testTokenValidityForRibbon] Token 无效或已过期`)
-      showError('Token无效或已过期，请重新获取', '验证失败')
+      getNotifyApi().error('Token无效或已过期，请重新获取', '验证失败')
     } else {
       bgmLog(
         LOG_LEVELS.ERROR,
@@ -198,7 +200,7 @@ export function testTokenValidityForRibbon(token?: string, signal?: AbortSignal)
         LOG_LEVELS.INFO,
         `[exceltobangumi/testTokenValidityForRibbon] 响应内容: ${xhr.responseText}`,
       )
-      showError(`Token验证失败 (HTTP ${String(xhr.status)})`, '错误')
+      getNotifyApi().error(`Token验证失败 (HTTP ${String(xhr.status)})`, '错误')
     }
   })
 
@@ -209,7 +211,7 @@ export function testTokenValidityForRibbon(token?: string, signal?: AbortSignal)
       LOG_LEVELS.ERROR,
       `[exceltobangumi/testTokenValidityForRibbon] 网络错误，耗时: ${String(duration)}ms`,
     )
-    showError(
+    getNotifyApi().error(
       '网络错误，无法连接到 Bangumi API\n\n可能原因：\n• 网络被墙（GFW）\n• 断网或 DNS 失败\n• API 服务器不可达\n\nToken 本身可能有效，请在网络恢复后重试',
       '网络错误',
     )
@@ -222,7 +224,7 @@ export function testTokenValidityForRibbon(token?: string, signal?: AbortSignal)
       LOG_LEVELS.WARN,
       `[exceltobangumi/testTokenValidityForRibbon] 请求超时，耗时: ${String(duration)}ms`,
     )
-    showError('请求超时（30s）\n\n可能网络受限或被墙，Token 本身可能有效', '超时')
+    getNotifyApi().error('请求超时（30s）\n\n可能网络受限或被墙，Token 本身可能有效', '超时')
   }
 
   bgmLog(LOG_LEVELS.INFO, `[exceltobangumi/testTokenValidityForRibbon] 正在发送请求...`)

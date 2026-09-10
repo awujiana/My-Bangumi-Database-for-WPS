@@ -16,16 +16,13 @@ import { BGM_CONFIG, LOG_LEVELS, ERROR_LEVELS, ErrorLevel, WPS_ENUM } from '../.
 import type { ErrorOptions } from '../../core/constants.js'
 import { BgmError } from '../../core/result.js'
 import type { BGMCache, BGMSheet, BGMSync, BGMUserInfo } from '../../core/types.js'
-import {
-  showConfirm,
-  showToast,
-  showAlert as customShowAlert,
-  showError as customShowError,
-  showInput as customShowInput,
-} from '../../ui/dialog.js'
+// 对话框与全量同步执行体走依赖反转桥：本模块属于底层（tools/），不得 runtime-import
+// 上层 UI 层（见 文档/TS_AUDIT_2026_09_10.md 的 P1-5）。实现分别由 ui/dialog.ts、
+// ui/preview.ts 在模块求值时注册；未注册则走桥的降级实现（记日志 + 忽略）。
+import { getNotifyApi, getSyncRunner } from '../../core/ui-bridge.js'
+// DialogOptions 是纯类型，`import type` 编译后不产生运行时依赖，不构成反向依赖边
 import type { DialogOptions } from '../../ui/dialog.js'
 
-import { syncAllRows } from '../../ui/preview.js'
 // 类型只从 index.js 导入（type-only import 不会产生运行时循环依赖）
 import { BGM_EVENTS, eventBus } from '../events.js'
 // 字符串工具已拆分到 string-utilities.ts，此处 import 供内部调用，并 re-export 保持向后兼容
@@ -205,7 +202,13 @@ export const BGM: {
         bgmLog(LOG_LEVELS.INFO, '开始执行同步...')
         void (async () => {
           try {
-            await syncAllRows()
+            const syncRunner = getSyncRunner()
+            if (syncRunner === null) {
+              BGM.Dialog.alert('同步功能当前不可用（界面未就绪）', '提示')
+              this.exitRunningState()
+              return
+            }
+            await syncRunner()
             // 成功路径也清理状态，与 catch 分支对称
             if (this.shouldStop) {
               BGM.Dialog.alert('同步已停止', '提示')
@@ -237,7 +240,7 @@ export const BGM: {
       // 定位到当前单元格
       const isLocated = this.locateCurrentCell()
       if (!isLocated) {
-        showToast('已暂停，但无法定位到当前单元格', 'warn')
+        getNotifyApi().toast('已暂停，但无法定位到当前单元格', 'warn')
       }
     },
 
@@ -279,7 +282,7 @@ export const BGM: {
       } catch (error: unknown) {
         const message = error instanceof Error ? error.message : String(error)
         bgmLog(LOG_LEVELS.WARN, `[sync] 定位单元格失败: ${message}`)
-        showToast(`定位单元格失败: ${message}`, 'error')
+        getNotifyApi().toast(`定位单元格失败: ${message}`, 'error')
         return false
       }
     },
@@ -332,10 +335,10 @@ export const BGM: {
         }
       }
       // 使用自定义对话框
-      customShowAlert(message, title)
+      getNotifyApi().alert(message, title)
     },
     confirm(message: string, callback: (isConfirmed: boolean) => void, title?: string): void {
-      showConfirm(message, callback, title)
+      getNotifyApi().confirm(message, callback, title)
     },
     error(title: string, message: string): void {
       if (typeof window !== 'undefined') {
@@ -352,7 +355,7 @@ export const BGM: {
         }
       }
       // 使用自定义对话框
-      customShowError(message, title)
+      getNotifyApi().error(message, title)
     },
     input(
       title: string,
@@ -373,7 +376,7 @@ export const BGM: {
         }
       }
       // 使用自定义对话框
-      customShowInput(
+      getNotifyApi().input(
         title,
         prompt,
         defaultValue,
@@ -1196,7 +1199,7 @@ export function showBangumiPanel(): void {
       win.BGMError('无法获取 WPS Application 对象！', '错误')
     } else {
       // 使用自定义错误对话框
-      customShowError('无法获取 WPS Application 对象！', '错误')
+      getNotifyApi().error('无法获取 WPS Application 对象！', '错误')
     }
     return
   }

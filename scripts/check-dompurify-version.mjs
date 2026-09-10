@@ -86,9 +86,7 @@ function main() {
     )
   }
   if (!isRangeSatisfied(declaredRange, installedVersion)) {
-    problems.push(
-      `package.json 声明范围 ${declaredRange} 不覆盖已安装版本 ${installedVersion}`,
-    )
+    problems.push(`package.json 声明范围 ${declaredRange} 不覆盖已安装版本 ${installedVersion}`)
   }
 
   if (problems.length > 0) {

@@ -1,23 +1,24 @@
 ﻿# Bangumi WPS Excel 加载项 - 架构与项目知识文档
 
-> 版本: 3.5 | 更新日期: 2026-08-28
+> 版本: 3.7 | 更新日期: 2026-09-10
 
 ---
 
 ## 版本历史
 
-| 版本 | 日期       | 变更说明                                                                                                                                                                                                                                                                                       |
-| ---- | ---------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| v1.0 | 2026-08-10 | 初始版本                                                                                                                                                                                                                                                                                       |
-| v2.8 | 2026-08-21 | 修复 GitHub 同步编译错误、同步完成弹窗支持明细表格                                                                                                                                                                                                                                             |
-| v2.9 | 2026-08-26 | 新增 enrichEngine 富化引擎（新番表+简介工作表双阶段富化）、标注白名单机制、自动添加缺失列、声优字段支持、数据同步列位置无关性验证、边界情况修复（parseRemoteContent 空值检查、getAnnotatedValue 空值守卫）、42 项边界测试                                                                      |
-| v3.0 | 2026-08-26 | 新增富化功能工作簿选择与锁定机制（enrichLock.ts）：跨工作簿 Bangumi 追踪表选择、PluginStorage 持久化、启动恢复校验、与面板锁定独立运行                                                                                                                                                         |
-| v3.1 | 2026-08-26 | enrichLock.ts 边界加固：WPS API null 返回安全处理、冗余查找逻辑简化、边界情况文档完善                                                                                                                                                                                                          |
-| v3.2 | 2026-08-26 | 命名规范重构：`taskpane/` 目录重命名为 `panel/`，页面文件使用 `Page` 后缀（`panelPage.ts`/`enrichPage.ts`），`taskpane-entry.ts` → `panel-entry.ts`；删除旧兼容文件 `ts/taskpane.ts`；统一 `@module` JSDoc 标签                                                                                |
-| v3.3 | 2026-08-26 | 循环依赖治理：创建 `types.ts`/`container.ts`/`services.ts`/`errorHandler.ts` 核心模块；扩展 EventBus 新增 `STATE_CHANGED`/`CONFIG_CHANGED` 事件；`index.ts` 瘦身为纯 re-export 便利桶；移除各模块对 `index.ts` 的直接依赖；函数名统一（`init面板`→`initPanel` 等）                             |
-| v3.4 | 2026-08-26 | 移除收藏回写数据源选择：收藏回写固定走 Bangumi API，删除「Bangumi API / GitHub 仓库」二选一下拉框、对应 UI、配置键 `bgm_writeback_source` 及文档说明                                                                                                                                           |
-| v3.5 | 2026-08-28 | 收藏回写空表自动填充：工作表为空时，经用户确认后自动写入标准表头并用 Bangumi 账号收藏条目填充 Excel，再执行标记；恢复缺失的 `css/panel-theme.css` 源文件                                                                                                                                       |
-| v3.6 | 2026-08-30 | 设置面板重构：顶栏+侧边功能导航+主区布局、滚动高亮、导航仅图标模式（`bgm_nav_icons_only`）；新增外观主题（`bgm_theme`，dark/light/system，`ts/tools/theme.ts`）与同步偏好扩展（`bgm_list_type`/`bgm_time_filter`/`bgm_refresh_interval`）；修复 `bgm:modulesReady` 派发时序与导航 tooltip 裁剪 |
+| 版本 | 日期       | 变更说明                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| ---- | ---------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| v1.0 | 2026-08-10 | 初始版本                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| v2.8 | 2026-08-21 | 修复 GitHub 同步编译错误、同步完成弹窗支持明细表格                                                                                                                                                                                                                                                                                                                                                                          |
+| v2.9 | 2026-08-26 | 新增 enrichEngine 富化引擎（新番表+简介工作表双阶段富化）、标注白名单机制、自动添加缺失列、声优字段支持、数据同步列位置无关性验证、边界情况修复（parseRemoteContent 空值检查、getAnnotatedValue 空值守卫）、42 项边界测试                                                                                                                                                                                                   |
+| v3.0 | 2026-08-26 | 新增富化功能工作簿选择与锁定机制（enrichLock.ts）：跨工作簿 Bangumi 追踪表选择、PluginStorage 持久化、启动恢复校验、与面板锁定独立运行                                                                                                                                                                                                                                                                                      |
+| v3.1 | 2026-08-26 | enrichLock.ts 边界加固：WPS API null 返回安全处理、冗余查找逻辑简化、边界情况文档完善                                                                                                                                                                                                                                                                                                                                       |
+| v3.2 | 2026-08-26 | 命名规范重构：`taskpane/` 目录重命名为 `panel/`，页面文件使用 `Page` 后缀（`panelPage.ts`/`enrichPage.ts`），`taskpane-entry.ts` → `panel-entry.ts`；删除旧兼容文件 `ts/taskpane.ts`；统一 `@module` JSDoc 标签                                                                                                                                                                                                             |
+| v3.3 | 2026-08-26 | 循环依赖治理：创建 `types.ts`/`container.ts`/`services.ts`/`errorHandler.ts` 核心模块；扩展 EventBus 新增 `STATE_CHANGED`/`CONFIG_CHANGED` 事件；`index.ts` 瘦身为纯 re-export 便利桶；移除各模块对 `index.ts` 的直接依赖；函数名统一（`init面板`→`initPanel` 等）                                                                                                                                                          |
+| v3.4 | 2026-08-26 | 移除收藏回写数据源选择：收藏回写固定走 Bangumi API，删除「Bangumi API / GitHub 仓库」二选一下拉框、对应 UI、配置键 `bgm_writeback_source` 及文档说明                                                                                                                                                                                                                                                                        |
+| v3.5 | 2026-08-28 | 收藏回写空表自动填充：工作表为空时，经用户确认后自动写入标准表头并用 Bangumi 账号收藏条目填充 Excel，再执行标记；恢复缺失的 `css/panel-theme.css` 源文件                                                                                                                                                                                                                                                                    |
+| v3.6 | 2026-08-30 | 设置面板重构：顶栏+侧边功能导航+主区布局、滚动高亮、导航仅图标模式（`bgm_nav_icons_only`）；新增外观主题（`bgm_theme`，dark/light/system，`ts/tools/theme.ts`）与同步偏好扩展（`bgm_list_type`/`bgm_time_filter`/`bgm_refresh_interval`）；修复 `bgm:modulesReady` 派发时序与导航 tooltip 裁剪                                                                                                                              |
+| v3.7 | 2026-09-10 | 分层治理（P1-5）：新增依赖反转桥 `ts/core/ui-bridge.ts`（`NotifyApi`/`SyncProgressApi`/`SyncRunner` + 未注册降级实现），`tools/`、`sync/` 的 5 处反向依赖改为依赖接口；`buildSyncConfig`/`SyncConfigSummary` 下沉 `ts/sync/sync-config-summary.ts`、`SyncProgressStats` 下沉 `ts/core/types.ts`；`core/crypto.ts` 正名 `core/token-payload.ts`；新增导入图门禁 `npm run check:cycles`（区分运行时边/类型边、致命环/良性环） |
 
 ## 一、架构概览
 
@@ -41,9 +42,30 @@
 
 **核心设计原则：**
 
-- 统一 barrel export 入口 (`ts/index.ts`)，所有模块通过 `index.js` 中转导入，降低模块间耦合
+- 统一 barrel export 入口 (`ts/index.ts`)，上层（`ui/`、`panel/`、`services/`、`entry/`）通过 `index.js` 中转导入，降低模块间耦合
+- **分层不可逆**：底层（`ts/core/`、`ts/tools/`、`ts/sync/`）**禁止** runtime-import 上层（`ts/ui/`、`ts/panel/`、`ts/services/`）。需要上层能力时走依赖反转桥 `ts/core/ui-bridge.ts`（见 §1.3）；仅类型可 `import type`（编译后擦除，不产生运行时边）
 - 显式入口模式：`ts/entry/` 下的文件负责启动副作用，模块本身不自动初始化
 - 跨 WebView 通信使用 PluginStorage 轮询 + postMessage 双通道保障
+
+**门禁**：`npm run check:cycles` 静态校验上述分层（基于 TypeScript AST）：分层反向依赖或「运行时环 + 顶层读取跨模块绑定」的致命环出现即退出码 1。环本身在 ESM live binding 下不必然出错，故良性环只提示不拦截。
+
+### 1.3 依赖反转桥（`ts/core/ui-bridge.ts`）
+
+底层需要「弹窗 / 报错 / 更新同步进度条 / 触发全量同步」时，**不 import UI 模块**，而是依赖桥上的接口；UI 层在模块求值时注册实现：
+
+```
+tools/、sync/  ──依赖──▶  core/ui-bridge.ts  ◀──注册实现──  ui/dialog.ts、ui/preview.ts
+```
+
+| 接口              | 方法                                                          | 实现方与时机                   |
+| ----------------- | ------------------------------------------------------------- | ------------------------------ |
+| `NotifyApi`       | `alert` / `confirm` / `error` / `success` / `toast` / `input` | `ui/dialog.ts` 模块求值时注册  |
+| `SyncProgressApi` | `show` / `update` / `complete` / `hide`                       | `ui/dialog.ts` 模块求值时注册  |
+| `SyncRunner`      | 执行体本身（`syncAllRows`）                                   | `ui/preview.ts` 模块求值时注册 |
+
+- 取用一律走 `getNotifyApi()` / `getSyncProgressApi()` / `getSyncRunner()`，**不返回 `null`**（除 `SyncRunner`），调用方无需到处判空。
+- 未注册时返回**降级实现**：写一次告警日志后忽略，`confirm` 按「未确认」回调（避免把默认值当作用户同意）。单测与纯 Node 环境下调用不会中断业务流程，同时留下可排查痕迹。
+- `SyncRunner` 未注册时返回 `null`，调用方应给出「同步不可用」提示（`BGM.sync.startSync` 已处理）。
 
 ### 1.2 模块依赖关系
 
@@ -52,12 +74,13 @@ ts/index.ts (thin barrel — 仅 re-export)
   │
   ├── ts/core/           (零依赖基础层 · 循环依赖治理核心)
   │   ├── constants.ts     → 常量、枚举、映射表
-  │   ├── types.ts         → 核心接口 (BGMCache/BGMSheet/BGMSync/BGMUserInfo/EnrichWorkbookState)
-  │   ├── crypto.ts        → Token 校验与完整性验证 (明文存储 + 校验和)
+  │   ├── types.ts         → 核心接口 (BGMCache/BGMSheet/BGMSync/BGMUserInfo/EnrichWorkbookState/SyncProgressStats)
+  │   ├── token-payload.ts → Token 载荷打包与完整性校验 (明文存储 + 校验和，**不提供加密**；原名 crypto.ts)
   │   ├── result.ts        → Result<T> 类型 + BgmError
   │   ├── container.ts     → 轻量 CDI 服务容器 (register/resolve)
   │   ├── services.ts      → 核心服务注册 (logService/eventBusService)
-  │   └── errorHandler.ts  → 全局错误处理 (initGlobalErrorHandler)
+  │   ├── ui-bridge.ts     → 底层→上层能力桥 (NotifyApi/SyncProgressApi/SyncRunner + 注册/获取)
+  │   └── error-handler.ts → 全局错误处理 (initGlobalErrorHandler)
   │
   ├── ts/tools/          (基础设施层 · 直接从源模块导入，不再经 index.ts)
   │   ├── events.ts        → EventBus (发布-订阅 + STATE_CHANGED/CONFIG_CHANGED)

@@ -88,14 +88,14 @@ export function extractToken(payload: string): string | null {
   try {
     const parts = payload.split(':')
     if (parts.length < 3) {
-      bgmLog(LOG_LEVELS.WARN, '[crypto] Payload格式无效')
+      bgmLog(LOG_LEVELS.WARN, '[token-payload] Payload格式无效')
       return null
     }
 
     const [version, checksumString, ...tokenParts] = parts
 
     if (version !== TOKEN_CONFIG.VERSION) {
-      bgmLog(LOG_LEVELS.WARN, `[crypto] Token版本不匹配: ${version ?? ''}`)
+      bgmLog(LOG_LEVELS.WARN, `[token-payload] Token版本不匹配: ${version ?? ''}`)
       return null
     }
 
@@ -103,13 +103,13 @@ export function extractToken(payload: string): string | null {
     const checksum = checksumString ? Number(checksumString) : NaN
     const expectedChecksum = calcChecksum(token)
     if (checksum !== expectedChecksum) {
-      bgmLog(LOG_LEVELS.WARN, '[crypto] Token校验和不匹配，可能已被篡改')
+      bgmLog(LOG_LEVELS.WARN, '[token-payload] Token校验和不匹配，可能已被篡改')
       return null
     }
 
     return token
   } catch (error: unknown) {
-    bgmLog(LOG_LEVELS.ERROR, `[crypto] extractToken 异常: ${(error as Error).message}`)
+    bgmLog(LOG_LEVELS.ERROR, `[token-payload] extractToken 异常: ${(error as Error).message}`)
     return null
   }
 }

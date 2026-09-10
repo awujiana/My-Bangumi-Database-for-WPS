@@ -4,11 +4,9 @@
  * @description 定义 WPS COM 对象的核心接口，避免 unknown 强制转换
  */
 import { LOG_LEVELS } from '../core/constants.js'
-import {
-  showAlert as customShowAlert,
-  showConfirm as customShowConfirm,
-  showInput as customShowInput,
-} from '../ui/dialog.js'
+// 对话框走依赖反转桥：本模块属于底层（tools/），不得 runtime-import 上层 UI 层
+// （见 文档/TS_AUDIT_2026_09_10.md 的 P1-5）。实现由 ui/dialog.ts 注册。
+import { getNotifyApi } from '../core/ui-bridge.js'
 
 import { getApp, bgmLog } from './util/index.js'
 
@@ -369,7 +367,7 @@ export function wpsPrompt(message: string, defaultValue?: string): Promise<strin
       )
     } else {
       // 使用自定义输入对话框
-      customShowInput(
+      getNotifyApi().input(
         '输入',
         message,
         defaultValue,
@@ -432,7 +430,7 @@ export function wpsMessageBox(message: string, buttons?: number, icon?: number):
         )
       } else {
         // 使用自定义确认对话框
-        customShowConfirm(
+        getNotifyApi().confirm(
           message,
           (confirmed) => {
             resolve(confirmed ? 6 : 7)
@@ -446,7 +444,7 @@ export function wpsMessageBox(message: string, buttons?: number, icon?: number):
       })
     } else {
       // 使用自定义警告对话框
-      customShowAlert(message, '提示', () => {
+      getNotifyApi().alert(message, '提示', () => {
         resolve(1)
       })
     }

@@ -4,7 +4,10 @@
  * @description 自定义对话框、确认对话框、Toast 通知
  */
 
+import { registerNotifyApi, registerSyncProgressApi } from '../core/ui-bridge.js'
+import type { SyncProgressStats } from '../core/types.js'
 import type { GithubSyncDetailItem } from '../sync/github-sync-diff.js'
+import type { SyncConfigSummary } from '../sync/sync-config-summary.js'
 import { sanitizeHtml } from '../tools/sanitize.js'
 import { createProgress, formatDuration } from './components/progress.js'
 import type { ProgressController } from './components/progress.js'
@@ -38,78 +41,11 @@ export interface DialogCallback {
   onCancel?: () => void
 }
 
-/** 同步配置摘要，显示在进度弹窗顶部 */
-export interface SyncConfigSummary {
-  /** 同步源标签（如 "远程仓库" / "本地文件"） */
-  sourceLabel?: string
-  /** 同步策略标签 */
-  strategyLabel?: string
-  /** 时间筛选描述 */
-  timeFilterLabel?: string
-  /** 是否仅同步选中行 */
-  selectedRowsOnly?: boolean
-  /** 同步方向描述（如 "远程仓库 → Excel"） */
-  directionLabel?: string
-  /** 额外的自定义配置行（key-value） */
-  extra?: { label: string; value: string }[]
-}
-
-/** 构建同步配置摘要的上下文 */
-export interface BuildSyncConfigContext {
-  /** 数据源标签 */
-  source?: string
-  /** 策略标签 */
-  strategy?: string
-  /** 方向标签 */
-  direction?: string
-  /** 是否选中行 */
-  selectedRowsOnly?: boolean
-  /** 时间筛选 */
-  timeFilter?: {
-    range: 'year' | 'quarter' | 'month' | 'future'
-    year: number
-    quarter?: number
-    month?: number
-  }
-  /** 额外的 key-value 对 */
-  extra?: { label: string; value: string }[]
-}
-
-/**
- * 构造同步配置摘要的工厂函数，统一各入口的配置构造逻辑。
- * @param context 配置上下文
- * @returns SyncConfigSummary 对象
- */
-export function buildSyncConfig(context: BuildSyncConfigContext): SyncConfigSummary {
-  const config: SyncConfigSummary = {}
-  if (context.source) config.sourceLabel = context.source
-  if (context.strategy) config.strategyLabel = context.strategy
-  if (context.direction) config.directionLabel = context.direction
-  if (context.selectedRowsOnly) config.selectedRowsOnly = true
-  if (context.timeFilter) {
-    const tf = context.timeFilter
-    switch (tf.range) {
-      case 'future': {
-        config.timeFilterLabel = '预告/未来动漫'
-        break
-      }
-      case 'year': {
-        config.timeFilterLabel = `${String(tf.year)}年全年`
-        break
-      }
-      case 'quarter': {
-        config.timeFilterLabel = `${String(tf.year)}年${String(tf.quarter)}月新番`
-        break
-      }
-      default: {
-        config.timeFilterLabel = `${String(tf.year)}年${String(tf.month)}月`
-        break
-      }
-    }
-  }
-  if (context.extra && context.extra.length > 0) config.extra = context.extra
-  return config
-}
+// 同步配置摘要是纯数据构造（零 UI 依赖），已下沉到 sync 层，以消除
+// `sync/exceltobangumi → ui/dialog` 的反向依赖（见 文档/TS_AUDIT_2026_09_10.md 的 P1-5）。
+// 此处 re-export 保持既有调用点（`buildSyncConfig` / `SyncConfigSummary`）不变。
+export { buildSyncConfig } from '../sync/sync-config-summary.js'
+export type { BuildSyncConfigContext, SyncConfigSummary } from '../sync/sync-config-summary.js'
 
 // ========== 常量与配置 ==========
 const DIALOG_TYPES: Record<string, DialogConfig> = {
@@ -547,20 +483,12 @@ export function updateSyncProgressDialog(
 }
 
 /**
- * 同步统计数据接口（增强版，支持完整仪表盘渲染）
+ * 同步统计数据接口（增强版，支持完整仪表盘渲染）。
+ *
+ * 形状本身与 UI 无关，已下沉到 `core/types.ts`，供 `sync/`、`ui/handlers/` 与
+ * 进度桥（`core/ui-bridge.ts`）共同引用，避免下层为了拿一个数据形状而反向依赖 UI。
  */
-export interface SyncProgressStats {
-  added: number
-  updated: number
-  deleted: number
-  unchanged: number
-  failed: number
-  skipped: number
-  remoteTotal: number
-  elapsedMs: number
-  avgSpeed: number
-  strategyLabel: string
-}
+export type { SyncProgressStats } from '../core/types.js'
 
 /**
  * 渲染同步统计图表（完整仪表盘布局，与 syncResultDialog 风格一致）
@@ -1077,3 +1005,24 @@ export function showToast(message: string, type?: string): void {
     _toastTimer = null
   }, 3000)
 }
+
+// ========== 注册 UI 实现到桥（依赖反转的收口点） ==========
+// 底层（tools/ sync/）不再 import 本模块，而是调用 core/ui-bridge 的 getNotifyApi() /
+// getSyncProgressApi()。本模块作为实现方，在模块求值时把函数注册进去。
+// 加载时机：`ts/index.ts`（barrel）re-export 本模块，三个 entry 都经由它间接引入，
+// 因此任何业务代码执行前注册都已完成；单测若不 import 本模块，桥会走降级实现（记日志 + 忽略）。
+registerNotifyApi({
+  alert: showAlert,
+  confirm: showConfirm,
+  error: showError,
+  success: showSuccess,
+  toast: showToast,
+  input: showInput,
+})
+
+registerSyncProgressApi({
+  show: showSyncProgressDialog,
+  update: updateSyncProgressDialog,
+  complete: completeSyncProgressDialog,
+  hide: hideSyncProgressDialog,
+})
