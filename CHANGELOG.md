@@ -23,6 +23,20 @@
 - 取舍口径（详见审查报告 §3.2.1）：**刻意的越界输入不改生产类型** —— `range: 'week'/'invalid'`、`quarter: 5/99`、数字型 `话数` 都是覆盖防御分支的健壮性测试（生产确实有 `default → false`、`toExtensionStringValue` 的 `String(value)` 等分支），加显式断言 + 注释即可；**`vi.hoisted` 内不能引用 import 绑定**（vitest 会报 `Cannot access '__vi_import_N__' before initialization`），该处只能保留最小形状并注明原因。
 - `npm run gate` 现在是五道关：`lint:check` → DOMPurify 版本一致 → 导入图（分层 + 致命环）→ tests 类型 → 全量测试。
 
+### 修复（数据安全 · 记录写入失败不再静默，P1-E）
+
+- **问题**：写记录的函数（`addSyncRecord(s)`、`addEnrichRecord(s)`）失败时只写日志、返回 `false`/`void`，而调用方普遍**不看返回值**。用户看到「同步完成」「富化完成」并被打上成功色标，实际情况是记录一条都没落盘 —— 即审查报告所说的**静默数据丢失**。
+- **改法**：① `addEnrichRecord` / `addEnrichRecords` 改为返回 `boolean`；② 各批量写入点检查返回值，失败时**按批次**提示一次（不逐行刷屏）：`progress-reporter` 的成功/失败两处、`handlers/sync` 阶段 1、`github-sync`、`enrich-engine`、`preview` 单行上传（抽 `writeSyncRecord()` helper）。
+- **为什么没有改 `handleError` 的默认级别**：现有实现里 `level` 默认已是 `ERROR`（会写错误日志），只是 `showAlert:false`；若把 `showAlert` 默认打开，**逐单元格**写入失败（`setCellValue` 内部即调用 `handleError`）在批量场景会弹出成百上千次，反而淹没真正的失败。可感知性的正确粒度是**批次**。
+- **36 处 `showAlert:false` 的分类结论**：绝大多数是内部降级路径（建表/建表头、缓存构建、格式设置、解析与筛选探测、面板刷新、Ribbon 冲突检测），**保留静默是对的**；真正会造成「以为成功但没落盘」的只有写入类调用，已全部覆盖。
+- 新增 3 条回归锁（`tests/progress-reporter.test.ts`）：写入失败必须提示、提示文案与级别正确、写入成功时不得打扰用户。
+
+### 修复（性能 · 富化记录改为批量写入，P1-C 批次二）
+
+- **问题（第三次同形态）**：`enrich-record.ts` 里 `addEnrichRecords()`（一次取表句柄 + 一次 `Range.Value2`）与 `addEnrichRecord()` 并列存在，但 `enrich-engine` 在 `for (const field of enrichedFields)` 里**逐条调用后者** —— 每条记录 9 次 `setCellValue`，**并且每次都重新走 `getOrCreateEnrichRecordSheet()`（查表 + 逐列校表头）**。按「条目数 × 字段数」估算，一次富化的 COM 调用量比同步记录那条链路更大。
+- **改法**：`enrichIntoRow` 只把记录 `push` 进调用方传入的累积数组，`enrichEntries` 在循环外一次 `addEnrichRecords(records)` 批量写入（含用户取消 `break` 的分支：对应单元格已写入，记录必须保持一致）。
+- **顺带消除一处重复定义**：`enrich-engine.ts` 内自带一份与 `enrich-record.ts` 导出**完全相同**的 `AddEnrichRecordParameters`（注释写「内部使用」）。两份同形接口会随字段演进静默漂移，已删除本地副本、改为导入唯一来源。
+
 ### 修复（性能 · 同步记录表读写改为矩形批量，P1-C）
 
 - **问题**：WPS 的每次单元格读写都是一次跨进程 IPC。同步记录表却把读写拆到了逐单元格粒度：写入分散在 4 处逐单元格 `setCellValue`（新增一行 = 12 次调用），读取有 3 处逐行 `getCellValue`。项目中其实早已有两个现成范式 —— `tools/util/sheet.ts` 的 `readRangeValues()`（矩形读）与 `Range.Value2 = 二维数组`（矩阵写）—— 只是同步记录表没用它们。
