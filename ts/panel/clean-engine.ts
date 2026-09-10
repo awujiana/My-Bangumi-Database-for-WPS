@@ -186,7 +186,12 @@ function isSheetAllowed(sheetName: string): boolean {
 }
 
 /* ========== 新番表（月历式）表头识别 ========== */
-// 新番表无「名称」表头（番剧名列表头为空），不能走 requireHeaderKeywords，改用专属签名识别并构造「名称 + 标签/分级」最小列映射以复用现有标签规则。
+// 新番表无「名称」表头（番剧名列表头为空），不能走标准特征列判定，改用专属签名识别并构造「名称 + 标签/分级」最小列映射以复用现有标签规则。
+
+/** 列映射是否命中任一「Bangumi 数据表特征列」（配置驱动：见 CLEAN_TARGETS.identityColumns） */
+function hasIdentityColumn(colMap: ReadonlyMap<string, number>): boolean {
+  return CLEAN_TARGETS.identityColumns.some((key) => colMap.has(key))
+}
 
 /** 扫描前若干行，返回首个命中新番表专属表头签名的行号（0 表示未识别） */
 function scanXinFanHeaderRow(ws: WpsWorksheet): number {
@@ -273,9 +278,11 @@ export interface SheetInspection {
   headers: string[]
   /** 是否识别为月历式新番表（无「名称」表头） */
   isXinFan: boolean
-  /** 是否具备「名称」列（含新番表锚点列推导） */
+  /** 是否具备「名称」列（含新番表锚点列推导；仅作展示信息，不再作为入选门槛） */
   hasNameColumn: boolean
-  /** 是否满足清理条件（有名称列 + 数据行数在护栏内） */
+  /** 是否识别为 Bangumi 数据表（命中特征列，或命中月历式新番表签名） */
+  isBangumiSheet: boolean
+  /** 是否满足清理条件（识别为 Bangumi 数据表 / 新番表 + 数据行数在护栏内） */
   eligible: boolean
   /** 未满足清理条件的原因（达标时为空串，页面据此展示提示） */
   reason: string
@@ -363,8 +370,9 @@ function resolveSheetLayout(ws: WpsWorksheet): SheetLayoutInfo {
  * 探测单张工作表的表头与数据规模（只读，不修改任何数据）。
  *
  * 识别路径与目标构造完全一致：
- *  1. 标准路径：表头命中「名称 / 标题 / 作品名」等关键词（`getColumnMap` 归一化）；
- *  2. 新番表路径：表头无「名称」，但命中 {@link XINFAN_HEADER} 专属签名（月历式新番表）。
+ *  1. 标准路径：表头行可识别（`getColumnMap` 归一化），且命中任一
+ *     {@link CLEAN_TARGETS.identityColumns} 特征列（名称 / Bangumi_URL）；
+ *  2. 新番表路径：表头无特征列，但命中 {@link XINFAN_HEADER} 专属签名（月历式新番表）。
  */
 export function inspectWorksheet(ws: WpsWorksheet): SheetInspection {
   const { headerRow, colMap, isXinFan } = resolveSheetLayout(ws)
@@ -372,12 +380,14 @@ export function inspectWorksheet(ws: WpsWorksheet): SheetInspection {
   const lastRow = readLastRow(ws)
   const dataRows = headerRow > 0 ? Math.max(0, lastRow - headerRow) : Math.max(0, lastRow - 1)
   const hasNameColumn = colMap.has('名称')
+  // 身份判定：命中特征列（名称 / Bangumi_URL），或命中月历式新番表专属签名
+  const isBangumiSheet = hasIdentityColumn(colMap) || isXinFan
 
   let reason = ''
   if (!headerRow) {
     reason = '未识别到表头行'
-  } else if (!hasNameColumn) {
-    reason = '未识别到「名称 / 标题 / 作品名」列'
+  } else if (!isBangumiSheet) {
+    reason = `未识别到 Bangumi 数据表特征列（${CLEAN_TARGETS.identityColumns.join(' / ')}）`
   } else if (dataRows < CLEAN_EXCLUDES.minDataRows) {
     reason = '无数据行'
   } else if (dataRows > CLEAN_TARGETS.maxDataRows) {
@@ -391,6 +401,7 @@ export function inspectWorksheet(ws: WpsWorksheet): SheetInspection {
     headers: readHeaderLabels(ws, headerRow),
     isXinFan,
     hasNameColumn,
+    isBangumiSheet,
     eligible: reason === '',
     reason,
   }
@@ -417,7 +428,7 @@ function readWorksheets(wb: WpsWorkbook): WpsWorksheet[] {
 /**
  * 按配置校验并构造单个清理目标；不满足条件时返回 null。
  *
- * @param isForced 用户显式勾选该表时为 true：跳过「必须有名称列」的硬门槛，
+ * @param isForced 用户显式勾选该表时为 true：跳过「必须有特征列」的硬门槛，
  *   让用户勾选的表一定进入扫描（行级规则缺列时会返回跳过原因，在预览说明中展示），
  *   避免「页面能勾选、引擎却查无此表」的错位。
  */
@@ -431,12 +442,11 @@ function buildTarget(
   if (!sheetName || !isSheetAllowed(sheetName)) return null
 
   const layout = resolveSheetLayout(ws)
-  if (!isForced && !layout.colMap.has('名称')) return null
+  if (!isForced && !hasIdentityColumn(layout.colMap) && !layout.isXinFan) return null
 
   // 未识别到表头时退化为第 1 行表头 + 空列映射（规则按列缺失自行跳过）
   const headerRow = layout.headerRow > 0 ? layout.headerRow : 1
-  const colMap =
-    layout.headerRow > 0 ? layout.colMap : new Map<string, number>()
+  const colMap = layout.headerRow > 0 ? layout.colMap : new Map<string, number>()
 
   const lastRow = readLastRow(ws)
   const dataRows = lastRow - headerRow
@@ -466,11 +476,7 @@ function safeSheetName(ws: WpsWorksheet): string {
 }
 
 /** 该工作表是否应被扫描（白名单为空 = 不限制；否则需命中用户勾选） */
-function shouldScanSheet(
-  whitelist: ReadonlySet<string>,
-  path: string,
-  sheetName: string,
-): boolean {
+function shouldScanSheet(whitelist: ReadonlySet<string>, path: string, sheetName: string): boolean {
   if (sheetName === '') return false
   if (whitelist.size === 0) return true
   return whitelist.has(`${path}\u{0000}${sheetName}`)
@@ -785,9 +791,7 @@ export function scanCleanRules(
   const targets = listCleanTargets(options.selectedSheets)
   if (targets.length === 0) {
     if (options.selectedSheets && options.selectedSheets.length > 0) {
-      notes.push(
-        '已勾选的工作表中没有可清理目标（表被排除规则命中，或数据行数不在护栏范围内）',
-      )
+      notes.push('已勾选的工作表中没有可清理目标（表被排除规则命中，或数据行数不在护栏范围内）')
     } else {
       notes.push('未找到可清理目标（需在「选择清理的表格」中勾选工作表）')
     }
@@ -979,8 +983,8 @@ export interface CleanScopeSummary {
   excludeWorkbookPath: string[]
   /** 表名包含规则（空 = 自动识别） */
   includeSheetName: string[]
-  /** 必备表头关键词 */
-  requireHeaderKeywords: string[]
+  /** 判定 Bangumi 数据表的特征列（命中任一即视为数据表） */
+  identityColumns: string[]
   /** 排除表名关键词 */
   excludeSheetName: string[]
   /** 排除行文本关键词 */
@@ -995,7 +999,7 @@ export function describeCleanScope(): CleanScopeSummary {
     includeWorkbookPath: [...CLEAN_TARGETS.includeWorkbookPath],
     excludeWorkbookPath: [...CLEAN_TARGETS.excludeWorkbookPath],
     includeSheetName: [...CLEAN_TARGETS.includeSheetName],
-    requireHeaderKeywords: [...CLEAN_TARGETS.requireHeaderKeywords],
+    identityColumns: [...CLEAN_TARGETS.identityColumns],
     excludeSheetName: [...CLEAN_EXCLUDES.sheetName],
     excludeRowText: [...CLEAN_EXCLUDES.rowText],
     maxDataRows: CLEAN_TARGETS.maxDataRows,

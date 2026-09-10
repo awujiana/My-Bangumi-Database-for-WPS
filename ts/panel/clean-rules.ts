@@ -66,8 +66,15 @@ export interface CleanTargetConfig {
   excludeWorkbookPath: string[]
   /** 仅处理表名包含任一关键词的工作表；空数组 = 按表头自动识别 */
   includeSheetName: string[]
-  /** 判定「数据表」必须命中的表头关键词（缺失即视为非数据表，跳过） */
-  requireHeaderKeywords: string[]
+  /**
+   * 判定「Bangumi 数据表」的特征列（取自 `getColumnMap()` 的归一化列键）：
+   * **命中任一即视为 Bangumi 数据表**。
+   *
+   * 判定宽松是有意的：同一份数据在不同工作簿里列名并不统一（如「剧集名 / 小说名」
+   * 不会归一化成「名称」），但只要有表头行 + Bangumi_URL 列，它就是可清理的
+   * Bangumi 数据表；缺列的规则会在扫描时自行跳过并在预览中说明原因。
+   */
+  identityColumns: string[]
   /** 单表最多扫描的数据行数（防御超大数据表把 WPS 卡死） */
   maxDataRows: number
 }
@@ -92,8 +99,8 @@ export const CLEAN_TARGETS: CleanTargetConfig = {
   // WPS 临时锁文件（~$ 开头）与加载项自身目录不参与清理
   excludeWorkbookPath: ['~$', '/dist/', '/dist-ts/', '/node_modules/'],
   includeSheetName: [],
-  // 必须具备「名称」列才认为是 Bangumi 数据表
-  requireHeaderKeywords: ['名称'],
+  // 命中任一即视为 Bangumi 数据表：有「名称」列，或有「Bangumi_URL」列（两者都有更好）
+  identityColumns: ['名称', 'Bangumi_URL'],
   maxDataRows: 50_000,
 }
 
@@ -123,7 +130,7 @@ export const CLEAN_EXCLUDES: CleanExcludeConfig = {
  * ```
  * 特征：① 表头行**没有「名称」列**（番剧名列 C 表头为空）；
  *      ② 表名 / 表头命中「周更时间 / 播放平台 / TAGS」等专属列。
- * 因此不能套用 `requireHeaderKeywords: ['名称']`，需要独立签名识别。
+ * 因此不能套用「必须有名称列」的门槛，需要独立签名识别。
  */
 export interface XinFanHeaderConfig {
   /** 新番表专属表头关键词（大小写不敏感） */

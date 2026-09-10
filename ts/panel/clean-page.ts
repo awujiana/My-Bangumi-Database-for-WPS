@@ -11,12 +11,7 @@
 import { LOG_LEVELS } from '../core/constants.js'
 import { showToast } from '../ui/dialog.js'
 import { BGM, bgmLog, getApp, markCleanPaneLoaded } from '../tools/util/index.js'
-import {
-  CLEAN_EXCLUDES,
-  CLEAN_RULES,
-  CLEAN_TARGETS,
-  RISK_LABELS,
-} from './clean-rules.js'
+import { CLEAN_EXCLUDES, CLEAN_RULES, CLEAN_TARGETS, RISK_LABELS } from './clean-rules.js'
 import type { CleanRule } from './clean-rules.js'
 import { formatBytes, inspectWorksheet, runCleanPlans, scanCleanRules } from './clean-engine.js'
 import type { CleanScanResult } from './clean-engine.js'
@@ -383,7 +378,7 @@ function handleLoadSheets(): void {
     )
     if (eligible === 0 && sheetCandidates.length > 0) {
       appendLog(
-        '未识别到含「名称 / 标题 / 作品名」列的数据表；可手动勾选任意工作表，规则会按列缺失自动跳过',
+        '未识别到「名称 / Bangumi_URL」列的数据表；可手动勾选任意工作表，规则会按列缺失自动跳过',
         'warn',
       )
     }

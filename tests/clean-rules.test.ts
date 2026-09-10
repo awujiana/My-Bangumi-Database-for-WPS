@@ -62,8 +62,9 @@ describe('CLEAN_TARGETS / CLEAN_EXCLUDES 配置', () => {
     expect(CLEAN_TARGETS.excludeWorkbookPath).toContain('~$')
   })
 
-  it('必备表头关键词包含「名称」', () => {
-    expect(CLEAN_TARGETS.requireHeaderKeywords).toContain('名称')
+  it('Bangumi 数据表特征列包含「名称」与「Bangumi_URL」（命中任一即视为数据表）', () => {
+    expect(CLEAN_TARGETS.identityColumns).toContain('名称')
+    expect(CLEAN_TARGETS.identityColumns).toContain('Bangumi_URL')
   })
 
   it('排除表名包含同步记录 / 日志类关键词', () => {

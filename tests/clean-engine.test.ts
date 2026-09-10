@@ -171,7 +171,7 @@ describe('listCleanTargets · 配置过滤', () => {
     expect(listCleanTargets()).toHaveLength(0)
   })
 
-  it('缺少「名称」表头的工作表跳过', () => {
+  it('未命中「名称 / Bangumi_URL」特征列的工作表跳过', () => {
     mockWorkbookSheet('动画')
     mocks.getColumnMap.mockReturnValue(new Map([['标题', 1]]))
     expect(listCleanTargets()).toHaveLength(0)
@@ -189,6 +189,37 @@ describe('listCleanTargets · 配置过滤', () => {
     expect(listCleanTargets()).toHaveLength(0)
   })
 
+  it('缺少「名称」但有 Bangumi_URL 的表（如「剧集和小说」）默认入选', () => {
+    mockWorkbookSheet('剧集和小说', 'D:/books/娱乐影视游戏记录.xlsm', { usedRangeLastRow: 30 })
+    // 表头行 + Bangumi_URL 列 → 判定为 Bangumi 数据表（名称列可能叫「剧集名 / 小说名」）
+    mocks.getColumnMap.mockReturnValue(
+      new Map([
+        ['序列号', 1],
+        ['是否看完', 2],
+        ['开播季度', 4],
+        ['Bangumi_URL', 9],
+      ]),
+    )
+    makeGrid({ 2: { 1: '1' }, 3: { 1: '2' } })
+    const targets = listCleanTargets()
+    expect(targets).toHaveLength(1)
+    expect(targets[0]?.sheetName).toBe('剧集和小说')
+    expect(targets[0]?.lastRow).toBe(30)
+    // 名称列缺失，但 URL 类规则仍可用；缺列的行级规则扫描时自行跳过
+    expect(targets[0]?.colMap.has('名称')).toBe(false)
+  })
+
+  it('既无「名称」也无「Bangumi_URL」的表跳过（非 Bangumi 数据表）', () => {
+    mockWorkbookSheet('参数表')
+    mocks.getColumnMap.mockReturnValue(
+      new Map([
+        ['序号', 1],
+        ['说明', 2],
+      ]),
+    )
+    expect(listCleanTargets()).toHaveLength(0)
+  })
+
   it('用户显式勾选的工作表（selectedSheets）命中时入选', () => {
     mockWorkbookSheet('动画')
     makeGrid({ 2: { 1: 'A' } })
@@ -197,20 +228,18 @@ describe('listCleanTargets · 配置过滤', () => {
     expect(targets[0]?.sheetName).toBe('动画')
   })
 
-  it('显式勾选可绕过「名称列」硬门槛（页面能勾选 → 引擎必定处理）', () => {
-    mockWorkbookSheet('剧集和小说', 'D:/books/娱乐影视游戏记录.xlsm', { usedRangeLastRow: 30 })
-    // 该表没有「名称」列（只有 序列号 / 是否看完 / …），默认不入选
-    mocks.getColumnMap.mockReturnValue(new Map([['序列号', 1]]))
+  it('显式勾选可绕过「特征列」硬门槛（页面能勾选 → 引擎必定处理）', () => {
+    mockWorkbookSheet('参数表', 'D:/books/参数.xlsx', { usedRangeLastRow: 30 })
+    // 既无「名称」也无「Bangumi_URL」→ 默认不入选
+    mocks.getColumnMap.mockReturnValue(new Map([['序号', 1]]))
     makeGrid({ 2: { 1: '1' }, 3: { 1: '2' } })
     expect(listCleanTargets()).toHaveLength(0)
 
-    const targets = listCleanTargets([
-      { workbookKey: 'D:/books/娱乐影视游戏记录.xlsm', sheetName: '剧集和小说' },
-    ])
+    const targets = listCleanTargets([{ workbookKey: 'D:/books/参数.xlsx', sheetName: '参数表' }])
     expect(targets).toHaveLength(1)
     expect(targets[0]?.headerRow).toBe(1)
     expect(targets[0]?.lastRow).toBe(30)
-    // 名称列缺失 → colMap 无「名称」，行级规则扫描时会自行跳过并说明原因
+    // 特征列缺失 → colMap 无「名称」/「Bangumi_URL」，规则扫描时会自行跳过并说明原因
     expect(targets[0]?.colMap.has('名称')).toBe(false)
   })
 
@@ -463,13 +492,32 @@ describe('inspectWorksheet', () => {
     expect(info.eligible).toBe(true)
   })
 
-  it('未识别到名称列：eligible=false 且给出原因', () => {
+  it('未命中特征列：eligible=false 且给出原因', () => {
     mockWorkbookSheet('参数表')
     mocks.getColumnMap.mockReturnValue(new Map([['序号', 1]]))
     const info = inspectWorksheet({ Name: '参数表' } as CleanTargetInfo['ws'])
     expect(info.hasNameColumn).toBe(false)
+    expect(info.isBangumiSheet).toBe(false)
     expect(info.eligible).toBe(false)
-    expect(info.reason).toContain('名称')
+    expect(info.reason).toContain('特征列')
+  })
+
+  it('仅有 Bangumi_URL 而无「名称」列：仍判定为 Bangumi 数据表且可清理', () => {
+    const ws = mockWorkbookSheet('剧集和小说', 'D:/books/娱乐影视游戏记录.xlsm', {
+      usedRangeLastRow: 30,
+    })
+    mocks.getColumnMap.mockReturnValue(
+      new Map([
+        ['序列号', 1],
+        ['Bangumi_URL', 9],
+      ]),
+    )
+    const info = inspectWorksheet(ws as CleanTargetInfo['ws'])
+    expect(info.hasNameColumn).toBe(false)
+    expect(info.isBangumiSheet).toBe(true)
+    expect(info.eligible).toBe(true)
+    expect(info.reason).toBe('')
+    expect(info.dataRows).toBe(29)
   })
 
   it('完全没有表头：reason 为未识别到表头行', () => {
@@ -648,7 +696,7 @@ describe('formatBytes', () => {
 describe('describeCleanScope', () => {
   it('返回配置快照（页面只读展示，不硬编码）', () => {
     const scope = describeCleanScope()
-    expect(scope.requireHeaderKeywords).toContain('名称')
+    expect(scope.identityColumns).toContain('Bangumi_URL')
     expect(scope.excludeSheetName).toContain('同步记录')
     expect(scope.maxDataRows).toBeGreaterThan(0)
     // 返回的是副本，改动不影响原配置
