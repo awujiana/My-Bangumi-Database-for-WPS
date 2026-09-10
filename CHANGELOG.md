@@ -15,7 +15,12 @@
 - **实现坑**：脚本直接用本机 node 跑 `node_modules/typescript/bin/tsc`，不经 `npx`/shell —— Windows 下 `npx.cmd` 经 `execFileSync` 解析失败会抛错，若容错写成「拿不到输出就当 0 错误」，门禁会空转（实测踩到）。
 - **批次一：254 → 125**。清除的全部是「mock 只实现被测路径访问到的成员」这一类，手法是把形状不完整**收敛到单点**：每个测试文件的 mock 工厂声明一个 `MockWorksheet` 类型并在工厂内做一次 `as unknown as`，调用点仍按真实接口 `WpsWorksheet` 校验（`Mock<T>` 携带 `T` 的调用签名，因此交集类型可双向使用）；配套 `createRangeMock` / `createCellItemMock` / `createMockWorkbook` / `createMockApp` helper。效果：`sheet.test.ts` 79→0、`cell.test.ts` 32→0、`sync-record.test.ts` 18→0。
   - 保留的逃逸点都写明理由：`asMalformedApp` / `malformedSheet`（用例本身就是验证「宿主返回 `null`/半成品」时的降级）、`{ ...createMockSheet(), Activate: undefined }` 这类刻意畸形构造。
-- 剩余 125 个已基线化，按「真实接口漂移 / 可空性 / 断言过窄 / 其他」四类写进审查报告 §3.2.1，逐批清账后下调基线。
+- 剩余 125 个曾按「真实接口漂移 / 可空性 / 断言过窄 / 其他」四类写进审查报告 §3.2.1，逐批清账后下调基线。**后续三批：125 → 106 → 63 → 0，基线已归零**（每批一次提交、每批 `--update` 下调）：
+  - **批次二（125 → 106）· 测试的全局装配断言**：`(globalThis as { XMLHttpRequest: typeof MockXHR }).XMLHttpRequest = X` 被判 TS2352 —— MockXHR 与 lib.dom 的构造函数形状不充分重叠，而 mock 的本意正是不兼容；改走 `Reflect.set`（运行时属性写入，与原写法语义完全一致）。`window.Application` 的读 / 写 / 删统一为 `Reflect.get` / `Reflect.set` / `Reflect.deleteProperty`，`workbook-auto-detect` 另加 `getMockApp()` 收敛取值。
+  - **批次三（106 → 63）· github 同步测试族与生产接口对齐**：删掉测试虚构的 `remote.desc` / `rating`（`GithubRemoteEntry` 无此字段）、修正写错的 `ConflictResolution.choice` → `chosenValue`、补必填的 `changedFields`、`changedFields: new Set(['*'])` → `['*']`、修正 `getFilterStatus` 与 `syncFromGithub` 的参数错位、给 `createMockSource` 补 `getSourceType()`（生产接口演进后 mock 未跟上），并把 `validateConfig` 的自造 `{isFail, error}` 形状换成生产的 `Result.okVoid()`（原形状缺 `success`/`data`/`isOk`/`unwrap` 等 7 个成员）。
+  - **批次四（63 → 0）· mock 基础设施**：① `sync-flow` 里 5 个无类型的 `vi.fn()` 被 TS 推断成「无参 / 返回 `never`」，`mockReturnValue` 因此连环报错 → 补显式签名；② vitest 的 `Mock<T>` 要求 `mockReturnValue` 收完整 `T`（参数逆变），于是「返回形状稍有不同的另一处赋值」被判不兼容 → 新增 `asRangeMock()` 单点收敛（17 处 `Range` 赋值）；③ `noUncheckedIndexedAccess` 下 18 处 `arr[0].x` 补 `?.`；④ `exceltobangumi` 的 `createMockWorksheet` 返回类型由 `unknown` 收敛为 `WpsWorksheet`，连带修正一处 `getFilterStatus` 的参数错位（漏传 `headerRow`，`false` 落在了 `headerRow` 上）。
+- **清账顺带修出 1 处生产类型缺口**：`httpRequest` 的 `zodSchema` 原为 `ZodSchema<T>` —— 那是本地降级实现的形状（带 `[k: string]: any` 索引签名），而真实 zod 的 `ZodObject` 是类实例、没有索引签名，因此被它拒之门外；该函数实际只调用 `schema.parse()`。改为 `Pick<ZodSchema<T>, 'parse'>` 后，真实 zod 与本地降级实现都能传入。
+- 取舍口径（详见审查报告 §3.2.1）：**刻意的越界输入不改生产类型** —— `range: 'week'/'invalid'`、`quarter: 5/99`、数字型 `话数` 都是覆盖防御分支的健壮性测试（生产确实有 `default → false`、`toExtensionStringValue` 的 `String(value)` 等分支），加显式断言 + 注释即可；**`vi.hoisted` 内不能引用 import 绑定**（vitest 会报 `Cannot access '__vi_import_N__' before initialization`），该处只能保留最小形状并注明原因。
 - `npm run gate` 现在是五道关：`lint:check` → DOMPurify 版本一致 → 导入图（分层 + 致命环）→ tests 类型 → 全量测试。
 
 ### 重构（架构 · 消除分层反向依赖，P1-5）
