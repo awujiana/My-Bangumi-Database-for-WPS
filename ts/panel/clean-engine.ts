@@ -258,6 +258,144 @@ function buildXinFanColumnMap(ws: WpsWorksheet, headerRow: number): Map<string, 
   return colMap
 }
 
+/**
+ * 工作表探测结果（页面「选择清理的表格」与引擎共用同一套识别逻辑，
+ * 避免页面显示与实际清理范围不一致）。
+ */
+export interface SheetInspection {
+  /** 表头行号（0 = 未识别到任何表头） */
+  headerRow: number
+  /** 最后一行行号（UsedRange 末行） */
+  lastRow: number
+  /** 数据行数（lastRow - headerRow，最小 0） */
+  dataRows: number
+  /** 表头文本（前 8 个非空值，仅展示用） */
+  headers: string[]
+  /** 是否识别为月历式新番表（无「名称」表头） */
+  isXinFan: boolean
+  /** 是否具备「名称」列（含新番表锚点列推导） */
+  hasNameColumn: boolean
+  /** 是否满足清理条件（有名称列 + 数据行数在护栏内） */
+  eligible: boolean
+  /** 未满足清理条件的原因（达标时为空串，页面据此展示提示） */
+  reason: string
+}
+
+/** 读取工作表末行（UsedRange 优先，异常回退 getLastRow） */
+function readLastRow(ws: WpsWorksheet): number {
+  try {
+    const used = ws.UsedRange
+    if (used) {
+      const startRow = used.Row
+      const rowCount = used.Rows.Count
+      if (Number.isFinite(startRow) && Number.isFinite(rowCount) && rowCount > 0) {
+        return startRow + rowCount - 1
+      }
+    }
+  } catch {
+    // 回落到 getLastRow
+  }
+  try {
+    return getLastRow(ws)
+  } catch {
+    return 0
+  }
+}
+
+/** 读取表头文本（前 8 个非空值，仅用于页面展示） */
+function readHeaderLabels(ws: WpsWorksheet, headerRow: number): string[] {
+  const labels: string[] = []
+  if (!headerRow) return labels
+  for (let col = 1; col <= 40 && labels.length < 8; col += 1) {
+    const text = getCellValue(ws, headerRow, col).trim()
+    if (text) labels.push(text)
+  }
+  return labels
+}
+
+/** 工作表结构解析结果（表头行 / 列映射 / 是否新番表） */
+interface SheetLayoutInfo {
+  headerRow: number
+  colMap: Map<string, number>
+  isXinFan: boolean
+}
+
+/** 安全读取表头行（异常时返回 0） */
+function safeFindHeaderRow(ws: WpsWorksheet): number {
+  try {
+    return findHeaderRow(ws)
+  } catch {
+    return 0
+  }
+}
+
+/**
+ * 解析工作表结构（只读）：标准路径优先，失败后尝试新番表签名路径。
+ * 页面探测与目标构造共用本函数，保证「页面显示」与「实际清理范围」一致。
+ */
+function resolveSheetLayout(ws: WpsWorksheet): SheetLayoutInfo {
+  const headerRow = safeFindHeaderRow(ws)
+
+  if (headerRow) {
+    try {
+      return { headerRow, colMap: getColumnMap(ws, headerRow), isXinFan: false }
+    } catch {
+      return { headerRow, colMap: new Map(), isXinFan: false }
+    }
+  }
+
+  try {
+    const xinFanHeaderRow = scanXinFanHeaderRow(ws)
+    if (xinFanHeaderRow) {
+      return {
+        headerRow: xinFanHeaderRow,
+        colMap: buildXinFanColumnMap(ws, xinFanHeaderRow),
+        isXinFan: true,
+      }
+    }
+  } catch {
+    // 忽略新番表探测异常
+  }
+  return { headerRow: 0, colMap: new Map(), isXinFan: false }
+}
+
+/**
+ * 探测单张工作表的表头与数据规模（只读，不修改任何数据）。
+ *
+ * 识别路径与目标构造完全一致：
+ *  1. 标准路径：表头命中「名称 / 标题 / 作品名」等关键词（`getColumnMap` 归一化）；
+ *  2. 新番表路径：表头无「名称」，但命中 {@link XINFAN_HEADER} 专属签名（月历式新番表）。
+ */
+export function inspectWorksheet(ws: WpsWorksheet): SheetInspection {
+  const { headerRow, colMap, isXinFan } = resolveSheetLayout(ws)
+
+  const lastRow = readLastRow(ws)
+  const dataRows = headerRow > 0 ? Math.max(0, lastRow - headerRow) : Math.max(0, lastRow - 1)
+  const hasNameColumn = colMap.has('名称')
+
+  let reason = ''
+  if (!headerRow) {
+    reason = '未识别到表头行'
+  } else if (!hasNameColumn) {
+    reason = '未识别到「名称 / 标题 / 作品名」列'
+  } else if (dataRows < CLEAN_EXCLUDES.minDataRows) {
+    reason = '无数据行'
+  } else if (dataRows > CLEAN_TARGETS.maxDataRows) {
+    reason = `数据行超过护栏（${String(CLEAN_TARGETS.maxDataRows)} 行）`
+  }
+
+  return {
+    headerRow,
+    lastRow,
+    dataRows,
+    headers: readHeaderLabels(ws, headerRow),
+    isXinFan,
+    hasNameColumn,
+    eligible: reason === '',
+    reason,
+  }
+}
+
 /** 枚举工作簿内的全部工作表（异常时返回空数组） */
 function readWorksheets(wb: WpsWorkbook): WpsWorksheet[] {
   const sheets: WpsWorksheet[] = []
@@ -278,26 +416,29 @@ function readWorksheets(wb: WpsWorkbook): WpsWorksheet[] {
 
 /**
  * 按配置校验并构造单个清理目标；不满足条件时返回 null。
- * 识别路径分两步：
- *  1. 标准路径：表头含「名称」（Bangumi 归档表等）；
- *  2. 新番表路径：表头无「名称」，但命中 {@link XINFAN_HEADER} 专属签名（月历式新番表）。
+ *
+ * @param isForced 用户显式勾选该表时为 true：跳过「必须有名称列」的硬门槛，
+ *   让用户勾选的表一定进入扫描（行级规则缺列时会返回跳过原因，在预览说明中展示），
+ *   避免「页面能勾选、引擎却查无此表」的错位。
  */
-function buildTarget(wb: WpsWorkbook, ws: WpsWorksheet, path: string): CleanTargetInfo | null {
+function buildTarget(
+  wb: WpsWorkbook,
+  ws: WpsWorksheet,
+  path: string,
+  isForced = false,
+): CleanTargetInfo | null {
   const sheetName = ws.Name
   if (!sheetName || !isSheetAllowed(sheetName)) return null
 
-  let headerRow = findHeaderRow(ws)
-  let colMap: Map<string, number> | undefined
-  if (headerRow) {
-    colMap = getColumnMap(ws, headerRow)
-  } else {
-    headerRow = scanXinFanHeaderRow(ws)
-    if (!headerRow) return null
-    colMap = buildXinFanColumnMap(ws, headerRow)
-  }
-  if (!colMap.has('名称')) return null
+  const layout = resolveSheetLayout(ws)
+  if (!isForced && !layout.colMap.has('名称')) return null
 
-  const lastRow = getLastRow(ws)
+  // 未识别到表头时退化为第 1 行表头 + 空列映射（规则按列缺失自行跳过）
+  const headerRow = layout.headerRow > 0 ? layout.headerRow : 1
+  const colMap =
+    layout.headerRow > 0 ? layout.colMap : new Map<string, number>()
+
+  const lastRow = readLastRow(ws)
   const dataRows = lastRow - headerRow
   if (dataRows < CLEAN_EXCLUDES.minDataRows) return null
   if (dataRows > CLEAN_TARGETS.maxDataRows) return null
@@ -315,12 +456,32 @@ function buildTarget(wb: WpsWorkbook, ws: WpsWorksheet, path: string): CleanTarg
   }
 }
 
+/** 安全读取工作表名（异常时返回空串） */
+function safeSheetName(ws: WpsWorksheet): string {
+  try {
+    return ws.Name
+  } catch {
+    return ''
+  }
+}
+
+/** 该工作表是否应被扫描（白名单为空 = 不限制；否则需命中用户勾选） */
+function shouldScanSheet(
+  whitelist: ReadonlySet<string>,
+  path: string,
+  sheetName: string,
+): boolean {
+  if (sheetName === '') return false
+  if (whitelist.size === 0) return true
+  return whitelist.has(`${path}\u{0000}${sheetName}`)
+}
+
 /**
  * 解析全部待清理目标：遍历已打开工作簿 → 按配置过滤 → 校验表头与数据行数。
  * 无任何可用目标时返回空数组（调用方据此提示）。
  *
  * @param selectedSheets 用户显式勾选的工作表（按 `工作簿全路径 :: 表名` 匹配）。
- *   非空时仅保留白名单命中；空数组表示「不限制」（保留旧行为，向后兼容）。
+ *   非空时仅保留白名单命中，且命中项跳过「必须有名称列」的硬门槛（用户已确认要清理）。
  */
 export function listCleanTargets(
   selectedSheets: readonly { workbookKey: string; sheetName: string }[] = [],
@@ -332,14 +493,13 @@ export function listCleanTargets(
   for (const wb of getOpenWorkbooks()) {
     const path = readWorkbookPath(wb)
     if (isWorkbookAllowed(path)) {
-      for (const ws of readWorksheets(wb)) {
-        const target = buildTarget(wb, ws, path)
-        if (
-          target &&
-          (whitelist.size === 0 || whitelist.has(`${path}\u{0000}${target.sheetName}`))
-        ) {
-          targets.push(target)
-        }
+      const picked = readWorksheets(wb)
+        .map((ws) => ({ ws, sheetName: safeSheetName(ws) }))
+        .filter((item) => shouldScanSheet(whitelist, path, item.sheetName))
+      for (const item of picked) {
+        const isPicked = whitelist.has(`${path}\u{0000}${item.sheetName}`)
+        const target = buildTarget(wb, item.ws, path, isPicked)
+        if (target) targets.push(target)
       }
     }
   }
@@ -626,10 +786,10 @@ export function scanCleanRules(
   if (targets.length === 0) {
     if (options.selectedSheets && options.selectedSheets.length > 0) {
       notes.push(
-        '未在已勾选的工作表中找到符合目标配置的工作表（需含「名称」表头且未被排除规则命中）',
+        '已勾选的工作表中没有可清理目标（表被排除规则命中，或数据行数不在护栏范围内）',
       )
     } else {
-      notes.push('未找到符合目标配置的工作表（需含「名称」表头且未被排除规则命中）')
+      notes.push('未找到可清理目标（需在「选择清理的表格」中勾选工作表）')
     }
   }
 

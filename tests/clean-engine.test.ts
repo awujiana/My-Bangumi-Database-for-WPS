@@ -50,6 +50,7 @@ import {
   mergeChangeValues,
   formatBytes,
   describeCleanScope,
+  inspectWorksheet,
 } from '../ts/panel/clean-engine.js'
 import type { CleanTargetInfo, CleanScanResult } from '../ts/panel/clean-engine.js'
 import { transformCellValue } from '../ts/panel/clean-transforms.js'
@@ -86,8 +87,21 @@ const DEFAULT_COL_MAP = new Map<string, number>([
   ['标签/分级', 3],
 ])
 
-function mockWorkbookSheet(sheetName: string, path = 'D:/books/数据表.xlsx'): void {
-  const ws = { Name: sheetName }
+function mockWorkbookSheet(
+  sheetName: string,
+  path = 'D:/books/数据表.xlsx',
+  options: { usedRangeLastRow?: number } = {},
+): unknown {
+  const ws = {
+    Name: sheetName,
+    // 引擎优先读 UsedRange 计算末行（未提供时回退 getLastRow）
+    ...(options.usedRangeLastRow !== undefined && {
+      UsedRange: {
+        Row: 1,
+        Rows: { Count: options.usedRangeLastRow },
+      },
+    }),
+  }
   const wb = {
     Name: '数据表.xlsx',
     FullName: path,
@@ -97,6 +111,7 @@ function mockWorkbookSheet(sheetName: string, path = 'D:/books/数据表.xlsx'):
   mocks.findHeaderRow.mockReturnValue(1)
   mocks.getColumnMap.mockReturnValue(new Map(DEFAULT_COL_MAP))
   mocks.getLastRow.mockReturnValue(4)
+  return ws
 }
 
 /** 构造最小 CleanTargetInfo（aggregatePlans / runCleanPlans 测试用） */
@@ -182,6 +197,23 @@ describe('listCleanTargets · 配置过滤', () => {
     expect(targets[0]?.sheetName).toBe('动画')
   })
 
+  it('显式勾选可绕过「名称列」硬门槛（页面能勾选 → 引擎必定处理）', () => {
+    mockWorkbookSheet('剧集和小说', 'D:/books/娱乐影视游戏记录.xlsm', { usedRangeLastRow: 30 })
+    // 该表没有「名称」列（只有 序列号 / 是否看完 / …），默认不入选
+    mocks.getColumnMap.mockReturnValue(new Map([['序列号', 1]]))
+    makeGrid({ 2: { 1: '1' }, 3: { 1: '2' } })
+    expect(listCleanTargets()).toHaveLength(0)
+
+    const targets = listCleanTargets([
+      { workbookKey: 'D:/books/娱乐影视游戏记录.xlsm', sheetName: '剧集和小说' },
+    ])
+    expect(targets).toHaveLength(1)
+    expect(targets[0]?.headerRow).toBe(1)
+    expect(targets[0]?.lastRow).toBe(30)
+    // 名称列缺失 → colMap 无「名称」，行级规则扫描时会自行跳过并说明原因
+    expect(targets[0]?.colMap.has('名称')).toBe(false)
+  })
+
   it('用户未勾选该工作表时返回空数组', () => {
     mockWorkbookSheet('动画')
     makeGrid({ 2: { 1: 'A' } })
@@ -198,7 +230,8 @@ describe('listCleanTargets · 配置过滤', () => {
 
   it('月历式新番表（无「名称」表头）按专属签名入选，并映射名称列与 TAGS 列', () => {
     mockWorkbookSheet('2026年4月新番表')
-    mocks.findHeaderRow.mockReturnValue(0) // 标准路径失败 → 走新番表签名
+    // 标准路径失败 → 走新番表签名
+    mocks.findHeaderRow.mockReturnValue(0)
     // 表头行（行2）命中签名：周更时间(D4) / 播放平台(F6) / 集数(L12) / TAGS(N14)
     setCellGrid({
       2: {
@@ -219,8 +252,10 @@ describe('listCleanTargets · 配置过滤', () => {
     const targets = listCleanTargets()
     expect(targets).toHaveLength(1)
     const colMap = targets[0]?.colMap
-    expect(colMap?.get('名称')).toBe(3) // 名称列 = C 列
-    expect(colMap?.get('标签/分级')).toBe(14) // TAGS 列复用「标签/分级」键
+    // 名称列 = C 列
+    expect(colMap?.get('名称')).toBe(3)
+    // TAGS 列复用「标签/分级」键
+    expect(colMap?.get('标签/分级')).toBe(14)
   })
 
   it('新番表表头未命中签名时仍按标准「名称」要求跳过', () => {
@@ -308,7 +343,8 @@ describe('scanCleanRules · 新番表噪声行', () => {
     expect(deleted).toContain(3)
     expect(deleted).toContain(4)
     expect(deleted).toContain(102)
-    expect(deleted).not.toContain(5) // 正常番剧行保留
+    // 正常番剧行保留
+    expect(deleted).not.toContain(5)
   })
 })
 
@@ -396,7 +432,64 @@ describe('scanCleanRules', () => {
     mocks.getOpenWorkbooks.mockReturnValue([])
     const result = scanCleanRules(['noise-tags'])
     expect(result.targetCount).toBe(0)
-    expect(result.notes.join('\n')).toContain('未找到符合目标配置')
+    expect(result.notes.join('\n')).toContain('未找到可清理目标')
+  })
+})
+
+// ========== 工作表探测（页面与引擎共用） ==========
+
+describe('inspectWorksheet', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  it('标准数据表：表头行 / 行数 / 名称列 / 可清理', () => {
+    mockWorkbookSheet('动画')
+    const info = inspectWorksheet({ Name: '动画' } as CleanTargetInfo['ws'])
+    expect(info.headerRow).toBe(1)
+    expect(info.lastRow).toBe(4)
+    expect(info.dataRows).toBe(3)
+    expect(info.hasNameColumn).toBe(true)
+    expect(info.eligible).toBe(true)
+    expect(info.reason).toBe('')
+    expect(info.isXinFan).toBe(false)
+  })
+
+  it('优先用 UsedRange 计算末行（真实数据行数）', () => {
+    const ws = mockWorkbookSheet('动画', 'D:/books/数据表.xlsx', { usedRangeLastRow: 120 })
+    const info = inspectWorksheet(ws as CleanTargetInfo['ws'])
+    expect(info.lastRow).toBe(120)
+    expect(info.dataRows).toBe(119)
+    expect(info.eligible).toBe(true)
+  })
+
+  it('未识别到名称列：eligible=false 且给出原因', () => {
+    mockWorkbookSheet('参数表')
+    mocks.getColumnMap.mockReturnValue(new Map([['序号', 1]]))
+    const info = inspectWorksheet({ Name: '参数表' } as CleanTargetInfo['ws'])
+    expect(info.hasNameColumn).toBe(false)
+    expect(info.eligible).toBe(false)
+    expect(info.reason).toContain('名称')
+  })
+
+  it('完全没有表头：reason 为未识别到表头行', () => {
+    mockWorkbookSheet('空白表')
+    // 无标准表头，且新番表签名也不命中（所有单元格为空）
+    mocks.findHeaderRow.mockReturnValue(0)
+    mocks.getCellValue.mockReturnValue('')
+    const info = inspectWorksheet({ Name: '空白表' } as CleanTargetInfo['ws'])
+    expect(info.headerRow).toBe(0)
+    expect(info.eligible).toBe(false)
+    expect(info.reason).toBe('未识别到表头行')
+  })
+
+  it('有名称列但无数据行：reason 为无数据行', () => {
+    mockWorkbookSheet('空数据表')
+    mocks.findHeaderRow.mockReturnValue(3)
+    mocks.getLastRow.mockReturnValue(3)
+    const info = inspectWorksheet({ Name: '空数据表' } as CleanTargetInfo['ws'])
+    expect(info.dataRows).toBe(0)
+    expect(info.reason).toBe('无数据行')
   })
 })
 
