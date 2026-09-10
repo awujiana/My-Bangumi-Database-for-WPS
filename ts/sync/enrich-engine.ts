@@ -20,6 +20,7 @@ import {
   isEmptyValue,
   findHeaderRow,
   getColumnMap,
+  readRangeValues,
   BGM,
 } from '../tools/util/index.js'
 import type { WpsWorksheet, WpsWorkbook } from '../tools/wps.js'
@@ -605,15 +606,22 @@ function buildBangumiIndexes(
   const aliasCol = findAliasColumn(bangumiSheet)
   const lastRow = getLastRow(bangumiSheet)
 
-  for (let row = 2; row <= lastRow; row += 1) {
-    const name = getCellValue(bangumiSheet, row, nameCol).trim()
+  // 性能（P1-C）：一次矩形读取覆盖名称列与别名列，替代逐行 1~2 次 getCellValue
+  const allData =
+    lastRow >= 2
+      ? readRangeValues(bangumiSheet, 2, lastRow, 1, Math.max(nameCol, aliasCol))
+      : []
+
+  for (const [index, rowData] of allData.entries()) {
+    const row = index + 2
+    const name = (rowData[nameCol - 1] ?? '').trim()
     if (name) {
       const normalizedName = normalizeName(name)
       nameIndex.set(normalizedName, row)
       rowNames.set(row, name)
 
       if (aliasCol > 0) {
-        const aliasString = getCellValue(bangumiSheet, row, aliasCol).trim()
+        const aliasString = (rowData[aliasCol - 1] ?? '').trim()
         if (aliasString) {
           const aliases = splitAliases(aliasString)
           for (const alias of aliases) {

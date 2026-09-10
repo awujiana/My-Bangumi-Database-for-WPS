@@ -77,6 +77,26 @@ function mockGetLastRow(ws: unknown, _shouldForceRefresh = false, headerRow?: nu
   return lastRow
 }
 
+/** 矩形批量读取（生产接口）：按行/列区间从内存 store 取值 */
+function mockReadRangeValues(
+  ws: unknown,
+  startRow: number,
+  endRow: number,
+  startCol: number,
+  endCol: number,
+): string[][] {
+  const sheetName = sheetNameOf(ws)
+  const result: string[][] = []
+  for (let row = startRow; row <= endRow; row += 1) {
+    const rowValues: string[] = []
+    for (let col = startCol; col <= endCol; col += 1) {
+      rowValues.push(store.get(cellKey(sheetName, row, col)) ?? '')
+    }
+    result.push(rowValues)
+  }
+  return result
+}
+
 function isEmptyValue(value: string | null | undefined): boolean {
   if (!value) return true
   return value.trim() === ''
@@ -101,6 +121,7 @@ vi.mock('../ts/tools/util/index.js', () => ({
   getLastRow: mockGetLastRow,
   findHeaderRow: mockFindHeaderRow,
   getColumnMap: mockGetColumnMap,
+  readRangeValues: mockReadRangeValues,
   isEmptyValue,
 }))
 

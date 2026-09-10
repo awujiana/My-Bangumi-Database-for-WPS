@@ -123,6 +123,36 @@ import {
   __resetSyncRecordCache,
 } from '../ts/sync/sync-record.js'
 
+/**
+ * 记录 `Range(...).Value2 = x` 的批量写入（地址 → 写入值）。
+ *
+ * P1-C 后「新增行 / 表头 / 迁移回写」都改走一次整行/整片写入，不再逐单元格
+ * `setCellValue`，因此原来的「setCellValue 被调用次数」断言失效；本记录器让用例
+ * 能直接断言**实际写入的内容**（比数调用次数更强）。
+ */
+const rangeWrites = new Map<string, unknown>()
+
+/** 取出某地址最后一次批量写入的数据（无写入时为空数组） */
+function getWrittenRows(address: string): unknown[][] {
+  const value = rangeWrites.get(address)
+  return Array.isArray(value) ? (value as unknown[][]) : []
+}
+
+/** 构造可捕获批量写入的区间 Range 桩（仅用于含 `:` 的地址） */
+function createRangeStub(address: string) {
+  return {
+    Interior: { Color: 0 },
+    Font: { Bold: false },
+    Delete: vi.fn(),
+    get Value2(): unknown {
+      return rangeWrites.get(address) ?? null
+    },
+    set Value2(value: unknown) {
+      rangeWrites.set(address, value)
+    },
+  }
+}
+
 function createMockCell(value: unknown = '') {
   let text: string
   if (value == null) {
@@ -172,12 +202,7 @@ function createMockSheet(options: { name?: string; rowCount?: number } = {}): Mo
     UsedRange: { Row: 1, Rows: { Count: 10 } },
     Range: vi.fn((address: string) => {
       if (address.includes(':')) {
-        return {
-          Value2: null,
-          Interior: { Color: 0 },
-          Font: { Bold: false },
-          Delete: vi.fn(),
-        }
+        return createRangeStub(address)
       }
       return createMockCell('')
     }),
@@ -1210,8 +1235,10 @@ describe('syncRecord', () => {
     it('更新已有记录时所有可选字段都被写入 (lines 586-593)', () => {
       const sheet = createMockSheet({ name: SYNC_RECORD_SHEET_NAME })
       const _mockRange = sheet.Range('A1:L1')
+      // 12 列完整行且 SID 位于首列，确保命中「更新已有 SID」分支（而非新建分支）
       mockReadRangeValues.mockReturnValue([
         [
+          'existing-sid',
           '2024-01-01T00:00:00',
           '测试名称',
           'http://test.com',
@@ -1241,8 +1268,25 @@ describe('syncRecord', () => {
       })
 
       expect(isResult).toBe(true)
-      // 验证所有可选字段都被写入
-      expect(mockSetCellValue).toHaveBeenCalled()
+      // 验证所有可选字段都被写入（更新分支仍逐字段写入，行号取缓存命中的 2）
+      expect(mockSetCellValue).toHaveBeenCalledWith(
+        expect.anything(),
+        2,
+        SYNC_RECORD_COL.NAME,
+        '新名称',
+      )
+      expect(mockSetCellValue).toHaveBeenCalledWith(
+        expect.anything(),
+        2,
+        SYNC_RECORD_COL.COLL_TYPE,
+        '想',
+      )
+      expect(mockSetCellValue).toHaveBeenCalledWith(
+        expect.anything(),
+        2,
+        SYNC_RECORD_COL.FINGERPRINT,
+        'new-fp',
+      )
     })
 
     it('更新时可选字段为空则跳过对应分支', () => {
@@ -1332,10 +1376,9 @@ describe('syncRecord', () => {
         // 关键：UsedRange 为 null
         UsedRange: null,
         Rows: { Count: 100 },
-        Range: vi.fn(() => ({
-          Value2: null,
-          Interior: { Color: 0 },
-        })),
+        Range: createRangeMock((address: string) =>
+          address.includes(':') ? createRangeStub(address) : createMockCell(''),
+        ),
         Activate: vi.fn(),
       }
       mockGetApp.mockReturnValue({
@@ -1356,8 +1399,23 @@ describe('syncRecord', () => {
       })
 
       expect(isResult).toBe(true)
-      // 验证 newRow 使用了 2（Rows.Count > 1 ? 2 : 1）
-      expect(mockSetCellValue).toHaveBeenCalled()
+      // 验证 newRow 使用了 2（Rows.Count > 1 ? 2 : 1）：整行一次写入地址为 A2:L2
+      expect(getWrittenRows('A2:L2')).toEqual([
+        [
+          'new-sid-fallback',
+          expect.any(String),
+          '回退测试',
+          'http://fallback.com',
+          '',
+          '',
+          1,
+          '',
+          'success',
+          '',
+          '',
+          '',
+        ],
+      ])
     })
 
     it('UsedRange 为 null 且 Rows.Count <= 1 时 nextRow 为 1', () => {
@@ -1788,8 +1846,23 @@ describe('addSyncRecord 新建路径 (lines 442-487)', () => {
     })
 
     expect(isResult).toBe(true)
-    const cellWriteCalls = mockSetCellValue.mock.calls
-    expect(cellWriteCalls.length).toBeGreaterThanOrEqual(8)
+    // P1-C：新建行改为一次 Range.Value2 写入整行（UsedRange Row1 + Count10 → nextRow 11）
+    expect(getWrittenRows('A11:L11')).toEqual([
+      [
+        'new-sid-1',
+        expect.any(String),
+        '新条目',
+        'http://example.com',
+        '',
+        'test',
+        1,
+        '测试内容',
+        'success',
+        '',
+        '',
+        '',
+      ],
+    ])
   })
 
   it('新建路径 fingerprint 不为 undefined 时应写入', () => {
@@ -1920,8 +1993,23 @@ describe('addSyncRecord 完整字段覆盖', () => {
     })
 
     expect(isResult).toBe(true)
-    const cellWriteCalls = mockSetCellValue.mock.calls
-    expect(cellWriteCalls.length).toBeGreaterThanOrEqual(10)
+    // P1-C：整行一次写入，逐列校验全部可选字段均被落盘
+    expect(getWrittenRows('A11:L11')).toEqual([
+      [
+        'all-fields',
+        expect.any(String),
+        '全字段',
+        'http://all.com',
+        'movie',
+        'test',
+        5,
+        '全字段内容',
+        'success',
+        '看',
+        '全字段消息',
+        'fp-all',
+      ],
+    ])
   })
 
   it('更新记录时所有字段都被更新', () => {
@@ -2240,37 +2328,53 @@ describe('migrateSyncRecordSchema 数据行处理 (lines 289-293) - 带实际数
     legacySheet.Range = createRangeMock((address: string) => {
       if (address === 'A1') return createMockCell('序号')
       if (address === 'F1') return createMockCell('次数')
-      if (address.includes(':'))
-        return { Value2: null, Interior: { Color: 0 }, Font: { Bold: false }, Delete: vi.fn() }
+      if (address.includes(':')) return createRangeStub(address)
       return createMockCell('')
     })
 
-    mockReadRangeValues.mockReturnValue([])
+    // 旧 12 列结构（序号在首列）。P1-C 后迁移读取走一次矩形读取，故数据由 readRangeValues 提供：
+    // lastRow = 5 → 4 行数据，其中 row 4/5 全空应被跳过
+    const legacyRows = [
+      [
+        '',
+        '',
+        '',
+        'http://migrate2.com',
+        'migrate-sid-2',
+        'TV',
+        '3',
+        '内容2',
+        'success',
+        '备注2',
+        'fp-2',
+        '',
+      ],
+      [
+        '',
+        '',
+        '',
+        'http://migrate3.com',
+        'migrate-sid-3',
+        '电影',
+        '1',
+        '内容3',
+        'fail',
+        '',
+        '',
+        '',
+      ],
+      ['', '', '', '', '', '', '', '', '', '', '', ''],
+      ['', '', '', '', '', '', '', '', '', '', '', ''],
+    ]
+    mockReadRangeValues.mockImplementation(
+      (_ws: unknown, _startRow: number, _endRow: number, startCol: number, endCol: number) => {
+        // 仅响应整片读取（迁移 / 缓存重建）；SID 单列读取（去重分组）返回空
+        if (startCol === 1 && endCol === SYNC_RECORD_COLUMNS.length) return legacyRows
+        return []
+      },
+    )
 
-    // 设置旧数据行（lastRow=5，所以有4行数据从row 2-5）
-    mockGetCellValue.mockImplementation((_sheet: unknown, row: number, col: number) => {
-      const r = row
-      const c = col
-      if (r === 2) {
-        if (c === 5) return 'migrate-sid-2'
-        if (c === 4) return 'http://migrate2.com'
-        if (c === 6) return 'TV'
-        if (c === 7) return '3'
-        if (c === 8) return '内容2'
-        if (c === 9) return 'success'
-        if (c === 10) return '备注2'
-        if (c === 11) return 'fp-2'
-      } else if (r === 3) {
-        if (c === 5) return 'migrate-sid-3'
-        if (c === 4) return 'http://migrate3.com'
-        if (c === 6) return '电影'
-        if (c === 7) return '1'
-        if (c === 8) return '内容3'
-        if (c === 9) return 'fail'
-      }
-      // row 4 和 5 为空（sid 和 URL 都为空，会被跳过）
-      return ''
-    })
+    mockGetCellValue.mockImplementation(() => '')
 
     mockGetApp.mockReturnValue({
       ActiveWorkbook: {
@@ -2288,9 +2392,39 @@ describe('migrateSyncRecordSchema 数据行处理 (lines 289-293) - 带实际数
       status: 'success',
     })
 
-    expect(typeof isResult).toBe('boolean')
-    // 验证 setCellValue 被多次调用（包括迁移写入 + 新记录写入）
-    expect(mockSetCellValue).toHaveBeenCalled()
+    expect(isResult).toBe(true)
+    // 表头与有效数据行各一次批量写入（行 4/5 因 SID 与 URL 皆空被跳过）
+    expect(getWrittenRows('A1:L1')).toEqual([SYNC_RECORD_COLUMNS])
+    expect(getWrittenRows('A2:L3')).toEqual([
+      [
+        'migrate-sid-2',
+        '',
+        '',
+        'http://migrate2.com',
+        'TV',
+        '',
+        '3',
+        '内容2',
+        'success',
+        '',
+        '备注2',
+        'fp-2',
+      ],
+      [
+        'migrate-sid-3',
+        '',
+        '',
+        'http://migrate3.com',
+        '电影',
+        '',
+        '1',
+        '内容3',
+        'fail',
+        '',
+        '',
+        '',
+      ],
+    ])
   })
 
   it('迁移时空数据行应被跳过 (lines 291 检查)', () => {

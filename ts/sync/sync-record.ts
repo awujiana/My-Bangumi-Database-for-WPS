@@ -28,7 +28,7 @@ import {
   setCellValue,
   readRangeValues,
 } from '../tools/util/index.js'
-import type { WpsWorksheet } from '../tools/wps.js'
+import type { WpsCellValue, WpsWorksheet } from '../tools/wps.js'
 
 export interface SyncRecord {
   seq?: number | string
@@ -203,6 +203,24 @@ function invalidateCache(): void {
 }
 
 /**
+ * 一次 `Range.Value2` 批量写入若干整行（P1-C）
+ *
+ * 同步记录表的所有写入（新增行 / 表头 / 迁移回写）都应走本函数：WPS 是跨进程 COM，
+ * 逐单元格 `setCellValue` 会让一次写入放大成 12×N 次调用。
+ *
+ * @param sheet 工作表
+ * @param startRow 起始行号（1-based）
+ * @param rows 每行一个数组，按列顺序排列；列数须等于 `SYNC_RECORD_COLUMNS.length`
+ */
+function writeSheetRows(sheet: WpsWorksheet, startRow: number, rows: WpsCellValue[][]): void {
+  if (rows.length === 0) return
+  const endRow = startRow + rows.length - 1
+  const endCol = colNumberToLetter(SYNC_RECORD_COLUMNS.length)
+  const range = sheet.Range(`A${String(startRow)}:${endCol}${String(endRow)}`)
+  range.Value2 = rows
+}
+
+/**
  * 迁移旧版同步记录表数据到当前 12 列结构
  * 当前列序：SID(1) 同步时间(2) 名称(3) URL(4) 条目类型(5) 来源(6)
  *          → 次数(7) 内容(8) 状态(9) 收藏状态(10) 备注(11) 数据指纹(12)
@@ -217,41 +235,26 @@ function migrateSyncRecordSchema(sheet: WpsWorksheet): void {
   const lastRow = getLastRow(sheet)
   if (lastRow <= 1) return
 
+  // 性能（P1-C）：整片一次矩形读取，替代逐行 11 次 getCellValue
+  const allData = readRangeValues(sheet, 2, lastRow, 1, SYNC_RECORD_COLUMNS.length)
   const rows: string[][] = []
-  for (let row = 2; row <= lastRow; row += 1) {
-    let oldSid: string
-    let oldUrl: string
-    let oldType: string
-    let oldCount: string
-    let oldContent: string
-    let oldStatus: string
-    let oldCollType: string
 
-    if (isLegacyWithSeq) {
-      oldSid = getCellValue(sheet, row, 5).trim()
-      oldUrl = getCellValue(sheet, row, 4).trim()
-      oldType = getCellValue(sheet, row, 6)
-      oldCount = getCellValue(sheet, row, 7)
-      oldContent = getCellValue(sheet, row, 8)
-      oldStatus = getCellValue(sheet, row, 9)
-      oldCollType = getCellValue(sheet, row, 12)
-    } else {
-      oldSid = getCellValue(sheet, row, 1).trim()
-      oldUrl = getCellValue(sheet, row, 4).trim()
-      oldType = getCellValue(sheet, row, 5)
-      oldCount = getCellValue(sheet, row, 6)
-      oldContent = getCellValue(sheet, row, 7)
-      oldStatus = getCellValue(sheet, row, 8)
-      oldCollType = getCellValue(sheet, row, 9)
-    }
-    const oldMessage = getCellValue(sheet, row, 10)
-    const oldFingerprint = getCellValue(sheet, row, 11)
+  for (const source of allData) {
+    /** 按 1-based 列号取该行的原始文本 */
+    const cell = (col: number): string => source[col - 1] ?? ''
+    const oldSid = cell(isLegacyWithSeq ? 5 : 1).trim()
+    const oldUrl = cell(4).trim()
+    const oldType = cell(isLegacyWithSeq ? 6 : 5)
+    const oldCount = cell(isLegacyWithSeq ? 7 : 6)
+    const oldContent = cell(isLegacyWithSeq ? 8 : 7)
+    const oldStatus = cell(isLegacyWithSeq ? 9 : 8)
+    const oldCollType = cell(isLegacyWithSeq ? 12 : 9)
 
     if (oldUrl || oldSid) {
       rows.push([
         oldSid,
-        getCellValue(sheet, row, 2),
-        getCellValue(sheet, row, 3),
+        cell(2),
+        cell(3),
         oldUrl,
         oldType,
         // 来源：旧数据无此字段，默认空
@@ -260,8 +263,8 @@ function migrateSyncRecordSchema(sheet: WpsWorksheet): void {
         oldContent,
         oldStatus,
         oldCollType,
-        oldMessage,
-        oldFingerprint,
+        cell(10),
+        cell(11),
       ])
     }
   }
@@ -270,21 +273,15 @@ function migrateSyncRecordSchema(sheet: WpsWorksheet): void {
     sheet.Range(`2:${String(lastRow)}`).Delete()
   }
 
-  for (const [index, column] of SYNC_RECORD_COLUMNS.entries()) {
-    const colLetter = colNumberToLetter(index + 1)
-    const cell = sheet.Range(`${colLetter}1`)
-    cell.Value2 = column
-    if (cell.Interior) {
-      cell.Interior.Color = BGM_COLOR.GRAY
-    }
+  // 表头：一次写入列名 + 一次设置底色（P1-C）
+  const headerRange = sheet.Range(`A1:${colNumberToLetter(SYNC_RECORD_COLUMNS.length)}1`)
+  headerRange.Value2 = [SYNC_RECORD_COLUMNS]
+  if (headerRange.Interior) {
+    headerRange.Interior.Color = BGM_COLOR.GRAY
   }
 
-  for (const [index, data] of rows.entries()) {
-    const nextRow = index + 2
-    for (const [col, value] of data.entries()) {
-      setCellValue(sheet, nextRow, col + 1, value)
-    }
-  }
+  // 数据行：一次 Range.Value2 写入全部重组后的记录（P1-C）
+  writeSheetRows(sheet, 2, rows)
 
   bgmLog(LOG_LEVELS.INFO, `数据迁移完成：${String(rows.length)} 条记录已重组到 12 列结构`)
 }
@@ -452,12 +449,22 @@ export function getAllSyncRecords(): SyncRecord[] {
   }
 }
 
-/** 按 SID 对数据行分组（row 从 2 起跳过表头） */
+/**
+ * 按 SID 对数据行分组（row 从 2 起跳过表头）
+ *
+ * 性能（P1-C）：整列**一次**矩形读取（`Range.Value2`）而非逐行 `getCellValue`。
+ * 本函数由 `deduplicateSyncRecords()` 在每次写入前调用，逐行读会让写入放大成
+ * O(n²) 次跨进程 COM 调用。读取失败时的降级口径与 `buildCache` 一致：
+ * 返回空分组（本次不做去重，下次写入时重试）。
+ */
 function groupRowsBySid(sheet: WpsWorksheet, lastRow: number): Map<string, number[]> {
   const sidRows = new Map<string, number[]>()
-  for (let row = 2; row <= lastRow; row += 1) {
-    const sid = getCellValue(sheet, row, SYNC_RECORD_COL.SID).trim()
+  const sidColumn = readRangeValues(sheet, 2, lastRow, SYNC_RECORD_COL.SID, SYNC_RECORD_COL.SID)
+
+  for (const [index, rowData] of sidColumn.entries()) {
+    const sid = (rowData[0] ?? '').trim()
     if (sid) {
+      const row = index + 2
       const rows = sidRows.get(sid) ?? []
       rows.push(row)
       sidRows.set(sid, rows)
@@ -710,20 +717,26 @@ function appendOrUpdateSyncRecord(parameters: UpdateRecordParameters) {
     const finalStatus = parameters.status ?? SYNC_STATUS.SUCCESS
     const finalCount = parameters.count ?? 1
 
-    setCellValue(sheet, nextRow, SYNC_RECORD_COL.TIME, now)
-    setCellValue(sheet, nextRow, SYNC_RECORD_COL.NAME, parameters.name ?? '')
-    setCellValue(sheet, nextRow, SYNC_RECORD_COL.URL, parameters.url ?? '')
-    setCellValue(sheet, nextRow, SYNC_RECORD_COL.SID, sid)
-    setCellValue(sheet, nextRow, SYNC_RECORD_COL.TYPE, parameters.type ?? '')
-    setCellValue(sheet, nextRow, SYNC_RECORD_COL.SOURCE, parameters.source ?? '')
-    setCellValue(sheet, nextRow, SYNC_RECORD_COL.COUNT, finalCount)
-    setCellValue(sheet, nextRow, SYNC_RECORD_COL.CONTENT, parameters.content ?? '')
-    setCellValue(sheet, nextRow, SYNC_RECORD_COL.STATUS, finalStatus)
-    setCellValue(sheet, nextRow, SYNC_RECORD_COL.MESSAGE, parameters.message ?? '')
+    // 性能（P1-C）：一次 Range.Value2 写入整行，替代 12 次 setCellValue（跨进程 COM 调用）
+    const rowValues: WpsCellValue[] = Array.from(
+      { length: SYNC_RECORD_COLUMNS.length },
+      () => '',
+    )
+    rowValues[SYNC_RECORD_COL.TIME - 1] = now
+    rowValues[SYNC_RECORD_COL.NAME - 1] = parameters.name ?? ''
+    rowValues[SYNC_RECORD_COL.URL - 1] = parameters.url ?? ''
+    rowValues[SYNC_RECORD_COL.SID - 1] = sid
+    rowValues[SYNC_RECORD_COL.TYPE - 1] = parameters.type ?? ''
+    rowValues[SYNC_RECORD_COL.SOURCE - 1] = parameters.source ?? ''
+    rowValues[SYNC_RECORD_COL.COUNT - 1] = finalCount
+    rowValues[SYNC_RECORD_COL.CONTENT - 1] = parameters.content ?? ''
+    rowValues[SYNC_RECORD_COL.STATUS - 1] = finalStatus
+    rowValues[SYNC_RECORD_COL.MESSAGE - 1] = parameters.message ?? ''
     if (parameters.fingerprint !== undefined)
-      setCellValue(sheet, nextRow, SYNC_RECORD_COL.FINGERPRINT, parameters.fingerprint)
-    if (parameters.collType)
-      setCellValue(sheet, nextRow, SYNC_RECORD_COL.COLL_TYPE, parameters.collType)
+      rowValues[SYNC_RECORD_COL.FINGERPRINT - 1] = parameters.fingerprint
+    if (parameters.collType) rowValues[SYNC_RECORD_COL.COLL_TYPE - 1] = parameters.collType
+
+    writeSheetRows(sheet, nextRow, [rowValues])
 
     setSyncRecordColors(sheet, nextRow, finalStatus, finalCount)
 
@@ -840,13 +853,7 @@ function appendOrUpdateSyncRecords(records: UpdateRecordParameters[]) {
   if (pendingRows.length > 0) {
     const usedRange = sheet.UsedRange
     const startRow = usedRange ? usedRange.Row + usedRange.Rows.Count : 2
-    const endRow = startRow + pendingRows.length - 1
-    const startColLetter = colNumberToLetter(1)
-    const endColLetter = colNumberToLetter(SYNC_RECORD_COLUMNS.length)
-    const range = sheet.Range(
-      `${startColLetter}${String(startRow)}:${endColLetter}${String(endRow)}`,
-    )
-    range.Value2 = pendingRows
+    writeSheetRows(sheet, startRow, pendingRows)
 
     // 设置新增行的颜色
     for (const [index, data] of pendingRows.entries()) {
