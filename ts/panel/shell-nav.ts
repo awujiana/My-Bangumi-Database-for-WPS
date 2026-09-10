@@ -185,7 +185,13 @@ export function initScrollspy(): void {
     // 规则 3/4：按「第一个完整显示的模块标题」判定，而不是按 section 可见面积判定。
     // 这样上一个内容很多的模块即使仍占据大面积，也不会抢走当前模块的高亮。
     const topbar = document.querySelector('.topbar')
-    const bandTop = topbar instanceof HTMLElement ? topbar.offsetHeight : 0
+    const sidebar = document.querySelector('.sidebar')
+    const isNarrow =
+      typeof window.matchMedia === 'function' && window.matchMedia('(max-width: 880px)').matches
+    // 窄屏时 sidebar 会变成顶栏下方的横向 sticky 导航，标题在它下面才算完整可见。
+    const bandTop =
+      (topbar instanceof HTMLElement ? topbar.offsetHeight : 0) +
+      (isNarrow && sidebar instanceof HTMLElement ? sidebar.offsetHeight : 0)
     let firstIntersecting: HTMLElement | null = null
     for (const section of sections) {
       const heading = section.querySelector<HTMLElement>('h1, h2, h3, h4, h5, h6')
