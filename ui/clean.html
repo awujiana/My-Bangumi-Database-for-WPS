@@ -108,12 +108,8 @@
               🧹 执行清理
             </button>
           </div>
-          <div id="cleanProgress" class="clean-progress" style="display: none">
-            <div class="clean-progress-bar">
-              <div class="clean-progress-fill" id="cleanProgressFill"></div>
-            </div>
-            <div class="clean-progress-text" id="cleanProgressText">准备中…</div>
-          </div>
+          <!-- 通用进度组件宿主（inline 模式，由 clean-page.ts 挂载） -->
+          <div id="cleanProgressHost"></div>
         </section>
 
         <!-- 结果日志 -->

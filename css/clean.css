@@ -240,32 +240,6 @@
   background: var(--bg-surface);
 }
 
-/* ---- 进度条 ---- */
-.clean-progress {
-  margin-top: var(--sp-3);
-}
-
-.clean-progress-bar {
-  height: 6px;
-  border-radius: var(--r-pill);
-  background: var(--bg-surface);
-  overflow: hidden;
-}
-
-.clean-progress-fill {
-  height: 100%;
-  width: 0;
-  border-radius: var(--r-pill);
-  background: var(--primary-grad);
-  transition: width var(--dur) var(--ease);
-}
-
-.clean-progress-text {
-  margin-top: 6px;
-  color: var(--text-3);
-  font-size: var(--fs-sm);
-}
-
 /* ---- 结果日志 ---- */
 .clean-log {
   margin-top: var(--sp-3);
