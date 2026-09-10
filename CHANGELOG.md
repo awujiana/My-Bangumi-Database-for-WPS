@@ -23,6 +23,18 @@
 - 取舍口径（详见审查报告 §3.2.1）：**刻意的越界输入不改生产类型** —— `range: 'week'/'invalid'`、`quarter: 5/99`、数字型 `话数` 都是覆盖防御分支的健壮性测试（生产确实有 `default → false`、`toExtensionStringValue` 的 `String(value)` 等分支），加显式断言 + 注释即可；**`vi.hoisted` 内不能引用 import 绑定**（vitest 会报 `Cannot access '__vi_import_N__' before initialization`），该处只能保留最小形状并注明原因。
 - `npm run gate` 现在是五道关：`lint:check` → DOMPurify 版本一致 → 导入图（分层 + 致命环）→ tests 类型 → 全量测试。
 
+### 修复（性能 · 同步记录表读写改为矩形批量，P1-C）
+
+- **问题**：WPS 的每次单元格读写都是一次跨进程 IPC。同步记录表却把读写拆到了逐单元格粒度：写入分散在 4 处逐单元格 `setCellValue`（新增一行 = 12 次调用），读取有 3 处逐行 `getCellValue`。项目中其实早已有两个现成范式 —— `tools/util/sheet.ts` 的 `readRangeValues()`（矩形读）与 `Range.Value2 = 二维数组`（矩阵写）—— 只是同步记录表没用它们。
+- **改法**：
+  - 新增 `writeSheetRows()`，成为同步记录表**唯一**的写入路径（表头、新增行、迁移回写、批量写入全部走它）：表头一次写值 + 一次设底色，新增行 12 次 → 1 次，迁移回写 12×N → 1 次。
+  - `groupRowsBySid()` 由逐行读改为**整列一次矩形读**。这一处意义超出它本身：它由 `deduplicateSyncRecords()` 在**每次写入前**调用，是 P1-B 把写入次数从 N² 降到 N 之后、链路里最后一次 O(n) 放大。
+  - `migrateSyncRecordSchema()`：旧表迁移由「11 次/行读 + 12 次/行写」改为「一次矩形读 + 一次矩形写」。
+  - `enrich-engine.buildBangumiIndexes()`：名称/别名索引构建由逐行 1~2 次读改为一次覆盖两列的矩形读。
+- **测试**：新增 `Range` 写入捕获桩（`createRangeStub` + `rangeWrites` + `getWrittenRows`），把原先「`setCellValue` 被调用次数 ≥8 / ≥10」这类**弱断言**换成**逐列校验实际落盘内容**（更强，且直接锁住「整行写入」的新形态）；`migrateSyncRecordSchema` 的数据行用例同步改为经 `readRangeValues` 注入旧结构数据。enrich-engine 的 util mock 补上 `readRangeValues`（mock 需跟上生产接口）。
+- **经核实已过时的条目**：审查报告 P1-4 中 `github-sync.ts:1204-1248`（`writeRowValuesWithUndo`）早就是「一次 COM 调用写入整行」＋逐单元格 undo 记录，无需改动。
+- **有意暂缓的一处**：「已存在 SID 的逐字段更新」仍是每行 3~11 次 `setCellValue`。合并成一次整行写入必须**读-改-写整行**（未提供的字段要读回原值，否则会被空值覆盖），而现有 `readRangeValues()` 会把所有单元格 `String()` 化 —— 读回再写出去会把「次数」等数字列变成文本列；且一旦读回失败（返回空数组），整行会被空值覆盖，即**静默清空用户的同步记录**。单次收益约 12 → 2 次调用、无复合放大，因此不为此引入数据丢失风险。推进前提是先补一个保留原始类型的矩形读原语并单独测试（详见审查报告 §3.2.3）。
+
 ### 修复（性能 · 消除同步记录的 O(n²) COM 链路，P1-B）
 
 - **问题**：`sync-record.ts` 的写入入口在**每次写之前**都要先跑一次 `deduplicateSyncRecords()` 保证缓存干净，而它会遍历同步记录表 `2..lastRow` 的每一行读取 SID 列。于是「循环内逐条 `addSyncRecord`」把一次 O(n) 的全表扫描放大成 **N×N 次跨进程 COM 调用** —— 数千行的同步会让任务窗格实质长时间无响应。这是本次审查中唯一会导致「不可用」的性能缺陷。
