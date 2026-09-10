@@ -20,8 +20,13 @@ import { sanitizeHtml } from '../tools/sanitize.js'
 import type { WpsWorksheet } from '../tools/wps.js'
 import { initShellNav } from './shell-nav.js'
 import { initTheme, startThemeSync } from '../tools/theme.js'
+import { createProgress } from '../ui/components/progress.js'
+import type { ProgressController } from '../ui/components/progress.js'
 
 // ========== 状态 ==========
+
+/** 清理执行期的进度组件实例（inline 模式，挂载在 #cleanProgressHost） */
+let cleanProgress: ProgressController | null = null
 
 // ========== 选择清理的表格 ==========
 
@@ -660,23 +665,34 @@ function handleScan(): void {
 
 // ========== 执行 ==========
 
-/** 设置执行中 UI 状态 */
+/**
+ * 设置执行中 UI 状态
+ * @remarks 进入运行态时创建 inline 进度组件；退出运行态时**保留完成态**供用户查看
+ *   （由用户点「关闭」销毁），因此这里只恢复按钮可用性。
+ */
 function setRunningState(isRunning_: boolean): void {
   isRunning = isRunning_
   const runButton = document.getElementById('cleanRunBtn') as HTMLButtonElement | null
   const scanButton = document.getElementById('cleanScanBtn') as HTMLButtonElement | null
-  const progress = document.getElementById('cleanProgress')
   if (runButton) runButton.disabled = isRunning_ || !scanResult || scanResult.plans.length === 0
   if (scanButton) scanButton.disabled = isRunning_
-  if (progress) progress.style.display = isRunning_ ? 'block' : 'none'
+  if (!isRunning_) return
+  cleanProgress?.hide()
+  cleanProgress = createProgress({
+    mode: 'inline',
+    hostId: 'cleanProgressHost',
+    title: '正在清理数据',
+    icon: '🧹',
+    enableLogs: true,
+    showHeader: true,
+  })
 }
 
-/** 更新进度条 */
+/** 更新进度条与实时日志 */
 function updateProgress(done: number, total: number, message: string): void {
-  const bar = document.getElementById('cleanProgressFill')
-  const text = document.getElementById('cleanProgressText')
-  if (bar) bar.style.width = total > 0 ? `${String(Math.round((done / total) * 100))}%` : '0%'
-  if (text) text.textContent = `${message}（${String(done)}/${String(total)}）`
+  const text = `${message}（${String(done)}/${String(total)}）`
+  cleanProgress?.update(done, total, text)
+  cleanProgress?.log(text)
 }
 
 /** 执行清理（二次确认 → 执行 → 结果日志） */
@@ -708,20 +724,19 @@ async function executeClean(): Promise<void> {
     const outcome = await runCleanPlans(scanResult, (done, total, message) => {
       updateProgress(done, total, message)
     })
+    const details: string[] = []
     for (const item of outcome.targets) {
-      if (item.error) {
-        appendLog(`${item.targetLabel}：清理失败 - ${item.error}`, 'error')
-      } else {
-        appendLog(
-          `${item.targetLabel}：删除 ${String(item.deletedRows)} 行，更新 ${String(item.changedCells)} 个单元格`,
-          'ok',
-        )
-      }
+      const { error } = item
+      const line =
+        error === undefined
+          ? `${item.targetLabel}：删除 ${String(item.deletedRows)} 行，更新 ${String(item.changedCells)} 个单元格`
+          : `${item.targetLabel}：清理失败 - ${error}`
+      appendLog(line, error === undefined ? 'ok' : 'error')
+      details.push(line)
     }
-    appendLog(
-      `清理完成：共删除 ${String(outcome.deletedRows)} 行、更新 ${String(outcome.changedCells)} 个单元格，涉及 ${String(outcome.fileCount)} 个文件，耗时 ${String(outcome.elapsedMs)}ms`,
-      'ok',
-    )
+    const finishLine = `清理完成：共删除 ${String(outcome.deletedRows)} 行、更新 ${String(outcome.changedCells)} 个单元格，涉及 ${String(outcome.fileCount)} 个文件，耗时 ${String(outcome.elapsedMs)}ms`
+    appendLog(finishLine, 'ok')
+    cleanProgress?.complete({ summary: finishLine, details })
     showToast(
       `清理完成：删除 ${String(outcome.deletedRows)} 行，更新 ${String(outcome.changedCells)} 个单元格`,
       'success',
@@ -729,6 +744,7 @@ async function executeClean(): Promise<void> {
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : String(error)
     appendLog(`执行失败：${message}`, 'error')
+    cleanProgress?.complete({ summary: `执行失败：${message}`, ok: false, icon: '❌' })
     showToast(`执行失败：${message}`, 'error')
   } finally {
     setRunningState(false)

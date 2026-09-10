@@ -6,6 +6,8 @@
 
 import type { GithubSyncDetailItem } from '../sync/github-sync-diff.js'
 import { sanitizeHtml } from '../tools/sanitize.js'
+import { createProgress, formatDuration } from './components/progress.js'
+import type { ProgressController } from './components/progress.js'
 
 // ========== 类型定义 ==========
 export interface DialogOptions {
@@ -435,201 +437,33 @@ export function showSyncResult(summary: string, details: string[]): void {
 }
 
 // ========== 同步进度弹窗 ==========
-let _syncProgressDialog: HTMLElement | null = null
-let _syncProgressLogCount = 0
-const _SYNC_PROGRESS_LOG_MAX = 500
+/**
+ * 实现已收敛到通用进度组件（ui/components/progress.ts）的 modal 模式；
+ * 本模块只保留同步专有的配置摘要、统计图表与对外 API 兼容层。
+ */
 
-/** 全局同步开始时间戳（ms），用于计算整体 ETA */
+/** 当前同步进度组件实例（modal 模式） */
+let _syncProgress: ProgressController | null = null
+
+/** 全局同步开始时间戳（ms），0 表示未计时 */
 let _syncGlobalStart = 0
-/** 全局累计暂停时长（ms），用于在暂停时扣除时间 */
+/** 全局累计暂停时长（ms），计算耗时时扣除 */
 let _syncPausedDuration = 0
-/** 暂停开始时间戳（ms） */
+/** 暂停开始时间戳（ms），0 表示未处于暂停 */
 let _syncPauseStart = 0
 
-/** 暂停/恢复/停止按钮回调 */
-let _syncPauseHandler: (() => void) | null = null
-let _syncResumeHandler: (() => void) | null = null
-let _syncStopHandler: (() => void) | null = null
-/** 下一步按钮回调（点击后打开同步完成详情弹窗） */
-let _syncNextHandler: (() => void) | null = null
-
-/** 当前是否处于暂停状态（统一监听器据此决定调用 pause 还是 resume） */
-let _isSyncPaused = false
-
-/** 触发同步弹窗的元素（关闭后恢复焦点） */
-let _syncProgressTrigger: HTMLElement | null = null
-
-/** ESC 键监听器引用（仅在完成状态下注册） */
-let _syncProgressEscHandler: ((event: KeyboardEvent) => void) | null = null
-
-/** 内部：根据暂停状态更新按钮文本/样式/aria-label，并追踪暂停时间用于全局 ETA */
-function _setSyncPausedState(isPaused: boolean): void {
-  // 追踪暂停时间，用于全局 ETA 扣除
-  if (isPaused) {
-    _syncPauseStart = Date.now()
-  } else if (_syncPauseStart > 0) {
-    _syncPausedDuration += Date.now() - _syncPauseStart
-    _syncPauseStart = 0
-  }
-  _isSyncPaused = isPaused
-  const pauseButton = _syncProgressDialog?.querySelector(
-    '#bgmSyncProgressPauseBtn',
-  ) as HTMLButtonElement | null
-  if (!pauseButton) return
-  pauseButton.textContent = isPaused ? '▶️ 继续' : '⏸️ 暂停'
-  pauseButton.setAttribute('aria-label', isPaused ? '继续同步' : '暂停同步')
-  if (isPaused) {
-    pauseButton.classList.remove('bgm-dialog-btn-default')
-    pauseButton.classList.add('bgm-dialog-btn-success')
-  } else {
-    pauseButton.classList.add('bgm-dialog-btn-default')
-    pauseButton.classList.remove('bgm-dialog-btn-success')
-  }
+/** 重置全局计时（每次开始同步时调用） */
+function _resetSyncTimer(): void {
+  _syncGlobalStart = Date.now()
+  _syncPausedDuration = 0
+  _syncPauseStart = 0
 }
 
-/** 内部：清理所有回调与状态（complete/hide 时调用） */
-function _clearSyncProgressHandlers(): void {
-  _syncPauseHandler = null
-  _syncResumeHandler = null
-  _syncStopHandler = null
-  _syncNextHandler = null
-  _isSyncPaused = false
-  // 移除 ESC 监听器，避免泄漏
-  if (_syncProgressEscHandler) {
-    document.removeEventListener('keydown', _syncProgressEscHandler)
-    _syncProgressEscHandler = null
-  }
-}
-
-function ensureSyncProgressDialog(): HTMLElement {
-  if (_syncProgressDialog) return _syncProgressDialog
-
-  const modal = document.createElement('div')
-  modal.id = 'bgmSyncProgressDialog'
-  modal.className = 'bgm-modal'
-  modal.style.display = 'none'
-  // 可访问性：声明对话框角色
-  modal.setAttribute('role', 'dialog')
-  modal.setAttribute('aria-modal', 'true')
-  modal.setAttribute('aria-labelledby', 'bgmSyncProgressTitle')
-  modal.setAttribute('aria-hidden', 'true')
-
-  modal.innerHTML = sanitizeHtml(`
-        <div class="bgm-modal-content bgm-sync-progress__content">
-            <div class="bgm-dialog-header bgm-sync-progress__header" id="bgmSyncProgressHeader">
-                <div class="bgm-dialog-header-left">
-                    <span class="bgm-dialog-icon" id="bgmSyncProgressIcon">🔄</span>
-                    <span class="bgm-dialog-title" id="bgmSyncProgressTitle">正在同步...</span>
-                </div>
-                <button id="bgmSyncProgressCloseTop" type="button" class="bgm-dialog-close-btn" aria-label="关闭弹窗" title="关闭">✕</button>
-            </div>
-            <div class="bgm-dialog-body bgm-sync-progress__body">
-                <!-- 配置摘要区（默认隐藏，由 showSyncProgressDialog 填充） -->
-                <div id="bgmSyncProgressConfig" class="bgm-sync-progress__config" style="display:none;"></div>
-                <!-- 进度区 -->
-                <div id="bgmSyncProgressSection">
-                    <div class="bgm-sync-progress__meta" aria-live="polite" aria-atomic="true">
-                        <span id="bgmSyncProgressLabel">进度: 0/0</span>
-                        <span id="bgmSyncProgressPercent">0%</span>
-                        <span id="bgmSyncProgressEta" class="bgm-sync-progress__eta" style="display:none;"></span>
-                        <span id="bgmSyncProgressGlobalEta" class="bgm-sync-progress__global-eta" style="display:none;"></span>
-                    </div>
-                    <div class="bgm-sync-progress__track">
-                        <div id="bgmSyncProgressBar" class="bgm-sync-progress__bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"></div>
-                    </div>
-                    <div id="bgmSyncProgressCurrent" class="bgm-sync-progress__current"></div>
-                    <div class="bgm-sync-progress__log-wrap">
-                        <div class="bgm-sync-progress__log-label">实时日志:</div>
-                        <div id="bgmSyncProgressLog" class="bgm-sync-progress__log" role="log" aria-live="polite"></div>
-                    </div>
-                </div>
-                <!-- 完成结果区（默认隐藏） -->
-                <div id="bgmSyncProgressResult" style="display: none;">
-                    <div id="bgmSyncProgressSummary" class="bgm-dialog-message bgm-sync-progress__result-summary"></div>
-                    <div id="bgmSyncProgressChart" class="bgm-sync-progress__chart"></div>
-                    <div id="bgmSyncProgressDetails" class="bgm-sync-progress__result-details"></div>
-                </div>
-            </div>
-            <div class="bgm-dialog-footer" id="bgmSyncProgressFooter">
-                <!-- 运行中按钮 -->
-                <div id="bgmSyncProgressRunningBtns" class="bgm-sync-progress__running-btns">
-                    <button id="bgmSyncProgressPauseBtn" type="button" class="bgm-dialog-btn bgm-dialog-btn-default" aria-label="暂停同步">⏸️ 暂停</button>
-                    <button id="bgmSyncProgressStop" type="button" class="bgm-dialog-btn bgm-dialog-btn-danger" aria-label="停止同步">⏹️ 停止</button>
-                </div>
-                <!-- 完成按钮（默认隐藏） -->
-                <div id="bgmSyncProgressDoneBtns" class="bgm-sync-progress__done-btns" style="display: none;">
-                    <button id="bgmSyncProgressToggleDetails" type="button" class="bgm-dialog-btn bgm-dialog-btn-default" aria-label="显示详情">显示详情</button>
-                    <button id="bgmSyncProgressClose" type="button" class="bgm-dialog-btn bgm-dialog-btn-default" aria-label="关闭弹窗">关闭</button>
-                    <button id="bgmSyncProgressNext" type="button" class="bgm-dialog-btn bgm-dialog-btn-primary" aria-label="下一步">下一步 →</button>
-                </div>
-            </div>
-        </div>
-    `)
-
-  document.body.appendChild(modal)
-
-  // 绑定按钮事件：统一使用 addEventListener，禁止 onclick 重绑定
-  const pauseButton = modal.querySelector<HTMLElement>('#bgmSyncProgressPauseBtn')
-  const stopButton = modal.querySelector<HTMLElement>('#bgmSyncProgressStop')
-  const closeButton = modal.querySelector<HTMLElement>('#bgmSyncProgressClose')
-  const closeTopButton = modal.querySelector<HTMLElement>('#bgmSyncProgressCloseTop')
-  const nextButton = modal.querySelector<HTMLElement>('#bgmSyncProgressNext')
-  const toggleDetailsButton = modal.querySelector<HTMLElement>('#bgmSyncProgressToggleDetails')
-
-  // 暂停/继续按钮：根据 _syncPaused 标志自行决定调用哪个处理器，并自行更新按钮文本
-  if (pauseButton) {
-    pauseButton.addEventListener('click', (): void => {
-      if (!_syncProgressDialog || _syncProgressDialog.style.display === 'none') return
-      if (_isSyncPaused) {
-        _syncResumeHandler?.()
-        _setSyncPausedState(false)
-      } else {
-        _syncPauseHandler?.()
-        _setSyncPausedState(true)
-      }
-    })
-  }
-  // 停止按钮
-  if (stopButton) {
-    stopButton.addEventListener('click', (): void => {
-      if (!_syncProgressDialog || _syncProgressDialog.style.display === 'none') return
-      _syncStopHandler?.()
-    })
-  }
-  // 关闭按钮
-  if (closeButton) {
-    closeButton.addEventListener('click', (): void => {
-      hideSyncProgressDialog()
-    })
-  }
-  // 右上角关闭按钮（始终可见）
-  if (closeTopButton) {
-    closeTopButton.addEventListener('click', (): void => {
-      hideSyncProgressDialog()
-    })
-  }
-  // 下一步按钮
-  if (nextButton) {
-    nextButton.addEventListener('click', (): void => {
-      const handler = _syncNextHandler
-      hideSyncProgressDialog()
-      handler?.()
-    })
-  }
-  // 详情切换按钮
-  if (toggleDetailsButton) {
-    toggleDetailsButton.addEventListener('click', (): void => {
-      const detailsElement = modal.querySelector<HTMLElement>('#bgmSyncProgressDetails')
-      if (!detailsElement) return
-      const isExpanded = detailsElement.style.display !== 'none'
-      detailsElement.style.display = isExpanded ? 'none' : 'block'
-      toggleDetailsButton.textContent = isExpanded ? '显示详情' : '收起详情'
-      toggleDetailsButton.setAttribute('aria-label', isExpanded ? '显示详情' : '收起详情')
-    })
-  }
-
-  _syncProgressDialog = modal
-  return modal
+/** 取扣除暂停时长后的净耗时（ms）；未开始计时返回 0 */
+function _syncElapsed(): number {
+  if (_syncGlobalStart === 0) return 0
+  const pausedNow = _syncPauseStart > 0 ? Date.now() - _syncPauseStart : 0
+  return Date.now() - _syncGlobalStart - _syncPausedDuration - pausedNow
 }
 
 /**
@@ -662,90 +496,30 @@ export function showSyncProgressDialog(
   handlers: { onPause: () => void; onResume: () => void; onStop: () => void },
   config?: SyncConfigSummary,
 ): void {
-  const modal = ensureSyncProgressDialog()
-
-  // 保存触发元素，用于关闭后恢复焦点
-  _syncProgressTrigger = document.activeElement as HTMLElement | null
-
-  // 重置回调与状态（必须在重置 UI 前完成，避免上次同步残留）
-  _clearSyncProgressHandlers()
-  _syncPauseHandler = handlers.onPause
-  _syncResumeHandler = handlers.onResume
-  _syncStopHandler = handlers.onStop
-  _isSyncPaused = false
-  _syncProgressLogCount = 0
-
-  // 初始化全局 ETA 追踪
-  _syncGlobalStart = Date.now()
-  _syncPausedDuration = 0
-  _syncPauseStart = 0
-
-  // 重置为运行中状态
-  const titleElement = modal.querySelector<HTMLElement>('#bgmSyncProgressTitle')
-  const iconElement = modal.querySelector<HTMLElement>('#bgmSyncProgressIcon')
-  const progressSection = modal.querySelector<HTMLElement>('#bgmSyncProgressSection')
-  const resultSection = modal.querySelector<HTMLElement>('#bgmSyncProgressResult')
-  const runningBtns = modal.querySelector<HTMLElement>('#bgmSyncProgressRunningBtns')
-  const doneBtns = modal.querySelector<HTMLElement>('#bgmSyncProgressDoneBtns')
-  const pauseButton = modal.querySelector<HTMLElement>('#bgmSyncProgressPauseBtn')
-
-  if (titleElement) titleElement.textContent = title
-  if (iconElement) iconElement.textContent = '🔄'
-  if (progressSection) progressSection.style.display = ''
-  if (resultSection) resultSection.style.display = 'none'
-  if (runningBtns) runningBtns.style.display = 'flex'
-  if (doneBtns) doneBtns.style.display = 'none'
-  // 重置暂停按钮（文本/样式/aria-label），避免上次同步残留的 resume 状态
-  if (pauseButton) {
-    pauseButton.textContent = '⏸️ 暂停'
-    pauseButton.setAttribute('aria-label', '暂停同步')
-    pauseButton.classList.remove('bgm-dialog-btn-success')
-    pauseButton.classList.add('bgm-dialog-btn-default')
-  }
-
-  // 渲染配置摘要
-  const configElement = modal.querySelector<HTMLElement>('#bgmSyncProgressConfig')
-  if (configElement) {
-    if (config) {
-      configElement.innerHTML = renderConfigSummary(config)
-      configElement.style.display = ''
-    } else {
-      configElement.replaceChildren()
-      configElement.style.display = 'none'
-    }
-  }
-
-  // 重置进度
-  const bar = modal.querySelector<HTMLElement>('#bgmSyncProgressBar')
-  const label = modal.querySelector<HTMLElement>('#bgmSyncProgressLabel')
-  const percent = modal.querySelector<HTMLElement>('#bgmSyncProgressPercent')
-  const current = modal.querySelector<HTMLElement>('#bgmSyncProgressCurrent')
-  const log = modal.querySelector<HTMLElement>('#bgmSyncProgressLog')
-  const etaElement = modal.querySelector<HTMLElement>('#bgmSyncProgressEta')
-  const globalEtaElement = modal.querySelector<HTMLElement>('#bgmSyncProgressGlobalEta')
-  if (bar) {
-    bar.style.width = '0%'
-    bar.textContent = ''
-    bar.setAttribute('aria-valuenow', '0')
-  }
-  if (label) label.textContent = '进度: 准备中...'
-  if (percent) percent.textContent = '--%'
-  if (current) current.textContent = ''
-  if (log) log.textContent = ''
-  if (etaElement) {
-    etaElement.textContent = ''
-    etaElement.style.display = 'none'
-  }
-  if (globalEtaElement) {
-    globalEtaElement.textContent = ''
-    globalEtaElement.style.display = 'none'
-  }
-
-  modal.style.display = 'flex'
-  modal.setAttribute('aria-hidden', 'false')
-
-  // 焦点管理：将焦点移至暂停按钮，便于键盘操作
-  pauseButton?.focus()
+  _syncProgress?.hide()
+  _resetSyncTimer()
+  _syncProgress = createProgress({
+    mode: 'modal',
+    title,
+    icon: '🔄',
+    showHeader: true,
+    enableLogs: true,
+    enablePause: true,
+    enableStop: true,
+    ...(config && { configHtml: renderConfigSummary(config) }),
+    onPause: (): void => {
+      _syncPauseStart = Date.now()
+      handlers.onPause()
+    },
+    onResume: (): void => {
+      _syncPausedDuration += _syncPauseStart > 0 ? Date.now() - _syncPauseStart : 0
+      _syncPauseStart = 0
+      handlers.onResume()
+    },
+    onStop: (): void => {
+      handlers.onStop()
+    },
+  })
 }
 
 /**
@@ -763,83 +537,13 @@ export function updateSyncProgressDialog(
   logLine?: string,
   eta?: string,
 ): void {
-  const modal = _syncProgressDialog
-  // 弹窗未显示时快速返回，避免无效 DOM 写入
-  if (!modal || modal.style.display === 'none') return
-
-  const bar = modal.querySelector<HTMLElement>('#bgmSyncProgressBar')
-  const label = modal.querySelector<HTMLElement>('#bgmSyncProgressLabel')
-  const percent = modal.querySelector<HTMLElement>('#bgmSyncProgressPercent')
-  const currentElement = modal.querySelector<HTMLElement>('#bgmSyncProgressCurrent')
-  const log = modal.querySelector<HTMLElement>('#bgmSyncProgressLog')
-  const etaElement = modal.querySelector<HTMLElement>('#bgmSyncProgressEta')
-  const globalEtaElement = modal.querySelector<HTMLElement>('#bgmSyncProgressGlobalEta')
-
-  const pct = total > 0 ? Math.round((current / total) * 100) : 0
-  if (bar) {
-    bar.style.width = `${String(pct)}%`
-    bar.textContent = `${String(pct)}%`
-    bar.setAttribute('aria-valuenow', String(pct))
-  }
-  if (label) label.textContent = `进度: ${String(current)}/${String(total)}`
-  if (percent) percent.textContent = `${String(pct)}%`
-  if (currentElement && message) currentElement.textContent = message
-
-  // 显示阶段 ETA：优先使用独立的 eta 参数，兼容旧版 logLine 以"预计剩余"/"剩余:"开头的情况
-  const etaText =
-    eta ??
-    (logLine &&
-      (logLine.startsWith('预计剩余') || logLine.startsWith('剩余:') ? logLine : undefined))
-  if (etaElement && etaText) {
-    etaElement.textContent = etaText
-    etaElement.style.display = ''
-  } else if (etaElement) {
-    etaElement.style.display = 'none'
-  }
-
-  // 计算全局 ETA（基于整体进度和已用时间）
-  if (globalEtaElement && _syncGlobalStart > 0 && total > 0) {
-    const now = Date.now()
-    // 扣除暂停时间
-    const effectiveElapsed = now - _syncGlobalStart - _syncPausedDuration
-    if (effectiveElapsed > 0 && current > 0) {
-      // 处理的项数 / 有效耗时 = 速率
-      const rate = current / effectiveElapsed
-      // 剩余项数 / 速率 = 剩余时间
-      const remaining = total - current
-      const remainingMs = remaining / rate
-      const elapsedString = formatDuration(effectiveElapsed)
-      const remainingString = formatDuration(remainingMs)
-      const totalString = formatDuration(effectiveElapsed + remainingMs)
-      globalEtaElement.textContent = `⏱ 已用${elapsedString} · 预计剩余${remainingString} · 总计${totalString}`
-      globalEtaElement.style.display = ''
-    } else if (current === 0) {
-      // 尚未开始，只显示已用时间
-      const elapsedString = formatDuration(now - _syncGlobalStart)
-      globalEtaElement.textContent = `⏱ 已用${elapsedString} · 计算中...`
-      globalEtaElement.style.display = ''
-    } else {
-      globalEtaElement.style.display = 'none'
-    }
-  }
-
-  // 将日志行追加到日志区（ETA 类型的 logLine 已在上方处理，不再重复追加）
-  if (logLine && log && logLine !== etaText) {
-    const isNearBottom = log.scrollHeight - log.scrollTop - log.clientHeight < 30
-    log.appendChild(document.createTextNode(`${logLine}\n`))
-    _syncProgressLogCount += 1
-    while (_syncProgressLogCount > _SYNC_PROGRESS_LOG_MAX) {
-      if (log.firstChild) {
-        log.removeChild(log.firstChild)
-        _syncProgressLogCount -= 1
-      } else {
-        break
-      }
-    }
-    if (isNearBottom) {
-      log.scrollTop = log.scrollHeight
-    }
-  }
+  if (_syncProgress === null) return
+  // 兼容旧调用：logLine 以「预计剩余」/「剩余:」开头时视为 ETA 文本
+  const isEtaLine =
+    logLine !== undefined && (logLine.startsWith('预计剩余') || logLine.startsWith('剩余:'))
+  const etaText = eta ?? (isEtaLine ? logLine : undefined)
+  _syncProgress.update(current, total, message, etaText)
+  if (logLine !== undefined && logLine !== etaText) _syncProgress.log(logLine)
 }
 
 /**
@@ -856,23 +560,6 @@ export interface SyncProgressStats {
   elapsedMs: number
   avgSpeed: number
   strategyLabel: string
-}
-
-/**
- * 格式化耗时为可读字符串
- */
-function formatDuration(ms: number): string {
-  if (ms < 1000) {
-    const seconds = Math.max(0, ms / 1000)
-    return `${seconds.toFixed(2)}秒`
-  }
-  const seconds = Math.floor(ms / 1000)
-  if (seconds < 60) return `${String(seconds)}秒`
-  const minutes = Math.floor(seconds / 60)
-  const secs = seconds % 60
-  return secs > 0
-    ? `${String(minutes)}分${secs.toString().padStart(2, '0')}秒`
-    : `${String(minutes)}分`
 }
 
 /**
@@ -899,7 +586,7 @@ function formatDuration(ms: number): string {
  * │  🎯 策略  📥 远程  ✅ 完成  🔍 跳过  ⚠️ 失败        │
  * └──────────────────────────────────────────────────────┘
  */
-function renderSyncStatsChart(container: HTMLElement, stats: SyncProgressStats): void {
+function renderSyncStatsChart(stats: SyncProgressStats): string {
   const totalProcessed = stats.added + stats.updated + stats.deleted
   const totalActive = totalProcessed + stats.unchanged + stats.failed
   const totalAll = totalActive + stats.skipped
@@ -968,7 +655,7 @@ function renderSyncStatsChart(container: HTMLElement, stats: SyncProgressStats):
     },
   ]
 
-  container.innerHTML = `
+  return `
     <!-- ===== 顶部概览条 ===== -->
     <div class="bgm-overview-bar">
       <div class="bgm-overview-cards">
@@ -1288,108 +975,29 @@ export function completeSyncProgressDialog(
   stats?: SyncProgressStats,
   detailItems?: GithubSyncDetailItem[],
 ): void {
-  const modal = ensureSyncProgressDialog()
-  const titleElement = modal.querySelector<HTMLElement>('#bgmSyncProgressTitle')
-  const iconElement = modal.querySelector<HTMLElement>('#bgmSyncProgressIcon')
-  const progressSection = modal.querySelector<HTMLElement>('#bgmSyncProgressSection')
-  const resultSection = modal.querySelector<HTMLElement>('#bgmSyncProgressResult')
-  const summaryElement = modal.querySelector<HTMLElement>('#bgmSyncProgressSummary')
-  const chartElement = modal.querySelector<HTMLElement>('#bgmSyncProgressChart')
-  const detailsElement = modal.querySelector<HTMLElement>('#bgmSyncProgressDetails')
-  const toggleButton = modal.querySelector<HTMLElement>('#bgmSyncProgressToggleDetails')
-  const nextButton = modal.querySelector<HTMLElement>('#bgmSyncProgressNext')
-  const runningBtns = modal.querySelector<HTMLElement>('#bgmSyncProgressRunningBtns')
-  const doneBtns = modal.querySelector<HTMLElement>('#bgmSyncProgressDoneBtns')
-
-  if (titleElement) titleElement.textContent = isStopped ? '同步已停止' : '同步完成'
-  if (iconElement) iconElement.textContent = isStopped ? '⏹️' : '✅'
-  if (progressSection) progressSection.style.display = 'none'
-  if (resultSection) resultSection.style.display = ''
-  if (runningBtns) runningBtns.style.display = 'none'
-  if (doneBtns) doneBtns.style.display = 'flex'
-
-  // 在 summary 中追加全局耗时
-  let finalSummary = summary
-  if (_syncGlobalStart > 0) {
-    const totalElapsed = Date.now() - _syncGlobalStart - _syncPausedDuration
-    const elapsedString = formatDuration(totalElapsed)
-    finalSummary = `${summary} 用时 ${elapsedString}`
-    // 重置全局 ETA 追踪
-    _syncGlobalStart = 0
-    _syncPausedDuration = 0
-    _syncPauseStart = 0
-  }
-  if (summaryElement) summaryElement.textContent = finalSummary
-
-  // 渲染统计图表（停止时也显示，展示已完成的部分统计）
-  if (chartElement && stats) {
-    chartElement.style.display = ''
-    renderSyncStatsChart(chartElement, stats)
-  } else if (chartElement) {
-    chartElement.style.display = 'none'
-  }
-
-  if (detailsElement) {
-    detailsElement.classList.remove('bgm-sync-progress__result-details--table')
-    if (detailItems && detailItems.length > 0) {
-      detailsElement.innerHTML = renderSyncDetailTable(detailItems)
-      detailsElement.classList.add('bgm-sync-progress__result-details--table')
-    } else {
-      detailsElement.textContent = details.length > 0 ? details.join('\n') : '无详情'
-    }
-    detailsElement.style.display = 'none'
-  }
-  if (toggleButton) {
-    toggleButton.textContent = '显示详情'
-    toggleButton.setAttribute('aria-label', '显示详情')
-    const hasDetails = details.length > 0 || (detailItems && detailItems.length > 0)
-    toggleButton.style.display = hasDetails ? '' : 'none'
-  }
-
-  // 下一步按钮：仅当提供 onNext 回调时显示
-  if (nextButton) {
-    if (onNext) {
-      nextButton.style.display = ''
-      _syncNextHandler = onNext
-    } else {
-      nextButton.style.display = 'none'
-    }
-  }
-
-  // 清理运行态回调（保留弹窗可见，供用户查看结果）
-  _clearSyncProgressHandlers()
-  // 恢复下一步回调（_clearSyncProgressHandlers 会清空，需重新设置）
-  if (onNext) _syncNextHandler = onNext
-
-  // 完成状态下支持 ESC 关闭
-  _syncProgressEscHandler = (event: KeyboardEvent): void => {
-    if (event.key === 'Escape') {
-      hideSyncProgressDialog()
-    }
-  }
-  document.addEventListener('keydown', _syncProgressEscHandler)
-
-  // 焦点切换到下一步按钮或关闭按钮，便于键盘用户立即操作
-  const focusTarget = onNext
-    ? modal.querySelector<HTMLElement>('#bgmSyncProgressNext')
-    : modal.querySelector<HTMLElement>('#bgmSyncProgressClose')
-  focusTarget?.focus()
+  const tableItems = detailItems ?? []
+  const hasTable = tableItems.length > 0
+  const elapsed = _syncElapsed()
+  const finalSummary = elapsed > 0 ? `${summary} 用时 ${formatDuration(elapsed)}` : summary
+  _syncProgress?.complete({
+    summary: finalSummary,
+    ok: !isStopped,
+    ...(stats !== undefined && { resultHtml: renderSyncStatsChart(stats) }),
+    ...(hasTable ? { detailsHtml: renderSyncDetailTable(tableItems) } : { details }),
+    ...(onNext && { onNext }),
+  })
+  _syncGlobalStart = 0
+  _syncPausedDuration = 0
+  _syncPauseStart = 0
 }
 
 /** 隐藏同步进度弹窗 */
 export function hideSyncProgressDialog(): void {
-  const modal = _syncProgressDialog
-  if (!modal) return
-  modal.style.display = 'none'
-  modal.setAttribute('aria-hidden', 'true')
-  _clearSyncProgressHandlers()
-  // 重置全局 ETA 追踪状态
+  _syncProgress?.hide()
+  _syncProgress = null
   _syncGlobalStart = 0
   _syncPausedDuration = 0
   _syncPauseStart = 0
-  // 焦点返回到触发元素
-  _syncProgressTrigger?.focus()
-  _syncProgressTrigger = null
 }
 
 // ========== 公共 API ==========

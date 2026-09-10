@@ -1235,7 +1235,7 @@ select.input {
     min-height: 48px;
 }
 
-.bgm-sync-progress__running-btns {
+.bgm-progress__btns {
     display: flex;
     gap: 8px;
     justify-content: flex-end;
@@ -1244,7 +1244,7 @@ select.input {
     top: 0;
 }
 
-.bgm-sync-progress__done-btns {
+.bgm-progress__btns {
     display: flex;
     gap: 8px;
     justify-content: flex-end;
@@ -1772,25 +1772,149 @@ select.input {
     --radius-md: 8px;
 }
 
-/* ========== 同步进度弹窗 ========== */
-.bgm-sync-progress__content {
+/* ========== 通用进度组件（modal / inline / detach） ========== */
+.bgm-progress__content {
     max-width: 640px;
 }
 
-.bgm-sync-progress__header {
-    /* 复用 .bgm-dialog-header 的布局，此处仅占位以保留语义化类名 */
+.bgm-progress {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    color: var(--text, #cdd6f4);
 }
 
-.bgm-sync-progress__body {
+/* ---- 标题栏 ---- */
+.bgm-progress__head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 10px 14px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.bgm-progress__head-left {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+}
+
+.bgm-progress__icon {
+    font-size: 16px;
+    line-height: 1;
+}
+
+.bgm-progress__title {
+    font-size: 14px;
+    font-weight: 600;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.bgm-progress__close {
+    flex: none;
+    padding: 2px 6px;
+    border: none;
+    border-radius: 4px;
+    background: transparent;
+    color: var(--subtext0, #a6adc8);
+    font-size: 13px;
+    line-height: 1;
+    cursor: pointer;
+}
+
+.bgm-progress__close:hover {
+    background: rgba(255, 255, 255, 0.08);
+    color: var(--text, #cdd6f4);
+}
+
+/* ---- 主体 ---- */
+.bgm-progress__body {
     overflow-y: auto;
+    min-height: 0;
+    padding: 12px 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+/* ---- 底部按钮 ---- */
+.bgm-progress__footer {
+    padding: 10px 14px;
+    border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.bgm-progress__btns {
+    display: flex;
+    gap: 8px;
+    justify-content: flex-end;
+}
+
+/* ---- inline 模式：嵌入面板容器内，无遮罩 ---- */
+.bgm-progress--inline {
+    margin-top: 8px;
+    border: 1px solid var(--border, rgba(255, 255, 255, 0.08));
+    border-radius: var(--r-md, 8px);
+    background: var(--bg-mantle, rgba(255, 255, 255, 0.02));
+    overflow: hidden;
+}
+
+.bgm-progress--inline .bgm-progress__body {
+    padding: 10px 12px;
+    max-height: 420px;
+}
+
+/* ---- detach 模式：浮动卡片，不阻塞操作 ---- */
+.bgm-progress__dock {
+    position: fixed;
+    right: 16px;
+    bottom: 16px;
+    z-index: 9999;
+    width: 360px;
+    max-width: calc(100vw - 32px);
+}
+
+.bgm-progress--detach {
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 10px;
+    background: var(--base, #1e1e2e);
+    box-shadow: 0 8px 28px rgba(0, 0, 0, 0.35);
+    overflow: hidden;
+}
+
+.bgm-progress--detach .bgm-progress__body {
+    max-height: 300px;
+}
+
+/* ---- 结果区 ---- */
+.bgm-progress__result {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
     min-height: 0;
 }
 
-.bgm-sync-progress__config {
+.bgm-progress__summary {
+    white-space: pre-line;
+    padding: 8px 10px;
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.04);
+    font-size: 12px;
+    line-height: 1.6;
+}
+
+.bgm-progress__result-body:empty {
+    display: none;
+}
+
+.bgm-progress__config {
     margin-bottom: 8px;
 }
 
-.bgm-sync-progress__config .cfg-summary {
+.bgm-progress__config .cfg-summary {
     display: flex;
     flex-wrap: wrap;
     gap: 6px;
@@ -1801,17 +1925,17 @@ select.input {
     line-height: 1.6;
 }
 
-.bgm-sync-progress__config .cfg-item {
+.bgm-progress__config .cfg-item {
     color: var(--text, #cdd6f4);
     white-space: nowrap;
 }
 
-.bgm-sync-progress__config .cfg-item.warn {
+.bgm-progress__config .cfg-item.warn {
     color: var(--yellow, #f9e2af);
     font-weight: 600;
 }
 
-.bgm-sync-progress__meta {
+.bgm-progress__meta {
     display: flex;
     justify-content: space-between;
     margin-bottom: 6px;
@@ -1819,27 +1943,27 @@ select.input {
     color: var(--subtext0, #a6adc8);
 }
 
-.bgm-sync-progress__eta {
+.bgm-progress__eta {
     font-size: 12px;
     color: var(--yellow, #f9e2af);
     font-weight: 500;
 }
 
-.bgm-sync-progress__global-eta {
+.bgm-progress__global-eta {
     font-size: 12px;
     color: var(--green, #a6e3a1);
     font-weight: 500;
     margin-left: 8px;
 }
 
-.bgm-sync-progress__track {
+.bgm-progress__track {
     background: var(--surface1, #313244);
     border-radius: 4px;
     height: 20px;
     overflow: hidden;
 }
 
-.bgm-sync-progress__bar {
+.bgm-progress__bar {
     width: 0%;
     height: 100%;
     background: var(--green, #a6e3a1);
@@ -1851,24 +1975,24 @@ select.input {
     transition: width 0.3s;
 }
 
-.bgm-sync-progress__current {
+.bgm-progress__current {
     margin-top: 8px;
     font-size: 12px;
     color: var(--subtext0, #a6adc8);
     min-height: 18px;
 }
 
-.bgm-sync-progress__log-wrap {
+.bgm-progress__log-wrap {
     margin-top: 8px;
 }
 
-.bgm-sync-progress__log-label {
+.bgm-progress__log-label {
     font-size: 12px;
     color: var(--subtext1, #bac2de);
     margin-bottom: 4px;
 }
 
-.bgm-sync-progress__log {
+.bgm-progress__log {
     max-height: 180px;
     overflow-y: auto;
     font-size: 11px;
@@ -1883,7 +2007,7 @@ select.input {
 }
 
 /* ========== 同步统计图表 ========== */
-.bgm-sync-progress__chart {
+.bgm-progress__chart {
     margin-top: 12px;
     padding: 14px;
     background: rgba(255, 255, 255, 0.03);
@@ -1892,7 +2016,7 @@ select.input {
 }
 
 /* 结果区域 - 确保可滚动 */
-#bgmSyncProgressResult {
+.bgm-progress__result {
     flex: 1;
     min-height: 0;
     overflow-y: auto;
@@ -1901,7 +2025,7 @@ select.input {
     gap: 10px;
 }
 
-.bgm-sync-progress__result-summary {
+.bgm-progress__summary {
     white-space: pre-line;
     color: var(--text, #cdd6f4);
     padding: 10px;
@@ -1911,7 +2035,7 @@ select.input {
     margin: 0;
 }
 
-.bgm-sync-progress__config {
+.bgm-progress__config {
     margin-bottom: 8px;
 }
 
@@ -2019,7 +2143,7 @@ select.input {
     height: auto;
 }
 
-.bgm-sync-progress__result-details {
+.bgm-progress__details {
     display: none;
     margin-top: 8px;
     max-height: 240px;
@@ -2032,7 +2156,7 @@ select.input {
 }
 
 /* 表格模式：覆盖 pre 换行并启用横向滚动 */
-.bgm-sync-progress__result-details--table {
+.bgm-progress__details--table {
     white-space: normal;
     font-family: inherit;
     padding: 0;
