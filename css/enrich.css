@@ -292,9 +292,8 @@
   font-size: 12px;
   vertical-align: middle;
   white-space: nowrap;
-  max-width: 220px;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  /* 不截断单元格：让表格随内容增长，配合容器 overflow-x:auto 出现横向滚动条，
+     TAGS / 标签等宽列可完整显示（源数据预览与「查看详细数据表格」弹窗共用） */
 }
 
 .preview-table tbody tr {
@@ -411,13 +410,41 @@
   color: var(--amber);
 }
 /* 一周七色：与日历应用一致便于区分 */
-.preview-table .weekday-chip.weekday-mon { background: rgba(248, 113, 113, 0.12); border-color: rgba(248, 113, 113, 0.35); color: #f87171; } /* 周一：红 */
-.preview-table .weekday-chip.weekday-tue { background: rgba(251, 146, 60, 0.12); border-color: rgba(251, 146, 60, 0.35); color: #fb923c; } /* 周二：橙 */
-.preview-table .weekday-chip.weekday-wed { background: rgba(250, 204, 21, 0.12); border-color: rgba(250, 204, 21, 0.4); color: #facc15; } /* 周三：黄 */
-.preview-table .weekday-chip.weekday-thu { background: rgba(132, 204, 22, 0.12); border-color: rgba(132, 204, 22, 0.35); color: #84cc16; } /* 周四：青柠 */
-.preview-table .weekday-chip.weekday-fri { background: rgba(34, 197, 94, 0.12); border-color: rgba(34, 197, 94, 0.35); color: #22c55e; } /* 周五：绿 */
-.preview-table .weekday-chip.weekday-sat { background: rgba(56, 189, 248, 0.12); border-color: rgba(56, 189, 248, 0.35); color: #38bdf8; } /* 周六：青 */
-.preview-table .weekday-chip.weekday-sun { background: rgba(168, 85, 247, 0.12); border-color: rgba(168, 85, 247, 0.35); color: #a855f7; } /* 周日：紫 */
+.preview-table .weekday-chip.weekday-mon {
+  background: rgba(248, 113, 113, 0.12);
+  border-color: rgba(248, 113, 113, 0.35);
+  color: #f87171;
+} /* 周一：红 */
+.preview-table .weekday-chip.weekday-tue {
+  background: rgba(251, 146, 60, 0.12);
+  border-color: rgba(251, 146, 60, 0.35);
+  color: #fb923c;
+} /* 周二：橙 */
+.preview-table .weekday-chip.weekday-wed {
+  background: rgba(250, 204, 21, 0.12);
+  border-color: rgba(250, 204, 21, 0.4);
+  color: #facc15;
+} /* 周三：黄 */
+.preview-table .weekday-chip.weekday-thu {
+  background: rgba(132, 204, 22, 0.12);
+  border-color: rgba(132, 204, 22, 0.35);
+  color: #84cc16;
+} /* 周四：青柠 */
+.preview-table .weekday-chip.weekday-fri {
+  background: rgba(34, 197, 94, 0.12);
+  border-color: rgba(34, 197, 94, 0.35);
+  color: #22c55e;
+} /* 周五：绿 */
+.preview-table .weekday-chip.weekday-sat {
+  background: rgba(56, 189, 248, 0.12);
+  border-color: rgba(56, 189, 248, 0.35);
+  color: #38bdf8;
+} /* 周六：青 */
+.preview-table .weekday-chip.weekday-sun {
+  background: rgba(168, 85, 247, 0.12);
+  border-color: rgba(168, 85, 247, 0.35);
+  color: #a855f7;
+} /* 周日：紫 */
 
 /* 集数徽章（阈值默认 1/12/13，配置项可改）：1=橙、2~短集阈值-1=黄、短集阈值=无、>短集阈值=绿 */
 .preview-table .ep-chip {
@@ -466,7 +493,10 @@
   font-size: 12px;
   cursor: pointer;
   white-space: nowrap;
-  transition: background 0.15s, color 0.15s, border-color 0.15s;
+  transition:
+    background 0.15s,
+    color 0.15s,
+    border-color 0.15s;
 }
 .workbook-tab:hover {
   border-color: var(--primary);
