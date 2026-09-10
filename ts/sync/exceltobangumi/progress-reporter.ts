@@ -7,7 +7,8 @@
 import { LOG_LEVELS, SYNC_STATUS, BGM_COLOR } from '../../core/constants.js'
 import { bgmLog, BGM, getCell } from '../../tools/util/index.js'
 import type { WpsWorksheet } from '../../tools/wps.js'
-import { addSyncRecord } from '../sync-record.js'
+import { addSyncRecords } from '../sync-record.js'
+import type { UpdateRecordParameters } from '../sync-record.js'
 
 /**
  * 同步任务项接口
@@ -81,12 +82,13 @@ export function applySyncSuccessResults(
   successTasks: SyncTask[],
   result: SyncResultStats,
 ): void {
+  const records: UpdateRecordParameters[] = []
   for (const task of successTasks) {
     // 标记颜色
     markSyncResultColor(ws, task.rowNum, true, seqCol)
 
-    // 记录同步日志
-    addSyncRecord({
+    // 记录同步日志（先累积，循环外一次性写入）
+    records.push({
       name: task.name || `SID:${task.sid}`,
       url: task.bgmUrl,
       sid: task.sid,
@@ -100,6 +102,10 @@ export function applySyncSuccessResults(
 
     result.success += 1
   }
+
+  // 性能：逐条 addSyncRecord 会在每次写入前触发一次全表去重扫描（O(n²) COM 调用），
+  // 改为循环外单次批量写入 —— 一次去重 + 一次 Range.Value2。
+  addSyncRecords(records)
 }
 
 /**
@@ -116,10 +122,11 @@ export function applySyncFailResults(
   failTasks: SyncTask[],
   result: SyncResultStats,
 ): void {
+  const records: UpdateRecordParameters[] = []
   for (const task of failTasks) {
     markSyncResultColor(ws, task.rowNum, false, seqCol)
 
-    addSyncRecord({
+    records.push({
       name: task.name || `SID:${task.sid}`,
       url: task.bgmUrl,
       sid: task.sid,
@@ -132,6 +139,9 @@ export function applySyncFailResults(
 
     result.fail += 1
   }
+
+  // 同 applySyncSuccessResults：批量写入，避免逐条触发全表去重
+  addSyncRecords(records)
 }
 
 /**

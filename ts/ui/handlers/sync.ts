@@ -26,7 +26,7 @@ import {
   SyncToBangumiAsync,
   getOrCreateSyncRecordSheet,
   getAllSyncRecords,
-  addSyncRecord,
+  addSyncRecords,
   BGM_COLOR,
   COLLECTION_TYPE_NAMES,
   BGM_SUBJECT_TYPES,
@@ -39,7 +39,12 @@ import {
   buildSyncConfig,
   formatDuration,
 } from '../../index.js'
-import type { SyncRecord, SyncProgressStats, SyncConfigSummary } from '../../index.js'
+import type {
+  SyncRecord,
+  SyncProgressStats,
+  SyncConfigSummary,
+  UpdateRecordParameters,
+} from '../../index.js'
 import { getSyncPreview, detectConflicts } from '../../services/ribbon-service.js'
 import { ensureSheetHeaders } from '../../tools/util/index.js'
 import type { WpsApp, WpsWorksheet } from '../../tools/wps.js'
@@ -835,24 +840,24 @@ async function _doAPISync(
     let currentCombined = 0
 
     // 阶段1：写入收藏到同步记录表（显示进度，但不需要定位单元格）
+    // 先累积、循环外一次性批量写入：逐条 addSyncRecord 会在每次写入前触发全表去重扫描（O(n²) COM 调用）
+    const pendingSyncRecords: UpdateRecordParameters[] = []
     for (const [index, item] of userCollections.entries()) {
       if (BGM.sync.checkShouldStop()) break
       if (BGM.sync.checkPaused()) await BGM.sync.waitForResume()
       if (BGM.sync.checkShouldStop()) break
 
       const itemName = item.subject?.name_cn || item.subject?.name || '(无名称)' // eslint-disable-line @typescript-eslint/prefer-nullish-coalescing -- API 字段空串需退到备用字段（`??` 会保留空串）
-      if (typeof addSyncRecord === 'function') {
-        addSyncRecord({
-          name: itemName,
-          url: `https://bgm.tv/subject/${String(item.subject_id)}`,
-          sid: String(item.subject_id),
-          type: BGM_SUBJECT_TYPES[item.subject_type ?? 2] ?? '',
-          content: '标记同步',
-          status: '成功',
-          count: 1,
-          collType: COLLECTION_TYPE_NAMES[item.type] ?? '',
-        })
-      }
+      pendingSyncRecords.push({
+        name: itemName,
+        url: `https://bgm.tv/subject/${String(item.subject_id)}`,
+        sid: String(item.subject_id),
+        type: BGM_SUBJECT_TYPES[item.subject_type ?? 2] ?? '',
+        content: '标记同步',
+        status: '成功',
+        count: 1,
+        collType: COLLECTION_TYPE_NAMES[item.type] ?? '',
+      })
       currentCombined += 1
       updateSyncProgressDialog(
         currentCombined,
@@ -861,6 +866,8 @@ async function _doAPISync(
         `📥 [${String(index + 1)}/${String(totalCollect)}] ${itemName}`,
       )
     }
+
+    if (typeof addSyncRecords === 'function') addSyncRecords(pendingSyncRecords)
 
     syncRecords = typeof getAllSyncRecords === 'function' ? getAllSyncRecords() : []
     syncCountMap.clear()
