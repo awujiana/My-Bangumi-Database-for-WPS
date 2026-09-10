@@ -194,3 +194,13 @@ export function initShellNav(): void {
   initScrollspy()
   onResettled()
 }
+
+/**
+ * 主动触发一次「当前可见区块 + 导航高亮」重算。
+ * 供各面板在动态加载/重布局（识别表头、渲染预览、切换工作簿等）后调用，
+ * 避免高亮停留在陈旧状态。
+ */
+export function recomputeScrollspy(): void {
+  if (typeof window === 'undefined') return
+  window.dispatchEvent(new Event('scroll'))
+}

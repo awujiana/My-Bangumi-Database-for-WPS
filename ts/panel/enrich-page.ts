@@ -69,6 +69,7 @@ import {
 import { findWorkbookByName, getOpenWorkbooks } from '../tools/locked-sheet.js'
 import type { WpsWorksheet, WpsWorkbook } from '../tools/wps.js'
 import { getConfig, CONFIG_KEYS } from '../tools/config.js'
+import { recomputeScrollspy } from './shell-nav.js'
 
 // ========== 类型定义 ==========
 
@@ -792,6 +793,14 @@ function renderBatchFileList(): void {
     const notice = safeGetElement('autoDetectNotice')
     if (notice) notice.style.display = 'none'
   }
+
+  // 6) 文件已选后折叠 sec-file 内的「选择文件 / 自动识别」按钮组（CSS 控制）
+  //    使 sec-file 收缩，让 sec-target 自然上移到主区域顶部，与侧栏第 2 项高亮对齐，
+  //    避免 scrollspy 在 sec-file 与 sec-target 之间跳动造成「导航高亮与首个可见模块错位」。
+  const secFile = document.getElementById('sec-file')
+  if (secFile) secFile.classList.toggle('has-file-selected', n > 0)
+  // 7) 主动触发 scrollspy 重算：sec-file 高度变化后立刻刷新「当前主导区块」
+  recomputeScrollspy()
 }
 
 // ========== 表头自动识别 ==========
@@ -2038,8 +2047,7 @@ function renderSourceDetailTable(ws: WpsWorksheet): string {
     const header = getCellValue(ws, headerRow, col).trim()
     const field = fieldByCol.get(col)
     if (header || field) {
-      const label =
-        header || (field ? (labelByField.get(field) ?? '') : '') || `第${String(col)}列`
+      const label = header || (field ? (labelByField.get(field) ?? '') : '') || `第${String(col)}列`
       columns.push({ col, label, field })
     }
   }

@@ -60,6 +60,14 @@
   transform: translateY(-2px);
 }
 
+/* 文件已选后折叠「选择文件 / 自动识别」按钮组与「识别后关闭文件」复选框，
+   让 sec-file 区块收缩，避免占据主区域大量首屏空间、触发 scrollspy 错位
+   （高亮留在 sec-file / sec-target 之间切换）。折叠后 sec-target 自然上移到
+   主区域顶部，与侧栏第 2 项高亮对齐。 */
+.enrich-section.has-file-selected [data-collapse-when='file-selected'] {
+  display: none;
+}
+
 /* 与 panel-theme.css .section h3 统一：中性 1px 分隔线 + 强调色块，去除蓝强调线 */
 .enrich-section h3 {
   color: var(--text-1);
