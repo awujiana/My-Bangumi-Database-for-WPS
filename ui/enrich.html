@@ -68,7 +68,8 @@
             ></div>
             <!-- 自动识别已打开新番表工作簿的提示（打开页面时检查发现后显示） -->
             <div id="autoDetectNotice" class="auto-detect-notice" style="display: none"></div>
-            <div class="bgm-btn-group bgm-btn-row">
+            <!-- 已选文件后整组折叠（文件选择 / 自动识别按钮仅在未选时需要） -->
+            <div class="bgm-btn-group bgm-btn-row" data-collapse-when="file-selected">
               <button
                 class="bgm-btn small primary"
                 id="selectFileBtn"
@@ -88,6 +89,7 @@
             </div>
             <label
               class="bgm-check"
+              data-collapse-when="file-selected"
               style="
                 display: flex;
                 align-items: center;
