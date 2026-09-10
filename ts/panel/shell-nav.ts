@@ -51,6 +51,9 @@ export function initScrollspy(): void {
 
   // 滑动胶囊：唯一实例，首次激活时创建并挂到导航容器
   let indicator: HTMLElement | null = null
+  // 导航点击后的过渡锁：防止平滑滚动尚未结束时，旧区块的可见面积把高亮抢回去
+  let navigationTarget: HTMLElement | null = null
+  let navigationLockTimer = 0
   const getIndicator = (): HTMLElement | null => {
     indicator ??= nav.querySelector<HTMLElement>('.nav-indicator')
     if (!indicator) {
@@ -88,11 +91,31 @@ export function initScrollspy(): void {
     moveIndicatorTo(activeLink)
   }
 
-  // 点击导航项：立即高亮（平滑滚动完成前先给反馈）
+  /** 清除导航点击过渡锁（正常滚动 scrollspy 不受影响） */
+  const clearNavigationLock = (): void => {
+    navigationTarget = null
+    if (navigationLockTimer) {
+      window.clearTimeout(navigationLockTimer)
+      navigationLockTimer = 0
+    }
+  }
+
+  // 点击导航项：立即高亮，并锁定到锚点滚动完成，防止高亮在过渡中回跳
+  const onNavLinkClick = (link: HTMLAnchorElement): void => {
+    const href = link.getAttribute('href') ?? ''
+    if (!href.startsWith('#')) return
+    const sectionId = href.slice(1)
+    const target = sections.find((section) => section.id === sectionId)
+    if (!target) return
+    navigationTarget = target
+    setActive(sectionId)
+    if (navigationLockTimer) window.clearTimeout(navigationLockTimer)
+    // 锚点滚动异常中断时也必须自动释放，不影响后续手动滚动
+    navigationLockTimer = window.setTimeout(clearNavigationLock, 2000)
+  }
   for (const link of navLinks) {
     link.addEventListener('click', () => {
-      const href = link.getAttribute('href') ?? ''
-      if (href.startsWith('#')) setActive(href.slice(1))
+      onNavLinkClick(link)
     })
   }
 
@@ -111,6 +134,20 @@ export function initScrollspy(): void {
    *     （实测：显示「记录与日志」却高亮「数据预览」）。
    */
   const resolveActiveByScroll = (): void => {
+    // 用户刚点击导航时，优先保持目标项高亮，直到目标区块进入吸顶定位带。
+    // 这是点击反馈的过渡锁，不改变正常手动滚动时的 scrollspy 规则。
+    if (navigationTarget) {
+      const topbar = document.querySelector('.topbar')
+      const bandTop = topbar instanceof HTMLElement ? topbar.offsetHeight : 0
+      const targetTop = navigationTarget.getBoundingClientRect().top
+      if (Math.abs(targetTop - bandTop) <= 12) {
+        clearNavigationLock()
+      } else {
+        setActive(navigationTarget.id)
+        return
+      }
+    }
+
     const { innerHeight, scrollY } = window
     const { documentElement } = document
     const viewportBottom = scrollY + innerHeight
