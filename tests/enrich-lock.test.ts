@@ -59,7 +59,7 @@ function createMockPluginStorage(store: Record<string, string> = {}): {
 } {
   const s = { ...store }
   return {
-    getItem: (k: string) => (Object.hasOwn(s, k) ? s[k] : null),
+    getItem: (k: string) => (Object.hasOwn(s, k) ? (s[k] ?? null) : null),
     setItem: (k: string, v: string) => {
       s[k] = v
     },
@@ -191,7 +191,7 @@ vi.mock('../ts/ui/handlers/index.js', () => ({
 
 // 主面板/富化 UI 层依赖 ts/index.js（仅取 getApp/bgmLog/BGM/LOG_LEVELS/showToast）
 vi.mock('../ts/index.js', () => ({
-  getApp: () => (window as Record<string, unknown>).Application ?? null,
+  getApp: (): unknown => Reflect.get(globalThis, 'Application') ?? null,
   bgmLog: mockReferences.mockBgmLog,
   BGM: sharedBGM,
   LOG_LEVELS: { INFO: 'INFO', WARN: 'WARN', ERROR: 'ERROR', DEBUG: 'DEBUG' },
@@ -200,7 +200,7 @@ vi.mock('../ts/index.js', () => ({
 
 // locked-sheet 依赖 tools/util；getApp 必须与 ts/index 返回同一个 Application
 vi.mock('../ts/tools/util/index.js', () => ({
-  getApp: () => (window as Record<string, unknown>).Application ?? null,
+  getApp: (): unknown => Reflect.get(globalThis, 'Application') ?? null,
   bgmLog: mockReferences.mockBgmLog,
   BGM: sharedBGM,
   getCellValue: mockGetCellValue,
@@ -258,7 +258,7 @@ afterEach(() => {
 // ============ 辅助函数 ============
 
 function setMockApp(app: unknown): void {
-  ;(window as Record<string, unknown>).Application = app
+  Reflect.set(globalThis, 'Application', app)
 }
 
 function setupBasicDom(): void {

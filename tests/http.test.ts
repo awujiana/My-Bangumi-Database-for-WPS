@@ -158,7 +158,7 @@ class MockXHR {
 }
 
 beforeEach(() => {
-  ;(globalThis as { XMLHttpRequest: typeof MockXHR }).XMLHttpRequest = MockXHR
+  Reflect.set(globalThis, 'XMLHttpRequest', MockXHR)
   lastXhrCall = null
   lastMockXhr = null
   xhrCallCount = 0

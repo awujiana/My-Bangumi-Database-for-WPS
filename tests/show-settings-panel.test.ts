@@ -28,7 +28,7 @@ function createMockPluginStorage(store: Record<string, string> = {}): {
 } {
   const s = { ...store }
   return {
-    getItem: (k: string) => (Object.hasOwn(s, k) ? s[k] : null),
+    getItem: (k: string) => (Object.hasOwn(s, k) ? (s[k] ?? null) : null),
     setItem: (k: string, v: string) => {
       s[k] = v
     },
@@ -240,7 +240,7 @@ afterEach(() => {
 
 /** 将 mock app 设置到 window.Application，使 getApp() 能获取 */
 function setMockApp(app: unknown): void {
-  ;(window as Record<string, unknown>).Application = app
+  Reflect.set(globalThis, 'Application', app)
 }
 
 // ============ 场景 1: 主面板可见 → 设置面板停靠右侧 ============

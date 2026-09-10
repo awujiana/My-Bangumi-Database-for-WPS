@@ -58,7 +58,7 @@ afterEach(() => {
   vi.clearAllMocks()
   // 恢复 XMLHttpRequest（若被替换）
   if (mockXhrConstructor !== null) {
-    ;(globalThis as { XMLHttpRequest?: typeof MockXHR }).XMLHttpRequest = mockXhrConstructor
+    Reflect.set(globalThis, 'XMLHttpRequest', mockXhrConstructor)
     mockXhrConstructor = null
   }
 })
@@ -168,7 +168,7 @@ class MockXHR {
 /** 安装 MockXHR 替换全局 XMLHttpRequest */
 function installMockXhr(): void {
   mockXhrConstructor = MockXHR
-  ;(globalThis as { XMLHttpRequest: typeof MockXHR }).XMLHttpRequest = MockXHR
+  Reflect.set(globalThis, 'XMLHttpRequest', MockXHR)
   lastXhrCall = null
   lastMockXhr = null
 }

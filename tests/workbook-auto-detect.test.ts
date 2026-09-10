@@ -185,7 +185,7 @@ function makeMockApp(
   windows: WpsWorkbook[] = [],
 ): void {
   const storage = new Map<string, string>()
-  ;(window as { Application?: unknown }).Application = {
+  Reflect.set(globalThis, 'Application', {
     Workbooks: {
       Count: workbooks.length,
       Item: (index: number): WpsWorkbook => {
@@ -209,11 +209,18 @@ function makeMockApp(
         storage.set(key, value)
       },
     },
-  }
+  })
 }
 
 function clearMockApp(): void {
-  delete (window as { Application?: unknown }).Application
+  Reflect.deleteProperty(globalThis, 'Application')
+}
+
+/** 读取当前 mock Application（测试装配用 Reflect 取值，避免不足断言 TS2352） */
+function getMockApp(): { PluginStorage: { setItem: (k: string, v: string) => void } } {
+  return Reflect.get(globalThis, 'Application') as {
+    PluginStorage: { setItem: (k: string, v: string) => void }
+  }
 }
 
 describe('scanMatchingWorkbooks 边界', () => {
@@ -314,9 +321,7 @@ describe('mergeDetectedPathsIntoStorage', () => {
     makeMockApp([target])
 
     // 预置持久化记录指向仍打开的工作簿
-    const app = (
-      window as { Application: { PluginStorage: { setItem: (k: string, v: string) => void } } }
-    ).Application
+    const app = getMockApp()
     app.PluginStorage.setItem(BANGUMI_TARGET_DETECTOR.key, JSON.stringify([target.FullName]))
 
     mergeDetectedPathsIntoStorage()
@@ -326,9 +331,7 @@ describe('mergeDetectedPathsIntoStorage', () => {
 
   it('持久化记录中已关闭的工作簿会被剔除', () => {
     makeMockApp([])
-    const app = (
-      window as { Application: { PluginStorage: { setItem: (k: string, v: string) => void } } }
-    ).Application
+    const app = getMockApp()
     app.PluginStorage.setItem(
       BANGUMI_TARGET_DETECTOR.key,
       JSON.stringify([String.raw`C:\closed.xlsx`]),

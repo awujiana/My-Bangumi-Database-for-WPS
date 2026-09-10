@@ -91,7 +91,7 @@ class MockXHR {
 
   private headers: Record<string, string> = {}
 
-  private _aborted = false
+  _aborted = false
 
   status = 0
 
@@ -183,7 +183,7 @@ class MockXHR {
 
 function installMockXhr(): void {
   mockXhrConstructor = MockXHR
-  ;(globalThis as { XMLHttpRequest: typeof MockXHR }).XMLHttpRequest = MockXHR
+  Reflect.set(globalThis, 'XMLHttpRequest', MockXHR)
   lastXhrCall = null
   lastMockXhr = null
 }
@@ -196,7 +196,7 @@ afterEach(() => {
   vi.clearAllTimers()
   vi.clearAllMocks()
   if (mockXhrConstructor !== null) {
-    ;(globalThis as { XMLHttpRequest?: typeof MockXHR }).XMLHttpRequest = mockXhrConstructor
+    Reflect.set(globalThis, 'XMLHttpRequest', mockXhrConstructor)
     mockXhrConstructor = null
   }
 })
