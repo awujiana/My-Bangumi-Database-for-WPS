@@ -182,7 +182,8 @@ describe('filterByTime', () => {
 // ========== computeDiff 测试 ==========
 function createRemoteEntry(
   sid: string,
-  overrides: Partial<GithubRemoteEntry> = {},
+  // exactOptionalPropertyTypes 下 Partial<T> 不接受显式 undefined，故用映射类型放宽
+  overrides: Partial<{ [K in keyof GithubRemoteEntry]: GithubRemoteEntry[K] | undefined }> = {},
 ): GithubRemoteEntry {
   return {
     sid,
@@ -998,12 +999,12 @@ describe('isWithinTimeFilter quarter 无效值 (line 360)', () => {
       ],
     ])
     // quarter=5 不在 QUARTER_MONTH_RANGES[1,4,7,10] 中
-    const invalidQuarterFilter: SyncTimeFilter = {
+    const invalidQuarterFilter = {
       enabled: true,
       range: 'quarter',
       quarter: 5,
       year: 2024,
-    }
+    } as unknown as SyncTimeFilter
     const diffs = computeDiff(remote, local, 'mirror', invalidQuarterFilter)
     // 因 isWithinTimeFilter 返回 false，本地条目不会被删除
     const deletes = diffs.filter((d) => d.kind === 'delete')
@@ -1041,7 +1042,7 @@ describe('computeDiff 扩展字段空字符串 (line 463)', () => {
     const local = new Map<string, LocalRowEntry>([
       ['sid-empty', { row: 2, sid: 'sid-empty', fields: { 名称: '测试', 开播日期: '2024-01-01' } }],
     ])
-    const diffs = computeDiff(remote, local, 'sync')
+    const diffs = computeDiff(remote, local, 'add-update')
     const updates = diffs.filter((d) => d.kind === 'update')
     // 名称相同，date 为空字符串（falsy）不应被视为变更
     expect(updates.length).toBe(0)

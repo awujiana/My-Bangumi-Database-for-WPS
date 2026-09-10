@@ -209,7 +209,7 @@ vi.mock('../../ts/sync/sync-source-registry.js', async () => {
     registerSyncSource: vi.fn(),
     syncFromRemote: async (
       onProgress?: (current: number, total: number, message: string) => void,
-      strategy = 'add-update',
+      strategy: SyncStrategy = 'add-update',
       signal?: AbortSignal,
     ) => {
       const sourceType = 'github'
@@ -262,7 +262,11 @@ import { SyncToBangumiAsync } from '../../ts/sync/exceltobangumi/index.js'
 import { syncFromGithub, applyDiffToSheet } from '../../ts/sync/github-sync.js'
 import { syncFromRemote } from '../../ts/sync/sync-source-registry.js'
 import { computeDiff, parseJsonl } from '../../ts/sync/github-sync-diff.js'
-import type { GithubRemoteEntry, LocalRowEntry } from '../../ts/sync/github-sync-diff.js'
+import type {
+  GithubRemoteEntry,
+  LocalRowEntry,
+  SyncStrategy,
+} from '../../ts/sync/github-sync-diff.js'
 import { clearUndoStack } from '../../ts/sync/undo-stack.js'
 import type { SyncSource } from '../../ts/sync/sync-source.js'
 import type { Result } from '../../ts/core/result.js'

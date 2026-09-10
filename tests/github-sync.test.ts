@@ -217,6 +217,7 @@ import type {
   GithubSyncDiff,
   LocalRowEntry,
   SyncStrategy,
+  SyncTimeFilter,
 } from '../ts/sync/github-sync-diff.js'
 
 import {
@@ -343,6 +344,17 @@ vi.mock('../ts/sync/sync-record.js', () => ({
 
 // ========== 辅助函数 ==========
 
+/**
+ * 构造数字类型的扩展字段值。
+ *
+ * JSONL 的 infobox 值契约上是字符串，但同步链路对「上游意外给出数字」做了防御
+ * （toExtensionStringValue 会 String() 转换）。测试借此覆盖该分支，故在此显式标注
+ * 类型越界，避免 `话数: 12` 被 tsc 判为不满足 string。
+ */
+function numericExtensionField(value: number): string {
+  return value as unknown as string
+}
+
 function setupXHRResponse(status: number, responseText: string) {
   mockXHR.setResponse(status, responseText)
 }
@@ -463,7 +475,8 @@ describe('computeDiff', () => {
   })
 
   it('远程字段为空 → 不视为差异（保留本地）', () => {
-    const remote: GithubRemoteEntry[] = [{ sid: '555', name: undefined }]
+    // name 缺失（运行时与显式 undefined 等价）→ 不应视为差异
+    const remote: GithubRemoteEntry[] = [{ sid: '555' }]
     const local = new Map<string, LocalRowEntry>([
       [
         '555',
@@ -816,7 +829,6 @@ describe('getSelectedRowSids (通过 syncFromGithub selectedRowsOnly)', () => {
     xhrInstance.responseText = JSON.stringify(remoteEntries)
 
     // 触发 onload
-    // @ts-expect-error - accessing private for test
     xhrInstance.onload?.()
 
     // 现在 getApp 返回 null 时，syncFromGithub 在 selectedRowsOnly 路径上会失败 因为无法获取 Selection 实际上这个测试需要更复杂的 mock 设置，我们改用直接测试内部逻辑
@@ -898,7 +910,7 @@ describe('formatDateToLocal (通过 applyDiffToSheet)', () => {
         kind: 'add',
         sid: '1',
         remote: { sid: '1', name: 'Test', date: '2024-01-15' },
-        changedFields: new Set(['*']),
+        changedFields: ['*'],
       },
     ]
 
@@ -940,7 +952,7 @@ describe('formatDateToLocal (通过 applyDiffToSheet)', () => {
         kind: 'add',
         sid: '1',
         remote: { sid: '1', name: 'Test', date: 'invalid-date' },
-        changedFields: new Set(['*']),
+        changedFields: ['*'],
       },
     ]
 
@@ -1315,7 +1327,6 @@ describe('applyDiffToSheet', () => {
           sid: '1',
           name: '测试条目',
           date: '2024-06-15',
-          desc: '测试简介',
         },
         changedFields: ['*'],
       },
@@ -1404,6 +1415,7 @@ describe('applyDiffToSheet', () => {
         kind: 'delete',
         sid: '1',
         localRow: 3,
+        changedFields: [],
       },
     ]
 
@@ -1663,11 +1675,20 @@ describe('syncFromGithub 时间过滤', () => {
 
     setupXHRResponse(200, JSON.stringify(remoteEntries))
 
-    const result = await syncFromGithub(undefined, 'add-update', undefined, undefined, false, {
+    // 刻意传入越界 range：覆盖 filterByTime 的 default 分支
+    const timeFilter = {
       enabled: true,
       range: 'week',
       year: new Date().getFullYear(),
-    })
+    } as unknown as SyncTimeFilter
+    const result = await syncFromGithub(
+      undefined,
+      'add-update',
+      undefined,
+      undefined,
+      false,
+      timeFilter,
+    )
 
     // 时间过滤在远程数据获取后进行
     expect(result.remoteTotal).toBeGreaterThan(0)
@@ -2076,7 +2097,9 @@ describe('syncFromGithub 冲突解决分支 (lines 1401-1402)', () => {
     }
     mockGetApp.mockReturnValue(mockApp)
 
-    const remoteEntries: GithubRemoteEntry[] = [{ sid: '1', name: '已更新条目', rating: 8 }]
+    const remoteEntries: GithubRemoteEntry[] = [
+      { sid: '1', name: '已更新条目', updatedAt: '2024-01-01' },
+    ]
     mockParseJsonl.mockReturnValue({ entries: remoteEntries, errors: [] })
     setupXHRResponse(200, JSON.stringify(remoteEntries))
 
@@ -2090,7 +2113,7 @@ describe('syncFromGithub 冲突解决分支 (lines 1401-1402)', () => {
       },
     ])
 
-    const conflictResolution = [{ sid: '1', field: 'rating', choice: 'remote' as const }]
+    const conflictResolution = [{ sid: '1', field: 'rating', chosenValue: 'remote' as const }]
 
     // 捕获 syncFromGithub 的结果（可能因 applyDiffToSheet 的 mock 工作表限制而失败）
     // 但关键是验证冲突解决分支（line 1401-1402）被执行
@@ -2397,19 +2420,22 @@ describe('filterByTime 未覆盖分支 (line 328)', () => {
       { sid: '1', name: '测试', date: '2024-06-15' },
       { sid: '2', name: '测试2', date: '2024-07-20' },
     ]
+    // 刻意传入越界 range：filterByTime 的 default 分支返回空数组
     const result = filterByTime(entries, {
       enabled: true,
       range: 'week',
       year: 2024,
-    })
+    } as unknown as SyncTimeFilter)
     expect(result).toHaveLength(0)
   })
 
   it('range 为 all 时应直接返回所有条目', () => {
     const entries: GithubRemoteEntry[] = [{ sid: '1', name: '测试', date: '2024-06-15' }]
+    // year 在 range='all' 下不参与筛选，但类型上必填
     const result = filterByTime(entries, {
       enabled: false,
       range: 'all',
+      year: 2024,
     })
     expect(result).toHaveLength(1)
   })
@@ -2453,12 +2479,13 @@ describe('filterByTime 未覆盖分支 (line 328)', () => {
 
   it('quarter 策略: quarter 超出范围返回空', () => {
     const entries: GithubRemoteEntry[] = [{ sid: '1', name: '测试', date: '2024-06-15' }]
+    // 刻意传入越界 quarter：覆盖「quarter 不在 QUARTER_MONTH_RANGES」的分支
     const result = filterByTime(entries, {
       enabled: true,
       range: 'quarter',
       year: 2024,
       quarter: 99,
-    })
+    } as unknown as SyncTimeFilter)
     expect(result).toHaveLength(0)
   })
 
@@ -2523,7 +2550,7 @@ describe('matchesTimeFilter 未覆盖分支 (lines 359-368) 通过 computeDiff',
       range: 'quarter',
       year: 2024,
       quarter: 99,
-    })
+    } as unknown as SyncTimeFilter)
     // quarter=99 无效 → matchesTimeFilter 返回 false → 跳过 delete
     const deletes = diffs.filter((d) => d.kind === 'delete')
     expect(deletes.length).toBe(0)
@@ -3219,7 +3246,7 @@ describe('batchUpdateRows 扩展字段处理 (lines 790-804)', () => {
           name: '数字扩展',
           date: '2024-06-15',
           // JSONL 字段 '片长'，对应 Excel 列 '时长'
-          片长: 120,
+          片长: '120',
         },
         localRow: 2,
         // changedFields 使用 Excel 列名
@@ -3414,7 +3441,12 @@ describe('applyDiffToSheet formatEta 路径 (line 548)', () => {
       })
     }
 
-    const progressCalls: { current: number; total: number; message: string; eta?: string }[] = []
+    const progressCalls: {
+      current: number
+      total: number
+      message: string
+      eta?: string | undefined
+    }[] = []
     const onProgress = (current: number, total: number, message: string, eta?: string): void => {
       progressCalls.push({ current, total, message, eta })
     }
@@ -3507,7 +3539,7 @@ describe('batchWriteNewRows 扩展字段写入 (lines 632-635)', () => {
           name: '扩展数字测试',
           date: '2024-06-15',
           // 数字类型扩展字段
-          话数: 12,
+          话数: numericExtensionField(12),
         },
         changedFields: ['*'],
       },
@@ -3768,7 +3800,7 @@ describe('batchWriteNewRows 扩展字段精确覆盖 (lines 632, 635)', () => {
           sid: 'ext-num-635',
           name: '扩展数字',
           date: '2024-06-15',
-          片长: 42,
+          片长: '42',
         },
         changedFields: ['*'],
       },
@@ -4100,7 +4132,7 @@ describe('batchUpdateRows 扩展字段分支覆盖 (lines 788-807)', () => {
           name: '数字测试',
           date: '2024-06-15',
           // 数字类型
-          话数: 24,
+          话数: numericExtensionField(24),
         },
         changedFields: ['话数'],
       },
@@ -4327,7 +4359,7 @@ describe('writeRemoteEntryToRow 数字类型扩展字段 (line 506)', () => {
           sid: 'num-ext-506',
           name: '数字扩展测试',
           date: '2024-06-15',
-          话数: 24,
+          话数: numericExtensionField(24),
         },
         changedFields: ['*'],
       },
@@ -4368,7 +4400,7 @@ describe('writeRemoteEntryToRow 数字类型扩展字段 (line 506)', () => {
           sid: 'num-ext-506b',
           name: '数字扩展测试B',
           date: '2024-06-15',
-          话数: 12,
+          话数: numericExtensionField(12),
         },
         changedFields: ['话数'],
       },
@@ -4548,7 +4580,7 @@ describe('safeSet 数字扩展字段 (line 506)', () => {
           sid: 'num-field-1',
           name: '数字字段测试',
           // 数字类型，触发 line 506
-          片长: 24,
+          片长: '24',
         },
         changedFields: ['*'],
       },
@@ -4628,7 +4660,8 @@ describe('readLocalEntries 无可读列边界 (lines 293-294)', () => {
     // colMap.has('Bangumi_URL') 为 true，但 get('Bangumi_URL') 返回 undefined
     // 这使得外层守卫通过，但 readCols 为空，触发 lines 293-294
     const colMapWithUndefined = new Map<string, number | undefined>([['Bangumi_URL', undefined]])
-    mockGetColumnMap.mockReturnValue(colMapWithUndefined)
+    // 刻意构造「has 为 true 但 get 为 undefined」的非法状态，覆盖守卫通过后的空 colMap 分支
+    mockGetColumnMap.mockReturnValue(colMapWithUndefined as unknown as Map<string, number>)
 
     const result = readLocalEntriesForSync()
     expect(result).not.toBeNull()
@@ -4938,13 +4971,14 @@ describe('applyDiffToSheet BATCH_WRITE_SIZE 边界 (501条 add)', () => {
           name: `条目${String(index)}`,
           date: '2024-06-15',
         },
+        changedFields: ['*'],
       })
     }
 
     // 记录进度回调中的 eta 参数
-    const progressCalls: { current: number; total: number; eta: string }[] = []
+    const progressCalls: { current: number; total: number; eta: string | undefined }[] = []
     const onProgressMock = vi.fn(
-      (current: number, total: number, _message: string, eta: string) => {
+      (current: number, total: number, _message: string, eta?: string) => {
         progressCalls.push({ current, total, eta })
       },
     )
@@ -5000,6 +5034,7 @@ describe('applyDiffToSheet BATCH_WRITE_SIZE 边界 (501条 add)', () => {
           name: `条目${String(index)}`,
           date: '2024-06-15',
         },
+        changedFields: ['*'],
       })
     }
 

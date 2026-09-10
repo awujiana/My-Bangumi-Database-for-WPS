@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { Result } from '../ts/core/result.js'
 
 // 使用 vi.hoisted 定义在 mock 工厂内引用的变量
 const mockBgmLogn = vi.hoisted(() => vi.fn())
@@ -31,6 +32,9 @@ const mockExtractSubjectId = vi.hoisted(() => vi.fn().mockReturnValue(null))
 const mockGetSyncSourceType = vi.hoisted(() => vi.fn().mockReturnValue('github'))
 
 // 创建可变的 mock source 引用
+// 注意：vi.hoisted 的代码先于 import 求值，此处不能引用 Result（会触发 TDZ
+// 「Cannot access '__vi_import_N__' before initialization」），故这里保留最小形状；
+// 生产代码只读取 isFail()/error，行为等价。
 const mockGithubSourceReference = vi.hoisted(() => ({
   getDisplayName: vi.fn().mockReturnValue('GitHub'),
   validateConfig: vi.fn().mockReturnValue({ isFail: () => false, error: null }),
@@ -62,8 +66,9 @@ vi.mock('../ts/core/constants.js', () => ({
 // Mock SyncSource interface factories（定义在 hoisted 外部，测试代码可访问）
 function createMockSource(type: string, name: string) {
   return {
+    getSourceType: () => type,
     getDisplayName: () => name,
-    validateConfig: () => ({ isFail: () => false, error: null }),
+    validateConfig: () => Result.okVoid(),
     fetchRemoteEntries: vi.fn().mockResolvedValue([]),
     type,
     name,
@@ -85,7 +90,7 @@ vi.mock('../ts/sync/github-sync.js', () => ({
 vi.mock('../ts/sync/gist-sync.js', () => ({
   GistSyncSource: vi.fn().mockImplementation(() => ({
     getDisplayName: () => 'Gist',
-    validateConfig: () => ({ isFail: () => false, error: null }),
+    validateConfig: () => Result.okVoid(),
     fetchRemoteEntries: vi.fn().mockResolvedValue([]),
     type: 'gist',
     name: 'Gist',
@@ -95,7 +100,7 @@ vi.mock('../ts/sync/gist-sync.js', () => ({
 vi.mock('../ts/sync/gitee-sync.js', () => ({
   GiteeSyncSource: vi.fn().mockImplementation(() => ({
     getDisplayName: () => 'Gitee',
-    validateConfig: () => ({ isFail: () => false, error: null }),
+    validateConfig: () => Result.okVoid(),
     fetchRemoteEntries: vi.fn().mockResolvedValue([]),
     type: 'gitee',
     name: 'Gitee',
@@ -105,7 +110,7 @@ vi.mock('../ts/sync/gitee-sync.js', () => ({
 vi.mock('../ts/sync/gitlab-sync.js', () => ({
   GitlabSyncSource: vi.fn().mockImplementation(() => ({
     getDisplayName: () => 'GitLab',
-    validateConfig: () => ({ isFail: () => false, error: null }),
+    validateConfig: () => Result.okVoid(),
     fetchRemoteEntries: vi.fn().mockResolvedValue([]),
     type: 'gitlab',
     name: 'GitLab',
@@ -115,7 +120,7 @@ vi.mock('../ts/sync/gitlab-sync.js', () => ({
 vi.mock('../ts/sync/local-file-sync.js', () => ({
   LocalFileSyncSource: vi.fn().mockImplementation(() => ({
     getDisplayName: () => '本地文件',
-    validateConfig: () => ({ isFail: () => false, error: null }),
+    validateConfig: () => Result.okVoid(),
     fetchRemoteEntries: vi.fn().mockResolvedValue([]),
     type: 'local',
     name: '本地文件',
@@ -141,6 +146,7 @@ import {
   isSyncSourceRegistered,
   syncFromRemote,
 } from '../ts/sync/sync-source-registry.js'
+import type { SyncTimeFilter } from '../ts/sync/github-sync-diff.js'
 
 describe('SyncSource 类型', () => {
   it('应能创建和识别同步源类型', () => {
@@ -241,7 +247,7 @@ describe('syncFromRemote', () => {
   beforeEach(() => {
     vi.restoreAllMocks()
     mockGetSyncSourceType.mockReturnValue('github')
-    mockGithubSourceReference.validateConfig.mockReturnValue({ isFail: () => false, error: null })
+    mockGithubSourceReference.validateConfig.mockReturnValue(Result.okVoid())
     mockGithubSourceReference.fetchRemoteEntries.mockResolvedValue([])
     mockReadLocalEntriesForSync.mockReturnValue({ entries: new Map(), lastRow: 1 })
     mockComputeDiff.mockReturnValue([])
@@ -371,7 +377,7 @@ describe('getSelectedRowSids（间接测试 via syncFromRemote）', () => {
   beforeEach(() => {
     vi.restoreAllMocks()
     mockGetSyncSourceType.mockReturnValue('github')
-    mockGithubSourceReference.validateConfig.mockReturnValue({ isFail: () => false, error: null })
+    mockGithubSourceReference.validateConfig.mockReturnValue(Result.okVoid())
     mockGithubSourceReference.fetchRemoteEntries.mockResolvedValue([{ sid: '1', name: 'A' }])
     mockReadLocalEntriesForSync.mockReturnValue({ entries: new Map(), lastRow: 1 })
     mockComputeDiff.mockReturnValue([])
@@ -471,7 +477,7 @@ describe('syncSourceRegistry 未覆盖分支', () => {
     mockGithubSourceReference.validateConfig.mockClear()
 
     mockGetSyncSourceType.mockReturnValue('github')
-    mockGithubSourceReference.validateConfig.mockReturnValue({ isFail: () => false, error: null })
+    mockGithubSourceReference.validateConfig.mockReturnValue(Result.okVoid())
     mockGithubSourceReference.fetchRemoteEntries.mockResolvedValue([{ sid: '1', name: 'A' }])
     mockReadLocalEntriesForSync.mockReturnValue({ entries: new Map(), lastRow: 1 })
     mockComputeDiff.mockReturnValue([])
@@ -539,7 +545,7 @@ describe('syncSourceRegistry 未覆盖分支', () => {
       { sid: '2', name: 'B' },
     ])
     mockFilterByTime.mockReturnValue([{ sid: '1', name: 'A' }])
-    const timeFilter = { enabled: true, range: 'quarter' as const, year: 2024, quarter: 4 }
+    const timeFilter: SyncTimeFilter = { enabled: true, range: 'quarter', year: 2024, quarter: 4 }
     await syncFromRemote(undefined, 'add-update', undefined, false, undefined, timeFilter)
     expect(mockFilterByTime).toHaveBeenCalled()
   })
@@ -646,7 +652,13 @@ describe('syncSourceRegistry 未覆盖分支', () => {
   it('timeFilter 使用无效 range 时回退到 month 分支', async () => {
     mockGithubSourceReference.fetchRemoteEntries.mockResolvedValue([{ sid: '1', name: 'A' }])
     mockFilterByTime.mockReturnValue([{ sid: '1', name: 'A' }])
-    const timeFilter = { enabled: true, range: 'invalid' as const, year: 2024, month: 8 }
+    // 刻意传入越界 range：覆盖消费方的回退分支（本用例断言其回退到 month 分支）
+    const timeFilter = {
+      enabled: true,
+      range: 'invalid',
+      year: 2024,
+      month: 8,
+    } as unknown as SyncTimeFilter
     const progress = vi.fn()
     await syncFromRemote(progress, 'add-update', undefined, false, undefined, timeFilter)
     expect(progress).toHaveBeenCalledWith(1, 3, expect.stringContaining('2024年8月'))
@@ -718,7 +730,8 @@ describe('syncSourceRegistry 未覆盖分支', () => {
   it('timeFilter.range 为 all 时不进入时间筛选分支', async () => {
     mockGithubSourceReference.fetchRemoteEntries.mockResolvedValue([{ sid: '1', name: 'A' }])
     mockComputeDiff.mockReturnValue([])
-    const timeFilter = { enabled: true, range: 'all' as const }
+    // year 在 range='all' 下不参与筛选（filterByTime 提前返回），但类型上必填
+    const timeFilter: SyncTimeFilter = { enabled: true, range: 'all', year: 2024 }
     await syncFromRemote(undefined, 'add-update', undefined, false, undefined, timeFilter)
     expect(mockFilterByTime).not.toHaveBeenCalled()
   })
@@ -846,7 +859,7 @@ describe('syncSourceRegistry 未覆盖分支', () => {
   it('时间筛选 quarter 分支 with 第一季度', async () => {
     mockGithubSourceReference.fetchRemoteEntries.mockResolvedValue([{ sid: '1', name: 'A' }])
     mockFilterByTime.mockReturnValue([{ sid: '1', name: 'A' }])
-    const timeFilter = { enabled: true, range: 'quarter' as const, year: 2025, quarter: 1 }
+    const timeFilter: SyncTimeFilter = { enabled: true, range: 'quarter', year: 2025, quarter: 1 }
     const progress = vi.fn()
     await syncFromRemote(progress, 'add-update', undefined, false, undefined, timeFilter)
     expect(progress).toHaveBeenCalledWith(1, 3, expect.stringContaining('2025年1月新番'))

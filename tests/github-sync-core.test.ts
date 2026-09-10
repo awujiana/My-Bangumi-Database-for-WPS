@@ -208,7 +208,7 @@ import type { GithubSyncDiff, ConflictResolution } from '../ts/sync/github-sync-
 
 function createMockSheet(
   options: {
-    rows?: { Value2: unknown[] }[]
+    rows?: unknown[][]
     // eslint-disable-next-line unicorn/no-unused-properties -- 预留测试选项，当前用例未使用
     colMap?: Map<string, number>
   } = {},
@@ -583,7 +583,7 @@ describe('applyDiffToSheet', () => {
     mockGetApp.mockReturnValue(null)
     mockGetCellValue.mockReturnValue('http://bgm.tv/subject/1')
 
-    const diffs: GithubSyncDiff[] = [{ kind: 'delete', sid: '1', localRow: 3 }]
+    const diffs: GithubSyncDiff[] = [{ kind: 'delete', sid: '1', localRow: 3, changedFields: [] }]
     const result = await applyDiffToSheet(diffs, 'mirror')
     expect(result.deleted).toBeGreaterThanOrEqual(0)
   })
@@ -709,7 +709,7 @@ describe('applyConflictResolutions', () => {
   })
 
   it('delete diff 不应受影响', () => {
-    const diffs: GithubSyncDiff[] = [{ kind: 'delete', sid: '1', localRow: 2 }]
+    const diffs: GithubSyncDiff[] = [{ kind: 'delete', sid: '1', localRow: 2, changedFields: [] }]
     const resolutions: ConflictResolution[] = [{ sid: '1', field: '名称', chosenValue: 'local' }]
     const result = applyConflictResolutions(diffs, resolutions)
     expect(result).toHaveLength(1)
@@ -822,7 +822,8 @@ describe('syncFromGithub', () => {
     setTimeout(() => mockXHR.xhrMock.onload?.(), 0)
     mockFilterByTime.mockReturnValue([])
     const timeFilter = { enabled: true, range: 'year' as const, year: 2024 }
-    await syncFromGithub(undefined, 'add-update', undefined, false, undefined, timeFilter)
+    // 第 4 参是 conflictResolution（此处不传），第 5 参才是 selectedRowsOnly
+    await syncFromGithub(undefined, 'add-update', undefined, undefined, false, timeFilter)
     // filterByTime 会被调用
   })
 
