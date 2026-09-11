@@ -53,6 +53,15 @@ import type {
   SyncTimeFilter,
 } from './github-sync-diff.js'
 import { extractSubjectId } from './pure-utilities.js'
+import {
+  DATE_COLUMNS,
+  appendValueWithSeparator,
+  formatDateToLocal,
+  formatDuration,
+  formatEta,
+  formatTimeFilterLabel,
+} from './github-time-format.js'
+import { resolveNewRowCellValue, resolveUpdateCellValue } from './github-cell-value.js'
 import { addSyncRecords, addSyncRecordSummary } from './sync-record.js'
 import type { UpdateRecordParameters } from './sync-record.js'
 import type { SyncSource } from './sync-source.js'
@@ -450,54 +459,6 @@ export function readLocalEntriesForSync(): {
   return { entries, lastRow }
 }
 
-// ========== 日期工具函数 ==========
-
-/**
- * 日期列名集合（写入时转换为本地"年月日"字符串格式）
- */
-const DATE_COLUMNS = new Set(['开播日期', '完播日'])
-
-/**
- * 将远程日期字符串（YYYY-MM-DD 等格式）转换为本地"年月日"格式字符串
- *
- * 本地 Excel 的"开播日期""完播日"列使用"YYYY年MM月DD日"格式的字符串，
- * 远程仓库使用 YYYY-MM-DD 格式，同步时需转换为本地格式写入。
- *
- * @param dateString 日期字符串，支持 YYYY-MM-DD、YYYY/MM/DD、YYYY.MM.DD 等格式
- * @returns "年月日"格式字符串，如"2015年12月15日"，解析失败返回 null
- */
-function formatDateToLocal(dateString: string): string | null {
-  if (!dateString) return null
-  const match = /^(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})/.exec(dateString)
-  if (!match) return null
-  const year = match[1] ?? ''
-  const month = (match[2] ?? '').padStart(2, '0')
-  const day = (match[3] ?? '').padStart(2, '0')
-  return `${year}年${month}月${day}日`
-}
-
-/**
- * 追加值到现有值后面，使用 ` | ` 分隔符
- *
- * 规则：
- * - 本地为空 → 直接返回新值
- * - 远程为空 → 返回本地值（不追加空值）
- * - 本地已包含新值 → 返回本地值（避免重复）
- * - 否则 → 返回 "本地 | 新值"
- *
- * @param localValue 本地现有值
- * @param remoteValue 远程新值
- * @returns 合并后的字符串
- */
-function appendValueWithSeparator(localValue: string, remoteValue: string): string {
-  const local = trim(localValue)
-  const remote = trim(remoteValue)
-  if (!remote) return local
-  if (!local) return remote
-  if (local.includes(remote)) return local
-  return `${local} | ${remote}`
-}
-
 // ========== 应用差异到工作表 ==========
 
 /**
@@ -665,174 +626,6 @@ function yieldToEventLoop(): Promise<void> {
   return new Promise<void>((resolve) => {
     setTimeout(resolve, 10)
   })
-}
-
-/**
- * 格式化持续时间（毫秒 → 可读字符串）
- */
-function formatDuration(ms: number): string {
-  if (ms < 1000) {
-    const seconds = Math.max(0, ms / 1000)
-    return `${seconds.toFixed(2)}秒`
-  }
-  const seconds = Math.floor(ms / 1000)
-  if (seconds < 60) return `${String(seconds)}秒`
-  const minutes = Math.floor(seconds / 60)
-  const secs = seconds % 60
-  return `${String(minutes)}分${secs.toString().padStart(2, '0')}秒`
-}
-
-/**
- * 格式化预估剩余时间
- */
-function formatEta(ms: number): string {
-  if (ms <= 0) return '剩余: 计算中...'
-  return `预计剩余: ${formatDuration(ms)}`
-}
-
-/**
- * 格式化时间筛选标签（year/quarter/month，future 归入 month 分支，与原有三元逻辑一致）
- */
-function formatTimeFilterLabel(timeFilter: SyncTimeFilter): string {
-  if (timeFilter.range === 'year') {
-    return `${String(timeFilter.year)}年`
-  }
-  if (timeFilter.range === 'quarter') {
-    return `${String(timeFilter.year)}年${String(timeFilter.quarter ?? '')}月新番`
-  }
-  return `${String(timeFilter.year)}年${String(timeFilter.month ?? '')}月`
-}
-
-/**
- * 解析新增行的单个单元格写入值（扩展字段支持别名列映射）
- *
- * 独立辅助函数：避免批量写入循环内的嵌套 switch/loop break
- */
-function resolveNewRowCellValue(
-  wc: { name: string },
-  entry: { remote: GithubRemoteEntry },
-): string | number | null {
-  switch (wc.name) {
-    case 'Bangumi_URL': {
-      return `https://bgm.tv/subject/${entry.remote.sid}`
-    }
-    case '名称': {
-      return entry.remote.name ?? null
-    }
-    case '标签/分级': {
-      return tagsToString(entry.remote.meta_tags) || null
-    }
-    case '集数': {
-      return entry.remote['话数'] ?? null
-    }
-    default: {
-      // 扩展字段：遍历 EXTENDED_FIELD_MAP 匹配（支持别名列映射）
-      for (const [jsonlField] of EXTENDED_FIELD_MAP) {
-        const aliases = getExcelAliases(jsonlField)
-        if (aliases.includes(wc.name)) {
-          const v = entry.remote[jsonlField as keyof GithubRemoteEntry]
-          if (typeof v === 'string') {
-            return DATE_COLUMNS.has(wc.name) ? (formatDateToLocal(v) ?? v) : v
-          }
-          if (typeof v === 'number') {
-            return String(v)
-          }
-          return null
-        }
-      }
-      return null
-    }
-  }
-}
-
-/**
- * 解析更新行的单个单元格新值与写入标记（支持别名列映射与合并策略）
- *
- * 独立辅助函数：避免批量更新循环内的嵌套 switch/loop break
- */
-function resolveUpdateCellValue(
-  wc: { name: string },
-  remote: GithubRemoteEntry,
-  fields: string[],
-  isWriteAll: boolean,
-  shouldForceOverwrite: boolean,
-  oldCellValue: string,
-): { value: string | number | null; shouldWrite: boolean } {
-  switch (wc.name) {
-    case 'Bangumi_URL': {
-      if (isWriteAll || fields.includes('Bangumi_URL')) {
-        return { value: `https://bgm.tv/subject/${remote.sid}`, shouldWrite: true }
-      }
-      return { value: null, shouldWrite: false }
-    }
-    case '别名': {
-      // 名称追加到「别名」列（合并策略）
-      // forceOverwrite 或 writeAll 时直接写入名称列（不合并）
-      if (!shouldForceOverwrite && !isWriteAll && fields.includes('名称')) {
-        const remoteName = remote.name ?? ''
-        if (remoteName) {
-          const value = appendValueWithSeparator(oldCellValue, remoteName)
-          if (value !== oldCellValue) {
-            return { value, shouldWrite: true }
-          }
-        }
-      }
-      // forceOverwrite 或 writeAll 时不处理别名（由名称列处理）
-      return { value: null, shouldWrite: false }
-    }
-    case '名称': {
-      // 名称列仅在 forceOverwrite 或 writeAll 时写入（新增或强制覆盖）
-      if (shouldForceOverwrite || isWriteAll || fields.includes('名称')) {
-        return { value: remote.name ?? '', shouldWrite: true }
-      }
-      return { value: null, shouldWrite: false }
-    }
-    case '标签/分级': {
-      if (isWriteAll || fields.includes('标签/分级')) {
-        const remoteTags = tagsToString(remote.meta_tags)
-        if (remoteTags) {
-          if (shouldForceOverwrite || isWriteAll) {
-            // 强制覆盖或新增：直接写入
-            return { value: remoteTags, shouldWrite: true }
-          }
-          // 普通更新：合并本地和远程标签
-          const value = appendValueWithSeparator(oldCellValue, remoteTags)
-          if (value !== oldCellValue) {
-            return { value, shouldWrite: true }
-          }
-        }
-      }
-      return { value: null, shouldWrite: false }
-    }
-    case '集数': {
-      if (isWriteAll || fields.includes('集数')) {
-        return { value: remote['话数'] ?? '', shouldWrite: true }
-      }
-      return { value: null, shouldWrite: false }
-    }
-    default: {
-      // 扩展字段：根据列名查找对应的 JSONL 字段（支持别名列映射，如「制作公司」/「动画制作公司」）
-      for (const [jsonlField] of EXTENDED_FIELD_MAP) {
-        const aliases = getExcelAliases(jsonlField)
-        if (aliases.includes(wc.name)) {
-          if (isWriteAll || aliases.some((a) => fields.includes(a))) {
-            const v = remote[jsonlField as keyof GithubRemoteEntry]
-            if (typeof v === 'string') {
-              return {
-                value: DATE_COLUMNS.has(wc.name) ? (formatDateToLocal(v) ?? v) : v,
-                shouldWrite: true,
-              }
-            }
-            if (typeof v === 'number') {
-              return { value: String(v), shouldWrite: true }
-            }
-          }
-          return { value: null, shouldWrite: false }
-        }
-      }
-      return { value: null, shouldWrite: false }
-    }
-  }
 }
 
 /**
