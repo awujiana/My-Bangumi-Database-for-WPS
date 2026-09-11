@@ -11,7 +11,6 @@
  */
 
 import { LOG_LEVELS, PANEL_CONFIG } from '../core/constants.js'
-import { CONFIG_KEYS, getConfig } from '../tools/config.js'
 import { getNotifyApi } from '../core/ui-bridge.js'
 import {
   bgmLog,
@@ -28,6 +27,26 @@ import type { WpsWorksheet, WpsWorkbook } from '../tools/wps.js'
 
 import { addEnrichRecords } from './enrich-record.js'
 import type { AddEnrichRecordParameters } from './enrich-record.js'
+import {
+  TAG_SEPARATOR,
+  FEATURE_SEPARATOR,
+  normalizeName,
+  splitAliases,
+  mergeTags,
+  appendFeatures,
+  shouldFilterNoise,
+} from './enrich-normalize.js'
+
+// 纯文本工具簇已迁至 `enrich-normalize.js`，此处再导出以保持既有导入路径不变。
+export {
+  normalizeName,
+  splitAliases,
+  splitTags,
+  mergeTags,
+  appendFeatures,
+  resetNoiseKeywordCache,
+  shouldFilterNoise,
+} from './enrich-normalize.js'
 
 // ========== 常量定义 ==========
 
@@ -86,9 +105,6 @@ const KNOWN_COLUMN_MAP: Record<string, keyof EnrichColumnMapping> = {
   类型: 'typeCol',
 }
 
-/** 标签分隔符 */
-const TAG_SEPARATOR = ' | '
-
 /**
  * 新番来源表的横向表头关键字。
  *
@@ -105,9 +121,6 @@ const ANIME_SOURCE_HEADER_KEYWORDS = [
   '特殊',
   'tags',
 ] as const
-
-/** 特点/印象分隔符 */
-const FEATURE_SEPARATOR = ' | '
 
 // ========== 类型定义 ==========
 
@@ -243,86 +256,6 @@ export interface EnrichProgress {
  */
 export type ProgressCallback = (progress: EnrichProgress) => void
 
-// ========== 辅助函数 ==========
-
-/**
- * 规范化名称
- * 去空格、转小写、全角转半角
- */
-export function normalizeName(name: string): string {
-  return name
-    .replace(/\s+/g, '')
-    .toLowerCase()
-    .replace(/[！-～]/g, (char) => {
-      const code = char.codePointAt(0) ?? 0
-      return String.fromCodePoint(code - 0xfee0)
-    })
-}
-
-/**
- * 分割别名字符串
- * 按 |、/、;、， 等分隔符分割
- */
-export function splitAliases(aliasesString: string): string[] {
-  if (!aliasesString) return []
-  return aliasesString
-    .split(/\s*\|\s*|\s*[;，、]\s*|\s*\/\s*/)
-    .map((a) => a.trim())
-    .filter((a) => a.length > 0)
-}
-
-/**
- * 分割标签字符串
- * 按 TAG_SEPARATOR 或常见分隔符分割
- */
-export function splitTags(tags: string): string[] {
-  if (!tags) return []
-  return tags
-    .split(/\s*\|\s*|\s*[,、;]\s*|\s*\/\s*/)
-    .map((t) => t.trim())
-    .filter((t) => t.length > 0)
-}
-
-/**
- * 合并标签去重
- * 现有标签 + 新标签，去重后以 TAG_SEPARATOR 连接
- */
-export function mergeTags(oldTags: string, incomingTags: string): string {
-  const oldList = splitTags(oldTags)
-  const list = splitTags(incomingTags)
-  const merged = [...oldList]
-  for (const tag of list) {
-    if (!merged.includes(tag)) {
-      merged.push(tag)
-    }
-  }
-  return merged.join(TAG_SEPARATOR)
-}
-
-/**
- * 追加特点信息去重
- * 将新特点追加到旧特点后，以 FEATURE_SEPARATOR 分隔
- */
-export function appendFeatures(oldFeature: string, features: string): string {
-  if (!oldFeature) return features
-  if (!features) return oldFeature
-  const oldList = oldFeature
-    .split(FEATURE_SEPARATOR)
-    .map((f) => f.trim())
-    .filter(Boolean)
-  const list = features
-    .split(FEATURE_SEPARATOR)
-    .map((f) => f.trim())
-    .filter(Boolean)
-  const merged = [...oldList]
-  for (const feat of list) {
-    if (!merged.includes(feat)) {
-      merged.push(feat)
-    }
-  }
-  return merged.join(FEATURE_SEPARATOR)
-}
-
 // ========== 核心函数 ==========
 
 /**
@@ -417,62 +350,6 @@ export function readPlatformValues(
     }
   }
   return values
-}
-
-// ========== 噪声过滤（预览与富化写入共用） ==========
-
-/** 内置噪声关键词：署名行 / 标注示例 / 占位文本 */
-const NOISE_KEYWORDS_DEFAULT = [
-  '新番表 by Hazx',
-  '版权平台标注示例',
-  '播放平台示例',
-  '标注示例',
-  '示例',
-  'placeholder',
-  '（示例）',
-  '(示例)',
-] as const
-
-let customNoiseKeywordsCache: string[] | null = null
-
-/** 清空自定义噪声关键词缓存（设置页保存后调用） */
-export function resetNoiseKeywordCache(): void {
-  customNoiseKeywordsCache = null
-}
-
-/** 读取自定义噪声关键词（CONFIG_KEYS.ENRICH_FILTER_KEYWORDS，换行/逗号分隔，带缓存） */
-function getCustomNoiseKeywords(): string[] {
-  if (customNoiseKeywordsCache) return customNoiseKeywordsCache
-  let keywords: string[] = []
-  try {
-    const raw = getConfig(CONFIG_KEYS.ENRICH_FILTER_KEYWORDS, '', true).trim()
-    if (raw) {
-      keywords = raw
-        .split(/[\n,]/)
-        .map((keyword) => keyword.trim())
-        .filter((keyword) => keyword !== '')
-    }
-  } catch {
-    keywords = []
-  }
-  customNoiseKeywordsCache = keywords
-  return keywords
-}
-
-/**
- * 判断单段文本是否应作为噪声过滤掉（子串匹配）：
- * 内置规则 + 设置页自定义关键词。
- */
-export function shouldFilterNoise(part: string): boolean {
-  const trimmed = part.trim()
-  if (!trimmed) return true
-  for (const keyword of NOISE_KEYWORDS_DEFAULT) {
-    if (trimmed.includes(keyword)) return true
-  }
-  for (const keyword of getCustomNoiseKeywords()) {
-    if (trimmed.includes(keyword)) return true
-  }
-  return false
 }
 
 export interface AnimeSourceLayout {
@@ -610,9 +487,7 @@ function buildBangumiIndexes(
 
   // 性能（P1-C）：一次矩形读取覆盖名称列与别名列，替代逐行 1~2 次 getCellValue
   const allData =
-    lastRow >= 2
-      ? readRangeValues(bangumiSheet, 2, lastRow, 1, Math.max(nameCol, aliasCol))
-      : []
+    lastRow >= 2 ? readRangeValues(bangumiSheet, 2, lastRow, 1, Math.max(nameCol, aliasCol)) : []
 
   for (const [index, rowData] of allData.entries()) {
     const row = index + 2
