@@ -35,11 +35,7 @@ import {
   initEnrichLock,
   autoSelectEnrichTarget,
 } from '../sync/enrich-lock.js'
-import {
-  getAllEnrichRecords,
-  getOrCreateEnrichRecordSheet,
-  clearEnrichRecords,
-} from '../sync/enrich-record.js'
+import { getOrCreateEnrichRecordSheet } from '../sync/enrich-record.js'
 import {
   ANIME_SOURCE_DETECTOR,
   BANGUMI_TARGET_DETECTOR,
@@ -54,7 +50,6 @@ import { sanitizeHtml, sanitizeTableRows } from '../tools/sanitize.js'
 import { createProgress } from '../ui/components/progress.js'
 import type { ProgressController, ProgressShowOptions } from '../ui/components/progress.js'
 import { escapeHtml } from '../tools/string-utilities.js'
-import { cleanSheetDuplicates } from '../sync/sheet-cleaning.js'
 import { showToast } from '../ui/dialog.js'
 import {
   getCellValue,
@@ -68,14 +63,10 @@ import {
 import { findWorkbookByName, getOpenWorkbooks } from '../tools/locked-sheet.js'
 import type { WpsWorksheet, WpsWorkbook } from '../tools/wps.js'
 import { recomputeScrollspy } from './shell-nav.js'
-import {
-  COLUMN_MAPPING_FIELDS,
-  getEnrichPreviewConfig,
-  resetEnrichPreviewConfig,
-} from './enrich-page-state.js'
+import { COLUMN_MAPPING_FIELDS, resetEnrichPreviewConfig } from './enrich-page-state.js'
 import type { ScalarMappingKey } from './enrich-page-state.js'
 import { renderPlatformChipsCell, renderPreviewCell } from './enrich-preview-cell.js'
-import { renderEnrichDetailHtml } from './enrich-detail-render.js'
+import { extractFileName } from './enrich-file-name.js'
 import {
   state,
   safeGetElement,
@@ -84,6 +75,14 @@ import {
   safeGetCheckbox,
 } from './enrich-page-context.js'
 import type { BatchFileResult } from './enrich-page-context.js'
+import { showSourceDetail, hideSourceDetail } from './enrich-source-detail.js'
+import {
+  maybeAutoCleanAfterEnrich,
+  showEnrichDetailButton,
+  showEnrichDetail,
+  hideEnrichDetail,
+} from './enrich-result-view.js'
+import { openEnrichRecordSheet, clearRecords, loadRecentRecords } from './enrich-record-view.js'
 
 // ========== 初始化 ==========
 
@@ -1614,102 +1613,6 @@ function renderSourcePreview(ws: WpsWorksheet, mapping: EnrichColumnMapping): vo
   bgmLog(LOG_LEVELS.INFO, `[enrich] 源数据预览已渲染: ${String(rowsHtml.length)} 行`)
 }
 
-// ========== 源数据完整表格弹窗 ==========
-
-function showSourceDetail(): void {
-  const modalElement = safeGetElement('sourceDetailModal')
-  const bodyElement = safeGetElement('sourceDetailBody')
-  const ws = state.animeSourceSheet
-  if (!modalElement || !bodyElement || !ws) return
-
-  bodyElement.innerHTML = renderSourceDetailTable(ws)
-  modalElement.style.display = 'flex'
-}
-
-function hideSourceDetail(): void {
-  const modalElement = safeGetElement('sourceDetailModal')
-  if (modalElement) {
-    modalElement.style.display = 'none'
-  }
-}
-
-/**
- * 渲染源表完整表格（弹窗展示）。
- *
- * 列集 = 有表头的列 ∪ 列映射命中的列（Hazx 模板的名称列没有表头，旧版按表头过滤会把它
- * 整列丢掉，造成弹窗「列数不全」）。无表头的映射列用字段名兜底（如「名称」）。
- * 单元格复用数据预览的渲染（周几七色 / 集数徽章 / TAGS 彩色标签 / 首播与平台着色），
- * 保证弹窗与预览样式一致。
- */
-function renderSourceDetailTable(ws: WpsWorksheet): string {
-  const maxCols = 50
-  const { headerRow, dataStartRow } = state
-  const mapping = state.columnMapping
-
-  // 列映射：列号 → 字段键（含 platformExtraCols 聚合列，也按平台徽章渲染）
-  const fieldByCol = new Map<number, ScalarMappingKey>()
-  if (mapping) {
-    for (const f of COLUMN_MAPPING_FIELDS) {
-      const col = mapping[f.key]
-      if (col && col > 0) fieldByCol.set(col, f.key)
-    }
-    const extraPlatformCols = mapping.platformExtraCols ?? []
-    for (const col of extraPlatformCols) {
-      fieldByCol.set(col, 'platformCol')
-    }
-  }
-  const labelByField = new Map(COLUMN_MAPPING_FIELDS.map((f) => [f.key, f.label]))
-
-  interface DetailColumn {
-    col: number
-    label: string
-    field?: ScalarMappingKey | undefined
-  }
-  const columns: DetailColumn[] = []
-  for (let col = 1; col <= maxCols; col += 1) {
-    const header = getCellValue(ws, headerRow, col).trim()
-    const field = fieldByCol.get(col)
-    if (header || field) {
-      const label = header || (field ? (labelByField.get(field) ?? '') : '') || `第${String(col)}列`
-      columns.push({ col, label, field })
-    }
-  }
-
-  if (columns.length === 0) {
-    return '<div class="preview-hint">未找到表头列，无法展示完整表格</div>'
-  }
-
-  const maxRows = 100
-  const lastRow = Math.min(getLastRow(ws), dataStartRow + maxRows - 1)
-
-  const bodyRows: string[] = []
-  for (let row = dataStartRow; row <= lastRow; row += 1) {
-    const rowCells: string[] = []
-    let hasData = false
-    for (const column of columns) {
-      const value = getCellValue(ws, row, column.col).trim()
-      if (value) hasData = true
-      if (column.field) {
-        // 已映射字段复用预览渲染（空值时 renderPreviewCell 自会输出空 td）
-        rowCells.push(renderPreviewCell(column.field, value))
-      } else {
-        rowCells.push(`<td title="${escapeHtml(value)}">${escapeHtml(value)}</td>`)
-      }
-    }
-    if (hasData) {
-      bodyRows.push(
-        `<tr data-row="${String(row)}"><td class="row-num">${String(row)}</td>${rowCells.join('')}</tr>`,
-      )
-    }
-  }
-
-  return sanitizeHtml(
-    `<div class="preview-table"><table><thead><tr><th></th>${columns
-      .map((c) => `<th>${escapeHtml(c.label)}</th>`)
-      .join('')}</tr></thead><tbody>${bodyRows.join('')}</tbody></table></div>`,
-  )
-}
-
 // ========== 匹配预览 ==========
 
 /**
@@ -2439,184 +2342,6 @@ function renderEnrichSummary(results: EnrichResultItem[]): void {
   }
 }
 
-// ========== 富化后自动合并去重 ==========
-
-/**
- * 富化完成后按设置自动执行「合并去重」清洗（设置页「富化预览」可关闭）。
- * 只清洗目标 Bangumi 表：按名称分组保留含 URL 的行、合并标签、删除重复行。
- * 失败仅记录日志与提示，不中断主流程。
- */
-function maybeAutoCleanAfterEnrich(): void {
-  if (!getEnrichPreviewConfig().autoCleanDuplicates) return
-  const target = state.bangumiSheet
-  if (!target) return
-  try {
-    const result = cleanSheetDuplicates(target)
-    if (result.performed) {
-      showToast(
-        `富化后自动去重完成：删除 ${String(result.deletedRows)} 行重复数据，合并 ${String(result.mergedTagGroups)} 组标签`,
-        'success',
-      )
-    }
-  } catch (error: unknown) {
-    BGM.handleError(error, {
-      showAlert: false,
-      level: BGM.ErrorLevel.WARN,
-      context: 'maybeAutoCleanAfterEnrich',
-    })
-    bgmLog(
-      LOG_LEVELS.WARN,
-      `[enrich] 富化后自动去重失败: ${error instanceof Error ? error.message : String(error)}`,
-    )
-  }
-}
-
-// ========== 富化详细结果 ==========
-
-function showEnrichDetailButton(): void {
-  const actionElement = safeGetElement('enrichDetailAction')
-  if (actionElement) {
-    actionElement.style.display = ''
-  }
-}
-
-function showEnrichDetail(): void {
-  const modalElement = safeGetElement('enrichDetailModal')
-  const bodyElement = safeGetElement('enrichDetailBody')
-  if (!modalElement || !bodyElement) return
-
-  bodyElement.innerHTML = renderEnrichDetailHtml(state.enrichDetailGroups)
-  modalElement.style.display = 'flex'
-}
-
-function hideEnrichDetail(): void {
-  const modalElement = safeGetElement('enrichDetailModal')
-  if (modalElement) {
-    modalElement.style.display = 'none'
-  }
-}
-
-// ========== 富化记录 ==========
-
-export function openEnrichRecordSheet(): void {
-  try {
-    const sheet = getOrCreateEnrichRecordSheet()
-    const app = getApp()
-    if (app?.ActiveWorkbook) {
-      sheet.Activate()
-      bgmLog(LOG_LEVELS.INFO, `[enrich] 已打开富化记录工作表: ${sheet.Name}`)
-    }
-  } catch (error: unknown) {
-    BGM.handleError(error, {
-      showAlert: false,
-      level: BGM.ErrorLevel.ERROR,
-      context: 'openEnrichRecordSheet',
-    })
-    BGM.Dialog.error('错误', '无法打开富化记录工作表')
-  }
-}
-
-export function clearRecords(): void {
-  BGM.Dialog.confirm('确定要清除所有富化记录吗？此操作不可撤销。', (isConfirmed: boolean) => {
-    if (!isConfirmed) return
-    try {
-      clearEnrichRecords()
-      loadRecentRecords()
-      bgmLog(LOG_LEVELS.INFO, '[enrich] 富化记录已清除')
-    } catch (error: unknown) {
-      BGM.handleError(error, {
-        showAlert: false,
-        level: BGM.ErrorLevel.ERROR,
-        context: 'clearRecords',
-      })
-    }
-  })
-}
-
-function loadRecentRecords(): void {
-  try {
-    const records = getAllEnrichRecords()
-
-    const totalElement = safeGetElement('totalRecordCount')
-    if (totalElement) totalElement.textContent = String(records.length)
-
-    const successCount = records.filter((r) => r.action === 'fill' || r.action === 'append').length
-    const skipCount = records.filter((r) => r.action === 'skip').length
-    const errorCount = records.filter((r) => r.action === 'error').length
-
-    const successElement = safeGetElement('successRecordCount')
-    if (successElement) successElement.textContent = String(successCount)
-
-    const skipElement = safeGetElement('skipRecordCount')
-    if (skipElement) skipElement.textContent = String(skipCount)
-
-    const errorElement = safeGetElement('errorRecordCount')
-    if (errorElement) errorElement.textContent = String(errorCount)
-
-    const recordsContainer = safeGetElement('recentRecords')
-    if (!recordsContainer) return
-
-    const recentRecords = records.slice(-10).reverse()
-    if (recentRecords.length === 0) {
-      recordsContainer.innerHTML = sanitizeHtml('<div class="record-empty">暂无记录</div>')
-      return
-    }
-
-    const recordsHtml = recentRecords
-      .map((r) => {
-        const actionClass = `record-action-${r.action}`
-        let actionText: string
-        switch (r.action) {
-          case 'fill': {
-            actionText = '填充'
-            break
-          }
-          case 'append': {
-            actionText = '追加'
-            break
-          }
-          case 'skip': {
-            actionText = '跳过'
-            break
-          }
-          default: {
-            actionText = '错误'
-            break
-          }
-        }
-        const name = escapeHtml(r.name)
-        const field = escapeHtml(r.enrichedField)
-        const updatedValue = escapeHtml(r.updatedValue)
-        const time = escapeHtml(r.timestamp ? new Date(r.timestamp).toLocaleString('zh-CN') : '')
-
-        return `
-          <div class="record-item">
-            <div class="record-header">
-              <span class="record-name">${name}</span>
-              <span class="record-action ${actionClass}">${actionText}</span>
-            </div>
-            <div class="record-detail">
-              <span class="record-field">${field}</span>
-              <span class="record-value">${updatedValue}</span>
-            </div>
-            <div class="record-time">${time}</div>
-          </div>
-        `
-      })
-      .join('')
-
-    recordsContainer.innerHTML = sanitizeHtml(recordsHtml)
-
-    bgmLog(LOG_LEVELS.INFO, `[enrich] 最近记录已加载: ${String(records.length)} 条`)
-  } catch (error: unknown) {
-    BGM.handleError(error, {
-      showAlert: false,
-      level: BGM.ErrorLevel.INFO,
-      context: 'loadRecentRecords',
-    })
-  }
-}
-
 // ========== 冲突对话框 ==========
 
 function collectAllConflicts(results: EnrichResultItem[]): ConflictInfo[] {
@@ -2722,12 +2447,6 @@ function handleConflictResolution(resolution: ConflictInfo['resolution']): void 
 }
 
 // ========== 批量富化 ==========
-
-/** 从文件路径提取文件名 */
-function extractFileName(filePath: string): string {
-  const lastSlash = Math.max(filePath.lastIndexOf('/'), filePath.lastIndexOf('\\'))
-  return lastSlash >= 0 ? filePath.substring(lastSlash + 1) : filePath
-}
 
 /** 绑定批量控件事件（单/多选统一入口后，只剩开始富化 + 清空列表两个按钮） */
 function bindBatchControls(): void {
@@ -3133,3 +2852,4 @@ function renderBatchSummary(): void {
 
 export { state } from './enrich-page-context.js'
 export { cancelEnrichment }
+export { openEnrichRecordSheet, clearRecords } from './enrich-record-view.js'
