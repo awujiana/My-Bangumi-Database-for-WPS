@@ -63,7 +63,7 @@ export interface GithubSyncConfig {
 }
 
 /** PluginStorage 配置键 */
-const CONFIG_KEYS = {
+const GITHUB_CONFIG_KEYS = {
   OWNER: 'github_sync_owner',
   REPO: 'github_sync_repo',
   BRANCH: 'github_sync_branch',
@@ -141,13 +141,13 @@ function getStorage(): WpsPluginStorage | undefined {
  */
 export function getGithubConfig(): GithubSyncConfig {
   const storage = getStorage()
-  const owner = storage?.getItem(CONFIG_KEYS.OWNER) ?? ''
-  const repo = storage?.getItem(CONFIG_KEYS.REPO) ?? ''
-  const branch = storage?.getItem(CONFIG_KEYS.BRANCH) ?? DEFAULT_BRANCH
-  const path = storage?.getItem(CONFIG_KEYS.PATH) ?? ''
-  const sourceTypeRaw = storage?.getItem(CONFIG_KEYS.SOURCE_TYPE)
+  const owner = storage?.getItem(GITHUB_CONFIG_KEYS.OWNER) ?? ''
+  const repo = storage?.getItem(GITHUB_CONFIG_KEYS.REPO) ?? ''
+  const branch = storage?.getItem(GITHUB_CONFIG_KEYS.BRANCH) ?? DEFAULT_BRANCH
+  const path = storage?.getItem(GITHUB_CONFIG_KEYS.PATH) ?? ''
+  const sourceTypeRaw = storage?.getItem(GITHUB_CONFIG_KEYS.SOURCE_TYPE)
   const sourceType: SyncSourceType = isSyncSourceType(sourceTypeRaw) ? sourceTypeRaw : 'github'
-  const gistId = storage?.getItem(CONFIG_KEYS.GIST_ID) ?? ''
+  const gistId = storage?.getItem(GITHUB_CONFIG_KEYS.GIST_ID) ?? ''
 
   // 首次读取：所有关键字段为空 → 返回默认值并持久化
   if (!owner && !repo && !path) {
@@ -156,11 +156,11 @@ export function getGithubConfig(): GithubSyncConfig {
       `[githubConfig] 首次读取：填充默认配置 ${DEFAULT_CONFIG.owner}/${DEFAULT_CONFIG.repo}/${DEFAULT_CONFIG.branch}/${DEFAULT_CONFIG.path}`,
     )
     if (storage) {
-      storage.setItem(CONFIG_KEYS.OWNER, DEFAULT_CONFIG.owner)
-      storage.setItem(CONFIG_KEYS.REPO, DEFAULT_CONFIG.repo)
-      storage.setItem(CONFIG_KEYS.BRANCH, DEFAULT_CONFIG.branch)
-      storage.setItem(CONFIG_KEYS.PATH, DEFAULT_CONFIG.path)
-      storage.setItem(CONFIG_KEYS.SOURCE_TYPE, DEFAULT_CONFIG.sourceType ?? 'github')
+      storage.setItem(GITHUB_CONFIG_KEYS.OWNER, DEFAULT_CONFIG.owner)
+      storage.setItem(GITHUB_CONFIG_KEYS.REPO, DEFAULT_CONFIG.repo)
+      storage.setItem(GITHUB_CONFIG_KEYS.BRANCH, DEFAULT_CONFIG.branch)
+      storage.setItem(GITHUB_CONFIG_KEYS.PATH, DEFAULT_CONFIG.path)
+      storage.setItem(GITHUB_CONFIG_KEYS.SOURCE_TYPE, DEFAULT_CONFIG.sourceType ?? 'github')
     }
     return { ...DEFAULT_CONFIG }
   }
@@ -181,15 +181,15 @@ export function setGithubConfig(config: GithubSyncConfig): boolean {
     bgmLog(LOG_LEVELS.ERROR, '[githubConfig] 无法获取 PluginStorage')
     return false
   }
-  storage.setItem(CONFIG_KEYS.OWNER, config.owner)
-  storage.setItem(CONFIG_KEYS.REPO, config.repo)
-  storage.setItem(CONFIG_KEYS.BRANCH, config.branch || DEFAULT_BRANCH)
-  storage.setItem(CONFIG_KEYS.PATH, config.path)
+  storage.setItem(GITHUB_CONFIG_KEYS.OWNER, config.owner)
+  storage.setItem(GITHUB_CONFIG_KEYS.REPO, config.repo)
+  storage.setItem(GITHUB_CONFIG_KEYS.BRANCH, config.branch || DEFAULT_BRANCH)
+  storage.setItem(GITHUB_CONFIG_KEYS.PATH, config.path)
   const sourceType = config.sourceType ?? 'github'
-  storage.setItem(CONFIG_KEYS.SOURCE_TYPE, sourceType)
+  storage.setItem(GITHUB_CONFIG_KEYS.SOURCE_TYPE, sourceType)
   // Gist ID 仅在提供时持久化（可选字段）
   if (config.gistId !== undefined) {
-    storage.setItem(CONFIG_KEYS.GIST_ID, config.gistId)
+    storage.setItem(GITHUB_CONFIG_KEYS.GIST_ID, config.gistId)
   }
   bgmLog(
     LOG_LEVELS.INFO,
@@ -232,7 +232,7 @@ export function buildRawUrl(): string {
  */
 export function getSyncStrategy(): SyncStrategy {
   const storage = getStorage()
-  const raw = storage?.getItem(CONFIG_KEYS.STRATEGY)
+  const raw = storage?.getItem(GITHUB_CONFIG_KEYS.STRATEGY)
   if (isSyncStrategy(raw)) {
     return raw
   }
@@ -254,7 +254,7 @@ export function setSyncStrategy(strategy: SyncStrategy): boolean {
     bgmLog(LOG_LEVELS.ERROR, '[githubConfig] 无法获取 PluginStorage')
     return false
   }
-  storage.setItem(CONFIG_KEYS.STRATEGY, strategy)
+  storage.setItem(GITHUB_CONFIG_KEYS.STRATEGY, strategy)
   bgmLog(LOG_LEVELS.INFO, `[githubConfig] 同步策略已保存: ${strategy}`)
   eventBus.emit(BGM_EVENTS.CONFIG_UPDATED, { key: 'github_sync_strategy', value: strategy })
   return true
@@ -266,7 +266,7 @@ export function setSyncStrategy(strategy: SyncStrategy): boolean {
  */
 export function getSyncSourceType(): SyncSourceType {
   const storage = getStorage()
-  const raw = storage?.getItem(CONFIG_KEYS.SOURCE_TYPE)
+  const raw = storage?.getItem(GITHUB_CONFIG_KEYS.SOURCE_TYPE)
   if (isSyncSourceType(raw)) {
     return raw
   }
@@ -288,7 +288,7 @@ export function setSyncSourceType(sourceType: string): boolean {
     bgmLog(LOG_LEVELS.ERROR, '[githubConfig] 无法获取 PluginStorage')
     return false
   }
-  storage.setItem(CONFIG_KEYS.SOURCE_TYPE, sourceType)
+  storage.setItem(GITHUB_CONFIG_KEYS.SOURCE_TYPE, sourceType)
   bgmLog(LOG_LEVELS.INFO, `[githubConfig] 同步源类型已保存: ${sourceType}`)
   eventBus.emit(BGM_EVENTS.CONFIG_UPDATED, { key: 'github_sync_source_type', value: sourceType })
   return true
@@ -315,7 +315,7 @@ export function setSyncSourceType(sourceType: string): boolean {
  */
 export function getGistId(): string {
   const storage = getStorage()
-  return storage?.getItem(CONFIG_KEYS.GIST_ID) ?? ''
+  return storage?.getItem(GITHUB_CONFIG_KEYS.GIST_ID) ?? ''
 }
 
 /**
@@ -330,7 +330,7 @@ export function setGistId(id: string): boolean {
     bgmLog(LOG_LEVELS.ERROR, '[githubConfig] 无法获取 PluginStorage')
     return false
   }
-  storage.setItem(CONFIG_KEYS.GIST_ID, id)
+  storage.setItem(GITHUB_CONFIG_KEYS.GIST_ID, id)
   bgmLog(LOG_LEVELS.INFO, `[githubConfig] Gist ID 已保存: ${id || '(空)'}`)
   eventBus.emit(BGM_EVENTS.CONFIG_UPDATED, { key: 'github_sync_gist_id', value: id })
   return true

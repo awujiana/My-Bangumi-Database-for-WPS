@@ -336,14 +336,55 @@ export function OnAddinLoad(ribbonUI: WpsRibbonUI): boolean {
 }
 
 /**
- * 「打开面板」类按钮：按钮 ID → 打开函数。
- * 抽成映射可避免 OnAction 的 switch 持续膨胀（unicorn/try-complexity 上限）。
+ * 同步按钮处理器表：按钮 ID → 处理函数。
+ *
+ * 单一分发表。此前是「PANEL_OPENERS 映射表 + OnAction switch」两套机制并存，
+ * 改错一处就静默失效；且按钮 ID 还要与 ribbon.xml 对齐。现在只剩这一张表，
+ * 与 ribbon.xml 的一致性由 tests/ribbon.test.ts 的 XML 对照用例守护。
  */
-const PANEL_OPENERS: Record<string, () => void> = {
+const SYNC_ACTIONS: Record<string, () => unknown> = {
   btnShowPanel: showBangumiPanel,
   btnOpenSettings: showSettingsPanel,
   btnOpenEnrichPanel: showEnrichPanel,
   btnOpenCleanPanel: showCleanPanel,
+  btnSetToken: setTokenForRibbon,
+  btnSetUserId: setUserIdForRibbon,
+  btnOpenCollection: openCollectionForRibbon,
+}
+
+/**
+ * 异步按钮处理器表。
+ *
+ * OnAction 是同步回调无法 await，统一交给 runAsyncRibbonAction 用 async IIFE 消费
+ * （连同步抛错一并捕获），避免每个按钮重复抄一段 try/catch。
+ */
+const ASYNC_ACTIONS: Record<string, () => Promise<unknown>> = {
+  btnSyncBangumi: syncWithConfirmation,
+  btnTestToken: testTokenForRibbon,
+  btnCopyToken: copyTokenForRibbon,
+  btnSyncFromGithub: syncFromGithubForRibbon,
+  btnUndoLastSync: undoLastSyncForRibbon,
+}
+
+/**
+ * 消费异步按钮处理器：async IIFE + 全量 try/catch
+ * @param buttonId - 按钮 ID（用于日志与错误上下文）
+ * @param run - 实际的异步处理函数
+ */
+function runAsyncRibbonAction(buttonId: string, run: () => Promise<unknown>): void {
+  void (async () => {
+    try {
+      await run()
+    } catch (error: unknown) {
+      const message = error instanceof Error && error.message ? error.message : String(error)
+      bgmLog(LOG_LEVELS.ERROR, `[OnAction] ${buttonId} 异常: ${message}`)
+      BGM.handleError(error, {
+        showAlert: true,
+        level: BGM.ErrorLevel.ERROR,
+        context: `Ribbon ${buttonId}`,
+      })
+    }
+  })()
 }
 
 /**
@@ -354,125 +395,17 @@ const PANEL_OPENERS: Record<string, () => void> = {
 export function OnAction(control: { Id: string }): boolean {
   bgmLog(LOG_LEVELS.INFO, `[BGM] OnAction: ${control.Id}`)
   try {
-    // 打开面板类按钮先走映射表，命中即返回
-    const openPanel = PANEL_OPENERS[control.Id]
-    if (openPanel) {
-      openPanel()
+    const syncAction = SYNC_ACTIONS[control.Id]
+    if (syncAction) {
+      syncAction()
       return true
     }
-    switch (control.Id) {
-      case 'btnSyncBangumi': {
-        // syncWithConfirmation 是 async 函数；OnAction 是同步回调无法 await，
-        // 用 async IIFE + 全量 try/catch 消费（连同步抛错一并捕获）
-        void (async () => {
-          try {
-            await syncWithConfirmation()
-          } catch (error: unknown) {
-            bgmLog(
-              LOG_LEVELS.ERROR,
-              `[OnAction] syncWithConfirmation 异常: ${error instanceof Error && error.message ? error.message : String(error)}`,
-            )
-            BGM.handleError(error, {
-              showAlert: true,
-              level: BGM.ErrorLevel.ERROR,
-              context: 'Ribbon btnSyncBangumi',
-            })
-          }
-        })()
-        break
-      }
-      case 'btnSetToken': {
-        setTokenForRibbon()
-        break
-      }
-      case 'btnTestToken': {
-        // testTokenForRibbon 是 async 函数；OnAction 是同步回调，async IIFE 消费
-        void (async () => {
-          try {
-            await testTokenForRibbon()
-          } catch (error: unknown) {
-            bgmLog(
-              LOG_LEVELS.ERROR,
-              `[OnAction] testTokenForRibbon 异常: ${error instanceof Error && error.message ? error.message : String(error)}`,
-            )
-            BGM.handleError(error, {
-              showAlert: true,
-              level: BGM.ErrorLevel.ERROR,
-              context: 'Ribbon btnTestToken',
-            })
-          }
-        })()
-        break
-      }
-      case 'btnCopyToken': {
-        // copyTokenForRibbon 是 async 函数；OnAction 是同步回调，async IIFE 消费
-        void (async () => {
-          try {
-            await copyTokenForRibbon()
-          } catch (error: unknown) {
-            bgmLog(
-              LOG_LEVELS.ERROR,
-              `[OnAction] copyTokenForRibbon 异常: ${error instanceof Error && error.message ? error.message : String(error)}`,
-            )
-            BGM.handleError(error, {
-              showAlert: true,
-              level: BGM.ErrorLevel.ERROR,
-              context: 'Ribbon btnCopyToken',
-            })
-          }
-        })()
-        break
-      }
-      case 'btnSetUserId': {
-        setUserIdForRibbon()
-        break
-      }
-      case 'btnOpenCollection': {
-        openCollectionForRibbon()
-        break
-      }
-      case 'btnSyncFromGithub': {
-        // syncFromGithubForRibbon 是 async 函数；OnAction 是同步回调，async IIFE 消费
-        void (async () => {
-          try {
-            await syncFromGithubForRibbon()
-          } catch (error: unknown) {
-            bgmLog(
-              LOG_LEVELS.ERROR,
-              `[OnAction] syncFromGithubForRibbon 异常: ${error instanceof Error && error.message ? error.message : String(error)}`,
-            )
-            BGM.handleError(error, {
-              showAlert: true,
-              level: BGM.ErrorLevel.ERROR,
-              context: 'Ribbon btnSyncFromGithub',
-            })
-          }
-        })()
-        break
-      }
-      case 'btnUndoLastSync': {
-        // undoLastSyncForRibbon 是 async 函数；OnAction 是同步回调，async IIFE 消费
-        void (async () => {
-          try {
-            await undoLastSyncForRibbon()
-          } catch (error: unknown) {
-            bgmLog(
-              LOG_LEVELS.ERROR,
-              `[OnAction] undoLastSyncForRibbon 异常: ${error instanceof Error && error.message ? error.message : String(error)}`,
-            )
-            BGM.handleError(error, {
-              showAlert: true,
-              level: BGM.ErrorLevel.ERROR,
-              context: 'Ribbon btnUndoLastSync',
-            })
-          }
-        })()
-        break
-      }
-      default: {
-        bgmLog(LOG_LEVELS.WARN, `[BGM] 未知按钮: ${control.Id}`)
-      }
+    const asyncAction = ASYNC_ACTIONS[control.Id]
+    if (asyncAction) {
+      runAsyncRibbonAction(control.Id, asyncAction)
+      return true
     }
+    bgmLog(LOG_LEVELS.WARN, `[BGM] 未知按钮: ${control.Id}`)
   } catch (error: unknown) {
     BGM.handleError(error, {
       showAlert: true,
@@ -494,7 +427,6 @@ const ICON_PATHS: Record<string, string> = {
   btnCopyToken: 'images/CopyToken.svg',
   btnSetUserId: 'images/user.svg',
   btnOpenCollection: 'images/link.svg',
-  btnClearColors: 'images/btnClearColors.svg',
   btnSyncFromGithub: 'images/github.svg',
   btnUndoLastSync: 'images/undo.svg',
   btnOpenSettings: 'images/settings.svg',
