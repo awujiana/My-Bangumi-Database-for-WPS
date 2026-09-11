@@ -8,6 +8,12 @@
 
 ## [未发布]
 
+### 变更（CSS · 响应式窄屏适配 + 令牌化收口，P2-11/P2-12）
+
+- **P2-11 响应式**：`clean.css` / `preview.css` 文件末尾各补 `@media (max-width: 480px)` 断点（任务窗格拖窄到 <480px 时避免横向溢出与内容顶破）。`tokens.css` 仅变量定义、无布局，不需要媒体查询。
+- **P2-12 令牌化**：新增可复跑工具 `scripts/tokenize-css.mjs`（默认 dry-run，`--write` 落盘），把 `styles.css` 中精确命中 token 值的 95 处硬编码 hex 替换为 `var(--token)`。替换约束：映射源只取 `tokens.css` 的 `:root`（跳过 `[data-theme=light]` 覆盖块，保护 preview.css 的 Catppuccin 独立调色板）、跳过 token 定义 RHS、排除目标文件自身重定义的同名 token、纯黑/纯白歧义色保留。结果：**深色渲染零变化**、浅色自动跟随主题。`panel-theme.css` / `enrich.css` 经工具扫描已无可替换项。
+- **验证**：lint 0 / tsc 0 / DOMPurify 版本 / 导入图 / ribbon 12==7+5 / tests-types 0 全绿。
+
 ### 新增（无障碍 · 静态模态框 ESC 关闭 + 焦点陷阱 + role/aria-modal，P2-10）
 
 - **问题**：`ui/*.html` 的静态模态框（`.modal` / `.detail-modal`）只能靠鼠标关闭 —— 无 `role="dialog"`/`aria-modal`（屏幕阅读器不识别为对话框）、无 ESC 关闭（仅进度组件支持）、无焦点陷阱（Tab 会逃逸到背景）；`index.html` 还缺 `lang`。
