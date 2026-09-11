@@ -110,7 +110,17 @@
   - `enrich-engine.buildBangumiIndexes()`：名称/别名索引构建由逐行 1~2 次读改为一次覆盖两列的矩形读。
 - **测试**：新增 `Range` 写入捕获桩（`createRangeStub` + `rangeWrites` + `getWrittenRows`），把原先「`setCellValue` 被调用次数 ≥8 / ≥10」这类**弱断言**换成**逐列校验实际落盘内容**（更强，且直接锁住「整行写入」的新形态）；`migrateSyncRecordSchema` 的数据行用例同步改为经 `readRangeValues` 注入旧结构数据。enrich-engine 的 util mock 补上 `readRangeValues`（mock 需跟上生产接口）。
 - **经核实已过时的条目**：审查报告 P1-4 中 `github-sync.ts:1204-1248`（`writeRowValuesWithUndo`）早就是「一次 COM 调用写入整行」＋逐单元格 undo 记录，无需改动。
-- **有意暂缓的一处**：「已存在 SID 的逐字段更新」仍是每行 3~11 次 `setCellValue`。合并成一次整行写入必须**读-改-写整行**（未提供的字段要读回原值，否则会被空值覆盖），而现有 `readRangeValues()` 会把所有单元格 `String()` 化 —— 读回再写出去会把「次数」等数字列变成文本列；且一旦读回失败（返回空数组），整行会被空值覆盖，即**静默清空用户的同步记录**。单次收益约 12 → 2 次调用、无复合放大，因此不为此引入数据丢失风险。推进前提是先补一个保留原始类型的矩形读原语并单独测试（详见审查报告 §3.2.3）。
+- **有意暂缓的一处（已收口，`0a3fbbd7`）**：「已存在 SID 的逐字段更新」原本仍是每行 3~11 次 `setCellValue`。合并成一次整行写入必须**读-改-写整行**（未提供的字段要读回原值，否则会被空值覆盖），而旧 `readRangeValues()` 会把所有单元格 `String()` 化、读失败会用空值覆盖整行（静默清空记录）。现按 §3.2.3 建议的推进顺序落地：先补 `readRangeCellValues(): WpsCellValue[][]`（保留原始类型，`null` 而非 `''`，单独测试），再整行读-改-写。详见下文「P1-C 残留」条目。
+
+### 修复（性能 · P1-C 残留：已存在 SID 整行读-改-写，`0a3fbbd7`）
+
+- **问题（§3.2.3 残留项）**：`appendOrUpdateSyncRecord` 的 else 分支（已存在 SID 单条更新）与 `appendOrUpdateSyncRecords` 的 `sidToUpdate` 循环（批量更新）仍是每行 3~11 次 `setCellValue`。合并成一次整行写入需读-改-写整行（未提供字段要读回原值，否则被空值覆盖），而旧 `readRangeValues()` 会 `String()` 化、读失败会用空值覆盖整行（静默清空记录）。
+- **改法（按 §3.2.3 推进顺序）**：
+  - 先在 `ts/tools/util/sheet.ts` 补 `readRangeCellValues(): WpsCellValue[][]`：保留原始类型（`string | number | boolean | Date | null`，`null` 而非 `''`，`null`/`undefined`/函数/原生代码返回 `null`），避免数字列被文本化；单独测试。
+  - 新增 `buildUpdatedSyncRow()`：以读回原始整行为底，仅覆盖显式提供字段（`message`/`fingerprint`/`name`/`url`/`type`/`source`/`content`/`collType`），保留其余原值。
+  - 两处更新改为 `readRangeCellValues` 整行读 → `buildUpdatedSyncRow` 构造 → `writeSheetRows` 整行落盘（一次 `Range.Value2`）。**读回失败（空数组）放弃写入并返回 `false`**，杜绝用空值覆盖用户同步记录。
+  - lint 收口：`no-continue` 禁止 → 批量循环改 `if (existing) { ... }` 正向条件块；`buildUpdatedSyncRow` 参数 `i` → `index`。
+- **测试**：`tests/sync-record.test.ts` 的「写入次数」弱断言（`mockSetCellValue.mock.calls.length ≥ N`）全部改为「捕获 `Range.Value2` 实际落盘内容」（`getWrittenRows(address)` 逐列比对 + `rangeWrites.size > 0`）；新增 `mockRangeWriteThrows` 让 `Value2` setter 抛错，覆盖写入失败返回 `false` 路径；两个 Proxy 异常用例显式注入正常行使更新路径读回真实整行。门禁：1863 用例全绿 / 53 文件。
 
 ### 修复（性能 · 消除同步记录的 O(n²) COM 链路，P1-B）
 
