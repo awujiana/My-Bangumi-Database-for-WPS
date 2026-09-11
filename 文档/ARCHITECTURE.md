@@ -106,7 +106,6 @@ ts/index.ts (thin barrel — 仅 re-export)
   │   ├── githubSync.ts     → GitHub 仓库同步
   │   ├── githubConfig.ts   → GitHub 配置 (PluginStorage)
   │   ├── githubSyncDiff.ts → 差异计算 (纯函数，零依赖)
-  │   ├── githubCache.ts    → 远程数据缓存
   │   ├── syncSourceRegistry.ts → 多源同步注册表
   │   ├── gistSync.ts       → Gist 同步源
   │   ├── giteeSync.ts      → Gitee 同步源
@@ -206,23 +205,9 @@ ts/index.ts (thin barrel — 仅 re-export)
 - **`EnrichWorkbookState`**: 富化工作簿锁定状态
 - **设计原则**: 所有模块直接从 `core/types.js` 导入类型，消除类型级循环依赖
 
-#### `container.ts` — 轻量 CDI 服务容器（v3.3 新增）
+#### ~~`container.ts` / `services.ts` — 轻量 CDI 服务容器~~（已移除）
 
-- **`ServiceContainer` 类**: 依赖注入容器
-  - `.register(key, factory)`: 注册服务工厂（懒加载）
-  - `.resolve(key)`: 解析服务实例（单例缓存）
-  - `.has(key)`: 检查服务是否已注册
-  - `.clear()`: 清空所有服务
-- **设计模式**: 工厂+单例，支持服务替换和测试 mock
-- **使用场景**: 日志服务、事件总线、配置服务等全局单例的统一管理
-
-#### `services.ts` — 核心服务注册（v3.3 新增）
-
-- **`registerCoreServices()`**: 注册核心服务到容器
-  - `logService`: 日志服务（bgmLog + LOG_LEVELS）
-  - `eventBusService`: 事件总线（eventBus 单例）
-  - `configService`: 配置服务（PluginStorage 读写）
-- **容器实例**: `container`（全局单例，供所有模块 resolve）
+> **这两个模块已于 2026-09-11 删除**（审查报告 P2-8）。`services.ts` 全库 0 引用 —— 其模块顶层的 `container.register()` 从未执行；`container.ts` 仅被 `services.ts` 引用，随之成为孤儿。项目实际使用的是 `core/ui-bridge.ts` 的接口注册（扇出依赖反转），而非通用 DI 容器。删除前没有任何代码调用 `container.resolve()`。
 
 #### `errorHandler.ts` — 全局错误处理（v3.3 新增）
 
@@ -394,7 +379,7 @@ ts/index.ts (thin barrel — 仅 re-export)
 
 #### 其他同步模块
 
-- **`githubCache.ts`**: 远程 JSON 数据本地缓存管理
+- ~~**`githubCache.ts`**: 远程 JSON 数据本地缓存管理~~（已于 2026-09-11 删除，见审查报告 P2-8：生产 0 引用，其 TTL 从未被调用；下载链路由 `sync-source-registry.ts` 的 JSONL 数据源接管）
 - **`gistSync.ts`**: GitHub Gist 同步源（通过 `api.github.com/gists/{id}` 获取）
 - **`giteeSync.ts`**: Gitee 仓库同步源
 - **`gitlabSync.ts`**: GitLab 仓库同步源

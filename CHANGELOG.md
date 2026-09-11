@@ -8,6 +8,38 @@
 
 ## [未发布]
 
+### 安全（依赖 · DOMPurify 双份副本同升 3.4.15，P2-3）
+
+- **问题**：`dompurify <= 3.4.12` 有中危 XSS 通告（GHSA-55q2-fjhq-7xh7：`IN_PLACE` hook 被移除后，残留的脱离子树仍可执行）。本项目同时存在**两份** DOMPurify：`libs/purify.js`（vendored UMD，`ui/*.html` 与 `index.html` 实际加载的就是它）与 `node_modules/dompurify`（测试与构建器解析的那份）。**`npm audit` / `npm update` 只作用于后者** —— 只升 npm 依赖会出现「通告看起来修好了、真机跑的仍是旧版」的假象。
+- **改法**：两份同升 **3.4.15**，并保持 `check:dompurify-version` 门禁为绿（vendored 3.4.15 == 安装 3.4.15）。升级后 `npm audit` 不再报本条。
+- **实施记录**：`npm install dompurify@3.4.15` 触发整树重解析，被 `eslint-config-airbnb-extended@3.2.0` 的 `peer eslint@^9` 与项目实际 `eslint@10.9.1` 的**既有**冲突挡住（该冲突早已存在，只是此前没做过会重解析整树的安装）。改用 `--legacy-peer-deps` 完成，并核对 lockfile 确认**只动了 dompurify（8 行）**，未让 npm 顺手重解析整棵树。
+
+### 变更（工程化 · Ribbon 按钮收敛为单一分发表 + 新增一致性门禁，P2-9/P3-3）
+
+- **问题**：按钮 ID 在 `ribbon.xml` 与 `ts/ribbon.ts` 两处维护，而 TS 侧还是「`PANEL_OPENERS` 映射表 + `OnAction` 的 `switch`」**两套机制并存**（12 个按钮 vs 4 项映射表 + 8 个 case）。两侧不同步的表现是**静默失效**：按钮点下去没有任何反应，只在日志里留一条 `[BGM] 未知按钮: xxx`，真机上极难察觉。
+- **改法**：
+  - 合并为 `SYNC_ACTIONS`（7 个同步处理器）/ `ASYNC_ACTIONS`（5 个异步处理器）两张表，5 段重复的「async IIFE + try/catch + `handleError`」收进 `runAsyncRibbonAction()`。`ts/ribbon.ts` 518 → **451 行**。
+  - 顺带清掉 `ICON_PATHS` 中指向已删除按钮的**孤儿图标项** `btnClearColors`。
+  - **新增 `scripts/check-ribbon-buttons.mjs` 并接入 `npm run gate`**：校验 `ribbon.xml` 的每个按钮都在分发表与图标表中、图标文件真实存在、`ICON_PATHS` 无孤儿键、`onAction`/`getImage` 指向的函数确有导出；**解析结果为空即报错**（避免门禁静默空转）。漂移从「静默」变成「红灯」。
+  - 门禁有效性用**负向测试**验证：临时注入一个幽灵按钮，确认报错并给出两条正确的定位信息，再还原。
+- **顺带清理同类问题**：`ts/sync/github-config.ts` 的模块私有 `CONFIG_KEYS`（`github_sync_*` 键）改名为 **`GITHUB_CONFIG_KEYS`**，不再与 `ts/tools/config.ts` 导出的 `CONFIG_KEYS`（`bgm_*` 键）同名不同义。
+- **另两组平行清单的核实结论**：清理规则 TS↔Python 双份 —— Python 侧（`clean/`）**未入库**（被 `.gitignore` 忽略），TS 侧是唯一事实来源且已注明移植出处，无仓库内漂移风险，不做改动。
+
+### 移除（死代码 · DI 容器与 GitHub 数据缓存，P2-8）
+
+- **`ts/core/services.ts`**：全库 0 引用，模块顶层的 `container.register()` 从未执行。
+- **`ts/core/container.ts`**：本不在清单里 —— 它**仅被 `services.ts` 引用**，删掉上游后自动成为下一个孤儿，一并删除。（死代码会**级联**：删完要回头再扫一遍。）
+- **`ts/sync/github-cache.ts`**：生产代码 0 引用，**仅 `tests/github-cache.test.ts` 引用**，其 TTL 逻辑（`isCacheValid`）从未被任何代码调用；下载链路早已由 `sync-source-registry` 的 JSONL 数据源（GitHub/GitLab/Gitee/本地文件/Gist）接管。随被测模块一并删除的 19 条测试，正是本条要消除的「有测试所以看着还活着」的错觉。
+
+### 变更（仓库卫生 · `v0.yaml` 迁入 `文档/`，P3-5）
+
+- **临时产物部分无需改动**：`.dry.json`、`.stats.tmp.json`、`.backup_before_recovery/`、`.archify-delivery-*/`、`__pycache__/`、`bgm-runtime-architecture.{html,json}` 经逐项 `git check-ignore` 验证**已全部被 `.gitignore` 覆盖**。
+- **`v0.yaml` 是规范文件而非临时产物**（Bangumi 官方 OpenAPI 规范，4170 行），故既不删除也不取消跟踪，而是连同 git 历史迁至 **`文档/bangumi-openapi-v0.yaml`**，让仓库根不再堆放规范文件。全库无脚本或文档引用该路径，迁移零风险。
+
+### 变更（工程化 · `npm run gate` 增至六道关）
+
+`lint:check` → `check:dompurify-version` → `check:cycles` → **`check:ribbon-buttons`** → `typecheck:tests` → `test`。本轮结束全绿：53 测试文件 / 1863 用例。
+
 ### 修复（数据安全 · 自动添加列不再静默部分成功，P2-6）
 
 - **问题**：`ensureBangumiColumns()` 在 `try` 内逐个把新列写进映射、`catch` 里只记日志后**返回已部分更新的映射** —— 表头其实没写成功时，映射里已经有这些列，下游便按映射往空列写值。用户看到的是「表头缺失 + 数据错位」，且无法回滚。
@@ -46,7 +78,7 @@
   - **批次四（63 → 0）· mock 基础设施**：① `sync-flow` 里 5 个无类型的 `vi.fn()` 被 TS 推断成「无参 / 返回 `never`」，`mockReturnValue` 因此连环报错 → 补显式签名；② vitest 的 `Mock<T>` 要求 `mockReturnValue` 收完整 `T`（参数逆变），于是「返回形状稍有不同的另一处赋值」被判不兼容 → 新增 `asRangeMock()` 单点收敛（17 处 `Range` 赋值）；③ `noUncheckedIndexedAccess` 下 18 处 `arr[0].x` 补 `?.`；④ `exceltobangumi` 的 `createMockWorksheet` 返回类型由 `unknown` 收敛为 `WpsWorksheet`，连带修正一处 `getFilterStatus` 的参数错位（漏传 `headerRow`，`false` 落在了 `headerRow` 上）。
 - **清账顺带修出 1 处生产类型缺口**：`httpRequest` 的 `zodSchema` 原为 `ZodSchema<T>` —— 那是本地降级实现的形状（带 `[k: string]: any` 索引签名），而真实 zod 的 `ZodObject` 是类实例、没有索引签名，因此被它拒之门外；该函数实际只调用 `schema.parse()`。改为 `Pick<ZodSchema<T>, 'parse'>` 后，真实 zod 与本地降级实现都能传入。
 - 取舍口径（详见审查报告 §3.2.1）：**刻意的越界输入不改生产类型** —— `range: 'week'/'invalid'`、`quarter: 5/99`、数字型 `话数` 都是覆盖防御分支的健壮性测试（生产确实有 `default → false`、`toExtensionStringValue` 的 `String(value)` 等分支），加显式断言 + 注释即可；**`vi.hoisted` 内不能引用 import 绑定**（vitest 会报 `Cannot access '__vi_import_N__' before initialization`），该处只能保留最小形状并注明原因。
-- `npm run gate` 现在是五道关：`lint:check` → DOMPurify 版本一致 → 导入图（分层 + 致命环）→ tests 类型 → 全量测试。
+- `npm run gate` 当时是五道关（后续增至六道，见本文档顶部「`npm run gate` 增至六道关」）：`lint:check` → DOMPurify 版本一致 → 导入图（分层 + 致命环）→ tests 类型 → 全量测试。
 
 ### 修复（数据安全 · 记录写入失败不再静默，P1-E）
 
