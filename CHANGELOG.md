@@ -8,6 +8,24 @@
 
 ## [未发布]
 
+### 变更（架构 · 拆分 `ui/handlers/index.ts` 2693 → 258 行，P1-G/P1-6/P1-H）
+
+- **背景**：`ui/handlers/index.ts` 是改动第 1 名的上帝模块（2693 行），内部同时承载资源追踪、按钮绑定、`ACTION_HANDLERS` 59 键分发表、日志面板、消息监听、事件总线订阅、设置页绑定、增量同步回写、GitHub 配置表单读写。
+- **拆分结果**（`ts/ui/handlers/` 现为 11 个单一职责模块，**index.ts 2693 → 258 行，-90.4%**）：
+  - `action-handlers.ts`（1449 行）：`ACTION_HANDLERS` 59 键表（1274 行）+ `handleActionClick` 分发 + `computeSyncMetrics` 纯函数。
+  - `incremental-bindings.ts`（284 行）：增量同步 / 跳过冲突复选框回写（含重试）+ 冲突策略单选 + Ribbon 初始化。
+  - `panel-events.ts`（255 行）：window message 监听（origin 白名单）+ 8 个事件总线处理器 + `setupEventListeners`；`removeMessageListener` 仍经 index.ts 再导出（对外 API 不变）。
+  - `github-settings.ts`（202 行）：配置输入框 ↔ PluginStorage 双向同步、按同步源类型切换字段、300ms 防抖自动保存。
+  - `settings-bindings.ts`（172 行）：主题 / 列表类型 / 时间筛选 / 刷新间隔 / 同步记录开关。
+  - `resource-tracking.ts`（93 行）：定时器 + DOM/事件总线监听器统一登记与清理。
+  - `path-controls.ts`（75 行）：WPS 文件夹选择（FileDialog + GetOpenFilename 回退）+ 路径回填。
+  - `clipboard.ts`（33 行）/ `log-panel.ts`（32 行）/ `panel-context.ts`（10 行）：剪贴板回退（`_copyTextToClipboard` 正名为 `copyTextToClipboard`）/ 日志面板渲染 / `isPanelContext`。
+  - `index.ts`（258 行）：只剩 `onAction`、`setupButtonListeners`、`startHandlers`、`initHandlers` + 对外 re-export 聚合。
+- **安全性**：新模块一律只依赖 barrel + 叶子模块，**不反向 import `index.ts`**（`isPanelContext` 特意抽成 `panel-context.ts` 以避免成环）。`check:cycles` 结果：无分层反向依赖、无致命环；新增环均为**良性环**（不在顶层读取环上绑定）。
+- **搬运完整性**：脚本比对 `git show HEAD:<file>` 与拆分后文件的顶层定义名集合 —— `MISSING(丢失)=(无)`、`INTEGRITY_OK`；对 `ACTION_HANDLERS` 另做整对象字面量归一化比对（59 键完全一致，唯一差异是刻意的函数改名）。
+- **配套测试（P1-H）**：新增 `tests/resource-tracking.test.ts`（假时钟按真实行为断言定时器清理）、`tests/handlers-split.test.ts`（jsdom：`isPanelContext` + `renderLogEntries`）。
+- **验证**：每批 `tsc --noEmit` 0 / `tests` tsc 0 / 全量 `eslint ts tests` 0 / `check:cycles` 0 / `check:ribbon-buttons` 0 / `typecheck:tests` 0 / 逐文件 `prettier --check` 通过。覆盖率是否达 P1-1 目标需本地 `npm test` 与 `npx vitest run --coverage` 复核（沙箱内 vitest 运行器损坏）。
+
 ### 变更（架构 · 拆分 `panel/enrich-page.ts` + 清除死导出，P1-G/P1-6/P1-H）
 
 - **背景**：`panel/enrich-page.ts` 3740 行、覆盖接近 0，同时是「上帝模块」与「覆盖率洼地」。沙箱内 vitest 运行器损坏、无法真跑测试，故采用**「先抽后测」**：先把自洽的纯逻辑切片抽成独立模块（改动可被 `tsc`/`eslint` 完整静态验证），再为小模块补单测 —— 而不是 in-place 写「mock 全部 14 个依赖」的不可验证测试。
