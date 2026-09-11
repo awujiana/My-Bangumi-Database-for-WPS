@@ -129,8 +129,8 @@ describe('enrich-page-state', () => {
       expect(Array.isArray(COLUMN_MAPPING_FIELDS)).toBe(true)
       expect(COLUMN_MAPPING_FIELDS).toHaveLength(8)
       const first = COLUMN_MAPPING_FIELDS[0]
-      expect(first.key).toBe('nameCol')
-      expect(first.required).toBe(true)
+      expect(first?.key).toBe('nameCol')
+      expect(first?.required).toBe(true)
       const keys = COLUMN_MAPPING_FIELDS.map((f) => f.key)
       expect(keys).not.toContain('platformExtraCols')
       for (const f of COLUMN_MAPPING_FIELDS) {

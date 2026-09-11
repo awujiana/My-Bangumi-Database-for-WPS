@@ -53,7 +53,7 @@ describe('tools/auto-fill-url', () => {
       vi.mocked(getCellValue).mockImplementation(
         (_ws: unknown, row: number, col: number) => data[row]?.[col] ?? '',
       )
-      vi.mocked(trim).mockImplementation((value: string) => value.trim())
+      vi.mocked(trim).mockImplementation((value) => (value ?? '').trim())
     })
 
     it('从有 URL 的同行收集 名称/别名 → URL 映射', () => {

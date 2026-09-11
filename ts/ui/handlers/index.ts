@@ -88,8 +88,14 @@ import { exportConfig, importConfig } from '../../services/config-service.js'
 import { executeUndoLastSync } from '../../services/ribbon-service.js'
 import { readLocalFileContent } from '../../sync/local-file-sync.js'
 import { debounce } from '../../tools/debounce.js'
-import { BGM_EVENTS, eventBus } from '../../tools/events.js'
-import type { EventHandler } from '../../tools/events.js'
+import { BGM_EVENTS } from '../../tools/events.js'
+import { initConfigPathControls, selectDefaultFolder, updatePathDisplay } from './path-controls.js'
+import {
+  clearTrackedListeners,
+  trackedAddEventListener,
+  trackedEventBusOn,
+  trackedSetTimeout,
+} from './resource-tracking.js'
 import { getRecentLogs, exportLogsToFile, clearLogs } from '../../tools/logger.js'
 import type { LogLevel } from '../../tools/logger.js'
 import { showConnectionTestDialog, hideConnectionTestDialog } from '../github-config-dialog.js'
@@ -130,6 +136,7 @@ export {
 } from './token.js'
 export { syncFromPanel, syncCollectionFromBgm, syncFromBgmByAPI } from './sync.js'
 export { cleanLockedDataSheet } from './sheet.js'
+export { clearAllPendingTimeouts } from './resource-tracking.js'
 
 // 连接测试弹窗
 
@@ -157,86 +164,6 @@ function computeSyncMetrics(
       ? Math.round(((result.remoteTotal - totalProcessed) / avgSpeed) * 1000)
       : 0
   return { totalElapsed, totalProcessed, avgSpeed, efficiency, etaMs }
-}
-
-// ========== 模块级资源追踪（防止事件监听器与定时器泄漏） ==========
-const _pendingTimeouts = new Set<ReturnType<typeof setTimeout>>()
-
-/**
- * 受追踪的 setTimeout：将 timeoutId 加入模块级 Set，便于统一清理。
- * 回调执行时自动从 Set 中移除。
- */
-function trackedSetTimeout(function_: () => void, delay: number): ReturnType<typeof setTimeout> {
-  const id = setTimeout(() => {
-    _pendingTimeouts.delete(id)
-    function_()
-  }, delay)
-  _pendingTimeouts.add(id)
-  return id
-}
-
-/**
- * 清理所有仍在等待的 setTimeout，防止面板关闭后回调仍被触发。
- */
-export function clearAllPendingTimeouts(): void {
-  for (const id of _pendingTimeouts) {
-    clearTimeout(id)
-  }
-  _pendingTimeouts.clear()
-}
-
-// ========== 模块级 DOM / 事件总线监听器追踪（防止重复注册与内存泄漏） ==========
-
-interface TrackedDomListener {
-  kind: 'dom'
-  element: EventTarget
-  type: string
-  handler: EventListenerOrEventListenerObject
-}
-
-interface TrackedBusListener {
-  kind: 'eventBus'
-  eventName: string
-  handler: EventHandler
-}
-
-type TrackedListener = TrackedDomListener | TrackedBusListener
-
-const _trackedListeners: TrackedListener[] = []
-
-/**
- * 清理所有已追踪的监听器。
- * 在 initHandlers 重新初始化前调用，防止同一面板内重复注册。
- */
-function clearTrackedListeners(): void {
-  for (const item of _trackedListeners) {
-    if (item.kind === 'dom') {
-      item.element.removeEventListener(item.type, item.handler)
-    } else {
-      eventBus.off(item.eventName, item.handler)
-    }
-  }
-  _trackedListeners.length = 0
-}
-
-/**
- * 受追踪的 addEventListener：自动记录，便于统一清理。
- */
-function trackedAddEventListener(
-  element: EventTarget,
-  type: string,
-  handler: EventListenerOrEventListenerObject,
-): void {
-  element.addEventListener(type, handler)
-  _trackedListeners.push({ kind: 'dom', element, type, handler })
-}
-
-/**
- * 受追踪的 eventBus.on：自动记录，便于统一清理。
- */
-function trackedEventBusOn<T = unknown>(eventName: string, handler: EventHandler<T>): void {
-  eventBus.on(eventName, handler)
-  _trackedListeners.push({ kind: 'eventBus', eventName, handler: handler as EventHandler })
 }
 
 // ========== 面板操作分发 ==========
@@ -579,74 +506,6 @@ interface ActionHandlerContext {
 }
 
 type ActionHandler = (context: ActionHandlerContext) => void
-
-// ========== 默认路径记忆（导出位置 / 导入文件夹） ==========
-
-/** WPS FileDialog 对象的能力子集（仅用到的成员） */
-interface WpsPathDialog {
-  Title: string
-  Show(): number
-  SelectedItems: { Count: number; Item(index: number): string }
-}
-
-/**
- * 弹出文件夹选择对话框并返回选中的文件夹绝对路径。
- * 优先使用 WPS Application.FileDialog(msoFileDialogFolderPicker=2)，
- * 不可用时回退到 GetOpenFilename 单选（由用户选取文件后取目录）。
- * 用户取消返回 null。
- */
-function selectDefaultFolder(title: string): string | null {
-  try {
-    const app = getApp() as {
-      FileDialog?: (dialogType: number) => WpsPathDialog | null
-      msoFileDialogFolderPicker?: number
-      GetOpenFilename?: (fileFilter: string, dialogTitle: string) => unknown
-    } | null
-    if (!app) return null
-
-    if (typeof app.FileDialog === 'function') {
-      const dialogType =
-        typeof app.msoFileDialogFolderPicker === 'number' ? app.msoFileDialogFolderPicker : 2
-      const dialog = app.FileDialog(dialogType)
-      if (dialog) {
-        dialog.Title = title
-        const result = dialog.Show()
-        if (result === -1 && dialog.SelectedItems.Count > 0) {
-          return dialog.SelectedItems.Item(1)
-        }
-        // 取消（result === 0）
-        return null
-      }
-    }
-
-    // 回退：GetOpenFilename 选择文件后取其所在目录作为默认文件夹
-    if (typeof app.GetOpenFilename === 'function') {
-      const selected = app.GetOpenFilename('所有文件 (*.*),*.*', title)
-      if (typeof selected === 'boolean' || selected === false) return null
-      const filePath = String(selected)
-      const normalized = filePath.replace(/\\+/g, '/')
-      const lastSlash = normalized.lastIndexOf('/')
-      if (lastSlash !== -1) return normalized.slice(0, lastSlash)
-      return null
-    }
-    return null
-  } catch {
-    return null
-  }
-}
-
-/** 设置设置页中的路径只读输入框显示值 */
-function updatePathDisplay(inputId: string, value: string): void {
-  const input = document.getElementById(inputId) as HTMLInputElement | null
-  if (input) input.value = value
-}
-
-/** 从 PluginStorage 读取已保存的默认路径并回填到设置页输入框 */
-function initConfigPathControls(): void {
-  if (typeof document === 'undefined') return
-  updatePathDisplay('exportPathDisplay', getExportPath(true))
-  updatePathDisplay('importPathDisplay', getImportPath(true))
-}
 
 const ACTION_HANDLERS: Record<string, ActionHandler> = {
   // 核心操作
