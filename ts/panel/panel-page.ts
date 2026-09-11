@@ -59,14 +59,35 @@ function initPanelCore(): void {
   // 定时轮询 PluginStorage，确保在 Ribbon 设置 Token 后 Panel 能自动更新 UI
   startUserInfoPolling()
 
-  // 恢复上次锁定的工作表
+  // 恢复上次锁定的工作表：只读 PluginStorage，成本低，保持同步（BGM.sheet 状态立即可用）
   const isRestored = restoreLockedSheet()
-  refreshSheets()
-  refreshWorkbooks()
 
-  // 自动检测最佳工作表并锁定
-  const detected = autoDetectSheet()
-  if (detected) {
+  /**
+   * 刷新工作表列表 → 自动检测最佳工作表 → 首帧预览。
+   *
+   * 这几步全在跨进程 COM 上：`autoDetectSheet` → `findBangumiTargetSheets` 会遍历
+   * **每个已打开工作簿的每一张工作表**（读表头、数数据行、比名称关键词），工作簿越多
+   * 耗时越长。同步执行会把任务窗格的**首帧**一起拖住（P2-13），故放到首屏之后跑。
+   *
+   * 用 `setTimeout(…, 0)`（宏任务）而非微任务：微任务仍在本次渲染前执行，达不到
+   * 「先出界面、再扫描」的效果。
+   */
+  const bootstrapSheetSelection = (): void => {
+    refreshSheets()
+    refreshWorkbooks()
+
+    // 自动检测最佳工作表并锁定
+    const detected = autoDetectSheet()
+    if (!detected) {
+      // 未检测到追踪表：沿用上次锁定的工作表，仅刷新预览
+      if (isRestored && BGM.sheet.isLocked) {
+        const select = document.getElementById('sheetSelect') as HTMLSelectElement | null
+        if (select) select.value = String(BGM.sheet.lockedIndex)
+        refreshData()
+      }
+      return
+    }
+
     const wbSelect = document.getElementById('workbookSelect') as HTMLSelectElement | null
     if (wbSelect && detected.workbookName) wbSelect.value = detected.workbookName
     BGM.sheet.lockedIndex = detected.sheetIndex
@@ -84,11 +105,9 @@ function initPanelCore(): void {
     updateLockButton()
     // 立即刷新一次预览
     refreshData()
-  } else if (isRestored && BGM.sheet.isLocked) {
-    const select = document.getElementById('sheetSelect') as HTMLSelectElement | null
-    if (select) select.value = String(BGM.sheet.lockedIndex)
-    refreshData()
   }
+
+  window.setTimeout(bootstrapSheetSelection, 0)
 
   // 更新 Token 和用户 ID 状态显示
   updateTokenStatus()
