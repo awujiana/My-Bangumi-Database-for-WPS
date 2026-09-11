@@ -8,6 +8,16 @@
 
 ## [未发布]
 
+### 新增（无障碍 · 静态模态框 ESC 关闭 + 焦点陷阱 + role/aria-modal，P2-10）
+
+- **问题**：`ui/*.html` 的静态模态框（`.modal` / `.detail-modal`）只能靠鼠标关闭 —— 无 `role="dialog"`/`aria-modal`（屏幕阅读器不识别为对话框）、无 ESC 关闭（仅进度组件支持）、无焦点陷阱（Tab 会逃逸到背景）；`index.html` 还缺 `lang`。
+- **改法（document 级事件委托，零调用点改动）**：新增 `ts/ui/components/modal-a11y.ts`，页面入口（panel / settings / enrich 三个 `*-bootstrap`）调用一次 `installModalA11y()`：
+  - **ESC** 关闭最上层可见静态模态框，且一律「点击模态框自身关闭控件」（`.modal-close-btn` / `.detail-close-btn` / `[data-action^="close"]`），保证既有清理与回调照常执行；**找不到关闭控件时不处理**，不强行 `display:none` 破坏状态机。
+  - **焦点陷阱**：Tab / Shift+Tab 在模态框内环绕；焦点在框外时拉回第一个；无可聚焦元素时阻止 Tab 逃逸。
+  - **明确不覆盖** `dialog.ts` / `progress.ts` 自管的 `.bgm-modal`（前者已自带 role/aria-modal；后者运行期需保持阻塞、完成态才允许 ESC），避免双重处理。
+- **HTML 属性补齐**：11 个静态模态框补 `role="dialog"` / `aria-modal="true"` / `aria-label`（panel 4 + panel-preview 3 + enrich 3 + settings 1）；`index.html` 补 `lang="zh-CN"`；`#closeSyncPreview` 补 `modal-close-btn` 类（原先只有 id，ESC 认不出）。
+- **测试**：新增 `tests/modal-a11y.test.ts`（14 条）。lint 0 / tsc 0 / cycles / ribbon / tests-types 0；**54 文件 1877 用例**。
+
 ### 安全（依赖 · DOMPurify 双份副本同升 3.4.15，P2-3）
 
 - **问题**：`dompurify <= 3.4.12` 有中危 XSS 通告（GHSA-55q2-fjhq-7xh7：`IN_PLACE` hook 被移除后，残留的脱离子树仍可执行）。本项目同时存在**两份** DOMPurify：`libs/purify.js`（vendored UMD，`ui/*.html` 与 `index.html` 实际加载的就是它）与 `node_modules/dompurify`（测试与构建器解析的那份）。**`npm audit` / `npm update` 只作用于后者** —— 只升 npm 依赖会出现「通告看起来修好了、真机跑的仍是旧版」的假象。
