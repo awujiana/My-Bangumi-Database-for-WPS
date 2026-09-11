@@ -173,12 +173,14 @@ describe('resolveUpdateCellValue', () => {
     ).toEqual({ value: null, shouldWrite: false })
   })
 
-  it('标签/分级：强制覆盖直接写，普通更新合并去重', () => {
+  it('标签/分级：写入范围内「强制覆盖直接写 / 普通更新合并去重」', () => {
     const remote = makeRemote({ meta_tags: ['恋爱'] })
-    expect(resolveUpdateCellValue({ name: '标签/分级' }, remote, [], false, true, '')).toEqual({
-      value: '恋爱',
-      shouldWrite: true,
-    })
+    // 注意：shouldForceOverwrite 只决定「直接写」还是「合并」，
+    // **是否写入**由 isWriteAll / fields 决定 —— 字段未命中且非 writeAll 时即便
+    // 强制覆盖也不写（与抽取前 github-sync.ts 的语义一致，勿按直觉改生产代码）。
+    expect(
+      resolveUpdateCellValue({ name: '标签/分级' }, remote, ['标签/分级'], false, true, '科幻'),
+    ).toEqual({ value: '恋爱', shouldWrite: true })
     expect(
       resolveUpdateCellValue({ name: '标签/分级' }, remote, ['标签/分级'], false, false, '科幻'),
     ).toEqual({ value: '科幻 | 恋爱', shouldWrite: true })
@@ -186,6 +188,10 @@ describe('resolveUpdateCellValue', () => {
     expect(
       resolveUpdateCellValue({ name: '标签/分级' }, remote, ['标签/分级'], false, false, '恋爱'),
     ).toEqual({ value: null, shouldWrite: false })
+    expect(resolveUpdateCellValue({ name: '标签/分级' }, remote, [], false, true, '科幻')).toEqual({
+      value: null,
+      shouldWrite: false,
+    })
   })
 
   it('标签/分级：远程无标签或字段未命中则不写', () => {

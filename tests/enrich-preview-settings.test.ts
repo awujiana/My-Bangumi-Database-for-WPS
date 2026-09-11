@@ -121,7 +121,7 @@ describe('saveEnrichPreviewSettings', () => {
     expect(setConfig).toHaveBeenCalledWith('bgm_enrich_ep_single', '1')
     expect(setConfig).toHaveBeenCalledWith('bgm_enrich_ep_full', '12')
     expect(setConfig).toHaveBeenCalledWith('bgm_enrich_filter_keywords', '噪声A\n噪声B')
-    expect(alert).toHaveBeenCalledWith('成功', '富化预览设置已保存，重新打开富化页预览即生效')
+    expect(alert).toHaveBeenCalledWith('成功', '富化预览设置已保存，下次预览即生效')
   })
 
   it('完结阈值 ≤ 单集阈值：拒绝保存并弹窗', () => {
