@@ -69,8 +69,9 @@ import {
 } from '../tools/util/index.js'
 import { findWorkbookByName, getOpenWorkbooks } from '../tools/locked-sheet.js'
 import type { WpsWorksheet, WpsWorkbook } from '../tools/wps.js'
-import { getConfig, CONFIG_KEYS } from '../tools/config.js'
 import { recomputeScrollspy } from './shell-nav.js'
+import { COLUMN_MAPPING_FIELDS, getEnrichPreviewConfig } from './enrich-page-state.js'
+import type { ScalarMappingKey } from './enrich-page-state.js'
 
 // ========== 类型定义 ==========
 
@@ -163,26 +164,6 @@ const state: EnrichPageState = {
 
   closeSourceAfterDetect: false,
 }
-
-// ========== 列映射字段元数据 ==========
-
-/** 标量（number）映射键：排除 platformExtraCols（number[]）这类聚合字段 */
-type ScalarMappingKey = Exclude<keyof EnrichColumnMapping, 'platformExtraCols'>
-
-const COLUMN_MAPPING_FIELDS: {
-  key: ScalarMappingKey
-  label: string
-  required: boolean
-}[] = [
-  { key: 'nameCol', label: '名称', required: true },
-  { key: 'tagsCol', label: 'TAGS/标签', required: false },
-  { key: 'premiereCol', label: '首播', required: false },
-  { key: 'episodesCol', label: '集数', required: false },
-  { key: 'weekdayCol', label: '周更时间', required: false },
-  { key: 'platformCol', label: '播放平台', required: false },
-  { key: 'exclusiveCol', label: '独播', required: false },
-  { key: 'specialCol', label: '特殊/备注', required: false },
-]
 
 // ========== 工具函数 ==========
 
@@ -1800,76 +1781,6 @@ function getEpisodeFullThreshold(): number {
   } catch {
     return 12
   }
-}
-
-/** 内存中缓存富化预览配置（启动时从 settings 读取） */
-interface EnrichPreviewConfig {
-  /** 集数「单集」阈值 */
-  epSingle: number
-  /** 集数「完结」阈值（>= 该值用绿色） */
-  epFull: number
-  /** TAGS 标签彩色化（每个标签一种颜色，相同标签同色，不显示 / 分隔符） */
-  tagsColor: boolean
-  /** 首播日期按日期着色（相同日期同色） */
-  premiereColor: boolean
-  /** 播放平台按平台名着色（相同平台同色） */
-  platformColor: boolean
-  /** 富化完成后自动执行合并去重清洗 */
-  autoCleanDuplicates: boolean
-}
-
-const DEFAULT_ENRICH_PREVIEW_CONFIG: EnrichPreviewConfig = {
-  epSingle: 1,
-  epFull: 12,
-  tagsColor: true,
-  premiereColor: true,
-  platformColor: true,
-  autoCleanDuplicates: true,
-}
-
-let _enrichPreviewConfig: EnrichPreviewConfig | null = null
-
-/** 布尔配置读取：仅显式 'false' 视为关闭，其余（空/异常）走默认开启 */
-function isToggleEnabled(key: string): boolean {
-  try {
-    return getConfig(key, 'true', true) !== 'false'
-  } catch {
-    return true
-  }
-}
-
-/**
- * 读取富化预览配置（懒加载 + 失败兜底默认）。
- * 配置键：bgm_enrich_ep_single / bgm_enrich_ep_full / bgm_enrich_tags_color /
- *         bgm_enrich_premiere_color / bgm_enrich_platform_color / bgm_enrich_auto_clean。
- * 噪声关键词过滤由引擎层 shouldFilterNoise 负责（预览与富化写入共用）。
- */
-function getEnrichPreviewConfig(): EnrichPreviewConfig {
-  if (_enrichPreviewConfig) return _enrichPreviewConfig
-  const next: EnrichPreviewConfig = { ...DEFAULT_ENRICH_PREVIEW_CONFIG }
-  try {
-    const singleRaw = Number(
-      getConfig(CONFIG_KEYS.ENRICH_EP_SINGLE, String(DEFAULT_ENRICH_PREVIEW_CONFIG.epSingle), true),
-    )
-    const fullRaw = Number(
-      getConfig(CONFIG_KEYS.ENRICH_EP_FULL, String(DEFAULT_ENRICH_PREVIEW_CONFIG.epFull), true),
-    )
-    if (Number.isFinite(singleRaw) && singleRaw > 0) next.epSingle = Math.trunc(singleRaw)
-    if (Number.isFinite(fullRaw) && fullRaw > 0) next.epFull = Math.trunc(fullRaw)
-  } catch {
-    // 兜底默认
-  }
-  next.tagsColor = isToggleEnabled(CONFIG_KEYS.ENRICH_TAGS_COLOR)
-  next.premiereColor = isToggleEnabled(CONFIG_KEYS.ENRICH_PREMIERE_COLOR)
-  next.platformColor = isToggleEnabled(CONFIG_KEYS.ENRICH_PLATFORM_COLOR)
-  next.autoCleanDuplicates = isToggleEnabled(CONFIG_KEYS.ENRICH_AUTO_CLEAN)
-  _enrichPreviewConfig = next
-  return next
-}
-
-/** 配置变更后清除缓存使下次读取重新加载（公开导出供设置页配置变更时调用） */
-export function resetEnrichPreviewConfig(): void {
-  _enrichPreviewConfig = null
 }
 
 function renderSourcePreview(ws: WpsWorksheet, mapping: EnrichColumnMapping): void {
@@ -3784,4 +3695,5 @@ function renderBatchSummary(): void {
 
 // ========== 导出 ==========
 
-export { state, cancelEnrichment, COLUMN_MAPPING_FIELDS }
+export { state, cancelEnrichment }
+export { COLUMN_MAPPING_FIELDS, resetEnrichPreviewConfig } from './enrich-page-state.js'
