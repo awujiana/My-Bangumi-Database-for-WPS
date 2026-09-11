@@ -795,7 +795,14 @@
     </div>
 
     <!-- 模态框覆盖层（结构保留，便于在 WPS 中复用） -->
-    <div id="detailModal" class="detail-modal" style="display: none">
+    <div
+      id="detailModal"
+      class="detail-modal"
+      role="dialog"
+      aria-modal="true"
+      aria-label="详细预览"
+      style="display: none"
+    >
       <div class="detail-modal-content">
         <div class="detail-modal-header">
           <h3>👁️ 详细预览</h3>
@@ -809,7 +816,14 @@
         <div class="detail-modal-body" id="detailModalBody"><div id="detailList"></div></div>
       </div>
     </div>
-    <div id="logModal" class="modal" style="display: none">
+    <div
+      id="logModal"
+      class="modal"
+      role="dialog"
+      aria-modal="true"
+      aria-label="系统日志"
+      style="display: none"
+    >
       <div class="modal-content" style="max-width: 800px">
         <div class="modal-header">
           <h3>📜 系统日志</h3>
@@ -820,13 +834,22 @@
         </div>
       </div>
     </div>
-    <div id="syncPreviewModal" class="modal sync-preview-modal" style="display: none">
+    <div
+      id="syncPreviewModal"
+      class="modal sync-preview-modal"
+      role="dialog"
+      aria-modal="true"
+      aria-label="同步预览数据"
+      style="display: none"
+    >
       <div class="modal-content">
         <div class="modal-header">
           <h3>同步预览数据</h3>
           <div class="sync-preview-modal-toolbar">
             <button id="syncAllBtn" class="modal-action-btn">全部同步</button
-            ><button id="closeSyncPreview">&times;</button>
+            ><button id="closeSyncPreview" class="modal-close-btn" aria-label="关闭">
+              &times;
+            </button>
           </div>
         </div>
         <div class="modal-body"></div>
