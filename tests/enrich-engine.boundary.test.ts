@@ -7,7 +7,6 @@
  *   - splitTags 空值/边界
  *   - mergeTags 空值/边界
  *   - appendFeatures 空值/边界
- *   - parseRemoteContent 空值/异常输入
  *   - getAnnotatedValue 白名单机制
  */
 
@@ -20,7 +19,6 @@ import {
   splitTags,
   mergeTags,
   appendFeatures,
-  parseRemoteContent,
 } from '../ts/sync/enrich-engine.js'
 
 // ========== normalizeName ==========
@@ -162,64 +160,6 @@ describe('appendFeatures 边界情况', () => {
 
   it('去重合并', () => {
     expect(appendFeatures('A | B', 'B | C')).toBe('A | B | C')
-  })
-})
-
-// ========== parseRemoteContent ==========
-describe('parseRemoteContent 边界情况', () => {
-  it('空字符串返回空数组', () => {
-    expect(parseRemoteContent('')).toEqual([])
-  })
-
-  it('null/undefined 返回空数组', () => {
-    // @ts-expect-error 测试边界：类型不允许 null/undefined，此处验证运行时容错行为
-    expect(parseRemoteContent(null)).toEqual([])
-    // @ts-expect-error 测试边界：类型不允许 null/undefined，此处验证运行时容错行为
-    expect(parseRemoteContent(undefined)).toEqual([])
-  })
-
-  it('纯空行返回空数组', () => {
-    expect(parseRemoteContent('\n'.repeat(3))).toEqual([])
-  })
-
-  it('单行 CSV', () => {
-    const result = parseRemoteContent('name,age\n张三,25')
-    expect(result).toHaveLength(1)
-    expect(result[0]).toEqual({ name: '张三', age: '25' })
-  })
-
-  it('多行 CSV', () => {
-    const result = parseRemoteContent('name,age\n张三,25\n李四,30')
-    expect(result).toHaveLength(2)
-    expect(result[0]).toEqual({ name: '张三', age: '25' })
-    expect(result[1]).toEqual({ name: '李四', age: '30' })
-  })
-
-  it('Tab 分隔符', () => {
-    const result = parseRemoteContent('name\tage\n张三\t25')
-    expect(result).toHaveLength(1)
-    expect(result[0]).toEqual({ name: '张三', age: '25' })
-  })
-
-  it('行数与列数不匹配，缺失值为空字符串', () => {
-    const result = parseRemoteContent('a,b,c\n1,2')
-    expect(result).toHaveLength(1)
-    expect(result[0]?.a).toBe('1')
-    expect(result[0]?.b).toBe('2')
-    expect(result[0]?.c).toBe('')
-  })
-
-  it('多余列被忽略', () => {
-    const result = parseRemoteContent('a,b\n1,2,3')
-    expect(result).toHaveLength(1)
-    expect(result[0]?.a).toBe('1')
-    expect(result[0]?.b).toBe('2')
-  })
-
-  it('CRLF 行尾正确处理', () => {
-    const result = parseRemoteContent('name,age\r\n张三,25\r\n')
-    expect(result).toHaveLength(1)
-    expect(result[0]).toEqual({ name: '张三', age: '25' })
   })
 })
 

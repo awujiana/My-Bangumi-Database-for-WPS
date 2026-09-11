@@ -412,8 +412,8 @@ ts/index.ts (thin barrel — 仅 re-export)
 - **`matchEntries()`**: 条目匹配（精确+别名双重匹配）
 - **`enrichEntries()`**: 富化执行（含进度回调、自动添加缺失列）
 - **`ensureBangumiColumns()`**: 自动检测缺失列并复制样式
-- **`parseRemoteContent()`**: 远程 JSONL/CSV 解析（含 null 输入防护）
-- **边界修复**: `getAnnotatedValue()` 空值守卫、`parseRemoteContent()` null 输入检查
+- **边界修复**: `getAnnotatedValue()` 空值守卫
+- 已移除：`fetchRemoteFile()` / `parseRemoteContent()` / `writeRemoteDataToSheet()`（v1 的「raw URL 直接拉 CSV 写表」路径，已被 `syncSourceRegistry` 的 JSONL 数据源（GitHub/GitLab/Gitee/本地文件/Gist）取代，无任何调用方）
 
 #### `enrichRecord.ts` — 富化记录表
 

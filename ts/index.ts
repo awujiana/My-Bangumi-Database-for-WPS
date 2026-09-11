@@ -581,10 +581,6 @@ export {
   ensureBangumiColumns,
   // 搜索与查询函数
   searchSheet,
-  // 远程仓库函数
-  fetchRemoteFile,
-  parseRemoteContent,
-  writeRemoteDataToSheet,
   // 富化引擎类型
   type EnrichColumnMapping,
   type EnrichConfig,
@@ -593,7 +589,6 @@ export {
   type EnrichedField,
   type ConflictInfo,
   type SearchResult,
-  type RemoteRepoConfig,
   type EnrichProgress,
   type ProgressCallback,
 } from './sync/enrich-engine.js'

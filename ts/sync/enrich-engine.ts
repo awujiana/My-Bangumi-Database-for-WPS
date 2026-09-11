@@ -1434,7 +1434,12 @@ function getAnnotatedValue(sourceKey: string, targetColName: string, value: stri
 
 /**
  * 检查并添加缺失的列到 Bangumi 追踪表
- * 返回更新后的列映射
+ *
+ * 语义（P2-6）：**全成或全不成**。只有表头写入并读回校验通过，新增列才会进入
+ * 返回的映射；失败时返回原映射（不含新列）并向用户提示，由下游按既有回退列处理。
+ * 因此调用方拿到的映射里出现的列，一定是本次确实可用的列。
+ *
+ * @returns 更新后的列映射（失败时为未含新列的入参映射）
  */
 export function ensureBangumiColumns(
   sheet: WpsWorksheet,
@@ -1458,9 +1463,16 @@ export function ensureBangumiColumns(
 
   if (missing.length === 0) return updatedMap
 
+  const firstNewCol = maxCol + 1
+  const lastNewCol = maxCol + missing.length
+  // 新增列的映射增量：**校验通过后**才合并进 updatedMap（不在 try 内提前 set）。
+  // 原实现在 try 内逐个 set 并在 catch 里静默返回，等于把"可能没写成表头"的列
+  // 当成已存在 → 下游按映射往空列写值，用户看到表头缺失 + 数据错位（P2-6）。
+  const additions: [string, number][] = []
+
   try {
     // 复制现有表头样式
-    const existingStyleCol = maxCol > 0 ? 1 : maxCol + 1
+    const existingStyleCol = maxCol > 0 ? 1 : firstNewCol
     const styleSourceRange = sheet.Range(
       `${WpsCellReference(headerRow, existingStyleCol)}:${WpsCellReference(headerRow, existingStyleCol)}`,
     )
@@ -1476,10 +1488,12 @@ export function ensureBangumiColumns(
 
     // 创建新列表头
     const headerRange = sheet.Range(
-      `${WpsCellReference(headerRow, maxCol + 1)}:${WpsCellReference(headerRow, maxCol + missing.length)}`,
+      `${WpsCellReference(headerRow, firstNewCol)}:${WpsCellReference(headerRow, lastNewCol)}`,
     )
-    const headers: string[][] = Array.from(missing, (m) => [m.field])
-    headerRange.Value = headers
+    // 单行范围必须写 1×N 数组：Excel/WPS 对二维数组**按数组自身形状**写入（不按
+    // 范围尺寸改写形状），N×1 会从起始列竖着写下去，覆盖起始列下方数据行的内容。
+    // 既有约定见 sync-record.ts 的表头写入 `headerRange.Value2 = [SYNC_RECORD_COLUMNS]`。
+    headerRange.Value = [missing.map((m) => m.field)]
 
     // 应用样式到新列
     try {
@@ -1502,21 +1516,37 @@ export function ensureBangumiColumns(
       bgmLog(LOG_LEVELS.WARN, '[ensureBangumiColumns] 复制样式失败，使用默认样式')
     }
 
-    for (const [index, missingField] of missing.entries()) {
-      const insertCol = maxCol + 1 + index
-      const { field } = missingField
-      if (field) {
-        updatedMap.set(field, insertCol)
-        bgmLog(
-          LOG_LEVELS.INFO,
-          `[ensureBangumiColumns] 新增列: ${field} → 第 ${String(insertCol)} 列 (样式已跟随现有列)`,
-        )
+    // 读回校验：COM 的批量赋值可能"部分成功"，读回是判断表头是否真落盘的唯一依据。
+    // 读失败（返回空）时**不据此下结论** —— 与 buildCache 同一降级口径：本次不判断，
+    // 下次运行时 getBangumiColumnMap 会从表头重新识别。
+    const readBack = readRangeValues(sheet, headerRow, headerRow, firstNewCol, lastNewCol)
+    const readBackRow = readBack[0]
+    if (readBackRow) {
+      // 按 missing 逐个比对（而非遍历读回结果）：读回列数不足时同样判为失败
+      const hasMismatch = missing.some((m, index) => readBackRow[index]?.trim() !== m.field)
+      if (hasMismatch) {
+        throw new Error('新列表头写入后读回校验不通过')
       }
     }
+
+    for (const [index, missingField] of missing.entries()) {
+      additions.push([missingField.field, firstNewCol + index])
+    }
   } catch (error) {
+    // 不做部分提交：写入失败的列一律不写进 colMap，下游会按既有回退列处理。
+    // 也**不清理**已写下的表头：读回可能因 COM 异常拿到空值，据不可靠信号去清空
+    // 会擦掉正确表头（数据丢失代价远高于残留一个空列）。
+    const errorMessage = error instanceof Error ? error.message : String(error)
+    bgmLog(LOG_LEVELS.ERROR, `[ensureBangumiColumns] 添加列失败: ${errorMessage}`)
+    getNotifyApi().toast(`自动添加缺失列失败：${errorMessage}。相关字段将回退到原有列。`, 'error')
+    return updatedMap
+  }
+
+  for (const [field, col] of additions) {
+    updatedMap.set(field, col)
     bgmLog(
-      LOG_LEVELS.ERROR,
-      `[ensureBangumiColumns] 添加列失败: ${error instanceof Error ? error.message : String(error)}`,
+      LOG_LEVELS.INFO,
+      `[ensureBangumiColumns] 新增列: ${field} → 第 ${String(col)} 列 (样式已跟随现有列)`,
     )
   }
 
@@ -2032,104 +2062,4 @@ export function searchSheet(
 
   bgmLog(LOG_LEVELS.INFO, `[searchSheet] 搜索 "${keyword}" 找到 ${String(results.length)} 条结果`)
   return results
-}
-
-// ========== 远程仓库下载 ==========
-
-/**
- * 远程仓库配置
- */
-export interface RemoteRepoConfig {
-  url: string
-  branch: string
-  filePath: string
-  localPath: string
-}
-
-/**
- * 从远程仓库获取文件内容（以 base64 方式）
- * 绕过中间列影响，直接下载原始数据
- */
-export async function fetchRemoteFile(config: RemoteRepoConfig): Promise<string | null> {
-  try {
-    const { url, branch, filePath } = config
-    const rawUrl = `${url}/raw/${branch}/${filePath}`
-
-    bgmLog(LOG_LEVELS.INFO, `[fetchRemoteFile] 正在获取: ${rawUrl}`)
-
-    const response = await fetch(rawUrl)
-    if (!response.ok) {
-      throw new Error(`HTTP ${String(response.status)}: ${response.statusText}`)
-    }
-
-    const content = await response.text()
-    bgmLog(LOG_LEVELS.INFO, `[fetchRemoteFile] 下载成功: ${String(content.length)} 字节`)
-    return content
-  } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : String(error)
-    bgmLog(LOG_LEVELS.ERROR, `[fetchRemoteFile] 下载失败: ${errorMessage}`)
-    return null
-  }
-}
-
-/**
- * 解析远程文件内容为 Excel 可导入格式
- * 支持 CSV/TSV 纯文本格式，不受中间列干扰
- */
-export function parseRemoteContent(content: string): Record<string, string>[] {
-  const records: Record<string, string>[] = []
-  if (!content) return records
-  const lines = content.split(/\r?\n/).filter((line) => line.trim())
-
-  if (lines.length === 0) return records
-
-  const firstLine = lines[0]
-  if (firstLine === undefined) return records
-
-  const delimiter = firstLine.includes('\t') ? '\t' : ','
-  const headers = firstLine.split(delimiter).map((h) => h.trim())
-
-  for (let index = 1; index < lines.length; index += 1) {
-    const line = lines[index]
-    if (line !== undefined) {
-      const values = line.split(delimiter)
-      const record: Record<string, string> = {}
-      for (const [colIndex, key] of headers.entries()) {
-        const value = values[colIndex]
-        record[key] = value ?? ''
-      }
-      records.push(record)
-    }
-  }
-
-  bgmLog(LOG_LEVELS.INFO, `[parseRemoteContent] 解析 ${String(records.length)} 条记录`)
-  return records
-}
-
-/**
- * 将远程获取的数据写入工作表
- * 支持指定列映射，避免中间列影响
- */
-export function writeRemoteDataToSheet(
-  sheet: WpsWorksheet,
-  data: Record<string, string>[],
-  colMap: Map<string, number>,
-  startRow: number,
-): number {
-  let row = startRow
-  let written = 0
-
-  for (const record of data) {
-    for (const [field, value] of Object.entries(record)) {
-      const col = colMap.get(field)
-      if (col !== undefined && value) {
-        setCellValue(sheet, row, col, value)
-      }
-    }
-    row += 1
-    written += 1
-  }
-
-  bgmLog(LOG_LEVELS.INFO, `[writeRemoteDataToSheet] 写入 ${String(written)} 行数据`)
-  return written
 }
