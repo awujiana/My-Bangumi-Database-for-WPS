@@ -97,7 +97,17 @@ export function getEnrichPreviewConfig(): EnrichPreviewConfig {
   return next
 }
 
-/** 配置变更后清除缓存使下次读取重新加载（公开导出供设置页配置变更时调用） */
+/**
+ * 清除缓存，使下次 `getEnrichPreviewConfig()` 重新从配置读取。
+ *
+ * 调用时机：富化页的两个预览渲染入口（`renderSourcePreview` /
+ * `renderMatchResultsToTable`）在渲染前各调一次 —— 缓存的意义是避免逐单元格读
+ * PluginStorage，而渲染入口每轮预览只跑一次，重读开销可忽略，却能让设置页的改动
+ * 在本页立即生效（无需重开富化页）。
+ *
+ * 注：设置页与富化页是**不同任务窗格（不同 realm）**，设置页调本函数只会清自己
+ * 那份从未填充的缓存，因此不要从设置页跨页调用 —— 靠富化页自己重读才是正确做法。
+ */
 export function resetEnrichPreviewConfig(): void {
   _enrichPreviewConfig = null
 }

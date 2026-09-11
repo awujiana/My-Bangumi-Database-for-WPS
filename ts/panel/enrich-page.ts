@@ -69,7 +69,11 @@ import {
 import { findWorkbookByName, getOpenWorkbooks } from '../tools/locked-sheet.js'
 import type { WpsWorksheet, WpsWorkbook } from '../tools/wps.js'
 import { recomputeScrollspy } from './shell-nav.js'
-import { COLUMN_MAPPING_FIELDS, getEnrichPreviewConfig } from './enrich-page-state.js'
+import {
+  COLUMN_MAPPING_FIELDS,
+  getEnrichPreviewConfig,
+  resetEnrichPreviewConfig,
+} from './enrich-page-state.js'
 import type { ScalarMappingKey } from './enrich-page-state.js'
 import { renderPlatformChipsCell, renderPreviewCell } from './enrich-preview-cell.js'
 import { renderEnrichDetailHtml } from './enrich-detail-render.js'
@@ -1603,6 +1607,9 @@ const TARGET_CMP_FIELDS: { colKey: string; label: string; fallbackColKey?: strin
 function renderSourcePreview(ws: WpsWorksheet, mapping: EnrichColumnMapping): void {
   const tableContainer = safeGetElement('sourceTable')
   if (!tableContainer) return
+  // 预览配置按页加载缓存（避免逐单元格读 PluginStorage）。此处是「每次预览只跑一次」
+  // 的入口，重读一次配置即可让设置页的改动在本页立即生效，无需重开富化页。
+  resetEnrichPreviewConfig()
 
   const { dataStartRow } = state
 
@@ -2046,6 +2053,8 @@ function hideMatchDetail(): void {
 function renderMatchResultsToTable(matches: MatchResult[]): void {
   const tbodyElement = safeGetElement('matchTable')?.querySelector('tbody')
   if (!tbodyElement) return
+  // 同 renderSourcePreview：每次匹配预览重读一次富化预览配置
+  resetEnrichPreviewConfig()
 
   // 目标表列映射：按目标表表头动态读取对比字段
   const sourceSheet = state.animeSourceSheet

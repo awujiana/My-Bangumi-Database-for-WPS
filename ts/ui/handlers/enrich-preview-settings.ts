@@ -10,7 +10,8 @@
  *   - bgm_enrich_platform_color   播放平台着色开关（默认开）
  *   - bgm_enrich_auto_clean       富化后自动合并去重开关（默认开）
  *
- * 富化页在每次页面加载时懒读取配置，因此设置页保存后无需跨页通知。
+ * 富化页在每次渲染预览前重读配置，因此设置页保存后无需跨页通知
+ * （跨页 postMessage 只会发到 parent/top/self，推不到作为兄弟窗格的富化页）。
  *
  * @module ui/handlers/enrich-preview-settings
  */
@@ -117,7 +118,7 @@ export function saveEnrichPreviewSettings(): void {
       resetNoiseKeywordCache()
     }
 
-    BGM.Dialog.alert('成功', '富化预览设置已保存，重新打开富化页预览即生效')
+    BGM.Dialog.alert('成功', '富化预览设置已保存，下次预览即生效')
   } catch (error: unknown) {
     BGM.handleError(error, { context: 'saveEnrichPreviewSettings', showAlert: true })
   }
