@@ -8,6 +8,31 @@
 
 ## [未发布]
 
+### 修复（数据安全 · 自动添加列不再静默部分成功，P2-6）
+
+- **问题**：`ensureBangumiColumns()` 在 `try` 内逐个把新列写进映射、`catch` 里只记日志后**返回已部分更新的映射** —— 表头其实没写成功时，映射里已经有这些列，下游便按映射往空列写值。用户看到的是「表头缺失 + 数据错位」，且无法回滚。
+- **改法（全成或全不成）**：写入表头 → **读回校验** → 校验通过才把新列合并进映射；失败则返回不含新列的映射并 `toast` 提示用户（下游按既有回退列处理）。读回拿不到数据时**不据此判失败**（与 `buildCache` 同一降级口径：本次不下结论，下次运行从表头重新识别）。
+- **实施顺带修掉一处会改用户数据的真缺陷**：表头值原为 `Array.from(missing, (m) => [m.field])`，即 **N×1**，而范围是单行 `C1:E1`。Excel/WPS 对二维数组是**按数组自身形状写入**的（不按范围尺寸改写形状），因此第二个表头会落到起始列**下方那一行**，覆盖该行数据。既有约定（`sync-record.ts` 的表头写入）是 `headerRange.Value2 = [COLUMNS]`（1×N），据此改为 `[missing.map((m) => m.field)]`。
+- 该函数此前**零测试覆盖**（正是这类「单元测试全绿、真机上改数据」缺陷的温床）。新增 `tests/enrich-engine.columns.test.ts`（6 条），锁死写入成功、读回为空、读回列数不足、写入抛错、读回本身失败、无缺失列六种情形。
+
+### 修复（异步 · 数据同步的写入阶段可被「停止」中断，P2-7）
+
+- **问题**：`AbortSignal` 只作用于下载阶段。用户点「停止」后 `applyDiffToSheet()` 仍会把整批 diff 写完（原注释「`applyDiffToSheet` 为同步函数，不支持取消」即是自认），进度状态与实际不符。
+- **改法**：`applyDiffToSheet()` 增加可选 `signal`，在**每个 add 批次 / update 批次 / 每条 delete** 前各检查一次取消；已完成的下载阶段就已被取消时直接不进入写入。未处理条目计入 `result.skipped`，并如实上报「已停止：已写入 N 条，剩余 M 条未处理」。
+- **已写入部分不回滚**：同步记录、undo 栈、行颜色都按**实际写入量**收敛，保证「表里有什么」与「记录里写了什么」一致（否则正是 P1-E 要消除的静默不一致）。
+- 两条入口 `syncFromGithub` / `syncFromRemote` 透传 `signal`；面板侧收尾按 `wasStopped` 把摘要标成「⏹️ 已停止（写入阶段中断）」，进度弹窗与结果弹窗都不再报成一次完整同步。新增 2 条测试。
+
+### 性能（面板 · 首屏不再被全工作簿扫描阻塞，P2-13）
+
+- **问题**：`initPanelCore()` 里 `refreshSheets` / `refreshWorkbooks` / `autoDetectSheet` / 首帧预览全部同步执行，而 `autoDetectSheet` → `findBangumiTargetSheets()` 会遍历**每个已打开工作簿的每一张工作表**（读表头、数数据行、比名称关键词）。工作簿一多，任务窗格打开就明显卡住。
+- **改法**：这四步收进 `bootstrapSheetSelection()`，用 `setTimeout(…, 0)` 挪到首屏之后。用**宏任务**而非微任务 —— 微任务仍在本次渲染前执行，等于没挪。`bgm:modulesReady` 仍在 `initPanelCore` 内同步派发，因此按钮可用性不受影响；`restoreLockedSheet()` 保持同步（只读 PluginStorage），`BGM.sheet` 状态与原先一样在初始化返回时就绪。
+
+### 移除（死代码 · 废弃的远程仓库下载三函数，P2-4/P2-5）
+
+- **背景**：审查报告 P2-4/P2-5 指出 `fetchRemoteFile`（裸 `fetch`，无超时/无 `AbortSignal`）与其 `catch → null` 会让「网络悬挂时任务永久卡死」「以空数据覆盖本地有效数据」。
+- **现场核实：条目锚定的代码没有调用方，两条风险不可达**。`fetchRemoteFile` / `parseRemoteContent` / `writeRemoteDataToSheet` 是 v1 的「raw URL 直接拉 CSV/TSV 写表」实现，已被 `syncSourceRegistry` 的 JSONL 数据源（GitHub/GitLab/Gitee/本地文件/Gist，超时与 `AbortSignal` 齐备）取代 —— 全库零生产调用、零测试引用（仅 `parseRemoteContent` 有 9 条自测）、barrel 无全局暴露，UI 的「🗄️ 数据同步」走的是 registry。
+- **处置**：删除这套平行实现，而不是为一个不存在的调用方补超时与 `Result`。barrel 导出、对应测试块与 `文档/ARCHITECTURE.md` 的说明同步清理（与 P2-8「清理死代码」同性质）。
+
 ### 新增（工程化 · `tests/` 类型门禁 `npm run typecheck:tests`）
 
 - **问题**：`tests/tsconfig.json` 早已存在，但**没有任何脚本运行它** —— `tsc` 主门禁只覆盖 `ts/`，于是 `tests/` 里 **254 个类型错误**长期无人知晓。这些错误本身就是证据：mock 的形状与真实接口脱节、断言参数与签名不符，个别还指向生产代码的类型缺口（如 `GithubRemoteEntry` 缺 `desc`/`rating`、`SyncTimeFilter` 缺 `'week'`）。
