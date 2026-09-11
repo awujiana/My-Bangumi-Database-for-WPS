@@ -27,6 +27,7 @@ import {
   getCellValue,
   setCellValue,
   readRangeValues,
+  readRangeCellValues,
 } from '../tools/util/index.js'
 import type { WpsCellValue, WpsWorksheet } from '../tools/wps.js'
 
@@ -689,6 +690,41 @@ export function __resetSyncRecordCache(): void {
 }
 
 /**
+ * 构造「已存在 SID」的整行更新值（整行读-改-写，替代逐单元格 setCellValue）。
+ * 以读回的原始整行（保留类型）为底，仅覆盖本次显式提供的字段。
+ * @param existing 读回的原始整行，长度不足时以 '' 补齐
+ * @param parameters 本次提供的字段
+ * @param now 当前时间戳字符串
+ * @param updatedCount 累加后的次数
+ * @param statusOverride 当非空时覆盖 STATUS 列（批量路径始终传入；单条路径仅在提供时传入）
+ */
+function buildUpdatedSyncRow(
+  existing: WpsCellValue[],
+  parameters: UpdateRecordParameters,
+  now: string,
+  updatedCount: number,
+  statusOverride: string | undefined,
+): WpsCellValue[] {
+  const rowValues: WpsCellValue[] = Array.from(
+    { length: SYNC_RECORD_COLUMNS.length },
+    (_, index) => existing[index] ?? '',
+  )
+  rowValues[SYNC_RECORD_COL.TIME - 1] = now
+  rowValues[SYNC_RECORD_COL.COUNT - 1] = updatedCount
+  if (statusOverride !== undefined) rowValues[SYNC_RECORD_COL.STATUS - 1] = statusOverride
+  if (parameters.message) rowValues[SYNC_RECORD_COL.MESSAGE - 1] = parameters.message
+  if (parameters.fingerprint !== undefined)
+    rowValues[SYNC_RECORD_COL.FINGERPRINT - 1] = parameters.fingerprint
+  if (parameters.name) rowValues[SYNC_RECORD_COL.NAME - 1] = parameters.name
+  if (parameters.url) rowValues[SYNC_RECORD_COL.URL - 1] = parameters.url
+  if (parameters.type) rowValues[SYNC_RECORD_COL.TYPE - 1] = parameters.type
+  if (parameters.source) rowValues[SYNC_RECORD_COL.SOURCE - 1] = parameters.source
+  if (parameters.content) rowValues[SYNC_RECORD_COL.CONTENT - 1] = parameters.content
+  if (parameters.collType) rowValues[SYNC_RECORD_COL.COLL_TYPE - 1] = parameters.collType
+  return rowValues
+}
+
+/**
  * appendOrUpdateSyncRecord（自 try 块抽离，降低 unicorn/try-complexity 计数）
  */
 function appendOrUpdateSyncRecord(parameters: UpdateRecordParameters) {
@@ -718,10 +754,7 @@ function appendOrUpdateSyncRecord(parameters: UpdateRecordParameters) {
     const finalCount = parameters.count ?? 1
 
     // 性能（P1-C）：一次 Range.Value2 写入整行，替代 12 次 setCellValue（跨进程 COM 调用）
-    const rowValues: WpsCellValue[] = Array.from(
-      { length: SYNC_RECORD_COLUMNS.length },
-      () => '',
-    )
+    const rowValues: WpsCellValue[] = Array.from({ length: SYNC_RECORD_COLUMNS.length }, () => '')
     rowValues[SYNC_RECORD_COL.TIME - 1] = now
     rowValues[SYNC_RECORD_COL.NAME - 1] = parameters.name ?? ''
     rowValues[SYNC_RECORD_COL.URL - 1] = parameters.url ?? ''
@@ -757,29 +790,30 @@ function appendOrUpdateSyncRecord(parameters: UpdateRecordParameters) {
       ...(parameters.collType && { collType: parameters.collType }),
     })
   } else {
-    const existingCount =
-      Math.trunc(Number(getCellValue(sheet, existingRow, SYNC_RECORD_COL.COUNT))) || 0
+    // 性能（P1-C 残留）：整行一次矩形读（保留原始类型），读-改-写整行，
+    // 替代 11 次 setCellValue。读回失败（空数组）则放弃写入并返回 false，
+    // 避免用空值覆盖整行、静默清空用户同步记录。
+    const existingRows = readRangeCellValues(
+      sheet,
+      existingRow,
+      existingRow,
+      1,
+      SYNC_RECORD_COLUMNS.length,
+    )
+    const existing = existingRows[0]
+    if (!existing) return false
+    const existingCount = Math.trunc(Number(existing[SYNC_RECORD_COL.COUNT - 1])) || 0
     const updatedCount = existingCount + (parameters.count ?? 1)
     const finalStatus = parameters.status ?? SYNC_STATUS.SUCCESS
 
-    // 更新时间戳
-    setCellValue(sheet, existingRow, SYNC_RECORD_COL.TIME, now)
-    setCellValue(sheet, existingRow, SYNC_RECORD_COL.COUNT, updatedCount)
-    if (parameters.status)
-      setCellValue(sheet, existingRow, SYNC_RECORD_COL.STATUS, parameters.status)
-    if (parameters.message)
-      setCellValue(sheet, existingRow, SYNC_RECORD_COL.MESSAGE, parameters.message)
-    if (parameters.fingerprint !== undefined)
-      setCellValue(sheet, existingRow, SYNC_RECORD_COL.FINGERPRINT, parameters.fingerprint)
-    if (parameters.name) setCellValue(sheet, existingRow, SYNC_RECORD_COL.NAME, parameters.name)
-    if (parameters.url) setCellValue(sheet, existingRow, SYNC_RECORD_COL.URL, parameters.url)
-    if (parameters.type) setCellValue(sheet, existingRow, SYNC_RECORD_COL.TYPE, parameters.type)
-    if (parameters.source)
-      setCellValue(sheet, existingRow, SYNC_RECORD_COL.SOURCE, parameters.source)
-    if (parameters.content)
-      setCellValue(sheet, existingRow, SYNC_RECORD_COL.CONTENT, parameters.content)
-    if (parameters.collType)
-      setCellValue(sheet, existingRow, SYNC_RECORD_COL.COLL_TYPE, parameters.collType)
+    const rowValues = buildUpdatedSyncRow(
+      existing,
+      parameters,
+      now,
+      updatedCount,
+      parameters.status,
+    )
+    writeSheetRows(sheet, existingRow, [rowValues])
 
     setSyncRecordColors(sheet, existingRow, finalStatus, updatedCount)
 
@@ -864,22 +898,17 @@ function appendOrUpdateSyncRecords(records: UpdateRecordParameters[]) {
     }
   }
 
-  // 更新已有 SID 的时间、次数、状态及其他字段
+  // 更新已有 SID 的时间、次数、状态及其他字段（整行读-改-写，替代逐单元格 setCellValue）
   for (const [sid, { row, updatedCount, status, params }] of sidToUpdate) {
-    setCellValue(sheet, row, SYNC_RECORD_COL.TIME, now)
-    setCellValue(sheet, row, SYNC_RECORD_COL.COUNT, updatedCount)
-    setCellValue(sheet, row, SYNC_RECORD_COL.STATUS, status)
-    if (params.name) setCellValue(sheet, row, SYNC_RECORD_COL.NAME, params.name)
-    if (params.url) setCellValue(sheet, row, SYNC_RECORD_COL.URL, params.url)
-    if (params.type) setCellValue(sheet, row, SYNC_RECORD_COL.TYPE, params.type)
-    if (params.source) setCellValue(sheet, row, SYNC_RECORD_COL.SOURCE, params.source)
-    if (params.content) setCellValue(sheet, row, SYNC_RECORD_COL.CONTENT, params.content)
-    if (params.message) setCellValue(sheet, row, SYNC_RECORD_COL.MESSAGE, params.message)
-    if (params.fingerprint !== undefined)
-      setCellValue(sheet, row, SYNC_RECORD_COL.FINGERPRINT, params.fingerprint)
-    if (params.collType) setCellValue(sheet, row, SYNC_RECORD_COL.COLL_TYPE, params.collType)
-    setSyncRecordColors(sheet, row, status, updatedCount)
-    _syncRecordSidCache.set(sid, row)
+    const existingRows = readRangeCellValues(sheet, row, row, 1, SYNC_RECORD_COLUMNS.length)
+    const existing = existingRows[0]
+    if (existing) {
+      const rowValues = buildUpdatedSyncRow(existing, params, now, updatedCount, status)
+      writeSheetRows(sheet, row, [rowValues])
+      setSyncRecordColors(sheet, row, status, updatedCount)
+      _syncRecordSidCache.set(sid, row)
+    }
+    // 读回失败：放弃该行的更新，避免用空值覆盖整行
   }
 
   invalidateCache()

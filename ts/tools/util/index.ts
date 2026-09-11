@@ -38,6 +38,7 @@ import type { WpsApp, WpsWorksheet } from '../wps.js'
 export { getCell, getCellValue, setCellValue, getSheetByIndex } from './cell.js'
 export {
   readRangeValues,
+  readRangeCellValues,
   cacheGet,
   findHeaderRow,
   getColumnMap,

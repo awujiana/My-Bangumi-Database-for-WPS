@@ -12,7 +12,7 @@ import {
   STANDARD_HEADERS,
 } from '../../core/constants.js'
 import { colNumberToLetter, trim } from '../string-utilities.js'
-import type { WpsWorksheet } from '../wps.js'
+import type { WpsCellValue, WpsWorksheet } from '../wps.js'
 
 // 循环依赖：仅在函数体内使用 BGM/bgmLog/getApp，运行时安全
 import { getCellValue } from './cell.js'
@@ -89,6 +89,29 @@ function safeCellValue(cell: unknown): string {
   return safeStringify(cell)
 }
 
+/**
+ * 将 WPS 桥接层返回的未知值按**原始类型**保留为 `WpsCellValue`：
+ * - null/undefined / 原生代码对象（WPS 内部 Proxy）/ 函数 → `null`
+ *   （返回 `null` 而非 `''`，避免读-改-写整行时把数字列覆盖成文本列）
+ * - string / number / boolean / Date → 原样保留
+ * 与 `safeCellValue`（一律 `String()` 化）形成对照：本函数用于需要保持
+ * 单元格原始类型的场景（如「已存在 SID 的逐字段更新」整行读-改-写）。
+ */
+function preserveCellValue(cell: unknown): WpsCellValue {
+  if (cell == null) return null
+  if (isNativeCode(cell)) return null
+  if (typeof cell === 'function') return null
+  if (
+    typeof cell === 'string' ||
+    typeof cell === 'number' ||
+    typeof cell === 'boolean' ||
+    cell instanceof Date
+  ) {
+    return cell
+  }
+  return null
+}
+
 export function readRangeValues(
   ws: WpsWorksheet | null | undefined,
   startRow: number,
@@ -114,6 +137,50 @@ export function readRangeValues(
         result.push(row.map((cell: unknown) => safeCellValue(cell)))
       } else {
         result.push([safeCellValue(row)])
+      }
+    }
+    return result
+  } catch {
+    return []
+  }
+}
+
+/**
+ * 批量读取工作表中指定范围的值，**保留单元格原始类型**，返回 `WpsCellValue` 二维数组 [行][列]。
+ * 与 `readRangeValues`（一律 `String()` 化）不同，本函数用于「读-改-写整行」场景：
+ * 读回的 number/Date 不会被强转成字符串，从而避免整行写回时把数字列变成文本列。
+ * 如果读取失败则返回空数组，调用方**必须**据此放弃写入（绝不能拿空数组覆盖整行，否则会清空用户数据）。
+ * @param ws 工作表对象
+ * @param startRow 起始行
+ * @param endRow 结束行
+ * @param startCol 起始列
+ * @param endCol 结束列
+ * @returns `WpsCellValue` 二维数组（失败时为空数组）
+ */
+export function readRangeCellValues(
+  ws: WpsWorksheet | null | undefined,
+  startRow: number,
+  endRow: number,
+  startCol: number,
+  endCol: number,
+): WpsCellValue[][] {
+  if (!ws) return []
+  try {
+    const range = ws.Range(
+      `${colNumberToLetter(startCol)}${String(startRow)}:${colNumberToLetter(endCol)}${String(endRow)}`,
+    )
+    const raw = (range as unknown as { Value2?: unknown }).Value2
+    if (!raw) return []
+    // 处理单个值的情况
+    if (!Array.isArray(raw)) {
+      return [[preserveCellValue(raw)]]
+    }
+    const result: WpsCellValue[][] = []
+    for (const row of raw) {
+      if (Array.isArray(row)) {
+        result.push(row.map((cell: unknown) => preserveCellValue(cell)))
+      } else {
+        result.push([preserveCellValue(row)])
       }
     }
     return result

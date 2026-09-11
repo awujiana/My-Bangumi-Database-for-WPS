@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
-import type { WpsRange, WpsWorksheet } from '../ts/tools/wps.js'
+import type { WpsCellValue, WpsRange, WpsWorksheet } from '../ts/tools/wps.js'
 
 const {
   SYNC_RECORD_COLUMNS,
@@ -94,6 +94,7 @@ const mockColNumberToLetter = vi.hoisted(() =>
 const mockGetCellValue = vi.hoisted(() => vi.fn().mockReturnValue(''))
 const mockSetCellValue = vi.hoisted(() => vi.fn().mockReturnValue(true))
 const mockReadRangeValues = vi.hoisted(() => vi.fn().mockReturnValue([]))
+const mockReadRangeCellValues = vi.hoisted(() => vi.fn().mockReturnValue([]))
 
 vi.mock('../ts/tools/util/index.js', () => ({
   bgmLog: mockBgmLogn,
@@ -103,6 +104,9 @@ vi.mock('../ts/tools/util/index.js', () => ({
   getCellValue: mockGetCellValue,
   setCellValue: mockSetCellValue,
   readRangeValues: mockReadRangeValues,
+  // P1-C 残留：更新路径整行读-改-写用 readRangeCellValues（保留原始类型）。
+  // 默认与 readRangeValues 同数据；更新路径用例按需覆盖为「已写入的行」。
+  readRangeCellValues: mockReadRangeCellValues,
   BGM: {
     handleError: vi.fn(),
     Color: BGM_COLOR,
@@ -132,6 +136,9 @@ import {
  */
 const rangeWrites = new Map<string, unknown>()
 
+/** 让批量写入的 Range.Value2 赋值抛出异常（模拟写入失败，验证错误可见性 / 返回 false） */
+const mockRangeWriteThrows = { value: false }
+
 /** 取出某地址最后一次批量写入的数据（无写入时为空数组） */
 function getWrittenRows(address: string): unknown[][] {
   const value = rangeWrites.get(address)
@@ -148,6 +155,9 @@ function createRangeStub(address: string) {
       return rangeWrites.get(address) ?? null
     },
     set Value2(value: unknown) {
+      if (mockRangeWriteThrows.value) {
+        throw new Error('批量写入失败')
+      }
       rangeWrites.set(address, value)
     },
   }
@@ -241,6 +251,12 @@ describe('syncRecord', () => {
     mockSetCellValue.mockReturnValue(true)
     mockGetLastRow.mockReturnValue(10)
     mockReadRangeValues.mockReturnValue([])
+    // P1-C 残留：更新路径整行读-改-写依赖 readRangeCellValues。默认与 readRangeValues
+    // 同数据（单条/批量更新用例提供的「已存在行」通常即 mockReadRangeValues 的首行），
+    // 多行/Proxy 用例按需显式覆盖。
+    mockReadRangeCellValues.mockImplementation(() => mockReadRangeValues() as WpsCellValue[][])
+    mockRangeWriteThrows.value = false
+    rangeWrites.clear()
     mockGetSyncRecordEnabled.mockReturnValue(true)
     mockSetCellValue.mockClear()
     mockBgmLogn.mockClear()
@@ -955,12 +971,10 @@ describe('syncRecord', () => {
           '',
         ],
       ])
-      // mock setCellValue 抛出异常，触发更新路径的错误
-      mockSetCellValue.mockImplementation(() => {
-        throw new Error('批量写入失败')
-      })
+      // 让批量写入（writeSheetRows → Range.Value2）抛出异常，触发更新路径的错误可见性
+      mockRangeWriteThrows.value = true
       // 用相同 SID 批量添加，buildCache 会从 readRangeValues 中找到该 SID
-      // 然后走更新路径时调用 setCellValue 抛出异常
+      // 然后走更新路径时 writeSheetRows 抛出异常
       const isResult = addSyncRecords([
         { sid: 'fail-batch', name: '更新', url: 'http://fail.com/2', type: '看', count: 2 },
       ])
@@ -1268,25 +1282,24 @@ describe('syncRecord', () => {
       })
 
       expect(isResult).toBe(true)
-      // 验证所有可选字段都被写入（更新分支仍逐字段写入，行号取缓存命中的 2）
-      expect(mockSetCellValue).toHaveBeenCalledWith(
-        expect.anything(),
-        2,
-        SYNC_RECORD_COL.NAME,
-        '新名称',
-      )
-      expect(mockSetCellValue).toHaveBeenCalledWith(
-        expect.anything(),
-        2,
-        SYNC_RECORD_COL.COLL_TYPE,
-        '想',
-      )
-      expect(mockSetCellValue).toHaveBeenCalledWith(
-        expect.anything(),
-        2,
-        SYNC_RECORD_COL.FINGERPRINT,
-        'new-fp',
-      )
+      // P1-C 残留：更新改为整行读-改-写（Range.Value2 一次落盘），不再逐单元格 setCellValue。
+      // 校验整行落盘内容：SID/时间外，全部可选字段均已覆盖，次数 = 原 1 + 本次 2 = 3。
+      expect(getWrittenRows('A2:L2')).toEqual([
+        [
+          'existing-sid',
+          expect.any(String),
+          '新名称',
+          'http://new.com',
+          'movie',
+          'local',
+          3,
+          '新内容',
+          'success',
+          '想',
+          '测试消息',
+          'new-fp',
+        ],
+      ])
     })
 
     it('更新时可选字段为空则跳过对应分支', () => {
@@ -1519,9 +1532,8 @@ describe('syncRecord', () => {
       ])
 
       expect(isResult).toBe(true)
-      // 更新路径：TIME, COUNT, STATUS, NAME, URL, TYPE, SOURCE, CONTENT, MESSAGE, FINGERPRINT, COLL_TYPE
-      const cellWriteCalls = mockSetCellValue.mock.calls
-      expect(cellWriteCalls.length).toBeGreaterThanOrEqual(10)
+      // 更新路径：整行读-改-写经 writeSheetRows 落盘，不再逐单元格 setCellValue
+      expect(rangeWrites.size).toBeGreaterThan(0)
     })
 
     it('更新时部分可选字段为空则跳过对应分支', () => {
@@ -1570,9 +1582,8 @@ describe('syncRecord', () => {
       ])
 
       expect(isResult).toBe(true)
-      // 至少有 TIME, COUNT, STATUS, URL 被写入
-      const cellWriteCalls = mockSetCellValue.mock.calls
-      expect(cellWriteCalls.length).toBeGreaterThanOrEqual(3)
+      // 更新路径：整行读-改-写经 writeSheetRows 落盘，不再逐单元格 setCellValue
+      expect(rangeWrites.size).toBeGreaterThan(0)
     })
   })
 })
@@ -1593,7 +1604,8 @@ describe('getStatusColor 默认分支 (line 93)', () => {
     })
 
     expect(isResult).toBe(true)
-    expect(mockSetCellValue.mock.calls.length).toBeGreaterThan(0)
+    // 数据经 writeSheetRows（Range.Value2）落盘，不再逐单元格 setCellValue
+    expect(rangeWrites.size).toBeGreaterThan(0)
   })
 
   it('SUCCESS 状态应返回 SUCCESS 颜色', () => {
@@ -1719,8 +1731,8 @@ describe('addSyncRecord 更新路径 (lines 405-440)', () => {
     })
 
     expect(isResult).toBe(true)
-    const cellWriteCalls = mockSetCellValue.mock.calls
-    expect(cellWriteCalls.length).toBeGreaterThanOrEqual(5)
+    // 更新路径：整行读-改-写经 writeSheetRows 落盘，不再逐单元格 setCellValue
+    expect(rangeWrites.size).toBeGreaterThan(0)
   })
 
   it('更新时 name 字段为空则跳过该分支', () => {
@@ -1755,8 +1767,8 @@ describe('addSyncRecord 更新路径 (lines 405-440)', () => {
     })
 
     expect(isResult).toBe(true)
-    const cellWriteCalls = mockSetCellValue.mock.calls
-    expect(cellWriteCalls.length).toBeGreaterThanOrEqual(3)
+    // 更新路径：整行读-改-写经 writeSheetRows 落盘，不再逐单元格 setCellValue
+    expect(rangeWrites.size).toBeGreaterThan(0)
   })
 
   it('更新时 collType 字段为空则跳过该分支', () => {
@@ -2498,6 +2510,24 @@ describe('buildCache 内层 catch 精确覆盖 (line 343)', () => {
         'fp-343',
       ],
     ])
+    // 更新路径整行读-改-写需要「已存在行」的原始整行：用正常行（跳过抛异常的 Proxy 行），
+    // 否则 readRangeCellValues 返回 Proxy 会在 buildUpdatedSyncRow 读列时再次抛错。
+    mockReadRangeCellValues.mockReturnValue([
+      [
+        'valid-sid-343',
+        '2024-01-01T00:00:00',
+        '正常名称',
+        'http://valid343.com',
+        'TV',
+        'github',
+        '1',
+        '正常内容',
+        'success',
+        '看',
+        '备注',
+        'fp-343',
+      ],
+    ])
 
     mockGetCellValue.mockImplementation((_sheet: unknown, _row: number, col: number) => {
       if (col === 1) return 'valid-sid-343'
@@ -2536,6 +2566,23 @@ describe('buildCache 内层 catch 精确覆盖 (line 343)', () => {
     mockReadRangeValues.mockReturnValue([
       throwingProxy1,
       throwingProxy2,
+      [
+        'valid-sid-343b',
+        '2024-01-01T00:00:00',
+        '正常名称B',
+        'http://valid343b.com',
+        'TV',
+        'github',
+        '1',
+        '正常内容B',
+        'success',
+        '看',
+        '备注B',
+        'fp-343b',
+      ],
+    ])
+    // 更新路径整行读-改-写需要「已存在行」的原始整行：用正常行（跳过抛异常的 Proxy 行）。
+    mockReadRangeCellValues.mockReturnValue([
       [
         'valid-sid-343b',
         '2024-01-01T00:00:00',
