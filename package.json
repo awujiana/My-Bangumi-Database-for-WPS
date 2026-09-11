@@ -12,8 +12,9 @@
     "lint:check": "eslint ts tests",
     "check:dompurify-version": "node scripts/check-dompurify-version.mjs",
     "check:cycles": "node scripts/check-import-cycles.mjs",
+    "check:ribbon-buttons": "node scripts/check-ribbon-buttons.mjs",
     "typecheck:tests": "node scripts/check-tests-types.mjs",
-    "gate": "npm run lint:check && npm run check:dompurify-version && npm run check:cycles && npm run typecheck:tests && npm run test",
+    "gate": "npm run lint:check && npm run check:dompurify-version && npm run check:cycles && npm run check:ribbon-buttons && npm run typecheck:tests && npm run test",
     "format": "prettier --write ts/ tests/",
     "format:check": "prettier --check ts/ tests/",
     "prepare": "husky",
@@ -57,7 +58,7 @@
   },
   "dependencies": {
     "@types/dompurify": "^3.0.5",
-    "dompurify": "^3.4.12",
+    "dompurify": "^3.4.15",
     "zod": "^4.4.3"
   }
 }
