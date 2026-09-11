@@ -449,3 +449,21 @@
   background: rgba(243, 139, 168, 0.12);
   border-color: rgba(243, 139, 168, 0.7);
 }
+
+/* ============================ 窄任务窗格适配（P2-11） ============================ */
+/* 任务窗格被拖到很窄（<480px）时，避免横向溢出、保证按钮可点。 */
+@media (max-width: 480px) {
+  .clean-scope-label {
+    flex: 0 0 auto;
+  }
+
+  .clean-stat-grid {
+    grid-template-columns: repeat(auto-fit, minmax(96px, 1fr));
+  }
+
+  .clean-table-wrap,
+  .clean-log,
+  .clean-sheet-list {
+    max-height: 240px;
+  }
+}

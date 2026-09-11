@@ -382,6 +382,32 @@
 
 /* 滚动按钮不可见状态 */
 .scroll-btn.hidden {
-    opacity: 0;
-    pointer-events: none;
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* ============================ 窄任务窗格适配（P2-11） ============================ */
+/* 同步预览模态框在窄窗格（<480px）下收紧边距、允许统计卡换行，避免横向溢出。 */
+@media (max-width: 480px) {
+  .sync-preview-modal .modal-content {
+    margin: 8px auto;
+    width: 100%;
+  }
+
+  .stat-cards-centered {
+    flex-wrap: wrap;
+  }
+
+  #syncPreviewModal .modal-header,
+  #syncPreviewModal .modal-body {
+    padding: 12px 14px;
+  }
+
+  .detail-item {
+    padding: 12px;
+  }
+
+  #statusFilterSelect {
+    margin-left: 4px;
+  }
 }
