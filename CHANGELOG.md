@@ -36,6 +36,12 @@
 - **临时产物部分无需改动**：`.dry.json`、`.stats.tmp.json`、`.backup_before_recovery/`、`.archify-delivery-*/`、`__pycache__/`、`bgm-runtime-architecture.{html,json}` 经逐项 `git check-ignore` 验证**已全部被 `.gitignore` 覆盖**。
 - **`v0.yaml` 是规范文件而非临时产物**（Bangumi 官方 OpenAPI 规范，4170 行），故既不删除也不取消跟踪，而是连同 git 历史迁至 **`文档/bangumi-openapi-v0.yaml`**，让仓库根不再堆放规范文件。全库无脚本或文档引用该路径，迁移零风险。
 
+### 变更（工程化 · `debug-panel.ts` 入口归属整理，P3-4）
+
+- **问题**：`ts/debug-panel.ts`（956 行）是 `index.html` 入口，却与 `panel-entry`/`ribbon-entry`/`settings-entry` 三个入口文件散落在不同目录，入口组织不一致；且它不在 `ts/entry/`，未被 vitest 的「入口文件排除」规则覆盖，实测 **0% 覆盖**。
+- **改法**：`git mv` 到 `ts/entry/debug-panel.ts`，与其它入口并排；同步修正内部 `await import('./tools/logger.js')` → `'../tools/logger.js'`；`index.html` 的 `<script>` 路径由 `./dist-ts/debug-panel.js` 改为 `./dist-ts/entry/debug-panel.js`（`tsc` 保留目录结构，产物落 `dist-ts/entry/`）。清理遗留的死构建产物 `dist-ts/debug-panel.js`。
+- **效果**：迁入后该文件与其它 entry 一并被排除覆盖率（同因：依赖 WPS 宿主、无法在 Node 测试环境执行），原「0% 覆盖」告警随之消解。文件内约 22 处 `as unknown as` 为读取 `window` 全局态所需，属调试面板常态，不在本次范围。
+
 ### 变更（工程化 · `npm run gate` 增至六道关）
 
 `lint:check` → `check:dompurify-version` → `check:cycles` → **`check:ribbon-buttons`** → `typecheck:tests` → `test`。本轮结束全绿：53 测试文件 / 1863 用例。
