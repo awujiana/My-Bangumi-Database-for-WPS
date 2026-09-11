@@ -78,7 +78,7 @@ let _logger: LoggerModule | null = null
 async function getLogger(): Promise<LoggerModule | null> {
   if (_logger) return _logger
   try {
-    const module_ = await import('./tools/logger.js')
+    const module_ = await import('../tools/logger.js')
     _logger = module_
     return _logger
   } catch {
