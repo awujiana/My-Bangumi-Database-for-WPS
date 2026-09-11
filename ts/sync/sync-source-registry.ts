@@ -233,7 +233,13 @@ export async function syncFromRemote(
       `[syncFromRemote] diff 完成（${strategy}）：新增 ${String(addedCount)}，更新 ${String(updateCount)}，删除 ${String(deletedCount)}，耗时 ${String(diffElapsed)}ms`,
     )
 
-    const result = await applyDiffToSheet(diffs, strategy, onProgress, source.getDisplayName())
+    const result = await applyDiffToSheet(
+      diffs,
+      strategy,
+      onProgress,
+      source.getDisplayName(),
+      signal,
+    )
     result.remoteTotal = effectiveRemoteEntries.length
     // unchanged = 远程总数 - (新增+更新)（delete 不计入 unchanged）
     result.unchanged = Math.max(0, effectiveRemoteEntries.length - addedCount - updateCount)

@@ -5059,3 +5059,94 @@ describe('applyDiffToSheet BATCH_WRITE_SIZE 边界 (501条 add)', () => {
     expect(ws.Range).toHaveBeenCalled()
   })
 })
+
+// ========== 写入阶段取消（P2-7） ==========
+describe('applyDiffToSheet 写入阶段取消 (P2-7)', () => {
+  it('signal 已 aborted：不写入任何行，全部计入 skipped 并如实报告', async () => {
+    const mockWs = createMockWorksheet()
+    mockGetDataSheet.mockReturnValue(mockWs)
+    mockFindHeaderRow.mockReturnValue(1)
+    mockGetLastRow.mockReturnValue(1)
+    mockGetColumnMap.mockReturnValue(new Map<string, number>([['名称', 2]]))
+    mockGetApp.mockReturnValue(null)
+
+    const diffs: GithubSyncDiff[] = [
+      {
+        kind: 'add',
+        sid: 's1',
+        remote: { sid: 's1', name: '条目一', date: '2024-01-01' },
+        changedFields: ['*'],
+      },
+      {
+        kind: 'add',
+        sid: 's2',
+        remote: { sid: 's2', name: '条目二', date: '2024-01-02' },
+        changedFields: ['*'],
+      },
+    ]
+
+    const controller = new AbortController()
+    controller.abort()
+    const messages: string[] = []
+    const onProgress = vi.fn((_current: number, _total: number, message: string) => {
+      messages.push(message)
+    })
+
+    const result = await applyDiffToSheet(
+      diffs,
+      'add-update',
+      onProgress,
+      'test',
+      controller.signal,
+    )
+
+    expect(result.added).toBe(0)
+    expect(result.skipped).toBe(2)
+    expect(messages.some((message) => message.includes('已停止'))).toBe(true)
+  })
+
+  it('删除过程中被取消：已删除的保留，未处理的计入 skipped', async () => {
+    const mockWs = createMockWorksheet()
+    const controller = new AbortController()
+    let hasDeletedOnce = false
+
+    // 第一次删除完成后用户点「停止」
+    mockWs.Range = asRangeMock((address: string) => {
+      if (!/^\d+:\d+$/.test(address)) {
+        return { Value2: null, Interior: { Color: 0 }, Font: { Bold: false } }
+      }
+      return {
+        Value2: null,
+        Interior: { Color: 0 },
+        Delete: (): void => {
+          if (hasDeletedOnce) return
+          hasDeletedOnce = true
+          controller.abort()
+        },
+      }
+    })
+
+    mockGetDataSheet.mockReturnValue(mockWs)
+    mockFindHeaderRow.mockReturnValue(1)
+    mockGetLastRow.mockReturnValue(5)
+    mockGetColumnMap.mockReturnValue(new Map<string, number>([['名称', 2]]))
+    mockGetCellValue.mockReturnValue('值')
+    mockGetApp.mockReturnValue({
+      ScreenUpdating: true,
+      Calculation: 1,
+      Wait: vi.fn(),
+      DoEvents: vi.fn(),
+    })
+
+    const diffs: GithubSyncDiff[] = [
+      { kind: 'delete', sid: 'd1', localRow: 5, changedFields: ['*'] },
+      { kind: 'delete', sid: 'd2', localRow: 4, changedFields: ['*'] },
+      { kind: 'delete', sid: 'd3', localRow: 3, changedFields: ['*'] },
+    ]
+
+    const result = await applyDiffToSheet(diffs, 'mirror', undefined, 'test', controller.signal)
+
+    expect(result.deleted).toBe(1)
+    expect(result.skipped).toBe(2)
+  })
+})

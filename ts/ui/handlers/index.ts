@@ -1144,7 +1144,8 @@ const ACTION_HANDLERS: Record<string, ActionHandler> = {
           return
         }
         // 使用模块化进度弹窗（与「同步到 Bangumi」「选中行同步」保持一致）
-        // AbortController 支持：用户点击「停止」时取消下载阶段（applyDiffToSheet 为同步函数，不支持取消）
+        // AbortController 支持：用户点「停止」时**下载阶段与写入阶段都会立即中断**
+        // （P2-7：applyDiffToSheet 每批写入前检查 signal，未处理条目计入 skipped）
         const abortController = new AbortController()
 
         // 构建配置摘要，显示在同步进度弹窗顶部
@@ -1208,12 +1209,22 @@ const ACTION_HANDLERS: Record<string, ActionHandler> = {
             undefined,
             timeFilter,
           )
+          const wasStopped = abortController.signal.aborted
           const { totalElapsed, totalProcessed, avgSpeed, efficiency, etaMs } = computeSyncMetrics(
             result,
             syncStartTime,
           )
 
-          const summary = `远程 ${String(result.remoteTotal)} 条 → ✅${String(result.added)} 🔄${String(result.updated)} ❌${String(result.deleted)} ⏭️${String(result.unchanged)} ⚠️${String(result.failed)} | 耗时 ${formatDuration(totalElapsed)} | ${String(avgSpeed > 0 ? avgSpeed : '?')} 行/秒 | 效率 ${String(efficiency)}%`
+          const summaryText = `远程 ${String(result.remoteTotal)} 条 → ✅${String(result.added)} 🔄${String(result.updated)} ❌${String(result.deleted)} ⏭️${String(result.unchanged)} ⚠️${String(result.failed)} | 耗时 ${formatDuration(totalElapsed)} | ${String(avgSpeed > 0 ? avgSpeed : '?')} 行/秒 | 效率 ${String(efficiency)}%`
+          // 写入阶段被中断时收尾文案如实标注「没跑完」，不能报成一次完整同步（P2-7）
+          const summary = wasStopped ? `⏹️ 已停止（写入阶段中断）：${summaryText}` : summaryText
+          // 收尾行优先级：已停止 > 有剩余 > 全部完成（写成 if/else 避免嵌套三元）
+          let tailLine = '✅ 全部完成'
+          if (wasStopped) {
+            tailLine = '⏹️ 已停止：剩余条目未处理'
+          } else if (etaMs > 0) {
+            tailLine = `🔮 预计剩余: ${formatDuration(etaMs)}`
+          }
           const details = [
             `📥 远程数据总量: ${String(result.remoteTotal)}`,
             `➕ 新增: ${String(result.added)}`,
@@ -1226,7 +1237,7 @@ const ACTION_HANDLERS: Record<string, ActionHandler> = {
             `⏱️ 总耗时: ${formatDuration(totalElapsed)}`,
             `⚡️ 平均速度: ${avgSpeed > 0 ? `${String(avgSpeed)} 行/秒` : '--'}`,
             `📈 处理效率: ${String(efficiency)}%`,
-            etaMs > 0 ? `🔮 预计剩余: ${formatDuration(etaMs)}` : '✅ 全部完成',
+            tailLine,
           ]
 
           const stats: SyncProgressStats = {
@@ -1247,7 +1258,7 @@ const ACTION_HANDLERS: Record<string, ActionHandler> = {
           completeSyncProgressDialog(
             summary,
             details,
-            false,
+            wasStopped,
             () => {
               let scrollToRow: number | undefined
               try {
@@ -1263,7 +1274,7 @@ const ACTION_HANDLERS: Record<string, ActionHandler> = {
                 elapsedMs: totalElapsed,
                 avgSpeed,
                 strategyLabel,
-                stopped: false,
+                stopped: wasStopped,
               }
               if (scrollToRow !== undefined) {
                 options.scrollToRow = scrollToRow

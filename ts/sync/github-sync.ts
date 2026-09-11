@@ -1324,10 +1324,17 @@ function batchUpdateRows(
 
 /**
  * 应用 diff 到 Excel 工作表
+ *
+ * 取消（P2-7）：`signal` 在**写入阶段同样生效**。每批写入前检查一次，已写入的部分
+ * 保持既定状态（同步记录 / undo 栈 / 颜色都按实际写入量收敛，不回滚），未处理的
+ * 条目计入 `result.skipped`。原先 signal 只作用于下载阶段，用户点「停止」后写入
+ * 仍会跑完，进度状态与实际不一致。
+ *
  * @param diffs 差异列表
  * @param strategy 同步策略（决定 force-overwrite 与 delete 行为）
  * @param onProgress 进度回调（current, total, message, eta）
  * @param source 同步来源显示名称（如 GitHub/GitLab/Gitee），用于写入同步记录
+ * @param signal 可选 AbortSignal，用于取消写入
  * @returns 同步结果统计
  */
 export async function applyDiffToSheet(
@@ -1335,6 +1342,7 @@ export async function applyDiffToSheet(
   strategy: SyncStrategy,
   onProgress?: (current: number, total: number, message: string, eta?: string) => void,
   source?: string,
+  signal?: AbortSignal,
 ): Promise<GithubSyncResult> {
   // 明细收集器：result.details 与本地 details 引用同一数组，push 直接走局部变量
   const details: GithubSyncDetailItem[] = []
@@ -1377,6 +1385,26 @@ export async function applyDiffToSheet(
   // 让出事件循环，允许 DOM 渲染初始进度
   await yieldToEventLoop()
 
+  // 下载阶段就已被取消：不进入任何写入（此时 undo 会话未开、屏幕刷新未关，可直接返回）
+  if (signal?.aborted === true) {
+    result.skipped = total
+    onProgress?.(0, total, `已停止：未开始写入，${String(total)} 条未处理`)
+    return result
+  }
+
+  // 写入阶段的取消计数（P2-7）：各阶段的"未处理"条目在循环里累计，末段统一报给用户
+  let remainingAdds = 0
+  let remainingUpdates = 0
+  let remainingDeletes = 0
+
+  /**
+   * 写入阶段是否已被请求取消。
+   *
+   * 写成函数而非裸比较：上面的提前返回已把 `signal.aborted` 收窄为 `false | undefined`，
+   * 后续再直接比较会触发 TS2367（两侧类型无重叠）。
+   */
+  const isWriteCancelled = (): boolean => signal?.aborted === true
+
   // 性能优化：关闭屏幕刷新和自动计算，大幅减少 COM 调用开销
   const app = getApp()
   let previousScreenUpdating: boolean | undefined
@@ -1409,6 +1437,11 @@ export async function applyDiffToSheet(
   // 将 add diffs 分批写入（每批 BATCH_WRITE_SIZE 行）
   let processedAdds = 0
   for (let batchStart = 0; batchStart < totalAdds; batchStart += BATCH_WRITE_SIZE) {
+    // 每批写入前检查取消（P2-7）：已写入的批次保持既定状态，未处理的计入 skipped
+    if (isWriteCancelled()) {
+      remainingAdds = totalAdds - processedAdds
+      break
+    }
     const batch = addedDiffs.slice(batchStart, batchStart + BATCH_WRITE_SIZE)
     const batchEntries = batch.map((d) => ({ remote: d.remote, sid: d.sid }))
 
@@ -1550,6 +1583,11 @@ export async function applyDiffToSheet(
   let updateProcessed = 0
   const updateTotal = updateDiffs.length
   for (let batchStart = 0; batchStart < updateTotal; batchStart += BATCH_UPDATE_SIZE) {
+    // 每批更新前检查取消（P2-7）
+    if (isWriteCancelled()) {
+      remainingUpdates = updateTotal - updateProcessed
+      break
+    }
     const batch = updateDiffs.slice(batchStart, batchStart + BATCH_UPDATE_SIZE)
     const batchUpdates = batch.map((d) => ({
       row: d.localRow,
@@ -1598,6 +1636,11 @@ export async function applyDiffToSheet(
   // 记录删除阶段开始时间，用于计算删除阶段专用速度（更准确地估算剩余时间）
   const removalStartTime = Date.now()
   for (const diff of deletedDiffs) {
+    // 每条删除前检查取消（P2-7）：删除是倒序逐行的，中断点即已删与未删的边界
+    if (isWriteCancelled()) {
+      remainingDeletes = totalDeletes - processedDeletes
+      break
+    }
     try {
       const rowValues: Record<number, string> = {}
       for (const col of colMap.values()) {
@@ -1690,6 +1733,24 @@ export async function applyDiffToSheet(
 
   // 统计 skip 数量（nonAddDiffs 中 kind='skip' 的条目）
   result.skipped = nonAddDiffs.length - updateDiffs.length - deletedDiffs.length
+
+  // 写入阶段被取消：未处理条目计入 skipped，并把结束进度如实报给用户（P2-7）。
+  // 已写入的部分不回滚 —— 同步记录 / undo 栈 / 行颜色都按实际写入量收敛，
+  // 保证"表里有什么"和"记录里写了什么"一致。
+  const remainingAfterStop = remainingAdds + remainingUpdates + remainingDeletes
+  if (remainingAfterStop > 0) {
+    result.skipped += remainingAfterStop
+    const processedAfterStop = total - remainingAfterStop
+    bgmLog(
+      LOG_LEVELS.WARN,
+      `[githubSync] 写入阶段被用户取消：已处理 ${String(processedAfterStop)}/${String(total)} 条（新增未处理 ${String(remainingAdds)}，更新未处理 ${String(remainingUpdates)}，删除未处理 ${String(remainingDeletes)}）`,
+    )
+    onProgress?.(
+      processedAfterStop,
+      total,
+      `已停止：已写入 ${String(processedAfterStop)} 条，剩余 ${String(remainingAfterStop)} 条未处理`,
+    )
+  }
 
   // 结束 undo 会话（空会话不入栈）
   endUndoSession()
@@ -1920,7 +1981,13 @@ export async function syncFromGithub(
       `[githubSync] diff 完成（${strategy}）：新增 ${String(addedCount)}，更新 ${String(updateCount)}，删除 ${String(deletedCount)}，耗时 ${formatDuration(diffElapsed)}`,
     )
 
-    const result = await applyDiffToSheet(diffs, strategy, onProgress, source.getDisplayName())
+    const result = await applyDiffToSheet(
+      diffs,
+      strategy,
+      onProgress,
+      source.getDisplayName(),
+      signal,
+    )
     result.remoteTotal = effectiveRemoteEntries.length
     // unchanged = 远程总数 - (新增+更新)（delete 不计入 unchanged）
     result.unchanged = Math.max(0, effectiveRemoteEntries.length - addedCount - updateCount)
