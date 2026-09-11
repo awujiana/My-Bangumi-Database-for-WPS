@@ -260,9 +260,10 @@ export function testTokenValidity(): void {
   bgmLog(LOG_LEVELS.INFO, `[testTokenValidity] ========== 开始测试 Token ==========`)
   bgmLog(LOG_LEVELS.INFO, `[testTokenValidity] API 路由: ${apiUrl}`)
   bgmLog(LOG_LEVELS.INFO, `[testTokenValidity] 请求方法: GET`)
+  // 安全：只打印长度，不打印凭据片段（日志会进环形缓冲并被调试面板展示/导出）
   bgmLog(
     LOG_LEVELS.INFO,
-    `[testTokenValidity] 请求头: Authorization: Bearer ${token.substring(0, 8)}...`,
+    `[testTokenValidity] 请求头: Authorization: Bearer <已脱敏，长度 ${String(token.length)}>`,
   )
   bgmLog(LOG_LEVELS.INFO, `[testTokenValidity] 请求头: Content-Type: application/json`)
 

@@ -106,9 +106,10 @@ export function testTokenValidityForRibbon(token?: string, signal?: AbortSignal)
   )
   bgmLog(LOG_LEVELS.INFO, `[exceltobangumi/testTokenValidityForRibbon] API 路由: ${apiUrl}`)
   bgmLog(LOG_LEVELS.INFO, `[exceltobangumi/testTokenValidityForRibbon] 请求方法: GET`)
+  // 安全：只打印长度，不打印凭据片段（日志会进环形缓冲并被调试面板展示/导出）
   bgmLog(
     LOG_LEVELS.INFO,
-    `[exceltobangumi/testTokenValidityForRibbon] 请求头: Authorization: Bearer ${testToken.substring(0, 8)}...`,
+    `[exceltobangumi/testTokenValidityForRibbon] 请求头: Authorization: Bearer <已脱敏，长度 ${String(testToken.length)}>`,
   )
   bgmLog(
     LOG_LEVELS.INFO,
