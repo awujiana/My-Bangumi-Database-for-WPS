@@ -25,6 +25,7 @@ import '../sync/sync-record.js'
 import '../sync/scraping.js'
 import '../sync/exceltobangumi.js'
 import '../entry/panel-entry.js'
+import { installModalA11y } from '../ui/components/modal-a11y.js'
 import { initShellNav } from './shell-nav.js'
 
 if (typeof window !== 'undefined') {
@@ -74,3 +75,7 @@ if (typeof document !== 'undefined') {
 if (typeof window !== 'undefined') {
   initShellNav()
 }
+
+// ========== 静态模态框无障碍增强（ESC 关闭 + 焦点陷阱，P2-10） ==========
+// 逻辑在 ui/components/modal-a11y.ts；document 不可用时内部直接返回。
+installModalA11y()

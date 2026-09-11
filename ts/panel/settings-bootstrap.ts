@@ -25,6 +25,7 @@ import '../sync/sync-record.js'
 import '../sync/scraping.js'
 import '../sync/exceltobangumi.js'
 import '../entry/settings-entry.js'
+import { installModalA11y } from '../ui/components/modal-a11y.js'
 
 if (typeof window !== 'undefined') {
   window.addEventListener(
@@ -87,4 +88,7 @@ if (typeof document !== 'undefined') {
       b.disabled = false
     })
   }, timeoutMs)
+
+  // ========== 静态模态框无障碍增强（ESC 关闭 + 焦点陷阱，P2-10） ==========
+  installModalA11y()
 }

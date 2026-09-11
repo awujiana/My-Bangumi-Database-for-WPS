@@ -27,6 +27,7 @@ import '../sync/exceltobangumi.js'
 import { initTheme, startThemeSync } from '../tools/theme.js'
 import { initShellNav } from './shell-nav.js'
 
+import { installModalA11y } from '../ui/components/modal-a11y.js'
 import { initEnrichPage } from './enrich-page.js'
 
 if (typeof document !== 'undefined') {
@@ -39,6 +40,9 @@ if (typeof document !== 'undefined') {
 
   // 外壳导航：吸顶偏移测量（--topbar-h / --nav-h）+ 侧栏滚动高亮
   initShellNav()
+
+  // 静态模态框无障碍增强（ESC 关闭 + 焦点陷阱，P2-10）
+  installModalA11y()
 
   // 模块就绪前禁用所有 data-action 按钮，避免误触发未初始化的处理逻辑
   document.querySelectorAll('button[data-action]').forEach((button) => {
