@@ -8,6 +8,17 @@
 
 ## [未发布]
 
+### 变更（架构 · 拆分 `panel/enrich-page.ts` + 清除死导出，P1-G/P1-6/P1-H）
+
+- **背景**：`panel/enrich-page.ts` 3740 行、覆盖接近 0，同时是「上帝模块」与「覆盖率洼地」。沙箱内 vitest 运行器损坏、无法真跑测试，故采用**「先抽后测」**：先把自洽的纯逻辑切片抽成独立模块（改动可被 `tsc`/`eslint` 完整静态验证），再为小模块补单测 —— 而不是 in-place 写「mock 全部 14 个依赖」的不可验证测试。
+- **拆分**（**3740 → 3227 行，-513**）：
+  - `ts/panel/enrich-page-state.ts`：预览配置懒加载缓存（`EnrichPreviewConfig` / `getEnrichPreviewConfig` / `resetEnrichPreviewConfig`）+ 列映射字段元数据（`COLUMN_MAPPING_FIELDS`）+ `ScalarMappingKey`。仅依赖 `tools/config`。
+  - `ts/panel/enrich-preview-cell.ts`：着色工具簇（TAGS / 首播 / 平台按内容稳定配色、weekday / episode 徽章、阈值读取），对外只导出生产实际引用的 `renderPreviewCell` / `renderPlatformChipsCell`。
+  - `ts/panel/enrich-detail-render.ts`：富化详情渲染簇（匹配方式 / 字段操作枚举→中文标记 + 分组/条目/字段三级 HTML）。`EnrichDetailGroup` 类型随「渲染输入契约」一并迁入，依赖**单向无环**。
+- **死代码清除**：`renderPreviewTable` / `renderMatchResults` / `renderProgress` 经三步判定（全库 grep 零调用方 → `ts/index.ts` 是显式 8 名再导出名单、可排除 `export *` 漏判 → UI 入口走的是另一条链路）确认无引用后删除（-109 行）；同时移除一处多余的 `enrich-page-state` 再导出。
+- **配套测试（P1-H）**：`tools/config.ts`、`tools/wps.ts`、`tools/theme.ts`、`tools/auto-fill-url.ts`、`panel/enrich-page-state.ts`、`panel/enrich-preview-cell.ts`、`panel/enrich-detail-render.ts` 各自新增单测，均只 mock 其最小依赖。
+- **验证**：每批 `tsc --noEmit` 0 / 全量 `eslint ts tests` 0 / `prettier --check` 通过。覆盖率是否达 P1-1 目标需本地 `npm test` 与 `npx vitest run --coverage` 复核（沙箱内 vitest 运行器损坏）。
+
 ### 变更（CSS · 响应式窄屏适配 + 令牌化收口，P2-11/P2-12）
 
 - **P2-11 响应式**：`clean.css` / `preview.css` 文件末尾各补 `@media (max-width: 480px)` 断点（任务窗格拖窄到 <480px 时避免横向溢出与内容顶破）。`tokens.css` 仅变量定义、无布局，不需要媒体查询。
