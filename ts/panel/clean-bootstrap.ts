@@ -23,6 +23,7 @@ import '../sync/sync-record.js'
 import '../sync/scraping.js'
 import '../sync/exceltobangumi.js'
 
+import { startNavOrderSync } from '../tools/nav-order.js'
 import { initCleanPage } from './clean-page.js'
 
 if (typeof document !== 'undefined') {
@@ -42,11 +43,14 @@ if (typeof document !== 'undefined') {
   })
 
   // DOM 就绪后初始化清理页面
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', () => {
-      initCleanPage()
-    })
-  } else {
+  const onCleanReady = (): void => {
     initCleanPage()
+    // 功能模块排序：启动时应用一次 + 轮询跨页同步（设置页改顺序后其它页实时重排）
+    startNavOrderSync('clean')
+  }
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', onCleanReady)
+  } else {
+    onCleanReady()
   }
 }

@@ -420,7 +420,9 @@ export default tseslint.config(
             '^[oO]n[A-Z]',
             '^Get[A-Z]',
             // b) 动作动词开头返回执行成败的函数（setXxx/addXxx/clearXxx/...）
-            '^(?:set|add|remove|clear|store|copy|save|ensure|export|deduplicate|restore|autoDetect|confirmAndExecute|lock)[A-Z]',
+            //     补充 move/reorder 类（moveModuleTo/moveModuleBy 等重排操作，
+            //     resetNavOrder 等恢复默认）同为「动作 + 返回成败」，与既有豁免同属一类
+            '^(?:set|add|remove|clear|store|copy|save|ensure|export|deduplicate|restore|move|reset|autoDetect|confirmAndExecute|lock)[A-Z]',
             // b') 下划线私有动作函数（_copyTextToClipboard）
             '^_copy',
           ],

@@ -29,6 +29,9 @@ import {
   getSyncRecordSheetIfExists,
   getSyncSourceType,
   getSyncStrategy,
+  CONFIG_KEYS,
+  removeConfig,
+  applyLogLevel,
   hideSyncProgressDialog,
   isGithubConfigComplete,
   isIncrementalSyncEnabled,
@@ -1018,6 +1021,43 @@ export const ACTION_HANDLERS: Record<string, ActionHandler> = {
     bgmLog(
       LOG_LEVELS.INFO,
       `[handleActionClick] 系统日志已清空，耗时: ${String(Date.now() - context.startTime)}ms`,
+    )
+  },
+
+  // 重置全部配置：清空所有已保存偏好（含 Token / 仓库配置 / 排序 / 各偏好键），仅保留会话态
+  resetAllConfig: (context) => {
+    bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 重置全部配置')
+    showConfirm(
+      '确定要清空所有已保存配置吗？此操作会清除 Token、仓库地址、模块排序等全部偏好，且不可撤销。',
+      (confirmed) => {
+        if (!confirmed) {
+          showToast('已取消重置', 'info')
+          return
+        }
+        const keys = Object.values(CONFIG_KEYS)
+        let removed = 0
+        for (const key of keys) {
+          try {
+            if (removeConfig(key)) removed += 1
+          } catch {
+            // 单个键失败不影响其余键
+          }
+        }
+        // 内存中的日志级别回到默认（否则刷新前仍按旧级别过滤）
+        applyLogLevel()
+        bgmLog(LOG_LEVELS.INFO, `[handleActionClick] 已重置 ${String(removed)} 项配置`)
+        showToast(`已重置 ${String(removed)} 项配置，正在重新加载…`, 'success')
+        // 重新加载页面，让所有表单回到默认值
+        if (typeof window !== 'undefined') {
+          window.setTimeout(() => {
+            window.location.reload()
+          }, 600)
+        }
+      },
+    )
+    bgmLog(
+      LOG_LEVELS.INFO,
+      `[handleActionClick] 重置全部配置操作完成，耗时: ${String(Date.now() - context.startTime)}ms`,
     )
   },
 

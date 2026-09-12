@@ -27,6 +27,7 @@ import '../sync/exceltobangumi.js'
 import '../entry/panel-entry.js'
 import { installModalA11y } from '../ui/components/modal-a11y.js'
 import { initShellNav } from './shell-nav.js'
+import { startNavOrderSync } from '../tools/nav-order.js'
 
 if (typeof window !== 'undefined') {
   window.addEventListener(
@@ -74,6 +75,8 @@ if (typeof document !== 'undefined') {
 // 逻辑已抽到 shell-nav.ts 由三页面共享；此处调用统一初始化。
 if (typeof window !== 'undefined') {
   initShellNav()
+  // 功能模块排序：启动时应用一次 + 轮询跨页同步（设置页改顺序后其它页实时重排）
+  startNavOrderSync('panel')
 }
 
 // ========== 静态模态框无障碍增强（ESC 关闭 + 焦点陷阱，P2-10） ==========

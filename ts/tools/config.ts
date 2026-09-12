@@ -8,7 +8,7 @@
 import { LOG_LEVELS } from '../core/constants.js'
 
 import { BGM_EVENTS, eventBus } from './events.js'
-import { getApp, bgmLog } from './util/index.js'
+import { BGM, getApp, bgmLog } from './util/index.js'
 import type { WpsPluginStorage } from './wps.js'
 
 // 配置键名常量
@@ -34,6 +34,8 @@ export const CONFIG_KEYS = {
   ENRICH_PREMIERE_COLOR: 'bgm_enrich_premiere_color',
   ENRICH_PLATFORM_COLOR: 'bgm_enrich_platform_color',
   ENRICH_AUTO_CLEAN: 'bgm_enrich_auto_clean',
+  NAV_ORDER: 'bgm_nav_order',
+  LOG_LEVEL: 'bgm_log_level',
 } as const
 
 /**
@@ -334,4 +336,48 @@ export function setImportPath(path: string): boolean {
  */
 export function getImportPath(isSilent = false): string {
   return getConfig(CONFIG_KEYS.IMPORT_PATH, '', isSilent)
+}
+
+// ========== 全局日志级别 ==========
+
+/** 日志级别取值范围：0=DEBUG（无同名常量，仅 bgmLog 内部识别），3=ERROR */
+const LOG_LEVEL_MIN = 0
+const LOG_LEVEL_MAX = LOG_LEVELS.ERROR
+
+/**
+ * 设置全局日志级别。
+ * 除持久化外，还会同步更新内存中的 `BGM.LOG_LEVEL` —— `bgmLog()` 依赖该字段做
+ * 过滤，只写存储不更新内存会导致「设置后当前页面日志级别不变」。
+ */
+export function setLogLevel(level: number): boolean {
+  if (!Number.isSafeInteger(level) || level < LOG_LEVEL_MIN || level > LOG_LEVEL_MAX) {
+    bgmLog(LOG_LEVELS.WARN, `[config] 无效日志级别: ${String(level)}，已忽略`)
+    return false
+  }
+  bgmLog(LOG_LEVELS.INFO, `[config] 设置全局日志级别: ${String(level)}`)
+  BGM.LOG_LEVEL = level
+  return setConfig(CONFIG_KEYS.LOG_LEVEL, String(level))
+}
+
+/**
+ * 获取全局日志级别（默认 INFO）
+ * @param isSilent - 静默模式，不打印日志
+ */
+export function getLogLevel(isSilent = false): number {
+  const raw = Number(getConfig(CONFIG_KEYS.LOG_LEVEL, String(LOG_LEVELS.INFO), isSilent))
+  const result =
+    Number.isSafeInteger(raw) && raw >= LOG_LEVEL_MIN && raw <= LOG_LEVEL_MAX
+      ? raw
+      : LOG_LEVELS.INFO
+  if (!isSilent) bgmLog(LOG_LEVELS.INFO, `[config] 获取全局日志级别: ${String(result)}`)
+  return result
+}
+
+/**
+ * 把持久化的日志级别应用到内存（`BGM.LOG_LEVEL`）。
+ * 供各页面入口启动时调用一次：`bgmLog()` 默认按 INFO 过滤，
+ * 用户此前调高/调低过级别的话，启动时必须重新套用。
+ */
+export function applyLogLevel(): void {
+  BGM.LOG_LEVEL = getLogLevel(true)
 }

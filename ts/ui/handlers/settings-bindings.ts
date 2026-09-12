@@ -10,6 +10,7 @@ import {
   getRefreshInterval,
   saveTheme,
   setListType,
+  setLogLevel,
   setRefreshInterval,
   setSyncRecordEnabled,
   setTimeFilter,
@@ -17,7 +18,7 @@ import {
 } from '../../index.js'
 import { renderLogEntries } from './log-panel.js'
 
-// ========== 设置页：同步记录开关 / 日志级别筛选 ==========
+// ========== 设置页：同步记录开关 / 日志级别筛选 / 全局日志级别 ==========
 
 export const handleEnableSyncRecordChange = (): void => {
   const chkEnableSyncRecord = document.getElementById(
@@ -32,6 +33,26 @@ export const handleEnableSyncRecordChange = (): void => {
 
 export const handleLogLevelFilterChange = (): void => {
   renderLogEntries()
+}
+
+/** 设置页「📜 日志偏好」：全局日志记录级别（0=DEBUG … 3=ERROR） */
+export const handleLogLevelChange = (): void => {
+  const select = document.getElementById('logLevelSelect') as HTMLSelectElement | null
+  if (!select) return
+  const level = Number(select.value)
+  if (!Number.isSafeInteger(level)) return
+  const isOk = setLogLevel(level)
+  if (isOk) {
+    const labels: Record<number, string> = {
+      0: 'DEBUG · 全部日志',
+      1: 'INFO · 常规信息',
+      2: 'WARN · 仅警告与错误',
+      3: 'ERROR · 仅错误',
+    }
+    showToast(`日志记录级别已设为「${labels[level] ?? String(level)}」`, 'success')
+  } else {
+    showToast('日志级别保存失败', 'error')
+  }
 }
 
 // ========== 设置页：外观主题 / 列表类型 / 时间筛选 / 刷新间隔 ==========

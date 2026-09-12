@@ -418,6 +418,10 @@ export {
   getExportPath,
   setImportPath,
   getImportPath,
+  // 全局日志级别
+  setLogLevel,
+  getLogLevel,
+  applyLogLevel,
 } from './tools/config.js'
 
 // ============================================================================

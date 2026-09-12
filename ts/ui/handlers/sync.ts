@@ -39,6 +39,8 @@ import {
   hideSyncProgressDialog,
   buildSyncConfig,
   formatDuration,
+  isIncrementalSyncEnabled,
+  getListType,
 } from '../../index.js'
 import type {
   SyncRecord,
@@ -329,10 +331,9 @@ function prepareSyncFromPanel(): SyncPreparedData | null {
     return null
   }
 
-  // 6. 增量同步开关（提前读取）
+  // 6. 增量同步开关（直接读配置；主面板已不再有该复选框，避免在设置页一处改动后不同步）
   bgmLog(LOG_LEVELS.INFO, '[syncFromPanel] 步骤6: 检查增量同步设置')
-  const isIncremental =
-    (document.getElementById('chkIncremental') as HTMLInputElement | null)?.checked ?? false
+  const isIncremental = isIncrementalSyncEnabled()
   bgmLog(LOG_LEVELS.INFO, `[syncFromPanel] 增量同步: ${isIncremental ? '开启' : '关闭'}`)
 
   // 构建增量同步的指纹映射
@@ -601,13 +602,12 @@ export function syncCollectionFromBgm(): void {
   const sheetIndex = Number.isFinite(parsedSheetIndex) ? parsedSheetIndex : 1
   bgmLog(LOG_LEVELS.INFO, `[syncCollectionFromBgm] 目标工作表索引: ${String(sheetIndex)}`)
 
-  const listTypeSelect = document.getElementById('listTypeSelect') as HTMLSelectElement | null
-  const listType = listTypeSelect?.value as 'collect' | 'wish' | 'do' | undefined
+  // 默认收藏列表类型已收拢到设置页；直接读配置，避免主面板缺失该下拉时取不到值
+  const listType = getListType()
   const typeLabelMap = { collect: '已看', wish: '想看', do: '在看' }
-  bgmLog(
-    LOG_LEVELS.INFO,
-    `[syncCollectionFromBgm] 收藏类型: ${listType ? typeLabelMap[listType] : '未选择'}`,
-  )
+  // 设置页「全部收藏」等价于不限定 type（syncFromBgmByAPI 以 null/undefined 表示全部）
+  const listTypeLabel = listType === 'all' ? '全部' : typeLabelMap[listType]
+  bgmLog(LOG_LEVELS.INFO, `[syncCollectionFromBgm] 收藏类型: ${listTypeLabel}`)
 
   const token = loadBgToken()
   if (!token) {
@@ -623,7 +623,7 @@ export function syncCollectionFromBgm(): void {
 
   try {
     bgmLog(LOG_LEVELS.INFO, '[syncCollectionFromBgm] 调用 syncFromBgmByAPI...')
-    syncFromBgmByAPI(sheetIndex, listType ?? null)
+    syncFromBgmByAPI(sheetIndex, listType === 'all' ? null : listType)
     bgmLog(
       LOG_LEVELS.INFO,
       `[syncCollectionFromBgm] 同步完成，耗时: ${String(Date.now() - startTime)}ms`,

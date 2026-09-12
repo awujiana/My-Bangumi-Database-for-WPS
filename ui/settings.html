@@ -13,7 +13,7 @@
     <link rel="stylesheet" href="../css/styles.css" />
     <link rel="stylesheet" href="../css/panel-theme.css" />
   </head>
-  <body>
+  <body data-page="settings">
     <script type="text/javascript" src="../libs/purify.js"></script>
     <script type="module" src="../dist-ts/panel/settings-bootstrap.js"></script>
     <script src="../wpsjsrpcsdk.js"></script>
@@ -24,7 +24,7 @@
         <div class="brand">
           <div class="brand-text">
             <span class="brand-title">⚙️ BGM 设置</span>
-            <span class="brand-sub">插件配置管理 · Token · 同步偏好 · 外观</span>
+            <span class="brand-sub">插件配置管理 · 外观与导航 · 同步偏好 · 模块排序</span>
           </div>
         </div>
         <div class="topbar-actions">
@@ -77,32 +77,26 @@
       <aside class="sidebar">
         <nav class="nav" aria-label="功能导航">
           <div class="nav-label">功能导航</div>
-          <a href="#sec-appearance" title="外观主题"
-            ><span class="nav-ico">🎨</span><span class="nav-text">外观主题</span></a
+          <a href="#sec-appearance" title="外观与导航"
+            ><span class="nav-ico">🎨</span><span class="nav-text">外观与导航</span></a
           >
-          <a href="#sec-nav" title="导航"
-            ><span class="nav-ico">🧭</span><span class="nav-text">导航</span></a
-          >
-          <a href="#sec-account" title="账户与凭证"
-            ><span class="nav-ico">🔑</span><span class="nav-text">账户与凭证</span></a
+          <a href="#sec-modules" title="模块排序"
+            ><span class="nav-ico">🧩</span><span class="nav-text">模块排序</span></a
           >
           <a href="#sec-sync-pref" title="同步偏好"
             ><span class="nav-ico">🔄</span><span class="nav-text">同步偏好</span></a
           >
-          <a href="#sec-strategy" title="冲突处理策略"
-            ><span class="nav-ico">⚖️</span><span class="nav-text">冲突处理策略</span></a
-          >
           <a href="#sec-enrich-preview" title="富化预览"
-            ><span class="nav-ico">🎨</span><span class="nav-text">富化预览</span></a
+            ><span class="nav-ico">✨</span><span class="nav-text">富化预览</span></a
           >
-          <a href="#sec-remote" title="远程仓库配置"
-            ><span class="nav-ico">🗄️</span><span class="nav-text">远程仓库配置</span></a
+          <a href="#sec-paths" title="默认路径"
+            ><span class="nav-ico">📁</span><span class="nav-text">默认路径</span></a
           >
-          <a href="#sec-data" title="配置导入导出"
-            ><span class="nav-ico">📦</span><span class="nav-text">配置导入导出</span></a
+          <a href="#sec-log-pref" title="日志偏好"
+            ><span class="nav-ico">📜</span><span class="nav-text">日志偏好</span></a
           >
-          <a href="#sec-logs" title="系统日志"
-            ><span class="nav-ico">📜</span><span class="nav-text">系统日志</span></a
+          <a href="#sec-data" title="配置管理"
+            ><span class="nav-ico">📦</span><span class="nav-text">配置管理</span></a
           >
           <a href="#sec-about" title="关于"
             ><span class="nav-ico">ℹ️</span><span class="nav-text">关于</span></a
@@ -112,9 +106,9 @@
 
       <!-- ===================== 主区 ===================== -->
       <main class="main">
-        <!-- 外观主题 -->
+        <!-- 外观与导航（主题模式 + 导航显示模式） -->
         <section class="section" id="sec-appearance">
-          <h3>🎨 外观主题</h3>
+          <h3>🎨 外观与导航</h3>
           <div class="form-group">
             <label for="themeSelect">主题模式</label>
             <select id="themeSelect" class="input">
@@ -134,11 +128,6 @@
               <span class="theme-preview-name">浅色</span>
             </div>
           </div>
-        </section>
-
-        <!-- 导航 -->
-        <section class="section" id="sec-nav">
-          <h3>🧭 导航</h3>
           <label class="check-row">
             <input type="checkbox" id="chkNavIconsOnly" data-action="toggleNavIconsOnly" />
             <span>导航仅显示图标（鼠标悬停显示名称）</span>
@@ -146,50 +135,17 @@
           <p class="hint">勾选后侧栏导航仅显示图标，鼠标悬停时显示名称；在三个页面中同时生效。</p>
         </section>
 
-        <!-- 账户与凭证 -->
-        <section class="section" id="sec-account">
-          <h3>🔑 账户与凭证</h3>
-          <div class="form-group">
-            <label>Token 设置</label>
-            <div class="token-display">
-              <div class="token-status-info">
-                <span id="tokenStatus">未设置</span>
-                <span id="tokenExpiresDisplay" class="token-expires" style="display: none"></span>
-              </div>
-              <div class="token-buttons">
-                <button class="bgm-btn small" data-action="showTokenDialog">设置/修改</button>
-                <button class="bgm-btn small" data-action="copyToken">📋 复制</button>
-                <button class="bgm-btn small" data-action="clearToken">清除</button>
-                <button class="bgm-btn small primary" data-action="testToken">测试</button>
-              </div>
-            </div>
-            <p class="hint">
-              Access Token 获取方式：<a href="#" data-action="openTokenPage">点击创建</a>
-            </p>
-          </div>
-
-          <div class="form-group" style="margin-top: 14px">
-            <label>用户信息</label>
-            <div class="user-profile" id="userProfile" style="display: none">
-              <div class="avatar-container">
-                <img id="userAvatar" class="user-avatar" src="" alt="用户头像" />
-              </div>
-              <div class="user-info">
-                <span id="userNameDisplay" class="user-name"></span>
-                <span id="userIdDisplay" class="user-id"></span>
-              </div>
-            </div>
-            <div class="status" id="userIdStatus">未设置</div>
-            <div class="bgm-btn-group bgm-btn-row" style="margin-top: 10px">
-              <button class="bgm-btn small" data-action="showUserIdDialog">设置用户ID</button>
-              <button class="bgm-btn small primary" data-action="openUserCollection">
-                打开收藏页
-              </button>
-            </div>
-          </div>
+        <!-- 模块排序（设置其他页面功能模块的显示顺序） -->
+        <section class="section" id="sec-modules">
+          <h3>🧩 模块排序</h3>
+          <p class="hint">
+            调整各页面功能模块的显示顺序。侧栏导航与主区模块会同步重排，调整后立即保存并同步到对应页面。支持
+            ↑↓ 按钮（键盘可达）与鼠标拖拽两种方式。
+          </p>
+          <div class="module-order-groups" id="moduleOrderGroups"></div>
         </section>
 
-        <!-- 同步偏好 -->
+        <!-- 同步偏好（跨会话生效的同步相关默认值） -->
         <section class="section" id="sec-sync-pref">
           <h3>🔄 同步偏好</h3>
           <label class="check-row">
@@ -198,7 +154,7 @@
           </label>
           <label class="check-row">
             <input type="checkbox" id="chkSkipConflicts" data-action="toggleSkipConflicts" />
-            <span>跳过冲突（保留Bangumi数据）</span>
+            <span>跳过冲突（保留 Bangumi 数据）</span>
           </label>
           <label class="check-row">
             <input type="checkbox" id="chkEnableSyncRecord" data-action="toggleEnableSyncRecord" />
@@ -246,24 +202,16 @@
             </div>
             <p class="hint">0 表示关闭自动刷新；有效范围 1–1440 分钟。</p>
           </div>
-        </section>
 
-        <!-- 冲突处理策略 -->
-        <section class="section" id="sec-strategy">
-          <h3>⚖️ 冲突处理策略</h3>
-          <div class="form-group">
-            <label for="githubStrategy">冲突处理方式</label>
-            <select id="githubStrategy" class="input">
-              <option value="skip" selected>跳过冲突（保留Bangumi数据）</option>
-              <option value="excel">Excel覆盖（用Excel数据覆盖）</option>
-            </select>
-            <p class="hint">当Excel条目与Bangumi收藏状态不一致时，自动按所选策略处理。</p>
-          </div>
+          <p class="hint">
+            冲突处理方式、远程仓库地址、Token
+            等「本次操作参数」保留在各操作页面，便于同步时就地确认与修改。
+          </p>
         </section>
 
         <!-- 富化预览 -->
         <section class="section" id="sec-enrich-preview">
-          <h3>🎨 富化预览</h3>
+          <h3>✨ 富化预览</h3>
           <p class="hint">
             控制「新番表富化」页数据预览的视觉呈现：周几颜色、集数阈值徽章颜色、标签/首播/平台着色，以及需要过滤的噪声关键词。
           </p>
@@ -308,7 +256,7 @@
               style="width: 100px"
             />
             <p class="hint">
-              集数等于此值时<b>不显示颜色</b>；大于此值显示绿色徽章；小于此值（且不等于>单集阈值）显示黄色徽章。默认
+              集数等于此值时<b>不显示颜色</b>；大于此值显示绿色徽章；小于此值（且不等于单集阈值）显示黄色徽章。默认
               12。
             </p>
           </div>
@@ -341,82 +289,81 @@
           </div>
         </section>
 
-        <!-- 远程仓库配置 -->
-        <section class="section" id="sec-remote">
-          <h3>🗄️ 远程仓库配置</h3>
-          <div class="form-row">
-            <label for="githubOwner">仓库所有者</label>
-            <input
-              type="text"
-              id="githubOwner"
-              placeholder="如：awujiana"
-              autocomplete="off"
-              spellcheck="false"
-            />
+        <!-- 默认路径（导出位置 / 导入文件夹记忆） -->
+        <section class="section" id="sec-paths">
+          <h3>📁 默认路径</h3>
+          <p class="hint">
+            为「导出配置 / 导出日志」与「导入配置」预设默认文件夹；留空时每次弹出选择对话框。
+          </p>
+          <div class="form-group">
+            <label for="exportPathDisplay">默认导出位置</label>
+            <div class="bgm-btn-group bgm-btn-row">
+              <input
+                type="text"
+                id="exportPathDisplay"
+                class="input"
+                style="flex: 1; min-width: 0"
+                readonly
+                placeholder="未设置（每次导出时询问）"
+              />
+              <button class="bgm-btn small" data-action="selectExportPath">选择…</button>
+              <button class="bgm-btn small" data-action="clearExportPath">清除</button>
+            </div>
           </div>
-          <div class="form-row">
-            <label for="githubRepo">仓库名</label>
-            <input
-              type="text"
-              id="githubRepo"
-              placeholder="如：Bangumi-Archive-Anime-Excel"
-              autocomplete="off"
-              spellcheck="false"
-            />
+          <div class="form-group">
+            <label for="importPathDisplay">默认导入文件夹</label>
+            <div class="bgm-btn-group bgm-btn-row">
+              <input
+                type="text"
+                id="importPathDisplay"
+                class="input"
+                style="flex: 1; min-width: 0"
+                readonly
+                placeholder="未设置（每次导入时询问）"
+              />
+              <button class="bgm-btn small" data-action="selectImportPath">选择…</button>
+              <button class="bgm-btn small" data-action="clearImportPath">清除</button>
+            </div>
           </div>
-          <div class="form-row">
-            <label for="githubBranch">分支名</label>
-            <input
-              type="text"
-              id="githubBranch"
-              placeholder="默认 main"
-              autocomplete="off"
-              spellcheck="false"
-            />
-          </div>
-          <div class="form-row">
-            <label for="githubPath">文件路径</label>
-            <input
-              type="text"
-              id="githubPath"
-              placeholder="如：data/bangumi.jsonlines"
-              autocomplete="off"
-              spellcheck="false"
-            />
+        </section>
+
+        <!-- 日志偏好（记录级别；日志查看在操作页） -->
+        <section class="section" id="sec-log-pref">
+          <h3>📜 日志偏好</h3>
+          <div class="form-group">
+            <label for="logLevelSelect">日志记录级别</label>
+            <select id="logLevelSelect" class="input">
+              <option value="0">DEBUG · 全部日志（排查问题时使用）</option>
+              <option value="1">INFO · 常规信息（默认）</option>
+              <option value="2">WARN · 仅警告与错误</option>
+              <option value="3">ERROR · 仅错误</option>
+            </select>
+            <p class="hint">
+              低于所选级别的日志不会被记录，可减少运行噪音。此项控制「记录什么」；查看与筛选已记录日志请到主面板的「记录与日志」模块。
+            </p>
           </div>
           <div class="bgm-btn-group bgm-btn-row">
-            <button class="bgm-btn small primary" data-action="saveGithubConfig">
-              💾 保存配置
+            <button class="bgm-btn small" data-action="clearLogs">🗑️ 清空已记录日志</button>
+          </div>
+        </section>
+
+        <!-- 配置管理 -->
+        <section class="section" id="sec-data">
+          <h3>📦 配置管理</h3>
+          <div class="settings-toolbar">
+            <button class="bgm-btn small primary" data-action="saveAllConfig">
+              💾 保存所有配置
             </button>
-            <button class="bgm-btn small" data-action="testGithubConfig">🔌 测试连接</button>
-            <button class="bgm-btn small" data-action="clearGithubCache">🗑️ 清除缓存</button>
+            <button class="bgm-btn small" data-action="exportConfig">📤 导出配置</button>
+            <button class="bgm-btn small" data-action="importConfig">📥 导入配置</button>
+            <button class="bgm-btn small danger" data-action="resetAllConfig">
+              ♻️ 重置全部配置
+            </button>
           </div>
           <p class="hint">
-            默认仓库：<code>awujiana/Bangumi-Archive-Anime-Excel/main/data/bangumi.jsonlines</code>
+            导出会下载配置文件并复制到剪贴板（含 Token、仓库配置与全部偏好项）；导入支持从粘贴的
+            JSON 恢复；重置会清空所有已保存配置，请谨慎操作。
           </p>
-        </section>
-
-        <!-- 配置导入导出 -->
-        <section class="section" id="sec-data">
-          <h3>📦 配置导入导出</h3>
-          <div class="bgm-btn-group bgm-btn-row">
-            <button class="bgm-btn small" data-action="exportConfig" style="flex: 1">
-              📤 导出配置
-            </button>
-            <button class="bgm-btn small" data-action="importConfig" style="flex: 1">
-              📥 导入配置
-            </button>
-          </div>
-          <p class="hint">导出会下载配置文件并复制到剪贴板，导入支持从粘贴的 JSON 恢复。</p>
-        </section>
-
-        <!-- 系统日志 -->
-        <section class="section" id="sec-logs">
-          <h3>📜 系统日志</h3>
-          <div class="bgm-btn-group bgm-btn-row">
-            <button class="bgm-btn small" data-action="showLogPanel">📜 查看日志</button>
-            <button class="bgm-btn small" data-action="clearLogs">🗑️ 清空日志</button>
-          </div>
         </section>
 
         <!-- 关于 -->
@@ -428,41 +375,12 @@
             • 上传同步（Excel → Bangumi）<br />
             • 数据同步（远程仓库 → Excel）<br />
             • 收藏下载（Bangumi → Excel）<br />
+            • 新番表富化 / 数据清洗<br />
             <br />
-            详细使用说明请查看项目文档。
+            本页只保留「跨会话生效的长期偏好」；Token、远程仓库、冲突策略等本次操作参数位于各操作页面。
           </p>
         </section>
       </main>
-    </div>
-
-    <!-- 日志面板模态框 -->
-    <div
-      id="logModal"
-      class="modal"
-      role="dialog"
-      aria-modal="true"
-      aria-label="系统日志"
-      style="display: none"
-    >
-      <div class="modal-content" style="max-width: 800px">
-        <div class="modal-header">
-          <h3>📜 系统日志</h3>
-          <button class="modal-close-btn" data-action="closeLogModal" aria-label="关闭">×</button>
-        </div>
-        <div class="modal-body">
-          <div class="bgm-btn-group" style="flex-direction: row; gap: 8px; margin-bottom: 12px">
-            <select id="logLevelFilter" class="input" style="width: auto" aria-label="日志级别筛选">
-              <option value="">全部级别</option>
-              <option value="ERROR">仅 ERROR</option>
-              <option value="WARN">仅 WARN</option>
-              <option value="INFO">仅 INFO</option>
-              <option value="DEBUG">仅 DEBUG</option>
-            </select>
-            <button class="bgm-btn small" data-action="exportLogs">📤 导出</button>
-          </div>
-          <div id="logModalBody" style="max-height: 440px; overflow-y: auto"></div>
-        </div>
-      </div>
     </div>
   </body>
 </html>

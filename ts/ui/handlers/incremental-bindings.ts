@@ -17,30 +17,17 @@ import {
 import { isPanelContext } from './panel-context.js'
 import { trackedAddEventListener, trackedSetTimeout } from './resource-tracking.js'
 
-export function tryUpdateIncrementalCheckbox(isChecked: boolean, attempts = 0): void {
+export function tryUpdateIncrementalCheckbox(isChecked: boolean): void {
   if (!isPanelContext()) return
 
+  // 增量同步开关已统一收拢到设置页（#chkIncrementalSync），主面板不再有该复选框。
+  // 元素不存在时为正常情况，静默跳过，避免每帧重试刷 ERROR 日志。
   const chkIncremental = document.getElementById('chkIncremental') as HTMLInputElement | null
+  if (!chkIncremental) return
 
-  if (chkIncremental) {
-    bgmLog(LOG_LEVELS.INFO, `[handlers] 找到 chkIncremental 元素`)
-    bgmLog(LOG_LEVELS.INFO, `[handlers] 当前状态: ${chkIncremental.checked ? '开启' : '关闭'}`)
-
-    chkIncremental.checked = isChecked
-
-    bgmLog(LOG_LEVELS.INFO, `[handlers] 增量同步复选框已更新: ${isChecked ? '开启' : '关闭'}`)
-  } else if (attempts < 3) {
-    // 最多重试3次
-    bgmLog(
-      LOG_LEVELS.WARN,
-      `[handlers] 未找到 chkIncremental 元素，延迟重试 (${String(attempts + 1)}/3)...`,
-    )
-    trackedSetTimeout(() => {
-      tryUpdateIncrementalCheckbox(isChecked, attempts + 1)
-    }, 100)
-  } else {
-    bgmLog(LOG_LEVELS.ERROR, `[handlers] 重试3次后仍未找到 chkIncremental 元素，放弃更新`)
-  }
+  bgmLog(LOG_LEVELS.INFO, `[handlers] 当前状态: ${chkIncremental.checked ? '开启' : '关闭'}`)
+  chkIncremental.checked = isChecked
+  bgmLog(LOG_LEVELS.INFO, `[handlers] 增量同步复选框已更新: ${isChecked ? '开启' : '关闭'}`)
 }
 
 // 尝试更新跳过冲突 UI（带重试机制）
@@ -103,33 +90,24 @@ export function tryUpdateSkipConflictsUI(shouldSkipConflicts: boolean, attempts 
   }
 }
 
-// 尝试更新启用同步记录复选框（带重试机制，与另外两个开关保持一致）
-export function tryUpdateEnableSyncRecordUI(isEnabled: boolean, attempts = 0): void {
+// 尝试更新启用同步记录复选框（与另外两个开关保持一致）
+export function tryUpdateEnableSyncRecordUI(isEnabled: boolean): void {
   if (!isPanelContext()) return
 
+  // 同步记录开关已统一收拢到设置页（#chkEnableSyncRecord），主面板不再有该复选框。
+  // 元素不存在时为正常情况，静默跳过。
   const chkEnableSyncRecord = document.getElementById(
     'chkEnableSyncRecord',
   ) as HTMLInputElement | null
 
-  if (chkEnableSyncRecord) {
-    bgmLog(LOG_LEVELS.INFO, `[handlers] 找到 chkEnableSyncRecord 元素`)
-    bgmLog(
-      LOG_LEVELS.INFO,
-      `[handlers] 当前状态: ${chkEnableSyncRecord.checked ? '开启' : '关闭'}，目标状态: ${isEnabled ? '开启' : '关闭'}`,
-    )
-    chkEnableSyncRecord.checked = isEnabled
-    bgmLog(LOG_LEVELS.INFO, `[handlers] 启用同步记录复选框已更新: ${isEnabled ? '开启' : '关闭'}`)
-  } else if (attempts < 3) {
-    bgmLog(
-      LOG_LEVELS.WARN,
-      `[handlers] 未找到 chkEnableSyncRecord 元素，延迟重试 (${String(attempts + 1)}/3)...`,
-    )
-    trackedSetTimeout(() => {
-      tryUpdateEnableSyncRecordUI(isEnabled, attempts + 1)
-    }, 100)
-  } else {
-    bgmLog(LOG_LEVELS.ERROR, `[handlers] 重试3次后仍未找到 chkEnableSyncRecord 元素，放弃更新`)
-  }
+  if (!chkEnableSyncRecord) return
+
+  bgmLog(
+    LOG_LEVELS.INFO,
+    `[handlers] 当前状态: ${chkEnableSyncRecord.checked ? '开启' : '关闭'}，目标状态: ${isEnabled ? '开启' : '关闭'}`,
+  )
+  chkEnableSyncRecord.checked = isEnabled
+  bgmLog(LOG_LEVELS.INFO, `[handlers] 启用同步记录复选框已更新: ${isEnabled ? '开启' : '关闭'}`)
 }
 
 export const handleIncrementalChange = (): void => {

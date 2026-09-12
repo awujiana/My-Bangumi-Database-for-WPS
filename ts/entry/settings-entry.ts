@@ -55,8 +55,14 @@ function initSettingsPage(): void {
   // 2. 加载同步偏好设置
   void (async () => {
     try {
-      const { isIncrementalSyncEnabled, isSkipConflictsEnabled, isSyncRecordEnabled, getConfig } =
-        await import('../tools/config.js')
+      const {
+        isIncrementalSyncEnabled,
+        isSkipConflictsEnabled,
+        isSyncRecordEnabled,
+        areNavIconsOnly,
+        applyLogLevel,
+        getLogLevel,
+      } = await import('../tools/config.js')
       // 设置复选框
       const chkIncremental = document.getElementById(
         'chkIncrementalSync',
@@ -72,38 +78,12 @@ function initSettingsPage(): void {
       if (chkSyncRecord) chkSyncRecord.checked = isSyncRecordEnabled(true)
 
       const chkNavIcons = document.getElementById('chkNavIconsOnly') as HTMLInputElement | null
-      if (chkNavIcons) {
-        const navConfig = await import('../tools/config.js')
-        chkNavIcons.checked = navConfig.areNavIconsOnly(true)
-      }
+      if (chkNavIcons) chkNavIcons.checked = areNavIconsOnly(true)
 
-      // 设置冲突策略下拉
-      const strategySelect = document.getElementById('githubStrategy') as HTMLSelectElement | null
-      if (strategySelect) {
-        const savedStrategy = getConfig('bgm_conflict_strategy', 'skip', true)
-        strategySelect.value = savedStrategy
-      }
-    } catch {
-      // 静默处理
-    }
-  })()
-
-  // 3. 加载 GitHub 配置
-  void (async () => {
-    try {
-      const { getGithubConfig } = await import('../index.js')
-      const config = getGithubConfig()
-      const ownerInput = document.getElementById('githubOwner') as HTMLInputElement | null
-      if (ownerInput) ownerInput.value = config.owner || ''
-
-      const repoInput = document.getElementById('githubRepo') as HTMLInputElement | null
-      if (repoInput) repoInput.value = config.repo || ''
-
-      const branchInput = document.getElementById('githubBranch') as HTMLInputElement | null
-      if (branchInput) branchInput.value = config.branch || ''
-
-      const pathInput = document.getElementById('githubPath') as HTMLInputElement | null
-      if (pathInput) pathInput.value = config.path || ''
+      // 应用全局日志级别到内存（bgmLog 依赖 BGM.LOG_LEVEL 过滤），并预填下拉
+      applyLogLevel()
+      const logLevelSelect = document.getElementById('logLevelSelect') as HTMLSelectElement | null
+      if (logLevelSelect) logLevelSelect.value = String(getLogLevel(true))
     } catch {
       // 静默处理
     }

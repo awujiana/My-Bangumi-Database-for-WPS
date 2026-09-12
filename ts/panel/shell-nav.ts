@@ -43,9 +43,13 @@ export function updateStickyOffsets(): void {
  */
 export function initScrollspy(): void {
   if (typeof document === 'undefined') return
-  const sections = [...document.querySelectorAll<HTMLElement>('main [id^="sec-"]')]
+  // 模块顺序可由用户在设置页调整（tools/nav-order 会就地重排 DOM），
+  // 因此每次判定都按「最新 DOM 顺序」重新取一遍区块，避免数组顺序陈旧导致高亮回跳。
+  const getSections = (): HTMLElement[] => [
+    ...document.querySelectorAll<HTMLElement>('main [id^="sec-"]'),
+  ]
   const navLinks = [...document.querySelectorAll<HTMLAnchorElement>('.nav a[href^="#"]')]
-  if (sections.length === 0 || navLinks.length === 0) return
+  if (getSections().length === 0 || navLinks.length === 0) return
   const nav = navLinks[0]?.parentElement
   if (!nav) return
 
@@ -110,7 +114,7 @@ export function initScrollspy(): void {
     const href = link.getAttribute('href') ?? ''
     if (!href.startsWith('#')) return
     const sectionId = href.slice(1)
-    const target = sections.find((section) => section.id === sectionId)
+    const target = getSections().find((section) => section.id === sectionId)
     if (!target) return
     navigationTarget = target
     setActive(sectionId)
@@ -164,6 +168,8 @@ export function initScrollspy(): void {
       return
     }
 
+    // 每帧按最新 DOM 顺序取区块（模块顺序可由用户在设置页调整）
+    const sections = getSections()
     const { innerHeight, scrollY } = window
     const { documentElement } = document
     const viewportBottom = scrollY + innerHeight

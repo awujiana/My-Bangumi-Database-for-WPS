@@ -18,8 +18,10 @@ import {
   getListType,
   getTimeFilter,
   getRefreshInterval,
+  getLogLevel,
 } from '../../index.js'
 import { loadGithubConfigIntoForm } from './github-settings.js'
+import { initModuleOrderEditor } from './module-order.js'
 import { initConfigPathControls } from './path-controls.js'
 import { clearTrackedListeners, trackedAddEventListener } from './resource-tracking.js'
 
@@ -32,6 +34,7 @@ import { setupEventListeners, setupMessageListener } from './panel-events.js'
 import {
   handleEnableSyncRecordChange,
   handleListTypeChange,
+  handleLogLevelChange,
   handleLogLevelFilterChange,
   handleRefreshIntervalChange,
   handleThemeChange,
@@ -187,6 +190,21 @@ export function setupButtonListeners(): void {
 
   // 设置页：默认导出位置 / 默认导入文件夹（回填已记忆的路径）
   initConfigPathControls()
+
+  // 设置页：全局日志级别（记录级别偏好）
+  const logLevelSelect = document.getElementById('logLevelSelect') as HTMLSelectElement | null
+  if (logLevelSelect) {
+    logLevelSelect.value = String(getLogLevel(true))
+    trackedAddEventListener(logLevelSelect, 'change', handleLogLevelChange)
+    bgmLog(LOG_LEVELS.INFO, '[handlers] 日志级别 change 监听器已注册')
+  }
+
+  // 设置页：模块排序编辑器（↑↓ 按钮 + 拖拽）
+  try {
+    initModuleOrderEditor()
+  } catch (error: unknown) {
+    bgmLog(LOG_LEVELS.WARN, `[handlers] 初始化模块排序编辑器失败: ${(error as Error).message}`)
+  }
 
   // 设置页：默认收藏列表类型
   const listTypeSelect = document.getElementById('listTypeSelect') as HTMLSelectElement | null
