@@ -17,6 +17,14 @@ import type {
 
 // ========== parseJsonl 测试 ==========
 describe('parseJsonl', () => {
+  /** 测试用表头（字段名只在首行出现一次） */
+  const HEADER: readonly string[] = ['sid', 'name']
+
+  /** 构造「表头 + 值数组」两段式文本 */
+  function toJsonl(rows: readonly (readonly unknown[])[]): string {
+    return [JSON.stringify(HEADER), ...rows.map((row) => JSON.stringify(row))].join('\n')
+  }
+
   it('空字符串应返回空结果', () => {
     const result = parseJsonl('')
     expect(result.entries).toEqual([])
@@ -29,39 +37,92 @@ describe('parseJsonl', () => {
     expect(result.entries).toEqual([])
   })
 
+  it('只有表头没有数据行时应返回空结果且无错误', () => {
+    const result = parseJsonl(JSON.stringify(HEADER))
+    expect(result.entries).toEqual([])
+    expect(result.errors).toEqual([])
+  })
+
   it('合法 JSONL 应正确解析', () => {
-    const text = '{"sid":"123","name":"测试"}\n{"sid":"456","name":"测试2"}'
-    const result = parseJsonl(text)
+    const result = parseJsonl(
+      toJsonl([
+        ['123', '测试'],
+        ['456', '测试2'],
+      ]),
+    )
     expect(result.entries.length).toBe(2)
     expect(result.entries[0]?.sid).toBe('123')
     expect(result.entries[1]?.sid).toBe('456')
+    expect(result.errors).toEqual([])
+  })
+
+  it('字段按表头顺序映射，与值的位置一一对应', () => {
+    const result = parseJsonl('["name","sid"]\n["测试","123"]')
+    expect(result.entries[0]?.sid).toBe('123')
+    expect(result.entries[0]?.name).toBe('测试')
+  })
+
+  it('数组/布尔等非字符串值应原样还原', () => {
+    const result = parseJsonl('["sid","meta_tags","nsfw"]\n["8",["机战","TV"],false]')
+    expect(result.entries[0]?.sid).toBe('8')
+    expect(result.entries[0]?.meta_tags).toEqual(['机战', 'TV'])
+    expect(result.entries[0]?.nsfw).toBe(false)
   })
 
   it('包含空行时应跳过', () => {
-    const text = '{"sid":"123"}\n\n{"sid":"456"}\n'
+    const text = `${JSON.stringify(HEADER)}\n\n["123","测试"]\n\n["456","测试2"]\n`
     const result = parseJsonl(text)
     expect(result.entries.length).toBe(2)
+    expect(result.errors).toEqual([])
+  })
+
+  it('CRLF 换行也能正确解析', () => {
+    const result = parseJsonl('["sid","name"]\r\n["123","测试"]\r\n["456","测试2"]\r\n')
+    expect(result.entries.length).toBe(2)
+    expect(result.errors).toEqual([])
   })
 
   it('非法 JSON 行应记录错误', () => {
-    const text = '{"sid":"123"}\ninvalid json\n{"sid":"456"}'
+    const text = `${JSON.stringify(HEADER)}\n["123","测试"]\ninvalid json\n["456","测试2"]`
     const result = parseJsonl(text)
     expect(result.entries.length).toBe(2)
     expect(result.errors.length).toBe(1)
-    expect(result.errors[0]?.line).toBe(2)
+    expect(result.errors[0]?.line).toBe(3)
+  })
+
+  it('首行不是表头（非纯字符串数组）应记录错误', () => {
+    const result = parseJsonl('{"sid":"123"}')
+    expect(result.entries.length).toBe(0)
+    expect(result.errors.length).toBe(1)
+    expect(result.errors[0]?.line).toBe(1)
+    expect(result.errors[0]?.reason).toContain('首行必须是表头')
+  })
+
+  it('值数组长度与表头不一致应记录错误', () => {
+    const result = parseJsonl('["sid","name"]\n["123"]')
+    expect(result.entries.length).toBe(0)
+    expect(result.errors.length).toBe(1)
+    expect(result.errors[0]?.reason).toContain('字段数不匹配')
+  })
+
+  it('数据行不是数组应记录错误', () => {
+    const result = parseJsonl('["sid"]\n"123"')
+    expect(result.entries.length).toBe(0)
+    expect(result.errors.length).toBe(1)
+    expect(result.errors[0]?.reason).toContain('不是数组')
   })
 
   it('缺少 sid 字段的条目应记录错误', () => {
-    const text = '{"name":"测试"}'
-    const result = parseJsonl(text)
+    const result = parseJsonl('["name"]\n["测试"]')
     expect(result.entries.length).toBe(0)
     expect(result.errors.length).toBe(1)
+    expect(result.errors[0]?.reason).toContain('sid')
   })
 
   it('sid 不是字符串的条目应记录错误', () => {
-    const text = '{"sid":123}'
-    const result = parseJsonl(text)
+    const result = parseJsonl('["sid","name"]\n[123,"测试"]')
     expect(result.entries.length).toBe(0)
+    expect(result.errors.length).toBe(1)
   })
 })
 

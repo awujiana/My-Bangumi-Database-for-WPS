@@ -41,7 +41,7 @@ export interface GithubSyncConfig {
   repo: string
   /** 分支名（默认 main） */
   branch: string
-  /** 文件路径（如 data/bangumi.jsonl） */
+  /** 文件路径（如 data/bangumi.jsonlines） */
   path: string
   /**
    * 同步源类型（可选，默认 'github'）
@@ -88,7 +88,7 @@ export const DEFAULT_GITHUB_CONFIG: Readonly<GithubSyncConfig> = Object.freeze({
   owner: 'awujiana',
   repo: 'Bangumi-Archive-Anime-Excel',
   branch: 'main',
-  path: 'data/bangumi.jsonl',
+  path: 'data/bangumi.jsonlines',
   sourceType: 'github',
 })
 

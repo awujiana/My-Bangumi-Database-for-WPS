@@ -921,7 +921,7 @@ export const ACTION_HANDLERS: Record<string, ActionHandler> = {
       }
       // 文件过滤器：JSONL / JSON / 所有文件
       const selected = wpsApp.GetOpenFilename(
-        'JSONL 文件 (*.jsonl),*.jsonl,JSON 文件 (*.json),*.json,所有文件 (*.*),*.*',
+        'JSONL 文件 (*.jsonlines;*.jsonl),*.jsonlines;*.jsonl,JSON 文件 (*.json),*.json,所有文件 (*.*),*.*',
         '选择 JSONL/JSON 文件',
       )
       // GetOpenFilename 返回 false 表示用户取消

@@ -9,8 +9,8 @@
  *                "id": "...",
  *                "description": "...",
  *                "files": {
- *                  "data1.jsonl": { "content": "..." },
- *                  "data2.jsonl": { "content": "..." }
+ *                  "data1.jsonlines": { "content": "..." },
+ *                  "data2.jsonlines": { "content": "..." }
  *                },
  *                ...
  *              }
@@ -18,6 +18,7 @@
  *              本模块从响应中提取所有 files[*].content 字段，
  *              按文件名字典序拼接为单一 JSONL 文本，再复用 githubSyncDiff.ts
  *              的 parseJsonl 解析为 GithubRemoteEntry[]。
+ *              因此表头必须位于字典序最靠前的那个文件里，其后文件只放值数组。
  *
  *              与 GitHub/GitLab/Gitee 远程源的差异：
  *              - 不需要 owner/repo/branch/path 字段，仅需 gist_id

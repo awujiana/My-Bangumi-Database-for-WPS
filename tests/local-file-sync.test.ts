@@ -327,8 +327,9 @@ describe('readLocalFileContent', () => {
 describe('LocalFileSyncSource.fetchRemoteEntries', () => {
   it('成功解析 JSONL 内容', async () => {
     const jsonlContent = [
-      '{"sid":"111","name":"条目A","type":3,"score":8}',
-      '{"sid":"222","name":"条目B","type":2,"score":9}',
+      '["sid","name","type","score"]',
+      '["111","条目A",3,8]',
+      '["222","条目B",2,9]',
     ].join('\n')
     mockedGetGithubConfig.mockReturnValue({
       owner: '',
@@ -365,10 +366,12 @@ describe('LocalFileSyncSource.fetchRemoteEntries', () => {
   it('包含空行的文件返回有效条目（空行被跳过）', async () => {
     const content = [
       '',
-      '{"sid":"111","name":"条目A"}',
+      '["sid","name"]',
       '',
       '',
-      '{"sid":"222","name":"条目B"}',
+      '["111","条目A"]',
+      '',
+      '["222","条目B"]',
       '',
     ].join('\n')
     mockedGetGithubConfig.mockReturnValue({
@@ -388,10 +391,8 @@ describe('LocalFileSyncSource.fetchRemoteEntries', () => {
   })
 
   it('包含非法 JSON 行时跳过非法行（不抛出，返回合法条目）', async () => {
-    // 第一行非法 JSON，第二行是合法 JSONL，第三行缺少 sid（不是合法条目）
-    const content = ['this is not json', '{"sid":"111","name":"条目A"}', '{"name":"no sid"}'].join(
-      '\n',
-    )
+    // 第 1 行表头，第 2 行非法 JSON，第 3 行合法，第 4 行字段数与表头不匹配
+    const content = ['["sid","name"]', 'this is not json', '["111","条目A"]', '["222"]'].join('\n')
     mockedGetGithubConfig.mockReturnValue({
       owner: '',
       repo: '',

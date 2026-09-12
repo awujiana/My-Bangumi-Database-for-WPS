@@ -424,8 +424,7 @@ describe('GistSyncSource.fetchRemoteEntries', () => {
 
   it('成功响应：返回解析后的 JSONL 条目', async () => {
     mockedGetGistId.mockReturnValue('gist123')
-    const jsonlContent =
-      '{"sid":"111","name":"条目A","type":3,"score":8}\n{"sid":"222","name":"条目B","type":2,"score":9}'
+    const jsonlContent = '["sid","name","type","score"]\n["111","条目A",3,8]\n["222","条目B",2,9]'
     const gistApiResponse = {
       id: 'gist123',
       files: {
@@ -451,8 +450,8 @@ describe('GistSyncSource.fetchRemoteEntries', () => {
     mockedGetGistId.mockReturnValue('multi')
     const gistApiResponse = {
       files: {
-        'data1.jsonl': { content: '{"sid":"111","name":"A"}' },
-        'data2.jsonl': { content: '{"sid":"222","name":"B"}' },
+        'data1.jsonl': { content: '["sid","name"]\n["111","A"]' },
+        'data2.jsonl': { content: '["222","B"]' },
       },
     }
     const source = new GistSyncSource()
@@ -491,8 +490,8 @@ describe('GistSyncSource.fetchRemoteEntries', () => {
 
   it('包含非法 JSONL 行时跳过非法行（不抛出，返回合法条目）', async () => {
     mockedGetGistId.mockReturnValue('mixed')
-    // 第一行非法 JSON，第二行合法 JSONL，第三行缺少 sid
-    const content = 'this is not json\n{"sid":"111","name":"条目A"}\n{"name":"no sid"}'
+    // 第 1 行表头，第 2 行非法 JSON，第 3 行合法，第 4 行字段数与表头不匹配
+    const content = '["sid","name"]\nthis is not json\n["111","条目A"]\n["222"]'
     const gistApiResponse = {
       files: { 'data.jsonl': { content } },
     }
@@ -631,7 +630,7 @@ describe('fetchGistJson', () => {
 
   it('单文件且有内容时返回该内容 (line 163)', async () => {
     mockedGetGistId.mockReturnValue('single-file')
-    const content = '{"sid":"single","name":"单文件测试"}'
+    const content = '["sid","name"]\n["single","单文件测试"]'
     const gistApiResponse = {
       files: { 'data.jsonl': { content } },
     }
@@ -645,7 +644,7 @@ describe('fetchGistJson', () => {
     mockedGetGistId.mockReturnValue('undefined-file')
     // 手动构造：files 中某个键对应值为 undefined
     const gistApiResponse = {
-      files: { 'valid.jsonl': { content: '{"sid":"v1"}' }, 'bad.jsonl': undefined },
+      files: { 'valid.jsonl': { content: '["sid"]\n["v1"]' }, 'bad.jsonl': undefined },
     }
     const promise = fetchGistJson()
     lastMockXhr!._respondOk(JSON.stringify(gistApiResponse))
@@ -702,7 +701,7 @@ describe('fetchGistJson', () => {
     it('单文件内容为有效 JSONL 时正常返回 (line 163)', async () => {
       mockedGetGistId.mockReturnValue('valid-single')
       const gistApiResponse = {
-        files: { 'data.jsonl': { content: '{"sid":"s1","name":"单文件"}' } },
+        files: { 'data.jsonl': { content: '["sid","name"]\n["s1","单文件"]' } },
       }
       const promise = fetchGistJson()
       lastMockXhr!._respondOk(JSON.stringify(gistApiResponse))

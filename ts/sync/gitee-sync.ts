@@ -13,10 +13,10 @@
  *              复用 githubConfig 的 owner/repo/branch/path 字段（与 GitHub 共享配置 UI），
  *              复用 githubSyncDiff.ts 的 parseJsonl 解析逻辑，不重复解析实现。
  *
- * 数据格式（远程 JSONL 文件，每行一个 JSON 对象）与 GitHub 一致：
- *   { "sid": "12345", "name": "...", "updatedAt": "2026-07-21",
- *     "date": "2024-01-01", "meta_tags": ["标签1","标签2"], "nsfw": false,
- *     "话数": "12", "播放结束": "...", "动画制作公司": "...", ... }
+ * 数据格式（远程 JSONL 文件，采用「表头 + 值数组」两段式）与 GitHub 一致：
+ *   第 1 个非空行   ["sid","name","updatedAt","date","meta_tags","nsfw","话数", ...]
+ *   其后每行        ["12345","...","2026-07-21","2024-01-01",["标签1","标签2"],false,"12", ...]
+ *   值数组按表头顺序排列，字段名只在表头出现一次（可让数据文件体积减半）。
  *
  * URL 字段从 sid 构造：https://bgm.tv/subject/{sid}
  * type 字段默认为 2（动漫），用于同步记录显示。

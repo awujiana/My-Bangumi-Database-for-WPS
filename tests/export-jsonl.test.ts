@@ -105,6 +105,20 @@ function createMockWorksheet(
   }
 }
 
+/**
+ * 把「表头 + 值数组」两段式导出结果还原成对象，便于断言字段值。
+ *
+ * @param result buildJsonlFromSheet 的返回值
+ * @param index 取第几条记录（0 基）
+ * @returns 以字段名为键的对象
+ */
+function parseRecord(result: string, index = 0): Record<string, unknown> {
+  const lines = result.split('\n')
+  const header = JSON.parse(lines[0]!) as string[]
+  const row = JSON.parse(lines[index + 1]!) as unknown[]
+  return Object.fromEntries(header.map((field, column) => [field, row.at(column)]))
+}
+
 describe('buildJsonlFromSheet', () => {
   beforeEach(() => {
     vi.clearAllMocks()
@@ -217,14 +231,62 @@ describe('buildJsonlFromSheet', () => {
     const result = buildJsonlFromSheet()
     expect(result).not.toBe('')
     const lines = result.split('\n')
-    expect(lines.length).toBeGreaterThanOrEqual(1)
-    const parsed = JSON.parse(lines[0]!) as Record<string, unknown>
+    // 第 1 行是表头，第 2 行起是值数组
+    expect(lines.length).toBe(2)
+    const header = JSON.parse(lines[0]!) as string[]
+    const row = JSON.parse(lines[1]!) as unknown[]
+    expect(header).toContain('sid')
+    expect(row).toHaveLength(header.length)
+    const parsed = parseRecord(result)
     expect(parsed.sid).toBe('99999')
     expect(parsed.name).toBe('完整动漫')
     expect(parsed['话数']).toBe('24')
     expect(parsed.meta_tags).toEqual(['治愈', '日常'])
     expect(parsed['播放结束']).toBe('2024年12月31日')
     expect(parsed['导演']).toBe('新海诚')
+  })
+
+  it('多条记录时应共用同一行表头，字段名不随记录重复', () => {
+    const ws = createMockWorksheet({ usedRange: 5 })
+    mockGetDataSheet.mockReturnValue(ws)
+    mockFindHeaderRow.mockReturnValue(1)
+    mockGetLastRow.mockReturnValue(4)
+
+    const colMap = new Map<string, number>([
+      ['Bangumi_URL', 1],
+      ['名称', 2],
+    ])
+    mockGetColumnMap.mockReturnValue(colMap)
+
+    mockGetCellValue.mockImplementation((_ws: unknown, row: number, col: number) => {
+      if (row === 2 && col === 1) return 'https://bgm.tv/subject/1'
+      if (row === 2 && col === 2) return '第一部'
+      if (row === 3 && col === 1) return 'https://bgm.tv/subject/2'
+      if (row === 3 && col === 2) return '第二部'
+      return ''
+    })
+
+    mockExtractSubjectId.mockImplementation((url: string) => (url.endsWith('/1') ? '1' : '2'))
+
+    const result = buildJsonlFromSheet()
+    const lines = result.split('\n')
+    // 1 行表头 + 2 行值数组
+    expect(lines).toHaveLength(3)
+
+    const header = JSON.parse(lines[0]!) as string[]
+    const row1 = JSON.parse(lines[1]!) as unknown[]
+    const row2 = JSON.parse(lines[2]!) as unknown[]
+
+    // 值数组是纯数组，不含字段名
+    expect(row1).toHaveLength(header.length)
+    expect(row2).toHaveLength(header.length)
+    expect(row1).not.toContain('sid')
+    // 字段名在整个文件里只出现一次（表头那一行）
+    expect(result.split('"sid"')).toHaveLength(2)
+    expect(result.split('"name"')).toHaveLength(2)
+
+    expect(parseRecord(result, 0).name).toBe('第一部')
+    expect(parseRecord(result, 1).name).toBe('第二部')
   })
 
   it('标签字段应按 | 分割并过滤空值', () => {
@@ -248,11 +310,11 @@ describe('buildJsonlFromSheet', () => {
     mockExtractSubjectId.mockReturnValue('111')
 
     const result = buildJsonlFromSheet()
-    const parsed = JSON.parse(result) as Record<string, unknown>
+    const parsed = parseRecord(result)
     expect(parsed.meta_tags).toEqual(['热血', '奇幻'])
   })
 
-  it('名称字段为空时不应写入 name 属性', () => {
+  it('名称字段为空时应补空字符串（值数组长度必须与表头一致）', () => {
     const ws = createMockWorksheet({ usedRange: 5 })
     mockGetDataSheet.mockReturnValue(ws)
     mockFindHeaderRow.mockReturnValue(1)
@@ -273,11 +335,11 @@ describe('buildJsonlFromSheet', () => {
     mockExtractSubjectId.mockReturnValue('222')
 
     const result = buildJsonlFromSheet()
-    const parsed = JSON.parse(result) as Record<string, unknown>
-    expect(parsed.name).toBeUndefined()
+    const parsed = parseRecord(result)
+    expect(parsed.name).toBe('')
   })
 
-  it('日期字段为空时不应写入 date 属性', () => {
+  it('日期字段为空时应补空字符串（值数组长度必须与表头一致）', () => {
     const ws = createMockWorksheet({ usedRange: 5 })
     mockGetDataSheet.mockReturnValue(ws)
     mockFindHeaderRow.mockReturnValue(1)
@@ -298,8 +360,8 @@ describe('buildJsonlFromSheet', () => {
     mockExtractSubjectId.mockReturnValue('333')
 
     const result = buildJsonlFromSheet()
-    const parsed = JSON.parse(result) as Record<string, unknown>
-    expect(parsed.date).toBeUndefined()
+    const parsed = parseRecord(result)
+    expect(parsed.date).toBe('')
   })
 
   it('getCellText 应优先使用单元格 Text 属性', () => {
@@ -327,7 +389,7 @@ describe('buildJsonlFromSheet', () => {
     mockExtractSubjectId.mockReturnValue('444')
 
     const result = buildJsonlFromSheet()
-    const parsed = JSON.parse(result) as Record<string, unknown>
+    const parsed = parseRecord(result)
     expect(parsed.date).toBe('2024年01月01日')
   })
 
@@ -354,7 +416,7 @@ describe('buildJsonlFromSheet', () => {
     mockExtractSubjectId.mockReturnValue('555')
 
     const result = buildJsonlFromSheet()
-    const parsed = JSON.parse(result) as Record<string, unknown>
+    const parsed = parseRecord(result)
     expect(parsed.date).toBe('2024/06/15')
   })
 
@@ -388,7 +450,7 @@ describe('buildJsonlFromSheet', () => {
     mockExtractSubjectId.mockReturnValue('666')
 
     const result = buildJsonlFromSheet()
-    const parsed = JSON.parse(result) as Record<string, unknown>
+    const parsed = parseRecord(result)
     expect(parsed.date).toBe('回退日期')
   })
 
@@ -421,7 +483,7 @@ describe('buildJsonlFromSheet', () => {
     mockExtractSubjectId.mockReturnValue('777')
 
     const result = buildJsonlFromSheet()
-    const parsed = JSON.parse(result) as Record<string, unknown>
+    const parsed = parseRecord(result)
     // Range 返回 null → getCellText 返回 '' → 回退到 getCellValue
     expect(parsed.date).toBe('回退值')
   })
@@ -451,7 +513,7 @@ describe('buildJsonlFromSheet', () => {
     // headerRow = 0 || 1 → 1，从第 2 行开始读取
     const result = buildJsonlFromSheet()
     expect(result).not.toBe('')
-    const parsed = JSON.parse(result) as Record<string, unknown>
+    const parsed = parseRecord(result)
     expect(parsed.sid).toBe('888')
   })
 
@@ -633,6 +695,6 @@ describe('exportSheetToJsonlFile', () => {
     const infoCalls = mockBgmLog.mock.calls.filter((c: unknown[]) => c[0] === 'INFO')
     const lastInfoCall = infoCalls.at(-1)
     expect(lastInfoCall?.[1]).toContain('bgm_sync_export_')
-    expect(lastInfoCall?.[1]).toContain('.jsonl')
+    expect(lastInfoCall?.[1]).toContain('.jsonlines')
   })
 })

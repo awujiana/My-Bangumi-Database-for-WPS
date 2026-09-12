@@ -669,15 +669,12 @@ describe('GitHub 同步流程：fetch JSONL → diff → apply → undo', () => 
   })
 
   it('完整流程：fetch JSONL → computeDiff → applyDiffToSheet → undoLastSync', async () => {
-    // 1. 构造远程 JSONL 数据（2 条：1 条新增，1 条更新）
-    const jsonlText = `${JSON.stringify({
-      sid: '10001',
-      name: '新条目',
-      meta_tags: ['标签1'],
-    })}\n${JSON.stringify({
-      sid: '10002',
-      name: '更新名称',
-    })}`
+    // 1. 构造远程 JSONL 数据（表头 + 2 条：1 条新增，1 条更新）
+    const jsonlText = [
+      '["sid","name","meta_tags"]',
+      JSON.stringify(['10001', '新条目', ['标签1']]),
+      JSON.stringify(['10002', '更新名称', []]),
+    ].join('\n')
 
     // 2. 解析 JSONL
     const { entries, errors } = parseJsonl(jsonlText)
@@ -850,11 +847,12 @@ describe('GitHub 同步流程：fetch JSONL → diff → apply → undo', () => 
 describe('parseJsonl 集成解析', () => {
   it('合法 JSONL 应正确解析为条目数组', () => {
     const text = [
-      JSON.stringify({ sid: '1', name: 'A', meta_tags: ['标签'] }),
-      JSON.stringify({ sid: '2', name: 'B', 话数: '12' }),
+      '["sid","name","meta_tags","话数"]',
+      JSON.stringify(['1', 'A', ['标签'], '']),
+      JSON.stringify(['2', 'B', [], '12']),
       // 空行应跳过
       '',
-      JSON.stringify({ sid: '3', name: 'C' }),
+      JSON.stringify(['3', 'C', [], '']),
     ].join('\n')
 
     const { entries, errors } = parseJsonl(text)
@@ -867,11 +865,12 @@ describe('parseJsonl 集成解析', () => {
 
   it('非法行应收集到 errors 不中断解析', () => {
     const text = [
-      JSON.stringify({ sid: '1', name: 'A' }),
+      '["sid","name"]',
+      JSON.stringify(['1', 'A']),
       '{ invalid json',
-      JSON.stringify({ sid: '2', name: 'B' }),
-      // 缺少 sid
-      JSON.stringify({ notSid: 'x' }),
+      JSON.stringify(['2', 'B']),
+      // 字段数与表头不匹配
+      JSON.stringify(['3']),
     ].join('\n')
 
     const { entries, errors } = parseJsonl(text)

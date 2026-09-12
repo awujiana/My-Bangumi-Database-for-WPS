@@ -1106,9 +1106,9 @@ Panel 头部右上角包含设置按钮与用户头像（窄屏显示）：
 | 仓库所有者 | GitHub 用户名或组织名 | `awujiana`                    |
 | 仓库名     | 仓库名称              | `Bangumi-Archive-Anime-Excel` |
 | 分支名     | Git 分支              | `main`                        |
-| 文件路径   | JSONL 文件路径        | `data/bangumi.jsonl`          |
+| 文件路径   | JSONL 文件路径        | `data/bangumi.jsonlines`      |
 
-**首次打开**：系统自动填充默认配置（awujiana/Bangumi-Archive-Anime-Excel/main/data/bangumi.jsonl）。
+**首次打开**：系统自动填充默认配置（awujiana/Bangumi-Archive-Anime-Excel/main/data/bangumi.jsonlines）。
 
 #### 2.10.3 本地文件选择（browseLocalFile）
 
@@ -1123,7 +1123,7 @@ Panel 头部右上角包含设置按钮与用户头像（窄屏显示）：
 1. 选择同步源类型为「📁 本地文件」。
 2. 点击「📁 选择」按钮。
 3. WPS 弹出文件选择对话框。
-4. 过滤器：JSONL 文件 (_.jsonl)、JSON 文件 (_.json)。
+4. 过滤器：JSONL 文件 (_.jsonlines;_.jsonl)、JSON 文件 (_.json)。
 5. 选择后路径自动填入输入框并触发防抖保存。
 
 **边界情况：**

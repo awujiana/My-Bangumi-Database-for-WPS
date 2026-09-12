@@ -1,7 +1,7 @@
 /**
  * @fileoverview 本地文件同步源模块
  * @module sync/localFileSync
- * @description 通过 WPS 文件对话框或路径输入选择本地 .jsonl/.json 文件，
+ * @description 通过 WPS 文件对话框或路径输入选择本地 .jsonlines/.jsonl/.json 文件，
  *              读取内容并复用 githubSyncDiff.ts 的 parseJsonl 解析逻辑。
  *
  *              与远程源（GitHub/GitLab/Gitee）的差异：
@@ -11,8 +11,8 @@
  *              - 复用 parseJsonl / isGithubRemoteEntry 解析逻辑，不重复实现
  *
  * 数据格式（与 GitHub 同步源一致）：
- *   每行一个独立的 JSON 对象（JSONL 格式），或单行 JSON 数组（.json 文件）
- *   非法行不中断整体解析，会被收集到 errors 中跳过。
+ *   「表头 + 值数组」两段式 JSON Lines——第 1 个非空行是表头（纯字符串数组），
+ *   其后每行是与表头等长的值数组；非法行不中断整体解析，会被收集到 errors 中跳过。
  *
  * WPS 文件 API 探索结论：
  *   ts/tools/wps.ts 当前未导出文件读取 API。
@@ -41,7 +41,7 @@ const FILE_READ_TIMEOUT_MS = 15_000
  * WPS 加载项环境运行在内置浏览器控件中，允许 file:// 协议访问本地文件系统。
  *
  * 路径规范化：
- *   - Windows 路径（如 `C:\Users\foo\data.jsonl`）转换为 `file:///C:/Users/foo/data.jsonl`
+ *   - Windows 路径（如 `C:\Users\foo\data.jsonlines`）转换为 `file:///C:/Users/foo/data.jsonlines`
  *   - 相对路径或无盘符路径按当前工作目录解析，可能失败
  *   - 已有的 `file://` 前缀保持不变
  *
@@ -212,9 +212,12 @@ export class LocalFileSyncSource implements SyncSource {
   validateConfig(): Result<void> {
     if (!isLocalFileConfigured()) {
       return Result.failVoid(
-        new BgmError('本地文件路径未配置，请在"文件路径"字段填写本地 .jsonl/.json 文件的绝对路径', {
-          code: 'CONFIG_INCOMPLETE',
-        }),
+        new BgmError(
+          '本地文件路径未配置，请在"文件路径"字段填写本地 .jsonlines/.jsonl/.json 文件的绝对路径',
+          {
+            code: 'CONFIG_INCOMPLETE',
+          },
+        ),
       )
     }
     return Result.okVoid()

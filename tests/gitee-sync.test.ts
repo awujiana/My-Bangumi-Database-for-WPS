@@ -305,7 +305,7 @@ describe('fetchGiteeJson', () => {
   })
 
   it('成功下载并解析 JSONL', async () => {
-    const jsonlContent = '{"sid":"1","name":"条目1"}\n{"sid":"2","name":"条目2"}'
+    const jsonlContent = '["sid","name"]\n["1","条目1"]\n["2","条目2"]'
     const promise = fetchGiteeJson()
     lastMockXhr!._respondOk(jsonlContent)
     const entries = await promise
@@ -323,7 +323,7 @@ describe('fetchGiteeJson', () => {
       sourceType: 'gitee',
     })
     const promise = fetchGiteeJson()
-    lastMockXhr!._respondOk('{"sid":"1"}')
+    lastMockXhr!._respondOk('["sid"]\n["1"]')
     await promise
     expect(lastXhrCall?.url).toBe('https://gitee.com/myowner/myrepo/raw/develop/data.jsonl')
     expect(lastXhrCall?.method).toBe('GET')
@@ -331,14 +331,14 @@ describe('fetchGiteeJson', () => {
 
   it('设置 Accept 请求头为 application/json', async () => {
     const promise = fetchGiteeJson()
-    lastMockXhr!._respondOk('{"sid":"1"}')
+    lastMockXhr!._respondOk('["sid"]\n["1"]')
     await promise
     expect(lastXhrCall?.headers.Accept).toBe('application/json')
   })
 
   it('设置 30 秒超时', async () => {
     const promise = fetchGiteeJson()
-    lastMockXhr!._respondOk('{"sid":"1"}')
+    lastMockXhr!._respondOk('["sid"]\n["1"]')
     await promise
     expect(lastXhrCall?.timeout).toBe(30_000)
   })
@@ -403,7 +403,7 @@ describe('fetchGiteeJson', () => {
   })
 
   it('部分非法行仍返回合法条目', async () => {
-    const jsonlContent = '{"sid":"1","name":"有效"}\ninvalid\n{"sid":"2","name":"也有效"}'
+    const jsonlContent = '["sid","name"]\n["1","有效"]\ninvalid\n["2","也有效"]'
     const promise = fetchGiteeJson()
     lastMockXhr!._respondOk(jsonlContent)
     const entries = await promise
@@ -420,7 +420,7 @@ describe('fetchGiteeJson', () => {
   })
 
   it('单行有效 JSONL', async () => {
-    const jsonlContent = '{"sid":"42","name":"单条记录","updatedAt":"2026-08-01"}'
+    const jsonlContent = '["sid","name","updatedAt"]\n["42","单条记录","2026-08-01"]'
     const promise = fetchGiteeJson()
     lastMockXhr!._respondOk(jsonlContent)
     const entries = await promise
@@ -442,7 +442,7 @@ describe('fetchGiteeJson', () => {
       throw new Error('JSON 解析器内部错误')
     })
     const promise = fetchGiteeJson()
-    lastMockXhr!._respondOk('{"sid":"1"}')
+    lastMockXhr!._respondOk('["sid"]\n["1"]')
     await expect(promise).rejects.toThrow(/JSONL 解析失败/)
   })
 
@@ -451,7 +451,7 @@ describe('fetchGiteeJson', () => {
       throw '字符串异常'
     })
     const promise = fetchGiteeJson()
-    lastMockXhr!._respondOk('{"sid":"1"}')
+    lastMockXhr!._respondOk('["sid"]\n["1"]')
     await expect(promise).rejects.toThrow(/JSONL 解析失败: 字符串异常/)
   })
 
@@ -480,7 +480,7 @@ describe('GiteeSyncSource.fetchRemoteEntries', () => {
 
   it('委托给 fetchGiteeJson 并返回条目', async () => {
     const source = new GiteeSyncSource()
-    const jsonlContent = '{"sid":"1","name":"条目1"}'
+    const jsonlContent = '["sid","name"]\n["1","条目1"]'
     const promise = source.fetchRemoteEntries()
     lastMockXhr!._respondOk(jsonlContent)
     const entries = await promise

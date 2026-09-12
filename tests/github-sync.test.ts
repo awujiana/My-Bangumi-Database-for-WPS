@@ -635,6 +635,9 @@ describe('computeDiff 策略修饰', () => {
 // ========== JSONL 解析测试 ==========
 
 describe('parseJsonl', () => {
+  /** 测试用表头（字段名只在首行出现一次） */
+  const HEADER = '["sid","name"]'
+
   it('空字符串返回空数组无错误', () => {
     const { entries, errors } = parseJsonl('')
     expect(entries).toHaveLength(0)
@@ -642,7 +645,7 @@ describe('parseJsonl', () => {
   })
 
   it('单行合法 JSON → 1 条记录', () => {
-    const text = '{"sid":"123","name":"测试","type":2}'
+    const text = `${HEADER}\n["123","测试"]`
     const { entries, errors } = parseJsonl(text)
     expect(entries).toHaveLength(1)
     expect(entries[0]?.sid).toBe('123')
@@ -651,11 +654,7 @@ describe('parseJsonl', () => {
   })
 
   it('多行 JSONL → 全部解析', () => {
-    const text = [
-      '{"sid":"1","name":"A"}',
-      '{"sid":"2","name":"B"}',
-      '{"sid":"3","name":"C"}',
-    ].join('\n')
+    const text = [HEADER, '["1","A"]', '["2","B"]', '["3","C"]'].join('\n')
     const { entries, errors } = parseJsonl(text)
     expect(entries).toHaveLength(3)
     expect(entries.map((entry) => entry.sid)).toEqual(['1', '2', '3'])
@@ -663,53 +662,49 @@ describe('parseJsonl', () => {
   })
 
   it('CRLF 换行也能正确解析', () => {
-    const text = '{"sid":"1"}\r\n{"sid":"2"}\r\n{"sid":"3"}'
+    const text = `${HEADER}\r\n["1","A"]\r\n["2","B"]\r\n["3","C"]`
     const { entries, errors } = parseJsonl(text)
     expect(entries).toHaveLength(3)
     expect(errors).toHaveLength(0)
   })
 
   it('空行被跳过不视为错误', () => {
-    const text = '{"sid":"1"}\n\n  \n{"sid":"2"}\n'
+    const text = `${HEADER}\n\n  \n["1","A"]\n`
     const { entries, errors } = parseJsonl(text)
-    expect(entries).toHaveLength(2)
+    expect(entries).toHaveLength(1)
     expect(errors).toHaveLength(0)
   })
 
   it('非法 JSON 行不中断整体解析，记录到 errors', () => {
-    const text = [
-      '{"sid":"1","name":"A"}',
-      '{this is invalid',
-      '{"sid":"2","name":"B"}',
-      'not json at all',
-    ].join('\n')
+    const text = [HEADER, '["1","A"]', '{this is invalid', '["2","B"]', 'not json at all'].join(
+      '\n',
+    )
     const { entries, errors } = parseJsonl(text)
     expect(entries).toHaveLength(2)
     expect(entries[0]?.sid).toBe('1')
     expect(entries[1]?.sid).toBe('2')
     expect(errors).toHaveLength(2)
-    expect(errors[0]?.line).toBe(2)
-    expect(errors[1]?.line).toBe(4)
+    expect(errors[0]?.line).toBe(3)
+    expect(errors[1]?.line).toBe(5)
   })
 
-  it('对象缺少 sid 字段 → 视为错误', () => {
-    const text = '{"name":"无sid"}\n{"sid":"1","name":"有sid"}'
+  it('表头缺少 sid 字段 → 每条数据行都视为错误', () => {
+    const text = '["name"]\n["无sid"]'
     const { entries, errors } = parseJsonl(text)
-    expect(entries).toHaveLength(1)
-    expect(entries[0]?.sid).toBe('1')
+    expect(entries).toHaveLength(0)
     expect(errors).toHaveLength(1)
-    expect(errors[0]?.line).toBe(1)
+    expect(errors[0]?.line).toBe(2)
   })
 
   it('sid 非字符串（数字）→ 视为错误', () => {
-    const text = '{"sid":12345,"name":"数字sid"}'
+    const text = `${HEADER}\n[12345,"数字sid"]`
     const { entries, errors } = parseJsonl(text)
     expect(entries).toHaveLength(0)
     expect(errors).toHaveLength(1)
   })
 
   it('首尾空白行被 trim 后跳过', () => {
-    const text = '   {"sid":"1"}   \n   {"sid":"2"}   '
+    const text = `   ${HEADER}   \n   ["1","A"]   \n   ["2","B"]   `
     const { entries, errors } = parseJsonl(text)
     expect(entries).toHaveLength(2)
     expect(errors).toHaveLength(0)
@@ -717,7 +712,8 @@ describe('parseJsonl', () => {
 
   it('带全部字段的完整记录正确解析', () => {
     const text =
-      '{"sid":"12345","name":"测试","updatedAt":"2026-07-21","date":"2024-01-01","meta_tags":["标签1","标签2"],"话数":"12"}'
+      '["sid","name","updatedAt","date","meta_tags","话数"]\n' +
+      '["12345","测试","2026-07-21","2024-01-01",["标签1","标签2"],"12"]'
     const { entries, errors } = parseJsonl(text)
     expect(entries).toHaveLength(1)
     expect(errors).toHaveLength(0)
@@ -4768,7 +4764,7 @@ describe('GithubSyncSource 方法', () => {
   })
 
   it('fetchRemoteEntries 委托给 fetchGithubJson', async () => {
-    setupXHRResponse(200, '{"sid":"1","name":"Test"}')
+    setupXHRResponse(200, '["sid","name"]\n["1","Test"]')
 
     const source = new GithubSyncSource()
     const entries = await source.fetchRemoteEntries()

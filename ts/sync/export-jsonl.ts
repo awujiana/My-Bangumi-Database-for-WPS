@@ -2,8 +2,9 @@
  * @fileoverview JSONL 导出模块
  * @module sync/exportJsonl
  * @description 将 Excel 工作表中的数据导出为 JSONL（JSON Lines）格式文件。
- *              JSONL 格式：每行一个独立的 JSON 对象，无外层数组括号，无逗号分隔。
- *              兼容 GitHub 仓库同步的 JSONL 数据格式。
+ *              采用「表头 + 值数组」两段式：第 1 行是字段名数组，其后每行是与
+ *              表头等长的值数组（仍是 JSON Lines，每行一个合法 JSON）。
+ *              与 GitHub 仓库同步的数据格式一致，可直接作为本地同步数据源。
  */
 
 import { LOG_LEVELS } from '../core/constants.js'
@@ -20,6 +21,55 @@ import { bgmLog } from '../tools/utility.js'
 import type { WpsWorksheet } from '../tools/wps.js'
 
 import { extractSubjectId } from './pure-utilities.js'
+
+/**
+ * 导出字段顺序
+ *
+ * 必须与数据仓库 `data/bangumi.jsonlines` 的表头一致
+ * （上游由 Archive/scripts/convert_dump_to_jsonl.py 的 HEADER_FIELDS 派生），
+ * 这样导出的文件可以直接当作「本地文件同步」的数据源使用。
+ */
+const EXPORT_FIELDS = [
+  'sid',
+  'name',
+  'updatedAt',
+  'date',
+  'meta_tags',
+  'nsfw',
+  '播放结束',
+  '动画制作公司',
+  '话数',
+  '片长',
+  '制片国家',
+  '语言',
+  '类型',
+  '导演',
+  '音乐',
+  '人物设定',
+  '机械设定',
+  '原作',
+  '脚本',
+  '分镜',
+  '演出',
+  '原案',
+  '系列构成',
+  '在线播放平台',
+  '关联的动漫ID',
+] as const
+
+/**
+ * 取字段值；缺省时按字段类型补默认值，保证每行长度与表头严格一致
+ *
+ * 数据仓库中的记录所有字段都必然存在（文本为空串、meta_tags 为空数组、nsfw 为 false），
+ * 导出时补齐同样的默认值，两种来源的数据结构才完全一致。
+ */
+function fieldOrDefault(entry: Record<string, unknown>, field: string): unknown {
+  const value = entry[field]
+  if (value !== undefined) return value
+  if (field === 'meta_tags') return []
+  if (field === 'nsfw') return false
+  return ''
+}
 
 /**
  * 读取单元格的显示文本（优先使用 Text 属性保留本地格式，回退到 getCellValue）
@@ -54,6 +104,8 @@ function getCellText(ws: WpsWorksheet, row: number, col: number): string {
  * 读取数据工作表中的所有行，按 {@link GithubRemoteEntry} 格式组织，
  * 包含 sid、name、updatedAt、date、meta_tags、话数 等字段。
  *
+ * 输出第 1 行为表头（{@link EXPORT_FIELDS}），其后每行为等长的值数组。
+ *
  * 日期字段（开播日期、完播日）优先使用单元格的本地格式（Text 属性），
  * 保留用户设置的日期格式，无格式时回退到默认的 Value2 值。
  *
@@ -76,7 +128,7 @@ export function buildJsonlFromSheet(): string {
     return ''
   }
 
-  const lines: string[] = []
+  const rows: unknown[][] = []
   const startRow = headerRow + 1
 
   for (let row = startRow; row <= lastRow; row += 1) {
@@ -151,13 +203,21 @@ export function buildJsonlFromSheet(): string {
           }
         }
 
-        lines.push(JSON.stringify(entry))
+        rows.push(EXPORT_FIELDS.map((field) => fieldOrDefault(entry, field)))
       }
     }
   }
 
-  bgmLog(LOG_LEVELS.INFO, `[exportJsonl] 构建完成：${String(lines.length)} 条记录`)
-  return lines.join('\n')
+  bgmLog(LOG_LEVELS.INFO, `[exportJsonl] 构建完成：${String(rows.length)} 条记录`)
+
+  // 无数据时返回空字符串（保持与历史行为一致，调用方据此判断是否有内容）
+  if (rows.length === 0) {
+    return ''
+  }
+
+  // 「表头 + 值数组」两段式：第 1 行字段名只出现一次，其后每行为等长值数组
+  const headerLine = JSON.stringify([...EXPORT_FIELDS])
+  return [headerLine, ...rows.map((row) => JSON.stringify(row))].join('\n')
 }
 
 /**
@@ -176,11 +236,11 @@ export function exportSheetToJsonlFile(): boolean {
       return false
     }
 
-    const blob = new Blob([content], { type: 'application/jsonl' })
+    const blob = new Blob([content], { type: 'application/jsonlines' })
     const url = URL.createObjectURL(blob)
 
     const timestamp = new Date().toISOString().slice(0, 19).replace(/[:]/g, '-')
-    const filename = `bgm_sync_export_${timestamp}.jsonl`
+    const filename = `bgm_sync_export_${timestamp}.jsonlines`
 
     const a = document.createElement('a')
     a.href = url

@@ -407,7 +407,7 @@
                 ><input
                   type="text"
                   id="githubPath"
-                  placeholder="如：data/bangumi.jsonl"
+                  placeholder="如：data/bangumi.jsonlines"
                   autocomplete="off"
                   spellcheck="false"
                 />
@@ -420,7 +420,7 @@
                   <input
                     type="text"
                     id="localFilePath"
-                    placeholder="如：D:\data\bangumi.jsonl"
+                    placeholder="如：D:\data\bangumi.jsonlines"
                     autocomplete="off"
                     spellcheck="false"
                     style="flex: 1"
@@ -434,7 +434,9 @@
                   </button>
                 </div>
               </div>
-              <p class="hint">支持 .jsonl 和 .json 文件；复用 #githubPath 字段存储路径。</p>
+              <p class="hint">
+                支持 .jsonlines / .jsonl / .json 文件；复用 #githubPath 字段存储路径。
+              </p>
             </div>
             <div id="gistFields" style="display: none">
               <div class="form-row">
@@ -591,9 +593,10 @@
               💾 数据缓存：<span id="githubCacheStatusText">检查中...</span>
             </p>
             <p class="hint">
-              <strong>JSONL 格式</strong>：每行一个 JSON 对象<br /><code
-                >{"sid":"8","name":"Code Geass
-                R2","updatedAt":"2026-08-04","date":"2008-04-06","话数":"25","导演":"谷口悟朗","动画制作公司":"サンライズ"}</code
+              <strong>JSONL 格式</strong>：第 1 行是表头，其后每行是与表头等长的值数组<br /><code
+                >["sid","name","updatedAt","date","话数","导演","动画制作公司"]</code
+              ><br /><code
+                >["8","Code Geass R2","2026-09-08","2008-04-06","25","谷口悟朗","サンライズ"]</code
               ><br />基础字段：<code>sid</code>（必填）、<code>name</code>、<code>updatedAt</code>
             </p>
           </section>

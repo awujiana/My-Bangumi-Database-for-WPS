@@ -434,7 +434,7 @@
                 <input
                   type="text"
                   id="githubPath"
-                  placeholder="如：data/bangumi.jsonl"
+                  placeholder="如：data/bangumi.jsonlines"
                   autocomplete="off"
                   spellcheck="false"
                 />
@@ -448,7 +448,7 @@
                   <input
                     type="text"
                     id="localFilePath"
-                    placeholder="如：D:\data\bangumi.jsonl（绝对路径）"
+                    placeholder="如：D:\data\bangumi.jsonlines（绝对路径）"
                     autocomplete="off"
                     spellcheck="false"
                     style="flex: 1"
@@ -463,7 +463,8 @@
                 </div>
               </div>
               <p class="hint">
-                支持 .jsonl 和 .json 文件；复用 #githubPath 字段存储路径（与远程源互斥）。
+                支持 .jsonlines / .jsonl / .json 文件；复用 #githubPath
+                字段存储路径（与远程源互斥）。
               </p>
             </div>
 
@@ -675,17 +676,23 @@
               💾 数据缓存：<span id="githubCacheStatusText">检查中...</span>
             </p>
             <p class="hint">
-              <strong>JSONL 格式</strong>：每行一个 JSON 对象（无外层数组括号，无逗号分隔）<br />
+              <strong>JSONL 格式</strong>：第 1
+              行是表头（字段名数组），其后每行是与表头等长的值数组<br />
               <code
-                >{"sid":"8","name":"Code Geass
-                R2","updatedAt":"2026-08-04","date":"2008-04-06","meta_tags":["机战","TV","日本"],"nsfw":false,"话数":"25","导演":"谷口悟朗","动画制作公司":"サンライズ","系列构成":"大河内一楼"}</code
+                >["sid","name","updatedAt","date","meta_tags","nsfw","话数","导演","动画制作公司","系列构成"]</code
+              ><br />
+              <code
+                >["8","Code Geass
+                R2","2026-09-08","2008-04-06",["机战","TV","日本"],false,"25","谷口悟朗","サンライズ","大河内一楼"]</code
               ><br />
               基础字段：<code>sid</code>（必填）、<code>name</code>、<code>updatedAt</code>（YYYY-MM-DD）<br />
               扩展字段：<code>date</code>、<code>meta_tags</code>、<code>nsfw</code>、<code>话数</code>、<code>导演</code>、<code>音乐</code>、<code>动画制作公司</code>、<code
                 >系列构成</code
               >
               等<br />
-              默认仓库：<code>awujiana/Bangumi-Archive-Anime-Excel/main/data/bangumi.jsonl</code>
+              默认仓库：<code
+                >awujiana/Bangumi-Archive-Anime-Excel/main/data/bangumi.jsonlines</code
+              >
             </p>
           </section>
 

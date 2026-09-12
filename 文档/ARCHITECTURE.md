@@ -292,7 +292,7 @@ ts/index.ts (thin barrel — 仅 re-export)
 #### `githubConfig.ts` — 配置存储中心
 
 - **PluginStorage 键清单**（详见第三章）
-- **默认配置**: `DEFAULT_GITHUB_CONFIG = { owner: 'awujiana', repo: 'Bangumi-Archive-Anime-Excel', branch: 'main', path: 'data/bangumi.jsonl', sourceType: 'github' }`
+- **默认配置**: `DEFAULT_GITHUB_CONFIG = { owner: 'awujiana', repo: 'Bangumi-Archive-Anime-Excel', branch: 'main', path: 'data/bangumi.jsonlines', sourceType: 'github' }`
 - **同步策略** (`SyncStrategy`): 'add-update' | 'add-only' | 'update-only' | 'mirror' | 'force-overwrite'
 - **同步源类型** (`SyncSourceType`): 'github' | 'gitlab' | 'gitee' | 'local' | 'gist'
 - **配置完整性校验**: `isGithubConfigComplete()` 检查 owner/repo/path 非空
@@ -688,7 +688,7 @@ ts/index.ts (thin barrel — 仅 re-export)
 | `github_sync_owner`       | string | `'awujiana'`                    | GitHub 仓库所有者 |
 | `github_sync_repo`        | string | `'Bangumi-Archive-Anime-Excel'` | GitHub 仓库名     |
 | `github_sync_branch`      | string | `'main'`                        | 分支名            |
-| `github_sync_path`        | string | `'data/bangumi.jsonl'`          | JSONL 文件路径    |
+| `github_sync_path`        | string | `'data/bangumi.jsonlines'`      | JSONL 文件路径    |
 | `github_sync_strategy`    | string | `'add-update'`                  | 同步策略          |
 | `github_sync_source_type` | string | `'github'`                      | 同步源类型        |
 | `github_sync_gist_id`     | string | `''` (空)                       | GitHub Gist ID    |

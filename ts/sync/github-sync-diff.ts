@@ -8,6 +8,10 @@
  *
  * type 字段约定（与 Bangumi 一致）：
  *   1=想看  2=在看  3=看过  4=搁置  5=抛弃
+ *
+ * 远程数据文件格式（数据仓库 data/bangumi.jsonlines 与各镜像源一致）：
+ *   第 1 个非空行是表头（纯字符串数组），其后每行是与表头等长的值数组。
+ *   解析细节见 {@link parseJsonl}。
  */
 
 /** 远程 JSON 单条记录结构 */
@@ -237,9 +241,76 @@ export function isGithubRemoteEntry(value: unknown): value is GithubRemoteEntry 
 }
 
 /**
+ * 解析错误：1-based 行号 + 原因
+ */
+export interface JsonlParseError {
+  /** 1-based 行号 */
+  line: number
+  /** 失败原因 */
+  reason: string
+}
+
+/**
+ * 类型守卫：判断未知值是否为纯字符串数组（即合法的表头行）
+ */
+function isStringArray(value: unknown): value is string[] {
+  return Array.isArray(value) && value.every((item) => typeof item === 'string')
+}
+
+/**
+ * 解析单行 JSON；失败时把原因写入 errors 并返回 undefined
+ *
+ * JSON.parse 对合法输入不会返回 undefined（最坏是 null），因此可用 undefined 作失败哨兵。
+ */
+function parseLine(trimmed: string, lineNumber: number, errors: JsonlParseError[]): unknown {
+  try {
+    return JSON.parse(trimmed) as unknown
+  } catch (error: unknown) {
+    const reason = error instanceof Error ? error.message : String(error)
+    errors.push({ line: lineNumber, reason })
+    return undefined
+  }
+}
+
+/**
+ * 把一行值数组按表头映射成记录对象
+ *
+ * @param header 表头字段名（顺序即列序）
+ * @param row 该行的值数组
+ * @returns 成功为 { entry }；失败为 { reason }
+ */
+function buildEntry(
+  header: string[],
+  row: unknown,
+): { entry: GithubRemoteEntry } | { reason: string } {
+  if (!Array.isArray(row)) {
+    return { reason: '该行不是数组（新格式要求首行为表头，其后每行为值数组）' }
+  }
+  if (row.length !== header.length) {
+    return {
+      reason: `字段数不匹配：表头 ${String(header.length)} 个，该行 ${String(row.length)} 个`,
+    }
+  }
+  const object: Record<string, unknown> = Object.fromEntries(
+    header.map((field, column): [string, unknown] => [field, row.at(column)]),
+  )
+  if (!isGithubRemoteEntry(object)) {
+    return { reason: '对象缺少 sid 字段或 sid 不是字符串' }
+  }
+  return { entry: object }
+}
+
+/**
  * 解析 JSONL 文本为 GithubRemoteEntry 数组
  *
- * JSONL（JSON Lines）格式：每行一个独立的 JSON 对象，无外层数组括号，无逗号分隔。
+ * 文件采用「表头 + 值数组」两段式（仍是 JSON Lines，每行一个合法 JSON）：
+ *
+ * ```
+ * ["sid","name","updatedAt", ...]          <- 第 1 个非空行：表头（纯字符串数组）
+ * ["8","Code Geass 反叛的鲁路修R2", ...]    <- 其后每行：与表头等长的值数组
+ * ```
+ *
+ * 字段名只在表头出现一次，不再随每条记录重复，可让数据文件体积减半。
  * 空行与首尾空白会被忽略；非法行的行号会被收集到 errors 中但不中断整体解析。
  *
  * @param text JSONL 原始文本
@@ -247,31 +318,50 @@ export function isGithubRemoteEntry(value: unknown): value is GithubRemoteEntry 
  */
 export function parseJsonl(text: string): {
   entries: GithubRemoteEntry[]
-  errors: { line: number; reason: string }[]
+  errors: JsonlParseError[]
 } {
   const entries: GithubRemoteEntry[] = []
-  const errors: { line: number; reason: string }[] = []
+  const errors: JsonlParseError[] = []
 
   if (!text || typeof text !== 'string') {
     return { entries, errors }
   }
 
-  const lines = text.split(/\r\n|\r|\n/)
-  for (const [index, raw] of lines.entries()) {
-    const lineNumber = index + 1
+  // 先收集非空行（保留 1-based 行号，便于错误定位）
+  const content: { lineNumber: number; trimmed: string }[] = []
+  for (const [index, raw] of text.split(/\r\n|\r|\n/).entries()) {
     const trimmed = raw.trim()
-    // 空行跳过
     if (trimmed) {
-      try {
-        const object: unknown = JSON.parse(trimmed)
-        if (isGithubRemoteEntry(object)) {
-          entries.push(object)
-        } else {
-          errors.push({ line: lineNumber, reason: '对象缺少 sid 字段或 sid 不是字符串' })
-        }
-      } catch (error: unknown) {
-        const reason = error instanceof Error ? error.message : String(error)
-        errors.push({ line: lineNumber, reason })
+      content.push({ lineNumber: index + 1, trimmed })
+    }
+  }
+
+  // 第 1 个非空行必须是表头
+  const headerLine = content.at(0)
+  if (!headerLine) {
+    return { entries, errors }
+  }
+  const rawHeader = parseLine(headerLine.trimmed, headerLine.lineNumber, errors)
+  if (rawHeader === undefined) {
+    return { entries, errors }
+  }
+  if (!isStringArray(rawHeader)) {
+    errors.push({
+      line: headerLine.lineNumber,
+      reason: '首行必须是表头（纯字符串数组），其后每行必须是等长的值数组',
+    })
+    return { entries, errors }
+  }
+
+  // 其余非空行按表头映射成记录
+  for (const { lineNumber, trimmed } of content.slice(1)) {
+    const parsed = parseLine(trimmed, lineNumber, errors)
+    if (parsed !== undefined) {
+      const result = buildEntry(rawHeader, parsed)
+      if ('entry' in result) {
+        entries.push(result.entry)
+      } else {
+        errors.push({ line: lineNumber, reason: result.reason })
       }
     }
   }

@@ -304,7 +304,7 @@ describe('fetchGitlabJson', () => {
   })
 
   it('成功下载并解析 JSONL', async () => {
-    const jsonlContent = '{"sid":"1","name":"条目1"}\n{"sid":"2","name":"条目2"}'
+    const jsonlContent = '["sid","name"]\n["1","条目1"]\n["2","条目2"]'
     const promise = fetchGitlabJson()
     lastMockXhr!._respondOk(jsonlContent)
     const entries = await promise
@@ -322,7 +322,7 @@ describe('fetchGitlabJson', () => {
       sourceType: 'gitlab',
     })
     const promise = fetchGitlabJson()
-    lastMockXhr!._respondOk('{"sid":"1"}')
+    lastMockXhr!._respondOk('["sid"]\n["1"]')
     await promise
     expect(lastXhrCall?.url).toBe('https://gitlab.com/myowner/myrepo/-/raw/develop/data.jsonl')
     expect(lastXhrCall?.method).toBe('GET')
@@ -330,14 +330,14 @@ describe('fetchGitlabJson', () => {
 
   it('设置 Accept 请求头为 application/json', async () => {
     const promise = fetchGitlabJson()
-    lastMockXhr!._respondOk('{"sid":"1"}')
+    lastMockXhr!._respondOk('["sid"]\n["1"]')
     await promise
     expect(lastXhrCall?.headers.Accept).toBe('application/json')
   })
 
   it('设置 30 秒超时', async () => {
     const promise = fetchGitlabJson()
-    lastMockXhr!._respondOk('{"sid":"1"}')
+    lastMockXhr!._respondOk('["sid"]\n["1"]')
     await promise
     expect(lastXhrCall?.timeout).toBe(30_000)
   })
@@ -407,7 +407,7 @@ describe('fetchGitlabJson', () => {
   })
 
   it('部分非法行仍返回合法条目', async () => {
-    const jsonlContent = '{"sid":"1","name":"有效"}\ninvalid\n{"sid":"2","name":"也有效"}'
+    const jsonlContent = '["sid","name"]\n["1","有效"]\ninvalid\n["2","也有效"]'
     const promise = fetchGitlabJson()
     lastMockXhr!._respondOk(jsonlContent)
     const entries = await promise
@@ -424,7 +424,7 @@ describe('fetchGitlabJson', () => {
   })
 
   it('单行有效 JSONL', async () => {
-    const jsonlContent = '{"sid":"99","name":"GitLab记录","updatedAt":"2026-08-01"}'
+    const jsonlContent = '["sid","name","updatedAt"]\n["99","GitLab记录","2026-08-01"]'
     const promise = fetchGitlabJson()
     lastMockXhr!._respondOk(jsonlContent)
     const entries = await promise
@@ -439,7 +439,7 @@ describe('fetchGitlabJson', () => {
       throw new Error('JSON 解析器内部错误')
     })
     const promise = fetchGitlabJson()
-    lastMockXhr!._respondOk('{"sid":"1"}')
+    lastMockXhr!._respondOk('["sid"]\n["1"]')
     await expect(promise).rejects.toThrow(/JSONL 解析失败/)
   })
 
@@ -448,7 +448,7 @@ describe('fetchGitlabJson', () => {
       throw '字符串异常'
     })
     const promise = fetchGitlabJson()
-    lastMockXhr!._respondOk('{"sid":"1"}')
+    lastMockXhr!._respondOk('["sid"]\n["1"]')
     await expect(promise).rejects.toThrow(/JSONL 解析失败: 字符串异常/)
   })
 
@@ -481,7 +481,7 @@ describe('GitlabSyncSource.fetchRemoteEntries', () => {
 
   it('委托给 fetchGitlabJson 并返回条目', async () => {
     const source = new GitlabSyncSource()
-    const jsonlContent = '{"sid":"1","name":"条目1"}'
+    const jsonlContent = '["sid","name"]\n["1","条目1"]'
     const promise = source.fetchRemoteEntries()
     lastMockXhr!._respondOk(jsonlContent)
     const entries = await promise

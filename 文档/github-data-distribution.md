@@ -10,7 +10,7 @@
 ```
 插件 ──① 检查本地缓存──▶ 有效缓存？→ 直接返回缓存条目
                    │
-                   │ ② 下载 data/bangumi.jsonl (raw URL) + 计算哈希
+                   │ ② 下载 data/bangumi.jsonlines (raw URL) + 计算哈希
                    │
                    │ ③ 哈希比对：与缓存一致？→ 更新时间戳，返回缓存条目
                    │
@@ -25,7 +25,7 @@
 
 ### 缓存机制说明
 
-为避免每次同步都下载完整的 15MB+ JSONL 文件，插件实现了基于 localStorage 的本地缓存策略：
+为避免每次同步都下载完整的 JSONL 文件（CDN 压缩后约 2.6 MB），插件实现了基于 localStorage 的本地缓存策略：
 
 - **缓存有效期**：24 小时（可在 UI 中手动清除）
 - **哈希算法**：DJB2（32 位无符号整数，8 位十六进制，冲突率可忽略）
@@ -52,7 +52,7 @@
 ```
 Bangumi-Archive-Anime-Excel/
 ├── data/
-│   └── bangumi.jsonl        ← 数据文件（~15.80 MB，30502 条，直接 JSONL 模式）
+│   └── bangumi.jsonlines        ← 数据文件（~8 MB，30836 条，表头+值数组）
 ├── differences/             ← 差异文件目录
 ├── xlsx/                    ← Excel 文件目录
 ├── .gitignore
@@ -70,25 +70,30 @@ Bangumi-Archive-Anime-Excel/
 | owner  | `awujiana`                    | GitHub 仓库所有者       |
 | repo   | `Bangumi-Archive-Anime-Excel` | 仓库名称                |
 | branch | `main`                        | 分支名（默认 main）     |
-| path   | `data/bangumi.jsonl`          | 仓库中 JSONL 文件的路径 |
+| path   | `data/bangumi.jsonlines`      | 仓库中 JSONL 文件的路径 |
 
 插件会从以下 URL 读取数据：
 
 ```
-https://raw.githubusercontent.com/awujiana/Bangumi-Archive-Anime-Excel/main/data/bangumi.jsonl
+https://raw.githubusercontent.com/awujiana/Bangumi-Archive-Anime-Excel/main/data/bangumi.jsonlines
 ```
 
 ## 数据格式
 
-`data/bangumi.jsonl` 为 JSONL 文件（每行一个独立的 JSON 对象，无外层数组括号，无逗号分隔）。
+`data/bangumi.jsonlines` 为「**表头 + 值数组**」两段式 JSONL 文件：
+第 1 个非空行是**表头**（纯字符串数组），其后每行是与表头**等长**的**值数组**。
 
 ### 实际数据示例
 
 ```jsonl
-{"sid":"8","name":"Code Geass 反叛的鲁路修R2","updatedAt":"2026-07-21","date":"2008-04-06","meta_tags":["机战","TV","日本","原创","战斗"],"nsfw":false,"播放结束":"2008年9月28日","动画制作公司":"サンライズ、david production、スタジオガッツ；作画协力：GONZO","话数":"25","片长":"","制片国家":"","语言":"","类型":"","导演":"谷口悟朗","音乐":"中川幸太郎、黒石ひとみ","人物设定":"木村貴宏","机械设定":"寺岡賢司、沙倉拓実；Knightmare设计：安田朗、中田栄治、阿久津潤一","原作":"","脚本":"","分镜":"","演出":"","原案":"故事原案：大河内一楼、谷口悟朗","系列构成":"大河内一楼","在线播放平台":"","关联的动漫ID":"85 | 344 | 793"}
-{"sid":"12","name":"人形电脑天使心","updatedAt":"2026-07-21","date":"2002-04-02","meta_tags":["科幻","TV","恋爱","日本","漫画改","日常"],"nsfw":false,"播放结束":"2002年9月24日","动画制作公司":"MADHOUSE","话数":"27","片长":"","制片国家":"","语言":"","类型":"","导演":"浅香守生","音乐":"高浪敬太郎","人物设定":"阿部恒","机械设定":"","原作":"CLAMP","脚本":"","分镜":"","演出":"","原案":"","系列构成":"","在线播放平台":"","关联的动漫ID":"11 | 497"}
-{"sid":"50","name":"机动战士高达","updatedAt":"2026-07-21","date":"1979-04-07","meta_tags":["科幻","机战","TV","日本","原创"],"nsfw":false,"播放结束":"1980年1月26日","动画制作公司":"日本サンライズ","话数":"43","片长":"","制片国家":"","语言":"","类型":"","导演":"","音乐":"渡辺岳夫、松山祐士","人物设定":"安彦良和","机械设定":"大河原邦男","原作":"矢立肇、富野喜幸","脚本":"星山博之","分镜":"斧谷稔","演出":"貞光紳也","原案":"","系列构成":"","在线播放平台":"","关联的动漫ID":"47 | 286"}
+["sid","name","updatedAt","date","meta_tags","nsfw","播放结束","动画制作公司","话数","片长","制片国家","语言","类型","导演","音乐","人物设定","机械设定","原作","脚本","分镜","演出","原案","系列构成","在线播放平台","关联的动漫ID"]
+["8","Code Geass 反叛的鲁路修R2","2026-09-08","2008-04-06",["机战","TV","日本","原创","战斗"],false,"2008年9月28日","サンライズ、david production、スタジオガッツ；作画协力：GONZO","25","","","","","谷口悟朗","中川幸太郎、黒石ひとみ","木村貴宏","寺岡賢司、沙倉拓実；Knightmare设计：安田朗、中田栄治、阿久津潤一","","","","","故事原案：大河内一楼、谷口悟朗","大河内一楼","","85 | 344 | 793 | 1081 | 3219 | 8813 | 8816 | 8817 | 8819 | 8820 | 17967 | 32214 | 33389 | 35866 | 51042 | 73715 | 78546 | 91493 | 99952 | 102098 | 110909 | 118733 | 118734 | 118735 | 118736 | 118737 | 118738 | 120756 | 120758 | 141050 | 145943 | 188684 | 188685 | 199228 | 199229 | 199230 | 199231 | 231875 | 231982 | 231989 | 237827 | 239861 | 306532 | 309324 | 321523 | 336526 | 377946 | 391213 | 391214 | 391873 | 400807 | 405346 | 452308 | 667009 | 667019"]
+["12","人形电脑天使心","2026-09-08","2002-04-02",["科幻","TV","恋爱","日本","漫画改","日常"],false,"2002年9月24日","MADHOUSE","27","","","","","浅香守生","高浪敬太郎","阿部恒","","CLAMP","","","","","","","11 | 497 | 2478 | 2891 | 4011 | 4989 | 4990 | 4991 | 4992 | 4993 | 4994 | 4995 | 21275 | 57933 | 62538 | 95057 | 95058 | 95059 | 95060 | 95062 | 563580"]
 ```
+
+> 仍然是合法的 JSON Lines（每行一个合法 JSON 值）。值数组的顺序与长度严格对应表头；
+> 缺失字段补默认值（字符串 `""`、`meta_tags` `[]`、`nsfw` `false`）。
+> 字段名只在表头出现一次，因此文件体积比「每行一个完整对象」减半，且完全无损。
 
 ### 字段定义
 
@@ -155,7 +160,7 @@ https://raw.githubusercontent.com/awujiana/Bangumi-Archive-Anime-Excel/main/data
 > - **Bangumi 官方 dump**：`type:2` 表示条目类型为「动画」（条目类型，1=漫画 2=动画 3=音乐 4=游戏 6=三次元）
 > - **BGM 插件 → Bangumi API**：`type` 表示观看状态（1=想看 2=在看 3=看过 4=搁置 5=抛弃），由用户在 Excel「是否看完」列维护
 >
-> 自 2026-07-30 起，`data/bangumi.jsonl` **不再输出 `type` 字段**（dump 中恒为 2，输出冗余；BGM 插件同步记录中固定显示「动漫」类型）。两者完全无关。
+> 自 2026-07-30 起，`data/bangumi.jsonlines` **不再输出 `type` 字段**（dump 中恒为 2，输出冗余；BGM 插件同步记录中固定显示「动漫」类型）。两者完全无关。
 
 ## 同步策略
 
@@ -173,7 +178,7 @@ https://raw.githubusercontent.com/awujiana/Bangumi-Archive-Anime-Excel/main/data
 
 ### 1. 更新数据文件
 
-将最新的 bangumi 数据导出为 JSONL 格式，替换仓库中的 `data/bangumi.jsonl`：
+将最新的 bangumi 数据导出为 JSONL 格式，替换仓库中的 `data/bangumi.jsonlines`：
 
 ```bash
 # 克隆仓库
@@ -181,10 +186,10 @@ git clone https://github.com/awujiana/Bangumi-Archive-Anime-Excel-to-sync.git
 cd Bangumi-Archive-Anime-Excel-to-sync
 
 # 替换数据文件
-cp /path/to/new-bangumi.jsonl data/bangumi.jsonl
+cp /path/to/new-bangumi.jsonlines data/bangumi.jsonlines
 
 # 提交推送
-git add data/bangumi.jsonl
+git add data/bangumi.jsonlines
 git commit -m "feat: 更新 bangumi 数据 dump $(date +%Y-%m-%d)"
 git push origin main
 ```
@@ -193,7 +198,7 @@ git push origin main
 
 在 WPS Excel 中点击「数据同步」，插件会：
 
-1. 从 raw URL 下载 `data/bangumi.jsonl`
+1. 从 raw URL 下载 `data/bangumi.jsonlines`
 2. 逐行解析 JSONL
 3. 按 SID 比对本地 Excel 行
 4. 根据所选策略增量写入
@@ -203,7 +208,7 @@ git push origin main
 | 特性      | 直接 JSONL 模式（当前启用） | Release Asset 模式（预留）   |
 | --------- | --------------------------- | ---------------------------- |
 | 适用场景  | 小文件（< 100MB）           | 大文件（> 100MB）            |
-| path 配置 | `data/bangumi.jsonl`        | `latest.json`                |
+| path 配置 | `data/bangumi.jsonlines`    | `latest.json`                |
 | 数据格式  | 直接 JSONL                  | zip 压缩包（内含 JSONL）     |
 | 版本管理  | 无（直接覆盖）              | 有（Release tag 历史）       |
 | 下载方式  | raw.githubusercontent.com   | github.com/releases/download |
@@ -236,6 +241,6 @@ git push origin main
 
 1. **仓库必须为 public**，否则 raw URL 读取需认证
 2. **未认证限流**：raw URL 读取限 60 次/小时/IP
-3. **JSONL 格式要求**：每行一个 JSON 对象，`sid` 字段必须为字符串
+3. **JSONL 格式要求**：第 1 个非空行为表头（纯字符串数组），其后每行为等长值数组，`sid` 字段必须为字符串
 4. **文件大小限制**：GitHub raw URL 对单文件无硬性大小限制，但大文件下载较慢，建议 < 50MB
 5. **CSP 策略**：插件 CSP 已配置 `connect-src 'self' https://api.bgm.tv https://bangumi.tv https://raw.githubusercontent.com https://api.github.com https://gitlab.com https://gitee.com`，覆盖 GitHub / GitLab / Gitee 三个同步源的域名
