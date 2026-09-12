@@ -218,7 +218,7 @@ npm run test:coverage    # 生成覆盖率报告
 
 ### 扩展：新增同步源 / 字段映射
 
-- **新增同步源**：在 `ts/sync/` 下实现 `SyncSource` 接口并注册到 `syncSourceRegistry.ts`。
+- **新增同步源**：在 `ts/sync/` 下实现 `SyncSource` 接口并注册到 `sync-source-registry.ts`。
 - **字段映射**：编辑 `config/field_mappings.json`，并在 `ts/schemas/` 补充对应 zod 校验。
 
 ---
