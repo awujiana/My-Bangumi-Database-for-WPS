@@ -18,7 +18,7 @@
 | a11y 增强       | 多处   | role/aria-live/aria-label                  |
 | any 整改        | 5 处   | events.ts/result.ts/exceltobangumi.ts      |
 | Vitest 引入     | 1 项   | 33 个测试用例                              |
-| 渐进拆分        | 2 项   | stringUtils.ts、pureUtils.ts               |
+| 渐进拆分        | 2 项   | string-utilities.ts、pure-utilities.ts     |
 
 ## 验证前准备
 

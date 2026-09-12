@@ -97,7 +97,7 @@ https://raw.githubusercontent.com/awujiana/Bangumi-Archive-Anime-Excel/main/data
 
 ### 字段定义
 
-输出字段共 25 个，分 3 类。BGM 插件 `GithubRemoteEntry` 接口（`ts/sync/githubSyncDiff.ts`）识别全部字段。
+输出字段共 25 个，分 3 类。BGM 插件 `GithubRemoteEntry` 接口（`ts/sync/github-sync-diff.ts`）识别全部字段。
 
 **基础字段**（3 个）：
 
@@ -235,7 +235,7 @@ git push origin main
 
 插件读取此 JSON 后，通过 `browser_download_url` 下载 zip 并解压。
 
-> **注意**：当前插件代码仅实现了直接 JSONL 模式。Release Asset 模式（zip 下载+解压）需在 `ts/sync/githubSync.ts` 中新增实现。
+> **注意**：当前插件代码仅实现了直接 JSONL 模式。Release Asset 模式（zip 下载+解压）需在 `ts/sync/github-sync.ts` 中新增实现。
 
 ## 注意事项
 

@@ -11,10 +11,10 @@
 | v1.0 | 2026-08-10 | 初始版本                                                                                                                                                                                                                                                                                                                                                                                                                    |
 | v2.8 | 2026-08-21 | 修复 GitHub 同步编译错误、同步完成弹窗支持明细表格                                                                                                                                                                                                                                                                                                                                                                          |
 | v2.9 | 2026-08-26 | 新增 enrichEngine 富化引擎（新番表+简介工作表双阶段富化）、标注白名单机制、自动添加缺失列、声优字段支持、数据同步列位置无关性验证、边界情况修复（parseRemoteContent 空值检查、getAnnotatedValue 空值守卫）、42 项边界测试                                                                                                                                                                                                   |
-| v3.0 | 2026-08-26 | 新增富化功能工作簿选择与锁定机制（enrichLock.ts）：跨工作簿 Bangumi 追踪表选择、PluginStorage 持久化、启动恢复校验、与面板锁定独立运行                                                                                                                                                                                                                                                                                      |
-| v3.1 | 2026-08-26 | enrichLock.ts 边界加固：WPS API null 返回安全处理、冗余查找逻辑简化、边界情况文档完善                                                                                                                                                                                                                                                                                                                                       |
-| v3.2 | 2026-08-26 | 命名规范重构：`taskpane/` 目录重命名为 `panel/`，页面文件使用 `Page` 后缀（`panelPage.ts`/`enrichPage.ts`），`taskpane-entry.ts` → `panel-entry.ts`；删除旧兼容文件 `ts/taskpane.ts`；统一 `@module` JSDoc 标签                                                                                                                                                                                                             |
-| v3.3 | 2026-08-26 | 循环依赖治理：创建 `types.ts`/`container.ts`/`services.ts`/`errorHandler.ts` 核心模块；扩展 EventBus 新增 `STATE_CHANGED`/`CONFIG_CHANGED` 事件；`index.ts` 瘦身为纯 re-export 便利桶；移除各模块对 `index.ts` 的直接依赖；函数名统一（`init面板`→`initPanel` 等）                                                                                                                                                          |
+| v3.0 | 2026-08-26 | 新增富化功能工作簿选择与锁定机制（enrich-lock.ts）：跨工作簿 Bangumi 追踪表选择、PluginStorage 持久化、启动恢复校验、与面板锁定独立运行                                                                                                                                                                                                                                                                                     |
+| v3.1 | 2026-08-26 | enrich-lock.ts 边界加固：WPS API null 返回安全处理、冗余查找逻辑简化、边界情况文档完善                                                                                                                                                                                                                                                                                                                                      |
+| v3.2 | 2026-08-26 | 命名规范重构：`taskpane/` 目录重命名为 `panel/`，页面文件使用 `Page` 后缀（`panel-page.ts`/`enrich-page.ts`），`taskpane-entry.ts` → `panel-entry.ts`；删除旧兼容文件 `ts/taskpane.ts`；统一 `@module` JSDoc 标签                                                                                                                                                                                                           |
+| v3.3 | 2026-08-26 | 循环依赖治理：创建 `types.ts`/`container.ts`/`services.ts`/`error-handler.ts` 核心模块；扩展 EventBus 新增 `STATE_CHANGED`/`CONFIG_CHANGED` 事件；`index.ts` 瘦身为纯 re-export 便利桶；移除各模块对 `index.ts` 的直接依赖；函数名统一（`init面板`→`initPanel` 等）                                                                                                                                                         |
 | v3.4 | 2026-08-26 | 移除收藏回写数据源选择：收藏回写固定走 Bangumi API，删除「Bangumi API / GitHub 仓库」二选一下拉框、对应 UI、配置键 `bgm_writeback_source` 及文档说明                                                                                                                                                                                                                                                                        |
 | v3.5 | 2026-08-28 | 收藏回写空表自动填充：工作表为空时，经用户确认后自动写入标准表头并用 Bangumi 账号收藏条目填充 Excel，再执行标记；恢复缺失的 `css/panel-theme.css` 源文件                                                                                                                                                                                                                                                                    |
 | v3.6 | 2026-08-30 | 设置面板重构：顶栏+侧边功能导航+主区布局、滚动高亮、导航仅图标模式（`bgm_nav_icons_only`）；新增外观主题（`bgm_theme`，dark/light/system，`ts/tools/theme.ts`）与同步偏好扩展（`bgm_list_type`/`bgm_time_filter`/`bgm_refresh_interval`）；修复 `bgm:modulesReady` 派发时序与导航 tooltip 裁剪                                                                                                                              |
@@ -89,44 +89,44 @@ ts/index.ts (thin barrel — 仅 re-export)
   │   ├── config.ts        → PluginStorage 配置读写
   │   ├── theme.ts         → 主题解析/应用/初始化 + 系统主题监听
   │   ├── util/            → 单元格/工作表操作、Token 存储、BGM 命名空间
-  │   ├── stringUtils.ts   → colNumToLetter, trim, escapeHtml, calcFingerprint
+  │   ├── string-utilities.ts → colNumToLetter, trim, escapeHtml, calcFingerprint
   │   └── wps.ts           → WPS 类型守卫与类型定义
   │
   ├── ts/services/       (业务逻辑层)
-  │   ├── ribbonService.ts → Ribbon 按钮业务逻辑
-  │   └── configService.ts → 配置导入/导出 (Zod 校验)
+  │   ├── ribbon-service.ts → Ribbon 按钮业务逻辑
+  │   └── config-service.ts → 配置导入/导出 (Zod 校验)
   │
   ├── ts/sync/           (数据同步层)
   │   ├── exceltobangumi/  → Excel → Bangumi 上传引擎
   │   │   ├── index.ts       → SyncToBangumiAsync 主引擎
   │   │   ├── api.ts         → Bangumi API 调用
-  │   │   ├── progressReporter.ts → 进度报告
-  │   │   └── chapterMarker.ts  → 章节标记
+  │   │   ├── progress-reporter.ts → 进度报告
+  │   │   └── chapter-marker.ts  → 章节标记
   │   ├── scraping.ts       → Bangumi → Excel 收藏抓取
-  │   ├── githubSync.ts     → GitHub 仓库同步
-  │   ├── githubConfig.ts   → GitHub 配置 (PluginStorage)
-  │   ├── githubSyncDiff.ts → 差异计算 (纯函数，零依赖)
-  │   ├── syncSourceRegistry.ts → 多源同步注册表
-  │   ├── gistSync.ts       → Gist 同步源
-  │   ├── giteeSync.ts      → Gitee 同步源
-  │   ├── gitlabSync.ts     → GitLab 同步源
-  │   ├── localFileSync.ts  → 本地文件同步源
-  │   ├── syncRecord.ts     → 同步记录工作表管理
-  │   ├── undoStack.ts      → 撤销栈 (单元格变更 + 行删除)
-  │   ├── conflictResolver.ts → 冲突检测与解决
-  │   ├── pureUtils.ts      → 纯工具函数
-  │   ├── pureUtilsCore.ts  → 核心纯工具
-  │   ├── exportJsonl.ts    → JSONL 导出
-  │   ├── enrichEngine.ts   → 新番表富化引擎 (双重匹配/数据合并/标注白名单)
-  │   ├── enrichRecord.ts   → 富化记录表操作
-  │   └── enrichLock.ts     → 富化工作簿锁定 (跨WB选择/持久化/恢复校验)
+  │   ├── github-sync.ts     → GitHub 仓库同步
+  │   ├── github-config.ts   → GitHub 配置 (PluginStorage)
+  │   ├── github-sync-diff.ts → 差异计算 (纯函数，零依赖)
+  │   ├── sync-source-registry.ts → 多源同步注册表
+  │   ├── gist-sync.ts       → Gist 同步源
+  │   ├── gitee-sync.ts      → Gitee 同步源
+  │   ├── gitlab-sync.ts     → GitLab 同步源
+  │   ├── local-file-sync.ts  → 本地文件同步源
+  │   ├── sync-record.ts     → 同步记录工作表管理
+  │   ├── undo-stack.ts      → 撤销栈 (单元格变更 + 行删除)
+  │   ├── conflict-resolver.ts → 冲突检测与解决
+  │   ├── pure-utilities.ts   → 纯工具函数
+  │   ├── pure-utils-core.ts  → 核心纯工具
+  │   ├── export-jsonl.ts    → JSONL 导出
+  │   ├── enrich-engine.ts   → 新番表富化引擎 (双重匹配/数据合并/标注白名单)
+  │   ├── enrich-record.ts   → 富化记录表操作
+  │   └── enrich-lock.ts     → 富化工作簿锁定 (跨WB选择/持久化/恢复校验)
   │
   ├── ts/ui/             (表示层)
   │   ├── dialog.ts         → 对话框系统 (alert/confirm/error/input/toast)
   │   ├── message.ts        → 状态栏消息
   │   ├── preview.ts        → 数据预览组件
-  │   ├── conflictResolver.ts → 冲突解决 UI
-  │   ├── syncResultDialog.ts → 同步结果弹窗
+  │   ├── conflict-resolver.ts → 冲突解决 UI
+  │   ├── sync-result-dialog.ts → 同步结果弹窗
   │   └── handlers/         → 事件处理器
   │       ├── index.ts      → 主 handler 分发 (含 trackedEventBusOn 清理机制)
   │       ├── sync.ts       → 同步相关 handler
@@ -135,10 +135,10 @@ ts/index.ts (thin barrel — 仅 re-export)
   │       └── _constants.ts → 中文常量
   │
   ├── ts/panel/          (Panel 子模块)
-  │   ├── panelPage.ts      → Panel 主模块（initPanel/refreshPanelUI）
-  │   ├── panelLifecycle.ts → 工作表锁定/解锁
-  │   ├── userInfoPolling.ts → 用户信息轮询 (PluginStorage)
-  │   └── enrichPage.ts     → 新番表富化 UI 控制器
+  │   ├── panel-page.ts      → Panel 主模块（initPanel/refreshPanelUI）
+  │   ├── panel-lifecycle.ts → 工作表锁定/解锁
+  │   ├── user-info-polling.ts → 用户信息轮询 (PluginStorage)
+  │   └── enrich-page.ts     → 新番表富化 UI 控制器
   │
   ├── ts/entry/          (入口绑定)
   │   ├── ribbon-entry.ts   → Ribbon OnAction 入口
@@ -146,12 +146,12 @@ ts/index.ts (thin barrel — 仅 re-export)
   │   └── settings-entry.ts → Settings 面板入口
   │
   └── ts/schemas/        (Zod 校验模式)
-      ├── pluginStorage.ts  → FullConfigSchema
-      ├── bgmCollection.ts  → 收藏数据校验
-      ├── bgmUser.ts        → 用户数据校验
-      └── githubEntry.ts    → GitHub 条目校验
+      ├── plugin-storage.ts  → FullConfigSchema
+      ├── bgm-collection.ts  → 收藏数据校验
+      ├── bgm-user.ts        → 用户数据校验
+      └── github-entry.ts    → GitHub 条目校验
   │
-  └── ts/debugPanel.ts  (独立调试模块，仅开发环境)
+  └── ts/debug-panel.ts  (独立调试模块，仅开发环境)
       └── 无依赖：仅读取 window 状态 + 动态 import logger
 ```
 
@@ -209,7 +209,7 @@ ts/index.ts (thin barrel — 仅 re-export)
 
 > **这两个模块已于 2026-09-11 删除**（审查报告 P2-8）。`services.ts` 全库 0 引用 —— 其模块顶层的 `container.register()` 从未执行；`container.ts` 仅被 `services.ts` 引用，随之成为孤儿。项目实际使用的是 `core/ui-bridge.ts` 的接口注册（扇出依赖反转），而非通用 DI 容器。删除前没有任何代码调用 `container.resolve()`。
 
-#### `errorHandler.ts` — 全局错误处理（v3.3 新增）
+#### `error-handler.ts` — 全局错误处理（v3.3 新增）
 
 - **`initGlobalErrorHandler()`**: 注册全局错误监听
   - `window.onerror`: 捕获未处理异常
@@ -260,7 +260,7 @@ ts/index.ts (thin barrel — 仅 re-export)
 
 ### 2.2 服务模块 (`ts/services/`)
 
-#### `ribbonService.ts` — Ribbon 按钮业务逻辑
+#### `ribbon-service.ts` — Ribbon 按钮业务逻辑
 
 - **`syncWithConfirmation()`**: 完整同步流程（预览统计 → 读取配置 → 用户确认 → 冲突检测 → 执行同步 → 结果提示）
   - 预览统计由 `getSyncPreview()` 执行（纯扫描，不发网络请求）
@@ -280,7 +280,7 @@ ts/index.ts (thin barrel — 仅 re-export)
 - **`undoLastSyncForRibbon()`**: 写入 PluginStorage 信号（`bgm_request_undo_sync`），由面板轮询后执行
 - **`executeUndoLastSync()`**: 面板上下文中的撤销执行（调用 `undoStack.undoLastSync()`）
 
-#### `configService.ts` — 配置导入/导出
+#### `config-service.ts` — 配置导入/导出
 
 - **`exportConfig()`**: 导出 Token + 用户ID + GitHub 配置 + 同步策略为 JSON 字符串
 - **`importConfig(json)`**: 使用 `FullConfigSchema` (Zod) 严格校验后写回 PluginStorage
@@ -289,7 +289,7 @@ ts/index.ts (thin barrel — 仅 re-export)
 
 ### 2.3 同步模块 (`ts/sync/`)
 
-#### `githubConfig.ts` — 配置存储中心
+#### `github-config.ts` — 配置存储中心
 
 - **PluginStorage 键清单**（详见第三章）
 - **默认配置**: `DEFAULT_GITHUB_CONFIG = { owner: 'awujiana', repo: 'Bangumi-Archive-Anime-Excel', branch: 'main', path: 'data/bangumi.jsonlines', sourceType: 'github' }`
@@ -300,7 +300,7 @@ ts/index.ts (thin barrel — 仅 re-export)
 - **Raw URL 构造**: `buildRawUrl()` → `https://raw.githubusercontent.com/{owner}/{repo}/{branch}/{path}`
 - **首次读取自动填充**: 当所有关键字段为空时，自动写入默认配置
 
-#### `githubSync.ts` — GitHub 数据同步
+#### `github-sync.ts` — GitHub 数据同步
 
 - **`syncFromGithub()`**: GitHub 专用同步入口
 - **`fetchGithubJson()`**: 下载远程 JSON/JSONL 文件
@@ -317,7 +317,7 @@ ts/index.ts (thin barrel — 仅 re-export)
   - Bangumi_URL：根据远程 sid 构造预期 URL `https://bgm.tv/subject/{sid}`，仅当本地存在该字段时进行比对和更新
 - **缓存管理**: `clearGithubDataCache()`, `isGithubDataCacheValid()`, `getGithubDataCacheAge()`, `loadGithubDataCache()`
 
-#### `githubSyncDiff.ts` — 差异计算 (纯函数)
+#### `github-sync-diff.ts` — 差异计算 (纯函数)
 
 - **`computeDiff()`**: 零依赖差异计算，可在 Node 测试环境运行
 - **`GithubRemoteEntry`**: 远程条目类型 (sid, name, meta_tags, '话数', 等)
@@ -329,7 +329,7 @@ ts/index.ts (thin barrel — 仅 re-export)
 - **字段别名映射** (`JSONL_FIELD_EXCEL_ALIASES`): 支持一个远程字段映射到多个本地列（如 `动画制作公司` → `制作公司` + `动画制作公司`）
 - **`getExcelAliases()`**: 获取远程字段的所有本地列名别名
 
-#### `syncSourceRegistry.ts` — 多源同步注册表
+#### `sync-source-registry.ts` — 多源同步注册表
 
 - **`syncFromRemote()`**: 按 `sourceType` 选择对应同步源执行
 - **`registerSyncSource()`**: 注册自定义同步源
@@ -352,7 +352,7 @@ ts/index.ts (thin barrel — 仅 re-export)
 - **`fetchAllUserCollections()`**: 分页获取用户全部收藏
 - **类型**: `BangumiUserData`, `TokenVerifyResult`, `ApiResponse`
 
-#### `syncRecord.ts` — 同步记录管理
+#### `sync-record.ts` — 同步记录管理
 
 - **工作表名称**: `同步记录` (`SYNC_RECORD_SHEET_NAME`)
 - **12 列结构**: SID | 同步时间 | 名称 | URL | 条目类型 | 来源 | 次数 | 内容 | 状态 | 收藏状态 | 备注 | 数据指纹
@@ -365,7 +365,7 @@ ts/index.ts (thin barrel — 仅 re-export)
 - **`migrateSyncRecordSchema()`**: 旧版 schema 自动迁移（支持 11 列和旧 12 列两种结构）
 - **`clearSyncRecords()` / `openSyncRecordSheet()`**: 清空与导航
 
-#### `undoStack.ts` — 撤销栈
+#### `undo-stack.ts` — 撤销栈
 
 - **`UndoEntry` 类型**: `{ type: 'cell', row, col, oldValue, newValue }` | `{ type: 'row-delete', rowSnapshot }`
 - **`UndoSession`**: 一次同步操作的所有变更 (timestamp + description + entries[])
@@ -379,15 +379,15 @@ ts/index.ts (thin barrel — 仅 re-export)
 
 #### 其他同步模块
 
-- ~~**`githubCache.ts`**: 远程 JSON 数据本地缓存管理~~（已于 2026-09-11 删除，见审查报告 P2-8：生产 0 引用，其 TTL 从未被调用；下载链路由 `sync-source-registry.ts` 的 JSONL 数据源接管）
-- **`gistSync.ts`**: GitHub Gist 同步源（通过 `api.github.com/gists/{id}` 获取）
-- **`giteeSync.ts`**: Gitee 仓库同步源
-- **`gitlabSync.ts`**: GitLab 仓库同步源
-- **`localFileSync.ts`**: 本地文件同步源
-- **`conflictResolver.ts`**: 冲突检测与解决策略
-- **`pureUtils.ts` / `pureUtilsCore.ts`**: 零依赖纯工具函数
+- ~~**`github-cache.ts`**: 远程 JSON 数据本地缓存管理~~（已于 2026-09-11 删除，见审查报告 P2-8：生产 0 引用，其 TTL 从未被调用；下载链路由 `sync-source-registry.ts` 的 JSONL 数据源接管）
+- **`gist-sync.ts`**: GitHub Gist 同步源（通过 `api.github.com/gists/{id}` 获取）
+- **`gitee-sync.ts`**: Gitee 仓库同步源
+- **`gitlab-sync.ts`**: GitLab 仓库同步源
+- **`local-file-sync.ts`**: 本地文件同步源
+- **`conflict-resolver.ts`**: 冲突检测与解决策略
+- **`pure-utilities.ts` / `pure-utilities-core.ts`**: 零依赖纯工具函数
 
-#### `enrichEngine.ts` — 新番表富化引擎
+#### `enrich-engine.ts` — 新番表富化引擎
 
 - **双重匹配算法**: 名称精确匹配 + 别名辅助匹配
 - **字段映射**: 新番表字段 → Bangumi 追踪表列（含 12 个简介工作表字段映射）
@@ -400,7 +400,7 @@ ts/index.ts (thin barrel — 仅 re-export)
 - **边界修复**: `getAnnotatedValue()` 空值守卫
 - 已移除：`fetchRemoteFile()` / `parseRemoteContent()` / `writeRemoteDataToSheet()`（v1 的「raw URL 直接拉 CSV 写表」路径，已被 `syncSourceRegistry` 的 JSONL 数据源（GitHub/GitLab/Gitee/本地文件/Gist）取代，无任何调用方）
 
-#### `enrichRecord.ts` — 富化记录表
+#### `enrich-record.ts` — 富化记录表
 
 - **工作表名称**: `富化记录`
 - **9 列结构**: 时间戳 | 匹配方式 | 动漫名称 | 行号 | 富化字段 | 原字段 | 新字段 | 操作类型 | 备注
@@ -408,7 +408,7 @@ ts/index.ts (thin barrel — 仅 re-export)
 - **`addEnrichRecord()` / `addEnrichRecords()`**: 单条/批量写入
 - **`clearEnrichRecords()` / `getAllEnrichRecords()`**: 清空与查询
 
-#### `enrichLock.ts` — 富化工作簿锁定（v3.0 新增）
+#### `enrich-lock.ts` — 富化工作簿锁定（v3.0 新增）
 
 - **PluginStorage 键**: `bgm_enrich_locked_workbook`
 - **状态命名空间**: `BGM.enrich.workbook`（与 `BGM.sheet` 独立）
@@ -429,7 +429,7 @@ ts/index.ts (thin barrel — 仅 re-export)
   - 重复锁定同一目标自动切换为解锁状态
   - 启动恢复校验：工作簿/工作表不存在时自动清除失效锁定
 
-- **`exportJsonl.ts`**: Excel → JSONL 文件导出
+- **`export-jsonl.ts`**: Excel → JSONL 文件导出
 
 ### 2.4 UI 模块 (`ts/ui/`)
 
@@ -478,8 +478,8 @@ ts/index.ts (thin barrel — 仅 re-export)
 #### 其他 UI 模块
 
 - **`message.ts`**: 状态栏消息 (`setStatus()`, `initMessageListener()`)
-- **`conflictResolver.ts`**: 冲突解决 UI (`showConflictResolver()`)
-- **`syncResultDialog.ts`**: 同步结果增强弹窗 (`showSyncResultDialog()`, `computeDateStatsFromSheet()`)
+- **`conflict-resolver.ts`**: 冲突解决 UI (`showConflictResolver()`)
+- **`sync-result-dialog.ts`**: 同步结果增强弹窗 (`showSyncResultDialog()`, `computeDateStatsFromSheet()`)
 
 ### 2.5 工具模块 (`ts/tools/`)
 
@@ -543,7 +543,7 @@ ts/index.ts (thin barrel — 仅 re-export)
 - **`index.ts`**: `BGM` 全局命名空间、`bgmLog()`、`getApp()`、Token 存储、用户信息、`showBangumiPanel()`、`showSettingsPanel()`、辅助函数
   - BGM 命名空间结构：`BGM.sheet`（Panel 锁定状态）、`BGM.sync`（同步状态机）、`BGM.enrich`（富化工作簿锁定状态，v3.0 新增）
   - `showSettingsPanel()`: 设置面板管理器，支持根据主面板可见性动态切换停靠位置
-- **`stringUtils.ts`**: `colNumToLetter()`, `trim()`, `escapeHtml()`, `calcFingerprint()`
+- **`string-utilities.ts`**: `colNumToLetter()`, `trim()`, `escapeHtml()`, `calcFingerprint()`
 
 #### 双面板位置协调逻辑
 
@@ -565,31 +565,31 @@ ts/index.ts (thin barrel — 仅 re-export)
 
 - **`debounce.ts`**: 防抖函数
 - **`sanitize.ts`**: HTML 清洗
-- **`autoFillUrl.ts`**: URL 自动填充 (`autoFillUrls()`, `showAutoFillUrlDialog()`)
+- **`auto-fill-url.ts`**: URL 自动填充 (`autoFillUrls()`, `showAutoFillUrlDialog()`)
 - **`wps.ts`**: WPS 类型守卫 (`isWpsApp()`, `isWpsWorksheet()`, `isWpsRange()`) 与完整 WPS 类型定义
 
 ### 2.6 Schema 模块 (`ts/schemas/`)
 
-#### `pluginStorage.ts` — PluginStorage 类型校验
+#### `plugin-storage.ts` — PluginStorage 类型校验
 
 - **`FullConfigSchema`**: 完整配置校验（version + exportedAt + githubConfig + token + userId）
 - **`SyncStrategySchema`**: 同步策略校验
 
-#### `bgmCollection.ts` — 收藏数据校验
+#### `bgm-collection.ts` — 收藏数据校验
 
 - Bangumi 收藏条目的 Zod Schema 定义
 
-#### `bgmUser.ts` — 用户数据校验
+#### `bgm-user.ts` — 用户数据校验
 
 - Bangumi 用户信息的 Zod Schema 定义
 
-#### `githubEntry.ts` — GitHub 条目校验
+#### `github-entry.ts` — GitHub 条目校验
 
 - GitHub 远程条目的 Zod Schema 定义
 
-### 2.7 调试面板 (`ts/debugPanel.ts`)
+### 2.7 调试面板 (`ts/debug-panel.ts`)
 
-- **文件**: `ts/debugPanel.ts`（约 938 行）
+- **文件**: `ts/debug-panel.ts`（约 938 行）
 - **目的**: 开发环境调试工具，**不在生产环境中激活**
 - **激活条件**: 当 `typeof WpsInvoke === 'undefined'` 时自动启动（即 WPS 加载项宿主不可用，代表开发服务器环境）
 - **设计原则**: 无侵入——不修改任何现有模块逻辑，仅通过读取 `window` 状态获取信息
@@ -839,13 +839,13 @@ handlers/sync.ts → _doAPISync(sheetIndex, token)
 
 #### 同步策略对比
 
-| 策略                | 新增 (add) | 更新 (update) | 删除 (delete) | 代码位置                      | 适用场景                             |
-| ------------------- | :--------: | :-----------: | :-----------: | ----------------------------- | ------------------------------------ |
-| `add-update` (默认) |     ✅     |      ✅       |      ❌       | `githubSyncDiff.ts#L412-L424` | 保守同步，不丢失本地数据             |
-| `add-only`          |     ✅     |      ❌       |      ❌       | `githubSyncDiff.ts#L422-L423` | 只添加新条目到 Excel                 |
-| `update-only`       |     ❌     |      ✅       |      ❌       | `githubSyncDiff.ts#L411-L412` | 只更新已有行，不新增                 |
-| **`mirror`**        |     ✅     |      ✅       |    **✅**     | `githubSyncDiff.ts#L479-L497` | **完整镜像，远程删除后同步删除本地** |
-| `force-overwrite`   |     ✅     |  ✅ (全字段)  |      ❌       | `githubSyncDiff.ts#L425-L435` | 强制覆盖，含空值覆盖                 |
+| 策略                | 新增 (add) | 更新 (update) | 删除 (delete) | 代码位置                        | 适用场景                             |
+| ------------------- | :--------: | :-----------: | :-----------: | ------------------------------- | ------------------------------------ |
+| `add-update` (默认) |     ✅     |      ✅       |      ❌       | `github-sync-diff.ts#L412-L424` | 保守同步，不丢失本地数据             |
+| `add-only`          |     ✅     |      ❌       |      ❌       | `github-sync-diff.ts#L422-L423` | 只添加新条目到 Excel                 |
+| `update-only`       |     ❌     |      ✅       |      ❌       | `github-sync-diff.ts#L411-L412` | 只更新已有行，不新增                 |
+| **`mirror`**        |     ✅     |      ✅       |    **✅**     | `github-sync-diff.ts#L479-L497` | **完整镜像，远程删除后同步删除本地** |
+| `force-overwrite`   |     ✅     |  ✅ (全字段)  |      ❌       | `github-sync-diff.ts#L425-L435` | 强制覆盖，含空值覆盖                 |
 
 > ⚠️ **关键提醒**：默认 `add-update` 策略**不会删除**任何本地行。若需同步远程删除，必须选择 `mirror` 策略。
 
@@ -855,40 +855,40 @@ handlers/sync.ts → _doAPISync(sheetIndex, token)
 
 **1. 差异计算阶段** (`computeDiff()`)
 
-| 步骤 | 操作                                                  | 代码位置                      |
-| ---- | ----------------------------------------------------- | ----------------------------- |
-| ①    | 构建远程 SID 集合 `remoteSids`                        | `githubSyncDiff.ts#L402-L406` |
-| ②    | 遍历本地 Excel 所有 SID                               | `githubSyncDiff.ts#L480-L496` |
-| ③    | 本地 SID 不在 `remoteSids` 中 → 标记 `kind: 'delete'` | `githubSyncDiff.ts#L489-L494` |
-| ④    | 时间筛选保护：筛选范围外的本地行跳过删除              | `githubSyncDiff.ts#L485-L488` |
+| 步骤 | 操作                                                  | 代码位置                        |
+| ---- | ----------------------------------------------------- | ------------------------------- |
+| ①    | 构建远程 SID 集合 `remoteSids`                        | `github-sync-diff.ts#L402-L406` |
+| ②    | 遍历本地 Excel 所有 SID                               | `github-sync-diff.ts#L480-L496` |
+| ③    | 本地 SID 不在 `remoteSids` 中 → 标记 `kind: 'delete'` | `github-sync-diff.ts#L489-L494` |
+| ④    | 时间筛选保护：筛选范围外的本地行跳过删除              | `github-sync-diff.ts#L485-L488` |
 
 **2. 执行删除阶段** (`applyDiffToSheet()`)
 
-| 步骤 | 操作                                                  | 代码位置                    |
-| ---- | ----------------------------------------------------- | --------------------------- |
-| ①    | 按行号**倒序**排列 diffs（避免先行删除导致行号错位）  | `githubSync.ts#L1066-L1070` |
-| ②    | 分离 `deleteDiffs`（仅保留有 `localRow` 的删除项）    | `githubSync.ts#L1076`       |
-| ③    | 记录撤销快照：`recordRowDeleteEntry({ row, values })` | `githubSync.ts#L1122-L1126` |
-| ④    | 调用 `ws.Range("行号:行号").Delete()` 删除整行        | `githubSync.ts#L1128`       |
-| ⑤    | 写入同步记录（状态：成功/失败）                       | `githubSync.ts#L1130-L1137` |
+| 步骤 | 操作                                                  | 代码位置                     |
+| ---- | ----------------------------------------------------- | ---------------------------- |
+| ①    | 按行号**倒序**排列 diffs（避免先行删除导致行号错位）  | `github-sync.ts#L1066-L1070` |
+| ②    | 分离 `deleteDiffs`（仅保留有 `localRow` 的删除项）    | `github-sync.ts#L1076`       |
+| ③    | 记录撤销快照：`recordRowDeleteEntry({ row, values })` | `github-sync.ts#L1122-L1126` |
+| ④    | 调用 `ws.Range("行号:行号").Delete()` 删除整行        | `github-sync.ts#L1128`       |
+| ⑤    | 写入同步记录（状态：成功/失败）                       | `github-sync.ts#L1130-L1137` |
 
 **3. 撤销恢复机制** (`undoStack.undoLastSync()`)
 
-| 操作 | 说明                                       | 代码位置                 |
-| ---- | ------------------------------------------ | ------------------------ |
-| ①    | 撤销时按行号**从大到小**恢复被删除的行     | `undoStack.ts#L136`      |
-| ②    | 从快照中读取 `rowValues`，在原位置插入新行 | `undoStack.ts#L171-L177` |
-| ③    | 恢复完成后弹出会话                         | `undoStack.ts#L162-L164` |
+| 操作 | 说明                                       | 代码位置                  |
+| ---- | ------------------------------------------ | ------------------------- |
+| ①    | 撤销时按行号**从大到小**恢复被删除的行     | `undo-stack.ts#L136`      |
+| ②    | 从快照中读取 `rowValues`，在原位置插入新行 | `undo-stack.ts#L171-L177` |
+| ③    | 恢复完成后弹出会话                         | `undo-stack.ts#L162-L164` |
 
 **删除保护机制**
 
-| 保护措施           | 说明                                                                                                          | 代码位置                                                 |
-| ------------------ | ------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------- |
-| **SID 白名单过滤** | 两层过滤：① 无 Bangumi_URL 列值的行直接跳过；② `extractSubjectId()` 无法提取有效 SID（非 1-8 位数字）的行跳过 | `githubSync.ts#L347-L350`<br>`pureUtilsCore.ts#L82-L118` |
-| 时间筛选           | 筛选范围外的本地行不执行删除                                                                                  | `githubSyncDiff.ts#L485-L488`                            |
-| 行号倒序           | 防止先行删除导致后续行号偏移                                                                                  | `githubSync.ts#L1066-L1070`                              |
-| 撤销栈             | 删除前保存快照，可一键恢复                                                                                    | `undoStack.ts#L73-L78`                                   |
-| 异常捕获           | 删除失败不中断整体同步流程                                                                                    | `githubSync.ts#L1138-L1154`                              |
+| 保护措施           | 说明                                                                                                          | 代码位置                                                    |
+| ------------------ | ------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------- |
+| **SID 白名单过滤** | 两层过滤：① 无 Bangumi_URL 列值的行直接跳过；② `extractSubjectId()` 无法提取有效 SID（非 1-8 位数字）的行跳过 | `github-sync.ts#L347-L350`<br>`pure-utils-core.ts#L82-L118` |
+| 时间筛选           | 筛选范围外的本地行不执行删除                                                                                  | `github-sync-diff.ts#L485-L488`                             |
+| 行号倒序           | 防止先行删除导致后续行号偏移                                                                                  | `github-sync.ts#L1066-L1070`                                |
+| 撤销栈             | 删除前保存快照，可一键恢复                                                                                    | `undo-stack.ts#L73-L78`                                     |
+| 异常捕获           | 删除失败不中断整体同步流程                                                                                    | `github-sync.ts#L1138-L1154`                                |
 
 **SID 白名单过滤详解（非 BGM 条目不删除）**
 
@@ -904,7 +904,7 @@ handlers/sync.ts → _doAPISync(sheetIndex, token)
 | URL 有效，SID 不在远程仓库                 |                ✅                 |    ✅（会被删除）    |
 
 ```typescript
-// 两层过滤代码（githubSync.ts#L347-L350）
+// 两层过滤代码（github-sync.ts#L347-L350）
 const url = getField('Bangumi_URL')
 if (!url) continue        // 关卡1：没有 URL → 跳过
 const sid = extractSubjectId(url)
@@ -913,7 +913,7 @@ if (!sid) continue        // 关卡2：URL 无法提取 SID → 跳过
 result.set(sid, { row, sid, fields: {...} })  // 只有通过两关才加入 Map
 ```
 
-`extractSubjectId()` 核心校验（pureUtilsCore.ts#L115-L117）：
+`extractSubjectId()` 核心校验（pure-utils-core.ts#L115-L117）：
 
 ```typescript
 // 强制校验为 1-8 位数字（防止脏数据：超长数字、目录遍历字符等）
@@ -1157,20 +1157,20 @@ npx vitest
 
 **可测试的纯函数模块：**
 
-- `sync/githubSyncDiff.ts`: 差异计算（零依赖，可在 Node 环境直接运行）
-- `sync/pureUtils.ts` / `pureUtilsCore.ts`: 纯工具函数
+- `sync/github-sync-diff.ts`: 差异计算（零依赖，可在 Node 环境直接运行）
+- `sync/pure-utilities.ts` / `pure-utilities-core.ts`: 纯工具函数
 - `core/crypto.ts`: Token 加解密逻辑
 - `core/result.ts`: Result 类型
 - `tools/events.ts`: EventBus
 - `tools/logger.ts`: 日志与脱敏
-- `sync/githubConfig.ts`: 配置读写
-- `sync/undoStack.ts`: 撤销栈逻辑
+- `sync/github-config.ts`: 配置读写
+- `sync/undo-stack.ts`: 撤销栈逻辑
 
 **测试隔离设计：**
 
 - `entry/` 模块使用 `typeof window !== 'undefined'` 守卫，测试环境导入不触发副作用
 - `ribbon.ts` 的消息监听和轮询通过显式 `initRibbon()` 调用启动
-- `panel/panelPage.ts` 的 DOM 操作通过 `initPanel()` 显式调用触发
+- `panel/panel-page.ts` 的 DOM 操作通过 `initPanel()` 显式调用触发
 
 ### 7.3 代码规范
 

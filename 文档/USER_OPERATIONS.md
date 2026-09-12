@@ -34,7 +34,7 @@
 
 | 术语                 | 说明                                                                 | 对应代码/路径                                    |
 | -------------------- | -------------------------------------------------------------------- | ------------------------------------------------ |
-| **Panel**            | 主侧边栏面板（原 Taskpane），提供数据操作入口                        | `ui/panel.html`、`ts/panel/panelPage.ts`         |
+| **Panel**            | 主侧边栏面板（原 Taskpane），提供数据操作入口                        | `ui/panel.html`、`ts/panel/panel-page.ts`        |
 | **Settings Panel**   | 设置面板，独立于主 Panel 的配置管理界面                              | `ui/settings.html`、`ts/entry/settings-entry.ts` |
 | **panel_id**         | 主 Panel 在 PluginStorage 中存储的唯一标识，用于跨会话持久化面板状态 | PluginStorage key: `panel_id`                    |
 | **settings_pane_id** | Settings Panel 在 PluginStorage 中存储的唯一标识                     | PluginStorage key: `settings_pane_id`            |

@@ -4,13 +4,13 @@
 
 [![License: CC BY-NC-SA 4.0](https://img.shields.io/badge/License-CC%20BY--NC--SA%204.0-2da44e.svg)](https://creativecommons.org/licenses/by-nc-sa/4.0/)
 [![Data Update](https://img.shields.io/badge/更新频率-每周三-2da44e.svg)](https://github.com/bangumi/Archive)
-[![Records](https://img.shields.io/badge/记录数-30836-2da44e.svg)](data/bangumi.jsonlines)
+[![Records](https://img.shields.io/badge/记录数-30836-2da44e.svg)](../../../../Bangumi-Archive-Anime-Excel/data/bangumi.jsonlines)
 
 ---
 
 ## 📖 项目简介
 
-本仓库是 [Bangumi Archive](https://github.com/bangumi/Archive) 数据处理链路的**数据下发仓库**，由上游 [Archive 项目](../Archive) 每周处理后同步而来。
+本仓库是 [Bangumi Archive](https://github.com/bangumi/Archive) 数据处理链路的**数据下发仓库**，由上游 [Archive 项目](../../../../Archive) 每周处理后同步而来。
 
 **数据链路**：
 
@@ -261,7 +261,7 @@ infobox字段包含条目原始wiki字符串，其中可能包含以下信息（
 
 | 项目                 | 仓库                                                  | 说明                                        |
 | -------------------- | ----------------------------------------------------- | ------------------------------------------- |
-| Archive 项目         | 本地 `../Archive`                                     | 数据处理流水线（上游）                      |
+| Archive 项目         | 本地 `../../../../Archive`                            | 数据处理流水线（上游）                      |
 | Bangumi 官方 Archive | [bangumi/Archive](https://github.com/bangumi/Archive) | 原始数据源                                  |
 | BGM 插件             | —                                                     | Excel 加载项，读取 JSONL 并同步 Bangumi API |
 
