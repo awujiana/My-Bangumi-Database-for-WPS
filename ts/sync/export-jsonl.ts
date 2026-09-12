@@ -55,7 +55,38 @@ const EXPORT_FIELDS = [
   '系列构成',
   '在线播放平台',
   '关联的动漫ID',
+  // 全量保真字段：Excel 表没有对应列，导出时统一补默认值，
+  // 仅用于保证表头与远程 data/bangumi.jsonlines 完全一致。
+  'name_original',
+  'type',
+  'platform',
+  'series',
+  'score',
+  'rank',
+  'score_details',
+  'favorite',
+  'tags',
+  'summary',
+  'infobox',
+  '别名',
 ] as const
+
+/**
+ * 各字段的默认值（缺省时使用，保证每行长度与表头严格一致）
+ *
+ * 数组与布尔/数值字段必须补对应类型，否则解析端会拿到错误类型。
+ */
+const FIELD_DEFAULTS: Readonly<Record<string, unknown>> = {
+  meta_tags: [],
+  score_details: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+  favorite: [0, 0, 0, 0, 0],
+  nsfw: false,
+  series: false,
+  type: 0,
+  platform: 0,
+  score: 0,
+  rank: 0,
+}
 
 /**
  * 取字段值；缺省时按字段类型补默认值，保证每行长度与表头严格一致
@@ -66,9 +97,7 @@ const EXPORT_FIELDS = [
 function fieldOrDefault(entry: Record<string, unknown>, field: string): unknown {
   const value = entry[field]
   if (value !== undefined) return value
-  if (field === 'meta_tags') return []
-  if (field === 'nsfw') return false
-  return ''
+  return FIELD_DEFAULTS[field] ?? ''
 }
 
 /**

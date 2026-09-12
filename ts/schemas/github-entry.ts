@@ -9,13 +9,12 @@ import type { infer as zInfer } from '../tools/zod-compat.js'
  * 扩展字段不在 schema 中显式定义，避免与 githubSyncDiff.ts 的 EXTENDED_FIELD_MAP
  * 产生重复维护与漂移风险。
  *
- * 已移除的字段（不再从 JSONL 输出，BGM 插件内部处理）：
+ * 未映射到 Excel 列的字段（随 dump 全量下发，但插件不写入表格）：
  * - URL：从 sid 构造（https://bgm.tv/subject/{sid}）
- * - type：默认为 2（动漫）
- * - tags：与 meta_tags 冗余，仅使用 meta_tags
  * - episode：恒为 0，使用 infobox.话数 替代
- * - platform：已从 EXTENDED_FIELD_MAP 移除
- * - score：数据源平均分，非用户打分，不输出
+ * - tags：与 meta_tags 冗余，仅使用 meta_tags 写入「标签/分级」列
+ * - 全量保真字段（2026-09 起随 dump 下发）：name_original / type / platform /
+ *   series / score / rank / score_details / favorite / summary / infobox / 别名
  */
 export const GithubEntrySchema = z
   .object({

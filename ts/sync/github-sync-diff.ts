@@ -67,6 +67,31 @@ export interface GithubRemoteEntry {
   在线播放平台?: string
   /** 关联的动漫ID（subject-relations） */
   关联的动漫ID?: string
+  // ── 全量保真字段（随 dump 全量下发；插件暂不映射到 Excel 列）──
+  /** 原始名（dump.name，与 name 并存，避免原始名丢失） */
+  name_original?: string
+  /** 条目类型（dump.type，2=动画） */
+  type?: number
+  /** 平台（dump.platform） */
+  platform?: number
+  /** 是否系列作（dump.series） */
+  series?: boolean
+  /** 评分（dump.score） */
+  score?: number
+  /** 排名（dump.rank） */
+  rank?: number
+  /** 评分分布（dump.score_details，固定序 [1分..10分] 各自人数） */
+  score_details?: number[]
+  /** 收藏统计（dump.favorite，固定序 [想看,看过,在看,搁置,抛弃]） */
+  favorite?: number[]
+  /** 用户标签（已压缩为 "名称:计数|名称:计数"） */
+  tags?: string
+  /** 简介（dump.summary） */
+  summary?: string
+  /** infobox 原文（dump.infobox，未裁剪） */
+  infobox?: string
+  /** 别名（infobox 别名，多值以 " | " 分隔） */
+  别名?: string
 }
 
 /**
