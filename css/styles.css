@@ -3464,3 +3464,49 @@ body {
         flex: 1 1 calc(50% - 12px);
     }
 }
+
+/* ========== 模块折叠 / 隐藏（右上角折叠按钮） ========== */
+/* 模块被隐藏时用 hidden 属性。布局类（flex / grid / block）会盖掉浏览器默认的
+   [hidden] { display: none }，故必须 !important —— 否则隐藏「看起来没生效」。
+   显式列出元素类型而非用裸 [hidden]，避免误伤其它地方的 hidden 用法。 */
+.section[hidden],
+.enrich-section[hidden],
+.command-center[hidden],
+.nav a[hidden] {
+    display: none !important;
+}
+
+/* 折叠：只留标题（h3），其余子元素全部收起 —— 标题必须留着，否则没法再点开 */
+.is-module-collapsed > *:not(h3) {
+    display: none;
+}
+
+.mod-collapse-btn {
+    float: right;
+    margin-left: 8px;
+    padding: 0 6px;
+    font-size: 12px;
+    line-height: 1.5;
+    color: var(--text-3);
+    background: transparent;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+.mod-collapse-btn:hover {
+    color: var(--text-1);
+    border-color: var(--border-strong);
+}
+
+.mod-collapse-btn:focus-visible {
+    outline: 2px solid var(--accent-blue);
+    outline-offset: 2px;
+}
+
+/* 排序编辑器里被隐藏的模块：置灰以便区分（仍可点 🚫 恢复） */
+.module-order-item.is-module-hidden .module-order-label,
+.module-order-item.is-module-hidden .module-order-ico {
+    opacity: 0.45;
+    text-decoration: line-through;
+}
