@@ -232,6 +232,31 @@ describe('toggle', () => {
   })
 })
 
+/**
+ * 设置页「模块排序」是唯一能恢复隐藏模块的入口，所以它自己必须永远可见。
+ * 隐藏它 = 永久锁死恢复能力，属于不可违反的不变量。
+ */
+describe('受保护模块：设置页「模块排序」永远可见', () => {
+  it('写入侧剔除：绕过 toggle 直接 setHiddenModules 也存不进去', () => {
+    setHiddenModules('settings', ['sec-modules', 'sec-about'])
+    expect(getHiddenModules('settings')).toEqual(['sec-about'])
+  })
+
+  it('读取侧兜底：配置从别处来（导入 / 旧版本 / 手改存储）也不算隐藏', () => {
+    // 直接改存储，模拟任何不经过 setHiddenModules 的来源
+    configStore.set(CONFIG_KEYS.MODULE_HIDDEN, JSON.stringify({ settings: ['sec-modules'] }))
+    expect(getHiddenModules('settings')).toEqual([])
+  })
+
+  it('读取侧兜底同样覆盖套用：编辑页不会被自己藏空', () => {
+    document.body.innerHTML =
+      '<main class="main"><section class="section" id="sec-modules"><h3>模块排序</h3></section></main>'
+    configStore.set(CONFIG_KEYS.MODULE_HIDDEN, JSON.stringify({ settings: ['sec-modules'] }))
+    applyModuleState('settings')
+    expect(moduleElement('sec-modules').hidden).toBe(false)
+  })
+})
+
 describe('applyModuleState', () => {
   it('隐藏：模块与侧栏锚点一起消失（只隐藏一处会出现「点了跳到空区块」）', () => {
     buildPanelDom()

@@ -115,14 +115,26 @@ function setIds(key: string, page: string, ids: readonly string[]): boolean {
   return setConfig(key, JSON.stringify(map))
 }
 
+/**
+ * 剔除不允许隐藏的模块 id（目前只有设置页的排序编辑器自身）。
+ *
+ * **读、写两侧都要过滤**，只拦写入侧是不够的：配置还有别的来源 ——
+ * 导入配置、旧版本遗留、手改 PluginStorage。这些路径不经过 `toggleModuleHidden`，
+ * 只靠写入侧守卫拦不住，而一旦编辑器模块被隐藏就再没有入口能恢复任何模块。
+ * 读侧保证「读出来的永远安全」，写侧保证「存下来的永远是干净的」。
+ */
+function filterHideable(page: string, ids: readonly string[]): string[] {
+  return ids.filter((id) => canHideModule(page, id))
+}
+
 /** 读取被折叠的模块 id */
 export function getCollapsedModules(page: string, isSilent = false): string[] {
   return readIds(CONFIG_KEYS.MODULE_COLLAPSED, page, isSilent)
 }
 
-/** 读取被隐藏的模块 id */
+/** 读取被隐藏的模块 id（受保护的模块即使配置里写了也不算隐藏） */
 export function getHiddenModules(page: string, isSilent = false): string[] {
-  return readIds(CONFIG_KEYS.MODULE_HIDDEN, page, isSilent)
+  return filterHideable(page, readIds(CONFIG_KEYS.MODULE_HIDDEN, page, isSilent))
 }
 
 /** 直接写入折叠集合（供「全部展开 / 全部折叠」类批量操作使用） */
@@ -130,9 +142,9 @@ export function setCollapsedModules(page: string, ids: readonly string[]): boole
   return setIds(CONFIG_KEYS.MODULE_COLLAPSED, page, ids)
 }
 
-/** 直接写入隐藏集合 */
+/** 直接写入隐藏集合（受保护的模块会被剔除，存储里不留脏数据） */
 export function setHiddenModules(page: string, ids: readonly string[]): boolean {
-  return setIds(CONFIG_KEYS.MODULE_HIDDEN, page, ids)
+  return setIds(CONFIG_KEYS.MODULE_HIDDEN, page, filterHideable(page, ids))
 }
 
 /** 切换单个模块的折叠状态；不可隐藏模块的隐藏请求会被静默忽略 */
@@ -147,13 +159,11 @@ export function toggleModuleCollapsed(page: string, moduleId: string): void {
 /**
  * 切换单个模块的隐藏状态。
  *
- * 不可隐藏的模块（设置页的排序编辑器自身）在这里**直接拒绝**：
- * 渲染层只是把按钮置灰，那只是提示；真出事的是有人绕过 disabled 触发点击 ——
- * 一旦编辑器模块被隐藏，就再也没有入口能恢复任何模块了。可恢复性属于不变量，
- * 必须在数据层保证，不能只靠 UI 状态。
+ * 不可隐藏的模块（设置页的排序编辑器自身）在 `filterHideable` 里被剔除 ——
+ * 渲染层把按钮置灰只是提示，真出事的是有人绕过 disabled 触发点击；而配置还有
+ * 导入 / 旧版本遗留这些不经过本函数的来源。可恢复性属于不变量，必须落在数据层。
  */
 export function toggleModuleHidden(page: string, moduleId: string): void {
-  if (!canHideModule(page, moduleId)) return
   const current = getHiddenModules(page)
   const next = current.includes(moduleId)
     ? current.filter((id) => id !== moduleId)
