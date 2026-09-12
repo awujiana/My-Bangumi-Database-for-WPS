@@ -116,6 +116,22 @@
         <section class="section" id="sec-log">
           <h3>📜 结果日志</h3>
           <div class="bgm-btn-group bgm-btn-row">
+            <button
+              class="bgm-btn small"
+              data-action="exportData"
+              data-args='["cleanLogs","csv"]'
+              style="flex: 1"
+            >
+              📄 导出 CSV
+            </button>
+            <button
+              class="bgm-btn small"
+              data-action="exportData"
+              data-args='["cleanLogs","txt"]'
+              style="flex: 1"
+            >
+              📝 导出 TXT
+            </button>
             <button class="bgm-btn small" id="cleanClearLogBtn">🗑️ 清空日志</button>
           </div>
           <div id="cleanLog" class="clean-log" aria-live="polite"></div>

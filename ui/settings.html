@@ -98,6 +98,9 @@
           <a href="#sec-data" title="配置管理"
             ><span class="nav-ico">📦</span><span class="nav-text">配置管理</span></a
           >
+          <a href="#sec-export" title="数据导出"
+            ><span class="nav-ico">📤</span><span class="nav-text">数据导出</span></a
+          >
           <a href="#sec-about" title="关于"
             ><span class="nav-ico">ℹ️</span><span class="nav-text">关于</span></a
           >
@@ -364,6 +367,70 @@
             导出会下载配置文件并复制到剪贴板（含 Token、仓库配置与全部偏好项）；导入支持从粘贴的
             JSON 恢复；重置会清空所有已保存配置，请谨慎操作。
           </p>
+        </section>
+
+        <!-- 数据导出 -->
+        <section class="section" id="sec-export">
+          <h3>📤 数据导出</h3>
+          <p class="hint">
+            把各工具的日志与记录导出为文件：CSV 可直接用 Excel 打开（带 BOM，中文不乱码），
+            TXT 适合在记事本里快速查看。三个工具页面各自也有就近的导出按钮。
+          </p>
+          <div class="export-source-list">
+            <div class="export-source-row">
+              <span class="export-source-label">同步记录</span>
+              <button
+                class="bgm-btn small"
+                data-action="exportData"
+                data-args='["syncRecords","csv"]'
+              >
+                📄 CSV
+              </button>
+              <button
+                class="bgm-btn small"
+                data-action="exportData"
+                data-args='["syncRecords","txt"]'
+              >
+                📝 TXT
+              </button>
+            </div>
+            <div class="export-source-row">
+              <span class="export-source-label">系统日志</span>
+              <button class="bgm-btn small" data-action="exportData" data-args='["systemLogs","csv"]'>
+                📄 CSV
+              </button>
+              <button class="bgm-btn small" data-action="exportData" data-args='["systemLogs","txt"]'>
+                📝 TXT
+              </button>
+            </div>
+            <div class="export-source-row">
+              <span class="export-source-label">富化记录</span>
+              <button
+                class="bgm-btn small"
+                data-action="exportData"
+                data-args='["enrichRecords","csv"]'
+              >
+                📄 CSV
+              </button>
+              <button
+                class="bgm-btn small"
+                data-action="exportData"
+                data-args='["enrichRecords","txt"]'
+              >
+                📝 TXT
+              </button>
+            </div>
+            <div class="export-source-row">
+              <span class="export-source-label">清理日志</span>
+              <button class="bgm-btn small" data-action="exportData" data-args='["cleanLogs","csv"]'>
+                📄 CSV
+              </button>
+              <button class="bgm-btn small" data-action="exportData" data-args='["cleanLogs","txt"]'>
+                📝 TXT
+              </button>
+            </div>
+          </div>
+          <p class="hint">清理日志仅记录本次打开清理页之后的操作，切换页面不会保留。</p>
         </section>
 
         <!-- 关于 -->

@@ -226,6 +226,7 @@
               🔍 预览匹配
             </button>
           </div>
+          <div id="sourceStats"></div>
           <div class="preview-table" id="sourcePreviewTable">
             <table id="sourceTable">
               <thead></thead>
@@ -363,6 +364,24 @@
             </button>
             <button class="bgm-btn small" data-action="clearRecords" style="flex: 1">
               🗑️ 清除记录
+            </button>
+          </div>
+          <div class="bgm-btn-group bgm-btn-row">
+            <button
+              class="bgm-btn small"
+              data-action="exportData"
+              data-args='["enrichRecords","csv"]'
+              style="flex: 1"
+            >
+              📄 导出 CSV
+            </button>
+            <button
+              class="bgm-btn small"
+              data-action="exportData"
+              data-args='["enrichRecords","txt"]'
+              style="flex: 1"
+            >
+              📝 导出 TXT
             </button>
           </div>
           <div class="record-list" id="recentRecords">

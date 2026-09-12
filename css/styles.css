@@ -1454,6 +1454,69 @@ select.input {
     margin-top: 4px;
 }
 
+/* ========== 共用统计卡片（三个页面预览区统一，配合 ts/ui/stat-cards.ts） ==========
+ * auto-fit + minmax 让卡片数不同也能自动换行，任务窗格拖窄到 480px 以下时
+ * 会自然折成两列，不需要额外的媒体查询。
+ */
+.stat-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(96px, 1fr));
+    gap: var(--sp-2, 8px);
+    margin-bottom: var(--sp-3, 12px);
+}
+
+.stat-card-success {
+    border-left-color: var(--success, #a6e3a1);
+}
+
+.stat-card-success .stat-value {
+    color: var(--success, #a6e3a1);
+}
+
+.stat-card-warning {
+    border-left-color: var(--warning, #f9e2af);
+}
+
+.stat-card-warning .stat-value {
+    color: var(--warning, #f9e2af);
+}
+
+.stat-card-error {
+    border-left-color: var(--danger, #f38ba8);
+}
+
+.stat-card-error .stat-value {
+    color: var(--danger, #f38ba8);
+}
+
+.stat-card-accent {
+    border-left-color: var(--accent, #cfcfcf);
+}
+
+.stat-card-accent .stat-value {
+    color: var(--text-1, #f2f2f2);
+}
+
+/* ========== 设置页「数据导出」列表（一个数据源一行：名称 + CSV/TXT 按钮） ========== */
+.export-source-list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-2, 8px);
+    margin-top: var(--sp-2, 8px);
+}
+
+.export-source-row {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-2, 8px);
+}
+
+.export-source-label {
+    flex: 1;
+    color: var(--text-2, #c8c8c8);
+    font-size: var(--fs-sm, 12.5px);
+}
+
 /* ========== 富预览 - 类型状态标签 ========== */
 .status-badges {
     display: flex;
