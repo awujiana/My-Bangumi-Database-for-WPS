@@ -12,6 +12,7 @@
  */
 
 import { LOG_LEVELS, bgmLog, showToast } from '../../index.js'
+import { CONFIG_KEYS, getConfig } from '../../tools/config.js'
 import {
   ORDERABLE_PAGES,
   PAGE_LABELS,
@@ -173,6 +174,48 @@ function onDragEnd(): void {
   }
 }
 
+/** 轮询间隔（ms），与 nav-order / nav-mode 的跨页同步保持一致 */
+const ORDER_SYNC_INTERVAL_MS = 2000
+
+/** 无定时器可清时的空清理函数（非浏览器上下文 / 编辑器不存在） */
+const noopCleanup = (): void => {
+  /* 无需清理 */
+}
+
+/**
+ * 跨页刷新：其他任务窗格改动排序后，本页编辑器里的清单会变旧。
+ * 与 nav-order 的同步策略一致，轮询 PluginStorage 中的排序配置，变化时重渲染。
+ * @returns 清理函数（清除定时器）
+ */
+export function startModuleOrderSync(): () => void {
+  if (typeof window === 'undefined' || typeof setInterval !== 'function') return noopCleanup
+  const host = document.getElementById('moduleOrderGroups')
+  if (!host) return noopCleanup
+  let lastRaw = getConfig(CONFIG_KEYS.NAV_ORDER, '', true)
+  const timer = setInterval(() => {
+    try {
+      const raw = getConfig(CONFIG_KEYS.NAV_ORDER, '', true)
+      if (raw !== lastRaw) {
+        lastRaw = raw
+        // 拖拽过程中不重渲染：会拆掉正在拖拽的 DOM 节点
+        if (!dragModuleId) renderModuleOrderEditor()
+      }
+    } catch {
+      // 静默处理偶发读取异常，轮询继续
+    }
+  }, ORDER_SYNC_INTERVAL_MS)
+  window.addEventListener(
+    'beforeunload',
+    () => {
+      clearInterval(timer)
+    },
+    { once: true },
+  )
+  return () => {
+    clearInterval(timer)
+  }
+}
+
 /**
  * 初始化模块排序编辑器：渲染清单并绑定容器级事件委托。
  * 仅在存在 `#moduleOrderGroups` 的设置页生效，其余页面静默跳过。
@@ -189,5 +232,6 @@ export function initModuleOrderEditor(): void {
   host.addEventListener('dragover', onDragOver)
   host.addEventListener('drop', onDrop)
   host.addEventListener('dragend', onDragEnd)
+  startModuleOrderSync()
   bgmLog(LOG_LEVELS.INFO, '[moduleOrder] 模块排序编辑器已初始化')
 }

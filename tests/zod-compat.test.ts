@@ -3,9 +3,14 @@ import { z } from '../ts/tools/zod-compat.js'
 
 // zod-compat 的 lite 工厂返回 `any` 形态 schema；用最小接口把调用面收成类型安全，
 // 避免 no-unsafe-* 全家桶。这是「刻意的 any → 已知形态」边界转换（见项目约定）。
+/** 单个 issue：lite-zod 只保证 path 为「索引/键名」数组，故元素类型放宽为 unknown */
+interface LiteIssue {
+  path?: readonly unknown[]
+}
+
 type LiteResult =
   | { success: true; data: unknown }
-  | { success: false; error: { issues: { path?: unknown }[] } }
+  | { success: false; error: { issues: readonly LiteIssue[] } }
 
 interface LiteSchema {
   safeParse(value: unknown): LiteResult

@@ -29,7 +29,6 @@ import {
   getSyncRecordSheetIfExists,
   getSyncSourceType,
   getSyncStrategy,
-  CONFIG_KEYS,
   removeConfig,
   applyLogLevel,
   hideSyncProgressDialog,
@@ -84,6 +83,7 @@ import { clearLogs, exportLogsToFile } from '../../tools/logger.js'
 import { hideConnectionTestDialog, showConnectionTestDialog } from '../github-config-dialog.js'
 import { _T } from './_constants.js'
 import { copyTextToClipboard } from './clipboard.js'
+import { getResettableConfigKeys } from './config-reset-keys.js'
 import {
   reloadEnrichPreviewSettings,
   saveEnrichPreviewSettings,
@@ -1034,9 +1034,10 @@ export const ACTION_HANDLERS: Record<string, ActionHandler> = {
           showToast('已取消重置', 'info')
           return
         }
-        const keys = Object.values(CONFIG_KEYS)
+        // 会话态键不参与重置：当前锁定的工作表/工作簿是用户的工作状态，
+        // 清掉会让下次打开「追踪表」时丢失目标表选择（config-service 也不把它们入档）
         let removed = 0
-        for (const key of keys) {
+        for (const key of getResettableConfigKeys()) {
           try {
             if (removeConfig(key)) removed += 1
           } catch {
@@ -1278,6 +1279,8 @@ export const ACTION_HANDLERS: Record<string, ActionHandler> = {
       if (result.isOk()) {
         showToast('配置导入成功', 'success')
         bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 配置导入成功')
+        // 导入可能带来新的日志级别；只写存储不会改变内存过滤阈值，须重新套用
+        applyLogLevel()
         // 刷新 UI 以反映新配置
         updateTokenStatus()
         updateUserIdStatus()

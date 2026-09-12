@@ -226,6 +226,8 @@ export function applyNavOrder(page?: string): void {
   }
 
   // 2) 主区模块：按 order 重排 main 的直接子元素
+  // 选择器用 `main.main` 而非 `main.main-grid`：只有 panel 是栅格布局，
+  // enrich / clean 用的是 `main.main` 单列布局，写死 main-grid 会让这两页静默不重排。
   const main = document.querySelector('main.main')
   if (main) {
     const children = [...main.children]
@@ -239,6 +241,20 @@ export function applyNavOrder(page?: string): void {
     }
     for (const child of children) {
       if (!applied.has(child)) main.appendChild(child)
+    }
+    // panel 的通栏模块（.command-center）用 CSS `grid-column: 1 / -1` 跨满整行来固定
+    // 「视觉焦点在最上方」。但栅格自动布局下，通栏项的放置行由它之前的自动项决定 ——
+    // 一旦被排到中段，它只跨当前那一行，上方的自动项会被挤到它下方，形成空洞。
+    // 显式指定 order 让 CSS Grid 把通栏项重新提到第一行。
+    if (main.classList.contains('main-grid')) {
+      for (const child of main.children) {
+        const element = child as HTMLElement
+        const index = order.indexOf(child.id)
+        // 不参与排序的元素（未列入注册表）：保持声明顺序，排在已排序元素之后
+        element.style.order = String(index === -1 ? order.length : index + 1)
+        // 通栏项提到首行（order 0 小于所有已排序项）
+        if (element.classList.contains('command-center')) element.style.order = '0'
+      }
     }
   }
 
