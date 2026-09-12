@@ -17,6 +17,12 @@ import { formatBytes, inspectWorksheet, runCleanPlans, scanCleanRules } from './
 import type { CleanScanResult } from './clean-engine.js'
 import { escapeHtml } from '../tools/string-utilities.js'
 import { sanitizeHtml } from '../tools/sanitize.js'
+import {
+  appendOperationLog,
+  clearOperationLogs,
+  CLEAN_LOG_SCOPE,
+} from '../tools/operation-log.js'
+import { renderStatCards } from '../ui/stat-cards.js'
 import type { WpsWorksheet } from '../tools/wps.js'
 import { initShellNav } from './shell-nav.js'
 import { initTheme, startThemeSync } from '../tools/theme.js'
@@ -474,8 +480,10 @@ function getSelectedRuleIds(): string[] {
 
 // ========== 日志 ==========
 
-/** 追加一行日志到日志区 */
+/** 追加一行日志到日志区（同时写入可导出的日志存储） */
 function appendLog(message: string, level: 'info' | 'ok' | 'warn' | 'error' = 'info'): void {
+  // 先存数据再渲染 DOM：导出读的是存储，顺序反了会漏掉最后一条
+  appendOperationLog(CLEAN_LOG_SCOPE, message, level)
   const box = document.getElementById('cleanLog')
   if (!box) return
   const line = document.createElement('div')
@@ -486,8 +494,9 @@ function appendLog(message: string, level: 'info' | 'ok' | 'warn' | 'error' = 'i
   bgmLog(LOG_LEVELS.INFO, `[cleanPage] ${message}`)
 }
 
-/** 清空日志区 */
+/** 清空日志区（同时清空可导出的日志存储） */
 function clearLog(): void {
+  clearOperationLogs(CLEAN_LOG_SCOPE)
   const box = document.getElementById('cleanLog')
   if (box) box.replaceChildren()
 }
@@ -563,31 +572,37 @@ function invalidatePreview(): void {
 
 // ========== 预览 ==========
 
+/** 累加各清理计划的删除行数 */
+function sumDeleteRows(result: CleanScanResult): number {
+  return result.plans.reduce((sum, plan) => sum + plan.deleteRows.length, 0)
+}
+
+/** 累加各清理计划的单元格变更数 */
+function sumChanges(result: CleanScanResult): number {
+  return result.plans.reduce((sum, plan) => sum + plan.changes.length, 0)
+}
+
+/**
+ * 渲染执行前预览的统计区。
+ *
+ * 用共用组件而非手写 HTML —— 三个页面的统计卡结构与配色由
+ * `ui/stat-cards.ts` 统一负责，此处只给数据。
+ */
+function renderPreviewStats(result: CleanScanResult): void {
+  renderStatCards(document.getElementById('cleanPreviewSummary'), [
+    { label: '涉及文件', value: result.fileCount },
+    { label: '目标工作表', value: result.targetCount },
+    { label: '命中规则', value: result.plans.length },
+    { label: '待清理条目', value: result.itemCount },
+    { label: '删除行', value: sumDeleteRows(result), tone: 'error' },
+    { label: '单元格变更', value: sumChanges(result), tone: 'warning' },
+    { label: '预计释放', value: formatBytes(result.estimatedBytes), tone: 'accent' },
+  ])
+}
+
 /** 渲染执行前预览 */
 function renderPreview(result: CleanScanResult): void {
-  const summary = document.getElementById('cleanPreviewSummary')
-  if (summary) {
-    summary.innerHTML = sanitizeHtml(`
-      <div class="clean-stat-grid">
-        <div class="clean-stat-card">
-          <div class="clean-stat-value">${String(result.fileCount)}</div>
-          <div class="clean-stat-label">涉及文件</div>
-        </div>
-        <div class="clean-stat-card">
-          <div class="clean-stat-value">${String(result.targetCount)}</div>
-          <div class="clean-stat-label">目标工作表</div>
-        </div>
-        <div class="clean-stat-card">
-          <div class="clean-stat-value">${String(result.itemCount)}</div>
-          <div class="clean-stat-label">待清理条目</div>
-        </div>
-        <div class="clean-stat-card accent">
-          <div class="clean-stat-value">${escapeHtml(formatBytes(result.estimatedBytes))}</div>
-          <div class="clean-stat-label">预计释放空间</div>
-        </div>
-      </div>
-    `)
-  }
+  renderPreviewStats(result)
 
   const detail = document.getElementById('cleanPreviewDetail')
   if (detail) {

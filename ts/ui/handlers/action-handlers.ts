@@ -79,7 +79,8 @@ import type {
 import { exportConfig, importConfig } from '../../services/config-service.js'
 import { executeUndoLastSync } from '../../services/ribbon-service.js'
 import { readLocalFileContent } from '../../sync/local-file-sync.js'
-import { clearLogs, exportLogsToFile } from '../../tools/logger.js'
+import { clearLogs } from '../../tools/logger.js'
+import { exportData } from './data-export.js'
 import { hideConnectionTestDialog, showConnectionTestDialog } from '../github-config-dialog.js'
 import { _T } from './_constants.js'
 import { copyTextToClipboard } from './clipboard.js'
@@ -996,20 +997,30 @@ export const ACTION_HANDLERS: Record<string, ActionHandler> = {
   },
 
   // 系统日志：导出日志到文件
+  // 走统一的导出源注册表（等价于 exportData('systemLogs', 'txt')），
+  // 这样「系统日志」与其它数据源共用同一套文件命名与空数据校验。
   exportLogs: (context) => {
     bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 导出系统日志到文件')
-    try {
-      exportLogsToFile()
-      showToast('日志已导出', 'success')
-    } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : String(error)
-      bgmLog(LOG_LEVELS.ERROR, `[handleActionClick] 导出日志失败: ${errorMessage}`)
-      showToast(`导出日志失败：${errorMessage}`, 'error')
-    }
+    exportData('systemLogs', 'txt')
     bgmLog(
       LOG_LEVELS.INFO,
       `[handleActionClick] 日志导出完成，耗时: ${String(Date.now() - context.startTime)}ms`,
     )
+  },
+
+  /**
+   * 通用数据导出：`<button data-action="exportData" data-args='["cleanLogs","csv"]'>`
+   *
+   * 8 个导出入口（4 个数据源 × CSV/TXT）共用一个 action —— 散成 8 个
+   * handler 必然出现漏改，且新增数据源要多处登记。
+   */
+  exportData: (context) => {
+    const [key, format] = context.args
+    if (!key) {
+      bgmLog(LOG_LEVELS.WARN, '[handleActionClick] exportData 缺少数据源参数')
+      return
+    }
+    exportData(key, format === 'txt' ? 'txt' : 'csv')
   },
 
   // 系统日志：清空日志缓冲区

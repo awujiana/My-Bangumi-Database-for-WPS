@@ -631,6 +631,7 @@
         <!-- 数据预览 -->
         <section class="section" id="sec-preview">
           <h3>👁️ 数据预览 <span id="previewCount"></span></h3>
+          <div id="previewStats"></div>
           <div class="preview-wrapper">
             <div class="preview-box" id="previewBox">
               <p class="hint">点击"刷新数据"加载预览（支持筛选后数据）</p>
@@ -684,6 +685,24 @@
               同步记录会保存在"同步记录"工作表中，包含：名称、URL、SID、类型、同步时间等<br />
               记录功能的启用开关与保留偏好位于「设置 → 同步偏好」
             </p>
+            <div class="bgm-btn-group bgm-btn-row">
+              <button
+                class="bgm-btn small"
+                data-action="exportData"
+                data-args='["syncRecords","csv"]'
+                style="flex: 1"
+              >
+                📄 导出 CSV
+              </button>
+              <button
+                class="bgm-btn small"
+                data-action="exportData"
+                data-args='["syncRecords","txt"]'
+                style="flex: 1"
+              >
+                📝 导出 TXT
+              </button>
+            </div>
           </div>
 
           <div class="form-group">
@@ -691,6 +710,24 @@
             <div class="bgm-btn-group">
               <button class="bgm-btn small" data-action="showLogPanel">📜 查看日志</button>
               <button class="bgm-btn small" data-action="clearLogs">🗑️ 清空日志</button>
+            </div>
+            <div class="bgm-btn-group bgm-btn-row">
+              <button
+                class="bgm-btn small"
+                data-action="exportData"
+                data-args='["systemLogs","csv"]'
+                style="flex: 1"
+              >
+                📄 导出 CSV
+              </button>
+              <button
+                class="bgm-btn small"
+                data-action="exportData"
+                data-args='["systemLogs","txt"]'
+                style="flex: 1"
+              >
+                📝 导出 TXT
+              </button>
             </div>
             <p class="hint">查看最近 1000 条系统日志，用于排查同步失败等问题</p>
           </div>

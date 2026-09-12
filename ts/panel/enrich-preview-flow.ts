@@ -24,6 +24,7 @@ import {
   scanMatchingWorkbooks,
 } from '../sync/workbook-auto-detect.js'
 import { sanitizeHtml, sanitizeTableRows } from '../tools/sanitize.js'
+import { renderStatCards } from '../ui/stat-cards.js'
 import { escapeHtml } from '../tools/string-utilities.js'
 import {
   getCellValue,
@@ -442,7 +443,9 @@ function renderSourcePreview(ws: WpsWorksheet, mapping: EnrichColumnMapping): vo
   // 仅在通过 tbody 校验后才需要 maxRows，故在 early exit 之后声明
   const maxRows = 20
   const rowsHtml: string[] = []
-  const lastRow = Math.min(getLastRow(ws), dataStartRow + maxRows - 1)
+  // 源表末行单独取一次：既要算预览上限，也要算「数据总行」统计（避免重复调 COM）
+  const sourceLastRow = getLastRow(ws)
+  const lastRow = Math.min(sourceLastRow, dataStartRow + maxRows - 1)
 
   for (let row = dataStartRow; row <= lastRow; row += 1) {
     const rowCells: string[] = []
@@ -484,6 +487,14 @@ function renderSourcePreview(ws: WpsWorksheet, mapping: EnrichColumnMapping): vo
   }
 
   tbody.innerHTML = sanitizeTableRows(rowsHtml.join(''))
+
+  // 源数据统计：预览只画前 20 行，但用户需要知道表里到底有多少行
+  renderStatCards(safeGetElement('sourceStats'), [
+    { label: '数据总行', value: Math.max(0, sourceLastRow - dataStartRow + 1) },
+    { label: '已映射字段', value: fieldCols.length + introFields.length },
+    { label: '本次预览', value: rowsHtml.length },
+    { label: '数据起始行', value: dataStartRow },
+  ])
 
   // 预览提示：仅展示前 maxRows 行
   const hintElement = safeGetElement('sourcePreviewHint')

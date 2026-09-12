@@ -23,6 +23,7 @@ import {
   clearSheetCache,
 } from '../index.js'
 import { sanitizeHtml } from '../tools/sanitize.js'
+import { renderStatCards } from '../ui/stat-cards.js'
 import {
   saveLockedSheet,
   findWorkbookByName,
@@ -665,6 +666,39 @@ function isReadPreviewSegmentBatch(
   return hasData
 }
 
+/** 预览统计所需的元数据 */
+interface PreviewStatsInput {
+  headerRow: number
+  columnCount: number
+  dataRowCount: number
+  isFiltered: boolean
+}
+
+/**
+ * 渲染预览统计（共用统计卡片组件）。
+ *
+ * 「表头行」与「筛选」是同步前最该确认的两件事：表头识别错了会整列错位，
+ * 忘了还开着筛选会只同步可见行。这里把它们显式暴露出来，而不是让用户
+ * 去翻日志。
+ */
+function renderPreviewStats(stats: PreviewStatsInput): void {
+  const hasHeader = stats.headerRow > 0
+  renderStatCards(document.getElementById('previewStats'), [
+    { label: '预览数据行', value: stats.dataRowCount },
+    { label: '列数', value: stats.columnCount },
+    {
+      label: '表头行',
+      value: hasHeader ? stats.headerRow : '未识别',
+      tone: hasHeader ? 'default' : 'warning',
+    },
+    {
+      label: '筛选状态',
+      value: stats.isFiltered ? '仅可见行' : '全部行',
+      tone: stats.isFiltered ? 'accent' : 'default',
+    },
+  ])
+}
+
 function renderPreviewTable(
   rows: PreviewRow[],
   sheetIndex: number,
@@ -925,6 +959,12 @@ export function refreshData(): void {
           : `<p class="hint">已选择工作表索引: ${String(sheetIndex)} (${escapeHtml(sheetName)})<br>未检测到数据</p>`,
       )
     }
+    renderPreviewStats({
+      headerRow: meta.headerRow,
+      columnCount: meta.previewColEnd - meta.previewColStart,
+      dataRowCount: previewRows.filter((row) => !row.isHeader).length,
+      isFiltered,
+    })
     updateFilterStatus(ws)
   }
   try {

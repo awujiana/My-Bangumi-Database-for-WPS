@@ -78,6 +78,7 @@ const mockState = vi.hoisted(() => ({
   // tools/logger.js
   getRecentLogs: vi.fn(() => []),
   exportLogsToFile: vi.fn(),
+  exportData: vi.fn(),
   clearLogs: vi.fn(),
   // tools/debounce.js
   debounce: vi.fn((function_: () => void) => function_),
@@ -211,6 +212,11 @@ vi.mock('../ts/tools/logger.js', () => ({
   exportLogsToFile: mockState.exportLogsToFile,
   clearLogs: mockState.clearLogs,
   LogLevel: { INFO: 'INFO', WARN: 'WARN', ERROR: 'ERROR' },
+}))
+
+// 通用数据导出：exportLogs 与 exportData 两个 action 都走它
+vi.mock('../ts/ui/handlers/data-export.js', () => ({
+  exportData: mockState.exportData,
 }))
 
 vi.mock('../index.js', () => ({
@@ -553,9 +559,25 @@ describe('ACTION_HANDLERS 分发（通过 DOM click 触发）', () => {
     expect(() => clickAction('unknownAction999')).not.toThrow()
   })
 
-  it('点击 [data-action="exportLogs"] 触发 exportLogsToFile', () => {
+  // 已改走统一的导出源注册表（等价于导出「系统日志」的 TXT），
+  // 与其它数据源共用同一套文件命名与空数据校验
+  it('点击 [data-action="exportLogs"] 导出系统日志（systemLogs + txt）', () => {
     clickAction('exportLogs')
-    expect(mockState.exportLogsToFile).toHaveBeenCalled()
+    expect(mockState.exportData).toHaveBeenCalledWith('systemLogs', 'txt')
+  })
+
+  it('点击 [data-action="exportData"] 按 data-args 传数据源与格式', () => {
+    clickAction('exportData', JSON.stringify(['cleanLogs', 'csv']))
+    expect(mockState.exportData).toHaveBeenCalledWith('cleanLogs', 'csv')
+  })
+
+  it('[data-action="exportData"] 缺少参数时不调用导出（不抛错）', () => {
+    expect(() => clickAction('exportData')).not.toThrow()
+  })
+
+  it('[data-action="exportData"] 格式缺省或非法时回落为 csv', () => {
+    clickAction('exportData', JSON.stringify(['enrichRecords']))
+    expect(mockState.exportData).toHaveBeenCalledWith('enrichRecords', 'csv')
   })
 
   it('点击 [data-action="clearLogs"] 触发 clearLogs', () => {

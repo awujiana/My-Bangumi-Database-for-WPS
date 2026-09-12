@@ -70,6 +70,7 @@ export const PAGE_MODULES: Readonly<Record<string, readonly NavModule[]>> = {
     { id: 'sec-paths', label: '默认路径', icon: '📁' },
     { id: 'sec-log-pref', label: '日志偏好', icon: '📜' },
     { id: 'sec-data', label: '配置管理', icon: '📦' },
+    { id: 'sec-export', label: '数据导出', icon: '📤' },
     { id: 'sec-about', label: '关于', icon: 'ℹ️' },
   ],
 }
