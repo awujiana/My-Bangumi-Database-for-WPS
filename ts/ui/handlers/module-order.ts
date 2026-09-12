@@ -23,6 +23,12 @@ import {
   notifyNavOrderChanged,
   resetNavOrder,
 } from '../../tools/nav-order.js'
+import {
+  applyModuleState,
+  canHideModule,
+  getHiddenModules,
+  toggleModuleHidden,
+} from '../../tools/module-state.js'
 import { escapeHtml } from '../../tools/string-utilities.js'
 
 /** 拖拽会话状态（仅记录当前被拖起的模块） */
@@ -36,6 +42,7 @@ function buildGroupHtml(page: string): string {
   const order = getNavOrder(page)
   const byId = new Map(modules.map((module) => [module.id, module]))
   const label = PAGE_LABELS[page] ?? page
+  const hidden = new Set(getHiddenModules(page))
 
   const items = order
     .map((id, index) => {
@@ -44,12 +51,22 @@ function buildGroupHtml(page: string): string {
       const isFirst = index === 0
       const isLast = index === order.length - 1
       const name = escapeHtml(module.label)
+      const isHidden = hidden.has(id)
+      // 编辑器所在模块禁止隐藏：隐藏后就没有入口能把任何模块恢复了
+      const hideDisabled = canHideModule(page, id) ? '' : ' disabled'
+      let hideTitle = '在页面中隐藏此模块'
+      if (!canHideModule(page, id)) {
+        hideTitle = '本模块是排序编辑器自身，不可隐藏'
+      } else if (isHidden) {
+        hideTitle = '恢复显示'
+      }
       return `
-        <li class="module-order-item" draggable="true" data-page="${escapeHtml(page)}" data-module="${escapeHtml(module.id)}">
+        <li class="module-order-item${isHidden ? ' is-module-hidden' : ''}" draggable="true" data-page="${escapeHtml(page)}" data-module="${escapeHtml(module.id)}">
           <span class="module-order-handle" title="拖拽调整顺序" aria-hidden="true">⋮⋮</span>
           <span class="module-order-ico" aria-hidden="true">${escapeHtml(module.icon)}</span>
           <span class="module-order-label">${name}</span>
           <span class="module-order-btns">
+            <button class="bgm-btn small" data-mod-hidden="${escapeHtml(module.id)}" data-page="${escapeHtml(page)}" title="${hideTitle}" aria-label="${name} ${isHidden ? '恢复显示' : '隐藏'}"${hideDisabled}>${isHidden ? '🚫' : '👁️'}</button>
             <button class="bgm-btn small" data-mod-move="up" data-page="${escapeHtml(page)}" data-module="${escapeHtml(module.id)}" title="上移" aria-label="${name} 上移"${isFirst ? ' disabled' : ''}>↑</button>
             <button class="bgm-btn small" data-mod-move="down" data-page="${escapeHtml(page)}" data-module="${escapeHtml(module.id)}" title="下移" aria-label="${name} 下移"${isLast ? ' disabled' : ''}>↓</button>
           </span>
@@ -93,7 +110,7 @@ function getCurrentPageKey(): string {
 function onEditorClick(event: Event): void {
   const { target } = event
   if (!(target instanceof Element)) return
-  const button = target.closest<HTMLElement>('[data-mod-move], [data-mod-reset]')
+  const button = target.closest<HTMLElement>('[data-mod-move], [data-mod-reset], [data-mod-hidden]')
   if (!button) return
   event.preventDefault()
 
@@ -104,6 +121,25 @@ function onEditorClick(event: Event): void {
     } else {
       showToast('恢复默认顺序失败', 'error')
     }
+    return
+  }
+
+  // 显示 / 隐藏：改配置后立刻套用到当前页（设置页隐藏自身模块时也即时生效）
+  const hideId = button.dataset.modHidden
+  if (hideId) {
+    const hidePage = button.dataset.page ?? ''
+    const wasHidden = getHiddenModules(hidePage).includes(hideId)
+    toggleModuleHidden(hidePage, hideId)
+    const isNowHidden = getHiddenModules(hidePage).includes(hideId)
+    if (isNowHidden === wasHidden) {
+      // 状态没变 = 切换没生效（模块不可隐藏，或页面未知）
+      showToast('切换显示状态失败', 'error')
+      return
+    }
+    renderModuleOrderEditor()
+    applyModuleState(hidePage)
+    showToast(isNowHidden ? '模块已隐藏，可在设置页恢复' : '模块已恢复显示', 'success')
+    bgmLog(LOG_LEVELS.INFO, `[moduleOrder] ${PAGE_LABELS[hidePage] ?? hidePage} 模块 ${hideId} ${isNowHidden ? '已隐藏' : '已恢复'}`)
     return
   }
 

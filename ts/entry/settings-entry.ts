@@ -11,6 +11,7 @@
 
 import { initTheme, startThemeSync } from '../tools/theme.js'
 import { startNavModeSync } from '../tools/nav-mode.js'
+import { startModuleStateSync } from '../tools/module-state.js'
 import { startNavOrderSync } from '../tools/nav-order.js'
 import { initHandlers } from '../ui/handlers/index.js'
 import { markSettingsPaneLoaded } from '../tools/util/index.js'
@@ -105,6 +106,8 @@ function applyAppearance(): void {
   startNavModeSync()
   // 跨页模块排序同步：其它页面（或本页编辑器）改动排序后即时重排本页侧栏与主区
   startNavOrderSync('settings')
+  // 模块折叠 / 隐藏：注入右上角折叠按钮 + 应用状态 + 轮询跨页同步
+  startModuleStateSync('settings')
   // 吸顶偏移测量 + 滚动高亮（共享模块，修复侧栏被顶栏遮挡 / 锚点跳转错位）
   initShellNav()
 }

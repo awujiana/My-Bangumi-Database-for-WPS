@@ -20,6 +20,7 @@
  *      （设置页按 ORDERABLE_PAGES 渲染编辑器，漏一个页面就少一组却没人发现）；
  *   4. 四个页面的启动入口都调用了 `startNavOrderSync('<page>')` 与 `startNavModeSync()`
  *      —— 少任何一个都会让该页静默地不参与跨页同步；
+ *      另需 `startModuleStateSync('<page>')` —— 漏了就没有折叠按钮、隐藏也不生效；
  *   5. 解析结果非空 —— 否则说明本脚本的解析失效，必须报错而不是「0 问题」空转。
  *
  * 退出码：0 一致；1 不一致（并打印修复指引）。
@@ -238,6 +239,12 @@ function main() {
           `设置页切「导航仅显示图标」时该页不跟随（检查：${existing.join(' / ')}）`,
       )
     }
+    if (!hasCallAcross(existing, `startModuleStateSync('${page}')`)) {
+      problems.push(
+        `页面 "${page}" 的入口未调用 startModuleStateSync('${page}') —— ` +
+          `该页模块没有右上角折叠按钮，设置页的「隐藏」也不生效（检查：${existing.join(' / ')}）`,
+      )
+    }
   }
 
   if (problems.length > 0) {
@@ -252,7 +259,7 @@ function main() {
   const totalModules = [...pageModules.values()].reduce((sum, ids) => sum + ids.length, 0)
   console.log(
     `✔ 模块排序一致：${pageModules.size} 个页面 / ${totalModules} 个模块 == HTML 的 <section id> 与侧栏锚点；` +
-      `各页入口均已接入 startNavOrderSync + startNavModeSync`,
+      `各页入口均已接入 startNavOrderSync + startNavModeSync + startModuleStateSync`,
   )
 }
 

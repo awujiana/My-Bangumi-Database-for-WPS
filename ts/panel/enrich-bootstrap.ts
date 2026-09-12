@@ -26,6 +26,7 @@ import '../sync/scraping.js'
 import '../sync/exceltobangumi.js'
 import { initTheme, startThemeSync } from '../tools/theme.js'
 import { initShellNav } from './shell-nav.js'
+import { startModuleStateSync } from '../tools/module-state.js'
 import { startNavOrderSync } from '../tools/nav-order.js'
 
 import { installModalA11y } from '../ui/components/modal-a11y.js'
@@ -43,6 +44,8 @@ if (typeof document !== 'undefined') {
   initShellNav()
   // 功能模块排序：启动时应用一次 + 轮询跨页同步（设置页改顺序后其它页实时重排）
   startNavOrderSync('enrich')
+  // 模块折叠 / 隐藏：注入右上角折叠按钮 + 应用状态 + 轮询跨页同步
+  startModuleStateSync('enrich')
 
   // 静态模态框无障碍增强（ESC 关闭 + 焦点陷阱，P2-10）
   installModalA11y()

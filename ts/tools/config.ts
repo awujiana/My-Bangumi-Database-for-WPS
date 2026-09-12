@@ -35,6 +35,8 @@ export const CONFIG_KEYS = {
   ENRICH_PLATFORM_COLOR: 'bgm_enrich_platform_color',
   ENRICH_AUTO_CLEAN: 'bgm_enrich_auto_clean',
   NAV_ORDER: 'bgm_nav_order',
+  MODULE_COLLAPSED: 'bgm_module_collapsed',
+  MODULE_HIDDEN: 'bgm_module_hidden',
   LOG_LEVEL: 'bgm_log_level',
 } as const
 

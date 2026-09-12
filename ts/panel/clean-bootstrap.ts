@@ -24,6 +24,7 @@ import '../sync/scraping.js'
 import '../sync/exceltobangumi.js'
 
 import { startNavModeSync } from '../tools/nav-mode.js'
+import { startModuleStateSync } from '../tools/module-state.js'
 import { startNavOrderSync } from '../tools/nav-order.js'
 import { initCleanPage } from './clean-page.js'
 
@@ -50,6 +51,8 @@ if (typeof document !== 'undefined') {
     startNavModeSync()
     // 功能模块排序：启动时应用一次 + 轮询跨页同步（设置页改顺序后其它页实时重排）
     startNavOrderSync('clean')
+    // 模块折叠 / 隐藏：注入右上折叠按钮 + 应用状态 + 轮询跨页同步
+    startModuleStateSync('clean')
   }
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', onCleanReady)
