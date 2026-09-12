@@ -7,8 +7,11 @@ import {
   moveModuleBy,
   moveModuleTo,
   applyNavOrder,
+  notifyNavOrderChanged,
   startNavOrderSync,
   PAGE_MODULES,
+  ORDERABLE_PAGES,
+  PAGE_LABELS,
 } from '../ts/tools/nav-order.js'
 import { CONFIG_KEYS } from '../ts/tools/config.js'
 
@@ -77,7 +80,7 @@ describe('nav-order 读取与自愈', () => {
   })
 
   it('未知页面返回空数组', () => {
-    expect(getNavOrder('settings')).toEqual([])
+    expect(getNavOrder('not-a-page')).toEqual([])
   })
 
   it('存储中的已知项按存储顺序返回', () => {
@@ -129,7 +132,7 @@ describe('nav-order 写入', () => {
   })
 
   it('setNavOrder 对未知页面返回 false', () => {
-    expect(setNavOrder('settings', ['a'])).toBe(false)
+    expect(setNavOrder('not-a-page', ['a'])).toBe(false)
   })
 
   it('resetNavOrder 删除该页存储项后回到默认顺序', () => {
@@ -238,6 +241,41 @@ describe('applyNavOrder 就地重排 DOM', () => {
   })
 })
 
+describe('nav-order 页面注册表', () => {
+  it('四个页面全部登记：panel / enrich / clean / settings', () => {
+    expect([...ORDERABLE_PAGES].sort((a, b) => a.localeCompare(b))).toEqual([
+      'clean',
+      'enrich',
+      'panel',
+      'settings',
+    ])
+  })
+
+  it('PAGE_MODULES 与 ORDERABLE_PAGES 键集合一致', () => {
+    expect(Object.keys(PAGE_MODULES).sort((a, b) => a.localeCompare(b))).toEqual(
+      [...ORDERABLE_PAGES].sort((a, b) => a.localeCompare(b)),
+    )
+  })
+
+  it('每个可排序页面都有中文名', () => {
+    for (const page of ORDERABLE_PAGES) {
+      expect(PAGE_LABELS[page]).toBeTruthy()
+    }
+  })
+
+  it('settings 页登记了 8 个模块，且每个都能读到默认顺序', () => {
+    expect(PAGE_MODULES.settings).toHaveLength(8)
+    expect(getNavOrder('settings')).toHaveLength(8)
+  })
+
+  it('每个页面的模块 id 无重复', () => {
+    for (const page of ORDERABLE_PAGES) {
+      const ids = (PAGE_MODULES[page] ?? []).map((module) => module.id)
+      expect(new Set(ids).size).toBe(ids.length)
+    }
+  })
+})
+
 describe('startNavOrderSync 跨页同步', () => {
   afterEach(() => {
     vi.useRealTimers()
@@ -283,5 +321,46 @@ describe('startNavOrderSync 跨页同步', () => {
       vi.advanceTimersByTime(2000)
     }).not.toThrow()
     spy.mockImplementation(original)
+  })
+
+  it('自适应：命中变化后切换为加密轮询（300ms 即再次检查）', () => {
+    vi.useFakeTimers()
+    document.body.innerHTML = `
+      <main class="main">
+        <section id="sec-file">f</section>
+        <section id="sec-target">t</section>
+      </main>`
+    startNavOrderSync('enrich')
+    // 空闲态：2s 才检查一次
+    writeRaw(JSON.stringify({ enrich: ['sec-target', 'sec-file'] }))
+    vi.advanceTimersByTime(1999)
+    expect(mainChildIds()).toEqual(['sec-file', 'sec-target'])
+    vi.advanceTimersByTime(1)
+    expect(mainChildIds()).toEqual(['sec-target', 'sec-file'])
+    // 命中变化后进入活跃窗口：再改一次只需 300ms 就被跟进
+    writeRaw(JSON.stringify({ enrich: ['sec-file', 'sec-target'] }))
+    vi.advanceTimersByTime(300)
+    expect(mainChildIds()).toEqual(['sec-file', 'sec-target'])
+  })
+})
+
+describe('notifyNavOrderChanged（本页即时重排）', () => {
+  it('调用后立即重排，无需等待轮询', () => {
+    document.body.innerHTML = `
+      <main class="main">
+        <section id="sec-file">f</section>
+        <section id="sec-target">t</section>
+      </main>`
+    setNavOrder('enrich', ['sec-target', 'sec-file'])
+    // 未启动任何同步，直接通知 —— 应同步生效
+    notifyNavOrderChanged('enrich')
+    expect(mainChildIds()).toEqual(['sec-target', 'sec-file'])
+  })
+
+  it('对未知页面是安全的空操作', () => {
+    document.body.innerHTML = '<main class="main"></main>'
+    expect(() => {
+      notifyNavOrderChanged('nope')
+    }).not.toThrow()
   })
 })

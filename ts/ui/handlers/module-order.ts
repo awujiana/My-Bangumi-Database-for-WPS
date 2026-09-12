@@ -20,6 +20,7 @@ import {
   getNavOrder,
   moveModuleBy,
   moveModuleTo,
+  notifyNavOrderChanged,
   resetNavOrder,
 } from '../../tools/nav-order.js'
 import { escapeHtml } from '../../tools/string-utilities.js'
@@ -74,11 +75,18 @@ export function renderModuleOrderEditor(): void {
   host.innerHTML = html
 }
 
-/** 排序变化后的统一收尾：重渲染 + 提示 */
+/** 排序变化后的统一收尾：本页即时重排 + 重渲染编辑器 + 提示 */
 function afterOrderChanged(page: string, message: string): void {
   renderModuleOrderEditor()
+  // 若被调整的正是当前页（如设置页自身），立刻重排，不等跨页轮询
+  if (page === getCurrentPageKey()) notifyNavOrderChanged(page)
   showToast(message, 'success')
   bgmLog(LOG_LEVELS.INFO, `[moduleOrder] ${PAGE_LABELS[page] ?? page} 排序已更新`)
+}
+
+/** 当前页面的排序键（取自 `body[data-page]`，与 nav-order 的推断口径一致） */
+function getCurrentPageKey(): string {
+  return document.body.dataset.page ?? ''
 }
 
 /** 容器点击委托：↑↓ 与恢复默认 */

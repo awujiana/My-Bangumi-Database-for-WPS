@@ -23,6 +23,7 @@ import '../sync/sync-record.js'
 import '../sync/scraping.js'
 import '../sync/exceltobangumi.js'
 
+import { startNavModeSync } from '../tools/nav-mode.js'
 import { startNavOrderSync } from '../tools/nav-order.js'
 import { initCleanPage } from './clean-page.js'
 
@@ -45,6 +46,8 @@ if (typeof document !== 'undefined') {
   // DOM 就绪后初始化清理页面
   const onCleanReady = (): void => {
     initCleanPage()
+    // 跨页导航模式同步：设置页勾选「导航仅显示图标」后本页跟随切换
+    startNavModeSync()
     // 功能模块排序：启动时应用一次 + 轮询跨页同步（设置页改顺序后其它页实时重排）
     startNavOrderSync('clean')
   }

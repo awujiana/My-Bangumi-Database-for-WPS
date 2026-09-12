@@ -1,7 +1,7 @@
 /**
  * @fileoverview 功能模块排序（跨页同步）
  * @module tools/navOrder
- * @description 让用户在设置页调整 panel / enrich / clean 三个页面的
+ * @description 让用户在设置页调整 panel / enrich / clean / settings 四个页面的
  *              「侧栏导航项 + 主区模块」显示顺序。
  *
  * 设计要点：
@@ -9,9 +9,16 @@
  *      `{ "panel": ["sec-command", ...] }`）；未设置的页面回落到注册表默认顺序。
  *   2. 自愈：读取时过滤掉存储中已不存在的模块 id，并把注册表里新增但存储中缺失的
  *      模块追加到末尾 —— 因此新增/删除模块无需写迁移逻辑，旧配置也不会失效。
- *   3. 跨页同步：WPS 每个任务窗格是独立 WebView，postMessage 无法跨上下文广播，
- *      因此各页面入口调用 `startNavOrderSync()` 定期轮询配置并就地重排
- *      （沿用 `tools/nav-mode.ts` 已验证的既有模式）。
+ *   3. 跨页同步分两条路径：
+ *      - **本页（编辑器所在页）**：改动后由 `notifyNavOrderChanged(page)` 同步重排，
+ *        零延迟 —— 用户点完 ↑↓ 立刻看到结果；
+ *      - **其它页**：各页入口调用 `startNavOrderSync()`，各自轮询 PluginStorage
+ *        （WPS 各任务窗格是独立 WebView，postMessage 无法跨窗格广播，没有推送通道）。
+ *        轮询间隔自适应：空闲 2s，命中变化后一段时间内加密到 300ms，让连续调整跟手。
+ *
+ * 新增页面时必须同步更新：`PAGE_MODULES` / `PAGE_LABELS` / `ORDERABLE_PAGES`，
+ * 并在该页入口加上 `startNavOrderSync('<page>')` 与 `startNavModeSync()`。
+ * 以上一致性由 `scripts/check-nav-order.mjs` 门禁强制校验。
  */
 
 import { LOG_LEVELS } from '../core/constants.js'
@@ -55,6 +62,16 @@ export const PAGE_MODULES: Readonly<Record<string, readonly NavModule[]>> = {
     { id: 'sec-run', label: '执行清理', icon: '🧹' },
     { id: 'sec-log', label: '结果日志', icon: '📜' },
   ],
+  settings: [
+    { id: 'sec-appearance', label: '外观与导航', icon: '🎨' },
+    { id: 'sec-modules', label: '模块排序', icon: '🧩' },
+    { id: 'sec-sync-pref', label: '同步偏好', icon: '🔄' },
+    { id: 'sec-enrich-preview', label: '富化预览', icon: '⚡️' },
+    { id: 'sec-paths', label: '默认路径', icon: '📁' },
+    { id: 'sec-log-pref', label: '日志偏好', icon: '📜' },
+    { id: 'sec-data', label: '配置管理', icon: '📦' },
+    { id: 'sec-about', label: '关于', icon: 'ℹ️' },
+  ],
 }
 
 /** 页面键 → 页面中文名（供设置页展示） */
@@ -62,13 +79,20 @@ export const PAGE_LABELS: Readonly<Record<string, string>> = {
   panel: '主面板',
   enrich: '富化面板',
   clean: '清理面板',
+  settings: '设置页',
 }
 
 /** 设置页中可配置排序的页面键（顺序即展示顺序） */
-export const ORDERABLE_PAGES: readonly string[] = ['panel', 'enrich', 'clean']
+export const ORDERABLE_PAGES: readonly string[] = ['panel', 'enrich', 'clean', 'settings']
 
-/** 排序持久化的轮询间隔（ms），与 nav-mode 保持一致 */
-const SYNC_INTERVAL_MS = 2000
+/** 排序持久化的轮询间隔（ms）：空闲态（无变化）时的读取频率 */
+const SYNC_IDLE_INTERVAL_MS = 2000
+
+/** 检测到变化后使用的加密轮询间隔（ms），让连续调整跟手 */
+const SYNC_ACTIVE_INTERVAL_MS = 300
+
+/** 命中一次变化后，保持加密轮询的时长（ms）；超过后回落到空闲间隔 */
+const SYNC_ACTIVE_WINDOW_MS = 5000
 
 /** 读取页面默认顺序 */
 function getDefaultOrder(page: string): string[] {
@@ -266,30 +290,69 @@ export function applyNavOrder(page?: string): void {
 }
 
 /**
+ * 本页排序已变更：立即就地重排，无需等待轮询。
+ *
+ * 供设置页的模块排序编辑器在 `setNavOrder` / `resetNavOrder` / `moveModule*`
+ * 成功后调用 —— 用户期望「点完 ↑↓ 立刻看到结果」，而跨页轮询最快也要一个间隔。
+ * 本页与编辑器处于同一 WebView，可以直接同步调用。
+ *
+ * @param page - 发生变化的页面键
+ */
+export function notifyNavOrderChanged(page: string): void {
+  if (typeof document === 'undefined') return
+  applyNavOrder(page)
+}
+
+/**
  * 跨页排序同步：轮询 PluginStorage 中的排序配置，变化时就地重排当前页面。
- * 各页面入口（panel / enrich / clean bootstrap）在启动时调用一次。
+ * 各页面入口（panel / enrich / clean / settings）在启动时调用一次。
+ *
+ * **为什么是轮询而不是事件推送**：WPS 每个任务窗格是独立 WebView，
+ * `window.postMessage` 只在同源同进程的 iframe 树内有效，跨任务窗格不会送达，
+ * 因此没有可用的跨窗格广播通道 —— 唯一共享媒介是 PluginStorage（只能读，不通知）。
+ * 各页只能各自轮询。
+ *
+ * **自适应间隔**：改动往往成串发生（用户连点 ↑↓ 或连续拖拽），固定 2s 间隔会让
+ * 中间几次改动被合并、看起来"没反应"。这里改成「检测到变化后一段时间内加密轮询」：
+ * 默认 {@link SYNC_IDLE_INTERVAL_MS}，每次命中变化后切换到
+ * {@link SYNC_ACTIVE_INTERVAL_MS} 并保持 {@link SYNC_ACTIVE_WINDOW_MS}，
+ * 之后回落到空闲间隔。既让连续调整跟手，又不让空闲页面无谓地频繁读存储。
+ *
+ * 编辑页自身的响应由 {@link notifyNavOrderChanged} 负责，不走轮询（零延迟）。
+ *
  * @param page - 当前页面键
  */
 export function startNavOrderSync(page: string): void {
-  if (typeof window === 'undefined' || typeof setInterval !== 'function') return
+  if (typeof window === 'undefined' || typeof setTimeout !== 'function') return
   // 启动时先应用一次，避免首屏闪回默认顺序
   applyNavOrder(page)
   let lastRaw = getConfig(CONFIG_KEYS.NAV_ORDER, '', true)
-  const timer = setInterval(() => {
+  let timer: ReturnType<typeof setTimeout> | undefined
+  /** 最近一次检测到变化的时间戳；用于决定下一轮用加密还是空闲间隔 */
+  let lastChangeAt = 0
+
+  /** 单次轮询：读配置，变化则重排，然后按当前活跃度安排下一次 */
+  const tick = (): void => {
     try {
       const raw = getConfig(CONFIG_KEYS.NAV_ORDER, '', true)
       if (raw !== lastRaw) {
         lastRaw = raw
+        lastChangeAt = Date.now()
         applyNavOrder(page)
       }
     } catch {
       // 静默处理偶发读取异常，轮询继续
     }
-  }, SYNC_INTERVAL_MS)
+    const isActive = Date.now() - lastChangeAt < SYNC_ACTIVE_WINDOW_MS
+    const delay = isActive ? SYNC_ACTIVE_INTERVAL_MS : SYNC_IDLE_INTERVAL_MS
+    timer = setTimeout(tick, delay)
+  }
+
+  tick()
   window.addEventListener(
     'beforeunload',
     () => {
-      clearInterval(timer)
+      if (timer !== undefined) clearTimeout(timer)
     },
     { once: true },
   )
