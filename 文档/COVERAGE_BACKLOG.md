@@ -73,7 +73,7 @@ node scripts/calc-coverage-backlog.mjs
 **第 1 批（低风险、立刻能做，合计约 +3%）**
 
 1. `ts/tools/util/index.ts`（+2.47%，纯逻辑）—— 但它是聚合桶，先按纯函数切片拆出叶子模块再测；
-2. `ts/tools/auto-fill-url.ts`（+0.43%）；
+2. ~~`ts/tools/auto-fill-url.ts`（+0.43%）~~ ✅ **已完成**（2026-09-13，提交 `ed66b8fd`）：新增 18 条测试，statements / functions / lines 100%、branches 96.66%（余 1 条为不可达防御分支，见 REF-gates-scripts.md）；单文件自查命令见该文件；
 3. `ts/ui/handlers/panel-events.ts`（+0.63%）、`settings-bindings.ts`（+0.57%）—— 已有部分覆盖，补边界分支即可。
 
 **第 2 批（先拆后测，单项收益最大）**
