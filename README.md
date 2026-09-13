@@ -58,7 +58,7 @@ BGM/
 ├── config/
 │   └── field_mappings.json     # Excel 列 ↔ 数据字段映射
 ├── data/
-│   └── bangumi.jsonlines       # 数据源本地副本（用于本地文件同步 / 开发测试）
+│   └── bangumi.jsonlines.gz    # 数据源本地副本（gzip，用于本地文件同步 / 开发测试）
 ├── differences/                # 数据差异摘要
 ├── 文档/                        # 项目文档（架构知识、用户操作手册、历史审计/评审、UI/交互、数据下发、数据源仓库说明、覆盖率报告，见「文档索引」）
 ├── tests/                      # Vitest 单元测试
@@ -160,7 +160,7 @@ npm run build:ts
    | owner  | `awujiana`                    |
    | repo   | `Bangumi-Archive-Anime-Excel` |
    | branch | `main`                        |
-   | path   | `data/bangumi.jsonlines`      |
+   | path   | `data/bangumi.jsonlines.gz`   |
 
 2. 选择同步策略（`add-update` 默认，保守）。
 3. 点击 **立即同步**（或功能区 **数据同步**）。插件下载 JSONL → 哈希比对缓存 → 按 SID 增量写入 Excel。
@@ -244,7 +244,7 @@ npm run test:coverage    # 生成覆盖率报告
 
 ## 🗂️ 数据来源
 
-插件默认从公开仓库 [`awujiana/Bangumi-Archive-Anime-Excel`](https://github.com/awujiana/Bangumi-Archive-Anime-Excel) 读取 `data/bangumi.jsonlines`（Bangumi 官方 Archive 每周 dump 处理后的动画条目数据）。本仓库 `data/` 下保留一份本地副本，用于「本地文件同步」与开发测试。
+插件默认从公开仓库 [`awujiana/Bangumi-Archive-Anime-Excel`](https://github.com/awujiana/Bangumi-Archive-Anime-Excel) 读取 `data/bangumi.jsonlines.gz`（Bangumi 官方 Archive 每周 dump 处理后的动画条目数据）。本仓库 `data/` 下保留一份本地副本，用于「本地文件同步」与开发测试。
 
 ---
 
