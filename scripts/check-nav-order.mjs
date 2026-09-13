@@ -21,7 +21,11 @@
  *   4. 四个页面的启动入口都调用了 `startNavOrderSync('<page>')` 与 `startNavModeSync()`
  *      —— 少任何一个都会让该页静默地不参与跨页同步；
  *      另需 `startModuleStateSync('<page>')` —— 漏了就没有折叠按钮、隐藏也不生效；
- *   5. 解析结果非空 —— 否则说明本脚本的解析失效，必须报错而不是「0 问题」空转。
+ *   5. **折叠按钮（原生写在 HTML 里）与 `PAGE_MODULES` 一一对应** —— 这是又一份平行清单，
+ *      漏写只表现为「该模块没有折叠按钮」，不报错也不影响其它功能，最容易漏；
+ *      同时校验按钮不重复、不指向未登记模块，以及「无 h3 白名单」与实际集合精确相等
+ *      （否则白名单会变成漏写按钮的逃生口）；
+ *   6. 解析结果非空 —— 否则说明本脚本的解析失效，必须报错而不是「0 问题」空转。
  *
  * 退出码：0 一致；1 不一致（并打印修复指引）。
  */
@@ -141,6 +145,100 @@ function readNavAnchors(html) {
 }
 
 /**
+ * 无 `<h3>` 因而不具备折叠按钮的模块。
+ *
+ * 必须与实际「缺 h3 的模块集合」**精确相等**（多一个少一个都报错）：
+ * 否则这个白名单会退化成「漏写按钮」的逃生口 —— 往这里加一行就没人拦了。
+ * 目前只有 panel 的通栏操作区（它没有标题，也没有可收起的正文）。
+ */
+const NO_TOGGLE_MODULES = new Set(['sec-command'])
+
+/** 两个数组是否逐项相等（调用方需先排序） */
+const sameList = (a, b) => a.length === b.length && a.every((value, index) => value === b[index])
+
+/**
+ * 按模块切分 `<main>`：得到「模块 id → 从该模块起始到下一个模块起始之间的 HTML」。
+ *
+ * 切分点取「所有更大的模块起始位置里最小的那个」，而不是数组里的下一个 ——
+ * 注册表顺序与 HTML 顺序不一致时（第 1 组检查会报出来）前者仍然切得对。
+ *
+ * @param {string} html - 页面 HTML
+ * @param {string[]} ids - 该页注册表里的模块 id
+ * @returns {Map<string, string>}
+ */
+function readModuleSegments(html, ids) {
+  const mainBlock = /<main\b[^>]*>([\s\S]*?)<\/main>/u.exec(html)
+  if (mainBlock === null || mainBlock[1] === undefined) {
+    throw new Error('页面 HTML 未解析到 <main>（脚本解析可能已失效）')
+  }
+  const main = mainBlock[1]
+  const positions = ids
+    .map((id) => ({ id, index: main.indexOf(`id="${id}"`) }))
+    .filter((item) => item.index >= 0)
+  if (positions.length === 0) {
+    throw new Error('<main> 内未定位到任何模块（脚本解析可能已失效）')
+  }
+  const segments = new Map()
+  for (const item of positions) {
+    const boundary = positions
+      .map((other) => other.index)
+      .filter((index) => index > item.index)
+      .sort((a, b) => a - b)[0]
+    segments.set(item.id, main.slice(item.index, boundary ?? main.length))
+  }
+  return segments
+}
+
+/**
+ * 校验「折叠按钮」这份平行清单：HTML 里每个模块 `<h3>` 内的原生按钮必须与注册表对应。
+ * @returns {string[]} 问题列表（空表示一致）
+ */
+function checkCollapseButtons(htmlPath, html, ids) {
+  const problems = []
+  const segments = readModuleSegments(html, ids)
+  const missingH3 = []
+
+  for (const id of ids) {
+    const segment = segments.get(id)
+    // 模块本身缺失已由第 1 组检查报出，这里不重复报
+    if (segment === undefined) continue
+    const heading = /<h3[^>]*>[\s\S]*?<\/h3>/u.exec(segment)
+    if (heading === null) {
+      missingH3.push(id)
+      continue
+    }
+    if (!heading[0].includes(`data-mod-collapse="${id}"`)) {
+      problems.push(
+        `${htmlPath}: 模块 "${id}" 的 <h3> 里没有 data-mod-collapse="${id}" 的折叠按钮（该模块点不出折叠）`,
+      )
+    }
+  }
+
+  const expectedNoH3 = [...NO_TOGGLE_MODULES].filter((id) => ids.includes(id)).sort((a, b) => a.localeCompare(b))
+  const actualNoH3 = [...missingH3].sort((a, b) => a.localeCompare(b))
+  if (!sameList(expectedNoH3, actualNoH3)) {
+    problems.push(
+      `${htmlPath}: 无 <h3> 的模块集合与白名单不一致：实际=[${actualNoH3.join(', ')}] ` +
+        `白名单=[${expectedNoH3.join(', ')}]（缺失说明按钮漏写；多了说明白名单该收窄）`,
+    )
+  }
+
+  const seen = new Set()
+  for (const matched of html.matchAll(/data-mod-collapse="([^"]+)"/gu)) {
+    const id = matched[1]
+    if (!ids.includes(id)) {
+      problems.push(`${htmlPath}: 折叠按钮指向未登记模块 "${id}"（按钮不会生效）`)
+    }
+    if (seen.has(id)) {
+      problems.push(`${htmlPath}: 折叠按钮重复出现 "${id}"（一次点击会被处理两次）`)
+    }
+    seen.add(id)
+  }
+
+  return problems
+}
+
+/**
  * 各页面的启动入口文件与其中应出现的跨页同步调用。
  * 页面键 → 需要检查的入口文件（相对仓库根）。
  * 一个页面可能有多个入口（panel 的排序在 bootstrap、导航模式在 entry），全部列出。
@@ -193,21 +291,23 @@ function main() {
         problems.push(`${page}: ${htmlPath} 的 <section id="${id}"> 未登记进 PAGE_MODULES（无法排序，永远排最后）`)
       }
     }
+
+    // ===== 1b) 折叠按钮（原生写在 HTML 里）与注册表一一对应 =====
+    problems.push(...checkCollapseButtons(htmlPath, html, ids))
   }
 
   // ===== 2) 三份清单的页面键集合必须一致 =====
   const modulePages = [...pageModules.keys()].sort((a, b) => a.localeCompare(b))
   const labelPages = [...pageLabels].sort((a, b) => a.localeCompare(b))
   const orderPages = [...orderablePages].sort((a, b) => a.localeCompare(b))
-  const sameSet = (a, b) => a.length === b.length && a.every((v, i) => v === b[i])
 
-  if (!sameSet(modulePages, labelPages)) {
+  if (!sameList(modulePages, labelPages)) {
     problems.push(
       `PAGE_MODULES 与 PAGE_LABELS 的页面键不一致：` +
         `PAGE_MODULES=[${modulePages.join(', ')}] PAGE_LABELS=[${labelPages.join(', ')}]`,
     )
   }
-  if (!sameSet(modulePages, orderPages)) {
+  if (!sameList(modulePages, orderPages)) {
     problems.push(
       `PAGE_MODULES 与 ORDERABLE_PAGES 的页面键不一致：` +
         `PAGE_MODULES=[${modulePages.join(', ')}] ORDERABLE_PAGES=[${orderPages.join(', ')}]`,
@@ -250,15 +350,18 @@ function main() {
   if (problems.length > 0) {
     console.log(`✖ 模块排序注册表与页面结构不一致（${problems.length} 项）：\n`)
     for (const problem of problems) console.log(`  · ${problem}`)
-    console.log('\n修法：PAGE_MODULES 是排序的唯一真相，页面 HTML 的 <section id> 与侧栏锚点')
-    console.log('      必须与它严格一致；新增页面时同步更新 PAGE_LABELS / ORDERABLE_PAGES /')
-    console.log('      PAGE_ENTRIES，并在该页入口加上 startNavOrderSync + startNavModeSync。')
+    console.log('\n修法：PAGE_MODULES 是排序的唯一真相，页面 HTML 的 <section id>、侧栏锚点与')
+    console.log('      模块 <h3> 里的折叠按钮都必须与它严格一致；确实不该有按钮的模块')
+    console.log(`      （如跨栏操作区）须在脚本的 NO_TOGGLE_MODULES 里显式登记。`)
+    console.log('      新增页面时同步更新 PAGE_LABELS / ORDERABLE_PAGES / PAGE_ENTRIES，')
+    console.log('      并在该页入口加上 startNavOrderSync + startNavModeSync + startModuleStateSync。')
     process.exit(1)
   }
 
   const totalModules = [...pageModules.values()].reduce((sum, ids) => sum + ids.length, 0)
   console.log(
-    `✔ 模块排序一致：${pageModules.size} 个页面 / ${totalModules} 个模块 == HTML 的 <section id> 与侧栏锚点；` +
+    `✔ 模块排序一致：${pageModules.size} 个页面 / ${totalModules} 个模块 == HTML 的 <section id>、` +
+      `侧栏锚点与折叠按钮（按钮数与 NO_TOGGLE_MODULES 白名单一致）；` +
       `各页入口均已接入 startNavOrderSync + startNavModeSync + startModuleStateSync`,
   )
 }

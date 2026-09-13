@@ -9,10 +9,22 @@ import {
   toggleModuleCollapsed,
   toggleModuleHidden,
   applyModuleState,
-  installCollapseToggles,
+  bindCollapseToggles,
   startModuleStateSync,
 } from '../ts/tools/module-state.js'
 import { CONFIG_KEYS } from '../ts/tools/config.js'
+import { PAGE_MODULES } from '../ts/tools/nav-order.js'
+import { registerNotifyApi } from '../ts/core/ui-bridge.js'
+
+/**
+ * `bgmLog` 与 `showSettingsPanel` 都来自 `tools/util` 这个巨型 barrel：
+ * 前者只是日志，后者要用断言验「点占位块里的按钮真的去开设置页」，故整体替换为 spy。
+ */
+const { utilMock } = vi.hoisted(() => ({ utilMock: { bgmLog: vi.fn(), showSettingsPanel: vi.fn() } }))
+vi.mock('../ts/tools/util/index.js', () => utilMock)
+
+/** 全隐藏提示的 toast（其余方法只需满足接口形状） */
+const toastSpy = vi.fn()
 
 /**
  * mock 的配置存储。
@@ -50,20 +62,54 @@ vi.mock('../ts/tools/config.js', () => ({
   setConfig: mockSetConfig,
 }))
 
-/** 建一个最小 panel 结构：侧栏锚点 + 三个模块（其中一个没有 h3） */
+/** 生成与生产 HTML 同形的原生折叠按钮（生产里手写在模块 `<h3>` 内，见 ui/*.html） */
+function nativeButton(id: string, label: string): string {
+  return (
+    `<button type="button" class="mod-collapse-btn" data-mod-collapse="${id}" ` +
+    `aria-expanded="true" aria-label="折叠 / 展开「${label}」">▾</button>`
+  )
+}
+
+/** 与 HTML 一致：唯一没有 h3 的模块（panel 的跨栏操作区，门禁白名单里显式登记） */
+const NO_TOGGLE_ID = 'sec-command'
+
+/** 某页注册表的全部模块 id（用于「全页隐藏」，避免写死清单随注册表变动而失真） */
+function allModuleIds(page: string): string[] {
+  return (PAGE_MODULES[page] ?? []).map((module) => module.id)
+}
+
+/**
+ * 建一个与 `PAGE_MODULES` **同构**的页面 DOM。
+ * 模块集合取自注册表而不是写死 —— 否则注册表加一个模块，测试里的「全隐藏」就悄悄失效了
+ * （曾经踩过：只隐藏 DOM 里那 3 个，注册表里另外 5 个仍算「可见」）。
+ */
+function buildPageDom(page: string): void {
+  const modules = PAGE_MODULES[page] ?? []
+  const anchors = modules.map((module) => `<a href="#${module.id}">${module.label}</a>`).join('')
+  const sections = modules
+    .map((module) =>
+      module.id === NO_TOGGLE_ID
+        ? `<section class="command-center" id="${module.id}">cmd</section>`
+        : `<section class="section" id="${module.id}"><h3>${module.label}${nativeButton(module.id, module.label)}</h3><div class="body">b</div></section>`,
+    )
+    .join('')
+  document.body.innerHTML = `<aside><nav class="nav">${anchors}</nav></aside><main class="main main-grid">${sections}</main>`
+  document.body.dataset.page = page
+}
+
+/** 最小 panel 结构 */
 function buildPanelDom(): void {
-  document.body.innerHTML = `
-    <aside><nav class="nav">
-      <a href="#sec-command">1</a>
-      <a href="#sec-account">2</a>
-      <a href="#sec-scope">3</a>
-    </nav></aside>
-    <main class="main main-grid">
-      <section class="command-center" id="sec-command">cmd</section>
-      <section class="section" id="sec-account"><h3>账户</h3><div class="body">b</div></section>
-      <section class="section" id="sec-scope"><h3>范围</h3><div class="body">b</div></section>
-    </main>`
-  document.body.dataset.page = 'panel'
+  buildPageDom('panel')
+}
+
+/** 最小 settings 结构（含不可隐藏的排序编辑器） */
+function buildSettingsDom(): void {
+  buildPageDom('settings')
+}
+
+/** 全隐藏时插入的常驻占位块（未插入时返回 null） */
+function emptyHint(): HTMLElement | null {
+  return document.getElementById('module-empty-hint')
 }
 
 function moduleElement(id: string): HTMLElement {
@@ -93,6 +139,18 @@ beforeEach(() => {
   throwState.next = false
   document.body.replaceChildren()
   document.body.dataset.page = 'panel'
+  registerNotifyApi({
+    alert: vi.fn(),
+    confirm: vi.fn(),
+    error: vi.fn(),
+    success: vi.fn(),
+    toast: toastSpy,
+    input: vi.fn(),
+  })
+  // 复位「本页已提示过全隐藏」的内部标记：此时无模块被隐藏，套用一次即清除该页记录
+  applyModuleState('panel')
+  toastSpy.mockClear()
+  utilMock.showSettingsPanel.mockClear()
 })
 
 afterEach(() => {
@@ -279,7 +337,7 @@ describe('applyModuleState', () => {
 
   it('同步折叠按钮的 aria-expanded 与图标', () => {
     buildPanelDom()
-    installCollapseToggles('panel')
+    bindCollapseToggles()
     applyModuleState('panel')
     expect(collapseButton('sec-account').getAttribute('aria-expanded')).toBe('true')
     setCollapsedModules('panel', ['sec-account'])
@@ -326,42 +384,41 @@ describe('applyModuleState', () => {
   })
 })
 
-describe('installCollapseToggles', () => {
-  it('给每个带 h3 的模块注入折叠按钮，右上角靠 CSS float', () => {
+describe('bindCollapseToggles：按钮由 HTML 原生提供', () => {
+  it('按钮来自 HTML（本模块不再创建按钮），无 h3 的模块没有按钮', () => {
     buildPanelDom()
-    installCollapseToggles('panel')
-    expect(collapseButton('sec-account')).toBeTruthy()
-    expect(collapseButton('sec-scope')).toBeTruthy()
-    // sec-command 没有 h3，不该被注入（它也没有可收起的正文）
+    expect(document.querySelectorAll('.mod-collapse-btn')).toHaveLength(
+      allModuleIds('panel').length - 1,
+    )
+    bindCollapseToggles()
+    expect(document.querySelectorAll('.mod-collapse-btn')).toHaveLength(
+      allModuleIds('panel').length - 1,
+    )
+    // sec-command 没有 h3，生产 HTML 里也没给它按钮（门禁白名单里显式登记）
     expect(document.querySelector('.mod-collapse-btn[data-mod-collapse="sec-command"]')).toBeNull()
   })
 
-  it('按钮带无障碍属性：aria-controls / aria-expanded / aria-label', () => {
+  it('aria-controls 由套用状态时补齐（HTML 里不重复写同一个 id）', () => {
     buildPanelDom()
-    installCollapseToggles('panel')
-    const button = collapseButton('sec-account')
-    expect(button.getAttribute('aria-controls')).toBe('sec-account')
-    expect(button.getAttribute('aria-expanded')).toBe('true')
-    expect(button.getAttribute('aria-label')).toContain('账户与凭证')
+    expect(collapseButton('sec-account').getAttribute('aria-controls')).toBeNull()
+    applyModuleState('panel')
+    expect(collapseButton('sec-account').getAttribute('aria-controls')).toBe('sec-account')
+    expect(collapseButton('sec-account').getAttribute('aria-label')).toContain('账户与凭证')
   })
 
-  it('幂等：重复调用不会叠加按钮', () => {
+  it('幂等：重复绑定不会让一次点击切换两次（切换两次等于没反应）', () => {
     buildPanelDom()
-    installCollapseToggles('panel')
-    installCollapseToggles('panel')
-    expect(document.querySelectorAll('.mod-collapse-btn')).toHaveLength(2)
-  })
-
-  it('未知页面不注入任何按钮', () => {
-    buildPanelDom()
-    installCollapseToggles('not-a-page')
-    expect(document.querySelectorAll('.mod-collapse-btn')).toHaveLength(0)
+    bindCollapseToggles()
+    bindCollapseToggles()
+    bindCollapseToggles()
+    collapseButton('sec-account').click()
+    expect(getCollapsedModules('panel')).toEqual(['sec-account'])
   })
 
   it('无 document 时静默返回', () => {
     vi.stubGlobal('document', undefined)
     expect(() => {
-      installCollapseToggles('panel')
+      bindCollapseToggles()
     }).not.toThrow()
   })
 })
@@ -369,7 +426,7 @@ describe('installCollapseToggles', () => {
 describe('点击折叠按钮', () => {
   it('点击后写入配置并立即套用（本页零延迟）', () => {
     buildPanelDom()
-    installCollapseToggles('panel')
+    bindCollapseToggles()
     collapseButton('sec-account').click()
     expect(getCollapsedModules('panel')).toEqual(['sec-account'])
     expect(moduleElement('sec-account').classList.contains('is-module-collapsed')).toBe(true)
@@ -378,7 +435,7 @@ describe('点击折叠按钮', () => {
 
   it('再点一次展开', () => {
     buildPanelDom()
-    installCollapseToggles('panel')
+    bindCollapseToggles()
     collapseButton('sec-account').click()
     collapseButton('sec-account').click()
     expect(getCollapsedModules('panel')).toEqual([])
@@ -387,7 +444,7 @@ describe('点击折叠按钮', () => {
 
   it('点到非按钮元素不触发', () => {
     buildPanelDom()
-    installCollapseToggles('panel')
+    bindCollapseToggles()
     document.getElementById('sec-account')?.querySelector('.body')?.dispatchEvent(
       new MouseEvent('click', { bubbles: true }),
     )
@@ -396,7 +453,7 @@ describe('点击折叠按钮', () => {
 
   it('按钮缺 data-mod-collapse 时不触发', () => {
     buildPanelDom()
-    installCollapseToggles('panel')
+    bindCollapseToggles()
     const orphan = document.createElement('button')
     orphan.className = 'mod-collapse-btn'
     document.body.appendChild(orphan)
@@ -406,7 +463,7 @@ describe('点击折叠按钮', () => {
 
   it('页面键为空时不触发（不知道该改哪页的配置）', () => {
     buildPanelDom()
-    installCollapseToggles('panel')
+    bindCollapseToggles()
     delete document.body.dataset.page
     collapseButton('sec-account').click()
     expect(getCollapsedModules('panel')).toEqual([])
@@ -414,7 +471,7 @@ describe('点击折叠按钮', () => {
 
   it('所在页面未知时不写入（写入失败就不改 DOM，避免出现「看着折叠了但没存住」）', () => {
     buildPanelDom()
-    installCollapseToggles('panel')
+    bindCollapseToggles()
     document.body.dataset.page = 'not-a-page'
     collapseButton('sec-account').click()
     expect(getCollapsedModules('not-a-page')).toEqual([])
@@ -423,19 +480,21 @@ describe('点击折叠按钮', () => {
 
   it('事件目标不是 Element 时忽略', () => {
     buildPanelDom()
-    installCollapseToggles('panel')
+    bindCollapseToggles()
     document.dispatchEvent(new MouseEvent('click'))
     expect(getCollapsedModules('panel')).toEqual([])
   })
 })
 
 describe('startModuleStateSync', () => {
-  it('启动即注入按钮并套用一次状态（避免首屏闪回展开）', () => {
+  it('启动即套用一次状态（避免首屏闪回展开）', () => {
     buildPanelDom()
     setCollapsedModules('panel', ['sec-scope'])
     vi.useFakeTimers()
     const stop = startModuleStateSync('panel')
-    expect(document.querySelectorAll('.mod-collapse-btn')).toHaveLength(2)
+    expect(document.querySelectorAll('.mod-collapse-btn')).toHaveLength(
+      allModuleIds('panel').length - 1,
+    )
     expect(moduleElement('sec-scope').classList.contains('is-module-collapsed')).toBe(true)
     stop()
   })
@@ -489,13 +548,81 @@ describe('startModuleStateSync', () => {
     expect(moduleElement('sec-account').hidden).toBe(false)
   })
 
-  it('无 window 时返回空清理函数且不做任何事', () => {
+  it('无 window 时返回空清理函数且不套用状态', () => {
     buildPanelDom()
+    setCollapsedModules('panel', ['sec-scope'])
     vi.stubGlobal('window', undefined)
     const stop = startModuleStateSync('panel')
-    expect(document.querySelectorAll('.mod-collapse-btn')).toHaveLength(0)
+    expect(moduleElement('sec-scope').classList.contains('is-module-collapsed')).toBe(false)
     expect(() => {
       stop()
     }).not.toThrow()
+  })
+})
+
+/**
+ * 全隐藏兜底：不禁止用户把某页藏空（可能就是想清屏），
+ * 但必须留一条明确的回路 —— 常驻占位块 + 一次 toast + 设置页入口。
+ */
+describe('全隐藏兜底', () => {
+  it('本页模块全被隐藏时插入常驻占位块并提示一次', () => {
+    buildPanelDom()
+    setHiddenModules('panel', allModuleIds('panel'))
+    applyModuleState('panel')
+    expect(emptyHint()).not.toBeNull()
+    expect(toastSpy).toHaveBeenCalledTimes(1)
+  })
+
+  it('重复套用（轮询每次命中都会跑）不会重复提示', () => {
+    buildPanelDom()
+    setHiddenModules('panel', allModuleIds('panel'))
+    applyModuleState('panel')
+    applyModuleState('panel')
+    applyModuleState('panel')
+    expect(document.querySelectorAll('[id="module-empty-hint"]')).toHaveLength(1)
+    expect(toastSpy).toHaveBeenCalledTimes(1)
+  })
+
+  it('恢复任一模块可见后占位块移除，再次全隐藏会重新提示', () => {
+    buildPanelDom()
+    setHiddenModules('panel', allModuleIds('panel'))
+    applyModuleState('panel')
+    expect(emptyHint()).not.toBeNull()
+
+    setHiddenModules('panel', ['sec-account'])
+    applyModuleState('panel')
+    expect(emptyHint()).toBeNull()
+
+    setHiddenModules('panel', allModuleIds('panel'))
+    applyModuleState('panel')
+    expect(toastSpy).toHaveBeenCalledTimes(2)
+  })
+
+  it('占位块里的「打开设置」按钮打开设置页（唯一的恢复入口）', () => {
+    buildPanelDom()
+    setHiddenModules('panel', allModuleIds('panel'))
+    applyModuleState('panel')
+    const button = emptyHint()?.querySelector<HTMLElement>('.module-empty-hint-btn')
+    expect(button).not.toBeNull()
+    button?.click()
+    expect(utilMock.showSettingsPanel).toHaveBeenCalledTimes(1)
+  })
+
+  it('设置页不会触发兜底：排序编辑器永远可见（它不可隐藏）', () => {
+    buildSettingsDom()
+    setHiddenModules('settings', allModuleIds('settings'))
+    applyModuleState('settings')
+    expect(emptyHint()).toBeNull()
+    expect(toastSpy).not.toHaveBeenCalled()
+  })
+
+  it('页面没有 main 容器时只提示、不抛错', () => {
+    document.body.innerHTML = '<div>no main</div>'
+    setHiddenModules('panel', allModuleIds('panel'))
+    expect(() => {
+      applyModuleState('panel')
+    }).not.toThrow()
+    expect(emptyHint()).toBeNull()
+    expect(toastSpy).toHaveBeenCalledTimes(1)
   })
 })

@@ -15,17 +15,27 @@
  *   5. **跨页同步只能轮询**（WPS 各任务窗格是独立 WebView，没有推送通道），
  *      策略与 `nav-order` 一致：空闲 2s，命中变化后加密到 300ms 并保持 5s。
  *
- * 折叠按钮由 `installCollapseToggles()` **运行时注入**到每个模块的 `<h3>` 里，
- * 而不是手写进 4 份 HTML —— 否则 29 个模块要改 29 处，新增模块还会漏。
+ * 6. **折叠按钮原生写在四页 HTML 的模块 `<h3>` 里**（2026-09-13 由「运行时注入」改回）：
+ *      按钮与 `PAGE_MODULES` 的一一对应由 `scripts/check-nav-order.mjs` 门禁强制；
+ *      本模块只负责 `bindCollapseToggles()` 挂点击委托 + 套用状态。
+ *      改回原生的理由：HTML 自描述、不依赖 JS 执行时机、可被静态检查；
+ *      代价是 27 处按钮成了 `PAGE_MODULES` 之外的第二份清单（漏一个只表现为「少一个按钮」，
+ *      不报错），所以必须由门禁兜住 —— 与本项目其它平行清单同一个套路。
+ *   7. **全隐藏兜底**：某页模块被全部隐藏时，渲染常驻占位块（含「打开设置」按钮）并弹一次
+ *      toast。**不禁止全隐藏**（用户可能就是想清屏），但要保证永远有路可回 ——
+ *      占位块必须常驻，因为 toast 3 秒就消失了，而用户回来看到的是一片空白。
  *
- * 新增页面时必须同步更新 `nav-order.ts` 的 `PAGE_MODULES` 并在入口调用
- * `startModuleStateSync('<page>')`，由 `scripts/check-nav-order.mjs` 门禁强制校验。
+ * 新增页面时必须同步更新 `nav-order.ts` 的 `PAGE_MODULES`、页面 HTML 里的折叠按钮，并在该页
+ * 入口调用 `startModuleStateSync('<page>')` —— 以上均由 `scripts/check-nav-order.mjs` 强制校验。
  */
 
+import { getNotifyApi } from '../core/ui-bridge.js'
 import { LOG_LEVELS } from '../core/constants.js'
 import { CONFIG_KEYS, getConfig, setConfig } from './config.js'
 import { PAGE_MODULES } from './nav-order.js'
-import { bgmLog } from './util/index.js'
+import { bgmLog, showSettingsPanel } from './util/index.js'
+
+import type { NavModule } from './nav-order.js'
 
 /** 空闲态轮询间隔（ms） */
 const SYNC_IDLE_INTERVAL_MS = 2000
@@ -45,6 +55,18 @@ const COLLAPSED_CLASS = 'is-module-collapsed'
 /** 展开 / 收起两种状态下的按钮图标 */
 const ICON_EXPANDED = '▾'
 const ICON_COLLAPSED = '▸'
+
+/** 本页模块被全部隐藏时插入的常驻占位块 id */
+const EMPTY_HINT_ID = 'module-empty-hint'
+
+/** 占位块里「打开设置」按钮的类名（供样式与测试定位） */
+const EMPTY_HINT_BUTTON_CLASS = 'module-empty-hint-btn'
+
+/** 全隐藏时的 toast 文案（占位块里的说明更详细，这里只做瞬时提醒） */
+const EMPTY_HINT_TOAST = '本页模块已全部隐藏，请到「设置 → 模块排序」重新开启'
+
+/** 占位块里的说明文案 */
+const EMPTY_HINT_TEXT = '本页模块已全部隐藏。请打开设置页，在「模块排序」中开启需要显示的功能模块。'
 
 /** 设置页「模块排序」编辑器自身所在模块：禁止隐藏，否则无法恢复其它模块 */
 const UNHIDEABLE = { page: 'settings', id: 'sec-modules' } as const
@@ -182,11 +204,12 @@ function resolvePage(page?: string): string {
 /**
  * 把折叠 / 隐藏状态套用到当前页面的 DOM。
  *
- * 三处一起处理，否则会出现「主区没了但侧栏锚点还在」这类半生效状态：
+ * 四处一起处理，否则会出现「主区没了但侧栏锚点还在」这类半生效状态：
  *  1. 模块根元素：隐藏用 `hidden` 属性（配 CSS `!important` 覆盖布局类），
  *     折叠用类名 `is-module-collapsed`（CSS 隐藏除标题外的子元素，标题必须留着才能再点开）；
  *  2. 侧栏锚点：模块隐藏时一并隐藏，避免点了跳转到一个不存在的区块；
- *  3. 折叠按钮：`aria-expanded` 与图标跟随状态更新。
+ *  3. 折叠按钮（HTML 里原生的那些）：`aria-expanded` / `aria-controls` 与图标跟随状态更新；
+ *  4. 全隐藏兜底：一个可见模块都不剩时挂常驻占位块（见 `syncEmptyHint`）。
  */
 export function applyModuleState(page?: string): void {
   if (typeof document === 'undefined') return
@@ -216,9 +239,14 @@ export function applyModuleState(page?: string): void {
     const button = collapseButtons.find((item) => item.dataset.modCollapse === module.id)
     if (button !== undefined) {
       button.setAttribute('aria-expanded', isCollapsed ? 'false' : 'true')
+      // `aria-controls` 由这里补：它和 `data-mod-collapse` 是同一个 id，写进 HTML 属于重复，
+      // 放在运行时补一次即可（幂等）。
+      button.setAttribute('aria-controls', module.id)
       button.textContent = isCollapsed ? ICON_COLLAPSED : ICON_EXPANDED
     }
   }
+
+  syncEmptyHint(pageKey, modules, hidden)
 }
 
 /** 点击委托是否已挂到 document（模块级，避免重复挂载导致一次点击切换两次） */
@@ -239,38 +267,72 @@ function onCollapseClick(event: Event): void {
 }
 
 /**
- * 往每个模块的第一个 `<h3>` 里注入折叠按钮。
- * 幂等：已注入过（按钮存在）就跳过，重复调用不会叠加。
+ * 挂上折叠按钮的点击委托（**不再创建按钮**）。
+ *
+ * 按钮原生写在四页 HTML 的模块 `<h3>` 里（见文件头说明），本函数只挂一次 document 级委托。
+ * 幂等：重复调用不会重复绑定 —— 绑两次的结果是一次点击切换两次，等于没反应。
  */
-export function installCollapseToggles(page?: string): void {
+export function bindCollapseToggles(): void {
   if (typeof document === 'undefined') return
-  const pageKey = resolvePage(page)
-  const modules = PAGE_MODULES[pageKey]
-  if (!modules) return
+  if (hasBoundCollapseListener) return
+  hasBoundCollapseListener = true
+  document.addEventListener('click', onCollapseClick)
+}
 
-  for (const module of modules) {
-    const heading = document.getElementById(module.id)?.querySelector(':scope > h3')
-    // 没有标题的模块（如 panel 的通栏 command-center）没有可收起的正文，不注入按钮；
-    // 已注入过的也不重复加（幂等）。
-    const existing = heading?.querySelector(`:scope > .${COLLAPSE_BUTTON_CLASS}`)
-    if (heading != null && existing === null) {
-      const button = document.createElement('button')
-      button.type = 'button'
-      button.className = COLLAPSE_BUTTON_CLASS
-      button.dataset.modCollapse = module.id
-      button.setAttribute('aria-controls', module.id)
-      button.setAttribute('aria-expanded', 'true')
-      button.setAttribute('aria-label', `折叠 / 展开「${module.label}」`)
-      button.title = `折叠 / 展开「${module.label}」`
-      button.textContent = ICON_EXPANDED
-      heading.appendChild(button)
-    }
-  }
+/** 已经就「本页全隐藏」提示过的页面（恢复可见后清掉，下次再全隐藏仍会提示） */
+const warnedEmptyPages = new Set<string>()
 
-  if (!hasBoundCollapseListener) {
-    hasBoundCollapseListener = true
-    document.addEventListener('click', onCollapseClick)
+/**
+ * 全隐藏兜底：本页一个可见模块都不剩时，挂常驻占位块 + 弹一次 toast。
+ *
+ * 为什么是「兜底」而不是「禁止全隐藏」：用户可能就是想清屏，硬拦反而难用；
+ * 真正的风险是**把常用页面藏空后找不到恢复入口** —— 只要有明确回路就够。
+ * 占位块必须常驻（toast 3 秒就消失，而用户回来看到的是一片空白），
+ * 并复用设置页已有入口 `showSettingsPanel()`；用户在设置页改完，本页靠轮询自动恢复。
+ */
+function syncEmptyHint(
+  page: string,
+  modules: readonly NavModule[],
+  hidden: ReadonlySet<string>,
+): void {
+  const isAllHidden = modules.every((module) => hidden.has(module.id))
+  const existing = document.getElementById(EMPTY_HINT_ID)
+
+  if (!isAllHidden) {
+    if (existing !== null) existing.remove()
+    warnedEmptyPages.delete(page)
+    return
   }
+  if (existing === null) renderEmptyHint()
+  // 只在「刚变成全隐藏」时提示一次：applyModuleState 每次轮询命中都会跑，无脑提示会刷屏
+  if (!warnedEmptyPages.has(page)) {
+    warnedEmptyPages.add(page)
+    getNotifyApi().toast(EMPTY_HINT_TOAST, 'warn')
+  }
+}
+
+/** 渲染常驻占位块（主区被藏空后，这是页面上唯一的可见内容） */
+function renderEmptyHint(): void {
+  const main = document.querySelector<HTMLElement>('main')
+  if (main === null) return
+  const hint = document.createElement('div')
+  hint.id = EMPTY_HINT_ID
+  hint.className = 'module-empty-hint'
+
+  const text = document.createElement('p')
+  text.className = 'module-empty-hint-text'
+  text.textContent = EMPTY_HINT_TEXT
+
+  const button = document.createElement('button')
+  button.type = 'button'
+  button.className = `bgm-btn small ${EMPTY_HINT_BUTTON_CLASS}`
+  button.textContent = '⚙️ 打开设置'
+  button.addEventListener('click', () => {
+    showSettingsPanel()
+  })
+
+  hint.append(text, button)
+  main.append(hint)
 }
 
 /** 无定时器可清时的空清理函数（非浏览器上下文） */
@@ -286,7 +348,7 @@ function rawSnapshot(): string {
 }
 
 /**
- * 启动本页的模块状态同步：注入折叠按钮 → 套用一次状态 → 轮询其它页的改动。
+ * 启动本页的模块状态同步：挂折叠委托 → 套用一次状态 → 轮询其它页的改动。
  *
  * **为什么是轮询**：见 `nav-order.ts` 的说明 —— WPS 各任务窗格是独立 WebView，
  * 没有跨窗格广播通道，PluginStorage 只能读、不通知。
@@ -296,7 +358,7 @@ function rawSnapshot(): string {
  */
 export function startModuleStateSync(page: string): () => void {
   if (typeof window === 'undefined') return noopCleanup
-  installCollapseToggles(page)
+  bindCollapseToggles()
   applyModuleState(page)
 
   let lastRaw = rawSnapshot()
