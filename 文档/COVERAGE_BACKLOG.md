@@ -1,10 +1,13 @@
 # 补测待办清单（按性价比排序）
 
-> **生成日期**：2026-09-13
-> **基线**：2348 测试（2347 通过，1 个已知 flaky：`ui-bridge` 5s 超时）
-> **全项目覆盖率**：46.62% stmts / 40.57% branch / 53.51% funcs / **46.82% lines**
-> **可执行行数**：13361，已覆盖 6256，**未覆盖 7105**
-> **换算**：全项目**每提升 1 个百分点 ≈ 134 行**（= 13361 / 100）
+> **首次生成**：2026-09-13（基线 46.82% lines / 2348 测试）
+> **基线刷新**：2026-09-13 晚 —— 清单第 1 批已全部完成
+> **测试**：2569 条 / 91 文件（2568 通过；唯一失败为 `ui-bridge` 的 5s 超时 flaky，隔离跑 9/9 稳过）
+> **全项目覆盖率**：**50.34% stmts / 44.03% branch / 57.39% funcs / 50.67% lines**（较首次生成 **+3.85 个点**）
+> **可执行行数**：13417，已覆盖 6799，**未覆盖 6618**
+> **换算**：全项目**每提升 1 个百分点 ≈ 134 行**（= 13417 / 100）
+>
+> 注：本轮涨幅来自三处 —— `auto-fill-url.ts` →100%、`panel-events.ts` + `settings-bindings.ts` →100%、`tools/util/index.ts` 30.81→88.05%；可执行行总数从 13361 涨到 13417 是同期外部在途改动（`ts/sync/jsonl-response.ts` 等）带来的。
 
 数据来源：`coverage/coverage-summary.json`（`npx vitest run --coverage --config vitest.cov.config.ts --coverage.reporter=json-summary`）。
 复算脚本：`scripts/calc-coverage-backlog.mjs`（读 summary → 按未覆盖行数排序 → 输出本文档表格）。
