@@ -149,7 +149,7 @@
 
         <!-- 账户与凭证 -->
         <section class="section" id="sec-account">
-          <h3>🔑 账户与凭证</h3>
+          <h3>🔑 账户与凭证<button type="button" class="mod-collapse-btn" data-mod-collapse="sec-account" aria-expanded="true" aria-label="折叠 / 展开「账户与凭证」">▾</button></h3>
 
           <div class="form-group">
             <label>Token 设置</label>
@@ -203,7 +203,7 @@
 
         <!-- 同步范围与选择 -->
         <section class="section" id="sec-scope">
-          <h3>🎯 同步范围与选择</h3>
+          <h3>🎯 同步范围与选择<button type="button" class="mod-collapse-btn" data-mod-collapse="sec-scope" aria-expanded="true" aria-label="折叠 / 展开「同步范围与选择」">▾</button></h3>
 
           <div class="form-group">
             <label>数据选择</label>
@@ -299,7 +299,7 @@
 
         <!-- 同步策略 -->
         <section class="section" id="sec-strategy">
-          <h3>⚖️ 同步策略</h3>
+          <h3>⚖️ 同步策略<button type="button" class="mod-collapse-btn" data-mod-collapse="sec-strategy" aria-expanded="true" aria-label="折叠 / 展开「同步策略」">▾</button></h3>
           <div class="form-group">
             <label>冲突处理策略</label>
             <select id="conflictStrategy" class="input">
@@ -316,7 +316,7 @@
 
         <!-- 远程数据同步 -->
         <section class="section" id="sec-remote">
-          <h3>🗄️ 数据同步（远程仓库 → 本地）</h3>
+          <h3>🗄️ 数据同步（远程仓库 → 本地）<button type="button" class="mod-collapse-btn" data-mod-collapse="sec-remote" aria-expanded="true" aria-label="折叠 / 展开「远程数据同步」">▾</button></h3>
           <p class="hint">
             从远程仓库下载 Bangumi 资料数据（名称、标签、集数等），按 SID
             增量合并到当前工作表（新增+更新，不删除）。<br />
@@ -370,7 +370,7 @@
               <input
                 type="text"
                 id="githubPath"
-                placeholder="如：data/bangumi.jsonlines"
+                placeholder="如：data/bangumi.jsonlines.gz"
                 autocomplete="off"
                 spellcheck="false"
               />
@@ -384,7 +384,7 @@
                 <input
                   type="text"
                   id="localFilePath"
-                  placeholder="如：D:\data\bangumi.jsonlines（绝对路径）"
+                  placeholder="如：D:\data\bangumi.jsonlines.gz（绝对路径）"
                   autocomplete="off"
                   spellcheck="false"
                   style="flex: 1"
@@ -624,13 +624,13 @@
               >系列构成</code
             >
             等<br />
-            默认仓库：<code>awujiana/Bangumi-Archive-Anime-Excel/main/data/bangumi.jsonlines</code>
+            默认仓库：<code>awujiana/Bangumi-Archive-Anime-Excel/main/data/bangumi.jsonlines.gz</code>
           </p>
         </section>
 
         <!-- 数据预览 -->
         <section class="section" id="sec-preview">
-          <h3>👁️ 数据预览 <span id="previewCount"></span></h3>
+          <h3>👁️ 数据预览 <span id="previewCount"></span><button type="button" class="mod-collapse-btn" data-mod-collapse="sec-preview" aria-expanded="true" aria-label="折叠 / 展开「数据预览」">▾</button></h3>
           <div id="previewStats"></div>
           <div class="preview-wrapper">
             <div class="preview-box" id="previewBox">
@@ -659,7 +659,7 @@
 
         <!-- 记录与日志 -->
         <section class="section" id="sec-records">
-          <h3>📊 记录与日志</h3>
+          <h3>📊 记录与日志<button type="button" class="mod-collapse-btn" data-mod-collapse="sec-records" aria-expanded="true" aria-label="折叠 / 展开「记录与日志」">▾</button></h3>
 
           <div class="form-group">
             <label>同步记录</label>
@@ -735,7 +735,7 @@
 
         <!-- 帮助与格式 -->
         <section class="section" id="sec-help">
-          <h3>📖 帮助与格式</h3>
+          <h3>📖 帮助与格式<button type="button" class="mod-collapse-btn" data-mod-collapse="sec-help" aria-expanded="true" aria-label="折叠 / 展开「帮助与格式」">▾</button></h3>
 
           <div class="form-group">
             <label>使用引导</label>

@@ -3482,8 +3482,8 @@ body {
 }
 
 .mod-collapse-btn {
-    float: right;
-    margin-left: 8px;
+    /* 模块 <h3> 是 flex 容器：float 会被忽略，靠 auto 外边距把它送到最右（标题右上角） */
+    margin-left: auto;
     padding: 0 6px;
     font-size: 12px;
     line-height: 1.5;
@@ -3502,6 +3502,27 @@ body {
 .mod-collapse-btn:focus-visible {
     outline: 2px solid var(--accent-blue);
     outline-offset: 2px;
+}
+
+/* 主区模块被全部隐藏时的常驻占位块（toast 3 秒就消失，这里必须留得住） */
+.module-empty-hint {
+    grid-column: 1 / -1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: var(--sp-3);
+    padding: var(--sp-6) var(--sp-4);
+    text-align: center;
+    border: 1px dashed var(--border-strong);
+    border-radius: var(--r-md);
+    color: var(--text-3);
+}
+
+.module-empty-hint-text {
+    margin: 0;
+    font-size: var(--fs-sm);
+    line-height: 1.6;
 }
 
 /* 排序编辑器里被隐藏的模块：置灰以便区分（仍可点 🚫 恢复） */
