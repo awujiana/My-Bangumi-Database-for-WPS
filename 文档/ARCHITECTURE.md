@@ -106,6 +106,7 @@ ts/index.ts (thin barrel — 仅 re-export)
   │   ├── github-sync.ts     → GitHub 仓库同步
   │   ├── github-config.ts   → GitHub 配置 (PluginStorage)
   │   ├── github-sync-diff.ts → 差异计算 (纯函数，零依赖)
+  │   ├── jsonl-response.ts  → 数据源响应解码 (gzip 魔数识别 + DecompressionStream)
   │   ├── sync-source-registry.ts → 多源同步注册表
   │   ├── gist-sync.ts       → Gist 同步源
   │   ├── gitee-sync.ts      → Gitee 同步源
@@ -292,7 +293,7 @@ ts/index.ts (thin barrel — 仅 re-export)
 #### `github-config.ts` — 配置存储中心
 
 - **PluginStorage 键清单**（详见第三章）
-- **默认配置**: `DEFAULT_GITHUB_CONFIG = { owner: 'awujiana', repo: 'Bangumi-Archive-Anime-Excel', branch: 'main', path: 'data/bangumi.jsonlines', sourceType: 'github' }`
+- **默认配置**: `DEFAULT_GITHUB_CONFIG = { owner: 'awujiana', repo: 'Bangumi-Archive-Anime-Excel', branch: 'main', path: 'data/bangumi.jsonlines.gz', sourceType: 'github' }`
 - **同步策略** (`SyncStrategy`): 'add-update' | 'add-only' | 'update-only' | 'mirror' | 'force-overwrite'
 - **同步源类型** (`SyncSourceType`): 'github' | 'gitlab' | 'gitee' | 'local' | 'gist'
 - **配置完整性校验**: `isGithubConfigComplete()` 检查 owner/repo/path 非空
@@ -328,6 +329,25 @@ ts/index.ts (thin barrel — 仅 re-export)
 - **`SYNC_STRATEGY_LABELS`**: 策略中文标签映射
 - **字段别名映射** (`JSONL_FIELD_EXCEL_ALIASES`): 支持一个远程字段映射到多个本地列（如 `动画制作公司` → `制作公司` + `动画制作公司`）
 - **`getExcelAliases()`**: 获取远程字段的所有本地列名别名
+
+#### `jsonl-response.ts` — 数据源响应解码（gzip 支持）
+
+- **背景**: 数据仓库的 `data/bangumi.jsonlines.gz` 是 gzip 压缩的「表头 + 值数组」JSONL。
+  明文 55.83 MiB 会触发 GitHub 单文件 50 MB 警告（`GH001`），且 raw CDN 对该文件**不做**透明压缩，
+  客户端每次同步都要拉满；压成 gzip 后为 20.86 MiB（−63%），因此解压必须在客户端完成。
+- **`isGzipBytes()`**: 按魔数 `1f 8b` 判断，**不依赖扩展名** —— 明文数据源、CDN 已按
+  `Content-Encoding: gzip` 透明解压过的响应、以及真正的 gzip 响应三种情况都能正确处理
+- **`gunzipBytes()`**: 用宿主原生 `DecompressionStream('gzip')` 解压，零第三方依赖；
+  写入与读取必须**并发**（该流有背压，先 await 写完再读会在数据超过管道缓冲时死锁）；
+  宿主不支持时抛可读错误，而不是让 `parseJsonl` 在二进制乱码上报一堆解析失败
+- **`decodeJsonlBytes()`** / **`readXhrJsonlText()`**: 字节 → UTF-8 JSONL 文本的统一入口，
+  兼容 `responseType = 'arraybuffer'`（远程源）与默认 `'text'`（测试桩 / 降级路径）
+- **接入方**: `github-sync.ts` / `gitee-sync.ts` / `gitlab-sync.ts`（均设 `xhr.responseType = 'arraybuffer'`）
+  与 `local-file-sync.ts`（本地 `.jsonlines.gz` 同样可读）
+- **不支持 gzip 的源**: `gist-sync.ts` 走 Gist REST API 的 `files[*].content` 文本字段，
+  GitHub 对二进制文件会省略 content，故 Gist 源只能读明文 JSONL
+- **旧配置自愈**: `github-config.ts` 的 `LEGACY_PATH_MIGRATIONS` 在读取配置时把历史的
+  `data/bangumi.jsonlines` 一次性迁移为 `data/bangumi.jsonlines.gz`，避免老配置 404
 
 #### `sync-source-registry.ts` — 多源同步注册表
 
@@ -688,7 +708,7 @@ ts/index.ts (thin barrel — 仅 re-export)
 | `github_sync_owner`       | string | `'awujiana'`                    | GitHub 仓库所有者 |
 | `github_sync_repo`        | string | `'Bangumi-Archive-Anime-Excel'` | GitHub 仓库名     |
 | `github_sync_branch`      | string | `'main'`                        | 分支名            |
-| `github_sync_path`        | string | `'data/bangumi.jsonlines'`      | JSONL 文件路径    |
+| `github_sync_path`        | string | `'data/bangumi.jsonlines.gz'`   | JSONL 文件路径    |
 | `github_sync_strategy`    | string | `'add-update'`                  | 同步策略          |
 | `github_sync_source_type` | string | `'github'`                      | 同步源类型        |
 | `github_sync_gist_id`     | string | `''` (空)                       | GitHub Gist ID    |

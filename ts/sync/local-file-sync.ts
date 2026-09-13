@@ -1,7 +1,7 @@
 /**
  * @fileoverview 本地文件同步源模块
  * @module sync/localFileSync
- * @description 通过 WPS 文件对话框或路径输入选择本地 .jsonlines/.jsonl/.json 文件，
+ * @description 通过 WPS 文件对话框或路径输入选择本地 .jsonlines / .jsonlines.gz / .jsonl / .json 文件，
  *              读取内容并复用 githubSyncDiff.ts 的 parseJsonl 解析逻辑。
  *
  *              与远程源（GitHub/GitLab/Gitee）的差异：
@@ -28,6 +28,7 @@ import { bgmLog } from '../tools/utility.js'
 import { getGithubConfig } from './github-config.js'
 import { parseJsonl } from './github-sync-diff.js'
 import type { GithubRemoteEntry } from './github-sync-diff.js'
+import { readXhrJsonlText } from './jsonl-response.js'
 import type { SyncSource } from './sync-source.js'
 // 复用 githubSyncDiff.ts 的纯解析函数与类型（零依赖纯模块，可在 Node 测试环境直接运行）
 
@@ -39,6 +40,9 @@ const FILE_READ_TIMEOUT_MS = 15_000
  *
  * 实现策略：通过 XMLHttpRequest + file:// 协议读取本地文件。
  * WPS 加载项环境运行在内置浏览器控件中，允许 file:// 协议访问本地文件系统。
+ *
+ * 内容可能是 gzip 压缩的 `.jsonlines.gz`（也可能是明文），
+ * 由 `readXhrJsonlText` 按 gzip 魔数自动识别并解压，调用方拿到的一律是 JSONL 文本。
  *
  * 路径规范化：
  *   - Windows 路径（如 `C:\Users\foo\data.jsonlines`）转换为 `file:///C:/Users/foo/data.jsonlines`
@@ -75,15 +79,25 @@ export function readLocalFileContent(filePath: string): Promise<string> {
     xhr.open('GET', fileUrl, true)
     xhr.timeout = FILE_READ_TIMEOUT_MS
     xhr.setRequestHeader('Accept', 'application/json,text/plain,*/*')
+    // 取原始字节：本地文件可能是 gzip 压缩的 .jsonlines.gz，需要按魔数判断后再解压
+    xhr.responseType = 'arraybuffer'
 
     xhr.addEventListener('load', (): void => {
       // file:// 协议下 status 通常为 0（成功）或 200
       if (xhr.status === 0 || xhr.status === 200) {
-        bgmLog(
-          LOG_LEVELS.INFO,
-          `[localFileSync] 文件读取成功: ${filePath}（${String(xhr.responseText.length)} 字符）`,
-        )
-        resolve(xhr.responseText)
+        // gzip 数据源需要异步解压（DecompressionStream），走异步流程
+        void (async (): Promise<void> => {
+          try {
+            const content = await readXhrJsonlText(xhr)
+            bgmLog(
+              LOG_LEVELS.INFO,
+              `[localFileSync] 文件读取成功: ${filePath}（${String(content.length)} 字符）`,
+            )
+            resolve(content)
+          } catch (error: unknown) {
+            reject(error instanceof Error ? error : new Error(String(error)))
+          }
+        })()
         return
       }
       reject(new Error(`读取文件失败（HTTP ${String(xhr.status)}）：${filePath}`))
@@ -213,7 +227,7 @@ export class LocalFileSyncSource implements SyncSource {
     if (!isLocalFileConfigured()) {
       return Result.failVoid(
         new BgmError(
-          '本地文件路径未配置，请在"文件路径"字段填写本地 .jsonlines/.jsonl/.json 文件的绝对路径',
+          '本地文件路径未配置，请在"文件路径"字段填写本地 .jsonlines / .jsonlines.gz / .jsonl / .json 文件的绝对路径',
           {
             code: 'CONFIG_INCOMPLETE',
           },

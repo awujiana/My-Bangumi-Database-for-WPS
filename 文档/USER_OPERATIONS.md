@@ -1106,9 +1106,9 @@ Panel 头部右上角包含设置按钮与用户头像（窄屏显示）：
 | 仓库所有者 | GitHub 用户名或组织名 | `awujiana`                    |
 | 仓库名     | 仓库名称              | `Bangumi-Archive-Anime-Excel` |
 | 分支名     | Git 分支              | `main`                        |
-| 文件路径   | JSONL 文件路径        | `data/bangumi.jsonlines`      |
+| 文件路径   | JSONL 文件路径        | `data/bangumi.jsonlines.gz`   |
 
-**首次打开**：系统自动填充默认配置（awujiana/Bangumi-Archive-Anime-Excel/main/data/bangumi.jsonlines）。
+**首次打开**：系统自动填充默认配置（awujiana/Bangumi-Archive-Anime-Excel/main/data/bangumi.jsonlines.gz）。
 
 #### 2.10.3 本地文件选择（browseLocalFile）
 

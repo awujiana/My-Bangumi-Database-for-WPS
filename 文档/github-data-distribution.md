@@ -10,7 +10,7 @@
 ```
 插件 ──① 检查本地缓存──▶ 有效缓存？→ 直接返回缓存条目
                    │
-                   │ ② 下载 data/bangumi.jsonlines (raw URL) + 计算哈希
+                   │ ② 下载 data/bangumi.jsonlines.gz (raw URL) + 计算哈希
                    │
                    │ ③ 哈希比对：与缓存一致？→ 更新时间戳，返回缓存条目
                    │
@@ -25,7 +25,7 @@
 
 ### 缓存机制说明
 
-为避免每次同步都下载完整的 JSONL 文件（CDN 压缩后约 20.9 MB），插件实现了基于 localStorage 的本地缓存策略：
+为避免每次同步都下载完整的 JSONL 文件（数据文件 gzip 后 20.86 MiB），插件实现了基于 localStorage 的本地缓存策略：
 
 - **缓存有效期**：24 小时（可在 UI 中手动清除）
 - **哈希算法**：DJB2（32 位无符号整数，8 位十六进制，冲突率可忽略）
@@ -52,7 +52,7 @@
 ```
 Bangumi-Archive-Anime-Excel/
 ├── data/
-│   └── bangumi.jsonlines        ← 数据文件（~56 MB，30836 条，表头+值数组）
+│   └── bangumi.jsonlines.gz     ← 数据文件（gzip，~21 MB / 解压 55.83 MiB，30836 条）
 ├── differences/             ← 差异文件目录
 ├── xlsx/                    ← Excel 文件目录
 ├── .gitignore
@@ -70,17 +70,17 @@ Bangumi-Archive-Anime-Excel/
 | owner  | `awujiana`                    | GitHub 仓库所有者       |
 | repo   | `Bangumi-Archive-Anime-Excel` | 仓库名称                |
 | branch | `main`                        | 分支名（默认 main）     |
-| path   | `data/bangumi.jsonlines`      | 仓库中 JSONL 文件的路径 |
+| path   | `data/bangumi.jsonlines.gz`   | 仓库中 JSONL 文件的路径 |
 
 插件会从以下 URL 读取数据：
 
 ```
-https://raw.githubusercontent.com/awujiana/Bangumi-Archive-Anime-Excel/main/data/bangumi.jsonlines
+https://raw.githubusercontent.com/awujiana/Bangumi-Archive-Anime-Excel/main/data/bangumi.jsonlines.gz
 ```
 
 ## 数据格式
 
-`data/bangumi.jsonlines` 为「**表头 + 值数组**」两段式 JSONL 文件：
+`data/bangumi.jsonlines.gz` 为「**表头 + 值数组**」两段式 JSONL 文件：
 第 1 个非空行是**表头**（纯字符串数组），其后每行是与表头**等长**的**值数组**。
 
 ### 实际数据示例
@@ -178,7 +178,7 @@ https://raw.githubusercontent.com/awujiana/Bangumi-Archive-Anime-Excel/main/data
 > - **Bangumi 官方 dump**：`type:2` 表示条目类型为「动画」（条目类型，1=漫画 2=动画 3=音乐 4=游戏 6=三次元）
 > - **BGM 插件 → Bangumi API**：`type` 表示观看状态（1=想看 2=在看 3=看过 4=搁置 5=抛弃），由用户在 Excel「是否看完」列维护
 >
-> 自 2026-09-13 起，`data/bangumi.jsonlines` **重新输出 dump 的 `type` 字段**（作为全量保真字段之一），但插件**不会**把它写入任何 Excel 列。两者完全无关。
+> 自 2026-09-13 起，`data/bangumi.jsonlines.gz` **重新输出 dump 的 `type` 字段**（作为全量保真字段之一），但插件**不会**把它写入任何 Excel 列。两者完全无关。
 
 ## 同步策略
 
@@ -196,18 +196,18 @@ https://raw.githubusercontent.com/awujiana/Bangumi-Archive-Anime-Excel/main/data
 
 ### 1. 更新数据文件
 
-将最新的 bangumi 数据导出为 JSONL 格式，替换仓库中的 `data/bangumi.jsonlines`：
+数据文件由 Archive 流水线步骤⑨ 直接生成 gzip 并下发到本仓库，正常无需手工替换；确需手工替换时按下面的方式压缩：
 
 ```bash
 # 克隆仓库
 git clone https://github.com/awujiana/Bangumi-Archive-Anime-Excel-to-sync.git
 cd Bangumi-Archive-Anime-Excel-to-sync
 
-# 替换数据文件
-cp /path/to/new-bangumi.jsonlines data/bangumi.jsonlines
+# 压缩替换数据文件（-n 去掉时间戳，保证相同内容产出相同字节）
+gzip -9 -n -c /path/to/new-bangumi.jsonlines > data/bangumi.jsonlines.gz
 
 # 提交推送
-git add data/bangumi.jsonlines
+git add data/bangumi.jsonlines.gz
 git commit -m "feat: 更新 bangumi 数据 dump $(date +%Y-%m-%d)"
 git push origin main
 ```
@@ -216,21 +216,21 @@ git push origin main
 
 在 WPS Excel 中点击「数据同步」，插件会：
 
-1. 从 raw URL 下载 `data/bangumi.jsonlines`
+1. 从 raw URL 下载 `data/bangumi.jsonlines.gz`
 2. 逐行解析 JSONL
 3. 按 SID 比对本地 Excel 行
 4. 根据所选策略增量写入
 
 ## 两种下发模式对比
 
-| 特性      | 直接 JSONL 模式（当前启用） | Release Asset 模式（预留）   |
-| --------- | --------------------------- | ---------------------------- |
-| 适用场景  | 小文件（< 100MB）           | 大文件（> 100MB）            |
-| path 配置 | `data/bangumi.jsonlines`    | `latest.json`                |
-| 数据格式  | 直接 JSONL                  | zip 压缩包（内含 JSONL）     |
-| 版本管理  | 无（直接覆盖）              | 有（Release tag 历史）       |
-| 下载方式  | raw.githubusercontent.com   | github.com/releases/download |
-| 限流      | 60 次/小时（未认证）        | Release 下载不限流           |
+| 特性      | 直接 JSONL 模式（当前启用）          | Release Asset 模式（预留）   |
+| --------- | ------------------------------------ | ---------------------------- |
+| 适用场景  | gzip 后 < 100 MB（当前 20.86 MiB）   | 大文件（> 100 MB）           |
+| path 配置 | `data/bangumi.jsonlines.gz`          | `latest.json`                |
+| 数据格式  | gzip 压缩的 JSONL（`.jsonlines.gz`） | zip 压缩包（内含 JSONL）     |
+| 版本管理  | 无（直接覆盖）                       | 有（Release tag 历史）       |
+| 下载方式  | raw.githubusercontent.com            | github.com/releases/download |
+| 限流      | 60 次/小时（未认证）                 | Release 下载不限流           |
 
 ### Release Asset 模式（预留，当前未实现）
 

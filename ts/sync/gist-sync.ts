@@ -28,6 +28,12 @@
  *
  *              注意：未认证的 Gist API 限流为 60 次/小时/IP（与 GitHub Raw 一致）。
  *              若需更高配额，可在后续扩展中通过请求头附加 token。
+ *
+ *              **gzip 数据源不支持**：Gist API 的 `files[*].content` 只承载文本，
+ *              GitHub 对二进制文件（如 `bangumi.jsonlines.gz`）会省略 content 字段，
+ *              因此本同步源只能读取**明文** JSONL。要使用 gzip 数据源，请改用
+ *              GitHub / GitLab / Gitee raw 直链或本地文件同步源
+ *              （它们统一走 jsonl-response.ts 按魔数解压）。
  */
 
 import { LOG_LEVELS } from '../core/constants.js'
@@ -201,7 +207,9 @@ function parseGistResponseBody(responseText: string): GithubRemoteEntry[] | null
   if (!content) {
     bgmLog(
       LOG_LEVELS.WARN,
-      `[gistSync] Gist 响应中未提取到任何文件内容（files 为空或 content 缺失）`,
+      `[gistSync] Gist 响应中未提取到任何文件内容（files 为空、content 缺失，` +
+        `或文件是 Gist API 无法承载的二进制内容如 .gz；` +
+        `gzip 数据源请改用 GitHub/GitLab/Gitee raw 或本地文件同步源）`,
     )
     return null
   }

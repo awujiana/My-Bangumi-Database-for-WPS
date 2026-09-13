@@ -9,7 +9,7 @@
  * type 字段约定（与 Bangumi 一致）：
  *   1=想看  2=在看  3=看过  4=搁置  5=抛弃
  *
- * 远程数据文件格式（数据仓库 data/bangumi.jsonlines 与各镜像源一致）：
+ * 远程数据文件格式（数据仓库 data/bangumi.jsonlines.gz 与各镜像源一致）：
  *   第 1 个非空行是表头（纯字符串数组），其后每行是与表头等长的值数组。
  *   解析细节见 {@link parseJsonl}。
  */

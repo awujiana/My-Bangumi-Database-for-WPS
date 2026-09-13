@@ -41,7 +41,7 @@ export interface GithubSyncConfig {
   repo: string
   /** 分支名（默认 main） */
   branch: string
-  /** 文件路径（如 data/bangumi.jsonlines） */
+  /** 文件路径（如 data/bangumi.jsonlines.gz，gzip 压缩的「表头 + 值数组」JSONL） */
   path: string
   /**
    * 同步源类型（可选，默认 'github'）
@@ -88,8 +88,21 @@ export const DEFAULT_GITHUB_CONFIG: Readonly<GithubSyncConfig> = Object.freeze({
   owner: 'awujiana',
   repo: 'Bangumi-Archive-Anime-Excel',
   branch: 'main',
-  path: 'data/bangumi.jsonlines',
+  path: 'data/bangumi.jsonlines.gz',
   sourceType: 'github',
+})
+
+/**
+ * 旧数据文件路径 -> 新路径的一次性迁移表
+ *
+ * 2026-09-13 起数据文件改为 gzip 压缩（`data/bangumi.jsonlines.gz`）：明文
+ * 55.83 MiB 超过 GitHub 单文件 50 MB 建议上限（push 报 GH001 警告），且 raw CDN
+ * 对该文件**不做**透明 gzip，客户端每次同步都要拉满；压缩后为 20.86 MiB（−63%）。
+ *
+ * 只迁移本插件历史上作为默认值出现过的明文路径，不触碰用户自定义路径。
+ */
+const LEGACY_PATH_MIGRATIONS: Readonly<Record<string, string>> = Object.freeze({
+  'data/bangumi.jsonlines': 'data/bangumi.jsonlines.gz',
 })
 
 // 内部引用（保持向后兼容）
@@ -166,9 +179,27 @@ export function getGithubConfig(): GithubSyncConfig {
   }
 
   // gistId 仅在非空时附加到返回值（满足 exactOptionalPropertyTypes: 不能赋 undefined 给可选属性）
+  const migratedPath = migrateLegacyPath(path, storage)
   return gistId
-    ? { owner, repo, branch, path, sourceType, gistId }
-    : { owner, repo, branch, path, sourceType }
+    ? { owner, repo, branch, path: migratedPath, sourceType, gistId }
+    : { owner, repo, branch, path: migratedPath, sourceType }
+}
+
+/**
+ * 把历史明文数据文件路径迁移为 gzip 路径（见 LEGACY_PATH_MIGRATIONS）
+ *
+ * @param path 存储中读到的原始路径
+ * @param storage PluginStorage（可为 undefined，此时只改返回值不落盘）
+ * @returns 迁移后的路径；无需迁移时原样返回
+ */
+function migrateLegacyPath(path: string, storage: WpsPluginStorage | undefined): string {
+  const migrated = LEGACY_PATH_MIGRATIONS[path]
+  if (migrated === undefined) {
+    return path
+  }
+  bgmLog(LOG_LEVELS.INFO, `[githubConfig] 数据文件路径自动迁移: ${path} -> ${migrated}`)
+  storage?.setItem(GITHUB_CONFIG_KEYS.PATH, migrated)
+  return migrated
 }
 
 /**

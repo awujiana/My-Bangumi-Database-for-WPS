@@ -62,6 +62,7 @@ import {
   formatTimeFilterLabel,
 } from './github-time-format.js'
 import { resolveNewRowCellValue, resolveUpdateCellValue } from './github-cell-value.js'
+import { readXhrJsonlText } from './jsonl-response.js'
 import { addSyncRecords, addSyncRecordSummary } from './sync-record.js'
 import type { UpdateRecordParameters } from './sync-record.js'
 import type { SyncSource } from './sync-source.js'
@@ -121,6 +122,9 @@ const REQUEST_TIMEOUT_MS = 30_000
  * JSONL（JSON Lines）格式：每行一个独立的 JSON 对象。
  * 解析时按行分割，逐行 JSON.parse，跳过空行，非法行不中断整体解析。
  *
+ * 响应体可能是 gzip 压缩的 `.jsonlines.gz`（也可能是明文 `.jsonlines`），
+ * 由 `readXhrJsonlText` 按 gzip 魔数自动识别并解压。
+ *
  * @param signal 可选 AbortSignal，用于取消请求
  * @returns 解析后的条目数组
  * @throws 网络错误、配置错误、解析失败时抛出 Error
@@ -149,6 +153,8 @@ export function fetchGithubJson(signal?: AbortSignal): Promise<GithubRemoteEntry
     xhr.open('GET', url, true)
     xhr.timeout = REQUEST_TIMEOUT_MS
     xhr.setRequestHeader('Accept', 'application/json')
+    // 取原始字节：数据源是 gzip 压缩的 .jsonlines.gz，需要按魔数判断后再解压
+    xhr.responseType = 'arraybuffer'
 
     // AbortSignal 支持：监听 abort 事件触发 xhr.abort()，并在请求完成后移除监听器
     let abortHandler: (() => void) | null = null
@@ -171,39 +177,48 @@ export function fetchGithubJson(signal?: AbortSignal): Promise<GithubRemoteEntry
       removeAbortHandler()
       switch (xhr.status) {
         case 200: {
-          try {
-            const { entries, errors } = parseJsonl(xhr.responseText)
-            if (entries.length === 0 && errors.length > 0) {
+          // gzip 数据源需要异步解压（DecompressionStream），200 分支走异步流程
+          void (async (): Promise<void> => {
+            try {
+              const text = await readXhrJsonlText(xhr)
+              const { entries, errors } = parseJsonl(text)
+              if (entries.length === 0 && errors.length > 0) {
+                reject(
+                  new Error(
+                    `JSONL 解析失败：${String(errors.length)} 行全部非法。` +
+                      `首行错误（第 ${String(errors[0]?.line ?? '')} 行）：${errors[0]?.reason ?? ''}`,
+                  ),
+                )
+                return
+              }
+              if (errors.length > 0) {
+                bgmLog(
+                  LOG_LEVELS.WARN,
+                  `[githubSync] JSONL 解析完成：${String(entries.length)} 条合法，${String(errors.length)} 行非法（已跳过）。` +
+                    `首行错误（第 ${String(errors[0]?.line ?? '')} 行）：${errors[0]?.reason ?? ''}`,
+                )
+              } else {
+                bgmLog(LOG_LEVELS.INFO, `[githubSync] 下载成功：${String(entries.length)} 条记录`)
+              }
+              resolve(entries)
+            } catch (error: unknown) {
               reject(
                 new Error(
-                  `JSONL 解析失败：${String(errors.length)} 行全部非法。` +
-                    `首行错误（第 ${String(errors[0]?.line ?? '')} 行）：${errors[0]?.reason ?? ''}`,
+                  `JSONL 解析失败: ${error instanceof Error ? error.message : String(error)}`,
                 ),
               )
-              return
             }
-            if (errors.length > 0) {
-              bgmLog(
-                LOG_LEVELS.WARN,
-                `[githubSync] JSONL 解析完成：${String(entries.length)} 条合法，${String(errors.length)} 行非法（已跳过）。` +
-                  `首行错误（第 ${String(errors[0]?.line ?? '')} 行）：${errors[0]?.reason ?? ''}`,
-              )
-            } else {
-              bgmLog(LOG_LEVELS.INFO, `[githubSync] 下载成功：${String(entries.length)} 条记录`)
-            }
-            resolve(entries)
-          } catch (error: unknown) {
-            reject(
-              new Error(
-                `JSONL 解析失败: ${error instanceof Error ? error.message : String(error)}`,
-              ),
-            )
-          }
+          })()
 
           break
         }
         case 404: {
-          reject(new Error(`文件不存在（404）：${url}，请检查 owner/repo/branch/path 配置`))
+          reject(
+            new Error(
+              `文件不存在（404）：${url}，请检查 owner/repo/branch/path 配置` +
+                `（数据文件路径应为 data/bangumi.jsonlines.gz）`,
+            ),
+          )
 
           break
         }
