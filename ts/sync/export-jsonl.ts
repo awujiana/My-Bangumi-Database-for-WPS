@@ -26,7 +26,7 @@ import { extractSubjectId } from './pure-utilities.js'
  * 导出字段顺序
  *
  * 必须与数据仓库 `data/bangumi.jsonlines.gz` 的表头一致
- * （上游由 Archive/scripts/convert_dump_to_jsonl.py 的 HEADER_FIELDS 派生），
+ * （上游由 Archive/scripts/step09_build_jsonl.py 的 HEADER_FIELDS 派生），
  * 这样导出的文件可以直接当作「本地文件同步」的数据源使用。
  */
 const EXPORT_FIELDS = [
