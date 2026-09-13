@@ -74,7 +74,7 @@ node scripts/calc-coverage-backlog.mjs
 
 1. `ts/tools/util/index.ts`（+2.47%，纯逻辑）—— 但它是聚合桶，先按纯函数切片拆出叶子模块再测；
 2. ~~`ts/tools/auto-fill-url.ts`（+0.43%）~~ ✅ **已完成**（2026-09-13，提交 `ed66b8fd`）：新增 18 条测试，statements / functions / lines 100%、branches 96.66%（余 1 条为不可达防御分支，见 REF-gates-scripts.md）；单文件自查命令见该文件；
-3. `ts/ui/handlers/panel-events.ts`（+0.63%）、`settings-bindings.ts`（+0.57%）—— 已有部分覆盖，补边界分支即可。
+3. ~~`ts/ui/handlers/panel-events.ts`（+0.63%）、`settings-bindings.ts`（+0.57%）~~ ✅ **已完成**（2026-09-13）：两个文件均达 statements / branches / functions / lines **100%**（29 + 34 = 63 条测试）。做法是「每个 handler 都覆盖『控件/依赖缺失 → 早退』与『控件存在 → 落盘 + toast 文案』两侧」，因为这两个文件的共同风险正是**取不到元素就静默 return**（id 拼错、DOM 重构后忘同步，表现都是「改了设置但不生效」且不报错）。
 
 **第 2 批（先拆后测，单项收益最大）**
 
