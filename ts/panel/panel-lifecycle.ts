@@ -365,11 +365,17 @@ export function detectHeaderAndColumns(
     }
   }
 
-  // 选列数最多、行号最小的作为表头
+  // 选列数最多、行号最小的行作为锚点
   candidates.sort((a, b) => b.colCount - a.colCount || a.row - b.row)
-  const bestCandidate = candidates[0]
-  const headerRow = bestCandidate?.row ?? 0
-  const headerMatchCount = bestCandidate?.matchCount ?? 0
+  const candidateRows = new Set(candidates.map((candidate) => candidate.row))
+  // 锚点未必是表头首行：多行表头里「补齐行」可能比主表头行更宽（colCount 更大），
+  // 直接把它当表头会整行丢掉主表头的列名。向上回溯到紧邻的连续候选块首行。
+  let headerRow = candidates[0]?.row ?? 0
+  while (candidateRows.has(headerRow - 1)) {
+    headerRow -= 1
+  }
+  const headerMatchCount =
+    candidates.find((candidate) => candidate.row === headerRow)?.matchCount ?? 0
 
   // 2. 读取表头名称
   const headerNames: string[] = []
@@ -380,23 +386,24 @@ export function detectHeaderAndColumns(
     headerIsImportant.push(IMPORTANT_COLS[v.toLowerCase()] ?? false)
   }
 
-  // 3. 检测多行表头（下一行是否填充了当前表头的空列）
+  // headerNames 是定长稠密数组：未写的列 push 的是 ''，MAX_SCAN_COLUMNS 个位置全部存在。
+  // 因此「这一列有没有表头名」只能看值是否为空，不能用 Object.hasOwn —— 后者在稠密数组上恒真。
+  const hasHeaderName = (index: number): boolean => (headerNames[index] ?? '') !== ''
+
+  // 3. 检测多行表头：续行补上了当前表头为空的列（第 1 行写主列名、第 2 行补剩余列名）。
+  // 前提：续行仍在扫描范围内，否则不读它的值。
   let dataStartRow = headerRow + 1
-  const secondHeaderRowLimit = Math.min(headerRow + 1, PANEL_CONFIG.MAX_SCAN_ROWS)
-  if (headerRow + 1 <= secondHeaderRowLimit) {
+  if (headerRow + 1 <= PANEL_CONFIG.MAX_SCAN_ROWS) {
     let filled = 0
-    let total = 0
     for (let c = 1; c <= PANEL_CONFIG.MAX_SCAN_COLUMNS; c += 1) {
       const nv = getCellValue(ws, headerRow + 1, c).trim()
-      if (nv) {
-        total += 1
-        if (!Object.hasOwn(headerNames, c - 1)) filled += 1
-      }
+      if (nv && !hasHeaderName(c - 1)) filled += 1
     }
-    if (filled >= 3 && total >= 3) {
+    // 补上 3 列以上才认作多行表头；低于阈值按数据行处理，避免吞掉首行数据
+    if (filled >= 3) {
       dataStartRow = headerRow + 2
       for (let c = 1; c <= PANEL_CONFIG.MAX_SCAN_COLUMNS; c += 1) {
-        const isExistingHeader = Object.hasOwn(headerNames, c - 1)
+        const isExistingHeader = hasHeaderName(c - 1)
         if (!isExistingHeader) {
           const nv = getCellValue(ws, headerRow + 1, c).trim()
           if (nv) {
@@ -430,7 +437,7 @@ export function detectHeaderAndColumns(
   // 表头结束列
   let headerLastCol = 0
   for (let c = 1; c <= PANEL_CONFIG.MAX_SCAN_COLUMNS; c += 1) {
-    if (Object.hasOwn(headerNames, c - 1)) headerLastCol = c
+    if (hasHeaderName(c - 1)) headerLastCol = c
   }
 
   const actualLastCol = Math.max(lastDataCol, headerLastCol)
@@ -438,7 +445,7 @@ export function detectHeaderAndColumns(
   // 预览显示的列范围：从第一个数据列左扩找到最左非空表头，但不能超过表头范围
   let previewColStart = Math.max(1, firstDataCol - 5)
   for (let c = previewColStart; c <= firstDataCol; c += 1) {
-    if (Object.hasOwn(headerNames, c - 1)) {
+    if (hasHeaderName(c - 1)) {
       previewColStart = c
       break
     }

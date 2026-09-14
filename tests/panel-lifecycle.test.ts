@@ -621,7 +621,7 @@ describe('panel-lifecycle · detectHeaderAndColumns', () => {
     expect(meta.headerMatchCount).toBe(4)
     expect(meta.dataStartRow).toBe(2)
     expect(meta.firstDataCol).toBe(1)
-    expect(meta.lastCol).toBeGreaterThanOrEqual(4)
+    expect(meta.lastCol).toBe(4)
   })
 
   it('关键字少于 3 个的行不算表头', () => {
@@ -703,13 +703,98 @@ describe('panel-lifecycle · detectHeaderAndColumns', () => {
     }
     const meta = detectHeaderAndColumns(asWs(makeSheet('动画', cells)))
     expect(meta.firstDataCol).toBe(1)
-    expect(meta.lastCol).toBeGreaterThanOrEqual(5)
-    expect(meta.previewColEnd).toBeGreaterThan(0)
+    expect(meta.lastCol).toBe(5)
+    expect(meta.previewColEnd).toBe(3)
   })
 
-  it('未传工作表时不抛错（按空表处理）', () => {
-    expect(() => detectHeaderAndColumns(null)).not.toThrow()
-    expect(detectHeaderAndColumns(undefined).headerRow).toBe(0)
+  it('预览列范围按真实表头宽度收敛，不是 MAX_SCAN_COLUMNS', () => {
+    const meta = detectHeaderAndColumns(asWs(makeSheet('动画', makeTrackedSheetCells())))
+
+    expect(meta.headerNames).toEqual(['序列号', '名称', '是否看完', '打分'])
+    expect(meta.lastCol).toBe(4)
+    expect(meta.previewColEnd).toBe(4)
+    expect(meta.previewColEnd - meta.previewColStart).toBe(4)
+  })
+
+  it('两行表头：续行补齐空列时合并列名，数据起始行后移一行', () => {
+    const cells = {
+      '1:1': '序列号',
+      '1:2': '名称',
+      '1:3': '打分',
+      // 第 2 行补齐第 1 行为空的第 4~6 列
+      '2:4': '开播日期',
+      '2:5': '集数',
+      '2:6': '标签',
+      '3:1': '1',
+      '3:2': '动画A',
+      '3:3': '9',
+      '3:4': '2026-07',
+      '3:5': '12',
+      '3:6': '恋爱',
+    }
+    const meta = detectHeaderAndColumns(asWs(makeSheet('动画', cells)))
+
+    expect(meta.headerRow).toBe(1)
+    expect(meta.dataStartRow).toBe(3)
+    expect(meta.headerNames).toEqual(['序列号', '名称', '打分', '开播日期', '集数', '标签'])
+    expect(meta.lastCol).toBe(6)
+  })
+
+  it('补齐行比主表头行更宽时，表头行仍取上一行（不丢主列名）', () => {
+    const cells = {
+      '1:1': '序列号',
+      '1:2': '名称',
+      '1:3': '打分',
+      // 第 2 行补 5 列 —— 列数比第 1 行多，只按 colCount 排序会把第 2 行误当表头
+      '2:4': '开播日期',
+      '2:5': '集数',
+      '2:6': '标签',
+      '2:7': '别名',
+      '2:8': '备注',
+      '3:1': '1',
+      '3:2': '动画A',
+    }
+    const meta = detectHeaderAndColumns(asWs(makeSheet('动画', cells)))
+
+    expect(meta.headerRow).toBe(1)
+    expect(meta.dataStartRow).toBe(3)
+    expect(meta.headerNames[0]).toBe('序列号')
+  })
+
+  it('表头与数据都从第 12 列开始时，预览起始列跟随表头而非左扩 5 列', () => {
+    const cells = {
+      '1:12': '序列号',
+      '1:13': '名称',
+      '1:14': '打分',
+      '1:15': '是否看完',
+      '2:12': '1',
+      '2:13': '动画A',
+    }
+    const meta = detectHeaderAndColumns(asWs(makeSheet('动画', cells)))
+
+    expect(meta.firstDataCol).toBe(12)
+    expect(meta.previewColStartAbsolute).toBe(12)
+    expect(meta.lastCol).toBe(15)
+    expect(meta.previewColEnd).toBe(4)
+  })
+
+  it('续行只补上不到 3 列时不算多行表头，避免吞掉首行数据', () => {
+    const cells = {
+      '1:1': '序列号',
+      '1:2': '名称',
+      '1:3': '打分',
+      '2:1': '1',
+      '2:2': '动画A',
+      '2:3': '9',
+      '2:4': '备注甲',
+      '2:5': '备注乙',
+      '3:1': '2',
+    }
+    const meta = detectHeaderAndColumns(asWs(makeSheet('动画', cells)))
+
+    // 第 2 行只有 2 列落在「表头为空」的列上 → 低于阈值，按数据行处理
+    expect(meta.headerRow).toBe(1)
+    expect(meta.dataStartRow).toBe(2)
   })
 })
 
