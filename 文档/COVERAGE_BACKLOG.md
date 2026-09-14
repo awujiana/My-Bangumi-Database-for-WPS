@@ -5,7 +5,7 @@
 > **基线刷新**：2026-09-14（第三轮）—— 清单第 5 批（`enrich-preview-flow` 补测 + `panel-lifecycle` 表头检测修复）；`npm run gate` 七关全绿
 > **基线刷新**：2026-09-14（第四轮）—— 清单第 6 批（清掉第 9 / 11 条待办隐患：`clean-page` 死分支前移 + `enrich-preview-flow` 读名收口）；`npm run gate` 七关全绿
 > **基线刷新**：2026-09-14（第五轮）—— 清单第 7 批（`panel-lifecycle` 收尾到 100% lines + `ui/preview.ts` 补测）；`npm run gate` 七关全绿
-> **基线刷新**：2026-09-14（第六轮）—— 清单第 8 批（`sync/enrich-engine.ts` 假绿测试改写 + 切片补测、`ui/sync-result-dialog.ts` 零测试起步补测、清掉第 14 条的 preview.ts 两个待拍板隐患）；`npm run gate` 七关全绿
+> **基线刷新**：2026-09-14（第六轮）—— 清单第 8 批（`sync/enrich-engine.ts` 假绿测试改写 + 切片补测、`ui/sync-result-dialog.ts` 零测试起步补测、清掉第 14 条的 preview.ts 两个隐患）；`npm run gate` 七关全绿
 > **测试**：**3465 条 / 105 文件，全绿**
 > **全项目覆盖率**：**84.42% stmts / 75.57% branch / 85.71% funcs / 85.25% lines**（较首次生成 **+38.43 个点**）
 > **可执行行数**：13405，已覆盖 11429，**未覆盖 1976**
@@ -100,7 +100,7 @@ node scripts/calc-coverage-backlog.mjs
 5. ~~`ts/panel/panel-lifecycle.ts`（+3.55%）、`ts/ui/handlers/action-handlers.ts`（+3.07%）~~ ✅ **已完成**：
    - `panel-lifecycle.ts` 5.2% → **97.4% lines / 100% funcs**（74 条）；`action-handlers.ts` 29.67% → **97.59% lines**（100 条）。
    - **顺带抓到一处真生产 bug**：无表头回退分支 push 的是 `{text, important}` 对象，却标记为 `aligned: true`，而表格渲染对 aligned 行按 `string[]` 输出 → 用户在数据预览里看到一串 `[object Object]`。已修（回退分支直接 push 字符串）。
-   - **又一处死分支（未改，待拍板）**：397-404 行「多行表头补齐」中 `headerNames` 恒被填满 `MAX_SCAN_COLUMNS` 个元素 → `Object.hasOwn` 恒真 → `filled >= 3` **永不成立**，多行表头检测功能实际失效。涉及业务语义，不擅删。
+   - **又一处死分支（已于第三轮修改，见第 12 条）**：397-404 行「多行表头补齐」中 `headerNames` 恒被填满 `MAX_SCAN_COLUMNS` 个元素 → `Object.hasOwn` 恒真 → `filled >= 3` **永不成立**，多行表头检测功能实际失效。**第三轮已改**：新增 `hasHeaderName(index)`（判值非空）替换 4 处 `Object.hasOwn`；**第七轮进一步收口风险 A**（宽而稀疏表头被数据行补满空隙列时误判，见第 12 条风险 A 项）。
 
 **第 3 批（`ts/sync/**`）—— 原判断「不要为了数字去 mock」已被证伪**
 
