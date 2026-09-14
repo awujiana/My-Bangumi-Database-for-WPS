@@ -43,7 +43,6 @@ vi.mock('../ts/core/ui-bridge.js', () => ({
 }))
 
 import { LOG_LEVELS, ErrorLevel } from '../ts/core/constants.js'
-import type { ErrorOptions } from '../ts/core/constants.js'
 import { BgmError } from '../ts/core/result.js'
 import { logger } from '../ts/tools/logger.js'
 import { colNumberToLetter } from '../ts/tools/string-utilities.js'
@@ -335,19 +334,17 @@ describe('BGM · handleError 错误分级', () => {
     expect(result.details.context).toBe('syncFromGithub')
   })
 
-  it('省略 context 时不填 —— 默认空串让 ??= 短路，自动取名分支实际不可达', () => {
-    // 实现里 options_ 的默认值是 `context: ''`，而 `??=` 只认 null/undefined，
-    // 因此 `options_.context ??= getCallerFunctionName()` 永不触发、
-    // 后面的 `if (options_.context)` 也恒为假 —— 注释宣称的「自动获取调用函数名」并未生效。
+  it('省略 context 时不填 —— context 只在显式传入时写进 details', () => {
+    // 这里曾是「??= 被默认空串短路、自动取名分支不可达」的现场记录。
+    // 现已按「生产 90+ 调用点全部显式传 context」的事实删掉栈推断，
+    // 断言与当时一致，但不再是缺陷、而是设计。
     const result = BGM.handleError(new Error('x'), { level: ErrorLevel.SILENT })
     expect(result.details.context).toBeUndefined()
   })
 
-  it('显式传 context: undefined 才会走进自动取名分支', () => {
-    const options = { level: ErrorLevel.SILENT, context: undefined } as unknown as ErrorOptions
-    const result = BGM.handleError(new Error('x'), options)
-    expect(typeof result.details.context).toBe('string')
-    expect(String(result.details.context).length).toBeGreaterThan(0)
+  it('显式传空串等同于不传（不写 details.context）', () => {
+    const result = BGM.handleError(new Error('x'), { level: ErrorLevel.SILENT, context: '' })
+    expect(result.details.context).toBeUndefined()
   })
 
   it('level=SILENT 完全不输出', () => {

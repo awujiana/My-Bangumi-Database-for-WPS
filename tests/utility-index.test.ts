@@ -37,6 +37,7 @@ import { BGM_EVENTS, eventBus } from '../ts/tools/events.js'
 import {
   BGM,
   bgmLog,
+  _fetchBgmUserInfo,
   _getBgmUserId,
   _getBgmUsername,
   _getUserApiPath,
@@ -46,6 +47,7 @@ import {
   clearBgToken,
   clearTokenExpires,
   copyTokenToClipboard,
+  fetchBgmUserInfo,
   getUrlPath,
   loadBgToken,
   loadTokenExpires,
@@ -851,5 +853,326 @@ describe('util · showSettingsPanel', () => {
     showSettingsPanel()
 
     expect(store.get('settings_pane_id')).toBe('')
+  })
+})
+
+// ========== _fetchBgmUserInfo / fetchBgmUserInfo ==========
+/**
+ * 假 XMLHttpRequest：只实现被测代码真正用到的那一面
+ * （open / setRequestHeader / addEventListener / send / abort / timeout / status / responseText），
+ * 且 **不自动完成请求** —— 由每个用例显式 `emit('load' | 'error')` 或 `ontimeout()` 驱动，
+ * 这样 200 / 非 200 / 解析失败 / 网络错误 / 超时五条分支才能各自被精确触发。
+ */
+class FakeXhr {
+  static readonly instances: FakeXhr[] = []
+
+  private readonly listeners = new Map<string, (() => void)[]>()
+
+  status = 200
+
+  responseText = '{}'
+
+  timeout = 0
+
+  aborted = false
+
+  method = ''
+
+  url = ''
+
+  headers: Record<string, string> = {}
+
+  ontimeout: (() => void) | null = null
+
+  open(method: string, url: string): void {
+    this.method = method
+    this.url = url
+  }
+
+  setRequestHeader(key: string, value: string): void {
+    this.headers[key] = value
+  }
+
+  addEventListener(type: string, handler: () => void): void {
+    const existing = this.listeners.get(type)
+    if (existing) {
+      existing.push(handler)
+    } else {
+      this.listeners.set(type, [handler])
+    }
+  }
+
+  send(): void {
+    FakeXhr.instances.push(this)
+  }
+
+  abort(): void {
+    this.aborted = true
+    // 真实 XHR 在 abort 后触发 error 事件 —— 被测代码正是靠 signal.aborted 把二者区分开的
+    this.emit('error')
+  }
+
+  emit(type: string): void {
+    const handlers = this.listeners.get(type)
+    if (handlers) {
+      for (const handler of handlers) handler()
+    }
+  }
+}
+
+/** 装好假宿主与 Token，返回本次请求创建的 XHR */
+function startUserInfoRequest(signal?: AbortSignal): FakeXhr {
+  mountApp(createFakeApp().app)
+  storeBgToken('my-token')
+  _fetchBgmUserInfo(vi.fn(), signal)
+  const xhr = FakeXhr.instances[0]
+  if (!xhr) throw new Error('未发起请求')
+  return xhr
+}
+
+describe('util · _fetchBgmUserInfo（XHR 状态机）', () => {
+  beforeEach(() => {
+    FakeXhr.instances.length = 0
+    vi.stubGlobal('XMLHttpRequest', FakeXhr)
+  })
+
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  it('无 Token 时回调 none，且不发起请求', () => {
+    mountApp(createFakeApp().app)
+    clearBgToken()
+    const callback = vi.fn()
+
+    _fetchBgmUserInfo(callback)
+
+    expect(callback).toHaveBeenCalledWith(null, 'none')
+    expect(FakeXhr.instances).toHaveLength(0)
+  })
+
+  it('signal 已是 aborted 时回调 aborted，不发起请求', () => {
+    const controller = new AbortController()
+    controller.abort()
+    const callback = vi.fn()
+
+    mountApp(createFakeApp().app)
+    storeBgToken('t')
+    _fetchBgmUserInfo(callback, controller.signal)
+
+    expect(callback).toHaveBeenCalledWith(null, 'aborted')
+    expect(FakeXhr.instances).toHaveLength(0)
+  })
+
+  it('有 Token 时按 BGM API 约定发起 GET /v0/me（Bearer + 15s 超时）', () => {
+    const xhr = startUserInfoRequest()
+
+    expect(xhr.method).toBe('GET')
+    expect(xhr.url).toMatch(/\/v0\/me$/)
+    expect(xhr.headers.Authorization).toBe('Bearer my-token')
+    expect(xhr.headers['Content-Type']).toBe('application/json')
+    expect(xhr.timeout).toBe(15_000)
+  })
+
+  it('200 + 完整 payload：写用户信息、头像（剥掉反引号）、持久化并回调', () => {
+    const app = createFakeApp()
+    mountApp(app.app)
+    storeBgToken('my-token')
+    const callback = vi.fn()
+    _fetchBgmUserInfo(callback)
+
+    const xhr = FakeXhr.instances[0]
+    if (!xhr) throw new Error('未发起请求')
+    xhr.status = 200
+    xhr.responseText = JSON.stringify({
+      id: 42,
+      nickname: 'momo',
+      avatar: { large: '`https://lain.bgm.tv/pic/user/l/42.jpg`' },
+    })
+    xhr.emit('load')
+
+    expect(_getBgmUserId()).toBe('42')
+    expect(_getBgmUsername()).toBe('momo')
+    expect(BGM.cache.avatarUrl).toBe('https://lain.bgm.tv/pic/user/l/42.jpg')
+    expect(app.store.get('bgm_avatar_url')).toBe('https://lain.bgm.tv/pic/user/l/42.jpg')
+    expect(callback).toHaveBeenCalledWith(
+      { id: '42', username: 'momo', avatarUrl: 'https://lain.bgm.tv/pic/user/l/42.jpg' },
+      'none',
+    )
+  })
+
+  it('200 但无头像字段：回退到按用户名构造的头像 URL', () => {
+    const xhr = startUserInfoRequest()
+    xhr.status = 200
+    xhr.responseText = JSON.stringify({ user_id: 7, user_name: 'nameX' })
+    xhr.emit('load')
+
+    expect(BGM.cache.avatarUrl).toContain('/v0/users/nameX/avatar?type=large')
+  })
+
+  it('200 但既无头像也无用户名：avatarUrl 为 null，存储写空串', () => {
+    const app = createFakeApp()
+    mountApp(app.app)
+    storeBgToken('t')
+    _fetchBgmUserInfo(vi.fn())
+
+    const xhr = FakeXhr.instances[0]
+    if (!xhr) throw new Error('未发起请求')
+    xhr.responseText = JSON.stringify({})
+    xhr.emit('load')
+
+    expect(BGM.cache.avatarUrl).toBeNull()
+    expect(app.store.get('bgm_avatar_url')).toBe('')
+  })
+
+  it('字段为空串时退到备用字段（nickname 优先于 username）', () => {
+    const xhr = startUserInfoRequest()
+    xhr.responseText = JSON.stringify({ id: 3, nickname: '', username: 'fallbackName' })
+    xhr.emit('load')
+
+    expect(_getBgmUsername()).toBe('fallbackName')
+  })
+
+  it('200 但响应不是合法 JSON：回调 parse', () => {
+    const app = createFakeApp()
+    mountApp(app.app)
+    storeBgToken('t')
+    const callback = vi.fn()
+    _fetchBgmUserInfo(callback)
+
+    const xhr = FakeXhr.instances[0]
+    if (!xhr) throw new Error('未发起请求')
+    xhr.responseText = '这不是 JSON'
+    xhr.emit('load')
+
+    expect(callback).toHaveBeenCalledWith(null, 'parse')
+  })
+
+  it('HTTP 非 200：回调 http', () => {
+    const app = createFakeApp()
+    mountApp(app.app)
+    storeBgToken('t')
+    const callback = vi.fn()
+    _fetchBgmUserInfo(callback)
+
+    const xhr = FakeXhr.instances[0]
+    if (!xhr) throw new Error('未发起请求')
+    xhr.status = 401
+    xhr.emit('load')
+
+    expect(callback).toHaveBeenCalledWith(null, 'http')
+  })
+
+  it('网络错误（非 abort 引起）：回调 network', () => {
+    const app = createFakeApp()
+    mountApp(app.app)
+    storeBgToken('t')
+    const callback = vi.fn()
+    _fetchBgmUserInfo(callback)
+
+    FakeXhr.instances[0]?.emit('error')
+
+    expect(callback).toHaveBeenCalledWith(null, 'network')
+  })
+
+  it('超时：回调 network', () => {
+    const app = createFakeApp()
+    mountApp(app.app)
+    storeBgToken('t')
+    const callback = vi.fn()
+    _fetchBgmUserInfo(callback)
+
+    FakeXhr.instances[0]?.ontimeout?.()
+
+    expect(callback).toHaveBeenCalledWith(null, 'network')
+  })
+
+  it('请求进行中被 abort：归类为 aborted 而不是 network', () => {
+    const controller = new AbortController()
+    const app = createFakeApp()
+    mountApp(app.app)
+    storeBgToken('t')
+    const callback = vi.fn()
+    _fetchBgmUserInfo(callback, controller.signal)
+
+    const xhr = FakeXhr.instances[0]
+    controller.abort()
+
+    expect(xhr?.aborted).toBe(true)
+    expect(callback).toHaveBeenCalledWith(null, 'aborted')
+    expect(callback).not.toHaveBeenCalledWith(null, 'network')
+  })
+
+  it('不传 callback 时不抛错（调用方可只关心副作用）', () => {
+    const xhr = startUserInfoRequest()
+    expect(() => {
+      xhr.emit('load')
+    }).not.toThrow()
+    // 默认 responseText 是空对象 → 用户 ID 为空 → 按「无值」落成 null
+    expect(_getBgmUserId()).toBeNull()
+  })
+
+  it('头像持久化失败时静默（不把存储异常升级成请求失败）', () => {
+    const app = createFakeApp({ throwingKeys: ['bgm_avatar_url'] })
+    mountApp(app.app)
+    storeBgToken('t')
+    const callback = vi.fn()
+    _fetchBgmUserInfo(callback)
+
+    const xhr = FakeXhr.instances[0]
+    if (!xhr) throw new Error('未发起请求')
+    xhr.responseText = JSON.stringify({ id: 9, nickname: 'noPersist' })
+    expect(() => {
+      xhr.emit('load')
+    }).not.toThrow()
+    expect(_getBgmUserId()).toBe('9')
+    expect(callback).toHaveBeenCalledWith(
+      expect.objectContaining({ id: '9', username: 'noPersist' }),
+      'none',
+    )
+  })
+})
+
+describe('util · fetchBgmUserInfo（Promise 包装）', () => {
+  beforeEach(() => {
+    FakeXhr.instances.length = 0
+    vi.stubGlobal('XMLHttpRequest', FakeXhr)
+  })
+
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  it('成功时 resolve 用户信息与 errorType=none', async () => {
+    mountApp(createFakeApp().app)
+    storeBgToken('t')
+    const promise = fetchBgmUserInfo()
+
+    const xhr = FakeXhr.instances[0]
+    if (!xhr) throw new Error('未发起请求')
+    xhr.responseText = JSON.stringify({ id: 11, nickname: 'promiseUser' })
+    xhr.emit('load')
+
+    const { userInfo, errorType } = await promise
+    expect(errorType).toBe('none')
+    expect(userInfo?.id).toBe('11')
+    expect(userInfo?.username).toBe('promiseUser')
+  })
+
+  it('无 Token 时 resolve null 且 errorType=none', async () => {
+    mountApp(createFakeApp().app)
+    clearBgToken()
+
+    await expect(fetchBgmUserInfo()).resolves.toEqual({ userInfo: null, errorType: 'none' })
+  })
+
+  it('网络错误时把 errorType 透传给调用方（便于区分「被墙」与「Token 失效」）', async () => {
+    mountApp(createFakeApp().app)
+    storeBgToken('t')
+    const promise = fetchBgmUserInfo()
+
+    FakeXhr.instances[0]?.emit('error')
+
+    await expect(promise).resolves.toEqual({ userInfo: null, errorType: 'network' })
   })
 })

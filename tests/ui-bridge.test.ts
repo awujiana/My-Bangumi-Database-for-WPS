@@ -102,7 +102,10 @@ describe('core/ui-bridge', () => {
     })
   })
 
-  describe('生产装配（防止忘记注册）', () => {
+  // 这两条要 `await import` 整条生产依赖链（preview.ts → sync/… 几十个模块），
+  // 冷启动 + 并行 worker 争 CPU 时首次 transform 会超过默认 5s —— 是环境慢、不是断言错，
+  // 因此单独放宽超时，避免它反复把全量测试染红（隔离单跑一直是 9/9 稳过）。
+  describe('生产装配（防止忘记注册）', { timeout: 30_000 }, () => {
     it('import ui/dialog.ts 即注册通知与同步进度实现', async () => {
       const dialog = await import('../ts/ui/dialog.js')
       const bridge = await import('../ts/core/ui-bridge.js')

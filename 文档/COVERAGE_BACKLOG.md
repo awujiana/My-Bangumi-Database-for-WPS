@@ -1,13 +1,15 @@
 # 补测待办清单（按性价比排序）
 
 > **首次生成**：2026-09-13（基线 46.82% lines / 2348 测试）
-> **基线刷新**：2026-09-13 晚 —— 清单第 1 批已全部完成
-> **测试**：2569 条 / 91 文件（2568 通过；唯一失败为 `ui-bridge` 的 5s 超时 flaky，隔离跑 9/9 稳过）
-> **全项目覆盖率**：**50.34% stmts / 44.03% branch / 57.39% funcs / 50.67% lines**（较首次生成 **+3.85 个点**）
-> **可执行行数**：13417，已覆盖 6799，**未覆盖 6618**
-> **换算**：全项目**每提升 1 个百分点 ≈ 134 行**（= 13417 / 100）
+> **基线刷新**：2026-09-14 —— 清单**第 1、2 批全部完成**；`ui-bridge` flaky 已消除
+> **测试**：**2809 条 / 94 文件，全绿**（`ui-bridge` 的 5s 超时 flaky 已通过放宽两处 `await import()` 用例超时消除）
+> **全项目覆盖率**：**61.21% stmts / 53.16% branch / 66.66% funcs / 61.81% lines**（较首次生成 **+14.99 个点**）
+> **可执行行数**：13402，已覆盖 8284，**未覆盖 5118**
+> **换算**：全项目**每提升 1 个百分点 ≈ 134 行**（= 13402 / 100）
 >
-> 注：本轮涨幅来自三处 —— `auto-fill-url.ts` →100%、`panel-events.ts` + `settings-bindings.ts` →100%、`tools/util/index.ts` 30.81→88.05%；可执行行总数从 13361 涨到 13417 是同期外部在途改动（`ts/sync/jsonl-response.ts` 等）带来的。
+> 注：第 2 批（`enrich-page.ts` 0.6%→88.21%、`panel-lifecycle.ts` 5.2%→97.4%、`action-handlers.ts` 29.67%→97.59%）合计 +11.14 个点，是本轮涨幅主体；
+> **关键结论**：这三个大文件**都没走「先拆后测」**—— 实测它们依赖的多为**收敛到单一 barrel 的薄路由 + 宿主对象**，用「真 DOM + mock 单个 barrel」就地驱动真实实现即可，断言打到真实 state 变迁 / 真实 DOM 写入，不存在假覆盖（同 §三-1 对 `tools/util/index.ts` 的判据）。
+> 可执行行总数从 13417 降到 13402 是同期外部在途改动（`ts/sync/**` 重命名与合并）带来的。
 
 数据来源：`coverage/coverage-summary.json`（`npx vitest run --coverage --config vitest.cov.config.ts --coverage.reporter=json-summary`）。
 复算脚本：`scripts/calc-coverage-backlog.mjs`（读 summary → 按未覆盖行数排序 → 输出本文档表格）。
@@ -82,10 +84,15 @@ node scripts/calc-coverage-backlog.mjs
 2. ~~`ts/tools/auto-fill-url.ts`（+0.43%）~~ ✅ **已完成**（2026-09-13，提交 `ed66b8fd`）：新增 18 条测试，statements / functions / lines 100%、branches 96.66%（余 1 条为不可达防御分支，见 REF-gates-scripts.md）；单文件自查命令见该文件；
 3. ~~`ts/ui/handlers/panel-events.ts`（+0.63%）、`settings-bindings.ts`（+0.57%）~~ ✅ **已完成**（2026-09-13）：两个文件均达 statements / branches / functions / lines **100%**（29 + 34 = 63 条测试）。做法是「每个 handler 都覆盖『控件/依赖缺失 → 早退』与『控件存在 → 落盘 + toast 文案』两侧」，因为这两个文件的共同风险正是**取不到元素就静默 return**（id 拼错、DOM 重构后忘同步，表现都是「改了设置但不生效」且不报错）。
 
-**第 2 批（先拆后测，单项收益最大）**
+**第 2 批（先拆后测，单项收益最大）** —— ✅ **2026-09-14 全部完成，但结论改写了：三个文件都没拆**
 
-4. `ts/panel/enrich-page.ts`（+4.92%）—— **必须先拆**。按现有节奏一次抽 1~2 个自洽切片，每步 `tsc` + `eslint` 验证，抽出来的新模块直接配 100% 单测。
-5. `ts/panel/panel-lifecycle.ts`（+3.55%）、`ts/ui/handlers/action-handlers.ts`（+3.07%）—— 同上，后者是分发表，抽出「入参解析」这类纯逻辑最好测。
+4. ~~`ts/panel/enrich-page.ts`（+4.92%）~~ ✅ **已完成**：行覆盖 **0.6% → 88.21%**（新增 `tests/enrich-page.test.ts` 49 条）。
+   **没有拆** —— 它虽是 1603 行编排控制器、import 15+ 兄弟模块，但**全部依赖都收敛进同一个 `ts/index.js` barrel**，`vi.mock` 单点即可接管；`enrich-page-context`（state 单例 + `safeGet*` 取元素）与 `enrich-file-name`（纯函数）用**真实现**。测试用真 DOM 驱动绑定路由、断言真实 state 变迁与真实点击分发的副作用。
+   **修正判据**：「依赖一堆兄弟模块 → 先拆」的前提是**无法用一个 mock 点接管全部依赖**。若依赖已收敛到单一 barrel，就地测同样不是假覆盖。
+5. ~~`ts/panel/panel-lifecycle.ts`（+3.55%）、`ts/ui/handlers/action-handlers.ts`（+3.07%）~~ ✅ **已完成**：
+   - `panel-lifecycle.ts` 5.2% → **97.4% lines / 100% funcs**（74 条）；`action-handlers.ts` 29.67% → **97.59% lines**（100 条）。
+   - **顺带抓到一处真生产 bug**：无表头回退分支 push 的是 `{text, important}` 对象，却标记为 `aligned: true`，而表格渲染对 aligned 行按 `string[]` 输出 → 用户在数据预览里看到一串 `[object Object]`。已修（回退分支直接 push 字符串）。
+   - **又一处死分支（未改，待拍板）**：397-404 行「多行表头补齐」中 `headerNames` 恒被填满 `MAX_SCAN_COLUMNS` 个元素 → `Object.hasOwn` 恒真 → `filled >= 3` **永不成立**，多行表头检测功能实际失效。涉及业务语义，不擅删。
 
 **第 3 批（投入产出比最低，谨慎）**
 

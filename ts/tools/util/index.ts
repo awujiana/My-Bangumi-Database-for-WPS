@@ -453,8 +453,10 @@ export const BGM: {
       context: '',
       ...options,
     }
-    // ✅ 自动获取调用函数名（如果 context 未手动指定）
-    options_.context ??= getCallerFunctionName()
+    // context 只在调用方显式传入时写进 details —— 不做栈推断。
+    // （原实现是 `options_.context ??= getCallerFunctionName()`，但默认值 `context: ''`
+    //  让 ??= 恒短路，分支从未生效；且生产 90+ 个调用点全都显式传 context，
+    //  栈解析在打包后的 WPS WebView 里也不可靠，故连同 getCallerFunctionName 一并移除。）
     let bgmError: BgmError
     if (error instanceof BgmError) {
       bgmError = error
@@ -587,39 +589,6 @@ export function bgmLog(level: number, message_ = ''): void {
     }
   }
 }
-/**
- * 从调用栈中提取第一个非内部函数的名称
- * @param skipAdditional 额外跳过的帧数（备用，通常无需传）
- */
-function getCallerFunctionName(_skipAdditional = 0): string {
-  const error = new Error('getCallerFunctionName')
-  const stack = error.stack ?? ''
-  const lines = stack.split('\n')
-  // 需要跳过的内部函数名列表
-  const internalFuncs = new Set([
-    'getCallerFunctionName',
-    'handleError',
-    'safeExecute',
-    'BGM.handleError',
-    'BGM.safeExecute',
-  ])
-
-  for (let index = 2; index < lines.length; index += 1) {
-    const rawLine = lines[index]
-    if (rawLine !== undefined) {
-      const line = rawLine.trim()
-      const match = /at\s+([^\s(]+)/.exec(line)
-      if (match) {
-        const name = match[1]
-        if (name !== undefined && !internalFuncs.has(name)) {
-          return name
-        }
-      }
-    }
-  }
-  return 'unknown'
-}
-
 // ========== Application 获取 ==========
 /**
  * 获取 Application 对象（使用类型守卫）

@@ -918,12 +918,14 @@ export function refreshData(): void {
       for (let r = 1; r <= Math.min(lastRow, 100) && count < 5; r += 1) {
         const isRowIncluded = !isFiltered || !visibleRowSet || visibleRowSet.has(r)
         if (isRowIncluded) {
-          const cols: { text: string; important: boolean }[] = []
+          // 与表头分支一致：cols 必须是字符串数组（aligned 路径的 renderPreviewTable
+          // 按 string[] 渲染；此前 push {text,important} 对象会显示成 [object Object]）
+          const cols: string[] = []
           let hasAny = false
           for (let c = 1; c <= PANEL_CONFIG.MAX_SCAN_COLUMNS; c += 1) {
             const v = getCellValue(ws, r, c).trim()
             if (v) {
-              cols.push({ text: v, important: false })
+              cols.push(v)
               hasAny = true
             }
           }
