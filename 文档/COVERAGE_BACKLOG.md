@@ -2,10 +2,14 @@
 
 > **首次生成**：2026-09-13（基线 46.82% lines / 2348 测试）
 > **基线刷新**：2026-09-14（第二轮）—— 清单第 1~4 批全部完成；`ui-bridge` flaky 已消除；`npm run gate` 七关全绿
-> **测试**：**3190 条 / 101 文件，全绿**
-> **全项目覆盖率**：**75.07% stmts / 64.74% branch / 78.49% funcs / 76.03% lines**（较首次生成 **+29.21 个点**）
-> **可执行行数**：13402，已覆盖 10190，**未覆盖 3212**
-> **换算**：全项目**每提升 1 个百分点 ≈ 134 行**（= 13402 / 100）
+> **基线刷新**：2026-09-14（第三轮）—— 清单第 5 批（`enrich-preview-flow` 补测 + `panel-lifecycle` 表头检测修复）；`npm run gate` 七关全绿
+> **测试**：**3271 条 / 102 文件，全绿**
+> **全项目覆盖率**：**78.12% stmts / 68.05% branch / 81.16% funcs / 79.02% lines**（较首次生成 **+32.20 个点**）
+> **可执行行数**：13401，已覆盖 10590，**未覆盖 2811**
+> **换算**：全项目**每提升 1 个百分点 ≈ 134 行**（= 13401 / 100）
+>
+> 注：第二轮涨幅主体是 §三 第 3、4 批 —— `ribbon-service`、`ui/handlers/sync`、`clean-page`、`scraping`、`sheet-cleaning`、`shell-nav` 等
+> 由 0~30% 补到 88~100%，未覆盖行 **5118 → 3212（−1906 行）**；第三轮（第 5 批）未覆盖 **3212 → 2811（−401 行）**。
 >
 > 注：第二轮涨幅主体是 §三 第 3、4 批 —— `ribbon-service`、`ui/handlers/sync`、`clean-page`、`scraping`、`sheet-cleaning`、`shell-nav` 等
 > 由 0~30% 补到 88~100%，未覆盖行 **5118 → 3212（−1906 行）**。
@@ -121,6 +125,12 @@ node scripts/calc-coverage-backlog.mjs
       源工作簿被关闭后读 `.Name` 抛错 → 被 `detectHeaderOnSheet` 的 catch 接住并 **返回 null**，而 state 已写入 →
       「列映射编辑器 + 源数据预览 + 工作簿按钮条」整链不渲染，用户只看到「识别表头失败」。建议补同形兜底。
     - 🔎 **死分支**：`316-322` 行按钮名 getter 的 `catch { return '' }` 不可达（能进循环的工作簿必已被 `collectWorkbookTabs()` 成功读过名字）。
+
+12. 🔧 **`ts/panel/panel-lifecycle.ts` 表头检测修复**（第三轮，**已改生产代码**）：`detectHeaderAndColumns` 的「多行表头检测」是死分支，但**不是功能不需要，而是判据写错** ——
+    `headerNames` 由 `push` 填满 `MAX_SCAN_COLUMNS` 项（定长稠密数组），4 处却用 `Object.hasOwn(headerNames, c - 1)` 探测「该列有无表头名」→ **恒真**。
+    探针实测：`filled` 恒 0（多行表头永不触发、`dataStartRow` 不推进）、`headerLastCol` 恒 60（预览 `columnCount` 恒 60、应 4）、预览起始列恒为 `firstDataCol - 5`（左扩循环空转）。
+    修复：新增 `hasHeaderName(index)`（判值非空）替换 4 处；并把锚点行**向上回溯到连续候选块首行**，解决「补齐行比主表头行更宽时主表头列名整行丢失」。测试 78 条全绿，文件行覆盖 **98.99%**。
+    - 🔎 **未做**：`candidates.sort` 本身未动（它还承担「表头上方有零散关键词行」的取舍）；`autoDetectSheet` 走 `findBangumiTargetSheets()`（`tools/locked-sheet.ts` 里另一套实现），与本函数**不共用**，未受牵连。
 
 ---
 
