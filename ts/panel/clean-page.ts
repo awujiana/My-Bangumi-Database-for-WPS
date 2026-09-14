@@ -640,6 +640,12 @@ function renderPreview(result: CleanScanResult): void {
 
 /** 扫描预览（只读，不修改任何数据） */
 function handleScan(): void {
+  // 宿主检查必须放在最前：下方 getSelectedSheetKeys() 依赖 getApp()?.PluginStorage，
+  // 宿主缺失时它必然返回空集并在前面提前 return，使这里的提示永远不可达。
+  if (!getApp()) {
+    BGM.Dialog.alert('提示', '未连接到 Excel / WPS，请打开工作簿后重试')
+    return
+  }
   const ruleIds = getSelectedRuleIds()
   if (ruleIds.length === 0) {
     showToast('请至少勾选一个清理项', 'warn')
@@ -648,10 +654,6 @@ function handleScan(): void {
   const selectedSheets = getSelectedSheetKeys()
   if (selectedSheets.length === 0) {
     showToast('请先在「🎯 选择清理的表格」中加载并勾选至少一张工作表', 'warn')
-    return
-  }
-  if (!getApp()) {
-    BGM.Dialog.alert('提示', '未连接到 Excel / WPS，请打开工作簿后重试')
     return
   }
   appendLog(

@@ -217,6 +217,21 @@ const INTRO_PREVIEW_FIELDS: { key: ScalarMappingKey; label: string }[] = [
   { key: 'originalWorkCol', label: '原作' },
 ]
 
+/**
+ * 安全读取工作簿 / 工作表名。
+ * @remarks 工作簿可能正在切换或已被关闭，此时读 `.Name` 会抛 COM 异常。该异常若冒泡到
+ *   `detectHeaderOnSheet` 的 catch，会让「列映射编辑器 + 源数据预览 + 工作簿按钮条」整链静默
+ *   不渲染（而 state 早已写入），用户只看到一句「识别表头失败」。故读名一律走这里。
+ */
+function readWorkbookName(wb: { Name: string } | null | undefined): string {
+  if (!wb) return ''
+  try {
+    return wb.Name
+  } catch {
+    return ''
+  }
+}
+
 // ========== 简介工作表关联 ==========
 
 /**
@@ -227,7 +242,7 @@ const INTRO_PREVIEW_FIELDS: { key: ScalarMappingKey; label: string }[] = [
  */
 function discoverIntroContext(): void {
   state.introContext = null
-  const sourceName = state.animeSourceSheet?.Name ?? ''
+  const sourceName = readWorkbookName(state.animeSourceSheet)
   const sourceWb =
     state.sourceWorkbook ??
     (state.animeSourceSheet as unknown as { Parent?: WpsWorkbook } | null)?.Parent ??
@@ -242,14 +257,8 @@ function discoverIntroContext(): void {
   }
 
   for (const wb of getOpenWorkbooks()) {
-    const name = (() => {
-      try {
-        return wb.Name
-      } catch {
-        return ''
-      }
-    })()
-    if (sourceWb?.Name === name) {
+    const name = readWorkbookName(wb)
+    if (readWorkbookName(sourceWb) === name) {
       // 源工作簿已在上方优先查找，跳过
     } else {
       const sheet = findIntroSheetInWorkbook(wb, sourceName)
@@ -271,14 +280,10 @@ function collectWorkbookTabs(): WpsWorkbook[] {
   const seen = new Set<string>()
   const items: WpsWorkbook[] = []
   const push = (wb: WpsWorkbook): void => {
-    try {
-      const name = wb.Name
-      if (name && !seen.has(name)) {
-        seen.add(name)
-        items.push(wb)
-      }
-    } catch {
-      // 工作簿切换中，跳过
+    const name = readWorkbookName(wb)
+    if (name && !seen.has(name)) {
+      seen.add(name)
+      items.push(wb)
     }
   }
   if (state.sourceWorkbook) push(state.sourceWorkbook)
@@ -286,13 +291,14 @@ function collectWorkbookTabs(): WpsWorkbook[] {
   return items
 }
 
-/** 当前活动源工作簿名（无则空串） */
+/** 当前活动源工作簿名（无则空串；工作簿已关闭时读名会抛错，故走 readWorkbookName 兜底） */
 function activeWorkbookName(): string {
-  return state.animeSourceSheet
-    ? (state.sourceWorkbook?.Name ??
-        (state.animeSourceSheet as unknown as { Parent?: WpsWorkbook } | null)?.Parent?.Name ??
-        '')
-    : ''
+  if (!state.animeSourceSheet) return ''
+  const fromSourceWorkbook = readWorkbookName(state.sourceWorkbook)
+  if (fromSourceWorkbook !== '') return fromSourceWorkbook
+  return readWorkbookName(
+    (state.animeSourceSheet as unknown as { Parent?: WpsWorkbook | null } | null)?.Parent ?? null,
+  )
 }
 
 /** 渲染「26年4月」式切换按钮条；仅一个候选时隐藏 */
@@ -313,13 +319,7 @@ function renderWorkbookTabs(): void {
   for (const wb of items) {
     const button = document.createElement('button')
     button.type = 'button'
-    const name = (() => {
-      try {
-        return wb.Name
-      } catch {
-        return ''
-      }
-    })()
+    const name = readWorkbookName(wb)
     button.className = `workbook-tab${name === activeName ? ' active' : ''}`
     button.textContent = monthLabelFromWorkbookName(name)
     button.title = name

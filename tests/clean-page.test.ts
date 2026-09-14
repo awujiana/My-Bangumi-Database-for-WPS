@@ -860,6 +860,19 @@ describe('renderSheetList 交互', () => {
 // ========== 扫描预览 ==========
 
 describe('handleScan', () => {
+  it('未连接宿主时先弹提示并中止（宿主检查位于函数入口）', async () => {
+    // 回归：宿主检查原先排在依赖 getApp()?.PluginStorage 的工作表校验之后，该提示永远不可达
+    await mountScannable()
+    m.getApp.mockReturnValue(null)
+    m.appendOperationLog.mockClear()
+
+    clickById('cleanScanBtn')
+
+    expect(m.dialogAlert).toHaveBeenCalledWith('提示', '未连接到 Excel / WPS，请打开工作簿后重试')
+    expect(m.scanCleanRules).not.toHaveBeenCalled()
+    expect(loggedMessages()).toEqual([])
+  })
+
   it('未勾选任何清理项时提示并中止', async () => {
     await mountScannable()
     for (const rule of CLEAN_RULES) {

@@ -967,6 +967,20 @@ describe('工作簿切换按钮条', () => {
     expect(workbookTabButtons().every((button) => button.className === 'workbook-tab')).toBe(true)
   })
 
+  it('源工作簿已关闭（读名抛错）时表头识别整链仍渲染', () => {
+    // 回归：读名抛错原先会冒泡到 detectHeaderOnSheet 的 catch，使渲染链静默中断
+    state.sourceWorkbook = makeWorkbook({ throwsOnName: true })
+    m.monthLabelFromWorkbookName.mockImplementation((name) => `[${name}]`)
+
+    // 抛错的工作簿会被 collectWorkbookTabs() 跳过，需另给两个候选才会走到 activeWorkbookName()
+    renderWorkbookTabButtons([makeWorkbook({ name: '甲' }), makeWorkbook({ name: '乙' })])
+
+    expect(m.dialogError).not.toHaveBeenCalled()
+    expect(mappingList().querySelectorAll('.mapping-select').length).toBeGreaterThan(0)
+    expect(elementById('workbookTabs').style.display).toBe('')
+    expect(workbookTabButtons()).toHaveLength(2)
+  })
+
   it('点击当前源工作簿不触发切换', () => {
     state.sourceWorkbook = makeWorkbook({ name: '甲' })
 

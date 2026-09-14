@@ -3,16 +3,14 @@
 > **首次生成**：2026-09-13（基线 46.82% lines / 2348 测试）
 > **基线刷新**：2026-09-14（第二轮）—— 清单第 1~4 批全部完成；`ui-bridge` flaky 已消除；`npm run gate` 七关全绿
 > **基线刷新**：2026-09-14（第三轮）—— 清单第 5 批（`enrich-preview-flow` 补测 + `panel-lifecycle` 表头检测修复）；`npm run gate` 七关全绿
-> **测试**：**3271 条 / 102 文件，全绿**
-> **全项目覆盖率**：**78.12% stmts / 68.05% branch / 81.16% funcs / 79.02% lines**（较首次生成 **+32.20 个点**）
-> **可执行行数**：13401，已覆盖 10590，**未覆盖 2811**
+> **基线刷新**：2026-09-14（第四轮）—— 清单第 6 批（清掉第 9 / 11 条待办隐患：`clean-page` 死分支前移 + `enrich-preview-flow` 读名收口）；`npm run gate` 七关全绿
+> **测试**：**3273 条 / 102 文件，全绿**
+> **全项目覆盖率**：**78.14% stmts / 68.07% branch / 81.15% funcs / 79.04% lines**（较首次生成 **+32.22 个点**）
+> **可执行行数**：13401，已覆盖 10593，**未覆盖 2808**
 > **换算**：全项目**每提升 1 个百分点 ≈ 134 行**（= 13401 / 100）
 >
 > 注：第二轮涨幅主体是 §三 第 3、4 批 —— `ribbon-service`、`ui/handlers/sync`、`clean-page`、`scraping`、`sheet-cleaning`、`shell-nav` 等
-> 由 0~30% 补到 88~100%，未覆盖行 **5118 → 3212（−1906 行）**；第三轮（第 5 批）未覆盖 **3212 → 2811（−401 行）**。
->
-> 注：第二轮涨幅主体是 §三 第 3、4 批 —— `ribbon-service`、`ui/handlers/sync`、`clean-page`、`scraping`、`sheet-cleaning`、`shell-nav` 等
-> 由 0~30% 补到 88~100%，未覆盖行 **5118 → 3212（−1906 行）**。
+> 由 0~30% 补到 88~100%，未覆盖行 **5118 → 3212（−1906 行）**；第三轮（第 5 批）**3212 → 2811（−401 行）**；第四轮（第 6 批）**2811 → 2808（−3 行）**。
 > **关键结论（累积）**：清单前列的「大文件 / COM 模块」**都没有走「先拆后测」**——依赖收敛到单一 barrel、依赖宿主对象、或依赖 ≤3 个薄封装的，就地测即可，
 > 断言打到真实 state 变迁 / 真实写盘调用 / 真实 DOM 写入，**不存在假覆盖**（判据见 `.workbuddy/memory/REF-testing.md`）。
 
@@ -115,22 +113,28 @@ node scripts/calc-coverage-backlog.mjs
    两者与 `ts/index.js` 互相 re-export，**对 barrel 用 `vi.mock(async (importOriginal) => …)` 会死锁**、vitest 静默回退真实现（mock 调用恒 0、走真网络）→ 改**逐层 mock 叶子模块**（见 `REF-testing.md`）。
 8. ~~`ts/panel/clean-page.ts`（+2.55%）、`ts/sync/scraping.ts`、`ts/sync/sheet-cleaning.ts`、`ts/panel/shell-nav.ts`~~ ✅ **已完成**：
    `clean-page.ts` 0% → **99.41% lines**（54 条）；`scraping.ts` 0% → **100% 全指标**（33 条）；`sheet-cleaning.ts` 0% → **100% lines**（49 条）；`shell-nav.ts` 0% → **100% lines**（30 条）。
-9. 🔎 **死分支（未改生产代码，待拍板）**：`clean-page.ts` 的 `handleScan` 里 `if (!getApp())` **不可达** —— `getSelectedSheetKeys()` 自身要经 `getApp()?.PluginStorage` 读存储，未连接宿主时集合必为空、前面的检查先 return，
-   即「未连接到 Excel / WPS」提示**永远不会显示**；建议把 `getApp()` 检查提到最前。
+9. ~~`clean-page.ts` 的 `handleScan` 宿主检查死分支~~ ✅ **已修复（2026-09-14）**：原顺序是「校验勾选清理项 → 校验已勾选工作表 → `if (!getApp())` 弹提示」，而第二道校验要经 `getApp()?.PluginStorage` 读存储 → 未连接宿主时集合必为空、前面的检查先 return，
+   **「未连接到 Excel / WPS」提示永远不会显示**。修复：把该检查**整块前移到函数入口**（不是删掉）。
+   用户可见变化：无宿主点「扫描」原本得到**误导提示**「请先…加载并勾选至少一张工作表」，现在得到准确的宿主提示。「死分支」的第三种处理方式（补测 / 删除 / **前移**）见 `REF-testing.md`。
 10. 🧹 **顺带修掉的历史门禁红灯**：`tests/shell-nav.test.ts` 带着 6 处 lint 错误入过库（3 处 `no-manually-wrapped-comments` + 3 处 `prefer-object-define-properties`），已用带断言的 node 脚本修复，gate 恢复 0。
 11. ~~`ts/panel/enrich-preview-flow.ts`（+2.94%）~~ ✅ **已完成**（2026-09-14）：行覆盖 **1% → 99.74%**（新增 `tests/enrich-preview-flow.test.ts` 77 条，funcs 100%）。
     **没有拆文件** —— 16 个 import 全是叶子模块、不回引 barrel，逐模块 `vi.mock` 就地测；`enrich-page-context` 用真实现（state 单例 + 真 `getElementById`），
     所以「元素缺失 → 早退」是真删 DOM 驱动的。
-    - 🔎 **隐患（未改生产代码）**：`activeWorkbookName()` 读 `sourceWorkbook.Name` / `Parent.Name` 时**没包 try/catch**（`collectWorkbookTabs()` 包了）。
-      源工作簿被关闭后读 `.Name` 抛错 → 被 `detectHeaderOnSheet` 的 catch 接住并 **返回 null**，而 state 已写入 →
-      「列映射编辑器 + 源数据预览 + 工作簿按钮条」整链不渲染，用户只看到「识别表头失败」。建议补同形兜底。
-    - 🔎 **死分支**：`316-322` 行按钮名 getter 的 `catch { return '' }` 不可达（能进循环的工作簿必已被 `collectWorkbookTabs()` 成功读过名字）。
+    - ✅ **隐患已修（2026-09-14）**：`activeWorkbookName()` 原先裸读 `.Name`（同文件 `collectWorkbookTabs()` 包了 try），源工作簿关闭后抛错 → 被 `detectHeaderOnSheet` 的 catch 接住并 **返回 null**，而 state 已写入 → 「列映射编辑器 + 源数据预览 + 工作簿按钮条」整链不渲染，用户只看到「识别表头失败」。
+      修复：新增 `readWorkbookName(wb)`，把该文件**全部 5 处读名**（3 处内联 IIFE + 1 处裸读 + 源表名）收口到一处；读名失败降级为空串（该工作簿本就该被跳过 / 不高亮），链继续走。
+    - ✅ **316-322 行那个「不可达 catch」随收口消失**：它被合并进 `readWorkbookName()`，并由新增的「源工作簿已关闭」用例真正覆盖，不再是未覆盖分支。
 
 12. 🔧 **`ts/panel/panel-lifecycle.ts` 表头检测修复**（第三轮，**已改生产代码**）：`detectHeaderAndColumns` 的「多行表头检测」是死分支，但**不是功能不需要，而是判据写错** ——
     `headerNames` 由 `push` 填满 `MAX_SCAN_COLUMNS` 项（定长稠密数组），4 处却用 `Object.hasOwn(headerNames, c - 1)` 探测「该列有无表头名」→ **恒真**。
     探针实测：`filled` 恒 0（多行表头永不触发、`dataStartRow` 不推进）、`headerLastCol` 恒 60（预览 `columnCount` 恒 60、应 4）、预览起始列恒为 `firstDataCol - 5`（左扩循环空转）。
     修复：新增 `hasHeaderName(index)`（判值非空）替换 4 处；并把锚点行**向上回溯到连续候选块首行**，解决「补齐行比主表头行更宽时主表头列名整行丢失」。测试 78 条全绿，文件行覆盖 **98.99%**。
     - 🔎 **未做**：`candidates.sort` 本身未动（它还承担「表头上方有零散关键词行」的取舍）；`autoDetectSheet` 走 `findBangumiTargetSheets()`（`tools/locked-sheet.ts` 里另一套实现），与本函数**不共用**，未受牵连。
+
+13. 🔧 **清掉第 9 / 11 条的待办隐患**（第三轮，**已改生产代码**）：
+    - `ts/panel/clean-page.ts`：宿主检查前移到 `handleScan` 入口；行覆盖 99.41% → **100% lines / 100% funcs**（55 条）。
+    - `ts/panel/enrich-preview-flow.ts`：读名收口到 `readWorkbookName()`；行覆盖 99.74% → **100% lines / 100% funcs**（78 条）。
+    - **验证方式：「回滚 → 复跑」**。两条新用例断言的是**可观察结果**（`dialogAlert` 调用次数 / `.mapping-select` 是否渲染），不是 `not.toThrow()` —— 后者对 `detectHeaderOnSheet` 的 try/catch 是**无效断言**（异常被吞、恒过）。临时回滚两处修复后复跑：`dialogAlert` 调用 **0 次**、`dialogError` 被调用 1 次且消息为 `识别表头失败: workbook closed`，证明用例真抓得住旧 bug。
+    - 未扩面的同源点（刻意不动）：`switchSourceWorkbook` 337/358 行（操作的是用户刚点的工作簿）、`previewMatch` 的两处 `state.*.Name`（在 try 内）；其它模块（`tools/locked-sheet.ts`、`sync/workbook-auto-detect.ts`、`panel/panel-lifecycle.ts`）的同类模式各自已有守卫。
 
 ---
 
