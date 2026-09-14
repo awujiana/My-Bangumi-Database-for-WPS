@@ -6,13 +6,14 @@
 > **基线刷新**：2026-09-14（第四轮）—— 清单第 6 批（清掉第 9 / 11 条待办隐患：`clean-page` 死分支前移 + `enrich-preview-flow` 读名收口）；`npm run gate` 七关全绿
 > **基线刷新**：2026-09-14（第五轮）—— 清单第 7 批（`panel-lifecycle` 收尾到 100% lines + `ui/preview.ts` 补测）；`npm run gate` 七关全绿
 > **基线刷新**：2026-09-14（第六轮）—— 清单第 8 批（`sync/enrich-engine.ts` 假绿测试改写 + 切片补测、`ui/sync-result-dialog.ts` 零测试起步补测、清掉第 14 条的 preview.ts 两个隐患）；`npm run gate` 七关全绿
-> **测试**：**3465 条 / 105 文件，全绿**
-> **全项目覆盖率**：**84.42% stmts / 75.57% branch / 85.71% funcs / 85.25% lines**（较首次生成 **+38.43 个点**）
-> **可执行行数**：13405，已覆盖 11429，**未覆盖 1976**
-> **换算**：全项目**每提升 1 个百分点 ≈ 134 行**（= 13405 / 100）
+> **基线刷新**：2026-09-14（第七轮）—— 清单第 9 批：`sync/enrich-record.ts` 1.67% → **100%**（未覆盖 176 → 0）、`ui/dialog.ts` 44% → **99.63%**（154 → 1，新增 `tests/dialog.ui.test.ts` 覆盖全部 UI 层）、`sync/exceltobangumi/index.ts` 48.33% → **74.62%**（279 → 137，只吃选区收集 / 行校验 / 筛选检测等纯逻辑切片，网络请求与重 COM 编排未硬造）；`npm run gate` 七关全绿
+> **测试**：**3616 条 / 108 文件，全绿**
+> **全项目覆盖率**：**87.96% stmts / 78.82% branch / 88.46% funcs / 88.77% lines**（较首次生成 **+41.95 个点**）
+> **可执行行数**：13410，已覆盖 11905，**未覆盖 1505**
+> **换算**：全项目**每提升 1 个百分点 ≈ 134 行**（= 13410 / 100）
 >
 > 注：第二轮涨幅主体是 §三 第 3、4 批 —— `ribbon-service`、`ui/handlers/sync`、`clean-page`、`scraping`、`sheet-cleaning`、`shell-nav` 等
-> 由 0~30% 补到 88~100%，未覆盖行 **5118 → 3212（−1906 行）**；第三轮（第 5 批）**3212 → 2811（−401 行）**；第四轮（第 6 批）**2811 → 2808（−3 行）**；第五轮（第 7 批）**2808 → 2467（−341 行）**；第六轮（第 8 批）**2467 → 1976（−491 行）**。
+> 由 0~30% 补到 88~100%，未覆盖行 **5118 → 3212（−1906 行）**；第三轮（第 5 批）**3212 → 2811（−401 行）**；第四轮（第 6 批）**2811 → 2808（−3 行）**；第五轮（第 7 批）**2808 → 2467（−341 行）**；第六轮（第 8 批）**2467 → 1976（−491 行）**；第七轮（第 9 批）**1976 → 1505（−471 行）**。
 > **关键结论（累积）**：清单前列的「大文件 / COM 模块」**都没有走「先拆后测」**——依赖收敛到单一 barrel、依赖宿主对象、或依赖 ≤3 个薄封装的，就地测即可，
 > 断言打到真实 state 变迁 / 真实写盘调用 / 真实 DOM 写入，**不存在假覆盖**（判据见 `.workbuddy/memory/REF-testing.md`）。
 
@@ -45,10 +46,8 @@ node scripts/calc-coverage-backlog.mjs
 
 | 未覆盖 | 全补完提升 | 当前行覆盖 | 难度 | 文件 |
 | -----: | ---------: | ---------: | ---- | ---- |
-| 279 | +2.08% | 48.33% | 难-COM/网络 | `ts/sync/exceltobangumi/index.ts` |
-| 176 | +1.31% | 1.67% | 难-COM/网络 | `ts/sync/enrich-record.ts` |
-| 154 | +1.15% | 44% | 中-DOM/UI | `ts/ui/dialog.ts` |
 | 153 | +1.14% | 1.92% | 难-COM/网络 | `ts/sync/exceltobangumi/api.ts` |
+| 137 | +1.02% | 74.62% | 难-COM/网络 | `ts/sync/exceltobangumi/index.ts` |
 | 114 | +0.85% | 0% | 中-DOM/UI | `ts/panel/user-info-polling.ts` |
 | 104 | +0.78% | 5.45% | 中-DOM/UI | `ts/ui/handlers/incremental-bindings.ts` |
 | 78 | +0.58% | 88.21% | 中-DOM/UI | `ts/panel/enrich-page.ts` |
@@ -75,6 +74,8 @@ node scripts/calc-coverage-backlog.mjs
 | 19 | +0.14% | 0% | 中-DOM/UI | `ts/ui/github-config-dialog.ts` |
 | 17 | +0.13% | 0% | 中-DOM/UI | `ts/panel/clean-bootstrap.ts` |
 | 17 | +0.13% | 90.55% | 易-纯逻辑 | `ts/tools/locked-sheet.ts` |
+| 14 | +0.10% | 89.55% | 易-纯逻辑 | `ts/tools/http.ts` |
+| 14 | +0.10% | 97.59% | 中-DOM/UI | `ts/ui/handlers/action-handlers.ts` |
 
 > **难度列是按目录粗判的**：`ts/tools`、`ts/core` 多为纯逻辑 → 易；`ts/panel`、`ts/ui` 依赖 DOM → 中；`ts/sync`、`ts/services` 依赖 COM / 网络 → 难。
 > 实际动手前仍需扫一眼文件内的依赖（例如 `tools/util/index.ts` 是聚合桶，可能混入依赖 WPS 全局对象的函数）。
