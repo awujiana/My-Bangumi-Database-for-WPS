@@ -734,9 +734,8 @@ describe('preview · previewSyncContent', () => {
 
 describe('preview · uploadSingleRow', () => {
   beforeEach(() => {
-    // 生产代码直接读 sheetSelect 的值、没有判空：缺这个元素会抛 TypeError，
-    // 被外层 catch 变成「上传出错: Cannot read properties of null」，
-    // 把真实的失败分支盖掉。这里统一先挂上。
+    // #sheetSelect 存在是常规路径（生产代码已判空，缺失会回退到工作表 1，
+    // 缺失路径单独有用例覆盖）。这里统一先挂上，让各用例只关注上传分支。
     mountSelect('sheetSelect', '1')
   })
 
@@ -899,6 +898,24 @@ describe('preview · uploadSingleRow', () => {
     expect(mocks.findHeaderRow).toHaveBeenCalledTimes(1)
     expect(mocks.bgmRequestSync).toHaveBeenCalledTimes(1)
   })
+
+  it('#sheetSelect 缺失 → 回退到工作表 1 并告警（不再抛 TypeError 掩盖真实失败）', async () => {
+    document.getElementById('sheetSelect')?.remove()
+    expect(document.getElementById('sheetSelect')).toBeNull()
+    const item = vi.fn(() => ({ Name: '动画' }))
+    mocks.getApp.mockReturnValue({ ActiveWorkbook: { Worksheets: { Item: item } } })
+
+    await uploadSingleRow(2)
+
+    expect(item).toHaveBeenCalledWith(1)
+    expect(mocks.bgmLog).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.stringContaining('未找到 #sheetSelect'),
+    )
+    // 关键：没有走进「上传出错: Cannot read properties of null」分支
+    expect(mocks.addSyncRecord).toHaveBeenCalledWith(expect.objectContaining({ status: '成功' }))
+    expect(mocks.showToast).not.toHaveBeenCalled()
+  })
 })
 
 // ========== 详情模态框 ==========
@@ -1035,14 +1052,8 @@ describe('preview · syncAllRows', () => {
     mocks.getApp.mockReturnValue({ PluginStorage: { getItem: () => 'true' } })
     mocks.syncToBangumi.mockResolvedValue({ success: 2, fail: 1, skip: 0, stopped: false })
 
-    // 生产代码把 SyncToBangumiAsync 的结果整个透传（含声明类型之外的 stopped），
-    // 这里按真实行为断言；类型声明只有三个字段这一点已记入台账。
-    await expect(syncAllRows()).resolves.toEqual({
-      success: 2,
-      fail: 1,
-      skip: 0,
-      stopped: false,
-    })
+    // 返回值收敛为声明中的三个字段（stopped 只用于本函数内的进度弹窗文案）
+    await expect(syncAllRows()).resolves.toEqual({ success: 2, fail: 1, skip: 0 })
 
     expect(mocks.detectConflicts).toHaveBeenCalledWith(
       expect.anything(),

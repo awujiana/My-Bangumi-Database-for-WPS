@@ -195,6 +195,8 @@ export interface EnrichedField {
   oldValue: string | null
   updatedValue: string
   action: 'fill' | 'append' | 'skip'
+  /** 附注：仅当来源字段名与目标列名不同时存在，形如「字段名差异: 编剧 → 脚本」 */
+  note?: string
 }
 
 /**

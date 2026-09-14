@@ -5,13 +5,14 @@
 > **基线刷新**：2026-09-14（第三轮）—— 清单第 5 批（`enrich-preview-flow` 补测 + `panel-lifecycle` 表头检测修复）；`npm run gate` 七关全绿
 > **基线刷新**：2026-09-14（第四轮）—— 清单第 6 批（清掉第 9 / 11 条待办隐患：`clean-page` 死分支前移 + `enrich-preview-flow` 读名收口）；`npm run gate` 七关全绿
 > **基线刷新**：2026-09-14（第五轮）—— 清单第 7 批（`panel-lifecycle` 收尾到 100% lines + `ui/preview.ts` 补测）；`npm run gate` 七关全绿
-> **测试**：**3333 条 / 103 文件，全绿**
-> **全项目覆盖率**：**80.61% stmts / 70.45% branch / 83.4% funcs / 81.59% lines**（较首次生成 **+34.77 个点**）
-> **可执行行数**：13401，已覆盖 10934，**未覆盖 2467**
-> **换算**：全项目**每提升 1 个百分点 ≈ 134 行**（= 13401 / 100）
+> **基线刷新**：2026-09-14（第六轮）—— 清单第 8 批（`sync/enrich-engine.ts` 假绿测试改写 + 切片补测、`ui/sync-result-dialog.ts` 零测试起步补测、清掉第 14 条的 preview.ts 两个待拍板隐患）；`npm run gate` 七关全绿
+> **测试**：**3465 条 / 105 文件，全绿**
+> **全项目覆盖率**：**84.42% stmts / 75.57% branch / 85.71% funcs / 85.25% lines**（较首次生成 **+38.43 个点**）
+> **可执行行数**：13405，已覆盖 11429，**未覆盖 1976**
+> **换算**：全项目**每提升 1 个百分点 ≈ 134 行**（= 13405 / 100）
 >
 > 注：第二轮涨幅主体是 §三 第 3、4 批 —— `ribbon-service`、`ui/handlers/sync`、`clean-page`、`scraping`、`sheet-cleaning`、`shell-nav` 等
-> 由 0~30% 补到 88~100%，未覆盖行 **5118 → 3212（−1906 行）**；第三轮（第 5 批）**3212 → 2811（−401 行）**；第四轮（第 6 批）**2811 → 2808（−3 行）**；第五轮（第 7 批）**2808 → 2467（−341 行）**。
+> 由 0~30% 补到 88~100%，未覆盖行 **5118 → 3212（−1906 行）**；第三轮（第 5 批）**3212 → 2811（−401 行）**；第四轮（第 6 批）**2811 → 2808（−3 行）**；第五轮（第 7 批）**2808 → 2467（−341 行）**；第六轮（第 8 批）**2467 → 1976（−491 行）**。
 > **关键结论（累积）**：清单前列的「大文件 / COM 模块」**都没有走「先拆后测」**——依赖收敛到单一 barrel、依赖宿主对象、或依赖 ≤3 个薄封装的，就地测即可，
 > 断言打到真实 state 变迁 / 真实写盘调用 / 真实 DOM 写入，**不存在假覆盖**（判据见 `.workbuddy/memory/REF-testing.md`）。
 
@@ -44,9 +45,7 @@ node scripts/calc-coverage-backlog.mjs
 
 | 未覆盖 | 全补完提升 | 当前行覆盖 | 难度 | 文件 |
 | -----: | ---------: | ---------: | ---- | ---- |
-| 315 | +2.35% | 44.54% | 难-COM/网络 | `ts/sync/enrich-engine.ts` |
 | 279 | +2.08% | 48.33% | 难-COM/网络 | `ts/sync/exceltobangumi/index.ts` |
-| 180 | +1.34% | 2.17% | 中-DOM/UI | `ts/ui/sync-result-dialog.ts` |
 | 176 | +1.31% | 1.67% | 难-COM/网络 | `ts/sync/enrich-record.ts` |
 | 154 | +1.15% | 44% | 中-DOM/UI | `ts/ui/dialog.ts` |
 | 153 | +1.14% | 1.92% | 难-COM/网络 | `ts/sync/exceltobangumi/api.ts` |
@@ -73,7 +72,9 @@ node scripts/calc-coverage-backlog.mjs
 | 20 | +0.15% | 0% | 中-DOM/UI | `ts/panel/enrich-bootstrap.ts` |
 | 20 | +0.15% | 0% | 中-DOM/UI | `ts/panel/enrich-result-view.ts` |
 | 20 | +0.15% | 64.91% | 易-纯逻辑 | `ts/tools/wps.ts` |
-| 20 | +0.15% | 0% | 中-DOM/UI | `ts/panel/enrich-result-view.ts` |
+| 19 | +0.14% | 0% | 中-DOM/UI | `ts/ui/github-config-dialog.ts` |
+| 17 | +0.13% | 0% | 中-DOM/UI | `ts/panel/clean-bootstrap.ts` |
+| 17 | +0.13% | 90.55% | 易-纯逻辑 | `ts/tools/locked-sheet.ts` |
 
 > **难度列是按目录粗判的**：`ts/tools`、`ts/core` 多为纯逻辑 → 易；`ts/panel`、`ts/ui` 依赖 DOM → 中；`ts/sync`、`ts/services` 依赖 COM / 网络 → 难。
 > 实际动手前仍需扫一眼文件内的依赖（例如 `tools/util/index.ts` 是聚合桶，可能混入依赖 WPS 全局对象的函数）。
@@ -143,9 +144,23 @@ node scripts/calc-coverage-backlog.mjs
     - `ts/ui/preview.ts` 7.37% → **99.18% lines / 92% funcs**（新增 `tests/preview.test.ts` 54 条）。
       依赖形状与 `panel-lifecycle` 同型（mock barrel 一层 + 4 个叶子模块），**没有拆文件**；`core/constants.js` **刻意不 mock** —— 模块顶层用真实 `WATCH_STATUS_MAP` 构造 `VALID_STATUSES`，mock 掉会让状态筛选器恒空、断言失去意义。
       剩两处不可达：排序比较器（非优先标签需 ≥2 个，而 `normalizeStatus` 把所有可识别中文都收敛到 7 个标准名，非优先只有「忽略」）、`typeof getAllSyncRecords !== 'function'`（静态 import 绑定恒为函数）。
-    - 🔎 **两个新发现（未改生产代码，待拍板）**：
+    - ✅ **两个新发现的隐患（2026-09-14 第六轮已全部修复，见第 8 批 15 条）**：
       ① `uploadSingleRow` 的 `document.getElementById('sheetSelect')` **无判空**（preview.ts 684 行）→ 元素缺失时 `select.value` 抛 TypeError，被外层 catch 兜成 `上传出错: Cannot read properties of null (reading 'value')`，用户看不懂；写测试时必须先挂该元素，否则一批用例会被同一个假错误掩盖。
       ② `syncAllRows` 声明返回 `{success, fail, skip}`，实际把 `SyncToBangumiAsync` 的结果**整个透传**（含 `stopped`）。
+
+**第 8 批（2026-09-14 第六轮，已完成）**
+
+15. ~~`ts/sync/enrich-engine.ts`（315 行未覆盖 / 44.54%）+ `ts/ui/sync-result-dialog.ts`（180 行 / 2.17%）+ 第 14 条的 preview.ts 两个隐患~~ ✅ **已完成**：
+    - **A · 先拆掉一个「假绿」文件**：`tests/enrich-engine.intro.test.ts`（885 行 / 49 条）**不 import 任何生产模块**，而是把生产逻辑复制成副本（`simulateEnrichIntroData` / `simulateEnrichOpEdPv` / `simulateEnrichAlias`）→ intro 家族（≈160 条语句）**零覆盖却有一个专测文件撑门面**。
+      改写为**直接 import 真实现**（`isIntroSheet` / `enrichIntroData` / `enrichOpEdPv` / `enrichAlias` / `readIntroSheetRow` / `buildIntroSheetContext` / `enrichIntroFromContext` …），断言全部打在真实现 + 内存工作表桩上；未导出的常量（`INTRO_FIELD_TO_BANGUMI` / 标注白名单）改为**经行为间接验证**。
+    - **B · 按 38 组切片地图补其余纯逻辑切片**（新增 `tests/enrich-engine.fields.test.ts`）：`detectColumns` / `readPlatformValues` / `readNewAnimeRow` / `getBangumiColumnMap` / `isBangumiSheetEmpty` / `matchEntries` / `enrichTags|Platform|Date|Episodes|Features` / `enrichEntries` / `ensureBangumiColumns` / `detectAnimeSourceLayout` / `searchSheet`。
+    - **C · `ui/sync-result-dialog.ts` 从 2.17% 起步**（新增 `tests/sync-result-dialog.test.ts`）：`formatDuration` / `computeDateStatsFromSheet` / `showSyncResultDialog`（标题图标随 `stopped`、完成度环配色、失败与跳过徽标、日期统计区块、确定/ESC 关闭、替换旧弹窗、导出成功与失败文案）/「查看详情」三分支 / 同步详情预览弹窗。
+    - **结果**：`enrich-engine.ts` 行覆盖 **44.54% → 99.47%**（未覆盖 315 → **3 行**）；`sync-result-dialog.ts` **2.17% → 99.45%**（未覆盖 180 → **1 行**）。
+    - **两个 preview.ts 隐患（第 14 条 ①②）**：
+      ① `uploadSingleRow` 改 `instanceof HTMLSelectElement` 判空，元素缺失时**回退工作表 1 + 记 WARN** —— 不再抛 TypeError 被外层 catch 兜成用户看不懂的「Cannot read properties of null」；
+      ② `syncAllRows` 收敛为**显式返回三字段**（`stopped` 只驱动本函数内的进度弹窗文案），「声明与运行时不符」消除。
+    - **顺带修掉一处生产类型缺口**：`EnrichedField` 运行时会带 `note`（「字段名差异: 编剧 → 脚本」），接口却没声明 —— 由 `scripts/check-tests-types.mjs` 抓出（测试读 `.note` 报 TS2339）。与 ①② 同类：**声明漏字段**。修法是一行 `note?: string`。
+    - **口径提示**：`ts/sync/**` 按项目方针**只吃纯逻辑切片**，COM 交互重的部分不硬造（A/B 全走内存工作表桩，断言打在真实 `setCellValue` / 真实返回结构上）。
 
 ---
 

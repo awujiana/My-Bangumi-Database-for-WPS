@@ -681,10 +681,19 @@ export async function uploadSingleRow(
     const app = getApp()
     if (!app?.ActiveWorkbook) throw new Error('无法获取 Application')
 
-    const select = document.getElementById('sheetSelect') as HTMLSelectElement
+    // #sheetSelect 可能不存在（非预览页调用 / 面板尚未渲染）：不得把 null 断言成
+    // HTMLSelectElement 再读 .value —— 那样抛出的 TypeError 会被外层 catch 包装成
+    // 「上传出错: Cannot read properties of null」，掩盖真实失败原因。
+    const sheetSelectElement = document.getElementById('sheetSelect')
+    let selectedSheetValue = ''
+    if (sheetSelectElement instanceof HTMLSelectElement) {
+      selectedSheetValue = sheetSelectElement.value
+    } else {
+      bgmLog(LOG_LEVELS.WARN, '[preview] 未找到 #sheetSelect，工作表序号回退到 1')
+    }
     // Number('') 为 0 会绕过 isFinite 兜底，空串须显式转 NaN
     const parsedSheetIndex =
-      BGM.sheet.lockedIndex ?? (select.value === '' ? NaN : Number(select.value))
+      BGM.sheet.lockedIndex ?? (selectedSheetValue === '' ? NaN : Number(selectedSheetValue))
     const sheetIndex = Number.isFinite(parsedSheetIndex) ? parsedSheetIndex : 1
     const ws = app.ActiveWorkbook.Worksheets.Item(sheetIndex)
 
@@ -839,7 +848,8 @@ export function viewSyncRecordDetail(sid: string): void {
  * - 使用 getSyncPreview 和 detectConflicts 进行统计和冲突检测
  * - 调用 SyncToBangumiAsync 执行批量同步
  * - 通过 showSyncProgressDialog/updateSyncProgressDialog/completeSyncProgressDialog 直接驱动进度弹窗
- * @returns 同步结果统计 { success, fail, skip }
+ * @returns 同步结果统计 { success, fail, skip }（不含 `SyncToBangumiAsync` 的
+ * `stopped` —— 该字段只驱动本函数内的进度弹窗文案，不外传）
  */
 export async function syncAllRows(): Promise<{ success: number; fail: number; skip: number }> {
   // 防重入预检（与 syncFromPanel 一致）
@@ -993,7 +1003,7 @@ export async function syncAllRows(): Promise<{ success: number; fail: number; sk
         ]
     completeSyncProgressDialog(summary, details, result.stopped)
 
-    return result
+    return { success: result.success, fail: result.fail, skip: result.skip }
   } catch (error: unknown) {
     // 异常时隐藏弹窗，避免残留运行态 UI
     hideSyncProgressDialog()
