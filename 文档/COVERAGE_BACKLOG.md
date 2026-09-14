@@ -114,6 +114,13 @@ node scripts/calc-coverage-backlog.mjs
 9. 🔎 **死分支（未改生产代码，待拍板）**：`clean-page.ts` 的 `handleScan` 里 `if (!getApp())` **不可达** —— `getSelectedSheetKeys()` 自身要经 `getApp()?.PluginStorage` 读存储，未连接宿主时集合必为空、前面的检查先 return，
    即「未连接到 Excel / WPS」提示**永远不会显示**；建议把 `getApp()` 检查提到最前。
 10. 🧹 **顺带修掉的历史门禁红灯**：`tests/shell-nav.test.ts` 带着 6 处 lint 错误入过库（3 处 `no-manually-wrapped-comments` + 3 处 `prefer-object-define-properties`），已用带断言的 node 脚本修复，gate 恢复 0。
+11. ~~`ts/panel/enrich-preview-flow.ts`（+2.94%）~~ ✅ **已完成**（2026-09-14）：行覆盖 **1% → 99.74%**（新增 `tests/enrich-preview-flow.test.ts` 77 条，funcs 100%）。
+    **没有拆文件** —— 16 个 import 全是叶子模块、不回引 barrel，逐模块 `vi.mock` 就地测；`enrich-page-context` 用真实现（state 单例 + 真 `getElementById`），
+    所以「元素缺失 → 早退」是真删 DOM 驱动的。
+    - 🔎 **隐患（未改生产代码）**：`activeWorkbookName()` 读 `sourceWorkbook.Name` / `Parent.Name` 时**没包 try/catch**（`collectWorkbookTabs()` 包了）。
+      源工作簿被关闭后读 `.Name` 抛错 → 被 `detectHeaderOnSheet` 的 catch 接住并 **返回 null**，而 state 已写入 →
+      「列映射编辑器 + 源数据预览 + 工作簿按钮条」整链不渲染，用户只看到「识别表头失败」。建议补同形兜底。
+    - 🔎 **死分支**：`316-322` 行按钮名 getter 的 `catch { return '' }` 不可达（能进循环的工作簿必已被 `collectWorkbookTabs()` 成功读过名字）。
 
 ---
 
