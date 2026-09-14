@@ -833,6 +833,41 @@ describe('panel-lifecycle · detectHeaderAndColumns', () => {
     expect(meta.headerRow).toBe(1)
     expect(meta.dataStartRow).toBe(2)
   })
+
+  it('风险A回归：宽而稀疏的表头行被下方数据行补满空隙列时不误判多行表头', () => {
+    // 第 1 行是「宽但稀疏」的表头：列 1-3 与 7-9 有表头名，中间 4-6 列为空。
+    // 第 2 行在空隙列 4-6 填了哨兵值（真实场景是数据），旧逻辑会因 filled>=3 把第 2 行
+    // 当成「补齐表头」吃掉（风险 A）。修复后只认「向右延伸」的续行，空隙列视为数据。
+    const cells = {
+      '1:1': '序列号',
+      '1:2': '名称',
+      '1:3': '打分',
+      '1:7': '标签',
+      '1:8': '别名',
+      '1:9': '备注',
+      '2:1': '1',
+      '2:2': '动画A',
+      '2:3': '9',
+      '2:4': 'SENTINEL_A',
+      '2:5': 'SENTINEL_B',
+      '2:6': 'SENTINEL_C',
+      '3:1': '2',
+      '3:2': '动画B',
+    }
+    const meta = detectHeaderAndColumns(asWs(makeSheet('动画', cells)))
+
+    expect(meta.headerRow).toBe(1)
+    // 关键：第 2 行是数据，不能被当成多行表头吃掉
+    expect(meta.dataStartRow).toBe(2)
+    // 空隙列的哨兵值不能被并入表头名
+    expect(meta.headerNames).not.toContain('SENTINEL_A')
+    expect(meta.headerNames).not.toContain('SENTINEL_B')
+    expect(meta.headerNames).not.toContain('SENTINEL_C')
+    // 列4 仍为空（哨兵未被并入表头）
+    expect(meta.headerNames[3]).toBe('')
+    // 第 1 行的列9 表头名保留
+    expect(meta.headerNames[8]).toBe('备注')
+  })
 })
 
 // ========== autoDetectSheet ==========

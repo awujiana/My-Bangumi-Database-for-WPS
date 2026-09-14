@@ -394,22 +394,35 @@ export function detectHeaderAndColumns(
   // 前提：续行仍在扫描范围内，否则不读它的值。
   let dataStartRow = headerRow + 1
   if (headerRow + 1 <= PANEL_CONFIG.MAX_SCAN_ROWS) {
-    let filled = 0
+    // 锚点行自身最右有值列：多行表头的续行应当「向右延伸」补在锚点最右列之外，
+    // 而非填补锚点内部的空隙列。后者（宽而稀疏的表头行被下方数据行补满空隙）是误判，
+    // 会把数据行当成表头吃掉（风险 A），必须排除。
+    let anchorLastCol = 0
+    for (let c = 1; c <= PANEL_CONFIG.MAX_SCAN_COLUMNS; c += 1) {
+      if (hasHeaderName(c - 1) && c > anchorLastCol) anchorLastCol = c
+    }
+    // 续行在锚点最右列右侧补上的列数（合法的向右延伸）
+    let filledRight = 0
+    // 续行填补锚点内部空隙列的列数（应视为数据，不能并入表头）
+    let filledGap = 0
     for (let c = 1; c <= PANEL_CONFIG.MAX_SCAN_COLUMNS; c += 1) {
       const nv = getCellValue(ws, headerRow + 1, c).trim()
-      if (nv && !hasHeaderName(c - 1)) filled += 1
+      const isHeader = hasHeaderName(c - 1)
+      if (nv && !isHeader) {
+        if (c > anchorLastCol) filledRight += 1
+        else filledGap += 1
+      }
     }
-    // 补上 3 列以上才认作多行表头；低于阈值按数据行处理，避免吞掉首行数据
-    if (filled >= 3) {
+    // 仅当续行「向右延伸 ≥3 列」且「不填补任何内部空隙」时才认作多行表头。
+    // 若续行主要填补锚点内部空隙（风险 A：下方数据行补满宽表头的空隙列），
+    // 则按普通数据行处理，dataStartRow 保持 headerRow+1，避免吞掉首行数据。
+    if (filledGap === 0 && filledRight >= 3) {
       dataStartRow = headerRow + 2
-      for (let c = 1; c <= PANEL_CONFIG.MAX_SCAN_COLUMNS; c += 1) {
-        const isExistingHeader = hasHeaderName(c - 1)
-        if (!isExistingHeader) {
-          const nv = getCellValue(ws, headerRow + 1, c).trim()
-          if (nv) {
-            headerNames[c - 1] = nv
-            headerIsImportant[c - 1] = IMPORTANT_COLS[nv.toLowerCase()] ?? false
-          }
+      for (let c = anchorLastCol + 1; c <= PANEL_CONFIG.MAX_SCAN_COLUMNS; c += 1) {
+        const nv = getCellValue(ws, headerRow + 1, c).trim()
+        if (nv) {
+          headerNames[c - 1] = nv
+          headerIsImportant[c - 1] = IMPORTANT_COLS[nv.toLowerCase()] ?? false
         }
       }
     }
