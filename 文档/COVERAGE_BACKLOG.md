@@ -1,15 +1,16 @@
 # 补测待办清单（按性价比排序）
 
 > **首次生成**：2026-09-13（基线 46.82% lines / 2348 测试）
-> **基线刷新**：2026-09-14 —— 清单**第 1、2 批全部完成**；`ui-bridge` flaky 已消除
-> **测试**：**2809 条 / 94 文件，全绿**（`ui-bridge` 的 5s 超时 flaky 已通过放宽两处 `await import()` 用例超时消除）
-> **全项目覆盖率**：**61.21% stmts / 53.16% branch / 66.66% funcs / 61.81% lines**（较首次生成 **+14.99 个点**）
-> **可执行行数**：13402，已覆盖 8284，**未覆盖 5118**
+> **基线刷新**：2026-09-14（第二轮）—— 清单第 1~4 批全部完成；`ui-bridge` flaky 已消除；`npm run gate` 七关全绿
+> **测试**：**3190 条 / 101 文件，全绿**
+> **全项目覆盖率**：**75.07% stmts / 64.74% branch / 78.49% funcs / 76.03% lines**（较首次生成 **+29.21 个点**）
+> **可执行行数**：13402，已覆盖 10190，**未覆盖 3212**
 > **换算**：全项目**每提升 1 个百分点 ≈ 134 行**（= 13402 / 100）
 >
-> 注：第 2 批（`enrich-page.ts` 0.6%→88.21%、`panel-lifecycle.ts` 5.2%→97.4%、`action-handlers.ts` 29.67%→97.59%）合计 +11.14 个点，是本轮涨幅主体；
-> **关键结论**：这三个大文件**都没走「先拆后测」**—— 实测它们依赖的多为**收敛到单一 barrel 的薄路由 + 宿主对象**，用「真 DOM + mock 单个 barrel」就地驱动真实实现即可，断言打到真实 state 变迁 / 真实 DOM 写入，不存在假覆盖（同 §三-1 对 `tools/util/index.ts` 的判据）。
-> 可执行行总数从 13417 降到 13402 是同期外部在途改动（`ts/sync/**` 重命名与合并）带来的。
+> 注：第二轮涨幅主体是 §三 第 3、4 批 —— `ribbon-service`、`ui/handlers/sync`、`clean-page`、`scraping`、`sheet-cleaning`、`shell-nav` 等
+> 由 0~30% 补到 88~100%，未覆盖行 **5118 → 3212（−1906 行）**。
+> **关键结论（累积）**：清单前列的「大文件 / COM 模块」**都没有走「先拆后测」**——依赖收敛到单一 barrel、依赖宿主对象、或依赖 ≤3 个薄封装的，就地测即可，
+> 断言打到真实 state 变迁 / 真实写盘调用 / 真实 DOM 写入，**不存在假覆盖**（判据见 `.workbuddy/memory/REF-testing.md`）。
 
 数据来源：`coverage/coverage-summary.json`（`npx vitest run --coverage --config vitest.cov.config.ts --coverage.reporter=json-summary`）。
 复算脚本：`scripts/calc-coverage-backlog.mjs`（读 summary → 按未覆盖行数排序 → 输出本文档表格）。
@@ -23,8 +24,11 @@ node scripts/calc-coverage-backlog.mjs
 
 ## 一、为什么不按「未覆盖行数」从上往下做
 
-清单前列全是 **2000+ 行、覆盖率 < 6% 的大文件**（`enrich-page.ts` 658 行未覆盖、`panel-lifecycle.ts` 474 行）。
+清单前列全是 **2000+ 行、覆盖率 < 6% 的大文件**（首轮快照：`enrich-page.ts` 658 行未覆盖、`panel-lifecycle.ts` 474 行）。
 它们单看收益最高（+4.92% / +3.55%），但**直接补测的代价被严重低估**：
+
+> 📌 2026-09-14 复盘：上面两个文件**已就地补完**（88.21% / 97.4% lines），且**都没拆文件**；
+> 本节原来的「必须先用 `REF-big-file-splitting.md` 拆模块」结论已被 §三 第 2 批改写为**按依赖形状分三条路**。本节保留作为当时的推理留档。
 
 - 写一个能加载这类文件的测试，需要 mock 掉它所有的依赖；一个 mock 写错，整个文件加载失败、测试全红；
 - 即使写通了，断言的是「mock 的行为」而非真实行为，产出的是**假覆盖**。
@@ -37,36 +41,36 @@ node scripts/calc-coverage-backlog.mjs
 
 | 未覆盖 | 全补完提升 | 当前行覆盖 | 难度 | 文件 |
 | -----: | ---------: | ---------: | ---- | ---- |
-| 658 | +4.92% | 0.6% | 中-DOM/UI | `ts/panel/enrich-page.ts` ⚠️ 2300+ 行，先拆后测 |
-| 474 | +3.55% | 5.2% | 中-DOM/UI | `ts/panel/panel-lifecycle.ts` |
-| 410 | +3.07% | 29.67% | 中-DOM/UI | `ts/ui/handlers/action-handlers.ts` |
-| 406 | +3.04% | 0% | 中-DOM/UI | `ts/ui/handlers/sync.ts` |
-| 394 | +2.95% | 1% | 中-DOM/UI | `ts/panel/enrich-preview-flow.ts` |
-| 366 | +2.74% | 0.27% | 难-COM | `ts/services/ribbon-service.ts` |
-| 365 | +2.73% | 0% | 中-DOM/UI | `ts/ui/handlers/token.ts` |
-| 341 | +2.55% | 0% | 中-DOM/UI | `ts/panel/clean-page.ts` |
-| 339 | +2.54% | 7.37% | 中-DOM/UI | `ts/ui/preview.ts` |
-| **330** | **+2.47%** | 30.81% | **易-纯逻辑** | **`ts/tools/util/index.ts`** ⭐ 首选 |
-| 315 | +2.36% | 44.54% | 难-COM | `ts/sync/enrich-engine.ts` |
-| 279 | +2.09% | 48.33% | 难-COM | `ts/sync/exceltobangumi/index.ts` |
-| 180 | +1.35% | 2.17% | 中-DOM/UI | `ts/ui/sync-result-dialog.ts` |
-| 176 | +1.32% | 1.67% | 难-COM | `ts/sync/enrich-record.ts` |
-| 165 | +1.23% | 0% | 难-COM | `ts/sync/sheet-cleaning.ts` |
+| 394 | +2.94% | 1% | 中-DOM/UI | `ts/panel/enrich-preview-flow.ts` |
+| 339 | +2.53% | 7.37% | 中-DOM/UI | `ts/ui/preview.ts` |
+| 315 | +2.35% | 44.54% | 难-COM/网络 | `ts/sync/enrich-engine.ts` |
+| 279 | +2.08% | 48.33% | 难-COM/网络 | `ts/sync/exceltobangumi/index.ts` |
+| 180 | +1.34% | 2.17% | 中-DOM/UI | `ts/ui/sync-result-dialog.ts` |
+| 176 | +1.31% | 1.67% | 难-COM/网络 | `ts/sync/enrich-record.ts` |
 | 154 | +1.15% | 44% | 中-DOM/UI | `ts/ui/dialog.ts` |
-| 153 | +1.15% | 1.92% | 难-COM | `ts/sync/exceltobangumi/api.ts` |
-| 139 | +1.04% | 0% | 中-DOM/UI | `ts/panel/shell-nav.ts` |
-| 129 | +0.97% | 0% | 难-COM | `ts/sync/scraping.ts` |
+| 153 | +1.14% | 1.92% | 难-COM/网络 | `ts/sync/exceltobangumi/api.ts` |
 | 114 | +0.85% | 0% | 中-DOM/UI | `ts/panel/user-info-polling.ts` |
 | 104 | +0.78% | 5.45% | 中-DOM/UI | `ts/ui/handlers/incremental-bindings.ts` |
-| 84 | +0.63% | 22.93% | 中-DOM/UI | `ts/ui/handlers/panel-events.ts` |
-| 77 | +0.58% | 1.28% | 中-DOM/UI | `ts/panel/panel-page.ts` |
-| 76 | +0.57% | 13.63% | 中-DOM/UI | `ts/ui/handlers/settings-bindings.ts` |
-| 69 | +0.52% | 59.17% | 难-COM | `ts/sync/workbook-auto-detect.ts` |
-| 58 | +0.43% | 26.58% | 易-纯逻辑 | `ts/tools/auto-fill-url.ts` ⭐ |
+| 78 | +0.58% | 88.21% | 中-DOM/UI | `ts/panel/enrich-page.ts` |
+| 77 | +0.57% | 1.28% | 中-DOM/UI | `ts/panel/panel-page.ts` |
+| 69 | +0.51% | 59.17% | 难-COM/网络 | `ts/sync/workbook-auto-detect.ts` |
 | 58 | +0.43% | 40.2% | 中-DOM/UI | `ts/ui/handlers/github-settings.ts` |
 | 53 | +0.40% | 0% | 中-DOM/UI | `ts/panel/enrich-conflict-dialog.ts` |
 | 53 | +0.40% | 0% | 中-DOM/UI | `ts/panel/enrich-record-view.ts` |
 | 46 | +0.34% | 0% | 中-DOM/UI | `ts/panel/enrich-source-detail.ts` |
+| 40 | +0.30% | 0% | 难-COM/网络 | `ts/sync/exceltobangumi/chapter-marker.ts` |
+| 32 | +0.24% | 81.39% | 易-纯逻辑 | `ts/tools/zod-compat.ts` |
+| 31 | +0.23% | 3.12% | 中-DOM/UI | `ts/ui/message.ts` |
+| 29 | +0.22% | 0% | 中-DOM/UI | `ts/panel/settings-bootstrap.ts` |
+| 28 | +0.21% | 88.97% | 易-纯逻辑 | `ts/tools/util/sheet.ts` |
+| 26 | +0.19% | 96% | 难-COM/网络 | `ts/sync/github-sync.ts` |
+| 24 | +0.18% | 92.4% | 中-DOM/UI | `ts/panel/clean-engine.ts` |
+| 24 | +0.18% | 0% | 中-DOM/UI | `ts/ui/handlers/sheet.ts` |
+| 22 | +0.16% | 0% | 中-DOM/UI | `ts/panel/panel-bootstrap.ts` |
+| 22 | +0.16% | 76.34% | 中-DOM/UI | `ts/ui/handlers/index.ts` |
+| 22 | +0.16% | 18.51% | 中-DOM/UI | `ts/ui/handlers/path-controls.ts` |
+| 20 | +0.15% | 0% | 中-DOM/UI | `ts/panel/enrich-bootstrap.ts` |
+| 20 | +0.15% | 0% | 中-DOM/UI | `ts/panel/enrich-result-view.ts` |
 
 > **难度列是按目录粗判的**：`ts/tools`、`ts/core` 多为纯逻辑 → 易；`ts/panel`、`ts/ui` 依赖 DOM → 中；`ts/sync`、`ts/services` 依赖 COM / 网络 → 难。
 > 实际动手前仍需扫一眼文件内的依赖（例如 `tools/util/index.ts` 是聚合桶，可能混入依赖 WPS 全局对象的函数）。
@@ -94,9 +98,22 @@ node scripts/calc-coverage-backlog.mjs
    - **顺带抓到一处真生产 bug**：无表头回退分支 push 的是 `{text, important}` 对象，却标记为 `aligned: true`，而表格渲染对 aligned 行按 `string[]` 输出 → 用户在数据预览里看到一串 `[object Object]`。已修（回退分支直接 push 字符串）。
    - **又一处死分支（未改，待拍板）**：397-404 行「多行表头补齐」中 `headerNames` 恒被填满 `MAX_SCAN_COLUMNS` 个元素 → `Object.hasOwn` 恒真 → `filled >= 3` **永不成立**，多行表头检测功能实际失效。涉及业务语义，不擅删。
 
-**第 3 批（投入产出比最低，谨慎）**
+**第 3 批（`ts/sync/**`）—— 原判断「不要为了数字去 mock」已被证伪**
 
-6. `ts/sync/**` 的 COM 模块 —— 需要构造 Excel/WPS 对象模型，mock 出来的覆盖基本不反映真实行为。**建议改为用集成测试或人工验收覆盖，不要为了数字去 mock**。
+6. ~~`ts/sync/**` 的 COM 模块 —— 建议改为用集成测试或人工验收覆盖，不要为了数字去 mock。~~ ✅ **结论已修正（2026-09-14）**：
+   `ts/sync/**` 里**薄依赖的模块反而最好补**：`scraping.ts`（只依赖 `core/constants` + `bgmLog`）用**假 XHR**、`sheet-cleaning.ts`（只依赖 `core/constants` + 6 个 COM 薄封装）用**假工作表模型**驱动真实实现，
+   断言真实的分页计划 / 真实 `Range.Delete` 区间 / 真实 `setCellValue` 调用，**没有一个断言打在 mock 上**，分别达 100% 全指标与 100% lines。
+   真正不建议硬补的只剩 `entry/**`、`panel/*-bootstrap.ts` 这类**宿主装配脚本**（只做事实转发，覆盖无信息量）。
+
+**第 4 批（2026-09-14 第二轮，已完成）**
+
+7. ~~`ts/services/ribbon-service.ts`（+2.74%）、`ts/ui/handlers/sync.ts`（+3.04%）~~ ✅ **已完成**：`ribbon-service` 0% → **99.45% lines / 100% funcs**（83 条）；`handlers/sync.ts` 0% → **100% stmts/lines/funcs**（62 条）。
+   两者与 `ts/index.js` 互相 re-export，**对 barrel 用 `vi.mock(async (importOriginal) => …)` 会死锁**、vitest 静默回退真实现（mock 调用恒 0、走真网络）→ 改**逐层 mock 叶子模块**（见 `REF-testing.md`）。
+8. ~~`ts/panel/clean-page.ts`（+2.55%）、`ts/sync/scraping.ts`、`ts/sync/sheet-cleaning.ts`、`ts/panel/shell-nav.ts`~~ ✅ **已完成**：
+   `clean-page.ts` 0% → **99.41% lines**（54 条）；`scraping.ts` 0% → **100% 全指标**（33 条）；`sheet-cleaning.ts` 0% → **100% lines**（49 条）；`shell-nav.ts` 0% → **100% lines**（30 条）。
+9. 🔎 **死分支（未改生产代码，待拍板）**：`clean-page.ts` 的 `handleScan` 里 `if (!getApp())` **不可达** —— `getSelectedSheetKeys()` 自身要经 `getApp()?.PluginStorage` 读存储，未连接宿主时集合必为空、前面的检查先 return，
+   即「未连接到 Excel / WPS」提示**永远不会显示**；建议把 `getApp()` 检查提到最前。
+10. 🧹 **顺带修掉的历史门禁红灯**：`tests/shell-nav.test.ts` 带着 6 处 lint 错误入过库（3 处 `no-manually-wrapped-comments` + 3 处 `prefer-object-define-properties`），已用带断言的 node 脚本修复，gate 恢复 0。
 
 ---
 
@@ -109,3 +126,4 @@ node scripts/calc-coverage-backlog.mjs
 
 > ⚠️ **已知无效配置**：`perFile: false` 下 vitest 的「glob 单文件阈值」**不会被检查**（实测把某文件阈值改成 101 也不报错）。
 > 想给单个文件（如 `module-state.ts`）锁 100%，只能靠测试本身维持，**不要写进 thresholds 假装它有保护**。
+

@@ -20,6 +20,7 @@ import {
 } from '../ts/panel/shell-nav.js'
 
 // ========== 布局桩 ==========
+
 // jsdom 实现的是 DOM 树而非排版引擎：下面这些「几何量」全部恒为 0，必须显式打桩。
 
 /** jsdom 不做布局：offsetHeight / getBoundingClientRect / scrollHeight 恒 0，需显式打桩 */
@@ -63,6 +64,7 @@ function setSectionRect(sectionId: string, top: number, bottom: number): void {
 }
 
 // ========== 环境桩 ==========
+
 // 窄态判定走 matchMedia；用可变开关让同一用例既能测桌面也能测窄屏。
 
 let isNarrow = false
@@ -100,8 +102,8 @@ function flushFrame(): void {
 }
 
 // ========== window 监听记录器 ==========
-// shell-nav 把监听挂到 window 上且从不移除；不记录并清理的话，
-// 前序用例的闭包会在后续用例派发事件时一起跑，污染「本用例注册/执行了几次」的断言。
+
+// shell-nav 把监听挂到 window 上且从不移除；不记录并清理的话，前序用例的闭包会在后续用例派发事件时一起跑，污染「本用例注册/执行了几次」的断言。
 
 interface RecordedListener {
   type: string
@@ -313,9 +315,11 @@ describe('shell-nav · 导航点击', () => {
     const [, second] = navLinks()
     if (!second) throw new Error('缺少第二个导航项')
     setHeight(second, 36)
-    Object.defineProperty(second, 'offsetWidth', { value: 120, configurable: true })
-    Object.defineProperty(second, 'offsetLeft', { value: 8, configurable: true })
-    Object.defineProperty(second, 'offsetTop', { value: 52, configurable: true })
+    Object.defineProperties(second, {
+      offsetWidth: { value: 120, configurable: true },
+      offsetLeft: { value: 8, configurable: true },
+      offsetTop: { value: 52, configurable: true },
+    })
     initScrollspy()
 
     second.dispatchEvent(new Event('click'))
@@ -562,16 +566,20 @@ describe('shell-nav · 滚动判定规则', () => {
     mountShell()
     const [, second] = navLinks()
     if (!second) throw new Error('缺少第二个导航项')
-    Object.defineProperty(second, 'offsetLeft', { value: 10, configurable: true })
-    Object.defineProperty(second, 'offsetTop', { value: 20, configurable: true })
-    Object.defineProperty(second, 'offsetWidth', { value: 100, configurable: true })
+    Object.defineProperties(second, {
+      offsetLeft: { value: 10, configurable: true },
+      offsetTop: { value: 20, configurable: true },
+      offsetWidth: { value: 100, configurable: true },
+    })
     setHeight(second, 30)
     initScrollspy()
     second.dispatchEvent(new Event('click'))
     expect(getElement('.nav-indicator').style.transform).toBe('translate(10px, 20px)')
 
-    Object.defineProperty(second, 'offsetLeft', { value: 33, configurable: true })
-    Object.defineProperty(second, 'offsetTop', { value: 44, configurable: true })
+    Object.defineProperties(second, {
+      offsetLeft: { value: 33, configurable: true },
+      offsetTop: { value: 44, configurable: true },
+    })
     window.dispatchEvent(new Event('resize'))
 
     expect(getElement('.nav-indicator').style.transform).toBe('translate(33px, 44px)')
