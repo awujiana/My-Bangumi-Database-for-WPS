@@ -474,6 +474,27 @@ describe('panel-lifecycle · refreshSheets', () => {
     )
     expect(select.options).toHaveLength(2)
   })
+
+  it('已锁定但锁定索引悬空时，自动选中回退到活动工作表索引', () => {
+    const select = mountSelect('sheetSelect')
+    const sheets = [makeSheet('动画'), makeSheet('漫画')]
+    const workbook = makeWorkbook('BGM.xlsx', sheets)
+    const [, manhua] = sheets
+    workbook.ActiveSheet = manhua
+    mocks.getApp.mockReturnValue({ ActiveWorkbook: workbook })
+    // 状态损坏形态：isLocked 为真但 lockedIndex 不指向任何一张在列表里的表
+    // （锁定表被删除 / 持久化只存了名字），此时两个选中条件都不成立。
+    sheetState.isLocked = true
+    sheetState.lockedIndex = null
+
+    refreshSheets({ autoSelectActive: true })
+
+    expect(select.value).toBe('2')
+    expect(mocks.bgmLog).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.stringContaining('自动选中当前活动工作表: 2'),
+    )
+  })
 })
 
 describe('panel-lifecycle · refreshWorkbooks', () => {
@@ -777,6 +798,22 @@ describe('panel-lifecycle · detectHeaderAndColumns', () => {
     expect(meta.lastCol).toBe(15)
     expect(meta.previewColEnd).toBe(4)
   })
+  it('数据区全空时首个数据列回退到第 1 列', () => {
+    // 表头行有 3 个关键字（够成为候选），但数据区一格值都没有：
+    // firstDataCol 扫描不到任何非空单元格，必须回退成 1，否则列范围算不出来。
+    const meta = detectHeaderAndColumns(
+      asWs(
+        makeSheet('动画', {
+          '1:1': '序列号',
+          '1:2': '名称',
+          '1:3': '是否看完',
+        }),
+      ),
+    )
+
+    expect(meta.headerRow).toBe(1)
+    expect(meta.firstDataCol).toBe(1)
+  })
 
   it('续行只补上不到 3 列时不算多行表头，避免吞掉首行数据', () => {
     const cells = {
@@ -902,6 +939,18 @@ describe('panel-lifecycle · updateFilterStatus', () => {
 
     updateFilterStatus(asWs(sheet))
 
+    expect(element.textContent).toBe('筛选已开启但无活动筛选，同步全部数据')
+  })
+  it('AutoFilterMode 为假但 AutoFilter.Mode 为真 → 仍按已开启筛选处理', () => {
+    const element = mountDiv('filterStatus')
+    const sheet = makeSheet('动画', {})
+    // 有些宿主只暴露 AutoFilter 对象、AutoFilterMode 恒为假，靠 AutoFilter.Mode 兜底。
+    sheet.AutoFilterMode = false
+    sheet.AutoFilter = { Mode: true, Filters: { Count: 0, Item: () => ({ On: false }) } }
+
+    updateFilterStatus(asWs(sheet))
+
+    // 兜底生效才会走到「已开启筛选」文案；否则会是「未开启筛选，同步全部数据」
     expect(element.textContent).toBe('筛选已开启但无活动筛选，同步全部数据')
   })
 
@@ -1112,6 +1161,88 @@ describe('panel-lifecycle · refreshData', () => {
     refreshData()
 
     expect(box.innerHTML).toContain('动画A')
+  })
+
+  it('多列范围却拿到标量返回值时，退回逐单元格读取', () => {
+    const box = mountDiv('previewBox')
+    mountSelect('sheetSelect', '1')
+    const sheet = makeSheet('动画', makeTrackedSheetCells())
+    // WPS 桥接层对某些 Range 会返回标量而不是二维数组，此时 is2D 为假。
+    sheet.Range = () => ({ Value2: '动画A' })
+    mocks.getApp.mockReturnValue({ ActiveWorkbook: makeWorkbook('BGM.xlsx', [sheet]) })
+    mocks.getLastRow.mockReturnValue(3)
+    mocks.getFilterStatus.mockReturnValue({ hasFilter: false, visibleRows: [1, 2, 3] })
+
+    refreshData()
+
+    expect(box.innerHTML).toContain('动画A')
+    expect(box.innerHTML).toContain('动画B')
+  })
+
+  it('预览收敛到单列且拿到标量返回值时，直接按标量取值', () => {
+    const box = mountDiv('previewBox')
+    mountSelect('sheetSelect', '1')
+    // 表头 4 列（1-4），数据行只在第 9 列有值：firstDataCol=9 > headerLastCol=4，
+    // previewColStart 被推到 4 → 预览列数 = 4-4+1 = 1，批量读取的 Range 是单格。
+    const sheet = makeSheet('动画', {
+      '1:1': '序列号',
+      '1:2': '名称',
+      '1:3': '是否看完',
+      '1:4': '打分',
+      '2:9': '远处数据',
+    })
+    const rangeAddresses: string[] = []
+    sheet.Range = (address: string) => {
+      rangeAddresses.push(address)
+      return { Value2: '打分' }
+    }
+    mocks.getApp.mockReturnValue({ ActiveWorkbook: makeWorkbook('BGM.xlsx', [sheet]) })
+    mocks.getLastRow.mockReturnValue(2)
+    mocks.getFilterStatus.mockReturnValue({ hasFilter: false, visibleRows: [1, 2] })
+
+    refreshData()
+
+    // 单格范围 D2:D2，证明预览确实收敛到 1 列、且落进 segLength===1 的单格分支
+    expect(rangeAddresses).toEqual(['D2:D2'])
+    // 该分支把标量当作这一格的值：渲染出 '打分'
+    expect(box.innerHTML).toContain('打分')
+  })
+  it('可见行跳号时按不连续分段读取（隐藏行不并入段）', () => {
+    const box = mountDiv('previewBox')
+    mountSelect('sheetSelect', '1')
+    const sheet = makeSheet('动画', {
+      '1:1': '序列号',
+      '1:2': '名称',
+      '1:3': '是否看完',
+      '1:4': '打分',
+      '2:1': '1',
+      '2:2': '动画A',
+      '2:3': '是',
+      '2:4': '8',
+      '4:1': '2',
+      '4:2': '动画B',
+      '4:3': '否',
+      '4:4': '9',
+    })
+    const rangeAddresses: string[] = []
+    sheet.Range = (address: string) => {
+      rangeAddresses.push(address)
+      return {
+        Value2: address.startsWith('A2')
+          ? [['1', '动画A', '是', '8']]
+          : [['2', '动画B', '否', '9']],
+      }
+    }
+    mocks.getApp.mockReturnValue({ ActiveWorkbook: makeWorkbook('BGM.xlsx', [sheet]) })
+    mocks.getLastRow.mockReturnValue(4)
+    // 第 3 行被隐藏：第 2 行与第 4 行不连续，必须拆成两段各读一次
+    mocks.getFilterStatus.mockReturnValue({ hasFilter: false, visibleRows: [1, 2, 4] })
+
+    refreshData()
+
+    expect(rangeAddresses).toEqual(['A2:D2', 'A4:D4'])
+    expect(box.innerHTML).toContain('动画A')
+    expect(box.innerHTML).toContain('动画B')
   })
 
   it('无表头时按回退逻辑展示前几行数据', () => {

@@ -4,13 +4,14 @@
 > **基线刷新**：2026-09-14（第二轮）—— 清单第 1~4 批全部完成；`ui-bridge` flaky 已消除；`npm run gate` 七关全绿
 > **基线刷新**：2026-09-14（第三轮）—— 清单第 5 批（`enrich-preview-flow` 补测 + `panel-lifecycle` 表头检测修复）；`npm run gate` 七关全绿
 > **基线刷新**：2026-09-14（第四轮）—— 清单第 6 批（清掉第 9 / 11 条待办隐患：`clean-page` 死分支前移 + `enrich-preview-flow` 读名收口）；`npm run gate` 七关全绿
-> **测试**：**3273 条 / 102 文件，全绿**
-> **全项目覆盖率**：**78.14% stmts / 68.07% branch / 81.15% funcs / 79.04% lines**（较首次生成 **+32.22 个点**）
-> **可执行行数**：13401，已覆盖 10593，**未覆盖 2808**
+> **基线刷新**：2026-09-14（第五轮）—— 清单第 7 批（`panel-lifecycle` 收尾到 100% lines + `ui/preview.ts` 补测）；`npm run gate` 七关全绿
+> **测试**：**3333 条 / 103 文件，全绿**
+> **全项目覆盖率**：**80.61% stmts / 70.45% branch / 83.4% funcs / 81.59% lines**（较首次生成 **+34.77 个点**）
+> **可执行行数**：13401，已覆盖 10934，**未覆盖 2467**
 > **换算**：全项目**每提升 1 个百分点 ≈ 134 行**（= 13401 / 100）
 >
 > 注：第二轮涨幅主体是 §三 第 3、4 批 —— `ribbon-service`、`ui/handlers/sync`、`clean-page`、`scraping`、`sheet-cleaning`、`shell-nav` 等
-> 由 0~30% 补到 88~100%，未覆盖行 **5118 → 3212（−1906 行）**；第三轮（第 5 批）**3212 → 2811（−401 行）**；第四轮（第 6 批）**2811 → 2808（−3 行）**。
+> 由 0~30% 补到 88~100%，未覆盖行 **5118 → 3212（−1906 行）**；第三轮（第 5 批）**3212 → 2811（−401 行）**；第四轮（第 6 批）**2811 → 2808（−3 行）**；第五轮（第 7 批）**2808 → 2467（−341 行）**。
 > **关键结论（累积）**：清单前列的「大文件 / COM 模块」**都没有走「先拆后测」**——依赖收敛到单一 barrel、依赖宿主对象、或依赖 ≤3 个薄封装的，就地测即可，
 > 断言打到真实 state 变迁 / 真实写盘调用 / 真实 DOM 写入，**不存在假覆盖**（判据见 `.workbuddy/memory/REF-testing.md`）。
 
@@ -43,8 +44,6 @@ node scripts/calc-coverage-backlog.mjs
 
 | 未覆盖 | 全补完提升 | 当前行覆盖 | 难度 | 文件 |
 | -----: | ---------: | ---------: | ---- | ---- |
-| 394 | +2.94% | 1% | 中-DOM/UI | `ts/panel/enrich-preview-flow.ts` |
-| 339 | +2.53% | 7.37% | 中-DOM/UI | `ts/ui/preview.ts` |
 | 315 | +2.35% | 44.54% | 难-COM/网络 | `ts/sync/enrich-engine.ts` |
 | 279 | +2.08% | 48.33% | 难-COM/网络 | `ts/sync/exceltobangumi/index.ts` |
 | 180 | +1.34% | 2.17% | 中-DOM/UI | `ts/ui/sync-result-dialog.ts` |
@@ -72,6 +71,8 @@ node scripts/calc-coverage-backlog.mjs
 | 22 | +0.16% | 76.34% | 中-DOM/UI | `ts/ui/handlers/index.ts` |
 | 22 | +0.16% | 18.51% | 中-DOM/UI | `ts/ui/handlers/path-controls.ts` |
 | 20 | +0.15% | 0% | 中-DOM/UI | `ts/panel/enrich-bootstrap.ts` |
+| 20 | +0.15% | 0% | 中-DOM/UI | `ts/panel/enrich-result-view.ts` |
+| 20 | +0.15% | 64.91% | 易-纯逻辑 | `ts/tools/wps.ts` |
 | 20 | +0.15% | 0% | 中-DOM/UI | `ts/panel/enrich-result-view.ts` |
 
 > **难度列是按目录粗判的**：`ts/tools`、`ts/core` 多为纯逻辑 → 易；`ts/panel`、`ts/ui` 依赖 DOM → 中；`ts/sync`、`ts/services` 依赖 COM / 网络 → 难。
@@ -135,6 +136,16 @@ node scripts/calc-coverage-backlog.mjs
     - `ts/panel/enrich-preview-flow.ts`：读名收口到 `readWorkbookName()`；行覆盖 99.74% → **100% lines / 100% funcs**（78 条）。
     - **验证方式：「回滚 → 复跑」**。两条新用例断言的是**可观察结果**（`dialogAlert` 调用次数 / `.mapping-select` 是否渲染），不是 `not.toThrow()` —— 后者对 `detectHeaderOnSheet` 的 try/catch 是**无效断言**（异常被吞、恒过）。临时回滚两处修复后复跑：`dialogAlert` 调用 **0 次**、`dialogError` 被调用 1 次且消息为 `识别表头失败: workbook closed`，证明用例真抓得住旧 bug。
     - 未扩面的同源点（刻意不动）：`switchSourceWorkbook` 337/358 行（操作的是用户刚点的工作簿）、`previewMatch` 的两处 `state.*.Name`（在 try 内）；其它模块（`tools/locked-sheet.ts`、`sync/workbook-auto-detect.ts`、`panel/panel-lifecycle.ts`）的同类模式各自已有守卫。
+
+14. ~~`ts/panel/panel-lifecycle.ts` 收尾 + `ts/ui/preview.ts`（+2.53%）~~ ✅ **已完成**（2026-09-14 第五轮）：
+    - `panel-lifecycle.ts` 97.4% → **100% lines / 100% funcs**（84 条；stmts 99.64 / branch 88.39）。补的是 202-204（锁定索引悬空时的「回退到活动工作表」兜底）、659-662（宿主对**单格** Range 返回标量时的取值路径）、435（数据区全空 → `firstDataCol` 回退 1）、576（`AutoFilterMode` 为假时靠 `AutoFilter.Mode` 兜底）、874（可见行跳号 → 拆成多段各读一次）。
+      剩 315 / 885 两条**不可达防御语句**：`isRowVisible` 的 `r === headerRow` 早退（调用点 `dr` 恒 ≥ `dataStartRow > headerRow`）、`segStart === undefined` 早退（被 `index < maxPreview ≤ dataRows.length` 保证）。
+    - `ts/ui/preview.ts` 7.37% → **99.18% lines / 92% funcs**（新增 `tests/preview.test.ts` 54 条）。
+      依赖形状与 `panel-lifecycle` 同型（mock barrel 一层 + 4 个叶子模块），**没有拆文件**；`core/constants.js` **刻意不 mock** —— 模块顶层用真实 `WATCH_STATUS_MAP` 构造 `VALID_STATUSES`，mock 掉会让状态筛选器恒空、断言失去意义。
+      剩两处不可达：排序比较器（非优先标签需 ≥2 个，而 `normalizeStatus` 把所有可识别中文都收敛到 7 个标准名，非优先只有「忽略」）、`typeof getAllSyncRecords !== 'function'`（静态 import 绑定恒为函数）。
+    - 🔎 **两个新发现（未改生产代码，待拍板）**：
+      ① `uploadSingleRow` 的 `document.getElementById('sheetSelect')` **无判空**（preview.ts 684 行）→ 元素缺失时 `select.value` 抛 TypeError，被外层 catch 兜成 `上传出错: Cannot read properties of null (reading 'value')`，用户看不懂；写测试时必须先挂该元素，否则一批用例会被同一个假错误掩盖。
+      ② `syncAllRows` 声明返回 `{success, fail, skip}`，实际把 `SyncToBangumiAsync` 的结果**整个透传**（含 `stopped`）。
 
 ---
 
