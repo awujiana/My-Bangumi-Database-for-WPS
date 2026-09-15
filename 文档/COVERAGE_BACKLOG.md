@@ -12,13 +12,14 @@
 > **基线刷新**：2026-09-15（第十轮）—— 清单第 12 批（纯逻辑小块批量）：`ts/tools/zod-compat.ts` 81.39% → **100% lines**（32 → 0）、`ts/tools/util/sheet.ts` 88.97% → **100% lines**（28 → 0，顺带修一处 getLastRow「来自缓存」文案永远误报的生产 bug）、`ts/tools/wps.ts` 64.91% → **100% lines**（20 → 0）、`ts/tools/locked-sheet.ts` 90.55% → **100% lines**（17 → 0）、`ts/tools/http.ts` 89.55% → **99.25% lines**（14 → 1，余 1 行为 MAX_RETRIES_EXCEEDED 不可达出口）；追加到既有测试文件 + 新建 `tests/wps-dialog-fallback.test.ts`（jsdom 侧降级链），合计 **+63 条**；`npm run gate` 七关全绿
 > **基线刷新**：2026-09-15（第十一轮）—— 清单第 13 批（中-DOM/UI 批量）：`ts/ui/handlers/path-controls.ts` 18.51% → **100% lines / 100% funcs**（22 → 0）、`ts/panel/enrich-result-view.ts` 0% → **100% 四项全满**（20 → 0）、`ts/ui/handlers/sheet.ts` 0% → **100% lines / 100% funcs / 100% stmts**（24 → 0）；新增 3 个测试文件 / 25 条；`npm run gate` 七关全绿
 > **基线刷新**：2026-09-15（第十二轮）—— 清单**第 16 批（P0 五文件速赢）+ 第 14 批（P1-5/6/9）一次收口**：`tools/config.ts` / `tools/logger.ts` / `tools/sanitize.ts` / `tools/util/cell.ts` / `core/error-handler.ts` 五个纯逻辑文件 **100% lines**（48 → 0），`panel/clean-engine.ts`（24 → 0）/ `ui/handlers/index.ts`（22 → 0）/ `ui/handlers/action-handlers.ts`（14 → 0）也全部 **100% lines**；8 个文件合计吃掉 **109 行**；新增 `tests/error-handler.test.ts`，其余 7 个文件就地扩写（+82 条）；`npm run gate` 七关全绿
-> **测试**：**3999 条 / 120 文件，全绿**
-> **全项目覆盖率**：**94.54% stmts / 85.25% branch / 95.00% funcs / 95.33% lines**（较首次生成 **+48.51 个点**）
-> **可执行行数**：13411，已覆盖 12785，**未覆盖 626**
+> **基线刷新**：2026-09-15（第十三轮）—— 清单**第 15 批（P1 其余 7 文件）一次收口**：`panel/enrich-page.ts`（78 → 0，另建 `tests/enrich-page-watch.test.ts` 隔离模块级轮询状态）、`panel/panel-page.ts`（78 → 0）、`ui/handlers/github-settings.ts`（58 → 0）、`ui/message.ts`（32 → 0）、`ui/github-config-dialog.ts`（19 → 0）、`panel/clean-bootstrap.ts`（17 → 0）、`ui/handlers/module-order.ts`（6 → 0），**7 个文件全部 100% lines，合计 288 行**；顺带修掉 `ui/github-config-dialog.ts` 里一处**属性注入漏洞**（自建 `escapeHtml` 不转义引号却拼进 `title="..."`，改用 `tools/string-utilities-pure.ts` 的规范实现，因此该文件可执行行 19 → 16）；新增 4 个测试文件 / 116 条；`npm run gate` 七关全绿
+> **测试**：**4115 条 / 125 文件，全绿**
+> **全项目覆盖率**：**96.68% stmts / 87.57% branch / 97.19% funcs / 97.45% lines**（较首次生成 **+50.63 个点**）
+> **可执行行数**：13408，已覆盖 13067，**未覆盖 341**
 > **换算**：全项目**每提升 1 个百分点 ≈ 134 行**（= 13410 / 100）
 >
 > 注：第二轮涨幅主体是 §三 第 3、4 批 —— `ribbon-service`、`ui/handlers/sync`、`clean-page`、`scraping`、`sheet-cleaning`、`shell-nav` 等
-> 由 0~30% 补到 88~100%，未覆盖行 **5118 → 3212（−1906 行）**；第三轮（第 5 批）**3212 → 2811（−401 行）**；第四轮（第 6 批）**2811 → 2808（−3 行）**；第五轮（第 7 批）**2808 → 2467（−341 行）**；第六轮（第 8 批）**2467 → 1976（−491 行）**；第七轮（第 9 批）**1976 → 1505（−471 行）**；第八轮（第 10 批）**1505 → 1134（−371 行）**；第九轮 **1134 → 911（−223 行）**；第十轮（第 12 批）**911 → 801（−110 行）**；第十一轮（第 13 批）**801 → 735（−66 行）**；第十二轮（P0 + 第 14 批）**735 → 626（−109 行）**。
+> 由 0~30% 补到 88~100%，未覆盖行 **5118 → 3212（−1906 行）**；第三轮（第 5 批）**3212 → 2811（−401 行）**；第四轮（第 6 批）**2811 → 2808（−3 行）**；第五轮（第 7 批）**2808 → 2467（−341 行）**；第六轮（第 8 批）**2467 → 1976（−491 行）**；第七轮（第 9 批）**1976 → 1505（−471 行）**；第八轮（第 10 批）**1505 → 1134（−371 行）**；第九轮 **1134 → 911（−223 行）**；第十轮（第 12 批）**911 → 801（−110 行）**；第十一轮（第 13 批）**801 → 735（−66 行）**；第十二轮（P0 + 第 14 批）**735 → 626（−109 行）**；第十三轮（第 15 批）**626 → 341（−285 行）**。
 > **关键结论（累积）**：清单前列的「大文件 / COM 模块」**都没有走「先拆后测」**——依赖收敛到单一 barrel、依赖宿主对象、或依赖 ≤3 个薄封装的，就地测即可，
 > 断言打到真实 state 变迁 / 真实写盘调用 / 真实 DOM 写入，**不存在假覆盖**（判据见 `.workbuddy/memory/REF-testing.md`）。
 
@@ -27,13 +28,19 @@
 **逐行定位**用 `scripts/calc-coverage-lines.mjs`（读 `coverage-final.json` → `istanbul-lib-coverage.getLineCoverage()` → 列出未覆盖行号，与本文档的未覆盖行数**逐行吻合**）。
 
 > ⚠️ **行口径陷阱**：`coverage-summary.json` 的 `lines` **不能**由 `coverage-final.json` 的 `statementMap` 行区间求和推导 ——
-> 实测 `ts/panel/clean-engine.ts` 求和得 531 行、台账口径是 316 行。`getLineCoverage()` 是「同一行取该行最后一个
-> statement / function / branch 的计数」，函数声明行与分支行会**覆盖**语句行。照 `statementMap` 求和去补测会跑偏。
+> 实测 `ts/panel/clean-engine.ts` 求和得 531 行、台账口径是 316 行。`getLineCoverage()` 是「同一行取该行所有
+> statement 计数的**最大值**」（见 `istanbul-lib-coverage/lib/file-coverage.js`）。照 `statementMap` 求和去补测会跑偏。
+>
+> 由此派生一条实用结论：形如 `if (cond) return X` 的**单行守卫**，IfStatement 每轮都会求值（计数 > 0），
+> 所以即便 `return X` 从未走到，**该行仍算已覆盖**。这类残留只会出现在 `calc-coverage-lines.mjs` 输出的
+> `uncovered stmts` 里，不会进 `uncovered lines` —— 想把 stmts 也刷满得单独造边界输入，本台账只按行统计。
 
 ```bash
 # 跑覆盖率复核：两个环境变量/参数都不能省
 #   CODEBUDDY_SAFE_DELETE_BULK_THRESHOLD 放行 coverage/.tmp 的批量删除（否则撞 safe-delete 守卫）
 #   --config vitest.cov.config.ts 让 clean:false 生效（否则收尾 cleanAfterRun 失败、进程 exit 1）
+#   两个 reporter 都要给：只给 --coverage.reporter=json 时 coverage-summary.json 不会重写，
+#   复算脚本里的 summary lines 会读到上一次的陈旧值（uncovered lines 仍准确）
 CODEBUDDY_SAFE_DELETE_BULK_THRESHOLD=1000000 \
 npx vitest run --coverage --config vitest.cov.config.ts \
   --coverage.reporter=json-summary --coverage.reporter=json
@@ -63,19 +70,18 @@ node scripts/calc-coverage-lines.mjs panel/clean-engine.ts   # 逐行定位（�
 | 未覆盖 | 全补完提升 | 当前行覆盖 | 难度 | 文件 |
 | -----: | ---------: | ---------: | ---- | ---- |
 | 137 | +1.02% | 74.62% | 难-COM/网络 | `ts/sync/exceltobangumi/index.ts` |
-| 78 | +0.58% | 88.21% | 中-DOM/UI | `ts/panel/enrich-page.ts` |
-| 77 | +0.57% | 1.28% | 中-DOM/UI | `ts/panel/panel-page.ts` |
 | 69 | +0.51% | 59.17% | 难-COM/网络 | `ts/sync/workbook-auto-detect.ts` |
-| 58 | +0.43% | 40.2% | 中-DOM/UI | `ts/ui/handlers/github-settings.ts` |
 | 40 | +0.30% | 0% | 难-COM/网络 | `ts/sync/exceltobangumi/chapter-marker.ts` |
-| 31 | +0.23% | 3.12% | 中-DOM/UI | `ts/ui/message.ts` |
 | 26 | +0.19% | 96% | 难-COM/网络 | `ts/sync/github-sync.ts` |
-| 19 | +0.14% | 0% | 中-DOM/UI | `ts/ui/github-config-dialog.ts` |
-| 17 | +0.13% | 0% | 中-DOM/UI | `ts/panel/clean-bootstrap.ts` |
 | 13 | +0.10% | 96.58% | 难-COM/网络 | `ts/sync/sync-record.ts` |
-| 6 | +0.04% | 95.45% | 中-DOM/UI | `ts/ui/handlers/module-order.ts` |
 | 5 | +0.04% | 96.75% | 难-COM/网络 | `ts/sync/enrich-lock.ts` |
 | 5 | +0.04% | 96.73% | 难-COM/网络 | `ts/sync/github-sync-diff.ts` |
+
+> 📌 **第十三轮后清单形态变了**：上表已无 `ts/panel` / `ts/ui` 文件 —— 中-DOM/UI 档**全部收口**（仅剩 `enrich-preview-cell` 3 行、
+> `ui/preview` 3 行这类零头）。剩下的 341 行里，前 5 个文件就占 285 行（84%），且**全是难-COM/网络**；
+> 其余 30 个文件每只差 1~3 行，合计 56 行（长尾已摊平，单文件收益 ≤ +0.02%）。
+> 也就是说：再往后**没有「顺手就能吃一大口」的目标了**，要么啃 COM 大块（需先评估是否真能造出宿主），
+> 要么逐个清 1~3 行的零头。
 
 > **难度列是按目录粗判的**：`ts/tools`、`ts/core` 多为纯逻辑 → 易；`ts/panel`、`ts/ui` 依赖 DOM → 中；`ts/sync`、`ts/services` 依赖 COM / 网络 → 难。
 > 实际动手前仍需扫一眼文件内的依赖（例如 `tools/util/index.ts` 是聚合桶，可能混入依赖 WPS 全局对象的函数）。
@@ -252,6 +258,38 @@ node scripts/calc-coverage-lines.mjs panel/clean-engine.ts   # 逐行定位（�
       - **`timeFilter` 三个 case 的断言技巧**：把 `mocks.answer.confirm` 置 `false`，只走到确认弹窗、**不真正执行同步**，于是能干净地断言弹窗文案（`🔮 时间筛选：预告/未来动漫（无开播日期）` / `📅 时间筛选：2025年全年` / `📅 时间筛选：2026年7月`），再另加一条真跑同步的用例断言第 6 个实参 `{enabled:true, year:2026, range:'month', month:7}`。
     - **本轮新踩的坑（已写进 `REF-testing.md`）**：① **`coverage-summary.json` 的 `lines` 指标不能由 `coverage-final.json` 的 `statementMap` 推导** —— 求和 statement 行区间会把 `clean-engine.ts` 算成 531 行（summary 是 316）；行口径要**用 `istanbul-lib-coverage` 的 `getLineCoverage()` 复刻**（本轮新增 `.workbuddy/tmp-lines.mjs`，读 `coverage-final.json` → 精确列出未覆盖行号，与台账数字**逐行吻合**），`coverage-final.json` 只用来定位哪些 statement / function / branch 计数为 0。② 跑覆盖率复核**必须**带 `--config vitest.cov.config.ts`（`clean:false`）+ `CODEBUDDY_SAFE_DELETE_BULK_THRESHOLD=1000000`，否则收尾 `V8CoverageProvider.cleanAfterRun` 会撞 safe-delete 守卫并让进程 exit 1。③ 一批新用例写完后**先跑 `npx eslint <files>` 再跑 `tsc`**：本轮 lint 报了 11 处（`unicorn/name-replacements` 把 `prevX` / `tempRule` 判为应写全 `previousX` / `temporaryRule`、`@typescript-eslint/no-unsafe-return` 在 `mock.calls.map(call => call[1])` 上、`no-unnecessary-type-assertion` 在 `new Proxy(doc, …) as Document` 上、`unicorn/consistent-function-scoping` 要求把 `mountSelectWithOption` 提到模块级）。
     - **全项目**：94.87% → **95.33% lines**（未覆盖 687 → **626**，吃掉 **61 行** —— 三文件台账合计 60 行，多出的 1 行来自 `action-handlers.test.ts` 新增用例顺带打到的相邻模块）；测试 3944 → **3999 条**（文件数仍 120）；`npm run gate` 七关全绿。
+
+**第 15 批 · P1 其余 7 文件（2026-09-15 第十三轮，已完成）**
+
+26. ~~`ts/panel/enrich-page.ts`（78 行 / 88.21%）、`ts/panel/panel-page.ts`（78 行 / 1.28%）、`ts/ui/handlers/github-settings.ts`（58 行 / 41.23%）、`ts/ui/message.ts`（32 行 / 3.12%）、`ts/ui/github-config-dialog.ts`（19 行 / 0%）、`ts/panel/clean-bootstrap.ts`（17 行 / 0%）、`ts/ui/handlers/module-order.ts`（6 行 / 95.45%）~~ ✅ **7 个文件全部 100% lines**（2026-09-15，就地扩写 3 个既有文件 + 新建 4 个测试文件，合计 **+116 条**；P1 档至此清空）：
+    - **`enrich-page.ts`**：88.21% → **100% lines**（78 → 0，49 → 68 条）。这是本批最大的一块，78 行分散在十来个流程块的早退/catch 分支上，逐块补：
+      - **绑定路由**：`workbookSelect` 的 change（取消兜底重试 + 刷新表列表 + 同步锁定按钮）、`viewEnrichDetailBtn`。
+      - **`refreshSheets` 的 `queueMicrotask(previewMatch)`**：需要 `await vi.waitFor(...)` 让出微任务；**坑**：刷新按钮会先跑 `selectTargetSheet()`，它读「工作簿下拉 + 活动工作簿」，两者都拿不到时会把 `state.bangumiSheet` **清空**，于是后面的 `animeSourceSheet && bangumiSheet && columnMapping` 守卫直接不成立 —— 必须先 `stubApp` 给出活动工作簿。
+      - **`selectTargetSheet`**：空值分支（jsdom 里 `select.value = ''` 会被静默丢弃，**必须显式造一个空 `<option>`**）、`Worksheets.Item` 抛错 → `applyTargetSheet(null)` + `handleError`。
+      - **`refreshWorkbookList` 已锁定**：回填 `lockedWorkbookName` 到下拉框（要先把默认选项换成别的值，否则断言恒真）。
+      - **`autoDetectHeaderFromFile`**：切换源工作簿时先回收上一个、文件无工作表且由本插件打开 → 回收 + 提示。
+      - **`mergeSelectedPaths`**：多选结果含已选文件 → 跳过重复项（区别于回退路径那条同义日志）。
+      - **`selectNewAnimeFile` 外层 catch**：`getApp` 抛错时，`pickFilesWithMultiSelect` 内部会先吞掉一次（触发回退），**回退路径里的第二次 `getApp`** 才冒到外层 catch。
+      - **`renderEnrichSummary` catch**：`getOrCreateEnrichRecordSheet` 抛错 → INFO 级 `handleError`，富化结果不受影响。
+      - **`autoAddOpenAnimeWorkbooks`**：added > 0 的完整链路（加入列表 + `showAutoDetectNotice` + 单文件自动识别）与 added === 0 的静默返回；`collectDetectedWorkbookPaths` 抛错时**两个检查点各自兜底**（`autoAddOpenAnimeWorkbooks` 与 `checkBangumiAutoDetectRecords`）。
+      - **`batchRemoveFile`**：列表移除按钮 → 删除 + `filePath` 跟随首位；由多文件移除到只剩一个 → 补跑一次 `maybeAutoDetectSingleFile`。
+      - **批量边界**：布局命中但 `columnMapping.nameCol === 0` → 标记错误且**不进入匹配**；`wb.Close()` 抛错 → WARN 但不影响该文件结果；`createInlineProgress` 的「停止」回调 → 置位 `batchCancelRequested` 并按停止收尾；批量模式刻意不回调进度。
+      - **模块级轮询状态另立文件**：`enrichWatchTimer` / `enrichWatchRetriesLeft` 是 **`enrich-page.ts` 的模块级状态** —— 前者让 `startEnrichWorkbookWatch` 幂等，后者**只递减、永不回补**，而本文件里任何一次 `select` 的 change 都会把它清零。因此 `recheckEnrichTarget` / `takeRecheckReason` / `pollOnce` / `stopEnrichWorkbookWatch` 这 29 行无法在 `enrich-page.test.ts` 里稳定复现，单独建 **`tests/enrich-page-watch.test.ts`**（8 条），每条用例先 `vi.resetModules()` 取一份全新注册表（`state` 也必须从新注册表里取，不能用顶层静态 import），再捕获 `window.setInterval` 的回调手动驱动。
+      - **顺手修正两条名不副实的既有用例**：`refreshSheets → 未锁定时走自动选择并联动预览匹配` 实际没断言 `previewMatch`（已改名）；`lockSheetBtn → 解锁后…` 因为 `toggleEnrichWorkbookLock` 是 mock、`isLocked` 根本没被翻成 `false`，走的其实是**锁定**分支（已改成真的翻 `false`，这才覆盖到解锁分支）。
+    - **`panel-page.ts`**：1.28% → **100% lines**（78 → 0，新建 `tests/panel-page.test.ts` 23 条）。四组依赖全 mock（barrel 里放一个**可变的** `stubs.bgm.sheet`，便于逐用例翻 `isLocked` / `lockedIndex`）。覆盖 `window` 桥接契约（`initPanelCore` / `refreshPanelUI` 的 descriptor 必须 `writable + configurable`）、`initPanel` 的 `readyState === 'complete'` 立即执行 / 非 complete 挂 `load` / 抛错 → `handleError` **且仍然广播 `bgm:modulesReady`**（否则按钮永远停在禁用态）/ 无 `document` 的同步分支、`initPanelCore` 的 WPS 枚举注入（仅缺失时）+ 用户信息恢复 + 锁定表恢复 + `setTimeout(…, 0)` 延后扫描 + 四条自动检测分支 + 全部事件绑定（含 `beforeunload` 摘掉 keydown 监听 —— 用「再按一次 Escape」反证）。
+      - **两个坑**：① jsdom 的 `select.value` 静默丢弃（同上），需要 `addOptions(id, ...values)` 预置选项；② `vi.stubGlobal('document', undefined)` 让 `typeof document === 'undefined'` 成立，但紧接着的 `document.getElementById` 抛的是 **`TypeError` 而不是 `ReferenceError`**。
+    - **`github-settings.ts`**：41.23% → **100% lines**（58 → 0，新建 `tests/github-settings.test.ts` 25 条）。刻意使用**真实** `debounce` + **真实** `trackedAddEventListener`，让「input → 300ms → 落盘」端到端可观测。覆盖 `toggleSourceFields` 三种来源类型 + 容器缺失、`saveGithubConfigFromDom`（trim、`branch` 兜底 `main`、必填缺失跳过、local 读 `localFilePath` 而非 `githubPath`、任一 setter 返回 false 则不打成功日志）、`debouncedSaveGithubConfig`（300ms / 合并 / 抛错 → WARN）、`refreshGithubConfigInputs`、`loadGithubConfigIntoForm`（含「配置为空时不打已加载日志」与 change → 立即切换可见性 + 防抖保存）。
+    - **`message.ts`**：3.12% → **100% lines**（32 → 0，新建 `tests/message.test.ts` 18 条）。覆盖重复 `initMessageListener` 会**摘掉旧 listener**（否则一条消息触发两次动作）、origin 白名单（`https://evil.example.com` 静默丢弃、`https://bgm.tv` 与自身 origin 放行、缺 `type` 丢弃）、5 种消息类型 + `default` → WARN、`setStatus` 写 `#statusBox`（`status info` 类名）/ 显式类型 / 回退 `#statusDisplay` / 两者都缺时静默返回。
+    - **`github-config-dialog.ts`**：0% → **100% lines**（19 → 0，新建 `tests/github-config-dialog.test.ts` 12 条）。**同时修掉一处真实的生产漏洞**：该文件自己实现的 `escapeHtml` 只做 `textContent → innerHTML`（转义 `< > &`，**不转义引号**），却被拼进 `title="${escapeHtml(url)}"` —— 攻击者可控的 `"` 能闭合属性并注入新属性。先跑探针确认 jsdom 行为（`innerHTML` 实测得到 `x" onmouseover="alert(1)`，引号确实未转义），再删掉本地实现、改用 `tools/string-utilities-pure.ts` 里的规范 `escapeHtml`（它额外做 `.replace(/"/g,'&quot;').replace(/'/g,'&#39;')`）。`ts/ui/` 引 `ts/tools/` 属合规方向，`check:cycles` 的分层约束不受影响；因该文件可执行行 19 → 16，全项目总行数也由 13411 降到 13408。断言用 `getAttributeNames()` 确认只多出 `title`、`childElementCount === 0`、`<img>` / `<script>` 未被创建。
+      - **坑**：`.detail-value` 这个 span 自带 `class`，所以 `getAttributeNames()` 是 `['class','title']`；另外**文本节点里的裸引号是合法的**（文本上下文不解析属性），断言不能写成「innerHTML 不含 `onmouseover="`」，要精确匹配转义后的 `title="…&quot;…"` 子串。
+    - **`clean-bootstrap.ts`**：0% → **100% lines**（17 → 0，扩写既有 `tests/panel-bootstrap.test.ts` 17 → 22 条）。覆盖 import 时禁用按钮、`bgm:modulesReady` 启用 + `[BGM Clean] 模块加载完成，按钮已启用`、ready 后 `initCleanPage` + `startNavModeSync` + `startNavOrderSync('clean')` + `startModuleStateSync('clean')`、`readyState === 'loading'` 延后到 `DOMContentLoaded`、以及「不安装主题 / 壳层导航」的反向断言。
+    - **`module-order.ts`**：95.45% → **100% lines**（6 → 0，扩写既有 `tests/module-order.test.ts` 25 → 30 条）。覆盖恢复默认顺序写盘失败（`mockSetConfig` 返回 `false` 的唯一可达路径，用 `vi.hoisted` 里一个可控开关驱动）、`dragstart` 写 `setData('text/plain', …)` + `effectAllowed = 'move'`、`dragover` 清掉上一个落点高亮、`drop` 源 id 不在顺序里 → `调整顺序失败`、`beforeunload` 清掉 2s 轮询定时器。
+      - **行口径注意**：该文件 `uncovered stmts` 里仍有 12 条零计数（如 `if (!modules || modules.length === 0) return ''` 的 `return`），但**这些行都算已覆盖**（同行的 IfStatement 每轮都求值）—— 见本文档开头「行口径陷阱」。
+    - **全项目**：95.33% → **97.45% lines**（未覆盖 626 → **341**，吃掉 **285 行**；7 个文件台账合计 288 行，其中 `github-config-dialog.ts` 因生产修复少了 3 行可执行行，288 − 3 = 285 **精确吻合**）；stmts 94.54% → 96.68%、branch 85.25% → 87.57%、funcs 95.00% → 97.19%；测试 3999 → **4115 条 / 125 文件**。
+    - **本轮新踩的坑（已写进 `REF-testing.md` / `REF-eslint-tests.md`）**：
+      ① **`npx eslint <dir> --fix` 会删掉它判定为「未使用」的 `eslint-disable-next-line` 注释** —— 本轮对 `tests/` 整目录跑 `--fix`，把 `github-sync-core.test.ts` / `sheet.test.ts` / `utility.test.ts` 里三条 `// eslint-disable-next-line unicorn/no-unused-properties -- 预留测试选项…` 抹掉了，于是三个**与本批无关**的文件凭空冒出 7 个 error（`git checkout --` 已还原）。**结论：`--fix` 只对本轮改动的那几个文件跑，别扫目录。**
+      ② 只给 `--coverage.reporter=json` 时 `coverage-summary.json` **不会重写**，`calc-coverage-lines.mjs` 里 `summary lines` 那一行会读到上一次的陈旧值（`uncovered lines` 仍准确）—— 两个 reporter 都要给。
+      ③ 本批 lint 又撞到 `unicorn/consistent-boolean-name`（`confirmed` → `isConfirmed`、`writeShouldFail` → `isWriteShouldFail`）、`unicorn/no-non-function-verb-prefix`（`removeButtons` / `setDataCalls` 这类以动词开头的**数组变量**要改名）、`unicorn/no-return-array-push`（`() => arr.push(x)` 隐式返回 push 的返回值，要改成块体）、`@typescript-eslint/no-unnecessary-condition`（参数已声明 `{ name?: string }` 时 `detector?.name` 的可选链多余）。
 
 ## 四、门禁现状
 

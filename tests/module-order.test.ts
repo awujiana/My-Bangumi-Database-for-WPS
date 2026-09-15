@@ -14,21 +14,28 @@ import { CONFIG_KEYS } from '../ts/tools/config.js'
  * `vi.mock` 工厂会被提升到 import 之前，工厂内不能引用模块级变量 —— 用 `vi.hoisted` 一并提升。
  * 这里不用 `vi.fn()`（hoisted 回调里引用 vi 不稳），改用普通数组记录调用。
  */
-const { configStore, mockGetConfig, mockSetConfig, toastCalls, logCalls } = vi.hoisted(() => {
-  const store = new Map<string, string>()
-  const toasts: [string, string][] = []
-  const logs: [string, string][] = []
-  return {
-    configStore: store,
-    toastCalls: toasts,
-    logCalls: logs,
-    mockGetConfig: (key: string, fallback = ''): string => store.get(key) ?? fallback,
-    mockSetConfig: (key: string, value: string): boolean => {
-      store.set(key, value)
-      return true
-    },
-  }
-})
+const { configStore, mockGetConfig, mockSetConfig, toastCalls, logCalls, setWriteShouldFail } =
+  vi.hoisted(() => {
+    const store = new Map<string, string>()
+    const toasts: [string, string][] = []
+    const logs: [string, string][] = []
+    // 可控写盘失败开关：驱动「写配置失败」的兜底提示分支
+    let isWriteShouldFail = false
+    return {
+      configStore: store,
+      toastCalls: toasts,
+      logCalls: logs,
+      setWriteShouldFail: (shouldFail: boolean): void => {
+        isWriteShouldFail = shouldFail
+      },
+      mockGetConfig: (key: string, fallback = ''): string => store.get(key) ?? fallback,
+      mockSetConfig: (key: string, value: string): boolean => {
+        if (isWriteShouldFail) return false
+        store.set(key, value)
+        return true
+      },
+    }
+  })
 
 vi.mock('../ts/tools/config.js', () => ({
   CONFIG_KEYS: {
@@ -104,6 +111,7 @@ beforeEach(() => {
   configStore.clear()
   toastCalls.length = 0
   logCalls.length = 0
+  setWriteShouldFail(false)
   // 用假定时器：initModuleOrderEditor 内部会起一个 2s 轮询，不冻结会留下悬挂定时器
   vi.useFakeTimers()
   buildHost()
@@ -329,5 +337,93 @@ describe('跨页同步与初始化', () => {
     expect(() => {
       initModuleOrderEditor()
     }).not.toThrow()
+  })
+})
+
+// ========== 兜底分支：写盘失败 / 拖拽数据 / 卸载清理 ==========
+
+/** 带 dataTransfer 的拖拽事件（jsdom 没有 DragEvent，用 Event 附加属性模拟） */
+function fireDragWithData(
+  type: string,
+  target: Element,
+): { recordedSetData: string[][]; transfer: { effectAllowed: string; dropEffect: string } } {
+  const recordedSetData: string[][] = []
+  const transfer = {
+    effectAllowed: '',
+    dropEffect: '',
+    setData: (format: string, data: string): void => {
+      recordedSetData.push([format, data])
+    },
+  }
+  const event = new Event(type, { bubbles: true, cancelable: true })
+  Object.assign(event, { dataTransfer: transfer })
+  target.dispatchEvent(event)
+  return { recordedSetData, transfer }
+}
+
+describe('兜底分支', () => {
+  it('恢复默认顺序写盘失败时提示错误（配置保持原样）', () => {
+    setNavOrder('panel', ['sec-help', 'sec-account'])
+    renderModuleOrderEditor()
+    const reset = document.querySelector<HTMLElement>('[data-mod-reset="panel"]')
+    if (!reset) throw new Error('缺少恢复默认按钮')
+
+    setWriteShouldFail(true)
+    click(reset)
+    setWriteShouldFail(false)
+
+    expect(toastMessages()).toContain('恢复默认顺序失败')
+    // 写盘失败 → 存储里仍是之前写入的顺序
+    expect(getNavOrder('panel')[0]).toBe('sec-help')
+  })
+
+  it('拖拽开始时写入拖拽数据（兼容 Firefox / WebView 的 drop 触发要求）', () => {
+    renderModuleOrderEditor()
+    const from = itemsOf('clean')[0]!
+    const { recordedSetData, transfer } = fireDragWithData('dragstart', from)
+
+    expect(recordedSetData).toEqual([['text/plain', from.dataset.module]])
+    expect(transfer.effectAllowed).toBe('move')
+  })
+
+  it('拖拽经过新目标时清掉上一个目标的高亮', () => {
+    renderModuleOrderEditor()
+    const from = itemsOf('clean')[0]!
+    const firstTarget = itemsOf('clean')[1]!
+    const secondTarget = itemsOf('clean')[2]!
+
+    fire('dragstart', from)
+    fire('dragover', firstTarget)
+    expect(firstTarget.classList.contains('is-drop-target')).toBe(true)
+
+    fire('dragover', secondTarget)
+    expect(firstTarget.classList.contains('is-drop-target')).toBe(false)
+    expect(secondTarget.classList.contains('is-drop-target')).toBe(true)
+  })
+
+  it('拖拽来源模块不在顺序表中时提示调整失败', () => {
+    renderModuleOrderEditor()
+    const from = itemsOf('clean')[0]!
+    // onDragStart 记录的是条目上的 data-module —— 改成注册表里不存在的 id
+    from.dataset.module = 'sec-nope'
+    fire('dragstart', from)
+    const target = itemsOf('clean')[2]!
+    fire('dragover', target)
+    fire('drop', target)
+
+    expect(toastMessages()).toContain('调整顺序失败')
+  })
+
+  it('beforeunload 时清掉轮询定时器（不再跟随其它窗格的改动）', () => {
+    renderModuleOrderEditor()
+    const stop = startModuleOrderSync()
+
+    window.dispatchEvent(new Event('beforeunload'))
+    setNavOrder('clean', ['sec-log', 'sec-targets'])
+    vi.advanceTimersByTime(4000)
+
+    // 定时器已清 → 不会重渲染，clean 首项仍是默认的 sec-targets
+    expect(itemsOf('clean')[0]?.dataset.module).toBe('sec-targets')
+    stop()
   })
 })

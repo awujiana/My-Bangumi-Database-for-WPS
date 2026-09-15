@@ -9,16 +9,22 @@
  * 为什么需要它（重要）：
  *   `coverage-summary.json` 的 `lines` 指标**不能**由 `coverage-final.json` 的 `statementMap`
  *   行区间求和推导 —— 实测 `ts/panel/clean-engine.ts` 求和得 531 行，而台账口径是 316 行。
- *   istanbul 的 `getLineCoverage()` 是「同一行取该行最后一个 statement / function / branch 的计数」，
- *   函数声明行与分支行会**覆盖**语句行。所以本脚本直接用 `istanbul-lib-coverage` 复刻台账口径，
+ *   istanbul 的 `getLineCoverage()` 是「同一行取该行所有 statement 计数的**最大值**」
+ *   （见 `istanbul-lib-coverage/lib/file-coverage.js`）。所以形如
+ *   `if (cond) return X` 的单行守卫：IfStatement 每次都会求值（计数 > 0），
+ *   同一行上的 `return X` 即使从未走到，该行也判为已覆盖 —— 这类残留只会出现在
+ *   下面的 `uncovered stmts` 里，不会进 `uncovered lines`。
+ *   本脚本直接用 `istanbul-lib-coverage` 复刻台账口径，
  *   保证输出与 `COVERAGE_BACKLOG.md` / `待办任务清单.md` 里记的未覆盖行数**逐行吻合**。
  *
- * 前置：
+ * 前置（两个 reporter 都要给）：
  *   CODEBUDDY_SAFE_DELETE_BULK_THRESHOLD=1000000 \
  *   npx vitest run --coverage --config vitest.cov.config.ts \
  *     --coverage.reporter=json-summary --coverage.reporter=json
- *   （不带 `--config vitest.cov.config.ts` 时收尾 `V8CoverageProvider.cleanAfterRun`
- *     会撞 safe-delete 守卫、进程 exit 1）
+ *   - 不带 `--config vitest.cov.config.ts` 时收尾 `V8CoverageProvider.cleanAfterRun`
+ *     会撞 safe-delete 守卫、进程 exit 1；
+ *   - 只给 `--coverage.reporter=json` 时 `coverage-summary.json` **不会重写**，
+ *     脚本里 `summary lines` 那一行会读到上一次的陈旧值（`uncovered lines` 仍准确）。
  */
 import { readFileSync } from 'node:fs'
 import libCoverage from 'istanbul-lib-coverage'

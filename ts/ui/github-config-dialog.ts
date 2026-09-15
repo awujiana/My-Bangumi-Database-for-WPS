@@ -2,6 +2,9 @@
  * 显示连接测试结果弹窗
  * 在 GitHub 配置测试完成后显示详细结果
  */
+
+import { escapeHtml } from '../tools/string-utilities-pure.js'
+
 export function showConnectionTestDialog(result: {
   success: boolean
   statusCode: number | null
@@ -79,10 +82,4 @@ export function hideConnectionTestDialog(): void {
   if (modal) {
     modal.style.display = 'none'
   }
-}
-
-function escapeHtml(text: string): string {
-  const div = document.createElement('div')
-  div.textContent = text
-  return div.innerHTML
 }

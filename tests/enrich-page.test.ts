@@ -9,7 +9,7 @@
  */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import type { WpsWorksheet } from '../ts/index.js'
+import type { WpsWorksheet, WpsWorkbook } from '../ts/index.js'
 
 // ========== 假宿主形状 ==========
 
@@ -492,7 +492,7 @@ describe('enrich-page · 绑定路由', () => {
     expect(m.updateEnrichLockButton).toHaveBeenCalledWith('lockSheetBtn', 'lockStatus')
   })
 
-  it('refreshSheets → 未锁定时走自动选择并联动预览匹配', () => {
+  it('refreshSheets → 未锁定时走自动选择并刷新列表', () => {
     const refreshButton = document.querySelector('[data-action="refreshSheets"]')!
 
     click(refreshButton)
@@ -532,13 +532,19 @@ describe('enrich-page · 绑定路由', () => {
     expect(state.bangumiSheet).toBe(ws2)
   })
 
-  it('lockSheetBtn → 解锁后清空目标表并取消兜底重试', () => {
+  it('lockSheetBtn → 解锁后清空目标表、恢复下拉框并取消兜底重试', () => {
+    // toggleEnrichWorkbookLock 是 mock：必须让它真的把 isLocked 翻成 false，
+    // 否则点完按钮 isLocked 仍为 true，走的其实是「锁定」分支而非「解锁」分支。
     sheetState.isLocked = true
     state.bangumiSheet = makeWs('追踪')
+    m.toggleEnrichWorkbookLock.mockImplementation(() => {
+      sheetState.isLocked = false
+    })
 
     click(document.getElementById('lockSheetBtn') as HTMLButtonElement)
 
     expect(state.bangumiSheet).toBeNull()
+    expect((document.getElementById('sheetSelect') as HTMLSelectElement).disabled).toBe(false)
     expect(m.toggleEnrichWorkbookLock).toHaveBeenCalled()
   })
 
@@ -1125,5 +1131,386 @@ describe('enrich-page · batchStartEnrichment', () => {
     })
     expect(state.batchResults[0]?.success).toBe(false)
     expect(state.batchResults[0]?.error).toBe('未检测到有效的表头行')
+  })
+
+  it('布局命中但名称列为 0 → 标记错误且不进入匹配', async () => {
+    primeBatch(['D:/无名称列.xlsx'])
+    m.detectAnimeSourceLayout.mockReturnValue({
+      headerRow: 1,
+      dataStartRow: 2,
+      columnMapping: { nameCol: 0 },
+    })
+
+    batchStartEnrichment()
+
+    await vi.waitFor(() => {
+      expect(state.isBatchEnriching).toBe(false)
+    })
+    expect(state.batchResults[0]?.success).toBe(false)
+    expect(state.batchResults[0]?.error).toBe('已找到字段行，但未找到名称列')
+    expect(m.matchEntries).not.toHaveBeenCalled()
+  })
+
+  it('关闭源文件抛错 → 记警告但不影响该文件的结果', async () => {
+    primeBatch(['D:/a.xlsx'])
+    // primeBatch 里 Close 是正常 vi.fn()；这里换成抛错版本，走 closeBatchSourceWorkbook 的 catch
+    stubApp({
+      Workbooks: {
+        Count: 0,
+        Open: () => {
+          const wb = {
+            Name: '源.xlsx',
+            Worksheets: { Count: 1, Item: () => makeWs('动画') },
+            Close: () => {
+              throw new Error('文件被占用')
+            },
+          }
+          return Object.assign(wb, { parent: null })
+        },
+      },
+      ActiveWorkbook: null,
+    })
+
+    batchStartEnrichment()
+
+    await vi.waitFor(() => {
+      expect(state.isBatchEnriching).toBe(false)
+    })
+    expect(state.batchResults[0]?.success).toBe(true)
+    expect(m.bgmLog).toHaveBeenCalledWith(expect.anything(), expect.stringContaining('关闭文件时警告'))
+  })
+
+  it('批量模式刻意不回调进度 → 进度函数被调用也不影响结果统计', async () => {
+    primeBatch(['D:/a.xlsx'])
+    m.enrichEntries.mockImplementation(
+      (
+        _ws: unknown,
+        _target: unknown,
+        _matches: unknown,
+        _config: unknown,
+        onProgress?: (progress: unknown) => void,
+      ) => {
+        // 生产在批量分支传的是空函数；这里主动调一次，确认它是无害的 no-op
+        onProgress?.({ current: 1, total: 1, currentName: 'x', stats: {} })
+        return [{ kind: 'matched', enrichedFields: ['名称'] }]
+      },
+    )
+
+    batchStartEnrichment()
+
+    await vi.waitFor(() => {
+      expect(state.isBatchEnriching).toBe(false)
+    })
+    expect(state.batchResults[0]?.success).toBe(true)
+    expect(state.batchResults[0]?.matched).toBe(1)
+  })
+
+  it('批量进度「停止」按钮 → 置位批量取消标记并按停止收尾', async () => {
+    const cancelHandlers: (() => void)[] = []
+    primeBatch(['D:/a.xlsx'])
+    m.createInlineProgress.mockImplementation(
+      (_host: string, _title: string, _icon: string, onCancel?: () => void) => {
+        if (onCancel) cancelHandlers.push(onCancel)
+        return { update: vi.fn(), hide: vi.fn() }
+      },
+    )
+
+    batchStartEnrichment()
+
+    // showBatchProgress(true) 在 runBatchEnrichment 的首个 await 之前同步执行
+    expect(cancelHandlers).toHaveLength(1)
+    cancelHandlers[0]?.()
+    expect(state.batchCancelRequested).toBe(true)
+
+    await vi.waitFor(() => {
+      expect(state.isBatchEnriching).toBe(false)
+    })
+    expect(m.showToast).toHaveBeenCalledWith(expect.stringContaining('已停止批量富化'), 'warning')
+  })
+})
+
+// ========== 兜底分支与边界补测 ==========
+//
+// 本块只补「行已覆盖、但某条分支从未走到」的边角：早退守卫、catch 兜底、
+// 可选开关的另一侧、以及多文件与单文件之间的状态回退。
+//
+// 注意：`enrichWatchTimer` / `enrichWatchRetriesLeft` 是 enrich-page.ts 的
+// **模块级**状态，一旦被本文件里任何一条用例改动（例如触发 select 的 change
+// 就会把剩余重试次数清零），后续用例再也拿不回初值。因此工作簿轮询那几条
+// 分支无法在本文件内稳定复现，单独放在 `enrich-page-watch.test.ts`（独立
+// 模块注册表 → 模块级状态天然是干净的）。
+
+describe('enrich-page · 兜底分支与边界补测', () => {
+  beforeEach(() => {
+    mountEnrichControls()
+    initEnrichPage()
+    vi.clearAllMocks()
+    m.detectHeaderOnSheet.mockReturnValue({ nameCol: 1 })
+    m.ensureSourceSheet.mockReturnValue(null)
+    m.autoSelectEnrichTarget.mockReturnValue('none')
+    m.collectDetectedWorkbookPaths.mockReturnValue([])
+    m.getLockedEnrichSheet.mockReturnValue(null)
+    m.enrichEntries.mockReturnValue([])
+    m.matchEntries.mockReturnValue([])
+    m.collectAllConflicts.mockReturnValue([])
+    m.openSourceWorkbook.mockReturnValue(null)
+  })
+
+  it('workbookSelect change → 刷新工作表列表并同步锁定按钮', () => {
+    const wbSelect = document.getElementById('workbookSelect') as HTMLSelectElement
+
+    wbSelect.dispatchEvent(new Event('change'))
+
+    expect(m.refreshEnrichSheets).toHaveBeenCalled()
+    expect(m.updateEnrichLockButton).toHaveBeenCalledWith('lockSheetBtn', 'lockStatus')
+  })
+
+  it('refreshSheets 且源表/目标表/列映射齐备 → 微任务里自动跑一次预览匹配', async () => {
+    // 刷新按钮会先跑 selectTargetSheet()：它读「工作簿下拉 + 活动工作簿」，
+    // 两者都拿不到时会把 state.bangumiSheet 清空，后面的守卫就不成立了。
+    const targetSheet = makeWs('追踪')
+    stubApp({
+      Workbooks: { Count: 1 },
+      ActiveWorkbook: {
+        Name: 'BGM.xlsx',
+        Worksheets: { Count: 1, Item: () => targetSheet },
+      },
+    })
+    state.animeSourceSheet = makeWs('动画')
+    state.bangumiSheet = targetSheet
+    state.columnMapping = { nameCol: 1 }
+
+    click(document.querySelector('[data-action="refreshSheets"]')!)
+
+    // queueMicrotask 里调度，必须让出一次微任务才能观察到
+    await vi.waitFor(() => {
+      expect(m.previewMatch).toHaveBeenCalled()
+    })
+  })
+
+  it('viewEnrichDetailBtn → 打开富化详情弹窗', () => {
+    click(document.getElementById('viewEnrichDetailBtn') as HTMLButtonElement)
+
+    expect(m.showEnrichDetail).toHaveBeenCalled()
+  })
+
+  it('sheetSelect 未选中任何工作表 → 清空目标表引用', () => {
+    const sheetSelect = document.getElementById('sheetSelect') as HTMLSelectElement
+    // jsdom：select.value 只有存在匹配 option 才能落住，空值必须显式造一个空 option
+    const emptyOption = document.createElement('option')
+    emptyOption.value = ''
+    sheetSelect.append(emptyOption)
+    sheetSelect.value = ''
+    state.bangumiSheet = makeWs('追踪')
+
+    sheetSelect.dispatchEvent(new Event('change'))
+
+    expect(state.bangumiSheet).toBeNull()
+    expect(m.resetMatchResults).toHaveBeenCalled()
+  })
+
+  it('读取目标工作表抛错 → 清空引用并记 INFO 级错误', () => {
+    stubApp({
+      Workbooks: { Count: 1 },
+      ActiveWorkbook: {
+        Name: 'BGM.xlsx',
+        Worksheets: {
+          Count: 2,
+          Item: () => {
+            throw new Error('索引越界')
+          },
+        },
+      },
+    })
+    const sheetSelect = document.getElementById('sheetSelect') as HTMLSelectElement
+    sheetSelect.value = '2'
+
+    sheetSelect.dispatchEvent(new Event('change'))
+
+    expect(state.bangumiSheet).toBeNull()
+    expect(m.handleError).toHaveBeenCalledWith(
+      expect.any(Error),
+      expect.objectContaining({ context: 'selectTargetSheet' }),
+    )
+  })
+
+  it('已锁定工作簿时刷新列表 → 回填锁定的工作簿', () => {
+    document.body.replaceChildren()
+    mountEnrichControls()
+    const wbSelect = document.getElementById('workbookSelect') as HTMLSelectElement
+    const otherOption = document.createElement('option')
+    otherOption.value = '其他.xlsx'
+    wbSelect.prepend(otherOption)
+    wbSelect.value = '其他.xlsx'
+    sheetState.isLocked = true
+    sheetState.lockedWorkbookName = 'BGM.xlsx'
+
+    initEnrichPage()
+
+    expect(wbSelect.value).toBe('BGM.xlsx')
+  })
+
+  it('识别新文件时先回收上一个源工作簿', () => {
+    state.filePath = 'D:/动画B.xlsx'
+    state.sourceWorkbook = { Name: '旧.xlsx' } as unknown as WpsWorkbook
+    const wb = {
+      Name: '新.xlsx',
+      Worksheets: { Count: 1, Item: () => makeWs('动画') },
+    } as unknown as WpsWorkbook
+    m.openSourceWorkbook.mockReturnValue({ wb, isOpenedByUs: false })
+
+    autoDetectHeader()
+
+    expect(m.closeOpenedSourceWorkbook).toHaveBeenCalled()
+    expect(state.sourceWorkbook).toBe(wb)
+    expect(state.isSourceWorkbookOpenedByUs).toBe(false)
+  })
+
+  it('文件无工作表且由本插件打开 → 立即回收并提示失败', () => {
+    state.filePath = 'D:/空.xlsx'
+    const wb = {
+      Name: '空.xlsx',
+      Worksheets: { Count: 0, Item: () => null },
+    } as unknown as WpsWorkbook
+    m.openSourceWorkbook.mockReturnValue({ wb, isOpenedByUs: true })
+
+    autoDetectHeader()
+
+    expect(m.closeWorkbook).toHaveBeenCalledWith(wb)
+    expect(m.dialogAlert).toHaveBeenCalledWith('提示', expect.stringContaining('文件中没有工作表'))
+  })
+
+  it('多选结果含已选文件 → 跳过重复项、只追加新文件', () => {
+    state.batchFiles = ['D:/动画A.xlsx']
+    stubApp({ FileDialog: () => makeDialog(-1, ['D:/动画A.xlsx', 'D:/动画B.xlsx']) })
+
+    selectNewAnimeFile()
+
+    expect(state.batchFiles).toEqual(['D:/动画A.xlsx', 'D:/动画B.xlsx'])
+    expect(m.bgmLog).toHaveBeenCalledWith(expect.anything(), expect.stringContaining('跳过重复文件'))
+  })
+
+  it('宿主桥接整体抛错 → 交给 BGM.handleError 兜底', () => {
+    // getApp 在 pickFilesWithMultiSelect 内部被自己的 try 吞掉（→ null 触发回退），
+    // 回退路径里的第二次 getApp 才会冒到 selectNewAnimeFile 的外层 catch
+    m.getApp.mockImplementation(() => {
+      throw new Error('桥接失效')
+    })
+
+    selectNewAnimeFile()
+
+    expect(m.handleError).toHaveBeenCalledWith(
+      expect.any(Error),
+      expect.objectContaining({ context: 'selectNewAnimeFile' }),
+    )
+  })
+
+  it('富化摘要刷新记录表失败 → 记 INFO 级错误但不影响富化结果', () => {
+    m.ensureSourceSheet.mockReturnValue(makeWs('动画'))
+    state.bangumiSheet = makeWs('追踪')
+    state.columnMapping = { nameCol: 1 }
+    state.matches = [{ matchType: 'exact' }] as unknown as typeof state.matches
+    state.filePath = 'D:/动画A.xlsx'
+    m.enrichEntries.mockReturnValue([{ kind: 'matched', enrichedFields: [] }])
+    m.collectAllConflicts.mockReturnValue([])
+    m.getOrCreateEnrichRecordSheet.mockImplementation(() => {
+      throw new Error('无权限')
+    })
+
+    startEnrichment()
+
+    expect(m.handleError).toHaveBeenCalledWith(
+      expect.any(Error),
+      expect.objectContaining({ context: 'renderEnrichSummary' }),
+    )
+    expect(state.isEnriching).toBe(false)
+  })
+
+  it('页面打开检查：检测到已打开的新番表 → 自动加入、弹提示并识别表头', () => {
+    document.body.replaceChildren()
+    mountEnrichControls()
+    m.collectDetectedWorkbookPaths.mockImplementation((detector: { name?: string }) =>
+      detector.name === 'anime' ? ['D:/动画A.xlsx'] : [],
+    )
+    const wb = {
+      Name: '动画A.xlsx',
+      Worksheets: { Count: 1, Item: () => makeWs('动画') },
+    } as unknown as WpsWorkbook
+    m.openSourceWorkbook.mockReturnValue({ wb, isOpenedByUs: false })
+
+    initEnrichPage()
+
+    expect(state.batchFiles).toEqual(['D:/动画A.xlsx'])
+    expect(document.getElementById('autoDetectNotice')?.textContent).toContain(
+      '已自动识别已打开的新番表工作簿',
+    )
+    expect(m.openSourceWorkbook).toHaveBeenCalledWith('D:/动画A.xlsx')
+  })
+
+  it('页面打开检查：检测到的文件都已在列表中 → 不重复添加、不弹提示', () => {
+    document.body.replaceChildren()
+    mountEnrichControls()
+    state.batchFiles = ['D:/动画A.xlsx']
+    m.collectDetectedWorkbookPaths.mockImplementation((detector: { name?: string }) =>
+      detector.name === 'anime' ? ['D:/动画A.xlsx'] : [],
+    )
+
+    initEnrichPage()
+
+    expect(state.batchFiles).toEqual(['D:/动画A.xlsx'])
+    expect(document.getElementById('autoDetectNotice')?.textContent).toBe('')
+  })
+
+  it('页面打开检查抛错 → 两个检查点各自兜底，且不阻断初始化', () => {
+    m.collectDetectedWorkbookPaths.mockImplementation(() => {
+      throw new Error('COM 不可用')
+    })
+
+    expect(() => {
+      initEnrichPage()
+    }).not.toThrow()
+
+    expect(m.handleError).toHaveBeenCalledWith(
+      expect.any(Error),
+      expect.objectContaining({ context: 'autoAddOpenAnimeWorkbooks' }),
+    )
+    expect(m.handleError).toHaveBeenCalledWith(
+      expect.any(Error),
+      expect.objectContaining({ context: 'checkBangumiAutoDetectRecords' }),
+    )
+  })
+
+  it('批量列表移除按钮 → 删除该文件并让 filePath 跟随首位', () => {
+    stubApp({ FileDialog: () => makeDialog(-1, ['D:/a.xlsx', 'D:/b.xlsx', 'D:/c.xlsx']) })
+
+    selectNewAnimeFile()
+
+    const batchRemoveNodeList = document.querySelectorAll('#batchFileList [data-batch-remove]')
+    expect(batchRemoveNodeList).toHaveLength(3)
+
+    click(batchRemoveNodeList[0]!)
+
+    expect(state.batchFiles).toEqual(['D:/b.xlsx', 'D:/c.xlsx'])
+    expect(state.filePath).toBe('D:/b.xlsx')
+    expect(m.bgmLog).toHaveBeenCalledWith(expect.anything(), expect.stringContaining('移除文件'))
+  })
+
+  it('由多文件移除到只剩一个 → 补跑一次自动识别表头', () => {
+    stubApp({ FileDialog: () => makeDialog(-1, ['D:/a.xlsx', 'D:/b.xlsx']) })
+
+    selectNewAnimeFile()
+    expect(state.batchFiles).toHaveLength(2)
+
+    const wb = {
+      Name: 'a.xlsx',
+      Worksheets: { Count: 1, Item: () => makeWs('动画') },
+    } as unknown as WpsWorkbook
+    m.openSourceWorkbook.mockReturnValue({ wb, isOpenedByUs: false })
+
+    click(document.querySelectorAll('#batchFileList [data-batch-remove]')[1]!)
+
+    expect(state.batchFiles).toEqual(['D:/a.xlsx'])
+    expect(state.filePath).toBe('D:/a.xlsx')
+    expect(m.openSourceWorkbook).toHaveBeenCalledWith('D:/a.xlsx')
   })
 })

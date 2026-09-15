@@ -1,13 +1,13 @@
 // @vitest-environment jsdom
 /**
- * @fileoverview 三个页面启动脚本（`panel-bootstrap` / `settings-bootstrap` / `enrich-bootstrap`）
- * 的单元测试。
+ * @fileoverview 四个页面启动脚本（`panel-bootstrap` / `settings-bootstrap` /
+ * `enrich-bootstrap` / `clean-bootstrap`）的单元测试。
  *
- * 这三个文件是**导入即执行**的顶层脚本：没有导出、靠模块求值时的副作用工作。因此
+ * 这四个文件是**导入即执行**的顶层脚本：没有导出、靠模块求值时的副作用工作。因此
  * 每条用例都 `vi.resetModules()` 后重新 `import()`，用「按钮状态 / 调用了大盘初始化 /
  * console 输出」这些**外部可观察量**断言，而不是断言内部变量。
  *
- * 三个脚本只用到被导入模块的**具名导出**（`installModalA11y` / `initShellNav` / …）或
+ * 四个脚本只用到被导入模块的**具名导出**（`installModalA11y` / `initShellNav` / …）或
  * 纯副作用（`import '../ui/dialog.js'`）。测试把两类一起接管：副作用模块 mock 成空对象
  * （否则会拖进整张真实依赖图，barrel 循环还会静默回退真实现），具名导出换成 spy。
  *
@@ -39,6 +39,7 @@ const stubs = vi.hoisted(() => ({
   startModuleStateSync: vi.fn<(page: string) => void>(),
   installModalA11y: vi.fn<() => void>(),
   initEnrichPage: vi.fn<() => void>(),
+  initCleanPage: vi.fn<() => void>(),
 }))
 
 // 纯副作用导入：mock 成空对象，避免拖入真实依赖图
@@ -71,6 +72,7 @@ vi.mock('../ts/tools/module-state.js', () => ({
 vi.mock('../ts/tools/nav-order.js', () => ({ startNavOrderSync: stubs.startNavOrderSync }))
 vi.mock('../ts/panel/shell-nav.js', () => ({ initShellNav: stubs.initShellNav }))
 vi.mock('../ts/panel/enrich-page.js', () => ({ initEnrichPage: stubs.initEnrichPage }))
+vi.mock('../ts/panel/clean-page.js', () => ({ initCleanPage: stubs.initCleanPage }))
 vi.mock('../ts/ui/components/modal-a11y.js', () => ({
   installModalA11y: stubs.installModalA11y,
 }))
@@ -326,5 +328,56 @@ describe('enrich-bootstrap', () => {
 
     expect(buttons.every((button) => !button.disabled)).toBe(true)
     expect(hasConsoleOutput('log', '[BGM Enrich] 模块加载完成，按钮已启用')).toBe(true)
+  })
+})
+
+// ========== clean-bootstrap ==========
+
+describe('clean-bootstrap', () => {
+  it('导入即禁用所有 data-action 按钮', async () => {
+    const buttons = mountActionButtons()
+
+    await import('../ts/panel/clean-bootstrap.js')
+
+    expect(buttons.every((button) => button.disabled)).toBe(true)
+  })
+
+  it('收到 bgm:modulesReady → 启用按钮并打印启动日志', async () => {
+    const buttons = mountActionButtons()
+    await import('../ts/panel/clean-bootstrap.js')
+    consoleMocks.log.mockClear()
+
+    signalModulesReady()
+
+    expect(buttons.every((button) => !button.disabled)).toBe(true)
+    expect(hasConsoleOutput('log', '[BGM Clean] 模块加载完成，按钮已启用')).toBe(true)
+  })
+
+  it('document 已就绪 → 立即初始化清理页并启动三个跨页同步（页标识 clean）', async () => {
+    await import('../ts/panel/clean-bootstrap.js')
+
+    expect(stubs.initCleanPage).toHaveBeenCalledTimes(1)
+    expect(stubs.startNavModeSync).toHaveBeenCalledTimes(1)
+    expect(stubs.startNavOrderSync).toHaveBeenCalledWith('clean')
+    expect(stubs.startModuleStateSync).toHaveBeenCalledWith('clean')
+  })
+
+  it('document 仍在加载 → 等 DOMContentLoaded 再初始化', async () => {
+    Object.defineProperty(document, 'readyState', { value: 'loading', configurable: true })
+
+    await import('../ts/panel/clean-bootstrap.js')
+    expect(stubs.initCleanPage).not.toHaveBeenCalled()
+
+    document.dispatchEvent(new Event('DOMContentLoaded'))
+    expect(stubs.initCleanPage).toHaveBeenCalledTimes(1)
+    expect(stubs.startNavOrderSync).toHaveBeenCalledWith('clean')
+  })
+
+  it('不装配主题与外壳导航（清理页无对应依赖）', async () => {
+    await import('../ts/panel/clean-bootstrap.js')
+
+    expect(stubs.initTheme).not.toHaveBeenCalled()
+    expect(stubs.initShellNav).not.toHaveBeenCalled()
+    expect(stubs.installModalA11y).not.toHaveBeenCalled()
   })
 })
