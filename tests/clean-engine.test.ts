@@ -40,10 +40,13 @@ vi.mock('../ts/sync/sheet-cleaning.js', () => ({
   applyRowPlan: mocks.applyRowPlan,
 }))
 
-import { CLEAN_EXCLUDES } from '../ts/panel/clean-rules.js'
+import { CLEAN_EXCLUDES, CLEAN_RULES, CLEAN_TARGETS, ROW_BYTES_FALLBACK } from '../ts/panel/clean-rules.js'
+import type { CleanRule } from '../ts/panel/clean-rules.js'
 import {
   listCleanTargets,
   collectExcludedRows,
+  countCleanTargets,
+  estimateRowBytes,
   scanCleanRules,
   aggregatePlans,
   runCleanPlans,
@@ -702,5 +705,524 @@ describe('describeCleanScope', () => {
     // 返回的是副本，改动不影响原配置
     scope.excludeSheetName.push('hack')
     expect(CLEAN_EXCLUDES.sheetName).not.toContain('hack')
+  })
+})
+
+describe('countCleanTargets', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  it('返回当前可清理的目标表数量（= listCleanTargets 长度）', () => {
+    mockWorkbookSheet('动画')
+    makeGrid({ 2: { 1: 'A' } })
+    expect(countCleanTargets()).toBe(1)
+  })
+
+  it('无可清理目标时返回 0', () => {
+    mocks.getOpenWorkbooks.mockReturnValue([])
+    expect(countCleanTargets()).toBe(0)
+  })
+})
+
+// ========== COM 异常兜底（工作簿 / 工作表属性读取失败） ==========
+
+describe('listCleanTargets · COM 读取异常兜底', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  it('FullName 读取抛错时回退 Name（退化路径不阻断清理）', () => {
+    const ws = { Name: '动画' }
+    mocks.getOpenWorkbooks.mockReturnValue([
+      {
+        Name: '数据表.xlsx',
+        get FullName(): string {
+          throw new Error('COM 未就绪')
+        },
+        Worksheets: { Count: 1, Item: () => ws },
+      },
+    ])
+    mocks.findHeaderRow.mockReturnValue(1)
+    mocks.getColumnMap.mockReturnValue(new Map(DEFAULT_COL_MAP))
+    mocks.getLastRow.mockReturnValue(4)
+
+    const targets = listCleanTargets()
+    expect(targets).toHaveLength(1)
+    // FullName 不可得 → workbookPath 为空串，但工作簿名与目标仍可用
+    expect(targets[0]?.workbookPath).toBe('')
+    expect(targets[0]?.label).toBe('数据表.xlsx / 动画')
+  })
+
+  it('枚举工作表抛错时记 WARN 日志并跳过该工作簿', () => {
+    mocks.getOpenWorkbooks.mockReturnValue([
+      {
+        Name: '坏簿.xlsx',
+        FullName: 'D:/books/坏簿.xlsx',
+        get Worksheets(): never {
+          throw new Error('枚举失败')
+        },
+      },
+    ])
+    expect(listCleanTargets()).toHaveLength(0)
+    expect(mocks.bgmLog).toHaveBeenCalledWith(
+      'WARN',
+      expect.stringContaining('枚举工作表失败'),
+    )
+  })
+
+  it('工作表名读取抛错时该表被跳过（不误伤其他表）', () => {
+    const badWs = {
+      get Name(): never {
+        throw new Error('COM 失败')
+      },
+    }
+    const goodWs = { Name: '动画' }
+    mocks.getOpenWorkbooks.mockReturnValue([
+      {
+        Name: '数据表.xlsx',
+        FullName: 'D:/books/数据表.xlsx',
+        Worksheets: { Count: 2, Item: (index: number) => (index === 1 ? badWs : goodWs) },
+      },
+    ])
+    mocks.findHeaderRow.mockReturnValue(1)
+    mocks.getColumnMap.mockReturnValue(new Map(DEFAULT_COL_MAP))
+    mocks.getLastRow.mockReturnValue(4)
+
+    const targets = listCleanTargets()
+    expect(targets).toHaveLength(1)
+    expect(targets[0]?.sheetName).toBe('动画')
+  })
+})
+
+// ========== 配置驱动的包含 / 排除分支 ==========
+
+describe('listCleanTargets · include 白名单配置生效', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  it('includeWorkbookPath / includeSheetName 非空时按关键词过滤', () => {
+    // 默认配置两项均为空（= 不限制），此处临时注入关键词以驱动包含分支，用后还原
+    const previousWorkbookPath = CLEAN_TARGETS.includeWorkbookPath
+    const previousSheetName = CLEAN_TARGETS.includeSheetName
+    try {
+      CLEAN_TARGETS.includeWorkbookPath = ['数据表']
+      CLEAN_TARGETS.includeSheetName = ['动画']
+
+      // 路径命中 + 表名命中 → 入选
+      mockWorkbookSheet('动画')
+      makeGrid({ 2: { 1: 'A' } })
+      expect(listCleanTargets()).toHaveLength(1)
+
+      // 路径不命中 include → 整簿跳过
+      mockWorkbookSheet('动画', 'D:/books/别的表.xlsx')
+      makeGrid({ 2: { 1: 'A' } })
+      expect(listCleanTargets()).toHaveLength(0)
+
+      // 路径命中但表名不命中 include → 该表跳过
+      mockWorkbookSheet('其他表')
+      makeGrid({ 2: { 1: 'A' } })
+      expect(listCleanTargets()).toHaveLength(0)
+    } finally {
+      CLEAN_TARGETS.includeWorkbookPath = previousWorkbookPath
+      CLEAN_TARGETS.includeSheetName = previousSheetName
+    }
+  })
+
+  it('排除表名词表为空时视为不排除（空关键词表不生效）', () => {
+    const previousSheetName = CLEAN_EXCLUDES.sheetName
+    try {
+      CLEAN_EXCLUDES.sheetName = []
+      mockWorkbookSheet('同步记录')
+      makeGrid({ 2: { 1: 'A' } })
+      // 词表为空 → 不再整表跳过，正常入选
+      expect(listCleanTargets()).toHaveLength(1)
+    } finally {
+      CLEAN_EXCLUDES.sheetName = previousSheetName
+    }
+  })
+
+  it('数据行数超过 maxDataRows 护栏时该表不入选', () => {
+    mockWorkbookSheet('动画', 'D:/books/数据表.xlsx', { usedRangeLastRow: 60_000 })
+    makeGrid({ 2: { 1: 'A' } })
+    expect(listCleanTargets()).toHaveLength(0)
+  })
+})
+
+// ========== 新番表锚点缺失 ==========
+
+describe('listCleanTargets · 新番表锚点列缺失', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  it('命中新番表签名但无「周更时间」锚点时，名称列缺省而 TAGS 列仍映射', () => {
+    mockWorkbookSheet('2026年4月新番表')
+    mocks.findHeaderRow.mockReturnValue(0)
+    // 表头行（行 2）命中「播放平台 + TAGS」两个签名关键词，但不含「周更时间」
+    setCellGrid({
+      2: { 6: '播放平台', 14: 'TAGS' },
+      5: { 14: '搞笑 / 抽象' },
+    })
+    mocks.getLastRow.mockReturnValue(5)
+    makeGrid({ 5: { 14: '搞笑 / 抽象' } })
+
+    const targets = listCleanTargets()
+    expect(targets).toHaveLength(1)
+    // 锚点查找失败 → 名称列无法推导（规则扫描时自行跳过）
+    expect(targets[0]?.colMap.has('名称')).toBe(false)
+    expect(targets[0]?.colMap.get('标签/分级')).toBe(14)
+  })
+
+  it('锚点左侧列有表头文本时停止名称列回退查找（名称列缺省）', () => {
+    mockWorkbookSheet('2026年4月新番表')
+    mocks.findHeaderRow.mockReturnValue(0)
+    // 锚点「周更时间」在 D 列，其左侧 C 列已有表头文本 → 不再继续向左探测
+    setCellGrid({
+      2: { 3: '番剧名', 4: '周更时间', 14: 'TAGS' },
+      5: { 3: '淫狱团地', 14: '搞笑 / 抽象' },
+    })
+    mocks.getLastRow.mockReturnValue(5)
+    makeGrid({ 5: { 3: '淫狱团地', 14: '搞笑 / 抽象' } })
+
+    const targets = listCleanTargets()
+    expect(targets).toHaveLength(1)
+    expect(targets[0]?.colMap.has('名称')).toBe(false)
+    expect(targets[0]?.colMap.get('标签/分级')).toBe(14)
+  })
+})
+
+// ========== 排除行 / 行字节估算的退化输入 ==========
+
+describe('collectExcludedRows · 空排除词表', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  it('排除行词表为空时直接返回空集合（不读取表格）', () => {
+    const previousRowText = CLEAN_EXCLUDES.rowText
+    try {
+      CLEAN_EXCLUDES.rowText = []
+      const target = fakeTarget('k', '数据表 / 动画')
+      makeGrid({ 2: { 1: '合计' } })
+      expect(collectExcludedRows(target).size).toBe(0)
+      expect(mocks.readRangeValues).not.toHaveBeenCalled()
+    } finally {
+      CLEAN_EXCLUDES.rowText = previousRowText
+    }
+  })
+})
+
+describe('estimateRowBytes · 退化输入兜底', () => {
+  it('无数据行（末行不晚于表头行）时返回 0', () => {
+    const target = fakeTarget('k', '数据表 / 动画')
+    target.lastRow = target.headerRow
+    expect(estimateRowBytes(target)).toBe(0)
+  })
+
+  it('末行号非有限值时采样循环不执行，回退到兜底字节数', () => {
+    const target = fakeTarget('k', '数据表 / 动画')
+    // COM 未就绪等极端情况下末行号可能非有限；采样无法进行 → 使用兜底值而非 0
+    target.lastRow = NaN
+    expect(estimateRowBytes(target)).toBe(ROW_BYTES_FALLBACK)
+  })
+})
+
+// ========== 表头 / 末行读取异常兜底 ==========
+
+describe('inspectWorksheet · 表头与末行读取异常兜底', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  it('findHeaderRow 抛错时视为未识别到表头', () => {
+    mockWorkbookSheet('动画')
+    setCellGrid({})
+    mocks.findHeaderRow.mockImplementation(() => {
+      throw new Error('COM 失败')
+    })
+
+    const info = inspectWorksheet({ Name: '动画' } as CleanTargetInfo['ws'])
+    expect(info.headerRow).toBe(0)
+    expect(info.isBangumiSheet).toBe(false)
+    expect(info.reason).toBe('未识别到表头行')
+  })
+
+  it('getColumnMap 抛错时列映射退化为空（特征列判定不通过）', () => {
+    mockWorkbookSheet('动画')
+    mocks.getColumnMap.mockImplementation(() => {
+      throw new Error('COM 失败')
+    })
+
+    const info = inspectWorksheet({ Name: '动画' } as CleanTargetInfo['ws'])
+    expect(info.headerRow).toBe(1)
+    expect(info.hasNameColumn).toBe(false)
+    expect(info.reason).toContain('特征列')
+  })
+
+  it('getLastRow 抛错时末行退化为 0（判为无数据行）', () => {
+    mockWorkbookSheet('动画')
+    mocks.getLastRow.mockImplementation(() => {
+      throw new Error('COM 失败')
+    })
+
+    const info = inspectWorksheet({ Name: '动画' } as CleanTargetInfo['ws'])
+    expect(info.lastRow).toBe(0)
+    expect(info.dataRows).toBe(0)
+    expect(info.reason).toBe('无数据行')
+  })
+
+  it('数据行数超过 maxDataRows 护栏时给出原因', () => {
+    const ws = mockWorkbookSheet('动画', 'D:/books/数据表.xlsx', { usedRangeLastRow: 60_000 })
+    const info = inspectWorksheet(ws as CleanTargetInfo['ws'])
+    expect(info.dataRows).toBe(59_999)
+    expect(info.eligible).toBe(false)
+    expect(info.reason).toContain('数据行超过护栏')
+  })
+
+  it('表头行有文本时用于展示（前 8 个非空值）', () => {
+    mockWorkbookSheet('动画')
+    setCellGrid({ 1: { 1: '名称', 2: 'Bangumi_URL' } })
+    const info = inspectWorksheet({ Name: '动画' } as CleanTargetInfo['ws'])
+    expect(info.headers).toEqual(['名称', 'Bangumi_URL'])
+  })
+})
+
+// ========== 目标列解析退化匹配 ==========
+
+describe('scanCleanRules · 目标列解析退化匹配', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  it('列键包含规则关键词时按包含匹配取列（兼容「标签/分级（备注）」类组合表头）', () => {
+    mockWorkbookSheet('动画')
+    mocks.getColumnMap.mockReturnValue(
+      new Map([
+        ['名称', 1],
+        ['Bangumi_URL', 2],
+        ['标签/分级（备注）', 3],
+      ]),
+    )
+    makeGrid({ 2: { 3: 'B站 | 漫画改' } })
+
+    const result = scanCleanRules(['noise-tags'])
+    expect(result.plans).toHaveLength(1)
+    expect(result.plans[0]?.changes[0]?.col).toBe(3)
+    expect(result.plans[0]?.changes[0]?.columnName).toBe('标签/分级（备注）')
+  })
+
+  it('列键完全不匹配时跳过该规则并说明缺失列', () => {
+    mockWorkbookSheet('动画')
+    makeGrid({ 2: { 1: 'A' } })
+
+    // category-prefix 需要「类别」列，默认列映射中没有
+    const result = scanCleanRules(['category-prefix'])
+    expect(result.plans).toHaveLength(0)
+    expect(result.notes.join('\n')).toContain('未找到目标列')
+  })
+
+  it('变更列不在列映射中时列名退化为「第N列」', () => {
+    mockWorkbookSheet('动画')
+    makeGrid({ 2: { 1: '作品A' }, 3: { 1: '作品A' } })
+    mocks.planDuplicateRows.mockReturnValue({
+      deleteRows: [3],
+      changes: [{ row: 2, col: 99, value: '合并标签' }],
+      groups: 1,
+      mergedGroups: 1,
+    })
+
+    const result = scanCleanRules(['dup-name'])
+    expect(result.plans[0]?.changes[0]?.columnName).toBe('第99列')
+  })
+})
+
+// ========== 规则分派与扫描异常 ==========
+
+describe('scanCleanRules · 规则分派与异常隔离', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  it('emptyNameRows 规则分派到空白行扫描器', () => {
+    mockWorkbookSheet('动画')
+    makeGrid({ 2: { 1: 'A' } })
+    mocks.planEmptyNameRows.mockReturnValue({
+      deleteRows: [4],
+      changes: [],
+      groups: 1,
+      mergedGroups: 0,
+    })
+
+    const result = scanCleanRules(['empty-name'])
+    expect(result.plans[0]?.deleteRows).toEqual([4])
+    expect(mocks.planEmptyNameRows).toHaveBeenCalledTimes(1)
+  })
+
+  it('行扫描器抛错时该规则跳过并记录原因（不影响其他规则）', () => {
+    mockWorkbookSheet('动画')
+    makeGrid({ 2: { 1: 'A' } })
+    mocks.planDuplicateRows.mockImplementation(() => {
+      throw new Error('COM 扫描失败')
+    })
+
+    const result = scanCleanRules(['dup-name'])
+    expect(result.plans).toHaveLength(0)
+    expect(result.notes.join('\n')).toContain('扫描失败：COM 扫描失败')
+  })
+
+  it('未配置噪声行词表时跳过并说明', () => {
+    const previousNoiseRowText = CLEAN_EXCLUDES.noiseRowText
+    try {
+      CLEAN_EXCLUDES.noiseRowText = []
+      mockWorkbookSheet('动画')
+      makeGrid({ 2: { 1: 'A' } })
+
+      const result = scanCleanRules(['noise-rows'])
+      expect(result.plans).toHaveLength(0)
+      expect(result.notes.join('\n')).toContain('未配置噪声行词表')
+    } finally {
+      CLEAN_EXCLUDES.noiseRowText = previousNoiseRowText
+    }
+  })
+
+  it('表中没有噪声行时跳过并说明', () => {
+    mockWorkbookSheet('动画')
+    makeGrid({ 2: { 1: '作品A' }, 3: { 1: '作品B' }, 4: { 1: '作品C' } })
+
+    const result = scanCleanRules(['noise-rows'])
+    expect(result.plans).toHaveLength(0)
+    expect(result.notes.join('\n')).toContain('未发现噪声行')
+  })
+
+  it('未知清理种类时跳过并说明（配置写错不炸引擎）', () => {
+    const rules = CLEAN_RULES as CleanRule[]
+    const temporaryRule = {
+      id: '__tmp_unknown_kind__',
+      name: '未知种类',
+      desc: '',
+      group: '',
+      icon: '',
+      kind: 'notAKind',
+      risk: 'low',
+      defaultOn: false,
+    } as unknown as CleanRule
+    try {
+      rules.push(temporaryRule)
+      mockWorkbookSheet('动画')
+      makeGrid({ 2: { 1: 'A' } })
+
+      const result = scanCleanRules(['__tmp_unknown_kind__'])
+      expect(result.plans).toHaveLength(0)
+      expect(result.notes.join('\n')).toContain('未知清理种类')
+    } finally {
+      rules.pop()
+    }
+  })
+
+  it('cellTransform 规则缺少 transform 配置时跳过并说明', () => {
+    const rules = CLEAN_RULES as CleanRule[]
+    const temporaryRule = {
+      id: '__tmp_no_transform__',
+      name: '缺变换配置',
+      desc: '',
+      group: '',
+      icon: '',
+      kind: 'cellTransform',
+      columns: ['标签/分级'],
+      risk: 'low',
+      defaultOn: false,
+    } as unknown as CleanRule
+    try {
+      rules.push(temporaryRule)
+      mockWorkbookSheet('动画')
+      makeGrid({ 2: { 3: 'B站 | 漫画改' } })
+
+      const result = scanCleanRules(['__tmp_no_transform__'])
+      expect(result.plans).toHaveLength(0)
+      expect(result.notes.join('\n')).toContain('规则未配置变换函数')
+    } finally {
+      rules.pop()
+    }
+  })
+})
+
+describe('scanCleanRules · 勾选白名单无目标时的提示', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  it('已勾选工作表但无可清理目标时给出专门提示', () => {
+    mocks.getOpenWorkbooks.mockReturnValue([])
+    const result = scanCleanRules(['noise-tags'], {
+      selectedSheets: [{ workbookKey: 'D:/books/数据表.xlsx', sheetName: '动画' }],
+    })
+    expect(result.targetCount).toBe(0)
+    expect(result.notes.join('\n')).toContain('已勾选的工作表中没有可清理目标')
+  })
+})
+
+// ========== 执行阶段的多行排序 ==========
+
+describe('runCleanPlans · 多行删除排序', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  it('待删除行去重并升序排序后交给 applyRowPlan', async () => {
+    const target = fakeTarget('t1', '数据表 / 动画')
+    const result = fakeScanResult(
+      [
+        {
+          ruleId: 'dup-name',
+          ruleName: '重复名称行',
+          targetKey: 't1',
+          targetLabel: target.label,
+          deleteRows: [4, 3],
+          changes: [],
+          estimatedBytes: 0,
+        },
+      ],
+      [target],
+    )
+    mocks.applyRowPlan.mockReturnValue(2)
+
+    const runResult = await runCleanPlans(result)
+    expect(runResult.deletedRows).toBe(2)
+    expect(mocks.applyRowPlan).toHaveBeenCalledWith(target.ws, {
+      deleteRows: [3, 4],
+      changes: [],
+      groups: 0,
+      mergedGroups: 0,
+    })
+  })
+
+  it('多个单元格变更按行号升序写入', async () => {
+    const target = fakeTarget('t1', '数据表 / 动画')
+    const result = fakeScanResult(
+      [
+        {
+          ruleId: 'noise-tags',
+          ruleName: '噪声标签',
+          targetKey: 't1',
+          targetLabel: target.label,
+          deleteRows: [],
+          changes: [
+            { row: 3, col: 3, columnName: '标签/分级', oldValue: 'A', nextValue: 'B' },
+            { row: 2, col: 3, columnName: '标签/分级', oldValue: 'A', nextValue: 'C' },
+          ],
+          estimatedBytes: 0,
+        },
+      ],
+      [target],
+    )
+    mocks.applyRowPlan.mockReturnValue(0)
+
+    const runResult = await runCleanPlans(result)
+    expect(runResult.changedCells).toBe(2)
+    // 排序后按 2 → 3 顺序写入（WPS COM 同步调用，顺序可观测）
+    const writtenRows = mocks.setCellValue.mock.calls.map((call: unknown[]) => call[1])
+    expect(writtenRows).toEqual([2, 3])
   })
 })

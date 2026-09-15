@@ -75,7 +75,12 @@ const mockState = vi.hoisted(() => ({
   setSyncStrategy: vi.fn(),
   getSyncSourceType: vi.fn(() => 'api'),
   setSyncSourceType: vi.fn(),
-  // tools/logger.js
+  // tools/logger.js：bgmLog() 的真实实现会把日志转发给 logger.*，
+  // 断言「记了 WARN/INFO 日志」必须打在这里（barrel 的 bgmLog 是真实实现，不是 mock）。
+  loggerDebug: vi.fn(),
+  loggerInfo: vi.fn(),
+  loggerWarn: vi.fn(),
+  loggerError: vi.fn(),
   getRecentLogs: vi.fn(() => []),
   exportLogsToFile: vi.fn(),
   exportData: vi.fn(),
@@ -90,6 +95,15 @@ const mockState = vi.hoisted(() => ({
   showError: vi.fn(),
   showInfo: vi.fn(),
   bgmLog: vi.fn(),
+  // setupButtonListeners 的「设置页控件回填」需要这 5 个 config getter。
+  // 缺失时对应控件块会被 getElementById 返回 null 提前跳过（历史未覆盖行即由此而来）。
+  getTheme: vi.fn(() => 'dark'),
+  getListType: vi.fn(() => 'all'),
+  getTimeFilter: vi.fn(() => 'year'),
+  getRefreshInterval: vi.fn(() => 0),
+  getLogLevel: vi.fn(() => 1),
+  // handlers/module-order.js
+  initModuleOrderEditor: vi.fn(),
   loadBgToken: vi.fn(),
   storeBgToken: vi.fn(),
   clearBgToken: vi.fn(),
@@ -139,6 +153,13 @@ vi.mock('../ts/ui/handlers/sheet.js', () => ({
   cleanLockedDataSheet: mockState.cleanLockedDataSheet,
 }))
 
+// 模块排序编辑器：仅被 handlers/index.ts 引用；mock 掉才能驱动
+// setupButtonListeners 中 `initModuleOrderEditor()` 的异常兜底分支。
+// 真实实现在 tests/module-order.test.ts 中另有完整覆盖，不受影响。
+vi.mock('../ts/ui/handlers/module-order.js', () => ({
+  initModuleOrderEditor: mockState.initModuleOrderEditor,
+}))
+
 vi.mock('../ts/ui/handlers/_constants.js', () => ({
   _T: { confirmClearMarks: '确认清除标记？' },
 }))
@@ -168,14 +189,16 @@ vi.mock('../ts/tools/config.js', () => ({
   // 一旦 mock 工厂遗漏，barrel 转发结果即为 undefined，
   // 会抛出 `getTheme is not a function` 并连带使本文件全部用例失败。
   // 返回值与 ts/tools/config.ts 中的真实默认值保持一致。
-  getTheme: vi.fn(() => 'dark'),
+  getTheme: mockState.getTheme,
   setNavIconsOnly: vi.fn(() => true),
-  getListType: vi.fn(() => 'all'),
+  getListType: mockState.getListType,
   setListType: vi.fn(() => true),
-  getTimeFilter: vi.fn(() => 'year'),
+  getTimeFilter: mockState.getTimeFilter,
   setTimeFilter: vi.fn(() => true),
-  getRefreshInterval: vi.fn(() => 0),
+  getRefreshInterval: mockState.getRefreshInterval,
   setRefreshInterval: vi.fn(() => true),
+  // 全局日志级别：setupButtonListeners 用它回填 #logLevelSelect
+  getLogLevel: mockState.getLogLevel,
   setExportPath: mockState.setExportPath,
   getExportPath: mockState.getExportPath,
   setImportPath: mockState.setImportPath,
@@ -203,10 +226,10 @@ vi.mock('../ts/sync/github-config.js', () => ({
 vi.mock('../ts/tools/logger.js', () => ({
   // util/index.ts 内部调用 logger.info/warn/error/debug 输出日志，需提供空实现
   logger: {
-    debug: vi.fn(),
-    info: vi.fn(),
-    warn: vi.fn(),
-    error: vi.fn(),
+    debug: mockState.loggerDebug,
+    info: mockState.loggerInfo,
+    warn: mockState.loggerWarn,
+    error: mockState.loggerError,
   },
   getRecentLogs: mockState.getRecentLogs,
   exportLogsToFile: mockState.exportLogsToFile,
@@ -328,6 +351,8 @@ import {
 vi.clearAllTimers()
 
 afterEach(() => {
+  // 先还原全局桩（部分用例会临时把 document 换掉），再清 DOM
+  vi.unstubAllGlobals()
   vi.clearAllTimers()
   vi.clearAllMocks()
   // 清理 DOM
@@ -765,5 +790,204 @@ describe('initHandlers', () => {
 
     button.click()
     expect(mockState.syncFromPanel).toHaveBeenCalled()
+  })
+
+  it('document.readyState=loading 时应把初始化挂到 DOMContentLoaded（不立即执行）', () => {
+    const domContentLoaded: (() => void)[] = []
+    // 用 Proxy 继承真实 document：只把 readyState 改成 loading、拦下 addEventListener，
+    // 其余成员（getElementById / querySelectorAll …）仍绑到真实 document 上，
+    // 这样回调真正执行时 startHandlers 能正常跑完。
+    const realDocument = document
+    const fakeDocument = new Proxy(realDocument, {
+      get(target, property) {
+        if (property === 'readyState') return 'loading'
+        if (property === 'addEventListener') {
+          return (type: string, handler: () => void) => {
+            if (type === 'DOMContentLoaded') domContentLoaded.push(handler)
+          }
+        }
+        const value: unknown = Reflect.get(target, property)
+        return typeof value === 'function'
+          ? (value as (...arguments_: unknown[]) => unknown).bind(target)
+          : value
+      },
+    })
+    vi.stubGlobal('document', fakeDocument)
+
+    initHandlers()
+
+    // 延迟注册：此刻还没有跑初始化
+    expect(domContentLoaded).toHaveLength(1)
+    expect(mockState.loggerInfo).not.toHaveBeenCalledWith('[handlers] initHandlers 完成')
+
+    // 触发 DOMContentLoaded 后才同步执行 startHandlers
+    domContentLoaded[0]!()
+    expect(mockState.loggerInfo).toHaveBeenCalledWith('[handlers] initHandlers 完成')
+  })
+
+  it('无 document 环境时走同步分支（Node 兜底；因缺少 DOM 而立即失败）', () => {
+    // 该分支服务于「无 DOM 的 Node 环境」，jsdom 下必须显式移除 document 才能进入。
+    // startHandlers() 会立刻访问 document.querySelectorAll，因此这里断言的是
+    // 「进入同步分支」这一事实（表现为同步抛错），而非成功路径 ——
+    // 成功路径需要一整套假 DOM，超出本文件职责，且产品里永远不会走这里。
+    vi.stubGlobal('document', undefined)
+    expect(() => initHandlers()).toThrow(TypeError)
+  })
+})
+
+// ========== setupButtonListeners · 设置页控件回填与异常兜底 ==========
+//
+// 这一组专门覆盖 setupButtonListeners 里「按 id 找控件 → 回填 → 注册监听」的
+// 各个 if 块，以及三处 try/catch 兜底。历史未覆盖行全部集中在这里：
+// 之前的用例只验证「不抛错」，没有把对应 id 的元素挂到 DOM 上，于是整块被跳过。
+
+/**
+ * 造一个「已挂到 body 且带同值 option」的 select。
+ * jsdom 对 `select.value = 'x'` 在无匹配 option 时会**静默丢弃**赋值，
+ * 直接断言 value 会得到空串（假失败），所以必须预置 option。
+ */
+function mountSelectWithOption(id: string, value: string): HTMLSelectElement {
+  const select = document.createElement('select')
+  select.id = id
+  const option = document.createElement('option')
+  option.value = value
+  select.append(option)
+  document.body.append(select)
+  return select
+}
+
+describe('setupButtonListeners · 设置页控件回填与异常兜底', () => {
+  // 对话框 DOM 未初始化时，showConfirm 会走 `window.confirm` 原生兜底
+  // （见 ts/ui/dialog.ts 的 _showDialog）。用它来驱动「用户确认/取消」两条分支。
+  // refreshData 是真实实现（ts/panel/panel-lifecycle.ts），无工作表时立即早退，
+  // 因此用它的首行日志作为「确实被调用」的观测点。
+
+  it('clear 用户确认后应调用 refreshData（原生 confirm 兜底路径）', () => {
+    vi.stubGlobal(
+      'confirm',
+      vi.fn(() => true),
+    )
+
+    expect(() => onAction('clear')).not.toThrow()
+
+    expect(mockState.loggerInfo).toHaveBeenCalledWith('refreshData 开始执行')
+  })
+
+  it('clear 用户取消时不调用 refreshData', () => {
+    vi.stubGlobal(
+      'confirm',
+      vi.fn(() => false),
+    )
+
+    onAction('clear')
+
+    expect(mockState.loggerInfo).not.toHaveBeenCalledWith('refreshData 开始执行')
+  })
+
+  it('showClearConfirm 用户确认后应调用 refreshData', () => {
+    vi.stubGlobal(
+      'confirm',
+      vi.fn(() => true),
+    )
+
+    onAction('showClearConfirm')
+
+    expect(mockState.loggerInfo).toHaveBeenCalledWith('refreshData 开始执行')
+  })
+
+  it('读取同步记录状态抛错时记 WARN 日志且不中断其余控件注册', () => {
+    mockState.isSyncRecordEnabled.mockImplementationOnce(() => {
+      throw new Error('PluginStorage 读取失败')
+    })
+    const checkbox = document.createElement('input')
+    checkbox.type = 'checkbox'
+    checkbox.id = 'chkEnableSyncRecord'
+    document.body.appendChild(checkbox)
+
+    expect(() => setupButtonListeners()).not.toThrow()
+
+    expect(mockState.loggerWarn).toHaveBeenCalledWith(
+      expect.stringContaining('读取同步记录状态失败'),
+    )
+    // 兜底只影响初值回填，checkbox 仍应被注册监听（保持默认未勾选）
+    expect(checkbox.checked).toBe(false)
+  })
+
+  it('加载 GitHub 配置抛错时记 WARN 日志并继续', () => {
+    // loadGithubConfigIntoForm() 第一行就调 getGithubConfig()，让它抛错即可命中兜底
+    mockState.getGithubConfig.mockImplementationOnce(() => {
+      throw new Error('配置读取失败')
+    })
+
+    expect(() => setupButtonListeners()).not.toThrow()
+    expect(mockState.loggerWarn).toHaveBeenCalledWith(
+      expect.stringContaining('加载 GitHub 配置失败'),
+    )
+  })
+
+  it('初始化模块排序编辑器抛错时记 WARN 日志并继续', () => {
+    mockState.initModuleOrderEditor.mockImplementationOnce(() => {
+      throw new Error('编辑器初始化失败')
+    })
+
+    expect(() => setupButtonListeners()).not.toThrow()
+    expect(mockState.loggerWarn).toHaveBeenCalledWith(
+      expect.stringContaining('初始化模块排序编辑器失败'),
+    )
+  })
+
+  it('主题选择框回填当前主题并注册 change 监听', () => {
+    const themeSelect = mountSelectWithOption('themeSelect', 'light')
+    mockState.getTheme.mockReturnValueOnce('light')
+
+    setupButtonListeners()
+
+    expect(themeSelect.value).toBe('light')
+  })
+
+  it('主题预览卡片注册 click 监听', () => {
+    const card = document.createElement('div')
+    card.dataset.themeCard = 'dark'
+    document.body.appendChild(card)
+
+    expect(() => setupButtonListeners()).not.toThrow()
+  })
+
+  it('日志级别下拉框回填当前级别并注册 change 监听', () => {
+    const logLevelSelect = mountSelectWithOption('logLevelSelect', '3')
+    mockState.getLogLevel.mockReturnValueOnce(3)
+
+    setupButtonListeners()
+
+    expect(logLevelSelect.value).toBe('3')
+  })
+
+  it('收藏列表类型下拉框回填当前类型', () => {
+    const listTypeSelect = mountSelectWithOption('listTypeSelect', 'wish')
+    mockState.getListType.mockReturnValueOnce('wish')
+
+    setupButtonListeners()
+
+    expect(listTypeSelect.value).toBe('wish')
+  })
+
+  it('时间筛选下拉框回填当前范围', () => {
+    const timeFilterSelect = mountSelectWithOption('timeFilterSelect', 'month')
+    mockState.getTimeFilter.mockReturnValueOnce('month')
+
+    setupButtonListeners()
+
+    expect(timeFilterSelect.value).toBe('month')
+  })
+
+  it('刷新间隔输入框回填当前分钟数', () => {
+    const refreshIntervalInput = document.createElement('input')
+    refreshIntervalInput.id = 'refreshIntervalInput'
+    document.body.appendChild(refreshIntervalInput)
+    mockState.getRefreshInterval.mockReturnValueOnce(45)
+
+    setupButtonListeners()
+
+    expect(refreshIntervalInput.value).toBe('45')
   })
 })

@@ -1,10 +1,18 @@
-import { describe, it, expect, beforeEach } from 'vitest'
+// @vitest-environment jsdom
+//
+// 说明：本文件绝大多数用例是纯逻辑（环形缓冲区 / 脱敏），但 exportLogsToFile
+// 走的是浏览器下载路径（Blob + document.createElement('a') + URL.createObjectURL），
+// 只能在 jsdom 下驱动。jsdom 不会改变其余用例的行为，故整文件统一用 jsdom，
+// 避免为一个函数再拆一个文件。
+
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import {
   logger,
   getRecentLogs,
   clearLogs,
   maskToken,
   maskSensitiveData,
+  exportLogsToFile,
 } from '../ts/tools/logger.js'
 
 describe('maskToken', () => {
@@ -171,5 +179,108 @@ describe('logger', () => {
     const ts = logs[0]?.timestamp
     expect(ts).toBeGreaterThanOrEqual(before)
     expect(ts).toBeLessThanOrEqual(after)
+  })
+})
+
+// ========== 导出日志到文件（浏览器下载路径） ==========
+
+/**
+ * jsdom 未实现 `URL.createObjectURL` / `revokeObjectURL`（`createObjectURL` 在 jsdom
+ * 里干脆是 undefined），必须显式打桩。用一个窄类型视图改写这两个方法，避免在赋值处
+ * 反复写 `as unknown as`。
+ */
+interface ObjectUrlApi {
+  createObjectURL: (object: Blob | MediaSource) => string
+  revokeObjectURL: (url: string) => void
+}
+const objectUrlApi = URL as unknown as ObjectUrlApi
+
+describe('exportLogsToFile', () => {
+  const originalCreateObjectURL = objectUrlApi.createObjectURL
+  const originalRevokeObjectURL = objectUrlApi.revokeObjectURL
+
+  let revokedUrls: string[]
+  let capturedBlob: Blob | null
+  /** click() 被调用时收集到的 <a> 元素（用 this 捕获，免去对 createElement 打桩） */
+  let clickedAnchors: HTMLAnchorElement[]
+  let clickSpy: ReturnType<typeof vi.spyOn>
+
+  beforeEach(() => {
+    clearLogs()
+    revokedUrls = []
+    capturedBlob = null
+    clickedAnchors = []
+
+    objectUrlApi.createObjectURL = (object) => {
+      // exportLogsToFile 只会传 Blob，这里收窄以方便后续断言文本内容
+      capturedBlob = object as Blob
+      return 'blob:bgm-logs'
+    }
+    objectUrlApi.revokeObjectURL = (url) => {
+      revokedUrls.push(url)
+    }
+
+    // 拦住 click()：既捕获被下载的 <a>，又避免 jsdom 触发真实导航
+    clickSpy = vi
+      .spyOn(HTMLAnchorElement.prototype, 'click')
+      .mockImplementation(function captureAnchor(this: HTMLAnchorElement) {
+        clickedAnchors.push(this)
+      })
+  })
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+    objectUrlApi.createObjectURL = originalCreateObjectURL
+    objectUrlApi.revokeObjectURL = originalRevokeObjectURL
+  })
+
+  it('应生成带时间戳与级别的纯文本并触发下载', async () => {
+    logger.info('导出内容 A')
+    logger.warn('导出内容 B')
+
+    exportLogsToFile()
+
+    expect(clickedAnchors).toHaveLength(1)
+    const anchor = clickedAnchors[0]!
+    expect(anchor.download).toMatch(/^bgm-logs-\d+\.txt$/)
+    expect(anchor.href).toBe('blob:bgm-logs')
+    expect(clickSpy).toHaveBeenCalledTimes(1)
+
+    expect(capturedBlob).not.toBeNull()
+    expect(capturedBlob!.type).toBe('text/plain;charset=utf-8')
+
+    const text = await capturedBlob!.text()
+    const lines = text.split('\n')
+    expect(lines).toHaveLength(2)
+    // 形如：[2026-09-13T01:02:03.456Z] [INFO] 导出内容 A
+    expect(lines[0]).toMatch(/^\[\d{4}-\d{2}-\d{2}T[\d:.]+Z\] \[INFO\] 导出内容 A$/)
+    expect(lines[1]).toContain('[WARN] 导出内容 B')
+  })
+
+  it('下载后应移除临时 <a> 并回收 object URL', () => {
+    logger.info('清理检查')
+    exportLogsToFile()
+
+    expect(clickedAnchors[0]!.isConnected).toBe(false)
+    expect(document.body.querySelector('a')).toBeNull()
+    expect(revokedUrls).toEqual(['blob:bgm-logs'])
+  })
+
+  it('缓冲区为空时导出空文本且不抛错', async () => {
+    exportLogsToFile()
+
+    expect(capturedBlob).not.toBeNull()
+    await expect(capturedBlob!.text()).resolves.toBe('')
+    expect(clickSpy).toHaveBeenCalledTimes(1)
+  })
+
+  it('导出的日志同样经过脱敏（凭据不得落盘）', async () => {
+    logger.info('请求 token=abcdefghijklmnop 完成')
+
+    exportLogsToFile()
+
+    const text = await capturedBlob!.text()
+    expect(text).not.toContain('abcdefghijklmnop')
+    expect(text).toContain('token=')
   })
 })

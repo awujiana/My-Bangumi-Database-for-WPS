@@ -11,22 +11,34 @@
 > **基线刷新**：2026-09-15（第九轮）—— 清单第 11 批：`panel/enrich-conflict-dialog.ts` 0% → **100% 四项全满**（53 → 0）、`panel/enrich-record-view.ts` 0% → **100% 四项全满**（53 → 0）、`panel/enrich-source-detail.ts` 0% → **100% lines/funcs/stmts**（46 → 0，branch 96.66% 余 1 条不可达兜底）、`panel/{panel,settings,enrich}-bootstrap.ts` 0% → **100% lines/funcs/stmts**（71 → 0）；新增 4 个测试文件 / 80 条；首次抽出 `tests/helpers/` 共享桩并修掉 `coverage.exclude` 漏排 `tests/**` 的统计缺陷；`npm run gate` 七关全绿
 > **基线刷新**：2026-09-15（第十轮）—— 清单第 12 批（纯逻辑小块批量）：`ts/tools/zod-compat.ts` 81.39% → **100% lines**（32 → 0）、`ts/tools/util/sheet.ts` 88.97% → **100% lines**（28 → 0，顺带修一处 getLastRow「来自缓存」文案永远误报的生产 bug）、`ts/tools/wps.ts` 64.91% → **100% lines**（20 → 0）、`ts/tools/locked-sheet.ts` 90.55% → **100% lines**（17 → 0）、`ts/tools/http.ts` 89.55% → **99.25% lines**（14 → 1，余 1 行为 MAX_RETRIES_EXCEEDED 不可达出口）；追加到既有测试文件 + 新建 `tests/wps-dialog-fallback.test.ts`（jsdom 侧降级链），合计 **+63 条**；`npm run gate` 七关全绿
 > **基线刷新**：2026-09-15（第十一轮）—— 清单第 13 批（中-DOM/UI 批量）：`ts/ui/handlers/path-controls.ts` 18.51% → **100% lines / 100% funcs**（22 → 0）、`ts/panel/enrich-result-view.ts` 0% → **100% 四项全满**（20 → 0）、`ts/ui/handlers/sheet.ts` 0% → **100% lines / 100% funcs / 100% stmts**（24 → 0）；新增 3 个测试文件 / 25 条；`npm run gate` 七关全绿
-> **测试**：**3917 条 / 119 文件，全绿**
-> **全项目覆盖率**：**93.66% stmts / 84.30% branch / 94.23% funcs / 94.52% lines**（较首次生成 **+47.70 个点**）
-> **可执行行数**：13411，已覆盖 12676，**未覆盖 735**
+> **基线刷新**：2026-09-15（第十二轮）—— 清单**第 16 批（P0 五文件速赢）+ 第 14 批（P1-5/6/9）一次收口**：`tools/config.ts` / `tools/logger.ts` / `tools/sanitize.ts` / `tools/util/cell.ts` / `core/error-handler.ts` 五个纯逻辑文件 **100% lines**（48 → 0），`panel/clean-engine.ts`（24 → 0）/ `ui/handlers/index.ts`（22 → 0）/ `ui/handlers/action-handlers.ts`（14 → 0）也全部 **100% lines**；8 个文件合计吃掉 **109 行**；新增 `tests/error-handler.test.ts`，其余 7 个文件就地扩写（+82 条）；`npm run gate` 七关全绿
+> **测试**：**3999 条 / 120 文件，全绿**
+> **全项目覆盖率**：**94.54% stmts / 85.25% branch / 95.00% funcs / 95.33% lines**（较首次生成 **+48.51 个点**）
+> **可执行行数**：13411，已覆盖 12785，**未覆盖 626**
 > **换算**：全项目**每提升 1 个百分点 ≈ 134 行**（= 13410 / 100）
 >
 > 注：第二轮涨幅主体是 §三 第 3、4 批 —— `ribbon-service`、`ui/handlers/sync`、`clean-page`、`scraping`、`sheet-cleaning`、`shell-nav` 等
-> 由 0~30% 补到 88~100%，未覆盖行 **5118 → 3212（−1906 行）**；第三轮（第 5 批）**3212 → 2811（−401 行）**；第四轮（第 6 批）**2811 → 2808（−3 行）**；第五轮（第 7 批）**2808 → 2467（−341 行）**；第六轮（第 8 批）**2467 → 1976（−491 行）**；第七轮（第 9 批）**1976 → 1505（−471 行）**；第八轮（第 10 批）**1505 → 1134（−371 行）**；第九轮 **1134 → 911（−223 行）**；第十轮（第 12 批）**911 → 801（−110 行）**；第十一轮（第 13 批）**801 → 735（−66 行）**。
+> 由 0~30% 补到 88~100%，未覆盖行 **5118 → 3212（−1906 行）**；第三轮（第 5 批）**3212 → 2811（−401 行）**；第四轮（第 6 批）**2811 → 2808（−3 行）**；第五轮（第 7 批）**2808 → 2467（−341 行）**；第六轮（第 8 批）**2467 → 1976（−491 行）**；第七轮（第 9 批）**1976 → 1505（−471 行）**；第八轮（第 10 批）**1505 → 1134（−371 行）**；第九轮 **1134 → 911（−223 行）**；第十轮（第 12 批）**911 → 801（−110 行）**；第十一轮（第 13 批）**801 → 735（−66 行）**；第十二轮（P0 + 第 14 批）**735 → 626（−109 行）**。
 > **关键结论（累积）**：清单前列的「大文件 / COM 模块」**都没有走「先拆后测」**——依赖收敛到单一 barrel、依赖宿主对象、或依赖 ≤3 个薄封装的，就地测即可，
 > 断言打到真实 state 变迁 / 真实写盘调用 / 真实 DOM 写入，**不存在假覆盖**（判据见 `.workbuddy/memory/REF-testing.md`）。
 
 数据来源：`coverage/coverage-summary.json`（`npx vitest run --coverage --config vitest.cov.config.ts --coverage.reporter=json-summary`）。
-复算脚本：`scripts/calc-coverage-backlog.mjs`（读 summary → 按未覆盖行数排序 → 输出本文档表格）。
+复算脚本：`scripts/calc-coverage-backlog.mjs`（读 summary → 按未覆盖行数排序 → 输出本文档表格）；
+**逐行定位**用 `scripts/calc-coverage-lines.mjs`（读 `coverage-final.json` → `istanbul-lib-coverage.getLineCoverage()` → 列出未覆盖行号，与本文档的未覆盖行数**逐行吻合**）。
+
+> ⚠️ **行口径陷阱**：`coverage-summary.json` 的 `lines` **不能**由 `coverage-final.json` 的 `statementMap` 行区间求和推导 ——
+> 实测 `ts/panel/clean-engine.ts` 求和得 531 行、台账口径是 316 行。`getLineCoverage()` 是「同一行取该行最后一个
+> statement / function / branch 的计数」，函数声明行与分支行会**覆盖**语句行。照 `statementMap` 求和去补测会跑偏。
 
 ```bash
-npx vitest run --coverage --config vitest.cov.config.ts --coverage.reporter=json-summary
+# 跑覆盖率复核：两个环境变量/参数都不能省
+#   CODEBUDDY_SAFE_DELETE_BULK_THRESHOLD 放行 coverage/.tmp 的批量删除（否则撞 safe-delete 守卫）
+#   --config vitest.cov.config.ts 让 clean:false 生效（否则收尾 cleanAfterRun 失败、进程 exit 1）
+CODEBUDDY_SAFE_DELETE_BULK_THRESHOLD=1000000 \
+npx vitest run --coverage --config vitest.cov.config.ts \
+  --coverage.reporter=json-summary --coverage.reporter=json
 node scripts/calc-coverage-backlog.mjs
+node scripts/calc-coverage-lines.mjs panel/clean-engine.ts   # 逐行定位（按路径子串过滤）
 ```
 
 ---
@@ -58,20 +70,12 @@ node scripts/calc-coverage-backlog.mjs
 | 40 | +0.30% | 0% | 难-COM/网络 | `ts/sync/exceltobangumi/chapter-marker.ts` |
 | 31 | +0.23% | 3.12% | 中-DOM/UI | `ts/ui/message.ts` |
 | 26 | +0.19% | 96% | 难-COM/网络 | `ts/sync/github-sync.ts` |
-| 24 | +0.18% | 92.4% | 中-DOM/UI | `ts/panel/clean-engine.ts` |
-| 22 | +0.16% | 76.34% | 中-DOM/UI | `ts/ui/handlers/index.ts` |
 | 19 | +0.14% | 0% | 中-DOM/UI | `ts/ui/github-config-dialog.ts` |
 | 17 | +0.13% | 0% | 中-DOM/UI | `ts/panel/clean-bootstrap.ts` |
-| 14 | +0.10% | 97.59% | 中-DOM/UI | `ts/ui/handlers/action-handlers.ts` |
 | 13 | +0.10% | 96.58% | 难-COM/网络 | `ts/sync/sync-record.ts` |
-| 13 | +0.10% | 90.07% | 易-纯逻辑 | `ts/tools/config.ts` |
-| 12 | +0.09% | 67.56% | 易-纯逻辑 | `ts/tools/logger.ts` |
-| 11 | +0.08% | 83.07% | 易-纯逻辑 | `ts/tools/sanitize.ts` |
-| 8 | +0.06% | 85.71% | 易-纯逻辑 | `ts/tools/util/cell.ts` |
 | 6 | +0.04% | 95.45% | 中-DOM/UI | `ts/ui/handlers/module-order.ts` |
 | 5 | +0.04% | 96.75% | 难-COM/网络 | `ts/sync/enrich-lock.ts` |
 | 5 | +0.04% | 96.73% | 难-COM/网络 | `ts/sync/github-sync-diff.ts` |
-| 4 | +0.03% | 55.55% | 易-纯逻辑 | `ts/core/error-handler.ts` |
 
 > **难度列是按目录粗判的**：`ts/tools`、`ts/core` 多为纯逻辑 → 易；`ts/panel`、`ts/ui` 依赖 DOM → 中；`ts/sync`、`ts/services` 依赖 COM / 网络 → 难。
 > 实际动手前仍需扫一眼文件内的依赖（例如 `tools/util/index.ts` 是聚合桶，可能混入依赖 WPS 全局对象的函数）。
@@ -218,6 +222,36 @@ node scripts/calc-coverage-backlog.mjs
     - **mock 策略（三个都走「单一 barrel 单点 mock」）**：`../ts/index.js` 提供 `getApp` / `getExportPath` / `getImportPath` / `LOG_LEVELS` / `bgmLog` / `BGM` 等；叶子模块（`enrich-page-state` / `enrich-page-context` / `sheet-cleaning` / `dialog` / `tools/util/index`）单点 mock，断言打在真实 DOM 写入 / 真实 `cleanSheetDuplicates` 调用 —— 与第 11 批「0% 子流程就地测」同型，不存在假覆盖。
     - **本轮新踩的 typecheck 坑（已写进 `REF-testing.md`）**：① `vi.fn(() => null)` 被推断返回类型 `null`，后续 `mockReturnValue(对象)` 报「not assignable to null」→ 写成 `vi.fn((): unknown => null)`；② `vi.hoisted` 里 `null as never` 会让后续 `= null` / `= {Name}` 都报「not assignable to never」→ 改成 `null as { Name: string } | null`。
     - **全项目**：94.03% → **94.52% lines**（未覆盖 801 → **735**，吃掉 66 行 = 22 + 20 + 24，数字吻合）；测试 3892 → **3917 条 / 119 文件**；`npm run gate` 七关全绿。
+
+**第 16 批 · P0 五文件速赢 + 第 14 批（2026-09-15 第十二轮，已完成）**
+
+24. ~~P0 五文件：`ts/tools/config.ts`（13 行）、`ts/tools/logger.ts`（12 行）、`ts/tools/sanitize.ts`（11 行）、`ts/tools/util/cell.ts`（8 行）、`ts/core/error-handler.ts`（4 行）~~ ✅ **五个纯逻辑文件全部收口**（2026-09-15，就地扩写 4 个既有文件 + 新建 `tests/error-handler.test.ts`，合计 +27 条）：
+    - **`config.ts`**：90.07% → **100% lines**（13 → 0，32 → 38 条）。补 postMessage 抛错吞并 + WARN、`areNavIconsOnly()` 非静默 INFO 日志、以及整个 `describe('全局日志级别')`（`setLogLevel` 落盘 `'3'` + 写 `BGM.LOG_LEVEL`、`setLogLevel(0)` 走 DEBUG、`[-1, LOG_LEVELS.ERROR+1, 1.5, NaN, Infinity]` 全部拒绝、`getLogLevel` 兜底、`applyLogLevel()`）。
+      **顺带修掉 mock 里的一个真实缺陷**：`LOG_LEVELS` 被误 mock 成**字符串**（`{WARN:'warn',INFO:'info',ERROR:'error'}`），导致 `LOG_LEVEL_MAX = LOG_LEVELS.ERROR` 变成字符串、`level > LOG_LEVEL_MAX` 守卫失效（比较恒 false）→ 改为与生产一致的**数字** `{INFO:1,WARN:2,ERROR:3}`（对照 `ts/core/constants.ts:157`）。这类「mock 把常量类型改错」会让守卫分支静默失效，是假绿测试的典型来源。
+    - **`logger.ts`**：67.56% → **100% lines**（12 → 0，18 → 30 条）。整文件切 `// @vitest-environment jsdom`（`exportLogsToFile` 需要 Blob / anchor / `URL.createObjectURL`）；新增 `describe('exportLogsToFile')`，用窄视图接口 `ObjectUrlApi` 替掉 `as unknown as typeof URL.createObjectURL`，用 `HTMLAnchorElement.prototype.click` 的 `this` 抓临时 `<a>`（避免 `vi.spyOn(document, 'createElement')` 触发 `@typescript-eslint/no-deprecated`）。覆盖：文本格式 `[ISO] [LEVEL] msg`、`download` 匹配 `/^bgm-logs-\d+\.txt$/`、anchor 移除 + URL revoke、空缓冲 → `''`、导出前仍走脱敏。
+    - **`sanitize.ts`**：83.07% → **100% lines**（11 → 0，42 → 47 条）。新增 `describe('降级路径与无 DOM 环境的兜底分支')` + 模块级 `useFallback()`（**必须同时** `delete globalThis.DOMPurify` **和** `resetSanitizerCache()`，只删一个不生效）。覆盖：降级实现剥离 `javascript:` / `vbscript:` URI 属性但保留安全属性；`vi.stubGlobal('document', undefined)` → 正则粗粒度兜底（script/style/iframe/meta + 三种 `on*=` 形态全清、`<div>` 与正文保留）；`sanitizeTableRows` 无 DOM 时的字符串剥离分支；`document.createElement` 抛错 → 正则回退。
+    - **`util/cell.ts`**：85.71% → **100% lines**（8 → 0，38 → 44 条）。新增 `describe('tryGetProperty 属性探测边界（间接）')`：函数返回原生函数 / 函数抛错 / 对象 `toString` 含 `'function'` / 仅含 `'[native code]'` / 普通对象直通，外加一条**真正走到 try/catch 的 own-accessor 抛错**（既有 Proxy 用例因 `Object.hasOwn === false` 在早退处就返回了，从没进过 catch）。
+    - **`error-handler.ts`**：55.55% → **100% lines（四项全满）**（4 → 0，新建 `tests/error-handler.test.ts` 5 条）。用 `Object.assign(new Event('unhandledrejection'), { reason, preventDefault })` 派发合成事件；断言 `console.error('[unhandledrejection]', message)`、`preventDefault` 被调、非 Error reason 走 `String()`、以及 `resetErrorHandlerState()` 允许重新注册。
+      **关键坑**：`initGlobalErrorHandler` 只用 `isInitialized` 幂等，但**每次调用都会再注册一个 listener**，而 `resetErrorHandlerState()` 会把开关放回未初始化 → 跨用例 listener 数会累积。因此这里的断言必须用**增量计数**，不能用绝对次数。
+    - **全项目**：94.52% → **94.87% lines**（未覆盖 735 → **687**，吃掉 48 行，与 5 文件合计 48 行**精确吻合**）；测试 3917 → **3944 条 / 120 文件**。
+
+25. ~~第 14 批：`ts/panel/clean-engine.ts`（24 行 / 92.4%）、`ts/ui/handlers/index.ts`（22 行 / 76.34%）、`ts/ui/handlers/action-handlers.ts`（14 行 / 97.59%）~~ ✅ **三个文件全部 100% lines**（2026-09-15，全部就地扩写，+55 条）：
+    - **`clean-engine.ts`**：92.4% → **100% lines / 100% funcs / 100% stmts**（24 → 0，41 → 71 条）。台账口径的 24 行**逐行**对齐（`coverage-summary.json` 的 lines 与 `coverage-final.json` 的 statement 口径不同，见 `REF-testing.md`）：
+      - **COM 异常兜底**：`FullName` getter 抛错 → `readWorkbookPath` 回退 `Name`；`Worksheets` getter 抛错 → `readWorksheets` 记 WARN；`ws.Name` getter 抛错 → `safeSheetName` 返回 `''` 且该表被 `shouldScanSheet` 跳过（**不误伤同簿其他表**）；`findHeaderRow` / `getColumnMap` / `getLastRow` 抛错 → 各自退化为「未识别表头 / 空列映射 / 末行 0」。
+      - **新番表识别链**：命中签名但**无「周更时间」锚点** → 名称列缺省、TAGS 列仍映射；锚点左侧列**已有表头文本** → 停止名称列回退探测。
+      - **配置驱动分支（临时注入 + `finally` 还原）**：`includeWorkbookPath` / `includeSheetName` 非空时的白名单过滤（路径不命中 → 整簿跳过；表名不命中 → 该表跳过）、`excludeSheetName` 空词表视为不排除（顺带覆盖 `hasAnyKeyword` 的 `keywords.length === 0` 早退 —— 该行在默认配置下**被 177/184 行的 length 守卫完全遮蔽，只能靠注入空词表到达**）、`rowText` / `noiseRowText` 空词表、`maxDataRows` 护栏（`inspectWorksheet` 给原因 / `buildTarget` 不入选）。
+      - **规则分派**：`emptyNameRows` 分派、`scanRowRule` 的 `default` 未知种类（临时 push 一条 `kind: 'notAKind'` 规则）、`scanRowRule` catch（行扫描器抛错 → `扫描失败：…` 写 notes 且不影响其他规则）、`cellTransform` 缺 `transform` 配置、`resolveColumn` 的**包含式退化匹配**（列键 `标签/分级（备注）` 命中关键词 `标签/分级`）与完全不匹配返回 `undefined`、`columnName` 的 `第N列` 兜底。
+      - **执行/统计**：`runCleanPlans` 待删除行**去重升序排序**（≥2 行才触发比较器）、多个单元格变更按行号升序写入、`countCleanTargets()`、`scanCleanRules` 在「已勾选但无目标」时的专门提示、`estimateRowBytes` 无数据行返回 0 / 末行非有限值时回退 `ROW_BYTES_FALLBACK`。
+      - **`inspectWorksheet` 表头展示**：`readHeaderLabels` 的「非空才 push」需要表头行**真有文本**才能覆盖 —— 既有用例的 `getCellValue` 桩恒返回 `''`，所以这一行一直是空的。
+    - **`handlers/index.ts`**：76.34% → **100% lines / 100% stmts**（22 → 0，69 → 77 条）。补 `initHandlers` 的三条分支（`typeof document === 'undefined'` 同步兜底 / `readyState === 'loading'` 挂 `DOMContentLoaded` / 直接执行）、`setupButtonListeners` 的设置页控件回填与三处 try/catch、`onAction('clear' / 'showClearConfirm')`。
+      - **`readyState === 'loading'` 的解法**：用 **`Proxy` 包住真实 `document`** —— `get` 陷阱只把 `readyState` 改成 `'loading'`、拦下 `addEventListener` 收集 `DOMContentLoaded` 回调，其余成员 `value.bind(target)` 绑回真实 document，这样回调真正执行时 `startHandlers()` 能跑完（否则只能断言「抛错」，等于没测）。
+      - **发现并绕开两处测试基建缺陷（不是生产 bug，但会让覆盖率凭空失真）**：① 本仓库 `tests/` 下 **`vi.mock('../index.js')` 根本解析不了**（只有 `../ts/index.js` 可解析），所以该 factory 是**死 mock**，barrel 上的 `showConfirm` / `refreshData` / `bgmLog` / `previewSyncContent` 等断言全部无效 —— 实际跑的是**真实实现**（用探针实测：`onAction('clear')` 命中真实 `showConfirm` → 无对话框 DOM → 落到原生 `window.confirm`，`mockState.showConfirm.mock.calls.length === 0`）。② 因此确认/取消分支改用 `vi.stubGlobal('confirm', …)` 驱动，日志断言改打在 **`logger.*` 的 spy** 上（`bgmLog` 是真实现，且会先过 `BGM.LOG_LEVEL` 门槛）。③ 设置页 `select` 回填必须**预置同值 `<option>`** —— jsdom 对无匹配 option 的 `select.value = 'x'` 会**静默丢弃**赋值，直接断言 value 只会拿到空串。
+    - **`action-handlers.ts`**：97.59% → **100% lines**（14 → 0，100 → 111 条）。补三个「barrel 导出缺失」的 WARN 守卫（`syncSelectedRows` / `previewSyncContent` / `enlargePreview`）、`clearToken` 正常路径（`{ PluginStorage: { setItem } }` → 断言 `bgm_user_id` / `bgm_username` 被清）、`clearToken` / `copyToken` 的 catch → `BGM.handleError(…, { context })` + 恒定收尾日志、`timeFilter` 剩余三个 case（`future` / `year` / `month`）、`app.StatusBar = false` 的失败复位、`resetAllConfig` 的 600ms reload。
+      - **「导出缺失」怎么驱动**：`withBarrelExportCleared(name, run)` —— Vite 的 SSR 转换会把具名 import 改写成**调用点**读命名空间属性（`__vite_ssr_import_x__.name`），所以临时把 `barrel[name] = undefined` 就能让 `typeof X === 'function'` 守卫走另一侧，`finally` 还原。
+      - **假定时器与 `Date.now()` 的取舍**：`runCleanPlans` 用 `Date.now()` 算耗时，而 `tests/action-handlers.test.ts` 的策略是**只断言稳定项**。`resetAllConfig` 的 600ms reload 用 `vi.useFakeTimers()` 只包住 `advanceTimersByTime(600)` 那一段、随后立刻 `vi.useRealTimers()`，保住真实 `Date.now()`（否则总耗时断言会变成 `1s` 之类的墙钟依赖）。
+      - **`timeFilter` 三个 case 的断言技巧**：把 `mocks.answer.confirm` 置 `false`，只走到确认弹窗、**不真正执行同步**，于是能干净地断言弹窗文案（`🔮 时间筛选：预告/未来动漫（无开播日期）` / `📅 时间筛选：2025年全年` / `📅 时间筛选：2026年7月`），再另加一条真跑同步的用例断言第 6 个实参 `{enabled:true, year:2026, range:'month', month:7}`。
+    - **本轮新踩的坑（已写进 `REF-testing.md`）**：① **`coverage-summary.json` 的 `lines` 指标不能由 `coverage-final.json` 的 `statementMap` 推导** —— 求和 statement 行区间会把 `clean-engine.ts` 算成 531 行（summary 是 316）；行口径要**用 `istanbul-lib-coverage` 的 `getLineCoverage()` 复刻**（本轮新增 `.workbuddy/tmp-lines.mjs`，读 `coverage-final.json` → 精确列出未覆盖行号，与台账数字**逐行吻合**），`coverage-final.json` 只用来定位哪些 statement / function / branch 计数为 0。② 跑覆盖率复核**必须**带 `--config vitest.cov.config.ts`（`clean:false`）+ `CODEBUDDY_SAFE_DELETE_BULK_THRESHOLD=1000000`，否则收尾 `V8CoverageProvider.cleanAfterRun` 会撞 safe-delete 守卫并让进程 exit 1。③ 一批新用例写完后**先跑 `npx eslint <files>` 再跑 `tsc`**：本轮 lint 报了 11 处（`unicorn/name-replacements` 把 `prevX` / `tempRule` 判为应写全 `previousX` / `temporaryRule`、`@typescript-eslint/no-unsafe-return` 在 `mock.calls.map(call => call[1])` 上、`no-unnecessary-type-assertion` 在 `new Proxy(doc, …) as Document` 上、`unicorn/consistent-function-scoping` 要求把 `mountSelectWithOption` 提到模块级）。
+    - **全项目**：94.87% → **95.33% lines**（未覆盖 687 → **626**，吃掉 **61 行** —— 三文件台账合计 60 行，多出的 1 行来自 `action-handlers.test.ts` 新增用例顺带打到的相邻模块）；测试 3944 → **3999 条**（文件数仍 120）；`npm run gate` 七关全绿。
 
 ## 四、门禁现状
 

@@ -269,6 +269,24 @@ function runAction(action: string, ...arguments_: string[]): void {
   handler({ args: arguments_, startTime: Date.now() })
 }
 
+/**
+ * 临时把 barrel 的某个导出置为 `undefined`，用于驱动「宿主/barrel 未提供该函数」的兜底分支。
+ *
+ * 被测代码经 Vite 的 SSR 转换后，命名导入是**调用时读命名空间属性**
+ * （`__vite_ssr_import_x__.name`），所以直接改写 mock 命名空间上的属性即可生效。
+ * 这类分支在产品里对应「某个子模块加载失败 / 被裁剪」的场景，不能静默吞掉用户操作。
+ */
+async function withBarrelExportCleared(name: string, run: () => void): Promise<void> {
+  const barrel = (await import('../ts/index.js')) as Record<string, unknown>
+  const original = barrel[name]
+  try {
+    barrel[name] = undefined
+    run()
+  } finally {
+    barrel[name] = original
+  }
+}
+
 /** 建一个带 id 的 div（handler 普遍用 getElementById 取控件） */
 function mountDiv(id: string): HTMLDivElement {
   const element = document.createElement('div')
@@ -441,6 +459,38 @@ describe('ACTION_HANDLERS · 核心操作', () => {
     expect(mocks.cleanLockedDataSheet).toHaveBeenCalledTimes(1)
     expect(mocks.openSyncRecordSheet).toHaveBeenCalledTimes(1)
   })
+
+  // 三个「barrel 未提供该函数」兜底：产品里对应子模块加载失败/被裁剪，
+  // 必须留下 WARN 日志而不是静默什么都不做（用户会以为点了没反应）。
+  it('testSelected：syncSelectedRows 不可用时记 WARN 且不抛错', async () => {
+    await withBarrelExportCleared('syncSelectedRows', () => {
+      runAction('testSelected')
+    })
+    expect(mocks.bgmLog).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.stringContaining('syncSelectedRows 函数未定义'),
+    )
+  })
+
+  it('previewSyncContent：previewSyncContent 不可用时记 WARN 且不抛错', async () => {
+    await withBarrelExportCleared('previewSyncContent', () => {
+      runAction('previewSyncContent')
+    })
+    expect(mocks.bgmLog).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.stringContaining('previewSyncContent 函数未定义'),
+    )
+  })
+
+  it('enlargePreview：enlargePreview 不可用时记 WARN 且不抛错', async () => {
+    await withBarrelExportCleared('enlargePreview', () => {
+      runAction('enlargePreview')
+    })
+    expect(mocks.bgmLog).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.stringContaining('enlargePreview 函数未定义'),
+    )
+  })
 })
 
 // ========== Token / 用户 ==========
@@ -476,6 +526,51 @@ describe('ACTION_HANDLERS · Token 与用户', () => {
     expect(mocks.showToast).toHaveBeenLastCalledWith(
       '复制失败，可能未设置 Token 或浏览器不支持',
       'error',
+    )
+  })
+
+  it('clearToken → 连接宿主时同步清掉存储里的用户信息', () => {
+    const setItem = vi.fn()
+    mocks.getApp.mockReturnValueOnce({ PluginStorage: { setItem } })
+
+    runAction('clearToken')
+
+    expect(setItem).toHaveBeenCalledWith('bgm_user_id', '')
+    expect(setItem).toHaveBeenCalledWith('bgm_username', '')
+    expect(mocks.showToast).toHaveBeenCalledWith('Token 已清除', 'info')
+  })
+
+  it('clearToken → 清理过程抛错时交给 BGM.handleError，且仍输出收尾日志', () => {
+    mocks.clearBgToken.mockImplementationOnce(() => {
+      throw new Error('存储不可写')
+    })
+
+    expect(() => runAction('clearToken')).not.toThrow()
+
+    expect(mocks.handleError).toHaveBeenCalledWith(
+      expect.any(Error),
+      expect.objectContaining({ context: 'clearToken' }),
+    )
+    expect(mocks.bgmLog).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.stringContaining('清除 Token 操作完成'),
+    )
+  })
+
+  it('copyToken → 剪贴板抛错时交给 BGM.handleError，且仍输出收尾日志', () => {
+    mocks.copyTokenToClipboard.mockImplementationOnce(() => {
+      throw new Error('剪贴板被拒绝')
+    })
+
+    expect(() => runAction('copyToken')).not.toThrow()
+
+    expect(mocks.handleError).toHaveBeenCalledWith(
+      expect.any(Error),
+      expect.objectContaining({ context: 'copyToken' }),
+    )
+    expect(mocks.bgmLog).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.stringContaining('复制 Token 操作完成'),
     )
   })
 
@@ -910,6 +1005,75 @@ describe('ACTION_HANDLERS · syncFromGithub', () => {
     }
     expect(options.scrollToRow).toBeUndefined()
   })
+
+  // 时间筛选的 4 种 range 都要在确认文案里给出明确说明（用户据此判断即将拉取哪段数据）。
+  // 这里只关心文案分支，故让用户在确认框点取消，避免把同步流程整条跑起来。
+  it('时间筛选 range=future → 确认文案标注「预告/未来动漫」', () => {
+    mocks.answer.confirm = false
+    const chk = mountInput('chkTimeFilter')
+    chk.checked = true
+    mountSelect('timeFilterRange', 'future')
+
+    runAction('syncFromGithub')
+
+    const [message] = mocks.showConfirm.mock.calls.at(-1) as [string]
+    expect(message).toContain('🔮 时间筛选：预告/未来动漫（无开播日期）')
+    expect(mocks.syncFromRemote).not.toHaveBeenCalled()
+  })
+
+  it('时间筛选 range=year → 确认文案标注「全年」', () => {
+    mocks.answer.confirm = false
+    const chk = mountInput('chkTimeFilter')
+    chk.checked = true
+    mountSelect('timeFilterYear', '2025')
+    mountSelect('timeFilterRange', 'year')
+
+    runAction('syncFromGithub')
+
+    const [message] = mocks.showConfirm.mock.calls.at(-1) as [string]
+    expect(message).toContain('📅 时间筛选：2025年全年')
+  })
+
+  it('时间筛选 range=month → 确认文案标注月份，并把 month 透传给同步', async () => {
+    mocks.syncFromRemote.mockResolvedValueOnce(result)
+    const chk = mountInput('chkTimeFilter')
+    chk.checked = true
+    mountSelect('timeFilterYear', '2026')
+    mountSelect('timeFilterRange', 'month')
+    mountSelect('timeFilterMonth', '7')
+
+    runAction('syncFromGithub')
+
+    const [message] = mocks.showConfirm.mock.calls.at(-1) as [string]
+    expect(message).toContain('📅 时间筛选：2026年7月')
+
+    await vi.waitFor(() => {
+      expect(mocks.syncFromRemote).toHaveBeenCalledTimes(1)
+    })
+    expect(mocks.syncFromRemote.mock.calls[0]?.[5]).toEqual({
+      enabled: true,
+      year: 2026,
+      range: 'month',
+      month: 7,
+    })
+  })
+
+  it('同步失败时若宿主提供状态栏，应把忙碌状态复位', async () => {
+    mocks.getApp.mockReturnValue({ StatusBar: true })
+    mocks.syncFromRemote.mockRejectedValueOnce(new Error('网络中断'))
+
+    try {
+      runAction('syncFromGithub')
+      await vi.waitFor(() => {
+        expect(mocks.hideSyncProgressDialog).toHaveBeenCalledTimes(1)
+      })
+    } finally {
+      mocks.getApp.mockReturnValue(null)
+    }
+
+    const app = mocks.getApp.mock.results.at(-1)?.value as { StatusBar: boolean }
+    expect(app.StatusBar).toBe(false)
+  })
 })
 
 // ========== GitHub 配置：连接测试 ==========
@@ -1125,6 +1289,24 @@ describe('ACTION_HANDLERS · resetAllConfig', () => {
   // 注：确认重置后的 `window.location.reload()`（延迟 600ms）不做断言 ——
   // jsdom 的 location.reload 不可被 spy，真实调用只会打印 "Not implemented: navigation"。
   // 该行为属宿主能力，留给真机验证。
+  it('确认后 600ms 触发页面重载（假定时器推进到点）', () => {
+    mocks.getResettableConfigKeys.mockReturnValueOnce(['LOG_LEVEL'])
+    mocks.removeConfig.mockReturnValue(true)
+
+    vi.useFakeTimers()
+    try {
+      runAction('resetAllConfig')
+      // 定时器已挂上：推进到 600ms 会执行 window.location.reload()
+      // （jsdom 只会打印 "Not implemented: navigation"，不会抛错）
+      expect(() => {
+        vi.advanceTimersByTime(600)
+      }).not.toThrow()
+    } finally {
+      vi.useRealTimers()
+    }
+
+    expect(mocks.showToast).toHaveBeenCalledWith('已重置 1 项配置，正在重新加载…', 'success')
+  })
 })
 
 // ========== 引导面板 ==========

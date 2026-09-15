@@ -18,7 +18,7 @@
 // @vitest-environment jsdom
 
 import DOMPurify from 'dompurify'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { resetSanitizerCache, sanitizeHtml, sanitizeTableRows } from '../ts/tools/sanitize.js'
 import { escapeHtml } from '../ts/tools/string-utilities-pure.js'
@@ -381,5 +381,93 @@ describe('测试环境保真：DOMPurify 默认注入与降级路径显式切换
       expect(button?.dataset.groupAll, label).toBe('D:/a.xlsx')
       expect(button?.dataset.sheetName, label).toBe('动画')
     }
+  })
+})
+
+/** 切到轻量降级实现（删全局 DOMPurify + 重置探测缓存，缺一不可） */
+function useFallback(): void {
+  delete (globalThis as { DOMPurify?: unknown }).DOMPurify
+  resetSanitizerCache()
+}
+
+/**
+ * 降级路径与「无 DOM 环境」的兜底分支。
+ *
+ * 这些分支在真实产品里都会被执行到（WPS 任务窗格首屏 DOMPurify 尚未加载、
+ * 纯 Node 环境、宿主 DOM 拒绝创建元素），但正常 jsdom 用例天然走不到，
+ * 必须显式反转环境才能命中：
+ *   - 删 `globalThis.DOMPurify` + `resetSanitizerCache()` → 切到降级实现
+ *   - `vi.stubGlobal('document', undefined)` → 连 DOM 都没有的极端环境
+ *   - 让 `document.createElement` 抛错 → DOM 操作失败的兜底
+ */
+describe('降级路径与无 DOM 环境的兜底分支', () => {
+  beforeEach(() => {
+    // 还原 setup 的默认注入（上一条 describe 的用例可能删过全局）
+    ;(globalThis as { DOMPurify?: typeof DOMPurify }).DOMPurify = DOMPurify
+    resetSanitizerCache()
+  })
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+    vi.unstubAllGlobals()
+    ;(globalThis as { DOMPurify?: typeof DOMPurify }).DOMPurify = DOMPurify
+    resetSanitizerCache()
+  })
+
+  it('降级路径应移除 javascript:/vbscript: 危险 URI 属性，保留安全 URI', () => {
+    useFallback()
+
+    const cleaned = sanitizeHtml(
+      '<a href="javascript:alert(1)" title="t">甲</a>' +
+        '<div background="vbscript:msgbox(1)" class="c">乙</div>' +
+        '<a href="https://example.com/x">丙</a>',
+    )
+
+    expect(cleaned).not.toMatch(/javascript:/i)
+    expect(cleaned).not.toMatch(/vbscript:/i)
+    // 非 URI 属性与安全 URI 必须原样保留（不能因噎废食剥光属性）
+    expect(cleaned).toContain('title="t"')
+    expect(cleaned).toContain('class="c"')
+    expect(cleaned).toContain('href="https://example.com/x"')
+    expect(cleaned).toContain('甲')
+  })
+
+  it('连 document 都不可用时应退化为正则粗过滤（保留结构标签、清危险内容）', () => {
+    useFallback()
+    vi.stubGlobal('document', undefined)
+
+    const cleaned = sanitizeHtml(
+      '<script>alert(1)</script><style>.x{}</style>' +
+        '<iframe src="https://evil.example"></iframe><meta charset="utf-8">' +
+        '<div onclick="a()" onmouseover=\'b()\' onfocus=c()>正文</div>',
+    )
+
+    // 危险块（含内容）与未闭合危险标签被整体删除
+    expect(cleaned).not.toMatch(/<(script|style|iframe|meta)\b/i)
+    expect(cleaned).not.toContain('alert(1)')
+    // 三种 on* 写法（双引号 / 单引号 / 裸值）都要清掉
+    expect(cleaned).not.toMatch(/\son\w+\s*=/i)
+    // 结构标签与正文必须留下（历史 bug：曾把整串转义成纯文本）
+    expect(cleaned).toContain('<div')
+    expect(cleaned).toContain('正文')
+  })
+
+  it('sanitizeTableRows 在无 DOM 环境下按字符串剥掉 table/tbody 包装', () => {
+    useFallback()
+    vi.stubGlobal('document', undefined)
+
+    expect(sanitizeTableRows('<tr><td>甲</td></tr>')).toBe('<tr><td>甲</td></tr>')
+  })
+
+  it('DOM 操作失败（createElement 抛错）时退化为正则兜底', () => {
+    useFallback()
+    vi.spyOn(document, 'createElement').mockImplementation(() => {
+      throw new Error('宿主 DOM 不可用')
+    })
+
+    const cleaned = sanitizeHtml('<div onclick="a()">正文</div>')
+
+    expect(cleaned).not.toMatch(/\son\w+\s*=/i)
+    expect(cleaned).toContain('正文')
   })
 })

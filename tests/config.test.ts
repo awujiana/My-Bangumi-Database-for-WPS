@@ -6,6 +6,9 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 vi.mock('../ts/tools/util/index.js', () => ({
   getApp: vi.fn(),
   bgmLog: vi.fn(),
+  // setLogLevel / applyLogLevel 会写内存中的 BGM.LOG_LEVEL（bgmLog 的过滤依据），
+  // 必须是稳定可断言的同一对象引用，故在工厂里一次性构造。
+  BGM: { LOG_LEVEL: 1, handleError: vi.fn(), ErrorLevel: { ERROR: 2 } },
 }))
 
 vi.mock('../ts/tools/events.js', () => ({
@@ -13,8 +16,11 @@ vi.mock('../ts/tools/events.js', () => ({
   BGM_EVENTS: { CONFIG_UPDATED: 'config:updated' },
 }))
 
+// 与 ts/core/constants.ts 保持一致（数值型）。旧版本此处 mock 成字符串
+// 'warn'/'info'/'error'，会让 LOG_LEVELS.ERROR 变成 'error'，
+// setLogLevel 的 `level > LOG_LEVEL_MAX` 退化为字符串比较而失去意义。
 vi.mock('../ts/core/constants.js', () => ({
-  LOG_LEVELS: { WARN: 'warn', INFO: 'info', ERROR: 'error' },
+  LOG_LEVELS: { INFO: 1, WARN: 2, ERROR: 3 },
 }))
 
 import {
@@ -41,9 +47,13 @@ import {
   getExportPath,
   setImportPath,
   getImportPath,
+  setLogLevel,
+  getLogLevel,
+  applyLogLevel,
   CONFIG_KEYS,
 } from '../ts/tools/config.js'
-import { getApp } from '../ts/tools/util/index.js'
+import { LOG_LEVELS } from '../ts/core/constants.js'
+import { BGM, bgmLog, getApp } from '../ts/tools/util/index.js'
 import { eventBus } from '../ts/tools/events.js'
 
 // 受控的 PluginStorage 实现，基于 Map 便于断言读写。
@@ -66,6 +76,9 @@ describe('tools/config', () => {
 
   beforeEach(() => {
     vi.clearAllMocks()
+    // BGM 是 mock 工厂里长期存在的对象，clearAllMocks 不会重置它的字段，
+    // 显式复位以免「日志级别」用例互相污染。
+    BGM.LOG_LEVEL = LOG_LEVELS.INFO
     storage = createFakeStorage()
     ;(getApp as ReturnType<typeof vi.fn>).mockReturnValue({ PluginStorage: storage })
   })
@@ -118,6 +131,26 @@ describe('tools/config', () => {
       expect(selfWindow.postMessage).toHaveBeenCalledWith(
         expect.objectContaining({ type: 'BGM:configUpdated' }),
         '*',
+      )
+    })
+
+    it('postMessage 抛错时吞掉异常并记 WARN 日志（不阻断配置写入）', () => {
+      // 宿主/浏览器拒绝 postMessage（跨源限制、窗口已销毁等）时不能把配置写入一起带崩
+      vi.stubGlobal('window', {
+        parent: {
+          postMessage: () => {
+            throw new Error('宿主拒绝 postMessage')
+          },
+        },
+        top: { postMessage: vi.fn() },
+        postMessage: vi.fn(),
+      })
+
+      expect(() => setConfig('broadcast_fail', 'value-b')).not.toThrow()
+      expect(storage.getItem('broadcast_fail')).toBe('value-b')
+      expect(bgmLog).toHaveBeenCalledWith(
+        LOG_LEVELS.WARN,
+        expect.stringContaining('postMessage 广播失败'),
       )
     })
   })
@@ -193,6 +226,15 @@ describe('tools/config', () => {
       setNavIconsOnly(false)
       expect(areNavIconsOnly(true)).toBe(false)
     })
+
+    it('areNavIconsOnly 非静默调用时输出 INFO 日志', () => {
+      setNavIconsOnly(true)
+      expect(areNavIconsOnly()).toBe(true)
+      expect(bgmLog).toHaveBeenCalledWith(
+        LOG_LEVELS.INFO,
+        expect.stringContaining('获取导航仅图标状态'),
+      )
+    })
   })
 
   describe('主题 / 列表类型 / 时间筛选', () => {
@@ -253,6 +295,61 @@ describe('tools/config', () => {
     it('setImportPath / getImportPath', () => {
       expect(setImportPath('C:/in')).toBe(true)
       expect(getImportPath(true)).toBe('C:/in')
+    })
+  })
+
+  // ========== 全局日志级别（设置项需要同时落盘 + 改内存） ==========
+  describe('全局日志级别', () => {
+    it('setLogLevel 合法值写入存储并同步内存 BGM.LOG_LEVEL', () => {
+      expect(setLogLevel(LOG_LEVELS.ERROR)).toBe(true)
+      expect(storage.getItem(CONFIG_KEYS.LOG_LEVEL)).toBe('3')
+      // 只写存储不更新内存会导致「设置后当前页面日志级别不变」
+      expect(BGM.LOG_LEVEL).toBe(LOG_LEVELS.ERROR)
+    })
+
+    it('setLogLevel(0) 允许 DEBUG 级（0 无同名常量）', () => {
+      expect(setLogLevel(0)).toBe(true)
+      expect(storage.getItem(CONFIG_KEYS.LOG_LEVEL)).toBe('0')
+      expect(BGM.LOG_LEVEL).toBe(0)
+    })
+
+    it('setLogLevel 越界 / 非安全整数时忽略、返回 false 且不动内存', () => {
+      for (const invalid of [-1, LOG_LEVELS.ERROR + 1, 1.5, NaN, Infinity]) {
+        expect(setLogLevel(invalid), `level=${String(invalid)}`).toBe(false)
+      }
+      expect(BGM.LOG_LEVEL).toBe(LOG_LEVELS.INFO)
+      expect(storage.getItem(CONFIG_KEYS.LOG_LEVEL)).toBeNull()
+    })
+
+    it('getLogLevel 读取存储值，缺失 / 非法 / 越界一律回落 INFO', () => {
+      storage.setItem(CONFIG_KEYS.LOG_LEVEL, '3')
+      expect(getLogLevel(true)).toBe(3)
+
+      storage.setItem(CONFIG_KEYS.LOG_LEVEL, 'abc')
+      expect(getLogLevel(true)).toBe(LOG_LEVELS.INFO)
+
+      storage.setItem(CONFIG_KEYS.LOG_LEVEL, '99')
+      expect(getLogLevel(true)).toBe(LOG_LEVELS.INFO)
+
+      storage.removeItem(CONFIG_KEYS.LOG_LEVEL)
+      expect(getLogLevel(true)).toBe(LOG_LEVELS.INFO)
+    })
+
+    it('getLogLevel 非静默调用时输出 INFO 日志', () => {
+      getLogLevel()
+      expect(bgmLog).toHaveBeenCalledWith(
+        LOG_LEVELS.INFO,
+        expect.stringContaining('获取全局日志级别'),
+      )
+    })
+
+    it('applyLogLevel 把持久化级别套用到内存', () => {
+      storage.setItem(CONFIG_KEYS.LOG_LEVEL, String(LOG_LEVELS.WARN))
+      BGM.LOG_LEVEL = LOG_LEVELS.INFO
+
+      applyLogLevel()
+
+      expect(BGM.LOG_LEVEL).toBe(LOG_LEVELS.WARN)
     })
   })
 })

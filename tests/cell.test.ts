@@ -68,6 +68,16 @@ function nativeCodeValue(): { toString: () => string } {
   return { toString: () => '42 [native code]' }
 }
 
+/**
+ * 模拟宿主 COM 方法：函数本身可调用，但 `toString()` 暴露 `[native code]`。
+ * 用于驱动 tryGetProperty 的「函数返回值仍是 native 函数」分支。
+ */
+const nativeLikeFunction = (): unknown => undefined
+Object.defineProperty(nativeLikeFunction, 'toString', {
+  value: () => 'function push() { [native code] }',
+  configurable: true,
+})
+
 function createMockWorksheet(
   cellValues: Record<string, unknown> = {},
   cellOverrides: Record<string, Record<string, unknown>> = {},
@@ -233,6 +243,107 @@ describe('getCellValue', () => {
         },
       )
       expect(getCellValue(ws, 1, 1)).toBe('42 [native code]')
+    })
+  })
+
+  /**
+   * `tryGetProperty` 的边界分支（间接覆盖）。
+   *
+   * 该函数是内部实现，但它的每条降级分支都对应真实宿主行为：
+   * COM 方法返回另一个 native 方法、COM 调用抛错、属性值是「带 toString 的宿主对象」、
+   * 以及属性读取本身抛错。这些路径不测就会静默把「函数源码 / [native code]」当成
+   * 单元格内容写进表格。
+   */
+  describe('tryGetProperty 属性探测边界（间接）', () => {
+    it('Value2 为「返回 native function」的函数时应跳过并回退 Value', () => {
+      const ws = createMockWorksheet(
+        {},
+        {
+          A1: {
+            Value2: () => nativeLikeFunction,
+            Value: 'real_value',
+            Text: 'real_value',
+          },
+        },
+      )
+      expect(getCellValue(ws, 1, 1)).toBe('real_value')
+    })
+
+    it('Value2 为「调用即抛错」的函数时应吞掉异常并回退 Value', () => {
+      const ws = createMockWorksheet(
+        {},
+        {
+          A1: {
+            Value2: () => {
+              throw new Error('COM 调用失败')
+            },
+            Value: 'after_function_throw',
+            Text: 'after_function_throw',
+          },
+        },
+      )
+      expect(getCellValue(ws, 1, 1)).toBe('after_function_throw')
+    })
+
+    it('Value2 为对象且 toString 含 "function" 时应跳过并回退 Value', () => {
+      const ws = createMockWorksheet(
+        {},
+        {
+          A1: {
+            Value2: { toString: () => 'function foo() {}' },
+            Value: 'after_function_marker',
+            Text: 'after_function_marker',
+          },
+        },
+      )
+      expect(getCellValue(ws, 1, 1)).toBe('after_function_marker')
+    })
+
+    it('Value2 为对象且 toString 仅含 "[native code]" 时应跳过并回退 Value', () => {
+      const ws = createMockWorksheet(
+        {},
+        {
+          A1: {
+            Value2: { toString: () => '[native code]' },
+            Value: 'after_native_marker',
+            Text: 'after_native_marker',
+          },
+        },
+      )
+      expect(getCellValue(ws, 1, 1)).toBe('after_native_marker')
+    })
+
+    it('Value2 为普通对象（toString 无标记）时应按 String() 语义返回', () => {
+      const ws = createMockWorksheet(
+        {},
+        {
+          A1: {
+            Value2: { toString: () => '普通对象' },
+            Value: 'ignored_value',
+            Text: 'ignored_value',
+          },
+        },
+      )
+      expect(getCellValue(ws, 1, 1)).toBe('普通对象')
+    })
+
+    it('自有属性 getter 抛错时应吞掉异常并回退 Value', () => {
+      // 与上一条 Proxy 用例的区别：Proxy 的 hasOwn 为 false（走「属性不存在」分支），
+      // 这里用真实自有访问器属性，才会命中 tryGetProperty 最外层 try/catch。
+      const throwingCell: Record<string, unknown> = {
+        Value: 'after_access_throw',
+        Text: 'after_access_throw',
+      }
+      Object.defineProperty(throwingCell, 'Value2', {
+        get() {
+          throw new Error('属性访问失败')
+        },
+        enumerable: true,
+        configurable: true,
+      })
+
+      const ws = malformedSheet(() => throwingCell)
+      expect(getCellValue(ws, 1, 1)).toBe('after_access_throw')
     })
   })
 
