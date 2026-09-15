@@ -1174,3 +1174,85 @@ describe('mirror 策略本地 SID 不在远程 (line 482)', () => {
     expect(deletes.length).toBe(0)
   })
 })
+
+// ========== 尾部分支补测（第十三轮） ==========
+
+describe('parseJsonl 全空白文本 (line 367)', () => {
+  it('只有空白行时应返回空结果（非空行集合为空 → 没有表头）', () => {
+    // 注意：空串 '' 在函数开头就早退了，这里必须给「有长度但全是空白」的文本才能走到表头判空
+    const result = parseJsonl('   \n\t\n  ')
+    expect(result.entries).toEqual([])
+    expect(result.errors).toEqual([])
+  })
+
+  it('表头行不是合法 JSON 时应记错误并返回空结果 (line 371)', () => {
+    const result = parseJsonl('这不是 JSON\n["sid"]')
+
+    expect(result.entries).toEqual([])
+    expect(result.errors).toHaveLength(1)
+    expect(result.errors[0]?.line).toBe(1)
+  })
+})
+
+describe('filterByTime future 模式 (line 469)', () => {
+  it('range=future 时应只保留无开播日期的条目', () => {
+    const entries: GithubRemoteEntry[] = [
+      { sid: 'sid-1', name: '有日期', date: '2024-06-01' },
+      { sid: 'sid-2', name: '无日期' },
+      { sid: 'sid-3', name: '空日期', date: ' '.repeat(3) },
+    ]
+    const filter: SyncTimeFilter = { enabled: true, year: 2024, range: 'future' }
+
+    const result = filterByTime(entries, filter)
+
+    expect(result.map((entry) => entry.sid)).toEqual(['sid-2', 'sid-3'])
+  })
+
+  it('range=future 且 enabled=false 时不筛选', () => {
+    const entries: GithubRemoteEntry[] = [{ sid: 'sid-1', name: '有日期', date: '2024-06-01' }]
+    const filter: SyncTimeFilter = { enabled: false, year: 2024, range: 'future' }
+
+    expect(filterByTime(entries, filter)).toBe(entries)
+  })
+})
+
+describe('computeDiff 比对 Bangumi_URL 派生字段 (lines 627-629)', () => {
+  it('本地 Bangumi_URL 与 sid 派生值不一致时应记入 changedFields', () => {
+    const remote: GithubRemoteEntry[] = [{ sid: '123', name: '条目' }]
+    const local = new Map<string, LocalRowEntry>([
+      ['123', {
+        row: 2,
+        sid: '123',
+        fields: { Bangumi_URL: 'https://bgm.tv/subject/999', 名称: '条目' },
+      }],
+    ])
+
+    const diffs = computeDiff(remote, local)
+
+    expect(diffs).toHaveLength(1)
+    expect(diffs[0]?.kind).toBe('update')
+    expect(diffs[0]?.changedFields).toEqual(['Bangumi_URL'])
+  })
+
+  it('本地 Bangumi_URL 与派生值一致且其余字段无差异时不产生 diff', () => {
+    const remote: GithubRemoteEntry[] = [{ sid: '123', name: '条目' }]
+    const local = new Map<string, LocalRowEntry>([
+      ['123', {
+        row: 2,
+        sid: '123',
+        fields: { Bangumi_URL: 'https://bgm.tv/subject/123', 名称: '条目' },
+      }],
+    ])
+
+    expect(computeDiff(remote, local)).toEqual([])
+  })
+
+  it('本地没有 Bangumi_URL 列时跳过该字段比对', () => {
+    const remote: GithubRemoteEntry[] = [{ sid: '123', name: '条目' }]
+    const local = new Map<string, LocalRowEntry>([
+      ['123', { row: 2, sid: '123', fields: { 名称: '条目' } }],
+    ])
+
+    expect(computeDiff(remote, local)).toEqual([])
+  })
+})

@@ -22,6 +22,20 @@ const { flags } = vi.hoisted(() => ({
     confirmResult: true,
     isRunning: false,
     enterRunning: false,
+    /** 状态机：是否已请求停止（BGM.sync.checkShouldStop） */
+    shouldStop: false,
+    /** 状态机：是否处于暂停（BGM.sync.checkPaused） */
+    paused: false,
+    /** 恢复后立刻再收到停止请求（覆盖「暂停期间停止」分支） */
+    stopAfterResume: false,
+    /** checkShouldStop 调用计数（0 表示不按次数触发） */
+    stopCheckCount: 0,
+    /** 第 N 次 checkShouldStop 之后开始返回 true（用于「并发窗口内收到停止」） */
+    stopAfterChecks: 0,
+    /** checkPaused 调用计数（0 表示不按次数触发） */
+    pauseCheckCount: 0,
+    /** 第 N 次 checkPaused 之后开始返回 true */
+    pauseAfterChecks: 0,
   },
 }))
 
@@ -29,9 +43,16 @@ const mockWpsMessageBox = vi.hoisted(() => vi.fn())
 const mockToast = vi.hoisted(() => vi.fn())
 const mockConfirm = vi.hoisted(() => vi.fn())
 const mockProgressHide = vi.hoisted(() => vi.fn())
+const mockProgressShow = vi.hoisted(() => vi.fn())
+const mockProgressUpdate = vi.hoisted(() => vi.fn())
+const mockProgressComplete = vi.hoisted(() => vi.fn())
 const mockFinalize = vi.hoisted(() => vi.fn())
 const mockMarkEpisodes = vi.hoisted(() => vi.fn())
+const mockBgmRequestSync = vi.hoisted(() => vi.fn())
+const mockGetOrCreateSyncRecordSheet = vi.hoisted(() => vi.fn())
 const mockGetAllSyncRecords = vi.hoisted(() => vi.fn<() => unknown[]>())
+/** 最小请求间隔等待（用于验证节流分支是否被触发） */
+const mockDelay = vi.hoisted(() => vi.fn())
 
 const { bgmStub } = vi.hoisted(() => ({
   bgmStub: {
@@ -48,6 +69,26 @@ const { bgmStub } = vi.hoisted(() => ({
       resetRunningState: vi.fn(),
       setShouldStop: vi.fn(),
       shouldStop: false,
+      checkShouldStop: (): boolean => {
+        flags.stopCheckCount += 1
+        if (flags.stopAfterChecks > 0 && flags.stopCheckCount > flags.stopAfterChecks) return true
+        return flags.shouldStop
+      },
+      checkPaused: (): boolean => {
+        flags.pauseCheckCount += 1
+        if (flags.pauseAfterChecks > 0 && flags.pauseCheckCount > flags.pauseAfterChecks) return true
+        return flags.paused
+      },
+      /** 等待恢复：解除暂停；若用例要求「暂停期间停止」则同时置位停止标志 */
+      waitForResume: (): Promise<void> => {
+        flags.paused = false
+        if (flags.stopAfterResume) flags.shouldStop = true
+        return Promise.resolve()
+      },
+      pause: vi.fn(),
+      resume: vi.fn(),
+      requestStop: vi.fn(),
+      exitRunningState: vi.fn(),
     },
     Color: {},
   },
@@ -65,7 +106,7 @@ vi.mock('../ts/tools/util/index.js', () => ({
   clearSheetCache: mockClearSheetCache,
   colNumberToLetter: (col: number) => String.fromCodePoint(64 + col),
   trim: (value: string) => value.trim(),
-  delay: vi.fn(),
+  delay: mockDelay,
   calcFingerprint: mockCalcFingerprint,
   BGM: bgmStub,
   _getUserApiPath: mockGetUserApiPath,
@@ -88,9 +129,9 @@ vi.mock('../ts/core/ui-bridge.js', () => ({
     input: vi.fn(),
   }),
   getSyncProgressApi: () => ({
-    show: vi.fn(),
-    update: vi.fn(),
-    complete: vi.fn(),
+    show: mockProgressShow,
+    update: mockProgressUpdate,
+    complete: mockProgressComplete,
     hide: mockProgressHide,
   }),
   registerNotifyApi: vi.fn(),
@@ -98,7 +139,7 @@ vi.mock('../ts/core/ui-bridge.js', () => ({
 }))
 
 vi.mock('../ts/sync/exceltobangumi/api.js', () => ({
-  bgmRequestSync: vi.fn(),
+  bgmRequestSync: mockBgmRequestSync,
 }))
 
 vi.mock('../ts/sync/exceltobangumi/chapter-marker.js', () => ({
@@ -113,7 +154,7 @@ vi.mock('../ts/sync/exceltobangumi/progress-reporter.js', () => ({
 
 vi.mock('../ts/sync/sync-record.js', () => ({
   getAllSyncRecords: mockGetAllSyncRecords,
-  getOrCreateSyncRecordSheet: vi.fn(),
+  getOrCreateSyncRecordSheet: mockGetOrCreateSyncRecordSheet,
 }))
 
 vi.mock('../ts/sync/sync-config-summary.js', () => ({
@@ -176,6 +217,8 @@ function createWorksheet(options: {
   throwOnAutoFilterMode?: boolean
   throwOnSpecialCells?: boolean
   throwOnAreas?: boolean
+  /** 可见区域不提供 Areas 成员（覆盖「整体作为单一区间」分支） */
+  missingAreas?: boolean
   throwOnRange?: boolean
   visibleCount?: number
 } = {}): WpsWorksheet {
@@ -196,6 +239,7 @@ function createWorksheet(options: {
                 if (options.throwOnSpecialCells) throw new Error('SpecialCells 失败')
                 return createVisibleCells(visibleRowNumbers, {
                   throwOnAreas: options.throwOnAreas ?? false,
+                  missingAreas: options.missingAreas ?? false,
                 })
               },
             },
@@ -209,6 +253,7 @@ function createWorksheet(options: {
           if (options.throwOnSpecialCells) throw new Error('SpecialCells 失败')
           return createVisibleCells(visibleRowNumbers, {
             throwOnAreas: options.throwOnAreas ?? false,
+            missingAreas: options.missingAreas ?? false,
           })
         },
       }
@@ -216,15 +261,16 @@ function createWorksheet(options: {
   } as unknown as WpsWorksheet
 }
 
-/** 构造可见单元格集合桩 */
+/** 构造可见单元格集合桩；`missingAreas` 表示宿主未提供 Areas 成员 */
 function createVisibleCells(
   rowNumbers: number[],
-  options: { throwOnAreas?: boolean } = {},
+  options: { throwOnAreas?: boolean; missingAreas?: boolean } = {},
 ): WpsRange {
   const area = createArea(rowNumbers)
   return {
     get Areas(): unknown {
       if (options.throwOnAreas) throw new Error('Areas 不可用')
+      if (options.missingAreas) return undefined
       return { Count: 1, Item: () => area }
     },
     Count: rowNumbers.length,
@@ -261,6 +307,66 @@ function firstMessageBox(): string {
   return String(mockWpsMessageBox.mock.calls[0]?.[0] ?? '')
 }
 
+/**
+ * 装配一个能走到 `executeSelectedSync` 执行阶段的环境。
+ *
+ * `syncSelectedRows` 的校验链（选区 → 表头 → 列 → Token → 状态机）已由既有用例覆盖，
+ * 这里统一把 `enterRunningState` 放行，让用例专注在真正的写入循环上。
+ */
+function setupExecution(
+  options: {
+    rows?: number[]
+    colMap?: Map<string, number>
+    cellValue?: (row: number, col: number) => string
+  } = {},
+): void {
+  const ws = createWorksheet()
+  mockGetApp.mockReturnValue(
+    createApp({ worksheet: ws, selection: createSelection({ rowNumbers: options.rows ?? [2] }) }),
+  )
+  mockFindHeaderRow.mockReturnValue(1)
+  mockGetColumnMap.mockReturnValue(options.colMap ?? new Map([['Bangumi_URL', 5]]))
+  const { cellValue } = options
+  if (cellValue) {
+    mockGetCellValue.mockImplementation((_ws: unknown, row: number, col: number) =>
+      cellValue(row, col),
+    )
+  }
+  flags.enterRunning = true
+}
+
+/** 取进度弹窗 show() 时传入的 handlers（暂停/恢复/停止回调） */
+function progressHandlers(): { onPause: () => void; onResume: () => void; onStop: () => void } {
+  return mockProgressShow.mock.calls[0]?.[1] as {
+    onPause: () => void
+    onResume: () => void
+    onStop: () => void
+  }
+}
+
+/** 选区同步用例的标准取值：URL / 名称 / 状态 / 集数，其余为空 */
+function fullCellValue(options: { status?: string; ep?: string; url?: string } = {}) {
+  const { status = '2', ep = '12', url = 'https://bgm.tv/subject/12345' } = options
+  return (row: number, col: number): string => {
+    if (col === 5) return url
+    if (col === 2) return `条目${String(row)}`
+    if (col === 3) return status
+    if (col === 7) return ep
+    return ''
+  }
+}
+
+/** 批量同步用例的标准取值：URL 固定为 subject/1，只关心状态与集数 */
+function batchCellValue(options: { status?: string; ep?: string } = {}) {
+  const { status = '2', ep = '12' } = options
+  return (_ws: unknown, _row: number, col: number): string => {
+    if (col === 5) return 'https://bgm.tv/subject/1'
+    if (col === 3) return status
+    if (col === 7) return ep
+    return ''
+  }
+}
+
 describe('exceltobangumi 选区与筛选链路', () => {
   beforeEach(() => {
     vi.clearAllMocks()
@@ -268,6 +374,13 @@ describe('exceltobangumi 选区与筛选链路', () => {
     flags.confirmResult = true
     flags.isRunning = false
     flags.enterRunning = false
+    flags.shouldStop = false
+    flags.paused = false
+    flags.stopAfterResume = false
+    flags.stopCheckCount = 0
+    flags.stopAfterChecks = 0
+    flags.pauseCheckCount = 0
+    flags.pauseAfterChecks = 0
     mockGetApp.mockReturnValue(null)
     mockGetCell.mockReturnValue(null)
     mockGetCellValue.mockReturnValue('')
@@ -278,6 +391,9 @@ describe('exceltobangumi 选区与筛选链路', () => {
     mockGetUserApiPath.mockReturnValue('/v0/users/-/collections')
     mockCalcFingerprint.mockReturnValue('fp-1')
     mockGetAllSyncRecords.mockReturnValue([])
+    mockBgmRequestSync.mockResolvedValue({ code: 200, message: '' })
+    mockMarkEpisodes.mockResolvedValue({ success: true, message: '已标记' })
+    mockGetOrCreateSyncRecordSheet.mockImplementation(() => {})
   })
 
   describe('getFilterStatus', () => {
@@ -413,6 +529,21 @@ describe('exceltobangumi 选区与筛选链路', () => {
       expect(result.hasFilter).toBe(true)
       expect(result.visibleRows).toEqual([2, 3])
       expect(mockHandleError).toHaveBeenCalled()
+    })
+
+    it('可见区域未提供 Areas 成员时整体作为单一区间处理', () => {
+      const ws = createWorksheet({
+        visibleCount: 100,
+        visibleRowNumbers: [1, 2, 5],
+        missingAreas: true,
+      })
+      mockGetApp.mockReturnValue(createApp({ worksheet: ws }))
+
+      const result = getFilterStatus(ws, 10, 1, true)
+
+      expect(result.hasFilter).toBe(true)
+      expect(result.visibleRows).toEqual([2, 5])
+      expect(mockHandleError).not.toHaveBeenCalled()
     })
 
     it('可见行超过 10 行时输出省略日志', () => {
@@ -732,6 +863,462 @@ describe('exceltobangumi 选区与筛选链路', () => {
       await SyncToBangumiAsync(ws, new Map([['Bangumi_URL', 5]]), 'token', 1, 1, { onProgress })
 
       expect(mockFinalize).toHaveBeenCalledTimes(1)
+    })
+  })
+
+  // ========== 第 17 批（P2-1）：executeSelectedSync 执行链路 ==========
+
+  describe('executeSelectedSync 执行链路', () => {
+    /** 标准列映射：URL + 名称 + 观看状态 + 集数 */
+    const FULL_COL_MAP = new Map<string, number>([
+      ['Bangumi_URL', 5],
+      ['名称', 2],
+      ['是否看完', 3],
+      ['集数', 7],
+    ])
+
+    /** 标准取值：URL / 名称 / 状态 / 集数，其余为空（实现见模块作用域 fullCellValue） */
+
+    it('成功同步一条：POST 请求体、进度更新、按 type=2 标记章节并输出汇总', async () => {
+      setupExecution({ colMap: FULL_COL_MAP, cellValue: fullCellValue() })
+
+      await syncSelectedRows()
+
+      expect(mockBgmRequestSync).toHaveBeenCalledWith(
+        'POST',
+        expect.stringContaining('12345'),
+        expect.stringContaining('"type":2'),
+        'token-abc',
+      )
+      expect(mockMarkEpisodes).toHaveBeenCalledWith('12345', 12, 'token-abc')
+      expect(mockProgressUpdate).toHaveBeenCalled()
+      expect(loggedMessages().some((m) => m.includes('========== 汇总 =========='))).toBe(true)
+      expect(mockProgressComplete).toHaveBeenCalledWith(
+        expect.stringContaining('📊 选中 1 行'),
+        expect.any(Array),
+        false,
+      )
+    })
+
+    it('进度弹窗的暂停/恢复/停止回调直通状态机', async () => {
+      setupExecution()
+      await syncSelectedRows()
+
+      const handlers = progressHandlers()
+      handlers.onPause()
+      handlers.onResume()
+      handlers.onStop()
+
+      expect(bgmStub.sync.pause).toHaveBeenCalled()
+      expect(bgmStub.sync.resume).toHaveBeenCalled()
+      expect(bgmStub.sync.requestStop).toHaveBeenCalled()
+    })
+
+    it('循环开始前已请求停止 → 不处理任何行并如实标记 stopped', async () => {
+      setupExecution({ rows: [2, 3], cellValue: () => 'https://bgm.tv/subject/1' })
+      flags.shouldStop = true
+
+      await syncSelectedRows()
+
+      expect(loggedMessages().some((m) => m.includes('检测到停止请求，终止循环'))).toBe(true)
+      expect(mockBgmRequestSync).not.toHaveBeenCalled()
+      expect(mockProgressComplete).toHaveBeenCalledWith(expect.any(String), expect.any(Array), true)
+    })
+
+    it('循环中暂停 → 等待恢复后继续处理', async () => {
+      setupExecution({ cellValue: fullCellValue() })
+      flags.paused = true
+
+      await syncSelectedRows()
+
+      expect(loggedMessages().some((m) => m.includes('同步已恢复，继续处理'))).toBe(true)
+      expect(mockBgmRequestSync).toHaveBeenCalled()
+    })
+
+    it('暂停期间收到停止请求 → 终止循环', async () => {
+      setupExecution({ rows: [2, 3], cellValue: fullCellValue() })
+      flags.paused = true
+      flags.stopAfterResume = true
+
+      await syncSelectedRows()
+
+      expect(loggedMessages().some((m) => m.includes('暂停期间收到停止请求，终止循环'))).toBe(true)
+      expect(mockBgmRequestSync).not.toHaveBeenCalled()
+    })
+
+    it('请求体为空（状态无法识别）→ 提示并计入跳过', async () => {
+      setupExecution({ colMap: FULL_COL_MAP, cellValue: fullCellValue({ status: '???' }) })
+
+      await syncSelectedRows()
+
+      expect(mockToast).toHaveBeenCalledWith(expect.stringContaining('请求体为空'), 'warn')
+      expect(loggedMessages().some((m) => m.includes('跳过: 请求体为空'))).toBe(true)
+      expect(mockBgmRequestSync).not.toHaveBeenCalled()
+    })
+
+    it('服务端非 2xx → 计入失败并记录状态码', async () => {
+      setupExecution({ colMap: FULL_COL_MAP, cellValue: fullCellValue() })
+      mockBgmRequestSync.mockResolvedValue({ code: 400, message: 'Bad Request' })
+
+      await syncSelectedRows()
+
+      expect(loggedMessages().some((m) => m.includes('同步失败！HTTP: 400'))).toBe(true)
+      expect(mockMarkEpisodes).not.toHaveBeenCalled()
+    })
+
+    it('观看状态非「看过/在看」但有集数 → 跳过章节标记', async () => {
+      setupExecution({ colMap: FULL_COL_MAP, cellValue: fullCellValue({ status: '1' }) })
+
+      await syncSelectedRows()
+
+      expect(loggedMessages().some((m) => m.includes('跳过章节标记'))).toBe(true)
+      expect(mockMarkEpisodes).not.toHaveBeenCalled()
+    })
+
+    it('章节标记失败 → 仅记录结果，不影响主流程', async () => {
+      setupExecution({ colMap: FULL_COL_MAP, cellValue: fullCellValue() })
+      mockMarkEpisodes.mockResolvedValue({ success: false, message: '章节接口 500' })
+
+      await syncSelectedRows()
+
+      expect(loggedMessages().some((m) => m.includes('章节标记结果: 章节接口 500'))).toBe(true)
+    })
+
+    it('URL 非 Bangumi 链接 → 提示并跳过', async () => {
+      setupExecution({
+        colMap: FULL_COL_MAP,
+        cellValue: fullCellValue({ url: 'https://example.com/anime' }),
+      })
+
+      await syncSelectedRows()
+
+      expect(mockToast).toHaveBeenCalledWith(expect.stringContaining('非BGM链接'), 'warn')
+      expect(mockBgmRequestSync).not.toHaveBeenCalled()
+    })
+
+    it('URL 为空 → 提示并跳过', async () => {
+      setupExecution({ colMap: FULL_COL_MAP, cellValue: fullCellValue({ url: '' }) })
+
+      await syncSelectedRows()
+
+      expect(mockToast).toHaveBeenCalledWith(expect.stringContaining('URL为空'), 'warn')
+    })
+
+    it('单行处理抛错 → 计入失败并写进度，不中断后续行', async () => {
+      setupExecution({ rows: [2, 3], colMap: FULL_COL_MAP, cellValue: fullCellValue() })
+      mockGetCellValue.mockImplementation(() => {
+        throw new Error('读取单元格失败')
+      })
+
+      await syncSelectedRows()
+
+      expect(loggedMessages().some((m) => m.includes('处理异常: 读取单元格失败'))).toBe(true)
+      expect(mockProgressUpdate).toHaveBeenCalled()
+    })
+
+    it('执行阶段整体抛错 → 隐藏进度、上报错误并弹窗', async () => {
+      setupExecution()
+      mockGetUserApiPath.mockImplementation(() => {
+        throw new Error('用户路径不可用')
+      })
+
+      await syncSelectedRows()
+
+      expect(mockProgressHide).toHaveBeenCalled()
+      expect(mockHandleError).toHaveBeenCalledWith(
+        expect.any(Error),
+        expect.objectContaining({ context: 'syncSelectedRows' }),
+      )
+      expect(firstMessageBox()).toContain('用户路径不可用')
+      // entered=true → finally 必须归还运行状态
+      expect(bgmStub.sync.exitRunningState).toHaveBeenCalled()
+    })
+
+    it('请求体 JSON 解析失败 → 记 WARN 且不标记章节', async () => {
+      setupExecution({ colMap: FULL_COL_MAP, cellValue: fullCellValue() })
+      // buildJsonPayload 产出的始终是合法 JSON，故直接让解析器抛错以覆盖防御分支
+      const parseSpy = vi.spyOn(JSON, 'parse').mockImplementation(() => {
+        throw new SyntaxError('请求体损坏')
+      })
+      try {
+        await syncSelectedRows()
+      } finally {
+        parseSpy.mockRestore()
+      }
+
+      expect(loggedMessages().some((m) => m.includes('jsonBody 解析失败: 请求体损坏'))).toBe(true)
+      expect(mockMarkEpisodes).not.toHaveBeenCalled()
+      // watchType 回落为 0 → 走「非看过/在看」跳过章节标记分支
+      expect(loggedMessages().some((m) => m.includes('状态非"看过/在看"(type=0)'))).toBe(true)
+    })
+
+    it('形似 Bangumi 但 ID 超长 → 提示无法提取 Subject ID 并跳过', async () => {
+      // 纯数字被 isBangumiUrl 接受，但 9 位超出 extractSubjectId 的 1-8 位校验
+      setupExecution({ colMap: FULL_COL_MAP, cellValue: fullCellValue({ url: '123456789' }) })
+
+      await syncSelectedRows()
+
+      expect(mockToast).toHaveBeenCalledWith(expect.stringContaining('无法提取 Subject ID'), 'warn')
+      expect(loggedMessages().some((m) => m.includes('跳过: 无效ID'))).toBe(true)
+      expect(mockBgmRequestSync).not.toHaveBeenCalled()
+    })
+  })
+
+  // ========== 第 17 批（P2-1）：批量链路补测 ==========
+
+  describe('批量链路补测', () => {
+    const FULL_COL_MAP = new Map<string, number>([
+      ['Bangumi_URL', 5],
+      ['是否看完', 3],
+      ['集数', 7],
+    ])
+
+    /** 批量取值实现见模块作用域 batchCellValue */
+
+    it('非增量模式下已标记成功的行按颜色跳过', async () => {
+      const ws = createWorksheet()
+      mockGetApp.mockReturnValue(createApp({ worksheet: ws }))
+      mockGetCellValue.mockImplementation(batchCellValue())
+      mockGetCell.mockReturnValue({ Interior: { Color: 0xccffcc } })
+
+      await SyncToBangumiAsync(ws, FULL_COL_MAP, 'token', 3, 1)
+
+      expect(loggedMessages().some((m) => m.includes('2 条跳过'))).toBe(true)
+      expect(mockBgmRequestSync).not.toHaveBeenCalled()
+    })
+
+    it('未标记的行正常同步（颜色不匹配）', async () => {
+      const ws = createWorksheet()
+      mockGetApp.mockReturnValue(createApp({ worksheet: ws }))
+      mockGetCellValue.mockImplementation(batchCellValue())
+      mockGetCell.mockReturnValue({ Interior: { Color: 0 } })
+
+      await SyncToBangumiAsync(ws, FULL_COL_MAP, 'token', 3, 1)
+
+      expect(mockBgmRequestSync).toHaveBeenCalledTimes(2)
+    })
+
+    it('颜色属性读取抛错时按未标记处理', async () => {
+      const ws = createWorksheet()
+      mockGetApp.mockReturnValue(createApp({ worksheet: ws }))
+      mockGetCellValue.mockImplementation(batchCellValue())
+      mockGetCell.mockReturnValue({
+        get Interior(): unknown {
+          throw new Error('Interior 读取失败')
+        },
+      })
+
+      await SyncToBangumiAsync(ws, FULL_COL_MAP, 'token', 3, 1)
+
+      expect(mockBgmRequestSync).toHaveBeenCalledTimes(2)
+    })
+
+    it('单行预处理抛错 → 计入失败并调用 BGM.handleError', async () => {
+      const ws = createWorksheet()
+      mockGetApp.mockReturnValue(createApp({ worksheet: ws }))
+      mockGetCellValue.mockImplementation(batchCellValue())
+      const skipSids = {
+        size: 1,
+        has: (): boolean => {
+          throw new Error('冲突集读取失败')
+        },
+      } as unknown as Set<string>
+
+      await SyncToBangumiAsync(ws, FULL_COL_MAP, 'token', 3, 1, { skipSids })
+
+      expect(mockHandleError).toHaveBeenCalledWith(
+        expect.any(Error),
+        expect.objectContaining({ context: 'SyncToBangumiAsync:preprocess' }),
+      )
+      expect(loggedMessages().some((m) => m.includes('失败2条'))).toBe(true)
+    })
+
+    it('章节标记抛错 → 记 WARN 不影响批量结果', async () => {
+      const ws = createWorksheet()
+      mockGetApp.mockReturnValue(createApp({ worksheet: ws }))
+      mockGetCellValue.mockImplementation(batchCellValue())
+      mockMarkEpisodes.mockRejectedValue(new Error('章节接口不可用'))
+
+      await SyncToBangumiAsync(ws, FULL_COL_MAP, 'token', 3, 1)
+
+      expect(loggedMessages().some((m) => m.includes('章节标记异常: 章节接口不可用'))).toBe(true)
+    })
+
+    it('状态非「看过/在看」但有集数 → 记日志跳过章节标记', async () => {
+      const ws = createWorksheet()
+      mockGetApp.mockReturnValue(createApp({ worksheet: ws }))
+      mockGetCellValue.mockImplementation(batchCellValue({ status: '1' }))
+
+      await SyncToBangumiAsync(ws, FULL_COL_MAP, 'token', 3, 1)
+
+      expect(loggedMessages().some((m) => m.includes('跳过章节标记'))).toBe(true)
+      expect(mockMarkEpisodes).not.toHaveBeenCalled()
+    })
+
+    it('创建同步记录表抛错 → 记 WARN 后继续批量同步', async () => {
+      const ws = createWorksheet()
+      mockGetApp.mockReturnValue(createApp({ worksheet: ws }))
+      mockGetCellValue.mockImplementation(batchCellValue())
+      mockGetOrCreateSyncRecordSheet.mockImplementation(() => {
+        throw new Error('记录表创建失败')
+      })
+
+      await SyncToBangumiAsync(ws, FULL_COL_MAP, 'token', 3, 1)
+
+      expect(mockHandleError).toHaveBeenCalledWith(
+        expect.any(Error),
+        expect.objectContaining({ context: 'SyncToBangumiAsync:createSheet' }),
+      )
+      expect(mockBgmRequestSync).toHaveBeenCalled()
+    })
+
+    it('阶段六的 reportProgress 会转调 options.onProgress', async () => {
+      const ws = createWorksheet()
+      mockGetApp.mockReturnValue(createApp({ worksheet: ws }))
+      mockGetCellValue.mockImplementation(batchCellValue())
+      const onProgress = vi.fn()
+
+      await SyncToBangumiAsync(ws, FULL_COL_MAP, 'token', 3, 1, { onProgress })
+
+      // finalizeSyncResults 被 mock，用例手动取出其 reportProgress 参数并调用
+      const reportProgress = mockFinalize.mock.calls[0]?.[8] as (c: number, m: string) => void
+      reportProgress(1, '收尾中')
+
+      expect(onProgress).toHaveBeenCalledWith(1, 2, '收尾中')
+    })
+
+    it('onProgress 回调抛错 → 记 WARN 不影响其余任务', async () => {
+      const ws = createWorksheet()
+      mockGetApp.mockReturnValue(createApp({ worksheet: ws }))
+      mockGetCellValue.mockImplementation(batchCellValue())
+      const onProgress = vi.fn(() => {
+        throw new Error('进度回调炸了')
+      })
+
+      await SyncToBangumiAsync(ws, FULL_COL_MAP, 'token', 3, 1, { onProgress })
+
+      expect(loggedMessages().some((m) => m.includes('onProgress 回调异常: 进度回调炸了'))).toBe(true)
+      expect(mockBgmRequestSync).toHaveBeenCalledTimes(2)
+    })
+
+    it('并发窗口内收到停止请求 → 等待在途任务后停止', async () => {
+      const ws = createWorksheet()
+      mockGetApp.mockReturnValue(createApp({ worksheet: ws }))
+      mockGetCellValue.mockImplementation(batchCellValue())
+      // 第一个请求立即完成，第二个在宏任务后完成 → 让第二轮循环仍持有在途任务
+      let requestCount = 0
+      mockBgmRequestSync.mockImplementation(
+        () =>
+          new Promise((resolve) => {
+            requestCount += 1
+            if (requestCount === 1) {
+              resolve({ code: 200, message: '' })
+              return
+            }
+            setTimeout(() => {
+              resolve({ code: 200, message: '' })
+            }, 0)
+          }),
+      )
+      // 第一次检查放行，之后立即报告停止
+      flags.stopAfterChecks = 1
+
+      await SyncToBangumiAsync(ws, FULL_COL_MAP, 'token', 3, 1)
+
+      expect(loggedMessages().some((m) => m.includes('检测到停止请求，正在停止'))).toBe(true)
+    })
+
+    it('并发窗口内暂停且恢复后立即停止 → 等待在途任务后停止', async () => {
+      const ws = createWorksheet()
+      mockGetApp.mockReturnValue(createApp({ worksheet: ws }))
+      mockGetCellValue.mockImplementation(batchCellValue())
+      let requestCount = 0
+      mockBgmRequestSync.mockImplementation(
+        () =>
+          new Promise((resolve) => {
+            requestCount += 1
+            if (requestCount === 1) {
+              resolve({ code: 200, message: '' })
+              return
+            }
+            setTimeout(() => {
+              resolve({ code: 200, message: '' })
+            }, 0)
+          }),
+      )
+      flags.pauseAfterChecks = 1
+      flags.stopAfterResume = true
+
+      await SyncToBangumiAsync(ws, FULL_COL_MAP, 'token', 3, 1)
+
+      expect(loggedMessages().some((m) => m.includes('暂停期间收到停止请求，正在停止'))).toBe(true)
+    })
+
+    it('暂停后恢复继续处理 → 记恢复日志', async () => {
+      const ws = createWorksheet()
+      mockGetApp.mockReturnValue(createApp({ worksheet: ws }))
+      mockGetCellValue.mockImplementation(batchCellValue())
+      flags.paused = true
+
+      await SyncToBangumiAsync(ws, FULL_COL_MAP, 'token', 3, 1)
+
+      expect(loggedMessages().some((m) => m.includes('同步已恢复，继续处理'))).toBe(true)
+      expect(mockBgmRequestSync).toHaveBeenCalledTimes(2)
+    })
+
+    it('批量缓存命中时直接取用行数据，不走逐格回退', async () => {
+      const ws = createWorksheet({ visibleRowNumbers: [1, 2] })
+      mockGetApp.mockReturnValue(createApp({ worksheet: ws }))
+      // 行 2 在批量缓存中的下标为 0；数组下标 i 对应第 i+1 列
+      mockReadRangeValues.mockReturnValue([
+        ['', '条目2', '2', '', 'https://bgm.tv/subject/1', '', '12'],
+      ])
+      // 逐格回退一律返回空值 → 只有命中缓存才可能产生同步任务
+      mockGetCellValue.mockReturnValue('')
+
+      await SyncToBangumiAsync(ws, FULL_COL_MAP, 'token', 2, 1)
+
+      expect(mockBgmRequestSync).toHaveBeenCalledWith(
+        'POST',
+        expect.stringContaining('/collections/1'),
+        expect.stringContaining('"type":2'),
+        'token',
+      )
+      expect(mockGetCellValue).not.toHaveBeenCalled()
+    })
+
+    it('增量模式下指纹未变化 → 整批跳过且不发请求', async () => {
+      const ws = createWorksheet()
+      mockGetApp.mockReturnValue(createApp({ worksheet: ws }))
+      mockGetCellValue.mockImplementation(batchCellValue())
+      mockGetAllSyncRecords.mockReturnValue([{ sid: '1', fingerprint: 'fp-1' }])
+      mockCalcFingerprint.mockReturnValue('fp-1')
+
+      const result = await SyncToBangumiAsync(ws, FULL_COL_MAP, 'token', 3, 1, {
+        incremental: true,
+      })
+
+      expect(mockBgmRequestSync).not.toHaveBeenCalled()
+      expect(result.skip).toBe(2)
+      expect(loggedMessages().some((m) => m.includes('2 条跳过'))).toBe(true)
+    })
+
+    it('两批任务间隔不足最小请求间隔时执行节流等待', async () => {
+      // 7 个可见行（去掉表头后 6 行）→ 并发窗口 5 + 1，第二批必然落在同一毫秒
+      const ws = createWorksheet({ visibleRowNumbers: [1, 2, 3, 4, 5, 6, 7] })
+      mockGetApp.mockReturnValue(createApp({ worksheet: ws }))
+      mockGetCellValue.mockImplementation(batchCellValue())
+      // 固定 Date.now：首批 lastRequestTime=0 不等待，第二批 elapsed=0 必然等待
+      const nowSpy = vi.spyOn(Date, 'now').mockReturnValue(5_000_000)
+      try {
+        await SyncToBangumiAsync(ws, FULL_COL_MAP, 'token', 7, 1)
+      } finally {
+        nowSpy.mockRestore()
+      }
+
+      expect(mockBgmRequestSync).toHaveBeenCalledTimes(6)
+      expect(mockDelay).toHaveBeenCalledTimes(1)
+      expect(mockDelay).toHaveBeenCalledWith(100)
     })
   })
 })

@@ -3156,3 +3156,77 @@ describe('addSyncRecordSummary 行为', () => {
     expect(isResult).toBe(true)
   })
 })
+
+// ========== 补充测试：deduplicateSyncRecords 重复 SID 合并路径（第十三轮） ==========
+//
+// ⚠️ 注意这里必须用 mockReadRangeValues（不是 mockGetCellValue）造重复：
+// `groupRowsBySid()` 是**整列批量读**（readRangeValues），既不逐行读 SID、也不看 getCellValue。
+// 上面 `deduplicateSyncRecords 详细测试 > 有重复 SID 时应合并并删除` 那条只 mock 了
+// getCellValue，所以它其实**从未进入合并分支**（断言只验证了返回值是 true）——
+// 这正是 mergeDuplicateSidGroups 的 489-503 一直未覆盖的原因。
+describe('deduplicateSyncRecords 重复 SID 合并 (lines 489-503)', () => {
+  // 本 describe 在文件作用域，不在 `describe('syncRecord')` 的 beforeEach 覆盖范围内，
+  // 必须自己清一次调用记录，否则断言会看到前面用例遗留的调用。
+  beforeEach(() => {
+    mockSetCellValue.mockClear()
+    mockBgmLogn.mockClear()
+  })
+
+  it('同一 SID 多行 → COUNT 求和写入首行、其余行逆序删除', () => {
+    mockGetApp.mockReturnValue({ ActiveWorkbook: createMockWorkbook() })
+    mockGetLastRow.mockReturnValue(4)
+    // 3 行同 SID（对应数据行 2/3/4）
+    mockReadRangeValues.mockReturnValue([['dup-sid'], ['dup-sid'], ['dup-sid']])
+    mockGetCellValue.mockImplementation((_sheet: unknown, _row: unknown, col: unknown) => {
+      // COUNT 列（第 7 列）每行都是 2
+      if ((col as number) === 7) return '2'
+      return ''
+    })
+
+    const isResult = deduplicateSyncRecords()
+
+    expect(isResult).toBe(true)
+    // 2 + 2 + 2 = 6，写回首行第 7 列
+    expect(mockSetCellValue).toHaveBeenCalledWith(expect.anything(), 2, 7, 6)
+    expect(mockBgmLogn).toHaveBeenCalledWith('INFO', expect.stringContaining('去重完成'))
+  })
+
+  it('COUNT 为空/非数字时按 1 计入合计', () => {
+    mockGetApp.mockReturnValue({ ActiveWorkbook: createMockWorkbook() })
+    mockGetLastRow.mockReturnValue(3)
+    mockReadRangeValues.mockReturnValue([['dup-sid'], ['dup-sid']])
+    mockGetCellValue.mockReturnValue('')
+
+    expect(deduplicateSyncRecords()).toBe(true)
+
+    // 1 + 1 = 2
+    expect(mockSetCellValue).toHaveBeenCalledWith(expect.anything(), 2, 7, 2)
+  })
+
+  it('多组重复 SID → 每组各自合并', () => {
+    mockGetApp.mockReturnValue({ ActiveWorkbook: createMockWorkbook() })
+    mockGetLastRow.mockReturnValue(5)
+    mockReadRangeValues.mockReturnValue([['sid-a'], ['sid-a'], ['sid-b'], ['sid-b']])
+    mockGetCellValue.mockImplementation((_sheet: unknown, _row: unknown, col: unknown) => {
+      if ((col as number) === 7) return '3'
+      return ''
+    })
+
+    expect(deduplicateSyncRecords()).toBe(true)
+
+    // 组 A：首行 2，删 3；组 B：首行 4，删 5 → 各写回 6
+    expect(mockSetCellValue).toHaveBeenCalledWith(expect.anything(), 2, 7, 6)
+    expect(mockSetCellValue).toHaveBeenCalledWith(expect.anything(), 4, 7, 6)
+  })
+
+  it('SID 全为空字符串 → 不进入合并分支、不打去重日志', () => {
+    mockGetApp.mockReturnValue({ ActiveWorkbook: createMockWorkbook() })
+    mockGetLastRow.mockReturnValue(3)
+    mockReadRangeValues.mockReturnValue([[''], ['']])
+
+    expect(deduplicateSyncRecords()).toBe(true)
+
+    expect(mockSetCellValue).not.toHaveBeenCalled()
+    expect(mockBgmLogn).not.toHaveBeenCalledWith('INFO', expect.stringContaining('去重完成'))
+  })
+})

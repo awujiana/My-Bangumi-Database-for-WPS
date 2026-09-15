@@ -1287,3 +1287,94 @@ describe('findBangumiTargetSheetInWorkbook', () => {
     expect(result).toBeNull()
   })
 })
+
+// ========== 尾部分支补测（第十三轮） ==========
+
+describe('enrich-lock 尾部分支补测', () => {
+  it('工作簿 Name 读取抛错 → 该工作簿不产出选项，其余照常 (line 58)', () => {
+    setupBasicDom()
+    // FullName 可读（保证 getOpenWorkbooks 的 key 非空、工作簿不被去重丢弃），
+    // 但 Name 读取抛错 —— 列表里会保留它，只是拿不到名字。
+    const brokenWb = {
+      FullName: 'C:/broken.xlsx',
+      get Name(): string {
+        throw new Error('COM 已断开')
+      },
+      Index: 1,
+      Worksheets: { Count: 1, Item: () => createMockWorksheets(['Sheet1'])[0] },
+    }
+    // 注意 activeWbName 传 ''：getOpenWorkbooks 末尾会把 app.ActiveWorkbook 兜底纳入列表，
+    // 若给了活动工作簿，它会额外产出一个选项、干扰「只有默认项」的断言。
+    setMockApp(createMockApp([brokenWb as unknown as MockWorkbook], ''))
+
+    expect(() => {
+      refreshEnrichWorkbooks('workbookSelect')
+    }).not.toThrow()
+
+    const select = document.getElementById('workbookSelect') as HTMLSelectElement
+    // 只有默认的「请选择」一项，抛错的工作簿被跳过
+    expect(select.options.length).toBe(1)
+    expect(select.options[0]?.value).toBe('')
+  })
+
+  it('活动工作簿不在列表内 → 下拉框清空选中 (line 80)', () => {
+    setupBasicDom()
+    const workbooks = createMockWorkbooks([
+      { Name: 'wb1.xlsx', Sheets: ['Sheet1'] },
+      { Name: 'wb2.xlsx', Sheets: ['Data'] },
+    ])
+    // activeWbName 留空：既让 hasSelection 恒为 false，也避免 getOpenWorkbooks
+    // 把活动工作簿兜底纳入列表（那会让「活动工作簿不在列表内」这个前提不成立）。
+    setMockApp(createMockApp(workbooks, ''))
+
+    refreshEnrichWorkbooks('workbookSelect')
+
+    const select = document.getElementById('workbookSelect') as HTMLSelectElement
+    expect(select.value).toBe('')
+    expect(select.options.length).toBe(3)
+  })
+
+  it('refreshEnrichSheets 拿不到 Workbooks → 记警告并早退 (lines 104-105)', () => {
+    setupBasicDom()
+    setMockApp(null)
+
+    expect(() => {
+      refreshEnrichSheets('wb1.xlsx', 'sheetSelect', 'workbookSelect')
+    }).not.toThrow()
+
+    expect(mockReferences.mockBgmLog).toHaveBeenCalledWith(
+      'WARN',
+      expect.stringContaining('refreshEnrichSheets: 无法获取 Workbooks'),
+    )
+  })
+
+  it('唯一候选但工作簿名为空 → 锁定失败，降级为 preselected (line 362)', () => {
+    setupBasicDom()
+    setupScanMocks()
+    const sheet = createScanSheet('bangumi 追踪', {
+      headerRow: 1,
+      headerKeyCount: 3,
+      dataCount: 3,
+    })
+    // Name 为空、FullName 非空：工作簿仍能被 getOpenWorkbooks 收录并扫出候选，
+    // 但候选的 workbookName 是 ''，lockEnrichWorkbookByName('') 会被
+    // findWorkbookByName 的 `if (!name) return null` 挡下 → 返回 false。
+    const wb = {
+      Name: '',
+      FullName: 'C:/wb1.xlsx',
+      Index: 1,
+      Worksheets: { Count: 1, Item: () => sheet },
+    }
+    setMockApp(createMockApp([wb], '', createMockPluginStorage()))
+
+    const result = autoSelectEnrichTarget(
+      'workbookSelect',
+      'sheetSelect',
+      'lockSheetBtn',
+      'lockStatus',
+    )
+
+    expect(result).toBe('preselected')
+    expect(sharedBGM.sheet.isLocked).toBe(false)
+  })
+})

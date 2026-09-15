@@ -229,6 +229,10 @@ import {
   GithubSyncSource,
 } from '../ts/sync/github-sync.js'
 
+// ui-bridge 未被 mock：同步记录落盘失败时的 toast 走真实模块，
+// 由用例通过 registerNotifyApi 注入探针来观测（getNotifyApi 只在 line 1586 用到）。
+import { registerNotifyApi } from '../ts/core/ui-bridge.js'
+
 // Mock 依赖模块
 vi.mock('../ts/core/constants.js', () => ({
   LOG_LEVELS: { INFO: 'INFO', WARN: 'WARN', ERROR: 'ERROR' },
@@ -5144,5 +5148,393 @@ describe('applyDiffToSheet 写入阶段取消 (P2-7)', () => {
 
     expect(result.deleted).toBe(1)
     expect(result.skipped).toBe(2)
+  })
+})
+
+// ========== 第 17 批（P2-4）：github-sync.ts 残留分支 ==========
+
+/**
+ * 构造「读旧值正常、整行写回抛错」的 Range mock。
+ *
+ * `batchUpdateRows` 走整行 `Range.Value2` 快路径时，旧值读取（line 1003）与写回
+ * （`writeRowValuesWithUndo` 里 `targetRange.Value2 = finalValues`）用的是同一个 Range
+ * 对象。这里 getter 返回二维数组让 `oldArray` 有值，setter 抛错把控制流赶进
+ * line 1058 的外层 catch（回退逐字段写入）。
+ */
+function asThrowingRowRangeMock(throwMessage: string): MockRange {
+  return asRangeMock((address: string) => {
+    if (!address.includes(':')) {
+      return { Value2: '', Text: '', Interior: { Color: 0 }, Font: { Bold: false } }
+    }
+    return {
+      get Value2(): string[][] {
+        return [['']]
+      },
+      set Value2(_value: string[][]) {
+        throw new Error(throwMessage)
+      },
+      Interior: { Color: 0 },
+    }
+  })
+}
+
+describe('applyDiffToSheet 批量更新回退 / 写入阶段取消 / 同步记录告警', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mockIsGithubConfigComplete.mockReturnValue(true)
+    // 必须同时给出「别名」列：非 writeAll 的更新把名称追加到「别名」列（safeAppend），
+    // 只有「名称」列时 safeAppend 会在 `if (!col) return` 处直接返回，
+    // 于是 attempted=false → 走「没有写入需要尝试 → 视为成功」，测不到回退分支
+    mockGetColumnMap.mockReturnValue(
+      new Map<string, number>([
+        ['名称', 2],
+        ['别名', 3],
+      ]),
+    )
+    mockFindHeaderRow.mockReturnValue(1)
+    mockGetLastRow.mockReturnValue(3)
+    mockGetCellValue.mockReturnValue('')
+    mockTagsToString.mockReturnValue('')
+    mockBeginUndoSession.mockImplementation(() => {})
+    mockAddSyncRecords.mockReturnValue(true)
+    mockGetApp.mockReturnValue({
+      ScreenUpdating: true,
+      Calculation: 1,
+      Wait: vi.fn(),
+      DoEvents: vi.fn(),
+    })
+  })
+
+  it('读取旧值失败且没有任何可写值 → 直接返回 0（line 727）', async () => {
+    const mockWs = createMockWorksheet()
+    // 整行 Range 抛错 → range 保持 null，走 line 724 之后的「回退逐字段写入」分支
+    mockWs.Range = asRangeMock(() => {
+      throw new Error('Range 访问失败')
+    })
+    mockGetDataSheet.mockReturnValue(mockWs)
+
+    const diffs: GithubSyncDiff[] = [
+      {
+        kind: 'update',
+        sid: 'empty-name',
+        // name 缺失 → 解析值为空串，且非强制覆盖 → 整行没有要写的值
+        remote: { sid: 'empty-name' },
+        localRow: 2,
+        changedFields: ['名称'],
+      },
+    ]
+
+    const result = await applyDiffToSheet(diffs, 'add-update')
+
+    expect(result.updated).toBe(0)
+    // batchUpdateRows 返回 0，调用方按 `batch.length - batchUpdated` 计入 failed
+    expect(result.failed).toBe(1)
+    expect(mockSetCellValue).not.toHaveBeenCalled()
+    expect(mockBgmLognnn).toHaveBeenCalledWith(
+      'WARN',
+      expect.stringContaining('读取旧值失败，使用空值'),
+    )
+  })
+
+  it('读取旧值失败且逐字段写入全部失败 → 记 ERROR 并计失败（lines 756-757）', async () => {
+    const mockWs = createMockWorksheet()
+    mockWs.Range = asRangeMock(() => {
+      throw new Error('Range 访问失败')
+    })
+    mockGetDataSheet.mockReturnValue(mockWs)
+    // setCellValue 返回 false（不抛错）→ attempted=true / success=false
+    mockSetCellValue.mockReturnValue(false)
+
+    const diffs: GithubSyncDiff[] = [
+      {
+        kind: 'update',
+        sid: 'n1',
+        remote: { sid: 'n1', name: '新名字' },
+        localRow: 2,
+        changedFields: ['名称'],
+      },
+    ]
+
+    const result = await applyDiffToSheet(diffs, 'add-update')
+
+    expect(result.updated).toBe(0)
+    expect(result.failed).toBe(1)
+    expect(mockSetCellValue).toHaveBeenCalled()
+    expect(mockBgmLognnn).toHaveBeenCalledWith(
+      'ERROR',
+      expect.stringContaining('回退逐字段写入全部失败'),
+    )
+  })
+
+  it('整行写入抛错后回退逐字段写入成功 → 计入 updated（lines 1059-1076）', async () => {
+    const mockWs = createMockWorksheet()
+    mockWs.Range = asThrowingRowRangeMock('整行写入被拒绝')
+    mockGetDataSheet.mockReturnValue(mockWs)
+    mockSetCellValue.mockReturnValue(true)
+
+    const diffs: GithubSyncDiff[] = [
+      {
+        kind: 'update',
+        sid: 'n1',
+        remote: { sid: 'n1', name: '新名字' },
+        localRow: 2,
+        changedFields: ['名称'],
+      },
+    ]
+
+    const result = await applyDiffToSheet(diffs, 'add-update')
+
+    expect(result.updated).toBe(1)
+    expect(result.failed).toBe(0)
+    expect(mockBgmLognnn).toHaveBeenCalledWith(
+      'WARN',
+      expect.stringContaining('写入失败，回退到逐字段写入: 整行写入被拒绝'),
+    )
+    // 回退路径成功时同步记录写明「回退逐字段写入」的 message 由 records 承载，
+    // 这里通过 setCellValue 确实被调用来证明走了逐字段写入
+    expect(mockSetCellValue).toHaveBeenCalled()
+  })
+
+  it('整行写入抛错且逐字段写入也全部失败 → 计失败（lines 1089-1103）', async () => {
+    const mockWs = createMockWorksheet()
+    mockWs.Range = asThrowingRowRangeMock('整行写入被拒绝')
+    mockGetDataSheet.mockReturnValue(mockWs)
+    mockSetCellValue.mockReturnValue(false)
+
+    const diffs: GithubSyncDiff[] = [
+      {
+        kind: 'update',
+        sid: 'n1',
+        remote: { sid: 'n1', name: '新名字' },
+        localRow: 2,
+        changedFields: ['名称'],
+      },
+    ]
+
+    const result = await applyDiffToSheet(diffs, 'add-update')
+
+    expect(result.updated).toBe(0)
+    expect(result.failed).toBe(1)
+    expect(mockSetCellValue).toHaveBeenCalled()
+  })
+
+  it('整行写入抛错且逐字段写入再抛错 → 记 ERROR（lines 1105-1118）', async () => {
+    const mockWs = createMockWorksheet()
+    mockWs.Range = asThrowingRowRangeMock('整行写入被拒绝')
+    mockGetDataSheet.mockReturnValue(mockWs)
+    mockSetCellValue.mockImplementation(() => {
+      throw new Error('单格写入也失败')
+    })
+
+    const diffs: GithubSyncDiff[] = [
+      {
+        kind: 'update',
+        sid: 'n1',
+        remote: { sid: 'n1', name: '新名字' },
+        localRow: 2,
+        changedFields: ['名称'],
+      },
+    ]
+
+    const result = await applyDiffToSheet(diffs, 'add-update')
+
+    expect(result.updated).toBe(0)
+    expect(result.failed).toBe(1)
+    expect(mockBgmLognnn).toHaveBeenCalledWith(
+      'ERROR',
+      expect.stringContaining('逐字段写入也失败: 单格写入也失败'),
+    )
+  })
+
+  it('读取旧值失败后逐字段写入成功 → 计入 updated（lines 734-752）', async () => {
+    const mockWs = createMockWorksheet()
+    mockWs.Range = asRangeMock(() => {
+      throw new Error('Range 访问失败')
+    })
+    mockGetDataSheet.mockReturnValue(mockWs)
+    mockSetCellValue.mockReturnValue(true)
+
+    const diffs: GithubSyncDiff[] = [
+      {
+        kind: 'update',
+        sid: 'n1',
+        remote: { sid: 'n1', name: '新名字' },
+        localRow: 2,
+        changedFields: ['名称'],
+      },
+    ]
+
+    const result = await applyDiffToSheet(diffs, 'add-update')
+
+    expect(result.updated).toBe(1)
+    expect(result.failed).toBe(0)
+    // 非 writeAll 的更新把名称追加到「别名」列（colMap 里 别名=3）
+    expect(mockSetCellValue).toHaveBeenCalledWith(mockWs, 2, 3, '新名字')
+  })
+
+  it('更新模式下标签与本地值合并后写入（lines 587-590）', async () => {
+    const mockWs = createMockWorksheet()
+    mockWs.Range = asRangeMock(() => {
+      throw new Error('Range 访问失败')
+    })
+    mockGetDataSheet.mockReturnValue(mockWs)
+    mockGetColumnMap.mockReturnValue(new Map<string, number>([['标签/分级', 5]]))
+    mockGetCellValue.mockReturnValue('本地标签')
+    mockTagsToString.mockReturnValue('远程标签')
+    mockSetCellValue.mockReturnValue(true)
+
+    const diffs: GithubSyncDiff[] = [
+      {
+        kind: 'update',
+        sid: 'n1',
+        remote: { sid: 'n1', meta_tags: ['远程标签'] },
+        localRow: 2,
+        changedFields: ['标签/分级'],
+      },
+    ]
+
+    const result = await applyDiffToSheet(diffs, 'add-update')
+
+    expect(result.updated).toBe(1)
+    // 合并策略：本地值 + ` | ` + 远程值
+    expect(mockSetCellValue).toHaveBeenCalledWith(mockWs, 2, 5, '本地标签 | 远程标签')
+  })
+
+  it('writeAll 模式下标签直接覆盖写入（lines 583-584）', async () => {
+    const mockWs = createMockWorksheet()
+    mockWs.Range = asRangeMock(() => {
+      throw new Error('Range 访问失败')
+    })
+    mockGetDataSheet.mockReturnValue(mockWs)
+    mockGetColumnMap.mockReturnValue(
+      new Map<string, number>([
+        ['Bangumi_URL', 1],
+        ['标签/分级', 5],
+      ]),
+    )
+    mockTagsToString.mockReturnValue('远程标签')
+    mockSetCellValue.mockReturnValue(true)
+
+    const diffs: GithubSyncDiff[] = [
+      {
+        kind: 'update',
+        sid: 'n1',
+        remote: { sid: 'n1', meta_tags: ['远程标签'] },
+        localRow: 2,
+        changedFields: ['*'],
+      },
+    ]
+
+    const result = await applyDiffToSheet(diffs, 'add-update')
+
+    expect(result.updated).toBe(1)
+    // writeAll 不做合并，远程标签直接落列
+    expect(mockSetCellValue).toHaveBeenCalledWith(mockWs, 2, 5, '远程标签')
+  })
+
+  it('新增批次开始前被取消 → 未处理的新增计入 skipped（lines 1250-1251）', async () => {
+    const mockWs = createMockWorksheet()
+    mockGetDataSheet.mockReturnValue(mockWs)
+
+    const controller = new AbortController()
+    // beginUndoSession 在 line 1197 的「下载阶段已取消」提前返回之后、
+    // 新增循环（line 1247）之前调用 —— 正好把 signal 卡在两者之间
+    mockBeginUndoSession.mockImplementation(() => {
+      controller.abort()
+    })
+
+    const diffs: GithubSyncDiff[] = [
+      {
+        kind: 'add',
+        sid: 's1',
+        remote: { sid: 's1', name: '条目一', date: '2024-01-01' },
+        changedFields: ['*'],
+      },
+      {
+        kind: 'add',
+        sid: 's2',
+        remote: { sid: 's2', name: '条目二', date: '2024-01-02' },
+        changedFields: ['*'],
+      },
+    ]
+
+    const result = await applyDiffToSheet(diffs, 'add-update', undefined, 'test', controller.signal)
+
+    expect(result.added).toBe(0)
+    expect(result.skipped).toBe(2)
+  })
+
+  it('新增写完后被取消 → 未处理的更新计入 skipped（lines 1396-1397）', async () => {
+    const mockWs = createMockWorksheet()
+    mockGetDataSheet.mockReturnValue(mockWs)
+    mockSetCellValue.mockReturnValue(true)
+
+    const controller = new AbortController()
+    // 注意：line 1191 会先发一次「准备写入」进度，不能在首次回调就 abort，
+    // 否则会被 line 1197 的提前返回拦下，走不到更新循环
+    const onProgress = vi.fn((_current: number, _total: number, message: string) => {
+      if (message.startsWith('新增')) controller.abort()
+    })
+
+    const diffs: GithubSyncDiff[] = [
+      {
+        kind: 'add',
+        sid: 's1',
+        remote: { sid: 's1', name: '条目一', date: '2024-01-01' },
+        changedFields: ['*'],
+      },
+      {
+        kind: 'update',
+        sid: 'u1',
+        remote: { sid: 'u1', name: '改名' },
+        localRow: 2,
+        changedFields: ['名称'],
+      },
+    ]
+
+    const result = await applyDiffToSheet(
+      diffs,
+      'add-update',
+      onProgress,
+      'test',
+      controller.signal,
+    )
+
+    expect(result.added).toBe(1)
+    expect(result.updated).toBe(0)
+    expect(result.skipped).toBe(1)
+  })
+
+  it('同步记录落盘失败 → 弹出错误 toast 提醒用户（line 1586）', async () => {
+    const mockWs = createMockWorksheet()
+    mockGetDataSheet.mockReturnValue(mockWs)
+    mockSetCellValue.mockReturnValue(true)
+    // 记录写入失败：工作簿已改但同步记录没落盘 → 必须让用户看见
+    mockAddSyncRecords.mockReturnValue(false)
+
+    const toast = vi.fn()
+    registerNotifyApi({
+      alert: vi.fn(),
+      confirm: vi.fn(),
+      error: vi.fn(),
+      success: vi.fn(),
+      toast,
+      input: vi.fn(),
+    })
+
+    const diffs: GithubSyncDiff[] = [
+      {
+        kind: 'add',
+        sid: 's1',
+        remote: { sid: 's1', name: '条目一', date: '2024-01-01' },
+        changedFields: ['*'],
+      },
+    ]
+
+    const result = await applyDiffToSheet(diffs, 'add-update')
+
+    expect(result.added).toBe(1)
+    expect(mockAddSyncRecords).toHaveBeenCalled()
+    expect(toast).toHaveBeenCalledWith(expect.stringContaining('同步记录写入失败'), 'error')
   })
 })

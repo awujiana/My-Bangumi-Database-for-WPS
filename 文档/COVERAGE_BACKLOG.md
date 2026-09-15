@@ -13,13 +13,14 @@
 > **基线刷新**：2026-09-15（第十一轮）—— 清单第 13 批（中-DOM/UI 批量）：`ts/ui/handlers/path-controls.ts` 18.51% → **100% lines / 100% funcs**（22 → 0）、`ts/panel/enrich-result-view.ts` 0% → **100% 四项全满**（20 → 0）、`ts/ui/handlers/sheet.ts` 0% → **100% lines / 100% funcs / 100% stmts**（24 → 0）；新增 3 个测试文件 / 25 条；`npm run gate` 七关全绿
 > **基线刷新**：2026-09-15（第十二轮）—— 清单**第 16 批（P0 五文件速赢）+ 第 14 批（P1-5/6/9）一次收口**：`tools/config.ts` / `tools/logger.ts` / `tools/sanitize.ts` / `tools/util/cell.ts` / `core/error-handler.ts` 五个纯逻辑文件 **100% lines**（48 → 0），`panel/clean-engine.ts`（24 → 0）/ `ui/handlers/index.ts`（22 → 0）/ `ui/handlers/action-handlers.ts`（14 → 0）也全部 **100% lines**；8 个文件合计吃掉 **109 行**；新增 `tests/error-handler.test.ts`，其余 7 个文件就地扩写（+82 条）；`npm run gate` 七关全绿
 > **基线刷新**：2026-09-15（第十三轮）—— 清单**第 15 批（P1 其余 7 文件）一次收口**：`panel/enrich-page.ts`（78 → 0，另建 `tests/enrich-page-watch.test.ts` 隔离模块级轮询状态）、`panel/panel-page.ts`（78 → 0）、`ui/handlers/github-settings.ts`（58 → 0）、`ui/message.ts`（32 → 0）、`ui/github-config-dialog.ts`（19 → 0）、`panel/clean-bootstrap.ts`（17 → 0）、`ui/handlers/module-order.ts`（6 → 0），**7 个文件全部 100% lines，合计 288 行**；顺带修掉 `ui/github-config-dialog.ts` 里一处**属性注入漏洞**（自建 `escapeHtml` 不转义引号却拼进 `title="..."`，改用 `tools/string-utilities-pure.ts` 的规范实现，因此该文件可执行行 19 → 16）；新增 4 个测试文件 / 116 条；`npm run gate` 七关全绿
-> **测试**：**4115 条 / 125 文件，全绿**
-> **全项目覆盖率**：**96.68% stmts / 87.57% branch / 97.19% funcs / 97.45% lines**（较首次生成 **+50.63 个点**）
-> **可执行行数**：13408，已覆盖 13067，**未覆盖 341**
-> **换算**：全项目**每提升 1 个百分点 ≈ 134 行**（= 13410 / 100）
+> **基线刷新**：2026-09-15（第十四轮）—— 清单**第 17 批（P2 七个难-COM/网络文件）一次收口**：`sync/exceltobangumi/index.ts`（137 → 0，顺带把 `createFieldGetter` 批量缓存、增量指纹跳过、最小请求间隔节流、`jsonBody` 解析降级、无法提取 Subject ID、`visibleCells.Areas` 缺失六类分支逐条打通）、`sync/workbook-auto-detect.ts`（69 → 0）、`sync/exceltobangumi/chapter-marker.ts`（40 → 0）、`sync/github-sync.ts`（26 → 0）、`sync/sync-record.ts`（13 → 0）、`sync/enrich-lock.ts`（5 → 0）、`sync/github-sync-diff.ts`（5 → 0），**7 个文件全部 100% lines，合计 295 行**；新增 `tests/chapter-marker.test.ts`（15 条）、`tests/workbook-auto-detect-scan.test.ts`（35 条），其余 5 个文件就地扩写，合计 **+111 条 / +2 文件**；`npm run gate` 七关全绿
+> **测试**：**4226 条 / 127 文件，全绿**
+> **全项目覆盖率**：**98.86% stmts / 89.80% branch / 99.06% funcs / 99.65% lines**（较首次生成 **+52.83 个点**）
+> **可执行行数**：13408，已覆盖 13362，**未覆盖 46**
+> **换算**：全项目**每提升 1 个百分点 ≈ 134 行**（= 13408 / 100）
 >
 > 注：第二轮涨幅主体是 §三 第 3、4 批 —— `ribbon-service`、`ui/handlers/sync`、`clean-page`、`scraping`、`sheet-cleaning`、`shell-nav` 等
-> 由 0~30% 补到 88~100%，未覆盖行 **5118 → 3212（−1906 行）**；第三轮（第 5 批）**3212 → 2811（−401 行）**；第四轮（第 6 批）**2811 → 2808（−3 行）**；第五轮（第 7 批）**2808 → 2467（−341 行）**；第六轮（第 8 批）**2467 → 1976（−491 行）**；第七轮（第 9 批）**1976 → 1505（−471 行）**；第八轮（第 10 批）**1505 → 1134（−371 行）**；第九轮 **1134 → 911（−223 行）**；第十轮（第 12 批）**911 → 801（−110 行）**；第十一轮（第 13 批）**801 → 735（−66 行）**；第十二轮（P0 + 第 14 批）**735 → 626（−109 行）**；第十三轮（第 15 批）**626 → 341（−285 行）**。
+> 由 0~30% 补到 88~100%，未覆盖行 **5118 → 3212（−1906 行）**；第三轮（第 5 批）**3212 → 2811（−401 行）**；第四轮（第 6 批）**2811 → 2808（−3 行）**；第五轮（第 7 批）**2808 → 2467（−341 行）**；第六轮（第 8 批）**2467 → 1976（−491 行）**；第七轮（第 9 批）**1976 → 1505（−471 行）**；第八轮（第 10 批）**1505 → 1134（−371 行）**；第九轮 **1134 → 911（−223 行）**；第十轮（第 12 批）**911 → 801（−110 行）**；第十一轮（第 13 批）**801 → 735（−66 行）**；第十二轮（P0 + 第 14 批）**735 → 626（−109 行）**；第十三轮（第 15 批）**626 → 341（−285 行）**；第十四轮（第 17 批）**341 → 46（−295 行，与台账 295 行精确吻合）**。
 > **关键结论（累积）**：清单前列的「大文件 / COM 模块」**都没有走「先拆后测」**——依赖收敛到单一 barrel、依赖宿主对象、或依赖 ≤3 个薄封装的，就地测即可，
 > 断言打到真实 state 变迁 / 真实写盘调用 / 真实 DOM 写入，**不存在假覆盖**（判据见 `.workbuddy/memory/REF-testing.md`）。
 
@@ -67,16 +68,22 @@ node scripts/calc-coverage-lines.mjs panel/clean-engine.ts   # 逐行定位（�
 
 ## 二、清单（按未覆盖行数排序）
 
-| 未覆盖 | 全补完提升 | 当前行覆盖 | 难度 | 文件 |
-| -----: | ---------: | ---------: | ---- | ---- |
-| 137 | +1.02% | 74.62% | 难-COM/网络 | `ts/sync/exceltobangumi/index.ts` |
-| 69 | +0.51% | 59.17% | 难-COM/网络 | `ts/sync/workbook-auto-detect.ts` |
-| 40 | +0.30% | 0% | 难-COM/网络 | `ts/sync/exceltobangumi/chapter-marker.ts` |
-| 26 | +0.19% | 96% | 难-COM/网络 | `ts/sync/github-sync.ts` |
-| 13 | +0.10% | 96.58% | 难-COM/网络 | `ts/sync/sync-record.ts` |
-| 5 | +0.04% | 96.75% | 难-COM/网络 | `ts/sync/enrich-lock.ts` |
-| 5 | +0.04% | 96.73% | 难-COM/网络 | `ts/sync/github-sync-diff.ts` |
+**✅ 第十四轮后清单已清空** —— 原 22 个待补测文件全部收口，下表保留收口时的口径备查：
 
+| 未覆盖 | 全补完提升 | 当前行覆盖 | 难度 | 文件 | 收口结果 |
+| -----: | ---------: | ---------: | ---- | ---- | ---- |
+| ~~137~~ **0** | +1.02% | **100%** | 难-COM/网络 | `ts/sync/exceltobangumi/index.ts` | ✅ 第 17 批 |
+| ~~69~~ **0** | +0.51% | **100%** | 难-COM/网络 | `ts/sync/workbook-auto-detect.ts` | ✅ 第 17 批 |
+| ~~40~~ **0** | +0.30% | **100%** | 难-COM/网络 | `ts/sync/exceltobangumi/chapter-marker.ts` | ✅ 第 17 批 |
+| ~~26~~ **0** | +0.19% | **100%** | 难-COM/网络 | `ts/sync/github-sync.ts` | ✅ 第 17 批 |
+| ~~13~~ **0** | +0.10% | **100%** | 难-COM/网络 | `ts/sync/sync-record.ts` | ✅ 第 17 批 |
+| ~~5~~ **0** | +0.04% | **100%** | 难-COM/网络 | `ts/sync/enrich-lock.ts` | ✅ 第 17 批 |
+| ~~5~~ **0** | +0.04% | **100%** | 难-COM/网络 | `ts/sync/github-sync-diff.ts` | ✅ 第 17 批 |
+
+> 📌 **第十四轮后清单形态**：`ts/panel`、`ts/ui`、`ts/tools`、`ts/core`、`ts/sync` 五档**均无成规模待补文件**。
+> 全项目剩余 **46 行**全部是长尾零头（单文件 ≤3 行，合计摊平在 ~30 个文件里，收益 ≤ +0.02%/文件），
+> **再往下做只能靠逐文件清零头，边际收益已接近 0**。
+>
 > 📌 **第十三轮后清单形态变了**：上表已无 `ts/panel` / `ts/ui` 文件 —— 中-DOM/UI 档**全部收口**（仅剩 `enrich-preview-cell` 3 行、
 > `ui/preview` 3 行这类零头）。剩下的 341 行里，前 5 个文件就占 285 行（84%），且**全是难-COM/网络**；
 > 其余 30 个文件每只差 1~3 行，合计 56 行（长尾已摊平，单文件收益 ≤ +0.02%）。
@@ -290,6 +297,40 @@ node scripts/calc-coverage-lines.mjs panel/clean-engine.ts   # 逐行定位（�
       ① **`npx eslint <dir> --fix` 会删掉它判定为「未使用」的 `eslint-disable-next-line` 注释** —— 本轮对 `tests/` 整目录跑 `--fix`，把 `github-sync-core.test.ts` / `sheet.test.ts` / `utility.test.ts` 里三条 `// eslint-disable-next-line unicorn/no-unused-properties -- 预留测试选项…` 抹掉了，于是三个**与本批无关**的文件凭空冒出 7 个 error（`git checkout --` 已还原）。**结论：`--fix` 只对本轮改动的那几个文件跑，别扫目录。**
       ② 只给 `--coverage.reporter=json` 时 `coverage-summary.json` **不会重写**，`calc-coverage-lines.mjs` 里 `summary lines` 那一行会读到上一次的陈旧值（`uncovered lines` 仍准确）—— 两个 reporter 都要给。
       ③ 本批 lint 又撞到 `unicorn/consistent-boolean-name`（`confirmed` → `isConfirmed`、`writeShouldFail` → `isWriteShouldFail`）、`unicorn/no-non-function-verb-prefix`（`removeButtons` / `setDataCalls` 这类以动词开头的**数组变量**要改名）、`unicorn/no-return-array-push`（`() => arr.push(x)` 隐式返回 push 的返回值，要改成块体）、`@typescript-eslint/no-unnecessary-condition`（参数已声明 `{ name?: string }` 时 `detector?.name` 的可选链多余）。
+
+**第 17 批 · P2 七个难-COM/网络文件（2026-09-15 第十四轮，已完成）**
+
+用户指令：`完成待办清单的全部`（`文档/待办任务清单.md`）。本批把 §三 剩下的 7 个「难-COM/网络」文件**一次吃完**，全部 **100% lines**，实测 **341 → 46（−295 行，与台账 295 行精确吻合）**，全项目 lines **97.45% → 99.65%**。
+
+**先扫依赖的结论（延续第 8/10 批的证伪）**：7 个文件**没有一个**是 `entry/**` / `*-bootstrap.ts` 那类真 COM 装配脚本 —— 依赖全部收敛到 1~3 个薄叶子（`tools/util/index.js` barrel、`sync/sync-record.js`、`exceltobangumi/{api,chapter-marker}.js`、`tools/locked-sheet.js`、`sync/enrich-engine.js`），因此**全部就地测**，无一项需要降级为人工验收。
+
+- **`ts/sync/exceltobangumi/index.ts`**：74.62% → **100% lines**（137 → 0）。本批最大的一块（1556 行）。扩写既有 `tests/exceltobangumi.selection.test.ts`（39 → **70 条**，未新建文件），新增两个 describe：`executeSelectedSync 执行链路`（15 条，走 `syncSelectedRows` 选区链路）与 `批量链路补测`（14 条，走 `SyncToBangumiAsync` 批量链路）。剩下 6 类零散分支逐条打通：
+  - **`createFieldGetter` 批量缓存命中**（167-169）：`mockReadRangeValues` 返回非空二维数组（下标 i 对应第 i+1 列），同时 `mockGetCellValue` 一律返回空串 —— 若走了逐格回退就必然拿不到 URL、产生不了任务，反过来证明命中的是缓存。
+  - **增量指纹一致跳过**（440）：`getAllSyncRecords` 给 `{ sid: '1', fingerprint: 'fp-1' }`、`calcFingerprint` 恒返 `'fp-1'`、URL 取 `subject/1` → `storedFingerprint === currentFingerprint` 成立，整批 `skip` 且不发请求。
+  - **最小请求间隔节流**（627）：造 **7 个可见行 → 6 个任务**，`DEFAULT_CONCURRENCY = 5` → 恰好两批；再用 `vi.spyOn(Date, 'now').mockReturnValue(5_000_000)` 让第二批 `elapsed === 0`，`delay(100)` 必然被调用（try/finally 里 `mockRestore()`）。顺带把 `delay: vi.fn()`（匿名）改成 hoisted 命名 mock `mockDelay` 才能断言。
+  - **`jsonBody` 解析失败降级**（1107）：`buildJsonPayload` 的出口是 `JSON.stringify(payload)`，**产出永远是合法 JSON**，所以只能 `vi.spyOn(JSON, 'parse').mockImplementation(() => { throw new SyntaxError('请求体损坏') })`（沿用 `tests/gist-sync.test.ts:686` 的先例 + try/finally 还原）；断言 `watchType` 回落为 0 → 走「非看过/在看 → 跳过章节标记」。
+  - **无法提取 Subject ID**（1154-1159）：用 `'123456789'`（9 位纯数字）—— `isBangumiUrl` 的 `/^\d+$/` 放行、`extractSubjectId` 的 `/^\d{1,8}$/` 拒绝，这是**唯一**能同时满足「过了 URL 校验」又「拿不到 SID」的输入形态。
+  - **`visibleCells.Areas` 缺失**（1418）：给 `createVisibleCells` / `createWorksheet` 加 `missingAreas` 开关（`Areas` getter 返回 `undefined`，区别于原有的 `throwOnAreas`）→ 走 `areas.push(visibleCells)` 的单区间降级，且**不**触发 `handleError`。
+  - **顺带清掉上一轮遗留的 3 类 lint 错误**（该文件上一轮只跑了 vitest、没跑 eslint）：`prefer-destructuring`（`const cellValue = options.cellValue` → `const { cellValue } = options`）、两处 `unicorn/consistent-function-scoping`（`fullCellValue` / `batchCellValue` 提到模块作用域，与既有 `setupExecution` / `progressHandlers` 同层）、两处 `@typescript-eslint/no-unsafe-assignment`（`expect.objectContaining({ context: expect.stringContaining('…') })` 里嵌套 matcher 返回 `any` → 改成精确字符串 `'SyncToBangumiAsync:preprocess'` / `'SyncToBangumiAsync:createSheet'`，断言反而更强）。
+- **`ts/sync/workbook-auto-detect.ts`**：59.17% → **100% lines**（69 → 0）。新建 `tests/workbook-auto-detect-scan.test.ts`（**35 条**）+ 扩写 `tests/workbook-auto-detect.test.ts`（+4 条 `monthLabelFromWorkbookName`）。三个依赖全 mock（`tools/util/index.js` 的 `getApp` 改为读 `Reflect.get(globalThis, 'Application')`、`tools/locked-sheet.js`、`sync/enrich-engine.js`）。
+  - **模块级一次性标志**：`isEventsRegistered` 只在首次 `initWorkbookAutoDetection` 时置位 → 每条用例必须 `vi.resetModules()` + 动态 `import()` 取全新模块实例（顶层静态 import 在 reset 之后就是陈旧单例）。
+  - **踩坑**：断言持久化结果时误比较了**原始存储字符串**（`'["C:\\新番表.xlsx"]'`，反斜杠已被 JSON 转义）→ 4 条断言全红。改为统一通过 `autoDetect.loadDetectedPaths(...)` 取**解析后**的路径数组；「不重复记录」那条要把 storage 预置成已记录状态。
+  - **踩坑**：`unicorn/name-replacements` 会把 `mod` 判成需改写为 `module_` → 变量统一改名 `autoDetect`（44 处）；`unicorn/consistent-function-scoping` 要求把 `setupEvents` 提到模块作用域。
+- **`ts/sync/exceltobangumi/chapter-marker.ts`**：0% → **100% lines**（40 → 0）。新建 `tests/chapter-marker.test.ts`（**15 条**，`// @vitest-environment jsdom`，可编程 `FakeXhr` 类沿用 `exceltobangumi.api.test.ts` 的成员形状）。
+  - **本批最耗时的坑**：`markEpisodesComplete` **内部自己会调 `fetchEpisodeIds`**，而后者会创建**属于它自己的** `FakeXhr`。最初的 `primeEpisodeIds()` 辅助函数驱动的是**另一个** XHR（对应另一个 Promise），于是内部的 `await` 永不 settle → **5 条用例各 5000ms 超时**。修法是反过来：**先启动 `markEpisodesComplete`，再取 `latestXhr()` 驱动**（Promise executor 同步执行，函数返回时内部 XHR 必然已构造）→ 15 条用例 **18ms** 跑完。
+- **`ts/sync/github-sync.ts`**：96% → **100% lines**（26 → 0）。扩写 `tests/github-sync.test.ts`（165 → **168 条**），新增 `describe('applyDiffToSheet 批量更新回退 / 写入阶段取消 / 同步记录告警')` + 一个 `asThrowingRowRangeMock()` 模块级辅助（`Value2` setter 抛错、`get` 返回 `[['']]`）。
+  - **踩坑**：非 `writeAll` 的更新把远程**名称**追加到**「别名」列**（`safeAppend`），colMap 里只给「名称」时 `safeAppend` 会在 `if (!col) return` 处直接返回 → `attempted = false` → 走「没有写入需要尝试 → 视为成功」，**回退分支根本测不到**。新 describe 的 `beforeEach` 必须同时映射 `['名称', 2]` 与 `['别名', 3]`。（定位手段：`-t` 单跑通过 / 整文件失败 → 顺序依赖；再 `console.log` 探针打出真实 colMap 与 `result`。）
+  - **口径**：`batchUpdateRows` 返回 0 时调用方按 `batch.length - batchUpdated` 记失败，所以「无值可写」应断言 `updated 0 / failed 1`（不是 `failed 0`）。
+  - **`typecheck:tests` 是独立一关**：顺带修掉 `tests/github-sync-diff.test.ts` 两处 `SyncTimeFilter` 缺 `year` 的 `tsc` 报错 —— **vitest 跑得通、`tsc` 才报**，别只看 vitest。
+- **`ts/sync/sync-record.ts`**（96.58% → **100%**，13 → 0）/ **`ts/sync/enrich-lock.ts`**（96.75% → **100%**，5 → 0）/ **`ts/sync/github-sync-diff.ts`**（96.73% → **100%**，5 → 0）：就地扩写既有测试文件，复用既有假宿主，未新建基础设施。
+- **全项目**：97.45% → **99.65% lines**（未覆盖 341 → **46**，吃掉 **295 行**）；stmts 96.68% → **98.86%**、branch 87.57% → **89.80%**、funcs 97.19% → **99.06%**；测试 4115 → **4226 条 / 127 文件**。
+- **本轮新踩的坑（已写进 `REF-testing.md` / `REF-eslint-tests.md`）**：
+  ① **被测函数内部自建 XHR 时，「先 prime 再调用」是错的** —— 必须「先调用、再取 `latestXhr()` 驱动」，否则内部 `await` 永不 settle、表现为 5s 超时。
+  ② **非 `writeAll` 的更新写「别名」列而非「名称」列** —— colMap 少一列会**静默**走「成功」路径，测试看起来绿、实际没测到回退。
+  ③ `buildJsonPayload` 产出恒为合法 JSON → 想覆盖 `JSON.parse` 的 catch 只能 spy 内建 `JSON.parse`（配 try/finally 还原）。
+  ④ `isBangumiUrl`（`/^\d+$/`）与 `extractSubjectId`（`/^\d{1,8}$/`）**校验强度不一致**，9 位纯数字是唯一能命中「无法提取 Subject ID」的输入。
+  ⑤ **节流分支（`elapsed < MIN_REQUEST_INTERVAL`）必须造出第二个并发批次 + 固定 `Date.now`** —— 同一批内所有任务都在写 `lastRequestTime` **之前**就各自算完了 `elapsed`，只加任务数是打不到的。
+  ⑥ 模块级一次性标志（`isEventsRegistered`）→ `vi.resetModules()` + 动态 `import()`；`vi.hoisted` 里的命名 mock 必须**先声明再被 `vi.mock` 工厂引用**（漏了声明就是 `ReferenceError: xxx is not defined`，且报错指向被 mock 的模块而非测试文件）。
 
 ## 四、门禁现状
 

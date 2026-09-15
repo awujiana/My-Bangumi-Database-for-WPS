@@ -17,6 +17,7 @@ import { describe, it, expect, afterEach } from 'vitest'
 import {
   isAnimeSourceFilename,
   extractFileNameFromPath,
+  monthLabelFromWorkbookName,
   mergeCandidatePaths,
   scanMatchingWorkbooks,
   describeOpenWorkbooks,
@@ -75,6 +76,28 @@ describe('extractFileNameFromPath', () => {
 
   it('空字符串', () => {
     expect(extractFileNameFromPath('')).toBe('')
+  })
+})
+
+describe('monthLabelFromWorkbookName', () => {
+  it('4 位年份取后两位，月份去掉前导零', () => {
+    expect(monthLabelFromWorkbookName('2026年4月新番表 v2.13.xlsx')).toBe('26年4月')
+    expect(monthLabelFromWorkbookName('2026年04月新番表.xlsx')).toBe('26年4月')
+    expect(monthLabelFromWorkbookName('2026年12月新番表.xlsx')).toBe('26年12月')
+  })
+
+  it('已是 2 位年份时原样保留', () => {
+    expect(monthLabelFromWorkbookName('26年7月新番表.xlsx')).toBe('26年7月')
+  })
+
+  it('无「yy年m月」时回退为去掉扩展名的文件名', () => {
+    expect(monthLabelFromWorkbookName('新番表.xlsx')).toBe('新番表')
+    expect(monthLabelFromWorkbookName('2026年新番表.xlsx')).toBe('2026年新番表')
+  })
+
+  it('无扩展名时原样返回', () => {
+    expect(monthLabelFromWorkbookName('新番表')).toBe('新番表')
+    expect(monthLabelFromWorkbookName('')).toBe('')
   })
 })
 
