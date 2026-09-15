@@ -14,13 +14,14 @@
 > **基线刷新**：2026-09-15（第十二轮）—— 清单**第 16 批（P0 五文件速赢）+ 第 14 批（P1-5/6/9）一次收口**：`tools/config.ts` / `tools/logger.ts` / `tools/sanitize.ts` / `tools/util/cell.ts` / `core/error-handler.ts` 五个纯逻辑文件 **100% lines**（48 → 0），`panel/clean-engine.ts`（24 → 0）/ `ui/handlers/index.ts`（22 → 0）/ `ui/handlers/action-handlers.ts`（14 → 0）也全部 **100% lines**；8 个文件合计吃掉 **109 行**；新增 `tests/error-handler.test.ts`，其余 7 个文件就地扩写（+82 条）；`npm run gate` 七关全绿
 > **基线刷新**：2026-09-15（第十三轮）—— 清单**第 15 批（P1 其余 7 文件）一次收口**：`panel/enrich-page.ts`（78 → 0，另建 `tests/enrich-page-watch.test.ts` 隔离模块级轮询状态）、`panel/panel-page.ts`（78 → 0）、`ui/handlers/github-settings.ts`（58 → 0）、`ui/message.ts`（32 → 0）、`ui/github-config-dialog.ts`（19 → 0）、`panel/clean-bootstrap.ts`（17 → 0）、`ui/handlers/module-order.ts`（6 → 0），**7 个文件全部 100% lines，合计 288 行**；顺带修掉 `ui/github-config-dialog.ts` 里一处**属性注入漏洞**（自建 `escapeHtml` 不转义引号却拼进 `title="..."`，改用 `tools/string-utilities-pure.ts` 的规范实现，因此该文件可执行行 19 → 16）；新增 4 个测试文件 / 116 条；`npm run gate` 七关全绿
 > **基线刷新**：2026-09-15（第十四轮）—— 清单**第 17 批（P2 七个难-COM/网络文件）一次收口**：`sync/exceltobangumi/index.ts`（137 → 0，顺带把 `createFieldGetter` 批量缓存、增量指纹跳过、最小请求间隔节流、`jsonBody` 解析降级、无法提取 Subject ID、`visibleCells.Areas` 缺失六类分支逐条打通）、`sync/workbook-auto-detect.ts`（69 → 0）、`sync/exceltobangumi/chapter-marker.ts`（40 → 0）、`sync/github-sync.ts`（26 → 0）、`sync/sync-record.ts`（13 → 0）、`sync/enrich-lock.ts`（5 → 0）、`sync/github-sync-diff.ts`（5 → 0），**7 个文件全部 100% lines，合计 295 行**；新增 `tests/chapter-marker.test.ts`（15 条）、`tests/workbook-auto-detect-scan.test.ts`（35 条），其余 5 个文件就地扩写，合计 **+111 条 / +2 文件**；`npm run gate` 七关全绿
-> **测试**：**4226 条 / 127 文件，全绿**
-> **全项目覆盖率**：**98.86% stmts / 89.80% branch / 99.06% funcs / 99.65% lines**（较首次生成 **+52.83 个点**）
-> **可执行行数**：13408，已覆盖 13362，**未覆盖 46**
-> **换算**：全项目**每提升 1 个百分点 ≈ 134 行**（= 13408 / 100）
+> **基线刷新**：2026-09-15（第十五轮）—— 清单**已全部清空**，本轮做 §6 非补测待办 **O-2（锁表查找加索引快路径）**：`tools/locked-sheet.ts` 的 `getLockedSheet()` 从「按名线性扫描 N 张表」改为「先用 `BGM.sheet.lockedIndex` 单次探测 + 按名复核、不过再回落扫描」，命中路径 COM 往返 **N → 1**；同时把 `Worksheets.Count` 提出循环条件（原来每轮多一次 COM 往返）。**无新增未覆盖行**（154 → 183 可执行行，仍 100% lines），配套 `tests/enrich-lock.test.ts` **+5 条**（断言 `Worksheets.Item` 调用次数，即优化本身）；`npm run gate` 七关全绿
+> **测试**：**4231 条 / 127 文件，全绿**
+> **全项目覆盖率**：**98.86% stmts / 89.81% branch / 99.06% funcs / 99.65% lines**（较首次生成 **+52.83 个点**）
+> **可执行行数**：13411，已覆盖 13365，**未覆盖 46**
+> **换算**：全项目**每提升 1 个百分点 ≈ 134 行**（= 13411 / 100）
 >
 > 注：第二轮涨幅主体是 §三 第 3、4 批 —— `ribbon-service`、`ui/handlers/sync`、`clean-page`、`scraping`、`sheet-cleaning`、`shell-nav` 等
-> 由 0~30% 补到 88~100%，未覆盖行 **5118 → 3212（−1906 行）**；第三轮（第 5 批）**3212 → 2811（−401 行）**；第四轮（第 6 批）**2811 → 2808（−3 行）**；第五轮（第 7 批）**2808 → 2467（−341 行）**；第六轮（第 8 批）**2467 → 1976（−491 行）**；第七轮（第 9 批）**1976 → 1505（−471 行）**；第八轮（第 10 批）**1505 → 1134（−371 行）**；第九轮 **1134 → 911（−223 行）**；第十轮（第 12 批）**911 → 801（−110 行）**；第十一轮（第 13 批）**801 → 735（−66 行）**；第十二轮（P0 + 第 14 批）**735 → 626（−109 行）**；第十三轮（第 15 批）**626 → 341（−285 行）**；第十四轮（第 17 批）**341 → 46（−295 行，与台账 295 行精确吻合）**。
+> 由 0~30% 补到 88~100%，未覆盖行 **5118 → 3212（−1906 行）**；第三轮（第 5 批）**3212 → 2811（−401 行）**；第四轮（第 6 批）**2811 → 2808（−3 行）**；第五轮（第 7 批）**2808 → 2467（−341 行）**；第六轮（第 8 批）**2467 → 1976（−491 行）**；第七轮（第 9 批）**1976 → 1505（−471 行）**；第八轮（第 10 批）**1505 → 1134（−371 行）**；第九轮 **1134 → 911（−223 行）**；第十轮（第 12 批）**911 → 801（−110 行）**；第十一轮（第 13 批）**801 → 735（−66 行）**；第十二轮（P0 + 第 14 批）**735 → 626（−109 行）**；第十三轮（第 15 批）**626 → 341（−285 行）**；第十四轮（第 17 批）**341 → 46（−295 行，与台账 295 行精确吻合）**；第十五轮（O-2 收尾优化）**未覆盖行维持 46**（可执行行 13408 → 13411，lines 维持 99.65%）。
 > **关键结论（累积）**：清单前列的「大文件 / COM 模块」**都没有走「先拆后测」**——依赖收敛到单一 barrel、依赖宿主对象、或依赖 ≤3 个薄封装的，就地测即可，
 > 断言打到真实 state 变迁 / 真实写盘调用 / 真实 DOM 写入，**不存在假覆盖**（判据见 `.workbuddy/memory/REF-testing.md`）。
 
@@ -331,6 +332,23 @@ node scripts/calc-coverage-lines.mjs panel/clean-engine.ts   # 逐行定位（�
   ④ `isBangumiUrl`（`/^\d+$/`）与 `extractSubjectId`（`/^\d{1,8}$/`）**校验强度不一致**，9 位纯数字是唯一能命中「无法提取 Subject ID」的输入。
   ⑤ **节流分支（`elapsed < MIN_REQUEST_INTERVAL`）必须造出第二个并发批次 + 固定 `Date.now`** —— 同一批内所有任务都在写 `lastRequestTime` **之前**就各自算完了 `elapsed`，只加任务数是打不到的。
   ⑥ 模块级一次性标志（`isEventsRegistered`）→ `vi.resetModules()` + 动态 `import()`；`vi.hoisted` 里的命名 mock 必须**先声明再被 `vi.mock` 工厂引用**（漏了声明就是 `ReferenceError: xxx is not defined`，且报错指向被 mock 的模块而非测试文件）。
+
+**§6 非补测待办 O-2 · 锁表查找加索引快路径（2026-09-15 第十五轮，已完成）**
+
+本批是**清单清空后的收尾优化**，不增加覆盖率（`locked-sheet.ts` 本就是 100% lines），目标是消除 `getLockedSheet()` 的**线性扫描成本**。
+
+- **问题**：`getLockedSheet()` 每次调用都要 `wb.Worksheets.Item(1..N)` 逐张比 `Name`，而它在同步链路里被高频调用（每个条目、每个面板刷新都可能走）—— N 张表就是 N 次 COM 往返，跨进程 COM 单次往返在毫秒量级，大工作簿下累积明显。
+- **方案（关键取舍）**：**不引入模块级缓存变量**。模块级缓存会带来两个麻烦：① 同一测试文件内的用例互相污染，每条用例都得 `vi.resetModules()` + 动态 `import()`；② 需要在**四个**写锁点（`initEnrichLock` / 面板切表 / 清锁 / 工作簿切换）挂失效钩子，漏一个就是「锁的是 A 表、实际去操作 B 表」的静默错。
+  改为**复用锁状态里已经在维护的 `BGM.sheet.lockedIndex`**：它是 `{ isLocked, lockedWorkbookName, lockedName, lockedIndex }` 的一部分，**缓存键就是锁状态本身** —— 任何一次写锁都会顺带改写索引，**天然失效，零钩子**。
+- **实现**：抽出 `resolveSheetInWorkbook(wb, sheetName, hintIndex)`：`hintIndex != null` 时先 `readSheetAtIndex(wb, hintIndex)`（`try/catch` 吞越界与宿主切表异常），**必须 `hinted?.Name === sheetName` 复核通过**才直接返回；否则回落原有全表扫描。索引只是**提示、不是真相**，所以行为与改造前逐字节等价。
+  `findSheetInWorkbook(wbName, sheetName)` 改为复用同一函数并传 `hintIndex = null`（按名查表的调用方没有索引可用），顺手删掉一份重复的扫描逻辑。
+- **顺带修掉**：`for (let index = 1; index <= wb.Worksheets.Count; index += 1)` —— `Count` 是 COM 属性，写在循环条件里**每轮都要读一次**，已提前取出为 `const sheetCount`。
+- **测试**（`tests/enrich-lock.test.ts` 71 → **76 条**，新增 `场景 13`）：**断言的是 `Worksheets.Item` 的调用次数**，因为「少几次 COM 往返」正是优化的全部意义，只断言返回的表名对是测不出退化的（改造前后都会返回同一张表）。用 `vi.spyOn(wb.Worksheets, 'Item')` 计数，5 条覆盖：
+  ① 命中 → `toHaveBeenCalledTimes(1)` 且参数为索引；② 提示过期（索引指向别的表）→ 复核失败、回落扫描（2 次）；③ 索引越界（`lockedIndex = 99`，桩抛 `RangeError`）→ 吞异常后回落；④ 提示过期且目标表已不存在 → 仍按原语义清锁；⑤ 只有索引没有名字 → 复核挡住、不误命中。
+- **口径**：可执行行 13408 → **13411**（+3），`locked-sheet.ts` 154 → **183 可执行行**，覆盖率维持 **100% lines**；项目未覆盖行 **46 不变**，lines 维持 **99.65%**（分母变大、分子同增）。
+- **本轮新踩的坑（已写进 `REF-testing.md`）**：
+  ① **「用索引当提示」优于「模块级缓存」的判据**：缓存失效点分散在多个写入口时，优先找**已经是状态一部分的字段**做 hint —— 缓存键 == 状态 → 不需要任何失效钩子。
+  ② 测试**性能优化**要断言**调用次数**，不能只断言结果 —— 结果在优化前后相同，只有计数能证伪退化。
 
 ## 四、门禁现状
 

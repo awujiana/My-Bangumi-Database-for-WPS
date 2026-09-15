@@ -190,9 +190,53 @@ export function findWorkbookByName(name: string | null): WpsWorkbook | null {
 export function findSheetInWorkbook(wbName: string, sheetName: string): WpsWorksheet | null {
   const wb = findWorkbookByName(wbName)
   if (!wb) return null
-  for (let index = 1; index <= wb.Worksheets.Count; index += 1) {
-    const ws = wb.Worksheets.Item(index)
-    if (ws.Name === sheetName) return ws
+  return resolveSheetInWorkbook(wb, sheetName, null)
+}
+
+/**
+ * 安全读取工作簿中指定索引的工作表（索引越界 / 宿主正在切换时返回 null）。
+ *
+ * 提示性探测必须容错：`lockedIndex` 可能过期（跨会话期间用户重排/删除过工作表），
+ * 越界时 WPS 的 `Worksheets.Item` 会抛错，这里吞掉并交给全表扫描兜底。
+ */
+function readSheetAtIndex(wb: WpsWorkbook, index: number): WpsWorksheet | null {
+  try {
+    return wb.Worksheets.Item(index)
+  } catch {
+    return null
+  }
+}
+
+/**
+ * 按名称在指定工作簿中解析工作表。
+ *
+ * **性能优化（O-2）**：优先用 `hintIndex`（即锁状态里已维护的 `BGM.sheet.lockedIndex`）
+ * 做**单次**探测 —— 命中时只花 1 次 COM 往返，避免逐表 `Item(i)` + `Name` 的线性扫描
+ * （N 张表 → 1 次）。
+ *
+ * 索引只是**提示**、不是真相：缓存/持久化的索引可能过期（跨会话期间用户重排 / 删除过
+ * 工作表），因此每次都用工作表名**复核**，复核不过就回落全表扫描。这样既不需要在四处
+ * 锁写入点挂失效钩子，也不会因外部重命名 / 换序 / 删表而解析到错表。
+ *
+ * @param wb 目标工作簿
+ * @param sheetName 目标工作表名
+ * @param hintIndex 索引提示；为 null 时直接全表扫描
+ * @returns 命中的工作表；未命中返回 null
+ */
+function resolveSheetInWorkbook(
+  wb: WpsWorkbook,
+  sheetName: string | null,
+  hintIndex: number | null,
+): WpsWorksheet | null {
+  if (hintIndex != null) {
+    const hinted = readSheetAtIndex(wb, hintIndex)
+    if (hinted?.Name === sheetName) return hinted
+  }
+  // 扫描边界先取值：`Count` 是 COM 属性，写在循环条件里会每轮多一次往返
+  const sheetCount = wb.Worksheets.Count
+  for (let index = 1; index <= sheetCount; index += 1) {
+    const sheet = wb.Worksheets.Item(index)
+    if (sheet.Name === sheetName) return sheet
   }
   return null
 }
@@ -215,14 +259,7 @@ export function getLockedSheet(): [WpsWorkbook, WpsWorksheet] | null {
     clearLockedSheet()
     return null
   }
-  let ws: WpsWorksheet | null = null
-  for (let index = 1; index <= wb.Worksheets.Count; index += 1) {
-    const sheet = wb.Worksheets.Item(index)
-    if (sheet.Name === BGM.sheet.lockedName) {
-      ws = sheet
-      break
-    }
-  }
+  const ws = resolveSheetInWorkbook(wb, BGM.sheet.lockedName, BGM.sheet.lockedIndex)
   if (!ws) {
     bgmLog(
       LOG_LEVELS.WARN,

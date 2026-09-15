@@ -1378,3 +1378,90 @@ describe('enrich-lock 尾部分支补测', () => {
     expect(sharedBGM.sheet.isLocked).toBe(false)
   })
 })
+
+// ============ 场景 13: getLockedSheet 的 lockedIndex 快路径（O-2 索引缓存）============
+describe('getLockedSheet 的 lockedIndex 快路径（O-2 索引缓存）', () => {
+  // 快路径的价值就在「命中时只探测 1 次」，因此相关用例都把 Worksheets.Item 的
+  // COM 往返次数断言出来 —— 否则测试绿了也证明不了优化生效。
+  it('lockedIndex 命中时只探测一次，不做线性扫描', () => {
+    const wb = createMockWorkbooks([
+      { Name: 'wb1.xlsx', Sheets: ['Sheet1', 'Sheet2', 'Sheet3', 'Target'] },
+    ])[0]!
+    const itemSpy = vi.spyOn(wb.Worksheets, 'Item')
+    sharedBGM.sheet.isLocked = true
+    sharedBGM.sheet.lockedWorkbookName = 'wb1.xlsx'
+    sharedBGM.sheet.lockedName = 'Target'
+    sharedBGM.sheet.lockedIndex = 4
+    setMockApp(createMockApp([wb]))
+
+    const result = getLockedSheet()
+
+    expect(result?.[1].Name).toBe('Target')
+    // 4 张表，快路径只按提示索引探测 1 次（原实现要逐表扫 4 次）
+    expect(itemSpy).toHaveBeenCalledTimes(1)
+    expect(itemSpy).toHaveBeenCalledWith(4)
+  })
+
+  it('lockedIndex 过期（提示指向别的表）时按名复核失败并回落扫描', () => {
+    const wb = createMockWorkbooks([
+      { Name: 'wb1.xlsx', Sheets: ['Target', 'Sheet1', 'Sheet2'] },
+    ])[0]!
+    const itemSpy = vi.spyOn(wb.Worksheets, 'Item')
+    sharedBGM.sheet.isLocked = true
+    sharedBGM.sheet.lockedWorkbookName = 'wb1.xlsx'
+    sharedBGM.sheet.lockedName = 'Target'
+    // 提示指向第 3 张（Sheet2），名字对不上 → 必须回落扫描并拿到真正的 Target
+    sharedBGM.sheet.lockedIndex = 3
+    setMockApp(createMockApp([wb]))
+
+    const result = getLockedSheet()
+
+    expect(result?.[1].Name).toBe('Target')
+    // 1 次提示探测 + 1 次扫描命中
+    expect(itemSpy).toHaveBeenCalledTimes(2)
+  })
+
+  it('lockedIndex 越界（宿主 Item 抛错）时吞掉异常并回落扫描', () => {
+    const wb = createMockWorkbooks([{ Name: 'wb1.xlsx', Sheets: ['Sheet1', 'Target'] }])[0]!
+    sharedBGM.sheet.isLocked = true
+    sharedBGM.sheet.lockedWorkbookName = 'wb1.xlsx'
+    sharedBGM.sheet.lockedName = 'Target'
+    // 越界 → 桩里的 Item 抛 RangeError，必须被吞掉再回落扫描
+    sharedBGM.sheet.lockedIndex = 99
+    setMockApp(createMockApp([wb]))
+
+    const result = getLockedSheet()
+
+    expect(result?.[1].Name).toBe('Target')
+  })
+
+  it('lockedIndex 过期且目标表已不存在 → 仍按原语义清锁', () => {
+    const wb = createMockWorkbooks([{ Name: 'wb1.xlsx', Sheets: ['Sheet1', 'Sheet2'] }])[0]!
+    const storage = createMockPluginStorage()
+    sharedBGM.sheet.isLocked = true
+    sharedBGM.sheet.lockedWorkbookName = 'wb1.xlsx'
+    sharedBGM.sheet.lockedName = 'Target'
+    sharedBGM.sheet.lockedIndex = 1
+    setMockApp(createMockApp([wb], '', storage))
+
+    const result = getLockedSheet()
+
+    expect(result).toBeNull()
+    expect(sharedBGM.sheet.isLocked).toBe(false)
+    expect(sharedBGM.sheet.lockedIndex).toBeNull()
+    expect(storage._store[LOCKED_SHEET_KEY]).toBe('')
+  })
+
+  it('只有 lockedIndex 没有 lockedName 时不误命中（按名复核挡住）', () => {
+    const wb = createMockWorkbooks([{ Name: 'wb1.xlsx', Sheets: ['Sheet1'] }])[0]!
+    sharedBGM.sheet.isLocked = true
+    sharedBGM.sheet.lockedWorkbookName = 'wb1.xlsx'
+    sharedBGM.sheet.lockedName = null
+    sharedBGM.sheet.lockedIndex = 1
+    setMockApp(createMockApp([wb]))
+
+    // 名字为 null 时任何表都不应被当成目标 → 清锁
+    expect(getLockedSheet()).toBeNull()
+    expect(sharedBGM.sheet.isLocked).toBe(false)
+  })
+})
