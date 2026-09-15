@@ -44,4 +44,17 @@ describe('startNavModeSync（跨页导航模式同步）', () => {
     }).not.toThrow()
     expect(document.body.classList.contains('nav-icons-only')).toBe(false)
   })
+
+  it('页面卸载（beforeunload）时清除轮询定时器', () => {
+    startNavModeSync()
+    expect(vi.getTimerCount()).toBeGreaterThan(0)
+    window.dispatchEvent(new Event('beforeunload'))
+    // 各次 startNavModeSync 注册的监听器都是 once + 各自清自己的 interval，
+    // 因此派发一次 beforeunload 后不应残留任何定时器
+    expect(vi.getTimerCount()).toBe(0)
+    // 清理后再推进时间也不会触发轮询（不会读配置）
+    vi.mocked(areNavIconsOnly).mockClear()
+    vi.advanceTimersByTime(10_000)
+    expect(areNavIconsOnly).not.toHaveBeenCalled()
+  })
 })

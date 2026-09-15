@@ -306,14 +306,23 @@ describe('httpRequest - 429 重试', () => {
     expect(result.error?.code).toBe('HTTP_ERROR')
   })
 
-  it('429 后重试次数耗尽返回 MAX_RETRIES_EXCEEDED', async () => {
-    // retries=0 表示不重试，但 429 在 retries=0 时直接返回 HTTP_ERROR（不进入重试分支）
+  it('retries=0 时 429 直接返回 HTTP_ERROR（不进入重试分支）', async () => {
     const promise = httpRequest('/v0/x', { retries: 0 })
     lastMockXhr!._respondError(429, 'Too Many Requests')
     const result = await promise
     expect(result.isFail()).toBe(true)
     expect(result.error?.code).toBe('HTTP_ERROR')
     expect(xhrCallCount).toBe(1)
+  })
+
+  it('retries 为负数时一次请求都不发，直接返回 MAX_RETRIES_EXCEEDED', async () => {
+    // `while (attempt <= retries)` 在 retries < 0 时不进入循环体，于是落到循环后的
+    // 兜底 return。这是该出口唯一的可达路径（只要进了循环体，每条分支都必然 return）。
+    const result = await httpRequest('/v0/x', { retries: -1 })
+    expect(result.isFail()).toBe(true)
+    expect(result.error?.code).toBe('MAX_RETRIES_EXCEEDED')
+    expect(result.error?.message).toContain('超过最大重试次数')
+    expect(xhrCallCount).toBe(0)
   })
 })
 

@@ -597,4 +597,25 @@ describe('同步详情预览弹窗', () => {
     expect(document.querySelectorAll('.bgm-preview-dialog')).toHaveLength(1)
     expect(previewDialog()?.innerHTML).toContain('第 3 行')
   })
+
+  it('弹窗已移除后再次触发关闭 → ESC 清理安全早退（不再调 removeEventListener）', async () => {
+    await openPreview()
+    const modal = previewDialog()
+    expect(modal).not.toBeNull()
+
+    document.querySelector<HTMLElement>('#bgmPreviewCloseBtn')?.click()
+    expect(previewDialog()).toBeNull()
+
+    // 元素已从 DOM 移除，但监听器仍挂在元素上：再次点击等价于「重复关闭」。
+    // 此时 _previewDialogEscHandler 已是 null，_clearPreviewEscHandler 应早退。
+    const removeListenerSpy = vi.spyOn(document, 'removeEventListener')
+    try {
+      expect(() => {
+        modal?.click()
+      }).not.toThrow()
+      expect(removeListenerSpy).not.toHaveBeenCalled()
+    } finally {
+      removeListenerSpy.mockRestore()
+    }
+  })
 })

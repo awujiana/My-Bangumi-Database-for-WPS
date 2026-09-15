@@ -32,6 +32,30 @@ import {
   setSyncStrategy,
 } from '../ts/sync/github-config.js'
 
+/**
+ * 最小 PluginStorage 替身。
+ * `tools/config.ts` 的 `setConfig` 只用到 getItem / setItem（removeItem 为接口完整性保留），
+ * 通过 stub `window.Application.PluginStorage` 让真实实现跑通「写入成功」分支。
+ */
+function createFakeStorage(): {
+  getItem: (key: string) => string | null
+  setItem: (key: string, value: string) => void
+  removeItem: (key: string) => void
+  snapshot: () => Record<string, string>
+} {
+  const store: Record<string, string> = {}
+  return {
+    getItem: (key) => store[key] ?? null,
+    setItem: (key, value) => {
+      store[key] = value
+    },
+    removeItem: (key) => {
+      delete store[key]
+    },
+    snapshot: () => ({ ...store }),
+  }
+}
+
 describe('configService', () => {
   beforeEach(() => {
     // 每个用例前重置 mock 调用记录
@@ -151,6 +175,57 @@ describe('configService', () => {
         path: 'sync.jsonl',
       })
       expect(setSyncStrategy).toHaveBeenCalledWith('force-overwrite')
+    })
+
+    it('preferences 只写回白名单内的字符串键，其余静默忽略', () => {
+      // 走真实 tools/config.ts 的 setConfig，因此必须提供可用的 PluginStorage，
+      // 否则 setConfig 一律返回 false，applyPreferences 永远写不进任何键。
+      const storage = createFakeStorage()
+      vi.stubGlobal('window', { Application: { PluginStorage: storage } })
+      try {
+        const json = JSON.stringify({
+          version: 1,
+          exportedAt: '2026-07-21T00:00:00.000Z',
+          preferences: {
+            bgm_theme: 'dark',
+            bgm_nav_icons_only: 'true',
+            bgm_not_a_real_key: 'should-be-ignored',
+            bgm_log_level: 3,
+          },
+        })
+
+        expect(importConfig(json).isOk()).toBe(true)
+
+        const written = storage.snapshot()
+        expect(written.bgm_theme).toBe('dark')
+        expect(written.bgm_nav_icons_only).toBe('true')
+        // 非白名单键与「值不是字符串」的键都必须被拒绝
+        expect(written.bgm_not_a_real_key).toBeUndefined()
+        expect(written.bgm_log_level).toBeUndefined()
+      } finally {
+        vi.unstubAllGlobals()
+      }
+    })
+
+    it('preferences 不是对象（数组 / 字符串 / 缺失）时不写入任何配置', () => {
+      const storage = createFakeStorage()
+      vi.stubGlobal('window', { Application: { PluginStorage: storage } })
+      try {
+        for (const preferences of [['bgm_theme'], 'bgm_theme=dark', null] as const) {
+          expect(
+            importConfig(
+              JSON.stringify({
+                version: 1,
+                exportedAt: '2026-07-21T00:00:00.000Z',
+                preferences,
+              }),
+            ).isOk(),
+          ).toBe(true)
+        }
+        expect(storage.snapshot()).toEqual({})
+      } finally {
+        vi.unstubAllGlobals()
+      }
     })
 
     it('仅包含必填字段的 JSON 也能导入成功', () => {

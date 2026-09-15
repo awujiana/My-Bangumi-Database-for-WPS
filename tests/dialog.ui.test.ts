@@ -144,6 +144,25 @@ describe('ui/dialog UI 层', () => {
 
       expect(document.querySelectorAll('div#bgmDialogContainer')).toHaveLength(1)
     })
+
+    it('readyState 为 loading 时挂 DOMContentLoaded 监听，事件触发后才建容器', async () => {
+      // 让模块在「文档尚未就绪」的路径下求值：走 addEventListener 分支而非 setTimeout 分支。
+      // jsdom 的 readyState 是原型上的 getter，这里用自有属性临时遮蔽，finally 里删除以还原。
+      Object.defineProperty(document, 'readyState', { value: 'loading', configurable: true })
+      try {
+        await loadDialogFresh()
+
+        // 仅注册了监听、并未建容器：此时 _showDialog 仍走原生兜底
+        expect(document.getElementById('bgmDialogContainer')).toBeNull()
+
+        document.dispatchEvent(new Event('DOMContentLoaded'))
+
+        expect(document.getElementById('bgmDialogContainer')).not.toBeNull()
+        expect(document.getElementById('bgmAlertDialog')).not.toBeNull()
+      } finally {
+        delete (document as unknown as Record<string, unknown>).readyState
+      }
+    })
   })
 
   describe('showAlert / showError / showWarning / showSuccess', () => {

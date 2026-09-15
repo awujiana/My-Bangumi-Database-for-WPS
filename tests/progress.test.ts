@@ -16,6 +16,8 @@ import DOMPurify from 'dompurify'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import {
+  appendProgressLog,
+  completeProgress,
   createProgress,
   formatDuration,
   getActiveProgress,
@@ -504,6 +506,54 @@ describe('销毁与全局入口', () => {
     expect(getActiveProgress()).not.toBeNull()
     hideProgress()
     expect(getActiveProgress()).toBeNull()
+  })
+
+  it('可见时点击停止按钮触发 onStop', () => {
+    const onStop = vi.fn()
+    showProgress({
+      mode: 'inline',
+      title: 'A',
+      hostId: makeHost().id,
+      showHeader: true,
+      enableStop: true,
+      onStop,
+    })
+
+    pickElement('[data-el="stopBtn"]').click()
+
+    expect(onStop).toHaveBeenCalledTimes(1)
+  })
+
+  it('appendProgressLog 把日志转发到当前活跃实例', () => {
+    showProgress({
+      mode: 'inline',
+      title: 'A',
+      hostId: makeHost().id,
+      showHeader: true,
+      enableLogs: true,
+    })
+
+    appendProgressLog('来自模块级 API 的一行')
+
+    expect(pickElement('[data-el="log"]').textContent).toContain('来自模块级 API 的一行')
+  })
+
+  it('completeProgress 把当前活跃实例切到完成态', () => {
+    showProgress({ mode: 'inline', title: 'A', hostId: makeHost().id, showHeader: true })
+
+    completeProgress({ summary: '共处理 3 条', ok: true })
+
+    expect(pickElement('[data-el="summary"]').textContent).toBe('共处理 3 条')
+    expect(pickElement('[data-el="doneBtns"]').style.display).toBe('flex')
+    expect(pickElement('[data-el="runningBtns"]').style.display).toBe('none')
+  })
+
+  it('没有活跃实例时模块级转发全部静默忽略', () => {
+    expect(getActiveProgress()).toBeNull()
+    expect(() => {
+      appendProgressLog('无处可去')
+      completeProgress({ summary: '无处可去' })
+    }).not.toThrow()
   })
 })
 

@@ -1147,6 +1147,40 @@ describe('ribbon-service · testTokenForRibbon', () => {
 
     expect(m.wpsMessageBox).toHaveBeenCalledWith('网络超时，请重试', 0, 48)
   })
+
+  it('401 分支中弹窗通道自身抛错 → 外层兜底记日志，不向外抛', async () => {
+    // 401 / 其它状态码分支的 `await wpsMessageBox(...)` 不在内层 try 里，
+    // 它抛错时由 load 回调最外层的 try/catch 兜住（只记日志）。
+    // 注意：该外层 catch 目前不调用 resolve()，所以这里**不能** await 返回的 Promise，
+    // 只清空微任务后断言日志；将来若补上 resolve()，本用例依然通过。
+    m.loadBgToken.mockReturnValue('t0ken')
+    m.wpsMessageBox.mockRejectedValue(new Error('弹窗通道异常'))
+
+    void testTokenForRibbon()
+    const xhr = lastRequest()
+    xhr.status = 401
+    xhr.emit('load')
+
+    await Promise.resolve()
+    await Promise.resolve()
+
+    const messages = m.bgmLog.mock.calls.map((call) => String(call[1]))
+    expect(messages.some((message) => message.includes('处理响应异常: 弹窗通道异常'))).toBe(true)
+  })
+
+  it('error 事件中弹窗通道自身抛错 → 外层兜底记日志，不向外抛', async () => {
+    m.loadBgToken.mockReturnValue('t0ken')
+    m.wpsMessageBox.mockRejectedValue(new Error('弹窗通道异常'))
+
+    void testTokenForRibbon()
+    lastRequest().emit('error')
+
+    await Promise.resolve()
+    await Promise.resolve()
+
+    const messages = m.bgmLog.mock.calls.map((call) => String(call[1]))
+    expect(messages.some((message) => message.includes('处理错误事件异常: 弹窗通道异常'))).toBe(true)
+  })
 })
 
 // ========== copyTokenForRibbon ==========

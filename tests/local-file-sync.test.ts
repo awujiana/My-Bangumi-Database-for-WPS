@@ -32,6 +32,13 @@ vi.mock('../ts/sync/github-config.js', () => ({
   }),
 }))
 
+vi.mock('../ts/sync/jsonl-response.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../ts/sync/jsonl-response.js')>()
+  // 默认仍走真实实现，只有「解码失败」那一条用例用 mockRejectedValueOnce 临时改道。
+  // 这样既不引入假实现，又能确定性地构造「解码层抛错」。
+  return { ...actual, readXhrJsonlText: vi.fn(actual.readXhrJsonlText) }
+})
+
 import {
   LocalFileSyncSource,
   readLocalFileContent,
@@ -43,6 +50,7 @@ import {
   isSyncSourceRegistered,
   getRegisteredSourceTypes,
 } from '../ts/sync/sync-source-registry.js'
+import { readXhrJsonlText } from '../ts/sync/jsonl-response.js'
 import { BgmError } from '../ts/core/result.js'
 import { getGithubConfig } from '../ts/sync/github-config.js'
 
@@ -320,6 +328,26 @@ describe('readLocalFileContent', () => {
     const promise = readLocalFileContent(String.raw`C:\slow.jsonl`)
     lastMockXhr!._triggerTimeout()
     await expect(promise).rejects.toThrow(/读取文件超时/)
+  })
+
+  it('响应已到达但解码失败时 reject（不能静默当作空内容）', async () => {
+    // 真实场景：本地 .jsonlines.gz 被截断 / 不是合法 gzip，
+    // readXhrJsonlText → decodeJsonlBytes → gunzipBytes 抛错。
+    const promise = readLocalFileContent(String.raw`C:\corrupt.jsonlines.gz`)
+    vi.mocked(readXhrJsonlText).mockRejectedValueOnce(new Error('解压失败：不是合法的 gzip 流'))
+    lastMockXhr!._respondOk('', 200)
+
+    await expect(promise).rejects.toThrow('解压失败：不是合法的 gzip 流')
+  })
+
+  it('解码抛出的非 Error 值也统一包成 Error 再 reject', async () => {
+    // 生产代码写的是 `error instanceof Error ? error : new Error(String(error))`，
+    // 非 Error 的抛出值（如字符串）必须被包一层，否则调用方拿到的不是 Error。
+    const promise = readLocalFileContent(String.raw`C:\corrupt.jsonlines.gz`)
+    vi.mocked(readXhrJsonlText).mockRejectedValueOnce('裸字符串错误')
+    lastMockXhr!._respondOk('', 200)
+
+    await expect(promise).rejects.toThrow('裸字符串错误')
   })
 })
 

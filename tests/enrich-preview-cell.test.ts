@@ -155,6 +155,23 @@ describe('panel/enrich-preview-cell', () => {
         '<td title="2"><span class="">2</span></td>',
       )
     })
+
+    it('读取预览配置抛异常时阈值回落出厂默认（1 / 12），不影响单元格渲染', () => {
+      // 阈值 getter 各自 try/catch：配置层异常不应让整个预览渲染失败
+      vi.mocked(getEnrichPreviewConfig).mockImplementation(() => {
+        throw new Error('配置读取失败')
+      })
+
+      expect(renderPreviewCell('episodesCol', '1')).toBe(
+        '<td title="1"><span class="ep-chip ep-single">1</span></td>',
+      )
+      expect(renderPreviewCell('episodesCol', '12')).toBe(
+        '<td title="12"><span class="">12</span></td>',
+      )
+      expect(renderPreviewCell('episodesCol', '13')).toBe(
+        '<td title="13"><span class="ep-chip ep-full">13</span></td>',
+      )
+    })
   })
 
   describe('renderPlatformChipsCell', () => {

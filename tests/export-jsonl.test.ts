@@ -697,4 +697,42 @@ describe('exportSheetToJsonlFile', () => {
     expect(lastInfoCall?.[1]).toContain('bgm_sync_export_')
     expect(lastInfoCall?.[1]).toContain('.jsonlines')
   })
+
+  it('Blob URL 延迟 10 秒才释放（下载是异步的，立即 revoke 会让文件失效）', () => {
+    vi.useFakeTimers()
+    try {
+      const ws = createMockWorksheet({ usedRange: 5 })
+      mockGetDataSheet.mockReturnValue(ws)
+      mockFindHeaderRow.mockReturnValue(1)
+      mockGetLastRow.mockReturnValue(3)
+      mockGetColumnMap.mockReturnValue(new Map<string, number>([['Bangumi_URL', 1]]))
+      mockGetCellValue.mockImplementation((_ws: unknown, row: number, col: number) =>
+        row === 2 && col === 1 ? 'https://bgm.tv/subject/12345' : '',
+      )
+      mockExtractSubjectId.mockReturnValue('12345')
+
+      const mockAnchor = {
+        href: '',
+        download: '',
+        style: { display: '' },
+        click: vi.fn(),
+      }
+      vi.spyOn(document, 'createElement').mockReturnValue(mockAnchor as unknown as HTMLElement)
+      vi.spyOn(document.body, 'appendChild').mockImplementation(() => mockAnchor as unknown as Node)
+      vi.spyOn(document.body, 'removeChild').mockImplementation(() => mockAnchor as unknown as Node)
+      vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:test')
+      const revokeSpy = vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => {})
+
+      expect(exportSheetToJsonlFile()).toBe(true)
+      expect(revokeSpy).not.toHaveBeenCalled()
+
+      vi.advanceTimersByTime(9999)
+      expect(revokeSpy).not.toHaveBeenCalled()
+
+      vi.advanceTimersByTime(1)
+      expect(revokeSpy).toHaveBeenCalledWith('blob:test')
+    } finally {
+      vi.useRealTimers()
+    }
+  })
 })

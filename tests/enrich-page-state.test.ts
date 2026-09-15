@@ -111,6 +111,23 @@ describe('enrich-page-state', () => {
       expect(config.platformColor).toBe(true)
       expect(config.autoCleanDuplicates).toBe(true)
     })
+
+    it('存储读取抛异常时四个开关按「失败开放」处理（默认开启）', () => {
+      // 存储异常不能把功能误关掉：isToggleEnabled 的 catch 显式返回 true。
+      // 阈值读取各有自己的 catch，同样回落默认，因此整份配置等于出厂默认。
+      vi.mocked(getConfig).mockImplementation(() => {
+        throw new Error('PluginStorage 读取失败')
+      })
+
+      expect(getEnrichPreviewConfig()).toEqual({
+        epSingle: 1,
+        epFull: 12,
+        tagsColor: true,
+        premiereColor: true,
+        platformColor: true,
+        autoCleanDuplicates: true,
+      })
+    })
   })
 
   describe('resetEnrichPreviewConfig 清缓存', () => {

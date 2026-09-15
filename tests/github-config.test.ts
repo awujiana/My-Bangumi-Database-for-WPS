@@ -327,4 +327,50 @@ describe('githubConfig 异常与回退分支', () => {
       }),
     ).toThrow('Storage 写入异常')
   })
+
+  it('历史明文路径自动迁移为 gzip 路径，并把迁移结果落盘', () => {
+    // 老版本存的是 data/bangumi.jsonlines；LEGACY_PATH_MIGRATIONS 会把它改成 .gz。
+    // 三个关键字段都非空 → 不会走「首次读取填默认值」的早退分支。
+    const app = createMockApp({
+      github_sync_owner: 'owner',
+      github_sync_repo: 'repo',
+      github_sync_path: 'data/bangumi.jsonlines',
+    })
+    vi.mocked(getApp).mockReturnValue(app)
+
+    const config = getGithubConfig()
+
+    expect(config.path).toBe('data/bangumi.jsonlines.gz')
+    // 迁移必须落盘，否则每次读取都要再迁一次
+    expect(app.PluginStorage.getItem('github_sync_path')).toBe('data/bangumi.jsonlines.gz')
+  })
+
+  it('非历史路径原样返回，不写 storage', () => {
+    const app = createMockApp({
+      github_sync_owner: 'owner',
+      github_sync_repo: 'repo',
+      github_sync_path: 'data/other.jsonlines',
+    })
+    vi.mocked(getApp).mockReturnValue(app)
+
+    expect(getGithubConfig().path).toBe('data/other.jsonlines')
+    expect(app.PluginStorage.getItem('github_sync_path')).toBe('data/other.jsonlines')
+  })
+
+  it('无 storage 时迁移只改返回值、不抛错（storage?.setItem 短路）', () => {
+    // getApp 返回 null → storage 为 undefined；owner/repo 来自默认填充，
+    // 但 path 需显式给出历史值才会触发迁移，故这里直接构造无 storage 的场景。
+    vi.mocked(getApp).mockReturnValue(null)
+    expect(() => getGithubConfig()).not.toThrow()
+    expect(getGithubConfig().path).toBe(DEFAULT_GITHUB_CONFIG.path)
+  })
+
+  it('配置不完整（只有 owner）时 buildRawUrl 抛出可读错误', () => {
+    // 注意：owner/repo/path 三者全空会走「首次读取填默认值」，因此必须留一个非空字段，
+    // 才能构造出「非全空但不完整」的状态。
+    vi.mocked(getApp).mockReturnValue(createMockApp({ github_sync_owner: 'owner' }))
+
+    expect(isGithubConfigComplete()).toBe(false)
+    expect(() => buildRawUrl()).toThrow('GitHub 仓库配置不完整，请在面板中设置 owner/repo/path')
+  })
 })

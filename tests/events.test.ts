@@ -140,6 +140,41 @@ describe('EventBus', () => {
       expect(isSecondCalled).toBe(true)
     })
   })
+
+  describe('便捷方法 emitStateChanged / emitConfigChanged', () => {
+    it('emitStateChanged 以 state:changed 事件派发 { key, value }', () => {
+      const received: unknown[] = []
+      bus.on(BGM_EVENTS.STATE_CHANGED, (data: unknown) => {
+        received.push(data)
+      })
+      bus.emitStateChanged('theme', 'dark')
+      expect(received).toEqual([{ key: 'theme', value: 'dark' }])
+    })
+
+    it('emitConfigChanged 以 config:changed 事件派发 { key, value }', () => {
+      const received: unknown[] = []
+      bus.on(BGM_EVENTS.CONFIG_CHANGED, (data: unknown) => {
+        received.push(data)
+      })
+      bus.emitConfigChanged('navIconsOnly', true)
+      expect(received).toEqual([{ key: 'navIconsOnly', value: true }])
+    })
+
+    it('两个便捷方法互不串台（各自只触发对应事件）', () => {
+      const stateEvents: unknown[] = []
+      const configEvents: unknown[] = []
+      bus.on(BGM_EVENTS.STATE_CHANGED, (data: unknown) => {
+        stateEvents.push(data)
+      })
+      bus.on(BGM_EVENTS.CONFIG_CHANGED, (data: unknown) => {
+        configEvents.push(data)
+      })
+      bus.emitStateChanged('a', 1)
+      bus.emitConfigChanged('b', 2)
+      expect(stateEvents).toEqual([{ key: 'a', value: 1 }])
+      expect(configEvents).toEqual([{ key: 'b', value: 2 }])
+    })
+  })
 })
 
 describe('BGM_EVENTS 常量', () => {

@@ -11,6 +11,7 @@ const mocks = vi.hoisted(() => ({
     (_key: string, defaultValue = '', _isSilent = false): string => defaultValue,
   ),
   alert: vi.fn<(title: string, message: string) => void>(),
+  handleError: vi.fn<(error: unknown, options?: unknown) => void>(),
 }))
 
 vi.mock('../ts/tools/config.js', () => ({
@@ -30,11 +31,11 @@ vi.mock('../ts/tools/config.js', () => ({
 vi.mock('../ts/tools/util/index.js', () => ({
   BGM: {
     Dialog: { alert: mocks.alert },
-    handleError: vi.fn(),
+    handleError: mocks.handleError,
   },
 }))
 
-const { setConfig, getConfig, alert } = mocks
+const { setConfig, getConfig, alert, handleError } = mocks
 
 /** 极简表单元素桩：仅 value 属性 */
 function fakeInput(value = ''): HTMLInputElement {
@@ -142,6 +143,24 @@ describe('saveEnrichPreviewSettings', () => {
     seedForm('1', '12', '噪声A,, 噪声A\n噪声B')
     saveEnrichPreviewSettings()
     expect(setConfig).toHaveBeenCalledWith('bgm_enrich_filter_keywords', '噪声A\n噪声B')
+  })
+
+  it('写入配置抛错 → 交给 BGM.handleError 统一处理，不向外抛', () => {
+    seedForm('1', '12', '')
+    setConfig.mockImplementation(() => {
+      throw new Error('PluginStorage 写入失败')
+    })
+
+    expect(() => {
+      saveEnrichPreviewSettings()
+    }).not.toThrow()
+
+    expect(handleError).toHaveBeenCalledWith(expect.any(Error), {
+      context: 'saveEnrichPreviewSettings',
+      showAlert: true,
+    })
+    // 保存失败时不得谎报成功
+    expect(alert).not.toHaveBeenCalledWith('成功', '富化预览设置已保存，下次预览即生效')
   })
 })
 

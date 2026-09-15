@@ -21,7 +21,7 @@
 > **换算**：全项目**每提升 1 个百分点 ≈ 134 行**（= 13411 / 100）
 >
 > 注：第二轮涨幅主体是 §三 第 3、4 批 —— `ribbon-service`、`ui/handlers/sync`、`clean-page`、`scraping`、`sheet-cleaning`、`shell-nav` 等
-> 由 0~30% 补到 88~100%，未覆盖行 **5118 → 3212（−1906 行）**；第三轮（第 5 批）**3212 → 2811（−401 行）**；第四轮（第 6 批）**2811 → 2808（−3 行）**；第五轮（第 7 批）**2808 → 2467（−341 行）**；第六轮（第 8 批）**2467 → 1976（−491 行）**；第七轮（第 9 批）**1976 → 1505（−471 行）**；第八轮（第 10 批）**1505 → 1134（−371 行）**；第九轮 **1134 → 911（−223 行）**；第十轮（第 12 批）**911 → 801（−110 行）**；第十一轮（第 13 批）**801 → 735（−66 行）**；第十二轮（P0 + 第 14 批）**735 → 626（−109 行）**；第十三轮（第 15 批）**626 → 341（−285 行）**；第十四轮（第 17 批）**341 → 46（−295 行，与台账 295 行精确吻合）**；第十五轮（O-2 收尾优化）**未覆盖行维持 46**（可执行行 13408 → 13411，lines 维持 99.65%）。
+> 由 0~30% 补到 88~100%，未覆盖行 **5118 → 3212（−1906 行）**；第三轮（第 5 批）**3212 → 2811（−401 行）**；第四轮（第 6 批）**2811 → 2808（−3 行）**；第五轮（第 7 批）**2808 → 2467（−341 行）**；第六轮（第 8 批）**2467 → 1976（−491 行）**；第七轮（第 9 批）**1976 → 1505（−471 行）**；第八轮（第 10 批）**1505 → 1134（−371 行）**；第九轮 **1134 → 911（−223 行）**；第十轮（第 12 批）**911 → 801（−110 行）**；第十一轮（第 13 批）**801 → 735（−66 行）**；第十二轮（P0 + 第 14 批）**735 → 626（−109 行）**；第十三轮（第 15 批）**626 → 341（−285 行）**；第十四轮（第 17 批）**341 → 46（−295 行，与台账 295 行精确吻合）**；第十五轮（O-2 收尾优化）**未覆盖行维持 46**（可执行行 13408 → 13411，lines 维持 99.65%）；第十六轮（第 18 批长尾清零）**46 → 7（−39 行）**，未覆盖文件 → **5 个**。
 > **关键结论（累积）**：清单前列的「大文件 / COM 模块」**都没有走「先拆后测」**——依赖收敛到单一 barrel、依赖宿主对象、或依赖 ≤3 个薄封装的，就地测即可，
 > 断言打到真实 state 变迁 / 真实写盘调用 / 真实 DOM 写入，**不存在假覆盖**（判据见 `.workbuddy/memory/REF-testing.md`）。
 
@@ -93,6 +93,11 @@ node scripts/calc-coverage-lines.mjs panel/clean-engine.ts   # 逐行定位（�
 
 > **难度列是按目录粗判的**：`ts/tools`、`ts/core` 多为纯逻辑 → 易；`ts/panel`、`ts/ui` 依赖 DOM → 中；`ts/sync`、`ts/services` 依赖 COM / 网络 → 难。
 > 实际动手前仍需扫一眼文件内的依赖（例如 `tools/util/index.ts` 是聚合桶，可能混入依赖 WPS 全局对象的函数）。
+
+> 📌 **第十六轮后（第 18 批长尾清零）**：长尾也被吃掉了 —— 未覆盖 **46 → 7 行 / 5 个文件**，全项目 **99.94% lines**。
+> 余下 7 行**全部是经可达性分析判定的不可达 / 死代码**（逐条依据见 §三 第 18 批），**不是「还没做」**。
+> 也就是说：**补测这条线已经做完** —— 想继续降只能「删死代码」或「重构掉不可达分支」，
+> 那属于**代码清理**任务，不属于补测任务，不应再挂在这份清单下。
 
 ---
 
@@ -349,6 +354,38 @@ node scripts/calc-coverage-lines.mjs panel/clean-engine.ts   # 逐行定位（�
 - **本轮新踩的坑（已写进 `REF-testing.md`）**：
   ① **「用索引当提示」优于「模块级缓存」的判据**：缓存失效点分散在多个写入口时，优先找**已经是状态一部分的字段**做 hint —— 缓存键 == 状态 → 不需要任何失效钩子。
   ② 测试**性能优化**要断言**调用次数**，不能只断言结果 —— 结果在优化前后相同，只有计数能证伪退化。
+
+**第 18 批 · 长尾清零（2026-09-15 第十六轮，已完成）**
+
+> 承接第十四轮后残留的 **46 行长尾**（单文件 ≤3 行、摊在二十多个文件里）。本轮**不新增文件级目标**，
+> 而是按目录分 A/B/C/D 四组，把「读得懂、测得出」的零头逐条吃掉。**动机**：把 lines 做成**二值不变量** ——
+> 一旦全项目 lines 触到 100%，此后覆盖率报告里**出现的任何一行未覆盖都等于一次真实回归**，
+> 比「99.65% 这种带小数点的指标」可读得多。
+
+18. ~~46 行长尾~~ ✅ **一次吃到 7 行**（−39 行；未覆盖文件 → **5 个**；全项目 lines **99.65% → 99.94%**）：
+    - **A 组 `ts/tools/` + `ts/core/`（7 文件）**：`http.ts`（`retries: -1` 使 `while` 不进入 → 落到循环后的 `MAX_RETRIES_EXCEEDED`，**该出口此前被判「不可达」是误判**）、`debounce.ts`（`throttle` 的 `clearTimeout` 清理）、`theme.ts`（模块级 `systemMedia` 的 change 分支，见下）、`jsonl-response.ts`（`DecompressionStream` 缺失降级）、`export-jsonl.ts`（10s 后才 `revokeObjectURL`）、`local-file-sync.ts`（解码失败 + **非 Error 抛值**包装）、`token-payload.ts`（`extractToken` 的 catch）。
+    - **B 组 `ts/sync/`（7 文件）**：`github-config.ts`（旧路径自愈 + 回写持久化）、`github-cell-value.ts`（扩展字段值类型兜底：`undefined` / `null` / boolean / 数字）、`sync-config-summary.ts`（**新建** `tests/sync-config-summary.test.ts`，11 条覆盖 `timeFilter.range` 四分支 `future` / `year` / `quarter` / `month`）、`clean-transforms.ts`（2 字节 UTF-8 分支 + `normalizeOriginalTag` 自定义改编优先）、`events.ts`、`nav-mode.ts`、`nav-order.ts`。
+    - **C 组 `ts/panel/` + `ts/services/`（5 文件）**：`enrich-page-state.ts`（`getConfig` 抛错 → 整体回落出厂默认，即 `isToggleEnabled` 的 fail-open）、`enrich-preview-cell.ts`（阈值回落 1 / 12 后仍能渲染）、`config-service.ts`（`applyPreferences` 走**真实** `tools/config.ts#setConfig`，靠 `vi.stubGlobal('window', { Application: { PluginStorage: 假存储 } })` 提供真存储，断言只写白名单内的字符串键）、`enrich-engine.ts`、`ribbon-service.ts`（`testTokenForRibbon` 两条 `wpsMessageBox` 拒绝路径）。
+    - **D 组 `ts/ui/`（6 文件）**：`dialog.ts`（`readyState === 'loading'` → 挂 `DOMContentLoaded` 而非 `setTimeout`）、`preview.ts`（优先状态在前 / 「忽略」在后 + `getAllSyncRecords` 非函数守卫）、`sync-result-dialog.ts`（无 ESC handler 时安全早退）、`progress.ts`（可见时点 `stopBtn` → `onStop`；`appendProgressLog` / `completeProgress` 两个全局入口）、`enrich-preview-settings.ts`（`setConfig` 抛错 → `handleError` 且不弹成功提示）、`token.ts`（见下表，不可达）。
+    - **三条可复用的判定（已写进 `REF-testing.md`）**：
+      ① **`getLineCoverage()` 取「该行所有语句的最大命中数」** —— `if (cond) return X` 这类一行两语句会被算作**已覆盖**，残余只体现在 `uncovered stmts`。所以「某行从未执行」**不等于**「该行会出现在 `uncovered lines` 里」，两个口径要分清（也是「不能用 `statementMap` 行区间求和」的同一件事）。
+      ② **`vi.mock` 工厂里的 getter 能让「静态 import 绑定恒为函数」的守卫变可达** —— 第 8 批把 `preview.ts` 的 `typeof getAllSyncRecords !== 'function'` 记为不可达（理由：静态 import 绑定恒为函数），本轮用 `get getX() { return mocks.getX }` 的工厂 + `Reflect.set(mocks, 'getX', undefined)` 打通。**判「不可达」之前，先确认这条依赖能不能被 mock 改写**。
+      ③ **假时钟与定时器队列是两件事**：`vi.setSystemTime(0)` 排下定时器后再 `vi.setSystemTime(1000)`，可造出「`remaining <= 0` 且 `timerId !== null`」这个**唯一**能命中 `throttle` 里 `clearTimeout` 清理的状态（用 `vi.getTimerCount()` 断言）。
+    - **残留 7 行：全部经可达性分析判定为不可达 / 死代码，按既有判据不造假测**（延续「不追」口径）：
+
+      | 文件:行 | 判定依据 |
+      | --- | --- |
+      | `ts/sync/enrich-engine.ts:632,633,639` | `matchEntriesInner` 每行的 `try` 体里只做 Map / 数组操作，容器由 `buildBangumiIndexes` 内部构造（值恒为 `number[]`）；`normalizeName()` / `getCellValue()` 都在 `try` **之外**调用 → 该 `catch` 不可达 |
+      | `ts/panel/enrich-preview-cell.ts:48` | `CHIP_COLOR_PALETTE` 12 项全非空，`stableColorIndex()` 返回 `hash % length`（恒在范围内），且表达式已有 `?? CHIP_COLOR_PALETTE[0]` → `!palette` 恒假，属**死代码** |
+      | `ts/services/config-service.ts:203` | `GithubConfigSchema.strategy` 是 `SyncStrategySchema.optional().default('add-update')`，zod 已把值收敛到合法枚举 → `else` 兜底不可达 |
+      | `ts/ui/handlers/token.ts:720` | 外层 `if (avatarUrl \|\| username)`（654 行）已蕴含内层 `if (username \|\| userId \|\| avatarUrl)`（698 行），且两个变量都是 `const` 解构、区间内无重赋值 → `else` 不可达 |
+      | `ts/ui/preview.ts:528` | 排序比较器：`dataset.status` 恒为 `normalizeStatus()` 的产物，只可能是 `WATCH_STATUS_MAP` 反查出的 **6 个**标准名；其中 5 个已在 `priorityStatus` 里，非优先集合最多只剩「忽略」**一个**元素，而 `Array#sort` 对长度 ≤1 **不调用比较器**（第 8 批已记录，本批复核确认） |
+
+    - **口径**：可执行行 **13411 不变**（**零生产代码改动**，只有测试与文档）；测试 **4231 → 4283 条 / 127 → 129 文件**；`npm run gate` 七关全绿。
+    - **本轮新踩的坑（已补进 `REF-eslint-tests.md`）**：4 个新写的测试文件在 `lint:check`（gate **第一关**）一次性爆出 **10 个 error** ——
+      `unicorn/no-return-array-push`（箭头函数体直接返回 `.push()` 的返回值）、`unicorn/numeric-separators-style`（4 位数 `9_999` **不许**加分隔符）、
+      `@stylistic/line-comment-position`（行尾注释）、`@typescript-eslint/array-type`（`Array<T>` → `T[]`）、
+      `n/no-top-level-await`（顶层 `await import()`）。**写测试文件后先对本文件单独 `npx eslint <file>` 过一遍**，别等全量 gate。
 
 ## 四、门禁现状
 

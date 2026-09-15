@@ -68,6 +68,15 @@ describe('hasGzipSupport', () => {
   it('当前运行环境提供 DecompressionStream', () => {
     expect(hasGzipSupport()).toBe(true)
   })
+
+  it('宿主未提供 DecompressionStream 时返回 false', () => {
+    vi.stubGlobal('DecompressionStream', undefined)
+    try {
+      expect(hasGzipSupport()).toBe(false)
+    } finally {
+      vi.unstubAllGlobals()
+    }
+  })
 })
 
 describe('gunzipBytes', () => {
@@ -79,6 +88,19 @@ describe('gunzipBytes', () => {
 
   it('数据不是合法 gzip 时 reject（而不是静默返回空）', async () => {
     await expect(gunzipBytes(bytesOf('not a gzip stream'))).rejects.toThrow()
+  })
+
+  it('宿主不支持 DecompressionStream 时抛出可读错误（而非解出乱码）', async () => {
+    // 老版本 WPS / Excel 的 WebView 可能没有 DecompressionStream；
+    // 此时必须在入口就给出可读提示，否则 parseJsonl 会在二进制乱码上报一堆解析失败。
+    vi.stubGlobal('DecompressionStream', undefined)
+    try {
+      await expect(gunzipBytes(bytesOf(PLAIN))).rejects.toThrow(
+        '当前运行环境不支持 DecompressionStream',
+      )
+    } finally {
+      vi.unstubAllGlobals()
+    }
   })
 })
 

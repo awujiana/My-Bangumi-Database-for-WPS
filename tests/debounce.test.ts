@@ -109,6 +109,29 @@ describe('throttle', () => {
     throttled()
     expect(function_).toHaveBeenCalledTimes(2)
   })
+
+  it('时钟跳跃导致剩余时间已过：清掉待触发的定时器并立即执行', () => {
+    // 覆盖「remaining <= 0 且 timerId !== null」这一支：既要有尚未触发的定时器，
+    // 又要让 Date.now 的推进量已经超过 interval。正常流程下两者互斥
+    // （定时器到点就会把 timerId 置空），只有系统时钟被向前拨动时才会同时成立
+    // —— 用 vi.setSystemTime 把时钟和定时器队列解耦来构造。
+    const function_ = vi.fn()
+    const throttled = throttle(function_, 300)
+
+    vi.setSystemTime(0)
+    throttled()
+    expect(function_).not.toHaveBeenCalled()
+    expect(vi.getTimerCount()).toBe(1)
+
+    vi.setSystemTime(1000)
+    throttled()
+
+    expect(function_).toHaveBeenCalledTimes(1)
+    // 待触发的定时器已被 clearTimeout 摘掉，不会再补一次调用
+    expect(vi.getTimerCount()).toBe(0)
+    vi.advanceTimersByTime(1000)
+    expect(function_).toHaveBeenCalledTimes(1)
+  })
 })
 
 function noopTimerFunction(): void {

@@ -18,6 +18,14 @@ describe('estimateUtf8Bytes', () => {
     expect(estimateUtf8Bytes('漫画')).toBe(6)
   })
 
+  it('拉丁扩展 / 西里尔等 2 字节区（U+0080–U+07FF）每字符 2 字节', () => {
+    // 覆盖 bytes += 2 分支：é(U+00E9)、ñ(U+00F1)、д(U+0434) 都落在两字节区
+    expect(estimateUtf8Bytes('é')).toBe(2)
+    expect(estimateUtf8Bytes('ñ')).toBe(2)
+    expect(estimateUtf8Bytes('д')).toBe(2)
+    expect(estimateUtf8Bytes('aé漫')).toBe(1 + 2 + 3)
+  })
+
   it('emoji（代理对）合计 4 字节', () => {
     expect(estimateUtf8Bytes('🎵')).toBe(4)
   })
@@ -160,6 +168,24 @@ describe('transformCellValue · normalizeOriginalTag', () => {
   it('无改类型标签时保守不变更', () => {
     const outcome = transformCellValue('normalizeOriginalTag', '日本 | 原创', { name: '' })
     expect(outcome).toEqual({ value: '日本 | 原创', changed: false, removed: 0 })
+  })
+
+  it('存在自定义（非标准）改类型时丢弃标准改类型，只保留自定义', () => {
+    // 「广播剧改」既不在 baseGaiTypes、也不在国家表里 → customAdapt 非空 →
+    // 标准改类型「漫画改」被丢弃，避免把非标准类型降级成标准类型。
+    // 结果被合并为「日本广播剧改」：国家只有 1 个、改类型也只剩 1 个。
+    const outcome = transformCellValue('normalizeOriginalTag', '日本 | 漫画改 | 广播剧改', {
+      name: '',
+    })
+    expect(outcome.value).toBe('日本广播剧改')
+    expect(outcome.changed).toBe(true)
+  })
+
+  it('只有标准改类型时不走自定义优先分支（标准类型全部保留）', () => {
+    const outcome = transformCellValue('normalizeOriginalTag', '日本 | 游戏改 | 漫画改', {
+      name: '',
+    })
+    expect(outcome.value).toBe('日本 | 游戏改 | 漫画改')
   })
 })
 

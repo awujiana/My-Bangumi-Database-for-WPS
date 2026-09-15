@@ -264,3 +264,51 @@ describe('resolveUpdateCellValue', () => {
     })
   })
 })
+
+// ========== 扩展字段的值类型兜底 ==========
+/**
+ * JSONL 是外部不可信数据：同一个扩展字段可能是字符串、数字，也可能缺失。
+ * `github-cell-value.ts` 对这三类都显式分支处理，下面把「缺失 / 非字符串非数字」
+ * 与「数字」两条兜底路径单独钉住。
+ */
+describe('扩展字段的值类型兜底', () => {
+  it('新增行：远程字段缺失（undefined）时返回 null 而不是空串', () => {
+    // 「时长」列对应 JSONL 的「片长」字段；makeRemote() 未提供 → undefined
+    expect(resolveNewRowCellValue({ name: '时长' }, { remote: makeRemote() })).toBeNull()
+  })
+
+  it('新增行：远程字段为 null / 布尔等非字符串非数字时返回 null', () => {
+    expect(
+      resolveNewRowCellValue({ name: '时长' }, { remote: makeRemote({ 片长: null as unknown as string }) }),
+    ).toBeNull()
+    expect(
+      resolveNewRowCellValue({ name: '时长' }, { remote: makeRemote({ 片长: true as unknown as string }) }),
+    ).toBeNull()
+  })
+
+  it('更新行：远程字段为数字时转成字符串写入', () => {
+    expect(
+      resolveUpdateCellValue(
+        { name: '时长' },
+        makeRemote({ 片长: 24 as unknown as string }),
+        [],
+        true,
+        false,
+        '',
+      ),
+    ).toEqual({ value: '24', shouldWrite: true })
+  })
+
+  it('更新行：数字值不受日期本地化影响（「时长」不在 DATE_COLUMNS）', () => {
+    expect(
+      resolveUpdateCellValue(
+        { name: '时长' },
+        makeRemote({ 片长: 0 as unknown as string }),
+        [],
+        true,
+        false,
+        '',
+      ),
+    ).toEqual({ value: '0', shouldWrite: true })
+  })
+})

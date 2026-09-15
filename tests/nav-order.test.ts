@@ -343,6 +343,17 @@ describe('startNavOrderSync 跨页同步', () => {
     vi.advanceTimersByTime(300)
     expect(mainChildIds()).toEqual(['sec-file', 'sec-target'])
   })
+
+  it('页面卸载（beforeunload）时清除轮询定时器', () => {
+    vi.useFakeTimers()
+    startNavOrderSync('enrich')
+    expect(vi.getTimerCount()).toBeGreaterThan(0)
+    window.dispatchEvent(new Event('beforeunload'))
+    expect(vi.getTimerCount()).toBe(0)
+    // 清理后不再有新的轮询被排入
+    vi.advanceTimersByTime(60_000)
+    expect(vi.getTimerCount()).toBe(0)
+  })
 })
 
 describe('notifyNavOrderChanged（本页即时重排）', () => {

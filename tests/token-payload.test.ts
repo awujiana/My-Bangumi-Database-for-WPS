@@ -157,6 +157,15 @@ describe('extractToken', () => {
     const payload = buildPayload('中文token-🔑')
     expect(extractToken(payload)).toBe('中文token-🔑')
   })
+
+  it('传入非字符串（宿主读到 null / undefined）时不抛错，吞异常返回 null', () => {
+    // extractToken 是对外导出的公共 API，调用方可能是未做类型守卫的 JS 代码，
+    // 因此函数体整体包在 try/catch 里。这里显式传入越界值，验证 catch 分支
+    // 真的能兜住（`null.split` 抛 TypeError），而不是让异常穿透到宿主。
+    expect(extractToken(null as unknown as string)).toBeNull()
+    expect(extractToken(undefined as unknown as string)).toBeNull()
+    expect(extractToken(123 as unknown as string)).toBeNull()
+  })
 })
 
 // ========== 综合场景 ==========
