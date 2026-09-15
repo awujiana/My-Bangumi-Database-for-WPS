@@ -19,6 +19,7 @@
 | v3.5 | 2026-08-28 | 收藏回写空表自动填充：工作表为空时，经用户确认后自动写入标准表头并用 Bangumi 账号收藏条目填充 Excel，再执行标记；恢复缺失的 `css/panel-theme.css` 源文件                                                                                                                                                                                                                                                                    |
 | v3.6 | 2026-08-30 | 设置面板重构：顶栏+侧边功能导航+主区布局、滚动高亮、导航仅图标模式（`bgm_nav_icons_only`）；新增外观主题（`bgm_theme`，dark/light/system，`ts/tools/theme.ts`）与同步偏好扩展（`bgm_list_type`/`bgm_time_filter`/`bgm_refresh_interval`）；修复 `bgm:modulesReady` 派发时序与导航 tooltip 裁剪                                                                                                                              |
 | v3.7 | 2026-09-10 | 分层治理（P1-5）：新增依赖反转桥 `ts/core/ui-bridge.ts`（`NotifyApi`/`SyncProgressApi`/`SyncRunner` + 未注册降级实现），`tools/`、`sync/` 的 5 处反向依赖改为依赖接口；`buildSyncConfig`/`SyncConfigSummary` 下沉 `ts/sync/sync-config-summary.ts`、`SyncProgressStats` 下沉 `ts/core/types.ts`；`core/crypto.ts` 正名 `core/token-payload.ts`；新增导入图门禁 `npm run check:cycles`（区分运行时边/类型边、致命环/良性环） |
+| v3.8 | 2026-09-15 | COM 往返性能治理：WPS 的 `Application`/`Workbook`/`Worksheet`/`Range` 均为**跨进程 COM 代理**，每次属性读取都是一次进程间往返；把 6 文件 / 11 处「循环条件里读 COM 属性」（`for (…; i <= sheets.Count; …)` 每轮重新求值，把 N 行扫描放大成 **N+1 次往返**）提成循环外单次读取；新增第 8 道门禁 `npm run check:com-in-loop`（AST 检查，非正则），并配运行时「往返次数」回归断言 |
 
 ## 一、架构概览
 
@@ -1165,6 +1166,9 @@ TypeScript 编译器 (tsconfig.json)
 项目使用 Vitest 作为测试框架：
 
 ```bash
+# 质量门禁（八关，推荐；提交前必跑）
+npm run gate
+
 # 运行全部测试
 npx vitest run
 
@@ -1175,11 +1179,29 @@ npx vitest run --coverage
 npx vitest
 ```
 
+**`npm run gate` 八道关**（任一失败即中断）：
+
+| # | 阶段 | 作用 |
+| ---: | --- | --- |
+| 1 | `lint:check` | `eslint ts tests`（`scripts/**` 不在 lint 范围） |
+| 2 | `check:dompurify-version` | 锁定 DOMPurify 版本，防静默升级引入 XSS 面 |
+| 3 | `check:cycles` | 导入图：分层反向依赖与「运行时环 + 顶层读取」的致命环 |
+| 4 | `check:ribbon-buttons` | `ribbon.xml` 按钮与 TS 分发表一致性 |
+| 5 | `check:nav-order` | `PAGE_MODULES` 与四个页面 HTML 结构、跨页同步接入一致性 |
+| 6 | `check:com-in-loop` | **AST** 查「循环条件里读 COM 属性」（跨进程往返放大器），`// com-loop-ok: <理由>` 可豁免 |
+| 7 | `typecheck:tests` | `tests/` 目录类型检查 |
+| 8 | `test` | `vitest run` |
+
+> **覆盖率复核**必须带 `--config vitest.cov.config.ts`（`clean:false`）并设
+> `CODEBUDDY_SAFE_DELETE_BULK_THRESHOLD=1000000`，且 `--coverage.reporter=json-summary`
+> 与 `--coverage.reporter=json` **两个都要给**（只给 `json` 时 `coverage-summary.json` 不重写）。
+> 当前基线：**99.95% lines**（未覆盖 6 行，均为类型驱动 / 防御分支），详见 `文档/COVERAGE_BACKLOG.md`。
+
 **可测试的纯函数模块：**
 
 - `sync/github-sync-diff.ts`: 差异计算（零依赖，可在 Node 环境直接运行）
 - `sync/pure-utilities.ts` / `pure-utilities-core.ts`: 纯工具函数
-- `core/crypto.ts`: Token 加解密逻辑
+- `core/token-payload.ts`: Token 载荷解析（原名 `core/crypto.ts`，v3.7 正名）
 - `core/result.ts`: Result 类型
 - `tools/events.ts`: EventBus
 - `tools/logger.ts`: 日志与脱敏
