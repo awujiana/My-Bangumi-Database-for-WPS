@@ -8,13 +8,14 @@
 > **基线刷新**：2026-09-14（第六轮）—— 清单第 8 批（`sync/enrich-engine.ts` 假绿测试改写 + 切片补测、`ui/sync-result-dialog.ts` 零测试起步补测、清掉第 14 条的 preview.ts 两个隐患）；`npm run gate` 七关全绿
 > **基线刷新**：2026-09-14（第七轮）—— 清单第 9 批：`sync/enrich-record.ts` 1.67% → **100%**（未覆盖 176 → 0）、`ui/dialog.ts` 44% → **99.63%**（154 → 1，新增 `tests/dialog.ui.test.ts` 覆盖全部 UI 层）、`sync/exceltobangumi/index.ts` 48.33% → **74.62%**（279 → 137，只吃选区收集 / 行校验 / 筛选检测等纯逻辑切片，网络请求与重 COM 编排未硬造）；`npm run gate` 七关全绿
 > **基线刷新**：2026-09-15（第八轮）—— 清单第 10 批：`sync/exceltobangumi/api.ts` 1.92% → **100% lines/funcs/stmts**（153 → 0）、`ui/handlers/incremental-bindings.ts` 5.45% → **100% 四项全满**（104 → 0）、`panel/user-info-polling.ts` 0% → **100% 四项全满**（114 → 0），新增 3 个测试文件 / 133 条；`npm run gate` 七关全绿
-> **测试**：**3749 条 / 111 文件，全绿**
-> **全项目覆盖率**：**90.59% stmts / 81.4% branch / 90.21% funcs / 91.54% lines**（较首次生成 **+44.72 个点**）
-> **可执行行数**：13410，已覆盖 12276，**未覆盖 1134**
+> **基线刷新**：2026-09-15（第九轮）—— 清单第 11 批：`panel/enrich-conflict-dialog.ts` 0% → **100% 四项全满**（53 → 0）、`panel/enrich-record-view.ts` 0% → **100% 四项全满**（53 → 0）、`panel/enrich-source-detail.ts` 0% → **100% lines/funcs/stmts**（46 → 0，branch 96.66% 余 1 条不可达兜底）、`panel/{panel,settings,enrich}-bootstrap.ts` 0% → **100% lines/funcs/stmts**（71 → 0）；新增 4 个测试文件 / 80 条；首次抽出 `tests/helpers/` 共享桩并修掉 `coverage.exclude` 漏排 `tests/**` 的统计缺陷；`npm run gate` 七关全绿
+> **测试**：**3829 条 / 115 文件，全绿**
+> **全项目覆盖率**：**92.26% stmts / 82.57% branch / 92.25% funcs / 93.2% lines**（较首次生成 **+46.38 个点**）
+> **可执行行数**：13410，已覆盖 12499，**未覆盖 911**
 > **换算**：全项目**每提升 1 个百分点 ≈ 134 行**（= 13410 / 100）
 >
 > 注：第二轮涨幅主体是 §三 第 3、4 批 —— `ribbon-service`、`ui/handlers/sync`、`clean-page`、`scraping`、`sheet-cleaning`、`shell-nav` 等
-> 由 0~30% 补到 88~100%，未覆盖行 **5118 → 3212（−1906 行）**；第三轮（第 5 批）**3212 → 2811（−401 行）**；第四轮（第 6 批）**2811 → 2808（−3 行）**；第五轮（第 7 批）**2808 → 2467（−341 行）**；第六轮（第 8 批）**2467 → 1976（−491 行）**；第七轮（第 9 批）**1976 → 1505（−471 行）**；第八轮（第 10 批）**1505 → 1134（−371 行）**。
+> 由 0~30% 补到 88~100%，未覆盖行 **5118 → 3212（−1906 行）**；第三轮（第 5 批）**3212 → 2811（−401 行）**；第四轮（第 6 批）**2811 → 2808（−3 行）**；第五轮（第 7 批）**2808 → 2467（−341 行）**；第六轮（第 8 批）**2467 → 1976（−491 行）**；第七轮（第 9 批）**1976 → 1505（−471 行）**；第八轮（第 10 批）**1505 → 1134（−371 行）**；第九轮 **1134 → 911（−223 行）**。
 > **关键结论（累积）**：清单前列的「大文件 / COM 模块」**都没有走「先拆后测」**——依赖收敛到单一 barrel、依赖宿主对象、或依赖 ≤3 个薄封装的，就地测即可，
 > 断言打到真实 state 变迁 / 真实写盘调用 / 真实 DOM 写入，**不存在假覆盖**（判据见 `.workbuddy/memory/REF-testing.md`）。
 
@@ -52,21 +53,15 @@ node scripts/calc-coverage-backlog.mjs
 | 77 | +0.57% | 1.28% | 中-DOM/UI | `ts/panel/panel-page.ts` |
 | 69 | +0.51% | 59.17% | 难-COM/网络 | `ts/sync/workbook-auto-detect.ts` |
 | 58 | +0.43% | 40.2% | 中-DOM/UI | `ts/ui/handlers/github-settings.ts` |
-| 53 | +0.40% | 0% | 中-DOM/UI | `ts/panel/enrich-conflict-dialog.ts` |
-| 53 | +0.40% | 0% | 中-DOM/UI | `ts/panel/enrich-record-view.ts` |
-| 46 | +0.34% | 0% | 中-DOM/UI | `ts/panel/enrich-source-detail.ts` |
 | 40 | +0.30% | 0% | 难-COM/网络 | `ts/sync/exceltobangumi/chapter-marker.ts` |
 | 32 | +0.24% | 81.39% | 易-纯逻辑 | `ts/tools/zod-compat.ts` |
 | 31 | +0.23% | 3.12% | 中-DOM/UI | `ts/ui/message.ts` |
-| 29 | +0.22% | 0% | 中-DOM/UI | `ts/panel/settings-bootstrap.ts` |
 | 28 | +0.21% | 88.97% | 易-纯逻辑 | `ts/tools/util/sheet.ts` |
 | 26 | +0.19% | 96% | 难-COM/网络 | `ts/sync/github-sync.ts` |
 | 24 | +0.18% | 92.4% | 中-DOM/UI | `ts/panel/clean-engine.ts` |
 | 24 | +0.18% | 0% | 中-DOM/UI | `ts/ui/handlers/sheet.ts` |
-| 22 | +0.16% | 0% | 中-DOM/UI | `ts/panel/panel-bootstrap.ts` |
 | 22 | +0.16% | 76.34% | 中-DOM/UI | `ts/ui/handlers/index.ts` |
 | 22 | +0.16% | 18.51% | 中-DOM/UI | `ts/ui/handlers/path-controls.ts` |
-| 20 | +0.15% | 0% | 中-DOM/UI | `ts/panel/enrich-bootstrap.ts` |
 | 20 | +0.15% | 0% | 中-DOM/UI | `ts/panel/enrich-result-view.ts` |
 | 20 | +0.15% | 64.91% | 易-纯逻辑 | `ts/tools/wps.ts` |
 | 19 | +0.14% | 0% | 中-DOM/UI | `ts/ui/github-config-dialog.ts` |
@@ -77,6 +72,12 @@ node scripts/calc-coverage-backlog.mjs
 | 13 | +0.10% | 96.58% | 难-COM/网络 | `ts/sync/sync-record.ts` |
 | 13 | +0.10% | 90.07% | 易-纯逻辑 | `ts/tools/config.ts` |
 | 12 | +0.09% | 67.56% | 易-纯逻辑 | `ts/tools/logger.ts` |
+| 11 | +0.08% | 83.07% | 易-纯逻辑 | `ts/tools/sanitize.ts` |
+| 8 | +0.06% | 85.71% | 易-纯逻辑 | `ts/tools/util/cell.ts` |
+| 6 | +0.04% | 95.45% | 中-DOM/UI | `ts/ui/handlers/module-order.ts` |
+| 5 | +0.04% | 96.75% | 难-COM/网络 | `ts/sync/enrich-lock.ts` |
+| 5 | +0.04% | 96.73% | 难-COM/网络 | `ts/sync/github-sync-diff.ts` |
+| 4 | +0.03% | 55.55% | 易-纯逻辑 | `ts/core/error-handler.ts` |
 
 > **难度列是按目录粗判的**：`ts/tools`、`ts/core` 多为纯逻辑 → 易；`ts/panel`、`ts/ui` 依赖 DOM → 中；`ts/sync`、`ts/services` 依赖 COM / 网络 → 难。
 > 实际动手前仍需扫一眼文件内的依赖（例如 `tools/util/index.ts` 是聚合桶，可能混入依赖 WPS 全局对象的函数）。
@@ -165,7 +166,7 @@ node scripts/calc-coverage-backlog.mjs
     - **顺带修掉一处生产类型缺口**：`EnrichedField` 运行时会带 `note`（「字段名差异: 编剧 → 脚本」），接口却没声明 —— 由 `scripts/check-tests-types.mjs` 抓出（测试读 `.note` 报 TS2339）。与 ①② 同类：**声明漏字段**。修法是一行 `note?: string`。
     - **口径提示**：`ts/sync/**` 按项目方针**只吃纯逻辑切片**，COM 交互重的部分不硬造（A/B 全走内存工作表桩，断言打在真实 `setCellValue` / 真实返回结构上）。
 
-**第 9 批（2026-09-15 第八轮，已完成）**
+**第 10 批（2026-09-15 第八轮，已完成）**
 
 16. ~~`ts/sync/exceltobangumi/api.ts`（153 行 / 1.92%）、`ts/ui/handlers/incremental-bindings.ts`（104 行 / 5.45%）、`ts/panel/user-info-polling.ts`（114 行 / 0%）~~ ✅ **三个全部收口**（2026-09-15，新增 3 个测试文件 / 133 条）：
     - **`api.ts`**：1.92% → **100% lines / 100% funcs / 100% stmts**（153 → **0**，55 条）。**清单里给的「难-COM/网络」标签偏高，已证伪**：它一行 COM 都不碰，258 行是 `testTokenValidityForRibbon` + `bgmRequestSync` 两段 `XMLHttpRequest` 编排 → 把全局 `XMLHttpRequest` 换成一个**不自动完成**的假实现、由用例显式 `emit('load' | 'error')` / `fireTimeout()` 驱动，200 / 401 / 429 / 5xx / 非 JSON / 网络错误 / 超时 / abort 各条分支逐条打进。
@@ -179,6 +180,26 @@ node scripts/calc-coverage-backlog.mjs
       ② `window` 上的 `beforeunload` 监听器**跨用例累积**（每次 `startUserInfoPolling` 注册一个且从不摘除）→ 直接 `dispatchEvent` 会一次打中历史上所有用例的 handler，必须改成「抓本次注册的那个 handler 单独调用」；
       ③ `startUserInfoPolling()` 在**启动瞬间**就快照一次 `loadBgToken()`，想在首轮 tick 观察到 Token 变更就必须**先启动再注入**，否则用例恒不触发。
     - **全项目**：88.77% → **91.54% lines**（未覆盖 1505 → **1134**，吃掉 371 行）；测试 3616 → **3749 条 / 111 文件**；`npm run gate` 七关全绿。
+
+**第 11 批（2026-09-15 第九轮，已完成）**
+
+19. ~~`ts/panel/enrich-conflict-dialog.ts`（53 行 / 0%）、`enrich-record-view.ts`（53 行 / 0%）、`enrich-source-detail.ts`（46 行 / 0%）~~ ✅ **三个 0% 子流程全部收口**，合计 152 → **0 行**（新增 3 个测试文件 / 62 条）：
+    - `enrich-conflict-dialog.ts` → **100% 四项全满**（53 → 0，20 条）。`handleConflictResolution` 是**私有函数**，只能经「带 `[data-resolution]` 的按钮点击」驱动，故每条用例都先建对话框骨架再派发 `click`；`enrich-progress-hosts` 用真模块（`progressHosts` 的赋值/清空本身就是断言目标），只把它下层的 `ui/components/progress.js` 换成返回桩的假工厂。
+    - `enrich-record-view.ts` → **100% 四项全满**（53 → 0，20 条）。`sanitizeHtml` mock 成恒等（DOMPurify 会重排属性顺序，逐字断言模板变脆），但 `escapeHtml` **保持真实** —— 本文件要断言的正是「用户数据进模板前被转义」，把它一起 mock 掉就等于把被测行为也 mock 掉了。
+    - `enrich-source-detail.ts` → **100% lines/funcs/stmts**（46 → 0，22 条）。`renderSourceDetailTable` 同为私有函数，经 `showSourceDetail()` 渲染后对 DOM 断言（「容器缺失 → 早退」是真删 DOM 驱动的）。
+      branch 96.66%：余 1 条是第 74 行 `|| \`第${col}列\`` 兜底，**逻辑不可达** —— 进入该表达式的前提是 `header || field` 为真，header 为空时 field 必来自 `fieldByCol`，其取值只可能是 `COLUMN_MAPPING_FIELDS` 的 key 或 `'platformCol'`，两者都在 `labelByField` 里。已在测试文件头写明不追。
+    - **踩坑**：不能用 `innerHTML` 里找 `&lt;` 断言属性转义 —— HTML 序列化会把属性值里的实体还原成字面量（`title="A&lt;B"` 解析后再序列化就是 `title="A<B"`），断言会假失败。改为直接取证「值有没有逃出属性上下文」（注入 `" onmouseover="alert(1)` 后断言 `getAttributeNames()` 只有 `title`）。
+20. ~~`ts/panel/panel-bootstrap.ts`（22 行 / 0%）、`settings-bootstrap.ts`（29 行 / 0%）、`enrich-bootstrap.ts`（20 行 / 0%）~~ ✅ **三个启动脚本全部收口**，合计 71 → **0 行**（`tests/panel-bootstrap.test.ts`，17 条）：
+    - 三个文件都是**导入即执行**（无导出、靠模块求值时的副作用工作），故用例 `vi.resetModules()` 后重新 `import()`，对「按钮禁用/启用、初始化函数被调用、console 输出」这些外部可观察量断言，而非断言内部变量。
+    - 16 个纯副作用 import（`../index.js` barrel、`../ui/dialog.js` 等）mock 成空对象 —— 否则会拖进整张真实依赖图（barrel 循环还会静默回退真实现）；有具名导出的 8 个模块（`installModalA11y` / `initShellNav` / `startNavOrderSync` …）换成 spy。
+    - **三条让该文件稳定的做法**：① `vi.clearAllTimers()` 必须留在 `beforeEach` —— settings 的 5 秒兜底定时器会随历史实例累积，不清理就会在下条用例推进时钟时替「本该超时」的实例把按钮启用，断言直接反向；② `document.readyState` 要显式复位成 `'complete'`（用例改成 `'loading'` 后 jsdom 不会自己改回来）；③ `bgm:modulesReady` 监听器跨用例累积（挂在 document 上，清 body 清不掉），断言一律用 `.some(...)` / 状态而非精确调用次数。
+    - branch 停在 61~77%：余下全是 `typeof window/document !== 'undefined'` 的**另一侧**，只在无宿主环境可达，收益是 0 行覆盖（lines 已 100%），**刻意不追**。
+21. **首次抽出 `tests/helpers/` 共享桩**（本轮新基建，本轮 4 个新文件已全部复用）：
+    - `dom.ts` —— `clearDom` / `mountElement` / `mountSelect` / `mountCheckbox` / `mountInput` / `mountButton` / `dispatch{Change,Input,Click}` / `settleMacrotasks`。把两个非显然的 jsdom 行为写成文档：`select.value = 'x'` 在无同名 `<option>` 时被**静默丢弃**；模块级监听器不随 `clearDom()` 消失。
+    - `utility-mock.ts` —— `ts/tools/util/index.js` barrel 的共享替身（`utilityMock` / `resetUtilityMock` / `loggedMessages` / `hasLogMessage`）。**用法**：`vi.mock(path, async () => (await import('./helpers/utility-mock.js')).utilityMock)` —— mock 工厂与测试文件静态 import 解析到**同一模块实例**，断言的 spy 就是被 mock 进去的那批（本模式先用探针验证过才铺开）。`resetUtilityMock` 走 `mockReset` + 重锚中性默认实现：`clearAllMocks` **不清实现**，上条用例的抛错实现会泄漏。
+    - `enrich-context.ts` —— `resetEnrichState()`：在 **helper 首次求值时**对 `state` 单例深拷贝一张默认快照，重锚时写回，故生产改了默认字段会**自动跟随**、不漂移。
+    - **顺带修掉一个被掩盖的统计缺陷**：`vitest.config.ts` 的 `coverage.exclude` 是**显式数组**，会整体替换 vitest 的默认 exclude（默认含 `test?(s)/**`）。少了这一条，`tests/helpers/**` 一旦被测试 import 就被 v8 采样进报告 —— 实测虚增 35 行未覆盖、把全项目 lines 从 93.2% 稀释到 92.97%。已在 `coverage.exclude` 补 `'tests/**'`（补后复核：`coverage-summary.json` 非 `ts/` 条目 = 0）。
+    - **全项目**：91.54% → **93.2% lines**（未覆盖 1134 → **911**，吃掉 223 行 = 152 + 71，数字吻合）；测试 3749 → **3829 条 / 115 文件**；`npm run gate` 七关全绿。
 
 ---
 

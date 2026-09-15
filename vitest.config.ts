@@ -13,6 +13,10 @@ export default defineConfig({
       reporter: ['text', 'html'],
       include: ['ts/**/*.ts'],
       exclude: [
+        // 测试代码与其共享 helper：本数组是**显式**的，会整体替换 vitest 的默认
+        // exclude（默认含 `test?(s)/**`）。少了这一条，`tests/helpers/**` 一旦被
+        // 测试 import 就会被 v8 采样进报告，虚增未覆盖行数并稀释全项目百分比。
+        'tests/**',
         // 入口聚合文件：仅 re-export，无独立逻辑
         'ts/index.ts',
         'ts/tools/utility.ts',
