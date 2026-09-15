@@ -10,13 +10,14 @@
 > **基线刷新**：2026-09-15（第八轮）—— 清单第 10 批：`sync/exceltobangumi/api.ts` 1.92% → **100% lines/funcs/stmts**（153 → 0）、`ui/handlers/incremental-bindings.ts` 5.45% → **100% 四项全满**（104 → 0）、`panel/user-info-polling.ts` 0% → **100% 四项全满**（114 → 0），新增 3 个测试文件 / 133 条；`npm run gate` 七关全绿
 > **基线刷新**：2026-09-15（第九轮）—— 清单第 11 批：`panel/enrich-conflict-dialog.ts` 0% → **100% 四项全满**（53 → 0）、`panel/enrich-record-view.ts` 0% → **100% 四项全满**（53 → 0）、`panel/enrich-source-detail.ts` 0% → **100% lines/funcs/stmts**（46 → 0，branch 96.66% 余 1 条不可达兜底）、`panel/{panel,settings,enrich}-bootstrap.ts` 0% → **100% lines/funcs/stmts**（71 → 0）；新增 4 个测试文件 / 80 条；首次抽出 `tests/helpers/` 共享桩并修掉 `coverage.exclude` 漏排 `tests/**` 的统计缺陷；`npm run gate` 七关全绿
 > **基线刷新**：2026-09-15（第十轮）—— 清单第 12 批（纯逻辑小块批量）：`ts/tools/zod-compat.ts` 81.39% → **100% lines**（32 → 0）、`ts/tools/util/sheet.ts` 88.97% → **100% lines**（28 → 0，顺带修一处 getLastRow「来自缓存」文案永远误报的生产 bug）、`ts/tools/wps.ts` 64.91% → **100% lines**（20 → 0）、`ts/tools/locked-sheet.ts` 90.55% → **100% lines**（17 → 0）、`ts/tools/http.ts` 89.55% → **99.25% lines**（14 → 1，余 1 行为 MAX_RETRIES_EXCEEDED 不可达出口）；追加到既有测试文件 + 新建 `tests/wps-dialog-fallback.test.ts`（jsdom 侧降级链），合计 **+63 条**；`npm run gate` 七关全绿
-> **测试**：**3892 条 / 116 文件，全绿**
-> **全项目覆盖率**：**93.16% stmts / 83.74% branch / 93.90% funcs / 94.03% lines**（较首次生成 **+47.21 个点**）
-> **可执行行数**：13411，已覆盖 12610，**未覆盖 801**
+> **基线刷新**：2026-09-15（第十一轮）—— 清单第 13 批（中-DOM/UI 批量）：`ts/ui/handlers/path-controls.ts` 18.51% → **100% lines / 100% funcs**（22 → 0）、`ts/panel/enrich-result-view.ts` 0% → **100% 四项全满**（20 → 0）、`ts/ui/handlers/sheet.ts` 0% → **100% lines / 100% funcs / 100% stmts**（24 → 0）；新增 3 个测试文件 / 25 条；`npm run gate` 七关全绿
+> **测试**：**3917 条 / 119 文件，全绿**
+> **全项目覆盖率**：**93.66% stmts / 84.30% branch / 94.23% funcs / 94.52% lines**（较首次生成 **+47.70 个点**）
+> **可执行行数**：13411，已覆盖 12676，**未覆盖 735**
 > **换算**：全项目**每提升 1 个百分点 ≈ 134 行**（= 13410 / 100）
 >
 > 注：第二轮涨幅主体是 §三 第 3、4 批 —— `ribbon-service`、`ui/handlers/sync`、`clean-page`、`scraping`、`sheet-cleaning`、`shell-nav` 等
-> 由 0~30% 补到 88~100%，未覆盖行 **5118 → 3212（−1906 行）**；第三轮（第 5 批）**3212 → 2811（−401 行）**；第四轮（第 6 批）**2811 → 2808（−3 行）**；第五轮（第 7 批）**2808 → 2467（−341 行）**；第六轮（第 8 批）**2467 → 1976（−491 行）**；第七轮（第 9 批）**1976 → 1505（−471 行）**；第八轮（第 10 批）**1505 → 1134（−371 行）**；第九轮 **1134 → 911（−223 行）**；第十轮（第 12 批）**911 → 801（−110 行）**。
+> 由 0~30% 补到 88~100%，未覆盖行 **5118 → 3212（−1906 行）**；第三轮（第 5 批）**3212 → 2811（−401 行）**；第四轮（第 6 批）**2811 → 2808（−3 行）**；第五轮（第 7 批）**2808 → 2467（−341 行）**；第六轮（第 8 批）**2467 → 1976（−491 行）**；第七轮（第 9 批）**1976 → 1505（−471 行）**；第八轮（第 10 批）**1505 → 1134（−371 行）**；第九轮 **1134 → 911（−223 行）**；第十轮（第 12 批）**911 → 801（−110 行）**；第十一轮（第 13 批）**801 → 735（−66 行）**。
 > **关键结论（累积）**：清单前列的「大文件 / COM 模块」**都没有走「先拆后测」**——依赖收敛到单一 barrel、依赖宿主对象、或依赖 ≤3 个薄封装的，就地测即可，
 > 断言打到真实 state 变迁 / 真实写盘调用 / 真实 DOM 写入，**不存在假覆盖**（判据见 `.workbuddy/memory/REF-testing.md`）。
 
@@ -58,10 +59,7 @@ node scripts/calc-coverage-backlog.mjs
 | 31 | +0.23% | 3.12% | 中-DOM/UI | `ts/ui/message.ts` |
 | 26 | +0.19% | 96% | 难-COM/网络 | `ts/sync/github-sync.ts` |
 | 24 | +0.18% | 92.4% | 中-DOM/UI | `ts/panel/clean-engine.ts` |
-| 24 | +0.18% | 0% | 中-DOM/UI | `ts/ui/handlers/sheet.ts` |
 | 22 | +0.16% | 76.34% | 中-DOM/UI | `ts/ui/handlers/index.ts` |
-| 22 | +0.16% | 18.51% | 中-DOM/UI | `ts/ui/handlers/path-controls.ts` |
-| 20 | +0.15% | 0% | 中-DOM/UI | `ts/panel/enrich-result-view.ts` |
 | 19 | +0.14% | 0% | 中-DOM/UI | `ts/ui/github-config-dialog.ts` |
 | 17 | +0.13% | 0% | 中-DOM/UI | `ts/panel/clean-bootstrap.ts` |
 | 14 | +0.10% | 97.59% | 中-DOM/UI | `ts/ui/handlers/action-handlers.ts` |
@@ -210,6 +208,16 @@ node scripts/calc-coverage-backlog.mjs
     - **本轮新踩的坑（已写进 `REF-testing.md`）**：① 两个并行 Edit 写同一测试文件只落地一处（`nullish` 进了、`vi` 导入没进）→ 改为带断言的 `tmp-spec.mjs` 批量修；② `class-methods-use-this` 在 XHR 抛错测试桩上用 `/* eslint-disable class-methods-use-this */` 包子类；③ `typecheck:tests` 基线门禁（`scripts/check-tests-types.mjs`）对新增用例的 TS 错误只许下降，本次 `LiteIssue` 缺 `message?` 触发 2 个 TS2339 当场修；④ `--reporter=basic` 在新版 vitest 已移除，改默认 reporter + `Out-File` 落盘。
     - **全项目**：93.2% → **94.03% lines**（未覆盖 911 → **801**，吃掉 110 行，与 5 文件合计 111 行口径吻合，余 1 行是 http 不可达）；测试 3829 → **3892 条 / 116 文件**；`npm run gate` 七关全绿。
 
+
+**第 13 批（2026-09-15 第十一轮，已完成）**
+
+23. ~~`ts/ui/handlers/path-controls.ts`（22 行 / 18.51%）、`ts/panel/enrich-result-view.ts`（20 行 / 0%）、`ts/ui/handlers/sheet.ts`（24 行 / 0%）~~ ✅ **三个 DOM/UI 文件全部收口**（2026-09-15，新增 3 个测试文件 / 25 条）：
+    - **`path-controls.ts`**：18.51% → **100% lines / 100% funcs**（22 → 0，11 条）。`selectDefaultFolder` 覆盖 8 分支（getApp 空 / FileDialog 选择 / 取消 / GetOpenFilename 回退取目录 / 取消 / 抛错兜底 / 无斜杠文件名返回 null / 既无 FileDialog 也无 GetOpenFilename）、`updatePathDisplay` 2 分支、`initConfigPathControls` 1 分支。branch 余 21/24（87.5%）：`initConfigPathControls` 开头 `if (typeof document === 'undefined') return` 的另一侧（无宿主早退）**刻意不追**（与三个 bootstrap 同判据，收益 0 行覆盖）。
+    - **`enrich-result-view.ts`**：0% → **100% 四项全满**（20 → 0，8 条）。`maybeAutoCleanAfterEnrich`（早退 / 成功 / 异常兜底）+ `showEnrichDetailButton` / `showEnrichDetail` / `hideEnrichDetail`（DOM 切换）。branch 余 13/16（81.25%）：`maybeAutoCleanAfterEnrich` 的 bangumiSheet 空判定两侧与 catch 属不可达/已前移分支。
+    - **`sheet.ts`**：0% → **100% lines / 100% funcs / 100% stmts**（24 → 0，6 条）。驱动真实 `cleanLockedDataSheet`，覆盖空工作表 / 有数据 / 异常兜底各分支。branch 余 18/20（90%）：两条 `typeof X === 'undefined'` 另一侧。
+    - **mock 策略（三个都走「单一 barrel 单点 mock」）**：`../ts/index.js` 提供 `getApp` / `getExportPath` / `getImportPath` / `LOG_LEVELS` / `bgmLog` / `BGM` 等；叶子模块（`enrich-page-state` / `enrich-page-context` / `sheet-cleaning` / `dialog` / `tools/util/index`）单点 mock，断言打在真实 DOM 写入 / 真实 `cleanSheetDuplicates` 调用 —— 与第 11 批「0% 子流程就地测」同型，不存在假覆盖。
+    - **本轮新踩的 typecheck 坑（已写进 `REF-testing.md`）**：① `vi.fn(() => null)` 被推断返回类型 `null`，后续 `mockReturnValue(对象)` 报「not assignable to null」→ 写成 `vi.fn((): unknown => null)`；② `vi.hoisted` 里 `null as never` 会让后续 `= null` / `= {Name}` 都报「not assignable to never」→ 改成 `null as { Name: string } | null`。
+    - **全项目**：94.03% → **94.52% lines**（未覆盖 801 → **735**，吃掉 66 行 = 22 + 20 + 24，数字吻合）；测试 3892 → **3917 条 / 119 文件**；`npm run gate` 七关全绿。
 
 ## 四、门禁现状
 
