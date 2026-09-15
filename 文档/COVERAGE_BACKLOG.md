@@ -7,13 +7,14 @@
 > **基线刷新**：2026-09-14（第五轮）—— 清单第 7 批（`panel-lifecycle` 收尾到 100% lines + `ui/preview.ts` 补测）；`npm run gate` 七关全绿
 > **基线刷新**：2026-09-14（第六轮）—— 清单第 8 批（`sync/enrich-engine.ts` 假绿测试改写 + 切片补测、`ui/sync-result-dialog.ts` 零测试起步补测、清掉第 14 条的 preview.ts 两个隐患）；`npm run gate` 七关全绿
 > **基线刷新**：2026-09-14（第七轮）—— 清单第 9 批：`sync/enrich-record.ts` 1.67% → **100%**（未覆盖 176 → 0）、`ui/dialog.ts` 44% → **99.63%**（154 → 1，新增 `tests/dialog.ui.test.ts` 覆盖全部 UI 层）、`sync/exceltobangumi/index.ts` 48.33% → **74.62%**（279 → 137，只吃选区收集 / 行校验 / 筛选检测等纯逻辑切片，网络请求与重 COM 编排未硬造）；`npm run gate` 七关全绿
-> **测试**：**3616 条 / 108 文件，全绿**
-> **全项目覆盖率**：**87.96% stmts / 78.82% branch / 88.46% funcs / 88.77% lines**（较首次生成 **+41.95 个点**）
-> **可执行行数**：13410，已覆盖 11905，**未覆盖 1505**
+> **基线刷新**：2026-09-15（第八轮）—— 清单第 10 批：`sync/exceltobangumi/api.ts` 1.92% → **100% lines/funcs/stmts**（153 → 0）、`ui/handlers/incremental-bindings.ts` 5.45% → **100% 四项全满**（104 → 0）、`panel/user-info-polling.ts` 0% → **100% 四项全满**（114 → 0），新增 3 个测试文件 / 133 条；`npm run gate` 七关全绿
+> **测试**：**3749 条 / 111 文件，全绿**
+> **全项目覆盖率**：**90.59% stmts / 81.4% branch / 90.21% funcs / 91.54% lines**（较首次生成 **+44.72 个点**）
+> **可执行行数**：13410，已覆盖 12276，**未覆盖 1134**
 > **换算**：全项目**每提升 1 个百分点 ≈ 134 行**（= 13410 / 100）
 >
 > 注：第二轮涨幅主体是 §三 第 3、4 批 —— `ribbon-service`、`ui/handlers/sync`、`clean-page`、`scraping`、`sheet-cleaning`、`shell-nav` 等
-> 由 0~30% 补到 88~100%，未覆盖行 **5118 → 3212（−1906 行）**；第三轮（第 5 批）**3212 → 2811（−401 行）**；第四轮（第 6 批）**2811 → 2808（−3 行）**；第五轮（第 7 批）**2808 → 2467（−341 行）**；第六轮（第 8 批）**2467 → 1976（−491 行）**；第七轮（第 9 批）**1976 → 1505（−471 行）**。
+> 由 0~30% 补到 88~100%，未覆盖行 **5118 → 3212（−1906 行）**；第三轮（第 5 批）**3212 → 2811（−401 行）**；第四轮（第 6 批）**2811 → 2808（−3 行）**；第五轮（第 7 批）**2808 → 2467（−341 行）**；第六轮（第 8 批）**2467 → 1976（−491 行）**；第七轮（第 9 批）**1976 → 1505（−471 行）**；第八轮（第 10 批）**1505 → 1134（−371 行）**。
 > **关键结论（累积）**：清单前列的「大文件 / COM 模块」**都没有走「先拆后测」**——依赖收敛到单一 barrel、依赖宿主对象、或依赖 ≤3 个薄封装的，就地测即可，
 > 断言打到真实 state 变迁 / 真实写盘调用 / 真实 DOM 写入，**不存在假覆盖**（判据见 `.workbuddy/memory/REF-testing.md`）。
 
@@ -46,10 +47,7 @@ node scripts/calc-coverage-backlog.mjs
 
 | 未覆盖 | 全补完提升 | 当前行覆盖 | 难度 | 文件 |
 | -----: | ---------: | ---------: | ---- | ---- |
-| 153 | +1.14% | 1.92% | 难-COM/网络 | `ts/sync/exceltobangumi/api.ts` |
 | 137 | +1.02% | 74.62% | 难-COM/网络 | `ts/sync/exceltobangumi/index.ts` |
-| 114 | +0.85% | 0% | 中-DOM/UI | `ts/panel/user-info-polling.ts` |
-| 104 | +0.78% | 5.45% | 中-DOM/UI | `ts/ui/handlers/incremental-bindings.ts` |
 | 78 | +0.58% | 88.21% | 中-DOM/UI | `ts/panel/enrich-page.ts` |
 | 77 | +0.57% | 1.28% | 中-DOM/UI | `ts/panel/panel-page.ts` |
 | 69 | +0.51% | 59.17% | 难-COM/网络 | `ts/sync/workbook-auto-detect.ts` |
@@ -76,6 +74,9 @@ node scripts/calc-coverage-backlog.mjs
 | 17 | +0.13% | 90.55% | 易-纯逻辑 | `ts/tools/locked-sheet.ts` |
 | 14 | +0.10% | 89.55% | 易-纯逻辑 | `ts/tools/http.ts` |
 | 14 | +0.10% | 97.59% | 中-DOM/UI | `ts/ui/handlers/action-handlers.ts` |
+| 13 | +0.10% | 96.58% | 难-COM/网络 | `ts/sync/sync-record.ts` |
+| 13 | +0.10% | 90.07% | 易-纯逻辑 | `ts/tools/config.ts` |
+| 12 | +0.09% | 67.56% | 易-纯逻辑 | `ts/tools/logger.ts` |
 
 > **难度列是按目录粗判的**：`ts/tools`、`ts/core` 多为纯逻辑 → 易；`ts/panel`、`ts/ui` 依赖 DOM → 中；`ts/sync`、`ts/services` 依赖 COM / 网络 → 难。
 > 实际动手前仍需扫一眼文件内的依赖（例如 `tools/util/index.ts` 是聚合桶，可能混入依赖 WPS 全局对象的函数）。
@@ -163,6 +164,21 @@ node scripts/calc-coverage-backlog.mjs
       ② `syncAllRows` 收敛为**显式返回三字段**（`stopped` 只驱动本函数内的进度弹窗文案），「声明与运行时不符」消除。
     - **顺带修掉一处生产类型缺口**：`EnrichedField` 运行时会带 `note`（「字段名差异: 编剧 → 脚本」），接口却没声明 —— 由 `scripts/check-tests-types.mjs` 抓出（测试读 `.note` 报 TS2339）。与 ①② 同类：**声明漏字段**。修法是一行 `note?: string`。
     - **口径提示**：`ts/sync/**` 按项目方针**只吃纯逻辑切片**，COM 交互重的部分不硬造（A/B 全走内存工作表桩，断言打在真实 `setCellValue` / 真实返回结构上）。
+
+**第 9 批（2026-09-15 第八轮，已完成）**
+
+16. ~~`ts/sync/exceltobangumi/api.ts`（153 行 / 1.92%）、`ts/ui/handlers/incremental-bindings.ts`（104 行 / 5.45%）、`ts/panel/user-info-polling.ts`（114 行 / 0%）~~ ✅ **三个全部收口**（2026-09-15，新增 3 个测试文件 / 133 条）：
+    - **`api.ts`**：1.92% → **100% lines / 100% funcs / 100% stmts**（153 → **0**，55 条）。**清单里给的「难-COM/网络」标签偏高，已证伪**：它一行 COM 都不碰，258 行是 `testTokenValidityForRibbon` + `bgmRequestSync` 两段 `XMLHttpRequest` 编排 → 把全局 `XMLHttpRequest` 换成一个**不自动完成**的假实现、由用例显式 `emit('load' | 'error')` / `fireTimeout()` 驱动，200 / 401 / 429 / 5xx / 非 JSON / 网络错误 / 超时 / abort 各条分支逐条打进。
+      残余 branch 92.2% 全是 `instanceof Error ? … : String(error)` 的**后半侧**，只有刻意让被依赖方抛「非 Error 值」才可达，按既有判据不造。
+    - **`incremental-bindings.ts`**：5.45% → **100% 四项全满**（104 → **0**，43 条）。依赖形状是「单一 barrel + 两个薄叶子」：barrel 单点 mock（工厂内只 `await import('core/constants.js')`，**不用** `importOriginal`）；`resource-tracking` 用**真模块**，于是「挂载 DOM → 派发 `change` 事件 → handler 真被执行」是可断言的事实，而不是「某个 mock 被调用过」。
+      重试链路（3 次 × 100ms）用假时钟逐跳验证：未找到 → 排定时器 → 命中 / 退 radio / 退 checkbox / 静默结束。
+    - **`user-info-polling.ts`**：0% → **100% 四项全满**（114 → **0**，35 条）。13 个符号来自 barrel + 4 个来自 `panel-lifecycle`，两个单点 mock；`tools/events.js` **不 mock**，直接对**真实** `eventBus` 打 spy，从而对真实 `BGM_EVENTS` 常量断言。
+      轮询是 `setInterval(pollOnce, 2000)` → 假时钟按 tick 驱动，`pollOnce` 内各条「检测到变化」分支（工作簿数量 / 活动工作簿 / 用户信息 / Token / 三个配置开关 / 面板显示信号 / 两个跨上下文请求信号）逐条打到位。
+    - **本轮新踩的三个坑（已写进 `.workbuddy/memory/REF-testing.md`）**：
+      ① jsdom 里 `select.value = 'skip'` 在**没有同名 `<option>`** 时会被静默丢弃（值保持 `''`）→ 缺选项的用例会得到「看似没生效」的假失败；
+      ② `window` 上的 `beforeunload` 监听器**跨用例累积**（每次 `startUserInfoPolling` 注册一个且从不摘除）→ 直接 `dispatchEvent` 会一次打中历史上所有用例的 handler，必须改成「抓本次注册的那个 handler 单独调用」；
+      ③ `startUserInfoPolling()` 在**启动瞬间**就快照一次 `loadBgToken()`，想在首轮 tick 观察到 Token 变更就必须**先启动再注入**，否则用例恒不触发。
+    - **全项目**：88.77% → **91.54% lines**（未覆盖 1505 → **1134**，吃掉 371 行）；测试 3616 → **3749 条 / 111 文件**；`npm run gate` 七关全绿。
 
 ---
 
