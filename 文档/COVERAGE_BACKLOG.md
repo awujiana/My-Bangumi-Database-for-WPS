@@ -9,13 +9,14 @@
 > **基线刷新**：2026-09-14（第七轮）—— 清单第 9 批：`sync/enrich-record.ts` 1.67% → **100%**（未覆盖 176 → 0）、`ui/dialog.ts` 44% → **99.63%**（154 → 1，新增 `tests/dialog.ui.test.ts` 覆盖全部 UI 层）、`sync/exceltobangumi/index.ts` 48.33% → **74.62%**（279 → 137，只吃选区收集 / 行校验 / 筛选检测等纯逻辑切片，网络请求与重 COM 编排未硬造）；`npm run gate` 七关全绿
 > **基线刷新**：2026-09-15（第八轮）—— 清单第 10 批：`sync/exceltobangumi/api.ts` 1.92% → **100% lines/funcs/stmts**（153 → 0）、`ui/handlers/incremental-bindings.ts` 5.45% → **100% 四项全满**（104 → 0）、`panel/user-info-polling.ts` 0% → **100% 四项全满**（114 → 0），新增 3 个测试文件 / 133 条；`npm run gate` 七关全绿
 > **基线刷新**：2026-09-15（第九轮）—— 清单第 11 批：`panel/enrich-conflict-dialog.ts` 0% → **100% 四项全满**（53 → 0）、`panel/enrich-record-view.ts` 0% → **100% 四项全满**（53 → 0）、`panel/enrich-source-detail.ts` 0% → **100% lines/funcs/stmts**（46 → 0，branch 96.66% 余 1 条不可达兜底）、`panel/{panel,settings,enrich}-bootstrap.ts` 0% → **100% lines/funcs/stmts**（71 → 0）；新增 4 个测试文件 / 80 条；首次抽出 `tests/helpers/` 共享桩并修掉 `coverage.exclude` 漏排 `tests/**` 的统计缺陷；`npm run gate` 七关全绿
-> **测试**：**3829 条 / 115 文件，全绿**
-> **全项目覆盖率**：**92.26% stmts / 82.57% branch / 92.25% funcs / 93.2% lines**（较首次生成 **+46.38 个点**）
-> **可执行行数**：13410，已覆盖 12499，**未覆盖 911**
+> **基线刷新**：2026-09-15（第十轮）—— 清单第 12 批（纯逻辑小块批量）：`ts/tools/zod-compat.ts` 81.39% → **100% lines**（32 → 0）、`ts/tools/util/sheet.ts` 88.97% → **100% lines**（28 → 0，顺带修一处 getLastRow「来自缓存」文案永远误报的生产 bug）、`ts/tools/wps.ts` 64.91% → **100% lines**（20 → 0）、`ts/tools/locked-sheet.ts` 90.55% → **100% lines**（17 → 0）、`ts/tools/http.ts` 89.55% → **99.25% lines**（14 → 1，余 1 行为 MAX_RETRIES_EXCEEDED 不可达出口）；追加到既有测试文件 + 新建 `tests/wps-dialog-fallback.test.ts`（jsdom 侧降级链），合计 **+63 条**；`npm run gate` 七关全绿
+> **测试**：**3892 条 / 116 文件，全绿**
+> **全项目覆盖率**：**93.16% stmts / 83.74% branch / 93.90% funcs / 94.03% lines**（较首次生成 **+47.21 个点**）
+> **可执行行数**：13411，已覆盖 12610，**未覆盖 801**
 > **换算**：全项目**每提升 1 个百分点 ≈ 134 行**（= 13410 / 100）
 >
 > 注：第二轮涨幅主体是 §三 第 3、4 批 —— `ribbon-service`、`ui/handlers/sync`、`clean-page`、`scraping`、`sheet-cleaning`、`shell-nav` 等
-> 由 0~30% 补到 88~100%，未覆盖行 **5118 → 3212（−1906 行）**；第三轮（第 5 批）**3212 → 2811（−401 行）**；第四轮（第 6 批）**2811 → 2808（−3 行）**；第五轮（第 7 批）**2808 → 2467（−341 行）**；第六轮（第 8 批）**2467 → 1976（−491 行）**；第七轮（第 9 批）**1976 → 1505（−471 行）**；第八轮（第 10 批）**1505 → 1134（−371 行）**；第九轮 **1134 → 911（−223 行）**。
+> 由 0~30% 补到 88~100%，未覆盖行 **5118 → 3212（−1906 行）**；第三轮（第 5 批）**3212 → 2811（−401 行）**；第四轮（第 6 批）**2811 → 2808（−3 行）**；第五轮（第 7 批）**2808 → 2467（−341 行）**；第六轮（第 8 批）**2467 → 1976（−491 行）**；第七轮（第 9 批）**1976 → 1505（−471 行）**；第八轮（第 10 批）**1505 → 1134（−371 行）**；第九轮 **1134 → 911（−223 行）**；第十轮（第 12 批）**911 → 801（−110 行）**。
 > **关键结论（累积）**：清单前列的「大文件 / COM 模块」**都没有走「先拆后测」**——依赖收敛到单一 barrel、依赖宿主对象、或依赖 ≤3 个薄封装的，就地测即可，
 > 断言打到真实 state 变迁 / 真实写盘调用 / 真实 DOM 写入，**不存在假覆盖**（判据见 `.workbuddy/memory/REF-testing.md`）。
 
@@ -54,20 +55,15 @@ node scripts/calc-coverage-backlog.mjs
 | 69 | +0.51% | 59.17% | 难-COM/网络 | `ts/sync/workbook-auto-detect.ts` |
 | 58 | +0.43% | 40.2% | 中-DOM/UI | `ts/ui/handlers/github-settings.ts` |
 | 40 | +0.30% | 0% | 难-COM/网络 | `ts/sync/exceltobangumi/chapter-marker.ts` |
-| 32 | +0.24% | 81.39% | 易-纯逻辑 | `ts/tools/zod-compat.ts` |
 | 31 | +0.23% | 3.12% | 中-DOM/UI | `ts/ui/message.ts` |
-| 28 | +0.21% | 88.97% | 易-纯逻辑 | `ts/tools/util/sheet.ts` |
 | 26 | +0.19% | 96% | 难-COM/网络 | `ts/sync/github-sync.ts` |
 | 24 | +0.18% | 92.4% | 中-DOM/UI | `ts/panel/clean-engine.ts` |
 | 24 | +0.18% | 0% | 中-DOM/UI | `ts/ui/handlers/sheet.ts` |
 | 22 | +0.16% | 76.34% | 中-DOM/UI | `ts/ui/handlers/index.ts` |
 | 22 | +0.16% | 18.51% | 中-DOM/UI | `ts/ui/handlers/path-controls.ts` |
 | 20 | +0.15% | 0% | 中-DOM/UI | `ts/panel/enrich-result-view.ts` |
-| 20 | +0.15% | 64.91% | 易-纯逻辑 | `ts/tools/wps.ts` |
 | 19 | +0.14% | 0% | 中-DOM/UI | `ts/ui/github-config-dialog.ts` |
 | 17 | +0.13% | 0% | 中-DOM/UI | `ts/panel/clean-bootstrap.ts` |
-| 17 | +0.13% | 90.55% | 易-纯逻辑 | `ts/tools/locked-sheet.ts` |
-| 14 | +0.10% | 89.55% | 易-纯逻辑 | `ts/tools/http.ts` |
 | 14 | +0.10% | 97.59% | 中-DOM/UI | `ts/ui/handlers/action-handlers.ts` |
 | 13 | +0.10% | 96.58% | 难-COM/网络 | `ts/sync/sync-record.ts` |
 | 13 | +0.10% | 90.07% | 易-纯逻辑 | `ts/tools/config.ts` |
@@ -202,6 +198,18 @@ node scripts/calc-coverage-backlog.mjs
     - **全项目**：91.54% → **93.2% lines**（未覆盖 1134 → **911**，吃掉 223 行 = 152 + 71，数字吻合）；测试 3749 → **3829 条 / 115 文件**；`npm run gate` 七关全绿。
 
 ---
+
+**第 12 批（2026-09-15 第十轮，已完成）**
+
+22. ~~`ts/tools/zod-compat.ts`（32 行 / 81.39%）、`ts/tools/util/sheet.ts`（28 行 / 88.97%）、`ts/tools/wps.ts`（20 行 / 64.91%）、`ts/tools/locked-sheet.ts`（17 行 / 90.55%）、`ts/tools/http.ts`（14 行 / 89.55%）~~ ✅ **五个纯逻辑小块全部收口**（2026-09-15，追加到既有测试文件 + 新建 1 个测试文件 / 合计 +63 条）：
+    - **`zod-compat.ts`**：81.39% → **100% lines**（32 → 0，36 条）。补了包装类 full API 面（LiteOptional / LiteNullable / LiteWithDefault 的 optional / nullable / nullish / default / parse）与 `resolveZod()` 对 `globalThis.z` 的探测（用 `vi.resetModules()` + 动态 import 重求值观察）。
+    - **`util/sheet.ts`**：88.97% → **100% lines**（28 → 0，+18 条）。补 `readRangeCellValues`（保留原始类型 / 空值 / 二维 / 一维 / 异常）、`safeStringify` 对象分支、`getLastRow` 异常回退（锚定列抛错回退 D 列 / UsedRange 抛错 / 空名缓存键 / 首次 vs 缓存日志文案）。**顺带修一处生产 bug**：`getLastRow` 的「来自缓存」文案取样时机错误（在 `cacheGet` 之后查 `has` 恒为 true），改为调用前取样 `isCached`；之前日志永远显示「来自缓存」会把首算误报成缓存命中。
+    - **`wps.ts`**：64.91% → **100% lines**（20 → 0，新建 `tests/wps-dialog-fallback.test.ts` 10 条，jsdom 环境）。`wpsPrompt` / `wpsMessageBox` 三级降级链（InputBox 抛错→`window.BGMInput`→`getNotifyApi().input`；MessageBox 抛错→`window.BGMConfirm`/`BGMAlert`→`confirm`/`alert`；`(buttons ?? 0) + (icon ?? 64)` 默认值；取消 / undefined 归 null）。node 侧 `wps.test.ts` 已覆盖 `typeof window === 'undefined'` 分支，jsdom 侧补剩余链，两侧合起来 100%。
+    - **`locked-sheet.ts`**：90.55% → **100% lines**（17 → 0，+18 条，复用现有 `tests/enrich-lock.test.ts` 假宿主、未建新文件）。补 `getOpenWorkbooks` 容错（无 App / FullName 抛错 / Count 抛错 / Windows.Count 抛错 / Windows 补齐）、`getLockedSheet` 回退（活动工作簿回退 / 无活动工作簿清锁 / 空 lockedName 清锁 / 无 App 时 save+restore 只记警告 / 空白名返回 null）、`findBangumiTargetSheets` 过滤、`findBangumiTargetSheetInWorkbook`（名称命中优先 / 无命中取首个 / 全无返回 null）。
+    - **`http.ts`**：89.55% → **99.25% lines**（14 → 1，+7 条，51 条）。补 XHR 层细节（响应头非空读取 / onProgress 注册 + lengthComputable=false 不回调 / `xhr.send` 抛错降级 NETWORK_ERROR / XHR 初始化抛非 Error 用 String() 兜底 / zodSchema.parse 抛非 Error 用 String() 兜底）+ `signal` 竞态（入口已 aborted 即失败）。**刻意不追**：`MAX_RETRIES_EXCEEDED` 不可达出口（重试循环出口逻辑使其无法到达）。
+    - **本轮新踩的坑（已写进 `REF-testing.md`）**：① 两个并行 Edit 写同一测试文件只落地一处（`nullish` 进了、`vi` 导入没进）→ 改为带断言的 `tmp-spec.mjs` 批量修；② `class-methods-use-this` 在 XHR 抛错测试桩上用 `/* eslint-disable class-methods-use-this */` 包子类；③ `typecheck:tests` 基线门禁（`scripts/check-tests-types.mjs`）对新增用例的 TS 错误只许下降，本次 `LiteIssue` 缺 `message?` 触发 2 个 TS2339 当场修；④ `--reporter=basic` 在新版 vitest 已移除，改默认 reporter + `Out-File` 落盘。
+    - **全项目**：93.2% → **94.03% lines**（未覆盖 911 → **801**，吃掉 110 行，与 5 文件合计 111 行口径吻合，余 1 行是 http 不可达）；测试 3829 → **3892 条 / 116 文件**；`npm run gate` 七关全绿。
+
 
 ## 四、门禁现状
 

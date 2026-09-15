@@ -625,3 +625,112 @@ describe('httpGet / httpPost / httpPut / httpDelete', () => {
     await promise
   })
 })
+
+// ============================================================
+//  补测（2026-09-15）：此前从未被触发的 XHR 层路径
+// ============================================================
+//
+// 说明：`httpRequest` 末尾那条 `MAX_RETRIES_EXCEEDED` 分支（L224-229）**刻意不追** ——
+// 循环体只有「return」和「attempt += 1（仅在 attempt < retries 时）」两种出口，
+// `attempt > retries` 只可能在进入循环前成立，故该 return 不可达，属死代码兜底。
+
+// 下面两个子类只负责让 XHR 在特定步骤抛错，不读写实例状态，因此不需要 this。
+/* eslint-disable class-methods-use-this */
+class ThrowingSendXHR extends MockXHR {
+  override send(_body?: string | null): void {
+    throw new Error('send 被拒')
+  }
+}
+
+class ThrowingOpenXHR extends MockXHR {
+  override open(): void {
+    // 非 Error 抛出：用来覆盖 `error instanceof Error ? … : String(error)` 的兜底侧
+    throw 'open 直接被拒'
+  }
+}
+/* eslint-enable class-methods-use-this */
+
+describe('httpRequest - XHR 层细节（响应头 / 上传进度 / send 抛错）', () => {
+  it('响应头非空时读取并记录响应头（不抛错）', async () => {
+    const promise = httpRequest('/v0/x')
+    lastMockXhr!.getAllResponseHeaders = () => 'content-type: application/json'
+    lastMockXhr!._respondOk('{}')
+
+    const result = await promise
+    expect(result.isOk()).toBe(true)
+  })
+
+  it('提供 onProgress 时注册上传进度回调；lengthComputable=false 时不回调', async () => {
+    const onProgress = vi.fn()
+    const promise = httpRequest('/v0/x', { method: 'POST', body: '{}', onProgress })
+
+    const { upload } = lastMockXhr!
+    expect(upload.onprogress).not.toBeNull()
+
+    upload.onprogress?.({ loaded: 50, total: 100, lengthComputable: true })
+    expect(onProgress).toHaveBeenCalledWith(50, 100)
+
+    onProgress.mockClear()
+    upload.onprogress?.({ loaded: 1, total: 0, lengthComputable: false })
+    expect(onProgress).not.toHaveBeenCalled()
+
+    lastMockXhr!._respondOk('{}')
+    await promise
+  })
+
+  it('xhr.send 抛错时降级为「发送请求失败」并返回 NETWORK_ERROR', async () => {
+    Reflect.set(globalThis, 'XMLHttpRequest', ThrowingSendXHR)
+
+    const result = await httpRequest('/v0/x', { retries: 0 })
+
+    expect(result.isFail()).toBe(true)
+    expect(result.error?.code).toBe('NETWORK_ERROR')
+    expect(result.error?.message).toContain('send 被拒')
+  })
+
+  it('XHR 初始化抛非 Error 时用 String() 兜底错误消息', async () => {
+    Reflect.set(globalThis, 'XMLHttpRequest', ThrowingOpenXHR)
+
+    const result = await httpRequest('/v0/x', { retries: 0 })
+
+    expect(result.isFail()).toBe(true)
+    expect(result.error?.code).toBe('NETWORK_ERROR')
+    expect(result.error?.message).toBe('open 直接被拒')
+  })
+
+  it('zodSchema.parse 抛非 Error 时用 String() 兜底并返回 SCHEMA_VALIDATION_ERROR', async () => {
+    const zodSchema = {
+      parse: (): unknown => {
+        throw '校验器直接抛了字符串'
+      },
+    }
+    const promise = httpRequest('/v0/x', { zodSchema })
+    lastMockXhr!._respondOk('{}')
+
+    const result = await promise
+    expect(result.isFail()).toBe(true)
+    expect(result.error?.code).toBe('SCHEMA_VALIDATION_ERROR')
+    expect(result.error?.message).toBe('响应数据校验失败: 校验器直接抛了字符串')
+  })
+})
+
+describe('httpRequest - signal 竞态（检查通过后才被取消）', () => {
+  it('executeXhrRequest 入口读到已 aborted 时立即失败且不发出请求', async () => {
+    // httpRequest 在进循环前与循环顶部各读一次 aborted，第三、四次读取才返回 true，
+    // 复现「检查通过 → 极短时间内被取消」这一真实竞态窗口，驱动 executeXhrRequest 内的守卫。
+    let readCount = 0
+    const racingSignal = {
+      get aborted(): boolean {
+        readCount += 1
+        return readCount > 2
+      },
+      addEventListener: vi.fn(),
+    } as unknown as AbortSignal
+
+    const result = await httpRequest('/v0/x', { signal: racingSignal })
+
+    expect(result.isFail()).toBe(true)
+    expect(result.error?.code).toBe('ABORTED')
+    expect(xhrCallCount).toBe(0)
+  })
+})

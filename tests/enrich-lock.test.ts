@@ -213,9 +213,11 @@ import {
   clearLockedSheet,
   restoreLockedSheet,
   getLockedSheet,
+  getOpenWorkbooks,
   findWorkbookByName,
   findSheetInWorkbook,
   findBangumiTargetSheets,
+  findBangumiTargetSheetInWorkbook,
   LOCKED_SHEET_KEY,
 } from '../ts/tools/locked-sheet.js'
 import {
@@ -1059,5 +1061,229 @@ describe('initEnrichLock', () => {
     initEnrichLock('workbookSelect', 'sheetSelect', 'lockSheetBtn', 'lockStatus')
 
     expect(sharedBGM.sheet.isLocked).toBe(false)
+  })
+})
+
+// ============================================================
+//  补测（2026-09-15）：locked-sheet 的容错分支
+// ============================================================
+//
+// 上面各场景打的是「宿主正常」主路径。以下四组打的是 WPS COM 的**真实边界**：
+// 集合在窗口切换期瞬时失效、属性 getter 抛错、Application 尚未注入、活动工作簿为空。
+// 这些分支的共同后果是「静默少认出一个工作簿/工作表」，不补测就等于没有防线。
+
+/** findBangumiTargetSheetInWorkbook 的参数类型（避免为一个 cast 新增 wps.js 的 type import） */
+type WorkbookArgument = Parameters<typeof findBangumiTargetSheetInWorkbook>[0]
+
+describe('getOpenWorkbooks 的容错分支', () => {
+  it('无 Application 时返回空数组', () => {
+    setMockApp(null)
+
+    expect(getOpenWorkbooks()).toEqual([])
+  })
+
+  it('工作簿的 FullName / Name 读取抛错时跳过该项', () => {
+    const throwingWorkbook = {
+      get FullName(): string {
+        throw new Error('窗口切换中')
+      },
+      get Name(): string {
+        throw new Error('窗口切换中')
+      },
+    }
+    setMockApp({ Workbooks: { Count: 1, Item: () => throwingWorkbook }, ActiveWorkbook: null })
+
+    expect(getOpenWorkbooks()).toEqual([])
+  })
+
+  it('Workbooks.Count 读取抛错时按 0 张处理', () => {
+    setMockApp({
+      Workbooks: {
+        get Count(): number {
+          throw new Error('集合瞬时失效')
+        },
+        Item: () => null,
+      },
+      ActiveWorkbook: null,
+    })
+
+    expect(getOpenWorkbooks()).toEqual([])
+  })
+
+  it('Windows.Count 读取抛错时按 0 个窗口处理', () => {
+    setMockApp({
+      Windows: {
+        get Count(): number {
+          throw new Error('集合瞬时失效')
+        },
+        Item: () => null,
+      },
+      ActiveWorkbook: null,
+    })
+
+    expect(getOpenWorkbooks()).toEqual([])
+  })
+
+  it('Workbooks 未枚举到的窗口工作簿会经 Windows 补齐', () => {
+    const windowWorkbook = { Name: 'win.xlsx', FullName: 'C:/win.xlsx' }
+    setMockApp({
+      Windows: { Count: 1, Item: () => ({ Workbook: windowWorkbook }) },
+      ActiveWorkbook: null,
+    })
+
+    const result = getOpenWorkbooks()
+
+    expect(result).toHaveLength(1)
+    expect(result[0]).toBe(windowWorkbook)
+  })
+})
+
+describe('getLockedSheet 的工作簿回退分支', () => {
+  it('未记录工作簿名时回退到活动工作簿', () => {
+    sharedBGM.sheet.isLocked = true
+    sharedBGM.sheet.lockedName = 'Sheet1'
+    const activeWorkbook = createMockWorkbooks([{ Name: 'active.xlsx', Sheets: ['Sheet1'] }])[0]!
+    setMockApp({
+      ActiveWorkbook: activeWorkbook,
+      Workbooks: { Count: 1, Item: () => activeWorkbook },
+    })
+
+    const result = getLockedSheet()
+
+    expect(result?.[0]).toBe(activeWorkbook)
+    expect(result?.[1].Name).toBe('Sheet1')
+  })
+
+  it('无活动工作簿时清锁并返回 null', () => {
+    const storage = createMockPluginStorage()
+    sharedBGM.sheet.isLocked = true
+    sharedBGM.sheet.lockedName = 'Sheet1'
+    setMockApp({ ActiveWorkbook: null, PluginStorage: storage })
+
+    expect(getLockedSheet()).toBeNull()
+    expect(sharedBGM.sheet.isLocked).toBe(false)
+    expect(storage._store[LOCKED_SHEET_KEY]).toBe('')
+  })
+
+  it('锁定的工作表名为空时清锁并返回 null', () => {
+    const storage = createMockPluginStorage()
+    sharedBGM.sheet.isLocked = true
+    sharedBGM.sheet.lockedName = null
+    sharedBGM.sheet.lockedWorkbookName = 'wb1.xlsx'
+    setMockApp(
+      createMockApp(createMockWorkbooks([{ Name: 'wb1.xlsx', Sheets: ['Sheet1'] }]), '', storage),
+    )
+
+    expect(getLockedSheet()).toBeNull()
+    expect(sharedBGM.sheet.isLocked).toBe(false)
+  })
+
+  it('无 Application 时 saveLockedSheet / restoreLockedSheet 只记警告', () => {
+    // clearLockedSheet 会连带调用 saveLockedSheet，因此这里同时覆盖两处的 `app?.` 短路侧
+    setMockApp(null)
+
+    expect(() => saveLockedSheet({ index: 1, name: 'Sheet1' })).not.toThrow()
+    expect(restoreLockedSheet()).toBe(false)
+    expect(mockReferences.mockBgmLog).toHaveBeenCalled()
+  })
+
+  it('findWorkbookByName 对纯空白名返回 null', () => {
+    setMockApp(createMockApp(createMockWorkbooks([{ Name: 'wb1.xlsx', Sheets: ['Sheet1'] }])))
+
+    expect(findWorkbookByName(' '.repeat(3))).toBeNull()
+  })
+})
+
+describe('findBangumiTargetSheets 的过滤分支', () => {
+  it('无 Application 时记警告并返回空数组', () => {
+    setMockApp(null)
+
+    expect(findBangumiTargetSheets()).toEqual([])
+    expect(mockReferences.mockBgmLog).toHaveBeenCalled()
+  })
+
+  it('Worksheets.Item 抛错时跳过该工作表', () => {
+    setupScanMocks()
+    const workbook = createMockWorkbooks([{ Name: 'wb1', Sheets: ['动画'] }])[0]!
+    ;(workbook.Worksheets as { Item: (index: number) => unknown }).Item = () => {
+      throw new RangeError('集合瞬时失效')
+    }
+    setMockApp(createMockApp([workbook], 'wb1'))
+
+    expect(findBangumiTargetSheets()).toEqual([])
+  })
+
+  it('表头关键词命中不足 3 个时不生成候选', () => {
+    setupScanMocks()
+    const sheet = createScanSheet('bangumi 表', { headerRow: 1, headerKeyCount: 2, dataCount: 5 })
+    setMockApp(createScanApp({ wb1: [sheet] }, 'wb1'))
+
+    expect(findBangumiTargetSheets()).toEqual([])
+  })
+
+  it('Worksheets.Count 读取抛错时按 0 张处理', () => {
+    setupScanMocks()
+    const workbook = createMockWorkbooks([{ Name: 'wb1', Sheets: ['动画'] }])[0]!
+    Object.defineProperty(workbook.Worksheets, 'Count', {
+      get() {
+        throw new Error('集合瞬时失效')
+      },
+    })
+    setMockApp(createMockApp([workbook], 'wb1'))
+
+    expect(findBangumiTargetSheets()).toEqual([])
+  })
+
+  it('活动工作簿无候选时，其余候选按扫描顺序排在最后', () => {
+    setupScanMocks()
+    // 两个工作表都不命中名称关键词（走 collect(false) 回退，isNameHit 被强制为 false），
+    // 活动工作簿名又不指向任何候选 → 两条都落到排序偏好最低的一档。
+    const first = createScanSheet('表一', { headerRow: 1, headerKeyCount: 3, dataCount: 3 })
+    const second = createScanSheet('表二', { headerRow: 1, headerKeyCount: 3, dataCount: 3 })
+    setMockApp(createScanApp({ wb1: [first, second] }, '不存在的活动工作簿'))
+
+    const result = findBangumiTargetSheets()
+
+    expect(result.map((candidate) => candidate.sheetName)).toEqual(['表一', '表二'])
+    expect(result.every((candidate) => !candidate.isNameHit)).toBe(true)
+  })
+})
+
+describe('findBangumiTargetSheetInWorkbook', () => {
+  it('优先返回名称命中关键词的强候选', () => {
+    setupScanMocks()
+    const plain = createScanSheet('表数据', { headerRow: 1, headerKeyCount: 3, dataCount: 3 })
+    const nameHit = createScanSheet('bangumi 追番', { headerRow: 1, headerKeyCount: 3, dataCount: 3 })
+    const app = createScanApp({ wb1: [plain, nameHit] })
+
+    const result = findBangumiTargetSheetInWorkbook(
+      app.Workbooks.Item(1) as unknown as WorkbookArgument,
+    )
+
+    expect(result).toBe(nameHit)
+  })
+
+  it('无名称命中时返回扫描顺序里首个通过校验的工作表', () => {
+    setupScanMocks()
+    const noHeader = createScanSheet('表头', { headerRow: 0, headerKeyCount: 0, dataCount: 0 })
+    const plain = createScanSheet('表数据', { headerRow: 1, headerKeyCount: 3, dataCount: 3 })
+    const app = createScanApp({ wb1: [noHeader, plain] })
+
+    const result = findBangumiTargetSheetInWorkbook(
+      app.Workbooks.Item(1) as unknown as WorkbookArgument,
+    )
+
+    expect(result).toBe(plain)
+  })
+
+  it('无任何通过校验的工作表时返回 null', () => {
+    setupScanMocks()
+    const app = createScanApp({ wb1: [createScanSheet('空表', null)] })
+
+    const result = findBangumiTargetSheetInWorkbook(
+      app.Workbooks.Item(1) as unknown as WorkbookArgument,
+    )
+
+    expect(result).toBeNull()
   })
 })

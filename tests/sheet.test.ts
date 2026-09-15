@@ -84,6 +84,7 @@ vi.mock('../ts/tools/util/index.js', () => ({
 
 import {
   readRangeValues,
+  readRangeCellValues,
   cacheGet,
   clearSheetCache,
   getLastRow,
@@ -1218,5 +1219,183 @@ describe('setCellValueDirect（间接测试 via ensureSheetHeaders）', () => {
     const isResult = ensureSheetHeaders(ws)
     // 虽然所有列写入失败，但前5列全部失败 → 返回 false
     expect(isResult).toBe(false)
+  })
+})
+
+// ============================================================
+//  补测块（2026-09-15）：此前只测了 readRangeValues / getLastRow 的「顺路径」，
+//  以下四组打的是同一模块里真正会被生产调用、却从未被任何用例触发的分支。
+// ============================================================
+
+describe('readRangeCellValues（保留原始类型，供「读-改-写整行」使用）', () => {
+  it('ws 为空时返回空数组（调用方必须据此放弃写入，否则会清空用户数据）', () => {
+    expect(readRangeCellValues(null, 1, 5, 1, 3)).toEqual([])
+    expect(readRangeCellValues(undefined, 1, 5, 1, 3)).toEqual([])
+  })
+
+  it('Value2 为 null / undefined（假值）时返回空数组', () => {
+    const ws = createMockWorksheet()
+    ws.Range = createRangeMock().mockReturnValue({ Value2: null })
+    expect(readRangeCellValues(ws, 1, 5, 1, 3)).toEqual([])
+    ws.Range = createRangeMock().mockReturnValue({ Value2: undefined })
+    expect(readRangeCellValues(ws, 1, 5, 1, 3)).toEqual([])
+  })
+
+  it('单个值（非数组）包装为 1x1 并保留类型', () => {
+    const ws = createMockWorksheet()
+    ws.Range = createRangeMock().mockReturnValue({ Value2: 42 })
+    expect(readRangeCellValues(ws, 1, 1, 1, 1)).toEqual([[42]])
+  })
+
+  it('二维数组保留 number / boolean / Date，其余一律归 null（避免数字列被写成文本列）', () => {
+    const date = new Date('2026-01-02T03:04:05.000Z')
+    const ws = createMockWorksheet()
+    ws.Range = createRangeMock().mockReturnValue({
+      Value2: [
+        [1, '壹', true, date],
+        [null, '', () => 1, { a: 1 }],
+      ],
+    })
+    expect(readRangeCellValues(ws, 1, 2, 1, 4)).toEqual([
+      [1, '壹', true, date],
+      [null, '', null, null],
+    ])
+  })
+
+  it('原生代码对象（WPS 内部 Proxy）与函数一律归 null', () => {
+    const ws = createMockWorksheet()
+    ws.Range = createRangeMock().mockReturnValue({
+      Value2: [
+        [createNativeValueFunction('function Value() { [native code] }'), functionReturnsNative()],
+      ],
+    })
+    expect(readRangeCellValues(ws, 1, 1, 1, 2)).toEqual([[null, null]])
+  })
+
+  it('一维数组按「每元素一行」处理', () => {
+    const ws = createMockWorksheet()
+    ws.Range = createRangeMock().mockReturnValue({ Value2: [7, 'x'] })
+    expect(readRangeCellValues(ws, 1, 2, 1, 1)).toEqual([[7], ['x']])
+  })
+
+  it('读取抛错时返回空数组', () => {
+    const ws = {
+      ...createMockWorksheet(),
+      Range: vi.fn(() => {
+        throw new Error('读取失败')
+      }),
+    }
+    expect(readRangeCellValues(ws, 1, 5, 1, 3)).toEqual([])
+  })
+})
+
+describe('safeStringify 的对象分支与函数返回值分支（间接 via readRangeValues）', () => {
+  it('对象自带普通 toString 时按其 toString 序列化', () => {
+    const ws = createMockWorksheet()
+    ws.Range = createRangeMock().mockReturnValue({ Value2: [[{ toString: () => 'plain-value' }]] })
+    expect(readRangeValues(ws, 1, 1, 1, 1)).toEqual([['plain-value']])
+  })
+
+  it('对象没有可调用 toString 时返回空串', () => {
+    const ws = createMockWorksheet()
+    ws.Range = createRangeMock().mockReturnValue({ Value2: [[Object.create(null) as object]] })
+    expect(readRangeValues(ws, 1, 1, 1, 1)).toEqual([['']])
+  })
+
+  it('函数返回 null 时走「值为空」分支返回空串', () => {
+    const ws = createMockWorksheet()
+    ws.Range = createRangeMock().mockReturnValue({ Value2: [[() => null]] })
+    expect(readRangeValues(ws, 1, 1, 1, 1)).toEqual([['']])
+  })
+
+  it('函数返回原生代码对象时走 isNativeCode 分支返回空串', () => {
+    const nativeObject = { toString: () => 'function Value() { [native code] }' }
+    const ws = createMockWorksheet()
+    ws.Range = createRangeMock().mockReturnValue({ Value2: [[() => nativeObject]] })
+    expect(readRangeValues(ws, 1, 1, 1, 1)).toEqual([['']])
+  })
+})
+
+describe('getLastRow 的异常回退与缓存文案', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    // 前缀为 '' 的 clearSheetCache 会清空整个缓存，避免用例间互相命中
+    clearSheetCache(createMockWorksheet({ name: '' }))
+  })
+
+  it('锚定列定位抛错时记警告并回退到 D 列', () => {
+    const ws = createMockWorksheet({ name: 'AnchorThrow', rows: 100 })
+    const anchorCell = {
+      Value2: 'd',
+      End: vi.fn(() => {
+        throw new Error('COM 桥接失效')
+      }),
+    }
+    const dCell = { Value2: 'd', End: vi.fn().mockReturnValue({ Row: 77 }) }
+    ws.Range = createRangeMock((address: string) => {
+      if (address === 'A1') return { Value2: '序号' }
+      return address.startsWith('A') ? anchorCell : dCell
+    })
+
+    expect(getLastRow(ws, false, 1)).toBe(77)
+    expect(bgmLog).toHaveBeenCalledWith('WARN', expect.stringContaining('回退到原有逻辑'))
+  })
+
+  it('UsedRange 读取抛错时记警告并返回默认 50000', () => {
+    const base = createMockWorksheet({ name: 'UsedRangeThrow', rows: 10 })
+    const failCell = {
+      Value2: '',
+      End: vi.fn(() => {
+        throw new Error('无 End')
+      }),
+    }
+    const ws = {
+      ...base,
+      Range: createRangeMock(() => failCell),
+      get UsedRange(): never {
+        throw new Error('COM 桥接失效')
+      },
+    } as unknown as WpsWorksheet
+
+    expect(getLastRow(ws)).toBe(50_000)
+    expect(bgmLog).toHaveBeenCalledWith('WARN', expect.stringContaining('UsedRange 失败'))
+  })
+
+  it('工作表名为空串时缓存键退化为空前缀，仍能定位最后行', () => {
+    const ws = createMockWorksheet({
+      name: '',
+      rows: 10,
+      usedRange: { Row: 1, Rows: { Count: 4 } },
+    })
+    ws.Range = createRangeMock(() => ({
+      Value2: '',
+      End: vi.fn(() => {
+        throw new Error('无 End')
+      }),
+    }))
+
+    expect(getLastRow(ws)).toBe(4)
+  })
+
+  it('「首次计算」与「来自缓存」两种日志文案可区分', () => {
+    const ws = createMockWorksheet({
+      name: 'LogText',
+      rows: 10,
+      usedRange: { Row: 1, Rows: { Count: 3 } },
+    })
+    ws.Range = createRangeMock(() => ({
+      Value2: '',
+      End: vi.fn(() => {
+        throw new Error('无 End')
+      }),
+    }))
+    clearSheetCache(ws)
+
+    getLastRow(ws)
+    expect(bgmLog).toHaveBeenCalledWith('INFO', expect.stringContaining('(首次计算)'))
+
+    // 不清空调用记录：第一次的「首次计算」必须留在历史里，第二次再叠加一条
+    getLastRow(ws)
+    expect(bgmLog).toHaveBeenCalledWith('INFO', expect.stringContaining('(来自缓存)'))
   })
 })

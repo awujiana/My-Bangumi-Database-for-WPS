@@ -392,6 +392,9 @@ export function getLastRow(
     bgmLog(LOG_LEVELS.INFO, '缓存已清除，重新计算最后行')
   }
 
+  // 必须在 cacheGet **之前**取样：cacheGet 内部会把计算结果写回 sheetCache，
+  // 之后再看 has() 恒为 true，日志将永远显示「来自缓存」，把排查引向错误方向。
+  const isCached = sheetCache.has(cacheKey)
   const cached = cacheGet<number>(cacheKey, () => {
     bgmLog(
       LOG_LEVELS.INFO,
@@ -468,7 +471,7 @@ export function getLastRow(
 
   bgmLog(
     LOG_LEVELS.INFO,
-    `工作表 "${sheetName}" 最后数据行: ${String(cached)}${sheetCache.has(cacheKey) ? ' (来自缓存)' : ' (首次计算)'}`,
+    `工作表 "${sheetName}" 最后数据行: ${String(cached)}${isCached ? ' (来自缓存)' : ' (首次计算)'}`,
   )
   return cached
 }
