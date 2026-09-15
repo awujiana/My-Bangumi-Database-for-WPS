@@ -98,7 +98,9 @@ export function getOrCreateEnrichRecordSheet(): WpsWorksheet {
 
   try {
     const sheets = wb.Sheets
-    for (let index = 1; index <= sheets.Count; index += 1) {
+    // 工作表总数只读一次：写在循环条件里每轮都会多一次跨进程 COM 往返
+    const sheetCount = sheets.Count
+    for (let index = 1; index <= sheetCount; index += 1) {
       const sheet = sheets.Item(index)
       if (sheet.Name === ENRICH_RECORD_SHEET_NAME) {
         enrichSheet = sheet
@@ -388,7 +390,9 @@ function getAllEnrichRecordsInner() {
 
   try {
     const sheets = wb.Sheets
-    for (let index = 1; index <= sheets.Count; index += 1) {
+    // 工作表总数只读一次：写在循环条件里每轮都会多一次跨进程 COM 往返
+    const sheetCount = sheets.Count
+    for (let index = 1; index <= sheetCount; index += 1) {
       const s = sheets.Item(index)
       if (s.Name === ENRICH_RECORD_SHEET_NAME) {
         sheet = s

@@ -109,7 +109,9 @@ export function getOrCreateSyncRecordSheet(): WpsWorksheet {
   // 查找现有工作表
   try {
     const sheets = wb.Sheets
-    for (let index = 1; index <= sheets.Count; index += 1) {
+    // 工作表总数只读一次：写在循环条件里每轮都会多一次跨进程 COM 往返
+    const sheetCount = sheets.Count
+    for (let index = 1; index <= sheetCount; index += 1) {
       const sheet = sheets.Item(index)
       if (sheet.Name === SYNC_RECORD_SHEET_NAME) {
         syncSheet = sheet
@@ -189,7 +191,9 @@ export function getSyncRecordSheetIfExists(): WpsWorksheet | null {
   if (!app?.ActiveWorkbook) return null
   try {
     const sheets = app.ActiveWorkbook.Sheets
-    for (let index = 1; index <= sheets.Count; index += 1) {
+    // 工作表总数只读一次：写在循环条件里每轮都会多一次跨进程 COM 往返
+    const sheetCount = sheets.Count
+    for (let index = 1; index <= sheetCount; index += 1) {
       const sheet = sheets.Item(index)
       if (sheet.Name === SYNC_RECORD_SHEET_NAME) return sheet
     }

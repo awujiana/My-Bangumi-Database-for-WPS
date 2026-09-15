@@ -18,13 +18,14 @@
 > **基线刷新**：2026-09-15（第十六轮）—— 清单**第 18 批（长尾清零）**：把第十四轮后残留的 **46 行长尾**一次吃到 **7 行**（−39 行），未覆盖文件 **→ 5 个**，全项目 lines **99.65% → 99.94%**。**零生产代码改动**（可执行行 13411 不变，改的全是测试与文档）；新增 `tests/sync-config-summary.test.ts`（11 条）、`tests/theme-system.test.ts`（3 条），其余 21 个测试文件就地扩写，合计 **+52 条 / +2 文件**；`npm run gate` 七关全绿
 > **基线刷新**：2026-09-15（第十七轮）—— 清单**第 19 批（死代码清理）**：把第 18 批残留的 **7 行**逐条**重新审计**（改用 `tsc` 探针代替读代码推理），结论是**只有 1 行是真死代码**（`ui/preview.ts` 那个永不调用的 `.sort()` 比较器，已删）；另 1 行实为**类型驱动**（`noUncheckedIndexedAccess` 下删了报 `TS18048`）、5 行是**有意义的防御分支**（删了改语义）→ **未覆盖 7 → 6 / 文件 5 → 4**，全项目 **99.94% → 99.95% lines**，`ui/preview.ts` 达 **100%**；可执行行 13411 → 13410；顺带把 `.workbuddy/` 下 311 个历史临时产物（2.4 MB）打包备份后清掉；`npm run gate` 七关全绿
 > **基线刷新**：2026-09-15（第十八轮）—— 清单**第 20 批（`entry/**` 装配冒烟 + 覆盖率排除收窄）**：新增 `tests/entry-smoke.test.ts`（13 条，jsdom）冒烟三个入口的**装配契约**（自动启动守卫、装配顺序、`bgm:modulesReady` 必须异步派发、设置页表单回填），新增 `tests/debug-panel.test.ts`（7 条）冒烟调试面板的**生产守卫**（`WpsInvoke` 在场时零 DOM 副作用）、幂等与 `readyState === 'loading'` 推迟启动。**顺带修掉一处 `coverage.exclude` 的陈旧理由**：原先 `ts/entry/**` 被整体排除，理由写「依赖 WPS 宿主，无法在 Node 测试环境执行」，但 `debug-panel-render.ts` 的文件头明写「本模块**无 import 时副作用**，可直接单测」（它正是为此才从 `debug-panel.ts` 拆出来的）—— 整体排除把这个拆分目的抹掉了。实测放开后 `debug-panel-render.ts` / `panel-entry.ts` / `ribbon-entry.ts` / `settings-entry.ts` **4 个文件全部 100% lines**（合计 89 行可执行行，此前完全不可见），故把排除收窄为 `ts/entry/debug-panel.ts` 单文件（生产 inert 的开发期 DOM 管线，按 §3 口径降级为冒烟）。**未覆盖行维持 6**（可执行行 13410 → 13499），lines 维持 **99.95%**；测试 **4283 → 4308 条 / 129 → 131 文件**；`npm run gate` 七关全绿
-> **测试**：**4308 条 / 131 文件，全绿**
+> **基线刷新**：2026-09-15（第十九轮）—— 清单**第 21 批（COM 往返次数性能回归基线）**：把 6 个文件里 **11 处**「循环条件里读 COM 属性」全部提成循环外单次读取（`ts/panel/panel-lifecycle.ts` ×3、`ts/sync/enrich-lock.ts` ×1、`ts/sync/sync-record.ts` ×2、`ts/sync/enrich-record.ts` ×2、`ts/tools/util/sheet.ts` ×1、`ts/sync/exceltobangumi/index.ts` ×2）。**为什么这是性能问题**：WPS 的 `Application`/`Workbook`/`Worksheet`/`Range` 都是**跨进程 COM 代理**，读一次属性 = 一次进程间往返；`for (let i = 1; i <= sheets.Count; i++)` 每轮都重新求值，把 N 行扫描放大成 **N+1 次往返**（最热的「按可见行扫描」在筛选后常是几千行）。**新增第 8 道门禁** `scripts/check-com-in-loop.mjs`：AST 解析（不是正则，正则分不清 `for…of` / `arr.length`），命中 `Count`/`Item`/`Areas`/`Rows` 等 COM 成员写在 `for`/`while`/`do` 条件里即报 `file:line`，**129 个模块 0 违规**；集合确实会在循环体内被改动时用 `// com-loop-ok: <理由>` 豁免。**运行时证据**：`tests/exceltobangumi.selection.test.ts` 新增断言「7 行可见扫描里 `Rows.Count` 只读 **1** 次」，回滚后实测 `got 8 times`（= N+1）—— 静态侧门禁 + 运行时断言双保险。**顺带审计了上一轮遗留的 2 行「疑似死代码」**（用 `tsc` 探针而非读代码推理）：`ui/preview.ts` 的 `.sort()` **已在第 19 批删掉**（现只剩注释），`ts/panel/enrich-preview-cell.ts` 的 `?? CHIP_COLOR_PALETTE[0]` **不可删**（删掉守卫后 `tsc` 报 **3 处** `TS18048: 'palette' is possibly 'undefined'`，因为 `noUncheckedIndexedAccess` 下 `PALETTE[0]` 本身就是 `T | undefined`，`??` 收窄不了、后面的 `if (!palette)` 是类型收窄必需）。**未覆盖行维持 6**（可执行行 13499 → **13510**，+11 恰为 11 处 hoist 各加 1 行且全在已覆盖路径上），lines 维持 **99.95%**；测试 **4308 → 4309 条 / 131 文件**；`npm run gate` **八关**全绿
+> **测试**：**4309 条 / 131 文件，全绿**
 > **全项目覆盖率**：**99.15% stmts / 90.16% branch / 99.67% funcs / 99.95% lines**（较首次生成 **+53.13 个点**）
-> **可执行行数**：13499，已覆盖 13493，**未覆盖 6**
-> **换算**：全项目**每提升 1 个百分点 ≈ 135 行**（= 13499 / 100）
+> **可执行行数**：13510，已覆盖 13504，**未覆盖 6**
+> **换算**：全项目**每提升 1 个百分点 ≈ 135 行**（= 13510 / 100）
 >
 > 注：第二轮涨幅主体是 §三 第 3、4 批 —— `ribbon-service`、`ui/handlers/sync`、`clean-page`、`scraping`、`sheet-cleaning`、`shell-nav` 等
-> 由 0~30% 补到 88~100%，未覆盖行 **5118 → 3212（−1906 行）**；第三轮（第 5 批）**3212 → 2811（−401 行）**；第四轮（第 6 批）**2811 → 2808（−3 行）**；第五轮（第 7 批）**2808 → 2467（−341 行）**；第六轮（第 8 批）**2467 → 1976（−491 行）**；第七轮（第 9 批）**1976 → 1505（−471 行）**；第八轮（第 10 批）**1505 → 1134（−371 行）**；第九轮 **1134 → 911（−223 行）**；第十轮（第 12 批）**911 → 801（−110 行）**；第十一轮（第 13 批）**801 → 735（−66 行）**；第十二轮（P0 + 第 14 批）**735 → 626（−109 行）**；第十三轮（第 15 批）**626 → 341（−285 行）**；第十四轮（第 17 批）**341 → 46（−295 行，与台账 295 行精确吻合）**；第十五轮（O-2 收尾优化）**未覆盖行维持 46**（可执行行 13408 → 13411，lines 维持 99.65%）；第十六轮（第 18 批长尾清零）**46 → 7（−39 行）**，未覆盖文件 → **5 个**；第十七轮（第 19 批死代码清理）**7 → 6（−1 行）**，未覆盖文件 → **4 个**；第十八轮（第 20 批 `entry/**` 装配冒烟 + 排除收窄）**未覆盖行维持 6**（可执行行 **13410 → 13499**：4 个 entry 文件纳入统计、实测均 **100% lines**，lines 维持 **99.95%**）。
+> 由 0~30% 补到 88~100%，未覆盖行 **5118 → 3212（−1906 行）**；第三轮（第 5 批）**3212 → 2811（−401 行）**；第四轮（第 6 批）**2811 → 2808（−3 行）**；第五轮（第 7 批）**2808 → 2467（−341 行）**；第六轮（第 8 批）**2467 → 1976（−491 行）**；第七轮（第 9 批）**1976 → 1505（−471 行）**；第八轮（第 10 批）**1505 → 1134（−371 行）**；第九轮 **1134 → 911（−223 行）**；第十轮（第 12 批）**911 → 801（−110 行）**；第十一轮（第 13 批）**801 → 735（−66 行）**；第十二轮（P0 + 第 14 批）**735 → 626（−109 行）**；第十三轮（第 15 批）**626 → 341（−285 行）**；第十四轮（第 17 批）**341 → 46（−295 行，与台账 295 行精确吻合）**；第十五轮（O-2 收尾优化）**未覆盖行维持 46**（可执行行 13408 → 13411，lines 维持 99.65%）；第十六轮（第 18 批长尾清零）**46 → 7（−39 行）**，未覆盖文件 → **5 个**；第十七轮（第 19 批死代码清理）**7 → 6（−1 行）**，未覆盖文件 → **4 个**；第十八轮（第 20 批 `entry/**` 装配冒烟 + 排除收窄）**未覆盖行维持 6**（可执行行 **13410 → 13499**：4 个 entry 文件纳入统计、实测均 **100% lines**，lines 维持 **99.95%**）；第十九轮（第 21 批 COM 往返性能基线）**未覆盖行维持 6**（可执行行 **13499 → 13510**：+11 恰为 11 处循环外 hoist 各 +1 行、全在已覆盖路径上，lines 维持 **99.95%**）。
 > **关键结论（累积）**：清单前列的「大文件 / COM 模块」**都没有走「先拆后测」**——依赖收敛到单一 barrel、依赖宿主对象、或依赖 ≤3 个薄封装的，就地测即可，
 > 断言打到真实 state 变迁 / 真实写盘调用 / 真实 DOM 写入，**不存在假覆盖**（判据见 `.workbuddy/memory/REF-testing.md`）。
 
@@ -111,6 +112,15 @@ node scripts/calc-coverage-lines.mjs panel/clean-engine.ts   # 逐行定位（�
 > **4 个文件（89 行可执行行）首次进入统计，实测全部 100% lines**。
 > 所以本轮「未覆盖行维持 6」的同时**可执行行 13410 → 13499** —— 分母变大而分子不变，
 > 这是**口径修正**、不是覆盖率退步；详见 §三 第 20 批。
+
+> 📌 **第十九轮后（第 21 批）—— 补测这条线已经到底，本轮转做「性能回归基线」**：剩下 6 行想再降只能
+> **删防御分支 / 重构掉不可达出口**，那是**改代码语义**、不是补测（见上方「第 19 批」结论）。真正值得投入的
+> 是**真实宿主手工验收 / `entry/**` 装配冒烟（第 20 批已做）/ 性能回归基线**。本轮把「循环条件里读 COM 属性」
+> 这一**跨进程往返放大器**一次性清掉（11 处 / 6 文件），并把它固化成**第 8 道门禁**
+> `scripts/check-com-in-loop.mjs`（AST 检查，129 模块 0 违规）＋一条运行时断言。
+> **未覆盖行维持 6**（可执行行 13499 → 13510，+11 全是 hoist 新增行且都在已覆盖路径），
+> lines 维持 **99.95%** —— 所以台账数字**没有变好**，但**代码变快了**：这类改动本就不该指望覆盖率数字。
+> 详见 §三 第 21 批。
 
 ---
 
@@ -495,9 +505,69 @@ node scripts/calc-coverage-lines.mjs panel/clean-engine.ts   # 逐行定位（�
         `await Promise.resolve()`（后者不够）；测 select 回填**必须先放 `<option>`**，
         否则 `select.value = x` 会被静默丢弃、断言变假绿。
 
+**第 21 批（性能回归基线：COM 往返次数）** —— ✅ **2026-09-15 完成**
+
+> **起因**：余下 6 行想继续降只能删防御分支（= 改语义，非补测）。与其硬凑覆盖率数字，不如把
+> 「真实用户会感知到的性能问题」固化成可回归的门禁。选中 **COM 跨进程往返** 作为第一个基线。
+
+- **问题本质**：WPS 的 `Application` / `Workbook` / `Worksheet` / `Range` 都是**跨进程 COM 代理** ——
+  每次读属性都是**一次进程间往返**。`for (let i = 1; i <= sheets.Count; i++)` 这种写法**每轮都重新求值**，
+  于是「扫 N 行」变成 **N+1 次往返**；`visibleCells.Areas.Count` 更是**两跳链**（读一次 = 2 次往返 → 2N）。
+  最热的「按可见行扫描」（筛选后常几千行）就在 `ts/sync/exceltobangumi/index.ts`。
+- **静态侧（11 处 hoist，6 文件）**：
+
+  | 文件 | 处数 | 说明 |
+  | --- | ---: | --- |
+  | `ts/panel/panel-lifecycle.ts` | 3 | 其中 `sheets.Count` 的 hoist **必须在探测 `try` 之外**（见下「踩的坑」） |
+  | `ts/sync/enrich-lock.ts` | 1 | 顺带让后续日志复用同一个 `sheetCount` |
+  | `ts/sync/sync-record.ts` | 2 | |
+  | `ts/sync/enrich-record.ts` | 2 | |
+  | `ts/tools/util/sheet.ts` | 1 | |
+  | `ts/sync/exceltobangumi/index.ts` | 2 | 含**两跳链** `Areas.Count` 与最热的可见行扫描 |
+
+- **新增第 8 道门禁**：`scripts/check-com-in-loop.mjs`（`npm run check:com-in-loop`，已并入 `gate`）。
+  - **用 AST 而不是正则**：正则分不清 `for (const x of arr)` / `i < arr.length` 与真正的 COM 属性访问。
+    用 `ts.createSourceFile` 遍历 `ForStatement` / `WhileStatement` / `DoStatement` 的 **condition**，
+    命中 COM 成员集（`Count` / `Item` / `UsedRange` / `Areas` / `Rows` / `Columns` / `Cells` / `Sheets` / …）即报 `file:line`。
+  - **129 个模块 0 违规**；集合**确实会在循环体内被改动**时用 `// com-loop-ok: <理由>` 豁免（会打印豁免行）。
+  - **牙齿验证**：故意还原 1 处 → 立即 `EXIT=1` 并精确指出 `ts/sync/sync-record.ts:114 [Count]` 与源码行。
+- **运行时侧（1 条代表性断言）**：`tests/exceltobangumi.selection.test.ts` 的 `createArea` 给 `Rows.Count`
+  加了 `vi.fn()` 回调（与 `tests/enrich-lock.test.ts` 的 `expect(itemSpy).toHaveBeenCalledTimes(1)` 同款手法），
+  断言「7 行可见扫描里 `Rows.Count` **只读 1 次**」，并先断言 `visibleRows` 长度证明循环**真的跑了 7 轮**。
+  - **牙齿验证**：还原循环条件读取 → `AssertionError: expected "vi.fn()" to be called 1 times, but got 8 times`（= N+1），
+    且**只有这 1 条**失败。
+  - **为何只做 1 条**：静态门禁已覆盖全库所有未来出现，逐文件加计数器收益低；这一条作为**可复制的范式**留档。
+- **口径**：可执行行 **13499 → 13510**（+11 = 11 处 hoist 各 +1 行，全在已覆盖路径），**未覆盖行维持 6**（4 文件），
+  lines 维持 **99.95%**；测试 **4308 → 4309 条 / 131 文件**；门禁 **七关 → 八关**，`npm run gate` 全绿。
+- **顺带审计上一轮遗留的 2 行「疑似死代码」（用 `tsc` 探针，不靠读代码）**：
+  - `ts/ui/preview.ts` 的 `.sort()`：**第 19 批已删**（现只剩注释）；剩下两处 `.sort((a, b) => a - b)` 是合法数值排序。
+  - `ts/panel/enrich-preview-cell.ts` 的 `?? CHIP_COLOR_PALETTE[0]`：**不可删**。实测删掉守卫后
+    `npx tsc --project tsconfig.build.json --noEmit` 报 **3 处** `TS18048: 'palette' is possibly 'undefined'`
+    —— 因为 `noUncheckedIndexedAccess: true` 下 `PALETTE[0]` 自身就是 `T | undefined`，`?? PALETTE[0]` 收窄不了，
+    紧跟的 `if (!palette)` 是**类型收窄必需**，不是死代码。
+- **本轮踩的坑（已补进 `REF-com-io.md`）**：
+  - **hoist 的位置会影响语义**：`sheetCount = sheets.Count` 若写在探测活动工作表的 `try` 里，
+    探测抛错时总数会一起被清零 → 工作表下拉框只剩占位项。**既有用例当场抓到**
+    （`panel-lifecycle.test.ts > 探测活动工作表时抛错 → 记录但不中断渲染`：`expected length 2 but got 1`）。
+    读 `.Count` 与 `ActiveSheet` **互不相关**，必须放在 `try` 之外。
+  - `no-param-reassign` 会拦「改传入对象的属性」这种计数器写法 → 改用 `vi.fn()` 记次（也更好读）。
+
 ---
 
 ## 四、门禁现状
+
+`npm run gate` = **八道关**（按顺序，任一失败即中断）：
+
+| # | 阶段 | 作用 |
+| ---: | --- | --- |
+| 1 | `lint:check` | `eslint ts tests`（`scripts/**` 不在 lint 范围，与既有门禁脚本一致） |
+| 2 | `check:dompurify-version` | 锁 DOMPurify 版本，防静默升级引入 XSS 面 |
+| 3 | `check:cycles` | `scripts/check-import-cycles.mjs`：AST 查循环依赖 |
+| 4 | `check:ribbon-buttons` | Ribbon 按钮与宿主配置一致性 |
+| 5 | `check:nav-order` | 导航顺序与 `panel.html` 一致 |
+| 6 | **`check:com-in-loop`** | **`scripts/check-com-in-loop.mjs`（第 19 轮新增）**：AST 查「循环条件里读 COM 属性」，即**跨进程往返放大器**；`// com-loop-ok: <理由>` 可豁免 |
+| 7 | `typecheck:tests` | 测试目录类型检查 |
+| 8 | `test` | `vitest run`（131 文件 / 4309 条） |
 
 `vitest.config.ts` 的全局阈值（2026-09-13 上调）：
 `statements 40 / branches 35 / functions 45 / lines 40`（`perFile: false`）。
@@ -506,4 +576,8 @@ node scripts/calc-coverage-lines.mjs panel/clean-engine.ts   # 逐行定位（�
 
 > ⚠️ **已知无效配置**：`perFile: false` 下 vitest 的「glob 单文件阈值」**不会被检查**（实测把某文件阈值改成 101 也不报错）。
 > 想给单个文件（如 `module-state.ts`）锁 100%，只能靠测试本身维持，**不要写进 thresholds 假装它有保护**。
+
+> ⚠️ **`coverage.exclude` 是「整份替换」而非「追加」**：写进这个数组就等于**接管** vitest 的默认排除表，
+> 所以每次往里加一条，都要问「默认排除的东西我补回来了吗」。第 20 批就是靠审计这一条，
+> 发现 `ts/entry/**` 被**过度排除**（4 个文件 / 89 行此前完全不可见）。
 

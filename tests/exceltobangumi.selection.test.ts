@@ -164,11 +164,17 @@ vi.mock('../ts/sync/sync-config-summary.js', () => ({
 import { getFilterStatus, getSequentialRowsBySeqCol, syncSelectedRows, SyncToBangumiAsync } from '../ts/sync/exceltobangumi/index.js'
 
 /** 构造一个区间桩；`rowNumbers` 为该区覆盖的行号 */
-function createArea(rowNumbers: number[]): WpsRange {
+function createArea(rowNumbers: number[], onRowsCountRead?: () => void): WpsRange {
   return {
     Row: rowNumbers[0] ?? 1,
     Rows: {
-      Count: rowNumbers.length,
+      // `Count` 走 getter 以便统计读取次数：WPS 是跨进程 COM，读一次就是一次往返。
+      // 传入回调后，「按可见行扫描」的往返次数就变成可断言的了（用 spy 记次，与
+      // `tests/enrich-lock.test.ts` 里 `expect(itemSpy).toHaveBeenCalledTimes(1)` 同款手法）。
+      get Count(): number {
+        onRowsCountRead?.()
+        return rowNumbers.length
+      },
       Item: (index: number) => ({ Row: rowNumbers[index - 1] ?? 1 }),
     },
     Count: rowNumbers.length,
@@ -221,6 +227,8 @@ function createWorksheet(options: {
   missingAreas?: boolean
   throwOnRange?: boolean
   visibleCount?: number
+  /** 传入后统计「按可见行扫描」时 `Rows.Count` 的读取次数（COM 往返次数回归断言用） */
+  onRowsCountRead?: () => void
 } = {}): WpsWorksheet {
   const visibleRowNumbers = options.visibleRowNumbers ?? [1, 2, 3]
   const totalCount = options.visibleCount ?? 100
@@ -237,10 +245,7 @@ function createWorksheet(options: {
             Range: {
               SpecialCells: () => {
                 if (options.throwOnSpecialCells) throw new Error('SpecialCells 失败')
-                return createVisibleCells(visibleRowNumbers, {
-                  throwOnAreas: options.throwOnAreas ?? false,
-                  missingAreas: options.missingAreas ?? false,
-                })
+                return createVisibleCells(visibleRowNumbers, options)
               },
             },
           }
@@ -251,10 +256,7 @@ function createWorksheet(options: {
         Count: totalCount,
         SpecialCells: () => {
           if (options.throwOnSpecialCells) throw new Error('SpecialCells 失败')
-          return createVisibleCells(visibleRowNumbers, {
-            throwOnAreas: options.throwOnAreas ?? false,
-            missingAreas: options.missingAreas ?? false,
-          })
+          return createVisibleCells(visibleRowNumbers, options)
         },
       }
     },
@@ -264,9 +266,14 @@ function createWorksheet(options: {
 /** 构造可见单元格集合桩；`missingAreas` 表示宿主未提供 Areas 成员 */
 function createVisibleCells(
   rowNumbers: number[],
-  options: { throwOnAreas?: boolean; missingAreas?: boolean } = {},
+  options: {
+    throwOnAreas?: boolean
+    missingAreas?: boolean
+    /** 透传给 createArea：统计 `Rows.Count` 读取次数 */
+    onRowsCountRead?: () => void
+  } = {},
 ): WpsRange {
-  const area = createArea(rowNumbers)
+  const area = createArea(rowNumbers, options.onRowsCountRead)
   return {
     get Areas(): unknown {
       if (options.throwOnAreas) throw new Error('Areas 不可用')
@@ -428,6 +435,26 @@ describe('exceltobangumi 选区与筛选链路', () => {
       getFilterStatus(10, 1)
 
       expect(loggedMessages().some((m) => m.includes('兼容模式'))).toBe(true)
+    })
+
+    it('按可见行扫描时 Rows.Count 只读 1 次（写进循环条件会放大成 N+1 次 COM 往返）', () => {
+      // WPS 的 Range 是**跨进程 COM 代理**：`for (…; r <= rows.Count; …)` 每轮都会重新求值，
+      // 7 个可见行就是 8 次往返。这条断言把「集合/属性提到循环外单次读取」锁成效率契约
+      // （静态侧由 `scripts/check-com-in-loop.mjs` 门禁兜底，这里是运行时证据）。
+      const countSpy = vi.fn()
+      const ws = createWorksheet({
+        visibleRowNumbers: [2, 3, 4, 5, 6, 7, 8],
+        autoFilterMode: true,
+        onRowsCountRead: countSpy,
+      })
+      mockGetApp.mockReturnValue(createApp({ worksheet: ws }))
+
+      const status = getFilterStatus(ws, 10, 1, false)
+
+      expect(status.hasFilter).toBe(true)
+      // 先证明循环确实跑了 7 轮 —— 否则「只读 1 次」可能只是因为压根没进循环
+      expect(status.visibleRows).toEqual([2, 3, 4, 5, 6, 7, 8])
+      expect(countSpy).toHaveBeenCalledTimes(1)
     })
 
     it('无参数时使用 ActiveSheet', () => {

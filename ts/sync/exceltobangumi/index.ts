@@ -1411,8 +1411,12 @@ function getFilterStatusCore(
   const areas: WpsRange[] = []
   try {
     if (visibleCells.Areas) {
-      for (let a = 1; a <= visibleCells.Areas.Count; a += 1) {
-        areas.push(visibleCells.Areas.Item(a))
+      // `visibleCells.Areas` 是**两跳 COM 属性链**（读一次就是 2 次跨进程往返），
+      // 所以集合只取一次、Count 只读一次；写在循环条件里会放大成 2N 次往返
+      const areaCollection = visibleCells.Areas
+      const areaCount = areaCollection.Count
+      for (let a = 1; a <= areaCount; a += 1) {
+        areas.push(areaCollection.Item(a))
       }
     } else {
       areas.push(visibleCells)
@@ -1424,7 +1428,10 @@ function getFilterStatusCore(
 
   for (const area of areas) {
     const rows = area.Rows
-    for (let r = 1; r <= rows.Count; r += 1) {
+    // ⚠️ 这里是**按可见行**循环：筛选后可见行常有几千行，
+    // 把 `rows.Count` 写在循环条件里会放大成几千次跨进程 COM 往返（本函数最热的一处）
+    const rowCount = rows.Count
+    for (let r = 1; r <= rowCount; r += 1) {
       rawRows.add(rows.Item(r).Row)
     }
   }

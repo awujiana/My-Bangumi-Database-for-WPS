@@ -147,12 +147,16 @@ export function refreshSheets(options?: { autoSelectActive?: boolean }): void {
     ? (findWorkbookByName(wbSelect.value) ?? app.ActiveWorkbook)
     : app.ActiveWorkbook
   const sheets = workbook.Worksheets
+  // 工作表总数只读一次：写在循环条件里每轮都会多一次跨进程 COM 往返。
+  // ⚠️ 必须在探测 try **之外**读：探测活动工作表失败时不能把总数也一起清零，
+  // 否则下面的下拉框会只剩占位项（既有用例「探测抛错 → 记录但不中断渲染」锁的就是这条）。
+  const sheetCount = sheets.Count
 
   // 探测当前活动工作表索引（autoSelectActive 时用于自动选中）
   let activeSheetIndex = 0
   try {
     const activeSheet = workbook.ActiveSheet
-    for (let index = 1; index <= sheets.Count; index += 1) {
+    for (let index = 1; index <= sheetCount; index += 1) {
       if (sheets.Item(index) === activeSheet) {
         activeSheetIndex = index
         break
@@ -175,7 +179,7 @@ export function refreshSheets(options?: { autoSelectActive?: boolean }): void {
 
   const isAutoSelectActive = options?.autoSelectActive === true
   let selectedIndex = 0
-  for (let index = 1; index <= sheets.Count; index += 1) {
+  for (let index = 1; index <= sheetCount; index += 1) {
     const option = document.createElement('option')
     option.value = String(index)
     option.text = sheets.Item(index).Name
@@ -523,7 +527,9 @@ export function autoDetectSheet(): {
  */
 function collectActiveFilterCols(ws: WpsWorksheet, filters: WpsFilters): string[] {
   const activeCols: string[] = []
-  for (let index = 1; index <= filters.Count; index += 1) {
+  // 筛选列数只读一次（COM 属性，写在循环条件里每轮都会多一次跨进程往返）
+  const filterCount = filters.Count
+  for (let index = 1; index <= filterCount; index += 1) {
     try {
       const f = filters.Item(index)
       if (f.On) {

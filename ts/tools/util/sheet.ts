@@ -494,7 +494,9 @@ export function getDataSheet(): WpsWorksheet | null | undefined {
       if (BGM.sheet.lockedWorkbookName) {
         const wbs = app.Workbooks
         if (wbs) {
-          for (let index = 1; index <= wbs.Count; index += 1) {
+          // 工作簿总数只读一次：写在循环条件里每轮都会多一次跨进程 COM 往返
+          const workbookCount = wbs.Count
+          for (let index = 1; index <= workbookCount; index += 1) {
             const wb = wbs.Item(index)
             if (wb.Name === BGM.sheet.lockedWorkbookName) {
               targetWb = wb

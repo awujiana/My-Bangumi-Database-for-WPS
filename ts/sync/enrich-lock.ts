@@ -125,6 +125,8 @@ export function refreshEnrichSheets(
 
   const sheets = workbook.Worksheets
   const currentLockedSheet = BGM.sheet.isLocked ? BGM.sheet.lockedName : null
+  // 工作表总数只读一次：写在循环条件里每轮都会多一次跨进程 COM 往返（末尾日志复用同一值）
+  const sheetCount = sheets.Count
 
   select.textContent = ''
   const defaultOpt = document.createElement('option')
@@ -132,7 +134,7 @@ export function refreshEnrichSheets(
   defaultOpt.textContent = '-- 请选择工作表 --'
   select.appendChild(defaultOpt)
 
-  for (let index = 1; index <= sheets.Count; index += 1) {
+  for (let index = 1; index <= sheetCount; index += 1) {
     const option = document.createElement('option')
     const sheet = sheets.Item(index)
     option.value = String(index)
@@ -147,7 +149,7 @@ export function refreshEnrichSheets(
 
   bgmLog(
     LOG_LEVELS.INFO,
-    `[enrichLock] 刷新工作表列表: ${wbName} 共 ${String(sheets.Count)} 个工作表`,
+    `[enrichLock] 刷新工作表列表: ${wbName} 共 ${String(sheetCount)} 个工作表`,
   )
 }
 
