@@ -177,10 +177,19 @@ npm run build:ts
 ## 🧪 测试
 
 ```bash
+npm run gate             # 质量门禁（八关，推荐；提交前必跑）
 npm test                 # 运行全部单元测试（Vitest）
 npm run test:watch       # 监视模式
 npm run test:coverage    # 生成覆盖率报告
 ```
+
+`npm run gate` 依次执行八道关：`lint:check` → `check:dompurify-version` → `check:cycles`
+→ `check:ribbon-buttons` → `check:nav-order` → `check:com-in-loop` → `typecheck:tests` → `test`。
+
+当前基线：**4309 条测试 / 131 文件**，行覆盖率 **99.95%**（详见 [`文档/COVERAGE_BACKLOG.md`](文档/COVERAGE_BACKLOG.md)）。
+
+> **真实宿主（WPS / Excel）手工验收**：单元测试覆盖不到「宿主 API 的真实行为 / 真实网络 / 跨 WebView 通信 / 真实大表性能」，
+> 这部分见 [`文档/HOST_ACCEPTANCE_CHECKLIST.md`](文档/HOST_ACCEPTANCE_CHECKLIST.md)（32 项，需在真机逐项执行）。
 
 ---
 
@@ -237,6 +246,10 @@ npm run test:coverage    # 生成覆盖率报告
 | [`文档/项目文档.md`](文档/项目文档.md)                                 | 数据源仓库项目文档：仓库级架构、转换脚本、CI 流程（参考）       |
 | [`文档/项目操作指南.md`](文档/项目操作指南.md)                         | 数据源仓库维护操作指南：初始化、发布、验证、回滚（参考）        |
 | [`文档/coverage-report.md`](文档/coverage-report.md)                   | 测试覆盖率报告（历史快照，以本地 `npm run test:coverage` 为准） |
+| [`文档/COVERAGE_BACKLOG.md`](文档/COVERAGE_BACKLOG.md)                 | **覆盖率台账（当前有效）**：补测批次记录、未覆盖行逐条判定依据、门禁现状 |
+| [`文档/待办任务清单.md`](文档/待办任务清单.md)                         | **待办清单（当前有效）**：分档待办、批次进度、跟进建议          |
+| [`文档/HOST_ACCEPTANCE_CHECKLIST.md`](文档/HOST_ACCEPTANCE_CHECKLIST.md) | **真实宿主手工验收清单（当前有效）**：32 项，覆盖 COM 真实语义 / 性能 / 网络 / 跨 WebView |
+| [`文档/VERIFICATION_CHECKLIST.md`](文档/VERIFICATION_CHECKLIST.md)     | 修复验证清单（2026-06/07 历史快照，已被上一行取代）             |
 
 > 全部项目文档已统一置于 `文档/` 下（架构/操作类核心文档与数据源仓库参考文档合并管理）。
 
