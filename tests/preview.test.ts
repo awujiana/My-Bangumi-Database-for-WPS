@@ -607,11 +607,10 @@ describe('preview · previewSyncContent', () => {
 
   it('状态下拉按「优先状态在前、非优先（忽略）在后」排序', async () => {
     setDataPreview()
-    // ⚠️ preview.ts 第 528 行的 `.sort()` 比较器**不可达**（台账 §第 8 批已记录，本批复核确认）：
-    //    `dataset.status` 恒为 `normalizeStatus()` 的产物，只可能是 WATCH_STATUS_MAP 反查出的
-    //    6 个标准名（想看/看过/在看/搁置/抛弃/忽略）；其中 5 个已在 priorityStatus 里，
-    //    非优先集合最多只剩「忽略」一个元素，而 Array#sort 对长度 ≤1 不会调用比较器。
-    //    故本用例断言**可观察的排序结果**（优先在前、忽略在后），不声称覆盖该比较器。
+    // ⚠️ 非优先组最多只有「忽略」一个成员：`dataset.status` 恒为 `normalizeStatus()` 的产物，
+    //    只可能是 WATCH_STATUS_MAP 反查出的 6 个标准名，其中 5 个已在 priorityStatus 里
+    //    → 所以这个下拉的排序**没有比较器可测**（原 `.sort()` 已作为死代码删除，见 preview.ts 该处注释）。
+    //    本用例断言的是**可观察的排序结果**：优先组在前、忽略在后。
     // 想看动画 经 normalizeStatus → '想看'（优先组）；忽略 是非优先组唯一成员
     cells['2:4'] = '想看动画'
     cells['3:4'] = '忽略'

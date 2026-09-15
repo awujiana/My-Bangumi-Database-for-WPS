@@ -521,11 +521,14 @@ export async function previewSyncContent(): Promise<void> {
 
     // 按预定义顺序排序
     const priorityStatus = ['想看', '在看', '看过', '搁置', '抛弃']
+    // ⚠️ 非优先组**最多只有一个成员**：`dataset.status` 恒为 normalizeStatus() 的产物，
+    // 只可能是 WATCH_STATUS_MAP 反查出的 6 个标准名（想看/看过/在看/搁置/抛弃/忽略），
+    // 其中 5 个已在 priorityStatus 里，非优先只剩「忽略」。
+    // 因此这里**不需要比较器**（原 `.sort(…)` 因 Array#sort 对长度 ≤1 不调用比较器而是死代码，已删）。
+    // 若将来 VALID_STATUSES 新增了「不会被 normalizeStatus 收敛」的状态，需把比较器加回来。
     const sortedStatus = [
       ...priorityStatus.filter((s) => statusMap.has(s)),
-      ...[...statusMap.keys()]
-        .filter((s) => !priorityStatus.includes(s))
-        .sort((a, b) => Number(a > b) - Number(a < b)),
+      ...[...statusMap.keys()].filter((s) => !priorityStatus.includes(s)),
     ]
 
     const select = document.createElement('select')

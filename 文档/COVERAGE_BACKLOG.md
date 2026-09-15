@@ -15,10 +15,12 @@
 > **基线刷新**：2026-09-15（第十三轮）—— 清单**第 15 批（P1 其余 7 文件）一次收口**：`panel/enrich-page.ts`（78 → 0，另建 `tests/enrich-page-watch.test.ts` 隔离模块级轮询状态）、`panel/panel-page.ts`（78 → 0）、`ui/handlers/github-settings.ts`（58 → 0）、`ui/message.ts`（32 → 0）、`ui/github-config-dialog.ts`（19 → 0）、`panel/clean-bootstrap.ts`（17 → 0）、`ui/handlers/module-order.ts`（6 → 0），**7 个文件全部 100% lines，合计 288 行**；顺带修掉 `ui/github-config-dialog.ts` 里一处**属性注入漏洞**（自建 `escapeHtml` 不转义引号却拼进 `title="..."`，改用 `tools/string-utilities-pure.ts` 的规范实现，因此该文件可执行行 19 → 16）；新增 4 个测试文件 / 116 条；`npm run gate` 七关全绿
 > **基线刷新**：2026-09-15（第十四轮）—— 清单**第 17 批（P2 七个难-COM/网络文件）一次收口**：`sync/exceltobangumi/index.ts`（137 → 0，顺带把 `createFieldGetter` 批量缓存、增量指纹跳过、最小请求间隔节流、`jsonBody` 解析降级、无法提取 Subject ID、`visibleCells.Areas` 缺失六类分支逐条打通）、`sync/workbook-auto-detect.ts`（69 → 0）、`sync/exceltobangumi/chapter-marker.ts`（40 → 0）、`sync/github-sync.ts`（26 → 0）、`sync/sync-record.ts`（13 → 0）、`sync/enrich-lock.ts`（5 → 0）、`sync/github-sync-diff.ts`（5 → 0），**7 个文件全部 100% lines，合计 295 行**；新增 `tests/chapter-marker.test.ts`（15 条）、`tests/workbook-auto-detect-scan.test.ts`（35 条），其余 5 个文件就地扩写，合计 **+111 条 / +2 文件**；`npm run gate` 七关全绿
 > **基线刷新**：2026-09-15（第十五轮）—— 清单**已全部清空**，本轮做 §6 非补测待办 **O-2（锁表查找加索引快路径）**：`tools/locked-sheet.ts` 的 `getLockedSheet()` 从「按名线性扫描 N 张表」改为「先用 `BGM.sheet.lockedIndex` 单次探测 + 按名复核、不过再回落扫描」，命中路径 COM 往返 **N → 1**；同时把 `Worksheets.Count` 提出循环条件（原来每轮多一次 COM 往返）。**无新增未覆盖行**（154 → 183 可执行行，仍 100% lines），配套 `tests/enrich-lock.test.ts` **+5 条**（断言 `Worksheets.Item` 调用次数，即优化本身）；`npm run gate` 七关全绿
-> **测试**：**4231 条 / 127 文件，全绿**
-> **全项目覆盖率**：**98.86% stmts / 89.81% branch / 99.06% funcs / 99.65% lines**（较首次生成 **+52.83 个点**）
-> **可执行行数**：13411，已覆盖 13365，**未覆盖 46**
-> **换算**：全项目**每提升 1 个百分点 ≈ 134 行**（= 13411 / 100）
+> **基线刷新**：2026-09-15（第十六轮）—— 清单**第 18 批（长尾清零）**：把第十四轮后残留的 **46 行长尾**一次吃到 **7 行**（−39 行），未覆盖文件 **→ 5 个**，全项目 lines **99.65% → 99.94%**。**零生产代码改动**（可执行行 13411 不变，改的全是测试与文档）；新增 `tests/sync-config-summary.test.ts`（11 条）、`tests/theme-system.test.ts`（3 条），其余 21 个测试文件就地扩写，合计 **+52 条 / +2 文件**；`npm run gate` 七关全绿
+> **基线刷新**：2026-09-15（第十七轮）—— 清单**第 19 批（死代码清理）**：把第 18 批残留的 **7 行**逐条**重新审计**（改用 `tsc` 探针代替读代码推理），结论是**只有 1 行是真死代码**（`ui/preview.ts` 那个永不调用的 `.sort()` 比较器，已删）；另 1 行实为**类型驱动**（`noUncheckedIndexedAccess` 下删了报 `TS18048`）、5 行是**有意义的防御分支**（删了改语义）→ **未覆盖 7 → 6 / 文件 5 → 4**，全项目 **99.94% → 99.95% lines**，`ui/preview.ts` 达 **100%**；可执行行 13411 → 13410；顺带把 `.workbuddy/` 下 311 个历史临时产物（2.4 MB）打包备份后清掉；`npm run gate` 七关全绿
+> **测试**：**4283 条 / 129 文件，全绿**
+> **全项目覆盖率**：**99.15% stmts / 90.12% branch / 99.67% funcs / 99.95% lines**（较首次生成 **+53.13 个点**）
+> **可执行行数**：13410，已覆盖 13404，**未覆盖 6**
+> **换算**：全项目**每提升 1 个百分点 ≈ 134 行**（= 13410 / 100）
 >
 > 注：第二轮涨幅主体是 §三 第 3、4 批 —— `ribbon-service`、`ui/handlers/sync`、`clean-page`、`scraping`、`sheet-cleaning`、`shell-nav` 等
 > 由 0~30% 补到 88~100%，未覆盖行 **5118 → 3212（−1906 行）**；第三轮（第 5 批）**3212 → 2811（−401 行）**；第四轮（第 6 批）**2811 → 2808（−3 行）**；第五轮（第 7 批）**2808 → 2467（−341 行）**；第六轮（第 8 批）**2467 → 1976（−491 行）**；第七轮（第 9 批）**1976 → 1505（−471 行）**；第八轮（第 10 批）**1505 → 1134（−371 行）**；第九轮 **1134 → 911（−223 行）**；第十轮（第 12 批）**911 → 801（−110 行）**；第十一轮（第 13 批）**801 → 735（−66 行）**；第十二轮（P0 + 第 14 批）**735 → 626（−109 行）**；第十三轮（第 15 批）**626 → 341（−285 行）**；第十四轮（第 17 批）**341 → 46（−295 行，与台账 295 行精确吻合）**；第十五轮（O-2 收尾优化）**未覆盖行维持 46**（可执行行 13408 → 13411，lines 维持 99.65%）；第十六轮（第 18 批长尾清零）**46 → 7（−39 行）**，未覆盖文件 → **5 个**。
@@ -94,10 +96,13 @@ node scripts/calc-coverage-lines.mjs panel/clean-engine.ts   # 逐行定位（�
 > **难度列是按目录粗判的**：`ts/tools`、`ts/core` 多为纯逻辑 → 易；`ts/panel`、`ts/ui` 依赖 DOM → 中；`ts/sync`、`ts/services` 依赖 COM / 网络 → 难。
 > 实际动手前仍需扫一眼文件内的依赖（例如 `tools/util/index.ts` 是聚合桶，可能混入依赖 WPS 全局对象的函数）。
 
-> 📌 **第十六轮后（第 18 批长尾清零）**：长尾也被吃掉了 —— 未覆盖 **46 → 7 行 / 5 个文件**，全项目 **99.94% lines**。
-> 余下 7 行**全部是经可达性分析判定的不可达 / 死代码**（逐条依据见 §三 第 18 批），**不是「还没做」**。
-> 也就是说：**补测这条线已经做完** —— 想继续降只能「删死代码」或「重构掉不可达分支」，
-> 那属于**代码清理**任务，不属于补测任务，不应再挂在这份清单下。
+> 📌 **第十七轮后（第 18 + 19 批收尾）**：长尾被吃到 **6 行 / 4 个文件**，全项目 **99.95% lines**。
+> 余下 6 行**逐条都做过可达性审计并留了判定依据**（见 §三 第 18 / 19 批），**不是「还没做」**：
+> **1 行**是类型驱动的防御代码（`noUncheckedIndexedAccess` 下删了报 `TS18048`）、
+> **5 行**是有意义的防御分支（每行 `catch` / 非法策略回落 / 隐藏分支），删掉等于**改语义**。
+> 也就是说：**补测这条线已经做完** —— 想继续降只剩「删掉这些防御分支」这一条路，而那是**改代码**、
+> 不是补测；本清单不再挂这类目标。**注意**：判「死代码」前务必**删一次跑 `tsc`**，
+> 别只靠读代码推理（第 19 批就靠这一手推翻了第 18 批的一处误判）。
 
 ---
 
@@ -376,16 +381,52 @@ node scripts/calc-coverage-lines.mjs panel/clean-engine.ts   # 逐行定位（�
       | 文件:行 | 判定依据 |
       | --- | --- |
       | `ts/sync/enrich-engine.ts:632,633,639` | `matchEntriesInner` 每行的 `try` 体里只做 Map / 数组操作，容器由 `buildBangumiIndexes` 内部构造（值恒为 `number[]`）；`normalizeName()` / `getCellValue()` 都在 `try` **之外**调用 → 该 `catch` 不可达 |
-      | `ts/panel/enrich-preview-cell.ts:48` | `CHIP_COLOR_PALETTE` 12 项全非空，`stableColorIndex()` 返回 `hash % length`（恒在范围内），且表达式已有 `?? CHIP_COLOR_PALETTE[0]` → `!palette` 恒假，属**死代码** |
-      | `ts/services/config-service.ts:203` | `GithubConfigSchema.strategy` 是 `SyncStrategySchema.optional().default('add-update')`，zod 已把值收敛到合法枚举 → `else` 兜底不可达 |
+      | `ts/panel/enrich-preview-cell.ts:48` | **类型驱动的防御代码**（第十七轮用 `tsc` 探针证实，原先误记为「死代码」）：`noUncheckedIndexedAccess: true` 下 `CHIP_COLOR_PALETTE[i]` 的类型是 `T \| undefined`，且 `CHIP_COLOR_PALETTE[0]` **同样是** `T \| undefined`，所以第 45 行的 `?? PALETTE[0]` 并不能把类型收窄成 `T` —— 第 47 行的 `if (!palette)` 是**类型收窄所必需**的。运行时确实走不到（`stableColorIndex()` 里 `>>> 0` 保证哈希非负、索引恒在 `[0, 11]`），但**删掉会报 `TS18048: 'palette' is possibly 'undefined'`** → 不能删 |
+      | `ts/services/config-service.ts:203` | `GithubConfigSchema.strategy` 是 `SyncStrategySchema.optional().default('add-update')`，zod 已把值收敛到合法枚举 → `else` 兜底不可达（生产代码里也有作者的注释「配置里的 default 已经保证 value ∈ SyncStrategy」）。**属有意义的防御兜底**，删掉会把「非法策略 → 回落 add-update」变成「静默不设置」 |
       | `ts/ui/handlers/token.ts:720` | 外层 `if (avatarUrl \|\| username)`（654 行）已蕴含内层 `if (username \|\| userId \|\| avatarUrl)`（698 行），且两个变量都是 `const` 解构、区间内无重赋值 → `else` 不可达 |
-      | `ts/ui/preview.ts:528` | 排序比较器：`dataset.status` 恒为 `normalizeStatus()` 的产物，只可能是 `WATCH_STATUS_MAP` 反查出的 **6 个**标准名；其中 5 个已在 `priorityStatus` 里，非优先集合最多只剩「忽略」**一个**元素，而 `Array#sort` 对长度 ≤1 **不调用比较器**（第 8 批已记录，本批复核确认） |
+      | `ts/ui/preview.ts:528` | 排序比较器：`dataset.status` 恒为 `normalizeStatus()` 的产物，只可能是 `WATCH_STATUS_MAP` 反查出的 **6 个**标准名；其中 5 个已在 `priorityStatus` 里，非优先集合最多只剩「忽略」**一个**元素，而 `Array#sort` 对长度 ≤1 **不调用比较器**（第 8 批已记录，本批复核确认）—— 这一条是**真正的死代码**，已在第十七轮删除，见下 |
 
-    - **口径**：可执行行 **13411 不变**（**零生产代码改动**，只有测试与文档）；测试 **4231 → 4283 条 / 127 → 129 文件**；`npm run gate` 七关全绿。
+    - **口径**：可执行行 **13411 不变**（**本批零生产代码改动**，只有测试与文档）；测试 **4231 → 4283 条 / 127 → 129 文件**；`npm run gate` 七关全绿。
+      （上表 `ui/preview.ts:528` 那一行在**第十七轮**作为死代码删除 → 可执行行 13411 → 13410，见 §三 第 19 批。）
     - **本轮新踩的坑（已补进 `REF-eslint-tests.md`）**：4 个新写的测试文件在 `lint:check`（gate **第一关**）一次性爆出 **10 个 error** ——
       `unicorn/no-return-array-push`（箭头函数体直接返回 `.push()` 的返回值）、`unicorn/numeric-separators-style`（4 位数 `9_999` **不许**加分隔符）、
       `@stylistic/line-comment-position`（行尾注释）、`@typescript-eslint/array-type`（`Array<T>` → `T[]`）、
       `n/no-top-level-await`（顶层 `await import()`）。**写测试文件后先对本文件单独 `npx eslint <file>` 过一遍**，别等全量 gate。
+
+**第 19 批 · 死代码清理（2026-09-15 第十七轮，已完成）**
+
+> 第 18 批收尾时留了个「可选」动作：余 7 行里有 2 行看似可直接删掉。本轮**先把 7 行逐条重新审计一遍**
+> （不再靠推理，能证就证），结论是**只有 1 行真能删**。这次审计本身比删那一行更有价值。
+
+19. ✅ **审计 7 行残留 → 删掉 1 行真死代码 → 未覆盖 7 → 6，全项目 99.95% lines**：
+    - **审计手段升级：用 `tsc` 探针代替「读代码推理」。** 对 `enrich-preview-cell.ts:48` 单独建一个最小复现，
+      用仓库自带的 `tsc` 加 `--noUncheckedIndexedAccess` 编译：
+
+      ```bash
+      npx tsc --ignoreConfig --noEmit --strict --noUncheckedIndexedAccess \
+        --target es2022 --module esnext <探针>.ts
+      # → error TS18048: 'palette' is possibly 'undefined'.
+      ```
+
+      **结论翻案**：第 18 批把这一行记为「死代码（`!palette` 恒假）」是**错的** ——
+      `noUncheckedIndexedAccess: true` 下 `CHIP_COLOR_PALETTE[i]` 与 `CHIP_COLOR_PALETTE[0]` **类型都是 `T | undefined`**，
+      所以 `?? PALETTE[0]` 并不能把类型收窄成 `T`，第 47 行的 `if (!palette)` 是**类型收窄所必需**的。
+      运行时确实走不到，但**删掉 `tsc` 就报错** → 属「类型驱动的防御代码」，**必须保留**。
+    - **7 行的最终分类**（1 删 / 1 类型驱动 / 5 防御性分支）：
+      | 类别 | 行 | 处置 |
+      | --- | --- | --- |
+      | **真死代码** | `ui/preview.ts:528` 的 `.sort((a,b) => …)` | ✅ **已删** —— `Array#sort` 对长度 ≤1 不调用比较器，删掉行为逐字节等价（Map 迭代序本身就是确定的）；同时在原位留注释说明「非优先组最多只有『忽略』一个成员，将来若新增不会被 `normalizeStatus` 收敛的状态需把比较器加回来」 |
+      | **类型驱动** | `panel/enrich-preview-cell.ts:48` | ❌ 保留 —— 删了 `tsc` 报 `TS18048`（见上） |
+      | **防御性分支** | `sync/enrich-engine.ts:632,633,639`（每行 `catch`）、`services/config-service.ts:203`（非法策略回落 `add-update`）、`ui/handlers/token.ts:720`（隐藏 Token 区用户信息） | ❌ 保留 —— 删掉会**改语义**（异常不再被吞成 `matchType:'error'` / 非法策略不再回落 / 分支消失），为覆盖率动这些不值得 |
+    - **口径**：可执行行 13411 → **13410**（删掉 `.sort()` 行 + 其比较器函数）；未覆盖 **7 → 6**，未覆盖文件 **5 → 4**；
+      全项目 lines **99.94% → 99.95%**，`ui/preview.ts` 达 **100% lines**；测试条数不变（**4283 条 / 129 文件**，`preview.test.ts` 57 条改的是注释）；
+      `npm run gate` 七关全绿。
+    - **本轮最该记住的一条判据**：**「这行运行时走不到」不等于「这行可以删」。**
+      在 `noUncheckedIndexedAccess` 打开的项目里，数组索引的 `?? 兜底` 和 `if (!x) 早退` 有一大半是**给类型检查器看的**。
+      判「死代码」之前，**删一次跑 `tsc` 看报不报错** —— 比读代码推理可靠得多。
+    - **顺带清理**：`.workbuddy/` 下积累了 **311 个**历史临时产物（`cov-*.txt` / `*.log` / 覆盖 json 转储 / `eejson/`，共 2.4 MB）。
+      打包成 `.workbuddy/_scratch-archive-20260915.tar.gz`（798 KB）后删掉原文件，目录从 **2.8 M → 1.1 M**；
+      `.workbuddy/memory/`（唯一被 git 跟踪的部分）未动。
 
 ## 四、门禁现状
 
