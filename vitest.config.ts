@@ -21,9 +21,20 @@ export default defineConfig({
         'ts/index.ts',
         'ts/tools/utility.ts',
         'ts/sync/exceltobangumi.ts',
-        // Ribbon / 入口文件：依赖 WPS 宿主，无法在 Node 测试环境执行
+        // Ribbon 实现：依赖 WPS 宿主（COM 回调注册），无法在 Node 测试环境执行
         'ts/ribbon.ts',
-        'ts/entry/**',
+        // 调试面板主文件：随 index.html 一起发布，但生产环境被 `isDebugEnvironment()`
+        // （`window.WpsInvoke === undefined`）拦成 inert。余下约 140 行是**开发期专用**的
+        // DOM 事件管线（Tab 切换 / Ribbon 卡片点击 / 日志轮询 / 诊断报告导出），只经内部
+        // 函数触达。按 §3 既定口径「entry/** 类装配脚本降级为集成冒烟，不为数字硬造 mock」，
+        // 这里只保留 `tests/debug-panel.test.ts` 对**守卫与启动时机**的冒烟。
+        'ts/entry/debug-panel.ts',
+        // ⚠️ `ts/entry/**` 的其余 4 个文件**不在**排除之列。2026-09-15 实测：它们依赖收敛、
+        // 可在 jsdom 下执行（`tests/entry-smoke.test.ts` 装配冒烟 + `tests/debug-panel-render.test.ts`），
+        // 4 个文件全部 **100% lines**。原先把 `ts/entry/**` 整体排除的理由是「依赖 WPS 宿主，
+        // 无法在 Node 测试环境执行」—— 这与 `debug-panel-render.ts` 自己文件头写的
+        // 「本模块**无 import 时副作用**，可直接单测」直接矛盾（该模块正是为了可测才从
+        // debug-panel.ts 拆出来的，整体排除把拆分目的抹掉了）。故把排除收窄到上述单文件。
         // 构建产物
         'dist-ts/**',
       ],
