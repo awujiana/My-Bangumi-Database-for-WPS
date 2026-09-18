@@ -476,6 +476,41 @@ body {
     color: #666;
 }
 
+/* ========== 数据分片多选 ========== */
+/* 复选组横向自动换行；label 需要覆盖 .form-row label 的固定 90px 宽度 */
+.shard-select-list {
+    display: flex;
+    flex: 1;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.shard-select-list label {
+    display: inline-flex;
+    flex: 0 0 auto;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 8px;
+    background: var(--bg-surface);
+    border: 1px solid #444;
+    border-radius: 4px;
+    color: #b0b0b0;
+    font-size: 12px;
+    font-weight: 400;
+    cursor: pointer;
+}
+
+.shard-select-list label.is-required {
+    cursor: not-allowed;
+    opacity: 0.7;
+}
+
+.shard-select-list input[type='checkbox'] {
+    flex: 0 0 auto;
+    margin: 0;
+    accent-color: #5789d9;
+}
+
 .form-row select {
     flex: 1;
     padding: 6px 10px;
