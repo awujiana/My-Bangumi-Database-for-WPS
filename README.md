@@ -55,8 +55,6 @@ BGM/
 ├── ui/                         # 面板 HTML（panel.html / settings.html）
 ├── css/                        # 面板样式
 ├── images/                     # 功能区与面板 SVG 图标
-├── config/
-│   └── field_mappings.json     # Excel 列 ↔ 数据字段映射
 ├── data/
 │   └── bangumi.jsonlines.gz    # 数据源本地副本（gzip，用于本地文件同步 / 开发测试）
 ├── differences/                # 数据差异摘要
@@ -228,28 +226,28 @@ npm run test:coverage    # 生成覆盖率报告
 ### 扩展：新增同步源 / 字段映射
 
 - **新增同步源**：在 `ts/sync/` 下实现 `SyncSource` 接口并注册到 `sync-source-registry.ts`。
-- **字段映射**：编辑 `config/field_mappings.json`，并在 `ts/schemas/` 补充对应 zod 校验。
+- **字段映射**：权威来源是 Archive 项目的 `Archive/config/field_mappings.json`（infobox 字段名 → 标准列名），本仓库不保留副本；改动后在 `ts/schemas/` 补充对应 zod 校验。
 
 ---
 
 ## 📚 文档索引
 
-| 文档                                                                   | 说明                                                            |
-| ---------------------------------------------------------------------- | --------------------------------------------------------------- |
-| [`CHANGELOG.md`](CHANGELOG.md)                                         | 跨文档变更总览（按内部功能版本记录）                            |
-| [`文档/ARCHITECTURE.md`](文档/ARCHITECTURE.md)                         | 架构与项目知识：分层模型、模块详解、配置体系、数据流、构建发布  |
-| [`文档/USER_OPERATIONS.md`](文档/USER_OPERATIONS.md)                   | 用户操作手册：每个按钮 / 面板 / 模态框的操作流程与边界          |
-| [`文档/ui-and-interaction.md`](文档/ui-and-interaction.md)             | UI 架构、面板交互、事件机制、Processor 清单                     |
-| [`文档/图标规范.md`](文档/图标规范.md)                                 | 图标规范：SVG / emoji 双体系、语义→图标映射表、VS16 规则        |
-| [`文档/github-data-distribution.md`](文档/github-data-distribution.md) | 远程数据下发机制、JSONL 格式、同步策略                          |
-| [`文档/README.data-distribution.md`](文档/README.data-distribution.md) | 数据源仓库（Bangumi-Archive-Anime-Excel）说明（参考）           |
-| [`文档/项目文档.md`](文档/项目文档.md)                                 | 数据源仓库项目文档：仓库级架构、转换脚本、CI 流程（参考）       |
-| [`文档/项目操作指南.md`](文档/项目操作指南.md)                         | 数据源仓库维护操作指南：初始化、发布、验证、回滚（参考）        |
-| [`文档/coverage-report.md`](文档/coverage-report.md)                   | 测试覆盖率报告（历史快照，以本地 `npm run test:coverage` 为准） |
-| [`文档/COVERAGE_BACKLOG.md`](文档/COVERAGE_BACKLOG.md)                 | **覆盖率台账（当前有效）**：补测批次记录、未覆盖行逐条判定依据、门禁现状 |
-| [`文档/待办任务清单.md`](文档/待办任务清单.md)                         | **待办清单（当前有效）**：分档待办、批次进度、跟进建议          |
+| 文档                                                                     | 说明                                                                                      |
+| ------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------- |
+| [`CHANGELOG.md`](CHANGELOG.md)                                           | 跨文档变更总览（按内部功能版本记录）                                                      |
+| [`文档/ARCHITECTURE.md`](文档/ARCHITECTURE.md)                           | 架构与项目知识：分层模型、模块详解、配置体系、数据流、构建发布                            |
+| [`文档/USER_OPERATIONS.md`](文档/USER_OPERATIONS.md)                     | 用户操作手册：每个按钮 / 面板 / 模态框的操作流程与边界                                    |
+| [`文档/ui-and-interaction.md`](文档/ui-and-interaction.md)               | UI 架构、面板交互、事件机制、Processor 清单                                               |
+| [`文档/图标规范.md`](文档/图标规范.md)                                   | 图标规范：SVG / emoji 双体系、语义→图标映射表、VS16 规则                                  |
+| [`文档/github-data-distribution.md`](文档/github-data-distribution.md)   | 远程数据下发机制、JSONL 格式、同步策略                                                    |
+| [`文档/README.data-distribution.md`](文档/README.data-distribution.md)   | 数据源仓库（Bangumi-Archive-Anime-Excel）说明（参考）                                     |
+| [`文档/项目文档.md`](文档/项目文档.md)                                   | 数据源仓库项目文档：仓库级架构、转换脚本、CI 流程（参考）                                 |
+| [`文档/项目操作指南.md`](文档/项目操作指南.md)                           | 数据源仓库维护操作指南：初始化、发布、验证、回滚（参考）                                  |
+| [`文档/coverage-report.md`](文档/coverage-report.md)                     | 测试覆盖率报告（历史快照，以本地 `npm run test:coverage` 为准）                           |
+| [`文档/COVERAGE_BACKLOG.md`](文档/COVERAGE_BACKLOG.md)                   | **覆盖率台账（当前有效）**：补测批次记录、未覆盖行逐条判定依据、门禁现状                  |
+| [`文档/待办任务清单.md`](文档/待办任务清单.md)                           | **待办清单（当前有效）**：分档待办、批次进度、跟进建议                                    |
 | [`文档/HOST_ACCEPTANCE_CHECKLIST.md`](文档/HOST_ACCEPTANCE_CHECKLIST.md) | **真实宿主手工验收清单（当前有效）**：32 项，覆盖 COM 真实语义 / 性能 / 网络 / 跨 WebView |
-| [`文档/VERIFICATION_CHECKLIST.md`](文档/VERIFICATION_CHECKLIST.md)     | 修复验证清单（2026-06/07 历史快照，已被上一行取代）             |
+| [`文档/VERIFICATION_CHECKLIST.md`](文档/VERIFICATION_CHECKLIST.md)       | 修复验证清单（2026-06/07 历史快照，已被上一行取代）                                       |
 
 > 全部项目文档已统一置于 `文档/` 下（架构/操作类核心文档与数据源仓库参考文档合并管理）。
 
