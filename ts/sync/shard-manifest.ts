@@ -12,8 +12,8 @@
  *              - `anime.infobox.jsonlines.gz`    2 列   infobox 原文
  *
  *              切片动机（实测）：infobox 占 47.6%、summary 占 29.4%，两个长文本字段
- *              就占了全部体积的 77%；而 Excel 实际用到的 27 列压缩后只有 3.37 MiB
- *              （相对旧单片 −83.8%）。只要简介的场景没必要把 infobox 一起拖下来。
+ *              就占了全部体积的 77%；而 Excel 实际用到的 28 列压缩后只有 3.42 MiB
+ *              （相对旧单片 −83.6%）。只要简介的场景没必要把 infobox 一起拖下来。
  *
  * 本模块**零项目依赖**（除纯函数模块 githubSyncDiff 的类型与映射表），可在 Node
  * 测试环境中直接运行，不触发 index.ts → handlers.ts 的 document 副作用链。

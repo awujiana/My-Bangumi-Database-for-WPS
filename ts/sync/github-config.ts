@@ -45,8 +45,8 @@ export interface GithubSyncConfig {
    * 文件路径（指向**分片清单** `data/anime.manifest.json`）
    *
    * 2026-09-18 起数据文件改为分片：插件按用户表头只下载需要的分片
-   * （`data/anime.<shard>.jsonlines.gz`），Excel 实际用到的 27 列压完仅
-   * 3.37 MiB（相对旧单片 −83.8%）。旧单片路径不再支持，存量配置由
+   * （`data/anime.<shard>.jsonlines.gz`），Excel 实际用到的 28 列压完仅
+   * 3.42 MiB（相对旧单片 −83.6%）。旧单片路径不再支持，存量配置由
    * {@link LEGACY_PATH_MIGRATIONS} 一次性迁移到清单路径。
    */
   path: string
