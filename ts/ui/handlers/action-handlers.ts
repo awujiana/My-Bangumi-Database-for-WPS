@@ -923,10 +923,10 @@ export const ACTION_HANDLERS: Record<string, ActionHandler> = {
         showToast('WPS 文件对话框不可用，请手动输入路径', 'warn')
         return
       }
-      // 文件过滤器：JSONL / JSON / 所有文件
+      // 文件过滤器：分片清单（JSON）优先，其余为兼容手动选择
       const selected = wpsApp.GetOpenFilename(
-        'JSONL 文件 (*.jsonlines;*.jsonl),*.jsonlines;*.jsonl,JSON 文件 (*.json),*.json,所有文件 (*.*),*.*',
-        '选择 JSONL/JSON 文件',
+        '分片清单 (*.json),*.json,JSONL 文件 (*.jsonlines;*.jsonl),*.jsonlines;*.jsonl,所有文件 (*.*),*.*',
+        '选择分片清单（anime.manifest.json）',
       )
       // GetOpenFilename 返回 false 表示用户取消
       if (typeof selected === 'boolean' || selected === false) {

@@ -27,11 +27,11 @@ import { LOG_LEVELS } from '../core/constants.js'
 import { Result, BgmError } from '../core/result.js'
 import { bgmLog } from '../tools/utility.js'
 
-import { getGithubConfig, isGithubConfigComplete } from './github-config.js'
-import { parseJsonl } from './github-sync-diff.js'
+import { getGithubConfig, getManualShards, isGithubConfigComplete } from './github-config.js'
 import type { GithubRemoteEntry } from './github-sync-diff.js'
 import { readXhrJsonlText } from './jsonl-response.js'
-import type { SyncSource } from './sync-source.js'
+import { loadEntriesFromPath } from './shard-fetch.js'
+import type { FetchRemoteEntriesOptions, SyncSource } from './sync-source.js'
 // 复用 githubSyncDiff.ts 的纯解析函数与类型（零依赖纯模块，可在 Node 测试环境直接运行）
 
 /** HTTP 请求超时（毫秒），与 githubSync 保持一致 */
@@ -47,35 +47,36 @@ const DEFAULT_BRANCH = 'main'
  *
  * 关键差异：GitLab 使用 `/-/raw/` 段（含三段横线），不同于 GitHub 的 `/raw/`。
  *
+ * @param relativePath 可选的仓库内相对路径覆盖（下载分片时用）
  * @returns URL 字符串
  * @throws 配置不完整时抛出 Error
  */
-export function buildGitlabRawUrl(): string {
+export function buildGitlabRawUrl(relativePath?: string): string {
   if (!isGithubConfigComplete()) {
     throw new Error('GitLab 仓库配置不完整，请在面板中设置 owner/repo/path')
   }
   // config 声明移到 early throw 之后（满足 unicorn/no-declarations-before-early-exit）
   const config = getGithubConfig()
   const branch = config.branch || DEFAULT_BRANCH
-  return `https://gitlab.com/${config.owner}/${config.repo}/-/raw/${branch}/${config.path}`
+  const target = relativePath ?? config.path
+  return `https://gitlab.com/${config.owner}/${config.repo}/-/raw/${branch}/${target}`
 }
 
 /**
- * 从 GitLab Raw 下载 JSONL 文件
+ * 按仓库内相对路径取原始文本（gzip 由 `readXhrJsonlText` 按魔数解压）
  *
- * JSONL（JSON Lines）格式与 GitHub 同步源一致：每行一个独立的 JSON 对象。
- * 解析复用 githubSyncDiff.ts 的 parseJsonl，非法行不中断整体解析。
- * 响应体可能是 gzip 压缩的 `.jsonlines.gz`，由 `readXhrJsonlText` 按魔数自动识别并解压。
+ * 供 `shardFetch.loadEntriesFromPath` 编排（清单 → 选片 → 拼接）。
  *
+ * @param relativePath 仓库内相对路径（清单或任一分片文件）
  * @param signal 可选 AbortSignal，用于取消请求
- * @returns 解析后的条目数组
- * @throws 网络错误、配置错误、解析失败时抛出 Error
+ * @returns 解码后的文本（JSONL / JSON 明文）
+ * @throws 配置错误、网络错误、HTTP 非 200 时抛出 Error
  */
-export function fetchGitlabJson(signal?: AbortSignal): Promise<GithubRemoteEntry[]> {
-  return new Promise<GithubRemoteEntry[]>((resolve, reject) => {
+export function fetchGitlabText(relativePath: string, signal?: AbortSignal): Promise<string> {
+  return new Promise<string>((resolve, reject) => {
     let url: string
     try {
-      url = buildGitlabRawUrl()
+      url = buildGitlabRawUrl(relativePath)
     } catch (error: unknown) {
       reject(error instanceof Error ? error : new Error(String(error)))
       return
@@ -108,31 +109,11 @@ export function fetchGitlabJson(signal?: AbortSignal): Promise<GithubRemoteEntry
           // gzip 数据源需要异步解压（DecompressionStream），200 分支走异步流程
           void (async (): Promise<void> => {
             try {
-              const text = await readXhrJsonlText(xhr)
-              const { entries, errors } = parseJsonl(text)
-              if (entries.length === 0 && errors.length > 0) {
-                reject(
-                  new Error(
-                    `JSONL 解析失败：${String(errors.length)} 行全部非法。` +
-                      `首行错误（第 ${String(errors[0]?.line ?? '')} 行）：${errors[0]?.reason ?? ''}`,
-                  ),
-                )
-                return
-              }
-              if (errors.length > 0) {
-                bgmLog(
-                  LOG_LEVELS.WARN,
-                  `[gitlabSync] JSONL 解析完成：${String(entries.length)} 条合法，${String(errors.length)} 行非法（已跳过）。` +
-                    `首行错误（第 ${String(errors[0]?.line ?? '')} 行）：${errors[0]?.reason ?? ''}`,
-                )
-              } else {
-                bgmLog(LOG_LEVELS.INFO, `[gitlabSync] 下载成功：${String(entries.length)} 条记录`)
-              }
-              resolve(entries)
+              resolve(await readXhrJsonlText(xhr))
             } catch (error: unknown) {
               reject(
                 new Error(
-                  `JSONL 解析失败: ${error instanceof Error ? error.message : String(error)}`,
+                  `数据解码失败: ${error instanceof Error ? error.message : String(error)}`,
                 ),
               )
             }
@@ -144,7 +125,7 @@ export function fetchGitlabJson(signal?: AbortSignal): Promise<GithubRemoteEntry
           reject(
             new Error(
               `文件不存在（404）：${url}，请检查 owner/repo/branch/path 配置` +
-                `（数据文件路径应为 data/bangumi.jsonlines.gz）`,
+                `（分片数据路径应为 data/anime.manifest.json）`,
             ),
           )
 
@@ -178,6 +159,32 @@ export function fetchGitlabJson(signal?: AbortSignal): Promise<GithubRemoteEntry
   })
 }
 
+/**
+ * 从 GitLab Raw 下载并解析远程条目
+ *
+ * 委托给 `shardFetch.loadEntriesFromPath`：清单模式下按 `neededFields` 选片下载后
+ * 按行拼接，旧单片路径仍可直接解析，清单取不到时自动回退单片。
+ *
+ * @param signal 可选 AbortSignal，用于取消请求
+ * @param neededFields 本次同步会用到的字段；undefined 表示全量下载
+ * @returns 解析后的条目数组
+ * @throws 网络错误、配置错误、解析失败时抛出 Error
+ */
+export async function fetchGitlabJson(
+  signal?: AbortSignal,
+  neededFields?: ReadonlySet<string>,
+): Promise<GithubRemoteEntry[]> {
+  const result = await loadEntriesFromPath({
+    path: getGithubConfig().path,
+    fetchText: fetchGitlabText,
+    neededFields,
+    manualShards: getManualShards(),
+    signal,
+    logTag: 'gitlabSync',
+  })
+  return result.entries
+}
+
 // ========== SyncSource 接口实现 ==========
 
 /**
@@ -202,9 +209,13 @@ export class GitlabSyncSource implements SyncSource {
   /**
    * 获取远程条目（委托给 fetchGitlabJson）
    * @param signal 可选的 AbortSignal
+   * @param options 取数选项（分片模式下按表头选片）
    */
-  async fetchRemoteEntries(signal?: AbortSignal): Promise<GithubRemoteEntry[]> {
-    return fetchGitlabJson(signal)
+  async fetchRemoteEntries(
+    signal?: AbortSignal,
+    options?: FetchRemoteEntriesOptions,
+  ): Promise<GithubRemoteEntry[]> {
+    return fetchGitlabJson(signal, options?.neededFields)
   }
 
   /**

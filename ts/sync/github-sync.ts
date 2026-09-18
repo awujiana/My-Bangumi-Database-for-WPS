@@ -34,11 +34,15 @@ import {
 } from '../tools/utility.js'
 import type { WpsCellValue, WpsRange, WpsWorksheet } from '../tools/wps.js'
 
-import { buildRawUrl, isGithubConfigComplete } from './github-config.js'
+import {
+  buildRawUrl,
+  getGithubConfig,
+  getManualShards,
+  isGithubConfigComplete,
+} from './github-config.js'
 import {
   computeDiff,
   tagsToString,
-  parseJsonl,
   EXTENDED_FIELD_MAP,
   getExcelAliases,
   filterByTime,
@@ -63,9 +67,10 @@ import {
 } from './github-time-format.js'
 import { resolveNewRowCellValue, resolveUpdateCellValue } from './github-cell-value.js'
 import { readXhrJsonlText } from './jsonl-response.js'
+import { collectNeededFieldsFromSheet, loadEntriesFromPath } from './shard-fetch.js'
 import { addSyncRecords, addSyncRecordSummary } from './sync-record.js'
 import type { UpdateRecordParameters } from './sync-record.js'
-import type { SyncSource } from './sync-source.js'
+import type { FetchRemoteEntriesOptions, SyncSource } from './sync-source.js'
 import {
   beginUndoSession,
   endUndoSession,
@@ -117,26 +122,24 @@ export interface GithubSyncResult {
 const REQUEST_TIMEOUT_MS = 30_000
 
 /**
- * 从 GitHub Raw 下载 JSONL 文件
+ * 按仓库内相对路径取原始文本（gzip 由 `readXhrJsonlText` 按魔数解压）
  *
- * JSONL（JSON Lines）格式：每行一个独立的 JSON 对象。
- * 解析时按行分割，逐行 JSON.parse，跳过空行，非法行不中断整体解析。
+ * 分片模式下每个分片各是一次独立请求，因此把「一次 GET + 解码」抽成可复用的
+ * 回调，交给 `shardFetch.loadEntriesFromPath` 编排（清单 → 选片 → 拼接）。
  *
- * 响应体可能是 gzip 压缩的 `.jsonlines.gz`（也可能是明文 `.jsonlines`），
- * 由 `readXhrJsonlText` 按 gzip 魔数自动识别并解压。
- *
+ * @param relativePath 仓库内相对路径（清单或任一分片文件）
  * @param signal 可选 AbortSignal，用于取消请求
- * @returns 解析后的条目数组
- * @throws 网络错误、配置错误、解析失败时抛出 Error
+ * @returns 解码后的文本（JSONL / JSON 明文）
+ * @throws 配置错误、网络错误、HTTP 非 200 时抛出 Error
  */
-export function fetchGithubJson(signal?: AbortSignal): Promise<GithubRemoteEntry[]> {
-  return new Promise<GithubRemoteEntry[]>((resolve, reject) => {
+export function fetchGithubText(relativePath: string, signal?: AbortSignal): Promise<string> {
+  return new Promise<string>((resolve, reject) => {
     let url: string
     try {
       if (!isGithubConfigComplete()) {
         throw new Error('GitHub 仓库配置不完整')
       }
-      url = buildRawUrl()
+      url = buildRawUrl(relativePath)
     } catch (error: unknown) {
       reject(error instanceof Error ? error : new Error(String(error)))
       return
@@ -180,31 +183,11 @@ export function fetchGithubJson(signal?: AbortSignal): Promise<GithubRemoteEntry
           // gzip 数据源需要异步解压（DecompressionStream），200 分支走异步流程
           void (async (): Promise<void> => {
             try {
-              const text = await readXhrJsonlText(xhr)
-              const { entries, errors } = parseJsonl(text)
-              if (entries.length === 0 && errors.length > 0) {
-                reject(
-                  new Error(
-                    `JSONL 解析失败：${String(errors.length)} 行全部非法。` +
-                      `首行错误（第 ${String(errors[0]?.line ?? '')} 行）：${errors[0]?.reason ?? ''}`,
-                  ),
-                )
-                return
-              }
-              if (errors.length > 0) {
-                bgmLog(
-                  LOG_LEVELS.WARN,
-                  `[githubSync] JSONL 解析完成：${String(entries.length)} 条合法，${String(errors.length)} 行非法（已跳过）。` +
-                    `首行错误（第 ${String(errors[0]?.line ?? '')} 行）：${errors[0]?.reason ?? ''}`,
-                )
-              } else {
-                bgmLog(LOG_LEVELS.INFO, `[githubSync] 下载成功：${String(entries.length)} 条记录`)
-              }
-              resolve(entries)
+              resolve(await readXhrJsonlText(xhr))
             } catch (error: unknown) {
               reject(
                 new Error(
-                  `JSONL 解析失败: ${error instanceof Error ? error.message : String(error)}`,
+                  `数据解码失败: ${error instanceof Error ? error.message : String(error)}`,
                 ),
               )
             }
@@ -216,7 +199,7 @@ export function fetchGithubJson(signal?: AbortSignal): Promise<GithubRemoteEntry
           reject(
             new Error(
               `文件不存在（404）：${url}，请检查 owner/repo/branch/path 配置` +
-                `（数据文件路径应为 data/bangumi.jsonlines.gz）`,
+                `（数据文件路径应为 data/anime.manifest.json）`,
             ),
           )
 
@@ -254,6 +237,36 @@ export function fetchGithubJson(signal?: AbortSignal): Promise<GithubRemoteEntry
   })
 }
 
+/**
+ * 从 GitHub 下载并拼接远程条目
+ *
+ * 数据仓库自 2026-09-18 起改为「6 个字段分片 + 一份清单」，因此这里委托给
+ * `shardFetch.loadEntriesFromPath`：配置指向清单（`data/anime.manifest.json`）→
+ * 按 `neededFields` 选片下载后按行拼接。
+ *
+ * 只支持清单路径：旧单片 `data/bangumi.jsonlines.gz` 不再兼容，历史配置由
+ * `github-config.ts` 的路径迁移表在读取时改写成清单路径。
+ *
+ * @param signal 可选 AbortSignal，用于取消请求
+ * @param neededFields 本次同步会用到的字段（来自用户表格表头）；undefined 表示全量下载
+ * @returns 拼接后的条目数组
+ * @throws 网络错误、配置错误、清单/分片格式非法时抛出 Error
+ */
+export async function fetchGithubJson(
+  signal?: AbortSignal,
+  neededFields?: ReadonlySet<string>,
+): Promise<GithubRemoteEntry[]> {
+  const result = await loadEntriesFromPath({
+    path: getGithubConfig().path,
+    fetchText: fetchGithubText,
+    neededFields,
+    manualShards: getManualShards(),
+    signal,
+    logTag: 'githubSync',
+  })
+  return result.entries
+}
+
 // ========== SyncSource 接口实现 ==========
 
 /**
@@ -278,9 +291,13 @@ export class GithubSyncSource implements SyncSource {
   /**
    * 获取远程条目（委托给 fetchGithubJson）
    * @param signal 可选的 AbortSignal
+   * @param options 取数选项（分片模式下按表头选片）
    */
-  async fetchRemoteEntries(signal?: AbortSignal): Promise<GithubRemoteEntry[]> {
-    return fetchGithubJson(signal)
+  async fetchRemoteEntries(
+    signal?: AbortSignal,
+    options?: FetchRemoteEntriesOptions,
+  ): Promise<GithubRemoteEntry[]> {
+    return fetchGithubJson(signal, options?.neededFields)
   }
 
   /**
@@ -1693,7 +1710,10 @@ export async function syncFromGithub(
   const syncStartTs = Date.now()
   onProgress?.(0, 1, `开始下载远程数据（${source.getDisplayName()} - 策略：${strategy}）...`)
   const downloadStartTs = Date.now()
-  const remoteEntries = await source.fetchRemoteEntries(signal)
+  // 分片数据源按表头只下载需要的片；读不到表头时返回 undefined → 全量下载
+  const remoteEntries = await source.fetchRemoteEntries(signal, {
+    neededFields: collectNeededFieldsFromSheet(),
+  })
   const downloadElapsed = Date.now() - downloadStartTs
   onProgress?.(
     1,

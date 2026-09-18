@@ -38,6 +38,7 @@ import type { ConflictResolution, SyncTimeFilter } from './github-sync-diff.js'
 import { GitlabSyncSource } from './gitlab-sync.js'
 import { LocalFileSyncSource } from './local-file-sync.js'
 import { extractSubjectId } from './pure-utilities.js'
+import { collectNeededFieldsFromSheet } from './shard-fetch.js'
 import type { SyncSource } from './sync-source.js'
 
 /** 同步源工厂函数：每次调用返回新实例，避免实例间状态共享 */
@@ -123,7 +124,10 @@ export async function syncFromRemote(
   const syncStartTs = Date.now()
   onProgress?.(0, 1, `开始下载远程数据（${source.getDisplayName()} - 策略：${strategy}）...`)
   const downloadStartTs = Date.now()
-  const remoteEntries = await source.fetchRemoteEntries(signal)
+  // 分片数据源按表头只下载需要的片；读不到表头时返回 undefined → 全量下载
+  const remoteEntries = await source.fetchRemoteEntries(signal, {
+    neededFields: collectNeededFieldsFromSheet(),
+  })
   const downloadElapsed = Date.now() - downloadStartTs
   onProgress?.(
     1,

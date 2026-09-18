@@ -18,6 +18,7 @@ vi.mock('../ts/sync/github-config.js', () => ({
   getGithubConfig: vi.fn(),
   isGithubConfigComplete: vi.fn(),
   buildRawUrl: vi.fn(),
+  getManualShards: vi.fn(() => []),
   getSyncSourceType: vi.fn(() => 'local'),
   setSyncSourceType: vi.fn(() => true),
   getSyncStrategy: vi.fn(() => 'add-update'),
@@ -27,7 +28,7 @@ vi.mock('../ts/sync/github-config.js', () => ({
     owner: 'awujiana',
     repo: 'Bangumi-Archive-Anime-Excel-to-sync',
     branch: 'main',
-    path: 'data.jsonl',
+    path: 'data/anime.manifest.json',
     sourceType: 'github',
   }),
 }))
@@ -88,6 +89,15 @@ interface MockXHRCall {
 let lastXhrCall: MockXHRCall | null = null
 let lastMockXhr: MockXHR | null = null
 
+/**
+ * 预置响应队列：每次 `send()` 消费一项并异步返回。
+ *
+ * 分片读取一次同步会读 1 + N 个文件（清单 + 各分片），逐个手动 `_respondOk`
+ * 需要精确插入 microtask 让出点，很容易写脆；队列方式让测试只关心「按顺序返回什么」。
+ * 队列为空时保持旧行为（测试手动调用 `_respondOk`）。
+ */
+let responseQueue: string[] = []
+
 /** 记录最近一次 send() 创建的 MockXHR 实例（避免将 this 直接赋给模块变量触发 no-this-assignment） */
 function recordLastMockXhr(xhr: MockXHR): void {
   lastMockXhr = xhr
@@ -144,6 +154,14 @@ class MockXHR {
       headers: { ...this.headers },
     }
     recordLastMockXhr(this)
+
+    const queued = responseQueue.at(0)
+    responseQueue = responseQueue.slice(1)
+    if (queued !== undefined) {
+      queueMicrotask(() => {
+        this._respondOk(queued)
+      })
+    }
   }
 
   // 测试辅助方法：模拟成功响应
@@ -183,6 +201,7 @@ function installMockXhr(): void {
 
 beforeEach(() => {
   installMockXhr()
+  responseQueue = []
 })
 
 // ========== 接口基础行为 ==========
@@ -351,127 +370,123 @@ describe('readLocalFileContent', () => {
   })
 })
 
-// ========== fetchRemoteEntries ==========
+/** 构造一份最小分片清单：base（必选）+ summary（可选） */
+function makeManifestText(): string {
+  return JSON.stringify({
+    formatVersion: 1,
+    subjectType: 2,
+    typeLabel: 'anime',
+    updatedAt: '2026-09-08',
+    recordCount: 2,
+    shards: [
+      { name: 'base', file: 'anime.base.jsonlines.gz', fields: ['sid', 'name', 'updatedAt'] },
+      { name: 'summary', file: 'anime.summary.jsonlines.gz', fields: ['sid', 'summary'] },
+    ],
+  })
+}
+
+/** 把 getGithubConfig 的 path 指向指定本地路径（sourceType=local） */
+function mockLocalPath(path: string): void {
+  mockedGetGithubConfig.mockReturnValue({
+    owner: '',
+    repo: '',
+    branch: '',
+    path,
+    sourceType: 'local',
+  })
+}
+
+// ========== fetchRemoteEntries（清单 → 选片 → 拼接） ==========
 describe('LocalFileSyncSource.fetchRemoteEntries', () => {
-  it('成功解析 JSONL 内容', async () => {
-    const jsonlContent = [
-      '["sid","name","type","score"]',
-      '["111","条目A",3,8]',
-      '["222","条目B",2,9]',
-    ].join('\n')
-    mockedGetGithubConfig.mockReturnValue({
-      owner: '',
-      repo: '',
-      branch: '',
-      path: String.raw`C:\data\test.jsonl`,
-      sourceType: 'local',
-    })
+  /** 本地清单的绝对路径（以 .json 结尾，下载层据此判定为清单） */
+  const MANIFEST_FILE = String.raw`C:\data\anime.manifest.json`
+
+  it('按清单读取必选片并拼出条目', async () => {
+    mockLocalPath(MANIFEST_FILE)
+    responseQueue = [
+      makeManifestText(),
+      '["sid","name","updatedAt"]\n["111","条目A","2026-09-08"]\n["222","条目B","2026-09-08"]',
+    ]
     const source = new LocalFileSyncSource()
-    const promise = source.fetchRemoteEntries()
-    lastMockXhr!._respondOk(jsonlContent, 0)
-    const entries = await promise
+    const entries = await source.fetchRemoteEntries(undefined, { neededFields: new Set() })
+
     expect(entries).toHaveLength(2)
     expect(entries[0]?.sid).toBe('111')
     expect(entries[0]?.name).toBe('条目A')
     expect(entries[1]?.sid).toBe('222')
   })
 
-  it('空文件返回空数组', async () => {
-    mockedGetGithubConfig.mockReturnValue({
-      owner: '',
-      repo: '',
-      branch: '',
-      path: String.raw`C:\empty.jsonl`,
-      sourceType: 'local',
-    })
+  it('按 neededFields 带出 summary 片并按行拼接', async () => {
+    mockLocalPath(MANIFEST_FILE)
+    responseQueue = [
+      makeManifestText(),
+      '["sid","name","updatedAt"]\n["111","条目A","2026-09-08"]',
+      '["sid","summary"]\n["111","简介A"]',
+    ]
     const source = new LocalFileSyncSource()
-    const promise = source.fetchRemoteEntries()
-    lastMockXhr!._respondOk('', 0)
-    const entries = await promise
+    const entries = await source.fetchRemoteEntries(undefined, {
+      neededFields: new Set(['summary']),
+    })
+
+    expect(entries[0]?.summary).toBe('简介A')
+    expect(entries[0]?.name).toBe('条目A')
+  })
+
+  it('neededFields 为 undefined 时全量下载（保守兜底）', async () => {
+    mockLocalPath(MANIFEST_FILE)
+    responseQueue = [
+      makeManifestText(),
+      '["sid","name","updatedAt"]\n["111","条目A","2026-09-08"]',
+      '["sid","summary"]\n["111","简介A"]',
+    ]
+    const source = new LocalFileSyncSource()
+    const entries = await source.fetchRemoteEntries()
+
+    expect(entries[0]?.summary).toBe('简介A')
+  })
+
+  it('分片只有表头（无数据行）时返回空数组', async () => {
+    mockLocalPath(MANIFEST_FILE)
+    responseQueue = [makeManifestText(), '["sid","name","updatedAt"]']
+    const source = new LocalFileSyncSource()
+    const entries = await source.fetchRemoteEntries(undefined, { neededFields: new Set() })
+
     expect(entries).toEqual([])
   })
 
-  it('包含空行的文件返回有效条目（空行被跳过）', async () => {
-    const content = [
-      '',
-      '["sid","name"]',
-      '',
-      '',
-      '["111","条目A"]',
-      '',
-      '["222","条目B"]',
-      '',
-    ].join('\n')
-    mockedGetGithubConfig.mockReturnValue({
-      owner: '',
-      repo: '',
-      branch: '',
-      path: String.raw`C:\data.jsonl`,
-      sourceType: 'local',
-    })
+  it('路径不是清单（.json）时抛出明确错误', async () => {
+    mockLocalPath(String.raw`C:\data\data.jsonl`)
     const source = new LocalFileSyncSource()
-    const promise = source.fetchRemoteEntries()
-    lastMockXhr!._respondOk(content, 0)
-    const entries = await promise
-    expect(entries).toHaveLength(2)
-    expect(entries[0]?.sid).toBe('111')
-    expect(entries[1]?.sid).toBe('222')
+
+    await expect(source.fetchRemoteEntries()).rejects.toThrow(/必须是分片清单/)
   })
 
-  it('包含非法 JSON 行时跳过非法行（不抛出，返回合法条目）', async () => {
-    // 第 1 行表头，第 2 行非法 JSON，第 3 行合法，第 4 行字段数与表头不匹配
-    const content = ['["sid","name"]', 'this is not json', '["111","条目A"]', '["222"]'].join('\n')
-    mockedGetGithubConfig.mockReturnValue({
-      owner: '',
-      repo: '',
-      branch: '',
-      path: String.raw`C:\mixed.jsonl`,
-      sourceType: 'local',
-    })
+  it('分片表头非法时抛出错误', async () => {
+    mockLocalPath(MANIFEST_FILE)
+    responseQueue = [makeManifestText(), 'this is not json']
     const source = new LocalFileSyncSource()
-    const promise = source.fetchRemoteEntries()
-    lastMockXhr!._respondOk(content, 0)
-    const entries = await promise
-    // 仅第二行（合法且含 sid）应被解析
-    expect(entries).toHaveLength(1)
-    expect(entries[0]?.sid).toBe('111')
+
+    await expect(source.fetchRemoteEntries(undefined, { neededFields: new Set() })).rejects.toThrow(
+      /分片表头非法/,
+    )
   })
 
-  it('全部行非法时抛出错误', async () => {
-    const content = 'this is not json\nalso not json'
-    mockedGetGithubConfig.mockReturnValue({
-      owner: '',
-      repo: '',
-      branch: '',
-      path: String.raw`C:\bad.jsonl`,
-      sourceType: 'local',
-    })
+  it('清单格式非法时抛出错误', async () => {
+    mockLocalPath(MANIFEST_FILE)
+    responseQueue = ['this is not json']
     const source = new LocalFileSyncSource()
-    const promise = source.fetchRemoteEntries()
-    lastMockXhr!._respondOk(content, 0)
-    await expect(promise).rejects.toThrow(/JSONL 解析失败/)
+
+    await expect(source.fetchRemoteEntries()).rejects.toThrow(/分片清单格式非法/)
   })
 
   it('path 未配置时抛出错误', async () => {
-    mockedGetGithubConfig.mockReturnValue({
-      owner: '',
-      repo: '',
-      branch: '',
-      path: '',
-      sourceType: 'local',
-    })
+    mockLocalPath('')
     const source = new LocalFileSyncSource()
     await expect(source.fetchRemoteEntries()).rejects.toThrow(/本地文件路径未配置/)
   })
 
   it('文件读取错误时抛出', async () => {
-    mockedGetGithubConfig.mockReturnValue({
-      owner: '',
-      repo: '',
-      branch: '',
-      path: String.raw`C:\nonexistent.jsonl`,
-      sourceType: 'local',
-    })
+    mockLocalPath(String.raw`C:\nonexistent\anime.manifest.json`)
     const source = new LocalFileSyncSource()
     const promise = source.fetchRemoteEntries()
     lastMockXhr!._triggerError()
@@ -479,32 +494,20 @@ describe('LocalFileSyncSource.fetchRemoteEntries', () => {
   })
 
   it('AbortSignal 已 aborted 时立即抛出', async () => {
-    mockedGetGithubConfig.mockReturnValue({
-      owner: '',
-      repo: '',
-      branch: '',
-      path: String.raw`C:\data.jsonl`,
-      sourceType: 'local',
-    })
+    mockLocalPath(MANIFEST_FILE)
     const controller = new AbortController()
     controller.abort()
     const source = new LocalFileSyncSource()
     await expect(source.fetchRemoteEntries(controller.signal)).rejects.toThrow(/请求被取消/)
   })
 
-  it('AbortSignal 在文件读取后 aborted 时抛出', async () => {
-    mockedGetGithubConfig.mockReturnValue({
-      owner: '',
-      repo: '',
-      branch: '',
-      path: String.raw`C:\data.jsonl`,
-      sourceType: 'local',
-    })
+  it('AbortSignal 在读取完成后 aborted 时抛出', async () => {
+    mockLocalPath(MANIFEST_FILE)
+    responseQueue = [makeManifestText(), '["sid","name","updatedAt"]\n["111","条目A","2026-09-08"]']
     const controller = new AbortController()
     const source = new LocalFileSyncSource()
-    const promise = source.fetchRemoteEntries(controller.signal)
-    // 文件读取成功，但在解析前 abort
-    lastMockXhr!._respondOk('{"sid":"111"}', 0)
+    const promise = source.fetchRemoteEntries(controller.signal, { neededFields: new Set() })
+    // 请求已发出后取消：下载会走完，但返回前的 aborted 检查必须抛出
     controller.abort()
     await expect(promise).rejects.toThrow(/请求被取消/)
   })

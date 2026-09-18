@@ -193,8 +193,10 @@ vi.mock('../../ts/sync/github-config.js', () => ({
     owner: 'test',
     repo: 'test',
     branch: 'main',
-    path: 'data.jsonl',
+    path: 'data/anime.manifest.json',
   })),
+  // 分片模式下由用户手动指定要下载的分片；空数组表示回到「按表头自动选片」
+  getManualShards: vi.fn(() => []),
   setGithubConfig: vi.fn(),
 }))
 

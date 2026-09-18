@@ -407,7 +407,7 @@
                 ><input
                   type="text"
                   id="githubPath"
-                  placeholder="如：data/bangumi.jsonlines.gz"
+                  placeholder="如：data/anime.manifest.json"
                   autocomplete="off"
                   spellcheck="false"
                 />
@@ -420,7 +420,7 @@
                   <input
                     type="text"
                     id="localFilePath"
-                    placeholder="如：D:\data\bangumi.jsonlines.gz"
+                    placeholder="如：D:\data\anime.manifest.json（绝对路径）"
                     autocomplete="off"
                     spellcheck="false"
                     style="flex: 1"
@@ -428,14 +428,15 @@
                   <button
                     class="bgm-btn small"
                     data-action="browseLocalFile"
-                    title="选择本地 JSONL 文件"
+                    title="选择分片清单（anime.manifest.json）"
                   >
                     📁 选择
                   </button>
                 </div>
               </div>
               <p class="hint">
-                支持 .jsonlines / .jsonl / .json 文件；复用 #githubPath 字段存储路径。
+                必须指向<strong>分片清单</strong>（<code>anime.manifest.json</code>），分片文件需与其同目录；复用
+                #githubPath 字段存储路径（与远程源互斥）。
               </p>
             </div>
             <div id="gistFields" style="display: none">

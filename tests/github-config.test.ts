@@ -328,9 +328,9 @@ describe('githubConfig 异常与回退分支', () => {
     ).toThrow('Storage 写入异常')
   })
 
-  it('历史明文路径自动迁移为 gzip 路径，并把迁移结果落盘', () => {
-    // 老版本存的是 data/bangumi.jsonlines；LEGACY_PATH_MIGRATIONS 会把它改成 .gz。
-    // 三个关键字段都非空 → 不会走「首次读取填默认值」的早退分支。
+  it('历史单片路径自动迁移为分片清单路径，并把迁移结果落盘', () => {
+    // 老版本存的是 data/bangumi.jsonlines（或 .gz）；LEGACY_PATH_MIGRATIONS 会把它
+    // 改成 data/anime.manifest.json。三个关键字段都非空 → 不会走「首次读取填默认值」的早退分支。
     const app = createMockApp({
       github_sync_owner: 'owner',
       github_sync_repo: 'repo',
@@ -340,9 +340,21 @@ describe('githubConfig 异常与回退分支', () => {
 
     const config = getGithubConfig()
 
-    expect(config.path).toBe('data/bangumi.jsonlines.gz')
+    expect(config.path).toBe('data/anime.manifest.json')
     // 迁移必须落盘，否则每次读取都要再迁一次
-    expect(app.PluginStorage.getItem('github_sync_path')).toBe('data/bangumi.jsonlines.gz')
+    expect(app.PluginStorage.getItem('github_sync_path')).toBe('data/anime.manifest.json')
+  })
+
+  it('历史 gzip 单片路径同样迁移到清单路径', () => {
+    const app = createMockApp({
+      github_sync_owner: 'owner',
+      github_sync_repo: 'repo',
+      github_sync_path: 'data/bangumi.jsonlines.gz',
+    })
+    vi.mocked(getApp).mockReturnValue(app)
+
+    expect(getGithubConfig().path).toBe('data/anime.manifest.json')
+    expect(app.PluginStorage.getItem('github_sync_path')).toBe('data/anime.manifest.json')
   })
 
   it('非历史路径原样返回，不写 storage', () => {

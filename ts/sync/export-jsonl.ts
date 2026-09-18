@@ -25,8 +25,8 @@ import { extractSubjectId } from './pure-utilities.js'
 /**
  * 导出字段顺序
  *
- * 必须与数据仓库 `data/bangumi.jsonlines.gz` 的表头一致
- * （上游由 Archive/scripts/step09_build_jsonl.py 的 HEADER_FIELDS 派生），
+ * 必须与数据仓库分片的字段并集一致（不含 type）
+ * （上游由 Archive/scripts/step09_build_jsonl.py 的 SHARD_DEFS 派生），
  * 这样导出的文件可以直接当作「本地文件同步」的数据源使用。
  */
 const EXPORT_FIELDS = [
@@ -56,9 +56,9 @@ const EXPORT_FIELDS = [
   '在线播放平台',
   '关联的动漫ID',
   // 全量保真字段：Excel 表没有对应列，导出时统一补默认值，
-  // 仅用于保证表头与远程 data/bangumi.jsonlines.gz 完全一致。
+  // 仅用于保证表头与远程分片的字段并集完全一致。
+  // 注意：不含 type —— 数据仓库已按文件名 anime 表达 type=2，任何文件都不再输出它。
   'name_original',
-  'type',
   'platform',
   'series',
   'score',
@@ -82,7 +82,6 @@ const FIELD_DEFAULTS: Readonly<Record<string, unknown>> = {
   favorite: [0, 0, 0, 0, 0],
   nsfw: false,
   series: false,
-  type: 0,
   platform: 0,
   score: 0,
   rank: 0,

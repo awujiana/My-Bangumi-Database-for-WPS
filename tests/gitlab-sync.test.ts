@@ -17,6 +17,7 @@ vi.mock('../ts/sync/github-config.js', () => ({
   getGithubConfig: vi.fn(),
   isGithubConfigComplete: vi.fn(),
   buildRawUrl: vi.fn(),
+  getManualShards: vi.fn(() => []),
   getSyncSourceType: vi.fn(() => 'gitlab'),
   setSyncSourceType: vi.fn(() => true),
   getSyncStrategy: vi.fn(() => 'add-update'),
@@ -26,27 +27,17 @@ vi.mock('../ts/sync/github-config.js', () => ({
     owner: 'awujiana',
     repo: 'Bangumi-Archive-Anime-Excel-to-sync',
     branch: 'main',
-    path: 'data.jsonl',
+    path: 'data/anime.manifest.json',
     sourceType: 'github',
   }),
 }))
 
-// Mock githubSyncDiff 以覆盖 parseJsonl 异常分支
-const mockParseJsonl = vi.hoisted(() => vi.fn())
-const realParseJsonlHolder = vi.hoisted(() => ({
-  current: null as ((text: string) => { entries: unknown[]; errors: unknown[] }) | null,
-}))
-vi.mock('../ts/sync/github-sync-diff.js', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('../ts/sync/github-sync-diff.js')>()
-  realParseJsonlHolder.current = actual.parseJsonl
-  mockParseJsonl.mockImplementation((text: string) => realParseJsonlHolder.current!(text))
-  return {
-    ...actual,
-    parseJsonl: mockParseJsonl,
-  }
-})
-
-import { buildGitlabRawUrl, fetchGitlabJson, GitlabSyncSource } from '../ts/sync/gitlab-sync.js'
+import {
+  buildGitlabRawUrl,
+  fetchGitlabJson,
+  fetchGitlabText,
+  GitlabSyncSource,
+} from '../ts/sync/gitlab-sync.js'
 import {
   getSyncSource,
   isSyncSourceRegistered,
@@ -57,7 +48,31 @@ import { getGithubConfig, isGithubConfigComplete } from '../ts/sync/github-confi
 
 const mockedGetGithubConfig = vi.mocked(getGithubConfig)
 const mockedIsGithubConfigComplete = vi.mocked(isGithubConfigComplete)
-const mockedParseJsonl = vi.mocked(mockParseJsonl)
+
+/** 分片清单路径（与生产默认值一致） */
+const MANIFEST_PATH = 'data/anime.manifest.json'
+/** base 片（必选）在仓库内的路径 */
+const BASE_FILE = 'data/anime.base.jsonlines.gz'
+
+/**
+ * 构造一份最小分片清单：base（必选）+ summary（可选）
+ *
+ * 字段刻意与真实清单同形（每片都带 sid，其余字段不重叠），这样「连接键不参与
+ * 选片匹配」的逻辑也在这一层被测到。
+ */
+function makeManifestText(): string {
+  return JSON.stringify({
+    formatVersion: 1,
+    subjectType: 2,
+    typeLabel: 'anime',
+    updatedAt: '2026-09-08',
+    recordCount: 1,
+    shards: [
+      { name: 'base', file: 'anime.base.jsonlines.gz', fields: ['sid', 'name', 'updatedAt'] },
+      { name: 'summary', file: 'anime.summary.jsonlines.gz', fields: ['sid', 'summary'] },
+    ],
+  })
+}
 
 // 清空模块加载期间累积的 fake timers，避免它们在测试中被意外触发
 vi.clearAllTimers()
@@ -74,6 +89,15 @@ interface MockXHRCall {
 let lastXhrCall: MockXHRCall | null = null
 let lastMockXhr: MockXHR | null = null
 let mockXhrConstructor: typeof MockXHR | null = null
+
+/**
+ * 预置响应队列：每次 `send()` 消费一项并异步返回。
+ *
+ * 分片下载一次同步会发 1 + N 次请求（清单 + 各分片），逐个手动 `_respondOk`
+ * 需要精确插入 microtask 让出点，很容易写脆；队列方式让测试只关心「按顺序返回什么」。
+ * 队列为空时保持旧行为（测试手动调用 `_respondOk`）。
+ */
+let responseQueue: string[] = []
 
 /** 记录最近一次 send() 创建的 MockXHR 实例（避免将 this 直接赋给模块变量触发 no-this-assignment） */
 function recordLastMockXhr(xhr: MockXHR): void {
@@ -150,6 +174,14 @@ class MockXHR {
       headers: { ...this.headers },
     }
     recordLastMockXhr(this)
+
+    const queued = responseQueue.at(0)
+    responseQueue = responseQueue.slice(1)
+    if (queued !== undefined) {
+      queueMicrotask(() => {
+        this._respondOk(queued)
+      })
+    }
   }
 
   _respondOk(body: string, status = 200): void {
@@ -188,6 +220,7 @@ function installMockXhr(): void {
 
 beforeEach(() => {
   installMockXhr()
+  responseQueue = []
 })
 
 afterEach(() => {
@@ -290,96 +323,85 @@ describe('buildGitlabRawUrl', () => {
   })
 })
 
-// ========== fetchGitlabJson ==========
-describe('fetchGitlabJson', () => {
+// ========== fetchGitlabText（传输层：一次 GET + 解码） ==========
+describe('fetchGitlabText', () => {
   beforeEach(() => {
     mockedGetGithubConfig.mockReturnValue({
       owner: 'testuser',
       repo: 'testrepo',
       branch: 'main',
-      path: 'data.jsonl',
+      path: MANIFEST_PATH,
       sourceType: 'gitlab',
     })
     mockedIsGithubConfigComplete.mockReturnValue(true)
   })
 
-  it('成功下载并解析 JSONL', async () => {
-    const jsonlContent = '["sid","name"]\n["1","条目1"]\n["2","条目2"]'
-    const promise = fetchGitlabJson()
-    lastMockXhr!._respondOk(jsonlContent)
-    const entries = await promise
-    expect(entries.length).toBe(2)
-    expect(entries[0]!.sid).toBe('1')
-    expect(entries[1]!.sid).toBe('2')
+  it('成功下载并返回文本', async () => {
+    const promise = fetchGitlabText(BASE_FILE)
+    lastMockXhr!._respondOk('["sid","name"]\n["1","条目1"]')
+    await expect(promise).resolves.toBe('["sid","name"]\n["1","条目1"]')
   })
 
-  it('请求构造正确的 GitLab URL（含 /-/raw/ 段）', async () => {
+  it('请求构造正确的 GitLab URL（相对路径覆盖配置 path，含 /-/raw/ 段）', async () => {
     mockedGetGithubConfig.mockReturnValue({
       owner: 'myowner',
       repo: 'myrepo',
       branch: 'develop',
-      path: 'data.jsonl',
+      path: MANIFEST_PATH,
       sourceType: 'gitlab',
     })
-    const promise = fetchGitlabJson()
-    lastMockXhr!._respondOk('["sid"]\n["1"]')
+    const promise = fetchGitlabText(BASE_FILE)
+    lastMockXhr!._respondOk('x')
     await promise
-    expect(lastXhrCall?.url).toBe('https://gitlab.com/myowner/myrepo/-/raw/develop/data.jsonl')
+    expect(lastXhrCall?.url).toBe(`https://gitlab.com/myowner/myrepo/-/raw/develop/${BASE_FILE}`)
     expect(lastXhrCall?.method).toBe('GET')
   })
 
   it('设置 Accept 请求头为 application/json', async () => {
-    const promise = fetchGitlabJson()
-    lastMockXhr!._respondOk('["sid"]\n["1"]')
+    const promise = fetchGitlabText(BASE_FILE)
+    lastMockXhr!._respondOk('x')
     await promise
     expect(lastXhrCall?.headers.Accept).toBe('application/json')
   })
 
   it('设置 30 秒超时', async () => {
-    const promise = fetchGitlabJson()
-    lastMockXhr!._respondOk('["sid"]\n["1"]')
+    const promise = fetchGitlabText(BASE_FILE)
+    lastMockXhr!._respondOk('x')
     await promise
     expect(lastXhrCall?.timeout).toBe(30_000)
   })
 
   it('配置不完整时 reject', async () => {
     mockedIsGithubConfigComplete.mockReturnValue(false)
-    await expect(fetchGitlabJson()).rejects.toThrow(/GitLab 仓库配置不完整/)
-  })
-
-  it('buildGitlabRawUrl 抛出非 Error 时被包装为 Error (line 76)', async () => {
-    mockedGetGithubConfig.mockImplementation(() => {
-      throw '非 Error 异常：配置获取失败'
-    })
-    await expect(fetchGitlabJson()).rejects.toThrow(/非 Error 异常/)
+    await expect(fetchGitlabText(BASE_FILE)).rejects.toThrow(/GitLab 仓库配置不完整/)
   })
 
   it('HTTP 404 时 reject', async () => {
-    const promise = fetchGitlabJson()
+    const promise = fetchGitlabText(BASE_FILE)
     lastMockXhr!._respondError(404, 'Not Found')
     await expect(promise).rejects.toThrow(/文件不存在（404）/)
   })
 
   it('HTTP 403 时 reject', async () => {
-    const promise = fetchGitlabJson()
+    const promise = fetchGitlabText(BASE_FILE)
     lastMockXhr!._respondError(403, 'Forbidden')
     await expect(promise).rejects.toThrow(/访问被拒（403）/)
   })
 
   it('其他 HTTP 错误时 reject', async () => {
-    const promise = fetchGitlabJson()
+    const promise = fetchGitlabText(BASE_FILE)
     lastMockXhr!._respondError(500, 'Internal Server Error')
     await expect(promise).rejects.toThrow(/HTTP 错误 500/)
   })
 
   it('网络错误时 reject', async () => {
-    const promise = fetchGitlabJson()
+    const promise = fetchGitlabText(BASE_FILE)
     lastMockXhr!._triggerError()
     await expect(promise).rejects.toThrow(/网络请求失败/)
   })
 
   it('请求超时时 reject', async () => {
-    const promise = fetchGitlabJson()
+    const promise = fetchGitlabText(BASE_FILE)
     lastMockXhr!._triggerTimeout()
     await expect(promise).rejects.toThrow(/请求超时（30000ms）/)
   })
@@ -387,82 +409,128 @@ describe('fetchGitlabJson', () => {
   it('AbortSignal 已 aborted 时立即 reject', async () => {
     const controller = new AbortController()
     controller.abort()
-    await expect(fetchGitlabJson(controller.signal)).rejects.toThrow(/请求被取消/)
+    await expect(fetchGitlabText(BASE_FILE, controller.signal)).rejects.toThrow(/请求被取消/)
   })
 
   it('AbortSignal abort 事件触发 xhr.abort()', async () => {
     const controller = new AbortController()
-    const promise = fetchGitlabJson(controller.signal)
+    const promise = fetchGitlabText(BASE_FILE, controller.signal)
+    // 触发 abort 事件（模拟 signal.abort）
     lastMockXhr!._triggerAbort()
+    // 同时 xhr.onerror 会因 signal.aborted 为 true 而 reject 为取消
     Object.defineProperty(controller.signal, 'aborted', { value: true })
     lastMockXhr!._triggerError()
     await expect(promise).rejects.toThrow(/请求被取消/)
   })
 
-  it('解析结果全为非法行时 reject', async () => {
-    const jsonlContent = 'invalid json\nalso broken\n'
-    const promise = fetchGitlabJson()
-    lastMockXhr!._respondOk(jsonlContent)
-    await expect(promise).rejects.toThrow(/JSONL 解析失败/)
-  })
-
-  it('部分非法行仍返回合法条目', async () => {
-    const jsonlContent = '["sid","name"]\n["1","有效"]\ninvalid\n["2","也有效"]'
-    const promise = fetchGitlabJson()
-    lastMockXhr!._respondOk(jsonlContent)
-    const entries = await promise
-    expect(entries.length).toBe(2)
-    expect(entries[0]!.sid).toBe('1')
-    expect(entries[1]!.sid).toBe('2')
-  })
-
-  it('空 JSONL 返回空数组', async () => {
-    const promise = fetchGitlabJson()
-    lastMockXhr!._respondOk('')
-    const entries = await promise
-    expect(entries).toEqual([])
-  })
-
-  it('单行有效 JSONL', async () => {
-    const jsonlContent = '["sid","name","updatedAt"]\n["99","GitLab记录","2026-08-01"]'
-    const promise = fetchGitlabJson()
-    lastMockXhr!._respondOk(jsonlContent)
-    const entries = await promise
-    expect(entries.length).toBe(1)
-    expect(entries[0]!.sid).toBe('99')
-    expect(entries[0]!.name).toBe('GitLab记录')
-    expect(entries[0]!.updatedAt).toBe('2026-08-01')
-  })
-
-  it('parseJsonl 抛出异常时 reject (line 123)', async () => {
-    mockedParseJsonl.mockImplementationOnce(() => {
-      throw new Error('JSON 解析器内部错误')
+  it('buildGitlabRawUrl 抛出非 Error 时被包装为 Error', async () => {
+    mockedGetGithubConfig.mockImplementation(() => {
+      throw '非 Error 异常：配置获取失败'
     })
-    const promise = fetchGitlabJson()
-    lastMockXhr!._respondOk('["sid"]\n["1"]')
-    await expect(promise).rejects.toThrow(/JSONL 解析失败/)
+    await expect(fetchGitlabText(BASE_FILE)).rejects.toThrow(/非 Error 异常/)
   })
 
-  it('parseJsonl 抛出非 Error 时使用 String() 转换 (line 123)', async () => {
-    mockedParseJsonl.mockImplementationOnce(() => {
-      throw '字符串异常'
-    })
-    const promise = fetchGitlabJson()
-    lastMockXhr!._respondOk('["sid"]\n["1"]')
-    await expect(promise).rejects.toThrow(/JSONL 解析失败: 字符串异常/)
-  })
-
-  it('AbortSignal abort 事件触发时 xhr.abort() 被调用 (line 95)', async () => {
+  it('AbortSignal abort 事件触发时 xhr.abort() 被调用', async () => {
     const controller = new AbortController()
-    const promise = fetchGitlabJson(controller.signal)
-    // 通过 controller.abort() 触发 signal 的 abort 事件
-    // 这将调用 signal.addEventListener('abort', () => { xhr.abort() }) 中注册的处理器
+    const promise = fetchGitlabText(BASE_FILE, controller.signal)
     controller.abort()
-    // 验证 xhr.abort() 被调用（_aborted 被设置）
     expect(lastMockXhr!._aborted).toBe(true)
-    // 触发 onerror（abort 通常也会触发 error 路径）
     lastMockXhr!._triggerError()
     await expect(promise).rejects.toThrow(/请求被取消/)
+  })
+})
+
+// ========== fetchGitlabJson（清单 → 选片 → 拼接） ==========
+describe('fetchGitlabJson', () => {
+  beforeEach(() => {
+    mockedGetGithubConfig.mockReturnValue({
+      owner: 'testuser',
+      repo: 'testrepo',
+      branch: 'main',
+      path: MANIFEST_PATH,
+      sourceType: 'gitlab',
+    })
+    mockedIsGithubConfigComplete.mockReturnValue(true)
+  })
+
+  it('只需要 base 片时只发 2 次请求（清单 + base）', async () => {
+    responseQueue = [makeManifestText(), '["sid","name","updatedAt"]\n["1","条目1","2026-09-08"]']
+    const entries = await fetchGitlabJson(undefined, new Set())
+
+    expect(responseQueue).toHaveLength(0)
+    expect(entries).toHaveLength(1)
+    expect(entries[0]!.sid).toBe('1')
+    expect(entries[0]!.name).toBe('条目1')
+  })
+
+  it('neededFields 为 undefined 时全量下载（保守兜底）', async () => {
+    responseQueue = [
+      makeManifestText(),
+      '["sid","name","updatedAt"]\n["1","条目1","2026-09-08"]',
+      '["sid","summary"]\n["1","简介1"]',
+    ]
+    const entries = await fetchGitlabJson()
+
+    expect(entries[0]!.summary).toBe('简介1')
+  })
+
+  it('按 neededFields 带出对应分片并逐行拼接', async () => {
+    responseQueue = [
+      makeManifestText(),
+      '["sid","name","updatedAt"]\n["1","条目1","2026-09-08"]',
+      '["sid","summary"]\n["1","简介1"]',
+    ]
+    const entries = await fetchGitlabJson(undefined, new Set(['summary']))
+
+    expect(entries[0]!.summary).toBe('简介1')
+    expect(entries[0]!.name).toBe('条目1')
+  })
+
+  it('配置路径不是清单时给出明确报错', async () => {
+    mockedGetGithubConfig.mockReturnValue({
+      owner: 'o',
+      repo: 'r',
+      branch: 'main',
+      path: 'data/bangumi.jsonlines.gz',
+      sourceType: 'gitlab',
+    })
+
+    await expect(fetchGitlabJson()).rejects.toThrow(/必须是分片清单/)
+  })
+
+  it('清单读取失败时包装为可读错误', async () => {
+    const promise = fetchGitlabJson()
+    lastMockXhr!._respondError(404, 'Not Found')
+
+    await expect(promise).rejects.toThrow(/分片清单读取失败/)
+  })
+
+  it('清单格式非法时报错', async () => {
+    responseQueue = ['not json']
+
+    await expect(fetchGitlabJson()).rejects.toThrow(/分片清单格式非法/)
+  })
+
+  it('分片表头非法时报错', async () => {
+    responseQueue = [makeManifestText(), 'not-a-header']
+
+    await expect(fetchGitlabJson(undefined, new Set())).rejects.toThrow(/分片表头非法/)
+  })
+
+  it('各分片行数不一致时报错', async () => {
+    responseQueue = [
+      makeManifestText(),
+      '["sid","name","updatedAt"]\n["1","条目1","2026-09-08"]',
+      '["sid","summary"]',
+    ]
+
+    await expect(fetchGitlabJson(undefined, new Set(['summary']))).rejects.toThrow(/分片拼接失败/)
+  })
+
+  it('拼接后全部缺少合法 sid 时报错', async () => {
+    responseQueue = [makeManifestText(), '["sid","name","updatedAt"]\n[null,"条目1","2026-09-08"]']
+
+    await expect(fetchGitlabJson(undefined, new Set())).rejects.toThrow(/没有可用记录/)
   })
 })
 
@@ -473,7 +541,7 @@ describe('GitlabSyncSource.fetchRemoteEntries', () => {
       owner: 'testuser',
       repo: 'testrepo',
       branch: 'main',
-      path: 'data.jsonl',
+      path: MANIFEST_PATH,
       sourceType: 'gitlab',
     })
     mockedIsGithubConfigComplete.mockReturnValue(true)
@@ -481,12 +549,27 @@ describe('GitlabSyncSource.fetchRemoteEntries', () => {
 
   it('委托给 fetchGitlabJson 并返回条目', async () => {
     const source = new GitlabSyncSource()
-    const jsonlContent = '["sid","name"]\n["1","条目1"]'
-    const promise = source.fetchRemoteEntries()
-    lastMockXhr!._respondOk(jsonlContent)
-    const entries = await promise
-    expect(entries.length).toBe(1)
+    responseQueue = [makeManifestText(), '["sid","name","updatedAt"]\n["1","条目1","2026-09-08"]']
+
+    const entries = await source.fetchRemoteEntries(undefined, { neededFields: new Set() })
+
+    expect(entries).toHaveLength(1)
     expect(entries[0]!.sid).toBe('1')
+  })
+
+  it('把 neededFields 透传给选片逻辑', async () => {
+    const source = new GitlabSyncSource()
+    responseQueue = [
+      makeManifestText(),
+      '["sid","name","updatedAt"]\n["1","条目1","2026-09-08"]',
+      '["sid","summary"]\n["1","简介1"]',
+    ]
+
+    const entries = await source.fetchRemoteEntries(undefined, {
+      neededFields: new Set(['summary']),
+    })
+
+    expect(entries[0]!.summary).toBe('简介1')
   })
 
   it('传递已 aborted 的 AbortSignal 给 fetchGitlabJson', async () => {

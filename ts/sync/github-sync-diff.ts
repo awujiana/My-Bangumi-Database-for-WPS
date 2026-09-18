@@ -67,11 +67,9 @@ export interface GithubRemoteEntry {
   在线播放平台?: string
   /** 关联的动漫ID（subject-relations） */
   关联的动漫ID?: string
-  // ── 全量保真字段（随 dump 全量下发；插件暂不映射到 Excel 列）──
+  // ── 全量保真字段（随 dump 全量下发；其中 score/rank 已映射到 Excel 列）──
   /** 原始名（dump.name，与 name 并存，避免原始名丢失） */
   name_original?: string
-  /** 条目类型（dump.type，2=动画） */
-  type?: number
   /** 平台（dump.platform） */
   platform?: number
   /** 是否系列作（dump.series） */
@@ -139,6 +137,9 @@ export const EXTENDED_FIELD_MAP: readonly (readonly [string, string])[] = [
   ['系列构成', '系列构成'],
   ['在线播放平台', '在线播放平台'],
   ['关联的动漫ID', '关联的动漫ID'],
+  // stats 片：评分与排名（2026-09-18 起支持写入 Excel「评分」「排名」列）
+  ['score', '评分'],
+  ['rank', '排名'],
 ] as const
 
 /**

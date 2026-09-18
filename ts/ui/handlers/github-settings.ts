@@ -1,8 +1,8 @@
 /**
- * GitHub 配置表单（读写 / 防抖自动保存 / 数据源字段切换）
+ * GitHub 配置表单（读写 / 防抖自动保存 / 数据源字段切换 / 数据分片多选）
  * @module ui/handlers/github-settings
- * @description 从 handlers/index.ts 抽出：配置输入框 ↔ PluginStorage 的双向同步，
- *              以及按同步源类型（GitHub / local / gist）切换可见字段。
+ * @description 从 handlers/index.ts 抽出：配置输入框 ↔ PluginStorage 的双向同步、
+ *              按同步源类型（GitHub / local / gist）切换可见字段，以及分片多选。
  */
 
 import {
@@ -10,6 +10,8 @@ import {
   bgmLog,
   getGithubConfig,
   setGithubConfig,
+  getManualShards,
+  setManualShards,
   getSyncStrategy,
   setSyncStrategy,
   getSyncSourceType,
@@ -20,11 +22,116 @@ import { debounce } from '../../tools/debounce.js'
 import { trackedAddEventListener } from './resource-tracking.js'
 
 /**
+ * 可手动选择的数据分片（顺序即界面展示顺序）
+ *
+ * 与数据仓库 `data/anime.manifest.json` 的 6 片一一对应。这里刻意用静态清单，
+ * 而不是打开面板时去拉一次清单：拉清单会给「打开设置」引入网络失败面，而手动选片
+ * 只是覆盖自动选片的兜底手段 —— 清单以后新增的分片在自动模式下仍会被正常选中。
+ */
+export const SHARD_OPTIONS: readonly { name: string; label: string }[] = [
+  { name: 'base', label: '基础（SID/名称/时间）' },
+  { name: 'meta', label: '资料（话数/导演等）' },
+  { name: 'relations', label: '关联条目' },
+  { name: 'stats', label: '评分/排名/标签' },
+  { name: 'summary', label: '简介' },
+  { name: 'infobox', label: 'infobox 原文' },
+] as const
+
+/**
+ * 不可取消的必选分片
+ *
+ * SID / 名称 / 更新时间都只在 `base` 里，缺了它拼不出记录，所以固定勾选且禁用。
+ */
+const REQUIRED_SHARDS: readonly string[] = ['base'] as const
+
+/**
+ * 按 {@link SHARD_OPTIONS} 渲染分片复选框（幂等：重复调用先清空）
+ */
+export function renderShardOptions(): void {
+  const list = document.getElementById('shardSelectList')
+  if (!list) return
+
+  list.textContent = ''
+  for (const option of SHARD_OPTIONS) {
+    const isRequired = REQUIRED_SHARDS.includes(option.name)
+    const label = document.createElement('label')
+    if (isRequired) label.classList.add('is-required')
+
+    const input = document.createElement('input')
+    input.type = 'checkbox'
+    input.dataset.shard = option.name
+    input.checked = isRequired
+    input.disabled = isRequired
+
+    label.append(input, document.createTextNode(option.label))
+    list.append(label)
+  }
+}
+
+/**
+ * 读取当前勾选的分片
+ *
+ * 必选片是 `disabled`，不计入用户选择；用户一个可选片都没勾时返回空数组，
+ * 语义是「回到按表头自动选片」。
+ *
+ * @returns 分片名数组；空数组表示自动模式
+ */
+export function collectSelectedShards(): string[] {
+  const list = document.getElementById('shardSelectList')
+  if (!list) return []
+
+  const optional: string[] = []
+  for (const input of list.querySelectorAll<HTMLInputElement>('input[type="checkbox"]')) {
+    const name = input.dataset.shard
+    if (name && input.checked && !REQUIRED_SHARDS.includes(name)) optional.push(name)
+  }
+  return optional.length > 0 ? [...REQUIRED_SHARDS, ...optional] : []
+}
+
+/**
+ * 从 PluginStorage 回填分片勾选状态
+ */
+export function refreshShardSelection(): void {
+  const list = document.getElementById('shardSelectList')
+  if (!list) return
+
+  const manual = new Set(getManualShards())
+  for (const input of list.querySelectorAll<HTMLInputElement>('input[type="checkbox"]')) {
+    const name = input.dataset.shard
+    if (name) {
+      input.checked = REQUIRED_SHARDS.includes(name) || manual.has(name)
+    }
+  }
+}
+
+/**
+ * 注册分片多选的变更监听（勾选即落盘）
+ */
+function bindShardSelection(list: HTMLElement): void {
+  trackedAddEventListener(list, 'change', () => {
+    const selected = collectSelectedShards()
+    if (!setManualShards(selected)) {
+      bgmLog(LOG_LEVELS.WARN, '[handlers] 数据分片选择保存失败')
+      return
+    }
+    bgmLog(
+      LOG_LEVELS.INFO,
+      selected.length > 0
+        ? `[handlers] 数据分片已手动指定: ${selected.join(', ')}`
+        : '[handlers] 数据分片已恢复为按表头自动选择',
+    )
+  })
+}
+
+/**
  * 按同步源类型切换 UI 字段显示/隐藏
  *
  * - GitHub/GitLab/Gitee: 显示 owner/repo/branch/path（#remoteSourceFields）
  * - local: 显示本地文件路径输入框 + 选择按钮（#localFileFields）
  * - gist: 显示 gistId 输入框（#gistFields）
+ *
+ * 分片多选（#shardSelectFields）对 GitHub / GitLab / Gitee / local 都有效，
+ * 只有 Gist 不支持（Gist API 只能读明文，读不了 gzip 分片），故一并隐藏。
  *
  * @param sourceType 同步源类型
  */
@@ -32,6 +139,7 @@ export function toggleSourceFields(sourceType: SyncSourceType): void {
   const remoteFields = document.getElementById('remoteSourceFields')
   const localFields = document.getElementById('localFileFields')
   const gistFields = document.getElementById('gistFields')
+  const shardFields = document.getElementById('shardSelectFields')
   if (remoteFields) {
     remoteFields.style.display = sourceType === 'local' || sourceType === 'gist' ? 'none' : ''
   }
@@ -40,6 +148,9 @@ export function toggleSourceFields(sourceType: SyncSourceType): void {
   }
   if (gistFields) {
     gistFields.style.display = sourceType === 'gist' ? '' : 'none'
+  }
+  if (shardFields) {
+    shardFields.style.display = sourceType === 'gist' ? 'none' : ''
   }
 }
 
@@ -130,6 +241,8 @@ export function refreshGithubConfigInputs(): void {
     const sourceType = getSyncSourceType()
     if (sourceTypeSelect) sourceTypeSelect.value = sourceType
     toggleSourceFields(sourceType)
+    renderShardOptions()
+    refreshShardSelection()
     bgmLog(
       LOG_LEVELS.INFO,
       `[refreshGithubConfigInputs] 已刷新 GitHub 配置输入框: ${config.owner}/${config.repo}/${config.branch}/${config.path}`,
@@ -170,6 +283,9 @@ export function loadGithubConfigIntoForm() {
   const savedSourceType = getSyncSourceType()
   if (sourceTypeSelect) sourceTypeSelect.value = savedSourceType
   toggleSourceFields(savedSourceType)
+  // 渲染分片多选并回填勾选状态（清单里的分片以后可能增减，故每次打开都重建）
+  renderShardOptions()
+  refreshShardSelection()
   if (config.owner || config.repo || config.path) {
     bgmLog(
       LOG_LEVELS.INFO,
@@ -197,5 +313,8 @@ export function loadGithubConfigIntoForm() {
       debouncedSaveGithubConfig()
     })
   }
+  // 分片多选：勾选即落盘（不走防抖，勾选是明确的单次动作）
+  const shardList = document.getElementById('shardSelectList')
+  if (shardList) bindShardSelection(shardList)
   bgmLog(LOG_LEVELS.INFO, '[handlers] GitHub 配置输入框防抖自动保存监听器已注册')
 }

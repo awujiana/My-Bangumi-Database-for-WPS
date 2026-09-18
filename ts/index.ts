@@ -276,6 +276,10 @@ export {
   getSyncSourceType,
   // 保存同步源类型
   setSyncSourceType,
+  // 读取手动指定的数据分片（空数组 = 按表头自动选片）
+  getManualShards,
+  // 保存手动指定的数据分片（传空数组即恢复自动选片）
+  setManualShards,
   // 预设默认仓库配置
   DEFAULT_GITHUB_CONFIG,
   // 配置类型

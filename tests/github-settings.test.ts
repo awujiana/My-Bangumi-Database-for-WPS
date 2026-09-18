@@ -2,12 +2,13 @@
 /**
  * @fileoverview `ts/ui/handlers/github-settings.ts` 的单元测试。
  *
- * 该模块负责「GitHub 配置表单 ↔ PluginStorage」的双向同步，共 5 个导出：
- *  1. `toggleSourceFields` —— 按数据源类型切换三组字段的显隐；
+ * 该模块负责「GitHub 配置表单 ↔ PluginStorage」的双向同步 + 数据分片多选：
+ *  1. `toggleSourceFields` —— 按数据源类型切换四组字段的显隐；
  *  2. `saveGithubConfigFromDom` —— 从 DOM 读值 → 校验必填 → 落盘（三个 setter 全成功才记日志）；
  *  3. `debouncedSaveGithubConfig` —— 300ms 防抖包装，内部 try/catch 记 WARN；
  *  4. `refreshGithubConfigInputs` —— 重新读配置回填输入框（供导入配置后刷新）；
- *  5. `loadGithubConfigIntoForm` —— 首次回填 + 注册 8 个防抖监听器。
+ *  5. `loadGithubConfigIntoForm` —— 首次回填 + 注册 9 个监听器（8 个防抖保存 + 1 个分片勾选）；
+ *  6. `renderShardOptions` / `collectSelectedShards` / `refreshShardSelection` —— 分片多选三件套。
  *
  * ## 断言口径
  * - `debounce` 与 `trackedAddEventListener` 用**真实现**（前者配假定时器推进 300ms，
@@ -15,6 +16,7 @@
  *   不是「断言 handler 被注册」这种弱断言。
  * - `select` 回填必须**预置同名 option**：jsdom 对无匹配 option 的 `select.value = 'x'`
  *   会静默丢弃赋值，直接断言 value 只会拿到 `''`（假失败）。
+ * - 分片多选走**真实 DOM 事件**（`fire(input, 'change')`），因此覆盖到「勾选 → 落盘」整条链。
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -22,6 +24,8 @@ const stubs = vi.hoisted(() => ({
   bgmLog: vi.fn(),
   getGithubConfig: vi.fn(),
   setGithubConfig: vi.fn(),
+  getManualShards: vi.fn(),
+  setManualShards: vi.fn(),
   getSyncStrategy: vi.fn(),
   setSyncStrategy: vi.fn(),
   getSyncSourceType: vi.fn(),
@@ -33,6 +37,8 @@ vi.mock('../ts/index.js', () => ({
   bgmLog: stubs.bgmLog,
   getGithubConfig: stubs.getGithubConfig,
   setGithubConfig: stubs.setGithubConfig,
+  getManualShards: stubs.getManualShards,
+  setManualShards: stubs.setManualShards,
   getSyncStrategy: stubs.getSyncStrategy,
   setSyncStrategy: stubs.setSyncStrategy,
   getSyncSourceType: stubs.getSyncSourceType,
@@ -43,9 +49,12 @@ vi.mock('../ts/index.js', () => ({
 vi.mock('../ts/tools/events.js', () => ({ eventBus: { on: vi.fn(), off: vi.fn() } }))
 
 import {
+  collectSelectedShards,
   debouncedSaveGithubConfig,
   loadGithubConfigIntoForm,
   refreshGithubConfigInputs,
+  refreshShardSelection,
+  renderShardOptions,
   saveGithubConfigFromDom,
   toggleSourceFields,
 } from '../ts/ui/handlers/github-settings.js'
@@ -65,6 +74,8 @@ function mountForm(): void {
     <div id="remoteSourceFields"></div>
     <div id="localFileFields"></div>
     <div id="gistFields"></div>
+    <div id="shardSelectFields"></div>
+    <div id="shardSelectList"></div>
     <input id="githubOwner">
     <input id="githubRepo">
     <input id="githubBranch">
@@ -74,6 +85,23 @@ function mountForm(): void {
     <select id="githubStrategy"></select>
     <select id="syncSourceType"></select>
   `
+}
+
+/** 取分片复选框（按分片名） */
+function shardCheckbox(name: string): HTMLInputElement {
+  for (const input of document.querySelectorAll<HTMLInputElement>(
+    '#shardSelectList input[type="checkbox"]',
+  )) {
+    if (input.dataset.shard === name) return input
+  }
+  throw new Error(`未找到分片复选框：${name}`)
+}
+
+/** 勾选/取消某个分片并派发 change（模拟用户操作） */
+function toggleShard(name: string, isChecked: boolean): void {
+  const input = shardCheckbox(name)
+  input.checked = isChecked
+  fire(input, 'change')
 }
 
 /** 给 select 预置 option 并赋值（jsdom 无匹配 option 会丢弃赋值） */
@@ -114,6 +142,8 @@ beforeEach(() => {
   mountForm()
   stubs.getGithubConfig.mockReturnValue({ ...EMPTY_CONFIG })
   stubs.setGithubConfig.mockReturnValue(true)
+  stubs.setManualShards.mockReturnValue(true)
+  stubs.getManualShards.mockReturnValue([])
   stubs.setSyncStrategy.mockReturnValue(true)
   stubs.setSyncSourceType.mockReturnValue(true)
   stubs.getSyncStrategy.mockReturnValue('add-update')
@@ -129,6 +159,7 @@ describe('toggleSourceFields', () => {
     expect(document.getElementById('remoteSourceFields')?.style.display).toBe('')
     expect(document.getElementById('localFileFields')?.style.display).toBe('none')
     expect(document.getElementById('gistFields')?.style.display).toBe('none')
+    expect(document.getElementById('shardSelectFields')?.style.display).toBe('')
   })
 
   it('local → 只显示本地文件字段', () => {
@@ -137,22 +168,160 @@ describe('toggleSourceFields', () => {
     expect(document.getElementById('remoteSourceFields')?.style.display).toBe('none')
     expect(document.getElementById('localFileFields')?.style.display).toBe('')
     expect(document.getElementById('gistFields')?.style.display).toBe('none')
+    expect(document.getElementById('shardSelectFields')?.style.display).toBe('')
   })
 
-  it('gist → 只显示 Gist ID 字段', () => {
+  it('gist → 只显示 Gist ID 字段，且隐藏分片多选（Gist 读不了 gzip 分片）', () => {
     toggleSourceFields('gist')
 
     expect(document.getElementById('remoteSourceFields')?.style.display).toBe('none')
     expect(document.getElementById('localFileFields')?.style.display).toBe('none')
     expect(document.getElementById('gistFields')?.style.display).toBe('')
+    expect(document.getElementById('shardSelectFields')?.style.display).toBe('none')
   })
 
-  it('三组容器都不存在时不抛错', () => {
+  it('四组容器都不存在时不抛错', () => {
     document.body.replaceChildren()
 
     expect(() => {
       toggleSourceFields('local')
     }).not.toThrow()
+  })
+})
+
+// ========== 数据分片多选 ==========
+
+describe('renderShardOptions', () => {
+  it('渲染 6 个分片复选框', () => {
+    renderShardOptions()
+
+    expect(document.querySelectorAll('#shardSelectList input[type="checkbox"]')).toHaveLength(6)
+  })
+
+  it('base 是必选：默认勾选且禁用（缺了它拼不出记录）', () => {
+    renderShardOptions()
+
+    const base = shardCheckbox('base')
+    expect(base.checked).toBe(true)
+    expect(base.disabled).toBe(true)
+  })
+
+  it('其余分片默认不勾选（= 自动模式）', () => {
+    renderShardOptions()
+
+    for (const name of ['meta', 'relations', 'stats', 'summary', 'infobox']) {
+      expect(shardCheckbox(name).checked).toBe(false)
+    }
+  })
+
+  it('幂等：重复调用不会叠加复选框', () => {
+    renderShardOptions()
+    renderShardOptions()
+
+    expect(document.querySelectorAll('#shardSelectList input[type="checkbox"]')).toHaveLength(6)
+  })
+
+  it('容器不存在时静默返回', () => {
+    document.getElementById('shardSelectList')?.remove()
+
+    expect(() => {
+      renderShardOptions()
+    }).not.toThrow()
+  })
+})
+
+describe('collectSelectedShards', () => {
+  beforeEach(() => {
+    renderShardOptions()
+  })
+
+  it('一个可选片都没勾 → 空数组（回到按表头自动选片）', () => {
+    expect(collectSelectedShards()).toEqual([])
+  })
+
+  it('勾选可选片时补上必选片 base', () => {
+    shardCheckbox('stats').checked = true
+    shardCheckbox('summary').checked = true
+
+    expect(collectSelectedShards()).toEqual(['base', 'stats', 'summary'])
+  })
+
+  it('容器不存在时返回空数组', () => {
+    document.getElementById('shardSelectList')?.remove()
+
+    expect(collectSelectedShards()).toEqual([])
+  })
+})
+
+describe('refreshShardSelection', () => {
+  beforeEach(() => {
+    renderShardOptions()
+  })
+
+  it('按落盘的手动分片回填勾选状态', () => {
+    stubs.getManualShards.mockReturnValue(['base', 'stats'])
+
+    refreshShardSelection()
+
+    expect(shardCheckbox('stats').checked).toBe(true)
+    expect(shardCheckbox('summary').checked).toBe(false)
+    expect(shardCheckbox('base').checked).toBe(true)
+  })
+
+  it('落盘为空数组时清空可选片勾选', () => {
+    shardCheckbox('stats').checked = true
+    stubs.getManualShards.mockReturnValue([])
+
+    refreshShardSelection()
+
+    expect(shardCheckbox('stats').checked).toBe(false)
+  })
+
+  it('容器不存在时静默返回', () => {
+    document.getElementById('shardSelectList')?.remove()
+
+    expect(() => {
+      refreshShardSelection()
+    }).not.toThrow()
+  })
+})
+
+describe('分片多选变更监听', () => {
+  it('loadGithubConfigIntoForm 后勾选分片即落盘（含必选片）', () => {
+    loadGithubConfigIntoForm()
+
+    toggleShard('summary', true)
+
+    expect(stubs.setManualShards).toHaveBeenCalledWith(['base', 'summary'])
+    expect(hasLog('数据分片已手动指定: base, summary')).toBe(true)
+  })
+
+  it('取消全部可选片 → 落盘空数组并记录「恢复自动选择」', () => {
+    loadGithubConfigIntoForm()
+
+    toggleShard('stats', true)
+    toggleShard('stats', false)
+
+    expect(stubs.setManualShards).toHaveBeenLastCalledWith([])
+    expect(hasLog('数据分片已恢复为按表头自动选择')).toBe(true)
+  })
+
+  it('落盘失败时记录 WARN 而不是静默吞掉', () => {
+    loadGithubConfigIntoForm()
+    stubs.setManualShards.mockReturnValue(false)
+
+    toggleShard('meta', true)
+
+    expect(hasLog('数据分片选择保存失败')).toBe(true)
+  })
+
+  it('打开表单时按落盘值回填勾选', () => {
+    stubs.getManualShards.mockReturnValue(['base', 'infobox'])
+
+    loadGithubConfigIntoForm()
+
+    expect(shardCheckbox('infobox').checked).toBe(true)
+    expect(shardCheckbox('meta').checked).toBe(false)
   })
 })
 
@@ -179,9 +348,11 @@ describe('saveGithubConfigFromDom', () => {
     })
     expect(stubs.setSyncStrategy).toHaveBeenCalledWith('overwrite')
     expect(stubs.setSyncSourceType).toHaveBeenCalledWith('github')
-    expect(hasLog('GitHub 配置已自动保存: alice/repo/dev/data/a.jsonlines, 策略: overwrite, 同步源: github')).toBe(
-      true,
-    )
+    expect(
+      hasLog(
+        'GitHub 配置已自动保存: alice/repo/dev/data/a.jsonlines, 策略: overwrite, 同步源: github',
+      ),
+    ).toBe(true)
   })
 
   it('分支为空时回退 main', () => {
@@ -348,9 +519,9 @@ describe('refreshGithubConfigInputs', () => {
     expect((document.getElementById('githubStrategy') as HTMLSelectElement).value).toBe('overwrite')
     expect((document.getElementById('syncSourceType') as HTMLSelectElement).value).toBe('gist')
     expect(document.getElementById('gistFields')?.style.display).toBe('')
-    expect(hasLog('[refreshGithubConfigInputs] 已刷新 GitHub 配置输入框: alice/repo/dev/a.jsonlines')).toBe(
-      true,
-    )
+    expect(
+      hasLog('[refreshGithubConfigInputs] 已刷新 GitHub 配置输入框: alice/repo/dev/a.jsonlines'),
+    ).toBe(true)
   })
 
   it('配置没有 gistId 时不覆盖 gistId 输入框', () => {
@@ -408,7 +579,9 @@ describe('loadGithubConfigIntoForm', () => {
     expect((document.getElementById('githubStrategy') as HTMLSelectElement).value).toBe('overwrite')
     expect(document.getElementById('localFileFields')?.style.display).toBe('none')
     expect(
-      hasLog('[handlers] GitHub 配置已加载: alice/repo/dev/a.jsonlines, 策略: overwrite, 同步源: github'),
+      hasLog(
+        '[handlers] GitHub 配置已加载: alice/repo/dev/a.jsonlines, 策略: overwrite, 同步源: github',
+      ),
     ).toBe(true)
     expect(hasLog('[handlers] GitHub 配置输入框防抖自动保存监听器已注册')).toBe(true)
   })

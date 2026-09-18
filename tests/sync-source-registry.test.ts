@@ -129,11 +129,15 @@ vi.mock('../ts/sync/local-file-sync.js', () => ({
 
 vi.mock('../ts/sync/github-config.js', () => ({
   getSyncSourceType: mockGetSyncSourceType,
+  getManualShards: vi.fn(() => []),
 }))
 
-vi.mock('../ts/sync/github-sync-diff.js', () => ({
-  filterByTime: mockFilterByTime,
-}))
+// 真实展开：shard-manifest 的 neededFieldsForColumns 依赖 EXTENDED_FIELD_MAP / getExcelAliases，
+// 只覆盖 filterByTime 即可，其余保留真实实现
+vi.mock('../ts/sync/github-sync-diff.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../ts/sync/github-sync-diff.js')>()
+  return { ...actual, filterByTime: mockFilterByTime }
+})
 
 vi.mock('../ts/sync/pure-utilities.js', () => ({
   extractSubjectId: mockExtractSubjectId,

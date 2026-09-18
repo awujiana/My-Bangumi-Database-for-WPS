@@ -26,6 +26,10 @@ const mockRecordRowDeleteEntry = vi.hoisted(() => vi.fn())
 const mockAddSyncRecords = vi.hoisted(() => vi.fn())
 const mockAddSyncRecordSummary = vi.hoisted(() => vi.fn())
 const mockFilterByTime = vi.hoisted(() => vi.fn())
+const mockGetGithubConfig = vi.hoisted(() => vi.fn())
+const mockGetManualShards = vi.hoisted(() => vi.fn(() => []))
+const mockLoadEntriesFromPath = vi.hoisted(() => vi.fn())
+const mockCollectNeededFieldsFromSheet = vi.hoisted(() => vi.fn())
 
 // Mock XMLHttpRequest
 const mockXHR = vi.hoisted(() => {
@@ -139,7 +143,16 @@ vi.mock('../ts/core/result.js', () => ({
 vi.mock('../ts/sync/github-config.js', () => ({
   buildRawUrl: mockBuildRawUrl,
   isGithubConfigComplete: mockIsGithubConfigComplete,
+  getGithubConfig: mockGetGithubConfig,
+  getManualShards: mockGetManualShards,
   getSyncSourceType: vi.fn().mockReturnValue('github'),
+}))
+
+// 分片下载编排在 shard-fetch.test.ts 与各源测试中单独覆盖；此处只验证 github-sync
+// 是否按约定把 path / fetchText / neededFields 交给它。
+vi.mock('../ts/sync/shard-fetch.js', () => ({
+  loadEntriesFromPath: mockLoadEntriesFromPath,
+  collectNeededFieldsFromSheet: mockCollectNeededFieldsFromSheet,
 }))
 
 vi.mock('../ts/sync/github-sync-diff.js', () => ({
@@ -196,6 +209,7 @@ vi.mock('../ts/sync/sync-record.js', () => ({
 
 import {
   fetchGithubJson,
+  fetchGithubText,
   readLocalEntriesForSync,
   applyDiffToSheet,
   syncFromGithub,
@@ -242,14 +256,16 @@ function createMockSheet(
   }
 }
 
-// ========== fetchGithubJson 测试 ==========
+// ========== fetchGithubText 测试（传输层：一次 GET + 解码） ==========
 
-describe('fetchGithubJson', () => {
+/** base 片在仓库内的相对路径 */
+const BASE_FILE = 'data/anime.base.jsonlines.gz'
+
+describe('fetchGithubText', () => {
   beforeEach(() => {
     vi.restoreAllMocks()
     mockIsGithubConfigComplete.mockReturnValue(true)
     mockBuildRawUrl.mockReturnValue('https://raw.githubusercontent.com/test/repo/main/data.jsonl')
-    mockParseJsonl.mockReturnValue({ entries: [], errors: [] })
     mockXHR.xhrMock.status = 200
     mockXHR.xhrMock.responseText = ''
     mockXHR.xhrMock.onload = null
@@ -259,44 +275,37 @@ describe('fetchGithubJson', () => {
 
   it('配置不完整时应抛出错误', async () => {
     mockIsGithubConfigComplete.mockReturnValue(false)
-    await expect(fetchGithubJson()).rejects.toThrow('GitHub 仓库配置不完整')
+    await expect(fetchGithubText(BASE_FILE)).rejects.toThrow('GitHub 仓库配置不完整')
   })
 
   it('AbortSignal 已取消时应立即 reject', async () => {
     const controller = new AbortController()
     controller.abort()
-    await expect(fetchGithubJson(controller.signal)).rejects.toThrow('请求被取消')
+    await expect(fetchGithubText(BASE_FILE, controller.signal)).rejects.toThrow('请求被取消')
   })
 
-  it('HTTP 200 且无解析错误应返回空数组', async () => {
-    mockParseJsonl.mockReturnValue({ entries: [], errors: [] })
-    mockXHR.xhrMock.onload = function handleOnload(this: typeof mockXHR.xhrMock) {
-      // 注意：onload 被调用时 this 指向 xhrMock
-    }
-    // 直接触发 onload（微任务时序与 Promise.resolve().then 等价：
-    // 在 fetchGithubJson 内部挂起后才执行，确保 onload 已挂载）
+  it('HTTP 200 时应返回解码后的文本', async () => {
+    mockXHR.xhrMock.responseText = '["sid","name"]\n["1","A"]'
+    mockXHR.xhrMock.onload = () => {}
     queueMicrotask(() => {
       mockXHR.xhrMock.onload?.()
     })
-    const result = await fetchGithubJson()
-    expect(result).toEqual([])
+    const result = await fetchGithubText(BASE_FILE)
+    expect(result).toBe('["sid","name"]\n["1","A"]')
   })
 
   it('HTTP 404 应抛出文件不存在错误', async () => {
     mockXHR.xhrMock.status = 404
-    mockXHR.xhrMock.onload = function handleOnload404() {
-      // 异步触发
-    }
-    // 需要手动触发 onload
+    mockXHR.xhrMock.onload = () => {}
     setTimeout(() => mockXHR.xhrMock.onload?.(), 0)
-    await expect(fetchGithubJson()).rejects.toThrow(/文件不存在/)
+    await expect(fetchGithubText(BASE_FILE)).rejects.toThrow(/文件不存在/)
   })
 
   it('HTTP 403 应抛出访问被拒错误', async () => {
     mockXHR.xhrMock.status = 403
     mockXHR.xhrMock.onload = () => {}
     setTimeout(() => mockXHR.xhrMock.onload?.(), 0)
-    await expect(fetchGithubJson()).rejects.toThrow(/访问被拒/)
+    await expect(fetchGithubText(BASE_FILE)).rejects.toThrow(/访问被拒/)
   })
 
   it('HTTP 其他错误应抛出通用错误', async () => {
@@ -304,51 +313,25 @@ describe('fetchGithubJson', () => {
     mockXHR.xhrMock.statusText = 'Internal Server Error'
     mockXHR.xhrMock.onload = () => {}
     setTimeout(() => mockXHR.xhrMock.onload?.(), 0)
-    await expect(fetchGithubJson()).rejects.toThrow(/HTTP 错误/)
-  })
-
-  it('解析成功有数据时应返回条目', async () => {
-    const entries = [
-      { sid: '1', name: 'A', meta_tags: [] },
-      { sid: '2', name: 'B', meta_tags: [] },
-    ]
-    mockParseJsonl.mockReturnValue({ entries, errors: [] })
-    mockXHR.xhrMock.status = 200
-    mockXHR.xhrMock.responseText = '{"sid":"1"}\n{"sid":"2"}'
-    mockXHR.xhrMock.onload = () => {}
-    setTimeout(() => mockXHR.xhrMock.onload?.(), 0)
-    const result = await fetchGithubJson()
-    expect(result).toHaveLength(2)
-  })
-
-  it('全部解析失败时应抛出错误', async () => {
-    mockParseJsonl.mockReturnValue({
-      entries: [],
-      errors: [{ line: 1, reason: 'missing sid' }],
-    })
-    mockXHR.xhrMock.status = 200
-    mockXHR.xhrMock.responseText = '{"no_sid"}'
-    mockXHR.xhrMock.onload = () => {}
-    setTimeout(() => mockXHR.xhrMock.onload?.(), 0)
-    await expect(fetchGithubJson()).rejects.toThrow(/JSONL 解析失败/)
+    await expect(fetchGithubText(BASE_FILE)).rejects.toThrow(/HTTP 错误/)
   })
 
   it('网络错误应抛出网络失败错误', async () => {
     mockXHR.xhrMock.onerror = () => {}
     setTimeout(() => mockXHR.xhrMock.onerror?.(), 0)
-    await expect(fetchGithubJson()).rejects.toThrow(/网络请求失败/)
+    await expect(fetchGithubText(BASE_FILE)).rejects.toThrow(/网络请求失败/)
   })
 
   it('超时应抛出超时错误', async () => {
     mockXHR.xhrMock.ontimeout = () => {}
     setTimeout(() => mockXHR.xhrMock.ontimeout?.(), 0)
-    await expect(fetchGithubJson()).rejects.toThrow(/请求超时/)
+    await expect(fetchGithubText(BASE_FILE)).rejects.toThrow(/请求超时/)
   })
 
   it('应设置 Accept 请求头', async () => {
     mockXHR.xhrMock.onload = () => {}
     setTimeout(() => mockXHR.xhrMock.onload?.(), 0)
-    await fetchGithubJson()
+    await fetchGithubText(BASE_FILE)
     expect(mockXHR.xhrMock.setRequestHeader).toHaveBeenCalledWith('Accept', 'application/json')
   })
 
@@ -372,13 +355,72 @@ describe('fetchGithubJson', () => {
         }
       }
     })
-    const fetchPromise = fetchGithubJson(controller.signal)
+    const fetchPromise = fetchGithubText(BASE_FILE, controller.signal)
     // 触发 abort
     controller.abort()
     // XHR abort 应该被调用
     // 但由于我们是 mock，需要手动触发 onerror
     mockXHR.xhrMock.onerror?.()
     await expect(fetchPromise).rejects.toThrow()
+  })
+})
+
+// ========== fetchGithubJson 测试（委托给分片编排） ==========
+
+describe('fetchGithubJson', () => {
+  beforeEach(() => {
+    vi.restoreAllMocks()
+    mockIsGithubConfigComplete.mockReturnValue(true)
+    mockGetGithubConfig.mockReturnValue({
+      owner: 'test',
+      repo: 'repo',
+      branch: 'main',
+      path: 'data/anime.manifest.json',
+      sourceType: 'github',
+    })
+    mockGetManualShards.mockReturnValue([])
+    mockLoadEntriesFromPath.mockResolvedValue({ entries: [], shards: [], updatedAt: '' })
+  })
+
+  it('把配置路径、取文本回调与手动选片交给 loadEntriesFromPath', async () => {
+    await fetchGithubJson()
+
+    expect(mockLoadEntriesFromPath).toHaveBeenCalledWith(
+      expect.objectContaining({
+        path: 'data/anime.manifest.json',
+        fetchText: fetchGithubText,
+        manualShards: [],
+        logTag: 'githubSync',
+      }),
+    )
+  })
+
+  it('neededFields 透传（undefined 表示全量下载）', async () => {
+    await fetchGithubJson(undefined, new Set(['summary']))
+
+    expect(mockLoadEntriesFromPath).toHaveBeenCalledWith(
+      expect.objectContaining({ neededFields: new Set(['summary']) }),
+    )
+  })
+
+  it('返回 loadEntriesFromPath 解析出的条目', async () => {
+    const entries = [
+      { sid: '1', name: 'A', meta_tags: [] },
+      { sid: '2', name: 'B', meta_tags: [] },
+    ]
+    mockLoadEntriesFromPath.mockResolvedValue({
+      entries,
+      shards: ['base'],
+      updatedAt: '2026-09-08',
+    })
+
+    await expect(fetchGithubJson()).resolves.toHaveLength(2)
+  })
+
+  it('loadEntriesFromPath 抛错时原样 reject', async () => {
+    mockLoadEntriesFromPath.mockRejectedValue(new Error('分片清单格式非法'))
+
+    await expect(fetchGithubJson()).rejects.toThrow(/分片清单格式非法/)
   })
 })
 
@@ -390,7 +432,15 @@ describe('GithubSyncSource', () => {
     // 重新设置默认返回值
     mockIsGithubConfigComplete.mockReturnValue(true)
     mockBuildRawUrl.mockReturnValue('https://raw.githubusercontent.com/test/repo/main/data.jsonl')
-    mockParseJsonl.mockReturnValue({ entries: [], errors: [] })
+    mockGetGithubConfig.mockReturnValue({
+      owner: 'test',
+      repo: 'repo',
+      branch: 'main',
+      path: 'data/anime.manifest.json',
+      sourceType: 'github',
+    })
+    mockGetManualShards.mockReturnValue([])
+    mockLoadEntriesFromPath.mockResolvedValue({ entries: [], shards: [], updatedAt: '' })
     mockComputeDiff.mockReturnValue([])
     mockTagsToString.mockReturnValue('')
     mockGetDataSheet.mockReturnValue(null)
@@ -430,12 +480,23 @@ describe('GithubSyncSource', () => {
   })
 
   it('fetchRemoteEntries 应调用 fetchGithubJson', async () => {
-    mockParseJsonl.mockReturnValue({ entries: [{ sid: '1', name: 'Test' }], errors: [] })
-    mockXHR.xhrMock.onload = () => {}
-    setTimeout(() => mockXHR.xhrMock.onload?.(), 0)
+    mockLoadEntriesFromPath.mockResolvedValue({
+      entries: [{ sid: '1', name: 'Test' }],
+      shards: ['base'],
+      updatedAt: '2026-09-08',
+    })
     const source = new GithubSyncSource()
     const result = await source.fetchRemoteEntries()
     expect(result).toHaveLength(1)
+  })
+
+  it('fetchRemoteEntries 把 neededFields 透传给选片', async () => {
+    const source = new GithubSyncSource()
+    await source.fetchRemoteEntries(undefined, { neededFields: new Set(['summary']) })
+
+    expect(mockLoadEntriesFromPath).toHaveBeenCalledWith(
+      expect.objectContaining({ neededFields: new Set(['summary']) }),
+    )
   })
 })
 
@@ -763,7 +824,16 @@ describe('syncFromGithub', () => {
     vi.restoreAllMocks()
     mockIsGithubConfigComplete.mockReturnValue(true)
     mockBuildRawUrl.mockReturnValue('https://raw.githubusercontent.com/test/repo/main/data.jsonl')
-    mockParseJsonl.mockReturnValue({ entries: [], errors: [] })
+    mockGetGithubConfig.mockReturnValue({
+      owner: 'test',
+      repo: 'repo',
+      branch: 'main',
+      path: 'data/anime.manifest.json',
+      sourceType: 'github',
+    })
+    mockGetManualShards.mockReturnValue([])
+    mockCollectNeededFieldsFromSheet.mockReturnValue(undefined)
+    mockLoadEntriesFromPath.mockResolvedValue({ entries: [], shards: [], updatedAt: '' })
     mockComputeDiff.mockReturnValue([])
     mockTagsToString.mockReturnValue('')
     mockGetDataSheet.mockReturnValue({

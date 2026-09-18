@@ -41,7 +41,14 @@ export interface GithubSyncConfig {
   repo: string
   /** 分支名（默认 main） */
   branch: string
-  /** 文件路径（如 data/bangumi.jsonlines.gz，gzip 压缩的「表头 + 值数组」JSONL） */
+  /**
+   * 文件路径（指向**分片清单** `data/anime.manifest.json`）
+   *
+   * 2026-09-18 起数据文件改为分片：插件按用户表头只下载需要的分片
+   * （`data/anime.<shard>.jsonlines.gz`），Excel 实际用到的 27 列压完仅
+   * 3.37 MiB（相对旧单片 −83.8%）。旧单片路径不再支持，存量配置由
+   * {@link LEGACY_PATH_MIGRATIONS} 一次性迁移到清单路径。
+   */
   path: string
   /**
    * 同步源类型（可选，默认 'github'）
@@ -71,6 +78,7 @@ const GITHUB_CONFIG_KEYS = {
   STRATEGY: 'github_sync_strategy',
   SOURCE_TYPE: 'github_sync_source_type',
   GIST_ID: 'github_sync_gist_id',
+  SHARDS: 'github_sync_shards',
 } as const
 
 /** 默认分支 */
@@ -88,21 +96,24 @@ export const DEFAULT_GITHUB_CONFIG: Readonly<GithubSyncConfig> = Object.freeze({
   owner: 'awujiana',
   repo: 'Bangumi-Archive-Anime-Excel',
   branch: 'main',
-  path: 'data/bangumi.jsonlines.gz',
+  path: 'data/anime.manifest.json',
   sourceType: 'github',
 })
 
 /**
  * 旧数据文件路径 -> 新路径的一次性迁移表
  *
- * 2026-09-13 起数据文件改为 gzip 压缩（`data/bangumi.jsonlines.gz`）：明文
- * 55.83 MiB 超过 GitHub 单文件 50 MB 建议上限（push 报 GH001 警告），且 raw CDN
- * 对该文件**不做**透明 gzip，客户端每次同步都要拉满；压缩后为 20.86 MiB（−63%）。
+ * 两次历史变更：
+ *   1. 2026-09-13 明文 `data/bangumi.jsonlines` → gzip `data/bangumi.jsonlines.gz`
+ *      （明文 55.83 MiB 超过 GitHub 单文件 50 MB 建议上限，且 raw CDN 不做透明 gzip）；
+ *   2. 2026-09-18 单片 → 分片清单 `data/anime.manifest.json`（按表头选片，
+ *      只需简介等少量字段时不必拖下 infobox 那 47.6% 体积）。
  *
- * 只迁移本插件历史上作为默认值出现过的明文路径，不触碰用户自定义路径。
+ * 只迁移本插件历史上作为默认值出现过的路径，不触碰用户自定义路径。
  */
 const LEGACY_PATH_MIGRATIONS: Readonly<Record<string, string>> = Object.freeze({
-  'data/bangumi.jsonlines': 'data/bangumi.jsonlines.gz',
+  'data/bangumi.jsonlines': 'data/anime.manifest.json',
+  'data/bangumi.jsonlines.gz': 'data/anime.manifest.json',
 })
 
 // 内部引用（保持向后兼容）
@@ -245,16 +256,56 @@ export function isGithubConfigComplete(): boolean {
 /**
  * 构造 GitHub Raw 文件下载 URL
  * 格式：https://raw.githubusercontent.com/{owner}/{repo}/{branch}/{path}
+ *
+ * @param relativePath 可选的仓库内相对路径覆盖（下载分片时用，如 `data/anime.base.jsonlines.gz`）；
+ *                     省略时使用配置里的 path（清单或旧单片）
  * @returns URL 字符串
  * @throws 配置不完整时抛出 Error
  */
-export function buildRawUrl(): string {
+export function buildRawUrl(relativePath?: string): string {
   if (!isGithubConfigComplete()) {
     throw new Error('GitHub 仓库配置不完整，请在面板中设置 owner/repo/path')
   }
   // config 声明移到 early throw 之后（满足 unicorn/no-declarations-before-early-exit）
   const config = getGithubConfig()
-  return `https://raw.githubusercontent.com/${config.owner}/${config.repo}/${config.branch || DEFAULT_BRANCH}/${config.path}`
+  const target = relativePath ?? config.path
+  return `https://raw.githubusercontent.com/${config.owner}/${config.repo}/${config.branch || DEFAULT_BRANCH}/${target}`
+}
+
+/**
+ * 读取用户手动指定的分片名列表
+ *
+ * 用于「分片下载选择」UI：用户在面板上多选/取消的结果。空数组表示**未手动指定**，
+ * 此时按表头自动选片。
+ *
+ * 存储格式是逗号分隔的字符串（PluginStorage 只存字符串）。
+ *
+ * @returns 分片名数组；未配置时为空数组
+ */
+export function getManualShards(): string[] {
+  const raw = getStorage()?.getItem(GITHUB_CONFIG_KEYS.SHARDS) ?? ''
+  return raw
+    .split(',')
+    .map((name) => name.trim())
+    .filter((name) => name.length > 0)
+}
+
+/**
+ * 保存用户手动指定的分片名列表
+ *
+ * @param shards 分片名数组；传空数组表示恢复「按表头自动选」
+ * @returns 成功返回 true
+ */
+export function setManualShards(shards: readonly string[]): boolean {
+  const storage = getStorage()
+  if (!storage) {
+    bgmLog(LOG_LEVELS.ERROR, '[githubConfig] 无法获取 PluginStorage')
+    return false
+  }
+  const value = shards.join(',')
+  storage.setItem(GITHUB_CONFIG_KEYS.SHARDS, value)
+  bgmLog(LOG_LEVELS.INFO, `[githubConfig] 分片选择已保存: ${value || '（自动）'}`)
+  return true
 }
 
 /**

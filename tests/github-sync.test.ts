@@ -19,6 +19,33 @@ const mockBuildRawUrl = vi.hoisted(() =>
   vi.fn().mockReturnValue('https://raw.githubusercontent.com/test/repo/main/data.jsonl'),
 )
 const mockIsGithubConfigComplete = vi.hoisted(() => vi.fn().mockReturnValue(true))
+const mockGetGithubConfig = vi.hoisted(() =>
+  vi.fn().mockReturnValue({
+    owner: 'test',
+    repo: 'repo',
+    branch: 'main',
+    path: 'data/anime.manifest.json',
+  }),
+)
+const mockGetManualShards = vi.hoisted(() => vi.fn(() => [] as string[]))
+const mockCollectNeededFieldsFromSheet = vi.hoisted(() => vi.fn())
+// 分片编排（清单 → 选片 → 拼接）由 shard-fetch.test.ts 与各源测试单独覆盖；
+// 本文件聚焦 github-sync 自身逻辑，故把 loadEntriesFromPath 换成受控桩。
+// 用共享状态而非 mockResolvedValue，才能像 mockXHR 一样被 reset() 一次性清干净。
+const remoteEntriesState = vi.hoisted(() => ({
+  entries: [] as unknown[],
+  shards: [] as string[],
+  updatedAt: '',
+}))
+const mockLoadEntriesFromPath = vi.hoisted(() =>
+  vi.fn(() =>
+    Promise.resolve({
+      entries: remoteEntriesState.entries,
+      shards: remoteEntriesState.shards,
+      updatedAt: remoteEntriesState.updatedAt,
+    }),
+  ),
+)
 // 这些 mock 仅用于其他测试，在 computeDiff/parseJsonl/isGithubRemoteEntry 测试中会被覆盖
 const realImpls = vi.hoisted(() => ({
   computeDiff: null as typeof import('../ts/sync/github-sync-diff.js').computeDiff | null,
@@ -98,6 +125,7 @@ function emptyResponseHeaders(): string {
 const mockXHR = vi.hoisted(() => {
   let sharedStatus = 200
   let sharedResponseText = ''
+  let sharedResponseBytes: ArrayBuffer | null = null
   let sharedError: Error | null = null
   let sharedTimeoutMs = 0
 
@@ -122,6 +150,7 @@ const mockXHR = vi.hoisted(() => {
     send = vi.fn(() => {
       this.status = sharedStatus
       this.responseText = sharedResponseText
+      this.response = sharedResponseBytes ?? ''
       if (sharedError) {
         queueMicrotask(() => this.onerror?.())
       } else if (sharedTimeoutMs > 0) {
@@ -153,7 +182,7 @@ const mockXHR = vi.hoisted(() => {
 
     readyState = 0
 
-    response = ''
+    response: unknown = ''
 
     responseType = ''
 
@@ -187,6 +216,18 @@ const mockXHR = vi.hoisted(() => {
     setResponse(status: number, responseText: string) {
       sharedStatus = status
       sharedResponseText = responseText
+      sharedResponseBytes = null
+      sharedError = null
+      sharedTimeoutMs = 0
+    },
+    /**
+     * 设置二进制响应体（用于覆盖 gzip 魔数识别与解压分支）。
+     * `xhr.response` 为 ArrayBuffer 时 `readXhrJsonlText` 会走字节解码路径。
+     */
+    setResponseBytes(bytes: ArrayBuffer) {
+      sharedStatus = 200
+      sharedResponseText = ''
+      sharedResponseBytes = bytes
       sharedError = null
       sharedTimeoutMs = 0
     },
@@ -199,8 +240,12 @@ const mockXHR = vi.hoisted(() => {
     reset() {
       sharedStatus = 200
       sharedResponseText = ''
+      sharedResponseBytes = null
       sharedError = null
       sharedTimeoutMs = 0
+      remoteEntriesState.entries = []
+      remoteEntriesState.shards = []
+      remoteEntriesState.updatedAt = ''
     },
   }
 })
@@ -225,6 +270,7 @@ import {
   applyDiffToSheet,
   syncFromGithub,
   fetchGithubJson,
+  fetchGithubText,
   readLocalEntriesForSync,
   GithubSyncSource,
 } from '../ts/sync/github-sync.js'
@@ -304,7 +350,15 @@ vi.mock('../ts/core/result.js', () => ({
 vi.mock('../ts/sync/github-config.js', () => ({
   buildRawUrl: mockBuildRawUrl,
   isGithubConfigComplete: mockIsGithubConfigComplete,
+  getGithubConfig: mockGetGithubConfig,
+  getManualShards: mockGetManualShards,
   getSyncSourceType: vi.fn().mockReturnValue('github'),
+}))
+
+// 分片下载编排整体桩掉：github-sync 只负责把「路径 / 取文本回调 / 表头所需字段」透传下去
+vi.mock('../ts/sync/shard-fetch.js', () => ({
+  loadEntriesFromPath: mockLoadEntriesFromPath,
+  collectNeededFieldsFromSheet: mockCollectNeededFieldsFromSheet,
 }))
 
 vi.mock('../ts/sync/github-sync-diff.js', async () => {
@@ -359,9 +413,20 @@ function numericExtensionField(value: number): string {
   return value as unknown as string
 }
 
-function setupXHRResponse(status: number, responseText: string) {
-  mockXHR.setResponse(status, responseText)
+/**
+ * 预置分片编排的返回结果。
+ *
+ * 分片链路（清单 → 选片 → 逐片取文本 → 按行拼接）已由 shard-fetch 承担，
+ * 本文件只关心「拿到 entries 之后 github-sync 怎么处理」，故直接喂结果。
+ */
+function setupRemoteEntries(entries: GithubRemoteEntry[]) {
+  remoteEntriesState.entries = entries
+  remoteEntriesState.shards = ['base']
+  remoteEntriesState.updatedAt = ''
 }
+
+const MANIFEST_PATH = 'data/anime.manifest.json'
+const BASE_SHARD_PATH = 'data/anime.base.jsonlines.gz'
 
 function createMockWorksheet(
   options: {
@@ -1572,7 +1637,7 @@ describe('syncFromGithub selectedRowsOnly', () => {
     mockComputeDiff.mockReturnValue([])
 
     // 让 XMLHttpRequest 正常工作
-    setupXHRResponse(200, JSON.stringify(mockRemoteEntries))
+    setupRemoteEntries(mockRemoteEntries)
 
     const result = await syncFromGithub(undefined, 'add-update', undefined, undefined, true)
 
@@ -1582,76 +1647,130 @@ describe('syncFromGithub selectedRowsOnly', () => {
   })
 })
 
-// ========== fetchGithubJson 异常路径测试 ==========
+// ========== fetchGithubText 异常路径测试（传输层：一次 GET + 按魔数解码） ==========
 
-describe('fetchGithubJson 异常路径', () => {
+describe('fetchGithubText 异常路径', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     mockXHR.reset()
     mockIsGithubConfigComplete.mockReturnValue(true)
-    mockBuildRawUrl.mockReturnValue('https://raw.githubusercontent.com/test/repo/main/data.jsonl')
+    mockBuildRawUrl.mockReturnValue(
+      'https://raw.githubusercontent.com/test/repo/main/data/anime.manifest.json',
+    )
   })
 
   it('配置不完整时应抛错', async () => {
     mockIsGithubConfigComplete.mockReturnValue(false)
-    await expect(fetchGithubJson()).rejects.toThrow(/GitHub 仓库配置不完整/)
+    await expect(fetchGithubText(MANIFEST_PATH)).rejects.toThrow(/GitHub 仓库配置不完整/)
   })
 
   it('XHR 发送失败时应抛出错误', async () => {
     // 使用共享状态设置错误模式
     mockXHR.setError(new Error('Network Error'))
 
-    await expect(fetchGithubJson()).rejects.toThrow(/网络请求失败/)
+    await expect(fetchGithubText(MANIFEST_PATH)).rejects.toThrow(/网络请求失败/)
   })
 
   it('HTTP 非 200 状态应抛出错误', async () => {
     mockXHR.setResponse(500, 'Internal Server Error')
 
-    await expect(fetchGithubJson()).rejects.toThrow(/HTTP 错误/)
+    await expect(fetchGithubText(MANIFEST_PATH)).rejects.toThrow(/HTTP 错误/)
   })
 
   it('404 状态应提示文件不存在', async () => {
     mockXHR.setResponse(404, 'Not Found')
 
-    await expect(fetchGithubJson()).rejects.toThrow(/文件不存在/)
+    await expect(fetchGithubText(MANIFEST_PATH)).rejects.toThrow(/文件不存在/)
   })
 
   it('403 状态应提示访问被拒', async () => {
     mockXHR.setResponse(403, 'Forbidden')
 
-    await expect(fetchGithubJson()).rejects.toThrow(/访问被拒/)
+    await expect(fetchGithubText(MANIFEST_PATH)).rejects.toThrow(/访问被拒/)
   })
 
-  it('响应解析为空且有错误时应抛出错误', async () => {
-    mockXHR.setResponse(200, '')
-    mockParseJsonl.mockReturnValue({ entries: [], errors: [{ line: 1, reason: '空内容' }] })
+  it('成功时应返回解码后的文本', async () => {
+    mockXHR.setResponse(200, '{"formatVersion":1}')
 
-    await expect(fetchGithubJson()).rejects.toThrow(/JSONL 解析失败/)
+    await expect(fetchGithubText(MANIFEST_PATH)).resolves.toBe('{"formatVersion":1}')
   })
 
-  it('成功解析应返回条目数据', async () => {
-    const entries: GithubRemoteEntry[] = [
-      { sid: '1', name: 'Test1' },
-      { sid: '2', name: 'Test2' },
-    ]
-    mockXHR.setResponse(200, '{"sid":"1","name":"Test1"}\n{"sid":"2","name":"Test2"}')
-    mockParseJsonl.mockReturnValue({ entries, errors: [] })
+  it('按传入的相对路径拼接下载 URL（分片模式每片各请求一次）', async () => {
+    mockXHR.setResponse(200, 'x')
 
-    const result = await fetchGithubJson()
-    expect(result).toEqual(entries)
+    await fetchGithubText(BASE_SHARD_PATH)
+    expect(mockBuildRawUrl).toHaveBeenCalledWith(BASE_SHARD_PATH)
   })
 
   it('AbortSignal 已取消时应立即拒绝', async () => {
     const controller = new AbortController()
     controller.abort()
 
-    await expect(fetchGithubJson(controller.signal)).rejects.toThrow('请求被取消')
+    await expect(fetchGithubText(MANIFEST_PATH, controller.signal)).rejects.toThrow('请求被取消')
   })
 
   it('请求超时应抛出错误', async () => {
     mockXHR.setTimeout(5000)
 
-    await expect(fetchGithubJson()).rejects.toThrow(/请求超时/)
+    await expect(fetchGithubText(MANIFEST_PATH)).rejects.toThrow(/请求超时/)
+  })
+})
+
+// ========== fetchGithubJson 委托测试（清单/选片/拼接由 shard-fetch 承担）==========
+
+describe('fetchGithubJson 委托分片编排', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mockXHR.reset()
+    mockGetGithubConfig.mockReturnValue({
+      owner: 'test',
+      repo: 'repo',
+      branch: 'main',
+      path: MANIFEST_PATH,
+    })
+    mockGetManualShards.mockReturnValue([])
+  })
+
+  it('把清单路径、取文本回调与手动选片交给 loadEntriesFromPath', async () => {
+    await fetchGithubJson()
+
+    expect(mockLoadEntriesFromPath).toHaveBeenCalledWith(
+      expect.objectContaining({
+        path: MANIFEST_PATH,
+        fetchText: fetchGithubText,
+        manualShards: [],
+        logTag: 'githubSync',
+      }),
+    )
+  })
+
+  it('neededFields 与 signal 一并透传（undefined 表示全量下载）', async () => {
+    const controller = new AbortController()
+
+    await fetchGithubJson(controller.signal, new Set(['summary']))
+
+    expect(mockLoadEntriesFromPath).toHaveBeenCalledWith(
+      expect.objectContaining({
+        neededFields: new Set(['summary']),
+        signal: controller.signal,
+      }),
+    )
+  })
+
+  it('成功时应返回编排结果中的 entries', async () => {
+    const entries: GithubRemoteEntry[] = [
+      { sid: '1', name: 'Test1' },
+      { sid: '2', name: 'Test2' },
+    ]
+    setupRemoteEntries(entries)
+
+    await expect(fetchGithubJson()).resolves.toEqual(entries)
+  })
+
+  it('编排失败时应原样向上抛出', async () => {
+    mockLoadEntriesFromPath.mockRejectedValueOnce(new Error('分片清单格式非法'))
+
+    await expect(fetchGithubJson()).rejects.toThrow(/分片清单格式非法/)
   })
 })
 
@@ -1687,7 +1806,7 @@ describe('syncFromGithub 时间过滤', () => {
     mockParseJsonl.mockReturnValue({ entries: remoteEntries, errors: [] })
     mockComputeDiff.mockReturnValue([])
 
-    setupXHRResponse(200, JSON.stringify(remoteEntries))
+    setupRemoteEntries(remoteEntries)
 
     // 刻意传入越界 range：覆盖 filterByTime 的 default 分支
     const timeFilter = {
@@ -1729,7 +1848,7 @@ describe('syncFromGithub 时间过滤', () => {
     mockParseJsonl.mockReturnValue({ entries: remoteEntries, errors: [] })
     mockComputeDiff.mockReturnValue([])
 
-    setupXHRResponse(200, JSON.stringify(remoteEntries))
+    setupRemoteEntries(remoteEntries)
 
     const result = await syncFromGithub(undefined, 'add-update', undefined, undefined, false, {
       enabled: true,
@@ -1783,7 +1902,7 @@ describe('syncFromGithub finally 块恢复 ScreenUpdating/Calculation', () => {
     mockGetApp.mockReturnValue(mockApp)
 
     const remoteEntries: GithubRemoteEntry[] = [{ sid: '1', name: 'Test' }]
-    setupXHRResponse(200, JSON.stringify(remoteEntries))
+    setupRemoteEntries(remoteEntries)
     mockParseJsonl.mockReturnValue({ entries: remoteEntries, errors: [] })
 
     expect(isScreenUpdatingValue).toBe(true)
@@ -1828,7 +1947,7 @@ describe('syncFromGithub finally 块恢复 ScreenUpdating/Calculation', () => {
     })
 
     const remoteEntries: GithubRemoteEntry[] = [{ sid: '1', name: 'Test' }]
-    setupXHRResponse(200, JSON.stringify(remoteEntries))
+    setupRemoteEntries(remoteEntries)
     mockParseJsonl.mockReturnValue({ entries: remoteEntries, errors: [] })
 
     try {
@@ -1870,7 +1989,7 @@ describe('syncFromGithub finally 块恢复 ScreenUpdating/Calculation', () => {
     mockGetApp.mockReturnValue(mockApp)
 
     const remoteEntries: GithubRemoteEntry[] = [{ sid: '1', name: 'Test' }]
-    setupXHRResponse(200, JSON.stringify(remoteEntries))
+    setupRemoteEntries(remoteEntries)
     mockParseJsonl.mockReturnValue({ entries: remoteEntries, errors: [] })
 
     // try 块和 finally 块中的 catch 都应吞掉异常
@@ -1982,7 +2101,7 @@ describe('getSelectedRowSids 分支覆盖', () => {
       { sid: '2', name: '条目2', date: '2024-02-01' },
     ]
     mockParseJsonl.mockReturnValue({ entries: remoteEntries, errors: [] })
-    setupXHRResponse(200, JSON.stringify(remoteEntries))
+    setupRemoteEntries(remoteEntries)
 
     const progressCalls: { current: number; total: number; message: string }[] = []
     const onProgress = vi.fn((current: number, total: number, message: string) => {
@@ -2014,7 +2133,7 @@ describe('getSelectedRowSids 分支覆盖', () => {
     mockGetApp.mockReturnValue(null)
 
     const remoteEntries: GithubRemoteEntry[] = [{ sid: '1', name: 'Test' }]
-    setupXHRResponse(200, JSON.stringify(remoteEntries))
+    setupRemoteEntries(remoteEntries)
     mockParseJsonl.mockReturnValue({ entries: remoteEntries, errors: [] })
 
     // 不应抛出
@@ -2048,7 +2167,7 @@ describe('getSelectedRowSids 分支覆盖', () => {
     mockGetApp.mockReturnValue(mockApp)
 
     const remoteEntries: GithubRemoteEntry[] = [{ sid: '1', name: 'Test' }]
-    setupXHRResponse(200, JSON.stringify(remoteEntries))
+    setupRemoteEntries(remoteEntries)
     mockParseJsonl.mockReturnValue({ entries: remoteEntries, errors: [] })
 
     // try 块中的 catch 应吞掉异常
@@ -2072,7 +2191,7 @@ describe('syncFromGithub 读取本地数据为空分支 (line 1391)', () => {
 
   it('readLocalEntriesForSync 返回 null 时应抛出错误', async () => {
     const remoteEntries: GithubRemoteEntry[] = [{ sid: '1', name: 'Test' }]
-    setupXHRResponse(200, JSON.stringify(remoteEntries))
+    setupRemoteEntries(remoteEntries)
     mockParseJsonl.mockReturnValue({ entries: remoteEntries, errors: [] })
 
     // 关键：getDataSheet 返回 null → readLocalEntriesForSync 返回 null
@@ -2115,7 +2234,7 @@ describe('syncFromGithub 冲突解决分支 (lines 1401-1402)', () => {
       { sid: '1', name: '已更新条目', updatedAt: '2024-01-01' },
     ]
     mockParseJsonl.mockReturnValue({ entries: remoteEntries, errors: [] })
-    setupXHRResponse(200, JSON.stringify(remoteEntries))
+    setupRemoteEntries(remoteEntries)
 
     // mock diff 必须包含 changedFields 字段，且 kind 为 update
     mockComputeDiff.mockReturnValue([
@@ -2181,7 +2300,7 @@ describe('syncFromGithub ensureSheetHeaders 返回 true (lines 1350-1351)', () =
     mockGetApp.mockReturnValue(mockApp)
 
     const remoteEntries: GithubRemoteEntry[] = [{ sid: '1', name: 'Test' }]
-    setupXHRResponse(200, JSON.stringify(remoteEntries))
+    setupRemoteEntries(remoteEntries)
     mockParseJsonl.mockReturnValue({ entries: remoteEntries, errors: [] })
 
     const progressMessages: string[] = []
@@ -2296,7 +2415,7 @@ describe('applyDiffToSheet 删除操作 yieldToEventLoop (line 1184)', () => {
     mockComputeDiff.mockReturnValue(deletedDiffs)
 
     const remoteEntries: GithubRemoteEntry[] = []
-    setupXHRResponse(200, JSON.stringify(remoteEntries))
+    setupRemoteEntries(remoteEntries)
     mockParseJsonl.mockReturnValue({ entries: remoteEntries, errors: [] })
 
     // 捕获可能的异常 — 关键是 line 1184 被执行
@@ -4466,7 +4585,7 @@ describe('getSelectedRowSids 无选区路径 (lines 1460-1461)', () => {
   })
 
   it('Selection 为 null 时应记录 WARN 日志 (lines 1460-1461)', async () => {
-    setupXHRResponse(200, JSON.stringify([]))
+    setupRemoteEntries([])
 
     const mockWs = createMockWorksheet()
     mockGetDataSheet.mockReturnValue(mockWs)
@@ -4490,7 +4609,7 @@ describe('getSelectedRowSids 无选区路径 (lines 1460-1461)', () => {
   })
 
   it('Selection 存在但无 Bangumi_URL 列时返回空集合', async () => {
-    setupXHRResponse(200, JSON.stringify([]))
+    setupRemoteEntries([])
 
     const mockWs = createMockWorksheet()
     mockGetDataSheet.mockReturnValue(mockWs)
@@ -4684,77 +4803,44 @@ describe('readLocalEntries 无可读列边界 (lines 293-294)', () => {
   })
 })
 
-// ========== 补充测试：fetchGithubJson 解析异常分支 (lines 166, 176) ==========
-describe('fetchGithubJson 解析异常分支', () => {
-  it('parseJsonl 返回部分错误时记录 WARN 日志 (line 166)', async () => {
-    setupXHRResponse(200, '{"sid":"1"}\n{"invalid"}\n{"sid":"2"}')
+// ========== 补充测试：fetchGithubText 解码分支 ==========
+describe('fetchGithubText 解码分支', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mockXHR.reset()
     mockIsGithubConfigComplete.mockReturnValue(true)
-
-    mockParseJsonl.mockReturnValue({
-      entries: [{ sid: '1' }, { sid: '2' }] as GithubRemoteEntry[],
-      errors: [{ line: 2, reason: '缺少 sid 字段' }],
-    })
-
-    const result = await fetchGithubJson()
-    expect(result).toHaveLength(2)
-    expect(mockBgmLognnn).toHaveBeenCalledWith('WARN', expect.stringContaining('解析完成'))
+    mockBuildRawUrl.mockReturnValue('https://example.com/data/anime.base.jsonlines.gz')
   })
 
-  it('parseJsonl 抛出异常时 reject (line 176)', async () => {
-    setupXHRResponse(200, 'valid json')
-    mockIsGithubConfigComplete.mockReturnValue(true)
+  it('响应体为 gzip 魔数但内容非法时应报「数据解码失败」', async () => {
+    // 1f 8b 是 gzip 魔数，但后续字节不是合法 gzip 流 → DecompressionStream 抛错
+    mockXHR.setResponseBytes(new Uint8Array([0x1f, 0x8b, 0x00, 0x01]).buffer)
 
-    mockParseJsonl.mockImplementation(() => {
-      throw new Error('JSON 解析器内部错误')
-    })
-
-    await expect(fetchGithubJson()).rejects.toThrow(/JSONL 解析失败/)
+    await expect(fetchGithubText(BASE_SHARD_PATH)).rejects.toThrow(/数据解码失败/)
   })
 
-  it('parseJsonl 全部失败时 reject (line 158)', async () => {
-    setupXHRResponse(200, 'all invalid')
-    mockIsGithubConfigComplete.mockReturnValue(true)
+  it('响应体为明文 ArrayBuffer 时按 UTF-8 直接解码', async () => {
+    const text = '["sid","name"]\n["1","Test"]'
+    mockXHR.setResponseBytes(new TextEncoder().encode(text).buffer)
 
-    mockParseJsonl.mockReturnValue({
-      entries: [],
-      errors: [
-        { line: 1, reason: '缺少 sid' },
-        { line: 2, reason: '格式错误' },
-      ],
-    })
-
-    await expect(fetchGithubJson()).rejects.toThrow(/JSONL 解析失败/)
+    await expect(fetchGithubText(BASE_SHARD_PATH)).resolves.toBe(text)
   })
 })
 
 // ========== 补充测试：GithubSyncSource 类方法 (line 221) ==========
 describe('GithubSyncSource 方法', () => {
   beforeEach(() => {
+    vi.clearAllMocks()
     mockXHR.reset()
-    mockParseJsonl.mockImplementation((text: string) => {
-      if (realImpls.parseJsonl) return realImpls.parseJsonl(text)
-      const entries: Record<string, unknown>[] = []
-      const errors: { line: number; message: string }[] = []
-      const lines = text.split(/\r?\n/)
-      for (const [index, rawLine] of lines.entries()) {
-        const line = rawLine.trim()
-        if (line) {
-          try {
-            const parsed = JSON.parse(line) as Record<string, unknown>
-            if (typeof parsed.sid === 'string' && parsed.sid) {
-              entries.push(parsed)
-            } else {
-              errors.push({ line: index + 1, message: '缺少有效的 sid 字段' })
-            }
-          } catch {
-            errors.push({ line: index + 1, message: '无效的 JSON' })
-          }
-        }
-      }
-      return { entries, errors }
+    mockGetGithubConfig.mockReturnValue({
+      owner: 'test',
+      repo: 'repo',
+      branch: 'main',
+      path: MANIFEST_PATH,
     })
+    mockGetManualShards.mockReturnValue([])
     mockIsGithubConfigComplete.mockReturnValue(true)
-    mockBuildRawUrl.mockReturnValue('https://example.com/data.jsonl')
+    mockBuildRawUrl.mockReturnValue('https://example.com/data/anime.manifest.json')
   })
 
   it('getSourceType 返回 github (line 221)', () => {
@@ -4768,32 +4854,41 @@ describe('GithubSyncSource 方法', () => {
   })
 
   it('fetchRemoteEntries 委托给 fetchGithubJson', async () => {
-    setupXHRResponse(200, '["sid","name"]\n["1","Test"]')
+    setupRemoteEntries([{ sid: '1', name: 'Test' }])
 
     const source = new GithubSyncSource()
     const entries = await source.fetchRemoteEntries()
     expect(entries).toHaveLength(1)
   })
+
+  it('fetchRemoteEntries 把 options.neededFields 透传到选片', async () => {
+    setupRemoteEntries([])
+
+    const source = new GithubSyncSource()
+    await source.fetchRemoteEntries(undefined, { neededFields: new Set(['summary']) })
+
+    expect(mockLoadEntriesFromPath).toHaveBeenCalledWith(
+      expect.objectContaining({ neededFields: new Set(['summary']) }),
+    )
+  })
 })
 
-// ========== 补充测试：fetchGithubJson onerror+abort 竞态 (line 194) ==========
-describe('fetchGithubJson onerror 与 signal.aborted 竞态 (line 194)', () => {
+// ========== 补充测试：fetchGithubText onerror+abort 竞态 (line 194) ==========
+describe('fetchGithubText onerror 与 signal.aborted 竞态 (line 194)', () => {
   beforeEach(() => {
+    vi.clearAllMocks()
     mockXHR.reset()
-    mockParseJsonl.mockRestore()
     mockIsGithubConfigComplete.mockReturnValue(true)
-    mockBuildRawUrl.mockReturnValue('https://example.com/data.jsonl')
+    mockBuildRawUrl.mockReturnValue('https://example.com/data/anime.base.jsonlines.gz')
   })
 
   it('onerror 触发时 signal.aborted 为 true 应返回取消错误 (line 194)', async () => {
-    mockIsGithubConfigComplete.mockReturnValue(true)
-    mockBuildRawUrl.mockReturnValue('https://example.com/data.jsonl')
     // 设置 sharedError 使 onerror 被触发（通过 queueMicrotask 延迟）
     mockXHR.setError(new Error('Simulated network abort'))
 
     const controller = new AbortController()
     // 开始请求（signal 未 aborted）
-    const promise = fetchGithubJson(controller.signal)
+    const promise = fetchGithubText(BASE_SHARD_PATH, controller.signal)
 
     // 在 microtask 执行 onerror 之前 abort signal
     // 由于 send 内部使用 queueMicrotask 延迟调用 onerror，
@@ -4823,7 +4918,7 @@ describe('getSelectedRowSids ActiveSheet 为 null (line 1469)', () => {
   })
 
   it('ActiveSheet 为 null 时 getSelectedRowSids 应返回空集合 (line 1469)', async () => {
-    setupXHRResponse(200, JSON.stringify([]))
+    setupRemoteEntries([])
 
     const mockWs = createMockWorksheet()
     mockGetDataSheet.mockReturnValue(mockWs)
@@ -4857,7 +4952,7 @@ describe('getSelectedRowSids row===headerRow continue (line 1479)', () => {
   })
 
   it('选区包含表头行时应跳过表头行（row===headerRow continue）', async () => {
-    setupXHRResponse(200, JSON.stringify([{ sid: 'test1', name: '测试' }]))
+    setupRemoteEntries([{ sid: 'test1', name: '测试' }])
 
     const mockWs = createMockWorksheet()
     mockGetDataSheet.mockReturnValue(mockWs)
@@ -4891,7 +4986,7 @@ describe('getSelectedRowSids row===headerRow continue (line 1479)', () => {
   })
 
   it('行无 URL 时应跳过（!url continue line 1481）', async () => {
-    setupXHRResponse(200, JSON.stringify([{ sid: 'test2', name: '测试2' }]))
+    setupRemoteEntries([{ sid: 'test2', name: '测试2' }])
 
     const mockWs = createMockWorksheet()
     mockGetDataSheet.mockReturnValue(mockWs)
@@ -4917,7 +5012,7 @@ describe('getSelectedRowSids row===headerRow continue (line 1479)', () => {
   })
 
   it('extractSubjectId 返回有效 SID 时应添加到集合 (lines 1482-1483)', async () => {
-    setupXHRResponse(200, JSON.stringify([{ sid: 'valid-sid', name: '有效条目' }]))
+    setupRemoteEntries([{ sid: 'valid-sid', name: '有效条目' }])
 
     const mockWs = createMockWorksheet()
     mockGetDataSheet.mockReturnValue(mockWs)

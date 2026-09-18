@@ -12,14 +12,14 @@
 
 手工验收的成本很高，所以先划清边界。下面这些**已经由自动化守住**，手工只需抽查、不需逐项重做：
 
-| 维度 | 自动化覆盖 | 证据 |
-| --- | --- | --- |
-| 纯逻辑 / 分支 / 边界 | **4309 条测试 / 131 文件，全绿** | `npm run test` |
-| 行覆盖率 | **99.95% lines**（未覆盖 6 行，均为类型驱动/防御分支） | `文档/COVERAGE_BACKLOG.md` |
-| 装配契约（入口自动启动、装配顺序、`bgm:modulesReady` 异步派发） | `tests/entry-smoke.test.ts`（13 条） | 第 20 批 |
-| 调试面板**生产 inert** 守卫 | `tests/debug-panel.test.ts`（7 条） | 第 20 批 |
-| 「循环条件里读 COM 属性」＝跨进程往返放大器 | `npm run check:com-in-loop`（AST，129 模块 0 违规） | 第 21 批 |
-| 分层 / 导入环 / Ribbon 按钮一致性 / 导航顺序 / DOMPurify 版本 / tests 类型 | `npm run gate` 第 2~5、7 关 | 各批次 |
+| 维度                                                                       | 自动化覆盖                                             | 证据                       |
+| -------------------------------------------------------------------------- | ------------------------------------------------------ | -------------------------- |
+| 纯逻辑 / 分支 / 边界                                                       | **4309 条测试 / 131 文件，全绿**                       | `npm run test`             |
+| 行覆盖率                                                                   | **99.95% lines**（未覆盖 6 行，均为类型驱动/防御分支） | `文档/COVERAGE_BACKLOG.md` |
+| 装配契约（入口自动启动、装配顺序、`bgm:modulesReady` 异步派发）            | `tests/entry-smoke.test.ts`（13 条）                   | 第 20 批                   |
+| 调试面板**生产 inert** 守卫                                                | `tests/debug-panel.test.ts`（7 条）                    | 第 20 批                   |
+| 「循环条件里读 COM 属性」＝跨进程往返放大器                                | `npm run check:com-in-loop`（AST，129 模块 0 违规）    | 第 21 批                   |
+| 分层 / 导入环 / Ribbon 按钮一致性 / 导航顺序 / DOMPurify 版本 / tests 类型 | `npm run gate` 第 2~5、7 关                            | 各批次                     |
 
 > **结论**：本清单只做这四类**自动化无法覆盖**的事 ——
 > ① **宿主 API 的真实行为**（mock 只能证明「我们这样调用」，证明不了「宿主这样响应」）；
@@ -49,11 +49,11 @@ console.log(window.BGM ? 'BGM 已挂载' : '❌ BGM 未挂载')
 
 新建一个 `.xlsx`，至少 3 张工作表：
 
-| 工作表 | 内容 |
-| --- | --- |
-| `动画` | 表头：`名称 / 链接 / 状态 / 集数 / 评分 / 标签 / 评论`，≥ 10 行真实数据，其中 **2 行留空链接**、**1 行含 emoji** |
-| `大数据` | 同上表头，**≥ 3000 行**（用于性能验收 B 组） |
-| `空表` | 仅表头，无数据行 |
+| 工作表   | 内容                                                                                                             |
+| -------- | ---------------------------------------------------------------------------------------------------------------- |
+| `动画`   | 表头：`名称 / 链接 / 状态 / 集数 / 评分 / 标签 / 评论`，≥ 10 行真实数据，其中 **2 行留空链接**、**1 行含 emoji** |
+| `大数据` | 同上表头，**≥ 3000 行**（用于性能验收 B 组）                                                                     |
+| `空表`   | 仅表头，无数据行                                                                                                 |
 
 ### 1.4 准备凭证与网络
 
@@ -62,13 +62,13 @@ console.log(window.BGM ? 'BGM 已挂载' : '❌ BGM 未挂载')
 
 ### 1.5 记录环境信息（失败时必需）
 
-| 项 | 值 |
-| --- | --- |
-| 宿主 | WPS / Excel + 版本号 |
-| 操作系统 | |
-| 网络环境 | 直连 / 代理 |
-| 构建 commit | `git rev-parse --short HEAD` → |
-| `npm run gate` 结果 | |
+| 项                  | 值                             |
+| ------------------- | ------------------------------ |
+| 宿主                | WPS / Excel + 版本号           |
+| 操作系统            |                                |
+| 网络环境            | 直连 / 代理                    |
+| 构建 commit         | `git rev-parse --short HEAD` → |
+| `npm run gate` 结果 |                                |
 
 ---
 
@@ -190,13 +190,14 @@ console.log(window.BGM ? 'BGM 已挂载' : '❌ BGM 未挂载')
 - [ ] **结果**：______
 - [ ] **定位线索**：Console 搜 `[HTTP]` 的重试日志
 
-#### C-3 数据下发（`raw.githubusercontent.com` + gzip）
+#### C-3 数据下发（`raw.githubusercontent.com` + 分片 gzip）
 
 - [ ] **执行**：点「从 GitHub 同步数据」（远程数据同步）
-- [ ] **预期**：能取到 `data/bangumi.jsonlines.gz` 并解压成功；条目数正常
-- [ ] **重点**：raw CDN 对二进制不做透明 gzip，**必须走原生 `DecompressionStream`**
+- [ ] **预期**：先取到清单 `data/anime.manifest.json`，再按表头选片，逐片取回 `data/anime.<shard>.jsonlines.gz` 并解压成功；条目数正常
+- [ ] **重点 1**：raw CDN 对二进制不做透明 gzip，**必须走原生 `DecompressionStream`**
+- [ ] **重点 2**：Console 里应看到「清单 … 本次下载 N 片 [base, …]」的日志；表里没有长文本列时**不应**出现 `summary` / `infobox`
 - [ ] **结果**：______
-- [ ] **定位线索**：`ts/sync/jsonl-response.ts` 的 `readXhrJsonlText()`（按 gzip 魔数判断）
+- [ ] **定位线索**：`ts/sync/shard-fetch.ts` 的 `loadEntriesFromPath()`、`ts/sync/jsonl-response.ts` 的 `readXhrJsonlText()`（按 gzip 魔数判断）
 
 #### C-4 Gist 路径
 
@@ -350,9 +351,10 @@ window.__BGM_MODULE_STATUS__
 // 5) 当前导航顺序（对比设置页拖拽结果）
 window.Application?.PluginStorage?.getItem('bgm_nav_order')
 
-// 6) 主题与导航偏好
-['bgm_theme', 'bgm_nav_icons_only', 'bgm_log_level'].forEach((k) =>
-  console.log(k, '=', window.Application?.PluginStorage?.getItem(k)))
+  [
+    // 6) 主题与导航偏好
+    ('bgm_theme', 'bgm_nav_icons_only', 'bgm_log_level')
+  ].forEach((k) => console.log(k, '=', window.Application?.PluginStorage?.getItem(k)))
 
 // 7) 把日志级别临时调到 DEBUG，便于抓 C 组网络日志
 window.Application?.PluginStorage?.setItem('bgm_log_level', '4')
@@ -362,17 +364,17 @@ window.Application?.PluginStorage?.setItem('bgm_log_level', '4')
 
 ## 四、汇总表
 
-| 组 | 范围 | 项数 | ✓ 通过 | ✗ 失败 | ⚠️ 部分 | 跳过 |
-| --- | --- | ---: | --- | --- | --- | --- |
-| A | 真实 COM 语义 | 9 | | | | |
-| B | 性能（COM 往返） | 3 | | | | |
-| C | 真实网络 | 4 | | | | |
-| D | 跨 WebView 通信 | 4 | | | | |
-| E | 数据安全（写盘） | 4 | | | | |
-| F | UI / 主题 / 导航 | 5 | | | | |
-| G | 调试面板守卫 | 2 | | | | |
-| H | Excel 兼容抽验 | 1 | | | | |
-| | **合计** | **32** | | | | |
+| 组  | 范围             |   项数 | ✓ 通过 | ✗ 失败 | ⚠️ 部分 | 跳过 |
+| --- | ---------------- | -----: | ------ | ------ | ------- | ---- |
+| A   | 真实 COM 语义    |      9 |        |        |         |      |
+| B   | 性能（COM 往返） |      3 |        |        |         |      |
+| C   | 真实网络         |      4 |        |        |         |      |
+| D   | 跨 WebView 通信  |      4 |        |        |         |      |
+| E   | 数据安全（写盘） |      4 |        |        |         |      |
+| F   | UI / 主题 / 导航 |      5 |        |        |         |      |
+| G   | 调试面板守卫     |      2 |        |        |         |      |
+| H   | Excel 兼容抽验   |      1 |        |        |         |      |
+|     | **合计**         | **32** |        |        |         |      |
 
 ---
 

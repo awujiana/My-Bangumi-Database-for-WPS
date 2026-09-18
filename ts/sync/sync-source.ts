@@ -15,6 +15,22 @@ import type { Result } from '../core/result.js'
 import type { GithubRemoteEntry } from './github-sync-diff.js'
 
 /**
+ * 取数选项
+ *
+ * 分片数据源（`data/anime.<shard>.jsonlines.gz`）需要知道本次同步真正会用到哪些
+ * 字段，才能只下载必要的分片；字段集合由调用方在下载前从**用户表格表头**推导
+ * （见 `shardFetch.collectNeededFieldsFromSheet`）。
+ */
+export interface FetchRemoteEntriesOptions {
+  /**
+   * 本次同步会用到的 JSONL 字段
+   *
+   * 传 `undefined` 表示无法判断（如读不到工作表）→ 分片模式下全量下载（保守）。
+   */
+  neededFields?: ReadonlySet<string> | undefined
+}
+
+/**
  * 同步源接口
  *
  * 所有数据源（GitHub/GitLab/Gitee/本地文件/Gist）需实现此接口。
@@ -33,10 +49,14 @@ export interface SyncSource {
   /**
    * 获取远程条目
    * @param signal 可选的 AbortSignal，用于取消请求
+   * @param options 取数选项（分片模式下用于按表头选片）
    * @returns 解析后的远程条目数组
    * @throws 网络错误、配置错误、解析失败时抛出 Error
    */
-  fetchRemoteEntries(signal?: AbortSignal): Promise<GithubRemoteEntry[]>
+  fetchRemoteEntries(
+    signal?: AbortSignal,
+    options?: FetchRemoteEntriesOptions,
+  ): Promise<GithubRemoteEntry[]>
 
   /**
    * 校验配置是否完整可用

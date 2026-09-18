@@ -25,11 +25,11 @@ import { LOG_LEVELS } from '../core/constants.js'
 import { Result, BgmError } from '../core/result.js'
 import { bgmLog } from '../tools/utility.js'
 
-import { getGithubConfig } from './github-config.js'
-import { parseJsonl } from './github-sync-diff.js'
+import { getGithubConfig, getManualShards } from './github-config.js'
 import type { GithubRemoteEntry } from './github-sync-diff.js'
 import { readXhrJsonlText } from './jsonl-response.js'
-import type { SyncSource } from './sync-source.js'
+import { loadEntriesFromPath } from './shard-fetch.js'
+import type { FetchRemoteEntriesOptions, SyncSource } from './sync-source.js'
 // 复用 githubSyncDiff.ts 的纯解析函数与类型（零依赖纯模块，可在 Node 测试环境直接运行）
 
 /** 文件读取超时（毫秒） */
@@ -169,11 +169,18 @@ export class LocalFileSyncSource implements SyncSource {
   /**
    * 获取远程条目（读取本地文件并解析为 JSONL）
    *
+   * 与远程源共用 `shardFetch.loadEntriesFromPath`：路径指向清单时按 `neededFields`
+   * 选片读取同目录下的分片文件后按行拼接；指向旧单片时直接解析。
+   *
    * @param signal 可选的 AbortSignal，用于取消请求
+   * @param options 取数选项（分片模式下按表头选片）
    * @returns 解析后的远程条目数组
    * @throws 文件路径未配置、文件读取失败、解析失败时抛出 Error
    */
-  async fetchRemoteEntries(signal?: AbortSignal): Promise<GithubRemoteEntry[]> {
+  async fetchRemoteEntries(
+    signal?: AbortSignal,
+    options?: FetchRemoteEntriesOptions,
+  ): Promise<GithubRemoteEntry[]> {
     // 1. 在发起请求前检查 signal.aborted，支持取消
     if (signal?.aborted) {
       throw new Error('请求被取消')
@@ -184,36 +191,23 @@ export class LocalFileSyncSource implements SyncSource {
       throw new Error('本地文件路径未配置，请在面板的"文件路径"字段填写或选择文件')
     }
 
-    // 2. 读取文件内容
-    const content = await readLocalFileContent(filePath)
+    // 2. 读取内容（清单 + 各分片，由 loadEntriesFromPath 编排）
+    bgmLog(LOG_LEVELS.INFO, `[localFileSync] 开始读取: ${filePath}`)
+    const result = await loadEntriesFromPath({
+      path: filePath,
+      fetchText: readLocalFileContent,
+      neededFields: options?.neededFields,
+      manualShards: getManualShards(),
+      signal,
+      logTag: 'localFileSync',
+    })
 
-    // 3. 读取完成后、解析前再次检查 signal.aborted
+    // 3. 读取完成后、返回前再次检查 signal.aborted
     if (signal?.aborted) {
       throw new Error('请求被取消')
     }
 
-    // 4. 复用 parseJsonl 解析内容（与 GitHub/GitLab/Gitee 一致）
-    bgmLog(LOG_LEVELS.INFO, `[localFileSync] 开始解析文件内容: ${filePath}`)
-    const { entries, errors } = parseJsonl(content)
-
-    if (entries.length === 0 && errors.length > 0) {
-      throw new Error(
-        `JSONL 解析失败：${String(errors.length)} 行全部非法。` +
-          `首行错误（第 ${String(errors[0]?.line ?? '')} 行）：${errors[0]?.reason ?? ''}`,
-      )
-    }
-
-    if (errors.length > 0) {
-      bgmLog(
-        LOG_LEVELS.WARN,
-        `[localFileSync] JSONL 解析完成：${String(entries.length)} 条合法，${String(errors.length)} 行非法（已跳过）。` +
-          `首行错误（第 ${String(errors[0]?.line ?? '')} 行）：${errors[0]?.reason ?? ''}`,
-      )
-    } else {
-      bgmLog(LOG_LEVELS.INFO, `[localFileSync] 解析成功：${String(entries.length)} 条记录`)
-    }
-
-    return entries
+    return result.entries
   }
 
   /**

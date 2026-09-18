@@ -19,7 +19,7 @@
 | v3.5 | 2026-08-28 | 收藏回写空表自动填充：工作表为空时，经用户确认后自动写入标准表头并用 Bangumi 账号收藏条目填充 Excel，再执行标记；恢复缺失的 `css/panel-theme.css` 源文件                                                                                                                                                                                                                                                                    |
 | v3.6 | 2026-08-30 | 设置面板重构：顶栏+侧边功能导航+主区布局、滚动高亮、导航仅图标模式（`bgm_nav_icons_only`）；新增外观主题（`bgm_theme`，dark/light/system，`ts/tools/theme.ts`）与同步偏好扩展（`bgm_list_type`/`bgm_time_filter`/`bgm_refresh_interval`）；修复 `bgm:modulesReady` 派发时序与导航 tooltip 裁剪                                                                                                                              |
 | v3.7 | 2026-09-10 | 分层治理（P1-5）：新增依赖反转桥 `ts/core/ui-bridge.ts`（`NotifyApi`/`SyncProgressApi`/`SyncRunner` + 未注册降级实现），`tools/`、`sync/` 的 5 处反向依赖改为依赖接口；`buildSyncConfig`/`SyncConfigSummary` 下沉 `ts/sync/sync-config-summary.ts`、`SyncProgressStats` 下沉 `ts/core/types.ts`；`core/crypto.ts` 正名 `core/token-payload.ts`；新增导入图门禁 `npm run check:cycles`（区分运行时边/类型边、致命环/良性环） |
-| v3.8 | 2026-09-15 | COM 往返性能治理：WPS 的 `Application`/`Workbook`/`Worksheet`/`Range` 均为**跨进程 COM 代理**，每次属性读取都是一次进程间往返；把 6 文件 / 11 处「循环条件里读 COM 属性」（`for (…; i <= sheets.Count; …)` 每轮重新求值，把 N 行扫描放大成 **N+1 次往返**）提成循环外单次读取；新增第 8 道门禁 `npm run check:com-in-loop`（AST 检查，非正则），并配运行时「往返次数」回归断言 |
+| v3.8 | 2026-09-15 | COM 往返性能治理：WPS 的 `Application`/`Workbook`/`Worksheet`/`Range` 均为**跨进程 COM 代理**，每次属性读取都是一次进程间往返；把 6 文件 / 11 处「循环条件里读 COM 属性」（`for (…; i <= sheets.Count; …)` 每轮重新求值，把 N 行扫描放大成 **N+1 次往返**）提成循环外单次读取；新增第 8 道门禁 `npm run check:com-in-loop`（AST 检查，非正则），并配运行时「往返次数」回归断言                                              |
 
 ## 一、架构概览
 
@@ -294,18 +294,21 @@ ts/index.ts (thin barrel — 仅 re-export)
 #### `github-config.ts` — 配置存储中心
 
 - **PluginStorage 键清单**（详见第三章）
-- **默认配置**: `DEFAULT_GITHUB_CONFIG = { owner: 'awujiana', repo: 'Bangumi-Archive-Anime-Excel', branch: 'main', path: 'data/bangumi.jsonlines.gz', sourceType: 'github' }`
+- **默认配置**: `DEFAULT_GITHUB_CONFIG = { owner: 'awujiana', repo: 'Bangumi-Archive-Anime-Excel', branch: 'main', path: 'data/anime.manifest.json', sourceType: 'github' }`（`path` 指向**分片清单**，不是数据文件本身）
 - **同步策略** (`SyncStrategy`): 'add-update' | 'add-only' | 'update-only' | 'mirror' | 'force-overwrite'
 - **同步源类型** (`SyncSourceType`): 'github' | 'gitlab' | 'gitee' | 'local' | 'gist'
 - **配置完整性校验**: `isGithubConfigComplete()` 检查 owner/repo/path 非空
 - **Gist 配置校验**: `isGistConfigured()` 检查 gistId 非空（独立于 GitHub 配置）
-- **Raw URL 构造**: `buildRawUrl()` → `https://raw.githubusercontent.com/{owner}/{repo}/{branch}/{path}`
+- **Raw URL 构造**: `buildRawUrl(relativePath?)` → `https://raw.githubusercontent.com/{owner}/{repo}/{branch}/{path}`；
+  传入相对路径时覆盖配置里的 `path`，供分片模式下逐片取数使用
+- **分片选择**: `getManualShards()` / `setManualShards()` 读写用户手动勾选的分片（存储键 `github_sync_shards`，空数组 = 按表头自动选片）
 - **首次读取自动填充**: 当所有关键字段为空时，自动写入默认配置
 
 #### `github-sync.ts` — GitHub 数据同步
 
 - **`syncFromGithub()`**: GitHub 专用同步入口
-- **`fetchGithubJson()`**: 下载远程 JSON/JSONL 文件
+- **`fetchGithubText(relativePath, signal?)`**: 按仓库内相对路径取一次原始文本（gzip 由 `readXhrJsonlText` 按魔数解压）
+- **`fetchGithubJson(signal?, neededFields?)`**: 委托 `shard-fetch.loadEntriesFromPath` 完成「清单 → 选片 → 逐片取文本 → 按行拼接」
 - **`readLocalEntriesForSync()`**: 读取本地 Excel 条目
 - **`applyDiffToSheet()`**: 将差异应用到工作表
 - **`applyConflictResolutions()`**: 应用用户冲突解决决策
@@ -333,9 +336,9 @@ ts/index.ts (thin barrel — 仅 re-export)
 
 #### `jsonl-response.ts` — 数据源响应解码（gzip 支持）
 
-- **背景**: 数据仓库的 `data/bangumi.jsonlines.gz` 是 gzip 压缩的「表头 + 值数组」JSONL。
-  明文 55.83 MiB 会触发 GitHub 单文件 50 MB 警告（`GH001`），且 raw CDN 对该文件**不做**透明压缩，
-  客户端每次同步都要拉满；压成 gzip 后为 20.86 MiB（−63%），因此解压必须在客户端完成。
+- **背景**: 数据仓库的数据文件是 gzip 压缩的「表头 + 值数组」JSONL，2026-09-18 起按字段类别切成 6 片。
+  明文单片 55.83 MiB 会触发 GitHub 单文件 50 MB 警告（`GH001`），且 raw CDN 对该文件**不做**透明压缩，
+  客户端每次同步都要拉满；分片 + gzip 后合计 21.11 MiB，且按表头选片后典型只需拉几片，因此解压必须在客户端完成。
 - **`isGzipBytes()`**: 按魔数 `1f 8b` 判断，**不依赖扩展名** —— 明文数据源、CDN 已按
   `Content-Encoding: gzip` 透明解压过的响应、以及真正的 gzip 响应三种情况都能正确处理
 - **`gunzipBytes()`**: 用宿主原生 `DecompressionStream('gzip')` 解压，零第三方依赖；
@@ -348,7 +351,33 @@ ts/index.ts (thin barrel — 仅 re-export)
 - **不支持 gzip 的源**: `gist-sync.ts` 走 Gist REST API 的 `files[*].content` 文本字段，
   GitHub 对二进制文件会省略 content，故 Gist 源只能读明文 JSONL
 - **旧配置自愈**: `github-config.ts` 的 `LEGACY_PATH_MIGRATIONS` 在读取配置时把历史的
-  `data/bangumi.jsonlines` 一次性迁移为 `data/bangumi.jsonlines.gz`，避免老配置 404
+  `data/bangumi.jsonlines` 与 `data/bangumi.jsonlines.gz` 都改写为 `data/anime.manifest.json`，避免老配置 404。
+  **旧单片本身已不再兼容**：路径不是 `.json` 时 `shard-fetch.loadEntriesFromPath` 直接给出明确报错。
+
+#### `shard-manifest.ts` — 清单解析 / 选片 / 拼接（纯函数）
+
+- **零项目依赖**（只用 `github-sync-diff.ts` 的类型与映射表），可在 Node 测试环境直接运行
+- **`parseShardManifest()`**: 解析 `anime.manifest.json`；结构非法/版本不认识/无分片一律返回 `null`，不抛异常
+- **`isManifestPath()`**: 只做前置校验（认 `.json` 结尾）—— 指向旧单片时直接给明确报错，而不是拿二进制去 `JSON.parse`
+- **`resolveSiblingPath()`**: 清单里的 `file` 只写文件名，按**清单所在目录**拼出仓库内路径（`data/` 改名不用改插件）
+- **`selectShards(manifest, neededFields?, manual?)`**: 选片规则 ——
+  必选片（含 `updatedAt`/`name` 锚点的片，即 `base`）永远选中；`manual` 非空时以它为准；
+  `neededFields === undefined`（读不到表头）→ **全选**；空集合 → 只下必选片
+- **连接键陷阱**: 「出现次数 > 1 的字段即连接键」（当前只有 `sid`）必须排除出字段匹配 ——
+  否则每片都含 `sid`，任何非空 `neededFields` 都会把全部片选中，选片彻底失效
+- **`neededFieldsForColumns()`**: 按 `EXTENDED_FIELD_MAP` + 列名别名反查需要的字段；
+  另补 `话数`（写「集数」列）与 `meta_tags`（写「标签/分级」列），它们不在映射表里
+- **`parseShardText()` / `joinShardRows()`**: 单片解析与按行拼接；拼接时校验行数一致、除 `sid` 外字段不重复、每行长度与表头一致
+
+#### `shard-fetch.ts` — 分片下载编排
+
+- **`loadEntriesFromPath({ path, fetchText, neededFields, manualShards, signal, logTag })`**:
+  清单 → 选片 → 逐片取文本 → 拼接 → 校验 `sid`，返回 `{ entries, shards, updatedAt }`
+- **四个同步源共用本模块**，只替换 `fetchText(仓库内相对路径)` 回调（`github-sync` / `gitee-sync` / `gitlab-sync` / `local-file-sync`）
+- **失败面全部包成可读错误**：路径不是清单 / 清单读取失败 / 清单格式非法 / 某片读取失败 / 分片表头非法 / 拼接失败 / 拼接后无合法记录
+- **`collectNeededFieldsFromSheet()`**: 读当前表头推导字段，**只读**（不调 `ensureSheetHeaders` ——
+  下载阶段动表会闪烁且失败留副作用）；读不到工作表或读不到任何列时返回 `undefined`，调用方按**全量下载**处理
+  （空表本来就要写全部标准列，全量下载正是正确行为）
 
 #### `sync-source-registry.ts` — 多源同步注册表
 
@@ -704,15 +733,16 @@ ts/index.ts (thin barrel — 仅 re-export)
 
 #### GitHub / 远程同步配置
 
-| 键名                      | 类型   | 默认值                          | 说明              |
-| ------------------------- | ------ | ------------------------------- | ----------------- |
-| `github_sync_owner`       | string | `'awujiana'`                    | GitHub 仓库所有者 |
-| `github_sync_repo`        | string | `'Bangumi-Archive-Anime-Excel'` | GitHub 仓库名     |
-| `github_sync_branch`      | string | `'main'`                        | 分支名            |
-| `github_sync_path`        | string | `'data/bangumi.jsonlines.gz'`   | JSONL 文件路径    |
-| `github_sync_strategy`    | string | `'add-update'`                  | 同步策略          |
-| `github_sync_source_type` | string | `'github'`                      | 同步源类型        |
-| `github_sync_gist_id`     | string | `''` (空)                       | GitHub Gist ID    |
+| 键名                      | 类型   | 默认值                          | 说明                                            |
+| ------------------------- | ------ | ------------------------------- | ----------------------------------------------- |
+| `github_sync_owner`       | string | `'awujiana'`                    | GitHub 仓库所有者                               |
+| `github_sync_repo`        | string | `'Bangumi-Archive-Anime-Excel'` | GitHub 仓库名                                   |
+| `github_sync_branch`      | string | `'main'`                        | 分支名                                          |
+| `github_sync_path`        | string | `'data/anime.manifest.json'`    | 分片清单路径                                    |
+| `github_sync_shards`      | string | `''` (空)                       | 手动指定的分片（逗号分隔）；空 = 按表头自动选片 |
+| `github_sync_strategy`    | string | `'add-update'`                  | 同步策略                                        |
+| `github_sync_source_type` | string | `'github'`                      | 同步源类型                                      |
+| `github_sync_gist_id`     | string | `''` (空)                       | GitHub Gist ID                                  |
 
 #### UI 与通信配置
 
@@ -1181,16 +1211,16 @@ npx vitest
 
 **`npm run gate` 八道关**（任一失败即中断）：
 
-| # | 阶段 | 作用 |
-| ---: | --- | --- |
-| 1 | `lint:check` | `eslint ts tests`（`scripts/**` 不在 lint 范围） |
-| 2 | `check:dompurify-version` | 锁定 DOMPurify 版本，防静默升级引入 XSS 面 |
-| 3 | `check:cycles` | 导入图：分层反向依赖与「运行时环 + 顶层读取」的致命环 |
-| 4 | `check:ribbon-buttons` | `ribbon.xml` 按钮与 TS 分发表一致性 |
-| 5 | `check:nav-order` | `PAGE_MODULES` 与四个页面 HTML 结构、跨页同步接入一致性 |
-| 6 | `check:com-in-loop` | **AST** 查「循环条件里读 COM 属性」（跨进程往返放大器），`// com-loop-ok: <理由>` 可豁免 |
-| 7 | `typecheck:tests` | `tests/` 目录类型检查 |
-| 8 | `test` | `vitest run` |
+|   # | 阶段                      | 作用                                                                                     |
+| --: | ------------------------- | ---------------------------------------------------------------------------------------- |
+|   1 | `lint:check`              | `eslint ts tests`（`scripts/**` 不在 lint 范围）                                         |
+|   2 | `check:dompurify-version` | 锁定 DOMPurify 版本，防静默升级引入 XSS 面                                               |
+|   3 | `check:cycles`            | 导入图：分层反向依赖与「运行时环 + 顶层读取」的致命环                                    |
+|   4 | `check:ribbon-buttons`    | `ribbon.xml` 按钮与 TS 分发表一致性                                                      |
+|   5 | `check:nav-order`         | `PAGE_MODULES` 与四个页面 HTML 结构、跨页同步接入一致性                                  |
+|   6 | `check:com-in-loop`       | **AST** 查「循环条件里读 COM 属性」（跨进程往返放大器），`// com-loop-ok: <理由>` 可豁免 |
+|   7 | `typecheck:tests`         | `tests/` 目录类型检查                                                                    |
+|   8 | `test`                    | `vitest run`                                                                             |
 
 > **覆盖率复核**必须带 `--config vitest.cov.config.ts`（`clean:false`）并设
 > `CODEBUDDY_SAFE_DELETE_BULK_THRESHOLD=1000000`，且 `--coverage.reporter=json-summary`
