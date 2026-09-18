@@ -239,6 +239,9 @@ export const SYNC_STATUS = {
 export const COLUMN_RULES: [RegExp, string][] = [
   // ── URL / ID ──
   [/bangumi.*url|bgm.*url|subject.*url|url.*bgm/i, 'Bangumi_URL'],
+  // 「关联条目ID」必须排在「关联的动漫ID」之前：两者是独立列，
+  // 且前者的正则不会命中后者的表头，顺序只为可读性
+  [/关联条目ID|关联条目\s*id/i, '关联条目ID'],
   [/关联的动漫ID|关联动漫|关联id|related.*id/i, '关联的动漫ID'],
 
   // ── 状态/日期 ──
@@ -401,14 +404,20 @@ export const HEADER_KEYWORDS = [
   '影厅',
   '电影票存根',
   '在线播放平台',
+  '关联条目ID',
   '关联的动漫ID',
 ]
 
 /**
- * 标准表头列表（37 列）
+ * 标准表头列表（42 列）
  *
  * 当工作表为空（无表头行）时，按此顺序在第 1 行写入表头。
- * 列顺序与用户模板一致，getColumnMap() 会通过 COLUMN_RULES 自动映射。
+ * 列顺序与用户模板一致（= Archive/config/template_mapping.json 的列序），
+ * getColumnMap() 会通过 COLUMN_RULES 自动映射。
+ *
+ * 2026-09-18 补齐：此前漏了 `播出方式` / `在线播放平台` 两列（HEADER_KEYWORDS
+ * 里一直有它们、COLUMN_RULES 也能识别），使本列表与用户模板对不上；同批新增
+ * `关联条目ID`（与 `关联的动漫ID` 拆分，见 Archive 侧 step06/step09）。
  *
  * @constant
  */
@@ -419,6 +428,7 @@ export const STANDARD_HEADERS: readonly string[] = [
   '开播季度',
   '开播日期',
   '完播日',
+  '播出方式',
   '类别',
   '原作标签',
   '制作公司',
@@ -451,6 +461,8 @@ export const STANDARD_HEADERS: readonly string[] = [
   '演出',
   '原案',
   '系列构成',
+  '在线播放平台',
+  '关联条目ID',
   '关联的动漫ID',
 ] as const
 

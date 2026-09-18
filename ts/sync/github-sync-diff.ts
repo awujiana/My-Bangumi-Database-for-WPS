@@ -65,7 +65,9 @@ export interface GithubRemoteEntry {
   系列构成?: string
   /** 在线播放平台（infobox.在线播放平台） */
   在线播放平台?: string
-  /** 关联的动漫ID（subject-relations） */
+  /** 关联条目ID（subject-relations，全部关联条目，不分被关联条目的类型） */
+  关联条目ID?: string
+  /** 关联的动漫ID（subject-relations，只含 type=2 动画的那部分关联条目） */
   关联的动漫ID?: string
   // ── 全量保真字段（随 dump 全量下发；其中 score/rank 已映射到 Excel 列）──
   /** 原始名（dump.name，与 name 并存，避免原始名丢失） */
@@ -136,6 +138,7 @@ export const EXTENDED_FIELD_MAP: readonly (readonly [string, string])[] = [
   ['原案', '原案'],
   ['系列构成', '系列构成'],
   ['在线播放平台', '在线播放平台'],
+  ['关联条目ID', '关联条目ID'],
   ['关联的动漫ID', '关联的动漫ID'],
   // stats 片：评分与排名（2026-09-18 起支持写入 Excel「评分」「排名」列）
   ['score', '评分'],

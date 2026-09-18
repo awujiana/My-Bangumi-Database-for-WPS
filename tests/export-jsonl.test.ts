@@ -63,7 +63,11 @@ vi.mock('../ts/sync/pure-utilities.js', () => ({
   extractSubjectId: mockExtractSubjectId,
 }))
 
-import { buildJsonlFromSheet, exportSheetToJsonlFile } from '../ts/sync/export-jsonl.js'
+import {
+  buildJsonlFromSheet,
+  exportSheetToJsonlFile,
+  EXPORT_FIELDS,
+} from '../ts/sync/export-jsonl.js'
 
 function createMockWorksheet(
   options: {
@@ -734,5 +738,75 @@ describe('exportSheetToJsonlFile', () => {
     } finally {
       vi.useRealTimers()
     }
+  })
+})
+
+// --------------------------------------------------------------------------
+// 导出字段契约
+// --------------------------------------------------------------------------
+
+/** 字段名排序比较器（`Array.prototype.sort()` 的默认字符串序对中文列名不稳定） */
+const byName = (a: string, b: string): number => a.localeCompare(b)
+
+describe('导出字段契约', () => {
+  /**
+   * 导出表头必须与数据仓库分片的字段并集完全一致，否则导出的 JSONL 不能
+   * 直接当作「本地文件同步」的数据源（缺字段 → 同步后该列永远为空）。
+   *
+   * 期望值来源：Archive/scripts/step09_build_jsonl.py 的 SHARD_DEFS 并集。
+   * 这里**刻意写成硬编码列表**：一旦上游增删字段，本测试会失败，逼着人显式
+   * 确认「插件侧要不要跟着改」，而不是让两边静默漂移。
+   */
+  const SHARD_FIELDS_UNION = [
+    'sid',
+    'name',
+    'name_original',
+    'updatedAt',
+    'date',
+    'meta_tags',
+    'nsfw',
+    '播放结束',
+    '动画制作公司',
+    '话数',
+    '片长',
+    '制片国家',
+    '语言',
+    '类型',
+    '导演',
+    '音乐',
+    '人物设定',
+    '机械设定',
+    '原作',
+    '脚本',
+    '分镜',
+    '演出',
+    '原案',
+    '系列构成',
+    '在线播放平台',
+    '别名',
+    '关联条目ID',
+    '关联的动漫ID',
+    'platform',
+    'series',
+    'score',
+    'rank',
+    'score_details',
+    'favorite',
+    'tags',
+    'summary',
+    'infobox',
+  ] as const
+
+  it('EXPORT_FIELDS 必须等于分片字段并集', () => {
+    expect([...EXPORT_FIELDS].sort(byName)).toEqual([...SHARD_FIELDS_UNION].sort(byName))
+  })
+
+  it('不得导出 type（数据仓库已用文件名 anime 表达 type=2）', () => {
+    expect(EXPORT_FIELDS).not.toContain('type')
+  })
+
+  it('关联两列必须都在导出字段里', () => {
+    expect(EXPORT_FIELDS).toContain('关联条目ID')
+    expect(EXPORT_FIELDS).toContain('关联的动漫ID')
   })
 })

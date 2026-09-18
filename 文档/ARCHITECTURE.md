@@ -236,7 +236,7 @@ ts/index.ts (thin barrel — 仅 re-export)
 - **URL 匹配模式** (`URL_PATTERNS`): 支持 bgm.tv, bangumi.tv, chii.in 三种域名
 - **列规则** (`COLUMN_RULES`): 37 条正则→标准字段映射规则
 - **表头关键字** (`HEADER_KEYWORDS`): 52 个关键字用于自动检测表头行
-- **标准表头** (`STANDARD_HEADERS`): 37 列标准模板列序
+- **标准表头** (`STANDARD_HEADERS`): 42 列标准模板列序
 - **同步记录表列** (`SYNC_RECORD_COLUMNS`): 12 列 (SID/同步时间/名称/URL/条目类型/来源/次数/内容/状态/收藏状态/备注/数据指纹)
 - **Token 配置** (`TOKEN_CONFIG`): VERSION='1'（Token 明文存储版本号）
 
@@ -338,7 +338,7 @@ ts/index.ts (thin barrel — 仅 re-export)
 
 - **背景**: 数据仓库的数据文件是 gzip 压缩的「表头 + 值数组」JSONL，2026-09-18 起按字段类别切成 6 片。
   明文单片 55.83 MiB 会触发 GitHub 单文件 50 MB 警告（`GH001`），且 raw CDN 对该文件**不做**透明压缩，
-  客户端每次同步都要拉满；分片 + gzip 后合计 21.11 MiB，且按表头选片后典型只需拉几片，因此解压必须在客户端完成。
+  客户端每次同步都要拉满；分片 + gzip 后合计 21.23 MiB，且按表头选片后典型只需拉几片，因此解压必须在客户端完成。
 - **`isGzipBytes()`**: 按魔数 `1f 8b` 判断，**不依赖扩展名** —— 明文数据源、CDN 已按
   `Content-Encoding: gzip` 透明解压过的响应、以及真正的 gzip 响应三种情况都能正确处理
 - **`gunzipBytes()`**: 用宿主原生 `DecompressionStream('gzip')` 解压，零第三方依赖；

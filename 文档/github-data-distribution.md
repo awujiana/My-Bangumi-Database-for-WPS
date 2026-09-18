@@ -37,7 +37,7 @@
 | 表头读不到（空表 / 无工作表） | **全量下载 6 片**（保守兜底，避免写入时缺列）                                        |
 | 用户在设置面板手动勾选分片    | 以勾选结果为准，但 `base` 固定必选不可取消                                           |
 
-> 实测：Excel 实际用到的 27 列压完只有 **3.37 MiB**，相对全量 21 MB **减少约 84%** 下载量。
+> 实测：Excel 实际用到的 28 列压完只有 **3.42 MiB**，相对全量 21 MB **减少约 84%** 下载量。
 > `infobox`（8.4 MB）+ `summary`（7.8 MB）两片就占了全部体积的 77%。
 
 ### 缓存机制说明
@@ -68,7 +68,7 @@
 
 ```
 Bangumi-Archive-Anime-Excel/
-├── data/                        ← BGM 插件数据源（6 片 + 清单，合计 ~21 MB / 解压 57.35 MiB，30836 条）
+├── data/                        ← BGM 插件数据源（6 片 + 清单，合计 ~21 MB / 解压 57.84 MiB，30889 条）
 │   ├── anime.manifest.json      ← 清单（插件先读它，再决定下载哪些片）
 │   ├── anime.base.jsonlines.gz
 │   ├── anime.meta.jsonlines.gz
@@ -119,7 +119,7 @@ https://raw.githubusercontent.com/awujiana/Bangumi-Archive-Anime-Excel/main/data
   "subjectType": 2,
   "typeLabel": "anime",
   "updatedAt": "2026-09-08",
-  "recordCount": 30836,
+  "recordCount": 30889,
   "shards": [
     {
       "name": "base",
@@ -138,7 +138,7 @@ https://raw.githubusercontent.com/awujiana/Bangumi-Archive-Anime-Excel/main/data
 | ----------- | ------------------------------ | ------ | ------- | -------------------------------------------------------------------------- |
 | `base`      | `anime.base.jsonlines.gz`      | 7      | ~1.1 MB | `sid`、`name`、`name_original`、`updatedAt`、`date`、`meta_tags`、`nsfw`   |
 | `meta`      | `anime.meta.jsonlines.gz`      | 20     | ~2.0 MB | infobox 解析出的 19 个中文列                                               |
-| `relations` | `anime.relations.jsonlines.gz` | 2      | ~0.3 MB | `关联的动漫ID`                                                             |
+| `relations` | `anime.relations.jsonlines.gz` | 3      | ~0.4 MB | `关联条目ID`（全部关联条目）、`关联的动漫ID`（只含 type=2 动画）           |
 | `stats`     | `anime.stats.jsonlines.gz`     | 8      | ~1.6 MB | `platform`、`series`、`score`、`rank`、`score_details`、`favorite`、`tags` |
 | `summary`   | `anime.summary.jsonlines.gz`   | 2      | ~7.8 MB | `summary`（简介）                                                          |
 | `infobox`   | `anime.infobox.jsonlines.gz`   | 2      | ~8.4 MB | `infobox`（wiki 原文）                                                     |
@@ -174,7 +174,7 @@ https://raw.githubusercontent.com/awujiana/Bangumi-Archive-Anime-Excel/main/data
 
 ### 字段定义
 
-输出字段共 **36 个**（不含 `type`），按分片归为 6 组；`sid` 为唯一必填主键，其余字段均为可选。
+输出字段共 **37 个**（不含 `type`），按分片归为 6 组；`sid` 为唯一必填主键，其余字段均为可选。
 BGM 插件 `GithubRemoteEntry` 接口（`ts/sync/github-sync-diff.ts`）识别全部字段。
 
 **基础字段**（4 个，在 `base` 片）：
@@ -218,11 +218,12 @@ BGM 插件 `GithubRemoteEntry` 接口（`ts/sync/github-sync-diff.ts`）识别�
 | `系列构成`     | `系列构成`     | 同名映射                              |
 | `在线播放平台` | `在线播放平台` | 同名映射                              |
 
-**关联字段**（1 个，在 `relations` 片）：
+**关联字段**（2 个，在 `relations` 片）：
 
-| 字段           | Excel 列名     | 说明                                |
-| -------------- | -------------- | ----------------------------------- |
-| `关联的动漫ID` | `关联的动漫ID` | 关联 subject_id 列表，`' \| '` 分隔 |
+| 字段           | Excel 列名     | 说明                                                                |
+| -------------- | -------------- | ------------------------------------------------------------------- |
+| `关联条目ID`   | `关联条目ID`   | **全部**关联 subject_id 列表（不分被关联条目的类型），`' \| '` 分隔 |
+| `关联的动漫ID` | `关联的动漫ID` | 只保留其中属于动画（type=2）的 subject_id，恒为 `关联条目ID` 的子集 |
 
 **全量保真扩展**（9 个，`stats` 片 7 个 + `summary`/`infobox` 各 1 个，2026-09-13 起新增）：
 
@@ -311,7 +312,7 @@ git push origin main
 
 | 特性      | 分片 JSONL 模式（当前启用）             | Release Asset 模式（预留）   |
 | --------- | --------------------------------------- | ---------------------------- |
-| 适用场景  | 分片后合计 < 100 MB（当前 21.11 MiB）   | 大文件（> 100 MB）           |
+| 适用场景  | 分片后合计 < 100 MB（当前 21.23 MiB）   | 大文件（> 100 MB）           |
 | path 配置 | `data/anime.manifest.json`              | `latest.json`                |
 | 数据格式  | 6 片 gzip 压缩的 JSONL + 一份 JSON 清单 | zip 压缩包（内含 JSONL）     |
 | 按需下载  | 支持（按表头选片，最多省 ~84%）         | 不支持（整包下载）           |

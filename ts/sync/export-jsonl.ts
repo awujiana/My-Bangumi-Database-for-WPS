@@ -29,7 +29,7 @@ import { extractSubjectId } from './pure-utilities.js'
  * （上游由 Archive/scripts/step09_build_jsonl.py 的 SHARD_DEFS 派生），
  * 这样导出的文件可以直接当作「本地文件同步」的数据源使用。
  */
-const EXPORT_FIELDS = [
+export const EXPORT_FIELDS = [
   'sid',
   'name',
   'updatedAt',
@@ -54,6 +54,7 @@ const EXPORT_FIELDS = [
   '原案',
   '系列构成',
   '在线播放平台',
+  '关联条目ID',
   '关联的动漫ID',
   // 全量保真字段：Excel 表没有对应列，导出时统一补默认值，
   // 仅用于保证表头与远程分片的字段并集完全一致。
@@ -221,6 +222,7 @@ export function buildJsonlFromSheet(): string {
           ['原案', '原案'],
           ['系列构成', '系列构成'],
           ['在线播放平台', '在线播放平台'],
+          ['关联条目ID', '关联条目ID'],
           ['关联的动漫ID', '关联的动漫ID'],
         ] as const
 

@@ -6,7 +6,7 @@
  *
  *              - `anime.base.jsonlines.gz`       7 列   sid/name/name_original/updatedAt/date/meta_tags/nsfw
  *              - `anime.meta.jsonlines.gz`      20 列   infobox 解析出的 19 个中文列
- *              - `anime.relations.jsonlines.gz`  2 列   关联的动漫ID
+ *              - `anime.relations.jsonlines.gz`  3 列   关联条目ID（全部）/ 关联的动漫ID（只含 type=2）
  *              - `anime.stats.jsonlines.gz`      8 列   platform/series/score/rank/score_details/favorite/tags
  *              - `anime.summary.jsonlines.gz`    2 列   简介
  *              - `anime.infobox.jsonlines.gz`    2 列   infobox 原文
