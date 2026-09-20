@@ -587,6 +587,24 @@ export function showSyncResultDialog(options: SyncResultDialogOptions): void {
       </div>`
       : ''
 
+  // 缺列提示：远程有数据、本地却没有对应表头的字段。
+  // 写入侧 safeSet 遇缺失列会静默 return，不提示的话用户只会看到「同步成功但字段没进来」。
+  // 这里把字段名显式列出来，由用户自行添加表头后重新同步（复用既有 meta-bar 样式，未新增 CSS）。
+  const missingColumns = result.missingColumns ?? []
+  const missingHtml =
+    missingColumns.length > 0
+      ? `
+      <div class="bgm-result-section">
+        <div class="bgm-result-section-title">⚠️ 未同步字段（本地缺少表头）</div>
+        <div class="bgm-result-date-label">以下字段远程有数据，但你的表里没有对应列，本次已跳过。如需同步，请先添加这些表头再重新同步：</div>
+        <div class="bgm-meta-bar">
+          ${missingColumns
+            .map((name) => `<span class="bgm-meta-tag bgm-meta-tag-warn">${escapeHtml(name)}</span>`)
+            .join('')}
+        </div>
+      </div>`
+      : ''
+
   const content = `
     <div class="bgm-modal-content">
       <div class="bgm-dialog-header">
@@ -599,6 +617,7 @@ export function showSyncResultDialog(options: SyncResultDialogOptions): void {
           ${chartSection}
         </div>
         ${dateHtml}
+        ${missingHtml}
         <div class="bgm-result-section">
           <div class="bgm-result-section-title">📋 操作</div>
           <div class="bgm-result-actions">

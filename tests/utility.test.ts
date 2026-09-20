@@ -337,12 +337,30 @@ describe('getColumnMap', () => {
     expect(colMap.has('序列号')).toBe(true)
     expect(colMap.has('名称')).toBe(true)
     expect(colMap.has('是否看完')).toBe(true)
-    // COLUMN_RULES 中评分对应的 key 是 "打分"（见 constants.ts:254）
-    expect(colMap.has('打分')).toBe(true)
+    // 「评分」独立成 key（Bangumi 站评分），与个人主观「打分」列区分；
+    // 依赖 constants.ts 中「评分」规则排在 /打分|评分|分数/ 之前，否则会被吞成「打分」
+    expect(colMap.has('评分')).toBe(true)
     expect(colMap.get('序列号')).toBe(1)
     expect(colMap.get('名称')).toBe(2)
     expect(colMap.get('是否看完')).toBe(4)
-    expect(colMap.get('打分')).toBe(5)
+    expect(colMap.get('评分')).toBe(5)
+  })
+
+  it('「打分」与「评分」是相互独立的两个 key，互不抢占', () => {
+    const ws = createMockWorksheet({ name: 'Sheet-GCM-1b' })
+    mockState.getCellValue.mockImplementation((_ws: unknown, _row: number, col: number) => {
+      const headers: Record<number, string> = {
+        1: '打分',
+        2: '评分',
+        3: '排名',
+      }
+      return headers[col] ?? ''
+    })
+    const colMap = getColumnMap(ws as never, 1)
+
+    expect(colMap.get('打分')).toBe(1)
+    expect(colMap.get('评分')).toBe(2)
+    expect(colMap.get('排名')).toBe(3)
   })
 
   it('未匹配到序列号列时使用第一个非空列作为回退', () => {

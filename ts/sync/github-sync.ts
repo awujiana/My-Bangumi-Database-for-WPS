@@ -46,6 +46,7 @@ import {
   EXTENDED_FIELD_MAP,
   getExcelAliases,
   filterByTime,
+  collectMissingColumns,
 } from './github-sync-diff.js'
 import type {
   ConflictResolution,
@@ -116,6 +117,13 @@ export interface GithubSyncResult {
   failed: number
   /** 新增/更新/删除/失败明细（用于详情表格展示） */
   details?: GithubSyncDetailItem[]
+  /**
+   * 「远程有数据、本地却缺少对应表头」的字段名清单
+   *
+   * 写入时 safeSet 遇缺失列会静默 return，远程数据被无声丢弃；
+   * 这里把这类字段挑出来，由结果弹窗提示用户自行添加对应列。
+   */
+  missingColumns?: string[]
 }
 
 /** HTTP 请求超时（毫秒） */
@@ -1819,6 +1827,23 @@ export async function syncFromGithub(
     result.remoteTotal = effectiveRemoteEntries.length
     // unchanged = 远程总数 - (新增+更新)（delete 不计入 unchanged）
     result.unchanged = Math.max(0, effectiveRemoteEntries.length - addedCount - updateCount)
+
+    // 缺列体检：远程有数据、本地却没有对应表头的字段 → 提示用户自行添加列。
+    // 写入侧 safeSet 遇缺失列直接 return，不体检的话用户只会看到「同步成功但字段没进来」。
+    const sheetForAudit = getDataSheet()
+    if (sheetForAudit) {
+      const auditHeaderRow = findHeaderRow(sheetForAudit) || 1
+      result.missingColumns = collectMissingColumns(
+        effectiveRemoteEntries,
+        getColumnMap(sheetForAudit, auditHeaderRow),
+      )
+      if (result.missingColumns.length > 0) {
+        bgmLog(
+          LOG_LEVELS.WARN,
+          `[githubSync] ${String(result.missingColumns.length)} 个远程字段因本地缺少表头未同步，建议添加列：${result.missingColumns.join('、')}`,
+        )
+      }
+    }
 
     const totalElapsed = Date.now() - syncStartTs
     const totalProcessed = addedCount + updateCount + deletedCount

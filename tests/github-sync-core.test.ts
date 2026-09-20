@@ -160,6 +160,8 @@ vi.mock('../ts/sync/github-sync-diff.js', () => ({
   computeDiff: mockComputeDiff,
   tagsToString: mockTagsToString,
   filterByTime: mockFilterByTime,
+  // 缺列体检：本文件用例关注同步主流程，不关心缺列提示，返回空清单
+  collectMissingColumns: vi.fn((): string[] => []),
   EXTENDED_FIELD_MAP: [
     ['date', '开播日期'],
     ['meta_tags', '标签/分级'],

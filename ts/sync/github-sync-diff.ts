@@ -140,7 +140,15 @@ export const EXTENDED_FIELD_MAP: readonly (readonly [string, string])[] = [
   ['在线播放平台', '在线播放平台'],
   ['关联条目ID', '关联条目ID'],
   ['关联的动漫ID', '关联的动漫ID'],
-  // stats 片：评分与排名（2026-09-18 起支持写入 Excel「评分」「排名」列）
+  // infobox 别名（多值以 " | " 分隔）→ 本地「别名」列
+  // 注意：name_original（原始名）刻意不映射 —— 它与 name 语义重叠，而 name 已由
+  // writeRemoteEntryToRow 走 safeAppend('别名', …) 追加；若再经本表 safeSet 写入
+  // 同一「别名」列，会覆盖刚追加进去的名称值。
+  ['别名', '别名'],
+  // stats 片：站评分与排名 → 独立的「评分」「排名」列（与个人「打分」列语义分离）。
+  // 命中依赖 COLUMN_RULES 里「评分」「排名」两条规则，且必须排在「打分」之前
+  // （否则「评分」被 /打分|评分|分数/ 吞成「打分」，映射恒落空）。
+  // 用户表若无这两列，则计入缺列提示，由用户自行添加。
   ['score', '评分'],
   ['rank', '排名'],
 ] as const
@@ -180,6 +188,96 @@ export function getExcelAliases(jsonlField: string): readonly string[] {
     }
   }
   return result
+}
+
+/** 本地 Bangumi URL 列名（colMap key，由 sid 构造写入，非远程字段） */
+const BANGUMI_URL_COLUMN = 'Bangumi_URL'
+
+/**
+ * 核心字段 → 本地列名（不经过 EXTENDED_FIELD_MAP，写入时有独立逻辑）
+ *
+ * 缺列体检需一并检查这些关键字段，否则「有数据但没列可写」会被漏报。
+ */
+const CORE_FIELD_COLUMNS: readonly (readonly [string, string])[] = [
+  ['name', '名称'],
+  ['meta_tags', '标签/分级'],
+  ['话数', '集数'],
+] as const
+
+/**
+ * 判断远程字段是否携带有效数据
+ *
+ * 空串 / 空数组 / 0 视为无数据（站评分 score、排名 rank 的 0 即「无」，不应催促用户加列）。
+ */
+function hasRemoteValue(value: unknown): boolean {
+  if (value === undefined || value === null) return false
+  if (typeof value === 'string') return value.trim() !== ''
+  if (Array.isArray(value)) return value.length > 0
+  if (typeof value === 'number') return Number.isFinite(value) && value !== 0
+  // 布尔字段（nsfw / series）只要远程给了值就算「有数据」，false 也是有语义的取值
+  return typeof value === 'boolean'
+}
+
+/**
+ * 体检：找出「远程有数据、本地却没有对应表头」的字段
+ *
+ * 背景：写入侧 safeSet 遇到缺失列会直接 return，远程数据被**静默丢弃**，
+ * 用户看到的是「同步成功但某些字段没进来」却无从排查。
+ * 本函数把这类字段挑出来，交给 UI 提示用户自行添加对应表头列。
+ *
+ * 判据（两条同时成立才计入）：
+ * 1. 远程条目中该字段**确有数据**（避免为全空字段骚扰用户加列）；
+ * 2. 本地 colMap 中该字段的**所有候选列名都不存在**（含别名，见 getExcelAliases）。
+ *
+ * @param remotes 本次参与同步的远程条目
+ * @param colMap  本地列映射（getColumnMap 结果）
+ * @returns 需用户自行添加的表头名清单（去重，核心字段在前，其余按 EXTENDED_FIELD_MAP 顺序）
+ */
+export function collectMissingColumns(
+  remotes: readonly GithubRemoteEntry[],
+  colMap: ReadonlyMap<string, number>,
+): string[] {
+  // 1. 汇总远程条目中「有数据」的字段
+  const fieldsWithData = new Set<string>()
+  for (const remote of remotes) {
+    const record = remote as unknown as Record<string, unknown>
+    for (const [field, value] of Object.entries(record)) {
+      if (hasRemoteValue(value)) {
+        fieldsWithData.add(field)
+      }
+    }
+  }
+
+  const missing: string[] = []
+  const seen = new Set<string>()
+
+  /** 单字段检查：有数据 + 本地无任一候选列 → 记为缺失 */
+  const checkField = (field: string, candidates: readonly string[], header: string): void => {
+    if (!fieldsWithData.has(field)) return
+    if (seen.has(header)) return
+    const isAnyColumnPresent = candidates.some((name) => colMap.has(name))
+    if (isAnyColumnPresent) return
+    seen.add(header)
+    missing.push(header)
+  }
+
+  // 2. Bangumi URL 列由 sid 构造（远程条目本身不含该字段），
+  //    只要有条目参与同步而本地缺此列，就无法按 SID 定位行（会被整表当作新增）。
+  const isUrlColumnMissing = remotes.length > 0 && !colMap.has(BANGUMI_URL_COLUMN)
+  if (isUrlColumnMissing) {
+    seen.add(BANGUMI_URL_COLUMN)
+    missing.push(BANGUMI_URL_COLUMN)
+  }
+
+  // 3. 核心字段 + 扩展字段
+  for (const [field, header] of CORE_FIELD_COLUMNS) {
+    checkField(field, [header], header)
+  }
+  for (const [field, primary] of EXTENDED_FIELD_MAP) {
+    checkField(field, getExcelAliases(field), primary)
+  }
+
+  return missing
 }
 
 /**
