@@ -179,12 +179,18 @@ npm run gate             # 质量门禁（八关，推荐；提交前必跑）
 npm test                 # 运行全部单元测试（Vitest）
 npm run test:watch       # 监视模式
 npm run test:coverage    # 生成覆盖率报告
+npm run check:guards-reverse   # 反向验证门禁自身（改了 check-*.mjs 后手工跑）
 ```
 
 `npm run gate` 依次执行八道关：`lint:check` → `check:dompurify-version` → `check:cycles`
 → `check:ribbon-buttons` → `check:nav-order` → `check:com-in-loop` → `typecheck:tests` → `test`。
 
-当前基线：**4309 条测试 / 131 文件**，行覆盖率 **99.95%**（详见 [`文档/COVERAGE_BACKLOG.md`](文档/COVERAGE_BACKLOG.md)）。
+`npm run check:guards-reverse` **不在 `gate` 内**：八道关里有 6 道是**源码级断言**，而一条永远为真的
+断言与有效断言外观完全相同 —— 都是绿的。该脚本为这 6 条各注入一个「已知违规」，确认它们真的会红，
+**且失败输出里出现预期片段**（脚本崩了退出码同样非 0），最后逐字节还原。
+**新增源码级断言时必须同时在它的 `CASES` 里补一个变异用例**，否则那条断言只是「看起来在守门」。
+
+当前基线：**4430 条测试 / 133 文件**，行覆盖率 **99.95%**（详见 [`文档/COVERAGE_BACKLOG.md`](文档/COVERAGE_BACKLOG.md)）。
 
 > **真实宿主（WPS / Excel）手工验收**：单元测试覆盖不到「宿主 API 的真实行为 / 真实网络 / 跨 WebView 通信 / 真实大表性能」，
 > 这部分见 [`文档/HOST_ACCEPTANCE_CHECKLIST.md`](文档/HOST_ACCEPTANCE_CHECKLIST.md)（32 项，需在真机逐项执行）。
