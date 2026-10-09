@@ -433,6 +433,9 @@ body {
     color: var(--text-3);
     font-size: 12px;
     margin-top: 10px;
+    /* 提示文本里混着 <code> 等行内元素时，行尾可能整块挪到下一行而横向溢出几个 px
+       （2026-10-09 审计实测 panel 页某条 hint 溢出 6px）→ 允许在任意位置断行 */
+    overflow-wrap: anywhere;
 }
 
 /* ========== 表单 ========== */
@@ -474,6 +477,34 @@ body {
 
 .form-row input::placeholder {
     color: #666;
+}
+
+/* ========== .form-row 里的「整行 label」 ==========
+ * .form-row 的常规布局是「左侧固定宽度标签 + 右侧控件」——见 panel-theme.css 的
+ * `.form-row label { flex: 0 0 96px }`。但当 label 自己就是整行内容（label 内直接放
+ * checkbox/radio + 说明文字）时，96px 会把说明文字挤成竖排。
+ *
+ * ⚠ 必须写成 `.form-row > label:has(...)`，两个理由缺一不可：
+ *   ① 多一层 `.form-row` + `:has()` 把特异性提到 (0,2,1)，高于 panel-theme.css 的
+ *      `.form-row label`（0,1,1）—— 否则同特异性下**后加载**的 panel-theme.css 胜出；
+ *   ② `:has()` 限定「label 内直接含 checkbox/radio」，不去动「左标签 + 右控件」的常规行。
+ * 2026-10-09 实测：「仅同步选中行（按 Bangumi URL 列匹配 SID）」与
+ * 「✅ 启用时间筛选（按开播日期过滤）」两处被钉成 96px，文字竖排成 4 行。
+ */
+.form-row > label:has(> input[type='checkbox']),
+.form-row > label:has(> input[type='radio']) {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+/* 同一处的第二个成因：这些复选框/单选框会被 panel-theme.css 的
+ * `.form-row input { width: 100% }` 撑满整个 label（实测 96px），文字区被挤没。
+ * 注意 `.form-row > label > input` 的特异性 (0,2,2) 高于 `.form-row input` (0,1,1)。 */
+.form-row > label > input[type='checkbox'],
+.form-row > label > input[type='radio'] {
+    flex: 0 0 auto;
+    width: auto;
+    padding: 0;
 }
 
 /* ========== 数据分片多选 ========== */
@@ -2476,7 +2507,13 @@ select.input {
 }
 
 /* ========== 时间筛选区美化 ========== */
-.time-filter-box {
+/* ⚠ 必须写 `.form-row.time-filter-box`（两个类）——不要简化成 `.time-filter-box`：
+ *   panel-theme.css 在 styles.css **之后**加载，其 `.form-row { display: flex }` 与本文件
+ *   旧写法**特异性相同**（都是 0,1,0），同特异性下后加载者胜出 → 这个本该垂直堆叠的区块
+ *   变成了横向 flex：label 与区块内的 `p.hint` 挤在同一行争抢宽度，label 只剩 ~111px，
+ *   其中「✅ 启用时间筛选（按开播日期过滤）」竖排成 4 行（2026-10-09 实测）。
+ *   多写一层类把特异性提到 (0,2,0)，恢复「label 独占一行 + hint 在下方」的原始设计。 */
+.form-row.time-filter-box {
     display: block;
 }
 

@@ -181,6 +181,7 @@ npm run test:watch       # 监视模式
 npm run test:coverage    # 生成覆盖率报告
 npm run check:guards-reverse   # 反向验证门禁自身（改了 check-*.mjs 后手工跑）
 npm run check:shard-layout     # 布局回归门禁（改了 css/ 或分片区后手工跑，需本机 Chrome）
+npm run audit:layout           # 全页面布局审计（改了 css/ 或页面结构后手工跑，需本机 Chrome）
 ```
 
 `npm run gate` 依次执行八道关：`lint:check` → `check:dompurify-version` → `check:cycles`
@@ -196,6 +197,11 @@ npm run check:shard-layout     # 布局回归门禁（改了 css/ 或分片区�
 headless Chrome 渲染真实的分片区块，在 320 / 400 / 500px 三种布局宽度下量**真实计算样式**，
 断言「每个分片标签的文字只占 1 行、标签高 ≤ 40px、复选框 ≤ 20px」。
 改了 `css/**`、`panel.html` 的分片区块或分片文案之后跑一次。
+
+`npm run audit:layout` 把同一套思路推广到**全部 5 个页面**：按「原生 checkbox/radio 渲染尺寸 > 20px」
+「短文本（≤ 24 字）却占多行」「内容横向溢出」三条客观判据找错位，一次就抓到 3 处与分片**同源**的 bug
+（详见 [`文档/ARCHITECTURE.md`](文档/ARCHITECTURE.md) v3.12）。判据 2 是启发式，命中项需人工确认；
+命令支持 `--json` / `--widths 360,500` / 指定单个页面。
 
 当前基线：**4430 条测试 / 133 文件**，行覆盖率 **99.95%**（详见 [`文档/COVERAGE_BACKLOG.md`](文档/COVERAGE_BACKLOG.md)）。
 
