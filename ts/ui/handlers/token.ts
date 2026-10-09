@@ -283,7 +283,7 @@ export function testTokenValidity(): void {
       LOG_LEVELS.INFO,
       `[testTokenValidity] HTTP 状态码: ${String(xhr.status)} (${xhr.statusText})`,
     )
-    bgmLog(LOG_LEVELS.INFO, `[testTokenValidity] 请求耗时: ${String(duration)}ms`)
+    bgmLog(LOG_LEVELS.DEBUG, `[testTokenValidity] 请求耗时: ${String(duration)}ms`)
 
     if (xhr.getAllResponseHeaders()) {
       bgmLog(LOG_LEVELS.INFO, `[testTokenValidity] 响应头: ${xhr.getAllResponseHeaders()}`)

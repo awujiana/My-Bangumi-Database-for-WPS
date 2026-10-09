@@ -80,6 +80,7 @@ import { exportConfig, importConfig } from '../../services/config-service.js'
 import { executeUndoLastSync } from '../../services/ribbon-service.js'
 import { readLocalFileContent } from '../../sync/local-file-sync.js'
 import { clearLogs } from '../../tools/logger.js'
+import type { LogLevel } from '../../tools/logger.js'
 import { exportData } from './data-export.js'
 import { hideConnectionTestDialog, showConnectionTestDialog } from '../github-config-dialog.js'
 import { _T } from './_constants.js'
@@ -143,7 +144,7 @@ export const ACTION_HANDLERS: Record<string, ActionHandler> = {
     bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 开始执行同步操作')
     void syncFromPanel()
     bgmLog(
-      LOG_LEVELS.INFO,
+      LOG_LEVELS.DEBUG,
       `[handleActionClick] 同步操作已触发，耗时: ${String(Date.now() - context.startTime)}ms`,
     )
   },
@@ -153,7 +154,7 @@ export const ACTION_HANDLERS: Record<string, ActionHandler> = {
     if (typeof syncSelectedRows === 'function') {
       void syncSelectedRows()
       bgmLog(
-        LOG_LEVELS.INFO,
+        LOG_LEVELS.DEBUG,
         `[handleActionClick] 选中行同步已触发，耗时: ${String(Date.now() - context.startTime)}ms`,
       )
     } else {
@@ -169,7 +170,7 @@ export const ACTION_HANDLERS: Record<string, ActionHandler> = {
 
         if (typeof refreshData === 'function') refreshData()
         bgmLog(
-          LOG_LEVELS.INFO,
+          LOG_LEVELS.DEBUG,
           `[handleActionClick] 刷新数据完成，耗时: ${String(Date.now() - context.startTime)}ms`,
         )
       } else {
@@ -183,7 +184,7 @@ export const ACTION_HANDLERS: Record<string, ActionHandler> = {
     if (typeof previewSyncContent === 'function') {
       void previewSyncContent()
       bgmLog(
-        LOG_LEVELS.INFO,
+        LOG_LEVELS.DEBUG,
         `[handleActionClick] 预览同步内容已触发，耗时: ${String(Date.now() - context.startTime)}ms`,
       )
     } else {
@@ -205,7 +206,7 @@ export const ACTION_HANDLERS: Record<string, ActionHandler> = {
     bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 打开 Token 设置对话框')
     showTokenDialog(loadBgToken() ?? '')
     bgmLog(
-      LOG_LEVELS.INFO,
+      LOG_LEVELS.DEBUG,
       `[handleActionClick] Token 设置对话框已打开，耗时: ${String(Date.now() - context.startTime)}ms`,
     )
   },
@@ -215,7 +216,7 @@ export const ACTION_HANDLERS: Record<string, ActionHandler> = {
     bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 显示 Token 设置对话框')
     showTokenDialog(loadBgToken() ?? '')
     bgmLog(
-      LOG_LEVELS.INFO,
+      LOG_LEVELS.DEBUG,
       `[handleActionClick] Token 设置对话框已显示，耗时: ${String(Date.now() - context.startTime)}ms`,
     )
   },
@@ -239,7 +240,7 @@ export const ACTION_HANDLERS: Record<string, ActionHandler> = {
       BGM.handleError(error, { showAlert: true, level: BGM.ErrorLevel.WARN, context: 'clearToken' })
     }
     bgmLog(
-      LOG_LEVELS.INFO,
+      LOG_LEVELS.DEBUG,
       `[handleActionClick] 清除 Token 操作完成，耗时: ${String(Date.now() - context.startTime)}ms`,
     )
   },
@@ -257,7 +258,7 @@ export const ACTION_HANDLERS: Record<string, ActionHandler> = {
       BGM.handleError(error, { showAlert: true, level: BGM.ErrorLevel.WARN, context: 'copyToken' })
     }
     bgmLog(
-      LOG_LEVELS.INFO,
+      LOG_LEVELS.DEBUG,
       `[handleActionClick] 复制 Token 操作完成，耗时: ${String(Date.now() - context.startTime)}ms`,
     )
   },
@@ -266,7 +267,7 @@ export const ACTION_HANDLERS: Record<string, ActionHandler> = {
     bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 开始测试 Token 有效性')
     testTokenValidity()
     bgmLog(
-      LOG_LEVELS.INFO,
+      LOG_LEVELS.DEBUG,
       `[handleActionClick] Token 测试已触发，耗时: ${String(Date.now() - context.startTime)}ms`,
     )
   },
@@ -277,7 +278,7 @@ export const ACTION_HANDLERS: Record<string, ActionHandler> = {
     // renewToken 已废弃，其内部仅委托给 testTokenValidity，直接调用等价流程
     testTokenValidity()
     bgmLog(
-      LOG_LEVELS.INFO,
+      LOG_LEVELS.DEBUG,
       `[handleActionClick] Token 续约已触发，耗时: ${String(Date.now() - context.startTime)}ms`,
     )
   },
@@ -292,7 +293,7 @@ export const ACTION_HANDLERS: Record<string, ActionHandler> = {
     bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 显示用户ID设置对话框')
     showUserIdDialog()
     bgmLog(
-      LOG_LEVELS.INFO,
+      LOG_LEVELS.DEBUG,
       `[handleActionClick] 用户ID设置对话框已显示，耗时: ${String(Date.now() - context.startTime)}ms`,
     )
   },
@@ -301,7 +302,7 @@ export const ACTION_HANDLERS: Record<string, ActionHandler> = {
     bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 尝试打开收藏页面')
     openUserCollection()
     bgmLog(
-      LOG_LEVELS.INFO,
+      LOG_LEVELS.DEBUG,
       `[handleActionClick] 收藏页面打开操作已触发，耗时: ${String(Date.now() - context.startTime)}ms`,
     )
   },
@@ -310,7 +311,7 @@ export const ACTION_HANDLERS: Record<string, ActionHandler> = {
     bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 打开 Token 申请页面')
     openBangumiTokenPage()
     bgmLog(
-      LOG_LEVELS.INFO,
+      LOG_LEVELS.DEBUG,
       `[handleActionClick] Token 申请页面已触发，耗时: ${String(Date.now() - context.startTime)}ms`,
     )
   },
@@ -319,7 +320,7 @@ export const ACTION_HANDLERS: Record<string, ActionHandler> = {
     bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 开始从 BGM 同步收藏')
     syncCollectionFromBgm()
     bgmLog(
-      LOG_LEVELS.INFO,
+      LOG_LEVELS.DEBUG,
       `[handleActionClick] 收藏同步已触发，耗时: ${String(Date.now() - context.startTime)}ms`,
     )
   },
@@ -328,7 +329,7 @@ export const ACTION_HANDLERS: Record<string, ActionHandler> = {
     bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 开始刷新工作表（自动匹配当前活动工作表）')
     refreshSheets({ autoSelectActive: true })
     bgmLog(
-      LOG_LEVELS.INFO,
+      LOG_LEVELS.DEBUG,
       `[handleActionClick] 工作表刷新已触发，耗时: ${String(Date.now() - context.startTime)}ms`,
     )
   },
@@ -338,7 +339,7 @@ export const ACTION_HANDLERS: Record<string, ActionHandler> = {
     refreshWorkbooks()
     refreshSheets({ autoSelectActive: true })
     bgmLog(
-      LOG_LEVELS.INFO,
+      LOG_LEVELS.DEBUG,
       `[handleActionClick] 工作簿刷新已触发，耗时: ${String(Date.now() - context.startTime)}ms`,
     )
   },
@@ -347,7 +348,7 @@ export const ACTION_HANDLERS: Record<string, ActionHandler> = {
     bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 开始刷新数据')
     refreshData()
     bgmLog(
-      LOG_LEVELS.INFO,
+      LOG_LEVELS.DEBUG,
       `[handleActionClick] 数据刷新已触发，耗时: ${String(Date.now() - context.startTime)}ms`,
     )
   },
@@ -356,7 +357,7 @@ export const ACTION_HANDLERS: Record<string, ActionHandler> = {
     bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 切换工作表锁定状态')
     toggleSheetLock()
     bgmLog(
-      LOG_LEVELS.INFO,
+      LOG_LEVELS.DEBUG,
       `[handleActionClick] 工作表锁定状态已切换，耗时: ${String(Date.now() - context.startTime)}ms`,
     )
   },
@@ -365,7 +366,7 @@ export const ACTION_HANDLERS: Record<string, ActionHandler> = {
     bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 开始清除同步记录')
     clearSyncRecords()
     bgmLog(
-      LOG_LEVELS.INFO,
+      LOG_LEVELS.DEBUG,
       `[handleActionClick] 同步记录清除已触发，耗时: ${String(Date.now() - context.startTime)}ms`,
     )
   },
@@ -375,7 +376,7 @@ export const ACTION_HANDLERS: Record<string, ActionHandler> = {
     deduplicateSyncRecords()
     showToast('去重完成', 'success')
     bgmLog(
-      LOG_LEVELS.INFO,
+      LOG_LEVELS.DEBUG,
       `[handleActionClick] 同步记录去重已触发，耗时: ${String(Date.now() - context.startTime)}ms`,
     )
   },
@@ -385,7 +386,7 @@ export const ACTION_HANDLERS: Record<string, ActionHandler> = {
     formatSyncRecordSheet()
     showToast('格式设置完成', 'success')
     bgmLog(
-      LOG_LEVELS.INFO,
+      LOG_LEVELS.DEBUG,
       `[handleActionClick] 同步记录表格式设置已触发，耗时: ${String(Date.now() - context.startTime)}ms`,
     )
   },
@@ -394,7 +395,7 @@ export const ACTION_HANDLERS: Record<string, ActionHandler> = {
     bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 开始清洗锁定数据表')
     cleanLockedDataSheet()
     bgmLog(
-      LOG_LEVELS.INFO,
+      LOG_LEVELS.DEBUG,
       `[handleActionClick] 数据清洗完成，耗时: ${String(Date.now() - context.startTime)}ms`,
     )
   },
@@ -403,7 +404,7 @@ export const ACTION_HANDLERS: Record<string, ActionHandler> = {
     bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 打开同步记录工作表')
     openSyncRecordSheet()
     bgmLog(
-      LOG_LEVELS.INFO,
+      LOG_LEVELS.DEBUG,
       `[handleActionClick] 同步记录工作表已打开，耗时: ${String(Date.now() - context.startTime)}ms`,
     )
   },
@@ -412,7 +413,7 @@ export const ACTION_HANDLERS: Record<string, ActionHandler> = {
     bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 测试调试连接')
     testDebugConnection()
     bgmLog(
-      LOG_LEVELS.INFO,
+      LOG_LEVELS.DEBUG,
       `[handleActionClick] 调试连接测试已完成，耗时: ${String(Date.now() - context.startTime)}ms`,
     )
   },
@@ -422,7 +423,7 @@ export const ACTION_HANDLERS: Record<string, ActionHandler> = {
     bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 关闭详情模态框')
     closeDetailModal()
     bgmLog(
-      LOG_LEVELS.INFO,
+      LOG_LEVELS.DEBUG,
       `[handleActionClick] 详情模态框已关闭，耗时: ${String(Date.now() - context.startTime)}ms`,
     )
   },
@@ -432,7 +433,7 @@ export const ACTION_HANDLERS: Record<string, ActionHandler> = {
     bgmLog(LOG_LEVELS.INFO, `[handleActionClick] 显示 Toast 消息: ${context.args[0] ?? ''}`)
     showToast(context.args[0] ?? '', context.args[1] ?? '')
     bgmLog(
-      LOG_LEVELS.INFO,
+      LOG_LEVELS.DEBUG,
       `[handleActionClick] Toast 已显示，耗时: ${String(Date.now() - context.startTime)}ms`,
     )
   },
@@ -441,7 +442,7 @@ export const ACTION_HANDLERS: Record<string, ActionHandler> = {
     bgmLog(LOG_LEVELS.INFO, `[handleActionClick] 显示警告框: ${context.args[0] ?? ''}`)
     showAlert(context.args[0] ?? '', context.args[1] ?? '')
     bgmLog(
-      LOG_LEVELS.INFO,
+      LOG_LEVELS.DEBUG,
       `[handleActionClick] 警告框已显示，耗时: ${String(Date.now() - context.startTime)}ms`,
     )
   },
@@ -450,7 +451,7 @@ export const ACTION_HANDLERS: Record<string, ActionHandler> = {
     bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 用户请求停止同步')
     BGM.sync.requestStop()
     bgmLog(
-      LOG_LEVELS.INFO,
+      LOG_LEVELS.DEBUG,
       `[handleActionClick] 停止同步请求已发送，耗时: ${String(Date.now() - context.startTime)}ms`,
     )
   },
@@ -459,7 +460,7 @@ export const ACTION_HANDLERS: Record<string, ActionHandler> = {
     bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 用户请求暂停同步')
     BGM.sync.pause()
     bgmLog(
-      LOG_LEVELS.INFO,
+      LOG_LEVELS.DEBUG,
       `[handleActionClick] 暂停同步请求已发送，耗时: ${String(Date.now() - context.startTime)}ms`,
     )
   },
@@ -468,7 +469,7 @@ export const ACTION_HANDLERS: Record<string, ActionHandler> = {
     bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 用户请求恢复同步')
     BGM.sync.resume()
     bgmLog(
-      LOG_LEVELS.INFO,
+      LOG_LEVELS.DEBUG,
       `[handleActionClick] 恢复同步请求已发送，耗时: ${String(Date.now() - context.startTime)}ms`,
     )
   },
@@ -536,7 +537,7 @@ export const ACTION_HANDLERS: Record<string, ActionHandler> = {
       showToast('保存失败：PluginStorage 不可用', 'error')
     }
     bgmLog(
-      LOG_LEVELS.INFO,
+      LOG_LEVELS.DEBUG,
       `[handleActionClick] 保存 GitHub 配置完成，耗时: ${String(Date.now() - context.startTime)}ms`,
     )
   },
@@ -808,7 +809,7 @@ export const ACTION_HANDLERS: Record<string, ActionHandler> = {
       },
     )
     bgmLog(
-      LOG_LEVELS.INFO,
+      LOG_LEVELS.DEBUG,
       `[handleActionClick] 数据同步已触发（策略: ${strategy}），耗时: ${String(Date.now() - context.startTime)}ms`,
     )
   },
@@ -900,7 +901,7 @@ export const ACTION_HANDLERS: Record<string, ActionHandler> = {
     xhr.send()
 
     bgmLog(
-      LOG_LEVELS.INFO,
+      LOG_LEVELS.DEBUG,
       `[handleActionClick] 测试 GitHub 配置已发起，耗时: ${String(Date.now() - context.startTime)}ms`,
     )
   },
@@ -948,7 +949,7 @@ export const ACTION_HANDLERS: Record<string, ActionHandler> = {
       bgmLog(LOG_LEVELS.ERROR, `[handleActionClick] 选择本地文件失败: ${errorMessage}`)
     }
     bgmLog(
-      LOG_LEVELS.INFO,
+      LOG_LEVELS.DEBUG,
       `[handleActionClick] 选择本地文件完成，耗时: ${String(Date.now() - context.startTime)}ms`,
     )
   },
@@ -966,7 +967,7 @@ export const ACTION_HANDLERS: Record<string, ActionHandler> = {
       }
     })()
     bgmLog(
-      LOG_LEVELS.INFO,
+      LOG_LEVELS.DEBUG,
       `[handleActionClick] 撤销同步已触发，耗时: ${String(Date.now() - context.startTime)}ms`,
     )
   },
@@ -980,7 +981,7 @@ export const ACTION_HANDLERS: Record<string, ActionHandler> = {
       renderLogEntries()
     }
     bgmLog(
-      LOG_LEVELS.INFO,
+      LOG_LEVELS.DEBUG,
       `[handleActionClick] 系统日志面板已打开，耗时: ${String(Date.now() - context.startTime)}ms`,
     )
   },
@@ -991,7 +992,7 @@ export const ACTION_HANDLERS: Record<string, ActionHandler> = {
     const modal = document.getElementById('logModal')
     if (modal) modal.style.display = 'none'
     bgmLog(
-      LOG_LEVELS.INFO,
+      LOG_LEVELS.DEBUG,
       `[handleActionClick] 系统日志面板已关闭，耗时: ${String(Date.now() - context.startTime)}ms`,
     )
   },
@@ -999,11 +1000,22 @@ export const ACTION_HANDLERS: Record<string, ActionHandler> = {
   // 系统日志：导出日志到文件
   // 走统一的导出源注册表（等价于 exportData('systemLogs', 'txt')），
   // 这样「系统日志」与其它数据源共用同一套文件命名与空数据校验。
+  //
+  // 顶部级别下拉框对导出同样生效：用户选了「仅 ERROR」再点导出，
+  // 拿到的就该只有 ERROR —— 否则导出内容与眼前所见不一致，看起来像功能坏了。
   exportLogs: (context) => {
-    bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 导出系统日志到文件')
-    exportData('systemLogs', 'txt')
+    const filterSelect = document.getElementById('logLevelFilter') as HTMLSelectElement | null
+    // 空串表示「全部级别」，须显式判空转成 undefined
+    // （`??` 会保留空串，把筛选条件误设成一个恒假的级别）
+    const selectedLevel = filterSelect?.value ?? ''
+    const logLevel = selectedLevel === '' ? undefined : (selectedLevel as LogLevel)
     bgmLog(
       LOG_LEVELS.INFO,
+      `[handleActionClick] 导出系统日志到文件${logLevel ? `（仅 ${logLevel}）` : ''}`,
+    )
+    exportData('systemLogs', 'txt', { logLevel })
+    bgmLog(
+      LOG_LEVELS.DEBUG,
       `[handleActionClick] 日志导出完成，耗时: ${String(Date.now() - context.startTime)}ms`,
     )
   },
@@ -1030,7 +1042,7 @@ export const ACTION_HANDLERS: Record<string, ActionHandler> = {
     renderLogEntries()
     showToast('日志已清空', 'info')
     bgmLog(
-      LOG_LEVELS.INFO,
+      LOG_LEVELS.DEBUG,
       `[handleActionClick] 系统日志已清空，耗时: ${String(Date.now() - context.startTime)}ms`,
     )
   },
@@ -1068,7 +1080,7 @@ export const ACTION_HANDLERS: Record<string, ActionHandler> = {
       },
     )
     bgmLog(
-      LOG_LEVELS.INFO,
+      LOG_LEVELS.DEBUG,
       `[handleActionClick] 重置全部配置操作完成，耗时: ${String(Date.now() - context.startTime)}ms`,
     )
   },
@@ -1102,7 +1114,7 @@ export const ACTION_HANDLERS: Record<string, ActionHandler> = {
       note.style.display = note.style.display === 'block' ? 'none' : 'block'
     }
     bgmLog(
-      LOG_LEVELS.INFO,
+      LOG_LEVELS.DEBUG,
       `[handleActionClick] 同步策略引导已打开，耗时: ${String(Date.now() - context.startTime)}ms`,
     )
   },
@@ -1118,7 +1130,7 @@ export const ACTION_HANDLERS: Record<string, ActionHandler> = {
       button.textContent = isHidden ? '📖 收起详细操作' : '📖 显示详细操作'
     }
     bgmLog(
-      LOG_LEVELS.INFO,
+      LOG_LEVELS.DEBUG,
       `[handleActionClick] 使用引导已${detail?.style.display === 'none' ? '隐藏' : '显示'}，耗时: ${String(Date.now() - context.startTime)}ms`,
     )
   },
@@ -1175,7 +1187,7 @@ export const ACTION_HANDLERS: Record<string, ActionHandler> = {
       showToast(`保存失败：${errorMessage}`, 'error')
     }
     bgmLog(
-      LOG_LEVELS.INFO,
+      LOG_LEVELS.DEBUG,
       `[handleActionClick] 保存配置操作完成，耗时: ${String(Date.now() - context.startTime)}ms`,
     )
   },
@@ -1196,7 +1208,7 @@ export const ACTION_HANDLERS: Record<string, ActionHandler> = {
       showToast('已取消选择导出位置', 'info')
     }
     bgmLog(
-      LOG_LEVELS.INFO,
+      LOG_LEVELS.DEBUG,
       `[handleActionClick] 选择导出位置操作完成，耗时: ${String(Date.now() - context.startTime)}ms`,
     )
   },
@@ -1210,7 +1222,7 @@ export const ACTION_HANDLERS: Record<string, ActionHandler> = {
     updatePathDisplay('exportPathDisplay', '')
     showToast('已清除默认导出位置', 'info')
     bgmLog(
-      LOG_LEVELS.INFO,
+      LOG_LEVELS.DEBUG,
       `[handleActionClick] 清除导出位置操作完成，耗时: ${String(Date.now() - context.startTime)}ms`,
     )
   },
@@ -1229,7 +1241,7 @@ export const ACTION_HANDLERS: Record<string, ActionHandler> = {
       showToast('已取消选择导入文件夹', 'info')
     }
     bgmLog(
-      LOG_LEVELS.INFO,
+      LOG_LEVELS.DEBUG,
       `[handleActionClick] 选择导入文件夹操作完成，耗时: ${String(Date.now() - context.startTime)}ms`,
     )
   },
@@ -1243,7 +1255,7 @@ export const ACTION_HANDLERS: Record<string, ActionHandler> = {
     updatePathDisplay('importPathDisplay', '')
     showToast('已清除默认导入文件夹', 'info')
     bgmLog(
-      LOG_LEVELS.INFO,
+      LOG_LEVELS.DEBUG,
       `[handleActionClick] 清除导入文件夹操作完成，耗时: ${String(Date.now() - context.startTime)}ms`,
     )
   },
@@ -1267,16 +1279,17 @@ export const ACTION_HANDLERS: Record<string, ActionHandler> = {
       URL.revokeObjectURL(url)
       // 同时复制到剪贴板，便于直接粘贴到其他环境
       copyTextToClipboard(json)
-      const suffix = defaultExportPath ? `（默认位置：${defaultExportPath}）` : '（未设置默认位置）'
-      showToast(`配置已导出，请将文件手动保存到默认位置 ${suffix}`.replace('  ', ' '), 'success')
-      bgmLog(LOG_LEVELS.INFO, `[handleActionClick] 配置导出完成${suffix}`)
+      // 浏览器下载无法指定保存目录，这里只能把记忆的位置「提示」给用户
+      const suffix = defaultExportPath ? `默认位置：${defaultExportPath}` : '未设置默认位置'
+      showToast(`配置已导出，请手动保存到该位置（${suffix}）`, 'success')
+      bgmLog(LOG_LEVELS.INFO, `[handleActionClick] 配置导出完成（${suffix}）`)
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : String(error)
       bgmLog(LOG_LEVELS.ERROR, `[handleActionClick] 配置导出失败: ${errorMessage}`)
       showToast(`配置导出失败：${errorMessage}`, 'error')
     }
     bgmLog(
-      LOG_LEVELS.INFO,
+      LOG_LEVELS.DEBUG,
       `[handleActionClick] 导出配置操作完成，耗时: ${String(Date.now() - context.startTime)}ms`,
     )
   },
@@ -1322,8 +1335,9 @@ export const ACTION_HANDLERS: Record<string, ActionHandler> = {
         }
       | undefined
     if (wpsApp && typeof wpsApp.GetOpenFilename === 'function') {
+      // 文件选择框不支持指定初始目录，位置只能写进标题作提示
       const title = defaultImportPath
-        ? `从默认导入文件夹选择配置文件（${defaultImportPath}）`
+        ? `选择配置文件 JSON（导入位置提示：${defaultImportPath}）`
         : '选择配置文件 JSON'
       const selected = wpsApp.GetOpenFilename('JSON 文件 (*.json),*.json,所有文件 (*.*),*.*', title)
       if (typeof selected === 'string' && selected !== '') {
@@ -1340,7 +1354,7 @@ export const ACTION_HANDLERS: Record<string, ActionHandler> = {
           }
         })()
         bgmLog(
-          LOG_LEVELS.INFO,
+          LOG_LEVELS.DEBUG,
           `[handleActionClick] 已选择配置文件，读取中，耗时: ${String(Date.now() - context.startTime)}ms`,
         )
         return
@@ -1361,7 +1375,7 @@ export const ACTION_HANDLERS: Record<string, ActionHandler> = {
       },
     )
     bgmLog(
-      LOG_LEVELS.INFO,
+      LOG_LEVELS.DEBUG,
       `[handleActionClick] 导入配置对话框已显示，耗时: ${String(Date.now() - context.startTime)}ms`,
     )
   },
@@ -1389,7 +1403,7 @@ export const ACTION_HANDLERS: Record<string, ActionHandler> = {
       bgmLog(LOG_LEVELS.WARN, '[handleActionClick] 未找到主面板ID')
     }
     bgmLog(
-      LOG_LEVELS.INFO,
+      LOG_LEVELS.DEBUG,
       `[handleActionClick] 关闭主面板操作完成，耗时: ${String(Date.now() - context.startTime)}ms`,
     )
   },
@@ -1399,7 +1413,7 @@ export const ACTION_HANDLERS: Record<string, ActionHandler> = {
     bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 打开设置面板')
     showSettingsPanel()
     bgmLog(
-      LOG_LEVELS.INFO,
+      LOG_LEVELS.DEBUG,
       `[handleActionClick] 设置面板操作已触发，耗时: ${String(Date.now() - context.startTime)}ms`,
     )
   },
@@ -1409,7 +1423,7 @@ export const ACTION_HANDLERS: Record<string, ActionHandler> = {
     bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 打开数据清理面板')
     showCleanPanel()
     bgmLog(
-      LOG_LEVELS.INFO,
+      LOG_LEVELS.DEBUG,
       `[handleActionClick] 数据清理面板操作已触发，耗时: ${String(Date.now() - context.startTime)}ms`,
     )
   },

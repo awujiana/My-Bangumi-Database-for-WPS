@@ -173,7 +173,6 @@ vi.mock('../index.js', () => ({
   openSyncRecordSheet: vi.fn(),
   testDebugConnection: vi.fn(),
   getRecentLogs: vi.fn(() => []),
-  exportLogsToFile: vi.fn(),
   clearLogs: vi.fn(),
   isIncrementalSyncEnabled: vi.fn(() => false),
   setIncrementalSync: vi.fn(),

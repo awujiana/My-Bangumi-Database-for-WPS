@@ -32,7 +32,17 @@ interface LogEntry {
 interface LoggerModule {
   getRecentLogs(level?: string, limit?: number): LogEntry[]
   clearLogs(): void
-  exportLogsToFile(): void
+}
+
+/**
+ * 统一导出出口。
+ *
+ * 导出**不在 logger 模块里**：日志导出与「同步记录 / 富化记录 / 清理日志」共用
+ * `ui/handlers/data-export.ts` 的注册表，文件命名、BOM、空数据校验都只有一份实现。
+ * 早先这里调的是 `logger.exportLogsToFile()`，产出的是另一套格式的 TXT，已收敛掉。
+ */
+interface ExportModule {
+  exportData(key: string, format: 'csv' | 'txt'): number
 }
 
 /** 动态加载 logger 模块并获取引用 */
@@ -43,6 +53,19 @@ async function getLogger(): Promise<LoggerModule | null> {
     const module_ = await import('../tools/logger.js')
     _logger = module_
     return _logger
+  } catch {
+    return null
+  }
+}
+
+/** 动态加载统一导出模块并获取引用 */
+let _exporter: ExportModule | null = null
+async function getExporter(): Promise<ExportModule | null> {
+  if (_exporter) return _exporter
+  try {
+    const module_ = await import('../ui/handlers/data-export.js')
+    _exporter = module_
+    return _exporter
   } catch {
     return null
   }
@@ -451,10 +474,8 @@ function bindLogActions(root: HTMLElement): void {
   const exportButton = root.querySelector<HTMLElement>('#bgm-dp-log-export')
   exportButton?.addEventListener('click', () => {
     void (async () => {
-      const logger = await getLogger()
-      if (logger) {
-        logger.exportLogsToFile()
-      }
+      const exporter = await getExporter()
+      exporter?.exportData('systemLogs', 'txt')
     })()
   })
 }

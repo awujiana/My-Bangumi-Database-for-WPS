@@ -82,7 +82,6 @@ const mockState = vi.hoisted(() => ({
   loggerWarn: vi.fn(),
   loggerError: vi.fn(),
   getRecentLogs: vi.fn(() => []),
-  exportLogsToFile: vi.fn(),
   exportData: vi.fn(),
   clearLogs: vi.fn(),
   // tools/debounce.js
@@ -232,7 +231,6 @@ vi.mock('../ts/tools/logger.js', () => ({
     error: mockState.loggerError,
   },
   getRecentLogs: mockState.getRecentLogs,
-  exportLogsToFile: mockState.exportLogsToFile,
   clearLogs: mockState.clearLogs,
   LogLevel: { INFO: 'INFO', WARN: 'WARN', ERROR: 'ERROR' },
 }))
@@ -284,7 +282,6 @@ vi.mock('../index.js', () => ({
   // ---- 调试 / 日志 ----
   testDebugConnection: mockState.testDebugConnection,
   getRecentLogs: mockState.getRecentLogs,
-  exportLogsToFile: mockState.exportLogsToFile,
   clearLogs: mockState.clearLogs,
 
   // ---- 配置相关（saveAllConfig 使用） ----
@@ -585,10 +582,10 @@ describe('ACTION_HANDLERS 分发（通过 DOM click 触发）', () => {
   })
 
   // 已改走统一的导出源注册表（等价于导出「系统日志」的 TXT），
-  // 与其它数据源共用同一套文件命名与空数据校验
+  // 与其它数据源共用同一套文件命名与空数据校验；级别下拉框的取值一并透传
   it('点击 [data-action="exportLogs"] 导出系统日志（systemLogs + txt）', () => {
     clickAction('exportLogs')
-    expect(mockState.exportData).toHaveBeenCalledWith('systemLogs', 'txt')
+    expect(mockState.exportData).toHaveBeenCalledWith('systemLogs', 'txt', { logLevel: undefined })
   })
 
   it('点击 [data-action="exportData"] 按 data-args 传数据源与格式', () => {

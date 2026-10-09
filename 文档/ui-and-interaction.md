@@ -148,8 +148,8 @@ showSettingsPanel() 调用时：
 #### I. 系统日志区
 
 - 查看最近 1000 条日志
-- 按级别（ERROR/WARN/INFO/DEBUG）筛选
-- 导出日志
+- 按级别（ERROR/WARN/INFO/DEBUG）筛选 —— 该筛选**同时决定「导出」的内容范围**，避免「眼前筛过、导出却是全量」
+- 导出日志（TXT；带级别筛选时文件名形如 `bgm-系统日志-ERROR-<时间戳>.txt`）
 
 ---
 
@@ -658,5 +658,5 @@ python -m http.server 5173 --directory .
 | `testToken`             | handlers/index.ts | 测试 Token 有效性        |
 | `showLogPanel`          | handlers/index.ts | 显示日志面板             |
 | `clearLogs`             | handlers/index.ts | 清空日志                 |
-| `exportLogs`            | handlers/index.ts | 导出日志                 |
+| `exportLogs`            | handlers/index.ts | 导出日志（跟随级别筛选） |
 | …                       | …                 | （共 30+ 个 action）     |

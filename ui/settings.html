@@ -111,7 +111,17 @@
       <main class="main">
         <!-- 外观与导航（主题模式 + 导航显示模式） -->
         <section class="section" id="sec-appearance">
-          <h3>🎨 外观与导航<button type="button" class="mod-collapse-btn" data-mod-collapse="sec-appearance" aria-expanded="true" aria-label="折叠 / 展开「外观与导航」">▾</button></h3>
+          <h3>
+            🎨 外观与导航<button
+              type="button"
+              class="mod-collapse-btn"
+              data-mod-collapse="sec-appearance"
+              aria-expanded="true"
+              aria-label="折叠 / 展开「外观与导航」"
+            >
+              ▾
+            </button>
+          </h3>
           <div class="form-group">
             <label for="themeSelect">主题模式</label>
             <select id="themeSelect" class="input">
@@ -140,7 +150,17 @@
 
         <!-- 模块排序（设置其他页面功能模块的显示顺序） -->
         <section class="section" id="sec-modules">
-          <h3>🧩 模块排序<button type="button" class="mod-collapse-btn" data-mod-collapse="sec-modules" aria-expanded="true" aria-label="折叠 / 展开「模块排序」">▾</button></h3>
+          <h3>
+            🧩 模块排序<button
+              type="button"
+              class="mod-collapse-btn"
+              data-mod-collapse="sec-modules"
+              aria-expanded="true"
+              aria-label="折叠 / 展开「模块排序」"
+            >
+              ▾
+            </button>
+          </h3>
           <p class="hint">
             调整各页面功能模块的显示顺序。侧栏导航与主区模块会同步重排，调整后立即保存并同步到对应页面。支持
             ↑↓ 按钮（键盘可达）与鼠标拖拽两种方式。
@@ -150,7 +170,17 @@
 
         <!-- 同步偏好（跨会话生效的同步相关默认值） -->
         <section class="section" id="sec-sync-pref">
-          <h3>🔄 同步偏好<button type="button" class="mod-collapse-btn" data-mod-collapse="sec-sync-pref" aria-expanded="true" aria-label="折叠 / 展开「同步偏好」">▾</button></h3>
+          <h3>
+            🔄 同步偏好<button
+              type="button"
+              class="mod-collapse-btn"
+              data-mod-collapse="sec-sync-pref"
+              aria-expanded="true"
+              aria-label="折叠 / 展开「同步偏好」"
+            >
+              ▾
+            </button>
+          </h3>
           <label class="check-row">
             <input type="checkbox" id="chkIncrementalSync" data-action="toggleIncrementalSync" />
             <span>仅同步变更（增量同步）</span>
@@ -214,7 +244,17 @@
 
         <!-- 富化预览 -->
         <section class="section" id="sec-enrich-preview">
-          <h3>✨ 富化预览<button type="button" class="mod-collapse-btn" data-mod-collapse="sec-enrich-preview" aria-expanded="true" aria-label="折叠 / 展开「富化预览」">▾</button></h3>
+          <h3>
+            ✨ 富化预览<button
+              type="button"
+              class="mod-collapse-btn"
+              data-mod-collapse="sec-enrich-preview"
+              aria-expanded="true"
+              aria-label="折叠 / 展开「富化预览」"
+            >
+              ▾
+            </button>
+          </h3>
           <p class="hint">
             控制「新番表富化」页数据预览的视觉呈现：周几颜色、集数阈值徽章颜色、标签/首播/平台着色，以及需要过滤的噪声关键词。
           </p>
@@ -294,9 +334,21 @@
 
         <!-- 默认路径（导出位置 / 导入文件夹记忆） -->
         <section class="section" id="sec-paths">
-          <h3>📁 默认路径<button type="button" class="mod-collapse-btn" data-mod-collapse="sec-paths" aria-expanded="true" aria-label="折叠 / 展开「默认路径」">▾</button></h3>
+          <h3>
+            📁 默认路径<button
+              type="button"
+              class="mod-collapse-btn"
+              data-mod-collapse="sec-paths"
+              aria-expanded="true"
+              aria-label="折叠 / 展开「默认路径」"
+            >
+              ▾
+            </button>
+          </h3>
           <p class="hint">
-            为「导出配置 / 导出日志」与「导入配置」预设默认文件夹；留空时每次弹出选择对话框。
+            这两个路径只作记忆与提示：导出配置时会在提示里告知保存位置，导入配置时会显示在文件选择框的标题上。
+            WPS
+            任务窗格走浏览器下载通道、文件选择框也不支持指定初始目录，因此两者都不会自动写入或跳转到该路径。
           </p>
           <div class="form-group">
             <label for="exportPathDisplay">默认导出位置</label>
@@ -307,7 +359,7 @@
                 class="input"
                 style="flex: 1; min-width: 0"
                 readonly
-                placeholder="未设置（每次导出时询问）"
+                placeholder="未设置（导出配置时仅作提示）"
               />
               <button class="bgm-btn small" data-action="selectExportPath">选择…</button>
               <button class="bgm-btn small" data-action="clearExportPath">清除</button>
@@ -322,7 +374,7 @@
                 class="input"
                 style="flex: 1; min-width: 0"
                 readonly
-                placeholder="未设置（每次导入时询问）"
+                placeholder="未设置（导入配置时不显示位置）"
               />
               <button class="bgm-btn small" data-action="selectImportPath">选择…</button>
               <button class="bgm-btn small" data-action="clearImportPath">清除</button>
@@ -332,7 +384,17 @@
 
         <!-- 日志偏好（记录级别；日志查看在操作页） -->
         <section class="section" id="sec-log-pref">
-          <h3>📜 日志偏好<button type="button" class="mod-collapse-btn" data-mod-collapse="sec-log-pref" aria-expanded="true" aria-label="折叠 / 展开「日志偏好」">▾</button></h3>
+          <h3>
+            📜 日志偏好<button
+              type="button"
+              class="mod-collapse-btn"
+              data-mod-collapse="sec-log-pref"
+              aria-expanded="true"
+              aria-label="折叠 / 展开「日志偏好」"
+            >
+              ▾
+            </button>
+          </h3>
           <div class="form-group">
             <label for="logLevelSelect">日志记录级别</label>
             <select id="logLevelSelect" class="input">
@@ -352,7 +414,17 @@
 
         <!-- 配置管理 -->
         <section class="section" id="sec-data">
-          <h3>📦 配置管理<button type="button" class="mod-collapse-btn" data-mod-collapse="sec-data" aria-expanded="true" aria-label="折叠 / 展开「配置管理」">▾</button></h3>
+          <h3>
+            📦 配置管理<button
+              type="button"
+              class="mod-collapse-btn"
+              data-mod-collapse="sec-data"
+              aria-expanded="true"
+              aria-label="折叠 / 展开「配置管理」"
+            >
+              ▾
+            </button>
+          </h3>
           <div class="settings-toolbar">
             <button class="bgm-btn small primary" data-action="saveAllConfig">
               💾 保存所有配置
@@ -371,10 +443,20 @@
 
         <!-- 数据导出 -->
         <section class="section" id="sec-export">
-          <h3>📤 数据导出<button type="button" class="mod-collapse-btn" data-mod-collapse="sec-export" aria-expanded="true" aria-label="折叠 / 展开「数据导出」">▾</button></h3>
+          <h3>
+            📤 数据导出<button
+              type="button"
+              class="mod-collapse-btn"
+              data-mod-collapse="sec-export"
+              aria-expanded="true"
+              aria-label="折叠 / 展开「数据导出」"
+            >
+              ▾
+            </button>
+          </h3>
           <p class="hint">
-            把各工具的日志与记录导出为文件：CSV 可直接用 Excel 打开（带 BOM，中文不乱码），
-            TXT 适合在记事本里快速查看。三个工具页面各自也有就近的导出按钮。
+            把各工具的日志与记录导出为文件：CSV 可直接用 Excel 打开（带 BOM，中文不乱码）， TXT
+            适合在记事本里快速查看。三个工具页面各自也有就近的导出按钮。
           </p>
           <div class="export-source-list">
             <div class="export-source-row">
@@ -396,10 +478,18 @@
             </div>
             <div class="export-source-row">
               <span class="export-source-label">系统日志</span>
-              <button class="bgm-btn small" data-action="exportData" data-args='["systemLogs","csv"]'>
+              <button
+                class="bgm-btn small"
+                data-action="exportData"
+                data-args='["systemLogs","csv"]'
+              >
                 📄 CSV
               </button>
-              <button class="bgm-btn small" data-action="exportData" data-args='["systemLogs","txt"]'>
+              <button
+                class="bgm-btn small"
+                data-action="exportData"
+                data-args='["systemLogs","txt"]'
+              >
                 📝 TXT
               </button>
             </div>
@@ -422,10 +512,18 @@
             </div>
             <div class="export-source-row">
               <span class="export-source-label">清理日志</span>
-              <button class="bgm-btn small" data-action="exportData" data-args='["cleanLogs","csv"]'>
+              <button
+                class="bgm-btn small"
+                data-action="exportData"
+                data-args='["cleanLogs","csv"]'
+              >
                 📄 CSV
               </button>
-              <button class="bgm-btn small" data-action="exportData" data-args='["cleanLogs","txt"]'>
+              <button
+                class="bgm-btn small"
+                data-action="exportData"
+                data-args='["cleanLogs","txt"]'
+              >
                 📝 TXT
               </button>
             </div>
@@ -435,7 +533,17 @@
 
         <!-- 关于 -->
         <section class="section" id="sec-about">
-          <h3>ℹ️ 关于<button type="button" class="mod-collapse-btn" data-mod-collapse="sec-about" aria-expanded="true" aria-label="折叠 / 展开「关于」">▾</button></h3>
+          <h3>
+            ℹ️ 关于<button
+              type="button"
+              class="mod-collapse-btn"
+              data-mod-collapse="sec-about"
+              aria-expanded="true"
+              aria-label="折叠 / 展开「关于」"
+            >
+              ▾
+            </button>
+          </h3>
           <p class="hint">
             <strong>Bangumi 同步工具</strong> v2.0<br />
             用于在 Excel 中管理 Bangumi 动漫数据，支持：<br />

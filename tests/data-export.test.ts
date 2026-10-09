@@ -7,6 +7,8 @@ interface MockState {
   enrichRecords: Record<string, unknown>[]
   cleanLogs: Record<string, unknown>[]
   throwOnSync: boolean
+  /** 记录 getRecentLogs 收到的 [level, limit]，用于验证级别筛选是否透传 */
+  logCalls: (string | number | undefined)[][]
   exportCalls: {
     baseName: string
     headers: readonly string[]
@@ -22,6 +24,7 @@ const h = vi.hoisted((): MockState => ({
   enrichRecords: [],
   cleanLogs: [],
   throwOnSync: false,
+  logCalls: [],
   exportCalls: [],
   toasts: [],
 }))
@@ -66,7 +69,10 @@ vi.mock('../ts/sync/enrich-record.js', () => ({
 }))
 
 vi.mock('../ts/tools/logger.js', () => ({
-  getRecentLogs: (): unknown => h.systemLogs,
+  getRecentLogs: (level?: string, limit?: number): unknown => {
+    h.logCalls.push([level, limit])
+    return h.systemLogs
+  },
 }))
 
 vi.mock('../ts/tools/operation-log.js', () => ({
@@ -82,6 +88,7 @@ beforeEach(() => {
   h.enrichRecords = []
   h.cleanLogs = []
   h.throwOnSync = false
+  h.logCalls.length = 0
   h.exportCalls.length = 0
   h.toasts.length = 0
 })
@@ -123,7 +130,9 @@ describe('exportData 主流程', () => {
   })
 
   it('日志时间戳格式化为 YYYY-MM-DD HH:mm:ss', () => {
-    h.cleanLogs = [{ timestamp: new Date(2026, 8, 13, 5, 4, 3).getTime(), level: 'ok', message: 'm' }]
+    h.cleanLogs = [
+      { timestamp: new Date(2026, 8, 13, 5, 4, 3).getTime(), level: 'ok', message: 'm' },
+    ]
     exportData('cleanLogs', 'txt')
     expect(h.exportCalls[0]?.rows[0]?.[0]).toBe('2026-09-13 05:04:03')
   })
@@ -220,6 +229,34 @@ describe('exportData 异常与边界', () => {
       message: 'm',
     }))
     expect(exportData('systemLogs', 'txt')).toBe(3)
+    expect(h.logCalls[0]).toEqual([undefined, 1000])
     expect(h.exportCalls[0]?.headers).toEqual(['时间', '级别', '消息'])
+  })
+
+  it('系统日志：级别筛选透传给 getRecentLogs，并写进文件名与提示', () => {
+    h.systemLogs = [{ timestamp: Date.now(), level: 'ERROR', message: 'boom' }]
+    expect(exportData('systemLogs', 'txt', { logLevel: 'ERROR' })).toBe(1)
+    expect(h.logCalls[0]).toEqual(['ERROR', 1000])
+    expect(h.exportCalls[0]?.baseName).toBe('系统日志-ERROR')
+    expect(h.toasts[0]).toContain('（仅 ERROR）')
+  })
+
+  it('系统日志：不传筛选时文件名不带级别后缀', () => {
+    h.systemLogs = [{ timestamp: Date.now(), level: 'INFO', message: 'm' }]
+    exportData('systemLogs', 'txt')
+    expect(h.exportCalls[0]?.baseName).toBe('系统日志')
+    expect(h.toasts[0]).not.toContain('仅')
+  })
+
+  it('系统日志：筛选后无数据时，「暂无」提示里带上筛选条件', () => {
+    expect(exportData('systemLogs', 'txt', { logLevel: 'DEBUG' })).toBe(0)
+    expect(h.exportCalls).toHaveLength(0)
+    expect(h.toasts[0]).toContain('暂无系统日志可导出（仅 DEBUG）')
+  })
+
+  it('筛选只对系统日志生效，其它数据源忽略该选项', () => {
+    h.cleanLogs = [{ timestamp: Date.now(), level: 'info', message: 'm' }]
+    expect(exportData('cleanLogs', 'csv', { logLevel: 'ERROR' })).toBe(1)
+    expect(h.exportCalls[0]?.baseName).toBe('清理日志')
   })
 })

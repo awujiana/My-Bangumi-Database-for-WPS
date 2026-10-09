@@ -152,7 +152,7 @@ export function testTokenValidityForRibbon(token?: string, signal?: AbortSignal)
       `[exceltobangumi/testTokenValidityForRibbon] HTTP 状态码: ${String(xhr.status)} (${xhr.statusText})`,
     )
     bgmLog(
-      LOG_LEVELS.INFO,
+      LOG_LEVELS.DEBUG,
       `[exceltobangumi/testTokenValidityForRibbon] 请求耗时: ${String(duration)}ms`,
     )
 

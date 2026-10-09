@@ -262,7 +262,11 @@ describe('extractResponseMessage', () => {
 
 describe('parseErrorResponse', () => {
   it('JSON 体带 error → 用 error', () => {
-    const xhr = xhrLike({ status: 401, statusText: 'Unauthorized', responseText: '{"error":"凭据无效"}' })
+    const xhr = xhrLike({
+      status: 401,
+      statusText: 'Unauthorized',
+      responseText: '{"error":"凭据无效"}',
+    })
     expect(parseErrorResponse(xhr)).toBe('凭据无效')
   })
 
@@ -281,7 +285,11 @@ describe('parseErrorResponse', () => {
   })
 
   it('响应体非 JSON → 用 statusText', () => {
-    const xhr = xhrLike({ status: 502, statusText: 'Bad Gateway', responseText: '<html>502</html>' })
+    const xhr = xhrLike({
+      status: 502,
+      statusText: 'Bad Gateway',
+      responseText: '<html>502</html>',
+    })
     expect(parseErrorResponse(xhr)).toBe('Bad Gateway')
   })
 
@@ -371,7 +379,10 @@ describe('testTokenValidityForRibbon · 响应分支', () => {
 
     xhr.emit('load')
 
-    expect(notifyApi.success).toHaveBeenCalledWith('Token有效！\n\n用户名: momo\n用户ID: 42', '验证成功')
+    expect(notifyApi.success).toHaveBeenCalledWith(
+      'Token有效！\n\n用户名: momo\n用户ID: 42',
+      '验证成功',
+    )
     expect(m.setBgmUserId).toHaveBeenCalledWith('42')
     expect(m.setBgmUsername).toHaveBeenCalledWith('momo')
     expect(bgmCache.userId).toBe('42')
@@ -380,9 +391,7 @@ describe('testTokenValidityForRibbon · 响应分支', () => {
     expect(hasLog('响应头: content-type: application/json')).toBe(true)
     // 短响应体不截断
     expect(
-      logMessages().some(
-        (message) => message.includes('响应数据:') && message.endsWith('...'),
-      ),
+      logMessages().some((message) => message.includes('响应数据:') && message.endsWith('...')),
     ).toBe(false)
   })
 
@@ -403,7 +412,10 @@ describe('testTokenValidityForRibbon · 响应分支', () => {
 
     xhr.emit('load')
 
-    expect(notifyApi.success).toHaveBeenCalledWith('Token有效！\n\n用户名: 未知用户\n用户ID: 未知ID', '验证成功')
+    expect(notifyApi.success).toHaveBeenCalledWith(
+      'Token有效！\n\n用户名: 未知用户\n用户ID: 未知ID',
+      '验证成功',
+    )
   })
 
   it('200 且 username 存在但 nickname 缺失 → 用 username 兜底', () => {
@@ -707,9 +719,10 @@ describe('bgmRequestSync · 失败分支', () => {
   })
 
   it('调用时 signal 已 aborted → 立即返回「请求被取消」，不发请求', async () => {
-    await expect(
-      bgmRequestSync('POST', '/v0/x', '{}', 'tok', abortedSignal()),
-    ).resolves.toEqual({ code: 0, message: '请求被取消' })
+    await expect(bgmRequestSync('POST', '/v0/x', '{}', 'tok', abortedSignal())).resolves.toEqual({
+      code: 0,
+      message: '请求被取消',
+    })
     expect(FakeXhr.instances).toHaveLength(0)
   })
 
@@ -780,7 +793,7 @@ describe('setBangumiToken', () => {
 // ========== 日志级别用法 ==========
 
 describe('日志级别用法', () => {
-  it('200 成功路径全部落 INFO', () => {
+  it('200 成功路径只落 DEBUG/INFO（不得出现 WARN/ERROR）', () => {
     testTokenValidityForRibbon('tok')
     const xhr = lastXhr()
     xhr.status = 200
@@ -788,7 +801,8 @@ describe('日志级别用法', () => {
     xhr.emit('load')
 
     const levels = new Set(m.bgmLog.mock.calls.map((call) => call[0]))
-    expect(levels).toEqual(new Set([LOG_LEVELS.INFO]))
+    // 请求耗时是时序追踪，走 DEBUG；其余成功日志（状态码 / 响应头）走 INFO
+    expect(levels).toEqual(new Set([LOG_LEVELS.DEBUG, LOG_LEVELS.INFO]))
   })
 
   it('401 落 WARN、其他非 2xx 落 ERROR', () => {
@@ -811,7 +825,8 @@ describe('日志级别用法', () => {
 
     expect(
       m.bgmLog.mock.calls.some(
-        (call) => call[0] === LOG_LEVELS.ERROR && call[1].includes('Token验证失败，HTTP 状态码: 502'),
+        (call) =>
+          call[0] === LOG_LEVELS.ERROR && call[1].includes('Token验证失败，HTTP 状态码: 502'),
       ),
     ).toBe(true)
   })

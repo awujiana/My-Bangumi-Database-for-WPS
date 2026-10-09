@@ -556,7 +556,10 @@ export const BGM: {
 // ========== 日志函数 ==========
 /**
  * 日志函数（支持日志级别控制）
- * @param level - 日志级别 (0=DEBUG, 1=INFO, 2=WARN, 3=ERROR)
+ *
+ * `level >= BGM.LOG_LEVEL` 才记录，故 DEBUG 级别（`LOG_LEVELS.DEBUG = 0`）即「全部日志」。
+ *
+ * @param level - 日志级别（取 {@link LOG_LEVELS} 之一）
  * @param message - 日志消息
  */
 
@@ -565,22 +568,21 @@ export function bgmLog(level: number, message_ = ''): void {
     return
   }
 
-  // 0=DEBUG, 1=INFO, 2=WARN, 3=ERROR（与 LOG_LEVELS 保持一致）
   // 通过 logger 输出，message 会自动经过 maskSensitiveData 脱敏
   switch (level) {
-    case 0: {
+    case LOG_LEVELS.DEBUG: {
       logger.debug(message_)
       break
     }
-    case 1: {
+    case LOG_LEVELS.INFO: {
       logger.info(message_)
       break
     }
-    case 2: {
+    case LOG_LEVELS.WARN: {
       logger.warn(message_)
       break
     }
-    case 3: {
+    case LOG_LEVELS.ERROR: {
       logger.error(message_)
       break
     }

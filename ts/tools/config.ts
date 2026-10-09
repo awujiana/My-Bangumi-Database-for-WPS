@@ -342,8 +342,8 @@ export function getImportPath(isSilent = false): string {
 
 // ========== 全局日志级别 ==========
 
-/** 日志级别取值范围：0=DEBUG（无同名常量，仅 bgmLog 内部识别），3=ERROR */
-const LOG_LEVEL_MIN = 0
+/** 日志级别取值范围：DEBUG(0) … ERROR(3)，两端都取 {@link LOG_LEVELS} 里的常量 */
+const LOG_LEVEL_MIN = LOG_LEVELS.DEBUG
 const LOG_LEVEL_MAX = LOG_LEVELS.ERROR
 
 /**

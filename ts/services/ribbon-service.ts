@@ -807,7 +807,7 @@ export function openCollectionForRibbon(): void {
   bgmLog(LOG_LEVELS.INFO, `[openCollectionForRibbon] 打开收藏页面: ${collectionUrl}`)
   window.open(collectionUrl, '_blank')
   bgmLog(
-    LOG_LEVELS.INFO,
+    LOG_LEVELS.DEBUG,
     `[openCollectionForRibbon] 完成，耗时: ${String(Date.now() - startTime)}ms`,
   )
 }

@@ -19,10 +19,37 @@ import { exportRows } from '../../tools/file-export.js'
 import type { ExportCell, ExportFormat } from '../../tools/file-export.js'
 import { CLEAN_LOG_SCOPE, getOperationLogs } from '../../tools/operation-log.js'
 import { getRecentLogs } from '../../tools/logger.js'
+import type { LogLevel } from '../../tools/logger.js'
 import { bgmLog } from '../../tools/util/index.js'
 import { getAllEnrichRecords } from '../../sync/enrich-record.js'
 import { getAllSyncRecords } from '../../sync/sync-record.js'
 import { showToast } from '../dialog.js'
+
+/**
+ * 导出的可选筛选。
+ *
+ * 目前只有「系统日志」用得上：日志弹窗顶部有一个级别下拉框，用户选中某一级后
+ * 点「导出」，期望拿到的是**筛选后**的内容，而不是全量 —— 两者不一致会让人
+ * 以为导出坏了。
+ */
+export interface ExportOptions {
+  /**
+   * 仅导出该级别的系统日志；不传（或显式传 `undefined`）表示全部级别。
+   *
+   * 显式带上 `| undefined` 是 `exactOptionalPropertyTypes: true` 的要求：
+   * 调用方（`exportLogs` handler）会把下拉框的取值直接塞进来，而它的类型
+   * 天然是 `LogLevel | undefined`，不这样声明就传不进去。
+   */
+  logLevel?: LogLevel | undefined
+}
+
+/** 文件名主体 + 提示里的补充说明（由数据源按筛选条件自行派生） */
+export interface ExportNaming {
+  /** 文件名主体（不含 `bgm-` 前缀、时间戳与扩展名） */
+  baseName: string
+  /** 追加到提示文案里的补充说明，如 `（仅 ERROR）`；无筛选时为空串 */
+  note: string
+}
 
 /** 一个可导出的数据源 */
 export interface ExportSource {
@@ -33,7 +60,15 @@ export interface ExportSource {
   /** CSV/TXT 表头 */
   headers: readonly string[]
   /** 取数（导出时才调用，避免启动时白读一次存储） */
-  getRows: () => ExportCell[][]
+  getRows: (options?: ExportOptions) => ExportCell[][]
+  /**
+   * 按筛选条件派生文件名与提示后缀。
+   *
+   * **不实现即表示该数据源不支持筛选** —— 此时传进来的 `options` 会被忽略，
+   * 不会污染文件名（否则给「清理日志」传个 `logLevel` 就会导出
+   * `bgm-清理日志-ERROR-….csv` 这种名不副实的文件）。
+   */
+  getNaming?: (options?: ExportOptions) => ExportNaming
 }
 
 /** 把毫秒时间戳格式化成 `YYYY-MM-DD HH:mm:ss`；非法输入返回空串 */
@@ -73,8 +108,13 @@ export const EXPORT_SOURCES: readonly ExportSource[] = [
     key: 'systemLogs',
     label: '系统日志',
     headers: LOG_HEADERS,
-    getRows: () =>
-      getRecentLogs(undefined, 1000).map((entry) => [
+    // 级别筛选只对本源有意义，故由本源决定文件名与提示要不要带级别
+    getNaming: (options) =>
+      options?.logLevel
+        ? { baseName: `系统日志-${options.logLevel}`, note: `（仅 ${options.logLevel}）` }
+        : { baseName: '系统日志', note: '' },
+    getRows: (options) =>
+      getRecentLogs(options?.logLevel, 1000).map((entry) => [
         formatTimestamp(entry.timestamp),
         entry.level,
         entry.message,
@@ -123,18 +163,27 @@ export function getExportSource(key: string): ExportSource | undefined {
  *
  * @param key - {@link EXPORT_SOURCES} 里的 key
  * @param format - 导出格式
+ * @param options - 可选筛选（目前仅系统日志的级别筛选会用到）
  * @returns 导出的行数；0 表示未导出（数据源不存在或无数据）
  */
-export function exportData(key: string, format: ExportFormat): number {
+export function exportData(key: string, format: ExportFormat, options?: ExportOptions): number {
   const source = getExportSource(key)
   if (!source) {
     bgmLog(LOG_LEVELS.WARN, `[dataExport] 未知导出源: ${key}`)
     return 0
   }
 
+  // 筛选信息同时进「文件名 / toast / 系统日志」，三处必须一致，
+  // 否则用户拿到文件后无法从名字判断它是全量还是筛选结果。
+  // 派生规则由数据源自己给（不支持的源会拿到默认的「无筛选」命名）。
+  const { baseName, note } = source.getNaming?.(options) ?? {
+    baseName: source.label,
+    note: '',
+  }
+
   let rows: ExportCell[][]
   try {
-    rows = source.getRows()
+    rows = source.getRows(options)
   } catch (error: unknown) {
     showToast(`${source.label}导出失败：${(error as Error).message}`, 'error')
     bgmLog(LOG_LEVELS.ERROR, `[dataExport] ${source.label} 取数失败: ${(error as Error).message}`)
@@ -142,16 +191,16 @@ export function exportData(key: string, format: ExportFormat): number {
   }
 
   if (rows.length === 0) {
-    showToast(`暂无${source.label}可导出`, 'warning')
+    showToast(`暂无${source.label}可导出${note}`, 'warning')
     return 0
   }
 
-  const count = exportRows(source.label, source.headers, rows, format)
+  const count = exportRows(baseName, source.headers, rows, format)
   const formatLabel = format === 'csv' ? 'CSV' : 'TXT'
-  showToast(`已导出 ${String(count)} 条${source.label}（${formatLabel}）`, 'success')
+  showToast(`已导出 ${String(count)} 条${source.label}${note} · ${formatLabel}`, 'success')
   bgmLog(
     LOG_LEVELS.INFO,
-    `[dataExport] 导出 ${source.label} ${String(count)} 条，格式 ${formatLabel}`,
+    `[dataExport] 导出 ${source.label} ${String(count)} 条${note}，格式 ${formatLabel}`,
   )
   return count
 }

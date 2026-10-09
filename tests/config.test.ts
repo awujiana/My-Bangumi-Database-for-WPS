@@ -19,8 +19,12 @@ vi.mock('../ts/tools/events.js', () => ({
 // 与 ts/core/constants.ts 保持一致（数值型）。旧版本此处 mock 成字符串
 // 'warn'/'info'/'error'，会让 LOG_LEVELS.ERROR 变成 'error'，
 // setLogLevel 的 `level > LOG_LEVEL_MAX` 退化为字符串比较而失去意义。
+//
+// 键必须与真实模块**逐项对齐**：`config.ts` 的 LOG_LEVEL_MIN 取自
+// `LOG_LEVELS.DEBUG`，这里少一个 DEBUG 就会让 MIN 变成 undefined，
+// 于是所有范围校验静默失效（-1 也被当成合法级别接受）。
 vi.mock('../ts/core/constants.js', () => ({
-  LOG_LEVELS: { INFO: 1, WARN: 2, ERROR: 3 },
+  LOG_LEVELS: { DEBUG: 0, INFO: 1, WARN: 2, ERROR: 3 },
 }))
 
 import {
@@ -307,10 +311,10 @@ describe('tools/config', () => {
       expect(BGM.LOG_LEVEL).toBe(LOG_LEVELS.ERROR)
     })
 
-    it('setLogLevel(0) 允许 DEBUG 级（0 无同名常量）', () => {
-      expect(setLogLevel(0)).toBe(true)
+    it('setLogLevel(LOG_LEVELS.DEBUG) 允许 DEBUG 级（下界，0 不再越界）', () => {
+      expect(setLogLevel(LOG_LEVELS.DEBUG)).toBe(true)
       expect(storage.getItem(CONFIG_KEYS.LOG_LEVEL)).toBe('0')
-      expect(BGM.LOG_LEVEL).toBe(0)
+      expect(BGM.LOG_LEVEL).toBe(LOG_LEVELS.DEBUG)
     })
 
     it('setLogLevel 越界 / 非安全整数时忽略、返回 false 且不动内存', () => {

@@ -96,7 +96,10 @@ const mocks = vi.hoisted(() => ({
 
   // ---- 兄弟模块 ----
   exportConfig: vi.fn(() => '{"logLevel":2}'),
-  importConfig: vi.fn((): { isOk: () => boolean; error: unknown } => ({ isOk: () => true, error: undefined })),
+  importConfig: vi.fn((): { isOk: () => boolean; error: unknown } => ({
+    isOk: () => true,
+    error: undefined,
+  })),
   executeUndoLastSync: vi.fn(),
   readLocalFileContent: vi.fn(() => '{}'),
   clearLogs: vi.fn(),
@@ -379,12 +382,7 @@ beforeEach(() => {
     },
   )
   mocks.showInput.mockImplementation(
-    (
-      _title: string,
-      _hint: string,
-      _initial: string,
-      callback?: (value?: string) => void,
-    ) => {
+    (_title: string, _hint: string, _initial: string, callback?: (value?: string) => void) => {
       callback?.(mocks.answer.input)
     },
   )
@@ -415,10 +413,7 @@ describe('ACTION_HANDLERS · 核心操作', () => {
 
   it('clear → 先弹确认，确认后才刷新数据', () => {
     runAction('clear')
-    expect(mocks.showConfirm).toHaveBeenCalledWith(
-      mocks.confirmClearMarks,
-      expect.any(Function),
-    )
+    expect(mocks.showConfirm).toHaveBeenCalledWith(mocks.confirmClearMarks, expect.any(Function))
     expect(mocks.refreshData).toHaveBeenCalledTimes(1)
   })
 
@@ -935,7 +930,9 @@ describe('ACTION_HANDLERS · syncFromGithub', () => {
   it('进度回调 → 同时刷新进度弹窗与宿主状态栏', async () => {
     mocks.getApp.mockReturnValueOnce({ StatusBar: false })
     mocks.syncFromRemote.mockImplementationOnce(
-      async (onProgress: (current: number, total: number, message: string, eta?: string) => void) => {
+      async (
+        onProgress: (current: number, total: number, message: string, eta?: string) => void,
+      ) => {
         onProgress(1, 10, '处理中', '约 3s')
         return result
       },
@@ -977,7 +974,8 @@ describe('ACTION_HANDLERS · syncFromGithub', () => {
     })
 
     // completeSyncProgressDialog(summary, details, wasStopped, onViewDetails, stats, detailItems)
-    const onViewDetails = mocks.completeSyncProgressDialog.mock.calls[0]?.[3] as unknown as () => void
+    const onViewDetails = mocks.completeSyncProgressDialog.mock
+      .calls[0]?.[3] as unknown as () => void
     onViewDetails()
 
     expect(mocks.showSyncResultDialog).toHaveBeenCalledWith(
@@ -996,7 +994,8 @@ describe('ACTION_HANDLERS · syncFromGithub', () => {
       expect(mocks.completeSyncProgressDialog).toHaveBeenCalledTimes(1)
     })
 
-    const onViewDetails = mocks.completeSyncProgressDialog.mock.calls[0]?.[3] as unknown as () => void
+    const onViewDetails = mocks.completeSyncProgressDialog.mock
+      .calls[0]?.[3] as unknown as () => void
     onViewDetails()
 
     expect(mocks.showSyncResultDialog).toHaveBeenCalledTimes(1)
@@ -1144,10 +1143,7 @@ describe('ACTION_HANDLERS · browseLocalFile', () => {
   it('宿主没有文件对话框 → 降级为手动输入提示', () => {
     mountInput('localFilePath')
     runAction('browseLocalFile')
-    expect(mocks.showToast).toHaveBeenCalledWith(
-      'WPS 文件对话框不可用，请手动输入路径',
-      'warn',
-    )
+    expect(mocks.showToast).toHaveBeenCalledWith('WPS 文件对话框不可用，请手动输入路径', 'warn')
   })
 
   it('降级路径下连输入框都没有 → 只提示，不抛错', () => {
@@ -1229,7 +1225,27 @@ describe('ACTION_HANDLERS · 撤销与系统日志', () => {
 
   it('exportLogs → 走统一导出源（systemLogs / txt）', () => {
     runAction('exportLogs')
-    expect(mocks.exportData).toHaveBeenCalledWith('systemLogs', 'txt')
+    expect(mocks.exportData).toHaveBeenCalledWith('systemLogs', 'txt', { logLevel: undefined })
+  })
+
+  it('exportLogs → 顶部级别下拉框的取值作为筛选条件透传（空串须转成 undefined）', () => {
+    const select = document.createElement('select')
+    select.id = 'logLevelFilter'
+    for (const value of ['', 'ERROR']) {
+      const option = document.createElement('option')
+      option.value = value
+      select.append(option)
+    }
+    document.body.append(select)
+
+    select.value = 'ERROR'
+    runAction('exportLogs')
+    expect(mocks.exportData).toHaveBeenLastCalledWith('systemLogs', 'txt', { logLevel: 'ERROR' })
+
+    // 空串 = 全部级别。若原样传 ''，会被下游当成「筛选 ERROR 之外的级别」这类假条件
+    select.value = ''
+    runAction('exportLogs')
+    expect(mocks.exportData).toHaveBeenLastCalledWith('systemLogs', 'txt', { logLevel: undefined })
   })
 
   it('exportData → 缺数据源参数时拒绝执行', () => {
@@ -1455,10 +1471,7 @@ describe('ACTION_HANDLERS · exportConfig', () => {
     expect(createObjectUrl).toHaveBeenCalledTimes(1)
     expect(revokeObjectUrl).toHaveBeenCalledTimes(1)
     expect(mocks.copyTextToClipboard).toHaveBeenCalledWith('{"logLevel":2}')
-    expect(mocks.showToast).toHaveBeenCalledWith(
-      expect.stringContaining('/default/dir'),
-      'success',
-    )
+    expect(mocks.showToast).toHaveBeenCalledWith(expect.stringContaining('/default/dir'), 'success')
   })
 
   it('未设置默认位置时提示里如实写「未设置」', () => {
@@ -1651,7 +1664,7 @@ describe('handleActionClick', () => {
       expect.anything(),
       expect.objectContaining({ context: 'handleActionClick' }),
     )
-    expect(mocks.exportData).toHaveBeenCalledWith('systemLogs', 'txt')
+    expect(mocks.exportData).toHaveBeenCalledWith('systemLogs', 'txt', { logLevel: undefined })
   })
 
   it('未知 action → 记警告且不抛错', () => {

@@ -73,22 +73,14 @@ export function maskSensitiveData(input: string): string {
     )
 }
 
-/** 导出最近日志到文件（浏览器下载） */
-export function exportLogsToFile(): void {
-  const logs = getRecentLogs(undefined, 1000)
-  const text = logs
-    .map((log) => `[${new Date(log.timestamp).toISOString()}] [${log.level}] ${log.message}`)
-    .join('\n')
-  const blob = new Blob([text], { type: 'text/plain;charset=utf-8' })
-  const url = URL.createObjectURL(blob)
-  const a = document.createElement('a')
-  a.href = url
-  a.download = `bgm-logs-${String(Date.now())}.txt`
-  document.body.appendChild(a)
-  a.click()
-  document.body.removeChild(a)
-  URL.revokeObjectURL(url)
-}
+/**
+ * 本模块**只负责记录**，不负责导出。
+ *
+ * 曾经这里有一个 `exportLogsToFile()`（`bgm-logs-<毫秒>.txt`、ISO UTC 时间戳、无表头），
+ * 与「设置页 / 日志弹窗」走的 `ui/handlers/data-export.ts`（`bgm-系统日志-<时间戳>.txt`、
+ * 本地时间、带表头、CSV 带 BOM）是**两套产物** —— 同一个功能两个入口，格式还不一样。
+ * 已删除，统一由 `exportData('systemLogs', 'txt')` 出口。
+ */
 
 /** logger 对象 */
 export const logger = {

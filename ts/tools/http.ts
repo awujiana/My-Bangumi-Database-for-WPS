@@ -300,7 +300,7 @@ function executeXhrRequest(
       bgmLog(LOG_LEVELS.INFO, `[HTTP] ========== 请求完成 ==========`)
       bgmLog(LOG_LEVELS.INFO, `[HTTP] URL: ${url}`)
       bgmLog(LOG_LEVELS.INFO, `[HTTP] HTTP 状态码: ${String(xhr.status)} (${xhr.statusText})`)
-      bgmLog(LOG_LEVELS.INFO, `[HTTP] 请求耗时: ${String(duration)}ms`)
+      bgmLog(LOG_LEVELS.DEBUG, `[HTTP] 请求耗时: ${String(duration)}ms`)
 
       if (xhr.getAllResponseHeaders()) {
         bgmLog(LOG_LEVELS.INFO, `[HTTP] 响应头: ${xhr.getAllResponseHeaders()}`)
