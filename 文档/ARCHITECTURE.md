@@ -1,26 +1,27 @@
 ﻿# Bangumi WPS Excel 加载项 - 架构与项目知识文档
 
-> 版本: 3.9 | 更新日期: 2026-10-09
+> 版本: 3.10 | 更新日期: 2026-10-09
 
 ---
 
 ## 版本历史
 
-| 版本 | 日期       | 变更说明                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
-| ---- | ---------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| v1.0 | 2026-08-10 | 初始版本                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
-| v2.8 | 2026-08-21 | 修复 GitHub 同步编译错误、同步完成弹窗支持明细表格                                                                                                                                                                                                                                                                                                                                                                                                                                  |
-| v2.9 | 2026-08-26 | 新增 enrichEngine 富化引擎（新番表+简介工作表双阶段富化）、标注白名单机制、自动添加缺失列、声优字段支持、数据同步列位置无关性验证、边界情况修复（parseRemoteContent 空值检查、getAnnotatedValue 空值守卫）、42 项边界测试                                                                                                                                                                                                                                                           |
-| v3.0 | 2026-08-26 | 新增富化功能工作簿选择与锁定机制（enrich-lock.ts）：跨工作簿 Bangumi 追踪表选择、PluginStorage 持久化、启动恢复校验、与面板锁定独立运行                                                                                                                                                                                                                                                                                                                                             |
-| v3.1 | 2026-08-26 | enrich-lock.ts 边界加固：WPS API null 返回安全处理、冗余查找逻辑简化、边界情况文档完善                                                                                                                                                                                                                                                                                                                                                                                              |
-| v3.2 | 2026-08-26 | 命名规范重构：`taskpane/` 目录重命名为 `panel/`，页面文件使用 `Page` 后缀（`panel-page.ts`/`enrich-page.ts`），`taskpane-entry.ts` → `panel-entry.ts`；删除旧兼容文件 `ts/taskpane.ts`；统一 `@module` JSDoc 标签                                                                                                                                                                                                                                                                   |
-| v3.3 | 2026-08-26 | 循环依赖治理：创建 `types.ts`/`container.ts`/`services.ts`/`error-handler.ts` 核心模块；扩展 EventBus 新增 `STATE_CHANGED`/`CONFIG_CHANGED` 事件；`index.ts` 瘦身为纯 re-export 便利桶；移除各模块对 `index.ts` 的直接依赖；函数名统一（`init面板`→`initPanel` 等）                                                                                                                                                                                                                 |
-| v3.4 | 2026-08-26 | 移除收藏回写数据源选择：收藏回写固定走 Bangumi API，删除「Bangumi API / GitHub 仓库」二选一下拉框、对应 UI、配置键 `bgm_writeback_source` 及文档说明                                                                                                                                                                                                                                                                                                                                |
-| v3.5 | 2026-08-28 | 收藏回写空表自动填充：工作表为空时，经用户确认后自动写入标准表头并用 Bangumi 账号收藏条目填充 Excel，再执行标记；恢复缺失的 `css/panel-theme.css` 源文件                                                                                                                                                                                                                                                                                                                            |
-| v3.6 | 2026-08-30 | 设置面板重构：顶栏+侧边功能导航+主区布局、滚动高亮、导航仅图标模式（`bgm_nav_icons_only`）；新增外观主题（`bgm_theme`，dark/light/system，`ts/tools/theme.ts`）与同步偏好扩展（`bgm_list_type`/`bgm_time_filter`/`bgm_refresh_interval`）；修复 `bgm:modulesReady` 派发时序与导航 tooltip 裁剪                                                                                                                                                                                      |
-| v3.7 | 2026-09-10 | 分层治理（P1-5）：新增依赖反转桥 `ts/core/ui-bridge.ts`（`NotifyApi`/`SyncProgressApi`/`SyncRunner` + 未注册降级实现），`tools/`、`sync/` 的 5 处反向依赖改为依赖接口；`buildSyncConfig`/`SyncConfigSummary` 下沉 `ts/sync/sync-config-summary.ts`、`SyncProgressStats` 下沉 `ts/core/types.ts`；`core/crypto.ts` 正名 `core/token-payload.ts`；新增导入图门禁 `npm run check:cycles`（区分运行时边/类型边、致命环/良性环）                                                         |
-| v3.8 | 2026-09-15 | COM 往返性能治理：WPS 的 `Application`/`Workbook`/`Worksheet`/`Range` 均为**跨进程 COM 代理**，每次属性读取都是一次进程间往返；把 6 文件 / 11 处「循环条件里读 COM 属性」（`for (…; i <= sheets.Count; …)` 每轮重新求值，把 N 行扫描放大成 **N+1 次往返**）提成循环外单次读取；新增第 8 道门禁 `npm run check:com-in-loop`（AST 检查，非正则），并配运行时「往返次数」回归断言                                                                                                      |
-| v3.9 | 2026-10-09 | 日志链路收口：① 补齐 `LOG_LEVELS.DEBUG = 0`，并把 57 处「纯时序」日志（动作收尾 + 耗时、单次 HTTP 请求耗时）从 INFO 降为 DEBUG —— 日志弹窗的「仅 DEBUG」筛选与设置页「DEBUG · 全部日志」此前是死选项；② 日志弹窗的「导出」改为跟随顶部级别筛选，文件名 / 提示 / 系统日志三处口径一致；③ 设置页「默认路径」文案改为如实描述（浏览器下载无法指定目录，该路径仅作提示与记忆）；④ 删除 `logger.exportLogsToFile()` 这第二套导出实现，debug-panel 与设置页统一走 `data-export.ts` 注册表 |
+| 版本  | 日期       | 变更说明                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| ----- | ---------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| v1.0  | 2026-08-10 | 初始版本                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| v2.8  | 2026-08-21 | 修复 GitHub 同步编译错误、同步完成弹窗支持明细表格                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| v2.9  | 2026-08-26 | 新增 enrichEngine 富化引擎（新番表+简介工作表双阶段富化）、标注白名单机制、自动添加缺失列、声优字段支持、数据同步列位置无关性验证、边界情况修复（parseRemoteContent 空值检查、getAnnotatedValue 空值守卫）、42 项边界测试                                                                                                                                                                                                                                                                |
+| v3.0  | 2026-08-26 | 新增富化功能工作簿选择与锁定机制（enrich-lock.ts）：跨工作簿 Bangumi 追踪表选择、PluginStorage 持久化、启动恢复校验、与面板锁定独立运行                                                                                                                                                                                                                                                                                                                                                  |
+| v3.1  | 2026-08-26 | enrich-lock.ts 边界加固：WPS API null 返回安全处理、冗余查找逻辑简化、边界情况文档完善                                                                                                                                                                                                                                                                                                                                                                                                   |
+| v3.2  | 2026-08-26 | 命名规范重构：`taskpane/` 目录重命名为 `panel/`，页面文件使用 `Page` 后缀（`panel-page.ts`/`enrich-page.ts`），`taskpane-entry.ts` → `panel-entry.ts`；删除旧兼容文件 `ts/taskpane.ts`；统一 `@module` JSDoc 标签                                                                                                                                                                                                                                                                        |
+| v3.3  | 2026-08-26 | 循环依赖治理：创建 `types.ts`/`container.ts`/`services.ts`/`error-handler.ts` 核心模块；扩展 EventBus 新增 `STATE_CHANGED`/`CONFIG_CHANGED` 事件；`index.ts` 瘦身为纯 re-export 便利桶；移除各模块对 `index.ts` 的直接依赖；函数名统一（`init面板`→`initPanel` 等）                                                                                                                                                                                                                      |
+| v3.4  | 2026-08-26 | 移除收藏回写数据源选择：收藏回写固定走 Bangumi API，删除「Bangumi API / GitHub 仓库」二选一下拉框、对应 UI、配置键 `bgm_writeback_source` 及文档说明                                                                                                                                                                                                                                                                                                                                     |
+| v3.5  | 2026-08-28 | 收藏回写空表自动填充：工作表为空时，经用户确认后自动写入标准表头并用 Bangumi 账号收藏条目填充 Excel，再执行标记；恢复缺失的 `css/panel-theme.css` 源文件                                                                                                                                                                                                                                                                                                                                 |
+| v3.6  | 2026-08-30 | 设置面板重构：顶栏+侧边功能导航+主区布局、滚动高亮、导航仅图标模式（`bgm_nav_icons_only`）；新增外观主题（`bgm_theme`，dark/light/system，`ts/tools/theme.ts`）与同步偏好扩展（`bgm_list_type`/`bgm_time_filter`/`bgm_refresh_interval`）；修复 `bgm:modulesReady` 派发时序与导航 tooltip 裁剪                                                                                                                                                                                           |
+| v3.7  | 2026-09-10 | 分层治理（P1-5）：新增依赖反转桥 `ts/core/ui-bridge.ts`（`NotifyApi`/`SyncProgressApi`/`SyncRunner` + 未注册降级实现），`tools/`、`sync/` 的 5 处反向依赖改为依赖接口；`buildSyncConfig`/`SyncConfigSummary` 下沉 `ts/sync/sync-config-summary.ts`、`SyncProgressStats` 下沉 `ts/core/types.ts`；`core/crypto.ts` 正名 `core/token-payload.ts`；新增导入图门禁 `npm run check:cycles`（区分运行时边/类型边、致命环/良性环）                                                              |
+| v3.8  | 2026-09-15 | COM 往返性能治理：WPS 的 `Application`/`Workbook`/`Worksheet`/`Range` 均为**跨进程 COM 代理**，每次属性读取都是一次进程间往返；把 6 文件 / 11 处「循环条件里读 COM 属性」（`for (…; i <= sheets.Count; …)` 每轮重新求值，把 N 行扫描放大成 **N+1 次往返**）提成循环外单次读取；新增第 8 道门禁 `npm run check:com-in-loop`（AST 检查，非正则），并配运行时「往返次数」回归断言                                                                                                           |
+| v3.9  | 2026-10-09 | 日志链路收口：① 补齐 `LOG_LEVELS.DEBUG = 0`，并把 57 处「纯时序」日志（动作收尾 + 耗时、单次 HTTP 请求耗时）从 INFO 降为 DEBUG —— 日志弹窗的「仅 DEBUG」筛选与设置页「DEBUG · 全部日志」此前是死选项；② 日志弹窗的「导出」改为跟随顶部级别筛选，文件名 / 提示 / 系统日志三处口径一致；③ 设置页「默认路径」文案改为如实描述（浏览器下载无法指定目录，该路径仅作提示与记忆）；④ 删除 `logger.exportLogsToFile()` 这第二套导出实现，debug-panel 与设置页统一走 `data-export.ts` 注册表      |
+| v3.10 | 2026-10-09 | 门禁的反向验证：新增 `scripts/verify-guards-reverse.mjs` + `npm run check:guards-reverse`（**不在 `gate` 内**）。6 道源码级断言（ribbon-buttons / dompurify-version / com-in-loop / nav-order / cycles / tests-types）各配一个「已知违规」变异，逐个走「基线绿 → 注入 → 变红且**失败输出含预期片段** → 逐字节还原」，并核对跑前跑后脏文件集合一致；三条失败路径（空断言 / 锚点失配 / 因错而红）已用桩脚本自检。约定：改了任何 `check-*.mjs` 必须跑一次，新增源码级断言必须同步补变异用例 |
 
 ## 一、架构概览
 
@@ -1228,6 +1229,36 @@ npx vitest
 > `CODEBUDDY_SAFE_DELETE_BULK_THRESHOLD=1000000`，且 `--coverage.reporter=json-summary`
 > 与 `--coverage.reporter=json` **两个都要给**（只给 `json` 时 `coverage-summary.json` 不重写）。
 > 当前基线：**99.95% lines**（未覆盖 6 行，均为类型驱动 / 防御分支），详见 `文档/COVERAGE_BACKLOG.md`。
+
+**门禁自身的反向验证：`npm run check:guards-reverse`**（**不在 `gate` 里**，手工跑）
+
+八道关里有 6 道是**源码级断言**（读源码文本 / XML / HTML 再判定）。一条**永远为真**的断言
+与有效断言外观完全相同 —— 都是绿的，所以每条断言都必须能回答一个问题：
+**注入一个已知违规，它会红吗？** `scripts/verify-guards-reverse.mjs` 为这 6 条各配了一个
+「已知违规」的变异，逐个走四步：
+
+1. **基线绿**（本来就红 → 用例无效，先修门禁本身）；
+2. **注入违规**（锚点必须命中；失配即报错，绝不静默跳过）；
+3. **必须变红，且失败输出里出现预期片段** —— 只判退出码不够：脚本崩了、依赖没装，
+   退出码同样非 0，那是「因错而红」；
+4. **逐字节还原**，并核对「脏文件集合跑前跑后完全一致」。
+
+| 用例                | 注入的违规                                                    |
+| ------------------- | ------------------------------------------------------------- |
+| `ribbon-buttons`    | 把 `ribbon.xml` 某个按钮 id 改成分发表里没有的                |
+| `dompurify-version` | 把 `libs/purify.js` banner 里的版本号改小                     |
+| `com-in-loop`       | 往 `ts/` 追加一个条件里读 `sheets.Count` 的循环               |
+| `nav-order`         | 把页面 `<main>` 里某个 `sec-*` 的 id 改掉                     |
+| `cycles`            | 往 `ts/tools/log-buffer.ts` 追加对 `logger` 的 import（造环） |
+| `tests-types`       | 往 `tests/` 追加一行类型错误                                  |
+
+约定：
+
+- **改了任何 `check-*.mjs` 之后手工跑一次**；**新增源码级断言时必须同时在 `CASES` 里补一个变异用例**，
+  否则那条断言只是「看起来在守门」。
+- **不进 `gate`、不进提交钩子** —— 它会临时改写工作区文件（随后逐字节还原），且每条用例都要重跑一遍门禁。
+- 脚本自身的三条失败路径（空断言 / 锚点失配 / 因错而红）已用桩脚本反向验证过，能分别判成
+  `VACUOUS` / `MUTATION-ERROR` / `WRONG-REASON`。
 
 **可测试的纯函数模块：**
 
