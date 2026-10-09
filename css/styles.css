@@ -477,7 +477,15 @@ body {
 }
 
 /* ========== 数据分片多选 ========== */
-/* 复选组横向自动换行；label 需要覆盖 .form-row label 的固定 90px 宽度 */
+/* 复选组横向自动换行。
+ *
+ * ⚠ 选择器必须写成 `.form-row .shard-select-list label`（两层类）——**不要简化成
+ *   `.shard-select-list label`**：`panel-theme.css` 在 `styles.css` **之后**加载，
+ *   其中 `.form-row label { flex: 0 0 96px }` 与本文件旧写法**特异性相同**（都是 0,1,1），
+ *   同特异性时按加载顺序后者胜出 —— 于是每个分片标签被钉成 96px 宽，
+ *   中文标签在 96px 内竖排成一字一行，整块网格错位（2026-10-09 实际踩到）。
+ *   多写一层 `.form-row` 把特异性提到 (0,2,1)，结果就不再受样式表加载顺序影响。
+ */
 .shard-select-list {
     display: flex;
     flex: 1;
@@ -485,7 +493,7 @@ body {
     gap: 8px;
 }
 
-.shard-select-list label {
+.form-row .shard-select-list label {
     display: inline-flex;
     flex: 0 0 auto;
     align-items: center;
@@ -500,13 +508,19 @@ body {
     cursor: pointer;
 }
 
-.shard-select-list label.is-required {
+.form-row .shard-select-list label.is-required {
     cursor: not-allowed;
     opacity: 0.7;
 }
 
-.shard-select-list input[type='checkbox'] {
+.form-row .shard-select-list input[type='checkbox'] {
     flex: 0 0 auto;
+    /* ⚠ 必须显式重置 width / padding —— 这是同一处错位的**第二个**成因：
+       panel-theme.css 的 `.form-row input { width: 100%; padding: 9px 12px }` 会命中
+       分片复选框，把它撑满整个标签（实测 140px 宽），文字只剩 ~35px 窄条而竖排。
+       只写 flex/margin/accent-color 是不够的 —— 那三样都盖不住 width。 */
+    width: auto;
+    padding: 0;
     margin: 0;
     accent-color: #5789d9;
 }

@@ -180,6 +180,7 @@ npm test                 # 运行全部单元测试（Vitest）
 npm run test:watch       # 监视模式
 npm run test:coverage    # 生成覆盖率报告
 npm run check:guards-reverse   # 反向验证门禁自身（改了 check-*.mjs 后手工跑）
+npm run check:shard-layout     # 布局回归门禁（改了 css/ 或分片区后手工跑，需本机 Chrome）
 ```
 
 `npm run gate` 依次执行八道关：`lint:check` → `check:dompurify-version` → `check:cycles`
@@ -189,6 +190,12 @@ npm run check:guards-reverse   # 反向验证门禁自身（改了 check-*.mjs �
 断言与有效断言外观完全相同 —— 都是绿的。该脚本为这 6 条各注入一个「已知违规」，确认它们真的会红，
 **且失败输出里出现预期片段**（脚本崩了退出码同样非 0），最后逐字节还原。
 **新增源码级断言时必须同时在它的 `CASES` 里补一个变异用例**，否则那条断言只是「看起来在守门」。
+
+`npm run check:shard-layout` 同样**不在 `gate` 内**（依赖本机 Chrome / Edge）：八道关都是源码断言或
+单元测试，**没有一道能发现样式错位** —— CSS 没有类型系统，jsdom 也不做布局计算。这道门禁用
+headless Chrome 渲染真实的分片区块，在 320 / 400 / 500px 三种布局宽度下量**真实计算样式**，
+断言「每个分片标签的文字只占 1 行、标签高 ≤ 40px、复选框 ≤ 20px」。
+改了 `css/**`、`panel.html` 的分片区块或分片文案之后跑一次。
 
 当前基线：**4430 条测试 / 133 文件**，行覆盖率 **99.95%**（详见 [`文档/COVERAGE_BACKLOG.md`](文档/COVERAGE_BACKLOG.md)）。
 
