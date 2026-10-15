@@ -186,8 +186,8 @@ export function initIncrementalSyncFromRibbon(): void {
 > locked-sheet buildCandidate、clean-engine scanXinFanHeaderRow、
 > preview getRowData、ribbon detectConflicts、sync-result-dialog 日期统计。
 > 仍未做：enrichIntoRow 整行批量读写、github-sync 删除 undo 快照、
-> export-jsonl、exceltobangumi syncSelectedRows、ui/handlers/sync.ts 收藏填充、
-> panel-lifecycle detectHeaderAndColumns。
+> ui/handlers/sync.ts 收藏填充（改批量写需先读旧值做基底，且会丢掉
+> setCellValue 的 Formula/Value 回退，收益风险比不划算，暂搁置）。
 >
 > 5.2 已完成：四个 `fetchXxxText` → `createRawTextFetcher`（含 abort 监听器泄漏修复）。
 > 其余 10 项未做。
