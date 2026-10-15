@@ -112,6 +112,44 @@ function preserveCellValue(cell: unknown): WpsCellValue {
   return null
 }
 
+/**
+ * 把 COM `Value2` 的返回值按「**请求的矩形形状**」归一成二维数组 [行][列]
+ *
+ * ⚠️ WPS / Excel 的 `Range.Value2` 形状随范围变化，且**不保证是二维**：
+ *   - 单单元格   → 标量
+ *   - 单行多列   → **一维**数组（该行的全部单元格）
+ *   - 多行多列   → 二维数组
+ *
+ * 旧实现遇到一维数组时逐标量 `push([v])`，把「1 行 N 列」读成「N 行 1 列」——
+ * 单行读-改-写场景下只拿得到第 1 个单元格，写回时 2..N 列被空值填满，
+ * **静默清空用户数据**（同步记录整行更新、新列写回校验等均走这条路径）。
+ *
+ * 判据用**请求形状**而非「数组第 0 项是否也是数组」：
+ *   - 请求单行 → 一维即该行
+ *   - 请求单列 → 一维即该列（列向量）
+ *   - 请求多行多列却拿到一维 → 形状不可信，返回 `null`（调用方必须放弃写入）
+ *
+ * @param raw `Range.Value2` 的返回值
+ * @param rowCount 请求的行数（endRow - startRow + 1）
+ * @param colCount 请求的列数（endCol - startCol + 1）
+ * @returns 二维数组；形状不可信时返回 `null`
+ */
+function normalizeValue2Shape(
+  raw: unknown,
+  rowCount: number,
+  colCount: number,
+): unknown[][] | null {
+  // 单单元格：宿主返回标量
+  if (!Array.isArray(raw)) return [[raw]]
+  if (raw.length === 0) return []
+  if (Array.isArray(raw[0])) return raw as unknown[][]
+  // 一维数组：按请求形状决定它是「一行」还是「一列」
+  if (rowCount === 1) return [raw as unknown[]]
+  if (colCount === 1) return (raw as unknown[]).map((cell) => [cell])
+  // 请求多行多列却拿回一维：无法判定归属，宁可判为读取失败
+  return null
+}
+
 export function readRangeValues(
   ws: WpsWorksheet | null | undefined,
   startRow: number,
@@ -129,19 +167,15 @@ export function readRangeValues(
     // 双重强转——那会丢掉声明类型、迫使下游全量 unknown 防御。
     const raw: unknown = range.Value2
     if (!raw) return []
-    // 处理单个值的情况
-    if (!Array.isArray(raw)) {
-      return [[safeCellValue(raw)]]
-    }
-    const result: string[][] = []
-    for (const row of raw) {
-      if (Array.isArray(row)) {
-        result.push(row.map((cell: unknown) => safeCellValue(cell)))
-      } else {
-        result.push([safeCellValue(row)])
-      }
-    }
-    return result
+    const rowCount = endRow - startRow + 1
+    const colCount = endCol - startCol + 1
+    const rows = normalizeValue2Shape(raw, rowCount, colCount)
+    // 形状不可信（请求多行多列却读回一维）：按读取失败处理，绝不猜形状
+    if (!rows) return []
+    // 单行读回宽度不足 ⇒ 后续「读-改-写」会把缺失列写成空值，等于静默清数据；
+    // 按读取失败处理（与 githubSync 的不变式一致）。
+    if (rowCount === 1 && (rows[0]?.length ?? 0) < colCount) return []
+    return rows.map((row) => row.map((cell) => safeCellValue(cell)))
   } catch {
     return []
   }
@@ -173,19 +207,15 @@ export function readRangeCellValues(
     )
     const raw: unknown = range.Value2
     if (!raw) return []
-    // 处理单个值的情况
-    if (!Array.isArray(raw)) {
-      return [[preserveCellValue(raw)]]
-    }
-    const result: WpsCellValue[][] = []
-    for (const row of raw) {
-      if (Array.isArray(row)) {
-        result.push(row.map((cell: unknown) => preserveCellValue(cell)))
-      } else {
-        result.push([preserveCellValue(row)])
-      }
-    }
-    return result
+    const rowCount = endRow - startRow + 1
+    const colCount = endCol - startCol + 1
+    const rows = normalizeValue2Shape(raw, rowCount, colCount)
+    // 形状不可信（请求多行多列却读回一维）：按读取失败处理，绝不猜形状
+    if (!rows) return []
+    // 单行读回宽度不足 ⇒ 整行写回会把缺失列填满空值，等于静默清数据；
+    // 按读取失败处理（调用方必须放弃写入）。
+    if (rowCount === 1 && (rows[0]?.length ?? 0) < colCount) return []
+    return rows.map((row) => row.map((cell) => preserveCellValue(cell)))
   } catch {
     return []
   }

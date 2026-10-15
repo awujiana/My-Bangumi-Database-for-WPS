@@ -300,6 +300,29 @@ describe('readRangeValues', () => {
     expect(result).toEqual([['single_val'], ['another_val']])
   })
 
+  it('单行多列：宿主返回一维数组时必须读成「1 行 N 列」而非「N 行 1 列」', () => {
+    // WPS 对单行范围返回一维数组；旧实现逐标量 push([v]) 会读成 3 行 1 列，
+    // 整行读-改-写时只拿得到第 1 个单元格，写回后 2..N 列被空值填满（静默清数据）。
+    const ws = createMockWorksheet()
+    const rangeMock = {
+      Value2: ['a1', 'b1', 'c1'],
+      Interior: { Color: 0 },
+    }
+    ws.Range = createRangeMock().mockReturnValue(rangeMock)
+    const result = readRangeValues(ws, 1, 1, 1, 3)
+    expect(result).toEqual([['a1', 'b1', 'c1']])
+  })
+
+  it('请求多行多列却读回一维（形状不可信）时返回空数组，绝不猜形状', () => {
+    const ws = createMockWorksheet()
+    const rangeMock = {
+      Value2: ['a1', 'b1', 'c1'],
+      Interior: { Color: 0 },
+    }
+    ws.Range = createRangeMock().mockReturnValue(rangeMock)
+    expect(readRangeValues(ws, 1, 2, 1, 3)).toEqual([])
+  })
+
   it('应在异常时返回空数组', () => {
     const ws = {
       ...createMockWorksheet(),
@@ -827,6 +850,16 @@ describe('cacheGet / clearSheetCache', () => {
   })
 })
 
+/**
+ * 带用户数据的首行（宽度 = HEADER_SCAN_COLUMNS = 64）
+ *
+ * 真实 COM 对 A1:BL1 一定返回 64 个单元格；此前桩只给 2 列，
+ * 会被「单行读回宽度不足 = 读失败」守卫判为读不全（桩不忠实，改桩不改守卫）。
+ */
+function firstRowWithUserData(): string[] {
+  return ['用户数据A', '用户数据B', ...Array.from({ length: 62 }, () => '')]
+}
+
 describe('ensureSheetHeaders', () => {
   beforeEach(() => {
     vi.clearAllMocks()
@@ -879,9 +912,10 @@ describe('ensureSheetHeaders', () => {
     const ws = createMockWorksheet({ name: 'NoHeaderButHasData' })
     ws.Range = createRangeMock((address: string) => {
       if (address.includes(':')) {
-        // 单行多列区域：二维形状
+        // 单行多列区域：二维形状。宽度必须是 HEADER_SCAN_COLUMNS(64)——
+        // 真实 COM 对 A1:BL1 会返回 64 个单元格，给 2 列会被「宽度不足 = 读失败」守卫拦掉。
         return {
-          Value2: [['用户数据A', '用户数据B']],
+          Value2: [firstRowWithUserData()],
           Interior: { Color: 0 },
           Font: { Bold: false },
         }
@@ -902,8 +936,13 @@ describe('ensureSheetHeaders', () => {
     const ws = createMockWorksheet({ name: 'NoHeader1D' })
     ws.Range = createRangeMock((address: string) => {
       if (address.includes(':')) {
-        // Excel/WPS 对单行范围返回一维数组（真实形状）
-        return { Value2: ['用户数据A', '用户数据B'], Interior: { Color: 0 }, Font: { Bold: false } }
+        // Excel/WPS 对单行范围返回一维数组（真实形状），宽度同样是 64
+        // 宽度同样是 HEADER_SCAN_COLUMNS(64)
+        return {
+          Value2: firstRowWithUserData(),
+          Interior: { Color: 0 },
+          Font: { Bold: false },
+        }
       }
       writtenCells.push(address)
       return createMockCell('')
@@ -1315,10 +1354,29 @@ describe('readRangeCellValues（保留原始类型，供「读-改-写整行」�
     expect(readRangeCellValues(ws, 1, 1, 1, 2)).toEqual([[null, null]])
   })
 
-  it('一维数组按「每元素一行」处理', () => {
+  it('单列多行：一维数组按「每元素一行」处理（列向量）', () => {
     const ws = createMockWorksheet()
     ws.Range = createRangeMock().mockReturnValue({ Value2: [7, 'x'] })
     expect(readRangeCellValues(ws, 1, 2, 1, 1)).toEqual([[7], ['x']])
+  })
+
+  it('单行多列（读-改-写整行的唯一形状）必须读成「1 行 N 列」并保留类型', () => {
+    // 同步记录整行更新走的就是这条路径：读错形状 ⇒ 只拿到第 1 个单元格 ⇒ 写回清空其余列。
+    const ws = createMockWorksheet()
+    ws.Range = createRangeMock().mockReturnValue({ Value2: [7, 'x', true] })
+    expect(readRangeCellValues(ws, 1, 1, 1, 3)).toEqual([[7, 'x', true]])
+  })
+
+  it('请求多行多列却读回一维时返回空数组（调用方据此放弃写入）', () => {
+    const ws = createMockWorksheet()
+    ws.Range = createRangeMock().mockReturnValue({ Value2: [7, 'x', true] })
+    expect(readRangeCellValues(ws, 1, 2, 1, 3)).toEqual([])
+  })
+
+  it('单行读回宽度不足（读不全）时返回空数组：整行写回会把缺失列清成空值', () => {
+    const ws = createMockWorksheet()
+    ws.Range = createRangeMock().mockReturnValue({ Value2: [['a', 'b']] })
+    expect(readRangeCellValues(ws, 1, 1, 1, 12)).toEqual([])
   })
 
   it('读取抛错时返回空数组', () => {
