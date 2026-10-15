@@ -1008,6 +1008,17 @@ async function executeSelectedSync(
     // 设置同步状态机位置（用于暂停时定位到单元格）
     BGM.sync.updatePosition(ws, 0, urlCol)
 
+    // 性能：复用本文件已有的 createFieldGetter 做一次矩形读（原先每行要
+    // URL / 名称 / 完播日 / 集数 + buildJsonPayload 的十余个字段，全是逐格读）。
+    // 它内部已带「矩形读不完整 → 回退逐格」的兜底。
+    let batchMinRow = rows[0] ?? 0
+    let batchMaxRow = batchMinRow
+    for (const row of rows) {
+      if (row < batchMinRow) batchMinRow = row
+      if (row > batchMaxRow) batchMaxRow = row
+    }
+    const readField = createFieldGetter(ws, colMap, batchMinRow, batchMaxRow)
+
     for (const [index, rowNumber] of rows.entries()) {
       // 检查停止
       if (BGM.sync.checkShouldStop()) {
@@ -1033,8 +1044,8 @@ async function executeSelectedSync(
       BGM.sync.updatePosition(undefined, rowNumber)
 
       const syncSingleRowTask = async (): Promise<void> => {
-        const bgmUrl = trim(getCellValue(ws, rowNumber, urlCol) || '')
-        const name = nameCol ? trim(getCellValue(ws, rowNumber, nameCol) || '') : ''
+        const bgmUrl = trim(readField(rowNumber, 'Bangumi_URL') || '')
+        const name = nameCol ? trim(readField(rowNumber, '名称') || '') : ''
 
         if (bgmUrl)
           if (isBangumiUrl(bgmUrl)) {
@@ -1053,11 +1064,8 @@ async function executeSelectedSync(
 
               const finishCol = colMap.get('完播日')
               const finishedDate =
-                finishCol === undefined ? '' : trim(getCellValue(ws, rowNumber, finishCol) || '')
-              const jsonBody = buildJsonPayload((key) => {
-                const col = colMap.get(key)
-                return col === undefined ? '' : trim(getCellValue(ws, rowNumber, col))
-              }, finishedDate)
+                finishCol === undefined ? '' : trim(readField(rowNumber, '完播日') || '')
+              const jsonBody = buildJsonPayload((key) => readField(rowNumber, key), finishedDate)
 
               if (jsonBody === '{}') {
                 const message = `行${String(rowNumber)} "${name || sid}" 请求体为空，跳过`
@@ -1107,8 +1115,8 @@ async function executeSelectedSync(
                       `[syncSelectedRows] 行${String(rowNumber)} jsonBody 解析失败: ${error instanceof Error ? error.message : String(error)}`,
                     )
                   }
-                  const epCol = Number(colMap.get('集数') ?? colMap.get('集号'))
-                  const epRaw = trim(getCellValue(ws, rowNumber, epCol))
+                  // 「集数」为空时退到「集号」（与原 Number(...) 取值口径一致）
+                  const epRaw = trim(readField(rowNumber, '集数') || readField(rowNumber, '集号'))
                   const epCount = Number(epRaw)
                   if (
                     (watchType === 2 || watchType === 3) &&
