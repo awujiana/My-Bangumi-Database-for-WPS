@@ -75,6 +75,22 @@ const mocks = vi.hoisted(() => ({
   /** 1 → A；测试列数远小于 26，故只需覆盖单字母区间 */
   colNumberToLetter: vi.fn((index: number) => String.fromCodePoint(64 + index)),
   getCellValue: vi.fn<(ws: FakeWorksheet, row: number, col: number) => string>(),
+  // 矩形读必须与逐格读来自同一份数据源（都是 `__cells`）：矩形读只是逐格读的
+  // 批量形态，两者不一致时生产代码走快路径就会读到空表（桩不忠实，改桩不改生产）。
+  readRangeValues: vi.fn(
+    (ws: unknown, r1: number, r2: number, c1: number, c2: number): string[][] => {
+      const cells = (ws as { __cells?: Record<string, string> }).__cells ?? {}
+      const out: string[][] = []
+      for (let row = r1; row <= r2; row += 1) {
+        const line: string[] = []
+        for (let col = c1; col <= c2; col += 1) {
+          line.push(cells[`${String(row)}:${String(col)}`] ?? '')
+        }
+        out.push(line)
+      }
+      return out
+    },
+  ),
   renderStatCards: vi.fn(),
   sanitizeHtml: vi.fn((html: string) => html),
   saveLockedSheet: vi.fn(),
@@ -108,6 +124,7 @@ vi.mock('../ts/index.js', async () => {
     bgmLog: mocks.bgmLog,
     escapeHtml: mocks.escapeHtml,
     getCellValue: mocks.getCellValue,
+    readRangeValues: mocks.readRangeValues,
     colNumberToLetter: mocks.colNumberToLetter,
     showToast: mocks.showToast,
     getFilterStatus: mocks.getFilterStatus,
@@ -680,7 +697,15 @@ describe('panel-lifecycle · detectHeaderAndColumns', () => {
       return ws.__cells?.[`${String(row)}:${String(col)}`] ?? ''
     })
 
+    // 本用例覆盖的是「单格读取失败 → 记 handleError 后继续」：矩形读可用时整块读
+    // 成功，单格不会失败（真实宿主同样如此），故显式让矩形读不可用，走逐格回退路径。
+    const originalRect = mocks.readRangeValues.getMockImplementation()
+    mocks.readRangeValues.mockReturnValue([])
+
     const meta = detectHeaderAndColumns(asWs(makeSheet('动画', makeTrackedSheetCells())))
+
+    if (originalRect) mocks.readRangeValues.mockImplementation(originalRect)
+
     expect(mocks.handleError).toHaveBeenCalledWith(
       expect.anything(),
       expect.objectContaining({ context: 'detectHeaderAndColumns' }),

@@ -14,6 +14,7 @@ import {
   BGM,
   escapeHtml,
   getCellValue,
+  readRangeValues,
   colNumberToLetter,
   HEADER_KEYWORDS,
   IMPORTANT_COLS,
@@ -320,6 +321,15 @@ export function detectHeaderAndColumns(
     return !isFiltered || (visibleRowSet?.has(r) ?? false)
   }
 
+  // 性能：一次矩形读覆盖「扫描区 + 数据采样区」× MAX_SCAN_COLUMNS 列。
+  // 原先仅第 1 步就是 10 行 × 60 列 = 600 次逐格读，连同表头名、续行、数据列采样合计约 2000 次/次刷新；矩形读不完整时回退逐格（行为不变）。采样区额外多读 22 行（数据列采样最多再向下看 20 行，留 2 行余量）。
+  const SCAN_ROWS_EXTRA = 22
+  const scanEndRow = PANEL_CONFIG.MAX_SCAN_ROWS + SCAN_ROWS_EXTRA
+  const block = readRangeValues(ws, 1, scanEndRow, 1, PANEL_CONFIG.MAX_SCAN_COLUMNS)
+  const canBatch = block.length === scanEndRow
+  const cellAt = (row: number, col: number): string =>
+    canBatch ? (block[row - 1]?.[col - 1] ?? '') : getCellValue(ws, row, col)
+
   // 1. 扫描前 MAX_SCAN_ROWS 行，找出所有候选表头行
   const candidates: CandidateHeader[] = []
   for (let r = 1; r <= PANEL_CONFIG.MAX_SCAN_ROWS; r += 1) {
@@ -329,7 +339,7 @@ export function detectHeaderAndColumns(
       let colCount = 0
       for (let c = 1; c <= PANEL_CONFIG.MAX_SCAN_COLUMNS; c += 1) {
         try {
-          const v = getCellValue(ws, r, c).trim()
+          const v = cellAt(r, c).trim()
           if (v) {
             colCount += 1
             const cv = v.toLowerCase()
@@ -385,7 +395,7 @@ export function detectHeaderAndColumns(
   const headerNames: string[] = []
   const headerIsImportant: boolean[] = []
   for (let c = 1; c <= PANEL_CONFIG.MAX_SCAN_COLUMNS; c += 1) {
-    const v = getCellValue(ws, headerRow, c).trim()
+    const v = cellAt(headerRow, c).trim()
     headerNames.push(v)
     headerIsImportant.push(IMPORTANT_COLS[v.toLowerCase()] ?? false)
   }
@@ -410,7 +420,7 @@ export function detectHeaderAndColumns(
     // 续行填补锚点内部空隙列的列数（应视为数据，不能并入表头）
     let filledGap = 0
     for (let c = 1; c <= PANEL_CONFIG.MAX_SCAN_COLUMNS; c += 1) {
-      const nv = getCellValue(ws, headerRow + 1, c).trim()
+      const nv = cellAt(headerRow + 1, c).trim()
       const isHeader = hasHeaderName(c - 1)
       if (nv && !isHeader) {
         if (c > anchorLastCol) filledRight += 1
@@ -423,7 +433,7 @@ export function detectHeaderAndColumns(
     if (filledGap === 0 && filledRight >= 3) {
       dataStartRow = headerRow + 2
       for (let c = anchorLastCol + 1; c <= PANEL_CONFIG.MAX_SCAN_COLUMNS; c += 1) {
-        const nv = getCellValue(ws, headerRow + 1, c).trim()
+        const nv = cellAt(headerRow + 1, c).trim()
         if (nv) {
           headerNames[c - 1] = nv
           headerIsImportant[c - 1] = IMPORTANT_COLS[nv.toLowerCase()] ?? false
@@ -441,7 +451,7 @@ export function detectHeaderAndColumns(
     if (isDataRowVisible) {
       samples += 1
       for (let c = 1; c <= PANEL_CONFIG.MAX_SCAN_COLUMNS; c += 1) {
-        const v = getCellValue(ws, dr, c).trim()
+        const v = cellAt(dr, c).trim()
         if (v) {
           if (firstDataCol < 0) firstDataCol = c
           if (c > lastDataCol) lastDataCol = c
