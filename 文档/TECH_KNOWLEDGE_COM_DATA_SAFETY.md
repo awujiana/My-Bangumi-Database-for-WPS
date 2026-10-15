@@ -226,7 +226,7 @@ export function initIncrementalSyncFromRibbon(): void {
 | `dialog.ts:517-823` vs `sync-result-dialog.ts:214-529` | 两份 ~300 行的同步统计仪表盘渲染（donut SVG、柱状图、性能盘、元信息栏） | 抽 `renderSyncChartSection(model)` 到共用模块 |
 | ~~`github-sync.ts:143-246` / `gitee-sync.ts:75-160` / `gitlab-sync.ts:75-160` / `gist-sync.ts:235-323`~~ **已收敛** | 四个 `fetchXxxText` 几乎逐字重复（各 ~85 行），且 **abort 监听器处理已分歧**：github 版有 `removeEventListener`，其余只 add 不 remove → 换配置就泄漏监听器 | ✅ 已提 `createRawTextFetcher({ buildUrl, logTag })` 工厂（净减 88 行），四个源均已改造 |
 | ~~`github-sync.ts:1922-1969` vs `sync-source-registry.ts:299-350`~~ **已收敛** | `getSelectedRowSids` 两份逐字重复（连日志文案都一样） | ✅ 抽 `sync/selected-rows.ts`（零副作用叶子模块），两处 import |
-| `sync-source-registry.ts:100-281` vs `github-sync.ts:1729-1915` | `syncFromRemote` 与 `syncFromGithub` 主体重复 ~150 行，且**功能已漂移**：`missingColumns` 缺列体检只有 github 路径有 → 从 Gitee/GitLab/本地同步时用户看不到缺列提示 | 合并为一份；registry 版本补缺列体检 |
+| `sync-source-registry.ts:100-281` vs `github-sync.ts:1729-1915` | ⚠️ **功能漂移已修，结构合并待做**：`syncFromRemote` 与 `syncFromGithub` 主体仍重复 ~150 行，但漂移点已补齐——① 启用时间筛选时 `neededFields` 补 `date`（否则分片源不下载承载 date 的片 → 筛完 0 条且无提示）；② 补 `missingColumns` 缺列体检（此前只有 GitHub 路径有，走 Gitee/GitLab/本地/Gist 时用户只看到「同步成功但字段没进来」） | 结构合并：抽 `remote-sync-core.ts`，两个入口都变成薄壳 |
 | 4 个 `*-bootstrap.ts` | 「禁用→`modulesReady`启用」整块复制 | 抽 `disableActionsUntilReady(tag)` |
 | `github-settings.ts` vs `action-handlers.ts` | GitHub 配置读/存两套实现（~80 行） | handler 委托 `saveGithubConfigFromDom` |
 | `github-sync.ts:756-829` / `1111-1180` / `1329-1399` | 逐字段回退路径三份重复（~120 行） | 提 `fallbackWriteRemoteEntry(...)` |

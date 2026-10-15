@@ -14,6 +14,8 @@ import { LOG_LEVELS } from '../core/constants.js'
 import {
   bgmLog,
   getApp,
+  findHeaderRow,
+  getColumnMap,
   ensureSheetHeaders,
   getDataSheet,
 } from '../tools/utility.js'
@@ -29,7 +31,7 @@ import {
   readLocalEntriesForSync,
 } from './github-sync.js'
 import type { GithubSyncResult, SyncStrategy } from './github-sync.js'
-import { filterByTime } from './github-sync-diff.js'
+import { collectMissingColumns, filterByTime } from './github-sync-diff.js'
 import type { ConflictResolution, SyncTimeFilter } from './github-sync-diff.js'
 import { GitlabSyncSource } from './gitlab-sync.js'
 import { LocalFileSyncSource } from './local-file-sync.js'
@@ -121,8 +123,17 @@ export async function syncFromRemote(
   onProgress?.(0, 1, `开始下载远程数据（${source.getDisplayName()} - 策略：${strategy}）...`)
   const downloadStartTs = Date.now()
   // 分片数据源按表头只下载需要的片；读不到表头时返回 undefined → 全量下载
+  const neededFields = collectNeededFieldsFromSheet()
+  // 时间筛选完全依赖远程条目的 date 字段，而 date **不在** REQUIRED_FIELDS 里：
+  // 用户表若没有「开播日期」列，按表头推导 neededFields 时不会带上 date，
+  // 分片选择可能不下载承载它的分片 → 所有 entry.date 均为 undefined →
+  // filterByTime 把它们全部判为「无日期」过滤掉，最终同步 0 条且无任何提示。
+  // 因此启用时间筛选时必须显式补上 date（读不到表头时本就是全量下载，不受影响）。
+  if (neededFields && timeFilter?.enabled === true && timeFilter.range !== 'all') {
+    neededFields.add('date')
+  }
   const remoteEntries = await source.fetchRemoteEntries(signal, {
-    neededFields: collectNeededFieldsFromSheet(),
+    neededFields,
   })
   const downloadElapsed = Date.now() - downloadStartTs
   onProgress?.(
@@ -243,6 +254,24 @@ export async function syncFromRemote(
     result.remoteTotal = effectiveRemoteEntries.length
     // unchanged = 远程总数 - (新增+更新)（delete 不计入 unchanged）
     result.unchanged = Math.max(0, effectiveRemoteEntries.length - addedCount - updateCount)
+
+    // 缺列体检：远程有数据、本地却没有对应表头的字段 → 提示用户自行添加列。
+    // 写入侧遇到缺失列直接跳过，不体检的话用户只会看到「同步成功但字段没进来」。
+    // 此前只有 GitHub 路径做体检，走 Gitee/GitLab/本地/Gist 时用户完全看不到提示。
+    const sheetForAudit = getDataSheet()
+    if (sheetForAudit) {
+      const auditHeaderRow = findHeaderRow(sheetForAudit) || 1
+      result.missingColumns = collectMissingColumns(
+        effectiveRemoteEntries,
+        getColumnMap(sheetForAudit, auditHeaderRow),
+      )
+      if (result.missingColumns.length > 0) {
+        bgmLog(
+          LOG_LEVELS.WARN,
+          `[syncFromRemote] ${String(result.missingColumns.length)} 个远程字段因本地缺少表头未同步，建议添加列：${result.missingColumns.join('、')}`,
+        )
+      }
+    }
 
     const totalElapsed = Date.now() - syncStartTs
     const totalProcessed = addedCount + updateCount + deletedCount

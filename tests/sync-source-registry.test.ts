@@ -636,6 +636,22 @@ describe('syncSourceRegistry 未覆盖分支', () => {
     expect(result.unchanged).toBe(1)
   })
 
+  it('同步完成后应做缺列体检：远程有数据但本地无表头时给出 missingColumns', async () => {
+    // 此前缺列体检只存在于 GitHub 路径，走 Gitee / GitLab / 本地 / Gist 时
+    // 用户只会看到「同步成功但字段没进来」，没有任何提示。
+    mockGithubSourceReference.fetchRemoteEntries.mockResolvedValue([{ sid: '1', name: 'A' }])
+    mockComputeDiff.mockReturnValue([])
+    mockGetDataSheet.mockReturnValue({ Name: 'Sheet1' })
+    mockFindHeaderRow.mockReturnValue(1)
+    mockGetColumnMap.mockReturnValue(new Map<string, number>())
+
+    const result = await syncFromRemote()
+
+    expect(Array.isArray(result.missingColumns)).toBe(true)
+    // 本地完全没有表头 ⇒ 至少 Bangumi_URL 会被判为缺失
+    expect(result.missingColumns?.length).toBeGreaterThan(0)
+  })
+
   it('readLocalEntriesForSync 返回 null 时应抛出错误', async () => {
     mockReadLocalEntriesForSync.mockReturnValue(null)
     await expect(syncFromRemote()).rejects.toThrow('无法读取本地工作表数据')
