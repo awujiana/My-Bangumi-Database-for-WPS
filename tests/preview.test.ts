@@ -44,6 +44,26 @@ const mocks = vi.hoisted(() => ({
   wpsMessageBox: vi.fn(() => Promise.resolve()),
   getApp: vi.fn((): unknown => null),
   getCellValue: vi.fn((_ws: unknown, _row: number, _col: number): string => ''),
+  // 矩形读必须与逐格读来自同一份数据源：矩形读只是逐格读的批量形态，
+  // 两者不一致时生产代码走快路径就会读到空表（桩不忠实，改桩不改生产）。
+  readRangeValues: vi.fn(
+    (_ws: unknown, r1: number, r2: number, c1: number, c2: number): string[][] => {
+      const out: string[][] = []
+      for (let row = r1; row <= r2; row += 1) {
+        const line: string[] = []
+        for (let col = c1; col <= c2; col += 1) {
+          // 与真实实现一致：单格读取失败按空串处理，不让整块读失败
+          try {
+            line.push(mocks.getCellValue(_ws, row, col))
+          } catch {
+            line.push('')
+          }
+        }
+        out.push(line)
+      }
+      return out
+    },
+  ),
   trim: vi.fn((value: unknown) => (typeof value === 'string' ? value : '').trim()),
   getCell: vi.fn((_ws: unknown, _row: number, _col: number): unknown => null),
   escapeHtml: vi.fn((text: unknown) => {
@@ -137,6 +157,7 @@ vi.mock('../ts/index.js', () => ({
     },
   },
   getCellValue: mocks.getCellValue,
+  readRangeValues: mocks.readRangeValues,
   trim: mocks.trim,
   _getUserApiPath: mocks.getUserApiPath,
   wpsMessageBox: mocks.wpsMessageBox,
@@ -469,7 +490,14 @@ describe('preview · previewSyncContent', () => {
       return original?.(ws, row, col) ?? ''
     })
 
+    // 本用例覆盖的是「逐格读抛错 ⇒ 计入错误行」：矩形读可用时整块读成功，
+    // 单格不会失败（真实宿主同样如此），故显式让矩形读不可用，走回退路径。
+    const originalRect = mocks.readRangeValues.getMockImplementation()
+    mocks.readRangeValues.mockReturnValue([])
+
     await previewSyncContent()
+
+    if (originalRect) mocks.readRangeValues.mockImplementation(originalRect)
 
     expect(mocks.completeSyncProgressDialog).toHaveBeenCalledWith(
       expect.stringContaining('错误: 1'),

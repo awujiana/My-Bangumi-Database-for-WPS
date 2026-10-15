@@ -13,6 +13,7 @@ import {
   _getUserApiPath,
   wpsMessageBox,
   getCell,
+  readRangeValues,
   escapeHtml,
   showAlert,
   showToast,
@@ -96,12 +97,73 @@ function isUploadedByColor(seqCell: WpsRange | null): boolean {
   return [BGM_COLOR.SUCCESS, BGM_COLOR.LIGHT_GREEN, BGM_COLOR.DARK_GREEN].includes(c)
 }
 
+/** 预览取数涉及的映射键（批量矩形读时据此确定列包围盒） */
+const PREVIEW_VALUE_KEYS = [
+  'Bangumi_URL',
+  '名称',
+  '是否看完',
+  '打分',
+  '标签/分级',
+  '原作标签',
+  '完播日',
+] as const
+
+/** 行跨度超过该阈值就不做整块矩形读（避免把稀疏选区放大成超大 COM 传输） */
+const MAX_BATCH_ROW_SPAN = 20_000
+
+/**
+ * 一次矩形读覆盖「所有行 × 所有取数列」，返回 行号 → (列号 → 文本)
+ *
+ * 原先每行要 7 次逐格读（500 行 ≈ 3500 次 IPC，是「预览同步」卡顿的主因）。
+ * 读回行数不足或行跨度过大时返回 undefined —— 调用方回退逐格读。
+ */
+function buildRowCellsCache(
+  ws: WpsWorksheet | null | undefined,
+  rows: number[],
+  colMap: ColumnMap,
+  seqCol: number,
+): Map<number, ReadonlyMap<number, string>> | undefined {
+  if (!ws || rows.length === 0) return undefined
+
+  let minRow = rows[0] ?? 0
+  let maxRow = minRow
+  for (const row of rows) {
+    if (row < minRow) minRow = row
+    if (row > maxRow) maxRow = row
+  }
+  if (maxRow - minRow + 1 > MAX_BATCH_ROW_SPAN) return undefined
+
+  const cols = new Set<number>([colMap.get('序列号') ?? seqCol])
+  for (const key of PREVIEW_VALUE_KEYS) {
+    const col = colMap.get(key)
+    if (col !== undefined) cols.add(col)
+  }
+  let minCol = Infinity
+  let maxCol = 0
+  for (const col of cols) {
+    if (col < minCol) minCol = col
+    if (col > maxCol) maxCol = col
+  }
+
+  const block = readRangeValues(ws, minRow, maxRow, minCol, maxCol)
+  if (block.length !== maxRow - minRow + 1) return undefined
+
+  const cache = new Map<number, ReadonlyMap<number, string>>()
+  for (const [index, cells] of block.entries()) {
+    const byCol = new Map<number, string>()
+    for (const col of cols) byCol.set(col, cells[col - minCol] ?? '')
+    cache.set(minRow + index, byCol)
+  }
+  return cache
+}
+
 function getRowData(
   ws: WpsWorksheet | null | undefined,
   rowNumber: number,
   colMap: ColumnMap,
   headerRow: number,
   seqCol = 9,
+  rowCells?: ReadonlyMap<number, string>,
 ): DetailItem {
   const data: DetailItem = {
     row: rowNumber,
@@ -120,7 +182,9 @@ function getRowData(
   const readCol = (mapKey: string): string => {
     const col = colMap.get(mapKey)
     if (col !== undefined) {
-      const value = trim(getCellValue(ws, rowNumber, col))
+      // 命中批量读缓存就用缓存，否则逐格读（兼容未走批量路径的调用点）
+      const raw = rowCells?.get(col) ?? getCellValue(ws, rowNumber, col)
+      const value = trim(raw)
       if (mapKey === 'Bangumi_URL') {
         data.urlCell = getCell(ws, rowNumber, col)
       }
@@ -374,6 +438,9 @@ export async function previewSyncContent(): Promise<void> {
   let skippedCount = 0
   let errorCount = 0
 
+  // 循环外一次矩形读全部取数列（缓存未建成时 getRowData 自动回退逐格读）
+  const rowCellsCache = buildRowCellsCache(ws, dataRows, colMap, 9)
+
   const renderPreviewCards = async (): Promise<void> => {
     for (const [index, rowNumber] of dataRows.entries()) {
       // 停止检查
@@ -404,8 +471,10 @@ export async function previewSyncContent(): Promise<void> {
         setTimeout(resolve, 0)
       })
 
+      // 缓存查表放在 try 外：可选链会抬高 try 块复杂度（unicorn/try-complexity）
+      const rowCells = rowCellsCache?.get(rowNumber)
       try {
-        const rowData = getRowData(ws, rowNumber, colMap, headerRow, 9)
+        const rowData = getRowData(ws, rowNumber, colMap, headerRow, 9, rowCells)
 
         // 过滤无效行
         if (!rowData.bgmUrl || !rowData.sid) {
