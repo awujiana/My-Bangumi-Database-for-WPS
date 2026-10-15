@@ -178,7 +178,25 @@ export function initIncrementalSyncFromRibbon(): void {
 
 ---
 
-## 五、COM 往返浪费：优化清单（未实施，按收益排序）
+## 五、COM 往返浪费：优化清单（按收益排序）
+
+> **进度（2026-10-15 批次）**
+>
+> 5.1 已完成：enrichAlias 别名列外提、findHeaderRow、getColumnMap、
+> locked-sheet buildCandidate、clean-engine scanXinFanHeaderRow、
+> preview getRowData、ribbon detectConflicts、sync-result-dialog 日期统计。
+> 仍未做：enrichIntoRow 整行批量读写、github-sync 删除 undo 快照、
+> export-jsonl、exceltobangumi syncSelectedRows、ui/handlers/sync.ts 收藏填充、
+> panel-lifecycle detectHeaderAndColumns。
+>
+> 5.2 已完成：四个 `fetchXxxText` → `createRawTextFetcher`（含 abort 监听器泄漏修复）。
+> 其余 10 项未做。
+>
+> 5.3 已完成：别名匹配 O(n²) → 反向索引。
+>
+> **统一改法**：全部走「矩形读 + 逐格读回退」——只有读回的行数（单行时还要求宽度）
+> 与请求一致才信任批量结果，否则回退原逐格路径。这样即便宿主/桩不支持区域读，
+> 行为也与改造前**逐字一致**，优化只会在真实宿主上生效。
 
 审计发现大量「循环内逐格读写」，门禁 `check:com-in-loop` **查不到**——它只查循环**条件**里的 COM 属性，不查循环**体**内的逐格读写。建议后续按此清单治理，每项都可独立提交。
 
@@ -206,7 +224,7 @@ export function initIncrementalSyncFromRibbon(): void {
 | 位置 | 重复内容 | 建议 |
 | --- | --- | --- |
 | `dialog.ts:517-823` vs `sync-result-dialog.ts:214-529` | 两份 ~300 行的同步统计仪表盘渲染（donut SVG、柱状图、性能盘、元信息栏） | 抽 `renderSyncChartSection(model)` 到共用模块 |
-| `github-sync.ts:143-246` / `gitee-sync.ts:75-160` / `gitlab-sync.ts:75-160` / `gist-sync.ts:235-323` | 四个 `fetchXxxText` 几乎逐字重复（各 ~85 行），且 **abort 监听器处理已分歧**：github 版有 `removeEventListener`，其余只 add 不 remove → 换配置就泄漏监听器 | 提 `createRawTextFetcher({ buildUrl, logTag })` 工厂 |
+| ~~`github-sync.ts:143-246` / `gitee-sync.ts:75-160` / `gitlab-sync.ts:75-160` / `gist-sync.ts:235-323`~~ **已收敛** | 四个 `fetchXxxText` 几乎逐字重复（各 ~85 行），且 **abort 监听器处理已分歧**：github 版有 `removeEventListener`，其余只 add 不 remove → 换配置就泄漏监听器 | ✅ 已提 `createRawTextFetcher({ buildUrl, logTag })` 工厂（净减 88 行），四个源均已改造 |
 | `github-sync.ts:1922-1969` vs `sync-source-registry.ts:299-350` | `getSelectedRowSids` 两份逐字重复（连日志文案都一样） | 保留一份，registry import |
 | `sync-source-registry.ts:100-281` vs `github-sync.ts:1729-1915` | `syncFromRemote` 与 `syncFromGithub` 主体重复 ~150 行，且**功能已漂移**：`missingColumns` 缺列体检只有 github 路径有 → 从 Gitee/GitLab/本地同步时用户看不到缺列提示 | 合并为一份；registry 版本补缺列体检 |
 | 4 个 `*-bootstrap.ts` | 「禁用→`modulesReady`启用」整块复制 | 抽 `disableActionsUntilReady(tag)` |
@@ -221,7 +239,7 @@ export function initIncrementalSyncFromRibbon(): void {
 
 | 位置 | 问题 | 改法 |
 | --- | --- | --- |
-| `enrich-engine.ts:614-618` | 别名匹配 O(n²)：1000 个未匹配行 × 5000 个别名索引 = 500 万次 `includes` | 构建 `aliasIndex` 时顺带产反向索引 `Map<row, alias[]>`，此处 O(1) 查表 |
+| ~~`enrich-engine.ts:614-618`~~ **已修** | 别名匹配 O(n²)：1000 个未匹配行 × 5000 个别名索引 = 500 万次 `includes` | ✅ 构建 `aliasIndex` 时顺带产反向索引 `aliasByRow: Map<row, alias[]>`，此处 O(1) 查表 |
 
 ---
 
