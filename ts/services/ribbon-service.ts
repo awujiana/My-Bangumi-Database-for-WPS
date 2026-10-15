@@ -440,10 +440,23 @@ export async function detectConflicts(
     bgmLog(LOG_LEVELS.INFO, `[detectConflicts] 全量模式: ${String(rowsToProcess.length)} 行`)
   }
 
+  // 性能：一次矩形读覆盖全部行 × 取数列（原先每行 3 次逐格读，1000 行 ≈ 3000 次 IPC）。
+  // 只读到 min..max 列包围盒；读回行数不足时 getField 自动回退逐格读。
+  const conflictKeys = ['Bangumi_URL', '是否看完', '名称'] as const
+  let conflictMaxCol = 1
+  for (const key of conflictKeys) {
+    const col = colMap.get(key)
+    if (col !== undefined) conflictMaxCol = Math.max(conflictMaxCol, col)
+  }
+  const allData = readRangeValues(ws, startRow, lastRow, 1, conflictMaxCol)
+
   const getField = (row: number, key: string): string => {
     const col = colMap.get(key)
-    if (col !== undefined) return trim(getCellValue(ws, row, col))
-    return ''
+    if (col === undefined) return ''
+    const rowData = allData[row - startRow]
+    if (rowData && col - 1 < rowData.length) return trim(rowData[col - 1])
+    // 矩形读不可用（宿主/桩未返回完整矩形）→ 回退逐格读，行为与改造前一致
+    return trim(getCellValue(ws, row, col))
   }
 
   for (const rowNumber of rowsToProcess) {

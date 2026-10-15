@@ -20,6 +20,7 @@ import {
   getColumnMap,
   getLastRow,
   getCellValue,
+  readRangeValues,
   trim,
 } from '../tools/util/index.js'
 import { bgmLog } from '../tools/utility.js'
@@ -125,14 +126,24 @@ export function computeDateStatsFromSheet(): DateStats {
   let datedCount = 0
   let totalCount = 0
 
+  // 性能：按列整列读（2 次 IPC），替代 2N 次逐格读（5000 行 ≈ 1 万次）。
+  // 只读这两列本身，不扩到列包围盒（避免把无关列一起拉回来）。
+  const rowCount = lastRow - startRow + 1
+  const urlColumn = readRangeValues(ws, startRow, lastRow, urlCol, urlCol)
+  const dateColumn = readRangeValues(ws, startRow, lastRow, dateCol, dateCol)
+  const canBatch = urlColumn.length === rowCount && dateColumn.length === rowCount
+
   for (let row = startRow; row <= lastRow; row += 1) {
-    const url = trim(getCellValue(ws, row, urlCol))
+    const index = row - startRow
+    const url = trim(canBatch ? (urlColumn[index]?.[0] ?? '') : getCellValue(ws, row, urlCol))
     if (url) {
       const sid = extractSubjectId(url)
       if (sid) {
         totalCount += 1
 
-        const dateString = trim(getCellValue(ws, row, dateCol))
+        const dateString = trim(
+          canBatch ? (dateColumn[index]?.[0] ?? '') : getCellValue(ws, row, dateCol),
+        )
         if (dateString) {
           datedCount += 1
 
