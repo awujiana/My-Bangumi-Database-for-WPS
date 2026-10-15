@@ -59,6 +59,7 @@ import type {
   SyncTimeFilter,
 } from './github-sync-diff.js'
 import { extractSubjectId } from './pure-utilities.js'
+import { getSelectedRowSids } from './selected-rows.js'
 import {
   DATE_COLUMNS,
   appendValueWithSeparator,
@@ -741,6 +742,32 @@ function writeRowValuesWithUndo(
   }
 }
 
+interface WriteCol {
+  name: string
+  col: number
+}
+
+/**
+ * 按列名清单收集「待写列」，去重后按列号升序返回。
+ *
+ * `batchWriteNewRows` 与 `batchUpdateRows` 此前各有一份逐字重复的
+ * 「seen 去重 + colMap 查列号 + 排序」逻辑，收敛为一份，避免后续各自漂移。
+ *
+ * @param colMap 列映射（列名 → 列号）
+ * @param names 候选列名（可重复、可无序；colMap 里没有的列会被跳过）
+ * @returns 去重且按列号升序的待写列
+ */
+function collectWriteCols(colMap: Map<string, number>, names: Iterable<string>): WriteCol[] {
+  const writeCols: WriteCol[] = []
+  const uniqueNames = new Set(names)
+  for (const name of uniqueNames) {
+    const col = colMap.get(name)
+    if (col) writeCols.push({ name, col })
+  }
+  writeCols.sort((a, b) => a.col - b.col)
+  return writeCols
+}
+
 /**
  * 批量写入新增行（使用 Range.Value2 二维数组，比逐行写入快 100-1000x）
  *
@@ -765,33 +792,11 @@ function batchWriteNewRows(
   if (rows.length === 0) return 0
 
   // 1. 收集需要写入的列（按列号升序排列）
-  interface WriteCol {
-    name: string
-    col: number
-  }
-  const writeCols: WriteCol[] = []
-  const seen = new Set<string>()
-  const tryAddCol = (name: string): void => {
-    if (seen.has(name)) return
-    seen.add(name)
-    const col = colMap.get(name)
-    if (col) writeCols.push({ name, col })
-  }
-
-  tryAddCol('Bangumi_URL')
-  tryAddCol('名称')
-  tryAddCol('标签/分级')
-  tryAddCol('集数')
+  const pendingFieldNames = ['Bangumi_URL', '名称', '标签/分级', '集数']
   for (const [, excelField] of EXTENDED_FIELD_MAP) {
-    tryAddCol(excelField)
+    pendingFieldNames.push(excelField)
   }
-
-  if (writeCols.length === 0) {
-    bgmLog(LOG_LEVELS.WARN, '[batchWriteNewRows] 未找到任何可写入的列')
-    return 0
-  }
-
-  writeCols.sort((a, b) => a.col - b.col)
+  const writeCols = collectWriteCols(colMap, pendingFieldNames)
   // 上方已守卫 writeCols 非空，?? 分支仅为类型层兜底
   const minCol = writeCols[0]?.col ?? 1
   const maxCol = writeCols.at(-1)?.col ?? minCol
@@ -905,17 +910,9 @@ function batchUpdateRows(
   if (updates.length === 0) return 0
 
   // 1. 收集需要写入的列
-  interface WriteCol {
-    name: string
-    col: number
-  }
-  const writeCols: WriteCol[] = []
-  const seen = new Set<string>()
-  const tryAddCol = (name: string): void => {
-    if (seen.has(name)) return
-    seen.add(name)
-    const col = colMap.get(name)
-    if (col) writeCols.push({ name, col })
+  const updateFieldNames: string[] = []
+  const addName = (name: string): void => {
+    updateFieldNames.push(name)
   }
 
   // 根据 updates 中所有 fields 的并集确定需要写入的列
@@ -924,15 +921,15 @@ function batchUpdateRows(
   // - 普通更新：追加到「别名」列
   for (const u of updates) {
     const isWriteAll = u.fields.includes('*')
-    if (isWriteAll || u.fields.includes('Bangumi_URL')) tryAddCol('Bangumi_URL')
+    if (isWriteAll || u.fields.includes('Bangumi_URL')) addName('Bangumi_URL')
     if (isWriteAll || u.fields.includes('名称')) {
       // 强制覆盖/新增时写入名称列
-      tryAddCol('名称')
+      addName('名称')
       // 普通更新时写入别名列
-      tryAddCol('别名')
+      addName('别名')
     }
-    if (isWriteAll || u.fields.includes('标签/分级')) tryAddCol('标签/分级')
-    if (isWriteAll || u.fields.includes('集数')) tryAddCol('集数')
+    if (isWriteAll || u.fields.includes('标签/分级')) addName('标签/分级')
+    if (isWriteAll || u.fields.includes('集数')) addName('集数')
     // 扩展字段：同时检查主映射和所有别名（如「动画制作公司」→「制作公司」/「动画制作公司」）
     const handled = new Set<string>()
     for (const [jsonlField] of EXTENDED_FIELD_MAP) {
@@ -941,18 +938,17 @@ function batchUpdateRows(
         handled.add(jsonlField)
         const aliases = getExcelAliases(jsonlField)
         if (isWriteAll || aliases.some((a) => u.fields.includes(a))) {
-          for (const a of aliases) tryAddCol(a)
+          for (const a of aliases) addName(a)
         }
       }
     }
   }
 
+  const writeCols = collectWriteCols(colMap, updateFieldNames)
   if (writeCols.length === 0) {
     bgmLog(LOG_LEVELS.WARN, '[batchUpdateRows] 未找到任何可写入的列')
     return 0
   }
-
-  writeCols.sort((a, b) => a.col - b.col)
   // 上方已守卫 writeCols 非空，?? 分支仅为类型层兜底
   const minCol = writeCols[0]?.col ?? 1
   const maxCol = writeCols.at(-1)?.col ?? minCol
@@ -1898,56 +1894,3 @@ export async function syncFromGithub(
   }
 }
 
-/**
- * 从 WPS 当前选区提取所有行的 SID 集合（用于「仅同步选中行」）
- *
- * @returns SID 字符串集合；空集合表示未选中行或未找到 URL
- */
-function getSelectedRowSids(): Set<string> {
-  const sids = new Set<string>()
-  try {
-    const app = getApp()
-    if (!app) return sids
-
-    const selection = app.Selection
-    if (!selection) {
-      bgmLog(LOG_LEVELS.WARN, '[getSelectedRowSids] 无选区')
-      return sids
-    }
-
-    const firstRow = selection.Row
-    const lastRow = selection.Row + selection.Rows.Count - 1
-    bgmLog(
-      LOG_LEVELS.INFO,
-      `[getSelectedRowSids] 选区行范围: ${String(firstRow)}-${String(lastRow)}`,
-    )
-
-    const ws = app.ActiveSheet
-    if (!ws) return sids
-    const headerRow = findHeaderRow(ws) || 1
-    const colMap = getColumnMap(ws, headerRow)
-    const urlCol = colMap.get('Bangumi_URL')
-    if (!urlCol) {
-      bgmLog(LOG_LEVELS.WARN, '[getSelectedRowSids] 未找到 Bangumi_URL 列')
-      return sids
-    }
-
-    for (let row = firstRow; row <= lastRow; row += 1) {
-      const isNotHeaderRow = row !== headerRow
-      if (isNotHeaderRow) {
-        const url = trim(getCellValue(ws, row, urlCol))
-        if (url) {
-          const sid = extractSubjectId(url)
-          if (sid) {
-            sids.add(sid)
-          }
-        }
-      }
-    }
-
-    bgmLog(LOG_LEVELS.INFO, `[getSelectedRowSids] 提取到 ${String(sids.size)} 个 SID`)
-  } catch (error: unknown) {
-    bgmLog(LOG_LEVELS.ERROR, `[getSelectedRowSids] 提取失败: ${(error as Error).message}`)
-  }
-  return sids
-}

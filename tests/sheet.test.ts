@@ -350,9 +350,11 @@ describe('readRangeValues', () => {
 function createGridWs(grid: string[][]): ReturnType<typeof createMockWorksheet> {
   const ws = createMockWorksheet()
   ws.Range = createRangeMock((address: string) => {
-    const [start, end] = address.split(':', 2)
+    const parts = address.split(':', 2)
+    const start = parts[0] ?? ''
+    const end = parts[1] ?? start
     const startRow = Number(start.slice(1))
-    const endRow = Number((end ?? start).slice(1))
+    const endRow = Number(end.slice(1))
     return {
       Value2: grid.slice(startRow - 1, endRow),
       Interior: { Color: 0 },

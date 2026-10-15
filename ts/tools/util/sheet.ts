@@ -150,6 +150,53 @@ function normalizeValue2Shape(
   return null
 }
 
+/**
+ * 矩形读的唯一实现：取 `Range.Value2` → 按请求形状归一 → 逐格转换。
+ *
+ * `readRangeValues`（一律 String 化）与 `readRangeCellValues`（保留原始类型）共用本函数，
+ * 只差最后的 `convert`，避免两份 90% 相同的实现各自漂移。
+ *
+ * 形状守卫（行数/列宽对不上、请求多行多列却读回一维）一律按**读取失败**返回 `null`：
+ * 宁可让调用方回退或放弃写入，也不猜形状——猜错就是静默清数据。
+ *
+ * @returns 二维数组 [行][列]；读取失败时 `null`
+ */
+function readRect<T>(
+  ws: WpsWorksheet | null | undefined,
+  startRow: number,
+  endRow: number,
+  startCol: number,
+  endCol: number,
+  convert: (cell: unknown) => T,
+): T[][] | null {
+  if (!ws) return null
+  try {
+    const range = ws.Range(
+      `${colNumberToLetter(startCol)}${String(startRow)}:${colNumberToLetter(endCol)}${String(endRow)}`,
+    )
+    // WpsRange 已声明 Value2?: WpsCellValue | WpsCellValue[][]，不需要 as unknown as
+    // 双重强转——那会丢掉声明类型、迫使下游全量 unknown 防御。
+    const raw: unknown = range.Value2
+    if (!raw) return null
+    const rowCount = endRow - startRow + 1
+    const colCount = endCol - startCol + 1
+    const rows = normalizeValue2Shape(raw, rowCount, colCount)
+    // 形状不可信（请求多行多列却读回一维）：按读取失败处理，绝不猜形状
+    if (!rows) return null
+    // 单行读回宽度不足 ⇒ 后续「读-改-写」会把缺失列写成空值，等于静默清数据；
+    // 按读取失败处理（与 githubSync 的不变式一致）。
+    if (rowCount === 1 && (rows[0]?.length ?? 0) < colCount) return null
+    return rows.map((row) => row.map((cell) => convert(cell)))
+  } catch {
+    return null
+  }
+}
+
+/**
+ * 批量读取工作表中指定范围的值（一律 `String()` 化），返回二维数组 [行][列]。
+ *
+ * 读取失败返回空数组——调用方**必须**据此放弃写入，绝不能拿空数组覆盖整行。
+ */
 export function readRangeValues(
   ws: WpsWorksheet | null | undefined,
   startRow: number,
@@ -157,28 +204,7 @@ export function readRangeValues(
   startCol: number,
   endCol: number,
 ): string[][] {
-  if (!ws) return []
-  try {
-    const range = ws.Range(
-      `${colNumberToLetter(startCol)}${String(startRow)}:${colNumberToLetter(endCol)}${String(endRow)}`,
-    )
-    // 复用 cell.ts 中的 tryGetProperty（未导出），此处通过 range 直接访问 Value2。
-    // WpsRange 已声明 Value2?: WpsCellValue | WpsCellValue[][]，不需要 as unknown as
-    // 双重强转——那会丢掉声明类型、迫使下游全量 unknown 防御。
-    const raw: unknown = range.Value2
-    if (!raw) return []
-    const rowCount = endRow - startRow + 1
-    const colCount = endCol - startCol + 1
-    const rows = normalizeValue2Shape(raw, rowCount, colCount)
-    // 形状不可信（请求多行多列却读回一维）：按读取失败处理，绝不猜形状
-    if (!rows) return []
-    // 单行读回宽度不足 ⇒ 后续「读-改-写」会把缺失列写成空值，等于静默清数据；
-    // 按读取失败处理（与 githubSync 的不变式一致）。
-    if (rowCount === 1 && (rows[0]?.length ?? 0) < colCount) return []
-    return rows.map((row) => row.map((cell) => safeCellValue(cell)))
-  } catch {
-    return []
-  }
+  return readRect(ws, startRow, endRow, startCol, endCol, safeCellValue) ?? []
 }
 
 /**
@@ -249,25 +275,7 @@ export function readRangeCellValues(
   startCol: number,
   endCol: number,
 ): WpsCellValue[][] {
-  if (!ws) return []
-  try {
-    const range = ws.Range(
-      `${colNumberToLetter(startCol)}${String(startRow)}:${colNumberToLetter(endCol)}${String(endRow)}`,
-    )
-    const raw: unknown = range.Value2
-    if (!raw) return []
-    const rowCount = endRow - startRow + 1
-    const colCount = endCol - startCol + 1
-    const rows = normalizeValue2Shape(raw, rowCount, colCount)
-    // 形状不可信（请求多行多列却读回一维）：按读取失败处理，绝不猜形状
-    if (!rows) return []
-    // 单行读回宽度不足 ⇒ 整行写回会把缺失列填满空值，等于静默清数据；
-    // 按读取失败处理（调用方必须放弃写入）。
-    if (rowCount === 1 && (rows[0]?.length ?? 0) < colCount) return []
-    return rows.map((row) => row.map((cell) => preserveCellValue(cell)))
-  } catch {
-    return []
-  }
+  return readRect(ws, startRow, endRow, startCol, endCol, preserveCellValue) ?? []
 }
 
 // 缓存相关（模块级 Map）

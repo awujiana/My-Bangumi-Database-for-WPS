@@ -205,8 +205,8 @@ export function initIncrementalSyncFromRibbon(): void {
 | 位置 | 现状 | 改法 | 预估收益 |
 | --- | --- | --- | --- |
 | `enrich-engine.ts:1850` `enrichAlias` | 每条匹配都重算 `findAliasColumn`（内部 50 次 `getCellValue`） | 循环外算一次，经 `enrichIntoRow` 传入 | 10 万次 → 1 次 |
-| `enrich-engine.ts:1100-1205` `enrichIntoRow` | 逐字段读+写，每条约 20 次 IPC | 入口一次 `readRangeValues` 读全映射列矩形，最后一次批量写 | 2 万次 → 约 4 次 |
-| `github-sync.ts:1506-1509` delete 阶段 | 逐格读整行记 undo（30+ 列） | 删除循环前一次矩形读全部待删行 | 6 万次 → 2000 次 |
+| `enrich-engine.ts:1100-1205` `enrichIntoRow` | 逐字段读+写，每条约 20 次 IPC | ⚠️ **只做了源表那一半**：`readNewAnimeRow` 7 次 / `readIntroSheetRow` 18 次逐格读 → 循环外一次 `readRowsCache`。目标表（bangumiSheet）**不缓存**——`enrichIntroData` 写特点列后 `enrichOpEdPv` 会再读同一格，只读缓存会拿到写前旧值导致合并出错 | 源表 2 万次 → 1 次 |
+| ~~`github-sync.ts:1506-1509` delete 阶段~~ **已修** | 逐格读整行记 undo（30+ 列） | ✅ 删除循环前用 `readRowsCache` 一次矩形读全部待删行（倒序删除前任何行都还在原始行号上） | 6 万次 → 2000 次 |
 | `export-jsonl.ts:163-239` | 逐格读 + **映射表在循环体内重建** | 循环外一次矩形读；映射表改为从 `github-sync-diff.js` 导入并提模块顶层 | 5 万次 → 2 次，消 20 行重复 |
 | `exceltobangumi/index.ts:1036-1114` `syncSelectedRows` | 逐格读，没用本文件已有的 `createFieldGetter` | 对 rows 的 min..max 区间调一次 `createFieldGetter` | 1.4 万次 → 2 次 |
 | `panel-lifecycle.ts:325-355` `detectHeaderAndColumns` | 10 行 × 60 列逐格扫 ≈ 2000 次/次 `refreshData` | 一次 `readRangeValues` 读 1–10 行进内存 | 2000 次 → 约 13 次 |
@@ -215,7 +215,7 @@ export function initIncrementalSyncFromRibbon(): void {
 | `locked-sheet.ts:306-330` | 每张表 660 次，多工作簿再乘表数 | 一次矩形读 10×60 | 660 次 → 11 次/表 |
 | `ribbon-service.ts:443` `detectConflicts` | 每行 2-3 次逐格读，1000 行 ≈ 3000 次 | 照抄同文件 `getSyncPreview:215` 的批量范式 | 3000 次 → 1 次 |
 | `ui/preview.ts:120-130` `getRowData` | 每行约 17 次 IPC，500 行 ≈ 8500 次（「预览同步」卡数秒的主因） | 循环外对列包围盒一次矩形读 | N×17 → 1 次 |
-| `ui/handlers/sync.ts:199-205` `_fillSheetWithCollections` | 每条收藏逐格写 ~8 列 | 每行一次 `Range.Value2` 矩形写 | 1.6 万次 → ~行数 |
+| ~~`ui/handlers/sync.ts:199-205` `_fillSheetWithCollections`~~ **主动搁置** | 每条收藏逐格写 ~8 列 | ❌ 不改：批量写要先读旧值做基底（否则 `null`/空串会清掉区间中段的列），且会丢掉 `setCellValue` 的 `Formula`/`Value` 回退链。收益/风险比不划算 | — |
 | `sync-result-dialog.ts:128-149` | 每次同步完成弹窗全表走一遍，5000 行 ≈ 2 万次 | 循环外一次读两列矩形 | 2N → 1 次 |
 | `clean-engine.ts:197-220` `scanXinFanHeaderRow` | 30 行 × 50 列逐格扫，且被每张表放大 | 逐行 `readRangeValues` | ~2100 次 → ~30 次/表 |
 
@@ -225,13 +225,13 @@ export function initIncrementalSyncFromRibbon(): void {
 | --- | --- | --- |
 | `dialog.ts:517-823` vs `sync-result-dialog.ts:214-529` | 两份 ~300 行的同步统计仪表盘渲染（donut SVG、柱状图、性能盘、元信息栏） | 抽 `renderSyncChartSection(model)` 到共用模块 |
 | ~~`github-sync.ts:143-246` / `gitee-sync.ts:75-160` / `gitlab-sync.ts:75-160` / `gist-sync.ts:235-323`~~ **已收敛** | 四个 `fetchXxxText` 几乎逐字重复（各 ~85 行），且 **abort 监听器处理已分歧**：github 版有 `removeEventListener`，其余只 add 不 remove → 换配置就泄漏监听器 | ✅ 已提 `createRawTextFetcher({ buildUrl, logTag })` 工厂（净减 88 行），四个源均已改造 |
-| `github-sync.ts:1922-1969` vs `sync-source-registry.ts:299-350` | `getSelectedRowSids` 两份逐字重复（连日志文案都一样） | 保留一份，registry import |
+| ~~`github-sync.ts:1922-1969` vs `sync-source-registry.ts:299-350`~~ **已收敛** | `getSelectedRowSids` 两份逐字重复（连日志文案都一样） | ✅ 抽 `sync/selected-rows.ts`（零副作用叶子模块），两处 import |
 | `sync-source-registry.ts:100-281` vs `github-sync.ts:1729-1915` | `syncFromRemote` 与 `syncFromGithub` 主体重复 ~150 行，且**功能已漂移**：`missingColumns` 缺列体检只有 github 路径有 → 从 Gitee/GitLab/本地同步时用户看不到缺列提示 | 合并为一份；registry 版本补缺列体检 |
 | 4 个 `*-bootstrap.ts` | 「禁用→`modulesReady`启用」整块复制 | 抽 `disableActionsUntilReady(tag)` |
 | `github-settings.ts` vs `action-handlers.ts` | GitHub 配置读/存两套实现（~80 行） | handler 委托 `saveGithubConfigFromDom` |
 | `github-sync.ts:756-829` / `1111-1180` / `1329-1399` | 逐字段回退路径三份重复（~120 行） | 提 `fallbackWriteRemoteEntry(...)` |
-| `github-sync.ts:854-885` / `964-1016` | `batchWriteNewRows`/`batchUpdateRows` 的 writeCols 收集逻辑重复 ~30 行 | 提 `collectWriteCols(colMap, predicate)` |
-| `sheet.ts:115` vs `:160` | `readRangeValues`/`readRangeCellValues` ~90% 相同 | 提 `readRect(ws,r1,r2,c1,c2,convert)` |
+| ~~`github-sync.ts:854-885` / `964-1016`~~ **已收敛** | `batchWriteNewRows`/`batchUpdateRows` 的 writeCols 收集逻辑重复 ~30 行 | ✅ 提 `collectWriteCols(colMap, names)`（`WriteCol` 接口同时提到模块级），调用方只负责攒列名 |
+| ~~`sheet.ts:115` vs `:160`~~ **已收敛** | `readRangeValues`/`readRangeCellValues` ~90% 相同 | ✅ 提 `readRect<T>(ws,r1,r2,c1,c2,convert)`：两个导出函数只剩一行委托，形状守卫只有一份 |
 | `ribbon-service.ts` vs `tools/util/index.ts` | `copyTokenForRibbon`/`copyTokenToClipboard`、`testTokenForRibbon`/`_fetchBgmUserInfo` 各重复 20+ 行 | 提 `copyTextToClipboard` / `fetchBgmMe` |
 | `preview.ts` / `sync.ts` | `{onPause,onResume,onStop}` handlers 对象重复 4 次 | 提 `createSyncControlHandlers()` |
 
