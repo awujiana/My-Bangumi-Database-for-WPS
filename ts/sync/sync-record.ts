@@ -158,12 +158,8 @@ export function getOrCreateSyncRecordSheet(): WpsWorksheet {
     syncSheet = wb.Sheets.Add()
     syncSheet.Name = SYNC_RECORD_SHEET_NAME
 
-    // 写入表头
-    for (const [index, column] of SYNC_RECORD_COLUMNS.entries()) {
-      const colLetter = colNumberToLetter(index + 1)
-      const cell = syncSheet.Range(`${colLetter}1`)
-      cell.Value2 = column
-    }
+    // 写入表头（一次矩形写，替代逐格写）
+    writeSyncRecordHeader(syncSheet)
 
     // 移到末尾
     try {
@@ -278,17 +274,33 @@ function migrateSyncRecordSchema(sheet: WpsWorksheet): void {
     sheet.Range(`2:${String(lastRow)}`).Delete()
   }
 
-  // 表头：一次写入列名 + 一次设置底色（P1-C）
-  const headerRange = sheet.Range(`A1:${colNumberToLetter(SYNC_RECORD_COLUMNS.length)}1`)
-  headerRange.Value2 = [SYNC_RECORD_COLUMNS]
-  if (headerRange.Interior) {
-    headerRange.Interior.Color = BGM_COLOR.GRAY
-  }
+  // 表头：一次写入列名 + 一次设置底色
+  writeSyncRecordHeader(sheet, { gray: true })
 
   // 数据行：一次 Range.Value2 写入全部重组后的记录（P1-C）
   writeSheetRows(sheet, 2, rows)
 
   bgmLog(LOG_LEVELS.INFO, `数据迁移完成：${String(rows.length)} 条记录已重组到 12 列结构`)
+}
+
+/**
+ * 写入同步记录表表头（一次 `Range.Value2` 矩形写）。
+ *
+ * 此前有两处写法：新建表时**逐格**写（`SYNC_RECORD_COLUMNS.length` 次 COM 往返）、
+ * 迁移时矩形一次写并顺带设底色。收敛为一份，新建表路径顺带从 12 次 IPC 降到 1 次。
+ *
+ * ⚠️ 已有表路径（`getOrCreateSyncRecordSheet` 的 else 分支）**不走本函数** ——
+ * 那里是「逐格读回比对 + 只修复不一致的列」，还会记录修复日志，语义不同。
+ *
+ * @param sheet 同步记录工作表
+ * @param options.gray 是否把表头底色设为 `BGM_COLOR.GRAY`（迁移路径原有行为）
+ */
+function writeSyncRecordHeader(sheet: WpsWorksheet, options?: { gray?: boolean }): void {
+  const headerRange = sheet.Range(`A1:${colNumberToLetter(SYNC_RECORD_COLUMNS.length)}1`)
+  headerRange.Value2 = [SYNC_RECORD_COLUMNS]
+  if (options?.gray === true && headerRange.Interior) {
+    headerRange.Interior.Color = BGM_COLOR.GRAY
+  }
 }
 
 function buildCache(sheet: WpsWorksheet): void {
