@@ -27,22 +27,10 @@ import { startNavModeSync } from '../tools/nav-mode.js'
 import { startModuleStateSync } from '../tools/module-state.js'
 import { startNavOrderSync } from '../tools/nav-order.js'
 import { initCleanPage } from './clean-page.js'
+import { installActionButtonsGate } from './action-buttons-gate.js'
 
 if (typeof document !== 'undefined') {
-  // 模块就绪前禁用所有 data-action 按钮，避免误触发未初始化的处理逻辑
-  document.querySelectorAll('button[data-action]').forEach((button) => {
-    const b = button as HTMLButtonElement
-    b.disabled = true
-  })
-
-  document.addEventListener('bgm:modulesReady', () => {
-    document.querySelectorAll('button[data-action]').forEach((button) => {
-      const b = button as HTMLButtonElement
-      b.disabled = false
-    })
-    // eslint-disable-next-line no-console -- 启动兜底阶段日志后端未必就绪，console 是唯一输出通道
-    console.log('[BGM Clean] 模块加载完成，按钮已启用')
-  })
+  installActionButtonsGate('[BGM Clean]')
 
   // DOM 就绪后初始化清理页面
   const onCleanReady = (): void => {

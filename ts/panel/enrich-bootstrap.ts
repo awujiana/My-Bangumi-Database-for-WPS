@@ -31,6 +31,7 @@ import { startNavOrderSync } from '../tools/nav-order.js'
 
 import { installModalA11y } from '../ui/components/modal-a11y.js'
 import { initEnrichPage } from './enrich-page.js'
+import { installActionButtonsGate } from './action-buttons-gate.js'
 
 if (typeof document !== 'undefined') {
   // 应用外观主题（深色 / 浅色 / 跟随系统）
@@ -50,21 +51,7 @@ if (typeof document !== 'undefined') {
   // 静态模态框无障碍增强（ESC 关闭 + 焦点陷阱，P2-10）
   installModalA11y()
 
-  // 模块就绪前禁用所有 data-action 按钮，避免误触发未初始化的处理逻辑
-  document.querySelectorAll('button[data-action]').forEach((button) => {
-    const b = button as HTMLButtonElement
-    b.disabled = true
-  })
-
-  // 接收到 modulesReady 事件后启用按钮
-  document.addEventListener('bgm:modulesReady', () => {
-    document.querySelectorAll('button[data-action]').forEach((button) => {
-      const b = button as HTMLButtonElement
-      b.disabled = false
-    })
-    // eslint-disable-next-line no-console -- console 是日志后端/启动兜底的唯一输出通道（启动日志，logger 初始化前可能执行）
-    console.log('[BGM Enrich] 模块加载完成，按钮已启用')
-  })
+  installActionButtonsGate('[BGM Enrich]')
 
   // DOM 就绪后初始化富化页面
   if (document.readyState === 'loading') {

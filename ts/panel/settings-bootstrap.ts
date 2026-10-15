@@ -26,6 +26,7 @@ import '../sync/scraping.js'
 import '../sync/exceltobangumi.js'
 import '../entry/settings-entry.js'
 import { installModalA11y } from '../ui/components/modal-a11y.js'
+import { installActionButtonsGate } from './action-buttons-gate.js'
 
 if (typeof window !== 'undefined') {
   window.addEventListener(
@@ -51,43 +52,7 @@ if (typeof window !== 'undefined') {
 }
 
 if (typeof document !== 'undefined') {
-  // 模块就绪前禁用所有 data-action 按钮
-  document.querySelectorAll('button[data-action]').forEach((button) => {
-    const b = button as HTMLButtonElement
-    b.disabled = true
-  })
-
-  // 接收到 modulesReady 事件后启用按钮
-  document.addEventListener('bgm:modulesReady', () => {
-    document.querySelectorAll('button[data-action]').forEach((button) => {
-      const b = button as HTMLButtonElement
-
-      b.disabled = false
-    })
-    // eslint-disable-next-line no-console -- 启动兜底阶段日志后端未必就绪，console 是唯一输出通道（与上方资源加载失败日志一致）
-    console.log('[BGM Settings] 模块加载完成，按钮已启用')
-  })
-
-  // 超时兜底：如果 5 秒后仍未收到 bgm:modulesReady，输出 WARN 日志并强制启用按钮
-  const timeoutMs = 5000
-  let isForced = false
-  document.addEventListener('bgm:modulesReady', () => {
-    isForced = true
-  })
-  setTimeout(() => {
-    if (isForced) {
-      return
-    }
-
-    // eslint-disable-next-line no-console -- 启动兜底阶段日志后端未必就绪，console 是唯一输出通道（与上方资源加载失败日志一致）
-    console.warn(
-      `[BGM Settings] ${String(timeoutMs)}ms 内未收到 bgm:modulesReady 事件，强制启用按钮（兜底）`,
-    )
-    document.querySelectorAll('button[data-action]').forEach((button) => {
-      const b = button as HTMLButtonElement
-      b.disabled = false
-    })
-  }, timeoutMs)
+  installActionButtonsGate('[BGM Settings]')
 
   // ========== 静态模态框无障碍增强（ESC 关闭 + 焦点陷阱，P2-10） ==========
   installModalA11y()

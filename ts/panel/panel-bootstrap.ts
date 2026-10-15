@@ -27,6 +27,7 @@ import '../sync/exceltobangumi.js'
 import '../entry/panel-entry.js'
 import { installModalA11y } from '../ui/components/modal-a11y.js'
 import { initShellNav } from './shell-nav.js'
+import { installActionButtonsGate } from './action-buttons-gate.js'
 import { startModuleStateSync } from '../tools/module-state.js'
 import { startNavOrderSync } from '../tools/nav-order.js'
 
@@ -53,24 +54,7 @@ if (typeof window !== 'undefined') {
   })
 }
 
-if (typeof document !== 'undefined') {
-  // 模块就绪前禁用所有 data-action 按钮，避免误触发未初始化的处理逻辑
-  document.querySelectorAll('button[data-action]').forEach((button) => {
-    const b = button as HTMLButtonElement
-    b.disabled = true
-  })
-
-  // 接收到 modulesReady 事件后启用按钮
-  document.addEventListener('bgm:modulesReady', () => {
-    document.querySelectorAll('button[data-action]').forEach((button) => {
-      const b = button as HTMLButtonElement
-
-      b.disabled = false
-    })
-    // eslint-disable-next-line no-console -- 启动兜底阶段日志后端未必就绪，console 是唯一输出通道（与上方资源加载失败日志一致）
-    console.log('[BGM] 模块加载完成，按钮已启用')
-  })
-}
+installActionButtonsGate('[BGM]')
 
 // ========== 外壳导航（吸顶偏移测量 + 滚动高亮） ==========
 // 逻辑已抽到 shell-nav.ts 由三页面共享；此处调用统一初始化。

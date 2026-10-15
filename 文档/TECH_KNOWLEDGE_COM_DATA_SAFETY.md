@@ -228,7 +228,7 @@ export function initIncrementalSyncFromRibbon(): void {
 | ~~`github-sync.ts:143-246` / `gitee-sync.ts:75-160` / `gitlab-sync.ts:75-160` / `gist-sync.ts:235-323`~~ **已收敛** | 四个 `fetchXxxText` 几乎逐字重复（各 ~85 行），且 **abort 监听器处理已分歧**：github 版有 `removeEventListener`，其余只 add 不 remove → 换配置就泄漏监听器 | ✅ 已提 `createRawTextFetcher({ buildUrl, logTag })` 工厂（净减 88 行），四个源均已改造 |
 | ~~`github-sync.ts:1922-1969` vs `sync-source-registry.ts:299-350`~~ **已收敛** | `getSelectedRowSids` 两份逐字重复（连日志文案都一样） | ✅ 抽 `sync/selected-rows.ts`（零副作用叶子模块），两处 import |
 | `sync-source-registry.ts:100-281` vs `github-sync.ts:1729-1915` | ⚠️ **功能漂移已修，结构合并待做**：`syncFromRemote` 与 `syncFromGithub` 主体仍重复 ~150 行，但漂移点已补齐——① 启用时间筛选时 `neededFields` 补 `date`（否则分片源不下载承载 date 的片 → 筛完 0 条且无提示）；② 补 `missingColumns` 缺列体检（此前只有 GitHub 路径有，走 Gitee/GitLab/本地/Gist 时用户只看到「同步成功但字段没进来」） | 结构合并：抽 `remote-sync-core.ts`，两个入口都变成薄壳 |
-| 4 个 `*-bootstrap.ts` | 「禁用→`modulesReady`启用」整块复制 | 抽 `disableActionsUntilReady(tag)` |
+| ~~4 个 `*-bootstrap.ts`~~ **已收敛（顺带修漂移）** | 「禁用→`modulesReady`启用」整块复制 | ✅ 抽 `ts/panel/action-buttons-gate.ts` 的 `installActionButtonsGate(logTag)`。漂移点：只有 settings 版带 5 秒超时兜底，其余三页一旦 `bgm:modulesReady` 没来（脚本 404 / 语法错误）就**永久禁用全部按钮且无提示**；统一后四页都有兜底 |
 | `github-settings.ts` vs `action-handlers.ts` | GitHub 配置读/存两套实现（~80 行） | handler 委托 `saveGithubConfigFromDom` |
 | `github-sync.ts:756-829` / `1111-1180` / `1329-1399` | 逐字段回退路径三份重复（~120 行） | 提 `fallbackWriteRemoteEntry(...)` |
 | ~~`github-sync.ts:854-885` / `964-1016`~~ **已收敛** | `batchWriteNewRows`/`batchUpdateRows` 的 writeCols 收集逻辑重复 ~30 行 | ✅ 提 `collectWriteCols(colMap, names)`（`WriteCol` 接口同时提到模块级），调用方只负责攒列名 |

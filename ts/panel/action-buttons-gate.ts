@@ -1,0 +1,53 @@
+/**
+ * @fileoverview 「模块就绪前禁用 data-action 按钮」启动门禁
+ * @module panel/actionButtonsGate
+ * @description 四个页面入口（panel / settings / clean / enrich）此前各写一份逐字相同的
+ *              「禁用 → 收到 `bgm:modulesReady` 后启用」逻辑，且**功能已漂移**：
+ *              只有 settings 版带 5 秒超时兜底，其余三页一旦事件没来就**永远禁用按钮**。
+ *              收敛为一份后四页都有兜底。
+ */
+
+/** 超时兜底：多久没收到 `bgm:modulesReady` 就强制启用按钮 */
+const READY_TIMEOUT_MS = 5000
+
+/** 统一的按钮选择器（与 HTML 里的 `data-action` 约定一致） */
+const ACTION_BUTTON_SELECTOR = 'button[data-action]'
+
+function setActionButtonsDisabled(isDisabled: boolean): void {
+  for (const button of document.querySelectorAll(ACTION_BUTTON_SELECTOR)) {
+    const element = button as HTMLButtonElement
+    element.disabled = isDisabled
+  }
+}
+
+/**
+ * 安装启动门禁：先禁用所有 `data-action` 按钮，模块就绪后启用。
+ *
+ * 超时兜底是**必须的**：模块加载失败（脚本 404 / 语法错误）时 `bgm:modulesReady`
+ * 永远不会来，没有兜底整个页面的按钮就永久失效且无任何提示。
+ *
+ * @param logTag 日志前缀（如 `[BGM Settings]`，便于区分是哪个页面）
+ */
+export function installActionButtonsGate(logTag: string): void {
+  if (typeof document === 'undefined') return
+
+  // 模块就绪前禁用所有 data-action 按钮，避免误触发未初始化的处理逻辑
+  setActionButtonsDisabled(true)
+
+  let isReady = false
+  document.addEventListener('bgm:modulesReady', () => {
+    isReady = true
+    setActionButtonsDisabled(false)
+    // eslint-disable-next-line no-console -- 启动兜底阶段日志后端未必就绪，console 是唯一输出通道
+    console.log(`${logTag} 模块加载完成，按钮已启用`)
+  })
+
+  setTimeout(() => {
+    if (isReady) return
+    // eslint-disable-next-line no-console -- 启动兜底阶段日志后端未必就绪，console 是唯一输出通道
+    console.warn(
+      `${logTag} ${String(READY_TIMEOUT_MS)}ms 内未收到 bgm:modulesReady 事件，强制启用按钮（兜底）`,
+    )
+    setActionButtonsDisabled(false)
+  }, READY_TIMEOUT_MS)
+}
