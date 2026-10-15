@@ -193,18 +193,39 @@ function hasIdentityColumn(colMap: ReadonlyMap<string, number>): boolean {
   return CLEAN_TARGETS.identityColumns.some((key) => colMap.has(key))
 }
 
+/** 新番表表头扫描区：前 30 行 × 前 50 列 */
+const XINFAN_SCAN_ROWS = 30
+const XINFAN_SCAN_COLS = 50
+
+/** 一行单元格命中了多少个新番表表头关键字 */
+function countXinFanHeaderHits(cells: string[], keywords: string[]): number {
+  let hits = 0
+  for (const value of cells) {
+    if (value && keywords.some((keyword) => value.toLowerCase().includes(keyword))) hits += 1
+  }
+  return hits
+}
+
 /** 扫描前若干行，返回首个命中新番表专属表头签名的行号（0 表示未识别） */
 function scanXinFanHeaderRow(ws: WpsWorksheet): number {
   const keywords = XINFAN_HEADER.headerKeywords.map((keyword) => keyword.toLowerCase())
-  for (let row = 1; row <= 30; row += 1) {
-    let hits = 0
-    for (let col = 1; col <= 50; col += 1) {
-      const value = getCellValue(ws, row, col)
-      if (value && keywords.some((keyword) => value.toLowerCase().includes(keyword))) {
-        hits += 1
+  // 快路径：一次矩形读扫描区（原先 30 行 × 50 列 = 1500 次逐格 COM 往返）。
+  // 读回行数不足（宿主/桩未返回完整矩形）时回退逐格读，行为与改造前完全一致。
+  const block = readRangeValues(ws, 1, XINFAN_SCAN_ROWS, 1, XINFAN_SCAN_COLS)
+  if (block.length === XINFAN_SCAN_ROWS) {
+    for (const [index, cells] of block.entries()) {
+      if (countXinFanHeaderHits(cells, keywords) >= XINFAN_HEADER.minHeaderHits) {
+        return index + 1
       }
     }
-    if (hits >= XINFAN_HEADER.minHeaderHits) return row
+    return 0
+  }
+  for (let row = 1; row <= XINFAN_SCAN_ROWS; row += 1) {
+    const cells: string[] = []
+    for (let col = 1; col <= XINFAN_SCAN_COLS; col += 1) {
+      cells.push(getCellValue(ws, row, col))
+    }
+    if (countXinFanHeaderHits(cells, keywords) >= XINFAN_HEADER.minHeaderHits) return row
   }
   return 0
 }

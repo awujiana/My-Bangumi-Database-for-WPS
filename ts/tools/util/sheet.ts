@@ -244,26 +244,52 @@ export function findHeaderRow(ws: WpsWorksheet | null | undefined, startRow?: nu
   const cacheKey = `${sheetName}:headerRow:${String(startRow ?? 1)}`
   return cacheGet(cacheKey, () => {
     const sRow = startRow ?? 1
+    const endRow = Math.max(sRow, PANEL_CONFIG.MAX_SCAN_ROWS)
+    // 快路径：一次矩形读整块扫描区（原先 10 行 × 60 列 = 最多 600 次逐格 COM 往返）。
+    // 读回行数不足（宿主未返回完整矩形 / 桩未实现区域读）时回退逐格扫描，
+    // 保证行为与改造前完全一致。
+    const block = readRangeValues(ws, sRow, endRow, 1, PANEL_CONFIG.MAX_SCAN_COLUMNS)
+    if (block.length === endRow - sRow + 1) {
+      for (const [index, rowCells] of block.entries()) {
+        if (isRowHeaderMatch(rowCells)) return sRow + index
+      }
+      return 0
+    }
     for (let row = sRow; row <= PANEL_CONFIG.MAX_SCAN_ROWS; row += 1) {
-      if (isRowHeaderMatch(ws, row)) return row
+      if (isRowHeaderMatch(readRowCellsByCell(ws, row))) return row
     }
     return 0
   })
 }
 
-/** 扫描单行是否命中 ≥3 个表头关键字（提取自 findHeaderRow，用 return 代替嵌套 break） */
-function isRowHeaderMatch(ws: WpsWorksheet | null | undefined, row: number): boolean {
-  let matchCount = 0
+/**
+ * 逐格读一行的前 MAX_SCAN_COLUMNS 列（矩形读不可用时的回退路径）
+ *
+ * 单格读取失败按空串处理：表头识别是「尽力而为」，不该因个别列抛错整行判否。
+ */
+function readRowCellsByCell(ws: WpsWorksheet | null | undefined, row: number): string[] {
+  const cells: string[] = []
   for (let col = 1; col <= PANEL_CONFIG.MAX_SCAN_COLUMNS; col += 1) {
     try {
-      const cellValue = getCellValue(ws, row, col).toLowerCase()
-      if (cellValue) {
-        const isMatched = HEADER_KEYWORDS.some((header) => cellValue.includes(header.toLowerCase()))
-        if (isMatched) matchCount += 1
-        if (matchCount >= 3) return true
-      }
+      // 取值即转小写（与改造前一致）：取不到或不是字符串会抛错，
+      // 由下面的 catch 按空串处理，不因此把整行判为「非表头行」。
+      cells.push(getCellValue(ws, row, col).toLowerCase())
     } catch {
-      // 忽略：此处无需处理错误
+      cells.push('')
+    }
+  }
+  return cells
+}
+
+/** 扫描一行是否命中 ≥3 个表头关键字（提取自 findHeaderRow，用 return 代替嵌套 break） */
+function isRowHeaderMatch(rowCells: string[]): boolean {
+  let matchCount = 0
+  for (const raw of rowCells) {
+    const cellValue = raw.toLowerCase()
+    if (cellValue) {
+      const isMatched = HEADER_KEYWORDS.some((header) => cellValue.includes(header.toLowerCase()))
+      if (isMatched) matchCount += 1
+      if (matchCount >= 3) return true
     }
   }
   return false
@@ -300,8 +326,14 @@ export function getColumnMap(
     let firstNonEmptyCol: number | undefined
 
     const lastCol = 50
+    // 快路径：一次矩形读表头行（原先两轮循环共 100 次逐格读）。
+    // 读回为空（宿主/桩未返回该行）时 readColName 自动回退逐格读，行为不变。
+    const headerCells = readRangeValues(ws, headerRow, headerRow, 1, lastCol)[0]
+    const readColName = (index: number): string =>
+      trim(headerCells ? (headerCells[index - 1] ?? '') : getCellValue(ws, headerRow, index))
+
     for (let index = 1; index <= lastCol; index += 1) {
-      const colName = trim(getCellValue(ws, headerRow, index))
+      const colName = readColName(index)
       // 记录第一个非空列作为序列号列候选
       if (!firstNonEmptyCol && colName) {
         firstNonEmptyCol = index
@@ -322,7 +354,7 @@ export function getColumnMap(
       } else {
         // 第一个非空列已被占用，向后查找第一个未被占用的非空列
         for (let index = 1; index <= lastCol; index += 1) {
-          const v = mappedCols.has(index) ? '' : trim(getCellValue(ws, headerRow, index))
+          const v = mappedCols.has(index) ? '' : readColName(index)
           if (v) {
             seqCol = index
             break

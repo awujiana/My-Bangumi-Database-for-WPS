@@ -7,6 +7,7 @@
  *   - enrichEntries 空表时未匹配条目作为新行追加写入（名称 + 常规字段富化）
  *   - enrichEntries 非空表时未匹配条目仍跳过（原行为不变）
  *   - 连续富化：空表追加后第二次匹配能命中新增行，不重复追加
+ *   - 别名匹配：命中行反查其全部别名（原实现为遍历全局索引的 O(n²)）
  */
 
 // @vitest-environment jsdom
@@ -324,5 +325,23 @@ describe('连续富化', () => {
 
     // 没有产生第 4 行新数据
     expect(store.get(cellKey(BANGUMI_SHEET_NAME, 4, 1)) ?? '').toBe('')
+  })
+})
+
+describe('matchEntries 别名匹配（行 → 别名反向索引）', () => {
+  it('按别名命中时应返回该 Bangumi 行的全部别名', () => {
+    seedAnimeSheet()
+    seedEmptyBangumiSheet()
+    // 第 2 行名称与 anime 表不同，只能靠别名命中
+    store.set(cellKey(BANGUMI_SHEET_NAME, 2, 1), '葬送的芙莉莲')
+    store.set(cellKey(BANGUMI_SHEET_NAME, 2, 6), '芙莉莲 / 芙莉莲第二季')
+
+    const matches = matchEntries(animeSheet, bangumiSheet, animeConfig)
+
+    const frieren = matches.find((m) => m.matchedAnimeName === '芙莉莲')
+    expect(frieren?.matchType).toBe('alias')
+    expect(frieren?.bangumiRow).toBe(2)
+    // 别名取自「命中行」而非遍历全局索引：顺序 = 该行别名书写顺序
+    expect(frieren?.aliases).toEqual(['芙莉莲', '芙莉莲第二季'])
   })
 })

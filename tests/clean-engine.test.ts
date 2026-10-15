@@ -60,15 +60,29 @@ import { transformCellValue } from '../ts/panel/clean-transforms.js'
 
 // ========== 测试工具 ==========
 
-/** 构造虚拟网格：grid[行][列] = 单元格文本 */
+/**
+ * 最近一次 setCellGrid 的表头网格。
+ *
+ * 真实工作表只有一张：逐格读（getCellValue）与矩形读（readRangeValues）必须看到
+ * 同一份数据。此前两套网格互不相干，导致走矩形快路径的扫描
+ * （scanXinFanHeaderRow）看不到表头行 —— 桩不忠实，改桩不改生产。
+ */
+let cellGrid: Record<number, Record<number, string>> = {}
+
+/** 构造虚拟网格：grid[行][列] = 单元格文本（与 cellGrid 合并，rows 优先） */
 function makeGrid(rows: Record<number, Record<number, string>>): void {
+  const merged: Record<number, Record<number, string>> = { ...cellGrid }
+  for (const [rowKey, cols] of Object.entries(rows)) {
+    const row = Number(rowKey)
+    merged[row] = { ...merged[row], ...cols }
+  }
   mocks.readRangeValues.mockImplementation(
     (_ws: unknown, r1: number, r2: number, c1: number, c2: number) => {
       const out: string[][] = []
       for (let row = r1; row <= r2; row += 1) {
         const line: string[] = []
         for (let col = c1; col <= c2; col += 1) {
-          line.push(rows[row]?.[col] ?? '')
+          line.push(merged[row]?.[col] ?? '')
         }
         out.push(line)
       }
@@ -79,6 +93,7 @@ function makeGrid(rows: Record<number, Record<number, string>>): void {
 
 /** 设置 getCellValue 的单格网格（供新番表表头 / 名称列探测使用） */
 function setCellGrid(rows: Record<number, Record<number, string>>): void {
+  cellGrid = rows
   mocks.getCellValue.mockImplementation(
     (_ws: unknown, row: number, col: number) => rows[row]?.[col] ?? '',
   )
@@ -116,6 +131,15 @@ function mockWorkbookSheet(
   mocks.getLastRow.mockReturnValue(4)
   return ws
 }
+
+// 每个用例前把矩形读桩复位为「未实现 ⇒ 空数组」：
+// 否则上一个用例 makeGrid 设进去的实现会泄漏到下一个用例，
+// 让走矩形快路径的代码读到别的用例的网格（桩不忠实，改桩不改生产）。
+// makeGrid / 用例内的实现会在本钩子之后覆盖它。
+beforeEach(() => {
+  cellGrid = {}
+  mocks.readRangeValues.mockImplementation(() => [])
+})
 
 /** 构造最小 CleanTargetInfo（aggregatePlans / runCleanPlans 测试用） */
 function fakeTarget(key: string, label: string, sheetName = '动画'): CleanTargetInfo {

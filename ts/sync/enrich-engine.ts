@@ -473,15 +473,18 @@ export function readNewAnimeRow(
 function buildBangumiIndexes(
   bangumiSheet: WpsWorksheet,
   columnMap: Map<string, number>,
-): [Map<string, number>, Map<string, number[]>, Map<number, string>] {
+): [Map<string, number>, Map<string, number[]>, Map<number, string>, Map<number, string[]>] {
   const nameIndex = new Map<string, number>()
   const aliasIndex = new Map<string, number[]>()
   const rowNames = new Map<number, string>()
+  // 反向索引：行号 → 该行的全部别名。有它「按行取别名」才是 O(1)；
+  // 否则 matchEntriesInner 每命中一条都要遍历整个 aliasIndex 做 rows.includes(row) —— O(n²)。
+  const aliasByRow = new Map<number, string[]>()
 
   const nameCol = columnMap.get('名称') ?? 0
   if (nameCol === 0) {
     bgmLog(LOG_LEVELS.WARN, '[buildBangumiIndexes] Bangumi表中未找到名称列')
-    return [nameIndex, aliasIndex, rowNames]
+    return [nameIndex, aliasIndex, rowNames, aliasByRow]
   }
 
   const aliasCol = findAliasColumn(bangumiSheet)
@@ -511,6 +514,12 @@ function buildBangumiIndexes(
             const rows = aliasIndex.get(normalizedAlias)
             if (rows && !rows.includes(row)) {
               rows.push(row)
+              const rowAliases = aliasByRow.get(row)
+              if (rowAliases) {
+                rowAliases.push(alias)
+              } else {
+                aliasByRow.set(row, [alias])
+              }
             }
           }
         }
@@ -523,7 +532,7 @@ function buildBangumiIndexes(
     `[buildBangumiIndexes] 名称索引: ${String(nameIndex.size)} 条, 别名索引: ${String(aliasIndex.size)} 条`,
   )
 
-  return [nameIndex, aliasIndex, rowNames]
+  return [nameIndex, aliasIndex, rowNames, aliasByRow]
 }
 
 /**
@@ -567,7 +576,10 @@ function matchEntriesInner(
   results: MatchResult[],
 ): void {
   const bangumiColMap = getBangumiColumnMap(bangumiSheet)
-  const [nameIndex, aliasIndex, rowNames] = buildBangumiIndexes(bangumiSheet, bangumiColMap)
+  const [nameIndex, aliasIndex, rowNames, aliasByRow] = buildBangumiIndexes(
+    bangumiSheet,
+    bangumiColMap,
+  )
 
   const lastRow = getLastRow(animeSheet)
   const { dataStartRow } = config
@@ -610,12 +622,8 @@ function matchEntriesInner(
           if (aliasRows && aliasRows.length > 0) {
             const bangumiRow = aliasRows[0]
             if (bangumiRow !== undefined) {
-              const aliases: string[] = []
-              for (const [alias, rows] of aliasIndex) {
-                if (rows.includes(bangumiRow)) {
-                  aliases.push(alias)
-                }
-              }
+              // 反向索引 O(1) 取该行别名（原先遍历整个 aliasIndex 做 includes，是 O(n²)）
+              const aliases = aliasByRow.get(bangumiRow) ?? []
               const matchedName = rowNames.get(bangumiRow)
               matchResult = {
                 animeRow: row,
@@ -965,6 +973,8 @@ export function enrichEntries(
   const isBangumiEmpty = bangumiHeaderRow > 0 && bangumiLastRow <= bangumiHeaderRow
   let nextAppendRow = bangumiLastRow + 1
   const bangumiNameCol = bangumiColMap.get('名称') ?? 0
+  // 别名列在循环外算一次（ensureBangumiColumns 之后，避免漏掉它新加的列）
+  const bangumiAliasCol = findAliasColumn(bangumiSheet)
 
   for (const [index, match] of matches.entries()) {
     // 取消检查放在条目边界：当前条目已写入的单元格保留（不回滚），避免半行脏数据
@@ -997,6 +1007,7 @@ export function enrichEntries(
         results,
         enrichRecords,
         intro,
+        bangumiAliasCol,
       )
       didEnrich = true
     } else if (match.matchType === 'unmatched') {
@@ -1043,6 +1054,7 @@ export function enrichEntries(
           results,
           enrichRecords,
           intro,
+          bangumiAliasCol,
         )
         didEnrich = true
       }
@@ -1109,6 +1121,7 @@ function enrichIntoRow(
   results: EnrichResultItem[],
   records: AddEnrichRecordParameters[],
   intro?: IntroSheetContext,
+  aliasCol?: number,
 ): EnrichRowOutcome {
   const isIntro = isIntroSheet(config.columnMapping)
   const incomingData = isIntro
@@ -1159,6 +1172,7 @@ function enrichIntoRow(
       bangumiName,
       bangumiColMap,
       enrichedFields,
+      aliasCol,
     )
 
     for (const field of enrichedFields) {
@@ -1831,6 +1845,7 @@ export function enrichAlias(
   bangumiName: string | undefined,
   colMap: Map<string, number>,
   enriched: EnrichedField[],
+  aliasCol?: number,
 ): void {
   const nameCol = colMap.get('名称')
   if (!nameCol) return
@@ -1846,10 +1861,12 @@ export function enrichAlias(
     return
   }
 
-  const aliasCol = findAliasColumn(sheet)
-  if (aliasCol === 0) return
+  // aliasCol 由 enrichEntries 在循环外算一次传入：findAliasColumn 内部要
+  // findHeaderRow + 最多 50 次逐格读，逐条重算是纯浪费（500 条 ≈ 3 万次 IPC）。
+  const resolvedAliasCol = aliasCol ?? findAliasColumn(sheet)
+  if (resolvedAliasCol === 0) return
 
-  const existingAliases = getCellValue(sheet, row, aliasCol)
+  const existingAliases = getCellValue(sheet, row, resolvedAliasCol)
   const aliasList = splitAliases(existingAliases)
 
   const normalizedNew = normalizeName(animeName)
@@ -1858,7 +1875,7 @@ export function enrichAlias(
   if (isAlreadyExists) {
     enriched.push({
       fieldName: '别名',
-      bangumiColumn: aliasCol,
+      bangumiColumn: resolvedAliasCol,
       oldValue: existingAliases,
       updatedValue: animeName,
       action: 'skip',
@@ -1868,10 +1885,10 @@ export function enrichAlias(
 
   const merged = existingAliases ? existingAliases + TAG_SEPARATOR + animeName : animeName
 
-  setCellValue(sheet, row, aliasCol, merged)
+  setCellValue(sheet, row, resolvedAliasCol, merged)
   enriched.push({
     fieldName: '别名',
-    bangumiColumn: aliasCol,
+    bangumiColumn: resolvedAliasCol,
     oldValue: existingAliases || null,
     updatedValue: merged,
     action: 'append',

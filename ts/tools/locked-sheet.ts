@@ -7,6 +7,9 @@
  */
 
 import { getApp, bgmLog, BGM, getCellValue, findHeaderRow } from './util/index.js'
+// 直接依赖 util/sheet.js 的矩形读：它自带 try/catch，宿主/桩不支持区域读时返回 []，
+// 调用方据此回退逐格读（见 buildCandidate）。
+import { readRangeValues } from './util/sheet.js'
 import { PANEL_CONFIG, LOG_LEVELS, HEADER_KEYWORDS } from '../core/constants.js'
 import type { WpsWorkbook, WpsWorksheet, WpsWindow } from './wps.js'
 
@@ -303,6 +306,24 @@ function isSystemSheet(name: string): boolean {
   return SYSTEM_SHEET_PATTERN.test(name)
 }
 
+/** 表头行后向下扫描的数据行数（判定「有数据的工作表」用） */
+const DATA_SCAN_ROWS = 10
+
+/** 统计一行单元格里命中的表头关键字数（行内容已由调用方批量读出） */
+function countHeaderKeywordsInCells(cells: string[]): number {
+  let count = 0
+  for (const raw of cells) {
+    const v = raw.toLowerCase()
+    if (v && HEADER_KEYWORDS.some((header) => v.includes(header.toLowerCase()))) count += 1
+  }
+  return count
+}
+
+/** 判断一行单元格中是否「任意列有值」（行内容已由调用方批量读出） */
+function isRowPopulatedCells(cells: string[]): boolean {
+  return cells.some((v) => v.trim() !== '')
+}
+
 function countHeaderKeywordsInRow(ws: WpsWorksheet, row: number): number {
   let count = 0
   for (let col = 1; col <= PANEL_CONFIG.MAX_SCAN_COLUMNS; col += 1) {
@@ -323,7 +344,7 @@ function isRowPopulated(ws: WpsWorksheet, row: number): boolean {
 /** 统计表头行后前 10 行中「任意列有值」的数据行数 */
 function countDataRowsAfter(ws: WpsWorksheet, headerRow: number): number {
   let count = 0
-  for (let row = headerRow + 1; row <= headerRow + 10; row += 1) {
+  for (let row = headerRow + 1; row <= headerRow + DATA_SCAN_ROWS; row += 1) {
     if (isRowPopulated(ws, row)) count += 1
   }
   return count
@@ -346,9 +367,27 @@ function buildCandidate(wb: WpsWorkbook, wsIndex: number, isNameHitOnly: boolean
 
   const headerRow = findHeaderRow(ws)
   if (headerRow <= 0) return null
-  const headerMatchCount = countHeaderKeywordsInRow(ws, headerRow)
+  // 快路径：一次矩形读「表头行 + 其后 DATA_SCAN_ROWS 行」× MAX_SCAN_COLUMNS 列
+  // （原先是 60 + 10×60 = 660 次逐格 COM 往返 / 每张表）。
+  // 读回行数不足时回退逐格读，保证行为与改造前完全一致。
+  const block = readRangeValues(
+    ws,
+    headerRow,
+    headerRow + DATA_SCAN_ROWS,
+    1,
+    PANEL_CONFIG.MAX_SCAN_COLUMNS,
+  )
+  // 两个分支都会赋值，无需初值（消除 no-useless-assignment）
+  let headerMatchCount: number
+  let dataRowCount: number
+  if (block.length === DATA_SCAN_ROWS + 1) {
+    headerMatchCount = countHeaderKeywordsInCells(block[0] ?? [])
+    dataRowCount = block.slice(1).filter((cells) => isRowPopulatedCells(cells)).length
+  } else {
+    headerMatchCount = countHeaderKeywordsInRow(ws, headerRow)
+    dataRowCount = countDataRowsAfter(ws, headerRow)
+  }
   if (headerMatchCount < 3) return null
-  const dataRowCount = countDataRowsAfter(ws, headerRow)
   if (dataRowCount < 2) return null
 
   return {
