@@ -229,7 +229,7 @@ export function initIncrementalSyncFromRibbon(): void {
 | ~~`github-sync.ts:1922-1969` vs `sync-source-registry.ts:299-350`~~ **已收敛** | `getSelectedRowSids` 两份逐字重复（连日志文案都一样） | ✅ 抽 `sync/selected-rows.ts`（零副作用叶子模块），两处 import |
 | `sync-source-registry.ts:100-281` vs `github-sync.ts:1729-1915` | ⚠️ **功能漂移已修，结构合并待做**：`syncFromRemote` 与 `syncFromGithub` 主体仍重复 ~150 行，但漂移点已补齐——① 启用时间筛选时 `neededFields` 补 `date`（否则分片源不下载承载 date 的片 → 筛完 0 条且无提示）；② 补 `missingColumns` 缺列体检（此前只有 GitHub 路径有，走 Gitee/GitLab/本地/Gist 时用户只看到「同步成功但字段没进来」） | 结构合并：抽 `remote-sync-core.ts`，两个入口都变成薄壳 |
 | ~~4 个 `*-bootstrap.ts`~~ **已收敛（顺带修漂移）** | 「禁用→`modulesReady`启用」整块复制 | ✅ 抽 `ts/panel/action-buttons-gate.ts` 的 `installActionButtonsGate(logTag)`。漂移点：只有 settings 版带 5 秒超时兜底，其余三页一旦 `bgm:modulesReady` 没来（脚本 404 / 语法错误）就**永久禁用全部按钮且无提示**；统一后四页都有兜底 |
-| `github-settings.ts` vs `action-handlers.ts` | GitHub 配置读/存两套实现（~80 行） | handler 委托 `saveGithubConfigFromDom` |
+| ~~`github-settings.ts` vs `action-handlers.ts`~~ **已收敛** | 「读 8 个输入框 → 按 sourceType 取 path/gistId → 必填校验 → setGithubConfig/setSyncStrategy/setSyncSourceType」两份实现（~80 行） | ✅ 抽 `readGithubConfigForm()` + `findMissingConfigField()`（返回具体缺哪一项，而非 boolean：手动保存要三种不同文案，防抖自动保存只关心跳过与否）。**两侧语义差异原样保留**：手动保存缺元素报「UI 元素缺失」、缺值按类型报对应文案；自动保存一律静默跳过 |
 | `github-sync.ts:756-829` / `1111-1180` / `1329-1399` | 逐字段回退路径三份重复（~120 行） | 提 `fallbackWriteRemoteEntry(...)` |
 | ~~`github-sync.ts:854-885` / `964-1016`~~ **已收敛** | `batchWriteNewRows`/`batchUpdateRows` 的 writeCols 收集逻辑重复 ~30 行 | ✅ 提 `collectWriteCols(colMap, names)`（`WriteCol` 接口同时提到模块级），调用方只负责攒列名 |
 | ~~`sheet.ts:115` vs `:160`~~ **已收敛** | `readRangeValues`/`readRangeCellValues` ~90% 相同 | ✅ 提 `readRect<T>(ws,r1,r2,c1,c2,convert)`：两个导出函数只剩一行委托，形状守卫只有一份 |

@@ -90,7 +90,11 @@ import {
   reloadEnrichPreviewSettings,
   saveEnrichPreviewSettings,
 } from './enrich-preview-settings.js'
-import { refreshGithubConfigInputs } from './github-settings.js'
+import {
+  findMissingConfigField,
+  readGithubConfigForm,
+  refreshGithubConfigInputs,
+} from './github-settings.js'
 import { renderLogEntries } from './log-panel.js'
 import { selectDefaultFolder, updatePathDisplay } from './path-controls.js'
 import { cleanLockedDataSheet } from './sheet.js'
@@ -477,61 +481,46 @@ export const ACTION_HANDLERS: Record<string, ActionHandler> = {
   // GitHub 仓库同步：保存配置（含策略与同步源类型）
   saveGithubConfig: (context) => {
     bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 保存 GitHub 配置')
-    const ownerInput = document.getElementById('githubOwner') as HTMLInputElement | null
-    const repoInput = document.getElementById('githubRepo') as HTMLInputElement | null
-    const pathInput = document.getElementById('githubPath') as HTMLInputElement | null
+    // 手动保存要求这三个输入框存在：缺失说明页面结构变了，直接报错而不是静默存空值
+    // （防抖自动保存走 saveGithubConfigFromDom，缺元素时是「跳过」而非报错）
+    const ownerInput = document.getElementById('githubOwner')
+    const repoInput = document.getElementById('githubRepo')
+    const pathInput = document.getElementById('githubPath')
     if (!ownerInput || !repoInput || !pathInput) {
       showToast('UI 元素缺失', 'error')
       return
     }
-    // 仅在通过必填项校验后才需要读取其余输入框，故在 early exit 之后声明
-    const branchInput = document.getElementById('githubBranch') as HTMLInputElement | null
-    const localFilePathInput = document.getElementById('localFilePath') as HTMLInputElement | null
-    const gistIdInput = document.getElementById('gistId') as HTMLInputElement | null
-    const strategySelect = document.getElementById('githubStrategy') as HTMLSelectElement | null
-    const sourceTypeSelect = document.getElementById('syncSourceType') as HTMLSelectElement | null
-    const sourceType = (sourceTypeSelect?.value as SyncSourceType | undefined) ?? 'github'
 
-    // 按数据源类型读取对应字段
-    const path =
-      sourceType === 'local' ? (localFilePathInput?.value ?? '').trim() : pathInput.value.trim()
-    let gistId: string | undefined
-    if (sourceType === 'gist') {
-      gistId = (gistIdInput?.value ?? '').trim() || undefined
+    const form = readGithubConfigForm()
+    const missing = findMissingConfigField(form)
+    if (missing === 'path') {
+      showToast('本地文件路径不能为空', 'warn')
+      return
     }
-
-    const config = {
-      owner: ownerInput.value.trim(),
-      repo: repoInput.value.trim(),
-      branch: branchInput?.value.trim() || 'main', // eslint-disable-line @typescript-eslint/prefer-nullish-coalescing -- 空串表示未选择/未填写，须回退默认（`??` 会保留空串）
-      path,
-      sourceType,
-      gistId,
+    if (missing === 'gistId') {
+      showToast('Gist ID 不能为空', 'warn')
+      return
     }
-    // 必填项校验
-    if (sourceType === 'local') {
-      if (!config.path) {
-        showToast('本地文件路径不能为空', 'warn')
-        return
-      }
-    } else if (sourceType === 'gist') {
-      if (!gistId) {
-        showToast('Gist ID 不能为空', 'warn')
-        return
-      }
-    } else if (!config.owner || !config.repo || !config.path) {
+    if (missing === 'ownerRepoPath') {
       showToast('owner / repo / path 不能为空', 'warn')
       return
     }
-    const strategy = (strategySelect?.value as SyncStrategy | undefined) ?? 'add-update'
-    const isOkConfig = setGithubConfig(config)
-    const isOkStrategy = setSyncStrategy(strategy)
-    const isOkSourceType = setSyncSourceType(sourceType)
+
+    const isOkConfig = setGithubConfig({
+      owner: form.owner,
+      repo: form.repo,
+      branch: form.branch,
+      path: form.path,
+      sourceType: form.sourceType,
+      gistId: form.gistId,
+    })
+    const isOkStrategy = setSyncStrategy(form.strategy)
+    const isOkSourceType = setSyncSourceType(form.sourceType)
     if (isOkConfig && isOkStrategy && isOkSourceType) {
-      showToast(`配置已保存（策略：${strategy}，同步源：${sourceType}）`, 'success')
+      showToast(`配置已保存（策略：${form.strategy}，同步源：${form.sourceType}）`, 'success')
       bgmLog(
         LOG_LEVELS.INFO,
-        `[handleActionClick] GitHub 配置已保存: ${config.owner}/${config.repo}/${config.branch}/${config.path}, 策略: ${strategy}, 同步源: ${sourceType}${gistId ? `, gistId: ${gistId}` : ''}`,
+        `[handleActionClick] GitHub 配置已保存: ${form.owner}/${form.repo}/${form.branch}/${form.path}, 策略: ${form.strategy}, 同步源: ${form.sourceType}${form.gistId ? `, gistId: ${form.gistId}` : ''}`,
       )
     } else {
       showToast('保存失败：PluginStorage 不可用', 'error')

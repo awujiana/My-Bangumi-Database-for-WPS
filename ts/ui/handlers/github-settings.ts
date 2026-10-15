@@ -155,9 +155,35 @@ export function toggleSourceFields(sourceType: SyncSourceType): void {
 }
 
 /**
- * saveGithubConfigFromDom（自 try 块抽离，降低 unicorn/try-complexity 计数）
+ * 从配置表单读到的原始值（**未做必填校验**，空串原样保留）
  */
-export function saveGithubConfigFromDom() {
+export interface GithubConfigForm {
+  owner: string
+  repo: string
+  branch: string
+  path: string
+  sourceType: SyncSourceType
+  strategy: SyncStrategy
+  // 显式带 `| undefined`：exactOptionalPropertyTypes 下 `gistId?: string` 不允许赋 undefined，
+  // 而 gist 源未填时正是 undefined（下游 setGithubConfig 亦按可选字段处理）
+  gistId?: string | undefined
+}
+
+/**
+ * 缺失的必填项；齐全时为 `null`。
+ *
+ * 返回**具体缺哪一项**而不是 boolean：手动保存要给「本地文件路径 / Gist ID /
+ * owner+repo+path」三种不同提示，而防抖自动保存只关心「要不要跳过」。
+ */
+export type GithubConfigMissingField = 'path' | 'gistId' | 'ownerRepoPath' | null
+
+/**
+ * 从 DOM 实时读取配置表单（不持有元素引用，避免闭包拿到过时节点）
+ *
+ * `saveGithubConfigFromDom`（防抖自动保存）与 `action-handlers` 的
+ * `saveGithubConfig`（手动保存）此前各写一份逐字相同的读取逻辑，收敛于此。
+ */
+export function readGithubConfigForm(): GithubConfigForm {
   const ownerInput = document.getElementById('githubOwner') as HTMLInputElement | null
   const repoInput = document.getElementById('githubRepo') as HTMLInputElement | null
   const branchInput = document.getElementById('githubBranch') as HTMLInputElement | null
@@ -167,39 +193,62 @@ export function saveGithubConfigFromDom() {
   const strategySelect = document.getElementById('githubStrategy') as HTMLSelectElement | null
   const sourceTypeSelect = document.getElementById('syncSourceType') as HTMLSelectElement | null
 
-  const owner = (ownerInput?.value ?? '').trim()
-  const repo = (repoInput?.value ?? '').trim()
-  const branch = (branchInput?.value ?? '').trim() || 'main'
-  const strategy = (strategySelect?.value as SyncStrategy | undefined) ?? 'add-update'
   const sourceType = (sourceTypeSelect?.value as SyncSourceType | undefined) ?? 'github'
-
-  // 按数据源类型读取对应字段值
-  // - local: 复用 githubConfig.path 字段存储本地文件路径（与远程源 path 字段互斥复用）
-  // - gist: 使用独立的 gistId 字段
-  // - GitHub/GitLab/Gitee: 使用 owner/repo/branch/path
-  const path =
-    sourceType === 'local'
-      ? (localFilePathInput?.value ?? '').trim()
-      : (pathInput?.value ?? '').trim()
-  let gistId: string | undefined
-  if (sourceType === 'gist') {
-    gistId = (gistIdInput?.value ?? '').trim() || undefined
+  const form: GithubConfigForm = {
+    owner: (ownerInput?.value ?? '').trim(),
+    repo: (repoInput?.value ?? '').trim(),
+    // 空串表示未选择/未填写，须回退默认（`??` 会保留空串）
+    branch: (branchInput?.value ?? '').trim() || 'main',
+    // 按数据源类型读取对应字段值：
+    // - local: 复用 githubConfig.path 字段存储本地文件路径（与远程源 path 字段互斥复用）
+    // - GitHub/GitLab/Gitee: 使用 owner/repo/branch/path
+    path:
+      sourceType === 'local'
+        ? (localFilePathInput?.value ?? '').trim()
+        : (pathInput?.value ?? '').trim(),
+    sourceType,
+    strategy: (strategySelect?.value as SyncStrategy | undefined) ?? 'add-update',
   }
+  // gist: 使用独立的 gistId 字段
+  if (sourceType === 'gist') {
+    form.gistId = (gistIdInput?.value ?? '').trim() || undefined
+  }
+  return form
+}
 
+/** 按同步源类型找出缺失的必填项；齐全时返回 `null` */
+export function findMissingConfigField(form: GithubConfigForm): GithubConfigMissingField {
+  if (form.sourceType === 'local') {
+    return form.path ? null : 'path'
+  }
+  if (form.sourceType === 'gist') {
+    return form.gistId ? null : 'gistId'
+  }
+  return form.owner && form.repo && form.path ? null : 'ownerRepoPath'
+}
+
+/**
+ * saveGithubConfigFromDom（自 try 块抽离，降低 unicorn/try-complexity 计数）
+ */
+export function saveGithubConfigFromDom() {
+  const form = readGithubConfigForm()
   // 必填项校验：用户可能正在输入，未完成时跳过自动保存
-  if (sourceType === 'local') {
-    if (!path) return
-  } else if (sourceType === 'gist') {
-    if (!gistId) return
-  } else if (!owner || !repo || !path) return
+  if (findMissingConfigField(form) !== null) return
 
-  const isOkConfig = setGithubConfig({ owner, repo, branch, path, sourceType, gistId })
-  const isOkStrategy = setSyncStrategy(strategy)
-  const isOkSourceType = setSyncSourceType(sourceType)
+  const isOkConfig = setGithubConfig({
+    owner: form.owner,
+    repo: form.repo,
+    branch: form.branch,
+    path: form.path,
+    sourceType: form.sourceType,
+    gistId: form.gistId,
+  })
+  const isOkStrategy = setSyncStrategy(form.strategy)
+  const isOkSourceType = setSyncSourceType(form.sourceType)
   if (isOkConfig && isOkStrategy && isOkSourceType) {
     bgmLog(
       LOG_LEVELS.INFO,
-      `[handlers] GitHub 配置已自动保存: ${owner}/${repo}/${branch}/${path}, 策略: ${strategy}, 同步源: ${sourceType}${gistId ? `, gistId: ${gistId}` : ''}`,
+      `[handlers] GitHub 配置已自动保存: ${form.owner}/${form.repo}/${form.branch}/${form.path}, 策略: ${form.strategy}, 同步源: ${form.sourceType}${form.gistId ? `, gistId: ${form.gistId}` : ''}`,
     )
   }
 }

@@ -226,7 +226,8 @@ vi.mock('../ts/ui/handlers/enrich-preview-settings.js', () => ({
   reloadEnrichPreviewSettings: mocks.reloadEnrichPreviewSettings,
   saveEnrichPreviewSettings: mocks.saveEnrichPreviewSettings,
 }))
-vi.mock('../ts/ui/handlers/github-settings.js', () => ({
+vi.mock('../ts/ui/handlers/github-settings.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../ts/ui/handlers/github-settings.js')>()),
   refreshGithubConfigInputs: mocks.refreshGithubConfigInputs,
 }))
 vi.mock('../ts/ui/handlers/log-panel.js', () => ({ renderLogEntries: mocks.renderLogEntries }))
