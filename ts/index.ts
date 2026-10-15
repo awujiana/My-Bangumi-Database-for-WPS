@@ -324,6 +324,7 @@ export {
   getTokenRemainingTime,
   // 复制 Token 到剪贴板
   copyTokenToClipboard,
+  copyTextWithResult,
   // 获取用户 ID
   _getBgmUserId,
   // 设置用户 ID

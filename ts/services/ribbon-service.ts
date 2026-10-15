@@ -5,6 +5,7 @@ import {
   BGM,
   wpsMessageBox,
   loadBgToken,
+  copyTextWithResult,
   storeBgToken,
   getDataSheet,
   findHeaderRow,
@@ -745,6 +746,7 @@ export async function testTokenForRibbon(): Promise<void> {
  * 复制 Token 到剪贴板（Ribbon 版本）
  *
  * 使用 wpsMsgBox（带浏览器兜底）显示结果，确保在 Ribbon 和浏览器环境均可见。
+ * 复制动作本身委托 `copyTextWithResult`，本函数只负责「按失败类型给不同文案」。
  */
 export async function copyTokenForRibbon(): Promise<void> {
   const token = loadBgToken()
@@ -753,34 +755,16 @@ export async function copyTokenForRibbon(): Promise<void> {
     return
   }
 
-  try {
-    const textarea = document.createElement('textarea')
-    textarea.value = token
-    textarea.style.position = 'fixed'
-    textarea.style.opacity = '0'
-    textarea.style.pointerEvents = 'none'
-    document.body.appendChild(textarea)
-    textarea.select()
-    // execCommand 已废弃（no-deprecated），但 WPS WebView 中 Clipboard API 不可用时需回退使用，
-    // 这里以精确类型调用规避废弃标注
-    const isOk = (
-      document as unknown as {
-        execCommand: (commandId: string, shouldShowUI?: boolean, value?: string) => boolean
-      }
-    ).execCommand('copy')
-    document.body.removeChild(textarea)
-    if (isOk) {
-      bgmLog(LOG_LEVELS.INFO, '[copyTokenForRibbon] Token 已复制到剪贴板')
-      await wpsMessageBox('Token 已复制到剪贴板', 0, 64)
-    } else {
-      bgmLog(LOG_LEVELS.WARN, '[copyTokenForRibbon] execCommand copy 失败')
-      await wpsMessageBox('复制失败，浏览器不支持剪贴板操作', 0, 48)
-    }
-  } catch (error: unknown) {
-    const errorMessage = error instanceof Error ? error.message : String(error)
-    bgmLog(LOG_LEVELS.ERROR, `[copyTokenForRibbon] 复制失败: ${errorMessage}`)
-    await wpsMessageBox(`复制失败: ${errorMessage}`, 0, 16)
+  const result = copyTextWithResult(token)
+  if (result.ok) {
+    await wpsMessageBox('Token 已复制到剪贴板', 0, 64)
+    return
   }
+  if (result.kind === 'unsupported') {
+    await wpsMessageBox('复制失败，浏览器不支持剪贴板操作', 0, 48)
+    return
+  }
+  await wpsMessageBox(`复制失败: ${result.message}`, 0, 16)
 }
 
 /** 设置用户 ID（Ribbon 版本） */

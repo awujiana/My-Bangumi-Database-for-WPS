@@ -233,7 +233,8 @@ export function initIncrementalSyncFromRibbon(): void {
 | `github-sync.ts:756-829` / `1111-1180` / `1329-1399` | 逐字段回退路径三份重复（~120 行） | 提 `fallbackWriteRemoteEntry(...)` |
 | ~~`github-sync.ts:854-885` / `964-1016`~~ **已收敛** | `batchWriteNewRows`/`batchUpdateRows` 的 writeCols 收集逻辑重复 ~30 行 | ✅ 提 `collectWriteCols(colMap, names)`（`WriteCol` 接口同时提到模块级），调用方只负责攒列名 |
 | ~~`sheet.ts:115` vs `:160`~~ **已收敛** | `readRangeValues`/`readRangeCellValues` ~90% 相同 | ✅ 提 `readRect<T>(ws,r1,r2,c1,c2,convert)`：两个导出函数只剩一行委托，形状守卫只有一份 |
-| `ribbon-service.ts` vs `tools/util/index.ts` | `copyTokenForRibbon`/`copyTokenToClipboard`、`testTokenForRibbon`/`_fetchBgmUserInfo` 各重复 20+ 行 | 提 `copyTextToClipboard` / `fetchBgmMe` |
+| ~~`ribbon-service.ts` vs `tools/util/index.ts` 的剪贴板部分~~ **已收敛** | `copyTokenForRibbon`/`copyTokenToClipboard` 各写一份逐字相同的「建 textarea → select → execCommand → 移除」 | ✅ 抽 `copyTextWithResult(text): ClipboardCopyResult`（判别联合 `ok / unsupported / error`，保留 Ribbon 弹窗「不支持」与「带原因」两种文案）；`copyTokenToClipboard` 变一行委托 |
+| `ribbon-service.ts:656` vs `tools/util/index.ts:888` | `testTokenForRibbon` 与 `_fetchBgmUserInfo` 仍是两份独立的 XHR 取用户资料（~80 / ~120 行），前者 async + 弹窗、后者回调式 | 待做：抽 `fetchBgmMe(signal)` 返回 Promise，两处各自包文案。`testTokenForRibbon` 还会顺带落库 userId/username，合并时要保住这个副作用 |
 | ~~`preview.ts` / `sync.ts`~~ **主动搁置** | `{onPause,onResume,onStop}` handlers 对象重复（实测 5 处逐字相同 + `preview.ts` 1 处空实现变体） | ❌ 不改：① 各文件对 util barrel 的 mock 口径不一（`preview.test.ts` 压根没 mock `tools/util/index.js`，新增该路径 import 会把真实重模块拉进测试）；② 多个测试用 `{sync:{pause,resume,requestStop}}` 这类精简桩，把工厂挂到 `BGM.sync` 上会让桩缺方法直接 TypeError。收益仅 ~35 行 |
 
 ### 5.3 CPU 热点（非 IPC）

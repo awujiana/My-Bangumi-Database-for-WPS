@@ -753,15 +753,29 @@ export function loadBgToken(): string | null {
 }
 
 /**
- * 复制 Token 到剪贴板
- * @returns 是否复制成功
+ * execCommand 复制结果。
+ *
+ * `kind` 区分两种失败：`unsupported`（execCommand 返回 false，浏览器/WPS 不支持）
+ * 与 `error`（抛异常，`message` 带具体原因）——Ribbon 弹窗需要据此给不同文案。
  */
-export function copyTokenToClipboard(): boolean {
-  const token = loadBgToken()
-  if (!token) return false
+export type ClipboardCopyResult =
+  | { ok: true }
+  | { ok: false; kind: 'unsupported'; message: string }
+  | { ok: false; kind: 'error'; message: string }
+
+/**
+ * 用 execCommand 把文本写入剪贴板（WPS WebView 里 Clipboard API 不可用时的回退路径）。
+ *
+ * `copyTokenToClipboard` 与 `copyTokenForRibbon` 此前各写一份逐字相同的实现，
+ * 收敛于此。
+ *
+ * @param text 待复制文本
+ * @returns 复制结果（区分「不支持」与「异常」，供调用方给不同文案）
+ */
+export function copyTextWithResult(text: string): ClipboardCopyResult {
   try {
     const textarea = document.createElement('textarea')
-    textarea.value = token
+    textarea.value = text
     textarea.style.position = 'fixed'
     textarea.style.opacity = '0'
     textarea.style.pointerEvents = 'none'
@@ -776,15 +790,26 @@ export function copyTokenToClipboard(): boolean {
     ).execCommand('copy')
     document.body.removeChild(textarea)
     if (isOk) {
-      bgmLog(LOG_LEVELS.INFO, '[copyTokenToClipboard] Token 已复制到剪贴板')
-    } else {
-      bgmLog(LOG_LEVELS.WARN, '[copyTokenToClipboard] execCommand copy 失败')
+      bgmLog(LOG_LEVELS.INFO, '[copyTextWithResult] 已复制到剪贴板')
+      return { ok: true }
     }
-    return isOk
+    bgmLog(LOG_LEVELS.WARN, '[copyTextWithResult] execCommand copy 失败')
+    return { ok: false, kind: 'unsupported', message: 'execCommand copy 返回 false' }
   } catch (error: unknown) {
-    bgmLog(LOG_LEVELS.ERROR, `[copyTokenToClipboard] 复制失败: ${(error as Error).message}`)
-    return false
+    const message = error instanceof Error ? error.message : String(error)
+    bgmLog(LOG_LEVELS.ERROR, `[copyTextWithResult] 复制失败: ${message}`)
+    return { ok: false, kind: 'error', message }
   }
+}
+
+/**
+ * 复制 Token 到剪贴板
+ * @returns 是否复制成功
+ */
+export function copyTokenToClipboard(): boolean {
+  const token = loadBgToken()
+  if (!token) return false
+  return copyTextWithResult(token).ok
 }
 
 /**
