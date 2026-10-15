@@ -904,6 +904,145 @@ export function _getUserApiPath(): string {
 }
 
 /**
+ * `fetchBgmMe` 的判别联合结果。
+ *
+ * 刻意**带 HTTP 状态码**、并把 `timeout` 单列，而不是压成
+ * `'network' | 'http' | 'parse' | 'aborted'` 这种粗分类：调用方的分档需求不同 ——
+ * `testTokenForRibbon` 要按 401 与其它状态码给不同文案、且超时与网络错误的文案不同，
+ * `_fetchBgmUserInfo` 只要粗分类。压平会让前者丢信息（这也是两处一直没能合并的原因）。
+ */
+export type BgmMeResult =
+  | { kind: 'ok'; user: BGMUserInfo; status: number }
+  | { kind: 'http'; status: number }
+  | { kind: 'network' }
+  | { kind: 'timeout' }
+  | { kind: 'parse' }
+  | { kind: 'aborted' }
+  | { kind: 'no-token' }
+
+/**
+ * 解析 `GET /v0/me` 的响应体为 {@link BGMUserInfo}。
+ *
+ * 抽成独立纯函数有两个好处：① 把 `fetchBgmMe` 的 try 块复杂度压到 lint 阈值内；
+ * ② 字段回退链（nickname → username → user_name → name）与头像 URL 的构造/清洗
+ * 只此一份，便于单测直接覆盖。
+ *
+ * @param responseText XHR 的原始响应文本
+ * @throws JSON.parse 失败或字段类型异常时抛出（调用方归类为 parse 错误）
+ */
+function parseBgmMePayload(responseText: string): BGMUserInfo {
+  const data = JSON.parse(responseText) as {
+    id?: string | number
+    user_id?: string | number
+    username?: string
+    user_name?: string
+    name?: string
+    nickname?: string
+    avatar?: { large?: string; medium?: string; small?: string }
+  }
+  const userId = String(data.id ?? data.user_id ?? '')
+  // BGM API v0 返回的用户名字段是 nickname，username 是用户ID
+  const username =
+    (data.nickname || data.username || data.user_name || data.name) ?? '' // eslint-disable-line @typescript-eslint/prefer-nullish-coalescing -- API 字段空串需退到备用字段（`??` 会保留空串）
+
+  // 从 API 响应中提取头像 URL，并清理可能存在的反引号包裹
+  const rawAvatarUrl =
+    (data.avatar?.large || data.avatar?.medium || data.avatar?.small) ?? '' // eslint-disable-line @typescript-eslint/prefer-nullish-coalescing -- API 字段空串需退到备用字段（`??` 会保留空串）
+  const cleanAvatarUrl = rawAvatarUrl ? rawAvatarUrl.replace(/`/g, '').trim() : ''
+
+  // 优先使用 API 返回的头像 URL，若不存在则回退到构造的 URL
+  const avatarUrl =
+    cleanAvatarUrl ||
+    (username
+      ? `${BGM_CONFIG.API_BASE}/v0/users/${encodeURIComponent(username)}/avatar?type=large`
+      : undefined)
+
+  return { id: userId, username, avatarUrl }
+}
+
+/**
+ * 请求 Bangumi 当前登录用户资料（`GET /v0/me`）。
+ *
+ * **纯请求 + 解析，无副作用** —— 不落库、不缓存头像、不弹窗、不写 PluginStorage；
+ * 这些由调用方按需处理（`_fetchBgmUserInfo` 落库 + 缓存头像 + 持久化，
+ * `testTokenForRibbon` 只落库 + 通知 Token 更新）。
+ *
+ * @param signal 可选 AbortSignal；已 aborted 时立即 resolve `{ kind: 'aborted' }`
+ * @returns 带 HTTP 状态码的判别联合（见 {@link BgmMeResult}）
+ */
+export function fetchBgmMe(signal?: AbortSignal): Promise<BgmMeResult> {
+  return new Promise<BgmMeResult>((resolve) => {
+    const token = loadBgToken()
+    if (!token) {
+      resolve({ kind: 'no-token' })
+      return
+    }
+    if (signal?.aborted === true) {
+      bgmLog(LOG_LEVELS.INFO, '[fetchBgmMe] 请求被取消（signal 已 aborted）')
+      resolve({ kind: 'aborted' })
+      return
+    }
+
+    const apiUrl = `${BGM_CONFIG.API_BASE}/v0/me`
+    bgmLog(LOG_LEVELS.INFO, `[fetchBgmMe] API 路由: ${apiUrl}`)
+
+    const xhr = new XMLHttpRequest()
+    xhr.open('GET', apiUrl, true)
+    xhr.setRequestHeader('Authorization', `Bearer ${token}`)
+    xhr.setRequestHeader('Content-Type', 'application/json')
+    // 15 秒超时，便于快速感知网络问题
+    xhr.timeout = 15_000
+
+    // AbortSignal 支持：监听 abort 事件触发 xhr.abort()
+    if (signal) {
+      signal.addEventListener('abort', () => {
+        xhr.abort()
+      })
+    }
+
+    xhr.addEventListener('load', (): void => {
+      if (xhr.status !== 200) {
+        bgmLog(
+          LOG_LEVELS.WARN,
+          `[fetchBgmMe] 获取用户信息失败，HTTP 状态码: ${String(xhr.status)}`,
+        )
+        resolve({ kind: 'http', status: xhr.status })
+        return
+      }
+      try {
+        const user = parseBgmMePayload(xhr.responseText)
+        bgmLog(
+          LOG_LEVELS.INFO,
+          `[fetchBgmMe] 获取用户信息成功: userId=${user.id}, username=${user.username}, hasAvatar=${String(user.avatarUrl !== undefined)}`,
+        )
+        resolve({ kind: 'ok', user, status: 200 })
+      } catch (error: unknown) {
+        bgmLog(LOG_LEVELS.ERROR, `[fetchBgmMe] 解析响应失败: ${(error as Error).message}`)
+        resolve({ kind: 'parse' })
+      }
+    })
+
+    xhr.addEventListener('error', (): void => {
+      // 如果是 abort 导致的 onerror，归类为 aborted
+      if (signal?.aborted === true) {
+        bgmLog(LOG_LEVELS.INFO, '[fetchBgmMe] 请求被取消')
+        resolve({ kind: 'aborted' })
+        return
+      }
+      bgmLog(LOG_LEVELS.WARN, `[fetchBgmMe] 网络错误：无法连接到 ${apiUrl}（可能被 GFW 墙）`)
+      resolve({ kind: 'network' })
+    })
+
+    xhr.ontimeout = function handleTimeout(): void {
+      bgmLog(LOG_LEVELS.WARN, '[fetchBgmMe] 请求超时（15s）：可能网络受限或被墙')
+      resolve({ kind: 'timeout' })
+    }
+
+    xhr.send()
+  })
+}
+
+/**
  * 获取 Bangumi 当前登录用户信息
  * @param callback 回调函数，接收 userInfo 和错误类型
  *   - errorType: 'none' | 'network' | 'http' | 'parse' | 'aborted'
@@ -917,121 +1056,47 @@ export function _fetchBgmUserInfo(
   ) => void,
   signal?: AbortSignal,
 ): void {
-  const token = loadBgToken()
-  if (!token) {
+  // 无 Token 时**同步**回调（保持旧实现语义：调用方在同一个 tick 内即可拿到结果）
+  if (!loadBgToken()) {
     if (callback) callback(null, 'none')
     return
   }
 
-  // 如果 signal 已 aborted，立即回调
-  if (signal?.aborted) {
-    bgmLog(LOG_LEVELS.INFO, `[_fetchBgmUserInfo] 请求被取消（signal 已 aborted）`)
-    if (callback) callback(null, 'aborted')
-    return
-  }
+  void (async (): Promise<void> => {
+    const result = await fetchBgmMe(signal)
 
-  const apiUrl = `${BGM_CONFIG.API_BASE}/v0/me`
-  bgmLog(LOG_LEVELS.INFO, `[_fetchBgmUserInfo] API 路由: ${apiUrl}`)
+    if (result.kind === 'ok') {
+      const { id, username, avatarUrl } = result.user
+      _setBgmUserId(id)
+      _setBgmUsername(username)
+      BGM.cache.avatarUrl = avatarUrl ?? null
 
-  const xhr = new XMLHttpRequest()
-  xhr.open('GET', apiUrl, true)
-  xhr.setRequestHeader('Authorization', `Bearer ${token}`)
-  xhr.setRequestHeader('Content-Type', 'application/json')
-  // 15 秒超时，便于快速感知网络问题
-  xhr.timeout = 15_000
-
-  // AbortSignal 支持：监听 abort 事件触发 xhr.abort()
-  if (signal) {
-    signal.addEventListener('abort', () => {
-      xhr.abort()
-    })
-  }
-
-  xhr.addEventListener('load', (): void => {
-    if (xhr.status === 200) {
-      const applyUserInfoPayload = (): void => {
-        const data = JSON.parse(xhr.responseText) as {
-          id?: string | number
-          user_id?: string | number
-          username?: string
-          user_name?: string
-          name?: string
-          nickname?: string
-          avatar?: {
-            large?: string
-            medium?: string
-            small?: string
-          }
-        }
-        const userId = String(data.id ?? data.user_id ?? '')
-        // BGM API v0 返回的用户名字段是 nickname，username 是用户ID
-        const username = (data.nickname || data.username || data.user_name || data.name) ?? '' // eslint-disable-line @typescript-eslint/prefer-nullish-coalescing -- API 字段空串需退到备用字段（`??` 会保留空串）
-
-        _setBgmUserId(userId)
-        _setBgmUsername(username)
-
-        // 从 API 响应中提取头像 URL，并清理可能存在的反引号包裹
-        const rawAvatarUrl = (data.avatar?.large || data.avatar?.medium || data.avatar?.small) ?? '' // eslint-disable-line @typescript-eslint/prefer-nullish-coalescing -- API 字段空串需退到备用字段（`??` 会保留空串）
-        const cleanAvatarUrl = rawAvatarUrl ? rawAvatarUrl.replace(/`/g, '').trim() : ''
-
-        // 优先使用 API 返回的头像 URL，若不存在则回退到构造的 URL
-        const avatarUrl =
-          cleanAvatarUrl ||
-          (username
-            ? `${BGM_CONFIG.API_BASE}/v0/users/${encodeURIComponent(username)}/avatar?type=large`
-            : null)
-
-        BGM.cache.avatarUrl = avatarUrl
-
-        // 持久化头像 URL 到 PluginStorage
-        try {
-          const app = getApp()
-          if (app?.PluginStorage) {
-            app.PluginStorage.setItem('bgm_avatar_url', avatarUrl ?? '')
-          }
-        } catch {
-          // 静默处理
-        }
-
-        bgmLog(
-          LOG_LEVELS.INFO,
-          `[_fetchBgmUserInfo] 获取用户信息成功: userId=${userId}, username=${username}, hasAvatar=${String(!!avatarUrl)}`,
-        )
-
-        if (callback) callback({ id: userId, username, avatarUrl: avatarUrl ?? undefined }, 'none')
-      }
+      // 持久化头像 URL 到 PluginStorage
       try {
-        applyUserInfoPayload()
-      } catch (error: unknown) {
-        bgmLog(LOG_LEVELS.ERROR, `[_fetchBgmUserInfo] 解析响应失败: ${(error as Error).message}`)
-        if (callback) callback(null, 'parse')
+        const app = getApp()
+        if (app?.PluginStorage) {
+          app.PluginStorage.setItem('bgm_avatar_url', avatarUrl ?? '')
+        }
+      } catch {
+        // 静默处理
       }
-    } else {
-      bgmLog(
-        LOG_LEVELS.WARN,
-        `[_fetchBgmUserInfo] 获取用户信息失败，HTTP 状态码: ${String(xhr.status)}`,
-      )
-      if (callback) callback(null, 'http')
-    }
-  })
 
-  xhr.addEventListener('error', (): void => {
-    // 如果是 abort 导致的 onerror，归类为 aborted
-    if (signal?.aborted) {
-      bgmLog(LOG_LEVELS.INFO, `[_fetchBgmUserInfo] 请求被取消`)
-      if (callback) callback(null, 'aborted')
+      bgmLog(
+        LOG_LEVELS.INFO,
+        `[_fetchBgmUserInfo] 获取用户信息成功: userId=${id}, username=${username}, hasAvatar=${String(avatarUrl !== undefined)}`,
+      )
+      if (callback) callback(result.user, 'none')
       return
     }
-    bgmLog(LOG_LEVELS.WARN, `[_fetchBgmUserInfo] 网络错误：无法连接到 ${apiUrl}（可能被 GFW 墙）`)
-    if (callback) callback(null, 'network')
-  })
 
-  xhr.ontimeout = function handleTimeout(): void {
-    bgmLog(LOG_LEVELS.WARN, `[_fetchBgmUserInfo] 请求超时（15s）：可能网络受限或被墙`)
-    if (callback) callback(null, 'network')
-  }
-
-  xhr.send()
+    if (!callback) return
+    if (result.kind === 'no-token') {
+      callback(null, 'none')
+      return
+    }
+    // 超时沿用旧口径：并入 network（本函数的调用方文案不区分二者）
+    callback(null, result.kind === 'timeout' ? 'network' : result.kind)
+  })()
 }
 /**
  * 获取 Bangumi 用户信息（Promise 版本，供 handlers.js 等模块使用）

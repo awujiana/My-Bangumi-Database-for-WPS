@@ -46,6 +46,7 @@ const m = vi.hoisted(() => ({
   setBgmUserId: vi.fn(),
   setBgmUsername: vi.fn(),
   testTokenValidityForRibbon: vi.fn(),
+  fetchBgmMe: vi.fn(),
   fetchAllUserCollections: vi.fn(),
   isGithubConfigComplete: vi.fn(),
   showBangumiPanel: vi.fn(),
@@ -75,6 +76,7 @@ vi.mock('../ts/tools/util/index.js', async (importOriginal) => {
       },
     },
     loadBgToken: m.loadBgToken,
+    fetchBgmMe: m.fetchBgmMe,
     storeBgToken: m.storeBgToken,
     getDataSheet: m.getDataSheet,
     findHeaderRow: m.findHeaderRow,
@@ -242,68 +244,6 @@ function fingerprintOf(name: string, type: number, rate: string): string {
   return calcFingerprint([name, String(type), rate, '', '', '', '', ''])
 }
 
-// ========== 假 XHR ==========
-
-class FakeXhr {
-  static readonly instances: FakeXhr[] = []
-
-  private readonly listeners = new Map<string, (() => void)[]>()
-
-  status = 200
-
-  statusText = 'OK'
-
-  responseText = '{}'
-
-  timeout = 0
-
-  method = ''
-
-  url = ''
-
-  headers: Record<string, string> = {}
-
-  ontimeout: (() => void) | null = null
-
-  open(method: string, url: string, _isAsync?: boolean): void {
-    this.method = method
-    this.url = url
-  }
-
-  setRequestHeader(key: string, value: string): void {
-    this.headers[key] = value
-  }
-
-  addEventListener(type: string, handler: () => void): void {
-    const existing = this.listeners.get(type)
-    if (existing) {
-      existing.push(handler)
-    } else {
-      this.listeners.set(type, [handler])
-    }
-  }
-
-  send(): void {
-    FakeXhr.instances.push(this)
-  }
-
-  emit(type: string): void {
-    const handlers = this.listeners.get(type)
-    if (!handlers) return
-    for (const handler of handlers) handler()
-  }
-
-  fireTimeout(): void {
-    this.ontimeout?.()
-  }
-}
-
-function lastRequest(): FakeXhr {
-  const xhr = FakeXhr.instances.at(-1)
-  if (!xhr) throw new Error('未发起请求')
-  return xhr
-}
-
 beforeEach(() => {
   vi.clearAllMocks()
   syncState.isRunning = false
@@ -319,8 +259,6 @@ beforeEach(() => {
   m.isGithubConfigComplete.mockReturnValue(true)
   m.fetchAllUserCollections.mockResolvedValue([])
   m.syncToBangumiAsync.mockResolvedValue({ success: 1, fail: 0, skip: 0 })
-  FakeXhr.instances.length = 0
-  vi.stubGlobal('XMLHttpRequest', FakeXhr)
 })
 
 afterEach(() => {
@@ -1050,86 +988,66 @@ describe('ribbon-service · testTokenForRibbon', () => {
     await testTokenForRibbon()
 
     expect(m.wpsMessageBox).toHaveBeenCalledWith('请先设置 Token！', 0, 48)
-    expect(FakeXhr.instances).toHaveLength(0)
+    expect(m.fetchBgmMe).not.toHaveBeenCalled()
   })
 
   it('200 + 合法响应 → 写入用户信息并在 Ribbon 弹窗展示', async () => {
     m.loadBgToken.mockReturnValue('t0ken')
+    m.fetchBgmMe.mockResolvedValue({
+      kind: 'ok',
+      user: { id: '100', username: 'momo' },
+      status: 200,
+    })
 
-    const promise = testTokenForRibbon()
-    const xhr = lastRequest()
-    expect(xhr.method).toBe('GET')
-    expect(xhr.url).toBe('https://api.bgm.tv/v0/me')
-    expect(xhr.timeout).toBe(15_000)
-    expect(xhr.headers.Authorization).toBe('Bearer t0ken')
+    await testTokenForRibbon()
 
-    xhr.responseText = JSON.stringify({ nickname: 'momo', id: 100 })
-    xhr.emit('load')
-    await promise
-
+    expect(m.fetchBgmMe).toHaveBeenCalledTimes(1)
     expect(m.setBgmUserId).toHaveBeenCalledWith('100')
     expect(m.setBgmUsername).toHaveBeenCalledWith('momo')
-    expect(m.wpsMessageBox).toHaveBeenCalledWith(
-      'Token 有效！\n用户: momo\nID: 100',
-      0,
-      64,
-    )
+    expect(m.wpsMessageBox).toHaveBeenCalledWith('Token 有效！\n用户: momo\nID: 100', 0, 64)
   })
 
-  it('昵称回退到 username，再回退到「未知用户」', async () => {
+  it('用户名为空 → 回退到「未知用户」', async () => {
     m.loadBgToken.mockReturnValue('t0ken')
+    m.fetchBgmMe.mockResolvedValue({ kind: 'ok', user: { id: '7', username: '' }, status: 200 })
 
-    const promise = testTokenForRibbon()
-    const xhr = lastRequest()
-    xhr.responseText = JSON.stringify({ username: 'fallback' })
-    xhr.emit('load')
-    await promise
+    await testTokenForRibbon()
 
-    expect(m.setBgmUsername).toHaveBeenCalledWith('fallback')
+    expect(m.setBgmUsername).toHaveBeenCalledWith('未知用户')
   })
 
-  it('响应不是 JSON → 提示解析失败', async () => {
+  it('kind=parse → 提示解析失败', async () => {
     m.loadBgToken.mockReturnValue('t0ken')
+    m.fetchBgmMe.mockResolvedValue({ kind: 'parse' })
 
-    const promise = testTokenForRibbon()
-    const xhr = lastRequest()
-    xhr.responseText = 'plain text'
-    xhr.emit('load')
-    await promise
+    await testTokenForRibbon()
 
     expect(m.wpsMessageBox).toHaveBeenCalledWith('解析响应失败，请重试', 0, 16)
   })
 
-  it('401 → 提示 Token 无效', async () => {
+  it('HTTP 401 → 提示 Token 无效', async () => {
     m.loadBgToken.mockReturnValue('t0ken')
+    m.fetchBgmMe.mockResolvedValue({ kind: 'http', status: 401 })
 
-    const promise = testTokenForRibbon()
-    const xhr = lastRequest()
-    xhr.status = 401
-    xhr.emit('load')
-    await promise
+    await testTokenForRibbon()
 
     expect(m.wpsMessageBox).toHaveBeenCalledWith('Token 无效或已过期，请重新设置', 0, 48)
   })
 
   it('其它状态码 → 提示带状态码的失败', async () => {
     m.loadBgToken.mockReturnValue('t0ken')
+    m.fetchBgmMe.mockResolvedValue({ kind: 'http', status: 500 })
 
-    const promise = testTokenForRibbon()
-    const xhr = lastRequest()
-    xhr.status = 500
-    xhr.emit('load')
-    await promise
+    await testTokenForRibbon()
 
     expect(m.wpsMessageBox).toHaveBeenCalledWith('Token 验证失败 (HTTP 500)', 0, 16)
   })
 
   it('网络错误 → 提示被墙或断网', async () => {
     m.loadBgToken.mockReturnValue('t0ken')
+    m.fetchBgmMe.mockResolvedValue({ kind: 'network' })
 
-    const promise = testTokenForRibbon()
-    lastRequest().emit('error')
-    await promise
+    await testTokenForRibbon()
 
     expect(m.wpsMessageBox).toHaveBeenCalledWith(
       '网络错误，无法连接到 Bangumi API\n可能原因：网络被墙或断网',
@@ -1138,48 +1056,25 @@ describe('ribbon-service · testTokenForRibbon', () => {
     )
   })
 
-  it('超时 → 提示重试', async () => {
+  it('超时 → 提示重试（与网络错误文案区分）', async () => {
     m.loadBgToken.mockReturnValue('t0ken')
+    m.fetchBgmMe.mockResolvedValue({ kind: 'timeout' })
 
-    const promise = testTokenForRibbon()
-    lastRequest().fireTimeout()
-    await promise
+    await testTokenForRibbon()
 
     expect(m.wpsMessageBox).toHaveBeenCalledWith('网络超时，请重试', 0, 48)
   })
 
-  it('401 分支中弹窗通道自身抛错 → 外层兜底记日志，不向外抛', async () => {
-    // 401 / 其它状态码分支的 `await wpsMessageBox(...)` 不在内层 try 里，
-    // 它抛错时由 load 回调最外层的 try/catch 兜住（只记日志）。
-    // 注意：该外层 catch 目前不调用 resolve()，所以这里**不能** await 返回的 Promise，
-    // 只清空微任务后断言日志；将来若补上 resolve()，本用例依然通过。
+  it('弹窗通道自身抛错 → 外层兜底记日志，不向外抛', async () => {
     m.loadBgToken.mockReturnValue('t0ken')
+    m.fetchBgmMe.mockResolvedValue({ kind: 'http', status: 401 })
     m.wpsMessageBox.mockRejectedValue(new Error('弹窗通道异常'))
 
-    void testTokenForRibbon()
-    const xhr = lastRequest()
-    xhr.status = 401
-    xhr.emit('load')
-
-    await Promise.resolve()
-    await Promise.resolve()
+    // 不 reject 即为「不向外抛」（旧契约：Ribbon 按钮处理器不因弹窗失败而崩）
+    await expect(testTokenForRibbon()).resolves.toBeUndefined()
 
     const messages = m.bgmLog.mock.calls.map((call) => String(call[1]))
     expect(messages.some((message) => message.includes('处理响应异常: 弹窗通道异常'))).toBe(true)
-  })
-
-  it('error 事件中弹窗通道自身抛错 → 外层兜底记日志，不向外抛', async () => {
-    m.loadBgToken.mockReturnValue('t0ken')
-    m.wpsMessageBox.mockRejectedValue(new Error('弹窗通道异常'))
-
-    void testTokenForRibbon()
-    lastRequest().emit('error')
-
-    await Promise.resolve()
-    await Promise.resolve()
-
-    const messages = m.bgmLog.mock.calls.map((call) => String(call[1]))
-    expect(messages.some((message) => message.includes('处理错误事件异常: 弹窗通道异常'))).toBe(true)
   })
 })
 

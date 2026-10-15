@@ -920,6 +920,19 @@ class FakeXhr {
   }
 }
 
+/**
+ * 等微任务队列清空。
+ *
+ * `_fetchBgmUserInfo` 现在委托 `fetchBgmMe`（Promise）→ 回调落在**微任务**里，
+ * 而 FakeXhr 的 emit 是同步的，所以驱动完请求后必须先 flush 再断言。
+ */
+const flushMicrotasks = (): Promise<void> =>
+  new Promise((resolve) => {
+    // 用 setTimeout(…, 0) 而非 setImmediate：后者的类型在当前 tsconfig 下解析不到
+    // （@typescript-eslint/no-unsafe-call）；两者都是宏任务，足以清空微任务队列。
+    setTimeout(resolve, 0)
+  })
+
 /** 装好假宿主与 Token，返回本次请求创建的 XHR */
 function startUserInfoRequest(signal?: AbortSignal): FakeXhr {
   mountApp(createFakeApp().app)
@@ -930,7 +943,7 @@ function startUserInfoRequest(signal?: AbortSignal): FakeXhr {
   return xhr
 }
 
-describe('util · _fetchBgmUserInfo（XHR 状态机）', () => {
+describe('util · _fetchBgmUserInfo（XHR 状态机）', async () => {
   beforeEach(() => {
     FakeXhr.instances.length = 0
     vi.stubGlobal('XMLHttpRequest', FakeXhr)
@@ -940,7 +953,7 @@ describe('util · _fetchBgmUserInfo（XHR 状态机）', () => {
     vi.unstubAllGlobals()
   })
 
-  it('无 Token 时回调 none，且不发起请求', () => {
+  it('无 Token 时回调 none，且不发起请求', async () => {
     mountApp(createFakeApp().app)
     clearBgToken()
     const callback = vi.fn()
@@ -951,7 +964,7 @@ describe('util · _fetchBgmUserInfo（XHR 状态机）', () => {
     expect(FakeXhr.instances).toHaveLength(0)
   })
 
-  it('signal 已是 aborted 时回调 aborted，不发起请求', () => {
+  it('signal 已是 aborted 时回调 aborted，不发起请求', async () => {
     const controller = new AbortController()
     controller.abort()
     const callback = vi.fn()
@@ -959,12 +972,13 @@ describe('util · _fetchBgmUserInfo（XHR 状态机）', () => {
     mountApp(createFakeApp().app)
     storeBgToken('t')
     _fetchBgmUserInfo(callback, controller.signal)
+    await flushMicrotasks()
 
     expect(callback).toHaveBeenCalledWith(null, 'aborted')
     expect(FakeXhr.instances).toHaveLength(0)
   })
 
-  it('有 Token 时按 BGM API 约定发起 GET /v0/me（Bearer + 15s 超时）', () => {
+  it('有 Token 时按 BGM API 约定发起 GET /v0/me（Bearer + 15s 超时）', async () => {
     const xhr = startUserInfoRequest()
 
     expect(xhr.method).toBe('GET')
@@ -974,7 +988,7 @@ describe('util · _fetchBgmUserInfo（XHR 状态机）', () => {
     expect(xhr.timeout).toBe(15_000)
   })
 
-  it('200 + 完整 payload：写用户信息、头像（剥掉反引号）、持久化并回调', () => {
+  it('200 + 完整 payload：写用户信息、头像（剥掉反引号）、持久化并回调', async () => {
     const app = createFakeApp()
     mountApp(app.app)
     storeBgToken('my-token')
@@ -990,6 +1004,7 @@ describe('util · _fetchBgmUserInfo（XHR 状态机）', () => {
       avatar: { large: '`https://lain.bgm.tv/pic/user/l/42.jpg`' },
     })
     xhr.emit('load')
+    await flushMicrotasks()
 
     expect(_getBgmUserId()).toBe('42')
     expect(_getBgmUsername()).toBe('momo')
@@ -1001,16 +1016,17 @@ describe('util · _fetchBgmUserInfo（XHR 状态机）', () => {
     )
   })
 
-  it('200 但无头像字段：回退到按用户名构造的头像 URL', () => {
+  it('200 但无头像字段：回退到按用户名构造的头像 URL', async () => {
     const xhr = startUserInfoRequest()
     xhr.status = 200
     xhr.responseText = JSON.stringify({ user_id: 7, user_name: 'nameX' })
     xhr.emit('load')
+    await flushMicrotasks()
 
     expect(BGM.cache.avatarUrl).toContain('/v0/users/nameX/avatar?type=large')
   })
 
-  it('200 但既无头像也无用户名：avatarUrl 为 null，存储写空串', () => {
+  it('200 但既无头像也无用户名：avatarUrl 为 null，存储写空串', async () => {
     const app = createFakeApp()
     mountApp(app.app)
     storeBgToken('t')
@@ -1020,20 +1036,22 @@ describe('util · _fetchBgmUserInfo（XHR 状态机）', () => {
     if (!xhr) throw new Error('未发起请求')
     xhr.responseText = JSON.stringify({})
     xhr.emit('load')
+    await flushMicrotasks()
 
     expect(BGM.cache.avatarUrl).toBeNull()
     expect(app.store.get('bgm_avatar_url')).toBe('')
   })
 
-  it('字段为空串时退到备用字段（nickname 优先于 username）', () => {
+  it('字段为空串时退到备用字段（nickname 优先于 username）', async () => {
     const xhr = startUserInfoRequest()
     xhr.responseText = JSON.stringify({ id: 3, nickname: '', username: 'fallbackName' })
     xhr.emit('load')
+    await flushMicrotasks()
 
     expect(_getBgmUsername()).toBe('fallbackName')
   })
 
-  it('200 但响应不是合法 JSON：回调 parse', () => {
+  it('200 但响应不是合法 JSON：回调 parse', async () => {
     const app = createFakeApp()
     mountApp(app.app)
     storeBgToken('t')
@@ -1044,11 +1062,12 @@ describe('util · _fetchBgmUserInfo（XHR 状态机）', () => {
     if (!xhr) throw new Error('未发起请求')
     xhr.responseText = '这不是 JSON'
     xhr.emit('load')
+    await flushMicrotasks()
 
     expect(callback).toHaveBeenCalledWith(null, 'parse')
   })
 
-  it('HTTP 非 200：回调 http', () => {
+  it('HTTP 非 200：回调 http', async () => {
     const app = createFakeApp()
     mountApp(app.app)
     storeBgToken('t')
@@ -1059,11 +1078,12 @@ describe('util · _fetchBgmUserInfo（XHR 状态机）', () => {
     if (!xhr) throw new Error('未发起请求')
     xhr.status = 401
     xhr.emit('load')
+    await flushMicrotasks()
 
     expect(callback).toHaveBeenCalledWith(null, 'http')
   })
 
-  it('网络错误（非 abort 引起）：回调 network', () => {
+  it('网络错误（非 abort 引起）：回调 network', async () => {
     const app = createFakeApp()
     mountApp(app.app)
     storeBgToken('t')
@@ -1071,11 +1091,12 @@ describe('util · _fetchBgmUserInfo（XHR 状态机）', () => {
     _fetchBgmUserInfo(callback)
 
     FakeXhr.instances[0]?.emit('error')
+    await flushMicrotasks()
 
     expect(callback).toHaveBeenCalledWith(null, 'network')
   })
 
-  it('超时：回调 network', () => {
+  it('超时：回调 network', async () => {
     const app = createFakeApp()
     mountApp(app.app)
     storeBgToken('t')
@@ -1083,11 +1104,12 @@ describe('util · _fetchBgmUserInfo（XHR 状态机）', () => {
     _fetchBgmUserInfo(callback)
 
     FakeXhr.instances[0]?.ontimeout?.()
+    await flushMicrotasks()
 
     expect(callback).toHaveBeenCalledWith(null, 'network')
   })
 
-  it('请求进行中被 abort：归类为 aborted 而不是 network', () => {
+  it('请求进行中被 abort：归类为 aborted 而不是 network', async () => {
     const controller = new AbortController()
     const app = createFakeApp()
     mountApp(app.app)
@@ -1097,22 +1119,24 @@ describe('util · _fetchBgmUserInfo（XHR 状态机）', () => {
 
     const xhr = FakeXhr.instances[0]
     controller.abort()
+    await flushMicrotasks()
 
     expect(xhr?.aborted).toBe(true)
     expect(callback).toHaveBeenCalledWith(null, 'aborted')
     expect(callback).not.toHaveBeenCalledWith(null, 'network')
   })
 
-  it('不传 callback 时不抛错（调用方可只关心副作用）', () => {
+  it('不传 callback 时不抛错（调用方可只关心副作用）', async () => {
     const xhr = startUserInfoRequest()
-    expect(() => {
-      xhr.emit('load')
-    }).not.toThrow()
+      expect(() => {
+        xhr.emit('load')
+      }).not.toThrow()
+      await flushMicrotasks()
     // 默认 responseText 是空对象 → 用户 ID 为空 → 按「无值」落成 null
     expect(_getBgmUserId()).toBeNull()
   })
 
-  it('头像持久化失败时静默（不把存储异常升级成请求失败）', () => {
+  it('头像持久化失败时静默（不把存储异常升级成请求失败）', async () => {
     const app = createFakeApp({ throwingKeys: ['bgm_avatar_url'] })
     mountApp(app.app)
     storeBgToken('t')
@@ -1122,10 +1146,11 @@ describe('util · _fetchBgmUserInfo（XHR 状态机）', () => {
     const xhr = FakeXhr.instances[0]
     if (!xhr) throw new Error('未发起请求')
     xhr.responseText = JSON.stringify({ id: 9, nickname: 'noPersist' })
-    expect(() => {
-      xhr.emit('load')
-    }).not.toThrow()
-    expect(_getBgmUserId()).toBe('9')
+      expect(() => {
+        xhr.emit('load')
+      }).not.toThrow()
+      await flushMicrotasks()
+      expect(_getBgmUserId()).toBe('9')
     expect(callback).toHaveBeenCalledWith(
       expect.objectContaining({ id: '9', username: 'noPersist' }),
       'none',
@@ -1152,6 +1177,7 @@ describe('util · fetchBgmUserInfo（Promise 包装）', () => {
     if (!xhr) throw new Error('未发起请求')
     xhr.responseText = JSON.stringify({ id: 11, nickname: 'promiseUser' })
     xhr.emit('load')
+    await flushMicrotasks()
 
     const { userInfo, errorType } = await promise
     expect(errorType).toBe('none')
@@ -1172,6 +1198,7 @@ describe('util · fetchBgmUserInfo（Promise 包装）', () => {
     const promise = fetchBgmUserInfo()
 
     FakeXhr.instances[0]?.emit('error')
+    await flushMicrotasks()
 
     await expect(promise).resolves.toEqual({ userInfo: null, errorType: 'network' })
   })

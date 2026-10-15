@@ -343,6 +343,8 @@ export {
   _getUserApiPath,
   // 获取 Bangumi 当前登录用户信息
   _fetchBgmUserInfo,
+  // 请求 Bangumi 当前登录用户资料（Promise + 带 HTTP status 的判别联合）
+  fetchBgmMe,
   // 显示主面板
   showBangumiPanel,
   // 显示设置面板（带动态停靠位置）
