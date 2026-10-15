@@ -246,6 +246,48 @@ export function initIncrementalSyncFromRibbon(): void {
 
 ---
 
+### 5.4 第六轮审查新增发现（2026-10-15，只读扫描，**未改动任何代码**）
+
+四个并行审查（本轮 4 个提交的回归核对 / `ts/sync`+`ts/services` / `ts/ui`+`ts/panel`+`ts/tools` / 对照本清单比对）。
+
+**本轮 4 个代码提交复盘：无回归。** `fallbackWriteRemoteEntry` 三处参数化忠实（处 1 带 `(回退逐字段写入)` 后缀与 `failRow`、处 3 无后缀无 row）；`formatDuration` 测试只改「999ms 四舍五入→截断」「整分补 00秒→不补」两类断言；`writeSyncRecordHeader` 的矩形写有桩支撑；`fetchBgmMe` 五种弹窗文案与旧实现逐字一致、`timeout→network` 映射保留、外层兜底契约保留。仅三处日志级痕迹：parse 失败日志丢了 error 详情（`ribbon-service.ts`）、起始日志去掉 API URL、已 aborted 的回调从同步变微任务（提交信息已声明）。
+
+**确定是 bug（建议优先修）**
+
+| #   | 位置                                                     | 问题                                                                                                                                                                                                 |
+| --- | -------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | `sync-record.ts:919-927`                                 | 单行读**未做形状归一化**：一维时 `existing` 只剩首列，`buildUpdatedSyncRow` 以 `''` 补齐其余 11 列后整行写回 → **清空该行用户同步记录**（与 §8 已列的 `813-821` 同病，但这条批量路径当时未纳管）     |
+| 2   | `sync/progress-reporter.ts:41-47`                        | `TYPE_NAMES` 把 2/3 标成「在看/看过」，与 `core/constants.ts` 的 `WATCH_STATUS_MAP`/`COLLECTION_TYPE_NAMES`（2=看过，3=在看）**相反** → 同步记录「条目类型」列标签写反                               |
+| 3   | `sync/exceltobangumi/index.ts:1107-1122` vs `541-567`    | 章节标记条件两路径不一致：批量只标 `type=2`，选中行标 `2                                                                                                                                             | 3`  |
+| 4   | `panel/clean-page.ts:302` vs `panel/clean-engine.ts:175` | `isWorkbookAllowed` 两份且行为分歧：clean-page 版只判 exclude，引擎版额外套 `includeWorkbookPath` 白名单 → 配了白名单时 **UI 候选与引擎实际清理范围不一致**                                          |
+| 5   | `sync/scraping.ts:99-103`                                | abort 监听器只 add 不 remove（`sync/jsonl-response.ts` 已修同类泄漏）                                                                                                                                |
+| 6   | `ui/panel-preview.html:644-661`                          | `.check-row` 被 `panel-theme.css:572` 的 `.form-group > label{display:block}`（0,1,1）压过同为 0,1,1 的 `.check-row{display:flex}` → flex/gap/居中失效；CSS 应写成 `.form-group .check-row` 提特异性 |
+| 7   | `ui/panel.html:619-633`                                  | `.time-filter-row` 是 flex 行，唯一子元素 `p.hint` 收缩到内容宽，边框/背景不铺满（time-filter 修复只覆盖了 label/box）→ `.time-filter-row > .hint { flex: 1 }`                                       |
+
+**重复与浪费（新增，未列入上方表格）**
+
+| #   | 位置                                             | 问题                                                                                                                                                                                  |
+| --- | ------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 8   | `SyncSource` 四个实现类                          | `github-sync.ts:202-239`、`gitee-sync.ts:118-155`、`gitlab-sync.ts:118-155`、`gist-sync.ts:352-388` 逐字重复（`fetchXxxText` 已收敛，类没有）→ 抽基类/工厂                            |
+| 9   | 标签合并三份                                     | `enrich-normalize.ts:62` `mergeTags`、`sheet-cleaning.ts:141` `mergeTagValues`、`github-time-format.ts:50` `appendValueWithSeparator`                                                 |
+| 10  | `sync/scraping.ts:155-200`                       | `verifyToken` 是 `GET /v0/me` 的**第三份**实现（已有 `fetchBgmMe`）→ 应委托                                                                                                           |
+| 11  | `sync/enrich-record.ts:131-138`                  | 新建表逐格写表头（`writeSyncRecordHeader` 已收敛矩形写）；`344-345` 又逐格重写；`277-279` `UsedRange` 求值 3 次（`clearSyncRecords` 已修同类）                                        |
+| 12  | `sync-source-registry.ts:165-173`                | `formatTimeFilterLabel` 与 `github-time-format.ts:80-88` 逐字重复 → import。**注意它已改在 duration 收敛清单之外**                                                                    |
+| 13  | `tools/../../sync/workbook-auto-detect.ts:73-87` | 复制 `locked-sheet.ts` 的 `isRowPopulated`/`countDataRowsAfter`（应为 `sync/workbook-auto-detect.ts`）                                                                                |
+| 14  | `tools/http.ts:47` vs `tools/util/sleep.ts:15`   | 私有 sleep（Promise 版）与工具版（void 版）并存                                                                                                                                       |
+| 15  | `tools/utility.js` vs `tools/util/index.js`      | 同一 barrel 两条 specifier：19 个测试 mock 前者、35 个 mock 后者；`ui/handlers/sync.ts:52` 因怕 undefined 挂了 `typeof ensureSheetHeaders !== 'function'` 死守卫 → 统一入口并删死守卫 |
+| 16  | `enrich-engine.ts:395-430`                       | 每表 ~500 次逐格读且每次 `SheetActivate` 全簿重跑 → 矩形读 + 结果缓存                                                                                                                 |
+
+**分层与测试卫生（低）**
+
+- ui/panel 直连 sync 非 barrel 函数 5 处（`cleanSheetDuplicates`、`shouldFilterNoise`、`isBangumiSheetEmpty`、`readLocalFileContent`、`resetNoiseKeywordCache`）—— `check:cycles` 只查底层→上层，管不到上层→底层，建议补 barrel 导出或列豁免清单。
+- 无 `...actual` 的整体 barrel mock 3 处（`tests/auto-fill-url.test.ts:6`、`tests/action-handlers.test.ts:129`、`tests/token.test.ts:42`）—— 目前工厂与导入逐字对齐，但新增导入即静默 undefined，建议加 CI 断言比对。
+- `ribbon-service.ts` 的 `getField`（236-248）与 `exceltobangumi/index.ts` 的 `createFieldGetter`（162-175）同构；指纹数组三处逐字重复。
+- `panel/panel-page.ts:40` 的 4 行 Escape 处理 vs `ui/components/modal-a11y.ts:52` 的完整 focus trap —— 详情模态疑似未复用 a11y 组件。
+- `toggleSheetLock` 两套实现：`panel/enrich-page.ts:970`（委托锁引擎）vs `panel/panel-lifecycle.ts:74`（自管 `BGM.sheet`）。
+
+---
+
 ## 六、测试桩忠实性原则（本次最重要的方法论收获）
 
 ### 原则
