@@ -50,7 +50,7 @@ oldArray = Array.isArray(oldValues)
 ```ts
 const raw: unknown = range.Value2
 if (Array.isArray(raw)) {
-  const row = Array.isArray(raw[0]) ? raw[0] : raw   // 二维取首行，一维整体即一行
+  const row = Array.isArray(raw[0]) ? raw[0] : raw // 二维取首行，一维整体即一行
 }
 ```
 
@@ -91,7 +91,7 @@ range.Value2 = finalValues                        // 未变化的列被写 null 
 ```ts
 const finalValues: (string | number | null)[] = Array.from(
   { length: colCount },
-  (_, c) => oldArray[c] ?? null,      // 先铺旧值
+  (_, c) => oldArray[c] ?? null, // 先铺旧值
 )
 // 只把「本次要写且值确实变了」的位置替换掉
 ```
@@ -123,8 +123,8 @@ function appendValueWithSeparator(localValue: string, remoteValue: string): stri
 ```ts
 if (range !== null && oldArray.length < colCount) {
   bgmLog(LOG_LEVELS.WARN, `行 ${row} 旧值读取失败或形状异常，回退逐字段写入`)
-  range = null        // writeRowValuesWithUndo 的 range === null 分支会用
-}                     // getCellValue 逐格重取旧值，天然带兜底
+  range = null // writeRowValuesWithUndo 的 range === null 分支会用
+} // getCellValue 逐格重取旧值，天然带兜底
 ```
 
 > 判据用 `oldArray.length < colCount` 而非 `=== 0`：能同时抓住「完全读不到」和「读了一半」两种情况。
@@ -134,14 +134,14 @@ if (range !== null && oldArray.length < colCount) {
 
 ## 三、本次审计发现并修复的 6 处缺陷
 
-| # | 位置 | 问题 | 后果 |
-| --- | --- | --- | --- |
-| 1 | `github-sync.ts` `batchUpdateRows` | 读旧值失败用空值合并 | 用户标签/别名被远程值整体替换 |
-| 2 | `github-sync.ts` `batchUpdateRows` | 单行 `Value2` 一维当二维 | 旧值退化首字符、undo 记错、合并写乱值 |
-| 3 | `github-sync.ts` `writeRowValuesWithUndo` | 未变化列铺 `null` 整行写 | 清空 `writeCols` 区间中段的用户列 |
-| 4 | `github-sync.ts` `batchWriteNewRows` | 新增行同样铺 `null` | 锚定列偏短时清掉目标行用户数据 |
-| 5 | `tools/util/sheet.ts` `ensureSheetHeaders` | 守卫是「未识别到表头」非「表为空」 | 用户第 1 行数据被 39 个标准表头覆盖 |
-| 6 | `ui/handlers/incremental-bindings.ts` | `initSkipConflictsFromRibbon` 被 `#chkIncremental` 早退挡住 | 主面板冲突策略下拉改动**不落配置** |
+| #   | 位置                                       | 问题                                                        | 后果                                  |
+| --- | ------------------------------------------ | ----------------------------------------------------------- | ------------------------------------- |
+| 1   | `github-sync.ts` `batchUpdateRows`         | 读旧值失败用空值合并                                        | 用户标签/别名被远程值整体替换         |
+| 2   | `github-sync.ts` `batchUpdateRows`         | 单行 `Value2` 一维当二维                                    | 旧值退化首字符、undo 记错、合并写乱值 |
+| 3   | `github-sync.ts` `writeRowValuesWithUndo`  | 未变化列铺 `null` 整行写                                    | 清空 `writeCols` 区间中段的用户列     |
+| 4   | `github-sync.ts` `batchWriteNewRows`       | 新增行同样铺 `null`                                         | 锚定列偏短时清掉目标行用户数据        |
+| 5   | `tools/util/sheet.ts` `ensureSheetHeaders` | 守卫是「未识别到表头」非「表为空」                          | 用户第 1 行数据被 39 个标准表头覆盖   |
+| 6   | `ui/handlers/incremental-bindings.ts`      | `initSkipConflictsFromRibbon` 被 `#chkIncremental` 早退挡住 | 主面板冲突策略下拉改动**不落配置**    |
 
 ### 缺陷 6 详解（唯一的行为 bug，其余 5 个是数据安全）
 
@@ -167,14 +167,14 @@ export function initIncrementalSyncFromRibbon(): void {
 
 ## 四、本次顺带修掉的小问题
 
-| 位置 | 问题 | 修法 |
-| --- | --- | --- |
-| `github-sync.ts` `syncFromGithub` | `date` 不在 `REQUIRED_FIELDS`，用户表无「开播日期」列时该字段不下载，而 `filterByTime` 完全依赖 `entry.date` → 全部条目被判无日期过滤，**同步 0 条且无提示** | 启用时间筛选时显式 `neededFields.add('date')` |
-| `ui/handlers/token.ts` `showUserProfile` | 三处 `addEventListener('error', 闭包)`，而该函数被 2 秒轮询反复调用 → **监听器无限累积** | 提为模块级命名函数 + `bindAvatarError()` 先 remove 再 add |
-| `sync-record.ts` `clearSyncRecords` | `sheet.UsedRange` 被求值 3 次，每次含 `Row`+`Rows`+`Count` ≈ 8 次 IPC | 提为局部常量 `const usedRange = sheet.UsedRange` |
-| `tools/util/sheet.ts` 两处读函数 | `(range as unknown as { Value2?: unknown }).Value2` 双重强转，丢掉 `WpsRange` 已声明的类型 | 改 `const raw: unknown = range.Value2` |
-| `exceltobangumi/index.ts` | `nameCol === urlCol ? rowNumber : rowNumber` 恒等三元 | 直接 `getCellValue(ws, rowNumber, nameCol)` |
-| `enrich-engine.ts` | `key === '简介' ? '简介' : key` 恒等三元 | 模板里直接用 `key` |
+| 位置                                     | 问题                                                                                                                                                         | 修法                                                      |
+| ---------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------- |
+| `github-sync.ts` `syncFromGithub`        | `date` 不在 `REQUIRED_FIELDS`，用户表无「开播日期」列时该字段不下载，而 `filterByTime` 完全依赖 `entry.date` → 全部条目被判无日期过滤，**同步 0 条且无提示** | 启用时间筛选时显式 `neededFields.add('date')`             |
+| `ui/handlers/token.ts` `showUserProfile` | 三处 `addEventListener('error', 闭包)`，而该函数被 2 秒轮询反复调用 → **监听器无限累积**                                                                     | 提为模块级命名函数 + `bindAvatarError()` 先 remove 再 add |
+| `sync-record.ts` `clearSyncRecords`      | `sheet.UsedRange` 被求值 3 次，每次含 `Row`+`Rows`+`Count` ≈ 8 次 IPC                                                                                        | 提为局部常量 `const usedRange = sheet.UsedRange`          |
+| `tools/util/sheet.ts` 两处读函数         | `(range as unknown as { Value2?: unknown }).Value2` 双重强转，丢掉 `WpsRange` 已声明的类型                                                                   | 改 `const raw: unknown = range.Value2`                    |
+| `exceltobangumi/index.ts`                | `nameCol === urlCol ? rowNumber : rowNumber` 恒等三元                                                                                                        | 直接 `getCellValue(ws, rowNumber, nameCol)`               |
+| `enrich-engine.ts`                       | `key === '简介' ? '简介' : key` 恒等三元                                                                                                                     | 模板里直接用 `key`                                        |
 
 ---
 
@@ -202,45 +202,45 @@ export function initIncrementalSyncFromRibbon(): void {
 
 ### 5.1 高收益（单点改造，收益千次级 IPC）
 
-| 位置 | 现状 | 改法 | 预估收益 |
-| --- | --- | --- | --- |
-| `enrich-engine.ts:1850` `enrichAlias` | 每条匹配都重算 `findAliasColumn`（内部 50 次 `getCellValue`） | 循环外算一次，经 `enrichIntoRow` 传入 | 10 万次 → 1 次 |
-| `enrich-engine.ts:1100-1205` `enrichIntoRow` | 逐字段读+写，每条约 20 次 IPC | ⚠️ **只做了源表那一半**：`readNewAnimeRow` 7 次 / `readIntroSheetRow` 18 次逐格读 → 循环外一次 `readRowsCache`。目标表（bangumiSheet）**不缓存**——`enrichIntroData` 写特点列后 `enrichOpEdPv` 会再读同一格，只读缓存会拿到写前旧值导致合并出错 | 源表 2 万次 → 1 次 |
-| ~~`github-sync.ts:1506-1509` delete 阶段~~ **已修** | 逐格读整行记 undo（30+ 列） | ✅ 删除循环前用 `readRowsCache` 一次矩形读全部待删行（倒序删除前任何行都还在原始行号上） | 6 万次 → 2000 次 |
-| `export-jsonl.ts:163-239` | 逐格读 + **映射表在循环体内重建** | 循环外一次矩形读；映射表改为从 `github-sync-diff.js` 导入并提模块顶层 | 5 万次 → 2 次，消 20 行重复 |
-| `exceltobangumi/index.ts:1036-1114` `syncSelectedRows` | 逐格读，没用本文件已有的 `createFieldGetter` | 对 rows 的 min..max 区间调一次 `createFieldGetter` | 1.4 万次 → 2 次 |
-| `panel-lifecycle.ts:325-355` `detectHeaderAndColumns` | 10 行 × 60 列逐格扫 ≈ 2000 次/次 `refreshData` | 一次 `readRangeValues` 读 1–10 行进内存 | 2000 次 → 约 13 次 |
-| `tools/util/sheet.ts:223` `isRowHeaderMatch` | 10 行 × 60 列逐格扫（`findHeaderRow` 被每张表调用） | 循环外一次矩形读 | 600 次 → 1 次/表 |
-| `tools/util/sheet.ts:271` `getColumnMap` | 两个循环各 50 次逐格读 | 一次 `readRangeValues(ws, hr, hr, 1, 50)` | 100 次 → 1 次 |
-| `locked-sheet.ts:306-330` | 每张表 660 次，多工作簿再乘表数 | 一次矩形读 10×60 | 660 次 → 11 次/表 |
-| `ribbon-service.ts:443` `detectConflicts` | 每行 2-3 次逐格读，1000 行 ≈ 3000 次 | 照抄同文件 `getSyncPreview:215` 的批量范式 | 3000 次 → 1 次 |
-| `ui/preview.ts:120-130` `getRowData` | 每行约 17 次 IPC，500 行 ≈ 8500 次（「预览同步」卡数秒的主因） | 循环外对列包围盒一次矩形读 | N×17 → 1 次 |
-| ~~`ui/handlers/sync.ts:199-205` `_fillSheetWithCollections`~~ **主动搁置** | 每条收藏逐格写 ~8 列 | ❌ 不改：批量写要先读旧值做基底（否则 `null`/空串会清掉区间中段的列），且会丢掉 `setCellValue` 的 `Formula`/`Value` 回退链。收益/风险比不划算 | — |
-| `sync-result-dialog.ts:128-149` | 每次同步完成弹窗全表走一遍，5000 行 ≈ 2 万次 | 循环外一次读两列矩形 | 2N → 1 次 |
-| `clean-engine.ts:197-220` `scanXinFanHeaderRow` | 30 行 × 50 列逐格扫，且被每张表放大 | 逐行 `readRangeValues` | ~2100 次 → ~30 次/表 |
+| 位置                                                                       | 现状                                                           | 改法                                                                                                                                                                                                                                           | 预估收益                    |
+| -------------------------------------------------------------------------- | -------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------- |
+| `enrich-engine.ts:1850` `enrichAlias`                                      | 每条匹配都重算 `findAliasColumn`（内部 50 次 `getCellValue`）  | 循环外算一次，经 `enrichIntoRow` 传入                                                                                                                                                                                                          | 10 万次 → 1 次              |
+| `enrich-engine.ts:1100-1205` `enrichIntoRow`                               | 逐字段读+写，每条约 20 次 IPC                                  | ⚠️ **只做了源表那一半**：`readNewAnimeRow` 7 次 / `readIntroSheetRow` 18 次逐格读 → 循环外一次 `readRowsCache`。目标表（bangumiSheet）**不缓存**——`enrichIntroData` 写特点列后 `enrichOpEdPv` 会再读同一格，只读缓存会拿到写前旧值导致合并出错 | 源表 2 万次 → 1 次          |
+| ~~`github-sync.ts:1506-1509` delete 阶段~~ **已修**                        | 逐格读整行记 undo（30+ 列）                                    | ✅ 删除循环前用 `readRowsCache` 一次矩形读全部待删行（倒序删除前任何行都还在原始行号上）                                                                                                                                                       | 6 万次 → 2000 次            |
+| `export-jsonl.ts:163-239`                                                  | 逐格读 + **映射表在循环体内重建**                              | 循环外一次矩形读；映射表改为从 `github-sync-diff.js` 导入并提模块顶层                                                                                                                                                                          | 5 万次 → 2 次，消 20 行重复 |
+| `exceltobangumi/index.ts:1036-1114` `syncSelectedRows`                     | 逐格读，没用本文件已有的 `createFieldGetter`                   | 对 rows 的 min..max 区间调一次 `createFieldGetter`                                                                                                                                                                                             | 1.4 万次 → 2 次             |
+| `panel-lifecycle.ts:325-355` `detectHeaderAndColumns`                      | 10 行 × 60 列逐格扫 ≈ 2000 次/次 `refreshData`                 | 一次 `readRangeValues` 读 1–10 行进内存                                                                                                                                                                                                        | 2000 次 → 约 13 次          |
+| `tools/util/sheet.ts:223` `isRowHeaderMatch`                               | 10 行 × 60 列逐格扫（`findHeaderRow` 被每张表调用）            | 循环外一次矩形读                                                                                                                                                                                                                               | 600 次 → 1 次/表            |
+| `tools/util/sheet.ts:271` `getColumnMap`                                   | 两个循环各 50 次逐格读                                         | 一次 `readRangeValues(ws, hr, hr, 1, 50)`                                                                                                                                                                                                      | 100 次 → 1 次               |
+| `locked-sheet.ts:306-330`                                                  | 每张表 660 次，多工作簿再乘表数                                | 一次矩形读 10×60                                                                                                                                                                                                                               | 660 次 → 11 次/表           |
+| `ribbon-service.ts:443` `detectConflicts`                                  | 每行 2-3 次逐格读，1000 行 ≈ 3000 次                           | 照抄同文件 `getSyncPreview:215` 的批量范式                                                                                                                                                                                                     | 3000 次 → 1 次              |
+| `ui/preview.ts:120-130` `getRowData`                                       | 每行约 17 次 IPC，500 行 ≈ 8500 次（「预览同步」卡数秒的主因） | 循环外对列包围盒一次矩形读                                                                                                                                                                                                                     | N×17 → 1 次                 |
+| ~~`ui/handlers/sync.ts:199-205` `_fillSheetWithCollections`~~ **主动搁置** | 每条收藏逐格写 ~8 列                                           | ❌ 不改：批量写要先读旧值做基底（否则 `null`/空串会清掉区间中段的列），且会丢掉 `setCellValue` 的 `Formula`/`Value` 回退链。收益/风险比不划算                                                                                                  | —                           |
+| `sync-result-dialog.ts:128-149`                                            | 每次同步完成弹窗全表走一遍，5000 行 ≈ 2 万次                   | 循环外一次读两列矩形                                                                                                                                                                                                                           | 2N → 1 次                   |
+| `clean-engine.ts:197-220` `scanXinFanHeaderRow`                            | 30 行 × 50 列逐格扫，且被每张表放大                            | 逐行 `readRangeValues`                                                                                                                                                                                                                         | ~2100 次 → ~30 次/表        |
 
 ### 5.2 重复代码收敛（中等收益，消 500+ 行）
 
-| 位置 | 重复内容 | 建议 |
-| --- | --- | --- |
-| ~~`dialog.ts:517-823` vs `sync-result-dialog.ts:214-529`~~ **已收敛** | 两份 ~300 行的同步统计仪表盘渲染（donut SVG、柱状图、性能盘、元信息栏），连配色阈值与 SVG 参数都一样 | ✅ 抽 `ts/ui/sync-stats-chart.ts`：`renderSyncStatsChart(stats: SyncProgressStats)` + `toSyncStatsChartModel()`（结果弹窗把 `GithubSyncResult` + 耗时/速度/策略收口成模型）。两处各删 330+ / 350 行 |
-| `components/progress.ts` / `github-time-format.ts` / `sync-result-dialog.ts` | **三份 `formatDuration` 实现已漂移**：999ms 是四舍五入（`1.00秒`）还是截断（`0.99秒`）、整分补不补 `00秒`，三份都不一样 | 共用图表已统一到 `components/progress.ts`（带 P3-1 截断修复的那份）。剩下两份待收口：注意 `sync-result-dialog` 版经 `index.ts` 被 `ui/handlers/*` 间接使用，动它会改日志文案 |
-| ~~`github-sync.ts:143-246` / `gitee-sync.ts:75-160` / `gitlab-sync.ts:75-160` / `gist-sync.ts:235-323`~~ **已收敛** | 四个 `fetchXxxText` 几乎逐字重复（各 ~85 行），且 **abort 监听器处理已分歧**：github 版有 `removeEventListener`，其余只 add 不 remove → 换配置就泄漏监听器 | ✅ 已提 `createRawTextFetcher({ buildUrl, logTag })` 工厂（净减 88 行），四个源均已改造 |
-| ~~`github-sync.ts:1922-1969` vs `sync-source-registry.ts:299-350`~~ **已收敛** | `getSelectedRowSids` 两份逐字重复（连日志文案都一样） | ✅ 抽 `sync/selected-rows.ts`（零副作用叶子模块），两处 import |
-| `sync-source-registry.ts:100-281` vs `github-sync.ts:1729-1915` | ⚠️ **功能漂移已修，结构合并待做**：`syncFromRemote` 与 `syncFromGithub` 主体仍重复 ~150 行，但漂移点已补齐——① 启用时间筛选时 `neededFields` 补 `date`（否则分片源不下载承载 date 的片 → 筛完 0 条且无提示）；② 补 `missingColumns` 缺列体检（此前只有 GitHub 路径有，走 Gitee/GitLab/本地/Gist 时用户只看到「同步成功但字段没进来」） | 结构合并：抽 `remote-sync-core.ts`，两个入口都变成薄壳 |
-| ~~4 个 `*-bootstrap.ts`~~ **已收敛（顺带修漂移）** | 「禁用→`modulesReady`启用」整块复制 | ✅ 抽 `ts/panel/action-buttons-gate.ts` 的 `installActionButtonsGate(logTag)`。漂移点：只有 settings 版带 5 秒超时兜底，其余三页一旦 `bgm:modulesReady` 没来（脚本 404 / 语法错误）就**永久禁用全部按钮且无提示**；统一后四页都有兜底 |
-| ~~`github-settings.ts` vs `action-handlers.ts`~~ **已收敛** | 「读 8 个输入框 → 按 sourceType 取 path/gistId → 必填校验 → setGithubConfig/setSyncStrategy/setSyncSourceType」两份实现（~80 行） | ✅ 抽 `readGithubConfigForm()` + `findMissingConfigField()`（返回具体缺哪一项，而非 boolean：手动保存要三种不同文案，防抖自动保存只关心跳过与否）。**两侧语义差异原样保留**：手动保存缺元素报「UI 元素缺失」、缺值按类型报对应文案；自动保存一律静默跳过 |
-| `github-sync.ts:756-829` / `1111-1180` / `1329-1399` | 逐字段回退路径三份重复（~120 行） | 提 `fallbackWriteRemoteEntry(...)` |
-| ~~`github-sync.ts:854-885` / `964-1016`~~ **已收敛** | `batchWriteNewRows`/`batchUpdateRows` 的 writeCols 收集逻辑重复 ~30 行 | ✅ 提 `collectWriteCols(colMap, names)`（`WriteCol` 接口同时提到模块级），调用方只负责攒列名 |
-| ~~`sheet.ts:115` vs `:160`~~ **已收敛** | `readRangeValues`/`readRangeCellValues` ~90% 相同 | ✅ 提 `readRect<T>(ws,r1,r2,c1,c2,convert)`：两个导出函数只剩一行委托，形状守卫只有一份 |
-| ~~`ribbon-service.ts` vs `tools/util/index.ts` 的剪贴板部分~~ **已收敛** | `copyTokenForRibbon`/`copyTokenToClipboard` 各写一份逐字相同的「建 textarea → select → execCommand → 移除」 | ✅ 抽 `copyTextWithResult(text): ClipboardCopyResult`（判别联合 `ok / unsupported / error`，保留 Ribbon 弹窗「不支持」与「带原因」两种文案）；`copyTokenToClipboard` 变一行委托 |
-| `ribbon-service.ts:656` vs `tools/util/index.ts:888` | `testTokenForRibbon` 与 `_fetchBgmUserInfo` 仍是两份独立的 XHR 取用户资料（~80 / ~120 行），前者 async + 弹窗、后者回调式 | 待做：抽 `fetchBgmMe(signal)` 返回 Promise，两处各自包文案。`testTokenForRibbon` 还会顺带落库 userId/username，合并时要保住这个副作用 |
-| ~~`preview.ts` / `sync.ts`~~ **主动搁置** | `{onPause,onResume,onStop}` handlers 对象重复（实测 5 处逐字相同 + `preview.ts` 1 处空实现变体） | ❌ 不改：① 各文件对 util barrel 的 mock 口径不一（`preview.test.ts` 压根没 mock `tools/util/index.js`，新增该路径 import 会把真实重模块拉进测试）；② 多个测试用 `{sync:{pause,resume,requestStop}}` 这类精简桩，把工厂挂到 `BGM.sync` 上会让桩缺方法直接 TypeError。收益仅 ~35 行 |
+| 位置                                                                                                                | 重复内容                                                                                                                                                                                                                                                                                                                              | 建议                                                                                                                                                                                                                                                                              |
+| ------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| ~~`dialog.ts:517-823` vs `sync-result-dialog.ts:214-529`~~ **已收敛**                                               | 两份 ~300 行的同步统计仪表盘渲染（donut SVG、柱状图、性能盘、元信息栏），连配色阈值与 SVG 参数都一样                                                                                                                                                                                                                                  | ✅ 抽 `ts/ui/sync-stats-chart.ts`：`renderSyncStatsChart(stats: SyncProgressStats)` + `toSyncStatsChartModel()`（结果弹窗把 `GithubSyncResult` + 耗时/速度/策略收口成模型）。两处各删 330+ / 350 行                                                                               |
+| `components/progress.ts` / `github-time-format.ts` / `sync-result-dialog.ts`                                        | **三份 `formatDuration` 实现已漂移**：999ms 是四舍五入（`1.00秒`）还是截断（`0.99秒`）、整分补不补 `00秒`，三份都不一样                                                                                                                                                                                                               | 共用图表已统一到 `components/progress.ts`（带 P3-1 截断修复的那份）。剩下两份待收口：注意 `sync-result-dialog` 版经 `index.ts` 被 `ui/handlers/*` 间接使用，动它会改日志文案                                                                                                      |
+| ~~`github-sync.ts:143-246` / `gitee-sync.ts:75-160` / `gitlab-sync.ts:75-160` / `gist-sync.ts:235-323`~~ **已收敛** | 四个 `fetchXxxText` 几乎逐字重复（各 ~85 行），且 **abort 监听器处理已分歧**：github 版有 `removeEventListener`，其余只 add 不 remove → 换配置就泄漏监听器                                                                                                                                                                            | ✅ 已提 `createRawTextFetcher({ buildUrl, logTag })` 工厂（净减 88 行），四个源均已改造                                                                                                                                                                                           |
+| ~~`github-sync.ts:1922-1969` vs `sync-source-registry.ts:299-350`~~ **已收敛**                                      | `getSelectedRowSids` 两份逐字重复（连日志文案都一样）                                                                                                                                                                                                                                                                                 | ✅ 抽 `sync/selected-rows.ts`（零副作用叶子模块），两处 import                                                                                                                                                                                                                    |
+| `sync-source-registry.ts:100-281` vs `github-sync.ts:1729-1915`                                                     | ⚠️ **功能漂移已修，结构合并待做**：`syncFromRemote` 与 `syncFromGithub` 主体仍重复 ~150 行，但漂移点已补齐——① 启用时间筛选时 `neededFields` 补 `date`（否则分片源不下载承载 date 的片 → 筛完 0 条且无提示）；② 补 `missingColumns` 缺列体检（此前只有 GitHub 路径有，走 Gitee/GitLab/本地/Gist 时用户只看到「同步成功但字段没进来」） | 结构合并：抽 `remote-sync-core.ts`，两个入口都变成薄壳                                                                                                                                                                                                                            |
+| ~~4 个 `*-bootstrap.ts`~~ **已收敛（顺带修漂移）**                                                                  | 「禁用→`modulesReady`启用」整块复制                                                                                                                                                                                                                                                                                                   | ✅ 抽 `ts/panel/action-buttons-gate.ts` 的 `installActionButtonsGate(logTag)`。漂移点：只有 settings 版带 5 秒超时兜底，其余三页一旦 `bgm:modulesReady` 没来（脚本 404 / 语法错误）就**永久禁用全部按钮且无提示**；统一后四页都有兜底                                             |
+| ~~`github-settings.ts` vs `action-handlers.ts`~~ **已收敛**                                                         | 「读 8 个输入框 → 按 sourceType 取 path/gistId → 必填校验 → setGithubConfig/setSyncStrategy/setSyncSourceType」两份实现（~80 行）                                                                                                                                                                                                     | ✅ 抽 `readGithubConfigForm()` + `findMissingConfigField()`（返回具体缺哪一项，而非 boolean：手动保存要三种不同文案，防抖自动保存只关心跳过与否）。**两侧语义差异原样保留**：手动保存缺元素报「UI 元素缺失」、缺值按类型报对应文案；自动保存一律静默跳过                          |
+| ~~`github-sync.ts` 三处逐字段回退~~ **已收敛**                                                                      | 三处调用点各有一份逐字重复的 ~35 行样板（`writeRowValuesWithUndo` 读旧值失败 / `batchUpdateRows` 整行写异常 / `applyDiffToSheet` 新增回退）                                                                                                                                                                                           | ✅ 提 `fallbackWriteRemoteEntry(parameters)`：业务差异（add/update、成功与失败文案、失败明细带不带行号）全部参数化；**日志刻意留在调用方**——三处文案与触发条件不同，且测试按文案断言（`回退逐字段写入全部失败` / `逐字段写入也失败` / `逐行写入失败`）。三处样板 208 行 → 88 行   |
+| ~~`github-sync.ts:854-885` / `964-1016`~~ **已收敛**                                                                | `batchWriteNewRows`/`batchUpdateRows` 的 writeCols 收集逻辑重复 ~30 行                                                                                                                                                                                                                                                                | ✅ 提 `collectWriteCols(colMap, names)`（`WriteCol` 接口同时提到模块级），调用方只负责攒列名                                                                                                                                                                                      |
+| ~~`sheet.ts:115` vs `:160`~~ **已收敛**                                                                             | `readRangeValues`/`readRangeCellValues` ~90% 相同                                                                                                                                                                                                                                                                                     | ✅ 提 `readRect<T>(ws,r1,r2,c1,c2,convert)`：两个导出函数只剩一行委托，形状守卫只有一份                                                                                                                                                                                           |
+| ~~`ribbon-service.ts` vs `tools/util/index.ts` 的剪贴板部分~~ **已收敛**                                            | `copyTokenForRibbon`/`copyTokenToClipboard` 各写一份逐字相同的「建 textarea → select → execCommand → 移除」                                                                                                                                                                                                                           | ✅ 抽 `copyTextWithResult(text): ClipboardCopyResult`（判别联合 `ok / unsupported / error`，保留 Ribbon 弹窗「不支持」与「带原因」两种文案）；`copyTokenToClipboard` 变一行委托                                                                                                   |
+| `ribbon-service.ts:656` vs `tools/util/index.ts:888`                                                                | `testTokenForRibbon` 与 `_fetchBgmUserInfo` 仍是两份独立的 XHR 取用户资料（~80 / ~120 行），前者 async + 弹窗、后者回调式                                                                                                                                                                                                             | 待做：抽 `fetchBgmMe(signal)` 返回 Promise，两处各自包文案。`testTokenForRibbon` 还会顺带落库 userId/username，合并时要保住这个副作用                                                                                                                                             |
+| ~~`preview.ts` / `sync.ts`~~ **主动搁置**                                                                           | `{onPause,onResume,onStop}` handlers 对象重复（实测 5 处逐字相同 + `preview.ts` 1 处空实现变体）                                                                                                                                                                                                                                      | ❌ 不改：① 各文件对 util barrel 的 mock 口径不一（`preview.test.ts` 压根没 mock `tools/util/index.js`，新增该路径 import 会把真实重模块拉进测试）；② 多个测试用 `{sync:{pause,resume,requestStop}}` 这类精简桩，把工厂挂到 `BGM.sync` 上会让桩缺方法直接 TypeError。收益仅 ~35 行 |
 
 ### 5.3 CPU 热点（非 IPC）
 
-| 位置 | 问题 | 改法 |
-| --- | --- | --- |
+| 位置                                    | 问题                                                                    | 改法                                                                                  |
+| --------------------------------------- | ----------------------------------------------------------------------- | ------------------------------------------------------------------------------------- |
 | ~~`enrich-engine.ts:614-618`~~ **已修** | 别名匹配 O(n²)：1000 个未匹配行 × 5000 个别名索引 = 500 万次 `includes` | ✅ 构建 `aliasIndex` 时顺带产反向索引 `aliasByRow: Map<row, alias[]>`，此处 O(1) 查表 |
 
 ---
@@ -253,12 +253,12 @@ export function initIncrementalSyncFromRibbon(): void {
 
 本次修数据安全时打翻了 5 个既有测试，逐一核实后确认**全部是桩不忠实**，没有一个是「修复有错」：
 
-| 桩问题 | 具体 | 后果 |
-| --- | --- | --- |
-| 返回值形状错误 | `asThrowingRowRangeMock` 的 getter 返回 `[['']]`（1 列），而区间是 2 列 | 被完整性守卫判为「读不全」而走回退，测不到「整行写入抛错 → 回退」路径 |
-| 返回值类型错误 | `mockSetCellValue.mockImplementation(() => {})` 返回 `undefined`，真实签名是 `boolean` | 逐字段回退路径检查该返回值 → 判定失败 |
-| 读回形状不真实 | `createMockWorksheet` 的 Range 对区域一律返回 `Value2: null` | 从不模拟一维/二维真实形状 |
-| 测试锁旧行为 | `incremental-bindings.test.ts` 断言「复选框不存在 → 不初始化冲突策略」 | 把 bug 固化成预期 |
+| 桩问题         | 具体                                                                                   | 后果                                                                  |
+| -------------- | -------------------------------------------------------------------------------------- | --------------------------------------------------------------------- |
+| 返回值形状错误 | `asThrowingRowRangeMock` 的 getter 返回 `[['']]`（1 列），而区间是 2 列                | 被完整性守卫判为「读不全」而走回退，测不到「整行写入抛错 → 回退」路径 |
+| 返回值类型错误 | `mockSetCellValue.mockImplementation(() => {})` 返回 `undefined`，真实签名是 `boolean` | 逐字段回退路径检查该返回值 → 判定失败                                 |
+| 读回形状不真实 | `createMockWorksheet` 的 Range 对区域一律返回 `Value2: null`                           | 从不模拟一维/二维真实形状                                             |
+| 测试锁旧行为   | `incremental-bindings.test.ts` 断言「复选框不存在 → 不初始化冲突策略」                 | 把 bug 固化成预期                                                     |
 
 ### 操作守则
 
@@ -296,7 +296,7 @@ PowerShell 7 默认 UTF-8，且需显式设置以保证管道一致：
 import { execSync } from 'node:child_process'
 import { writeFileSync } from 'node:fs'
 const out = execSync('git --no-pager log -1 --format=%B', { cwd: '<项目根目录>' })
-writeFileSync('<临时文件>', out)   // Buffer 原样落盘，不经 shell 编码转换
+writeFileSync('<临时文件>', out) // Buffer 原样落盘，不经 shell 编码转换
 ```
 
 再用编辑器打开该临时文件确认中文是否正常。
@@ -315,7 +315,13 @@ writeFileSync('<临时文件>', out)   // Buffer 原样落盘，不经 shell 编
 `ts/sync/sync-record.ts:800-810`：
 
 ```ts
-const existingRows = readRangeCellValues(sheet, existingRow, existingRow, 1, SYNC_RECORD_COLUMNS.length)
+const existingRows = readRangeCellValues(
+  sheet,
+  existingRow,
+  existingRow,
+  1,
+  SYNC_RECORD_COLUMNS.length,
+)
 const existing = existingRows[0]
 ```
 

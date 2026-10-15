@@ -674,74 +674,156 @@ function writeRowValuesWithUndo(
     return 0
   }
 
+  const outcome = fallbackWriteRemoteEntry({
+    ws,
+    colMap,
+    row,
+    remote,
+    fields,
+    forceOverwrite: shouldForceOverwrite,
+    sid: u.sid,
+    kind: 'update',
+    content: '仓库同步-更新',
+    failContent: '仓库同步-更新失败',
+    source: 'repo',
+    okMessage: `${fields.join(', ')} (回退逐字段写入)`,
+    failRow: row,
+    details,
+    records,
+  })
+  if (outcome.ok) return 1
+
+  if (outcome.errorMessage === undefined) {
+    bgmLog(LOG_LEVELS.ERROR, `[batchUpdateRows] 行 ${String(row)} 回退逐字段写入全部失败`)
+  } else {
+    bgmLog(
+      LOG_LEVELS.ERROR,
+      `[batchUpdateRows] 行 ${String(row)} 回退逐字段写入异常: ${outcome.errorMessage}`,
+    )
+  }
+  return 0
+}
+
+/**
+ * 批量写不可用时回退到逐字段写入，并统一记录同步明细与同步记录。
+ *
+ * 三处调用点此前各有一份逐字重复的 ~35 行样板 ——「调 `writeRemoteEntryToRow`
+ * → 判 `success || !attempted` → push 明细 + 同步记录」：
+ *
+ *   · `writeRowValuesWithUndo`：整行 `Range` 读旧值失败（`range === null`）
+ *   · `batchUpdateRows`：整行写入抛异常
+ *   · `applyDiffToSheet`：新增行的批量写失败
+ *
+ * 三者的**业务差异**（记 add 还是 update、成功/失败文案、失败明细带不带行号）由参数传入；
+ * ⚠️ **日志不在这里打** —— 三处的日志文案、级别与触发条件各不相同，且测试按文案断言
+ * （`回退逐字段写入全部失败` / `逐字段写入也失败` / `逐行写入失败`），
+ * 一律留给调用方按返回的 `errorMessage` 自行记录。
+ *
+ * @returns `ok` 为 true 表示写入成功（含「没有需要写入的字段」）；
+ *          抛异常时 `ok` 为 false 并带上 `errorMessage`
+ */
+function fallbackWriteRemoteEntry(parameters: {
+  ws: WpsWorksheet
+  colMap: Map<string, number>
+  row: number
+  remote: GithubRemoteEntry
+  fields: string[]
+  forceOverwrite: boolean
+  sid: string
+  /** 明细类型：更新写 'update'，新增写 'add' */
+  kind: 'update' | 'add'
+  /** 成功时同步记录的 content */
+  content: string
+  /** 失败时同步记录的 content */
+  failContent: string
+  source: string | undefined
+  /** 成功时同步记录的 message；不传则不带该字段（新增路径原本就不带） */
+  okMessage?: string | undefined
+  /** 失败明细里附的行号；新增失败时行号未定，不传（与原实现一致） */
+  failRow?: number | undefined
+  details: GithubSyncDetailItem[] | undefined
+  records: UpdateRecordParameters[]
+}): { ok: boolean; errorMessage?: string | undefined } {
+  const {
+    ws,
+    colMap,
+    row,
+    remote,
+    fields,
+    forceOverwrite,
+    sid,
+    kind,
+    content,
+    failContent,
+    source,
+    okMessage,
+    failRow,
+    details,
+    records,
+  } = parameters
+
   try {
-    const result = writeRemoteEntryToRow(ws, colMap, row, remote, fields, shouldForceOverwrite)
+    const result = writeRemoteEntryToRow(ws, colMap, row, remote, fields, forceOverwrite)
     if (result.success || !result.attempted) {
       // 写入成功 或 没有写入需要尝试（如空列映射）→ 视为成功
       details?.push({
-        kind: 'update',
-        sid: u.sid,
+        kind,
+        sid,
         name: remote.name,
         row,
         fields: fields.includes('*') ? ['全部字段'] : [...fields],
       })
       records.push({
-        sid: u.sid,
+        sid,
         name: remote.name ?? '',
-        url: `https://bgm.tv/subject/${u.sid}`,
+        url: `https://bgm.tv/subject/${sid}`,
         type: BGM_SUBJECT_TYPES[2] ?? '',
-        source: 'repo',
-        content: '仓库同步-更新',
+        source,
+        content,
         status: '成功',
-        message: `${fields.join(', ')} (回退逐字段写入)`,
+        ...(okMessage !== undefined && { message: okMessage }),
         count: 1,
       })
-      return 1
+      return { ok: true }
     }
 
     // 尝试了写入但全部失败
-    bgmLog(LOG_LEVELS.ERROR, `[batchUpdateRows] 行 ${String(row)} 回退逐字段写入全部失败`)
     details?.push({
       kind: 'fail',
-      sid: u.sid,
+      sid,
       name: remote.name,
-      row,
+      ...(failRow !== undefined && { row: failRow }),
       message: '逐字段写入失败',
     })
     records.push({
-      sid: u.sid,
-      source: 'repo',
-      content: '仓库同步-更新失败',
+      sid,
+      source,
+      content: failContent,
       status: '失败',
       message: '逐字段写入失败',
       count: 1,
     })
-    return 0
+    return { ok: false }
   } catch (error: unknown) {
     const errorMessage = error instanceof Error ? error.message : String(error)
-    bgmLog(
-      LOG_LEVELS.ERROR,
-      `[batchUpdateRows] 行 ${String(row)} 回退逐字段写入异常: ${errorMessage}`,
-    )
     details?.push({
       kind: 'fail',
-      sid: u.sid,
+      sid,
       name: remote.name,
-      row,
+      ...(failRow !== undefined && { row: failRow }),
       message: errorMessage,
     })
     records.push({
-      sid: u.sid,
-      source: 'repo',
-      content: '仓库同步-更新失败',
+      sid,
+      source,
+      content: failContent,
       status: '失败',
       message: errorMessage,
       count: 1,
     })
-    return 0
+    return { ok: false, errorMessage }
   }
 }
-
 interface WriteCol {
   name: string
   col: number
@@ -1052,69 +1134,31 @@ function batchUpdateRows(
         LOG_LEVELS.WARN,
         `[batchUpdateRows] 行 ${String(row)} 写入失败，回退到逐字段写入: ${(error as Error).message}`,
       )
-      // 回退到逐字段写入
-      try {
-        const result = writeRemoteEntryToRow(ws, colMap, row, remote, fields, shouldForceOverwrite)
-        if (result.success || !result.attempted) {
-          // 写入成功 或 没有写入需要尝试（如空列映射）→ 视为成功
-          successCount += 1
-          details?.push({
-            kind: 'update',
-            sid: u.sid,
-            name: remote.name,
-            row,
-            fields: fields.includes('*') ? ['全部字段'] : [...fields],
-          })
-          records.push({
-            sid: u.sid,
-            name: remote.name ?? '',
-            url: `https://bgm.tv/subject/${u.sid}`,
-            type: BGM_SUBJECT_TYPES[2] ?? '',
-            source: 'repo',
-            content: '仓库同步-更新',
-            status: '成功',
-            message: fields.join(', '),
-            count: 1,
-          })
-        } else {
-          // 尝试了写入但全部失败
-          details?.push({
-            kind: 'fail',
-            sid: u.sid,
-            name: remote.name,
-            row,
-            message: '逐字段写入失败',
-          })
-          records.push({
-            sid: u.sid,
-            source: 'repo',
-            content: '仓库同步-更新失败',
-            status: '失败',
-            message: '逐字段写入失败',
-            count: 1,
-          })
-        }
-      } catch (error_: unknown) {
-        const errorMessage = error_ instanceof Error ? error_.message : String(error_)
+      // 回退到逐字段写入（失败时不额外打日志，与原实现一致）
+      const outcome = fallbackWriteRemoteEntry({
+        ws,
+        colMap,
+        row,
+        remote,
+        fields,
+        forceOverwrite: shouldForceOverwrite,
+        sid: u.sid,
+        kind: 'update',
+        content: '仓库同步-更新',
+        failContent: '仓库同步-更新失败',
+        source: 'repo',
+        okMessage: fields.join(', '),
+        failRow: row,
+        details,
+        records,
+      })
+      if (outcome.ok) {
+        successCount += 1
+      } else if (outcome.errorMessage !== undefined) {
         bgmLog(
           LOG_LEVELS.ERROR,
-          `[batchUpdateRows] 行 ${String(row)} 逐字段写入也失败: ${errorMessage}`,
+          `[batchUpdateRows] 行 ${String(row)} 逐字段写入也失败: ${outcome.errorMessage}`,
         )
-        details?.push({
-          kind: 'fail',
-          sid: u.sid,
-          name: remote.name,
-          row,
-          message: errorMessage,
-        })
-        records.push({
-          sid: u.sid,
-          source: 'repo',
-          content: '仓库同步-更新失败',
-          status: '失败',
-          message: errorMessage,
-          count: 1,
-        })
       }
     }
   }
@@ -1300,74 +1344,30 @@ export async function applyDiffToSheet(
     } else {
       // 批量写入失败，回退到逐行写入
       for (const diff of batch) {
-        try {
-          const writeResult = writeRemoteEntryToRow(
-            ws,
-            colMap,
-            nextAppendRow,
-            diff.remote,
-            ['*'],
-            isForceOverwrite,
-          )
-          if (writeResult.success || !writeResult.attempted) {
-            // 写入成功 或 没有写入需要尝试（如空列映射）→ 视为成功
-            const writtenRow = nextAppendRow
-            nextAppendRow += 1
-            result.added += 1
-            details.push({
-              kind: 'add',
-              sid: diff.sid,
-              name: diff.remote.name,
-              row: writtenRow,
-              fields: ['全部字段'],
-            })
-            syncRecords.push({
-              sid: diff.sid,
-              name: diff.remote.name ?? '',
-              url: `https://bgm.tv/subject/${diff.sid}`,
-              type: BGM_SUBJECT_TYPES[2] ?? '',
-              source,
-              content: '仓库同步-新增',
-              status: '成功',
-              count: 1,
-            })
-          } else {
-            // 尝试了写入但全部失败
-            result.failed += 1
-            bgmLog(LOG_LEVELS.ERROR, `[githubSync] 逐行写入失败 sid=${diff.sid}: 写入全部失败`)
-            details.push({
-              kind: 'fail',
-              sid: diff.sid,
-              name: diff.remote.name,
-              message: '逐字段写入失败',
-            })
-            syncRecords.push({
-              sid: diff.sid,
-              source,
-              content: '仓库同步-新增失败',
-              status: '失败',
-              message: '逐字段写入失败',
-              count: 1,
-            })
-          }
-        } catch (error: unknown) {
-          const errorMessage = error instanceof Error ? error.message : String(error)
+        const outcome = fallbackWriteRemoteEntry({
+          ws,
+          colMap,
+          row: nextAppendRow,
+          remote: diff.remote,
+          fields: ['*'],
+          forceOverwrite: isForceOverwrite,
+          sid: diff.sid,
+          kind: 'add',
+          content: '仓库同步-新增',
+          failContent: '仓库同步-新增失败',
+          source,
+          details,
+          records: syncRecords,
+        })
+        if (outcome.ok) {
+          nextAppendRow += 1
+          result.added += 1
+        } else {
           result.failed += 1
-          bgmLog(LOG_LEVELS.ERROR, `[githubSync] 逐行写入失败 sid=${diff.sid}: ${errorMessage}`)
-          details.push({
-            kind: 'fail',
-            sid: diff.sid,
-            name: diff.remote.name,
-            message: errorMessage,
-          })
-          syncRecords.push({
-            sid: diff.sid,
-            source,
-            content: '仓库同步-新增失败',
-            status: '失败',
-            message: errorMessage,
-            count: 1,
-          })
+          bgmLog(
+            LOG_LEVELS.ERROR,
+            `[githubSync] 逐行写入失败 sid=${diff.sid}: ${outcome.errorMessage ?? '写入全部失败'}`,
+          )
         }
       }
     }
