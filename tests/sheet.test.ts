@@ -872,6 +872,49 @@ describe('ensureSheetHeaders', () => {
     expect(isResult).toBe(true)
   })
 
+  it('第 1 行已有内容但未识别到表头时应拒绝写入（避免覆盖用户数据）', () => {
+    // findHeaderRow 返回 0（表头认不出来），但第 1 行有用户数据
+    vi.mocked(getCellValue).mockReturnValue('')
+    const writtenCells: string[] = []
+    const ws = createMockWorksheet({ name: 'NoHeaderButHasData' })
+    ws.Range = createRangeMock((address: string) => {
+      if (address.includes(':')) {
+        // 单行多列区域：二维形状
+        return {
+          Value2: [['用户数据A', '用户数据B']],
+          Interior: { Color: 0 },
+          Font: { Bold: false },
+        }
+      }
+      writtenCells.push(address)
+      return createMockCell('')
+    })
+
+    const isResult = ensureSheetHeaders(ws)
+
+    expect(isResult).toBe(false)
+    expect(writtenCells).toHaveLength(0)
+  })
+
+  it('第 1 行有内容且 Value2 为一维数组（单行区域真实形状）时同样拒绝写入', () => {
+    vi.mocked(getCellValue).mockReturnValue('')
+    const writtenCells: string[] = []
+    const ws = createMockWorksheet({ name: 'NoHeader1D' })
+    ws.Range = createRangeMock((address: string) => {
+      if (address.includes(':')) {
+        // Excel/WPS 对单行范围返回一维数组（真实形状）
+        return { Value2: ['用户数据A', '用户数据B'], Interior: { Color: 0 }, Font: { Bold: false } }
+      }
+      writtenCells.push(address)
+      return createMockCell('')
+    })
+
+    const isResult = ensureSheetHeaders(ws)
+
+    expect(isResult).toBe(false)
+    expect(writtenCells).toHaveLength(0)
+  })
+
   it('关键列写入失败时应返回 false', () => {
     vi.mocked(getCellValue).mockReturnValue('')
     const ws = createMockWorksheet({ name: 'FailSheet' })

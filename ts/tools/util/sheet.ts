@@ -526,14 +526,23 @@ export function safeActivate(ws: WpsWorksheet | null | undefined): void {
 }
 
 /**
+ * 判断「表为空」时扫描第 1 行的列数上限
+ *
+ * 取 64 而非 STANDARD_HEADERS.length(39)：用户内容可能落在第 39 列之后，
+ * 扫宽一点才能在拒绝填充时不漏判（漏判的代价是覆盖用户数据）。
+ */
+const HEADER_SCAN_COLUMNS = 64
+
+/**
  * 检查工作表是否为空（无表头行），若是则写入标准表头
  *
- * 判定逻辑：findHeaderRow() 返回 0（前 10 行未匹配到 ≥3 个关键字）。
+ * 判定逻辑：findHeaderRow() 返回 0（前 10 行未匹配到 ≥3 个关键字），
+ * **且第 1 行无任何内容**（后者用于区分「真空表」与「有数据但表头不规范」）。
  * 写入位置：第 1 行，按 STANDARD_HEADERS 顺序逐列写入。
  * 写入后清除缓存，确保后续 getColumnMap / findHeaderRow 能读到新表头。
  *
  * @param ws 工作表对象
- * @returns true 表示已填充表头（原为空表），false 表示已有表头无需填充
+ * @returns true 表示已填充表头（原为空表），false 表示已有表头 / 拒绝填充
  */
 export function ensureSheetHeaders(ws: WpsWorksheet | null | undefined): boolean {
   if (!ws) {
@@ -544,6 +553,22 @@ export function ensureSheetHeaders(ws: WpsWorksheet | null | undefined): boolean
   const headerRow = findHeaderRow(ws)
   if (headerRow > 0) {
     bgmLog(LOG_LEVELS.INFO, `[ensureSheetHeaders] 已有表头行 ${String(headerRow)}，无需填充`)
+    return false
+  }
+
+  // 守卫：「未识别到表头」≠「工作表为空」。
+  // 若第 1 行已有内容（例如用户数据从第 1 行开始、表头写法不规范导致
+  // findHeaderRow 认不出来），往下写 39 个标准表头会**覆盖用户第 1 行数据**。
+  // 此时拒绝填充并告警，交由用户自行补表头。
+  const firstRowCells = readRangeValues(ws, 1, 1, 1, HEADER_SCAN_COLUMNS)
+  const hasFirstRowContent = firstRowCells.some((cells) =>
+    cells.some((cell) => cell.trim() !== ''),
+  )
+  if (hasFirstRowContent) {
+    bgmLog(
+      LOG_LEVELS.WARN,
+      '[ensureSheetHeaders] 未识别到表头，但第 1 行已有内容；拒绝写入标准表头（避免覆盖用户数据）',
+    )
     return false
   }
 

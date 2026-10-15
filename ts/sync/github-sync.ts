@@ -694,19 +694,27 @@ function writeRowValuesWithUndo(
 ): number {
   if (range) {
     // 使用已读取的旧值（oldArr 在循环开始前已读取）
-    // 只写入有变化的单元格
+    // **以旧值为基底**铺满整行：本次不写的列原值写回，而不是铺 null。
+    // 原因：null 在 Range.Value2 二维数组里的语义是「清空该单元格」，而
+    // minCol..maxCol 之间可能夹着**不属于本次 writeCols** 的列 ——
+    // writeCols 是整批 updates 的 fields 并集，列号并不连续（例如一批里
+    // 有人只改「名称」(列2)、有人只改「评分」(列30)，区间 3..29 全是用户数据）。
+    // 原实现把这些位置铺成 null，等于把用户在中段列的数据清掉。
     let hasChanges = false
-    const finalValues = [...rowValues]
+    const finalValues: (string | number | null)[] = Array.from(
+      { length: colCount },
+      (_, c) => oldArray[c] ?? null,
+    )
     for (let c = 0; c < colCount; c += 1) {
-      const updatedValue = finalValues[c]
+      const updatedValue = rowValues[c] ?? null
       if (updatedValue !== null) {
         const oldValue = oldArray[c] == null ? '' : String(oldArray[c])
         const valueString = String(updatedValue)
         if (oldValue === valueString) {
-          // 无变化，跳过
-          finalValues[c] = null
+          // 无变化：finalValues[c] 已是旧值，无需处理
         } else {
           hasChanges = true
+          finalValues[c] = updatedValue
           // 记录 undo
           recordUndoEntry({
             row,
@@ -1017,7 +1025,8 @@ function batchUpdateRows(
 
     // 先读取当前行的值（用于合并逻辑和 undo 记录）
     let oldArray: (string | number | null)[] = []
-    let range: WpsRange | null = null
+    // 不赋初值：try 成功时赋 Range、失败时 catch 赋 null，两条路径都已定值
+    let range: WpsRange | null
     try {
       const startColLetter = colNumberToLetter(minCol)
       const endColLetter = colNumberToLetter(maxCol)
@@ -1025,13 +1034,32 @@ function batchUpdateRows(
       range = ws.Range(rangeAddr)
 
       // 读取旧值
-      const oldValues = range.Value2 as unknown as (string | number | null)[] | null
-      oldArray = Array.isArray(oldValues)
-        ? ((oldValues[0] as (string | number | null)[] | undefined) ?? [])
-        : []
+      const oldValues = range.Value2 as unknown
+      if (Array.isArray(oldValues)) {
+        // 形状归一化：单行范围在 Excel/WPS 下可能返回**一维**数组（整个数组即一行），
+        // 只有多行范围才返回二维。原来直接取 oldValues[0]，一维时会把「首个单元格的
+        // 值」当成行数组 → 旧值退化成首字符、undo 记错旧值、合并写出乱值。
+        const firstRow = Array.isArray(oldValues[0]) ? oldValues[0] : oldValues
+        oldArray = firstRow as (string | number | null)[]
+      }
     } catch {
-      // Range 访问失败时，oldArr 保持为空数组，将使用空字符串进行合并
-      bgmLog(LOG_LEVELS.WARN, `[batchUpdateRows] 行 ${String(row)} 读取旧值失败，使用空值`)
+      // Range 访问失败：放弃批量路径，改走逐字段回退（该路径用 getCellValue 逐格重取旧值）
+      bgmLog(LOG_LEVELS.WARN, `[batchUpdateRows] 行 ${String(row)} 读取旧值失败，回退逐字段写入`)
+      range = null
+      oldArray = []
+    }
+
+    // 旧值读不全（Value2 为 null / 标量，或列数不足 colCount）时放弃批量路径：
+    // 批量路径用 oldArray 做「本地 | 远程」合并，空旧值会使用户已有的标签/别名
+    // 被远程值**整体替换**（静默丢失本地数据，违反「读失败＝放弃写入」铁律）。
+    // update diff 的行必然带 Bangumi URL（匹配依据），不可能整行为空，
+    // 因此旧值读不全一律按「读失败」处理，交给逐字段回退。
+    if (range !== null && oldArray.length < colCount) {
+      bgmLog(
+        LOG_LEVELS.WARN,
+        `[batchUpdateRows] 行 ${String(row)} 旧值读取失败或形状异常，回退逐字段写入（避免空值合并覆盖本地数据）`,
+      )
+      range = null
     }
 
     // 构建该行的值数组
@@ -1719,8 +1747,17 @@ export async function syncFromGithub(
   onProgress?.(0, 1, `开始下载远程数据（${source.getDisplayName()} - 策略：${strategy}）...`)
   const downloadStartTs = Date.now()
   // 分片数据源按表头只下载需要的片；读不到表头时返回 undefined → 全量下载
+  const neededFields = collectNeededFieldsFromSheet()
+  // 时间筛选完全依赖远程条目的 date 字段，而 date **不在** REQUIRED_FIELDS 里：
+  // 用户表若没有「开播日期」列，按表头推导 neededFields 时不会带上 date，
+  // 分片选择可能不下载承载它的片 → 所有 entry.date 均为 undefined →
+  // filterByTime 把它们全部判为「无日期」过滤掉，最终同步 0 条且无任何提示。
+  // 因此启用时间筛选时必须显式补上 date（读不到表头时本就是全量下载，不受影响）。
+  if (neededFields && timeFilter?.enabled === true && timeFilter.range !== 'all') {
+    neededFields.add('date')
+  }
   const remoteEntries = await source.fetchRemoteEntries(signal, {
-    neededFields: collectNeededFieldsFromSheet(),
+    neededFields,
   })
   const downloadElapsed = Date.now() - downloadStartTs
   onProgress?.(

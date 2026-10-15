@@ -3298,6 +3298,13 @@ describe('applyDiffToSheet 删除操作处理 (lines 1118-1125)', () => {
 describe('batchUpdateRows 扩展字段处理 (lines 790-804)', () => {
   it('更新扩展字段时正确匹配 EXTENDED_FIELD_MAP', async () => {
     const mockWs = createMockWorksheet()
+    // 忠实桩：单行范围返回二维旧值数组（列数与 colMap 一致），
+    // 使批量写入路径（而非逐字段回退）被真正走到
+    mockWs.Range = asRangeMock((address: string) =>
+      address.includes(':')
+        ? { Value2: [['', '', '']], Interior: { Color: 0 } }
+        : { Value2: '', Text: undefined, Interior: { Color: 0 }, Font: { Bold: false } },
+    )
     mockGetDataSheet.mockReturnValue(mockWs)
     mockFindHeaderRow.mockReturnValue(1)
     mockGetLastRow.mockReturnValue(5)
@@ -3345,6 +3352,12 @@ describe('batchUpdateRows 扩展字段处理 (lines 790-804)', () => {
 
   it('扩展字段值为数字时转为字符串', async () => {
     const mockWs = createMockWorksheet()
+    // 忠实桩：4 列（Bangumi_URL/名称/集数/时长），单行范围返回二维旧值
+    mockWs.Range = asRangeMock((address: string) =>
+      address.includes(':')
+        ? { Value2: [['', '', '', '']], Interior: { Color: 0 } }
+        : { Value2: '', Text: undefined, Interior: { Color: 0 }, Font: { Bold: false } },
+    )
     mockGetDataSheet.mockReturnValue(mockWs)
     mockFindHeaderRow.mockReturnValue(1)
     mockGetLastRow.mockReturnValue(5)
@@ -3395,6 +3408,12 @@ describe('batchUpdateRows 扩展字段处理 (lines 790-804)', () => {
 describe('batchUpdateRows 日期列格式化 (lines 814-815)', () => {
   it('日期列值经过 formatDateToLocal 处理', async () => {
     const mockWs = createMockWorksheet()
+    // 忠实桩：单行范围返回二维旧值数组（列数与 colMap 一致）
+    mockWs.Range = asRangeMock((address: string) =>
+      address.includes(':')
+        ? { Value2: [['', '', '']], Interior: { Color: 0 } }
+        : { Value2: '', Text: undefined, Interior: { Color: 0 }, Font: { Bold: false } },
+    )
     mockGetDataSheet.mockReturnValue(mockWs)
     mockFindHeaderRow.mockReturnValue(1)
     mockGetLastRow.mockReturnValue(5)
@@ -3444,6 +3463,12 @@ describe('batchUpdateRows 日期列格式化 (lines 814-815)', () => {
 describe('batchUpdateRows 非日期字符串扩展字段 (line 797)', () => {
   it('扩展字段为字符串且非日期列时直接赋值 (line 797)', async () => {
     const mockWs = createMockWorksheet()
+    // 忠实桩：单行范围返回二维旧值数组（列数与 colMap 一致）
+    mockWs.Range = asRangeMock((address: string) =>
+      address.includes(':')
+        ? { Value2: [['', '', '']], Interior: { Color: 0 } }
+        : { Value2: '', Text: undefined, Interior: { Color: 0 }, Font: { Bold: false } },
+    )
     mockGetDataSheet.mockReturnValue(mockWs)
     mockFindHeaderRow.mockReturnValue(1)
     mockGetLastRow.mockReturnValue(5)
@@ -3488,6 +3513,122 @@ describe('batchUpdateRows 非日期字符串扩展字段 (line 797)', () => {
     const result = await applyDiffToSheet(diffs, 'add-update')
     expect(result.updated).toBe(1)
     // 验证 line 797 路径：value = v（直接赋值，非日期格式化）
+  })
+})
+
+// ========== 数据安全回归：单行一维旧值 + 区间中段列保全 ==========
+
+describe('batchUpdateRows 单行一维旧值与区间中段列保全（数据安全回归）', () => {
+  it('单行范围返回一维数组时：旧值整体读入，区间内非写入列原值写回', async () => {
+    const mockWs = createMockWorksheet()
+    let writtenRow: unknown = null
+    // Excel/WPS 对**单行**范围返回一维数组：整个数组就是一行（列 3..8）
+    const oldRow = ['本地标签A', '用户列4数据', '用户列5数据', '用户列6数据', '用户列7数据', '5']
+    const rowRange = {
+      Interior: { Color: 0 },
+      get Value2() {
+        return oldRow
+      },
+      set Value2(v: unknown) {
+        writtenRow = v
+      },
+    }
+    mockWs.Range = asRangeMock((address: string) =>
+      address.includes(':')
+        ? rowRange
+        : { Value2: '', Text: undefined, Interior: { Color: 0 }, Font: { Bold: false } },
+    )
+    mockGetDataSheet.mockReturnValue(mockWs)
+    mockFindHeaderRow.mockReturnValue(1)
+    mockGetLastRow.mockReturnValue(5)
+    mockGetCellValue.mockReturnValue('')
+    mockSetCellValue.mockReturnValue(true)
+    mockTagsToString.mockReturnValue('远程标签')
+    // 列 4~7 是用户自己的列，不在本次 writeCols（标签/分级=3、评分=8）里
+    mockGetColumnMap.mockReturnValue(
+      new Map<string, number>([
+        ['Bangumi_URL', 1],
+        ['名称', 2],
+        ['标签/分级', 3],
+        ['评分', 8],
+      ]),
+    )
+    mockGetApp.mockReturnValue({
+      ScreenUpdating: true,
+      Calculation: 1,
+      Wait: vi.fn(),
+      DoEvents: vi.fn(),
+    })
+
+    const diffs: GithubSyncDiff[] = [
+      {
+        kind: 'update',
+        sid: 'safe-1',
+        remote: { sid: 'safe-1', name: '安全条目', meta_tags: ['远程标签'], score: 9 },
+        localRow: 2,
+        changedFields: ['标签/分级', '评分'],
+      },
+    ]
+
+    const result = await applyDiffToSheet(diffs, 'add-update')
+
+    expect(result.updated).toBe(1)
+    // 一维旧值整体读入 → 标签与**完整**本地值合并（误判形状时会退化成首字符）
+    // 区间中段的用户列（4~7）原值写回，不被 null 清空
+    expect(writtenRow).toEqual([
+      '本地标签A | 远程标签',
+      '用户列4数据',
+      '用户列5数据',
+      '用户列6数据',
+      '用户列7数据',
+      '9',
+    ])
+  })
+
+  it('旧值读不到（Value2 为 null）时应回退逐字段，不用空值合并覆盖本地标签', async () => {
+    const mockWs = createMockWorksheet()
+    // 单行范围读回 null → 视为读失败，放弃批量路径
+    mockWs.Range = asRangeMock((address: string) =>
+      address.includes(':')
+        ? { Value2: null, Interior: { Color: 0 } }
+        : { Value2: '', Text: undefined, Interior: { Color: 0 }, Font: { Bold: false } },
+    )
+    mockGetDataSheet.mockReturnValue(mockWs)
+    mockFindHeaderRow.mockReturnValue(1)
+    mockGetLastRow.mockReturnValue(5)
+    // 逐字段回退路径用 getCellValue 逐格重取旧值
+    mockGetCellValue.mockReturnValue('本地标签A')
+    mockSetCellValue.mockReturnValue(true)
+    mockTagsToString.mockReturnValue('远程标签')
+    mockGetColumnMap.mockReturnValue(
+      new Map<string, number>([
+        ['Bangumi_URL', 1],
+        ['名称', 2],
+        ['标签/分级', 3],
+      ]),
+    )
+    mockGetApp.mockReturnValue({
+      ScreenUpdating: true,
+      Calculation: 1,
+      Wait: vi.fn(),
+      DoEvents: vi.fn(),
+    })
+
+    const diffs: GithubSyncDiff[] = [
+      {
+        kind: 'update',
+        sid: 'safe-2',
+        remote: { sid: 'safe-2', name: '回退条目', meta_tags: ['远程标签'] },
+        localRow: 2,
+        changedFields: ['标签/分级'],
+      },
+    ]
+
+    const result = await applyDiffToSheet(diffs, 'add-update')
+
+    expect(result.updated).toBe(1)
+    // 回退路径拿到真实旧值 → 合并而非整体替换
+    expect(mockSetCellValue).toHaveBeenCalledWith(mockWs, 2, 3, '本地标签A | 远程标签')
   })
 })
 
@@ -5263,7 +5404,10 @@ function asThrowingRowRangeMock(throwMessage: string): MockRange {
     }
     return {
       get Value2(): string[][] {
-        return [['']]
+        // 忠实桩：读回的列数必须与区间一致（本 describe 的 colMap 为 名称=2/别名=3，
+        // 区间 B..C 共 2 列）。返回 `[['']]`（仅 1 列）会被完整性守卫判为「读不全」
+        // 而走逐字段回退，从而测不到「整行写入抛错 → 回退」这条路径。
+        return [['', '']]
       },
       set Value2(_value: string[][]) {
         throw new Error(throwMessage)
@@ -5327,7 +5471,7 @@ describe('applyDiffToSheet 批量更新回退 / 写入阶段取消 / 同步记�
     expect(mockSetCellValue).not.toHaveBeenCalled()
     expect(mockBgmLognnn).toHaveBeenCalledWith(
       'WARN',
-      expect.stringContaining('读取旧值失败，使用空值'),
+      expect.stringContaining('读取旧值失败，回退逐字段写入'),
     )
   })
 
