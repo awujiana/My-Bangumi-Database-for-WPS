@@ -14,12 +14,14 @@ import {
   getColumnMap,
   getLastRow,
   getCellValue,
+  readRangeValues,
   colNumberToLetter,
   trim,
 } from '../tools/util/index.js'
 import { bgmLog } from '../tools/utility.js'
 import type { WpsWorksheet } from '../tools/wps.js'
 
+import { EXTENDED_FIELD_MAP } from './github-sync-diff.js'
 import { extractSubjectId } from './pure-utilities.js'
 
 /**
@@ -160,15 +162,31 @@ export function buildJsonlFromSheet(): string {
   const rows: unknown[][] = []
   const startRow = headerRow + 1
 
+  // 性能：一次矩形读覆盖「全部行 × 全部取数列」——原先每行的扩展字段就是 22 次
+  // 逐格读（5000 行 ≈ 11 万次 IPC）。日期列走 getCellText（读 Text 属性以保留
+  // 用户日期格式），无法并入本批，仍是每行 2 次。
+  const batchKeys = new Set(['名称', '标签/分级', '集数'])
+  for (const [, excelField] of EXTENDED_FIELD_MAP) batchKeys.add(excelField)
+  let batchMaxCol = urlCol
+  for (const key of batchKeys) {
+    const col = colMap.get(key)
+    if (col !== undefined && col > batchMaxCol) batchMaxCol = col
+  }
+  const block = readRangeValues(ws, startRow, lastRow, 1, batchMaxCol)
+  const canBatch = block.length === lastRow - startRow + 1
+  // 矩形读不可用时回退逐格读（行为与改造前一致）
+  const cellText = (row: number, col: number): string =>
+    canBatch ? (block[row - startRow]?.[col - 1] ?? '') : getCellValue(ws, row, col)
+
   for (let row = startRow; row <= lastRow; row += 1) {
-    const url = trim(getCellValue(ws, row, urlCol))
+    const url = trim(cellText(row, urlCol))
     if (url) {
       const sid = extractSubjectId(url)
       if (sid) {
         const getField = (key: string): string => {
           const col = colMap.get(key)
           if (!col) return ''
-          return trim(getCellValue(ws, row, col))
+          return trim(cellText(row, col))
         }
 
         // 日期列优先使用本地格式（Text 属性），保留用户设置的日期格式
@@ -202,29 +220,7 @@ export function buildJsonlFromSheet(): string {
             .filter(Boolean)
         }
 
-        // 扩展字段
-        const EXTENDED_FIELD_MAP: readonly (readonly [string, string])[] = [
-          ['date', '开播日期'],
-          ['播放结束', '完播日'],
-          ['动画制作公司', '制作公司'],
-          ['片长', '时长'],
-          ['制片国家', '制片国家'],
-          ['语言', '语言'],
-          ['类型', '类型'],
-          ['导演', '导演'],
-          ['音乐', '音乐'],
-          ['人物设定', '人物设定'],
-          ['机械设定', '机械设定'],
-          ['原作', '原作'],
-          ['脚本', '脚本'],
-          ['分镜', '分镜'],
-          ['演出', '演出'],
-          ['原案', '原案'],
-          ['系列构成', '系列构成'],
-          ['在线播放平台', '在线播放平台'],
-          ['关联条目ID', '关联条目ID'],
-          ['关联的动漫ID', '关联的动漫ID'],
-        ] as const
+        // 扩展字段：映射表此前在循环体内逐行重建（每行 new 一个 22 元数组）且与 github-sync-diff.ts 的同名表重复，改为复用那一份唯一事实来源；顺带修掉缺陷：本地「别名 / 评分 / 排名」列此前不在表里，导出被静默丢弃，而 EXPORT_FIELDS 明明包含这三个字段。
 
         for (const [jsonlField, excelField] of EXTENDED_FIELD_MAP) {
           const value = getField(excelField)

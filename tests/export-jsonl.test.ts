@@ -11,9 +11,10 @@ const {
   mockGetDataSheet,
   mockTrim,
   mockExtractSubjectId,
+  mockReadRangeValues,
 } = vi.hoisted(() => ({
   mockBgmLog: vi.fn(),
-  mockGetCellValue: vi.fn().mockReturnValue(''),
+  mockGetCellValue: vi.fn((_ws: unknown, _row: number, _col: number): string => ''),
   mockColNumToLetter: vi.fn((col: number) => {
     let result = ''
     let n = col
@@ -30,6 +31,26 @@ const {
   mockGetDataSheet: vi.fn().mockReturnValue(null),
   mockTrim: vi.fn((v: string) => v.trim()),
   mockExtractSubjectId: vi.fn().mockReturnValue(null),
+  // 矩形读必须与逐格读来自同一份数据源：矩形读只是逐格读的批量形态，
+  // 两者不一致时生产代码走快路径就会读到空表（桩不忠实，改桩不改生产）。
+  mockReadRangeValues: vi.fn(
+    (_ws: unknown, r1: number, r2: number, c1: number, c2: number): string[][] => {
+      const out: string[][] = []
+      for (let row = r1; row <= r2; row += 1) {
+        const line: string[] = []
+        for (let col = c1; col <= c2; col += 1) {
+          // 与真实实现一致：单格读取失败按空串处理，不让整块读失败
+          try {
+            line.push(mockGetCellValue(_ws, row, col))
+          } catch {
+            line.push('')
+          }
+        }
+        out.push(line)
+      }
+      return out
+    },
+  ),
 }))
 
 vi.mock('../ts/index.js', () => ({}))
@@ -50,6 +71,7 @@ vi.mock('../ts/tools/util/index.js', () => ({
   getApp: vi.fn(),
   colNumberToLetter: mockColNumToLetter,
   getCellValue: mockGetCellValue,
+  readRangeValues: mockReadRangeValues,
   getLastRow: mockGetLastRow,
   findHeaderRow: mockFindHeaderRow,
   getColumnMap: mockGetColumnMap,
@@ -140,6 +162,44 @@ describe('buildJsonlFromSheet', () => {
     mockGetColumnMap.mockReturnValue(new Map())
     const result = buildJsonlFromSheet()
     expect(result).toBe('')
+  })
+
+  it('本地「别名 / 评分 / 排名」列应被导出（此前映射表缺这三条，静默丢弃）', () => {
+    const ws = createMockWorksheet({ usedRange: 5 })
+    mockGetDataSheet.mockReturnValue(ws)
+    mockFindHeaderRow.mockReturnValue(1)
+    mockGetLastRow.mockReturnValue(2)
+
+    const colMap = new Map<string, number>([
+      ['Bangumi_URL', 1],
+      ['别名', 2],
+      ['评分', 3],
+      ['排名', 4],
+    ])
+    mockGetColumnMap.mockReturnValue(colMap)
+
+    mockGetCellValue.mockImplementation((_ws: unknown, row: number, col: number) => {
+      if (row !== 2) return ''
+      if (col === 1) return 'https://bgm.tv/subject/12345'
+      if (col === 2) return '葬送のフリーレン'
+      if (col === 3) return '8.1'
+      if (col === 4) return '42'
+      return ''
+    })
+
+    mockExtractSubjectId.mockImplementation((url: string) =>
+      /subject\/(\d+)/.exec(url)?.[1] ?? null,
+    )
+
+    const result = buildJsonlFromSheet()
+    const lines = result.split('\n').filter(Boolean)
+    const header = JSON.parse(lines[0] ?? '[]') as string[]
+    const values = JSON.parse(lines[1] ?? '[]') as unknown[]
+
+    const pick = (field: string): unknown => values[header.indexOf(field)]
+    expect(pick('别名')).toBe('葬送のフリーレン')
+    expect(pick('score')).toBe('8.1')
+    expect(pick('rank')).toBe('42')
   })
 
   it('有数据时应返回 JSONL 字符串', () => {
