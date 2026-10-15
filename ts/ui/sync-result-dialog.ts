@@ -191,19 +191,12 @@ function _clearEscHandler(): void {
 }
 
 /**
- * 计算格式化耗时字符串
+ * 计算格式化耗时字符串。
+ *
+ * 实现已下沉到 `tools/util/duration.ts`（全项目唯一一份）；此处保留同名转出，
+ * 因为 `ts/index.ts` 从本模块对外导出 `formatDuration`（`ui/handlers/*` 经 barrel 使用）。
  */
-export function formatDuration(ms: number): string {
-  if (ms < 1000) {
-    const seconds = Math.max(0, ms / 1000)
-    return `${seconds.toFixed(2)}秒`
-  }
-  const seconds = Math.floor(ms / 1000)
-  if (seconds < 60) return `${String(seconds)}秒`
-  const minutes = Math.floor(seconds / 60)
-  const secs = seconds % 60
-  return `${String(minutes)}分${secs.toString().padStart(2, '0')}秒`
-}
+export { formatDuration } from '../tools/util/duration.js'
 
 /**
  * 显示同步完成增强结果弹窗

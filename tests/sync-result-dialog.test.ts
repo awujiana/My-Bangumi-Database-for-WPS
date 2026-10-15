@@ -2,7 +2,7 @@
  * @fileoverview sync-result-dialog 单测
  *
  * 覆盖 `ts/ui/sync-result-dialog.ts`（此前无任何测试，行覆盖 2.17%）：
- *   - formatDuration（本文件自带的一份实现，与 github-time-format / progress 的同名函数彼此独立）
+ *   - formatDuration（2026-10-15 起三份实现已收敛到 `tools/util/duration.ts`，本文件覆盖其对外转出）
  *   - computeDateStatsFromSheet（最早/最晚开播日、最新季度、日期条数计数、日期格式容错）
  *   - showSyncResultDialog（标题/图标随 stopped 变化、完成度环配色、失败与跳过徽标、
  *     导出按钮、查看详情按钮的三条分支、关闭按钮与 ESC、日期统计区块）
@@ -257,8 +257,8 @@ describe('formatDuration 耗时格式化', () => {
     expect(formatDuration(0)).toBe('0.00秒')
     expect(formatDuration(500)).toBe('0.50秒')
     expect(formatDuration(990)).toBe('0.99秒')
-    // 999ms 经 toFixed(2) 进位为 1.00，属预期语义
-    expect(formatDuration(999)).toBe('1.00秒')
+    // 截断语义：999ms 不得四舍五入成 1.00秒（会与 1000ms 的「1秒」跨档混淆）
+    expect(formatDuration(999)).toBe('0.99秒')
   })
 
   it('负数按 0 处理', () => {
@@ -270,10 +270,10 @@ describe('formatDuration 耗时格式化', () => {
     expect(formatDuration(59_999)).toBe('59秒')
   })
 
-  it('1 分钟以上：分与补零秒', () => {
-    expect(formatDuration(60_000)).toBe('1分00秒')
+  it('1 分钟以上：分（整分不补秒）', () => {
+    expect(formatDuration(60_000)).toBe('1分')
     expect(formatDuration(125_000)).toBe('2分05秒')
-    expect(formatDuration(3_600_000)).toBe('60分00秒')
+    expect(formatDuration(3_600_000)).toBe('60分')
   })
 })
 

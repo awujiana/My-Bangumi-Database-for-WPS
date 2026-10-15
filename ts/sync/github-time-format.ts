@@ -7,6 +7,7 @@
  */
 
 import { trim } from '../tools/string-utilities-pure.js'
+import { formatDuration } from '../tools/util/duration.js'
 import type { SyncTimeFilter } from './github-sync-diff.js'
 
 /**
@@ -56,19 +57,14 @@ export function appendValueWithSeparator(localValue: string, remoteValue: string
 }
 
 /**
- * 格式化持续时间（毫秒 → 可读字符串）
+ * 格式化持续时间（毫秒 → 可读字符串）。
+ *
+ * 实现已下沉到 `tools/util/duration.ts`（全项目唯一一份）。此前这里与
+ * `ui/components/progress.ts`、`ui/sync-result-dialog.ts` 各有一份且已漂移
+ * （999ms 四舍五入成 `1.00秒`、整分补成 `1分00秒`），2026-10-15 统一为
+ * progress 版的截断语义（`0.99秒` / `1分`）。
  */
-export function formatDuration(ms: number): string {
-  if (ms < 1000) {
-    const seconds = Math.max(0, ms / 1000)
-    return `${seconds.toFixed(2)}秒`
-  }
-  const seconds = Math.floor(ms / 1000)
-  if (seconds < 60) return `${String(seconds)}秒`
-  const minutes = Math.floor(seconds / 60)
-  const secs = seconds % 60
-  return `${String(minutes)}分${secs.toString().padStart(2, '0')}秒`
-}
+export { formatDuration } from '../tools/util/duration.js'
 
 /**
  * 格式化预估剩余时间

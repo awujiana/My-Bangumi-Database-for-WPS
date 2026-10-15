@@ -80,7 +80,8 @@ describe('formatDuration', () => {
   it('不足 1 秒按秒显示两位小数', () => {
     expect(formatDuration(0)).toBe('0.00秒')
     expect(formatDuration(500)).toBe('0.50秒')
-    expect(formatDuration(999)).toBe('1.00秒')
+    // 截断语义：999ms 不得四舍五入成 1.00秒（会与 1000ms 的「1秒」跨档混淆）
+    expect(formatDuration(999)).toBe('0.99秒')
   })
 
   it('负数按 0 处理（Math.max 兜底）', () => {
@@ -92,8 +93,9 @@ describe('formatDuration', () => {
     expect(formatDuration(59_000)).toBe('59秒')
   })
 
-  it('超过 1 分钟显示「分 + 补零秒」', () => {
-    expect(formatDuration(60_000)).toBe('1分00秒')
+  it('超过 1 分钟显示「分」或「分 + 补零秒」', () => {
+    // 整分不补 00秒（统一到 progress 版语义）
+    expect(formatDuration(60_000)).toBe('1分')
     expect(formatDuration(61_000)).toBe('1分01秒')
     expect(formatDuration(125_000)).toBe('2分05秒')
   })
@@ -107,7 +109,7 @@ describe('formatEta', () => {
 
   it('正数复用 formatDuration 并加前缀', () => {
     expect(formatEta(1000)).toBe('预计剩余: 1秒')
-    expect(formatEta(60_000)).toBe('预计剩余: 1分00秒')
+    expect(formatEta(60_000)).toBe('预计剩余: 1分')
   })
 })
 
