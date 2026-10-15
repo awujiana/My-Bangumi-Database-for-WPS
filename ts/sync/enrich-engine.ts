@@ -23,6 +23,7 @@ import {
   readRangeValues,
   BGM,
 } from '../tools/util/index.js'
+import { readRowsCache } from '../tools/util/sheet.js'
 import type { WpsWorksheet, WpsWorkbook } from '../tools/wps.js'
 
 import { addEnrichRecords } from './enrich-record.js'
@@ -329,6 +330,27 @@ export function detectColumns(sheet: WpsWorksheet, headerRow: number): EnrichCol
 }
 
 /**
+ * 计算列映射中用到的最大列号（含 `platformExtraCols`）
+ *
+ * 用于「一次矩形读覆盖所有需要的列」——矩形读的范围恒为 1..maxCol，
+ * 因此必须取到映射里出现过的最大列号，否则靠后的列会读不到而静默取空。
+ */
+function mappingMaxCol(mapping: EnrichColumnMapping): number {
+  let max = mapping.nameCol
+  const values = Object.values(mapping)
+  for (const value of values) {
+    if (typeof value === 'number' && value > max) max = value
+  }
+  const extraCols = mapping.platformExtraCols
+  if (extraCols) {
+    for (const col of extraCols) {
+      if (col > max) max = col
+    }
+  }
+  return max
+}
+
+/**
  * 聚合一行全部播放平台值：platformCol + platformExtraCols + exclusiveCol，去空去重保序。
  * 署名/标注示例等噪声同时过滤（预览与富化写入共用口径）。
  */
@@ -336,19 +358,21 @@ export function readPlatformValues(
   sheet: WpsWorksheet,
   row: number,
   mapping: EnrichColumnMapping,
+  rowCells?: readonly string[],
 ): string[] {
+  // 缺省列用 0 占位，先过滤掉：循环里再判空会让整段被 if 包住（unicorn/prefer-continue
+  // 与 no-continue 互相打架），过滤后循环体是平的
   const cols = [
     mapping.platformCol ?? 0,
     ...(mapping.platformExtraCols ?? []),
     mapping.exclusiveCol ?? 0,
-  ]
+  ].filter((col) => col > 0)
   const values: string[] = []
   for (const col of cols) {
-    if (col > 0) {
-      for (const part of getCellValue(sheet, row, col).split(/[,，、/|]/)) {
-        const value = part.trim()
-        if (value && !shouldFilterNoise(value) && !values.includes(value)) values.push(value)
-      }
+    const raw = rowCells?.[col - 1] ?? getCellValue(sheet, row, col)
+    for (const part of raw.split(/[,，、/|]/)) {
+      const value = part.trim()
+      if (value && !shouldFilterNoise(value) && !values.includes(value)) values.push(value)
     }
   }
   return values
@@ -453,16 +477,18 @@ export function readNewAnimeRow(
   sheet: WpsWorksheet,
   row: number,
   mapping: EnrichColumnMapping,
+  rowCells?: readonly string[],
 ): Record<string, string> {
-  const data: Record<string, string> = { 名称: getCellValue(sheet, row, mapping.nameCol) || '' }
-  if (mapping.tagsCol) data.TAGS = getCellValue(sheet, row, mapping.tagsCol) || ''
-  if (mapping.premiereCol) data['首播'] = getCellValue(sheet, row, mapping.premiereCol) || ''
-  if (mapping.episodesCol) data['集数'] = getCellValue(sheet, row, mapping.episodesCol) || ''
-  if (mapping.weekdayCol) data['周更时间'] = getCellValue(sheet, row, mapping.weekdayCol) || ''
+  const cell = (col: number): string => rowCells?.[col - 1] ?? getCellValue(sheet, row, col)
+  const data: Record<string, string> = { 名称: cell(mapping.nameCol) || '' }
+  if (mapping.tagsCol) data.TAGS = cell(mapping.tagsCol) || ''
+  if (mapping.premiereCol) data['首播'] = cell(mapping.premiereCol) || ''
+  if (mapping.episodesCol) data['集数'] = cell(mapping.episodesCol) || ''
+  if (mapping.weekdayCol) data['周更时间'] = cell(mapping.weekdayCol) || ''
   // 播放平台聚合：platformCol + platformExtraCols + exclusiveCol 去空去重（富化与预览共用口径）
-  data['播放平台'] = readPlatformValues(sheet, row, mapping).join(TAG_SEPARATOR)
-  if (mapping.exclusiveCol) data['独播'] = getCellValue(sheet, row, mapping.exclusiveCol) || ''
-  if (mapping.specialCol) data['特殊'] = getCellValue(sheet, row, mapping.specialCol) || ''
+  data['播放平台'] = readPlatformValues(sheet, row, mapping, rowCells).join(TAG_SEPARATOR)
+  if (mapping.exclusiveCol) data['独播'] = cell(mapping.exclusiveCol) || ''
+  if (mapping.specialCol) data['特殊'] = cell(mapping.specialCol) || ''
   return data
 }
 
@@ -956,6 +982,11 @@ export function enrichEntries(
   // startTime 声明移到 early return 之后（满足 unicorn/no-declarations-before-early-exit）
   const startTime = Date.now()
 
+  // 源表（新番表 / 简介表）在富化全程只读不写，可在循环外一次矩形读建缓存：
+  // 逐行 8~19 次逐格读 → 1 次矩形读。缓存不可用时 readRowsCache 返回 null，调用方回退逐格读。
+  const sourceRows = [...new Set(matches.map((m) => m.animeRow))]
+  const sourceCells = readRowsCache(animeSheet, sourceRows, mappingMaxCol(config.columnMapping))
+
   let bangumiColMap = getBangumiColumnMap(bangumiSheet)
 
   if (intro || isIntroSheet(config.columnMapping)) {
@@ -1008,6 +1039,7 @@ export function enrichEntries(
         enrichRecords,
         intro,
         bangumiAliasCol,
+        sourceCells?.get(match.animeRow),
       )
       didEnrich = true
     } else if (match.matchType === 'unmatched') {
@@ -1055,6 +1087,7 @@ export function enrichEntries(
           enrichRecords,
           intro,
           bangumiAliasCol,
+          sourceCells?.get(match.animeRow),
         )
         didEnrich = true
       }
@@ -1122,11 +1155,12 @@ function enrichIntoRow(
   records: AddEnrichRecordParameters[],
   intro?: IntroSheetContext,
   aliasCol?: number,
+  sourceCells?: readonly string[],
 ): EnrichRowOutcome {
   const isIntro = isIntroSheet(config.columnMapping)
   const incomingData = isIntro
-    ? readIntroSheetRow(animeSheet, match.animeRow, config.columnMapping)
-    : readNewAnimeRow(animeSheet, match.animeRow, config.columnMapping)
+    ? readIntroSheetRow(animeSheet, match.animeRow, config.columnMapping, sourceCells)
+    : readNewAnimeRow(animeSheet, match.animeRow, config.columnMapping, sourceCells)
   const enrichedFields: EnrichedField[] = []
   const fieldConflicts: ConflictInfo[] = []
 
@@ -1662,29 +1696,31 @@ export function readIntroSheetRow(
   sheet: WpsWorksheet,
   row: number,
   mapping: EnrichColumnMapping,
+  rowCells?: readonly string[],
 ): Record<string, string> {
-  const data: Record<string, string> = { 名称: getCellValue(sheet, row, mapping.nameCol) || '' }
-  if (mapping.introCol) data['简介'] = getCellValue(sheet, row, mapping.introCol) || ''
-  if (mapping.studioCol) data['动画制作'] = getCellValue(sheet, row, mapping.studioCol) || ''
-  if (mapping.directorCol) data['导演'] = getCellValue(sheet, row, mapping.directorCol) || ''
-  if (mapping.musicCol) data['音乐'] = getCellValue(sheet, row, mapping.musicCol) || ''
-  if (mapping.voiceCol) data['声优'] = getCellValue(sheet, row, mapping.voiceCol) || ''
-  if (mapping.opCol) data.OP = getCellValue(sheet, row, mapping.opCol) || ''
-  if (mapping.edCol) data.ED = getCellValue(sheet, row, mapping.edCol) || ''
-  if (mapping.pvCol) data.PV = getCellValue(sheet, row, mapping.pvCol) || ''
-  if (mapping.screenplayCol) data['编剧'] = getCellValue(sheet, row, mapping.screenplayCol) || ''
+  const cell = (col: number): string => rowCells?.[col - 1] ?? getCellValue(sheet, row, col)
+  const data: Record<string, string> = { 名称: cell(mapping.nameCol) || '' }
+  if (mapping.introCol) data['简介'] = cell(mapping.introCol) || ''
+  if (mapping.studioCol) data['动画制作'] = cell(mapping.studioCol) || ''
+  if (mapping.directorCol) data['导演'] = cell(mapping.directorCol) || ''
+  if (mapping.musicCol) data['音乐'] = cell(mapping.musicCol) || ''
+  if (mapping.voiceCol) data['声优'] = cell(mapping.voiceCol) || ''
+  if (mapping.opCol) data.OP = cell(mapping.opCol) || ''
+  if (mapping.edCol) data.ED = cell(mapping.edCol) || ''
+  if (mapping.pvCol) data.PV = cell(mapping.pvCol) || ''
+  if (mapping.screenplayCol) data['编剧'] = cell(mapping.screenplayCol) || ''
   if (mapping.characterDesignCol)
-    data['人设'] = getCellValue(sheet, row, mapping.characterDesignCol) || ''
-  if (mapping.cgDirectorCol) data['CG导演'] = getCellValue(sheet, row, mapping.cgDirectorCol) || ''
+    data['人设'] = cell(mapping.characterDesignCol) || ''
+  if (mapping.cgDirectorCol) data['CG导演'] = cell(mapping.cgDirectorCol) || ''
   if (mapping.seriesCompositionCol)
-    data['系列构成'] = getCellValue(sheet, row, mapping.seriesCompositionCol) || ''
-  if (mapping.storyboardCol) data['分镜'] = getCellValue(sheet, row, mapping.storyboardCol) || ''
+    data['系列构成'] = cell(mapping.seriesCompositionCol) || ''
+  if (mapping.storyboardCol) data['分镜'] = cell(mapping.storyboardCol) || ''
   if (mapping.originalWorkCol)
-    data['原作'] = getCellValue(sheet, row, mapping.originalWorkCol) || ''
-  if (mapping.languageCol) data['语言'] = getCellValue(sheet, row, mapping.languageCol) || ''
+    data['原作'] = cell(mapping.originalWorkCol) || ''
+  if (mapping.languageCol) data['语言'] = cell(mapping.languageCol) || ''
   if (mapping.productionCountryCol)
-    data['制片国家'] = getCellValue(sheet, row, mapping.productionCountryCol) || ''
-  if (mapping.typeCol) data['类型'] = getCellValue(sheet, row, mapping.typeCol) || ''
+    data['制片国家'] = cell(mapping.productionCountryCol) || ''
+  if (mapping.typeCol) data['类型'] = cell(mapping.typeCol) || ''
   return data
 }
 

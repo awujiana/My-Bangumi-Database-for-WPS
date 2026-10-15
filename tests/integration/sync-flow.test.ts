@@ -45,6 +45,10 @@ const mockState = vi.hoisted(() => ({
   setCellValue: vi.fn(() => true),
   // 生产签名为 (ws, startRow, endRow, startCol, endCol)；测试只 mock 返回值，故用可变参数收
   readRangeValues: vi.fn<(...arguments_: unknown[]) => string[][]>(() => []),
+  // 默认返回 null：模拟「矩形读不可用」，生产代码回退逐格读（与改动前行为一致）
+  readRowsCache: vi.fn<(...arguments_: unknown[]) => Map<number, readonly string[]> | null>(
+    () => null,
+  ),
 
   // GitHub 同步依赖 mock
   beginUndoSession: vi.fn(),
@@ -150,6 +154,7 @@ vi.mock('../../ts/tools/util/index.js', () => ({
   cacheGet: <T>(key: string, factory: () => T): T => factory(),
   clearSheetCache: vi.fn(),
   readRangeValues: mockState.readRangeValues,
+  readRowsCache: mockState.readRowsCache,
   delay: () => Promise.resolve(),
   sleep: () => Promise.resolve(),
   loadBgToken: (): string => 'test-token',
