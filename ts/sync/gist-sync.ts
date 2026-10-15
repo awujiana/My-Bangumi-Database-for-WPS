@@ -256,14 +256,26 @@ export function fetchGistJson(signal?: AbortSignal): Promise<GithubRemoteEntry[]
     xhr.timeout = REQUEST_TIMEOUT_MS
     xhr.setRequestHeader('Accept', 'application/vnd.github+json')
 
-    // AbortSignal 支持：监听 abort 事件触发 xhr.abort()
+    // AbortSignal 支持：监听 abort 事件触发 xhr.abort()，并在请求结束后移除监听器。
+    // 必须 removeEventListener：Gist 源可能被反复同步，只 add 不 remove 会持续泄漏监听器。
+    let abortHandler: (() => void) | null = null
+    const removeAbortHandler = (): void => {
+      if (!(abortHandler && signal)) {
+        return
+      }
+
+      signal.removeEventListener('abort', abortHandler)
+      abortHandler = null
+    }
     if (signal) {
-      signal.addEventListener('abort', () => {
+      abortHandler = (): void => {
         xhr.abort()
-      })
+      }
+      signal.addEventListener('abort', abortHandler)
     }
 
     xhr.addEventListener('load', (): void => {
+      removeAbortHandler()
       switch (xhr.status) {
         case 200: {
           try {
@@ -306,6 +318,7 @@ export function fetchGistJson(signal?: AbortSignal): Promise<GithubRemoteEntry[]
     })
 
     xhr.addEventListener('error', (): void => {
+      removeAbortHandler()
       // 如果是 abort 导致的 onerror，归类为取消
       if (signal?.aborted) {
         reject(new Error('请求被取消'))
@@ -315,6 +328,7 @@ export function fetchGistJson(signal?: AbortSignal): Promise<GithubRemoteEntry[]
     })
 
     xhr.ontimeout = (): void => {
+      removeAbortHandler()
       reject(new Error(`请求超时（${String(REQUEST_TIMEOUT_MS)}ms）：${url}`))
     }
 

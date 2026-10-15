@@ -23,19 +23,14 @@
  * updatedAt 为 YYYY-MM-DD 格式（仅日期，不含时间，节省空间）。
  */
 
-import { LOG_LEVELS } from '../core/constants.js'
 import { Result, BgmError } from '../core/result.js'
-import { bgmLog } from '../tools/utility.js'
 
 import { getGithubConfig, getManualShards, isGithubConfigComplete } from './github-config.js'
 import type { GithubRemoteEntry } from './github-sync-diff.js'
-import { readXhrJsonlText } from './jsonl-response.js'
+import { createRawTextFetcher } from './jsonl-response.js'
 import { loadEntriesFromPath } from './shard-fetch.js'
 import type { FetchRemoteEntriesOptions, SyncSource } from './sync-source.js'
 // 复用 githubSyncDiff.ts 的纯解析函数与类型（零依赖纯模块，可在 Node 测试环境直接运行）
-
-/** HTTP 请求超时（毫秒），与 githubSync 保持一致 */
-const REQUEST_TIMEOUT_MS = 30_000
 
 /** 默认分支名（与 githubConfig 默认值一致） */
 const DEFAULT_BRANCH = 'main'
@@ -65,99 +60,24 @@ export function buildGitlabRawUrl(relativePath?: string): string {
 /**
  * 按仓库内相对路径取原始文本（gzip 由 `readXhrJsonlText` 按魔数解压）
  *
- * 供 `shardFetch.loadEntriesFromPath` 编排（清单 → 选片 → 拼接）。
+ * XHR 骨架与 GitHub / Gitee 完全同构，统一走 `createRawTextFetcher` 工厂
+ * （见 `jsonl-response.ts`）：本处只提供 GitLab 的构 URL 逻辑与错误措辞。
  *
  * @param relativePath 仓库内相对路径（清单或任一分片文件）
  * @param signal 可选 AbortSignal，用于取消请求
  * @returns 解码后的文本（JSONL / JSON 明文）
  * @throws 配置错误、网络错误、HTTP 非 200 时抛出 Error
  */
-export function fetchGitlabText(relativePath: string, signal?: AbortSignal): Promise<string> {
-  return new Promise<string>((resolve, reject) => {
-    let url: string
-    try {
-      url = buildGitlabRawUrl(relativePath)
-    } catch (error: unknown) {
-      reject(error instanceof Error ? error : new Error(String(error)))
-      return
-    }
-
-    // 如果 signal 已 aborted，立即 reject
-    if (signal?.aborted) {
-      reject(new Error('请求被取消'))
-      return
-    }
-
-    bgmLog(LOG_LEVELS.INFO, `[gitlabSync] 开始下载: ${url}`)
-    const xhr = new XMLHttpRequest()
-    xhr.open('GET', url, true)
-    xhr.timeout = REQUEST_TIMEOUT_MS
-    xhr.setRequestHeader('Accept', 'application/json')
-    // 取原始字节：数据源是 gzip 压缩的 .jsonlines.gz，需要按魔数判断后再解压
-    xhr.responseType = 'arraybuffer'
-
-    // AbortSignal 支持：监听 abort 事件触发 xhr.abort()
-    if (signal) {
-      signal.addEventListener('abort', () => {
-        xhr.abort()
-      })
-    }
-
-    xhr.addEventListener('load', (): void => {
-      switch (xhr.status) {
-        case 200: {
-          // gzip 数据源需要异步解压（DecompressionStream），200 分支走异步流程
-          void (async (): Promise<void> => {
-            try {
-              resolve(await readXhrJsonlText(xhr))
-            } catch (error: unknown) {
-              reject(
-                new Error(
-                  `数据解码失败: ${error instanceof Error ? error.message : String(error)}`,
-                ),
-              )
-            }
-          })()
-
-          break
-        }
-        case 404: {
-          reject(
-            new Error(
-              `文件不存在（404）：${url}，请检查 owner/repo/branch/path 配置` +
-                `（分片数据路径应为 data/anime.manifest.json）`,
-            ),
-          )
-
-          break
-        }
-        case 403: {
-          reject(new Error(`访问被拒（403）：可能是私有仓库或触发 GitLab 限流`))
-
-          break
-        }
-        default: {
-          reject(new Error(`HTTP 错误 ${String(xhr.status)}: ${xhr.statusText}`))
-        }
-      }
-    })
-
-    xhr.addEventListener('error', (): void => {
-      // 如果是 abort 导致的 onerror，归类为取消
-      if (signal?.aborted) {
-        reject(new Error('请求被取消'))
-        return
-      }
-      reject(new Error(`网络请求失败：${url}（可能是 CORS 或网络不通）`))
-    })
-
-    xhr.ontimeout = (): void => {
-      reject(new Error(`请求超时（${String(REQUEST_TIMEOUT_MS)}ms）：${url}`))
-    }
-
-    xhr.send()
-  })
-}
+export const fetchGitlabText = createRawTextFetcher({
+  logTag: 'gitlabSync',
+  buildUrl: (relativePath) => buildGitlabRawUrl(relativePath),
+  messages: {
+    notFound: (url) =>
+      `文件不存在（404）：${url}，请检查 owner/repo/branch/path 配置` +
+      `（分片数据路径应为 data/anime.manifest.json）`,
+    forbidden: (url) => `访问被拒（403）：${url}，可能是私有仓库或触发 GitLab 限流`,
+  },
+})
 
 /**
  * 从 GitLab Raw 下载并解析远程条目

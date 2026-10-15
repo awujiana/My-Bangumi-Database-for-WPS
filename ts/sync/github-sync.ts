@@ -67,7 +67,7 @@ import {
   formatTimeFilterLabel,
 } from './github-time-format.js'
 import { resolveNewRowCellValue, resolveUpdateCellValue } from './github-cell-value.js'
-import { readXhrJsonlText } from './jsonl-response.js'
+import { createRawTextFetcher } from './jsonl-response.js'
 import { collectNeededFieldsFromSheet, loadEntriesFromPath } from './shard-fetch.js'
 import { addSyncRecords, addSyncRecordSummary } from './sync-record.js'
 import type { UpdateRecordParameters } from './sync-record.js'
@@ -126,124 +126,36 @@ export interface GithubSyncResult {
   missingColumns?: string[]
 }
 
-/** HTTP 请求超时（毫秒） */
-const REQUEST_TIMEOUT_MS = 30_000
-
 /**
  * 按仓库内相对路径取原始文本（gzip 由 `readXhrJsonlText` 按魔数解压）
  *
  * 分片模式下每个分片各是一次独立请求，因此把「一次 GET + 解码」抽成可复用的
  * 回调，交给 `shardFetch.loadEntriesFromPath` 编排（清单 → 选片 → 拼接）。
  *
+ * XHR 骨架与 Gitee / GitLab 完全同构，统一走 `createRawTextFetcher` 工厂
+ * （见 `jsonl-response.ts`）：本处只提供 GitHub 的构 URL 逻辑与错误措辞。
+ *
  * @param relativePath 仓库内相对路径（清单或任一分片文件）
  * @param signal 可选 AbortSignal，用于取消请求
  * @returns 解码后的文本（JSONL / JSON 明文）
  * @throws 配置错误、网络错误、HTTP 非 200 时抛出 Error
  */
-export function fetchGithubText(relativePath: string, signal?: AbortSignal): Promise<string> {
-  return new Promise<string>((resolve, reject) => {
-    let url: string
-    try {
-      if (!isGithubConfigComplete()) {
-        throw new Error('GitHub 仓库配置不完整')
-      }
-      url = buildRawUrl(relativePath)
-    } catch (error: unknown) {
-      reject(error instanceof Error ? error : new Error(String(error)))
-      return
+export const fetchGithubText = createRawTextFetcher({
+  logTag: 'githubSync',
+  buildUrl: (relativePath) => {
+    if (!isGithubConfigComplete()) {
+      throw new Error('GitHub 仓库配置不完整')
     }
-
-    // 如果 signal 已 aborted，立即 reject
-    if (signal?.aborted) {
-      reject(new Error('请求被取消'))
-      return
-    }
-
-    bgmLog(LOG_LEVELS.INFO, `[githubSync] 开始下载: ${url}`)
-    const xhr = new XMLHttpRequest()
-    xhr.open('GET', url, true)
-    xhr.timeout = REQUEST_TIMEOUT_MS
-    xhr.setRequestHeader('Accept', 'application/json')
-    // 取原始字节：数据源是 gzip 压缩的 .jsonlines.gz，需要按魔数判断后再解压
-    xhr.responseType = 'arraybuffer'
-
-    // AbortSignal 支持：监听 abort 事件触发 xhr.abort()，并在请求完成后移除监听器
-    let abortHandler: (() => void) | null = null
-    const removeAbortHandler = (): void => {
-      if (!(abortHandler && signal)) {
-        return
-      }
-
-      signal.removeEventListener('abort', abortHandler)
-      abortHandler = null
-    }
-    if (signal) {
-      abortHandler = () => {
-        xhr.abort()
-      }
-      signal.addEventListener('abort', abortHandler)
-    }
-
-    xhr.addEventListener('load', (): void => {
-      removeAbortHandler()
-      switch (xhr.status) {
-        case 200: {
-          // gzip 数据源需要异步解压（DecompressionStream），200 分支走异步流程
-          void (async (): Promise<void> => {
-            try {
-              resolve(await readXhrJsonlText(xhr))
-            } catch (error: unknown) {
-              reject(
-                new Error(
-                  `数据解码失败: ${error instanceof Error ? error.message : String(error)}`,
-                ),
-              )
-            }
-          })()
-
-          break
-        }
-        case 404: {
-          reject(
-            new Error(
-              `文件不存在（404）：${url}，请检查 owner/repo/branch/path 配置` +
-                `（数据文件路径应为 data/anime.manifest.json）`,
-            ),
-          )
-
-          break
-        }
-        case 403: {
-          reject(
-            new Error(`访问被拒（403）：可能是私有仓库或触发 GitHub 限流（未认证 60次/小时/IP）`),
-          )
-
-          break
-        }
-        default: {
-          reject(new Error(`HTTP 错误 ${String(xhr.status)}: ${xhr.statusText}`))
-        }
-      }
-    })
-
-    xhr.addEventListener('error', (): void => {
-      removeAbortHandler()
-      // 如果是 abort 导致的 onerror，归类为取消
-      if (signal?.aborted) {
-        reject(new Error('请求被取消'))
-        return
-      }
-      reject(new Error(`网络请求失败：${url}（可能是 CORS 或网络不通）`))
-    })
-
-    xhr.ontimeout = (): void => {
-      removeAbortHandler()
-      reject(new Error(`请求超时（${String(REQUEST_TIMEOUT_MS)}ms）：${url}`))
-    }
-
-    xhr.send()
-  })
-}
+    return buildRawUrl(relativePath)
+  },
+  messages: {
+    notFound: (url) =>
+      `文件不存在（404）：${url}，请检查 owner/repo/branch/path 配置` +
+      `（数据文件路径应为 data/anime.manifest.json）`,
+    forbidden: (url) =>
+      `访问被拒（403）：${url}，可能是私有仓库或触发 GitHub 限流（未认证 60次/小时/IP）`,
+  },
+})
 
 /**
  * 从 GitHub 下载并拼接远程条目

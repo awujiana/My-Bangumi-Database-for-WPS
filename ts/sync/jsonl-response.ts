@@ -110,3 +110,149 @@ export async function readXhrJsonlText(xhr: XMLHttpRequest): Promise<string> {
   }
   return xhr.responseText
 }
+
+/** 远程请求默认超时（毫秒）—— 四个同步源原本各自定义一份，收敛到此 */
+export const REMOTE_REQUEST_TIMEOUT_MS = 30_000
+
+/** {@link createRawTextFetcher} 的配置 */
+export interface RawTextFetcherOptions {
+  /** 日志前缀，如 `'githubSync'` */
+  logTag: string
+  /** 由「仓库内相对路径」构造完整下载 URL（可抛配置错误） */
+  buildUrl: (relativePath: string) => string
+  /** 404 / 403 的文案（各源措辞不同，地址已由调用方插值） */
+  messages: {
+    notFound: (url: string) => string
+    forbidden: (url: string) => string
+  }
+  /** Accept 请求头，默认 `application/json` */
+  acceptHeader?: string
+  /** 是否按 arraybuffer 取原始字节（gzip 数据源必须），默认 true */
+  rawBytes?: boolean
+  /** 超时（毫秒），默认 {@link REMOTE_REQUEST_TIMEOUT_MS} */
+  timeoutMs?: number
+}
+
+/**
+ * 构造「按仓库内相对路径下载并解码文本」的 fetcher
+ *
+ * GitHub / Gitee / GitLab 三个 raw 源的取数流程**完全同构**：
+ * 构 URL（可抛配置错误）→ 已取消早退 → XHR 准备 → abort 支持 →
+ * status 分支（200 解码 / 404 / 403 / 其它）→ 错误归类 → send。
+ * 差异只在 logTag、Accept 头、错误措辞，故收敛到本工厂，各源只提供 URL 构造函数。
+ *
+ * ⚠️ **abort 监听器必须在 load / error / timeout 后 removeEventListener**。
+ * 原实现里只有 GitHub 版这么做，Gitee / GitLab 两份只 add 不 remove ——
+ * 同一同步源反复同步（或切换配置重试）会持续往 signal 上挂监听器，属于泄漏。
+ *
+ * @param options 配置
+ * @returns `(relativePath, signal) => Promise<string>`
+ */
+export function createRawTextFetcher(
+  options: RawTextFetcherOptions,
+): (relativePath: string, signal?: AbortSignal) => Promise<string> {
+  const {
+    logTag,
+    buildUrl,
+    messages,
+    acceptHeader = 'application/json',
+    rawBytes = true,
+    timeoutMs = REMOTE_REQUEST_TIMEOUT_MS,
+  } = options
+
+  return (relativePath: string, signal?: AbortSignal): Promise<string> =>
+    new Promise<string>((resolve, reject) => {
+      let url: string
+      try {
+        url = buildUrl(relativePath)
+      } catch (error: unknown) {
+        reject(error instanceof Error ? error : new Error(String(error)))
+        return
+      }
+
+      // 如果 signal 已 aborted，立即 reject
+      if (signal?.aborted) {
+        reject(new Error('请求被取消'))
+        return
+      }
+
+      bgmLog(LOG_LEVELS.INFO, `[${logTag}] 开始下载: ${url}`)
+      const xhr = new XMLHttpRequest()
+      xhr.open('GET', url, true)
+      xhr.timeout = timeoutMs
+      xhr.setRequestHeader('Accept', acceptHeader)
+      // 取原始字节：数据源是 gzip 压缩的 .jsonlines.gz，需要按魔数判断后再解压
+      if (rawBytes) {
+        xhr.responseType = 'arraybuffer'
+      }
+
+      // AbortSignal 支持：监听 abort 触发 xhr.abort()，并在请求结束后移除监听器
+      let abortHandler: (() => void) | null = null
+      const removeAbortHandler = (): void => {
+        if (!(abortHandler && signal)) {
+          return
+        }
+
+        signal.removeEventListener('abort', abortHandler)
+        abortHandler = null
+      }
+      if (signal) {
+        abortHandler = (): void => {
+          xhr.abort()
+        }
+        signal.addEventListener('abort', abortHandler)
+      }
+
+      xhr.addEventListener('load', (): void => {
+        removeAbortHandler()
+        switch (xhr.status) {
+          case 200: {
+            // gzip 数据源需要异步解压（DecompressionStream），200 分支走异步流程
+            void (async (): Promise<void> => {
+              try {
+                resolve(await readXhrJsonlText(xhr))
+              } catch (error: unknown) {
+                reject(
+                  new Error(
+                    `数据解码失败: ${error instanceof Error ? error.message : String(error)}`,
+                  ),
+                )
+              }
+            })()
+
+            break
+          }
+          case 404: {
+            reject(new Error(messages.notFound(url)))
+
+            break
+          }
+          case 403: {
+            reject(new Error(messages.forbidden(url)))
+
+            break
+          }
+          default: {
+            reject(new Error(`HTTP 错误 ${String(xhr.status)}: ${xhr.statusText}`))
+          }
+        }
+      })
+
+      xhr.addEventListener('error', (): void => {
+        removeAbortHandler()
+        // 如果是 abort 导致的 onerror，归类为取消
+        if (signal?.aborted) {
+          reject(new Error('请求被取消'))
+          return
+        }
+        reject(new Error(`网络请求失败：${url}（可能是 CORS 或网络不通）`))
+      })
+
+      xhr.ontimeout = (): void => {
+        removeAbortHandler()
+        reject(new Error(`请求超时（${String(timeoutMs)}ms）：${url}`))
+      }
+
+      xhr.send()
+    })
+}
