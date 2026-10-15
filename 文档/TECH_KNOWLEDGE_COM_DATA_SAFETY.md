@@ -223,7 +223,8 @@ export function initIncrementalSyncFromRibbon(): void {
 
 | 位置 | 重复内容 | 建议 |
 | --- | --- | --- |
-| `dialog.ts:517-823` vs `sync-result-dialog.ts:214-529` | 两份 ~300 行的同步统计仪表盘渲染（donut SVG、柱状图、性能盘、元信息栏） | 抽 `renderSyncChartSection(model)` 到共用模块 |
+| ~~`dialog.ts:517-823` vs `sync-result-dialog.ts:214-529`~~ **已收敛** | 两份 ~300 行的同步统计仪表盘渲染（donut SVG、柱状图、性能盘、元信息栏），连配色阈值与 SVG 参数都一样 | ✅ 抽 `ts/ui/sync-stats-chart.ts`：`renderSyncStatsChart(stats: SyncProgressStats)` + `toSyncStatsChartModel()`（结果弹窗把 `GithubSyncResult` + 耗时/速度/策略收口成模型）。两处各删 330+ / 350 行 |
+| `components/progress.ts` / `github-time-format.ts` / `sync-result-dialog.ts` | **三份 `formatDuration` 实现已漂移**：999ms 是四舍五入（`1.00秒`）还是截断（`0.99秒`）、整分补不补 `00秒`，三份都不一样 | 共用图表已统一到 `components/progress.ts`（带 P3-1 截断修复的那份）。剩下两份待收口：注意 `sync-result-dialog` 版经 `index.ts` 被 `ui/handlers/*` 间接使用，动它会改日志文案 |
 | ~~`github-sync.ts:143-246` / `gitee-sync.ts:75-160` / `gitlab-sync.ts:75-160` / `gist-sync.ts:235-323`~~ **已收敛** | 四个 `fetchXxxText` 几乎逐字重复（各 ~85 行），且 **abort 监听器处理已分歧**：github 版有 `removeEventListener`，其余只 add 不 remove → 换配置就泄漏监听器 | ✅ 已提 `createRawTextFetcher({ buildUrl, logTag })` 工厂（净减 88 行），四个源均已改造 |
 | ~~`github-sync.ts:1922-1969` vs `sync-source-registry.ts:299-350`~~ **已收敛** | `getSelectedRowSids` 两份逐字重复（连日志文案都一样） | ✅ 抽 `sync/selected-rows.ts`（零副作用叶子模块），两处 import |
 | `sync-source-registry.ts:100-281` vs `github-sync.ts:1729-1915` | ⚠️ **功能漂移已修，结构合并待做**：`syncFromRemote` 与 `syncFromGithub` 主体仍重复 ~150 行，但漂移点已补齐——① 启用时间筛选时 `neededFields` 补 `date`（否则分片源不下载承载 date 的片 → 筛完 0 条且无提示）；② 补 `missingColumns` 缺列体检（此前只有 GitHub 路径有，走 Gitee/GitLab/本地/Gist 时用户只看到「同步成功但字段没进来」） | 结构合并：抽 `remote-sync-core.ts`，两个入口都变成薄壳 |
