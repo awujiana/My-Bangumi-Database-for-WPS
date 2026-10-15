@@ -26,6 +26,7 @@ import {
   getLastRow,
   getColumnMap,
   getCellValue,
+  readRowsCache,
   setCellValue,
   colNumberToLetter,
   trim,
@@ -1126,6 +1127,40 @@ function batchUpdateRows(
 }
 
 /**
+ * 删除阶段 undo 快照：一次矩形读替代「N 行 × M 列」次逐格读。
+ *
+ * 删除是倒序逐行执行的，但**在任何删除发生之前**所有待删行都还在原始行号上，
+ * 因此可以在循环外一次读回整段（见 `readRowsCache`），再按需要的列抽成快照。
+ *
+ * @param ws 工作表
+ * @param rows 待删行号（原始行号，尚未发生任何删除）
+ * @param cols 需要快照的列号
+ * @returns 行号 → (列号 → 单元格文本)；`null` 表示批量读不可用，调用方须回退逐格读
+ */
+function buildRemovalSnapshot(
+  ws: WpsWorksheet | null | undefined,
+  rows: readonly number[],
+  cols: readonly number[],
+): Map<number, ReadonlyMap<number, string>> | null {
+  if (rows.length === 0 || cols.length === 0) return new Map()
+  let maxCol = cols[0] ?? 0
+  for (const col of cols) {
+    if (col > maxCol) maxCol = col
+  }
+  const cache = readRowsCache(ws, rows, maxCol)
+  if (!cache) return null
+  const snapshot = new Map<number, ReadonlyMap<number, string>>()
+  for (const row of rows) {
+    const line = cache.get(row)
+    if (!line) return null
+    const cells = new Map<number, string>()
+    for (const col of cols) cells.set(col, line[col - 1] ?? '')
+    snapshot.set(row, cells)
+  }
+  return snapshot
+}
+
+/**
  * 应用 diff 到 Excel 工作表
  *
  * 取消（P2-7）：`signal` 在**写入阶段同样生效**。每批写入前检查一次，已写入的部分
@@ -1438,6 +1473,12 @@ export async function applyDiffToSheet(
   const totalDeletes = deletedDiffs.length
   // 记录删除阶段开始时间，用于计算删除阶段专用速度（更准确地估算剩余时间）
   const removalStartTime = Date.now()
+  // 快照必须在任何删除发生之前取：此刻所有待删行仍在原始行号上（新增是追加、更新不移动行）
+  const removalSnapshot = buildRemovalSnapshot(
+    ws,
+    deletedDiffs.map((d) => d.localRow),
+    [...colMap.values()],
+  )
   for (const diff of deletedDiffs) {
     // 每条删除前检查取消（P2-7）：删除是倒序逐行的，中断点即已删与未删的边界
     if (isWriteCancelled()) {
@@ -1446,8 +1487,9 @@ export async function applyDiffToSheet(
     }
     try {
       const rowValues: Record<number, string> = {}
+      const snapshotCells = removalSnapshot?.get(diff.localRow)
       for (const col of colMap.values()) {
-        rowValues[col] = getCellValue(ws, diff.localRow, col)
+        rowValues[col] = snapshotCells?.get(col) ?? getCellValue(ws, diff.localRow, col)
       }
       recordRowDeleteEntry({ row: diff.localRow, values: rowValues })
       try {

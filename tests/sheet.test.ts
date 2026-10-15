@@ -84,6 +84,7 @@ vi.mock('../ts/tools/util/index.js', () => ({
 
 import {
   readRangeValues,
+  readRowsCache,
   readRangeCellValues,
   cacheGet,
   clearSheetCache,
@@ -342,6 +343,68 @@ describe('readRangeValues', () => {
     ws.Range = createRangeMock().mockReturnValue(rangeMock)
     const result = readRangeValues(ws, 1, 1, 1, 2)
     expect(result).toEqual([['', 'valid']])
+  })
+})
+
+/** 造一个按请求范围返回二维 Value2 的工作表桩（readRowsCache 用例共用） */
+function createGridWs(grid: string[][]): ReturnType<typeof createMockWorksheet> {
+  const ws = createMockWorksheet()
+  ws.Range = createRangeMock((address: string) => {
+    const [start, end] = address.split(':', 2)
+    const startRow = Number(start.slice(1))
+    const endRow = Number((end ?? start).slice(1))
+    return {
+      Value2: grid.slice(startRow - 1, endRow),
+      Interior: { Color: 0 },
+      Font: { Bold: false },
+    }
+  })
+  return ws
+}
+
+describe('readRowsCache', () => {
+  it('行号为空 / maxCol < 1 时返回空 Map（不发起 COM 读）', () => {
+    const ws = createMockWorksheet()
+    expect(readRowsCache(ws, [], 3)).toEqual(new Map())
+    expect(readRowsCache(ws, [2], 0)).toEqual(new Map())
+  })
+
+  it('应为离散行号建缓存：一次矩形读覆盖 1..maxCol', () => {
+    const ws = createGridWs([
+      ['r1c1', 'r1c2'],
+      ['r2c1', 'r2c2'],
+      ['r3c1', 'r3c2'],
+      ['r4c1', 'r4c2'],
+    ])
+    const cache = readRowsCache(ws, [4, 2], 2)
+    expect(cache).not.toBeNull()
+    expect(cache?.get(2)).toEqual(['r2c1', 'r2c2'])
+    expect(cache?.get(4)).toEqual(['r4c1', 'r4c2'])
+    expect(cache?.has(3)).toBe(false)
+  })
+
+  it('读回行数不足时返回 null（形状不可信，调用方须回退逐格读）', () => {
+    const ws = createGridWs([['r1c1', 'r1c2']])
+    expect(readRowsCache(ws, [1, 2], 2)).toBeNull()
+  })
+
+  it('读回列宽不足时返回 null', () => {
+    const ws = createGridWs([
+      ['r1c1'],
+      ['r2c1'],
+    ])
+    expect(readRowsCache(ws, [1, 2], 2)).toBeNull()
+  })
+
+  it('首行缺失（minRow 起点偏移）时返回 null', () => {
+    const ws = createGridWs([['r1c1', 'r1c2']])
+    // 请求 2..3 行，只有 1 行数据 → block[1] 为 undefined
+    expect(readRowsCache(ws, [3], 2)).toBeNull()
+  })
+
+  it('ws 为空时返回 null（readRangeValues 返回空 ⇒ 行数不足）', () => {
+    expect(readRowsCache(null, [1, 2], 2)).toBeNull()
+    expect(readRowsCache(undefined, [1, 2], 2)).toBeNull()
   })
 })
 

@@ -182,6 +182,55 @@ export function readRangeValues(
 }
 
 /**
+ * 离散行矩形读缓存允许的最大行跨度。
+ *
+ * 超过此跨度就不做整段矩形读：极端情况下（首尾行相隔几万行）一次拉回的数组
+ * 既占内存又无必要，回退逐格读更稳。
+ */
+const ROWS_CACHE_MAX_SPAN = 20_000
+
+/**
+ * 为「一批离散行号」做一次矩形读，返回 行号 → 该行 1..maxCol 的文本。
+ *
+ * 面向「循环里对每个条目逐格读 N 列」的 COM 热点：把 O(条目数 × 列数) 次跨进程往返
+ * 压成 1 次。典型用法是循环外先建缓存、循环内命中即用、未命中回退逐格读。
+ *
+ * ⚠️ 传入的行号必须是**尚未发生插入/删除**的原始行号；一旦期间发生行位移，缓存即失效。
+ *
+ * 形状守卫沿用本项目不变式：行数/列宽对不上就返回 `null`，调用方回退逐格读，绝不猜形状。
+ *
+ * @param ws 工作表
+ * @param rows 需要的行号（可离散、可无序、允许重复）
+ * @param maxCol 需要的最大列号（读取范围恒为 1..maxCol）
+ * @returns 行号 → 该行文本数组；`null` 表示批量读不可用，调用方须回退逐格读
+ */
+export function readRowsCache(
+  ws: WpsWorksheet | null | undefined,
+  rows: readonly number[],
+  maxCol: number,
+): Map<number, readonly string[]> | null {
+  if (rows.length === 0 || maxCol < 1) return new Map()
+  let minRow = rows[0] ?? 0
+  let maxRow = minRow
+  for (const row of rows) {
+    if (row < minRow) minRow = row
+    if (row > maxRow) maxRow = row
+  }
+  const span = maxRow - minRow + 1
+  if (span > ROWS_CACHE_MAX_SPAN) return null
+  const block = readRangeValues(ws, minRow, maxRow, 1, maxCol)
+  // 行数不足 ⇒ 宿主返回了非预期形状，宁可判为读取失败（回退逐格读），绝不猜形状
+  if (block.length !== span) return null
+  const cache = new Map<number, readonly string[]>()
+  for (const row of rows) {
+    const line = block[row - minRow]
+    if (!line || line.length < maxCol) return null
+    cache.set(row, line)
+  }
+  return cache
+}
+
+/**
  * 批量读取工作表中指定范围的值，**保留单元格原始类型**，返回 `WpsCellValue` 二维数组 [行][列]。
  * 与 `readRangeValues`（一律 `String()` 化）不同，本函数用于「读-改-写整行」场景：
  * 读回的 number/Date 不会被强转成字符串，从而避免整行写回时把数字列变成文本列。

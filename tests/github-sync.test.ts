@@ -10,6 +10,42 @@ const mockGetColumnMap = vi.hoisted(() =>
   vi.fn<(ws?: unknown, headerRow?: number) => Map<string, number>>().mockReturnValue(new Map()),
 )
 const mockGetCellValue = vi.hoisted(() => vi.fn().mockReturnValue(''))
+
+const mockReadRowsCache = vi.hoisted(() =>
+  vi.fn(
+    (
+      _ws: unknown,
+      _rows: readonly number[],
+      _maxCol: number,
+    ): Map<number, readonly string[]> | null => null,
+  ),
+)
+const mockReadRangeValues = vi.hoisted(() =>
+  vi.fn(
+    (
+      ws: unknown,
+      startRow: number,
+      endRow: number,
+      startCol: number,
+      endCol: number,
+    ): string[][] => {
+      try {
+        const rows: string[][] = []
+        for (let row = startRow; row <= endRow; row += 1) {
+          const line: string[] = []
+          for (let col = startCol; col <= endCol; col += 1) {
+            const value = mockGetCellValue(ws, row, col) as string | number | boolean | null
+            line.push(value == null ? '' : String(value))
+          }
+          rows.push(line)
+        }
+        return rows
+      } catch {
+        return []
+      }
+    },
+  ),
+)
 const mockSetCellValue = vi.hoisted(() => vi.fn())
 const mockColNumberToLetter = vi.hoisted(() => vi.fn((c: number) => String.fromCodePoint(64 + c)))
 const mockTrim = vi.hoisted(() => vi.fn((v: string) => v.trim()))
@@ -325,6 +361,8 @@ vi.mock('../ts/tools/utility.js', () => ({
   getLastRow: mockGetLastRow,
   getColumnMap: mockGetColumnMap,
   getCellValue: mockGetCellValue,
+  readRangeValues: mockReadRangeValues,
+  readRowsCache: mockReadRowsCache,
   setCellValue: mockSetCellValue,
   colNumberToLetter: mockColNumberToLetter,
   trim: mockTrim,
@@ -3929,6 +3967,74 @@ describe('applyDiffToSheet delete 异常路径', () => {
 
     const result = await applyDiffToSheet(diffs, 'add-update')
     expect(result.failed).toBeGreaterThanOrEqual(1)
+  })
+})
+
+// ========== 补充测试：delete 阶段 undo 快照的矩形读路径 ==========
+describe('applyDiffToSheet delete 批量 undo 快照', () => {
+  it('快照优先走矩形读：逐格读不可用时删除仍成功且只读一次', async () => {
+    const mockWs = createMockWorksheet()
+    mockGetDataSheet.mockReturnValue(mockWs)
+    mockFindHeaderRow.mockReturnValue(1)
+    mockGetLastRow.mockReturnValue(5)
+    mockSetCellValue.mockImplementation(() => {})
+    mockColNumberToLetter.mockImplementation((c: number) => String.fromCodePoint(64 + c))
+    mockWs.Range = asRangeMock(() => ({ Delete: vi.fn() }))
+    mockGetColumnMap.mockReturnValue(
+      new Map<string, number>([
+        ['Bangumi_URL', 1],
+        ['名称', 2],
+      ]),
+    )
+
+    // 逐格读不可用：任何一次 getCellValue 都会抛错（模拟该单元格读取失败）
+    mockGetCellValue.mockImplementation(() => {
+      throw new Error('per-cell read unavailable')
+    })
+    // 矩形读可用：行 2/4 是待删行，行 3 夹在中间
+    const originalRect = mockReadRangeValues.getMockImplementation()
+    const originalCache = mockReadRowsCache.getMockImplementation()
+    const grid = new Map<number, string[]>([
+      [2, ['url-2', 'name-2']],
+      [3, ['', '']],
+      [4, ['url-4', 'name-4']],
+    ])
+    mockReadRangeValues.mockImplementation(
+      (_ws: unknown, startRow: number, endRow: number): string[][] => {
+        const rows: string[][] = []
+        for (let row = startRow; row <= endRow; row += 1) rows.push(grid.get(row) ?? ['', ''])
+        return rows
+      },
+    )
+    mockReadRowsCache.mockImplementation(
+      (_ws: unknown, rows: readonly number[]): Map<number, readonly string[]> | null => {
+        const cache = new Map<number, readonly string[]>()
+        for (const row of rows) {
+          const line = grid.get(row)
+          if (!line) return null
+          cache.set(row, line)
+        }
+        return cache
+      },
+    )
+
+    try {
+      const diffs: GithubSyncDiff[] = [
+        { kind: 'delete', sid: 'rect-1', localRow: 2, changedFields: [] },
+        { kind: 'delete', sid: 'rect-2', localRow: 4, changedFields: [] },
+      ]
+
+      const result = await applyDiffToSheet(diffs, 'mirror')
+
+      // 逐格读全程不可用，能删成功就证明旧值确实来自矩形读快照
+      expect(result.deleted).toBe(2)
+      expect(result.failed).toBe(0)
+      // 快照一次覆盖整段 1~2 列，而不是 2 行 × 2 列 = 4 次逐格读
+      expect(mockReadRowsCache).toHaveBeenCalledWith(mockWs, expect.arrayContaining([2, 4]), 2)
+    } finally {
+      if (originalRect) mockReadRangeValues.mockImplementation(originalRect)
+      if (originalCache) mockReadRowsCache.mockImplementation(originalCache)
+    }
   })
 })
 

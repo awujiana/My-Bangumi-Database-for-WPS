@@ -6,6 +6,42 @@ import { Result } from '../ts/core/result.js'
 const mockBgmLogn = vi.hoisted(() => vi.fn())
 const mockGetApp = vi.hoisted(() => vi.fn())
 const mockGetCellValue = vi.hoisted(() => vi.fn().mockReturnValue(''))
+
+const mockReadRowsCache = vi.hoisted(() =>
+  vi.fn(
+    (
+      _ws: unknown,
+      _rows: readonly number[],
+      _maxCol: number,
+    ): Map<number, readonly string[]> | null => null,
+  ),
+)
+const mockReadRangeValues = vi.hoisted(() =>
+  vi.fn(
+    (
+      ws: unknown,
+      startRow: number,
+      endRow: number,
+      startCol: number,
+      endCol: number,
+    ): string[][] => {
+      try {
+        const rows: string[][] = []
+        for (let row = startRow; row <= endRow; row += 1) {
+          const line: string[] = []
+          for (let col = startCol; col <= endCol; col += 1) {
+            const value = mockGetCellValue(ws, row, col) as string | number | boolean | null
+            line.push(value == null ? '' : String(value))
+          }
+          rows.push(line)
+        }
+        return rows
+      } catch {
+        return []
+      }
+    },
+  ),
+)
 const mockFindHeaderRow = vi.hoisted(() => vi.fn().mockReturnValue(1))
 const mockGetColumnMap = vi.hoisted(() => vi.fn().mockReturnValue(new Map()))
 const mockTrim = vi.hoisted(() => vi.fn((v: string) => v.trim()))
@@ -48,6 +84,8 @@ vi.mock('../ts/tools/utility.js', () => ({
   getApp: mockGetApp,
   LOG_LEVELS: { INFO: 'INFO', WARN: 'WARN', ERROR: 'ERROR' },
   getCellValue: mockGetCellValue,
+  readRangeValues: mockReadRangeValues,
+  readRowsCache: mockReadRowsCache,
   findHeaderRow: mockFindHeaderRow,
   getColumnMap: mockGetColumnMap,
   trim: mockTrim,

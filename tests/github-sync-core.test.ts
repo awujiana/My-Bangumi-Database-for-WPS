@@ -9,6 +9,42 @@ const mockFindHeaderRow = vi.hoisted(() => vi.fn())
 const mockGetLastRow = vi.hoisted(() => vi.fn())
 const mockGetColumnMap = vi.hoisted(() => vi.fn())
 const mockGetCellValue = vi.hoisted(() => vi.fn())
+
+const mockReadRowsCache = vi.hoisted(() =>
+  vi.fn(
+    (
+      _ws: unknown,
+      _rows: readonly number[],
+      _maxCol: number,
+    ): Map<number, readonly string[]> | null => null,
+  ),
+)
+const mockReadRangeValues = vi.hoisted(() =>
+  vi.fn(
+    (
+      ws: unknown,
+      startRow: number,
+      endRow: number,
+      startCol: number,
+      endCol: number,
+    ): string[][] => {
+      try {
+        const rows: string[][] = []
+        for (let row = startRow; row <= endRow; row += 1) {
+          const line: string[] = []
+          for (let col = startCol; col <= endCol; col += 1) {
+            const value = mockGetCellValue(ws, row, col) as string | number | boolean | null
+            line.push(value == null ? '' : String(value))
+          }
+          rows.push(line)
+        }
+        return rows
+      } catch {
+        return []
+      }
+    },
+  ),
+)
 const mockSetCellValue = vi.hoisted(() => vi.fn())
 const mockColNumberToLetter = vi.hoisted(() => vi.fn())
 const mockEnsureSheetHeaders = vi.hoisted(() => vi.fn())
@@ -117,6 +153,8 @@ vi.mock('../ts/tools/utility.js', () => ({
   getLastRow: mockGetLastRow,
   getColumnMap: mockGetColumnMap,
   getCellValue: mockGetCellValue,
+  readRangeValues: mockReadRangeValues,
+  readRowsCache: mockReadRowsCache,
   setCellValue: mockSetCellValue,
   colNumberToLetter: mockColNumberToLetter,
   trim: vi.fn((v: string) => v.trim()),

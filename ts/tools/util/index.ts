@@ -37,6 +37,7 @@ import type { WpsApp, WpsWorksheet } from '../wps.js'
 // re-export 子模块
 export { getCell, getCellValue, setCellValue, getSheetByIndex } from './cell.js'
 export {
+  readRowsCache,
   readRangeValues,
   readRangeCellValues,
   cacheGet,
