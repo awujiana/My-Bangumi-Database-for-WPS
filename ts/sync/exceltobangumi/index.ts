@@ -1034,9 +1034,7 @@ async function executeSelectedSync(
 
       const syncSingleRowTask = async (): Promise<void> => {
         const bgmUrl = trim(getCellValue(ws, rowNumber, urlCol) || '')
-        const name = nameCol
-          ? trim(getCellValue(ws, nameCol === urlCol ? rowNumber : rowNumber, nameCol) || '')
-          : ''
+        const name = nameCol ? trim(getCellValue(ws, rowNumber, nameCol) || '') : ''
 
         if (bgmUrl)
           if (isBangumiUrl(bgmUrl)) {

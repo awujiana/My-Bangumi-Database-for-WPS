@@ -1539,9 +1539,8 @@ export function enrichIntroData(
     for (const key of INTRO_FEATURE_FIELDS) {
       const value = incomingData[key] ?? ''
       if (!isEmptyValue(value)) {
-        const label = key === '简介' ? '简介' : key
         const display = key === '简介' && value.length > 80 ? `${value.substring(0, 80)}...` : value
-        featureParts.push(`${label}:${display}`)
+        featureParts.push(`${key}:${display}`)
       }
     }
     if (featureParts.length > 0) {

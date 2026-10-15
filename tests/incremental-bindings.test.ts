@@ -515,15 +515,22 @@ describe('initIncrementalSyncFromRibbon', () => {
     expect(m.bgmLog).not.toHaveBeenCalled()
   })
 
-  it('复选框不存在 → 直接返回，不注册监听也不初始化冲突策略', () => {
+  it('复选框不存在 → 增量部分直接返回，但冲突策略仍要初始化', () => {
+    // 主面板 panel.html 只有 #conflictStrategy、没有 #chkIncremental。
+    // 旧实现把 initSkipConflictsFromRibbon 放在函数尾部，被早退挡住 →
+    // 冲突策略下拉的 change 监听永不注册，用户改了下拉却不落配置。
     const select = mountSelect('conflictStrategy')
     select.value = 'excel'
 
     initIncrementalSyncFromRibbon()
 
     expect(m.isIncrementalSyncEnabled).not.toHaveBeenCalled()
-    expect(hasLog('已注册冲突策略 select 变化监听器')).toBe(false)
-    expect(select.value).toBe('excel')
+    expect(hasLog('已注册冲突策略 select 变化监听器')).toBe(true)
+
+    // 监听器真的连上了：改下拉应落配置
+    select.value = 'skip'
+    dispatchChange(select)
+    expect(m.setSkipConflicts).toHaveBeenCalledWith(true)
   })
 
   it('从配置读取状态回填复选框，并真连上 change 事件', () => {

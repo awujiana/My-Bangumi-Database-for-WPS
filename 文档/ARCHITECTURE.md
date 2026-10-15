@@ -1,6 +1,6 @@
 ﻿# Bangumi WPS Excel 加载项 - 架构与项目知识文档
 
-> 版本: 3.12 | 更新日期: 2026-10-09
+> 版本: 3.13 | 更新日期: 2026-10-15
 
 ---
 
@@ -24,6 +24,7 @@
 | v3.10 | 2026-10-09 | 门禁的反向验证：新增 `scripts/verify-guards-reverse.mjs` + `npm run check:guards-reverse`（**不在 `gate` 内**）。6 道源码级断言（ribbon-buttons / dompurify-version / com-in-loop / nav-order / cycles / tests-types）各配一个「已知违规」变异，逐个走「基线绿 → 注入 → 变红且**失败输出含预期片段** → 逐字节还原」，并核对跑前跑后脏文件集合一致；三条失败路径（空断言 / 锚点失配 / 因错而红）已用桩脚本自检。约定：改了任何 `check-*.mjs` 必须跑一次，新增源码级断言必须同步补变异用例                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
 | v3.11 | 2026-10-09 | 分片网格错位修复 + **布局回归门禁**。根因是**两个样式表互相盖**（不是某条规则写错）：① `panel-theme.css` 在 `styles.css` **之后**加载，其 `.form-row label { flex: 0 0 96px }` 与 `styles.css` 的 `.shard-select-list label { flex: 0 0 auto }` **特异性相同**（都是 0,1,1）→ 由加载顺序决定胜负 → 标签被钉成 96px，中文标签竖排成一字一行；② `.form-row input { width: 100%; padding: 9px 12px }` 同时命中分片**复选框** → 撑到 140px，文字只剩 ~35px 窄条（原覆盖规则只重置 flex/margin/accent-color，**盖不住 width**）。修法：分片控件选择器提到 (0,2,1)（`.form-row .shard-select-list label`），并显式 `width: auto; padding: 0`。新增 `scripts/check-shard-layout.mjs` + `npm run check:shard-layout`（**不在 `gate` 内**，依赖本机 Chrome）：headless Chrome 在 320/400/500 三种布局宽度下量**真实计算样式**，断言文字单行 / 标签高 ≤ 40px / 复选框 ≤ 20px；fixture 实时取自 `panel.html` 与 `github-settings.ts`，另有渲染契约自检与**样式生效自检**，空结果一律大声失败。这类 bug 对单元测试完全隐形（jsdom 不做布局计算）—— 该门禁已按纪律反向验证：完整回退 → 54 项失败（理由为「文字占 N 行」而非崩溃）；仅去掉 `width` 重置 → 复选框断言独立变红                                                                                                                                                                                                    |
 | v3.12 | 2026-10-09 | **全页面**同类错位排查 + 布局审计工具。v3.11 只修了「数据分片」一处，遂用真浏览器扫了 `ui/*.html` 全部 5 个页面，又抓到 **3 处同源 bug**：① `#chkSyncSelectedOnly` 的 label 被 `.form-row label{flex:0 0 96px}` 钉成 96px、其中的复选框又被 `.form-row input{width:100%}` 撑到 96px，「仅同步选中行（按 Bangumi URL 列匹配 SID）」被挤爆；② `.time-filter-box` 在 `styles.css` 里声明 `display: block`，却被**后加载**的 `panel-theme.css` 的 `.form-row { display: flex }` 盖掉（同特异性 0,1,0）→ 该区块变成横向 flex，label 与块内 `p.hint` 争宽、label 只剩 111px，「✅ 启用时间筛选（按开播日期过滤）」竖排 4 行；③ 提示文本里的行内 `<code>` 使 `p.hint` 横向溢出 6px。修法统一为**提升特异性**（不是 `!important`）：`.form-row > label:has(> input[type='checkbox'])` / `:has(> input[type='radio'])` 设 `flex: 1 1 auto`、`.form-row > label > input[type='checkbox'/'radio']` 设 `width: auto`、`.form-row.time-filter-box` 设 `display: block`，另给 `.hint` 加 `overflow-wrap: anywhere`。新增 `scripts/audit-layout.mjs` + `npm run audit:layout`（**不在 `gate` 内**，依赖本机 Chrome）：5 个页面 × 500/400px 两档，按三条客观判据找错位（原生 checkbox/radio > 20px、短文本 ≤ 24 字占 > 1 视觉行、内容横向溢出），并已反向验证（回退 CSS → 退出码 1、准确报 3 类问题，`clean`/`enrich`/`settings` 仍判无异常）。修复后 5 页面 × 2 档**全部无异常** |
+| v3.13 | 2026-10-15 | **全链路数据安全审计**：修复 6 处会「吞数据 / 改用户数据」的缺陷（详见 §2.7）。核心是三条 COM 读写不变式——**单行区域 `Value2` 是一维数组**（原来按二维取 `oldValues[0]` 会拿到首个单元格的值，索引字符串得「第 N 个字符」）、**`null` 在二维数组里的语义是「清空该单元格」**（原来把未变化列铺 null 再整行赋值，会清掉 `writeCols` 区间中段的用户数据）、**读失败必须放弃写入**（原来用空旧值做「本地 \| 远程」合并，等于把用户标签/别名整体替换成远程值）。另修一个用户可见行为 bug：主面板 `#conflictStrategy` 下拉的 change 监听因 `#chkIncremental` 早退而从未注册，用户改了下拉却不落 `bgm_skip_conflicts` 配置。同时确立**测试桩忠实性原则**（桩不忠实就修桩，不为迁就桩弱化生产守卫） |
 
 ## 一、架构概览
 
@@ -696,6 +697,69 @@ ts/index.ts (thin barrel — 仅 re-export)
 - **开发模式**: 在浏览器中直接打开 HTML 页面时，因 `WpsInvoke` 不存在，面板自动激活
 - **生产环境**: WPS 宿主中 `WpsInvoke` 可用，`isDebugEnvironment()` 返回 `false`，面板不渲染
 - **诊断报告**: 遇到线上问题时，可在开发环境复现后导出 JSON 诊断信息辅助排查
+
+---
+
+### 2.8 COM 读写不变式（数据安全基线，v3.13 确立）
+
+WPS 的 `Application` / `Workbook` / `Worksheet` / `Range` 都是**跨进程 COM 代理**。除 v3.8 已治理的「循环条件里读属性 = N+1 次往返」外，还有三条**与数据安全直接相关**的不变式。这三条都曾在生产里造成过真实的吞数据 / 改用户数据，均为 2026-10-15 审计发现并修复：
+
+#### 不变式一：单行区域的 `Value2` 是**一维数组**
+
+```
+Range("A2:H2").Value2   →  [v1, v2, v3, ...]        // 一维！整个数组就是一行
+Range("A2:H9").Value2   →  [[v1, v2, ...], [...]]   // 二维
+Range("A2").Value2      →  v1                        // 标量
+```
+
+**错误写法**（会把首个单元格的值当成行数组）：
+```ts
+const old = range.Value2 as (string | number)[][]
+const row = old[0]          // 一维时这里是 v1（一个字符串），不是行数组！
+row[2]                      // 字符串按下标取字符 → "第 2 个字符"
+```
+**正确写法**（形状归一化，已固化在 `github-sync.ts` 的两处读取）：
+```ts
+const raw: unknown = range.Value2
+if (Array.isArray(raw)) {
+  const row = Array.isArray(raw[0]) ? raw[0] : raw   // 二维取首行，一维整体即一行
+}
+```
+
+#### 不变式二：`null` 在二维数组里的语义是「清空该单元格」
+
+批量写 `range.Value2 = values` 时，数组里每个 `null` 都会把对应单元格**清空**，而不是「保持不变」。
+
+因此**绝不能用 `null` 铺满「本次不写的列」**。危险场景：`writeCols` 是整批 fields 的**并集**、列号不连续——一批里有人只改「名称」(列2)、有人只改「评分」(列30)，区间 3..29 全是用户数据，铺 null 就把它们全清了。
+
+**正确写法**（以旧值为基底铺满整行）：
+```ts
+const finalValues = Array.from({ length: colCount }, (_, c) => oldArray[c] ?? null)
+// 只把「本次要写且值确实变了」的位置替换掉
+```
+
+#### 不变式三：读失败 / 读回为空 ＝ 放弃写入
+
+项目铁律原文：「读失败或读回为空＝放弃写入（否则静默清用户数据）」。对**合并型列**（标签/分级、别名）尤其致命——合并逻辑是 `appendValueWithSeparator(旧值, 远程值)`，旧值为空时函数直接返回远程值，**等于把用户本地数据整体替换成远程值**。
+
+**正确写法**（读不全就走逐字段回退，该路径用 `getCellValue` 逐格重取旧值）：
+```ts
+if (range !== null && oldArray.length < colCount) {
+  bgmLog(LOG_LEVELS.WARN, `行 ${row} 旧值读取失败或形状异常，回退逐字段写入`)
+  range = null        // 交给 writeRowValuesWithUndo 的 range === null 分支
+}
+```
+
+#### 配套约定
+
+| 约定 | 说明 |
+| --- | --- |
+| 读取入口 | 一律 `readRangeValues()` / `readRangeCellValues()`（`ts/tools/util/sheet.ts`）。两者都把一维输入退化成「多行单列」，**不能直接用于单行多列区域**，需调用方自形状归一化 |
+| 写入入口 | 一律一次矩形 `Range.Value2`；写函数返回 `boolean`，调用方必须检查并 toast 一次 |
+| 新增行 | 同样要以目标区域旧值为基底（`batchWriteNewRows`），因为 `nextAppendRow` 由锚定列 `End(xlUp)` 定位，锚定列比别的列短时目标行本来就有用户数据 |
+| 表头自动填充 | `ensureSheetHeaders` 的守卫是「**未识别到表头**」而非「表为空」，必须再查第 1 行是否有内容，否则会覆盖用户第 1 行数据 |
+
+> 详细审计过程、优化清单与测试桩忠实性原则见 `文档/TECH_KNOWLEDGE_COM_DATA_SAFETY.md`。
 
 ---
 

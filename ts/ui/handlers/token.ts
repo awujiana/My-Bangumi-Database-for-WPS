@@ -641,6 +641,39 @@ export function checkTokenExpiryWarning(expires: number): void {
 // ========== 用户头像显示 ==========
 
 /**
+ * 头像加载失败 → 隐藏头像本身
+ *
+ * 必须是**模块级命名函数**，且调用方通过 {@link bindAvatarError} 先 remove 再 add：
+ * showUserProfile 会被 updateTokenStatus（tokenUpdated 事件 + 2 秒轮询）反复调用，
+ * 内联闭包每次都是新函数引用，addEventListener 无法去重 → 监听器无限累积。
+ */
+const handleAvatarError = (event: Event): void => {
+  const img = event.currentTarget as HTMLImageElement | null
+  if (img) img.style.display = 'none'
+  bgmLog(LOG_LEVELS.WARN, '[showUserProfile] 头像加载失败')
+}
+
+/**
+ * 顶栏头像加载失败 → 隐藏顶栏容器
+ *
+ * 按 ID 定位容器而非 `currentTarget.parentElement`：不依赖 DOM 嵌套关系，
+ * 单测平铺挂载时同样生效。
+ */
+const handleTopbarAvatarError = (event: Event): void => {
+  const img = event.currentTarget as HTMLImageElement | null
+  if (img) img.style.display = 'none'
+  const container = document.getElementById('topbarAvatar')
+  if (container) container.style.display = 'none'
+  bgmLog(LOG_LEVELS.WARN, '[showUserProfile] 顶栏头像加载失败')
+}
+
+/** 绑定头像 error 监听：先去重再绑定，保证每个元素至多一个监听器 */
+function bindAvatarError(img: HTMLImageElement, handler: (event: Event) => void): void {
+  img.removeEventListener('error', handler)
+  img.addEventListener('error', handler)
+}
+
+/**
  * 显示用户头像和信息
  * 根据 BGM.cache 中的数据更新头像显示区域
  */
@@ -656,15 +689,13 @@ export function showUserProfile(): void {
       profileElement.style.display = 'flex'
     }
 
+    // 主头像
     const avatarImg = document.getElementById('userAvatar') as HTMLImageElement | null
     if (avatarImg) {
       if (avatarUrl) {
         avatarImg.src = avatarUrl
         avatarImg.alt = username || _T.avatarDefault // eslint-disable-line @typescript-eslint/prefer-nullish-coalescing -- 空值须显示占位文案（`??` 会显示空串）
-        avatarImg.addEventListener('error', () => {
-          avatarImg.style.display = 'none'
-          bgmLog(LOG_LEVELS.WARN, '[showUserProfile] 头像加载失败')
-        })
+        bindAvatarError(avatarImg, handleAvatarError)
         avatarImg.style.display = ''
       } else {
         avatarImg.style.display = 'none'
@@ -682,10 +713,7 @@ export function showUserProfile(): void {
       if (topbarAvatarImg && avatarUrl) {
         topbarAvatarImg.src = avatarUrl
         topbarAvatarImg.alt = username || _T.avatarDefault // eslint-disable-line @typescript-eslint/prefer-nullish-coalescing -- 空值须显示占位文案（`??` 会显示空串）
-        topbarAvatarImg.addEventListener('error', () => {
-          topbarAvatarElement.style.display = 'none'
-          bgmLog(LOG_LEVELS.WARN, '[showUserProfile] 顶栏头像加载失败')
-        })
+        bindAvatarError(topbarAvatarImg, handleTopbarAvatarError)
       }
     }
 
@@ -707,10 +735,7 @@ export function showUserProfile(): void {
           if (avatarUrl) {
             tokenAvatarImg.src = avatarUrl
             tokenAvatarImg.alt = username || _T.avatarDefault // eslint-disable-line @typescript-eslint/prefer-nullish-coalescing -- 空值须显示占位文案（`??` 会显示空串）
-            tokenAvatarImg.addEventListener('error', () => {
-              tokenAvatarImg.style.display = 'none'
-              bgmLog(LOG_LEVELS.WARN, '[showUserProfile] Token 区头像加载失败')
-            })
+            bindAvatarError(tokenAvatarImg, handleAvatarError)
             tokenAvatarImg.style.display = ''
           } else {
             tokenAvatarImg.style.display = 'none'

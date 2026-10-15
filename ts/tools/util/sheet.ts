@@ -124,8 +124,10 @@ export function readRangeValues(
     const range = ws.Range(
       `${colNumberToLetter(startCol)}${String(startRow)}:${colNumberToLetter(endCol)}${String(endRow)}`,
     )
-    // 复用 cell.ts 中的 tryGetProperty（未导出），此处通过 range 直接访问 Value2
-    const raw = (range as unknown as { Value2?: unknown }).Value2
+    // 复用 cell.ts 中的 tryGetProperty（未导出），此处通过 range 直接访问 Value2。
+    // WpsRange 已声明 Value2?: WpsCellValue | WpsCellValue[][]，不需要 as unknown as
+    // 双重强转——那会丢掉声明类型、迫使下游全量 unknown 防御。
+    const raw: unknown = range.Value2
     if (!raw) return []
     // 处理单个值的情况
     if (!Array.isArray(raw)) {
@@ -169,7 +171,7 @@ export function readRangeCellValues(
     const range = ws.Range(
       `${colNumberToLetter(startCol)}${String(startRow)}:${colNumberToLetter(endCol)}${String(endRow)}`,
     )
-    const raw = (range as unknown as { Value2?: unknown }).Value2
+    const raw: unknown = range.Value2
     if (!raw) return []
     // 处理单个值的情况
     if (!Array.isArray(raw)) {

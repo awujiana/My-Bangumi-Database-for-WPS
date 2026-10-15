@@ -641,9 +641,10 @@ export function clearSyncRecords(): boolean {
       bgmLog(LOG_LEVELS.WARN, '[clearSyncRecords] 同步记录表不存在，请先启用同步记录功能')
       return false
     }
-    const lastRow = sheet.UsedRange
-      ? sheet.UsedRange.Row + sheet.UsedRange.Rows.Count - 1
-      : sheet.Rows.Count
+    // UsedRange 是跨进程 COM 属性，提为局部常量：原写法求值 3 次，
+    // 每次含 Row + Rows + Count ≈ 8 次 IPC，这里白耗 16 次。
+    const usedRange = sheet.UsedRange
+    const lastRow = usedRange ? usedRange.Row + usedRange.Rows.Count - 1 : sheet.Rows.Count
     if (lastRow > 1) {
       sheet.Range(`2:${String(lastRow)}`).Delete()
     }

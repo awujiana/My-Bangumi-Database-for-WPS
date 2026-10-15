@@ -886,9 +886,42 @@ function batchWriteNewRows(
 
   // 2. 构建二维值数组（列对齐到 minCol 偏移）
   // 日期列（开播日期、完播日）写入数值序列号以保留本地列格式
+  //
+  // **以目标区域旧值为基底**：minCol..maxCol 之间可能夹着不属于 writeCols 的用户列
+  // （writeCols 只收录 colMap 里认得的字段）。若直接铺 null，会把用户在这些列的数据清掉。
+  // 且 nextAppendRow 由锚定列的 End(xlUp) 定位，锚定列比别的列短时，目标行本来就有用户数据。
+  // 读不到旧值（空表/读失败）时旧值全为 null，与原行为一致。
+  const startColLetter = colNumberToLetter(minCol)
+  const endColLetter = colNumberToLetter(maxCol)
+  const endRow = startRow + rows.length - 1
+  let oldRows: (string | number | null)[][] = []
+  try {
+    const probeAddr = `${startColLetter}${String(startRow)}:${endColLetter}${String(endRow)}`
+    const probe = ws.Range(probeAddr)
+    const raw = probe.Value2 as unknown
+    if (Array.isArray(raw)) {
+      // 形状归一化：单行范围可能返回一维数组（整个数组即一行）
+      const isSingleRow = endRow === startRow
+      if (isSingleRow) {
+        const first = Array.isArray(raw[0])
+          ? (raw[0] as (string | number | null)[])
+          : (raw as (string | number | null)[])
+        oldRows = [first]
+      } else {
+        oldRows = raw as (string | number | null)[][]
+      }
+    }
+  } catch {
+    // 读旧值失败：按空行处理（新增行通常是空的，风险面小）
+    oldRows = []
+  }
+
   const values: (string | number | null)[][] = []
-  for (const entry of rows) {
-    const row = Array.from<unknown, string | number | null>({ length: colCount }, () => null)
+  for (const [rowIndex, entry] of rows.entries()) {
+    const row: (string | number | null)[] = Array.from(
+      { length: colCount },
+      (_, c) => oldRows[rowIndex]?.[c] ?? null,
+    )
     for (const wc of writeCols) {
       const index = wc.col - minCol
       row[index] = resolveNewRowCellValue(wc, entry)
@@ -897,9 +930,6 @@ function batchWriteNewRows(
   }
 
   // 3. 批量写入 Range.Value2
-  const startColLetter = colNumberToLetter(minCol)
-  const endColLetter = colNumberToLetter(maxCol)
-  const endRow = startRow + rows.length - 1
   try {
     const rangeAddr = `${startColLetter}${String(startRow)}:${endColLetter}${String(endRow)}`
     const range = ws.Range(rangeAddr)
