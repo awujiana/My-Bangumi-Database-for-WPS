@@ -556,6 +556,19 @@ body {
     accent-color: #5789d9;
 }
 
+/* ========== .form-group 里的整行复选标签（.check-row） ==========
+ * label.check-row 要做成「复选框 + 文字」横排（flex）。但 panel-theme.css 的
+ * `.form-group > label { display: block }`（特异性 0,1,1）会盖掉 panel-theme.css 自己的
+ * `.check-row { display: flex }`（0,1,0）—— 复选框与文字被挤成竖排。
+ * ⚠ 必须写成 `.form-group > .check-row`（两层类，特异性 0,2,0）：既压过
+ *   `.form-group > label`，也不受 panel-theme.css 后加载的影响。不用 !important。
+ */
+.form-group > .check-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
 .form-row select {
     flex: 1;
     padding: 6px 10px;
@@ -2527,6 +2540,14 @@ select.input {
 
 .time-filter-row:last-child {
     margin-bottom: 0;
+}
+
+/* ⚠ `.time-filter-row` 是 `.form-row` 的 flex 行（display:flex 来自 panel-theme.css），
+ *   其中的 `p.hint` 是唯一子元素、默认 flex: 0 1 auto → 收缩到内容宽度，
+ *   边框/背景不铺满整行。`.time-filter-row > .hint` 特异性 (0,2,0)，显式 flex: 1 铺满。
+ *   只加 flex，不动 .hint 的颜色/字号（那两条 panel-theme.css 也管，同特异性不冲突）。 */
+.time-filter-row > .hint {
+    flex: 1;
 }
 
 .time-filter-label {
