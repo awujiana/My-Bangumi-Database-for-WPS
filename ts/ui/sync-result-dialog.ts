@@ -15,6 +15,7 @@ import type { GithubSyncResult } from '../sync/github-sync.js'
 import type { GithubSyncDetailItem } from '../sync/github-sync-diff.js'
 import { extractSubjectId } from '../sync/pure-utilities.js'
 import {
+  bgmLog,
   getDataSheet,
   findHeaderRow,
   getColumnMap,
@@ -23,7 +24,6 @@ import {
   readRangeValues,
   trim,
 } from '../tools/util/index.js'
-import { bgmLog } from '../tools/utility.js'
 import { escapeHtml } from '../tools/string-utilities.js'
 import {
   renderSyncStatsChart,

@@ -37,13 +37,12 @@
  */
 
 import { LOG_LEVELS } from '../core/constants.js'
-import { Result, BgmError } from '../core/result.js'
 import { bgmLog } from '../tools/utility.js'
 
 import { getGistId, isGistConfigured } from './github-config.js'
 import { parseJsonl } from './github-sync-diff.js'
 import type { GithubRemoteEntry } from './github-sync-diff.js'
-import type { SyncSource } from './sync-source.js'
+import { BaseSyncSource } from './sync-source-base.js'
 // 复用 githubSyncDiff.ts 的纯解析函数与类型（零依赖纯模块，可在 Node 测试环境直接运行）
 
 /** HTTP 请求超时（毫秒），与 githubSync 保持一致 */
@@ -349,15 +348,14 @@ export function fetchGistJson(signal?: AbortSignal): Promise<GithubRemoteEntry[]
  *      从 files[*].content 提取 JSONL 文本
  *   3. 配置存储使用独立的 gistId 字段（不复用 path）
  */
-export class GistSyncSource implements SyncSource {
-  /** 数据源类型标识 */
-  getSourceType(): string {
-    return 'gist'
-  }
-
-  /** 数据源显示名称（用于日志与进度提示） */
-  getDisplayName(): string {
-    return 'Gist'
+export class GistSyncSource extends BaseSyncSource {
+  constructor() {
+    super(
+      'gist',
+      'Gist',
+      isGistConfigured,
+      'Gist ID 未配置，请在面板的 Gist ID 字段填写 GitHub Gist ID',
+    )
   }
 
   /**
@@ -366,23 +364,5 @@ export class GistSyncSource implements SyncSource {
    */
   async fetchRemoteEntries(signal?: AbortSignal): Promise<GithubRemoteEntry[]> {
     return fetchGistJson(signal)
-  }
-
-  /**
-   * 校验配置是否完整可用
-   *
-   * Gist 源仅需 gist_id 字段非空，不需要 owner/repo/branch/path。
-   *
-   * @returns gist_id 非空返回 Result.ok(undefined)，否则返回 Result.fail(BgmError)
-   */
-  validateConfig(): Result<void> {
-    if (!isGistConfigured()) {
-      return Result.failVoid(
-        new BgmError('Gist ID 未配置，请在面板的 Gist ID 字段填写 GitHub Gist ID', {
-          code: 'CONFIG_INCOMPLETE',
-        }),
-      )
-    }
-    return Result.okVoid()
   }
 }

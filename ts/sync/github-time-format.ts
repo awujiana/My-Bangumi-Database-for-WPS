@@ -2,11 +2,10 @@
  * @fileoverview GitHub 同步的日期 / 时长格式化纯函数
  * @module sync/githubTimeFormat
  * @description 从 `github-sync.ts` 抽出的零副作用纯逻辑：日期字符串本地化、值追加合并、
- *              时长 / ETA 格式化、时间筛选标签。除 `trim` 外无任何 WPS / DOM 依赖，
+ *              时长 / ETA 格式化、时间筛选标签。无任何 WPS / DOM 依赖，
  *              可在 Node 测试环境直接运行（P1-G 上帝模块拆分 + P1-H 测试安全网）。
  */
 
-import { trim } from '../tools/string-utilities-pure.js'
 import { formatDuration } from '../tools/util/duration.js'
 import type { SyncTimeFilter } from './github-sync-diff.js'
 
@@ -34,27 +33,9 @@ export function formatDateToLocal(dateString: string): string | null {
   return `${year}年${month}月${day}日`
 }
 
-/**
- * 追加值到现有值后面，使用 ` | ` 分隔符
- *
- * 规则：
- * - 本地为空 → 直接返回新值
- * - 远程为空 → 返回本地值（不追加空值）
- * - 本地已包含新值 → 返回本地值（避免重复）
- * - 否则 → 返回 "本地 | 新值"
- *
- * @param localValue 本地现有值
- * @param remoteValue 远程新值
- * @returns 合并后的字符串
- */
-export function appendValueWithSeparator(localValue: string, remoteValue: string): string {
-  const local = trim(localValue)
-  const remote = trim(remoteValue)
-  if (!remote) return local
-  if (!local) return remote
-  if (local.includes(remote)) return local
-  return `${local} | ${remote}`
-}
+// 追加值合并的实现已下沉到 value-merge.ts（零依赖叶子模块，语义差异见其模块文档），
+// 此处 re-export 保持既有导入路径（github-cell-value / github-sync / 测试）不变。
+export { appendValueWithSeparator } from './value-merge.js'
 
 /**
  * 格式化持续时间（毫秒 → 可读字符串）。

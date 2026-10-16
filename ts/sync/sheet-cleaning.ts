@@ -23,6 +23,7 @@ import {
   readRangeValues,
   setCellValue,
 } from '../tools/util/index.js'
+import { mergeTagValues } from './value-merge.js'
 
 /** 清洗结果摘要（cleanSheetDuplicates 的返回类型） */
 export interface CleanDuplicatesResult {
@@ -137,19 +138,9 @@ function toIndex(layout: SheetLayout, row: number): number {
   return row - layout.dataStartRow
 }
 
-/** 合并两个「 | 」分隔的值（保序去重） */
-export function mergeTagValues(base: string, extra: string): string {
-  const seen = new Set<string>()
-  const result: string[] = []
-  for (const part of [...base.split(/\s*\|\s*/u), ...extra.split(/\s*\|\s*/u)]) {
-    const trimmed = part.trim()
-    if (trimmed && !seen.has(trimmed)) {
-      seen.add(trimmed)
-      result.push(trimmed)
-    }
-  }
-  return result.join(' | ')
-}
+// 合并「 | 」分隔值的实现已下沉到 value-merge.ts（零依赖叶子模块，语义差异见其模块文档），
+// 保持既有导出路径（sheet-cleaning 测试）不变。
+export { mergeTagValues } from './value-merge.js'
 
 /** 把待删行的标签并入保留行，返回合并后的值；无变化时返回 null */
 function mergeVictimTags(

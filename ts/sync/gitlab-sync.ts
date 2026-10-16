@@ -23,13 +23,13 @@
  * updatedAt 为 YYYY-MM-DD 格式（仅日期，不含时间，节省空间）。
  */
 
-import { Result, BgmError } from '../core/result.js'
 
 import { getGithubConfig, getManualShards, isGithubConfigComplete } from './github-config.js'
 import type { GithubRemoteEntry } from './github-sync-diff.js'
 import { createRawTextFetcher } from './jsonl-response.js'
 import { loadEntriesFromPath } from './shard-fetch.js'
-import type { FetchRemoteEntriesOptions, SyncSource } from './sync-source.js'
+import type { FetchRemoteEntriesOptions } from './sync-source.js'
+import { BaseSyncSource } from './sync-source-base.js'
 // 复用 githubSyncDiff.ts 的纯解析函数与类型（零依赖纯模块，可在 Node 测试环境直接运行）
 
 /** 默认分支名（与 githubConfig 默认值一致） */
@@ -115,15 +115,14 @@ export async function fetchGitlabJson(
  * 1. validateConfig() 在下载前校验配置完整性（复用 githubConfig）
  * 2. fetchRemoteEntries() 委托给 fetchGitlabJson，仅 URL 构造不同
  */
-export class GitlabSyncSource implements SyncSource {
-  /** 数据源类型标识 */
-  getSourceType(): string {
-    return 'gitlab'
-  }
-
-  /** 数据源显示名称（用于日志与进度提示） */
-  getDisplayName(): string {
-    return 'GitLab'
+export class GitlabSyncSource extends BaseSyncSource {
+  constructor() {
+    super(
+      'gitlab',
+      'GitLab',
+      isGithubConfigComplete,
+      'GitLab 仓库配置不完整，请填写 owner/repo/branch/path',
+    )
   }
 
   /**
@@ -136,20 +135,5 @@ export class GitlabSyncSource implements SyncSource {
     options?: FetchRemoteEntriesOptions,
   ): Promise<GithubRemoteEntry[]> {
     return fetchGitlabJson(signal, options?.neededFields)
-  }
-
-  /**
-   * 校验配置是否完整可用
-   * @returns 完整返回 Result.ok(undefined)，不完整返回 Result.fail(BgmError)
-   */
-  validateConfig(): Result<void> {
-    if (!isGithubConfigComplete()) {
-      return Result.failVoid(
-        new BgmError('GitLab 仓库配置不完整，请填写 owner/repo/branch/path', {
-          code: 'CONFIG_INCOMPLETE',
-        }),
-      )
-    }
-    return Result.okVoid()
   }
 }

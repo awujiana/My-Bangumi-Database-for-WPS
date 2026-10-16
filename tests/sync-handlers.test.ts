@@ -99,7 +99,6 @@ const m = vi.hoisted(() => ({
   // ---- 「函数是否已加载」开关（配合 getter 覆盖 typeof 早退分支）----
   helpersLoaded: true,
   recordsLoaded: true,
-  headersFnLoaded: true,
 }))
 
 vi.mock('../ts/index.js', async () => {
@@ -166,9 +165,7 @@ vi.mock('../ts/tools/util/index.js', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../ts/tools/util/index.js')>()
   return {
     ...actual,
-    get ensureSheetHeaders() {
-      return m.headersFnLoaded ? m.ensureSheetHeaders : undefined
-    },
+    ensureSheetHeaders: m.ensureSheetHeaders,
   }
 })
 
@@ -309,7 +306,6 @@ beforeEach(() => {
   runtime.lockedIndex = 1
   m.helpersLoaded = true
   m.recordsLoaded = true
-  m.headersFnLoaded = true
   dataSheet = makeDataSheet()
   originalSheet = makeOriginalSheet()
 
@@ -803,17 +799,6 @@ describe('sync · _doAPISync > 空表自动填充', () => {
     m.getLastRow.mockReturnValue(0)
     m.fetchAllUserCollections.mockResolvedValue([collection()])
     m.ensureSheetHeaders.mockReturnValue(false)
-
-    await runApiSync()
-
-    expect(m.showAlert).toHaveBeenCalledWith('工作表为空且无法写入标准表头，请检查工作表状态。')
-  })
-
-  it('ensureSheetHeaders 未加载 → 同样提示无法写入表头', async () => {
-    m.findHeaderRow.mockReturnValue(0)
-    m.getLastRow.mockReturnValue(0)
-    m.fetchAllUserCollections.mockResolvedValue([collection()])
-    m.headersFnLoaded = false
 
     await runApiSync()
 

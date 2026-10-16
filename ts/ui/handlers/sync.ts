@@ -736,7 +736,7 @@ async function _doAPISync(
 
     // 缺少表头时先写入标准表头
     if (headerRow === 0 || !colMap.has('Bangumi_URL')) {
-      if (typeof ensureSheetHeaders !== 'function' || !ensureSheetHeaders(ws)) {
+      if (!ensureSheetHeaders(ws)) {
         showAlert('工作表为空且无法写入标准表头，请检查工作表状态。')
         return
       }

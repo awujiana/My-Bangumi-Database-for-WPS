@@ -55,21 +55,9 @@ export function splitTags(tags: string): string[] {
     .filter((t) => t.length > 0)
 }
 
-/**
- * 合并标签去重
- * 现有标签 + 新标签，去重后以 TAG_SEPARATOR 连接
- */
-export function mergeTags(oldTags: string, incomingTags: string): string {
-  const oldList = splitTags(oldTags)
-  const list = splitTags(incomingTags)
-  const merged = [...oldList]
-  for (const tag of list) {
-    if (!merged.includes(tag)) {
-      merged.push(tag)
-    }
-  }
-  return merged.join(TAG_SEPARATOR)
-}
+// 合并标签去重的实现已下沉到 value-merge.ts（零依赖叶子模块，语义差异见其模块文档），
+// 此处 re-export 保持既有导入路径（enrich-engine / index barrel / 测试）不变。
+export { mergeTags } from './value-merge.js'
 
 /**
  * 追加特点信息去重

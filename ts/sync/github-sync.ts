@@ -17,7 +17,6 @@
 // 直接从子模块导入，避开 index.ts 的副作用链（index → handlers → document.readyState）
 // 注意：bgmLog 定义在 tools/utility.ts（不在 core/constants.ts），与 BGM/getDataSheet 等同源导入
 import { LOG_LEVELS, BGM_SUBJECT_TYPES } from '../core/constants.js'
-import { Result, BgmError } from '../core/result.js'
 import { getNotifyApi } from '../core/ui-bridge.js'
 import {
   bgmLog,
@@ -74,6 +73,7 @@ import { collectNeededFieldsFromSheet, loadEntriesFromPath } from './shard-fetch
 import { addSyncRecords, addSyncRecordSummary } from './sync-record.js'
 import type { UpdateRecordParameters } from './sync-record.js'
 import type { FetchRemoteEntriesOptions, SyncSource } from './sync-source.js'
+import { BaseSyncSource } from './sync-source-base.js'
 import {
   beginUndoSession,
   endUndoSession,
@@ -196,18 +196,17 @@ export async function fetchGithubJson(
  *
  * 包装 fetchGithubJson 为 SyncSource 接口实现，供 syncSourceRegistry 注册与调度。
  * 通过 syncFromGithub 主流程统一调用：
- * 1. validateConfig() 在下载前校验配置完整性
+ * 1. validateConfig() 在下载前校验配置完整性（骨架见 BaseSyncSource）
  * 2. fetchRemoteEntries() 复用既有 fetchGithubJson 实现，保持向后兼容
  */
-export class GithubSyncSource implements SyncSource {
-  /** 数据源类型标识 */
-  getSourceType(): string {
-    return 'github'
-  }
-
-  /** 数据源显示名称（用于日志与进度提示） */
-  getDisplayName(): string {
-    return 'GitHub'
+export class GithubSyncSource extends BaseSyncSource {
+  constructor() {
+    super(
+      'github',
+      'GitHub',
+      isGithubConfigComplete,
+      'GitHub 仓库配置不完整，请填写 owner/repo/branch/path',
+    )
   }
 
   /**
@@ -220,21 +219,6 @@ export class GithubSyncSource implements SyncSource {
     options?: FetchRemoteEntriesOptions,
   ): Promise<GithubRemoteEntry[]> {
     return fetchGithubJson(signal, options?.neededFields)
-  }
-
-  /**
-   * 校验配置是否完整可用
-   * @returns 完整返回 Result.ok(undefined)，不完整返回 Result.fail(BgmError)
-   */
-  validateConfig(): Result<void> {
-    if (!isGithubConfigComplete()) {
-      return Result.failVoid(
-        new BgmError('GitHub 仓库配置不完整，请填写 owner/repo/branch/path', {
-          code: 'CONFIG_INCOMPLETE',
-        }),
-      )
-    }
-    return Result.okVoid()
   }
 }
 

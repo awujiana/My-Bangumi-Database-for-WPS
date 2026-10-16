@@ -299,7 +299,9 @@ export function writeSheetHeaderRow(
   options?: { gray?: boolean },
 ): void {
   const headerRange = sheet.Range(`A1:${colNumberToLetter(headers.length)}1`)
-  headerRange.Value2 = [headers]
+  // 展开成可变数组：headers 声明为 readonly string[]（泛化后可接受任意列清单），
+  // 而 Range.Value2 需要可变二维数组 —— 不展开会触发 TS 类型错误（readonly 不可赋值）。
+  headerRange.Value2 = [[...headers]]
   if (options?.gray === true && headerRange.Interior) {
     headerRange.Interior.Color = BGM_COLOR.GRAY
   }
