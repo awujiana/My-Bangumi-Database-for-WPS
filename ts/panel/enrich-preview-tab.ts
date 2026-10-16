@@ -11,6 +11,9 @@
  *   内容或只切页签，避免"两处各管一半"导致切页签后残留上一个页签的提示。
  */
 
+// isBangumiSheetEmpty 直连子模块（barrel 亦导出该函数供上层使用）：本模块被
+// enrich-source-workbook.test.ts 等聚焦单测引用，其对 core/constants.js 的原子 mock
+// 无法支撑真实 barrel 全图（ui/preview.ts 顶层读 WATCH_STATUS_MAP，见该测试 fixtures）。
 import { isBangumiSheetEmpty } from '../sync/enrich-engine.js'
 import { state, safeGetElement } from './enrich-page-context.js'
 

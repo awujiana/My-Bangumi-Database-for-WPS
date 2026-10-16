@@ -97,7 +97,9 @@ vi.mock('../../ts/sync/sync-record.js', () => ({
 }))
 
 // ========== Mock: tools/util/index.js（WPS API 边界） ==========
-// 提供完整导出，覆盖 exceltobangumi/index.ts 与 githubSync.ts 的所有引用
+// 提供完整导出，覆盖 exceltobangumi/index.ts 与 githubSync.ts 的所有引用。
+// exceltobangumi/index.ts 对 createBatchFieldGetter / calcSyncRowFingerprint 直连
+// 子模块 field-getter.js（本文件不 mock 它），其内部经 './index.js' 读取落在下方替身。
 vi.mock('../../ts/tools/util/index.js', () => ({
   BGM: {
     handleError: vi.fn(),

@@ -1,9 +1,13 @@
+// @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 // Mock 依赖：auto-fill-url.ts 从 '../index.js' 桶导入 10 个符号。
 // 受测的 _splitAliases / _buildNameUrlMap 仅用到 getCellValue 与 trim，
 // 其余符号以 vi.fn() 占位，避免模块加载期 undefined 访问。
-vi.mock('../ts/index.js', () => ({
+// `...await importOriginal()` 保证将来 barrel 新增导出时本 mock 不会静默变 undefined
+// （真实 barrel 只能在 jsdom 下加载：panel-page.ts 模块级挂 window，node 环境会抛）。
+vi.mock('../ts/index.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../ts/index.js')>()),
   getDataSheet: vi.fn(),
   getCellValue: vi.fn(),
   setCellValue: vi.fn(),

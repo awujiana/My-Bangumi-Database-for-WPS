@@ -126,7 +126,11 @@ const mocks = vi.hoisted(() => ({
   confirmClearMarks: '确定要清空所有标记吗？',
 }))
 
-vi.mock('../ts/index.js', () => ({
+// `...await importOriginal()`：将来 barrel 新增导出不会在本 mock 里静默变 undefined
+// （action-handlers 的 readLocalFileContent 即由 barrel 提供，经此链拿到
+//  `../ts/sync/local-file-sync.js` 的 mock 实现）
+vi.mock('../ts/index.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../ts/index.js')>()),
   BGM: {
     cache: { userId: null, username: null, avatarUrl: null },
     sync: {

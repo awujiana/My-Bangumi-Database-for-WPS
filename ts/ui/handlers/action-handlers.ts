@@ -40,6 +40,7 @@ import {
   openBangumiTokenPage,
   openSyncRecordSheet,
   previewSyncContent,
+  readLocalFileContent,
   refreshData,
   refreshSheets,
   refreshWorkbooks,
@@ -78,7 +79,6 @@ import type {
 } from '../../index.js'
 import { exportConfig, importConfig } from '../../services/config-service.js'
 import { executeUndoLastSync } from '../../services/ribbon-service.js'
-import { readLocalFileContent } from '../../sync/local-file-sync.js'
 import { clearLogs } from '../../tools/logger.js'
 import type { LogLevel } from '../../tools/logger.js'
 import { exportData } from './data-export.js'

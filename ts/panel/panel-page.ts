@@ -17,7 +17,6 @@ import {
   BGM,
   updateTokenStatus,
   updateUserIdStatus,
-  closeDetailModal,
   removeMessageListener,
   clearAllPendingTimeouts,
 } from '../index.js'
@@ -34,14 +33,9 @@ import {
 import { saveLockedSheet, restoreLockedSheet } from '../tools/locked-sheet.js'
 import { restoreUserInfoFromStorage, startUserInfoPolling } from './user-info-polling.js'
 
-// ========== 初始化 ==========
+// Escape 关闭模态框统一由 panel-bootstrap 安装的 modal-a11y 负责（document 级委托，覆盖 .modal / .detail-modal）；本模块不再自绑 keydown，避免同一按键两套处理。
 
-/** Escape 键关闭详情模态框 */
-function handleKeydown(event: KeyboardEvent): void {
-  if (event.key === 'Escape') {
-    closeDetailModal()
-  }
-}
+// ========== 初始化 ==========
 
 function initPanelCore(): void {
   bgmLog(LOG_LEVELS.INFO, 'initPanelCore 开始')
@@ -147,11 +141,8 @@ function initPanelCore(): void {
     const modal = document.getElementById('syncPreviewModal')
     if (modal) modal.style.display = 'none'
   })
-  // 按 Escape 键关闭详情模态框
-  document.addEventListener('keydown', handleKeydown)
-  // 面板关闭时移除键盘监听
+  // 面板关闭时中止请求，防止内存泄漏
   window.addEventListener('beforeunload', () => {
-    document.removeEventListener('keydown', handleKeydown)
     // 兜底：再次调用 abort，确保任何后续监听器也能触发取消
     BGM.abortController.abort()
   })

@@ -391,17 +391,15 @@ describe('initPanelCore · 事件绑定', () => {
     expect(modal?.style.display).toBe('none')
   })
 
-  it('按 Escape → 关闭详情模态框；其它键不触发', () => {
+  it('Escape 不再由本模块处理（统一委托 panel-bootstrap 安装的 modal-a11y）', () => {
     initPanelCore()
 
-    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'a' }))
-    expect(stubs.closeDetailModal).not.toHaveBeenCalled()
-
     document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))
-    expect(stubs.closeDetailModal).toHaveBeenCalled()
+
+    expect(stubs.closeDetailModal).not.toHaveBeenCalled()
   })
 
-  it('beforeunload → 摘掉键盘监听、中止请求并清理消息监听与待执行定时器', () => {
+  it('beforeunload → 中止请求并清理消息监听与待执行定时器', () => {
     initPanelCore()
 
     window.dispatchEvent(new Event('beforeunload'))
@@ -409,11 +407,6 @@ describe('initPanelCore · 事件绑定', () => {
     expect(stubs.abort).toHaveBeenCalled()
     expect(stubs.removeMessageListener).toHaveBeenCalled()
     expect(stubs.clearAllPendingTimeouts).toHaveBeenCalled()
-
-    // 键盘监听已摘掉 → 再按 Escape 不再调用 closeDetailModal
-    stubs.closeDetailModal.mockClear()
-    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))
-    expect(stubs.closeDetailModal).not.toHaveBeenCalled()
   })
 
   it('初始化完成时广播 bgm:modulesReady 并打印完成日志', () => {

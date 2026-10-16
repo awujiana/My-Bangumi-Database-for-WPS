@@ -94,6 +94,10 @@ const { bgmStub } = vi.hoisted(() => ({
   },
 }))
 
+// util/index.js 走原子集 mock：exceltobangumi/index.ts 对 createBatchFieldGetter /
+// calcSyncRowFingerprint 改为直连子模块 field-getter.js（本文件不 mock 它），其内部
+// 经 './index.js' 读 readRangeValues / getCellValue / trim / calcFingerprint，正好落在
+// 下方测试替身上，矩形读行为与原本地 createFieldGetter 一致。
 vi.mock('../ts/tools/util/index.js', () => ({
   bgmLog: mockBgmLog,
   getApp: mockGetApp,

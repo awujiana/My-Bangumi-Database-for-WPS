@@ -7,7 +7,7 @@
  */
 
 import { LOG_LEVELS } from '../core/constants.js'
-import { cleanSheetDuplicates } from '../sync/sheet-cleaning.js'
+import { cleanSheetDuplicates } from '../index.js'
 import { showToast } from '../ui/dialog.js'
 import { bgmLog, BGM } from '../tools/util/index.js'
 import { getEnrichPreviewConfig } from './enrich-page-state.js'

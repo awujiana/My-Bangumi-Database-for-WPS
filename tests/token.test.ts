@@ -39,9 +39,12 @@ const bgmCache = vi.hoisted(() => ({
   avatarUrl: '',
 }))
 
-vi.mock('../ts/index.js', async () => {
+vi.mock('../ts/index.js', async (importOriginal) => {
+  // `...await importOriginal()`：将来 barrel 新增导出不会在本 mock 里静默变 undefined
+  const actual = await importOriginal<typeof import('../ts/index.js')>()
   const constants = await import('../ts/core/constants.js')
   return {
+    ...actual,
     LOG_LEVELS: constants.LOG_LEVELS,
     bgmLog: m.bgmLog,
     BGM: {

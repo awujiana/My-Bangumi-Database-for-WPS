@@ -241,6 +241,11 @@ export {
 } from './sync/sync-source-registry.js'
 
 export {
+  // 读取本地数据文件内容（「本地文件」同步源与导入配置共用）
+  readLocalFileContent,
+} from './sync/local-file-sync.js'
+
+export {
   // 纯函数：差异计算（零依赖，可在 Node 测试环境运行）
   computeDiff,
   tagsToString,
@@ -381,6 +386,10 @@ export {
   getUrlPath,
   // 计算数据指纹（用于缓存）
   calcFingerprint,
+  // 批量读 + 逐格回退的字段访问器工厂（同步预览 / 上传预处理共用一份实现）
+  createBatchFieldGetter,
+  // 增量同步行指纹（字段口径与 buildJsonPayload 一致）
+  calcSyncRowFingerprint,
 } from './tools/utility.js'
 
 // ============================================================================
@@ -560,6 +569,26 @@ export {
 export { exportSheetToJsonlFile, buildJsonlFromSheet } from './sync/export-jsonl.js'
 
 // ============================================================================
+// 21.1 通用数据清洗（来自 sync/sheet-cleaning.js）
+//       富化后自动去重（enrich-result-view）与锁定表清洗（UI/handlers/sheet）
+//       共用同一实现；清理引擎（panel/clean-engine）消费其行计划函数。
+// ============================================================================
+export {
+  // 合并去重入口（按名称分组、保留含 URL 行、合并标签、删重复行）
+  cleanSheetDuplicates,
+  // 行计划（清理引擎 scan/预览/执行用）
+  planDuplicateRows,
+  planDuplicateUrlRows,
+  planEmptyNameRows,
+  // 应用行计划（批量删行 + 标签合并写回）
+  applyRowPlan,
+  // 清洗结果与行计划类型
+  type CleanDuplicatesResult,
+  type RowChange,
+  type RowPlan,
+} from './sync/sheet-cleaning.js'
+
+// ============================================================================
 // 22. 新番表富化引擎（来自 sync/enrich-engine.js + sync/enrich-record.js）
 // ============================================================================
 export {
@@ -590,6 +619,12 @@ export {
   resolveConflictField,
   // 列管理函数
   ensureBangumiColumns,
+  // 噪声关键词过滤（预览单元格渲染与富化写入共用）
+  shouldFilterNoise,
+  // 噪声关键词缓存失效（设置页保存自定义关键词后调用）
+  resetNoiseKeywordCache,
+  // 判断 Bangumi 目标表是否为空表（预览空态判定）
+  isBangumiSheetEmpty,
   // 搜索与查询函数
   searchSheet,
   // 富化引擎类型

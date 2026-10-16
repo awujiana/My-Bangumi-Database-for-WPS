@@ -8,6 +8,7 @@
  * 拆分结构：
  *   - util/cell.ts：单元格读取/设置（getCell、getCellValue、setCellValue、getSheetByIndex）
  *   - util/sheet.ts：工作表读取/缓存（readRangeValues、cacheGet、findHeaderRow、getColumnMap、clearSheetCache、getLastRow、isEmptyValue、getDataSheet、safeActivate）
+ *   - util/field-getter.ts：批量字段访问器（矩形读 + 逐格回退）与同步行指纹
  *   - util/sleep.ts：延时（sleep、delay）
  *   - util/index.ts：BGM 命名空间、bgmLog、getApp、Token 存储、用户 ID/用户名、辅助函数（shellExecuteByOAAssist、getUrlPath、showBangumiPanel）
  */
@@ -50,6 +51,12 @@ export {
   safeActivate,
   ensureSheetHeaders,
 } from './sheet.js'
+// 批量字段访问器（矩形读 + 逐格回退）与同步行指纹：exceltobangumi / ribbon-service 共用
+export {
+  createBatchFieldGetter,
+  calcSyncRowFingerprint,
+  type FieldGetter,
+} from './field-getter.js'
 export { sleep, delay } from './sleep.js'
 
 // ========== BGM 全局窗口扩展接口 ==========

@@ -27,8 +27,9 @@ import {
   fetchAllUserCollections,
   getCell,
   trim,
-  calcFingerprint,
   isGithubConfigComplete,
+  createBatchFieldGetter,
+  calcSyncRowFingerprint,
 } from '../index.js'
 import type { WpsWorksheet, GithubSyncResult, GithubRemoteEntry, LocalRowEntry } from '../index.js'
 import { undoLastSync, getLastSessionDescription } from '../sync/undo-stack.js'
@@ -81,6 +82,23 @@ const GITHUB_CONFLICT_FIELDS: readonly FieldCompareSpec[] = Object.freeze([
     remoteToString: (r) => (Array.isArray(r.meta_tags) ? r.meta_tags.join('|') : ''),
   },
   { localField: '集数', remoteToString: (r) => r['话数'] ?? '' },
+])
+
+/**
+ * 同步预览的批量读取列名表：决定矩形读宽度（`1..maxCol`）。
+ * 与上传同步的 `BATCH_READ_COLUMNS` 是两套列集（预览不需要完播日/类别等列），
+ * 故不共用同一张表；访问器对表外列（如「状态」）自动走逐格回退。
+ */
+const SYNC_PREVIEW_READ_COLUMNS: readonly string[] = Object.freeze([
+  'Bangumi_URL',
+  '名称',
+  '是否看完',
+  '打分',
+  '标签/分级',
+  '原作标签',
+  '剧透/感言',
+  '集数',
+  '集号',
 ])
 
 /**
@@ -195,27 +213,15 @@ export function getSyncPreview(
   )
   bgmLog(LOG_LEVELS.INFO, `[getSyncPreview] 增量同步: ${isIncremental ? '开启' : '关闭'}`)
 
-  // 批量读取（与同步函数相同的列范围）
-  const neededKeys = [
-    'Bangumi_URL',
-    '名称',
-    '是否看完',
-    '打分',
-    '标签/分级',
-    '原作标签',
-    '剧透/感言',
-    '集数',
-    '集号',
-  ]
-  let maxCol = 1
-  for (const key of neededKeys) {
-    const col = colMap.get(key)
-    if (col !== undefined) maxCol = Math.max(maxCol, col)
-  }
-  bgmLog(LOG_LEVELS.INFO, `[getSyncPreview] 最大列号: ${String(maxCol)}`)
-
-  const allData = readRangeValues(ws, startRow, lastRow, 1, maxCol)
-  bgmLog(LOG_LEVELS.INFO, `[getSyncPreview] 批量读取数据: ${String(allData.length || 0)} 行`)
+  // 批量读取（与同步函数相同的列范围）：矩形读 + 逐格回退的字段访问器，
+  // 与上传同步（exceltobangumi）共用 tools/util/field-getter.ts 的一份实现
+  const getField = createBatchFieldGetter(
+    ws,
+    colMap,
+    startRow,
+    lastRow,
+    SYNC_PREVIEW_READ_COLUMNS,
+  )
 
   // 获取可见行（与同步函数相同）
   const filterStatus = getFilterStatus(ws, lastRow, headerRow, true)
@@ -231,20 +237,6 @@ export function getSyncPreview(
   } else {
     for (let r = startRow; r <= lastRow; r += 1) rowsToProcess.push(r)
     bgmLog(LOG_LEVELS.INFO, `[getSyncPreview] 全量模式: ${String(rowsToProcess.length)} 行`)
-  }
-
-  const getField = (rowNumber: number, key: string): string => {
-    const col = colMap.get(key)
-    if (!col) return ''
-    const rowIndex = rowNumber - startRow
-    if (rowIndex >= 0 && rowIndex < allData.length) {
-      const rowData = allData[rowIndex]
-      if (Array.isArray(rowData) && col - 1 < rowData.length) {
-        return trim(rowData[col - 1])
-      }
-    }
-    const fallbackCol = colMap.get(key)
-    return fallbackCol === undefined ? '' : trim(getCellValue(ws, rowNumber, fallbackCol))
   }
 
   for (const rowNumber of rowsToProcess) {
@@ -273,20 +265,15 @@ export function getSyncPreview(
           // 增量模式：已上传且指纹匹配则跳过
           const sid = extractSubjectId(bgmUrl)
           if (sid && fingerprintMap) {
-            const currentFingerprint = calcFingerprint([
-              getField(rowNumber, '名称'),
-              mapWatchStatus(
-                getField(rowNumber, '是否看完') ||
-                  getField(rowNumber, '状态') ||
-                  getField(rowNumber, '观看状态'),
-              ).toString(),
-              getField(rowNumber, '打分'),
-              getField(rowNumber, '标签/分级'),
-              getField(rowNumber, '原作标签'),
-              getField(rowNumber, '剧透/感言'),
-              getField(rowNumber, '集数'),
-              getField(rowNumber, '集号'),
-            ])
+            const uploadedWatchType = mapWatchStatus(
+              getField(rowNumber, '是否看完') ||
+                getField(rowNumber, '状态') ||
+                getField(rowNumber, '观看状态'),
+            )
+            const currentFingerprint = calcSyncRowFingerprint(
+              (key) => getField(rowNumber, key),
+              uploadedWatchType,
+            )
             if (fingerprintMap.get(sid) === currentFingerprint) {
               incrementalSkipped += 1
               isUploadedSkipped = true
@@ -316,16 +303,10 @@ export function getSyncPreview(
             if (isIncremental && fingerprintMap) {
               const sid = extractSubjectId(bgmUrl)
               if (sid) {
-                const currentFingerprint = calcFingerprint([
-                  getField(rowNumber, '名称'),
-                  type.toString(),
-                  getField(rowNumber, '打分'),
-                  getField(rowNumber, '标签/分级'),
-                  getField(rowNumber, '原作标签'),
-                  getField(rowNumber, '剧透/感言'),
-                  getField(rowNumber, '集数'),
-                  getField(rowNumber, '集号'),
-                ])
+                const currentFingerprint = calcSyncRowFingerprint(
+                  (key) => getField(rowNumber, key),
+                  type,
+                )
                 isFingerprintMatched = fingerprintMap.get(sid) === currentFingerprint
               }
             }

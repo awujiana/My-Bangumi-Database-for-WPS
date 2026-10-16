@@ -6,7 +6,7 @@
  */
 
 import { escapeHtml } from '../tools/string-utilities.js'
-import { shouldFilterNoise } from '../sync/enrich-engine.js'
+import { shouldFilterNoise } from '../index.js'
 import { getEnrichPreviewConfig } from './enrich-page-state.js'
 import type { ScalarMappingKey } from './enrich-page-state.js'
 

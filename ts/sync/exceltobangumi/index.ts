@@ -27,11 +27,16 @@ import {
   loadBgToken,
   BGM,
   _getUserApiPath,
-  readRangeValues,
   delay,
-  calcFingerprint,
   clearSheetCache,
 } from '../../tools/util/index.js'
+// createBatchFieldGetter 与 calcSyncRowFingerprint 直连子模块 field-getter.js：
+// 本模块的测试对 '../../tools/util/index.js' 做原子集 mock，经 barrel 取这两个
+// 函数时，mock 工厂执行期的共享模块自引用请求会绕过替身落到真实现（COM 矩形读
+// 在假 worksheet 上返回空）。直连子模块后，其内部 './index.js' 读取经普通
+// import 链正常命中 mock，矩形读替身与原本地 createFieldGetter 行为一致。
+// 同型先例：enrich-engine.ts 直连 ../tools/util/sheet.js。
+import { createBatchFieldGetter, calcSyncRowFingerprint } from '../../tools/util/field-getter.js'
 import type { WpsApp, WpsWorksheet, WpsRange } from '../../tools/wps.js'
 import { wpsMessageBox, isWpsWorksheet } from '../../tools/wps.js'
 // 通知与同步进度弹窗走依赖反转桥：本模块属于底层（sync/），不得 runtime-import
@@ -143,37 +148,11 @@ function isCellMarkedSuccess(ws: WpsWorksheet, row: number, seqCol?: number): bo
 
 /**
  * 批量读取数据并创建字段快速访问器
- * 优化点：集中批量读取，减少 COM 调用
+ *
+ * 已收敛到 `tools/util/field-getter.ts` 的 {@link createBatchFieldGetter}
+ * （矩形读 + 逐格回退，与 ribbon-service 的同步预览共用一份实现），
+ * 此处经 `../../tools/util/index.js` 引入。
  */
-function createFieldGetter(
-  ws: WpsWorksheet,
-  colMap: Map<string, number>,
-  startRow: number,
-  lastRow: number,
-): (row: number, key: string) => string {
-  // 批量读取所有需要的数据列
-  let maxCol = 1
-  for (const key of BATCH_READ_COLUMNS) {
-    const col = colMap.get(key)
-    if (col !== undefined) maxCol = Math.max(maxCol, col)
-  }
-  const allData = readRangeValues(ws, startRow, lastRow, 1, maxCol)
-
-  return (row: number, key: string): string => {
-    const col = colMap.get(key)
-    if (!col) return ''
-    const rowIndex = row - startRow
-    if (rowIndex >= 0 && rowIndex < allData.length) {
-      const rowData = allData[rowIndex]
-      if (Array.isArray(rowData) && col - 1 < rowData.length) {
-        return trim(rowData[col - 1])
-      }
-    }
-    // 回退到逐单元格读取
-    const fallbackCol = colMap.get(key)
-    return fallbackCol === undefined ? '' : trim(getCellValue(ws, row, fallbackCol))
-  }
-}
 
 // 以下纯函数（extractSubjectId / mapWatchStatus / addTagsFromString / buildTagsArray） 已迁移至 ./pure-utilities.js，通过顶部 import 与 re-export 引入。
 
@@ -424,16 +403,7 @@ function processRowToSyncTaskInner(
   // 增量同步指纹检查（标签包含 标签/分级 + 原作标签，与 buildJsonPayload 保持一致）
   let currentFingerprint: string | undefined
   if (fingerprintMap) {
-    currentFingerprint = calcFingerprint([
-      getField(rowNumber, '名称'),
-      watchType.toString(),
-      getField(rowNumber, '打分'),
-      getField(rowNumber, '标签/分级'),
-      getField(rowNumber, '原作标签'),
-      getField(rowNumber, '剧透/感言'),
-      getField(rowNumber, '集数'),
-      getField(rowNumber, '集号'),
-    ])
+    currentFingerprint = calcSyncRowFingerprint((key) => getField(rowNumber, key), watchType)
 
     const storedFingerprint = fingerprintMap.get(sid)
     if (storedFingerprint === currentFingerprint) {
@@ -494,7 +464,7 @@ function prepareSyncTasks(
   const rowsToProcess = fetchVisibleRowsForSync(ws, startRow, lastRow, headerRow)
 
   // 步骤2：批量读取数据缓存（性能关键）
-  const getField = createFieldGetter(ws, colMap, startRow, lastRow)
+  const getField = createBatchFieldGetter(ws, colMap, startRow, lastRow, BATCH_READ_COLUMNS)
 
   // 步骤3：构建历史指纹映射（数据获取）
   const fingerprintMap = buildFingerprintMap(options?.incremental)
@@ -1006,7 +976,7 @@ async function executeSelectedSync(
     // 设置同步状态机位置（用于暂停时定位到单元格）
     BGM.sync.updatePosition(ws, 0, urlCol)
 
-    // 性能：复用本文件已有的 createFieldGetter 做一次矩形读（原先每行要
+    // 性能：复用 tools/util 的 createBatchFieldGetter 做一次矩形读（原先每行要
     // URL / 名称 / 完播日 / 集数 + buildJsonPayload 的十余个字段，全是逐格读）。
     // 它内部已带「矩形读不完整 → 回退逐格」的兜底。
     let batchMinRow = rows[0] ?? 0
@@ -1015,7 +985,7 @@ async function executeSelectedSync(
       if (row < batchMinRow) batchMinRow = row
       if (row > batchMaxRow) batchMaxRow = row
     }
-    const readField = createFieldGetter(ws, colMap, batchMinRow, batchMaxRow)
+    const readField = createBatchFieldGetter(ws, colMap, batchMinRow, batchMaxRow, BATCH_READ_COLUMNS)
 
     for (const [index, rowNumber] of rows.entries()) {
       // 检查停止
