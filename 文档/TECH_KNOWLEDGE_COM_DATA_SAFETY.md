@@ -248,6 +248,15 @@ export function initIncrementalSyncFromRibbon(): void {
 
 ### 5.4 第六轮审查新增发现（2026-10-15，只读扫描，**未改动任何代码**）
 
+> **✅ 2026-10-16 已全部修复并提交。** 下表为当时的发现记录，保留作为追溯。
+> 修复提交：`26e7e391`（5 处确定 bug）、`efd1336f`（abort 泄漏 + enrich-engine 矩形读）、
+> `58a9c17a`（formatTimeFilterLabel / sleep / 表头写入 / locked-sheet 四处小重复）、
+> `0fada38c`（SyncSource 基类 + value-merge + barrel 局部合一）。
+> 三处**结论与清单建议不同**的取舍（均有理由，详见各提交信息）：
+> ① `verifyToken` **未**委托 `fetchBgmMe` —— 后者内部读「已存 token」，而前者要验证「调用方显式传入的 token」（可能是未保存的测试 Token），委托会改变签名语义；
+> ② `tools/utility.js` 与 `tools/util/index.js` 的双轨 **只做局部合一**（删死守卫 + sync-result-dialog 同文件两 specifier 合一）—— 全局统一要改 19 个测试文件的 mock 路径，超过阈值；
+> ③ 布局探测**未加跨调用缓存** —— 布局在 SheetActivate/编辑后会变，无失效机制的 memo 有写错数据风险。
+
 四个并行审查（本轮 4 个提交的回归核对 / `ts/sync`+`ts/services` / `ts/ui`+`ts/panel`+`ts/tools` / 对照本清单比对）。
 
 **本轮 4 个代码提交复盘：无回归。** `fallbackWriteRemoteEntry` 三处参数化忠实（处 1 带 `(回退逐字段写入)` 后缀与 `failRow`、处 3 无后缀无 row）；`formatDuration` 测试只改「999ms 四舍五入→截断」「整分补 00秒→不补」两类断言；`writeSyncRecordHeader` 的矩形写有桩支撑；`fetchBgmMe` 五种弹窗文案与旧实现逐字一致、`timeout→network` 映射保留、外层兜底契约保留。仅三处日志级痕迹：parse 失败日志丢了 error 详情（`ribbon-service.ts`）、起始日志去掉 API URL、已 aborted 的回调从同步变微任务（提交信息已声明）。
