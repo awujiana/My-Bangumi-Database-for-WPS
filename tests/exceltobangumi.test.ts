@@ -804,8 +804,9 @@ describe('SyncToBangumiAsync', () => {
     }
   })
 
-  it('type=3（在看）时不应调用 markEpisodesComplete（跳过章节标记）', async () => {
+  it('type=3（在看）且有集数时也应调用 markEpisodesComplete（与选中行路径统一口径）', async () => {
     mockState.bgmRequestSync.mockResolvedValue({ code: 200, message: 'OK' })
+    mockState.markEpisodesComplete.mockResolvedValue({ success: true, message: 'OK' })
 
     const mockWs = createMockWorksheet({
       autoFilterMode: false,
@@ -829,10 +830,10 @@ describe('SyncToBangumiAsync', () => {
 
     await SyncToBangumiAsync(mockWs, colMap, 'test-token', 2, 1)
 
-    // type=3 时不应调用 markEpisodesComplete
-    // 注意：源码中 type=3 也会跳过章节标记
+    // type=3（在看）与 type=2（看过）口径统一：均应标记章节
+    // （历史上批量路径只标 type=2，与选中行路径分歧，属被锁定的旧行为，现统一）
     if (mockState.bgmRequestSync.mock.calls.length > 0) {
-      expect(mockState.markEpisodesComplete).not.toHaveBeenCalled()
+      expect(mockState.markEpisodesComplete).toHaveBeenCalledWith('12345', 12, 'test-token')
     }
   })
 

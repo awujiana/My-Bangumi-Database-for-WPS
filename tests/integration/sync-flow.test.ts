@@ -401,7 +401,7 @@ describe('Excel→Bangumi 完整同步流程', () => {
     expect(result.stopped).toBe(false)
   })
 
-  it('type=3（在看）应跳过章节标记', async () => {
+  it('type=3（在看）也应标记章节', async () => {
     mockState.bgmRequestSync.mockResolvedValue({ code: 200, message: 'OK' })
     mockState.markEpisodesComplete.mockResolvedValue({ success: true, message: 'ok' })
 
@@ -422,8 +422,8 @@ describe('Excel→Bangumi 完整同步流程', () => {
 
     // API 被调用
     expect(mockState.bgmRequestSync).toHaveBeenCalled()
-    // 章节标记不应被调用（type=3 跳过）
-    expect(mockState.markEpisodesComplete).not.toHaveBeenCalled()
+    // 章节标记也应被调用（type=3「在看」与 type=2「看过」同样标记）
+    expect(mockState.markEpisodesComplete).toHaveBeenCalled()
   })
 })
 

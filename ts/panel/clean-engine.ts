@@ -171,8 +171,8 @@ function readWorkbookPath(wb: WpsWorkbook): string {
   }
 }
 
-/** 工作簿是否允许清理（排除规则优先于包含规则） */
-function isWorkbookAllowed(path: string): boolean {
+/** 工作簿是否允许清理（排除规则优先于包含规则；供 clean-page 复用，保证 UI 候选与引擎口径一致） */
+export function isWorkbookAllowed(path: string): boolean {
   if (hasAnyKeyword(path, CLEAN_TARGETS.excludeWorkbookPath)) return false
   if (CLEAN_TARGETS.includeWorkbookPath.length === 0) return true
   return hasAnyKeyword(path, CLEAN_TARGETS.includeWorkbookPath)

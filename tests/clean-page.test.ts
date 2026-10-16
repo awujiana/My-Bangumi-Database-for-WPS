@@ -54,6 +54,8 @@ const m = vi.hoisted(() => ({
     ) => Promise<unknown>
   >(),
   formatBytes: vi.fn<(bytes: number) => string>(),
+  // panel/clean-engine.js（isWorkbookAllowed：与引擎同一函数，页面不再有本地副本）
+  isWorkbookAllowed: vi.fn<(path: string) => boolean>(),
   // ui/stat-cards.js
   renderStatCards: vi.fn<(container: unknown, cards: unknown) => void>(),
   // tools/operation-log.js
@@ -90,6 +92,7 @@ vi.mock('../ts/panel/clean-engine.js', () => ({
   scanCleanRules: m.scanCleanRules,
   runCleanPlans: m.runCleanPlans,
   formatBytes: m.formatBytes,
+  isWorkbookAllowed: m.isWorkbookAllowed,
 }))
 
 vi.mock('../ts/ui/stat-cards.js', () => ({ renderStatCards: m.renderStatCards }))
@@ -111,7 +114,7 @@ vi.mock('../ts/tools/theme.js', () => ({
 
 vi.mock('../ts/ui/components/progress.js', () => ({ createProgress: m.createProgress }))
 
-import { CLEAN_EXCLUDES, CLEAN_RULES } from '../ts/panel/clean-rules.js'
+import { CLEAN_EXCLUDES, CLEAN_RULES, CLEAN_TARGETS } from '../ts/panel/clean-rules.js'
 
 type CleanPageModule = typeof import('../ts/panel/clean-page.js')
 
@@ -309,6 +312,15 @@ beforeEach(() => {
     complete: m.progressComplete,
   })
   m.inspectWorksheet.mockReturnValue(DEFAULT_INSPECTION)
+  // isWorkbookAllowed 默认实现与 clean-engine.ts 逐字同构（排除优先于包含），桩忠实于真实引擎
+  m.isWorkbookAllowed.mockImplementation((path: string) => {
+    const lower = path.toLowerCase()
+    const hasKeyword = (keywords: readonly string[]): boolean =>
+      keywords.some((keyword) => keyword !== '' && lower.includes(keyword.toLowerCase()))
+    if (hasKeyword(CLEAN_TARGETS.excludeWorkbookPath)) return false
+    if (CLEAN_TARGETS.includeWorkbookPath.length === 0) return true
+    return hasKeyword(CLEAN_TARGETS.includeWorkbookPath)
+  })
   m.scanCleanRules.mockReturnValue(emptyScanResult())
   m.runCleanPlans.mockResolvedValue({
     targets: [],

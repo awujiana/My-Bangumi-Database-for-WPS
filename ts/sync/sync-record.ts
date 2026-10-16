@@ -919,13 +919,20 @@ function appendOrUpdateSyncRecords(records: UpdateRecordParameters[]) {
   for (const [sid, { row, updatedCount, status, params }] of sidToUpdate) {
     const existingRows = readRangeCellValues(sheet, row, row, 1, SYNC_RECORD_COLUMNS.length)
     const existing = existingRows[0]
-    if (existing) {
+    // 读回失败（形状归一化失败）或读回宽度不足时放弃该行的更新并记录日志：
+    // 单行区域的 Value2 可能是一维数组，existing 只剩首列时 buildUpdatedSyncRow 会用
+    // '' 补齐其余 11 列并整行写回，等于静默清空该行的用户同步记录（文档 §2.1 / §2.3）。
+    if (!existing || existing.length < SYNC_RECORD_COLUMNS.length) {
+      bgmLog(
+        LOG_LEVELS.WARN,
+        `[addSyncRecords] 第 ${String(row)} 行旧值读取失败或宽度不足，放弃更新（SID=${sid}）`,
+      )
+    } else {
       const rowValues = buildUpdatedSyncRow(existing, params, now, updatedCount, status)
       writeSheetRows(sheet, row, [rowValues])
       setSyncRecordColors(sheet, row, status, updatedCount)
       _syncRecordSidCache.set(sid, row)
     }
-    // 读回失败：放弃该行的更新，避免用空值覆盖整行
   }
 
   invalidateCache()

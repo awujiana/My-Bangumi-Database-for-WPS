@@ -11,9 +11,15 @@
 import { LOG_LEVELS } from '../core/constants.js'
 import { showToast } from '../ui/dialog.js'
 import { BGM, bgmLog, getApp, markCleanPaneLoaded } from '../tools/util/index.js'
-import { CLEAN_EXCLUDES, CLEAN_RULES, CLEAN_TARGETS, RISK_LABELS } from './clean-rules.js'
+import { CLEAN_EXCLUDES, CLEAN_RULES, RISK_LABELS } from './clean-rules.js'
 import type { CleanRule } from './clean-rules.js'
-import { formatBytes, inspectWorksheet, runCleanPlans, scanCleanRules } from './clean-engine.js'
+import {
+  formatBytes,
+  inspectWorksheet,
+  isWorkbookAllowed,
+  runCleanPlans,
+  scanCleanRules,
+} from './clean-engine.js'
 import type { CleanScanResult } from './clean-engine.js'
 import { escapeHtml } from '../tools/string-utilities.js'
 import { sanitizeHtml } from '../tools/sanitize.js'
@@ -296,11 +302,6 @@ function readWorkbookPath(wb: { FullName?: string; Name: string }): string {
   } catch {
     return ''
   }
-}
-
-/** 是否允许处理该工作簿（沿用 CLEAN_TARGETS.excludeWorkbookPath） */
-function isWorkbookAllowed(path: string): boolean {
-  return !hasAnyKeyword(path, CLEAN_TARGETS.excludeWorkbookPath)
 }
 
 interface WpsWorkbookLike {

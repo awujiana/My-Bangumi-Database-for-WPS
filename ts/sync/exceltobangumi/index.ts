@@ -535,15 +535,15 @@ function prepareSyncTasks(
  */
 
 /**
- * 按收藏类型处理章节标记：仅"看过"(type=2) 需要标记章节；标记失败仅警告不中断。
+ * 按收藏类型处理章节标记："看过"(type=2) 和 "在看"(type=3) 均需标记章节；标记失败仅警告不中断。
  * （从 batchSyncRequests 并发任务的 try 块抽出，降低 try-complexity）
  */
 async function markEpisodesByType(task: _SyncTask, token: string): Promise<void> {
-  if (task.type === 2 && task.epCount && task.epCount > 0) {
+  if ((task.type === 2 || task.type === 3) && task.epCount && task.epCount > 0) {
     try {
       bgmLog(
         LOG_LEVELS.INFO,
-        `[batchSyncRequests] SID ${task.sid} 状态"看过"(type=2)，集数: ${String(task.epCount)}，开始标记章节...`,
+        `[batchSyncRequests] SID ${task.sid} 状态${task.type === 2 ? '"看过"' : '"在看"'}(type=${String(task.type)})，集数: ${String(task.epCount)}，开始标记章节...`,
       )
       const epResult = await _markEpisodesComplete(task.sid, task.epCount, token)
       bgmLog(
@@ -556,12 +556,10 @@ async function markEpisodesByType(task: _SyncTask, token: string): Promise<void>
         `[batchSyncRequests] SID ${task.sid} 章节标记异常: ${error instanceof Error ? error.message : String(error)}`,
       )
     }
-  } else if (task.type === 3 && task.epCount && task.epCount > 0) {
-    bgmLog(LOG_LEVELS.INFO, `[batchSyncRequests] SID ${task.sid} 状态"在看"(type=3)，跳过章节标记`)
   } else if (task.epCount && task.epCount > 0) {
     bgmLog(
       LOG_LEVELS.INFO,
-      `[batchSyncRequests] SID ${task.sid} 状态非"看过"(type=${String(task.type)})，跳过章节标记`,
+      `[batchSyncRequests] SID ${task.sid} 状态非"看过/在看"(type=${String(task.type)})，跳过章节标记`,
     )
   }
 }
@@ -642,7 +640,7 @@ async function batchSyncRequests(
               `[batchSyncRequests] SID ${task.sid} 同步成功，HTTP ${String(apiResult.code)}`,
             )
 
-            // 按收藏类型处理章节标记（仅"看过" type=2 需要标记）
+            // 按收藏类型处理章节标记（"看过" type=2 和 "在看" type=3 均需标记）
             await markEpisodesByType(task, token)
           } else {
             fail.push(task)

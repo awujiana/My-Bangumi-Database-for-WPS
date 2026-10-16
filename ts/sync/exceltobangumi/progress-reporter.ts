@@ -4,7 +4,7 @@
  * @description 同步任务类型定义、同步结果应用到 UI（颜色标记）、写入同步记录、汇总上报。
  *              本模块定义共享类型 SyncTask / SyncResultStats，供 index.ts 使用。
  */
-import { LOG_LEVELS, SYNC_STATUS, BGM_COLOR } from '../../core/constants.js'
+import { COLLECTION_TYPE_NAMES, LOG_LEVELS, SYNC_STATUS, BGM_COLOR } from '../../core/constants.js'
 import { getNotifyApi } from '../../core/ui-bridge.js'
 import { bgmLog, BGM, getCell } from '../../tools/util/index.js'
 import type { WpsWorksheet } from '../../tools/wps.js'
@@ -37,14 +37,15 @@ export interface SyncResultStats {
   stopped: boolean
 }
 
-/** 观看状态类型名称映射 (优化点：提取常量) */
-export const TYPE_NAMES: Record<number, string> = {
-  1: '想看',
-  2: '在看',
-  3: '看过',
-  4: '搁置',
-  5: '抛弃',
-}
+/**
+ * 观看状态类型名称映射（下标即数值：1=想看、2=看过、3=在看、4=搁置、5=抛弃）。
+ *
+ * 曾是本地字面量表且把 2/3 标反（「看过」标成「在看」），与 core/constants 的
+ * WATCH_STATUS_MAP / COLLECTION_TYPE_NAMES 相反，导致同步记录「条目类型」列标签写反。
+ * 现不再保留本地副本：名称一律取自 COLLECTION_TYPE_NAMES，TYPE_NAMES 仅作为其
+ * 兼容别名转出（exceltobangumi/index.ts 等既有消费方不变）。
+ */
+export { COLLECTION_TYPE_NAMES as TYPE_NAMES } from '../../core/constants.js'
 
 /** 序列号列默认索引 */
 export const DEFAULT_SEQ_COL = 4
@@ -93,7 +94,7 @@ export function applySyncSuccessResults(
       name: task.name || `SID:${task.sid}`,
       url: task.bgmUrl,
       sid: task.sid,
-      type: TYPE_NAMES[task.type] ?? `类型${String(task.type)}`,
+      type: COLLECTION_TYPE_NAMES[task.type] ?? `类型${String(task.type)}`,
       content: task.jsonBody,
       status: SYNC_STATUS.SUCCESS,
       message: '批量同步成功',
@@ -137,7 +138,7 @@ export function applySyncFailResults(
       name: task.name || `SID:${task.sid}`,
       url: task.bgmUrl,
       sid: task.sid,
-      type: TYPE_NAMES[task.type] ?? `类型${String(task.type)}`,
+      type: COLLECTION_TYPE_NAMES[task.type] ?? `类型${String(task.type)}`,
       content: task.jsonBody,
       status: SYNC_STATUS.FAIL,
       message: '批量同步失败',
