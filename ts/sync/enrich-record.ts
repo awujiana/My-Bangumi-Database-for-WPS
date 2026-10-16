@@ -8,6 +8,7 @@
  */
 
 import { LOG_LEVELS, BGM_COLOR } from '../core/constants.js'
+import { writeSheetHeaderRow } from './sync-record.js'
 import {
   bgmLog,
   getApp,
@@ -128,14 +129,7 @@ export function getOrCreateEnrichRecordSheet(): WpsWorksheet {
     enrichSheet = wb.Sheets.Add()
     enrichSheet.Name = ENRICH_RECORD_SHEET_NAME
 
-    for (const [index, column] of ENRICH_RECORD_COLUMNS.entries()) {
-      const colLetter = colNumberToLetter(index + 1)
-      const cell = enrichSheet.Range(`${colLetter}1`)
-      cell.Value2 = column
-      if (cell.Interior) {
-        cell.Interior.Color = BGM_COLOR.GRAY
-      }
-    }
+    writeSheetHeaderRow(enrichSheet, ENRICH_RECORD_COLUMNS, { gray: true })
 
     try {
       enrichSheet.Move(null, wb.Sheets.Item(wb.Sheets.Count))
@@ -274,9 +268,8 @@ export function addEnrichRecords(records: AddEnrichRecordParameters[]): boolean 
 export function clearEnrichRecords(): void {
   try {
     const sheet = getOrCreateEnrichRecordSheet()
-    const lastRow = sheet.UsedRange
-      ? sheet.UsedRange.Row + sheet.UsedRange.Rows.Count - 1
-      : sheet.Rows.Count
+    const usedRange = sheet.UsedRange
+    const lastRow = usedRange ? usedRange.Row + usedRange.Rows.Count - 1 : sheet.Rows.Count
     if (lastRow > 1) {
       sheet.Range(`2:${String(lastRow)}`).Delete()
     }
@@ -341,9 +334,7 @@ export function formatEnrichRecordSheet(): void {
     const lastCol = ENRICH_RECORD_COLUMNS.length
     const lastRow = getLastRow(sheet)
 
-    for (let c = 1; c <= lastCol; c += 1) {
-      setCellValue(sheet, 1, c, ENRICH_RECORD_COLUMNS[c - 1])
-    }
+    writeSheetHeaderRow(sheet, ENRICH_RECORD_COLUMNS)
 
     const headerRange = sheet.Range('1:1')
     if (headerRange.Font) {

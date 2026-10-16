@@ -33,6 +33,7 @@ import {
 import type { GithubSyncResult, SyncStrategy } from './github-sync.js'
 import { collectMissingColumns, filterByTime } from './github-sync-diff.js'
 import type { ConflictResolution, SyncTimeFilter } from './github-sync-diff.js'
+import { formatTimeFilterLabel } from './github-time-format.js'
 import { GitlabSyncSource } from './gitlab-sync.js'
 import { LocalFileSyncSource } from './local-file-sync.js'
 import { getSelectedRowSids } from './selected-rows.js'
@@ -156,20 +157,6 @@ export async function syncFromRemote(
     }
   } catch {
     // 忽略关闭失败
-  }
-
-  /**
-   * 格式化时间筛选标签（year/quarter/month，future 归入 month 分支，与原三元逻辑一致）
-   * 独立辅助函数：消除 onProgress 回调内的嵌套三元（no-nested-ternary）
-   */
-  function formatTimeFilterLabel(filter: SyncTimeFilter): string {
-    if (filter.range === 'year') {
-      return `${String(filter.year)}年`
-    }
-    if (filter.range === 'quarter') {
-      return `${String(filter.year)}年${String(filter.quarter ?? '')}月新番`
-    }
-    return `${String(filter.year)}年${String(filter.month ?? '')}月`
   }
 
   const applyRemoteEntries = async (): Promise<GithubSyncResult> => {

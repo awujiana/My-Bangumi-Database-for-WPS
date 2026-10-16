@@ -8,6 +8,7 @@ import { BGM_CONFIG, LOG_LEVELS } from '../core/constants.js'
 import { Result, BgmError } from '../core/result.js'
 
 import { bgmLog, BGM } from './util/index.js'
+import { delay } from './util/sleep.js'
 import type { ZodSchema } from './zod-compat.js'
 
 export type HttpMethod = 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH'
@@ -39,15 +40,6 @@ function validateEndpoint(endpoint: string): void {
   if (endpoint.includes('..') || endpoint.startsWith('http')) {
     throw new BgmError('endpoint 包含非法字符', { code: 'INVALID_ENDPOINT' })
   }
-}
-
-/**
- * 异步延迟
- */
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => {
-    setTimeout(resolve, ms)
-  })
 }
 
 /**
@@ -196,7 +188,7 @@ export async function httpRequest<T = unknown>(
           LOG_LEVELS.WARN,
           `API 限流 (429)，第 ${String(attempt)} 次重试，等待 ${String(delayMs)}ms`,
         )
-        await sleep(delayMs)
+        await delay(delayMs)
       } else {
         const errorMessage = getErrorMessage(response.status)
         return Result.fail(
@@ -213,7 +205,7 @@ export async function httpRequest<T = unknown>(
         attempt += 1
         const delayMs = BGM_CONFIG.RETRY_DELAY_BASE * 2 ** (attempt - 1)
         bgmLog(LOG_LEVELS.WARN, `网络错误，第 ${String(attempt)} 次重试，等待 ${String(delayMs)}ms`)
-        await sleep(delayMs)
+        await delay(delayMs)
       } else {
         const errorMessage = error instanceof Error ? error.message : String(error)
         return Result.fail(new BgmError(errorMessage, { code: 'NETWORK_ERROR' }))

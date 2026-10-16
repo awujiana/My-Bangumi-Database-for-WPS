@@ -334,7 +334,7 @@ function countHeaderKeywordsInRow(ws: WpsWorksheet, row: number): number {
 }
 
 /** 判断某行「前 MAX_SCAN_COLUMNS 列中是否有任一列有值」 */
-function isRowPopulated(ws: WpsWorksheet, row: number): boolean {
+export function isRowPopulated(ws: WpsWorksheet, row: number): boolean {
   for (let col = 1; col <= PANEL_CONFIG.MAX_SCAN_COLUMNS; col += 1) {
     if (getCellValue(ws, row, col).trim()) return true
   }
@@ -342,7 +342,7 @@ function isRowPopulated(ws: WpsWorksheet, row: number): boolean {
 }
 
 /** 统计表头行后前 10 行中「任意列有值」的数据行数 */
-function countDataRowsAfter(ws: WpsWorksheet, headerRow: number): number {
+export function countDataRowsAfter(ws: WpsWorksheet, headerRow: number): number {
   let count = 0
   for (let row = headerRow + 1; row <= headerRow + DATA_SCAN_ROWS; row += 1) {
     if (isRowPopulated(ws, row)) count += 1

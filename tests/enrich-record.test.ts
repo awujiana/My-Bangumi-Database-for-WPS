@@ -300,9 +300,9 @@ describe('enrich-record', () => {
 
       expect(wb.Sheets.Add).toHaveBeenCalledTimes(1)
       expect(result.Name).toBe(ENRICH_RECORD_SHEET_NAME)
-      expect(getWritten('A1')).toBe('时间戳')
-      expect(getWritten('I1')).toBe('备注')
-      expect(getInteriorColor('A1')).toBe(BGM_COLOR.GRAY)
+      // 表头已收敛为一次矩形写（writeSheetHeaderRow），地址为 A1:I1
+      expect(getWritten('A1:I1')).toEqual([ENRICH_RECORD_COLUMNS])
+      expect(getInteriorColor('A1:I1')).toBe(BGM_COLOR.GRAY)
       expect(added.Move).toHaveBeenCalledTimes(1)
       const createdMessages = mockBgmLog.mock.calls.map((call) => call[1])
       expect(createdMessages).toContain('已创建富化记录工作表')
@@ -743,9 +743,9 @@ describe('enrich-record', () => {
 
       formatEnrichRecordSheet()
 
-      expect(mockSetCellValue).toHaveBeenCalledTimes(9)
-      expect(mockSetCellValue).toHaveBeenCalledWith(sheet, 1, 1, '时间戳')
-      expect(mockSetCellValue).toHaveBeenCalledWith(sheet, 1, 9, '备注')
+      // 表头重写已收敛为一次矩形写（writeSheetHeaderRow），不再逐格 setCellValue
+      expect(mockSetCellValue).not.toHaveBeenCalled()
+      expect(getWritten('A1:I1')).toEqual([ENRICH_RECORD_COLUMNS])
       expect(fontBolds.get('1:1')).toBe(true)
       expect(getInteriorColor('1:1')).toBe(BGM_COLOR.GRAY)
       expect(sheet.Range('1:1').HorizontalAlignment).toBe(-4108)

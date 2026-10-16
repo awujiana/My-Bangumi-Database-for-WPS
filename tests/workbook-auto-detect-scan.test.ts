@@ -42,6 +42,20 @@ vi.mock('../ts/tools/locked-sheet.js', () => ({
   findBangumiTargetSheetInWorkbook: m.findBangumiTargetSheetInWorkbook,
   getOpenWorkbooks: m.getOpenWorkbooks,
   TARGET_SHEET_NAME_KEYWORDS: m.TARGET_SHEET_NAME_KEYWORDS,
+  // 忠实复刻 locked-sheet.ts countDataRowsAfter：表头行后前 10 行中
+  // 「前 MAX_SCAN_COLUMNS(60) 列任一有值」的行数，由本文件的 getCellValue 桩驱动
+  countDataRowsAfter: (ws: WpsWorksheet, headerRow: number): number => {
+    let count = 0
+    for (let row = headerRow + 1; row <= headerRow + 10; row += 1) {
+      for (let col = 1; col <= 60; col += 1) {
+        if (String(m.getCellValue(ws, row, col) ?? '').trim()) {
+          count += 1
+          break
+        }
+      }
+    }
+    return count
+  },
 }))
 
 vi.mock('../ts/sync/enrich-engine.js', () => ({

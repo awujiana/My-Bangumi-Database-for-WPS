@@ -159,7 +159,7 @@ export function getOrCreateSyncRecordSheet(): WpsWorksheet {
     syncSheet.Name = SYNC_RECORD_SHEET_NAME
 
     // 写入表头（一次矩形写，替代逐格写）
-    writeSyncRecordHeader(syncSheet)
+    writeSheetHeaderRow(syncSheet, SYNC_RECORD_COLUMNS)
 
     // 移到末尾
     try {
@@ -275,7 +275,7 @@ function migrateSyncRecordSchema(sheet: WpsWorksheet): void {
   }
 
   // 表头：一次写入列名 + 一次设置底色
-  writeSyncRecordHeader(sheet, { gray: true })
+  writeSheetHeaderRow(sheet, SYNC_RECORD_COLUMNS, { gray: true })
 
   // 数据行：一次 Range.Value2 写入全部重组后的记录（P1-C）
   writeSheetRows(sheet, 2, rows)
@@ -284,20 +284,22 @@ function migrateSyncRecordSchema(sheet: WpsWorksheet): void {
 }
 
 /**
- * 写入同步记录表表头（一次 `Range.Value2` 矩形写）。
+ * 写入表头行（一次 `Range.Value2` 矩形写）。
  *
- * 此前有两处写法：新建表时**逐格**写（`SYNC_RECORD_COLUMNS.length` 次 COM 往返）、
- * 迁移时矩形一次写并顺带设底色。收敛为一份，新建表路径顺带从 12 次 IPC 降到 1 次。
+ * 同步记录表与富化记录表（`sync/enrich-record.ts`）共用：逐格写表头会让一次建表
+ * 放大成 `headers.length` 次跨进程 COM 往返，矩形写只花 1 次。
  *
- * ⚠️ 已有表路径（`getOrCreateSyncRecordSheet` 的 else 分支）**不走本函数** ——
- * 那里是「逐格读回比对 + 只修复不一致的列」，还会记录修复日志，语义不同。
- *
- * @param sheet 同步记录工作表
- * @param options.gray 是否把表头底色设为 `BGM_COLOR.GRAY`（迁移路径原有行为）
+ * @param sheet 工作表
+ * @param headers 表头列名（按列顺序）
+ * @param options.gray 是否把表头底色设为 `BGM_COLOR.GRAY`
  */
-function writeSyncRecordHeader(sheet: WpsWorksheet, options?: { gray?: boolean }): void {
-  const headerRange = sheet.Range(`A1:${colNumberToLetter(SYNC_RECORD_COLUMNS.length)}1`)
-  headerRange.Value2 = [SYNC_RECORD_COLUMNS]
+export function writeSheetHeaderRow(
+  sheet: WpsWorksheet,
+  headers: readonly string[],
+  options?: { gray?: boolean },
+): void {
+  const headerRange = sheet.Range(`A1:${colNumberToLetter(headers.length)}1`)
+  headerRange.Value2 = [headers]
   if (options?.gray === true && headerRange.Interior) {
     headerRange.Interior.Color = BGM_COLOR.GRAY
   }

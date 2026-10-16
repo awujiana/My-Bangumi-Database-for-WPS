@@ -16,10 +16,11 @@
  *   E. 切换活动工作表时：SheetActivate 事件实时记录。
  */
 
-import { LOG_LEVELS, PANEL_CONFIG } from '../core/constants.js'
+import { LOG_LEVELS } from '../core/constants.js'
 import { detectAnimeSourceLayout } from './enrich-engine.js'
-import { bgmLog, getApp, getCellValue } from '../tools/util/index.js'
+import { bgmLog, getApp } from '../tools/util/index.js'
 import {
+  countDataRowsAfter,
   findBangumiTargetSheetInWorkbook,
   getOpenWorkbooks,
   TARGET_SHEET_NAME_KEYWORDS,
@@ -67,23 +68,6 @@ export function monthLabelFromWorkbookName(name: string): string {
   }
   const dot = name.lastIndexOf('.')
   return dot > 0 ? name.substring(0, dot) : name
-}
-
-/** 判断某行「前 MAX_SCAN_COLUMNS 列中是否有任一列有值」（参考 locked-sheet.ts isRowPopulated） */
-function isRowPopulated(ws: WpsWorksheet, row: number): boolean {
-  for (let col = 1; col <= PANEL_CONFIG.MAX_SCAN_COLUMNS; col += 1) {
-    if (getCellValue(ws, row, col).trim()) return true
-  }
-  return false
-}
-
-/** 统计表头行后前 10 行中「任意列有值」的数据行数（参考 locked-sheet.ts countDataRowsAfter） */
-function countDataRowsAfter(ws: WpsWorksheet, headerRow: number): number {
-  let count = 0
-  for (let row = headerRow + 1; row <= headerRow + 10; row += 1) {
-    if (isRowPopulated(ws, row)) count += 1
-  }
-  return count
 }
 
 /** 读取并校验单个工作表是否为新番表布局（表头 ≥3 关键字 + ≥2 数据行）；不满足返回 null */
