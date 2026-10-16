@@ -95,14 +95,27 @@ function requestPromise(
       return
     }
 
-    // AbortSignal 支持：监听 abort 事件触发 xhr.abort()
+    // AbortSignal 支持：监听 abort 事件触发 xhr.abort()，并在请求结束后移除监听器。
+    // 只 add 不 remove 会泄漏：同一 signal 被反复取消/重试时监听器持续累积
+    // （修法同 sync/jsonl-response.ts 的 createRawTextFetcher）。
+    let abortHandler: (() => void) | null = null
+    const removeAbortHandler = (): void => {
+      if (!(abortHandler && signal)) {
+        return
+      }
+
+      signal.removeEventListener('abort', abortHandler)
+      abortHandler = null
+    }
     if (signal) {
-      signal.addEventListener('abort', () => {
+      abortHandler = (): void => {
         xhr.abort()
-      })
+      }
+      signal.addEventListener('abort', abortHandler)
     }
 
     xhr.addEventListener('load', () => {
+      removeAbortHandler()
       const duration = Date.now() - startTime
       bgmLog(
         LOG_LEVELS.INFO,
@@ -116,10 +129,12 @@ function requestPromise(
       }
     })
     xhr.addEventListener('error', () => {
+      removeAbortHandler()
       // 如果是 abort 导致的 onerror，归类为取消
       reject(new Error(signal?.aborted ? '请求被取消' : '网络错误'))
     })
     xhr.ontimeout = () => {
+      removeAbortHandler()
       reject(new Error('请求超时'))
     }
     xhr.send()

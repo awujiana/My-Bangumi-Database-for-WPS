@@ -392,11 +392,25 @@ export function detectAnimeSourceLayout(sheet: WpsWorksheet): AnimeSourceLayout 
   let headerRow = 0
   let firstFieldCol = 0
 
+  // 「矩形读 + 逐格读回退」统一改法（见 文档/TECH_KNOWLEDGE_COM_DATA_SAFETY.md §5.1）：
+  // 循环外一次矩形读覆盖下面两轮扫描（表头行 1..MAX_SCAN_ROWS × 50 列，以及随后的
+  // 数据起始行扫描 headerRow+1..MAX_SCAN_ROWS+10 的名称列），结果只读一次、两轮共用
+  // （原先每表约 500 次逐格读，且每次 SheetActivate 全簿重跑）。
+  // 读回行数 / 列宽与请求不一致 ⇒ 宿主或桩不支持区域读 ⇒ isRectReadUsable 为 false，
+  // 全部取值回退到原逐格路径（getCellValue），行为与改造前逐字一致。
+  const scanCols = 50
+  const scanEndRow = PANEL_CONFIG.MAX_SCAN_ROWS + 10
+  const scanBlock = readRangeValues(sheet, 1, scanEndRow, 1, scanCols)
+  const isRectReadUsable =
+    scanBlock.length === scanEndRow && scanBlock.every((line) => line.length >= scanCols)
+  const cellAt = (row: number, col: number): string =>
+    isRectReadUsable ? (scanBlock[row - 1]?.[col - 1] ?? '') : getCellValue(sheet, row, col)
+
   for (let row = 1; row <= PANEL_CONFIG.MAX_SCAN_ROWS; row += 1) {
     let matchedFields = 0
     let rowFirstFieldCol = 0
-    for (let col = 1; col <= 50; col += 1) {
-      const value = getCellValue(sheet, row, col).trim().toLowerCase()
+    for (let col = 1; col <= scanCols; col += 1) {
+      const value = cellAt(row, col).trim().toLowerCase()
       if (
         value &&
         ANIME_SOURCE_HEADER_KEYWORDS.some((keyword) => value === keyword.toLowerCase())
@@ -421,8 +435,8 @@ export function detectAnimeSourceLayout(sheet: WpsWorksheet): AnimeSourceLayout 
   }
 
   let dataStartRow = headerRow + 1
-  for (let row = headerRow + 1; row <= PANEL_CONFIG.MAX_SCAN_ROWS + 10; row += 1) {
-    const name = getCellValue(sheet, row, columnMapping.nameCol).trim()
+  for (let row = headerRow + 1; row <= scanEndRow; row += 1) {
+    const name = cellAt(row, columnMapping.nameCol).trim()
     if (name && !name.includes('新番表') && !name.includes('番组表')) {
       dataStartRow = row
       break
