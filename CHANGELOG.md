@@ -8,6 +8,13 @@
 
 ## [未发布]
 
+### 修复（同步预览样式丢失 + 死样式引用）
+
+- **现象**：主面板控制台报 `Refused to apply style from '.../css/preview.css' because its MIME type ('text/html')`；同步预览弹窗的统计卡左侧色条（待上传/已上传）、详情列表间距、面板右下角「回到顶部/滚到底部」按钮样式、窄窗格响应式**全部失效**。
+- **根因**：`f499c955` 删除孤儿页面 `panel-preview.html` 时把 `css/preview.css` 一并删除，但 ① `ui/panel.html` 仍 `<link>` 该文件（wpsjs 对缺失文件回退 `index.html` → MIME 报错）；② 该文件里有 **7 条规则未并入 `styles.css`**：`.detail-list`、`.stat-cards-centered`、`.stat-card-pending`/`.stat-card-uploaded`、`.scroll-btn`(+hover/active/hidden)、`.scroll-to-top`/`.scroll-to-bottom`；③ `.sync-preview-modal .modal-content` 的 `position: relative`（滚动按钮的定位上下文）与 **P2-11 的 480px 响应式块**也一并丢失。
+- **修复**：按原文件逐字恢复上述规则到 `styles.css`（颜色刻意保留原值——`--success`/`--warning` 的 token 值与原值不同，换 token 会改变既有渲染）；`ui/panel.html` 移除对已删除文件的 `<link>`。
+- **验证**：`ui/*.html` + `index.html` 全部资源引用可达（0 缺失）、CSS 括号平衡、`npm run audit:layout` 5 页面 × 500/400px **全部无异常**、`prettier --check` 通过。
+
 ### 新增（功能 · 同步前列映射确认框 + 缺列主动通知）
 
 - **背景**：两个用户可见缺口。① 勾了分片但表里没有对应列时，字段被**静默丢弃**——只有完成弹窗里的一个小区块和一条 WARN 日志，不翻日志的用户完全无感；② 同步前无法确认「远程字段 → 本地列」的对应关系，也没有取消某列同步 / 改目标列 / 补缺失列的入口。
