@@ -44,6 +44,7 @@ import type { FetchRemoteEntriesOptions, SyncSource } from './sync-source.js'
 import { BaseSyncSource } from './sync-source-base.js'
 import { runRemoteSync } from './remote-sync-core.js'
 import type { GithubSyncResult } from './remote-sync-apply.js'
+import type { SyncMappingConfig } from './sync-mapping.js'
 
 // apply 阶段（readLocalEntriesForSync / applyDiffToSheet / applyConflictResolutions
 // 与 GithubSyncResult）2026-10-17 起整体迁至 remote-sync-apply.ts；此处 re-export
@@ -200,6 +201,7 @@ export async function syncFromGithub(
   conflictResolution?: ConflictResolution[],
   shouldUseSelectedRowsOnly?: boolean,
   timeFilter?: SyncTimeFilter,
+  mapping?: SyncMappingConfig,
 ): Promise<GithubSyncResult> {
   const source: SyncSource = new GithubSyncSource()
   return runRemoteSync({
@@ -212,5 +214,6 @@ export async function syncFromGithub(
     conflictResolution,
     shouldUseSelectedRowsOnly,
     timeFilter,
+    mapping,
   })
 }

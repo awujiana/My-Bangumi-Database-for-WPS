@@ -58,6 +58,7 @@ import {
   showConfirm,
   showInput,
   showSettingsPanel,
+  showSyncMappingDialog,
   showSyncProgressDialog,
   showSyncResultDialog,
   showToast,
@@ -622,6 +623,15 @@ export const ACTION_HANDLERS: Record<string, ActionHandler> = {
           bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 用户取消数据同步')
           return
         }
+        // 同步前列映射确认（2026-10-17）：确认框 → 列映射框 → 真正同步。
+        // 用户在这里取消勾选 / 改目标列 / 补缺失列；点「取消同步」= 中止本次同步。
+        // 弹窗不可用（如测试环境 barrel 被整体 mock）时按默认继续，不阻塞既有链路。
+        const mappingConfig =
+          typeof showSyncMappingDialog === 'function' ? await showSyncMappingDialog() : undefined
+        if (mappingConfig === null) {
+          bgmLog(LOG_LEVELS.INFO, '[handleActionClick] 用户在列映射确认框取消同步')
+          return
+        }
         // 使用模块化进度弹窗（与「同步到 Bangumi」「选中行同步」保持一致）
         // AbortController 支持：用户点「停止」时**下载阶段与写入阶段都会立即中断**
         // （P2-7：applyDiffToSheet 每批写入前检查 signal，未处理条目计入 skipped）
@@ -687,6 +697,8 @@ export const ACTION_HANDLERS: Record<string, ActionHandler> = {
             // conflictResolution
             undefined,
             timeFilter,
+            // 列映射确认结果（取消勾选 / 改目标列）
+            mappingConfig,
           )
           const wasStopped = abortController.signal.aborted
           const { totalElapsed, totalProcessed, avgSpeed, efficiency, etaMs } = computeSyncMetrics(

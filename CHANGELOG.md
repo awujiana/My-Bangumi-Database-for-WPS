@@ -8,6 +8,20 @@
 
 ## [未发布]
 
+### 新增（功能 · 同步前列映射确认框 + 缺列主动通知）
+
+- **背景**：两个用户可见缺口。① 勾了分片但表里没有对应列时，字段被**静默丢弃**——只有完成弹窗里的一个小区块和一条 WARN 日志，不翻日志的用户完全无感；② 同步前无法确认「远程字段 → 本地列」的对应关系，也没有取消某列同步 / 改目标列 / 补缺失列的入口。
+- **新增模块**：
+  - `ts/sync/sync-mapping.ts`（纯逻辑，零 UI/COM）：从 `EXTENDED_FIELD_MAP` + `CORE_FIELD_COLUMNS` **派生**可同步字段行（不复制第二份字段表）；提供 `buildSyncMappingRows` / `resolveSyncMappingConfig` / `findOverrideConflicts` / `applyColumnOverrides` / `excludedColumnClosure` / `withoutColumns` / `remapColumnIndices` / `excludedJsonlFields`；`UNMAPPED_REMOTE_FIELDS` 列明「随分片下载但不落盘」的字段（简介原文 / infobox / 用户标签等）。
+  - `ts/ui/sync-mapping-dialog.ts`：同步前确认框（`.bgm-modal` + 复用既有 dialog 样式类）。每行 = 勾选 + 拖拽手柄 + 字段 → 目标列下拉 + 状态徽章 + ▲▼；「一键补齐缺失列」写表头并**读回校验**（P2-6 纪律）；目标列冲突时拦下确认并给出提示。
+- **主流程贯通**（`remote-sync-core.ts` / `remote-sync-apply.ts`）：
+  - 排除列：① 从 `neededFields` 剔除（整片无所需字段时不再下载）；② update diff 的显式字段过滤（滤空的 update 移出，计数如实）；③ 写入层从 colMap 摘列（含别名闭包，`制作公司` 与 `动画制作公司` 同步排除）——所有写入点（批量写 / 逐字段写 / 回退）自动跳过，无需逐函数加参；④ 缺列体检过滤掉用户主动排除的列。
+  - 改目标列：本地侧把目标列的值复制到默认列名键（`applyColumnOverrides`），写入侧把默认列号指向目标列（`remapColumnIndices`），`computeDiff` / 写入函数零改动。
+  - 缺列主动通知：core 在缺列体检后调 `getNotifyApi().toast(..., 'warning')`（前 5 个字段名 + 条数 + 「添加同名列后重新同步」指引）；完成弹窗的缺列区块补上「怎么补」的说明。
+- **接线**：`ACTION_HANDLERS.syncFromGithub` 在用户确认「是否继续」后、真正同步前弹列映射框；「取消同步」= 中止；弹窗不可用（测试环境 barrel 被整体 mock）时按默认继续，不阻塞既有链路。`syncFromGithub` / `syncFromRemote` 各新增末尾可选参数 `mapping`（既有调用方零改动）。
+- **测试**：新增 `tests/sync-mapping.test.ts`（22 条）+ `tests/sync-mapping-dialog.test.ts`（8 条，jsdom：渲染 / 取消勾选 / 改目标列 / 补列读回 / 冲突拦截 / ESC / 上下移）；`tests/action-handlers.test.ts` 的同步调用断言补第 7 位实参。
+- **验证**：tsc 0 / eslint 0 / prettier 通过 / check:cycles 0 / gate 八关 / 全量 vitest 通过。
+
 ### 变更（架构 · 收敛 `syncFromRemote` / `syncFromGithub` 双入口，sync 结构合并路线①）
 
 - **背景**：`syncFromRemote`（sync-source-registry.ts，~190 行）与 `syncFromGithub`（github-sync.ts，~190 行）主体逐字重复 ~150 行，2026-10-15 逐行比对确认差异仅 5 处（source 获取方式 / 校验失败文案 / 日志 tag / 耗时格式 `${ms}` vs `formatDuration` / 时间筛选标签函数是否内联）。原阻塞点为循环依赖：抽 core 需要 `applyDiffToSheet` 等定义在 `github-sync.ts` 内的函数，而 `syncFromGithub` 又要调 core。

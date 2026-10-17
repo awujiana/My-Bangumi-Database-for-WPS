@@ -66,6 +66,9 @@ const mockReadLocalEntriesForSync = vi.hoisted(() =>
 const mockFilterByTime = vi.hoisted(() => vi.fn().mockReturnValue([]))
 const mockExtractSubjectId = vi.hoisted(() => vi.fn().mockReturnValue(null))
 const mockGetSyncSourceType = vi.hoisted(() => vi.fn().mockReturnValue('github'))
+// 缺列主动通知（toast）：core 经通知桥的 getNotifyApi 发出（依赖反转，不直连 UI 层），
+// 桥被 mock 成只记 toast 调用，避免真实降级实现写日志噪声
+const mockToast = vi.hoisted(() => vi.fn<(message: string, toastType?: string) => void>())
 
 // 创建可变的 mock source 引用
 // 注意：vi.hoisted 的代码先于 import 求值，此处不能引用 Result（会触发 TDZ
@@ -101,6 +104,18 @@ vi.mock('../ts/core/constants.js', () => ({
   ErrorLevel: { INFO: 0, WARN: 1, ERROR: 2, FATAL: 3 },
   DEFAULT_BANGUMI_API_URL: 'https://api.bgm.tv',
   SYNC_RECORD_SHEET_NAME: 'Bangumi 同步记录',
+}))
+
+// 通知桥：core 的缺列 toast 走 getNotifyApi().toast（依赖反转，不直连 UI 层）
+vi.mock('../ts/core/ui-bridge.js', () => ({
+  getNotifyApi: () => ({
+    toast: mockToast,
+    alert: vi.fn(),
+    confirm: vi.fn(),
+    error: vi.fn(),
+    success: vi.fn(),
+    input: vi.fn(),
+  }),
 }))
 
 // Mock SyncSource interface factories（定义在 hoisted 外部，测试代码可访问）
@@ -298,6 +313,7 @@ describe('默认源注册', () => {
 describe('syncFromRemote', () => {
   beforeEach(() => {
     vi.restoreAllMocks()
+    mockToast.mockClear()
     mockGetSyncSourceType.mockReturnValue('github')
     mockGithubSourceReference.validateConfig.mockReturnValue(Result.okVoid())
     mockGithubSourceReference.fetchRemoteEntries.mockResolvedValue([])
@@ -545,6 +561,7 @@ describe('syncSourceRegistry 未覆盖分支', () => {
     mockApplyConflictResolutions.mockClear()
     mockFilterByTime.mockClear()
     mockGetSyncSourceType.mockClear()
+    mockToast.mockClear()
     mockGithubSourceReference.fetchRemoteEntries.mockClear()
     mockGithubSourceReference.validateConfig.mockClear()
 
@@ -680,6 +697,33 @@ describe('syncSourceRegistry 未覆盖分支', () => {
     expect(Array.isArray(result.missingColumns)).toBe(true)
     // 本地完全没有表头 ⇒ 至少 Bangumi_URL 会被判为缺失
     expect(result.missingColumns?.length).toBeGreaterThan(0)
+  })
+
+  it('缺列体检有结果时应发 toast 主动通知（不只进日志与弹窗细节）', async () => {
+    mockGithubSourceReference.fetchRemoteEntries.mockResolvedValue([{ sid: '1', name: 'A' }])
+    mockComputeDiff.mockReturnValue([])
+    mockGetDataSheet.mockReturnValue({ Name: 'Sheet1' })
+    mockFindHeaderRow.mockReturnValue(1)
+    mockGetColumnMap.mockReturnValue(new Map<string, number>())
+
+    await syncFromRemote()
+
+    expect(mockToast).toHaveBeenCalledTimes(1)
+    const [message, toastType] = mockToast.mock.calls[0] ?? []
+    // 条数 + 「缺少表头」归因 + 「重新同步」指引都要在 toast 里
+    expect(String(message)).toContain('缺少表头')
+    expect(String(message)).toContain('重新同步')
+    expect(String(message)).toMatch(/^\d+ 个远程字段/)
+    expect(toastType).toBe('warning')
+  })
+
+  it('无缺列时不应发 toast（不打扰用户）', async () => {
+    mockGithubSourceReference.fetchRemoteEntries.mockResolvedValue([])
+    mockComputeDiff.mockReturnValue([])
+
+    await syncFromRemote()
+
+    expect(mockToast).not.toHaveBeenCalled()
   })
 
   it('readLocalEntriesForSync 返回 null 时应抛出错误', async () => {

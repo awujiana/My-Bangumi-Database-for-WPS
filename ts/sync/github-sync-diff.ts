@@ -197,8 +197,9 @@ const BANGUMI_URL_COLUMN = 'Bangumi_URL'
  * 核心字段 → 本地列名（不经过 EXTENDED_FIELD_MAP，写入时有独立逻辑）
  *
  * 缺列体检需一并检查这些关键字段，否则「有数据但没列可写」会被漏报。
+ * 导出供 `sync-mapping.ts`（同步前列映射确认）派生字段行，不重复维护第二份。
  */
-const CORE_FIELD_COLUMNS: readonly (readonly [string, string])[] = [
+export const CORE_FIELD_COLUMNS: readonly (readonly [string, string])[] = [
   ['name', '名称'],
   ['meta_tags', '标签/分级'],
   ['话数', '集数'],

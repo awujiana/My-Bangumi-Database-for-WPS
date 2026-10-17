@@ -48,6 +48,7 @@ import type {
   SyncStrategy,
 } from './github-sync-diff.js'
 import { resolveNewRowCellValue, resolveUpdateCellValue } from './github-cell-value.js'
+import { remapColumnIndices, withoutColumns } from './sync-mapping.js'
 import {
   DATE_COLUMNS,
   appendValueWithSeparator,
@@ -89,8 +90,7 @@ export interface GithubSyncResult {
    * 写入时 safeSet 遇缺失列会静默 return，远程数据被无声丢弃；
    * 这里把这类字段挑出来，由结果弹窗提示用户自行添加对应列。
    */
-  missingColumns?: string[]
-  /**
+  missingColumns?: string[] /**
    * 分片拼接后因**缺少合法 sid** 被跳过的记录条数（>0 才出现）
    *
    * 与 `missingColumns` 同口径：链路内部原本只进 WARN 日志，用户看到的是
@@ -99,6 +99,20 @@ export interface GithubSyncResult {
    * 由结果弹窗提示，数字大于 0 即说明数据源本身有脏数据。
    */
   skippedInvalidLines?: number
+}
+
+/**
+ * applyDiffToSheet 的列映射选项（同步前列映射确认的下游落地）
+ *
+ * 由 `remote-sync-core.ts` 从 `SyncMappingConfig` 构建：
+ * - `excludedColumns`：用户取消同步的列（含别名闭包）→ 从 colMap 摘除
+ * - `columnRemap`：默认列名 → 目标列号（改映射）→ 替换默认列的列号
+ */
+export interface ApplyMappingOptions {
+  /** 取消同步的列名集合（含别名闭包） */
+  excludedColumns?: ReadonlySet<string> | undefined
+  /** 默认列名 → 用户选定的目标列号 */
+  columnRemap?: ReadonlyMap<string, number> | undefined
 }
 
 // ========== 本地数据读取 ==========
@@ -1067,6 +1081,7 @@ export async function applyDiffToSheet(
   onProgress?: (current: number, total: number, message: string, eta?: string) => void,
   source?: string,
   signal?: AbortSignal,
+  options?: ApplyMappingOptions,
 ): Promise<GithubSyncResult> {
   // 明细收集器：result.details 与本地 details 引用同一数组，push 直接走局部变量
   const details: GithubSyncDetailItem[] = []
@@ -1090,7 +1105,17 @@ export async function applyDiffToSheet(
 
   const headerRow = findHeaderRow(ws) || 1
   const lastRow = getLastRow(ws)
-  const colMap = getColumnMap(ws, headerRow)
+  let colMap = getColumnMap(ws, headerRow)
+  // 同步前列映射（2026-10-17）：用户取消同步的列从 colMap 摘除、改映射的列把默认
+  // 列号换成目标列号。下游所有写入点（批量写 / writeRowValuesWithUndo /
+  // writeRemoteEntryToRow / fallback）都经 colMap 寻址，在此一层变换即全覆盖，
+  // 无需给每个写入函数加参。默认 undefined 时行为与从前逐字一致。
+  if (options?.columnRemap !== undefined) {
+    colMap = remapColumnIndices(colMap, options.columnRemap)
+  }
+  if (options?.excludedColumns !== undefined && options.excludedColumns.size > 0) {
+    colMap = withoutColumns(colMap, options.excludedColumns)
+  }
   let nextAppendRow = lastRow + 1
   const isForceOverwrite = strategy === 'force-overwrite'
 

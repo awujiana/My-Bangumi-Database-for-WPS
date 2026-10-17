@@ -564,7 +564,12 @@ export {
 } from './ui/sync-result-dialog.js'
 
 // ============================================================================
-// 21. JSONL 导出（来自 sync/export-jsonl.js）
+// 21. 同步前列映射确认（来自 ui/sync-mapping-dialog.js）
+// ============================================================================
+export { showSyncMappingDialog } from './ui/sync-mapping-dialog.js'
+
+// ============================================================================
+// 22. JSONL 导出（来自 sync/export-jsonl.js）
 // ============================================================================
 export { exportSheetToJsonlFile, buildJsonlFromSheet } from './sync/export-jsonl.js'
 

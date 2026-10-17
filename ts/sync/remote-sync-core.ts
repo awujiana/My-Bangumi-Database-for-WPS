@@ -19,6 +19,7 @@
  */
 
 import { LOG_LEVELS } from '../core/constants.js'
+import { getNotifyApi } from '../core/ui-bridge.js'
 import {
   bgmLog,
   ensureSheetHeaders,
@@ -36,9 +37,11 @@ import {
   applyDiffToSheet,
   readLocalEntriesForSync,
 } from './remote-sync-apply.js'
-import type { GithubSyncResult } from './remote-sync-apply.js'
+import type { ApplyMappingOptions, GithubSyncResult } from './remote-sync-apply.js'
 import { getSelectedRowSids } from './selected-rows.js'
 import { collectNeededFieldsFromSheet } from './shard-fetch.js'
+import { applyColumnOverrides, excludedColumnClosure, excludedJsonlFields } from './sync-mapping.js'
+import type { SyncMappingConfig } from './sync-mapping.js'
 import type { SyncSource } from './sync-source.js'
 
 /** {@link runRemoteSync} 入参：两个薄入口的历史差异全部在此参数化 */
@@ -61,6 +64,13 @@ export interface RunRemoteSyncParameters {
   conflictResolution?: ConflictResolution[] | undefined
   /** 时间筛选条件 */
   timeFilter?: SyncTimeFilter | undefined
+  /**
+   * 同步前列映射确认结果（2026-10-17）
+   *
+   * 用户在确认框里取消同步的列 / 改映射的目标列。undefined = 未经确认框
+   * （既有调用方与测试的行为与从前逐字一致）。
+   */
+  mapping?: SyncMappingConfig | undefined
 }
 
 /**
@@ -92,6 +102,7 @@ export async function runRemoteSync(
     shouldUseSelectedRowsOnly,
     conflictResolution,
     timeFilter,
+    mapping,
   } = parameters
   // 两个薄入口的签名上都带默认值，这里再兜一层：core 被单独调用时不依赖调用方
   const effectiveStrategy: SyncStrategy = strategy ?? 'add-update'
@@ -121,6 +132,15 @@ export async function runRemoteSync(
   // 因此启用时间筛选时必须显式补上 date（读不到表头时本就是全量下载，不受影响）。
   if (neededFields && timeFilter?.enabled === true && timeFilter.range !== 'all') {
     neededFields.add('date')
+  }
+  // 列映射确认：用户取消同步的字段不进入下载集（整片无所需字段时该片不再下载；
+  // 用户手动勾选的分片除外——那种情况下仍会下载，只是不写入）。
+  // base 片恒下载（REQUIRED_SHARD_ANCHORS），sid / date 等锚点字段不受影响。
+  if (neededFields && mapping && mapping.excludedColumns.length > 0) {
+    const excludedFields = excludedJsonlFields(mapping.excludedColumns)
+    for (const field of excludedFields) {
+      neededFields.delete(field)
+    }
   }
   const remoteEntries = await source.fetchRemoteEntries(signal, {
     neededFields,
@@ -198,6 +218,12 @@ export async function runRemoteSync(
       throw new Error('无法读取本地工作表数据')
     }
 
+    // 列映射确认（本地侧）：改映射 = 把用户选的目标列的值复制到默认列名键下，
+    // computeDiff / 写入侧都按默认列名寻址即可命中（列号改写见下面 columnRemap）。
+    if (mapping && Object.keys(mapping.columnOverrides).length > 0) {
+      applyColumnOverrides(local.entries, mapping.columnOverrides)
+    }
+
     onProgress?.(2, 3, '比对差异中...')
     const diffStartTs = Date.now()
     const diffs = computeDiff(effectiveRemoteEntries, local.entries, effectiveStrategy, timeFilter)
@@ -212,20 +238,72 @@ export async function runRemoteSync(
       )
     }
 
-    const addedCount = diffs.filter((d) => d.kind === 'add').length
-    const updateCount = diffs.filter((d) => d.kind === 'update').length
-    const deletedCount = diffs.filter((d) => d.kind === 'delete').length
+    // 列映射确认（写入侧）：取消同步的列从 diff 显式字段里剔除。
+    // add 的 '*' 不在此滤——写入层经 colMap 摘列天然跳过（见 applyDiffToSheet）。
+    // 滤完后 changedFields 为空的 update diff 没有可写内容，移出 diff 列表，
+    // 否则计数与明细会显示「更新了 N 条」但实际什么都没写。
+    // 过滤必须早于下面的计数：counts 与 apply 用同一份 writableDiffs。
+    // 用 map 出新数组而非原地改 changedFields：diff 是 computeDiff 的产物，
+    // 原地改会让「冲突解决后的 diffs」与「实际写入的 diffs」暗中共享状态。
+    const excludedSet =
+      mapping && mapping.excludedColumns.length > 0 ? new Set(mapping.excludedColumns) : undefined
+    const writableDiffs =
+      excludedSet === undefined
+        ? diffs
+        : diffs
+            .map((diff) =>
+              diff.changedFields.includes('*')
+                ? diff
+                : {
+                    ...diff,
+                    changedFields: diff.changedFields.filter((field) => !excludedSet.has(field)),
+                  },
+            )
+            .filter((diff) => diff.kind !== 'update' || diff.changedFields.length > 0)
+
+    const addedCount = writableDiffs.filter((d) => d.kind === 'add').length
+    const updateCount = writableDiffs.filter((d) => d.kind === 'update').length
+    const deletedCount = writableDiffs.filter((d) => d.kind === 'delete').length
     bgmLog(
       LOG_LEVELS.INFO,
       `[${logTag}] diff 完成（${effectiveStrategy}）：新增 ${String(addedCount)}，更新 ${String(updateCount)}，删除 ${String(deletedCount)}，耗时 ${String(diffElapsed)}ms`,
     )
 
+    // 列映射确认（写入侧）：改映射的列号改写表。默认列名 → 目标列在 colMap 里的列号。
+    // 目标列不存在（用户选了不存在的列）时跳过该条 —— applyColumnOverrides 已把
+    // 本地值复制到默认键，缺失列在写入层静默跳过，不会写错位置。
+    let columnRemap: Map<string, number> | undefined
+    if (mapping && Object.keys(mapping.columnOverrides).length > 0) {
+      const remapSheet = getDataSheet()
+      if (remapSheet) {
+        const remapHeaderRow = findHeaderRow(remapSheet) || 1
+        const remapColMap = getColumnMap(remapSheet, remapHeaderRow)
+        columnRemap = new Map<string, number>()
+        for (const [from, to] of Object.entries(mapping.columnOverrides)) {
+          const targetIndex = remapColMap.get(to)
+          if (targetIndex !== undefined) columnRemap.set(from, targetIndex)
+        }
+      }
+    }
+
+    // 列映射确认的 apply 选项：排除列（含别名闭包）+ 改映射列号表。
+    // 用赋值构建而不用条件展开：避免 unicorn/consistent-conditional-object-spread
+    // 与 TS 对 `...false` 的限制打架（两条路都堵）。
+    const applyOptions: ApplyMappingOptions = {}
+    if (mapping && mapping.excludedColumns.length > 0) {
+      applyOptions.excludedColumns = excludedColumnClosure(mapping.excludedColumns)
+    }
+    if (columnRemap !== undefined && columnRemap.size > 0) {
+      applyOptions.columnRemap = columnRemap
+    }
+
     const result = await applyDiffToSheet(
-      diffs,
+      writableDiffs,
       effectiveStrategy,
       onProgress,
       source.getDisplayName(),
       signal,
+      mapping ? applyOptions : undefined,
     )
     result.remoteTotal = effectiveRemoteEntries.length
     // unchanged = 远程总数 - (新增+更新)（delete 不计入 unchanged）
@@ -236,14 +314,26 @@ export async function runRemoteSync(
     const sheetForAudit = getDataSheet()
     if (sheetForAudit) {
       const auditHeaderRow = findHeaderRow(sheetForAudit) || 1
-      result.missingColumns = collectMissingColumns(
+      const missing = collectMissingColumns(
         effectiveRemoteEntries,
         getColumnMap(sheetForAudit, auditHeaderRow),
       )
+      // 用户主动取消同步的列不进缺列提示——那是选择，不是遗漏
+      result.missingColumns =
+        excludedSet === undefined ? missing : missing.filter((name) => !excludedSet.has(name))
       if (result.missingColumns.length > 0) {
         bgmLog(
           LOG_LEVELS.WARN,
           `[${logTag}] ${String(result.missingColumns.length)} 个远程字段因本地缺少表头未同步，建议添加列：${result.missingColumns.join('、')}`,
+        )
+        // 主动通知：缺列 = 「勾了片但字段没进表」。只进日志与完成弹窗细节的话，
+        // 不翻日志、不细看弹窗的用户完全无感（synced 字段少了一截却显示同步成功）。
+        // toast 列表截断到前 5 个（完整清单在完成弹窗），3 秒自动消失不打断流程。
+        const shownColumns = result.missingColumns.slice(0, 5).join('、')
+        const truncatedSuffix = result.missingColumns.length > 5 ? ' 等' : ''
+        getNotifyApi().toast(
+          `${String(result.missingColumns.length)} 个远程字段因本地缺少表头未同步（${shownColumns}${truncatedSuffix}），请在表头行添加同名列后重新同步，详见完成弹窗`,
+          'warning',
         )
       }
     }

@@ -21,6 +21,7 @@ import { GitlabSyncSource } from './gitlab-sync.js'
 import { LocalFileSyncSource } from './local-file-sync.js'
 import { runRemoteSync } from './remote-sync-core.js'
 import type { GithubSyncResult } from './remote-sync-apply.js'
+import type { SyncMappingConfig } from './sync-mapping.js'
 import type { SyncSource } from './sync-source.js'
 
 /** 同步源工厂函数：每次调用返回新实例，避免实例间状态共享 */
@@ -87,6 +88,7 @@ export async function syncFromRemote(
   shouldUseSelectedRowsOnly?: boolean,
   conflictResolution?: ConflictResolution[],
   timeFilter?: SyncTimeFilter,
+  mapping?: SyncMappingConfig,
 ): Promise<GithubSyncResult> {
   // 1. 按 sourceType 从注册表获取 SyncSource 实例
   const sourceType = getSyncSourceType()
@@ -106,6 +108,7 @@ export async function syncFromRemote(
     shouldUseSelectedRowsOnly,
     conflictResolution,
     timeFilter,
+    mapping,
   })
 }
 

@@ -258,14 +258,14 @@ export function showSyncResultDialog(options: SyncResultDialogOptions): void {
 
   // 缺列提示：远程有数据、本地却没有对应表头的字段。
   // 写入侧 safeSet 遇缺失列会静默 return，不提示的话用户只会看到「同步成功但字段没进来」。
-  // 这里把字段名显式列出来，由用户自行添加表头后重新同步（复用既有 meta-bar 样式，未新增 CSS）。
+  // 除字段名外还给出补列方法（表头行加同名列、顺序不限），core 侧另有 toast 主动通知。
   const missingColumns = result.missingColumns ?? []
   const missingHtml =
     missingColumns.length > 0
       ? `
       <div class="bgm-result-section">
         <div class="bgm-result-section-title">⚠️ 未同步字段（本地缺少表头）</div>
-        <div class="bgm-result-date-label">以下字段远程有数据，但你的表里没有对应列，本次已跳过。如需同步，请先添加这些表头再重新同步：</div>
+        <div class="bgm-result-date-label">以下字段远程有数据，但你的表里没有对应列，本次已跳过。补法：在数据表头行添加与下面同名的列（顺序不限、可插在任意位置），重新执行同步即可补上。</div>
         <div class="bgm-meta-bar">
           ${missingColumns
             .map(

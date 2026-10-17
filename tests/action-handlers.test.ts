@@ -818,6 +818,8 @@ describe('ACTION_HANDLERS · syncFromGithub', () => {
       false,
       undefined,
       undefined,
+      // 第 7 位 = 列映射确认结果（本用例无数据表 → 空配置）
+      { excludedColumns: [], columnOverrides: {} },
     )
     await vi.waitFor(() => {
       expect(mocks.completeSyncProgressDialog).toHaveBeenCalledTimes(1)

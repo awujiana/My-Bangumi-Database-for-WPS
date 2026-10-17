@@ -1,6 +1,6 @@
 ﻿# Bangumi WPS Excel 加载项 - 架构与项目知识文档
 
-> 版本: 3.14 | 更新日期: 2026-10-17
+> 版本: 3.15 | 更新日期: 2026-10-17
 
 ---
 
@@ -26,6 +26,7 @@
 | v3.12 | 2026-10-09 | **全页面**同类错位排查 + 布局审计工具。v3.11 只修了「数据分片」一处，遂用真浏览器扫了 `ui/*.html` 全部 5 个页面，又抓到 **3 处同源 bug**：① `#chkSyncSelectedOnly` 的 label 被 `.form-row label{flex:0 0 96px}` 钉成 96px、其中的复选框又被 `.form-row input{width:100%}` 撑到 96px，「仅同步选中行（按 Bangumi URL 列匹配 SID）」被挤爆；② `.time-filter-box` 在 `styles.css` 里声明 `display: block`，却被**后加载**的 `panel-theme.css` 的 `.form-row { display: flex }` 盖掉（同特异性 0,1,0）→ 该区块变成横向 flex，label 与块内 `p.hint` 争宽、label 只剩 111px，「✅ 启用时间筛选（按开播日期过滤）」竖排 4 行；③ 提示文本里的行内 `<code>` 使 `p.hint` 横向溢出 6px。修法统一为**提升特异性**（不是 `!important`）：`.form-row > label:has(> input[type='checkbox'])` / `:has(> input[type='radio'])` 设 `flex: 1 1 auto`、`.form-row > label > input[type='checkbox'/'radio']` 设 `width: auto`、`.form-row.time-filter-box` 设 `display: block`，另给 `.hint` 加 `overflow-wrap: anywhere`。新增 `scripts/audit-layout.mjs` + `npm run audit:layout`（**不在 `gate` 内**，依赖本机 Chrome）：5 个页面 × 500/400px 两档，按三条客观判据找错位（原生 checkbox/radio > 20px、短文本 ≤ 24 字占 > 1 视觉行、内容横向溢出），并已反向验证（回退 CSS → 退出码 1、准确报 3 类问题，`clean`/`enrich`/`settings` 仍判无异常）。修复后 5 页面 × 2 档**全部无异常** |
 | v3.13 | 2026-10-15 | **全链路数据安全审计**：修复 6 处会「吞数据 / 改用户数据」的缺陷（详见 §2.7）。核心是三条 COM 读写不变式——**单行区域 `Value2` 是一维数组**（原来按二维取 `oldValues[0]` 会拿到首个单元格的值，索引字符串得「第 N 个字符」）、**`null` 在二维数组里的语义是「清空该单元格」**（原来把未变化列铺 null 再整行赋值，会清掉 `writeCols` 区间中段的用户数据）、**读失败必须放弃写入**（原来用空旧值做「本地 \| 远程」合并，等于把用户标签/别名整体替换成远程值）。另修一个用户可见行为 bug：主面板 `#conflictStrategy` 下拉的 change 监听因 `#chkIncremental` 早退而从未注册，用户改了下拉却不落 `bgm_skip_conflicts` 配置。同时确立**测试桩忠实性原则**（桩不忠实就修桩，不为迁就桩弱化生产守卫）                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
 | v3.14 | 2026-10-17 | **sync 结构合并（路线①）**：`syncFromRemote` 与 `syncFromGithub` 主体逐字重复 ~150 行（2026-10-15 逐行比对确认差异仅 5 处：source 获取 / 校验文案 / 日志 tag / 耗时格式 / 时间筛选标签函数是否内联）。新增 `ts/sync/remote-sync-apply.ts`（apply 阶段整体逐字迁入，1537 行，含 `readLocalEntriesForSync` / `applyDiffToSheet` / `applyConflictResolutions` 与 12 个私有辅助）与 `ts/sync/remote-sync-core.ts`（`runRemoteSync` 统一编排，入口差异全部参数化）；`github-sync.ts` 1893 → 215、`sync-source-registry.ts` 314 → 118，均变薄壳，apply 三函数与 `GithubSyncResult` 经兼容 re-export 保留（barrel 与消费方不变）。关键约束：**`vi.mock` 截不住模块内调用 → apply 与编排必须分模块**，否则 registry 测试对 apply 三函数的 mock 静默失效（最终零断言变更，仅 mock 接缝随模块边界迁移）。进度口径统一 `0/1→1/3→2/3→3/3`、编排层耗时统一裸毫秒 `${ms}ms`（github 路径用户可见文案随之小改），apply 阶段内部 `formatDuration` 文案不变。依赖单向无环：apply ← core ← 两个薄壳                                                                                                                                                                                                                                                                                                                                                                                 |
+| v3.15 | 2026-10-17 | **同步前列映射确认框 + 缺列主动通知**：新增 `ts/sync/sync-mapping.ts`（纯逻辑，从既有字段表派生行、排除/改列/补列的解析与落地辅助）与 `ts/ui/sync-mapping-dialog.ts`（勾选 / 拖拽排序 / 改目标列 / 一键补缺失列，写表头读回校验）。主流程贯通四点：排除列从 neededFields 剔除 + update diff 过滤 + 写入层从 colMap 摘列（含别名闭包）+ 缺列体检过滤；改映射用「本地复制字段键 + 写入换列号」实现，computeDiff 与写入函数零改动。缺列从「只进日志」升级为 toast 主动通知 + 弹窗补列指引。接线在 `ACTION_HANDLERS.syncFromGithub`（确认框 → 列映射框 → 同步），两入口新增末尾可选参数 `mapping`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
 
 ## 一、架构概览
 
@@ -115,6 +116,7 @@ ts/index.ts (thin barrel — 仅 re-export)
   │   ├── github-sync-diff.ts → 差异计算 (纯函数，零依赖)
   │   ├── remote-sync-core.ts → runRemoteSync 统一编排（两入口共用）
   │   ├── remote-sync-apply.ts → apply 阶段（读本地 / 写差异 / undo / 同步记录）
+  │   ├── sync-mapping.ts   → 同步前列映射确认（纯逻辑：行构建 / 排除 / 改列）
   │   ├── jsonl-response.ts  → 数据源响应解码 (gzip 魔数识别 + DecompressionStream)
   │   ├── sync-source-registry.ts → 多源同步注册表（含 syncFromRemote 薄壳）
   │   ├── gist-sync.ts       → Gist 同步源
@@ -137,6 +139,7 @@ ts/index.ts (thin barrel — 仅 re-export)
   │   ├── preview.ts        → 数据预览组件
   │   ├── conflict-resolver.ts → 冲突解决 UI
   │   ├── sync-result-dialog.ts → 同步结果弹窗
+  │   ├── sync-mapping-dialog.ts → 同步前列映射确认框
   │   └── handlers/         → 事件处理器
   │       ├── index.ts      → 主 handler 分发 (含 trackedEventBusOn 清理机制)
   │       ├── sync.ts       → 同步相关 handler
@@ -351,6 +354,16 @@ ts/index.ts (thin barrel — 仅 re-export)
   - 制作公司/动画制作公司：远程 `动画制作公司` 字段同步到本地 `制作公司` 和 `动画制作公司` 两列（双列映射）
   - Bangumi_URL：根据远程 sid 构造预期 URL `https://bgm.tv/subject/{sid}`，仅当本地存在该字段时进行比对和更新
 
+#### `sync-mapping.ts` — 同步前列映射确认（纯逻辑，2026-10-17）
+
+- **`buildSyncMappingRows(localColumns)`**: 从 `EXTENDED_FIELD_MAP` + `CORE_FIELD_COLUMNS` **派生**可同步字段行（不复制第二份字段表）；行含默认列 / 别名列 / 本地是否已有该列 / 默认勾选状态
+- **`resolveSyncMappingConfig(rows)`**: 行状态 → `{ excludedColumns, columnOverrides }`（未勾选 = 排除；目标列 ≠ 默认列 = 改映射）
+- **`findOverrideConflicts(rows)`**: 目标列冲突校验（含别名列占位；后占位者报冲突）
+- **`applyColumnOverrides(entries, overrides)` / `remapColumnIndices(colMap, remap)`**: 改映射的一对落地——本地侧复制字段键、写入侧换列号，`computeDiff` / 写入函数**零改动**
+- **`withoutColumns(colMap, excluded)` / `excludedColumnClosure(columns)`**: 排除列的落地（从 colMap 摘列，含别名闭包）
+- **`excludedJsonlFields(columns)`**: 排除列反查远程字段，用于从 `neededFields` 剔除（少下载整片）
+- **`UNMAPPED_REMOTE_FIELDS`**: 随分片下载但不落盘的字段清单（简介原文 / infobox / 用户标签 / 评分分布 / 收藏统计 / 平台 / 系列 / NSFW / 原始名 / updatedAt），确认框脚注用
+
 #### `github-sync-diff.ts` — 差异计算 (纯函数)
 
 - **`computeDiff()`**: 零依赖差异计算，可在 Node 测试环境运行
@@ -560,6 +573,7 @@ ts/index.ts (thin barrel — 仅 re-export)
 - **`message.ts`**: 状态栏消息 (`setStatus()`, `initMessageListener()`)
 - **`conflict-resolver.ts`**: 冲突解决 UI (`showConflictResolver()`)
 - **`sync-result-dialog.ts`**: 同步结果增强弹窗 (`showSyncResultDialog()`, `computeDateStatsFromSheet()`)
+- **`sync-mapping-dialog.ts`**: 同步前列映射确认框 (`showSyncMappingDialog()`)——勾选/拖拽排序/改目标列/一键补列；返回 `SyncMappingConfig | null`（null = 取消同步）。纯逻辑在 `sync/sync-mapping.ts`
 
 ### 2.5 工具模块 (`ts/tools/`)
 
