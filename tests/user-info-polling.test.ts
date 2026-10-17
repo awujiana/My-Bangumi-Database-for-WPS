@@ -24,7 +24,6 @@ const m = vi.hoisted(() => ({
   getBgmUsername: vi.fn((): string | null => null),
   updateTokenStatus: vi.fn(),
   updateUserIdStatus: vi.fn(),
-  isIncrementalSyncEnabled: vi.fn((): boolean => false),
   isSkipConflictsEnabled: vi.fn((): boolean => false),
   isSyncRecordEnabled: vi.fn((): boolean => false),
 }))
@@ -60,7 +59,6 @@ vi.mock('../ts/index.js', async () => {
     _getBgmUsername: m.getBgmUsername,
     updateTokenStatus: m.updateTokenStatus,
     updateUserIdStatus: m.updateUserIdStatus,
-    isIncrementalSyncEnabled: m.isIncrementalSyncEnabled,
     isSkipConflictsEnabled: m.isSkipConflictsEnabled,
     isSyncRecordEnabled: m.isSyncRecordEnabled,
   }
@@ -75,10 +73,7 @@ vi.mock('../ts/panel/panel-lifecycle.js', () => ({
 
 import { LOG_LEVELS } from '../ts/core/constants.js'
 import { BGM_EVENTS, eventBus } from '../ts/tools/events.js'
-import {
-  restoreUserInfoFromStorage,
-  startUserInfoPolling,
-} from '../ts/panel/user-info-polling.js'
+import { restoreUserInfoFromStorage, startUserInfoPolling } from '../ts/panel/user-info-polling.js'
 
 /** 真实单例上的 spy：每个用例只清调用记录，不 restore（restore 后后续用例就没 spy 了） */
 const emitSpy = vi.spyOn(eventBus, 'emit')
@@ -175,7 +170,6 @@ beforeEach(() => {
   m.loadBgToken.mockReturnValue(null)
   m.getBgmUserId.mockReturnValue(null)
   m.getBgmUsername.mockReturnValue(null)
-  m.isIncrementalSyncEnabled.mockReturnValue(false)
   m.isSkipConflictsEnabled.mockReturnValue(false)
   m.isSyncRecordEnabled.mockReturnValue(false)
 })
@@ -304,7 +298,6 @@ describe('startUserInfoPolling · 基线', () => {
     startUserInfoPolling()
     tick()
 
-    expect(m.isIncrementalSyncEnabled).toHaveBeenCalledWith(true)
     expect(m.isSkipConflictsEnabled).toHaveBeenCalledWith(true)
     expect(m.isSyncRecordEnabled).toHaveBeenCalledWith(true)
   })
@@ -446,45 +439,9 @@ describe('startUserInfoPolling · 用户信息与 Token', () => {
 // ========== startUserInfoPolling · 配置同步 ==========
 
 describe('startUserInfoPolling · Ribbon 配置同步', () => {
-  it('增量同步变更 + 复选框存在 → 同步勾选状态', () => {
-    mountApp()
-    m.isIncrementalSyncEnabled.mockReturnValue(true)
-    const checkbox = mountInput('chkIncremental')
-
-    startUserInfoPolling()
-    tick()
-
-    expect(hasLog('检测到增量同步配置变更: 开启')).toBe(true)
-    expect(checkbox.checked).toBe(true)
-    expect(hasLog('增量同步复选框已同步: 开启')).toBe(true)
-  })
-
-  it('增量同步保持关闭 + 复选框存在 → 同步为未勾选', () => {
-    mountApp()
-    const checkbox = mountInput('chkIncremental')
-    checkbox.checked = true
-
-    startUserInfoPolling()
-    tick()
-
-    expect(hasLog('检测到增量同步配置变更: 关闭')).toBe(true)
-    expect(checkbox.checked).toBe(false)
-    expect(hasLog('增量同步复选框已同步: 关闭')).toBe(true)
-  })
-
-  it('增量同步变更 + 复选框不存在 → 静默跳过（不抛错）', () => {
-    mountApp()
-    m.isIncrementalSyncEnabled.mockReturnValue(true)
-
-    expect(() => {
-      startUserInfoPolling()
-      tick()
-    }).not.toThrow()
-
-    expect(hasLog('检测到增量同步配置变更: 开启')).toBe(true)
-    expect(hasLog('增量同步复选框已同步')).toBe(false)
-  })
-
+  // 「增量同步复选框同步」用例已随死分支删除：panel.html 的「仅同步变更」
+  // 复选框已收拢到「设置」页（panel.html 说明文案），主面板没有
+  // #chkIncremental，user-info-polling 里的同步分支是空转死代码。
   it('跳过冲突变更 + select 存在 → 同步下拉值', () => {
     mountApp()
     m.isSkipConflictsEnabled.mockReturnValue(true)

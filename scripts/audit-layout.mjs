@@ -2,7 +2,7 @@
 /**
  * @fileoverview 全页面**布局审计**（真浏览器量计算样式，找「样式错位」类问题）
  *
- * 背景：BGM 的页面把 `panel-theme.css` 放在**最后**加载（panel / settings / panel-preview），
+ * 背景：BGM 的面板类页面把 `panel-theme.css` 放在**最后**加载（panel / settings），
  * 它里面的**通用**规则（`.form-row label { flex: 0 0 96px }`、`.form-row input { width: 100% }`）
  * 会命中各种内部控件；而 `styles.css` 里针对同类控件的覆盖规则**特异性相同**（都是 0,1,1）
  * → 由加载顺序决定胜负 → 覆盖失效、控件被挤窄或撑大。2026-10-09 一次就抓到 3 处：

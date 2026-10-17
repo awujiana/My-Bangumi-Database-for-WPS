@@ -15,7 +15,6 @@ import {
   _getBgmUsername,
   updateTokenStatus,
   updateUserIdStatus,
-  isIncrementalSyncEnabled,
   isSkipConflictsEnabled,
   isSyncRecordEnabled,
 } from '../index.js'
@@ -67,7 +66,6 @@ export function startUserInfoPolling(): void {
   let lastUserId = BGM.cache.userId ?? null
   let lastUsername = BGM.cache.username ?? null
   let lastToken = loadBgToken()
-  let lastIncrementalSync: boolean | null = null
   let lastSkipConflicts: boolean | null = null
   let lastEnableSyncRecord: boolean | null = null
   let lastPanelShownAt: string | null = null
@@ -146,25 +144,11 @@ export function startUserInfoPolling(): void {
       updateUserIdStatus()
     }
 
-    // 同步 Ribbon 的配置变更到 Panel UI（增量同步 + 跳过冲突，静默读取避免日志刷屏）
-    const isCurrentIncrementalSync = isIncrementalSyncEnabled(true)
+    // 同步 Ribbon 的配置变更到 Panel UI（跳过冲突，静默读取避免日志刷屏）
+    // 增量同步没有这一步：panel.html 的「仅同步变更」复选框已收拢到「设置」页
+    // （见 panel.html 的说明文案），主面板不再有 #chkIncremental 控件，
+    // 保留该分支只会永久走进「元素不存在」的空转。
     const isCurrentSkipConflicts = isSkipConflictsEnabled(true)
-
-    if (isCurrentIncrementalSync !== lastIncrementalSync) {
-      bgmLog(
-        LOG_LEVELS.INFO,
-        `[startUserInfoPolling] 检测到增量同步配置变更: ${isCurrentIncrementalSync ? '开启' : '关闭'}`,
-      )
-      lastIncrementalSync = isCurrentIncrementalSync
-      const chkIncremental = document.getElementById('chkIncremental') as HTMLInputElement | null
-      if (chkIncremental) {
-        chkIncremental.checked = isCurrentIncrementalSync
-        bgmLog(
-          LOG_LEVELS.INFO,
-          `[startUserInfoPolling] 增量同步复选框已同步: ${isCurrentIncrementalSync ? '开启' : '关闭'}`,
-        )
-      }
-    }
 
     if (isCurrentSkipConflicts !== lastSkipConflicts) {
       bgmLog(
