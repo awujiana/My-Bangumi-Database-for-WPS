@@ -46,6 +46,36 @@ const mockReadRangeValues = vi.hoisted(() =>
     },
   ),
 )
+const mockReadRangeCellValues = vi.hoisted(() =>
+  vi.fn(
+    (
+      ws: unknown,
+      startRow: number,
+      endRow: number,
+      startCol: number,
+      endCol: number,
+    ): (string | number | boolean | Date | null)[][] => {
+      // 默认实现与 mockReadRangeValues 同源（走 mockGetCellValue），但**保留原始
+      // 类型**：与真实宿主「读到什么返什么」一致，宽度自动等于请求列数，
+      // 因此「读-改-写」用例无需再逐个 stub ws.Range 的区域 Value2。
+      // 「读失败」场景的用例用 mockReturnValueOnce([]) 覆盖本默认实现。
+      try {
+        const rows: (string | number | boolean | Date | null)[][] = []
+        for (let row = startRow; row <= endRow; row += 1) {
+          const line: (string | number | boolean | Date | null)[] = []
+          for (let col = startCol; col <= endCol; col += 1) {
+            const value = mockGetCellValue(ws, row, col) as string | number | boolean | null
+            line.push(value ?? null)
+          }
+          rows.push(line)
+        }
+        return rows
+      } catch {
+        return []
+      }
+    },
+  ),
+)
 const mockSetCellValue = vi.hoisted(() => vi.fn())
 const mockColNumberToLetter = vi.hoisted(() => vi.fn((c: number) => String.fromCodePoint(64 + c)))
 const mockTrim = vi.hoisted(() => vi.fn((v: string) => v.trim()))
@@ -72,6 +102,8 @@ const remoteEntriesState = vi.hoisted(() => ({
   entries: [] as unknown[],
   shards: [] as string[],
   updatedAt: '',
+  // 分片拼接后缺合法 sid 被跳过的条数（供 skippedInvalidLines 透传测试）
+  skippedInvalidRecords: 0,
 }))
 const mockLoadEntriesFromPath = vi.hoisted(() =>
   vi.fn(() =>
@@ -79,6 +111,7 @@ const mockLoadEntriesFromPath = vi.hoisted(() =>
       entries: remoteEntriesState.entries,
       shards: remoteEntriesState.shards,
       updatedAt: remoteEntriesState.updatedAt,
+      skippedInvalidRecords: remoteEntriesState.skippedInvalidRecords,
     }),
   ),
 )
@@ -282,6 +315,7 @@ const mockXHR = vi.hoisted(() => {
       remoteEntriesState.entries = []
       remoteEntriesState.shards = []
       remoteEntriesState.updatedAt = ''
+      remoteEntriesState.skippedInvalidRecords = 0
     },
   }
 })
@@ -362,6 +396,7 @@ vi.mock('../ts/tools/utility.js', () => ({
   getColumnMap: mockGetColumnMap,
   getCellValue: mockGetCellValue,
   readRangeValues: mockReadRangeValues,
+  readRangeCellValues: mockReadRangeCellValues,
   readRowsCache: mockReadRowsCache,
   setCellValue: mockSetCellValue,
   colNumberToLetter: mockColNumberToLetter,
@@ -1230,19 +1265,16 @@ describe('readLocalEntries 批量读取路径', () => {
   })
 
   it('readLocalEntriesForSync 应正确解析批量数据', () => {
-    const batchData: unknown[][] = [
+    const batchData: string[][] = [
       ['https://bgm.tv/subject/1', '条目1', '标签1'],
       ['https://bgm.tv/subject/2', '条目2', '标签2'],
       ['https://bgm.tv/subject/3', '条目3', '标签3'],
     ]
 
     const mockWs = createMockWorksheet()
-    mockWs.Range = asRangeMock((address: string) => {
-      if (address.includes(':')) {
-        return { Value2: batchData, Interior: { Color: 0 } }
-      }
-      return { Value2: '', Text: '', Interior: { Color: 0 }, Font: { Bold: false } }
-    })
+    // readLocalEntries 已改走统一入口 readRangeValues（含形状守卫），
+    // 区域读由该入口的 mock 供给——ws.Range 不再是本地读取的数据源。
+    mockReadRangeValues.mockReturnValueOnce(batchData)
 
     mockGetDataSheet.mockReturnValue(mockWs)
     mockFindHeaderRow.mockReturnValue(1)
@@ -1809,6 +1841,21 @@ describe('fetchGithubJson 委托分片编排', () => {
     mockLoadEntriesFromPath.mockRejectedValueOnce(new Error('分片清单格式非法'))
 
     await expect(fetchGithubJson()).rejects.toThrow(/分片清单格式非法/)
+  })
+
+  it('缺合法 sid 计数经出参 stats 透传给调用方（结果弹窗用）', async () => {
+    remoteEntriesState.skippedInvalidRecords = 3
+    const stats = { skippedInvalidLines: 0 }
+
+    await fetchGithubJson(undefined, undefined, stats)
+
+    expect(stats.skippedInvalidLines).toBe(3)
+  })
+
+  it('未传 stats 出参时不影响正常返回（可选参数契约）', async () => {
+    remoteEntriesState.skippedInvalidRecords = 3
+
+    await expect(fetchGithubJson()).resolves.toEqual([])
   })
 })
 
@@ -3560,8 +3607,12 @@ describe('batchUpdateRows 单行一维旧值与区间中段列保全（数据安
   it('单行范围返回一维数组时：旧值整体读入，区间内非写入列原值写回', async () => {
     const mockWs = createMockWorksheet()
     let writtenRow: unknown = null
-    // Excel/WPS 对**单行**范围返回一维数组：整个数组就是一行（列 3..8）
+    // 列 3..8 的旧值（单行范围的完整一行）。
+    // 「单行范围宿主返回**一维**数组」的归一由 readRangeCellValues 内部的 readRect
+    // 负责，其回归在 tests/sheet.test.ts（单行一维不得读成 N 行 1 列）；
+    // 本用例焦点是读-改-写**基底逻辑**：区间中段的用户列原值写回、不被 null 清空。
     const oldRow = ['本地标签A', '用户列4数据', '用户列5数据', '用户列6数据', '用户列7数据', '5']
+    mockReadRangeCellValues.mockReturnValueOnce([oldRow])
     const rowRange = {
       Interior: { Color: 0 },
       get Value2() {
@@ -3625,12 +3676,10 @@ describe('batchUpdateRows 单行一维旧值与区间中段列保全（数据安
 
   it('旧值读不到（Value2 为 null）时应回退逐字段，不用空值合并覆盖本地标签', async () => {
     const mockWs = createMockWorksheet()
-    // 单行范围读回 null → 视为读失败，放弃批量路径
-    mockWs.Range = asRangeMock((address: string) =>
-      address.includes(':')
-        ? { Value2: null, Interior: { Color: 0 } }
-        : { Value2: '', Text: undefined, Interior: { Color: 0 }, Font: { Bold: false } },
-    )
+    // 单行范围读回 null → readRect 判读失败返 [] → 宽度不足，放弃批量路径。
+    // readRangeCellValues 的默认桩会从 getCellValue 造出够宽的行（模拟正常宿主），
+    // 这里 once 覆盖成 [] 来锁定「读失败即回退」。
+    mockReadRangeCellValues.mockReturnValueOnce([])
     mockGetDataSheet.mockReturnValue(mockWs)
     mockFindHeaderRow.mockReturnValue(1)
     mockGetLastRow.mockReturnValue(5)
@@ -4980,15 +5029,11 @@ describe('safeSet 数字扩展字段 (line 506)', () => {
 // ========== 补充测试：readLocalEntries 批量读取失败回退逐单元格 (line 316) ==========
 describe('readLocalEntries 批量读取异常回退 (line 316)', () => {
   it('Range.Value2 抛异常时应回退到逐单元格读取 (line 316)', () => {
-    const normalSheet = createMockWorksheet()
-    normalSheet.Range = asRangeMock((address: string) => {
-      if (address.includes(':')) {
-        // 批量读取的矩形区域 → 抛异常
-        throw new Error('COM 异常：无法读取批量区域')
-      }
-      return { Value2: '', Text: undefined, Interior: { Color: 0 }, Font: { Bold: false } }
-    })
+    // readRect 内部对 COM 异常一律 catch 后按「读失败」返回 []；
+    // readLocalEntries 以「读回行数 !== 请求行数」判据回退逐单元格读。
+    mockReadRangeValues.mockReturnValueOnce([])
 
+    const normalSheet = createMockWorksheet()
     mockGetDataSheet.mockReturnValue(normalSheet)
     mockFindHeaderRow.mockReturnValue(1)
     mockGetLastRow.mockReturnValue(5)
@@ -5552,10 +5597,9 @@ describe('applyDiffToSheet 批量更新回退 / 写入阶段取消 / 同步记�
 
   it('读取旧值失败且没有任何可写值 → 直接返回 0（line 727）', async () => {
     const mockWs = createMockWorksheet()
-    // 整行 Range 抛错 → range 保持 null，走 line 724 之后的「回退逐字段写入」分支
-    mockWs.Range = asRangeMock(() => {
-      throw new Error('Range 访问失败')
-    })
+    // readRect 读失败返 []（旧内联实现里对应 `ws.Range` 抛错 / Value2 为 null）
+    // → 宽度不足，range 保持 null，走「回退逐字段写入」分支
+    mockReadRangeCellValues.mockReturnValueOnce([])
     mockGetDataSheet.mockReturnValue(mockWs)
 
     const diffs: GithubSyncDiff[] = [
@@ -5577,7 +5621,7 @@ describe('applyDiffToSheet 批量更新回退 / 写入阶段取消 / 同步记�
     expect(mockSetCellValue).not.toHaveBeenCalled()
     expect(mockBgmLognnn).toHaveBeenCalledWith(
       'WARN',
-      expect.stringContaining('读取旧值失败，回退逐字段写入'),
+      expect.stringContaining('旧值读取失败或形状异常，回退逐字段写入'),
     )
   })
 

@@ -573,6 +573,30 @@ describe('GiteeSyncSource.fetchRemoteEntries', () => {
     expect(entries[0]!.summary).toBe('简介1')
   })
 
+  it('缺合法 sid 计数写入 loadStats（syncFromRemote 弹窗展示用）', async () => {
+    const source = new GiteeSyncSource()
+    responseQueue = [
+      makeManifestText(),
+      '["sid","name","updatedAt"]\n["1","条目1","2026-09-08"]\n[null,"坏行",""]',
+    ]
+
+    const entries = await source.fetchRemoteEntries(undefined, { neededFields: new Set() })
+
+    expect(entries).toHaveLength(1)
+    expect(source.loadStats.skippedInvalidLines).toBe(1)
+  })
+
+  it('数据干净时 loadStats 归零', async () => {
+    const source = new GiteeSyncSource()
+    // 先用一次脏数据把 loadStats 顶起来，再证明干净同步会整体覆写而不是累加
+    source.loadStats.skippedInvalidLines = 9
+    responseQueue = [makeManifestText(), '["sid","name","updatedAt"]\n["1","条目1","2026-09-08"]']
+
+    await source.fetchRemoteEntries(undefined, { neededFields: new Set() })
+
+    expect(source.loadStats.skippedInvalidLines).toBe(0)
+  })
+
   it('传递已 aborted 的 AbortSignal 给 fetchGiteeJson', async () => {
     const source = new GiteeSyncSource()
     const controller = new AbortController()

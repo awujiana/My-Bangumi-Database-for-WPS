@@ -156,6 +156,16 @@ export function isLocalFileConfigured(): boolean {
  *      （XHR 的 abort 由 signal 监听器触发，行为与远程源一致）
  */
 export class LocalFileSyncSource implements SyncSource {
+  /**
+   * 最近一次 {@link fetchRemoteEntries} 的下载统计
+   *
+   * 与 `BaseSyncSource` 子类同口径：loadEntriesFromPath 拼完后缺合法 sid
+   * 被跳过的条数，由 syncFromRemote 读取后进入同步结果弹窗。实例级，
+   * 每次同步从注册表取到的都是同一实例（注册表单例），但值是每次取数
+   * 整体覆写（不是累加），不存在跨同步残留。
+   */
+  readonly loadStats: { skippedInvalidLines: number } = { skippedInvalidLines: 0 }
+
   /** 数据源类型标识 */
   getSourceType(): string {
     return 'local'
@@ -201,6 +211,8 @@ export class LocalFileSyncSource implements SyncSource {
       signal,
       logTag: 'localFileSync',
     })
+    // 脏数据计数透传给同步结果弹窗（loadStats 每次整体覆写，不累加）
+    this.loadStats.skippedInvalidLines = result.skippedInvalidRecords
 
     // 3. 读取完成后、返回前再次检查 signal.aborted
     if (signal?.aborted) {

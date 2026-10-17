@@ -45,6 +45,34 @@ const mockReadRangeValues = vi.hoisted(() =>
     },
   ),
 )
+const mockReadRangeCellValues = vi.hoisted(() =>
+  vi.fn(
+    (
+      ws: unknown,
+      startRow: number,
+      endRow: number,
+      startCol: number,
+      endCol: number,
+    ): (string | number | boolean | Date | null)[][] => {
+      // 默认实现从 mockGetCellValue 构建并保留原始类型（与真实宿主一致），
+      // 宽度自动等于请求列数；「读失败」用例用 mockReturnValueOnce([]) 覆盖。
+      try {
+        const rows: (string | number | boolean | Date | null)[][] = []
+        for (let row = startRow; row <= endRow; row += 1) {
+          const line: (string | number | boolean | Date | null)[] = []
+          for (let col = startCol; col <= endCol; col += 1) {
+            const value = mockGetCellValue(ws, row, col) as string | number | boolean | null
+            line.push(value ?? null)
+          }
+          rows.push(line)
+        }
+        return rows
+      } catch {
+        return []
+      }
+    },
+  ),
+)
 const mockSetCellValue = vi.hoisted(() => vi.fn())
 const mockColNumberToLetter = vi.hoisted(() => vi.fn())
 const mockEnsureSheetHeaders = vi.hoisted(() => vi.fn())
@@ -154,6 +182,7 @@ vi.mock('../ts/tools/utility.js', () => ({
   getColumnMap: mockGetColumnMap,
   getCellValue: mockGetCellValue,
   readRangeValues: mockReadRangeValues,
+  readRangeCellValues: mockReadRangeCellValues,
   readRowsCache: mockReadRowsCache,
   setCellValue: mockSetCellValue,
   colNumberToLetter: mockColNumberToLetter,

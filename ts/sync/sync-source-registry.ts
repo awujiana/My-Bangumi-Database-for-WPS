@@ -260,6 +260,18 @@ export async function syncFromRemote(
       }
     }
 
+    // 脏数据体检：分片拼接时缺合法 sid 的记录被静默跳过（与 parseJsonl 的
+    // 「非法行不中断整体解析」同口径），提示后用户能区分「本来就是这么多」
+    // 与「下载了一部分」。Gist 等未提供该统计的源跳过本段。
+    const skippedInvalid = source.loadStats?.skippedInvalidLines ?? 0
+    if (skippedInvalid > 0) {
+      result.skippedInvalidLines = skippedInvalid
+      bgmLog(
+        LOG_LEVELS.WARN,
+        `[syncFromRemote] ${String(skippedInvalid)} 条远程记录缺少合法 sid 已跳过，数据源本身有脏数据`,
+      )
+    }
+
     const totalElapsed = Date.now() - syncStartTs
     const totalProcessed = addedCount + updateCount + deletedCount
     const overallSpeed =
@@ -299,4 +311,3 @@ registerSyncSource('gitlab', () => new GitlabSyncSource())
 registerSyncSource('gitee', () => new GiteeSyncSource())
 registerSyncSource('local', () => new LocalFileSyncSource())
 registerSyncSource('gist', () => new GistSyncSource())
-

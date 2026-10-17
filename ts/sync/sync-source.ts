@@ -59,6 +59,16 @@ export interface SyncSource {
   ): Promise<GithubRemoteEntry[]>
 
   /**
+   * 最近一次 fetchRemoteEntries 的下载统计（可选）
+   *
+   * 分片数据源（GitHub / GitLab / Gitee / 本地文件）回填
+   * `skippedInvalidLines`（缺合法 sid 被跳过的条数），由 syncFromGithub /
+   * syncFromRemote 读取后进入结果弹窗。单片源（Gist）未提供该统计，
+   * 其「全部行非法」路上抛错、「部分行非法」走日志，故为可选。
+   */
+  readonly loadStats?: { skippedInvalidLines: number }
+
+  /**
    * 校验配置是否完整可用
    * @returns 成功返回 Result.ok(undefined)，失败返回 Result.fail(BgmError)
    */

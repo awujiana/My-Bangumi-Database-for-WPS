@@ -25,6 +25,8 @@ import {
   getLastRow,
   getColumnMap,
   getCellValue,
+  readRangeValues,
+  readRangeCellValues,
   readRowsCache,
   setCellValue,
   colNumberToLetter,
@@ -70,6 +72,7 @@ import {
 import { resolveNewRowCellValue, resolveUpdateCellValue } from './github-cell-value.js'
 import { createRawTextFetcher } from './jsonl-response.js'
 import { collectNeededFieldsFromSheet, loadEntriesFromPath } from './shard-fetch.js'
+import type { FetchLoadStats } from './shard-fetch.js'
 import { addSyncRecords, addSyncRecordSummary } from './sync-record.js'
 import type { UpdateRecordParameters } from './sync-record.js'
 import type { FetchRemoteEntriesOptions, SyncSource } from './sync-source.js'
@@ -126,6 +129,15 @@ export interface GithubSyncResult {
    * 这里把这类字段挑出来，由结果弹窗提示用户自行添加对应列。
    */
   missingColumns?: string[]
+  /**
+   * 分片拼接后因**缺少合法 sid** 被跳过的记录条数（>0 才出现）
+   *
+   * 与 `missingColumns` 同口径：链路内部原本只进 WARN 日志，用户看到的是
+   * 「下载了 N 条、只同步了一部分」却说不出原因。缺合法 sid 的记录
+   * （如数据文件混入表头行以外的坏行）会被静默跳过，这里显式计数
+   * 由结果弹窗提示，数字大于 0 即说明数据源本身有脏数据。
+   */
+  skippedInvalidLines?: number
 }
 
 /**
@@ -177,6 +189,7 @@ export const fetchGithubText = createRawTextFetcher({
 export async function fetchGithubJson(
   signal?: AbortSignal,
   neededFields?: ReadonlySet<string>,
+  stats?: FetchLoadStats,
 ): Promise<GithubRemoteEntry[]> {
   const result = await loadEntriesFromPath({
     path: getGithubConfig().path,
@@ -186,6 +199,10 @@ export async function fetchGithubJson(
     signal,
     logTag: 'githubSync',
   })
+  if (stats) {
+    // eslint-disable-next-line no-param-reassign -- stats 是有意的出参（调用方传字面量接收统计），不是「修改入参」
+    stats.skippedInvalidLines = result.skippedInvalidRecords
+  }
   return result.entries
 }
 
@@ -218,7 +235,8 @@ export class GithubSyncSource extends BaseSyncSource {
     signal?: AbortSignal,
     options?: FetchRemoteEntriesOptions,
   ): Promise<GithubRemoteEntry[]> {
-    return fetchGithubJson(signal, options?.neededFields)
+    const entries = await fetchGithubJson(signal, options?.neededFields, this.loadStats)
+    return entries
   }
 }
 
@@ -245,7 +263,7 @@ function readLocalEntries(
     return result
   }
 
-  // ===== 批量读取优化：用一次 Range.Value2 替代逐单元格 getCellValue =====
+  // ===== 批量读取优化：一次矩形读替代逐单元格 getCellValue =====
   // 收集需要读取的列（与旧版 getField 读取的列一致）
   const readColNames = [
     'Bangumi_URL',
@@ -283,22 +301,22 @@ function readLocalEntries(
   const maxCol = readCols.at(-1)?.col ?? minCol
   const rowCount = lastRow - startRow + 1
 
-  // 一次性读取整个矩形区域
-  let rawData: unknown[][] | null = null
-  try {
-    const startColLetter = colNumberToLetter(minCol)
-    const endColLetter = colNumberToLetter(maxCol)
-    const rangeAddr = `${startColLetter}${String(startRow)}:${endColLetter}${String(lastRow)}`
-    const range = ws.Range(rangeAddr)
-    const raw = range.Value2 as unknown
-    if (Array.isArray(raw)) {
-      rawData = raw as unknown[][]
-    }
-  } catch (error: unknown) {
-    bgmLog(
-      LOG_LEVELS.WARN,
-      `[githubSync] 批量读取失败，回退到逐单元格: ${(error as Error).message}`,
-    )
+  // 一次性读取整个矩形区域（统一走 `readRangeValues`，内部 readRect 含形状守卫）：
+  //  · 单行范围宿主返回**一维**数组时由 normalizeValue2Shape 按请求形状升维 ——
+  //    旧内联实现直接把 `Array.isArray(raw)` 的结果当二维数组用，本地只有 1 条
+  //    数据时 rawData[0] 会退化成「第 1 个单元格的值」，整行字段读成空串 → SID
+  //    提取失败 → 该行被跳过 → 远程同一 SID 被判为新增，**重复写一行**；
+  //  · 读失败 / 形状不可信一律按读取失败处理，绝不猜形状。
+  // `readRangeValues` 无法区分「真空区域」与「读失败」（两者都返回 []），因此以
+  // **读回行数 === 请求行数** 作为可用判据：不符即回退逐单元格读（空表逐格读
+  // 同样得到空串，最终结果与旧行为一致）。
+  const rect = readRangeValues(ws, startRow, lastRow, minCol, maxCol)
+  const rawData: string[][] | null = rect.length === rowCount ? rect : null
+  if (!rawData) {
+    // readRangeValues 读失败（COM 异常/形状不可信）时返回 []，与「真空区域」
+    // 不可区分；行数判据触发回退时补一条 WARN —— 与旧内联 catch 分支等价，
+    // 同步失败时能看出是「区域读挂了回退逐格」而非静默降级。
+    bgmLog(LOG_LEVELS.WARN, '[githubSync] 批量读取失败，回退到逐单元格')
   }
 
   // 构建 col name → 数组索引 的映射
@@ -313,9 +331,9 @@ function readLocalEntries(
     if (index === undefined) return ''
     const rowArray = rawData?.[rowOffset]
     if (!rowArray) return ''
-    const value = rowArray[index] as string | number | boolean | null | undefined
-    if (value === null || value === undefined) return ''
-    return trim(String(value))
+    // readRangeValues 已把单元格值一律 String() 化（null → 空串）；
+    // `?? ''` 兜住索引越界——宿主返回的行宽小于目标列号时下标为 undefined。
+    return trim(rowArray[index] ?? '')
   }
 
   /** 逐单元格读取（回退用） */
@@ -583,7 +601,7 @@ function writeRowValuesWithUndo(
   fields: string[],
   minCol: number,
   colCount: number,
-  oldArray: (string | number | null)[],
+  oldArray: WpsCellValue[],
   rowValues: (string | number | null)[],
   range: WpsRange | null,
   shouldForceOverwrite: boolean,
@@ -591,7 +609,7 @@ function writeRowValuesWithUndo(
   records: UpdateRecordParameters[],
 ): number {
   if (range) {
-    // 使用已读取的旧值（oldArr 在循环开始前已读取）
+    // 使用已读取的旧值（oldArray 由 readRangeCellValues 在循环开始前读取）
     // **以旧值为基底**铺满整行：本次不写的列原值写回，而不是铺 null。
     // 原因：null 在 Range.Value2 二维数组里的语义是「清空该单元格」，而
     // minCol..maxCol 之间可能夹着**不属于本次 writeCols** 的列 ——
@@ -599,7 +617,7 @@ function writeRowValuesWithUndo(
     // 有人只改「名称」(列2)、有人只改「评分」(列30)，区间 3..29 全是用户数据）。
     // 原实现把这些位置铺成 null，等于把用户在中段列的数据清掉。
     let hasChanges = false
-    const finalValues: (string | number | null)[] = Array.from(
+    const finalValues: WpsCellValue[] = Array.from(
       { length: colCount },
       (_, c) => oldArray[c] ?? null,
     )
@@ -878,31 +896,19 @@ function batchWriteNewRows(
   const startColLetter = colNumberToLetter(minCol)
   const endColLetter = colNumberToLetter(maxCol)
   const endRow = startRow + rows.length - 1
-  let oldRows: (string | number | null)[][] = []
-  try {
-    const probeAddr = `${startColLetter}${String(startRow)}:${endColLetter}${String(endRow)}`
-    const probe = ws.Range(probeAddr)
-    const raw = probe.Value2 as unknown
-    if (Array.isArray(raw)) {
-      // 形状归一化：单行范围可能返回一维数组（整个数组即一行）
-      const isSingleRow = endRow === startRow
-      if (isSingleRow) {
-        const first = Array.isArray(raw[0])
-          ? (raw[0] as (string | number | null)[])
-          : (raw as (string | number | null)[])
-        oldRows = [first]
-      } else {
-        oldRows = raw as (string | number | null)[][]
-      }
-    }
-  } catch {
-    // 读旧值失败：按空行处理（新增行通常是空的，风险面小）
-    oldRows = []
-  }
+  // 读旧值基底：统一走 `readRangeCellValues`（内部 readRect 含形状守卫）。
+  //  · 单行范围（endRow === startRow）宿主返回**一维**数组，由 normalizeValue2Shape
+  //    按请求形状升维——旧手工归一只处理了 `raw[0]` 是否为数组，多行范围返回
+  //    一维时（宿主异常）仍会被当成二维，基底错位会把旧值写进错误的列；
+  //  · 读失败 / 形状不可信返回 []，按「无旧值基底」处理——新增行的目标区域
+  //    通常为空，读失败的影响面与原手工 catch 分支一致（oldRows = []）。
+  // 必须保留单元格原始类型（preserveCellValue）：基底列可能是数字/日期，
+  // String() 化后整行写回会把用户的数据列变成文本列。
+  const oldRows = readRangeCellValues(ws, startRow, endRow, minCol, maxCol)
 
-  const values: (string | number | null)[][] = []
+  const values: WpsCellValue[][] = []
   for (const [rowIndex, entry] of rows.entries()) {
-    const row: (string | number | null)[] = Array.from(
+    const row: WpsCellValue[] = Array.from(
       { length: colCount },
       (_, c) => oldRows[rowIndex]?.[c] ?? null,
     )
@@ -1029,42 +1035,37 @@ function batchUpdateRows(
     const isWriteAll = fields.includes('*')
 
     // 先读取当前行的值（用于合并逻辑和 undo 记录）
-    let oldArray: (string | number | null)[] = []
-    // 不赋初值：try 成功时赋 Range、失败时 catch 赋 null，两条路径都已定值
-    let range: WpsRange | null
-    try {
-      const startColLetter = colNumberToLetter(minCol)
-      const endColLetter = colNumberToLetter(maxCol)
-      const rangeAddr = `${startColLetter}${String(row)}:${endColLetter}${String(row)}`
-      range = ws.Range(rangeAddr)
+    // 统一走 `readRangeCellValues`（内部 readRect 含形状守卫）：单行范围宿主
+    // 返回**一维**数组时由 normalizeValue2Shape 按请求形状升维，读失败返回 []
+    // （旧值全空）——旧内联实现遇到 `Value2` 为 null 时 oldArray 为空数组，
+    // 由下方宽度守卫回退逐字段写入，语义一致。
+    const oldArray: WpsCellValue[] = readRangeCellValues(ws, row, row, minCol, maxCol)[0] ?? []
 
-      // 读取旧值
-      const oldValues = range.Value2 as unknown
-      if (Array.isArray(oldValues)) {
-        // 形状归一化：单行范围在 Excel/WPS 下可能返回**一维**数组（整个数组即一行），
-        // 只有多行范围才返回二维。原来直接取 oldValues[0]，一维时会把「首个单元格的
-        // 值」当成行数组 → 旧值退化成首字符、undo 记错旧值、合并写出乱值。
-        const firstRow = Array.isArray(oldValues[0]) ? oldValues[0] : oldValues
-        oldArray = firstRow as (string | number | null)[]
-      }
-    } catch {
-      // Range 访问失败：放弃批量路径，改走逐字段回退（该路径用 getCellValue 逐格重取旧值）
-      bgmLog(LOG_LEVELS.WARN, `[batchUpdateRows] 行 ${String(row)} 读取旧值失败，回退逐字段写入`)
-      range = null
-      oldArray = []
-    }
-
-    // 旧值读不全（Value2 为 null / 标量，或列数不足 colCount）时放弃批量路径：
+    // 旧值读不全（读失败返回 []、或列数不足 colCount）时放弃批量路径：
     // 批量路径用 oldArray 做「本地 | 远程」合并，空旧值会使用户已有的标签/别名
     // 被远程值**整体替换**（静默丢失本地数据，违反「读失败＝放弃写入」铁律）。
     // update diff 的行必然带 Bangumi URL（匹配依据），不可能整行为空，
     // 因此旧值读不全一律按「读失败」处理，交给逐字段回退。
-    if (range !== null && oldArray.length < colCount) {
+    // 读-改-写还需要 Range 对象：宽度够用时才取；取不到（COM 异常）同样回退。
+    // （读走 readRect、写单独取 Range，比旧实现「读+写复用同一个 Range」多一次
+    //  Range 获取；换来形状守卫只有一份实现，不做第二份会漂移。）
+    let range: WpsRange | null = null
+    if (oldArray.length < colCount) {
       bgmLog(
         LOG_LEVELS.WARN,
         `[batchUpdateRows] 行 ${String(row)} 旧值读取失败或形状异常，回退逐字段写入（避免空值合并覆盖本地数据）`,
       )
-      range = null
+    } else {
+      try {
+        const rangeAddr = `${colNumberToLetter(minCol)}${String(row)}:${colNumberToLetter(maxCol)}${String(row)}`
+        range = ws.Range(rangeAddr)
+      } catch {
+        bgmLog(
+          LOG_LEVELS.WARN,
+          `[batchUpdateRows] 行 ${String(row)} 获取写入范围失败，回退逐字段写入`,
+        )
+        range = null
+      }
     }
 
     // 构建该行的值数组
@@ -1846,6 +1847,18 @@ export async function syncFromGithub(
       }
     }
 
+    // 脏数据体检：分片拼接时缺合法 sid 的记录被静默跳过（与 parseJsonl 的
+    // 「非法行不中断整体解析」同口径），不提示的话用户只会看到「下载了 N 条、
+    // 只同步了一部分」却说不出原因。
+    const skippedInvalid = source.loadStats?.skippedInvalidLines ?? 0
+    if (skippedInvalid > 0) {
+      result.skippedInvalidLines = skippedInvalid
+      bgmLog(
+        LOG_LEVELS.WARN,
+        `[githubSync] ${String(skippedInvalid)} 条远程记录缺少合法 sid 已跳过，数据源本身有脏数据`,
+      )
+    }
+
     const totalElapsed = Date.now() - syncStartTs
     const totalProcessed = addedCount + updateCount + deletedCount
     const overallSpeed =
@@ -1877,4 +1890,3 @@ export async function syncFromGithub(
     }
   }
 }
-

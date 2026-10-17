@@ -34,6 +34,16 @@ import type { FetchRemoteEntriesOptions, SyncSource } from './sync-source.js'
  */
 export abstract class BaseSyncSource implements SyncSource {
   /**
+   * 最近一次 {@link fetchRemoteEntries} 的下载统计
+   *
+   * 各源在取数时把 `fetchXxxJson` 回填的 `FetchLoadStats` 写进来，由
+   * `syncFromGithub` / `syncFromRemote` 读取后进入同步结果弹窗
+   * （链路内部才看得到的丢弃统计，见 `GithubSyncResult.skippedInvalidLines`）。
+   * 实例级（每次同步 new 一个源），不存在多源并存串数据的问题。
+   */
+  readonly loadStats: { skippedInvalidLines: number } = { skippedInvalidLines: 0 }
+
+  /**
    * @param sourceType 数据源类型标识（如 'github' / 'gitlab' / 'gitee' / 'gist'）
    * @param displayName 数据源显示名称（用于日志与进度提示）
    * @param isConfigComplete 配置是否完整的判定函数（各源校验口径不同）

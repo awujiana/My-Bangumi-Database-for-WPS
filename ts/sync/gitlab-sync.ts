@@ -23,11 +23,11 @@
  * updatedAt 为 YYYY-MM-DD 格式（仅日期，不含时间，节省空间）。
  */
 
-
 import { getGithubConfig, getManualShards, isGithubConfigComplete } from './github-config.js'
 import type { GithubRemoteEntry } from './github-sync-diff.js'
 import { createRawTextFetcher } from './jsonl-response.js'
 import { loadEntriesFromPath } from './shard-fetch.js'
+import type { FetchLoadStats } from './shard-fetch.js'
 import type { FetchRemoteEntriesOptions } from './sync-source.js'
 import { BaseSyncSource } from './sync-source-base.js'
 // 复用 githubSyncDiff.ts 的纯解析函数与类型（零依赖纯模块，可在 Node 测试环境直接运行）
@@ -87,12 +87,14 @@ export const fetchGitlabText = createRawTextFetcher({
  *
  * @param signal 可选 AbortSignal，用于取消请求
  * @param neededFields 本次同步会用到的字段；undefined 表示全量下载
+ * @param stats 可选出参：回填缺合法 sid 被跳过的条数（供同步结果弹窗展示）
  * @returns 解析后的条目数组
  * @throws 网络错误、配置错误、解析失败时抛出 Error
  */
 export async function fetchGitlabJson(
   signal?: AbortSignal,
   neededFields?: ReadonlySet<string>,
+  stats?: FetchLoadStats,
 ): Promise<GithubRemoteEntry[]> {
   const result = await loadEntriesFromPath({
     path: getGithubConfig().path,
@@ -102,6 +104,10 @@ export async function fetchGitlabJson(
     signal,
     logTag: 'gitlabSync',
   })
+  if (stats) {
+    // eslint-disable-next-line no-param-reassign -- stats 是有意的出参（调用方传字面量接收统计），不是「修改入参」
+    stats.skippedInvalidLines = result.skippedInvalidRecords
+  }
   return result.entries
 }
 
@@ -134,6 +140,6 @@ export class GitlabSyncSource extends BaseSyncSource {
     signal?: AbortSignal,
     options?: FetchRemoteEntriesOptions,
   ): Promise<GithubRemoteEntry[]> {
-    return fetchGitlabJson(signal, options?.neededFields)
+    return fetchGitlabJson(signal, options?.neededFields, this.loadStats)
   }
 }

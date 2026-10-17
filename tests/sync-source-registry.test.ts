@@ -75,6 +75,8 @@ const mockGithubSourceReference = vi.hoisted(() => ({
   getDisplayName: vi.fn().mockReturnValue('GitHub'),
   validateConfig: vi.fn().mockReturnValue({ isFail: () => false, error: null }),
   fetchRemoteEntries: vi.fn().mockResolvedValue([]),
+  // 下载统计（syncFromRemote 读取后写入 result.skippedInvalidLines）
+  loadStats: { skippedInvalidLines: 0 },
 }))
 
 vi.mock('../ts/index.js', () => ({}))
@@ -291,6 +293,8 @@ describe('syncFromRemote', () => {
     mockGetSyncSourceType.mockReturnValue('github')
     mockGithubSourceReference.validateConfig.mockReturnValue(Result.okVoid())
     mockGithubSourceReference.fetchRemoteEntries.mockResolvedValue([])
+    // 下载统计归零：loadStats 是普通对象属性，restoreAllMocks 不会重置它
+    mockGithubSourceReference.loadStats.skippedInvalidLines = 0
     mockReadLocalEntriesForSync.mockReturnValue({ entries: new Map(), lastRow: 1 })
     mockComputeDiff.mockReturnValue([])
     mockApplyDiffToSheet.mockResolvedValue({
@@ -316,6 +320,24 @@ describe('syncFromRemote', () => {
     expect(result).toBeDefined()
     expect(mockGithubSourceReference.fetchRemoteEntries).toHaveBeenCalled()
     expect(mockApplyDiffToSheet).toHaveBeenCalled()
+  })
+
+  it('缺合法 sid 计数透传到 result.skippedInvalidLines 并记 WARN', async () => {
+    mockGithubSourceReference.loadStats.skippedInvalidLines = 3
+
+    const result = await syncFromRemote()
+
+    expect(result.skippedInvalidLines).toBe(3)
+    expect(mockBgmLogn).toHaveBeenCalledWith(
+      'WARN',
+      expect.stringContaining('3 条远程记录缺少合法 sid 已跳过'),
+    )
+  })
+
+  it('无脏数据时 result.skippedInvalidLines 为 undefined（不给弹窗加空段）', async () => {
+    const result = await syncFromRemote()
+
+    expect(result.skippedInvalidLines).toBeUndefined()
   })
 
   it('未知 sourceType 应抛出错误', async () => {

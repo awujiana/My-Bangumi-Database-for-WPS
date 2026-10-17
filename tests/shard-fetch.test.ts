@@ -366,6 +366,7 @@ describe('loadEntriesFromPath 拼接与校验', () => {
     })
 
     expect(result.entries).toHaveLength(1)
+    expect(result.skippedInvalidRecords).toBe(1)
     expect(mockBgmlog).toHaveBeenCalledWith('WARN', expect.stringContaining('1 条缺少合法 sid'))
   })
 
@@ -385,6 +386,7 @@ describe('loadEntriesFromPath 拼接与校验', () => {
 
     expect(result.updatedAt).toBe('2026-09-08')
     expect(result.shards).toEqual(['base', 'summary'])
+    expect(result.skippedInvalidRecords).toBe(0)
     expect(result.entries).toEqual([
       {
         sid: '1',

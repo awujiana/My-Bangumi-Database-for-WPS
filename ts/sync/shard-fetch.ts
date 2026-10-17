@@ -70,6 +70,26 @@ export interface LoadEntriesResult {
   shards: string[]
   /** 数据期次（清单的 updatedAt） */
   updatedAt: string
+  /**
+   * 拼接后因**缺少合法 sid** 被跳过的记录条数
+   *
+   * 与 `parseJsonl` 的「非法行不中断整体解析」同一口径：分片表头合法、
+   * 单条记录却不合法（如 sid 为空/非字符串）时静默跳过。此前只进 WARN
+   * 日志，用户看不到「明明下载了 100 条、只同步进来 90 条」。
+   */
+  skippedInvalidRecords: number
+}
+
+/**
+ * 下载统计出参（调用方传字面量对象，取数函数回填字段）
+ *
+ * 供 `fetchXxxJson` 系函数把「链路内部才看得到的丢弃统计」带出给
+ * `syncFromGithub` / `syncFromRemote`，最终进入同步结果弹窗——
+ * 不改这些函数的返回类型（`GithubRemoteEntry[]` 是既定契约）。
+ */
+export interface FetchLoadStats {
+  /** 拼接后因缺少合法 sid 被跳过的条数 */
+  skippedInvalidLines: number
 }
 
 /** 取错误的可读文本 */
@@ -159,7 +179,12 @@ export async function loadEntriesFromPath(options: LoadEntriesOptions): Promise<
     bgmLog(LOG_LEVELS.INFO, `[${logTag}] 分片下载成功：${String(entries.length)} 条记录`)
   }
 
-  return { entries, shards: picked.map((shard) => shard.name), updatedAt: manifest.updatedAt }
+  return {
+    entries,
+    shards: picked.map((shard) => shard.name),
+    updatedAt: manifest.updatedAt,
+    skippedInvalidRecords: invalid,
+  }
 }
 
 /**

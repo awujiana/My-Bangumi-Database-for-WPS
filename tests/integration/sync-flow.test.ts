@@ -45,6 +45,11 @@ const mockState = vi.hoisted(() => ({
   setCellValue: vi.fn(() => true),
   // 生产签名为 (ws, startRow, endRow, startCol, endCol)；测试只 mock 返回值，故用可变参数收
   readRangeValues: vi.fn<(...arguments_: unknown[]) => string[][]>(() => []),
+  // 保留原始类型的矩形读：「读-改-写整行」基底。默认 []（读不到旧值），
+  // 需要旧值基底的用例显式 mockReturnValue 二维数组
+  readRangeCellValues: vi.fn<
+    (...arguments_: unknown[]) => (string | number | boolean | Date | null)[][]
+  >(() => []),
   // 默认返回 null：模拟「矩形读不可用」，生产代码回退逐格读（与改动前行为一致）
   readRowsCache: vi.fn<(...arguments_: unknown[]) => Map<number, readonly string[]> | null>(
     () => null,
@@ -156,6 +161,7 @@ vi.mock('../../ts/tools/util/index.js', () => ({
   cacheGet: <T>(key: string, factory: () => T): T => factory(),
   clearSheetCache: vi.fn(),
   readRangeValues: mockState.readRangeValues,
+  readRangeCellValues: mockState.readRangeCellValues,
   readRowsCache: mockState.readRowsCache,
   delay: () => Promise.resolve(),
   sleep: () => Promise.resolve(),
@@ -342,6 +348,7 @@ describe('Excel→Bangumi 完整同步流程', () => {
 
     // 默认配置：readRangeValues 返回空，getCellValue 返回空
     mockState.readRangeValues.mockReturnValue([])
+    mockState.readRangeCellValues.mockReturnValue([])
     mockState.getCellValue.mockReturnValue('')
     // getAllSyncRecords 默认返回空数组
     mockState.getAllSyncRecords.mockReturnValue([])
@@ -443,6 +450,7 @@ describe('5xx 重试场景', () => {
     mockState.readRangeValues.mockReset()
     mockState.getCellValue.mockReset()
     mockState.readRangeValues.mockReturnValue([])
+    mockState.readRangeCellValues.mockReturnValue([])
     mockState.getCellValue.mockReturnValue('')
     mockState.getAllSyncRecords.mockReturnValue([])
   })
@@ -515,6 +523,7 @@ describe('AbortController 取消场景', () => {
     mockState.readRangeValues.mockReset()
     mockState.getCellValue.mockReset()
     mockState.readRangeValues.mockReturnValue([])
+    mockState.readRangeCellValues.mockReturnValue([])
     mockState.getCellValue.mockReturnValue('')
     mockState.getAllSyncRecords.mockReturnValue([])
   })
@@ -563,6 +572,7 @@ describe('空 Excel 数据场景', () => {
     mockState.readRangeValues.mockReset()
     mockState.getCellValue.mockReset()
     mockState.readRangeValues.mockReturnValue([])
+    mockState.readRangeCellValues.mockReturnValue([])
     mockState.getCellValue.mockReturnValue('')
     mockState.getAllSyncRecords.mockReturnValue([])
   })
@@ -570,6 +580,7 @@ describe('空 Excel 数据场景', () => {
   it('无数据行时应正常完成，success=0/fail=0', async () => {
     // readRangeValues 返回空数组（无数据行）
     mockState.readRangeValues.mockReturnValue([])
+    mockState.readRangeCellValues.mockReturnValue([])
 
     const mockWs = { Name: 'Sheet1', AutoFilterMode: false, AutoFilter: null }
     const colMap = new Map<string, number>([
@@ -669,6 +680,7 @@ describe('GitHub 同步流程：fetch JSONL → diff → apply → undo', () => 
     mockState.getCellValue.mockReturnValue('')
     mockState.setCellValue.mockReturnValue(true)
     mockState.readRangeValues.mockReturnValue([])
+    mockState.readRangeCellValues.mockReturnValue([])
     mockState.getAllSyncRecords.mockReturnValue([])
   })
 

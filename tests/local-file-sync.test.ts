@@ -511,6 +511,30 @@ describe('LocalFileSyncSource.fetchRemoteEntries', () => {
     controller.abort()
     await expect(promise).rejects.toThrow(/请求被取消/)
   })
+
+  it('缺合法 sid 计数写入 loadStats（syncFromRemote 弹窗展示用）', async () => {
+    mockLocalPath(MANIFEST_FILE)
+    responseQueue = [
+      makeManifestText(),
+      '["sid","name","updatedAt"]\n["111","条目A","2026-09-08"]\n[null,"坏行",""]',
+    ]
+    const source = new LocalFileSyncSource()
+    const entries = await source.fetchRemoteEntries(undefined, { neededFields: new Set() })
+
+    expect(entries).toHaveLength(1)
+    expect(source.loadStats.skippedInvalidLines).toBe(1)
+  })
+
+  it('数据干净时 loadStats 归零（整体覆写，不累加）', async () => {
+    mockLocalPath(MANIFEST_FILE)
+    responseQueue = [makeManifestText(), '["sid","name","updatedAt"]\n["111","条目A","2026-09-08"]']
+    const source = new LocalFileSyncSource()
+    source.loadStats.skippedInvalidLines = 9
+
+    await source.fetchRemoteEntries(undefined, { neededFields: new Set() })
+
+    expect(source.loadStats.skippedInvalidLines).toBe(0)
+  })
 })
 
 // ========== 注册表 ==========

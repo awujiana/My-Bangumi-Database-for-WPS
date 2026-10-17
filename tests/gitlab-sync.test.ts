@@ -578,6 +578,29 @@ describe('GitlabSyncSource.fetchRemoteEntries', () => {
     controller.abort()
     await expect(source.fetchRemoteEntries(controller.signal)).rejects.toThrow(/请求被取消/)
   })
+
+  it('缺合法 sid 计数写入 loadStats（syncFromRemote 弹窗展示用）', async () => {
+    const source = new GitlabSyncSource()
+    responseQueue = [
+      makeManifestText(),
+      '["sid","name","updatedAt"]\n["1","条目1","2026-09-08"]\n[null,"坏行",""]',
+    ]
+
+    const entries = await source.fetchRemoteEntries(undefined, { neededFields: new Set() })
+
+    expect(entries).toHaveLength(1)
+    expect(source.loadStats.skippedInvalidLines).toBe(1)
+  })
+
+  it('数据干净时 loadStats 归零（整体覆写，不累加）', async () => {
+    const source = new GitlabSyncSource()
+    source.loadStats.skippedInvalidLines = 9
+    responseQueue = [makeManifestText(), '["sid","name","updatedAt"]\n["1","条目1","2026-09-08"]']
+
+    await source.fetchRemoteEntries(undefined, { neededFields: new Set() })
+
+    expect(source.loadStats.skippedInvalidLines).toBe(0)
+  })
 })
 
 // ========== 配置校验 ==========
