@@ -285,6 +285,24 @@
 - **补齐 VS16**：`⚡` → `⚡️`（富化执行 / 冲突确认）、`✋` → `✋️`（手动选择）、`⏳` → `⏳️`（富化中），确保跨平台彩色 emoji 呈现。
 - **同步更新文档**：`文档/ui-and-interaction.md` 9.2 图标规范、`README.md` 文档索引、`文档/USER_OPERATIONS.md` 版本历史 v3.7。
 
+### 修复（数据安全 · 三处内联 `Range.Value2` 读入口收敛，§8 待办①）
+
+- **问题**：`readLocalEntries` / `batchWriteNewRows` / `batchUpdateRows` 各自内联 `Range.Value2` 读，形状归一化各写一份。其中 `readLocalEntries` 有真 bug：本地只有 **1 条数据**时单行范围返回**一维**数组，`Array.isArray(raw)` 后直接当二维用 → 该行每个字段读成空串 → SID 提取失败 → 该行被跳过 → 远程同一 SID 被判为新增，**重复写一行**（与 §5.4 已修的 sync-record / enrich-engine / batchWriteNewRows 同类，唯独此处漏了）。
+- **改法**：三处读路径全部改走统一入口 `readRangeValues` / `readRangeCellValues`（内部 `readRect` 的形状守卫只有一份：单行一维按请求形状升维、多行多列读回一维判读失败、宽度不足判读失败）。`readLocalEntries` 以「读回行数 === 请求行数」判可用（`readRangeValues` 无法区分真空区域与读失败），不符即回退逐格读并补一条 WARN；`batchUpdateRows` 读走 readRect、写单独取 `Range`（比旧实现「读+写复用同一 Range」多一次 Range 获取，换来形状守卫不漂移）；`batchWriteNewRows` 探测读必须保留原始类型（数字/日期列基线不能 `String()` 化）。**写路径仍用 `Range.Value2` 批量写**（有意的性能优化，形状由构造方保证）。
+- 测试：`readRangeCellValues` 桩补进 3 个 mock（github-sync / github-sync-core / sync-flow），默认从 `getCellValue` 造保留类型的二维数组（宽度自动匹配，行为贴近真实宿主）；`readLocalEntries` 的「单行一维归一」回归归属 `tests/sheet.test.ts`（同一 `readRect`），原用例改为锁定读-改-写基底逻辑。
+
+### 改进（可观测 · 数据源脏记录不再静默跳过，§8 待办②）
+
+- **问题**：分片拼接后缺合法 sid 的记录按「与 `parseJsonl` 一致的非法行不中断口径」静默跳过，只进 WARN 日志。用户看到的是「下载了 N 条、只同步了一部分」却说不出原因。
+- **改法**：`loadEntriesFromPath` 回报 `skippedInvalidRecords` → 各源 `fetchXxxJson` 经**可选出参** `FetchLoadStats`（不改返回类型契约）写进 `BaseSyncSource.loadStats`（实例级，每次同步新建实例，不串数据）→ `syncFromGithub` / `syncFromRemote` 填 `GithubSyncResult.skippedInvalidLines`（仅 >0）→ 结果弹窗新增「⚠️ 数据源含非法记录」段（与 `missingColumns` 同口径）。Gist 单片源保持原行为（全非法抛错、部分非法 WARN）。
+- 新增覆盖：shard-fetch 2 条断言、github-sync 出参透传 2 条、syncFromRemote 2 条、gitee/gitlab/local-file 各 2 条（含「干净同步整体覆写不累加」）。
+
+### 移除（死代码 · 孤儿页面 `panel-preview.html` 与死分支，§8 待办③）
+
+- **四步判定**：① TS 无引用；② 构建入口无（rollup input 只有 `index.html`，`ui/*` 拷贝是 glob 不点名）；③ HTML/XML 无交叉引用、任务面板 URL 是 `ui/panel.html`；④ 无动态构造。连带删除只被它引用的 `css/preview.css`。
+- **连带清理**：`ts/panel/user-info-polling.ts` 同步 `#chkIncremental` 复选框的分支随该控件消失（panel.html 的「仅同步变更」已收拢到设置页，主面板无此控件，该分支永久空转）；对应 4 条测试用例随死分支删除，`isIncrementalSyncEnabled` 从该测试 mock 移除。
+- 同步更新：`ARCHITECTURE.md` 模态框清单、`ui-and-interaction.md` 调试 URL、`图标规范.md` 适用范围、`audit-layout.mjs` 注释、`TECH_KNOWLEDGE_COM_DATA_SAFETY.md` §8 与 §5.1（11 项「实际已修」补标注）。**旧日期文档与历史条目不改**（`TS_AUDIT_2026_09_10.md` 等）。
+
 ---
 
 ## [v3.7] - 2026-08-31

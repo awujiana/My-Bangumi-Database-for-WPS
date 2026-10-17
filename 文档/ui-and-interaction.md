@@ -580,7 +580,6 @@ WPS/Excel 加载项的 Task Pane 本质是一个嵌在 Office 宿主内的 WebVi
 python -m http.server 5173 --directory .
 
 # 打开预览页
-# http://localhost:5173/ui/panel-preview.html
 # http://localhost:5173/ui/panel.html       （真实面板）
 # http://localhost:5173/ui/settings.html    （设置面板）
 ```
