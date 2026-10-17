@@ -1289,6 +1289,63 @@ select.input {
     margin-bottom: 0;
 }
 
+/* 同步前列映射确认（2026-10-17）：每行 = 勾选 + 拖拽手柄 + 字段 → 目标列下拉 + 状态 */
+.bgm-mapping-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 8px 0;
+    flex-wrap: wrap;
+}
+
+.bgm-mapping-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 5px 2px;
+    border-bottom: 1px solid var(--border, rgba(255, 255, 255, 0.08));
+}
+
+.bgm-mapping-row--missing {
+    opacity: 0.75;
+}
+
+.bgm-mapping-row--dragging {
+    opacity: 0.4;
+}
+
+.bgm-mapping-handle {
+    cursor: grab;
+    color: var(--text-3, #8a8a8a);
+    user-select: none;
+    flex: 0 0 auto;
+}
+
+.bgm-mapping-field {
+    flex: 0 0 96px;
+    font-size: 13px;
+    color: var(--text-1, #f2f2f2);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.bgm-mapping-arrow {
+    color: var(--text-3, #8a8a8a);
+    flex: 0 0 auto;
+}
+
+.bgm-mapping-select {
+    flex: 1 1 auto;
+    min-width: 0;
+    font-size: 13px;
+    background: var(--bg-surface, #2a2a2a);
+    color: var(--text-1, #f2f2f2);
+    border: 1px solid var(--border-strong, rgba(255, 255, 255, 0.16));
+    border-radius: 4px;
+    padding: 2px 4px;
+}
+
 .bgm-dialog-message {
     font-size: 14px;
     line-height: 1.6;
