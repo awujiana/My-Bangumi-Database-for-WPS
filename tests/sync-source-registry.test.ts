@@ -116,13 +116,20 @@ function createMockSource(type: string, name: string) {
 }
 
 // Mock githubSync module
+// 2026-10-17 结构合并：apply 三函数已迁去 remote-sync-apply.js（下面单独全量 mock），
+// computeDiff 由 github-sync-diff.js 的部分 mock 覆盖，此处只需提供源实现类。
 vi.mock('../ts/sync/github-sync.js', () => ({
-  applyConflictResolutions: mockApplyConflictResolutions,
-  applyDiffToSheet: mockApplyDiffToSheet,
-  computeDiff: mockComputeDiff,
   GithubSyncSource: vi.fn().mockImplementation(function createGithubSyncSource() {
     return mockGithubSourceReference
   }),
+}))
+
+// Mock apply 阶段（全量工厂：真实模块不加载 → sync-record / undo-stack 等不随编排层入场，
+// 与改动前 github-sync.js 全量 mock 的隔离级别一致）。
+// remote-sync-core.ts 以跨模块 import 使用这三个函数，vi.mock 截得住。
+vi.mock('../ts/sync/remote-sync-apply.js', () => ({
+  applyConflictResolutions: mockApplyConflictResolutions,
+  applyDiffToSheet: mockApplyDiffToSheet,
   readLocalEntriesForSync: mockReadLocalEntriesForSync,
 }))
 
@@ -173,10 +180,11 @@ vi.mock('../ts/sync/github-config.js', () => ({
 }))
 
 // 真实展开：shard-manifest 的 neededFieldsForColumns 依赖 EXTENDED_FIELD_MAP / getExcelAliases，
-// 只覆盖 filterByTime 即可，其余保留真实实现
+// 只覆盖 filterByTime 与 computeDiff 即可，其余保留真实实现
+// （computeDiff 原先随 github-sync.js 全量 mock 提供；结构合并后由 core 从本模块导入）
 vi.mock('../ts/sync/github-sync-diff.js', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../ts/sync/github-sync-diff.js')>()
-  return { ...actual, filterByTime: mockFilterByTime }
+  return { ...actual, filterByTime: mockFilterByTime, computeDiff: mockComputeDiff }
 })
 
 vi.mock('../ts/sync/pure-utilities.js', () => ({

@@ -8,6 +8,19 @@
 
 ## [未发布]
 
+### 变更（架构 · 收敛 `syncFromRemote` / `syncFromGithub` 双入口，sync 结构合并路线①）
+
+- **背景**：`syncFromRemote`（sync-source-registry.ts，~190 行）与 `syncFromGithub`（github-sync.ts，~190 行）主体逐字重复 ~150 行，2026-10-15 逐行比对确认差异仅 5 处（source 获取方式 / 校验失败文案 / 日志 tag / 耗时格式 `${ms}` vs `formatDuration` / 时间筛选标签函数是否内联）。原阻塞点为循环依赖：抽 core 需要 `applyDiffToSheet` 等定义在 `github-sync.ts` 内的函数，而 `syncFromGithub` 又要调 core。
+- **拆分结果**（`ts/sync/` 新增两个模块，两个入口变薄壳）：
+  - `ts/sync/remote-sync-apply.ts`（1537 行，新建）：apply 阶段整体逐字迁入 —— `readLocalEntriesForSync` / `applyDiffToSheet` / `applyConflictResolutions` + 12 个私有辅助（`writeRemoteEntryToRow` / `batchWriteNewRows` / `batchUpdateRows` / `writeRowValuesWithUndo` / `fallbackWriteRemoteEntry` / `collectWriteCols` / `buildRemovalSnapshot` 等）。注释、边界处理与日志 tag（`[githubSync]`）逐字保留。
+  - `ts/sync/remote-sync-core.ts`（295 行，新建）：`runRemoteSync(parameters)` 统一编排（校验 → 按表头选字段 → 下载 → 屏幕刷新 → 空表表头 / 选中行 / 时间筛选 → 读本地 → diff → 冲突决策 → apply → 体检 → 收尾）；两入口 5 处历史差异全部参数化（`source` / `logTag` / 校验失败兜底文案 / 进度口径 / 耗时口径）。
+  - `ts/sync/github-sync.ts`（**1893 → 215 行，-88.6%**）：只剩 GitHub 源实现（`GithubSyncSource`）+ 取数（`fetchGithubText` / `fetchGithubJson`）+ `syncFromGithub` 薄壳；apply 三函数与 `GithubSyncResult` 经**兼容 re-export** 转出，`ts/index.ts` barrel 与既有消费方不变。
+  - `ts/sync/sync-source-registry.ts`（**314 → 118 行，-62.4%**）：注册表机制 + `syncFromRemote` 薄壳。
+- **设计决策**：选**路线①**（apply 整体搬进 core 方向）而非当时建议的 ②（调用方注入 apply）—— ② 会把夹在下载与 apply 之间的空文档表头填充 / 选中行 / 时间筛选 / 屏幕刷新收尾劈回调用方。① 的改动面风险由一条硬约束化解：**`vi.mock` 截不住模块内调用，apply 与编排必须分模块**，否则 registry 测试对 apply 三函数的 mock 会静默失效。最终依赖单向无环：`remote-sync-apply.ts` ← `remote-sync-core.ts` ← 两个薄壳。
+- **行为口径**：进度分母统一为 registry 版 `0/1 → 1/3 → 2/3 → 3/3`；编排层耗时统一为裸毫秒 `${ms}ms`（**github 路径用户可见文案随之小改**，如「下载完成：N 条（耗时 123ms）」）；apply 阶段内部 `formatDuration` 生成的文案不变。
+- **配套测试**：`tests/sync-source-registry.test.ts` mock 接缝随模块边界迁移（**零断言变更**）：github-sync.js mock 收缩为仅 `GithubSyncSource`、新增 `remote-sync-apply.js` 全量工厂（真实 apply 模块不加载，与改动前 github-sync.js 全量 mock 隔离级别一致）、github-sync-diff 部分 mock 补 `computeDiff`（core 改为从该模块导入）。
+- **验证**：`tsc --project tsconfig.build.json` 0 / 全量 `eslint ts tests` 0 / 改动文件 `prettier --check` 通过 / `check:cycles` 0（无新增环）/ `check:ribbon-buttons` / `check:nav-order` / `check:com-in-loop` / `typecheck:tests` 全过；`vitest run --no-file-parallelism` 全量通过（含 sync-source-registry 70、github-sync 177、github-sync-core 45、sync-source 7、sync-result-dialog 35、sync-flow 15）。
+
 ### 变更（架构 · 拆分 `ui/handlers/index.ts` 2693 → 258 行，P1-G/P1-6/P1-H）
 
 - **背景**：`ui/handlers/index.ts` 是改动第 1 名的上帝模块（2693 行），内部同时承载资源追踪、按钮绑定、`ACTION_HANDLERS` 59 键分发表、日志面板、消息监听、事件总线订阅、设置页绑定、增量同步回写、GitHub 配置表单读写。

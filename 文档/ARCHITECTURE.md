@@ -1,6 +1,6 @@
 ﻿# Bangumi WPS Excel 加载项 - 架构与项目知识文档
 
-> 版本: 3.13 | 更新日期: 2026-10-15
+> 版本: 3.14 | 更新日期: 2026-10-17
 
 ---
 
@@ -25,6 +25,7 @@
 | v3.11 | 2026-10-09 | 分片网格错位修复 + **布局回归门禁**。根因是**两个样式表互相盖**（不是某条规则写错）：① `panel-theme.css` 在 `styles.css` **之后**加载，其 `.form-row label { flex: 0 0 96px }` 与 `styles.css` 的 `.shard-select-list label { flex: 0 0 auto }` **特异性相同**（都是 0,1,1）→ 由加载顺序决定胜负 → 标签被钉成 96px，中文标签竖排成一字一行；② `.form-row input { width: 100%; padding: 9px 12px }` 同时命中分片**复选框** → 撑到 140px，文字只剩 ~35px 窄条（原覆盖规则只重置 flex/margin/accent-color，**盖不住 width**）。修法：分片控件选择器提到 (0,2,1)（`.form-row .shard-select-list label`），并显式 `width: auto; padding: 0`。新增 `scripts/check-shard-layout.mjs` + `npm run check:shard-layout`（**不在 `gate` 内**，依赖本机 Chrome）：headless Chrome 在 320/400/500 三种布局宽度下量**真实计算样式**，断言文字单行 / 标签高 ≤ 40px / 复选框 ≤ 20px；fixture 实时取自 `panel.html` 与 `github-settings.ts`，另有渲染契约自检与**样式生效自检**，空结果一律大声失败。这类 bug 对单元测试完全隐形（jsdom 不做布局计算）—— 该门禁已按纪律反向验证：完整回退 → 54 项失败（理由为「文字占 N 行」而非崩溃）；仅去掉 `width` 重置 → 复选框断言独立变红                                                                                                                                                                                                    |
 | v3.12 | 2026-10-09 | **全页面**同类错位排查 + 布局审计工具。v3.11 只修了「数据分片」一处，遂用真浏览器扫了 `ui/*.html` 全部 5 个页面，又抓到 **3 处同源 bug**：① `#chkSyncSelectedOnly` 的 label 被 `.form-row label{flex:0 0 96px}` 钉成 96px、其中的复选框又被 `.form-row input{width:100%}` 撑到 96px，「仅同步选中行（按 Bangumi URL 列匹配 SID）」被挤爆；② `.time-filter-box` 在 `styles.css` 里声明 `display: block`，却被**后加载**的 `panel-theme.css` 的 `.form-row { display: flex }` 盖掉（同特异性 0,1,0）→ 该区块变成横向 flex，label 与块内 `p.hint` 争宽、label 只剩 111px，「✅ 启用时间筛选（按开播日期过滤）」竖排 4 行；③ 提示文本里的行内 `<code>` 使 `p.hint` 横向溢出 6px。修法统一为**提升特异性**（不是 `!important`）：`.form-row > label:has(> input[type='checkbox'])` / `:has(> input[type='radio'])` 设 `flex: 1 1 auto`、`.form-row > label > input[type='checkbox'/'radio']` 设 `width: auto`、`.form-row.time-filter-box` 设 `display: block`，另给 `.hint` 加 `overflow-wrap: anywhere`。新增 `scripts/audit-layout.mjs` + `npm run audit:layout`（**不在 `gate` 内**，依赖本机 Chrome）：5 个页面 × 500/400px 两档，按三条客观判据找错位（原生 checkbox/radio > 20px、短文本 ≤ 24 字占 > 1 视觉行、内容横向溢出），并已反向验证（回退 CSS → 退出码 1、准确报 3 类问题，`clean`/`enrich`/`settings` 仍判无异常）。修复后 5 页面 × 2 档**全部无异常** |
 | v3.13 | 2026-10-15 | **全链路数据安全审计**：修复 6 处会「吞数据 / 改用户数据」的缺陷（详见 §2.7）。核心是三条 COM 读写不变式——**单行区域 `Value2` 是一维数组**（原来按二维取 `oldValues[0]` 会拿到首个单元格的值，索引字符串得「第 N 个字符」）、**`null` 在二维数组里的语义是「清空该单元格」**（原来把未变化列铺 null 再整行赋值，会清掉 `writeCols` 区间中段的用户数据）、**读失败必须放弃写入**（原来用空旧值做「本地 \| 远程」合并，等于把用户标签/别名整体替换成远程值）。另修一个用户可见行为 bug：主面板 `#conflictStrategy` 下拉的 change 监听因 `#chkIncremental` 早退而从未注册，用户改了下拉却不落 `bgm_skip_conflicts` 配置。同时确立**测试桩忠实性原则**（桩不忠实就修桩，不为迁就桩弱化生产守卫）                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| v3.14 | 2026-10-17 | **sync 结构合并（路线①）**：`syncFromRemote` 与 `syncFromGithub` 主体逐字重复 ~150 行（2026-10-15 逐行比对确认差异仅 5 处：source 获取 / 校验文案 / 日志 tag / 耗时格式 / 时间筛选标签函数是否内联）。新增 `ts/sync/remote-sync-apply.ts`（apply 阶段整体逐字迁入，1537 行，含 `readLocalEntriesForSync` / `applyDiffToSheet` / `applyConflictResolutions` 与 12 个私有辅助）与 `ts/sync/remote-sync-core.ts`（`runRemoteSync` 统一编排，入口差异全部参数化）；`github-sync.ts` 1893 → 215、`sync-source-registry.ts` 314 → 118，均变薄壳，apply 三函数与 `GithubSyncResult` 经兼容 re-export 保留（barrel 与消费方不变）。关键约束：**`vi.mock` 截不住模块内调用 → apply 与编排必须分模块**，否则 registry 测试对 apply 三函数的 mock 静默失效（最终零断言变更，仅 mock 接缝随模块边界迁移）。进度口径统一 `0/1→1/3→2/3→3/3`、编排层耗时统一裸毫秒 `${ms}ms`（github 路径用户可见文案随之小改），apply 阶段内部 `formatDuration` 文案不变。依赖单向无环：apply ← core ← 两个薄壳                                                                                                                                                                                                                                                                                                                                                                                 |
 
 ## 一、架构概览
 
@@ -109,11 +110,13 @@ ts/index.ts (thin barrel — 仅 re-export)
   │   │   ├── progress-reporter.ts → 进度报告
   │   │   └── chapter-marker.ts  → 章节标记
   │   ├── scraping.ts       → Bangumi → Excel 收藏抓取
-  │   ├── github-sync.ts     → GitHub 仓库同步
+  │   ├── github-sync.ts     → GitHub 源实现 + 取数 + syncFromGithub 薄壳
   │   ├── github-config.ts   → GitHub 配置 (PluginStorage)
   │   ├── github-sync-diff.ts → 差异计算 (纯函数，零依赖)
+  │   ├── remote-sync-core.ts → runRemoteSync 统一编排（两入口共用）
+  │   ├── remote-sync-apply.ts → apply 阶段（读本地 / 写差异 / undo / 同步记录）
   │   ├── jsonl-response.ts  → 数据源响应解码 (gzip 魔数识别 + DecompressionStream)
-  │   ├── sync-source-registry.ts → 多源同步注册表
+  │   ├── sync-source-registry.ts → 多源同步注册表（含 syncFromRemote 薄壳）
   │   ├── gist-sync.ts       → Gist 同步源
   │   ├── gitee-sync.ts      → Gitee 同步源
   │   ├── gitlab-sync.ts     → GitLab 同步源
@@ -309,23 +312,44 @@ ts/index.ts (thin barrel — 仅 re-export)
 - **分片选择**: `getManualShards()` / `setManualShards()` 读写用户手动勾选的分片（存储键 `github_sync_shards`，空数组 = 按表头自动选片）
 - **首次读取自动填充**: 当所有关键字段为空时，自动写入默认配置
 
-#### `github-sync.ts` — GitHub 数据同步
+#### `github-sync.ts` — GitHub 源实现 + 取数 + 薄入口
 
-- **`syncFromGithub()`**: GitHub 专用同步入口
+2026-10-17 结构合并后，本文件只剩三件事：**GitHub 源实现、取数、`syncFromGithub` 薄壳**；
+主流程在 `remote-sync-core.ts`，apply 阶段在 `remote-sync-apply.ts`（下见两节）。
+
+- **`syncFromGithub()`**: GitHub 专用同步入口（薄壳：`new GithubSyncSource()` + `runRemoteSync`）
+  ⚠️ 参数顺序与 `syncFromRemote` **不同**（第 4、5 位互换），既有调用方依赖该签名，勿「顺手统一」
 - **`fetchGithubText(relativePath, signal?)`**: 按仓库内相对路径取一次原始文本（gzip 由 `readXhrJsonlText` 按魔数解压）
 - **`fetchGithubJson(signal?, neededFields?)`**: 委托 `shard-fetch.loadEntriesFromPath` 完成「清单 → 选片 → 逐片取文本 → 按行拼接」
-- **`readLocalEntriesForSync()`**: 读取本地 Excel 条目
-- **`applyDiffToSheet()`**: 将差异应用到工作表
+- **`GithubSyncSource`**: SyncSource 实现（`validateConfig` 委托 `isGithubConfigComplete`，`fetchRemoteEntries` 复用 `fetchGithubJson` 并把 `skippedInvalidLines` 写进 `loadStats` 出参）
+- **兼容 re-export**: `readLocalEntriesForSync` / `applyDiffToSheet` / `applyConflictResolutions` / `GithubSyncResult` 经本文件转出（定义已迁至 `remote-sync-apply.ts`），`ts/index.ts` barrel 与既有消费方不变
+
+#### `remote-sync-core.ts` — 统一同步编排（各入口共用）
+
+- **`runRemoteSync(parameters)`**: `syncFromGithub` 与 `syncFromRemote` 共用的主流程：
+  校验配置 → 按表头推导所需字段（时间筛选启用时补 `date`）→ 下载 → 关闭屏幕刷新 →
+  空文档表头填充 / 选中行过滤 / 时间筛选 → 读本地 → `computeDiff` → `applyConflictResolutions` →
+  `applyDiffToSheet` → 缺列与脏数据体检 → 汇总收尾（`finally` 恢复屏幕刷新）
+- **入口差异参数化**: source 获取 / 校验失败兜底文案 / 日志 tag / 进度口径经 `RunRemoteSyncParameters` 传入；
+  进度分母 `0/1 → 1/3 → 2/3 → 3/3`，编排层耗时一律裸毫秒 `${ms}ms`
+- **为何 apply 必须分模块**: `vi.mock` 截不住模块内调用 —— apply 与编排同模块时，registry 测试对
+  apply 三函数的 mock 会静默失效（详见 `文档/TECH_KNOWLEDGE_COM_DATA_SAFETY.md` §5.2）
+
+#### `remote-sync-apply.ts` — apply 阶段（本地读取 / 写差异 / undo / 同步记录）
+
+2026-10-17 自 `github-sync.ts` 整体逐字迁入（注释、边界处理与日志原文保留，日志 tag 仍为 `[githubSync]`）：
+
+- **`readLocalEntriesForSync()`**: 读取本地 Excel 条目（SID 白名单两层过滤 + 扩展字段与别名收集）
+- **`applyDiffToSheet()`**: 将差异应用到工作表（add 批量写 → update 批量改 → delete 倒序删，删除前统一记 undo 快照）
 - **`applyConflictResolutions()`**: 应用用户冲突解决决策
-- **`writeRemoteEntryToRow()`**: 将远程条目写入本地行（支持新增全量写入 + 更新追加合并策略）
-- **`batchUpdateRows()`**: 批量更新多行（支持逐行追加合并）
-- **`appendValueWithSeparator()`**: 值追加合并工具函数（`|` 分隔，自动去重）
-- **字段追加合并规则**:
-  - 标签/分级：远程标签追加到本地后面，以 `|` 分隔（已包含值时不重复追加）
+- **私有辅助**: `readLocalEntries` / `writeRemoteEntryToRow` / `batchWriteNewRows`（`BATCH_WRITE_SIZE`=500）/
+  `batchUpdateRows`（`BATCH_UPDATE_SIZE`=50）/ `writeRowValuesWithUndo` / `fallbackWriteRemoteEntry` /
+  `collectWriteCols`（`WriteCol`）/ `buildRemovalSnapshot`
+- **字段追加合并规则**（update 时保留本地数据）:
+  - 标签/分级：远程标签追加到本地后面，以 `|` 分隔（已包含值时不重复追加，`appendValueWithSeparator` 在 `github-time-format.ts`）
   - 名称：更新时远程名称追加到「别名」列，保留本地「名称」列不变；新增时直接写入「名称」列
   - 制作公司/动画制作公司：远程 `动画制作公司` 字段同步到本地 `制作公司` 和 `动画制作公司` 两列（双列映射）
   - Bangumi_URL：根据远程 sid 构造预期 URL `https://bgm.tv/subject/{sid}`，仅当本地存在该字段时进行比对和更新
-- **缓存管理**: `clearGithubDataCache()`, `isGithubDataCacheValid()`, `getGithubDataCacheAge()`, `loadGithubDataCache()`
 
 #### `github-sync-diff.ts` — 差异计算 (纯函数)
 
@@ -384,9 +408,10 @@ ts/index.ts (thin barrel — 仅 re-export)
   下载阶段动表会闪烁且失败留副作用）；读不到工作表或读不到任何列时返回 `undefined`，调用方按**全量下载**处理
   （空表本来就要写全部标准列，全量下载正是正确行为）
 
-#### `sync-source-registry.ts` — 多源同步注册表
+#### `sync-source-registry.ts` — 多源同步注册表（含 syncFromRemote 薄壳）
 
-- **`syncFromRemote()`**: 按 `sourceType` 选择对应同步源执行
+- **`syncFromRemote()`**: 按 `sourceType` 选择对应同步源执行（薄壳：取源 + `runRemoteSync`，主流程见 `remote-sync-core.ts`）
+  ⚠️ 参数顺序与 `syncFromGithub` **不同**（第 4、5 位互换：`shouldUseSelectedRowsOnly` 在前）
 - **`registerSyncSource()`**: 注册自定义同步源
 - **`getSyncSource()` / `getRegisteredSourceTypes()` / `isSyncSourceRegistered()`**: 查询注册表
 
@@ -720,7 +745,7 @@ const row = old[0] // 一维时这里是 v1（一个字符串），不是行数�
 row[2] // 字符串按下标取字符 → "第 2 个字符"
 ```
 
-**正确写法**（形状归一化，已固化在 `github-sync.ts` 的两处读取）：
+**正确写法**（形状归一化，已固化在 `tools/util/sheet.ts` 的 `readRect` / `normalizeValue2Shape`，经 `readRangeValues` 使用；`readLocalEntries` 等批量读一律走它）：
 
 ```ts
 const raw: unknown = range.Value2
@@ -989,13 +1014,13 @@ handlers/sync.ts → _doAPISync(sheetIndex, token)
 
 **2. 执行删除阶段** (`applyDiffToSheet()`)
 
-| 步骤 | 操作                                                  | 代码位置                     |
-| ---- | ----------------------------------------------------- | ---------------------------- |
-| ①    | 按行号**倒序**排列 diffs（避免先行删除导致行号错位）  | `github-sync.ts#L1066-L1070` |
-| ②    | 分离 `deleteDiffs`（仅保留有 `localRow` 的删除项）    | `github-sync.ts#L1076`       |
-| ③    | 记录撤销快照：`recordRowDeleteEntry({ row, values })` | `github-sync.ts#L1122-L1126` |
-| ④    | 调用 `ws.Range("行号:行号").Delete()` 删除整行        | `github-sync.ts#L1128`       |
-| ⑤    | 写入同步记录（状态：成功/失败）                       | `github-sync.ts#L1130-L1137` |
+| 步骤 | 操作                                                  | 代码位置                           |
+| ---- | ----------------------------------------------------- | ---------------------------------- |
+| ①    | 按行号**倒序**排列 diffs（避免先行删除导致行号错位）  | `remote-sync-apply.ts#L1246-L1251` |
+| ②    | 分离 `deleteDiffs`（仅保留有 `localRow` 的删除项）    | `remote-sync-apply.ts#L1257-L1259` |
+| ③    | 记录撤销快照：`recordRowDeleteEntry({ row, values })` | `remote-sync-apply.ts#L1336`       |
+| ④    | 调用 `ws.Range("行号:行号").Delete()` 删除整行        | `remote-sync-apply.ts#L1338`       |
+| ⑤    | 写入同步记录（状态：成功/失败）                       | `remote-sync-apply.ts#L1340-L1353` |
 
 **3. 撤销恢复机制** (`undoStack.undoLastSync()`)
 
@@ -1007,13 +1032,13 @@ handlers/sync.ts → _doAPISync(sheetIndex, token)
 
 **删除保护机制**
 
-| 保护措施           | 说明                                                                                                          | 代码位置                                                    |
-| ------------------ | ------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------- |
-| **SID 白名单过滤** | 两层过滤：① 无 Bangumi_URL 列值的行直接跳过；② `extractSubjectId()` 无法提取有效 SID（非 1-8 位数字）的行跳过 | `github-sync.ts#L347-L350`<br>`pure-utils-core.ts#L82-L118` |
-| 时间筛选           | 筛选范围外的本地行不执行删除                                                                                  | `github-sync-diff.ts#L485-L488`                             |
-| 行号倒序           | 防止先行删除导致后续行号偏移                                                                                  | `github-sync.ts#L1066-L1070`                                |
-| 撤销栈             | 删除前保存快照，可一键恢复                                                                                    | `undo-stack.ts#L73-L78`                                     |
-| 异常捕获           | 删除失败不中断整体同步流程                                                                                    | `github-sync.ts#L1138-L1154`                                |
+| 保护措施           | 说明                                                                                                          | 代码位置                                                          |
+| ------------------ | ------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------- |
+| **SID 白名单过滤** | 两层过滤：① 无 Bangumi_URL 列值的行直接跳过；② `extractSubjectId()` 无法提取有效 SID（非 1-8 位数字）的行跳过 | `remote-sync-apply.ts#L213-L216`<br>`pure-utils-core.ts#L82-L118` |
+| 时间筛选           | 筛选范围外的本地行不执行删除                                                                                  | `github-sync-diff.ts#L485-L488`                                   |
+| 行号倒序           | 防止先行删除导致后续行号偏移                                                                                  | `remote-sync-apply.ts#L1246-L1251`                                |
+| 撤销栈             | 删除前保存快照，可一键恢复                                                                                    | `undo-stack.ts#L73-L78`                                           |
+| 异常捕获           | 删除失败不中断整体同步流程                                                                                    | `remote-sync-apply.ts#L1354-L1375`                                |
 
 **SID 白名单过滤详解（非 BGM 条目不删除）**
 
@@ -1029,7 +1054,7 @@ handlers/sync.ts → _doAPISync(sheetIndex, token)
 | URL 有效，SID 不在远程仓库                 |                ✅                 |    ✅（会被删除）    |
 
 ```typescript
-// 两层过滤代码（github-sync.ts#L347-L350）
+// 两层过滤代码（remote-sync-apply.ts#L213-L216）
 const url = getField('Bangumi_URL')
 if (!url) continue        // 关卡1：没有 URL → 跳过
 const sid = extractSubjectId(url)
