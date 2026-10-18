@@ -980,12 +980,12 @@ export function refreshData(): void {
           : `<div class="preview-empty">已选择工作表索引: ${String(sheetIndex)} (${escapeHtml(sheetName)})<br>未检测到数据<br><span class="preview-empty-hint">确认数据区非空，或取消筛选后重试</span></div>`
       // 指纹未变 **且** 容器里仍是我们上次渲染的结果 → 跳过重建。
       // 第二个条件不能省：上一次渲染的是「请先选择工作表」这类提示时，
-      // 新 html 与指纹恰好相同也会被误判成「已经渲染过了」而跳过，提示就永远刷不掉。
+      // 新 HTML 与指纹恰好相同也会被误判成「已经渲染过了」而跳过，提示就永远刷不掉。
       const root = previewBox.firstElementChild
-      const alreadyRendered =
+      const isAlreadyRendered =
         root?.classList.contains('preview-table') === true ||
         root?.classList.contains('preview-empty') === true
-      if (!(alreadyRendered && html === lastPreviewHtml)) {
+      if (!(isAlreadyRendered && html === lastPreviewHtml)) {
         // 渲染前统一经 sanitizeHtml 清洗，剥离可能的事件处理器/危险脚本
         previewBox.innerHTML = sanitizeHtml(html)
         lastPreviewHtml = html

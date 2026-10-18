@@ -1259,7 +1259,7 @@ describe('panel-lifecycle · refreshData', () => {
     probe.id = 'render-probe'
     box.appendChild(probe)
 
-    // 改一格数据 → html 指纹变化
+    // 改一格数据 → HTML 指纹变化
     if (sheet.__cells) sheet.__cells['2:2'] = '动画Z'
     refreshData()
 
