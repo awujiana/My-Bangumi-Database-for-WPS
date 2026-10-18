@@ -33,6 +33,7 @@ import {
 } from '../index.js'
 import type { WpsWorksheet, GithubSyncResult, GithubRemoteEntry, LocalRowEntry } from '../index.js'
 import { undoLastSync, getLastSessionDescription } from '../sync/undo-stack.js'
+import { createStatusBarWriter } from '../tools/util/status-bar.js'
 
 // ========== GitHub 同步冲突解决类型 ==========
 
@@ -569,12 +570,13 @@ export async function syncWithConfirmation(): Promise<void> {
   }
   try {
     bgmLog(LOG_LEVELS.INFO, '[syncWithConfirmation] 开始执行同步...')
+    // StatusBar 节流（200ms）：逐行赋值 = 逐行一次 COM 往返
+    const statusBar = createStatusBarWriter(app)
     const result = await SyncToBangumiAsync(ws, colMap, token, lastRow, headerRow, {
       ...(skipSids !== undefined && { skipSids }),
       incremental: isIncremental,
       onProgress: (current, total, message) => {
-        if (app?.StatusBar !== undefined)
-          app.StatusBar = `[${String(current)}/${String(total)}] ${message}`
+        statusBar.write(`[${String(current)}/${String(total)}] ${message}`)
       },
     })
     if (app) app.StatusBar = false

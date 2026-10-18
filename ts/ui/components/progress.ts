@@ -339,6 +339,19 @@ export function createProgress(options: ProgressShowOptions): ProgressController
   const trigger = document.activeElement instanceof HTMLElement ? document.activeElement : null
   const hasLogs = options.enableLogs ?? false
 
+  // 日志区「是否跟随尾部」用滚动事件维护，而不是每条日志都读 scrollHeight：
+  // 读 scrollHeight / scrollTop / clientHeight 会强制同步布局（reflow），
+  // 同步流程每行一条日志时就是 O(n) 次 reflow（4000 行 ≈ 4000 次）。
+  // 这里只在用户真正滚动时读一次，日志追加只做写入。
+  let isFollowTail = true
+  els.log.addEventListener(
+    'scroll',
+    () => {
+      isFollowTail = els.log.scrollHeight - els.log.scrollTop - els.log.clientHeight < 30
+    },
+    { passive: true },
+  )
+
   // ---- 标题栏 / 能力开关 ----
   const shouldShowHeader = options.showHeader ?? options.mode !== 'inline'
   els.head.style.display = shouldShowHeader ? '' : 'none'
@@ -368,6 +381,7 @@ export function createProgress(options: ProgressShowOptions): ProgressController
   els.percent.textContent = '--%'
   els.current.textContent = ''
   els.log.textContent = ''
+  isFollowTail = true
   els.eta.style.display = 'none'
   els.globalEta.style.display = 'none'
   els.section.style.display = ''
@@ -472,9 +486,8 @@ export function createProgress(options: ProgressShowOptions): ProgressController
     },
     log(line: string): void {
       if (!isVisible || !hasLogs) return
-      const isNearBottom = els.log.scrollHeight - els.log.scrollTop - els.log.clientHeight < 30
       logCount = appendLogLine(els.log, line, logCount)
-      if (isNearBottom) els.log.scrollTop = els.log.scrollHeight
+      if (isFollowTail) els.log.scrollTop = els.log.scrollHeight
     },
     setPaused(isPausedNext: boolean): void {
       if (!isVisible) return

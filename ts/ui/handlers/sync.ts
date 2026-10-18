@@ -50,6 +50,7 @@ import type {
 } from '../../index.js'
 import { getSyncPreview, detectConflicts } from '../../services/ribbon-service.js'
 import { createSyncControlHandlers } from '../../core/sync-progress-handlers.js'
+import { createStatusBarWriter } from '../../tools/util/status-bar.js'
 import { ensureSheetHeaders, readRangeCellValues } from '../../tools/util/index.js'
 import { colNumberToLetter } from '../../tools/string-utilities.js'
 import type { WpsApp, WpsCellValue, WpsWorksheet } from '../../tools/wps.js'
@@ -596,14 +597,14 @@ async function confirmAndExecuteSync(prepared: SyncPreparedData): Promise<boolea
       syncFromPanelConfig,
     )
     bgmLog(LOG_LEVELS.INFO, '[syncFromPanel] 调用 SyncToBangumiAsync...')
+    // StatusBar 节流（200ms）：逐行赋值 = 逐行一次 COM 往返
+    const statusBar = createStatusBarWriter(app)
     const result = await SyncToBangumiAsync(ws, colMap, token, lastRow, headerRow, {
       ...(conflictSids !== undefined && { skipSids: conflictSids }),
       incremental,
       onProgress: (current: number, total: number, statusMessage: string) => {
         updateSyncProgressDialog(current, total, statusMessage)
-        if (app.StatusBar !== undefined) {
-          app.StatusBar = `[${String(current)}/${String(total)}] ${statusMessage}`
-        }
+        statusBar.write(`[${String(current)}/${String(total)}] ${statusMessage}`)
         bgmLog(
           LOG_LEVELS.INFO,
           `[syncFromPanel] 同步进度: ${String(current)}/${String(total)} - ${statusMessage}`,

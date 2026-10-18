@@ -80,6 +80,7 @@ import type {
 } from '../../index.js'
 import { exportConfig, importConfig } from '../../services/config-service.js'
 import { executeUndoLastSync } from '../../services/ribbon-service.js'
+import { createStatusBarWriter } from '../../tools/util/status-bar.js'
 import { clearLogs } from '../../tools/logger.js'
 import type { LogLevel } from '../../tools/logger.js'
 import { exportData } from './data-export.js'
@@ -681,15 +682,15 @@ export const ACTION_HANDLERS: Record<string, ActionHandler> = {
         const app = getApp()
         // 性能追踪：记录同步开始时间，用于计算总耗时
         const syncStartTime = Date.now()
+        // StatusBar 节流（200ms）：逐行赋值 = 逐行一次 COM 往返
+        const statusBar = createStatusBarWriter(app)
         try {
           const result = await syncFromRemote(
             (current, total, message, eta) => {
               // message 写入日志区，eta 独立传入 ETA 区
               updateSyncProgressDialog(current, total, message, message, eta)
-              if (app?.StatusBar !== undefined) {
-                const statusMessage = eta ? `${message} | ${eta}` : message
-                app.StatusBar = `[${String(current)}/${String(total)}] ${statusMessage}`
-              }
+              const statusMessage = eta ? `${message} | ${eta}` : message
+              statusBar.write(`[${String(current)}/${String(total)}] ${statusMessage}`)
             },
             strategy,
             abortController.signal,
