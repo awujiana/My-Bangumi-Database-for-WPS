@@ -20,6 +20,12 @@
 - **测试**：新增 `tests/diff-view.test.ts`（21 条：裁剪边界 / 渲染结构 / XSS 转义 / 分页追加 / 空区块）；`tests/clean-page.test.ts` +4（分组对比 / 变更行对 / 平铺空白行 / 分页）；`tests/sheet-cleaning.test.ts` 4 处 changes 断言补 `oldValue`；`clean-engine.test.ts` 16 处调用随异步化改 `await`。
 - **验证**：tsc 0 / eslint 0 / gate 八关 / 全量 vitest **136 文件 4511 用例全绿** / `audit:layout` 窄档 5 页面 × 2 档无异常 / 宽视口 Chrome 探针（grid 列数、预览跨列、零横向溢出 + 截图）。
 
+### 优化（样式 · 横屏通栏区块操作区限宽）
+
+- **现象**：横屏（宽窗格）停靠时，通栏区块（`.section-wide`）内带 `flex: 1` 的操作横条被拉到整个主区宽——clean 页「扫描预览」按钮从 ~150px 变成 ~1200px 巨条，enrich 页数据预览的两个页签（各占一半）变成 750px 巨型 tab。
+- **修法**：`.section-wide` 内按钮行 `max-width: 720px`、页签改内容宽度、统计条 `max-width: 880px`；`#cleanScanBtn` 的行内 `flex: 1` 下沉为 `clean.css` 基础规则（列内/窄屏行为不变），通栏时覆盖。数据表格与 diff 明细仍全宽。⚠️ 限宽规则与栅格同断点（960px）——`.section-wide` 类不区分宽度，不加断点会改变窄屏行为。
+- **验证**：双档 Chrome 探针（1500/1000px 按钮 < 320px；500px 按钮 > 400px 且 tab 均分，窄屏不回退）+ `audit:layout` 窄档无异常。
+
 ### 修复（同步预览样式丢失 + 死样式引用）
 
 - **现象**：主面板控制台报 `Refused to apply style from '.../css/preview.css' because its MIME type ('text/html')`；同步预览弹窗的统计卡左侧色条（待上传/已上传）、详情列表间距、面板右下角「回到顶部/滚到底部」按钮样式、窄窗格响应式**全部失效**。

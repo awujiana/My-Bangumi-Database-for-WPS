@@ -349,6 +349,14 @@ export function initIncrementalSyncFromRibbon(): void {
 
 ⚠️ **不用 `repeat(auto-fit, minmax(280px, 400px))`**（panel 的口径）：Chrome 探针实测 1500px 窗格下它给 2×400px，**右侧空出约 1/4 宽度**——正是要消除的问题。改用确定性列数 + `1fr` 铺满（超宽也不碎片化）。验证用一次性宽视口探针（量计算样式 + 截图），`audit:layout` 窄档 5 页面 × 2 档复测无异常。
 
+#### 5.5.6 通栏区块的操作区限宽（横屏美观修复）
+
+**问题**（用户反馈「扫描前预览组件横向太长不美观」）：通栏区块横跨全部列后，内部带 `flex: 1` 的操作横条被拉到整个主区宽——`#cleanScanBtn` 从 ~150px 变成 ~1200px 的巨条，`.preview-tab`（各占一半）变成 750px 巨型页签。
+
+**修法**（`panel-theme.css`，与栅格同断点）：`.section-wide` 内的按钮行 `max-width: 720px`、页签 `flex: 0 0 auto`（改内容宽度）、统计条 `max-width: 880px`；`#cleanScanBtn` 的行内 `flex: 1` 下沉为 `clean.css` 基础规则（列内/窄屏行为不变），通栏时覆盖为内容宽度。**数据表格与 diff 明细仍用全宽**（信息密度需要）。
+
+⚠️ **坑：`.section-wide` 类本身不区分宽度**——限宽规则必须包进 `@media (min-width: 960px)`，否则窄屏单列也命中（按钮/页签不再填满，改变窄屏行为）。双档探针断言：1500/1000px 按钮 < 320px、500px 按钮 > 400px 且两 tab 均分。
+
 ---
 
 ## 六、测试桩忠实性原则（本次最重要的方法论收获）
