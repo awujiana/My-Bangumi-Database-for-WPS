@@ -63,6 +63,7 @@ const m = vi.hoisted(() => ({
   clearOperationLogs: vi.fn<(scope: string) => void>(),
   // tools/sanitize.js
   sanitizeHtml: vi.fn<(html: string) => string>(),
+  sanitizeTableRows: vi.fn<(rows: string) => string>(),
   // panel/shell-nav.js
   initShellNav: vi.fn<() => void>(),
   // tools/theme.js
@@ -103,7 +104,10 @@ vi.mock('../ts/tools/operation-log.js', () => ({
   clearOperationLogs: m.clearOperationLogs,
 }))
 
-vi.mock('../ts/tools/sanitize.js', () => ({ sanitizeHtml: m.sanitizeHtml }))
+vi.mock('../ts/tools/sanitize.js', () => ({
+  sanitizeHtml: m.sanitizeHtml,
+  sanitizeTableRows: m.sanitizeTableRows,
+}))
 
 vi.mock('../ts/panel/shell-nav.js', () => ({ initShellNav: m.initShellNav }))
 
@@ -296,6 +300,10 @@ async function flushAsync(): Promise<void> {
   await Promise.resolve()
   await Promise.resolve()
   await Promise.resolve()
+  // 扫描让出的是宏任务（setTimeout 0，生产环境为真重绘），微任务冲不干净
+  await new Promise<void>((resolve) => {
+    setTimeout(resolve, 0)
+  })
 }
 
 beforeEach(() => {
@@ -304,6 +312,7 @@ beforeEach(() => {
   // clearAllMocks 不清实现，默认值必须在每轮重新锚定，否则上一条用例的覆写会泄漏
   m.getApp.mockReturnValue(null)
   m.sanitizeHtml.mockImplementation((html: string) => html)
+  m.sanitizeTableRows.mockImplementation((rows: string) => rows)
   m.formatBytes.mockImplementation((bytes: number) => `${String(bytes)} B`)
   m.createProgress.mockReturnValue({
     hide: m.progressHide,
@@ -392,6 +401,7 @@ async function mountRunnable(): Promise<void> {
   clickById('cleanLoadSheetsBtn')
   m.scanCleanRules.mockReturnValue(hitScanResult())
   clickById('cleanScanBtn')
+    await flushAsync()
   m.appendOperationLog.mockClear()
 }
 
@@ -916,6 +926,7 @@ describe('handleScan', () => {
     m.appendOperationLog.mockClear()
 
     clickById('cleanScanBtn')
+    await flushAsync()
 
     const call = m.scanCleanRules.mock.calls[0]
     const ruleIds = call?.[0] ?? []
@@ -946,11 +957,150 @@ describe('handleScan', () => {
     m.appendOperationLog.mockClear()
 
     clickById('cleanScanBtn')
+    await flushAsync()
 
     expect(byId('cleanPreviewDetail').innerHTML).toContain('未发现需要清理的数据')
     expect(loggedMessages().at(-1)).toContain('扫描完成：未发现需要清理的数据')
     expect(m.showToast).toHaveBeenCalledWith('未发现需要清理的数据', 'info')
     expect(buttonById('cleanRunBtn').disabled).toBe(true)
+  })
+
+  it('重复组计划渲染「保留行 vs 待删除行」diff 对比', async () => {
+    await mountScannable()
+    m.scanCleanRules.mockReturnValue({
+      targets: [{ key: 'A.xlsx::动画', label: 'A / 动画' }],
+      plans: [
+        {
+          ruleId: 'dup-name',
+          ruleName: '重复名称行',
+          targetKey: 'A.xlsx::动画',
+          targetLabel: 'A / 动画',
+          deleteRows: [9],
+          changes: [],
+          estimatedBytes: 2048,
+          rowPreviews: [{ row: 9, name: '动画A', url: '' }],
+          groupPreviews: [
+            {
+              keepRow: 7,
+              keepName: '动画A',
+              keepUrl: 'https://bgm.tv/subject/1',
+              victims: [{ row: 9, name: '动画A', url: '' }],
+            },
+          ],
+        },
+      ],
+      fileCount: 1,
+      targetCount: 1,
+      itemCount: 1,
+      estimatedBytes: 2048,
+      notes: [],
+    })
+    m.appendOperationLog.mockClear()
+
+    clickById('cleanScanBtn')
+    await flushAsync()
+
+    const detail = byId('cleanPreviewDetail')
+    expect(detail.querySelector('.diff-row-context')?.textContent).toContain('第 1 组 · 名称「动画A」')
+    const keepRow = detail.querySelector('.diff-row-keep')
+    expect(keepRow?.querySelector('.diff-row-num')?.textContent).toBe('7')
+    expect(keepRow?.textContent).toContain('保留')
+    const removedRow = detail.querySelector('.diff-row-delete')
+    expect(removedRow?.querySelector('.diff-row-num')?.textContent).toBe('9')
+    expect(removedRow?.textContent).toContain('无 URL')
+  })
+
+  it('单元格变更渲染「- 旧值 / + 新值」行对', async () => {
+    await mountScannable()
+    m.scanCleanRules.mockReturnValue(hitScanResult())
+    m.appendOperationLog.mockClear()
+
+    clickById('cleanScanBtn')
+    await flushAsync()
+
+    const rows = [...byId('cleanPreviewDetail').querySelectorAll('.diff-row')]
+    const markers = rows.map((row) => row.querySelector('.diff-marker')?.textContent)
+    expect(markers).toContain('-')
+    expect(markers).toContain('+')
+    const insertRow = rows.find((row) => row.className.includes('diff-row-insert'))
+    expect(insertRow?.querySelector('.diff-row-num')?.textContent).toBe('5')
+    expect(insertRow?.textContent).toContain('b')
+  })
+
+  it('无分组的待删行平铺展示，空白行有占位文案', async () => {
+    await mountScannable()
+    m.scanCleanRules.mockReturnValue({
+      targets: [{ key: 'A.xlsx::动画', label: 'A / 动画' }],
+      plans: [
+        {
+          ruleId: 'empty-name',
+          ruleName: '空白数据行',
+          targetKey: 'A.xlsx::动画',
+          targetLabel: 'A / 动画',
+          deleteRows: [12, 30],
+          changes: [],
+          estimatedBytes: 512,
+          rowPreviews: [
+            { row: 12, name: '', url: '' },
+            { row: 30, name: '', url: '' },
+          ],
+        },
+      ],
+      fileCount: 1,
+      targetCount: 1,
+      itemCount: 2,
+      estimatedBytes: 512,
+      notes: [],
+    })
+    m.appendOperationLog.mockClear()
+
+    clickById('cleanScanBtn')
+    await flushAsync()
+
+    const detail = byId('cleanPreviewDetail')
+    expect(detail.querySelector('.diff-row-context')).toBeNull()
+    const removedRows = detail.querySelectorAll(':scope .diff-row-delete')
+    expect(removedRows).toHaveLength(2)
+    expect(removedRows[0]?.textContent).toContain('（空白行）')
+    expect(detail.textContent).toContain('空白数据行 · 待删除行')
+  })
+
+  it('超过每页行数的区块分页渲染，「显示更多」按批追加', async () => {
+    await mountScannable()
+    const manyRows = Array.from({ length: 60 }, (_, index) => index + 2)
+    m.scanCleanRules.mockReturnValue({
+      targets: [{ key: 'A.xlsx::动画', label: 'A / 动画' }],
+      plans: [
+        {
+          ruleId: 'empty-name',
+          ruleName: '空白数据行',
+          targetKey: 'A.xlsx::动画',
+          targetLabel: 'A / 动画',
+          deleteRows: manyRows,
+          changes: [],
+          estimatedBytes: 512,
+          rowPreviews: manyRows.map((row) => ({ row, name: '', url: '' })),
+        },
+      ],
+      fileCount: 1,
+      targetCount: 1,
+      itemCount: 60,
+      estimatedBytes: 512,
+      notes: [],
+    })
+    m.appendOperationLog.mockClear()
+
+    clickById('cleanScanBtn')
+    await flushAsync()
+
+    const detail = byId('cleanPreviewDetail')
+    expect(detail.querySelectorAll(':scope .diff-table tbody tr')).toHaveLength(50)
+    const moreButton = detail.querySelector<HTMLButtonElement>('[data-diff-more]')
+    expect(moreButton?.textContent).toBe('显示更多（剩余 10 行）')
+
+    moreButton?.click()
+    expect(detail.querySelectorAll(':scope .diff-table tbody tr')).toHaveLength(60)
+    expect(detail.querySelector('[data-diff-more]')).toBeNull()
   })
 
   it('扫描抛错时记 error 日志并弹 toast', async () => {
@@ -1161,6 +1311,7 @@ describe('handleRun / executeClean', () => {
     clickById('cleanRunBtn')
     await flushAsync()
     clickById('cleanScanBtn')
+    await flushAsync()
     clickById('cleanRunBtn')
     await flushAsync()
 
@@ -1277,6 +1428,7 @@ describe('按钮绑定与日志', () => {
     m.scanCleanRules.mockReturnValue(hitScanResult())
 
     clickById('cleanScanBtn')
+    await flushAsync()
 
     expect(buttonById('cleanRunBtn').disabled).toBe(false)
   })

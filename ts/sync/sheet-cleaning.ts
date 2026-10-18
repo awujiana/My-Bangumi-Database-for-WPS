@@ -47,6 +47,33 @@ export interface RowChange {
   col: number
   /** 目标值 */
   value: string
+  /** 原值（行级规则的标签合并等；采集自已读入的列，零额外 COM 读取） */
+  oldValue?: string | undefined
+}
+
+/**
+ * 待删除行的预览数据（执行前预览的 diff 视图用）。
+ * 扫描期顺带采集：names / urls 等列本就已读入内存，**不产生额外 COM 读取**。
+ */
+export interface DeletedRowPreview {
+  /** Excel 行号（1-based） */
+  row: number
+  /** 名称列值（空白行 / 无名称列时为空串） */
+  name: string
+  /** Bangumi_URL 值（无 URL 列或无 URL 时为空串） */
+  url: string
+}
+
+/** 重复分组的「保留行 vs 待删除行」结构（diff 对比视图用） */
+export interface DuplicateGroupPreview {
+  /** 保留行行号 */
+  keepRow: number
+  /** 保留行名称 */
+  keepName: string
+  /** 保留行 URL */
+  keepUrl: string
+  /** 待删除行（含名称与 URL，便于用户核对引擎是否留对了行） */
+  victims: DeletedRowPreview[]
 }
 
 /** 行级清理计划（只读扫描的产物） */
@@ -61,6 +88,10 @@ export interface RowPlan {
   mergedGroups: number
   /** 未产生任何清理时的原因 */
   skippedReason?: string | undefined
+  /** 待删除行的预览数据（执行前预览用；扫描期顺带采集，零额外 COM 读取） */
+  rowPreviews?: DeletedRowPreview[]
+  /** 重复分组结构（保留行 vs 待删除行；仅重复类规则产出） */
+  groupPreviews?: DuplicateGroupPreview[]
 }
 
 /** 扫描选项 */
@@ -267,21 +298,47 @@ export function planDuplicateRows(ws: WpsWorksheet, options?: RowPlanOptions): R
   let groupCount = 0
   let mergedCount = 0
 
+  // 执行前预览数据顺带采集（names / urls 已在内存，零额外 COM 读取）
+  const rowPreviews: DeletedRowPreview[] = []
+  const groupPreviews: DuplicateGroupPreview[] = []
+
   for (const rows of groups.values()) {
     const outcome = resolveNameGroup(layout, rows, urls, tags, dates, episodes)
     if (outcome) {
       groupCount += 1
       rowsToDelete.push(...outcome.victims)
       if (tagsCol && outcome.mergedTags !== null) {
-        changes.push({ row: outcome.keepRow, col: tagsCol, value: outcome.mergedTags })
+        changes.push({
+          row: outcome.keepRow,
+          col: tagsCol,
+          value: outcome.mergedTags,
+          oldValue: tags?.[toIndex(layout, outcome.keepRow)] ?? '',
+        })
         mergedCount += 1
       }
+      // 组内行共享同一名称（分组键），保留行与待删行的名称相同
+      const keepName = (names[toIndex(layout, outcome.keepRow)] ?? '').trim()
+      const keepUrl = (urls[toIndex(layout, outcome.keepRow)] ?? '').trim()
+      const victims: DeletedRowPreview[] = outcome.victims.map((row) => ({
+        row,
+        name: keepName,
+        url: (urls[toIndex(layout, row)] ?? '').trim(),
+      }))
+      rowPreviews.push(...victims)
+      groupPreviews.push({ keepRow: outcome.keepRow, keepName, keepUrl, victims })
     }
   }
 
   rowsToDelete.sort((a, b) => a - b)
   if (rowsToDelete.length === 0) return emptyPlan('未发现重复数据')
-  return { deleteRows: rowsToDelete, changes, groups: groupCount, mergedGroups: mergedCount }
+  return {
+    deleteRows: rowsToDelete,
+    changes,
+    groups: groupCount,
+    mergedGroups: mergedCount,
+    rowPreviews,
+    groupPreviews,
+  }
 }
 
 // ========== 2. 同 URL 跨名称重复行 ==========
@@ -317,6 +374,9 @@ export function planDuplicateUrlRows(ws: WpsWorksheet, options?: RowPlanOptions)
   const excluded = options?.excludedRows
   const urls = readColumn(ws, layout, urlCol)
   const tags = tagsCol ? readColumn(ws, layout, tagsCol) : null
+  // 同 URL 组内各行名称不同，diff 对比视图需要名称列（一次矩形读）
+  const nameCol = layout.colMap.get('名称')
+  const names = nameCol ? readColumn(ws, layout, nameCol) : null
 
   const groups = new Map<string, number[]>()
   for (const [index, rawUrl] of urls.entries()) {
@@ -334,21 +394,46 @@ export function planDuplicateUrlRows(ws: WpsWorksheet, options?: RowPlanOptions)
   let groupCount = 0
   let mergedCount = 0
 
+  // 执行前预览数据顺带采集（urls / names 已在内存，零额外 COM 读取）
+  const rowPreviews: DeletedRowPreview[] = []
+  const groupPreviews: DuplicateGroupPreview[] = []
+
   for (const rows of groups.values()) {
     const outcome = resolveUrlGroup(layout, rows, tags)
     if (outcome) {
       groupCount += 1
       rowsToDelete.push(...outcome.victims)
       if (tagsCol && outcome.mergedTags !== null) {
-        changes.push({ row: outcome.keepRow, col: tagsCol, value: outcome.mergedTags })
+        changes.push({
+          row: outcome.keepRow,
+          col: tagsCol,
+          value: outcome.mergedTags,
+          oldValue: tags?.[toIndex(layout, outcome.keepRow)] ?? '',
+        })
         mergedCount += 1
       }
+      const keepName = names ? (names[toIndex(layout, outcome.keepRow)] ?? '').trim() : ''
+      const keepUrl = (urls[toIndex(layout, outcome.keepRow)] ?? '').trim()
+      const victims: DeletedRowPreview[] = outcome.victims.map((row) => ({
+        row,
+        name: names ? (names[toIndex(layout, row)] ?? '').trim() : '',
+        url: (urls[toIndex(layout, row)] ?? '').trim(),
+      }))
+      rowPreviews.push(...victims)
+      groupPreviews.push({ keepRow: outcome.keepRow, keepName, keepUrl, victims })
     }
   }
 
   rowsToDelete.sort((a, b) => a - b)
   if (rowsToDelete.length === 0) return emptyPlan('未发现同 URL 重复行')
-  return { deleteRows: rowsToDelete, changes, groups: groupCount, mergedGroups: mergedCount }
+  return {
+    deleteRows: rowsToDelete,
+    changes,
+    groups: groupCount,
+    mergedGroups: mergedCount,
+    rowPreviews,
+    groupPreviews,
+  }
 }
 
 // ========== 3. 空白数据行 ==========
@@ -364,22 +449,29 @@ export function planEmptyNameRows(ws: WpsWorksheet, options?: RowPlanOptions): R
   if (!nameCol) return emptyPlan('未找到「名称」列')
 
   const excluded = options?.excludedRows
-  const names = readColumn(ws, layout, nameCol)
-  const others: string[][] = []
-  for (const col of layout.colMap.values()) {
-    if (col !== nameCol) others.push(readColumn(ws, layout, col))
-  }
+  // 单次矩形读整块数据区：原实现按列逐个读（列数 = COM 往返次数）。
+  // 语义不变——仍只检查 colMap 已识别列（表头为空的间隙列有数据时不阻止判空白）。
+  const maxCol = Math.max(...layout.colMap.values())
+  const block = readRangeValues(ws, layout.dataStartRow, layout.lastRow, 1, maxCol)
+  const otherCols = [...layout.colMap.values()].filter((col) => col !== nameCol)
 
   const rowsToDelete: number[] = []
-  for (const [index, rawName] of names.entries()) {
+  for (const [index, cells] of block.entries()) {
     const row = toRow(layout, index)
     const isBlank =
-      rawName.trim() === '' && others.every((column) => (column[index] ?? '').trim() === '')
+      (cells[nameCol - 1] ?? '').trim() === '' &&
+      otherCols.every((col) => (cells[col - 1] ?? '').trim() === '')
     if (isBlank && !excluded?.has(row)) rowsToDelete.push(row)
   }
 
   if (rowsToDelete.length === 0) return emptyPlan('未发现空白数据行')
-  return { deleteRows: rowsToDelete, changes: [], groups: rowsToDelete.length, mergedGroups: 0 }
+  return {
+    deleteRows: rowsToDelete,
+    changes: [],
+    groups: rowsToDelete.length,
+    mergedGroups: 0,
+    rowPreviews: rowsToDelete.map((row) => ({ row, name: '', url: '' })),
+  }
 }
 
 // ========== 写入阶段 ==========

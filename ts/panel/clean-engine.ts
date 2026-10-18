@@ -38,7 +38,12 @@ import {
   planDuplicateUrlRows,
   planEmptyNameRows,
 } from '../sync/sheet-cleaning.js'
-import type { RowChange, RowPlan } from '../sync/sheet-cleaning.js'
+import type {
+  DeletedRowPreview,
+  DuplicateGroupPreview,
+  RowChange,
+  RowPlan,
+} from '../sync/sheet-cleaning.js'
 
 // ========== 类型 ==========
 
@@ -96,6 +101,10 @@ export interface RulePlan {
   estimatedBytes: number
   /** 跳过原因（无计划时） */
   skipped?: string
+  /** 待删除行的预览数据（执行前预览的 diff 视图用；行级规则产出） */
+  rowPreviews?: DeletedRowPreview[] | undefined
+  /** 重复分组结构（保留行 vs 待删除行；重复类规则产出） */
+  groupPreviews?: DuplicateGroupPreview[] | undefined
 }
 
 /** 计划的基础字段（构建具体计划时复用） */
@@ -539,11 +548,15 @@ export function listCleanTargets(
  * 计算单个目标中「不参与清理」的行号集合（汇总行 / 说明行等）。
  * 只扫描前 rowScanColumns 列，避免整表读取。
  */
-export function collectExcludedRows(target: CleanTargetInfo): Set<number> {
+export function collectExcludedRows(
+  target: CleanTargetInfo,
+  block?: readonly string[][],
+): Set<number> {
   const excluded = new Set<number>()
   if (CLEAN_EXCLUDES.rowText.length === 0) return excluded
   const maxCol = Math.min(CLEAN_EXCLUDES.rowScanColumns, 50)
-  const rows = readRangeValues(target.ws, target.headerRow + 1, target.lastRow, 1, maxCol)
+  // block 为调用方（scanTarget）已读入的数据区整块；未提供时按原行为自行读取
+  const rows = block ?? readRangeValues(target.ws, target.headerRow + 1, target.lastRow, 1, maxCol)
   for (const [index, rowValues] of rows.entries()) {
     const joined = rowValues.join(' ')
     if (CLEAN_EXCLUDES.rowText.some((keyword) => joined.includes(keyword))) {
@@ -559,7 +572,7 @@ export function collectExcludedRows(target: CleanTargetInfo): Set<number> {
  * 估算单个目标的「每行平均字节数」：均匀采样至多 ROW_BYTES_SAMPLE_LIMIT 行读取整行，
  * 取平均；采样失败时回退到 ROW_BYTES_FALLBACK。
  */
-export function estimateRowBytes(target: CleanTargetInfo): number {
+export function estimateRowBytes(target: CleanTargetInfo, block?: readonly string[][]): number {
   const dataRows = target.lastRow - target.headerRow
   if (dataRows <= 0) return 0
   const sampleCount = Math.min(ROW_BYTES_SAMPLE_LIMIT, dataRows)
@@ -570,9 +583,18 @@ export function estimateRowBytes(target: CleanTargetInfo): number {
   let sampled = 0
   let index = 0
   while (index < dataRows) {
-    const row = target.headerRow + 1 + index
-    const values = readRangeValues(target.ws, row, row, 1, maxCol)
-    total += estimateUtf8Bytes((values[0] ?? []).join(''))
+    // block 为调用方（scanTarget）已读入的数据区整块（索引 0 = 首个数据行）；
+    // 未提供时按原行为逐行读，保持导出函数可独立使用
+    const values = block
+      ? (block[index] ?? [])
+      : (readRangeValues(
+          target.ws,
+          target.headerRow + 1 + index,
+          target.headerRow + 1 + index,
+          1,
+          maxCol,
+        )[0] ?? [])
+    total += estimateUtf8Bytes(values.join(''))
     sampled += 1
     index += step
   }
@@ -658,8 +680,22 @@ function scanCellTransform(
   return { ...base, deleteRows: [], changes, estimatedBytes }
 }
 
+/** 预览行文本的最大长度（噪声行整行文本可能很长，截断即可识别） */
+const PREVIEW_TEXT_LIMIT = 60
+
+/** 截断过长的预览文本（超出补省略号） */
+function truncatePreviewText(text: string): string {
+  const trimmed = text.trim()
+  return trimmed.length <= PREVIEW_TEXT_LIMIT ? trimmed : `${trimmed.slice(0, PREVIEW_TEXT_LIMIT)}…`
+}
+
 /** 扫描噪声行：按 {@link CLEAN_EXCLUDES.noiseRowText} 命中的行整行删除（不遵守 excludedRows） */
-function planNoiseRows(ws: WpsWorksheet, headerRow: number, lastRow: number): RowPlan {
+function planNoiseRows(
+  ws: WpsWorksheet,
+  headerRow: number,
+  lastRow: number,
+  block?: readonly string[][],
+): RowPlan {
   const keywords = CLEAN_EXCLUDES.noiseRowText
   if (keywords.length === 0) {
     return {
@@ -672,11 +708,16 @@ function planNoiseRows(ws: WpsWorksheet, headerRow: number, lastRow: number): Ro
   }
   const maxCol = Math.min(CLEAN_EXCLUDES.rowScanColumns, 50)
   const rowsToDelete: number[] = []
-  const rows = readRangeValues(ws, headerRow + 1, lastRow, 1, maxCol)
+  const rowPreviews: DeletedRowPreview[] = []
+  // block 为调用方（scanTarget）已读入的数据区整块（列跨度一致）；未提供时自行读取
+  const rows = block ?? readRangeValues(ws, headerRow + 1, lastRow, 1, maxCol)
   for (const [index, rowValues] of rows.entries()) {
     const joined = rowValues.join(' ')
     if (keywords.some((keyword) => joined.includes(keyword))) {
-      rowsToDelete.push(headerRow + 1 + index)
+      const row = headerRow + 1 + index
+      rowsToDelete.push(row)
+      // 噪声行无「名称」概念，预览展示行文本截断（采集自已读入的整块，零额外 COM）
+      rowPreviews.push({ row, name: truncatePreviewText(joined), url: '' })
     }
   }
   if (rowsToDelete.length === 0) {
@@ -688,7 +729,13 @@ function planNoiseRows(ws: WpsWorksheet, headerRow: number, lastRow: number): Ro
       skippedReason: '未发现噪声行',
     }
   }
-  return { deleteRows: rowsToDelete, changes: [], groups: rowsToDelete.length, mergedGroups: 0 }
+  return {
+    deleteRows: rowsToDelete,
+    changes: [],
+    groups: rowsToDelete.length,
+    mergedGroups: 0,
+    rowPreviews,
+  }
 }
 
 function scanRowRule(
@@ -696,6 +743,7 @@ function scanRowRule(
   target: CleanTargetInfo,
   excludedRows: ReadonlySet<number>,
   rowBytes: number,
+  block?: readonly string[][],
 ): RulePlan {
   const base: RulePlanBase = {
     ruleId: rule.id,
@@ -721,7 +769,7 @@ function scanRowRule(
       }
       case 'noiseRows': {
         // 噪声行刻意不遵守 excludedRows：否则这些行会被 rowText 保护语义先行排除，永远删不掉
-        plan = planNoiseRows(target.ws, target.headerRow, target.lastRow)
+        plan = planNoiseRows(target.ws, target.headerRow, target.lastRow, block)
         break
       }
       default: {
@@ -741,7 +789,8 @@ function scanRowRule(
     row: change.row,
     col: change.col,
     columnName: columnName(target, change.col),
-    oldValue: '',
+    // 行级变更（标签合并）的旧值由计划顺带采集；未提供时为空串
+    oldValue: change.oldValue ?? '',
     nextValue: change.value,
   }))
 
@@ -750,6 +799,8 @@ function scanRowRule(
     deleteRows: plan.deleteRows,
     changes,
     estimatedBytes: Math.round(plan.deleteRows.length * rowBytes),
+    rowPreviews: plan.rowPreviews,
+    groupPreviews: plan.groupPreviews,
   }
 }
 
@@ -760,6 +811,7 @@ function scanOneRule(
   excludedRows: ReadonlySet<number>,
   rowBytes: number,
   notes: string[],
+  block?: readonly string[][],
 ): RulePlan | null {
   const rule = findCleanRule(id)
   if (!rule) {
@@ -769,7 +821,7 @@ function scanOneRule(
   const plan =
     rule.kind === 'cellTransform'
       ? scanCellTransform(rule, target, excludedRows)
-      : scanRowRule(rule, target, excludedRows, rowBytes)
+      : scanRowRule(rule, target, excludedRows, rowBytes, block)
   if (plan.skipped) {
     notes.push(`${target.label} · ${rule.name}：${plan.skipped}`)
     return null
@@ -783,15 +835,22 @@ function scanTarget(
   ruleIds: readonly string[],
   notes: string[],
 ): RulePlan[] {
-  const excludedRows = collectExcludedRows(target)
+  // 数据区整块只读一次，排除行判定与行字节估算共用：
+  // 原为 collectExcludedRows 1 次 + estimateRowBytes 至多 ROW_BYTES_SAMPLE_LIMIT 次 COM 往返
+  const maxCol = Math.min(CLEAN_EXCLUDES.rowScanColumns, 50)
+  const block =
+    target.lastRow > target.headerRow
+      ? readRangeValues(target.ws, target.headerRow + 1, target.lastRow, 1, maxCol)
+      : undefined
+  const excludedRows = collectExcludedRows(target, block)
   if (excludedRows.size > 0) {
     notes.push(`${target.label}：排除 ${String(excludedRows.size)} 行（汇总/说明行）`)
   }
-  const rowBytes = estimateRowBytes(target)
+  const rowBytes = estimateRowBytes(target, block)
 
   const plans: RulePlan[] = []
   for (const id of ruleIds) {
-    const plan = scanOneRule(id, target, excludedRows, rowBytes, notes)
+    const plan = scanOneRule(id, target, excludedRows, rowBytes, notes, block)
     if (plan) plans.push(plan)
   }
   return plans
@@ -799,15 +858,20 @@ function scanTarget(
 
 /**
  * 扫描全部勾选规则（只读，不修改任何单元格）。
+ *
+ * **异步**：逐目标之间让出宏任务（setTimeout 0，而非微任务 —— 微任务不足以
+ * 让浏览器重绘）。大表扫描是整块 COM 读取，同步执行会让任务窗格在扫描期间
+ * 完全冻结（按钮无反馈、无法滚动）；让出后每完成一张表就有一次重绘机会。
+ *
  * @param ruleIds 勾选的规则 ID
  * @param options.selectedSheets 用户显式勾选的工作表白名单（按 `工作簿全路径 :: 表名` 形式）；
  *   传空数组表示不限制（保留旧行为，向后兼容）。
  *   命中时只清理白名单内的目标；未命中时整张表跳过。
  */
-export function scanCleanRules(
+export async function scanCleanRules(
   ruleIds: readonly string[],
   options: { selectedSheets?: readonly { workbookKey: string; sheetName: string }[] } = {},
-): CleanScanResult {
+): Promise<CleanScanResult> {
   const notes: string[] = []
   const targets = listCleanTargets(options.selectedSheets)
   if (targets.length === 0) {
@@ -825,6 +889,10 @@ export function scanCleanRules(
 
   for (const target of targets) {
     files.add(target.workbookPath)
+    // 每完成一张表让出一次宏任务，使任务窗格保持响应（与首屏 COM 扫描同一原则）
+    await new Promise<void>((resolve) => {
+      setTimeout(resolve, 0)
+    })
     for (const plan of scanTarget(target, ruleIds, notes)) {
       plans.push(plan)
       itemCount += plan.deleteRows.length + plan.changes.length

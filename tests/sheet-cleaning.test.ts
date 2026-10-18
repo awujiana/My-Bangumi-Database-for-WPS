@@ -247,7 +247,9 @@ describe('planDuplicateRows · 组解析', () => {
     const plan = planDuplicateRows(ws)
 
     expect(plan.deleteRows).toEqual([3])
-    expect(plan.changes).toEqual([{ row: 2, col: 3, value: '标签X | 标签Y' }])
+    expect(plan.changes).toEqual([
+      { row: 2, col: 3, value: '标签X | 标签Y', oldValue: '标签X' },
+    ])
     expect(plan.groups).toBe(1)
     expect(plan.mergedGroups).toBe(1)
     expect(plan.skippedReason).toBeUndefined()
@@ -337,7 +339,9 @@ describe('planDuplicateRows · 组解析', () => {
     // 两个 URL 行都保留（不是 victim），只有无 URL 行进入待删
     expect(plan.deleteRows).toEqual([4])
     expect(plan.mergedGroups).toBe(1)
-    expect(plan.changes).toEqual([{ row: 2, col: 3, value: '标签X | 标签Z' }])
+    expect(plan.changes).toEqual([
+      { row: 2, col: 3, value: '标签X | 标签Z', oldValue: '标签X' },
+    ])
   })
 
   it('两个含 URL 行数据一致且存在空 URL 行 → 删除空 URL 行', () => {
@@ -353,7 +357,9 @@ describe('planDuplicateRows · 组解析', () => {
 
     expect(plan.deleteRows).toEqual([4])
     // 受害行只有第 4 行：第 3 行含 URL 会被保留，其标签不并入保留行
-    expect(plan.changes).toEqual([{ row: 2, col: 3, value: '标签X | 标签Z' }])
+    expect(plan.changes).toEqual([
+      { row: 2, col: 3, value: '标签X | 标签Z', oldValue: '标签X' },
+    ])
   })
 
   it('缺「标签/分级」列 → 仍删行但不产生变更', () => {
@@ -451,7 +457,9 @@ describe('planDuplicateUrlRows', () => {
     const plan = planDuplicateUrlRows(ws)
 
     expect(plan.deleteRows).toEqual([2])
-    expect(plan.changes).toEqual([{ row: 3, col: 3, value: '标签Y | 标签X' }])
+    expect(plan.changes).toEqual([
+      { row: 3, col: 3, value: '标签Y | 标签X', oldValue: '标签Y' },
+    ])
     expect(plan.groups).toBe(1)
     expect(plan.mergedGroups).toBe(1)
     expect(model.deletedRanges).toEqual([])

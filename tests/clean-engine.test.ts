@@ -375,7 +375,7 @@ describe('scanCleanRules · 新番表噪声行', () => {
     vi.clearAllMocks()
   })
 
-  it('新番表水印行（新番表 by Hazx）/ 说明行（版权平台标注）被整行删除，正常行保留', () => {
+  it('新番表水印行（新番表 by Hazx）/ 说明行（版权平台标注）被整行删除，正常行保留', async () => {
     mockWorkbookSheet('2026年4月新番表')
     mocks.findHeaderRow.mockReturnValue(0)
     setCellGrid({
@@ -392,7 +392,7 @@ describe('scanCleanRules · 新番表噪声行', () => {
       5: { 3: '淫狱团地', 14: '搞笑 / 抽象 / 涩涩' },
       102: { 3: '版权平台标注示例' },
     })
-    const result = scanCleanRules(['noise-rows'])
+    const result = await scanCleanRules(['noise-rows'])
     const plans = result.plans.filter((plan) => plan.ruleId === 'noise-rows')
     expect(plans.length).toBeGreaterThan(0)
     const deleted = plans[0]?.deleteRows ?? []
@@ -424,14 +424,14 @@ describe('scanCleanRules', () => {
     vi.clearAllMocks()
   })
 
-  it('cellTransform 规则产出单元格变更（排除行不参与）', () => {
+  it('cellTransform 规则产出单元格变更（排除行不参与）', async () => {
     mockWorkbookSheet('动画')
     makeGrid({
       2: { 1: '作品A', 3: 'B站 | 漫画改' },
       3: { 1: '合计（示例）', 3: '待定档' },
       4: { 1: '作品C', 3: '漫画改 | 2020' },
     })
-    const result = scanCleanRules(['noise-tags'])
+    const result = await scanCleanRules(['noise-tags'])
     expect(result.targets).toHaveLength(1)
     expect(result.plans).toHaveLength(1)
     const plan = result.plans[0]
@@ -444,7 +444,7 @@ describe('scanCleanRules', () => {
     expect(result.itemCount).toBe(2)
   })
 
-  it('行级规则（重复名称行）产出删除行计划', () => {
+  it('行级规则（重复名称行）产出删除行计划', async () => {
     mockWorkbookSheet('动画')
     makeGrid({ 2: { 1: '作品A' }, 3: { 1: '作品A' } })
     mocks.planDuplicateRows.mockReturnValue({
@@ -453,7 +453,7 @@ describe('scanCleanRules', () => {
       groups: 1,
       mergedGroups: 1,
     })
-    const result = scanCleanRules(['dup-name'])
+    const result = await scanCleanRules(['dup-name'])
     const plan = result.plans[0]
     expect(plan?.deleteRows).toEqual([3])
     expect(plan?.changes[0]?.nextValue).toBe('合并标签')
@@ -461,15 +461,15 @@ describe('scanCleanRules', () => {
     expect(mocks.planDuplicateRows).toHaveBeenCalledTimes(1)
   })
 
-  it('未知规则 ID 记入 notes', () => {
+  it('未知规则 ID 记入 notes', async () => {
     mockWorkbookSheet('动画')
     makeGrid({ 2: { 1: 'A' } })
-    const result = scanCleanRules(['__no_such_rule__'])
+    const result = await scanCleanRules(['__no_such_rule__'])
     expect(result.plans).toHaveLength(0)
     expect(result.notes.some((note) => note.includes('未知清理项'))).toBe(true)
   })
 
-  it('规则跳过时原因写入 notes', () => {
+  it('规则跳过时原因写入 notes', async () => {
     mockWorkbookSheet('动画')
     makeGrid({ 2: { 1: 'A' } })
     mocks.planDuplicateUrlRows.mockReturnValue({
@@ -479,14 +479,14 @@ describe('scanCleanRules', () => {
       mergedGroups: 0,
       skippedReason: '未找到「Bangumi_URL」列',
     })
-    const result = scanCleanRules(['dup-url'])
+    const result = await scanCleanRules(['dup-url'])
     expect(result.plans).toHaveLength(0)
     expect(result.notes.join('\n')).toContain('未找到「Bangumi_URL」列')
   })
 
-  it('无可用目标时 notes 提示', () => {
+  it('无可用目标时 notes 提示', async () => {
     mocks.getOpenWorkbooks.mockReturnValue([])
-    const result = scanCleanRules(['noise-tags'])
+    const result = await scanCleanRules(['noise-tags'])
     expect(result.targetCount).toBe(0)
     expect(result.notes.join('\n')).toContain('未找到可清理目标')
   })
@@ -1020,7 +1020,7 @@ describe('scanCleanRules · 目标列解析退化匹配', () => {
     vi.clearAllMocks()
   })
 
-  it('列键包含规则关键词时按包含匹配取列（兼容「标签/分级（备注）」类组合表头）', () => {
+  it('列键包含规则关键词时按包含匹配取列（兼容「标签/分级（备注）」类组合表头）', async () => {
     mockWorkbookSheet('动画')
     mocks.getColumnMap.mockReturnValue(
       new Map([
@@ -1031,23 +1031,23 @@ describe('scanCleanRules · 目标列解析退化匹配', () => {
     )
     makeGrid({ 2: { 3: 'B站 | 漫画改' } })
 
-    const result = scanCleanRules(['noise-tags'])
+    const result = await scanCleanRules(['noise-tags'])
     expect(result.plans).toHaveLength(1)
     expect(result.plans[0]?.changes[0]?.col).toBe(3)
     expect(result.plans[0]?.changes[0]?.columnName).toBe('标签/分级（备注）')
   })
 
-  it('列键完全不匹配时跳过该规则并说明缺失列', () => {
+  it('列键完全不匹配时跳过该规则并说明缺失列', async () => {
     mockWorkbookSheet('动画')
     makeGrid({ 2: { 1: 'A' } })
 
     // category-prefix 需要「类别」列，默认列映射中没有
-    const result = scanCleanRules(['category-prefix'])
+    const result = await scanCleanRules(['category-prefix'])
     expect(result.plans).toHaveLength(0)
     expect(result.notes.join('\n')).toContain('未找到目标列')
   })
 
-  it('变更列不在列映射中时列名退化为「第N列」', () => {
+  it('变更列不在列映射中时列名退化为「第N列」', async () => {
     mockWorkbookSheet('动画')
     makeGrid({ 2: { 1: '作品A' }, 3: { 1: '作品A' } })
     mocks.planDuplicateRows.mockReturnValue({
@@ -1057,7 +1057,7 @@ describe('scanCleanRules · 目标列解析退化匹配', () => {
       mergedGroups: 1,
     })
 
-    const result = scanCleanRules(['dup-name'])
+    const result = await scanCleanRules(['dup-name'])
     expect(result.plans[0]?.changes[0]?.columnName).toBe('第99列')
   })
 })
@@ -1069,7 +1069,7 @@ describe('scanCleanRules · 规则分派与异常隔离', () => {
     vi.clearAllMocks()
   })
 
-  it('emptyNameRows 规则分派到空白行扫描器', () => {
+  it('emptyNameRows 规则分派到空白行扫描器', async () => {
     mockWorkbookSheet('动画')
     makeGrid({ 2: { 1: 'A' } })
     mocks.planEmptyNameRows.mockReturnValue({
@@ -1079,31 +1079,31 @@ describe('scanCleanRules · 规则分派与异常隔离', () => {
       mergedGroups: 0,
     })
 
-    const result = scanCleanRules(['empty-name'])
+    const result = await scanCleanRules(['empty-name'])
     expect(result.plans[0]?.deleteRows).toEqual([4])
     expect(mocks.planEmptyNameRows).toHaveBeenCalledTimes(1)
   })
 
-  it('行扫描器抛错时该规则跳过并记录原因（不影响其他规则）', () => {
+  it('行扫描器抛错时该规则跳过并记录原因（不影响其他规则）', async () => {
     mockWorkbookSheet('动画')
     makeGrid({ 2: { 1: 'A' } })
     mocks.planDuplicateRows.mockImplementation(() => {
       throw new Error('COM 扫描失败')
     })
 
-    const result = scanCleanRules(['dup-name'])
+    const result = await scanCleanRules(['dup-name'])
     expect(result.plans).toHaveLength(0)
     expect(result.notes.join('\n')).toContain('扫描失败：COM 扫描失败')
   })
 
-  it('未配置噪声行词表时跳过并说明', () => {
+  it('未配置噪声行词表时跳过并说明', async () => {
     const previousNoiseRowText = CLEAN_EXCLUDES.noiseRowText
     try {
       CLEAN_EXCLUDES.noiseRowText = []
       mockWorkbookSheet('动画')
       makeGrid({ 2: { 1: 'A' } })
 
-      const result = scanCleanRules(['noise-rows'])
+      const result = await scanCleanRules(['noise-rows'])
       expect(result.plans).toHaveLength(0)
       expect(result.notes.join('\n')).toContain('未配置噪声行词表')
     } finally {
@@ -1111,16 +1111,16 @@ describe('scanCleanRules · 规则分派与异常隔离', () => {
     }
   })
 
-  it('表中没有噪声行时跳过并说明', () => {
+  it('表中没有噪声行时跳过并说明', async () => {
     mockWorkbookSheet('动画')
     makeGrid({ 2: { 1: '作品A' }, 3: { 1: '作品B' }, 4: { 1: '作品C' } })
 
-    const result = scanCleanRules(['noise-rows'])
+    const result = await scanCleanRules(['noise-rows'])
     expect(result.plans).toHaveLength(0)
     expect(result.notes.join('\n')).toContain('未发现噪声行')
   })
 
-  it('未知清理种类时跳过并说明（配置写错不炸引擎）', () => {
+  it('未知清理种类时跳过并说明（配置写错不炸引擎）', async () => {
     const rules = CLEAN_RULES as CleanRule[]
     const temporaryRule = {
       id: '__tmp_unknown_kind__',
@@ -1137,7 +1137,7 @@ describe('scanCleanRules · 规则分派与异常隔离', () => {
       mockWorkbookSheet('动画')
       makeGrid({ 2: { 1: 'A' } })
 
-      const result = scanCleanRules(['__tmp_unknown_kind__'])
+      const result = await scanCleanRules(['__tmp_unknown_kind__'])
       expect(result.plans).toHaveLength(0)
       expect(result.notes.join('\n')).toContain('未知清理种类')
     } finally {
@@ -1145,7 +1145,7 @@ describe('scanCleanRules · 规则分派与异常隔离', () => {
     }
   })
 
-  it('cellTransform 规则缺少 transform 配置时跳过并说明', () => {
+  it('cellTransform 规则缺少 transform 配置时跳过并说明', async () => {
     const rules = CLEAN_RULES as CleanRule[]
     const temporaryRule = {
       id: '__tmp_no_transform__',
@@ -1163,7 +1163,7 @@ describe('scanCleanRules · 规则分派与异常隔离', () => {
       mockWorkbookSheet('动画')
       makeGrid({ 2: { 3: 'B站 | 漫画改' } })
 
-      const result = scanCleanRules(['__tmp_no_transform__'])
+      const result = await scanCleanRules(['__tmp_no_transform__'])
       expect(result.plans).toHaveLength(0)
       expect(result.notes.join('\n')).toContain('规则未配置变换函数')
     } finally {
@@ -1177,9 +1177,9 @@ describe('scanCleanRules · 勾选白名单无目标时的提示', () => {
     vi.clearAllMocks()
   })
 
-  it('已勾选工作表但无可清理目标时给出专门提示', () => {
+  it('已勾选工作表但无可清理目标时给出专门提示', async () => {
     mocks.getOpenWorkbooks.mockReturnValue([])
-    const result = scanCleanRules(['noise-tags'], {
+    const result = await scanCleanRules(['noise-tags'], {
       selectedSheets: [{ workbookKey: 'D:/books/数据表.xlsx', sheetName: '动画' }],
     })
     expect(result.targetCount).toBe(0)

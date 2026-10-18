@@ -20,7 +20,9 @@ import {
   runCleanPlans,
   scanCleanRules,
 } from './clean-engine.js'
-import type { CleanScanResult } from './clean-engine.js'
+import type { CleanScanResult, RulePlan } from './clean-engine.js'
+import { renderDiffSections } from '../ui/diff-view.js'
+import type { DiffRow, DiffSection } from '../ui/diff-view.js'
 import { escapeHtml } from '../tools/string-utilities.js'
 import { sanitizeHtml } from '../tools/sanitize.js'
 import {
@@ -47,6 +49,22 @@ const CHECK_KEY_PREFIX = 'bgm_clean_on_'
 
 /** 工作表勾选状态持久化键前缀（按工作簿全路径区分） */
 const SHEET_KEY_PREFIX = 'bgm_clean_sheets:'
+
+/**
+ * 工作表勾选状态的内存缓存（write-through）。
+ *
+ * PluginStorage.getItem 是跨 WebView 桥调用（IPC + JSON.parse），而渲染 /
+ * 勾选 / 扫描路径会按候选表数量反复读同一个键：50 张表时一次勾选就是
+ * 上百次 IPC，任务窗格明显卡顿。这里把读取收敛到内存，写入同时落缓存
+ * 与持久化 —— 勾选一次从 ~N 次 IPC 降为 1 次。
+ *
+ * 一致性依据：勾选状态只由本页写入（无跨写者），页面加载时缓存惰性填充；
+ * 无宿主时 setItem 静默失败，与原行为一致（重载后同样丢失）。
+ */
+const sheetSelectionCache = new Map<string, Set<string>>()
+
+/** 工作簿是否已有持久化勾选记录（区分「从未选过」与「显式清空」） */
+const sheetSelectionPersisted = new Map<string, boolean>()
 
 /** 当前加载的工作表清单（来自用户加载后的缓存） */
 interface SheetCandidate {
@@ -75,29 +93,40 @@ let sheetCandidates: SheetCandidate[] = []
 /** 已折叠的工作簿键（仅内存，不持久化） */
 const collapsedWorkbooks = new Set<string>()
 
-/** 读取某工作簿已勾选的工作表名集合（持久化） */
+/** 读取某工作簿已勾选的工作表名集合（缓存优先，未命中时读持久化并回填） */
 function loadSelectedSheetNames(workbookKey: string): Set<string> {
+  const cached = sheetSelectionCache.get(workbookKey)
+  if (cached) return cached
   const raw = getApp()?.PluginStorage?.getItem(SHEET_KEY_PREFIX + workbookKey) ?? ''
-  if (raw === '') return new Set()
-  try {
-    const parsed: unknown = JSON.parse(raw)
-    if (Array.isArray(parsed)) {
-      return new Set(parsed.filter((value): value is string => typeof value === 'string'))
+  // 空串 = 从未选过；非空但解析失败 = 损坏数据（按空集合处理，且视为已持久化）
+  const hasRecord = raw !== ''
+  let names = new Set<string>()
+  if (hasRecord) {
+    try {
+      const parsed: unknown = JSON.parse(raw)
+      if (Array.isArray(parsed)) {
+        names = new Set(parsed.filter((value): value is string => typeof value === 'string'))
+      }
+    } catch {
+      // 忽略损坏的持久化数据
     }
-  } catch {
-    // 忽略损坏的持久化数据
   }
-  return new Set()
+  sheetSelectionCache.set(workbookKey, names)
+  sheetSelectionPersisted.set(workbookKey, hasRecord)
+  return names
 }
 
-/** 写入某工作簿已勾选的工作表名集合 */
+/** 写入某工作簿已勾选的工作表名集合（write-through：缓存 + 持久化） */
 function saveSelectedSheetNames(workbookKey: string, names: ReadonlySet<string>): void {
   getApp()?.PluginStorage?.setItem(SHEET_KEY_PREFIX + workbookKey, JSON.stringify([...names]))
+  sheetSelectionCache.set(workbookKey, new Set(names))
+  sheetSelectionPersisted.set(workbookKey, true)
 }
 
 /** 该工作簿是否已有持久化的勾选记录（用于区分「从未选过」与「显式清空」） */
 function hasPersistedSelection(workbookKey: string): boolean {
-  return (getApp()?.PluginStorage?.getItem(SHEET_KEY_PREFIX + workbookKey) ?? '') !== ''
+  loadSelectedSheetNames(workbookKey)
+  return sheetSelectionPersisted.get(workbookKey) === true
 }
 
 /** 收集全部已勾选的工作表（用于引擎的 include 列表） */
@@ -455,6 +484,9 @@ let scanResult: CleanScanResult | null = null
 /** 是否正在执行（防重入） */
 let isRunning = false
 
+/** 是否正在扫描（防重入：大表扫描期间重复点击会交错写 scanResult） */
+let isScanning = false
+
 // ========== 勾选状态持久化 ==========
 
 /** 读取某清理项是否勾选（未持久化时用规则默认值） */
@@ -573,6 +605,12 @@ function invalidatePreview(): void {
 
 // ========== 预览 ==========
 
+/** 噪声行规则 ID（其预览文本为整行拼接，列标签切换为「行内容」） */
+const NOISE_ROWS_RULE_ID = 'noiseRows'
+
+/** 空白数据行在 diff 视图中的占位文本 */
+const BLANK_ROW_LABEL = '（空白行）'
+
 /** 累加各清理计划的删除行数 */
 function sumDeleteRows(result: CleanScanResult): number {
   return result.plans.reduce((sum, plan) => sum + plan.deleteRows.length, 0)
@@ -601,7 +639,109 @@ function renderPreviewStats(result: CleanScanResult): void {
   ])
 }
 
-/** 渲染执行前预览 */
+/**
+ * 构造「待删除行」diff 区块。
+ *
+ * 重复类规则带分组结构（{@link RulePlan.groupPreviews}）→ 展示「保留行 vs 待删除行」
+ * 对比，用户可逐组核对引擎是否留对了行；无分组结构（空白行 / 噪声行）→ 平铺列出
+ * 待删行及其内容预览。
+ */
+function buildDeleteRowsSection(plan: RulePlan): DiffSection | null {
+  if (plan.deleteRows.length === 0) return null
+  // 噪声行的预览文本来自整行拼接（无「名称」概念），列标签随之切换
+  const isNoiseRule = plan.ruleId === NOISE_ROWS_RULE_ID
+  const columns = [isNoiseRule ? '行内容' : '名称', 'Bangumi_URL', '说明']
+  const rows: DiffRow[] = []
+
+  const groups = plan.groupPreviews ?? []
+  if (groups.length > 0) {
+    for (const [index, group] of groups.entries()) {
+      const contextRow: DiffRow = {
+        kind: 'context',
+        cells: [`第 ${String(index + 1)} 组 · 名称「${group.keepName}」`],
+      }
+      const keepRow: DiffRow = {
+        kind: 'keep',
+        rowNumber: group.keepRow,
+        cells: [group.keepName, group.keepUrl],
+        note: '保留',
+      }
+      const victimRows: DiffRow[] = group.victims.map((victim) => ({
+        kind: 'delete',
+        rowNumber: victim.row,
+        cells: [victim.name, victim.url],
+        // 数据驱动说明：无 URL 的名称重复 / 与保留行同 URL 的跨名称重复
+        note: victim.url === '' ? '无 URL' : 'URL 与保留行相同',
+      }))
+      rows.push(contextRow, keepRow, ...victimRows)
+    }
+  } else {
+    const previewByRow = new Map((plan.rowPreviews ?? []).map((item) => [item.row, item]))
+    for (const row of plan.deleteRows) {
+      const preview = previewByRow.get(row)
+      const name = preview?.name ?? ''
+      rows.push({
+        kind: 'delete',
+        rowNumber: row,
+        cells: [name === '' ? BLANK_ROW_LABEL : name, preview?.url ?? ''],
+        note: isNoiseRule ? '噪声行' : '',
+      })
+    }
+  }
+
+  const groupSuffix = groups.length > 0 ? ` · ${String(groups.length)} 组` : ''
+  return {
+    id: `${plan.targetKey}::${plan.ruleId}::rows`,
+    title: `${plan.ruleName} · 待删除行`,
+    subtitle: `${plan.targetLabel} · 删 ${String(plan.deleteRows.length)} 行${groupSuffix} · 约 ${formatBytes(plan.estimatedBytes)}`,
+    columns,
+    rows,
+  }
+}
+
+/** 构造「单元格变更」diff 区块：每处变更 = 删除行（旧值）+ 插入行（新值），行内高亮差异中段 */
+function buildCellChangesSection(plan: RulePlan): DiffSection | null {
+  if (plan.changes.length === 0) return null
+  const rows: DiffRow[] = []
+  for (const change of plan.changes) {
+    const pair = { oldValue: change.oldValue, nextValue: change.nextValue }
+    rows.push(
+      {
+        kind: 'delete',
+        rowNumber: change.row,
+        cells: [change.columnName, change.oldValue],
+        inlineDiff: pair,
+      },
+      {
+        kind: 'insert',
+        rowNumber: change.row,
+        cells: [change.columnName, change.nextValue],
+        inlineDiff: pair,
+      },
+    )
+  }
+  return {
+    id: `${plan.targetKey}::${plan.ruleId}::cells`,
+    title: `${plan.ruleName} · 单元格变更`,
+    subtitle: `${plan.targetLabel} · ${String(plan.changes.length)} 处变更`,
+    columns: ['列', '值'],
+    rows,
+  }
+}
+
+/** 把扫描结果转成 diff 视图区块（按 计划 × 操作类型；每个区块独立分页） */
+function buildPreviewSections(result: CleanScanResult): DiffSection[] {
+  const sections: DiffSection[] = []
+  for (const plan of result.plans) {
+    const rowsSection = buildDeleteRowsSection(plan)
+    if (rowsSection) sections.push(rowsSection)
+    const cellsSection = buildCellChangesSection(plan)
+    if (cellsSection) sections.push(cellsSection)
+  }
+  return sections
+}
+
+/** 渲染执行前预览（统计胶囊 + diff 明细） */
 function renderPreview(result: CleanScanResult): void {
   renderPreviewStats(result)
 
@@ -610,28 +750,7 @@ function renderPreview(result: CleanScanResult): void {
     if (result.plans.length === 0) {
       detail.innerHTML = '<p class="hint">🎉 未发现需要清理的数据。</p>'
     } else {
-      const rows = result.plans
-        .map(
-          (plan) => `
-          <tr>
-            <td>${escapeHtml(plan.ruleName)}</td>
-            <td title="${escapeHtml(plan.targetLabel)}">${escapeHtml(plan.targetLabel)}</td>
-            <td class="num">${String(plan.deleteRows.length)}</td>
-            <td class="num">${String(plan.changes.length)}</td>
-            <td class="num">${escapeHtml(formatBytes(plan.estimatedBytes))}</td>
-          </tr>`,
-        )
-        .join('')
-      detail.innerHTML = sanitizeHtml(`
-        <div class="clean-table-wrap">
-          <table class="clean-table">
-            <thead>
-              <tr><th>清理项</th><th>目标</th><th>删除行</th><th>单元格</th><th>预计释放</th></tr>
-            </thead>
-            <tbody>${rows}</tbody>
-          </table>
-        </div>
-      `)
+      renderDiffSections(detail, buildPreviewSections(result))
     }
   }
 
@@ -639,8 +758,9 @@ function renderPreview(result: CleanScanResult): void {
   if (runButton) runButton.disabled = result.plans.length === 0
 }
 
-/** 扫描预览（只读，不修改任何数据） */
-function handleScan(): void {
+/** 扫描预览（只读，不修改任何数据；异步：大表扫描期间任务窗格保持响应） */
+async function handleScan(): Promise<void> {
+  if (isScanning || isRunning) return
   // 宿主检查必须放在最前：下方 getSelectedSheetKeys() 依赖 getApp()?.PluginStorage，
   // 宿主缺失时它必然返回空集并在前面提前 return，使这里的提示永远不可达。
   if (!getApp()) {
@@ -660,8 +780,11 @@ function handleScan(): void {
   appendLog(
     `开始扫描，勾选 ${String(ruleIds.length)} 个清理项 · ${String(selectedSheets.length)} 张工作表…`,
   )
+  const scanButton = document.getElementById('cleanScanBtn') as HTMLButtonElement | null
+  isScanning = true
+  if (scanButton) scanButton.disabled = true
   try {
-    const result = scanCleanRules(ruleIds, { selectedSheets })
+    const result = await scanCleanRules(ruleIds, { selectedSheets })
     scanResult = result
     renderPreview(result)
     for (const note of result.notes) appendLog(note, 'warn')
@@ -678,6 +801,9 @@ function handleScan(): void {
     const message = error instanceof Error ? error.message : String(error)
     appendLog(`扫描失败：${message}`, 'error')
     showToast(`扫描失败：${message}`, 'error')
+  } finally {
+    isScanning = false
+    if (scanButton) scanButton.disabled = false
   }
 }
 
@@ -777,7 +903,9 @@ async function executeClean(): Promise<void> {
 
 /** 绑定按钮（data-action 之外，本页面用显式 id 绑定，避免与全局 ACTION_HANDLERS 冲突） */
 function bindButtons(): void {
-  document.getElementById('cleanScanBtn')?.addEventListener('click', handleScan)
+  document.getElementById('cleanScanBtn')?.addEventListener('click', () => {
+    void handleScan()
+  })
   document.getElementById('cleanRunBtn')?.addEventListener('click', handleRun)
   document.getElementById('cleanClearLogBtn')?.addEventListener('click', clearLog)
   document.getElementById('cleanLoadSheetsBtn')?.addEventListener('click', handleLoadSheets)
