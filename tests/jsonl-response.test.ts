@@ -15,7 +15,7 @@
 
 import { describe, expect, it, vi } from 'vitest'
 
-vi.mock('../ts/tools/utility.js', () => ({
+vi.mock('../ts/tools/util/index.js', () => ({
   bgmLog: vi.fn(),
 }))
 

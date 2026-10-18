@@ -2,12 +2,19 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 // Mock 依赖：避开 utility.ts 的副作用链（util → wps → index → handlers → document）
 // 仅提供 configService.ts 实际使用的 4 个函数
-vi.mock('../ts/tools/utility.js', () => ({
-  loadBgToken: vi.fn(() => 'test-token'),
-  storeBgToken: vi.fn(() => true),
-  _getBgmUserId: vi.fn(() => 'test-user-123'),
-  _setBgmUserId: vi.fn(),
-}))
+// §5.6 C3：barrel 统一后本 mock 会同时拦截 config.ts 等传递依赖（原先它们走
+// 真实 util barrel）。用 importOriginal 只覆盖 token / 用户 ID 四个函数，
+// 其余保持真实实现——避免「No getApp export」这类整体 mock 缺项。
+vi.mock('../ts/tools/util/index.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../ts/tools/util/index.js')>()
+  return {
+    ...actual,
+    loadBgToken: vi.fn(() => 'test-token'),
+    storeBgToken: vi.fn(() => true),
+    _getBgmUserId: vi.fn(() => 'test-user-123'),
+    _setBgmUserId: vi.fn(),
+  }
+})
 
 // Mock githubConfig.ts：避免触发 PluginStorage 访问和事件发射
 vi.mock('../ts/sync/github-config.js', () => ({
@@ -24,7 +31,7 @@ vi.mock('../ts/sync/github-config.js', () => ({
 
 // 在 mock 注册之后导入被测模块
 import { exportConfig, importConfig } from '../ts/services/config-service.js'
-import { loadBgToken, storeBgToken, _getBgmUserId, _setBgmUserId } from '../ts/tools/utility.js'
+import { loadBgToken, storeBgToken, _getBgmUserId, _setBgmUserId } from '../ts/tools/util/index.js'
 import {
   getGithubConfig,
   setGithubConfig,

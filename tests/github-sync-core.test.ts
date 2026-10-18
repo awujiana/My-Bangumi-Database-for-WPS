@@ -174,7 +174,7 @@ vi.mock('../ts/core/constants.js', () => ({
   ErrorLevel: { INFO: 0, WARN: 1, ERROR: 2, FATAL: 3 },
 }))
 
-vi.mock('../ts/tools/utility.js', () => ({
+vi.mock('../ts/tools/util/index.js', () => ({
   bgmLog: mockBgmLogn,
   getDataSheet: mockGetDataSheet,
   findHeaderRow: mockFindHeaderRow,

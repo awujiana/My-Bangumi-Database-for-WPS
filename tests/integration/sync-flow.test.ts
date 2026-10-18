@@ -9,7 +9,7 @@
  *   5. GitHub 同步流程：fetch JSONL → computeDiff → applyDiffToSheet → undoLastSync
  *
  * Mock 策略：
- *   - vi.mock HTTP 层（bgmRequestSync）与 WPS API（tools/utility.js）
+ *   - vi.mock HTTP 层（bgmRequestSync）与 WPS API（tools/util/index.js）
  *   - vi.mock 进度上报与同步记录子模块
  *   - vi.mock GitHub 同步依赖（undoStack、githubConfig、syncSourceRegistry）
  *   - 使用 vi.hoisted 在 import 之前启用 fake timers，避免 handlers.ts 副作用
@@ -36,7 +36,7 @@ const mockState = vi.hoisted(() => ({
   addSyncRecords: vi.fn<(records: unknown[]) => boolean>(() => true),
   addSyncRecordSummary: vi.fn<(summary: unknown) => boolean>(() => true),
 
-  // tools/utility.js mock（可按测试配置）
+  // tools/util/index.js mock（可按测试配置）
   getDataSheet: vi.fn<() => { Name: string } | null>(() => null),
   findHeaderRow: vi.fn(() => 1),
   getLastRow: vi.fn(() => 1),

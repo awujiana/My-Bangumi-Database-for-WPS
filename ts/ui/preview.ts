@@ -50,7 +50,7 @@ import {
 } from '../core/sync-progress-handlers.js'
 import { getAllSyncRecords } from '../sync/sync-record.js'
 import { sanitizeHtml } from '../tools/sanitize.js'
-import { loadBgToken } from '../tools/utility.js'
+import { loadBgToken } from '../tools/util/index.js'
 
 // ========== 类型定义 ==========
 export interface DetailItem {

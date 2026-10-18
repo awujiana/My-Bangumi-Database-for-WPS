@@ -15,7 +15,7 @@
  * 注入 mock 日志函数，以避免触发 tools/util → ui/handlers 的副作用链。
  */
 
-import { bgmLog } from '../tools/utility.js'
+import { bgmLog } from '../tools/util/index.js'
 
 import { setLogger } from './pure-utilities-core.js'
 

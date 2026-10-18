@@ -2,7 +2,7 @@
 import { describe, it, expect, vi, afterEach, afterAll } from 'vitest'
 
 // 注意：syncSourceRegistry.ts 在模块加载时会默认注册 'github' → GithubSyncSource。
-// 这会触发 githubSync.ts → tools/utility.js → tools/wps.js → index.js → ui/handlers.js
+// 这会触发 githubSync.ts → tools/util/index.js → tools/wps.js → index.js → ui/handlers.js
 // 的副作用链，handlers.js 顶层访问 document.readyState，因此需要 jsdom 环境。
 //
 // handlers.ts 在模块加载时通过 trackedSetTimeout(setupButtonListeners, 0) 与

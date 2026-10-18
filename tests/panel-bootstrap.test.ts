@@ -45,7 +45,7 @@ const stubs = vi.hoisted(() => ({
 // 纯副作用导入：mock 成空对象，避免拖入真实依赖图
 vi.mock('../ts/index.js', () => ({}))
 vi.mock('../ts/tools/config.js', () => ({}))
-vi.mock('../ts/tools/utility.js', () => ({}))
+vi.mock('../ts/tools/util/index.js', () => ({}))
 vi.mock('../ts/core/token-payload.js', () => ({}))
 vi.mock('../ts/tools/events.js', () => ({}))
 vi.mock('../ts/core/result.js', () => ({}))

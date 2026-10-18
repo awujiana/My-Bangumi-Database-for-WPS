@@ -9,7 +9,7 @@
 // 注意：LOG_LEVELS 定义在 core/constants.ts（utility.ts 仅导入未 re-export）
 import { LOG_LEVELS } from '../core/constants.js'
 import { BGM_EVENTS, eventBus } from '../tools/events.js'
-import { bgmLog, getApp } from '../tools/utility.js'
+import { bgmLog, getApp } from '../tools/util/index.js'
 import type { WpsPluginStorage } from '../tools/wps.js'
 
 import type { SyncStrategy } from './github-sync-diff.js'

@@ -23,7 +23,7 @@ vi.mock('../ts/core/constants.js', () => ({
   LOG_LEVELS: { INFO: 'INFO', WARN: 'WARN', ERROR: 'ERROR' },
 }))
 
-vi.mock('../ts/tools/utility.js', () => ({
+vi.mock('../ts/tools/util/index.js', () => ({
   bgmLog: mockBgmlog,
   getDataSheet: mockGetDataSheet,
   findHeaderRow: mockFindHeaderRow,

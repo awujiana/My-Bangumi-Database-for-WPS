@@ -27,7 +27,7 @@ import {
   getApp,
   getColumnMap,
   getDataSheet,
-} from '../tools/utility.js'
+} from '../tools/util/index.js'
 
 import { collectMissingColumns, computeDiff, filterByTime } from './github-sync-diff.js'
 import type { ConflictResolution, SyncStrategy, SyncTimeFilter } from './github-sync-diff.js'

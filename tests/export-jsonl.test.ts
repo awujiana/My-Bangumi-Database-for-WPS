@@ -61,11 +61,6 @@ vi.mock('../ts/core/constants.js', () => ({
   WATCH_STATUS_MAP: {},
 }))
 
-vi.mock('../ts/tools/utility.js', () => ({
-  bgmLog: mockBgmLog,
-  getApp: vi.fn(),
-}))
-
 vi.mock('../ts/tools/util/index.js', () => ({
   bgmLog: mockBgmLog,
   getApp: vi.fn(),

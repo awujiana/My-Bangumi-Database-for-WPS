@@ -8,7 +8,7 @@ const { mockSetCellValue, mockGetDataSheet, mockBgmLog } = vi.hoisted(() => ({
   mockBgmLog: vi.fn(),
 }))
 
-vi.mock('../ts/tools/utility.js', () => ({
+vi.mock('../ts/tools/util/index.js', () => ({
   getDataSheet: mockGetDataSheet,
   setCellValue: mockSetCellValue,
   bgmLog: mockBgmLog,

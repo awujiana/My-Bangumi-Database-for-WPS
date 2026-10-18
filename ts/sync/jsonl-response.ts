@@ -21,7 +21,7 @@
  */
 
 import { LOG_LEVELS } from '../core/constants.js'
-import { bgmLog } from '../tools/utility.js'
+import { bgmLog } from '../tools/util/index.js'
 
 /** gzip 魔数（RFC 1952：ID1 = 0x1f，ID2 = 0x8b） */
 const GZIP_MAGIC_1 = 0x1f

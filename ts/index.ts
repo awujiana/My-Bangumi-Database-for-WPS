@@ -294,7 +294,7 @@ export {
 } from './sync/github-config.js'
 
 // ============================================================================
-// 12. 通用工具函数与全局状态（来自 tools/utility.js）
+// 12. 通用工具函数与全局状态（来自 tools/util/index.js）
 // ============================================================================
 export {
   // 日志函数
@@ -390,7 +390,7 @@ export {
   createBatchFieldGetter,
   // 增量同步行指纹（字段口径与 buildJsonPayload 一致）
   calcSyncRowFingerprint,
-} from './tools/utility.js'
+} from './tools/util/index.js'
 
 // ============================================================================
 // 13. 配置管理模块（来自 tools/config.js）

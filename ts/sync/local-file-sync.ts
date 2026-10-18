@@ -23,7 +23,7 @@
 
 import { LOG_LEVELS } from '../core/constants.js'
 import { Result, BgmError } from '../core/result.js'
-import { bgmLog } from '../tools/utility.js'
+import { bgmLog } from '../tools/util/index.js'
 
 import { getGithubConfig, getManualShards } from './github-config.js'
 import type { GithubRemoteEntry } from './github-sync-diff.js'

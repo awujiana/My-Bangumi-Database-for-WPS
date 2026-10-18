@@ -797,10 +797,12 @@ async function _doAPISync(
   const userCollections = await fetchAllUserCollections(token, undefined, collectionOptions)
 
   // 2. 解析表头与空表检测
-  let headerRow = typeof findHeaderRow === 'function' ? findHeaderRow(ws) : 1
-  let colMap =
-    typeof getColumnMap === 'function' ? getColumnMap(ws, headerRow) : new Map<string, number>()
-  let lastRow = typeof getLastRow === 'function' ? getLastRow(ws) : 200
+  // §5.6 C3：barrel 已统一到 tools/util/index.js，不存在「另一条 specifier 拿到
+  // undefined」的风险；此前的 typeof 死守卫（: 1 / : 200 / : new Map）会静默产出
+  // 错误默认值，已删除。函数缺失的模块加载竞态由 syncFromPanel 入口的早退守卫兜住。
+  let headerRow = findHeaderRow(ws)
+  let colMap = getColumnMap(ws, headerRow)
+  let lastRow = getLastRow(ws)
 
   // 空表时提供从 Bangumi API 自动填充
   if (headerRow === 0 || lastRow <= headerRow) {
@@ -849,11 +851,11 @@ async function _doAPISync(
       `[_doAPISync] 空表填充完成：${String(filledCount)}/${String(userCollections.length)}`,
     )
 
-    // 重新计算待处理行
+    // 重新计算待处理行（§5.6 C3：barrel 已统一，直接调用）
     clearSheetCache(ws)
-    lastRow = typeof getLastRow === 'function' ? getLastRow(ws, true, headerRow) : lastRow
-    headerRow = typeof findHeaderRow === 'function' ? findHeaderRow(ws) : headerRow
-    colMap = typeof getColumnMap === 'function' ? getColumnMap(ws, headerRow) : colMap
+    lastRow = getLastRow(ws, true, headerRow)
+    headerRow = findHeaderRow(ws)
+    colMap = getColumnMap(ws, headerRow)
   }
 
   // 3. 必须有 Bangumi_URL 列

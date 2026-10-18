@@ -18,7 +18,7 @@
  */
 
 import { LOG_LEVELS } from '../core/constants.js'
-import { bgmLog, findHeaderRow, getColumnMap, getDataSheet } from '../tools/utility.js'
+import { bgmLog, findHeaderRow, getColumnMap, getDataSheet } from '../tools/util/index.js'
 
 import { isGithubRemoteEntry } from './github-sync-diff.js'
 import type { GithubRemoteEntry } from './github-sync-diff.js'

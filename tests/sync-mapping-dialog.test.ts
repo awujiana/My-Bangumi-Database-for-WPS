@@ -62,17 +62,6 @@ vi.mock('../ts/tools/util/index.js', () => ({
   getColumnMap: getColumnMapStub,
 }))
 
-vi.mock('../ts/tools/utility.js', () => ({
-  getDataSheet: () => (isDataSheetMissing ? null : DATA_SHEET),
-  getCellValue: (_sheet: unknown, row: number, col: number) => getCell(row, col),
-  setCellValue: (_sheet: unknown, row: number, col: number, value: unknown) => {
-    setCell(row, col, String(value))
-    return true
-  },
-  findHeaderRow: findHeaderRowStub,
-  getColumnMap: getColumnMapStub,
-}))
-
 import { showSyncMappingDialog } from '../ts/ui/sync-mapping-dialog.js'
 
 /** 写入一行表头（第 1 行） */

@@ -191,7 +191,7 @@ vi.mock('../ts/sync/sync-record.js', () => ({
   },
 }))
 vi.mock('../ts/tools/sanitize.js', () => ({ sanitizeHtml: mocks.sanitizeHtml }))
-vi.mock('../ts/tools/utility.js', () => ({ loadBgToken: mocks.loadBgToken }))
+vi.mock('../ts/tools/util/index.js', () => ({ loadBgToken: mocks.loadBgToken }))
 
 import { BGM_COLOR } from '../ts/core/constants.js'
 import {

@@ -20,7 +20,7 @@ import {
   getDataSheet,
   findHeaderRow,
   setCellValue,
-} from '../tools/utility.js'
+} from '../tools/util/index.js'
 import type { WpsWorksheet } from '../tools/wps.js'
 
 import {

@@ -22,7 +22,7 @@ import {
 } from '../sync/github-config.js'
 import type { SyncStrategy } from '../sync/github-sync-diff.js'
 import { CONFIG_KEYS, getConfig, setConfig } from '../tools/config.js'
-import { loadBgToken, storeBgToken, _getBgmUserId, _setBgmUserId } from '../tools/utility.js'
+import { loadBgToken, storeBgToken, _getBgmUserId, _setBgmUserId } from '../tools/util/index.js'
 
 /** 导出配置的当前版本号，与 FullConfigSchema.version 保持一致 */
 const CONFIG_VERSION = 1 as const

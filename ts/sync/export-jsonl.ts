@@ -17,8 +17,8 @@ import {
   readRangeValues,
   colNumberToLetter,
   trim,
+  bgmLog,
 } from '../tools/util/index.js'
-import { bgmLog } from '../tools/utility.js'
 import type { WpsWorksheet } from '../tools/wps.js'
 
 import { EXTENDED_FIELD_MAP } from './github-sync-diff.js'

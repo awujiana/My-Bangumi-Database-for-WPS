@@ -4,7 +4,7 @@ import { describe, it, expect, vi, afterEach, afterAll, beforeEach } from 'vites
 // 与 tests/gistSync.test.ts / gitlabSync.test.ts 一致：
 // syncSourceRegistry.ts 在模块加载时会注册 'github' / 'gitlab' / 'gitee'，
 // 触发 githubSync.ts / gitlabSync.ts / giteeSync.ts →
-// tools/utility.js → tools/wps.js → index.js → ui/handlers.js 的副作用链，
+// tools/util/index.js → tools/wps.js → index.js → ui/handlers.js 的副作用链，
 // handlers.js 顶层访问 document.readyState 并通过 trackedSetTimeout 调度延迟回调。
 // 使用 fake timers 使这些 setTimeout 进入 fake 队列而不会真实触发。
 vi.hoisted(() => {

@@ -35,7 +35,7 @@ import {
   colNumberToLetter,
   trim,
   getApp,
-} from '../tools/utility.js'
+} from '../tools/util/index.js'
 import type { WpsCellValue, WpsRange, WpsWorksheet } from '../tools/wps.js'
 
 import { EXTENDED_FIELD_MAP, getExcelAliases, tagsToString } from './github-sync-diff.js'

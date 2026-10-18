@@ -4,7 +4,7 @@
  * @description `github-sync.ts` 与 `sync-source-registry.ts` 此前各有一份
  *              **逐字重复**的实现（连日志文案都一样），收敛为一份，避免后续各自漂移。
  *
- *              依赖只有 `tools/utility.js` 与 `pure-utilities.js`，是零副作用的叶子模块。
+ *              依赖只有 `tools/util/index.js` 与 `pure-utilities.js`，是零副作用的叶子模块。
  */
 
 import { LOG_LEVELS } from '../core/constants.js'
@@ -15,7 +15,7 @@ import {
   findHeaderRow,
   getColumnMap,
   trim,
-} from '../tools/utility.js'
+} from '../tools/util/index.js'
 import { extractSubjectId } from './pure-utilities.js'
 
 /**

@@ -84,7 +84,7 @@ const mockGithubSourceReference = vi.hoisted(() => ({
 
 vi.mock('../ts/index.js', () => ({}))
 
-vi.mock('../ts/tools/utility.js', () => ({
+vi.mock('../ts/tools/util/index.js', () => ({
   bgmLog: mockBgmLogn,
   getApp: mockGetApp,
   LOG_LEVELS: { INFO: 'INFO', WARN: 'WARN', ERROR: 'ERROR' },

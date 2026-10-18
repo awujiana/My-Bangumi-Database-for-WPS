@@ -12,7 +12,7 @@
 import '../index.js'
 import '../core/constants.js'
 import '../tools/config.js'
-import '../tools/utility.js'
+import '../tools/util/index.js'
 import '../core/token-payload.js'
 import '../tools/events.js'
 import '../core/result.js'

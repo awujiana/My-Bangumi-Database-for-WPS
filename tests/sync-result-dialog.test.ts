@@ -108,10 +108,6 @@ vi.mock('../ts/tools/util/index.js', () => ({
   isEmptyValue: isEmptyValueStub,
 }))
 
-vi.mock('../ts/tools/utility.js', () => ({
-  bgmLog: mocks.bgmLog,
-}))
-
 vi.mock('../ts/ui/dialog.js', () => ({
   renderSyncDetailTable: mocks.renderSyncDetailTable,
 }))
