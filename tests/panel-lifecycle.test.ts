@@ -99,13 +99,20 @@ const mocks = vi.hoisted(() => ({
   getOpenWorkbooks: vi.fn(() => [] as FakeWorkbook[]),
 }))
 
+/**
+ * 唯一 BGM 替身（§5.6 C4）：根 barrel 与 tools/util barrel 必须返回**同一个**
+ * BGM 对象——真实 locked-sheet 核心（applyLockedSheet / renderSheetLockUi）
+ * 经 tools/util 读 BGM.sheet，页面代码经根 barrel 读；两个对象会让状态各写各的。
+ */
+const bgmMock = vi.hoisted(() => ({
+  sheet: sheetState,
+  ErrorLevel: { SILENT: 0, WARN: 1, ERROR: 2, THROW: 3, INFO: 4 },
+  // 与 mocks.handleError 同一实例：多处用例断言 mocks.handleError 的调用
+  handleError: mocks.handleError,
+}))
+
 vi.mock('../ts/index.js', async () => {
   const constants = await import('../ts/core/constants.js')
-  const bgmMock = {
-    sheet: sheetState,
-    ErrorLevel: { SILENT: 0, WARN: 1, ERROR: 2, THROW: 3, INFO: 4 },
-    handleError: mocks.handleError,
-  }
   // 生产代码把预览元信息写在 BGM 顶层（BGM.dataPreview），而不是 BGM.sheet 上；
   // 用 getter/setter 桥接，让测试仍可通过 sheetState 断言。
   Object.defineProperty(bgmMock, 'dataPreview', {
@@ -133,14 +140,29 @@ vi.mock('../ts/index.js', async () => {
   }
 })
 
+/**
+ * §5.6 C4：真实 locked-sheet 核心从 tools/util barrel 读 BGM——必须与根 barrel
+ * 的 BGM 是同一个替身，否则 applyLockedSheet 写到另一个对象上、断言看不到。
+ */
+vi.mock('../ts/tools/util/index.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../ts/tools/util/index.js')>()
+  return { ...actual, BGM: bgmMock }
+})
+
 vi.mock('../ts/tools/sanitize.js', () => ({ sanitizeHtml: mocks.sanitizeHtml }))
 vi.mock('../ts/ui/stat-cards.js', () => ({ renderStatCards: mocks.renderStatCards }))
-vi.mock('../ts/tools/locked-sheet.js', () => ({
-  saveLockedSheet: mocks.saveLockedSheet,
-  findWorkbookByName: mocks.findWorkbookByName,
-  findBangumiTargetSheets: mocks.findBangumiTargetSheets,
-  getOpenWorkbooks: mocks.getOpenWorkbooks,
-}))
+// §5.6 C4：状态核心（applyLockedSheet / isLockedAt / renderSheetLockUi）用真实实现，
+// 只替换持久化与扫描器——状态与 DOM 渲染是被测行为本身，不能桩掉。
+vi.mock('../ts/tools/locked-sheet.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../ts/tools/locked-sheet.js')>()
+  return {
+    ...actual,
+    saveLockedSheet: mocks.saveLockedSheet,
+    findWorkbookByName: mocks.findWorkbookByName,
+    findBangumiTargetSheets: mocks.findBangumiTargetSheets,
+    getOpenWorkbooks: mocks.getOpenWorkbooks,
+  }
+})
 
 import {
   activateSheetIfNeeded,

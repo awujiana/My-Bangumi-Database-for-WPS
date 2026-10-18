@@ -26,18 +26,15 @@ import {
 import { sanitizeHtml } from '../tools/sanitize.js'
 import { renderStatCards } from '../ui/stat-cards.js'
 import {
+  applyLockedSheet,
+  isLockedAt,
+  renderSheetLockUi,
   saveLockedSheet,
   findWorkbookByName,
   findBangumiTargetSheets,
   getOpenWorkbooks,
 } from '../tools/locked-sheet.js'
-
-// ========== 类型定义 ==========
-interface LockedSheetInfo {
-  index: number
-  name: string
-  workbookName?: string
-}
+import type { LockedSheetInfo } from '../tools/locked-sheet.js'
 
 interface CandidateHeader {
   row: number
@@ -81,11 +78,9 @@ export function toggleSheetLock(): void {
     return
   }
 
-  if (BGM.sheet.isLocked && BGM.sheet.lockedIndex === sheetIndex) {
-    BGM.sheet.lockedIndex = null
-    BGM.sheet.lockedName = null
-    BGM.sheet.isLocked = false
-    BGM.sheet.lockedWorkbookName = null
+  if (isLockedAt(sheetIndex)) {
+    // §5.6 C4：状态清位走共享实现；持久化显式调用（便于测试观察）
+    applyLockedSheet(null)
     saveLockedSheet(null)
     showToast('已解锁工作表', 'info')
   } else {
@@ -93,14 +88,11 @@ export function toggleSheetLock(): void {
     // 获取选中的工作簿名称
     const wbSelect = document.getElementById('workbookSelect') as HTMLSelectElement | null
     const wbName = wbSelect?.value ?? ''
-    BGM.sheet.lockedIndex = sheetIndex
-    BGM.sheet.lockedName = sheetName
-    BGM.sheet.lockedWorkbookName = wbName || null
-    BGM.sheet.isLocked = true
     const sheetInfo: LockedSheetInfo = { index: sheetIndex, name: sheetName }
     if (wbName) {
       sheetInfo.workbookName = wbName
     }
+    applyLockedSheet(sheetInfo)
     saveLockedSheet(sheetInfo)
     showToast(`已锁定工作表: ${sheetName}${wbName ? `（工作簿: ${wbName}）` : ''}`, 'info')
   }
@@ -109,27 +101,8 @@ export function toggleSheetLock(): void {
 }
 
 export function updateLockButton(): void {
-  const button = document.getElementById('lockSheetBtn') as HTMLButtonElement | null
-  const status = document.getElementById('lockStatus')
-
-  if (button) {
-    if (BGM.sheet.isLocked) {
-      button.textContent = '🔓 解锁'
-      button.classList.add('locked')
-    } else {
-      button.textContent = '🔒 锁定'
-      button.classList.remove('locked')
-    }
-  }
-
-  if (status) {
-    if (BGM.sheet.isLocked) {
-      status.style.display = 'inline'
-      status.textContent = `已锁定: ${String(BGM.sheet.lockedName)}`
-    } else {
-      status.style.display = 'none'
-    }
-  }
+  // §5.6 C4：与富化页共用渲染实现（inline 模式 = 主面板的状态区显隐方式）
+  renderSheetLockUi('lockSheetBtn', 'lockStatus')
 }
 
 export function refreshSheets(options?: { autoSelectActive?: boolean }): void {

@@ -33,12 +33,71 @@ export function saveLockedSheet(info: LockedSheetInfo | null): void {
   app.PluginStorage.setItem(LOCKED_SHEET_KEY, info ? JSON.stringify(info) : '')
 }
 
+/**
+ * 应用锁定状态到 `BGM.sheet`（内存状态的**唯一置位 / 清位点**）。
+ *
+ * §5.6 C4：主面板 `toggleSheetLock` 与富化页 `toggleEnrichWorkbookLock` 原先
+ * 各写一份四字段赋值（还有 `lockEnrichWorkbookByName` 的自动锁定路径），
+ * 收敛到本函数后，页面层只负责校验 / 提示 / 持久化 / 页面后处理。
+ * @param info 锁定的工作表信息；`null` 表示解锁（四个字段全部清空）
+ */
+export function applyLockedSheet(info: LockedSheetInfo | null): void {
+  BGM.sheet.lockedIndex = info?.index ?? null
+  BGM.sheet.lockedName = info?.name ?? null
+  BGM.sheet.lockedWorkbookName = info?.workbookName ?? null
+  BGM.sheet.isLocked = info !== null
+}
+
+/**
+ * 当前锁定是否指向该工作表。
+ * @param sheetIndex 工作表索引（1-based）
+ * @param workbookName 传入时还要求工作簿名一致（富化页语义）；
+ *                     不传时只比较索引（主面板语义）
+ */
+export function isLockedAt(sheetIndex: number, workbookName?: string): boolean {
+  if (!BGM.sheet.isLocked || BGM.sheet.lockedIndex !== sheetIndex) return false
+  return workbookName === undefined || BGM.sheet.lockedWorkbookName === workbookName
+}
+
+/**
+ * 渲染锁定按钮与状态文字（主面板 / 富化页共用，§5.6 C4）。
+ *
+ * 两处页面的**按钮**渲染完全一致；**状态区**的显隐方式不同：
+ * - `inline`（主面板）：`style.display` 显隐，锁定文案只带工作表名；
+ * - `badge`（富化页）：`classList.show` 显隐，锁定文案带「工作簿 → 工作表」。
+ * 逐字保留两套既有行为，不强行统一视觉。
+ */
+export function renderSheetLockUi(
+  buttonId: string,
+  statusId: string,
+  statusMode: 'inline' | 'badge' = 'inline',
+): void {
+  const button = document.getElementById(buttonId) as HTMLButtonElement | null
+  if (button) {
+    button.textContent = BGM.sheet.isLocked ? '🔓 解锁' : '🔒 锁定'
+    button.classList.toggle('locked', BGM.sheet.isLocked)
+  }
+
+  const status = document.getElementById(statusId)
+  if (!status) return
+
+  if (statusMode === 'badge') {
+    status.classList.toggle('show', BGM.sheet.isLocked)
+    status.textContent = BGM.sheet.isLocked
+      ? `已锁定: ${BGM.sheet.lockedWorkbookName ?? ''} → ${BGM.sheet.lockedName ?? ''}`
+      : ''
+    return
+  }
+
+  status.style.display = BGM.sheet.isLocked ? 'inline' : 'none'
+  if (BGM.sheet.isLocked) {
+    status.textContent = `已锁定: ${String(BGM.sheet.lockedName)}`
+  }
+}
+
 /** 清除 BGM.sheet 锁定状态（内存 + 持久化） */
 export function clearLockedSheet(): void {
-  BGM.sheet.lockedIndex = null
-  BGM.sheet.lockedName = null
-  BGM.sheet.lockedWorkbookName = null
-  BGM.sheet.isLocked = false
+  applyLockedSheet(null)
   saveLockedSheet(null)
 }
 

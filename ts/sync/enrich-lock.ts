@@ -10,6 +10,9 @@ import type { WpsWorksheet } from '../index.js'
 import { getApp, bgmLog, BGM, LOG_LEVELS, showToast } from '../index.js'
 import type { LockedSheetInfo } from '../tools/locked-sheet.js'
 import {
+  applyLockedSheet,
+  isLockedAt,
+  renderSheetLockUi,
   saveLockedSheet,
   clearLockedSheet,
   restoreLockedSheet,
@@ -184,20 +187,14 @@ export function toggleEnrichWorkbookLock(
     return
   }
 
-  if (
-    BGM.sheet.isLocked &&
-    BGM.sheet.lockedIndex === sheetIndex &&
-    BGM.sheet.lockedWorkbookName === wbName
-  ) {
+  if (isLockedAt(sheetIndex, wbName)) {
+    // §5.6 C4：解锁走共享清位实现（applyLockedSheet(null) + 持久化）
     clearLockedSheet()
     showToast('已解锁目标工作表', 'info')
   } else {
     const sheetName = sheetSelect.options[sheetSelect.selectedIndex]?.text ?? ''
-    BGM.sheet.lockedWorkbookName = wbName
-    BGM.sheet.lockedName = sheetName
-    BGM.sheet.lockedIndex = sheetIndex
-    BGM.sheet.isLocked = true
     const info: LockedSheetInfo = { index: sheetIndex, name: sheetName, workbookName: wbName }
+    applyLockedSheet(info)
     saveLockedSheet(info)
     showToast(`已锁定: ${wbName} → ${sheetName}`, 'info')
   }
@@ -216,28 +213,8 @@ export function updateEnrichLockButton(
   lockButtonId = 'enrichLockBtn',
   statusId = 'enrichLockStatus',
 ): void {
-  const button = document.getElementById(lockButtonId) as HTMLButtonElement | null
-  const status = document.getElementById(statusId)
-
-  if (button) {
-    if (BGM.sheet.isLocked) {
-      button.textContent = '🔓 解锁'
-      button.classList.add('locked')
-    } else {
-      button.textContent = '🔒 锁定'
-      button.classList.remove('locked')
-    }
-  }
-
-  if (status) {
-    if (BGM.sheet.isLocked) {
-      status.classList.add('show')
-      status.textContent = `已锁定: ${BGM.sheet.lockedWorkbookName ?? ''} → ${BGM.sheet.lockedName ?? ''}`
-    } else {
-      status.classList.remove('show')
-      status.textContent = ''
-    }
-  }
+  // §5.6 C4：与主面板共用渲染实现（badge 模式 = 富化页的状态区显隐方式）
+  renderSheetLockUi(lockButtonId, statusId, 'badge')
 }
 
 // ========== 按工作簿+索引锁定 ==========
@@ -267,10 +244,7 @@ export function lockEnrichWorkbookByName(workbookName: string, sheetIndex: numbe
   }
 
   const sheetName = ws.Name
-  BGM.sheet.lockedWorkbookName = workbookName
-  BGM.sheet.lockedName = sheetName
-  BGM.sheet.lockedIndex = sheetIndex
-  BGM.sheet.isLocked = true
+  applyLockedSheet({ index: sheetIndex, name: sheetName, workbookName })
   saveLockedSheet({ index: sheetIndex, name: sheetName, workbookName })
   bgmLog(
     LOG_LEVELS.INFO,
