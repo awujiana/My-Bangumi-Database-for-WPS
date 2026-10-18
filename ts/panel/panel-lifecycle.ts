@@ -801,10 +801,8 @@ export function refreshData(): void {
   }
 
   const sheetName = ws.Name || ''
-  // 清除该工作表所有缓存，确保获取到最新数据
-  if (typeof clearSheetCache === 'function') {
-    clearSheetCache(ws)
-  }
+  // 清除该工作表所有缓存，确保获取到最新数据（§5.6 C3：barrel 已统一，去掉死守卫）
+  clearSheetCache(ws)
   const needRestore = activateSheetIfNeeded(ws)
   const refreshDataCore = (): void => {
     // 获取最后数据行（强制刷新，不使用缓存）

@@ -54,6 +54,12 @@ export interface WpsApp {
   ScreenUpdating?: boolean
   /** 计算模式：-4135=手动, -4105=自动 */
   Calculation?: number
+  /**
+   * 工作表内容变更事件（单元格编辑触发）。
+   * 面板用它做「预览随编辑自动刷新」（见 `panel/panel-auto-refresh.ts`）；
+   * 部分宿主版本不提供该事件，此时为 `undefined`。
+   */
+  SheetChange?: ((sheet?: WpsWorksheet, target?: unknown) => void) | undefined
 }
 
 // ========== WPS 工作簿集合 ==========

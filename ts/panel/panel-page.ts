@@ -32,8 +32,28 @@ import {
 } from './panel-lifecycle.js'
 import { saveLockedSheet, restoreLockedSheet } from '../tools/locked-sheet.js'
 import { restoreUserInfoFromStorage, startUserInfoPolling } from './user-info-polling.js'
+import { registerSheetChangeAutoRefresh, registerVisibilityRefresh } from './panel-auto-refresh.js'
 
 // Escape 关闭模态框统一由 panel-bootstrap 安装的 modal-a11y 负责（document 级委托，覆盖 .modal / .detail-modal）；本模块不再自绑 keydown，避免同一按键两套处理。
+
+/**
+ * 自动刷新的闸门：只在「编辑的是当前预览的那张表」且「没有同步在跑」时放行。
+ *
+ * 同步进行中不刷新——同步流程自己会更新预览，两条路径同时读写同一张表会互相
+ * 抢 COM，也会把用户正在跑的进度数据覆盖成中间态。
+ */
+function shouldRefresh(): boolean {
+  if (BGM.sync.isRunning) return false
+  const activeSheet = (getApp() as { ActiveSheet?: { Name?: string } } | null)?.ActiveSheet
+  const activeName = activeSheet?.Name ?? ''
+  if (!activeName) return false
+  if (BGM.sheet.isLocked && BGM.sheet.lockedName) {
+    return activeName === BGM.sheet.lockedName
+  }
+  const select = document.getElementById('sheetSelect') as HTMLSelectElement | null
+  const selectedName = select?.options[select.selectedIndex]?.text ?? ''
+  return selectedName !== '' && activeName === selectedName
+}
 
 // ========== 初始化 ==========
 
@@ -130,6 +150,13 @@ function initPanelCore(): void {
       autoDetectAndLockSheet()
     })
   }
+
+  // 预览自动刷新：防抖 400ms，只在「编辑的是当前预览的表」且没有同步在跑时
+  // 刷新（同步流程自己会更新预览，避免与其 COM 读写抢跑）。
+  // 两条触发源互补：SheetChange 覆盖「面板可见时旁边改数据」，
+  // window.focus / visibilitychange 覆盖「切走编辑 → 切回面板」（后者零宿主依赖，保底）。
+  registerSheetChangeAutoRefresh(getApp(), refreshData, { shouldRefresh })
+  registerVisibilityRefresh(refreshData, { shouldRefresh })
 
   // 模式切换（自动/手动）
   document.querySelectorAll<HTMLInputElement>('input[name="selectMode"]').forEach((radio) => {
