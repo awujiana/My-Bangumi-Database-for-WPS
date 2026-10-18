@@ -427,7 +427,7 @@ describe('preview · previewSyncContent', () => {
     // 卡片真实落到 DOM，统计卡片跟着卡片数走
     expect(body?.innerHTML).toContain('动画A')
     expect(body?.innerHTML).toContain('动画B')
-    expect(body?.innerHTML).toContain('detail-stats')
+    expect(body?.innerHTML).toContain('stat-grid')
     expect(modal.style.display).toBe('block')
 
     // 状态下拉：全部 + 卡片里出现过的标准状态（看过 / 在看）
@@ -472,7 +472,7 @@ describe('preview · previewSyncContent', () => {
     await previewSyncContent()
 
     const statsHtml = mocks.sanitizeHtml.mock.calls.at(-1)?.[0] ?? ''
-    expect(statsHtml).toContain('stat-card-uploaded')
+    expect(statsHtml).toContain('stat-card-success')
     // 总行数 2（两张卡片）、已上传 1
     expect(statsHtml).toContain('>2</div>')
   })

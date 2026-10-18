@@ -13,6 +13,7 @@
     <link rel="stylesheet" href="../css/styles.css" />
     <link rel="stylesheet" href="../css/panel-theme.css" />
     <link rel="stylesheet" href="../css/enrich.css" />
+    <link rel="stylesheet" href="../css/diff.css" />
   </head>
   <body data-page="enrich">
     <script type="text/javascript" src="../libs/purify.js"></script>
@@ -212,7 +213,7 @@
           <div id="lockStatus"></div>
         </div>
 
-        <div class="enrich-section" id="sec-preview">
+        <div class="enrich-section section-wide" id="sec-preview">
           <h3>👁️ 数据预览<button type="button" class="mod-collapse-btn" data-mod-collapse="sec-preview" aria-expanded="true" aria-label="折叠 / 展开「数据预览」">▾</button></h3>
           <!-- 多新番表工作簿切换按钮（26年4月 / 26年7月 …，横向滚动） -->
           <div class="workbook-tabs" id="workbookTabs" style="display: none"></div>
@@ -239,16 +240,16 @@
               📄 查看详细数据表格
             </button>
           </div>
-          <div class="match-stats" id="matchStats" style="display: none">
-            <div class="match-stat-card">
+          <div class="stat-grid" id="matchStats" style="display: none">
+            <div class="stat-card stat-card-accent">
               <div class="stat-value" id="exactMatchCount">0</div>
               <div class="stat-label">精确匹配</div>
             </div>
-            <div class="match-stat-card">
+            <div class="stat-card stat-card-warning">
               <div class="stat-value" id="aliasMatchCount">0</div>
               <div class="stat-label">别名匹配</div>
             </div>
-            <div class="match-stat-card">
+            <div class="stat-card stat-card-error">
               <div class="stat-value" id="unmatchedCount">0</div>
               <div class="stat-label">未匹配</div>
             </div>
@@ -306,18 +307,18 @@
             <!-- 进度条宿主：内容由通用进度组件 inline 模式渲染 -->
             <div id="enrichProgressHost"></div>
             <div class="enrich-stats">
-              <div class="enrich-stat-grid">
-                <div class="enrich-stat-item">
-                  <span class="enrich-stat-num" id="enrichedCount">0</span>
-                  <span class="enrich-stat-text">已富化</span>
+              <div class="stat-grid">
+                <div class="stat-card stat-card-success">
+                  <div class="stat-value" id="enrichedCount">0</div>
+                  <div class="stat-label">已富化</div>
                 </div>
-                <div class="enrich-stat-item">
-                  <span class="enrich-stat-num" id="skippedCount">0</span>
-                  <span class="enrich-stat-text">跳过</span>
+                <div class="stat-card stat-card-warning">
+                  <div class="stat-value" id="skippedCount">0</div>
+                  <div class="stat-label">跳过</div>
                 </div>
-                <div class="enrich-stat-item">
-                  <span class="enrich-stat-num" id="failedCount">0</span>
-                  <span class="enrich-stat-text">失败</span>
+                <div class="stat-card stat-card-error">
+                  <div class="stat-value" id="failedCount">0</div>
+                  <div class="stat-label">失败</div>
                 </div>
               </div>
             </div>
@@ -340,20 +341,20 @@
 
         <div class="enrich-section" id="sec-records">
           <h3>📊 富化记录<button type="button" class="mod-collapse-btn" data-mod-collapse="sec-records" aria-expanded="true" aria-label="折叠 / 展开「富化记录」">▾</button></h3>
-          <div class="record-summary">
-            <div class="record-stat-card">
+          <div class="stat-grid">
+            <div class="stat-card">
               <div class="stat-value" id="totalRecordCount">0</div>
               <div class="stat-label">总记录</div>
             </div>
-            <div class="record-stat-card success">
+            <div class="stat-card stat-card-success">
               <div class="stat-value" id="successRecordCount">0</div>
               <div class="stat-label">成功</div>
             </div>
-            <div class="record-stat-card warning">
+            <div class="stat-card stat-card-warning">
               <div class="stat-value" id="skipRecordCount">0</div>
               <div class="stat-label">跳过</div>
             </div>
-            <div class="record-stat-card error">
+            <div class="stat-card stat-card-error">
               <div class="stat-value" id="errorRecordCount">0</div>
               <div class="stat-label">错误</div>
             </div>

@@ -1104,30 +1104,6 @@ select.input {
     text-align: center;
 }
 
-.stat-value {
-    font-size: 24px;
-    font-weight: bold;
-    color: var(--accent-blue);
-}
-
-.stat-value.success {
-    color: #4ade80;
-}
-
-.stat-value.error {
-    color: #ff6b6b;
-}
-
-.stat-value.warning {
-    color: #ffc107;
-}
-
-.stat-label {
-    font-size: 12px;
-    color: var(--text-3);
-    margin-top: 4px;
-}
-
 /* ========== 动画 ========== */
 @keyframes spin {
     from { transform: rotate(0deg); }
@@ -1577,76 +1553,84 @@ select.input {
     max-width: 200px;
 }
 
-/* ========== 富预览 - 统计卡片 ========== */
-.detail-stats {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 10px;
-    margin-bottom: 16px;
-}
-
-.stat-card {
-    background: var(--bg-surface-2);
-    padding: 14px 12px;
-    border-radius: 10px;
-    text-align: center;
-    border-left: 3px solid var(--accent-blue);
-}
-
-.stat-card .stat-value {
-    font-size: 26px;
-    font-weight: 700;
-    color: var(--accent-blue);
-    line-height: 1.2;
-}
-
-.stat-card .stat-label {
-    font-size: 12px;
-    color: var(--text-3);
-    margin-top: 4px;
-}
-
-/* ========== 共用统计卡片（三个页面预览区统一，配合 ts/ui/stat-cards.ts） ==========
- * auto-fit + minmax 让卡片数不同也能自动换行，任务窗格拖窄到 480px 以下时
- * 会自然折成两列，不需要额外的媒体查询。
+/* ========== 共用统计条（所有页面预览区统一，配合 ts/ui/stat-cards.ts） ==========
+ * 视觉语言对齐侧栏导航：横排胶囊（r-md 圆角 + 1px 描边 + 悬停加深），
+ * 数值加粗 + tabular-nums，语义色只作用于数值与描边。
+ * 本规则取代此前四套手写变体：富预览统计卡（detail-stats / stat-cards-centered /
+ * stat-card-pending|uploaded）、富化匹配统计（match-stat-*）、富化进度统计
+ * （enrich-stat-*）、富化记录统计（record-stat-*）、清理页死样式（clean-stat-*）、
+ * 孤儿统计卡（bgm-stat-card*）。任务窗格拖窄时 flex-wrap 自然折行，无需媒体查询。
  */
 .stat-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(96px, 1fr));
-    gap: var(--sp-2, 8px);
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
     margin-bottom: var(--sp-3, 12px);
 }
 
+.stat-card {
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+    padding: 5px 12px;
+    border: 1px solid var(--border);
+    border-radius: var(--r-md);
+    background: var(--bg-surface);
+    transition:
+        border-color var(--dur) var(--ease),
+        background var(--dur) var(--ease);
+}
+
+.stat-card:hover {
+    border-color: var(--border-strong);
+}
+
+.stat-card .stat-value {
+    color: var(--text-1);
+    font-size: var(--fs-h3);
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    line-height: 1.5;
+}
+
+.stat-card .stat-label {
+    color: var(--text-3);
+    font-size: 11px;
+    line-height: 1.5;
+    white-space: nowrap;
+}
+
+/* ---- 语义色调（与导航高亮同一套 token；只作用于数值与描边） ---- */
 .stat-card-success {
-    border-left-color: var(--success, #a6e3a1);
+    border-color: color-mix(in srgb, var(--success) 35%, var(--border));
 }
 
 .stat-card-success .stat-value {
-    color: var(--success, #a6e3a1);
+    color: var(--success);
 }
 
 .stat-card-warning {
-    border-left-color: var(--warning, #f9e2af);
+    border-color: color-mix(in srgb, var(--warning) 35%, var(--border));
 }
 
 .stat-card-warning .stat-value {
-    color: var(--warning, #f9e2af);
+    color: var(--warning);
 }
 
 .stat-card-error {
-    border-left-color: var(--danger, #f38ba8);
+    border-color: color-mix(in srgb, var(--danger) 35%, var(--border));
 }
 
 .stat-card-error .stat-value {
-    color: var(--danger, #f38ba8);
+    color: var(--danger);
 }
 
 .stat-card-accent {
-    border-left-color: var(--accent, #cfcfcf);
+    border-color: color-mix(in srgb, var(--accent) 35%, var(--border));
 }
 
 .stat-card-accent .stat-value {
-    color: var(--text-1, #f2f2f2);
+    color: var(--accent);
 }
 
 /* ========== 设置页「数据导出」列表（一个数据源一行：名称 + CSV/TXT 按钮） ========== */
@@ -2258,70 +2242,6 @@ select.input {
     background: rgba(255, 255, 255, 0.06);
     color: #94a3b8;
     white-space: nowrap;
-}
-
-.bgm-stat-cards {
-    display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: 8px;
-    margin-bottom: 10px;
-}
-
-.bgm-stat-card {
-    position: relative;
-    display: flex;
-    flex-direction: column;
-    align-items: flex-start;
-    padding: 10px;
-    background: rgba(255, 255, 255, 0.04);
-    border-radius: 8px;
-    border: 1px solid rgba(255, 255, 255, 0.06);
-    overflow: hidden;
-}
-
-.bgm-stat-card__icon {
-    font-size: 14px;
-    margin-bottom: 2px;
-}
-
-.bgm-stat-card__info {
-    display: flex;
-    flex-direction: column;
-}
-
-.bgm-stat-card__value {
-    font-size: 18px;
-    font-weight: 700;
-    color: #f1f5f9;
-    line-height: 1.2;
-}
-
-.bgm-stat-card__label {
-    font-size: 11px;
-    color: #94a3b8;
-}
-
-.bgm-stat-card__bar {
-    position: absolute;
-    bottom: 0;
-    left: 0;
-    height: 3px;
-    border-radius: 0 3px 0 0;
-    transition: width 0.5s ease;
-}
-
-.bgm-stat-badge {
-    padding: 6px 12px;
-    border-radius: 8px;
-    font-size: 12px;
-    font-weight: 500;
-    margin-bottom: 8px;
-}
-
-.bgm-stat-badge--error {
-    background: rgba(239, 68, 68, 0.12);
-    color: #f87171;
-    border: 1px solid rgba(239, 68, 68, 0.25);
 }
 
 .bgm-stats-chart-wrap {
@@ -3698,35 +3618,20 @@ body {
     text-decoration: line-through;
 }
 
-/* ============================ 同步预览：统计卡 / 详情列表 / 滚动按钮 ============================ */
+/* ============================ 同步预览：详情列表 / 滚动按钮 ============================ */
 /* 2026-10-17：f499c955 删除孤儿页面 panel-preview.html 时 css/preview.css 一并删除，
-   但下列规则未并入本文件 → 统计卡左侧色条、详情列表间距、滚动按钮（panel.html 的
+   但下列规则未并入本文件 → 详情列表间距、滚动按钮（panel.html 的
    #scrollToTopBtn / #scrollToBottomBtn）与窄窗格响应式全部失效；panel.html 仍
    <link> 该文件 → 404（wpsjs 回退 index.html，控制台报 MIME 错误）。
-   此处按原文件逐字恢复。颜色**刻意保留原值**：--success/--warning 的 token 值
-   与原值不同（#a6e3a1 vs #22c55e、#f9e2af vs #f59e0b），换 token 会改变既有渲染。 */
+   此处按原文件逐字恢复。
+   2026-10-18：同步预览的统计卡改入上方「共用统计条」（.stat-grid / .stat-card，
+   令牌化语义色）；原 .stat-cards-centered / .stat-card-pending / .stat-card-uploaded
+   与硬编码 hex 一并删除 —— ts/ui/preview.ts 的 buildStatsHtml 已改产统一标记。 */
 
 .detail-list {
     display: flex;
     flex-direction: column;
     gap: 12px;
-}
-
-.stat-cards-centered {
-    margin-left: auto;
-    margin-right: auto;
-    max-width: 640px;
-    display: flex;
-    gap: 12px;
-    margin-bottom: 12px;
-}
-
-.stat-card-pending {
-    border-left: 3px solid #f59e0b;
-}
-
-.stat-card-uploaded {
-    border-left: 3px solid #22c55e;
 }
 
 .scroll-btn {
@@ -3780,10 +3685,6 @@ body {
     .sync-preview-modal .modal-content {
         margin: 8px auto;
         width: 100%;
-    }
-
-    .stat-cards-centered {
-        flex-wrap: wrap;
     }
 
     #syncPreviewModal .modal-header,

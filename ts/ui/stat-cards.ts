@@ -2,13 +2,15 @@
  * @fileoverview 统一统计卡片组件
  * @module ui/stat-cards
  * @description
- *   三个页面的预览区各自手写了统计卡片，样式与结构各不相同
- *   （`clean-stat-*` / `match-stat-*` / `record-stat-*`），
- *   新增一个统计值要在三处分别改 HTML + CSS + 渲染代码。
+ *   历史上三个页面的预览区各自手写统计卡片，样式与结构各不相同
+ *   （`clean-stat-*` / `match-stat-*` / `record-stat-*` / `detail-stats`），
+ *   新增一个统计值要在多处分别改 HTML + CSS + 渲染代码。
  *
- *   这里收敛成**一个**渲染函数：调用方只给 `{ label, value, tone }` 数组，
- *   结构与配色由组件统一负责。样式在 `css/styles.css` 的 `.stat-grid` /
- *   `.stat-card`（所有页面都引入该文件，故三页外观一致）。
+ *   现已收敛为**一个**渲染函数 + **一套** `.stat-grid` / `.stat-card` 标记：
+ *   调用方只给 `{ label, value, tone }` 数组；静态页面的统计块
+ *   （enrich 匹配 / 进度 / 记录、同步预览弹窗）也改产同一套标记。
+ *   视觉语言对齐侧栏导航：横排胶囊 + r-md 圆角，语义色只作用于数值
+ *   （`css/styles.css`，所有页面都引入该文件，故各页外观一致）。
  *
  *   **安全**：值可能来自用户数据（工作表名、规则名），一律先 `escapeHtml`
  *   再整体过 `sanitizeHtml`。

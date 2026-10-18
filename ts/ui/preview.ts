@@ -701,21 +701,20 @@ function buildStatsHtml(totalRows: number): string {
   const d = detailPreviewData
   const pending = d.totalWithType - d.totalUploaded
 
+  // 共用统计条（与 clean / enrich / panel 三页预览区同一组件与视觉语言）
   return `
-    <div class="detail-stats">
-      <div class="stat-cards stat-cards-centered">
-        <div class="stat-card">
-          <div class="stat-value">${String(totalRows)}</div>
-          <div class="stat-label">总行数</div>
-        </div>
-        <div class="stat-card stat-card-pending">
-          <div class="stat-value" style="color:#f59e0b;">${String(pending)}</div>
-          <div class="stat-label">待上传</div>
-        </div>
-        <div class="stat-card stat-card-uploaded">
-          <div class="stat-value" style="color:#22c55e;">${String(d.totalUploaded)}</div>
-          <div class="stat-label">已上传</div>
-        </div>
+    <div class="stat-grid">
+      <div class="stat-card">
+        <div class="stat-value">${String(totalRows)}</div>
+        <div class="stat-label">总行数</div>
+      </div>
+      <div class="stat-card stat-card-warning">
+        <div class="stat-value">${String(pending)}</div>
+        <div class="stat-label">待上传</div>
+      </div>
+      <div class="stat-card stat-card-success">
+        <div class="stat-value">${String(d.totalUploaded)}</div>
+        <div class="stat-label">已上传</div>
       </div>
     </div>
   `

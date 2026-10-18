@@ -702,50 +702,6 @@
 }
 
 /* ========== 匹配统计卡片 ========== */
-.match-stats {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 8px;
-  margin: 12px 0;
-}
-
-.match-stat-card {
-  background: var(--bg-surface);
-  padding: 12px 8px;
-  border-radius: 8px;
-  text-align: center;
-  border-left: 3px solid var(--accent-blue);
-}
-
-.match-stat-card .stat-value {
-  font-size: 22px;
-  font-weight: 700;
-  color: var(--accent-blue);
-  line-height: 1.2;
-}
-
-.match-stat-card:nth-child(2) {
-  border-left-color: var(--amber);
-}
-
-.match-stat-card:nth-child(2) .stat-value {
-  color: var(--amber);
-}
-
-.match-stat-card:nth-child(3) {
-  border-left-color: var(--red);
-}
-
-.match-stat-card:nth-child(3) .stat-value {
-  color: var(--red);
-}
-
-.match-stat-card .stat-label {
-  font-size: 11px;
-  color: var(--text-3);
-  margin-top: 3px;
-}
-
 /* ========== 富化执行区域 ========== */
 .strategy-desc {
   background: var(--bg-surface);
@@ -820,109 +776,6 @@
   display: flex;
   flex-direction: column;
   gap: 8px;
-}
-
-.enrich-stat-row {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 12px;
-}
-
-.enrich-stat-label {
-  color: var(--text-3);
-}
-
-.enrich-stat-value {
-  color: var(--text-1);
-  font-weight: 500;
-}
-
-.enrich-stat-grid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 8px;
-}
-
-.enrich-stat-item {
-  text-align: center;
-  padding: 8px 4px;
-  background: var(--bg-surface-2);
-  border-radius: 6px;
-}
-
-.enrich-stat-num {
-  display: block;
-  font-size: 18px;
-  font-weight: 700;
-  color: var(--accent-blue);
-  line-height: 1.2;
-}
-
-.enrich-stat-item:nth-child(2) .enrich-stat-num {
-  color: var(--amber);
-}
-
-.enrich-stat-item:nth-child(3) .enrich-stat-num {
-  color: var(--red);
-}
-
-.enrich-stat-text {
-  font-size: 11px;
-  color: var(--text-3);
-}
-
-/* ========== 富化记录 ========== */
-.record-summary {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 6px;
-  margin-bottom: 12px;
-}
-
-.record-stat-card {
-  background: var(--bg-surface);
-  padding: 10px 6px;
-  border-radius: 8px;
-  text-align: center;
-  border-top: 3px solid var(--accent-blue);
-}
-
-.record-stat-card .stat-value {
-  font-size: 18px;
-  font-weight: 700;
-  color: var(--accent-blue);
-  line-height: 1.2;
-}
-
-.record-stat-card.success {
-  border-top-color: var(--teal);
-}
-
-.record-stat-card.success .stat-value {
-  color: var(--teal);
-}
-
-.record-stat-card.warning {
-  border-top-color: var(--amber);
-}
-
-.record-stat-card.warning .stat-value {
-  color: var(--amber);
-}
-
-.record-stat-card.error {
-  border-top-color: var(--red);
-}
-
-.record-stat-card.error .stat-value {
-  color: var(--red);
-}
-
-.record-stat-card .stat-label {
-  font-size: 10px;
-  color: var(--text-3);
-  margin-top: 3px;
 }
 
 .record-list {
@@ -1063,14 +916,6 @@
     font-size: 14px;
   }
 
-  .match-stats {
-    gap: 6px;
-  }
-
-  .match-stat-card .stat-value {
-    font-size: 18px;
-  }
-
   .preview-table td,
   .preview-table th {
     padding: 6px;
@@ -1185,7 +1030,7 @@
 }
 
 .detect-result,
-.match-stats,
+#matchStats,
 .enrich-progress,
 .record-list {
   animation: fadeIn 0.3s ease;
