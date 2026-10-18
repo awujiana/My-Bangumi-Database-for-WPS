@@ -117,6 +117,15 @@ function mockReadRangeValues(
   return result
 }
 
+/**
+ * 区域读探针（§5.6 B1）：记录 readRangeValues 调用，并可在用例里模拟
+ * 「宿主不支持区域读」（返回形状不符的空数组 → 生产代码回退逐格读）。
+ */
+const areaRead = vi.hoisted(() => ({
+  calls: [] as unknown[][],
+  failAreaRead: false,
+}))
+
 function isEmptyValue(value: string | null | undefined): boolean {
   if (!value) return true
   return value.trim() === ''
@@ -138,7 +147,17 @@ vi.mock('../ts/tools/util/index.js', () => ({
   getLastRow: mockGetLastRow,
   findHeaderRow: mockFindHeaderRow,
   getColumnMap: mockGetColumnMap,
-  readRangeValues: mockReadRangeValues,
+  readRangeValues: (
+    ws: unknown,
+    startRow: number,
+    endRow: number,
+    startCol: number,
+    endCol: number,
+  ): string[][] => {
+    areaRead.calls.push([sheetNameOf(ws), startRow, endRow, startCol, endCol])
+    if (areaRead.failAreaRead) return []
+    return mockReadRangeValues(ws, startRow, endRow, startCol, endCol)
+  },
   isEmptyValue,
 }))
 
@@ -210,6 +229,8 @@ function createWorkbook(sheets: { Name: string }[]): never {
 
 beforeEach(() => {
   store.clear()
+  areaRead.calls.length = 0
+  areaRead.failAreaRead = false
   vi.clearAllMocks()
 })
 
@@ -821,6 +842,28 @@ describe('findAliasColumn', () => {
     setCell(BANGUMI, 1, 1, '名称')
     expect(findAliasColumn(bangumiSheet)).toBe(0)
   })
+
+  it('表头行一次矩形读覆盖 1..50 列（§5.6 B2）', () => {
+    setCell(BANGUMI, 1, 1, '名称')
+    setCell(BANGUMI, 1, 3, '别名')
+
+    expect(findAliasColumn(bangumiSheet)).toBe(3)
+
+    // 单行 × 1..50 列一次矩形读（原为最多 50 次逐格读）
+    const aliasReads = areaRead.calls.filter(
+      (call) =>
+        call[0] === 'bangumi' && call[1] === 1 && call[2] === 1 && call[3] === 1 && call[4] === 50,
+    )
+    expect(aliasReads).toHaveLength(1)
+  })
+
+  it('区域读不可用（形状不符）→ 逐格读回退，结果不变（§5.6 B2）', () => {
+    setCell(BANGUMI, 1, 1, '名称')
+    setCell(BANGUMI, 1, 3, '别名')
+    areaRead.failAreaRead = true
+
+    expect(findAliasColumn(bangumiSheet)).toBe(3)
+  })
 })
 
 // ========== resolveConflictField 冲突解决测试 ==========
@@ -1147,6 +1190,33 @@ describe('findIntroSheetInWorkbook 工作簿内查找', () => {
     setCell(INTRO, 1, 2, '随便')
     setCell(INTRO, 1, 3, '什么')
     expect(findIntroSheetInWorkbook(wb)).toBeNull()
+  })
+
+  it('简介表头扫描一次矩形读覆盖 1..MAX_SCAN_ROWS × 50 列（§5.6 B1）', () => {
+    seedIntroSheetInBook()
+    const wb = createWorkbook([{ Name: BANGUMI }, introSheet])
+
+    findIntroSheetInWorkbook(wb)
+
+    // 布局探测的矩形读是 1..MAX_SCAN_ROWS+10 行；1..MAX_SCAN_ROWS(100) 行的读
+    // 只可能来自简介表头扫描块——两张候选表各一次
+    const introReads = areaRead.calls.filter((call) => call[1] === 1 && call[2] === 100)
+    expect(introReads).toHaveLength(2)
+    expect(introReads.every((call) => call[3] === 1 && call[4] === 50)).toBe(true)
+  })
+
+  it('区域读不可用（形状不符）→ 逐格读回退，识别结果不变（§5.6 B1）', () => {
+    seedIntroSheetInBook()
+    const wb = createWorkbook([{ Name: BANGUMI }, introSheet])
+    areaRead.failAreaRead = true
+
+    // 全部区域读返回形状不符：布局探测与简介扫描都回退逐格读，仍能找到简介表
+    expect(findIntroSheetInWorkbook(wb)).toBe(introSheet)
+
+    // buildIntroSheetContext 同样走回退路径并正常构建上下文
+    const context = buildIntroSheetContext(introSheet)
+    expect(context?.headerRow).toBe(1)
+    expect(context?.nameIndex.get('葬送的芙莉莲')).toBe(2)
   })
 })
 

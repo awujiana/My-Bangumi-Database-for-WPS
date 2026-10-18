@@ -480,16 +480,27 @@ function detectAnimeSourceLayoutUncached(sheet: WpsWorksheet): AnimeSourceLayout
   return { headerRow, dataStartRow, columnMapping }
 }
 
+/** 别名列识别的表头扫描列跨度（与原逐格扫描一致：1..50 列） */
+const ALIAS_SCAN_COLUMNS = 50
+
 /**
  * 查找 Bangumi 追踪表的别名列
+ *
+ * §5.6 B2：表头行一次矩形读覆盖 1..50 列（原 50 次逐格读，每次调用都付一遍）；
+ * 形状不符（宿主 / 桩不支持区域读）时逐格读回退，行为与改造前逐字一致。
  */
 export function findAliasColumn(sheet: WpsWorksheet): number {
   const headerRow = findHeaderRow(sheet)
   if (headerRow === 0) return 0
 
-  const maxCols = 50
-  for (let col = 1; col <= maxCols; col += 1) {
-    const headerValue = getCellValue(sheet, headerRow, col).trim().toLowerCase()
+  const headerBlock = readScanBlock(sheet, headerRow, headerRow, ALIAS_SCAN_COLUMNS)
+  const headerAt = (col: number): string =>
+    (headerBlock ? (headerBlock[0]?.[col - 1] ?? '') : getCellValue(sheet, headerRow, col))
+      .trim()
+      .toLowerCase()
+
+  for (let col = 1; col <= ALIAS_SCAN_COLUMNS; col += 1) {
+    const headerValue = headerAt(col)
     if (
       headerValue.includes('别名') ||
       headerValue.includes('alias') ||
@@ -1885,11 +1896,52 @@ const INTRO_SHEET_HEADER_KEYWORDS = [
   '动画制作',
 ] as const
 
-/** 统计某行命中简介表头关键字的次数 */
-function countIntroHeaderHits(sheet: WpsWorksheet, row: number): number {
+/** 简介表头扫描的列跨度（与原逐格扫描一致：1..50 列） */
+const INTRO_SCAN_COLUMNS = 50
+
+/**
+ * 扫描块一次矩形读（§5.6 B1/B2）：替代「逐格循环读」——`行数 × 列数` 次跨进程
+ * 往返压成 1 次。
+ *
+ * 「矩形读 + 逐格读回退」统一改法（§5 引言）：读回行数 / 列宽与请求不一致
+ * （宿主或桩不支持区域读）时返回 null，调用方逐格读回退，行为与改造前逐字一致。
+ */
+function readScanBlock(
+  sheet: WpsWorksheet,
+  startRow: number,
+  endRow: number,
+  colCount: number,
+): readonly string[][] | null {
+  const block = readRangeValues(sheet, startRow, endRow, 1, colCount)
+  const rowCount = endRow - startRow + 1
+  const isShapeOk =
+    block.length === rowCount && block.every((line) => line.length >= colCount)
+  return isShapeOk ? block : null
+}
+
+/**
+ * 简介表头扫描块（§5.6 B1）：一次矩形读覆盖 `1..MAX_SCAN_ROWS` 行 ×
+ * {@link INTRO_SCAN_COLUMNS} 列，替代原先「每行 50 次逐格读」——每张候选表
+ * 最坏 `MAX_SCAN_ROWS × 50` 次跨进程往返 → 1 次。
+ */
+function readIntroScanBlock(sheet: WpsWorksheet): readonly string[][] | null {
+  return readScanBlock(sheet, 1, PANEL_CONFIG.MAX_SCAN_ROWS, INTRO_SCAN_COLUMNS)
+}
+
+/**
+ * 统计某行命中简介表头关键字的次数。
+ * @param scanBlock {@link readIntroScanBlock} 的结果；为 null（区域读不可用）时
+ *   逐格读回退，与改造前逐字一致。
+ */
+function countIntroHeaderHits(
+  sheet: WpsWorksheet,
+  row: number,
+  scanBlock?: readonly string[][] | null,
+): number {
   let hits = 0
-  for (let col = 1; col <= 50; col += 1) {
-    const value = getCellValue(sheet, row, col).trim()
+  for (let col = 1; col <= INTRO_SCAN_COLUMNS; col += 1) {
+    const raw = scanBlock ? (scanBlock[row - 1]?.[col - 1] ?? '') : getCellValue(sheet, row, col)
+    const value = raw.trim()
     if (value && INTRO_SHEET_HEADER_KEYWORDS.some((keyword) => value.includes(keyword))) {
       hits += 1
     }
@@ -1944,8 +1996,10 @@ export function findIntroSheetInWorkbook(
       })()
       // 排除当前主源表与主新番表布局的工作表，其余表头命中简介关键字的才算候选
       if ((!name || name !== excludeSheetName) && !detectAnimeSourceLayout(ws)) {
+        // §5.6 B1：候选表的表头扫描一次矩形读完成（原为每行 50 次逐格读）
+        const scanBlock = readIntroScanBlock(ws)
         for (let row = 1; row <= PANEL_CONFIG.MAX_SCAN_ROWS; row += 1) {
-          if (countIntroHeaderHits(ws, row) >= 2) return ws
+          if (countIntroHeaderHits(ws, row, scanBlock) >= 2) return ws
         }
       }
     }
@@ -1956,8 +2010,10 @@ export function findIntroSheetInWorkbook(
 /** 构建简介工作表上下文（表头识别 + 名称行索引）；非简介表返回 null */
 export function buildIntroSheetContext(sheet: WpsWorksheet): IntroSheetContext | null {
   let headerRow = 0
+  // §5.6 B1：表头扫描一次矩形读完成（原为每行 50 次逐格读）
+  const scanBlock = readIntroScanBlock(sheet)
   for (let row = 1; row <= PANEL_CONFIG.MAX_SCAN_ROWS; row += 1) {
-    if (countIntroHeaderHits(sheet, row) >= 2) {
+    if (countIntroHeaderHits(sheet, row, scanBlock) >= 2) {
       headerRow = row
       break
     }
