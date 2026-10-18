@@ -1209,6 +1209,22 @@ describe('panel-lifecycle · refreshData', () => {
     expect(mocks.showToast).toHaveBeenCalledWith('已自动锁定工作表: 动画', 'info')
   })
 
+  it('预览单元格带 title 全文（列宽被 max-width 截断后可悬浮看完整内容）', () => {
+    const box = mountDiv('previewBox')
+    mountSelect('sheetSelect', '1')
+    mountButton('lockSheetBtn')
+    const sheet = makeSheet('动画', makeTrackedSheetCells())
+    mocks.getApp.mockReturnValue({ ActiveWorkbook: makeWorkbook('BGM.xlsx', [sheet]) })
+    mocks.getLastRow.mockReturnValue(3)
+    mocks.getFilterStatus.mockReturnValue({ hasFilter: false, visibleRows: [1, 2, 3] })
+
+    refreshData()
+
+    expect(box.innerHTML).toContain('title="动画A"')
+    // 空单元格不产生空 title（悬浮出空白气泡无意义）
+    expect(box.innerHTML).not.toContain('title=""')
+  })
+
   it('二维批量读取到数据时按起始列切片渲染', () => {
     const box = mountDiv('previewBox')
     mountSelect('sheetSelect', '1')
@@ -1356,6 +1372,8 @@ describe('panel-lifecycle · refreshData', () => {
     refreshData()
 
     expect(box.innerHTML).toContain('未检测到数据')
+    // 空状态走 .preview-empty 块（居中弱化），而不是普通 hint 段落在顶部一排
+    expect(box.innerHTML).toContain('class="preview-empty"')
   })
 
   it('已锁定时不重复自动锁定，也不会覆盖用户选择', () => {

@@ -733,7 +733,10 @@ function renderPreviewTable(
           cls = 'preview-header'
           if (item.isImportant?.[index] === true) cls += ' preview-important-header'
         }
-        html += `<td class="${cls}">${escapeHtml(text)}</td>`
+        const safeText = escapeHtml(text)
+        // 单元格有 max-width + 省略号，截断后靠 title 悬浮看全文
+        const title = text ? ` title="${safeText}"` : ''
+        html += `<td class="${cls}"${title}>${safeText}</td>`
       }
     }
     html += '</tr>'
@@ -962,10 +965,12 @@ export function refreshData(): void {
 
     if (previewBox) {
       // 渲染前统一经 sanitizeHtml 清洗，剥离可能的事件处理器/危险脚本
+      // 空状态：这一支是唯一可达的「无预览行」路径（renderPreviewTable 恒有表头行，
+      // 不需要在里面再兜一层空数组分支）
       previewBox.innerHTML = sanitizeHtml(
         previewRows.length > 0
           ? renderPreviewTable(previewRows, sheetIndex, sheetName, meta.headerRow)
-          : `<p class="hint">已选择工作表索引: ${String(sheetIndex)} (${escapeHtml(sheetName)})<br>未检测到数据</p>`,
+          : `<div class="preview-empty">已选择工作表索引: ${String(sheetIndex)} (${escapeHtml(sheetName)})<br>未检测到数据<br><span class="preview-empty-hint">确认数据区非空，或取消筛选后重试</span></div>`,
       )
     }
     renderPreviewStats({
