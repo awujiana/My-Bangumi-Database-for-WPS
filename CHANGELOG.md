@@ -8,6 +8,16 @@
 
 ## [未发布]
 
+### 文档（COM 优化清单盘点：评估后不做 / 新发现重构点汇总，TECH_KNOWLEDGE §5.6）
+
+- **背景**：`文档/TECH_KNOWLEDGE_COM_DATA_SAFETY.md` §5.1–§5.5 的重构点大多已标注「已修」，但「**未做**」的项散落四节（§5.1 主动搁置 / §5.2 主动搁置 / §5.4 取舍③ / §5.5.3 末尾），且从未按「有无性能收益」归类——想捡起某一项时要在全文档里人肉找前置条件。
+- **新增 §5.6「评估后不做 / 新发现重构点汇总」**，三桶分类：
+  - **A · 评估后不做、有性能收益（3 项，各附重启前置条件）**：A1 清理多规则重复解析表结构（`planDuplicateRows`/`planDuplicateUrlRows`/`planEmptyNameRows` 三处各自 `readSheetLayout`；共享 layout 会改变新番表语义，前置 = 先给 `CleanTargetInfo` 记 `isXinFan` 再分流）；A2 富化布局探测无跨调用缓存（`detectAnimeSourceLayout`/`findIntroSheetInWorkbook` 每次进富化页 / SheetActivate 全簿重跑；前置 = 失效机制，可复用 `clearSheetCache(ws)` 激活即清的先例）；A3 收藏填充逐格写（`_fillSheetWithCollections` 每条约 8 次 COM；前置 = 读旧值做基底 + 批量失败逐格 `setCellValue` 兜底，保 `Formula`/`Value` 回退链）。
+  - **B · 新发现、有性能收益（2 项，2026-10-18 只读盘点，未评估未改代码）**：B1 `countIntroHeaderHits` 每候选表最坏 10 行 × 50 列 = **500 次逐格读**（`findIntroSheetInWorkbook`/`buildIntroSheetContext` 调用）；B2 `findAliasColumn` 每次 ~50 次逐格读。两者均可按项目统一改法「矩形读 + 形状守卫失败回退逐格」收敛，行为逐字一致。
+  - **C · 无性能收益的搁置项（5 项）**：handlers 工厂 / `verifyToken` 委托 `fetchBgmMe` / tools 双轨 barrel 全局合一 / `toggleSheetLock` 两套统一 / `getSequentialRowsBySeqCol` 删除——纯去重或语义取舍，备查。
+- 所有位置与行号按当前代码重新核对（三处 `readSheetLayout` 调用点、`_fillSheetWithCollections` 逐格写循环、`clearSheetCache` 激活即清的先例均实证）。
+- §8 末尾新增「性能重构备查」指针；§5.5.3 末尾与两处「主动搁置」表格行补 §5.6 交叉引用。
+
 ### 新增（功能 · 清理页执行前预览：diff 视图 + 横屏排版 + 性能优化）
 
 - **背景**：清理页「执行前预览」原先只有一个「扫描预览」按钮和一句提示——扫完之后也只显示一张「规则 × 目标」汇总表（几行数字），用户**看不到将删哪些行、那些行里是什么数据、引擎会保留哪一行**。而删除行不可撤销，等于闭眼执行。同时任务窗格横屏停靠时主区单列铺不满、大表扫描期间界面冻结、每次勾选工作表都明显卡顿。
