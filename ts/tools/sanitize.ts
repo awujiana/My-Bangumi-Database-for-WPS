@@ -104,6 +104,8 @@ function getPurify(): (d: string) => string {
           'id',
           'style',
           'title',
+          // 表格（diff 视图 context 行的跨列单元格）
+          'colspan',
           // 链接
           'href',
           'target',
