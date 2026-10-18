@@ -1243,6 +1243,38 @@ select.input option,
   grid-column: 1 / -1;
 }
 
+/* ============================ 15b. 横屏排版：宽任务窗格多列栅格 ============================ */
+/* 任务窗格停靠成横排（宽而矮，典型如顶部停靠）时，单列主区会留下大片空白、
+   上下滚动距离也翻倍。此处把非 panel 页（panel 早已用 .main.main-grid）的主区
+   切换为多列栅格，口径与 panel 一致：auto-fit + 固定列宽上限，防止宽屏无限拉伸。
+   .section-wide 标记「天然需要全宽」的区块（预览 / 大表），跨全部列；
+   页面标记见 ui/clean.html 与 ui/enrich.html 的 sec-preview。 */
+@media (min-width: 960px) {
+  .main:not(.main-grid) {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--gap);
+    align-items: start;
+  }
+
+  .main:not(.main-grid) > * {
+    min-width: 0;
+  }
+
+  .main:not(.main-grid) > .section-wide {
+    grid-column: 1 / -1;
+  }
+}
+
+/* 超宽窗格再放一列：列数确定性递增（不用 auto-fit + 固定上限的组合——
+   那会在 1500px 档留下约 1/4 宽度的右侧空白，正是横屏要消除的问题），
+   1fr 保证列宽始终铺满可用宽度。 */
+@media (min-width: 1440px) {
+  .main:not(.main-grid) {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
 /* ============================ 16. 模块排序编辑器 ======================== */
 /* 设置页「模块排序」：每个页面一组，条目支持 ↑↓ 按钮与鼠标拖拽两种排序方式 */
 .module-order-groups {

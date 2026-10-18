@@ -165,39 +165,6 @@
   border-color: rgba(243, 139, 168, 0.35);
 }
 
-/* ---- 预览统计卡 ---- */
-.clean-stat-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
-  gap: var(--sp-2);
-  margin-top: var(--sp-3);
-}
-
-.clean-stat-card {
-  padding: 10px var(--sp-3);
-  border: 1px solid var(--border);
-  border-radius: var(--r-md);
-  background: var(--bg-base);
-  text-align: center;
-}
-
-.clean-stat-card.accent {
-  border-color: var(--border-strong);
-  background: var(--bg-surface);
-}
-
-.clean-stat-value {
-  color: var(--text-1);
-  font-size: var(--fs-h2);
-  font-weight: 700;
-  line-height: 1.4;
-}
-
-.clean-stat-label {
-  color: var(--text-3);
-  font-size: var(--fs-sm);
-}
-
 /* ---- 预览明细表（横向滚动） ---- */
 .clean-table-wrap {
   margin-top: var(--sp-3);
@@ -455,10 +422,6 @@
 @media (max-width: 480px) {
   .clean-scope-label {
     flex: 0 0 auto;
-  }
-
-  .clean-stat-grid {
-    grid-template-columns: repeat(auto-fit, minmax(96px, 1fr));
   }
 
   .clean-table-wrap,
