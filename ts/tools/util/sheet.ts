@@ -15,7 +15,7 @@ import { colNumberToLetter, trim } from '../string-utilities.js'
 import type { WpsCellValue, WpsWorksheet } from '../wps.js'
 
 // 循环依赖：仅在函数体内使用 BGM/bgmLog/getApp，运行时安全
-import { getCellValue } from './cell.js'
+import { getCellValue, setCellValue } from './cell.js'
 
 import { BGM, bgmLog, getApp } from './index.js'
 // 同目录子模块：getCellValue
@@ -214,6 +214,91 @@ export function readRangeValues(
  * 既占内存又无必要，回退逐格读更稳。
  */
 const ROWS_CACHE_MAX_SPAN = 20_000
+
+/**
+ * 工作表单元格会话缓存（**写穿透**）。
+ *
+ * 面向「同一单元格在一次任务里被多次读、且读之间夹着写」的 COM 热点：
+ * 典型如富化链——`enrichIntroData` 写「特点」列后 `enrichOpEdPv` 会再读同一格。
+ * 只读缓存在这里会拿到**写前旧值**导致合并出错，因此写必须同步更新缓存。
+ */
+export interface SheetCellCache {
+  /**
+   * 读单元格：命中缓存直接返回（写后读拿到的是新值）；
+   * 未命中回落 `getCellValue` 并回填缓存。
+   */
+  read(row: number, col: number): string
+  /**
+   * 写单元格：**先写 COM**，成功后才更新缓存。
+   * 写抛错时不更新缓存——缓存保持与工作表一致（旧值仍是表里的真实值）。
+   */
+  write(row: number, col: number, value: string): void
+}
+
+/**
+ * 缓存的后备单元格 IO。
+ *
+ * 默认用真实 COM 封装；**可注入**是为了让调用方把自身依赖路径上的读写函数
+ * 传进来（典型：调用方从 barrel 导入、测试对 barrel 做 mock）——
+ * 本模块内部的 cell.js 导入是测试 mock 不到的，直接用会让测试里的读写
+ * 打到无宿主的真实封装上（写变 no-op）。
+ */
+export interface SheetCellIo {
+  read(ws: WpsWorksheet, row: number, col: number): string
+  write(ws: WpsWorksheet, row: number, col: number, value: string): void
+}
+
+const realCellIo: SheetCellIo = {
+  read: (ws, row, col) => getCellValue(ws, row, col),
+  write: (ws, row, col, value) => {
+    setCellValue(ws, row, col, value)
+  },
+}
+
+/**
+ * 建一个写穿透单元格缓存：先用 `readRowsCache` 做一次矩形读播种
+ * （O(行×列) 次跨进程往返 → 1 次），之后读命中缓存、写穿透更新。
+ *
+ * 适用条件与 `readRowsCache` 相同：任务期间这些行不发生插入/删除位移。
+ * 播种失败（跨度过大 / 宿主返回形状不符）时不播种——读写全部回落逐格路径，
+ * 行为与不建缓存一致（只是没有加速）。
+ *
+ * @param ws 工作表
+ * @param rows 预计会访问的行号（可离散；循环中动态新增的行不在此列也能用——
+ *   未播种的行首次读回落 `getCellValue` 并回填）
+ * @param maxCol 预计会访问的最大列号（超出列的访问同样回落逐格读）
+ * @param io 后备单元格 IO（默认真实 COM 封装；见 {@link SheetCellIo}）
+ */
+export function createSheetCellCache(
+  ws: WpsWorksheet,
+  rows: readonly number[],
+  maxCol: number,
+  io: SheetCellIo = realCellIo,
+): SheetCellCache {
+  const cells = new Map<string, string>()
+  const seeded = readRowsCache(ws, rows, maxCol)
+  if (seeded) {
+    for (const [row, line] of seeded) {
+      for (let col = 1; col <= maxCol; col += 1) {
+        cells.set(`${String(row)}:${String(col)}`, line[col - 1] ?? '')
+      }
+    }
+  }
+  return {
+    read(row: number, col: number): string {
+      const key = `${String(row)}:${String(col)}`
+      const hit = cells.get(key)
+      if (hit !== undefined) return hit
+      const value = io.read(ws, row, col)
+      cells.set(key, value)
+      return value
+    },
+    write(row: number, col: number, value: string): void {
+      io.write(ws, row, col, value)
+      cells.set(`${String(row)}:${String(col)}`, value)
+    },
+  }
+}
 
 /**
  * 为「一批离散行号」做一次矩形读，返回 行号 → 该行 1..maxCol 的文本。

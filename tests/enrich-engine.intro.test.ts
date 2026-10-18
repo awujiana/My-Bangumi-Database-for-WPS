@@ -149,6 +149,7 @@ vi.mock('../ts/sync/enrich-record.js', () => ({
 
 // ========== 导入被测真实实现 ==========
 
+import { createSheetCellCache } from '../ts/tools/util/sheet.js'
 import {
   isIntroSheet,
   enrichIntroData,
@@ -632,6 +633,71 @@ describe('enrichOpEdPv 逻辑', () => {
     expect(enriched).toHaveLength(1)
     expect(enriched[0]?.action).toBe('skip')
     expect(getCell(BANGUMI, BANGUMI_ROW, 10)).toBe('OP:OP1')
+  })
+})
+
+// ========== 目标表写穿透缓存：写后读语义（文档所述隐患的回归） ==========
+
+describe('enrichIntroData → enrichOpEdPv 写穿透缓存', () => {
+  /** 无「脚本」列：编剧 回退写「特点/印象」列（同一格被两条链路先后写） */
+  const fallbackColMap = new Map<string, number>([['特点/印象', 10]])
+
+  it('走缓存时：enrichIntroData 写特点列后，enrichOpEdPv 读到写后新值并正确合并', () => {
+    const cache = createSheetCellCache(bangumiSheet, [BANGUMI_ROW], 12, {
+      read: mockGetCellValue,
+      write: mockSetCellValue,
+    })
+
+    const introEnriched: EnrichedField[] = []
+    enrichIntroData(
+      bangumiSheet,
+      BANGUMI_ROW,
+      { 编剧: '奈须蘑菇' },
+      fallbackColMap,
+      introEnriched,
+      [],
+      2,
+      '葬送的芙莉莲',
+      cache,
+    )
+    expect(getCell(BANGUMI, BANGUMI_ROW, 10)).toBe('编剧:奈须蘑菇(编剧)')
+
+    const opEnriched: EnrichedField[] = []
+    enrichOpEdPv(bangumiSheet, BANGUMI_ROW, { OP: 'OP1: 歌曲A' }, fallbackColMap, opEnriched, cache)
+
+    // 关键断言：OP 必须追加在 intro 写入之后——只读缓存会拿到写前空值，
+    // 走 fill 分支把「编剧」整个覆盖掉（文档记录过的合并出错）
+    expect(getCell(BANGUMI, BANGUMI_ROW, 10)).toBe('编剧:奈须蘑菇(编剧) | OP:OP1: 歌曲A')
+    expect(opEnriched[0]?.action).toBe('append')
+    expect(opEnriched[0]?.oldValue).toBe('编剧:奈须蘑菇(编剧)')
+  })
+
+  it('不传缓存时行为不变（逐格读同样拿到写后值，两条链路等价）', () => {
+    const introEnriched: EnrichedField[] = []
+    enrichIntroData(
+      bangumiSheet,
+      BANGUMI_ROW,
+      { 编剧: '奈须蘑菇' },
+      fallbackColMap,
+      introEnriched,
+      [],
+      2,
+      '葬送的芙莉莲',
+    )
+    const opEnriched: EnrichedField[] = []
+    enrichOpEdPv(bangumiSheet, BANGUMI_ROW, { OP: 'OP1: 歌曲A' }, fallbackColMap, opEnriched)
+
+    expect(getCell(BANGUMI, BANGUMI_ROW, 10)).toBe('编剧:奈须蘑菇(编剧) | OP:OP1: 歌曲A')
+    expect(opEnriched[0]?.action).toBe('append')
+  })
+
+  it('缓存构建不因工作表桩抛错（readRowsCache 播种失败时静默回落逐格）', () => {
+    expect(() =>
+      createSheetCellCache(bangumiSheet, [BANGUMI_ROW], 12, {
+        read: mockGetCellValue,
+        write: mockSetCellValue,
+      }),
+    ).not.toThrow()
   })
 })
 

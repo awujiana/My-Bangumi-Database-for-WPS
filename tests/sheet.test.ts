@@ -85,6 +85,7 @@ vi.mock('../ts/tools/util/index.js', () => ({
 import {
   readRangeValues,
   readRowsCache,
+  createSheetCellCache,
   readRangeCellValues,
   cacheGet,
   clearSheetCache,
@@ -407,6 +408,93 @@ describe('readRowsCache', () => {
   it('ws 为空时返回 null（readRangeValues 返回空 ⇒ 行数不足）', () => {
     expect(readRowsCache(null, [1, 2], 2)).toBeNull()
     expect(readRowsCache(undefined, [1, 2], 2)).toBeNull()
+  })
+})
+
+/** 造一个「内存单元格 + 计数」的后备 IO（验证缓存是否真的拦下了读写） */
+function makeIo(seed: Record<string, string> = {}) {
+  const store = new Map(Object.entries(seed))
+  const stats = { reads: 0, writes: 0 }
+  return {
+    stats,
+    io: {
+      read: (_ws: unknown, row: number, col: number): string => {
+        stats.reads += 1
+        return store.get(`${String(row)}:${String(col)}`) ?? ''
+      },
+      write: (_ws: unknown, row: number, col: number, value: string): void => {
+        stats.writes += 1
+        store.set(`${String(row)}:${String(col)}`, value)
+      },
+    },
+    store,
+  }
+}
+
+describe('createSheetCellCache', () => {
+  it('写穿透：write 之后 read 拿到的是新值（而非写前旧值）', () => {
+    const { io, store } = makeIo({ '2:3': '旧标签' })
+    const cache = createSheetCellCache(createMockWorksheet(), [2], 3, io)
+
+    expect(cache.read(2, 3)).toBe('旧标签')
+    cache.write(2, 3, '旧标签 | 新标签')
+    // 关键断言：写后读必须拿到新值——只读缓存在这里会返回写前旧值导致合并出错
+    expect(cache.read(2, 3)).toBe('旧标签 | 新标签')
+    expect(store.get('2:3')).toBe('旧标签 | 新标签')
+  })
+
+  it('write 先走后备 IO（COM 写真实发生），成功后更新缓存', () => {
+    const { io, stats } = makeIo()
+    const cache = createSheetCellCache(createMockWorksheet(), [2], 3, io)
+
+    cache.write(5, 1, '值')
+    expect(stats.writes).toBe(1)
+    // 缓存已更新：后续读不再打后备 IO
+    const before = stats.reads
+    expect(cache.read(5, 1)).toBe('值')
+    expect(stats.reads).toBe(before)
+  })
+
+  it('后备 IO 读抛错时不回填缓存（异常直接透出，不缓存坏值）', () => {
+    const cache = createSheetCellCache(createMockWorksheet(), [2], 3, {
+      read: (): string => {
+        throw new Error('COM 炸了')
+      },
+      write: (): void => {},
+    })
+    expect(() => cache.read(2, 3)).toThrow('COM 炸了')
+  })
+
+  it('矩形读播种成功：读命中缓存，零次后备 IO；未播种的行列才回落', () => {
+    const ws = createGridWs([
+      ['a1', 'b1'],
+      ['a2', 'b2'],
+    ])
+    const { io, stats } = makeIo()
+    const cache = createSheetCellCache(ws, [1, 2], 2, io)
+
+    expect(cache.read(1, 1)).toBe('a1')
+    expect(cache.read(2, 2)).toBe('b2')
+    // 全部命中播种，没有一次逐格读
+    expect(stats.reads).toBe(0)
+    // 未播种的行 / 超出 maxCol 的列：回落后备 IO 并回填
+    expect(cache.read(9, 9)).toBe('')
+    expect(stats.reads).toBe(1)
+    // 第二次命中回填
+    expect(cache.read(9, 9)).toBe('')
+    expect(stats.reads).toBe(1)
+  })
+
+  it('播种失败（形状不符）时读写全部回落，行为与不建缓存一致', () => {
+    // 列宽不足 → readRowsCache 返回 null
+    const ws = createGridWs([['only-one-col']])
+    const { io, stats } = makeIo({ '1:1': 'fallback' })
+    const cache = createSheetCellCache(ws, [1], 2, io)
+
+    expect(cache.read(1, 1)).toBe('fallback')
+    expect(stats.reads).toBe(1)
+    cache.write(1, 1, 'x')
+    expect(stats.writes).toBe(1)
   })
 })
 

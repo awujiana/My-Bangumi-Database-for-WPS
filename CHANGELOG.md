@@ -20,6 +20,14 @@
 - **测试**：新增 `tests/diff-view.test.ts`（21 条：裁剪边界 / 渲染结构 / XSS 转义 / 分页追加 / 空区块）；`tests/clean-page.test.ts` +4（分组对比 / 变更行对 / 平铺空白行 / 分页）；`tests/sheet-cleaning.test.ts` 4 处 changes 断言补 `oldValue`；`clean-engine.test.ts` 16 处调用随异步化改 `await`。
 - **验证**：tsc 0 / eslint 0 / gate 八关 / 全量 vitest **136 文件 4511 用例全绿** / `audit:layout` 窄档 5 页面 × 2 档无异常 / 宽视口 Chrome 探针（grid 列数、预览跨列、零横向溢出 + 截图）。
 
+### 优化（富化目标表写穿透缓存：逐格读全部命中缓存，~9N 次 COM → 1 次矩形读）
+
+- **背景**：`enrichEntries` 对每条匹配在 Bangumi 目标表上做约 9 次逐格读（标签 / 开播日期 / 集数 / 平台 / 特点 / OP·ED·PV / 别名）。此前只给源表（新番表 / 简介表）建了 `readRowsCache` 只读缓存，目标表（`bangumiSheet`）**没有**缓存——而它恰是「读之间夹着写」的那张表：`enrichIntroData` 写「特点」列后 `enrichOpEdPv` 会再读同一格，只读缓存会拿到写前旧值导致 `appendFeatures` 合并出错（`文档/TECH_KNOWLEDGE_COM_DATA_SAFETY.md` §5.1 记录过的隐患）。
+- **新增 `createSheetCellCache`**（`ts/tools/util/sheet.ts`）：`readRowsCache` 一次矩形读播种 + **写穿透**——`write` 先写 COM、成功后才更新缓存；写抛错时不更新（缓存保持与工作表一致）。后备 IO 为可注入参数（默认真实 COM 封装）；`enrichEntries` 传入 barrel 级 `getCellValue`/`setCellValue`，与各 enrich 函数同一条依赖路径（测试对 barrel 的 mock 生效）。
+- **接线**（`ts/sync/enrich-engine.ts`）：循环外按 `matches` 的 `bangumiRow` 与 `bangumiColMap` 最大列建缓存，经 `readTargetCell`/`writeTargetCell` 两个小助手贯穿 `enrichTags`/`enrichDate`/`enrichEpisodes`/`enrichPlatform`/`enrichFeatures`/`enrichIntroData`/`enrichOpEdPv`/`enrichIntroFromContext`/`enrichAlias` 与空表追加路径。追加行（`nextAppendRow`）不在预读集合——首次读回落逐格读并回填，写后读仍正确。播种失败（跨度过大 / 形状不符）时不播种，读写全部回落逐格路径，行为与不建缓存一致。
+- **测试**：`tests/sheet.test.ts` +5（写穿透 / 先写 COM 后更新缓存 / 读抛错不回填 / 播种命中零回落 / 播种失败回落）；`tests/enrich-engine.intro.test.ts` +3（写后读合并正确——只读缓存会把「编剧」整格覆盖掉的回归 / 无缓存路径等价 / 工作表桩不抛错）。
+- **验证**：eslint 0 / gate 八关全绿 / 全量 vitest **136 文件 4519 用例全绿**。
+
 ### 优化（样式 · 横屏通栏区块操作区限宽）
 
 - **现象**：横屏（宽窗格）停靠时，通栏区块（`.section-wide`）内带 `flex: 1` 的操作横条被拉到整个主区宽——clean 页「扫描预览」按钮从 ~150px 变成 ~1200px 巨条，enrich 页数据预览的两个页签（各占一半）变成 750px 巨型 tab。
