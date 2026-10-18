@@ -8,7 +8,7 @@
  *   - exceltobangumi/api.ts：API 请求（bgmRequestSync、setBangumiToken、testTokenValidityForRibbon、openBangumiTokenPage、notifyUserInfoUpdated）
  *   - exceltobangumi/chapterMarker.ts：章节标记（fetchEpisodeIds、markEpisodesComplete）
  *   - exceltobangumi/progressReporter.ts：进度上报（SyncTask、applySyncSuccessResults、applySyncFailResults、handleStoppedRemainingTasks、finalizeSyncResults）
- *   - exceltobangumi/index.ts：常量、辅助函数、getFilterStatus、getSequentialRowsBySeqCol、buildJsonPayload、SyncToBangumiAsync、syncSelectedRows 等
+ *   - exceltobangumi/index.ts：常量、辅助函数、getFilterStatus、buildJsonPayload、SyncToBangumiAsync、syncSelectedRows 等
  *
  * @author BGM Development Team
  * @version 1.1.0 (优化版，保留原注释和日志)
@@ -24,7 +24,6 @@ import {
   getColumnMap,
   findHeaderRow,
   colNumberToLetter,
-  getCellValue,
   loadBgToken,
   BGM,
   _getUserApiPath,
@@ -185,57 +184,6 @@ export function getFilterStatus(
     return getFilterStatusCore(result, wsOrLastRow, lastRow, headerRow, shouldDeepCheck)
   } catch (error: unknown) {
     BGM.handleError(error, { context: 'getFilterStatus', showAlert: false })
-  }
-
-  return result
-}
-
-/**
- * 根据序列号列获取连续的有效行
- *
- * @function getSequentialRowsBySeqCol
- * @param {number} startRow - 起始行
- * @param {number} endRow - 结束行
- * @param {Map<string, number>} [colMap] - 列映射（可选）
- * @returns {{ validRows: number[]; seqMap: Map<string, number> }} 有效行和序列号映射
- *
- * @description
- * 扫描序列号列，找出有序列号的数据行。
- * 序列号格式应为数字，用于标记同步进度。
- */
-export function getSequentialRowsBySeqCol(
-  startRow: number,
-  endRow: number,
-  colMap?: Map<string, number>,
-): { validRows: number[]; seqMap: Map<string, number> } {
-  const result = {
-    validRows: [] as number[],
-    seqMap: new Map<string, number>(),
-  }
-
-  try {
-    const app = getApp()
-    if (!app?.ActiveWorkbook) return result
-
-    const ws = app.ActiveWorkbook.ActiveSheet
-
-    const seqCol = getSeqColIndex(colMap)
-    for (let r = startRow; r <= endRow; r += 1) {
-      try {
-        const value = getCellValue(ws, r, seqCol)
-        if (value !== '') {
-          const seqNumber = value.trim()
-          if (/^\d+$/.test(seqNumber)) {
-            result.validRows.push(r)
-            result.seqMap.set(seqNumber, r)
-          }
-        }
-      } catch (error: unknown) {
-        BGM.handleError(error, { context: 'getSequentialRowsBySeqCol', showAlert: false })
-      }
-    }
-  } catch (error: unknown) {
-    BGM.handleError(error, { context: 'getSequentialRowsBySeqCol', showAlert: false })
   }
 
   return result

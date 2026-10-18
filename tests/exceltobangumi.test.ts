@@ -4,7 +4,6 @@
  * 测试目标：
  *   - buildJsonPayload：根据字段访问器构造 API 请求体（状态/评分/标签/感言/私密）
  *   - getFilterStatus：检测工作表筛选状态（无筛选/AutoFilter/异常路径）
- *   - getSequentialRowsBySeqCol：根据序列号列收集有效行
  *   - SyncToBangumiAsync：批量同步主流程（成功/失败/跳过/章节标记/进度回调）
  *
  * 模块依赖说明：
@@ -78,7 +77,6 @@ vi.mock('../ts/sync/sync-record.js', () => ({
 import {
   buildJsonPayload,
   getFilterStatus,
-  getSequentialRowsBySeqCol,
   SyncToBangumiAsync,
 } from '../ts/sync/exceltobangumi/index.js'
 import { WATCH_STATUS_MAP } from '../ts/core/constants.js'
@@ -433,136 +431,6 @@ describe('getFilterStatus', () => {
     const result = getFilterStatus(100, 1, 1, false)
     expect(result.hasFilter).toBe(false)
     expect(result.visibleRows).toEqual([])
-  })
-})
-
-// ========== getSequentialRowsBySeqCol ==========
-describe('getSequentialRowsBySeqCol', () => {
-  it('无 window.Application 时返回空结果', () => {
-    const result = getSequentialRowsBySeqCol(2, 10)
-    expect(result.validRows).toEqual([])
-    expect(result.seqMap.size).toBe(0)
-  })
-
-  it('window.Application 无 ActiveWorkbook 时返回空结果', () => {
-    setMockApp({})
-    const result = getSequentialRowsBySeqCol(2, 10)
-    expect(result.validRows).toEqual([])
-    expect(result.seqMap.size).toBe(0)
-  })
-
-  it('无 ActiveSheet 时返回空结果', () => {
-    setMockApp({
-      ActiveWorkbook: {},
-    })
-    const result = getSequentialRowsBySeqCol(2, 10)
-    expect(result.validRows).toEqual([])
-    expect(result.seqMap.size).toBe(0)
-  })
-
-  it('应收集有效序列号行（数字字符串）', () => {
-    const mockWs = createMockWorksheet({
-      rangeValues: {
-        I2: '1',
-        I3: '2',
-        I4: '3',
-        // 空 → 跳过
-        I5: '',
-        // 非数字 → 跳过
-        I6: 'abc',
-      },
-    })
-    setMockApp({
-      ActiveWorkbook: { ActiveSheet: mockWs },
-    })
-    // 默认 seqCol=4(D)，指定 colMap 让函数读取 I 列(9)
-    const colMap = new Map<string, number>([['序列号', 9]])
-    const result = getSequentialRowsBySeqCol(2, 6, colMap)
-    expect(result.validRows).toEqual([2, 3, 4])
-    expect(result.seqMap.get('1')).toBe(2)
-    expect(result.seqMap.get('2')).toBe(3)
-    expect(result.seqMap.get('3')).toBe(4)
-  })
-
-  it('应跳过空值和非数字序列号', () => {
-    const mockWs = createMockWorksheet({
-      rangeValues: {
-        I2: '100',
-        // null → 跳过
-        I3: null,
-        // 非数字 → 跳过
-        I4: 'undefined',
-        I5: '200',
-      },
-    })
-    setMockApp({
-      ActiveWorkbook: { ActiveSheet: mockWs },
-    })
-    const colMap = new Map<string, number>([['序列号', 9]])
-    const result = getSequentialRowsBySeqCol(2, 5, colMap)
-    expect(result.validRows).toEqual([2, 5])
-    expect(result.seqMap.size).toBe(2)
-  })
-
-  it('应跳过带空白的序列号（trim 后非数字）', () => {
-    const mockWs = createMockWorksheet({
-      rangeValues: {
-        // trim 后为 "1" → 数字 → 接受
-        I2: '  1  ',
-        // 非纯数字 → 跳过
-        I3: '1a',
-        // 数字 → 接受
-        I4: '2',
-      },
-    })
-    setMockApp({
-      ActiveWorkbook: { ActiveSheet: mockWs },
-    })
-    const colMap = new Map<string, number>([['序列号', 9]])
-    const result = getSequentialRowsBySeqCol(2, 4, colMap)
-    expect(result.validRows).toEqual([2, 4])
-  })
-
-  it('所有行序列号都为空时返回空数组', () => {
-    const mockWs = createMockWorksheet({
-      rangeValues: {
-        I2: '',
-        I3: '',
-        I4: '',
-      },
-    })
-    setMockApp({
-      ActiveWorkbook: { ActiveSheet: mockWs },
-    })
-    const result = getSequentialRowsBySeqCol(2, 4)
-    expect(result.validRows).toEqual([])
-    expect(result.seqMap.size).toBe(0)
-  })
-
-  it('startRow > endRow 时返回空数组', () => {
-    const mockWs = createMockWorksheet({
-      rangeValues: { I2: '1' },
-    })
-    setMockApp({
-      ActiveWorkbook: { ActiveSheet: mockWs },
-    })
-    const result = getSequentialRowsBySeqCol(10, 5)
-    expect(result.validRows).toEqual([])
-  })
-
-  it('提供 colMap 时使用 colMap 中的"序列号"列索引', () => {
-    const mockWs = createMockWorksheet({
-      rangeValues: {
-        I2: '1',
-        I3: '2',
-      },
-    })
-    setMockApp({
-      ActiveWorkbook: { ActiveSheet: mockWs },
-    })
-    const colMap = new Map<string, number>([['序列号', 9]])
-    const result = getSequentialRowsBySeqCol(2, 3, colMap)
-    expect(result.validRows).toEqual([2, 3])
   })
 })
 

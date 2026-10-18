@@ -181,7 +181,6 @@ export {
   // 获取筛选状态
   getFilterStatus,
   // 根据 D 列序列号获取连续行
-  getSequentialRowsBySeqCol,
   // 异步同步到 Bangumi
   SyncToBangumiAsync,
   // 同步选中行

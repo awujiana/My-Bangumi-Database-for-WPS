@@ -165,7 +165,7 @@ vi.mock('../ts/sync/sync-config-summary.js', () => ({
   buildSyncConfig: () => ({}),
 }))
 
-import { getFilterStatus, getSequentialRowsBySeqCol, syncSelectedRows, SyncToBangumiAsync } from '../ts/sync/exceltobangumi/index.js'
+import { getFilterStatus, syncSelectedRows, SyncToBangumiAsync } from '../ts/sync/exceltobangumi/index.js'
 
 /** 构造一个区间桩；`rowNumbers` 为该区覆盖的行号 */
 function createArea(rowNumbers: number[], onRowsCountRead?: () => void): WpsRange {
@@ -599,43 +599,6 @@ describe('exceltobangumi 选区与筛选链路', () => {
         expect.any(Error),
         expect.objectContaining({ context: 'getFilterStatus' }),
       )
-    })
-  })
-
-  describe('getSequentialRowsBySeqCol 异常分支', () => {
-    it('无 Application 时返回空结果', () => {
-      mockGetApp.mockReturnValue(null)
-
-      expect(getSequentialRowsBySeqCol(2, 5).validRows).toEqual([])
-    })
-
-    it('单行读取抛错时记录错误并继续后续行', () => {
-      mockGetApp.mockReturnValue(createApp({ worksheet: createWorksheet() }))
-      mockGetCellValue.mockImplementation((_ws: unknown, row: number) => {
-        if (row === 3) throw new Error('读取失败')
-        return String(row)
-      })
-
-      const result = getSequentialRowsBySeqCol(2, 4)
-
-      expect(result.validRows).toEqual([2, 4])
-      expect(mockHandleError).toHaveBeenCalledWith(
-        expect.any(Error),
-        expect.objectContaining({ context: 'getSequentialRowsBySeqCol' }),
-      )
-    })
-
-    it('外层读取抛错时记录错误并返回已收集结果', () => {
-      mockGetApp.mockReturnValue({
-        get ActiveWorkbook(): never {
-          throw new Error('工作簿不可用')
-        },
-      })
-
-      const result = getSequentialRowsBySeqCol(2, 4)
-
-      expect(result.validRows).toEqual([])
-      expect(mockHandleError).toHaveBeenCalled()
     })
   })
 
