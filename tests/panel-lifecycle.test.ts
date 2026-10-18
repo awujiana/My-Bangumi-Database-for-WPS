@@ -1225,6 +1225,48 @@ describe('panel-lifecycle · refreshData', () => {
     expect(box.innerHTML).not.toContain('title=""')
   })
 
+  it('数据指纹未变 → 跳过预览重建（自动刷新频繁入口时不白重排整表）', () => {
+    const box = mountDiv('previewBox')
+    mountSelect('sheetSelect', '1')
+    mountButton('lockSheetBtn')
+    const sheet = makeSheet('动画', makeTrackedSheetCells())
+    mocks.getApp.mockReturnValue({ ActiveWorkbook: makeWorkbook('BGM.xlsx', [sheet]) })
+    mocks.getLastRow.mockReturnValue(3)
+    mocks.getFilterStatus.mockReturnValue({ hasFilter: false, visibleRows: [1, 2, 3] })
+
+    refreshData()
+    // 打一个探针节点：一旦重建整表，它就会随 innerHTML 一起被冲掉
+    const probe = document.createElement('span')
+    probe.id = 'render-probe'
+    box.appendChild(probe)
+
+    refreshData()
+
+    expect(box.querySelector('#render-probe')).not.toBeNull()
+  })
+
+  it('数据变了 → 必须重建（指纹相同但内容已不同，不能沿用旧表）', () => {
+    const box = mountDiv('previewBox')
+    mountSelect('sheetSelect', '1')
+    mountButton('lockSheetBtn')
+    const sheet = makeSheet('动画', makeTrackedSheetCells())
+    mocks.getApp.mockReturnValue({ ActiveWorkbook: makeWorkbook('BGM.xlsx', [sheet]) })
+    mocks.getLastRow.mockReturnValue(3)
+    mocks.getFilterStatus.mockReturnValue({ hasFilter: false, visibleRows: [1, 2, 3] })
+
+    refreshData()
+    const probe = document.createElement('span')
+    probe.id = 'render-probe'
+    box.appendChild(probe)
+
+    // 改一格数据 → html 指纹变化
+    if (sheet.__cells) sheet.__cells['2:2'] = '动画Z'
+    refreshData()
+
+    expect(box.querySelector('#render-probe')).toBeNull()
+    expect(box.innerHTML).toContain('动画Z')
+  })
+
   it('二维批量读取到数据时按起始列切片渲染', () => {
     const box = mountDiv('previewBox')
     mountSelect('sheetSelect', '1')

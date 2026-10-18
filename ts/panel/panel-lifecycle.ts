@@ -708,6 +708,14 @@ function renderPreviewStats(stats: PreviewStatsInput): void {
   ])
 }
 
+/**
+ * 上一次真正写进预览容器的 HTML（数据指纹）。
+ *
+ * 自动刷新（SheetChange / 面板重新获得焦点）会让 `refreshData` 频繁入口，而整表
+ * 重建 = DOMPurify 清洗一遍 + 整表重排。数据没变时这是纯浪费，故按指纹跳过。
+ */
+let lastPreviewHtml: string | null = null
+
 function renderPreviewTable(
   rows: PreviewRow[],
   sheetIndex: number,
@@ -964,14 +972,24 @@ export function refreshData(): void {
     }
 
     if (previewBox) {
-      // 渲染前统一经 sanitizeHtml 清洗，剥离可能的事件处理器/危险脚本
       // 空状态：这一支是唯一可达的「无预览行」路径（renderPreviewTable 恒有表头行，
       // 不需要在里面再兜一层空数组分支）
-      previewBox.innerHTML = sanitizeHtml(
+      const html =
         previewRows.length > 0
           ? renderPreviewTable(previewRows, sheetIndex, sheetName, meta.headerRow)
-          : `<div class="preview-empty">已选择工作表索引: ${String(sheetIndex)} (${escapeHtml(sheetName)})<br>未检测到数据<br><span class="preview-empty-hint">确认数据区非空，或取消筛选后重试</span></div>`,
-      )
+          : `<div class="preview-empty">已选择工作表索引: ${String(sheetIndex)} (${escapeHtml(sheetName)})<br>未检测到数据<br><span class="preview-empty-hint">确认数据区非空，或取消筛选后重试</span></div>`
+      // 指纹未变 **且** 容器里仍是我们上次渲染的结果 → 跳过重建。
+      // 第二个条件不能省：上一次渲染的是「请先选择工作表」这类提示时，
+      // 新 html 与指纹恰好相同也会被误判成「已经渲染过了」而跳过，提示就永远刷不掉。
+      const root = previewBox.firstElementChild
+      const alreadyRendered =
+        root?.classList.contains('preview-table') === true ||
+        root?.classList.contains('preview-empty') === true
+      if (!(alreadyRendered && html === lastPreviewHtml)) {
+        // 渲染前统一经 sanitizeHtml 清洗，剥离可能的事件处理器/危险脚本
+        previewBox.innerHTML = sanitizeHtml(html)
+        lastPreviewHtml = html
+      }
     }
     renderPreviewStats({
       headerRow: meta.headerRow,
