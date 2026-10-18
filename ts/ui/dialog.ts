@@ -6,6 +6,7 @@
 
 import { registerNotifyApi, registerSyncProgressApi } from '../core/ui-bridge.js'
 import type { SyncProgressStats } from '../core/types.js'
+import type { SyncProgressHandlers } from '../core/sync-progress-handlers.js'
 import type { GithubSyncDetailItem } from '../sync/github-sync-diff.js'
 import type { SyncConfigSummary } from '../sync/sync-config-summary.js'
 import { sanitizeHtml } from '../tools/sanitize.js'
@@ -430,7 +431,7 @@ export function renderConfigSummary(config: SyncConfigSummary): string {
  */
 export function showSyncProgressDialog(
   title: string,
-  handlers: { onPause: () => void; onResume: () => void; onStop: () => void },
+  handlers: SyncProgressHandlers,
   config?: SyncConfigSummary,
 ): void {
   _syncProgress?.hide()

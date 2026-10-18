@@ -15,6 +15,7 @@
  */
 
 import { BGM_COLOR, LOG_LEVELS } from '../../core/constants.js'
+import { createSyncControlHandlers } from '../../core/sync-progress-handlers.js'
 import {
   bgmLog,
   getApp,
@@ -960,17 +961,7 @@ async function executeSelectedSync(
     // P1：显示同步进度弹窗（新 API：handlers 对象，暂停状态由 dialog 内部管理）
     getSyncProgressApi().show(
       '正在同步 - 选中行同步',
-      {
-        onPause: () => {
-          BGM.sync.pause()
-        },
-        onResume: () => {
-          BGM.sync.resume()
-        },
-        onStop: () => {
-          BGM.sync.requestStop()
-        },
-      },
+      createSyncControlHandlers(BGM.sync),
       selectedRowsConfig,
     )
     // 设置同步状态机位置（用于暂停时定位到单元格）

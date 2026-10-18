@@ -49,6 +49,7 @@ import type {
   UpdateRecordParameters,
 } from '../../index.js'
 import { getSyncPreview, detectConflicts } from '../../services/ribbon-service.js'
+import { createSyncControlHandlers } from '../../core/sync-progress-handlers.js'
 import { ensureSheetHeaders, readRangeCellValues } from '../../tools/util/index.js'
 import { colNumberToLetter } from '../../tools/string-utilities.js'
 import type { WpsApp, WpsCellValue, WpsWorksheet } from '../../tools/wps.js'
@@ -591,17 +592,7 @@ async function confirmAndExecuteSync(prepared: SyncPreparedData): Promise<boolea
     })
     showSyncProgressDialog(
       '正在同步 - 同步到 Bangumi',
-      {
-        onPause: () => {
-          BGM.sync.pause()
-        },
-        onResume: () => {
-          BGM.sync.resume()
-        },
-        onStop: () => {
-          BGM.sync.requestStop()
-        },
-      },
+      createSyncControlHandlers(BGM.sync),
       syncFromPanelConfig,
     )
     bgmLog(LOG_LEVELS.INFO, '[syncFromPanel] 调用 SyncToBangumiAsync...')
@@ -916,21 +907,7 @@ async function _doAPISync(
         { label: '待处理行', value: String(rowsToProcess.length) },
       ],
     })
-    showSyncProgressDialog(
-      '正在收藏下载',
-      {
-        onPause: () => {
-          BGM.sync.pause()
-        },
-        onResume: () => {
-          BGM.sync.resume()
-        },
-        onStop: () => {
-          BGM.sync.requestStop()
-        },
-      },
-      collectionConfig,
-    )
+    showSyncProgressDialog('正在收藏下载', createSyncControlHandlers(BGM.sync), collectionConfig)
 
     // 两阶段进度合并：累计 total，避免阶段切换时进度条从 100% 回退到 0%
     const totalCollect = userCollections.length

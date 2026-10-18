@@ -44,6 +44,10 @@ import type {
 // 「顶层读取 + 环」的组合 —— 初始化期可能拿到 undefined。故直接从定义处导入。
 import { BGM_COLOR, LOG_LEVELS, WATCH_STATUS_MAP } from '../core/constants.js'
 import { registerSyncRunner } from '../core/ui-bridge.js'
+import {
+  createNoopSyncHandlers,
+  createSyncControlHandlers,
+} from '../core/sync-progress-handlers.js'
 import { getAllSyncRecords } from '../sync/sync-record.js'
 import { sanitizeHtml } from '../tools/sanitize.js'
 import { loadBgToken } from '../tools/utility.js'
@@ -413,17 +417,7 @@ export async function previewSyncContent(): Promise<void> {
   })
   showSyncProgressDialog(
     '正在同步 - 预览同步',
-    {
-      onPause: () => {
-        BGM.sync.pause()
-      },
-      onResume: () => {
-        BGM.sync.resume()
-      },
-      onStop: () => {
-        BGM.sync.requestStop()
-      },
-    },
+    createSyncControlHandlers(BGM.sync),
     previewConfig,
   )
 
@@ -938,17 +932,7 @@ export async function syncAllRows(): Promise<{ success: number; fail: number; sk
   const token = loadBgToken()
   if (!token) {
     // 无 token 流程：显示进度弹窗提示用户，不退出页面
-    showSyncProgressDialog('Bangumi Token 未设置', {
-      onPause: () => {
-        /* empty */
-      },
-      onResume: () => {
-        /* empty */
-      },
-      onStop: () => {
-        /* empty */
-      },
-    })
+    showSyncProgressDialog('Bangumi Token 未设置', createNoopSyncHandlers())
     completeSyncProgressDialog(
       '⚠️ 无法同步：缺少 Bangumi Token',
       [
@@ -1032,17 +1016,7 @@ export async function syncAllRows(): Promise<{ success: number; fail: number; sk
     // 显示同步进度弹窗（提供暂停/恢复/停止按钮）
     showSyncProgressDialog(
       '正在上传同步',
-      {
-        onPause: () => {
-          BGM.sync.pause()
-        },
-        onResume: () => {
-          BGM.sync.resume()
-        },
-        onStop: () => {
-          BGM.sync.requestStop()
-        },
-      },
+      createSyncControlHandlers(BGM.sync),
       uploadConfig,
     )
 

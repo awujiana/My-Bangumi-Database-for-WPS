@@ -30,6 +30,7 @@ import { logger } from '../tools/logger.js'
 
 import type { SyncConfigSummary } from '../sync/sync-config-summary.js'
 import type { SyncProgressStats } from './types.js'
+import type { SyncProgressHandlers } from './sync-progress-handlers.js'
 import type { GithubSyncDetailItem } from '../sync/github-sync-diff.js'
 
 /**
@@ -63,7 +64,7 @@ export interface SyncProgressApi {
   /** 打开进度弹窗并接管暂停/继续/停止回调 */
   show(
     title: string,
-    handlers: { onPause: () => void; onResume: () => void; onStop: () => void },
+    handlers: SyncProgressHandlers,
     config?: SyncConfigSummary,
   ): void
   /** 更新进度 */
